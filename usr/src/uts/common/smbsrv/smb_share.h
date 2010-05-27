@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMB_SHARE_H
@@ -30,18 +31,20 @@
 #include <smbsrv/smb_inet.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/wintypes.h>
-#include <smbsrv/lmerr.h>
-#include <smbsrv/smb_door.h>
+#include <smb/lmerr.h>
 
 #ifndef _KERNEL
 #include <libshare.h>
-#else
-#include <sys/door.h>
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define	SMB_CVOL		"/var/smb/cvol"
+#define	SMB_SYSROOT		SMB_CVOL "/windows"
+#define	SMB_SYSTEM32		SMB_SYSROOT "/system32"
+#define	SMB_VSS			SMB_SYSTEM32 "/vss"
 
 /*
  * Share Properties:
@@ -82,14 +85,10 @@ extern "C" {
 #define	SHOPT_RW		"rw"
 #define	SHOPT_NONE		"none"
 #define	SHOPT_DFSROOT		"dfsroot"
+#define	SHOPT_DESCRIPTION	"description"
 
 #define	SMB_DEFAULT_SHARE_GROUP	"smb"
 #define	SMB_PROTOCOL_NAME	"smb"
-
-#define	SMB_SHR_MAP		0
-#define	SMB_SHR_UNMAP		1
-#define	SMB_SHR_DISP_CONT_STR	"continue"
-#define	SMB_SHR_DISP_TERM_STR	"terminate"
 
 /*
  * RAP protocol share related commands only understand
@@ -139,12 +138,7 @@ extern "C" {
  * SMB_SHRF_TRANS	Transient share
  * SMB_SHRF_PERM	Permanent share
  * SMB_SHRF_AUTOHOME	Autohome share.
- * SMB_SHRF_LONGNAME	Share name in OEM is longer than 13 chars
  * SMB_SHRF_ADMIN	Admin share
- * SMB_SHRF_MAP		Map command is specified
- * SMB_SHRF_UNMAP	Unmap command is specified
- * SMB_SHRF_DISP_TERM	Disposition is set to terminate
- * SMB_SHRF_EXEC_MASK	All of the exec bits
  *
  * All autohome shares are transient but not all transient shares are autohome.
  * IPC$ and drive letter shares (e.g. d$, e$, etc) are transient but
@@ -174,16 +168,10 @@ extern "C" {
 /*
  * Runtime flags
  */
-#define	SMB_SHRF_MAP		0x00010000
-#define	SMB_SHRF_UNMAP		0x00020000
-#define	SMB_SHRF_DISP_TERM	0x00040000
-#define	SMB_SHRF_EXEC_MASK	0x00070000
-
 #define	SMB_SHRF_ADMIN		0x01000000
 #define	SMB_SHRF_TRANS		0x10000000
 #define	SMB_SHRF_PERM		0x20000000
 #define	SMB_SHRF_AUTOHOME	0x40000000
-#define	SMB_SHRF_LONGNAME	0x80000000
 
 /*
  * refcnt is currently only used for autohome.  autohome needs a refcnt
@@ -196,7 +184,6 @@ typedef struct smb_share {
 	char		shr_path[MAXPATHLEN];
 	char		shr_cmnt[SMB_SHARE_CMNT_MAX];
 	char		shr_container[MAXPATHLEN];
-	char		shr_oemname[SMB_SHARE_OEMNAME_MAX];
 	uint32_t	shr_flags;
 	uint32_t	shr_type;
 	uint32_t	shr_refcnt;
@@ -220,37 +207,16 @@ typedef struct smb_shrlist {
 	smb_share_t	sl_shares[LMSHARES_PER_REQUEST];
 } smb_shrlist_t;
 
-/*
- * This structure is a helper for building NetShareEnum response
- * in user space and send it back down to kernel.
- *
- * es_posix_uid	UID of the user requesting the shares list which
- * 		is used to detect if the user has any autohome
- * es_bufsize	size of the response buffer
- * es_buf	pointer to the response buffer
- * es_ntotal	total number of shares exported by server which
- * 		their OEM names is less then 13 chars
- * es_nsent	number of shares that can fit in the specified buffer
- * es_datasize	actual data size (share's data) which was encoded
- * 		in the response buffer
- */
-typedef struct smb_enumshare_info {
-	uid_t		es_posix_uid;
-	uint16_t	es_bufsize;
-	char		*es_buf;
-	uint16_t	es_ntotal;
-	uint16_t	es_nsent;
-	uint16_t	es_datasize;
-} smb_enumshare_info_t;
-
-typedef struct smb_execsub_info {
+typedef struct smb_shr_execinfo {
+	char		*e_sharename;
 	char		*e_winname;
 	char		*e_userdom;
 	smb_inaddr_t	e_srv_ipaddr;
 	smb_inaddr_t	e_cli_ipaddr;
 	char		*e_cli_netbiosname;
 	uid_t		e_uid;
-} smb_execsub_info_t;
+	int		e_type;
+} smb_shr_execinfo_t;
 
 /*
  * LanMan share API (for both SMB kernel module and GUI/CLI sub-system)
@@ -278,8 +244,8 @@ uint32_t smb_shr_rename(char *, char *);
 uint32_t smb_shr_get(char *, smb_share_t *);
 uint32_t smb_shr_modify(smb_share_t *);
 uint32_t smb_shr_get_realpath(const char *, char *, int);
-void smb_shr_hostaccess(smb_share_t *, smb_inaddr_t *);
-int smb_shr_exec(char *, smb_execsub_info_t *, int);
+uint32_t smb_shr_hostaccess(smb_inaddr_t *, char *, char *, char *, uint32_t);
+int smb_shr_exec(smb_shr_execinfo_t *);
 
 boolean_t smb_shr_exists(char *);
 int smb_shr_is_special(char *);
@@ -303,52 +269,7 @@ uint32_t smb_share_rename(char *, char *);
 uint32_t smb_share_create(smb_share_t *);
 uint32_t smb_share_modify(smb_share_t *);
 
-#else
-
-door_handle_t smb_kshare_init(int);
-void smb_kshare_fini(door_handle_t);
-uint32_t smb_kshare_getinfo(door_handle_t, char *, smb_share_t *,
-    smb_inaddr_t *);
-int smb_kshare_upcall(door_handle_t, void *, boolean_t);
-uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
-uint32_t smb_kshare_exec(door_handle_t, char *, smb_execsub_info_t *, int);
-
 #endif
-
-#define	SMB_SHARE_DNAME		"/var/run/smb_share_door"
-#define	SMB_SHARE_DSIZE		(65 * 1024)
-
-/*
- * Door interface
- *
- * Define door operations
- */
-#define	SMB_SHROP_NUM_SHARES		1
-#define	SMB_SHROP_DELETE		2
-#define	SMB_SHROP_RENAME		3
-#define	SMB_SHROP_GETINFO		4
-#define	SMB_SHROP_ADD			5
-#define	SMB_SHROP_MODIFY		6
-#define	SMB_SHROP_LIST			7
-#define	SMB_SHROP_ENUM			8
-#define	SMB_SHROP_EXEC			9
-
-/*
- * Door server status
- *
- * SMB_SHARE_DERROR is returned by the door server if there is problem
- * with marshalling/unmarshalling. Otherwise, SMB_SHARE_DSUCCESS is
- * returned.
- *
- */
-#define	SMB_SHARE_DSUCCESS		0
-#define	SMB_SHARE_DERROR		-1
-
-void smb_dr_get_share(smb_dr_ctx_t *, smb_share_t *);
-void smb_dr_put_share(smb_dr_ctx_t *, smb_share_t *);
-
-void smb_share_door_clnt_init(void);
-void smb_share_door_clnt_fini(void);
 
 #ifdef __cplusplus
 }

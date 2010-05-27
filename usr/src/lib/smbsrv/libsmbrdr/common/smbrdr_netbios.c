@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -103,10 +102,8 @@ void
 nb_close(int fd)
 {
 	(void) mutex_lock(&nb_mutex);
-	if (fd > 0) {
+	if (fd > 0)
 		(void) close(fd);
-		(void) printf("[%d] socket (%d) closed\n", pthread_self(), fd);
-	}
 	(void) mutex_unlock(&nb_mutex);
 }
 

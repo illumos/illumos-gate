@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -34,11 +34,12 @@
 
 #include <stdio.h>
 #include <strings.h>
-#include <smbsrv/ntstatus.h>
+
+#include <smbsrv/libsmb.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/ntifs.h>
 #include <smbsrv/winsvc.h>
-#include <smbsrv/nterror.h>
 #include <smbsrv/ndl/svcctl.ndl>
 #include <smbsrv/libmlsvc.h>
 

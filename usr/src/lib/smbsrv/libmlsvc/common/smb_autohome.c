@@ -516,6 +516,24 @@ smb_autohome_parse_options(smb_share_t *si)
 			continue;
 		}
 
+		if (strncasecmp(value, "rw=", 3) == 0) {
+			(void) strlcpy(si->shr_access_rw, (value + 3),
+			    sizeof (si->shr_access_rw));
+			continue;
+		}
+
+		if (strncasecmp(value, "ro=", 3) == 0) {
+			(void) strlcpy(si->shr_access_ro, (value + 3),
+			    sizeof (si->shr_access_ro));
+			continue;
+		}
+
+		if (strncasecmp(value, "none=", 5) == 0) {
+			(void) strlcpy(si->shr_access_none, (value + 5),
+			    sizeof (si->shr_access_none));
+			continue;
+		}
+
 		if (separator)
 			(void) strlcat(bp, ",", MAXPATHLEN);
 		(void) strlcat(bp, value, MAXPATHLEN);

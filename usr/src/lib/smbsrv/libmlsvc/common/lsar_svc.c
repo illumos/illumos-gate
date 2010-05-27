@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,8 +37,6 @@
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/lsarpc.ndl>
 #include <lsalib.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/nterror.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/ntlocale.h>
@@ -220,7 +218,7 @@ lsarpc_s_QuerySecurityObject(void *arg, ndr_xa_t *mxa)
  * multiple enumeration calls to obtain the complete list of SIDs.
  * It should be set to 0 on the first call and passed unchanged on
  * subsequent calls until there are no more accounts - the server will
- * return NT_SC_WARNING(NT_STATUS_NO_MORE_DATA).
+ * return STATUS_NO_MORE_ENTRIES.
  *
  * For now just set the status to access-denied. Note that we still have
  * to provide a valid address for enum_buf because it's a reference and
@@ -257,7 +255,7 @@ lsarpc_s_EnumAccounts(void *arg, ndr_xa_t *mxa)
  * support multiple enumeration calls to obtain the complete list.
  * It should be set to 0 on the first call and passed unchanged on
  * subsequent calls until there are no more accounts - the server will
- * return NT_SC_WARNING(NT_STATUS_NO_MORE_DATA).
+ * return STATUS_NO_MORE_ENTRIES.
  *
  * For now just set the status to access-denied. Note that we still have
  * to provide a valid address for enum_buf because it's a reference and
@@ -292,7 +290,7 @@ lsarpc_s_EnumTrustedDomain(void *arg, ndr_xa_t *mxa)
  * support multiple enumeration calls to obtain the complete list.
  * It should be set to 0 on the first call and passed unchanged on
  * subsequent calls until there are no more accounts - the server will
- * return NT_SC_WARNING(NT_STATUS_NO_MORE_DATA).
+ * return STATUS_NO_MORE_ENTRIES.
  *
  * For now just set the status to access-denied. Note that we still have
  * to provide a valid address for enum_buf because it's a reference and

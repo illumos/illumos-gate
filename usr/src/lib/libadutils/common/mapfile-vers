@@ -59,6 +59,7 @@ SUNWprivate {
 	adutils_add_ds;
 	adutils_add_domain;
 	adutils_set_logger;
+	adutils_set_debug;
 	ad_disc_fini;
 	ad_disc_init;
 	ad_disc_get_DomainName;

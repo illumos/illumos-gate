@@ -18,24 +18,22 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <pthread.h>
 #include <string.h>
 #include <strings.h>
-#include <syslog.h>
 #include <synch.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/libsmbrdr.h>
-#include <smbsrv/ntstatus.h>
 #include <smbsrv/smb.h>
 #include <smbrdr.h>
 
@@ -58,7 +56,7 @@ smbrdr_logon(char *domain_controller, char *domain, char *username)
 	int rc;
 
 	if (username == NULL || *username == 0) {
-		syslog(LOG_DEBUG, "smbrdr: no username");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_logon: no username");
 		return (-1);
 	}
 
@@ -66,13 +64,15 @@ smbrdr_logon(char *domain_controller, char *domain, char *username)
 	if (smb_strcasecmp(username, SMBRDR_ANON_USER, 0) != 0) {
 		smb_ipc_get_passwd(pwd_hash, SMBAUTH_HASH_SZ);
 		if (*pwd_hash == 0) {
-			syslog(LOG_DEBUG, "smbrdr: no password");
+			smb_log(smbrdr_log_hdl, LOG_DEBUG,
+			    "smbrdr_logon: no password");
 			return (-1);
 		}
 	}
 
 	if (smbrdr_negotiate(domain_controller, domain) != 0) {
-		syslog(LOG_DEBUG, "smbrdr: negotiate failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_logon: negotiate failed");
 		return (-1);
 	}
 
@@ -138,7 +138,8 @@ smbrdr_authenticate(char *server, char *username, uint8_t *pwd)
 
 	session = smbrdr_session_lock(server, SDB_SLCK_WRITE);
 	if (session == NULL) {
-		syslog(LOG_DEBUG, "smbrdr_authenticate: %s: no session with %s",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_authenticate: %s: no session with %s",
 		    username, server);
 		return (-1);
 	}
@@ -160,7 +161,8 @@ smbrdr_authenticate(char *server, char *username, uint8_t *pwd)
 	logon = smbrdr_logon_init(session, username, pwd);
 
 	if (logon == NULL) {
-		syslog(LOG_DEBUG, "smbrdr_authenticate: %s: %m", username);
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_authenticate: %s: %s", username, strerror(errno));
 		smbrdr_session_unlock(session);
 		return (-1);
 	}
@@ -210,6 +212,7 @@ smbrdr_session_setupx(struct sdb_logon *logon)
 	size_t (*strlen_fn)(const char *s);
 	DWORD status;
 	int rc;
+	int64_t lmlevel;
 
 	/*
 	 * Paranoia check - we should never get this
@@ -228,7 +231,7 @@ smbrdr_session_setupx(struct sdb_logon *logon)
 	}
 
 	if (smbrdr_sign_init(session, logon) < 0) {
-		syslog(LOG_DEBUG,
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
 		    "smbrdr_session_setupx: smbrdr_sign_init failed");
 		return (-1);
 	}
@@ -238,7 +241,7 @@ smbrdr_session_setupx(struct sdb_logon *logon)
 
 	if (status != NT_STATUS_SUCCESS) {
 		smbrdr_sign_fini(session);
-		syslog(LOG_DEBUG, "smbrdr_session_setupx: %s",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_session_setupx: %s",
 		    xlate_nt_status(status));
 		return (-1);
 	}
@@ -309,16 +312,31 @@ smbrdr_session_setupx(struct sdb_logon *logon)
 	}
 
 	if (rc <= 0) {
-		syslog(LOG_DEBUG, "smbrdr_session_setupx: encode failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_session_setupx: encode failed");
 		smbrdr_handle_free(&srh);
 		smbrdr_sign_fini(session);
 		return (-1);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
+
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_session_setupx: %s",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_session_setupx: %s",
 		    xlate_nt_status(status));
+
+		if (status == NT_STATUS_INVALID_PARAMETER) {
+			rc = smb_config_getnum(SMB_CI_LM_LEVEL, &lmlevel);
+			if (rc != SMBD_SMF_OK || lmlevel > 2)
+				smb_log(smbrdr_log_hdl, LOG_DEBUG,
+				    "If the DC is running Windows Server 2008: "
+				    "apply hotfix KB 957441");
+				smb_log(smbrdr_log_hdl, LOG_DEBUG,
+				    "If the DC is running Windows Server 2008 "
+				    "R2: do not apply the hotfix but update "
+				    "the registry as described in KB 957441");
+		}
+
 		smbrdr_handle_free(&srh);
 		smbrdr_sign_fini(session);
 		return (-1);
@@ -355,7 +373,8 @@ smbrdr_session_setupx(struct sdb_logon *logon)
 	}
 
 	if (rc <= 0) {
-		syslog(LOG_DEBUG, "smbrdr_session_setupx: decode failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_session_setupx: decode failed");
 		smbrdr_handle_free(&srh);
 		smbrdr_sign_fini(session);
 		return (-1);
@@ -421,8 +440,8 @@ smbrdr_logoffx(struct sdb_logon *logon)
 
 	if (status != NT_STATUS_SUCCESS) {
 		logon->state = SDB_LSTATE_SETUP;
-		syslog(LOG_DEBUG, "smbrdr_logoffx: %s: %s", logon->username,
-		    xlate_nt_status(status));
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_logoffx: %s: %s",
+		    logon->username, xlate_nt_status(status));
 		return (-1);
 	}
 
@@ -430,15 +449,15 @@ smbrdr_logoffx(struct sdb_logon *logon)
 	if (rc < 0) {
 		logon->state = SDB_LSTATE_SETUP;
 		smbrdr_handle_free(&srh);
-		syslog(LOG_DEBUG, "smbrdr_logoffx: %s: encode failed",
-		    logon->username);
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_logoffx: %s: encode failed", logon->username);
 		return (rc);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_logoffx: %s: %s", logon->username,
-		    xlate_nt_status(status));
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_logoffx: %s: %s",
+		    logon->username, xlate_nt_status(status));
 		rc = -1;
 	} else {
 		rc = 0;

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -192,6 +191,18 @@ void *
 smb_srm_rezalloc(smb_request_t *sr, void *p, size_t size)
 {
 	return (smb_realloc(sr, p, size, B_TRUE));
+}
+
+char *
+smb_srm_strdup(smb_request_t *sr, const char *s)
+{
+	char	*p;
+	size_t	size;
+
+	size = strlen(s) + 1;
+	p = smb_srm_alloc(sr, size);
+	bcopy(s, p, size);
+	return (p);
 }
 
 /*

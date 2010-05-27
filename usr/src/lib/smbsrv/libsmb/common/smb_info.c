@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -102,6 +101,7 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	(void) smb_config_getstr(SMB_CI_SYS_CMNT, kcfg->skc_system_comment,
 	    sizeof (kcfg->skc_system_comment));
 	smb_config_get_version(&kcfg->skc_version);
+	kcfg->skc_execflags = smb_config_get_execinfo(NULL, NULL, 0);
 }
 
 /*

@@ -557,7 +557,7 @@ smb_node_delete_on_close(smb_node_t *node)
 		else
 			rc = smb_fsop_remove(0, node->delete_on_close_cred,
 			    d_snode, node->od_name, flags);
-		smb_cred_rele(node->delete_on_close_cred);
+		crfree(node->delete_on_close_cred);
 	}
 	if (rc != 0)
 		cmn_err(CE_WARN, "File %s could not be removed, rc=%d\n",

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -58,11 +57,98 @@ extern "C" {
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_vops.h>
+#include <smbsrv/smb_kstat.h>
 
 struct smb_disp_entry;
 struct smb_request;
 struct smb_server;
 struct smb_event;
+
+/*
+ * Accumulated time and queue length statistics.
+ *
+ * Accumulated time statistics are kept as a running sum of "active" time.
+ * Queue length statistics are kept as a running sum of the product of queue
+ * length and elapsed time at that length -- i.e., a Riemann sum for queue
+ * length integrated against time.  (You can also think of the active time as a
+ * Riemann sum, for the boolean function (queue_length > 0) integrated against
+ * time, or you can think of it as the Lebesgue measure of the set on which
+ * queue_length > 0.)
+ *
+ *		^
+ *		|			_________
+ *		8			| i4	|
+ *		|			|	|
+ *	Queue	6			|	|
+ *	Length	|	_________	|	|
+ *		4	| i2	|_______|	|
+ *		|	|	    i3		|
+ *		2_______|			|
+ *		|    i1				|
+ *		|_______________________________|
+ *		Time->	t1	t2	t3	t4
+ *
+ * At each change of state (entry or exit from the queue), we add the elapsed
+ * time (since the previous state change) to the active time if the queue length
+ * was non-zero during that interval; and we add the product of the elapsed time
+ * times the queue length to the running length*time sum.
+ *
+ * This method is generalizable to measuring residency in any defined system:
+ * instead of queue lengths, think of "outstanding RPC calls to server X".
+ *
+ * A large number of I/O subsystems have at least two basic "lists" of
+ * transactions they manage: one for transactions that have been accepted for
+ * processing but for which processing has yet to begin, and one for
+ * transactions which are actively being processed (but not done). For this
+ * reason, two cumulative time statistics are defined here: wait (pre-service)
+ * time, and run (service) time.
+ *
+ * All times are 64-bit nanoseconds (hrtime_t), as returned by gethrtime().
+ *
+ * The units of cumulative busy time are accumulated nanoseconds. The units of
+ * cumulative length*time products are elapsed time times queue length.
+ *
+ * Updates to the fields below are performed implicitly by calls to
+ * these functions:
+ *
+ *	smb_srqueue_init()
+ *	smb_srqueue_destroy()
+ *	smb_srqueue_waitq_enter()
+ *	smb_srqueue_runq_exit()
+ *	smb_srqueue_waitq_to_runq()
+ *	smb_srqueue_update()
+ *
+ * These fields should never be updated by any other means.
+ */
+typedef struct smb_srqueue {
+	kmutex_t	srq_mutex;
+	hrtime_t	srq_wlastupdate;
+	hrtime_t	srq_wtime;
+	hrtime_t	srq_wlentime;
+	hrtime_t	srq_rlastupdate;
+	hrtime_t	srq_rtime;
+	hrtime_t	srq_rlentime;
+	uint32_t	srq_wcnt;
+	uint32_t	srq_rcnt;
+} smb_srqueue_t;
+
+/*
+ * The fields with the prefix 'ly_a' contain the statistics collected since the
+ * server was last started ('a' for 'aggregated'). The fields with the prefix
+ * 'ly_d' contain the statistics collected since the last snapshot ('d' for
+ * 'delta').
+ */
+typedef struct smb_latency {
+	kmutex_t	ly_mutex;
+	uint64_t	ly_a_nreq;
+	hrtime_t	ly_a_sum;
+	hrtime_t	ly_a_mean;
+	hrtime_t	ly_a_stddev;
+	uint64_t	ly_d_nreq;
+	hrtime_t	ly_d_sum;
+	hrtime_t	ly_d_mean;
+	hrtime_t	ly_d_stddev;
+} smb_latency_t;
 
 int smb_noop(void *, size_t, int);
 
@@ -310,6 +396,62 @@ typedef struct smb_slist {
 	boolean_t	sl_waiting;
 } smb_slist_t;
 
+/*
+ * smb_avl_t State Machine
+ * --------------------
+ *
+ *                      +-----------------------------+
+ *                      |     SMB_AVL_STATE_START     |
+ *                      +-----------------------------+
+ *                                    | T0
+ *                                    v
+ *                      +-----------------------------+
+ *                      |     SMB_AVL_STATE_READY     |
+ *                      +-----------------------------+
+ *                                    | T1
+ *                                    v
+ *                      +-----------------------------+
+ *                      |  SMB_AVL_STATE_DESTROYING   |
+ *                      +-----------------------------+
+ *
+ * Transition T0
+ *
+ *    This transition is executed in smb_avl_create().
+ *
+ * Transition T1
+ *
+ *    This transition is executed in smb_avl_destroy().
+ *
+ */
+typedef enum {
+	SMB_AVL_STATE_START = 0,
+	SMB_AVL_STATE_READY,
+	SMB_AVL_STATE_DESTROYING
+} smb_avl_state_t;
+
+typedef struct smb_avl_nops {
+	int		(*avln_cmp) (const void *, const void *);
+	void		(*avln_hold)(const void *);
+	boolean_t	(*avln_rele)(const void *);
+	void		(*avln_destroy)(void *);
+} smb_avl_nops_t;
+
+typedef struct smb_avl_cursor {
+	void		*avlc_next;
+	uint32_t	avlc_sequence;
+} smb_avl_cursor_t;
+
+typedef struct smb_avl {
+	krwlock_t	avl_lock;
+	avl_tree_t	avl_tree;
+	kmutex_t	avl_mutex;
+	kcondvar_t	avl_cv;
+	smb_avl_state_t	avl_state;
+	uint32_t	avl_refcnt;
+	uint32_t	avl_sequence;
+	smb_avl_nops_t	*avl_nops;
+} smb_avl_t;
+
 typedef struct smb_session_list {
 	krwlock_t	se_lock;
 	uint64_t	se_wrop;
@@ -436,11 +578,6 @@ typedef struct smb_vfs {
 	vnode_t			*sv_rootvp;
 } smb_vfs_t;
 
-typedef struct smb_unexport {
-	list_node_t	ux_lnd;
-	char		ux_sharename[MAXNAMELEN];
-} smb_unexport_t;
-
 /*
  * Solaris file systems handle timestamps differently from NTFS.
  * In order to provide a more similar view of an open file's
@@ -522,6 +659,68 @@ typedef struct smb_node {
 
 #define	SMB_NODE_VFS(node)	((node)->vp->v_vfsp)
 #define	SMB_NODE_FSID(node)	((node)->vp->v_vfsp->vfs_fsid)
+
+/* Maximum buffer size for encryption key */
+#define	SMB_ENCRYPT_KEY_MAXLEN		32
+
+#define	SMB_SHARE_MAGIC		0x4B534852	/* KSHR */
+
+typedef struct smb_kshare {
+	uint32_t	shr_magic;
+	char		*shr_name;
+	char		*shr_path;
+	char		*shr_cmnt;
+	char		*shr_container;
+	char		*shr_oemname;
+	uint32_t	shr_flags;
+	uint32_t	shr_type;
+	uint32_t	shr_refcnt;
+	uint32_t	shr_autocnt;
+	uid_t		shr_uid;
+	gid_t		shr_gid;
+	char		*shr_access_none;
+	char		*shr_access_ro;
+	char		*shr_access_rw;
+	avl_node_t	shr_link;
+	kmem_cache_t	*shr_cache;
+	kmutex_t	shr_mutex;
+} smb_kshare_t;
+
+
+typedef struct smb_arg_negotiate {
+	char		*ni_name;
+	int		ni_dialect;
+	int		ni_index;
+	uint32_t	ni_capabilities;
+	uint16_t	ni_maxmpxcount;
+	int16_t		ni_tzcorrection;
+	uint8_t		ni_keylen;
+	uint8_t		ni_key[SMB_ENCRYPT_KEY_MAXLEN];
+	timestruc_t	ni_servertime;
+} smb_arg_negotiate_t;
+
+typedef struct smb_arg_sessionsetup {
+	char		*ssi_user;
+	char		*ssi_domain;
+	uint16_t	ssi_cipwlen;
+	uint8_t		*ssi_cipwd;
+	uint16_t	ssi_cspwlen;
+	uint8_t		*ssi_cspwd;
+	uint16_t	ssi_maxmpxcount;
+	uint32_t	ssi_capabilities;
+	uint32_t	ssi_sesskey;
+	boolean_t	ssi_guest;
+} smb_arg_sessionsetup_t;
+
+typedef struct tcon {
+	char		*path;
+	char		*service;
+	int		pwdlen;
+	char		*password;
+	uint16_t	flags;
+	uint16_t	optional_support;
+	smb_kshare_t	*si;
+} smb_arg_tcon_t;
 
 /*
  * Based on section 2.6.1.2 (Connection Management) of the June 13,
@@ -713,6 +912,8 @@ typedef struct smb_session {
 	char 			workstation[SMB_PI_MAX_HOST];
 	int			dialect;
 	int			native_os;
+	int			native_lm;
+
 	uint32_t		capabilities;
 	struct smb_sign		signing;
 
@@ -743,6 +944,7 @@ typedef struct smb_session {
 	int			outpipe_datalen;
 	int			outpipe_cookie;
 	list_t			s_oplock_brkreqs;
+	smb_srqueue_t		*s_srqueue;
 } smb_session_t;
 
 #define	SMB_USER_MAGIC 0x55534552	/* 'USER' */
@@ -754,6 +956,9 @@ typedef struct smb_session {
 #define	SMB_USER_FLAG_ADMIN			SMB_ATF_ADMIN
 #define	SMB_USER_FLAG_POWER_USER		SMB_ATF_POWERUSER
 #define	SMB_USER_FLAG_BACKUP_OPERATOR		SMB_ATF_BACKUPOP
+
+#define	SMB_USER_IS_ADMIN(U)	(((U)->u_flags & SMB_USER_FLAG_ADMIN) != 0)
+#define	SMB_USER_IS_GUEST(U)	(((U)->u_flags & SMB_USER_FLAG_GUEST) != 0)
 
 #define	SMB_USER_PRIV_TAKE_OWNERSHIP	0x00000001
 #define	SMB_USER_PRIV_BACKUP		0x00000002
@@ -855,7 +1060,7 @@ typedef struct smb_tree {
 	char			t_volume[SMB_VOLNAMELEN];
 	acl_type_t		t_acltype;
 	uint32_t		t_access;
-	uint32_t		t_shr_flags;
+	uint32_t		t_execflags;
 	time_t			t_connect_time;
 	volatile uint32_t	t_open_files;
 } smb_tree_t;
@@ -1103,7 +1308,6 @@ typedef struct smb_odirent {
 
 typedef struct smb_fileinfo {
 	char		fi_name[MAXNAMELEN];
-	char		fi_name83[SMB_SHORTNAMELEN];
 	char		fi_shortname[SMB_SHORTNAMELEN];
 	uint32_t	fi_cookie;
 	uint32_t	fi_dosattr;	/* DOS attributes */
@@ -1201,12 +1405,18 @@ typedef struct smb_fqi {
 	char		fq_last_comp[MAXNAMELEN];
 } smb_fqi_t;
 
+typedef struct dirop {
+	smb_fqi_t	fqi;
+	smb_fqi_t	dst_fqi;
+	uint16_t	info_level;
+	uint16_t	flags;
+} smb_arg_dirop_t;
+
 #define	OPLOCK_MIN_TIMEOUT	(5 * 1000)
 #define	OPLOCK_STD_TIMEOUT	(15 * 1000)
 #define	OPLOCK_RETRIES		2
 
 typedef struct {
-	uint32_t severity;
 	uint32_t status;
 	uint16_t errcls;
 	uint16_t errcode;
@@ -1236,7 +1446,7 @@ typedef struct open_param {
 	/* This is only set by NTTransactCreate */
 	struct smb_sd	*sd;
 	uint8_t		op_oplock_level;
-} open_param_t;
+} smb_arg_open_t;
 
 #define	SMB_OPLOCK_NONE		0
 #define	SMB_OPLOCK_EXCLUSIVE	1
@@ -1443,30 +1653,31 @@ typedef struct smb_request {
 	smb_user_t		*uid_user;
 
 	union {
-	    struct tcon {
-		char		*path;
-		char		*service;
-		int		pwdlen;
-		char		*password;
-		uint16_t	flags;
-		uint16_t	optional_support;
-	    } tcon;
-
-	    struct dirop {
-		smb_fqi_t	fqi;
-		smb_fqi_t	dst_fqi;
-		uint16_t	info_level;
-		uint16_t	flags;
-	    } dirop;
-
-	    open_param_t	open;
-	    smb_rw_param_t	*rw;
-	    uint32_t		timestamp;
+		smb_arg_negotiate_t	*negprot;
+		smb_arg_sessionsetup_t	*ssetup;
+		smb_arg_tcon_t		tcon;
+		smb_arg_dirop_t		dirop;
+		smb_arg_open_t		open;
+		smb_rw_param_t		*rw;
+		uint32_t		timestamp;
 	} arg;
 
 	cred_t			*user_cr;
 	kthread_t		*sr_worker;
+	hrtime_t		sr_time_submitted;
+	hrtime_t		sr_time_active;
+	hrtime_t		sr_time_start;
+	int32_t			sr_txb;
+	uint32_t		sr_seqnum;
 } smb_request_t;
+
+#define	sr_ssetup	arg.ssetup
+#define	sr_negprot	arg.negprot
+#define	sr_tcon		arg.tcon
+#define	sr_dirop	arg.dirop
+#define	sr_open		arg.open
+#define	sr_rw		arg.rw
+#define	sr_timestamp	arg.timestamp
 
 #define	SMB_READ_PROTOCOL(hdr) \
 	LE_IN32(((smb_hdr_t *)(hdr))->protocol)
@@ -1480,6 +1691,18 @@ typedef struct smb_request {
 #define	SMB_IS_WRITERAW(rd_sr) \
 	(SMB_READ_COMMAND((rd_sr)->sr_request_buf) == SMB_COM_WRITE_RAW)
 
+#define	SMB_IS_NT_CANCEL(rd_sr) \
+	(SMB_READ_COMMAND((rd_sr)->sr_request_buf) == SMB_COM_NT_CANCEL)
+
+#define	SMB_IS_SESSION_SETUP_ANDX(rd_sr) \
+	(SMB_READ_COMMAND((rd_sr)->sr_request_buf) == \
+	    SMB_COM_SESSION_SETUP_ANDX)
+
+#define	SMB_IS_NT_NEGOTIATE(rd_sr) \
+	(SMB_READ_COMMAND((rd_sr)->sr_request_buf) == SMB_COM_NEGOTIATE)
+
+#define	SMB_IS_TREE_CONNECT_ANDX(rd_sr) \
+	(SMB_READ_COMMAND((rd_sr)->sr_request_buf) == SMB_COM_TREE_CONNECT_ANDX)
 
 #define	SMB_XA_FLAG_OPEN	0x0001
 #define	SMB_XA_FLAG_CLOSE	0x0002
@@ -1561,12 +1784,6 @@ typedef enum {
     ASSERT(((s) != NULL) && ((s)->sv_magic == SMB_SERVER_MAGIC))
 
 typedef struct {
-	kstat_named_t	open_files;
-	kstat_named_t	open_trees;
-	kstat_named_t	open_users;
-} smb_server_stats_t;
-
-typedef struct {
 	kthread_t		*ld_kth;
 	kt_did_t		ld_ktdid;
 	ksocket_t		ld_so;
@@ -1584,12 +1801,12 @@ typedef enum smb_server_state {
 	SMB_SERVER_STATE_SENTINEL
 } smb_server_state_t;
 
-#define	SMB_SERVER_STATE_VALID(S)		\
-    ASSERT(((S) == SMB_SERVER_STATE_CREATED) ||	\
-	((S) == SMB_SERVER_STATE_CONFIGURED) ||	\
-	((S) == SMB_SERVER_STATE_RUNNING) ||	\
-	((S) == SMB_SERVER_STATE_STOPPING) ||	\
-	((S) == SMB_SERVER_STATE_DELETING))
+#define	SMB_SERVER_STATE_VALID(S)               \
+    ASSERT(((S) == SMB_SERVER_STATE_CREATED) || \
+	    ((S) == SMB_SERVER_STATE_CONFIGURED) || \
+	    ((S) == SMB_SERVER_STATE_RUNNING) ||    \
+	    ((S) == SMB_SERVER_STATE_STOPPING) ||   \
+	    ((S) == SMB_SERVER_STATE_DELETING))
 
 typedef struct smb_server {
 	uint32_t		sv_magic;
@@ -1606,22 +1823,14 @@ typedef struct smb_server {
 	smb_kmod_cfg_t		sv_cfg;
 	smb_session_t		*sv_session;
 
-	kstat_t			*sv_ksp;
-	kmutex_t		sv_ksp_mutex;
-	char			sv_ksp_name[KSTAT_STRLEN];
-	smb_server_stats_t	sv_ks_data;
-
 	door_handle_t		sv_lmshrd;
 
 	int32_t			si_gmtoff;
 
 	smb_thread_t		si_thread_timers;
-	smb_thread_t		si_thread_unexport;
 
 	taskq_t			*sv_thread_pool;
 
-	kmem_cache_t		*si_cache_unexport;
-	kmem_cache_t		*si_cache_vfs;
 	kmem_cache_t		*si_cache_request;
 	kmem_cache_t		*si_cache_session;
 	kmem_cache_t		*si_cache_user;
@@ -1631,15 +1840,23 @@ typedef struct smb_server {
 	kmem_cache_t		*si_cache_opipe;
 	kmem_cache_t		*si_cache_event;
 
-	volatile uint32_t	sv_open_trees;
-	volatile uint32_t	sv_open_files;
-	volatile uint32_t	sv_open_users;
-
 	smb_node_t		*si_root_smb_node;
-	smb_llist_t		sv_vfs_list;
 	smb_llist_t		sv_opipe_list;
 	smb_llist_t		sv_event_list;
-	smb_slist_t		sv_unexport_list;
+
+	/* Statistics */
+	hrtime_t		sv_start_time;
+	kstat_t			*sv_ksp;
+	volatile uint32_t	sv_nbt_sess;
+	volatile uint32_t	sv_tcp_sess;
+	volatile uint32_t	sv_users;
+	volatile uint32_t	sv_trees;
+	volatile uint32_t	sv_files;
+	volatile uint32_t	sv_pipes;
+	volatile uint64_t	sv_txb;
+	volatile uint64_t	sv_rxb;
+	volatile uint64_t	sv_nreq;
+	smb_srqueue_t		sv_srqueue;
 } smb_server_t;
 
 #define	SMB_EVENT_MAGIC		0x45564E54	/* EVNT */
@@ -1675,13 +1892,58 @@ typedef struct smb_tsd {
 } smb_tsd_t;
 
 typedef struct smb_disp_entry {
-	smb_sdrc_t		(*sdt_pre_op)(smb_request_t *);
-	smb_sdrc_t		(*sdt_function)(smb_request_t *);
-	void			(*sdt_post_op)(smb_request_t *);
-	char			sdt_dialect;
-	unsigned char		sdt_flags;
-	kstat_named_t		sdt_dispatch_stats; /* invocations */
+	char		sdt_name[KSTAT_STRLEN];
+	smb_sdrc_t	(*sdt_pre_op)(smb_request_t *);
+	smb_sdrc_t	(*sdt_function)(smb_request_t *);
+	void		(*sdt_post_op)(smb_request_t *);
+	uint8_t		sdt_com;
+	char		sdt_dialect;
+	uint8_t		sdt_flags;
+	volatile uint64_t sdt_txb;
+	volatile uint64_t sdt_rxb;
+	smb_latency_t	sdt_lat;
 } smb_disp_entry_t;
+
+typedef struct smb_xlate {
+	int	code;
+	char	*str;
+} smb_xlate_t;
+
+typedef struct smb_export {
+	kmutex_t	e_mutex;
+	boolean_t	e_ready;
+	smb_llist_t	e_vfs_list;
+	smb_avl_t	e_share_avl;
+	smb_slist_t	e_unexport_list;
+
+	kmem_cache_t	*e_cache_share;
+	kmem_cache_t	*e_cache_vfs;
+	kmem_cache_t	*e_cache_unexport;
+
+	smb_thread_t	e_unexport_thread;
+} smb_export_t;
+
+/*
+ * This structure is a helper for building RAP NetShareEnum response
+ *
+ * es_posix_uid UID of the user requesting the shares list which
+ *              is used to detect if the user has any autohome
+ * es_bufsize   size of the response buffer
+ * es_buf       pointer to the response buffer
+ * es_ntotal    total number of shares exported by server which
+ *              their OEM names is less then 13 chars
+ * es_nsent     number of shares that can fit in the specified buffer
+ * es_datasize  actual data size (share's data) which was encoded
+ *              in the response buffer
+ */
+typedef struct smb_enumshare_info {
+	uid_t		es_posix_uid;
+	uint16_t	es_bufsize;
+	char		*es_buf;
+	uint16_t	es_ntotal;
+	uint16_t	es_nsent;
+	uint16_t	es_datasize;
+} smb_enumshare_info_t;
 
 #ifdef	__cplusplus
 }

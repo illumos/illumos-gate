@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#ifndef _SMBSRV_LMERR_H
-#define	_SMBSRV_LMERR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef _SMB_LMERR_H
+#define	_SMB_LMERR_H
 
 /*
  * This file contains the LAN Manager network error definitions. All
@@ -46,6 +44,9 @@
  *
  * See msdn.microsoft.com for additional information on the meaning
  * of each error code.
+ *
+ * This file is compatible with the Windows SDK file: Include/LMErr.h
+ * Please preserve this compatibility.
  */
 
 #ifdef __cplusplus
@@ -65,8 +66,8 @@ extern "C" {
 #define	NERR_NoNetworkResource	(NERR_BASE+5)
 #define	NERR_RemoteOnly		(NERR_BASE+6)
 #define	NERR_DevNotRedirected	(NERR_BASE+7)
-/* NERR_BASE+8 is used for ERROR_CONNECTED_OTHER_PASSWORD */
-/* UNUSED BASE+9 */
+/* NERR_BASE+8 is ERROR_CONNECTED_OTHER_PASSWORD */
+/* NERR_BASE+9 is ERROR_CONNECTED_OTHER_PASSWORD_DEFAULT */
 /* UNUSED BASE+10 */
 /* UNUSED BASE+11 */
 /* UNUSED BASE+12 */
@@ -256,6 +257,13 @@ extern "C" {
 #define	NERR_MultipleNets	(NERR_BASE+200)
 
 /*
+ * NERR_BASE+201 is ERROR_OPEN_FILES
+ * NERR_BASE+202 is ERROR_ACTIVE_CONNECTIONS
+ * NERR_BASE+204 is ERROR_DEVICE_IN_USE
+ * (see nterror.h)
+ */
+
+/*
  * Server API related
  * Error codes BASE+210 to BASE+229
  */
@@ -293,16 +301,16 @@ extern "C" {
  * NetIListCanon and NetINameCheck
  * Error codes BASE+250 to BASE+269
  */
-#define	NERR_InvalidComputer   (NERR_BASE+251)
+#define	NERR_InvalidComputer	(NERR_BASE+251)
 /* UNUSED BASE+252 */
 /* UNUSED BASE+253 */
-#define	NERR_MaxLenExceeded    (NERR_BASE+254)
+#define	NERR_MaxLenExceeded	(NERR_BASE+254)
 /* UNUSED BASE+255 */
 #define	NERR_BadComponent	(NERR_BASE+256)
 #define	NERR_CantType		(NERR_BASE+257)
 /* UNUSED BASE+258 */
 /* UNUSED BASE+259 */
-#define	NERR_TooManyEntries    (NERR_BASE+262)
+#define	NERR_TooManyEntries	(NERR_BASE+262)
 
 /*
  * NetProfile
@@ -402,17 +410,17 @@ extern "C" {
 #define	NERR_NoAlternateServers (NERR_BASE+367)
 /* UNUSED BASE+368 */
 /* UNUSED BASE+369 */
-#define	NERR_TryDownLevel		   (NERR_BASE+370)
+#define	NERR_TryDownLevel		(NERR_BASE+370)
 
 /*
  * UPS error codes.
  * NERR_BASE + (380-384)
  */
-#define	NERR_UPSDriverNotStarted	   (NERR_BASE+380)
-#define	NERR_UPSInvalidConfig		   (NERR_BASE+381)
-#define	NERR_UPSInvalidCommPort		   (NERR_BASE+382)
-#define	NERR_UPSSignalAsserted		   (NERR_BASE+383)
-#define	NERR_UPSShutdownFailed		   (NERR_BASE+384)
+#define	NERR_UPSDriverNotStarted	(NERR_BASE+380)
+#define	NERR_UPSInvalidConfig		(NERR_BASE+381)
+#define	NERR_UPSInvalidCommPort		(NERR_BASE+382)
+#define	NERR_UPSSignalAsserted		(NERR_BASE+383)
+#define	NERR_UPSShutdownFailed		(NERR_BASE+384)
 
 /*
  * Remoteboot error codes.
@@ -423,26 +431,26 @@ extern "C" {
  * Error code 418 is for when REMOTEBOOT can't start
  * Error code 419 is for a disallowed 2nd rpl connection
  */
-#define	NERR_BadDosRetCode		   (NERR_BASE+400)
-#define	NERR_ProgNeedsExtraMem		   (NERR_BASE+401)
-#define	NERR_BadDosFunction		   (NERR_BASE+402)
-#define	NERR_RemoteBootFailed		   (NERR_BASE+403)
-#define	NERR_BadFileCheckSum		   (NERR_BASE+404)
-#define	NERR_NoRplBootSystem		   (NERR_BASE+405)
-#define	NERR_RplLoadrNetBiosErr		   (NERR_BASE+406)
-#define	NERR_RplLoadrDiskErr		   (NERR_BASE+407)
-#define	NERR_ImageParamErr		   (NERR_BASE+408)
-#define	NERR_TooManyImageParams		   (NERR_BASE+409)
-#define	NERR_NonDosFloppyUsed		   (NERR_BASE+410)
-#define	NERR_RplBootRestart		   (NERR_BASE+411)
-#define	NERR_RplSrvrCallFailed		   (NERR_BASE+412)
-#define	NERR_CantConnectRplSrvr		   (NERR_BASE+413)
-#define	NERR_CantOpenImageFile		   (NERR_BASE+414)
-#define	NERR_CallingRplSrvr		   (NERR_BASE+415)
-#define	NERR_StartingRplBoot		   (NERR_BASE+416)
-#define	NERR_RplBootServiceTerm		   (NERR_BASE+417)
-#define	NERR_RplBootStartFailed		   (NERR_BASE+418)
-#define	NERR_RPL_CONNECTED		   (NERR_BASE+419)
+#define	NERR_BadDosRetCode		(NERR_BASE+400)
+#define	NERR_ProgNeedsExtraMem		(NERR_BASE+401)
+#define	NERR_BadDosFunction		(NERR_BASE+402)
+#define	NERR_RemoteBootFailed		(NERR_BASE+403)
+#define	NERR_BadFileCheckSum		(NERR_BASE+404)
+#define	NERR_NoRplBootSystem		(NERR_BASE+405)
+#define	NERR_RplLoadrNetBiosErr		(NERR_BASE+406)
+#define	NERR_RplLoadrDiskErr		(NERR_BASE+407)
+#define	NERR_ImageParamErr		(NERR_BASE+408)
+#define	NERR_TooManyImageParams		(NERR_BASE+409)
+#define	NERR_NonDosFloppyUsed		(NERR_BASE+410)
+#define	NERR_RplBootRestart		(NERR_BASE+411)
+#define	NERR_RplSrvrCallFailed		(NERR_BASE+412)
+#define	NERR_CantConnectRplSrvr		(NERR_BASE+413)
+#define	NERR_CantOpenImageFile		(NERR_BASE+414)
+#define	NERR_CallingRplSrvr		(NERR_BASE+415)
+#define	NERR_StartingRplBoot		(NERR_BASE+416)
+#define	NERR_RplBootServiceTerm		(NERR_BASE+417)
+#define	NERR_RplBootStartFailed		(NERR_BASE+418)
+#define	NERR_RPL_CONNECTED		(NERR_BASE+419)
 
 /*
  * FTADMIN API error codes
@@ -454,83 +462,88 @@ extern "C" {
  * Browser service API error codes
  * NERR_BASE + (450-475)
  */
-#define	NERR_BrowserConfiguredToNotRun	   (NERR_BASE+450)
+#define	NERR_BrowserConfiguredToNotRun	(NERR_BASE+450)
 
 /*
  * Additional Remoteboot error codes.
  * NERR_BASE + (510-550)
  */
-#define	NERR_RplNoAdaptersStarted	   (NERR_BASE+510)
-#define	NERR_RplBadRegistry		   (NERR_BASE+511)
-#define	NERR_RplBadDatabase		   (NERR_BASE+512)
-#define	NERR_RplRplfilesShare		   (NERR_BASE+513)
-#define	NERR_RplNotRplServer		   (NERR_BASE+514)
-#define	NERR_RplCannotEnum		   (NERR_BASE+515)
-#define	NERR_RplWkstaInfoCorrupted	   (NERR_BASE+516)
-#define	NERR_RplWkstaNotFound		   (NERR_BASE+517)
-#define	NERR_RplWkstaNameUnavailable	   (NERR_BASE+518)
-#define	NERR_RplProfileInfoCorrupted	   (NERR_BASE+519)
-#define	NERR_RplProfileNotFound		   (NERR_BASE+520)
-#define	NERR_RplProfileNameUnavailable	   (NERR_BASE+521)
-#define	NERR_RplProfileNotEmpty		   (NERR_BASE+522)
-#define	NERR_RplConfigInfoCorrupted	   (NERR_BASE+523)
-#define	NERR_RplConfigNotFound		   (NERR_BASE+524)
-#define	NERR_RplAdapterInfoCorrupted	   (NERR_BASE+525)
-#define	NERR_RplInternal		   (NERR_BASE+526)
-#define	NERR_RplVendorInfoCorrupted	   (NERR_BASE+527)
-#define	NERR_RplBootInfoCorrupted	   (NERR_BASE+528)
-#define	NERR_RplWkstaNeedsUserAcct	   (NERR_BASE+529)
-#define	NERR_RplNeedsRPLUSERAcct	   (NERR_BASE+530)
-#define	NERR_RplBootNotFound		   (NERR_BASE+531)
-#define	NERR_RplIncompatibleProfile	   (NERR_BASE+532)
-#define	NERR_RplAdapterNameUnavailable	   (NERR_BASE+533)
-#define	NERR_RplConfigNotEmpty		   (NERR_BASE+534)
-#define	NERR_RplBootInUse		   (NERR_BASE+535)
-#define	NERR_RplBackupDatabase		   (NERR_BASE+536)
-#define	NERR_RplAdapterNotFound		   (NERR_BASE+537)
-#define	NERR_RplVendorNotFound		   (NERR_BASE+538)
-#define	NERR_RplVendorNameUnavailable	   (NERR_BASE+539)
-#define	NERR_RplBootNameUnavailable	   (NERR_BASE+540)
-#define	NERR_RplConfigNameUnavailable	   (NERR_BASE+541)
+#define	NERR_RplNoAdaptersStarted	(NERR_BASE+510)
+#define	NERR_RplBadRegistry		(NERR_BASE+511)
+#define	NERR_RplBadDatabase		(NERR_BASE+512)
+#define	NERR_RplRplfilesShare		(NERR_BASE+513)
+#define	NERR_RplNotRplServer		(NERR_BASE+514)
+#define	NERR_RplCannotEnum		(NERR_BASE+515)
+#define	NERR_RplWkstaInfoCorrupted	(NERR_BASE+516)
+#define	NERR_RplWkstaNotFound		(NERR_BASE+517)
+#define	NERR_RplWkstaNameUnavailable	(NERR_BASE+518)
+#define	NERR_RplProfileInfoCorrupted	(NERR_BASE+519)
+#define	NERR_RplProfileNotFound		(NERR_BASE+520)
+#define	NERR_RplProfileNameUnavailable	(NERR_BASE+521)
+#define	NERR_RplProfileNotEmpty		(NERR_BASE+522)
+#define	NERR_RplConfigInfoCorrupted	(NERR_BASE+523)
+#define	NERR_RplConfigNotFound		(NERR_BASE+524)
+#define	NERR_RplAdapterInfoCorrupted	(NERR_BASE+525)
+#define	NERR_RplInternal		(NERR_BASE+526)
+#define	NERR_RplVendorInfoCorrupted	(NERR_BASE+527)
+#define	NERR_RplBootInfoCorrupted	(NERR_BASE+528)
+#define	NERR_RplWkstaNeedsUserAcct	(NERR_BASE+529)
+#define	NERR_RplNeedsRPLUSERAcct	(NERR_BASE+530)
+#define	NERR_RplBootNotFound		(NERR_BASE+531)
+#define	NERR_RplIncompatibleProfile	(NERR_BASE+532)
+#define	NERR_RplAdapterNameUnavailable	(NERR_BASE+533)
+#define	NERR_RplConfigNotEmpty		(NERR_BASE+534)
+#define	NERR_RplBootInUse		(NERR_BASE+535)
+#define	NERR_RplBackupDatabase		(NERR_BASE+536)
+#define	NERR_RplAdapterNotFound		(NERR_BASE+537)
+#define	NERR_RplVendorNotFound		(NERR_BASE+538)
+#define	NERR_RplVendorNameUnavailable	(NERR_BASE+539)
+#define	NERR_RplBootNameUnavailable	(NERR_BASE+540)
+#define	NERR_RplConfigNameUnavailable	(NERR_BASE+541)
 
 /*
  * Dfs API error codes.
  * NERR_BASE + (560-590)
  */
-#define	NERR_DfsInternalCorruption	   (NERR_BASE+560)
-#define	NERR_DfsVolumeDataCorrupt	   (NERR_BASE+561)
-#define	NERR_DfsNoSuchVolume		   (NERR_BASE+562)
-#define	NERR_DfsVolumeAlreadyExists	   (NERR_BASE+563)
-#define	NERR_DfsAlreadyShared		   (NERR_BASE+564)
-#define	NERR_DfsNoSuchShare		   (NERR_BASE+565)
-#define	NERR_DfsNotALeafVolume		   (NERR_BASE+566)
-#define	NERR_DfsLeafVolume		   (NERR_BASE+567)
-#define	NERR_DfsVolumeHasMultipleServers   (NERR_BASE+568)
-#define	NERR_DfsCantCreateJunctionPoint	   (NERR_BASE+569)
-#define	NERR_DfsServerNotDfsAware	   (NERR_BASE+570)
-#define	NERR_DfsBadRenamePath		   (NERR_BASE+571)
-#define	NERR_DfsVolumeIsOffline		   (NERR_BASE+572)
-#define	NERR_DfsNoSuchServer		   (NERR_BASE+573)
-#define	NERR_DfsCyclicalName		   (NERR_BASE+574)
-#define	NERR_DfsNotSupportedInServerDfs	   (NERR_BASE+575)
-#define	NERR_DfsInternalError		   (NERR_BASE+590)
+#define	NERR_DfsInternalCorruption	(NERR_BASE+560)
+#define	NERR_DfsVolumeDataCorrupt	(NERR_BASE+561)
+#define	NERR_DfsNoSuchVolume		(NERR_BASE+562)
+#define	NERR_DfsVolumeAlreadyExists	(NERR_BASE+563)
+#define	NERR_DfsAlreadyShared		(NERR_BASE+564)
+#define	NERR_DfsNoSuchShare		(NERR_BASE+565)
+#define	NERR_DfsNotALeafVolume		(NERR_BASE+566)
+#define	NERR_DfsLeafVolume		(NERR_BASE+567)
+#define	NERR_DfsVolumeHasMultipleServers (NERR_BASE+568)
+#define	NERR_DfsCantCreateJunctionPoint	(NERR_BASE+569)
+#define	NERR_DfsServerNotDfsAware	(NERR_BASE+570)
+#define	NERR_DfsBadRenamePath		(NERR_BASE+571)
+#define	NERR_DfsVolumeIsOffline		(NERR_BASE+572)
+#define	NERR_DfsNoSuchServer		(NERR_BASE+573)
+#define	NERR_DfsCyclicalName		(NERR_BASE+574)
+#define	NERR_DfsNotSupportedInServerDfs	(NERR_BASE+575)
+#define	NERR_DfsInternalError		(NERR_BASE+590)
 
 /*
  * Net setup error codes.
  * NERR_BASE + (591-595)
  */
-#define	NERR_SetupAlreadyJoined		   (NERR_BASE+591)
-#define	NERR_SetupNotJoined		   (NERR_BASE+592)
-#define	NERR_SetupDomainController	   (NERR_BASE+593)
+#define	NERR_SetupAlreadyJoined		(NERR_BASE+591)
+#define	NERR_SetupNotJoined		(NERR_BASE+592)
+#define	NERR_SetupDomainController	(NERR_BASE+593)
+#define	NERR_DefaultJoinRequired	(NERR_BASE+594)
+#define	NERR_InvalidWorkgroupName	(NERR_BASE+595)
+#define	NERR_NameUsesIncompatibleCodePage (NERR_BASE+596)
+#define	NERR_ComputerAccountNotFound	(NERR_BASE+597)
+#define	NERR_PersonalSku		(NERR_BASE+598)
 
 /*
  * MAX_NERR is the last value in the NERR range.
  * Do not exceed this value here.
  */
-#define	MAX_NERR			   (NERR_BASE+899)
+#define	MAX_NERR			(NERR_BASE+899)
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _SMBSRV_LMERR_H */
+#endif /* _SMB_LMERR_H */

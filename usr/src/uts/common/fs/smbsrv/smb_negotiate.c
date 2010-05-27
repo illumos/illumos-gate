@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -194,6 +193,21 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smbinfo.h>
 
+static smb_xlate_t smb_dialect[] = {
+	{ DIALECT_UNKNOWN,		"DIALECT_UNKNOWN" },
+	{ PC_NETWORK_PROGRAM_1_0,	"PC NETWORK PROGRAM 1.0" },
+	{ PCLAN1_0,			"PCLAN1.0" },
+	{ MICROSOFT_NETWORKS_1_03,	"MICROSOFT NETWORKS 1.03" },
+	{ MICROSOFT_NETWORKS_3_0,	"MICROSOFT NETWORKS 3.0" },
+	{ LANMAN1_0,			"LANMAN1.0" },
+	{ LM1_2X002,			"LM1.2X002" },
+	{ DOS_LM1_2X002,		"DOS LM1.2X002" },
+	{ DOS_LANMAN2_1,		"DOS LANMAN2.1" },
+	{ LANMAN2_1,			"LANMAN2.1" },
+	{ Windows_for_Workgroups_3_1a,	"Windows for Workgroups 3.1a" },
+	{ NT_LM_0_12,			"NT LM 0.12" }
+};
+
 /*
  * Maximum buffer size for DOS: chosen to be the same as NT.
  * Do not change this value, DOS is very sensitive to it.
@@ -215,50 +229,69 @@
 static uint32_t	smb_dos_tcp_rcvbuf = 8700;
 static uint32_t	smb_nt_tcp_rcvbuf = 1048560;	/* scale factor of 4 */
 
-static void smb_get_security_info(smb_request_t *, unsigned short *,
-    unsigned char *, unsigned char *, uint32_t *);
+static void smb_negotiate_genkey(smb_request_t *);
+static int smb_xlate_dialect(const char *);
 
 int smb_cap_passthru = 1;
 
-/*
- * Function: int smb_com_negotiate(struct smb_request *)
- */
 smb_sdrc_t
 smb_pre_negotiate(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Negotiate__start, smb_request_t *, sr);
+	smb_arg_negotiate_t	*negprot;
+	int			dialect;
+	int			pos;
+	int			rc = 0;
+
+	negprot = smb_srm_zalloc(sr, sizeof (smb_arg_negotiate_t));
+	negprot->ni_index = -1;
+	sr->sr_negprot = negprot;
+
+	for (pos = 0; smbsr_decode_data_avail(sr); pos++) {
+		if (smbsr_decode_data(sr, "%L", sr, &negprot->ni_name) != 0) {
+			smbsr_error(sr, 0, ERRSRV, ERRerror);
+			rc = -1;
+			break;
+		}
+
+		if ((dialect = smb_xlate_dialect(negprot->ni_name)) < 0)
+			continue;
+
+		if (negprot->ni_dialect < dialect) {
+			negprot->ni_dialect = dialect;
+			negprot->ni_index = pos;
+		}
+	}
+
+	DTRACE_SMB_2(op__Negotiate__start, smb_request_t *, sr,
+	    smb_arg_negotiate_t, negprot);
 	smb_rwx_rwenter(&sr->session->s_lock, RW_WRITER);
-	return (SDRC_SUCCESS);
+	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 void
 smb_post_negotiate(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Negotiate__done, smb_request_t *, sr);
+	smb_arg_negotiate_t	*negprot = sr->sr_negprot;
+
+	DTRACE_SMB_2(op__Negotiate__done, smb_request_t *, sr,
+	    smb_arg_negotiate_t, negprot);
 	smb_rwx_rwexit(&sr->session->s_lock);
+
+	bzero(negprot, sizeof (smb_arg_negotiate_t));
 }
 
 smb_sdrc_t
 smb_com_negotiate(smb_request_t *sr)
 {
-	int			dialect = 0;
-	int			this_dialect;
-	unsigned char		keylen;
-	int			sel_pos = -1;
-	int			pos;
-	char 			key[32];
-	char			*p;
-	timestruc_t		time_val;
-	unsigned short		secmode;
+	smb_arg_negotiate_t	*negprot = sr->sr_negprot;
+	uint16_t		secmode;
 	uint32_t		sesskey;
-	uint32_t		capabilities = 0;
-	int			rc;
-	unsigned short		max_mpx_count;
-	int16_t			tz_correction;
 	char			ipaddr_buf[INET6_ADDRSTRLEN];
-	char			*tmpbuf;
-	int			buflen;
+	char			*nbdomain;
+	uint8_t			*wcbuf;
+	int			wclen;
 	smb_msgbuf_t		mb;
+	int			rc;
 
 	if (sr->session->s_state != SMB_SESSION_STATE_ESTABLISHED) {
 		/* The protocol has already been negotiated. */
@@ -266,37 +299,52 @@ smb_com_negotiate(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	for (pos = 0;
-	    sr->smb_data.chain_offset < sr->smb_data.max_bytes;
-	    pos++) {
-		if (smb_mbc_decodef(&sr->smb_data, "%L", sr, &p) != 0) {
-			smbsr_error(sr, 0, ERRSRV, ERRerror);
-			return (SDRC_ERROR);
-		}
+	sr->session->secmode = NEGOTIATE_SECURITY_CHALLENGE_RESPONSE |
+	    NEGOTIATE_SECURITY_USER_LEVEL;
+	secmode = sr->session->secmode;
 
-		this_dialect = smb_xlate_dialect_str_to_cd(p);
+	smb_negotiate_genkey(sr);
+	sesskey = sr->session->sesskey;
 
-		if (this_dialect < 0)
-			continue;
+	(void) microtime(&negprot->ni_servertime);
+	negprot->ni_tzcorrection = sr->sr_gmtoff / 60;
+	negprot->ni_maxmpxcount = sr->sr_cfg->skc_maxworkers;
+	nbdomain = sr->sr_cfg->skc_nbdomain;
 
-		if (dialect < this_dialect) {
-			dialect = this_dialect;
-			sel_pos = pos;
-		}
-	}
+	/*
+	 * UNICODE support is required for long share names,
+	 * long file names and streams.
+	 */
+	negprot->ni_capabilities = CAP_LARGE_FILES
+	    | CAP_UNICODE
+	    | CAP_NT_SMBS
+	    | CAP_STATUS32
+	    | CAP_NT_FIND
+	    | CAP_RAW_MODE
+	    | CAP_LEVEL_II_OPLOCKS
+	    | CAP_LOCK_AND_READ
+	    | CAP_RPC_REMOTE_APIS
+	    | CAP_LARGE_READX
+	    | CAP_LARGE_WRITEX
+	    | CAP_DFS;
 
-	smb_get_security_info(sr, &secmode, (unsigned char *)key,
-	    &keylen, &sesskey);
+	if (smb_cap_passthru)
+		negprot->ni_capabilities |= CAP_INFOLEVEL_PASSTHRU;
+	else
+		cmn_err(CE_NOTE, "smbsrv: cap passthru is %s",
+		    (negprot->ni_capabilities & CAP_INFOLEVEL_PASSTHRU) ?
+		    "enabled" : "disabled");
 
-	(void) microtime(&time_val);
-	tz_correction = sr->sr_gmtoff / 60;
+	(void) smb_inet_ntop(&sr->session->ipaddr, ipaddr_buf,
+	    SMB_IPSTRLEN(sr->session->ipaddr.a_family));
 
-	switch (dialect) {
+	switch (negprot->ni_dialect) {
 	case PC_NETWORK_PROGRAM_1_0:	/* core */
 		(void) ksocket_setsockopt(sr->session->sock, SOL_SOCKET,
 		    SO_RCVBUF, (const void *)&smb_dos_tcp_rcvbuf,
 		    sizeof (smb_dos_tcp_rcvbuf), CRED());
-		rc = smbsr_encode_result(sr, 1, 0, "bww", 1, sel_pos, 0);
+		rc = smbsr_encode_result(sr, 1, 0, "bww", 1,
+		    negprot->ni_index, 0);
 		break;
 
 	case Windows_for_Workgroups_3_1a:
@@ -312,21 +360,21 @@ smb_com_negotiate(smb_request_t *sr)
 		sr->smb_flg |= SMB_FLAGS_LOCK_AND_READ_OK;
 		rc = smbsr_encode_result(sr, 13, VAR_BCC,
 		    "bwwwwwwlYww2.w#c",
-		    13,		/* wct */
-		    sel_pos,	/* dialect index */
-		    secmode,		/* security mode */
-		    SMB_DOS_MAXBUF,	/* max buffer size */
-		    1,		/* max MPX (temporary) */
-		    1,		/* max VCs (temporary, ambiguous) */
-		    3,		/* raw mode (s/b 3) */
-		    sesskey,	/* session key */
-		    time_val.tv_sec, /* server time/date */
-		    tz_correction,
-		    (short)keylen,	/* Encryption Key Length */
-				/* reserved field handled 2. */
+		    13,				/* wct */
+		    negprot->ni_index,		/* dialect index */
+		    secmode,			/* security mode */
+		    SMB_DOS_MAXBUF,		/* max buffer size */
+		    1,				/* max MPX */
+		    1,				/* max VCs */
+		    3,				/* raw mode (s/b 3) */
+		    sesskey,			/* session key */
+		    negprot->ni_servertime.tv_sec, /* server date/time */
+		    negprot->ni_tzcorrection,
+		    (uint16_t)negprot->ni_keylen, /* encryption key length */
+						/* reserved field handled 2. */
 		    VAR_BCC,
-		    (int)keylen,
-		    key);		/* encryption key */
+		    (int)negprot->ni_keylen,
+		    negprot->ni_key);		/* encryption key */
 		break;
 
 	case DOS_LANMAN2_1:
@@ -337,51 +385,28 @@ smb_com_negotiate(smb_request_t *sr)
 		sr->smb_flg |= SMB_FLAGS_LOCK_AND_READ_OK;
 		rc = smbsr_encode_result(sr, 13, VAR_BCC,
 		    "bwwwwwwlYww2.w#cs",
-		    13,		/* wct */
-		    sel_pos,	/* dialect index */
-		    secmode,		/* security mode */
-		    SMB_DOS_MAXBUF,	/* max buffer size */
-		    1,		/* max MPX (temporary) */
-		    1,		/* max VCs (temporary, ambiguous) */
-		    3,		/* raw mode (s/b 3) */
-		    sesskey,	/* session key */
-		    time_val.tv_sec, /* server time/date */
-		    tz_correction,
-		    (short)keylen,	/* Encryption Key Length */
-				/* reserved field handled 2. */
+		    13,				/* wct */
+		    negprot->ni_index,		/* dialect index */
+		    secmode,			/* security mode */
+		    SMB_DOS_MAXBUF,		/* max buffer size */
+		    1,				/* max MPX */
+		    1,				/* max VCs */
+		    3,				/* raw mode (s/b 3) */
+		    sesskey,			/* session key */
+		    negprot->ni_servertime.tv_sec, /* server date/time */
+		    negprot->ni_tzcorrection,
+		    (uint16_t)negprot->ni_keylen, /* encryption key length */
+						/* reserved field handled 2. */
 		    VAR_BCC,
-		    (int)keylen,
-		    key,		/* encryption key */
-		    sr->sr_cfg->skc_nbdomain);
+		    (int)negprot->ni_keylen,
+		    negprot->ni_key,		/* encryption key */
+		    nbdomain);
 		break;
 
 	case NT_LM_0_12:
 		(void) ksocket_setsockopt(sr->session->sock, SOL_SOCKET,
 		    SO_RCVBUF, (const void *)&smb_nt_tcp_rcvbuf,
 		    sizeof (smb_nt_tcp_rcvbuf), CRED());
-		/*
-		 * UNICODE support is required for long share names,
-		 * long file names and streams.
-		 */
-		capabilities = CAP_LARGE_FILES
-		    | CAP_UNICODE
-		    | CAP_NT_SMBS
-		    | CAP_STATUS32
-		    | CAP_NT_FIND
-		    | CAP_RAW_MODE
-		    | CAP_LEVEL_II_OPLOCKS
-		    | CAP_LOCK_AND_READ
-		    | CAP_RPC_REMOTE_APIS
-		    | CAP_LARGE_READX
-		    | CAP_LARGE_WRITEX
-		    | CAP_DFS;
-
-		if (smb_cap_passthru)
-			capabilities |= CAP_INFOLEVEL_PASSTHRU;
-		else
-			cmn_err(CE_NOTE, "smbsrv: cap passthru is %s",
-			    (capabilities & CAP_INFOLEVEL_PASSTHRU) ?
-			    "enabled" : "disabled");
 
 		/*
 		 * Turn off Extended Security Negotiation
@@ -400,55 +425,45 @@ smb_com_negotiate(smb_request_t *sr)
 
 			sr->session->secmode = secmode;
 		}
-		(void) smb_inet_ntop(&sr->session->ipaddr, ipaddr_buf,
-		    SMB_IPSTRLEN(sr->session->ipaddr.a_family));
-
-		max_mpx_count = sr->sr_cfg->skc_maxworkers;
 
 		/*
-		 * skc_nbdomain is not expected to be aligned.
+		 * nbdomain is not expected to be aligned.
 		 * Use temporary buffer to avoid alignment padding
 		 */
-		buflen = smb_wcequiv_strlen(sr->sr_cfg->skc_nbdomain) +
-		    sizeof (smb_wchar_t);
-		tmpbuf = kmem_zalloc(buflen, KM_SLEEP);
-		smb_msgbuf_init(&mb, (uint8_t *)tmpbuf, buflen,
-		    SMB_MSGBUF_UNICODE);
-		if (smb_msgbuf_encode(&mb, "U",
-		    sr->sr_cfg->skc_nbdomain) < 0) {
+		wclen = smb_wcequiv_strlen(nbdomain) + sizeof (smb_wchar_t);
+		wcbuf = smb_srm_zalloc(sr, wclen);
+		smb_msgbuf_init(&mb, wcbuf, wclen, SMB_MSGBUF_UNICODE);
+		if (smb_msgbuf_encode(&mb, "U", nbdomain) < 0) {
 			smb_msgbuf_term(&mb);
-			kmem_free(tmpbuf, buflen);
 			smbsr_error(sr, 0, ERRSRV, ERRerror);
 			return (SDRC_ERROR);
 		}
 
 		rc = smbsr_encode_result(sr, 17, VAR_BCC,
 		    "bwbwwllllTwbw#c#c",
-		    17,		/* wct */
-		    sel_pos,	/* dialect index */
-		    secmode,	/* security mode */
-		    max_mpx_count,		/* max MPX (temporary) */
-		    1,		/* max VCs (temporary, ambiguous) */
+		    17,				/* wct */
+		    negprot->ni_index,		/* dialect index */
+		    secmode,			/* security mode */
+		    negprot->ni_maxmpxcount,	/* max MPX */
+		    1,				/* max VCs */
 		    (DWORD)smb_maxbufsize,	/* max buffer size */
-		    0xFFFF,	/* max raw size */
-		    sesskey,	/* session key */
-		    capabilities,
-		    &time_val,	/* system time */
-		    tz_correction,
-		    keylen,	/* Encryption Key Length */
+		    0xFFFF,			/* max raw size */
+		    sesskey,			/* session key */
+		    negprot->ni_capabilities,
+		    &negprot->ni_servertime,	/* system time */
+		    negprot->ni_tzcorrection,
+		    negprot->ni_keylen,		/* encryption key length */
 		    VAR_BCC,
-		    (int)keylen,
-		    key,	/* encryption key */
-		    buflen,
-		    tmpbuf);	/* skc_nbdomain */
+		    (int)negprot->ni_keylen,
+		    negprot->ni_key,		/* encryption key */
+		    wclen,
+		    wcbuf);			/* nbdomain (unicode) */
 
 		smb_msgbuf_term(&mb);
-		kmem_free(tmpbuf, buflen);
 		break;
 
 	default:
-		sel_pos = -1;
-		rc = smbsr_encode_result(sr, 1, 0, "bww", 1, sel_pos, 0);
+		rc = smbsr_encode_result(sr, 1, 0, "bww", 1, -1, 0);
 		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
@@ -459,34 +474,40 @@ smb_com_negotiate(smb_request_t *sr)
 	 * Save the agreed dialect. Note that this value is also
 	 * used to detect and reject attempts to re-negotiate.
 	 */
-	sr->session->dialect = dialect;
+	sr->session->dialect = negprot->ni_dialect;
 	sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
 	return (SDRC_SUCCESS);
 }
 
 static void
-smb_get_security_info(
-    struct smb_request *sr,
-    unsigned short *secmode,
-    unsigned char *key,
-    unsigned char *keylen,
-    uint32_t *sesskey)
+smb_negotiate_genkey(smb_request_t *sr)
 {
-	uchar_t tmp_key[8];
+	smb_arg_negotiate_t	*negprot = sr->sr_negprot;
+	uint8_t			tmp_key[8];
 
 	(void) random_get_pseudo_bytes(tmp_key, 8);
 	bcopy(tmp_key, &sr->session->challenge_key, 8);
 	sr->session->challenge_len = 8;
-	*keylen = 8;
-	bcopy(tmp_key, key, 8);
-
-	sr->session->secmode = NEGOTIATE_SECURITY_CHALLENGE_RESPONSE|
-	    NEGOTIATE_SECURITY_USER_LEVEL;
+	negprot->ni_keylen = 8;
+	bcopy(tmp_key, negprot->ni_key, 8);
 
 	(void) random_get_pseudo_bytes(tmp_key, 4);
 	sr->session->sesskey = tmp_key[0] | tmp_key[1] << 8 |
 	    tmp_key[2] << 16 | tmp_key[3] << 24;
+}
 
-	*secmode = sr->session->secmode;
-	*sesskey = sr->session->sesskey;
+static int
+smb_xlate_dialect(const char *dialect)
+{
+	smb_xlate_t	*dp;
+	int		i;
+
+	for (i = 0; i < sizeof (smb_dialect) / sizeof (smb_dialect[0]); ++i) {
+		dp = &smb_dialect[i];
+
+		if (strcmp(dp->str, dialect) == 0)
+			return (dp->code);
+	}
+
+	return (-1);
 }

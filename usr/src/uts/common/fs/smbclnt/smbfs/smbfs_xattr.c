@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -346,7 +345,7 @@ smbfs_xa_findopen(struct smbfs_fctx *ctx, struct smbnode *dnp,
 	t2p->t2_maxdcount = INT16_MAX;
 	error = smb_t2_request(t2p);
 	if (error) {
-		if (smb_t2_err(t2p) == NT_STATUS_INVALID_PARAMETER)
+		if (t2p->t2_sr_error == NT_STATUS_INVALID_PARAMETER)
 			error = ENOTSUP;
 	}
 	/*

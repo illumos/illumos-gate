@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -41,7 +40,6 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/smb_share.h>
-#include <smbsrv/lmerr.h>
 #include <smbsrv/smb.h>
 
 #define	SMB_SHARE_DOOR_CALL_RETRIES		3

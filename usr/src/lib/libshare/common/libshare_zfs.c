@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1445,4 +1444,139 @@ sa_zfs_get_info(libzfs_handle_t *libzfs, char *path, char *mountpointp,
 	}
 
 	return (ret);
+}
+
+/*
+ * This method builds values for "sharesmb" property from the
+ * nvlist argument. The values are returned in sharesmb_val variable.
+ */
+static int
+sa_zfs_sprintf_new_prop(nvlist_t *nvl, char *sharesmb_val)
+{
+	char cur_val[MAXPATHLEN];
+	char *name, *val;
+	nvpair_t *cur;
+	int err = 0;
+
+	cur = nvlist_next_nvpair(nvl, NULL);
+	while (cur != NULL) {
+		name = nvpair_name(cur);
+		err = nvpair_value_string(cur, &val);
+		if ((err != 0) || (name == NULL) || (val == NULL))
+			return (-1);
+
+		(void) snprintf(cur_val, MAXPATHLEN, "%s=%s,", name, val);
+		(void) strlcat(sharesmb_val, cur_val, MAXPATHLEN);
+
+		cur = nvlist_next_nvpair(nvl, cur);
+	}
+
+	return (0);
+}
+
+/*
+ * This method builds values for "sharesmb" property from values
+ * already existing on the share. The properties set via sa_zfs_sprint_new_prop
+ * method are passed in sharesmb_val. If a existing property is already
+ * set via sa_zfs_sprint_new_prop method, then they are not appended
+ * to the sharesmb_val string. The returned sharesmb_val string is a combination
+ * of new and existing values for 'sharesmb' property.
+ */
+static int
+sa_zfs_sprintf_existing_prop(zfs_handle_t *handle, char *sharesmb_val)
+{
+	char shareopts[ZFS_MAXPROPLEN], cur_val[MAXPATHLEN];
+	char *token, *last, *value;
+
+	if (zfs_prop_get(handle, ZFS_PROP_SHARESMB, shareopts,
+	    sizeof (shareopts), NULL, NULL, 0, B_FALSE) != 0)
+		return (-1);
+
+	if (strstr(shareopts, "=") == NULL)
+		return (0);
+
+	for (token = strtok_r(shareopts, ",", &last); token != NULL;
+	    token = strtok_r(NULL, ",", &last)) {
+		value = strchr(token, '=');
+		if (value == NULL)
+			return (-1);
+		*value++ = '\0';
+
+		(void) snprintf(cur_val, MAXPATHLEN, "%s=", token);
+		if (strstr(sharesmb_val, cur_val) == NULL) {
+			(void) strlcat(cur_val, value, MAXPATHLEN);
+			(void) strlcat(cur_val, ",", MAXPATHLEN);
+			(void) strlcat(sharesmb_val, cur_val, MAXPATHLEN);
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * Sets the share properties on a ZFS share. For now, this method sets only
+ * the "sharesmb" property.
+ *
+ * This method includes building a comma seperated name-value string to be
+ * set on the "sharesmb" property of a ZFS share. This name-value string is
+ * build in 2 steps:
+ *    - New property values given as name-value pair are set first.
+ *    - Existing optionset properties, which are not part of the new properties
+ *	passed in step 1, are appended to the newly set properties.
+ */
+int
+sa_zfs_setprop(sa_handle_t handle, char *path, nvlist_t *nvl)
+{
+	zfs_handle_t *z_fs;
+	libzfs_handle_t *z_lib;
+	char sharesmb_val[MAXPATHLEN];
+	char *dataset, *lastcomma;
+
+	if (nvlist_empty(nvl))
+		return (0);
+
+	if ((handle == NULL) || (path == NULL))
+		return (-1);
+
+	if ((dataset = get_zfs_dataset(handle, path, B_FALSE)) == NULL)
+		return (-1);
+
+	if ((z_lib = libzfs_init()) == NULL) {
+		free(dataset);
+		return (-1);
+	}
+
+	z_fs = zfs_open(z_lib, dataset, ZFS_TYPE_DATASET);
+	if (z_fs == NULL) {
+		free(dataset);
+		libzfs_fini(z_lib);
+		return (-1);
+	}
+
+	bzero(sharesmb_val, MAXPATHLEN);
+	if (sa_zfs_sprintf_new_prop(nvl, sharesmb_val) != 0) {
+		free(dataset);
+		zfs_close(z_fs);
+		libzfs_fini(z_lib);
+		return (-1);
+	}
+
+	if (sa_zfs_sprintf_existing_prop(z_fs, sharesmb_val) != 0) {
+		free(dataset);
+		zfs_close(z_fs);
+		libzfs_fini(z_lib);
+		return (-1);
+	}
+
+	lastcomma = strrchr(sharesmb_val, ',');
+	if ((lastcomma != NULL) && (lastcomma[1] == '\0'))
+		*lastcomma = '\0';
+
+	(void) zfs_prop_set(z_fs, zfs_prop_to_name(ZFS_PROP_SHARESMB),
+	    sharesmb_val);
+	free(dataset);
+	zfs_close(z_fs);
+	libzfs_fini(z_lib);
+
+	return (0);
 }

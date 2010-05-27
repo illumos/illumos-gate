@@ -19,9 +19,121 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
+%#if	defined(_KERNEL)
+%#include <sys/nvpair.h>
+%#else
+%#include <libnvpair.h>
+%#endif
+
+/*
+ * XDR support for nvlist_t.  libnvpair includes support for serializing
+ * an nvlist, but does not include any direct XDR plug-in support.  Support
+ * is made trickier by the fact that on read xdr_pointer() wants to allocate
+ * structures on its own, even when there's a custom xdr_*() function for
+ * the structure.  nvlist_unpack *also* wants to allocate the nvlist_t,
+ * and it seems wrong to burn sizeof(nvlist_t) into the program binary.
+ *
+ * Another possibility is to use opaque<> in this declaration, but that
+ * requires moving part of the encoding (the interaction with nvlist_pack
+ * and nvlist_unpack) out into the application, instead of keeping it
+ * all encapsulated in this layer.
+ *
+ * The resolution here is to put an nvlist_t * into a new typedef, and have
+ * *that* typedef have a custom xdr_*() function.  xdr allocates space for
+ * the pointer, but leaves all initialization of it nvlist_t *) to the
+ * custom function.
+ */
+#if	defined(RPC_HDR)
+%typedef nvlist_t *nvlist_t_ptr;
+#endif
+
+#if	defined(RPC_XDR)
+%#if	!defined(_KERNEL)
+%#include <string.h>
+%#include <stdio.h>
+%#endif
+%
+%bool_t
+%xdr_nvlist_t_ptr(XDR *xdrs, nvlist_t_ptr *n)
+%{
+%	char *buf;
+%	u_int len;
+%	bool_t ret;
+%	int err;
+%	size_t	sz;
+%	bool_t	present;
+%
+%	switch (xdrs->x_op) {
+%	case XDR_DECODE:
+%		if (!xdr_bool(xdrs, &present))
+%			return (FALSE);
+%		if (!present) {
+%			*n = NULL;
+%			return (TRUE);
+%		}
+%		buf = NULL;
+%		if (!xdr_bytes(xdrs, &buf, &len, ~0))
+%			return (FALSE);
+%
+%		err = nvlist_unpack(buf, (size_t)len, n, 0);
+%#if	defined(_KERNEL)
+%		kmem_free(buf, len);
+%#else
+%		free(buf);
+%#endif
+%
+%		if (err != 0) {
+%#if	!defined(_KERNEL)
+%			fprintf(stderr, "xdr_nvlist_t unpack:  %s\n",
+%			    strerror(err));
+%#endif
+%			return (FALSE);
+%		}
+%		return (TRUE);
+%
+%	case XDR_ENCODE:
+%		present = (*n != NULL);
+%		if (!xdr_bool(xdrs, &present))
+%			return (FALSE);
+%		if (!present)
+%			return (TRUE);
+%		buf = NULL;
+%		err = nvlist_pack(*n, &buf, &sz, NV_ENCODE_XDR, 0);
+%		if (err != 0) {
+%#if	!defined(_KERNEL)
+%			fprintf(stderr, "xdr_nvlist_t pack:  %s\n",
+%			    strerror(err));
+%#endif
+%			return (FALSE);
+%		}
+%
+%		/* nvlist_pack() and xdr_bytes() want different types */
+%		len = (u_int) sz;
+%
+%		ret = xdr_bytes(xdrs, &buf, &len, ~0);
+%#if	defined(_KERNEL)
+%		kmem_free(buf, len);
+%#else
+%		free(buf);
+%#endif
+%
+%		return (ret);
+%
+%	case XDR_FREE:
+%		if (*n != NULL) {
+%			nvlist_free(*n);
+%			*n = NULL;
+%		}
+%		return (TRUE);
+%
+%	default:
+%		return (FALSE);
+%	}
+%}
+#endif
 
 /* opaque type to support non-ASCII strings */
 typedef	string	idmap_utf8str<>;
@@ -119,6 +231,7 @@ union idmap_how switch(idmap_map_type map_type) {
 struct idmap_info {
 	idmap_map_src	src;
 	idmap_how	how;
+	nvlist_t_ptr	trace;
 };
 
 
@@ -160,6 +273,9 @@ const IDMAP_REQ_FLG_MAPPING_INFO	= 0x00000008;
 /* Request mapping for well-known or local SIDs only */
 const IDMAP_REQ_FLG_WK_OR_LOCAL_SIDS_ONLY	= 0x00000020;
 
+/* Request trace of mapping process */
+const IDMAP_REQ_FLG_TRACE	= 0x00000040;
+
 
 /*
  * Mapping direction definitions
@@ -185,6 +301,7 @@ struct idmap_mapping {
 
 typedef idmap_mapping	idmap_mapping_batch<>;
 
+#ifndef IDMAP_XDR_MAPPING_ONLY
 struct idmap_mappings_res {
 	idmap_retcode		retcode;
 	uint64_t		lastrowid;
@@ -218,7 +335,6 @@ typedef idmap_update_op idmap_update_batch<>;
 
 const AD_DISC_MAXHOSTNAME = 256;
 
-#ifndef _KERNEL
 struct idmap_ad_disc_ds_t {
 	int	port;
 	int	priority;
@@ -269,7 +385,6 @@ struct idmap_prop_res {
 	idmap_prop_val	value;
 	bool		auto_discovered;
 };
-#endif
 
 enum idmap_flush_op {
 	IDMAP_FLUSH_EXPIRE = 0,
@@ -345,16 +460,20 @@ union directory_results_rpc switch (bool failed) {
 	case FALSE:
 		directory_entry_rpc	entries<>;
 };
+#endif	/* IDMAP_XDR_MAPPING_ONLY */
 
 program IDMAP_PROG {
 	version IDMAP_V1 {
+#ifndef	IDMAP_XDR_MAPPING_ONLY
 		void
 		IDMAP_NULL(void) = 0;
+#endif	/* IDMAP_XDR_MAPPING_ONLY */
 
 		/* Batch of requests to get mapped identities */
 		idmap_ids_res
 		IDMAP_GET_MAPPED_IDS(idmap_mapping_batch batch) = 1;
 
+#ifndef	IDMAP_XDR_MAPPING_ONLY
 		/* List all identity mappings */
 		idmap_mappings_res
 		IDMAP_LIST_MAPPINGS(int64_t lastrowid,
@@ -373,11 +492,10 @@ program IDMAP_PROG {
 		idmap_mappings_res
 		IDMAP_GET_MAPPED_ID_BY_NAME(idmap_mapping request) = 5;
 
-#ifndef _KERNEL 
 		/* Get configuration property */
 		idmap_prop_res
 		IDMAP_GET_PROP(idmap_prop_type) = 6;
-#endif
+
 		/*
 		 * Retrieve directory information about a list of users
 		 * or groups by name or SID.
@@ -402,5 +520,6 @@ program IDMAP_PROG {
 
 		idmap_retcode
 		IDMAP_FLUSH(idmap_flush_op) = 8;
+#endif	/* IDMAP_XDR_MAPPING_ONLY */
 	} = 1;
 } = 100172;

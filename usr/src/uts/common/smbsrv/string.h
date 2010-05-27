@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SMBSRV_STRING_H
@@ -124,9 +123,8 @@ int smb_isstrupr(const char *);
 int smb_isstrlwr(const char *);
 int smb_strcasecmp(const char *, const char *, size_t);
 
-int smb_match(char *patn, char *str);
-int smb_match_ci(char *patn, char *str);
-int smb_match83(char *patn, char *str83);
+boolean_t smb_match(char *, char *);
+boolean_t smb_match_ci(char *, char *);
 
 size_t smb_mbstowcs(smb_wchar_t *, const char *, size_t);
 size_t smb_wcstombs(char *, const smb_wchar_t *, size_t);

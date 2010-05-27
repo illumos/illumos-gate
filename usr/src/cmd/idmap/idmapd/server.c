@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -123,10 +122,10 @@ validate_mapped_id_by_name_req(idmap_mapping *req)
 {
 	int e;
 
-	if (IS_REQUEST_UID(*req) || IS_REQUEST_GID(*req))
+	if (IS_ID_UID(req->id1) || IS_ID_GID(req->id1))
 		return (IDMAP_SUCCESS);
 
-	if (IS_REQUEST_SID(*req, 1)) {
+	if (IS_ID_SID(req->id1)) {
 		if (!EMPTY_STRING(req->id1name) &&
 		    u8_validate(req->id1name, strlen(req->id1name),
 		    NULL, U8_VALIDATE_ENTIRE, &e) < 0)
@@ -186,6 +185,9 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	lookup_state_t	state;
 	idmap_retcode	retcode;
 	uint_t		i;
+	idmap_mapping	*req;
+	idmap_id_res	*res;
+	boolean_t	any_tracing;
 
 	/* Init */
 	(void) memset(result, 0, sizeof (*result));
@@ -241,28 +243,34 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	/* Init our 'done' flags */
 	state.sid2pid_done = state.pid2sid_done = TRUE;
 
+	any_tracing = B_FALSE;
+
 	/* First stage */
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+		req = &batch.idmap_mapping_batch_val[i];
+		res = &result->ids.ids_val[i];
+		if (TRACING(req))
+			any_tracing = B_TRUE;
 		state.curpos = i;
-		(void) sanitize_mapping_request(
-		    &batch.idmap_mapping_batch_val[i]);
-		if (IS_BATCH_SID(batch, i)) {
+		(void) sanitize_mapping_request(req);
+		TRACE(req, res, "Start mapping");
+		if (IS_ID_SID(req->id1)) {
 			retcode = sid2pid_first_pass(
 			    &state,
-			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i]);
-		} else if (IS_BATCH_UID(batch, i)) {
+			    req,
+			    res);
+		} else if (IS_ID_UID(req->id1)) {
 			retcode = pid2sid_first_pass(
 			    &state,
-			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i], 1);
-		} else if (IS_BATCH_GID(batch, i)) {
+			    req,
+			    res, 1);
+		} else if (IS_ID_GID(req->id1)) {
 			retcode = pid2sid_first_pass(
 			    &state,
-			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i], 0);
+			    req,
+			    res, 0);
 		} else {
-			result->ids.ids_val[i].retcode = IDMAP_ERR_IDTYPE;
+			res->retcode = IDMAP_ERR_IDTYPE;
 			continue;
 		}
 		if (IDMAP_FATAL_ERROR(retcode)) {
@@ -288,8 +296,22 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	if (state.nldap_nqueries) {
 		retcode = nldap_lookup_batch(&state, &batch, result);
 		if (IDMAP_FATAL_ERROR(retcode)) {
+			TRACE(req, res, "Native LDAP lookup error=%d", retcode);
 			result->retcode = retcode;
 			goto out;
+		}
+		if (any_tracing) {
+			for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+				res = &result->ids.ids_val[i];
+				req = &batch.idmap_mapping_batch_val[i];
+				if (IDMAP_ERROR(res->retcode)) {
+					TRACE(req, res,
+					    "Native LDAP lookup error=%d",
+					    res->retcode);
+				} else {
+					TRACE(req, res, "Native LDAP lookup");
+				}
+			}
 		}
 	}
 
@@ -310,8 +332,44 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	if (state.ad_nqueries) {
 		retcode = ad_lookup_batch(&state, &batch, result);
 		if (IDMAP_FATAL_ERROR(retcode)) {
+			TRACE(req, res, "AD lookup error=%d", retcode);
 			result->retcode = retcode;
 			goto out;
+		}
+		for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+			res = &result->ids.ids_val[i];
+			req = &batch.idmap_mapping_batch_val[i];
+			if (res->retcode == IDMAP_ERR_DOMAIN_NOTFOUND &&
+			    req->id1.idmap_id_u.sid.prefix != NULL &&
+			    req->id1name != NULL) {
+				/*
+				 * If AD lookup failed Domain Not Found but
+				 * we have a winname and SID, it means that
+				 * - LSA succeeded
+				 * - it's a request a cross-forest trust
+				 * and
+				 * - we were looking for directory-based
+				 *   mapping information.
+				 * In that case, we're OK, just go on.
+				 *
+				 * If this seems more convoluted than it
+				 * should be, it is - really, we probably
+				 * shouldn't even be attempting AD lookups
+				 * in this situation, but that's a more
+				 * intricate cleanup that will have to wait
+				 * for later.
+				 */
+				res->retcode = IDMAP_SUCCESS;
+				TRACE(req, res,
+				    "AD lookup - domain not found (ignored)");
+				continue;
+			}
+			if (res->retcode == IDMAP_SUCCESS)
+				TRACE(req, res, "Found in AD");
+			else if (res->retcode == IDMAP_ERR_NOTFOUND)
+				TRACE(req, res, "Not found in AD");
+			else
+				TRACE(req, res, "AD lookup error");
 		}
 	}
 
@@ -324,8 +382,16 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	if (state.nldap_nqueries) {
 		retcode = nldap_lookup_batch(&state, &batch, result);
 		if (IDMAP_FATAL_ERROR(retcode)) {
+			TRACE(req, res, "Native LDAP lookup error=%d", retcode);
 			result->retcode = retcode;
 			goto out;
+		}
+		if (any_tracing) {
+			for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+				res = &result->ids.ids_val[i];
+				req = &batch.idmap_mapping_batch_val[i];
+				TRACE(req, res, "Native LDAP lookup");
+			}
 		}
 	}
 
@@ -334,22 +400,24 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/* Second stage */
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+		req = &batch.idmap_mapping_batch_val[i];
+		res = &result->ids.ids_val[i];
 		state.curpos = i;
-		if (IS_BATCH_SID(batch, i)) {
+		if (IS_ID_SID(req->id1)) {
 			retcode = sid2pid_second_pass(
 			    &state,
-			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i]);
-		} else if (IS_BATCH_UID(batch, i)) {
+			    req,
+			    res);
+		} else if (IS_ID_UID(req->id1)) {
 			retcode = pid2sid_second_pass(
 			    &state,
-			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i], 1);
-		} else if (IS_BATCH_GID(batch, i)) {
+			    req,
+			    res, 1);
+		} else if (IS_ID_GID(req->id1)) {
 			retcode = pid2sid_second_pass(
 			    &state,
-			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i], 0);
+			    req,
+			    res, 0);
 		} else {
 			/* First stage has already set the error */
 			continue;
@@ -373,18 +441,20 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		goto out;
 
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+		req = &batch.idmap_mapping_batch_val[i];
+		res = &result->ids.ids_val[i];
 		state.curpos = i;
-		if (IS_BATCH_SID(batch, i)) {
+		if (IS_ID_SID(req->id1)) {
 			(void) update_cache_sid2pid(
 			    &state,
-			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i]);
-		} else if ((IS_BATCH_UID(batch, i)) ||
-		    (IS_BATCH_GID(batch, i))) {
+			    req,
+			    res);
+		} else if ((IS_ID_UID(req->id1)) ||
+		    (IS_ID_GID(req->id1))) {
 			(void) update_cache_pid2sid(
 			    &state,
-			    &batch.idmap_mapping_batch_val[i],
-			    &result->ids.ids_val[i]);
+			    req,
+			    res);
 		}
 	}
 
@@ -399,11 +469,36 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 out:
 	cleanup_lookup_state(&state);
 	if (IDMAP_ERROR(result->retcode)) {
+		if (any_tracing) {
+			for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+				req = &batch.idmap_mapping_batch_val[i];
+				res = &result->ids.ids_val[i];
+				TRACE(req, res,
+				    "Failure code %d", result->retcode);
+			}
+		}
 		xdr_free(xdr_idmap_ids_res, (caddr_t)result);
 		result->ids.ids_len = 0;
 		result->ids.ids_val = NULL;
+	} else {
+		if (any_tracing) {
+			for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+				req = &batch.idmap_mapping_batch_val[i];
+				res = &result->ids.ids_val[i];
+				TRACE(req, res, "Done");
+			}
+		}
 	}
 	result->retcode = idmap_stat4prot(result->retcode);
+
+	for (i = 0; i < result->ids.ids_len; i++) {
+		req = &batch.idmap_mapping_batch_val[i];
+		res = &result->ids.ids_val[i];
+
+		if (!(req->flag & IDMAP_REQ_FLG_MAPPING_INFO) &&
+		    res->retcode == IDMAP_SUCCESS)
+			idmap_how_clear(&res->info.how);
+	}
 	return (TRUE);
 }
 
@@ -1087,11 +1182,7 @@ idmap_get_mapped_id_by_name_1_svc(idmap_mapping request,
 
 	result->retcode = batch_result.ids.ids_val[0].retcode;
 
-	if (map->flag & IDMAP_REQ_FLG_MAPPING_INFO ||
-	    result->retcode != IDMAP_SUCCESS) {
-		(void) idmap_info_mov(&map->info,
-		    &batch_result.ids.ids_val[0].info);
-	}
+	idmap_info_mov(&map->info, &batch_result.ids.ids_val[0].info);
 
 out:
 	if (IDMAP_FATAL_ERROR(result->retcode)) {

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBMLSVC_H
@@ -95,10 +94,6 @@ int mlsvc_encrypt_nt_password(char *password, char *key, int keylen, char *out,
 
 #define	SMB_AUTOHOME_FILE	"smbautohome"
 #define	SMB_AUTOHOME_PATH	"/etc"
-#define	SMB_CVOL		"/var/smb/cvol"
-#define	SMB_SYSROOT		"/var/smb/cvol/windows"
-#define	SMB_SYSTEM32		"/var/smb/cvol/windows/system32"
-#define	SMB_VSS			"/var/smb/cvol/windows/system32/vss"
 
 typedef struct smb_autohome {
 	struct smb_autohome *ah_next;

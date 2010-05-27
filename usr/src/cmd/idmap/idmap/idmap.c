@@ -117,6 +117,7 @@ id_code_t identity2code[] = {
 #define	n_FLAG	'n'
 #define	c_FLAG	'c'
 #define	v_FLAG	'v'
+#define	V_FLAG	'V'
 #define	j_FLAG	'j'
 
 
@@ -256,7 +257,7 @@ static int do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static cmd_ops_t commands[] = {
 	{
 		"show",
-		"c(create)v(verbose)",
+		"c(create)v(verbose)V(trace)",
 		do_show_mapping
 	},
 	{
@@ -1462,9 +1463,6 @@ print_how(idmap_how *how)
 }
 
 
-
-
-
 static
 void
 print_info(idmap_info *info)
@@ -1488,6 +1486,11 @@ print_info(idmap_info *info)
 			break;
 		}
 		print_how(&info->how);
+	}
+
+	if (info->trace != NULL) {
+		(void) printf(gettext("Trace:\n"));
+		idmap_trace_print(stdout, "\t", info->trace);
 	}
 }
 
@@ -1571,6 +1574,11 @@ print_error_info(idmap_info *info)
 		    CHECK_NULL(how->idmap_how_u.idmu.value));
 		break;
 	}
+
+	if (info->trace != NULL) {
+		(void) printf(gettext("Trace:\n"));
+		idmap_trace_print(stderr, "\t", info->trace);
+	}
 }
 
 
@@ -1627,7 +1635,7 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 
 		if (stat >= 0) {
 			(void) print_mapping(ph, nm);
-			(void) print_how(&info.how);
+			print_how(&info.how);
 			idmap_info_free(&info);
 		}
 		name_mapping_fini(nm);
@@ -2952,8 +2960,13 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		return (-1);
 	}
 
-	flag = f[c_FLAG] != NULL ? 0 : IDMAP_REQ_FLG_NO_NEW_ID_ALLOC;
-	flag |= f[v_FLAG] == NULL ? 0 : IDMAP_REQ_FLG_MAPPING_INFO;
+	flag = 0;
+	if (f[c_FLAG] == NULL)
+		flag |= IDMAP_REQ_FLG_NO_NEW_ID_ALLOC;
+	if (f[v_FLAG] != NULL)
+		flag |= IDMAP_REQ_FLG_MAPPING_INFO;
+	if (f[V_FLAG] != NULL)
+		flag |= IDMAP_REQ_FLG_TRACE;
 
 	if (init_command())
 		return (-1);
@@ -3182,8 +3195,9 @@ errormsg:
 		print_error(pos, gettext("Error:\t%s\n"),
 		    idmap_stat2string(handle, map_stat));
 		print_error_info(&info);
-	} else
+	} else {
 		print_info(&info);
+	}
 	idmap_info_free(&info);
 
 cleanup:
@@ -3546,7 +3560,6 @@ static
 void
 idmap_cli_logger(int pri, const char *format, ...)
 {
-	NOTE(ARGUNUSED(pri))
 	va_list args;
 
 	if (pri == LOG_DEBUG)

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -61,19 +60,20 @@
 smb_sdrc_t
 smb_pre_tree_connect(smb_request_t *sr)
 {
-	int rc;
+	smb_arg_tcon_t	*tcon = &sr->sr_tcon;
+	int		rc;
 
 	/*
 	 * Perhaps this should be "%A.sA" now that unicode is enabled.
 	 */
-	rc = smbsr_decode_data(sr, "%AAA", sr, &sr->arg.tcon.path,
-	    &sr->arg.tcon.password, &sr->arg.tcon.service);
+	rc = smbsr_decode_data(sr, "%AAA", sr, &tcon->path,
+	    &tcon->password, &tcon->service);
 
-	sr->arg.tcon.flags = 0;
-	sr->arg.tcon.optional_support = 0;
+	tcon->flags = 0;
+	tcon->optional_support = 0;
 
 	DTRACE_SMB_2(op__TreeConnect__start, smb_request_t *, sr,
-	    struct tcon *, &sr->arg.tcon);
+	    smb_arg_tcon_t *, tcon);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -243,27 +243,28 @@ smb_com_tree_connect(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_tree_connect_andx(smb_request_t *sr)
 {
-	uint8_t *pwbuf = NULL;
-	uint16_t pwlen = 0;
-	int rc;
+	smb_arg_tcon_t	*tcon = &sr->sr_tcon;
+	uint8_t		*pwbuf = NULL;
+	uint16_t	pwlen = 0;
+	int		rc;
 
 	rc = smbsr_decode_vwv(sr, "b.www", &sr->andx_com, &sr->andx_off,
-	    &sr->arg.tcon.flags, &pwlen);
+	    &tcon->flags, &pwlen);
 	if (rc == 0) {
 		if (pwlen != 0)
 			pwbuf = smb_srm_zalloc(sr, pwlen);
 
 		rc = smbsr_decode_data(sr, "%#cus", sr, pwlen, pwbuf,
-		    &sr->arg.tcon.path, &sr->arg.tcon.service);
+		    &tcon->path, &tcon->service);
 
-		sr->arg.tcon.pwdlen = pwlen;
-		sr->arg.tcon.password = (char *)pwbuf;
+		tcon->pwdlen = pwlen;
+		tcon->password = (char *)pwbuf;
 	}
 
-	sr->arg.tcon.optional_support = 0;
+	tcon->optional_support = 0;
 
 	DTRACE_SMB_2(op__TreeConnectX__start, smb_request_t *, sr,
-	    struct tcon *, &sr->arg.tcon);
+	    smb_arg_tcon_t *, tcon);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -277,9 +278,10 @@ smb_post_tree_connect_andx(smb_request_t *sr)
 smb_sdrc_t
 smb_com_tree_connect_andx(smb_request_t *sr)
 {
-	smb_tree_t *tree;
-	char *service;
-	int rc;
+	smb_arg_tcon_t	*tcon = &sr->sr_tcon;
+	smb_tree_t	*tree;
+	char		*service;
+	int		rc;
 
 	if ((tree = smb_tree_connect(sr)) == NULL)
 		return (SDRC_ERROR);
@@ -287,10 +289,17 @@ smb_com_tree_connect_andx(smb_request_t *sr)
 	sr->smb_tid = tree->t_tid;
 	sr->tid_tree = tree;
 
-	if (STYPE_ISIPC(tree->t_res_type))
+	switch (tree->t_res_type & STYPE_MASK) {
+	case STYPE_IPC:
 		service = "IPC";
-	else
+		break;
+	case STYPE_PRINTQ:
+		service = "LPT1:";
+		break;
+	case STYPE_DISKTREE:
+	default:
 		service = "A:";
+	}
 
 	if (sr->session->dialect < NT_LM_0_12) {
 		rc = smbsr_encode_result(sr, 2, VAR_BCC, "bb.wwss",
@@ -305,7 +314,7 @@ smb_com_tree_connect_andx(smb_request_t *sr)
 		    (char)3,		/* wct */
 		    sr->andx_com,
 		    (short)64,
-		    sr->arg.tcon.optional_support,
+		    tcon->optional_support,
 		    VAR_BCC,
 		    service,
 		    sr,
@@ -352,6 +361,10 @@ smb_com_tree_connect_andx(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_tree_disconnect(smb_request_t *sr)
 {
+	sr->uid_user = smb_session_lookup_uid(sr->session, sr->smb_uid);
+	if (sr->uid_user != NULL)
+		sr->tid_tree = smb_user_lookup_tree(sr->uid_user, sr->smb_tid);
+
 	DTRACE_SMB_1(op__TreeDisconnect__start, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
@@ -376,11 +389,6 @@ smb_post_tree_disconnect(smb_request_t *sr)
 smb_sdrc_t
 smb_com_tree_disconnect(smb_request_t *sr)
 {
-	sr->uid_user = smb_session_lookup_uid(sr->session, sr->smb_uid);
-	if (sr->uid_user != NULL)
-		sr->tid_tree = smb_user_lookup_tree(sr->uid_user,
-		    sr->smb_tid);
-
 	if (sr->uid_user == NULL || sr->tid_tree == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRinvnid);
 		return (SDRC_ERROR);

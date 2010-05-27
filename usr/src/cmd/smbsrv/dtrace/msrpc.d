@@ -19,9 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -150,7 +150,7 @@ smb_com_logoff_andx:return
 /*
  * Raise error functions (no return).
  */
-smbsr_error:entry
+smbsr_status:entry
 {
     printf("status=0x%08x class=%d, code=%d", arg1, arg2, arg3);
 }
@@ -160,7 +160,7 @@ smbsr_errno:entry
     printf("errno=%d", arg1);
 }
 
-smbsr_error:return,
+smbsr_status:return,
 smbsr_errno:return
 {
 }

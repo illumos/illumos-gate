@@ -53,6 +53,9 @@
 #include <sys/sid.h>
 #include <sys/idmap.h>
 #include <pthread.h>
+#include <stdarg.h>
+#include <assert.h>
+#include <note.h>
 
 static void	term_handler(int);
 static void	init_idmapd();
@@ -63,30 +66,12 @@ idmapd_state_t	_idmapdstate;
 SVCXPRT *xprt = NULL;
 
 static int dfd = -1;		/* our door server fildes, for unregistration */
-static int degraded = 0;	/* whether the FMRI has been marked degraded */
+static boolean_t degraded = B_FALSE;
 
 
 static uint32_t		num_threads = 0;
 static pthread_key_t	create_threads_key;
 static uint32_t		max_threads = 40;
-
-
-/*
- * The following structure determines where the log messages from idmapdlog()
- * go to. It can be stderr (idmapd -d) and/or the real idmapdlog (idmapd).
- *
- * logstate.max_pri is integer cutoff necessary to silence low-priority
- * messages to stderr. idmapdlog has its own means so there a boolean
- * logstate.write_idmapdlog is enough.
- *
- * logstate.degraded is a mode used by idmapd in its degraded state.
- */
-
-static struct {
-	boolean_t write_syslog;
-	int max_pri; /* Max priority written to stderr */
-	boolean_t degraded;
-} logstate = {B_FALSE, LOG_DEBUG, B_FALSE};
 
 /*
  * Server door thread start routine.
@@ -193,16 +178,8 @@ term_handler(int sig)
 static void
 usr1_handler(int sig)
 {
-	boolean_t saved_debug_mode = _idmapdstate.debug_mode;
-
-	_idmapdstate.debug_mode = B_TRUE;
-	idmap_log_stderr(LOG_DEBUG);
-
+	NOTE(ARGUNUSED(sig))
 	print_idmapdstate();
-
-	_idmapdstate.debug_mode = saved_debug_mode;
-	idmap_log_stderr(_idmapdstate.daemon_mode ? -1 : LOG_DEBUG);
-
 }
 
 static int pipe_fd = -1;
@@ -274,7 +251,6 @@ main(int argc, char **argv)
 	struct rlimit rl;
 
 	_idmapdstate.daemon_mode = TRUE;
-	_idmapdstate.debug_mode = FALSE;
 	while ((c = getopt(argc, argv, "d")) != -1) {
 		switch (c) {
 			case 'd':
@@ -293,8 +269,6 @@ main(int argc, char **argv)
 
 	idmap_set_logger(idmapdlog);
 	adutils_set_logger(idmapdlog);
-	idmap_log_syslog(B_TRUE);
-	idmap_log_stderr(_idmapdstate.daemon_mode ? -1 : LOG_DEBUG);
 
 	if (is_system_labeled() && getzoneid() != GLOBAL_ZONEID) {
 		idmapdlog(LOG_ERR,
@@ -373,7 +347,7 @@ init_idmapd()
 	 * one.
 	 */
 	(void) unlink(IDMAP_CACHEDIR "/ccache");
-	putenv("KRB5CCNAME=" IDMAP_CACHEDIR "/ccache");
+	(void) putenv("KRB5CCNAME=" IDMAP_CACHEDIR "/ccache");
 
 	if (sysinfo(SI_HOSTNAME, _idmapdstate.hostname,
 	    sizeof (_idmapdstate.hostname)) == -1) {
@@ -433,7 +407,8 @@ init_idmapd()
 		_idmapdstate.limit_gid = _idmapdstate.next_gid + 8192;
 	}
 
-	print_idmapdstate();
+	if (DBG(CONFIG, 1))
+		print_idmapdstate();
 
 	return;
 
@@ -445,7 +420,7 @@ errout:
 static void
 fini_idmapd()
 {
-	__idmap_unreg(dfd);
+	(void) __idmap_unreg(dfd);
 	fini_mapping_system();
 	if (xprt != NULL)
 		svc_destroy(xprt);
@@ -492,13 +467,10 @@ degrade_svc(int poke_discovery, const char *reason)
 	if (degraded)
 		return;
 
-	idmapdlog(LOG_ERR, "Degraded operation (%s).  If you are running an "
-	    "SMB server in workgroup mode, or if you're not running an SMB "
-	    "server, then you can ignore this message", reason);
+	idmapdlog(LOG_ERR, "Degraded operation (%s).", reason);
 
 	membar_producer();
-	degraded = 1;
-	idmap_log_degraded(B_TRUE);
+	degraded = B_TRUE;
 
 	if ((fmri = get_fmri()) != NULL)
 		(void) smf_degrade_instance(fmri, 0);
@@ -524,8 +496,7 @@ restore_svc(void)
 		(void) smf_restore_instance(fmri);
 
 	membar_producer();
-	degraded = 0;
-	idmap_log_degraded(B_FALSE);
+	degraded = B_FALSE;
 
 	idmapdlog(LOG_NOTICE, "Normal operation restored");
 }
@@ -536,41 +507,152 @@ void
 idmapdlog(int pri, const char *format, ...) {
 	va_list args;
 
-	if (pri <= logstate.max_pri) {
-		va_start(args, format);
-		(void) vfprintf(stderr, format, args);
-		(void) fprintf(stderr, "\n");
-		va_end(args);
-	}
+	va_start(args, format);
+	(void) vfprintf(stderr, format, args);
+	(void) fprintf(stderr, "\n");
+	va_end(args);
 
 	/*
 	 * We don't want to fill up the logs with useless messages when
 	 * we're degraded, but we still want to log.
 	 */
-	if (logstate.degraded)
+	if (degraded)
 		pri = LOG_DEBUG;
 
-	if (logstate.write_syslog) {
-		va_start(args, format);
-		vsyslog(pri, format, args);
-		va_end(args);
+	va_start(args, format);
+	vsyslog(pri, format, args);
+	va_end(args);
+}
+
+static void
+trace_str(nvlist_t *entry, char *n1, char *n2, char *str)
+{
+	char name[IDMAP_TRACE_NAME_MAX+1];	/* Max used is only about 11 */
+
+	(void) strlcpy(name, n1, sizeof (name));
+	if (n2 != NULL)
+		(void) strlcat(name, n2, sizeof (name));
+
+	(void) nvlist_add_string(entry, name, str);
+}
+
+static void
+trace_int(nvlist_t *entry, char *n1, char *n2, int64_t i)
+{
+	char name[IDMAP_TRACE_NAME_MAX+1];	/* Max used is only about 11 */
+
+	(void) strlcpy(name, n1, sizeof (name));
+	if (n2 != NULL)
+		(void) strlcat(name, n2, sizeof (name));
+
+	(void) nvlist_add_int64(entry, name, i);
+}
+
+static void
+trace_sid(nvlist_t *entry, char *n1, char *n2, idmap_sid *sid)
+{
+	char *str;
+
+	(void) asprintf(&str, "%s-%u", sid->prefix, sid->rid);
+	if (str == NULL)
+		return;
+
+	trace_str(entry, n1, n2, str);
+	free(str);
+}
+
+static void
+trace_id(nvlist_t *entry, char *fromto, idmap_id *id, char *name, char *domain)
+{
+	trace_int(entry, fromto, IDMAP_TRACE_TYPE, (int64_t)id->idtype);
+	if (IS_ID_SID(*id)) {
+		if (name != NULL) {
+			char *str;
+
+			(void) asprintf(&str, "%s%s%s", name,
+			    domain == NULL ? "" : "@",
+			    domain == NULL ? "" : domain);
+			if (str != NULL) {
+				trace_str(entry, fromto, IDMAP_TRACE_NAME, str);
+				free(str);
+			}
+		}
+		if (id->idmap_id_u.sid.prefix != NULL) {
+			trace_sid(entry, fromto, IDMAP_TRACE_SID,
+			    &id->idmap_id_u.sid);
+		}
+	} else if (IS_ID_POSIX(*id)) {
+		if (name != NULL)
+			trace_str(entry, fromto, IDMAP_TRACE_NAME, name);
+		if (id->idmap_id_u.uid != IDMAP_SENTINEL_PID) {
+			trace_int(entry, fromto, IDMAP_TRACE_UNIXID,
+			    (int64_t)id->idmap_id_u.uid);
+		}
 	}
 }
 
-void
-idmap_log_stderr(int pri)
+/*
+ * Record a trace event.  TRACE() has already decided whether or not
+ * tracing is required; what we do here is collect the data and send it
+ * to its destination - to the trace log in the response, if
+ * IDMAP_REQ_FLG_TRACE is set, and to the SMF service log, if debug/mapping
+ * is greater than zero.
+ */
+int
+trace(idmap_mapping *req, idmap_id_res *res, char *fmt, ...)
 {
-	logstate.max_pri = pri;
-}
+	va_list va;
+	char *buf;
+	int err;
+	nvlist_t *entry;
 
-void
-idmap_log_syslog(boolean_t what)
-{
-	logstate.write_syslog = what;
-}
+	assert(req != NULL);
+	assert(res != NULL);
 
-void
-idmap_log_degraded(boolean_t what)
-{
-	logstate.degraded = what;
+	err = nvlist_alloc(&entry, NV_UNIQUE_NAME, 0);
+	if (err != 0) {
+		(void) fprintf(stderr, "trace nvlist_alloc(entry):  %s\n",
+		    strerror(err));
+		return (0);
+	}
+
+	trace_id(entry, "from", &req->id1, req->id1name, req->id1domain);
+	trace_id(entry, "to", &res->id, req->id2name, req->id2domain);
+
+	if (IDMAP_ERROR(res->retcode)) {
+		trace_int(entry, IDMAP_TRACE_ERROR, NULL,
+		    (int64_t)res->retcode);
+	}
+
+	va_start(va, fmt);
+	(void) vasprintf(&buf, fmt, va);
+	va_end(va);
+	if (buf != NULL) {
+		trace_str(entry, IDMAP_TRACE_MESSAGE, NULL, buf);
+		free(buf);
+	}
+
+	if (DBG(MAPPING, 1))
+		idmap_trace_print_1(stderr, "", entry);
+
+	if (req->flag & IDMAP_REQ_FLG_TRACE) {
+		/* Lazily allocate the trace list */
+		if (res->info.trace == NULL) {
+			err = nvlist_alloc(&res->info.trace, 0, 0);
+			if (err != 0) {
+				res->info.trace = NULL; /* just in case */
+				(void) fprintf(stderr,
+				    "trace nvlist_alloc(trace):  %s\n",
+				    strerror(err));
+				nvlist_free(entry);
+				return (0);
+			}
+		}
+		(void) nvlist_add_nvlist(res->info.trace, "", entry);
+		/* Note that entry is copied, so we must still free our copy */
+	}
+
+	nvlist_free(entry);
+
+	return (0);
 }

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -53,18 +52,28 @@ static void smb_lock_destroy(smb_lock_t *);
 static void smb_lock_free(smb_lock_t *);
 
 /*
- * Return the number of range locks on the specified node.
+ * Return the number of range locks on the specified ofile.
  */
 uint32_t
-smb_lock_get_lock_count(smb_node_t *node)
+smb_lock_get_lock_count(smb_node_t *node, smb_ofile_t *of)
 {
-	uint32_t	count;
+	smb_lock_t 	*lock;
+	smb_llist_t	*llist;
+	uint32_t	count = 0;
 
 	SMB_NODE_VALID(node);
+	SMB_OFILE_VALID(of);
 
-	smb_llist_enter(&node->n_lock_list, RW_READER);
-	count = smb_llist_get_count(&node->n_ofile_list);
-	smb_llist_exit(&node->n_lock_list);
+	llist = &node->n_lock_list;
+
+	smb_llist_enter(llist, RW_READER);
+	for (lock = smb_llist_head(llist);
+	    lock != NULL;
+	    lock = smb_llist_next(llist, lock)) {
+		if (lock->l_file == of)
+			++count;
+	}
+	smb_llist_exit(llist);
 
 	return (count);
 }

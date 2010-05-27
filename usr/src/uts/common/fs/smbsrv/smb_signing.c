@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 /*
  * These routines provide the SMB MAC signing for the SMB server.
  * The routines calculate the signature of a SMB message in an mbuf chain.
@@ -56,25 +54,29 @@ smb_sign_calc(struct mbuf_chain *mbc,
 
 #ifdef DEBUG
 void smb_sign_find_seqnum(
+    uint32_t seqnum,
     struct smb_sign *sign,
     struct mbuf_chain *command,
     unsigned char *mac_sig,
     unsigned char *sr_sig,
     boolean_t *found);
-
-#define	SMB_CHECK_SEQNUM(sign, command, mac_sig, sr_sig, found) \
+#define	SMB_CHECK_SEQNUM(seqnum, sign, command, mac_sig, sr_sig, found) \
 { \
 	if (smb_sign_debug) \
-		smb_sign_find_seqnum(sign, command, mac_sig, sr_sig, found); \
+		smb_sign_find_seqnum(seqnum, sign, \
+		    command, mac_sig, sr_sig, found); \
 }
 #else
-#define	SMB_CHECK_SEQNUM(sign, command, mac_sig, sr_sig, found) \
-	{  }
+#define	SMB_CHECK_SEQNUM(seqnum, sign, command, mac_sig, sr_sig, found) \
+	{ \
+		*found = 0; \
+	}
 #endif
 
 #ifdef DEBUG
 void
 smb_sign_find_seqnum(
+    uint32_t seqnum,
     struct smb_sign *sign,
     struct mbuf_chain *command,
     unsigned char *mac_sig,
@@ -86,21 +88,22 @@ int i;
 
 	/* Debug code to hunt for the sequence number */
 	*found = B_FALSE;
-	start_seqnum = (int)sign->seqnum - 6;
+	start_seqnum = seqnum - 10;
 	if (start_seqnum < 0)
 		start_seqnum = 0;
-	for (i = start_seqnum; i <= start_seqnum + 6; i++) {
+	for (i = start_seqnum; i <= start_seqnum + 20; i++) {
 		(void) smb_sign_calc(command, sign, i, mac_sig);
 		if (memcmp(mac_sig, sr_sig, SMB_SIG_SIZE) == 0) {
 			sign->seqnum = i;
 			*found = B_TRUE;
 			break;
 		}
-		cmn_err(CE_WARN, "smb_sign_find_seqnum: seqnum%d mismatch", i);
+		cmn_err(CE_WARN, "smb_sign_find_seqnum: seqnum:%d mismatch", i);
 	}
 	cmn_err(CE_WARN, "smb_sign_find_seqnum: found=%d", *found);
 }
 #endif
+
 /* This holds the MD5 mechanism */
 static	crypto_mechanism_t crypto_mech = {CRYPTO_MECHANISM_INVALID, 0, 0};
 
@@ -143,8 +146,9 @@ smb_sign_init(smb_request_t *sr, smb_session_key_t *session_key,
 	    resp_len);
 	sign->mackey_len = sizeof (smb_session_key_t) + resp_len;
 
+	sr->session->signing.seqnum = 0;
+	sr->sr_seqnum = 2;
 	sr->reply_seqnum = 1;
-	sign->seqnum = 2;
 	sign->flags = SMB_SIGNING_ENABLED;
 
 }
@@ -327,6 +331,7 @@ smb_sign_check_request(smb_request_t *sr)
 	struct smb_sign *sign = &sr->session->signing;
 	int rtn = 0;
 	boolean_t found = B_TRUE;
+
 	/*
 	 * Don't check secondary transactions - we dont know the sequence
 	 * number.
@@ -340,34 +345,22 @@ smb_sign_check_request(smb_request_t *sr)
 	command.chain_offset = sr->orig_request_hdr;
 
 	/* calculate mac signature */
-	if (smb_sign_calc(&command, sign, sign->seqnum, mac_sig) != 0)
+	if (smb_sign_calc(&command, sign, sr->sr_seqnum, mac_sig) != 0)
 		return (-1);
 
 	/* compare the signatures */
 	if (memcmp(mac_sig, sr->smb_sig, SMB_SIG_SIZE) != 0) {
 		DTRACE_PROBE2(smb__signing__req, smb_request_t, sr,
 		    smb_sign_t *, sr->smb_sig);
-		cmn_err(CE_NOTE, "message signing: bad signature");
+		cmn_err(CE_NOTE, "smb_sign_check_request: bad signature");
 		/*
 		 * check nearby sequence numbers in debug mode
 		 */
-		SMB_CHECK_SEQNUM(sign, &command, mac_sig, sr->smb_sig, &found);
+		SMB_CHECK_SEQNUM(sr->sr_seqnum, sign, &command,
+		    mac_sig, sr->smb_sig, &found);
 		if (found == B_FALSE)
 			rtn = -1;
 	}
-	/*
-	 * Increment the sequence number for the reply, save the reply
-	 * and set it for the next expect command.
-	 * There is no reply for NT Cancel so just increment it for the
-	 * next expected command.
-	 */
-	sign->seqnum++;
-
-	if (sr->smb_com == SMB_COM_NT_CANCEL)
-		sr->reply_seqnum = 0;
-	else
-		sr->reply_seqnum = sign->seqnum++;
-
 	return (rtn);
 }
 
@@ -407,9 +400,6 @@ smb_sign_check_secondary(smb_request_t *sr, unsigned int reply_seqnum)
 	return (rtn);
 }
 
-
-
-
 /*
  * smb_sign_reply
  *
@@ -440,8 +430,10 @@ smb_sign_reply(smb_request_t *sr, struct mbuf_chain *reply)
 	/*
 	 * Calculate MAC signature
 	 */
-	if (smb_sign_calc(&resp, sign, sr->reply_seqnum, signature) != 0)
+	if (smb_sign_calc(&resp, sign, sr->reply_seqnum, signature) != 0) {
+		cmn_err(CE_WARN, "smb_sign_reply: error in smb_sign_calc");
 		return;
+	}
 
 	/*
 	 * Put signature in the response

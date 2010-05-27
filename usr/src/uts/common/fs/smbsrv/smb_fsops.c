@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -355,10 +354,9 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
 
 	/* Not a named stream */
 
-	if (smb_maybe_mangled_name(name)) {
+	if (smb_maybe_mangled(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dnode, name, longname,
-		    MAXNAMELEN, flags);
+		rc = smb_unmangle(dnode, name, longname, MAXNAMELEN, flags);
 		kmem_free(longname, MAXNAMELEN);
 
 		if (rc == 0)
@@ -468,7 +466,7 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
     smb_node_t *dnode, char *name, int flags,
     smb_attr_t *attr, smb_node_t **ret_snode)
 {
-	open_param_t	*op = &sr->arg.open;
+	smb_arg_open_t	*op = &sr->sr_open;
 	vnode_t		*vp;
 	smb_fssd_t	fs_sd;
 	uint32_t	secinfo;
@@ -586,10 +584,9 @@ smb_fsop_mkdir(
 	if (SMB_TREE_SUPPORTS_ABE(sr))
 		flags |= SMB_ABE;
 
-	if (smb_maybe_mangled_name(name)) {
+	if (smb_maybe_mangled(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dnode, name, longname,
-		    MAXNAMELEN, flags);
+		rc = smb_unmangle(dnode, name, longname, MAXNAMELEN, flags);
 		kmem_free(longname, MAXNAMELEN);
 
 		/*
@@ -749,7 +746,7 @@ smb_fsop_remove(
 		rc = smb_vop_remove(dnode->vp, name, flags, cr);
 
 		if (rc == ENOENT) {
-			if (smb_maybe_mangled_name(name) == 0) {
+			if (!smb_maybe_mangled(name)) {
 				kmem_free(fname, MAXNAMELEN);
 				kmem_free(sname, MAXNAMELEN);
 				return (rc);
@@ -759,8 +756,8 @@ smb_fsop_remove(
 			if (SMB_TREE_SUPPORTS_ABE(sr))
 				flags |= SMB_ABE;
 
-			rc = smb_unmangle_name(dnode, name,
-			    longname, MAXNAMELEN, flags);
+			rc = smb_unmangle(dnode, name, longname, MAXNAMELEN,
+			    flags);
 
 			if (rc == 0) {
 				/*
@@ -892,15 +889,14 @@ smb_fsop_rmdir(
 	rc = smb_vop_rmdir(dnode->vp, name, flags, cr);
 
 	if (rc == ENOENT) {
-		if (smb_maybe_mangled_name(name) == 0)
+		if (!smb_maybe_mangled(name))
 			return (rc);
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 		if (SMB_TREE_SUPPORTS_ABE(sr))
 			flags |= SMB_ABE;
-		rc = smb_unmangle_name(dnode, name, longname,
-		    MAXNAMELEN, flags);
+		rc = smb_unmangle(dnode, name, longname, MAXNAMELEN, flags);
 
 		if (rc == 0) {
 			/*
@@ -1035,10 +1031,10 @@ smb_fsop_link(smb_request_t *sr, cred_t *cr, smb_node_t *from_fnode,
 	if (SMB_TREE_SUPPORTS_ABE(sr))
 		flags |= SMB_ABE;
 
-	if (smb_maybe_mangled_name(to_name)) {
+	if (smb_maybe_mangled(to_name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(to_dnode, to_name,
-		    longname, MAXNAMELEN, flags);
+		rc = smb_unmangle(to_dnode, to_name, longname,
+		    MAXNAMELEN, flags);
 		kmem_free(longname, MAXNAMELEN);
 
 		if (rc == 0)
@@ -1593,6 +1589,13 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
  *
  * Return an error if the looked-up file is in outside the tree.
  * (Required when invoked from open path.)
+ *
+ * Case sensitivity flags (SMB_IGNORE_CASE, SMB_CASE_SENSITIVE):
+ * if SMB_CASE_SENSITIVE is set, the SMB_IGNORE_CASE flag will NOT be set
+ * based on the tree's case sensitivity. However, if the SMB_IGNORE_CASE
+ * flag is set in the flags value passed as a parameter, a case insensitive
+ * lookup WILL be done (regardless of whether SMB_CASE_SENSITIVE is set
+ * or not).
  */
 
 int
@@ -1622,8 +1625,10 @@ smb_fsop_lookup_name(
 	 * The following check is required for streams processing, below
 	 */
 
-	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
-		flags |= SMB_IGNORE_CASE;
+	if (!(flags & SMB_CASE_SENSITIVE)) {
+		if (SMB_TREE_IS_CASEINSENSITIVE(sr))
+			flags |= SMB_IGNORE_CASE;
+	}
 
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -1774,14 +1779,13 @@ smb_fsop_lookup(
 	    &ret_flags, root_node ? root_node->vp : NULL, &attr, cr);
 
 	if (rc != 0) {
-		if (smb_maybe_mangled_name(name) == 0) {
+		if (!smb_maybe_mangled(name)) {
 			kmem_free(od_name, MAXNAMELEN);
 			return (rc);
 		}
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dnode, name, longname,
-		    MAXNAMELEN, flags);
+		rc = smb_unmangle(dnode, name, longname, MAXNAMELEN, flags);
 		if (rc != 0) {
 			kmem_free(od_name, MAXNAMELEN);
 			kmem_free(longname, MAXNAMELEN);

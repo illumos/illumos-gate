@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -56,123 +55,38 @@ static char *special_chars = "[];=,+";
 
 #define	isinvalid(c)	(strchr(invalid_dos_chars, c) || (c & 0x80))
 
-static int smb_match_unknown(char *name, char *pattern);
 static boolean_t smb_is_reserved_dos_name(const char *name);
+static int smb_generate_mangle(uint64_t, char *, size_t);
+static char smb_mangle_char(char);
 
 /*
  * smb_match_name
  *
- * This function will mangle the "name" field and save the resulted
- * shortname to the "shortname" field and 8.3 name to "name83" field.
- * The three fields, "name", "shortname" and "name83" will then be
- * sent for pattern match with "pattern" field.
+ * Don't match reserved dos filenames.
+ * Check name to see if it matches pattern.
+ * Generate the shortname (even if !smb_needs_mangled()) since names may
+ * be mangled to address case conflicts) and check if shortname matches
+ * pattern.
  *
- * The 0 is returned when the name is a reserved dos name, no match
- * for the pattern or any type of failure. The 1 is returned when
- * there is a match.
+ * Returns: B_TRUE  - if there is a match
+ *          B_FALSE - otherwise
  */
-int
-smb_match_name(ino64_t fileid, char *name, char *pattern, boolean_t ignore_case)
+boolean_t
+smb_match_name(ino64_t fid, char *name, char *pattern)
 {
-	int rc = 0;
-	int force;
-	char name83[SMB_SHORTNAMELEN];
 	char shortname[SMB_SHORTNAMELEN];
 
-	/* Leading or trailing dots are disallowed */
 	if (smb_is_reserved_dos_name(name))
-		return (0);
+		return (B_FALSE);
 
-	for (force = 0; (force < 2 && rc == 0); force++) {
-		(void) smb_mangle_name(fileid, name, shortname, name83, force);
+	if (smb_match_ci(pattern, name))
+		return (B_TRUE);
 
-		rc = smb_match_ci(pattern, name);
+	smb_mangle(name, fid, shortname, SMB_SHORTNAMELEN);
+	if (smb_match_ci(pattern, shortname))
+		return (B_TRUE);
 
-		/* If no match, check for shortname (if any) */
-
-		if (rc == 0 && strchr(pattern, '~'))
-			if (*shortname != 0)
-				rc = smb_match_ci(pattern, shortname);
-
-		/*
-		 * Sigh... DOS Shells use short name
-		 * interchangeably with long case sensitive
-		 * names. So check that too...
-		 */
-		if ((rc == 0) && !ignore_case)
-			rc = smb_match83(pattern, name83);
-
-		/*
-		 * Still not found and potentially a premangled name...
-		 * Check to see if the butt-head programmer is
-		 * assuming that we mangle names in the same manner
-		 * as NT...
-		 */
-		if (rc == 0)
-			rc = smb_match_unknown(name, pattern);
-	}
-
-	return (rc);
-}
-
-/*
- * smb_match_unknown
- *
- * I couldn't figure out what the assumptions of this peice of
- * code about the format of pattern and name are and so how
- * it's trying to match them.  I just cleaned it up a little bit!
- *
- * If anybody could figure out what this is doing, please put
- * comment here and change the function's name!
- */
-static int
-smb_match_unknown(char *name, char *pattern)
-{
-	int rc;
-	char nc, pc;
-	char *np, *pp;
-
-	rc = 0;
-	if (smb_isstrupr(pattern) <= 0)
-		return (rc);
-
-	np = name;
-	pp = pattern;
-
-	pc = *pattern;
-	while ((nc = *np++) != 0) {
-		if (nc == ' ')
-			continue;
-
-		nc = smb_toupper(nc);
-		if ((pc = *pp++) != nc)
-			break;
-	}
-
-	if ((pc == '~') &&
-	    (pp != (pattern + 1)) &&
-	    ((pc = *pp++) != 0)) {
-		while (smb_isdigit(pc))
-			pc = *pp++;
-
-		if (pc == '.') {
-			while ((nc = *np++) != 0) {
-				if (nc == '.')
-					break;
-			}
-
-			while ((nc = *np++) != 0) {
-				nc = smb_toupper(nc);
-				if ((pc = *pp++) != nc)
-					break;
-			}
-		}
-
-		if (pc == 0)
-			rc = 1;
-	}
-
-	return (rc);
+	return (B_FALSE);
 }
 
 /*
@@ -252,195 +166,99 @@ smb_is_reserved_dos_name(const char *name)
 }
 
 /*
- * smb_needs_mangle
+ * smb_needs_mangled
  *
- * Determines whether the given name needs to get mangled.
- *
- * Here are the (known) rules:
- *
- *	1st char is dot (.)
- *	name length > 12 chars
- *	# dots > 1
- *	# dots == 0 and length > 8
- *	# dots == 1 and name isn't 8.3
- *	contains illegal chars
+ * A name needs to be mangled if any of the following are true:
+ * - the first character is dot (.) and the name is not "." or ".."
+ * - the name contains illegal or special charsacter
+ * - the name name length > 12
+ * - the number of dots == 0 and length > 8
+ * - the number of dots > 1
+ * - the number of dots == 1 and name is not 8.3
  */
-int
-smb_needs_mangle(char *name, char **dot_pos)
+boolean_t
+smb_needs_mangled(const char *name)
 {
-	int len, ndots;
-	char *namep;
-	char *last_dot;
+	int len, extlen, ndots;
+	const char *p;
+	const char *last_dot;
 
-	/*
-	 * Returning (1) for these cases forces consistency with how
-	 * these names are treated (smb_mangle_name() will produce an 8.3 name
-	 * for these)
-	 */
 	if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0))
-		return (1);
+		return (B_FALSE);
 
-	/* skip the leading dots (if any) */
-	for (namep = name; *namep == '.'; namep++)
-		;
-
-	len = ndots = 0;
-	last_dot = 0;
-	for (; *namep; namep++) {
-		len++;
-		if (*namep == '.') {
-			/* keep the position of last dot */
-			last_dot = namep;
-			ndots++;
-		}
-	}
-	*dot_pos = last_dot;
-
-	/* Windows mangles names like .a, .abc, or .abcd */
 	if (*name == '.')
-		return (1);
+		return (B_TRUE);
 
-	if (len > 12)
-		return (1);
+	len = 0;
+	ndots = 0;
+	last_dot = NULL;
+	for (p = name; *p != '\0'; ++p) {
+		if (smb_iscntrl(*p) ||
+		    (strchr(special_chars, *p) != NULL) ||
+		    (strchr(invalid_dos_chars, *p)) != NULL)
+			return (B_TRUE);
 
-	switch (ndots) {
-	case 0:
-		/* no dot */
-		if (len > 8)
-			return (1);
-		break;
-
-	case 1:
-		/* just one dot */
-		/*LINTED E_PTR_DIFF_OVERFLOW*/
-		if (((last_dot - name) > 8) ||		/* name length > 8 */
-		    (strlen(last_dot + 1) > 3))		/* extention > 3 */
-			return (1);
-		break;
-
-	default:
-		/* more than one dot */
-		return (1);
-	}
-
-	for (namep = name; *namep; namep++) {
-		if (!smb_isascii(*namep) ||
-		    strchr(special_chars, *namep) ||
-		    strchr(invalid_dos_chars, *namep))
-			return (1);
-	}
-
-	return (0);
-}
-
-/*
- * smb_needs_shortname
- *
- * Determine whether a shortname should be generated for a file name that is
- * already in 8.3 format.
- *
- * Paramters:
- *   name - original file name
- *
- * Return:
- *   1 - Shortname is required to be generated.
- *   0 - No shortname needs to be generated.
- *
- * Note
- * =======
- * Windows NT server:       shortname is created only if either
- *                          the filename or extension portion of
- *                          a file is made up of mixed case.
- * Windows 2000 server:     shortname is not created regardless
- *                          of the case.
- * Windows 2003 server:     [Same as Windows NT server.]
- *
- * StorEdge will conform to the rule used by Windows NT/2003 server.
- *
- * For instance:
- *    File      | Create shortname?
- * ================================
- *  nf.txt      | N
- *  NF.TXT      | N
- *  NF.txt      | N
- *  nf          | N
- *  NF          | N
- *  nF.txt      | Y
- *  nf.TxT      | Y
- *  Nf          | Y
- *  nF          | Y
- *
- */
-static int
-smb_needs_shortname(char *name)
-{
-	char buf[9];
-	int len;
-	int create = 0;
-	const char *dot_pos = 0;
-
-	dot_pos = strrchr(name, '.');
-	/*LINTED E_PTRDIFF_OVERFLOW*/
-	len = (!dot_pos) ? strlen(name) : (dot_pos - name);
-	/* First, examine the name portion of the file */
-	if (len) {
-		(void) snprintf(buf, len + 1, "%s", name);
-		/* if the name contains both lower and upper cases */
-		if (smb_isstrupr(buf) == 0 && smb_isstrlwr(buf) == 0) {
-			/* create shortname */
-			create = 1;
-		} else 	if (dot_pos) {
-			/* Next, examine the extension portion of the file */
-			(void) snprintf(buf, sizeof (buf), "%s", dot_pos + 1);
-			/*
-			 * if the extension contains both lower and upper
-			 * cases
-			 */
-			if (smb_isstrupr(buf) == 0 && smb_isstrlwr(buf) == 0)
-				/* create shortname */
-				create = 1;
+		if (*p == '.') {
+			++ndots;
+			last_dot = p;
 		}
+		++len;
 	}
 
-	return (create);
+	if ((len > SMB_NAME83_LEN) ||
+	    (ndots == 0 && len > SMB_NAME83_BASELEN) ||
+	    (ndots > 1)) {
+		return (B_TRUE);
+	}
+
+	if (last_dot != NULL) {
+		extlen = strlen(last_dot + 1);
+		if ((extlen == 0) || (extlen > SMB_NAME83_EXTLEN))
+			return (B_TRUE);
+
+		if ((len - extlen - 1) > SMB_NAME83_BASELEN)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }
 
 /*
  * smb_mangle_char
  *
- * If given char is an invalid DOS character or it's not an
- * ascii char, it should be deleted from mangled and 8.3 name.
+ * If c is an invalid DOS character or non-ascii, it should
+ * not be used in the mangled name. We return -1 to indicate
+ * an invalid character.
  *
- * If given char is one of special chars, it should be replaced
- * with '_'.
+ * If c is a special chars, it should be replaced with '_'.
  *
- * Otherwise just make it upper case.
+ * Otherwise c is returned as uppercase.
  */
-static unsigned char
-smb_mangle_char(unsigned char ch)
+static char
+smb_mangle_char(char c)
 {
-	if (isinvalid(ch))
-		return (0);
+	if (isinvalid(c))
+		return (-1);
 
-	if (strchr(special_chars, ch))
+	if (strchr(special_chars, c))
 		return ('_');
 
-	return (smb_toupper(ch));
+	return (smb_toupper(c));
 }
 
 /*
  * smb_generate_mangle
  *
- * Generate a mangle string containing at least 2 characters and at most
- * (buflen - 1) characters.  Note: fid cannot be 0.
+ * Generate a mangle string containing at least 2 characters and
+ * at most (buflen - 1) characters.
  *
  * Returns the number of chars in the generated mangle.
  */
 static int
-smb_generate_mangle(uint64_t fid, unsigned char *buf, size_t buflen)
+smb_generate_mangle(uint64_t fid, char *buf, size_t buflen)
 {
 	static char *base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	unsigned char *p = buf;
+	char *p = buf;
 	int i;
 
 	if (fid == 0)
@@ -455,7 +273,7 @@ smb_generate_mangle(uint64_t fid, unsigned char *buf, size_t buflen)
 }
 
 /*
- * smb_maybe_mangled_name
+ * smb_maybe_mangled
  *
  * Mangled names should be valid DOS file names: less than 12 characters
  * long, contain at least one tilde character and conform to an 8.3 name
@@ -463,8 +281,8 @@ smb_generate_mangle(uint64_t fid, unsigned char *buf, size_t buflen)
  *
  * Returns true if the name looks like a mangled name.
  */
-int
-smb_maybe_mangled_name(char *name)
+boolean_t
+smb_maybe_mangled(char *name)
 {
 	const char *p;
 	boolean_t has_tilde = B_FALSE;
@@ -488,162 +306,79 @@ smb_maybe_mangled_name(char *name)
 			return (B_FALSE);
 	}
 
-	return ((*p == 0) && has_tilde);
+	return ((*p == '\0') && has_tilde);
 }
 
 /*
- * smb_mangle_name
+ * smb_mangle
  *
  * Microsoft knowledge base article #142982 describes how Windows
  * generates 8.3 filenames from long file names. Some other details
  * can be found in article #114816.
  *
- * The function first checks to see whether the given name needs mangling.
- * If not, and the force parameter is not set, then no mangling is done,
- * but both the shortname (if needed) and the 8.3 name are produced and
- * returned.
+ * This function will mangle the name whether mangling is required
+ * or not. Callers should use smb_needs_mangled() to determine whether
+ * mangling is required.
  *
- * If the "force" parameter is set (as will be the case for case-insensitive
- * collisions), then the name will be mangled.
- *
- * Whenever mangling is needed, both the shortname and the 8.3 names are
- * produced and returned.
- *
- * For example, the xxx.xy in 8.3 format will be "xxx     .xy ".
+ * name		original file name
+ * fid		inode number to generate unique mangle
+ * buf		output buffer (buflen bytes) to contain mangled name
  */
-
-int smb_mangle_name(
-	ino64_t fileid,		/* inode number to generate unique mangle */
-	char *name,		/* original file name */
-	char *shortname,	/* mangled name (if applicable) */
-	char *name83,		/* (mangled) name in 8.3 format */
-	int force)		/* force mangling even if mangling is not */
-				/* needed according to standard algorithm */
+void
+smb_mangle(const char *name, ino64_t fid, char *buf, size_t buflen)
 {
-	int avail, len;
-	unsigned char ch;
-	unsigned char mangle_buf[SMB_NAME83_BASELEN];
-	unsigned char *namep;
-	unsigned char *manglep;
-	unsigned char *out_short;
-	unsigned char *out_83;
-	char *dot_pos = NULL;
+	int i, avail;
+	const char *p;
+	char c;
+	char *pbuf;
+	char mangle_buf[SMB_NAME83_BASELEN];
+
+	ASSERT(name && buf && (buflen >= SMB_SHORTNAMELEN));
+
+	avail = SMB_NAME83_BASELEN -
+	    smb_generate_mangle(fid, mangle_buf, SMB_NAME83_BASELEN);
+	name += strspn(name, ".");
 
 	/*
-	 * NOTE:
-	 * This function used to consider filename case
-	 * in order to mangle. I removed those checks.
+	 * Copy up to avail characters from the base part of name
+	 * to buf then append the generated mangle string.
 	 */
-
-	*shortname = *name83 = 0;
-
-	/* Allow dot and dot dot up front */
-	if (strcmp(name, ".") == 0) {
-		/* no shortname */
-		(void) strcpy(name83, ".       .   ");
-		return (1);
-	}
-
-	if (strcmp(name, "..") == 0) {
-		/* no shortname */
-		(void) strcpy(name83, "..      .   ");
-		return (1);
-	}
-
-	out_short = (unsigned char *)shortname;
-	out_83 = (unsigned char *)name83;
-
-	if ((smb_needs_mangle(name, &dot_pos) == 0) && (force == 0)) {
-		/* no mangle */
-
-		/* check if shortname is required or not */
-		if (smb_needs_shortname(name)) {
-			namep = (unsigned char *)name;
-			while (*namep)
-				*out_short++ = smb_toupper(*namep++);
-			*out_short = '\0';
-		}
-
-		out_83 = (unsigned char *)name83;
-		(void) strcpy((char *)out_83, "        .   ");
-		while (*name && *name != '.')
-			*out_83++ = smb_toupper(*name++);
-
-		if (*name == '.') {
-			/* copy extension */
-			name++;
-			out_83 = (unsigned char *)name83 + 9;
-			while (*name)
-				*out_83++ = smb_toupper(*name++);
-		}
-		return (1);
-	}
-
-	len = smb_generate_mangle(fileid, mangle_buf, SMB_NAME83_BASELEN);
-	avail = SMB_NAME83_BASELEN - len;
-
-	/*
-	 * generated mangle part has always less than 8 chars, so
-	 * use the chars before the first dot in filename
-	 * and try to generate a full 8 char name.
-	 */
-
-	/* skip the leading dots (if any) */
-	for (namep = (unsigned char *)name; *namep == '.'; namep++)
-		;
-
-	for (; avail && *namep && (*namep != '.'); namep++) {
-		ch = smb_mangle_char(*namep);
-		if (ch == 0)
+	p = name;
+	pbuf = buf;
+	for (i = 0; (i < avail) && (*p != '\0') && (*p != '.'); ++i, ++p) {
+		if ((c = smb_mangle_char(*p)) == -1)
 			continue;
-		*out_short++ = *out_83++ = ch;
-		avail--;
+		*pbuf++ = c;
 	}
+	*pbuf = '\0';
+	(void) strlcat(pbuf, mangle_buf, SMB_NAME83_BASELEN);
+	pbuf = strchr(pbuf, '\0');
 
-	/* Copy in mangled part */
-	manglep = mangle_buf;
-
-	while (*manglep)
-		*out_short++ = *out_83++ = *(manglep++);
-
-	/* Pad any leftover in 8.3 name with spaces */
-	while (avail--)
-		*out_83++ = ' ';
-
-	/* Work on extension now */
-	avail = 3;
-	*out_83++ = '.';
-	if (dot_pos) {
-		namep = (unsigned char *)dot_pos + 1;
-		if (*namep != 0) {
-			*out_short++ = '.';
-			for (; avail && *namep; namep++) {
-				ch = smb_mangle_char(*namep);
-				if (ch == 0)
-					continue;
-
-				*out_short++ = *out_83++ = ch;
-				avail--;
-			}
+	/*
+	 * Find the last dot in the name. If there is a dot and an
+	 * extension, append '.' and up to SMB_NAME83_EXTLEN extension
+	 * characters to the mangled name.
+	 */
+	if (((p = strrchr(name, '.')) != NULL) && (*(++p) != '\0')) {
+		*pbuf++ = '.';
+		for (i = 0; (i < SMB_NAME83_EXTLEN) && (*p != '\0'); ++i, ++p) {
+			if ((c = smb_mangle_char(*p)) == -1)
+				continue;
+			*pbuf++ = c;
 		}
 	}
 
-	while (avail--)
-		*out_83++ = ' ';
-
-	*out_short = *out_83 = '\0';
-
-	return (1);
+	*pbuf = '\0';
 }
 
 /*
- * smb_unmangle_name
+ * smb_unmangle
  *
  * Given a mangled name, try to find the real file name as it appears
  * in the directory entry.
  *
- * smb_unmangle_name should only be called on names for which
- * smb_maybe_mangled_name() is true
+ * smb_unmangle should only be called on names for which
+ * smb_maybe_mangled() is true
  *
  * File systems which support VFSFT_EDIRENT_FLAGS will return the
  * directory entries as a buffer of edirent_t structure. Others will
@@ -659,7 +394,7 @@ int smb_mangle_name(
  */
 #define	SMB_UNMANGLE_BUFSIZE	(4 * 1024)
 int
-smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf,
+smb_unmangle(smb_node_t *dnode, char *name, char *namebuf,
     int buflen, uint32_t flags)
 {
 	int		err, eof, bufsize, reclen;
@@ -668,7 +403,6 @@ smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf,
 	boolean_t	is_edp;
 	char		*namep, *buf;
 	char		shortname[SMB_SHORTNAMELEN];
-	char		name83[SMB_SHORTNAMELEN];
 	vnode_t		*vp;
 	union {
 		char		*bufptr;
@@ -682,7 +416,7 @@ smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf,
 	if (dnode == NULL || name == NULL || namebuf == NULL || buflen == 0)
 		return (EINVAL);
 
-	ASSERT(smb_maybe_mangled_name(name) != 0);
+	ASSERT(smb_maybe_mangled(name) == B_TRUE);
 
 	if (!smb_node_is_dir(dnode))
 		return (ENOTDIR);
@@ -723,8 +457,7 @@ smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf,
 			    U8_VALIDATE_ENTIRE, &err) < 0)
 				continue;
 
-			(void) smb_mangle_name(ino, namep,
-			    shortname, name83, 1);
+			smb_mangle(namep, ino, shortname, SMB_SHORTNAMELEN);
 
 			if (smb_strcasecmp(name, shortname, 0) == 0) {
 				(void) strlcpy(namebuf, namep, buflen);

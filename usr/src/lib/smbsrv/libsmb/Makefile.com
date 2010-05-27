@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY= libsmb.a
@@ -34,7 +33,6 @@ OBJS_SHARED = 			\
 	smb_native.o		\
 	smb_oem.o		\
 	smb_sid.o		\
-	smb_status_xlat.o	\
 	smb_string.o 		\
 	smb_token.o		\
 	smb_token_xdr.o		\
@@ -59,13 +57,13 @@ OBJS_COMMON = 			\
 	smb_lgrp.o		\
 	smb_mac.o		\
 	smb_nic.o		\
-	smb_nicmon.o		\
 	smb_pwdutil.o		\
 	smb_privilege.o		\
 	smb_reparse.o		\
 	smb_sam.o		\
 	smb_scfutil.o		\
 	smb_sd.o		\
+	smb_status_tbl.o	\
 	smb_util.o		\
 	smb_wksids.o
 

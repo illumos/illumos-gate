@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -642,13 +641,6 @@ smb_t2_done(struct smb_t2rq *t2p)
 	cv_destroy(&t2p->t2_cond);
 	if (t2p->t2_flags & SMBT2_ALLOCED)
 		kmem_free(t2p, sizeof (*t2p));
-}
-
-u_int32_t
-smb_t2_err(struct smb_t2rq *t2p)
-{
-	/* mask off "severity" and the "component"  bit */
-	return (t2p->t2_sr_error & ~(0xe0000000));
 }
 
 void

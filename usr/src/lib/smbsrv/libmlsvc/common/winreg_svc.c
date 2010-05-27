@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -50,8 +50,6 @@
 #include <strings.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/nterror.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/winreg.ndl>
@@ -64,23 +62,24 @@ static char *winreg_keys[] = {
 	"HKU",
 	"HKLM\\SOFTWARE",
 	"HKLM\\SYSTEM",
-	"Application",
-	"Security",
 	"System",
 	"CurrentControlSet",
 	"SunOS",
 	"Solaris",
 	"System\\CurrentControlSet\\Services\\Eventlog",
-	"System\\CurrentControlSet\\Services\\Eventlog\\Application",
-	"System\\CurrentControlSet\\Services\\Eventlog\\"
-						"Application\\Application",
-	"System\\CurrentControlSet\\Services\\Eventlog\\Security",
-	"System\\CurrentControlSet\\Services\\Eventlog\\Security\\Security",
-	"System\\CurrentControlSet\\Services\\Eventlog\\System",
-	"System\\CurrentControlSet\\Services\\Eventlog\\System\\System",
 	"System\\CurrentControlSet\\Control\\ProductOptions",
 	"SOFTWARE",
 	"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
+};
+
+static char *winreg_eventlog = "System\\CurrentControlSet\\Services\\Eventlog";
+
+static char *winreg_log[] = {
+	"Application",
+	"Security",
+	"System",
+	"smbd",
+	"smbrdr"
 };
 
 typedef struct winreg_subkey {
@@ -98,6 +97,7 @@ typedef struct winreg_keylist {
 static winreg_keylist_t winreg_keylist;
 static mutex_t winreg_mutex;
 
+static void winreg_add_predefined(const char *);
 static ndr_hdid_t *winreg_alloc_id(ndr_xa_t *, const char *);
 static void winreg_dealloc_id(ndr_xa_t *, ndr_hdid_t *);
 static boolean_t winreg_key_has_subkey(const char *);
@@ -192,9 +192,9 @@ static char winreg_sysver[SMB_VERSTR_LEN];
 void
 winreg_initialize(void)
 {
-	winreg_subkey_t *key;
 	smb_version_t version;
 	struct utsname name;
+	char subkey[MAXPATHLEN];
 	char *sysname;
 	int i;
 
@@ -204,16 +204,20 @@ winreg_initialize(void)
 	    offsetof(winreg_subkey_t, sk_lnd));
 	winreg_keylist.kl_count = 0;
 
-	for (i = 0; i < sizeof (winreg_keys)/sizeof (winreg_keys[0]); ++i) {
-		if ((key = malloc(sizeof (winreg_subkey_t))) != NULL) {
-			bzero(key, sizeof (winreg_subkey_t));
-			(void) strlcpy(key->sk_name, winreg_keys[i],
-			    MAXPATHLEN);
-			key->sk_predefined = B_TRUE;
+	for (i = 0; i < sizeof (winreg_keys)/sizeof (winreg_keys[0]); ++i)
+		winreg_add_predefined(winreg_keys[i]);
 
-			list_insert_tail(&winreg_keylist.kl_list, key);
-			++winreg_keylist.kl_count;
-		}
+	for (i = 0; i < sizeof (winreg_log)/sizeof (winreg_log[0]); ++i) {
+		(void) snprintf(subkey, MAXPATHLEN, "%s", winreg_log[i]);
+		winreg_add_predefined(subkey);
+
+		(void) snprintf(subkey, MAXPATHLEN, "%s\\%s",
+		    winreg_eventlog, winreg_log[i]);
+		winreg_add_predefined(subkey);
+
+		(void) snprintf(subkey, MAXPATHLEN, "%s\\%s\\%s",
+		    winreg_eventlog, winreg_log[i], winreg_log[i]);
+		winreg_add_predefined(subkey);
 	}
 
 	(void) mutex_unlock(&winreg_mutex);
@@ -230,6 +234,21 @@ winreg_initialize(void)
 	    version.sv_major, version.sv_minor);
 
 	(void) ndr_svc_register(&winreg_service);
+}
+
+static void
+winreg_add_predefined(const char *subkey)
+{
+	winreg_subkey_t *key;
+
+	if ((key = malloc(sizeof (winreg_subkey_t))) != NULL) {
+		bzero(key, sizeof (winreg_subkey_t));
+		(void) strlcpy(key->sk_name, subkey, MAXPATHLEN);
+		key->sk_predefined = B_TRUE;
+
+		list_insert_tail(&winreg_keylist.kl_list, key);
+		++winreg_keylist.kl_count;
+	}
 }
 
 static int

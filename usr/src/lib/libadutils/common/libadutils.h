@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBADUTILS_H
@@ -37,6 +36,18 @@ extern "C" {
 #endif
 
 #define	ADUTILS_DEF_NUM_RETRIES	2
+
+/*
+ * Symbolic constants for different sets of debug messages.
+ */
+enum ad_debug {
+	AD_DEBUG_ALL = 0,
+	AD_DEBUG_DNS = 1,
+	AD_DEBUG_LDAP = 2,
+	AD_DEBUG_DISC = 3,
+	AD_DEBUG_MAX = 3
+};
+
 #define	ADUTILS_SID_MAX_SUB_AUTHORITIES	15
 #define	ADUTILS_MAXBINSID\
 	(1 + 1 + 6 + (ADUTILS_SID_MAX_SUB_AUTHORITIES * 4))
@@ -131,6 +142,7 @@ typedef enum adutils_ad_partition {
 
 typedef void (*adutils_logger)(int, const char *, ...);
 
+extern void		adutils_set_debug(enum ad_debug item, int val);
 
 extern adutils_rc	adutils_ad_alloc(adutils_ad_t **new_ad,
 				const char *domain_name,

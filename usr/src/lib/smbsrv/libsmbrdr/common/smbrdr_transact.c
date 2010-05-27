@@ -18,20 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * SMB transaction functions.
  */
 
-#include <syslog.h>
 #include <strings.h>
 
 #include <smbsrv/libsmbrdr.h>
-#include <smbsrv/ntstatus.h>
 #include <smbsrv/smb.h>
 #include <smbrdr.h>
 
@@ -82,7 +80,7 @@ smbrdr_transact(int fid, char *out_buf, int out_len, char *in_buf, int in_len)
 	    session, logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_transact: %s",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_transact: %s",
 		    xlate_nt_status(status));
 		smbrdr_ofile_put(ofile);
 		return (-1);
@@ -93,7 +91,8 @@ smbrdr_transact(int fid, char *out_buf, int out_len, char *in_buf, int in_len)
 	rc = prep_smb_transact(mb, ofile->fid, out_buf, out_len, in_len,
 	    session->remote_caps & CAP_UNICODE);
 	if (rc < 0) {
-		syslog(LOG_DEBUG, "smbrdr_transact: prep failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_transact: prep failed");
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
 		return (rc);
@@ -106,7 +105,8 @@ smbrdr_transact(int fid, char *out_buf, int out_len, char *in_buf, int in_len)
 		smbrdr_unlock_transport();
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
-		syslog(LOG_DEBUG, "smbrdr_transact: send failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_transact: send failed");
 		return (-1);
 	}
 
@@ -116,14 +116,15 @@ smbrdr_transact(int fid, char *out_buf, int out_len, char *in_buf, int in_len)
 
 	do {
 		if (smbrdr_rcv(&srh, first_rsp) != NT_STATUS_SUCCESS) {
-			syslog(LOG_DEBUG, "smbrdr_transact: nb_rcv failed");
+			smb_log(smbrdr_log_hdl, LOG_DEBUG,
+			    "smbrdr_transact: nb_rcv failed");
 			rc = -1;
 			break;
 		}
 
 		rc = decode_smb_transact(mb, in_buf, cur_inlen, &rsp);
 		if (rc < 0 || rsp.TotalDataCount > in_len) {
-			syslog(LOG_DEBUG,
+			smb_log(smbrdr_log_hdl, LOG_DEBUG,
 			    "smbrdr_transact: decode failed");
 			rc = -1;
 			break;

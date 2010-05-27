@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG =		idmapd
@@ -35,6 +34,7 @@ SERVEROBJS =				\
 	idmap_config.o			\
 	idmapd.o			\
 	init.o				\
+	idmap_lsa.o				\
 	nldaputils.o			\
 	rpc_svc.o			\
 	server.o			\
@@ -71,7 +71,8 @@ $(ROOTMANIFEST) := FILEMODE= 444
 
 INCS += -I. -I../../../lib/libidmap/common\
 	 -I../../../lib/libsldap/common\
-	 -I../../../lib/libadutils/common
+	 -I../../../lib/libadutils/common \
+	 -I../../../lib/smbsrv/libsmb/common
 
 $(OBJS) := CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) := CPPFLAGS += $(INCS)
@@ -86,12 +87,16 @@ LDLIBS += -lsecdb \
 	-lldap \
 	-luuid \
 	-ladutils \
-	-lumem
+	-lumem \
+	-lnvpair \
+	-L $(ROOT)/usr/lib/smbsrv \
+	-lsmb
 
 rpc_svc.o := CFLAGS += $(RPC_MSGOUT_OPT)
 
 $(PROG) := MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
-$(PROG) := LDFLAGS += $(MAPFILES:%=-M%)
+$(PROG) := LDFLAGS += $(MAPFILES:%=-M%) \
+	-R /usr/lib/smbsrv
 
 DIRMODE = 0755
 FILEMODE = 0555

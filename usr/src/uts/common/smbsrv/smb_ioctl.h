@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMB_IOCTL_H_
@@ -68,8 +67,8 @@ typedef	struct {
 
 typedef struct smb_ioc_share {
 	smb_ioc_header_t hdr;
-	char		path[MAXPATHLEN];
-	char		name[MAXNAMELEN];
+	uint32_t	shrlen;
+	char		shr[1];
 } smb_ioc_share_t;
 
 typedef	struct smb_ioc_listen {
@@ -151,6 +150,8 @@ typedef struct smb_ioc_cfg {
 	int32_t		sync_enable;
 	int32_t		secmode;
 	int32_t		ipv6_enable;
+	uint32_t	exec_flags;
+	smb_version_t	version;
 	char		nbdomain[NETBIOS_NAME_SZ];
 	char		fqdn[SMB_PI_MAX_DOMAIN];
 	char		hostname[SMB_PI_MAX_HOST];

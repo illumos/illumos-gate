@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -40,8 +41,6 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/nterror.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/ndl/samrpc.ndl>
@@ -1287,7 +1286,7 @@ samr_s_QueryDispInfo(void *arg, ndr_xa_t *mxa)
 			retcnt = max_retcnt;
 			param->status = status;
 		} else {
-			param->status = ERROR_MORE_ENTRIES;
+			param->status = NT_STATUS_MORE_ENTRIES;
 		}
 
 		param->users.total_size = num_users;
@@ -1497,12 +1496,6 @@ samr_s_CreateDomainAlias(void *arg, ndr_xa_t *mxa)
 	    ((param->access_mask & SAMR_ALIAS_ACCESS_WRITE_ACCOUNT) == 0)) {
 		bzero(&param->alias_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-		return (NDR_DRC_OK);
-	}
-
-	if (getgrnam(gname) == NULL) {
-		bzero(&param->alias_handle, sizeof (samr_handle_t));
-		param->status = NT_SC_ERROR(NT_STATUS_INVALID_PARAMETER);
 		return (NDR_DRC_OK);
 	}
 

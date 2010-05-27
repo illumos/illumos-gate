@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -111,7 +110,7 @@ smb_opipe_dealloc(smb_opipe_t *opipe)
 int
 smb_opipe_open(smb_request_t *sr)
 {
-	open_param_t *op = &sr->arg.open;
+	smb_arg_open_t	*op = &sr->sr_open;
 	smb_ofile_t *of;
 	smb_opipe_t *opipe;
 	smb_doorhdr_t hdr;

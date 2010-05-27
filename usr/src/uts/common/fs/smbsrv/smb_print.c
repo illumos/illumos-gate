@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -54,6 +53,7 @@ smb_pre_open_print_file(smb_request_t *sr)
 	struct open_param	*op = &sr->arg.open;
 	char			*path;
 	char			*identifier;
+	uint32_t		new_id;
 	uint16_t		setup;
 	uint16_t		mode;
 	int			rc;
@@ -64,11 +64,12 @@ smb_pre_open_print_file(smb_request_t *sr)
 	if (rc == 0)
 		rc = smbsr_decode_data(sr, "%S", sr, &identifier);
 
-	atomic_inc_32(&tmp_id);
-
-	path = smb_srm_zalloc(sr, MAXPATHLEN);
-	(void) snprintf(path, MAXPATHLEN, "%s%05u", identifier, tmp_id);
-	op->fqi.fq_path.pn_path = path;
+	if (rc == 0) {
+		path = smb_srm_zalloc(sr, MAXPATHLEN);
+		op->fqi.fq_path.pn_path = path;
+		new_id = atomic_inc_32_nv(&tmp_id);
+		(void) snprintf(path, MAXPATHLEN, "%s%05u", identifier, new_id);
+	}
 
 	op->create_disposition = FILE_OVERWRITE_IF;
 	op->create_options = FILE_NON_DIRECTORY_FILE;

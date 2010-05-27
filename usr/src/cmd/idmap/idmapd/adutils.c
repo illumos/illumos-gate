@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -78,13 +77,13 @@ typedef struct idmap_q {
 	 */
 	char			*ecanonname;	/* expected canon name */
 	char			*edomain;	/* expected domain name */
-	int			eunixtype;	/* expected unix type */
+	idmap_id_type		esidtype;	/* expected SID type */
 	/* results */
 	char			**canonname;	/* actual canon name */
 	char			**domain;	/* name of domain of object */
 	char			**sid;		/* stringified SID */
 	rid_t			*rid;		/* RID */
-	int			*sid_type;	/* user or group SID? */
+	idmap_id_type		*sid_type;	/* user or group SID? */
 	char			**unixname;	/* unixname for name mapping */
 	char			**dn;		/* DN of entry */
 	char			**attr;		/* Attr for name mapping */
@@ -352,7 +351,7 @@ idmap_bv_objclass2sidtype(BerValue **bvalues, int *sid_type)
 {
 	BerValue	**cbval;
 
-	*sid_type = _IDMAP_T_OTHER;
+	*sid_type = IDMAP_SID;
 	if (bvalues == NULL)
 		return (0);
 
@@ -363,14 +362,14 @@ idmap_bv_objclass2sidtype(BerValue **bvalues, int *sid_type)
 	 */
 	for (cbval = bvalues; *cbval != NULL; cbval++) {
 		if (BVAL_CASEEQ(cbval, "group")) {
-			*sid_type = _IDMAP_T_GROUP;
+			*sid_type = IDMAP_GSID;
 			break;
 		} else if (BVAL_CASEEQ(cbval, "user")) {
-			*sid_type = _IDMAP_T_USER;
+			*sid_type = IDMAP_USID;
 			break;
 		}
 		/*
-		 * "else if (*sid_type = _IDMAP_T_USER)" then this is a
+		 * "else if (*sid_type = IDMAP_USID)" then this is a
 		 * new sub-class of user -- what to do with it??
 		 */
 	}
@@ -426,9 +425,9 @@ idmap_extract_object(idmap_query_state_t *state, idmap_q_t *q,
 
 	if (state->directory_based_mapping == DIRECTORY_MAPPING_IDMU &&
 	    q->pid != NULL) {
-		if (sid_type == _IDMAP_T_USER)
+		if (sid_type == IDMAP_USID)
 			attr = UIDNUMBER;
-		else if (sid_type == _IDMAP_T_GROUP)
+		else if (sid_type == IDMAP_GSID)
 			attr = GIDNUMBER;
 		if (attr != NULL) {
 			bvalues = ldap_get_values_len(ld, res, attr);
@@ -451,24 +450,20 @@ idmap_extract_object(idmap_query_state_t *state, idmap_q_t *q,
 		 * AD attribute name that will have the unixname, and retrieve
 		 * its value.
 		 */
-		int unix_type;
+		idmap_id_type esidtype;
 		/*
-		 * Determine the target UNIX type.
+		 * Determine the target type.
 		 *
 		 * If the caller specified one, use that.  Otherwise, give the
 		 * same type that as we found for the Windows user.
 		 */
-		unix_type = q->eunixtype;
-		if (unix_type == _IDMAP_T_UNDEF) {
-			if (sid_type == _IDMAP_T_USER)
-				unix_type = _IDMAP_T_USER;
-			else if (sid_type == _IDMAP_T_GROUP)
-				unix_type = _IDMAP_T_GROUP;
-		}
+		esidtype = q->esidtype;
+		if (esidtype == IDMAP_SID)
+			esidtype = sid_type;
 
-		if (unix_type == _IDMAP_T_USER)
+		if (esidtype == IDMAP_USID)
 			attr = state->ad_unixuser_attr;
-		else if (unix_type == _IDMAP_T_GROUP)
+		else if (esidtype == IDMAP_GSID)
 			attr = state->ad_unixgroup_attr;
 
 		if (attr != NULL) {
@@ -591,10 +586,10 @@ idmap_lookup_batch_end(idmap_query_state_t **state)
 static
 idmap_retcode
 idmap_batch_add1(idmap_query_state_t *state, const char *filter,
-	char *ecanonname, char *edomain, int eunixtype,
+	char *ecanonname, char *edomain, idmap_id_type esidtype,
 	char **dn, char **attr, char **value,
 	char **canonname, char **dname,
-	char **sid, rid_t *rid, int *sid_type, char **unixname,
+	char **sid, rid_t *rid, idmap_id_type *sid_type, char **unixname,
 	posix_id_t *pid,
 	idmap_retcode *rc)
 {
@@ -614,7 +609,7 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 	 */
 	q->ecanonname = ecanonname;
 	q->edomain = edomain;
-	q->eunixtype = eunixtype;
+	q->esidtype = esidtype;
 
 	/* Remember where to put the results */
 	q->canonname = canonname;
@@ -637,18 +632,18 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 
 	if (unixname != NULL) {
 		/* Add unixuser/unixgroup attribute names to the attrs list */
-		if (eunixtype != _IDMAP_T_GROUP &&
+		if (esidtype != IDMAP_GSID &&
 		    state->ad_unixuser_attr != NULL)
 			attrs[i++] = (char *)state->ad_unixuser_attr;
-		if (eunixtype != _IDMAP_T_USER &&
+		if (esidtype != IDMAP_USID &&
 		    state->ad_unixgroup_attr != NULL)
 			attrs[i++] = (char *)state->ad_unixgroup_attr;
 	}
 
 	if (pid != NULL) {
-		if (eunixtype != _IDMAP_T_GROUP)
+		if (esidtype != IDMAP_GSID)
 			attrs[i++] = UIDNUMBER;
-		if (eunixtype != _IDMAP_T_USER)
+		if (esidtype != IDMAP_USID)
 			attrs[i++] = GIDNUMBER;
 	}
 
@@ -667,7 +662,7 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 	 */
 	*rc = IDMAP_ERR_RETRIABLE_NET_ERR;
 	if (sid_type != NULL)
-		*sid_type = _IDMAP_T_OTHER;
+		*sid_type = IDMAP_SID;
 	if (sid != NULL)
 		*sid = NULL;
 	if (dname != NULL)
@@ -698,10 +693,10 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 
 idmap_retcode
 idmap_name2sid_batch_add1(idmap_query_state_t *state,
-	const char *name, const char *dname, int eunixtype,
+	const char *name, const char *dname, idmap_id_type esidtype,
 	char **dn, char **attr, char **value,
 	char **canonname, char **sid, rid_t *rid,
-	int *sid_type, char **unixname,
+	idmap_id_type *sid_type, char **unixname,
 	posix_id_t *pid, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
@@ -761,7 +756,7 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 	}
 
 	retcode = idmap_batch_add1(state, filter, ecanonname, edomain,
-	    eunixtype, dn, attr, value, canonname, NULL, sid, rid, sid_type,
+	    esidtype, dn, attr, value, canonname, NULL, sid, rid, sid_type,
 	    unixname, pid, rc);
 
 	free(filter);
@@ -771,9 +766,9 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 
 idmap_retcode
 idmap_sid2name_batch_add1(idmap_query_state_t *state,
-	const char *sid, const rid_t *rid, int eunixtype,
+	const char *sid, const rid_t *rid, idmap_id_type esidtype,
 	char **dn, char **attr, char **value,
-	char **name, char **dname, int *sid_type,
+	char **name, char **dname, idmap_id_type *sid_type,
 	char **unixname, posix_id_t *pid, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
@@ -801,7 +796,7 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 	if (filter == NULL)
 		return (IDMAP_ERR_MEMORY);
 
-	retcode = idmap_batch_add1(state, filter, NULL, NULL, eunixtype,
+	retcode = idmap_batch_add1(state, filter, NULL, NULL, esidtype,
 	    dn, attr, value, name, dname, NULL, NULL, sid_type, unixname,
 	    pid, rc);
 
@@ -815,7 +810,7 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 	const char *unixname, int is_user, int is_wuser,
 	char **dn, char **attr, char **value,
 	char **sid, rid_t *rid, char **name,
-	char **dname, int *sid_type, idmap_retcode *rc)
+	char **dname, idmap_id_type *sid_type, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	char		*filter, *s_unixname;
@@ -841,7 +836,7 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 	}
 
 	retcode = idmap_batch_add1(state, filter, NULL, NULL,
-	    _IDMAP_T_UNDEF, dn, NULL, NULL, name, dname, sid, rid, sid_type,
+	    IDMAP_POSIXID, dn, NULL, NULL, name, dname, sid, rid, sid_type,
 	    NULL, NULL, rc);
 
 	if (retcode == IDMAP_SUCCESS && attr != NULL) {
@@ -864,7 +859,7 @@ idmap_pid2sid_batch_add1(idmap_query_state_t *state,
 	posix_id_t pid, int is_user,
 	char **dn, char **attr, char **value,
 	char **sid, rid_t *rid, char **name,
-	char **dname, int *sid_type, idmap_retcode *rc)
+	char **dname, idmap_id_type *sid_type, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	char		*filter;
@@ -882,7 +877,7 @@ idmap_pid2sid_batch_add1(idmap_query_state_t *state,
 		return (IDMAP_ERR_MEMORY);
 
 	retcode = idmap_batch_add1(state, filter, NULL, NULL,
-	    _IDMAP_T_UNDEF, dn, NULL, NULL, name, dname, sid, rid, sid_type,
+	    IDMAP_POSIXID, dn, NULL, NULL, name, dname, sid, rid, sid_type,
 	    NULL, NULL, rc);
 
 	if (retcode == IDMAP_SUCCESS && attr != NULL) {

@@ -220,6 +220,7 @@ smb_ofile_open(
 
 	if (ftype == SMB_FTYPE_MESG_PIPE) {
 		of->f_pipe = smb_opipe_alloc(tree->t_server);
+		smb_server_inc_pipes(of->f_server);
 	} else {
 		ASSERT(ftype == SMB_FTYPE_DISK); /* Regular file, not a pipe */
 		ASSERT(node);
@@ -274,14 +275,13 @@ smb_ofile_open(
 		smb_node_inc_open_ofiles(node);
 		smb_node_add_ofile(node, of);
 		smb_node_ref(node);
+		smb_server_inc_files(of->f_server);
 	}
 	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
 	smb_llist_insert_tail(&tree->t_ofile_list, of);
 	smb_llist_exit(&tree->t_ofile_list);
 	atomic_inc_32(&tree->t_open_files);
-	atomic_inc_32(&tree->t_server->sv_open_files);
 	atomic_inc_32(&of->f_session->s_file_cnt);
-
 	return (of);
 }
 
@@ -305,6 +305,7 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 
 		if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
 			smb_opipe_close(of);
+			smb_server_dec_pipes(of->f_server);
 		} else {
 			smb_ofile_set_close_attrs(of, last_wtime);
 
@@ -329,9 +330,9 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 			 */
 			if (of->f_node->flags & NODE_FLAGS_NOTIFY_CHANGE)
 				smb_process_file_notify_change_queue(of);
+			smb_server_dec_files(of->f_server);
 		}
 		atomic_dec_32(&of->f_tree->t_open_files);
-		atomic_dec_32(&of->f_tree->t_server->sv_open_files);
 
 		mutex_enter(&of->f_mutex);
 		ASSERT(of->f_refcnt);
@@ -1217,16 +1218,13 @@ smb_ofile_netinfo_init(smb_ofile_t *of, smb_netfileinfo_t *fi)
 		ASSERT(node);
 
 		fi->fi_permissions = of->f_granted_access;
-		fi->fi_numlocks = smb_lock_get_lock_count(node);
+		fi->fi_numlocks = smb_lock_get_lock_count(node, of);
 
 		path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 
 		if (node != tree->t_snode) {
-			rc = vnodetopath(tree->t_snode->vp, node->vp, path,
-			    MAXPATHLEN, kcred);
-			if (rc == 0)
-				(void) strsubst(path, '/', '\\');
-			else
+			rc = smb_node_getshrpath(node, tree, path, MAXPATHLEN);
+			if (rc != 0)
 				(void) strlcpy(path, node->od_name, MAXPATHLEN);
 		}
 

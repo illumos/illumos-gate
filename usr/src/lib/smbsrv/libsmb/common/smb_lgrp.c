@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -33,6 +34,9 @@
 #include <libintl.h>
 #include <smbsrv/libsmb.h>
 #include <smb_sqlite.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/param.h>
 
 /*
  * Local domain SID (aka machine SID) is not stored in the domain table
@@ -114,6 +118,18 @@
 #define	SMB_LGRP_INFO_MEMB	0x10
 #define	SMB_LGRP_INFO_ALL	0x1F
 
+#define	SMB_LGRP_PGRP_GRPTMP	"/etc/gtmp"
+#define	SMB_LGRP_PGRP_GRPBUFSIZ	5120
+#define	SMB_LGRP_PGRP_GROUP	"/etc/group"
+#define	SMB_LGRP_PGRP_MAXGLEN	9	/* max length of group name */
+#define	SMB_LGRP_PGRP_DEFRID	99	/* max reserved id */
+
+#define	SMB_LGRP_PGRP_NOTUNIQUE	0
+#define	SMB_LGRP_PGRP_RESERVED	1
+#define	SMB_LGRP_PGRP_UNIQUE	2
+#define	SMB_LGRP_PGRP_TOOBIG	3
+#define	SMB_LGRP_PGRP_INVALID	4
+
 #define	NULL_MSGCHK(msg)	((msg) ? (msg) : "NULL")
 
 /* Member ID */
@@ -176,7 +192,8 @@ static struct {
 	{ SMB_LGRP_DELETE_FAILED,	"group delete failed" },
 	{ SMB_LGRP_UPDATE_FAILED,	"group update failed" },
 	{ SMB_LGRP_LOOKUP_FAILED,	"group lookup failed" },
-	{ SMB_LGRP_OFFLINE,		"local group service is offline" }
+	{ SMB_LGRP_OFFLINE,		"local group service is offline" },
+	{ SMB_LGRP_POSIXCREATE_FAILED,	"posix group create failed" }
 };
 
 /*
@@ -231,6 +248,7 @@ static boolean_t smb_lgrp_chkmember(uint16_t);
 static int smb_lgrp_getsid(int, uint32_t *, uint16_t, sqlite *, smb_sid_t **);
 static int smb_lgrp_getgid(uint32_t rid, gid_t *gid);
 static boolean_t smb_lgrp_exists(char *);
+static int smb_lgrp_pgrp_add(char *);
 
 /*
  * smb_lgrp_add
@@ -270,8 +288,15 @@ smb_lgrp_add(char *gname, char *cmnt)
 	wka = smb_wka_lookup_name(gname);
 	if (wka == NULL) {
 		if ((pxgrp = getgrnam(gname)) == NULL) {
-			smb_lgrp_exit();
-			return (SMB_LGRP_NOT_FOUND);
+			if (smb_lgrp_pgrp_add(gname) != 0) {
+				smb_lgrp_exit();
+				return (SMB_LGRP_POSIXCREATE_FAILED);
+			}
+
+			if ((pxgrp = getgrnam(gname)) == NULL) {
+				smb_lgrp_exit();
+				return (SMB_LGRP_NOT_FOUND);
+			}
 		}
 
 		/*
@@ -363,6 +388,18 @@ smb_lgrp_rename(char *gname, char *new_gname)
 
 	if (!smb_lgrp_enter())
 		return (SMB_LGRP_OFFLINE);
+
+	if (getgrnam(new_gname) == NULL) {
+		if (smb_lgrp_pgrp_add(new_gname) != 0) {
+			smb_lgrp_exit();
+			return (SMB_LGRP_POSIXCREATE_FAILED);
+		}
+
+		if (getgrnam(new_gname) == NULL) {
+			smb_lgrp_exit();
+			return (SMB_LGRP_NOT_FOUND);
+		}
+	}
 
 	db = smb_lgrp_db_open(SMB_LGRP_DB_ORW);
 	rc = smb_lgrp_gtbl_update(db, gname, &grp, SMB_LGRP_GTBL_NAME);
@@ -969,7 +1006,7 @@ smb_lgrp_err_to_ntstatus(uint32_t lgrp_err)
 		{ SMB_LGRP_PRIV_HELD,		NT_STATUS_SUCCESS },
 		{ SMB_LGRP_PRIV_NOT_HELD,	NT_STATUS_PRIVILEGE_NOT_HELD },
 		{ SMB_LGRP_BAD_DATA,		NT_STATUS_DATA_ERROR },
-		{ SMB_LGRP_NO_MORE,		NT_STATUS_NO_MORE_DATA },
+		{ SMB_LGRP_NO_MORE,		NT_STATUS_NO_MORE_ENTRIES },
 		{ SMB_LGRP_DBOPEN_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
 		{ SMB_LGRP_DBEXEC_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
 		{ SMB_LGRP_DBINIT_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
@@ -980,7 +1017,8 @@ smb_lgrp_err_to_ntstatus(uint32_t lgrp_err)
 		{ SMB_LGRP_UPDATE_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
 		{ SMB_LGRP_LOOKUP_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
 		{ SMB_LGRP_NOT_SUPPORTED,	NT_STATUS_NOT_SUPPORTED },
-		{ SMB_LGRP_OFFLINE,		NT_STATUS_INTERNAL_ERROR }
+		{ SMB_LGRP_OFFLINE,		NT_STATUS_INTERNAL_ERROR },
+		{ SMB_LGRP_POSIXCREATE_FAILED,	NT_STATUS_UNSUCCESSFUL }
 	};
 
 	for (i = 0; i < sizeof (err_map)/sizeof (err_map[0]); ++i) {
@@ -2453,4 +2491,185 @@ smb_lgrp_exists(char *gname)
 	smb_lgrp_db_close(db);
 
 	return (rc);
+}
+
+/*
+ * smb_lgrp_pgrp_valid_gname
+ *
+ * Validate posix group name string.
+ */
+static int
+smb_lgrp_pgrp_valid_gname(char *group)
+{
+	char *ptr = group;
+	char c;
+	int len = 0;
+	int badchar = 0;
+
+	if (!group || !*group)
+		return (SMB_LGRP_PGRP_INVALID);
+
+	for (c = *ptr; c != NULL; ptr++, c = *ptr) {
+		len++;
+		if (!isprint(c) || (c == ':') || (c == '\n'))
+			return (SMB_LGRP_PGRP_INVALID);
+
+		if (!(islower(c) || isdigit(c)))
+			badchar++;
+	}
+
+	if ((len > SMB_LGRP_PGRP_MAXGLEN - 1) || (badchar != 0))
+		return (SMB_LGRP_PGRP_INVALID);
+
+	if (getgrnam(group) != NULL)
+		return (SMB_LGRP_PGRP_NOTUNIQUE);
+
+	return (SMB_LGRP_PGRP_UNIQUE);
+}
+
+/*
+ * smb_lgrp_pgrp_valid_gid
+ *
+ * Check to see that the gid is not a reserved gid
+ * -- nobody (60001), noaccess (60002) or nogroup (65534)
+ */
+static int
+smb_lgrp_pgrp_valid_gid(gid_t gid)
+{
+	return (gid != 60001 && gid != 60002 && gid != 65534);
+}
+
+/*
+ * smb_lgrp_pgrp_findnextgid(void)
+ *
+ * This method finds the next valid GID.
+ * It sorts the used GIDs in decreasing order to return MAXUSED + 1.
+ * It then adds one to obtain the next valid GID.
+ * On failure, -1 is returned. On success, a valid GID is returned.
+ */
+static int
+smb_lgrp_pgrp_findnextgid(void)
+{
+	FILE *fptr;
+	gid_t last, next;
+	int gid;
+
+	if ((fptr = popen("exec sh -c "
+	    "\"getent group|cut -f3 -d:|sort -nr|uniq \" 2>/dev/null",
+	    "r")) == NULL)
+		return (-1);
+
+	if (fscanf(fptr, "%u\n", &next) == EOF) {
+		(void) pclose(fptr);
+		return (SMB_LGRP_PGRP_DEFRID + 1);
+	}
+
+	last = MAXUID;
+	gid = -1;
+	do {
+		if (!smb_lgrp_pgrp_valid_gid(next))
+			continue;
+
+		if (next <= SMB_LGRP_PGRP_DEFRID) {
+			if (last != SMB_LGRP_PGRP_DEFRID + 1)
+				gid = SMB_LGRP_PGRP_DEFRID + 1;
+			break;
+		}
+
+		if ((gid = next + 1) != last) {
+			while (!smb_lgrp_pgrp_valid_gid((gid_t)gid))
+				gid++;
+			if (gid > 0 && gid < last)
+				break;
+		}
+
+		gid = -1;
+		last = next;
+	} while (fscanf(fptr, "%u\n", &next) != EOF);
+
+	(void) pclose(fptr);
+	return (gid);
+}
+
+/*
+ * smb_lgrp_pgrp_add
+ *
+ * Create a posix group with the given name.
+ * This group will be added to the /etc/group file.
+ */
+static int
+smb_lgrp_pgrp_add(char *group)
+{
+	FILE *etcgrp;
+	FILE *etctmp;
+	int o_mask, gret;
+	int newdone = 0;
+	struct stat sb;
+	char buf[SMB_LGRP_PGRP_GRPBUFSIZ];
+	gid_t gid;
+	int rc = 0;
+
+	rc = smb_lgrp_pgrp_valid_gname(group);
+	if ((rc == SMB_LGRP_PGRP_INVALID) || (rc == SMB_LGRP_PGRP_NOTUNIQUE))
+		return (-1);
+
+	if ((gret = smb_lgrp_pgrp_findnextgid()) < 0)
+		return (-1);
+	gid = gret;
+
+	if ((etcgrp = fopen(SMB_LGRP_PGRP_GROUP, "r")) == NULL)
+		return (-1);
+
+	if (fstat(fileno(etcgrp), &sb) < 0)
+		sb.st_mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH;
+
+	o_mask = umask(077);
+	etctmp = fopen(SMB_LGRP_PGRP_GRPTMP, "w+");
+	(void) umask(o_mask);
+
+	if (etctmp == NULL) {
+		(void) fclose(etcgrp);
+		return (-1);
+	}
+
+	if (lockf(fileno(etctmp), F_LOCK, 0) != 0) {
+		(void) fclose(etcgrp);
+		(void) fclose(etctmp);
+		(void) unlink(SMB_LGRP_PGRP_GRPTMP);
+		return (-1);
+	}
+
+	if (fchmod(fileno(etctmp), sb.st_mode) != 0 ||
+	    fchown(fileno(etctmp), sb.st_uid, sb.st_gid) != 0) {
+		(void) lockf(fileno(etctmp), F_ULOCK, 0);
+		(void) fclose(etcgrp);
+		(void) fclose(etctmp);
+		(void) unlink(SMB_LGRP_PGRP_GRPTMP);
+		return (-1);
+	}
+
+	while (fgets(buf, SMB_LGRP_PGRP_GRPBUFSIZ, etcgrp) != NULL) {
+		/* Check for NameService reference */
+		if (!newdone && (buf[0] == '+' || buf[0] == '-')) {
+			(void) fprintf(etctmp, "%s::%u:\n", group, gid);
+			newdone = 1;
+		}
+
+		(void) fputs(buf, etctmp);
+	}
+	(void) fclose(etcgrp);
+
+	if (!newdone)
+		(void) fprintf(etctmp, "%s::%u:\n", group, gid);
+
+	if (rename(SMB_LGRP_PGRP_GRPTMP, SMB_LGRP_PGRP_GROUP) < 0) {
+		(void) lockf(fileno(etctmp), F_ULOCK, 0);
+		(void) fclose(etctmp);
+		(void) unlink(SMB_LGRP_PGRP_GRPTMP);
+		return (-1);
+	}
+
+	(void) lockf(fileno(etctmp), F_ULOCK, 0);
+	(void) fclose(etctmp);
+	return (0);
 }

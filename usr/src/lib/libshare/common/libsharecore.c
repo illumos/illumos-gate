@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -69,6 +68,7 @@ static char *notice[DFSTAB_NOTICE_LINES] =	{
 #define	MAXARGSFORSHARE	256
 
 static mutex_t sharetab_lock = DEFAULTMUTEX;
+extern mutex_t sa_dfstab_lock;
 
 /* used internally only */
 typedef
@@ -545,6 +545,7 @@ sa_comment_line(char *line, char *err)
 		(void) setvbuf(dfstab, NULL, _IOLBF, BUFSIZ * 8);
 		sablocksigs(&old);
 		(void) lockf(fileno(dfstab), F_LOCK, 0);
+		(void) mutex_lock(&sa_dfstab_lock);
 		list = getdfstab(dfstab);
 		rewind(dfstab);
 		/*
@@ -555,6 +556,7 @@ sa_comment_line(char *line, char *err)
 		outdfstab(dfstab, list);
 		(void) fprintf(dfstab, "# Error: %s: %s", err, line);
 		(void) fsync(fileno(dfstab));
+		(void) mutex_unlock(&sa_dfstab_lock);
 		(void) lockf(fileno(dfstab), F_ULOCK, 0);
 		(void) fclose(dfstab);
 		saunblocksigs(&old);
@@ -596,6 +598,7 @@ sa_delete_legacy(sa_share_t share, char *protocol)
 		parent = sa_get_parent_group(share);
 		if (parent != NULL) {
 			(void) lockf(fileno(dfstab), F_LOCK, 0);
+			(void) mutex_lock(&sa_dfstab_lock);
 			list = getdfstab(dfstab);
 			rewind(dfstab);
 			if (protocol != NULL) {
@@ -634,6 +637,7 @@ sa_delete_legacy(sa_share_t share, char *protocol)
 			if (list != NULL)
 				dfs_free_list(list);
 			(void) fflush(dfstab);
+			(void) mutex_unlock(&sa_dfstab_lock);
 			(void) lockf(fileno(dfstab), F_ULOCK, 0);
 		}
 		(void) fsync(fileno(dfstab));
@@ -701,6 +705,7 @@ sa_update_legacy(sa_share_t share, char *proto)
 			(void) setvbuf(dfstab, NULL, _IOLBF, BUFSIZ * 8);
 			sablocksigs(&old);
 			(void) lockf(fileno(dfstab), F_LOCK, 0);
+			(void) mutex_lock(&sa_dfstab_lock);
 			list = getdfstab(dfstab);
 			rewind(dfstab);
 			if (list != NULL)
@@ -708,6 +713,7 @@ sa_update_legacy(sa_share_t share, char *proto)
 			list = adddfsentry(list, share, proto);
 			outdfstab(dfstab, list);
 			(void) fflush(dfstab);
+			(void) mutex_unlock(&sa_dfstab_lock);
 			(void) lockf(fileno(dfstab), F_ULOCK, 0);
 			(void) fsync(fileno(dfstab));
 			saunblocksigs(&old);

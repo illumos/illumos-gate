@@ -19,17 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+#
 
 include ../../../Makefile.master
 
 HDRS=	alloc.h			\
 	cp_unicode.h		\
 	cp_usascii.h		\
-	doserror.h		\
 	hash_table.h		\
-	lmerr.h			\
 	mac_cifs.h		\
 	mailslot.h		\
 	mbuf.h			\
@@ -39,11 +37,9 @@ HDRS=	alloc.h			\
 	netrauth.h		\
 	nmpipes.h		\
 	ntaccess.h		\
-	nterror.h		\
 	ntifs.h			\
 	ntlocale.h		\
 	smb_sid.h		\
-	ntstatus.h		\
 	smb.h			\
 	smb_door.h		\
 	smb_dfs.h		\

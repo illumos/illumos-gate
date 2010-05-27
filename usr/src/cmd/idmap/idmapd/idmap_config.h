@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _IDMAP_CONFIG_H
@@ -57,7 +56,7 @@ typedef struct idmap_cfg_handles {
 	scf_instance_t		*instance;
 	scf_service_t		*service;
 	scf_propertygroup_t	*config_pg;
-	scf_propertygroup_t	*general_pg;
+	scf_propertygroup_t	*debug_pg;
 	ad_disc_t		ad_ctx;
 } idmap_cfg_handles_t;
 
@@ -106,6 +105,8 @@ typedef struct idmap_pg_config {
 	char		*nldap_winname_attr;
 	int		directory_based_mapping;	/* enum */
 	boolean_t	eph_map_unres_sids;
+	boolean_t	use_lsa;
+	boolean_t	disable_cross_forest_trusts;
 } idmap_pg_config_t;
 
 typedef struct idmap_cfg {

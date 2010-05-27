@@ -44,7 +44,7 @@ include ../../Makefile.lib
 C99MODE = $(C99_ENABLE)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lavl -lnsl
+LDLIBS +=	-lc -lavl -lnsl -lnvpair
 
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)

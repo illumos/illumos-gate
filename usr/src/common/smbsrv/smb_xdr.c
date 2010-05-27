@@ -29,7 +29,6 @@
 #include <stddef.h>
 #endif /* _KERNEL */
 #include <smbsrv/smb_door.h>
-#include <smbsrv/smb_xdr.h>
 #include <smbsrv/alloc.h>
 #include <sys/socket.h>
 #include <sys/sysmacros.h>
@@ -95,7 +94,9 @@ smb_doorhdr_opname(uint32_t op)
 		{ SMB_DR_ADS_FIND_HOST,		"ads_find_host" },
 		{ SMB_DR_QUOTA_QUERY,		"quota_query" },
 		{ SMB_DR_QUOTA_SET,		"quota_set" },
-		{ SMB_DR_DFS_GET_REFERRALS,	"dfs_get_referrals" }
+		{ SMB_DR_DFS_GET_REFERRALS,	"dfs_get_referrals" },
+		{ SMB_DR_SHR_HOSTACCESS,	"share_hostaccess" },
+		{ SMB_DR_SHR_EXEC,		"share_exec" }
 	};
 	int	i;
 
@@ -403,18 +404,6 @@ smb_netfileinfo_xdr(XDR *xdrs, smb_netfileinfo_t *objp)
 }
 
 bool_t
-smb_dr_kshare_xdr(XDR *xdrs, smb_dr_kshare_t *objp)
-{
-	if (!xdr_int32_t(xdrs, &objp->k_op))
-		return (FALSE);
-	if (!xdr_string(xdrs, &objp->k_path, MAXPATHLEN))
-		return (FALSE);
-	if (!xdr_string(xdrs, &objp->k_sharename, MAXNAMELEN))
-		return (FALSE);
-	return (TRUE);
-}
-
-bool_t
 smb_gmttoken_query_xdr(XDR *xdrs, smb_gmttoken_query_t *objp)
 {
 	if (!xdr_uint32_t(xdrs, &objp->gtq_count)) {
@@ -690,6 +679,57 @@ dfs_referral_response_xdr(XDR *xdrs, dfs_referral_response_t *objp)
 		return (FALSE);
 
 	if (!xdr_uint32_t(xdrs, &objp->rp_status))
+		return (FALSE);
+
+	return (TRUE);
+}
+
+bool_t
+smb_shr_hostaccess_query_xdr(XDR *xdrs, smb_shr_hostaccess_query_t *objp)
+{
+	if (!xdr_string(xdrs, &objp->shq_none, ~0))
+		return (FALSE);
+
+	if (!xdr_string(xdrs, &objp->shq_ro, ~0))
+		return (FALSE);
+
+	if (!xdr_string(xdrs, &objp->shq_rw, ~0))
+		return (FALSE);
+
+	if (!xdr_uint32_t(xdrs, &objp->shq_flag))
+		return (FALSE);
+
+	if (!smb_inaddr_xdr(xdrs, &objp->shq_ipaddr))
+		return (FALSE);
+
+	return (TRUE);
+}
+
+bool_t
+smb_shr_execinfo_xdr(XDR *xdrs, smb_shr_execinfo_t *objp)
+{
+	if (!xdr_string(xdrs, &objp->e_sharename, ~0))
+		return (FALSE);
+
+	if (!xdr_string(xdrs, &objp->e_winname, ~0))
+		return (FALSE);
+
+	if (!xdr_string(xdrs, &objp->e_userdom, ~0))
+		return (FALSE);
+
+	if (!smb_inaddr_xdr(xdrs, &objp->e_srv_ipaddr))
+		return (FALSE);
+
+	if (!smb_inaddr_xdr(xdrs, &objp->e_cli_ipaddr))
+		return (FALSE);
+
+	if (!xdr_string(xdrs, &objp->e_cli_netbiosname, ~0))
+		return (FALSE);
+
+	if (!xdr_u_int(xdrs, &objp->e_uid))
+		return (FALSE);
+
+	if (!xdr_int(xdrs, &objp->e_type))
 		return (FALSE);
 
 	return (TRUE);

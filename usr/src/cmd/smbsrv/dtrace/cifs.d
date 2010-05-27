@@ -20,8 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -69,17 +68,62 @@ sdt:smbsrv::-smb_op*-done
 	self->status = sr->smb_error.status;
 }
 
+sdt:smbsrv::-smb_op-Negotiate-done
+{
+	sr = (struct smb_request *)arg0;
+	negprot = (smb_arg_negotiate_t *)arg1;
+
+	printf("dialect=%s index=%u caps=0x%08x maxmpx=%u tz=%d time=%u",
+	    stringof(negprot->ni_name),
+	    negprot->ni_index,
+	    negprot->ni_capabilities,
+	    negprot->ni_maxmpxcount,
+	    negprot->ni_tzcorrection,
+	    negprot->ni_servertime.tv_sec);
+
+	printf(" [status=0x%08x (class=%d code=%d)]",
+	    sr->smb_error.status,
+	    sr->smb_error.errcls, sr->smb_error.errcode);
+
+	self->status = sr->smb_error.status;
+}
+
 sdt:smbsrv::-smb_op-SessionSetupX-start
 {
 	sr = (struct smb_request *)arg0;
+	ssetup = (smb_arg_sessionsetup_t *)arg1;
 
-	printf("[%s] %s",
+	printf("[%s] %s %s %s",
 	    (sr->session->s_local_port == 139) ? "NBT" : "TCP",
 	    (sr->session->s_local_port == 139) ?
-	    stringof(sr->session->workstation) : "");
+	    stringof(sr->session->workstation) : "",
+	    stringof(ssetup->ssi_domain),
+	    stringof(ssetup->ssi_user));
+
+	printf(" maxmpx=%u vc=%u maxbuf=%u",
+	    ssetup->ssi_maxmpxcount,
+	    sr->session->vcnumber,
+	    sr->session->smb_msg_size);
 }
 
-sdt:smbsrv::-smb_op-SessionSetupX-done,
+sdt:smbsrv::-smb_op-SessionSetupX-done
+{
+	sr = (struct smb_request *)arg0;
+	ssetup = (smb_arg_sessionsetup_t *)arg1;
+
+	printf("%s/%s: smbuid=%d (%s)",
+	    stringof(sr->uid_user->u_domain),
+	    stringof(sr->uid_user->u_name),
+	    sr->smb_uid,
+	    (ssetup->ssi_guest == 0) ? "user" : "guest");
+
+	printf(" [status=0x%08x (class=%d code=%d)]",
+	    sr->smb_error.status,
+	    sr->smb_error.errcls, sr->smb_error.errcode);
+
+	self->status = sr->smb_error.status;
+}
+
 sdt:smbsrv::-smb_op-LogoffX-start
 {
 	sr = (struct smb_request *)arg0;
@@ -98,7 +142,19 @@ sdt:smbsrv::-smb_op-TreeConnectX-start
                 stringof(tcon->path));
 }
 
-sdt:smbsrv::-smb_op-TreeConnectX-done,
+sdt:smbsrv::-smb_op-TreeConnectX-done
+{
+	sr = (struct smb_request *)arg0;
+
+	printf("tid %d: %s", sr->smb_tid,
+	    (sr->smb_error.status == 0) ?
+	    stringof(sr->tid_tree->t_sharename) : "");
+
+	printf(" [status=0x%08x (class=%d code=%d)]",
+	    sr->smb_error.status,
+	    sr->smb_error.errcls, sr->smb_error.errcode);
+}
+
 sdt:smbsrv::-smb_op-TreeDisconnect-start
 {
 	sr = (struct smb_request *)arg0;
@@ -172,8 +228,8 @@ sdt:smbsrv::-smb_op-Rename-start
 	p = (struct dirop *)arg1;
 
 	printf("%s to %s",
-	     stringof(p->fqi.fq_path.pn_path),
-		 stringof(p->dst_fqi.fq_path.pn_path));
+	    stringof(p->fqi.fq_path.pn_path),
+	    stringof(p->dst_fqi.fq_path.pn_path));
 }
 
 sdt:smbsrv::-smb_op-CheckDirectory-start,
@@ -192,7 +248,7 @@ smb_dispatch_request:return,
 smb_pre_*:return,
 smb_com_*:return,
 smb_post_*:return,
-smbsr_error:return,
+smbsr_status:return,
 smbsr_errno:return
 {
 }
@@ -207,7 +263,7 @@ smb_post_*:entry
 	    sr->smb_com, sr->smb_uid, sr->smb_tid);
 }
 
-smbsr_error:entry
+smbsr_status:entry
 {
     printf("status=0x%08x class=%d, code=%d\n", arg1, arg2, arg3);
 }

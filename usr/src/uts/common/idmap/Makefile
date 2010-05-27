@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # uts/common/idmap/Makefile
@@ -46,7 +45,7 @@ all_h: $(DERIVED_FILES)
 
 idmap_xdr.c:	$(IDMAP_PROT_X)
 	$(RM) $@
-	$(RPCGEN) -CMNc -D_KERNEL -o $@ $(IDMAP_PROT_X)
+	$(RPCGEN) -CMNc -DIDMAP_XDR_MAPPING_ONLY -o $@ $(IDMAP_PROT_X)
 
 check:	$(CHECKHDRS)
 

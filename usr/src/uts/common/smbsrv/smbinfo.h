@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SMBSRV_SMBINFO_H
@@ -119,12 +118,20 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_sync_enable;
 	int32_t skc_secmode;
 	int32_t skc_ipv6_enable;
+	uint32_t skc_execflags;
 	smb_version_t skc_version;
 	char skc_nbdomain[NETBIOS_NAME_SZ];
 	char skc_fqdn[SMB_PI_MAX_DOMAIN];
 	char skc_hostname[SMB_PI_MAX_HOST];
 	char skc_system_comment[SMB_PI_MAX_COMMENT];
 } smb_kmod_cfg_t;
+
+#define	SMB_EXEC_MAP	0x01
+#define	SMB_EXEC_UNMAP	0x02
+#define	SMB_EXEC_TERM	0x04
+
+#define	SMB_EXEC_DISP_CONTINUE	"continue"
+#define	SMB_EXEC_DISP_TERMINATE	"terminate"
 
 /*
  * Major version numbers

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -60,6 +59,8 @@ static uint32_t smb_vss_get_count(char *);
 static void smb_vss_map_gmttoken(char *, char *, char *);
 static void smb_vss_get_snapshots(char *, uint32_t, smb_gmttoken_response_t *);
 static void smb_vss_get_snapshots_free(smb_gmttoken_response_t *);
+static int smb_vss_lookup_node(smb_request_t *sr, smb_node_t *, vnode_t *,
+    char *, smb_node_t *, char *, smb_node_t **);
 
 /*
  * This is to respond to the nt_transact_ioctl to either respond with the
@@ -130,7 +131,7 @@ smb_vss_ioctl_enumerate_snaps(smb_request_t *sr, smb_xa_t *xa)
  * created that is the same place in the directory tree, but
  * in the snapshot. We also use root_node to do the same for
  * the root.
- * One the new smb node is found, the path is modified by
+ * Once the new smb node is found, the path is modified by
  * removing the @GMT token from the path in the buf.
  */
 int
@@ -138,114 +139,103 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
     smb_node_t *cur_node, char *buf, smb_node_t **vss_cur_node,
     smb_node_t **vss_root_node)
 {
-	const char *p;
-	smb_node_t *tnode;
-	char *rootpath;
-	char *snapname;
-	char *nodepath;
-	char gmttoken[SMB_VSS_GMT_SIZE];
-	vnode_t *fsrootvp;
-	vnode_t *vp = NULL;
-	int err = 0;
+	const char	*p;
+	smb_node_t	*tnode;
+	char		*snapname, *path;
+	char		gmttoken[SMB_VSS_GMT_SIZE];
+	vnode_t		*fsrootvp = NULL;
+	int		err = 0;
 
 	if (sr->tid_tree == NULL)
 		return (ESTALE);
 
-	ASSERT(sr->tid_tree->t_snode);
-	ASSERT(sr->tid_tree->t_snode->vp);
-	ASSERT(sr->tid_tree->t_snode->vp->v_vfsp);
+	tnode = sr->tid_tree->t_snode;
 
+	ASSERT(tnode);
+	ASSERT(tnode->vp);
+	ASSERT(tnode->vp->v_vfsp);
+
+	/* get gmttoken from buf and find corresponding snapshot name */
 	if ((p = smb_vss_find_gmttoken(buf)) == NULL)
 		return (ENOENT);
 
 	bcopy(p, gmttoken, SMB_VSS_GMT_SIZE);
 	gmttoken[SMB_VSS_GMT_SIZE - 1] = '\0';
 
-	tnode = sr->tid_tree->t_snode;
+	path = smb_srm_alloc(sr, MAXPATHLEN);
+	snapname = smb_srm_alloc(sr, MAXPATHLEN);
+
+	err = smb_node_getmntpath(tnode, path, MAXPATHLEN);
+	if (err != 0)
+		return (err);
+
+	*snapname = '\0';
+	smb_vss_map_gmttoken(path, gmttoken, snapname);
+	if (!*snapname)
+		return (ENOENT);
+
+	/* find snapshot nodes */
 	err = VFS_ROOT(tnode->vp->v_vfsp, &fsrootvp);
 	if (err != 0)
 		return (err);
 
-	rootpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-	snapname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	nodepath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-
-	err = smb_node_getmntpath(tnode, rootpath, MAXPATHLEN);
-	if (err != 0)
-		goto error;
-
-	*snapname = '\0';
-
-	smb_vss_map_gmttoken(rootpath, gmttoken, snapname);
-
-	if (!*snapname) {
-		err = ENOENT;
-		goto error;
+	/* find snapshot node corresponding to root_node */
+	err = smb_vss_lookup_node(sr, root_node, fsrootvp,
+	    snapname, cur_node, gmttoken, vss_root_node);
+	if (err == 0) {
+		/* find snapshot node corresponding to cur_node */
+		err = smb_vss_lookup_node(sr, cur_node, fsrootvp,
+		    snapname, cur_node, gmttoken, vss_cur_node);
+		if (err != 0)
+			smb_node_release(*vss_root_node);
 	}
 
-	/* note the value of root_node->vp */
-	err = vnodetopath(fsrootvp, root_node->vp, nodepath,
-	    MAXPATHLEN, kcred);
-
-	if (err != 0)
-		goto error;
-
-	(void) snprintf(rootpath, MAXPATHLEN, ".zfs/snapshot/%s/%s",
-	    snapname, nodepath);
-
-	vp = smb_lookuppathvptovp(sr, rootpath, fsrootvp, fsrootvp);
-
-	if (vp) {
-		/* note the value of cur_node->vp */
-		err = vnodetopath(fsrootvp, cur_node->vp, nodepath,
-		    MAXPATHLEN, kcred);
-		if (err != 0) {
-			VN_RELE(vp);
-			goto error;
-		}
-
-		*vss_root_node = smb_node_lookup(sr, NULL, kcred, vp,
-		    gmttoken, cur_node, NULL);
-		VN_RELE(vp);
-
-		if (*vss_root_node == NULL) {
-			err = ENOENT;
-			goto error;
-		}
-
-		(void) snprintf(rootpath, MAXPATHLEN, ".zfs/snapshot/%s/%s",
-		    snapname, nodepath);
-
-
-		vp = smb_lookuppathvptovp(sr, rootpath, fsrootvp, fsrootvp);
-
-		if (vp) {
-			*vss_cur_node = smb_node_lookup(sr, NULL, kcred, vp,
-			    gmttoken, cur_node, NULL);
-			VN_RELE(vp);
-
-			if (*vss_cur_node != NULL) {
-				smb_vss_remove_first_token_from_path(buf);
-			} else {
-				(void) smb_node_release(*vss_root_node);
-				err = ENOENT;
-			}
-		} else {
-			(void) smb_node_release(*vss_root_node);
-			err = ENOENT;
-		}
-	} else {
-		err = ENOENT;
-	}
-
-error:
 	VN_RELE(fsrootvp);
-	kmem_free(rootpath, MAXPATHLEN);
-	kmem_free(snapname, MAXNAMELEN);
-	kmem_free(nodepath, MAXPATHLEN);
 
+	smb_vss_remove_first_token_from_path(buf);
 	return (err);
 }
+
+/*
+ * Find snapshot node corresponding to 'node', and return it in
+ * 'vss_node', as follows:
+ * - find the path from fsrootvp to node, appending it to the
+ *   the snapshot path
+ * - lookup the vnode and smb_node (vss_node).
+ */
+static int
+smb_vss_lookup_node(smb_request_t *sr, smb_node_t *node, vnode_t *fsrootvp,
+    char *snapname, smb_node_t *dnode, char *odname, smb_node_t **vss_node)
+{
+	char *p, *path;
+	int err, len;
+	vnode_t *vp = NULL;
+
+	*vss_node = NULL;
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) snprintf(path, MAXPATHLEN, ".zfs/snapshot/%s/", snapname);
+	len = strlen(path);
+	p = path + len;
+
+	err = smb_node_getpath(node, fsrootvp, p, MAXPATHLEN - len);
+	if (err == 0) {
+		vp = smb_lookuppathvptovp(sr, path, fsrootvp, fsrootvp);
+		if (vp) {
+			*vss_node = smb_node_lookup(sr, NULL, kcred, vp,
+			    odname, dnode, NULL);
+			VN_RELE(vp);
+		}
+	}
+
+	kmem_free(path, MAXPATHLEN);
+
+	if (*vss_node != NULL)
+		return (0);
+
+	return (err ? err : ENOENT);
+}
+
 
 static boolean_t
 smb_vss_is_gmttoken(const char *s)

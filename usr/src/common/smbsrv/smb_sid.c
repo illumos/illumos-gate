@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _KERNEL
@@ -282,7 +281,7 @@ smb_sid_islocal(smb_sid_t *sid)
  * binary sid.
  */
 void
-smb_sid_tostr(smb_sid_t *sid, char *strsid)
+smb_sid_tostr(const smb_sid_t *sid, char *strsid)
 {
 	char *p = strsid;
 	int i;
@@ -325,11 +324,11 @@ smb_sid_tostr(smb_sid_t *sid, char *strsid)
  */
 #ifdef _KERNEL
 smb_sid_t *
-smb_sid_fromstr(char *sidstr)
+smb_sid_fromstr(const char *sidstr)
 {
 	smb_sid_t *sid;
 	smb_sid_t *retsid;
-	char *p;
+	const char *p;
 	int size;
 	uint8_t i;
 	unsigned long sua;
@@ -373,10 +372,10 @@ smb_sid_fromstr(char *sidstr)
 }
 #else /* _KERNEL */
 smb_sid_t *
-smb_sid_fromstr(char *sidstr)
+smb_sid_fromstr(const char *sidstr)
 {
 	smb_sid_t *sid;
-	char *p;
+	const char *p;
 	int size;
 	uint8_t i;
 

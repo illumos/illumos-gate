@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_RQ_H_
@@ -201,7 +200,6 @@ int  smb_t2_init(struct smb_t2rq *rqp, struct smb_connobj *layer,
 	ushort_t *setup, int setupcnt, struct smb_cred *scred);
 void smb_t2_done(struct smb_t2rq *t2p);
 int  smb_t2_request(struct smb_t2rq *t2p);
-uint32_t smb_t2_err(struct smb_t2rq *t2p);
 
 int  smb_nt_alloc(struct smb_connobj *layer, ushort_t fn,
 	struct smb_cred *scred, struct smb_ntrq **rqpp);

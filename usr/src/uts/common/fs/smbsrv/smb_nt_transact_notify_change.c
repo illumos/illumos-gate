@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -276,10 +276,15 @@ void
 smb_reply_notify_change_request(smb_request_t *sr)
 {
 	smb_node_t	*node;
+	smb_srqueue_t	*srq;
 	int		total_bytes, n_setup, n_param, n_data;
 	int		param_off, param_pad, data_off, data_pad;
 	struct		smb_xa *xa;
 	smb_error_t	err;
+
+	SMB_REQ_VALID(sr);
+	srq = sr->session->s_srqueue;
+	smb_srqueue_waitq_to_runq(srq);
 
 	xa = sr->r_xa;
 	node = sr->sr_ncr.nc_node;
@@ -335,7 +340,6 @@ smb_reply_notify_change_request(smb_request_t *sr)
 		break;
 
 	case SMB_REQ_STATE_CANCELED:
-		err.severity = ERROR_SEVERITY_ERROR;
 		err.status   = NT_STATUS_CANCELLED;
 		err.errcls   = ERRDOS;
 		err.errcode  = ERROR_OPERATION_ABORTED;
@@ -377,6 +381,7 @@ smb_reply_notify_change_request(smb_request_t *sr)
 	mutex_enter(&sr->sr_mutex);
 	sr->sr_state = SMB_REQ_STATE_COMPLETED;
 	mutex_exit(&sr->sr_mutex);
+	smb_srqueue_runq_exit(srq);
 	smb_request_free(sr);
 }
 
@@ -411,6 +416,8 @@ smb_process_session_notify_change_queue(
 				    &smb_nce_list,
 				    &smb_ncr_list,
 				    sr);
+				smb_srqueue_waitq_enter(
+				    sr->session->s_srqueue);
 				sr->sr_state = SMB_REQ_STATE_CANCELED;
 				sig = B_TRUE;
 				break;
@@ -454,6 +461,8 @@ smb_process_file_notify_change_queue(struct smb_ofile *of)
 			case SMB_REQ_STATE_WAITING_EVENT:
 				smb_slist_obj_move(&smb_nce_list,
 				    &smb_ncr_list, sr);
+				smb_srqueue_waitq_enter(
+				    sr->session->s_srqueue);
 				sr->sr_state = SMB_REQ_STATE_CANCELED;
 				sig = B_TRUE;
 				break;
@@ -501,6 +510,8 @@ smb_reply_specific_cancel_request(struct smb_request *zsr)
 			case SMB_REQ_STATE_WAITING_EVENT:
 				smb_slist_obj_move(&smb_nce_list,
 				    &smb_ncr_list, sr);
+				smb_srqueue_waitq_enter(
+				    sr->session->s_srqueue);
 				sr->sr_state = SMB_REQ_STATE_CANCELED;
 				sig = B_TRUE;
 				break;
@@ -561,6 +572,8 @@ smb_process_node_notify_change_queue(smb_node_t *node)
 			case SMB_REQ_STATE_WAITING_EVENT:
 				smb_slist_obj_move(&smb_nce_list,
 				    &smb_ncr_list, sr);
+				smb_srqueue_waitq_enter(
+				    sr->session->s_srqueue);
 				sr->sr_state = SMB_REQ_STATE_EVENT_OCCURRED;
 				sig = B_TRUE;
 				break;

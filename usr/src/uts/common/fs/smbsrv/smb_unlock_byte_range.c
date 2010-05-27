@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -86,7 +86,7 @@ smb_com_unlock_byte_range(smb_request_t *sr)
 	    (u_offset_t)Offset, (uint64_t)Length);
 	if (result != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
-		    ERRDOS, ERRnotlocked);
+		    ERRDOS, ERROR_NOT_LOCKED);
 		return (SDRC_ERROR);
 	}
 

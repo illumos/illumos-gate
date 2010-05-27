@@ -49,7 +49,6 @@ static pthread_mutex_t smb_share_dsrv_mtx = PTHREAD_MUTEX_INITIALIZER;
 static smbd_door_t smb_share_sdh;
 
 static void smbd_share_dispatch(void *, char *, size_t, door_desc_t *, uint_t);
-static int smbd_share_enum(smb_enumshare_info_t *esi);
 
 /*
  * Start the LanMan share door service.
@@ -145,11 +144,7 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	char *sharename, *sharename2;
 	smb_share_t lmshr_info;
 	smb_shrlist_t lmshr_list;
-	smb_enumshare_info_t esi;
 	int offset;
-	smb_inaddr_t ipaddr;
-	int exec_type;
-	smb_execsub_info_t subs;
 
 	smbd_door_enter(&smb_share_sdh);
 
@@ -203,23 +198,6 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		smb_dr_free_string(sharename2);
 		break;
 
-	case SMB_SHROP_GETINFO:
-		sharename = smb_dr_get_string(dec_ctx);
-		(void) smb_dr_get_buf(dec_ctx, (unsigned char *)&ipaddr,
-		    sizeof (smb_inaddr_t));
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
-			smb_dr_free_string(sharename);
-			goto decode_error;
-		}
-		rc = smb_shr_get(sharename, &lmshr_info);
-		if (rc == NERR_Success)
-			smb_shr_hostaccess(&lmshr_info, &ipaddr);
-		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
-		smb_dr_put_uint32(enc_ctx, rc);
-		smb_dr_put_share(enc_ctx, &lmshr_info);
-		smb_dr_free_string(sharename);
-		break;
-
 	case SMB_SHROP_ADD:
 		smb_dr_get_share(dec_ctx, &lmshr_info);
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
@@ -254,59 +232,6 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		    sizeof (smb_shrlist_t));
 		break;
 
-	case SMB_SHROP_ENUM:
-		esi.es_bufsize = smb_dr_get_ushort(dec_ctx);
-		esi.es_posix_uid = smb_dr_get_uint32(dec_ctx);
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
-			goto decode_error;
-
-		rc = smbd_share_enum(&esi);
-
-		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
-		smb_dr_put_uint32(enc_ctx, rc);
-		if (rc == NERR_Success) {
-			smb_dr_put_ushort(enc_ctx, esi.es_ntotal);
-			smb_dr_put_ushort(enc_ctx, esi.es_nsent);
-			smb_dr_put_ushort(enc_ctx, esi.es_datasize);
-			smb_dr_put_buf(enc_ctx,
-			    (unsigned char *)esi.es_buf, esi.es_bufsize);
-			free(esi.es_buf);
-		}
-		break;
-
-	case SMB_SHROP_EXEC:
-		sharename = smb_dr_get_string(dec_ctx);
-		subs.e_winname = smb_dr_get_string(dec_ctx);
-		subs.e_userdom = smb_dr_get_string(dec_ctx);
-		(void) smb_dr_get_buf(dec_ctx,
-		    (unsigned char *)&subs.e_srv_ipaddr, sizeof (smb_inaddr_t));
-		(void) smb_dr_get_buf(dec_ctx,
-		    (unsigned char *)&subs.e_cli_ipaddr, sizeof (smb_inaddr_t));
-		subs.e_cli_netbiosname = smb_dr_get_string(dec_ctx);
-		subs.e_uid = smb_dr_get_int32(dec_ctx);
-		exec_type = smb_dr_get_int32(dec_ctx);
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
-			smb_dr_free_string(sharename);
-			smb_dr_free_string(subs.e_winname);
-			smb_dr_free_string(subs.e_userdom);
-			smb_dr_free_string(subs.e_cli_netbiosname);
-			goto decode_error;
-		}
-
-		rc = smb_shr_exec(sharename, &subs, exec_type);
-
-		if (rc != 0)
-			syslog(LOG_NOTICE, "Failed to execute %s command",
-			    (exec_type == SMB_SHR_UNMAP) ? "unmap" : "map");
-
-		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
-		smb_dr_put_uint32(enc_ctx, rc);
-		smb_dr_free_string(sharename);
-		smb_dr_free_string(subs.e_winname);
-		smb_dr_free_string(subs.e_userdom);
-		smb_dr_free_string(subs.e_cli_netbiosname);
-		break;
-
 	default:
 		dec_status = smb_dr_decode_finish(dec_ctx);
 		goto decode_error;
@@ -327,110 +252,4 @@ decode_error:
 	smb_dr_put_uint32(enc_ctx, dec_status);
 	(void) smb_dr_encode_finish(enc_ctx, &used);
 	smbd_door_return(&smb_share_sdh, buf, used, NULL, 0);
-}
-
-/*
- * This function builds a response for a NetShareEnum RAP request which
- * originates from smbsrv kernel module. A response buffer is allocated
- * with the specified size in esi->es_bufsize. List of shares is scanned
- * twice. In the first round the total number of shares which their OEM
- * name is shorter than 13 chars (esi->es_ntotal) and also the number of
- * shares that fit in the given buffer are calculated. In the second
- * round the shares data are encoded in the buffer.
- *
- * The data associated with each share has two parts, a fixed size part and
- * a variable size part which is share's comment. The outline of the response
- * buffer is so that fixed part for all the shares will appear first and follows
- * with the comments for all those shares and that's why the data cannot be
- * encoded in one round without unnecessarily complicating the code.
- */
-static int
-smbd_share_enum(smb_enumshare_info_t *esi)
-{
-	smb_shriter_t shi;
-	smb_share_t *si;
-	int remained;
-	uint16_t infolen = 0;
-	uint16_t cmntlen = 0;
-	uint16_t sharelen;
-	uint16_t clen;
-	uint32_t cmnt_offs;
-	smb_msgbuf_t info_mb;
-	smb_msgbuf_t cmnt_mb;
-	boolean_t autohome_added = B_FALSE;
-
-	esi->es_ntotal = esi->es_nsent = 0;
-
-	if ((esi->es_buf = malloc(esi->es_bufsize)) == NULL)
-		return (NERR_InternalError);
-
-	bzero(esi->es_buf, esi->es_bufsize);
-	remained = esi->es_bufsize;
-
-	/* Do the necessary calculations in the first round */
-	smb_shr_iterinit(&shi);
-
-	while ((si = smb_shr_iterate(&shi)) != NULL) {
-		if (si->shr_flags & SMB_SHRF_LONGNAME)
-			continue;
-
-		if ((si->shr_flags & SMB_SHRF_AUTOHOME) && !autohome_added) {
-			if (esi->es_posix_uid == si->shr_uid)
-				autohome_added = B_TRUE;
-			else
-				continue;
-		}
-
-		esi->es_ntotal++;
-
-		if (remained <= 0)
-			continue;
-
-		clen = strlen(si->shr_cmnt) + 1;
-		sharelen = SHARE_INFO_1_SIZE + clen;
-
-		if (sharelen <= remained) {
-			infolen += SHARE_INFO_1_SIZE;
-			cmntlen += clen;
-		}
-
-		remained -= sharelen;
-	}
-
-	esi->es_datasize = infolen + cmntlen;
-
-	smb_msgbuf_init(&info_mb, (uint8_t *)esi->es_buf, infolen, 0);
-	smb_msgbuf_init(&cmnt_mb, (uint8_t *)esi->es_buf + infolen, cmntlen, 0);
-	cmnt_offs = infolen;
-
-	/* Encode the data in the second round */
-	smb_shr_iterinit(&shi);
-	autohome_added = B_FALSE;
-
-	while ((si = smb_shr_iterate(&shi)) != NULL) {
-		if (si->shr_flags & SMB_SHRF_LONGNAME)
-			continue;
-
-		if ((si->shr_flags & SMB_SHRF_AUTOHOME) && !autohome_added) {
-			if (esi->es_posix_uid == si->shr_uid)
-				autohome_added = B_TRUE;
-			else
-				continue;
-		}
-
-		if (smb_msgbuf_encode(&info_mb, "13c.wl",
-		    si->shr_oemname, si->shr_type, cmnt_offs) < 0)
-			break;
-
-		if (smb_msgbuf_encode(&cmnt_mb, "s", si->shr_cmnt) < 0)
-			break;
-
-		cmnt_offs += strlen(si->shr_cmnt) + 1;
-		esi->es_nsent++;
-	}
-
-	smb_msgbuf_term(&info_mb);
-	smb_msgbuf_term(&cmnt_mb);
-
-	return (NERR_Success);
 }

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_H
@@ -36,9 +36,10 @@
 #include <smbsrv/string.h>
 #include <smbsrv/msgbuf.h>
 
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/nterror.h>
-#include <smbsrv/doserror.h>
+#include <smb/ntstatus.h>
+#include <smb/nterror.h>
+#include <smb/lmerr.h>
+#include <smb/doserror.h>
 #include <smbsrv/ntaccess.h>
 
 /*
@@ -317,6 +318,7 @@ typedef uint32_t smb_utime_t;
 #define	SMB_COM_CLOSE_PRINT_FILE	0xC2
 #define	SMB_COM_GET_PRINT_QUEUE		0xC3
 
+#define	SMB_COM_NUM			0x100
 
 /*
  * Flags field of the SMB header. The names in parenthesis represent

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -116,7 +116,6 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 		 * should provide a buffer size hint for the client.
 		 */
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "l", sdlen);
-		err.severity = ERROR_SEVERITY_ERROR;
 		err.status   = NT_STATUS_BUFFER_TOO_SMALL;
 		err.errcls   = ERRDOS;
 		err.errcode  = ERROR_INSUFFICIENT_BUFFER;

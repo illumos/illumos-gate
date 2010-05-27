@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -91,38 +90,6 @@ smb_common_decode(char *buf, size_t len, xdrproc_t proc, void *data)
 
 	xdr_destroy(&xdrs);
 	return (rc);
-}
-
-/*
- * smb_kshare_mkselfrel
- *
- * encode: structure -> flat buffer (buffer size)
- * Pre-condition: kshare is non-null.
- */
-uint8_t *
-smb_kshare_mkselfrel(smb_dr_kshare_t *kshare, uint32_t *len)
-{
-	uint8_t *buf;
-	XDR xdrs;
-
-	if (!kshare)
-		return (NULL);
-
-	*len = xdr_sizeof(smb_dr_kshare_xdr, kshare);
-	buf = (uint8_t *)malloc(*len);
-	if (!buf)
-		return (NULL);
-
-	xdrmem_create(&xdrs, (const caddr_t)buf, *len, XDR_ENCODE);
-
-	if (!smb_dr_kshare_xdr(&xdrs, kshare)) {
-		*len = 0;
-		free(buf);
-		buf = NULL;
-	}
-
-	xdr_destroy(&xdrs);
-	return (buf);
 }
 
 char *

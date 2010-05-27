@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -160,86 +161,87 @@
  *       being queued in that list is NOT registered by incrementing the
  *       reference count.
  */
-#include <sys/types.h>
+
 #include <sys/refstr_impl.h>
-#include <sys/feature_tests.h>
-#include <sys/sunddi.h>
-#include <sys/fsid.h>
-#include <sys/vfs.h>
-#include <sys/stat.h>
-#include <sys/varargs.h>
-#include <sys/cred.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/lmerr.h>
+#include <smbsrv/smb_ktypes.h>
 #include <smbsrv/smb_fsops.h>
-#include <smbsrv/smb_share.h>
-#include <sys/pathname.h>
 
 int smb_tcon_mute = 0;
 
 static smb_tree_t *smb_tree_connect_disk(smb_request_t *, const char *);
+static smb_tree_t *smb_tree_connect_printq(smb_request_t *, const char *);
 static smb_tree_t *smb_tree_connect_ipc(smb_request_t *, const char *);
-static smb_tree_t *smb_tree_alloc(smb_user_t *, const smb_share_t *,
-    int32_t, smb_node_t *, uint32_t);
+static smb_tree_t *smb_tree_alloc(smb_user_t *, const smb_kshare_t *,
+    smb_node_t *, uint32_t, uint32_t);
 static boolean_t smb_tree_is_connected_locked(smb_tree_t *);
 static boolean_t smb_tree_is_disconnected(smb_tree_t *);
 static const char *smb_tree_get_sharename(const char *);
-static int smb_tree_get_stype(const char *, const char *, int32_t *);
-static int smb_tree_getattr(const smb_share_t *, smb_node_t *, smb_tree_t *);
+static int smb_tree_getattr(const smb_kshare_t *, smb_node_t *, smb_tree_t *);
 static void smb_tree_get_volname(vfs_t *, smb_tree_t *);
-static void smb_tree_get_flags(const smb_share_t *, vfs_t *, smb_tree_t *);
+static void smb_tree_get_flags(const smb_kshare_t *, vfs_t *, smb_tree_t *);
 static void smb_tree_log(smb_request_t *, const char *, const char *, ...);
 static void smb_tree_close_odirs(smb_tree_t *, uint16_t);
 static smb_ofile_t *smb_tree_get_ofile(smb_tree_t *, smb_ofile_t *);
 static smb_odir_t *smb_tree_get_odir(smb_tree_t *, smb_odir_t *);
-static void smb_tree_set_execsub_info(smb_tree_t *, smb_execsub_info_t *);
+static void smb_tree_set_execinfo(smb_tree_t *, smb_shr_execinfo_t *, int);
 static int smb_tree_enum_private(smb_tree_t *, smb_svcenum_t *);
 static int smb_tree_netinfo_encode(smb_tree_t *, uint8_t *, size_t, uint32_t *);
 static void smb_tree_netinfo_init(smb_tree_t *tree, smb_netconnectinfo_t *);
 static void smb_tree_netinfo_fini(smb_netconnectinfo_t *);
 
 /*
- * Extract the share name and share type and connect as appropriate.
+ * Lookup the share name dispatch the appropriate stype handler.
  * Share names are case insensitive so we map the share name to
  * lower-case as a convenience for internal processing.
+ *
+ * Valid service values are:
+ *	A:      Disk share
+ *	LPT1:   Printer
+ *	IPC     Named pipe (IPC$ is reserved as the named pipe share).
+ *	COMM    Communications device
+ *	?????   Any type of device (wildcard)
  */
 smb_tree_t *
 smb_tree_connect(smb_request_t *sr)
 {
-	char *unc_path = sr->arg.tcon.path;
-	char *service = sr->arg.tcon.service;
-	smb_tree_t *tree = NULL;
-	const char *name;
-	int32_t stype;
+	char		*unc_path = sr->sr_tcon.path;
+	smb_tree_t	*tree = NULL;
+	smb_kshare_t	*si;
+	const char	*name;
 
 	(void) smb_strlwr(unc_path);
 
 	if ((name = smb_tree_get_sharename(unc_path)) == NULL) {
+		smb_tree_log(sr, name, "invalid UNC path");
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 		return (NULL);
 	}
 
-	if (smb_tree_get_stype(name, service, &stype) != 0) {
-		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
-		    ERRDOS, ERROR_BAD_DEV_TYPE);
+	if ((si = smb_kshare_lookup(name)) == NULL) {
+		smb_tree_log(sr, name, "share not found");
+		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 		return (NULL);
 	}
+	sr->sr_tcon.si = si;
 
-	switch (stype & STYPE_MASK) {
+	switch (si->shr_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
 		tree = smb_tree_connect_disk(sr, name);
 		break;
-
 	case STYPE_IPC:
 		tree = smb_tree_connect_ipc(sr, name);
 		break;
-
+	case STYPE_PRINTQ:
+		tree = smb_tree_connect_printq(sr, name);
+		break;
 	default:
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		break;
 	}
 
+	smb_kshare_release(si);
 	return (tree);
 }
 
@@ -249,7 +251,7 @@ smb_tree_connect(smb_request_t *sr)
 void
 smb_tree_disconnect(smb_tree_t *tree, boolean_t do_exec)
 {
-	smb_execsub_info_t subs;
+	smb_shr_execinfo_t execinfo;
 
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 
@@ -262,7 +264,6 @@ smb_tree_disconnect(smb_tree_t *tree, boolean_t do_exec)
 		 */
 		tree->t_state = SMB_TREE_STATE_DISCONNECTING;
 		mutex_exit(&tree->t_mutex);
-		atomic_dec_32(&tree->t_server->sv_open_trees);
 
 		if (do_exec) {
 			/*
@@ -277,17 +278,16 @@ smb_tree_disconnect(smb_tree_t *tree, boolean_t do_exec)
 
 		mutex_enter(&tree->t_mutex);
 		tree->t_state = SMB_TREE_STATE_DISCONNECTED;
+		smb_server_dec_trees(tree->t_server);
 	}
 
 	mutex_exit(&tree->t_mutex);
 
-	if (do_exec && tree->t_state == SMB_TREE_STATE_DISCONNECTED &&
-	    tree->t_shr_flags & SMB_SHRF_UNMAP) {
+	if (do_exec && (tree->t_state == SMB_TREE_STATE_DISCONNECTED) &&
+	    (tree->t_execflags & SMB_EXEC_UNMAP)) {
 
-		(void) smb_tree_set_execsub_info(tree, &subs);
-
-		(void) smb_kshare_exec(tree->t_server->sv_lmshrd,
-		    (char *)tree->t_sharename, &subs, SMB_SHR_UNMAP);
+		smb_tree_set_execinfo(tree, &execinfo, SMB_EXEC_UNMAP);
+		(void) smb_kshare_exec(&execinfo);
 	}
 }
 
@@ -454,9 +454,20 @@ smb_tree_fclose(smb_tree_t *tree, uint32_t uniqid)
 /* *************************** Static Functions ***************************** */
 
 #define	SHARES_DIR	".zfs/shares/"
-static void
-smb_tree_acl_access(smb_request_t *sr, const smb_share_t *si, vnode_t *pathvp,
-    uint32_t *access)
+
+/*
+ * Calculates permissions given by the share's ACL to the
+ * user in the passed request.  The default is full access.
+ * If any error occurs, full access is granted.
+ *
+ * Using the vnode of the share path find the root directory
+ * of the mounted file system. Then look to see if there is a
+ * .zfs/shares directory and if there is, lookup the file with
+ * the same name as the share name in it. The ACL set for this
+ * file is the share's ACL which is used for access check here.
+ */
+static uint32_t
+smb_tree_acl_access(smb_request_t *sr, const smb_kshare_t *si, vnode_t *pathvp)
 {
 	smb_user_t	*user;
 	cred_t		*cred;
@@ -467,10 +478,11 @@ smb_tree_acl_access(smb_request_t *sr, const smb_share_t *si, vnode_t *pathvp,
 	char		*sharepath;
 	struct pathname	pnp;
 	size_t		size;
+	uint32_t	access;
 
 	user = sr->uid_user;
 	cred = user->u_cred;
-	*access = ACE_ALL_PERMS; /* default to full "UNIX" access */
+	access = ACE_ALL_PERMS;
 
 	if (si->shr_flags & SMB_SHRF_AUTOHOME) {
 		/*
@@ -478,16 +490,13 @@ smb_tree_acl_access(smb_request_t *sr, const smb_share_t *si, vnode_t *pathvp,
 		 * Everyone else is denied access.
 		 */
 		if (si->shr_uid != crgetuid(cred))
-			*access = 0;
-		return;
+			access = 0;
+
+		return (access);
 	}
 
 	/*
-	 * Using the vnode of the share path, we then find the root
-	 * directory of the mounted file system. We will then look to
-	 * see if there is a .zfs/shares directory and if there is,
-	 * get the access information from the ACL/ACES values and
-	 * check against the cred.
+	 * The hold on 'root' is released by the lookuppnvp() that follows
 	 */
 	vfsp = pathvp->v_vfsp;
 	if (vfsp != NULL)
@@ -496,155 +505,130 @@ smb_tree_acl_access(smb_request_t *sr, const smb_share_t *si, vnode_t *pathvp,
 		rc = ENOENT;
 
 	if (rc != 0)
-		return;
+		return (access);
 
-
-	/*
-	 * Find the share object, if there is one. Need to construct
-	 * the path to the .zfs/shares/<sharename> object and look it
-	 * up.  root is called held but will be released by
-	 * lookuppnvp().
-	 */
 
 	size = sizeof (SHARES_DIR) + strlen(si->shr_name) + 1;
-	sharepath = kmem_alloc(size, KM_SLEEP);
+	sharepath = smb_srm_alloc(sr, size);
 	(void) sprintf(sharepath, "%s%s", SHARES_DIR, si->shr_name);
 
 	pn_alloc(&pnp);
 	(void) pn_set(&pnp, sharepath);
-	rc = lookuppnvp(&pnp, NULL, NO_FOLLOW, NULL,
-	    &sharevp, rootdir, root, kcred);
+	rc = lookuppnvp(&pnp, NULL, NO_FOLLOW, NULL, &sharevp, rootdir, root,
+	    kcred);
 	pn_free(&pnp);
 
-	kmem_free(sharepath, size);
-
 	/*
-	 * Now get the effective access value based on cred and ACL
-	 * values.
+	 * Now get the effective access value based on cred and ACL values.
 	 */
-
 	if (rc == 0) {
-		smb_vop_eaccess(sharevp, (int *)access, V_ACE_MASK, NULL, cred);
+		smb_vop_eaccess(sharevp, (int *)&access, V_ACE_MASK, NULL,
+		    cred);
 		VN_RELE(sharevp);
 	}
+
+	return (access);
+}
+
+/*
+ * Performs the following access checks for a disk share:
+ *
+ *  - No IPC/anonymous user is allowed
+ *
+ *  - If user is Guest, guestok property of the share should be
+ *    enabled
+ *
+ *  - If this is an Admin share, the user should have administrative
+ *    privileges
+ *
+ *  - Host based access control lists
+ *
+ *  - Share ACL
+ *
+ *  Returns the access allowed or 0 if access is denied.
+ */
+static uint32_t
+smb_tree_chkaccess(smb_request_t *sr, smb_kshare_t *shr, vnode_t *vp)
+{
+	smb_user_t *user = sr->uid_user;
+	char *sharename = shr->shr_name;
+	uint32_t host_access;
+	uint32_t acl_access;
+	uint32_t access;
+
+	if (user->u_flags & SMB_USER_FLAG_IPC) {
+		smb_tree_log(sr, sharename, "access denied: IPC only");
+		return (0);
+	}
+
+	if ((user->u_flags & SMB_USER_FLAG_GUEST) &&
+	    ((shr->shr_flags & SMB_SHRF_GUEST_OK) == 0)) {
+		smb_tree_log(sr, sharename, "access denied: guest disabled");
+		return (0);
+	}
+
+	if ((shr->shr_flags & SMB_SHRF_ADMIN) && !smb_user_is_admin(user)) {
+		smb_tree_log(sr, sharename, "access denied: not admin");
+		return (0);
+	}
+
+	host_access = smb_kshare_hostaccess(shr, &sr->session->ipaddr);
+	if ((host_access & ACE_ALL_PERMS) == 0) {
+		smb_tree_log(sr, sharename, "access denied: host access");
+		return (0);
+	}
+
+	acl_access = smb_tree_acl_access(sr, shr, vp);
+	if ((acl_access & ACE_ALL_PERMS) == 0) {
+		smb_tree_log(sr, sharename, "access denied: share ACL");
+		return (0);
+	}
+
+	access = host_access & acl_access;
+	if ((access & ACE_ALL_PERMS) == 0) {
+		smb_tree_log(sr, sharename, "access denied");
+		return (0);
+	}
+
+	return (access);
 }
 
 /*
  * Connect a share for use with files and directories.
  */
-
 static smb_tree_t *
 smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 {
+	const char		*any = "?????";
 	smb_user_t		*user = sr->uid_user;
 	smb_node_t		*dnode = NULL;
 	smb_node_t		*snode = NULL;
+	smb_kshare_t 		*si = sr->sr_tcon.si;
+	char			*service = sr->sr_tcon.service;
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
-	smb_share_t 		*si;
-	cred_t			*u_cred;
 	int			rc;
-	uint32_t		access = 0; /* read/write is assumed */
-	uint32_t		hostaccess = ACE_ALL_PERMS;
-	uint32_t		aclaccess;
-	smb_execsub_info_t	subs;
+	uint32_t		access;
+	smb_shr_execinfo_t	execinfo;
 
 	ASSERT(user);
-	u_cred = user->u_cred;
-	ASSERT(u_cred);
+	ASSERT(user->u_cred);
 
-	if (user->u_flags & SMB_USER_FLAG_IPC) {
-		smb_tree_log(sr, sharename, "access denied: IPC only");
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
-		return (NULL);
-	}
-
-	si = kmem_zalloc(sizeof (smb_share_t), KM_SLEEP);
-
-	if (smb_kshare_getinfo(sr->sr_server->sv_lmshrd, (char *)sharename, si,
-	    &sr->session->ipaddr) != NERR_Success) {
-		smb_tree_log(sr, sharename, "share not found");
-		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-		kmem_free(si, sizeof (smb_share_t));
-		return (NULL);
-	}
-
-	if (user->u_flags & SMB_USER_FLAG_GUEST) {
-		if ((si->shr_flags & SMB_SHRF_GUEST_OK) == 0) {
-			smb_tree_log(sr, sharename,
-			    "access denied: guest disabled");
-			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV,
-			    ERRaccess);
-			kmem_free(si, sizeof (smb_share_t));
-			return (NULL);
-		}
-	}
-
-	/*
-	 * Handle the default administration shares: C$, D$ etc.
-	 * Only a user with admin rights is allowed to map these
-	 * shares.
-	 */
-	if (si->shr_flags & SMB_SHRF_ADMIN) {
-		if (!smb_user_is_admin(user)) {
-			smb_tree_log(sr, sharename, "access denied: not admin");
-			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
-			    ERRSRV, ERRaccess);
-			kmem_free(si, sizeof (smb_share_t));
-			return (NULL);
-		}
-	}
-
-	/*
-	 * Set up the OptionalSupport for this share.
-	 */
-	sr->arg.tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
-
-	switch (si->shr_flags & SMB_SHRF_CSC_MASK) {
-	case SMB_SHRF_CSC_DISABLED:
-		sr->arg.tcon.optional_support |= SMB_CSC_CACHE_NONE;
-		break;
-	case SMB_SHRF_CSC_AUTO:
-		sr->arg.tcon.optional_support |= SMB_CSC_CACHE_AUTO_REINT;
-		break;
-	case SMB_SHRF_CSC_VDO:
-		sr->arg.tcon.optional_support |= SMB_CSC_CACHE_VDO;
-		break;
-	case SMB_SHRF_CSC_MANUAL:
-	default:
-		/*
-		 * Default to SMB_CSC_CACHE_MANUAL_REINT.
-		 */
-		break;
-	}
-
-	/* ABE support */
-	if (si->shr_flags & SMB_SHRF_ABE)
-		sr->arg.tcon.optional_support |=
-		    SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM;
-
-	if (si->shr_flags & SMB_SHRF_DFSROOT)
-		sr->arg.tcon.optional_support |= SMB_SHARE_IS_IN_DFS;
-
-	access = si->shr_access_value & SMB_SHRF_ACC_ALL;
-
-	if (access == SMB_SHRF_ACC_RO) {
-		hostaccess &= ~ACE_ALL_WRITE_PERMS;
-	} else if (access == SMB_SHRF_ACC_NONE) {
-		kmem_free(si, sizeof (smb_share_t));
-		smb_tree_log(sr, sharename, "access denied: host access");
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
+	if ((strcmp(service, any) != 0) && (strcasecmp(service, "A:") != 0)) {
+		smb_tree_log(sr, sharename, "invalid service (%s)", service);
+		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
+		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		return (NULL);
 	}
 
 	/*
 	 * Check that the shared directory exists.
 	 */
-	rc = smb_pathname_reduce(sr, u_cred, si->shr_path, 0, 0, &dnode,
+	rc = smb_pathname_reduce(sr, user->u_cred, si->shr_path, 0, 0, &dnode,
 	    last_component);
 
 	if (rc == 0) {
-		rc = smb_fsop_lookup(sr, u_cred, SMB_FOLLOW_LINKS,
+		rc = smb_fsop_lookup(sr, user->u_cred, SMB_FOLLOW_LINKS,
 		    sr->sr_server->si_root_smb_node, dnode, last_component,
 		    &snode);
 
@@ -657,61 +641,140 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 
 		smb_tree_log(sr, sharename, "bad path: %s", si->shr_path);
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
-		kmem_free(si, sizeof (smb_share_t));
 		return (NULL);
 	}
 
-	/*
-	 * Find share level ACL if it exists in the designated
-	 * location. Needs to be done after finding a valid path but
-	 * before the tree is allocated.
-	 */
-	smb_tree_acl_access(sr, si, snode->vp, &aclaccess);
-	if ((aclaccess & ACE_ALL_PERMS) == 0) {
-		smb_tree_log(sr, sharename, "access denied: share ACL");
-		smbsr_error(sr, 0, ERRSRV, ERRaccess);
-		kmem_free(si, sizeof (smb_share_t));
+	if ((access = smb_tree_chkaccess(sr, si, snode->vp)) == 0) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
 		smb_node_release(snode);
 		return (NULL);
 	}
 
 	/*
-	 * Set tree ACL access to the minimum ACL permissions based on
-	 * hostaccess (those allowed by host based access) and
-	 * aclaccess (those from the ACL object for the share). This
-	 * is done during the alloc.
+	 * Set up the OptionalSupport for this share.
 	 */
+	sr->sr_tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
 
-	(void) strlcpy(si->shr_name, sharename, MAXNAMELEN);
-	tree = smb_tree_alloc(user, si, STYPE_DISKTREE, snode,
-	    hostaccess & aclaccess);
+	switch (si->shr_flags & SMB_SHRF_CSC_MASK) {
+	case SMB_SHRF_CSC_DISABLED:
+		sr->sr_tcon.optional_support |= SMB_CSC_CACHE_NONE;
+		break;
+	case SMB_SHRF_CSC_AUTO:
+		sr->sr_tcon.optional_support |= SMB_CSC_CACHE_AUTO_REINT;
+		break;
+	case SMB_SHRF_CSC_VDO:
+		sr->sr_tcon.optional_support |= SMB_CSC_CACHE_VDO;
+		break;
+	case SMB_SHRF_CSC_MANUAL:
+	default:
+		/*
+		 * Default to SMB_CSC_CACHE_MANUAL_REINT.
+		 */
+		break;
+	}
+
+	/* ABE support */
+	if (si->shr_flags & SMB_SHRF_ABE)
+		sr->sr_tcon.optional_support |=
+		    SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM;
+
+	if (si->shr_flags & SMB_SHRF_DFSROOT)
+		sr->sr_tcon.optional_support |= SMB_SHARE_IS_IN_DFS;
+
+	tree = smb_tree_alloc(user, si, snode, access,
+	    sr->sr_cfg->skc_execflags);
+
+	smb_node_release(snode);
+
+	if (tree) {
+		if (tree->t_execflags & SMB_EXEC_MAP) {
+			smb_tree_set_execinfo(tree, &execinfo, SMB_EXEC_MAP);
+
+			rc = smb_kshare_exec(&execinfo);
+
+			if ((rc != 0) && (tree->t_execflags & SMB_EXEC_TERM)) {
+				smb_tree_disconnect(tree, B_FALSE);
+				smb_tree_release(tree);
+				smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV,
+				    ERRaccess);
+				return (NULL);
+			}
+		}
+	} else {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
+	}
+
+	return (tree);
+}
+
+/*
+ * Shares have both a share and host based access control.  The access
+ * granted will be minimum permissions based on both hostaccess
+ * (permissions allowed by host based access) and aclaccess (from the
+ * share ACL).
+ */
+static smb_tree_t *
+smb_tree_connect_printq(smb_request_t *sr, const char *sharename)
+{
+	const char		*any = "?????";
+	smb_user_t		*user = sr->uid_user;
+	smb_node_t		*dnode = NULL;
+	smb_node_t		*snode = NULL;
+	smb_kshare_t 		*si = sr->sr_tcon.si;
+	char			*service = sr->sr_tcon.service;
+	char			last_component[MAXNAMELEN];
+	smb_tree_t		*tree;
+	int			rc;
+	uint32_t		access;
+
+	ASSERT(user);
+	ASSERT(user->u_cred);
+
+	if ((strcmp(service, any) != 0) &&
+	    (strcasecmp(service, "LPT1:") != 0)) {
+		smb_tree_log(sr, sharename, "invalid service (%s)", service);
+		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
+		    ERRDOS, ERROR_BAD_DEV_TYPE);
+		return (NULL);
+	}
+
+	/*
+	 * Check that the shared directory exists.
+	 */
+	rc = smb_pathname_reduce(sr, user->u_cred, si->shr_path, 0, 0, &dnode,
+	    last_component);
+	if (rc == 0) {
+		rc = smb_fsop_lookup(sr, user->u_cred, SMB_FOLLOW_LINKS,
+		    sr->sr_server->si_root_smb_node, dnode, last_component,
+		    &snode);
+
+		smb_node_release(dnode);
+	}
+
+	if (rc) {
+		if (snode)
+			smb_node_release(snode);
+
+		smb_tree_log(sr, sharename, "bad path: %s", si->shr_path);
+		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
+		return (NULL);
+	}
+
+	if ((access = smb_tree_chkaccess(sr, si, snode->vp)) == 0) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
+		smb_node_release(snode);
+		return (NULL);
+	}
+
+	sr->sr_tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
+
+	tree = smb_tree_alloc(user, si, snode, access,
+	    sr->sr_cfg->skc_execflags);
 
 	smb_node_release(snode);
 
 	if (tree == NULL)
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
-	else {
-
-		tree->t_shr_flags = si->shr_flags;
-
-		if (tree->t_shr_flags & SMB_SHRF_MAP) {
-			(void) smb_tree_set_execsub_info(tree, &subs);
-
-			rc = smb_kshare_exec(sr->sr_server->sv_lmshrd,
-			    (char *)sharename, &subs, SMB_SHR_MAP);
-
-			if (rc != 0 && tree->t_shr_flags & SMB_SHRF_DISP_TERM) {
-				smb_tree_disconnect(tree, B_FALSE);
-				smb_tree_release(tree);
-				smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV,
-				    ERRaccess);
-				kmem_free(si, sizeof (smb_share_t));
-				return (NULL);
-			}
-		}
-	}
-
-	kmem_free(si, sizeof (smb_share_t));
 
 	return (tree);
 }
@@ -722,9 +785,11 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 static smb_tree_t *
 smb_tree_connect_ipc(smb_request_t *sr, const char *name)
 {
+	const char	*any = "?????";
 	smb_user_t	*user = sr->uid_user;
 	smb_tree_t	*tree;
-	smb_share_t	*si;
+	smb_kshare_t	*si = sr->sr_tcon.si;
+	char		*service = sr->sr_tcon.service;
 
 	ASSERT(user);
 
@@ -735,20 +800,21 @@ smb_tree_connect_ipc(smb_request_t *sr, const char *name)
 		return (NULL);
 	}
 
-	sr->arg.tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
+	if ((strcmp(service, any) != 0) && (strcasecmp(service, "IPC") != 0)) {
+		smb_tree_log(sr, name, "invalid service (%s)", service);
+		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
+		    ERRDOS, ERROR_BAD_DEV_TYPE);
+		return (NULL);
+	}
 
-	si = kmem_zalloc(sizeof (smb_share_t), KM_SLEEP);
-	(void) strlcpy(si->shr_name, name, MAXNAMELEN);
-	(void) strlcpy(si->shr_path, name, MAXPATHLEN);
-	si->shr_type = STYPE_IPC | STYPE_SPECIAL;
+	sr->sr_tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
 
-	tree = smb_tree_alloc(user, si, STYPE_IPC, NULL, ACE_ALL_PERMS);
+	tree = smb_tree_alloc(user, si, NULL, ACE_ALL_PERMS, 0);
 	if (tree == NULL) {
 		smb_tree_log(sr, name, "access denied");
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
 	}
 
-	kmem_free(si, sizeof (smb_share_t));
 	return (tree);
 }
 
@@ -756,14 +822,11 @@ smb_tree_connect_ipc(smb_request_t *sr, const char *name)
  * Allocate a tree.
  */
 static smb_tree_t *
-smb_tree_alloc(
-    smb_user_t		*user,
-    const smb_share_t	*si,
-    int32_t		stype,
-    smb_node_t		*snode,
-    uint32_t access)
+smb_tree_alloc(smb_user_t *user, const smb_kshare_t *si, smb_node_t *snode,
+    uint32_t access, uint32_t execflags)
 {
 	smb_tree_t	*tree;
+	uint32_t	stype = si->shr_type;
 	uint16_t	tid;
 
 	if (smb_idpool_alloc(&user->u_tid_pool, &tid))
@@ -772,7 +835,7 @@ smb_tree_alloc(
 	tree = kmem_cache_alloc(user->u_server->si_cache_tree, KM_SLEEP);
 	bzero(tree, sizeof (smb_tree_t));
 
-	if (STYPE_ISDSK(stype)) {
+	if (STYPE_ISDSK(stype) || STYPE_ISPRN(stype)) {
 		if (smb_tree_getattr(si, snode, tree) != 0) {
 			smb_idpool_free(&user->u_tid_pool, tid);
 			kmem_cache_free(user->u_server->si_cache_tree, tree);
@@ -816,12 +879,13 @@ smb_tree_alloc(
 	tree->t_magic = SMB_TREE_MAGIC;
 	tree->t_access = access;
 	tree->t_connect_time = gethrestime_sec();
+	tree->t_execflags = execflags;
 
 	/* if FS is readonly, enforce that here */
 	if (tree->t_flags & SMB_TREE_READONLY)
 		tree->t_access &= ~ACE_ALL_WRITE_PERMS;
 
-	if (STYPE_ISDSK(stype)) {
+	if (STYPE_ISDSK(stype) || STYPE_ISPRN(stype)) {
 		smb_node_ref(snode);
 		tree->t_snode = snode;
 		tree->t_acltype = smb_fsop_acltype(snode);
@@ -831,8 +895,7 @@ smb_tree_alloc(
 	smb_llist_insert_head(&user->u_tree_list, tree);
 	smb_llist_exit(&user->u_tree_list);
 	atomic_inc_32(&user->u_session->s_tree_cnt);
-	atomic_inc_32(&user->u_server->sv_open_trees);
-
+	smb_server_inc_trees(user->u_server);
 	return (tree);
 }
 
@@ -955,46 +1018,10 @@ smb_tree_get_sharename(const char *unc_path)
 }
 
 /*
- * Map the service to a resource type.  Valid values for service are:
- *
- *	A:      Disk share
- *	LPT1:   Printer
- *	IPC     Named pipe
- *	COMM    Communications device
- *	?????   Any type of device (wildcard)
- *
- * We support IPC and disk shares; anything else is currently treated
- * as an error.  IPC$ is reserved as the named pipe share.
- */
-static int
-smb_tree_get_stype(const char *sharename, const char *service,
-    int32_t *stype_ret)
-{
-	const char *any = "?????";
-
-	if ((strcmp(service, any) == 0) || (strcasecmp(service, "IPC") == 0)) {
-		if (strcasecmp(sharename, "IPC$") == 0) {
-			*stype_ret = STYPE_IPC;
-			return (0);
-		}
-	}
-
-	if ((strcmp(service, any) == 0) || (strcasecmp(service, "A:") == 0)) {
-		if (strcasecmp(sharename, "IPC$") == 0)
-			return (-1);
-
-		*stype_ret = STYPE_DISKTREE;
-		return (0);
-	}
-
-	return (-1);
-}
-
-/*
  * Obtain the tree attributes: volume name, typename and flags.
  */
 static int
-smb_tree_getattr(const smb_share_t *si, smb_node_t *node, smb_tree_t *tree)
+smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
 {
 	vfs_t *vfsp = SMB_NODE_VFS(node);
 
@@ -1040,7 +1067,7 @@ smb_tree_get_volname(vfs_t *vfsp, smb_tree_t *tree)
  * File system types are hardcoded in uts/common/os/vfs_conf.c.
  */
 static void
-smb_tree_get_flags(const smb_share_t *si, vfs_t *vfsp, smb_tree_t *tree)
+smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 {
 	typedef struct smb_mtype {
 		char		*mt_name;
@@ -1299,14 +1326,16 @@ smb_tree_close_odirs(smb_tree_t *tree, uint16_t pid)
 }
 
 static void
-smb_tree_set_execsub_info(smb_tree_t *tree, smb_execsub_info_t *subs)
+smb_tree_set_execinfo(smb_tree_t *tree, smb_shr_execinfo_t *exec, int exec_type)
 {
-		subs->e_winname = tree->t_user->u_name;
-		subs->e_userdom = tree->t_user->u_domain;
-		subs->e_srv_ipaddr = tree->t_session->local_ipaddr;
-		subs->e_cli_ipaddr = tree->t_session->ipaddr;
-		subs->e_cli_netbiosname = tree->t_session->workstation;
-		subs->e_uid = crgetuid(tree->t_user->u_cred);
+	exec->e_sharename = tree->t_sharename;
+	exec->e_winname = tree->t_user->u_name;
+	exec->e_userdom = tree->t_user->u_domain;
+	exec->e_srv_ipaddr = tree->t_session->local_ipaddr;
+	exec->e_cli_ipaddr = tree->t_session->ipaddr;
+	exec->e_cli_netbiosname = tree->t_session->workstation;
+	exec->e_uid = crgetuid(tree->t_user->u_cred);
+	exec->e_type = exec_type;
 }
 
 /*

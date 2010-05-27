@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -149,6 +148,7 @@ SUNWprivate {
 	sa_get_zfs_handle;
 	sa_zfs_process_share;
 	sa_update_sharetab_ts;
+	sa_zfs_setprop;
     local:
 	*;
 };

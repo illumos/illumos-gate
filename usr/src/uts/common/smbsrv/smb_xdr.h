@@ -37,24 +37,15 @@ extern "C" {
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_ioctl.h>
 #include <smbsrv/smb_sid.h>
-#include <smbsrv/wintypes.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/smb_dfs.h>
-
-typedef struct smb_dr_kshare {
-	int32_t k_op;
-	char *k_path;
-	char *k_sharename;
-} smb_dr_kshare_t;
+#include <smbsrv/wintypes.h>
 
 #ifdef _KERNEL
 #define	xdr_int8_t	xdr_char
 #define	xdr_uint8_t	xdr_u_char
 #define	xdr_int16_t	xdr_short
 #define	xdr_uint16_t	xdr_u_short
-
-smb_dr_kshare_t *smb_share_mkabsolute(uint8_t *buf, uint32_t len);
-#else
-uint8_t *smb_kshare_mkselfrel(smb_dr_kshare_t *kshare, uint32_t *len);
 #endif /* _KERNEL */
 
 /* null-terminated string */
@@ -184,7 +175,6 @@ typedef struct smb_netsvc {
 
 bool_t smb_buf32_xdr(XDR *, smb_buf32_t *);
 bool_t smb_string_xdr(XDR *, smb_string_t *);
-bool_t smb_dr_kshare_xdr(XDR *, smb_dr_kshare_t *);
 bool_t smb_inaddr_xdr(XDR *, smb_inaddr_t *);
 
 const char *smb_doorhdr_opname(uint32_t);
@@ -311,6 +301,17 @@ typedef struct dfs_referral_response {
 
 bool_t dfs_referral_query_xdr(XDR *, dfs_referral_query_t *);
 bool_t dfs_referral_response_xdr(XDR *, dfs_referral_response_t *);
+
+typedef struct smb_shr_hostaccess_query {
+	char		*shq_none;
+	char		*shq_ro;
+	char		*shq_rw;
+	uint32_t	shq_flag;
+	smb_inaddr_t	shq_ipaddr;
+} smb_shr_hostaccess_query_t;
+
+bool_t smb_shr_hostaccess_query_xdr(XDR *, smb_shr_hostaccess_query_t *);
+bool_t smb_shr_execinfo_xdr(XDR *, smb_shr_execinfo_t *);
 
 #ifdef	__cplusplus
 }

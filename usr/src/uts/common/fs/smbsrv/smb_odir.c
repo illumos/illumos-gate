@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -493,7 +492,6 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
     smb_odirent_t *odirent, boolean_t *eof)
 {
 	int		rc;
-	boolean_t	ignore_case;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -515,13 +513,11 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
 		return (-1);
 	}
 
-	ignore_case = (od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE);
-
 	for (;;) {
 		if ((rc = smb_odir_next_odirent(od, odirent)) != 0)
 			break;
 		if (smb_match_name(odirent->od_ino, odirent->od_name,
-		    od->d_pattern, ignore_case))
+		    od->d_pattern))
 			break;
 	}
 
@@ -569,7 +565,6 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 {
 	int		rc, errnum;
 	smb_odirent_t	*odirent;
-	boolean_t	ignore_case;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -591,8 +586,6 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (-1);
 	}
 
-	ignore_case = (od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE);
-
 	if (!(od->d_flags & SMB_ODIR_FLAG_WILDCARDS)) {
 		if (od->d_eof)
 			rc = ENOENT;
@@ -613,7 +606,7 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 				continue;
 
 			if (!smb_match_name(odirent->od_ino, odirent->od_name,
-			    od->d_pattern, ignore_case))
+			    od->d_pattern))
 				continue;
 
 			rc = smb_odir_wildcard_fileinfo(sr, od, odirent,
@@ -637,7 +630,6 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (-1);
 	}
 }
-
 
 /*
  * smb_odir_read_streaminfo
@@ -1090,11 +1082,6 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (rc);
 	}
 
-	ino = attr.sa_vattr.va_nodeid;
-	(void) smb_mangle_name(ino, fnode->od_name,
-	    fileinfo->fi_shortname, fileinfo->fi_name83, case_conflict);
-	name = (case_conflict) ? fileinfo->fi_shortname : fnode->od_name;
-	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
 	/* follow link to get target node & attr */
 	if (smb_node_is_symlink(fnode) &&
@@ -1112,6 +1099,15 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		smb_node_release(fnode);
 		return (ENOENT);
 	}
+
+	name = fnode->od_name;
+	ino = attr.sa_vattr.va_nodeid;
+	if (case_conflict || smb_needs_mangled(name))
+		smb_mangle(name, ino, fileinfo->fi_shortname, SMB_SHORTNAMELEN);
+	if (case_conflict)
+		name = fileinfo->fi_shortname;
+
+	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
 	fileinfo->fi_dosattr = attr.sa_dosattr;
 	fileinfo->fi_nodeid = attr.sa_vattr.va_nodeid;
@@ -1134,11 +1130,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
  *
  * odirent contains a directory entry, obtained from a vop_readdir.
  * If a case conflict is identified the filename is mangled and the
- * shortname is used as 'name', in place of odirent->od_name. This
- * name will be used in the smb_fsop_lookup because smb_fsop_lookup
- * performs a case insensitive lookup if the tree is case insesitive,
- * so the mangled name is required in the case conflict scenario to
- * ensure the correct match.
+ * shortname is used as 'name', in place of odirent->od_name.
  *
  * If the looked up file is a link, we attempt to lookup the link target
  * to use its attributes in place of those of the files's.
@@ -1173,21 +1165,14 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	ASSERT(MUTEX_HELD(&od->d_mutex));
 	bzero(fileinfo, sizeof (smb_fileinfo_t));
 
-	case_conflict = ((od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) &&
-	    (odirent->od_eflags & ED_CASE_CONFLICT));
-	(void) smb_mangle_name(odirent->od_ino, odirent->od_name,
-	    fileinfo->fi_shortname, fileinfo->fi_name83, case_conflict);
-	name = (case_conflict) ? fileinfo->fi_shortname : odirent->od_name;
-	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
-
-	rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
-	    od->d_dnode, name, &fnode);
+	rc = smb_fsop_lookup(sr, od->d_cred, SMB_CASE_SENSITIVE,
+	    od->d_tree->t_snode, od->d_dnode, odirent->od_name, &fnode);
 	if (rc != 0)
 		return (rc);
 
 	/* follow link to get target node & attr */
 	if (smb_node_is_symlink(fnode) &&
-	    smb_odir_lookup_link(sr, od, name, &tgt_node)) {
+	    smb_odir_lookup_link(sr, od, odirent->od_name, &tgt_node)) {
 		smb_node_release(fnode);
 		fnode = tgt_node;
 	}
@@ -1208,6 +1193,16 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		smb_node_release(fnode);
 		return (ENOENT);
 	}
+
+	case_conflict = ((od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) &&
+	    (odirent->od_eflags & ED_CASE_CONFLICT));
+	if (case_conflict || smb_needs_mangled(odirent->od_name)) {
+		smb_mangle(odirent->od_name, odirent->od_ino,
+		    fileinfo->fi_shortname, SMB_SHORTNAMELEN);
+	}
+
+	name = (case_conflict) ? fileinfo->fi_shortname : odirent->od_name;
+	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
 	fileinfo->fi_cookie = (uint32_t)od->d_offset;
 	fileinfo->fi_dosattr = attr.sa_dosattr;
@@ -1241,7 +1236,7 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
  * symlinks to directories. Symlinks to other object types
  * should be unaffected.
  *
- * Returns:  B_TRUE - followed link. tgt_node and tgt_attr set
+ * Returns: B_TRUE  - followed link. tgt_node and tgt_attr set
  *          B_FALSE - link not followed
  */
 static boolean_t
@@ -1249,8 +1244,9 @@ smb_odir_lookup_link(smb_request_t *sr, smb_odir_t *od,
     char *fname, smb_node_t **tgt_node)
 {
 	int rc;
+	uint32_t flags = SMB_FOLLOW_LINKS | SMB_CASE_SENSITIVE;
 
-	rc = smb_fsop_lookup(sr, od->d_cred, SMB_FOLLOW_LINKS,
+	rc = smb_fsop_lookup(sr, od->d_cred, flags,
 	    od->d_tree->t_snode, od->d_dnode, fname, tgt_node);
 	if (rc != 0) {
 		*tgt_node = NULL;

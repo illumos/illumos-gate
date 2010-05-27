@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -100,7 +99,8 @@ load_config()
 		return (rc);
 	}
 
-	idmapdlog(LOG_DEBUG, "Initial configuration loaded");
+	if (DBG(CONFIG, 1))
+		idmapdlog(LOG_DEBUG, "Initial configuration loaded");
 
 	return (0);
 }
@@ -111,13 +111,20 @@ reload_gcs()
 {
 	int		i, j;
 	adutils_ad_t	**new_gcs;
-	adutils_ad_t	**old_gcs;
+	adutils_ad_t	**old_gcs = _idmapdstate.gcs;
 	int		new_num_gcs;
-	int		old_num_gcs;
+	int		old_num_gcs = _idmapdstate.num_gcs;
 	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
 	idmap_trustedforest_t *trustfor = pgcfg->trusted_forests;
 	int		num_trustfor = pgcfg->num_trusted_forests;
 	ad_disc_domainsinforest_t *domain_in_forest;
+
+	if (pgcfg->domain_name == NULL) {
+		/* No domain name specified - workgroup mode. */
+		new_gcs = NULL;
+		new_num_gcs = 0;
+		goto out;
+	}
 
 	if (pgcfg->global_catalog == NULL ||
 	    pgcfg->global_catalog[0].host[0] == '\0') {
@@ -131,9 +138,6 @@ reload_gcs()
 		    "Global Catalog servers not configured/discoverable");
 		return;
 	}
-
-	old_gcs = _idmapdstate.gcs;
-	old_num_gcs = _idmapdstate.num_gcs;
 
 	new_num_gcs = 1 + num_trustfor;
 	new_gcs = calloc(new_num_gcs, sizeof (adutils_ad_t *));
@@ -220,7 +224,6 @@ out:
 	_idmapdstate.gcs = new_gcs;
 	_idmapdstate.num_gcs = new_num_gcs;
 
-
 	if (old_gcs != NULL) {
 		for (i = 0; i < old_num_gcs; i++)
 			adutils_ad_free(&old_gcs[i]);
@@ -240,10 +243,17 @@ reload_dcs(void)
 {
 	int		i;
 	adutils_ad_t	**new_dcs;
-	adutils_ad_t	**old_dcs;
+	adutils_ad_t	**old_dcs = _idmapdstate.dcs;
 	int		new_num_dcs;
-	int		old_num_dcs;
+	int		old_num_dcs = _idmapdstate.num_dcs;
 	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
+
+	if (pgcfg->domain_name == NULL) {
+		/* No domain name specified - workgroup mode. */
+		new_dcs = NULL;
+		new_num_dcs = 0;
+		goto out;
+	}
 
 	if (pgcfg->domain_controller == NULL ||
 	    pgcfg->domain_controller[0].host[0] == '\0') {
@@ -257,9 +267,6 @@ reload_dcs(void)
 		    "Domain controller servers not configured/discoverable");
 		return;
 	}
-
-	old_dcs = _idmapdstate.dcs;
-	old_num_dcs = _idmapdstate.num_dcs;
 
 	new_num_dcs = 1;
 	new_dcs = calloc(new_num_dcs, sizeof (adutils_ad_t *));
@@ -295,6 +302,7 @@ reload_dcs(void)
 		}
 	}
 
+out:
 	_idmapdstate.dcs = new_dcs;
 	_idmapdstate.num_dcs = new_num_dcs;
 
@@ -325,7 +333,7 @@ reload_ad(void)
 }
 
 void
-print_idmapdstate()
+print_idmapdstate(void)
 {
 	int i, j;
 	idmap_pg_config_t *pgcfg;

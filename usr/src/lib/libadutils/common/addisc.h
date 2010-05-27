@@ -20,13 +20,14 @@
  */
 
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_ADINFO_H
 #define	_ADINFO_H
 
 #include <rpcsvc/idmap_prot.h>
+#include "libadutils.h"
 
 
 #ifdef __cplusplus

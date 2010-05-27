@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -31,7 +31,6 @@
 #include <assert.h>
 #include <smbsrv/ntifs.h>
 #include <smbsrv/smb_idmap.h>
-#include <smbsrv/ntstatus.h>
 #include <smbsrv/libsmb.h>
 
 #define	SMB_SHR_ACE_READ_PERMS	(ACE_READ_PERMS | ACE_EXECUTE | ACE_SYNCHRONIZE)

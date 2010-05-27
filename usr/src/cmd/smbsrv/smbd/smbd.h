@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMBD_H
@@ -43,6 +42,9 @@ int smbd_opipe_start(void);
 void smbd_opipe_stop(void);
 int smbd_share_start(void);
 void smbd_share_stop(void);
+int smbd_nicmon_start(const char *);
+void smbd_nicmon_stop(void);
+int smbd_nicmon_refresh(void);
 boolean_t smbd_set_netlogon_cred(void);
 int smbd_locate_dc_start(void);
 smb_token_t *smbd_user_auth_logon(smb_logon_t *);
@@ -78,7 +80,11 @@ typedef struct smbd {
 	pthread_t	s_nbt_listener_id;
 	pthread_t	s_tcp_listener_id;
 	boolean_t	s_fatal_error;
+	smb_log_hdl_t	s_loghd;
 } smbd_t;
+
+#define	SMBD_LOGNAME		"smbd"
+#define	SMBD_LOGSIZE		1024
 
 #define	SMBD_DOOR_NAMESZ	16
 

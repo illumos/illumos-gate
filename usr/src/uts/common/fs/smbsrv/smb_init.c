@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -133,14 +132,21 @@ static dev_info_t *smb_drv_dip = NULL;
 int
 _init(void)
 {
-	int	rc;
+	int rc;
 
-	rc = smb_server_svc_init();
-	if (rc == 0) {
-		rc = mod_install(&modlinkage);
-		if (rc != 0)
-			(void) smb_server_svc_fini();
+	if ((rc = smb_kshare_init()) != 0)
+		return (rc);
+
+	if ((rc = smb_server_svc_init()) != 0) {
+		smb_kshare_fini();
+		return (rc);
 	}
+
+	if ((rc = mod_install(&modlinkage)) != 0) {
+		smb_kshare_fini();
+		(void) smb_server_svc_fini();
+	}
+
 	return (rc);
 }
 
@@ -155,9 +161,11 @@ _fini(void)
 {
 	int	rc;
 
-	rc = mod_remove(&modlinkage);
-	if (rc == 0)
+	if ((rc = mod_remove(&modlinkage)) == 0) {
 		rc = smb_server_svc_fini();
+		smb_kshare_fini();
+	}
+
 	return (rc);
 }
 
@@ -244,10 +252,10 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 		rc = smb_server_set_gmtoff(&ioc->ioc_gmt);
 		break;
 	case SMB_IOC_SHARE:
-		rc = smb_server_share_export(&ioc->ioc_share);
+		rc = smb_kshare_export_list(&ioc->ioc_share);
 		break;
 	case SMB_IOC_UNSHARE:
-		rc = smb_server_share_unexport(&ioc->ioc_share);
+		rc = smb_kshare_unexport_list(&ioc->ioc_share);
 		break;
 	case SMB_IOC_NUMOPEN:
 		rc = smb_server_numopen(&ioc->ioc_opennum);

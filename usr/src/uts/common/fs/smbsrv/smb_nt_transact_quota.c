@@ -18,15 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/string.h>
-#include <smbsrv/lmerr.h>
 #include <sys/fs/zfs.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_door.h>
@@ -202,7 +202,7 @@ smb_nt_transact_query_quota(smb_request_t *sr, smb_xa_t *xa)
 	smb_quota_free_sids(&request);
 
 	if (status != NT_STATUS_SUCCESS) {
-		if (status == NT_STATUS_NO_MORE_DATA) {
+		if (status == NT_STATUS_NO_MORE_ENTRIES) {
 			smb_ofile_set_quota_resume(ofile, NULL);
 			smbsr_warn(sr, status, 0, 0);
 			status = NT_STATUS_SUCCESS;

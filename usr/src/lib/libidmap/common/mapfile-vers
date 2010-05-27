@@ -62,15 +62,6 @@ SUNWprivate {
 	idmap_fini;
 	idmap_flush;
 	idmap_free;
-	idmap_getext_gidbysid;
-	idmap_getext_pidbysid;
-	idmap_getext_sidbygid;
-	idmap_getext_sidbyuid;
-	idmap_getext_uidbysid;
-	idmap_getgidbywinname;
-	idmap_getuidbywinname;
-	idmap_getwinnamebygid;
-	idmap_getwinnamebyuid;
 	idmap_get_create;
 	idmap_get_destroy;
 	idmap_get_gidbysid;
@@ -83,7 +74,16 @@ SUNWprivate {
 	idmap_get_u2w_mapping;
 	idmap_get_uidbysid;
 	idmap_get_w2u_mapping;
-	idmap_info_cpy;
+	idmap_getext_gidbysid;
+	idmap_getext_pidbysid;
+	idmap_getext_sidbygid;
+	idmap_getext_sidbyuid;
+	idmap_getext_uidbysid;
+	idmap_getgidbywinname;
+	idmap_getuidbywinname;
+	idmap_getwinnamebygid;
+	idmap_getwinnamebyuid;
+	idmap_how_clear;
 	idmap_info_free;
 	idmap_info_mov;
 	idmap_init;
@@ -97,6 +97,8 @@ SUNWprivate {
 	idmap_stat2string;
 	idmap_stat4prot;
 	idmap_string2stat;
+	idmap_trace_print;
+	idmap_trace_print_1;
 	idmap_udt_add_namerule;
 	idmap_udt_commit;
 	idmap_udt_create;
@@ -123,13 +125,13 @@ SUNWprivate {
 	xdr_directory_get_common_1_argument;
 	xdr_directory_results_rpc;
 	xdr_idmap_flush_op;
-	xdr_idmap_ids_res;
 	xdr_idmap_id_res;
+	xdr_idmap_ids_res;
 	xdr_idmap_list_mappings_1_argument;
 	xdr_idmap_list_namerules_1_argument;
 	xdr_idmap_mapping;
-	xdr_idmap_mappings_res;
 	xdr_idmap_mapping_batch;
+	xdr_idmap_mappings_res;
 	xdr_idmap_namerule;
 	xdr_idmap_namerules_res;
 	xdr_idmap_prop_res;
@@ -137,6 +139,7 @@ SUNWprivate {
 	xdr_idmap_retcode;
 	xdr_idmap_update_batch;
 	xdr_idmap_update_res;
+
     local:
 	*;
 };

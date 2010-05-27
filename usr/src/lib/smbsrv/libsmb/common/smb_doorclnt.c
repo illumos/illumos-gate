@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -43,7 +42,6 @@ static int smb_door_encode(smb_doorarg_t *, uint32_t);
 static int smb_door_decode(smb_doorarg_t *);
 static void smb_door_sethdr(smb_doorhdr_t *, uint32_t, uint32_t);
 static boolean_t smb_door_chkhdr(smb_doorarg_t *, smb_doorhdr_t *);
-static uint32_t smb_door_txid(void);
 static void smb_door_free(door_arg_t *arg);
 
 /*
@@ -214,6 +212,7 @@ boolean_t
 smb_find_ads_server(char *fqdn, char *buf, int buflen)
 {
 	smb_string_t	server;
+	smb_string_t	domain;
 	boolean_t	found = B_FALSE;
 	int		rc;
 
@@ -226,7 +225,9 @@ smb_find_ads_server(char *fqdn, char *buf, int buflen)
 	bzero(&server, sizeof (smb_string_t));
 	*buf = '\0';
 
-	rc = smb_door_call(SMB_DR_ADS_FIND_HOST, fqdn, smb_string_xdr,
+	domain.buf = fqdn;
+
+	rc = smb_door_call(SMB_DR_ADS_FIND_HOST, &domain, smb_string_xdr,
 	    &server, smb_string_xdr);
 
 	if (rc != 0)
@@ -429,7 +430,7 @@ smb_door_sethdr(smb_doorhdr_t *hdr, uint32_t cmd, uint32_t datalen)
 	hdr->dh_magic = SMB_DOOR_HDR_MAGIC;
 	hdr->dh_flags = SMB_DF_USERSPACE;
 	hdr->dh_op = cmd;
-	hdr->dh_txid = smb_door_txid();
+	hdr->dh_txid = smb_get_txid();
 	hdr->dh_datalen = datalen;
 	hdr->dh_door_rc = SMB_DOP_NOT_CALLED;
 }
@@ -452,35 +453,6 @@ smb_door_chkhdr(smb_doorarg_t *da, smb_doorhdr_t *hdr)
 	}
 
 	return (B_TRUE);
-}
-
-/*
- * The txid is an arbitrary transaction id used to associate door
- * requests with responses.  A new txid is returned on each call.
- *
- * 0 or -1 are not assigned so that they can be used to detect
- * invalid conditions.
- */
-static uint32_t
-smb_door_txid(void)
-{
-	static mutex_t	txmutex;
-	static uint32_t	txid;
-	uint32_t	txid_ret;
-
-	(void) mutex_lock(&txmutex);
-
-	if (txid == 0)
-		txid = time(NULL);
-
-	do {
-		++txid;
-	} while (txid == 0 || txid == (uint32_t)-1);
-
-	txid_ret = txid;
-	(void) mutex_unlock(&txmutex);
-
-	return (txid_ret);
 }
 
 /*

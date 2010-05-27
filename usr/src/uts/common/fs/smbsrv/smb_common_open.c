@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -175,7 +175,7 @@ smb_ofun_to_crdisposition(uint16_t  ofun)
 uint32_t
 smb_common_open(smb_request_t *sr)
 {
-	open_param_t	*parg;
+	smb_arg_open_t	*parg;
 	uint32_t	status = NT_STATUS_SUCCESS;
 	int		count;
 
@@ -302,7 +302,7 @@ smb_open_subr(smb_request_t *sr)
 	smb_node_t	*node = NULL;
 	smb_node_t	*dnode = NULL;
 	smb_node_t	*cur_node = NULL;
-	open_param_t	*op = &sr->arg.open;
+	smb_arg_open_t	*op = &sr->sr_open;
 	int		rc;
 	smb_ofile_t	*of;
 	smb_attr_t	new_attr;
@@ -341,9 +341,8 @@ smb_open_subr(smb_request_t *sr)
 
 	if (sr->session->s_file_cnt >= SMB_SESSION_OFILE_MAX) {
 		ASSERT(sr->uid_user);
-		cmn_err(CE_NOTE, "smbd[%s\\%s]: %s", sr->uid_user->u_domain,
-		    sr->uid_user->u_name,
-		    xlate_nt_status(NT_STATUS_TOO_MANY_OPENED_FILES));
+		cmn_err(CE_NOTE, "smbd[%s\\%s]: TOO_MANY_OPENED_FILES",
+		    sr->uid_user->u_domain, sr->uid_user->u_name);
 
 		smbsr_error(sr, NT_STATUS_TOO_MANY_OPENED_FILES,
 		    ERRDOS, ERROR_TOO_MANY_OPEN_FILES);
@@ -905,7 +904,7 @@ static int
 smb_set_open_timestamps(smb_request_t *sr, smb_ofile_t *of, boolean_t created)
 {
 	int		rc = 0;
-	open_param_t	*op = &sr->arg.open;
+	smb_arg_open_t	*op = &sr->sr_open;
 	smb_node_t	*node = of->f_node;
 	boolean_t	existing_file, set_times;
 	smb_attr_t	attr;
@@ -946,7 +945,7 @@ smb_set_open_timestamps(smb_request_t *sr, smb_ofile_t *of, boolean_t created)
 static void
 smb_delete_new_object(smb_request_t *sr)
 {
-	open_param_t	*op = &sr->arg.open;
+	smb_arg_open_t	*op = &sr->sr_open;
 	smb_fqi_t	*fqi = &(op->fqi);
 	uint32_t	flags = 0;
 

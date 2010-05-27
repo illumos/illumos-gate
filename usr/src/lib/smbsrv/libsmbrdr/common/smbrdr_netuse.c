@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -32,13 +32,11 @@
 #include <sys/errno.h>
 #include <string.h>
 #include <strings.h>
-#include <syslog.h>
 #include <synch.h>
 #include <pthread.h>
 
 #include <smbsrv/libsmbrdr.h>
 #include <smbrdr.h>
-#include <smbsrv/ntstatus.h>
 
 
 /*
@@ -94,14 +92,16 @@ smbrdr_tree_connect(char *hostname, char *domain, char *username,
 
 	session = smbrdr_session_lock(hostname, SDB_SLCK_READ);
 	if (session == NULL) {
-		syslog(LOG_DEBUG, "smbrdr_tree_connect: no session for %s@%s",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_tree_connect: no session for %s@%s",
 		    username, hostname);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
 
 	if ((netuse = smbrdr_netuse_alloc(session, sharename)) == 0) {
-		syslog(LOG_DEBUG, "smbrdr_tree_connect: init failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_tree_connect: init failed");
 		smbrdr_session_unlock(session);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
@@ -115,7 +115,8 @@ smbrdr_tree_connect(char *hostname, char *domain, char *username,
 	if ((path = (char *)malloc(path_len)) == 0) {
 		smbrdr_netuse_free(netuse);
 		smbrdr_session_unlock(session);
-		syslog(LOG_DEBUG, "smbrdr_tree_connect: %s", strerror(ENOMEM));
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_tree_connect: %s",
+		    strerror(ENOMEM));
 		return (NT_STATUS_NO_MEMORY);
 	}
 
@@ -130,7 +131,8 @@ smbrdr_tree_connect(char *hostname, char *domain, char *username,
 	    != NT_STATUS_SUCCESS) {
 		smbrdr_netuse_free(netuse);
 		smbrdr_session_unlock(session);
-		syslog(LOG_DEBUG, "smbrdr_tree_connect: %s failed", path);
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_tree_connect: %s failed", path);
 		free(path);
 		return (status);
 	}
@@ -173,7 +175,7 @@ smbrdr_tree_connectx(struct sdb_session *session, struct sdb_netuse *netuse,
 	    session, &session->logon, 0);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_tree_connectx: %s",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_tree_connectx: %s",
 		    xlate_nt_status(status));
 		return (status);
 	}
@@ -206,14 +208,15 @@ smbrdr_tree_connectx(struct sdb_session *session, struct sdb_netuse *netuse,
 	    service);			/* Service */
 
 	if (rc <= 0) {
-		syslog(LOG_DEBUG, "smbrdr_tree_connectx: encode failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_tree_connectx: encode failed");
 		smbrdr_handle_free(&srh);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_tree_connectx: %s",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_tree_connectx: %s",
 		    xlate_nt_status(status));
 		smbrdr_handle_free(&srh);
 		return (status);
@@ -303,7 +306,8 @@ smbrdr_tdcon(struct sdb_netuse *netuse)
 	    session, &session->logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_tdcon: %s", xlate_nt_status(status));
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_tdcon: %s",
+		    xlate_nt_status(status));
 		/* should we clear here? */
 		smbrdr_netuse_clear(netuse);
 		return (-1);
@@ -311,7 +315,8 @@ smbrdr_tdcon(struct sdb_netuse *netuse)
 
 	rc = smb_msgbuf_encode(&srh.srh_mbuf, "bw.", 0, 0);
 	if (rc < 0) {
-		syslog(LOG_DEBUG, "smbrdr_tdcon: encode failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_tdcon: encode failed");
 		smbrdr_handle_free(&srh);
 		/* should we clear here? */
 		smbrdr_netuse_clear(netuse);
@@ -320,7 +325,8 @@ smbrdr_tdcon(struct sdb_netuse *netuse)
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_tdcon: %s", xlate_nt_status(status));
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_tdcon: %s",
+		    xlate_nt_status(status));
 		rc = -1;
 	} else {
 		rc = 0;
@@ -370,7 +376,7 @@ smbrdr_netuse_alloc(struct sdb_session *session, char *sharename)
 		(void) mutex_unlock(&netuse->mtx);
 	}
 
-	syslog(LOG_DEBUG, "smbrdr_netuse_alloc: table full");
+	smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_netuse_alloc: table full");
 	return (0);
 }
 
@@ -432,7 +438,8 @@ smbrdr_netuse_get(int tid)
 		(void) mutex_unlock(&netuse->mtx);
 	}
 
-	syslog(LOG_DEBUG, "smbrdr_netuse_get: %d: no such TID", tid);
+	smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_netuse_get: %d: no such TID",
+	    tid);
 	return (0);
 }
 
@@ -449,10 +456,12 @@ smbrdr_dump_netuse()
 		netuse = &netuse_table[i];
 		(void) mutex_lock(&netuse->mtx);
 		if (netuse->session) {
-			syslog(LOG_DEBUG, "tree[%d]: %s (tid=%d)", i,
+			smb_log(smbrdr_log_hdl, LOG_DEBUG,
+			    "smbrdr_dump_netuse: tree[%d]: %s (tid=%d)", i,
 			    netuse->share, netuse->tid);
-			syslog(LOG_DEBUG, "tree[%d]: session(%d), user(%d)",
-			    i, netuse->session->sock, netuse->uid);
+			smb_log(smbrdr_log_hdl, LOG_DEBUG,
+			    "smbrdr_dump_netuse: tree[%d]: session(%d), "
+			    "user(%d)", i, netuse->session->sock, netuse->uid);
 		}
 		(void) mutex_unlock(&netuse->mtx);
 	}

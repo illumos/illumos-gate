@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -39,6 +38,17 @@
 #include <ctype.h>
 #include <smbsrv/ndl/eventlog.ndl>
 #include <smbsrv/libmlsvc.h>
+
+typedef struct logr_eventlog {
+	const char *el_name;
+	const char *el_path;
+} logr_eventlog_t;
+
+logr_eventlog_t logr_eventlog[] = {
+	{ "System",     "/var/adm/messages" },
+	{ "smbd",       "/var/smb/smbd_log.txt" },
+	{ "smbrdr",     "/var/smb/smbrdr_log.txt" }
+};
 
 typedef enum {
 	LOGR_MONTH = 0,
@@ -301,11 +311,20 @@ static int
 logr_syslog_snapshot(char *logname, logr_info_t *loginfo)
 {
 	FILE *fp;
+	char path[MAXPATHLEN];
+	int i;
 
 	if ((loginfo == NULL) || (!logr_is_supported(logname)))
 		return (-1);
 
-	if ((fp = fopen("/var/adm/messages", "r")) == 0)
+	path[0] = '\0';
+	for (i = 0; i < sizeof (logr_eventlog)/sizeof (logr_eventlog[0]); ++i) {
+		if (strcasecmp(logname, logr_eventlog[i].el_name) == 0)
+			(void) strlcpy(path, logr_eventlog[i].el_path,
+			    MAXPATHLEN);
+	}
+
+	if ((fp = fopen(path, "r")) == 0)
 		return (-1);
 
 	if (logr_syslog_load(fp, loginfo) < 0) {
@@ -329,16 +348,20 @@ logr_syslog_snapshot(char *logname, logr_info_t *loginfo)
 boolean_t
 logr_is_supported(char *log_name)
 {
+	int i;
+
 	if (log_name == NULL)
 		return (B_FALSE);
 
 	if (logr_interposer_ops.logr_op_supported != NULL)
 		return (logr_interposer_ops.logr_op_supported(log_name));
 
-	if (strcasecmp(log_name, LOGR_SYSTEM_LOG) != 0)
-		return (B_FALSE);
+	for (i = 0; i < sizeof (logr_eventlog)/sizeof (logr_eventlog[0]); ++i) {
+		if (strcasecmp(log_name, logr_eventlog[i].el_name) == 0)
+			return (B_TRUE);
+	}
 
-	return (B_TRUE);
+	return (B_FALSE);
 }
 
 /*

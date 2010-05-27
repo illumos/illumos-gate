@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -28,7 +29,6 @@
 #include <smbsrv/string.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/mailslot.h>
-#include <smbsrv/lmerr.h>
 
 /*
  * count of bytes in server response packet
@@ -724,8 +724,6 @@ smb_encode_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
 int
 smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 {
-	door_handle_t dhdl = sr->sr_server->sv_lmshrd;
-
 	/*
 	 * Number of data bytes that will
 	 * be sent in the current response
@@ -796,15 +794,14 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_SUCCESS);
 	}
 
-	esi.es_buf = kmem_zalloc(esi.es_bufsize, KM_SLEEP);
+	esi.es_buf = smb_srm_zalloc(sr, esi.es_bufsize);
 	esi.es_posix_uid = crgetuid(sr->uid_user->u_cred);
-	(void) smb_kshare_enum(dhdl, &esi);
+	smb_kshare_enum(&esi);
 
 	/* client buffer size is not big enough to hold any shares */
 	if (esi.es_nsent == 0) {
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
 		    ERROR_MORE_DATA, 0, esi.es_nsent, esi.es_ntotal);
-		kmem_free(esi.es_buf, esi.es_bufsize);
 		return (SDRC_SUCCESS);
 	}
 
@@ -916,7 +913,6 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_session_send(sr->session, 0, &reply);
 	}
 
-	kmem_free(esi.es_buf, esi.es_bufsize);
 	return (SDRC_NO_REPLY);
 }
 
@@ -927,18 +923,18 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 	struct mbuf_chain	str_mb;
 	char			*share;
 	char			*password;
-	smb_share_t		si;
-	int			rc;
+	smb_kshare_t		*si;
 
 	if (smb_mbc_decodef(&xa->req_param_mb, "%sww", sr,
 	    &share, &level, &max_bytes) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
-	(void) smb_strlwr(share);
-	rc = smb_kshare_getinfo(sr->sr_server->sv_lmshrd, share, &si, NULL);
-	if ((rc != NERR_Success) || (si.shr_flags & SMB_SHRF_LONGNAME)) {
+	si = smb_kshare_lookup(share);
+	if ((si == NULL) || (si->shr_oemname == NULL)) {
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    NERR_NetNameNotFound, 0, 0);
+		if (si)
+			smb_kshare_release(si);
 		return (SDRC_SUCCESS);
 	}
 
@@ -949,27 +945,30 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 
 	switch (level) {
 	case 0 :
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "13c", si.shr_oemname);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "13c",
+		    si->shr_oemname);
 		break;
 
 	case 1 :
 		smb_encode_SHARE_INFO_1(&xa->rep_data_mb, &str_mb,
-		    si.shr_oemname, si.shr_type, si.shr_cmnt);
+		    si->shr_oemname, si->shr_type, si->shr_cmnt);
 		break;
 
 	case 2 :
 		smb_encode_SHARE_INFO_2(&xa->rep_data_mb, &str_mb, sr,
-		    si.shr_oemname, si.shr_type, si.shr_cmnt, access,
-		    si.shr_path, password);
+		    si->shr_oemname, si->shr_type, si->shr_cmnt, access,
+		    si->shr_path, password);
 		break;
 
 	default:
+		smb_kshare_release(si);
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    ERROR_INVALID_LEVEL, 0, 0);
 		m_freem(str_mb.chain);
 		return (SDRC_NOT_IMPLEMENTED);
 	}
 
+	smb_kshare_release(si);
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "www", NERR_Success,
 	    -MBC_LENGTH(&xa->rep_data_mb),
 	    MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb));

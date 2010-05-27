@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -36,10 +36,9 @@
 #include <strings.h>
 #include <sys/sysmacros.h>
 
-#include <smbsrv/ndl/netdfs.ndl>
-#include <smbsrv/nmpipes.h>
-#include <smbsrv/nterror.h>
 #include <smbsrv/libmlsvc.h>
+#include <smbsrv/nmpipes.h>
+#include <smbsrv/ndl/netdfs.ndl>
 #include <dfs.h>
 
 /*
@@ -711,10 +710,13 @@ netdfs_s_addstdroot(void *arg, ndr_xa_t *mxa)
 	dfs_setpriv(PRIV_ON);
 
 	/* For now only allow a single standalone namespace */
-	if (dfs_namespace_count() == 0)
+	if (dfs_namespace_count() == 0) {
 		param->status = dfs_namespace_add(share, comment);
-	else
+		if (param->status == ERROR_SUCCESS)
+			(void) smb_config_setnum(SMB_CI_DFS_STDROOT_NUM, 1);
+	} else {
 		param->status = ERROR_NOT_SUPPORTED;
+	}
 
 	dfs_setpriv(PRIV_OFF);
 	return (NDR_DRC_OK);
@@ -735,10 +737,13 @@ netdfs_s_remstdroot(void *arg, ndr_xa_t *mxa)
 
 	dfs_setpriv(PRIV_ON);
 
-	if (ndr_is_admin(mxa))
+	if (ndr_is_admin(mxa)) {
 		param->status = dfs_namespace_remove(share);
-	else
+		if (param->status == ERROR_SUCCESS)
+			(void) smb_config_setnum(SMB_CI_DFS_STDROOT_NUM, 0);
+	} else {
 		param->status = ERROR_ACCESS_DENIED;
+	}
 
 	dfs_setpriv(PRIV_OFF);
 	return (NDR_DRC_OK);

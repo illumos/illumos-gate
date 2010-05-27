@@ -22,11 +22,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"@(#)stype.d	1.4	08/08/07 SMI"
 
 #pragma D option flowindent
 
@@ -53,14 +50,37 @@ END
 sdt:smbsrv::-smb_op-SessionSetupX-start
 {
 	sr = (struct smb_request *)arg0;
+	ssetup = (smb_arg_sessionsetup_t *)arg1;
 
-	printf("[%s] %s",
+	printf("[%s] %s %s %s",
 	    (sr->session->s_local_port == 139) ? "NBT" : "TCP",
 	    (sr->session->s_local_port == 139) ?
-	    stringof(sr->session->workstation) : "");
+	    stringof(sr->session->workstation) : "",
+	    stringof(ssetup->ssi_domain),
+	    stringof(ssetup->ssi_user));
+
+	printf(" maxmpx=%u vc=%u maxbuf=%u",
+	    ssetup->ssi_maxmpxcount,
+	    sr->session->vcnumber,
+	    sr->session->smb_msg_size);
 }
 
-sdt:smbsrv::-smb_op-SessionSetupX-done,
+sdt:smbsrv::-smb_op-SessionSetupX-done
+{
+	sr = (struct smb_request *)arg0;
+	ssetup = (smb_arg_sessionsetup_t *)arg1;
+
+	printf("%s/%s: smbuid=%d (%s)",
+	    stringof(sr->uid_user->u_domain),
+	    stringof(sr->uid_user->u_name),
+	    sr->smb_uid,
+	    (ssetup->ssi_guest == 0) ? "user" : "guest");
+
+	printf(" [status=0x%08x (class=%d code=%d)]",
+	    sr->smb_error.status,
+	    sr->smb_error.errcls, sr->smb_error.errcode);
+}
+
 sdt:smbsrv::-smb_op-LogoffX-start
 {
 	sr = (struct smb_request *)arg0;
@@ -79,8 +99,20 @@ sdt:smbsrv::-smb_op-TreeConnectX-start
                 stringof(tcon->path));
 }
 
-sdt:smbsrv::-smb_op-TreeConnectX-done,
-sdt:smbsrv::-smb_op-TreeDisconnect-done
+sdt:smbsrv::-smb_op-TreeConnectX-done
+{
+	sr = (struct smb_request *)arg0;
+
+	printf("tid %d: %s", sr->smb_tid,
+	    (sr->smb_error.status == 0) ?
+	    stringof(sr->tid_tree->t_sharename) : "");
+
+	printf(" [status=0x%08x (class=%d code=%d)]",
+	    sr->smb_error.status,
+	    sr->smb_error.errcls, sr->smb_error.errcode);
+}
+
+sdt:smbsrv::-smb_op-TreeDisconnect-start
 {
 	sr = (struct smb_request *)arg0;
 
@@ -92,7 +124,7 @@ sdt:smbsrv::-smb_op-TreeDisconnect-done
 /*
  * Error functions
  */
-smbsr_error:entry
+smbsr_status:entry
 {
     printf("status=0x%08x class=%d, code=%d", arg1, arg2, arg3);
 }
@@ -102,7 +134,7 @@ smbsr_errno:entry
     printf("errno=%d", arg1);
 }
 
-smbsr_error:return,
+smbsr_status:return,
 smbsr_errno:return
 {
 }
@@ -119,15 +151,16 @@ smb_tree_get_sharename:entry
 	printf("uncpath=%s", stringof(arg0));
 }
 
-smb_tree_get_stype:entry
-{
-	printf("sharename=%s service=%s", stringof(arg0), stringof(arg1));
-}
-
 smb_tree_connect_disk:entry
 {
 	printf("sharename=%s", stringof(arg1));
 	self->stype = 0;
+}
+
+smb_tree_connect_printq:entry
+{
+	printf("sharename=%s", stringof(arg1));
+	self->stype = 1;
 }
 
 smb_tree_connect_ipc:entry
@@ -138,7 +171,6 @@ smb_tree_connect_ipc:entry
 
 smb_tree_connect:return,
 smb_tree_get_sharename:return,
-smb_tree_get_stype:return,
 smb_tree_connect_disk:return,
 smb_tree_connect_ipc:return
 {

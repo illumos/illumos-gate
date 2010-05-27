@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 #include <sys/atomic.h>
 #include <sys/strsubr.h>
 #include <sys/synch.h>
@@ -196,6 +194,7 @@ smb_session_send(smb_session_t *session, uint8_t type, mbuf_chain_t *mbc)
 		return (rc);
 	}
 	txr->tr_len += NETBIOS_HDR_SZ;
+	smb_server_add_txb(session->s_server, (int64_t)txr->tr_len);
 	return (smb_net_txr_send(session->sock, &session->s_txlst, txr));
 }
 
@@ -539,11 +538,14 @@ smb_session_daemon(smb_session_list_t *se)
 static int
 smb_session_message(smb_session_t *session)
 {
+	smb_server_t	*sv;
 	smb_request_t	*sr = NULL;
 	smb_xprt_t	hdr;
 	uint8_t		*req_buf;
 	uint32_t	resid;
 	int		rc;
+
+	sv = session->s_server;
 
 	for (;;) {
 
@@ -573,7 +575,6 @@ smb_session_message(smb_session_t *session)
 			return (EPROTO);
 
 		session->keep_alive = smb_keep_alive;
-
 		/*
 		 * Allocate a request context, read the SMB header and validate
 		 * it. The sr includes a buffer large enough to hold the SMB
@@ -606,7 +607,8 @@ smb_session_message(smb_session_t *session)
 				return (rc);
 			}
 		}
-
+		smb_server_add_rxb(sv,
+		    (int64_t)(hdr.xh_length + NETBIOS_HDR_SZ));
 		/*
 		 * Initialize command MBC to represent the received data.
 		 */
@@ -624,8 +626,20 @@ smb_session_message(smb_session_t *session)
 				continue;
 			return (rc);
 		}
-
+		if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
+			if (SMB_IS_NT_CANCEL(sr)) {
+				sr->session->signing.seqnum++;
+				sr->sr_seqnum = sr->session->signing.seqnum + 1;
+				sr->reply_seqnum = 0;
+			} else {
+				sr->session->signing.seqnum += 2;
+				sr->sr_seqnum = sr->session->signing.seqnum;
+				sr->reply_seqnum = sr->sr_seqnum + 1;
+			}
+		}
+		sr->sr_time_submitted = gethrtime();
 		sr->sr_state = SMB_REQ_STATE_SUBMITTED;
+		smb_srqueue_waitq_enter(session->s_srqueue);
 		(void) taskq_dispatch(session->s_server->sv_thread_pool,
 		    smb_session_worker, sr, TQ_SLEEP);
 	}
@@ -677,7 +691,7 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 
 	smb_rwx_init(&session->s_lock);
 
-	if (new_so) {
+	if (new_so != NULL) {
 		if (family == AF_INET) {
 			slen = sizeof (sin);
 			(void) ksocket_getsockname(new_so,
@@ -709,10 +723,15 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 		session->local_ipaddr.a_family = family;
 		session->s_local_port = port;
 		session->sock = new_so;
+		if (port == IPPORT_NETBIOS_SSN)
+			smb_server_inc_nbt_sess(sv);
+		else
+			smb_server_inc_tcp_sess(sv);
 	}
-
 	session->s_server = sv;
 	smb_server_get_cfg(sv, &session->s_cfg);
+	session->s_srqueue = &sv->sv_srqueue;
+
 	session->s_cache_request = sv->si_cache_request;
 	session->s_cache = sv->si_cache_session;
 	session->s_magic = SMB_SESSION_MAGIC;
@@ -727,6 +746,11 @@ smb_session_delete(smb_session_t *session)
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
 
 	session->s_magic = 0;
+
+	if (session->s_local_port == IPPORT_NETBIOS_SSN)
+		smb_server_dec_nbt_sess(session->s_server);
+	else
+		smb_server_dec_tcp_sess(session->s_server);
 
 	smb_rwx_destroy(&session->s_lock);
 	smb_net_txl_destructor(&session->s_txlst);
@@ -813,13 +837,16 @@ void
 smb_session_worker(void	*arg)
 {
 	smb_request_t	*sr;
+	smb_srqueue_t	*srq;
 
 	sr = (smb_request_t *)arg;
+	SMB_REQ_VALID(sr);
 
-	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-
+	srq = sr->session->s_srqueue;
+	smb_srqueue_waitq_to_runq(srq);
 	sr->sr_worker = curthread;
 	mutex_enter(&sr->sr_mutex);
+	sr->sr_time_active = gethrtime();
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_SUBMITTED:
 		mutex_exit(&sr->sr_mutex);
@@ -838,6 +865,7 @@ smb_session_worker(void	*arg)
 		smb_request_free(sr);
 		break;
 	}
+	smb_srqueue_runq_exit(srq);
 }
 
 void

@@ -19,12 +19,18 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 HDRS=	libsmb.h
 
+GENSRCS = common/smb_status_tbl.h
+CLEANFILES += $(GENSRCS)
+
+all install lint: $(GENSRCS)
+
 include ../Makefile.smbsrv
+
+$(GENSRCS): common/smb_status_gen.awk $(SRC)/uts/common/smb/ntstatus.h
+	nawk -f common/smb_status_gen.awk \
+	  $(SRC)/uts/common/smb/ntstatus.h > $@

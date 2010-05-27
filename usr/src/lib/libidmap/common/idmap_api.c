@@ -40,10 +40,9 @@
 #include <libintl.h>
 #include <ucontext.h>
 #include <syslog.h>
+#include <assert.h>
 #include "idmap_impl.h"
 #include "idmap_cache.h"
-
-/*LINTLIBRARY*/
 
 static struct timeval TIMEOUT = { 25, 0 };
 
@@ -989,10 +988,8 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 		    .idtype == IDMAP_USID)?1:0;
 
 	if (info) {
-		retcode = idmap_info_cpy(info,
+		idmap_info_mov(info,
 		    &mappings->mappings.mappings_val[iter->next].info);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
 	}
 	iter->next++;
 
@@ -1695,9 +1692,10 @@ idmap_get_mappings(idmap_get_handle_t *gh)
 			*gh->retlist[i].stat = IDMAP_ERR_NORESULT;
 			break;
 		}
-		if (gh->retlist[i].info != NULL)
-			(void) idmap_info_cpy(gh->retlist[i].info,
+		if (gh->retlist[i].info != NULL) {
+			idmap_info_mov(gh->retlist[i].info,
 			    &res.ids.ids_val[i].info);
+		}
 	}
 	retcode = IDMAP_SUCCESS;
 
@@ -1807,6 +1805,9 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		goto out;
 	}
 
+	if (info != NULL)
+		idmap_info_mov(info, &mapping->info);
+
 	if (mapping->id2.idtype == IDMAP_UID) {
 		*is_user = 1;
 	} else if (mapping->id2.idtype == IDMAP_GID) {
@@ -1829,10 +1830,6 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		*pid = mapping->id2.idmap_id_u.uid;
 
 	rc = idmap_strdupnull(unixname, mapping->id2name);
-	if (rc != IDMAP_SUCCESS)
-		retcode = rc;
-
-	rc = idmap_info_cpy(info, &mapping->info);
 	if (rc != IDMAP_SUCCESS)
 		retcode = rc;
 
@@ -1924,6 +1921,9 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 		goto out;
 	}
 
+	if (info != NULL)
+		idmap_info_mov(info, &mapping->info);
+
 	if (direction != NULL)
 		*direction = mapping->direction;
 
@@ -1952,10 +1952,6 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 		retcode = rc;
 
 	rc = idmap_strdupnull(windomain, mapping->id2domain);
-	if (rc != IDMAP_SUCCESS)
-		retcode = rc;
-
-	rc = idmap_info_cpy(info, &mapping->info);
 	if (rc != IDMAP_SUCCESS)
 		retcode = rc;
 
@@ -2225,163 +2221,33 @@ idmap_namerule_cpy(idmap_namerule *to, idmap_namerule *from)
 }
 
 
-static
-idmap_stat
-idmap_how_ds_based_cpy(idmap_how_ds_based *to, idmap_how_ds_based *from)
-{
-	idmap_stat retval;
-
-	if (to == NULL)
-		return (IDMAP_SUCCESS);
-
-	retval = idmap_strdupnull(&to->dn, from->dn);
-	if (retval != IDMAP_SUCCESS)
-		return (retval);
-
-	retval = idmap_strdupnull(&to->attr, from->attr);
-	if (retval != IDMAP_SUCCESS) {
-		free(to->dn);
-		to->dn = NULL;
-		return (retval);
-	}
-
-	retval = idmap_strdupnull(&to->value, from->value);
-	if (retval != IDMAP_SUCCESS) {
-		free(to->dn);
-		to->dn = NULL;
-		free(to->attr);
-		to->attr = NULL;
-		return (retval);
-	}
-
-	return (retval);
-}
-
-idmap_stat
-idmap_info_cpy(idmap_info *to, idmap_info *from)
-{
-	idmap_stat retval = IDMAP_SUCCESS;
-
-	if (to == NULL)
-		return (IDMAP_SUCCESS);
-
-	(void) memset(to, 0, sizeof (idmap_info));
-
-	to->src = from->src;
-	to->how.map_type = from->how.map_type;
-	switch (to->how.map_type) {
-	case IDMAP_MAP_TYPE_DS_AD:
-		retval = idmap_how_ds_based_cpy(&to->how.idmap_how_u.ad,
-		    &from->how.idmap_how_u.ad);
-		break;
-
-	case IDMAP_MAP_TYPE_DS_NLDAP:
-		retval = idmap_how_ds_based_cpy(&to->how.idmap_how_u.nldap,
-		    &from->how.idmap_how_u.nldap);
-		break;
-
-	case IDMAP_MAP_TYPE_RULE_BASED:
-		retval = idmap_namerule_cpy(&to->how.idmap_how_u.rule,
-		    &from->how.idmap_how_u.rule);
-		break;
-
-	case IDMAP_MAP_TYPE_EPHEMERAL:
-		break;
-
-	case IDMAP_MAP_TYPE_LOCAL_SID:
-		break;
-
-	case IDMAP_MAP_TYPE_KNOWN_SID:
-		break;
-
-	case IDMAP_MAP_TYPE_IDMU:
-		retval = idmap_how_ds_based_cpy(&to->how.idmap_how_u.idmu,
-		    &from->how.idmap_how_u.idmu);
-		break;
-	}
-	return (retval);
-}
-
-
 /*
- * This routine is similar to idmap_info_cpy, but the strings
- * are moved from the "from" info to the "to" info.
- * This routine is equivalent to:
- *
- *	idmap_info_cpy(to,from);
- *	idmap_info_free(from);
+ * Move the contents of the "info" structure from "from" to "to".
  */
-idmap_stat
+void
 idmap_info_mov(idmap_info *to, idmap_info *from)
 {
-	idmap_stat retval = IDMAP_SUCCESS;
-
-	if (to == NULL) {
-		idmap_info_free(from);
-		return (IDMAP_SUCCESS);
-	}
 	(void) memcpy(to, from, sizeof (idmap_info));
-
 	(void) memset(from, 0, sizeof (idmap_info));
-
-	return (retval);
 }
 
 
 void
 idmap_info_free(idmap_info *info)
 {
-	idmap_how *how;
-
 	if (info == NULL)
 		return;
 
-	how = &info->how;
-	switch (how->map_type) {
-	case IDMAP_MAP_TYPE_DS_AD:
-		free(how->idmap_how_u.ad.dn);
-		how->idmap_how_u.ad.dn = NULL;
-		free(how->idmap_how_u.ad.attr);
-		how->idmap_how_u.ad.attr = NULL;
-		free(how->idmap_how_u.ad.value);
-		how->idmap_how_u.ad.value = NULL;
-		break;
+	xdr_free(xdr_idmap_info, (caddr_t)info);
+	(void) memset(info, 0, sizeof (idmap_info));
+}
 
-	case IDMAP_MAP_TYPE_DS_NLDAP:
-		free(how->idmap_how_u.nldap.dn);
-		how->idmap_how_u.nldap.dn = NULL;
-		free(how->idmap_how_u.nldap.attr);
-		how->idmap_how_u.nldap.attr = NULL;
-		free(how->idmap_how_u.nldap.value);
-		how->idmap_how_u.nldap.value = NULL;
-		break;
 
-	case IDMAP_MAP_TYPE_RULE_BASED:
-		free(how->idmap_how_u.rule.windomain);
-		how->idmap_how_u.rule.windomain = NULL;
-		free(how->idmap_how_u.rule.winname);
-		how->idmap_how_u.rule.winname = NULL;
-		free(how->idmap_how_u.rule.unixname);
-		how->idmap_how_u.rule.unixname = NULL;
-		break;
-
-	case IDMAP_MAP_TYPE_EPHEMERAL:
-		break;
-
-	case IDMAP_MAP_TYPE_LOCAL_SID:
-		break;
-
-	case IDMAP_MAP_TYPE_IDMU:
-		free(how->idmap_how_u.idmu.dn);
-		how->idmap_how_u.idmu.dn = NULL;
-		free(how->idmap_how_u.idmu.attr);
-		how->idmap_how_u.idmu.attr = NULL;
-		free(how->idmap_how_u.idmu.value);
-		how->idmap_how_u.idmu.value = NULL;
-		break;
-	}
-	how->map_type = IDMAP_MAP_TYPE_UNKNOWN;
-	info->src = IDMAP_MAP_SRC_UNKNOWN;
+void
+idmap_how_clear(idmap_how *how)
+{
+	xdr_free(xdr_idmap_how, (caddr_t)how);
+	(void) memset(how, 0, sizeof (*how));
 }
 
 
@@ -2595,4 +2461,121 @@ void
 idmap_set_logger(idmap_logger_t funct)
 {
 	logger = funct;
+}
+
+/*
+ * Helper functions that concatenate two parts of a name and then
+ * look up a value, so that the same set of functions can be used to
+ * process both "in" and "out" parameters.
+ */
+static
+boolean_t
+idmap_trace_get_str(nvlist_t *entry, char *n1, char *n2, char **ret)
+{
+	char name[IDMAP_TRACE_NAME_MAX+1];	/* Max used is about 11 */
+	int err;
+
+	(void) strlcpy(name, n1, sizeof (name));
+	if (n2 != NULL)
+		(void) strlcat(name, n2, sizeof (name));
+
+	err = nvlist_lookup_string(entry, name, ret);
+	return (err == 0);
+}
+
+static
+boolean_t
+idmap_trace_get_int(nvlist_t *entry, char *n1, char *n2, int64_t *ret)
+{
+	char name[IDMAP_TRACE_NAME_MAX+1];	/* Max used is about 11 */
+	int err;
+
+	(void) strlcpy(name, n1, sizeof (name));
+	if (n2 != NULL)
+		(void) strlcat(name, n2, sizeof (name));
+
+	err = nvlist_lookup_int64(entry, name, ret);
+	return (err == 0);
+}
+
+static
+void
+idmap_trace_print_id(FILE *out, nvlist_t *entry, char *fromto)
+{
+	char *s;
+	int64_t i64;
+
+	if (idmap_trace_get_int(entry, fromto, IDMAP_TRACE_TYPE, &i64)) {
+		switch (i64) {
+		case IDMAP_POSIXID:
+			(void) fprintf(out, "unixname ");
+			break;
+		case IDMAP_UID:
+			(void) fprintf(out, "unixuser ");
+			break;
+		case IDMAP_GID:
+			(void) fprintf(out, "unixgroup ");
+			break;
+		case IDMAP_SID:
+			(void) fprintf(out, "winname ");
+			break;
+		case IDMAP_USID:
+			(void) fprintf(out, "winuser ");
+			break;
+		case IDMAP_GSID:
+			(void) fprintf(out, "wingroup ");
+			break;
+		case IDMAP_NONE:
+			(void) fprintf(out, gettext("unknown "));
+			break;
+		default:
+			(void) fprintf(out, gettext("bad %d "), (int)i64);
+			break;
+		}
+	}
+
+	if (idmap_trace_get_str(entry, fromto, IDMAP_TRACE_NAME, &s))
+		(void) fprintf(out, "%s ", s);
+
+	if (idmap_trace_get_str(entry, fromto, IDMAP_TRACE_SID, &s))
+		(void) fprintf(out, "%s ", s);
+
+	if (idmap_trace_get_int(entry, fromto, IDMAP_TRACE_UNIXID, &i64))
+		(void) fprintf(out, "%u ", (uid_t)i64);
+}
+
+void
+idmap_trace_print_1(FILE *out, char *prefix, nvlist_t *entry)
+{
+	char *s;
+	int64_t i64;
+
+	(void) fprintf(out, "%s", prefix);
+	idmap_trace_print_id(out, entry, "from");
+	(void) fprintf(out, "-> ");
+	idmap_trace_print_id(out, entry, "to");
+	if (idmap_trace_get_int(entry, IDMAP_TRACE_ERROR, NULL, &i64))
+		(void) fprintf(out, gettext("Error %d "), (int)i64);
+	(void) fprintf(out, "-");
+	if (idmap_trace_get_str(entry, IDMAP_TRACE_MESSAGE, NULL, &s))
+		(void) fprintf(out, " %s", s);
+	(void) fprintf(out, "\n");
+}
+
+void
+idmap_trace_print(FILE *out, char *prefix, nvlist_t *trace)
+{
+	nvpair_t *nvp;
+
+	for (nvp = nvlist_next_nvpair(trace, NULL);
+	    nvp != NULL;
+	    nvp = nvlist_next_nvpair(trace, nvp)) {
+		nvlist_t *entry;
+		int err;
+
+		err = nvpair_value_nvlist(nvp, &entry);
+		assert(err == 0);
+
+		idmap_trace_print_1(out, prefix, entry);
+	}
 }

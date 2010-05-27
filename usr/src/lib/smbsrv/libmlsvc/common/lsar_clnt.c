@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -36,7 +36,6 @@
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/ntaccess.h>
-#include <smbsrv/ntstatus.h>
 #include <smbsrv/ntlocale.h>
 #include <smbsrv/string.h>
 #include <lsalib.h>
@@ -986,8 +985,7 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 	rc = ndr_rpc_call(lsa_handle, opnum, &arg);
 	if (rc == 0) {
 		if (arg.status != 0) {
-			if ((arg.status & 0x00FFFFFF) ==
-			    NT_STATUS_NO_MORE_DATA) {
+			if (arg.status == NT_STATUS_NO_MORE_ENTRIES) {
 				*enum_context = arg.enum_context;
 			} else {
 				ndr_rpc_status(lsa_handle, opnum, arg.status);
@@ -1057,10 +1055,10 @@ lsar_enum_trusted_domains(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 		status = NT_SC_VALUE(arg.status);
 
 		/*
-		 * status 0x8000001A means NO_MORE_DATA,
-		 * which is not an error.
+		 * STATUS_NO_MORE_ENTRIES provides call
+		 * status but does not indicate an error.
 		 */
-		if (status != NT_STATUS_NO_MORE_DATA)
+		if (status != NT_STATUS_NO_MORE_ENTRIES)
 			ndr_rpc_status(lsa_handle, opnum, arg.status);
 	} else if (arg.enum_buf->entries_read == 0) {
 		*enum_context = arg.enum_context;
@@ -1101,10 +1099,10 @@ lsar_enum_trusted_domains_ex(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 		status = NT_SC_VALUE(arg.status);
 
 		/*
-		 * status 0x8000001A means NO_MORE_DATA,
-		 * which is not an error.
+		 * STATUS_NO_MORE_ENTRIES provides call
+		 * status but does not indicate an error.
 		 */
-		if (status != NT_STATUS_NO_MORE_DATA)
+		if (status != NT_STATUS_NO_MORE_ENTRIES)
 			ndr_rpc_status(lsa_handle, opnum, arg.status);
 	} else if (arg.enum_buf->entries_read == 0) {
 		*enum_context = arg.enum_context;

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -36,6 +35,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <libnvpair.h>
 
 /*
  * Basic datatypes for most functions
@@ -268,6 +268,7 @@ extern int sa_delete_sharetab(sa_handle_t, char *, char *);
 extern int sa_zfs_is_shared(sa_handle_t, char *);
 extern int sa_group_is_zfs(sa_group_t);
 extern int sa_path_is_zfs(char *);
+extern int sa_zfs_setprop(sa_handle_t, char *, nvlist_t *);
 
 /* SA Handle specific functions */
 extern sa_handle_t sa_find_group_handle(sa_group_t);

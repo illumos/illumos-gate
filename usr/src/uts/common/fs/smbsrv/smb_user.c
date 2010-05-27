@@ -160,45 +160,23 @@
  *       being queued in that list is NOT registered by incrementing the
  *       reference count.
  */
+#include <sys/types.h>
+#include <sys/sid.h>
+#include <sys/priv_names.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_door.h>
 
-
 #define	ADMINISTRATORS_SID	"S-1-5-32-544"
-
-static smb_sid_t *smb_admins_sid = NULL;
 
 static boolean_t smb_user_is_logged_in(smb_user_t *);
 static int smb_user_enum_private(smb_user_t *, smb_svcenum_t *);
 static smb_tree_t *smb_user_get_tree(smb_llist_t *, smb_tree_t *);
+static void smb_user_setcred(smb_user_t *, cred_t *, uint32_t);
 static void smb_user_nonauth_logon(uint32_t);
 static void smb_user_auth_logoff(uint32_t);
 
-int
-smb_user_init(void)
-{
-	if (smb_admins_sid != NULL)
-		return (0);
-
-	if ((smb_admins_sid = smb_sid_fromstr(ADMINISTRATORS_SID)) == NULL)
-		return (-1);
-
-	return (0);
-}
-
-void
-smb_user_fini(void)
-{
-	if (smb_admins_sid != NULL) {
-		smb_sid_free(smb_admins_sid);
-		smb_admins_sid = NULL;
-	}
-}
-
 /*
- * smb_user_login
- *
- *
+ * Create a new user.
  */
 smb_user_t *
 smb_user_login(
@@ -225,13 +203,10 @@ smb_user_login(
 	user->u_server = session->s_server;
 	user->u_logon_time = gethrestime_sec();
 	user->u_flags = flags;
-	user->u_privileges = privileges;
 	user->u_name_len = strlen(account_name) + 1;
 	user->u_domain_len = strlen(domain_name) + 1;
 	user->u_name = smb_mem_strdup(account_name);
 	user->u_domain = smb_mem_strdup(domain_name);
-	user->u_cred = cr;
-	user->u_privcred = smb_cred_create_privs(cr, privileges);
 	user->u_audit_sid = audit_sid;
 
 	if (!smb_idpool_alloc(&session->s_uid_pool, &user->u_uid)) {
@@ -239,15 +214,13 @@ smb_user_login(
 			smb_llist_constructor(&user->u_tree_list,
 			    sizeof (smb_tree_t), offsetof(smb_tree_t, t_lnd));
 			mutex_init(&user->u_mutex, NULL, MUTEX_DEFAULT, NULL);
-			crhold(user->u_cred);
-			if (user->u_privcred)
-				crhold(user->u_privcred);
+			smb_user_setcred(user, cr, privileges);
 			user->u_state = SMB_USER_STATE_LOGGED_IN;
 			user->u_magic = SMB_USER_MAGIC;
 			smb_llist_enter(&session->s_user_list, RW_WRITER);
 			smb_llist_insert_tail(&session->s_user_list, user);
 			smb_llist_exit(&session->s_user_list);
-			atomic_inc_32(&session->s_server->sv_open_users);
+			smb_server_inc_users(session->s_server);
 			return (user);
 		}
 		smb_idpool_free(&session->s_uid_pool, user->u_uid);
@@ -306,7 +279,6 @@ smb_user_logoff(
 		 */
 		user->u_state = SMB_USER_STATE_LOGGING_OFF;
 		mutex_exit(&user->u_mutex);
-		atomic_dec_32(&user->u_server->sv_open_users);
 		/*
 		 * All the trees hanging off of this user are disconnected.
 		 */
@@ -314,6 +286,7 @@ smb_user_logoff(
 		smb_user_auth_logoff(user->u_audit_sid);
 		mutex_enter(&user->u_mutex);
 		user->u_state = SMB_USER_STATE_LOGGED_OFF;
+		smb_server_dec_users(user->u_server);
 		break;
 	}
 	case SMB_USER_STATE_LOGGED_OFF:
@@ -631,22 +604,50 @@ smb_user_fclose(smb_user_t *user, uint32_t uniqid)
  * Members of the administrators group have administrative rights.
  */
 boolean_t
-smb_user_is_admin(
-    smb_user_t		*user)
+smb_user_is_admin(smb_user_t *user)
 {
-	cred_t		*u_cred;
+	char		sidstr[SMB_SID_STRSZ];
+	ksidlist_t	*ksidlist;
+	ksid_t		ksid1;
+	ksid_t		*ksid2;
+	boolean_t	rc = B_FALSE;
+	int		i;
 
 	ASSERT(user);
-	u_cred = user->u_cred;
-	ASSERT(u_cred);
+	ASSERT(user->u_cred);
 
-	if (smb_admins_sid == NULL)
-		return (B_FALSE);
-
-	if (smb_cred_is_member(u_cred, smb_admins_sid))
+	if (SMB_USER_IS_ADMIN(user))
 		return (B_TRUE);
 
-	return (B_FALSE);
+	bzero(&ksid1, sizeof (ksid_t));
+	(void) strlcpy(sidstr, ADMINISTRATORS_SID, SMB_SID_STRSZ);
+	ASSERT(smb_sid_splitstr(sidstr, &ksid1.ks_rid) == 0);
+	ksid1.ks_domain = ksid_lookupdomain(sidstr);
+
+	ksidlist = crgetsidlist(user->u_cred);
+	ASSERT(ksidlist);
+	ASSERT(ksid1.ks_domain);
+	ASSERT(ksid1.ks_domain->kd_name);
+
+	i = 0;
+	ksid2 = crgetsid(user->u_cred, KSID_USER);
+	do {
+		ASSERT(ksid2->ks_domain);
+		ASSERT(ksid2->ks_domain->kd_name);
+
+		if (strcmp(ksid1.ks_domain->kd_name,
+		    ksid2->ks_domain->kd_name) == 0 &&
+		    ksid1.ks_rid == ksid2->ks_rid) {
+			user->u_flags |= SMB_USER_FLAG_ADMIN;
+			rc = B_TRUE;
+			break;
+		}
+
+		ksid2 = &ksidlist->ksl_sids[i];
+	} while (i++ < ksidlist->ksl_nsid);
+
+	ksid_rele(&ksid1);
+	return (rc);
 }
 
 /*
@@ -770,7 +771,8 @@ smb_user_delete(void *arg)
 	mutex_destroy(&user->u_mutex);
 	smb_llist_destructor(&user->u_tree_list);
 	smb_idpool_destructor(&user->u_tid_pool);
-	crfree(user->u_cred);
+	if (user->u_cred)
+		crfree(user->u_cred);
 	if (user->u_privcred)
 		crfree(user->u_privcred);
 	smb_mem_free(user->u_name);
@@ -825,6 +827,43 @@ cred_t *
 smb_user_getprivcred(smb_user_t *user)
 {
 	return ((user->u_privcred)? user->u_privcred : user->u_cred);
+}
+
+/*
+ * Assign the user cred and privileges.
+ *
+ * If the user has backup and/or restore privleges, dup the cred
+ * and add those privileges to this new privileged cred.
+ */
+static void
+smb_user_setcred(smb_user_t *user, cred_t *cr, uint32_t privileges)
+{
+	cred_t *privcred = NULL;
+
+	ASSERT(cr);
+	crhold(cr);
+
+	if (privileges & (SMB_USER_PRIV_BACKUP | SMB_USER_PRIV_RESTORE))
+		privcred = crdup(cr);
+
+	if (privcred != NULL) {
+		if (privileges & SMB_USER_PRIV_BACKUP) {
+			(void) crsetpriv(privcred, PRIV_FILE_DAC_READ,
+			    PRIV_FILE_DAC_SEARCH, PRIV_SYS_MOUNT, NULL);
+		}
+
+		if (privileges & SMB_USER_PRIV_RESTORE) {
+			(void) crsetpriv(privcred, PRIV_FILE_DAC_WRITE,
+			    PRIV_FILE_CHOWN, PRIV_FILE_CHOWN_SELF,
+			    PRIV_FILE_DAC_SEARCH, PRIV_FILE_LINK_ANY,
+			    PRIV_FILE_OWNER, PRIV_FILE_SETID,
+			    PRIV_SYS_LINKDIR, PRIV_SYS_MOUNT, NULL);
+		}
+	}
+
+	user->u_cred = cr;
+	user->u_privcred = privcred;
+	user->u_privileges = privileges;
 }
 
 /*

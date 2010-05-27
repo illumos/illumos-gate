@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _KERNEL
@@ -45,20 +44,14 @@ static int smb_match_private(const char *, const char *, int *);
 static int smb_match_ci_private(const char *, const char *, int *);
 
 /*
- * Returns:
- * 1	match
- * 0	no-match
+ * smb_match
  */
-int
+boolean_t
 smb_match(char *patn, char *str)
 {
 	int depth = 0;
-	int rc;
 
-	if ((rc = smb_match_private(patn, str, &depth)) == -1)
-		rc = 0;
-
-	return (rc);
+	return (smb_match_private(patn, str, &depth) == 1);
 }
 
 /*
@@ -121,56 +114,15 @@ smb_match_private(const char *patn, const char *str, int *depth)
 	/*NOTREACHED*/
 }
 
-int
-smb_match83(char *patn, char *str83)
-{
-	int	avail;
-	char	*ptr;
-	char	name83[14];
-
-	ptr = name83;
-	for (avail = SMB_NAME83_BASELEN;
-	    (avail > 0) && (*patn != '.') && (*patn != 0);
-	    avail--) {
-		*(ptr++) = *(patn++);
-	}
-	while (avail--)
-		*(ptr++) = ' ';
-	*(ptr++) = '.';
-
-	if (*patn == '.')
-		patn++;
-	else if (*patn != 0)
-		return (0);
-
-	for (avail = SMB_NAME83_EXTLEN; (avail > 0) && (*patn != 0); avail--) {
-		*(ptr++) = *(patn++);
-	}
-	if (*patn != 0)
-		return (0);
-
-	while (avail--)
-		*(ptr++) = ' ';
-	*ptr = 0;
-
-	return (smb_match_ci(name83, str83));
-}
-
 /*
- * Returns:
- * 1	match
- * 0	no-match
+ * smb_match_ci
  */
-int
+boolean_t
 smb_match_ci(char *patn, char *str)
 {
 	int depth = 0;
-	int rc;
 
-	if ((rc = smb_match_ci_private(patn, str, &depth)) == -1)
-		rc = 0;
-
-	return (rc);
+	return (smb_match_ci_private(patn, str, &depth) == 1);
 }
 
 /*

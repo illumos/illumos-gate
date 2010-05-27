@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -172,11 +171,13 @@ main(int argc, char *argv[])
 	(void) sigaction(SIGHUP, &act, NULL);
 	(void) sigaction(SIGINT, &act, NULL);
 	(void) sigaction(SIGPIPE, &act, NULL);
+	(void) sigaction(SIGUSR1, &act, NULL);
 
 	(void) sigdelset(&set, SIGTERM);
 	(void) sigdelset(&set, SIGHUP);
 	(void) sigdelset(&set, SIGINT);
 	(void) sigdelset(&set, SIGPIPE);
+	(void) sigdelset(&set, SIGUSR1);
 
 	if (smbd.s_fg) {
 		(void) sigdelset(&set, SIGTSTP);
@@ -221,6 +222,10 @@ main(int argc, char *argv[])
 		case SIGHUP:
 			syslog(LOG_DEBUG, "refresh requested");
 			(void) pthread_cond_signal(&refresh_cond);
+			break;
+
+		case SIGUSR1:
+			smb_log_dumpall();
 			break;
 
 		default:
@@ -465,10 +470,11 @@ smbd_service_init(void)
 		return (-1);
 	}
 
+	smbd.s_loghd = smb_log_create(SMBD_LOGSIZE, SMBD_LOGNAME);
 	smb_codepage_init();
 
-	if (smb_nicmon_start(SMBD_DEFAULT_INSTANCE_FMRI) != 0)
-		smbd_report("NIC monitoring failed to start");
+	if (smbd_nicmon_start(SMBD_DEFAULT_INSTANCE_FMRI) != 0)
+		smbd_report("NIC monitor failed to start");
 
 	(void) dyndns_start();
 	smb_ipc_init();
@@ -583,7 +589,7 @@ smbd_service_fini(void)
 	smbd_share_stop();
 	smb_shr_stop();
 	dyndns_stop();
-	smb_nicmon_stop();
+	smbd_nicmon_stop();
 	smb_ccache_remove(SMB_CCACHE_PATH);
 	smb_pwd_fini();
 	smb_domain_fini();
@@ -683,9 +689,8 @@ smbd_refresh_monitor(void *arg)
 		(void) dyndns_start();
 		dyndns_clear_zones();
 
-		/* re-initialize NIC table */
-		if (smb_nic_init() != SMB_NIC_SUCCESS)
-			smbd_report("failed to get NIC information");
+		if (smbd_nicmon_refresh() != 0)
+			smbd_report("NIC monitor refresh failed");
 		smb_netbios_name_reconfig();
 		smb_browser_reconfig();
 		smbd_refresh_dc();
@@ -742,8 +747,8 @@ smbd_refresh_dc(void)
 	if (smb_getfqdomainname(fqdomain, MAXHOSTNAMELEN))
 		return;
 
-	if (smb_locate_dc(fqdomain, "", NULL))
-		smbd_report("DC discovery failed");
+	if (!smb_locate_dc(fqdomain, "", NULL))
+		smbd_report("DC refresh failed");
 }
 
 void

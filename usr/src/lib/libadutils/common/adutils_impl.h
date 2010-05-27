@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_ADUTILS_IMPL_H
@@ -38,6 +37,11 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#define	DBG(type, lev)	\
+	(ad_debug[AD_DEBUG_##type] >= (lev) || \
+	    ad_debug[AD_DEBUG_ALL] >= (lev))
+extern int ad_debug[AD_DEBUG_MAX + 1];
 
 #define	ADUTILS_SEARCH_TIMEOUT	3
 #define	ADUTILS_LDAP_OPEN_TIMEOUT	1

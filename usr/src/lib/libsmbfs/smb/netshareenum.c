@@ -37,8 +37,7 @@
 /* END CSTYLED */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -313,7 +312,7 @@ rap_netshareenum(struct smb_ctx *ctx, int *entriesp, int *totalp,
 
 	error = smb_rap_NetShareEnum(ctx, 1, rpbuf, &bufsize, &entries, &total);
 	if (error &&
-	    error != (SMB_ERROR_MORE_DATA | SMB_RAP_ERROR)) {
+	    error != (ERROR_MORE_DATA | SMB_RAP_ERROR)) {
 		free(rpbuf);
 		return (error);
 	}

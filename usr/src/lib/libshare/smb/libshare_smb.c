@@ -174,6 +174,7 @@ struct option_defs optdefs[] = {
 	{ SHOPT_CSC,		OPT_TYPE_CSC },
 	{ SHOPT_GUEST,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_DFSROOT,	OPT_TYPE_BOOLEAN },
+	{ SHOPT_DESCRIPTION,	OPT_TYPE_STRING },
 	{ NULL, NULL }
 };
 
@@ -1625,8 +1626,20 @@ smb_add_transient(sa_handle_t handle, smb_share_t *si)
 	opt = (si->shr_flags & SMB_SHRF_ABE) ? "true" : "false";
 	err |= nvlist_add_string(nvl, SHOPT_ABE, opt);
 
-	opt = (si->shr_flags & SMB_SHRF_GUEST_OK) ? "true" : "false";
-	err |= nvlist_add_string(nvl, SHOPT_GUEST, opt);
+	if ((si->shr_flags & SMB_SHRF_AUTOHOME) == 0) {
+		opt = (si->shr_flags & SMB_SHRF_GUEST_OK) ? "true" : "false";
+		err |= nvlist_add_string(nvl, SHOPT_GUEST, opt);
+	}
+
+	if (si->shr_access_ro[0] != '\0')
+		err |= nvlist_add_string(nvl, SHOPT_RO, si->shr_access_ro);
+
+	if (si->shr_access_rw[0] != '\0')
+		err |= nvlist_add_string(nvl, SHOPT_RW, si->shr_access_rw);
+
+	if (si->shr_access_none[0] != '\0')
+		err |= nvlist_add_string(nvl, SHOPT_NONE, si->shr_access_none);
+
 	if (err) {
 		nvlist_free(nvl);
 		return (SA_CONFIG_ERR);
@@ -1745,7 +1758,8 @@ smb_parse_optstring(sa_group_t group, char *options)
 		 * SA_PROP_SHARE_ONLY, so we come back in with a share
 		 * instead of a group.
 		 */
-		if (strncmp(options, "name=", sizeof ("name=") - 1) == 0 ||
+		if (iszfs ||
+		    strncmp(options, "name=", sizeof ("name=") - 1) == 0 ||
 		    strstr(options, ",name=") != NULL) {
 			return (SA_PROP_SHARE_ONLY);
 		}
@@ -1811,7 +1825,7 @@ smb_parse_optstring(sa_group_t group, char *options)
 			 * "name" property for special handling.
 			 */
 
-			if (strcmp(token, "name") == 0) {
+			if (strcmp(token, SHOPT_NAME) == 0) {
 				char *prefix;
 				char *name = NULL;
 				/*
@@ -1863,6 +1877,16 @@ smb_parse_optstring(sa_group_t group, char *options)
 					ret = SA_NO_MEMORY;
 					break;
 				}
+				continue;
+			}
+
+			if (iszfs && strcmp(token, SHOPT_DESCRIPTION) == 0) {
+				if (resource == NULL)
+					(void) sa_set_share_description(
+					    (sa_share_t)group, value);
+				else
+					(void) sa_set_resource_description(
+					    resource, value);
 				continue;
 			}
 
@@ -2300,8 +2324,8 @@ disposition_validator(int index, char *value)
 	if (*value == '\0')
 		return (SA_OK);
 
-	if ((strcasecmp(value, SMB_SHR_DISP_CONT_STR) == 0) ||
-	    (strcasecmp(value, SMB_SHR_DISP_TERM_STR) == 0))
+	if ((strcasecmp(value, SMB_EXEC_DISP_CONTINUE) == 0) ||
+	    (strcasecmp(value, SMB_EXEC_DISP_TERMINATE) == 0))
 		return (SA_OK);
 
 	return (SA_BAD_VALUE);

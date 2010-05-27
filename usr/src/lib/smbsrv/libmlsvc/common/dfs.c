@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <strings.h>
@@ -28,16 +28,16 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <dlfcn.h>
 #include <pthread.h>
 #include <syslog.h>
 #include <sys/fs_reparse.h>
 #include <uuid/uuid.h>
 
-#include <smbsrv/nterror.h>
-#include <smbsrv/smb_dfs.h>
-#include <smbsrv/smb_share.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
+#include <smbsrv/smb_dfs.h>
+#include <smbsrv/smb_share.h>
 #include <dfs.h>
 
 /*
@@ -59,6 +59,12 @@
 #define	DFS_ROOT_XATTR			"SUNWdfs.rootinfo"
 
 #define	DFS_INFO_ALL			0
+
+static void *dfs_intr_hdl = NULL;
+
+static struct {
+	int (*dfsops_remote_count)(uint32_t *);
+} dfs_intr_ops;
 
 /*
  * Namespace cache
@@ -143,6 +149,18 @@ dfs_init(void)
 		return;
 
 	(void) strlcpy(dfs_nbname, di.di_nbname, NETBIOS_NAME_SZ);
+
+	bzero((void *)&dfs_intr_ops, sizeof (dfs_intr_ops));
+
+	if ((dfs_intr_hdl = smb_dlopen()) == NULL)
+		return;
+
+	if ((dfs_intr_ops.dfsops_remote_count =
+	    (int (*)())dlsym(dfs_intr_hdl, "smb_dfs_remote_count")) == NULL) {
+		smb_dlclose(dfs_intr_hdl);
+		dfs_intr_hdl = NULL;
+		bzero((void *)&dfs_intr_ops, sizeof (dfs_intr_ops));
+	}
 }
 
 /*
@@ -153,6 +171,7 @@ dfs_init(void)
 void
 dfs_fini(void)
 {
+	smb_dlclose(dfs_intr_hdl);
 	smb_cache_destroy(&dfs_nscache);
 }
 
@@ -251,6 +270,20 @@ dfs_namespace_count(void)
 	smb_shriter_t shi;
 	smb_share_t *si;
 	uint32_t nroot = 0;
+	int rc;
+
+	if (dfs_intr_ops.dfsops_remote_count != NULL &&
+	    (rc = dfs_intr_ops.dfsops_remote_count(&nroot)) != 0) {
+		/*
+		 * If this call fails, let's assume there's at least one root
+		 * namespace already configured.  The interposer library cannot
+		 * confirm or deny the presence of a namespace, so let's take
+		 * the safe approach and assume one exists.
+		 */
+		nroot = 1;
+		syslog(LOG_WARNING, "dfs: dfsops_remote_count() failed: %d, "
+		    "assuming one namespace exists", rc);
+	}
 
 	smb_shr_iterinit(&shi);
 	while ((si = smb_shr_iterate(&shi)) != NULL) {

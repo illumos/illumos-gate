@@ -90,6 +90,8 @@ static int smbd_dop_ads_find_host(smbd_arg_t *);
 static int smbd_dop_quota_query(smbd_arg_t *);
 static int smbd_dop_quota_set(smbd_arg_t *);
 static int smbd_dop_dfs_get_referrals(smbd_arg_t *);
+static int smbd_dop_shr_hostaccess(smbd_arg_t *);
+static int smbd_dop_shr_exec(smbd_arg_t *);
 
 typedef int (*smbd_dop_t)(smbd_arg_t *);
 
@@ -114,7 +116,9 @@ smbd_doorop_t smbd_doorops[] = {
 	{ SMB_DR_ADS_FIND_HOST,		smbd_dop_ads_find_host },
 	{ SMB_DR_QUOTA_QUERY,		smbd_dop_quota_query },
 	{ SMB_DR_QUOTA_SET,		smbd_dop_quota_set },
-	{ SMB_DR_DFS_GET_REFERRALS,	smbd_dop_dfs_get_referrals }
+	{ SMB_DR_DFS_GET_REFERRALS,	smbd_dop_dfs_get_referrals },
+	{ SMB_DR_SHR_HOSTACCESS,	smbd_dop_shr_hostaccess },
+	{ SMB_DR_SHR_EXEC,		smbd_dop_shr_exec }
 };
 
 static int smbd_ndoorop = (sizeof (smbd_doorops) / sizeof (smbd_doorops[0]));
@@ -947,6 +951,59 @@ smbd_dop_dfs_get_referrals(smbd_arg_t *arg)
 		dfs_info_free(&reply.rp_referrals);
 
 	xdr_free(dfs_referral_query_xdr, (char *)&request);
+
+	if (arg->rbuf == NULL)
+		return (SMB_DOP_ENCODE_ERROR);
+	return (SMB_DOP_SUCCESS);
+}
+
+static int
+smbd_dop_shr_hostaccess(smbd_arg_t *arg)
+{
+	smb_shr_hostaccess_query_t request;
+	uint32_t reply;
+
+	bzero(&request, sizeof (request));
+	bzero(&reply, sizeof (reply));
+
+	if (smb_common_decode(arg->data, arg->datalen,
+	    smb_shr_hostaccess_query_xdr, &request) != 0)
+		return (SMB_DOP_DECODE_ERROR);
+
+	reply = smb_shr_hostaccess(&request.shq_ipaddr, request.shq_none,
+	    request.shq_ro, request.shq_rw, request.shq_flag);
+
+	arg->rbuf = smb_common_encode(&reply, xdr_uint32_t, &arg->rsize);
+
+	xdr_free(smb_shr_hostaccess_query_xdr, (char *)&request);
+
+	if (arg->rbuf == NULL)
+		return (SMB_DOP_ENCODE_ERROR);
+	return (SMB_DOP_SUCCESS);
+}
+
+static int
+smbd_dop_shr_exec(smbd_arg_t *arg)
+{
+	smb_shr_execinfo_t request;
+	int reply;
+
+	bzero(&request, sizeof (request));
+	bzero(&reply, sizeof (reply));
+
+	if (smb_common_decode(arg->data, arg->datalen,
+	    smb_shr_execinfo_xdr, &request) != 0)
+		return (SMB_DOP_DECODE_ERROR);
+
+	reply = smb_shr_exec(&request);
+
+	if (reply != 0)
+		syslog(LOG_NOTICE, "Failed to execute %s command",
+		    (request.e_type == SMB_EXEC_MAP) ? "map" : "unmap");
+
+	arg->rbuf = smb_common_encode(&reply, xdr_int, &arg->rsize);
+
+	xdr_free(smb_shr_execinfo_xdr, (char *)&request);
 
 	if (arg->rbuf == NULL)
 		return (SMB_DOP_ENCODE_ERROR);

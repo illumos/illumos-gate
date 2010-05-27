@@ -18,21 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * SMB ReadX functions.
  */
 
-#include <syslog.h>
 #include <strings.h>
 
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/netbios.h>
-#include <smbsrv/ntstatus.h>
 #include <smbrdr.h>
 
 #define	SMBRDR_READX_RSP_OVERHEAD \
@@ -68,7 +66,8 @@ smbrdr_readx(int fid, char *in_buf, int in_len)
 	    netuse->session, &netuse->session->logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_readx: %s", xlate_nt_status(status));
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_readx: %s",
+		    xlate_nt_status(status));
 		smbrdr_ofile_put(ofile);
 		return (-1);
 	}
@@ -99,7 +98,7 @@ smbrdr_readx(int fid, char *in_buf, int in_len)
 	    0);		/* Count of data bytes = 0 */
 
 	if (rc < 0) {
-		syslog(LOG_DEBUG, "smbrdr_readx: prep failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_readx: prep failed");
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
 		return (rc);
@@ -112,14 +111,15 @@ smbrdr_readx(int fid, char *in_buf, int in_len)
 		smbrdr_unlock_transport();
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
-		syslog(LOG_DEBUG, "smbrdr_readx: send failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_readx: send failed");
 		return (-1);
 	}
 
 	status = smbrdr_rcv(&srh, 1);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_readx: nb_rcv failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_readx: nb_rcv failed");
 		smbrdr_unlock_transport();
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
@@ -129,7 +129,8 @@ smbrdr_readx(int fid, char *in_buf, int in_len)
 	rc = smbrdr_decode_readx_rsp(mb, in_buf, in_len, &rsp);
 
 	if (rc < 0) {
-		syslog(LOG_DEBUG, "smbrdr_readx: decode failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_readx: decode failed");
 		smbrdr_unlock_transport();
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -223,7 +222,7 @@ static wksids_table_t wksids[] = {
  */
 const
 wksids_table_t *
-find_wksid_by_name(const char *name, const char *domain, int type)
+find_wksid_by_name(const char *name, const char *domain, idmap_id_type type)
 {
 	int i;
 
@@ -286,7 +285,7 @@ find_wksid_by_name(const char *name, const char *domain, int type)
  */
 const
 wksids_table_t *
-find_wksid_by_sid(const char *sid, int rid, int type)
+find_wksid_by_sid(const char *sid, int rid, idmap_id_type type)
 {
 	int i;
 

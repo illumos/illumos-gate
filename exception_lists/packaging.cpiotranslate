@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -294,17 +293,19 @@ usr/include/inet/nca/ncalogd.h
 usr/include/inet/nca/ncandd.h
 usr/include/netsmb/smbfs_acl.h
 usr/include/netsmb/smbfs_api.h
+usr/include/smb/doserror.h
+usr/include/smb/lmerr.h
+usr/include/smb/nterror.h
+usr/include/smb/ntstatus.h
 usr/include/smbsrv/alloc.h
 usr/include/smbsrv/cp_unicode.h
 usr/include/smbsrv/cp_usascii.h
-usr/include/smbsrv/doserror.h
 usr/include/smbsrv/hash_table.h
 usr/include/smbsrv/libmlrpc.h
 usr/include/smbsrv/libmlsvc.h
 usr/include/smbsrv/libsmb.h
 usr/include/smbsrv/libsmbns.h
 usr/include/smbsrv/libsmbrdr.h
-usr/include/smbsrv/lmerr.h
 usr/include/smbsrv/mac_cifs.h
 usr/include/smbsrv/mailslot.h
 usr/include/smbsrv/mbuf.h
@@ -329,10 +330,8 @@ usr/include/smbsrv/netbios.h
 usr/include/smbsrv/netrauth.h
 usr/include/smbsrv/nmpipes.h
 usr/include/smbsrv/ntaccess.h
-usr/include/smbsrv/nterror.h
 usr/include/smbsrv/ntifs.h
 usr/include/smbsrv/ntlocale.h
-usr/include/smbsrv/ntstatus.h
 usr/include/smbsrv/smb_door.h
 usr/include/smbsrv/smb_dfs.h
 usr/include/smbsrv/smb_fsops.h

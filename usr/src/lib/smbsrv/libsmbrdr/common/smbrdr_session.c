@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -29,7 +28,6 @@
  */
 
 #include <unistd.h>
-#include <syslog.h>
 #include <synch.h>
 #include <string.h>
 #include <strings.h>
@@ -136,7 +134,8 @@ done:
 	(void) mutex_unlock(&smbrdr_screate_mtx);
 
 	if (rc != 0)
-		syslog(LOG_DEBUG, "smbrdr_negotiate: cannot access domain");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_negotiate: cannot access domain");
 	return (rc);
 }
 
@@ -163,7 +162,8 @@ smbrdr_session_connect(char *domain_controller, char *domain)
 	 */
 	if ((session = smbrdr_session_init(domain_controller, domain))
 	    == NULL) {
-		syslog(LOG_DEBUG, "smbrdr_session_init failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_session_init failed");
 		return (-1);
 	}
 
@@ -176,7 +176,8 @@ smbrdr_session_connect(char *domain_controller, char *domain)
 	if (rc < 0) {
 		smbrdr_session_clear(session);
 		smbrdr_session_unlock(session);
-		syslog(LOG_DEBUG, "smbrdr: connect failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_session_connect: connect failed");
 		return (-1);
 	}
 
@@ -184,7 +185,8 @@ smbrdr_session_connect(char *domain_controller, char *domain)
 		(void) close(session->sock);
 		smbrdr_session_clear(session);
 		smbrdr_session_unlock(session);
-		syslog(LOG_DEBUG, "smbrdr: negotiate failed");
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_session_connect: negotiate failed");
 		return (-1);
 	}
 
@@ -215,7 +217,9 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	char ipstr[INET6_ADDRSTRLEN];
 
 	if ((sock = socket(sess->srv_ipaddr.a_family, SOCK_STREAM, 0)) <= 0) {
-		syslog(LOG_DEBUG, "smbrdr: socket failed: %s", strerror(errno));
+		smb_log(smbrdr_log_hdl, LOG_ERR,
+		    "smbrdr_trnsprt_connect: socket failed: %s",
+		    strerror(errno));
 		return (-1);
 	}
 	if (sess->srv_ipaddr.a_family == AF_INET) {
@@ -236,7 +240,8 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	}
 
 	if (rc  < 0) {
-		syslog(LOG_DEBUG, "smbrdr: connect failed: %s",
+		smb_log(smbrdr_log_hdl, LOG_ERR,
+		    "smbrdr_trnsprt_connect: connect failed: %s",
 		    strerror(errno));
 		if (sock != 0)
 			(void) close(sock);
@@ -248,7 +253,8 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	rc = ucstooem(server_name, unicode_server_name, SMB_PI_MAX_DOMAIN,
 	    OEM_CPG_850);
 	if (rc == 0) {
-		syslog(LOG_DEBUG, "smbrdr: unicode conversion failed");
+		smb_log(smbrdr_log_hdl, LOG_ERR,
+		    "smbrdr_trnsprt_connect: unicode conversion failed");
 		if (sock != 0)
 			(void) close(sock);
 		return (-1);
@@ -262,7 +268,8 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	 */
 	if (port == IPPORT_NETBIOS_SSN) {
 		if (smb_getnetbiosname(hostname, MAXHOSTNAMELEN) != 0) {
-			syslog(LOG_DEBUG, "smbrdr: no hostname");
+			smb_log(smbrdr_log_hdl, LOG_ERR,
+			    "smbrdr_trnsprt_connect: no hostname");
 			if (sock != 0)
 				(void) close(sock);
 			return (-1);
@@ -272,9 +279,9 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 		    server_name, sess->scope, hostname, sess->scope);
 
 		if (rc != 0) {
-			syslog(LOG_DEBUG,
-			    "smbrdr: NBT session request to %s failed %d",
-			    server_name, rc);
+			smb_log(smbrdr_log_hdl, LOG_ERR,
+			    "smbrdr_trnsprt_connect: NBT session request "
+			    "to %s failed %d", server_name, rc);
 			if (sock != 0)
 				(void) close(sock);
 			return (-1);
@@ -283,7 +290,8 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 
 	sess->sock = sock;
 	sess->port = port;
-	syslog(LOG_DEBUG, "smbrdr: connected on port %d", port);
+	smb_log(smbrdr_log_hdl, LOG_DEBUG,
+	    "smbrdr_trnsprt_connect: connected on port %d", port);
 	sess->state = SDB_SSTATE_CONNECTED;
 	return (0);
 }
@@ -326,7 +334,7 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr: negotiate: %s",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG, "smbrdr_smb_negotiate: %s",
 		    xlate_nt_status(status));
 		smbrdr_handle_free(&srh);
 		return (-1);
@@ -360,7 +368,8 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
 	if ((sess->secmode & NEGOTIATE_SECURITY_SIGNATURES_REQUIRED) &&
 	    (sess->secmode & NEGOTIATE_SECURITY_SIGNATURES_ENABLED)) {
 		sess->sign_ctx.ssc_flags |= SMB_SCF_REQUIRED;
-		syslog(LOG_DEBUG, "smbrdr: %s: signing required",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_smb_negotiate: %s: signing required",
 		    sess->srv_name);
 	}
 
@@ -390,7 +399,8 @@ smbrdr_session_init(char *domain_controller, char *domain)
 		return (NULL);
 
 	if ((h = smb_gethostbyname(domain_controller, &rc)) == NULL) {
-		syslog(LOG_DEBUG, "smbrdr: failed to resolve %s to IP (%d)",
+		smb_log(smbrdr_log_hdl, LOG_DEBUG,
+		    "smbrdr_session_init: failed to resolve %s to IP (%d)",
 		    domain_controller, rc);
 		return (NULL);
 	}
@@ -442,7 +452,8 @@ smbrdr_session_init(char *domain_controller, char *domain)
 		(void) rw_unlock(&session->rwl);
 	}
 
-	syslog(LOG_DEBUG, "smbrdr: no session available");
+	smb_log(smbrdr_log_hdl, LOG_DEBUG,
+	    "smbrdr_session_init: no session available");
 	return (NULL);
 }
 
@@ -561,17 +572,23 @@ smbrdr_dump_sessions(void)
 		if (session->state != SDB_SSTATE_START) {
 			(void) smb_inet_ntop(&session->srv_ipaddr, ipstr,
 			    SMB_IPSTRLEN(session->srv_ipaddr.a_family));
-			syslog(LOG_DEBUG, "session[%d]: state=%d",
+			smb_log(smbrdr_log_hdl, LOG_DEBUG,
+			    "smbrdr_dump_sessions: session[%d]: state=%d",
 			    i, session->state);
-			syslog(LOG_DEBUG, "session[%d]: %s %s (%s)", i,
+			smb_log(smbrdr_log_hdl, LOG_DEBUG,
+			    "smbrdr_dump_sessions: session[%d]: %s %s (%s)", i,
 			    session->domain, session->srv_name, ipstr);
-			syslog(LOG_DEBUG, "session[%d]: %s %s (sock=%d)", i,
+			smb_log(smbrdr_log_hdl, LOG_DEBUG,
+			    "smbrdr_dump_sessions: session[%d]: %s %s "
+			    "(sock=%d)", i,
 			    session->native_os, session->native_lanman,
 			    session->sock);
 
 			logon = &session->logon;
 			if (logon->type != SDB_LOGON_NONE)
-				syslog(LOG_DEBUG, "logon[%d]: %s (uid=%d)",
+				smb_log(smbrdr_log_hdl, LOG_DEBUG,
+				    "smbrdr_dump_sessions: logon[%d]: %s "
+				    "(uid=%d)",
 				    i, logon->username, logon->uid);
 		}
 		(void) rw_unlock(&session->rwl);

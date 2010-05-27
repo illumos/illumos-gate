@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -41,10 +41,11 @@
 #include <time.h>
 #include <dlfcn.h>
 #include <sys/types.h>
-#include <smbsrv/winsvc.h>
-#include <smbsrv/nterror.h>
-#include <smbsrv/ndl/svcctl.ndl>
+
+#include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
+#include <smbsrv/winsvc.h>
+#include <smbsrv/ndl/svcctl.ndl>
 
 #define	LEGACY_UNKNOWN	"unknown"
 #define	SVC_NAME_PROP	"name"

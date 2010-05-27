@@ -768,6 +768,7 @@ usr/include/sys/srn.h
 #
 # Private/Internal header files of smbsrv. Do not ship.
 #
+usr/include/smb
 usr/include/smbsrv
 #
 # Private/Internal dtrace scripts of smbsrv. Do not ship.

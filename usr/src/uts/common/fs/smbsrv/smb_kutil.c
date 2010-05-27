@@ -28,7 +28,9 @@
 #include <sys/atomic.h>
 #include <sys/kidmap.h>
 #include <sys/time.h>
+#include <sys/spl.h>
 #include <sys/cpuvar.h>
+#include <sys/random.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
@@ -43,6 +45,9 @@ static kmem_cache_t	*smb_dtor_cache;
 static boolean_t	smb_llist_initialized = B_FALSE;
 
 static boolean_t smb_thread_continue_timedwait_locked(smb_thread_t *, int);
+
+static boolean_t smb_avl_hold(smb_avl_t *);
+static void smb_avl_rele(smb_avl_t *);
 
 time_t tzh_leapcnt = 0;
 
@@ -694,7 +699,7 @@ void
 smb_slist_destructor(
     smb_slist_t	*sl)
 {
-	ASSERT(sl->sl_count == 0);
+	VERIFY(sl->sl_count == 0);
 
 	mutex_destroy(&sl->sl_mutex);
 	cv_destroy(&sl->sl_cv);
@@ -1856,222 +1861,6 @@ smb_timegm(struct tm *tm)
 }
 
 /*
- * smb_cred_set_sid
- *
- * Initialize the ksid based on the given smb_id_t.
- */
-static void
-smb_cred_set_sid(smb_id_t *id, ksid_t *ksid)
-{
-	char sidstr[SMB_SID_STRSZ];
-	int rc;
-
-	ASSERT(id);
-	ASSERT(id->i_sid);
-
-	ksid->ks_id = id->i_id;
-	smb_sid_tostr(id->i_sid, sidstr);
-	rc = smb_sid_splitstr(sidstr, &ksid->ks_rid);
-	ASSERT(rc == 0);
-
-	ksid->ks_attr = id->i_attrs;
-	ksid->ks_domain = ksid_lookupdomain(sidstr);
-}
-
-/*
- * smb_cred_set_sidlist
- *
- * Allocate and initialize the ksidlist based on the Windows group list of the
- * access token.
- */
-static ksidlist_t *
-smb_cred_set_sidlist(smb_ids_t *token_grps)
-{
-	int i;
-	ksidlist_t *lp;
-
-	lp = kmem_zalloc(KSIDLIST_MEM(token_grps->i_cnt), KM_SLEEP);
-	lp->ksl_ref = 1;
-	lp->ksl_nsid = token_grps->i_cnt;
-	lp->ksl_neid = 0;
-
-	for (i = 0; i < lp->ksl_nsid; i++) {
-		smb_cred_set_sid(&token_grps->i_ids[i], &lp->ksl_sids[i]);
-		if (lp->ksl_sids[i].ks_id > IDMAP_WK__MAX_GID)
-			lp->ksl_neid++;
-	}
-
-	return (lp);
-}
-
-/*
- * A Solaris credential (cred_t structure) will be allocated and
- * initialized based on the given Windows style user access token.
- *
- * cred's gid is set to the primary group of the mapped Solaris user.
- * When there is no such mapped user (i.e. the mapped UID is ephemeral)
- * or his/her primary group could not be obtained, cred's gid is set to
- * the mapped Solaris group of token's primary group.
- */
-cred_t *
-smb_cred_create(smb_token_t *token, uint32_t *privileges)
-{
-	ksid_t			ksid;
-	ksidlist_t		*ksidlist = NULL;
-	smb_posix_grps_t	*posix_grps;
-	cred_t			*cr;
-	gid_t			gid;
-
-	ASSERT(token);
-	ASSERT(token->tkn_posix_grps);
-	posix_grps = token->tkn_posix_grps;
-
-	ASSERT(privileges);
-
-	cr = crget();
-	ASSERT(cr != NULL);
-
-	if (!IDMAP_ID_IS_EPHEMERAL(token->tkn_user.i_id) &&
-	    (posix_grps->pg_ngrps != 0)) {
-		gid = posix_grps->pg_grps[0];
-	} else {
-		gid = token->tkn_primary_grp.i_id;
-	}
-
-	if (crsetugid(cr, token->tkn_user.i_id, gid) != 0) {
-		crfree(cr);
-		return (NULL);
-	}
-
-	if (crsetgroups(cr, posix_grps->pg_ngrps, posix_grps->pg_grps) != 0) {
-		crfree(cr);
-		return (NULL);
-	}
-
-	smb_cred_set_sid(&token->tkn_user, &ksid);
-	crsetsid(cr, &ksid, KSID_USER);
-	smb_cred_set_sid(&token->tkn_primary_grp, &ksid);
-	crsetsid(cr, &ksid, KSID_GROUP);
-	smb_cred_set_sid(&token->tkn_owner, &ksid);
-	crsetsid(cr, &ksid, KSID_OWNER);
-	ksidlist = smb_cred_set_sidlist(&token->tkn_win_grps);
-	crsetsidlist(cr, ksidlist);
-
-	*privileges = 0;
-
-	if (smb_token_query_privilege(token, SE_BACKUP_LUID))
-		*privileges |= SMB_USER_PRIV_BACKUP;
-
-	if (smb_token_query_privilege(token, SE_RESTORE_LUID))
-		*privileges |= SMB_USER_PRIV_RESTORE;
-
-	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID)) {
-		*privileges |= SMB_USER_PRIV_TAKE_OWNERSHIP;
-		(void) crsetpriv(cr, PRIV_FILE_CHOWN, NULL);
-	}
-
-	if (smb_token_query_privilege(token, SE_SECURITY_LUID))
-		*privileges |= SMB_USER_PRIV_SECURITY;
-
-	return (cr);
-}
-
-/*
- * smb_cred_rele
- *
- * The reference count of the user's credential will get decremented if it
- * is non-zero. Otherwise, the credential will be freed.
- */
-void
-smb_cred_rele(cred_t *cr)
-{
-	ASSERT(cr);
-	crfree(cr);
-}
-
-/*
- * smb_cred_is_member
- *
- * Same as smb_token_is_member. The only difference is that
- * we compare the given SID against user SID and the ksidlist
- * of the user's cred.
- */
-int
-smb_cred_is_member(cred_t *cr, smb_sid_t *sid)
-{
-	ksidlist_t *ksidlist;
-	ksid_t ksid1, *ksid2;
-	smb_id_t id;
-	int i, rc = 0;
-
-	ASSERT(cr);
-
-	bzero(&id, sizeof (smb_id_t));
-	id.i_sid = sid;
-	smb_cred_set_sid(&id, &ksid1);
-
-	ksidlist = crgetsidlist(cr);
-	ASSERT(ksidlist);
-	ASSERT(ksid1.ks_domain);
-	ASSERT(ksid1.ks_domain->kd_name);
-
-	i = 0;
-	ksid2 = crgetsid(cr, KSID_USER);
-	do {
-		ASSERT(ksid2->ks_domain);
-		ASSERT(ksid2->ks_domain->kd_name);
-
-		if (strcmp(ksid1.ks_domain->kd_name,
-		    ksid2->ks_domain->kd_name) == 0 &&
-		    ksid1.ks_rid == ksid2->ks_rid) {
-			rc = 1;
-			break;
-		}
-
-		ksid2 = &ksidlist->ksl_sids[i];
-	} while (i++ < ksidlist->ksl_nsid);
-
-	ksid_rele(&ksid1);
-	return (rc);
-}
-
-/*
- * smb_cred_create_privs
- *
- * Creates a duplicate credential that contains system privileges for
- * certain SMB privileges: Backup and Restore.
- *
- */
-cred_t *
-smb_cred_create_privs(cred_t *user_cr, uint32_t privileges)
-{
-	cred_t *cr = NULL;
-
-	ASSERT(user_cr != NULL);
-
-	if (privileges & (SMB_USER_PRIV_BACKUP | SMB_USER_PRIV_RESTORE))
-		cr = crdup(user_cr);
-
-	if (cr == NULL)
-		return (NULL);
-
-	if (privileges & SMB_USER_PRIV_BACKUP) {
-		(void) crsetpriv(cr, PRIV_FILE_DAC_READ,
-		    PRIV_FILE_DAC_SEARCH, PRIV_SYS_MOUNT, NULL);
-	}
-
-	if (privileges & SMB_USER_PRIV_RESTORE) {
-		(void) crsetpriv(cr, PRIV_FILE_DAC_WRITE,
-		    PRIV_FILE_CHOWN, PRIV_FILE_CHOWN_SELF,
-		    PRIV_FILE_DAC_SEARCH, PRIV_FILE_LINK_ANY,
-		    PRIV_FILE_OWNER, PRIV_FILE_SETID, PRIV_SYS_LINKDIR,
-		    PRIV_SYS_MOUNT, NULL);
-	}
-
-	return (cr);
-}
-
-/*
  * smb_pad_align
  *
  * Returns the number of bytes required to pad an offset to the
@@ -2098,4 +1887,463 @@ void
 smb_panic(char *file, const char *func, int line)
 {
 	cmn_err(CE_PANIC, "%s:%s:%d\n", file, func, line);
+}
+
+/*
+ * Creates an AVL tree and initializes the given smb_avl_t
+ * structure using the passed args
+ */
+void
+smb_avl_create(smb_avl_t *avl, size_t size, size_t offset, smb_avl_nops_t *ops)
+{
+	ASSERT(avl);
+	ASSERT(ops);
+
+	rw_init(&avl->avl_lock, NULL, RW_DEFAULT, NULL);
+	mutex_init(&avl->avl_mutex, NULL, MUTEX_DEFAULT, NULL);
+
+	avl->avl_nops = ops;
+	avl->avl_state = SMB_AVL_STATE_READY;
+	avl->avl_refcnt = 0;
+	(void) random_get_pseudo_bytes((uint8_t *)&avl->avl_sequence,
+	    sizeof (uint32_t));
+
+	avl_create(&avl->avl_tree, ops->avln_cmp, size, offset);
+}
+
+/*
+ * Destroys the specified AVL tree.
+ * It waits for all the in-flight operations to finish
+ * before destroying the AVL.
+ */
+void
+smb_avl_destroy(smb_avl_t *avl)
+{
+	void *cookie = NULL;
+	void *node;
+
+	ASSERT(avl);
+
+	mutex_enter(&avl->avl_mutex);
+	if (avl->avl_state != SMB_AVL_STATE_READY) {
+		mutex_exit(&avl->avl_mutex);
+		return;
+	}
+
+	avl->avl_state = SMB_AVL_STATE_DESTROYING;
+
+	while (avl->avl_refcnt > 0)
+		(void) cv_wait(&avl->avl_cv, &avl->avl_mutex);
+	mutex_exit(&avl->avl_mutex);
+
+	rw_enter(&avl->avl_lock, RW_WRITER);
+	while ((node = avl_destroy_nodes(&avl->avl_tree, &cookie)) != NULL)
+		avl->avl_nops->avln_destroy(node);
+
+	avl_destroy(&avl->avl_tree);
+	rw_exit(&avl->avl_lock);
+
+	rw_destroy(&avl->avl_lock);
+
+	mutex_destroy(&avl->avl_mutex);
+	bzero(avl, sizeof (smb_avl_t));
+}
+
+/*
+ * Adds the given item to the AVL if it's
+ * not already there.
+ *
+ * Returns:
+ *
+ * 	ENOTACTIVE	AVL is not in READY state
+ * 	EEXIST		The item is already in AVL
+ */
+int
+smb_avl_add(smb_avl_t *avl, void *item)
+{
+	avl_index_t where;
+
+	ASSERT(avl);
+	ASSERT(item);
+
+	if (!smb_avl_hold(avl))
+		return (ENOTACTIVE);
+
+	rw_enter(&avl->avl_lock, RW_WRITER);
+	if (avl_find(&avl->avl_tree, item, &where) != NULL) {
+		rw_exit(&avl->avl_lock);
+		smb_avl_rele(avl);
+		return (EEXIST);
+	}
+
+	avl_insert(&avl->avl_tree, item, where);
+	avl->avl_sequence++;
+	rw_exit(&avl->avl_lock);
+
+	smb_avl_rele(avl);
+	return (0);
+}
+
+/*
+ * Removes the given item from the AVL.
+ * If no reference is left on the item
+ * it will also be destroyed by calling the
+ * registered destroy operation.
+ */
+void
+smb_avl_remove(smb_avl_t *avl, void *item)
+{
+	avl_index_t where;
+	void *rm_item;
+
+	ASSERT(avl);
+	ASSERT(item);
+
+	if (!smb_avl_hold(avl))
+		return;
+
+	rw_enter(&avl->avl_lock, RW_WRITER);
+	if ((rm_item = avl_find(&avl->avl_tree, item, &where)) == NULL) {
+		rw_exit(&avl->avl_lock);
+		smb_avl_rele(avl);
+		return;
+	}
+
+	avl_remove(&avl->avl_tree, rm_item);
+	if (avl->avl_nops->avln_rele(rm_item))
+		avl->avl_nops->avln_destroy(rm_item);
+	avl->avl_sequence++;
+	rw_exit(&avl->avl_lock);
+
+	smb_avl_rele(avl);
+}
+
+/*
+ * Looks up the AVL for the given item.
+ * If the item is found a hold on the object
+ * is taken before the pointer to it is
+ * returned to the caller. The caller MUST
+ * always call smb_avl_release() after it's done
+ * using the returned object to release the hold
+ * taken on the object.
+ */
+void *
+smb_avl_lookup(smb_avl_t *avl, void *item)
+{
+	void *node = NULL;
+
+	ASSERT(avl);
+	ASSERT(item);
+
+	if (!smb_avl_hold(avl))
+		return (NULL);
+
+	rw_enter(&avl->avl_lock, RW_READER);
+	node = avl_find(&avl->avl_tree, item, NULL);
+	if (node != NULL)
+		avl->avl_nops->avln_hold(node);
+	rw_exit(&avl->avl_lock);
+
+	if (node == NULL)
+		smb_avl_rele(avl);
+
+	return (node);
+}
+
+/*
+ * The hold on the given object is released.
+ * This function MUST always be called after
+ * smb_avl_lookup() and smb_avl_iterate() for
+ * the returned object.
+ *
+ * If AVL is in DESTROYING state, the destroying
+ * thread will be notified.
+ */
+void
+smb_avl_release(smb_avl_t *avl, void *item)
+{
+	ASSERT(avl);
+	ASSERT(item);
+
+	if (avl->avl_nops->avln_rele(item))
+		avl->avl_nops->avln_destroy(item);
+
+	smb_avl_rele(avl);
+}
+
+/*
+ * Initializes the given cursor for the AVL.
+ * The cursor will be used to iterate through the AVL
+ */
+void
+smb_avl_iterinit(smb_avl_t *avl, smb_avl_cursor_t *cursor)
+{
+	ASSERT(avl);
+	ASSERT(cursor);
+
+	cursor->avlc_next = NULL;
+	cursor->avlc_sequence = avl->avl_sequence;
+}
+
+/*
+ * Iterates through the AVL using the given cursor.
+ * It always starts at the beginning and then returns
+ * a pointer to the next object on each subsequent call.
+ *
+ * If a new object is added to or removed from the AVL
+ * between two calls to this function, the iteration
+ * will terminate prematurely.
+ *
+ * The caller MUST always call smb_avl_release() after it's
+ * done using the returned object to release the hold taken
+ * on the object.
+ */
+void *
+smb_avl_iterate(smb_avl_t *avl, smb_avl_cursor_t *cursor)
+{
+	void *node;
+
+	ASSERT(avl);
+	ASSERT(cursor);
+
+	if (!smb_avl_hold(avl))
+		return (NULL);
+
+	rw_enter(&avl->avl_lock, RW_READER);
+	if (cursor->avlc_sequence != avl->avl_sequence) {
+		rw_exit(&avl->avl_lock);
+		smb_avl_rele(avl);
+		return (NULL);
+	}
+
+	if (cursor->avlc_next == NULL)
+		node = avl_first(&avl->avl_tree);
+	else
+		node = AVL_NEXT(&avl->avl_tree, cursor->avlc_next);
+
+	if (node != NULL)
+		avl->avl_nops->avln_hold(node);
+
+	cursor->avlc_next = node;
+	rw_exit(&avl->avl_lock);
+
+	if (node == NULL)
+		smb_avl_rele(avl);
+
+	return (node);
+}
+
+/*
+ * Increments the AVL reference count in order to
+ * prevent the avl from being destroyed while it's
+ * being accessed.
+ */
+static boolean_t
+smb_avl_hold(smb_avl_t *avl)
+{
+	mutex_enter(&avl->avl_mutex);
+	if (avl->avl_state != SMB_AVL_STATE_READY) {
+		mutex_exit(&avl->avl_mutex);
+		return (B_FALSE);
+	}
+	avl->avl_refcnt++;
+	mutex_exit(&avl->avl_mutex);
+
+	return (B_TRUE);
+}
+
+/*
+ * Decrements the AVL reference count to release the
+ * hold. If another thread is trying to destroy the
+ * AVL and is waiting for the reference count to become
+ * 0, it is signaled to wake up.
+ */
+static void
+smb_avl_rele(smb_avl_t *avl)
+{
+	mutex_enter(&avl->avl_mutex);
+	ASSERT(avl->avl_refcnt > 0);
+	avl->avl_refcnt--;
+	if (avl->avl_state == SMB_AVL_STATE_DESTROYING)
+		cv_broadcast(&avl->avl_cv);
+	mutex_exit(&avl->avl_mutex);
+}
+
+/*
+ * smb_latency_init
+ */
+void
+smb_latency_init(smb_latency_t *lat)
+{
+	bzero(lat, sizeof (*lat));
+	mutex_init(&lat->ly_mutex, NULL, MUTEX_SPIN, (void *)ipltospl(SPL7));
+}
+
+/*
+ * smb_latency_destroy
+ */
+void
+smb_latency_destroy(smb_latency_t *lat)
+{
+	mutex_destroy(&lat->ly_mutex);
+}
+
+/*
+ * smb_latency_add_sample
+ *
+ * Uses the new sample to calculate the new mean and standard deviation. The
+ * sample must be a scaled value.
+ */
+void
+smb_latency_add_sample(smb_latency_t *lat, hrtime_t sample)
+{
+	hrtime_t	a_mean;
+	hrtime_t	d_mean;
+
+	mutex_enter(&lat->ly_mutex);
+	lat->ly_a_nreq++;
+	lat->ly_a_sum += sample;
+	if (lat->ly_a_nreq != 0) {
+		a_mean = lat->ly_a_sum / lat->ly_a_nreq;
+		lat->ly_a_stddev =
+		    (sample - a_mean) * (sample - lat->ly_a_mean);
+		lat->ly_a_mean = a_mean;
+	}
+	lat->ly_d_nreq++;
+	lat->ly_d_sum += sample;
+	if (lat->ly_d_nreq != 0) {
+		d_mean = lat->ly_d_sum / lat->ly_d_nreq;
+		lat->ly_d_stddev =
+		    (sample - d_mean) * (sample - lat->ly_d_mean);
+		lat->ly_d_mean = d_mean;
+	}
+	mutex_exit(&lat->ly_mutex);
+}
+
+/*
+ * smb_srqueue_init
+ */
+void
+smb_srqueue_init(smb_srqueue_t *srq)
+{
+	bzero(srq, sizeof (*srq));
+	mutex_init(&srq->srq_mutex, NULL, MUTEX_SPIN, (void *)ipltospl(SPL7));
+	srq->srq_wlastupdate = srq->srq_rlastupdate = gethrtime_unscaled();
+}
+
+/*
+ * smb_srqueue_destroy
+ */
+void
+smb_srqueue_destroy(smb_srqueue_t *srq)
+{
+	mutex_destroy(&srq->srq_mutex);
+}
+
+/*
+ * smb_srqueue_waitq_enter
+ */
+void
+smb_srqueue_waitq_enter(smb_srqueue_t *srq)
+{
+	hrtime_t	new;
+	hrtime_t	delta;
+	uint32_t	wcnt;
+
+	mutex_enter(&srq->srq_mutex);
+	new = gethrtime_unscaled();
+	delta = new - srq->srq_wlastupdate;
+	srq->srq_wlastupdate = new;
+	wcnt = srq->srq_wcnt++;
+	if (wcnt != 0) {
+		srq->srq_wlentime += delta * wcnt;
+		srq->srq_wtime += delta;
+	}
+	mutex_exit(&srq->srq_mutex);
+}
+
+/*
+ * smb_srqueue_runq_exit
+ */
+void
+smb_srqueue_runq_exit(smb_srqueue_t *srq)
+{
+	hrtime_t	new;
+	hrtime_t	delta;
+	uint32_t	rcnt;
+
+	mutex_enter(&srq->srq_mutex);
+	new = gethrtime_unscaled();
+	delta = new - srq->srq_rlastupdate;
+	srq->srq_rlastupdate = new;
+	rcnt = srq->srq_rcnt--;
+	ASSERT(rcnt > 0);
+	srq->srq_rlentime += delta * rcnt;
+	srq->srq_rtime += delta;
+	mutex_exit(&srq->srq_mutex);
+}
+
+/*
+ * smb_srqueue_waitq_to_runq
+ */
+void
+smb_srqueue_waitq_to_runq(smb_srqueue_t *srq)
+{
+	hrtime_t	new;
+	hrtime_t	delta;
+	uint32_t	wcnt;
+	uint32_t	rcnt;
+
+	mutex_enter(&srq->srq_mutex);
+	new = gethrtime_unscaled();
+	delta = new - srq->srq_wlastupdate;
+	srq->srq_wlastupdate = new;
+	wcnt = srq->srq_wcnt--;
+	ASSERT(wcnt > 0);
+	srq->srq_wlentime += delta * wcnt;
+	srq->srq_wtime += delta;
+	delta = new - srq->srq_rlastupdate;
+	srq->srq_rlastupdate = new;
+	rcnt = srq->srq_rcnt++;
+	if (rcnt != 0) {
+		srq->srq_rlentime += delta * rcnt;
+		srq->srq_rtime += delta;
+	}
+	mutex_exit(&srq->srq_mutex);
+}
+
+/*
+ * smb_srqueue_update
+ *
+ * Takes a snapshot of the smb_sr_stat_t structure passed in.
+ */
+void
+smb_srqueue_update(smb_srqueue_t *srq, smb_kstat_utilization_t *kd)
+{
+	hrtime_t	delta;
+	hrtime_t	snaptime;
+
+	mutex_enter(&srq->srq_mutex);
+	snaptime = gethrtime_unscaled();
+	delta = snaptime - srq->srq_wlastupdate;
+	srq->srq_wlastupdate = snaptime;
+	if (srq->srq_wcnt != 0) {
+		srq->srq_wlentime += delta * srq->srq_wcnt;
+		srq->srq_wtime += delta;
+	}
+	delta = snaptime - srq->srq_rlastupdate;
+	srq->srq_rlastupdate = snaptime;
+	if (srq->srq_rcnt != 0) {
+		srq->srq_rlentime += delta * srq->srq_rcnt;
+		srq->srq_rtime += delta;
+	}
+	kd->ku_rlentime = srq->srq_rlentime;
+	kd->ku_rtime = srq->srq_rtime;
+	kd->ku_wlentime = srq->srq_wlentime;
+	kd->ku_wtime = srq->srq_wtime;
+	mutex_exit(&srq->srq_mutex);
+	scalehrtime(&kd->ku_rlentime);
+	scalehrtime(&kd->ku_rtime);
+	scalehrtime(&kd->ku_wlentime);
+	scalehrtime(&kd->ku_wtime);
 }

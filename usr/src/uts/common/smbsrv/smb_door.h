@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_DOOR_H
@@ -65,7 +64,9 @@ typedef enum smb_dopcode {
 	SMB_DR_ADS_FIND_HOST,
 	SMB_DR_QUOTA_QUERY,
 	SMB_DR_QUOTA_SET,
-	SMB_DR_DFS_GET_REFERRALS
+	SMB_DR_DFS_GET_REFERRALS,
+	SMB_DR_SHR_HOSTACCESS,
+	SMB_DR_SHR_EXEC
 } smb_dopcode_t;
 
 struct smb_event;
@@ -98,6 +99,33 @@ int smb_common_decode(char *, size_t, xdrproc_t, void *);
 char *smb_string_encode(char *, size_t *);
 int smb_string_decode(smb_string_t *, char *, size_t);
 #endif /* _KERNEL */
+
+/*
+ * Legacy door interface
+ */
+#define	SMB_SHARE_DNAME		"/var/run/smb_share_door"
+#define	SMB_SHARE_DSIZE		(65 * 1024)
+
+/*
+ * door operations
+ */
+#define	SMB_SHROP_NUM_SHARES		1
+#define	SMB_SHROP_DELETE		2
+#define	SMB_SHROP_RENAME		3
+#define	SMB_SHROP_ADD			4
+#define	SMB_SHROP_MODIFY		5
+#define	SMB_SHROP_LIST			6
+
+/*
+ * Door server status
+ *
+ * SMB_SHARE_DERROR is returned by the door server if there is problem
+ * with marshalling/unmarshalling. Otherwise, SMB_SHARE_DSUCCESS is
+ * returned.
+ *
+ */
+#define	SMB_SHARE_DSUCCESS		0
+#define	SMB_SHARE_DERROR		-1
 
 typedef struct smb_dr_ctx {
 	char *ptr;
@@ -138,6 +166,12 @@ BYTE smb_dr_get_BYTE(smb_dr_ctx_t *);
 
 void smb_dr_put_buf(smb_dr_ctx_t *, unsigned char *, int);
 int smb_dr_get_buf(smb_dr_ctx_t *, unsigned char *, int);
+
+void smb_dr_get_share(smb_dr_ctx_t *, smb_share_t *);
+void smb_dr_put_share(smb_dr_ctx_t *, smb_share_t *);
+
+void smb_share_door_clnt_init(void);
+void smb_share_door_clnt_fini(void);
 
 #ifdef __cplusplus
 }

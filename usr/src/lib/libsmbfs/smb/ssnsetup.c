@@ -72,11 +72,6 @@
 #include "ntlm.h"
 #include "smb_crypt.h"
 
-/*
- * When we have a _real_ ntstatus.h, eliminate this.
- * XXX: Current smb.h defines it without the high bits.
- */
-#define	STATUS_MORE_PROCESSING_REQUIRED 0xC0000016
 
 static int
 smb__ssnsetup(struct smb_ctx *ctx,
@@ -284,7 +279,7 @@ smb_ssnsetup_spnego(struct smb_ctx *ctx, struct mbdata *hint_mb)
 			goto out;
 		if (ntstatus == 0)
 			break; /* normal loop termination */
-		if (ntstatus != STATUS_MORE_PROCESSING_REQUIRED) {
+		if (ntstatus != NT_STATUS_MORE_PROCESSING_REQUIRED) {
 			err = EAUTH;
 			goto out;
 		}
@@ -424,7 +419,7 @@ smb__ssnsetup(struct smb_ctx *ctx,
 	 * Note: err=0, means rq_status is valid.
 	 */
 	if (rqp->rq_status != 0 &&
-	    rqp->rq_status != STATUS_MORE_PROCESSING_REQUIRED) {
+	    rqp->rq_status != NT_STATUS_MORE_PROCESSING_REQUIRED) {
 		goto out;
 	}
 

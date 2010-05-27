@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -48,8 +49,8 @@ extern "C" {
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_share.h>
-#include <smbsrv/nterror.h>
-#include <smbsrv/ntstatus.h>
+#include <smb/nterror.h>
+#include <smb/ntstatus.h>
 #include <smbsrv/smb_door.h>
 #include <smbsrv/alloc.h>
 #include <smbsrv/hash_table.h>
@@ -59,6 +60,7 @@ extern "C" {
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/ntifs.h>
 
+#define	SMB_VARSMB_DIR "/var/smb"
 #define	SMB_VARRUN_DIR "/var/run/smb"
 #define	SMB_CCACHE_FILE "ccache"
 #define	SMB_CCACHE_PATH SMB_VARRUN_DIR "/" SMB_CCACHE_FILE
@@ -145,6 +147,7 @@ typedef enum {
 	SMB_CI_MAP,
 	SMB_CI_UNMAP,
 	SMB_CI_DISPOSITION,
+	SMB_CI_DFS_STDROOT_NUM,
 	SMB_CI_MAX
 } smb_cfg_id_t;
 
@@ -193,6 +196,8 @@ extern int smb_config_set_idmap_domain(char *);
 extern int smb_config_refresh_idmap(void);
 extern int smb_config_getip(smb_cfg_id_t, smb_inaddr_t *);
 extern void smb_config_get_version(smb_version_t *);
+uint32_t smb_config_get_execinfo(char *, char *, size_t);
+
 
 extern void smb_load_kconfig(smb_kmod_cfg_t *kcfg);
 extern uint32_t smb_crc_gen(uint8_t *, size_t);
@@ -279,6 +284,8 @@ extern int smb_getnameinfo(smb_inaddr_t *, char *, int, int);
 
 void smb_trace(const char *s);
 void smb_tracef(const char *fmt, ...);
+
+const char *xlate_nt_status(unsigned int);
 
 /*
  * Authentication
@@ -739,6 +746,7 @@ int smb_lookup_name(const char *, sid_type_t, lsa_account_t *);
 #define	SMB_LGRP_LOOKUP_FAILED		30
 #define	SMB_LGRP_NOT_SUPPORTED		31
 #define	SMB_LGRP_OFFLINE		32
+#define	SMB_LGRP_POSIXCREATE_FAILED	33
 
 #define	SMB_LGRP_COMMENT_MAX	256
 
@@ -799,10 +807,6 @@ boolean_t smb_nic_is_same_subnet(smb_inaddr_t *);
 #define	SMB_NIC_SOCK			14
 #define	SMB_NIC_IOCTL			15
 #define	SMB_NIC_CHANGED			16
-
-/* NIC Monitoring functions */
-int smb_nicmon_start(const char *);
-void smb_nicmon_stop(void);
 
 /*
  * Well-known account structure
@@ -883,8 +887,8 @@ int smb_kmod_nbtlisten(int);
 int smb_kmod_tcpreceive(void);
 int smb_kmod_nbtreceive(void);
 void smb_kmod_unbind(void);
-int smb_kmod_share(char *, char *);
-int smb_kmod_unshare(char *, char *);
+int smb_kmod_share(nvlist_t *);
+int smb_kmod_unshare(nvlist_t *);
 int smb_kmod_get_open_num(smb_opennum_t *);
 int smb_kmod_enum(smb_netsvc_t *);
 smb_netsvc_t *smb_kmod_enum_init(smb_svcenum_t *);
@@ -976,6 +980,40 @@ int smb_reparse_stat(const char *, uint32_t *);
 int smb_reparse_svcadd(const char *, const char *, const char *);
 int smb_reparse_svcdel(const char *, const char *);
 int smb_reparse_svcget(const char *, const char *, char **);
+
+uint32_t smb_get_txid(void);
+
+#define	SMB_LOG_LINE_SZ		256
+
+typedef uint32_t	smb_log_hdl_t;
+
+typedef struct smb_log_item {
+	list_node_t	li_lnd;
+	char		li_msg[SMB_LOG_LINE_SZ];
+} smb_log_item_t;
+
+typedef struct smb_log {
+	smb_log_hdl_t	l_handle;
+	int		l_cnt;
+	int		l_max_cnt;
+	mutex_t		l_mtx;
+	list_t		l_list;
+	char		l_file[MAXPATHLEN];
+} smb_log_t;
+
+typedef struct smb_loglist_item {
+	list_node_t	lli_lnd;
+	smb_log_t	lli_log;
+} smb_loglist_item_t;
+
+typedef struct smb_loglist {
+	mutex_t		ll_mtx;
+	list_t		ll_list;
+} smb_loglist_t;
+
+smb_log_hdl_t smb_log_create(int, char *);
+void smb_log(smb_log_hdl_t, int, const char *, ...);
+void smb_log_dumpall(void);
 
 #ifdef	__cplusplus
 }

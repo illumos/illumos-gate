@@ -197,14 +197,12 @@ static void smb_shr_unpublish(const char *, const char *);
  */
 static uint32_t smb_shr_lookup(char *, smb_share_t *);
 static uint32_t smb_shr_add_transient(char *, char *, char *);
-static void smb_shr_set_oemname(smb_share_t *);
 static int smb_shr_enable_all_privs(void);
-static int smb_shr_expand_subs(char **, smb_share_t *, smb_execsub_info_t *);
+static int smb_shr_expand_subs(char **, smb_share_t *, smb_shr_execinfo_t *);
 static char **smb_shr_tokenize_cmd(char *);
 static void smb_shr_sig_abnormal_term(int);
 static void smb_shr_sig_child(int);
-static void smb_shr_get_exec_info(void);
-static void smb_shr_set_exec_flags(smb_share_t *);
+static int smb_shr_encode(smb_share_t *, nvlist_t **);
 
 /*
  * libshare handle and synchronization
@@ -217,7 +215,6 @@ typedef struct smb_sa_handle {
 
 static smb_sa_handle_t smb_sa_handle;
 
-static int smb_shr_exec_flags;
 static char smb_shr_exec_map[MAXPATHLEN];
 static char smb_shr_exec_unmap[MAXPATHLEN];
 static mutex_t smb_shr_exec_mtx;
@@ -327,7 +324,10 @@ smb_shr_load(void)
 	rc = pthread_create(&load_thr, &tattr, smb_shr_sa_loadall, 0);
 	(void) pthread_attr_destroy(&tattr);
 
-	smb_shr_get_exec_info();
+	(void) mutex_lock(&smb_shr_exec_mtx);
+	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
+	    MAXPATHLEN);
+	(void) mutex_unlock(&smb_shr_exec_mtx);
 
 	return (rc);
 }
@@ -383,7 +383,6 @@ smb_shr_iterate(smb_shriter_t *shi)
 		if ((cached_si = smb_shr_cache_iterate(shi)) != NULL) {
 			share = &shi->si_share;
 			bcopy(cached_si, share, sizeof (smb_share_t));
-			smb_shr_set_exec_flags(share);
 		}
 		smb_shr_cache_unlock();
 	}
@@ -406,6 +405,7 @@ uint32_t
 smb_shr_add(smb_share_t *si)
 {
 	smb_share_t *cached_si;
+	nvlist_t *shrlist;
 	uint32_t status;
 	int rc;
 
@@ -437,16 +437,19 @@ smb_shr_add(smb_share_t *si)
 	/* don't hold the lock across door call */
 	smb_shr_cache_unlock();
 
-	/* call kernel to take a hold on the shared file system */
-	rc = smb_kmod_share(si->shr_path, si->shr_name);
+	if ((rc = smb_shr_encode(si, &shrlist)) == 0) {
+		/* send the share to kernel */
+		rc = smb_kmod_share(shrlist);
+		nvlist_free(shrlist);
 
-	if (rc == 0) {
-		smb_shr_publish(si->shr_name, si->shr_container);
+		if (rc == 0) {
+			smb_shr_publish(si->shr_name, si->shr_container);
 
-		/* If path is ZFS, add the .zfs/shares/<share> entry. */
-		smb_shr_zfs_add(si);
+			/* If path is ZFS, add the .zfs/shares/<share> entry. */
+			smb_shr_zfs_add(si);
 
-		return (NERR_Success);
+			return (NERR_Success);
+		}
 	}
 
 	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) == NERR_Success) {
@@ -472,9 +475,9 @@ uint32_t
 smb_shr_remove(char *sharename)
 {
 	smb_share_t *si;
-	char path[MAXPATHLEN];
 	char container[MAXPATHLEN];
 	boolean_t dfsroot;
+	nvlist_t *shrlist;
 
 	assert(sharename != NULL);
 
@@ -507,8 +510,8 @@ smb_shr_remove(char *sharename)
 	 * to remove before cleanup of cache occurs.
 	 */
 	smb_shr_zfs_remove(si);
+	(void) smb_shr_encode(si, &shrlist);
 
-	(void) strlcpy(path, si->shr_path, sizeof (path));
 	(void) strlcpy(container, si->shr_container, sizeof (container));
 	dfsroot = ((si->shr_flags & SMB_SHRF_DFSROOT) != 0);
 	smb_shr_cache_delent(sharename);
@@ -517,7 +520,10 @@ smb_shr_remove(char *sharename)
 	smb_shr_unpublish(sharename, container);
 
 	/* call kernel to release the hold on the shared file system */
-	(void) smb_kmod_unshare(path, sharename);
+	if (shrlist != NULL) {
+		(void) smb_kmod_unshare(shrlist);
+		nvlist_free(shrlist);
+	}
 
 	if (dfsroot)
 		dfs_namespace_unload(sharename);
@@ -536,6 +542,7 @@ smb_shr_rename(char *from_name, char *to_name)
 	smb_share_t *from_si;
 	smb_share_t to_si;
 	uint32_t status;
+	nvlist_t *shrlist;
 
 	assert((from_name != NULL) && (to_name != NULL));
 
@@ -575,6 +582,16 @@ smb_shr_rename(char *from_name, char *to_name)
 
 	smb_shr_cache_delent(from_name);
 	smb_shr_cache_unlock();
+
+	if (smb_shr_encode(from_si, &shrlist) == 0) {
+		(void) smb_kmod_unshare(shrlist);
+		nvlist_free(shrlist);
+
+		if (smb_shr_encode(&to_si, &shrlist) == 0) {
+			(void) smb_kmod_share(shrlist);
+			nvlist_free(shrlist);
+		}
+	}
 
 	smb_shr_unpublish(from_name, to_si.shr_container);
 	smb_shr_publish(to_name, to_si.shr_container);
@@ -621,6 +638,7 @@ smb_shr_modify(smb_share_t *new_si)
 	boolean_t adc_changed = B_FALSE;
 	char old_container[MAXPATHLEN];
 	uint32_t access, flag;
+	nvlist_t *shrlist;
 
 	assert(new_si != NULL);
 
@@ -687,6 +705,16 @@ smb_shr_modify(smb_share_t *new_si)
 
 	smb_shr_cache_unlock();
 
+	if (smb_shr_encode(si, &shrlist) == 0) {
+		(void) smb_kmod_unshare(shrlist);
+		nvlist_free(shrlist);
+
+		if (smb_shr_encode(new_si, &shrlist) == 0) {
+			(void) smb_kmod_share(shrlist);
+			nvlist_free(shrlist);
+		}
+	}
+
 	if (adc_changed) {
 		smb_shr_unpublish(new_si->shr_name, old_container);
 		smb_shr_publish(new_si->shr_name, new_si->shr_container);
@@ -732,29 +760,30 @@ smb_shr_exists(char *sharename)
  * needed.  If x is wildcard (< 0) then check to see if the other
  * values are a match. If a match, that wins.
  *
- * ipv6 is wide open for now, see smb_chk_hostaccess
+ * ipv6 is wide open (returns SMB_SHRF_ACC_OPEN) for now until the underlying
+ * functions support ipv6.
  */
-void
-smb_shr_hostaccess(smb_share_t *si, smb_inaddr_t *ipaddr)
+uint32_t
+smb_shr_hostaccess(smb_inaddr_t *ipaddr, char *none_list, char *ro_list,
+    char *rw_list, uint32_t flag)
 {
-	int acc = SMB_SHRF_ACC_OPEN;
+	uint32_t acc = SMB_SHRF_ACC_NONE;
+	int none = 0;
+	int ro = 0;
+	int rw = 0;
 
-	/*
-	 * Check to see if there area any share level access
-	 * restrictions.
-	 */
-	if ((!smb_inet_iszero(ipaddr)) &&
-	    (si->shr_flags & SMB_SHRF_ACC_ALL) != 0) {
-		int none = SMB_SHRF_ACC_OPEN;
-		int rw = SMB_SHRF_ACC_OPEN;
-		int ro = SMB_SHRF_ACC_OPEN;
+	if (!smb_inet_iszero(ipaddr)) {
 
-		if (si->shr_flags & SMB_SHRF_ACC_NONE)
-			none = smb_chk_hostaccess(ipaddr, si->shr_access_none);
-		if (si->shr_flags & SMB_SHRF_ACC_RW)
-			rw = smb_chk_hostaccess(ipaddr, si->shr_access_rw);
-		if (si->shr_flags & SMB_SHRF_ACC_RO)
-			ro = smb_chk_hostaccess(ipaddr, si->shr_access_ro);
+		if (ipaddr->a_family == AF_INET6)
+			return (SMB_SHRF_ACC_OPEN);
+
+		if ((flag & SMB_SHRF_ACC_NONE) != 0)
+			none = smb_chk_hostaccess(ipaddr, none_list);
+		if ((flag & SMB_SHRF_ACC_RO) != 0)
+			ro = smb_chk_hostaccess(ipaddr, ro_list);
+		if ((flag & SMB_SHRF_ACC_RW) != 0)
+			rw = smb_chk_hostaccess(ipaddr, rw_list);
+
 		/* make first pass to get basic value */
 		if (none != 0)
 			acc = SMB_SHRF_ACC_NONE;
@@ -784,7 +813,8 @@ smb_shr_hostaccess(smb_share_t *si, smb_inaddr_t *ipaddr)
 				acc = SMB_SHRF_ACC_RO;
 		}
 	}
-	si->shr_access_value = acc;	/* return access here */
+
+	return (acc);
 }
 
 /*
@@ -995,7 +1025,7 @@ smb_shr_list(int offset, smb_shrlist_t *list)
  * Returns 0 on success.  Otherwise non-zero for errors.
  */
 int
-smb_shr_exec(char *share, smb_execsub_info_t *subs, int exec_type)
+smb_shr_exec(smb_shr_execinfo_t *subs)
 {
 	char cmd[MAXPATHLEN], **cmd_tokens, *path, *ptr;
 	pid_t child_pid;
@@ -1003,18 +1033,18 @@ smb_shr_exec(char *share, smb_execsub_info_t *subs, int exec_type)
 	struct sigaction pact, cact;
 	smb_share_t si;
 
-	if (smb_shr_get(share, &si) != 0)
+	if (smb_shr_get(subs->e_sharename, &si) != 0)
 		return (-1);
 
 	*cmd = '\0';
 
 	(void) mutex_lock(&smb_shr_exec_mtx);
 
-	switch (exec_type) {
-	case SMB_SHR_MAP:
+	switch (subs->e_type) {
+	case SMB_EXEC_MAP:
 		(void) strlcpy(cmd, smb_shr_exec_map, sizeof (cmd));
 		break;
-	case SMB_SHR_UNMAP:
+	case SMB_EXEC_UNMAP:
 		(void) strlcpy(cmd, smb_shr_exec_unmap, sizeof (cmd));
 		break;
 	default:
@@ -1146,7 +1176,6 @@ smb_shr_lookup(char *sharename, smb_share_t *si)
 		cached_si = smb_shr_cache_findent(sharename);
 		if (cached_si != NULL) {
 			bcopy(cached_si, si, sizeof (smb_share_t));
-			smb_shr_set_exec_flags(si);
 			status = NERR_Success;
 		}
 
@@ -1186,50 +1215,6 @@ smb_shr_add_transient(char *name, char *cmnt, char *path)
 	}
 
 	return (status);
-}
-
-/*
- * smb_shr_set_oemname
- *
- * Generate the OEM name for the specified share.  If the name is
- * shorter than 13 bytes the oemname will be saved in si->shr_oemname.
- * Otherwise si->shr_oemname will be empty and SMB_SHRF_LONGNAME will
- * be set in si->shr_flags.
- */
-static void
-smb_shr_set_oemname(smb_share_t *si)
-{
-	smb_wchar_t *unibuf;
-	char *oem_name;
-	int length;
-
-	length = strlen(si->shr_name) + 1;
-
-	oem_name = malloc(length);
-	unibuf = malloc(length * sizeof (smb_wchar_t));
-	if ((oem_name == NULL) || (unibuf == NULL)) {
-		free(oem_name);
-		free(unibuf);
-		return;
-	}
-
-	(void) smb_mbstowcs(unibuf, si->shr_name, length);
-
-	if (ucstooem(oem_name, unibuf, length, OEM_CPG_850) == 0)
-		(void) strcpy(oem_name, si->shr_name);
-
-	free(unibuf);
-
-	if (strlen(oem_name) + 1 > SMB_SHARE_OEMNAME_MAX) {
-		si->shr_flags |= SMB_SHRF_LONGNAME;
-		*si->shr_oemname = '\0';
-	} else {
-		si->shr_flags &= ~SMB_SHRF_LONGNAME;
-		(void) strlcpy(si->shr_oemname, oem_name,
-		    SMB_SHARE_OEMNAME_MAX);
-	}
-
-	free(oem_name);
 }
 
 /*
@@ -1407,17 +1392,16 @@ smb_shr_cache_addent(smb_share_t *si)
 	if ((cache_ent = malloc(sizeof (smb_share_t))) == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	bcopy(si, cache_ent, sizeof (smb_share_t));
-
-	(void) smb_strlwr(cache_ent->shr_name);
-	smb_shr_set_oemname(cache_ent);
+	(void) smb_strlwr(si->shr_name);
 
 	if ((si->shr_type & STYPE_IPC) == 0)
-		cache_ent->shr_type = STYPE_DISKTREE;
-	cache_ent->shr_type |= smb_shr_is_special(cache_ent->shr_name);
+		si->shr_type = STYPE_DISKTREE;
+	si->shr_type |= smb_shr_is_special(cache_ent->shr_name);
 
 	if (smb_shr_is_admin(cache_ent->shr_name))
-		cache_ent->shr_flags |= SMB_SHRF_ADMIN;
+		si->shr_flags |= SMB_SHRF_ADMIN;
+
+	bcopy(si, cache_ent, sizeof (smb_share_t));
 
 	if (si->shr_flags & SMB_SHRF_AUTOHOME)
 		cache_ent->shr_refcnt = 1;
@@ -2251,7 +2235,7 @@ smb_shr_tokenize_cmd(char *cmdstr)
  * Returns 0 on success.  Otherwise -1.
  */
 static int
-smb_shr_expand_subs(char **cmd_toks, smb_share_t *si, smb_execsub_info_t *subs)
+smb_shr_expand_subs(char **cmd_toks, smb_share_t *si, smb_shr_execinfo_t *subs)
 {
 	char *fmt, *sub_chr, *ptr;
 	boolean_t unknown;
@@ -2388,46 +2372,76 @@ smb_shr_sig_child(int sig_val)
 }
 
 /*
- *  Gets the exec bit flags for each share.
+ * This is a temporary function which converts the given smb_share_t
+ * structure to the nvlist format that will be provided by libsharev2
  */
-static void
-smb_shr_get_exec_info(void)
+static int
+smb_shr_encode(smb_share_t *si, nvlist_t **nvlist)
 {
-	char buf[MAXPATHLEN];
+	nvlist_t *list;
+	nvlist_t *share;
+	nvlist_t *smb;
+	char *csc;
+	int rc = 0;
 
-	(void) mutex_lock(&smb_shr_exec_mtx);
+	*nvlist = NULL;
 
-	smb_shr_exec_flags = 0;
+	if ((rc = nvlist_alloc(&list, NV_UNIQUE_NAME, 0)) != 0)
+		return (rc);
 
-	*smb_shr_exec_map = '\0';
-	(void) smb_config_getstr(SMB_CI_MAP, smb_shr_exec_map,
-	    sizeof (smb_shr_exec_map));
-	if (*smb_shr_exec_map != '\0')
-		smb_shr_exec_flags |= SMB_SHRF_MAP;
+	if ((rc = nvlist_alloc(&share, NV_UNIQUE_NAME, 0)) != 0) {
+		nvlist_free(list);
+		return (rc);
+	}
 
-	*smb_shr_exec_unmap = '\0';
-	(void) smb_config_getstr(SMB_CI_UNMAP, smb_shr_exec_unmap,
-	    sizeof (smb_shr_exec_unmap));
-	if (*smb_shr_exec_unmap != '\0')
-		smb_shr_exec_flags |= SMB_SHRF_UNMAP;
+	if ((rc = nvlist_alloc(&smb, NV_UNIQUE_NAME, 0)) != 0) {
+		nvlist_free(share);
+		nvlist_free(list);
+		return (rc);
+	}
 
-	*buf = '\0';
-	(void) smb_config_getstr(SMB_CI_DISPOSITION, buf, sizeof (buf));
-	if (*buf != '\0')
-		if (strcasecmp(buf, SMB_SHR_DISP_TERM_STR) == 0)
-			smb_shr_exec_flags |= SMB_SHRF_DISP_TERM;
+	/* global share properties */
+	rc |= nvlist_add_string(share, "name", si->shr_name);
+	rc |= nvlist_add_string(share, "path", si->shr_path);
+	rc |= nvlist_add_string(share, "desc", si->shr_cmnt);
 
-	(void) mutex_unlock(&smb_shr_exec_mtx);
-}
+	/* smb protocol properties */
+	rc = nvlist_add_string(smb, SHOPT_AD_CONTAINER, si->shr_container);
+	if ((si->shr_flags & SMB_SHRF_ACC_NONE) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_NONE, si->shr_access_none);
+	if ((si->shr_flags & SMB_SHRF_ACC_RO) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_RO, si->shr_access_ro);
+	if ((si->shr_flags & SMB_SHRF_ACC_RW) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_RW, si->shr_access_rw);
 
-/*
- *  Sets the exec bit flags for each share.
- */
-static void
-smb_shr_set_exec_flags(smb_share_t *si)
-{
-	(void) mutex_lock(&smb_shr_exec_mtx);
-	si->shr_flags &= ~SMB_SHRF_EXEC_MASK;
-	si->shr_flags |= smb_shr_exec_flags;
-	(void) mutex_unlock(&smb_shr_exec_mtx);
+	if ((si->shr_flags & SMB_SHRF_ABE) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_ABE, "true");
+	if ((si->shr_flags & SMB_SHRF_CATIA) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_CATIA, "true");
+	if ((si->shr_flags & SMB_SHRF_GUEST_OK) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_GUEST, "true");
+	if ((si->shr_flags & SMB_SHRF_DFSROOT) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_DFSROOT, "true");
+
+	if ((si->shr_flags & SMB_SHRF_AUTOHOME) != 0) {
+		rc |= nvlist_add_string(smb, "Autohome", "true");
+		rc |= nvlist_add_uint32(smb, "uid", si->shr_uid);
+		rc |= nvlist_add_uint32(smb, "gid", si->shr_gid);
+	}
+
+	if ((csc = smb_shr_sa_csc_name(si)) != NULL)
+		rc |= nvlist_add_string(smb, SHOPT_CSC, csc);
+
+	rc |= nvlist_add_nvlist(share, "smb", smb);
+	rc |= nvlist_add_nvlist(list, si->shr_name, share);
+
+	nvlist_free(share);
+	nvlist_free(smb);
+
+	if (rc != 0)
+		nvlist_free(list);
+	else
+		*nvlist = list;
+
+	return (rc);
 }

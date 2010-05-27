@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -32,7 +32,6 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_token.h>
 
@@ -239,9 +238,9 @@ lsa_enum_trusted_domains(char *server, char *domain,
 	enum_context = 0;
 
 	status = lsar_enum_trusted_domains(&domain_handle, &enum_context, info);
-	if (status == NT_STATUS_NO_MORE_DATA) {
+	if (status == NT_STATUS_NO_MORE_ENTRIES) {
 		/*
-		 * NT_STATUS_NO_MORE_DATA indicates that we
+		 * STATUS_NO_MORE_ENTRIES indicates that we
 		 * have all of the available information.
 		 */
 		status = NT_STATUS_SUCCESS;
@@ -279,9 +278,9 @@ lsa_enum_trusted_domains_ex(char *server, char *domain,
 
 	status = lsar_enum_trusted_domains_ex(&domain_handle, &enum_context,
 	    info);
-	if (status == NT_STATUS_NO_MORE_DATA) {
+	if (status == NT_STATUS_NO_MORE_ENTRIES) {
 		/*
-		 * NT_STATUS_NO_MORE_DATA indicates that we
+		 * STATUS_NO_MORE_ENTRIES indicates that we
 		 * have all of the available information.
 		 */
 		status = NT_STATUS_SUCCESS;

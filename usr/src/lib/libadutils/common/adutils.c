@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <alloca.h>
@@ -56,6 +55,8 @@ static adutils_query_state_t	*qstatehead = NULL;
 static char *adutils_sid_ber2str(BerValue *bvalues);
 static void adutils_lookup_batch_unlock(adutils_query_state_t **state);
 static void delete_ds(adutils_ad_t *ad, const char *host, int port);
+
+int ad_debug[AD_DEBUG_MAX+1] = {0};
 
 typedef struct binary_attrs {
 	const char	*name;
@@ -1702,4 +1703,11 @@ domain_eq(const char *a, const char *b)
 
 	return (u8_strcmp(a, b, 0, U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err)
 	    == 0 && err == 0);
+}
+
+void
+adutils_set_debug(enum ad_debug item, int value)
+{
+	if (item >= 0 && item <= AD_DEBUG_MAX)
+		ad_debug[item] = value;
 }

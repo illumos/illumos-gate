@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libmlsvc.a
@@ -32,7 +30,7 @@ OBJS_COMMON =		\
 	dssetup_clnt.o	\
 	dssetup_svc.o	\
 	eventlog_svc.o	\
-	eventlog_syslog.o	\
+	eventlog_log.o	\
 	lsalib.o	\
 	lsar_clnt.o	\
 	lsar_svc.o	\

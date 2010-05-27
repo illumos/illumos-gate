@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -195,6 +194,9 @@
  * circuit to the consumer.
  */
 
+#define	SMB_NAME83_BUFLEN	12
+static void smb_name83(const char *, char *, size_t);
+
 /* *** smb_com_search *** */
 
 smb_sdrc_t
@@ -219,6 +221,7 @@ smb_com_search(smb_request_t *sr)
 	uint16_t		key_len;
 	uint32_t		client_key;
 	char			name[SMB_SHORTNAMELEN];
+	char			name83[SMB_SHORTNAMELEN];
 	smb_pathname_t		*pn;
 	unsigned char		resume_char;
 	unsigned char		type;
@@ -328,25 +331,20 @@ smb_com_search(smb_request_t *sr)
 		if ((rc != 0 || (eos == B_TRUE)))
 			break;
 
-		(void) memset(name, ' ', sizeof (name));
 		if (*fileinfo.fi_shortname == '\0') {
-			(void) strlcpy(name, fileinfo.fi_name,
+			(void) strlcpy(fileinfo.fi_shortname, fileinfo.fi_name,
 			    SMB_SHORTNAMELEN - 1);
 			if (to_upper)
-				(void) smb_strupr(name);
-		} else {
-			(void) strlcpy(name, fileinfo.fi_shortname,
-			    SMB_SHORTNAMELEN - 1);
+				(void) smb_strupr(fileinfo.fi_shortname);
 		}
+		smb_name83(fileinfo.fi_shortname, name83, SMB_SHORTNAMELEN);
 
-		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
-		    resume_char,
-		    fileinfo.fi_name83, fileinfo.fi_name83+9,
-		    index, odid, client_key,
+		(void) smb_mbc_encodef(&sr->reply, "b11c.wwlbYl13c",
+		    resume_char, name83, index, odid, client_key,
 		    fileinfo.fi_dosattr & 0xff,
 		    smb_time_gmt_to_local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
-		    name);
+		    fileinfo.fi_shortname);
 
 		smb_odir_save_cookie(od, index, fileinfo.fi_cookie);
 
@@ -404,7 +402,7 @@ smb_com_find(smb_request_t *sr)
 	uint16_t		sattr, odid;
 	uint16_t		key_len;
 	uint32_t		client_key;
-	char			name[SMB_SHORTNAMELEN];
+	char			name83[SMB_SHORTNAMELEN];
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
 	boolean_t		eos;
@@ -477,23 +475,18 @@ smb_com_find(smb_request_t *sr)
 		if ((rc != 0 || (eos == B_TRUE)))
 			break;
 
-		(void) memset(name, ' ', sizeof (name));
 		if (*fileinfo.fi_shortname == '\0') {
-			(void) strlcpy(name, fileinfo.fi_name,
-			    SMB_SHORTNAMELEN - 1);
-		} else {
-			(void) strlcpy(name, fileinfo.fi_shortname,
+			(void) strlcpy(fileinfo.fi_shortname, fileinfo.fi_name,
 			    SMB_SHORTNAMELEN - 1);
 		}
+		smb_name83(fileinfo.fi_shortname, name83, SMB_SHORTNAMELEN);
 
-		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
-		    resume_char,
-		    fileinfo.fi_name83, fileinfo.fi_name83+9,
-		    index, odid, client_key,
+		(void) smb_mbc_encodef(&sr->reply, "b11c.wwlbYl13c",
+		    resume_char, name83, index, odid, client_key,
 		    fileinfo.fi_dosattr & 0xff,
 		    smb_time_gmt_to_local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
-		    name);
+		    fileinfo.fi_shortname);
 
 		smb_odir_save_cookie(od, index, fileinfo.fi_cookie);
 
@@ -618,7 +611,7 @@ smb_com_find_unique(struct smb_request *sr)
 	smb_pathname_t		*pn;
 	unsigned char		resume_char = '\0';
 	uint32_t		client_key = 0;
-	char			name[SMB_SHORTNAMELEN];
+	char			name83[SMB_SHORTNAMELEN];
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
 	boolean_t		eos;
@@ -666,23 +659,18 @@ smb_com_find_unique(struct smb_request *sr)
 		if ((rc != 0 || (eos == B_TRUE)))
 			break;
 
-		(void) memset(name, ' ', sizeof (name));
 		if (*fileinfo.fi_shortname == '\0') {
-			(void) strlcpy(name, fileinfo.fi_name,
-			    SMB_SHORTNAMELEN - 1);
-		} else {
-			(void) strlcpy(name, fileinfo.fi_shortname,
+			(void) strlcpy(fileinfo.fi_shortname, fileinfo.fi_name,
 			    SMB_SHORTNAMELEN - 1);
 		}
+		smb_name83(fileinfo.fi_shortname, name83, SMB_SHORTNAMELEN);
 
-		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
-		    resume_char,
-		    fileinfo.fi_name83, fileinfo.fi_name83+9,
-		    index, odid, client_key,
+		(void) smb_mbc_encodef(&sr->reply, "b11c.wwlbYl13c",
+		    resume_char, name83, index, odid, client_key,
 		    fileinfo.fi_dosattr & 0xff,
 		    smb_time_gmt_to_local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
-		    name);
+		    fileinfo.fi_shortname);
 
 		count++;
 		index++;
@@ -707,4 +695,57 @@ smb_com_find_unique(struct smb_request *sr)
 	}
 
 	return (SDRC_SUCCESS);
+}
+
+/*
+ * smb_name83
+ *
+ * Format the filename for inclusion in the resume key. The filename
+ * returned in the resume key is 11 bytes:
+ * - up to 8 bytes of filename, space padded to 8 bytes
+ * - up to 3 bytes of ext, space padded to 3 bytes
+ *
+ * The name passed to smb_name83 should be a shortname or a name that
+ * doesn't require mangling.
+ *
+ * Examples:
+ *	"fname.txt"    -> "FNAME   TXT"
+ *	"fname.tx"     -> "FNAME   TX "
+ *	"filename"     -> "FILENAME   "
+ *	"filename.txt" -> "FILENAMETXT"
+ *	"FILE~1.TXT"   -> "FILE~1  TXT"
+ */
+static void
+smb_name83(const char *name, char *buf, size_t buflen)
+{
+	const char *p;
+	char *pbuf;
+	int i;
+
+	ASSERT(name && buf && (buflen >= SMB_NAME83_BUFLEN));
+
+	(void) strlcpy(buf, "           ", SMB_NAME83_BUFLEN);
+
+	/* Process "." and ".." up front */
+	if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
+		(void) strncpy(buf, name, strlen(name));
+		return;
+	}
+
+	ASSERT(smb_needs_mangled(name) == B_FALSE);
+
+	/* Process basename */
+	for (i = 0, p = name, pbuf = buf;
+	    (i < SMB_NAME83_BASELEN) && (*p != '\0') && (*p != '.'); ++i)
+		*pbuf++ = *p++;
+
+	/* Process the extension from the last dot in name */
+	if ((p = strchr(name, '.')) != NULL) {
+		++p;
+		pbuf = &buf[SMB_NAME83_BASELEN];
+		for (i = 0; (i < SMB_NAME83_EXTLEN) && (*p != '\0'); ++i)
+			*pbuf++ = *p++;
+	}
+
+	(void) smb_strupr(buf);
 }

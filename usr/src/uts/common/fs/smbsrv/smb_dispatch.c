@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -138,390 +138,335 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_kstat.h>
 #include <sys/sdt.h>
-
-#define	SMB_ALL_DISPATCH_STAT_INCR(stat)	atomic_inc_64(&stat);
-#define	SMB_COM_NUM	256
-
-static kstat_t *smb_dispatch_ksp = NULL;
-static kmutex_t smb_dispatch_ksmtx;
+#include <sys/spl.h>
 
 static int is_andx_com(unsigned char);
 static int smbsr_check_result(struct smb_request *, int, int);
 
-static smb_disp_entry_t	dispatch[SMB_COM_NUM] = {
-	{ SMB_SDT_OPS(create_directory),			/* 0x00 000 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbCreateDirectory", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(delete_directory),			/* 0x01 001 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbDeleteDirectory", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(open),					/* 0x02 002 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbOpen", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(create),					/* 0x03 003 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbCreate", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(close),					/* 0x04 004 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbClose", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(flush),					/* 0x05 005 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbFlush", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(delete),					/* 0x06 006 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbDelete", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(rename),					/* 0x07 007 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbRename", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(query_information),			/* 0x08 008 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbQueryInformation", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(set_information),				/* 0x09 009 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbSetInformation", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(read),					/* 0x0A 010 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbRead", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(write),					/* 0x0B 011 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbWrite", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(lock_byte_range),				/* 0x0C 012 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbLockByteRange", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(unlock_byte_range),			/* 0x0D 013 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbUnlockByteRange", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(create_temporary),			/* 0x0E 014 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbCreateTemporary", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(create_new),				/* 0x0F 015 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbCreateNew",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(check_directory),				/* 0x10 016 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbCheckDirectory", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(process_exit),				/* 0x11 017 */
-	    PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
-	    { "SmbProcessExit", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(seek),					/* 0x12 018 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbSeek", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(lock_and_read),				/* 0x13 019 */
-	    LANMAN1_0, 0,
-	    { "SmbLockAndRead", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(write_and_unlock),			/* 0x14 020 */
-	    LANMAN1_0, 0,
-	    { "SmbWriteAndUnlock", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x15 021 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x16 022 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x17 023 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x18 024 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x19 025 */
-	{ SMB_SDT_OPS(read_raw),				/* 0x1A 026 */
-	    LANMAN1_0, 0,
-	    { "SmbReadRaw", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x1B 027 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x1C 028 */
-	{ SMB_SDT_OPS(write_raw),				/* 0x1D 029 */
-	    LANMAN1_0, 0,
-	    { "SmbWriteRaw", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x1E 030 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x1F 031 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x20 032 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x21 033 */
-	{ SMB_SDT_OPS(set_information2),			/* 0x22 034 */
-	    LANMAN1_0, 0,
-	    { "SmbSetInformation2", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(query_information2),			/* 0x23 035 */
-	    LANMAN1_0, 0,
-	    { "SmbQueryInformation2",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(locking_andx),				/* 0x24 036 */
-	    LANMAN1_0, 0,
-	    { "SmbLockingX", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(transaction),				/* 0x25 037 */
-	    LANMAN1_0, 0,
-	    { "SmbTransaction", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(transaction_secondary),			/* 0x26 038 */
-	    LANMAN1_0, 0,
-	    { "SmbTransactionSecondary", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(ioctl),					/* 0x27 039 */
-	    LANMAN1_0, 0,
-	    { "SmbIoctl", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x28 040 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x29 041 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x2A 042 */
-	{ SMB_SDT_OPS(echo),					/* 0x2B 043 */
-	    LANMAN1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
-	    { "SmbEcho", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(write_and_close),				/* 0x2C 044 */
-	    LANMAN1_0, 0,
-	    { "SmbWriteAndClose", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(open_andx),				/* 0x2D 045 */
-	    LANMAN1_0, 0,
-	    { "SmbOpenX", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(read_andx),				/* 0x2E 046 */
-	    LANMAN1_0, 0,
-	    { "SmbReadX", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(write_andx),				/* 0x2F 047 */
-	    LANMAN1_0, 0,
-	    { "SmbWriteX",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x30 048 */
-	{ SMB_SDT_OPS(close_and_tree_disconnect),		/* 0x31 049 */
-	    LANMAN1_0, 0,
-	    { "SmbCloseAndTreeDisconnect", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(transaction2),				/* 0x32 050 */
-	    LM1_2X002, 0,
-	    { "SmbTransaction2", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(transaction2_secondary),			/* 0x33 051 */
-	    LM1_2X002, 0,
-	    { "SmbTransaction2Secondary", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(find_close2),				/* 0x34 052 */
-	    LM1_2X002, 0,
-	    { "SmbFindClose2", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x35 053 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x36 054 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x37 055 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x38 056 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x39 057 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x3A 058 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x3B 059 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x3C 060 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x3D 061 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x3E 062 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x3F 063 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x40 064 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x41 065 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x42 066 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x43 067 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x44 068 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x45 069 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x46 070 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x47 071 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x48 072 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x49 073 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x4A 074 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x4B 075 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x4C 076 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x4D 077 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x4E 078 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x4F 079 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x50 080 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x51 081 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x52 082 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x53 083 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x54 084 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x55 085 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x56 086 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x57 087 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x58 088 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x59 089 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x5A 090 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x5B 091 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x5C 092 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x5D 093 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x5E 094 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x5F 095 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x60 096 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x61 097 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x62 098 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x63 099 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x64 100 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x65 101 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x66 102 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x67 103 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x68 104 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x69 105 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x6A 106 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x6B 107 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x6C 108 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x6D 109 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x6E 110 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x6F 111 */
-	{ SMB_SDT_OPS(tree_connect),				/* 0x70 112 */
-	    PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID,
-	    { "SmbTreeConnect", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(tree_disconnect),				/* 0x71 113 */
-	    PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
-	    { "SmbTreeDisconnect", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(negotiate),				/* 0x72 114 */
-	    PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
-	    { "SmbNegotiate", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(session_setup_andx),			/* 0x73 115 */
-	    LANMAN1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
-	    { "SmbSessionSetupX",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(logoff_andx),				/* 0x74 116 */
-	    LM1_2X002, SDDF_SUPPRESS_TID,
-	    { "SmbLogoffX", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(tree_connect_andx),			/* 0x75 117 */
-	    LANMAN1_0, SDDF_SUPPRESS_TID,
-	    { "SmbTreeConnectX", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x76 118 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x77 119 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x78 120 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x79 121 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x7A 122 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x7B 123 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x7C 124 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x7D 125 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x7E 126 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x7F 127 */
-	{ SMB_SDT_OPS(query_information_disk),			/* 0x80 128 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbQueryInformationDisk", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(search),					/* 0x81 129 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbSearch", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(find),					/* 0x82 130 */
-	    LANMAN1_0, 0,
-	    { "SmbFind", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(find_unique),				/* 0x83 131 */
-	    LANMAN1_0, 0,
-	    { "SmbFindUnique", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(find_close),				/* 0x84 132 */
-	    LANMAN1_0, 0,
-	    { "SmbFindClose", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x85 133 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x86 134 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x87 135 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x88 136 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x89 137 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x8A 138 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x8B 139 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x8C 140 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x8D 141 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x8E 142 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x8F 143 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x90 144 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x91 145 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x92 146 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x93 147 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x94 148 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x95 149 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x96 150 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x97 151 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x98 152 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x99 153 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x9A 154 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x9B 155 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x9C 156 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x9D 157 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x9E 158 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0x9F 159 */
-	{ SMB_SDT_OPS(nt_transact),				/* 0xA0 160 */
-	    NT_LM_0_12, 0,
-	    { "SmbNtTransact",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(nt_transact_secondary),			/* 0xA1 161 */
-	    NT_LM_0_12, 0,
-	    { "SmbNtTransactSecondary",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(nt_create_andx),				/* 0xA2 162 */
-	    NT_LM_0_12, 0,
-	    { "SmbNtCreateX",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA3 163 */
-	{ SMB_SDT_OPS(nt_cancel),				/* 0xA4 164 */
-	    NT_LM_0_12, 0,
-	    { "SmbNtCancel",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(nt_rename),				/* 0xA5 165 */
-	    NT_LM_0_12, 0,
-	    { "SmbNtRename",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA6 166 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA7 167 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA8 168 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA9 169 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xAA 170 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xAB 171 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xAC 172 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xAD 173 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xAE 174 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xAF 175 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB0 176 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB1 177 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB2 178 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB3 179 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB4 180 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB5 181 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB6 182 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB7 183 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB8 184 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xB9 185 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xBA 186 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xBB 187 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xBC 188 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xBD 189 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xBE 190 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xBF 191 */
-	{ SMB_SDT_OPS(open_print_file),				/* 0xC0 192 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbOpenPrintFile", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(write_print_file),			/* 0xC1 193 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbWritePrintFile", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(close_print_file),			/* 0xC2 194 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbClosePrintFile", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(get_print_queue),				/* 0xC3 195 */
-	    PC_NETWORK_PROGRAM_1_0, 0,
-	    { "SmbGetPrintQueue", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xC4 196 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xC5 197 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xC6 198 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xC7 199 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xC8 200 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xC9 201 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xCA 202 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xCB 203 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xCC 204 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xCD 205 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xCE 206 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xCF 207 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD0 208 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD1 209 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD2 210 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD3 211 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD4 212 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD5 213 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD6 214 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD7 215 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD8 216 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xD9 217 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xDA 218 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xDB 219 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xDC 220 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xDD 221 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xDE 222 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xDF 223 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE0 224 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE1 225 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE2 226 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE3 227 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE4 228 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE5 229 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE6 230 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE7 231 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE8 232 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xE9 233 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xEA 234 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xEB 235 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xEC 236 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xED 237 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xEE 238 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xEF 239 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF0 240 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF1 241 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF2 242 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF3 243 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF4 244 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF5 245 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF6 246 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF7 247 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF8 248 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xF9 249 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xFA 250 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xFB 251 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xFC 252 */
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xFD 253 */
-	{ SMB_SDT_OPS(invalid), LANMAN1_0, 0,			/* 0xFE 254 */
-	    { "SmbInvalidCommand", KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 }			/* 0xFF 255 */
+static smb_disp_entry_t	smb_disp_table[SMB_COM_NUM] = {
+	{ "SmbCreateDirectory", SMB_SDT_OPS(create_directory),  /* 0x00 000 */
+	    0x00, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbDeleteDirectory", SMB_SDT_OPS(delete_directory),	/* 0x01 001 */
+	    0x01, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbOpen", SMB_SDT_OPS(open),				/* 0x02 002 */
+	    0x02, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbCreate", SMB_SDT_OPS(create),			/* 0x03 003 */
+	    0x03, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbClose", SMB_SDT_OPS(close),			/* 0x04 004 */
+	    0x04, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbFlush", SMB_SDT_OPS(flush),			/* 0x05 005 */
+	    0x05, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbDelete", SMB_SDT_OPS(delete),			/* 0x06 006 */
+	    0x06, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbRename", SMB_SDT_OPS(rename),			/* 0x07 007 */
+	    0x07, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbQueryInformation", SMB_SDT_OPS(query_information), /* 0x08 008 */
+	    0x08, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbSetInformation", SMB_SDT_OPS(set_information),	/* 0x09 009 */
+	    0x09, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbRead", SMB_SDT_OPS(read),				/* 0x0A 010 */
+	    0x0A, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbWrite", SMB_SDT_OPS(write),			/* 0x0B 011 */
+	    0x0B, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbLockByteRange", SMB_SDT_OPS(lock_byte_range),	/* 0x0C 012 */
+	    0x0C, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbUnlockByteRange", SMB_SDT_OPS(unlock_byte_range),	/* 0x0D 013 */
+	    0x0D, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbCreateTemporary", SMB_SDT_OPS(create_temporary),	/* 0x0E 014 */
+	    0x0E, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbCreateNew", SMB_SDT_OPS(create_new),		/* 0x0F 015 */
+	    0x0F, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbCheckDirectory", SMB_SDT_OPS(check_directory),	/* 0x10 016 */
+	    0x10, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbProcessExit", SMB_SDT_OPS(process_exit),		/* 0x11 017 */
+	    0x11, PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
+	    0, 0, { 0 } },
+	{ "SmbSeek", SMB_SDT_OPS(seek),				/* 0x12 018 */
+	    0x12, PC_NETWORK_PROGRAM_1_0 },
+	{ "SmbLockAndRead", SMB_SDT_OPS(lock_and_read),		/* 0x13 019 */
+	    0x13, LANMAN1_0 },
+	{ "SmbWriteAndUnlock", SMB_SDT_OPS(write_and_unlock),	/* 0x14 020 */
+	    0x14, LANMAN1_0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x15, 0 },		/* 0x15	021 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x16, 0 },		/* 0x16 022 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x17, 0 },		/* 0x17 023 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x18, 0 },		/* 0x18 024 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x19, 0 },		/* 0x19 025 */
+	{ "SmbReadRaw", SMB_SDT_OPS(read_raw),			/* 0x1A 026 */
+	    0x1A, LANMAN1_0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x1B, 0 },		/* 0x1B 027 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x1C, 0 },		/* 0x1C 028 */
+	{ "SmbWriteRaw", SMB_SDT_OPS(write_raw),		/* 0x1D 029 */
+	    0x1D, LANMAN1_0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x1E, 0 },		/* 0x1E 030 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x1F, 0 },		/* 0x1F 031 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x20, 0 },		/* 0x20 032 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x21, 0 },		/* 0x21 033 */
+	{ "SmbSetInformation2", SMB_SDT_OPS(set_information2),	/* 0x22 034 */
+	    0x22, LANMAN1_0 },
+	{ "SmbQueryInformation2",
+	    SMB_SDT_OPS(query_information2),			/* 0x23 035 */
+	    0x23, LANMAN1_0 },
+	{ "SmbLockingX", SMB_SDT_OPS(locking_andx),		/* 0x24 036 */
+	    0x24, LANMAN1_0 },
+	{ "SmbTransaction", SMB_SDT_OPS(transaction),		/* 0x25 037 */
+	    0x25, LANMAN1_0 },
+	{ "SmbTransactionSecondary",
+	    SMB_SDT_OPS(transaction_secondary),			/* 0x26 038 */
+	    0x26, LANMAN1_0 },
+	{ "SmbIoctl", SMB_SDT_OPS(ioctl),			/* 0x27 039 */
+	    0x27, LANMAN1_0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x28, 0 },	/* 0x28 040 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x29, 0 },	/* 0x29 041 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x2A, 0 },	/* 0x2A 042 */
+	{ "SmbEcho", SMB_SDT_OPS(echo),				/* 0x2B 043 */
+	    0x2B, LANMAN1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID },
+	{ "SmbWriteAndClose", SMB_SDT_OPS(write_and_close),	/* 0x2C 044 */
+	    0x2C, LANMAN1_0 },
+	{ "SmbOpenX", SMB_SDT_OPS(open_andx),			/* 0x2D 045 */
+	    0x2D, LANMAN1_0 },
+	{ "SmbReadX", SMB_SDT_OPS(read_andx),			/* 0x2E 046 */
+	    0x2E, LANMAN1_0 },
+	{ "SmbWriteX", SMB_SDT_OPS(write_andx),			/* 0x2F 047 */
+	    0x2F, LANMAN1_0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x30, 0 },	/* 0x30 048 */
+	{ "SmbCloseAndTreeDisconnect",
+	    SMB_SDT_OPS(close_and_tree_disconnect),		/* 0x31 049 */
+	    0x31, LANMAN1_0 },
+	{ "SmbTransaction2", SMB_SDT_OPS(transaction2),		/* 0x32 050 */
+	    0x32, LM1_2X002 },
+	{ "SmbTransaction2Secondary",
+	    SMB_SDT_OPS(transaction2_secondary),		/* 0x33 051 */
+	    0x33, LM1_2X002 },
+	{ "SmbFindClose2", SMB_SDT_OPS(find_close2),		/* 0x34 052 */
+	    0x34, LM1_2X002 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x35, 0 },	/* 0x35 053 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x36, 0 },	/* 0x36 054 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x37, 0 },	/* 0x37 055 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x38, 0 },	/* 0x38 056 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x39, 0 },	/* 0x39 057 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x3A, 0 },	/* 0x3A 058 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x3B, 0 },	/* 0x3B 059 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x3C, 0 },	/* 0x3C 060 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x3D, 0 },	/* 0x3D 061 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x3E, 0 },	/* 0x3E 062 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x3F, 0 },	/* 0x3F 063 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x40, 0 },	/* 0x40 064 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x47, 0 },	/* 0x47 065 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x48, 0 },	/* 0x48 066 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x49, 0 },	/* 0x49 067 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x44, 0 },	/* 0x44 068 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x45, 0 },	/* 0x45 069 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x46, 0 },	/* 0x46 070 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x47, 0 },	/* 0x47 071 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x48, 0 },	/* 0x48 072 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x49, 0 },	/* 0x49 073 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x4A, 0 },	/* 0x4A 074 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x4B, 0 },	/* 0x4B 075 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x4C, 0 },	/* 0x4C 076 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x4D, 0 },	/* 0x4D 077 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x4E, 0 },	/* 0x4E 078 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x4F, 0 },	/* 0x4F 079 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x50, 0 },	/* 0x50 080 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x51, 0 },	/* 0x51 081 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x52, 0 },	/* 0x52 082 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x53, 0 },	/* 0x53 083 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x54, 0 },	/* 0x54 084 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x55, 0 },	/* 0x55 085 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x56, 0 },	/* 0x56 086 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x57, 0 },	/* 0x57 087 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x58, 0 },	/* 0x58 088 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x59, 0 },	/* 0x59 089 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x5A, 0 },	/* 0x5A 090 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x5B, 0 },	/* 0x5B 091 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x5C, 0 },	/* 0x5C 092 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x5D, 0 },	/* 0x5D 093 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x5E, 0 },	/* 0x5E 094 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x5F, 0 },	/* 0x5F 095 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x60, 0 },	/* 0x60 096 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x61, 0 },	/* 0x61 097 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x62, 0 },	/* 0x62 098 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x63, 0 },	/* 0x63 099 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x64, 0 },	/* 0x64 100 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x65, 0 },	/* 0x65 101 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x66, 0 },	/* 0x66 102 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x67, 0 },	/* 0x67 103 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x68, 0 },	/* 0x68 104 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x69, 0 },	/* 0x69 105 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x6A, 0 },	/* 0x6A 106 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x6B, 0 },	/* 0x6B 107 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x6C, 0 },	/* 0x6C 108 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x6D, 0 },	/* 0x6D 109 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x6E, 0 },	/* 0x6E 110 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x6F, 0 },	/* 0x6F 111 */
+	{ "SmbTreeConnect", SMB_SDT_OPS(tree_connect),		/* 0x70 112 */
+	    0x70, PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID },
+	{ "SmbTreeDisconnect", SMB_SDT_OPS(tree_disconnect),	/* 0x71 113 */
+	    0x71, PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
+	    NULL },
+	{ "SmbNegotiate", SMB_SDT_OPS(negotiate),		/* 0x72 114 */
+	    0x72, PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
+	    NULL },
+	{ "SmbSessionSetupX", SMB_SDT_OPS(session_setup_andx),	/* 0x73 115 */
+	    0x73, LANMAN1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID },
+	{ "SmbLogoffX", SMB_SDT_OPS(logoff_andx),		/* 0x74 116 */
+	    0x74, LM1_2X002, SDDF_SUPPRESS_TID },
+	{ "SmbTreeConnectX", SMB_SDT_OPS(tree_connect_andx),	/* 0x75 117 */
+	    0x75, LANMAN1_0, SDDF_SUPPRESS_TID },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x76, 0, 0 },	/* 0x76 118 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x77, 0, 0 },	/* 0x77 119 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x78, 0, 0 },	/* 0x78 120 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x79, 0, 0 },	/* 0x79 121 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x7A, 0, 0 },	/* 0x7A 122 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x7B, 0, 0 },	/* 0x7B 123 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x7C, 0, 0 },	/* 0x7C 124 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x7D, 0, 0 },	/* 0x7D 125 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x7E, 0, 0 },	/* 0x7E 126 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x7F, 0, 0 },	/* 0x7F 127 */
+	{ "SmbQueryInformationDisk",
+	    SMB_SDT_OPS(query_information_disk),		/* 0x80 128 */
+	    0x80, PC_NETWORK_PROGRAM_1_0, 0 },
+	{ "SmbSearch", SMB_SDT_OPS(search),			/* 0x81 129 */
+	    0x81, PC_NETWORK_PROGRAM_1_0, 0 },
+	{ "SmbFind", SMB_SDT_OPS(find),				/* 0x82 130 */
+	    0x82, LANMAN1_0, 0 },
+	{ "SmbFindUnique", SMB_SDT_OPS(find_unique),		/* 0x83 131 */
+	    0x83, LANMAN1_0, 0 },
+	{ "SmbFindClose", SMB_SDT_OPS(find_close),		/* 0x84 132 */
+	    0x84, LANMAN1_0, 0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x85, 0, 0 },	/* 0x85 133 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x86, 0, 0 },	/* 0x86 134 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x87, 0, 0 },	/* 0x87 135 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x88, 0, 0 },	/* 0x88 136 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x89, 0, 0 },	/* 0x89 137 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x8A, 0, 0 },	/* 0x8A 138 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x8B, 0, 0 },	/* 0x8B 139 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x8C, 0, 0 },	/* 0x8C 140 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x8D, 0, 0 },	/* 0x8D 141 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x8E, 0, 0 },	/* 0x8E 142 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x8F, 0, 0 },	/* 0x8F 143 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x90, 0, 0 },	/* 0x90 144 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x91, 0, 0 },	/* 0x91 145 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x92, 0, 0 },	/* 0x92 146 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x93, 0, 0 },	/* 0x93 147 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x94, 0, 0 },	/* 0x94 148 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x95, 0, 0 },	/* 0x95 149 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x96, 0, 0 },	/* 0x96 150 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x97, 0, 0 },	/* 0x97 151 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x98, 0, 0 },	/* 0x98 152 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x99, 0, 0 },	/* 0x99 153 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x9A, 0, 0 },	/* 0x9A 154 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x9B, 0, 0 },	/* 0x9B 155 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x9C, 0, 0 },	/* 0x9C 156 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x9D, 0, 0 },	/* 0x9D 157 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x9E, 0, 0 },	/* 0x9E 158 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0x9F, 0, 0 },	/* 0x9F 159 */
+	{ "SmbNtTransact", SMB_SDT_OPS(nt_transact),	/* 0xA0 160 */
+	    0xA0, NT_LM_0_12, 0 },
+	{ "SmbNtTransactSecondary",
+	    SMB_SDT_OPS(nt_transact_secondary),			/* 0xA1 161 */
+	    0xA1, NT_LM_0_12, 0 },
+	{ "SmbNtCreateX", SMB_SDT_OPS(nt_create_andx),		/* 0xA2 162 */
+	    0xA2, NT_LM_0_12, 0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xA3, 0, 0 },	/* 0xA3 163 */
+	{ "SmbNtCancel", SMB_SDT_OPS(nt_cancel),		/* 0xA4 164 */
+	    0xA4, NT_LM_0_12, 0 },
+	{ "SmbNtRename", SMB_SDT_OPS(nt_rename),		/* 0xA5 165 */
+	    0xA5, NT_LM_0_12, 0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xA6, 0, 0 },	/* 0xA6 166 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xA7, 0, 0 },	/* 0xA7 167 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xA8, 0, 0 },	/* 0xA8 168 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xA9, 0, 0 },	/* 0xA9 169 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xAA, 0, 0 },	/* 0xAA 170 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xAB, 0, 0 },	/* 0xAB 171 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xAC, 0, 0 },	/* 0xAC 172 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xAD, 0, 0 },	/* 0xAD 173 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xAE, 0, 0 },	/* 0xAE 174 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xAF, 0, 0 },	/* 0xAF 175 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB0, 0, 0 },	/* 0xB0 176 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB1, 0, 0 },	/* 0xB1 177 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB2, 0, 0 },	/* 0xB2 178 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB3, 0, 0 },	/* 0xB3 179 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB4, 0, 0 },	/* 0xB4 180 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB5, 0, 0 },	/* 0xB5 181 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB6, 0, 0 },	/* 0xB6 182 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB7, 0, 0 },	/* 0xB7 183 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB8, 0, 0 },	/* 0xB8 184 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xB9, 0, 0 },	/* 0xB9 185 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xBA, 0, 0 },	/* 0xBA 186 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xBB, 0, 0 },	/* 0xBB 187 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xBC, 0, 0 },	/* 0xBC 188 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xBD, 0, 0 },	/* 0xBD 189 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xBE, 0, 0 },	/* 0xBE 190 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xBF, 0, 0 },	/* 0xBF 191 */
+	{ "SmbOpenPrintFile", SMB_SDT_OPS(open_print_file),	/* 0xC0 192 */
+	    0xC0, PC_NETWORK_PROGRAM_1_0, 0 },
+	{ "SmbWritePrintFile", SMB_SDT_OPS(write_print_file),	/* 0xC1 193 */
+	    0xC1, PC_NETWORK_PROGRAM_1_0, 0 },
+	{ "SmbClosePrintFile", SMB_SDT_OPS(close_print_file),	/* 0xC2 194 */
+	    0xC2, PC_NETWORK_PROGRAM_1_0, 0 },
+	{ "SmbGetPrintQueue", SMB_SDT_OPS(get_print_queue),	/* 0xC3 195 */
+	    0xC3, PC_NETWORK_PROGRAM_1_0, 0 },
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xC4, 0, 0 },	/* 0xC4 196 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xC5, 0, 0 },	/* 0xC5 197 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xC6, 0, 0 },	/* 0xC6 198 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xC7, 0, 0 },	/* 0xC7 199 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xC8, 0, 0 },	/* 0xC8 200 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xC9, 0, 0 },	/* 0xC9 201 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xCA, 0, 0 },	/* 0xCA 202 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xCB, 0, 0 },	/* 0xCB 203 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xCC, 0, 0 },	/* 0xCC 204 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xCD, 0, 0 },	/* 0xCD 205 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xCE, 0, 0 },	/* 0xCE 206 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xCF, 0, 0 },	/* 0xCF 207 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD0, 0, 0 },	/* 0xD0 208 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD1, 0, 0 },	/* 0xD1 209 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD2, 0, 0 },	/* 0xD2 210 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD3, 0, 0 },	/* 0xD3 211 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD4, 0, 0 },	/* 0xD4 212 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD5, 0, 0 },	/* 0xD5 213 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD6, 0, 0 },	/* 0xD6 214 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD7, 0, 0 },	/* 0xD7 215 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD8, 0, 0 },	/* 0xD8 216 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xD9, 0, 0 },	/* 0xD9 217 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xDA, 0, 0 },	/* 0xDA 218 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xDB, 0, 0 },	/* 0xDB 219 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xDC, 0, 0 },	/* 0xDC 220 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xDD, 0, 0 },	/* 0xDD 221 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xDE, 0, 0 },	/* 0xDE 222 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xDF, 0, 0 },	/* 0xDF 223 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE0, 0, 0 },	/* 0xE0 224 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE1, 0, 0 },	/* 0xE1 225 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE2, 0, 0 },	/* 0xE2 226 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE3, 0, 0 },	/* 0xE3 227 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE4, 0, 0 },	/* 0xE4 228 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE5, 0, 0 },	/* 0xE5 229 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE6, 0, 0 },	/* 0xE6 230 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE7, 0, 0 },	/* 0xE7 231 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE8, 0, 0 },	/* 0xE8 232 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xE9, 0, 0 },	/* 0xE9 233 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xEA, 0, 0 },	/* 0xEA 234 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xEB, 0, 0 },	/* 0xEB 235 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xEC, 0, 0 },	/* 0xEC 236 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xED, 0, 0 },	/* 0xED 237 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xEE, 0, 0 },	/* 0xEE 238 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xEF, 0, 0 },	/* 0xEF 239 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF0, 0, 0 },	/* 0xF0 240 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF1, 0, 0 },	/* 0xF1 241 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF2, 0, 0 },	/* 0xF2 242 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF3, 0, 0 },	/* 0xF3 243 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF4, 0, 0 },	/* 0xF4 244 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF5, 0, 0 },	/* 0xF5 245 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF6, 0, 0 },	/* 0xF6 246 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF7, 0, 0 },	/* 0xF7 247 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF8, 0, 0 },	/* 0xF8 248 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xF9, 0, 0 },	/* 0xF9 249 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xFA, 0, 0 },	/* 0xFA 250 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xFB, 0, 0 },	/* 0xFB 251 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xFC, 0, 0 },	/* 0xFC 252 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xFD, 0, 0 },	/* 0xFD 253 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xFE, 0, 0 },	/* 0xFE 254 */
+	{ "Invalid", SMB_SDT_OPS(invalid), 0xFF, 0, 0 }	/* 0xFF	255 */
 };
 
 /*
@@ -650,7 +595,7 @@ smb_dispatch_request(struct smb_request *sr)
 	}
 
 andx_more:
-	sdd = &dispatch[sr->smb_com];
+	sdd = &smb_disp_table[sr->smb_com];
 	ASSERT(sdd->sdt_function);
 
 	if (smb_mbc_decodef(&sr->command, "b", &sr->smb_wct) != 0) {
@@ -665,6 +610,10 @@ andx_more:
 		disconnect = B_TRUE;
 		goto report_error;
 	}
+
+	atomic_add_64(&sdd->sdt_rxb,
+	    (int64_t)(sr->smb_wct * 2 + sr->smb_bcc + 1));
+	sr->sr_txb = sr->reply.chain_offset;
 
 	/*
 	 * Ignore smb_bcc if CAP_LARGE_READX/CAP_LARGE_WRITEX
@@ -761,14 +710,7 @@ andx_more:
 	}
 	smb_rwx_rwexit(&session->s_lock);
 
-	/*
-	 * Increment method invocation count. This value is exposed
-	 * via kstats, and it represents a count of all the dispatched
-	 * requests, including the ones that have a return value, other
-	 * than SDRC_SUCCESS.
-	 */
-	SMB_ALL_DISPATCH_STAT_INCR(sdd->sdt_dispatch_stats.value.ui64);
-
+	sr->sr_time_start = gethrtime();
 	if ((sdrc = (*sdd->sdt_pre_op)(sr)) == SDRC_SUCCESS)
 		sdrc = (*sdd->sdt_function)(sr);
 
@@ -776,6 +718,10 @@ andx_more:
 		(*sdd->sdt_post_op)(sr);
 		smbsr_cleanup(sr);
 	}
+	smb_latency_add_sample(&sdd->sdt_lat, gethrtime() - sr->sr_time_start);
+
+	atomic_add_64(&sdd->sdt_txb,
+	    (int64_t)(sr->reply.chain_offset - sr->sr_txb));
 
 	if (sdrc != SDRC_SUCCESS) {
 		/*
@@ -977,8 +923,14 @@ smbsr_decode_data(struct smb_request *sr, char *fmt, ...)
 	return (rc);
 }
 
+boolean_t
+smbsr_decode_data_avail(smb_request_t *sr)
+{
+	return (sr->smb_data.chain_offset < sr->smb_data.max_bytes);
+}
+
 void
-smbsr_send_reply(struct smb_request *sr)
+smbsr_send_reply(smb_request_t *sr)
 {
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		sr->smb_flg |= SMB_FLAGS_CASE_INSENSITIVE;
@@ -1002,6 +954,7 @@ smbsr_send_reply(struct smb_request *sr)
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED)
 		smb_sign_reply(sr, NULL);
 
+	smb_server_inc_req(sr->session->s_server);
 	if (smb_session_send(sr->session, 0, &sr->reply) == 0)
 		sr->reply.chain = 0;
 }
@@ -1054,7 +1007,6 @@ smbsr_map_errno(int errnum, smb_error_t *err)
 
 	for (i = 0; i < sizeof (smb_errno_map)/sizeof (smb_errno_map[0]); ++i) {
 		if (smb_errno_map[i].errnum == errnum) {
-			err->severity = ERROR_SEVERITY_ERROR;
 			err->status   = smb_errno_map[i].status32;
 			err->errcls   = smb_errno_map[i].errcls;
 			err->errcode  = smb_errno_map[i].errcode;
@@ -1062,7 +1014,6 @@ smbsr_map_errno(int errnum, smb_error_t *err)
 		}
 	}
 
-	err->severity = ERROR_SEVERITY_ERROR;
 	err->status   = NT_STATUS_INTERNAL_ERROR;
 	err->errcls   = ERRDOS;
 	err->errcode  = ERROR_INTERNAL_ERROR;
@@ -1076,26 +1027,11 @@ smbsr_errno(struct smb_request *sr, int errnum)
 }
 
 /*
- * Report a request processing warning.
+ * Report a request processing status (error or warning).
  */
 void
-smbsr_warn(smb_request_t *sr, DWORD status, uint16_t errcls, uint16_t errcode)
+smbsr_status(smb_request_t *sr, DWORD status, uint16_t errcls, uint16_t errcode)
 {
-	sr->smb_error.severity = ERROR_SEVERITY_WARNING;
-	sr->smb_error.status   = status;
-	sr->smb_error.errcls   = errcls;
-	sr->smb_error.errcode  = errcode;
-
-	smbsr_set_error(sr, &sr->smb_error);
-}
-
-/*
- * Report a request processing error.  This function will not return.
- */
-void
-smbsr_error(smb_request_t *sr, DWORD status, uint16_t errcls, uint16_t errcode)
-{
-	sr->smb_error.severity = ERROR_SEVERITY_ERROR;
 	sr->smb_error.status   = status;
 	sr->smb_error.errcls   = errcls;
 	sr->smb_error.errcode  = errcode;
@@ -1116,14 +1052,12 @@ void
 smbsr_set_error(smb_request_t *sr, smb_error_t *err)
 {
 	uint32_t status;
-	uint32_t severity;
 	uint32_t capabilities;
 
 	ASSERT(sr);
 	ASSERT(err);
 
 	status = err->status;
-	severity = (err->severity == 0) ? ERROR_SEVERITY_ERROR : err->severity;
 	capabilities = sr->session->capabilities;
 
 	if ((err->errcls == 0) && (err->errcode == 0)) {
@@ -1133,7 +1067,6 @@ smbsr_set_error(smb_request_t *sr, smb_error_t *err)
 	}
 
 	if ((capabilities & CAP_STATUS32) && (status != 0)) {
-		status |= severity;
 		sr->smb_rcls = status & 0xff;
 		sr->smb_reh = (status >> 8) & 0xff;
 		sr->smb_err  = status >> 16;
@@ -1240,76 +1173,62 @@ smb_com_invalid(smb_request_t *sr)
 }
 
 /*
- * smb_dispatch_kstat_update
+ * smb_dispatch_stats_init
  *
- * This callback function updates the smb_dispatch_kstat_data when kstat
- * command is invoked.
+ * Initializes dispatch statistics.
  */
-static int
-smb_dispatch_kstat_update(kstat_t *ksp, int rw)
+void
+smb_dispatch_stats_init(smb_kstat_req_t *ksr)
 {
-	smb_disp_entry_t	*sdd;
-	kstat_named_t		*ks_named;
-	int i;
+	int	i;
 
-	if (rw == KSTAT_WRITE)
-		return (EACCES);
+	for (i = 0; i < SMB_COM_NUM; i++, ksr++) {
+		smb_latency_init(&smb_disp_table[i].sdt_lat);
+		(void) strlcpy(ksr->kr_name, smb_disp_table[i].sdt_name,
+		    sizeof (ksr->kr_name));
+	}
+}
 
-	ASSERT(MUTEX_HELD(ksp->ks_lock));
+/*
+ * smb_dispatch_stats_fini
+ *
+ * Frees and destroyes the resources used for statistics.
+ */
+void
+smb_dispatch_stats_fini(void)
+{
+	int	i;
 
-	ks_named = ksp->ks_data;
-	for (i = 0; i < SMB_COM_NUM; i++) {
-		sdd = &dispatch[i];
+	for (i = 0; i < SMB_COM_NUM; i++)
+		smb_latency_destroy(&smb_disp_table[i].sdt_lat);
+}
 
-		if (sdd->sdt_function != smb_com_invalid) {
-			bcopy(&sdd->sdt_dispatch_stats, ks_named,
-			    sizeof (kstat_named_t));
-			++ks_named;
+void
+smb_dispatch_stats_update(smb_kstat_req_t *ksr, int first, int nreq)
+{
+	int	i;
+	int	last;
+
+	last = first + nreq - 1;
+
+	if ((first < SMB_COM_NUM) && (last < SMB_COM_NUM))  {
+		for (i = first; i <= last; i++, ksr++) {
+			ksr->kr_rxb = smb_disp_table[i].sdt_rxb;
+			ksr->kr_txb = smb_disp_table[i].sdt_txb;
+			mutex_enter(&smb_disp_table[i].sdt_lat.ly_mutex);
+			ksr->kr_nreq = smb_disp_table[i].sdt_lat.ly_a_nreq;
+			ksr->kr_sum = smb_disp_table[i].sdt_lat.ly_a_sum;
+			ksr->kr_a_mean = smb_disp_table[i].sdt_lat.ly_a_mean;
+			ksr->kr_a_stddev =
+			    smb_disp_table[i].sdt_lat.ly_a_stddev;
+			ksr->kr_d_mean = smb_disp_table[i].sdt_lat.ly_d_mean;
+			ksr->kr_d_stddev =
+			    smb_disp_table[i].sdt_lat.ly_d_stddev;
+			smb_disp_table[i].sdt_lat.ly_d_mean = 0;
+			smb_disp_table[i].sdt_lat.ly_d_nreq = 0;
+			smb_disp_table[i].sdt_lat.ly_d_stddev = 0;
+			smb_disp_table[i].sdt_lat.ly_d_sum = 0;
+			mutex_exit(&smb_disp_table[i].sdt_lat.ly_mutex);
 		}
-	}
-
-	return (0);
-}
-
-/*
- * smb_dispatch_kstat_init
- *
- * Initialize dispatch kstats.
- */
-void
-smb_dispatch_kstat_init(void)
-{
-	int ks_ndata;
-	int i;
-
-	for (i = 0, ks_ndata = 0; i < SMB_COM_NUM; i++) {
-		if (dispatch[i].sdt_function != smb_com_invalid)
-			ks_ndata++;
-	}
-
-	smb_dispatch_ksp = kstat_create(SMBSRV_KSTAT_MODULE, 0,
-	    SMBSRV_KSTAT_NAME_CMDS, SMBSRV_KSTAT_CLASS,
-	    KSTAT_TYPE_NAMED, ks_ndata, 0);
-
-	if (smb_dispatch_ksp) {
-		mutex_init(&smb_dispatch_ksmtx, NULL, MUTEX_DEFAULT, NULL);
-		smb_dispatch_ksp->ks_update = smb_dispatch_kstat_update;
-		smb_dispatch_ksp->ks_lock = &smb_dispatch_ksmtx;
-		kstat_install(smb_dispatch_ksp);
-	}
-}
-
-/*
- * smb_dispatch_kstat_fini
- *
- * Remove dispatch kstats.
- */
-void
-smb_dispatch_kstat_fini(void)
-{
-	if (smb_dispatch_ksp != NULL) {
-		kstat_delete(smb_dispatch_ksp);
-		mutex_destroy(&smb_dispatch_ksmtx);
-		smb_dispatch_ksp = NULL;
 	}
 }

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -748,14 +747,6 @@ smbadm_group_create(int argc, char **argv)
 		smbadm_usage(B_FALSE);
 	}
 
-	if (getgrnam(gname) == NULL) {
-		(void) fprintf(stderr,
-		    gettext("failed to get the Solaris group '%s'\n"), gname);
-		(void) fprintf(stderr,
-		    gettext("use 'groupadd' to add '%s'\n"), gname);
-		return (1);
-	}
-
 	status = smb_lgrp_add(gname, desc);
 	if (status != SMB_LGRP_SUCCESS) {
 		(void) fprintf(stderr,
@@ -992,14 +983,6 @@ smbadm_group_rename(int argc, char **argv)
 	if (optind >= argc || ngname == NULL || *ngname == '\0') {
 		(void) fprintf(stderr, gettext("missing new group name\n"));
 		smbadm_usage(B_FALSE);
-	}
-
-	if (getgrnam(ngname) == NULL) {
-		(void) fprintf(stderr,
-		    gettext("failed to get the Solaris group '%s'\n"), ngname);
-		(void) fprintf(stderr,
-		    gettext("use 'groupadd' to add '%s'\n"), ngname);
-		return (1);
 	}
 
 	status = smb_lgrp_rename(gname, ngname);

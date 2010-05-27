@@ -18,10 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
 /*
  * SMB: locking_andx
  *
@@ -281,7 +282,8 @@ smb_com_locking_andx(smb_request_t *sr)
 	 * implement this)
 	 */
 	if (lock_type & LOCKING_ANDX_CHANGE_LOCK_TYPE) {
-		smbsr_error(sr, 0, ERRDOS, ERRnoatomiclocks);
+		smbsr_error(sr, 0, ERRDOS,
+		    ERROR_ATOMIC_LOCKS_NOT_SUPPORTED);
 		return (SDRC_ERROR);
 	}
 
@@ -320,7 +322,7 @@ smb_com_locking_andx(smb_request_t *sr)
 			    offset64, length64);
 			if (result != NT_STATUS_SUCCESS) {
 				smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
-				    ERRDOS, ERRnotlocked);
+				    ERRDOS, ERROR_NOT_LOCKED);
 				return (SDRC_ERROR);
 			}
 		}
@@ -353,7 +355,7 @@ smb_com_locking_andx(smb_request_t *sr)
 			    (uint64_t)offset32, (uint64_t)length32);
 			if (result != NT_STATUS_SUCCESS) {
 				smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
-				    ERRDOS, ERRnotlocked);
+				    ERRDOS, ERROR_NOT_LOCKED);
 				return (SDRC_ERROR);
 			}
 		}

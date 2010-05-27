@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright 1990 by the Massachusetts Institute of Technology.
@@ -82,20 +81,20 @@ smb_kinit(char *principal_name, char *principal_passwd)
 
 	code = krb5_init_context(&ctx);
 	if (code) {
-		doing = "initializing context";
+		doing = "smbns_krb: initializing context";
 		goto cleanup;
 	}
 
 	code = krb5_cc_default(ctx, &cc);
 	if (code != 0) {
-		doing = "resolve default credentials cache";
+		doing = "smbns_krb: resolve default credentials cache";
 		goto cleanup;
 	}
 
 	/* Use specified name */
 	code = krb5_parse_name(ctx, principal_name, &me);
 	if (code != 0) {
-		doing = "parsing principal name";
+		doing = "smbns_krb: parsing principal name";
 		goto cleanup;
 	}
 
@@ -103,10 +102,10 @@ smb_kinit(char *principal_name, char *principal_passwd)
 	    principal_passwd, NULL, 0, (krb5_deltat)0,
 	    NULL, NULL);
 	if (code != 0) {
-		doing = "getting initial credentials";
+		doing = "smbns_krb: getting initial credentials";
 
 		if (code == KRB5KRB_AP_ERR_BAD_INTEGRITY) {
-			errmsg = "Password incorrect";
+			errmsg = "smbns_krb: Password incorrect";
 		}
 
 		goto cleanup;
@@ -114,13 +113,13 @@ smb_kinit(char *principal_name, char *principal_passwd)
 
 	code = krb5_cc_initialize(ctx, cc, me);
 	if (code != 0) {
-		doing = "initializing cache";
+		doing = "smbns_krb: initializing cache";
 		goto cleanup;
 	}
 
 	code = krb5_cc_store_cred(ctx, cc, &my_creds);
 	if (code != 0) {
-		doing = "storing credentials";
+		doing = "smbns_krb: storing credentials";
 		goto cleanup;
 	}
 
@@ -129,8 +128,9 @@ smb_kinit(char *principal_name, char *principal_passwd)
 cleanup:
 	if (code != 0) {
 		if (errmsg == NULL)
-			errmsg = error_message(code);
-		syslog(LOG_ERR, "k5_kinit: %s (%s)", doing, errmsg);
+			smb_krb5_log_errmsg(ctx, doing, code);
+		else
+			syslog(LOG_ERR, "%s (%s)", doing, errmsg);
 	}
 
 	if (my_creds.client == me) {
@@ -146,6 +146,19 @@ cleanup:
 		krb5_free_context(ctx);
 
 	return (code == 0);
+}
+
+/*
+ * Invoke krb5_get_error_message() to generate a richer error message.
+ */
+void
+smb_krb5_log_errmsg(krb5_context ctx, const char *prefix, krb5_error_code code)
+{
+	const char *msg;
+
+	msg = krb5_get_error_message(ctx, code);
+	syslog(LOG_ERR, "%s (%s)", prefix, msg);
+	krb5_free_error_message(ctx, msg);
 }
 
 /*
@@ -176,5 +189,6 @@ void
 smb_ccache_remove(char *path)
 {
 	if ((remove(path) < 0) && (errno != ENOENT))
-		syslog(LOG_ERR, "failed to remove ccache (%s)", path);
+		syslog(LOG_ERR, "smbns_krb: failed to remove ccache (%s)",
+		    path);
 }

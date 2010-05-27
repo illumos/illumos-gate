@@ -101,6 +101,20 @@
 #define	SMB_ADS_ENC_AES128	8
 #define	SMB_ADS_ENC_AES256	16
 
+static krb5_enctype w2k8enctypes[] = {
+    ENCTYPE_AES256_CTS_HMAC_SHA1_96,
+    ENCTYPE_AES128_CTS_HMAC_SHA1_96,
+    ENCTYPE_ARCFOUR_HMAC,
+    ENCTYPE_DES_CBC_CRC,
+    ENCTYPE_DES_CBC_MD5,
+};
+
+static krb5_enctype pre_w2k8enctypes[] = {
+    ENCTYPE_ARCFOUR_HMAC,
+    ENCTYPE_DES_CBC_CRC,
+    ENCTYPE_DES_CBC_MD5,
+};
+
 #define	SMB_ADS_ATTR_SAMACCT	"sAMAccountName"
 #define	SMB_ADS_ATTR_UPN	"userPrincipalName"
 #define	SMB_ADS_ATTR_SPN	"servicePrincipalName"
@@ -197,8 +211,6 @@ static int smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *, int, char *);
 static krb5_kvno smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *, char *);
 static int smb_ads_gen_machine_passwd(char *, size_t);
 static void smb_ads_free_cached_host(void);
-static int smb_ads_get_spnset(char *, char **);
-static void smb_ads_free_spnset(char **);
 static int smb_ads_alloc_attr(LDAPMod **, int);
 static void smb_ads_free_attr(LDAPMod **);
 static int smb_ads_get_dc_level(smb_ads_handle_t *);
@@ -214,6 +226,7 @@ static boolean_t smb_ads_is_same_domain(char *, char *);
 static boolean_t smb_ads_is_pdc_configured(void);
 static smb_ads_host_info_t *smb_ads_dup_host_info(smb_ads_host_info_t *);
 static char *smb_ads_get_sharedn(const char *, const char *, const char *);
+static krb5_enctype *smb_ads_get_enctypes(int, int *);
 
 /*
  * smb_ads_init
@@ -1276,43 +1289,6 @@ smb_ads_free_attr(LDAPMod *attrs[])
 }
 
 /*
- * smb_ads_get_spnset
- *
- * Derives the core set of SPNs based on the FQHN.
- * The spn_set is a null-terminated array of char pointers.
- *
- * Returns 0 upon success. Otherwise, returns -1.
- */
-static int
-smb_ads_get_spnset(char *fqhost, char **spn_set)
-{
-	int i;
-
-	bzero(spn_set, (SMBKRB5_SPN_IDX_MAX + 1) * sizeof (char *));
-	for (i = 0; i < SMBKRB5_SPN_IDX_MAX; i++) {
-		if ((spn_set[i] = smb_krb5_get_spn(i, fqhost)) == NULL) {
-			smb_ads_free_spnset(spn_set);
-			return (-1);
-		}
-	}
-
-	return (0);
-}
-
-/*
- * smb_ads_free_spnset
- *
- * Free the memory allocated for the set of SPNs.
- */
-static void
-smb_ads_free_spnset(char **spn_set)
-{
-	int i;
-	for (i = 0; spn_set[i]; i++)
-		free(spn_set[i]);
-}
-
-/*
  * Returns share DN in an allocated buffer.  The format of the DN is
  * cn=<sharename>,<container RDNs>,<domain DN>
  *
@@ -1799,17 +1775,17 @@ static int
 smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 {
 	LDAPMod *attrs[SMB_ADS_COMPUTER_NUM_ATTR];
-	char *sam_val[2], *usr_val[2];
-	char *spn_set[SMBKRB5_SPN_IDX_MAX + 1], *ctl_val[2], *fqh_val[2];
+	char *sam_val[2];
+	char *ctl_val[2], *fqh_val[2];
 	char *encrypt_val[2];
 	int j = -1;
 	int ret, usrctl_flags = 0;
 	char sam_acct[SMB_SAMACCT_MAXLEN];
 	char fqhost[MAXHOSTNAMELEN];
-	char *user_principal;
 	char usrctl_buf[16];
 	char encrypt_buf[16];
 	int max;
+	smb_krb5_pn_set_t spn, upn;
 
 	if (smb_getsamaccount(sam_acct, sizeof (sam_acct)) != 0)
 		return (-1);
@@ -1817,14 +1793,14 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	if (smb_ads_getfqhostname(ah, fqhost, MAXHOSTNAMELEN))
 		return (-1);
 
-	if (smb_ads_get_spnset(fqhost, spn_set) != 0)
+	/* The SPN attribute is multi-valued and must be 1 or greater */
+	if (smb_krb5_get_pn_set(&spn, SMB_PN_SPN_ATTR, ah->domain) == 0)
 		return (-1);
 
-	user_principal = smb_krb5_get_upn(spn_set[SMBKRB5_SPN_IDX_HOST],
-	    ah->domain);
-
-	if (user_principal == NULL) {
-		smb_ads_free_spnset(spn_set);
+	/* The UPN attribute is single-valued and cannot be zero */
+	if (smb_krb5_get_pn_set(&upn, SMB_PN_UPN_ATTR, ah->domain) != 1) {
+		smb_krb5_free_pn_set(&spn);
+		smb_krb5_free_pn_set(&upn);
 		return (-1);
 	}
 
@@ -1832,8 +1808,8 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	    - (dclevel >= SMB_ADS_DCLEVEL_W2K8 ?  0 : 1);
 
 	if (smb_ads_alloc_attr(attrs, max) != 0) {
-		free(user_principal);
-		smb_ads_free_spnset(spn_set);
+		smb_krb5_free_pn_set(&spn);
+		smb_krb5_free_pn_set(&upn);
 		return (-1);
 	}
 
@@ -1852,13 +1828,11 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 
 	attrs[++j]->mod_op = op;
 	attrs[j]->mod_type = SMB_ADS_ATTR_UPN;
-	usr_val[0] = user_principal;
-	usr_val[1] = 0;
-	attrs[j]->mod_values = usr_val;
+	attrs[j]->mod_values = upn.s_pns;
 
 	attrs[++j]->mod_op = op;
 	attrs[j]->mod_type = SMB_ADS_ATTR_SPN;
-	attrs[j]->mod_values = spn_set;
+	attrs[j]->mod_values =  spn.s_pns;
 
 	attrs[++j]->mod_op = op;
 	attrs[j]->mod_type = SMB_ADS_ATTR_CTL;
@@ -1911,8 +1885,8 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	}
 
 	smb_ads_free_attr(attrs);
-	free(user_principal);
-	smb_ads_free_spnset(spn_set);
+	smb_krb5_free_pn_set(&spn);
+	smb_krb5_free_pn_set(&upn);
 
 	return (ret);
 }
@@ -2235,7 +2209,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 {
 	smb_ads_handle_t *ah = NULL;
 	krb5_context ctx = NULL;
-	krb5_principal krb5princs[SMBKRB5_SPN_IDX_MAX];
+	krb5_principal *krb5princs = NULL;
 	krb5_kvno kvno;
 	boolean_t des_only, delete = B_TRUE;
 	smb_adjoin_status_t rc = SMB_ADJOIN_SUCCESS;
@@ -2244,24 +2218,8 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	smb_ads_qstat_t qstat;
 	char dn[SMB_ADS_DN_MAX];
 	char *tmpfile;
-
-	/*
-	 * Call library functions that can be used to get
-	 * the list of encryption algorithms available on the system.
-	 * (similar to what 'encrypt -l' CLI does). For now,
-	 * unless someone has modified the configuration of the
-	 * cryptographic framework (very unlikely), the following is the
-	 * list of algorithms available on any system running Nevada
-	 * by default.
-	 */
-	krb5_enctype w2k8enctypes[] = {ENCTYPE_AES256_CTS_HMAC_SHA1_96,
-	    ENCTYPE_AES128_CTS_HMAC_SHA1_96, ENCTYPE_ARCFOUR_HMAC,
-	    ENCTYPE_DES_CBC_CRC, ENCTYPE_DES_CBC_MD5,
-	};
-
-	krb5_enctype pre_w2k8enctypes[] = {ENCTYPE_ARCFOUR_HMAC,
-	    ENCTYPE_DES_CBC_CRC, ENCTYPE_DES_CBC_MD5,
-	};
+	int cnt;
+	smb_krb5_pn_set_t spns;
 
 	krb5_enctype *encptr;
 
@@ -2321,13 +2279,22 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		goto adjoin_cleanup;
 	}
 
-	if (smb_krb5_get_principals(ah->domain, ctx, krb5princs) != 0) {
+	if (smb_krb5_get_pn_set(&spns, SMB_PN_KEYTAB_ENTRY, ah->domain) == 0) {
 		rc = SMB_ADJOIN_ERR_GET_SPNS;
 		goto adjoin_cleanup;
 	}
 
-	if (smb_krb5_setpwd(ctx, krb5princs[SMBKRB5_SPN_IDX_HOST],
-	    machine_passwd) != 0) {
+	if (smb_krb5_get_kprincs(ctx, spns.s_pns, spns.s_cnt, &krb5princs)
+	    != 0) {
+		smb_krb5_free_pn_set(&spns);
+		rc = SMB_ADJOIN_ERR_GET_SPNS;
+		goto adjoin_cleanup;
+	}
+
+	cnt = spns.s_cnt;
+	smb_krb5_free_pn_set(&spns);
+
+	if (smb_krb5_setpwd(ctx, ah->domain, machine_passwd) != 0) {
 		rc = SMB_ADJOIN_ERR_KSETPWD;
 		goto adjoin_cleanup;
 	}
@@ -2365,20 +2332,13 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		goto adjoin_cleanup;
 	}
 
-	if (dclevel >= SMB_ADS_DCLEVEL_W2K8) {
-		num = sizeof (w2k8enctypes) / sizeof (krb5_enctype);
-		encptr = w2k8enctypes;
-	} else {
-		num = sizeof (pre_w2k8enctypes) / sizeof (krb5_enctype);
-		encptr = pre_w2k8enctypes;
-	}
-
 	tmpfile = mktemp(SMBNS_KRB5_KEYTAB_TMP);
 	if (tmpfile == NULL)
 		tmpfile = SMBNS_KRB5_KEYTAB_TMP;
 
-	if (smb_krb5_add_keytab_entries(ctx, krb5princs, tmpfile,
-	    kvno, machine_passwd, encptr, num) != 0) {
+	encptr = smb_ads_get_enctypes(dclevel, &num);
+	if (smb_krb5_kt_populate(ctx, ah->domain, krb5princs, cnt,
+	    tmpfile, kvno, machine_passwd, encptr, num) != 0) {
 		rc = SMB_ADJOIN_ERR_WRITE_KEYTAB;
 		goto adjoin_cleanup;
 	}
@@ -2390,8 +2350,7 @@ adjoin_cleanup:
 
 	if (rc != SMB_ADJOIN_ERR_INIT_KRB_CTX) {
 		if (rc != SMB_ADJOIN_ERR_GET_SPNS)
-			smb_krb5_free_principals(ctx, krb5princs,
-			    SMBKRB5_SPN_IDX_MAX);
+			smb_krb5_free_kprincs(ctx, krb5princs, cnt);
 		smb_krb5_ctx_fini(ctx);
 	}
 
@@ -2677,4 +2636,20 @@ smb_ads_lookup_msdcs(char *fqdn, char *server, char *buf, uint32_t buflen)
 
 	free(hinfo);
 	return (B_TRUE);
+}
+
+static krb5_enctype *
+smb_ads_get_enctypes(int dclevel, int *num)
+{
+	krb5_enctype *encptr;
+
+	if (dclevel >= SMB_ADS_DCLEVEL_W2K8) {
+		*num = sizeof (w2k8enctypes) / sizeof (krb5_enctype);
+		encptr = w2k8enctypes;
+	} else {
+		*num = sizeof (pre_w2k8enctypes) / sizeof (krb5_enctype);
+		encptr = pre_w2k8enctypes;
+	}
+
+	return (encptr);
 }

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * SMB Locking library functions.
@@ -141,7 +140,7 @@ static void smb_oplock_wait(smb_node_t *);
  * done earlier in the calling path.)
  */
 void
-smb_oplock_acquire(smb_node_t *node, smb_ofile_t *of, open_param_t *op)
+smb_oplock_acquire(smb_node_t *node, smb_ofile_t *of, smb_arg_open_t *op)
 {
 	smb_session_t	*session;
 	smb_oplock_t	*ol;
@@ -368,7 +367,8 @@ smb_oplock_release(smb_node_t *node, smb_ofile_t *of)
  * pointer so as to do the session check.
  */
 boolean_t
-smb_oplock_conflict(smb_node_t *node, smb_session_t *session, open_param_t *op)
+smb_oplock_conflict(smb_node_t *node, smb_session_t *session,
+    smb_arg_open_t *op)
 {
 	boolean_t	rb;
 

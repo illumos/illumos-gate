@@ -19,43 +19,48 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#include <sys/types.h>
-#include <sys/fsid.h>
 #include <sys/vfs.h>
-#include <sys/stat.h>
 #include <smbsrv/smb_ktypes.h>
 #include <smbsrv/smb_kproto.h>
 
-static smb_vfs_t *smb_vfs_lookup(smb_server_t *, vnode_t *);
+static smb_vfs_t *smb_vfs_find(smb_export_t *, vfs_t *);
+static void smb_vfs_destroy(smb_export_t *, smb_vfs_t *);
 
 /*
- * smb_vfs_hold
- *
- * Increments the reference count of the fs passed in. If no smb_vfs_t structure
- * has been created yet for the fs passed in it is created.
+ * If a hold on the specified VFS has already been taken
+ * then only increment the reference count of the corresponding
+ * smb_vfs_t structure. If no smb_vfs_t structure has been created
+ * yet for the specified VFS then create one and take a hold on
+ * the VFS.
  */
-boolean_t
-smb_vfs_hold(smb_server_t *sv, vfs_t *vfsp)
+int
+smb_vfs_hold(smb_export_t *se, vfs_t *vfsp)
 {
 	smb_vfs_t	*smb_vfs;
 	vnode_t 	*rootvp;
+	int		rc;
 
-	if ((vfsp == NULL) || VFS_ROOT(vfsp, &rootvp))
-		return (B_FALSE);
+	if (se == NULL || vfsp == NULL)
+		return (EINVAL);
 
-	smb_llist_enter(&sv->sv_vfs_list, RW_WRITER);
-	smb_vfs = smb_vfs_lookup(sv, rootvp);
-	if (smb_vfs) {
+	smb_llist_enter(&se->e_vfs_list, RW_WRITER);
+
+	if ((smb_vfs = smb_vfs_find(se, vfsp)) != NULL) {
+		smb_vfs->sv_refcnt++;
 		DTRACE_PROBE1(smb_vfs_hold_hit, smb_vfs_t *, smb_vfs);
-		smb_llist_exit(&sv->sv_vfs_list);
-		VN_RELE(rootvp);
-		return (B_TRUE);
+		smb_llist_exit(&se->e_vfs_list);
+		return (0);
 	}
-	smb_vfs = kmem_cache_alloc(sv->si_cache_vfs, KM_SLEEP);
+
+	if ((rc = VFS_ROOT(vfsp, &rootvp)) != 0) {
+		smb_llist_exit(&se->e_vfs_list);
+		return (rc);
+	}
+
+	smb_vfs = kmem_cache_alloc(se->e_cache_vfs, KM_SLEEP);
 
 	bzero(smb_vfs, sizeof (smb_vfs_t));
 
@@ -67,10 +72,12 @@ smb_vfs_hold(smb_server_t *sv, vfs_t *vfsp)
 	 * from the VFS_ROOT call above.
 	 */
 	smb_vfs->sv_rootvp = rootvp;
-	smb_llist_insert_head(&sv->sv_vfs_list, smb_vfs);
+
+	smb_llist_insert_head(&se->e_vfs_list, smb_vfs);
 	DTRACE_PROBE1(smb_vfs_hold_miss, smb_vfs_t *, smb_vfs);
-	smb_llist_exit(&sv->sv_vfs_list);
-	return (B_TRUE);
+	smb_llist_exit(&se->e_vfs_list);
+
+	return (0);
 }
 
 /*
@@ -80,34 +87,25 @@ smb_vfs_hold(smb_server_t *sv, vfs_t *vfsp)
  * drops to zero the smb_vfs_t structure associated with the fs is freed.
  */
 void
-smb_vfs_rele(smb_server_t *sv, vfs_t *vfsp)
+smb_vfs_rele(smb_export_t *se, vfs_t *vfsp)
 {
 	smb_vfs_t	*smb_vfs;
-	vnode_t		*rootvp;
 
 	ASSERT(vfsp);
 
-	if (VFS_ROOT(vfsp, &rootvp))
-		return;
-
-	smb_llist_enter(&sv->sv_vfs_list, RW_WRITER);
-	smb_vfs = smb_vfs_lookup(sv, rootvp);
-	DTRACE_PROBE2(smb_vfs_release, smb_vfs_t *, smb_vfs, vnode_t *, rootvp);
-	VN_RELE(rootvp);
+	smb_llist_enter(&se->e_vfs_list, RW_WRITER);
+	smb_vfs = smb_vfs_find(se, vfsp);
+	DTRACE_PROBE1(smb_vfs_release, smb_vfs_t *, smb_vfs)
 	if (smb_vfs) {
-		--smb_vfs->sv_refcnt;
 		ASSERT(smb_vfs->sv_refcnt);
 		if (--smb_vfs->sv_refcnt == 0) {
-			smb_llist_remove(&sv->sv_vfs_list, smb_vfs);
-			smb_llist_exit(&sv->sv_vfs_list);
-			ASSERT(rootvp == smb_vfs->sv_rootvp);
-			VN_RELE(smb_vfs->sv_rootvp);
-			smb_vfs->sv_magic = (uint32_t)~SMB_VFS_MAGIC;
-			kmem_cache_free(sv->si_cache_vfs, smb_vfs);
+			smb_llist_remove(&se->e_vfs_list, smb_vfs);
+			smb_llist_exit(&se->e_vfs_list);
+			smb_vfs_destroy(se, smb_vfs);
 			return;
 		}
 	}
-	smb_llist_exit(&sv->sv_vfs_list);
+	smb_llist_exit(&se->e_vfs_list);
 }
 
 /*
@@ -118,25 +116,22 @@ smb_vfs_rele(smb_server_t *sv, vfs_t *vfsp)
  * Called at driver close time.
  */
 void
-smb_vfs_rele_all(smb_server_t *sv)
+smb_vfs_rele_all(smb_export_t *se)
 {
 	smb_vfs_t	*smb_vfs;
 
-	smb_llist_enter(&sv->sv_vfs_list, RW_WRITER);
-	while ((smb_vfs = smb_llist_head(&sv->sv_vfs_list)) != NULL) {
+	smb_llist_enter(&se->e_vfs_list, RW_WRITER);
+	while ((smb_vfs = smb_llist_head(&se->e_vfs_list)) != NULL) {
 
 		ASSERT(smb_vfs->sv_magic == SMB_VFS_MAGIC);
 		DTRACE_PROBE1(smb_vfs_rele_all_hit, smb_vfs_t *, smb_vfs);
-		smb_llist_remove(&sv->sv_vfs_list, smb_vfs);
-		VN_RELE(smb_vfs->sv_rootvp);
-		kmem_cache_free(sv->si_cache_vfs, smb_vfs);
+		smb_llist_remove(&se->e_vfs_list, smb_vfs);
+		smb_vfs_destroy(se, smb_vfs);
 	}
-	smb_llist_exit(&sv->sv_vfs_list);
+	smb_llist_exit(&se->e_vfs_list);
 }
 
 /*
- * smb_vfs_lookup
- *
  * Goes through the list of smb_vfs_t structure and returns the one matching
  * the vnode passed in. If no match is found a NULL pointer is returned.
  *
@@ -144,64 +139,25 @@ smb_vfs_rele_all(smb_server_t *sv)
  * this function.
  */
 static smb_vfs_t *
-smb_vfs_lookup(smb_server_t *sv, vnode_t *rootvp)
+smb_vfs_find(smb_export_t *se, vfs_t *vfsp)
 {
-	smb_vfs_t	*smb_vfs;
+	smb_vfs_t *smb_vfs;
 
-	smb_vfs = smb_llist_head(&sv->sv_vfs_list);
+	smb_vfs = smb_llist_head(&se->e_vfs_list);
 	while (smb_vfs) {
 		ASSERT(smb_vfs->sv_magic == SMB_VFS_MAGIC);
-		if (smb_vfs->sv_rootvp == rootvp) {
-			smb_vfs->sv_refcnt++;
-			ASSERT(smb_vfs->sv_refcnt);
+		if (smb_vfs->sv_vfsp == vfsp)
 			return (smb_vfs);
-		}
-		smb_vfs = smb_llist_next(&sv->sv_vfs_list, smb_vfs);
+		smb_vfs = smb_llist_next(&se->e_vfs_list, smb_vfs);
 	}
+
 	return (NULL);
 }
 
-/*
- * Returns true if both VFS pointers represent the same mounted
- * file system.  Otherwise returns false.
- */
-boolean_t
-smb_vfs_cmp(vfs_t *vfsp1, vfs_t *vfsp2)
+static void
+smb_vfs_destroy(smb_export_t *se, smb_vfs_t *smb_vfs)
 {
-	fsid_t *fsid1 = &vfsp1->vfs_fsid;
-	fsid_t *fsid2 = &vfsp2->vfs_fsid;
-	boolean_t result = B_FALSE;
-
-	if ((vfsp1 = getvfs(fsid1)) == NULL)
-		return (B_FALSE);
-
-	if ((vfsp2 = getvfs(fsid2)) == NULL) {
-		VFS_RELE(vfsp1);
-		return (B_FALSE);
-	}
-
-	if ((fsid1->val[0] == fsid2->val[0]) &&
-	    (fsid1->val[1] == fsid2->val[1])) {
-		result = B_TRUE;
-	}
-
-	VFS_RELE(vfsp2);
-	VFS_RELE(vfsp1);
-	return (result);
-}
-
-/*
- * Check whether or not a file system is readonly.
- */
-boolean_t
-smb_vfs_is_readonly(vfs_t *vfsp)
-{
-	boolean_t result;
-
-	if (getvfs(&vfsp->vfs_fsid) == NULL)
-		return (B_FALSE);
-
-	result = (vfsp->vfs_flag & VFS_RDONLY);
-	VFS_RELE(vfsp);
-	return (result);
+	VN_RELE(smb_vfs->sv_rootvp);
+	smb_vfs->sv_magic = (uint32_t)~SMB_VFS_MAGIC;
+	kmem_cache_free(se->e_cache_vfs, smb_vfs);
 }

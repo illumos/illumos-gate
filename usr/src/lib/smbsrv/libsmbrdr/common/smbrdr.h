@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMBRDR_H_
@@ -38,6 +37,9 @@
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/wintypes.h>
+
+#define	SMBRDR_LOG_NAME		"smbrdr"
+#define	SMBRDR_LOG_MAXCNT	1024
 
 #define	SMBRDR_REQ_BUFSZ	4096
 
@@ -310,5 +312,7 @@ void smbrdr_sign_unset_key(struct sdb_session *);
 
 void smbrdr_lock_transport(void);
 void smbrdr_unlock_transport(void);
+
+extern smb_log_hdl_t smbrdr_log_hdl;
 
 #endif /* _SMBRDR_H_ */

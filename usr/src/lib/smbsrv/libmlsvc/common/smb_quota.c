@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -34,7 +36,6 @@
 #include <errno.h>
 #include <synch.h>
 #include <smbsrv/smb_xdr.h>
-#include <smbsrv/ntstatus.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smb_idmap.h>
 #include <mlsvc.h>
@@ -494,7 +495,7 @@ smb_quota_query_all(smb_quota_tree_t *qtree, smb_quota_query_t *request,
 	} else if (request->qq_restart) {
 		quota = avl_first(avl_tree);
 		if (quota == NULL)
-			return (NT_STATUS_NO_MORE_DATA);
+			return (NT_STATUS_NO_MORE_ENTRIES);
 	} else {
 		sid_list = &request->qq_sid_list;
 		sid = list_head(sid_list);
@@ -504,7 +505,7 @@ smb_quota_query_all(smb_quota_tree_t *qtree, smb_quota_query_t *request,
 			return (NT_STATUS_INVALID_PARAMETER);
 		quota = AVL_NEXT(avl_tree, quota);
 		if (quota == NULL)
-			return (NT_STATUS_NO_MORE_DATA);
+			return (NT_STATUS_NO_MORE_ENTRIES);
 	}
 
 	if ((request->qq_single) && (request->qq_max_quota > 1))

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -51,7 +52,6 @@
 #include <nss_dbdefs.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/lmerr.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/netrauth.h>
@@ -2959,7 +2959,8 @@ srvsvc_sa_modify(smb_share_t *si, srvsvc_netshare_setinfo_t *info)
 	sa_handle_t handle;
 	sa_share_t share;
 	sa_resource_t resource;
-	boolean_t renamed = B_FALSE;
+	boolean_t renamed = B_FALSE, is_zfs = B_FALSE;
+	nvlist_t *nvl;
 	uint32_t nerr = NERR_Success;
 
 	if ((handle = smb_shr_sa_enter()) == NULL)
@@ -2975,20 +2976,45 @@ srvsvc_sa_modify(smb_share_t *si, srvsvc_netshare_setinfo_t *info)
 		return (NERR_InternalError);
 	}
 
+	if (sa_group_is_zfs(sa_get_parent_group(share))) {
+		is_zfs = B_TRUE;
+		if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
+			smb_shr_sa_exit();
+			return (NERR_InternalError);
+		}
+	}
+
 	if (info->nss_netname != NULL && info->nss_netname[0] != '\0' &&
 	    smb_strcasecmp(info->nss_netname, si->shr_name, 0) != 0) {
-		(void) sa_set_resource_attr(resource, SHOPT_NAME,
-		    info->nss_netname);
+		if (is_zfs)
+			(void) nvlist_add_string(nvl, SHOPT_NAME,
+			    info->nss_netname);
+		else
+			(void) sa_set_resource_attr(resource, SHOPT_NAME,
+			    info->nss_netname);
 		renamed = B_TRUE;
 	}
 
 	if ((info->nss_comment != NULL) &&
 	    (strcmp(info->nss_comment, si->shr_cmnt) != 0)) {
-		(void) sa_set_resource_description(resource, info->nss_comment);
+		if (is_zfs)
+			(void) nvlist_add_string(nvl, SHOPT_DESCRIPTION,
+			    info->nss_comment);
+		else
+			(void) sa_set_resource_description(resource,
+			    info->nss_comment);
 		(void) strlcpy(si->shr_cmnt, info->nss_comment,
 		    SMB_SHARE_CMNT_MAX);
 	}
 
+	if (is_zfs) {
+		if (sa_zfs_setprop(handle, si->shr_path, nvl) != 0) {
+			smb_shr_sa_exit();
+			nvlist_free(nvl);
+			return (NERR_InternalError);
+		}
+		nvlist_free(nvl);
+	}
 	smb_shr_sa_exit();
 
 	if (renamed) {
@@ -3003,12 +3029,12 @@ srvsvc_sa_modify(smb_share_t *si, srvsvc_netshare_setinfo_t *info)
 }
 
 /*
- * Update the share properties.
+ * Sets the share properties.
  *
- * Updates the optionset properties of the share resource.
- * The properties are given as a list of name-value pair.
- * The name argument should be the optionset property name and the value
- * should be a valid value for the specified property.
+ * This method sets share properties. If its a ZFS share, then properties
+ * are set by calling the sa_zfs_setprop method. Else the optionset properties
+ * of the share resource are set.The properties to be set are given as a list
+ * of name-value pair.
  */
 static uint32_t
 srvsvc_sa_setprop(smb_share_t *si, nvlist_t *nvl)
@@ -3034,6 +3060,13 @@ srvsvc_sa_setprop(smb_share_t *si, nvlist_t *nvl)
 	if ((resource = sa_get_share_resource(share, si->shr_name)) == NULL) {
 		sa_fini(handle);
 		return (NERR_InternalError);
+	}
+
+	if (sa_group_is_zfs(sa_get_parent_group(share))) {
+		if (sa_zfs_setprop(handle, si->shr_path, nvl) != 0)
+			nerr = NERR_InternalError;
+		sa_fini(handle);
+		return (nerr);
 	}
 
 	if ((opts = sa_get_optionset(resource, SMB_PROTOCOL_NAME)) == NULL) {
@@ -3082,7 +3115,6 @@ srvsvc_sa_setprop(smb_share_t *si, nvlist_t *nvl)
 	sa_fini(handle);
 	return (nerr);
 }
-
 
 static ndr_stub_table_t srvsvc_stub_table[] = {
 	{ srvsvc_s_NetConnectEnum,	SRVSVC_OPNUM_NetConnectEnum },

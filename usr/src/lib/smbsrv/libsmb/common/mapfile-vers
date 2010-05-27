@@ -109,6 +109,7 @@ SUNWprivate {
 	smb_common_decode;
 	smb_common_encode;
 	smb_config_get;
+	smb_config_get_execinfo;
 	smb_config_get_fg_flag;
 	smb_config_get_localsid;
 	smb_config_get_secmode;
@@ -187,6 +188,7 @@ SUNWprivate {
 	smb_fssd_term;
 	smb_get_dcinfo;
 	smb_get_nameservers;
+	smb_get_txid;
 	smb_getdataset;
 	smb_getdomainname;
 	smb_getfqdomainname;
@@ -265,6 +267,9 @@ SUNWprivate {
 	smb_lgrp_stop;
 	smb_lgrp_strerror;
 	smb_load_kconfig;
+	smb_log;
+	smb_log_create;
+	smb_log_dumpall;
 	smb_logon_decode;
 	smb_logon_free;
 	smb_lookup_name;
@@ -274,7 +279,6 @@ SUNWprivate {
 	smb_mac_inc_seqnum;
 	smb_mac_init;
 	smb_mac_sign;
-	smb_match83;
 	smb_match;
 	smb_match_ci;
 	smb_match_netlogon_seqnum;
@@ -315,8 +319,6 @@ SUNWprivate {
 	smb_nic_getnext;
 	smb_nic_getnum;
 	smb_nic_init;
-	smb_nicmon_start;
-	smb_nicmon_stop;
 	smb_priv_getbyname;
 	smb_priv_getbyvalue;
 	smb_priv_presentable_ids;
@@ -349,6 +351,8 @@ SUNWprivate {
 	smb_sam_grp_cnt;
 	smb_sam_usr_cnt;
 	smb_sam_usr_groups;
+	smb_shr_execinfo_xdr;
+	smb_shr_hostaccess_query_xdr;
 	smb_quota_query_xdr;
 	smb_quota_response_xdr;
 	smb_quota_set_xdr;
@@ -376,8 +380,12 @@ SUNWprivate {
 	smb_sid_splitstr;
 	smb_sid_tostr;
 	smb_sid_type2str;
+	smb_smf_create_service_pgroup;
+	smb_smf_get_boolean_property;
 	smb_smf_maintenance_mode;
 	smb_smf_restart_service;
+	smb_smf_scf_fini;
+	smb_smf_scf_init;
 	smb_stombs;
 	smb_strcasecmp;
 	smb_string_decode;

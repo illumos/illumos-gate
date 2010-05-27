@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_KRB_H
@@ -35,29 +34,64 @@ extern "C" {
 #define	SMBNS_KRB5_KEYTAB	"/etc/krb5/krb5.keytab"
 #define	SMBNS_KRB5_KEYTAB_TMP	"/etc/krb5/krb5.keytab.tmp.XXXXXX"
 
-/* core set of SPNs */
-typedef enum smb_krb5_spn_idx {
-	SMBKRB5_SPN_IDX_HOST = 0,
-	SMBKRB5_SPN_IDX_NFS,
-	SMBKRB5_SPN_IDX_HTTP,
-	SMBKRB5_SPN_IDX_ROOT,
-	SMBKRB5_SPN_IDX_MAX
-} smb_krb5_spn_idx_t;
+#define	SMB_PN_SPN_ATTR			0x0001 /* w/o REALM portion */
+#define	SMB_PN_UPN_ATTR			0x0002 /* w/  REALM */
+#define	SMB_PN_KEYTAB_ENTRY		0x0004 /* w/  REALM */
+#define	SMB_PN_SALT			0x0008 /* w/  REALM */
+
+#define	SMB_PN_SVC_HOST			"host"
+#define	SMB_PN_SVC_NFS			"nfs"
+#define	SMB_PN_SVC_HTTP			"HTTP"
+#define	SMB_PN_SVC_ROOT			"root"
+
+/* Assign an identifier for each principal name format */
+typedef enum smb_krb5_pn_id {
+	SMB_KRB5_PN_ID_SALT,
+	SMB_KRB5_PN_ID_HOST_FQHN,
+	SMB_KRB5_PN_ID_NFS_FQHN,
+	SMB_KRB5_PN_ID_HTTP_FQHN,
+	SMB_KRB5_PN_ID_ROOT_FQHN,
+} smb_krb5_pn_id_t;
+
+/*
+ * A principal name can be constructed based on the following:
+ *
+ * p_id    - identifier for a principal name.
+ * p_svc   - service with which the principal is associated.
+ * p_flags - usage of the principal is identified - whether it can be used as a
+ *           SPN attribute, UPN attribute, or/and keytab entry, etc.
+ */
+typedef struct smb_krb5_pn {
+	smb_krb5_pn_id_t	p_id;
+	char			*p_svc;
+	uint32_t		p_flags;
+} smb_krb5_pn_t;
+
+/*
+ * A set of principal names
+ *
+ * ps_cnt - the number of principal names in the array.
+ * ps_set - An array of principal names terminated with a NULL pointer.
+ */
+typedef struct smb_krb5_pn_set {
+	uint32_t	s_cnt;
+	char		**s_pns;
+} smb_krb5_pn_set_t;
 
 int smb_kinit(char *, char *);
-char *smb_krb5_get_spn(smb_krb5_spn_idx_t idx, char *fqhost);
-char *smb_krb5_get_upn(char *spn, char *domain);
-int smb_krb5_ctx_init(krb5_context *ctx);
-void smb_krb5_ctx_fini(krb5_context ctx);
-int smb_krb5_get_principals(char *domain, krb5_context ctx,
-    krb5_principal *krb5princs);
-void smb_krb5_free_principals(krb5_context ctx, krb5_principal *krb5princs,
-    size_t num);
-int smb_krb5_setpwd(krb5_context ctx, krb5_principal princ, char *passwd);
-int smb_krb5_add_keytab_entries(krb5_context ctx, krb5_principal *princs,
-    char *fname, krb5_kvno kvno, char *passwd, krb5_enctype *enctypes,
-    int enctype_count);
-boolean_t smb_krb5_find_keytab_entries(const char *fqhn, char *fname);
+int smb_krb5_ctx_init(krb5_context *);
+void smb_krb5_ctx_fini(krb5_context);
+int smb_krb5_get_kprincs(krb5_context, char **, size_t, krb5_principal **);
+void smb_krb5_free_kprincs(krb5_context, krb5_principal *, size_t);
+int smb_krb5_setpwd(krb5_context, const char *, char *);
+
+int smb_krb5_kt_populate(krb5_context, const char *, krb5_principal *,
+    int, char *, krb5_kvno, char *, krb5_enctype *, int);
+boolean_t smb_krb5_kt_find(smb_krb5_pn_id_t, const char *, char *);
+
+uint32_t smb_krb5_get_pn_set(smb_krb5_pn_set_t *, uint32_t, char *);
+void smb_krb5_free_pn_set(smb_krb5_pn_set_t *);
+void smb_krb5_log_errmsg(krb5_context, const char *, krb5_error_code);
 
 #ifdef __cplusplus
 }

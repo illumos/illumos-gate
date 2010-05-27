@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -171,6 +171,7 @@ typedef struct ad_disc {
 						/* port array */
 	ad_item_t	site_global_catalog;	/* Directory hostname and */
 						/* port array */
+	int		debug[AD_DEBUG_MAX+1];	/* Debug levels */
 } ad_disc;
 
 
@@ -201,8 +202,6 @@ typedef struct ad_disc {
 
 #define	is_changed(item, num, param) 			\
 	((item)->param_version[num] != (param)->version)
-
-/*LINTLIBRARY*/
 
 /*
  * Function definitions
@@ -312,7 +311,7 @@ ds_dup(const idmap_ad_disc_ds_t *srv)
 	size = (i + 1) * sizeof (idmap_ad_disc_ds_t);
 	new = malloc(size);
 	if (new != NULL)
-		memcpy(new, srv, size);
+		(void) memcpy(new, srv, size);
 	return (new);
 }
 
@@ -367,7 +366,7 @@ td_dup(const ad_disc_trusteddomains_t *td)
 	size = (i + 1) * sizeof (ad_disc_trusteddomains_t);
 	new = malloc(size);
 	if (new != NULL)
-		memcpy(new, td, size);
+		(void) memcpy(new, td, size);
 	return (new);
 }
 
@@ -424,7 +423,7 @@ df_dup(const ad_disc_domainsinforest_t *df)
 	size = (i + 1) * sizeof (ad_disc_domainsinforest_t);
 	new = malloc(size);
 	if (new != NULL)
-		memcpy(new, df, size);
+		(void) memcpy(new, df, size);
 	return (new);
 }
 
@@ -461,13 +460,13 @@ find_subnets()
 		logger(LOG_ERR,
 		    "Failed to find the number of network interfaces (%s)",
 		    strerror(errno));
-		close(sock);
+		(void) close(sock);
 		return (NULL);
 	}
 
 	if (lifn.lifn_count < 1) {
 		logger(LOG_ERR, "No IPv4 network interfaces found");
-		close(sock);
+		(void) close(sock);
 		return (NULL);
 	}
 
@@ -478,7 +477,7 @@ find_subnets()
 
 	if (lifc.lifc_buf == NULL) {
 		logger(LOG_ERR, "Out of memory");
-		close(sock);
+		(void) close(sock);
 		return (NULL);
 	}
 
@@ -486,7 +485,7 @@ find_subnets()
 		logger(LOG_ERR, "Failed to list network interfaces (%s)",
 		    strerror(errno));
 		free(lifc.lifc_buf);
-		close(sock);
+		(void) close(sock);
 		return (NULL);
 	}
 
@@ -494,7 +493,7 @@ find_subnets()
 
 	if ((results = calloc(n + 1, sizeof (ad_subnet_t))) == NULL) {
 		free(lifc.lifc_buf);
-		close(sock);
+		(void) close(sock);
 		return (NULL);
 	}
 
@@ -518,7 +517,7 @@ find_subnets()
 	}
 
 	free(lifc.lifc_buf);
-	close(sock);
+	(void) close(sock);
 
 	return (results);
 }
@@ -690,34 +689,42 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 	/* Search, querydomain or query */
 	if (rrname != NULL) {
 		*rrname = NULL;
+		if (DBG(DNS, 1))  {
+			logger(LOG_DEBUG, "Looking for SRV RRs '%s.*'",
+			    svc_name);
+		}
 		len = res_nsearch(state, svc_name, C_IN, T_SRV,
 		    msg.buf, sizeof (msg.buf));
-		logger(LOG_DEBUG, "Searching DNS for SRV RRs named '%s'",
-		    svc_name);
 		if (len < 0) {
-			logger(LOG_DEBUG, "DNS search for '%s' failed (%s)",
-			    svc_name, hstrerror(state->res_h_errno));
+			if (DBG(DNS, 0)) {
+				logger(LOG_DEBUG,
+				    "DNS search for '%s' failed (%s)",
+				    svc_name, hstrerror(state->res_h_errno));
+			}
 			return (NULL);
 		}
 	} else if (dname != NULL) {
-		logger(LOG_DEBUG,
-		    "Querying DNS for SRV RRs named '%s' for '%s' ",
-		    svc_name, dname);
+		if (DBG(DNS, 1)) {
+			logger(LOG_DEBUG, "Looking for SRV RRs '%s.%s' ",
+			    svc_name, dname);
+		}
 
 		len = res_nquerydomain(state, svc_name, dname, C_IN, T_SRV,
 		    msg.buf, sizeof (msg.buf));
 
 		if (len < 0) {
-			logger(LOG_DEBUG,
-			    "DNS query for '%s' for '%s' failed (%s)",
-			    svc_name, dname, hstrerror(state->res_h_errno));
+			if (DBG(DNS, 0)) {
+				logger(LOG_DEBUG, "DNS: %s.%s: %s",
+				    svc_name, dname,
+				    hstrerror(state->res_h_errno));
+			}
 			return (NULL);
 		}
 	}
 
 	if (len > sizeof (msg.buf)) {
-		logger(LOG_ERR, "DNS query %ib message doesn't fit"
-		    " into %ib buffer",
+		logger(LOG_ERR,
+		    "DNS query %ib message doesn't fit into %ib buffer",
 		    len, sizeof (msg.buf));
 		return (NULL);
 	}
@@ -791,9 +798,13 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 		if (rttl < *ttl)
 			*ttl = rttl;
 
-		logger(LOG_DEBUG, "Found %s %d IN SRV [%d][%d] %s:%d",
-		    namebuf, rttl, srv->priority, srv->weight, srv->host,
-		    srv->port);
+		if (DBG(DNS, 1)) {
+			logger(LOG_DEBUG, "    %s", namebuf);
+			logger(LOG_DEBUG,
+			    "        ttl=%d pri=%d weight=%d %s:%d",
+			    rttl, srv->priority, srv->weight,
+			    srv->host, srv->port);
+		}
 
 		/* 3. move ptr to the end of current record */
 
@@ -835,10 +846,12 @@ ldap_lookup_init(idmap_ad_disc_ds_t *ds)
 	for (i = 0; ds[i].host[0] != '\0'; i++) {
 		ld = ldap_init(ds[i].host, ds[i].port);
 		if (ld == NULL) {
-			logger(LOG_DEBUG, "Couldn't connect to "
-			    "AD DC %s:%d (%s)",
-			    ds[i].host, ds[i].port,
-			    strerror(errno));
+			if (DBG(LDAP, 1)) {
+				logger(LOG_DEBUG,
+				    "Couldn't connect to AD DC %s:%d (%s)",
+				    ds[i].host, ds[i].port,
+				    strerror(errno));
+			}
 			continue;
 		}
 
@@ -869,8 +882,11 @@ ldap_lookup_init(idmap_ad_disc_ds_t *ds)
 		if (rc == LDAP_SUCCESS)
 			break;
 
-		logger(LOG_INFO, "LDAP SASL bind to %s:%d failed (%s)",
-		    ds[i].host, ds[i].port, ldap_err2string(rc));
+		if (DBG(LDAP, 0)) {
+			logger(LOG_INFO, "LDAP: %s:%d: %s",
+			    ds[i].host, ds[i].port, ldap_err2string(rc));
+			ldap_perror(ld, ds[i].host);
+		}
 		(void) ldap_unbind(ld);
 		ld = NULL;
 	}
@@ -956,6 +972,8 @@ ldap_lookup_trusted_domains(LDAP **ld, idmap_ad_disc_ds_t *globalCatalog,
 	int		num = 0;
 	ad_disc_trusteddomains_t *trusted_domains = NULL;
 
+	if (DBG(DISC, 1))
+		logger(LOG_DEBUG, "Looking for trusted domains...");
 
 	if (*ld == NULL)
 		*ld = ldap_lookup_init(globalCatalog);
@@ -967,11 +985,18 @@ ldap_lookup_trusted_domains(LDAP **ld, idmap_ad_disc_ds_t *globalCatalog,
 	attrs[1] = "trustDirection";
 	attrs[2] = NULL;
 
-	/* trustDirection values - inbound = 1 and bidirectional = 3 */
+	/*
+	 * Trust direction values:
+	 * 1 - inbound (they trust us)
+	 * 2 - outbound (we trust them)
+	 * 3 - bidirectional (we trust each other)
+	 */
 	filter = "(&(objectclass=trustedDomain)"
-	    "(|(trustDirection=3)(trustDirection=1)))";
+	    "(|(trustDirection=3)(trustDirection=2)))";
 
 	rc = ldap_search_s(*ld, base_dn, scope, filter, attrs, 0, &results);
+	if (DBG(DISC, 1))
+		logger(LOG_DEBUG, "Trusted domains:");
 	if (rc == LDAP_SUCCESS) {
 		for (entry = ldap_first_entry(*ld, results);
 		    entry != NULL; entry = ldap_next_entry(*ld, entry)) {
@@ -980,6 +1005,10 @@ ldap_lookup_trusted_domains(LDAP **ld, idmap_ad_disc_ds_t *globalCatalog,
 			    *ld, entry, "trustDirection");
 
 			if (partner != NULL && direction != NULL) {
+				if (DBG(DISC, 1)) {
+					logger(LOG_DEBUG, "    %s (%s)",
+					    partner[0], direction[0]);
+				}
 				num++;
 				void *tmp = realloc(trusted_domains,
 				    (num + 1) *
@@ -988,14 +1017,14 @@ ldap_lookup_trusted_domains(LDAP **ld, idmap_ad_disc_ds_t *globalCatalog,
 					free(trusted_domains);
 					ldap_value_free(partner);
 					ldap_value_free(direction);
-					ldap_msgfree(results);
+					(void) ldap_msgfree(results);
 					return (NULL);
 				}
 				trusted_domains = tmp;
 				/* Last element should be zero */
-				memset(&trusted_domains[num], 0,
+				(void) memset(&trusted_domains[num], 0,
 				    sizeof (ad_disc_trusteddomains_t));
-				strcpy(trusted_domains[num - 1].domain,
+				(void) strcpy(trusted_domains[num - 1].domain,
 				    partner[0]);
 				trusted_domains[num - 1].direction =
 				    atoi(direction[0]);
@@ -1008,9 +1037,11 @@ ldap_lookup_trusted_domains(LDAP **ld, idmap_ad_disc_ds_t *globalCatalog,
 	} else if (rc == LDAP_NO_RESULTS_RETURNED) {
 		/* This is not an error - return empty trusted domain */
 		trusted_domains = calloc(1, sizeof (ad_disc_trusteddomains_t));
+		if (DBG(DISC, 1))
+			logger(LOG_DEBUG, "    not found");
 	}
 	if (results != NULL)
-		ldap_msgfree(results);
+		(void) ldap_msgfree(results);
 
 	return (trusted_domains);
 }
@@ -1033,16 +1064,20 @@ ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 	int		nresults;
 	ad_disc_domainsinforest_t *domains = NULL;
 
+	if (DBG(DISC, 2))
+		logger(LOG_DEBUG, "Looking for domains in forest...");
+
 	if (*ld == NULL)
 		*ld = ldap_lookup_init(globalCatalogs);
 
 	if (*ld == NULL)
 		return (NULL);
 
-	logger(LOG_DEBUG, "Looking for domains in forest...");
 	/* Find domains */
 	rc = ldap_search_s(*ld, "", LDAP_SCOPE_SUBTREE,
 	    "(objectClass=Domain)", attrs, 0, &result);
+	if (DBG(DISC, 1))
+		logger(LOG_DEBUG, "Domains in forest:");
 	if (rc != LDAP_SUCCESS)
 		goto err;
 
@@ -1073,7 +1108,7 @@ ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 		if ((sid_str = adutils_sid2txt(&sid)) == NULL)
 			goto err;
 
-		strcpy(domains[ndomains].sid, sid_str);
+		(void) strcpy(domains[ndomains].sid, sid_str);
 		free(sid_str);
 
 		dn = ldap_get_dn(*ld, entry);
@@ -1082,16 +1117,20 @@ ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 		if (name == NULL)
 			goto err;
 
-		strcpy(domains[ndomains].domain, name);
+		(void) strcpy(domains[ndomains].domain, name);
 		free(name);
 
-		logger(LOG_DEBUG, "    found %s", domains[ndomains].domain);
+		if (DBG(DISC, 1))
+			logger(LOG_DEBUG, "    %s", domains[ndomains].domain);
 
 		ndomains++;
 	}
 
-	if (ndomains == 0)
+	if (ndomains == 0) {
+		if (DBG(DISC, 1))
+			logger(LOG_DEBUG, "    not found");
 		goto err;
+	}
 
 	if (ndomains < nresults) {
 		ad_disc_domainsinforest_t *tmp;
@@ -1102,14 +1141,14 @@ ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 	}
 
 	if (result != NULL)
-		ldap_msgfree(result);
+		(void) ldap_msgfree(result);
 
 	return (domains);
 
 err:
 	free(domains);
 	if (result != NULL)
-		ldap_msgfree(result);
+		(void) ldap_msgfree(result);
 	return (NULL);
 }
 
@@ -1134,7 +1173,6 @@ ad_disc_init(void)
 	ctx->site_global_catalog.type = AD_DIRECTORY;
 	return (ctx);
 }
-
 
 void
 ad_disc_fini(ad_disc_t ctx)
@@ -1248,15 +1286,21 @@ validate_DomainName(ad_disc_t ctx)
 
 	/* Try to find our domain by searching for DCs for it */
 	DO_RES_NINIT(ctx);
-	domain_controller = srv_query(&ctx->res_state, LDAP_SRV_HEAD
-	    DC_SRV_TAIL, ctx->domain_name.value, &srvname, &ttl);
+	if (DBG(DISC, 2))
+		logger(LOG_DEBUG, "Looking for our AD domain name...");
+	domain_controller = srv_query(&ctx->res_state,
+	    LDAP_SRV_HEAD DC_SRV_TAIL,
+	    ctx->domain_name.value, &srvname, &ttl);
 
 	/*
 	 * If we can't find DCs by via res_nsearch() then there's no
 	 * point in trying anything else to discover the AD domain name.
 	 */
-	if (domain_controller == NULL)
+	if (domain_controller == NULL) {
+		if (DBG(DISC, 1))
+			logger(LOG_DEBUG, "Can't find our domain name.");
 		return (NULL);
+	}
 
 	free(domain_controller);
 	/*
@@ -1278,6 +1322,8 @@ validate_DomainName(ad_disc_t ctx)
 	if (len > 0 && dname[len - 1] == '.')
 		dname[len - 1] = '\0';
 
+	if (DBG(DISC, 1))
+		logger(LOG_DEBUG, "Our domain name:  %s", dname);
 	update_item(&ctx->domain_name, dname, AD_STATE_AUTO, ttl);
 
 	return (&ctx->domain_name);
@@ -1337,6 +1383,10 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 		if (!is_valid(&ctx->domain_controller) ||
 		    is_changed(&ctx->domain_controller, PARAM1,
 		    domain_name_item)) {
+			if (DBG(DISC, 2)) {
+				logger(LOG_DEBUG, "Looking for DCs for %s",
+				    domain_name_item->value);
+			}
 			/*
 			 * Lookup DNS SRV RR named
 			 * _ldap._tcp.dc._msdcs.<DomainName>
@@ -1346,8 +1396,27 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 			    LDAP_SRV_HEAD DC_SRV_TAIL,
 			    domain_name_item->value, NULL, &ttl);
 
-			if (domain_controller == NULL)
+			if (DBG(DISC, 1)) {
+				logger(LOG_DEBUG, "DCs for %s:",
+				    domain_name_item->value);
+			}
+			if (domain_controller == NULL) {
+				if (DBG(DISC, 1))
+					logger(LOG_DEBUG, "    not found");
 				return (NULL);
+			}
+
+			if (DBG(DISC, 1)) {
+				int i;
+
+				for (i = 0;
+				    domain_controller[i].host[0] != '\0';
+				    i++) {
+					logger(LOG_DEBUG, "    %s:%d",
+					    domain_controller[i].host,
+					    domain_controller[i].port);
+				}
+			}
 
 			update_item(&ctx->domain_controller, domain_controller,
 			    AD_STATE_AUTO, ttl);
@@ -1364,6 +1433,12 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 		    is_changed(&ctx->site_domain_controller, PARAM2,
 		    site_name_item)) {
 			char rr_name[DNS_MAX_NAME];
+			if (DBG(DISC, 2)) {
+				logger(LOG_DEBUG,
+				    "Looking for DCs for %s in %s",
+				    domain_name_item->value,
+				    site_name_item->value);
+			}
 			/*
 			 * Lookup DNS SRV RR named
 			 * _ldap._tcp.<SiteName>._sites.dc._msdcs.<DomainName>
@@ -1374,8 +1449,29 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 			DO_RES_NINIT(ctx);
 			domain_controller = srv_query(&ctx->res_state, rr_name,
 			    domain_name_item->value, NULL, &ttl);
-			if (domain_controller == NULL)
+			if (DBG(DISC, 1)) {
+				logger(LOG_DEBUG,
+				    "DCs for %s in %s",
+				    domain_name_item->value,
+				    site_name_item->value);
+			}
+			if (domain_controller == NULL) {
+				if (DBG(DISC, 1))
+					logger(LOG_DEBUG, "    not found");
 				return (NULL);
+			}
+
+			if (DBG(DISC, 1)) {
+				int i;
+
+				for (i = 0;
+				    domain_controller[i].host[0] != '\0';
+				    i++) {
+					logger(LOG_DEBUG, "    %s:%d",
+					    domain_controller[i].host,
+					    domain_controller[i].port);
+				}
+			}
 
 			update_item(&ctx->site_domain_controller,
 			    domain_controller, AD_STATE_AUTO, ttl);
@@ -1423,7 +1519,6 @@ validate_SiteName(ad_disc_t ctx)
 	char *site_name = NULL;
 	char *forest_name;
 	int len;
-	int i;
 	boolean_t update_required = B_FALSE;
 	ad_item_t *domain_controller_item;
 
@@ -1460,6 +1555,9 @@ validate_SiteName(ad_disc_t ctx)
 	dn_root[0] = "";
 	dn_root[1] = NULL;
 
+	if (DBG(DISC, 1))
+		logger(LOG_DEBUG, "Getting site name");
+
 	config_naming_context = ldap_lookup_entry_attr(
 	    &ld, ctx->domain_controller.value,
 	    dn_root, "configurationNamingContext");
@@ -1481,10 +1579,25 @@ validate_SiteName(ad_disc_t ctx)
 		int len = strlen(str);
 		if (strncasecmp(config_naming_context, str, len) == 0) {
 			forest_name = DN_to_DNS(config_naming_context + len);
+			if (DBG(DISC, 1)) {
+				logger(LOG_DEBUG, "    forest: %s",
+				    forest_name);
+			}
 			update_item(&ctx->forest_name, forest_name,
 			    AD_STATE_AUTO, 0);
 			update_version(&ctx->forest_name, PARAM1,
 			    domain_controller_item);
+		}
+	}
+
+	if (DBG(DISC, 2))
+		logger(LOG_DEBUG, "    CNC: %s", config_naming_context);
+
+	if (DBG(DISC, 2)) {
+		int i;
+		logger(LOG_DEBUG, "    Looking for sites for subnets:");
+		for (i = 0; subnets[i].subnet[0] != '\0'; i++) {
+			logger(LOG_DEBUG, "        %s", subnets[i].subnet);
 		}
 	}
 
@@ -1501,12 +1614,18 @@ validate_SiteName(ad_disc_t ctx)
 		 * CN=<site>,CN=Sites,CN=Configuration,
 		 *		<DN Domain>
 		 */
+		if (DBG(DISC, 2))
+			logger(LOG_DEBUG, "    Site object: %s", site_object);
 		if (strncasecmp(site_object, "CN=", 3) == 0) {
 			for (len = 0; site_object[len + 3] != ','; len++)
 					;
 			site_name = malloc(len + 1);
 			(void) strncpy(site_name, &site_object[3], len);
 			site_name[len] = '\0';
+			if (DBG(DISC, 1)) {
+				logger(LOG_DEBUG, "    Site name \"%s\"",
+				    site_name);
+			}
 			update_item(&ctx->site_name, site_name,
 			    AD_STATE_AUTO, 0);
 			update_version(&ctx->site_name, PARAM1,
@@ -1527,6 +1646,7 @@ out:
 		(void) ldap_unbind(ld);
 
 	if (dn_subnets != NULL) {
+		int i;
 		for (i = 0; dn_subnets[i] != NULL; i++)
 			free(dn_subnets[i]);
 		free(dn_subnets);
@@ -1590,6 +1710,8 @@ validate_ForestName(ad_disc_t ctx)
 
 		dn_list[0] = "";
 		dn_list[1] = NULL;
+		if (DBG(DISC, 1))
+			logger(LOG_DEBUG, "Getting forest name");
 		config_naming_context = ldap_lookup_entry_attr(
 		    &ld, ctx->domain_controller.value,
 		    dn_list, "configurationNamingContext");
@@ -1612,8 +1734,14 @@ validate_ForestName(ad_disc_t ctx)
 		if (ld != NULL)
 			(void) ldap_unbind(ld);
 
-		if (forest_name == NULL)
+		if (forest_name == NULL) {
+			if (DBG(DISC, 1))
+				logger(LOG_DEBUG, "    not found");
 			return (NULL);
+		}
+
+		if (DBG(DISC, 1))
+			logger(LOG_DEBUG, "    %s", forest_name);
 
 		update_item(&ctx->forest_name, forest_name, AD_STATE_AUTO, 0);
 		update_version(&ctx->forest_name, PARAM1,
@@ -1686,8 +1814,27 @@ validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 			    LDAP_SRV_HEAD GC_SRV_TAIL,
 			    ctx->forest_name.value, NULL, &ttl);
 
-			if (global_catalog == NULL)
+			if (DBG(DISC, 1)) {
+				logger(LOG_DEBUG,
+				    "GC servers for %s:",
+				    ctx->forest_name.value);
+			}
+			if (global_catalog == NULL) {
+				if (DBG(DISC, 1))
+					logger(LOG_DEBUG, "    not found");
 				return (NULL);
+			}
+
+			if (DBG(DISC, 1)) {
+				int i;
+				for (i = 0;
+				    global_catalog[i].host[0] != '\0';
+				    i++) {
+					logger(LOG_DEBUG, "    %s:%d",
+					    global_catalog[i].host,
+					    global_catalog[i].port);
+				}
+			}
 
 			update_item(&ctx->global_catalog, global_catalog,
 			    AD_STATE_AUTO, ttl);
@@ -1718,8 +1865,29 @@ validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 			global_catalog = srv_query(&ctx->res_state, rr_name,
 			    ctx->forest_name.value, NULL, &ttl);
 
-			if (global_catalog == NULL)
+			if (DBG(DISC, 1)) {
+				logger(LOG_DEBUG,
+				    "GC servers for %s in %s",
+				    ctx->forest_name.value,
+				    ctx->site_name.value);
+			}
+			if (global_catalog == NULL) {
+				if (DBG(DISC, 1))
+					logger(LOG_DEBUG, "    not found");
 				return (NULL);
+			}
+
+			if (DBG(DISC, 1)) {
+				int i;
+				for (i = 0;
+				    global_catalog[i].host[0] != '\0';
+				    i++) {
+					logger(LOG_DEBUG, "    %s:%d",
+					    global_catalog[i].host,
+					    global_catalog[i].port);
+				}
+			}
+
 			update_item(&ctx->site_global_catalog, global_catalog,
 			    AD_STATE_AUTO, ttl);
 			update_version(&ctx->site_global_catalog, PARAM1,

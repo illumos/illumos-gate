@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -204,7 +203,7 @@ smb_pathname_reduce(
 	local_cur_node = cur_node;
 	local_root_node = root_node;
 
-	if (sr && (sr->smb_flg2 & SMB_FLAGS2_DFS)) {
+	if (SMB_TREE_IS_DFSROOT(sr) && (sr->smb_flg2 & SMB_FLAGS2_DFS)) {
 		err = smb_pathname_dfs_preprocess(sr, usepath, MAXPATHLEN);
 		if (err != 0) {
 			kmem_free(usepath, MAXPATHLEN);
@@ -403,10 +402,10 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 		    &vp, rootvp, dnode->vp, &attr, cred);
 
 		if (err) {
-			if (smb_maybe_mangled_name(component) == 0)
+			if (!smb_maybe_mangled(component))
 				break;
 
-			if ((err = smb_unmangle_name(dnode, component,
+			if ((err = smb_unmangle(dnode, component,
 			    real_name, MAXNAMELEN, abe_flag)) != 0)
 				break;
 

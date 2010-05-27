@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -1805,6 +1804,8 @@ dyndns_add_remove_entry(int update_zone, const char *hostname,
 	int buf_sz;
 	int level = 0;
 	smb_inaddr_t dns_ip;
+	char *fqdn;
+	char *p;
 
 	assert(dns_str);
 	assert(*dns_str);
@@ -1868,9 +1869,18 @@ retry_higher:
 		return (-1);
 	}
 
-	if (smb_krb5_find_keytab_entries(hostname, SMBNS_KRB5_KEYTAB))
+	if ((p = strchr(hostname, '.')) == NULL)
+		return (-1);
+
+	fqdn = ++p;
+	if (smb_krb5_kt_find(SMB_KRB5_PN_ID_HOST_FQHN, fqdn,
+	    SMBNS_KRB5_KEYTAB)) {
 		ret = dyndns_sec_add_remove_entry(update_zone, hostname,
 		    ip_addr, life_time, update_type, del_type, dns_str);
+	} else {
+		syslog(LOG_NOTICE, "dyndns: secure update failed: cannot find "
+		    "host principal \"%s\" in local keytab file.", hostname);
+	}
 
 	return (ret);
 }

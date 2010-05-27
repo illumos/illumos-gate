@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMB_SID_H
@@ -285,8 +284,8 @@ boolean_t smb_sid_islocal(smb_sid_t *);
 boolean_t smb_sid_indomain(smb_sid_t *, smb_sid_t *);
 void smb_sid_free(smb_sid_t *);
 int smb_sid_splitstr(char *, uint32_t *);
-void smb_sid_tostr(smb_sid_t *, char *);
-smb_sid_t *smb_sid_fromstr(char *);
+void smb_sid_tostr(const smb_sid_t *, char *);
+smb_sid_t *smb_sid_fromstr(const char *);
 char *smb_sid_type2str(uint16_t);
 
 void smb_ids_free(smb_ids_t *);

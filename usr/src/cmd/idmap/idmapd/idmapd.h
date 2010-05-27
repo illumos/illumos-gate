@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _IDMAPD_H
@@ -59,13 +58,41 @@ typedef enum idmap_namemap_mode {
 } idmap_namemap_mode_t;
 
 /*
+ * Debugging output.
+ *
+ * There are some number of areas - configuration, mapping, discovery, et
+ * cetera - and for each area there is a verbosity level controlled through
+ * an SMF property.  The default is zero, and "debug/all" provides a master
+ * control allowing you to turn on all debugging output with one setting.
+ *
+ * A typical debugging output sequence would look like
+ *
+ * 	if (DBG(CONFIG, 2)) {
+ *		idmapdlog(LOG_DEBUG,
+ *		    "some message about config at verbosity 2");
+ *	}
+ */
+enum idmapd_debug {
+	IDMAPD_DEBUG_ALL = 0,
+	IDMAPD_DEBUG_CONFIG = 1,
+	IDMAPD_DEBUG_MAPPING = 2,
+	IDMAPD_DEBUG_DISC = 3,
+	IDMAPD_DEBUG_DNS = 4,
+	IDMAPD_DEBUG_LDAP = 5,
+	IDMAPD_DEBUG_MAX = 5
+};
+
+#define	DBG(type, lev)	\
+	(_idmapdstate.debug[IDMAPD_DEBUG_##type] >= (lev) || \
+	    _idmapdstate.debug[IDMAPD_DEBUG_ALL] >= (lev))
+
+/*
  * Global state of idmapd daemon.
  */
 typedef struct idmapd_state {
 	rwlock_t	rwlk_cfg;		/* config lock */
 	idmap_cfg_t	*cfg;			/* config */
 	bool_t		daemon_mode;
-	bool_t		debug_mode;
 	char		hostname[MAX_NAME_LEN];	/* my hostname */
 	uid_t		next_uid;
 	gid_t		next_gid;
@@ -76,6 +103,7 @@ typedef struct idmapd_state {
 	adutils_ad_t	**gcs;
 	int		num_dcs;
 	adutils_ad_t	**dcs;
+	int		debug[IDMAPD_DEBUG_MAX+1];
 } idmapd_state_t;
 extern idmapd_state_t	_idmapdstate;
 
@@ -207,30 +235,24 @@ typedef struct wksids_table {
 #define	IDMAP_DBNAME	IDMAP_DBDIR "/idmap.db"
 #define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
 
-#define	IS_BATCH_SID(batch, i) \
-	(batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_SID ||	\
-	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_USID ||	\
-	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GSID)
-
-#define	IS_BATCH_UID(batch, i) \
-	(batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_UID)
-
-#define	IS_BATCH_GID(batch, i) \
-	(batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GID)
+#define	IS_ID_NONE(id)	\
+	((id).idtype == IDMAP_NONE)
 
 #define	IS_ID_SID(id)	\
 	((id).idtype == IDMAP_SID ||	\
 	(id).idtype == IDMAP_USID ||	\
 	(id).idtype == IDMAP_GSID)	\
 
-#define	IS_REQUEST_SID(req, n) IS_ID_SID((req).id##n)
+#define	IS_ID_UID(id)	\
+	((id).idtype == IDMAP_UID)
 
+#define	IS_ID_GID(id)	\
+	((id).idtype == IDMAP_GID)
 
-#define	IS_REQUEST_UID(request) \
-	((request).id1.idtype == IDMAP_UID)
-
-#define	IS_REQUEST_GID(request) \
-	((request).id1.idtype == IDMAP_GID)
+#define	IS_ID_POSIX(id)	\
+	((id).idtype == IDMAP_UID ||	\
+	(id).idtype == IDMAP_GID ||	\
+	(id).idtype == IDMAP_POSIXID)	\
 
 /*
  * Local RID ranges
@@ -239,6 +261,32 @@ typedef struct wksids_table {
 #define	LOCALRID_UID_MAX	((uint32_t)INT32_MAX)
 #define	LOCALRID_GID_MIN	(((uint32_t)INT32_MAX) + 1)
 #define	LOCALRID_GID_MAX	UINT32_MAX
+
+/*
+ * Tracing.
+ *
+ * The tracing mechanism is intended to help the administrator understand
+ * why their mapping configuration is doing what it is.  Each interesting
+ * decision point during the mapping process calls TRACE() with the current
+ * request and response and a printf-style message.  The message, plus
+ * data from the request and the response, is logged to the service log
+ * (if debug/mapping is greater than zero) or reported to the caller
+ * (if IDMAP_REQ_FLG_TRACE was set in the request.  The primary consumer
+ * is the "-V" option to "idmap show".
+ *
+ * TRACING(req) says whether tracing is appropriate for the request, and
+ * is used to determine and record whether any request in a batch requested
+ * tracing, to control whether later code loops over the batch to do tracing
+ * for any of the requests.
+ *
+ * TRACE(req, res, fmt, ...) generates a trace entry if appropriate.
+ */
+#define	TRACING(req)	\
+	(DBG(MAPPING, 1) ||	\
+	((req)->flag & IDMAP_REQ_FLG_TRACE) != 0)
+#define	TRACE(req, res, ...)			\
+	((void)(TRACING(req) && trace(req, res, __VA_ARGS__)))
+extern int	trace(idmap_mapping *req, idmap_id_res *res, char *fmt, ...);
 
 typedef idmap_retcode (*update_list_res_cb)(void *, const char **, uint64_t);
 typedef int (*list_svc_cb)(void *, int, char **, char **);
@@ -251,7 +299,7 @@ extern void	print_idmapdstate();
 extern int	create_directory(const char *, uid_t, gid_t);
 extern int	load_config();
 extern void	reload_ad();
-extern int	idmap_init_tsd_key(void);
+extern void	idmap_init_tsd_key(void);
 extern void	degrade_svc(int, const char *);
 extern void	restore_svc(void);
 
@@ -294,22 +342,19 @@ extern void		cleanup_lookup_state(lookup_state_t *);
 extern idmap_retcode	ad_lookup_batch(lookup_state_t *,
 				idmap_mapping_batch *, idmap_ids_res *);
 extern idmap_retcode	lookup_name2sid(sqlite *, const char *, const char *,
-				int *, char **, char **, char **,
-				idmap_rid_t *, idmap_mapping *, int);
+				int, char **, char **, char **,
+				idmap_rid_t *, idmap_id_type *,
+				idmap_mapping *, int);
 extern idmap_retcode	lookup_wksids_name2sid(const char *, const char *,
 				char **, char **, char **, idmap_rid_t *,
-				int *);
+				idmap_id_type *);
 extern idmap_retcode	idmap_cache_flush(idmap_flush_op);
-
-extern void 	idmap_log_stderr(int);
-extern void	idmap_log_syslog(boolean_t);
-extern void	idmap_log_degraded(boolean_t);
 
 extern const wksids_table_t *find_wksid_by_pid(posix_id_t pid, int is_user);
 extern const wksids_table_t *find_wksid_by_sid(const char *sid, int rid,
-    int type);
+    idmap_id_type type);
 extern const wksids_table_t *find_wksid_by_name(const char *name,
-    const char *domain, int type);
+    const char *domain, idmap_id_type type);
 extern const wksids_table_t *find_wk_by_sid(char *sid);
 
 #ifdef __cplusplus

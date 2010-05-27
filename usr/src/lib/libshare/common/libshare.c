@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -98,6 +97,8 @@ struct doc2handle {
 	xmlNodePtr		root;
 	sa_handle_impl_t	handle;
 };
+
+mutex_t sa_dfstab_lock;
 
 /* definitions used in a couple of property functions */
 #define	SA_PROP_OP_REMOVE	1
@@ -594,18 +595,26 @@ validpath(sa_handle_t handle, char *path, int strictness)
  *
  * "group" can be either an sa_group_t or an sa_share_t. (void *)
  * works since both thse types are also void *.
+ * If the share is a ZFS share, mark it as persistent.
  */
 int
 sa_is_persistent(void *group)
 {
 	char *type;
 	int persist = 1;
+	sa_group_t grp;
 
 	type = sa_get_group_attr((sa_group_t)group, "type");
-	if (type != NULL && strcmp(type, "transient") == 0)
-		persist = 0;
-	if (type != NULL)
+	if (type != NULL) {
+		if (strcmp(type, "transient") == 0)
+			persist = 0;
 		sa_free_attr_string(type);
+	}
+
+	grp = (sa_is_share(group)) ? sa_get_parent_group(group) : group;
+	if (sa_group_is_zfs(grp))
+		persist = 1;
+
 	return (persist);
 }
 
@@ -869,6 +878,7 @@ sa_init(int init_service)
 					extern int errno;
 					errno = 0;
 					(void) lockf(lockfd, F_LOCK, 0);
+					(void) mutex_lock(&sa_dfstab_lock);
 					/*
 					 * Check whether we are going to need
 					 * to merge any dfstab changes. This
@@ -905,13 +915,15 @@ sa_init(int init_service)
 						 */
 						updatelegacy = B_TRUE;
 					}
-				}
-				if (updatelegacy == B_FALSE) {
-					/* Don't need the lock anymore */
-					(void) lockf(lockfd, F_ULOCK, 0);
-					(void) close(lockfd);
-				}
+					if (updatelegacy == B_FALSE) {
+						(void) mutex_unlock(
+						    &sa_dfstab_lock);
+						(void) lockf(lockfd, F_ULOCK,
+						    0);
+						(void) close(lockfd);
+					}
 
+				}
 				/*
 				 * It is essential that the document tree and
 				 * the internal list of roots to handles be
@@ -954,6 +966,13 @@ sa_init(int init_service)
 					 * sa_init().
 					 */
 					sa_fini(handle);
+					if (updatelegacy == B_TRUE) {
+						(void) mutex_unlock(
+						    &sa_dfstab_lock);
+						(void) lockf(lockfd,
+						    F_ULOCK, 0);
+						(void) close(lockfd);
+					}
 					return (NULL);
 				}
 
@@ -979,6 +998,7 @@ sa_init(int init_service)
 					 * Safe to unlock now to allow
 					 * others to run
 					 */
+					(void) mutex_unlock(&sa_dfstab_lock);
 					(void) lockf(lockfd, F_ULOCK, 0);
 					(void) close(lockfd);
 				}
@@ -2502,7 +2522,8 @@ sa_set_share_description(sa_share_t share, char *content)
 		xmlFreeNode(node);
 	}
 	group = sa_get_parent_group(share);
-	if (group != NULL && sa_is_persistent(share)) {
+	if (group != NULL &&
+	    sa_is_persistent(share) && (!sa_group_is_zfs(group))) {
 		sa_handle_impl_t impl_handle;
 		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
 		if (impl_handle != NULL) {
@@ -4335,9 +4356,11 @@ sa_set_resource_description(sa_resource_t resource, char *content)
 		xmlUnlinkNode(node);
 		xmlFreeNode(node);
 	}
+
 	share = sa_get_resource_parent(resource);
 	group = sa_get_parent_group(share);
-	if (group != NULL && sa_is_persistent(share)) {
+	if (group != NULL &&
+	    sa_is_persistent(share) && (!sa_group_is_zfs(group))) {
 		sa_handle_impl_t impl_handle;
 		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
 		if (impl_handle != NULL)

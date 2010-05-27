@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -68,7 +69,6 @@ typedef struct smb_queryinfo {
 	smb_attr_t	qi_attr;
 	boolean_t	qi_delete_on_close;
 	uint32_t	qi_namelen;
-	char		qi_name83[SMB_SHORTNAMELEN];
 	char		qi_shortname[SMB_SHORTNAMELEN];
 	char		qi_name[MAXPATHLEN];
 } smb_queryinfo_t;
@@ -90,8 +90,9 @@ static int smb_query_encode_response(smb_request_t *, smb_xa_t *,
     uint16_t, smb_queryinfo_t *);
 static void smb_encode_stream_info(smb_request_t *, smb_xa_t *,
     smb_queryinfo_t *);
-static int smb_query_pathname(smb_tree_t *, smb_node_t *, boolean_t,
-    char *, size_t);
+static int smb_query_pathname(smb_request_t *, smb_node_t *, boolean_t,
+    smb_queryinfo_t *);
+static void smb_query_shortname(smb_node_t *, smb_queryinfo_t *);
 
 int smb_query_passthru;
 
@@ -232,7 +233,7 @@ smb_query_by_fid(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 	}
 
 	if (infolev == SMB_INFO_IS_NAME_VALID) {
-		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
+		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_LEVEL);
 		smbsr_release_file(sr);
 		return (-1);
 	}
@@ -292,7 +293,7 @@ smb_query_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 
 	/* VALID, but not yet supported */
 	if (infolev == SMB_FILE_ACCESS_INFORMATION) {
-		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
+		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_LEVEL);
 		return (-1);
 	}
 
@@ -559,7 +560,7 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
 			smbsr_error(sr, NT_STATUS_NOT_SUPPORTED,
 			    ERRDOS, ERROR_NOT_SUPPORTED);
 		else
-			smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
+			smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_LEVEL);
 		return (-1);
 	}
 
@@ -693,45 +694,6 @@ smb_encode_stream_info(smb_request_t *sr, smb_xa_t *xa, smb_queryinfo_t *qinfo)
 }
 
 /*
- * smb_query_pathname
- *
- * Determine the absolute pathname of 'node' within the share.
- * For some levels (e.g. ALL_INFO) the pathname should include the
- * sharename for others (e.g. NAME_INFO) the pathname should be
- * relative to the share.
- * For example if the node represents file "test1.txt" in directory
- * "dir1" on share "share1"
- * - if include_share is TRUE the pathname would be: \share1\dir1\test1.txt
- * - if include_share is FALSE the pathname would be: \dir1\test1.txt
- */
-static int
-smb_query_pathname(smb_tree_t *tree, smb_node_t *node, boolean_t include_share,
-    char *buf, size_t buflen)
-{
-	char *sharename = tree->t_sharename;
-	int rc;
-	size_t len;
-
-	if (include_share) {
-		len = snprintf(buf, buflen, "\\%s", sharename);
-		if (len == (buflen - 1))
-			return (ENAMETOOLONG);
-
-		buf += len;
-		buflen -= len;
-	}
-
-	if (node == tree->t_snode) {
-		if (!include_share)
-			(void) strlcpy(buf, "\\", buflen);
-		return (0);
-	}
-
-	rc =  smb_node_getshrpath(node, tree, buf, buflen);
-	return (rc);
-}
-
-/*
  * smb_query_fileinfo
  *
  * Populate smb_queryinfo_t structure for SMB_FTYPE_DISK
@@ -741,9 +703,7 @@ int
 smb_query_fileinfo(smb_request_t *sr, smb_node_t *node, uint16_t infolev,
     smb_queryinfo_t *qinfo)
 {
-	int rc;
-	boolean_t include_sharename = B_FALSE;
-	char *namep;
+	int rc = 0;
 
 	(void) bzero(qinfo, sizeof (smb_queryinfo_t));
 
@@ -767,55 +727,113 @@ smb_query_fileinfo(smb_request_t *sr, smb_node_t *node, uint16_t infolev,
 		--(qinfo->qi_attr.sa_vattr.va_nlink);
 	}
 
-	/* populate name, namelen and shortname */
-
-	/* ALL_INFO levels include the sharename in the name field */
-	if ((infolev == SMB_QUERY_FILE_ALL_INFO) ||
-	    (infolev == SMB_FILE_ALL_INFORMATION)) {
-		include_sharename = B_TRUE;
+	/*
+	 * populate name, namelen and shortname ONLY for the information
+	 * levels that require these fields
+	 */
+	switch (infolev) {
+	case SMB_QUERY_FILE_ALL_INFO:
+	case SMB_FILE_ALL_INFORMATION:
+		rc = smb_query_pathname(sr, node, B_TRUE, qinfo);
+		break;
+	case SMB_QUERY_FILE_NAME_INFO:
+	case SMB_FILE_NAME_INFORMATION:
+		rc = smb_query_pathname(sr, node, B_FALSE, qinfo);
+		break;
+	case SMB_QUERY_FILE_ALT_NAME_INFO:
+	case SMB_FILE_ALT_NAME_INFORMATION:
+		smb_query_shortname(node, qinfo);
+		break;
+	default:
+		break;
 	}
 
-	rc = smb_query_pathname(sr->tid_tree, node, include_sharename,
-	    qinfo->qi_name, MAXPATHLEN);
 	if (rc != 0) {
 		smbsr_errno(sr, rc);
 		return (-1);
 	}
+	return (0);
+}
 
-	qinfo->qi_namelen = smb_ascii_or_unicode_strlen(sr, qinfo->qi_name);
+/*
+ * smb_query_pathname
+ *
+ * Determine the absolute pathname of 'node' within the share.
+ * For some levels (e.g. ALL_INFO) the pathname should include the
+ * sharename for others (e.g. NAME_INFO) the pathname should be
+ * relative to the share.
+ * For example if the node represents file "test1.txt" in directory
+ * "dir1" on share "share1"
+ * - if include_share is TRUE the pathname would be: \share1\dir1\test1.txt
+ * - if include_share is FALSE the pathname would be: \dir1\test1.txt
+ *
+ * For some reason NT will not show the security tab in the root
+ * directory of a mapped drive unless the filename length is greater
+ * than one. So if the length is 1 we set it to 2 to persuade NT to
+ * show the tab. It should be safe because of the null terminator.
+ */
+static int
+smb_query_pathname(smb_request_t *sr, smb_node_t *node, boolean_t include_share,
+    smb_queryinfo_t *qinfo)
+{
+	smb_tree_t *tree = sr->tid_tree;
+	char *buf = qinfo->qi_name;
+	size_t buflen = MAXPATHLEN;
+	size_t len;
+	int rc;
 
-	/*
-	 * For some reason NT will not show the security tab in the root
-	 * directory of a mapped drive unless the filename length is
-	 * greater than one. So we hack the length here to persuade NT
-	 * to show the tab. It should be safe because of the null
-	 * terminator character.
-	 */
-	if (qinfo->qi_namelen == 1)
-		qinfo->qi_namelen = 2;
+	if (include_share) {
+		len = snprintf(buf, buflen, "\\%s", tree->t_sharename);
+		if (len == (buflen - 1))
+			return (ENAMETOOLONG);
 
-	/*
-	 * If the node is an named stream, use its associated
-	 * unnamed stream name to determine the shortname.
-	 * If the shortname is generated by smb_mangle_name()
-	 * it will be returned as the alternative name.
-	 * Otherwise, convert the original name to upper-case
-	 * and return it as the alternative name.
-	 */
+		buf += len;
+		buflen -= len;
+	}
+
+	if (node == tree->t_snode) {
+		if (!include_share)
+			(void) strlcpy(buf, "\\", buflen);
+		return (0);
+	}
+
+	rc =  smb_node_getshrpath(node, tree, buf, buflen);
+	if (rc == 0) {
+		qinfo->qi_namelen =
+		    smb_ascii_or_unicode_strlen(sr, qinfo->qi_name);
+		if (qinfo->qi_namelen == 1)
+			qinfo->qi_namelen = 2;
+	}
+	return (rc);
+}
+
+/*
+ * smb_query_shortname
+ *
+ * If the node is a named stream, use its associated
+ * unnamed stream name to determine the shortname.
+ * If a shortname is required (smb_needs_mangle()), generate it
+ * using smb_mangle(), otherwise, convert the original name to
+ * upper-case and return it as the alternative name.
+ */
+static void
+smb_query_shortname(smb_node_t *node, smb_queryinfo_t *qinfo)
+{
+	char *namep;
+
 	if (SMB_IS_STREAM(node))
 		namep = node->n_unode->od_name;
 	else
 		namep = node->od_name;
 
-	(void) smb_mangle_name(qinfo->qi_attr.sa_vattr.va_nodeid,
-	    namep, qinfo->qi_shortname, qinfo->qi_name83, 0);
-	if (*qinfo->qi_shortname == 0) {
+	if (smb_needs_mangled(namep)) {
+		smb_mangle(namep, qinfo->qi_attr.sa_vattr.va_nodeid,
+		    qinfo->qi_shortname, SMB_SHORTNAMELEN);
+	} else {
 		(void) strlcpy(qinfo->qi_shortname, namep,
 		    SMB_SHORTNAMELEN);
 		(void) smb_strupr(qinfo->qi_shortname);
 	}
-
-	return (0);
 }
 
 /*

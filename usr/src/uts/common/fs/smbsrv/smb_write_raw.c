@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -421,6 +420,7 @@ smb_handle_write_raw(smb_session_t *session, smb_request_t *sr)
 	case SMB_SESSION_STATE_OPLOCK_BREAKING:
 		session->s_state = SMB_SESSION_STATE_WRITE_RAW_ACTIVE;
 		smb_rwx_rwexit(&session->s_lock);
+		smb_srqueue_waitq_enter(session->s_srqueue);
 		sr->sr_state = SMB_REQ_STATE_SUBMITTED;
 		(void) taskq_dispatch(session->s_server->sv_thread_pool,
 		    smb_session_worker, sr, TQ_SLEEP);

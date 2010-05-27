@@ -1178,7 +1178,6 @@ SMBSRV_SHARED_OBJS += \
 		smb_token.o \
 		smb_token_xdr.o \
 		smb_sid.o \
-		smb_status_xlat.o \
 		smb_native.o \
 		smb_netbios_util.o
 
@@ -1248,8 +1247,7 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_vops.o				\
 		smb_vss.o				\
 		smb_write.o				\
-		smb_write_raw.o				\
-		smb_xlate.o
+		smb_write_raw.o
 
 PCFS_OBJS +=	pc_alloc.o	pc_dir.o	pc_node.o	pc_subr.o \
 		pc_vfsops.o	pc_vnops.o

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <netdb.h>
@@ -31,8 +31,6 @@
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/nmpipes.h>
-#include <smbsrv/nterror.h>
-#include <smbsrv/lmerr.h>
 #include <smbsrv/ndl/srvsvc.ndl>
 
 static int wkssvc_s_NetWkstaGetInfo(void *, ndr_xa_t *);

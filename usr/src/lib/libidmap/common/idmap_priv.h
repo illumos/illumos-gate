@@ -155,14 +155,12 @@ extern idmap_stat idmap_stat4prot(idmap_stat);
 /* copy idmap_namerule including strings */
 extern idmap_stat idmap_namerule_cpy(idmap_namerule *, idmap_namerule *);
 
-/* copy idmap_info info including strings */
-extern idmap_stat idmap_info_cpy(idmap_info *to, idmap_info *from);
-
 /* Move  idmap_info info including strings */
-extern idmap_stat idmap_info_mov(idmap_info *to, idmap_info *from);
+extern void idmap_info_mov(idmap_info *to, idmap_info *from);
 
 /* free idmap_info info from  user supplied struct */
 extern void idmap_info_free(idmap_info *);
+extern void idmap_how_clear(idmap_how *);
 
 
 /*
@@ -194,6 +192,23 @@ extern idmap_stat idmap_get_prop_ds(idmap_handle_t *, idmap_prop_type,
     idmap_ad_disc_ds_t *);
 extern idmap_stat idmap_get_prop_str(idmap_handle_t *, idmap_prop_type,
     char **);
+
+/*
+ * Trace
+ *
+ * These are the names of the trace parameters that may be returned
+ * when tracing is requested.
+ */
+#define	IDMAP_TRACE_NAME_MAX	100	/* max length of a trace param name */
+#define	IDMAP_TRACE_TYPE	"-type"		/* prefix with "from" or "to" */
+#define	IDMAP_TRACE_NAME	"-name"		/* prefix with "from" or "to" */
+#define	IDMAP_TRACE_SID		"-sid"		/* prefix with "from" or "to" */
+#define	IDMAP_TRACE_UNIXID	"-unixid"	/* prefix with "from" or "to" */
+#define	IDMAP_TRACE_ERROR	"error"
+#define	IDMAP_TRACE_MESSAGE	"message"
+
+extern void idmap_trace_print_1(FILE *out, char *prefix, nvlist_t *entry);
+extern void idmap_trace_print(FILE *out, char *prefix, nvlist_t *trace);
 
 #ifdef __cplusplus
 }

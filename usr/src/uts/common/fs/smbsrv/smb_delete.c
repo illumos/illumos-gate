@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -304,7 +304,7 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 		if (rc != 0)
 			break;
 
-		rc = smb_fsop_lookup_name(sr, sr->user_cr, 0,
+		rc = smb_fsop_lookup_name(sr, sr->user_cr, SMB_CASE_SENSITIVE,
 		    sr->tid_tree->t_snode, fqi->fq_dnode,
 		    namebuf, &fqi->fq_fnode);
 		if (rc != 0)
@@ -362,13 +362,6 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
  * Find next filename that matches search pattern and return it
  * in namebuf.
  *
- * Case insensitivity note:
- * If the tree is case insensitive and there's a case conflict
- * with the name returned from smb_odir_read, smb_delete_find_fname
- * performs case conflict name mangling to produce a unique filename.
- * This ensures that any subsequent smb_fsop_lookup, (which will
- * find the first case insensitive match) will find the correct file.
- *
  * Returns: 0 - success
  *          errno
  */
@@ -378,35 +371,18 @@ smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od, char *namebuf, int len)
 	int		rc;
 	smb_odirent_t	*odirent;
 	boolean_t	eos;
-	char		*name;
-	char		shortname[SMB_SHORTNAMELEN];
-	char		name83[SMB_SHORTNAMELEN];
 
 	odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
 
 	rc = smb_odir_read(sr, od, odirent, &eos);
-	if (rc != 0) {
-		kmem_free(odirent, sizeof (smb_odirent_t));
-		return (rc);
+	if (rc == 0) {
+		if (eos)
+			rc = ENOENT;
+		else
+			(void) strlcpy(namebuf, odirent->od_name, len);
 	}
-	if (eos) {
-		kmem_free(odirent, sizeof (smb_odirent_t));
-		return (ENOENT);
-	}
-
-	/* if case conflict, force mangle and use shortname */
-	if ((od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) &&
-	    (odirent->od_eflags & ED_CASE_CONFLICT)) {
-		(void) smb_mangle_name(odirent->od_ino, odirent->od_name,
-		    shortname, name83, 1);
-		name = shortname;
-	} else {
-		name = odirent->od_name;
-	}
-	(void) strlcpy(namebuf, name, len);
-
 	kmem_free(odirent, sizeof (smb_odirent_t));
-	return (0);
+	return (rc);
 }
 
 /*
@@ -592,7 +568,6 @@ static void
 smb_delete_error(smb_error_t *err,
     uint32_t status, uint16_t errcls, uint16_t errcode)
 {
-	err->severity = ERROR_SEVERITY_ERROR;
 	err->status = status;
 	err->errcls = errcls;
 	err->errcode = errcode;

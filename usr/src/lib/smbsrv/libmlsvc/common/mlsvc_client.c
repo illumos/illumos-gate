@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -407,14 +407,20 @@ ndr_rpc_status(mlsvc_handle_t *handle, int opnum, DWORD status)
 	char *name = "NDR RPC";
 	char *s = "unknown";
 
-	if (status == 0)
+	switch (NT_SC_SEVERITY(status)) {
+	case NT_STATUS_SEVERITY_SUCCESS:
 		s = "success";
-	else if (NT_SC_IS_ERROR(status))
-		s = "error";
-	else if (NT_SC_IS_WARNING(status))
-		s = "warning";
-	else if (NT_SC_IS_INFO(status))
+		break;
+	case NT_STATUS_SEVERITY_INFORMATIONAL:
 		s = "info";
+		break;
+	case NT_STATUS_SEVERITY_WARNING:
+		s = "warning";
+		break;
+	case NT_STATUS_SEVERITY_ERROR:
+		s = "error";
+		break;
+	}
 
 	if (handle) {
 		svc = handle->clnt->binding->service;

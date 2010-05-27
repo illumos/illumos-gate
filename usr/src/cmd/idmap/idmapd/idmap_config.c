@@ -40,12 +40,13 @@
 #include <port.h>
 #include <net/route.h>
 #include <sys/u8_textprep.h>
+#include <note.h>
 #include "addisc.h"
 
 #define	MACHINE_SID_LEN		(9 + 3 * 11)
 #define	FMRI_BASE		"svc:/system/idmap"
 #define	CONFIG_PG		"config"
-#define	GENERAL_PG		"general"
+#define	DEBUG_PG		"debug"
 #define	RECONFIGURE		1
 #define	POKE_AUTO_DISCOVERY	2
 
@@ -57,7 +58,6 @@ enum event_type {
 	EVENT_REFRESH,	/* SMF refresh */
 };
 
-/*LINTLIBRARY*/
 
 
 static pthread_t update_thread_handle = 0;
@@ -69,6 +69,13 @@ struct enum_lookup_map directory_mapping_map[] = {
 	{ DIRECTORY_MAPPING_NONE, "none" },
 	{ DIRECTORY_MAPPING_NAME, "name" },
 	{ DIRECTORY_MAPPING_IDMU, "idmu" },
+	{ 0, NULL },
+};
+
+struct enum_lookup_map trust_dir_map[] = {
+	{ 1, "they trust us" },
+	{ 2, "we trust them" },
+	{ 3, "we trust each other" },
 	{ 0, NULL },
 };
 
@@ -125,9 +132,79 @@ prop_exists(idmap_cfg_handles_t *handles, const char *name, boolean_t *exists)
 {
 
 	scf_property_t *scf_prop;
-	scf_value_t *value;
 
 	*exists = B_FALSE;
+
+	scf_prop = scf_property_create(handles->main);
+	if (scf_prop == NULL) {
+		idmapdlog(LOG_ERR, "scf_property_create() failed: %s",
+		    scf_strerror(scf_error()));
+		return (-1);
+	}
+
+	if (scf_pg_get_property(handles->config_pg, name, scf_prop) == 0)
+		*exists = B_TRUE;
+
+	scf_property_destroy(scf_prop);
+
+	return (0);
+}
+
+static int
+get_debug(idmap_cfg_handles_t *handles, const char *name)
+{
+	int64_t i64 = 0;
+
+	scf_property_t *scf_prop;
+	scf_value_t *value;
+
+	scf_prop = scf_property_create(handles->main);
+	if (scf_prop == NULL) {
+		idmapdlog(LOG_ERR, "scf_property_create() failed: %s",
+		    scf_strerror(scf_error()));
+		abort();
+	}
+	value = scf_value_create(handles->main);
+	if (value == NULL) {
+		idmapdlog(LOG_ERR, "scf_value_create() failed: %s",
+		    scf_strerror(scf_error()));
+		abort();
+	}
+
+	if (scf_pg_get_property(handles->debug_pg, name, scf_prop) < 0) {
+		/* this is OK: the property is just undefined */
+		goto destruction;
+	}
+
+
+	if (scf_property_get_value(scf_prop, value) < 0) {
+		/* It is still OK when a property doesn't have any value */
+		goto destruction;
+	}
+
+	if (scf_value_get_integer(value, &i64) != 0) {
+		idmapdlog(LOG_ERR, "Can not retrieve %s/%s:  %s",
+		    DEBUG_PG, name, scf_strerror(scf_error()));
+		abort();
+	}
+
+destruction:
+	scf_value_destroy(value);
+	scf_property_destroy(scf_prop);
+
+	return ((int)i64);
+}
+
+static int
+get_val_bool(idmap_cfg_handles_t *handles, const char *name,
+	boolean_t *val, boolean_t default_val)
+{
+	int rc = 0;
+
+	scf_property_t *scf_prop;
+	scf_value_t *value;
+
+	*val = default_val;
 
 	scf_prop = scf_property_create(handles->main);
 	if (scf_prop == NULL) {
@@ -143,16 +220,28 @@ prop_exists(idmap_cfg_handles_t *handles, const char *name, boolean_t *exists)
 		return (-1);
 	}
 
-	if (scf_pg_get_property(handles->config_pg, name, scf_prop) == 0)
-		*exists = B_TRUE;
+	/* It is OK if the property is undefined */
+	if (scf_pg_get_property(handles->config_pg, name, scf_prop) < 0)
+		goto destruction;
 
+
+	/* It is still OK when a property doesn't have any value */
+	if (scf_property_get_value(scf_prop, value) < 0)
+		goto destruction;
+
+	uint8_t b;
+	rc = scf_value_get_boolean(value, &b);
+
+	if (rc == 0)
+		*val = (boolean_t)b;
+
+destruction:
 	scf_value_destroy(value);
 	scf_property_destroy(scf_prop);
 
-	return (0);
+	return (rc);
 }
 
-/* Check if in the case of failure the original value of *val is preserved */
 static int
 get_val_int(idmap_cfg_handles_t *handles, const char *name,
 	void *val, scf_type_t type)
@@ -161,12 +250,8 @@ get_val_int(idmap_cfg_handles_t *handles, const char *name,
 
 	scf_property_t *scf_prop;
 	scf_value_t *value;
-	uint8_t b;
 
 	switch (type) {
-	case SCF_TYPE_BOOLEAN:
-		*(boolean_t *)val = B_FALSE;
-		break;
 	case SCF_TYPE_COUNT:
 		*(uint64_t *)val = 0;
 		break;
@@ -203,10 +288,6 @@ get_val_int(idmap_cfg_handles_t *handles, const char *name,
 		goto destruction;
 
 	switch (type) {
-	case SCF_TYPE_BOOLEAN:
-		rc = scf_value_get_boolean(value, &b);
-		*(boolean_t *)val = b;
-		break;
 	case SCF_TYPE_COUNT:
 		rc = scf_value_get_count(value, val);
 		break;
@@ -426,7 +507,10 @@ destruction:
 
 
 static int
-del_val(idmap_cfg_handles_t *handles, const char *name)
+del_val(
+    idmap_cfg_handles_t *handles,
+    scf_propertygroup_t *pg,
+    const char *name)
 {
 	int			rc = -1;
 	int			ret;
@@ -447,13 +531,13 @@ del_val(idmap_cfg_handles_t *handles, const char *name)
 	}
 
 	do {
-		if (scf_pg_update(handles->config_pg) == -1) {
+		if (scf_pg_update(pg) == -1) {
 			idmapdlog(LOG_ERR,
 			    "scf_pg_update(%s) failed: %s",
 			    name, scf_strerror(scf_error()));
 			goto destruction;
 		}
-		if (scf_transaction_start(tx, handles->config_pg) != 0) {
+		if (scf_transaction_start(tx, pg) != 0) {
 			idmapdlog(LOG_ERR,
 			    "scf_transaction_start(%s) failed: %s",
 			    name, scf_strerror(scf_error()));
@@ -496,18 +580,19 @@ destruction:
 
 
 static int
-set_val_astring(idmap_cfg_handles_t *handles, const char *name, const char *val)
+set_val(
+    idmap_cfg_handles_t *handles,
+    scf_propertygroup_t *pg,
+    const char *name,
+    scf_value_t *value)
 {
 	int			rc = -1;
-	int			ret = -2;
 	int			i;
-	scf_property_t		*scf_prop = NULL;
-	scf_value_t		*value = NULL;
+	scf_property_t		*prop = NULL;
 	scf_transaction_t	*tx = NULL;
 	scf_transaction_entry_t	*ent = NULL;
 
-	if ((scf_prop = scf_property_create(handles->main)) == NULL ||
-	    (value = scf_value_create(handles->main)) == NULL ||
+	if ((prop = scf_property_create(handles->main)) == NULL ||
 	    (tx = scf_transaction_create(handles->main)) == NULL ||
 	    (ent = scf_entry_create(handles->main)) == NULL) {
 		idmapdlog(LOG_ERR, "Unable to set property %s",
@@ -515,26 +600,45 @@ set_val_astring(idmap_cfg_handles_t *handles, const char *name, const char *val)
 		goto destruction;
 	}
 
-	for (i = 0; i < MAX_TRIES && (ret == -2 || ret == 0); i++) {
-		if (scf_transaction_start(tx, handles->config_pg) == -1) {
+	for (i = 0; i < MAX_TRIES; i++) {
+		int ret;
+
+		if (scf_pg_update(pg) == -1) {
+			idmapdlog(LOG_ERR,
+			    "scf_pg_update() failed: %s",
+			    scf_strerror(scf_error()));
+			goto destruction;
+		}
+
+		if (scf_transaction_start(tx, pg) == -1) {
 			idmapdlog(LOG_ERR,
 			    "scf_transaction_start(%s) failed: %s",
 			    name, scf_strerror(scf_error()));
 			goto destruction;
 		}
 
-		if (scf_transaction_property_new(tx, ent, name,
-		    SCF_TYPE_ASTRING) < 0) {
+		ret = scf_pg_get_property(pg, name, prop);
+		if (ret == SCF_SUCCESS) {
+			if (scf_transaction_property_change_type(tx, ent, name,
+			    scf_value_type(value)) < 0) {
+				idmapdlog(LOG_ERR,
+				    "scf_transaction_property_change_type(%s)"
+				    " failed: %s",
+				    name, scf_strerror(scf_error()));
+				goto destruction;
+			}
+		} else if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			if (scf_transaction_property_new(tx, ent, name,
+			    scf_value_type(value)) < 0) {
+				idmapdlog(LOG_ERR,
+				    "scf_transaction_property_new() failed: %s",
+				    scf_strerror(scf_error()));
+				goto destruction;
+			}
+		} else {
 			idmapdlog(LOG_ERR,
-			    "scf_transaction_property_new() failed: %s",
-			    scf_strerror(scf_error()));
-			goto destruction;
-		}
-
-		if (scf_value_set_astring(value, val) == -1) {
-			idmapdlog(LOG_ERR,
-			    "scf_value_set_astring() failed: %s",
-			    scf_strerror(scf_error()));
+			    "scf_pg_get_property(%s) failed: %s",
+			    name, scf_strerror(scf_error()));
 			goto destruction;
 		}
 
@@ -545,41 +649,90 @@ set_val_astring(idmap_cfg_handles_t *handles, const char *name, const char *val)
 			goto destruction;
 		}
 
-		if ((ret = scf_transaction_commit(tx)) == 1)
-			break;
-
-		if (ret == 0 && i < MAX_TRIES - 1) {
+		ret = scf_transaction_commit(tx);
+		if (ret == 0) {
 			/*
 			 * Property group set in scf_transaction_start()
 			 * is not the most recent. Update pg, reset tx and
 			 * retry tx.
 			 */
 			idmapdlog(LOG_WARNING,
-			    "scf_transaction_commit(%s) failed - Retry: %s",
+			    "scf_transaction_commit(%s) failed: %s",
 			    name, scf_strerror(scf_error()));
-			if (scf_pg_update(handles->config_pg) == -1) {
-				idmapdlog(LOG_ERR,
-				    "scf_pg_update() failed: %s",
-				    scf_strerror(scf_error()));
-				goto destruction;
-			}
 			scf_transaction_reset(tx);
+			continue;
 		}
+		if (ret != 1) {
+			idmapdlog(LOG_ERR,
+			    "scf_transaction_commit(%s) failed: %s",
+			    name, scf_strerror(scf_error()));
+			goto destruction;
+		}
+		/* Success! */
+		rc = 0;
+		break;
 	}
 
-
-	if (ret == 1)
-		rc = 0;
-	else if (ret != -2)
-		idmapdlog(LOG_ERR,
-		    "scf_transaction_commit(%s) failed: %s",
-		    name, scf_strerror(scf_error()));
-
 destruction:
-	scf_value_destroy(value);
 	scf_entry_destroy(ent);
 	scf_transaction_destroy(tx);
-	scf_property_destroy(scf_prop);
+	scf_property_destroy(prop);
+	return (rc);
+}
+
+static int
+set_val_integer(
+    idmap_cfg_handles_t *handles,
+    scf_propertygroup_t *pg,
+    const char *name,
+    int64_t val)
+{
+	scf_value_t		*value = NULL;
+	int			rc;
+
+	if ((value = scf_value_create(handles->main)) == NULL) {
+		idmapdlog(LOG_ERR, "Unable to set property %s",
+		    name, scf_strerror(scf_error()));
+		return (-1);
+	}
+
+	scf_value_set_integer(value, val);
+
+	rc = set_val(handles, pg, name, value);
+
+	scf_value_destroy(value);
+
+	return (rc);
+}
+
+
+static int
+set_val_astring(
+    idmap_cfg_handles_t *handles,
+    scf_propertygroup_t *pg,
+    const char *name,
+    const char *val)
+{
+	scf_value_t		*value = NULL;
+	int			rc = -1;
+
+	if ((value = scf_value_create(handles->main)) == NULL) {
+		idmapdlog(LOG_ERR, "Unable to set property %s",
+		    name, scf_strerror(scf_error()));
+		goto out;
+	}
+
+	if (scf_value_set_astring(value, val) == -1) {
+		idmapdlog(LOG_ERR,
+		    "scf_value_set_astring() failed: %s",
+		    scf_strerror(scf_error()));
+		goto out;
+	}
+
+	rc = set_val(handles, pg, name, value);
+
+out:
+	scf_value_destroy(value);
 	return (rc);
 }
 
@@ -595,11 +748,14 @@ update_bool(boolean_t *value, boolean_t *new, char *name)
 	if (*value == *new)
 		return (0);
 
-	idmapdlog(LOG_INFO, "change %s=%s", name, *new ? "true" : "false");
+	if (DBG(CONFIG, 1)) {
+		idmapdlog(LOG_INFO, "change %s=%s", name,
+		    *new ? "true" : "false");
+	}
+
 	*value = *new;
 	return (1);
 }
-
 
 /*
  * This function updates a string value.
@@ -608,21 +764,29 @@ update_bool(boolean_t *value, boolean_t *new, char *name)
 static int
 update_string(char **value, char **new, char *name)
 {
-	if (*new == NULL)
-		return (0);
+	int changed;
 
-	if (*value != NULL && strcmp(*new, *value) == 0) {
-		free(*new);
-		*new = NULL;
-		return (0);
-	}
+	if (*new == NULL && *value != NULL)
+		changed = 1;
+	else if (*new != NULL && *value == NULL)
+		changed = 1;
+	else if (*new != NULL && *value != NULL && strcmp(*new, *value) != 0)
+		changed = 1;
+	else
+		changed = 0;
 
-	idmapdlog(LOG_INFO, "change %s=%s", name, CHECK_NULL(*new));
-	if (*value != NULL)
-		free(*value);
+	/*
+	 * Note that even if unchanged we can't just return; we must free one
+	 * of the values.
+	 */
+
+	if (DBG(CONFIG, 1) && changed)
+		idmapdlog(LOG_INFO, "change %s=%s", name, CHECK_NULL(*new));
+
+	free(*value);
 	*value = *new;
 	*new = NULL;
-	return (1);
+	return (changed);
 }
 
 static int
@@ -631,7 +795,10 @@ update_enum(int *value, int *new, char *name, struct enum_lookup_map *map)
 	if (*value == *new)
 		return (0);
 
-	idmapdlog(LOG_INFO, "change %s=%s", name, enum_lookup(*new, map));
+	if (DBG(CONFIG, 1)) {
+		idmapdlog(LOG_INFO, "change %s=%s", name,
+		    enum_lookup(*new, map));
+	}
 
 	*value = *new;
 
@@ -666,14 +833,18 @@ update_dirs(idmap_ad_disc_ds_t **value, idmap_ad_disc_ds_t **new, char *name)
 
 	if (*value == NULL) {
 		/* We're unsetting this DS property */
-		idmapdlog(LOG_INFO, "change %s=<none>", name);
+		if (DBG(CONFIG, 1))
+			idmapdlog(LOG_INFO, "change %s=<none>", name);
 		return (1);
 	}
 
-	/* List all the new DSs */
-	for (i = 0; (*value)[i].host[0] != '\0'; i++)
-		idmapdlog(LOG_INFO, "change %s=%s port=%d", name,
-		    (*value)[i].host, (*value)[i].port);
+	if (DBG(CONFIG, 1)) {
+		/* List all the new DSs */
+		for (i = 0; (*value)[i].host[0] != '\0'; i++) {
+			idmapdlog(LOG_INFO, "change %s=%s port=%d", name,
+			    (*value)[i].host, (*value)[i].port);
+		}
+	}
 	return (1);
 }
 
@@ -706,15 +877,19 @@ update_trusted_domains(ad_disc_trusteddomains_t **value,
 
 	if (*value == NULL) {
 		/* We're unsetting this DS property */
-		idmapdlog(LOG_INFO, "change %s=<none>", name);
+		if (DBG(CONFIG, 1))
+			idmapdlog(LOG_INFO, "change %s=<none>", name);
 		return (1);
 	}
 
-	/* List all the new domains */
-	for (i = 0; (*value)[i].domain[0] != '\0'; i++)
-		idmapdlog(LOG_INFO, "change %s=%s direction=%s", name,
-		    (*value)[i].domain,
-		    (*value)[i].direction == 3 ? "bi-directional" : "inbound");
+	if (DBG(CONFIG, 1)) {
+		/* List all the new domains */
+		for (i = 0; (*value)[i].domain[0] != '\0'; i++) {
+			idmapdlog(LOG_INFO, "change %s=%s direction=%s", name,
+			    (*value)[i].domain,
+			    enum_lookup((*value)[i].direction, trust_dir_map));
+		}
+	}
 	return (1);
 }
 
@@ -748,14 +923,18 @@ update_domains_in_forest(ad_disc_domainsinforest_t **value,
 
 	if (*value == NULL) {
 		/* We're unsetting this DS property */
-		idmapdlog(LOG_INFO, "change %s=<none>", name);
+		if (DBG(CONFIG, 1))
+			idmapdlog(LOG_INFO, "change %s=<none>", name);
 		return (1);
 	}
 
-	/* List all the new domains */
-	for (i = 0; (*value)[i].domain[0] != '\0'; i++)
-		idmapdlog(LOG_INFO, "change %s=%s", name,
-		    (*value)[i].domain);
+	if (DBG(CONFIG, 1)) {
+		/* List all the new domains */
+		for (i = 0; (*value)[i].domain[0] != '\0'; i++) {
+			idmapdlog(LOG_INFO, "change %s=%s", name,
+			    (*value)[i].domain);
+		}
+	}
 	return (1);
 }
 
@@ -865,26 +1044,36 @@ not_equal:
 
 	if (*value == NULL) {
 		/* We're unsetting this DS property */
-		idmapdlog(LOG_INFO, "change %s=<none>", name);
+		if (DBG(CONFIG, 1))
+			idmapdlog(LOG_INFO, "change %s=<none>", name);
 		return (1);
 	}
 
-	/* List all the trusted forests */
-	for (i = 0; i < *num_value; i++) {
-		for (j = 0; (*value)[i].domains_in_forest[j].domain[0] != '\0';
-		    j++) {
-			/* List trusted Domains in the forest. */
-			if ((*value)[i].domains_in_forest[j].trusted)
-				idmapdlog(LOG_INFO, "change %s=%s domain=%s",
-				    name, (*value)[i].forest_name,
-				    (*value)[i].domains_in_forest[j].domain);
+	if (DBG(CONFIG, 1)) {
+		/* List all the trusted forests */
+		for (i = 0; i < *num_value; i++) {
+			idmap_trustedforest_t *f = &(*value)[i];
+			for (j = 0;
+			    f->domains_in_forest[j].domain[0] != '\0';
+			    j++) {
+				/* List trusted Domains in the forest. */
+				if (f->domains_in_forest[j].trusted)
+					idmapdlog(LOG_INFO,
+					    "change %s=%s domain=%s",
+					    name, f->forest_name,
+					    f->domains_in_forest[j].domain);
+			}
+			/* List the hosts */
+			for (j = 0;
+			    f->global_catalog[j].host[0] != '\0';
+			    j++) {
+				idmapdlog(LOG_INFO,
+				    "change %s=%s host=%s port=%d",
+				    name, f->forest_name,
+				    f->global_catalog[j].host,
+				    f->global_catalog[j].port);
+			}
 		}
-		/* List the hosts */
-		for (j = 0; (*value)[i].global_catalog[j].host[0] != '\0'; j++)
-			idmapdlog(LOG_INFO, "change %s=%s host=%s port=%d",
-			    name, (*value)[i].forest_name,
-			    (*value)[i].global_catalog[j].host,
-			    (*value)[i].global_catalog[j].port);
 	}
 	return (1);
 }
@@ -950,7 +1139,7 @@ wait_for_event(struct timespec *timeoutp)
 {
 	port_event_t pe;
 
-	memset(&pe, 0, sizeof (pe));
+	(void) memset(&pe, 0, sizeof (pe));
 	if (port_get(idmapd_ev_port, &pe, timeoutp) != 0) {
 		switch (errno) {
 		case EINTR:
@@ -1004,12 +1193,16 @@ wait_for_event(struct timespec *timeoutp)
 			 * timeout if need be.
 			 */
 			if (pfroute_event_is_interesting(rt_sock)) {
-				idmapdlog(LOG_DEBUG,
-				    "Interesting routing event");
+				if (DBG(CONFIG, 1)) {
+					idmapdlog(LOG_DEBUG,
+					    "Interesting routing event");
+				}
 				return (EVENT_ROUTING);
 			} else {
-				idmapdlog(LOG_DEBUG,
-				    "Boring routing event");
+				if (DBG(CONFIG, 2)) {
+					idmapdlog(LOG_DEBUG,
+					    "Boring routing event");
+				}
 				return (EVENT_NOTHING);
 			}
 		}
@@ -1023,6 +1216,7 @@ wait_for_event(struct timespec *timeoutp)
 void *
 idmap_cfg_update_thread(void *arg)
 {
+	NOTE(ARGUNUSED(arg))
 
 	const ad_disc_t		ad_ctx = _idmapdstate.cfg->handles.ad_ctx;
 
@@ -1062,10 +1256,12 @@ idmap_cfg_update_thread(void *arg)
 
 			switch (wait_for_event(timeoutp)) {
 			case EVENT_NOTHING:
-				idmapdlog(LOG_DEBUG, "Boring event.");
+				if (DBG(CONFIG, 2))
+					idmapdlog(LOG_DEBUG, "Boring event.");
 				continue;
 			case EVENT_REFRESH:
-				idmapdlog(LOG_INFO, "SMF refresh");
+				if (DBG(CONFIG, 1))
+					idmapdlog(LOG_INFO, "SMF refresh");
 				/*
 				 * Blow away the ccache, we might have
 				 * re-joined the domain or joined a new one
@@ -1073,11 +1269,14 @@ idmap_cfg_update_thread(void *arg)
 				(void) unlink(IDMAP_CACHEDIR "/ccache");
 				break;
 			case EVENT_DEGRADE:
-				idmapdlog(LOG_DEBUG,
-				    "Service degraded");
+				if (DBG(CONFIG, 1)) {
+					idmapdlog(LOG_DEBUG,
+					    "Service degraded");
+				}
 				break;
 			case EVENT_TIMEOUT:
-				idmapdlog(LOG_DEBUG, "TTL expired");
+				if (DBG(CONFIG, 1))
+					idmapdlog(LOG_DEBUG, "TTL expired");
 				break;
 			case EVENT_ROUTING:
 				/* Already logged to DEBUG */
@@ -1157,29 +1356,40 @@ valid_ldap_attr(const char *attr) {
 }
 
 static
-int
+void
+idmapd_set_debug(
+    idmap_cfg_handles_t *handles,
+    enum idmapd_debug item,
+    const char *name)
+{
+	int val;
+
+	if (item < 0 || item > IDMAPD_DEBUG_MAX)
+		return;
+
+	val = get_debug(handles, name);
+
+	if (val != _idmapdstate.debug[item])
+		idmapdlog(LOG_DEBUG, "%s/%s = %d", DEBUG_PG, name, val);
+
+	_idmapdstate.debug[item] = val;
+}
+
+static
+void
 check_smf_debug_mode(idmap_cfg_handles_t *handles)
 {
-	boolean_t new_debug_mode;
-	int rc;
+	idmapd_set_debug(handles, IDMAPD_DEBUG_ALL, "all");
+	idmapd_set_debug(handles, IDMAPD_DEBUG_CONFIG, "config");
+	idmapd_set_debug(handles, IDMAPD_DEBUG_MAPPING, "mapping");
+	idmapd_set_debug(handles, IDMAPD_DEBUG_DISC, "discovery");
+	idmapd_set_debug(handles, IDMAPD_DEBUG_DNS, "dns");
+	idmapd_set_debug(handles, IDMAPD_DEBUG_LDAP, "ldap");
 
-	rc = prop_exists(handles, "debug", &new_debug_mode);
-	if (rc != 0)
-		return (rc);
-
-	if (_idmapdstate.debug_mode != new_debug_mode) {
-		if (!_idmapdstate.debug_mode) {
-			_idmapdstate.debug_mode = new_debug_mode;
-			idmap_log_stderr(LOG_DEBUG);
-			idmapdlog(LOG_DEBUG, "debug mode enabled");
-		} else {
-			idmapdlog(LOG_DEBUG, "debug mode disabled");
-			idmap_log_stderr(-1);
-			_idmapdstate.debug_mode = new_debug_mode;
-		}
-	}
-
-	return (0);
+	adutils_set_debug(AD_DEBUG_ALL, _idmapdstate.debug[IDMAPD_DEBUG_ALL]);
+	adutils_set_debug(AD_DEBUG_DISC, _idmapdstate.debug[IDMAPD_DEBUG_DISC]);
+	adutils_set_debug(AD_DEBUG_DNS, _idmapdstate.debug[IDMAPD_DEBUG_DNS]);
+	adutils_set_debug(AD_DEBUG_LDAP, _idmapdstate.debug[IDMAPD_DEBUG_LDAP]);
 }
 
 /*
@@ -1206,18 +1416,26 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		return (-2);
 	}
 
-	if (scf_pg_update(handles->general_pg) < 0) {
+	if (scf_pg_update(handles->debug_pg) < 0) {
 		idmapdlog(LOG_ERR, "scf_pg_update() failed: %s",
 		    scf_strerror(scf_error()));
 		return (-2);
 	}
 
-	rc = check_smf_debug_mode(handles);
+	check_smf_debug_mode(handles);
+
+	rc = get_val_bool(handles, "unresolvable_sid_mapping",
+	    &pgcfg->eph_map_unres_sids, B_TRUE);
 	if (rc != 0)
 		(*errors)++;
 
-	rc = get_val_int(handles, "unresolvable_sid_mapping",
-	    &pgcfg->eph_map_unres_sids, SCF_TYPE_BOOLEAN);
+	rc = get_val_bool(handles, "use_lsa",
+	    &pgcfg->use_lsa, B_TRUE);
+	if (rc != 0)
+		(*errors)++;
+
+	rc = get_val_bool(handles, "disable_cross_forest_trusts",
+	    &pgcfg->disable_cross_forest_trusts, B_TRUE);
 	if (rc != 0)
 		(*errors)++;
 
@@ -1249,6 +1467,11 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (rc != 0)
 		(*errors)++;
 	else {
+		if (pgcfg->domain_name != NULL &&
+		    pgcfg->domain_name[0] == '\0') {
+			free(pgcfg->domain_name);
+			pgcfg->domain_name = NULL;
+		}
 		(void) ad_disc_set_DomainName(handles->ad_ctx,
 		    pgcfg->domain_name);
 		pgcfg->domain_name_auto_disc = B_FALSE;
@@ -1276,8 +1499,8 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		/* If machine_sid not configured, generate one */
 		if (generate_machine_sid(&pgcfg->machine_sid) < 0)
 			return (-2);
-		rc = set_val_astring(handles, "machine_sid",
-		    pgcfg->machine_sid);
+		rc = set_val_astring(handles, handles->config_pg,
+		    "machine_sid", pgcfg->machine_sid);
 		if (rc != 0)
 			(*errors)++;
 	}
@@ -1368,19 +1591,19 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 
 }
 
-
-/*
- * This is the half of idmap_cfg_load() that auto-discovers values of
- * discoverable properties that weren't already set via SMF properties.
- *
- * idmap_cfg_discover() is called *after* idmap_cfg_load_smf(), so it
- * needs to be careful not to overwrite any properties set in SMF.
- */
 static
 void
-idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
+log_if_unable(const void *val, const char *what)
 {
-	ad_disc_t ad_ctx = handles->ad_ctx;
+	if (val == NULL) {
+		idmapdlog(LOG_DEBUG, "unable to discover %s", what);
+	}
+}
+
+static
+void
+discover_trusted_domains(idmap_pg_config_t *pgcfg, ad_disc_t ad_ctx)
+{
 	ad_disc_t trusted_ctx;
 	int i, j, k, l;
 	char *forestname;
@@ -1390,39 +1613,6 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 	idmap_ad_disc_ds_t *globalcatalog;
 	idmap_trustedforest_t *trustedforests;
 	ad_disc_domainsinforest_t *domainsinforest;
-
-	idmapdlog(LOG_DEBUG, "Running discovery.");
-
-	ad_disc_refresh(ad_ctx);
-
-	if (pgcfg->default_domain == NULL)
-		pgcfg->default_domain = ad_disc_get_DomainName(ad_ctx,
-		    NULL);
-
-	if (pgcfg->domain_name == NULL)
-		pgcfg->domain_name = ad_disc_get_DomainName(ad_ctx,
-		    &pgcfg->domain_name_auto_disc);
-
-	if (pgcfg->domain_controller == NULL)
-		pgcfg->domain_controller =
-		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE,
-		    &pgcfg->domain_controller_auto_disc);
-
-	if (pgcfg->forest_name == NULL)
-		pgcfg->forest_name = ad_disc_get_ForestName(ad_ctx,
-		    &pgcfg->forest_name_auto_disc);
-
-	if (pgcfg->site_name == NULL)
-		pgcfg->site_name = ad_disc_get_SiteName(ad_ctx,
-		    &pgcfg->site_name_auto_disc);
-
-	if (pgcfg->global_catalog == NULL)
-		pgcfg->global_catalog =
-		    ad_disc_get_GlobalCatalog(ad_ctx, AD_DISC_PREFER_SITE,
-		    &pgcfg->global_catalog_auto_disc);
-
-	pgcfg->domains_in_forest =
-	    ad_disc_get_DomainsInForest(ad_ctx, NULL);
 
 	pgcfg->trusted_domains =
 	    ad_disc_get_TrustedDomains(ad_ctx, NULL);
@@ -1444,14 +1634,17 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 		for (i = 0; pgcfg->trusted_domains[i].domain[0] != '\0'; i++) {
 			trusteddomain = pgcfg->trusted_domains[i].domain;
 			trusted_ctx = ad_disc_init();
-			ad_disc_set_DomainName(trusted_ctx,
+			(void) ad_disc_set_DomainName(trusted_ctx,
 			    trusteddomain);
 			forestname =
 			    ad_disc_get_ForestName(trusted_ctx, NULL);
 			if (forestname == NULL) {
-				idmapdlog(LOG_DEBUG, "unable to discover "
-				    "Forest Name for the trusted domain %s",
-				    trusteddomain);
+				if (DBG(CONFIG, 1)) {
+					idmapdlog(LOG_DEBUG,
+					    "unable to discover Forest Name"
+					    " for the trusted domain %s",
+					    trusteddomain);
+				}
 				ad_disc_fini(trusted_ctx);
 				continue;
 			}
@@ -1501,10 +1694,12 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 			    ad_disc_get_GlobalCatalog(trusted_ctx,
 			    AD_DISC_PREFER_SITE, NULL);
 			if (globalcatalog == NULL) {
-				idmapdlog(LOG_DEBUG,
-				    "unable to discover Global "
-				    "Catalog for the trusted domain %s",
-				    trusteddomain);
+				if (DBG(CONFIG, 1)) {
+					idmapdlog(LOG_DEBUG,
+					    "unable to discover Global Catalog"
+					    " for the trusted domain %s",
+					    trusteddomain);
+				}
 				free(forestname);
 				ad_disc_fini(trusted_ctx);
 				continue;
@@ -1513,10 +1708,12 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 			    ad_disc_get_DomainsInForest(trusted_ctx,
 			    NULL);
 			if (domainsinforest == NULL) {
-				idmapdlog(LOG_DEBUG,
-				    "unable to discover Domains in the Forest "
-				    "for the trusted domain %s",
-				    trusteddomain);
+				if (DBG(CONFIG, 1)) {
+					idmapdlog(LOG_DEBUG,
+					    "unable to discover Domains in the"
+					    " Forest for the trusted domain %s",
+					    trusteddomain);
+				}
 				free(globalcatalog);
 				free(forestname);
 				ad_disc_fini(trusted_ctx);
@@ -1545,25 +1742,75 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 			free(trustedforests);
 		}
 	}
+}
 
-	if (pgcfg->domain_name == NULL)
-		idmapdlog(LOG_DEBUG, "unable to discover Domain Name");
-	if (pgcfg->domain_controller == NULL)
-		idmapdlog(LOG_DEBUG, "unable to discover Domain Controller");
-	if (pgcfg->forest_name == NULL)
-		idmapdlog(LOG_DEBUG, "unable to discover Forest Name");
-	if (pgcfg->site_name == NULL)
-		idmapdlog(LOG_DEBUG, "unable to discover Site Name");
-	if (pgcfg->global_catalog == NULL)
-		idmapdlog(LOG_DEBUG, "unable to discover Global Catalog");
-	if (pgcfg->domains_in_forest == NULL)
-		idmapdlog(LOG_DEBUG,
-		    "unable to discover Domains in the Forest");
-	if (pgcfg->trusted_domains == NULL)
-		idmapdlog(LOG_DEBUG, "unable to discover Trusted Domains");
+/*
+ * This is the half of idmap_cfg_load() that auto-discovers values of
+ * discoverable properties that weren't already set via SMF properties.
+ *
+ * idmap_cfg_discover() is called *after* idmap_cfg_load_smf(), so it
+ * needs to be careful not to overwrite any properties set in SMF.
+ */
+static
+void
+idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
+{
+	ad_disc_t ad_ctx = handles->ad_ctx;
+
+	if (DBG(CONFIG, 1))
+		idmapdlog(LOG_DEBUG, "Running discovery.");
+
+	ad_disc_refresh(ad_ctx);
+
+	if (pgcfg->domain_name == NULL) {
+		idmapdlog(LOG_DEBUG, "No domain name specified.");
+	} else {
+		if (pgcfg->domain_controller == NULL)
+			pgcfg->domain_controller =
+			    ad_disc_get_DomainController(ad_ctx,
+			    AD_DISC_PREFER_SITE,
+			    &pgcfg->domain_controller_auto_disc);
+
+		if (pgcfg->forest_name == NULL)
+			pgcfg->forest_name = ad_disc_get_ForestName(ad_ctx,
+			    &pgcfg->forest_name_auto_disc);
+
+		if (pgcfg->site_name == NULL)
+			pgcfg->site_name = ad_disc_get_SiteName(ad_ctx,
+			    &pgcfg->site_name_auto_disc);
+
+		if (pgcfg->global_catalog == NULL)
+			pgcfg->global_catalog =
+			    ad_disc_get_GlobalCatalog(ad_ctx,
+			    AD_DISC_PREFER_SITE,
+			    &pgcfg->global_catalog_auto_disc);
+
+		pgcfg->domains_in_forest =
+		    ad_disc_get_DomainsInForest(ad_ctx, NULL);
+
+		if (!pgcfg->disable_cross_forest_trusts)
+			discover_trusted_domains(pgcfg, ad_ctx);
+
+		if (DBG(CONFIG, 1)) {
+			log_if_unable(pgcfg->domain_name, "Domain Name");
+			log_if_unable(pgcfg->domain_controller,
+			    "Domain Controller");
+			log_if_unable(pgcfg->forest_name, "Forest Name");
+			log_if_unable(pgcfg->site_name, "Site Name");
+			log_if_unable(pgcfg->global_catalog, "Global Catalog");
+			log_if_unable(pgcfg->domains_in_forest,
+			    "Domains in the Forest");
+			if (!pgcfg->disable_cross_forest_trusts) {
+				log_if_unable(pgcfg->trusted_domains,
+				    "Trusted Domains");
+			}
+		}
+	}
 
 	ad_disc_done(ad_ctx);
-	idmapdlog(LOG_DEBUG, "Discovery done.");
+
+	if (DBG(CONFIG, 1))
+		idmapdlog(LOG_DEBUG, "Discovery done.");
 }
 
 
@@ -1574,18 +1821,16 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
  * reads from SMF, but you still have to refresh the service after
  * changing the config pg in order for the changes to take effect.
  *
- * There are two flags:
+ * There is one flag:
  *
  *  - CFG_DISCOVER
- *  - CFG_LOG
  *
  * If CFG_DISCOVER is set then idmap_cfg_load() calls
  * idmap_cfg_discover() to discover, via DNS and LDAP lookups, property
  * values that weren't set in SMF.
  *
- * If CFG_LOG is set then idmap_cfg_load() will log (to LOG_NOTICE)
- * whether the configuration changed.  This should be used only from the
- * refresh method.
+ * idmap_cfg_load() will log (to LOG_NOTICE) whether the configuration
+ * changed.
  *
  * Return values: 0 -> success, -1 -> failure, -2 -> hard failures
  * reading from SMF.
@@ -1599,10 +1844,13 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	int ad_reload_required = 0;
 	idmap_pg_config_t new_pgcfg, *live_pgcfg;
 
+	if (DBG(CONFIG, 1))
+		idmapdlog(LOG_DEBUG, "Loading configuration.");
+
 	live_pgcfg = &cfg->pgcfg;
 	(void) memset(&new_pgcfg, 0, sizeof (new_pgcfg));
 
-	pthread_mutex_lock(&cfg->handles.mutex);
+	(void) pthread_mutex_lock(&cfg->handles.mutex);
 
 	if ((rc = idmap_cfg_load_smf(&cfg->handles, &new_pgcfg, &errors)) < -1)
 		goto err;
@@ -1612,8 +1860,10 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	WRLOCK_CONFIG();
 	if (live_pgcfg->list_size_limit != new_pgcfg.list_size_limit) {
-		idmapdlog(LOG_INFO, "change list_size=%d",
-		    new_pgcfg.list_size_limit);
+		if (DBG(CONFIG, 1)) {
+			idmapdlog(LOG_INFO, "change list_size=%d",
+			    new_pgcfg.list_size_limit);
+		}
 		live_pgcfg->list_size_limit = new_pgcfg.list_size_limit;
 	}
 
@@ -1623,6 +1873,13 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	changed += update_bool(&live_pgcfg->eph_map_unres_sids,
 	    &new_pgcfg.eph_map_unres_sids, "unresolvable_sid_mapping");
+
+	changed += update_bool(&live_pgcfg->use_lsa,
+	    &new_pgcfg.use_lsa, "use_lsa");
+
+	changed += update_bool(&live_pgcfg->disable_cross_forest_trusts,
+	    &new_pgcfg.disable_cross_forest_trusts,
+	    "disable_cross_forest_trusts");
 
 	changed += update_enum(&live_pgcfg->directory_based_mapping,
 	    &new_pgcfg.directory_based_mapping, "directory_based_mapping",
@@ -1695,20 +1952,17 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	idmap_cfg_unload(&new_pgcfg);
 
-	if (flags & CFG_LOG) {
-		/*
-		 * If the config changes as a result of a refresh of the
-		 * service, then logging about it can provide useful
-		 * feedback to the sysadmin.
-		 */
-		idmapdlog(LOG_NOTICE, "Configuration %schanged",
-		    changed ? "" : "un");
+	if (DBG(CONFIG, 1)) {
+		if (changed)
+			idmapdlog(LOG_NOTICE, "Configuration changed");
+		else
+			idmapdlog(LOG_NOTICE, "Configuration unchanged");
 	}
 
 	UNLOCK_CONFIG();
 
 err:
-	pthread_mutex_unlock(&cfg->handles.mutex);
+	(void) pthread_mutex_unlock(&cfg->handles.mutex);
 
 	if (rc < -1)
 		return (rc);
@@ -1749,7 +2003,7 @@ idmap_cfg_init()
 	if (!(handles->service = scf_service_create(handles->main)) ||
 	    !(handles->instance = scf_instance_create(handles->main)) ||
 	    !(handles->config_pg = scf_pg_create(handles->main)) ||
-	    !(handles->general_pg = scf_pg_create(handles->main))) {
+	    !(handles->debug_pg = scf_pg_create(handles->main))) {
 		idmapdlog(LOG_ERR, "scf handle creation failed: %s",
 		    scf_strerror(scf_error()));
 		goto error;
@@ -1769,14 +2023,13 @@ idmap_cfg_init()
 	}
 
 	if (scf_service_get_pg(handles->service,
-	    GENERAL_PG, handles->general_pg) < 0) {
-		idmapdlog(LOG_ERR, "scf_service_get_pg() failed: %s",
-		    scf_strerror(scf_error()));
+	    DEBUG_PG, handles->debug_pg) < 0) {
+		idmapdlog(LOG_ERR, "Property group \"%s\": %s",
+		    DEBUG_PG, scf_strerror(scf_error()));
 		goto error;
 	}
 
-	if (check_smf_debug_mode(handles) != 0)
-		goto error;
+	check_smf_debug_mode(handles);
 
 	/* Initialize AD Auto Discovery context */
 	handles->ad_ctx = ad_disc_init();
@@ -1852,7 +2105,8 @@ idmap_cfg_fini(idmap_cfg_t *cfg)
 
 	(void) pthread_mutex_destroy(&handles->mutex);
 	scf_pg_destroy(handles->config_pg);
-	scf_pg_destroy(handles->general_pg);
+	if (handles->debug_pg != NULL)
+		scf_pg_destroy(handles->debug_pg);
 	scf_instance_destroy(handles->instance);
 	scf_service_destroy(handles->service);
 	scf_handle_destroy(handles->main);
@@ -1876,6 +2130,47 @@ idmap_cfg_hup_handler(int sig)
 {
 	if (idmapd_ev_port >= 0)
 		(void) port_send(idmapd_ev_port, RECONFIGURE, NULL);
+}
+
+/*
+ * Upgrade the debug flags.
+ *
+ * We're replacing a single debug flag with a fine-grained mechanism that
+ * is also capable of considerably more verbosity.  We'll take a stab at
+ * producing roughly the same level of output.
+ */
+static
+int
+upgrade_debug(idmap_cfg_handles_t *handles)
+{
+	boolean_t debug_present;
+	const char DEBUG_PROP[] = "debug";
+	int rc;
+
+	rc = prop_exists(handles, DEBUG_PROP, &debug_present);
+
+	if (rc != 0)
+		return (rc);
+
+	if (!debug_present)
+		return (0);
+
+	idmapdlog(LOG_INFO,
+	    "Upgrading old %s/%s setting to %s/* settings.",
+	    CONFIG_PG, DEBUG_PROP, DEBUG_PG);
+
+	rc = set_val_integer(handles, handles->debug_pg, "config", 1);
+	if (rc != 0)
+		return (rc);
+	rc = set_val_integer(handles, handles->debug_pg, "discovery", 1);
+	if (rc != 0)
+		return (rc);
+
+	rc = del_val(handles, handles->config_pg, DEBUG_PROP);
+	if (rc != 0)
+		return (rc);
+
+	return (0);
 }
 
 /*
@@ -1908,8 +2203,8 @@ upgrade_directory_mapping(idmap_cfg_handles_t *handles)
 		return (0);
 
 	boolean_t legacy_ds_name_mapping_enabled;
-	rc = get_val_int(handles, DS_NAME_MAPPING_ENABLED,
-	    &legacy_ds_name_mapping_enabled, SCF_TYPE_BOOLEAN);
+	rc = get_val_bool(handles, DS_NAME_MAPPING_ENABLED,
+	    &legacy_ds_name_mapping_enabled, B_FALSE);
 	if (rc != 0)
 		return (rc);
 
@@ -1935,8 +2230,8 @@ upgrade_directory_mapping(idmap_cfg_handles_t *handles)
 		    "to %s=%s.",
 		    DS_NAME_MAPPING_ENABLED, legacy_bool_string,
 		    DIRECTORY_BASED_MAPPING, legacy_mode);
-		rc = set_val_astring(handles, DIRECTORY_BASED_MAPPING,
-		    legacy_mode);
+		rc = set_val_astring(handles, handles->config_pg,
+		    DIRECTORY_BASED_MAPPING, legacy_mode);
 		if (rc != 0)
 			return (rc);
 	} else {
@@ -1962,7 +2257,7 @@ upgrade_directory_mapping(idmap_cfg_handles_t *handles)
 		free(directory_based_mapping);
 	}
 
-	rc = del_val(handles, DS_NAME_MAPPING_ENABLED);
+	rc = del_val(handles, handles->config_pg, DS_NAME_MAPPING_ENABLED);
 	if (rc != 0)
 		return (rc);
 
@@ -1979,6 +2274,10 @@ idmap_cfg_upgrade(idmap_cfg_t *cfg)
 	int rc;
 
 	rc = upgrade_directory_mapping(&cfg->handles);
+	if (rc != 0)
+		return (rc);
+
+	rc = upgrade_debug(&cfg->handles);
 	if (rc != 0)
 		return (rc);
 

@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -22,8 +21,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -95,6 +92,20 @@
 			name='list_size_limit'
 			type='count'
 			value='0' />
+		<propval
+			name='value_authorization'
+			type='astring'
+			value='solaris.smf.value.idmap' />
+	</property_group>
+
+	<property_group name='debug' type='application' >
+		<stability value='Unstable' />
+		<propval name='all'       type='integer' value='0' />
+		<propval name='config'    type='integer' value='0' />
+		<propval name='mapping'   type='integer' value='0' />
+		<propval name='discovery' type='integer' value='0' />
+		<propval name='dns'       type='integer' value='0' />
+		<propval name='ldap'      type='integer' value='0' />
 		<propval
 			name='value_authorization'
 			type='astring'

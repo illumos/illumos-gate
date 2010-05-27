@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -79,6 +78,8 @@ smb_kmod_setcfg(smb_kmod_cfg_t *cfg)
 	ioc.sync_enable = cfg->skc_sync_enable;
 	ioc.secmode = cfg->skc_secmode;
 	ioc.ipv6_enable = cfg->skc_ipv6_enable;
+	ioc.exec_flags = cfg->skc_execflags;
+	ioc.version = cfg->skc_version;
 
 	(void) strlcpy(ioc.nbdomain, cfg->skc_nbdomain, sizeof (ioc.nbdomain));
 	(void) strlcpy(ioc.fqdn, cfg->skc_fqdn, sizeof (ioc.fqdn));
@@ -162,38 +163,52 @@ smb_kmod_nbtreceive(void)
 }
 
 int
-smb_kmod_share(char *path, char *name)
+smb_kmod_share(nvlist_t *shrlist)
 {
 	smb_ioc_share_t *ioc;
+	uint32_t ioclen;
+	char *shrbuf = NULL;
+	size_t bufsz;
 	int rc = ENOMEM;
 
-	ioc = malloc(sizeof (smb_ioc_share_t));
+	if ((rc = nvlist_pack(shrlist, &shrbuf, &bufsz, NV_ENCODE_XDR, 0)) != 0)
+		return (rc);
 
-	if (ioc != NULL) {
-		(void) strlcpy(ioc->path, path, sizeof (ioc->path));
-		(void) strlcpy(ioc->name, name, sizeof (ioc->name));
-		rc = smb_kmod_ioctl(SMB_IOC_SHARE, &ioc->hdr,
-		    sizeof (smb_ioc_share_t));
+	ioclen = sizeof (smb_ioc_share_t) + bufsz;
+
+	if ((ioc = malloc(ioclen)) != NULL) {
+		ioc->shrlen = bufsz;
+		bcopy(shrbuf, ioc->shr, bufsz);
+		rc = smb_kmod_ioctl(SMB_IOC_SHARE, &ioc->hdr, ioclen);
 		free(ioc);
 	}
+
+	free(shrbuf);
 	return (rc);
 }
 
 int
-smb_kmod_unshare(char *path, char *name)
+smb_kmod_unshare(nvlist_t *shrlist)
 {
 	smb_ioc_share_t *ioc;
+	uint32_t ioclen;
+	char *shrbuf = NULL;
+	size_t bufsz;
 	int rc = ENOMEM;
 
-	ioc = malloc(sizeof (smb_ioc_share_t));
+	if ((rc = nvlist_pack(shrlist, &shrbuf, &bufsz, NV_ENCODE_XDR, 0)) != 0)
+		return (rc);
 
-	if (ioc != NULL) {
-		(void) strlcpy(ioc->path, path, sizeof (ioc->path));
-		(void) strlcpy(ioc->name, name, sizeof (ioc->name));
-		rc = smb_kmod_ioctl(SMB_IOC_UNSHARE, &ioc->hdr,
-		    sizeof (smb_ioc_share_t));
+	ioclen = sizeof (smb_ioc_share_t) + bufsz;
+
+	if ((ioc = malloc(ioclen)) != NULL) {
+		ioc->shrlen = bufsz;
+		bcopy(shrbuf, ioc->shr, bufsz);
+		rc = smb_kmod_ioctl(SMB_IOC_UNSHARE, &ioc->hdr, ioclen);
 		free(ioc);
 	}
+
+	free(shrbuf);
 	return (rc);
 }
 

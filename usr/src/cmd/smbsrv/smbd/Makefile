@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 
@@ -30,6 +29,7 @@ SRCS=				\
 	smbd_join.c		\
 	smbd_logon.c		\
 	smbd_main.c		\
+	smbd_nicmon.c		\
 	smbd_opipe_doorsvc.c	\
 	smbd_share_doorsvc.c	\
 	smbd_vss.c
@@ -51,7 +51,7 @@ $(ROOTVARSMBDLL):= FILEMODE = 0755
 include ../Makefile.smbsrv.defs
 
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lmlsvc -lmlrpc -lsmbns -lsmb \
-	-lzfs -lbsm -lnsl -lumem
+	-lzfs -lbsm -lsocket -lnsl -lscf -lumem
 LDFLAGS += -R/usr/lib/smbsrv
 
 ROOTSMBDDIR = $(ROOTLIB)/smbsrv

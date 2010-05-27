@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -721,7 +720,7 @@ nldap_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 		idmap_ids_res *result)
 {
 	idmap_retcode			retcode, rc1;
-	int				i, add, is_wuser;
+	int				i, add;
 	idmap_mapping			*req;
 	idmap_id_res			*res;
 	idmap_nldap_query_state_t	*qs = NULL;
@@ -751,7 +750,7 @@ nldap_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 		if (!(req->direction & _IDMAP_F_LOOKUP_NLDAP))
 			continue;
 
-		if (IS_REQUEST_SID(*req, 1)) {
+		if (IS_ID_SID(req->id1)) {
 
 			/* win2unix request: */
 
@@ -779,7 +778,7 @@ nldap_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 
 			/* Lookup nldap by winname to get pid and unixname */
 			add = 1;
-			idmap_info_free(&res->info);
+			idmap_how_clear(&res->info.how);
 			res->info.src = IDMAP_MAP_SRC_NEW;
 			how = &res->info.how;
 			how->map_type = IDMAP_MAP_TYPE_DS_NLDAP;
@@ -792,7 +791,7 @@ nldap_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 			    &req->id2name, &res->id.idmap_id_u.uid,
 			    &res->retcode);
 
-		} else if (IS_REQUEST_UID(*req) || IS_REQUEST_GID(*req)) {
+		} else if (IS_ID_UID(req->id1) || IS_ID_GID(req->id1)) {
 
 			/* unix2win request: */
 
@@ -807,7 +806,7 @@ nldap_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 			req->id2domain = NULL;
 
 			/* Set how info */
-			idmap_info_free(&res->info);
+			idmap_how_clear(&res->info.how);
 			res->info.src = IDMAP_MAP_SRC_NEW;
 			how = &res->info.how;
 			how->map_type = IDMAP_MAP_TYPE_DS_NLDAP;
@@ -887,18 +886,16 @@ out:
 		if (res->retcode == IDMAP_SUCCESS &&
 		    req->id2name != NULL &&
 		    res->id.idmap_id_u.sid.prefix == NULL &&
-		    (IS_REQUEST_UID(*req) || IS_REQUEST_GID(*req))) {
+		    (IS_ID_UID(req->id1) || IS_ID_GID(req->id1))) {
 
-			is_wuser = -1;
 			rc1 = lookup_name2sid(state->cache,
-			    req->id2name, req->id2domain, &is_wuser,
+			    req->id2name, req->id2domain, -1,
 			    NULL, NULL,
 			    &res->id.idmap_id_u.sid.prefix,
-			    &res->id.idmap_id_u.sid.rid, req, 1);
-			if (rc1 == IDMAP_SUCCESS)
-				res->id.idtype =
-				    is_wuser ? IDMAP_USID : IDMAP_GSID;
-			else if (rc1 == IDMAP_ERR_NOTFOUND) {
+			    &res->id.idmap_id_u.sid.rid,
+			    &res->id.idtype,
+			    req, 1);
+			if (rc1 == IDMAP_ERR_NOTFOUND) {
 				req->direction |= _IDMAP_F_LOOKUP_AD;
 				state->ad_nqueries++;
 			} else
@@ -913,7 +910,7 @@ out:
 		if (res->retcode != IDMAP_SUCCESS &&
 		    res->retcode != IDMAP_ERR_NS_LDAP_BAD_WINNAME &&
 		    !(IDMAP_FATAL_ERROR(res->retcode))) {
-			idmap_info_free(&res->info);
+			idmap_how_clear(&res->info.how);
 			res->retcode = IDMAP_SUCCESS;
 		}
 	}

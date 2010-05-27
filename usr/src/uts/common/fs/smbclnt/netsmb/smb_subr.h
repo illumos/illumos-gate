@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_SUBR_H_
@@ -108,7 +107,7 @@ int  smb_lmresponse(const uchar_t *hash, const uchar_t *C8, uchar_t *RN);
 int  smb_ntlmv2response(const uchar_t *hash, const uchar_t *C8,
     const uchar_t *blob, size_t bloblen, uchar_t **RN, size_t *RNlen);
 int  smb_maperror(int eclass, int eno);
-uint32_t  smb_maperr32(uint32_t eno);
+int  smb_maperr32(uint32_t eno);
 int  smb_put_dmem(struct mbchain *mbp, struct smb_vc *vcp,
     const char *src, int len, int caseopt, int *lenp);
 int  smb_put_dstring(struct mbchain *mbp, struct smb_vc *vcp,
