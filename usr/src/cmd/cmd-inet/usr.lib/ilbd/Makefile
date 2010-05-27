@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 ILBD=		ilbd
@@ -42,6 +41,7 @@ SRCS=		$(ILBD_SRCS) $(LIST_SRCS)
 ILBSUBDIRS=	ilb
 
 include		../../../Makefile.cmd
+include		../../../Makefile.ctf
 include		../../Makefile.cmd-inet
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)/loadbalancer
@@ -63,12 +63,6 @@ install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
 lint:=		TARGET= lint
-
-# used for debugging ONLY:
-
-CFLAGS =		-g -K pic 
-STRIP_STABS=		:
-CTFCVTFLAGS +=		-g
 
 
 LDLIBS +=	-lsocket -lsecdb -lnsl -lilb -lscf -linetutil -lbsm

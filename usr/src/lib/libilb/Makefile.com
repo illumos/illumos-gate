@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libilb.a
@@ -46,17 +45,9 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 C99MODE =	$(C99_ENABLE)
 
-# use for prod:
 CFLAGS +=	-mt $(CCVERBOSE)
 CPPFLAGS +=	$(INCS)
 LDLIBS +=	-lsocket
-
-# use for debug:
-CFLAGS +=	-g
-STRIP_STABS=	:
-CTFCVTFLAGS +=	-g
-CTFMERGE_LIB	= $(CTFMERGE) -g -t -f -L VERSION -o $@ $(PICS)
-DYNFLAGS +=	-g
 
 .KEEP_STATE:
 
