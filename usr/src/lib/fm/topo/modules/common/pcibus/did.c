@@ -336,6 +336,7 @@ did_create(topo_mod_t *mp, di_node_t src,
 		/*
 		 * This is a pci node.
 		 */
+		np->dp_physlot = -1;
 		if (di_slotinfo_get(mp, src, &np->dp_nslots,
 		    &np->dp_slotnames) < 0) {
 			if (np->dp_devtype != NULL)

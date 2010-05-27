@@ -221,12 +221,14 @@ typedef struct ses_open_fail_list {
 
 static ses_open_fail_list_t *ses_sofh;
 static pthread_mutex_t ses_sofmt;
+static void ses_ct_print(char *ptr);
 
 static void
-ses_recheck_dir(topo_mod_t *mod)
+ses_recheck_dir()
 {
 	ses_target_t *target;
 	sysevent_id_t eid;
+	char buf[80];
 	ses_open_fail_list_t *sof;
 
 	/*
@@ -239,16 +241,18 @@ ses_recheck_dir(topo_mod_t *mod)
 		 */
 		if ((target = ses_open(LIBSES_VERSION,
 		    sof->sof_path)) == NULL) {
-			topo_mod_dprintf(mod,
+			(void) snprintf(buf, sizeof (buf),
 			    "recheck_dir - still can't open %s", sof->sof_path);
+			ses_ct_print(buf);
 			continue;
 		}
 
 		/*
 		 * ok - better force a new snapshot
 		 */
-		topo_mod_dprintf(mod,
+		(void) snprintf(buf, sizeof (buf),
 		    "recheck_dir - can now open %s", sof->sof_path);
+		ses_ct_print(buf);
 		(void) sysevent_post_event(EC_PLATFORM, ESC_PLATFORM_SP_RESET,
 		    SUNW_VENDOR, "fmd", NULL, &eid);
 		ses_close(target);
@@ -366,6 +370,23 @@ static struct ses_thread_s {
 	0
 };
 
+typedef struct ses_mod_list {
+	struct ses_mod_list	*smod_next;
+	topo_mod_t		*smod_mod;
+} ses_mod_list_t;
+
+static ses_mod_list_t *ses_smod;
+
+static void
+ses_ct_print(char *ptr)
+{
+	(void) pthread_mutex_lock(&sesthread.mt);
+	if (ses_smod->smod_mod)
+		topo_mod_dprintf(ses_smod->smod_mod, ptr);
+	(void) pthread_mutex_unlock(&sesthread.mt);
+}
+
+/*ARGSUSED*/
 static void *
 ses_contract_thread(void *arg)
 {
@@ -374,14 +395,14 @@ ses_contract_thread(void *arg)
 	ctevid_t evid;
 	uint_t event;
 	char path[PATH_MAX];
+	char buf[80];
 	ses_enum_target_t *stp;
 	ct_stathdl_t stathdl;
 	ctid_t ctid;
-	topo_mod_t *mod = (topo_mod_t *)arg;
 	struct pollfd fds;
 	int pollret;
 
-	topo_mod_dprintf(mod, "start contract event thread");
+	ses_ct_print("start contract event thread");
 	efd = open64(CTFS_ROOT "/device/pbundle", O_RDONLY);
 	fds.fd = efd;
 	fds.events = POLLIN;
@@ -398,13 +419,13 @@ ses_contract_thread(void *arg)
 		/* poll until an event arrives */
 		if ((pollret = poll(&fds, 1, 10000)) <= 0) {
 			if (pollret == 0)
-				ses_recheck_dir(mod);
+				ses_recheck_dir();
 			continue;
 		}
 
 		/* read the event */
 		(void) pthread_mutex_lock(&ses_sslmt);
-		topo_mod_dprintf(mod, "read contract event");
+		ses_ct_print("read contract event");
 		if (ct_event_read(efd, &ev) != 0) {
 			(void) pthread_mutex_unlock(&ses_sslmt);
 			continue;
@@ -412,10 +433,14 @@ ses_contract_thread(void *arg)
 
 		/* see if it is an event we are expecting */
 		ctid = ct_event_get_ctid(ev);
-		topo_mod_dprintf(mod, "got contract event ctid=%d", ctid);
+		(void) snprintf(buf, sizeof (buf),
+		    "got contract event ctid=%d", ctid);
+		ses_ct_print(buf);
 		event = ct_event_get_type(ev);
 		if (event != CT_DEV_EV_OFFLINE && event != CT_EV_NEGEND) {
-			topo_mod_dprintf(mod, "bad contract event %x", event);
+			snprintf(buf, sizeof (buf),
+			    "bad contract event %x", event);
+			ses_ct_print(buf);
 			ct_event_free(ev);
 			(void) pthread_mutex_unlock(&ses_sslmt);
 			continue;
@@ -434,8 +459,9 @@ ses_contract_thread(void *arg)
 
 		/* check if target pointer is still valid */
 		if (ses_ssl_valid(stp) == 0) {
-			topo_mod_dprintf(mod, "contract already abandoned %x",
-			    event);
+			snprintf(buf, sizeof (buf),
+			    "contract already abandoned %x", event);
+			ses_ct_print(buf);
 			(void) snprintf(path, PATH_MAX,
 			    CTFS_ROOT "/device/%ld/ctl", ctid);
 			ctlfd = open64(path, O_WRONLY);
@@ -456,9 +482,9 @@ ses_contract_thread(void *arg)
 		ctlfd = open64(path, O_WRONLY);
 		if (event != CT_EV_NEGEND) {
 			/* if this is an offline event, do the offline */
-			topo_mod_dprintf(mod, "got contract offline event");
+			ses_ct_print("got contract offline event");
 			if (stp->set_target) {
-				topo_mod_dprintf(mod, "contract thread rele");
+				ses_ct_print("contract thread rele");
 				ses_snap_rele(stp->set_snap);
 				ses_close(stp->set_target);
 				stp->set_target = NULL;
@@ -466,10 +492,11 @@ ses_contract_thread(void *arg)
 			ct_ctl_ack(ctlfd, evid);
 		} else {
 			/* if this is the negend, then abandon the contract */
-			topo_mod_dprintf(mod, "got contract negend");
+			ses_ct_print("got contract negend");
 			if (stp->set_ctid) {
-				topo_mod_dprintf(mod, "abandon old contract %d",
-				    stp->set_ctid);
+				snprintf(buf, sizeof (buf),
+				    "abandon old contract %d", stp->set_ctid);
+				ses_ct_print(buf);
 				stp->set_ctid = NULL;
 			}
 			ct_ctl_abandon(ctlfd);
@@ -528,13 +555,18 @@ ses_handler(int sig)
 }
 
 static void
-ses_thread_init(void *arg)
+ses_thread_init(topo_mod_t *mod)
 {
 	pthread_attr_t *attr = NULL;
 	struct sigaction act;
+	ses_mod_list_t *smod;
 
 	(void) pthread_mutex_lock(&sesthread.mt);
 	sesthread.count++;
+	smod = topo_mod_zalloc(mod, sizeof (*smod));
+	smod->smod_mod = mod;
+	smod->smod_next = ses_smod;
+	ses_smod = smod;
 	if (sesthread.tid == 0) {
 		/* find a suitable signal to use for killing the thread below */
 		sesthread.thr_sig = find_thr_sig();
@@ -547,15 +579,29 @@ ses_thread_init(void *arg)
 
 		/* create a thread to listen for offline events */
 		(void) pthread_create(&sesthread.tid,
-		    attr, ses_contract_thread, arg);
+		    attr, ses_contract_thread, NULL);
 	}
 	(void) pthread_mutex_unlock(&sesthread.mt);
 }
 
 static void
-ses_thread_fini()
+ses_thread_fini(topo_mod_t *mod)
 {
+	ses_mod_list_t *smod, *prev_smod;
+
 	(void) pthread_mutex_lock(&sesthread.mt);
+	prev_smod = NULL;
+	for (smod = ses_smod; smod != NULL; smod = smod->smod_next) {
+		if (smod->smod_mod == mod) {
+			if (prev_smod == NULL)
+				ses_smod = smod->smod_next;
+			else
+				prev_smod->smod_next = smod->smod_next;
+			topo_mod_free(mod, smod, sizeof (*smod));
+			break;
+		}
+		prev_smod = smod;
+	}
 	if (--sesthread.count > 0) {
 		(void) pthread_mutex_unlock(&sesthread.mt);
 		return;
@@ -3021,7 +3067,7 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 void
 _topo_fini(topo_mod_t *mod)
 {
-	ses_thread_fini();
+	ses_thread_fini(mod);
 	ses_sof_freeall(mod);
 	topo_mod_unregister(mod);
 }
