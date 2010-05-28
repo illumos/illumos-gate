@@ -315,13 +315,16 @@ platform_getpath(nvlist_t *nvl)
 	switch (type) {
 	case DT_HC:
 		if (topo_fmri_getprop(Eft_topo_hdl, dfmri, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_RESOURCE, NULL, &resource, &err) == -1)
+		    TOPO_PROP_RESOURCE, NULL, &resource, &err) == -1) {
 			ret = hc_fmri_nodeize(dfmri);
-		else if (nvlist_lookup_nvlist(resource,
+			break;
+		} else if (nvlist_lookup_nvlist(resource,
 		    TOPO_PROP_VAL_VAL, &real_fmri) != 0)
 			ret = hc_fmri_nodeize(dfmri);
 		else
 			ret = hc_fmri_nodeize(real_fmri);
+
+		nvlist_free(resource);
 		break;
 
 	case DT_DEV:
