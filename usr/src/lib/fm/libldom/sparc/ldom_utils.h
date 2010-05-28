@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -35,7 +34,7 @@
 extern "C" {
 #endif
 
-extern int ldom_find_thr_sig(void);
+extern boolean_t notify_setup(int *);
 
 #ifdef	__cplusplus
 }

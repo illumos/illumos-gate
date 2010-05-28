@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -31,60 +30,17 @@
  */
 
 #include <stdio.h>
-#include <signal.h>
-#include <pthread.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-/*
- * ldom_find_thr_sig()
- * Description:
- *     Find an unmasked signal which is used for terminating the thread
- *
- *     If the libldom.so thread is started before all fmd modules are loaded,
- *     all signals are unmasked. Either SIGTERM or SIGUSR1 can be used to
- *     stop the thread.
- *     If the thread is started by a fmd module, fmd has masked all signals
- *     except the client.thrsig and a list of reserver/non-catchable signals.
- *     The fmd client.thrsig signal must be used to stop the thread. The default
- *     value of the client.thrsig is SIGUSR1.
- *
- *     This fucntion first tries to check if the SIGTERM, SIGUSR1 or SIGUSR2
- *     signal is umasked. If so, select this signal.
- *     Otherwise, go through all the signals and find an umasked one.
- */
-int
-ldom_find_thr_sig(void)
+boolean_t
+notify_setup(int *notify_pipe)
 {
-	int i;
-	sigset_t oset, rset;
-	int sig[] = {SIGTERM, SIGUSR1, SIGUSR2};
-	int sig_sz = sizeof (sig) / sizeof (int);
-	int rc = SIGTERM;
-
-	/* prefered set of signals that are likely used to terminate threads */
-	(void) sigemptyset(&oset);
-	(void) pthread_sigmask(SIG_SETMASK, NULL, &oset);
-	for (i = 0; i < sig_sz; i++) {
-		if (sigismember(&oset, sig[i]) == 0) {
-			return (sig[i]);
-		}
+	if (pipe(notify_pipe) < 0) {
+		return (B_FALSE);
+	} else {
+		fcntl(notify_pipe[1], F_SETFL, O_NONBLOCK);
 	}
-
-	/* reserved set of signals that are not allowed to terminate thread */
-	(void) sigemptyset(&rset);
-	(void) sigaddset(&rset, SIGABRT);
-	(void) sigaddset(&rset, SIGKILL);
-	(void) sigaddset(&rset, SIGSTOP);
-	(void) sigaddset(&rset, SIGCANCEL);
-
-	/* Find signal that is not masked and not in the reserved list. */
-	for (i = 1; i < MAXSIG; i++) {
-		if (sigismember(&rset, i) == 1) {
-			continue;
-		}
-		if (sigismember(&oset, i) == 0) {
-			return (i);
-		}
-	}
-
-	return (rc);
+	return (B_TRUE);
 }

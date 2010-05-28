@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -104,7 +103,7 @@ static struct poller_s {
 	pthread_mutex_t mt;
 	pthread_cond_t cv;
 	pthread_t polling_tid;
-	int polling_thr_sig;
+	int notify_pipe[2];
 	int doreset;
 	int doexit;
 	int nclients;
@@ -115,7 +114,7 @@ static struct poller_s {
 	PTHREAD_MUTEX_INITIALIZER,
 	PTHREAD_COND_INITIALIZER,
 	0,
-	SIGTERM,
+	{-1, -1},
 	1,
 	0,
 	0,
@@ -190,7 +189,7 @@ read_stream(int fd, void *buf, size_t size)
 	 */
 	do {
 		if ((rv = read(fd, (void *)currentp, data_left)) < 0) {
-			if (errno == EAGAIN && poll(&pollfd, 1, -1) > 0)
+			if (errno == EAGAIN && poll(&pollfd, 1, 3000) > 0)
 				continue;	/* retry */
 			else
 				return (1);
@@ -427,9 +426,11 @@ poller_shutdown(boolean_t wait)
 	(void) pthread_mutex_unlock(&pollbase.mt);
 
 	if (wait == B_TRUE) {
-		/* stop the poller thread  and wait for it to end */
-		(void) pthread_kill(pollbase.polling_tid,
-		    pollbase.polling_thr_sig);
+		/*
+		 * Write a byte to the pipe to notify the poller thread to exit.
+		 * Then wait for it to exit.
+		 */
+		(void) write(pollbase.notify_pipe[0], "1", 1);
 		(void) pthread_join(pollbase.polling_tid, NULL);
 	}
 }
@@ -444,7 +445,9 @@ static void *
 poller_loop(void *arg)
 {
 	struct ldmsvcs_info *lsp;
-	pollfd_t pollfd;
+	pollfd_t pollfd[2];
+	struct pollfd *pipe_fd = &pollfd[0];
+	struct pollfd *recv_fd = &pollfd[1];
 	int ier;
 
 	lsp = (struct ldmsvcs_info *)arg;
@@ -470,6 +473,7 @@ poller_loop(void *arg)
 
 			pollbase.doreset = 0;
 		}
+
 		(void) pthread_mutex_unlock(&pollbase.mt);
 
 		if ((ier = channel_openreset(lsp)) == 1) {
@@ -482,18 +486,28 @@ poller_loop(void *arg)
 			continue;
 		}
 
-		pollfd.events = POLLIN;
-		pollfd.revents = 0;
-		pollfd.fd = lsp->fds_chan.fd;
+		pipe_fd->fd = pollbase.notify_pipe[1];	/* notification pipe */
+		pipe_fd->events = POLLIN;
+		pipe_fd->revents = 0;
+		recv_fd->fd = lsp->fds_chan.fd;		/* FMA LDC */
+		recv_fd->events = POLLIN;
+		recv_fd->revents = 0;
 
-		if (poll(&pollfd, 1, -1) <= 0 || read_msg(lsp) != 0) {
-			/*
-			 * read error and/or fd got closed
-			 */
+		if (poll(pollfd, 2, -1) <= 0) {
+			/* fd got closed */
 			(void) pthread_mutex_lock(&pollbase.mt);
 			pollbase.doreset = 1;
 			(void) pthread_mutex_unlock(&pollbase.mt);
-
+			channel_close(lsp);
+		} else if (pipe_fd->revents & POLLIN) {
+			/* Receive a notification to exit */
+			channel_close(lsp);
+			pthread_exit((void *)NULL);
+		} else if (read_msg(lsp) != 0) {
+			/* fail to read a message from the LDOM manager */
+			(void) pthread_mutex_lock(&pollbase.mt);
+			pollbase.doreset = 1;
+			(void) pthread_mutex_unlock(&pollbase.mt);
 			channel_close(lsp);
 		}
 	}
@@ -517,10 +531,9 @@ poller_init(struct ldmsvcs_info *lsp)
 
 		/*
 		 * create a joinable polling thread for receiving messages
-		 * The polling_thr_sig stores the signal number that is not
-		 * currently masked. it is used to stop the poller thread.
+		 * The notify pipe is for stopping the thread
 		 */
-		pollbase.polling_thr_sig = ldom_find_thr_sig();
+		(void) notify_setup(pollbase.notify_pipe);
 		if (pthread_create(&pollbase.polling_tid, attr,
 		    poller_loop, lsp) != 0)
 			rc = 1;

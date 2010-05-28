@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -81,7 +80,7 @@ static void handle_ldm_resp(xmpp_conn_t *conn, char *buf, size_t buf_size);
 static void handle_ldm_event(xmpp_conn_t *conn, char *buf, size_t buf_size);
 
 static int xmpp_enable = 0;
-static int xmpp_thr_sig = SIGTERM;
+static int xmpp_notify_pipe[2];
 static pthread_t xmpp_tid = 0;
 static pthread_mutex_t xmpp_tid_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -344,6 +343,9 @@ xmpp_client_thr(void *data)
 	int cnt;
 	char buf[XMPP_BUF_SIZE];
 	xmpp_conn_t conn;
+	pollfd_t pollfd[2];
+	struct pollfd *pipe_fd = &pollfd[0];
+	struct pollfd *recv_fd = &pollfd[1];
 
 	while (xmpp_enable) {
 		/* clear the conn struct */
@@ -364,9 +366,25 @@ xmpp_client_thr(void *data)
 			continue;
 		}
 
+		pipe_fd->fd = xmpp_notify_pipe[1];	/* notification pipe */
+		pipe_fd->events = POLLIN;
+		recv_fd->fd = conn.fd;			/* XMPP connection */
+		recv_fd->events = POLLIN;
+
 		/* process input */
 		while ((conn.state != CONN_STATE_FAILURE) &&
 		    (conn.state != CONN_STATE_DONE) && xmpp_enable) {
+
+			/* Wait for xmpp input or the notification */
+			pipe_fd->revents = 0;
+			recv_fd->revents = 0;
+			if (poll(pollfd, 2, -1) <= 0) {
+				break;
+			} else if (pipe_fd->revents & POLLIN) {
+				/* Receive a notification to exit */
+				xmpp_close(&conn);
+				pthread_exit((void *)NULL);
+			}
 
 			/*
 			 * Assume the document size of a ldmd response is
@@ -517,7 +535,11 @@ xmpp_stop(void)
 	(void) pthread_mutex_lock(&xmpp_tid_lock);
 	xmpp_enable = 0;
 	if (xmpp_tid) {
-		(void) pthread_kill(xmpp_tid, xmpp_thr_sig);
+		/*
+		 * Write a byte to the pipe to notify the xmpp thread to exit.
+		 * Then wait for it to exit.
+		 */
+		(void) write(xmpp_notify_pipe[0], "1", 1);
 		(void) pthread_join(xmpp_tid, NULL);
 		xmpp_tid = 0;
 	}
@@ -550,11 +572,10 @@ xmpp_start(void)
 	xmpp_enable = 1;
 
 	/*
-	 * create xmpp client thread for receiving domain events
-	 * xmpp_thr_sig stores the signal number that is not currently masked.
-	 * It is used to stop the client thread.
+	 * create xmpp client thread for receiving domain events.
+	 * The notification pipe is for stopping the thread.
 	 */
-	xmpp_thr_sig = ldom_find_thr_sig();
+	(void) notify_setup(xmpp_notify_pipe);
 	(void) pthread_create(&xmpp_tid, NULL, xmpp_client_thr, NULL);
 
 	(void) pthread_mutex_unlock(&xmpp_tid_lock);
