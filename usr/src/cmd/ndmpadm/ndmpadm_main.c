@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -104,7 +103,8 @@ static char *prop_table[] = {
 	"tcp-port",
 	"backup-quarantine",
 	"restore-quarantine",
-	"overwrite-quarantine"
+	"overwrite-quarantine",
+	"zfs-force-override"
 };
 
 #define	NDMPADM_NPROP	(sizeof (prop_table) / sizeof (prop_table[0]))

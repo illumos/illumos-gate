@@ -144,9 +144,12 @@ static int ndmpd_zfs_backup(ndmpd_zfs_args_t *);
  *
  * 	0.0.n/0.bob.p
  * 	0.0.u/1.bob.p/0.jane.d
+ *
+ * Note: NDMPD_ZFS_SUBPROP_MAX is calculated based on ZFS_MAXPROPLEN
  */
 
 #define	NDMPD_ZFS_PROP_INCR "com.sun.ndmp:incr"
+#define	NDMPD_ZFS_SUBPROP_MAX	28
 
 /*
  * NDMPD_ZFS_LOG_ZERR
@@ -858,6 +861,8 @@ ndmpd_zfs_restore_recv_write(ndmpd_zfs_args_t *ndmpd_zfs_args)
 
 	flags.nomount = B_TRUE;
 
+	NDMP_LOG(LOG_DEBUG, "nz_zfs_force: %d\n", ndmpd_zfs_args->nz_zfs_force);
+
 	if (ndmpd_zfs_args->nz_zfs_force)
 		flags.force = B_TRUE;
 
@@ -1241,6 +1246,8 @@ ndmpd_zfs_backup_getpath(ndmpd_zfs_args_t *ndmpd_zfs_args, char *zpath,
 		ndmpd_zfs_args->nz_snapname[0] = '\0';
 	}
 
+	(void) trim_whitespace(ndmpd_zfs_args->nz_dataset);
+
 	return (0);
 }
 
@@ -1442,10 +1449,45 @@ ndmpd_zfs_getenv_zfs_mode(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	return (0);
 }
 
+/*
+ * ndmpd_zfs_getenv_zfs_force()
+ *
+ * If SMF property zfs-force-override is set to "yes" or "no", this
+ * value will override any value of NDMP environment variable ZFS_FORCE
+ * as set by the DMA admin (or override the default of 'n', if ZFS_FORCE
+ * is not set).  By default, zfs-force-override is "off", which means it
+ * will not override ZFS_FORCE.
+ */
+
 static int
 ndmpd_zfs_getenv_zfs_force(ndmpd_zfs_args_t *ndmpd_zfs_args)
 {
 	char *envp_force;
+	char *override;
+
+	override = ndmpd_get_prop(NDMP_ZFS_FORCE_OVERRIDE);
+
+	if (strcasecmp(override, "yes") == 0) {
+		ndmpd_zfs_args->nz_zfs_force = B_TRUE;
+		NDMP_LOG(LOG_NOTICE,
+		    "SMF property zfs-force-override set to 'yes', "
+		    "overriding ZFS_FORCE");
+		return (0);
+	}
+
+	if (strcasecmp(override, "no") == 0) {
+		ndmpd_zfs_args->nz_zfs_force = B_FALSE;
+		NDMP_LOG(LOG_NOTICE,
+		    "SMF property zfs-force-override set to 'no', "
+		    "overriding ZFS_FORCE");
+		return (0);
+	}
+
+	if (strcasecmp(override, "off") != 0) {
+		ndmpd_zfs_dma_log(ndmpd_zfs_args, NDMP_LOG_ERROR,
+		    "SMF property zfs-force-override set to invalid value of "
+		    "'%s'; treating it as 'off'.", override);
+	}
 
 	envp_force = MOD_GETENV(ndmpd_zfs_params, "ZFS_FORCE");
 
@@ -1663,7 +1705,7 @@ ndmpd_zfs_snapshot_prepare(ndmpd_zfs_args_t *ndmpd_zfs_args)
  * ndmpd_zfs_snapshot_cleanup()
  *
  * If UPDATE = y, find the old snapshot (if any) corresponding to
- * {LEVEL, DMPNAME, ZFS_MODE}. If it was ndmpd-generated,
+ * {LEVEL, DMP_NAME, ZFS_MODE}. If it was ndmpd-generated,
  * remove the snapshot.  Otherwise, update its NDMPD_ZFS_PROP_INCR
  * property to remove {L, D, Z}.
  *
@@ -1991,7 +2033,7 @@ ndmpd_zfs_snapshot_prop_get(zfs_handle_t *zhp, char *propstr)
  * ndmpd_zfs_snapshot_prop_add()
  *
  * Update snapshot's NDMPD_ZFS_PROP_INCR property with
- * the current LEVEL, DMPNAME, and ZFSMODE values
+ * the current LEVEL, DMP_NAME, and ZFS_MODE values
  * (add property if it doesn't exist)
  */
 
@@ -2052,6 +2094,8 @@ ndmpd_zfs_snapshot_prop_create(ndmpd_zfs_args_t *ndmpd_zfs_args,
     char *propstr, boolean_t *set)
 {
 	char subprop[ZFS_MAXPROPLEN];
+	char *p = propstr;
+	int slash_count = 0;
 
 	*set = B_TRUE;
 
@@ -2074,13 +2118,22 @@ ndmpd_zfs_snapshot_prop_create(ndmpd_zfs_args_t *ndmpd_zfs_args,
 		return (0);
 	}
 
-	if ((strlen(propstr) + strlen(subprop) + 2) >= ZFS_MAXPROPLEN) {
-		NDMP_LOG(LOG_ERR, "snapshot %s: user property "
-		    "%s would overflow; cannot complete operation",
+	while (*p) {
+		if (*(p++) == '/')
+			slash_count++;
+	}
+
+	if (slash_count >= NDMPD_ZFS_SUBPROP_MAX) {
+		ndmpd_zfs_dma_log(ndmpd_zfs_args, NDMP_LOG_ERROR,
+		    "snapshot %s: user property %s limit of %d subprops "
+		    "reached; cannot complete operation",
 		    ndmpd_zfs_args->nz_snapname,
-		    NDMPD_ZFS_PROP_INCR);
+		    NDMPD_ZFS_PROP_INCR,
+		    NDMPD_ZFS_SUBPROP_MAX);
 		return (-1);
 	}
+
+	assert((strlen(propstr) + strlen(subprop) + 2) < ZFS_MAXPROPLEN);
 
 	(void) strlcat(propstr, "/", ZFS_MAXPROPLEN);
 	(void) strlcat(propstr, subprop, ZFS_MAXPROPLEN);
@@ -2331,6 +2384,6 @@ ndmpd_zfs_dma_log(ndmpd_zfs_args_t *ndmpd_zfs_args, ndmp_log_type log_type,
 	if ((log_type) == NDMP_LOG_ERROR) {
 		NDMP_LOG(LOG_ERR, buf);
 	} else {
-		NDMP_LOG(LOG_INFO, buf);
+		NDMP_LOG(LOG_NOTICE, buf);
 	}
 }

@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -113,6 +112,7 @@ typedef enum {
 	NDMP_BACKUP_QTN,
 	NDMP_RESTORE_QTN,
 	NDMP_OVERWRITE_QTN,
+	NDMP_ZFS_FORCE_OVERRIDE,
 	NDMP_MAXALL
 } ndmpd_cfg_id_t;
 

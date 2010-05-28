@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -89,6 +88,7 @@ ndmpd_cfg_param_t ndmpd_cfg_table[] =
 	{"backup-quarantine",		"",	0, NDMP_CF_NOTINIT},
 	{"restore-quarantine",		"",	0, NDMP_CF_NOTINIT},
 	{"overwrite-quarantine",	"",	0, NDMP_CF_NOTINIT},
+	{"zfs-force-override",		"",	0, NDMP_CF_NOTINIT},
 };
 
 /*
