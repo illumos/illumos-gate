@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -278,15 +277,15 @@ damap_print(struct dam *dam, void **kdamda, int kdamda_n)
 	if ((ss->n_items == 0) || (ss->array == NULL))
 		return;
 
-	mdb_printf("\t#: target-port       [ASR] ref lunmap::damap        "
-	    "hba-private\n");
+	mdb_printf("    #: %-20s [ASR] ref config-private   provider-private\n",
+	    "address");
 	for (i = 0; i < ss->n_items; i++) {
 		da = ss->array[i];
 		if (da == NULL)
 			continue;
 
 		/* Print index and address. */
-		mdb_printf("  %3d: %s [", i, da->da_addr);
+		mdb_printf("  %3d: %-20s [", i, da->da_addr);
 
 		/* Print shorthand of Active/Stable/Report set membership */
 		if (BT_TEST(dam->dam_active_set.bs_set, i))
@@ -303,10 +302,10 @@ damap_print(struct dam *dam, void **kdamda, int kdamda_n)
 			mdb_printf(".");
 
 		/* Print the reference count and priv */
-		mdb_printf("] %2d %0?lx %0?lx\n",
+		mdb_printf("] %-3d %0?lx %0?lx\n",
 		    da->da_ref, da->da_cfg_priv, da->da_ppriv);
 
-		mdb_printf("\t\t\t\t      %p::print -ta dam_da_t\n", kdamda[i]);
+		mdb_printf("       %p::print -ta dam_da_t\n", kdamda[i]);
 	}
 }
 
@@ -317,6 +316,10 @@ damap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	struct dam	*dam;
 	void		**kdamda;
 	int		kdamda_n;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		return (DCMD_ERR);
+	}
 
 	dam = damap_get(addr, &kdamda, &kdamda_n);
 	if (dam == NULL)
