@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpu_acpi.h>
@@ -686,7 +685,7 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 	ACPI_STATUS astatus;
 	ACPI_BUFFER abuf;
 	ACPI_OBJECT *obj;
-	ACPI_INTEGER cnt;
+	ACPI_INTEGER cnt, old_cnt;
 	cpu_acpi_cstate_t *cstate, *p;
 	size_t alloc_size;
 	int i, count;
@@ -729,6 +728,16 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 		    "count %d != Package count %d for CPU %d",
 		    (int)cnt, (int)obj->Package.Count - 1, handle->cs_id);
 		goto out;
+	}
+
+	/*
+	 * Reuse the old buffer if the number of C states is the same.
+	 */
+	if (CPU_ACPI_CSTATES(handle) &&
+	    (old_cnt = CPU_ACPI_CSTATES_COUNT(handle)) != cnt) {
+		kmem_free(CPU_ACPI_CSTATES(handle),
+		    CPU_ACPI_CSTATES_SIZE(old_cnt));
+		CPU_ACPI_CSTATES(handle) = NULL;
 	}
 
 	CPU_ACPI_CSTATES_COUNT(handle) = (uint32_t)cnt;
