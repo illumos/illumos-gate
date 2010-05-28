@@ -18,10 +18,9 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Portions Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Portions Copyright (c) 2010, Oracle and/or its affiliates.
+ * All rights reserved.
  */
 
 /*
@@ -121,6 +120,14 @@ typedef struct qinv {
 	qinv_iotlb_pend_node_t  **qinv_iotlb_pend_node;
 } qinv_t;
 
+static struct immu_flushops immu_qinv_flushops = {
+	immu_qinv_context_fsi,
+	immu_qinv_context_dsi,
+	immu_qinv_context_gbl,
+	immu_qinv_iotlb_psi,
+	immu_qinv_iotlb_dsi,
+	immu_qinv_iotlb_gbl
+};
 
 /* helper macro for making queue invalidation descriptor */
 #define	INV_DSC_TYPE(dsc)	((dsc)->lo & 0xF)
@@ -674,6 +681,7 @@ immu_qinv_startup(immu_t *immu)
 	qinv = (qinv_t *)immu->immu_qinv;
 	qinv_reg_value = qinv->qinv_table.qinv_mem_paddr | qinv_iqa_qs;
 	immu_regs_qinv_enable(immu, qinv_reg_value);
+	immu->immu_flushops = &immu_qinv_flushops;
 	immu->immu_qinv_running = B_TRUE;
 }
 
@@ -717,7 +725,7 @@ immu_qinv_context_gbl(immu_t *immu)
  *   paged based iotlb invalidation
  */
 void
-immu_inv_iotlb_psi(immu_t *immu, uint_t domain_id,
+immu_qinv_iotlb_psi(immu_t *immu, uint_t domain_id,
 	uint64_t dvma, uint_t count, uint_t hint)
 {
 	uint_t am = 0;

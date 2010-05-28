@@ -1010,6 +1010,9 @@ immu_init(void)
 		return;
 	}
 
+	if (immu_intrmap_enable == B_TRUE)
+		immu_qinv_enable = B_TRUE;
+
 	/*
 	 * Next, check if the system even has an Intel IOMMU
 	 * We use the presence or absence of the IOMMU ACPI
@@ -1200,9 +1203,9 @@ immu_quiesce(void)
 
 		/* flush caches */
 		rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
-		immu_regs_context_flush(immu, 0, 0, 0, CONTEXT_GLOBAL);
+		immu_flush_context_gbl(immu);
 		rw_exit(&(immu->immu_ctx_rwlock));
-		immu_regs_iotlb_flush(immu, 0, 0, 0, 0, IOTLB_GLOBAL);
+		immu_flush_iotlb_gbl(immu);
 		immu_regs_wbf_flush(immu);
 
 		mutex_enter(&(immu->immu_lock));
@@ -1269,9 +1272,9 @@ immu_unquiesce(void)
 
 		/* flush caches before unquiesce */
 		rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
-		immu_regs_context_flush(immu, 0, 0, 0, CONTEXT_GLOBAL);
+		immu_flush_context_gbl(immu);
 		rw_exit(&(immu->immu_ctx_rwlock));
-		immu_regs_iotlb_flush(immu, 0, 0, 0, 0, IOTLB_GLOBAL);
+		immu_flush_iotlb_gbl(immu);
 
 		/*
 		 * Set IOMMU unit's regs to do

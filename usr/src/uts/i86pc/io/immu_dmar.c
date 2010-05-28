@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Portions Copyright (c) 2010, Oracle and/or its affiliates.
+ * All rights reserved.
  */
 
 /*
@@ -44,6 +44,7 @@
 #include <sys/bootconf.h>
 #include <sys/int_fmtio.h>
 #include <sys/smbios.h>
+#include <sys/apic.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 #include <sys/iommulib.h>
@@ -670,6 +671,14 @@ drhd_devi_create(drhd_t *drhd, char *name)
 	    dip, "reg", (int *)&reg,
 	    sizeof (struct regspec) / sizeof (int));
 
+	/*
+	 * This is an artificially constructed dev_info, and we
+	 * need to set a few more things to be able to use it
+	 * for ddi_dma_alloc_handle/free_handle.
+	 */
+	ddi_set_driver(dip, ddi_get_driver(ddi_root_node()));
+	DEVI(dip)->devi_bus_dma_allochdl =
+	    DEVI(ddi_get_driver((ddi_root_node())));
 
 	pdptr = kmem_zalloc(sizeof (struct ddi_parent_private_data)
 	    + sizeof (struct regspec), KM_SLEEP);
@@ -1261,14 +1270,14 @@ immu_dmar_intrmap_supported(void)
 
 /* for a given ioapicid, find the source id and immu */
 uint16_t
-immu_dmar_ioapic_sid(int ioapicid)
+immu_dmar_ioapic_sid(int ioapic_ix)
 {
 	ioapic_drhd_t *idt;
 
-	idt = ioapic_drhd_lookup(ioapicid);
+	idt = ioapic_drhd_lookup(apic_io_id[ioapic_ix]);
 	if (idt == NULL) {
 		ddi_err(DER_PANIC, NULL, "cannot determine source-id for "
-		    "IOAPIC (id = %d)", ioapicid);
+		    "IOAPIC (index = %d)", ioapic_ix);
 		/*NOTREACHED*/
 	}
 
@@ -1277,11 +1286,11 @@ immu_dmar_ioapic_sid(int ioapicid)
 
 /* for a given ioapicid, find the source id and immu */
 immu_t *
-immu_dmar_ioapic_immu(int ioapicid)
+immu_dmar_ioapic_immu(int ioapic_ix)
 {
 	ioapic_drhd_t *idt;
 
-	idt = ioapic_drhd_lookup(ioapicid);
+	idt = ioapic_drhd_lookup(apic_io_id[ioapic_ix]);
 	if (idt) {
 		return (idt->ioapic_drhd ? idt->ioapic_drhd->dr_immu : NULL);
 	}

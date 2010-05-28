@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Portions Copyright (c) 2010, Oracle and/or its affiliates.
+ * All rights reserved.
  */
 
 /*
@@ -44,6 +44,15 @@
 #define	put_reg64(immu, offset, val)	ddi_put64\
 		((immu)->immu_regs_handle, \
 		(uint64_t *)(immu->immu_regs_addr + (offset)), val)
+
+struct immu_flushops immu_regs_flushops = {
+	immu_regs_context_fsi,
+	immu_regs_context_dsi,
+	immu_regs_context_gbl,
+	immu_regs_iotlb_psi,
+	immu_regs_iotlb_dsi,
+	immu_regs_iotlb_gbl
+};
 
 /*
  * wait max 60s for the hardware completion
@@ -129,7 +138,6 @@ iotlb_flush(immu_t *immu, uint_t domain_id,
 		return;
 	}
 
-	ASSERT(!(status & TLB_INV_IVT));
 	if (iva)
 		put_reg64(immu, iva_offset, iva);
 	put_reg64(immu, iotlb_offset, command);
@@ -138,11 +146,11 @@ iotlb_flush(immu_t *immu, uint_t domain_id,
 }
 
 /*
- * iotlb_psi()
+ * immu_regs_iotlb_psi()
  *   iotlb page specific invalidation
  */
-static void
-iotlb_psi(immu_t *immu, uint_t did, uint64_t dvma, uint_t snpages,
+void
+immu_regs_iotlb_psi(immu_t *immu, uint_t did, uint64_t dvma, uint_t snpages,
     uint_t hint)
 {
 	int dvma_am;
@@ -154,7 +162,11 @@ iotlb_psi(immu_t *immu, uint_t did, uint64_t dvma, uint_t snpages,
 	int npages;
 	int i;
 
-	ASSERT(IMMU_CAP_GET_PSI(immu->immu_regs_cap));
+	if (!IMMU_CAP_GET_PSI(immu->immu_regs_cap)) {
+		immu_regs_iotlb_dsi(immu, did);
+		return;
+	}
+
 	ASSERT(dvma % IMMU_PAGESIZE == 0);
 
 	max_am = IMMU_CAP_GET_MAMV(immu->immu_regs_cap);
@@ -195,11 +207,11 @@ iotlb_psi(immu_t *immu, uint_t did, uint64_t dvma, uint_t snpages,
 }
 
 /*
- * iotlb_dsi()
+ * immu_regs_iotlb_dsi()
  *	domain specific invalidation
  */
-static void
-iotlb_dsi(immu_t *immu, uint_t domain_id)
+void
+immu_regs_iotlb_dsi(immu_t *immu, uint_t domain_id)
 {
 	mutex_enter(&(immu->immu_regs_lock));
 	iotlb_flush(immu, domain_id, 0, 0, 0, IOTLB_DSI);
@@ -207,11 +219,11 @@ iotlb_dsi(immu_t *immu, uint_t domain_id)
 }
 
 /*
- * iotlb_global()
+ * immu_regs_iotlb_gbl()
  *     global iotlb invalidation
  */
-static void
-iotlb_global(immu_t *immu)
+void
+immu_regs_iotlb_gbl(immu_t *immu)
 {
 	mutex_enter(&(immu->immu_regs_lock));
 	iotlb_flush(immu, 0, 0, 0, 0, IOTLB_GLOBAL);
@@ -410,6 +422,8 @@ setup_regs(immu_t *immu)
 		return (DDI_FAILURE);
 	}
 	immu->immu_regs_cmdval = 0;
+
+	immu->immu_flushops = &immu_regs_flushops;
 
 	return (DDI_SUCCESS);
 }
@@ -649,62 +663,12 @@ immu_regs_cpu_flush(immu_t *immu, caddr_t addr, uint_t size)
 	mfence_insn();
 }
 
-void
-immu_regs_iotlb_flush(immu_t *immu, uint_t domainid, uint64_t dvma,
-    uint64_t count, uint_t hint, immu_iotlb_inv_t type)
-{
-	ASSERT(immu);
-
-#ifndef TEST
-	if (type == IOTLB_PSI && !IMMU_CAP_GET_PSI(immu->immu_regs_cap)) {
-		dvma = 0;
-		count = 0;
-		hint = 0;
-		type = IOTLB_DSI;
-	}
-#else
-	if (type == IOTLB_PSI) {
-		dvma = 0;
-		count = 0;
-		hint = 0;
-		type = IOTLB_DSI;
-	}
-#endif
-
-
-	switch (type) {
-	case IOTLB_PSI:
-		ASSERT(domainid > 0);
-		ASSERT(count > 0);
-		iotlb_psi(immu, domainid, dvma, count, hint);
-		break;
-	case IOTLB_DSI:
-		ASSERT(domainid > 0);
-		ASSERT(dvma == 0);
-		ASSERT(count == 0);
-		ASSERT(hint == 0);
-		iotlb_dsi(immu, domainid);
-		break;
-	case IOTLB_GLOBAL:
-		ASSERT(domainid == 0);
-		ASSERT(dvma == 0);
-		ASSERT(count == 0);
-		ASSERT(hint == 0);
-		iotlb_global(immu);
-		break;
-	default:
-		ddi_err(DER_PANIC, NULL, "invalid IOTLB invalidation type: %d",
-		    type);
-		/*NOTREACHED*/
-	}
-}
-
 /*
  * immu_regs_context_flush()
  *   flush the context cache
  */
-void
-immu_regs_context_flush(immu_t *immu, uint8_t function_mask,
+static void
+context_flush(immu_t *immu, uint8_t function_mask,
     uint16_t sid, uint_t did, immu_context_inv_t type)
 {
 	uint64_t command = 0;
@@ -747,6 +711,25 @@ immu_regs_context_flush(immu_t *immu, uint8_t function_mask,
 	wait_completion(immu, IMMU_REG_CONTEXT_CMD, get_reg64,
 	    (!(status & CCMD_INV_ICC)), status);
 	mutex_exit(&(immu->immu_regs_lock));
+}
+
+void
+immu_regs_context_fsi(immu_t *immu, uint8_t function_mask,
+    uint16_t source_id, uint_t domain_id)
+{
+	context_flush(immu, function_mask, source_id, domain_id, CONTEXT_FSI);
+}
+
+void
+immu_regs_context_dsi(immu_t *immu, uint_t domain_id)
+{
+	context_flush(immu, 0, 0, domain_id, CONTEXT_DSI);
+}
+
+void
+immu_regs_context_gbl(immu_t *immu)
+{
+	context_flush(immu, 0, 0, 0, CONTEXT_GLOBAL);
 }
 
 void

@@ -20,8 +20,8 @@
  */
 
 /*
- * Portions Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Portions Copyright (c) 2010, Oracle and/or its affiliates.
+ * All rights reserved.
  */
 
 /*
@@ -322,6 +322,14 @@ init_unit(immu_t *immu)
 		DDI_NEVERSWAP_ACC,
 		DDI_STRICTORDER_ACC
 	};
+
+	/*
+	 * Using interrupt remapping implies using the queue
+	 * invalidation interface. According to Intel,
+	 * hardware that supports interrupt remapping should
+	 * also support QI.
+	 */
+	ASSERT(IMMU_ECAP_GET_QI(immu->immu_regs_excap));
 
 	if (intrmap_apic_mode == LOCAL_X2APIC) {
 		if (!IMMU_ECAP_GET_EIM(immu->immu_regs_excap)) {
@@ -868,7 +876,8 @@ immu_intrmap_rdt(apic_irq_t *irq_ptr, ioapic_rdt_t *irdt)
 
 	rdt_entry = irdt->ir_lo;
 
-	if (INTRMAP_PRIVATE(irq_ptr) != NULL) {
+	if (INTRMAP_PRIVATE(irq_ptr) != NULL &&
+	    INTRMAP_PRIVATE(irq_ptr) != INTRMAP_DISABLE) {
 		idx = INTRMAP_PRIVATE(irq_ptr)->ir_idx;
 		tm = RDT_TM(rdt_entry);
 		pol = RDT_POL(rdt_entry);
@@ -891,7 +900,8 @@ immu_intrmap_msi(apic_irq_t *irq_ptr, msi_regs_t *mregs)
 {
 	uint_t	idx;
 
-	if (INTRMAP_PRIVATE(irq_ptr) != NULL) {
+	if (INTRMAP_PRIVATE(irq_ptr) != NULL &&
+	    INTRMAP_PRIVATE(irq_ptr) != INTRMAP_DISABLE) {
 		idx = INTRMAP_PRIVATE(irq_ptr)->ir_idx;
 
 		mregs->mr_data = 0;

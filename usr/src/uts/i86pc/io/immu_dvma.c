@@ -1554,8 +1554,7 @@ again:
 		ASSERT(rw_write_held(&(immu->immu_ctx_rwlock)));
 
 		sid = ((bus << 8) | devfunc);
-		immu_regs_context_flush(immu, 0, sid, domain->dom_did,
-		    CONTEXT_FSI);
+		immu_flush_context_fsi(immu, 0, sid, domain->dom_did);
 
 		immu_regs_wbf_flush(immu);
 
@@ -1640,9 +1639,9 @@ context_init(immu_t *immu)
 	immu_regs_set_root_table(immu);
 
 	rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
-	immu_regs_context_flush(immu, 0, 0, 0, CONTEXT_GLOBAL);
+	immu_flush_context_gbl(immu);
 	rw_exit(&(immu->immu_ctx_rwlock));
-	immu_regs_iotlb_flush(immu, 0, 0, 0, 0, IOTLB_GLOBAL);
+	immu_flush_iotlb_gbl(immu);
 	immu_regs_wbf_flush(immu);
 }
 
@@ -2835,8 +2834,8 @@ cookie_finalize(ddi_dma_impl_t *hp, immu_t *immu, domain_t *domain,
 	    dma->dp_dmax + 1, rdip, immu_flags);
 
 	/* Invalidate the IOTLB */
-	immu_regs_iotlb_flush(immu, domain->dom_did, dvma, npages,
-	    pde_set == B_TRUE ? TLB_IVA_WHOLE : TLB_IVA_LEAF, IOTLB_PSI);
+	immu_flush_iotlb_psi(immu, domain->dom_did, dvma, npages,
+	    pde_set == B_TRUE ? TLB_IVA_WHOLE : TLB_IVA_LEAF);
 
 	/* Now setup dvcookies and real cookie addresses */
 	for (i = 0; i <= dma->dp_dvmax; i++) {
@@ -2848,7 +2847,7 @@ cookie_finalize(ddi_dma_impl_t *hp, immu_t *immu, domain_t *domain,
 	}
 
 #ifdef TEST
-	immu_regs_iotlb_flush(immu, domain->dom_did, 0, 0, 0, IOTLB_DSI);
+	immu_flush_iotlb_dsi(immu, domain->dom_did);
 #endif
 }
 
@@ -3200,9 +3199,9 @@ immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
 		dcount = 1;
 		pde_set = dvma_map(immu, domain, mrng->mrng_start,
 		    mrng->mrng_npages, dcookies, dcount, rdip, immu_flags);
-		immu_regs_iotlb_flush(immu, domain->dom_did, mrng->mrng_start,
+		immu_flush_iotlb_psi(immu, domain->dom_did, mrng->mrng_start,
 		    mrng->mrng_npages, pde_set == B_TRUE ?
-		    TLB_IVA_WHOLE : TLB_IVA_LEAF, IOTLB_PSI);
+		    TLB_IVA_WHOLE : TLB_IVA_LEAF);
 		r = DDI_DMA_MAPPED;
 	} else {
 		ddi_err(DER_PANIC, rdip, "invalid flags for immu_dvma_map()");

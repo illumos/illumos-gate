@@ -507,6 +507,8 @@ typedef struct hw_rce {
 #define	PDTE_CLEAR_READ(hw_pdte) ((hw_pdte) &= ~(0x1))
 #define	PDTE_SET_READ(hw_pdte) ((hw_pdte) |= (0x1))
 
+struct immu_flushops;
+
 typedef struct immu {
 	kmutex_t		immu_lock;
 	char			*immu_name;
@@ -578,6 +580,8 @@ typedef struct immu {
 
 	/* list_node for system-wide list of DMAR units */
 	list_node_t		immu_node;
+
+	struct immu_flushops	*immu_flushops;
 } immu_t;
 
 /* properties that control DVMA */
@@ -683,6 +687,36 @@ typedef struct immu_arg {
 } immu_arg_t;
 
 /*
+ * Invalidation operation function pointers for context and IOTLB.
+ * These will be set to either the register or the queue invalidation
+ * interface functions, since the hardware does not allow using them
+ * both at the same time.
+ */
+struct immu_flushops {
+	void (*imf_context_fsi)(immu_t *, uint8_t, uint16_t, uint_t);
+	void (*imf_context_dsi)(immu_t *, uint_t);
+	void (*imf_context_gbl)(immu_t *);
+
+	void (*imf_iotlb_psi)(immu_t *, uint_t, uint64_t, uint_t, uint_t);
+	void (*imf_iotlb_dsi)(immu_t *, uint_t);
+	void (*imf_iotlb_gbl)(immu_t *);
+};
+
+#define	immu_flush_context_fsi(i, f, s, d) \
+	(i)->immu_flushops->imf_context_fsi(i, f, s, d)
+#define	immu_flush_context_dsi(i, d) \
+	(i)->immu_flushops->imf_context_dsi(i, d)
+#define	immu_flush_context_gbl(i) \
+	(i)->immu_flushops->imf_context_gbl(i)
+
+#define	immu_flush_iotlb_psi(i, d, v, c, h) \
+	(i)->immu_flushops->imf_iotlb_psi(i, d, v, c, h)
+#define	immu_flush_iotlb_dsi(i, d) \
+	(i)->immu_flushops->imf_iotlb_dsi(i, d)
+#define	immu_flush_iotlb_gbl(i) \
+	(i)->immu_flushops->imf_iotlb_gbl(i)
+
+/*
  * Globals used by IOMMU code
  */
 /* shared between IOMMU files */
@@ -777,10 +811,16 @@ boolean_t immu_regs_is_SNP_reserved(immu_t *immu);
 
 void immu_regs_wbf_flush(immu_t *immu);
 void immu_regs_cpu_flush(immu_t *immu, caddr_t addr, uint_t size);
-void immu_regs_iotlb_flush(immu_t *immu, uint_t domainid, uint64_t dvma,
-    uint64_t count, uint_t hint, immu_iotlb_inv_t type);
-void immu_regs_context_flush(immu_t *immu, uint8_t function_mask,
-    uint16_t source_id, uint_t did, immu_context_inv_t type);
+
+void immu_regs_context_fsi(immu_t *immu, uint8_t function_mask,
+    uint16_t source_id, uint_t domain_id);
+void immu_regs_context_dsi(immu_t *immu, uint_t domain_id);
+void immu_regs_context_gbl(immu_t *immu);
+void immu_regs_iotlb_psi(immu_t *immu, uint_t domain_id,
+    uint64_t dvma, uint_t count, uint_t hint);
+void immu_regs_iotlb_dsi(immu_t *immu, uint_t domain_id);
+void immu_regs_iotlb_gbl(immu_t *immu);
+
 void immu_regs_set_root_table(immu_t *immu);
 void immu_regs_qinv_enable(immu_t *immu, uint64_t qinv_reg_value);
 void immu_regs_intr_enable(immu_t *immu, uint32_t msi_addr, uint32_t msi_data,
@@ -834,6 +874,7 @@ void immu_qinv_iotlb_psi(immu_t *immu, uint_t domain_id,
     uint64_t dvma, uint_t count, uint_t hint);
 void immu_qinv_iotlb_dsi(immu_t *immu, uint_t domain_id);
 void immu_qinv_iotlb_gbl(immu_t *immu);
+
 void immu_qinv_intr_global(immu_t *immu);
 void immu_qinv_intr_one_cache(immu_t *immu, uint_t idx);
 void immu_qinv_intr_caches(immu_t *immu, uint_t idx, uint_t cnt);
