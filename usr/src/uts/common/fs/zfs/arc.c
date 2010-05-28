@@ -952,11 +952,6 @@ arc_cksum_compute(arc_buf_t *buf, boolean_t force)
 void
 arc_buf_thaw(arc_buf_t *buf)
 {
-	kmutex_t *hash_lock;
-
-	hash_lock = HDR_LOCK(buf->b_hdr);
-	mutex_enter(hash_lock);
-
 	if (zfs_flags & ZFS_DEBUG_MODIFY) {
 		if (buf->b_hdr->b_state != arc_anon)
 			panic("modifying non-anon buffer!");
@@ -978,7 +973,6 @@ arc_buf_thaw(arc_buf_t *buf)
 	}
 
 	mutex_exit(&buf->b_hdr->b_freeze_lock);
-	mutex_exit(hash_lock);
 }
 
 void
