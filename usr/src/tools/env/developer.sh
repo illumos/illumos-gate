@@ -30,6 +30,7 @@
 # which will contain the resulting packages and archives. It is based off
 # the onnv release. It sets NIGHTLY_OPTIONS to make nightly do:
 #	creates cpio archives for bfu (-a)
+#	check ELF ABI/versioning (-A)
 #	runs 'make check' (-C)
 #	DEBUG and non-DEBUG builds (-D)
 #	runs lint in usr/src (-l plus the LINTDIRS variable)
@@ -37,7 +38,7 @@
 #	creates packages for PIT/RE (-p)
 #	checks for changes in ELF runpaths (-r)
 #
-NIGHTLY_OPTIONS="-aCDlmpr";		export NIGHTLY_OPTIONS
+NIGHTLY_OPTIONS="-aACDlmpr";		export NIGHTLY_OPTIONS
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself
