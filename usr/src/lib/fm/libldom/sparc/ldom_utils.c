@@ -40,7 +40,7 @@ notify_setup(int *notify_pipe)
 	if (pipe(notify_pipe) < 0) {
 		return (B_FALSE);
 	} else {
-		fcntl(notify_pipe[1], F_SETFL, O_NONBLOCK);
+		(void) fcntl(notify_pipe[1], F_SETFL, O_NONBLOCK);
 	}
 	return (B_TRUE);
 }
