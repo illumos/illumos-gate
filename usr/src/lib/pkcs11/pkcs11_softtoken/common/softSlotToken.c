@@ -301,10 +301,12 @@ C_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)
 	return (CKR_OK);
 }
 
-
 CK_RV
 C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)
 {
+	boolean_t pin_initialized = B_FALSE;
+	char	*ks_cryptpin = NULL;
+
 	if (!softtoken_initialized)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 
@@ -315,10 +317,22 @@ C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)
 	if (pInfo == NULL)
 		return (CKR_ARGUMENTS_BAD);
 
+	/*
+	 * It is intentional that we don't forward the error code
+	 * returned from soft_keystore_pin_initialized() to the caller
+	 */
 	pInfo->flags = SOFT_TOKEN_FLAGS;
 	if (soft_slot.keystore_load_status == KEYSTORE_UNAVAILABLE) {
 		pInfo->flags |= CKF_WRITE_PROTECTED;
+	} else {
+		if ((soft_keystore_pin_initialized(&pin_initialized,
+		    &ks_cryptpin, B_FALSE) == CKR_OK) && !pin_initialized)
+			pInfo->flags |= CKF_USER_PIN_TO_BE_CHANGED;
 	}
+
+	if (ks_cryptpin)
+		free(ks_cryptpin);
+
 	/* Provide information about a token in the provided buffer */
 	(void) strncpy((char *)pInfo->label, SOFT_TOKEN_LABEL, 32);
 	(void) strncpy((char *)pInfo->manufacturerID, SOFT_MANUFACTURER_ID, 32);

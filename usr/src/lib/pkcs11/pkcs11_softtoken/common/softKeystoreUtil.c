@@ -343,7 +343,7 @@ create_keystore()
 				}
 				/* create $HOME/.sunw/pkcs11_softtoken */
 				(void) snprintf(keystore, sizeof (keystore),
-				    "%s/%s/$s", home, SUNW_PATH, KEYSTORE_PATH);
+				    "%s/%s/%s", home, SUNW_PATH, KEYSTORE_PATH);
 				if (mkdirp(keystore,
 				    S_IRUSR|S_IWUSR|S_IXUSR) < 0) {
 					return (-1);
