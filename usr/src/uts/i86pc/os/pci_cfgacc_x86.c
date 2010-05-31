@@ -196,12 +196,12 @@ pci_cfgacc_mmio(pci_cfgacc_req_t *req)
 }
 
 static boolean_t
-pci_cfgacc_valid(pci_cfgacc_req_t *req, uint16_t maxoffset)
+pci_cfgacc_valid(pci_cfgacc_req_t *req, uint16_t cfgspc_size)
 {
 	int sz = req->size;
 
 	if (IS_P2ALIGNED(req->offset, sz) &&
-	    (req->offset < maxoffset) &&
+	    (req->offset + sz - 1 < cfgspc_size) &&
 	    ((sz & 0xf) && ISP2(sz)))
 		return (B_TRUE);
 
@@ -234,7 +234,7 @@ pci_cfgacc_acc(pci_cfgacc_req_t *req)
 	pci_cfgacc_check_io(req);
 
 	if (req->ioacc) {
-		if (pci_cfgacc_valid(req, pci_iocfg_max_offset))
+		if (pci_cfgacc_valid(req, pci_iocfg_max_offset + 1))
 			pci_cfgacc_io(req);
 	} else {
 		if (pci_cfgacc_valid(req, PCIE_CFG_SPACE_SIZE))

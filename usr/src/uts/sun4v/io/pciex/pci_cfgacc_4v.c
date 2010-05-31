@@ -50,7 +50,7 @@ pci_cfgacc_valid(pci_cfgacc_req_t *req)
 	int sz = req->size;
 
 	if (IS_P2ALIGNED(req->offset, sz)		&&
-	    (req->offset < PCIE_CFG_SPACE_SIZE)		&&
+	    (req->offset + sz - 1 < PCIE_CFG_SPACE_SIZE)	&&
 	    ((sz & 0xf) && ISP2(sz)))
 		return (B_TRUE);
 
