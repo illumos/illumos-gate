@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -875,7 +874,7 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 	secinfo4 *resok_val;
 	struct secinfo *secp;
 	seconfig_t *si;
-	bool_t did_traverse;
+	bool_t did_traverse = FALSE;
 	int dotdot, walk;
 
 	dvp = cs->vp;
@@ -968,7 +967,6 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 		 * traverse)
 		 */
 		different_export = 1;
-		did_traverse = FALSE;
 	}
 
 	/*
@@ -2776,8 +2774,7 @@ do_rfs4_op_lookup(char *nm, struct svc_req *req, struct compound_state *cs)
 		crfree(cs->cr);
 		cs->cr = crdup(cs->basecr);
 
-		if (cs->vp)
-			oldvp = cs->vp;
+		oldvp = cs->vp;
 		cs->vp = vp;
 		is_newvp = TRUE;
 
@@ -4556,7 +4553,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			kmem_free(converted_onm, MAXPATHLEN + 1);
 		kmem_free(onm, olen);
 		if (nnm != converted_nnm)
-			kmem_free(converted_onm, MAXPATHLEN + 1);
+			kmem_free(converted_nnm, MAXPATHLEN + 1);
 		kmem_free(nnm, nlen);
 		goto out;
 	}
