@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
  * Use is subject to license terms.
  */
 
@@ -49,6 +50,7 @@ u_longlong_t panic_tick;
 extern u_longlong_t	gettick();
 static void reboot_machine(char *);
 int disable_watchdog_on_exit = 0;
+extern uint64_t		cpc_level15_inum;
 
 /*
  * Machine dependent code to reboot.
@@ -272,12 +274,18 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
  * was made and so we re-enqueue an interrupt request structure to allow
  * further level 14 interrupts to be processed once we lower PIL.  This allows
  * us to handle panics from the deadman() CY_HIGH_LEVEL cyclic.
+ *
+ * In case we panic at level 15, ensure that the cpc handler has been
+ * reinstalled otherwise we could run the risk of hitting a missing interrupt
+ * handler when this thread drops PIL and the cpc counter overflows.
  */
 void
 panic_enter_hw(int spl)
 {
+	uint_t opstate;
+
 	if (spl == ipltospl(PIL_14)) {
-		uint_t opstate = disable_vec_intr();
+		opstate = disable_vec_intr();
 
 		if (curthread->t_panic_trap != NULL) {
 			tickcmpr_disable();
@@ -294,6 +302,11 @@ panic_enter_hw(int spl)
 			    TICK_INT_MASK | STICK_INT_MASK);
 		}
 
+		enable_vec_intr(opstate);
+	} else if (spl == ipltospl(PIL_15)) {
+		opstate = disable_vec_intr();
+		intr_enqueue_req(PIL_15, cpc_level15_inum);
+		wr_clr_softint(1 << PIL_15);
 		enable_vec_intr(opstate);
 	}
 }

@@ -24,8 +24,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -375,25 +374,8 @@ panel_intr(caddr_t arg)
 	(void) ddi_get8(statep->panel_regs_handle, statep->panelregs);
 
 	if (panel_enable) {
-		uint_t pstate_save;
-
 		/* avoid double panic */
 		panel_enable 	= 0;
-
-		/*
-		 * Re-enqueue the cpc interrupt handler for PIL15 here since we
-		 * are not unwinding back to the interrupt handler subsystem.
-		 * This is to allow potential cpc overflow interrupts to
-		 * function while we go thru the panic flow. Note that this
-		 * logic could be implemented in panic_enter_hw(), we do
-		 * it here for now as it is less risky. This particular
-		 * condition is only specific to OPL hardware and we want
-		 * to minimize exposure of this new logic to other existing
-		 * platforms.
-		 */
-		pstate_save = disable_vec_intr();
-		intr_enqueue_req(PIL_15, cpc_level15_inum);
-		enable_vec_intr(pstate_save);
 
 		cmn_err(CE_PANIC,
 		    "System Panel Driver: Emergency panic request "

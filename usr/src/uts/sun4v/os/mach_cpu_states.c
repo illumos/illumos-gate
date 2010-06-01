@@ -81,6 +81,11 @@ extern uint64_t xc_tick_jump_limit;
 extern uint64_t xc_sync_tick_limit;
 
 /*
+ * Bring in the cpc PIL_15 handler for panic_enter_hw.
+ */
+extern uint64_t	cpc_level15_inum;
+
+/*
  * We keep our own copies, used for cache flushing, because we can be called
  * before cpu_fiximpl().
  */
@@ -403,10 +408,16 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
  * was made and so we re-enqueue an interrupt request structure to allow
  * further level 14 interrupts to be processed once we lower PIL.  This allows
  * us to handle panics from the deadman() CY_HIGH_LEVEL cyclic.
+ *
+ * In case we panic at level 15, ensure that the cpc handler has been
+ * reinstalled otherwise we could run the risk of hitting a missing interrupt
+ * handler when this thread drops PIL and the cpc counter overflows.
  */
 void
 panic_enter_hw(int spl)
 {
+	uint_t opstate;
+
 	if (!panic_tick) {
 		panic_tick = gettick();
 		if (mach_htraptrace_enable) {
@@ -424,7 +435,7 @@ panic_enter_hw(int spl)
 	mach_set_soft_state(SIS_TRANSITION, &SOLARIS_SOFT_STATE_PANIC_MSG);
 
 	if (spl == ipltospl(PIL_14)) {
-		uint_t opstate = disable_vec_intr();
+		opstate = disable_vec_intr();
 
 		if (curthread->t_panic_trap != NULL) {
 			tickcmpr_disable();
@@ -441,6 +452,11 @@ panic_enter_hw(int spl)
 			    TICK_INT_MASK | STICK_INT_MASK);
 		}
 
+		enable_vec_intr(opstate);
+	} else if (spl == ipltospl(PIL_15)) {
+		opstate = disable_vec_intr();
+		intr_enqueue_req(PIL_15, cpc_level15_inum);
+		wr_clr_softint(1 << PIL_15);
 		enable_vec_intr(opstate);
 	}
 }
