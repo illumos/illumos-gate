@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lsvcrun - run an rc?.d script, modifying appropriate data in the
@@ -37,6 +34,9 @@
  * displayed by svcs(1m); state_timestamp; contract, contract ID;
  * inode, the inode of the script; and suffix, the suffix of the
  * script name, e.g. 'foo'.
+ *
+ * In order to support rc scripts which delete themselves upon invocation we
+ * collect inode before running the script.
  *
  * When we run a K script, we try to identify and remove the
  * property group by means of examining the inode and script
@@ -501,9 +501,9 @@ prepare_contract(const char *script, const char *action)
 	char *svc_strbuf;
 	int err = 0;
 
-	do
+	do {
 		fd = open64(CTFS_ROOT "/process/template", O_RDWR);
-	while (fd < 0 && errno == EINTR);
+	} while (fd < 0 && errno == EINTR);
 	if (fd < 0) {
 		uu_warn(gettext("Can not create contract"));
 		return (-1);
@@ -700,14 +700,13 @@ err:
 }
 
 static void
-set_legacy_service(scf_propertygroup_t *pg, const char *script)
+set_legacy_service(scf_propertygroup_t *pg, const char *script, ino_t inode)
 {
 	scf_handle_t *h;
 	const char *func;
 	char *suffix;
 	scf_transaction_t *tx;
 	struct timeval tstamp;
-	struct stat st;
 	ctid_t ctid;
 	char *svc_name = NULL;
 	int ret;
@@ -720,12 +719,6 @@ set_legacy_service(scf_propertygroup_t *pg, const char *script)
 
 	ret = gettimeofday(&tstamp, NULL);
 	assert(ret == 0);
-
-	if (stat(script, &st) != 0) {
-		uu_warn(gettext("Couldn't stat %s (%s).\n"), script,
-		    strerror(errno));
-		goto err;
-	}
 
 	if (errno = contract_latest(&ctid)) {
 		uu_warn(gettext("Could not get contract"));
@@ -758,7 +751,7 @@ set_legacy_service(scf_propertygroup_t *pg, const char *script)
 		goto err;
 
 	if (add_new_property(h, tx, SCF_LEGACY_PROPERTY_INODE,
-	    SCF_TYPE_COUNT, (void *)st.st_ino) != 0)
+	    SCF_TYPE_COUNT, (void *)inode) != 0)
 		goto err;
 
 	if ((suffix = script_suffix(script)) != NULL) {
@@ -814,6 +807,7 @@ main(int argc, char *argv[], char *envp[])
 	int pipefds[2];
 	char c;
 	int exitstatus;
+	struct stat st;
 
 	scf_propertygroup_t *pg;
 	boolean_t pg_ok;
@@ -892,6 +886,12 @@ main(int argc, char *argv[], char *envp[])
 		(void) printf(gettext("Executing legacy init script \"%s\".\n"),
 		    script);
 	(void) fflush(stdout);
+
+	if (stat(script, &st) != 0) {
+		uu_warn(gettext("Couldn't stat %s (%s).\n"), script,
+		    strerror(errno));
+		st.st_ino = (ino_t)0;
+	}
 
 	pid = fork();
 	if (pid < 0) {
@@ -975,7 +975,7 @@ main(int argc, char *argv[], char *envp[])
 
 	if (pg != NULL) {
 		if (start_flag)
-			set_legacy_service(pg, script);
+			set_legacy_service(pg, script, st.st_ino);
 		else
 			cleanup_pg(pg);
 		scf_pg_destroy(pg);
