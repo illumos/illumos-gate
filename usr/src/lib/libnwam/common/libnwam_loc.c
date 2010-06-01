@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -1066,7 +1065,7 @@ static int
 loc_set_enabled(nwam_loc_handle_t loch, void *data)
 {
 	nwam_value_t enabledval;
-	boolean_t enabled = B_FALSE;
+	boolean_t curr_state, enabled = B_FALSE;
 	nwam_loc_handle_t testloch = data;
 	nwam_error_t err = NWAM_SUCCESS;
 
@@ -1080,6 +1079,12 @@ loc_set_enabled(nwam_loc_handle_t loch, void *data)
 			enabled = B_TRUE;
 		}
 	}
+
+	/* If the enabled property is not changing, don't do anything. */
+	if (nwam_loc_is_enabled(loch, &curr_state) == NWAM_SUCCESS &&
+	    curr_state == enabled)
+		return (0);
+
 	if (nwam_value_create_boolean(enabled, &enabledval) != NWAM_SUCCESS)
 		return (0);
 	if (nwam_set_prop_value(loch->nwh_data, NWAM_LOC_PROP_ENABLED,

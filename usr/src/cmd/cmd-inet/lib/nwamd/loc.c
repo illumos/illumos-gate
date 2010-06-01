@@ -418,7 +418,7 @@ nwamd_loc_handle_init_event(nwamd_event_t event)
 	nwamd_object_t object;
 	nwam_loc_handle_t loch;
 	nwam_error_t err;
-	boolean_t manual_disabled = B_FALSE;
+	boolean_t new_enabled, old_enabled = B_FALSE;
 	nwam_state_t state;
 
 	if ((err = nwam_loc_read(event->event_object, 0, &loch))
@@ -431,6 +431,7 @@ nwamd_loc_handle_init_event(nwamd_event_t event)
 	}
 	if ((object = nwamd_object_find(NWAM_OBJECT_TYPE_LOC,
 	    event->event_object)) != NULL) {
+		old_enabled = loc_is_enabled(object->nwamd_object_handle);
 		nwam_loc_free(object->nwamd_object_handle);
 		object->nwamd_object_handle = loch;
 	} else {
@@ -440,18 +441,19 @@ nwamd_loc_handle_init_event(nwamd_event_t event)
 		object->nwamd_object_aux_state =
 		    NWAM_AUX_STATE_CONDITIONS_NOT_MET;
 	}
-	manual_disabled = (loc_get_activation_mode(loch) ==
-	    NWAM_ACTIVATION_MODE_MANUAL && !loc_is_enabled(loch));
+	new_enabled = loc_is_enabled(loch);
 	state = object->nwamd_object_state;
 	nwamd_object_release(object);
 
 	/*
-	 * If this location is ONLINE, and not manual and disabled (since in
-	 * that case it was online but we've just set enabled = false as part
-	 * of a disable action), then it is still active but refreshing.
-	 * Change states to re-activate itself.
+	 * If this location is ONLINE and the value of the "enabled" property
+	 * has not changed, then this location is getting refreshed because it
+	 * was committed with changes.  Change states to re-activate itself.
+	 * If the "enabled" property has changed, then this location is
+	 * getting refreshed as part of a enable/disable action and there is
+	 * no need to change states here.
 	 */
-	if (!manual_disabled && state == NWAM_STATE_ONLINE) {
+	if (state == NWAM_STATE_ONLINE && old_enabled == new_enabled) {
 		nwamd_object_set_state(NWAM_OBJECT_TYPE_LOC,
 		    event->event_object, NWAM_STATE_OFFLINE_TO_ONLINE,
 		    NWAM_AUX_STATE_METHOD_RUNNING);
@@ -591,8 +593,15 @@ nwamd_loc_handle_state_event(nwamd_event_t event)
 	case NWAM_STATE_ONLINE_TO_OFFLINE:
 		/*
 		 * Don't need to deactivate current location - condition check
-		 * will activate another.
+		 * will activate another.  If the currently active location is
+		 * being deactivated, then it is being manually deactivated;
+		 * so also clear active_loc so condition checking is not
+		 * confused.
 		 */
+		(void) pthread_mutex_lock(&active_loc_mutex);
+		if (strcmp(event->event_object, active_loc) == 0)
+			active_loc[0] = '\0';
+		(void) pthread_mutex_unlock(&active_loc_mutex);
 		nwamd_loc_check_conditions();
 		break;
 	case NWAM_STATE_DISABLED:
