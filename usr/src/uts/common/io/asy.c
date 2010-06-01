@@ -2953,7 +2953,6 @@ rv:
 		async->async_sw_overrun = 0;
 	}
 	if (asy->asy_flags & ASY_DOINGSOFT_RETRY) {
-		mutex_exit(&asy->asy_excl_hi);
 		mutex_exit(&asy->asy_excl);
 		goto begin;
 	}
