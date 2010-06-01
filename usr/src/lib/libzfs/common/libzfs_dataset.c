@@ -3926,7 +3926,8 @@ zfs_userspace(zfs_handle_t *zhp, zfs_userquota_prop_t type,
 
 int
 zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
-    boolean_t recursive, boolean_t temphold, boolean_t enoent_ok)
+    boolean_t recursive, boolean_t temphold, boolean_t enoent_ok,
+    int cleanup_fd)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
@@ -3938,6 +3939,7 @@ zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
 		return (zfs_error(hdl, EZFS_TAGTOOLONG, tag));
 	zc.zc_cookie = recursive;
 	zc.zc_temphold = temphold;
+	zc.zc_cleanup_fd = cleanup_fd;
 
 	if (zfs_ioctl(hdl, ZFS_IOC_HOLD, &zc) != 0) {
 		char errbuf[ZFS_MAXNAMELEN+32];
@@ -3990,6 +3992,7 @@ struct hold_range_arg {
 	boolean_t	recursive;
 	snapfilter_cb_t	*filter_cb;
 	void		*filter_cb_arg;
+	int		cleanup_fd;
 };
 
 static int
@@ -4023,7 +4026,7 @@ zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
 	if (hra->holding) {
 		/* We could be racing with destroy, so ignore ENOENT. */
 		error = zfs_hold(hra->origin, thissnap, hra->tag,
-		    hra->recursive, hra->temphold, B_TRUE);
+		    hra->recursive, hra->temphold, B_TRUE, hra->cleanup_fd);
 		if (error == 0) {
 			(void) strlcpy(hra->lastsnapheld, zfs_get_name(zhp),
 			    sizeof (hra->lastsnapheld));
@@ -4045,7 +4048,7 @@ zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
 int
 zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
     const char *tag, boolean_t recursive, boolean_t temphold,
-    snapfilter_cb_t filter_cb, void *cbarg)
+    snapfilter_cb_t filter_cb, void *cbarg, int cleanup_fd)
 {
 	struct hold_range_arg arg = { 0 };
 	int error;
@@ -4060,13 +4063,17 @@ zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	arg.seenfrom = (fromsnap == NULL);
 	arg.filter_cb = filter_cb;
 	arg.filter_cb_arg = cbarg;
+	arg.cleanup_fd = cleanup_fd;
 
 	error = zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg);
 
 	/*
-	 * Make sure we either hold the entire range or none.
+	 * Make sure we either hold the entire range or none. If we're
+	 * using cleanup-on-exit, we'll let the closing of the cleanup_fd
+	 * do the work for us.
 	 */
-	if (error && arg.lastsnapheld[0] != '\0') {
+	if (error && arg.lastsnapheld[0] != '\0' &&
+	    (cleanup_fd == -1 || !temphold)) {
 		(void) zfs_release_range(zhp, fromsnap,
 		    (const char *)arg.lastsnapheld, tag, recursive);
 	}
@@ -4130,6 +4137,7 @@ zfs_release_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	arg.tag = tag;
 	arg.recursive = recursive;
 	arg.seenfrom = (fromsnap == NULL);
+	arg.cleanup_fd = -1;
 
 	return (zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg));
 }

@@ -4355,7 +4355,8 @@ ztest_dmu_snapshot_hold(ztest_ds_t *zd, uint64_t id)
 		fatal(0, "dmu_objset_snapshot(%s) = %d", fullname, error);
 	}
 
-	error = dsl_dataset_user_hold(osname, snapname, tag, B_FALSE, B_TRUE);
+	error = dsl_dataset_user_hold(osname, snapname, tag, B_FALSE,
+	    B_TRUE, -1);
 	if (error)
 		fatal(0, "dsl_dataset_user_hold(%s)", fullname, tag);
 

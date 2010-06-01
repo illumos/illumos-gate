@@ -60,6 +60,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/zfs_ctldir.h>
 #include <sys/zfs_dir.h>
+#include <sys/zfs_onexit.h>
 #include <sys/zvol.h>
 #include <sys/dsl_scan.h>
 #include <sharefs/share.h>
@@ -3342,11 +3343,14 @@ static boolean_t zfs_ioc_recv_inject_err;
  * zc_cookie		file descriptor to recv from
  * zc_begin_record	the BEGIN record of the stream (not byteswapped)
  * zc_guid		force flag
+ * zc_cleanup_fd	cleanup-on-exit file descriptor
+ * zc_action_handle	handle for this guid/ds mapping (or zero on first call)
  *
  * outputs:
  * zc_cookie		number of bytes read
  * zc_nvlist_dst{_size} error for each unapplied received property
  * zc_obj		zprop_errflags_t
+ * zc_action_handle	handle for this guid/ds mapping
  */
 static int
 zfs_ioc_recv(zfs_cmd_t *zc)
@@ -3475,7 +3479,8 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	}
 
 	off = fp->f_offset;
-	error = dmu_recv_stream(&drc, fp->f_vnode, &off);
+	error = dmu_recv_stream(&drc, fp->f_vnode, &off, zc->zc_cleanup_fd,
+	    &zc->zc_action_handle);
 
 	if (error == 0) {
 		zfsvfs_t *zfsvfs = NULL;
@@ -4182,11 +4187,12 @@ zfs_ioc_smb_acl(zfs_cmd_t *zc)
 
 /*
  * inputs:
- * zc_name	name of filesystem
- * zc_value	short name of snap
- * zc_string	user-supplied tag for this reference
- * zc_cookie	recursive flag
- * zc_temphold	set if hold is temporary
+ * zc_name		name of filesystem
+ * zc_value		short name of snap
+ * zc_string		user-supplied tag for this hold
+ * zc_cookie		recursive flag
+ * zc_temphold		set if hold is temporary
+ * zc_cleanup_fd	cleanup-on-exit file descriptor for calling process
  *
  * outputs:		none
  */
@@ -4199,17 +4205,17 @@ zfs_ioc_hold(zfs_cmd_t *zc)
 		return (EINVAL);
 
 	return (dsl_dataset_user_hold(zc->zc_name, zc->zc_value,
-	    zc->zc_string, recursive, zc->zc_temphold));
+	    zc->zc_string, recursive, zc->zc_temphold, zc->zc_cleanup_fd));
 }
 
 /*
  * inputs:
- * zc_name	name of dataset from which we're releasing a user reference
+ * zc_name	name of dataset from which we're releasing a user hold
  * zc_value	short name of snap
- * zc_string	user-supplied tag for this reference
+ * zc_string	user-supplied tag for this hold
  * zc_cookie	recursive flag
  *
- * outputs:		none
+ * outputs:	none
  */
 static int
 zfs_ioc_release(zfs_cmd_t *zc)
@@ -4369,14 +4375,124 @@ pool_status_check(const char *name, zfs_ioc_namecheck_t type)
 	return (error);
 }
 
+/*
+ * Find a free minor number.
+ */
+minor_t
+zfsdev_minor_alloc(void)
+{
+	static minor_t last_minor;
+	minor_t m;
+
+	ASSERT(MUTEX_HELD(&zfsdev_state_lock));
+
+	for (m = last_minor + 1; m != last_minor; m++) {
+		if (m > ZFSDEV_MAX_MINOR)
+			m = 1;
+		if (ddi_get_soft_state(zfsdev_state, m) == NULL) {
+			last_minor = m;
+			return (m);
+		}
+	}
+
+	return (0);
+}
+
+static int
+zfs_ctldev_init(dev_t *devp)
+{
+	minor_t minor;
+	zfs_soft_state_t *zs;
+
+	ASSERT(MUTEX_HELD(&zfsdev_state_lock));
+	ASSERT(getminor(*devp) == 0);
+
+	minor = zfsdev_minor_alloc();
+	if (minor == 0)
+		return (ENXIO);
+
+	if (ddi_soft_state_zalloc(zfsdev_state, minor) != DDI_SUCCESS)
+		return (EAGAIN);
+
+	*devp = makedevice(getemajor(*devp), minor);
+
+	zs = ddi_get_soft_state(zfsdev_state, minor);
+	zs->zss_type = ZSST_CTLDEV;
+	zfs_onexit_init((zfs_onexit_t **)&zs->zss_data);
+
+	return (0);
+}
+
+static void
+zfs_ctldev_destroy(zfs_onexit_t *zo, minor_t minor)
+{
+	ASSERT(MUTEX_HELD(&zfsdev_state_lock));
+
+	zfs_onexit_destroy(zo);
+	ddi_soft_state_free(zfsdev_state, minor);
+}
+
+void *
+zfsdev_get_soft_state(minor_t minor, enum zfs_soft_state_type which)
+{
+	zfs_soft_state_t *zp;
+
+	zp = ddi_get_soft_state(zfsdev_state, minor);
+	if (zp == NULL || zp->zss_type != which)
+		return (NULL);
+
+	return (zp->zss_data);
+}
+
+static int
+zfsdev_open(dev_t *devp, int flag, int otyp, cred_t *cr)
+{
+	int error = 0;
+
+	if (getminor(*devp) != 0)
+		return (zvol_open(devp, flag, otyp, cr));
+
+	/* This is the control device. Allocate a new minor if requested. */
+	if (flag & FEXCL) {
+		mutex_enter(&zfsdev_state_lock);
+		error = zfs_ctldev_init(devp);
+		mutex_exit(&zfsdev_state_lock);
+	}
+
+	return (error);
+}
+
+static int
+zfsdev_close(dev_t dev, int flag, int otyp, cred_t *cr)
+{
+	zfs_onexit_t *zo;
+	minor_t minor = getminor(dev);
+
+	if (minor == 0)
+		return (0);
+
+	mutex_enter(&zfsdev_state_lock);
+	zo = zfsdev_get_soft_state(minor, ZSST_CTLDEV);
+	if (zo == NULL) {
+		mutex_exit(&zfsdev_state_lock);
+		return (zvol_close(dev, flag, otyp, cr));
+	}
+	zfs_ctldev_destroy(zo, minor);
+	mutex_exit(&zfsdev_state_lock);
+
+	return (0);
+}
+
 static int
 zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 {
 	zfs_cmd_t *zc;
 	uint_t vec;
 	int error, rc;
+	minor_t minor = getminor(dev);
 
-	if (getminor(dev) != 0)
+	if (minor != 0 &&
+	    zfsdev_get_soft_state(minor, ZSST_CTLDEV) == NULL)
 		return (zvol_ioctl(dev, cmd, arg, flag, cr, rvalp));
 
 	vec = cmd - ZFS_IOC;
@@ -4499,8 +4615,8 @@ zfs_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
  * so most of the standard driver entry points are in zvol.c.
  */
 static struct cb_ops zfs_cb_ops = {
-	zvol_open,	/* open */
-	zvol_close,	/* close */
+	zfsdev_open,	/* open */
+	zfsdev_close,	/* close */
 	zvol_strategy,	/* strategy */
 	nodev,		/* print */
 	zvol_dump,	/* dump */

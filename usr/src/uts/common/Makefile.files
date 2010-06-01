@@ -1404,6 +1404,7 @@ ZFS_OBJS +=			\
 	zfs_dir.o		\
 	zfs_ioctl.o		\
 	zfs_log.o		\
+	zfs_onexit.o		\
 	zfs_replay.o		\
 	zfs_rlock.o		\
 	rrwlock.o		\

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ZFS_IOCTL_H
@@ -265,6 +264,9 @@ typedef struct zfs_cmd {
 	zinject_record_t zc_inject_record;
 	boolean_t	zc_defer_destroy;
 	boolean_t	zc_temphold;
+	uint64_t	zc_action_handle;
+	int		zc_cleanup_fd;
+	uint8_t		zc_pad[4];
 } zfs_cmd_t;
 
 typedef struct zfs_useracct {
@@ -274,8 +276,8 @@ typedef struct zfs_useracct {
 	uint64_t zu_space;
 } zfs_useracct_t;
 
-#define	ZVOL_MAX_MINOR	(1 << 16)
-#define	ZFS_MIN_MINOR	(ZVOL_MAX_MINOR + 1)
+#define	ZFSDEV_MAX_MINOR	(1 << 16)
+#define	ZFS_MIN_MINOR	(ZFSDEV_MAX_MINOR + 1)
 
 #define	ZPOOL_EXPORT_AFTER_SPLIT 0x1
 
@@ -294,6 +296,28 @@ extern int zfs_secpolicy_rename_perms(const char *from,
 extern int zfs_secpolicy_destroy_perms(const char *name, cred_t *cr);
 extern int zfs_busy(void);
 extern int zfs_unmount_snap(const char *, void *);
+
+/*
+ * ZFS minor numbers can refer to either a control device instance or
+ * a zvol. Depending on the value of zss_type, zss_data points to either
+ * a zvol_state_t or a zfs_onexit_t.
+ */
+enum zfs_soft_state_type {
+	ZSST_ZVOL,
+	ZSST_CTLDEV
+};
+
+typedef struct zfs_soft_state {
+	enum zfs_soft_state_type zss_type;
+	void *zss_data;
+} zfs_soft_state_t;
+
+extern void *zfsdev_get_soft_state(minor_t minor,
+    enum zfs_soft_state_type which);
+extern minor_t zfsdev_minor_alloc(void);
+
+extern void *zfsdev_state;
+extern kmutex_t zfsdev_state_lock;
 
 #endif	/* _KERNEL */
 

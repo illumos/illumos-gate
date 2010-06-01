@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -943,4 +942,26 @@ kmem_asprintf(const char *fmt, ...)
 	va_end(adx);
 
 	return (buf);
+}
+
+/* ARGSUSED */
+int
+zfs_onexit_add_cb(int fd, void (*func)(void *), void *data,
+    uint64_t *action_handle)
+{
+	return (0);
+}
+
+/* ARGSUSED */
+int
+zfs_onexit_del_cb(int fd, uint64_t action_handle, boolean_t fire)
+{
+	return (0);
+}
+
+/* ARGSUSED */
+int
+zfs_onexit_cb_data(int fd, uint64_t action_handle, void **data)
+{
+	return (0);
 }

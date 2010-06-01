@@ -37,6 +37,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/spa.h>
 #include <sys/zfs_znode.h>
+#include <sys/zfs_onexit.h>
 #include <sys/zvol.h>
 #include <sys/dsl_scan.h>
 #include <sys/dsl_deadlist.h>
@@ -3421,6 +3422,23 @@ struct dsl_ds_holdarg {
 	char failed[MAXPATHLEN];
 };
 
+typedef struct zfs_hold_cleanup_arg {
+	char dsname[MAXNAMELEN];
+	char snapname[MAXNAMELEN];
+	char htag[MAXNAMELEN];
+	boolean_t recursive;
+} zfs_hold_cleanup_arg_t;
+
+static void
+dsl_dataset_user_release_onexit(void *arg)
+{
+	zfs_hold_cleanup_arg_t *ca = arg;
+
+	(void) dsl_dataset_user_release(ca->dsname, ca->snapname,
+	    ca->htag, ca->recursive);
+	kmem_free(ca, sizeof (zfs_hold_cleanup_arg_t));
+}
+
 /*
  * The max length of a temporary tag prefix is the number of hex digits
  * required to express UINT64_MAX plus one for the hyphen.
@@ -3525,7 +3543,7 @@ dsl_dataset_user_hold_one(const char *dsname, void *arg)
 
 int
 dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
-    boolean_t recursive, boolean_t temphold)
+    boolean_t recursive, boolean_t temphold, int cleanup_fd)
 {
 	struct dsl_ds_holdarg *ha;
 	dsl_sync_task_t *dst;
@@ -3547,6 +3565,7 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 	ha->snapname = snapname;
 	ha->recursive = recursive;
 	ha->temphold = temphold;
+
 	if (recursive) {
 		error = dmu_objset_find(dsname, dsl_dataset_user_hold_one,
 		    ha, DS_FIND_CHILDREN);
@@ -3574,6 +3593,24 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 		(void) strlcpy(dsname, ha->failed, sizeof (ha->failed));
 
 	dsl_sync_task_group_destroy(ha->dstg);
+
+	/*
+	 * If this set of temporary holds is to be removed upon process exit,
+	 * register that action now.
+	 */
+	if (error == 0 && cleanup_fd != -1 && temphold) {
+		zfs_hold_cleanup_arg_t *ca;
+		uint64_t action_handle;
+
+		ca = kmem_alloc(sizeof (zfs_hold_cleanup_arg_t), KM_SLEEP);
+		(void) strlcpy(ca->dsname, dsname, sizeof (ca->dsname));
+		(void) strlcpy(ca->snapname, snapname, sizeof (ca->snapname));
+		(void) strlcpy(ca->htag, htag, sizeof (ca->htag));
+		ca->recursive = recursive;
+		ASSERT3U(0, ==, zfs_onexit_add_cb(cleanup_fd,
+		    dsl_dataset_user_release_onexit, ca, &action_handle));
+	}
+
 	kmem_free(ha, sizeof (struct dsl_ds_holdarg));
 	spa_close(spa, FTAG);
 	return (error);
