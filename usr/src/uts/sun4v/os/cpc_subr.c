@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -46,7 +45,7 @@
 #include <sys/modctl.h>
 #include <sys/sdt.h>
 
-uint64_t	cpc_level15_inum;	/* used in interrupt.s */
+uint64_t	cpc_level15_inum = 0;	/* used in interrupt.s */
 int		cpc_has_overflow_intr;	/* set in cheetah.c */
 
 extern kcpc_ctx_t *kcpc_overflow_intr(caddr_t arg, uint64_t bitmap);
@@ -58,7 +57,7 @@ extern int kcpc_counts_include_idle;
 void
 kcpc_hw_init(void)
 {
-	if (cpc_has_overflow_intr) {
+	if ((cpc_has_overflow_intr) && (cpc_level15_inum == 0)) {
 		cpc_level15_inum = add_softintr(PIL_15,
 		    kcpc_hw_overflow_intr, NULL, SOFTINT_MT);
 	}
