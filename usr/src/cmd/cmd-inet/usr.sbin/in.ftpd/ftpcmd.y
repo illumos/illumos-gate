@@ -1884,7 +1884,14 @@ char *wu_getline(char *s, int n, register FILE *iop)
 	    }
 	}
 	*cs++ = c;
-	if (--n <= 0 || c == '\n')
+	if (--n <= 0) {
+		/* If command does not fit to buffer then discard the rest. */
+		while (c != '\n' && (c = getc(iop)) != EOF)
+			;
+		reply(500, "Command too long");
+		break;
+	}
+	if (c == '\n')
 	    break;
     }
 
