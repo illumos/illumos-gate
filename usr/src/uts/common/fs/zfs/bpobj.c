@@ -210,8 +210,10 @@ bpobj_iterate_impl(bpobj_t *bpo, bpobj_itor_t func, void *arg, dmu_tx_t *tx,
 
 	ASSERT(bpo->bpo_havecomp);
 	err = dmu_object_info(bpo->bpo_os, bpo->bpo_phys->bpo_subobjs, &doi);
-	if (err)
+	if (err) {
+		mutex_exit(&bpo->bpo_lock);
 		return (err);
+	}
 	epb = doi.doi_data_block_size / sizeof (uint64_t);
 
 	for (i = bpo->bpo_phys->bpo_num_subobjs - 1; i >= 0; i--) {
