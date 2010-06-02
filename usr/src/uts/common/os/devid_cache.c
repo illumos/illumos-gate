@@ -625,11 +625,13 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 }
 
 /*
- * Unregister a device's devid
- * Called as an instance detachs
- * Invalidate the devid's devinfo reference
- * Devid-path remains in the cache
+ * Unregister a device's devid; the devinfo may hit on multiple entries
+ * arising from both pHCI and vHCI paths.
+ * Called as an instance detachs.
+ * Invalidate the devid's devinfo reference.
+ * Devid-path remains in the cache.
  */
+
 void
 e_devid_cache_unregister(dev_info_t *dip)
 {
@@ -647,7 +649,6 @@ e_devid_cache_unregister(dev_info_t *dip)
 			    "unregister: %s\n", np->nvp_devpath));
 			np->nvp_flags &= ~NVP_DEVID_DIP;
 			np->nvp_dip = NULL;
-			break;
 		}
 	}
 
