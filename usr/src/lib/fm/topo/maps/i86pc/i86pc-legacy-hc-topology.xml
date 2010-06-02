@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -166,10 +165,6 @@
 
     </dependents>
 
-  </range>
-
-  <range name='ses-enclosure' min='0' max='1024'>
-    <enum-method name='ses' version='1' />
   </range>
 
 </topology>
