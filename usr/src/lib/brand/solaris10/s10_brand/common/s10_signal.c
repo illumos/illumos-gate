@@ -170,6 +170,13 @@ s10sig_to_native(int sig)
 		return (-1);
 
 	/*
+	 * If an app passes in a signal that is out of range, it
+	 * expects to get back EINVAL.
+	 */
+	if (sig > S10_MAXSIG)
+		return (-1);
+
+	/*
 	 * Map S10 RT signals to their native counterparts to the degree
 	 * possible.  If the signal would be out of the native RT signal
 	 * range, return an error to the caller.
