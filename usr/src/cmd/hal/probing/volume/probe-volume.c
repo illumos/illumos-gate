@@ -2,8 +2,7 @@
  *
  * probe-volume.c : probe volumes
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Licensed under the Academic Free License version 2.1
  *
@@ -315,9 +314,11 @@ probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *has_data,
 
 		/*
 		 * XXX for some reason CDROMREADTOCENTRY fails on video DVDs,
-		 * but extracting the toc directly works okay.
+		 * but extracting the toc directly works okay. And the toc
+		 * data buffer length passed to read_toc() should be the same
+		 * as the real buffer size.
 		 */
-        	if (!read_toc(fd, 0, 1, 4, smalltoc)) {
+		if (!read_toc(fd, 0, 1, 12, smalltoc)) {
                 	HAL_DEBUG(("read_toc failed"));
 			*has_data = B_TRUE; /* probe for fs anyway */
         	} else {
