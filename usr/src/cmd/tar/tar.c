@@ -1614,8 +1614,10 @@ top:
 		if (chksum != checksum_signed(&dblock)) {
 			(void) fprintf(stderr, gettext(
 			    "tar: directory checksum error\n"));
-			if (iflag)
+			if (iflag) {
+				Errflg = 2;
 				goto top;
+			}
 			done(2);
 		} else {
 			if (! warn_chksum_sign) {
@@ -1629,8 +1631,10 @@ top:
 	if (chksum != checksum(&dblock)) {
 		(void) fprintf(stderr, gettext(
 		"tar: directory checksum error\n"));
-		if (iflag)
+		if (iflag) {
+			Errflg = 2;
 			goto top;
+		}
 		done(2);
 	}
 #endif	/* EUC */
