@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -297,7 +296,6 @@ sctp_ootb_shutdown_ack(mblk_t *mp, uint_t ip_hdr_len, ip_recv_attr_t *ira,
 			return;
 		}
 		mp1->b_rptr += sctps->sctps_wroff_xtra;
-		mp1->b_wptr = mp1->b_rptr + MBLKL(mp);
 		bcopy(mp->b_rptr, mp1->b_rptr, MBLKL(mp));
 		freeb(mp);
 		mp = mp1;
@@ -307,6 +305,8 @@ sctp_ootb_shutdown_ack(mblk_t *mp, uint_t ip_hdr_len, ip_recv_attr_t *ira,
 
 	ixas.ixa_pktlen = ip_hdr_len + sizeof (*insctph) + sizeof (*scch);
 	ixas.ixa_ip_hdr_length = ip_hdr_len;
+	mp->b_wptr = (mp->b_rptr + ixas.ixa_pktlen);
+
 	/*
 	 * We follow the logic in tcp_xmit_early_reset() in that we skip
 	 * reversing source route (i.e. replace all IP options with EOL).

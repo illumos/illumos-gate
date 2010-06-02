@@ -1004,6 +1004,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 	int			error;
 	boolean_t		notsent = B_TRUE;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	uint32_t		tsn;
 
 	if (sctp->sctp_ftsn == sctp->sctp_lastacked + 1) {
 		sacklen = 0;
@@ -1171,11 +1172,15 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 		SCTP_CHUNK_SENT(sctp, mp, sdc, fp, chunklen, meta);
 		mp = mp->b_next;
 
-		/* Use this chunk to measure RTT? */
-		if (sctp->sctp_out_time == 0) {
+		/*
+		 * Use this chunk to measure RTT?
+		 * Must not be a retransmision of an earlier chunk,
+		 * ensure the tsn is current.
+		 */
+		tsn = ntohl(sdc->sdh_tsn);
+		if (sctp->sctp_out_time == 0 && tsn == (sctp->sctp_ltsn - 1)) {
 			sctp->sctp_out_time = now;
-			sctp->sctp_rtt_tsn = sctp->sctp_ltsn - 1;
-			ASSERT(sctp->sctp_rtt_tsn == ntohl(sdc->sdh_tsn));
+			sctp->sctp_rtt_tsn = tsn;
 		}
 		if (extra > 0) {
 			fill = sctp_get_padding(sctp, extra);

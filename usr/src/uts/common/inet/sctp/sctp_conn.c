@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -501,9 +500,6 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen,
 		/* do the connect */
 		/* XXX check for attempt to connect to self */
 		connp->conn_fport = dstport;
-
-		ASSERT(sctp->sctp_iphc);
-		ASSERT(sctp->sctp_iphc6);
 
 		/*
 		 * Don't allow this connection to completely duplicate
