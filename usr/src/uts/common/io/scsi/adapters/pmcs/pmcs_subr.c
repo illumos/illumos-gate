@@ -7109,7 +7109,7 @@ void
 pmcs_complete_work_impl(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
     size_t amt)
 {
-	pmcs_phy_t	*pptr;
+	pmcs_phy_t	*pptr = NULL;
 
 	switch (PMCS_TAG_TYPE(pwrk->htag)) {
 	case PMCS_TAG_TYPE_CBACK:
@@ -7129,24 +7129,18 @@ pmcs_complete_work_impl(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 #ifdef DEBUG
 		pmcs_check_iomb_status(pwp, iomb);
 #endif
-		/*
-		 * If this was an abort all cmd, clear the phy's
-		 * 'abort_all_start' time and signal the abort_all_cv.
-		 */
-		if (pwrk->abt_htag == PMCS_ABT_HTAG_ALL) {
-			pptr = pwrk->phy;
-			if (pptr != NULL) {
-				mutex_exit(&pwrk->lock);
-				mutex_enter(&pptr->phy_lock);
-				if (pptr->abort_all_start) {
-					pptr->abort_all_start = 0;
-					cv_signal(&pptr->abort_all_cv);
-				}
-				mutex_exit(&pptr->phy_lock);
-				mutex_enter(&pwrk->lock);
-			}
-		}
+		pptr = pwrk->phy;
 		pmcs_pwork(pwp, pwrk);
+
+		/* If this was an abort all, clean up if needed */
+		if ((pwrk->abt_htag == PMCS_ABT_HTAG_ALL) && (pptr != NULL)) {
+			mutex_enter(&pptr->phy_lock);
+			if (pptr->abort_all_start) {
+				pptr->abort_all_start = 0;
+				cv_signal(&pptr->abort_all_cv);
+			}
+			mutex_exit(&pptr->phy_lock);
+		}
 		break;
 	default:
 		/*

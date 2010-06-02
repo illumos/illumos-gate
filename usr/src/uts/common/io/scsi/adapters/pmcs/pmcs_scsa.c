@@ -2217,7 +2217,7 @@ out:
 	 * back, but only after confirming it's not already been freed
 	 * elsewhere.
 	 */
-	if (!PMCS_COMMAND_DONE(pwrk)) {
+	if (pwrk->htag != PMCS_TAG_FREE) {
 		pmcs_pwork(pwp, pwrk);
 	}
 
@@ -2711,7 +2711,7 @@ out:
 	 * back, but only after confirming it's not already been freed
 	 * elsewhere.
 	 */
-	if (!PMCS_COMMAND_DONE(pwrk)) {
+	if (pwrk->htag != PMCS_TAG_FREE) {
 		pmcs_pwork(pwp, pwrk);
 	}
 
