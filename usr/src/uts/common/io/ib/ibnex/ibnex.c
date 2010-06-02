@@ -1717,8 +1717,8 @@ ibnex_get_pkey_commsvc_index_portnum(char *device_name, int *index,
 	if (ibnex_devname_to_portnum(device_name, port_num) !=
 	    IBNEX_SUCCESS) {
 		IBTF_DPRINTF_L2("ibnex",
-		    "\tget_pkey_commsvc_index_portnum: Invalid PortGuid");
-		return (NULL);
+		    "\tget_pkey_commsvc_index_portnum: Invalid Service Name");
+		return (IBNEX_FAILURE);
 	}
 	srv = strchr(device_name, ',');
 	if (srv == 0)
