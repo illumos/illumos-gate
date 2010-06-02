@@ -1175,6 +1175,7 @@ zfs_domount(vfs_t *vfsp, char *osname)
 			goto out;
 		xattr_changed_cb(zfsvfs, pval);
 		zfsvfs->z_issnap = B_TRUE;
+		zfsvfs->z_os->os_sync = ZFS_SYNC_DISABLED;
 
 		mutex_enter(&zfsvfs->z_os->os_user_ptr_lock);
 		dmu_objset_set_user(zfsvfs->z_os, zfsvfs);
