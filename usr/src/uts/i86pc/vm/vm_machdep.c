@@ -3982,7 +3982,6 @@ page_get_physical(uintptr_t seed)
 	    &tmpseg, (caddr_t)(ctr += MMU_PAGESIZE));	/* changing VA usage */
 	if (pp != NULL) {
 		page_io_unlock(pp);
-		page_hashout(pp, NULL);
 		page_downgrade(pp);
 	}
 	return (pp);

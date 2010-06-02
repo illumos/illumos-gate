@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -334,18 +333,17 @@ ptable_free(pfn_t pfn)
 	 * Get an exclusive lock, might have to wait for a kmem reader.
 	 */
 	if (!page_tryupgrade(pp)) {
+		u_offset_t off = pp->p_offset;
 		page_unlock(pp);
-		/*
-		 * RFE: we could change this to not loop forever
-		 * For now looping works - it's just like sfmmu.
-		 */
-		while (!page_lock(pp, SE_EXCL, (kmutex_t *)NULL, P_RECLAIM))
-			continue;
+		pp = page_lookup(&kvp, off, SE_EXCL);
+		if (pp == NULL)
+			panic("page not found");
 	}
 #ifdef __xpv
 	if (kpm_vbase && xen_kpm_page(pfn, PT_VALID | PT_WRITABLE) < 0)
 		panic("failure making kpm r/w pfn=0x%lx", pfn);
 #endif
+	page_hashout(pp, NULL);
 	page_free(pp, 1);
 	page_unresv(1);
 }

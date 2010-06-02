@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -2200,22 +2199,7 @@ hat_pte_unmap(
 			x86_hm_enter(pp);
 		}
 
-		/*
-		 * If freeing the address space, check that the PTE
-		 * hasn't changed, as the mappings are no longer in use by
-		 * any thread, invalidation is unnecessary.
-		 * If not freeing, do a full invalidate.
-		 *
-		 * On the hypervisor we must always remove mappings, as a
-		 * writable mapping left behind could cause a page table
-		 * allocation to fail.
-		 */
-#if !defined(__xpv)
-		if (hat->hat_flags & HAT_FREEING)
-			old_pte = x86pte_get(ht, entry);
-		else
-#endif
-			old_pte = x86pte_inval(ht, entry, old_pte, pte_ptr);
+		old_pte = x86pte_inval(ht, entry, old_pte, pte_ptr);
 
 		/*
 		 * If the page hadn't changed we've unmapped it and can proceed
@@ -3421,6 +3405,13 @@ hati_pageunload(struct page *pp, uint_t pg_szcd, uint_t forceflag)
 	level_t		level;
 
 	XPV_DISALLOW_MIGRATE();
+
+	/*
+	 * prevent recursion due to kmem_free()
+	 */
+	++curthread->t_hatdepth;
+	ASSERT(curthread->t_hatdepth < 16);
+
 #if defined(__amd64)
 	/*
 	 * clear the vpm ref.
@@ -3448,6 +3439,8 @@ next_size:
 				 * If not part of a larger page, we're done.
 				 */
 				if (cur_pp->p_szc <= pg_szcd) {
+					ASSERT(curthread->t_hatdepth > 0);
+					--curthread->t_hatdepth;
 					XPV_ALLOW_MIGRATE();
 					return (0);
 				}
