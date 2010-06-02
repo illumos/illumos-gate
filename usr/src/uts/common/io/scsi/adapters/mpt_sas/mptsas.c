@@ -14404,6 +14404,13 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 			goto phys_create_done;
 		}
 
+		/*
+		 * The following code is to set properties for SM-HBA support, 
+		 * it doesn't apply to RAID volumes
+		 */
+		if (ptgt->m_phymask == 0)
+			goto phys_raid_lun;
+
 		mutex_enter(&mpt->m_mutex);
 
 		page_address = (MPI2_SAS_DEVICE_PGAD_FORM_HANDLE &
@@ -14503,7 +14510,7 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 				goto phys_create_done;
 			}
 		}
-
+phys_raid_lun:
 		/*
 		 * if this is a SAS controller, and the target is a SATA
 		 * drive, set the 'pm-capable' property for sd and if on
