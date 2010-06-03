@@ -176,8 +176,6 @@ w strvals
 1,$d
 r tnames.c
 1i
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* tnames.c: Made automatically from caps and maketerm.ed - don't edit me! */
 .
 1,$s/ $//
@@ -187,8 +185,6 @@ w tnames.c
 1,$d
 r tinames.c
 1i
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* tinames.c: Made automatically from caps and maketerm.ed - don't edit me! */
 .
 1,$s/ $//
@@ -198,8 +194,6 @@ w tinames.c
 1,$d
 r tifnames.c
 1i
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* tifnames.c: Made automatically from caps and maketerm.ed - don't edit me! */
 .
 1,$s/ $//
@@ -338,8 +332,6 @@ e ./tmp/term.h.new
 1i
 #ifndef	_TERM_H
 #define	_TERM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * term.h - this file is automatically made from caps and maketerm.ed.
@@ -568,7 +560,8 @@ extern	char
 extern	char	*tparm();
 #endif
 
-extern char	*tgetstr(char *, char **),
+extern char	*tgoto(char *, int, int),
+		*tgetstr(char *, char **),
 		*tigetstr(char *),
 		*termname(void);
 
