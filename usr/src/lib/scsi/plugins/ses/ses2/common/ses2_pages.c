@@ -61,25 +61,14 @@ ses2_aes_index(ses_plugin_t *sp, ses_node_t *np, void *data, size_t pagelen,
 	ses2_aes_descr_eip_impl_t *dep;
 	size_t desclen;
 	int i, pos;
-	ses_node_t *uncle;
 
-	VERIFY(nvlist_lookup_uint64(props, SES_PROP_ELEMENT_INDEX,
+	VERIFY(nvlist_lookup_uint64(props, SES_PROP_ELEMENT_ONLY_INDEX,
 	    &index) == 0);
 	VERIFY(nvlist_lookup_uint64(props, SES_PROP_ELEMENT_TYPE,
 	    &type) == 0);
 
 	if (pagelen < offsetof(ses2_aes_page_impl_t, sapi_data))
 		return (0);
-
-	/*
-	 * Because, according to 6.1.13.1, the element index "does not
-	 * include the OVERALL STATUS fields", we have to go recompute the
-	 * index of this element each time.  This, naturally, is a linear
-	 * exercise as well.
-	 */
-	for (uncle = ses_node_parent(np); uncle != NULL;
-	    uncle = ses_node_prev_sibling(uncle))
-		--index;
 
 	for (dep = (ses2_aes_descr_eip_impl_t *)apip->sapi_data, pos = 0, i = 0;
 	    pos < SCSI_READ16(&apip->sapi_page_length);
@@ -112,6 +101,13 @@ ses2_aes_index(ses_plugin_t *sp, ses_node_t *np, void *data, size_t pagelen,
 			continue;
 		} else if (dep->sadei_eip &&
 		    dep->sadei_element_index != index) {
+			/*
+			 * The element index field from AES descriptor is
+			 * element only index which doesn't include the OVERALL
+			 * STATUS fields so we should compare with
+			 * SES_PROP_ELEMENT_ONLY_INDEX not
+			 * SES_PROP_ELEMENT_INDEX.
+			 */
 			continue;
 		} else if (dep->sadei_eip || i == index) {
 			*len = desclen;
