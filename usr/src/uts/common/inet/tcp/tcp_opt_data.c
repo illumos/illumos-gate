@@ -122,6 +122,14 @@ opdes_t	tcp_opt_arr[] = {
 
 { TCP_CORK, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 
+{ TCP_RTO_INITIAL, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (uint32_t), 0 },
+
+{ TCP_RTO_MIN, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (uint32_t), 0 },
+
+{ TCP_RTO_MAX, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (uint32_t), 0 },
+
+{ TCP_LINGER2, IPPROTO_TCP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
 { IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
 	(OP_VARLEN|OP_NODEFAULT),
 	IP_MAX_OPT_LENGTH + IP_ADDR_LEN, -1 /* not initialized */ },
@@ -401,6 +409,18 @@ tcp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 		case TCP_CORK:
 			*i1 = tcp->tcp_cork;
 			return (sizeof (int));
+		case TCP_RTO_INITIAL:
+			*i1 = tcp->tcp_rto_initial;
+			return (sizeof (uint32_t));
+		case TCP_RTO_MIN:
+			*i1 = tcp->tcp_rto_min;
+			return (sizeof (uint32_t));
+		case TCP_RTO_MAX:
+			*i1 = tcp->tcp_rto_max;
+			return (sizeof (uint32_t));
+		case TCP_LINGER2:
+			*i1 = tcp->tcp_fin_wait_2_flush_interval / SECONDS;
+			return (sizeof (int));
 		}
 		break;
 	case IPPROTO_IP:
@@ -455,6 +475,7 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 	int	reterr;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_opt_arg_t	coas;
+	uint32_t	val = *((uint32_t *)invalp);
 
 	coas.coa_connp = connp;
 	coas.coa_ixa = connp->conn_ixa;
@@ -639,9 +660,7 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			}
 			/* Setting done in conn_opt_set */
 			break;
-		case TCP_INIT_CWND: {
-			uint32_t init_cwnd = *((uint32_t *)invalp);
-
+		case TCP_INIT_CWND:
 			if (checkonly)
 				break;
 
@@ -650,21 +669,20 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			 * privilege to set the initial cwnd to be larger
 			 * than allowed by RFC 3390.
 			 */
-			if (init_cwnd <= MIN(4, MAX(2, 4380 / tcp->tcp_mss))) {
-				tcp->tcp_init_cwnd = init_cwnd;
+			if (val <= MIN(4, MAX(2, 4380 / tcp->tcp_mss))) {
+				tcp->tcp_init_cwnd = val;
 				break;
 			}
 			if ((reterr = secpolicy_ip_config(cr, B_TRUE)) != 0) {
 				*outlenp = 0;
 				return (reterr);
 			}
-			if (init_cwnd > tcp_max_init_cwnd) {
+			if (val > tcp_max_init_cwnd) {
 				*outlenp = 0;
 				return (EINVAL);
 			}
-			tcp->tcp_init_cwnd = init_cwnd;
+			tcp->tcp_init_cwnd = val;
 			break;
-		}
 		case TCP_KEEPALIVE_THRESHOLD:
 			if (checkonly)
 				break;
@@ -719,6 +737,108 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				}
 				tcp->tcp_cork = onoff;
 			}
+			break;
+		case TCP_RTO_INITIAL: {
+			clock_t rto;
+
+			if (checkonly || val == 0)
+				break;
+
+			/*
+			 * Sanity checks
+			 *
+			 * The initial RTO should be bounded by the minimum
+			 * and maximum RTO.  And it should also be smaller
+			 * than the connect attempt abort timeout.  Otherwise,
+			 * the connection won't be aborted in a period
+			 * reasonably close to that timeout.
+			 */
+			if (val < tcp->tcp_rto_min || val > tcp->tcp_rto_max ||
+			    val > tcp->tcp_second_ctimer_threshold ||
+			    val < tcps->tcps_rexmit_interval_initial_low ||
+			    val > tcps->tcps_rexmit_interval_initial_high) {
+				*outlenp = 0;
+				return (EINVAL);
+			}
+			tcp->tcp_rto_initial = val;
+
+			/*
+			 * If TCP has not sent anything, need to re-calculate
+			 * tcp_rto.  Otherwise, this option change does not
+			 * really affect anything.
+			 */
+			if (tcp->tcp_state >= TCPS_SYN_SENT)
+				break;
+
+			tcp->tcp_rtt_sa = tcp->tcp_rto_initial << 2;
+			tcp->tcp_rtt_sd = tcp->tcp_rto_initial >> 1;
+			rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
+			    tcps->tcps_rexmit_interval_extra +
+			    (tcp->tcp_rtt_sa >> 5) +
+			    tcps->tcps_conn_grace_period;
+			TCP_SET_RTO(tcp, rto);
+			break;
+		}
+		case TCP_RTO_MIN:
+			if (checkonly || val == 0)
+				break;
+
+			if (val < tcps->tcps_rexmit_interval_min_low ||
+			    val > tcps->tcps_rexmit_interval_min_high ||
+			    val > tcp->tcp_rto_max) {
+				*outlenp = 0;
+				return (EINVAL);
+			}
+			tcp->tcp_rto_min = val;
+			if (tcp->tcp_rto < val)
+				tcp->tcp_rto = val;
+			break;
+		case TCP_RTO_MAX:
+			if (checkonly || val == 0)
+				break;
+
+			/*
+			 * Sanity checks
+			 *
+			 * The maximum RTO should not be larger than the
+			 * connection abort timeout.  Otherwise, the
+			 * connection won't be aborted in a period reasonably
+			 * close to that timeout.
+			 */
+			if (val < tcps->tcps_rexmit_interval_max_low ||
+			    val > tcps->tcps_rexmit_interval_max_high ||
+			    val < tcp->tcp_rto_min ||
+			    val > tcp->tcp_second_timer_threshold) {
+				*outlenp = 0;
+				return (EINVAL);
+			}
+			tcp->tcp_rto_max = val;
+			if (tcp->tcp_rto > val)
+				tcp->tcp_rto = val;
+			break;
+		case TCP_LINGER2:
+			if (checkonly || *i1 == 0)
+				break;
+
+			/*
+			 * Note that the option value's unit is second.  And
+			 * the value should be bigger than the private
+			 * parameter tcp_fin_wait_2_flush_interval's lower
+			 * bound and smaller than the current value of that
+			 * parameter.  It should be smaller than the current
+			 * value to avoid an app setting TCP_LINGER2 to a big
+			 * value, causing resource to be held up too long in
+			 * FIN-WAIT-2 state.
+			 */
+			if (*i1 < 0 ||
+			    tcps->tcps_fin_wait_2_flush_interval_low/SECONDS >
+			    *i1 ||
+			    tcps->tcps_fin_wait_2_flush_interval/SECONDS <
+			    *i1) {
+				*outlenp = 0;
+				return (EINVAL);
+			}
+			tcp->tcp_fin_wait_2_flush_interval = *i1 * SECONDS;
 			break;
 		default:
 			break;

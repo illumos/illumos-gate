@@ -1482,7 +1482,11 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	eager->tcp_detached = B_TRUE;
 	SOCK_CONNID_INIT(eager->tcp_connid);
 
-	tcp_init_values(eager);
+	/*
+	 * Initialize the eager's tcp_t and inherit some parameters from
+	 * the listener.
+	 */
+	tcp_init_values(eager, listener);
 
 	ASSERT((econnp->conn_ixa->ixa_flags &
 	    (IXAF_SET_ULP_CKSUM | IXAF_VERIFY_SOURCE |
@@ -1573,28 +1577,12 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		}
 	}
 
-	/* Inherit various TCP parameters from the listener */
-	eager->tcp_naglim = listener->tcp_naglim;
-	eager->tcp_first_timer_threshold = listener->tcp_first_timer_threshold;
-	eager->tcp_second_timer_threshold =
-	    listener->tcp_second_timer_threshold;
-	eager->tcp_first_ctimer_threshold =
-	    listener->tcp_first_ctimer_threshold;
-	eager->tcp_second_ctimer_threshold =
-	    listener->tcp_second_ctimer_threshold;
-
 	/*
 	 * tcp_set_destination() may set tcp_rwnd according to the route
 	 * metrics. If it does not, the eager's receive window will be set
 	 * to the listener's receive window later in this function.
 	 */
 	eager->tcp_rwnd = 0;
-
-	/*
-	 * Inherit listener's tcp_init_cwnd.  Need to do this before
-	 * calling tcp_process_options() which set the initial cwnd.
-	 */
-	eager->tcp_init_cwnd = listener->tcp_init_cwnd;
 
 	if (is_system_labeled()) {
 		ip_xmit_attr_t *ixa = econnp->conn_ixa;
@@ -4427,7 +4415,7 @@ est:
 				 * flushing the FIN_WAIT_2 connection.
 				 */
 				TCP_TIMER_RESTART(tcp,
-				    tcps->tcps_fin_wait_2_flush_interval);
+				    tcp->tcp_fin_wait_2_flush_interval);
 			}
 			break;
 		case TCPS_FIN_WAIT_2:
@@ -5228,13 +5216,7 @@ tcp_set_rto(tcp_t *tcp, clock_t rtt)
 	 */
 	rto = (sa >> 3) + sv + tcps->tcps_rexmit_interval_extra + (sa >> 5);
 
-	if (rto > tcps->tcps_rexmit_interval_max) {
-		tcp->tcp_rto = tcps->tcps_rexmit_interval_max;
-	} else if (rto < tcps->tcps_rexmit_interval_min) {
-		tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
-	} else {
-		tcp->tcp_rto = rto;
-	}
+	TCP_SET_RTO(tcp, rto);
 
 	/* Now, we can reset tcp_timer_backoff to use the new RTO... */
 	tcp->tcp_timer_backoff = 0;

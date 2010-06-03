@@ -460,9 +460,9 @@ tcp_keepalive_timer(void *arg)
 					/*
 					 * We should probe again at least
 					 * in ka_intrvl, but not more than
-					 * tcp_rexmit_interval_max.
+					 * tcp_rto_max.
 					 */
-					max = tcps->tcps_rexmit_interval_max;
+					max = tcp->tcp_rto_max;
 					firetime = MIN(ka_intrvl - 1,
 					    tcp->tcp_ka_last_intrvl << 1);
 					if (firetime > max)
@@ -624,6 +624,7 @@ tcp_timer(void *arg)
 	conn_t		*connp = (conn_t *)arg;
 	tcp_t		*tcp = connp->conn_tcp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	boolean_t	dont_timeout = B_FALSE;
 
 	tcp->tcp_timer_tid = 0;
 
@@ -693,11 +694,29 @@ tcp_timer(void *arg)
 	case TCPS_SYN_SENT:
 		first_threshold =  tcp->tcp_first_ctimer_threshold;
 		second_threshold = tcp->tcp_second_ctimer_threshold;
+
+		/* Retransmit forever unless this is a passive open... */
+		if (second_threshold == 0) {
+			if (!tcp->tcp_active_open) {
+				second_threshold =
+				    tcps->tcps_ip_abort_linterval;
+			} else {
+				dont_timeout = B_TRUE;
+			}
+		}
 		break;
 	case TCPS_ESTABLISHED:
+	case TCPS_CLOSE_WAIT:
+		/*
+		 * If the end point has not been closed, TCP can retransmit
+		 * forever.  But if the end point is closed, the normal
+		 * timeout applies.
+		 */
+		if (second_threshold == 0)
+			dont_timeout = B_TRUE;
+		/* FALLTHRU */
 	case TCPS_FIN_WAIT_1:
 	case TCPS_CLOSING:
-	case TCPS_CLOSE_WAIT:
 	case TCPS_LAST_ACK:
 		/* If we have data to rexmit */
 		if (tcp->tcp_suna != tcp->tcp_snxt) {
@@ -844,7 +863,7 @@ tcp_timer(void *arg)
 			(void) tcp_clean_death(tcp, 0);
 		} else {
 			TCP_TIMER_RESTART(tcp,
-			    tcps->tcps_fin_wait_2_flush_interval);
+			    tcp->tcp_fin_wait_2_flush_interval);
 		}
 		return;
 	case TCPS_TIME_WAIT:
@@ -868,7 +887,13 @@ tcp_timer(void *arg)
 	if (tcps->tcps_reclaim || (tcp->tcp_listen_cnt != NULL &&
 	    tcp->tcp_listen_cnt->tlc_cnt > tcp->tcp_listen_cnt->tlc_max)) {
 		second_threshold = tcp_early_abort * SECONDS;
+
+		/* We will ignore the never timeout promise in this case... */
+		dont_timeout = B_FALSE;
 	}
+
+	if (!dont_timeout && second_threshold == 0)
+		second_threshold = tcps->tcps_ip_abort_interval;
 
 	if ((ms = tcp->tcp_ms_we_have_waited) > second_threshold) {
 		/*
@@ -877,6 +902,9 @@ tcp_timer(void *arg)
 		if (tcp->tcp_snd_zcopy_aware && !tcp->tcp_xmit_zc_clean)
 			tcp->tcp_xmit_head = tcp_zcopy_backoff(tcp,
 			    tcp->tcp_xmit_head, B_TRUE);
+
+		if (dont_timeout)
+			goto timer_rexmit;
 
 		/*
 		 * For zero window probe, we need to send indefinitely,
@@ -923,10 +951,10 @@ tcp_timer(void *arg)
 			 * We don't need to decrement tcp_timer_backoff
 			 * to avoid overflow because it will be decremented
 			 * later if new timeout value is greater than
-			 * tcp_rexmit_interval_max.  In the case when
-			 * tcp_rexmit_interval_max is greater than
-			 * second_threshold, it means that we will wait
-			 * longer than second_threshold to send the next
+			 * tcp_rto_max.  In the case when tcp_rto_max is
+			 * greater than second_threshold, it means that we
+			 * will wait longer than second_threshold to send
+			 * the next
 			 * window probe.
 			 */
 			tcp->tcp_ms_we_have_waited = second_threshold;
@@ -955,21 +983,23 @@ tcp_timer(void *arg)
 			tcp->tcp_rtt_update = 0;
 		}
 	}
+
+timer_rexmit:
 	tcp->tcp_timer_backoff++;
 	if ((ms = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
 	    tcps->tcps_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5)) <
-	    tcps->tcps_rexmit_interval_min) {
+	    tcp->tcp_rto_min) {
 		/*
 		 * This means the original RTO is tcp_rexmit_interval_min.
 		 * So we will use tcp_rexmit_interval_min as the RTO value
 		 * and do the backoff.
 		 */
-		ms = tcps->tcps_rexmit_interval_min << tcp->tcp_timer_backoff;
+		ms = tcp->tcp_rto_min << tcp->tcp_timer_backoff;
 	} else {
 		ms <<= tcp->tcp_timer_backoff;
 	}
-	if (ms > tcps->tcps_rexmit_interval_max) {
-		ms = tcps->tcps_rexmit_interval_max;
+	if (ms > tcp->tcp_rto_max) {
+		ms = tcp->tcp_rto_max;
 		/*
 		 * ms is at max, decrement tcp_timer_backoff to avoid
 		 * overflow.

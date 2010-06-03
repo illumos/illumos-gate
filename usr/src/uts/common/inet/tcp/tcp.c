@@ -661,13 +661,7 @@ tcp_set_destination(tcp_t *tcp)
 		    tcps->tcps_rexmit_interval_extra +
 		    (tcp->tcp_rtt_sa >> 5);
 
-		if (rto > tcps->tcps_rexmit_interval_max) {
-			tcp->tcp_rto = tcps->tcps_rexmit_interval_max;
-		} else if (rto < tcps->tcps_rexmit_interval_min) {
-			tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
-		} else {
-			tcp->tcp_rto = rto;
-		}
+		TCP_SET_RTO(tcp, rto);
 	}
 	if (uinfo.iulp_ssthresh != 0)
 		tcp->tcp_cwnd_ssthresh = uinfo.iulp_ssthresh;
@@ -2021,7 +2015,7 @@ tcp_reinit(tcp_t *tcp)
 	/*
 	 * Initialize to default values
 	 */
-	tcp_init_values(tcp);
+	tcp_init_values(tcp, NULL);
 
 	DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
 	    connp->conn_ixa, void, NULL, tcp_t *, tcp, void, NULL,
@@ -2313,17 +2307,72 @@ tcp_reinit_values(tcp)
 #undef	PRESERVE
 }
 
+/*
+ * Initialize the various fields in tcp_t.  If parent (the listener) is non
+ * NULL, certain values will be inheritted from it.
+ */
 void
-tcp_init_values(tcp_t *tcp)
+tcp_init_values(tcp_t *tcp, tcp_t *parent)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
+	clock_t		rto;
 
 	ASSERT((connp->conn_family == AF_INET &&
 	    connp->conn_ipversion == IPV4_VERSION) ||
 	    (connp->conn_family == AF_INET6 &&
 	    (connp->conn_ipversion == IPV4_VERSION ||
 	    connp->conn_ipversion == IPV6_VERSION)));
+
+	if (parent == NULL) {
+		tcp->tcp_naglim = tcps->tcps_naglim_def;
+
+		tcp->tcp_rto_initial = tcps->tcps_rexmit_interval_initial;
+		tcp->tcp_rto_min = tcps->tcps_rexmit_interval_min;
+		tcp->tcp_rto_max = tcps->tcps_rexmit_interval_max;
+
+		tcp->tcp_first_ctimer_threshold =
+		    tcps->tcps_ip_notify_cinterval;
+		tcp->tcp_second_ctimer_threshold =
+		    tcps->tcps_ip_abort_cinterval;
+		tcp->tcp_first_timer_threshold = tcps->tcps_ip_notify_interval;
+		tcp->tcp_second_timer_threshold = tcps->tcps_ip_abort_interval;
+
+		tcp->tcp_fin_wait_2_flush_interval =
+		    tcps->tcps_fin_wait_2_flush_interval;
+
+		tcp->tcp_ka_interval = tcps->tcps_keepalive_interval;
+		tcp->tcp_ka_abort_thres = tcps->tcps_keepalive_abort_interval;
+
+		/*
+		 * Default value of tcp_init_cwnd is 0, so no need to set here
+		 * if parent is NULL.  But we need to inherit it from parent.
+		 */
+	} else {
+		/* Inherit various TCP parameters from the parent. */
+		tcp->tcp_naglim = parent->tcp_naglim;
+
+		tcp->tcp_rto_initial = parent->tcp_rto_initial;
+		tcp->tcp_rto_min = parent->tcp_rto_min;
+		tcp->tcp_rto_max = parent->tcp_rto_max;
+
+		tcp->tcp_first_ctimer_threshold =
+		    parent->tcp_first_ctimer_threshold;
+		tcp->tcp_second_ctimer_threshold =
+		    parent->tcp_second_ctimer_threshold;
+		tcp->tcp_first_timer_threshold =
+		    parent->tcp_first_timer_threshold;
+		tcp->tcp_second_timer_threshold =
+		    parent->tcp_second_timer_threshold;
+
+		tcp->tcp_fin_wait_2_flush_interval =
+		    parent->tcp_fin_wait_2_flush_interval;
+
+		tcp->tcp_ka_interval = parent->tcp_ka_interval;
+		tcp->tcp_ka_abort_thres = parent->tcp_ka_abort_thres;
+
+		tcp->tcp_init_cwnd = parent->tcp_init_cwnd;
+	}
 
 	/*
 	 * Initialize tcp_rtt_sa and tcp_rtt_sd so that the calculated RTO
@@ -2332,13 +2381,13 @@ tcp_init_values(tcp_t *tcp)
 	 * during first few transmissions of a connection as seen in slow
 	 * links.
 	 */
-	tcp->tcp_rtt_sa = tcps->tcps_rexmit_interval_initial << 2;
-	tcp->tcp_rtt_sd = tcps->tcps_rexmit_interval_initial >> 1;
-	tcp->tcp_rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
+	tcp->tcp_rtt_sa = tcp->tcp_rto_initial << 2;
+	tcp->tcp_rtt_sd = tcp->tcp_rto_initial >> 1;
+	rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
 	    tcps->tcps_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5) +
 	    tcps->tcps_conn_grace_period;
-	if (tcp->tcp_rto < tcps->tcps_rexmit_interval_min)
-		tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
+	TCP_SET_RTO(tcp, rto);
+
 	tcp->tcp_timer_backoff = 0;
 	tcp->tcp_ms_we_have_waited = 0;
 	tcp->tcp_last_recv_time = ddi_get_lbolt();
@@ -2347,17 +2396,6 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_snd_burst = TCP_CWND_INFINITE;
 
 	tcp->tcp_maxpsz_multiplier = tcps->tcps_maxpsz_multiplier;
-
-	tcp->tcp_first_timer_threshold = tcps->tcps_ip_notify_interval;
-	tcp->tcp_first_ctimer_threshold = tcps->tcps_ip_notify_cinterval;
-	tcp->tcp_second_timer_threshold = tcps->tcps_ip_abort_interval;
-	/*
-	 * Fix it to tcp_ip_abort_linterval later if it turns out to be a
-	 * passive open.
-	 */
-	tcp->tcp_second_ctimer_threshold = tcps->tcps_ip_abort_cinterval;
-
-	tcp->tcp_naglim = tcps->tcps_naglim_def;
 
 	/* NOTE:  ISS is now set in tcp_set_destination(). */
 
@@ -2388,9 +2426,6 @@ tcp_init_values(tcp_t *tcp)
 	 */
 	if (!connp->conn_debug)
 		connp->conn_debug = tcps->tcps_dbg;
-
-	tcp->tcp_ka_interval = tcps->tcps_keepalive_interval;
-	tcp->tcp_ka_abort_thres = tcps->tcps_keepalive_abort_interval;
 }
 
 /*
@@ -2674,7 +2709,7 @@ tcp_create_common(cred_t *credp, boolean_t isv6, boolean_t issocket,
 	SOCK_CONNID_INIT(tcp->tcp_connid);
 	/* DTrace ignores this - it isn't a tcp:::state-change */
 	tcp->tcp_state = TCPS_IDLE;
-	tcp_init_values(tcp);
+	tcp_init_values(tcp, NULL);
 	return (connp);
 }
 

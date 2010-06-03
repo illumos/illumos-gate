@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <inet/ip.h>
@@ -337,8 +336,8 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 
 	{ "tcp_fin_wait_2_flush_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
-	    {1*SECONDS, UINT32_MAX, 675*SECONDS},
-	    {675*SECONDS} },
+	    {1*SECONDS, 2*HOURS, 60*SECONDS},
+	    {60*SECONDS} },
 
 	{ "tcp_max_buf", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,

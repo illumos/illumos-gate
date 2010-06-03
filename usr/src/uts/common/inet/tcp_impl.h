@@ -228,6 +228,17 @@ typedef struct tcp_squeue_priv_s {
 	}
 
 /*
+ * Set tcp_rto with boundary checking.
+ */
+#define	TCP_SET_RTO(tcp, rto) \
+	if ((rto) < (tcp)->tcp_rto_min)			\
+		(tcp)->tcp_rto = (tcp)->tcp_rto_min;	\
+	else if ((rto) > (tcp)->tcp_rto_max)		\
+		(tcp)->tcp_rto = (tcp)->tcp_rto_max;	\
+	else						\
+		(tcp)->tcp_rto = (rto);
+
+/*
  * TCP options struct returned from tcp_parse_options.
  */
 typedef struct tcp_opt_s {
@@ -428,9 +439,17 @@ extern uint32_t tcp_early_abort;
 #define	tcps_mss_max_ipv4		tcps_propinfo_tbl[17].prop_cur_uval
 #define	tcps_mss_min			tcps_propinfo_tbl[18].prop_cur_uval
 #define	tcps_naglim_def			tcps_propinfo_tbl[19].prop_cur_uval
+#define	tcps_rexmit_interval_initial_high	\
+					tcps_propinfo_tbl[20].prop_max_uval
 #define	tcps_rexmit_interval_initial	tcps_propinfo_tbl[20].prop_cur_uval
+#define	tcps_rexmit_interval_initial_low	\
+					tcps_propinfo_tbl[20].prop_min_uval
+#define	tcps_rexmit_interval_max_high	tcps_propinfo_tbl[21].prop_max_uval
 #define	tcps_rexmit_interval_max	tcps_propinfo_tbl[21].prop_cur_uval
+#define	tcps_rexmit_interval_max_low	tcps_propinfo_tbl[21].prop_min_uval
+#define	tcps_rexmit_interval_min_high	tcps_propinfo_tbl[22].prop_max_uval
 #define	tcps_rexmit_interval_min	tcps_propinfo_tbl[22].prop_cur_uval
+#define	tcps_rexmit_interval_min_low	tcps_propinfo_tbl[22].prop_min_uval
 #define	tcps_deferred_ack_interval	tcps_propinfo_tbl[23].prop_cur_uval
 #define	tcps_snd_lowat_fraction		tcps_propinfo_tbl[24].prop_cur_uval
 #define	tcps_dupack_fast_retransmit	tcps_propinfo_tbl[25].prop_cur_uval
@@ -441,7 +460,11 @@ extern uint32_t tcp_early_abort;
 #define	tcps_xmit_lowat			tcps_propinfo_tbl[30].prop_cur_uval
 #define	tcps_recv_hiwat			tcps_propinfo_tbl[31].prop_cur_uval
 #define	tcps_recv_hiwat_minmss		tcps_propinfo_tbl[32].prop_cur_uval
+#define	tcps_fin_wait_2_flush_interval_high	\
+					tcps_propinfo_tbl[33].prop_max_uval
 #define	tcps_fin_wait_2_flush_interval	tcps_propinfo_tbl[33].prop_cur_uval
+#define	tcps_fin_wait_2_flush_interval_low	\
+					tcps_propinfo_tbl[33].prop_min_uval
 #define	tcps_max_buf			tcps_propinfo_tbl[34].prop_cur_uval
 #define	tcps_strong_iss			tcps_propinfo_tbl[35].prop_cur_uval
 #define	tcps_rtt_updates		tcps_propinfo_tbl[36].prop_cur_uval
@@ -527,7 +550,7 @@ extern int	tcp_getpeername(sock_lower_handle_t, struct sockaddr *,
 		    socklen_t *, cred_t *);
 extern int	tcp_getsockname(sock_lower_handle_t, struct sockaddr *,
 		    socklen_t *, cred_t *);
-extern void	tcp_init_values(tcp_t *);
+extern void	tcp_init_values(tcp_t *, tcp_t *);
 extern void	tcp_ipsec_cleanup(tcp_t *);
 extern int	tcp_maxpsz_set(tcp_t *, boolean_t);
 extern void	tcp_mss_set(tcp_t *, uint32_t);

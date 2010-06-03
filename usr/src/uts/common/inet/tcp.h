@@ -158,6 +158,9 @@ typedef struct tcp_s {
 	clock_t	tcp_rto;		/* Round trip timeout */
 	clock_t	tcp_last_rcv_lbolt;
 				/* lbolt on last packet, used for PAWS */
+	uint32_t tcp_rto_initial;	/* Initial RTO */
+	uint32_t tcp_rto_min;		/* Minimum RTO */
+	uint32_t tcp_rto_max;		/* Maximum RTO */
 
 	uint32_t tcp_snxt;		/* Senders next seq num */
 	uint32_t tcp_swnd;		/* Senders window (relative to suna) */
@@ -477,6 +480,9 @@ typedef struct tcp_s {
 
 	/* Segment reassembly timer. */
 	timeout_id_t		tcp_reass_tid;
+
+	/* FIN-WAIT-2 flush timeout */
+	uint32_t		tcp_fin_wait_2_flush_interval;
 
 #ifdef DEBUG
 	pc_t			tcmp_stk[15];

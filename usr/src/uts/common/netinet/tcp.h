@@ -1,6 +1,26 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -12,7 +32,6 @@
 #ifndef	_NETINET_TCP_H
 #define	_NETINET_TCP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* tcp.h 1.11 88/08/19 SMI; from UCB 7.2 10/28/86	*/
 
 
@@ -98,6 +117,10 @@ struct tcphdr {
 #define	TCP_KEEPALIVE_THRESHOLD		0x16
 #define	TCP_KEEPALIVE_ABORT_THRESHOLD	0x17
 #define	TCP_CORK			0x18
+#define	TCP_RTO_INITIAL			0x19
+#define	TCP_RTO_MIN			0x1A
+#define	TCP_RTO_MAX			0x1B
+#define	TCP_LINGER2			0x1C
 
 /* gap for expansion of ``standard'' options */
 #define	TCP_ANONPRIVBIND		0x20	/* for internal use only  */

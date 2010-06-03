@@ -1832,6 +1832,10 @@ tcp_optname(private_t *pri, long val)
 	case TCP_KEEPALIVE_ABORT_THRESHOLD:
 		return ("TCP_KEEPALIVE_ABORT_THRESHOLD");
 	case TCP_CORK:			return ("TCP_CORK");
+	case TCP_RTO_INITIAL:		return ("TCP_RTO_INITIAL");
+	case TCP_RTO_MIN:		return ("TCP_RTO_MIN");
+	case TCP_RTO_MAX:		return ("TCP_RTO_MAX");
+	case TCP_LINGER2:		return ("TCP_LINGER2");
 
 	default:			(void) snprintf(pri->code_buf,
 					    sizeof (pri->code_buf),
