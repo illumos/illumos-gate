@@ -75,10 +75,13 @@
  *
  * external SGT tables: The external SGT tables pointed to from
  *	within si_prb_t are actually abstracted as si_sgblock_t. Each
- *	si_sgblock_t contains SI_MAX_SGT_TABLES_PER_PRB number of
- *	SGT tables linked in a chain. Currently this max value of
- *	SGT tables per block is hard coded as 10 which translates
- *	to a maximum of 31 dma cookies per single dma transfer.
+ *	si_sgblock_t contains si_dma_sg_number number of
+ *	SGT tables linked in a chain. Currently this default value of
+ *	SGT tables per block is at 85 as  which translates
+ *	to a maximum of 256 dma cookies per single dma transfer.
+ *	This value can be changed through the global var: si_dma_sg_number
+ *	in /etc/system, the maxium is at 21844 as which translates to 65535
+ *	dma cookies per single dma transfer.
  *
  *
  * III. Driver operation
@@ -342,7 +345,7 @@ static ddi_dma_attr_t buffer_dma_attr = {
 	1,			/* dma_attr_minxfer */
 	0xffffffffull,		/* dma_attr_maxxfer i.e. includes all cookies */
 	0xffffffffull,		/* dma_attr_seg */
-	SI_MAX_SGL_LENGTH,	/* dma_attr_sgllen */
+	SI_DEFAULT_SGL_LENGTH,	/* dma_attr_sgllen */
 	512,			/* dma_attr_granular */
 	0,			/* dma_attr_flags */
 };
@@ -421,6 +424,14 @@ static char si_log_buf[512];
 #endif	/* SI_DEBUG */
 uint32_t si_debug_flags = 0x0;
 static int is_msi_supported = 0;
+
+/*
+ * The below global variables are tunable via /etc/system
+ *
+ * si_dma_sg_number
+ */
+
+int si_dma_sg_number = SI_DEFAULT_SGT_TABLES_PER_PRB;
 
 /* Opaque state pointer to be initialized by ddi_soft_state_init() */
 static void *si_statep	= NULL;
@@ -1033,6 +1044,16 @@ si_register_sata_hba_tran(si_ctl_state_t *si_ctlp)
 
 	sata_hba_tran->sata_tran_hba_rev = SATA_TRAN_HBA_REV;
 	sata_hba_tran->sata_tran_hba_dip = si_ctlp->sictl_devinfop;
+
+	if (si_dma_sg_number > SI_MAX_SGT_TABLES_PER_PRB) {
+		si_dma_sg_number = SI_MAX_SGT_TABLES_PER_PRB;
+	} else if (si_dma_sg_number < SI_MIN_SGT_TABLES_PER_PRB) {
+		si_dma_sg_number = SI_MIN_SGT_TABLES_PER_PRB;
+	}
+
+	if (si_dma_sg_number != SI_DEFAULT_SGT_TABLES_PER_PRB) {
+		buffer_dma_attr.dma_attr_sgllen = SGE_LENGTH(si_dma_sg_number);
+	}
 	sata_hba_tran->sata_tran_hba_dma_attr = &buffer_dma_attr;
 
 	sata_hba_tran->sata_tran_hba_num_cports = si_ctlp->sictl_num_ports;
@@ -1961,7 +1982,8 @@ si_alloc_sgbpool(si_ctl_state_t *si_ctlp, int port)
 {
 	si_port_state_t *si_portp;
 	uint_t cookie_count;
-	size_t incore_sgbpool_size = SI_NUM_SLOTS * sizeof (si_sgblock_t);
+	size_t incore_sgbpool_size = SI_NUM_SLOTS * sizeof (si_sgblock_t)
+	    * si_dma_sg_number;
 	size_t ret_len;
 	ddi_dma_cookie_t sgbpool_dma_cookie;
 
@@ -2615,7 +2637,7 @@ si_deliver_satapkt(
 		if (spkt->satapkt_cmd.satacmd_num_dma_cookies) {
 			prb->prb_sge1.sge_addr =
 			    si_portp->siport_sgbpool_physaddr +
-			    slot*sizeof (si_sgblock_t);
+			    slot * sizeof (si_sgblock_t) * si_dma_sg_number;
 			SET_SGE_LNK(prb->prb_sge1);
 		} else {
 			SET_SGE_TRM(prb->prb_sge1);
@@ -2625,7 +2647,7 @@ si_deliver_satapkt(
 		if (spkt->satapkt_cmd.satacmd_num_dma_cookies) {
 			prb->prb_sge0.sge_addr =
 			    si_portp->siport_sgbpool_physaddr +
-			    slot*sizeof (si_sgblock_t);
+			    slot * sizeof (si_sgblock_t) * si_dma_sg_number;
 			SET_SGE_LNK(prb->prb_sge0);
 
 		} else {
@@ -2635,14 +2657,15 @@ si_deliver_satapkt(
 		/* sge1 is left empty in non-ATAPI case */
 	}
 
-	bzero(&si_portp->siport_sgbpool[slot], sizeof (si_sgblock_t));
+	bzero(&si_portp->siport_sgbpool[slot * si_dma_sg_number],
+	    sizeof (si_sgblock_t) * si_dma_sg_number);
 
 	ncookies = spkt->satapkt_cmd.satacmd_num_dma_cookies;
-	ASSERT(ncookies <= SI_MAX_SGL_LENGTH);
+	ASSERT(ncookies <= (SGE_LENGTH(si_dma_sg_number)));
 
 	SIDBG1(SIDBG_COOKIES, si_ctlp, "total ncookies: %d", ncookies);
 	if (ncookies == 0) {
-		sgbp = &si_portp->siport_sgbpool[slot];
+		sgbp = &si_portp->siport_sgbpool[slot * si_dma_sg_number];
 		sgtp = &sgbp->sgb_sgt[0];
 		sgep = &sgtp->sgt_sge[0];
 
@@ -2657,10 +2680,11 @@ si_deliver_satapkt(
 		goto sgl_fill_done;
 	}
 
-	for (i = 0, cookie_index = 0, sgbp = &si_portp->siport_sgbpool[slot];
-	    i < SI_MAX_SGT_TABLES_PER_PRB; i++) {
+	for (i = 0, cookie_index = 0,
+	    sgbp = &si_portp->siport_sgbpool[slot * si_dma_sg_number];
+	    i < si_dma_sg_number; i++) {
 
-		sgtp = &sgbp->sgb_sgt[i];
+		sgtp = &sgbp->sgb_sgt[0] + i;
 
 		/* Now fill the first 3 entries of SGT in the loop below. */
 		for (j = 0, sgep = &sgtp->sgt_sge[0];
@@ -2708,7 +2732,7 @@ si_deliver_satapkt(
 			    cookie_index,
 			    ncookies);
 			sgep->sge_addr = si_portp->siport_sgbpool_physaddr +
-			    slot * sizeof (si_sgblock_t) +
+			    slot * sizeof (si_sgblock_t) * si_dma_sg_number +
 			    (i+1) * sizeof (si_sgt_t);
 
 			SET_SGE_LNK((*sgep));
@@ -2783,8 +2807,9 @@ sgl_fill_done:
 			    "si_deliver_satpkt sgt: low, high, count link");
 			for (j = 0,
 			    tmpsgep = (si_sge_t *)
-			    &si_portp->siport_sgbpool[slot];
-			    j < (sizeof (si_sgblock_t)/ sizeof (si_sge_t));
+			    &si_portp->siport_sgbpool[slot * si_dma_sg_number];
+			    j < (sizeof (si_sgblock_t)/ sizeof (si_sge_t))
+			    *si_dma_sg_number;
 			    j++, tmpsgep++) {
 				ptr = (int *)(void *)tmpsgep;
 				cmn_err(CE_WARN, "%x %x %x %x",

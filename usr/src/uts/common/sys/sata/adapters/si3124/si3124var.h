@@ -38,17 +38,19 @@ extern "C" {
 #define	SI_TIMEOUT			(1)	/* timed out */
 #define	SI_FAILURE			(-1)	/* unsuccessful return */
 
-#define	SI_MAX_SGT_TABLES_PER_PRB	10
-
+#define	SI_MAX_SGT_TABLES_PER_PRB	21844
+#define	SI_DEFAULT_SGT_TABLES_PER_PRB	85
+#define	SI_MIN_SGT_TABLES_PER_PRB	1
 /*
  * While the si_sge_t and si_sgt_t correspond to the actual SGE and SGT
  * definitions as per the datasheet, the si_sgblock_t (i.e scatter gather
- * block) is a logical data structure which holds multiple SGT tables.
- * The idea is to use multiple chained SGT tables per each PRB request.
+ * block) is a logical data structure which can hold dynamic SGEs and it
+ * is tunable through global variables /etc/system si3124:si_dma_sg_number.
+ * The idea is to use multiple tunable chained SGT tables per each PRB request.
  */
 
 typedef struct si_sgblock {
-	si_sgt_t sgb_sgt[SI_MAX_SGT_TABLES_PER_PRB];
+	si_sgt_t sgb_sgt[1];
 } si_sgblock_t;
 
 /*
@@ -58,7 +60,8 @@ typedef struct si_sgblock {
  * SGT in the chain can host all the 4 entries since it does not need to
  * link any more.
  */
-#define	SI_MAX_SGL_LENGTH	(3*SI_MAX_SGT_TABLES_PER_PRB)+1
+#define	SGE_LENGTH(x)	(3*(x)+1)
+#define	SI_DEFAULT_SGL_LENGTH	SGE_LENGTH(SI_DEFAULT_SGT_TABLES_PER_PRB)
 
 typedef struct si_portmult_state {
 	int sipm_num_ports;

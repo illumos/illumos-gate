@@ -297,8 +297,8 @@ typedef struct si_prb {
 			DDI_DMA_SYNC_FORDEV);				  \
 									  \
 	(void) ddi_dma_sync(si_portp->siport_sgbpool_dma_handle,	  \
-			slot * sizeof (si_sgblock_t),			  \
-			sizeof (si_sgblock_t),				  \
+			slot * sizeof (si_sgblock_t) * si_dma_sg_number,  \
+			sizeof (si_sgblock_t) * si_dma_sg_number,	  \
 			DDI_DMA_SYNC_FORDEV);				  \
 									  \
 	ddi_put64(si_ctlp->sictl_port_acc_handle, 			  \
