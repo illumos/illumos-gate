@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 	.file	"atomic.s"
@@ -400,8 +399,8 @@
 	jne	1b
 	movzbl	%cl, %eax	/ return new value
 	ret
-	SET_SIZE(atomic_and_uchar_nv)
-	SET_SIZE(atomic_and_8_nv)
+	SET_SIZE(atomic_or_uchar_nv)
+	SET_SIZE(atomic_or_8_nv)
 
 	ENTRY(atomic_or_16_nv)
 	ALTENTRY(atomic_or_ushort_nv)
