@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -522,26 +521,28 @@ int *actionp;
 		case F_GROUP: {
 			struct	passwd	*pw;
 			struct	group *gr;
-			i = -1;
+			long value;
+			char *q;
+
+			value = -1;
 			if (argp->action == F_USER) {
 				if ((pw = getpwnam(b)) != 0)
-					i = (int)pw->pw_uid;
+					value = (long)pw->pw_uid;
 			} else {
 				if ((gr = getgrnam(b)) != 0)
-					i = (int)gr->gr_gid;
+					value = (long)gr->gr_gid;
 			}
-			if (i == -1) {
-				if (fnmatch("[0-9][0-9][0-9]*", b, 0) &&
-						fnmatch("[0-9][0-9]", b, 0) &&
-						fnmatch("[0-9]", b, 0)) {
+			if (value == -1) {
+				errno = 0;
+				value = strtol(b, &q, 10);
+				if (errno != 0 || q == b || *q != '\0') {
 					(void) fprintf(stderr, gettext(
 					    "%s: cannot find %s name\n"),
 						cmdname, *av);
 					exit(1);
 				}
-				i = atoi(b);
 			}
-			np->first.l = i;
+			np->first.l = value;
 			break;
 		}
 
