@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -52,6 +51,14 @@
 #include <sys/sata/adapters/ahci/ahcivar.h>
 
 /*
+ * FMA header files
+ */
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
+
+/*
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
@@ -80,6 +87,20 @@ static	int ahci_tran_hotplug_port_deactivate(dev_info_t *, sata_device_t *);
 #if defined(__lock_lint)
 static	int ahci_selftest(dev_info_t *, sata_device_t *);
 #endif
+
+/*
+ * FMA Prototypes
+ */
+static	void ahci_fm_init(ahci_ctl_t *);
+static	void ahci_fm_fini(ahci_ctl_t *);
+static	int ahci_fm_error_cb(dev_info_t *, ddi_fm_error_t *, const void*);
+int	ahci_check_acc_handle(ddi_acc_handle_t);
+int	ahci_check_dma_handle(ddi_dma_handle_t);
+void	ahci_fm_ereport(ahci_ctl_t *, char *);
+static	int ahci_check_all_handle(ahci_ctl_t *);
+static	int ahci_check_ctl_handle(ahci_ctl_t *);
+static	int ahci_check_port_handle(ahci_ctl_t *, int);
+static	int ahci_check_slot_handle(ahci_port_t *, int);
 
 /*
  * Local function prototypes
@@ -284,9 +305,10 @@ static ddi_dma_attr_t cmd_table_dma_attr = {
 
 /* Device access attributes */
 static ddi_device_acc_attr_t accattr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
 };
 
 
@@ -573,6 +595,11 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	attach_state |= AHCI_ATTACH_STATE_STATEP_ALLOC;
+
+	/* Initialize FMA properties */
+	ahci_fm_init(ahci_ctlp);
+
+	attach_state |= AHCI_ATTACH_STATE_FMA;
 
 	/*
 	 * Now map the AHCI base address; which includes global
@@ -914,6 +941,13 @@ intr_done:
 		goto err_out;
 	}
 
+	/* Check all handles at the end of the attach operation. */
+	if (ahci_check_all_handle(ahci_ctlp) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "!ahci%d: invalid dma/acc handles",
+		    instance);
+		goto err_out;
+	}
+
 	ahci_ctlp->ahcictl_flags &= ~AHCI_ATTACH;
 
 	AHCIDBG(AHCIDBG_INIT, ahci_ctlp, "ahci_attach success!", NULL);
@@ -921,6 +955,10 @@ intr_done:
 	return (DDI_SUCCESS);
 
 err_out:
+	/* FMA message */
+	ahci_fm_ereport(ahci_ctlp, DDI_FM_DEVICE_NO_RESPONSE);
+	ddi_fm_service_impact(ahci_ctlp->ahcictl_dip, DDI_SERVICE_LOST);
+
 	if (attach_state & AHCI_ATTACH_STATE_TIMEOUT_ENABLED) {
 		mutex_enter(&ahci_ctlp->ahcictl_mutex);
 		(void) untimeout(ahci_ctlp->ahcictl_timeout_id);
@@ -950,6 +988,10 @@ err_out:
 
 	if (attach_state & AHCI_ATTACH_STATE_REG_MAP) {
 		ddi_regs_map_free(&ahci_ctlp->ahcictl_ahci_acc_handle);
+	}
+
+	if (attach_state & AHCI_ATTACH_STATE_FMA) {
+		ahci_fm_fini(ahci_ctlp);
 	}
 
 	if (attach_state & AHCI_ATTACH_STATE_STATEP_ALLOC) {
@@ -1016,6 +1058,9 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		/* remove the reg maps. */
 		ddi_regs_map_free(&ahci_ctlp->ahcictl_ahci_acc_handle);
+
+		/* release fma resource */
+		ahci_fm_fini(ahci_ctlp);
 
 		/* free the soft state. */
 		ddi_soft_state_free(ahci_statep, instance);
@@ -1427,6 +1472,14 @@ out:
 				rval = SATA_FAILURE;
 	}
 
+	/* Check handles for the sata registers access */
+	if ((ahci_check_ctl_handle(ahci_ctlp) != DDI_SUCCESS) ||
+	    (ahci_check_port_handle(ahci_ctlp, port) != DDI_SUCCESS)) {
+		ddi_fm_service_impact(ahci_ctlp->ahcictl_dip,
+		    DDI_SERVICE_UNAFFECTED);
+		rval = SATA_FAILURE;
+	}
+
 	mutex_exit(&ahci_portp->ahciport_mutex);
 	return (rval);
 }
@@ -1633,6 +1686,13 @@ ahci_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 		return (SATA_TRAN_BUSY);
 	}
 
+	if (ahci_check_ctl_handle(ahci_ctlp) != DDI_SUCCESS) {
+		ddi_fm_service_impact(ahci_ctlp->ahcictl_dip,
+		    DDI_SERVICE_UNAFFECTED);
+		mutex_exit(&ahci_portp->ahciport_mutex);
+		return (SATA_TRAN_BUSY);
+	}
+
 	if (spkt->satapkt_op_mode &
 	    (SATA_OPMODE_SYNCH | SATA_OPMODE_POLLING)) {
 		/*
@@ -1653,20 +1713,14 @@ ahci_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 		/* We need to do the sync start now */
 		if (ahci_do_sync_start(ahci_ctlp, ahci_portp, &addr,
 		    spkt) == AHCI_FAILURE) {
-			AHCIDBG(AHCIDBG_ERRS, ahci_ctlp, "ahci_tran_start "
-			    "return QUEUE_FULL: port %d", port);
-			mutex_exit(&ahci_portp->ahciport_mutex);
-			return (SATA_TRAN_QUEUE_FULL);
+			goto fail_out;
 		}
 	} else {
 		/* Async start, using interrupt */
 		if (ahci_deliver_satapkt(ahci_ctlp, ahci_portp, &addr, spkt)
 		    == AHCI_FAILURE) {
 			spkt->satapkt_reason = SATA_PKT_QUEUE_FULL;
-			AHCIDBG(AHCIDBG_ERRS, ahci_ctlp, "ahci_tran_start "
-			    "returning QUEUE_FULL: port %d", port);
-			mutex_exit(&ahci_portp->ahciport_mutex);
-			return (SATA_TRAN_QUEUE_FULL);
+			goto fail_out;
 		}
 	}
 
@@ -1675,6 +1729,27 @@ ahci_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 
 	mutex_exit(&ahci_portp->ahciport_mutex);
 	return (SATA_TRAN_ACCEPTED);
+
+fail_out:
+	/*
+	 * Failed to deliver packet to the controller.
+	 * Check if it's caused by invalid handles.
+	 */
+	if (ahci_check_ctl_handle(ahci_ctlp) != DDI_SUCCESS ||
+	    ahci_check_port_handle(ahci_ctlp, port) != DDI_SUCCESS) {
+		spkt->satapkt_device.satadev_type =
+		    AHCIPORT_GET_DEV_TYPE(ahci_portp, &addr);
+		spkt->satapkt_device.satadev_state =
+		    AHCIPORT_GET_STATE(ahci_portp, &addr);
+		spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+		mutex_exit(&ahci_portp->ahciport_mutex);
+		return (SATA_TRAN_PORT_ERROR);
+	}
+
+	AHCIDBG(AHCIDBG_ERRS, ahci_ctlp, "ahci_tran_start "
+	    "return QUEUE_FULL: port %d", port);
+	mutex_exit(&ahci_portp->ahciport_mutex);
+	return (SATA_TRAN_QUEUE_FULL);
 }
 
 /*
@@ -2294,6 +2369,15 @@ ahci_deliver_satapkt(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    sizeof (ahci_cmd_header_t),
 	    DDI_DMA_SYNC_FORDEV);
 
+	if ((ahci_check_dma_handle(ahci_portp->
+	    ahciport_cmd_tables_dma_handle[cmd_slot]) != DDI_FM_OK) ||
+	    ahci_check_dma_handle(ahci_portp->
+	    ahciport_cmd_list_dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(ahci_ctlp->ahcictl_dip,
+		    DDI_SERVICE_UNAFFECTED);
+		return (AHCI_FAILURE);
+	}
+
 	/* Set the corresponding bit in the PxSACT.DS for queued command */
 	if (command_type == AHCI_NCQ_CMD) {
 		ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
@@ -2308,6 +2392,14 @@ ahci_deliver_satapkt(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 	AHCIDBG(AHCIDBG_INFO, ahci_ctlp, "ahci_deliver_satapkt "
 	    "exit: port %d", port);
+
+	/* Make sure the command is started by the PxSACT/PxCI */
+	if (ahci_check_acc_handle(ahci_ctlp->
+	    ahcictl_ahci_acc_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(ahci_ctlp->ahcictl_dip,
+		    DDI_SERVICE_UNAFFECTED);
+		return (AHCI_FAILURE);
+	}
 
 	return (cmd_slot);
 }
@@ -3226,6 +3318,236 @@ ahci_selftest(dev_info_t *dip, sata_device_t *device)
 }
 #endif
 
+/*
+ * Initialize fma capabilities and register with IO fault services.
+ */
+static void
+ahci_fm_init(ahci_ctl_t *ahci_ctlp)
+{
+	/*
+	 * Need to change iblock to priority for new MSI intr
+	 */
+	ddi_iblock_cookie_t fm_ibc;
+
+	ahci_ctlp->ahcictl_fm_cap = ddi_getprop(DDI_DEV_T_ANY,
+	    ahci_ctlp->ahcictl_dip,
+	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "fm-capable",
+	    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+	    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+
+	/* Only register with IO Fault Services if we have some capability */
+	if (ahci_ctlp->ahcictl_fm_cap) {
+		/* Adjust access and dma attributes for FMA */
+		accattr.devacc_attr_access = DDI_FLAGERR_ACC;
+		buffer_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
+		rcvd_fis_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
+		cmd_list_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
+		cmd_table_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
+
+		/*
+		 * Register capabilities with IO Fault Services.
+		 * ahcictl_fm_cap will be updated to indicate
+		 * capabilities actually supported (not requested.)
+		 */
+		ddi_fm_init(ahci_ctlp->ahcictl_dip,
+		    &ahci_ctlp->ahcictl_fm_cap, &fm_ibc);
+
+		if (ahci_ctlp->ahcictl_fm_cap == DDI_FM_NOT_CAPABLE) {
+			cmn_err(CE_WARN, "!ahci%d: fma init failed.",
+			    ddi_get_instance(ahci_ctlp->ahcictl_dip));
+			return;
+		}
+		/*
+		 * Initialize pci ereport capabilities if ereport
+		 * capable (should always be.)
+		 */
+		if (DDI_FM_EREPORT_CAP(ahci_ctlp->ahcictl_fm_cap) ||
+		    DDI_FM_ERRCB_CAP(ahci_ctlp->ahcictl_fm_cap)) {
+			pci_ereport_setup(ahci_ctlp->ahcictl_dip);
+		}
+
+		/*
+		 * Register error callback if error callback capable.
+		 */
+		if (DDI_FM_ERRCB_CAP(ahci_ctlp->ahcictl_fm_cap)) {
+			ddi_fm_handler_register(ahci_ctlp->ahcictl_dip,
+			    ahci_fm_error_cb, (void *) ahci_ctlp);
+		}
+
+		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
+		    "ahci_fm_fini: fma enabled.", NULL);
+	}
+}
+
+/*
+ * Releases fma capabilities and un-registers with IO fault services.
+ */
+static void
+ahci_fm_fini(ahci_ctl_t *ahci_ctlp)
+{
+	/* Only unregister FMA capabilities if registered */
+	if (ahci_ctlp->ahcictl_fm_cap) {
+		/*
+		 * Un-register error callback if error callback capable.
+		 */
+		if (DDI_FM_ERRCB_CAP(ahci_ctlp->ahcictl_fm_cap)) {
+			ddi_fm_handler_unregister(ahci_ctlp->ahcictl_dip);
+		}
+
+		/*
+		 * Release any resources allocated by pci_ereport_setup()
+		 */
+		if (DDI_FM_EREPORT_CAP(ahci_ctlp->ahcictl_fm_cap) ||
+		    DDI_FM_ERRCB_CAP(ahci_ctlp->ahcictl_fm_cap)) {
+			pci_ereport_teardown(ahci_ctlp->ahcictl_dip);
+		}
+
+		/* Unregister from IO Fault Services */
+		ddi_fm_fini(ahci_ctlp->ahcictl_dip);
+
+		/* Adjust access and dma attributes for FMA */
+		accattr.devacc_attr_access = DDI_DEFAULT_ACC;
+		buffer_dma_attr.dma_attr_flags &=  ~DDI_DMA_FLAGERR;
+		rcvd_fis_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		cmd_list_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		cmd_table_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+
+		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
+		    "ahci_fm_fini: fma disabled.", NULL);
+	}
+}
+
+/*ARGSUSED*/
+static int
+ahci_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+	/*
+	 * as the driver can always deal with an error in any dma or
+	 * access handle, we can just return the fme_status value.
+	 */
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}
+
+int
+ahci_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_acc_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+int
+ahci_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_dma_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+/*
+ * Generate an ereport
+ */
+void
+ahci_fm_ereport(ahci_ctl_t *ahci_ctlp, char *detail)
+{
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (DDI_FM_EREPORT_CAP(ahci_ctlp->ahcictl_fm_cap)) {
+		ddi_fm_ereport_post(ahci_ctlp->ahcictl_dip, buf, ena,
+		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8,
+		    FM_EREPORT_VERSION, NULL);
+	}
+}
+
+/*
+ * Check if all handles are correctly allocated. This function is only called
+ * by ahci_attach(), so we do not need hold any mutex here.
+ */
+static int
+ahci_check_all_handle(ahci_ctl_t *ahci_ctlp)
+{
+	int port;
+	if (ahci_check_ctl_handle(ahci_ctlp) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+	for (port = 0; port < ahci_ctlp->ahcictl_num_ports; port++) {
+		if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, port))
+			continue;
+		if (ahci_check_port_handle(ahci_ctlp, port) != DDI_SUCCESS) {
+			return (DDI_FAILURE);
+		}
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Check the access handles for the controller. Note that
+ * ahcictl_pci_conf_handle is only used in attach process.
+ */
+static int
+ahci_check_ctl_handle(ahci_ctl_t *ahci_ctlp)
+{
+	if ((ahci_check_acc_handle(ahci_ctlp->
+	    ahcictl_pci_conf_handle) != DDI_FM_OK) ||
+	    (ahci_check_acc_handle(ahci_ctlp->
+	    ahcictl_ahci_acc_handle) != DDI_FM_OK)) {
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Check the DMA handles and the access handles of a controller port.
+ *
+ * WARNING!!! ahciport_mutex should be acquired before the function is called.
+ */
+static int
+ahci_check_port_handle(ahci_ctl_t *ahci_ctlp, int port)
+{
+	ahci_port_t *ahci_portp = ahci_ctlp->ahcictl_ports[port];
+	int slot;
+	if ((ahci_check_dma_handle(ahci_portp->
+	    ahciport_rcvd_fis_dma_handle) != DDI_FM_OK) ||
+	    (ahci_check_dma_handle(ahci_portp->
+	    ahciport_cmd_list_dma_handle) != DDI_FM_OK) ||
+	    (ahci_check_acc_handle(ahci_portp->
+	    ahciport_rcvd_fis_acc_handle) != DDI_FM_OK) ||
+	    (ahci_check_acc_handle(ahci_portp->
+	    ahciport_cmd_list_acc_handle) != DDI_FM_OK)) {
+		return (DDI_FAILURE);
+	}
+	for (slot = 0; slot < ahci_ctlp->ahcictl_num_cmd_slots;
+	    slot ++) {
+		if (ahci_check_slot_handle(ahci_portp, slot)
+		    != DDI_SUCCESS) {
+			return (DDI_FAILURE);
+		}
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Check the DMA handles and the access handles of a cmd table slot.
+ *
+ * WARNING!!! ahciport_mutex should be acquired before the function is called.
+ */
+static int
+ahci_check_slot_handle(ahci_port_t *ahci_portp, int slot)
+{
+	if ((ahci_check_acc_handle(ahci_portp->
+	    ahciport_cmd_tables_acc_handle[slot]) != DDI_FM_OK) ||
+	    (ahci_check_dma_handle(ahci_portp->
+	    ahciport_cmd_tables_dma_handle[slot]) != DDI_FM_OK)) {
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
 /*
  * Allocate the ports structure, only called by ahci_attach
  */
@@ -4796,6 +5118,13 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    "port_cmd_issue = 0x%x, slot = 0x%x",
 	    loop_count, port_cmd_issue, slot);
 
+	if ((ahci_check_ctl_handle(ahci_ctlp) != DDI_SUCCESS) ||
+	    (ahci_check_port_handle(ahci_ctlp, port) != DDI_SUCCESS)) {
+		ddi_fm_service_impact(ahci_ctlp->ahcictl_dip,
+		    DDI_SERVICE_UNAFFECTED);
+		goto out;
+	}
+
 	rval = AHCI_SUCCESS;
 out:
 	AHCIDBG(AHCIDBG_ERRS, ahci_ctlp,
@@ -6235,6 +6564,18 @@ ahci_port_intr(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 
 	port_intr_status &= port_intr_enable;
 
+	/*
+	 * Pending interrupt events are indicated by the PxIS register.
+	 * Make sure we don't miss any event.
+	 */
+	if (ahci_check_ctl_handle(ahci_ctlp) != DDI_SUCCESS) {
+		ddi_fm_service_impact(ahci_ctlp->ahcictl_dip,
+		    DDI_SERVICE_UNAFFECTED);
+		ddi_fm_acc_err_clear(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    DDI_FME_VERSION);
+		return;
+	}
+
 	/* First clear the port interrupts status */
 	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxIS(ahci_ctlp, port),
@@ -6319,6 +6660,15 @@ ahci_port_intr(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 	/* Second clear the corresponding bit in IS.IPS */
 	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_GLOBAL_IS(ahci_ctlp), (0x1 << port));
+
+	/* Try to recover at the end of the interrupt handler. */
+	if (ahci_check_acc_handle(ahci_ctlp->ahcictl_ahci_acc_handle) !=
+	    DDI_FM_OK) {
+		ddi_fm_service_impact(ahci_ctlp->ahcictl_dip,
+		    DDI_SERVICE_UNAFFECTED);
+		ddi_fm_acc_err_clear(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    DDI_FME_VERSION);
+	}
 }
 
 /*
@@ -6345,6 +6695,19 @@ ahci_intr(caddr_t arg1, caddr_t arg2)
 
 	if (!(global_intr_status & ahci_ctlp->ahcictl_ports_implemented)) {
 		/* The interrupt is not ours */
+		return (DDI_INTR_UNCLAIMED);
+	}
+
+	/*
+	 * Check the handle after reading global_intr_status - we don't want
+	 * to miss any port with pending interrupts.
+	 */
+	if (ahci_check_acc_handle(ahci_ctlp->ahcictl_ahci_acc_handle) !=
+	    DDI_FM_OK) {
+		ddi_fm_service_impact(ahci_ctlp->ahcictl_dip,
+		    DDI_SERVICE_UNAFFECTED);
+		ddi_fm_acc_err_clear(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    DDI_FME_VERSION);
 		return (DDI_INTR_UNCLAIMED);
 	}
 
@@ -6424,6 +6787,13 @@ ahci_intr_cmd_cmplt(ahci_ctl_t *ahci_ctlp,
 
 	port_cmd_issue = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxCI(ahci_ctlp, port));
+
+	/* If the PxCI corrupts, don't complete the commmands. */
+	if (ahci_check_acc_handle(ahci_ctlp->ahcictl_ahci_acc_handle)
+	    != DDI_FM_OK) {
+		mutex_exit(&ahci_portp->ahciport_mutex);
+		return (AHCI_FAILURE);
+	}
 
 	if (ERR_RETRI_CMD_IN_PROGRESS(ahci_portp)) {
 		/* Slot 0 is always used during error recovery */
@@ -6687,6 +7057,13 @@ ahci_intr_ncq_events(ahci_ctl_t *ahci_ctlp,
 
 	issued_tags = ahci_portp->ahciport_pending_tags &
 	    ~port_cmd_issue & AHCI_SLOT_MASK(ahci_ctlp);
+
+	/* If the PxSACT/PxCI corrupts, don't complete the NCQ commmands. */
+	if (ahci_check_acc_handle(ahci_ctlp->ahcictl_ahci_acc_handle)
+	    != DDI_FM_OK) {
+		mutex_exit(&ahci_portp->ahciport_mutex);
+		return (AHCI_FAILURE);
+	}
 
 	AHCIDBG(AHCIDBG_INTR|AHCIDBG_NCQ, ahci_ctlp,
 	    "ahci_intr_set_device_bits: port %d pending_tags = 0x%x "

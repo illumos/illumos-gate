@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -416,6 +415,9 @@ typedef struct ahci_ctl {
 	size_t			ahcictl_intr_size; /* Size of intr array */
 	uint_t			ahcictl_intr_pri;  /* Intr priority */
 	int			ahcictl_intr_cap;  /* Intr capabilities */
+
+	/* FMA capabilities */
+	int			ahcictl_fm_cap;
 } ahci_ctl_t;
 
 /* Warlock annotation */
@@ -498,13 +500,14 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 /* State values for ahci_attach */
 #define	AHCI_ATTACH_STATE_NONE			(0x1 << 0)
 #define	AHCI_ATTACH_STATE_STATEP_ALLOC		(0x1 << 1)
-#define	AHCI_ATTACH_STATE_REG_MAP		(0x1 << 2)
-#define	AHCI_ATTACH_STATE_PCICFG_SETUP		(0x1 << 3)
-#define	AHCI_ATTACH_STATE_INTR_ADDED		(0x1 << 4)
-#define	AHCI_ATTACH_STATE_MUTEX_INIT		(0x1 << 5)
-#define	AHCI_ATTACH_STATE_PORT_ALLOC		(0x1 << 6)
-#define	AHCI_ATTACH_STATE_HW_INIT		(0x1 << 7)
-#define	AHCI_ATTACH_STATE_TIMEOUT_ENABLED	(0x1 << 8)
+#define	AHCI_ATTACH_STATE_FMA			(0x1 << 2)
+#define	AHCI_ATTACH_STATE_REG_MAP		(0x1 << 3)
+#define	AHCI_ATTACH_STATE_PCICFG_SETUP		(0x1 << 4)
+#define	AHCI_ATTACH_STATE_INTR_ADDED		(0x1 << 5)
+#define	AHCI_ATTACH_STATE_MUTEX_INIT		(0x1 << 6)
+#define	AHCI_ATTACH_STATE_PORT_ALLOC		(0x1 << 7)
+#define	AHCI_ATTACH_STATE_HW_INIT		(0x1 << 8)
+#define	AHCI_ATTACH_STATE_TIMEOUT_ENABLED	(0x1 << 9)
 
 /* Interval used for delay */
 #define	AHCI_10MS_TICKS	(drv_usectohz(10000))	/* ticks in 10 ms */
