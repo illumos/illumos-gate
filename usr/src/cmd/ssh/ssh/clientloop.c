@@ -59,8 +59,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "includes.h"
@@ -406,10 +405,30 @@ static void
 client_check_window_change(void)
 {
 	struct winsize ws;
+	Channel *c;
 
 	if (! received_window_change_signal)
 		return;
-	/** XXX race */
+	
+	/*
+	 * We want to send a window-change request only when a session is
+	 * already established and alive.
+	 *
+	 * Note: During session handshake we cannot send window-change request,
+	 * because we do not know the remote channel ID yet. We have to store
+	 * the information about signals which have arrived and send the
+	 * window-change request when the channel and the session are fully
+	 * established.
+	 */
+	if (compat20) {
+		if (session_ident == -1 || session_closed)
+			return;
+		c = channel_lookup(session_ident);
+		if (c == NULL || c->type != SSH_CHANNEL_OPEN ||
+		    c->remote_id == -1)
+			return;
+	}
+
 	received_window_change_signal = 0;
 
 	if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) < 0)

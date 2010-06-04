@@ -38,8 +38,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "includes.h"
@@ -270,6 +269,7 @@ channel_new(char *ctype, int type, int rfd, int wfd, int efd,
 	c->detach_user = NULL;
 	c->confirm = NULL;
 	c->input_filter = NULL;
+	c->delayed = 1;		/* prevent call to channel_post handler */
 	debug("channel %d: new [%s]", found, remote_name);
 	return c;
 }
@@ -598,11 +598,11 @@ channel_request_start(int local_id, char *service, int wantconfirm)
 {
 	Channel *c = channel_lookup(local_id);
 
+	debug("channel request %d: %s", local_id, service);
 	if (c == NULL) {
 		log("channel_request_start: %d: unknown channel id", local_id);
 		return;
 	}
-	debug("channel request %d: %s", local_id, service) ;
 	packet_start(SSH2_MSG_CHANNEL_REQUEST);
 	packet_put_int(c->remote_id);
 	packet_put_cstring(service);
@@ -1090,7 +1090,6 @@ channel_pre_dynamic(Channel *c, fd_set * readset, fd_set * writeset)
 	int have, ret;
 
 	have = buffer_len(&c->input);
-	c->delayed = 0;
 	debug2("channel %d: pre_dynamic: have %d", c->self, have);
 	/* buffer_dump(&c->input); */
 	/* check if the fixed size part of the packet is in buffer. */
@@ -1283,16 +1282,8 @@ channel_post_port_listener(Channel *c, fd_set * readset, fd_set * writeset)
 		nc->host_port = c->host_port;
 		strlcpy(nc->path, c->path, sizeof(nc->path));
 
-		if (nextstate == SSH_CHANNEL_DYNAMIC) {
-			/*
-			 * do not call the channel_post handler until
-			 * this flag has been reset by a pre-handler.
-			 * otherwise the FD_ISSET calls might overflow
-			 */
-			nc->delayed = 1;
-		} else {
+		if (nextstate != SSH_CHANNEL_DYNAMIC)
 			port_open_helper(nc, rtype);
-		}
 	}
 }
 
@@ -1541,8 +1532,6 @@ channel_check_window(Channel *c)
 static void
 channel_post_open(Channel *c, fd_set * readset, fd_set * writeset)
 {
-	if (c->delayed)
-		return;
 	channel_handle_rfd(c, readset, writeset);
 	channel_handle_wfd(c, readset, writeset);
 	if (!compat20)
@@ -1672,17 +1661,23 @@ static void
 channel_handler(chan_fn *ftab[], fd_set * readset, fd_set * writeset)
 {
 	static int did_init = 0;
-	int i;
+	int i, oalloc;
 	Channel *c;
 
 	if (!did_init) {
 		channel_handler_init();
 		did_init = 1;
 	}
-	for (i = 0; i < channels_alloc; i++) {
+	for (i = 0, oalloc = channels_alloc; i < oalloc; i++) {
 		c = channels[i];
 		if (c == NULL)
 			continue;
+		if (c->delayed) {
+			if (ftab == channel_pre)
+				c->delayed = 0;
+			else
+				continue;
+		}
 		if (ftab[c->type] != NULL)
 			(*ftab[c->type])(c, readset, writeset);
 		channel_garbage_collect(c);

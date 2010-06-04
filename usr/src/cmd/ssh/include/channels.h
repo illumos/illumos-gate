@@ -33,8 +33,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*	$OpenBSD: channels.h,v 1.70 2002/06/24 14:33:27 markus Exp $	*/
 
@@ -88,7 +87,11 @@ struct Channel {
 	int     isatty;		/* rfd is a tty */
 	int     wfd_isatty;	/* wfd is a tty */
 	int     force_drain;	/* force close on iEOF */
-	int     delayed;		/* fdset hack */
+	int     delayed;	/* post-select handlers for newly created
+				 * channels are delayed until the first call
+				 * to a matching pre-select handler. 
+				 * this way post-select handlers are not
+				 * accidenly called if a FD gets reused */
 	Buffer  input;		/* data read from socket, to be sent over
 				 * encrypted connection */
 	Buffer  output;		/* data received over encrypted connection for

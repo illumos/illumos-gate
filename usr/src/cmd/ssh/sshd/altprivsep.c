@@ -18,8 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <fcntl.h>
@@ -331,7 +330,7 @@ altprivsep_rekey(int type, u_int32_t seq, void *ctxt)
 	if (type != SSH2_MSG_NEWKEYS) {
 		debug2("Forwarding re-key packet (%d) to monitor", type);
 		if (!altprivsep_fwd_packet(type))
-			fatal("Monitor not responding");
+			fatal("altprivsep_rekey: Monitor not responding");
 	}
 
 	/* tell server_loop2() that we're re-keying */
@@ -361,7 +360,7 @@ altprivsep_process_input(fd_set *rset)
 
 	debug2("reading from pipe to monitor (%d)", pipe_fd);
 	if ((type = altprivsep_packet_read()) == -1)
-		fatal("Monitor not responding");
+		fatal("altprivsep_process_input: Monitor not responding");
 
 	if (!compat20)
 		return; /* shouldn't happen! but be safe */
@@ -857,6 +856,7 @@ altprivsep_packet_send(void)
 	u_char	plen_buf[sizeof (plen)];
 	u_char padlen;	/* padding length */
 	fd_set *setp;
+	int err;
 
 	if (pipe_fd == -1)
 		return (-1);
@@ -922,12 +922,15 @@ altprivsep_packet_send(void)
 	return (1);
 
 pipe_gone:
+	
+	err = errno;
 
 	(void) close(pipe_fd);
 
 	pipe_fd = -1;
 
-	fatal("Monitor not responding");
+	fatal("altprvsep_packet_send: Monitor not responding: %.100s",
+	    strerror(err));
 
 	/* NOTREACHED */
 	return (0);
@@ -944,6 +947,7 @@ altprivsep_packet_read(void)
 	u_char plen_buf[sizeof (plen)];
 	u_char padlen;
 	fd_set *setp;
+	int err;
 
 	if (pipe_fd == -1)
 		return (-1);
@@ -995,12 +999,15 @@ altprivsep_packet_read(void)
 
 pipe_gone:
 
+	err = errno;
+
 	(void) close(pipe_fd);
 
 	pipe_fd = -1;
 
 	if (len < 0)
-		fatal("Monitor not responding");
+		fatal("altpriv_packet_read: Monitor not responding %.100s",
+		    strerror(err));
 
 	debug2("Monitor pipe closed by monitor");
 	return (0);
@@ -1014,7 +1021,7 @@ altprivsep_packet_read_expect(int expected)
 	type = altprivsep_packet_read();
 
 	if (type <= 0)
-		fatal("Monitor not responding");
+		fatal("altprivsep_packet_read_expect: Monitor not responding");
 
 	if (type != expected)
 		fatal("Protocol error in privilege separation; expected "
