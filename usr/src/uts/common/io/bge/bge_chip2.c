@@ -4398,7 +4398,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 		bgep->bge_intr_running = B_TRUE;
 		mutex_exit(bgep->genlock);
 		bge_receive(bgep, bsp);
-		bge_recycle(bgep, bsp);
+		(void) bge_recycle(bgep, bsp);
 		mutex_enter(bgep->genlock);
 		bgep->bge_intr_running = B_FALSE;
 
@@ -4670,6 +4670,13 @@ static boolean_t
 bge_factotum_stall_check(bge_t *bgep)
 {
 	uint32_t dogval;
+	bge_status_t *bsp;
+	uint64_t now = gethrtime();
+
+	if ((now - bgep->timestamp) < BGE_CYCLIC_PERIOD)
+		return (B_FALSE);
+
+	bgep->timestamp = now;
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -4688,7 +4695,8 @@ bge_factotum_stall_check(bge_t *bgep)
 	 * where packets are left pending indefinitely!
 	 */
 	dogval = bge_atomic_shl32(&bgep->watchdog, 1);
-	if (dogval < bge_watchdog_count)
+	bsp = DMA_VPTR(bgep->status_block);
+	if (dogval < bge_watchdog_count || bge_recycle(bgep, bsp))
 		return (B_FALSE);
 
 #if !defined(BGE_NETCONSOLE)

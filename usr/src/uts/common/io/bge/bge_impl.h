@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _BGE_IMPL_H
@@ -168,7 +167,7 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
  */
 
 #define	BGE_HALFTICK		268435456LL		/* 2**28 ns!	*/
-#define	BGE_CYCLIC_PERIOD	(2*BGE_HALFTICK)	/*    ~0.5s	*/
+#define	BGE_CYCLIC_PERIOD	(4*BGE_HALFTICK)	/*    ~1.0s	*/
 #define	BGE_SERDES_STABLE_TIME	(3*BGE_HALFTICK)	/*    ~0.8s	*/
 #define	BGE_PHY_STABLE_TIME	(11*BGE_HALFTICK)	/*    ~3.0s	*/
 #define	BGE_LINK_SETTLE_TIME	(111*BGE_HALFTICK)	/*   ~30.0s	*/
@@ -957,6 +956,7 @@ typedef struct bge {
 
 
 	uint32_t		link_update_timer;
+	uint64_t		timestamp;
 } bge_t;
 
 /*
@@ -1247,7 +1247,7 @@ void bge_receive(bge_t *bgep, bge_status_t *bsp);
 /* bge_send.c */
 mblk_t *bge_m_tx(void *arg, mblk_t *mp);
 mblk_t *bge_ring_tx(void *arg, mblk_t *mp);
-void bge_recycle(bge_t *bgep, bge_status_t *bsp);
+boolean_t bge_recycle(bge_t *bgep, bge_status_t *bsp);
 uint_t bge_send_drain(caddr_t arg);
 
 /* bge_atomic.c */

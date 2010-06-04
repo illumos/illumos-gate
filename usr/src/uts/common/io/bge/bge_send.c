@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "bge_impl.h"
@@ -84,10 +83,10 @@
  * copying) and that method doesn't need any special per-buffer action
  * for recycling.
  */
-static void bge_recycle_ring(bge_t *bgep, send_ring_t *srp);
+static boolean_t bge_recycle_ring(bge_t *bgep, send_ring_t *srp);
 #pragma	inline(bge_recycle_ring)
 
-static void
+static boolean_t
 bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 {
 	sw_sbd_t *ssbdp;
@@ -125,14 +124,7 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 		n++;
 	}
 	if (n == 0)
-		return;
-
-	/*
-	 * Update recycle index and free tx BD number
-	 */
-	srp->tc_next = slot;
-	ASSERT(srp->tx_free + n <= srp->desc.nslots);
-	bge_atomic_renounce(&srp->tx_free, n);
+		return (B_FALSE);
 
 	/*
 	 * Reset the watchdog count: to 0 if all buffers are
@@ -144,7 +136,14 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 	 * have claimed one before we leave here; in this case
 	 * the watchdog will restart on the next send() call).
 	 */
-	bgep->watchdog = srp->tx_free == srp->desc.nslots ? 0 : 1;
+	bgep->watchdog = (slot == srp->tx_next) ? 0 : 1;
+
+	/*
+	 * Update recycle index and free tx BD number
+	 */
+	srp->tc_next = slot;
+	ASSERT(srp->tx_free + n <= srp->desc.nslots);
+	bge_atomic_renounce(&srp->tx_free, n);
 
 	/*
 	 * Return tx buffers to buffer push queue
@@ -167,6 +166,8 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 
 	if (srp->tx_flow != 0 || bgep->tx_resched_needed)
 		ddi_trigger_softintr(bgep->drain_id);
+
+	return (B_TRUE);
 }
 
 /*
@@ -197,15 +198,16 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
  * constant and allows the compiler to optimise away the outer do-loop
  * if only one send ring is being used.
  */
-void bge_recycle(bge_t *bgep, bge_status_t *bsp);
+boolean_t bge_recycle(bge_t *bgep, bge_status_t *bsp);
 #pragma	no_inline(bge_recycle)
 
-void
+boolean_t
 bge_recycle(bge_t *bgep, bge_status_t *bsp)
 {
 	send_ring_t *srp;
 	uint64_t ring;
 	uint64_t tx_rings = bgep->chipid.tx_rings;
+	boolean_t tx_done = B_FALSE;
 
 restart:
 	ring = 0;
@@ -222,7 +224,7 @@ restart:
 			continue;		/* no slots to recycle	*/
 		if (mutex_tryenter(srp->tc_lock) == 0)
 			continue;		/* already in process	*/
-		bge_recycle_ring(bgep, srp);
+		tx_done |= bge_recycle_ring(bgep, srp);
 		mutex_exit(srp->tc_lock);
 
 		/*
@@ -239,6 +241,8 @@ restart:
 		 * Loop over all rings (if there *are* multiple rings)
 		 */
 	} while (++srp, ++ring < tx_rings);
+
+	return (tx_done);
 }
 
 
@@ -321,56 +325,6 @@ bge_get_txbuf(bge_t *bgep, send_ring_t *srp)
 	return (txbuf_item);
 }
 
-static void bge_send_fill_txbd(send_ring_t *srp, send_pkt_t *pktp);
-#pragma	inline(bge_send_fill_txbd)
-
-static void
-bge_send_fill_txbd(send_ring_t *srp, send_pkt_t *pktp)
-{
-	bge_sbd_t *hw_sbd_p;
-	sw_sbd_t *ssbdp;
-	bge_queue_item_t *txbuf_item;
-	sw_txbuf_t *txbuf;
-	uint64_t slot;
-
-	ASSERT(mutex_owned(srp->tx_lock));
-
-	/*
-	 * Go straight to claiming our already-reserved places
-	 * on the train!
-	 */
-	ASSERT(pktp->txbuf_item != NULL);
-	txbuf_item = pktp->txbuf_item;
-	txbuf = txbuf_item->item;
-	slot = srp->tx_next;
-	ssbdp = &srp->sw_sbds[slot];
-	hw_sbd_p = DMA_VPTR(ssbdp->desc);
-	hw_sbd_p->flags = 0;
-	ASSERT(txbuf->copy_len != 0);
-	(void) ddi_dma_sync(txbuf->buf.dma_hdl,  0,
-	    txbuf->copy_len, DDI_DMA_SYNC_FORDEV);
-	ASSERT(ssbdp->pbuf == NULL);
-	ssbdp->pbuf = txbuf_item;
-	srp->tx_next = NEXT(slot, srp->desc.nslots);
-	pktp->txbuf_item = NULL;
-
-	/*
-	 * Setting hardware send buffer descriptor
-	 */
-	hw_sbd_p->host_buf_addr = txbuf->buf.cookie.dmac_laddress;
-	hw_sbd_p->len = txbuf->copy_len;
-	if (pktp->vlan_tci != 0) {
-		hw_sbd_p->vlan_tci = pktp->vlan_tci;
-		hw_sbd_p->host_buf_addr += VLAN_TAGSZ;
-		hw_sbd_p->flags |= SBD_FLAG_VLAN_TAG;
-	}
-	if (pktp->pflags & HCK_IPV4_HDRCKSUM)
-		hw_sbd_p->flags |= SBD_FLAG_IP_CKSUM;
-	if (pktp->pflags & HCK_FULLCKSUM)
-		hw_sbd_p->flags |= SBD_FLAG_TCP_UDP_CKSUM;
-	hw_sbd_p->flags |= SBD_FLAG_PACKET_END;
-}
-
 /*
  * Send a message by copying it into a preallocated (and premapped) buffer
  */
@@ -409,6 +363,9 @@ bge_send_serial(bge_t *bgep, send_ring_t *srp)
 	uint32_t tx_next;
 	sw_sbd_t *ssbdp;
 	bge_status_t *bsp;
+	bge_sbd_t *hw_sbd_p;
+	bge_queue_item_t *txbuf_item;
+	sw_txbuf_t *txbuf;
 
 	/*
 	 * Try to hold the tx lock:
@@ -424,9 +381,8 @@ bge_send_serial(bge_t *bgep, send_ring_t *srp)
 
 	bsp = DMA_VPTR(bgep->status_block);
 	txfill_next = srp->txfill_next;
-start_tx:
 	tx_next = srp->tx_next;
-	ssbdp = &srp->sw_sbds[tx_next];
+start_tx:
 	for (count = 0; count < bgep->param_drain_max; ++count) {
 		pktp = &srp->pktp[txfill_next];
 		if (!pktp->tx_ready) {
@@ -439,7 +395,7 @@ start_tx:
 		 * If there are no enough BDs: try to recycle more
 		 */
 		if (srp->tx_free <= 1)
-			bge_recycle(bgep, bsp);
+			(void) bge_recycle(bgep, bsp);
 
 		/*
 		 * Reserved required BDs: 1 is enough
@@ -452,9 +408,45 @@ start_tx:
 		/*
 		 * Filling the tx BD
 		 */
-		bge_send_fill_txbd(srp, pktp);
-		txfill_next = NEXT(txfill_next, BGE_SEND_BUF_MAX);
+
+		/*
+		 * Go straight to claiming our already-reserved places
+		 * on the train!
+		 */
+		ASSERT(pktp->txbuf_item != NULL);
+		txbuf_item = pktp->txbuf_item;
+		pktp->txbuf_item = NULL;
 		pktp->tx_ready = B_FALSE;
+
+		txbuf = txbuf_item->item;
+		ASSERT(txbuf->copy_len != 0);
+		(void) ddi_dma_sync(txbuf->buf.dma_hdl,  0,
+		    txbuf->copy_len, DDI_DMA_SYNC_FORDEV);
+
+		ssbdp = &srp->sw_sbds[tx_next];
+		ASSERT(ssbdp->pbuf == NULL);
+		ssbdp->pbuf = txbuf_item;
+
+		/*
+		 * Setting hardware send buffer descriptor
+		 */
+		hw_sbd_p = DMA_VPTR(ssbdp->desc);
+		hw_sbd_p->flags = 0;
+		hw_sbd_p->host_buf_addr = txbuf->buf.cookie.dmac_laddress;
+		hw_sbd_p->len = txbuf->copy_len;
+		if (pktp->vlan_tci != 0) {
+			hw_sbd_p->vlan_tci = pktp->vlan_tci;
+			hw_sbd_p->host_buf_addr += VLAN_TAGSZ;
+			hw_sbd_p->flags |= SBD_FLAG_VLAN_TAG;
+		}
+		if (pktp->pflags & HCK_IPV4_HDRCKSUM)
+			hw_sbd_p->flags |= SBD_FLAG_IP_CKSUM;
+		if (pktp->pflags & HCK_FULLCKSUM)
+			hw_sbd_p->flags |= SBD_FLAG_TCP_UDP_CKSUM;
+		hw_sbd_p->flags |= SBD_FLAG_PACKET_END;
+
+		txfill_next = NEXT(txfill_next, BGE_SEND_BUF_MAX);
+		tx_next = NEXT(tx_next, srp->desc.nslots);
 	}
 
 	/*
@@ -462,18 +454,22 @@ start_tx:
 	 */
 	if (count != 0) {
 		bge_atomic_sub64(&srp->tx_flow, count);
-		if (tx_next + count > srp->desc.nslots) {
+		srp->txfill_next = txfill_next;
+
+		if (srp->tx_next > tx_next) {
 			(void) ddi_dma_sync(ssbdp->desc.dma_hdl,  0,
-			    (srp->desc.nslots - tx_next) * sizeof (bge_sbd_t),
+			    (srp->desc.nslots - srp->tx_next) *
+			    sizeof (bge_sbd_t),
 			    DDI_DMA_SYNC_FORDEV);
-			count -= srp->desc.nslots - tx_next;
+			count -= srp->desc.nslots - srp->tx_next;
 			ssbdp = &srp->sw_sbds[0];
 		}
 		(void) ddi_dma_sync(ssbdp->desc.dma_hdl,  0,
 		    count*sizeof (bge_sbd_t), DDI_DMA_SYNC_FORDEV);
-		bge_mbx_put(bgep, srp->chip_mbx_reg, srp->tx_next);
-		srp->txfill_next = txfill_next;
-		bgep->watchdog++;
+		bge_mbx_put(bgep, srp->chip_mbx_reg, tx_next);
+		srp->tx_next = tx_next;
+		atomic_or_32(&bgep->watchdog, 1);
+
 		if (srp->tx_flow != 0 && srp->tx_free > 1)
 			goto start_tx;
 	}
