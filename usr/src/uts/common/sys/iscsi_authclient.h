@@ -20,14 +20,12 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_ISCSI_AUTHCLIENT_H
 #define	_ISCSI_AUTHCLIENT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is the include file for for iscsiAuthClient.c
@@ -37,7 +35,7 @@
 extern "C" {
 #endif
 
-enum { iscsiAuthStringMaxLength = 256 };
+enum { iscsiAuthStringMaxLength = 512 };
 enum { iscsiAuthStringBlockMaxLength = 1024 };
 enum { iscsiAuthLargeBinaryMaxLength = 1024 };
 

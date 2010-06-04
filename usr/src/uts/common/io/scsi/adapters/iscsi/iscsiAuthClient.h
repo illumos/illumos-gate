@@ -20,8 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_ISCSIAUTHCLIENT_H
@@ -35,7 +34,7 @@
 extern "C" {
 #endif
 
-enum { iscsiAuthStringMaxLength = 256 };
+enum { iscsiAuthStringMaxLength = 512 };
 enum { iscsiAuthStringBlockMaxLength = 1024 };
 enum { iscsiAuthLargeBinaryMaxLength = 1024 };
 

@@ -3107,6 +3107,7 @@ modifyNodeAuthParam(IMA_OID oid, int param, char *chapName, int *funcRet)
 	IMA_STATUS status;
 	int ret;
 	int secretLen = MAX_CHAP_SECRET_LEN;
+	int nameLen = 0;
 
 	IMA_BYTE chapSecret[MAX_CHAP_SECRET_LEN + 1];
 
@@ -3126,15 +3127,20 @@ modifyNodeAuthParam(IMA_OID oid, int param, char *chapName, int *funcRet)
 			(void) fprintf(stderr, "CHAP name cannot be NULL.\n");
 			return (1);
 		}
-		if (strlen(chapName) == 0) {
+		nameLen = strlen(chapName);
+		if (nameLen == 0) {
 			(void) fprintf(stderr, "CHAP name cannot be empty.\n");
+			return (1);
+		}
+		if (nameLen > ISCSI_MAX_C_USER_LEN) {
+			(void) fprintf(stderr, "CHAP name is too long.\n");
 			return (1);
 		}
 		(void) memset(&authParams.chapParms.name, 0,
 		    sizeof (authParams.chapParms.name));
 		(void) memcpy(&authParams.chapParms.name,
-		    &chapName[0], strlen(chapName));
-		authParams.chapParms.nameLength = strlen(chapName);
+		    &chapName[0], nameLen);
+		authParams.chapParms.nameLength = nameLen;
 		break;
 
 	case AUTH_PASSWORD :
@@ -3176,6 +3182,7 @@ modifyTargetAuthParam(IMA_OID oid, int param, char *chapName, int *funcRet)
 	IMA_STATUS status;
 	int ret;
 	int secretLen = MAX_CHAP_SECRET_LEN;
+	int nameLen = 0;
 
 	IMA_BYTE chapSecret[MAX_CHAP_SECRET_LEN + 1];
 
@@ -3195,15 +3202,20 @@ modifyTargetAuthParam(IMA_OID oid, int param, char *chapName, int *funcRet)
 			(void) fprintf(stderr, "CHAP name cannot be NULL.\n");
 			return (1);
 		}
-		if (strlen(chapName) == 0) {
+		nameLen = strlen(chapName);
+		if (nameLen == 0) {
 			(void) fprintf(stderr, "CHAP name cannot be empty.\n");
+			return (1);
+		}
+		if (nameLen > ISCSI_MAX_C_USER_LEN) {
+			(void) fprintf(stderr, "CHAP name is too long.\n");
 			return (1);
 		}
 		(void) memset(&authParams.chapParms.name, 0,
 		    sizeof (authParams.chapParms.name));
 		(void) memcpy(&authParams.chapParms.name,
-		    &chapName[0], strlen(chapName));
-		authParams.chapParms.nameLength = strlen(chapName);
+		    &chapName[0], nameLen);
+		authParams.chapParms.nameLength = nameLen;
 		break;
 
 	case AUTH_PASSWORD :

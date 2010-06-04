@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _ISCSI_PROTOCOL_H
@@ -44,6 +43,7 @@ extern "C" {
 #include <sys/isa_defs.h>
 
 #define	ISCSI_MAX_NAME_LEN	224
+#define	ISCSI_MAX_C_USER_LEN	512
 
 /* iSCSI listen port for incoming connections */
 #define	ISCSI_LISTEN_PORT 3260

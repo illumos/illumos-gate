@@ -341,7 +341,7 @@ typedef struct chap_props {
 	uint32_t		c_vers,
 				c_retries,
 				c_oid;
-	unsigned char		c_user[128];
+	unsigned char		c_user[ISCSI_MAX_C_USER_LEN];
 	uint32_t		c_user_len;
 	unsigned char		c_secret[16];
 	uint32_t		c_secret_len;
