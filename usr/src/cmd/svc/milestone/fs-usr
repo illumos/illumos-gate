@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
@@ -172,7 +171,7 @@ if [ -f "${UPDATEFILE}" ]; then
 			/usr/sbin/reboot -f -- "$bootcmd" 
 			exit $SMF_EXIT_OK
 		fi
-		boot_prop=`/usr/sbin/svccfg -s svc:/system/boot-config:default listprop config/trust-bios-boot-device | \
+		boot_prop=`/usr/sbin/svccfg -s svc:/system/boot-config:default listprop config/auto-reboot-safe | \
 			/usr/bin/nawk '{ print $3}'`
 		if [ "$boot_prop" != "true" ]; then 
 			cecho ""
