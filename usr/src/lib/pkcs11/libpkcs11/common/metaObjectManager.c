@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -1134,7 +1133,7 @@ get_wrap_mechanism(CK_OBJECT_CLASS obj_class, CK_KEY_TYPE key_type,
 
 		/*
 		 * if we are here, that means neither the source slot
-		 * nor the destination slots suppports CKM_SKIPJACK_WRAP
+		 * nor the destination slots supports CKM_SKIPJACK_WRAP.
 		 */
 		rv = CKR_FUNCTION_FAILED;
 		goto finish;
@@ -1510,7 +1509,7 @@ finish:
  * Creates a "clone" of a metaobject on the specified slot. A clone is a
  * copy of the object.
  *
- * Clones are cached, so that they can be reused with subsquent operations.
+ * Clones are cached, so that they can be reused with subsequent operations.
  */
 CK_RV
 meta_object_get_clone(meta_object_t *object,
@@ -1636,6 +1635,7 @@ meta_clone_template_setup(meta_object_t *object,
 		/* Allocate space to store the attribute value. */
 		clone_template[c].pValue = malloc(clone_template[c].ulValueLen);
 		if (clone_template[c].pValue == NULL) {
+			free(clone_template);
 			rv = CKR_HOST_MEMORY;
 			(void) pthread_rwlock_unlock(&object->attribute_lock);
 			goto finish;
