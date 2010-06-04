@@ -57,6 +57,7 @@
 #include <sys/mnttab.h>
 #include <sys/attr.h>
 #include <atomic.h>
+#include <sys/acl.h>
 
 #include <s10_brand.h>
 #include <brand_misc.h>
@@ -860,6 +861,255 @@ s10_getdents64(sysret_t *rval, int fd, struct dirent64 *buf, size_t nbyte)
 	    offsetof(struct dirent64, d_reclen)));
 }
 #endif	/* !_LP64 */
+
+#define	S10_TRIVIAL_ACL_CNT	6
+#define	NATIVE_TRIVIAL_ACL_CNT	3
+
+/*
+ * Check if the ACL qualifies as a trivial ACL based on the native
+ * interpretation.
+ */
+static boolean_t
+has_trivial_native_acl(int cmd, int cnt, const char *fname, int fd)
+{
+	int i, err;
+	sysret_t rval;
+	ace_t buf[NATIVE_TRIVIAL_ACL_CNT];
+
+	if (fname != NULL)
+		err = __systemcall(&rval, SYS_pathconf + 1024, fname,
+		    _PC_ACL_ENABLED);
+	else
+		err = __systemcall(&rval, SYS_fpathconf + 1024, fd,
+		    _PC_ACL_ENABLED);
+	if (err != 0 || rval.sys_rval1 != _ACL_ACE_ENABLED)
+		return (B_FALSE);
+
+	/*
+	 * If we just got the ACL cnt, we don't need to get it again, its
+	 * passed in as the cnt arg.
+	 */
+	if (cmd != ACE_GETACLCNT) {
+		if (fname != NULL) {
+			if (__systemcall(&rval, SYS_acl + 1024, fname,
+			    ACE_GETACLCNT, 0, NULL) != 0)
+				return (B_FALSE);
+		} else {
+			if (__systemcall(&rval, SYS_facl + 1024, fd,
+			    ACE_GETACLCNT, 0, NULL) != 0)
+				return (B_FALSE);
+		}
+		cnt = rval.sys_rval1;
+	}
+
+	if (cnt != NATIVE_TRIVIAL_ACL_CNT)
+		return (B_FALSE);
+
+	if (fname != NULL) {
+		if (__systemcall(&rval, SYS_acl + 1024, fname, ACE_GETACL, cnt,
+		    buf) != 0)
+			return (B_FALSE);
+	} else {
+		if (__systemcall(&rval, SYS_facl + 1024, fd, ACE_GETACL, cnt,
+		    buf) != 0)
+			return (B_FALSE);
+	}
+
+	/*
+	 * The following is based on the logic from the native OS
+	 * ace_trivial_common() to determine if the native ACL is trivial.
+	 */
+	for (i = 0; i < cnt; i++) {
+		switch (buf[i].a_flags & ACE_TYPE_FLAGS) {
+		case ACE_OWNER:
+		case ACE_GROUP|ACE_IDENTIFIER_GROUP:
+		case ACE_EVERYONE:
+			break;
+		default:
+			return (B_FALSE);
+		}
+
+		if (buf[i].a_flags & (ACE_FILE_INHERIT_ACE|
+		    ACE_DIRECTORY_INHERIT_ACE|ACE_NO_PROPAGATE_INHERIT_ACE|
+		    ACE_INHERIT_ONLY_ACE))
+			return (B_FALSE);
+
+		/*
+		 * Special check for some special bits
+		 *
+		 * Don't allow anybody to deny reading basic
+		 * attributes or a files ACL.
+		 */
+		if (buf[i].a_access_mask & (ACE_READ_ACL|ACE_READ_ATTRIBUTES) &&
+		    buf[i].a_type == ACE_ACCESS_DENIED_ACE_TYPE)
+			return (B_FALSE);
+
+		/*
+		 * Delete permissions are never set by default
+		 */
+		if (buf[i].a_access_mask & (ACE_DELETE|ACE_DELETE_CHILD))
+			return (B_FALSE);
+		/*
+		 * only allow owner@ to have
+		 * write_acl/write_owner/write_attributes/write_xattr/
+		 */
+		if (buf[i].a_type == ACE_ACCESS_ALLOWED_ACE_TYPE &&
+		    (!(buf[i].a_flags & ACE_OWNER) && (buf[i].a_access_mask &
+		    (ACE_WRITE_OWNER|ACE_WRITE_ACL| ACE_WRITE_ATTRIBUTES|
+		    ACE_WRITE_NAMED_ATTRS))))
+			return (B_FALSE);
+
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * The following logic is based on the S10 adjust_ace_pair_common() code.
+ */
+static void
+s10_adjust_ace_mask(void *pair, size_t access_off, size_t pairsize, mode_t mode)
+{
+	char *datap = (char *)pair;
+	uint32_t *amask0 = (uint32_t *)(uintptr_t)(datap + access_off);
+	uint32_t *amask1 = (uint32_t *)(uintptr_t)(datap + pairsize +
+	    access_off);
+
+	if (mode & S_IROTH)
+		*amask1 |= ACE_READ_DATA;
+	else
+		*amask0 |= ACE_READ_DATA;
+	if (mode & S_IWOTH)
+		*amask1 |= ACE_WRITE_DATA|ACE_APPEND_DATA;
+	else
+		*amask0 |= ACE_WRITE_DATA|ACE_APPEND_DATA;
+	if (mode & S_IXOTH)
+		*amask1 |= ACE_EXECUTE;
+	else
+		*amask0 |= ACE_EXECUTE;
+}
+
+/*
+ * Construct a trivial S10 style ACL.
+ */
+static int
+make_trivial_s10_acl(const char *fname, int fd, ace_t *bp)
+{
+	int err;
+	sysret_t rval;
+	struct stat64 buf;
+	ace_t trivial_s10_acl[] = {
+		{(uint_t)-1, 0, ACE_OWNER, ACE_ACCESS_DENIED_ACE_TYPE},
+		{(uint_t)-1, ACE_WRITE_ACL|ACE_WRITE_OWNER|ACE_WRITE_ATTRIBUTES|
+		    ACE_WRITE_NAMED_ATTRS, ACE_OWNER,
+		    ACE_ACCESS_ALLOWED_ACE_TYPE},
+		{(uint_t)-1, 0, ACE_GROUP|ACE_IDENTIFIER_GROUP,
+		    ACE_ACCESS_DENIED_ACE_TYPE},
+		{(uint_t)-1, 0, ACE_GROUP|ACE_IDENTIFIER_GROUP,
+		    ACE_ACCESS_ALLOWED_ACE_TYPE},
+		{(uint_t)-1, ACE_WRITE_ACL|ACE_WRITE_OWNER|ACE_WRITE_ATTRIBUTES|
+		    ACE_WRITE_NAMED_ATTRS, ACE_EVERYONE,
+		    ACE_ACCESS_DENIED_ACE_TYPE},
+		{(uint_t)-1, ACE_READ_ACL|ACE_READ_ATTRIBUTES|
+		    ACE_READ_NAMED_ATTRS|ACE_SYNCHRONIZE, ACE_EVERYONE,
+		    ACE_ACCESS_ALLOWED_ACE_TYPE}
+	};
+
+	if (fname != NULL) {
+		if ((err = __systemcall(&rval, SYS_fstatat64 + 1024, AT_FDCWD,
+		    fname, &buf, 0)) != 0)
+			return (err);
+	} else {
+		if ((err = __systemcall(&rval, SYS_fstatat64 + 1024, fd,
+		    NULL, &buf, 0)) != 0)
+			return (err);
+	}
+
+	s10_adjust_ace_mask(&trivial_s10_acl[0], offsetof(ace_t, a_access_mask),
+	    sizeof (ace_t), (buf.st_mode & 0700) >> 6);
+	s10_adjust_ace_mask(&trivial_s10_acl[2], offsetof(ace_t, a_access_mask),
+	    sizeof (ace_t), (buf.st_mode & 0070) >> 3);
+	s10_adjust_ace_mask(&trivial_s10_acl[4], offsetof(ace_t, a_access_mask),
+	    sizeof (ace_t), buf.st_mode & 0007);
+
+	if (brand_uucopy(&trivial_s10_acl, bp, sizeof (trivial_s10_acl)) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+/*
+ * The definition of a trivial ace-style ACL (used by ZFS and NFSv4) has been
+ * simplified since S10.  Instead of 6 entries on a trivial S10 ACE ACL we now
+ * have 3 streamlined entries.  The new, simpler trivial style confuses S10
+ * commands such as 'ls -v' or 'cp -p' which don't see the expected S10 trivial
+ * ACL entries and thus assume that there is a complex ACL on the file.
+ *
+ * See: PSARC/2010/029 Improved ACL interoperability
+ *
+ * Note that the trival ACL detection code is implemented in acl_trival() in
+ * lib/libsec/common/aclutils.c.  It always uses the acl() syscall (not the
+ * facl syscall) to determine if an ACL is trivial.  However, we emulate both
+ * acl() and facl() so that the two provide consistent results.
+ *
+ * We don't currently try to emulate setting of ACLs since the primary
+ * consumer of this feature is SMB or NFSv4 servers, neither of which are
+ * supported in solaris10-branded zones.  If ACLs are used they must be set on
+ * files using the native OS interpretation.
+ */
+int
+s10_acl(sysret_t *rval, const char *fname, int cmd, int nentries, void *aclbufp)
+{
+	int res;
+
+	res = __systemcall(rval, SYS_acl + 1024, fname, cmd, nentries, aclbufp);
+
+	switch (cmd) {
+	case ACE_GETACLCNT:
+		if (res == 0 && has_trivial_native_acl(ACE_GETACLCNT,
+		    rval->sys_rval1, fname, 0)) {
+			rval->sys_rval1 = S10_TRIVIAL_ACL_CNT;
+		}
+		break;
+	case ACE_GETACL:
+		if (res == 0 &&
+		    has_trivial_native_acl(ACE_GETACL, 0, fname, 0) &&
+		    nentries >= S10_TRIVIAL_ACL_CNT) {
+			res = make_trivial_s10_acl(fname, 0, aclbufp);
+			rval->sys_rval1 = S10_TRIVIAL_ACL_CNT;
+		}
+		break;
+	}
+
+	return (res);
+}
+
+int
+s10_facl(sysret_t *rval, int fdes, int cmd, int nentries, void *aclbufp)
+{
+	int res;
+
+	res = __systemcall(rval, SYS_facl + 1024, fdes, cmd, nentries, aclbufp);
+
+	switch (cmd) {
+	case ACE_GETACLCNT:
+		if (res == 0 && has_trivial_native_acl(ACE_GETACLCNT,
+		    rval->sys_rval1, NULL, fdes)) {
+			rval->sys_rval1 = S10_TRIVIAL_ACL_CNT;
+		}
+		break;
+	case ACE_GETACL:
+		if (res == 0 &&
+		    has_trivial_native_acl(ACE_GETACL, 0, NULL, fdes) &&
+		    nentries >= S10_TRIVIAL_ACL_CNT) {
+			res = make_trivial_s10_acl(NULL, fdes, aclbufp);
+			rval->sys_rval1 = S10_TRIVIAL_ACL_CNT;
+		}
+		break;
+	}
+
+	return (res);
+}
 
 #define	S10_AC_PROC		(0x1 << 28)
 #define	S10_AC_TASK		(0x2 << 28)
@@ -1730,7 +1980,7 @@ brand_sysent_table_t brand_sysent_table[] = {
 	NOSYS,					/* 182 */
 	NOSYS,					/* 183 */
 	NOSYS,					/* 184 */
-	NOSYS,					/* 185 */
+	EMULATE(s10_acl, 4 | RV_DEFAULT),	/* 185 */
 	EMULATE(s10_auditsys, 4 | RV_64RVAL),	/* 186 */
 	NOSYS,					/* 187 */
 	NOSYS,					/* 188 */
@@ -1745,7 +1995,7 @@ brand_sysent_table_t brand_sysent_table[] = {
 	NOSYS,					/* 197 */
 	NOSYS,					/* 198 */
 	NOSYS,					/* 199 */
-	NOSYS,					/* 200 */
+	EMULATE(s10_facl, 4 | RV_DEFAULT),	/* 200 */
 	NOSYS,					/* 201 */
 	NOSYS,					/* 202 */
 	NOSYS,					/* 203 */

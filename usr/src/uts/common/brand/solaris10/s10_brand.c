@@ -538,8 +538,10 @@ _init(void)
 #endif	/* __amd64 */
 	s10_emulation_table[S10_SYS_lwp_mutex_lock] = 1;	/* 169 */
 	s10_emulation_table[SYS_pwrite] = 1;			/* 174 */
+	s10_emulation_table[SYS_acl] = 1;			/* 185 */
 	s10_emulation_table[SYS_auditsys] = 1;			/* 186 */
 	s10_emulation_table[SYS_sigqueue] = 1;			/* 190 */
+	s10_emulation_table[SYS_facl] = 1;			/* 200 */
 	s10_emulation_table[SYS_signotify] = 1;			/* 205 */
 	s10_emulation_table[SYS_lwp_mutex_timedlock] = 1;	/* 210 */
 	s10_emulation_table[SYS_getdents64] = 1;		/* 213 */
