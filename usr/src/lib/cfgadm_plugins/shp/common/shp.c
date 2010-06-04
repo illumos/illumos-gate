@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -653,27 +652,26 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 	DBG(1, ("cfga_change_state: state is %d\n", state));
 	switch (state_change_cmd) {
 	case CFGA_CMD_CONNECT:
-		if ((state == DDI_HP_CN_STATE_EMPTY) ||
-		    (state >= DDI_HP_CN_STATE_POWERED)) {
+		DBG(1, ("connect\n"));
+		if (state == DDI_HP_CN_STATE_EMPTY) {
 			cfga_err(errstring, ERR_AP_ERR, 0);
 			rv = CFGA_INVAL;
-		} else {
-			/* Lets connect the slot */
+		} else if (state == DDI_HP_CN_STATE_PRESENT) {
+			/* Connect the slot */
 			if (hp_set_state(node, 0, new_state, &results) != 0) {
 				rv = CFGA_ERROR;
 				cfga_err(errstring, CMD_SLOT_CONNECT, 0);
 			}
 		}
-
 		break;
 
 	case CFGA_CMD_DISCONNECT:
 		DBG(1, ("disconnect\n"));
-
-		if (state < DDI_HP_CN_STATE_POWERED) {
+		if (state == DDI_HP_CN_STATE_EMPTY) {
 			cfga_err(errstring, ERR_AP_ERR, 0);
 			rv = CFGA_INVAL;
-		} else {
+		} else if (state > DDI_HP_CN_STATE_PRESENT) {
+			/* Disconnect the slot */
 			if ((rv = hp_set_state(node, 0, new_state, &results))
 			    != 0) {
 				if (rv == EBUSY)
@@ -690,7 +688,6 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 				}
 			}
 		}
-
 		break;
 
 	case CFGA_CMD_CONFIGURE:
@@ -699,17 +696,22 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 		 * configure on the same slot because one
 		 * func can be configured and other one won't
 		 */
-		if (hp_set_state(node, 0, new_state, &results) != 0) {
+		DBG(1, ("configure\n"));
+		if (state == DDI_HP_CN_STATE_EMPTY) {
+			cfga_err(errstring, ERR_AP_ERR, 0);
+			rv = CFGA_INVAL;
+		} else if (hp_set_state(node, 0, new_state, &results) != 0) {
 			rv = CFGA_ERROR;
 			cfga_err(errstring, CMD_SLOT_CONFIGURE, 0);
 		}
-
 		break;
 
 	case CFGA_CMD_UNCONFIGURE:
 		DBG(1, ("unconfigure\n"));
-
-		if (state >= DDI_HP_CN_STATE_ENABLED) {
+		if (state == DDI_HP_CN_STATE_EMPTY) {
+			cfga_err(errstring, ERR_AP_ERR, 0);
+			rv = CFGA_INVAL;
+		} else if (state >= DDI_HP_CN_STATE_ENABLED) {
 			if ((rv = hp_set_state(node, 0, new_state, &results))
 			    != 0) {
 				if (rv == EBUSY)
@@ -725,11 +727,7 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 					    CMD_SLOT_UNCONFIGURE, 0);
 				}
 			}
-		} else {
-			cfga_err(errstring, ERR_AP_ERR, 0);
-			rv = CFGA_INVAL;
 		}
-
 		DBG(1, ("unconfigure rv:(%i)\n", rv));
 		break;
 
