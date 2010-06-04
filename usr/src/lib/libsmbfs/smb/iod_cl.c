@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -54,30 +53,29 @@
 #include <netsmb/nb_lib.h>
 #include <netsmb/smb_dev.h>
 
+#include <assert.h>
+
 #include "charsets.h"
 #include "private.h"
-
-static const char smbiod_path[] = "/usr/lib/smbfs/smbiod";
 
 /*
  * This is constant for the life of a process,
  * and initialized at startup, so no locks.
  */
-static char door_path[40];
+static char door_path[64];
 static int iod_start_timeout = 10;	/* seconds */
 
 char *
 smb_iod_door_path(void)
 {
-	static const char fmtR[] = "/var/run/smbiod-%d";
-	static const char fmtU[] = "/tmp/.smbiod-%d";
-	const char *fmt;
 	uid_t uid;
+	int x;
 
 	if (door_path[0] == '\0') {
 		uid = getuid();
-		fmt = (uid == 0) ? fmtR : fmtU;
-		snprintf(door_path, sizeof (door_path), fmt, uid);
+		x = snprintf(door_path, sizeof (door_path),
+		    SMBIOD_USR_DOOR, uid);
+		assert(x <= sizeof (door_path));
 	}
 
 	return (door_path);
@@ -126,56 +124,86 @@ smb_iod_open_door(int *fdp)
 }
 
 /*
- * Start the IOD (if not already running) and
- * wait until its door service is ready.
+ * Request the creation of our per-user smbiod
+ * via door call to the "main" IOD service.
+ */
+static int
+start_iod(void)
+{
+	const char *svc_door = SMBIOD_SVC_DOOR;
+	door_arg_t da;
+	int32_t cmd, err;
+	int fd, rc;
+
+	fd = open(svc_door, O_RDONLY, 0);
+	if (fd < 0) {
+		err = errno;
+		DPRINT("%s: open failed, err %d", svc_door, err);
+		return (err);
+	}
+	cmd = SMBIOD_START;
+	memset(&da, 0, sizeof (da));
+	da.data_ptr = (void *) &cmd;
+	da.data_size = sizeof (cmd);
+	da.rbuf = (void *) &err;
+	da.rsize = sizeof (err);
+	rc = door_call(fd, &da);
+	close(fd);
+	if (rc < 0) {
+		err = errno;
+		DPRINT("door_call, err %d", err);
+		return (err);
+	}
+
+	return (err);
+}
+
+/*
+ * Get a door handle to the IOD, starting it if necessary.
  * On success, sets ctx->ct_door_fd
  */
 int
 smb_iod_start(smb_ctx_t *ctx)
 {
-	int err, pid, tmo;
+	int err, tmo;
 	int fd = -1;
 
-	err = smb_iod_open_door(&fd);
-	if (err == 0)
-		goto OK;
-
-	pid = vfork();
-	if (pid < 0)
-		return (errno);
-
-	/*
-	 * child: start smbiod
-	 */
-	if (pid == 0) {
-		char *argv[2];
-		argv[0] = "smbiod";
-		argv[1] = NULL;
-		(void) execv(smbiod_path, argv);
-		_exit(1);
-	}
-
-	/*
-	 * parent: wait for smbiod to start
-	 */
 	tmo = iod_start_timeout;
-	while (--tmo >= 0) {
-		(void) sleep(1);
-		err = smb_iod_open_door(&fd);
-		if (err == 0)
-			goto OK;
-	}
-	return (err);
+	while ((err = smb_iod_open_door(&fd)) != 0) {
+		if (--tmo <= 0)
+			goto errout;
 
-OK:
+		/*
+		 * We have no per-user IOD yet.  Request one.
+		 * Do this request every time through the loop
+		 * because the master IOD will only start our
+		 * per-user IOD if we don't have one, and our
+		 * first requst could have happened while we
+		 * had an IOD that was doing shutdown.
+		 * (Prevents a shutdown/startup race).
+		 */
+		err = start_iod();
+		if (err != 0)
+			goto errout;
+		/*
+		 * Wait for it to get ready.
+		 */
+		(void) sleep(1);
+	}
+
 	/* Save the door fd. */
 	if (ctx->ct_door_fd != -1)
 		close(ctx->ct_door_fd);
 	ctx->ct_door_fd = fd;
 
 	return (0);
-}
 
+errout:
+	smb_error(dgettext(TEXT_DOMAIN,
+	    "Could not contact service: %s"),
+	    0, "svc:/network/smb/client");
+	return (ENOTACTIVE);
+}
 
 /*
  * Ask the IOD to connect using the info in ctx.

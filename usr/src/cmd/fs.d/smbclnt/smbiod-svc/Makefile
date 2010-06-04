@@ -1,4 +1,3 @@
-#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -21,38 +20,38 @@
 #
 
 #
-# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# Start/stop client SMB service
+# cmd/fs.d/smbclnt/smbiod-svc/Makefile
 #
 
-. /lib/svc/share/smf_include.sh
+FSTYPE=		smbfs
+TYPEPROG=	smbiod-svc
 
-result=${SMF_EXIT_OK}
+include		../../Makefile.fstype
 
-case "$1" in
-'start')
-	# Start the main smbiod service
-	/usr/lib/smbfs/smbiod-svc
-	result=$?
-	# Do smbfs mounts (background)
-	/usr/bin/ctrun -l none \
-	  /sbin/mountall -F smbfs
-	;;
+OBJS=	$(TYPEPROG).o
+SRCS=	$(TYPEPROG).c
+POFILE=	$(TYPEPROG).po
 
-'stop')
-	# First destroy the mounts,
-	/sbin/umountall -F smbfs
-	# then kill the smbiod service.
-	smf_kill_contract $2 TERM 1
-	result=$?
-	;;
+CFLAGS += $(CCVERBOSE)
+C99MODE= $(C99_ENABLE)
 
-*)
-	echo "Usage: $0 { start | stop }"
-	result=1
-	;;
-esac
-exit $result
+CPPFLAGS += -I$(SRC)/lib/libsmbfs \
+	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common
+
+# Debugging
+${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
+
+all:	$(TYPEPROG)
+
+catalog:	$(POFILE)
+
+lint:	lint_SRCS
+
+clean:
+	$(RM) $(OBJS) $(POFILE)
+
+.KEEP_STATE:

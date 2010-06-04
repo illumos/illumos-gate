@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -284,7 +283,8 @@ smb_rq_verify(struct smb_rq *rqp)
 	if (bcmp(sigbuf, sigloc, SMBSIGLEN) == 0)
 		return (0);
 
-	SMBSDEBUG("BAD signature, MID=0x%x\n", rqp->sr_mid);
+	SMBERROR("BAD signature, Server=%s MID=0x%x Seq=%d\n",
+	    vcp->vc_srvname, rqp->sr_mid, rsn);
 
 #ifdef DEBUG
 	/*
@@ -302,8 +302,8 @@ smb_rq_verify(struct smb_rq *rqp)
 		}
 	}
 	if (fudge <= nsmb_signing_fudge) {
-		SMBSDEBUG("sr_rseqno=%d, but %d would have worked\n",
-		    rsn, rsn + fudge);
+		SMBERROR("MID=0x%x, Seq=%d, but %d would have worked\n",
+		    rqp->sr_mid, rsn, rsn + fudge);
 	}
 #endif
 	return (EBADRPC);

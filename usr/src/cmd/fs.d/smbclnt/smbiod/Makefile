@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,14 +36,12 @@ OBJS=	$(TYPEPROG).o
 SRCS=	$(TYPEPROG).c
 POFILE=	$(TYPEPROG).po
 
-CLOBBERFILES	+= $(TYPEPROG)
-
 CFLAGS += $(CCVERBOSE)
 C99MODE= $(C99_ENABLE)
 
 # This is a multi-thread program but Nevada
 # no longer needs -lthread
-LDLIBS += -lsmbfs
+LDLIBS += -lsmbfs -lumem
 
 CPPFLAGS += -I$(SRC)/lib/libsmbfs \
 	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common

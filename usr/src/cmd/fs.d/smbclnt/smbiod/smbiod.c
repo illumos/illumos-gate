@@ -24,7 +24,7 @@
  */
 
 /*
- * SMBFS I/O Deamon (smbiod)
+ * SMBFS I/O Daemon (Per-user IOD)
  */
 
 #include <sys/types.h>
@@ -43,26 +43,20 @@
 #include <time.h>
 #include <unistd.h>
 #include <ucred.h>
-
 #include <err.h>
 #include <door.h>
+#include <libscf.h>
+#include <locale.h>
 #include <thread.h>
 
 #include <netsmb/smb_lib.h>
 
-#define	EXIT_FAIL	1
-#define	EXIT_OK		0
-
-#if defined(DEBUG) || defined(__lint)
 #define	DPRINT(...)	do \
 { \
 	if (smb_debug) \
 		fprintf(stderr, __VA_ARGS__); \
 	_NOTE(CONSTCOND) \
 } while (0)
-#else
-#define	DPRINT(...) ((void)0)
-#endif
 
 mutex_t	iod_mutex = DEFAULTMUTEX;
 int iod_thr_count;	/* threads, excluding main */
@@ -77,13 +71,16 @@ void * iod_work(void *arg);
 int
 main(int argc, char **argv)
 {
-	static const int door_attrs =
-	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL;
 	sigset_t oldmask, tmpmask;
 	char *env, *door_path = NULL;
-	int door_fd = -1, tmp_fd = -1;
-	int err, i, sig;
-	int rc = EXIT_FAIL;
+	int door_fd = -1;
+	int err, sig;
+	int rc = SMF_EXIT_ERR_FATAL;
+	boolean_t attached = B_FALSE;
+
+	/* set locale and text domain for i18n */
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
 
 	/* Debugging support. */
 	if ((env = getenv("SMBFS_DEBUG")) != NULL) {
@@ -94,75 +91,42 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * Find out if an IOD is already running.
-	 * If so, we lost a harmless startup race.
-	 * An IOD did start, so exit success.
+	 * If a user runs this command (i.e. by accident)
+	 * don't interfere with any already running IOD.
 	 */
 	err = smb_iod_open_door(&door_fd);
 	if (err == 0) {
 		close(door_fd);
 		door_fd = -1;
-		DPRINT("main: already running\n");
-		exit(EXIT_OK);
+		DPRINT("%s: already running\n", argv[0]);
+		exit(SMF_EXIT_OK);
 	}
 
 	/*
-	 * Create a file for the door.
-	 */
-	door_path = smb_iod_door_path();
-	unlink(door_path);
-	tmp_fd = open(door_path, O_RDWR|O_CREAT|O_EXCL, 0600);
-	if (tmp_fd < 0) {
-		perror(door_path);
-		exit(EXIT_FAIL);
-	}
-	close(tmp_fd);
-	tmp_fd = -1;
-
-
-	/*
-	 * Close FDs 0,1,2 so we don't have a TTY, and
-	 * re-open them on /dev/null so they won't be
-	 * used for device handles (etc.) later, and
-	 * we don't have to worry about printf calls
-	 * or whatever going to these FDs.
-	 */
-	for (i = 0; i < 3; i++) {
-		/* Exception: If smb_debug, keep stderr */
-		if (smb_debug && i == 2)
-			break;
-		close(i);
-		tmp_fd = open("/dev/null", O_RDWR);
-		if (tmp_fd < 0)
-			perror("/dev/null");
-		if (tmp_fd != i)
-			DPRINT("Open /dev/null - wrong fd?\n");
-	}
-
-	/*
-	 * Become session leader.
-	 */
-	setsid();
-
-	/*
-	 * Create door service threads with signals blocked.
+	 * Want all signals blocked, as we're doing
+	 * synchronous delivery via sigwait below.
 	 */
 	sigfillset(&tmpmask);
 	sigprocmask(SIG_BLOCK, &tmpmask, &oldmask);
 
 	/* Setup the door service. */
-	door_fd = door_create(iod_dispatch, NULL, door_attrs);
-	if (door_fd < 0) {
-		fprintf(stderr, "%s: door_create failed\n", argv[0]);
-		rc = EXIT_FAIL;
-		goto errout;
+	door_path = smb_iod_door_path();
+	door_fd = door_create(iod_dispatch, NULL,
+	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
+	if (door_fd == -1) {
+		perror("iod door_create");
+		goto out;
 	}
 	fdetach(door_path);
 	if (fattach(door_fd, door_path) < 0) {
-		fprintf(stderr, "%s: fattach failed\n", argv[0]);
-		rc = EXIT_FAIL;
-		goto errout;
+		fprintf(stderr, "%s: fattach failed, %s\n",
+		    door_path, strerror(errno));
+		goto out;
 	}
+	attached = B_TRUE;
+
+	/* Initializations done. */
+	rc = SMF_EXIT_OK;
 
 	/*
 	 * Post the initial alarm, and then just
@@ -172,25 +136,48 @@ main(int argc, char **argv)
 again:
 	sig = sigwait(&tmpmask);
 	DPRINT("main: sig=%d\n", sig);
+	switch (sig) {
+	case SIGCONT:
+		goto again;
+
+	case SIGALRM:
+		/* No threads active for a while. */
+		mutex_lock(&iod_mutex);
+		if (iod_thr_count > 0) {
+			/*
+			 * Door call thread creation raced with
+			 * the alarm.  Ignore this alaram.
+			 */
+			mutex_unlock(&iod_mutex);
+			goto again;
+		}
+		/* Prevent a race with iod_thr_count */
+		iod_terminating = 1;
+		mutex_unlock(&iod_mutex);
+		break;
+
+	case SIGINT:
+	case SIGTERM:
+		break;	/* normal termination */
+
+	default:
+		/* Unexpected signal. */
+		fprintf(stderr, "iod_main: unexpected sig=%d\n", sig);
+		break;
+	}
+
+out:
+	iod_terminating = 1;
+	if (attached)
+		fdetach(door_path);
+	if (door_fd != -1)
+		door_revoke(door_fd);
 
 	/*
-	 * If a door call races with the alarm, ignore the alarm.
-	 * It will be rescheduled when the threads go away.
+	 * We need a reference in -lumem to satisfy check_rtime,
+	 * else we get build hoise.  This is sufficient.
 	 */
-	mutex_lock(&iod_mutex);
-	if (sig == SIGALRM && iod_thr_count > 0) {
-		mutex_unlock(&iod_mutex);
-		goto again;
-	}
-	iod_terminating = 1;
-	mutex_unlock(&iod_mutex);
-	rc = EXIT_OK;
-
-errout:
-	fdetach(door_path);
-	door_revoke(door_fd);
-	door_fd = -1;
-	unlink(door_path);
+	free(NULL);
 
 	return (rc);
 }
@@ -226,7 +213,7 @@ iod_dispatch(void *cookie, char *argp, size_t argsz,
 
 	/*
 	 * The library uses a NULL arg call to check if
-	 * the deamon is running.  Just return zero.
+	 * the daemon is running.  Just return zero.
 	 */
 	if (argp == NULL) {
 		rc = 0;

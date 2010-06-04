@@ -32,6 +32,10 @@
  * $Id: nbns_rq.c,v 1.9 2005/02/24 02:04:38 lindak Exp $
  */
 
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -351,7 +355,7 @@ nbns_getnodestatus(struct nb_ctx *ctx,
 			foundserver = 1;
 		}
 	}
-	if (!foundserver)
+	if (foundserver == 0 && retname != NULL)
 		strlcpy(system, retname, NB_NAMELEN);
 	ctx->nb_lastns = rqp->nr_sender;
 

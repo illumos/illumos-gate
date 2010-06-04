@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -75,33 +74,27 @@
 		<service_fmri value='svc:/milestone/multi-user' />
 	</dependent>
 
-	<!--
-	  Err on the side of caution for the mountalls in the smb-client
-	  startup script.  Don't timeout just because remote servers are
-	  being sluggish.
-	-->
 	<exec_method
-	    type='method'
-	    name='start'
-	    exec='/lib/svc/method/smb-client %m'
-	    timeout_seconds='300' />
+		type='method'
+		name='start'
+		exec='/lib/svc/method/smb-client %m'
+		timeout_seconds='60' />
 
 	<exec_method
-	    type='method'
-	    name='stop'
-	    exec='/lib/svc/method/smb-client %m'
-	    timeout_seconds='60' />
+		type='method'
+		name='stop'
+		exec='/lib/svc/method/smb-client %m %{restarter/contract}'
+		timeout_seconds='60' />
 
-        <property_group name='general' type='framework'>
-                <!-- To Start/Stop/Refresh the service -->
-                <propval name='action_authorization' type='astring'
-                        value='solaris.smf.manage.smbfs' />
-        </property_group>
+	<property_group name='general' type='framework'>
+		<!-- To Start/Stop/Refresh the service -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.smbfs' />
+	</property_group>
 
-	<property_group
-	    name='startd'
-	    type='framework'>
-		<propval name='duration' type='astring' value='transient' />
+	<property_group name='application' type='framework'>
+		<stability value='Evolving' />
+		<propval name='auto_enable' type='boolean' value='true' />
 	</property_group>
 
 	<stability value='Unstable' />
