@@ -445,6 +445,7 @@ static void doxtract(char *argv[], int cnt);
 static void dotable(char *argv[]);
 static void doxtract(char *argv[]);
 #endif
+static int tar_chdir(const char *path);
 static int is_directory(char *name);
 static int has_dot_dot(char *name);
 static int is_absolute(char *name);
@@ -1409,7 +1410,7 @@ dorep(char *argv[])
 			}
 #endif	/*  _iBCS2 */
 
-			if (chdir(*++argv) < 0)
+			if (tar_chdir(*++argv) < 0)
 				vperror(0, gettext(
 				    "can't change directories to %s"), *argv);
 			else
@@ -1448,7 +1449,7 @@ dorep(char *argv[])
 		}
 		if (cp2 != file) {
 			*cp2 = '\0';
-			if (chdir(file) < 0) {
+			if (tar_chdir(file) < 0) {
 				vperror(0, gettext(
 				    "can't change directories to %s"), file);
 				continue;
@@ -1471,7 +1472,7 @@ dorep(char *argv[])
 		}
 #endif
 
-		if (chdir(origdir) < 0)
+		if (tar_chdir(origdir) < 0)
 			vperror(0, gettext("cannot change back?: %s"), origdir);
 
 		if (exitflag) {
@@ -2195,7 +2196,7 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 		else
 			(void) sprintf(newparent, "%s", shortname);
 
-		if (chdir(shortname) < 0) {
+		if (tar_chdir(shortname) < 0) {
 			vperror(0, "%s", newparent);
 			goto out;
 		}
@@ -2203,7 +2204,7 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 		if ((dirp = opendir(".")) == NULL) {
 			vperror(0, gettext(
 			    "can't open directory %s"), longname);
-			if (chdir(parent) < 0)
+			if (tar_chdir(parent) < 0)
 				vperror(0, gettext("cannot change back?: %s"),
 				    parent);
 			goto out;
@@ -2267,7 +2268,7 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 			free_children(child);
 		}
 
-		if (chdir(parent) < 0) {
+		if (tar_chdir(parent) < 0) {
 			vperror(0, gettext("cannot change back?: %s"), parent);
 		}
 
@@ -6192,6 +6193,59 @@ is_directory(char *name)
 }
 
 /*
+ * Version of chdir that handles directory pathnames of greater than PATH_MAX
+ * length, by changing the working directory to manageable portions of the
+ * complete directory pathname. If any of these attempts fail, then it exits
+ * non-zero.
+ *
+ * If a segment (i.e. a portion of "path" between two "/"'s) of the overall
+ * pathname is greater than PATH_MAX, then this still won't work, and this
+ * routine will return -1 with errno set to ENAMETOOLONG.
+ *
+ * NOTE: this routine is semantically different to the system chdir in
+ * that it is remotely possible for the currently working directory to be
+ * changed to a different directory, if a chdir call fails when processing
+ * one of the segments of a path that is greater than PATH_MAX. This isn't
+ * a problem as this is tar's own specific version of chdir.
+ */
+
+static int
+tar_chdir(const char *path) {
+	const char *sep = "/";
+	char *path_copy = NULL;
+	char *ptr = NULL;
+
+	/* The trivial case. */
+	if (chdir(path) == 0) {
+		return (0);
+	}
+	if (errno == ENAMETOOLONG) {
+		if (path[0] == '/' && chdir(sep) != 0)
+			return (-1);
+
+		/* strtok(3C) modifies the string, so make a copy. */
+		if ((path_copy = strdup(path)) == NULL) {
+			return (-1);
+		}
+
+		/* chdir(2) for every path element. */
+		for (ptr = strtok(path_copy, sep);
+			ptr != NULL;
+			ptr = strtok(NULL, sep)) {
+			if (chdir(ptr) != 0) {
+				free(path_copy);
+				return (-1);
+			}
+		}
+		free(path_copy);
+		return (0);
+	}
+
+	/* If chdir fails for any reason except ENAMETOOLONG. */
+	return (-1);
+}
+
+/*
  * Test if name has a '..' sequence in it.
  *
  * Return 1 if found, 0 otherwise.
@@ -8172,7 +8226,7 @@ xattrs_put(char *longname, char *shortname, char *parent, char *attrparent)
 
 	/* Change back to the parent directory of the base file */
 	if (attrparent == NULL) {
-		(void) chdir(parent);
+		(void) tar_chdir(parent);
 	}
 	Hiddendir = 0;
 }
