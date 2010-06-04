@@ -766,6 +766,7 @@ nfsauth_refresh_thread(void)
 int
 nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 {
+	struct netbuf		*taddrmask;
 	struct netbuf		addr;
 	struct netbuf		*claddr;
 	struct auth_cache	**head;
@@ -790,7 +791,10 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 	addr = *claddr;
 	addr.buf = kmem_alloc(addr.len, KM_SLEEP);
 	bcopy(claddr->buf, addr.buf, claddr->len);
-	addrmask(&addr, svc_getaddrmask(req->rq_xprt));
+	SVC_GETADDRMASK(req->rq_xprt, SVC_TATTR_ADDRMASK, (void **)&taddrmask);
+	ASSERT(taddrmask != NULL);
+	if (taddrmask)
+		addrmask(&addr, taddrmask);
 
 	rw_enter(&exi->exi_cache_lock, RW_READER);
 	head = &exi->exi_cache[hash(&addr)];

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1789,11 +1788,13 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	{
 		if (!svc_sendreply(xprt, disp->dis_fastxdrres, res)) {
 			cmn_err(CE_NOTE, "%s: bad sendreply", pgmname);
+			svcerr_systemerr(xprt);
 			error++;
 		}
 	} else {
 		if (!svc_sendreply(xprt, disp->dis_xdrres, res)) {
 			cmn_err(CE_NOTE, "%s: bad sendreply", pgmname);
+			svcerr_systemerr(xprt);
 			error++;
 		}
 	}

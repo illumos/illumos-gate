@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -345,6 +344,7 @@ typedef struct conn {
 	char 		*c_netid;	/* tcp or tcp6 token */
 	struct netbuf	c_raddr;	/* remote address */
 	struct netbuf	c_laddr;	/* local address */
+	struct netbuf	c_addrmask;	/* Address Mask */
 	int		c_ref;		/* no. of clients of connection */
 	struct conn	*c_next;	/* next in list of connections */
 	struct conn	*c_prev;	/* prev in list of connections */

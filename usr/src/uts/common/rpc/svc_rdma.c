@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -118,6 +117,7 @@ static void		svc_rdma_kclone_destroy(SVCXPRT *);
 static void		svc_rdma_kstart(SVCMASTERXPRT *);
 void			svc_rdma_kstop(SVCMASTERXPRT *);
 static void		svc_rdma_kclone_xprt(SVCXPRT *, SVCXPRT *);
+static void		svc_rdma_ktattrs(SVCXPRT *, int, void **);
 
 static int	svc_process_long_reply(SVCXPRT *, xdrproc_t,
 			caddr_t, struct rpc_msg *, bool_t, int *,
@@ -145,7 +145,8 @@ struct svc_ops rdma_svc_ops = {
 	svc_rdma_kfreeres,	/* Destroy pre-serialized response header */
 	svc_rdma_kclone_destroy,	/* Destroy a clone xprt */
 	svc_rdma_kstart,	/* Tell `ready-to-receive' to rpcmod */
-	svc_rdma_kclone_xprt	/* Transport specific clone xprt */
+	svc_rdma_kclone_xprt,	/* Transport specific clone xprt */
+	svc_rdma_ktattrs	/* Get Transport Attributes */
 };
 
 /*
@@ -268,15 +269,6 @@ svc_rdma_kcreate(char *netid, SVC_CALLOUT_TABLE *sct, int id,
 		q->q_ptr = &rd->rd_xprt;
 		xprt->xp_netid = NULL;
 
-		xprt->xp_addrmask.maxlen =
-		    xprt->xp_addrmask.len = sizeof (struct sockaddr_in);
-		xprt->xp_addrmask.buf =
-		    kmem_zalloc(xprt->xp_addrmask.len, KM_SLEEP);
-		((struct sockaddr_in *)xprt->xp_addrmask.buf)->sin_addr.s_addr =
-		    (uint32_t)~0;
-		((struct sockaddr_in *)xprt->xp_addrmask.buf)->sin_family =
-		    (ushort_t)~0;
-
 		/*
 		 * Each of the plugins will have their own Service ID
 		 * to listener specific mapping, like port number for VI
@@ -339,7 +331,6 @@ svc_rdma_kdestroy(SVCMASTERXPRT *xprt)
 	mutex_destroy(&xprt->xp_req_lock);
 	mutex_destroy(&xprt->xp_thread_lock);
 	kmem_free(rd, sizeof (*rd));
-	kmem_free(xprt->xp_addrmask.buf, xprt->xp_addrmask.maxlen);
 	kmem_free(xprt, sizeof (*xprt));
 }
 
@@ -427,6 +418,20 @@ svc_rdma_kclone_xprt(SVCXPRT *src_xprt, SVCXPRT *dst_xprt)
 	}
 }
 
+static void
+svc_rdma_ktattrs(SVCXPRT *clone_xprt, int attrflag, void **tattr)
+{
+	CONN	*conn;
+	*tattr = NULL;
+
+	switch (attrflag) {
+	case SVC_TATTR_ADDRMASK:
+		conn = ((struct clone_rdma_data *)clone_xprt->xp_p2buf)->conn;
+		ASSERT(conn != NULL);
+		if (conn)
+			*tattr = (void *)&conn->c_addrmask;
+	}
+}
 
 static bool_t
 svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)

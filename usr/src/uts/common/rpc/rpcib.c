@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2088,6 +2087,9 @@ rib_disconnect_channel(CONN *conn, rib_conn_list_t *conn_list)
 	if (conn->c_netid != NULL) {
 		kmem_free(conn->c_netid, (strlen(conn->c_netid) + 1));
 	}
+	if (conn->c_addrmask.buf != NULL) {
+		kmem_free(conn->c_addrmask.buf, conn->c_addrmask.len);
+	}
 
 	/*
 	 * Credit control cleanup.
@@ -3069,6 +3071,16 @@ rib_srv_cm_handler(void *any, ibt_cm_event_t *event,
 			bcopy((void *)&ipinfo.dst_addr.un.ip4addr,
 			    &s->sin_addr, in_size);
 
+			conn->c_addrmask.maxlen = conn->c_addrmask.len =
+			    sizeof (struct sockaddr_in);
+			conn->c_addrmask.buf =
+			    kmem_zalloc(conn->c_addrmask.len, KM_SLEEP);
+			((struct sockaddr_in *)
+			    conn->c_addrmask.buf)->sin_addr.s_addr =
+			    (uint32_t)~0;
+			((struct sockaddr_in *)
+			    conn->c_addrmask.buf)->sin_family =
+			    (sa_family_t)~0;
 			break;
 
 		case AF_INET6:
@@ -3097,6 +3109,16 @@ rib_srv_cm_handler(void *any, ibt_cm_event_t *event,
 			    &s6->sin6_addr,
 			    sizeof (struct in6_addr));
 
+			conn->c_addrmask.maxlen = conn->c_addrmask.len =
+			    sizeof (struct sockaddr_in6);
+			conn->c_addrmask.buf =
+			    kmem_zalloc(conn->c_addrmask.len, KM_SLEEP);
+			(void) memset(&((struct sockaddr_in6 *)
+			    conn->c_addrmask.buf)->sin6_addr, (uchar_t)~0,
+			    sizeof (struct in6_addr));
+			((struct sockaddr_in6 *)
+			    conn->c_addrmask.buf)->sin6_family =
+			    (sa_family_t)~0;
 			break;
 
 		default:
@@ -4370,9 +4392,29 @@ rib_connect(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
 	if (rpt->srcip.family == AF_INET) {
 		cn->c_netid = kmem_zalloc(strlen(RIBNETID_TCP) + 1, KM_SLEEP);
 		(void) strcpy(cn->c_netid, RIBNETID_TCP);
+
+		cn->c_addrmask.len = cn->c_addrmask.maxlen =
+		    sizeof (struct sockaddr_in);
+		cn->c_addrmask.buf = kmem_zalloc(cn->c_addrmask.len, KM_SLEEP);
+
+		((struct sockaddr_in *)cn->c_addrmask.buf)->sin_addr.s_addr =
+		    (uint32_t)~0;
+		((struct sockaddr_in *)cn->c_addrmask.buf)->sin_family =
+		    (ushort_t)~0;
+
 	} else {
 		cn->c_netid = kmem_zalloc(strlen(RIBNETID_TCP6) + 1, KM_SLEEP);
 		(void) strcpy(cn->c_netid, RIBNETID_TCP6);
+
+		cn->c_addrmask.len = cn->c_addrmask.maxlen =
+		    sizeof (struct sockaddr_in6);
+		cn->c_addrmask.buf = kmem_zalloc(cn->c_addrmask.len, KM_SLEEP);
+
+		(void) memset(
+		    &((struct sockaddr_in6 *)cn->c_addrmask.buf)->sin6_addr,
+		    (uchar_t)~0, sizeof (struct in6_addr));
+		((struct sockaddr_in6 *)cn->c_addrmask.buf)->sin6_family =
+		    (sa_family_t)~0;
 	}
 
 	/*

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -54,6 +53,15 @@
 #include <rpc/rpc_sztypes.h>
 #include <rpc/rpc_rdma.h>
 #include <sys/sysmacros.h>
+
+/*
+ * RCP header and xdr encoding overhead.  The number was determined by
+ * tracing the msglen in svc_rdma_ksend for sec=sys,krb5,krb5i and krb5p.
+ * If the XDR_RDMA_BUF_OVERHEAD is not large enough the result is the trigger
+ * of the dtrace probe on the server "krpc-e-svcrdma-ksend-noreplycl" from
+ * svc_rdma_ksend.
+ */
+#define	XDR_RDMA_BUF_OVERHEAD	300
 
 static bool_t   xdrrdma_getint32(XDR *, int32_t *);
 static bool_t   xdrrdma_putint32(XDR *, int32_t *);
@@ -771,7 +779,8 @@ xdrrdma_control(XDR *xdrs, int request, void *info)
 		case RCI_WRITE_UIO_CHUNK:
 			xdrp->xp_reply_chunk_len_alt += rcip->rci_len;
 
-			if (rcip->rci_len < xdrp->xp_min_chunk) {
+			if ((rcip->rci_len + XDR_RDMA_BUF_OVERHEAD) <
+			    xdrp->xp_min_chunk) {
 				xdrp->xp_wcl = NULL;
 				*(rcip->rci_clpp) = NULL;
 				return (TRUE);

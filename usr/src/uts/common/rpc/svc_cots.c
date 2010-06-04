@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *  Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- *  Use is subject to license terms.
+ *  Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -84,6 +83,7 @@ static int32_t		*svc_cots_kgetres(SVCXPRT *, int);
 static void		svc_cots_kfreeres(SVCXPRT *);
 static void		svc_cots_kclone_destroy(SVCXPRT *);
 static void		svc_cots_kstart(SVCMASTERXPRT *);
+static void		svc_cots_ktattrs(SVCXPRT *, int, void **);
 
 /*
  * Server transport operations vector.
@@ -100,7 +100,8 @@ struct svc_ops svc_cots_op = {
 	svc_cots_kfreeres,	/* Destroy pre-serialized response header */
 	svc_cots_kclone_destroy, /* Destroy a clone xprt */
 	svc_cots_kstart,	/* Tell `ready-to-receive' to rpcmod */
-	NULL			/* Transport specific clone xprt */
+	NULL,			/* Transport specific clone xprt */
+	svc_cots_ktattrs	/* Transport Attributes */
 };
 
 /*
@@ -324,6 +325,20 @@ svc_cots_kclone_destroy(SVCXPRT *clone_xprt)
 		cd->cd_req_mp = (mblk_t *)0;
 	}
 	ASSERT(cd->cd_mp == NULL);
+}
+
+/*
+ * Transport Attributes.
+ */
+static void
+svc_cots_ktattrs(SVCXPRT *clone_xprt, int attrflag, void **tattr)
+{
+	*tattr = NULL;
+
+	switch (attrflag) {
+	case SVC_TATTR_ADDRMASK:
+		*tattr = (void *)&clone_xprt->xp_master->xp_addrmask;
+	}
 }
 
 /*

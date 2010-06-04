@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -189,7 +188,11 @@ struct svc_ops {
 		/* `ready-to-receive' */
 	void	(*xp_clone_xprt)(SVCXPRT *, SVCXPRT *);
 		/* transport specific clone function */
+	void	(*xp_tattrs) (SVCXPRT *, int, void **);
 };
+
+#define	SVC_TATTR_ADDRMASK	1
+
 #else	/* _KERNEL */
 /*
  *	Service control requests
@@ -512,6 +515,9 @@ struct __svcxprt {
  */
 
 #ifdef	_KERNEL
+
+#define	SVC_GETADDRMASK(clone_xprt, attrflag, tattr) \
+(*(clone_xprt)->xp_ops->xp_tattrs)((clone_xprt), (attrflag), (tattr))
 
 #define	SVC_CLONE_XPRT(src_xprt, dst_xprt) \
 	if ((src_xprt)->xp_ops->xp_clone_xprt) \

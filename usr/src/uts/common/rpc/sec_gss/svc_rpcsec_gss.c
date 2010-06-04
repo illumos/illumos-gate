@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -984,6 +983,9 @@ rpcsec_gss_init(
 	arg->client_data = client_data;
 	arg->cr_version = creds.version;
 	arg->cr_service = creds.service;
+
+	/* We no longer need the xp_xdrin, destroy it all here. */
+	XDR_DESTROY(&(rqst->rq_xprt->xp_xdrin));
 
 	/* should be ok to hold clm lock as taskq will have new thread(s) */
 	ret = ddi_taskq_dispatch(svcrpcsec_gss_init_taskq,
