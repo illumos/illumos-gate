@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -54,17 +53,14 @@ pthread_mutex_t g_prop_mutex = PTHREAD_MUTEX_INITIALIZER;
 MP_STATUS
 Initialize(MP_UINT32 pluginOwnerID)
 {
-	MP_STATUS mpStatus = MP_STATUS_SUCCESS;
-
-
 	log(LOG_INFO, "Initialize()", " - enter");
 
 
 	(void) memset(&g_Property_Callback_List, 0,
-		sizeof (PROPERTY_CALLBACK_NODE) * (MP_OBJECT_TYPE_MAX + 1));
+	    sizeof (PROPERTY_CALLBACK_NODE) * (MP_OBJECT_TYPE_MAX + 1));
 
 	(void) memset(&g_Visibility_Callback_List, 0,
-		sizeof (VISIBILITY_CALLBACK_NODE) * (MP_OBJECT_TYPE_MAX + 1));
+	    sizeof (VISIBILITY_CALLBACK_NODE) * (MP_OBJECT_TYPE_MAX + 1));
 
 	/* Attempt to open the driver that this plugin will make request of. */
 	g_scsi_vhci_fd = open("/devices/scsi_vhci:devctl",
@@ -75,20 +71,12 @@ Initialize(MP_UINT32 pluginOwnerID)
 		    " - failed to open driver.  error is : %s",
 		    strerror(errno));
 		log(LOG_INFO, "Initialize()", " - error exit");
-	    return (MP_STATUS_FAILED);
+		return (MP_STATUS_FAILED);
 	}
 
 	g_pluginOwnerID = pluginOwnerID;
 
-	/* Register to listen for visibility and property change events */
-	mpStatus = init_sysevents();
-
-	log(LOG_INFO, "Initialize()",
-	    " - init_sysevents() returned %d",
-	    mpStatus);
-
-
 	log(LOG_INFO, "Initialize()", " - exit");
 
-	return (mpStatus);
+	return (MP_STATUS_SUCCESS);
 }

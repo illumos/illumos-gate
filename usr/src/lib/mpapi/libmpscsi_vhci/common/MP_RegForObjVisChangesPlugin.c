@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "mp_utils.h"
@@ -41,17 +40,17 @@ MP_RegisterForObjectVisibilityChangesPlugin(MP_OBJECT_VISIBILITY_FN pClientFn,
 
 
 	log(LOG_INFO, "MP_RegisterForObjectVisibilityChangesPlugin()",
-		" - enter");
+	    " - enter");
 
 
 	/* Validate the object type passes in within range */
 	if (objectType > MP_OBJECT_TYPE_MAX) {
 
 		log(LOG_INFO, "MP_RegisterForObjectVisibilityChangesPlugin()",
-			" - objectType is invalid");
+		    " - objectType is invalid");
 
 		log(LOG_INFO, "MP_RegisterForObjectVisibilityChangesPlugin()",
-			" - error exit");
+		    " - error exit");
 
 		return (MP_STATUS_INVALID_PARAMETER);
 	}
@@ -59,21 +58,28 @@ MP_RegisterForObjectVisibilityChangesPlugin(MP_OBJECT_VISIBILITY_FN pClientFn,
 	if (objectType < 1) {
 
 		log(LOG_INFO, "MP_RegisterForObjectVisibilityChangesPlugin()",
-			" - objectType is invalid");
+		    " - objectType is invalid");
 
 		log(LOG_INFO, "MP_RegisterForObjectVisibilityChangesPlugin()",
-			" - error exit");
+		    " - error exit");
 
 		return (MP_STATUS_INVALID_PARAMETER);
 	}
 
-	/*   Check to see if we are going to be replacing */
+	/* Init sysevents if they have not been initialized yet */
+	if (g_SysEventHandle == NULL) {
+		if (init_sysevents() != MP_STATUS_SUCCESS)
+			return (MP_STATUS_FAILED);
+	}
+
+	/* Check to see if we are going to be replacing */
 	(void) pthread_mutex_lock(&g_visa_mutex);
 	if (g_Visibility_Callback_List[objectType].pClientFn != NULL) {
 
 		hasFunc = MP_TRUE;
 	}
 
+	/* Add the registration */
 	g_Visibility_Callback_List[objectType].pClientFn   = pClientFn;
 	g_Visibility_Callback_List[objectType].pCallerData = pCallerData;
 	(void) pthread_mutex_unlock(&g_visa_mutex);
@@ -81,14 +87,14 @@ MP_RegisterForObjectVisibilityChangesPlugin(MP_OBJECT_VISIBILITY_FN pClientFn,
 	if (hasFunc) {
 
 		log(LOG_INFO, "MP_RegisterForObjectVisibilityChangesPlugin()",
-			" - returning MP_STATUS_FN_REPLACED");
+		    " - returning MP_STATUS_FN_REPLACED");
 
 		return (MP_STATUS_FN_REPLACED);
 	}
 
 
 	log(LOG_INFO, "MP_RegisterForObjectVisibilityChangesPlugin()",
-		" - exit");
+	    " - exit");
 
 	return (MP_STATUS_SUCCESS);
 }
