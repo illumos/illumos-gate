@@ -885,13 +885,6 @@ usr/lib/llib-lunistat.ln
 usr/include/sys/scsi/adapters/iscsi_door.h
 usr/include/sys/scsi/adapters/iscsi_if.h
 #
-# qus driver headers not installed
-#
-usr/include/sys/scsi/adapters/quscmd.h			sparc
-usr/include/sys/scsi/adapters/qusmail.h			sparc
-usr/include/sys/scsi/adapters/qusreg.h			sparc
-usr/include/sys/scsi/adapters/qusvar.h			sparc
-#
 # sbd ioctl hdr
 #
 usr/include/sys/stmf_sbd_ioctl.h

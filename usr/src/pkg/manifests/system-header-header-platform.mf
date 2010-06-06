@@ -20,30 +20,10 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/system/header/header-platform@$(PKGVERS)
-set name=pkg.description \
-    value="SunOS C/C++ header files for development of software for the PCI bus on SPARC platforms."
-set name=pkg.summary value="PCI Drivers Headers"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=pkg.fmri value=pkg:/system/header/header-platform@0.5.11,5.11-0.142
 set name=variant.arch value=sparc
 set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/include/sys
-dir path=usr/include/sys/scsi
-dir path=usr/include/sys/scsi/adapters
-file path=usr/include/sys/scsi/adapters/glmreg.h
-file path=usr/include/sys/scsi/adapters/glmvar.h
-file path=usr/include/sys/scsi/adapters/mptreg.h
-file path=usr/include/sys/scsi/adapters/mptvar.h
-legacy pkg=SUNWpdu arch=$(ARCH) category=system \
-    desc="SunOS C/C++ header files for development of software for the PCI bus on SPARC platforms." \
-    hotline="Please contact your local service provider" \
-    name="PCI Drivers Headers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
+set name=pkg.obsolete value=true

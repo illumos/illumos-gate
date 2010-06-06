@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -39,3 +38,13 @@ usr/include/ike
 # bmc (IPMI) interfaces shared within ON.
 #
 usr/include/sys/bmc_cmd.h
+
+# closed HBA header files
+usr/include/sys/scsi/adapters/glmreg.h	sparc
+usr/include/sys/scsi/adapters/glmvar.h	sparc
+usr/include/sys/scsi/adapters/mptreg.h	sparc
+usr/include/sys/scsi/adapters/mptvar.h	sparc
+usr/include/sys/scsi/adapters/quscmd.h	sparc
+usr/include/sys/scsi/adapters/qusmail.h	sparc
+usr/include/sys/scsi/adapters/qusreg.h	sparc
+usr/include/sys/scsi/adapters/qusvar.h	sparc

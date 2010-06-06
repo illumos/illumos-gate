@@ -23,8 +23,5 @@
 
 set name=pkg.fmri value=pkg:/system/storage/mms@0.5.11,5.11-0.139
 set name=pkg.obsolete value=true
-set name=pkg.description value="Media Management System"
-set name=pkg.summary value="MMS - Media Management Software"
-set name=info.classification value=org.opensolaris.category.2008:System/Media
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
