@@ -164,6 +164,9 @@ static int	ipif_set_values_tail(ill_t *ill, ipif_t *ipif, mblk_t *mp,
 static ipif_t	*ipif_lookup_on_name(char *name, size_t namelen,
     boolean_t do_alloc, boolean_t *exists, boolean_t isv6, zoneid_t zoneid,
     ip_stack_t *);
+static ipif_t	*ipif_lookup_on_name_async(char *name, size_t namelen,
+    boolean_t isv6, zoneid_t zoneid, queue_t *q, mblk_t *mp, ipsq_func_t func,
+    int *error, ip_stack_t *);
 
 static int	ill_alloc_ppa(ill_if_t *, ill_t *);
 static void	ill_delete_interface_type(ill_if_t *);
@@ -7009,7 +7012,7 @@ ip_extract_lifreq(queue_t *q, mblk_t *mp, const ip_ioctl_cmd_t *ipip,
 	ill_t		*ill;
 	conn_t		*connp;
 	boolean_t	isv6;
-	boolean_t	exists;
+	int		err;
 	mblk_t		*mp1;
 	zoneid_t	zoneid;
 	ip_stack_t	*ipst;
@@ -7079,39 +7082,17 @@ ip_extract_lifreq(queue_t *q, mblk_t *mp, const ip_ioctl_cmd_t *ipip,
 		ipif = ill->ill_ipif;
 		ipif_refhold(ipif);
 	} else {
-		ipif = ipif_lookup_on_name(name, mi_strlen(name), B_FALSE,
-		    &exists, isv6, zoneid, ipst);
-
 		/*
-		 * Ensure that get ioctls don't see any internal state changes
+		 * Ensure that ioctls don't see any internal state changes
 		 * caused by set ioctls by deferring them if IPIF_CHANGING is
 		 * set.
 		 */
-		if (ipif != NULL && !(ipip->ipi_flags & IPI_WR) &&
-		    !IAM_WRITER_IPIF(ipif)) {
-			ipsq_t	*ipsq;
-
-			if (connp != NULL)
-				mutex_enter(&connp->conn_lock);
-			mutex_enter(&ipif->ipif_ill->ill_lock);
-			if (IPIF_IS_CHANGING(ipif) &&
-			    !IPIF_IS_CONDEMNED(ipif)) {
-				ipsq = ipif->ipif_ill->ill_phyint->phyint_ipsq;
-				mutex_enter(&ipsq->ipsq_lock);
-				mutex_enter(&ipsq->ipsq_xop->ipx_lock);
-				mutex_exit(&ipif->ipif_ill->ill_lock);
-				ipsq_enq(ipsq, q, mp, ip_process_ioctl,
-				    NEW_OP, ipif->ipif_ill);
-				mutex_exit(&ipsq->ipsq_xop->ipx_lock);
-				mutex_exit(&ipsq->ipsq_lock);
-				if (connp != NULL)
-					mutex_exit(&connp->conn_lock);
-				ipif_refrele(ipif);
-				return (EINPROGRESS);
-			}
-			mutex_exit(&ipif->ipif_ill->ill_lock);
-			if (connp != NULL)
-				mutex_exit(&connp->conn_lock);
+		ipif = ipif_lookup_on_name_async(name, mi_strlen(name),
+		    isv6, zoneid, q, mp, ip_process_ioctl, &err, ipst);
+		if (ipif == NULL) {
+			if (err == EINPROGRESS)
+				return (err);
+			err = 0;	/* Ensure we don't use it below */
 		}
 	}
 
@@ -13741,6 +13722,145 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 	mutex_exit(&ill->ill_lock);
 	ill_refrele(ill);
 	return (ipif);
+}
+
+/*
+ * Variant of the above that queues the request on the ipsq when
+ * IPIF_CHANGING is set.
+ */
+static ipif_t *
+ipif_lookup_on_name_async(char *name, size_t namelen, boolean_t isv6,
+    zoneid_t zoneid, queue_t *q, mblk_t *mp, ipsq_func_t func, int *error,
+    ip_stack_t *ipst)
+{
+	char	*cp;
+	char	*endp;
+	long	id;
+	ill_t	*ill;
+	ipif_t	*ipif;
+	boolean_t did_alloc = B_FALSE;
+	ipsq_t	*ipsq;
+
+	if (error != NULL)
+		*error = 0;
+
+	if (namelen == 0) {
+		if (error != NULL)
+			*error = ENXIO;
+		return (NULL);
+	}
+
+	/* Look for a colon in the name. */
+	endp = &name[namelen];
+	for (cp = endp; --cp > name; ) {
+		if (*cp == IPIF_SEPARATOR_CHAR)
+			break;
+	}
+
+	if (*cp == IPIF_SEPARATOR_CHAR) {
+		/*
+		 * Reject any non-decimal aliases for logical
+		 * interfaces. Aliases with leading zeroes
+		 * are also rejected as they introduce ambiguity
+		 * in the naming of the interfaces.
+		 * In order to confirm with existing semantics,
+		 * and to not break any programs/script relying
+		 * on that behaviour, if<0>:0 is considered to be
+		 * a valid interface.
+		 *
+		 * If alias has two or more digits and the first
+		 * is zero, fail.
+		 */
+		if (&cp[2] < endp && cp[1] == '0') {
+			if (error != NULL)
+				*error = EINVAL;
+			return (NULL);
+		}
+	}
+
+	if (cp <= name) {
+		cp = endp;
+	} else {
+		*cp = '\0';
+	}
+
+	/*
+	 * Look up the ILL, based on the portion of the name
+	 * before the slash. ill_lookup_on_name returns a held ill.
+	 * Temporary to check whether ill exists already. If so
+	 * ill_lookup_on_name will clear it.
+	 */
+	ill = ill_lookup_on_name(name, B_FALSE, isv6, &did_alloc, ipst);
+	if (cp != endp)
+		*cp = IPIF_SEPARATOR_CHAR;
+	if (ill == NULL)
+		return (NULL);
+
+	/* Establish the unit number in the name. */
+	id = 0;
+	if (cp < endp && *endp == '\0') {
+		/* If there was a colon, the unit number follows. */
+		cp++;
+		if (ddi_strtol(cp, NULL, 0, &id) != 0) {
+			ill_refrele(ill);
+			if (error != NULL)
+				*error = ENXIO;
+			return (NULL);
+		}
+	}
+
+	GRAB_CONN_LOCK(q);
+	mutex_enter(&ill->ill_lock);
+	/* Now see if there is an IPIF with this unit number. */
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		if (ipif->ipif_id == id) {
+			if (zoneid != ALL_ZONES &&
+			    zoneid != ipif->ipif_zoneid &&
+			    ipif->ipif_zoneid != ALL_ZONES) {
+				mutex_exit(&ill->ill_lock);
+				RELEASE_CONN_LOCK(q);
+				ill_refrele(ill);
+				if (error != NULL)
+					*error = ENXIO;
+				return (NULL);
+			}
+
+			if (!(IPIF_IS_CHANGING(ipif) ||
+			    IPIF_IS_CONDEMNED(ipif)) ||
+			    IAM_WRITER_IPIF(ipif)) {
+				ipif_refhold_locked(ipif);
+				mutex_exit(&ill->ill_lock);
+				/*
+				 * Drop locks before calling ill_refrele
+				 * since it can potentially call into
+				 * ipif_ill_refrele_tail which can end up
+				 * in trying to acquire any lock.
+				 */
+				RELEASE_CONN_LOCK(q);
+				ill_refrele(ill);
+				return (ipif);
+			} else if (q != NULL && !IPIF_IS_CONDEMNED(ipif)) {
+				ipsq = ill->ill_phyint->phyint_ipsq;
+				mutex_enter(&ipsq->ipsq_lock);
+				mutex_enter(&ipsq->ipsq_xop->ipx_lock);
+				mutex_exit(&ill->ill_lock);
+				ipsq_enq(ipsq, q, mp, func, NEW_OP, ill);
+				mutex_exit(&ipsq->ipsq_xop->ipx_lock);
+				mutex_exit(&ipsq->ipsq_lock);
+				RELEASE_CONN_LOCK(q);
+				ill_refrele(ill);
+				if (error != NULL)
+					*error = EINPROGRESS;
+				return (NULL);
+			}
+		}
+	}
+	RELEASE_CONN_LOCK(q);
+	mutex_exit(&ill->ill_lock);
+	ill_refrele(ill);
+	if (error != NULL)
+		*error = ENXIO;
+	return (NULL);
 }
 
 /*
