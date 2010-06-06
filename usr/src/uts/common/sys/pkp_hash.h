@@ -19,50 +19,30 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#ifndef _SHAREFS_SHARETAB_H
-#define	_SHAREFS_SHARETAB_H
+#ifndef	_PKP_HASH_H_
+#define	_PKP_HASH_H_
 
-#include <sys/pkp_hash.h>
-
-/*
- * This header defines the glue to keeping a sharetab in memory.
- * It is broken out from sharefs.h in the case that it will be
- * reused in userland.
- */
-
-/*
- * Note:
- * Must include share/share.h before this header.
- */
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct sh_list {		/* cached share list */
-	struct sh_list	*shl_next;
-	share_t		*shl_sh;
-} sh_list_t;
+/*
+ * Pearson's string hash
+ *
+ * See: Communications of the ACM, June 1990 Vol 33 pp 677-680
+ * http://portal.acm.org/citation.cfm?doid=78973.78978
+ */
+#define	PKP_HASH_SIZE		256
 
-typedef struct sharefs_hash_head {
-	share_t		*ssh_sh;
-	uint_t		ssh_count;
-} sharefs_hash_head_t;
-
-#define	SHARETAB_HASHES		PKP_HASH_SIZE
-
-typedef struct sharetab {
-	sharefs_hash_head_t	s_buckets[SHARETAB_HASHES];
-	char			*s_fstype;
-	struct sharetab		*s_next;
-	uint_t			s_count;
-} sharetab_t;
+extern uint_t pkp_tab_hash(char *, int);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* !_SHAREFS_SHARETAB_H */
+#endif /* _PKP_HASH_H_ */

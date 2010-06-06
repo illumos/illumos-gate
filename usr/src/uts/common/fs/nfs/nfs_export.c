@@ -62,12 +62,14 @@
 #include <nfs/nfs_log.h>
 #include <nfs/lm.h>
 #include <sys/sunddi.h>
+#include <sys/pkp_hash.h>
 
 treenode_t *ns_root;
 
+struct exportinfo *exptable_path_hash[PKP_HASH_SIZE];
 struct exportinfo *exptable[EXPTABLESIZE];
 
-static int	unexport(fsid_t *, fid_t *, vnode_t *);
+static void	unexport(exportinfo_t *);
 static void	exportfree(exportinfo_t *);
 static int	loadindex(exportdata_t *);
 
@@ -112,61 +114,36 @@ fhandle_t nullfh2;	/* for comparing V2 filehandles */
 
 #define	exptablehash(fsid, fid) (nfs_fhhash((fsid), (fid)) & (EXPTABLESIZE - 1))
 
+static uint8_t
+xor_hash(uint8_t *data, int len)
+{
+	uint8_t h = 0;
+
+	while (len--)
+		h ^= *data++;
+
+	return (h);
+}
+
 /*
- * File handle hash function, good for producing hash values 16 bits wide.
+ * File handle hash function, XOR over all bytes in fsid and fid.
  */
-int
+static unsigned
 nfs_fhhash(fsid_t *fsid, fid_t *fid)
 {
-	short *data;
-	int i, len;
-	short h;
+	int len;
+	uint8_t h;
 
-	ASSERT(fid != NULL);
-
-	data = (short *)fid->fid_data;
-
-	/* fid_data must be aligned on a short */
-	ASSERT((((uintptr_t)data) & (sizeof (short) - 1)) == 0);
-
-	if (fid->fid_len == 10) {
-		/*
-		 * probably ufs: hash on bytes 4,5 and 8,9
-		 */
-		return (fsid->val[0] ^ data[2] ^ data[4]);
-	}
-
-	if (fid->fid_len == 6) {
-		/*
-		 * probably hsfs: hash on bytes 0,1 and 4,5
-		 */
-		return ((fsid->val[0] ^ data[0] ^ data[2]));
-	}
-
-	/*
-	 * Some other file system. Assume that every byte is
-	 * worth hashing.
-	 */
-	h = (short)fsid->val[0];
+	h = xor_hash((uint8_t *)fsid, sizeof (fsid_t));
 
 	/*
 	 * Sanity check the length before using it
 	 * blindly in case the client trashed it.
 	 */
-	if (fid->fid_len > NFS_FHMAXDATA)
-		len = 0;
-	else
-		len = fid->fid_len / sizeof (short);
+	len = fid->fid_len > NFS_FH4MAXDATA ? 0 : fid->fid_len;
+	h ^= xor_hash((uint8_t *)fid->fid_data, len);
 
-	/*
-	 * This will ignore one byte if len is not a multiple of
-	 * of sizeof (short). No big deal since we at least get some
-	 * variation with fsid->val[0];
-	 */
-	for (i = 0; i < len; i++)
-		h ^= data[i];
-
-	return ((int)h);
+	return ((unsigned)h);
 }
 
 /*
@@ -189,7 +166,6 @@ srv_secinfo_entry_free(struct secinfo *secp)
 		    sizeof (rpc_gss_OID_desc));
 		secp->s_secinfo.sc_gss_mech_type = NULL;
 	}
-
 }
 
 /*
@@ -783,13 +759,35 @@ srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt, int isadd)
 	}
 }
 
-void
-export_link(exportinfo_t *exi) {
-	int exporthash;
+/* hash_name is a text substitution for either fid_hash or path_hash */
+#define	exp_hash_unlink(exi, hash_name) \
+	if (*(exi)->hash_name.bckt == (exi)) \
+		*(exi)->hash_name.bckt = (exi)->hash_name.next; \
+	if ((exi)->hash_name.prev) \
+		(exi)->hash_name.prev->hash_name.next = (exi)->hash_name.next; \
+	if ((exi)->hash_name.next) \
+		(exi)->hash_name.next->hash_name.prev = (exi)->hash_name.prev; \
+	(exi)->hash_name.bckt = NULL;
 
-	exporthash = exptablehash(&exi->exi_fsid, &exi->exi_fid);
-	exi->exi_hash = exptable[exporthash];
-	exptable[exporthash] = exi;
+#define	exp_hash_link(exi, hash_name, bucket) \
+	(exi)->hash_name.bckt = (bucket); \
+	(exi)->hash_name.prev = NULL; \
+	(exi)->hash_name.next = *(bucket); \
+	if ((exi)->hash_name.next) \
+		(exi)->hash_name.next->hash_name.prev = (exi); \
+	*(bucket) = (exi);
+
+void
+export_link(exportinfo_t *exi)
+{
+	exportinfo_t **bckt;
+
+	bckt = &exptable[exptablehash(&exi->exi_fsid, &exi->exi_fid)];
+	exp_hash_link(exi, fid_hash, bckt);
+
+	bckt = &exptable_path_hash[pkp_tab_hash(exi->exi_export.ex_path,
+	    strlen(exi->exi_export.ex_path))];
+	exp_hash_link(exi, path_hash, bckt);
 }
 
 /*
@@ -948,7 +946,7 @@ rfs_gsscallback(struct svc_req *req, gss_cred_id_t deleg, void *gss_context,
 					}
 				}
 			}
-			exi = exi->exi_hash;
+			exi = exi->fid_hash.next;
 		}
 	}
 done:
@@ -998,7 +996,7 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	vnode_t *dvp;
 	struct exportdata *kex;
 	struct exportinfo *exi = NULL;
-	struct exportinfo *ex, *prev;
+	struct exportinfo *ex, *ex1, *ex2;
 	fid_t fid;
 	fsid_t fsid;
 	int error;
@@ -1018,9 +1016,46 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	struct secinfo oldsec[MAX_FLAVORS];
 	int oldcnt;
 	int i;
+	struct pathname lookpn;
 
 	STRUCT_SET_HANDLE(uap, model, args);
 
+	/* Read in pathname from userspace */
+	if (error = pn_get(STRUCT_FGETP(uap, dname), UIO_USERSPACE, &lookpn))
+		return (error);
+
+	/* Walk the export list looking for that pathname */
+	rw_enter(&exported_lock, RW_READER);
+	DTRACE_PROBE(nfss__i__exported_lock1_start);
+	for (ex1 = exptable_path_hash[pkp_tab_hash(lookpn.pn_path,
+	    strlen(lookpn.pn_path))]; ex1; ex1 = ex1->path_hash.next) {
+		if (ex1 != exi_root && 0 ==
+		    strcmp(ex1->exi_export.ex_path, lookpn.pn_path)) {
+			exi_hold(ex1);
+			break;
+		}
+	}
+	DTRACE_PROBE(nfss__i__exported_lock1_stop);
+	rw_exit(&exported_lock);
+
+	/* Is this an unshare? */
+	if (STRUCT_FGETP(uap, uex) == NULL) {
+		pn_free(&lookpn);
+		rw_enter(&exported_lock, RW_WRITER);
+		/* Check if ex1 is still linked in the export table */
+		if (ex1 == NULL || !EXP_LINKED(ex1) || PSEUDO(ex1)) {
+			rw_exit(&exported_lock);
+			if (ex1)
+				exi_rele(ex1);
+			return (EINVAL);
+		}
+		unexport(ex1);
+		rw_exit(&exported_lock);
+		exi_rele(ex1);
+		return (0);
+	}
+
+	/* It is a share or a re-share */
 	error = lookupname(STRUCT_FGETP(uap, dname), UIO_USERSPACE,
 	    FOLLOW, &dvp, &vp);
 	if (error == EINVAL) {
@@ -1034,86 +1069,17 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 		dvp = NULL;
 	}
 	if (!error && vp == NULL) {
-		/*
-		 * Last component of fname not found
-		 */
-		if (dvp != NULL) {
+		/* Last component of fname not found */
+		if (dvp != NULL)
 			VN_RELE(dvp);
-		}
 		error = ENOENT;
 	}
-
 	if (error) {
-		/*
-		 * If this is a request to unexport, indicated by the
-		 * uex pointer being NULL, it is possible that the
-		 * directory has already been removed or shared filesystem
-		 * could have been forcibly unmounted. In which case
-		 * we scan the export list which records the pathname
-		 * originally exported.
-		 */
-		if (STRUCT_FGETP(uap, uex) == NULL) {
-			char namebuf[TYPICALMAXPATHLEN];
-			struct pathname lookpn;
-			int i;
-
-			/* Read in pathname from userspace */
-			error = pn_get_buf(STRUCT_FGETP(uap, dname),
-			    UIO_USERSPACE, &lookpn, namebuf, sizeof (namebuf));
-			if (error == ENAMETOOLONG) {
-				/*
-				 * pathname > TYPICALMAXPATHLEN, use
-				 * pn_get() instead. Remember to
-				 * pn_free() afterwards.
-				 */
-				error = pn_get(STRUCT_FGETP(uap, dname),
-				    UIO_USERSPACE, &lookpn);
-			}
-
-			if (error)
-				return (error);
-
-			/* Walk the export list looking for that pathname */
-			rw_enter(&exported_lock, RW_READER);
-			for (i = 0; i < EXPTABLESIZE; i++) {
-				exi = exptable[i];
-				while (exi) {
-					if (strcmp(exi->exi_export.ex_path,
-					    lookpn.pn_path) == 0) {
-						goto exi_scan_end;
-					}
-					exi = exi->exi_hash;
-				}
-			}
-exi_scan_end:
-			rw_exit(&exported_lock);
-			if (exi) {
-				/* Found a match, use it. */
-				vp = exi->exi_vp;
-				dvp = exi->exi_dvp;
-				DTRACE_PROBE2(nfss__i__nmspc__tree,
-				    char *,
-				    "unsharing removed dir/unmounted fs",
-				    char *, lookpn.pn_path);
-				VN_HOLD(vp);
-				VN_HOLD(dvp);
-				error = 0;
-			} else {
-				/* Still no match, set error */
-				error = ENOENT;
-			}
-			if (lookpn.pn_buf != namebuf) {
-				/*
-				 * We didn't use namebuf, so make
-				 * sure we free the allocated memory
-				 */
-				pn_free(&lookpn);
-			}
-		}
-	}
-
-	if (error)
+		pn_free(&lookpn);
+		if (ex1)
+			exi_rele(ex1);
 		return (error);
+	}
 
 	/*
 	 * 'vp' may be an AUTOFS node, so we perform a
@@ -1135,9 +1101,21 @@ exi_scan_end:
 			VN_RELE(vp);
 			if (dvp != NULL)
 				VN_RELE(dvp);
+			pn_free(&lookpn);
+			if (ex1)
+				exi_rele(ex1);
 			return (error);
 		}
 	}
+
+	/* Do not allow sharing another vnode for already shared path */
+	if (ex1 && !PSEUDO(ex1) && !VN_CMP(ex1->exi_vp, vp)) {
+		pn_free(&lookpn);
+		exi_rele(ex1);
+		return (EEXIST);
+	}
+	if (ex1)
+		exi_rele(ex1);
 
 	/*
 	 * Get the vfs id
@@ -1147,13 +1125,7 @@ exi_scan_end:
 	error = VOP_FID(vp, &fid, NULL);
 	fsid = vp->v_vfsp->vfs_fsid;
 
-	/*
-	 * Allow unshare request for forcibly unmounted shared filesystem.
-	 */
-	if (error == EIO && exi) {
-		fid = exi->exi_fid;
-		fsid = exi->exi_fsid;
-	} else if (error) {
+	if (error) {
 		VN_RELE(vp);
 		if (dvp != NULL)
 			VN_RELE(dvp);
@@ -1163,16 +1135,30 @@ exi_scan_end:
 		 */
 		if (error == ENOSPC)
 			error = EREMOTE;
+		pn_free(&lookpn);
 		return (error);
 	}
 
-	if (STRUCT_FGETP(uap, uex) == NULL) {
-		error = unexport(&fsid, &fid, vp);
-		VN_RELE(vp);
-		if (dvp != NULL)
-		VN_RELE(dvp);
-		return (error);
+	/*
+	 * Do not allow re-sharing a shared vnode under a different path
+	 * PSEUDO export has ex_path fabricated, e.g. "/tmp (pseudo)", skip it.
+	 */
+	rw_enter(&exported_lock, RW_READER);
+	DTRACE_PROBE(nfss__i__exported_lock2_start);
+	for (ex2 = exptable[exptablehash(&fsid, &fid)]; ex2;
+	    ex2 = ex2->fid_hash.next) {
+		if (ex2 != exi_root && !PSEUDO(ex2) &&
+		    VN_CMP(ex2->exi_vp, vp) &&
+		    strcmp(ex2->exi_export.ex_path, lookpn.pn_path) != 0) {
+			DTRACE_PROBE(nfss__i__exported_lock2_stop);
+			rw_exit(&exported_lock);
+			pn_free(&lookpn);
+			return (EEXIST);
+		}
 	}
+	DTRACE_PROBE(nfss__i__exported_lock2_stop);
+	rw_exit(&exported_lock);
+	pn_free(&lookpn);
 
 	exi = kmem_zalloc(sizeof (*exi), KM_SLEEP);
 	exi->exi_fsid = fsid;
@@ -1447,6 +1433,7 @@ exi_scan_end:
 	 * Insert the new entry at the front of the export list
 	 */
 	rw_enter(&exported_lock, RW_WRITER);
+	DTRACE_PROBE(nfss__i__exported_lock3_start);
 
 	export_link(exi);
 
@@ -1455,10 +1442,9 @@ exi_scan_end:
 	 * If one is found then unlink it, wait until this is the
 	 * only reference and then free it.
 	 */
-	prev = exi;
-	for (ex = prev->exi_hash; ex != NULL; prev = ex, ex = ex->exi_hash) {
+	for (ex = exi->fid_hash.next; ex != NULL; ex = ex->fid_hash.next) {
 		if (ex != exi_root && VN_CMP(ex->exi_vp, vp)) {
-			prev->exi_hash = ex->exi_hash;
+			export_unlink(ex);
 			break;
 		}
 	}
@@ -1553,6 +1539,7 @@ exi_scan_end:
 		ex->exi_visible = NULL;
 	}
 
+	DTRACE_PROBE(nfss__i__exported_lock3_stop);
 	rw_exit(&exported_lock);
 
 	if (exi_public == exi || kex->ex_flags & EX_LOG) {
@@ -1569,7 +1556,8 @@ exi_scan_end:
 
 out7:
 	/* Unlink the new export in exptable. */
-	(void) export_unlink(&exi->exi_fsid, &exi->exi_fid, exi->exi_vp, NULL);
+	export_unlink(exi);
+	DTRACE_PROBE(nfss__i__exported_lock3_stop);
 	rw_exit(&exported_lock);
 out6:
 	if (kex->ex_flags & EX_INDEX)
@@ -1607,70 +1595,27 @@ out1:
 /*
  * Remove the exportinfo from the export list
  */
-int
-export_unlink(fsid_t *fsid, fid_t *fid, vnode_t *vp, struct exportinfo **exip)
+void
+export_unlink(struct exportinfo *exi)
 {
-	struct exportinfo **tail;
-
 	ASSERT(RW_WRITE_HELD(&exported_lock));
 
-	tail = &exptable[exptablehash(fsid, fid)];
-	while (*tail != NULL) {
-		if (exportmatch(*tail, fsid, fid)) {
-			/*
-			 * If vp is given, check if vp is the
-			 * same vnode as the exported node.
-			 *
-			 * Since VOP_FID of a lofs node returns the
-			 * fid of its real node (ufs), the exported
-			 * node for lofs and (pseudo) ufs may have
-			 * the same fsid and fid.
-			 */
-			if (vp == NULL || vp == (*tail)->exi_vp) {
-
-				if (exip != NULL)
-					*exip = *tail;
-				*tail = (*tail)->exi_hash;
-
-				return (0);
-			}
-		}
-		tail = &(*tail)->exi_hash;
-	}
-
-	return (EINVAL);
+	exp_hash_unlink(exi, fid_hash);
+	exp_hash_unlink(exi, path_hash);
 }
 
 /*
  * Unexport an exported filesystem
  */
-int
-unexport(fsid_t *fsid, fid_t *fid, vnode_t *vp)
+void
+unexport(struct exportinfo *exi)
 {
-	struct exportinfo *exi = NULL;
-	int error;
 	struct secinfo cursec[MAX_FLAVORS];
 	int curcnt;
 
-	rw_enter(&exported_lock, RW_WRITER);
+	ASSERT(RW_WRITE_HELD(&exported_lock));
 
-	error = export_unlink(fsid, fid, vp, &exi);
-
-	if (error) {
-		rw_exit(&exported_lock);
-		return (error);
-	}
-
-	/* pseudo node is not a real exported filesystem */
-	if (PSEUDO(exi)) {
-		/*
-		 * Put the pseudo node back into the export table
-		 * before erroring out.
-		 */
-		export_link(exi);
-		rw_exit(&exported_lock);
-		return (EINVAL);
-	}
+	export_unlink(exi);
 
 	/*
 	 * Remove security flavors before treeclimb_unexport() is called
@@ -1688,24 +1633,16 @@ unexport(fsid_t *fsid, fid_t *fid, vnode_t *vp)
 	if (exi->exi_visible) {
 		struct exportinfo *newexi;
 
-		error = pseudo_exportfs(exi->exi_vp, exi->exi_visible,
-		    &exi->exi_export, &newexi);
-		if (error)
-			goto done;
-
+		newexi = pseudo_exportfs(exi->exi_vp, &exi->exi_fid,
+		    exi->exi_visible, &exi->exi_export);
 		exi->exi_visible = NULL;
-		/*
-		 * pseudo_exportfs() has allocated new exportinfo,
-		 * update the treenode.
-		 */
+
+		/* interconnect the existing treenode with the new exportinfo */
 		newexi->exi_tree = exi->exi_tree;
 		newexi->exi_tree->tree_exi = newexi;
-
 	} else {
 		treeclimb_unexport(exi);
 	}
-
-	rw_exit(&exported_lock);
 
 	/*
 	 * Need to call into the NFSv4 server and release all data
@@ -1736,12 +1673,6 @@ unexport(fsid_t *fsid, fid_t *fid, vnode_t *vp)
 	}
 
 	exi_rele(exi);
-	return (error);
-
-done:
-	rw_exit(&exported_lock);
-	exi_rele(exi);
-	return (error);
 }
 
 /*
@@ -2525,7 +2456,7 @@ checkexport(fsid_t *fsid, fid_t *fid)
 	rw_enter(&exported_lock, RW_READER);
 	for (exi = exptable[exptablehash(fsid, fid)];
 	    exi != NULL;
-	    exi = exi->exi_hash) {
+	    exi = exi->fid_hash.next) {
 		if (exportmatch(exi, fsid, fid)) {
 			/*
 			 * If this is the place holder for the
@@ -2563,7 +2494,7 @@ checkexport4(fsid_t *fsid, fid_t *fid, vnode_t *vp)
 
 	for (exi = exptable[exptablehash(fsid, fid)];
 	    exi != NULL;
-	    exi = exi->exi_hash) {
+	    exi = exi->fid_hash.next) {
 		if (exportmatch(exi, fsid, fid)) {
 			/*
 			 * If this is the place holder for the

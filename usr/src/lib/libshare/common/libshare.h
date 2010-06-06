@@ -87,6 +87,7 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 #define	SA_NO_SUCH_SECTION	30	/* no section found */
 #define	SA_NO_PROPERTIES	31	/* no properties found */
 #define	SA_PASSWORD_ENC		32	/* passwords must be encrypted */
+#define	SA_SHARE_EXISTS		33	/* path or file is already shared */
 
 /* API Initialization */
 #define	SA_INIT_SHARE_API	0x0001	/* init share specific interface */

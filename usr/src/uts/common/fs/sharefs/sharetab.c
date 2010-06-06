@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/types32.h>
@@ -86,36 +83,6 @@ timestruc_t	sharetab_snap_time;
 
 uint_t		sharetab_generation;	/* Only increments and wraps! */
 
-static uint_t	pkp_tab[SHARETAB_HASHES];
-
-/*
- * Initialize table in pseudo-random fashion
- * for use in Pearson's string hash algorithm.
- *
- * See: Communications of the ACM, June 1990 Vol 33 pp 677-680
- * http://www.acm.org/pubs/citations/journals/cacm/1990-33-6/p677-pearson
- */
-static void
-init_pkp_tab(void)
-{
-	int	i;
-	int	j;
-	int	k = 7;
-	uint_t	s;
-
-	for (i = 0; i < SHARETAB_HASHES; i++)
-		pkp_tab[i] = i;
-
-	for (j = 0; j < 4; j++) {
-		for (i = 0; i < SHARETAB_HASHES; i++) {
-			s = pkp_tab[i];
-			k = MOD2((k + s), SHARETAB_HASHES);
-			pkp_tab[i] = pkp_tab[k];
-			pkp_tab[k] = s;
-		}
-	}
-}
-
 /*
  * Take care of cleaning up a share.
  * If passed in a length array, use it to determine how much
@@ -168,7 +135,7 @@ sharefs_remove(share_t *sh, sharefs_lens_t *shl)
 	}
 
 	iPath = shl ? shl->shl_path : strlen(sh->sh_path);
-	SHARETAB_HASH_IT(iHash, sh->sh_path);
+	iHash = pkp_tab_hash(sh->sh_path, strlen(sh->sh_path));
 
 	/*
 	 * Now walk down the hash table and find the entry to free!
@@ -263,7 +230,7 @@ sharefs_add(share_t *sh, sharefs_lens_t *shl)
 	/*
 	 * Now we need to find where we have to add the entry.
 	 */
-	SHARETAB_HASH_IT(iHash, sh->sh_path);
+	iHash = pkp_tab_hash(sh->sh_path, strlen(sh->sh_path));
 
 	iPath = shl ? shl->shl_path : strlen(sh->sh_path);
 
@@ -347,8 +314,6 @@ sharefs_add(share_t *sh, sharefs_lens_t *shl)
 void
 sharefs_sharetab_init(void)
 {
-	init_pkp_tab();
-
 	rw_init(&sharetab_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&sharefs_lock, NULL, RW_DEFAULT, NULL);
 
