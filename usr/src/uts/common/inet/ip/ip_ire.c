@@ -1117,10 +1117,14 @@ ire_atomic_start(irb_t *irb_ptr, ire_t *ire)
 		mutex_enter(&ill->ill_lock);
 
 		/*
-		 * Don't allow IRE's to be created on dying ills.
+		 * Don't allow IRE's to be created on dying ills, or on
+		 * ill's for which the last ipif is going down, or ones which
+		 * don't have even a single UP interface
 		 */
-		if (ill->ill_state_flags & ILL_CONDEMNED) {
+		if ((ill->ill_state_flags &
+		    (ILL_CONDEMNED|ILL_DOWN_IN_PROGRESS)) != 0) {
 			ire_atomic_end(irb_ptr, ire);
+			DTRACE_PROBE1(ire__add__on__dying__ill, ire_t *, ire);
 			return (ENXIO);
 		}
 

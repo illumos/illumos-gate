@@ -1117,11 +1117,6 @@ ill_down_start(queue_t *q, mblk_t *mp)
 	ipif_t	*ipif;
 
 	ASSERT(IAM_WRITER_ILL(ill));
-	mutex_enter(&ill->ill_lock);
-	ill->ill_state_flags |= ILL_DOWN_IN_PROGRESS;
-	/* no more nce addition allowed */
-	mutex_exit(&ill->ill_lock);
-
 	/*
 	 * It is possible that some ioctl is already in progress while we
 	 * received the M_ERROR / M_HANGUP in which case, we need to abort
@@ -13295,6 +13290,22 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 	}
 
 	/*
+	 * Removal of the last ipif from an ill may result in a DL_UNBIND
+	 * being sent to the driver, and we must not send any data packets to
+	 * the driver after the DL_UNBIND_REQ. To ensure this, all the
+	 * ire and nce entries used in the data path will be cleaned
+	 * up, and we also set  the ILL_DOWN_IN_PROGRESS bit to make
+	 * sure on new entries will be added until the ill is bound
+	 * again. The ILL_DOWN_IN_PROGRESS bit is turned off upon
+	 * receipt of a DL_BIND_ACK.
+	 */
+	if (ill->ill_wq != NULL && !ill->ill_logical_down &&
+	    ill->ill_ipif_up_count == 0 && ill->ill_ipif_dup_count == 0 &&
+	    ill->ill_dl_up) {
+		ill->ill_state_flags |= ILL_DOWN_IN_PROGRESS;
+	}
+
+	/*
 	 * Blow away memberships we established in ipif_multicast_up().
 	 */
 	ipif_multicast_down(ipif);
@@ -13599,6 +13610,7 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 	ipif_t	*ipif;
 	uint_t	ire_type;
 	boolean_t did_alloc = B_FALSE;
+	char	last;
 
 	/*
 	 * If the caller wants to us to create the ipif, make sure we have a
@@ -13639,9 +13651,9 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 
 	if (cp <= name) {
 		cp = endp;
-	} else {
-		*cp = '\0';
 	}
+	last = *cp;
+	*cp = '\0';
 
 	/*
 	 * Look up the ILL, based on the portion of the name
@@ -13651,8 +13663,7 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 	 */
 	ill = ill_lookup_on_name(name, do_alloc, isv6,
 	    &did_alloc, ipst);
-	if (cp != endp)
-		*cp = IPIF_SEPARATOR_CHAR;
+	*cp = last;
 	if (ill == NULL)
 		return (NULL);
 
@@ -17733,9 +17744,16 @@ ill_set_phys_addr(ill_t *ill, mblk_t *mp)
 	}
 
 	ipsq_current_start(ipsq, ill->ill_ipif, 0);
+
+	/*
+	 * Since we'll only do a logical down, we can't rely on ipif_down
+	 * to turn on ILL_DOWN_IN_PROGRESS, or for the DL_BIND_ACK to reset
+	 * ILL_DOWN_IN_PROGRESS. We instead manage this separately for this
+	 * case, to quiesce ire's and nce's for ill_is_quiescent.
+	 */
 	mutex_enter(&ill->ill_lock);
 	ill->ill_state_flags |= ILL_DOWN_IN_PROGRESS;
-	/* no more nce addition allowed */
+	/* no more ire/nce addition allowed */
 	mutex_exit(&ill->ill_lock);
 
 	/*
@@ -17817,16 +17835,19 @@ ill_set_phys_addr_tail(ipsq_t *ipsq, queue_t *q, mblk_t *addrmp, void *dummy)
 	}
 
 	/*
+	 * reset ILL_DOWN_IN_PROGRESS so that we can successfully add ires
+	 * as we bring the ipifs up again.
+	 */
+	mutex_enter(&ill->ill_lock);
+	ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
+	mutex_exit(&ill->ill_lock);
+	/*
 	 * If there are ipifs to bring up, ill_up_ipifs() will return
 	 * EINPROGRESS, and ipsq_current_finish() will be called by
 	 * ip_rput_dlpi_writer() or arp_bringup_done() when the last ipif is
 	 * brought up.
 	 */
 	status = ill_up_ipifs(ill, q, addrmp);
-	mutex_enter(&ill->ill_lock);
-	if (ill->ill_dl_up)
-		ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
-	mutex_exit(&ill->ill_lock);
 	if (status != EINPROGRESS)
 		ipsq_current_finish(ipsq);
 }
@@ -17854,11 +17875,6 @@ ill_replumb(ill_t *ill, mblk_t *mp)
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
 
 	ipsq_current_start(ipsq, ill->ill_ipif, 0);
-
-	mutex_enter(&ill->ill_lock);
-	ill->ill_state_flags |= ILL_DOWN_IN_PROGRESS;
-	/* no more nce addition allowed */
-	mutex_exit(&ill->ill_lock);
 
 	/*
 	 * If we can quiesce the ill, then continue.  If not, then

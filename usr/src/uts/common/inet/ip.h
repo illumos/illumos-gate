@@ -1429,10 +1429,13 @@ typedef struct ill_lso_capab_s ill_lso_capab_t;
 #define	ILL_LL_SUBNET_PENDING	0x01	/* Waiting for DL_INFO_ACK from drv */
 #define	ILL_CONDEMNED		0x02	/* No more new ref's to the ILL */
 #define	ILL_DL_UNBIND_IN_PROGRESS	0x04	/* UNBIND_REQ is sent */
-#define	ILL_DOWN_IN_PROGRESS	0x08	/* ILL is going down - no new nce's */
-#define	ILL_LL_BIND_PENDING	0x0020	/* XXX Reuse ILL_LL_SUBNET_PENDING ? */
-#define	ILL_LL_UP		0x0040
-#define	ILL_LL_DOWN		0x0080
+/*
+ * ILL_DOWN_IN_PROGRESS is set to ensure the following:
+ * - no packets are sent to the driver after the DL_UNBIND_REQ is sent,
+ * - no longstanding references will be acquired on objects that are being
+ *   brought down.
+ */
+#define	ILL_DOWN_IN_PROGRESS	0x08
 
 /* Is this an ILL whose source address is used by other ILL's ? */
 #define	IS_USESRC_ILL(ill)			\
