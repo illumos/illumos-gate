@@ -178,6 +178,13 @@ static const topo_pgroup_info_t smp_pgroup = {
 	1
 };
 
+static const topo_pgroup_info_t ses_pgroup = {
+	TOPO_PGROUP_SES,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
 static int ses_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int ses_contains(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
@@ -980,7 +987,6 @@ ses_set_standard_props(topo_mod_t *mod, tnode_t *frutn, tnode_t *tn,
 	int err;
 	char *product, *chassis;
 	nvlist_t *fmri;
-	topo_pgroup_info_t pgi;
 
 	/*
 	 * Set the authority explicitly if specified.
@@ -1038,11 +1044,7 @@ ses_set_standard_props(topo_mod_t *mod, tnode_t *frutn, tnode_t *tn,
 	 * Set the SES-specific properties so that consumers can query
 	 * additional information about the particular SES element.
 	 */
-	pgi.tpi_name = TOPO_PGROUP_SES;
-	pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
-	pgi.tpi_datastab = TOPO_STABILITY_PRIVATE;
-	pgi.tpi_version = TOPO_VERSION;
-	if (topo_pgroup_create(tn, &pgi, &err) != 0) {
+	if (topo_pgroup_create(tn, &ses_pgroup, &err) != 0) {
 		topo_mod_dprintf(mod, "failed to create propgroup "
 		    "%s: %s\n", TOPO_PGROUP_SES, topo_strerror(err));
 		return (-1);
@@ -1504,10 +1506,11 @@ ses_set_expander_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	}
 
 	/* update the ses property group with SES target info */
-	if (topo_pgroup_info(tnode, TOPO_PGROUP_SES, &err) == NULL) {
-		/* the SES property group should exist. */
+	if ((topo_pgroup_create(tnode, &ses_pgroup, &err) == NULL) &&
+	    (err != ETOPO_PROP_DEFD)) {
+		/* SES prop group doesn't exist but failed to be created. */
 		topo_mod_dprintf(mod, "ses_set_expander_props: "
-		    "ses pgroup info error %s\n", topo_strerror(err));
+		    "ses pgroup create error %s\n", topo_strerror(err));
 		goto error;
 	} else {
 		/* locate assciated enclosure dev_di_node. */
