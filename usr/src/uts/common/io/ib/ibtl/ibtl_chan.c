@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1225,9 +1224,7 @@ ibt_alloc_pd(ibt_hca_hdl_t hca_hdl, ibt_pd_flags_t flags, ibt_pd_hdl_t *pd)
 	}
 
 	/* Update the PDs Resource Count per HCA Device. */
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_pd_cnt++;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_inc_32(&hca_hdl->ha_pd_cnt);
 
 	return (retval);
 }
@@ -1265,9 +1262,7 @@ ibt_free_pd(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd)
 	}
 
 	/* Update the PDs Resource Count per HCA Device. */
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_pd_cnt--;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_dec_32(&hca_hdl->ha_pd_cnt);
 
 	return (retval);
 }
@@ -1316,9 +1311,7 @@ ibt_alloc_ah(ibt_hca_hdl_t hca_hdl, ibt_ah_flags_t flags, ibt_pd_hdl_t pd,
 	}
 
 	/* Update the AHs Resource Count per HCA Device. */
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_ah_cnt++;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_inc_32(&hca_hdl->ha_ah_cnt);
 
 	return (retval);
 }
@@ -1356,9 +1349,7 @@ ibt_free_ah(ibt_hca_hdl_t hca_hdl, ibt_ah_hdl_t ah)
 	}
 
 	/* Update the AHs Resource Count per HCA Device. */
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_ah_cnt--;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_dec_32(&hca_hdl->ha_ah_cnt);
 
 	return (retval);
 }

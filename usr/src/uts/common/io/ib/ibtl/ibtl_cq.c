@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/ib/ibtl/impl/ibtl.h>
@@ -155,9 +154,7 @@ ibt_alloc_cq(ibt_hca_hdl_t hca_hdl, ibt_cq_attr_t *cq_attr,
 	mutex_init(&ibt_cq->cq_mutex, NULL, MUTEX_DEFAULT, NULL);
 
 	/* Update the cq resource count */
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_cq_cnt++;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_inc_32(&hca_hdl->ha_cq_cnt);
 
 	return (IBT_SUCCESS);
 }
@@ -190,9 +187,7 @@ ibt_free_cq(ibt_cq_hdl_t ibt_cq)
 	ibtl_free_cq_async_check(ibt_cq);
 
 	/* Update the cq resource count */
-	mutex_enter(&ibt_hca->ha_mutex);
-	ibt_hca->ha_cq_cnt--;
-	mutex_exit(&ibt_hca->ha_mutex);
+	atomic_dec_32(&ibt_hca->ha_cq_cnt);
 
 	return (status);
 }

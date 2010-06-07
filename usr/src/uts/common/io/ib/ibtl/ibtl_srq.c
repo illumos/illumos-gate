@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/ibtl/impl/ibtl.h>
 
@@ -85,9 +82,7 @@ ibt_alloc_srq(ibt_hca_hdl_t hca_hdl, ibt_srq_flags_t flags, ibt_pd_hdl_t pd,
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(ibt_srq->srq_hca))
 
 	/* Update the srq resource count */
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_srq_cnt++;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_inc_32(&hca_hdl->ha_srq_cnt);
 
 	return (IBT_SUCCESS);
 }
@@ -117,9 +112,7 @@ ibt_free_srq(ibt_srq_hdl_t ibt_srq)
 	ibtl_free_srq_async_check(ibt_srq);
 
 	/* Update the srq resource count */
-	mutex_enter(&ibt_hca->ha_mutex);
-	ibt_hca->ha_srq_cnt--;
-	mutex_exit(&ibt_hca->ha_mutex);
+	atomic_dec_32(&ibt_hca->ha_srq_cnt);
 
 	return (status);
 }

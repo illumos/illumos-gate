@@ -185,9 +185,7 @@ ibt_alloc_qp(ibt_hca_hdl_t hca_hdl, ibt_qp_type_t type,
 	mutex_init(&chanp->ch_cm_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&chanp->ch_cm_cv, NULL, CV_DEFAULT, NULL);
 
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_qp_cnt++;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_inc_32(&hca_hdl->ha_qp_cnt);
 
 	IBTF_DPRINTF_L2(ibtf_qp, "ibt_alloc_qp: SUCCESS: qp %p owned by '%s'",
 	    chanp, hca_hdl->ha_clnt_devp->clnt_name);
@@ -393,9 +391,7 @@ ibt_alloc_special_qp(ibt_hca_hdl_t hca_hdl, uint8_t port, ibt_sqp_type_t type,
 	chanp->ch_qp.qp_flags = qp_attrp->qp_flags;
 	chanp->ch_qp.qp_pd_hdl = qp_attrp->qp_pd_hdl;
 
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_qp_cnt++;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_inc_32(&hca_hdl->ha_qp_cnt);
 
 	*ibt_qp_p = chanp;
 
@@ -701,9 +697,7 @@ ibt_free_qp(ibt_qp_hdl_t ibt_qp)
 				mutex_enter(&ibtl_clnt_list_mutex);
 				ibtl_hca->ha_qpn_cnt++;
 				mutex_exit(&ibtl_clnt_list_mutex);
-				mutex_enter(&ibtl_hca->ha_mutex);
-				ibtl_hca->ha_qp_cnt--;
-				mutex_exit(&ibtl_hca->ha_mutex);
+				atomic_dec_32(&ibtl_hca->ha_qp_cnt);
 				IBTF_DPRINTF_L3(ibtf_qp, "ibt_free_qp(%p) - "
 				    "SUCCESS", ibt_qp);
 			} else
@@ -724,9 +718,7 @@ ibt_free_qp(ibt_qp_hdl_t ibt_qp)
 		/* effectively, this is kmem_free(ibt_qp); */
 		ibtl_free_qp_async_check(&ibt_qp->ch_qp);
 
-		mutex_enter(&ibtl_hca->ha_mutex);
-		ibtl_hca->ha_qp_cnt--;
-		mutex_exit(&ibtl_hca->ha_mutex);
+		atomic_dec_32(&ibtl_hca->ha_qp_cnt);
 		IBTF_DPRINTF_L3(ibtf_qp, "ibt_free_qp(%p) - SUCCESS", ibt_qp);
 	} else {
 		IBTF_DPRINTF_L2(ibtf_qp, "ibt_free_qp: "

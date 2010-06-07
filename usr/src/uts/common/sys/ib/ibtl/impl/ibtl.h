@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_IB_IBTL_IMPL_IBTL_H
@@ -210,9 +209,9 @@ typedef struct ibtl_hca_s {
 	ibtl_hca_devinfo_t	*ha_hca_devp;	/* CI HCA device structure. */
 	ibtl_clnt_t		*ha_clnt_devp;	/* Client state struct */
 	void			*ha_clnt_private;
-	kmutex_t		ha_mutex;	/* Mutex to protect resource */
-						/* counters. */
 	int			ha_flags;	/* misc. flags */
+
+	/* The following counters are accessed with atomic operations. */
 	uint32_t		ha_qp_cnt;	/* QP resource counter */
 	uint32_t		ha_eec_cnt;	/* EEC resource counter */
 	uint32_t		ha_cq_cnt;	/* CQ resource counter */
@@ -225,7 +224,6 @@ typedef struct ibtl_hca_s {
 	ibtl_async_flags_t	ha_async_flags;	/* see *_async_flags above */
 	uint32_t		ha_async_cnt;	/* #asyncs in progress */
 	uint32_t		ha_fmr_pool_cnt; /* FMR Pool resource count */
-	uint32_t		ha_ma_cnt;	/* Mem Area resource count */
 } ibtl_hca_t;
 
 /* ha_flags values */

@@ -393,6 +393,9 @@ ibt_detach(ibt_clnt_hdl_t ibt_hdl)
 		IBTF_DPRINTF_L2(ibtf, "ibt_detach: "
 		    "ERROR: Client '%s' has not closed all of its HCAs",
 		    ibt_hdl->clnt_modinfop->mi_clnt_name);
+		cmn_err(CE_CONT, "IBT DETACH failed: resources not yet "
+		    "freed by client '%s'\n",
+		    ibt_hdl->clnt_modinfop->mi_clnt_name);
 		return (IBT_HCA_RESOURCES_NOT_FREED);
 	}
 
@@ -400,6 +403,9 @@ ibt_detach(ibt_clnt_hdl_t ibt_hdl)
 		mutex_exit(&ibtl_clnt_list_mutex);
 		IBTF_DPRINTF_L2(ibtf, "ibt_detach: client '%s' still has "
 		    "services or subnet_notices registered",
+		    ibt_hdl->clnt_modinfop->mi_clnt_name);
+		cmn_err(CE_CONT, "IBT DETACH failed: resources not yet "
+		    "freed by client '%s'\n",
 		    ibt_hdl->clnt_modinfop->mi_clnt_name);
 		return (IBT_HCA_RESOURCES_NOT_FREED);
 	}

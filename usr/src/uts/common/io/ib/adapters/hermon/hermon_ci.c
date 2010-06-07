@@ -2856,23 +2856,15 @@ fail2:
  * Unmap the memory
  *    Context: Can be called from interrupt or base context.
  */
-/* ARGSUSED */
 static ibt_status_t
 hermon_ci_unmap_mem_iov(ibc_hca_hdl_t hca, ibc_mi_hdl_t mi_hdl)
 {
 	int		status, i;
 	hermon_state_t	*state;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL)
-		return (IBT_HCA_HDL_INVALID);
-
 	state = (hermon_state_t *)hca;
 
-	if (mi_hdl == NULL)
-		return (IBT_MI_HDL_INVALID);
-
-	for (i = 0; i < mi_hdl->imh_len; i++) {
+	for (i = mi_hdl->imh_len; --i >= 0; ) {
 		status = ddi_dma_unbind_handle(mi_hdl->imh_dmahandle[i]);
 		if (status != DDI_SUCCESS)
 			HERMON_WARNING(state, "failed to unbind DMA mapping");

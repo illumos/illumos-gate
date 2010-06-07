@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtl_hca.c
@@ -149,9 +146,6 @@ ibt_open_hca(ibt_clnt_hdl_t ibt_hdl, ib_guid_t hca_guid,
 	/* Create a new HCA Info entity. */
 	hca_infop = kmem_zalloc(sizeof (ibtl_hca_t), KM_SLEEP);
 
-	/* Initialize HCA Mutex. */
-	mutex_init(&hca_infop->ha_mutex, NULL, MUTEX_DEFAULT, NULL);
-
 	/* Update the HCA Info entity */
 	hca_infop->ha_hca_devp  = hca_devp;	/* HCA Device Info */
 	hca_infop->ha_clnt_devp = ibt_hdl;	/* Client Info */
@@ -176,6 +170,16 @@ ibt_open_hca(ibt_clnt_hdl_t ibt_hdl, ib_guid_t hca_guid,
 	return (IBT_SUCCESS);
 }
 
+static char *ibtl_close_error_fmt = "IBT CLOSE HCA failed: %d '%s' "
+	"resources not yet freed by client '%s'\n";
+
+#define	IBTL_CLOSE_RESOURCE_CHECK(counter, resource_type) \
+	if ((cntr = atomic_add_32_nv(&(counter), 0)) != 0) {		\
+		cmn_err(CE_CONT, ibtl_close_error_fmt,			\
+		    cntr, resource_type,				\
+		    hca_hdl->ha_clnt_devp->clnt_modinfop->mi_clnt_name); \
+	}								\
+	error |= cntr
 
 /*
  * Function:
@@ -197,6 +201,7 @@ ibt_close_hca(ibt_hca_hdl_t hca_hdl)
 	ibtl_hca_devinfo_t	*hca_devp, *tmp_devp;
 	ibtl_hca_t		**hcapp;
 	ibtl_clnt_t		*clntp = hca_hdl->ha_clnt_devp;
+	uint32_t		cntr, error;
 
 	IBTF_DPRINTF_L3(ibtf_hca, "ibt_close_hca(%p)", hca_hdl);
 
@@ -219,22 +224,22 @@ ibt_close_hca(ibt_hca_hdl_t hca_hdl)
 		return (IBT_HCA_HDL_INVALID);
 	}
 
-	mutex_enter(&hca_hdl->ha_mutex);
-
 	/* Make sure resources have been freed. */
-	if (hca_hdl->ha_qp_cnt | hca_hdl->ha_cq_cnt | hca_hdl->ha_eec_cnt |
-	    hca_hdl->ha_ah_cnt | hca_hdl->ha_mr_cnt | hca_hdl->ha_mw_cnt |
-	    hca_hdl->ha_pd_cnt | hca_hdl->ha_fmr_pool_cnt |
-	    hca_hdl->ha_ma_cnt) {
-		IBTF_DPRINTF_L2(ibtf_hca, "ibt_close_hca: "
-		    "some resources have not been freed by '%s': hca_hdl = %p",
-		    hca_hdl->ha_clnt_devp->clnt_modinfop->mi_clnt_name,
-		    hca_hdl);
-		mutex_exit(&hca_hdl->ha_mutex);
+	error = 0;
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_qp_cnt, "QP/Channel");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_eec_cnt, "EEC");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_cq_cnt, "CQ");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_pd_cnt, "Protection Domain");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_ah_cnt, "AH");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_mr_cnt, "Memory Region");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_mw_cnt, "Memory Window");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_qpn_cnt, "QPN");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_srq_cnt, "SRQ");
+	IBTL_CLOSE_RESOURCE_CHECK(hca_hdl->ha_fmr_pool_cnt, "FMR Pool");
+	if (error) {
 		mutex_exit(&ibtl_clnt_list_mutex);
 		return (IBT_HCA_RESOURCES_NOT_FREED);
 	}
-	mutex_exit(&hca_hdl->ha_mutex);	/* ok to drop this now */
 
 	/* we are now committed to closing the HCA */
 	hca_hdl->ha_flags |= IBTL_HA_CLOSING;
@@ -280,9 +285,6 @@ ibt_close_hca(ibt_hca_hdl_t hca_hdl)
 	/* hcapp now points to a link that points to us */
 	*hcapp = hca_hdl->ha_clnt_link;		/* remove us */
 	mutex_exit(&ibtl_clnt_list_mutex);
-
-	/* Un-Initialize HCA Mutex. */
-	mutex_destroy(&hca_hdl->ha_mutex);
 
 	/* Free memory for this HCA Handle */
 	ibtl_free_hca_async_check(hca_hdl);

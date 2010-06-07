@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -74,9 +73,7 @@ ibt_register_mr(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd, ibt_mr_attr_t *mem_attr,
 	    mr_hdl_p, mem_desc);
 	if (status == IBT_SUCCESS) {
 		mem_desc->md_vaddr = vaddr;
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt++;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_inc_32(&hca_hdl->ha_mr_cnt);
 	}
 
 	return (status);
@@ -121,9 +118,7 @@ ibt_register_buf(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
 	    IBTL_HCA2CIHCA(hca_hdl), pd, mem_bpattr, bp, IBTL_HCA2CLNT(hca_hdl),
 	    mr_hdl_p, mem_desc);
 	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt++;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_inc_32(&hca_hdl->ha_mr_cnt);
 	}
 
 	return (status);
@@ -184,9 +179,7 @@ ibt_deregister_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl)
 	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_deregister_mr(
 	    IBTL_HCA2CIHCA(hca_hdl), mr_hdl);
 	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt--;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_dec_32(&hca_hdl->ha_mr_cnt);
 	}
 	return (status);
 }
@@ -239,9 +232,7 @@ ibt_reregister_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl, ibt_pd_hdl_t pd,
 		    "Re-registration Failed: %d", status);
 
 		/* we lost one memory region resource */
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt--;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_dec_32(&hca_hdl->ha_mr_cnt);
 	}
 
 	return (status);
@@ -297,9 +288,7 @@ ibt_reregister_buf(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl,
 		    "Re-registration Mem Failed: %d", status);
 
 		/* we lost one memory region resource */
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt--;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_dec_32(&hca_hdl->ha_mr_cnt);
 	}
 	return (status);
 }
@@ -341,9 +330,7 @@ ibt_register_shared_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl,
 	    IBTL_HCA2CIHCA(hca_hdl), mr_hdl, pd, mem_sattr,
 	    IBTL_HCA2CLNT(hca_hdl), mr_hdl_p, mem_desc);
 	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt++;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_inc_32(&hca_hdl->ha_mr_cnt);
 	}
 	return (status);
 }
@@ -420,9 +407,7 @@ ibt_alloc_mw(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd, ibt_mw_flags_t flags,
 	 * a good reason to have local MW state at this point, so we won't.
 	 */
 	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mw_cnt++;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_inc_32(&hca_hdl->ha_mw_cnt);
 	}
 	return (status);
 }
@@ -481,9 +466,7 @@ ibt_free_mw(ibt_hca_hdl_t hca_hdl, ibt_mw_hdl_t mw_hdl)
 	    IBTL_HCA2CIHCA(hca_hdl), mw_hdl);
 
 	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mw_cnt--;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_dec_32(&hca_hdl->ha_mw_cnt);
 	}
 	return (status);
 }
@@ -525,11 +508,8 @@ ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
 	    IBTL_HCA2CIHCA(hca_hdl), va_attrs,
 	    NULL, /* IBTL_HCA2MODI_P(hca_hdl)->mi_reserved */
 	    paddr_list_len, reg_req, ma_hdl_p);
-	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_ma_cnt++;
-		mutex_exit(&hca_hdl->ha_mutex);
-	}
+	/* Not doing reference counting, which adversely effects performance */
+
 	return (status);
 }
 
@@ -557,11 +537,7 @@ ibt_unmap_mem_area(ibt_hca_hdl_t hca_hdl, ibt_ma_hdl_t ma_hdl)
 
 	status = (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_unmap_mem_area(
 	    IBTL_HCA2CIHCA(hca_hdl), ma_hdl));
-	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_ma_cnt--;
-		mutex_exit(&hca_hdl->ha_mutex);
-	}
+	/* Not doing reference counting, which adversely effects performance */
 
 	return (status);
 }
@@ -594,11 +570,7 @@ ibt_map_mem_iov(ibt_hca_hdl_t hca_hdl, ibt_iov_attr_t *iov_attr,
 
 	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_map_mem_iov(
 	    IBTL_HCA2CIHCA(hca_hdl), iov_attr, wr, mi_hdl_p);
-	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_ma_cnt++;
-		mutex_exit(&hca_hdl->ha_mutex);
-	}
+	/* Not doing reference counting, which adversely effects performance */
 
 	return (status);
 }
@@ -627,11 +599,7 @@ ibt_unmap_mem_iov(ibt_hca_hdl_t hca_hdl, ibt_mi_hdl_t mi_hdl)
 
 	status = (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_unmap_mem_iov(
 	    IBTL_HCA2CIHCA(hca_hdl), mi_hdl));
-	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_ma_cnt--;
-		mutex_exit(&hca_hdl->ha_mutex);
-	}
+	/* Not doing reference counting, which adversely effects performance */
 
 	return (status);
 }
@@ -720,9 +688,7 @@ ibt_alloc_lkey(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd, ibt_lkey_flags_t flags,
 	    IBTL_HCA2CIHCA(hca_hdl), pd, flags, phys_buf_list_sz, mr_hdl_p,
 	    mem_desc_p);
 	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt++;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_inc_32(&hca_hdl->ha_mr_cnt);
 	}
 
 	return (status);
@@ -759,9 +725,7 @@ ibt_register_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
 	    NULL, /* IBTL_HCA2MODI_P(hca_hdl)->mi_reserved */
 	    mr_hdl_p, mem_desc_p);
 	if (status == IBT_SUCCESS) {
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt++;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_inc_32(&hca_hdl->ha_mr_cnt);
 	}
 
 	return (status);
@@ -805,9 +769,7 @@ ibt_reregister_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl,
 		    "Re-registration Mem Failed: %d", status);
 
 		/* we lost one memory region resource */
-		mutex_enter(&hca_hdl->ha_mutex);
-		hca_hdl->ha_mr_cnt--;
-		mutex_exit(&hca_hdl->ha_mutex);
+		atomic_dec_32(&hca_hdl->ha_mr_cnt);
 
 	}
 	return (status);
@@ -842,9 +804,7 @@ ibt_create_fmr_pool(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
 	}
 
 	/* Update the FMR resource count */
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_fmr_pool_cnt++;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_inc_32(&hca_hdl->ha_fmr_pool_cnt);
 
 	return (status);
 }
@@ -873,9 +833,7 @@ ibt_destroy_fmr_pool(ibt_hca_hdl_t hca_hdl, ibt_fmr_pool_hdl_t fmr_pool)
 		return (status);
 	}
 
-	mutex_enter(&hca_hdl->ha_mutex);
-	hca_hdl->ha_fmr_pool_cnt--;
-	mutex_exit(&hca_hdl->ha_mutex);
+	atomic_dec_32(&hca_hdl->ha_fmr_pool_cnt);
 
 	return (status);
 }
