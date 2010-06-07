@@ -18,17 +18,15 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Makefile for Kerberos client-install utility.
 #
 
 PROG=		ksetpw \
 		kdyndns \
-		ksmb
+		ksmb \
+		kconf
 
 SHFILES=	kclient
 SECFILES=	pam_krb5_first \
@@ -45,8 +43,9 @@ $(SEC):=	FILEMODE = $(LIBFILEMODE)
 KS_OBJS=	ksetpw.o
 KD_OBJS=	kdyndns.o
 KSMB_OBJS=	ksmb.o
+KC_OBJS=	kconf.o
 
-OBJS=		$(KS_OBJS) $(KD_OBJS) $(KSMB_OBJS)
+OBJS=		$(KS_OBJS) $(KD_OBJS) $(KSMB_OBJS) $(KC_OBJS)
 
 SSRCS=	kclient.sh
 SRCS=	$(OBJS:%.o=%.c)
@@ -64,10 +63,12 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 ksetpw:=	LDFLAGS += $(KRUNPATH)
 kdyndns:=	LDFLAGS += -R/usr/lib/smbsrv
 ksmb:=		LDFLAGS += -R/usr/lib/smbsrv
+kconf:=		LDFLAGS += $(KRUNPATH)
 
 KS_LDLIBS =	$(LDLIBS) $(KMECHLIB)
 KD_LDLIBS =	$(LDLIBS) -L$(ROOT)/usr/lib/smbsrv -lsmbns
 KSMB_LDLIBS =	$(LDLIBS) -L$(ROOT)/usr/lib/smbsrv -lsmb
+KC_LDLIBS =	$(LDLIBS) $(KMECHLIB)
 
 .KEEP_STATE:
 
@@ -85,6 +86,10 @@ ksmb:		$(KSMB_OBJS)
 
 ksetpw:		$(KS_OBJS)
 	$(LINK.c) $(KS_OBJS) -o $@ $(KS_LDLIBS)
+	$(POST_PROCESS)
+
+kconf:		$(KC_OBJS)
+	$(LINK.c) $(KC_OBJS) -o $@ $(KC_LDLIBS)
 	$(POST_PROCESS)
 
 $(KRB5SBIN):

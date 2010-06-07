@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # This script is used to setup the Kerberos client by
 # supplying information about the Kerberos realm and kdc.
@@ -861,36 +860,27 @@ function getDC {
 }
 
 function write_ads_krb5conf {
+	typeset kdcs
+
 	printf "\n$(gettext "Setting up %s").\n\n" $KRB5_CONFIG_FILE
 
-	exec 3>$KRB5_CONFIG
-	if [[ $? -ne 0 ]]; then
-		printf "\n$(gettext "Can not write to %s, exiting").\n" $KRB5_CONFIG >&2
-		error_message
-	fi
-
-	printf "[libdefaults]\n" 1>&3
-	printf "\tdefault_realm = $realm\n" 1>&3
-	printf "\n[realms]\n" 1>&3
-	printf "\t$realm = {\n" 1>&3
 	for i in ${KDCs[@]}
 	do
 		[[ $i == +([0-9]) ]] && continue
-		printf "\t\tkdc = $i\n" 1>&3
+		if [[ -n $kdcs ]]
+		then
+			kdcs="$kdcs,$i"
+		else
+			kdcs=$i
+		fi
 	done
-	# Defining the same as admin_server.  This would cause auth failures
-	# if this was different.
-	printf "\n\t\tkpasswd_server = $KDC\n" 1>&3
-	printf "\n\t\tadmin_server = $KDC\n" 1>&3
-	printf "\t\tkpasswd_protocol = SET_CHANGE\n\t}\n" 1>&3
-	printf "\n[domain_realm]\n" 1>&3
-	printf "\t.$dom = $realm\n\n" 1>&3
-	printf "[logging]\n" 1>&3
-	printf "\tdefault = FILE:/var/krb5/kdc.log\n" 1>&3
-	printf "\tkdc = FILE:/var/krb5/kdc.log\n" 1>&3
-	printf "\tkdc_rotate = {\n\t\tperiod = 1d\n\t\tversions = 10\n\t}\n\n" 1>&3
-	printf "[appdefaults]\n" 1>&3
-	printf "\tkinit = {\n\t\trenewable = true\n\t\tforwardable = true\n\t}\n" 1>&3
+
+	$KCONF -f $KRB5_CONFIG -r $realm -k $kdcs -m $KDC -p SET_CHANGE -d .$dom
+
+	if [[ $? -ne 0 ]]; then
+		printf "\n$(gettext "Can not update %s, exiting").\n" $KRB5_CONFIG >&2
+		error_message
+	fi
 }
 
 function getForestName {
@@ -1576,6 +1566,7 @@ KLOOKUP=/usr/lib/krb5/klookup;	check_bin $KLOOKUP
 KSETPW=/usr/lib/krb5/ksetpw;	check_bin $KSETPW
 KSMB=/usr/lib/krb5/ksmb;	check_bin $KSMB
 KDYNDNS=/usr/lib/krb5/kdyndns;	check_bin $KDYNDNS
+KCONF=/usr/lib/krb5/kconf;	check_bin $KCONF
 
 dns_lookup=no
 ask_fqdns=no

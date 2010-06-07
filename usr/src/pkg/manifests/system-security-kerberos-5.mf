@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/security/kerberos-5@$(PKGVERS)
@@ -62,6 +61,7 @@ file path=usr/lib/krb5/README.db2 mode=0444
 file path=usr/lib/krb5/db2.so.1
 file path=usr/lib/krb5/gkadmin.jar mode=0444
 file path=usr/lib/krb5/kadmind mode=0500
+file path=usr/lib/krb5/kconf mode=0555
 file path=usr/lib/krb5/kdyndns mode=0555
 file path=usr/lib/krb5/kldap.so.1
 file path=usr/lib/krb5/klookup mode=0555
