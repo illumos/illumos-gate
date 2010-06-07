@@ -341,10 +341,20 @@ main(int argc, char **argv)
 		 * error related to this
 		 */
 		if ((cwdpath = getcwd(NULL, PATH_MAX)) == NULL) {
-			(void) fprintf(stderr,
-			    gettext("%s : cannot get the current working "
-			    "directory\n"), cmdname);
-			exit(1);
+			if ((errno == EACCES) && (walkflags & FTW_CHDIR)) {
+				/*
+				 * A directory above cwd is inaccessible,
+				 * so don't do chdir(2)s. Slower, but at least
+				 * it works.
+				 */
+				walkflags &= ~FTW_CHDIR;
+				free(cwdpath);
+			} else {
+				(void) fprintf(stderr,
+				    gettext("%s : cannot get the current "
+				    "working directory\n"), cmdname);
+				exit(1);
+			}
 		} else
 			free(cwdpath);
 
