@@ -476,6 +476,69 @@ i_ddi_intr_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_ctlop_t op,
 	return (DDI_ENOTSUP);
 }
 
+/*
+ * Interrupt target get/set functions
+ */
+int
+get_intr_affinity(ddi_intr_handle_t h, processorid_t *tgt_p)
+{
+	ddi_intr_handle_impl_t	*hdlp = (ddi_intr_handle_impl_t *)h;
+	int			ret;
+
+	DDI_INTR_APIDBG((CE_CONT, "get_intr_affinity: hdlp = %p\n",
+	    (void *)hdlp));
+
+	if ((hdlp == NULL) || (tgt_p == NULL))
+		return (DDI_EINVAL);
+
+	rw_enter(&hdlp->ih_rwlock, RW_READER);
+	if (hdlp->ih_state != DDI_IHDL_STATE_ENABLE) {
+		rw_exit(&hdlp->ih_rwlock);
+		return (DDI_EINVAL);
+	}
+
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	    DDI_INTROP_GETTARGET, hdlp, (void *)tgt_p);
+
+	DDI_INTR_APIDBG((CE_CONT, "get_intr_affinity: target %x\n",
+	    *tgt_p));
+
+	if (ret == DDI_SUCCESS)
+		hdlp->ih_target = *tgt_p;
+
+	rw_exit(&hdlp->ih_rwlock);
+	return (ret);
+}
+
+int
+set_intr_affinity(ddi_intr_handle_t h, processorid_t tgt)
+{
+	ddi_intr_handle_impl_t	*hdlp = (ddi_intr_handle_impl_t *)h;
+	int			ret;
+
+	DDI_INTR_APIDBG((CE_CONT, "set_intr_affinity: hdlp = %p "
+	    "target %x\n", (void *)hdlp, tgt));
+
+	if (hdlp == NULL)
+		return (DDI_EINVAL);
+
+	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
+	if ((hdlp->ih_state != DDI_IHDL_STATE_ENABLE) ||
+	    (hdlp->ih_type != DDI_INTR_TYPE_MSIX)) {
+		rw_exit(&hdlp->ih_rwlock);
+		return (DDI_EINVAL);
+	}
+
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	    DDI_INTROP_SETTARGET, hdlp, &tgt);
+
+	if (ret == DDI_SUCCESS)
+		hdlp->ih_target = tgt;
+
+	rw_exit(&hdlp->ih_rwlock);
+	return (ret);
+}
+
 #if defined(__i386) || defined(__amd64)
 ddi_acc_handle_t
 i_ddi_get_pci_config_handle(dev_info_t *dip)

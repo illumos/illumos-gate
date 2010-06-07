@@ -118,9 +118,9 @@ typedef struct ddi_intr_handle_impl {
 	 * The ih_target field may not reflect the actual target that is
 	 * currently being used for the given interrupt. This field is just a
 	 * snapshot taken either during ddi_intr_add_handler() or
-	 * ddi_intr_get/set_affinity() calls.
+	 * get/set_intr_affinity() calls.
 	 */
-	ddi_intr_target_t	ih_target;	/* Target ID */
+	processorid_t 		ih_target;	/* Target ID */
 } ddi_intr_handle_impl_t;
 
 /* values for ih_state (strictly for interrupt handle) */
@@ -418,6 +418,12 @@ int	i_ddi_get_intx_nintrs(dev_info_t *dip);
  *	in future minor/major solaris release.
  */
 typedef enum {DDI_INTR_CTLOPS_NONE} ddi_intr_ctlop_t;
+
+/*
+ * Interrupt get/set affinity functions
+ */
+int	get_intr_affinity(ddi_intr_handle_t h, processorid_t *tgt_p);
+int	set_intr_affinity(ddi_intr_handle_t h, processorid_t tgt);
 
 /* The following are obsolete interfaces */
 ddi_intrspec_t	i_ddi_get_intrspec(dev_info_t *dip, dev_info_t *rdip,

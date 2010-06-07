@@ -1031,8 +1031,6 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		cap = DDI_INTR_FLAG_PENDING;
 		if (hdlp->ih_type == DDI_INTR_TYPE_FIXED)
 			cap |= DDI_INTR_FLAG_MASKABLE;
-		else if (hdlp->ih_type == DDI_INTR_TYPE_MSIX)
-			cap |= DDI_INTR_FLAG_RETARGETABLE;
 		*result = cap;
 		break;
 	case PSM_INTR_OP_GET_SHARED:

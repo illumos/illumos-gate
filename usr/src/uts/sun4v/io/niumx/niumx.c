@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -824,8 +823,7 @@ niumx_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		*(int *)result = DDI_INTR_TYPE_FIXED;
 		break;
 	case DDI_INTROP_GETCAP:
-		*(int *)result =  DDI_INTR_FLAG_LEVEL |
-		    DDI_INTR_FLAG_RETARGETABLE;
+		*(int *)result =  DDI_INTR_FLAG_LEVEL;
 		break;
 	case DDI_INTROP_SETCAP:
 		ret = DDI_ENOTSUP;

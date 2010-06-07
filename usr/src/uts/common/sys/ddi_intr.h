@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DDI_INTR_H
@@ -87,7 +86,6 @@ extern "C" {
 #define	DDI_INTR_FLAG_PENDING	0x0020	/* (RO) int pending supported */
 #define	DDI_INTR_FLAG_BLOCK	0x0100	/* (RO) requires block enable */
 #define	DDI_INTR_FLAG_MSI64	0x0200	/* (RO) MSI/X supports 64 bit addr */
-#define	DDI_INTR_FLAG_RETARGETABLE	0x0400	/* (RO) retargetable */
 
 /*
  * Macro to be used while passing interrupt priority
@@ -100,11 +98,6 @@ extern "C" {
  */
 typedef struct __ddi_intr_handle *ddi_intr_handle_t;
 typedef struct __ddi_softint_handle *ddi_softint_handle_t;
-
-/*
- * Typedef for interrupt target
- */
-typedef	processorid_t ddi_intr_target_t;
 
 /*
  * Definition for behavior flag which is used with ddi_intr_alloc(9f).
@@ -183,11 +176,6 @@ int	ddi_intr_dup_handler(ddi_intr_handle_t org, int vector,
 	    ddi_intr_handle_t *dup);
 int	ddi_intr_remove_handler(ddi_intr_handle_t h);
 
-/*
- * Interrupt get/set affinity functions
- */
-int	ddi_intr_get_affinity(ddi_intr_handle_t h, ddi_intr_target_t *tgt_p);
-int	ddi_intr_set_affinity(ddi_intr_handle_t h, ddi_intr_target_t tgt);
 
 /*
  * Interrupt enable/disable/block_enable/block_disable functions

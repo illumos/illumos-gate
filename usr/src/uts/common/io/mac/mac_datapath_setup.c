@@ -1303,9 +1303,9 @@ mac_rx_srs_retarget_intr(mac_soft_ring_set_t *mac_srs, processorid_t cpuid)
 	if (cp == NULL || !cpu_is_online(cp))
 		return;
 
-	/* Drop the cpu_lock as ddi_intr_set_affinity() holds it */
+	/* Drop the cpu_lock as set_intr_affinity() holds it */
 	mutex_exit(&cpu_lock);
-	if (ddi_intr_set_affinity(mintr->mi_ddi_handle, cpuid) == DDI_SUCCESS)
+	if (set_intr_affinity(mintr->mi_ddi_handle, cpuid) == DDI_SUCCESS)
 		mac_srs->srs_cpu.mc_rx_intr_cpu = cpuid;
 	else
 		mac_srs->srs_cpu.mc_rx_intr_cpu = -1;
@@ -1343,11 +1343,11 @@ mac_tx_srs_retarget_intr(mac_soft_ring_set_t *mac_srs)
 			}
 			mintr = &ring->mr_info.mri_intr;
 			/*
-			 * Drop the cpu_lock as ddi_intr_set_affinity()
+			 * Drop the cpu_lock as set_intr_affinity()
 			 * holds it
 			 */
 			mutex_exit(&cpu_lock);
-			if (ddi_intr_set_affinity(mintr->mi_ddi_handle,
+			if (set_intr_affinity(mintr->mi_ddi_handle,
 			    cpuid) == DDI_SUCCESS) {
 				srs_cpu->mc_tx_retargeted_cpu[i] = cpuid;
 			} else {
@@ -1367,7 +1367,7 @@ mac_tx_srs_retarget_intr(mac_soft_ring_set_t *mac_srs)
 		if (MAC_RING_RETARGETABLE(ring)) {
 			mintr = &ring->mr_info.mri_intr;
 			mutex_exit(&cpu_lock);
-			if ((ddi_intr_set_affinity(mintr->mi_ddi_handle,
+			if ((set_intr_affinity(mintr->mi_ddi_handle,
 			    cpuid) == DDI_SUCCESS)) {
 				srs_cpu->mc_tx_retargeted_cpu[0] = cpuid;
 			} else {

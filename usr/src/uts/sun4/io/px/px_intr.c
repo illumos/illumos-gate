@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -581,8 +580,6 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
 		ret = pci_msi_get_cap(rdip, hdlp->ih_type, (int *)result);
-		if (ret == DDI_SUCCESS)
-			*(int *)result |= DDI_INTR_FLAG_RETARGETABLE;
 		break;
 	case DDI_INTROP_SETCAP:
 		DBG(DBG_INTROPS, dip, "px_msix_ops: SetCap is not supported\n");
