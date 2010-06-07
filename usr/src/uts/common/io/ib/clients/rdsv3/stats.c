@@ -129,7 +129,7 @@ rdsv3_stats_info(struct rsock *sock, unsigned int len,
     struct rdsv3_info_iterator *iter,
     struct rdsv3_info_lengths *lens)
 {
-	struct rdsv3_statistics stats = {0, };
+	struct rdsv3_statistics stats;
 	uint64_t *src;
 	uint64_t *sum;
 	size_t i;
@@ -143,10 +143,14 @@ rdsv3_stats_info(struct rsock *sock, unsigned int len,
 		goto trans;
 	}
 
+	bzero(&stats, sizeof (struct rdsv3_statistics));
+
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		src = (uint64_t *)&(rdsv3_per_cpu(rdsv3_stats, cpu));
 		sum = (uint64_t *)&stats;
-		for (i = 0; i < sizeof (stats) / sizeof (uint64_t); i++)
+		for (i = 0;
+		    i < sizeof (struct rdsv3_statistics) / sizeof (uint64_t);
+		    i++)
 			*(sum++) += *(src++);
 	}
 

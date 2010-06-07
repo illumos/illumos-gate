@@ -35,7 +35,7 @@ OBJECTS		= $(RDSV3_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(RDSV3_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CFLAGS 		+= $(CCVERBOSE) $(_XPG4_2)
-LDFLAGS		+= -dy -Nfs/sockfs -Nmisc/ksocket -Nmisc/ip -Nmisc/ibtl -Nmisc/ibcm -Nmisc/sol_ofs
+LDFLAGS		+= -dy -Nfs/sockfs -Nmisc/ksocket -Ndrv/ip -Nmisc/ibtl -Nmisc/ibcm -Nmisc/sol_ofs
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/rdsv3
 #
 #	Include common rules.

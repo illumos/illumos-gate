@@ -48,12 +48,12 @@ typedef void (*rdsv3_info_func)(struct rsock *sock, unsigned int len,
     struct rdsv3_info_lengths *lens);
 
 #define	rdsv3_info_copy(iter, data, bytes)			\
-	bcopy(data, iter->addr + iter->offset, bytes);		\
+	(void) ddi_copyout(data, iter->addr + iter->offset, bytes, 0);	\
 	iter->offset += bytes
 
 void rdsv3_info_register_func(int optname, rdsv3_info_func func);
 void rdsv3_info_deregister_func(int optname, rdsv3_info_func func);
-int rdsv3_info_getsockopt(struct rsock *sock, int optname, char *optval,
-    socklen_t *optlen);
+int rdsv3_info_ioctl(struct rsock *sock, int optname, char *optval,
+    int32_t *rvalp);
 
 #endif /* _RDSV3_INFO_H */

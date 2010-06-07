@@ -80,7 +80,7 @@ rdsv3_ib_add_one(ib_device_t *device)
 	ibt_hca_attr_t *dev_attr;
 	char name[64];
 
-	RDSV3_DPRINTF4("rdsv3_ib_add_one", "device: %p", device);
+	RDSV3_DPRINTF2("rdsv3_ib_add_one", "device: %p", device);
 
 	/* Only handle IB (no iWARP) devices */
 	if (device->node_type != RDMA_NODE_IB_CA)
@@ -146,7 +146,7 @@ rdsv3_ib_add_one(ib_device_t *device)
 
 	ib_set_client_data(device, &rdsv3_ib_client, rds_ibdev);
 
-	RDSV3_DPRINTF4("rdsv3_ib_add_one", "Return: device: %p", device);
+	RDSV3_DPRINTF2("rdsv3_ib_add_one", "Return: device: %p", device);
 
 	goto free_attr;
 
@@ -164,7 +164,7 @@ rdsv3_ib_remove_one(struct ib_device *device)
 	struct rdsv3_ib_device *rds_ibdev;
 	struct rdsv3_ib_ipaddr *i_ipaddr, *i_next;
 
-	RDSV3_DPRINTF4("rdsv3_ib_remove_one", "device: %p", device);
+	RDSV3_DPRINTF2("rdsv3_ib_remove_one", "device: %p", device);
 
 	rds_ibdev = ib_get_client_data(device, &rdsv3_ib_client);
 	if (!rds_ibdev)
@@ -205,7 +205,7 @@ rdsv3_ib_remove_one(struct ib_device *device)
 	list_remove_node(&rds_ibdev->list);
 	kmem_free(rds_ibdev, sizeof (*rds_ibdev));
 
-	RDSV3_DPRINTF4("rdsv3_ib_remove_one", "Return: device: %p", device);
+	RDSV3_DPRINTF2("rdsv3_ib_remove_one", "Return: device: %p", device);
 }
 
 #ifndef __lock_lint

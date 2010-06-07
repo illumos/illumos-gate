@@ -55,11 +55,12 @@
  *
  */
 #include <sys/ib/clients/rdsv3/ib.h>
+#include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
 unsigned long rdsv3_ib_sysctl_max_send_wr = RDSV3_IB_DEFAULT_SEND_WR;
 unsigned long rdsv3_ib_sysctl_max_recv_wr = RDSV3_IB_DEFAULT_RECV_WR;
 unsigned long rdsv3_ib_sysctl_max_recv_allocation =
-	(128 * 1024 * 1024) / RDSV3_FRAG_SIZE;
+	(512 * 1024 * 1024) / RDSV3_FRAG_SIZE;
 /* hardware will fail CQ creation long before this */
 
 unsigned long rdsv3_ib_sysctl_max_unsig_wrs = 16;
@@ -86,5 +87,18 @@ rdsv3_ib_sysctl_exit(void)
 int
 rdsv3_ib_sysctl_init(void)
 {
+	RDSV3_DPRINTF2("rdsv3_ib_sysctl_init",
+	    "rdsv3_ib_sysctl_max_send_wr = 0x%lx "
+	    "rdsv3_ib_sysctl_max_recv_wr = 0x%lx "
+	    "rdsv3_ib_sysctl_max_recv_allocation = 0x%lx "
+	    "rdsv3_ib_sysctl_max_unsig_wrs = 0x%lx "
+	    "rdsv3_ib_sysctl_max_unsig_bytes = 0x%lx "
+	    "rdsv3_ib_sysctl_flow_control = 0x%x",
+	    rdsv3_ib_sysctl_max_send_wr,
+	    rdsv3_ib_sysctl_max_recv_wr,
+	    rdsv3_ib_sysctl_max_recv_allocation,
+	    rdsv3_ib_sysctl_max_unsig_wrs,
+	    rdsv3_ib_sysctl_max_unsig_bytes,
+	    rdsv3_ib_sysctl_flow_control);
 	return (0);
 }

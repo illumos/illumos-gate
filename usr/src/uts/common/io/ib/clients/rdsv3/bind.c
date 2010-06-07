@@ -46,8 +46,9 @@ rdsv3_bind_tree_walk(uint32_be_t addr, uint16_be_t port,
 {
 	struct rdsv3_sock *rs;
 	avl_index_t	where;
+	uint64_t	needle = ((uint64_t)addr << 32) | port;
 
-	rs = avl_find(&rdsv3_bind_tree, &port, &where);
+	rs = avl_find(&rdsv3_bind_tree, &needle, &where);
 	if ((rs == NULL) && (insert != NULL)) {
 		insert->rs_bound_addr = addr;
 		insert->rs_bound_port = port;

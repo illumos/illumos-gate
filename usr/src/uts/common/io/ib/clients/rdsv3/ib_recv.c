@@ -964,8 +964,6 @@ rdsv3_ib_recv(struct rdsv3_connection *conn)
 	return (ret);
 }
 
-uint_t	MaxRecvMemory = 128 * 1024 * 1024;
-
 extern int rdsv3_ib_inc_constructor(void *buf, void *arg, int kmflags);
 extern void rdsv3_ib_inc_destructor(void *buf, void *arg);
 
@@ -973,9 +971,6 @@ int
 rdsv3_ib_recv_init(void)
 {
 	RDSV3_DPRINTF4("rdsv3_ib_recv_init", "Enter");
-
-	/* XXX - hard code it to 128 MB */
-	rdsv3_ib_sysctl_max_recv_allocation = MaxRecvMemory / RDSV3_FRAG_SIZE;
 
 	rdsv3_ib_incoming_slab = kmem_cache_create("rdsv3_ib_incoming",
 	    sizeof (struct rdsv3_ib_incoming), 0, rdsv3_ib_inc_constructor,

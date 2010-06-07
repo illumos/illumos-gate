@@ -364,7 +364,7 @@ rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
 	    &umem_cookie, NULL, NULL);
 	if (ret != 0) {
 		kmem_free((void *) ibmr, sizeof (*ibmr));
-		ibmr = ERR_PTR(ret);
+		ibmr = ERR_PTR(-ret);
 		return (ibmr);
 	}
 

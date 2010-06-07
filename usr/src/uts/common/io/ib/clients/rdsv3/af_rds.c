@@ -299,8 +299,12 @@ rdsv3_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 		rval = rdsv3_do_ip_ioctl(so4, &buf, &bufsize, &numifs);
 		if (rval != 0) break;
 		if (cmd == SIOCGLIFNUM) {
-			(void) ddi_copyout(&numifs, (void *)arg,
-			    sizeof (int), 0);
+			struct lifnum	lifn;
+			lifn.lifn_family = AF_INET_OFFLOAD;
+			lifn.lifn_flags = 0;
+			lifn.lifn_count = numifs;
+			(void) ddi_copyout(&lifn, (void *)arg,
+			    sizeof (struct lifnum), 0);
 		} else {
 			len = 0;
 			for (lifrp = (struct lifreq *)buf, rc = 0; rc < numifs;
@@ -448,6 +452,12 @@ rdsv3_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 		break;
 
 	default:
+		if ((cmd >= RDSV3_INFO_FIRST) &&
+		    (cmd <= RDSV3_INFO_LAST)) {
+			return (rdsv3_info_ioctl((struct rsock *)proto_handle,
+			    cmd, (char *)arg, rvalp));
+		}
+		RDSV3_DPRINTF2("rdsv3_ioctl", "Unknown ioctl cmd: %d",  cmd);
 		cmn_err(CE_CONT, "unsupported IOCTL cmd: %d \n", cmd);
 		rval = EOPNOTSUPP;
 	}
@@ -602,11 +612,6 @@ rdsv3_getsockopt(sock_lower_handle_t proto_handle, int level,
 		}
 		return (0);
 	default:
-		if ((optname >= RDSV3_INFO_FIRST) &&
-		    (optname <= RDSV3_INFO_LAST)) {
-			return (rdsv3_info_getsockopt(sk, optname, optval,
-			    optlen));
-		}
 		RDSV3_DPRINTF2("rdsv3_getsockopt",
 		    "Unknown: level: %d optname: %d", level, optname);
 		ret = -ENOPROTOOPT;

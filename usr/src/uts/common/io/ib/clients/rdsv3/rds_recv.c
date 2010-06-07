@@ -466,12 +466,17 @@ rdsv3_recvmsg(struct rdsv3_sock *rs, uio_t *uio,
 {
 	struct rsock *sk = rdsv3_rs_to_sk(rs);
 	long timeo;
-	int ret = 0, nonblock = msg_flags & MSG_DONTWAIT;
+	int ret = 0;
 	struct sockaddr_in *sin = NULL;
 	struct rdsv3_incoming *inc = NULL;
+	boolean_t nonblock = B_FALSE;
 
 	RDSV3_DPRINTF4("rdsv3_recvmsg",
 	    "Enter(rs: %p size: %d msg_flags: 0x%x)", rs, size, msg_flags);
+
+	if ((uio->uio_fmode & (FNDELAY | FNONBLOCK)) ||
+	    (msg_flags & MSG_DONTWAIT))
+		nonblock = B_TRUE;
 
 	/* udp_recvmsg()->sock_recvtimeo() gets away without locking too.. */
 	timeo = rdsv3_rcvtimeo(sk, nonblock);

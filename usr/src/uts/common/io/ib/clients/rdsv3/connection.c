@@ -412,11 +412,7 @@ rdsv3_for_each_conn_info(struct rsock *sock, unsigned int len,
     int (*visitor)(struct rdsv3_connection *, void *),
     size_t item_len)
 {
-#if !defined(__lock_lint) && !defined(__GNUC__)
-	uint64_t buffer[(item_len + 7) / 8];
-#else
-	uint64_t buffer[256];
-#endif
+	uint8_t *buffer;
 	struct rdsv3_connection *conn;
 
 	rw_enter(&rdsv3_conn_lock, RW_READER);
@@ -430,27 +426,34 @@ rdsv3_for_each_conn_info(struct rsock *sock, unsigned int len,
 		return;
 	}
 
+	/* allocate a little extra as this can get cast to a uint64_t */
+	buffer = kmem_zalloc(item_len + 8, KM_SLEEP);
+
 	conn = (struct rdsv3_connection *)avl_first(&rdsv3_conn_hash);
 
 	do {
 		/* XXX no c_lock usage.. */
-		if (!visitor(conn, buffer))
-			continue;
-
-		/*
-		 * We copy as much as we can fit in the buffer,
-		 * but we count all items so that the caller
-		 * can resize the buffer.
-		 */
-		if (len >= item_len) {
-			rdsv3_info_copy(iter, buffer, item_len);
-			len -= item_len;
+		if (visitor(conn, buffer)) {
+			/*
+			 * We copy as much as we can fit in the buffer,
+			 * but we count all items so that the caller
+			 * can resize the buffer.
+			 */
+			if (len >= item_len) {
+				RDSV3_DPRINTF4("rdsv3_for_each_conn_info",
+				    "buffer: %p iter: %p bytes: %d", buffer,
+				    iter->addr + iter->offset, item_len);
+				rdsv3_info_copy(iter, buffer, item_len);
+				len -= item_len;
+			}
+			lens->nr++;
 		}
-		lens->nr++;
 		conn = AVL_NEXT(&rdsv3_conn_hash, conn);
 	} while (conn != NULL);
 
 	rw_exit(&rdsv3_conn_lock);
+
+	kmem_free(buffer, item_len + 8);
 }
 
 static int

@@ -131,6 +131,11 @@ extern "C" {
 #define	RDSV3_INFO_IWARP_CONNECTIONS	10010
 #define	RDSV3_INFO_LAST			10010
 
+struct rds_info_arg {
+	uint64_t	lenp;
+	uint64_t	datap;
+};
+
 #ifndef __lock_lint
 #pragma pack(1)
 struct rdsv3_info_counter {

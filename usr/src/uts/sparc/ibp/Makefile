@@ -37,7 +37,7 @@ LINTS		= $(IBD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/ibd
 LDFLAGS		+= -dy -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf -Ndrv/ip \
-		-Nmisc/dls -Nmisc/dld
+		-Nmisc/dls -Ndrv/dld
 WARLOCK_OUT     = $(IBD_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 WLCMD_DIR	= $(UTSBASE)/common/io/warlock

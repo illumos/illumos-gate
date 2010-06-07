@@ -57,6 +57,7 @@
 #include <sys/rds.h>
 
 #include <sys/ib/clients/rdsv3/rdsv3.h>
+#include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
 /*
  * This file implements a getsockopt() call which copies a set of fixed
@@ -113,43 +114,91 @@ rdsv3_info_deregister_func(int optname, rdsv3_info_func func)
  * @optval points to the userspace buffer that the information snapshot
  * will be copied into.
  *
- * @optlen on input is the size of the buffer in userspace.  @optlen
- * on output is the size of the requested snapshot in bytes.
- *
  * This function returns -errno if there is a failure, particularly -ENOSPC
  * if the given userspace buffer was not large enough to fit the snapshot.
  * On success it returns the positive number of bytes of each array element
  * in the snapshot.
  */
 int
-rdsv3_info_getsockopt(struct rsock *sock, int optname, char *optval,
-    socklen_t *optlen)
+rdsv3_info_ioctl(struct rsock *sock, int optname, char *optval,
+    int32_t *rvalp)
 {
 	struct rdsv3_info_iterator iter;
 	struct rdsv3_info_lengths lens;
 	rdsv3_info_func func;
+	struct rds_info_arg arg;
+	uint32_t ulen = 0, klen;
 
 	func = rdsv3_info_funcs[optname - RDSV3_INFO_FIRST];
 	if (func == NULL) {
-		return (-ENOPROTOOPT);
+		RDSV3_DPRINTF2("rdsv3_info_ioctl",
+		    "No Info Function, optname: %d", optname);
+		return (ENOPROTOOPT);
 	}
 
-	if (*optlen == sizeof (struct rdsv3_info_lengths)) {
+	if (optval == NULL) {
+		RDSV3_DPRINTF2("rdsv3_info_ioctl", "optval is NULL");
+		return (EINVAL);
+	}
+	if (ddi_copyin(optval, &arg, sizeof (struct rds_info_arg), 0) != 0) {
+		RDSV3_DPRINTF2("rdsv3_info_ioctl",
+		    "ddi_copyin for address: 0x%p failed", optval);
+		return (EFAULT);
+	}
+
+	RDSV3_DPRINTF4("rdsv3_info_ioctl",
+	    "optname: %d lenp: %llx datap: %llx", optname, arg.lenp, arg.datap);
+
+	if (arg.lenp == NULL) {
+		RDSV3_DPRINTF2("rdsv3_info_ioctl", "arg.lenp is NULL");
+		return (EFAULT);
+	}
+
+	if (ddi_copyin((void *)(uintptr_t)arg.lenp, &ulen,
+	    sizeof (uint32_t), 0) != 0) {
+		RDSV3_DPRINTF2("rdsv3_info_ioctl",
+		    "ddi_copyin for address, lenp: 0x%p failed", arg.lenp);
+		return (EFAULT);
+	}
+
+	RDSV3_DPRINTF3("rdsv3_info_ioctl", "optname: %d len: %d datap: %p",
+	    optname, ulen, arg.datap);
+
+	bzero(&iter, sizeof (struct rdsv3_info_iterator));
+	/* a 0 len call is just trying to probe its length */
+	if (ulen == 0) {
 		iter.addr = NULL;
+	} else if (arg.datap == NULL) {
+		RDSV3_DPRINTF2("rdsv3_info_ioctl",
+		    "arg.datap is NULL, ulen set to: %d", ulen);
+		return (EINVAL);
 	} else {
-		iter.addr = optval;
+		iter.addr = (char *)(uintptr_t)arg.datap;
 	}
-
 	iter.offset = 0;
 
-	func(sock, *optlen, &iter, &lens);
-	ASSERT(lens.each != 0);
+	bzero(&lens, sizeof (struct rdsv3_info_lengths));
+	func(sock, ulen, &iter, &lens);
 
-	if (iter.addr == NULL) {
-		bcopy(&lens, optval, sizeof (struct rdsv3_info_lengths));
-	} else {
-		*optlen = lens.nr * lens.each;
+	klen = lens.nr * lens.each;
+
+	if (ddi_copyout(&klen, (void *)(uintptr_t)arg.lenp,
+	    sizeof (uint32_t), 0) != 0) {
+		RDSV3_DPRINTF2("rdsv3_info_ioctl",
+		    "ddi_copyout(%p %p) failed", &klen, arg.lenp);
+		return (EFAULT);
 	}
 
+	RDSV3_DPRINTF3("rdsv3_info_ioctl",
+	    "optname: %d ulen: %d klen: %d each: %d", optname, ulen, klen,
+	    lens.each);
+
+	if (ulen < klen) {
+		return (ENOSPC);
+	}
+
+	RDSV3_DPRINTF4("rdsv3_info_ioctl", "Return optname: %d", optname);
+
+	*rvalp = lens.each;
 	return (0);
 }

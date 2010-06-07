@@ -262,6 +262,7 @@ retry_count:
 
 		/* save the record */
 		bcopy(lp, rlp, sizeof (struct lifreq));
+		rlp->lifr_addr.ss_family = AF_INET_OFFLOAD;
 		rlp++;
 	}
 
@@ -475,6 +476,7 @@ retry_count:
 
 		/* save the record */
 		bcopy(lp, rlp, sizeof (struct ifreq));
+		rlp->ifr_addr.sa_family = AF_INET_OFFLOAD;
 		rlp++;
 	}
 
@@ -1142,19 +1144,16 @@ rdsv3_verify_bind_address(ipaddr_t addr)
 	return (1);
 }
 
-/* XXX - need to enhance to compare IP address and port */
 int
 rdsv3_bind_node_compare(const void *a, const void *b)
 {
-	uint16_be_t			port = *(in_port_t *)a;
+	uint64_t			needle = *(uint64_t *)a;
 	struct rdsv3_sock		*rs = (struct rdsv3_sock *)b;
 
-	RDSV3_DPRINTF5("rdsv3_bind_node_compare", "Enter (%x %x)", port,
-	    rs->rs_bound_port);
-
-	if (port > rs->rs_bound_port)
+	if (needle > (((uint64_t)rs->rs_bound_addr << 32) | rs->rs_bound_port))
 		return (+1);
-	else if (port < rs->rs_bound_port)
+	else if (needle <
+	    (((uint64_t)rs->rs_bound_addr << 32) | rs->rs_bound_port))
 		return (-1);
 
 	return (0);

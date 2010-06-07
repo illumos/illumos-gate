@@ -389,8 +389,12 @@ rdsv3_message_copy_from_user(struct uio *uiop,
 
 		ret = uiomove(rdsv3_sg_page(sg), rdsv3_sg_len(sg), UIO_WRITE,
 		    uiop);
-		if (ret)
+		if (ret) {
+			RDSV3_DPRINTF2("rdsv3_message_copy_from_user",
+			    "uiomove failed");
+			ret = -ret;
 			goto out;
+		}
 
 		total_len -= rdsv3_sg_len(sg);
 		sg++;
