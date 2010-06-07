@@ -31,7 +31,7 @@
 #ifndef	_QLT_DMA_H
 #define	_QLT_DMA_H
 
-#include <stmf.h>
+#include <sys/stmf.h>
 
 #ifdef	__cplusplus
 extern "C" {

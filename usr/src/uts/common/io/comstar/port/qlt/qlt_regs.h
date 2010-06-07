@@ -25,14 +25,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QLT_REGS_H
 #define	_QLT_REGS_H
 
-#include <stmf_defines.h>
+#include <sys/stmf_defines.h>
 
 #ifdef	__cplusplus
 extern "C" {

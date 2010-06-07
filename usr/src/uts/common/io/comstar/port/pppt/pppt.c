@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -40,7 +39,8 @@
 #include <sys/stmf_ioctl.h>
 #include <sys/pppt_ioctl.h>
 #include <sys/portif.h>
-#include <pppt.h>
+
+#include "pppt.h"
 
 #define	PPPT_VERSION		BUILD_DATE "-1.18dev"
 #define	PPPT_NAME_VERSION	"COMSTAR PPPT v" PPPT_VERSION

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -97,8 +96,8 @@
 /*
  * Driver's own header files
  */
-#include <fcoet.h>
-#include <fcoet_eth.h>
+#include "fcoet.h"
+#include "fcoet_eth.h"
 
 /*
  * function forward declaration

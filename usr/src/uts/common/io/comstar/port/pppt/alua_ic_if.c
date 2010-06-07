@@ -40,9 +40,9 @@
 #include <sys/lpif.h>
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
-#include <pppt.h>
 #include <sys/pppt_ic_if.h>
 
+#include "pppt.h"
 
 /*
  * Macros

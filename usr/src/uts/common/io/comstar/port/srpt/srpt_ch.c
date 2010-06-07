@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -43,9 +42,9 @@
 #include <sys/scsi/scsi.h>
 #include <sys/ib/ibtl/ibti.h>
 
-#include <stmf.h>
-#include <stmf_ioctl.h>
-#include <portif.h>
+#include <sys/stmf.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/portif.h>
 
 #include "srp.h"
 #include "srpt_impl.h"

@@ -38,7 +38,8 @@
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
-#include <pppt.h>
+
+#include "pppt.h"
 
 static void pppt_msg_tgt_register(stmf_ic_msg_t *reg_port);
 

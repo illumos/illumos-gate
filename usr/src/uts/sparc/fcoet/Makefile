@@ -20,8 +20,7 @@
 #
 # uts/sparc/fcoet/Makefile
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # This makefile drives the production of the fcoet driver for COMSTAR.
 #
@@ -57,7 +56,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -dy -Ndrv/stmf -Ndrv/fct -Ndrv/fcoe
-INC_PATH	+= -I$(UTSBASE)/common/io/comstar/port/fcoet
 
 #	Default build targets.
 #

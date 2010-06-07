@@ -40,13 +40,14 @@
 #include <sys/zvol.h>
 #include <sys/zfs_rlock.h>
 
-#include <stmf.h>
-#include <lpif.h>
-#include <portif.h>
-#include <stmf_ioctl.h>
-#include <stmf_sbd.h>
-#include <stmf_sbd_ioctl.h>
-#include <sbd_impl.h>
+#include <sys/stmf.h>
+#include <sys/lpif.h>
+#include <sys/portif.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/stmf_sbd_ioctl.h>
+
+#include "stmf_sbd.h"
+#include "sbd_impl.h"
 
 
 /*

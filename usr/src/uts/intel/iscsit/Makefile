@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the iscsit pseudo-driver for 
 #	COMSTAR.
@@ -60,8 +59,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -dy -Ndrv/stmf -Nmisc/idm -Nfs/sockfs -Nmisc/md5 -Nmisc/ksocket
-
-INC_PATH	+= -I$(UTSBASE)/common/io/comstar/port/iscsit
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

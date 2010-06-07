@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/random.h>
@@ -32,7 +31,8 @@
 #include <sys/idm/idm_so.h>
 #include <sys/iscsit/radius_packet.h>
 #include <sys/iscsit/radius_protocol.h>
-#include <radius_auth.h>
+
+#include "radius_auth.h"
 
 /* Forward declaration */
 /*

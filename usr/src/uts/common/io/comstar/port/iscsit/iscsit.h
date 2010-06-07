@@ -25,8 +25,9 @@
 #define	_ISCSIT_H_
 
 #include <sys/iscsit/iscsi_if.h>
-#include <iscsit_authclient.h>
 #include <sys/iscsit/iscsit_common.h>
+
+#include "iscsit_authclient.h"
 
 /*
  * For some reason iscsi_protocol.h lists the max version as "0x02" and the

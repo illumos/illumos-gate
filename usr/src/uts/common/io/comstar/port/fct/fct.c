@@ -35,13 +35,14 @@
 #include <sys/atomic.h>
 #include <sys/sdt.h>
 
-#include <stmf.h>
-#include <stmf_ioctl.h>
-#include <portif.h>
-#include <fct.h>
-#include <fctio.h>
-#include <fct_impl.h>
-#include <discovery.h>
+#include <sys/stmf.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/portif.h>
+#include <sys/fct.h>
+#include <sys/fctio.h>
+
+#include "fct_impl.h"
+#include "discovery.h"
 
 static int fct_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int fct_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
@@ -1135,7 +1136,7 @@ fct_register_local_port(fct_local_port_t *port)
 	stmf_local_port_t	*lport;
 	fct_cmd_slot_t		*slot;
 	int			i;
-	char			taskq_name[24];
+	char			taskq_name[FCT_TASKQ_NAME_LEN];
 
 	iport = (fct_i_local_port_t *)port->port_fct_private;
 	if (port->port_fca_version != FCT_FCA_MODREV_1) {
@@ -1159,9 +1160,8 @@ fct_register_local_port(fct_local_port_t *port)
 	}
 	stmf_wwn_to_devid_desc((scsi_devid_desc_t *)iport->iport_id,
 	    port->port_pwwn, PROTOCOL_FIBRE_CHANNEL);
-	(void) snprintf(taskq_name, 24, "stmf_fct_taskq_%d",
+	(void) snprintf(taskq_name, sizeof (taskq_name), "stmf_fct_taskq_%d",
 	    atomic_add_32_nv(&taskq_cntr, 1));
-	taskq_name[23] = 0;
 	if ((iport->iport_worker_taskq = ddi_taskq_create(NULL,
 	    taskq_name, 1, TASKQ_DEFAULTPRI, 0)) == NULL) {
 		return (FCT_FAILURE);
@@ -1359,7 +1359,7 @@ void
 fct_handle_event(fct_local_port_t *port, int event_id, uint32_t event_flags,
 		caddr_t arg)
 {
-	char			info[80];
+	char			info[FCT_INFO_LEN];
 	fct_i_event_t		*e;
 	fct_i_local_port_t	*iport = (fct_i_local_port_t *)
 	    port->port_fct_private;
@@ -1370,10 +1370,9 @@ fct_handle_event(fct_local_port_t *port, int event_id, uint32_t event_flags,
 		/*
 		 * XXX Throw HBA fatal error event
 		 */
-		(void) snprintf(info, 80,
+		(void) snprintf(info, sizeof (info),
 		    "fct_handle_event: iport-%p, allocation "
 		    "of fct_i_event failed", (void *)iport);
-		info[79] = 0;
 		(void) fct_port_shutdown(iport->iport_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 		return;
@@ -2028,7 +2027,7 @@ fct_send_response_done(fct_cmd_t *cmd, fct_status_t s, uint32_t ioflags)
 void
 fct_cmd_free(fct_cmd_t *cmd)
 {
-	char			info[80];
+	char			info[FCT_INFO_LEN];
 	fct_i_cmd_t		*icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 	fct_local_port_t	*port = cmd->cmd_port;
 	fct_i_local_port_t	*iport = (fct_i_local_port_t *)
@@ -2104,10 +2103,9 @@ fct_cmd_free(fct_cmd_t *cmd)
 			 * XXX Throw HBA fatal error event
 			 * Later shutdown svc will terminate the ABTS in the end
 			 */
-			(void) snprintf(info, 80,
+			(void) snprintf(info, sizeof (info),
 			    "fct_cmd_free: iport-%p, ABTS_ACC"
 			    " port_send_cmd_response failed", (void *)iport);
-			info[79] = 0;
 			(void) fct_port_shutdown(iport->iport_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 			return;
@@ -2807,16 +2805,16 @@ void
 fct_cmd_fca_aborted(fct_cmd_t *cmd, fct_status_t s, uint32_t ioflags)
 {
 	fct_i_cmd_t		*icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
-	char			info[160];
+	char			info[FCT_INFO_LEN];
 	unsigned long long	st;
 
 	st = s;	/* To make gcc happy */
 	ASSERT(icmd->icmd_flags & ICMD_BEING_ABORTED);
 	if ((((s != FCT_ABORT_SUCCESS) && (s != FCT_NOT_FOUND))) ||
 	    ((ioflags & FCT_IOF_FCA_DONE) == 0)) {
-		(void) snprintf(info, 160, "fct_cmd_fca_aborted: cmd-%p, "
+		(void) snprintf(info, sizeof (info),
+		    "fct_cmd_fca_aborted: cmd-%p, "
 		    "s-%llx, iofalgs-%x", (void *)cmd, st, ioflags);
-		info[159] = 0;
 		(void) fct_port_shutdown(cmd->cmd_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 		return;
@@ -2903,7 +2901,7 @@ fct_fill_abts_acc(fct_cmd_t *cmd)
 void
 fct_handle_rcvd_abts(fct_cmd_t *cmd)
 {
-	char			info[80];
+	char			info[FCT_INFO_LEN];
 	fct_local_port_t	*port = cmd->cmd_port;
 	fct_i_local_port_t	*iport =
 	    (fct_i_local_port_t *)port->port_fct_private;
@@ -2983,11 +2981,10 @@ fct_handle_rcvd_abts(fct_cmd_t *cmd)
 			 * XXX Throw HBA fatal error event
 			 * Later shutdown svc will terminate the ABTS in the end
 			 */
-			(void) snprintf(info, 80,
+			(void) snprintf(info, sizeof (info),
 			    "fct_handle_rcvd_abts: iport-%p, "
 			    "ABTS_ACC port_send_cmd_response failed",
 			    (void *)iport);
-			info[79] = 0;
 			(void) fct_port_shutdown(iport->iport_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 		} else {
@@ -3237,7 +3234,7 @@ fct_port_shutdown(fct_local_port_t *port, uint32_t rflags,
 disc_action_t
 fct_cmd_terminator(fct_i_local_port_t *iport)
 {
-	char			info[80];
+	char			info[FCT_INFO_LEN];
 	clock_t			endtime;
 	fct_i_cmd_t		**ppicmd;
 	fct_i_cmd_t		*icmd;
@@ -3288,12 +3285,11 @@ fct_cmd_terminator(fct_i_local_port_t *iport)
 					 * svc will trigger fct_cmd_termination
 					 * again.
 					 */
-					(void) snprintf(info, 80,
+					(void) snprintf(info, sizeof (info),
 					    "fct_cmd_terminator:"
 					    " iport-%p, port_abort_cmd with "
 					    "FORCE_FCA_DONE failed",
 					    (void *)iport);
-					info[79] = 0;
 					(void) fct_port_shutdown(
 					    iport->iport_port,
 					    STMF_RFLAG_FATAL_ERROR |
@@ -3397,11 +3393,11 @@ fct_cmd_terminator(fct_i_local_port_t *iport)
 					cmd_type[0] = 0;
 				}
 				st = cmd->cmd_comp_status;	/* gcc fix */
-				(void) snprintf(info, 80, "fct_cmd_terminator:"
+				(void) snprintf(info, sizeof (info),
+				    "fct_cmd_terminator:"
 				    " iport-%p, cmd_type(0x%s),"
 				    " reason(%llx)", (void *)iport, cmd_type,
 				    st);
-				info[79] = 0;
 				(void) fct_port_shutdown(port,
 				    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET,
 				    info);

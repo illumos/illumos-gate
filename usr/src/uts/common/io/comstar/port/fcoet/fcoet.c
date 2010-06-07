@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -92,9 +91,9 @@
 /*
  * Driver's own header files
  */
-#include <fcoet.h>
-#include <fcoet_eth.h>
-#include <fcoet_fc.h>
+#include "fcoet.h"
+#include "fcoet_eth.h"
+#include "fcoet_fc.h"
 
 /*
  * static function forward declaration
@@ -438,7 +437,7 @@ fcoet_attach_init(fcoet_soft_state_t *ss)
 	fcoe_port_t		*eport;
 	fct_local_port_t	*port;
 	fct_dbuf_store_t	*fds;
-	char			 taskq_name[32];
+	char			 taskq_name[FCOET_TASKQ_NAME_LEN];
 	int			 ret;
 
 	/*
@@ -585,9 +584,8 @@ fcoet_attach_init(fcoet_soft_state_t *ss)
 	/*
 	 * Start watchdog thread
 	 */
-	(void) snprintf(taskq_name, 32, "stmf_fct_fcoet_%d_taskq",
-	    ss->ss_instance);
-	taskq_name[31] = 0;
+	(void) snprintf(taskq_name, sizeof (taskq_name),
+	    "stmf_fct_fcoet_%d_taskq", ss->ss_instance);
 	if ((ss->ss_watchdog_taskq = ddi_taskq_create(NULL,
 	    taskq_name, 2, TASKQ_DEFAULTPRI, 0)) == NULL) {
 		goto fail_create_taskq;

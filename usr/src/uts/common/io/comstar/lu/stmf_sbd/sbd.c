@@ -39,12 +39,13 @@
 #include <sys/dkio.h>
 #include <sys/zfs_ioctl.h>
 
-#include <stmf.h>
-#include <lpif.h>
-#include <stmf_ioctl.h>
-#include <stmf_sbd.h>
-#include <sbd_impl.h>
-#include <stmf_sbd_ioctl.h>
+#include <sys/stmf.h>
+#include <sys/lpif.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/stmf_sbd_ioctl.h>
+
+#include "stmf_sbd.h"
+#include "sbd_impl.h"
 
 #define	SBD_IS_ZVOL(zvol)	(strncmp("/dev/zvol", zvol, 9))
 

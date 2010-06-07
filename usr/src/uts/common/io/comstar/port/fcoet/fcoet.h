@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_FCOET_H
 #define	_FCOET_H
@@ -36,6 +35,8 @@ extern "C" {
 #define	FCOET_VERSION	"v20091123-1.02"
 #define	FCOET_NAME	"COMSTAR FCoET "
 #define	FCOET_MOD_NAME	FCOET_NAME FCOET_VERSION
+
+#define	FCOET_TASKQ_NAME_LEN	32
 
 /*
  * FCOET logging

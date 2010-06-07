@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -42,7 +41,7 @@
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
 #define	PPPT_TGT_SM_STRINGS
-#include <pppt.h>
+#include "pppt.h"
 
 typedef struct {
 	list_node_t		te_ctx_node;

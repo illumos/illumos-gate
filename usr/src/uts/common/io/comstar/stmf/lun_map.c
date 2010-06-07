@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -34,10 +33,11 @@
 #include <sys/byteorder.h>
 #include <sys/atomic.h>
 
-#include "stmf.h"
-#include "lpif.h"
-#include "portif.h"
-#include "stmf_ioctl.h"
+#include <sys/stmf.h>
+#include <sys/lpif.h>
+#include <sys/portif.h>
+#include <sys/stmf_ioctl.h>
+
 #include "stmf_impl.h"
 #include "lun_map.h"
 #include "stmf_state.h"

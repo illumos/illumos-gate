@@ -40,16 +40,17 @@
 #include <sys/atomic.h>
 #include <sys/scsi/scsi.h>
 
-#include <stmf_defines.h>
-#include <fct_defines.h>
-#include <stmf.h>
-#include <portif.h>
-#include <fct.h>
-#include <qlt.h>
-#include <qlt_dma.h>
-#include <qlt_ioctl.h>
-#include <qlt_open.h>
-#include <stmf_ioctl.h>
+#include <sys/stmf_defines.h>
+#include <sys/fct_defines.h>
+#include <sys/stmf.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/portif.h>
+#include <sys/fct.h>
+
+#include "qlt.h"
+#include "qlt_dma.h"
+#include "qlt_ioctl.h"
+#include "qlt_open.h"
 
 static int qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int qlt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
@@ -1694,7 +1695,7 @@ qlt_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 	qlt_fw_info_t	*fwi;
 	mbox_cmd_t	*mcp;
 	fct_status_t	st;
-	char		info[80];
+	char		info[QLT_INFO_LEN];
 	fct_status_t	ret2;
 
 	if (drv_priv(credp) != 0)
@@ -1748,9 +1749,8 @@ qlt_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 			iocd->stmf_error = QLTIO_NOT_ONLINE;
 			break;
 		}
-		(void) snprintf(info, 80, "qlt_ioctl: qlt-%p, "
+		(void) snprintf(info, sizeof (info), "qlt_ioctl: qlt-%p, "
 		    "user triggered FWDUMP with RFLAG_RESET", (void *)qlt);
-		info[79] = 0;
 		if ((ret2 = fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_USER_REQUEST | STMF_RFLAG_RESET |
 		    STMF_RFLAG_COLLECT_DEBUG_DUMP, info)) != FCT_SUCCESS) {
@@ -2501,7 +2501,7 @@ qlt_mailbox_command(qlt_state_t *qlt, mbox_cmd_t *mcp)
 {
 	int	retries;
 	int	i;
-	char	info[80];
+	char	info[QLT_INFO_LEN];
 
 	if (curthread->t_flag & T_INTR_THREAD) {
 		ASSERT(0);
@@ -2541,9 +2541,9 @@ qlt_mbox_wait_loop:;
 	/* Wait for mailbox command completion */
 	if (cv_timedwait(&qlt->mbox_cv, &qlt->mbox_lock, ddi_get_lbolt()
 	    + drv_usectohz(MBOX_TIMEOUT)) < 0) {
-		(void) snprintf(info, 80, "qlt_mailbox_command: qlt-%p, "
+		(void) snprintf(info, sizeof (info),
+		    "qlt_mailbox_command: qlt-%p, "
 		    "cmd-0x%02X timed out", (void *)qlt, qlt->mcp->to_fw[0]);
-		info[79] = 0;
 		qlt->mcp = NULL;
 		qlt->mbox_io_state = MBOX_STATE_UNKNOWN;
 		mutex_exit(&qlt->mbox_lock);
@@ -2588,7 +2588,7 @@ qlt_isr(caddr_t arg, caddr_t arg2)
 	uint32_t	risc_status, intr_type;
 	int		i;
 	int		intr_loop_count;
-	char		info[80];
+	char		info[QLT_INFO_LEN];
 
 	risc_status = REG_RD32(qlt, REG_RISC_STATUS);
 	if (!mutex_tryenter(&qlt->intr_lock)) {
@@ -2643,8 +2643,8 @@ intr_again:;
 		EL(qlt, "Risc Pause status=%xh\n", risc_status);
 		cmn_err(CE_WARN, "qlt(%d): Risc Pause %08x",
 		    qlt->instance, risc_status);
-		(void) snprintf(info, 80, "Risc Pause %08x", risc_status);
-		info[79] = 0;
+		(void) snprintf(info, sizeof (info), "Risc Pause %08x",
+		    risc_status);
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET |
 		    STMF_RFLAG_COLLECT_DEBUG_DUMP, info);
@@ -2712,15 +2712,14 @@ intr_again:;
 			    0, 0);
 		} else if ((code == 0x8002) || (code == 0x8003) ||
 		    (code == 0x8004) || (code == 0x8005)) {
-			(void) snprintf(info, 80,
+			(void) snprintf(info, sizeof (info),
 			    "Got %04x, mb1=%x mb2=%x mb5=%x mb6=%x",
 			    code, mbox1, mbox2, mbox5, mbox6);
-			info[79] = 0;
 			(void) fct_port_shutdown(qlt->qlt_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET |
 			    STMF_RFLAG_COLLECT_DEBUG_DUMP, info);
 		} else if (code == 0x800F) {
-			(void) snprintf(info, 80,
+			(void) snprintf(info, sizeof (info),
 			    "Got 800F, mb1=%x mb2=%x mb3=%x",
 			    mbox1, mbox2, mbox3);
 
@@ -2729,10 +2728,9 @@ intr_again:;
 				qlt_verify_fw(qlt);
 			}
 		} else if (code == 0x8101) {
-			(void) snprintf(info, 80,
+			(void) snprintf(info, sizeof (info),
 			    "IDC Req Rcvd:%04x, mb1=%x mb2=%x mb3=%x",
 			    code, mbox1, mbox2, mbox3);
-			info[79] = 0;
 
 			/* check if "ACK" is required (timeout != 0) */
 			if (mbox1 & 0x0f00) {
@@ -2756,9 +2754,8 @@ intr_again:;
 					QMEM_WR16(qlt, req+20, mbox6);
 					qlt_submit_req_entries(qlt, 1);
 				} else {
-					(void) snprintf(info, 80,
+					(void) snprintf(info, sizeof (info),
 					    "IDC ACK failed");
-					info[79] = 0;
 				}
 				mutex_exit(&qlt->req_lock);
 			}
@@ -3266,7 +3263,7 @@ qlt_handle_purex(qlt_state_t *qlt, uint8_t *resp)
 	uint8_t			*pldptr, *bndrptr;
 	int			i, off;
 	uint16_t		iocb_flags;
-	char			info[160];
+	char			info[QLT_INFO_LEN];
 
 	remote_portid = ((uint32_t)(QMEM_RD16(qlt, (&resp[0x18])))) |
 	    ((uint32_t)(resp[0x1A])) << 16;
@@ -3288,9 +3285,9 @@ qlt_handle_purex(qlt_state_t *qlt, uint8_t *resp)
 	if (cmd == NULL) {
 		EL(qlt, "fct_alloc cmd==NULL\n");
 cmd_null:;
-		(void) snprintf(info, 160, "qlt_handle_purex: qlt-%p, can't "
-		    "allocate space for fct_cmd", (void *)qlt);
-		info[159] = 0;
+		(void) snprintf(info, sizeof (info),
+		    "qlt_handle_purex: qlt-%p, "
+		    "can't allocate space for fct_cmd", (void *)qlt);
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 		return;
@@ -3337,7 +3334,7 @@ fct_status_t
 qlt_send_cmd_response(fct_cmd_t *cmd, uint32_t ioflags)
 {
 	qlt_state_t	*qlt;
-	char		info[160];
+	char		info[QLT_INFO_LEN];
 
 	qlt = (qlt_state_t *)cmd->cmd_port->port_fca_private;
 
@@ -3371,10 +3368,10 @@ qlt_send_cmd_response(fct_cmd_t *cmd, uint32_t ioflags)
 	}
 
 fatal_panic:;
-	(void) snprintf(info, 160, "qlt_send_cmd_response: can not handle "
+	(void) snprintf(info, sizeof (info),
+	    "qlt_send_cmd_response: can not handle "
 	    "FCT_IOF_FORCE_FCA_DONE for cmd %p, ioflags-%x", (void *)cmd,
 	    ioflags);
-	info[159] = 0;
 	(void) fct_port_shutdown(qlt->qlt_port,
 	    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 	return (FCT_FAILURE);
@@ -3901,7 +3898,7 @@ qlt_handle_atio(qlt_state_t *qlt, uint8_t *atio)
 	uint32_t	rportid, fw_xchg_addr;
 	uint8_t		*p, *q, *req, tm;
 	uint16_t	cdb_size, flags, oxid;
-	char		info[160];
+	char		info[QLT_INFO_LEN];
 
 	/*
 	 * If either bidirection xfer is requested of there is extended
@@ -3964,10 +3961,9 @@ qlt_handle_atio(qlt_state_t *qlt, uint8_t *atio)
 		if (req == NULL) {
 			mutex_exit(&qlt->req_lock);
 
-			(void) snprintf(info, 160,
+			(void) snprintf(info, sizeof (info),
 			    "qlt_handle_atio: qlt-%p, can't "
 			    "allocate space for scsi_task", (void *)qlt);
-			info[159] = 0;
 			(void) fct_port_shutdown(qlt->qlt_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 			return;
@@ -4112,7 +4108,7 @@ qlt_handle_dereg_completion(qlt_state_t *qlt, uint8_t *rsp)
 static void
 qlt_handle_unsol_els_completion(qlt_state_t *qlt, uint8_t *rsp)
 {
-	char		info[160];
+	char		info[QLT_INFO_LEN];
 	fct_cmd_t	*cmd;
 	qlt_cmd_t	*qcmd;
 	uint32_t	hndl;
@@ -4131,10 +4127,10 @@ qlt_handle_unsol_els_completion(qlt_state_t *qlt, uint8_t *rsp)
 		 * only happen when abort for an unsol els completes.
 		 * This condition indicates a firmware bug.
 		 */
-		(void) snprintf(info, 160, "qlt_handle_unsol_els_completion: "
+		(void) snprintf(info, sizeof (info),
+		    "qlt_handle_unsol_els_completion: "
 		    "Invalid handle: hndl-%x, status-%x/%x/%x, rsp-%p",
 		    hndl, status, subcode1, subcode2, (void *)rsp);
-		info[159] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET |
 		    STMF_RFLAG_COLLECT_DEBUG_DUMP, info);
@@ -4159,11 +4155,10 @@ qlt_handle_unsol_els_completion(qlt_state_t *qlt, uint8_t *rsp)
 		/*
 		 * Now why would this happen ???
 		 */
-		(void) snprintf(info, 160,
+		(void) snprintf(info, sizeof (info),
 		    "qlt_handle_unsol_els_completion: can not "
 		    "get cmd, hndl-%x, status-%x, rsp-%p", hndl, status,
 		    (void *)rsp);
-		info[159] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -4200,7 +4195,7 @@ qlt_handle_unsol_els_completion(qlt_state_t *qlt, uint8_t *rsp)
 static void
 qlt_handle_unsol_els_abort_completion(qlt_state_t *qlt, uint8_t *rsp)
 {
-	char		info[160];
+	char		info[QLT_INFO_LEN];
 	fct_cmd_t	*cmd;
 	qlt_cmd_t	*qcmd;
 	uint32_t	hndl;
@@ -4225,11 +4220,10 @@ qlt_handle_unsol_els_abort_completion(qlt_state_t *qlt, uint8_t *rsp)
 			 * There could be exchange resource leakage, so
 			 * throw HBA fatal error event now
 			 */
-			(void) snprintf(info, 160,
+			(void) snprintf(info, sizeof (info),
 			    "qlt_handle_unsol_els_abort_completion: "
 			    "Invalid handle: hndl-%x, status-%x/%x/%x, rsp-%p",
 			    hndl, status, subcode1, subcode2, (void *)rsp);
-			info[159] = 0;
 			(void) fct_port_shutdown(qlt->qlt_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET |
 			    STMF_RFLAG_COLLECT_DEBUG_DUMP, info);
@@ -4245,11 +4239,10 @@ qlt_handle_unsol_els_abort_completion(qlt_state_t *qlt, uint8_t *rsp)
 		/*
 		 * Why would this happen ??
 		 */
-		(void) snprintf(info, 160,
+		(void) snprintf(info, sizeof (info),
 		    "qlt_handle_unsol_els_abort_completion: can not get "
 		    "cmd, hndl-%x, status-%x, rsp-%p", hndl, status,
 		    (void *)rsp);
-		info[159] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -4278,7 +4271,7 @@ qlt_handle_unsol_els_abort_completion(qlt_state_t *qlt, uint8_t *rsp)
 static void
 qlt_handle_sol_els_completion(qlt_state_t *qlt, uint8_t *rsp)
 {
-	char		info[160];
+	char		info[QLT_INFO_LEN];
 	fct_cmd_t	*cmd;
 	fct_els_t	*els;
 	qlt_cmd_t	*qcmd;
@@ -4296,10 +4289,10 @@ qlt_handle_sol_els_completion(qlt_state_t *qlt, uint8_t *rsp)
 		/*
 		 * This cannot happen for sol els completion.
 		 */
-		(void) snprintf(info, 160, "qlt_handle_sol_els_completion: "
+		(void) snprintf(info, sizeof (info),
+		    "qlt_handle_sol_els_completion: "
 		    "Invalid handle: hndl-%x, status-%x/%x/%x, rsp-%p",
 		    hndl, status, subcode1, subcode2, (void *)rsp);
-		info[159] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET |
 		    STMF_RFLAG_COLLECT_DEBUG_DUMP, info);
@@ -4309,11 +4302,10 @@ qlt_handle_sol_els_completion(qlt_state_t *qlt, uint8_t *rsp)
 	cmd = fct_handle_to_cmd(qlt->qlt_port, hndl);
 	if (cmd == NULL) {
 		EL(qlt, "fct_handle_to_cmd cmd==NULL, hndl=%xh\n", hndl);
-		(void) snprintf(info, 160,
+		(void) snprintf(info, sizeof (info),
 		    "qlt_handle_sol_els_completion: can not "
 		    "get cmd, hndl-%x, status-%x, rsp-%p", hndl, status,
 		    (void *)rsp);
-		info[159] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -4359,7 +4351,7 @@ qlt_handle_ct_completion(qlt_state_t *qlt, uint8_t *rsp)
 	qlt_cmd_t	*qcmd;
 	uint32_t	 hndl;
 	uint16_t	 status;
-	char		 info[160];
+	char		 info[QLT_INFO_LEN];
 
 	hndl = QMEM_RD32(qlt, rsp+4);
 	status = QMEM_RD16(qlt, rsp+8);
@@ -4369,9 +4361,9 @@ qlt_handle_ct_completion(qlt_state_t *qlt, uint8_t *rsp)
 		/*
 		 * Solicited commands will always have a valid handle.
 		 */
-		(void) snprintf(info, 160, "qlt_handle_ct_completion: hndl-"
-		    "%x, status-%x, rsp-%p", hndl, status, (void *)rsp);
-		info[159] = 0;
+		(void) snprintf(info, sizeof (info),
+		    "qlt_handle_ct_completion: "
+		    "hndl-%x, status-%x, rsp-%p", hndl, status, (void *)rsp);
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET |
 		    STMF_RFLAG_COLLECT_DEBUG_DUMP, info);
@@ -4381,11 +4373,10 @@ qlt_handle_ct_completion(qlt_state_t *qlt, uint8_t *rsp)
 	cmd = fct_handle_to_cmd(qlt->qlt_port, hndl);
 	if (cmd == NULL) {
 		EL(qlt, "fct_handle_to_cmd cmd==NULL, hndl=%xh\n", hndl);
-		(void) snprintf(info, 160,
+		(void) snprintf(info, sizeof (info),
 		    "qlt_handle_ct_completion: cannot find "
 		    "cmd, hndl-%x, status-%x, rsp-%p", hndl, status,
 		    (void *)rsp);
-		info[159] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -4434,7 +4425,7 @@ qlt_handle_ctio_completion(qlt_state_t *qlt, uint8_t *rsp)
 	uint16_t	flags;
 	uint8_t		abort_req;
 	uint8_t		n;
-	char		info[160];
+	char		info[QLT_INFO_LEN];
 
 	/* XXX: Check validity of the IOCB by checking 4th byte. */
 	hndl = QMEM_RD32(qlt, rsp+4);
@@ -4457,10 +4448,9 @@ qlt_handle_ctio_completion(qlt_state_t *qlt, uint8_t *rsp)
 			 * There could be exchange resource leakage, so
 			 * throw HBA fatal error event now
 			 */
-			(void) snprintf(info, 160,
+			(void) snprintf(info, sizeof (info),
 			    "qlt_handle_ctio_completion: hndl-"
 			    "%x, status-%x, rsp-%p", hndl, status, (void *)rsp);
-			info[159] = 0;
 			(void) fct_port_shutdown(qlt->qlt_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -4480,11 +4470,10 @@ qlt_handle_ctio_completion(qlt_state_t *qlt, uint8_t *rsp)
 	cmd = fct_handle_to_cmd(qlt->qlt_port, hndl);
 	if (cmd == NULL) {
 		EL(qlt, "fct_handle_to_cmd cmd==NULL, hndl=%xh\n", hndl);
-		(void) snprintf(info, 160,
+		(void) snprintf(info, sizeof (info),
 		    "qlt_handle_ctio_completion: cannot find "
 		    "cmd, hndl-%x, status-%x, rsp-%p", hndl, status,
 		    (void *)rsp);
-		info[159] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -4553,7 +4542,7 @@ qlt_handle_ctio_completion(qlt_state_t *qlt, uint8_t *rsp)
 static void
 qlt_handle_sol_abort_completion(qlt_state_t *qlt, uint8_t *rsp)
 {
-	char		info[80];
+	char		info[QLT_INFO_LEN];
 	fct_cmd_t	*cmd;
 	qlt_cmd_t	*qcmd;
 	uint32_t	h;
@@ -4567,10 +4556,9 @@ qlt_handle_sol_abort_completion(qlt_state_t *qlt, uint8_t *rsp)
 		/*
 		 * Solicited commands always have a valid handle.
 		 */
-		(void) snprintf(info, 80,
+		(void) snprintf(info, sizeof (info),
 		    "qlt_handle_sol_abort_completion: hndl-"
 		    "%x, status-%x, rsp-%p", h, status, (void *)rsp);
-		info[79] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET |
 		    STMF_RFLAG_COLLECT_DEBUG_DUMP, info);
@@ -4582,11 +4570,10 @@ qlt_handle_sol_abort_completion(qlt_state_t *qlt, uint8_t *rsp)
 		/*
 		 * What happened to the cmd ??
 		 */
-		(void) snprintf(info, 80,
+		(void) snprintf(info, sizeof (info),
 		    "qlt_handle_sol_abort_completion: cannot "
 		    "find cmd, hndl-%x, status-%x, rsp-%p", h, status,
 		    (void *)rsp);
-		info[79] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -4616,7 +4603,7 @@ qlt_handle_rcvd_abts(qlt_state_t *qlt, uint8_t *resp)
 	qlt_abts_cmd_t	*qcmd;
 	fct_cmd_t	*cmd;
 	uint32_t	remote_portid;
-	char		info[160];
+	char		info[QLT_INFO_LEN];
 
 	remote_portid = ((uint32_t)(QMEM_RD16(qlt, (&resp[0x18])))) |
 	    ((uint32_t)(resp[0x1A])) << 16;
@@ -4624,10 +4611,9 @@ qlt_handle_rcvd_abts(qlt_state_t *qlt, uint8_t *resp)
 	    sizeof (qlt_abts_cmd_t), 0);
 	if (cmd == NULL) {
 		EL(qlt, "fct_alloc cmd==NULL\n");
-		(void) snprintf(info, 160,
+		(void) snprintf(info, sizeof (info),
 		    "qlt_handle_rcvd_abts: qlt-%p, can't "
 		    "allocate space for fct_cmd", (void *)qlt);
-		info[159] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
 		    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 		return;
@@ -4653,7 +4639,7 @@ static void
 qlt_handle_abts_completion(qlt_state_t *qlt, uint8_t *resp)
 {
 	uint16_t status;
-	char	info[80];
+	char	info[QLT_INFO_LEN];
 
 	status = QMEM_RD16(qlt, resp+8);
 
@@ -4661,10 +4647,10 @@ qlt_handle_abts_completion(qlt_state_t *qlt, uint8_t *resp)
 		return;
 	}
 	EL(qlt, "status = %xh\n", status);
-	(void) snprintf(info, 80, "ABTS completion failed %x/%x/%x resp_off %x",
+	(void) snprintf(info, sizeof (info),
+	    "ABTS completion failed %x/%x/%x resp_off %x",
 	    status, QMEM_RD32(qlt, resp+0x34), QMEM_RD32(qlt, resp+0x38),
 	    ((uint32_t)(qlt->resp_ndx_to_fw)) << 6);
-	info[79] = 0;
 	(void) fct_port_shutdown(qlt->qlt_port, STMF_RFLAG_FATAL_ERROR |
 	    STMF_RFLAG_RESET | STMF_RFLAG_COLLECT_DEBUG_DUMP, info);
 }
@@ -5872,18 +5858,20 @@ static void
 qlt_handle_verify_fw_completion(qlt_state_t *qlt, uint8_t *rsp)
 {
 	uint16_t	status;
-	char		info[80];
+	char		info[QLT_INFO_LEN];
 
 	status = QMEM_RD16(qlt, rsp+8);
 	if (status != 0) {
-		(void) snprintf(info, 80, "qlt_handle_verify_fw_completion: "
+		(void) snprintf(info, sizeof (info),
+		    "qlt_handle_verify_fw_completion: "
 		    "status:%x, rsp:%p", status, (void *)rsp);
 		if (status == 3) {
 			uint16_t error_code;
 
 			error_code = QMEM_RD16(qlt, rsp+0xA);
-			(void) snprintf(info, 80, "qlt_handle_verify_fw_"
-			    "completion: error code:%x", error_code);
+			(void) snprintf(info, sizeof (info),
+			    "qlt_handle_verify_fw_completion: error code:%x",
+			    error_code);
 		}
 	}
 }

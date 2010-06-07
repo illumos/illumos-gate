@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the stmf driver for 
 #	COMSTAR.
@@ -58,9 +57,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
 CERRWARN	+= -erroff=E_STATEMENT_NOT_REACHED
-
-INC_PATH	+= -I$(UTSBASE)/common/io/comstar/stmf
-INC_PATH	+= -I$(UTSBASE)/common/sys
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

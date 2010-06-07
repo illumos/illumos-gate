@@ -39,9 +39,10 @@
 #include <sys/idm/idm_so.h>
 #include <sys/iscsit/iscsit_common.h>
 #include <sys/iscsit/isns_protocol.h>
-#include <iscsit.h>
-#include <iscsit_isns.h>
 #include <sys/ksocket.h>
+
+#include "iscsit.h"
+#include "iscsit_isns.h"
 
 /*
  * iscsit_isns.c -- isns client that is part of the iscsit server

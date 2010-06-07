@@ -28,13 +28,14 @@
 #include <sys/scsi/scsi_types.h>
 #include <sys/scsi/generic/persist.h>
 
-#include <lpif.h>
-#include <stmf.h>
-#include <stmf_ioctl.h>
-#include <stmf_sbd.h>
-#include <sbd_impl.h>
-#include <portif.h>
-#include <stmf_sbd_ioctl.h>
+#include <sys/lpif.h>
+#include <sys/stmf.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/portif.h>
+#include <sys/stmf_sbd_ioctl.h>
+
+#include "stmf_sbd.h"
+#include "sbd_impl.h"
 
 #define	MAX_PGR_PARAM_LIST_LENGTH	(256 * 1024)
 

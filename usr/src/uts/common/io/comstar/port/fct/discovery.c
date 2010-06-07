@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -36,13 +35,14 @@
 #include <sys/atomic.h>
 #include <sys/sdt.h>
 
-#include <stmf.h>
-#include <stmf_ioctl.h>
-#include <portif.h>
-#include <fct.h>
-#include <fct_impl.h>
-#include <discovery.h>
-#include <fctio.h>
+#include <sys/stmf.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/portif.h>
+#include <sys/fct.h>
+#include <sys/fctio.h>
+
+#include "fct_impl.h"
+#include "discovery.h"
 
 disc_action_t fct_handle_local_port_event(fct_i_local_port_t *iport);
 disc_action_t fct_walk_discovery_queue(fct_i_local_port_t *iport);
@@ -1106,7 +1106,7 @@ fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 	fct_i_local_port_t	*iport;
 	fct_i_remote_port_t	*irp;
 	int			i;
-	char			info[160];
+	char			info[FCT_INFO_LEN];
 
 	iport = (fct_i_local_port_t *)port->port_fct_private;
 	irp = (fct_i_remote_port_t *)rp->rp_fct_private;
@@ -1119,24 +1119,23 @@ fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 	rw_enter(&irp->irp_lock, RW_WRITER);
 	if (rp->rp_handle != FCT_HANDLE_NONE) {
 		if (rp->rp_handle >= port->port_max_logins) {
-			(void) snprintf(info, 160,
+			(void) snprintf(info, sizeof (info),
 			    "fct_register_remote_port: FCA "
 			    "returned a	handle (%d) for portid %x which is "
 			    "out of range (max logins = %d)", rp->rp_handle,
 			    rp->rp_id, port->port_max_logins);
-			info[159] = 0;
 			goto hba_fatal_err;
 		}
 		if ((iport->iport_rp_slots[rp->rp_handle] != NULL) &&
 		    (iport->iport_rp_slots[rp->rp_handle] != irp)) {
 			fct_i_remote_port_t *t_irp =
 			    iport->iport_rp_slots[rp->rp_handle];
-			(void) snprintf(info, 160, "fct_register_remote_port: "
+			(void) snprintf(info, sizeof (info),
+			    "fct_register_remote_port: "
 			    "FCA returned a handle %d for portid %x "
 			    "which was already in use for a different "
 			    "portid (%x)", rp->rp_handle, rp->rp_id,
 			    t_irp->irp_rp->rp_id);
-			info[159] = 0;
 			goto hba_fatal_err;
 		}
 	} else {
@@ -1148,10 +1147,10 @@ fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 		}
 		if (i == port->port_max_logins) {
 			/* This is really pushing it. */
-			(void) snprintf(info, 160, "fct_register_remote_port "
+			(void) snprintf(info, sizeof (info),
+			    "fct_register_remote_port "
 			    "Cannot register portid %x because all the "
 			    "handles are used up", rp->rp_id);
-			info[159] = 0;
 			goto hba_fatal_err;
 		}
 		rp->rp_handle = i;
@@ -1236,7 +1235,7 @@ fct_send_accrjt(fct_cmd_t *cmd, uint8_t accrjt, uint8_t reason, uint8_t expl)
 disc_action_t
 fct_walk_discovery_queue(fct_i_local_port_t *iport)
 {
-	char			info[80];
+	char			info[FCT_INFO_LEN];
 	fct_i_remote_port_t	**pirp;
 	fct_i_remote_port_t	*prev_irp = NULL;
 	disc_action_t		suggested_action = DISC_ACTION_NO_WORK;
@@ -1345,12 +1344,11 @@ fct_walk_discovery_queue(fct_i_local_port_t *iport)
 				 * It looks like we can't deregister it in the
 				 * normal way, so we have to use extrem way
 				 */
-				(void) snprintf(info, 80,
+				(void) snprintf(info, sizeof (info),
 				    "fct_walk_discovery_queue: "
 				    "iport-%p, can't deregister irp-%p after "
 				    "trying 5 times", (void *)iport,
 				    (void *)irp_cur_item);
-				info[79] = 0;
 				(void) fct_port_shutdown(iport->iport_port,
 				    STMF_RFLAG_FATAL_ERROR |
 				    STMF_RFLAG_RESET, info);
@@ -1393,7 +1391,7 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 	uint8_t			 cmd_type   = cmd->cmd_type;
 	uint32_t		 icmd_flags = icmd->icmd_flags;
 	clock_t			 end_time;
-	char			 info[160];
+	char			 info[FCT_INFO_LEN];
 
 	DTRACE_FC_4(rport__login__start,
 	    fct_cmd_t, cmd,
@@ -1420,11 +1418,10 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 		end_time = icmd->icmd_start_time +
 		    drv_usectohz(USEC_ELS_TIMEOUT);
 		if (ddi_get_lbolt() > end_time) {
-			(void) snprintf(info, 160,
+			(void) snprintf(info, sizeof (info),
 			    "fct_process_plogi: unable to "
 			    "clean up I/O. iport-%p, icmd-%p", (void *)iport,
 			    (void *)icmd);
-			info[159] = 0;
 			(void) fct_port_shutdown(iport->iport_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -1570,7 +1567,7 @@ fct_process_prli(fct_i_cmd_t *icmd)
 	stmf_scsi_session_t	*ses   = NULL;
 	fct_status_t		 ret;
 	clock_t			 end_time;
-	char			 info[160];
+	char			 info[FCT_INFO_LEN];
 
 	/* We dont support solicited PRLIs yet */
 	ASSERT(cmd->cmd_type == FCT_CMD_RCVD_ELS);
@@ -1621,11 +1618,10 @@ fct_process_prli(fct_i_cmd_t *icmd)
 		end_time = icmd->icmd_start_time +
 		    drv_usectohz(USEC_ELS_TIMEOUT);
 		if (ddi_get_lbolt() > end_time) {
-			(void) snprintf(info, 160,
+			(void) snprintf(info, sizeof (info),
 			    "fct_process_prli: unable to clean "
 			    "up I/O. iport-%p, icmd-%p", (void *)iport,
 			    (void *)icmd);
-			info[159] = 0;
 			(void) fct_port_shutdown(iport->iport_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -1722,7 +1718,7 @@ fct_process_logo(fct_i_cmd_t *icmd)
 	fct_i_remote_port_t	*irp   = (fct_i_remote_port_t *)
 	    rp->rp_fct_private;
 	fct_status_t		 ret;
-	char			 info[160];
+	char			 info[FCT_INFO_LEN];
 	clock_t			 end_time;
 
 	DTRACE_FC_4(rport__logout__start,
@@ -1750,11 +1746,10 @@ fct_process_logo(fct_i_cmd_t *icmd)
 		end_time = icmd->icmd_start_time +
 		    drv_usectohz(USEC_ELS_TIMEOUT);
 		if (ddi_get_lbolt() > end_time) {
-			(void) snprintf(info, 160,
+			(void) snprintf(info, sizeof (info),
 			    "fct_process_logo: unable to clean "
 			    "up I/O. iport-%p, icmd-%p", (void *)iport,
 			    (void *)icmd);
-			info[159] = 0;
 			(void) fct_port_shutdown(iport->iport_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 
@@ -1838,7 +1833,7 @@ fct_process_prlo(fct_i_cmd_t *icmd)
 	    rp->rp_fct_private;
 	fct_status_t		 ret;
 	clock_t			 end_time;
-	char			 info[160];
+	char			 info[FCT_INFO_LEN];
 
 	/* We do not support solicited PRLOs yet */
 	ASSERT(cmd->cmd_type == FCT_CMD_RCVD_ELS);
@@ -1862,11 +1857,10 @@ fct_process_prlo(fct_i_cmd_t *icmd)
 		end_time = icmd->icmd_start_time +
 		    drv_usectohz(USEC_ELS_TIMEOUT);
 		if (ddi_get_lbolt() > end_time) {
-			(void) snprintf(info, 160,
+			(void) snprintf(info, sizeof (info),
 			    "fct_process_prlo: unable to "
 			    "clean up I/O. iport-%p, icmd-%p", (void *)iport,
 			    (void *)icmd);
-			info[159] = 0;
 			(void) fct_port_shutdown(iport->iport_port,
 			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 

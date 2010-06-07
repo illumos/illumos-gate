@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -36,11 +35,10 @@
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
-
-#include <iscsit.h>
-
 #include <sys/iscsit/chap.h>
-#include <radius_auth.h>
+
+#include "iscsit.h"
+#include "radius_auth.h"
 
 void
 client_set_numeric_data(auth_key_block_t *keyBlock,

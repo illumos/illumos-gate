@@ -33,13 +33,14 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 
-#include <stmf_defines.h>
-#include <fct_defines.h>
-#include <stmf.h>
-#include <portif.h>
-#include <fct.h>
-#include <qlt.h>
-#include <qlt_dma.h>
+#include <sys/stmf_defines.h>
+#include <sys/fct_defines.h>
+#include <sys/stmf.h>
+#include <sys/portif.h>
+#include <sys/fct.h>
+
+#include "qlt.h"
+#include "qlt_dma.h"
 
 /*
  *  Local Function Prototypes.

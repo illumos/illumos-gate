@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the qlt driver for 
 #	COMSTAR.
@@ -60,9 +59,6 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -dy -Ndrv/fct -Ndrv/stmf
 CFLAGS		+= -DUNIQUE_FW_NAME
 LINTTAGS	+= -DUNIQUE_FW_NAME
-
-INC_PATH	+= -I$(UTSBASE)/common/io/comstar/port/qlt
-INC_PATH	+= -I$(UTSBASE)/common/sys
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

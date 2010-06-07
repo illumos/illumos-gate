@@ -38,15 +38,16 @@
 #include <sys/zone.h>
 #include <sys/id_space.h>
 
-#include <stmf.h>
-#include <lpif.h>
-#include <portif.h>
-#include <stmf_ioctl.h>
-#include <stmf_impl.h>
-#include <lun_map.h>
-#include <stmf_state.h>
-#include <pppt_ic_if.h>
-#include <stmf_stats.h>
+#include <sys/stmf.h>
+#include <sys/lpif.h>
+#include <sys/portif.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/pppt_ic_if.h>
+
+#include "stmf_impl.h"
+#include "lun_map.h"
+#include "stmf_state.h"
+#include "stmf_stats.h"
 
 /*
  * Lock order:
@@ -5256,10 +5257,10 @@ stmf_task_lu_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 
 	st = s;	/* gcc fix */
 	if ((s != STMF_ABORT_SUCCESS) && (s != STMF_NOT_FOUND)) {
-		(void) snprintf(info, STMF_CHANGE_INFO_LEN,
+		(void) snprintf(info, sizeof (info),
 		    "task %p, lu failed to abort ret=%llx", (void *)task, st);
 	} else if ((iof & STMF_IOF_LU_DONE) == 0) {
-		(void) snprintf(info, STMF_CHANGE_INFO_LEN,
+		(void) snprintf(info, sizeof (info),
 		    "Task aborted but LU is not finished, task ="
 		    "%p, s=%llx, iof=%x", (void *)task, st, iof);
 	} else {
@@ -5270,7 +5271,6 @@ stmf_task_lu_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 		return;
 	}
 
-	info[STMF_CHANGE_INFO_LEN - 1] = 0;
 	stmf_abort_task_offline(task, 1, info);
 }
 
@@ -5284,11 +5284,11 @@ stmf_task_lport_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 
 	st = s;
 	if ((s != STMF_ABORT_SUCCESS) && (s != STMF_NOT_FOUND)) {
-		(void) snprintf(info, STMF_CHANGE_INFO_LEN,
+		(void) snprintf(info, sizeof (info),
 		    "task %p, tgt port failed to abort ret=%llx", (void *)task,
 		    st);
 	} else if ((iof & STMF_IOF_LPORT_DONE) == 0) {
-		(void) snprintf(info, STMF_CHANGE_INFO_LEN,
+		(void) snprintf(info, sizeof (info),
 		    "Task aborted but tgt port is not finished, "
 		    "task=%p, s=%llx, iof=%x", (void *)task, st, iof);
 	} else {
@@ -5304,7 +5304,6 @@ stmf_task_lport_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 		return;
 	}
 
-	info[STMF_CHANGE_INFO_LEN - 1] = 0;
 	stmf_abort_task_offline(task, 0, info);
 }
 
@@ -5439,18 +5438,16 @@ stmf_do_task_abort(scsi_task_t *task)
 			atomic_and_32(&itask->itask_flags,
 			    ~ITASK_LU_ABORT_CALLED);
 		} else if (ret != STMF_SUCCESS) {
-			(void) snprintf(info, STMF_CHANGE_INFO_LEN,
+			(void) snprintf(info, sizeof (info),
 			    "Abort failed by LU %p, ret %llx", (void *)lu, ret);
-			info[STMF_CHANGE_INFO_LEN - 1] = 0;
 			stmf_abort_task_offline(task, 1, info);
 		}
 	} else if (itask->itask_flags & ITASK_KNOWN_TO_LU) {
 		if (ddi_get_lbolt() > (itask->itask_start_time +
 		    STMF_SEC2TICK(lu->lu_abort_timeout?
 		    lu->lu_abort_timeout : ITASK_DEFAULT_ABORT_TIMEOUT))) {
-			(void) snprintf(info, STMF_CHANGE_INFO_LEN,
+			(void) snprintf(info, sizeof (info),
 			    "lu abort timed out");
-			info[STMF_CHANGE_INFO_LEN - 1] = 0;
 			stmf_abort_task_offline(itask->itask_task, 1, info);
 		}
 	}
@@ -5473,10 +5470,9 @@ stmf_do_task_abort(scsi_task_t *task)
 			atomic_and_32(&itask->itask_flags,
 			    ~ITASK_TGT_PORT_ABORT_CALLED);
 		} else if (ret != STMF_SUCCESS) {
-			(void) snprintf(info, STMF_CHANGE_INFO_LEN,
+			(void) snprintf(info, sizeof (info),
 			    "Abort failed by tgt port %p ret %llx",
 			    (void *)lport, ret);
-			info[STMF_CHANGE_INFO_LEN - 1] = 0;
 			stmf_abort_task_offline(task, 0, info);
 		}
 	} else if (itask->itask_flags & ITASK_KNOWN_TO_TGT_PORT) {
@@ -5484,9 +5480,8 @@ stmf_do_task_abort(scsi_task_t *task)
 		    STMF_SEC2TICK(lport->lport_abort_timeout?
 		    lport->lport_abort_timeout :
 		    ITASK_DEFAULT_ABORT_TIMEOUT))) {
-			(void) snprintf(info, STMF_CHANGE_INFO_LEN,
+			(void) snprintf(info, sizeof (info),
 			    "lport abort timed out");
-			info[STMF_CHANGE_INFO_LEN - 1] = 0;
 			stmf_abort_task_offline(itask->itask_task, 0, info);
 		}
 	}

@@ -41,8 +41,8 @@
 #include <sys/idm/idm.h>
 
 #define	ISCSIT_TGT_SM_STRINGS
-#include <iscsit.h>
-#include <iscsit_isns.h>
+#include "iscsit.h"
+#include "iscsit_isns.h"
 
 typedef struct {
 	list_node_t		te_ctx_node;

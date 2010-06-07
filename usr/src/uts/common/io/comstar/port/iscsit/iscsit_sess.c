@@ -42,7 +42,7 @@
 #include <sys/idm/idm.h>
 
 #define	ISCSIT_SESS_SM_STRINGS
-#include <iscsit.h>
+#include "iscsit.h"
 
 typedef struct {
 	list_node_t		se_ctx_node;

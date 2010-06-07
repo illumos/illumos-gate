@@ -157,6 +157,9 @@ typedef struct fct_rcvd_abts {
 #define	FCHBA_DRIVER_NAME_LEN		256
 #define	FCHBA_SYMB_NAME_LEN		255
 
+#define	FCT_INFO_LEN			160
+#define	FCT_TASKQ_NAME_LEN		24
+
 #define	FC_TGT_PORT_INFO_CMD		(((uint32_t)'I') << 24)
 #define	FC_TGT_PORT_RLS			FC_TGT_PORT_INFO_CMD + 0x1
 

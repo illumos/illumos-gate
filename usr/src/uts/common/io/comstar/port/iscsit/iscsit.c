@@ -40,8 +40,9 @@
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_conn_sm.h>
-#include <iscsit_isns.h>
-#include <iscsit.h>
+
+#include "iscsit_isns.h"
+#include "iscsit.h"
 
 #define	ISCSIT_VERSION		BUILD_DATE "-1.18dev"
 #define	ISCSIT_NAME_VERSION	"COMSTAR ISCSIT v" ISCSIT_VERSION

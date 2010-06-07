@@ -35,9 +35,9 @@
 #include <sys/ib/ibtl/ibti.h>
 #include <sys/modctl.h>
 
-#include <stmf.h>
-#include <stmf_ioctl.h>
-#include <portif.h>
+#include <sys/stmf.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/portif.h>
 
 #include <sys/ib/mgt/ibdma/ibdma.h>
 

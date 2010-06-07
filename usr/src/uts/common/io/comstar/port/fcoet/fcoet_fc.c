@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -62,9 +61,9 @@
 /*
  * Driver's own header files
  */
-#include <fcoet.h>
-#include <fcoet_fc.h>
-#include <fcoet_eth.h>
+#include "fcoet.h"
+#include "fcoet_fc.h"
+#include "fcoet_eth.h"
 
 /*
  * function forward declaration
@@ -168,7 +167,7 @@ fcoet_send_cmd(fct_cmd_t *cmd)
 fct_status_t
 fcoet_send_cmd_response(fct_cmd_t *cmd, uint32_t ioflags)
 {
-	char	info[160];
+	char	info[FCT_INFO_LEN];
 
 	if (cmd->cmd_type == FCT_CMD_FCP_XCHG) {
 		if (ioflags & FCT_IOF_FORCE_FCA_DONE) {
@@ -198,10 +197,9 @@ fcoet_send_cmd_response(fct_cmd_t *cmd, uint32_t ioflags)
 	}
 
 send_cmd_rsp_error:
-	(void) snprintf(info, 160, "fcoet_send_cmd_response: can not handle "
-	    "FCT_IOF_FORCE_FCA_DONE for cmd %p, ioflags-%x", (void *)cmd,
+	(void) snprintf(info, sizeof (info), "fcoet_send_cmd_response: can not "
+	    "handle FCT_IOF_FORCE_FCA_DONE for cmd %p, ioflags-%x", (void *)cmd,
 	    ioflags);
-	info[159] = 0;
 	(void) fct_port_shutdown(CMD2SS(cmd)->ss_port,
 	    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);
 	return (FCT_FAILURE);

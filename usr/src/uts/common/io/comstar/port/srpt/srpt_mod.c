@@ -40,9 +40,9 @@
 #include <sys/sdt.h>
 #include <sys/taskq.h>
 
-#include <stmf.h>
-#include <stmf_ioctl.h>
-#include <portif.h>
+#include <sys/stmf.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/portif.h>
 
 #include "srp.h"
 #include "srpt_impl.h"

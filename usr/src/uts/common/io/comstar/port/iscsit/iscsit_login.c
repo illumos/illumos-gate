@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -44,8 +43,8 @@
 #include <sys/idm/idm_text.h>
 
 #define	ISCSIT_LOGIN_SM_STRINGS
-#include <iscsit.h>
-#include <iscsit_auth.h>
+#include "iscsit.h"
+#include "iscsit_auth.h"
 
 typedef struct {
 	list_node_t		le_ctx_node;

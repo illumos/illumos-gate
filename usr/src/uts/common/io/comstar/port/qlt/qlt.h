@@ -31,8 +31,8 @@
 #ifndef	_QLT_H
 #define	_QLT_H
 
-#include <stmf_defines.h>
-#include <qlt_regs.h>
+#include <sys/stmf_defines.h>
+#include "qlt_regs.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -412,6 +412,7 @@ typedef struct {
 #define	TOTAL_DMA_MEM_SIZE	(MBOX_DMA_MEM_OFFSET + MBOX_DMA_MEM_SIZE)
 
 #define	QLT_MAX_ITERATIONS_PER_INTR	32
+#define	QLT_INFO_LEN			160
 
 #define	REG_RD16(qlt, addr) \
 	ddi_get16(qlt->regs_acc_handle, (uint16_t *)(qlt->regs + addr))
