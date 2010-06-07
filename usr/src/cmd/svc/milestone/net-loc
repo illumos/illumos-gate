@@ -166,6 +166,21 @@ copy_default () {
 }
 
 #
+# enable_nonet
+#
+# Enables the NoNet location.  This function is called whenever an error is
+# detected in the location currently being activated (missing property or the
+# location itself).
+#
+enable_nonet () {
+	echo "reverting to NoNet location"
+	set_smf_prop $SMF_FMRI location/selected NoNet
+	refresh_svc $SMF_FMRI
+	# Refresh nwam so that it re-does the condition checking
+	refresh_svc $NWAM_FMRI
+}
+
+#
 # do_dns <location>
 #
 # Installs DNS information on /etc/resolv.conf for location
@@ -178,7 +193,14 @@ do_dns () {
 	$TOUCH $file.$$
 
 	DNS_CONFIGSRC=`nwam_get_loc_prop $loc dns-nameservice-configsrc`
+	if [ -z "$DNS_CONFIGSRC" ]; then
+		echo "missing 'dns-nameservice-configsrc' property for '$loc'"
+		enable_nonet
+		return
+	fi
+
 	(IFS=" ";
+	dns_server_set=false
 	for configsrc in $DNS_CONFIGSRC; do
 		case "$configsrc" in
 		'manual')
@@ -212,12 +234,19 @@ do_dns () {
 			    printf("\n") }' >> $file.$$
 		fi
 		if [ -n "$DNS_SERVERS" ]; then
+			dns_server_set=true
 			echo "$DNS_SERVERS" | $NAWK \
 			    'FS="," { for (i = 1; i <= NF; i++) \
 			    print "nameserver ", $i }' >> $file.$$
 		fi
-	done
+	done	
+	if [ "$dns_server_set" = "false" ]; then
+		echo "DNS nameserver not set for '$loc'"
+		enable_nonet
+		return
+	fi
 	)
+
 	# Finally, copy our working version to the real thing
 	$MV -f $file.$$ $file
 	start_svc $DNS_CLIENT_FMRI
@@ -232,6 +261,12 @@ do_nis () {
 	loc=$1
 
 	NIS_CONFIGSRC=`nwam_get_loc_prop $loc nis-nameservice-configsrc`
+	if [ -z "$NIS_CONFIGSRC" ]; then
+		echo "missing 'nis-nameservice-configsrc' property for '$loc'"
+		enable_nonet
+		return
+	fi
+
 	(IFS=" ";
 	domainname_set=false
 	for configsrc in $NIS_CONFIGSRC; do
@@ -241,9 +276,11 @@ do_nis () {
 			    nis-nameservice-servers`
 			DEFAULT_DOMAIN=`nwam_get_loc_prop $loc default-domain`
 			# user-specified default-domain always wins
-			$DOMAINNAME $DEFAULT_DOMAIN
-			$DOMAINNAME > $ETC_DEFAULT_DOMAIN
-			domainname_set=true
+			if [ -n "$DEFAULT_DOMAIN" ]; then
+				$DOMAINNAME $DEFAULT_DOMAIN
+				$DOMAINNAME > $ETC_DEFAULT_DOMAIN
+				domainname_set=true
+			fi
 			;;
 		'dhcp')
 			# Use only the first name
@@ -271,6 +308,11 @@ do_nis () {
 			    > $NIS_BIND_PATH/$DEFAULT_DOMAIN/ypservers
 		fi
 	done
+	if [ "$domainname_set" = "false" ]; then
+		echo "'domainname' not set for '$loc'"
+		enable_nonet
+		return
+	fi
 	)
 	start_svc $NIS_CLIENT_FMRI
 }
@@ -284,7 +326,14 @@ do_ldap () {
 	loc=$1
 
 	LDAP_CONFIGSRC=`nwam_get_loc_prop $loc ldap-nameservice-configsrc`
+	if [ -z "$LDAP_CONFIGSRC" ]; then
+		echo "missing 'ldap-nameservice-configsrc' property for '$loc'"
+		enable_nonet
+		return
+	fi
+
 	(IFS=" ";
+	ldap_config_set=false
 	for configsrc in $LDAP_CONFIGSRC; do
 		case "$configsrc" in
 		'manual')
@@ -301,11 +350,17 @@ do_ldap () {
 
 		# Use ldapclient(1M) to initialize LDAP client settings.
 		if [ -n "$DEFAULT_DOMAIN" -o -n "$LDAP_SERVERS" ]; then
+			ldap_config_set=true
 			# XXX need to check how to specify multiple LDAP servers.
 			$LDAPCLIENT init -a domainName=$DEFAULT_DOMAIN \
 			    $LDAP_SERVERS
 		fi
 	done
+	if [ "$ldap_config_set" = "false" ]; then
+		echo "LDAP configuration could not be set for '$loc'"
+		enable_nonet
+		return
+	fi
 	)
 	start_svc $LDAP_CLIENT_FMRI
 }
@@ -336,17 +391,21 @@ do_ns () {
 	$RM -f $ETC_DEFAULT_DOMAIN
 	$DOMAINNAME " "
 
+	NAMESERVICES=`nwam_get_loc_prop $loc nameservices`
+	if [ -z "$NAMESERVICES" ]; then
+		echo "missing 'nameservices' property for location '$loc'"
+		enable_nonet
+		return
+	fi
+
 	NAMESERVICES_CONFIG_FILE=`nwam_get_loc_prop \
 	    $loc nameservices-config-file`
-	NAMESERVICES=`nwam_get_loc_prop $loc nameservices`
-
-	if [ -f "$NAMESERVICES_CONFIG_FILE" ]; then
-		$CP -p $NAMESERVICES_CONFIG_FILE /etc/nsswitch.conf
-	else
-		echo "Failed to activate location ${loc}:\
-		    missing nameservices-config-file property"
-		exit $SMF_EXIT_ERR_CONFIG
+	if [ -z "$NAMESERVICES_CONFIG_FILE" ]; then
+		echo "missing 'nameservices-config-file' property for '$loc'"
+		enable_nonet
+		return
 	fi
+	$CP -p $NAMESERVICES_CONFIG_FILE /etc/nsswitch.conf
 
 	(IFS=,;
 	for ns in $NAMESERVICES; do
@@ -691,9 +750,8 @@ else
 		# check if the selected location exists
 		$NWAMCFG list loc $sel_loc >/dev/null 2>&1
 		if [ $? -eq 1 ]; then
-			echo "location $sel_loc doesn't exist, revert to NoNet"
-			set_smf_prop $SMF_FMRI location/selected NoNet
-			refresh_svc $SMF_FMRI
+			echo "location '$sel_loc' doesn't exist"
+			enable_nonet
 		else
 			# activate selected location
 			activate_loc $sel_loc
