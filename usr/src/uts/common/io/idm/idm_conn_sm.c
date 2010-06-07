@@ -601,6 +601,22 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		(void) idm_notify_client(ic, CN_LOGIN_FAIL, NULL);
 		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
 		break;
+	case CE_LOGOUT_SESSION_SUCCESS:
+		/*
+		 * T8
+		 * A session reinstatement request can be received while a
+		 * session is active and a login is in process. The iSCSI
+		 * connections are shut down by a CE_LOGOUT_SESSION_SUCCESS
+		 * event sent from the session to the IDM layer.
+		 */
+		if (IDM_CONN_ISTGT(ic)) {
+			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
+		} else {
+			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
+		}
+		idm_update_state(ic, CS_S11_COMPLETE, event_ctx);
+		break;
+
 	case CE_LOGIN_SND:
 		ASSERT(ic->ic_client_callback == NULL);
 		/*

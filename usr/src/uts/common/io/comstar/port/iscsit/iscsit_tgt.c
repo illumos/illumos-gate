@@ -1230,9 +1230,7 @@ iscsit_tgt_lookup_sess(iscsit_tgt_t *tgt, char *initiator_name,
 
 	result = avl_find(sess_avl, &tmp_sess, &where);
 	if (result != NULL) {
-		iscsit_sess_hold(result);
-		UNLOCK_FOR_SESS_LOOKUP(tgt);
-		return (result);
+		goto found_result;
 	}
 
 	/*
@@ -1244,9 +1242,7 @@ iscsit_tgt_lookup_sess(iscsit_tgt_t *tgt, char *initiator_name,
 	    (strcmp(result->ist_initiator_name, initiator_name) == 0) &&
 	    (memcmp(result->ist_isid, isid, ISCSI_ISID_LEN) == 0) &&
 	    (result->ist_tpgt_tag == tag)) {
-		iscsit_sess_hold(result);
-		UNLOCK_FOR_SESS_LOOKUP(tgt);
-		return (result);
+		goto found_result;
 	}
 
 	result = avl_nearest(sess_avl, where, AVL_AFTER);
@@ -1254,14 +1250,18 @@ iscsit_tgt_lookup_sess(iscsit_tgt_t *tgt, char *initiator_name,
 	    (strcmp(result->ist_initiator_name, initiator_name) == 0) &&
 	    (memcmp(result->ist_isid, isid, ISCSI_ISID_LEN) == 0) &&
 	    (result->ist_tpgt_tag == tag)) {
-		iscsit_sess_hold(result);
-		UNLOCK_FOR_SESS_LOOKUP(tgt);
-		return (result);
+		goto found_result;
 	}
 
-	UNLOCK_FOR_SESS_LOOKUP(tgt);
+	result = NULL;
 
-	return (NULL);
+found_result:
+	if ((result != NULL) &&
+	    (iscsit_sess_check_hold(result) != IDM_STATUS_SUCCESS)) {
+		result = NULL;
+	}
+	UNLOCK_FOR_SESS_LOOKUP(tgt);
+	return (result);
 }
 
 static idm_status_t

@@ -319,6 +319,20 @@ iscsit_sess_rele(iscsit_sess_t *ist)
 	idm_refcnt_rele(&ist->ist_refcnt);
 }
 
+idm_status_t
+iscsit_sess_check_hold(iscsit_sess_t *ist)
+{
+	mutex_enter(&ist->ist_mutex);
+	if (ist->ist_state != SS_Q6_DONE &&
+	    ist->ist_state != SS_Q7_ERROR) {
+		idm_refcnt_hold(&ist->ist_refcnt);
+		mutex_exit(&ist->ist_mutex);
+		return (IDM_STATUS_SUCCESS);
+	}
+	mutex_exit(&ist->ist_mutex);
+	return (IDM_STATUS_FAIL);
+}
+
 iscsit_conn_t *
 iscsit_sess_lookup_conn(iscsit_sess_t *ist, uint16_t cid)
 {
@@ -562,6 +576,8 @@ sess_sm_q1_free(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 static void
 sess_sm_q2_active(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 {
+	iscsit_conn_t	*ict;
+
 	switch (ctx->se_ctx_event) {
 	case SE_CONN_LOGGED_IN:
 		/* N2 track FFP connections */
@@ -577,6 +593,19 @@ sess_sm_q2_active(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 		break;
 	case SE_SESSION_REINSTATE:
 		/* N11 */
+		/*
+		 * Shutdown the iSCSI connections by
+		 * sending an implicit logout to all
+		 * the IDM connections and transition
+		 * the session to SS_Q6_DONE state.
+		 */
+		mutex_enter(&ist->ist_mutex);
+		for (ict = list_head(&ist->ist_conn_list);
+		    ict != NULL;
+		    ict = list_next(&ist->ist_conn_list, ict)) {
+			iscsit_conn_logout(ict);
+		}
+		mutex_exit(&ist->ist_mutex);
 		sess_sm_new_state(ist, ctx, SS_Q6_DONE);
 		break;
 	default:
@@ -588,7 +617,7 @@ sess_sm_q2_active(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 static void
 sess_sm_q3_logged_in(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 {
-	iscsit_conn_t *ict;
+	iscsit_conn_t	*ict;
 
 	switch (ctx->se_ctx_event) {
 	case SE_CONN_IN_LOGIN:
@@ -645,8 +674,7 @@ sess_sm_q3_logged_in(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 				 */
 				continue;
 			}
-			idm_conn_event(ict->ict_ic, CE_LOGOUT_SESSION_SUCCESS,
-			    NULL);
+			iscsit_conn_logout(ict);
 		}
 		mutex_exit(&ist->ist_mutex);
 

@@ -1367,9 +1367,13 @@ iscsit_conn_destroy(idm_conn_t *ic)
 		iscsit_sess_sm_event(ict->ict_sess, SE_CONN_FAIL, ict);
 	}
 
-	ict->ict_ic = NULL;
-
 	idm_refcnt_wait_ref(&ict->ict_refcnt);
+	/*
+	 * The session state machine does not need to post
+	 * events to IDM any longer, so it is safe to set
+	 * the idm connection reference to NULL
+	 */
+	ict->ict_ic = NULL;
 
 	/* Reap the login state machine */
 	iscsit_login_sm_fini(ict);
@@ -1384,6 +1388,23 @@ iscsit_conn_destroy(idm_conn_t *ic)
 	iscsit_global_rele();
 
 	return (IDM_STATUS_SUCCESS);
+}
+
+void
+iscsit_conn_logout(iscsit_conn_t *ict)
+{
+	/*
+	 * If the iscsi connection is active, then
+	 * logout the IDM connection by sending a
+	 * CE_LOGOUT_SESSION_SUCCESS, else, no action
+	 * needs to be taken because the connection
+	 * is already in the teardown process.
+	 */
+	mutex_enter(&ict->ict_mutex);
+	if (ict->ict_lost == B_FALSE && ict->ict_destroyed == B_FALSE) {
+		idm_conn_event(ict->ict_ic, CE_LOGOUT_SESSION_SUCCESS, NULL);
+	}
+	mutex_exit(&ict->ict_mutex);
 }
 
 /*

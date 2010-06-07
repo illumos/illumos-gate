@@ -688,6 +688,9 @@ iscsit_conn_hold(iscsit_conn_t *ict);
 void
 iscsit_conn_rele(iscsit_conn_t *ict);
 
+void
+iscsit_conn_logout(iscsit_conn_t *ict);
+
 /*
  * Session functions
  */
@@ -705,6 +708,9 @@ iscsit_sess_destroy(iscsit_sess_t *ist);
 
 void
 iscsit_sess_hold(iscsit_sess_t *ist);
+
+idm_status_t
+iscsit_sess_check_hold(iscsit_sess_t *ist);
 
 void
 iscsit_sess_rele(iscsit_sess_t *ist);
