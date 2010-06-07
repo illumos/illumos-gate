@@ -1529,47 +1529,22 @@ EOF
 	#
 	salt=host/${locase_nodename}.${domain}@${realm}
 
-	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" host/${fqdn}@${realm} > /dev/null 2>&1
-	if [[ $? -ne 0 ]]
-	then
-		printf "$(gettext "Failed to set account password").\n" >&2
-		error_message
-	fi
+	skeys=(host/${fqdn}@${realm} nfs/${fqdn}@${realm} HTTP/${fqdn}@${realm})
+	skeys+=(root/${fqdn}@${realm} cifs/${fqdn}@${realm})
+	skeys+=(${netbios_nodename}@${realm} host/${upcase_nodename}@${realm})
+	skeys+=(cifs/${upcase_nodename}@${realm})
 
-	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" nfs/${fqdn}@${realm} > /dev/null 2>&1
-	if [[ $? -ne 0 ]]
-	then
-		printf "$(gettext "Failed to set account password").\n" >&2
-		error_message
-	fi
+	ks_args="-n -s $salt -v $kvno -k $new_keytab ${args[@]}" 
 
-	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" HTTP/${fqdn}@${realm} > /dev/null 2>&1
-	if [[ $? -ne 0 ]]
-	then
-		printf "$(gettext "Failed to set account password").\n" >&2
-		error_message
-	fi
-
-	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" root/${fqdn}@${realm} > /dev/null 2>&1
-	if [[ $? -ne 0 ]]
-	then
-		printf "$(gettext "Failed to set account password").\n" >&2
-		error_message
-	fi
-
-	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" cifs/${fqdn}@${realm} > /dev/null 2>&1
-	if [[ $? -ne 0 ]]
-	then
-		printf "$(gettext "Failed to set account password").\n" >&2
-		error_message
-	fi
-
-	printf "%s" "$newpw" | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" ${netbios_nodename}@${realm} > /dev/null 2>&1
-	if [[ $? -ne 0 ]]
-	then
-		printf "$(gettext "Failed to set account password").\n" >&2
-		error_message
-	fi
+	for skey in ${skeys[@]}
+	do
+		printf "%s" "$newpw" | $KSETPW $ks_args $skey > /dev/null 2>&1
+		if [[ $? -ne 0 ]]
+		then
+			printf "$(gettext "Failed to set password").\n" >&2
+			error_message
+		fi
+	done
 
 	doKRB5config
 
