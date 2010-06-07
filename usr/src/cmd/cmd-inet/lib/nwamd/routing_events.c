@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
@@ -38,7 +37,6 @@
 #include <sys/fcntl.h>
 #include <unistd.h>
 
-#include <inetcfg.h>
 #include <libnwam.h>
 #include "events.h"
 #include "ncp.h"
@@ -101,8 +99,6 @@ rtmtype_str(int type)
 		return ("CHGADDR");
 	case RTM_FREEADDR:
 		return ("FREEADDR");
-	case RTM_IFINFO:
-		return ("IFINFO");
 	default:
 		(void) snprintf(typestr, sizeof (typestr), "type %d", type);
 		return (typestr);
@@ -117,10 +113,9 @@ routing_events_v4(void *arg)
 	union rtm_buf buffer;
 	struct rt_msghdr *rtm;
 	struct ifa_msghdr *ifa;
-	struct if_msghdr *ifm;
 	char *addrs, *if_name;
 	struct sockaddr_dl *addr_dl;
-	struct sockaddr *addr;
+	struct sockaddr *addr, *netmask;
 	nwamd_event_t ip_event;
 
 	nlog(LOG_DEBUG, "v4 routing socket %d", v4_sock);
@@ -169,7 +164,6 @@ routing_events_v4(void *arg)
 			nlog(LOG_DEBUG, "v4 routing message %s: "
 			    "index %d flags %x", rtmtype_str(rtm->rtm_type),
 			    ifa->ifam_index, ifa->ifam_flags);
-			printaddrs(ifa->ifam_addrs, addrs);
 
 			if ((addr = (struct sockaddr *)getaddr(RTA_IFA,
 			    ifa->ifam_addrs, addrs)) == NULL)
@@ -183,6 +177,10 @@ routing_events_v4(void *arg)
 				    "tossing message for 0.0.0.0");
 				break;
 			}
+
+			if ((netmask = (struct sockaddr *)getaddr(RTA_NETMASK,
+			    ifa->ifam_addrs, addrs)) == NULL)
+				break;
 
 			if ((addr_dl = (struct sockaddr_dl *)getaddr
 			    (RTA_IFP, ifa->ifam_addrs, addrs)) == NULL)
@@ -205,56 +203,16 @@ routing_events_v4(void *arg)
 				break;
 			}
 
+			printaddrs(ifa->ifam_addrs, addrs);
+
 			/* Create and enqueue IF_STATE event */
 			ip_event = nwamd_event_init_if_state(if_name,
 			    ifa->ifam_flags,
 			    (rtm->rtm_type == RTM_NEWADDR ||
 			    rtm->rtm_type == RTM_CHGADDR ? B_TRUE : B_FALSE),
-			    ifa->ifam_index, addr);
+			    addr, netmask);
 			if (ip_event != NULL)
 				nwamd_event_enqueue(ip_event);
-			break;
-
-		case RTM_IFINFO:
-
-			ifm = (void *)rtm;
-			addrs = (char *)ifm + sizeof (*ifm);
-			nlog(LOG_DEBUG, "v4 routing message %s: "
-			    "index %d flags %x", rtmtype_str(rtm->rtm_type),
-			    ifm->ifm_index, ifm->ifm_flags);
-			printaddrs(ifm->ifm_addrs, addrs);
-
-			if ((addr_dl = (struct sockaddr_dl *)getaddr(RTA_IFP,
-			    ifm->ifm_addrs, addrs)) == NULL)
-				break;
-			/*
-			 * We don't use the lladdr in this structure so we can
-			 * run over it.
-			 */
-			addr_dl->sdl_data[addr_dl->sdl_nlen] = 0;
-			if_name = addr_dl->sdl_data; /* no lifnum */
-
-			if (ifm->ifm_index == 0) {
-				nlog(LOG_DEBUG, "tossing index 0 message");
-				break;
-			}
-			if (ifm->ifm_type != RTM_IFINFO) {
-				nlog(LOG_DEBUG,
-				    "routing_events_v4: unhandled type %d",
-				    ifm->ifm_type);
-				break;
-			}
-
-			/* Create and enqueue IF_STATE event */
-			ip_event = nwamd_event_init_if_state(if_name,
-			    ifm->ifm_flags, B_FALSE, ifm->ifm_index, NULL);
-			if (ip_event != NULL)
-				nwamd_event_enqueue(ip_event);
-			break;
-
-		default:
-			nlog(LOG_DEBUG, "v4 routing message %s discarded",
-			    rtmtype_str(rtm->rtm_type));
 			break;
 		}
 	}
@@ -270,10 +228,9 @@ routing_events_v6(void *arg)
 	union rtm_buf buffer;
 	struct rt_msghdr *rtm;
 	struct ifa_msghdr *ifa;
-	struct if_msghdr *ifm;
 	char *addrs, *if_name;
 	struct sockaddr_dl *addr_dl;
-	struct sockaddr *addr;
+	struct sockaddr *addr, *netmask;
 	nwamd_event_t ip_event;
 
 	nlog(LOG_DEBUG, "v6 routing socket %d", v6_sock);
@@ -323,13 +280,19 @@ routing_events_v6(void *arg)
 			nlog(LOG_DEBUG, "v6 routing message %s: "
 			    "index %d flags %x", rtmtype_str(rtm->rtm_type),
 			    ifa->ifam_index, ifa->ifam_flags);
-			printaddrs(ifa->ifam_addrs, addrs);
 
 			if ((addr = (struct sockaddr *)getaddr(RTA_IFA,
 			    ifa->ifam_addrs, addrs)) == NULL)
 				break;
 
-			/* Ignore messages for link local address */
+			/* Ignore routing socket messages for :: & linklocal */
+			/*LINTED*/
+			if (IN6_IS_ADDR_UNSPECIFIED(
+			    &((struct sockaddr_in6 *)addr)->sin6_addr)) {
+				nlog(LOG_INFO, "routing_events_v6: "
+				    "tossing message for ::");
+				break;
+			}
 			/*LINTED*/
 			if (IN6_IS_ADDR_LINKLOCAL(
 			    &((struct sockaddr_in6 *)addr)->sin6_addr)) {
@@ -337,6 +300,11 @@ routing_events_v6(void *arg)
 				    "tossing message for link local address");
 				break;
 			}
+
+			if ((netmask =
+			    (struct sockaddr *)getaddr(RTA_NETMASK,
+			    ifa->ifam_addrs, addrs)) == NULL)
+				break;
 
 			if ((addr_dl = (struct sockaddr_dl *)getaddr
 			    (RTA_IFP, ifa->ifam_addrs, addrs)) == NULL)
@@ -359,57 +327,18 @@ routing_events_v6(void *arg)
 				break;
 			}
 
+			printaddrs(ifa->ifam_addrs, addrs);
+
 			/* Create and enqueue IF_STATE event */
 			ip_event = nwamd_event_init_if_state(if_name,
 			    ifa->ifam_flags,
 			    (rtm->rtm_type == RTM_NEWADDR ||
 			    rtm->rtm_type == RTM_CHGADDR ? B_TRUE : B_FALSE),
-			    ifa->ifam_index, addr);
+			    addr, netmask);
 			if (ip_event != NULL)
 				nwamd_event_enqueue(ip_event);
 			break;
 
-		case RTM_IFINFO:
-
-			ifm = (void *)rtm;
-			addrs = (char *)ifm + sizeof (*ifm);
-			nlog(LOG_DEBUG, "v6 routing message %s: "
-			    "index %d flags %x", rtmtype_str(rtm->rtm_type),
-			    ifm->ifm_index, ifm->ifm_flags);
-			printaddrs(ifm->ifm_addrs, addrs);
-
-			if ((addr_dl = (struct sockaddr_dl *)getaddr(RTA_IFP,
-			    ifm->ifm_addrs, addrs)) == NULL)
-				break;
-			/*
-			 * We don't use the lladdr in this structure so we can
-			 * run over it.
-			 */
-			addr_dl->sdl_data[addr_dl->sdl_nlen] = 0;
-			if_name = addr_dl->sdl_data; /* no lifnum */
-
-			if (ifm->ifm_index == 0) {
-				nlog(LOG_DEBUG, "tossing index 0 message");
-				break;
-			}
-			if (ifm->ifm_type != RTM_IFINFO) {
-				nlog(LOG_DEBUG,
-				    "routing_events_v6: unhandled type %d",
-				    ifm->ifm_type);
-				break;
-			}
-
-			/* Create and enqueue IF_STATE event */
-			ip_event = nwamd_event_init_if_state(if_name,
-			    ifm->ifm_flags, B_FALSE, ifm->ifm_index, NULL);
-			if (ip_event != NULL)
-				nwamd_event_enqueue(ip_event);
-			break;
-
-		default:
-			nlog(LOG_DEBUG, "v6 routing message %s discarded",
-			    rtmtype_str(rtm->rtm_type));
-			break;
 		}
 	}
 	/* NOTREACHED */
@@ -458,26 +387,18 @@ nwamd_add_route(struct sockaddr *dest, struct sockaddr *mask,
 	struct rt_msghdr *rtm = (struct rt_msghdr *)rtbuf;
 	void *addrs = rtbuf + sizeof (struct rt_msghdr);
 	struct sockaddr_dl sdl;
-	icfg_if_t intf;
-	icfg_handle_t h;
 	int rlen, index;
 	int af;
 
 	af = gateway->sa_family;
 
-	/* set interface for default route to be associated with */
-	(void) strlcpy(intf.if_name, ifname, sizeof (intf.if_name));
-	intf.if_protocol = af;
-	if (icfg_open(&h, &intf) != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "nwamd_add_route: "
-		    "icfg_open failed on %s", ifname);
+	/* retrieve the index value for the interface */
+	if ((index = if_nametoindex(ifname)) == 0) {
+		nlog(LOG_ERR, "nwamd_add_route: if_nametoindex failed on %s",
+		    ifname);
 		return;
 	}
-	if (icfg_get_index(h, &index) != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "nwamd_add_route: "
-		    "icfg_get_index failed on %s", ifname);
-	}
-	icfg_close(h);
+
 	(void) bzero(&sdl, sizeof (struct sockaddr_dl));
 	sdl.sdl_family = AF_LINK;
 	sdl.sdl_index = index;

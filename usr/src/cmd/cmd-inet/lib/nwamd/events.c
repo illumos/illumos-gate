@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <atomic.h>
@@ -369,7 +368,7 @@ nwamd_event_init_link_state(const char *name, boolean_t up)
 
 nwamd_event_t
 nwamd_event_init_if_state(const char *linkname, uint32_t flags,
-    uint32_t addr_added, uint32_t index, struct sockaddr *addr)
+    uint32_t addr_added, struct sockaddr *addr, struct sockaddr *netmask)
 {
 	nwamd_event_t event;
 	nwam_error_t err;
@@ -394,7 +393,6 @@ nwamd_event_init_if_state(const char *linkname, uint32_t flags,
 	    linkname,
 	    sizeof (event->event_msg->nwe_data.nwe_if_state.nwe_name));
 	event->event_msg->nwe_data.nwe_if_state.nwe_flags = flags;
-	event->event_msg->nwe_data.nwe_if_state.nwe_index = index;
 	event->event_msg->nwe_data.nwe_if_state.nwe_addr_added = addr_added;
 	event->event_msg->nwe_data.nwe_if_state.nwe_addr_valid = (addr != NULL);
 
@@ -402,6 +400,12 @@ nwamd_event_init_if_state(const char *linkname, uint32_t flags,
 		bcopy(addr, &(event->event_msg->nwe_data.nwe_if_state.nwe_addr),
 		    addr->sa_family == AF_INET ? sizeof (struct sockaddr_in) :
 		    sizeof (struct sockaddr_in6));
+	}
+	if (netmask != NULL) {
+		bcopy(netmask,
+		    &(event->event_msg->nwe_data.nwe_if_state.nwe_netmask),
+		    netmask->sa_family == AF_INET ?
+		    sizeof (struct sockaddr_in) : sizeof (struct sockaddr_in6));
 	}
 
 	return (event);

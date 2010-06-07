@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _EVENTS_H
@@ -102,7 +101,7 @@ extern nwamd_event_t nwamd_event_init_priority_group_change(int64_t);
 extern nwamd_event_t nwamd_event_init_link_action(const char *, nwam_action_t);
 extern nwamd_event_t nwamd_event_init_link_state(const char *, boolean_t);
 extern nwamd_event_t nwamd_event_init_if_state(const char *, uint32_t,
-    uint32_t, uint32_t, struct sockaddr *);
+    uint32_t, struct sockaddr *, struct sockaddr *);
 extern nwamd_event_t nwamd_event_init_wlan(const char *, int32_t, boolean_t,
     nwam_wlan_t *, uint_t);
 extern nwamd_event_t nwamd_event_init_ncu_check(void);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
@@ -106,7 +105,7 @@ nwamd_dlpi_add_link(nwamd_object_t obj)
 
 	assert(ncu != NULL && ncu->ncu_type == NWAM_NCU_TYPE_LINK);
 
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 
 	/* Already running? */
 	if (link->nwamd_link_dlpi_thread != 0) {
@@ -157,16 +156,15 @@ nwamd_dlpi_delete_link(nwamd_object_t obj)
 	nlog(LOG_DEBUG, "nwamd_dlpi_delete_link: ncu %p (%s) type %d",
 	    ncu, obj->nwamd_object_name, ncu != NULL ? ncu->ncu_type : -1);
 
-	if (ncu->ncu_node.u_link.nwamd_link_dlpi_thread != 0) {
+	if (ncu->ncu_link.nwamd_link_dlpi_thread != 0) {
 		(void) pthread_cancel(
-		    ncu->ncu_node.u_link.nwamd_link_dlpi_thread);
-		(void) pthread_join(ncu->ncu_node.u_link.nwamd_link_dlpi_thread,
-		    NULL);
-		ncu->ncu_node.u_link.nwamd_link_dlpi_thread = 0;
+		    ncu->ncu_link.nwamd_link_dlpi_thread);
+		(void) pthread_join(ncu->ncu_link.nwamd_link_dlpi_thread, NULL);
+		ncu->ncu_link.nwamd_link_dlpi_thread = 0;
 		/* Unset properties before closing */
 		nwamd_set_unset_link_properties(ncu, B_FALSE);
 	}
 
-	dlpi_close(ncu->ncu_node.u_link.nwamd_link_dhp);
-	ncu->ncu_node.u_link.nwamd_link_dhp = NULL;
+	dlpi_close(ncu->ncu_link.nwamd_link_dhp);
+	ncu->ncu_link.nwamd_link_dhp = NULL;
 }

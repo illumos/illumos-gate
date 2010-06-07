@@ -237,11 +237,11 @@ find_next_priority_group_cb(nwamd_object_t object, void *data)
 	uint64_t priority;
 	nwamd_ncu_t *ncu = object->nwamd_object_data;
 
-	if (ncu->ncu_node.u_link.nwamd_link_activation_mode !=
+	if (ncu->ncu_link.nwamd_link_activation_mode !=
 	    NWAM_ACTIVATION_MODE_PRIORITIZED)
 		return (0);
 
-	priority = ncu->ncu_node.u_link.nwamd_link_priority_group;
+	priority = ncu->ncu_link.nwamd_link_priority_group;
 
 	if (priority >= cbarg->minpriority && priority < cbarg->currpriority) {
 		cbarg->found = B_TRUE;
@@ -340,21 +340,21 @@ nwamd_ncu_check_or_activate(nwamd_object_t object, void *data)
 		    "skipping interface NCU %s", name);
 		return (0);
 	}
-	if (!wa->manual && ncu->ncu_node.u_link.nwamd_link_activation_mode !=
+	if (!wa->manual && ncu->ncu_link.nwamd_link_activation_mode !=
 	    NWAM_ACTIVATION_MODE_PRIORITIZED) {
 		nlog(LOG_DEBUG, "nwamd_ncu_check_or_activate: "
 		    "skipping non-prioritized NCU %s", name);
 		return (0);
 	}
-	if (wa->manual && ncu->ncu_node.u_link.nwamd_link_activation_mode !=
+	if (wa->manual && ncu->ncu_link.nwamd_link_activation_mode !=
 	    NWAM_ACTIVATION_MODE_MANUAL) {
 		nlog(LOG_DEBUG, "nwamd_ncu_check_or_activate: "
 		    "skipping non-manual NCU %s", name);
 		return (0);
 	}
 
-	priority_group = ncu->ncu_node.u_link.nwamd_link_priority_group;
-	priority_mode = ncu->ncu_node.u_link.nwamd_link_priority_mode;
+	priority_group = ncu->ncu_link.nwamd_link_priority_group;
+	priority_mode = ncu->ncu_link.nwamd_link_priority_mode;
 	/* Only work with NCUs in the requested priority-group */
 	if (!wa->manual && priority_group != wa->priority_group) {
 		nlog(LOG_DEBUG, "nwamd_ncu_check_or_activate: "

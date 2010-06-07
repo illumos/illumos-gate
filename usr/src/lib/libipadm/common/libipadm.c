@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -858,6 +857,7 @@ ipadm_door_call(ipadm_handle_t iph, void *arg, size_t asize, void **rbufp,
 	door_arg_t	darg;
 	int		err;
 	ipmgmt_retval_t	rval, *rvalp;
+	boolean_t	reopen = B_FALSE;
 
 	if (rbufp == NULL) {
 		rvalp = &rval;
@@ -872,6 +872,7 @@ ipadm_door_call(ipadm_handle_t iph, void *arg, size_t asize, void **rbufp,
 	darg.rbuf = *rbufp;
 	darg.rsize = rsize;
 
+reopen:
 	(void) pthread_mutex_lock(&iph->iph_lock);
 	/* The door descriptor is opened if it isn't already */
 	if (iph->iph_door_fd == -1) {
@@ -883,8 +884,20 @@ ipadm_door_call(ipadm_handle_t iph, void *arg, size_t asize, void **rbufp,
 	}
 	(void) pthread_mutex_unlock(&iph->iph_lock);
 
-	if (door_call(iph->iph_door_fd, &darg) == -1)
+	if (door_call(iph->iph_door_fd, &darg) == -1) {
+		/*
+		 * Stale door descriptor is possible if ipmgmtd was restarted
+		 * since last iph_door_fd was opened, so try re-opening door
+		 * descriptor.
+		 */
+		if (!reopen && errno == EBADF) {
+			(void) close(iph->iph_door_fd);
+			iph->iph_door_fd = -1;
+			reopen = B_TRUE;
+			goto reopen;
+		}
 		return (errno);
+	}
 	err = ((ipmgmt_retval_t *)(void *)(darg.rbuf))->ir_err;
 	if (darg.rbuf != *rbufp) {
 		/*

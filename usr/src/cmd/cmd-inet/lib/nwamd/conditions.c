@@ -20,25 +20,20 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
 #include <inet/ip.h>
-#include <inetcfg.h>
 #include <libdladm.h>
 #include <libdllink.h>
 #include <libdlwlan.h>
 #include <netdb.h>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 
 #include <libnwam.h>
 #include "conditions.h"
@@ -405,6 +400,36 @@ prefixmatch(uchar_t *addr1, uchar_t *addr2, int prefixlen)
 	return (B_TRUE);
 }
 
+/*
+ * Given a string representation of an IPv4 or IPv6 address returns the
+ * sockaddr representation. Note that 'sockaddr' should point at the correct
+ * sockaddr structure for the address family (sockaddr_in for AF_INET or
+ * sockaddr_in6 for AF_INET6) or alternatively at a sockaddr_storage
+ * structure.
+ */
+static struct sockaddr_storage *
+nwamd_str2sockaddr(sa_family_t af, const char *straddr,
+    struct sockaddr_storage *addr)
+{
+	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
+	int err;
+
+	if (af == AF_INET) {
+		sin = (struct sockaddr_in *)addr;
+		sin->sin_family = AF_INET;
+		err = inet_pton(AF_INET, straddr, &sin->sin_addr);
+	} else if (af == AF_INET6) {
+		sin6 = (struct sockaddr_in6 *)addr;
+		sin6->sin6_family = AF_INET6;
+		err = inet_pton(AF_INET6, straddr, &sin6->sin6_addr);
+	} else {
+		errno = EINVAL;
+		return (NULL);
+	}
+	return (err == 1 ? addr : NULL);
+}
+
 struct nwamd_ipaddr_condition_walk_arg {
 	nwam_condition_t condition;
 	struct sockaddr_storage sockaddr;
@@ -413,41 +438,25 @@ struct nwamd_ipaddr_condition_walk_arg {
 };
 
 static int
-check_ipaddr(icfg_if_t *intf, void *arg)
+check_ipaddr(sa_family_t family, struct ifaddrs *ifa, void *arg)
 {
 	struct nwamd_ipaddr_condition_walk_arg *wa = arg;
-	struct sockaddr_storage sockaddr;
-	icfg_handle_t h;
-	socklen_t addrlen = intf->if_protocol == AF_INET ?
-	    sizeof (struct sockaddr_in) : sizeof (struct sockaddr_in6);
-	int prefixlen = 0;
 	boolean_t match = B_FALSE;
 	uchar_t *addr1, *addr2;
 
-	if (icfg_open(&h, intf) != ICFG_SUCCESS)
-		return (0);
-
-	if (icfg_get_addr(h, (struct sockaddr *)&sockaddr, &addrlen,
-	    &prefixlen, B_TRUE) != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "check_ipaddr: icfg_get_addr: %s",
-		    strerror(errno));
-		return (0);
-	}
-
-	if (intf->if_protocol == AF_INET) {
+	if (family == AF_INET) {
 		addr1 = (uchar_t *)&(((struct sockaddr_in *)
-		    &sockaddr)->sin_addr.s_addr);
+		    ifa->ifa_addr)->sin_addr.s_addr);
 		addr2 = (uchar_t *)&(((struct sockaddr_in *)
 		    &(wa->sockaddr))->sin_addr.s_addr);
 	} else {
 		addr1 = (uchar_t *)&(((struct sockaddr_in6 *)
-		    &sockaddr)->sin6_addr.s6_addr);
+		    ifa->ifa_addr)->sin6_addr.s6_addr);
 		addr2 = (uchar_t *)&(((struct sockaddr_in6 *)
 		    &(wa->sockaddr))->sin6_addr.s6_addr);
 	}
 
 	match = prefixmatch(addr1, addr2, wa->prefixlen);
-	icfg_close(h);
 
 	nlog(LOG_DEBUG, "check_ipaddr: match %d\n", match);
 	switch (wa->condition) {
@@ -470,11 +479,10 @@ static boolean_t
 test_condition_ip_address(nwam_condition_t condition,
     const char *ip_address_string)
 {
-	int proto;
+	sa_family_t family;
 	char *copy, *ip_address, *prefixlen_string, *lasts;
-	socklen_t addrlen = sizeof (struct sockaddr_in);
-	socklen_t addr6len = sizeof (struct sockaddr_in6);
 	struct nwamd_ipaddr_condition_walk_arg wa;
+	struct ifaddrs *ifap, *ifa;
 
 	if ((copy = strdup(ip_address_string)) == NULL)
 		return (B_FALSE);
@@ -486,17 +494,17 @@ test_condition_ip_address(nwam_condition_t condition,
 
 	prefixlen_string = strtok_r(NULL, " \t", &lasts);
 
-	if (icfg_str_to_sockaddr(AF_INET, ip_address,
-	    (struct sockaddr *)&(wa.sockaddr), &addrlen) == ICFG_SUCCESS) {
-		proto = AF_INET;
+	if (nwamd_str2sockaddr(AF_INET, ip_address, &wa.sockaddr) != NULL) {
+		family = AF_INET;
 		wa.prefixlen = IP_ABITS;
-	} else if (icfg_str_to_sockaddr(AF_INET6, ip_address,
-	    (struct sockaddr *)&(wa.sockaddr), &addr6len) == ICFG_SUCCESS) {
-		proto = AF_INET6;
+	} else if (nwamd_str2sockaddr(AF_INET6, ip_address, &wa.sockaddr)
+	    != NULL) {
+		family = AF_INET6;
 		wa.prefixlen = IPV6_ABITS;
 	} else {
 		nlog(LOG_ERR, "test_condition_ip_address: "
-		    "icfg_str_to_sockaddr: %s", strerror(errno));
+		    "nwamd_str2sockaddr failed for %s: %s", ip_address,
+		    strerror(errno));
 		free(copy);
 		return (B_FALSE);
 	}
@@ -519,10 +527,20 @@ test_condition_ip_address(nwam_condition_t condition,
 		free(copy);
 		return (B_FALSE);
 	}
-
-	(void) icfg_iterate_if(proto, ICFG_PLUMBED, &wa, check_ipaddr);
-
 	free(copy);
+
+	if (getifaddrs(&ifa) == -1) {
+		nlog(LOG_ERR, "test_condition_ip_address: "
+		    "getifaddrs failed: %s", strerror(errno));
+		return (wa.res);
+	}
+	for (ifap = ifa; ifap != NULL; ifap = ifap->ifa_next) {
+		if (ifap->ifa_addr->ss_family != family)
+			continue;
+		if (check_ipaddr(family, ifap, &wa) == 1)
+			break;
+	}
+	freeifaddrs(ifa);
 
 	return (wa.res);
 }

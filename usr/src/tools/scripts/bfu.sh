@@ -6595,7 +6595,6 @@ mondo_loop() {
 	    $usr/lib/libgen.a				\
 	    $usr/lib/libgenIO.a				\
 	    $usr/lib/libike.a				\
-	    $usr/lib/libinetcfg.a			\
 	    $usr/lib/libinetutil.a			\
 	    $usr/lib/libintl.a				\
 	    $usr/lib/libkstat.a				\

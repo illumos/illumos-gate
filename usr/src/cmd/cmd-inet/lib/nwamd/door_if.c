@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <auth_attr.h>
@@ -188,7 +187,7 @@ nwamd_door_req_wlan_scan_results(nwamd_door_arg_t *req, ucred_t *ucr,
 	}
 
 	ncu = obj->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 	num_wlans = link->nwamd_link_wifi_scan.nwamd_wifi_scan_curr_num;
 
 	if (num_wlans > 0) {

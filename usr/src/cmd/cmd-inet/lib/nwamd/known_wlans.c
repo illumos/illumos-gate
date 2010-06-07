@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <ctype.h>
@@ -501,7 +500,7 @@ nwamd_ncu_known_wlan_committed(nwamd_object_t object, void *data)
 		return (0);
 
 	/* network selection will be done only if possible */
-	if (ncu_data->ncu_node.u_link.nwamd_link_media == DL_WIFI)
+	if (ncu_data->ncu_link.nwamd_link_media == DL_WIFI)
 		(void) nwamd_wlan_scan(ncu_data->ncu_name);
 	return (0);
 }

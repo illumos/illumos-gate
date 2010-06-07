@@ -182,7 +182,6 @@ file path=lib/libelf.so.1
 file path=lib/libelfsign.so.1
 $(i386_ONLY)file path=lib/libfdisk.so.1
 file path=lib/libgen.so.1
-file path=lib/libinetcfg.so.1
 file path=lib/libinetutil.so.1
 file path=lib/libintl.so.1
 file path=lib/libipadm.so.1
@@ -982,7 +981,6 @@ link path=usr/lib/libgen.so target=../../lib/libgen.so.1
 link path=usr/lib/libgen.so.1 target=../../lib/libgen.so.1
 link path=usr/lib/libhotplug.so target=./libhotplug.so.1
 link path=usr/lib/libidmap.so target=./libidmap.so.1
-link path=usr/lib/libinetcfg.so.1 target=../../lib/libinetcfg.so.1
 link path=usr/lib/libinetutil.so.1 target=../../lib/libinetutil.so.1
 link path=usr/lib/libintl.so target=../../lib/libintl.so.1
 link path=usr/lib/libintl.so.1 target=../../lib/libintl.so.1

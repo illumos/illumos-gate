@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -35,7 +34,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <inetcfg.h>
 #include <libdllink.h>
 #include <limits.h>
 #include <libscf.h>

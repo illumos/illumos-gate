@@ -108,7 +108,6 @@ SUBDIRS += \
 	libwanboot	\
 	libwanbootutil	\
 	libcryptoutil	\
-	libinetcfg	\
 	libinetutil	\
 	libipadm	\
 	libipmp		\
@@ -328,7 +327,6 @@ MSGSUBDIRS=		\
 	libgrubmgmt	\
 	libgss		\
 	libidmap	\
-	libinetcfg	\
 	libipmp		\
 	libilb		\
 	libinetutil	\
@@ -413,7 +411,6 @@ HDRSUBDIRS=		\
 	libgen		\
 	libipadm	\
 	libipsecutil	\
-	libinetcfg	\
 	libinetsvc	\
 	libinetutil	\
 	libinstzones	\
@@ -593,7 +590,6 @@ libefi:		libuuid
 libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
 libidmap:	libadutils libldap5 libavl libsldap
-libinetcfg:	libnsl libsocket libdlpi libinetutil
 libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
 		libdladm libsecdb
 libiscsit:	libc libnvpair libstmf libuuid libnsl

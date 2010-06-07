@@ -1747,6 +1747,21 @@ ipadm_set_addr(ipadm_addrobj_t ipaddr, const char *astr, sa_family_t af)
 }
 
 /*
+ * Gets the static source address from the address object in `ipaddr'.
+ * Memory for `addr' should be already allocated by the caller.
+ */
+ipadm_status_t
+ipadm_get_addr(const ipadm_addrobj_t ipaddr, struct sockaddr_storage *addr)
+{
+	if (ipaddr == NULL || ipaddr->ipadm_atype != IPADM_ADDR_STATIC ||
+	    addr == NULL) {
+		return (IPADM_INVALID_ARG);
+	}
+	*addr = ipaddr->ipadm_static_addr;
+
+	return (IPADM_SUCCESS);
+}
+/*
  * Set up tunnel destination address in ipaddr by contacting DNS.
  * The function works similar to ipadm_set_addr().
  * The dst_addr must resolve to exactly one address. IPADM_BAD_ADDR is returned
@@ -2207,6 +2222,20 @@ fail:
 }
 
 /*
+ * Returns `aobjname' from the address object in `ipaddr'.
+ */
+ipadm_status_t
+ipadm_get_aobjname(const ipadm_addrobj_t ipaddr, char *aobjname, size_t len)
+{
+	if (ipaddr == NULL || aobjname == NULL)
+		return (IPADM_INVALID_ARG);
+	if (strlcpy(aobjname, ipaddr->ipadm_aobjname, len) >= len)
+		return (IPADM_INVALID_ARG);
+
+	return (IPADM_SUCCESS);
+}
+
+/*
  * Frees the address object in `ipaddr'.
  */
 void
@@ -2355,6 +2384,10 @@ i_ipadm_get_db_addr(ipadm_handle_t iph, const char *ifname,
  * if provided, will be ignored and replaced with the newly generated name.
  * The interface name provided has to be a logical interface name that
  * already exists. No new logical interface will be added in this function.
+ *
+ * If IPADM_OPT_V46 is passed in the flags, then both IPv4 and IPv6 interfaces
+ * are plumbed (if they haven't been already).  Otherwise, just the interface
+ * specified in `addr' is plumbed.
  */
 ipadm_status_t
 ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
@@ -2435,7 +2468,7 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	}
 	if (status == IPADM_SUCCESS)
 		created_af = B_TRUE;
-	if (!is_6to4 && !legacy) {
+	if (!is_6to4 && !legacy && (flags & IPADM_OPT_V46)) {
 		other_af = (af == AF_INET ? AF_INET6 : AF_INET);
 		status = i_ipadm_create_if(iph, ifname, other_af, flags);
 		if (status != IPADM_SUCCESS && status != IPADM_IF_EXISTS) {
@@ -2672,7 +2705,7 @@ ret:
  * in the address object will be removed from the physical interface.
  * If the address type is IPADM_ADDR_DHCP, the flag IPADM_OPT_RELEASE specifies
  * whether the lease should be released. If IPADM_OPT_RELEASE is not
- * specified, the lease will be dropped. This option is ignored
+ * specified, the lease will be dropped. This option is not supported
  * for other address types.
  *
  * If the address type is IPADM_ADDR_IPV6_ADDRCONF, the link-local address and
@@ -3329,7 +3362,7 @@ i_ipadm_validate_create_addr(ipadm_handle_t iph, ipadm_addrobj_t ipaddr,
 	boolean_t		af_exists, other_af_exists, a_exists;
 
 	if (ipaddr == NULL || flags == 0 || flags == IPADM_OPT_PERSIST ||
-	    (flags & ~(IPADM_COMMON_OPT_MASK|IPADM_OPT_UP))) {
+	    (flags & ~(IPADM_COMMON_OPT_MASK|IPADM_OPT_UP|IPADM_OPT_V46))) {
 		return (IPADM_INVALID_ARG);
 	}
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
@@ -32,13 +31,9 @@
 #include <dhcpagent_util.h>
 #include <errno.h>
 #include <execinfo.h>
-#include <inetcfg.h>
 #include <libnwam.h>
-#include <netinet/in.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <ucontext.h>
 #include <unistd.h>
 #include <libscf.h>
@@ -57,30 +52,41 @@
 #define	STATELESS_RUNNING	(IFF_RUNNING | IFF_UP | IFF_ADDRCONF)
 #define	DHCP_RUNNING		(IFF_RUNNING | IFF_UP | IFF_DHCPRUNNING)
 
-static void *start_dhcp_thread(void *);
-static void nwamd_down_interface(const char *, uint_t, int);
+static void nwamd_dhcp(const char *, ipadm_addrobj_t, dhcp_ipc_type_t);
+static void nwamd_down_interface(const char *, ipadm_addr_type_t, const char *);
 static boolean_t stateless_running(const nwamd_ncu_t *);
 
-char *
-nwamd_sockaddr_to_str(const struct sockaddr *sockaddr, char *str, size_t len)
+/*
+ * Given a sockaddr representation of an IPv4 or IPv6 address returns the
+ * string representation. Note that 'sockaddr' should point at the correct
+ * sockaddr structure for the address family (sockaddr_in for AF_INET or
+ * sockaddr_in6 for AF_INET6) or alternatively at a sockaddr_storage
+ * structure.
+ */
+static const char *
+nwamd_sockaddr2str(const struct sockaddr *addr, char *str, size_t len)
 {
-	if (icfg_sockaddr_to_str(sockaddr->sa_family, sockaddr, str, len) !=
-	    ICFG_SUCCESS) {
+	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
+	const char *straddr;
+
+	if (addr == NULL)
 		return (NULL);
+
+	if (addr->sa_family == AF_INET) {
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sin = (struct sockaddr_in *)addr;
+		straddr = inet_ntop(AF_INET, (void *)&sin->sin_addr, str, len);
+	} else if (addr->sa_family == AF_INET6) {
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sin6 = (struct sockaddr_in6 *)addr;
+		straddr = inet_ntop(AF_INET6, (void *)&sin6->sin6_addr, str,
+		    len);
 	} else {
-		return (str);
+		errno = EINVAL;
+		return (NULL);
 	}
-}
-
-static void
-nwamd_log_if_address(int severity, struct nwamd_if_address *nifa)
-{
-	char str[INET6_ADDRSTRLEN];
-
-	nlog(severity, "%s address %s is %s",
-	    nifa->address.sa_family == AF_INET ? "IPv4" : "IPv6",
-	    nwamd_sockaddr_to_str(&nifa->address, str, sizeof (str)),
-	    nifa->configured ? "configured" : "not configured");
+	return (straddr != NULL ? str : NULL);
 }
 
 void
@@ -214,169 +220,9 @@ fail:
 }
 
 void
-nwamd_dhcp_release(const char *ifname)
-{
-	dhcp_ipc_reply_t *reply = NULL;
-	dhcp_ipc_request_t *request;
-	int rc;
-
-	/* Now allocate and send the request */
-	request = dhcp_ipc_alloc_request(DHCP_RELEASE, ifname, NULL, 0,
-	    DHCP_TYPE_NONE);
-	if (request == NULL) {
-		nlog(LOG_DEBUG, "nwamd_dhcp_release: dhcp_ipc_alloc_request : "
-		    "%s", strerror(errno));
-		return;
-	}
-	rc = dhcp_ipc_make_request(request, &reply, 1);
-	free(request);
-	free(reply);
-	reply = NULL;
-	if (rc != 0) {
-		/* Fall back to drop request */
-		request = dhcp_ipc_alloc_request(DHCP_DROP, ifname, NULL, 0,
-		    DHCP_TYPE_NONE);
-		if (request == NULL) {
-			nlog(LOG_DEBUG, "nwamd_dhcp_release: "
-			    "dhcp_ipc_alloc_request : %s", strerror(errno));
-			return;
-		}
-		(void) dhcp_ipc_make_request(request, &reply, 1);
-		free(request);
-		free(reply);
-	}
-}
-
-static boolean_t
-add_ip_address(const char *ifname, struct nwamd_if_address *nifa,
-    boolean_t logical_if)
-{
-	icfg_handle_t h, newh;
-	icfg_if_t intf;
-	uint64_t flags;
-	int rc;
-	struct sockaddr_in bcastaddr;
-	char str[INET6_ADDRSTRLEN];
-
-	(void) strlcpy(intf.if_name, ifname, sizeof (intf.if_name));
-	intf.if_protocol = nifa->address.sa_family;
-
-	nlog(LOG_DEBUG, "add_ip_address: %s address %s for link %s",
-	    logical_if ? "adding" : "setting",
-	    nwamd_sockaddr_to_str(&nifa->address, str, sizeof (str)),
-	    intf.if_name);
-
-	if (icfg_open(&h, &intf) != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "add_ip_address: icfg_open failed on %s", ifname);
-		return (B_FALSE);
-	}
-	/*
-	 * When working with the physical interface, we need to be careful
-	 * to set the prefixlen and broadcast addresses before setting the
-	 * IP address, otherwise RTM_DELADDRs for the old broadcast/netmask
-	 * will confuse us into thinking we've lost the address we've just
-	 * assigned.
-	 */
-	if (logical_if) {
-		rc = icfg_add_addr(h, &newh,
-		    (const struct sockaddr *)&nifa->address,
-		    intf.if_protocol == AF_INET ?
-		    sizeof (struct sockaddr_in) : sizeof (struct sockaddr_in6));
-	} else {
-		newh = h;
-
-		/* Make sure DHCP is no longer running */
-		if (icfg_get_flags(newh, &flags) == ICFG_SUCCESS) {
-			if (flags & IFF_DHCPRUNNING) {
-				nlog(LOG_DEBUG, "add_ip_address: "
-				    "turning off DHCP for %s", ifname);
-				nwamd_dhcp_release(ifname);
-			}
-		}
-		/*
-		 * Set interface IFF_UP if not already.  Do this and
-		 * setting of prefixlen/broadcast addresses as otherwise
-		 * these can trigger an RTM_DELADDR that makes it appear
-		 * that the address has gone away.
-		 */
-		rc = icfg_set_addr(newh,
-		    (const struct sockaddr *)&nifa->address,
-		    intf.if_protocol == AF_INET ?
-		    sizeof (struct sockaddr_in) :
-		    sizeof (struct sockaddr_in6));
-	}
-	if (rc != ICFG_SUCCESS) {
-		nlog(LOG_DEBUG, "add_ip_address: add of ipaddr failed "
-		    "for %s: %d", ifname, rc);
-		goto out;
-	}
-
-	if (nifa->prefix != 0) {
-		if ((rc = icfg_set_prefixlen(newh, nifa->prefix))
-		    != ICFG_SUCCESS) {
-			nlog(LOG_ERR, "add_ip_address: icfg_set_prefix %d "
-			    "failed on %s: %s", nifa->prefix, ifname,
-			    icfg_errmsg(rc));
-		} else if (intf.if_protocol == AF_INET) {
-			/* Set broadcast address based on address, prefixlen */
-			bcastaddr.sin_addr.s_addr =
-			/*LINTED*/
-			    ((struct sockaddr_in *)&nifa->address)
-			    ->sin_addr.s_addr |
-			    htonl(0xffffffff >> nifa->prefix);
-
-			if ((rc = icfg_set_broadcast(newh, &bcastaddr))
-			    != ICFG_SUCCESS) {
-				nlog(LOG_ERR, "add_ip_address: "
-				    "icfg_set_broadcast(%s) failed on %s: %s",
-				    inet_ntoa(bcastaddr.sin_addr), ifname,
-				    icfg_errmsg(rc));
-			}
-		}
-	}
-	if (rc == ICFG_SUCCESS) {
-		if (icfg_get_flags(newh, &flags) == ICFG_SUCCESS) {
-			if ((flags & IFF_UP) == 0)
-				rc = icfg_set_flags(newh, flags | IFF_UP);
-		} else {
-			nlog(LOG_DEBUG, "add_ip_address: couldn't bring up %s",
-			    ifname);
-		}
-	}
-
-out:
-	/* Check if address was a duplicate */
-	if (rc == ICFG_DAD_FOUND || (flags & IFF_DUPLICATE) != 0) {
-		char *object_name;
-		nwam_error_t err;
-
-		nlog(LOG_INFO, "add_ip_address: "
-		    "duplicate address detected on %s", ifname);
-		if ((err = nwam_ncu_name_to_typed_name(ifname,
-		    NWAM_NCU_TYPE_INTERFACE, &object_name)) == NWAM_SUCCESS) {
-			nwamd_object_set_state(NWAM_OBJECT_TYPE_NCU,
-			    object_name, NWAM_STATE_MAINTENANCE,
-			    NWAM_AUX_STATE_IF_DUPLICATE_ADDR);
-			free(object_name);
-		} else {
-			nlog(LOG_ERR, "add_ip_address: could not "
-			    "create state event for %s: %s", ifname,
-			    nwam_strerror(err));
-		}
-		rc = ICFG_DAD_FOUND;
-	}
-
-	if (h != newh)
-		icfg_close(newh);
-	icfg_close(h);
-
-	return (rc == ICFG_SUCCESS);
-}
-
-void
 nwamd_add_default_routes(nwamd_ncu_t *ncu)
 {
-	nwamd_if_t *nif = &ncu->ncu_node.u_if;
+	nwamd_if_t *nif = &ncu->ncu_if;
 	char str[INET6_ADDRSTRLEN];
 
 	if (nif->nwamd_if_ipv4 && nif->nwamd_if_ipv4_default_route_set) {
@@ -389,8 +235,8 @@ nwamd_add_default_routes(nwamd_ncu_t *ncu)
 		v4mask.sin_family = AF_INET;
 
 		nlog(LOG_DEBUG, "nwamd_add_default_routes: adding default "
-		    "route %s", nwamd_sockaddr_to_str
-		    ((struct sockaddr *)&nif->nwamd_if_ipv4_default_route, str,
+		    "route %s", nwamd_sockaddr2str((struct sockaddr *)
+		    &nif->nwamd_if_ipv4_default_route, str,
 		    sizeof (str)));
 		nwamd_add_route((struct sockaddr *)&v4dest,
 		    (struct sockaddr *)&v4mask,
@@ -408,8 +254,8 @@ nwamd_add_default_routes(nwamd_ncu_t *ncu)
 		v6mask.sin6_family = AF_INET6;
 
 		nlog(LOG_DEBUG, "nwamd_add_default_routes: adding default "
-		    "route %s", nwamd_sockaddr_to_str
-		    ((struct sockaddr *)&nif->nwamd_if_ipv6_default_route, str,
+		    "route %s", nwamd_sockaddr2str((struct sockaddr *)
+		    &nif->nwamd_if_ipv6_default_route, str,
 		    sizeof (str)));
 		nwamd_add_route((struct sockaddr *)&v6dest,
 		    (struct sockaddr *)&v6mask,
@@ -418,154 +264,82 @@ nwamd_add_default_routes(nwamd_ncu_t *ncu)
 	}
 }
 
-void
-nwamd_dhcp_inform(nwamd_ncu_t *ncu)
-{
-	struct nwamd_dhcp_thread_arg *arg;
-	char *name = NULL;
-	pthread_attr_t attr;
-
-	arg = malloc(sizeof (*arg));
-	if (arg == NULL) {
-		nlog(LOG_ERR, "nwamd_dhcp_inform: error allocating memory "
-		    "for dhcp request");
-		free(name);
-		return;
-	}
-
-	arg->name = strdup(ncu->ncu_name);
-	arg->type = DHCP_INFORM;
-	arg->timeout = DHCP_IPC_WAIT_DEFAULT;
-
-	(void) pthread_attr_init(&attr);
-	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	if (pthread_create(NULL, &attr, start_dhcp_thread, arg) == -1) {
-		nlog(LOG_ERR, "Cannot start dhcp thread");
-		free(name);
-		free(arg);
-		(void) pthread_attr_destroy(&attr);
-		return;
-	}
-	(void) pthread_attr_destroy(&attr);
-}
-
-static boolean_t
-addresses_match(const struct sockaddr *addr1, const struct sockaddr *addr2)
-{
-	if (addr1->sa_family != addr2->sa_family)
-		return (B_FALSE);
-
-	switch (addr1->sa_family) {
-	case AF_INET:
-		/*LINTED*/
-		return (memcmp(&((struct sockaddr_in *)addr1)->sin_addr,
-		/*LINTED*/
-		    &((struct sockaddr_in *)addr2)->sin_addr,
-		    sizeof (struct in_addr)) == 0);
-	case AF_INET6:
-		/*LINTED*/
-		return (memcmp(&((struct sockaddr_in6 *)addr1)->sin6_addr,
-		/*LINTED*/
-		    &((struct sockaddr_in6 *)addr2)->sin6_addr,
-		    sizeof (struct in6_addr)) == 0);
-	default:
-		return (B_FALSE);
-	}
-}
-
 /*
  * Returns the nwamd_if_address structure for the given static address,
  * NULL if not found.
  */
 static struct nwamd_if_address *
-find_static_address(const struct sockaddr *addr, const nwamd_ncu_t *ncu)
+find_static_address(const struct sockaddr_storage *addr, const nwamd_ncu_t *ncu)
 {
-	struct nwamd_if_address *n, *nifa = ncu->ncu_node.u_if.nwamd_if_list;
+	struct nwamd_if_address *nifap, *nifa = ncu->ncu_if.nwamd_if_list;
+	struct sockaddr_storage saddr;
 	char str[INET6_ADDRSTRLEN];
 
-	nlog(LOG_DEBUG, "find_static_address %s",
-	    nwamd_sockaddr_to_str(addr, str, sizeof (str)));
-	for (n = nifa; n != NULL; n = n->next) {
-		if (addresses_match(addr, &n->address))
-			return (n);
+	nlog(LOG_DEBUG, "find_static_address: %s",
+	    nwamd_sockaddr2str((struct sockaddr *)addr, str, sizeof (str)));
+	for (nifap = nifa; nifap != NULL; nifap = nifap->next) {
+		if (nifap->ipaddr_atype != IPADM_ADDR_STATIC ||
+		    ipadm_get_addr(nifap->ipaddr, &saddr) != IPADM_SUCCESS)
+			continue;
+
+		if (sockaddrcmp(addr, &saddr))
+			return (nifap);
 	}
 	return (NULL);
 }
 
 /*
  * Returns the nwamd_if_address structure representing the non-static address
- * in the NCU.  dhcp is used to detemrine if the DHCP (stateful for v6)
- * structure is needed or the stateless/autoconf structure for the given
- * family.  dhcp should be B_TRUE if looking for v4.  Will only return the
- * nwamd_if_address if the relevant address is configured (v4 DHCP, v6
- * stateless/stateful) for the NCU.
- *
- * Returns NULL if structure is not found.
+ * in the NCU.  For IPv6, both stateless and stateful (DHCPv6) share the same
+ * nwamd_if_address.  Will only return the nwamd_if_address if the relevant
+ * address is configured (v4 DHCP, v6 either stateless or stateless) for the
+ * NCU.  Returns NULL if the structure is not found.
  */
 static struct nwamd_if_address *
-find_nonstatic_address(const nwamd_ncu_t *ncu, ushort_t family, boolean_t dhcp)
+find_nonstatic_address(const nwamd_ncu_t *ncu, sa_family_t family)
 {
-	struct nwamd_if_address *n, *nifa = ncu->ncu_node.u_if.nwamd_if_list;
-	const nwamd_if_t *u_if = &ncu->ncu_node.u_if;
+	struct nwamd_if_address *nifap, *nifa = ncu->ncu_if.nwamd_if_list;
+	const nwamd_if_t *u_if = &ncu->ncu_if;
 
-	nlog(LOG_DEBUG, "find_nonstatic_address: %s",
-	    dhcp ? "dhcp" : "stateless");
-	for (n = nifa; n != NULL; n = n->next) {
+	nlog(LOG_DEBUG, "find_nonstatic_address for %s %s",
+	    (family == AF_INET ? "IPv4" : "IPv6"),  ncu->ncu_name);
+	for (nifap = nifa; nifap != NULL; nifap = nifap->next) {
+		if (nifap->ipaddr_atype == IPADM_ADDR_STATIC)
+			continue;
+
 		if (family == AF_INET) {
-			if (!dhcp)
-				return (NULL);
-			if (n->address.sa_family == family && n->dhcp_if &&
-			    u_if->nwamd_if_dhcp_configured)
-				return (n);
+			if (nifap->ipaddr_atype == IPADM_ADDR_DHCP &&
+			    u_if->nwamd_if_dhcp_requested)
+				return (nifap);
 		} else if (family == AF_INET6) {
-			if (n->address.sa_family == family) {
-				if (dhcp && n->dhcp_if &&
-				    u_if->nwamd_if_stateful_configured)
-					return (n);
-				else if (!dhcp && n->stateless_if &&
-				    u_if->nwamd_if_stateless_configured)
-					return (n);
-			}
+			if (nifap->ipaddr_atype == IPADM_ADDR_IPV6_ADDRCONF &&
+			    (u_if->nwamd_if_stateful_requested ||
+			    u_if->nwamd_if_stateless_requested))
+				return (nifap);
 		}
 	}
 	return (NULL);
 }
 
 /*
- * Sets "configured" nwam_if_address value for corresponding address.
- * Used when we process IF_STATE events to handle RTM_NEWADDR/DELADDRs.
+ * Returns the nwamd_if_address structure that configured the given address,
+ * NULL if not found.
  */
-static boolean_t
-update_address_configured_value(const struct sockaddr *configured_addr,
-    nwamd_ncu_t *ncu, boolean_t configured)
+static struct nwamd_if_address *
+find_configured_address(const struct sockaddr_storage *addr,
+    const nwamd_ncu_t *ncu)
 {
-	struct nwamd_if_address *n;
+	struct nwamd_if_address *nifap, *nifa = ncu->ncu_if.nwamd_if_list;
 	char str[INET6_ADDRSTRLEN];
 
-	nlog(LOG_DEBUG, "update_address_configured_value(%s, %s, %s)",
-	    nwamd_sockaddr_to_str(configured_addr, str, sizeof (str)),
-	    ncu->ncu_name, configured ? "configure" : "unconfigure");
-	n = find_static_address(configured_addr, ncu);
-	if (n) {
-		n->configured = configured;
-		nlog(LOG_DEBUG, "update_address_configured_value: marking "
-		    "address %s",
-		    nwamd_sockaddr_to_str(&n->address, str, sizeof (str)));
-		return (B_TRUE);
+	nlog(LOG_DEBUG, "find_configured_address: %s",
+	    nwamd_sockaddr2str((struct sockaddr *)addr, str, sizeof (str)));
+	for (nifap = nifa; nifap != NULL; nifap = nifap->next) {
+		if (sockaddrcmp(addr, &nifap->conf_addr) ||
+		    sockaddrcmp(addr, &nifap->conf_stateless_addr))
+			return (nifap);
 	}
-	return (B_FALSE);
-}
-
-void
-nwamd_update_addresses_unconfigured(nwamd_ncu_t *ncu, sa_family_t af)
-{
-	struct nwamd_if_address *n, *nifa = ncu->ncu_node.u_if.nwamd_if_list;
-
-	for (n = nifa; n != NULL; n = n->next)
-		if (af == AF_UNSPEC || n->address.sa_family == af) {
-			n->configured = B_FALSE;
-			nwamd_log_if_address(LOG_DEBUG, n);
-		}
+	return (NULL);
 }
 
 /*
@@ -576,9 +350,11 @@ nwamd_static_addresses_configured(nwamd_ncu_t *ncu, sa_family_t family)
 {
 	struct nwamd_if_address *n;
 
-	for (n = ncu->ncu_node.u_if.nwamd_if_list; n != NULL; n = n->next) {
-		if ((family == AF_UNSPEC || family == n->address.sa_family) &&
-		    n->configured && !n->dhcp_if && !n->stateless_if)
+	for (n = ncu->ncu_if.nwamd_if_list; n != NULL; n = n->next) {
+		if (n->ipaddr_atype != IPADM_ADDR_STATIC)
+			continue;
+		if ((family == AF_UNSPEC || family == n->family) &&
+		    n->configured)
 			return (B_TRUE);
 	}
 	nlog(LOG_DEBUG, "no static addresses configured for %s", ncu->ncu_name);
@@ -595,36 +371,25 @@ nwamd_static_addresses_configured(nwamd_ncu_t *ncu, sa_family_t family)
 boolean_t
 nwamd_dhcp_managing(int protocol, nwamd_ncu_t *ncu)
 {
-	icfg_if_t *iflist;
-	icfg_handle_t ifh;
-	int numif, i;
-	struct sockaddr_storage addr;
-	socklen_t len;
-	int prefixlen;
+	struct sockaddr_storage *addr;
 	uint64_t flags;
 	boolean_t rv = B_FALSE;
+	ipadm_addr_info_t *addrinfo, *a;
+	ipadm_status_t ipstatus;
 
-	if (icfg_get_if_list(&iflist, &numif, protocol, ICFG_PLUMBED) !=
-	    ICFG_SUCCESS) {
-		return (B_TRUE);
+	if ((ipstatus = ipadm_addr_info(ipadm_handle, ncu->ncu_name, &addrinfo,
+	    0, 0)) != IPADM_SUCCESS) {
+		nlog(LOG_ERR, "nwamd_dhcp_managing: "
+		    "ipadm_addr_info failed for %s: %s",
+		    ncu->ncu_name, ipadm_status2str(ipstatus));
+		return (B_FALSE);
 	}
-	for (i = 0; i < numif; i++) {
-		if (strncmp(iflist[i].if_name, ncu->ncu_name,
-		    strlen(ncu->ncu_name)) != 0)
-				continue;
 
-		if (icfg_open(&ifh, &iflist[i]) != ICFG_SUCCESS)
-			continue;
-
+	for (a = addrinfo; a != NULL; a = IA_NEXT(a)) {
 		/* is this address an expected static one? */
-		len = sizeof (addr);
-		if (icfg_get_addr(ifh, (struct sockaddr *)&addr, &len,
-		    &prefixlen, B_FALSE) != ICFG_SUCCESS ||
-		    find_static_address((struct sockaddr *)&addr, ncu)
-		    != NULL) {
-			icfg_close(ifh);
+		addr = a->ia_ifa.ifa_addr;
+		if (find_static_address(addr, ncu) != NULL)
 			continue;
-		}
 
 		/*
 		 * For IPv4, DHCPRUNNING flag is set when dhcpagent is in
@@ -635,31 +400,32 @@ nwamd_dhcp_managing(int protocol, nwamd_ncu_t *ncu)
 		 * as not being managed by DHCP and skip checking of flags.
 		 */
 		if ((protocol == AF_INET &&
-		    ((struct sockaddr_in *)&addr)->sin_addr.s_addr ==
+		    ((struct sockaddr_in *)addr)->sin_addr.s_addr ==
 		    INADDR_ANY) ||
 		    (protocol == AF_INET6 &&
 		    IN6_IS_ADDR_LINKLOCAL(
-		    &((struct sockaddr_in6 *)&addr)->sin6_addr))) {
-			icfg_close(ifh);
+		    &((struct sockaddr_in6 *)addr)->sin6_addr))) {
 			continue;
 		}
 
-		if (icfg_get_flags(ifh, &flags) == ICFG_SUCCESS &&
-		    (flags & IFF_DHCPRUNNING)) {
+		flags = a->ia_ifa.ifa_flags;
+		if (flags & IFF_DHCPRUNNING) {
 			/*
 			 * If we get here we have an address that has the
 			 * DHCP flag set and isn't an expected static address.
 			 */
-			icfg_close(ifh);
 			rv = B_TRUE;
 			break;
 		}
 	}
 
-	icfg_free_if_list(iflist);
+	ipadm_free_addr_info(addrinfo);
 	return (rv);
 }
 
+/*
+ * Return B_TRUE if IPv4 is requested in the given NCU.
+ */
 static boolean_t
 nwamd_v4_requested(nwamd_ncu_t *ncu)
 {
@@ -667,22 +433,27 @@ nwamd_v4_requested(nwamd_ncu_t *ncu)
 	nwamd_if_t *u_if;
 
 	anyv4_requested = B_FALSE;
-	u_if = &ncu->ncu_node.u_if;
+	u_if = &ncu->ncu_if;
 	if (u_if->nwamd_if_dhcp_requested) {
 		anyv4_requested = B_TRUE;
 	} else {
-		struct nwamd_if_address *a;
-		for (a = u_if->nwamd_if_list;
-		    a != NULL && a->address.sa_family != AF_INET;
-		    a = a->next)
-			/* Empty loop body */;
-		if (a != NULL)
+		struct nwamd_if_address *n;
+
+		for (n = u_if->nwamd_if_list; n != NULL; n = n->next) {
+			if (n->family == AF_INET &&
+			    n->ipaddr_atype == IPADM_ADDR_STATIC)
+				break;
+		}
+		if (n != NULL)
 			anyv4_requested = B_TRUE;
 	}
 
 	return (anyv4_requested);
 }
 
+/*
+ * Returns B_TRUE if IPv6 is requested in the given NCU.
+ */
 static boolean_t
 nwamd_v6_requested(nwamd_ncu_t *ncu)
 {
@@ -690,17 +461,19 @@ nwamd_v6_requested(nwamd_ncu_t *ncu)
 	nwamd_if_t *u_if;
 
 	anyv6_requested = B_FALSE;
-	u_if = &ncu->ncu_node.u_if;
+	u_if = &ncu->ncu_if;
 	if (u_if->nwamd_if_stateful_requested ||
 	    u_if->nwamd_if_stateless_requested) {
 		anyv6_requested = B_TRUE;
 	} else {
-		struct nwamd_if_address *a;
-		for (a = u_if->nwamd_if_list;
-		    a != NULL && a->address.sa_family != AF_INET6;
-		    a = a->next)
-			/* Empty loop body */;
-		if (a != NULL)
+		struct nwamd_if_address *n;
+
+		for (n = u_if->nwamd_if_list; n != NULL; n = n->next) {
+			if (n->family == AF_INET6 &&
+			    n->ipaddr_atype == IPADM_ADDR_STATIC)
+				break;
+		}
+		if (n != NULL)
 			anyv6_requested = B_TRUE;
 	}
 
@@ -771,171 +544,229 @@ interface_ncu_down(nwamd_ncu_t *ncu)
 	interface_ncu_up_down(ncu, B_FALSE);
 }
 
-/* Callback to find if DHCP is running on the interface index */
-static int
-flags_set_for_ifindex_cb(icfg_if_t *intf, void *arg, uint64_t flags_wanted)
-{
-	int *indexp = arg;
-	icfg_handle_t h;
-	int index;
-	uint64_t flags = 0;
-
-	if (icfg_open(&h, intf) != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "flags_set_for_ifindex_cb: icfg_open failed");
-		return (0);
-	}
-	if (icfg_get_index(h, &index) != ICFG_SUCCESS) {
-		nlog(LOG_ERR,
-		    "flags_set_for_ifindex_cb: icfg_get_index failed");
-		icfg_close(h);
-		return (0);
-	}
-	if (index != *indexp) {
-		icfg_close(h);
-		return (0);
-	}
-
-	if (icfg_get_flags(h, &flags) != ICFG_SUCCESS) {
-		nlog(LOG_ERR,
-		    "flags_set_for_ifindex_cb: icfg_get_flags failed");
-	}
-	icfg_close(h);
-	return ((flags & flags_wanted) == flags_wanted);
-}
-
-static int
-stateless_running_for_ifindex_cb(icfg_if_t *intf, void *arg)
-{
-	return (flags_set_for_ifindex_cb(intf, arg,
-	    IFF_RUNNING | IFF_ADDRCONF | IFF_UP));
-}
-
-/*
- * Is autoconf running on the interface with specified ifindex?
- */
-static boolean_t
-stateless_running_for_ifindex(int ifindex)
-{
-	return (icfg_iterate_if(AF_INET6, ICFG_PLUMBED, &ifindex,
-	    stateless_running_for_ifindex_cb) != 0);
-}
-
 static boolean_t
 stateless_running(const nwamd_ncu_t *ncu)
 {
-	int index;
-	icfg_if_t intf;
-	icfg_handle_t ifh;
+	ipadm_addr_info_t *ainfo, *ainfop;
+	ipadm_status_t ipstatus;
+	boolean_t rv = B_FALSE;
+	uint64_t flags;
 
-	intf.if_protocol = AF_INET6;
-	(void) strlcpy(intf.if_name, ncu->ncu_name, sizeof (intf.if_name));
-	if (icfg_open(&ifh, &intf) != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "stateless_running: icfg_open(%s) failed",
-		    ncu->ncu_name);
+	if ((ipstatus = ipadm_addr_info(ipadm_handle, ncu->ncu_name, &ainfo,
+	    0, 0)) != IPADM_SUCCESS) {
+		nlog(LOG_ERR, "stateless_running: "
+		    "ipadm_addr_info failed for %s: %s",
+		    ncu->ncu_name, ipadm_status2str(ipstatus));
 		return (B_FALSE);
 	}
 
-	if (icfg_get_index(ifh, &index) != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "stateless_running: icfg_get_index(%s) failed",
-		    ncu->ncu_name);
-		return (B_FALSE);
+	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
+		if (ainfop->ia_ifa.ifa_addr->ss_family != AF_INET6)
+			continue;
+		flags = ainfop->ia_ifa.ifa_flags;
+		if (flags & STATELESS_RUNNING) {
+			rv = B_TRUE;
+			break;
+		}
 	}
-
-	icfg_close(ifh);
-
-	return (stateless_running_for_ifindex(index));
+	ipadm_free_addr_info(ainfo);
+	return (rv);
 }
 
+/*
+ * Returns the addrinfo associated with the given address.  There is always
+ * only one addrinfo for each address.
+ */
+static boolean_t
+addrinfo_for_addr(const struct sockaddr_storage *caddr, const char *ifname,
+    ipadm_addr_info_t **ainfo)
+{
+	ipadm_addr_info_t *addrinfo, *ainfop, *last = NULL;
+	ipadm_status_t ipstatus;
+
+	ipstatus = ipadm_addr_info(ipadm_handle, ifname, &addrinfo, 0, 0);
+	if (ipstatus != IPADM_SUCCESS) {
+		nlog(LOG_INFO, "addrinfo_for_addr: "
+		    "ipadm_addr_info failed for %s: %s",
+		    ifname, ipadm_status2str(ipstatus));
+		return (B_FALSE);
+	}
+
+	*ainfo = NULL;
+	for (ainfop = addrinfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
+		/*
+		 * If addresses match, rearrange pointers so that addrinfo
+		 * does not contain a, and return a.
+		 */
+		if (sockaddrcmp(ainfop->ia_ifa.ifa_addr, caddr)) {
+			if (last != NULL)
+				last->ia_ifa.ifa_next = ainfop->ia_ifa.ifa_next;
+			else
+				addrinfo = IA_NEXT(ainfop);
+
+			ainfop->ia_ifa.ifa_next = NULL;
+			*ainfo = ainfop;
+			break;
+		}
+		last = ainfop;
+	}
+	ipadm_free_addr_info(addrinfo);
+	return (*ainfo == NULL ? B_FALSE : B_TRUE);
+}
+
+/*
+ * Returns B_TRUE if the addrinfo associated with the given ipaddr using its
+ * aobjname is found.  An addrinfo list is created and returned in ainfo.
+ * Stateless and stateful IPv6 addrinfo have the same aobjname, thus the need
+ * to create a list of addrinfo.
+ */
+static boolean_t
+addrinfo_for_ipaddr(ipadm_addrobj_t ipaddr, const char *ifname,
+    ipadm_addr_info_t **ainfo)
+{
+	char aobjname[IPADM_AOBJSIZ];
+	ipadm_addr_info_t *addrinfo, *ainfop;
+	ipadm_addr_info_t *last = NULL;
+	ipadm_status_t ipstatus;
+
+	ipstatus = ipadm_get_aobjname(ipaddr, aobjname, sizeof (aobjname));
+	if (ipstatus != IPADM_SUCCESS)
+		return (B_FALSE);
+
+	ipstatus = ipadm_addr_info(ipadm_handle, ifname, &addrinfo, 0, 0);
+	if (ipstatus != IPADM_SUCCESS) {
+		nlog(LOG_INFO, "addrinfo_for_ipaddr: "
+		    "ipadm_addr_info failed for %s: %s",
+		    ifname, ipadm_status2str(ipstatus));
+		return (B_FALSE);
+	}
+
+	*ainfo = NULL;
+	ainfop = addrinfo;
+	while (ainfop != NULL) {
+		/* If aobjnames match, rearrange pointers to create new list */
+		if (strcmp(ainfop->ia_aobjname, aobjname) == 0) {
+			ipadm_addr_info_t *match = ainfop;
+
+			ainfop = IA_NEXT(ainfop); /* move iterator */
+			if (last != NULL)
+				last->ia_ifa.ifa_next = match->ia_ifa.ifa_next;
+			else
+				addrinfo = ainfop;
+			if (*ainfo == NULL)
+				match->ia_ifa.ifa_next = NULL;
+			else
+				match->ia_ifa.ifa_next = &(*ainfo)->ia_ifa;
+			*ainfo = match;
+		} else {
+			last = ainfop;
+			ainfop = IA_NEXT(ainfop);
+		}
+	}
+	ipadm_free_addr_info(addrinfo);
+	return (*ainfo == NULL ? B_FALSE : B_TRUE);
+}
+
+/*
+ * Add the address provided in the nwamd_if_address.  If DHCP is required,
+ * start DHCP.  If a static address is configured, create the address; then do
+ * a DHCP_INFORM (in a separate thread) to get other networking configuration
+ * parameters.  RTM_NEWADDRs - translated into IF_STATE events - will then
+ * finish the job of bringing the NCU online.
+ */
+static boolean_t
+add_ip_address(const char *ifname, const struct nwamd_if_address *nifa)
+{
+	ipadm_status_t ipstatus;
+	ipadm_addr_info_t *addrinfo = NULL;
+	uint64_t flags;
+
+	if (nifa->ipaddr_atype == IPADM_ADDR_DHCP) {
+		/*
+		 * To make getting a DHCP address asynchronous, call
+		 * ipadm_create_addr() in a new thread.
+		 */
+		nlog(LOG_DEBUG, "add_ip_address: "
+		    "adding IPv4 DHCP address on %s", ifname);
+		nwamd_dhcp(ifname, nifa->ipaddr, DHCP_START);
+	} else {
+		nlog(LOG_DEBUG, "add_ip_address: adding %s address on %s",
+		    (nifa->ipaddr_atype == IPADM_ADDR_STATIC ?
+		    "STATIC" : "IPv6 ADDRCONF"), ifname);
+		if ((ipstatus = ipadm_create_addr(ipadm_handle, nifa->ipaddr,
+		    IPADM_OPT_ACTIVE | IPADM_OPT_UP)) != IPADM_SUCCESS) {
+			nlog(LOG_ERR, "add_ip_address: "
+			    "ipadm_create_addr failed on %s: %s",
+			    ifname, ipadm_status2str(ipstatus));
+			return (B_FALSE);
+		}
+		/*
+		 * When creating a static address, ipadm_create_addr() returns
+		 * SUCCESS even if duplicate address is detected.  Retrieve
+		 * the addrinfo to get the flags.
+		 */
+		if (nifa->ipaddr_atype == IPADM_ADDR_STATIC) {
+			/*
+			 * Since we are configuring a static address, there
+			 * will be just *ONE* addrinfo with the aobjname in
+			 * nifa->ipaddr.
+			 */
+			if (!addrinfo_for_ipaddr(nifa->ipaddr, ifname,
+			    &addrinfo)) {
+				nlog(LOG_ERR, "add_ip_address: "
+				    "could not find addrinfo on %s", ifname);
+				return (B_FALSE);
+			}
+
+			flags = addrinfo->ia_ifa.ifa_flags;
+			ipadm_free_addr_info(addrinfo);
+			if (flags & IFF_DUPLICATE) {
+				char *object_name;
+				nwam_error_t err;
+
+				nlog(LOG_INFO, "add_ip_address: "
+				    "duplicate address detected on %s", ifname);
+				if ((err = nwam_ncu_name_to_typed_name(ifname,
+				    NWAM_NCU_TYPE_INTERFACE, &object_name))
+				    == NWAM_SUCCESS) {
+					nwamd_object_set_state(
+					    NWAM_OBJECT_TYPE_NCU,
+					    object_name, NWAM_STATE_MAINTENANCE,
+					    NWAM_AUX_STATE_IF_DUPLICATE_ADDR);
+					free(object_name);
+				} else {
+					nlog(LOG_ERR, "add_ip_address: "
+					    "could not create state event "
+					    "for %s: %s",
+					    ifname, nwam_strerror(err));
+				}
+				return (B_FALSE);
+			}
+			/* Do DHCP_INFORM using async ipadm_refresh_addr() */
+			nwamd_dhcp(ifname, nifa->ipaddr, DHCP_INFORM);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Adds addresses for the given NCU.
+ */
 void
 nwamd_configure_interface_addresses(nwamd_ncu_t *ncu)
 {
-	struct nwamd_if_address *nifa = ncu->ncu_node.u_if.nwamd_if_list;
-	struct nwamd_if_address *n;
-	int num_configured_v4 = 0;
-	boolean_t add_logical_if;
+	struct nwamd_if_address *nifap, *nifa = ncu->ncu_if.nwamd_if_list;
 
 	nlog(LOG_DEBUG, "nwamd_configure_interface_addresses(%s)",
 	    ncu->ncu_name);
 
-	/*
-	 * Add static addresses.  For IPv4, we only use the physical interface
-	 * (i.e. not a logical interface) if DHCP has not been requested and
-	 * this is the first address to be configured.
-	 */
-	for (n = nifa; n != NULL; n = n->next) {
-		if (n->configured || n->dhcp_if || n->stateless_if)
+	for (nifap = nifa; nifap != NULL; nifap = nifap->next) {
+		if (nifap->configured)
 			continue;
-		switch (n->address.sa_family) {
-		case AF_INET:
-			add_logical_if = (num_configured_v4 > 0 ||
-			    ncu->ncu_node.u_if.nwamd_if_dhcp_requested);
-			num_configured_v4++;
-			break;
-		case AF_INET6:
-			add_logical_if = B_TRUE;
-			break;
-		}
-		n->configured = add_ip_address(ncu->ncu_name, n,
-		    add_logical_if);
+
+		nifap->configured = add_ip_address(ncu->ncu_name, nifap);
 	}
-}
-
-static int
-lifnum_from_ifname(const char *ifname)
-{
-	char *lifstr = strchr(ifname, ':');
-
-	if (lifstr != NULL) {
-		lifstr++;
-		return (atoi(lifstr));
-	}
-	return (0);
-}
-
-/*
- * Copies the ifname (with lifnum) associated with the given address.
- * Returns B_TRUE if a match is found, B_FASLE otherwise.
- */
-static boolean_t
-ifname_for_addr(const struct sockaddr *caddr, char *ifname, int len)
-{
-	struct sockaddr_in6 addr;
-	int numif, i, prefixlen;
-	icfg_if_t *iflist;
-	icfg_handle_t ifh;
-	socklen_t slen;
-
-	if (icfg_get_if_list(&iflist, &numif, caddr->sa_family, ICFG_PLUMBED)
-	    != ICFG_SUCCESS) {
-		nlog(LOG_DEBUG, "ifname_for_addr: icfg_get_if_list failed");
-		return (B_FALSE);
-	}
-
-	for (i = 0; i < numif; i++) {
-		if (icfg_open(&ifh, &iflist[i]) != ICFG_SUCCESS) {
-			nlog(LOG_ERR, "ifname_for_addr: icfg_open %s failed",
-			    iflist[i].if_name);
-			continue;
-		}
-
-		slen = sizeof (addr);
-		if (icfg_get_addr(ifh, (struct sockaddr *)&addr,
-		    &slen, &prefixlen, B_FALSE) != ICFG_SUCCESS) {
-			nlog(LOG_ERR, "ifname_for_addr: "
-			    "icfg_get_addr %s failed", iflist[i].if_name);
-		} else {
-			/* Compare addresses */
-			if (addresses_match((struct sockaddr *)&addr, caddr)) {
-				(void) strlcpy(ifname, iflist[i].if_name, len);
-				icfg_close(ifh);
-				icfg_free_if_list(iflist);
-				return (B_TRUE);
-			}
-		}
-		icfg_close(ifh);
-	}
-	icfg_free_if_list(iflist);
-	return (B_FALSE);
 }
 
 /*
@@ -1001,95 +832,144 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 
 	if (evm->nwe_data.nwe_if_state.nwe_addr_valid) {
 		struct nwam_event_if_state *if_state;
-		boolean_t stateless_running;
-		char addrstr[INET6_ADDRSTRLEN], ifname[LIFNAMSIZ];
-		boolean_t v4dhcp_running;
-		boolean_t v6dhcp_running;
-		struct nwamd_if_address *nifa;
-		struct sockaddr *addr;
-		boolean_t static_addr;
-		icfg_if_t intf;
-		icfg_handle_t ifh;
+		char addrstr[INET6_ADDRSTRLEN];
+		boolean_t static_addr, addr_added;
+		boolean_t v4dhcp_running, v6dhcp_running, stateless_running;
+		ipadm_addr_info_t *ai = NULL, *addrinfo = NULL;
+		boolean_t stateless_ai_found = B_FALSE;
+		boolean_t stateful_ai_found = B_FALSE;
+		struct nwamd_if_address *nifa = NULL;
 		nwamd_if_t *u_if;
+		struct sockaddr_storage *addr, *ai_addr = 0;
 		ushort_t family;
 		uint64_t flags = 0;
-		int lifnum;
 
 		if_state = &evm->nwe_data.nwe_if_state;
-		u_if = &ncu->ncu_node.u_if;
+		u_if = &ncu->ncu_if;
 		family = if_state->nwe_addr.ss_family;
-		addr = (struct sockaddr *)&if_state->nwe_addr;
+		addr = &if_state->nwe_addr;
+		addr_added = if_state->nwe_addr_added;
 
 		nlog(LOG_DEBUG,
 		    "nwamd_ncu_handle_if_state_event: addr %s %s",
-		    nwamd_sockaddr_to_str(addr, addrstr, sizeof (addrstr)),
-		    evm->nwe_data.nwe_if_state.nwe_addr_added ?
-		    "added" : "removed");
-
-		/* determine the interface name with lifnum */
-		if (if_state->nwe_addr_added) {
-			/* figure out the ifname for the address */
-			if (!ifname_for_addr(addr, ifname, sizeof (ifname))) {
-				nlog(LOG_ERR,
-				    "nwamd_ncu_handle_if_state_event:"
-				    "could not find ifname for %s", addrstr);
-				nwamd_event_do_not_send(event);
-				goto exit;
-			}
-		} else {
-			/*
-			 * Figure out the ifname that had the address that was
-			 * removed.  The address is already gone from the
-			 * interface, so cannot walk the interface list.
-			 */
-			struct nwamd_if_address *n;
-
-			if ((n = find_static_address(addr, ncu)) == NULL &&
-			    (n = find_nonstatic_address(ncu, family, B_TRUE))
-			    == NULL &&
-			    (n = find_nonstatic_address(ncu, family, B_FALSE))
-			    == NULL) {
-				nlog(LOG_ERR,
-				    "nwamd_ncu_handle_if_state_event: "
-				    "could not find nwamd_if_address for %s",
-				    addrstr);
-				nwamd_event_do_not_send(event);
-				goto exit;
-			}
-			(void) strlcpy(ifname, n->ifname, sizeof (ifname));
-		}
-
-		nlog(LOG_DEBUG, "nwamd_ncu_handle_if_state_event: "
-		    "ifname for %s is %s", addrstr, ifname);
+		    nwamd_sockaddr2str((struct sockaddr *)addr, addrstr,
+		    sizeof (addrstr)), addr_added ? "added" : "removed");
 
 		/*
-		 * Get interface flags using nwe_ifname as it is logical
-		 * interface name.
+		 * Need to get flags for this interface.  Get the addrinfo for
+		 * the address that generated this IF_STATE event.
 		 */
-		intf.if_protocol = family;
-		(void) strlcpy(intf.if_name, ifname, sizeof (intf.if_name));
-		lifnum = lifnum_from_ifname(intf.if_name);
-
-		if (icfg_open(&ifh, &intf) != ICFG_SUCCESS) {
-			nlog(LOG_ERR, "nwamd_ncu_handle_if_state_event: can't "
-			    "find if %s", intf.if_name);
-			nwamd_event_do_not_send(event);
-			goto exit;
-		}
-		if (icfg_get_flags(ifh, &flags) != ICFG_SUCCESS) {
-			nlog(LOG_INFO, "nwamd_ncu_handle_if_state_event: can't "
-			    "get flags for %s", icfg_if_name(ifh));
+		if (addr_added) {
 			/*
-			 * If the interface is unplumbed, icfg_get_flags()
-			 * will fail.  Don't exit, continue with empty flags.
+			 * Address was added.  Find the addrinfo for this
+			 * address and the nwamd_if_address corresponding to
+			 * this address.
 			 */
-			if (if_state->nwe_addr_added) {
-				icfg_close(ifh);
-				goto exit;
+			if (!addrinfo_for_addr(addr, ncu->ncu_name, &ai)) {
+				nlog(LOG_ERR,
+				    "nwamd_ncu_handle_if_state_event: "
+				    "addrinfo doesn't exist for %s", addrstr);
+				nwamd_event_do_not_send(event);
+				goto valid_done;
+			}
+			addrinfo = ai;
+			flags = addrinfo->ia_ifa.ifa_flags;
+			ai_addr = addrinfo->ia_ifa.ifa_addr;
+
+			if (addrinfo->ia_atype == IPADM_ADDR_IPV6_ADDRCONF ||
+			    addrinfo->ia_atype == IPADM_ADDR_DHCP)
+				nifa = find_nonstatic_address(ncu, family);
+			else if (addrinfo->ia_atype == IPADM_ADDR_STATIC)
+				nifa = find_static_address(addr, ncu);
+
+			/*
+			 * If nwamd_if_address is not found, then this address
+			 * isn't one that nwamd created.  Remove it.
+			 */
+			if (nifa == NULL) {
+				nlog(LOG_ERR,
+				    "nwamd_ncu_handle_if_state_event: "
+				    "address %s not managed by nwam added, "
+				    "removing it", addrstr);
+				nwamd_down_interface(addrinfo->ia_aobjname,
+				    addrinfo->ia_atype, ncu->ncu_name);
+				nwamd_event_do_not_send(event);
+				goto valid_done;
+			}
+
+			/* check flags to determine how intf is configured */
+			stateless_running = (family == AF_INET6) &&
+			    ((flags & STATELESS_RUNNING) == STATELESS_RUNNING);
+			v4dhcp_running = (family == AF_INET) &&
+			    ((flags & DHCP_RUNNING) == DHCP_RUNNING);
+			v6dhcp_running = (family == AF_INET6) &&
+			    ((flags & DHCP_RUNNING) == DHCP_RUNNING);
+			static_addr = (addrinfo->ia_atype == IPADM_ADDR_STATIC);
+
+			/* copy the configured address into nwamd_if_address */
+			if (stateless_running) {
+				(void) memcpy(&nifa->conf_stateless_addr,
+				    addrinfo->ia_ifa.ifa_addr,
+				    sizeof (struct sockaddr_storage));
+			} else {
+				(void) memcpy(&nifa->conf_addr,
+				    addrinfo->ia_ifa.ifa_addr,
+				    sizeof (struct sockaddr_storage));
+			}
+
+		} else {
+			/*
+			 * Address was removed.  Find the nwamd_if_address
+			 * that configured this address.
+			 */
+			nifa = find_configured_address(addr, ncu);
+			if (nifa == NULL) {
+				nlog(LOG_ERR,
+				    "nwamd_ncu_handle_if_state_event: "
+				    "address %s not managed by nwam removed, "
+				    "nothing to do", addrstr);
+				nwamd_event_do_not_send(event);
+				goto valid_done;
+			}
+
+			if (addrinfo_for_ipaddr(nifa->ipaddr, ncu->ncu_name,
+			    &ai)) {
+				ipadm_addr_info_t *a;
+				for (a = ai; a != NULL; a = IA_NEXT(a)) {
+					/*
+					 * Since multiple addrinfo can have
+					 * the same ipaddr, find the one for
+					 * the address that generated this
+					 * state event.
+					 */
+					if (sockaddrcmp(addr,
+					    a->ia_ifa.ifa_addr)) {
+						flags = a->ia_ifa.ifa_flags;
+						ai_addr = a->ia_ifa.ifa_addr;
+						addrinfo = a;
+					}
+					/*
+					 * Stateful and stateless IPv6
+					 * addrinfo have the same aobjname.
+					 * Use the flags to determine which
+					 * address is present in the system.
+					 */
+					if (family == AF_INET6) {
+						stateless_ai_found =
+						    (a->ia_ifa.ifa_flags &
+						    STATELESS_RUNNING);
+						stateful_ai_found =
+						    (a->ia_ifa.ifa_flags &
+						    DHCP_RUNNING);
+					}
+				}
 			}
 		}
 
-		if (family == AF_INET && !if_state->nwe_addr_added) {
+		/* Set the flags in the event for listeners */
+		evm->nwe_data.nwe_if_state.nwe_flags = flags;
+
+		if (family == AF_INET && !addr_added) {
 			/*
 			 * Check for failure due to CR 6745448: if we get a
 			 * report that an address has been deleted, then check
@@ -1100,68 +980,64 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			 * (which aren't smart enough to avoid dead
 			 * interfaces).
 			 */
-			/*LINTED*/
 			if (((struct sockaddr_in *)addr)->sin_addr.s_addr
-			    == INADDR_ANY) {
-				socklen_t slen;
-				struct sockaddr_in s;
-				int pfxlen;
+			    == INADDR_ANY && ai_addr != 0) {
+				struct sockaddr_in *a;
+				char astr[INET6_ADDRSTRLEN];
+				a = (struct sockaddr_in *)ai_addr;
 
 				if ((flags & IFF_UP) &&
 				    !(flags & IFF_RUNNING) &&
-				    icfg_get_addr(ifh, (struct sockaddr *)&s,
-				    &slen, &pfxlen, B_FALSE) == ICFG_SUCCESS &&
-				    s.sin_addr.s_addr != INADDR_ANY) {
-					nlog(LOG_DEBUG, "bug workaround: "
-					    "clear out addr %s on %s",
-					    inet_ntoa(s.sin_addr), ifname);
-					s.sin_addr.s_addr = INADDR_ANY;
-					(void) icfg_set_addr(ifh,
-					    (const struct sockaddr *)&s, slen);
+				    a->sin_addr.s_addr != INADDR_ANY) {
+					nlog(LOG_DEBUG,
+					    "nwamd_ncu_handle_if_state_event: "
+					    "bug workaround: clear out addr "
+					    "%s on %s", nwamd_sockaddr2str
+					    ((struct sockaddr *)a, astr,
+					    sizeof (astr)),
+					    ncu->ncu_name);
+					nwamd_down_interface(
+					    addrinfo->ia_aobjname,
+					    IPADM_ADDR_DHCP, ncu->ncu_name);
 				}
-				icfg_close(ifh);
-				goto exit;
+				goto valid_done;
 			}
 		}
 
 		/*
-		 * Has address really been removed? Sometimes spurious
+		 * If we received an RTM_NEWADDR and the IFF_UP flags has not
+		 * been set, ignore this IF_STATE event.  Once the IFF_UP flag
+		 * is set, we'll get another RTM_NEWADDR message.
+		 */
+		if (addr_added & !(flags & IFF_UP)) {
+			nlog(LOG_INFO, "nwamd_ncu_handle_if_state_event: "
+			    "address %s added on %s without IFF_UP flag (%x), "
+			    "ignoring IF_STATE event",
+			    addrstr, ncu->ncu_name, flags);
+			nwamd_event_do_not_send(event);
+			goto valid_done;
+		}
+
+		/*
+		 * Has the address really been removed?  Sometimes spurious
 		 * RTM_DELADDRs are generated, so we need to ensure that
 		 * the address is really gone.  If IFF_DUPLICATE is set,
 		 * we're getting the RTM_DELADDR due to DAD, so don't test
 		 * in that case.
 		 */
-		if (!if_state->nwe_addr_added && !(flags & IFF_DUPLICATE)) {
-			struct sockaddr_storage ifaddr;
-			socklen_t len;
-			int plen;
-
-			len = family == AF_INET ? sizeof (struct sockaddr_in) :
-			    sizeof (struct sockaddr_in6);
-			if (icfg_get_addr(ifh, (struct sockaddr *)&ifaddr, &len,
-			    &plen, B_FALSE) == ICFG_SUCCESS &&
-			    addresses_match(addr, (struct sockaddr *)&ifaddr)) {
-				nlog(LOG_DEBUG,
+		if (!addr_added && !(flags & IFF_DUPLICATE)) {
+			if (ai_addr != 0 && sockaddrcmp(addr, ai_addr)) {
+				nlog(LOG_INFO,
 				    "nwamd_ncu_handle_if_state_event: "
 				    "address %s is not really gone from %s, "
 				    "ignoring IF_STATE event",
-				    addrstr, intf.if_name);
-				icfg_close(ifh);
+				    addrstr, ncu->ncu_name);
 				nwamd_event_do_not_send(event);
-				goto exit;
+				goto valid_done;
 			}
 		}
-		icfg_close(ifh);
 
-		stateless_running = (family == AF_INET6) &&
-		    ((flags & STATELESS_RUNNING) == STATELESS_RUNNING);
-		v4dhcp_running = (family == AF_INET) &&
-		    ((flags & DHCP_RUNNING) == DHCP_RUNNING);
-		v6dhcp_running = (family == AF_INET6) &&
-		    ((flags & DHCP_RUNNING) == DHCP_RUNNING);
-		static_addr = (find_static_address(addr, ncu) != NULL);
-
-		if (if_state->nwe_addr_added) {
+		if (addr_added) {
 			/*
 			 * Address has been added.
 			 *
@@ -1170,63 +1046,27 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			 * address but by the time we got here we don't really
 			 * want it and need to remove it.
 			 *
-			 * [Note that since we use DHCP inform on interfaces
-			 * with static addresses that they will also have the
-			 * DHCP flag set on the interface.]
-			 *
 			 * Once we decide we want the address adjust the ncu
 			 * state accordingly.  For example if this address is
 			 * enough move online.
 			 */
-
-			/* Figure out if we want to keep this address. */
-			if (static_addr) {
-				nifa = find_static_address(addr, ncu);
-				assert(nifa != NULL);
-				nifa->configured = B_TRUE;
-				(void) strlcpy(nifa->ifname, ifname,
-				    sizeof (nifa->ifname));
-			} else if (u_if->nwamd_if_dhcp_requested &&
-			    v4dhcp_running) {
+			if (u_if->nwamd_if_dhcp_requested && v4dhcp_running) {
 				u_if->nwamd_if_dhcp_configured = B_TRUE;
-				nifa = find_nonstatic_address(ncu, family,
-				    B_TRUE);
-				assert(nifa != NULL);
-				(void) strlcpy(nifa->ifname, ifname,
-				    sizeof (nifa->ifname));
 			} else if (u_if->nwamd_if_stateful_requested &&
 			    v6dhcp_running) {
 				u_if->nwamd_if_stateful_configured = B_TRUE;
-				nifa = find_nonstatic_address(ncu, family,
-				    B_TRUE);
-				assert(nifa != NULL);
-				(void) strlcpy(nifa->ifname, ifname,
-				    sizeof (nifa->ifname));
 			} else if (u_if->nwamd_if_stateless_requested &&
 			    stateless_running) {
 				u_if->nwamd_if_stateless_configured = B_TRUE;
-				nifa = find_nonstatic_address(ncu, family,
-				    B_FALSE);
-				assert(nifa != NULL);
-				(void) strlcpy(nifa->ifname, ifname,
-				    sizeof (nifa->ifname));
-			} else {
+			} else if (!static_addr) {
 				/*
 				 * This is something we didn't expect.  Remove
-				 * it by unplumbing the logical interface.
+				 * the address.
 				 */
-				if (u_if->nwamd_if_dhcp_requested &&
-				    v4dhcp_running)
-					nwamd_dhcp_release(ncu->ncu_name);
-				if (lifnum == 0) {
-					nwamd_down_interface(ncu->ncu_name,
-					    lifnum, family);
-					interface_ncu_down(ncu);
-				} else {
-					nwamd_unplumb_interface(ncu, lifnum,
-					    family);
-				}
-				goto exit;
+				nwamd_down_interface(addrinfo->ia_aobjname,
+				    addrinfo->ia_atype, ncu->ncu_name);
+				nifa->configured = B_FALSE;
+				goto valid_done;
 			}
 
 			/*
@@ -1235,8 +1075,7 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			 * v4 is configured or a v6 address if only v6 is
 			 * configured.
 			 */
-			(void) update_address_configured_value(addr, ncu,
-			    B_TRUE);
+			nifa->configured = B_TRUE;
 			if (state != NWAM_STATE_ONLINE)
 				interface_ncu_up(ncu);
 
@@ -1255,6 +1094,7 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 				    "event: refresh of %s "
 				    "failed", NET_LOC_FMRI);
 			}
+
 		} else if (state == NWAM_STATE_ONLINE ||
 		    state == NWAM_STATE_OFFLINE_TO_ONLINE) {
 			/*
@@ -1267,21 +1107,24 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			 * We can get RTM_DELADDRs for duplicate addresses
 			 * so deal with this seperately.
 			 */
-			if (static_addr) {
-				(void) update_address_configured_value(addr,
-				    ncu, B_FALSE);
-			} else if (family == AF_INET) {
+			nifa->configured = B_FALSE;
+
+			if (!static_addr && family == AF_INET) {
 				u_if->nwamd_if_dhcp_configured = B_FALSE;
-			} else if (family == AF_INET6) {
+			} else if (!static_addr && family == AF_INET6) {
 				/*
-				 * The address is already gone.  I'm not sure
-				 * how we figure out if this address is
-				 * stateful (DHCP) or stateless.  When we
-				 * are managing IPv6 more explicitly this will
-				 * have to be done more carefully.
+				 * The address is already gone.  When looking
+				 * for the addrinfo (using aobjname in
+				 * ipaddr), we found addrinfo for either one
+				 * or both stateless and stateful.  Using the
+				 * flags we determined whether each was
+				 * configured or not.  Update the flags here
+				 * accordingly.
 				 */
-				u_if->nwamd_if_stateful_configured = B_FALSE;
-				u_if->nwamd_if_stateless_configured = B_FALSE;
+				u_if->nwamd_if_stateful_configured =
+				    stateless_ai_found;
+				u_if->nwamd_if_stateless_configured =
+				    stateful_ai_found;
 			}
 
 			if (flags & IFF_DUPLICATE) {
@@ -1297,8 +1140,9 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 				interface_ncu_down(ncu);
 			}
 		}
+valid_done:
+		ipadm_free_addr_info(ai);
 	}
-exit:
 	nwamd_object_release(ncu_obj);
 }
 
@@ -1320,140 +1164,104 @@ nwamd_ncu_handle_if_action_event(nwamd_event_t event)
 }
 
 /*
- * This function downs any logical interface and just zeros the address off of
- * the physical interface (logical interface 0).  If you want to unplumb 0 then
- * you need to call nwamd_unplumb_interface() directly.
+ * Remove the address in the given aobjname.  IPADM_OPT_RELEASE is specified
+ * for a DHCP address and specifies that the DHCP lease should also be released.
+ * ifname is only used for nlog().
  */
 static void
-nwamd_down_interface(const char *linkname, uint_t lifnum, int family)
+nwamd_down_interface(const char *aobjname, ipadm_addr_type_t atype,
+    const char *ifname)
 {
-	uint64_t flags;
-	icfg_if_t intf;
-	icfg_handle_t h;
-	icfg_error_t rc;
+	ipadm_status_t ipstatus;
+	uint32_t rflags = (atype == IPADM_ADDR_DHCP ? IPADM_OPT_RELEASE : 0);
 
-	if (linkname == NULL) {
-		nlog(LOG_ERR, "nwamd_down_interface: linkname null");
-		return;
+	nlog(LOG_DEBUG, "nwamd_down_interface: %s [aobjname = %s]",
+	    ifname, aobjname);
+	if ((ipstatus = ipadm_delete_addr(ipadm_handle, aobjname,
+	    IPADM_OPT_ACTIVE | rflags)) != IPADM_SUCCESS) {
+		nlog(LOG_ERR, "nwamd_down_interface: "
+		    "ipadm_delete_addr failed on %s: %s",
+		    ifname, ipadm_status2str(ipstatus));
 	}
-
-	(void) nwamd_link_to_ifname(linkname, lifnum, intf.if_name,
-	    sizeof (intf.if_name));
-	intf.if_protocol = family;
-
-	rc = icfg_open(&h, &intf);
-	if (rc != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "nwamd_down_interface: icfg_open failed for %s: "
-		    "%s", intf.if_name, icfg_errmsg(rc));
-		return;
-	}
-
-	if (lifnum == 0) {
-		struct sockaddr_in6 addr;
-
-		(void) memset(&addr, 0, sizeof (addr));
-		addr.sin6_family = family;
-		if (icfg_set_addr(h, (struct sockaddr *)&addr,
-		    family == AF_INET ? sizeof (struct sockaddr_in) :
-		    sizeof (struct sockaddr_in6)) != ICFG_SUCCESS)
-			nlog(LOG_ERR, "nwamd_down_interface couldn't zero "
-			    "address on %s", h->ifh_interface.if_name);
-	} else {
-		if (icfg_get_flags(h, &flags) == ICFG_SUCCESS) {
-			if (icfg_set_flags(h, flags & ~IFF_UP) != ICFG_SUCCESS)
-				nlog(LOG_ERR, "nwamd_down_interface: couldn't "
-				    "bring %s down", h->ifh_interface.if_name);
-		} else {
-			nlog(LOG_ERR, "nwamd_down_interface: icfg_get_flags "
-			    "failed on %s", h->ifh_interface.if_name);
-		}
-	}
-
-	icfg_close(h);
 }
 
 static void
-nwamd_plumb_unplumb_interface(nwamd_ncu_t *ncu, uint_t lifnum,
-    int af, boolean_t plumb)
+unconfigure_addresses(nwamd_ncu_t *ncu, sa_family_t af)
 {
-	uint64_t flags;
-	icfg_if_t intf;
-	icfg_handle_t h;
-	icfg_error_t rc;
-	nwamd_if_t *u_if;
-	const char *linkname = ncu->ncu_name;
+	struct nwamd_if_address *nifap, *nifa = ncu->ncu_if.nwamd_if_list;
 
-	if (linkname == NULL) {
-		nlog(LOG_ERR, "nwamd_plumb_unplumb_interface: linkname null");
+	for (nifap = nifa; nifap != NULL; nifap = nifap->next)
+		if (af == AF_UNSPEC || nifap->family == af)
+			nifap->configured = B_FALSE;
+}
+
+static void
+dhcp_release(const char *ifname)
+{
+	ipadm_addr_info_t *ainfo, *ainfop;
+
+	if (ipadm_addr_info(ipadm_handle, ifname, &ainfo, 0, 0)
+	    != IPADM_SUCCESS)
 		return;
+
+	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
+		if (ainfop->ia_atype == IPADM_ADDR_DHCP)
+			nwamd_down_interface(ainfop->ia_aobjname,
+			    ainfop->ia_atype, ifname);
+	}
+	ipadm_free_addr_info(ainfo);
+}
+
+static void
+nwamd_plumb_unplumb_interface(nwamd_ncu_t *ncu, sa_family_t af, boolean_t plumb)
+{
+	char *ifname = ncu->ncu_name;
+	nwamd_if_t *u_if = &ncu->ncu_if;
+	ipadm_status_t ipstatus;
+
+	nlog(LOG_DEBUG, "nwamd_plumb_unplumb_interface: %s %s %s",
+	    (plumb ? "plumb" : "unplumb"), (af == AF_INET ? "IPv4" : "IPv6"),
+	    ifname);
+
+	if (plumb) {
+		ipstatus = ipadm_create_if(ipadm_handle, ifname, af,
+		    IPADM_OPT_ACTIVE);
+	} else {
+		/* release DHCP address, if any */
+		if (af == AF_INET)
+			dhcp_release(ifname);
+		ipstatus = ipadm_delete_if(ipadm_handle, ifname, af,
+		    IPADM_OPT_ACTIVE);
 	}
 
-	(void) nwamd_link_to_ifname(linkname, lifnum, intf.if_name,
-	    sizeof (intf.if_name));
-	intf.if_protocol = af;
-
-	nlog(LOG_DEBUG, "nwamd_plumb_unplumb_interface: %s %s on link %s",
-	    plumb ? "plumbing" : "unplumbing",
-	    af == AF_INET ? "IPv4" : "IPv6", linkname);
-
-	/*
-	 * Before unplumbing, do a DHCP release if lifnum is 0.  Otherwise
-	 * dhcpagent can get confused.
-	 */
-	if (!plumb && af == AF_INET && lifnum == 0)
-		nwamd_dhcp_release(ncu->ncu_name);
-
-	rc = icfg_open(&h, &intf);
-	if (rc != ICFG_SUCCESS) {
-		nlog(LOG_ERR, "nwamd_plumb_unplumb_interface: "
-		    "icfg_open failed for %s: %s", intf.if_name,
-		    icfg_errmsg(rc));
-		return;
-	}
-	rc = plumb ? icfg_plumb(h) : icfg_unplumb(h);
-
-	if (rc != ICFG_SUCCESS) {
-		if ((plumb && rc != ICFG_EXISTS) ||
-		    (!plumb && rc != ICFG_NO_EXIST)) {
+	if (ipstatus != IPADM_SUCCESS) {
+		if ((plumb && ipstatus != IPADM_IF_EXISTS) ||
+		    (!plumb && ipstatus != IPADM_ENXIO)) {
 			nlog(LOG_ERR, "nwamd_plumb_unplumb_interface: "
 			    "%s %s failed for %s: %s",
-			    plumb ? "plumb" : "unplumb",
-			    af == AF_INET ? "IPv4" : "IPv6",
-			    intf.if_name, icfg_errmsg(rc));
-		}
-	} else if (plumb) {
-		if (icfg_get_flags(h, &flags) == ICFG_SUCCESS &&
-		    (flags & IFF_UP) == 0) {
-			if (icfg_set_flags(h, flags | IFF_UP) != ICFG_SUCCESS)
-				nlog(LOG_ERR, "nwamd_plumb_unplumb_interface: "
-				    "couldn't bring %s up",
-				    h->ifh_interface.if_name);
-		} else {
-			nlog(LOG_ERR, "nwamd_plumb_unplumb_interface: "
-			    "icfg_get_flags failed on %s",
-			    h->ifh_interface.if_name);
+			    (plumb ? "plumb" : "unplumb"),
+			    (af == AF_INET ? "IPv4" : "IPv6"),
+			    ifname, ipadm_status2str(ipstatus));
 		}
 	}
 
-	u_if = &ncu->ncu_node.u_if;
+	/* Unset flags */
 	if (!plumb) {
-		nwamd_update_addresses_unconfigured(ncu, af);
+		unconfigure_addresses(ncu, af);
 		switch (af) {
-			case AF_INET:
-				u_if->nwamd_if_dhcp_configured = B_FALSE;
-				break;
-			case AF_INET6:
-				u_if->nwamd_if_stateful_configured = B_FALSE;
-				u_if->nwamd_if_stateless_configured = B_FALSE;
-				break;
+		case AF_INET:
+			u_if->nwamd_if_dhcp_configured = B_FALSE;
+			break;
+		case AF_INET6:
+			u_if->nwamd_if_stateful_configured = B_FALSE;
+			u_if->nwamd_if_stateless_configured = B_FALSE;
+			break;
 		}
 	}
-
-	icfg_close(h);
 }
 
 void
-nwamd_plumb_interface(nwamd_ncu_t *ncu, uint_t lifnum, int af)
+nwamd_plumb_interface(nwamd_ncu_t *ncu, sa_family_t af)
 {
 	/*
 	 * We get all posssible privs by calling nwamd_deescalate().  During
@@ -1461,80 +1269,88 @@ nwamd_plumb_interface(nwamd_ncu_t *ncu, uint_t lifnum, int af)
 	 * because we don't have access to /etc/security/device_policy yet.
 	 */
 	nwamd_escalate();
-	nwamd_plumb_unplumb_interface(ncu, lifnum, af, B_TRUE);
+	nwamd_plumb_unplumb_interface(ncu, af, B_TRUE);
 	nwamd_deescalate();
 }
 
 void
-nwamd_unplumb_interface(nwamd_ncu_t *ncu, uint_t lifnum, int af)
+nwamd_unplumb_interface(nwamd_ncu_t *ncu, sa_family_t af)
 {
-	nwamd_plumb_unplumb_interface(ncu, lifnum, af, B_FALSE);
+	nwamd_plumb_unplumb_interface(ncu, af, B_FALSE);
 }
 
 static void *
 start_dhcp_thread(void *arg)
 {
-	struct nwamd_dhcp_thread_arg *thread_arg;
-	dhcp_ipc_reply_t *reply = NULL;
-	dhcp_ipc_request_t *request;
+	struct nwamd_dhcp_thread_arg *thread_arg = arg;
+	nwamd_object_t ncu_obj;
 	dhcp_ipc_type_t type;
-	int timeout;
 	char *name;
-	int rc, retries = 0;
+	ipadm_addrobj_t ipaddr;
+	ipadm_status_t ipstatus;
+	int retries = 0;
 
-	thread_arg = (struct nwamd_dhcp_thread_arg *)arg;
-	timeout = thread_arg->timeout;
 	name = thread_arg->name;
 	type = thread_arg->type;
+	ipaddr = thread_arg->ipaddr;
 
-	/* Try starting agent, though it may already be there */
-	nwamd_escalate();
-	rc = dhcp_start_agent(DHCP_IPC_MAX_WAIT);
-	nwamd_deescalate();
-	if (rc == -1) {
-		nlog(LOG_DEBUG, "Unable to start %s", DHCP_AGENT_PATH);
-		goto failed;
-	}
 retry:
-	/* Now allocate and send the request */
-	request = dhcp_ipc_alloc_request(type, name, NULL, 0,
-	    DHCP_TYPE_NONE);
-	if (request == NULL) {
-		nlog(LOG_DEBUG, "start_dhcp: dhcp_ipc_alloc_request : %s",
-		    strerror(errno));
-		goto failed;
+	/* Make sure the NCU is in appropriate state for DHCP command */
+	ncu_obj = nwamd_ncu_object_find(NWAM_NCU_TYPE_INTERFACE, name);
+	if (ncu_obj == NULL) {
+		nlog(LOG_ERR, "start_dhcp: no IP object %s");
+		return (NULL);
 	}
 
-	rc = dhcp_ipc_make_request(request, &reply, timeout);
-	free(request);
-	if (rc != 0) {
-		nlog(LOG_DEBUG, "start_dhcp %s: %s", name,
-		    dhcp_ipc_strerror(rc));
-		goto failed;
+	if (ncu_obj->nwamd_object_state != NWAM_STATE_OFFLINE_TO_ONLINE &&
+	    ncu_obj->nwamd_object_state != NWAM_STATE_ONLINE) {
+		nlog(LOG_INFO, "start_dhcp: IP NCU %s is in invalid state "
+		    "for DHCP command", ncu_obj->nwamd_object_name);
+		nwamd_object_release(ncu_obj);
+		return (NULL);
 	}
+	nwamd_object_release(ncu_obj);
 
-	rc = reply->return_code;
-	if (rc != 0) {
-		if (rc == DHCP_IPC_E_TIMEOUT && timeout == 0) {
-			goto failed;
+	switch (type) {
+	case DHCP_INFORM:
+	{
+		char aobjname[IPADM_AOBJSIZ];
+
+		if ((ipstatus = ipadm_get_aobjname(ipaddr, aobjname,
+		    sizeof (aobjname))) != IPADM_SUCCESS) {
+			nlog(LOG_ERR, "start_dhcp: "
+			    "ipadm_get_aobjname failed for %s: %s",
+			    name, ipadm_status2str(ipstatus));
+			goto done;
 		}
+		ipstatus = ipadm_refresh_addr(ipadm_handle, aobjname,
+		    IPADM_OPT_ACTIVE | IPADM_OPT_INFORM);
 
-		/*
-		 * DHCP timed out: change state for this NCU and enqueue
-		 * event to check NCU priority-groups.  Only care for
-		 * DHCP requests (not informs).
-		 */
-		if (rc == DHCP_IPC_E_TIMEOUT && type != DHCP_INFORM) {
+		break;
+	}
+	case DHCP_START:
+	{
+		ipstatus = ipadm_create_addr(ipadm_handle, ipaddr,
+		    IPADM_OPT_ACTIVE);
+
+		if (ipstatus == IPADM_DHCP_IPC_TIMEOUT) {
+			/*
+			 * DHCP timed out: change state for this NCU and enqueue
+			 * event to check NCU priority-groups.  Only care for
+			 * DHCP requests (not informs).
+			 */
 			char *object_name;
 
 			nlog(LOG_INFO, "start_dhcp: DHCP timed out for %s",
 			    name);
+
 			if (nwam_ncu_name_to_typed_name(name,
 			    NWAM_NCU_TYPE_INTERFACE, &object_name)
 			    != NWAM_SUCCESS) {
 				nlog(LOG_ERR, "start_dhcp: "
-				    "nwam_ncu_name_to_typed_name failed");
-				goto failed;
+				    "nwam_ncu_name_to_typed_name failed "
+				    "for %s", name);
+				goto done;
 			}
 			nwamd_object_set_state(NWAM_OBJECT_TYPE_NCU,
 			    object_name, NWAM_STATE_OFFLINE_TO_ONLINE,
@@ -1542,133 +1358,63 @@ retry:
 			nwamd_create_ncu_check_event(0);
 
 			free(object_name);
-			goto failed;
+			goto done;
 
-		} else if (rc == DHCP_IPC_E_RUNNING) {
-			/*
-			 * DHCP is already running.  Check if IP address is
-			 * already configured on the interface.
-			 */
-
-			icfg_handle_t h;
-			icfg_if_t intf;
-			struct sockaddr_in sin;
-			socklen_t alen = sizeof (struct sockaddr_in);
-			int plen, index;
-			uint64_t flags;
-			nwamd_event_t ip_event;
-
-			nlog(LOG_ERR, "start_dhcp: DHCP already running on %s",
-			    name);
-
-			(void) strlcpy(intf.if_name, name,
-			    sizeof (intf.if_name));
-			intf.if_protocol = AF_INET;
-
-			if (icfg_open(&h, &intf) != ICFG_SUCCESS) {
-				nlog(LOG_ERR, "start_dhcp: "
-				    "icfg_open failed on %s", name);
-				goto failed;
-			}
-
-			/* Get address */
-			if (icfg_get_addr(h, (struct sockaddr *)&sin, &alen,
-			    &plen, B_FALSE) != ICFG_SUCCESS) {
-				nlog(LOG_ERR, "start_dhcp: "
-				    "icfg_get_addr failed on %s: %s",
-				    name, strerror(errno));
-				goto bail;
-			}
-			/* Check if 0.0.0.0 */
-			if (sin.sin_addr.s_addr == INADDR_ANY) {
-				nlog(LOG_ERR, "start_dhcp: empty address on %s",
-				    name);
-				goto bail;
-			}
-
-			/* valid address exists, get the flags, index of intf */
-			if (icfg_get_flags(h, &flags) != ICFG_SUCCESS) {
-				nlog(LOG_ERR, "start_dhcp: "
-				    "icfg_get_flags failed on %s", name);
-				goto bail;
-			}
-			if (icfg_get_index(h, &index) != ICFG_SUCCESS) {
-				nlog(LOG_ERR, "start_dhcp: "
-				    "icfg_get_index failed on %s", name);
-				goto bail;
-			}
-
-			/* synthesize an IF_STATE event with the intf's flags */
-			ip_event = nwamd_event_init_if_state(name, flags,
-			    B_TRUE, index, (struct sockaddr *)&sin);
-			if (ip_event != NULL)
-				nwamd_event_enqueue(ip_event);
-bail:
-			icfg_close(h);
-			goto failed;
-
-		} else if ((rc == DHCP_IPC_E_SOCKET ||
-		    rc == DHCP_IPC_E_INVIF) && retries++ < NWAMD_DHCP_RETRIES) {
+		} else if (ipstatus == IPADM_DHCP_IPC_ERROR &&
+		    retries++ < NWAMD_DHCP_RETRIES) {
 			/*
 			 * Retry DHCP request as we may have been unplumbing
 			 * as part of the configuration phase.
 			 */
-			nlog(LOG_ERR, "start_dhcp %s: %s; will retry in %d sec",
-			    name, dhcp_ipc_strerror(rc),
-			    rc == DHCP_IPC_E_INVIF ?
-			    NWAMD_DHCP_RETRY_WAIT_TIME : 0);
-			if (rc == DHCP_IPC_E_INVIF)
-				(void) sleep(NWAMD_DHCP_RETRY_WAIT_TIME);
+			nlog(LOG_ERR, "start_dhcp: will retry on %s in %d sec",
+			    name, NWAMD_DHCP_RETRY_WAIT_TIME);
+			(void) sleep(NWAMD_DHCP_RETRY_WAIT_TIME);
 			goto retry;
-		} else {
-			nlog(LOG_ERR, "start_dhcp %s: %s", name,
-			    dhcp_ipc_strerror(rc));
-			goto failed;
 		}
+		break;
+	}
+	default:
+		nlog(LOG_ERR, "start_dhcp: invalid dhcp_ipc_type_t: %d", type);
+		goto done;
 	}
 
-	/* If status was the command, then output the results */
-	if (DHCP_IPC_CMD(type) == DHCP_STATUS) {
-		nlog(LOG_DEBUG, "%s", dhcp_status_hdr_string());
-		nlog(LOG_DEBUG, "%s", dhcp_status_reply_to_string(reply));
+	if (ipstatus != IPADM_SUCCESS) {
+		nlog(LOG_ERR, "start_dhcp: ipadm_%s_addr failed for %s: %s",
+		    (type == DHCP_START ? "create" : "refresh"),
+		    name, ipadm_status2str(ipstatus));
 	}
 
-failed:
-	free(reply);
-	if (arg != NULL) {
-		free(name);
-		free(arg);
-	}
+done:
+	free(name);
+	free(arg);
 	return (NULL);
 }
 
-void
-nwamd_start_dhcp(nwamd_ncu_t *ncu)
+static void
+nwamd_dhcp(const char *ifname, ipadm_addrobj_t ipaddr, dhcp_ipc_type_t cmd)
 {
 	struct nwamd_dhcp_thread_arg *arg;
-	char *name = NULL;
 	pthread_attr_t attr;
 
-	nlog(LOG_DEBUG, "nwamd_start_dhcp: starting DHCP for %s %d",
-	    ncu->ncu_name, ncu->ncu_type);
+	nlog(LOG_DEBUG, "nwamd_dhcp: starting DHCP %s thread for %s",
+	    dhcp_ipc_type_to_string(cmd), ifname);
 
 	arg = malloc(sizeof (*arg));
 	if (arg == NULL) {
-		nlog(LOG_ERR, "nwamd_start_dhcp: error allocating memory "
-		    "for dhcp request");
-		free(name);
+		nlog(LOG_ERR, "nwamd_dhcp: error allocating memory for "
+		    "dhcp request");
 		return;
 	}
 
-	arg->name = strdup(ncu->ncu_name);
-	arg->type = DHCP_START;
-	arg->timeout = ncu_wait_time;
+	arg->name = strdup(ifname);
+	arg->type = cmd;
+	arg->ipaddr = ipaddr;
 
 	(void) pthread_attr_init(&attr);
 	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	if (pthread_create(NULL, &attr, start_dhcp_thread, arg) == -1) {
-		nlog(LOG_ERR, "nwamd_start_dhcp: cannot start dhcp thread");
-		free(name);
+		nlog(LOG_ERR, "nwamd_dhcp: cannot start dhcp thread");
+		free(arg->name);
 		free(arg);
 		(void) pthread_attr_destroy(&attr);
 		return;

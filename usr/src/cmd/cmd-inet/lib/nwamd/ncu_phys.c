@@ -33,7 +33,6 @@
 #include <libdllink.h>
 #include <libdlstat.h>
 #include <libdlwlan.h>
-#include <libinetutil.h>
 #include <libnwam.h>
 #include <limits.h>
 #include <pthread.h>
@@ -60,17 +59,6 @@
  * ncu_phys.c - contains routines that are physical-link specific.
  * Mostly WiFi code.
  */
-
-char *
-nwamd_link_to_ifname(const char *linkname, int lifnum, char *ifname, int len)
-{
-	if (lifnum == 0) {
-		(void) strlcpy(ifname, linkname, len);
-	} else {
-		(void) snprintf(ifname, len, "%s:%d", linkname, lifnum);
-	}
-	return (ifname);
-}
 
 /*
  * Get link state from kstats. Used to determine initial link state for
@@ -121,12 +109,11 @@ out:
 void
 nwamd_set_unset_link_properties(nwamd_ncu_t *ncu, boolean_t set)
 {
-	dlpi_handle_t dh = ncu->ncu_node.u_link.nwamd_link_dhp;
-	char *addr = set ? ncu->ncu_node.u_link.nwamd_link_mac_addr : NULL;
-	uint64_t mtu = set ? ncu->ncu_node.u_link.nwamd_link_mtu : 0;
-	char **autopush = set ? ncu->ncu_node.u_link.nwamd_link_autopush : NULL;
-	uint_t num_autopush = set ?
-	    ncu->ncu_node.u_link.nwamd_link_num_autopush : 0;
+	dlpi_handle_t dh = ncu->ncu_link.nwamd_link_dhp;
+	char *addr = set ? ncu->ncu_link.nwamd_link_mac_addr : NULL;
+	uint64_t mtu = set ? ncu->ncu_link.nwamd_link_mtu : 0;
+	char **autopush = set ? ncu->ncu_link.nwamd_link_autopush : NULL;
+	uint_t num_autopush = set ? ncu->ncu_link.nwamd_link_num_autopush : 0;
 	uchar_t *hwaddr = NULL, curraddr[DLPI_PHYSADDR_MAX];
 	size_t hwaddrlen = DLPI_PHYSADDR_MAX;
 	int retval;
@@ -143,8 +130,8 @@ nwamd_set_unset_link_properties(nwamd_ncu_t *ncu, boolean_t set)
 	if (mtu == 0) {
 		cp = mtustr;
 		status = dladm_get_linkprop(dld_handle,
-		    ncu->ncu_node.u_link.nwamd_link_id, DLADM_PROP_VAL_DEFAULT,
-		    "mtu", &cp, &cnt);
+		    ncu->ncu_link.nwamd_link_id, DLADM_PROP_VAL_DEFAULT, "mtu",
+		    &cp, &cnt);
 		if (status != DLADM_STATUS_OK) {
 			nlog(LOG_ERR, "nwamd_set_unset_link_properties: "
 			    "dladm_get_linkprop failed: %s",
@@ -159,9 +146,8 @@ nwamd_set_unset_link_properties(nwamd_ncu_t *ncu, boolean_t set)
 
 	nlog(LOG_DEBUG, "nwamd_set_unset_link_properties: setting MTU of %s "
 	    "for link %s", mtustr, ncu->ncu_name);
-	status = dladm_set_linkprop(dld_handle,
-	    ncu->ncu_node.u_link.nwamd_link_id, "mtu", &cp, 1,
-	    DLADM_OPT_ACTIVE);
+	status = dladm_set_linkprop(dld_handle, ncu->ncu_link.nwamd_link_id,
+	    "mtu", &cp, 1, DLADM_OPT_ACTIVE);
 	if (status != DLADM_STATUS_OK) {
 		nlog(LOG_ERR, "nwamd_set_unset_link_properties: "
 		    "dladm_set_linkprop failed: %s",
@@ -170,9 +156,8 @@ nwamd_set_unset_link_properties(nwamd_ncu_t *ncu, boolean_t set)
 
 	nlog(LOG_DEBUG, "nwamd_set_unset_link_properties: setting %d "
 	    "autopush module for link %s", num_autopush, ncu->ncu_name);
-	status = dladm_set_linkprop(dld_handle,
-	    ncu->ncu_node.u_link.nwamd_link_id, "autopush", autopush,
-	    num_autopush, DLADM_OPT_ACTIVE);
+	status = dladm_set_linkprop(dld_handle, ncu->ncu_link.nwamd_link_id,
+	    "autopush", autopush, num_autopush, DLADM_OPT_ACTIVE);
 	if (status != DLADM_STATUS_OK) {
 		nlog(LOG_ERR, "nwamd_set_unset_link_properties: "
 		    "dladm_set_linkprop failed for autopush property: %s",
@@ -432,7 +417,7 @@ nwamd_wlan_set_key(const char *linkname, const char *essid, const char *bssid,
 		return (NWAM_ENTITY_NOT_FOUND);
 	}
 	ncu = ncu_obj->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 
 	nlog(LOG_DEBUG, "nwamd_wlan_set_key: running for link %s", linkname);
 	/*
@@ -629,17 +614,17 @@ wireless_selection_possible(nwamd_object_t object)
 {
 	nwamd_ncu_t *ncu = object->nwamd_object_data;
 
-	if (ncu->ncu_node.u_link.nwamd_link_media != DL_WIFI)
+	if (ncu->ncu_link.nwamd_link_media != DL_WIFI)
 		return (B_FALSE);
 
 	(void) pthread_mutex_lock(&active_ncp_mutex);
 	if (object->nwamd_object_state == NWAM_STATE_DISABLED ||
 	    ((object->nwamd_object_state == NWAM_STATE_OFFLINE ||
 	    object->nwamd_object_state == NWAM_STATE_ONLINE_TO_OFFLINE) &&
-	    ncu->ncu_node.u_link.nwamd_link_activation_mode ==
+	    ncu->ncu_link.nwamd_link_activation_mode ==
 	    NWAM_ACTIVATION_MODE_PRIORITIZED &&
 	    (current_ncu_priority_group == INVALID_PRIORITY_GROUP ||
-	    ncu->ncu_node.u_link.nwamd_link_priority_group >
+	    ncu->ncu_link.nwamd_link_priority_group >
 	    current_ncu_priority_group))) {
 		(void) pthread_mutex_unlock(&active_ncp_mutex);
 		return (B_FALSE);
@@ -659,7 +644,7 @@ void
 nwamd_set_selected_connected(nwamd_ncu_t *ncu, boolean_t selected,
     boolean_t connected)
 {
-	nwamd_link_t *link = &ncu->ncu_node.u_link;
+	nwamd_link_t *link = &ncu->ncu_link;
 	nwamd_wifi_scan_t *s = &link->nwamd_link_wifi_scan;
 	int i;
 	boolean_t trigger_scan_event = B_FALSE;
@@ -780,7 +765,7 @@ nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
 		return (NWAM_ENTITY_NOT_FOUND);
 	}
 	ncu = ncu_obj->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 
 	/*
 	 * If wireless selection is not possible because of the current
@@ -932,7 +917,7 @@ static int
 find_best_wlan_cb(nwam_known_wlan_handle_t kwh, void *data)
 {
 	nwamd_ncu_t *ncu = data;
-	nwamd_link_t *link = &ncu->ncu_node.u_link;
+	nwamd_link_t *link = &ncu->ncu_link;
 	nwamd_wifi_scan_t *s = &link->nwamd_link_wifi_scan;
 	nwam_error_t err;
 	char *name = NULL;
@@ -1163,7 +1148,7 @@ boolean_t
 nwamd_wlan_connected(nwamd_object_t ncu_obj)
 {
 	nwamd_ncu_t *ncu = ncu_obj->nwamd_object_data;
-	nwamd_link_t *link = &ncu->ncu_node.u_link;
+	nwamd_link_t *link = &ncu->ncu_link;
 	dladm_wlan_linkattr_t attr;
 	char essid[DLADM_STRSIZE];
 	char bssid[DLADM_STRSIZE];
@@ -1274,7 +1259,7 @@ wlan_scan_thread(void *arg)
 	}
 
 	ncu = ncu_obj->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 
 	/*
 	 * It is possible multiple scan threads have queued up waiting for the
@@ -1339,7 +1324,7 @@ wlan_scan_thread(void *arg)
 		return (NULL);
 	}
 	ncu = ncu_obj->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 
 	/* For new scan data, add key info from known WLANs */
 	for (i = 0; i < s.nwamd_wifi_scan_curr_num; i++) {
@@ -1522,7 +1507,7 @@ wlan_connect_thread(void *arg)
 	}
 
 	ncu = ncu_obj->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 
 	if (!wireless_selection_possible(ncu_obj)) {
 		nlog(LOG_DEBUG, "wlan_connect_thread: %s in invalid state or "
@@ -1623,7 +1608,7 @@ wlan_connect_thread(void *arg)
 	}
 
 	ncu = ncu_obj->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 
 	if (autoconf)
 		link->nwamd_link_wifi_autoconf = B_TRUE;
@@ -1719,7 +1704,7 @@ wlan_monitor_signal_thread(void *arg)
 			break;
 		}
 		ncu = ncu_obj->nwamd_object_data;
-		link = &ncu->ncu_node.u_link;
+		link = &ncu->ncu_link;
 
 		/* If the NCU is DISABLED/OFFLINE, exit the monitoring thread */
 		if (ncu_obj->nwamd_object_state == NWAM_STATE_OFFLINE ||
@@ -1810,7 +1795,7 @@ nwamd_ncu_handle_link_state_event(nwamd_event_t event)
 		return;
 	}
 	ncu = ncu_obj->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 	evm = event->event_msg;
 
 	/*

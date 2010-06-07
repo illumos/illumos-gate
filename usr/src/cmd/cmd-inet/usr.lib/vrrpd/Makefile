@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG=		vrrpd
@@ -45,7 +44,7 @@ C99MODE=		$(C99_ENABLE)
 # via the SUS standards.  Further, C99 support requires SUSv3 or higher.
 #
 CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
-LDLIBS += -lvrrpadm -lsocket -lnsl -ldladm -linetutil -lsysevent -lnvpair -lsecdb -linetcfg
+LDLIBS += -lvrrpadm -lsocket -lnsl -ldladm -linetutil -lipadm -lsysevent -lnvpair -lsecdb
 LINTFLAGS += -erroff=E_INCONS_ARG_DECL2  -erroff=E_INCONS_ARG_USED2
 
 #

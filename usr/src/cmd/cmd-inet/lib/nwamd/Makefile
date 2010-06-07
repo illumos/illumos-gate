@@ -52,7 +52,7 @@ $(ROOTCFGFILES) := FILEMODE= 644
 ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
 
 LDLIBS +=	-ldhcpagent -ldhcputil -ldladm -ldlpi -lgen \
-		-linetcfg -linetutil -lkstat -lnsl -lnvpair -lnwam \
+		-linetutil -lipadm -lkstat -lnsl -lnvpair -lnwam \
 		-lsecdb -lscf -lsocket -lsysevent -lumem -luutil
 
 #

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1019,11 +1018,10 @@ struct nwam_event {
 		struct nwam_event_if_state {
 			char nwe_name[NWAM_MAX_NAME_LEN];
 			uint32_t nwe_flags;
-			uint32_t nwe_index;
 			uint32_t nwe_addr_valid; /* boolean */
 			uint32_t nwe_addr_added; /* boolean */
 			struct sockaddr_storage nwe_addr;
-			/* might be longer then sizeof(if_state) for addr */
+			struct sockaddr_storage nwe_netmask;
 		} nwe_if_state;
 
 		struct nwam_event_link_state {

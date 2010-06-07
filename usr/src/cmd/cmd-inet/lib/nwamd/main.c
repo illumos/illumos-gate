@@ -25,7 +25,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <inetcfg.h>
 #include <libdllink.h>
 #include <libintl.h>
 #include <libnwam.h>
@@ -55,6 +54,7 @@
 
 boolean_t fg = B_FALSE;
 dladm_handle_t dld_handle = NULL;
+ipadm_handle_t ipadm_handle = NULL;
 boolean_t shutting_down = B_FALSE;
 
 sigset_t original_sigmask;
@@ -317,7 +317,8 @@ main(int argc, char *argv[])
 	int c;
 	uint64_t version;
 	nwamd_event_t event;
-	dladm_status_t rc;
+	dladm_status_t drc;
+	ipadm_status_t irc;
 	uid_t uid = getuid();
 
 	/*
@@ -367,12 +368,16 @@ main(int argc, char *argv[])
 	 * then one must have *all* privs in order to open /dev/dld, which
 	 * is one of the steps performed in dladm_open().
 	 */
-	rc = dladm_open(&dld_handle);
-	if (rc != DLADM_STATUS_OK) {
+	drc = dladm_open(&dld_handle);
+	if (drc != DLADM_STATUS_OK) {
 		char status_str[DLADM_STRSIZE];
-		(void) dladm_status2str(rc, status_str);
-		pfail("failed to open dladm handle: %s", status_str);
+		pfail("failed to open dladm handle: %s",
+		    dladm_status2str(drc, status_str));
 	}
+
+	irc = ipadm_open(&ipadm_handle, 0);
+	if (irc != IPADM_SUCCESS)
+		pfail("failed to open ipadm handle: %s", ipadm_status2str(irc));
 
 	/*
 	 * Create the event queue before starting event sources, including
@@ -462,6 +467,7 @@ main(int argc, char *argv[])
 	 */
 	nwamd_event_handler();
 
+	ipadm_close(ipadm_handle);
 	dladm_close(dld_handle);
 
 	return (EXIT_SUCCESS);

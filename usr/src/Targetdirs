@@ -870,8 +870,6 @@ $(ROOT)/usr/lib/libfdisk.so.1:=		REALPATH=../../lib/libfdisk.so.1
 $(ROOT)/usr/lib/libfdisk.so:=		REALPATH=../../lib/libfdisk.so.1
 $(ROOT)/usr/lib/libgen.so.1:=		REALPATH=../../lib/libgen.so.1
 $(ROOT)/usr/lib/libgen.so:=		REALPATH=../../lib/libgen.so.1
-$(ROOT)/usr/lib/libinetcfg.so.1:=	REALPATH=../../lib/libinetcfg.so.1
-$(ROOT)/usr/lib/libinetcfg.so:=		REALPATH=../../lib/libinetcfg.so.1
 $(ROOT)/usr/lib/libinetutil.so.1:=	REALPATH=../../lib/libinetutil.so.1
 $(ROOT)/usr/lib/libinetutil.so:=	REALPATH=../../lib/libinetutil.so.1
 $(ROOT)/usr/lib/libintl.so.1:=		REALPATH=../../lib/libintl.so.1
@@ -994,8 +992,6 @@ $(ROOT)/usr/lib/llib-lfdisk.ln:=	REALPATH=../../lib/llib-lfdisk.ln
 $(ROOT)/usr/lib/llib-lfdisk:=		REALPATH=../../lib/llib-lfdisk
 $(ROOT)/usr/lib/llib-lgen.ln:=		REALPATH=../../lib/llib-lgen.ln
 $(ROOT)/usr/lib/llib-lgen:=		REALPATH=../../lib/llib-lgen
-$(ROOT)/usr/lib/llib-linetcfg.ln:=	REALPATH=../../lib/llib-linetcfg.ln
-$(ROOT)/usr/lib/llib-linetcfg:=		REALPATH=../../lib/llib-linetcfg
 $(ROOT)/usr/lib/llib-linetutil.ln:=	REALPATH=../../lib/llib-linetutil.ln
 $(ROOT)/usr/lib/llib-linetutil:=	REALPATH=../../lib/llib-linetutil
 $(ROOT)/usr/lib/llib-lintl.ln:=		REALPATH=../../lib/llib-lintl.ln
@@ -1470,8 +1466,6 @@ SYM.USRLIB= \
 	/usr/lib/libelf.so.1 \
 	/usr/lib/libgen.so \
 	/usr/lib/libgen.so.1 \
-	/usr/lib/libinetcfg.so \
-	/usr/lib/libinetcfg.so.1 \
 	/usr/lib/libinetutil.so \
 	/usr/lib/libinetutil.so.1 \
 	/usr/lib/libintl.so \
@@ -1588,8 +1582,6 @@ SYM.USRLIB= \
 	/usr/lib/llib-lelf.ln \
 	/usr/lib/llib-lgen \
 	/usr/lib/llib-lgen.ln \
-	/usr/lib/llib-linetcfg \
-	/usr/lib/llib-linetcfg.ln \
 	/usr/lib/llib-linetutil \
 	/usr/lib/llib-linetutil.ln \
 	/usr/lib/llib-lintl \

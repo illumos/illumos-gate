@@ -56,7 +56,9 @@ SUNWprivate_1.1 {
 	ipadm_enable_if;
 	ipadm_free_addr_info;
 	ipadm_free_if_info;
+	ipadm_get_addr;
 	ipadm_get_addrprop;
+	ipadm_get_aobjname;
 	ipadm_get_ifprop;
 	ipadm_get_prop;
 	ipadm_if_enabled;

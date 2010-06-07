@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _NCP_H
 #define	_NCP_H
 
-#include <inetcfg.h>
 #include <libdladm.h>
 #include <libdlpi.h>
 #include <libdlwlan.h>

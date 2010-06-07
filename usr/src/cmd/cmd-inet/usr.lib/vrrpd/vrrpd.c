@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -41,7 +40,6 @@
 #include <libsysevent.h>
 #include <limits.h>
 #include <locale.h>
-#include <inetcfg.h>
 #include <arpa/inet.h>
 #include <signal.h>
 #include <assert.h>
@@ -51,6 +49,7 @@
 #include <priv_utils.h>
 #include <libdllink.h>
 #include <libdlvnic.h>
+#include <libipadm.h>
 #include <pwd.h>
 #include <libvrrpadm.h>
 #include <net/route.h>
@@ -89,6 +88,7 @@ typedef struct vrrpd_rtsock_s {
 	iu_event_id_t	vrt_eid;	/* event ID */
 } vrrpd_rtsock_t;
 
+static ipadm_handle_t	vrrp_ipadm_handle = NULL;	/* libipadm handle */
 static int		vrrp_logflag = 0;
 boolean_t		vrrp_debug_level = 0;
 iu_eh_t			*vrrpd_eh = NULL;
@@ -216,7 +216,7 @@ static void vrrpd_delete_ip(vrrp_intf_t *, vrrp_ip_t *);
 
 static void vrrpd_init_ipcache(int);
 static void vrrpd_update_ipcache(int);
-static int vrrpd_walk_ipaddr(icfg_if_t *, void *);
+static ipadm_status_t vrrpd_walk_addr_info(int);
 static vrrp_err_t vrrpd_add_ipaddr(char *, int, vrrp_addr_t *,
     int, uint64_t);
 static vrrp_ip_t *vrrpd_select_primary(vrrp_intf_t *);
@@ -796,6 +796,12 @@ vrrpd_init()
 		goto fail;
 	}
 
+	/* Open the libipadm handle */
+	if (ipadm_open(&vrrp_ipadm_handle, 0) != IPADM_SUCCESS) {
+		vrrp_log(VRRP_ERR, "vrrpd_init(): ipadm_open() failed");
+		goto fail;
+	}
+
 	/*
 	 * Build the list of interfaces and IP addresses. Also, start the time
 	 * to scan the interfaces/IP addresses periodically.
@@ -852,6 +858,8 @@ vrrpd_fini()
 	vrrpd_vh = NULL;
 	assert(TAILQ_EMPTY(&vrrp_vr_list));
 	assert(TAILQ_EMPTY(&vrrp_intf_list));
+
+	ipadm_close(vrrp_ipadm_handle);
 }
 
 static void
@@ -1460,11 +1468,8 @@ vrrpd_scan(int af)
 again:
 	vrrpd_init_ipcache(af);
 
-	/*
-	 * If interface index changes, walk again.
-	 */
-	if (icfg_iterate_if(af, ICFG_PLUMBED, NULL,
-	    vrrpd_walk_ipaddr) != ICFG_SUCCESS)
+	/* If interface index changes, walk again. */
+	if (vrrpd_walk_addr_info(af) != IPADM_SUCCESS)
 		goto again;
 
 	vrrpd_update_ipcache(af);
@@ -1544,86 +1549,74 @@ vrrpd_init_ipcache(int af)
 }
 
 /*
- * Walk all the IP addresses on the given interface and update its
- * addresses list. Return ICFG_FAILURE if it is required to walk
+ * Walk all the IP addresses of the given family and update its
+ * addresses list. Return IPADM_FAILURE if it is required to walk
  * all the interfaces again (one of the interface index changes in between).
  */
-/* ARGSUSED */
-static int
-vrrpd_walk_ipaddr(icfg_if_t *intf, void *arg)
+static ipadm_status_t
+vrrpd_walk_addr_info(int af)
 {
-	icfg_handle_t	ih;
-	int		ifindex;
-	vrrp_addr_t	addr;
-	socklen_t	addrlen = (socklen_t)sizeof (struct sockaddr_in6);
-	int		prefixlen;
-	uint64_t	flags;
-	int		err = ICFG_SUCCESS;
+	ipadm_addr_info_t	*ainfo, *ainfop;
+	ipadm_status_t		ipstatus;
+	char			*lifname;
+	vrrp_addr_t		*addr;
+	int			ifindex;
+	uint64_t		flags;
 
-	vrrp_log(VRRP_DBG0, "vrrpd_walk_ipaddr(%s, %s)", intf->if_name,
-	    af_str(intf->if_protocol));
+	vrrp_log(VRRP_DBG0, "vrrpd_walk_addr_info(%s)", af_str(af));
 
-	if (icfg_open(&ih, intf) != ICFG_SUCCESS) {
-		vrrp_log(VRRP_ERR, "vrrpd_walk_ipaddr(%s, %s): icfg_open() "
-		    "failed: %s", intf->if_name, af_str(intf->if_protocol),
-		    strerror(errno));
-		return (err);
+	ipstatus = ipadm_addr_info(vrrp_ipadm_handle, NULL, &ainfo, 0, 0);
+	if (ipstatus != IPADM_SUCCESS) {
+		vrrp_log(VRRP_ERR, "vrrpd_walk_addr_info(%s): "
+		    "ipadm_addr_info() failed: %s",
+		    af_str(af), ipadm_status2str(ipstatus));
+		return (IPADM_SUCCESS);
 	}
 
-	if (icfg_get_flags(ih, &flags) != ICFG_SUCCESS) {
-		if (errno != ENXIO && errno != ENOENT) {
-			vrrp_log(VRRP_ERR, "vrrpd_walk_ipaddr(%s, %s): "
-			    "icfg_get_flags() failed %s", intf->if_name,
-			    af_str(intf->if_protocol), strerror(errno));
+	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
+		if (ainfop->ia_ifa.ifa_addr->ss_family != af)
+			continue;
+
+		lifname = ainfop->ia_ifa.ifa_name;
+		flags = ainfop->ia_ifa.ifa_flags;
+		addr = (vrrp_addr_t *)ainfop->ia_ifa.ifa_addr;
+
+		vrrp_log(VRRP_DBG0, "vrrpd_walk_addr_info(%s): %s",
+		    af_str(af), lifname);
+
+		/* Skip virtual/IPMP/P2P interfaces */
+		if (flags & (IFF_VIRTUAL|IFF_IPMP|IFF_POINTOPOINT)) {
+			vrrp_log(VRRP_DBG0, "vrrpd_walk_addr_info(%s): "
+			    "skipped %s", af_str(af), lifname);
+			continue;
 		}
-		goto done;
-	}
 
-	/*
-	 * skip virtual/IPMP/P2P interfaces.
-	 */
-	if ((flags & (IFF_VIRTUAL|IFF_IPMP|IFF_POINTOPOINT)) != 0) {
-		vrrp_log(VRRP_DBG0, "vrrpd_walk_ipaddr(%s, %s) skipped",
-		    intf->if_name, af_str(intf->if_protocol));
-		goto done;
-	}
+		/* Filter out the all-zero IP address */
+		if (VRRPADDR_UNSPECIFIED(af, addr))
+			continue;
 
-	if (icfg_get_index(ih, &ifindex) != ICFG_SUCCESS) {
-		if (errno != ENXIO && errno != ENOENT) {
-			vrrp_log(VRRP_ERR, "vrrpd_walk_ipaddr(%s, %s) "
-			    "icfg_get_index() failed: %s", intf->if_name,
-			    af_str(intf->if_protocol), strerror(errno));
+		if ((ifindex = if_nametoindex(lifname)) == 0) {
+			if (errno != ENXIO && errno != ENOENT) {
+				vrrp_log(VRRP_ERR, "vrrpd_walk_addr_info(%s): "
+				    "if_nametoindex() failed for %s: %s",
+				    af_str(af), lifname, strerror(errno));
+			}
+			break;
 		}
-		goto done;
-	}
 
-	if (icfg_get_addr(ih, (struct sockaddr *)&addr, &addrlen,
-	    &prefixlen, _B_FALSE) != ICFG_SUCCESS) {
-		if (errno != ENXIO && errno != ENOENT) {
-			vrrp_log(VRRP_ERR, "vrrpd_walk_ipaddr(%s, %s) "
-			    "icfg_get_addr() failed: %s", intf->if_name,
-			    af_str(intf->if_protocol), strerror(errno));
+		/*
+		 * The interface is unplumbed/replumbed during the walk.  Try
+		 * to walk the IP addresses one more time.
+		 */
+		if (vrrpd_add_ipaddr(lifname, af, addr, ifindex, flags)
+		    == VRRP_EAGAIN) {
+			ipstatus = IPADM_FAILURE;
+			break;
 		}
-		goto done;
 	}
 
-	/*
-	 * Filter out the all-zero IP address.
-	 */
-	if (VRRPADDR_UNSPECIFIED(intf->if_protocol, &addr))
-		goto done;
-
-	/*
-	 * The interface is unplumbed/replumbed during we walk the IP
-	 * addresses. Try walk the IP addresses one more time.
-	 */
-	if (vrrpd_add_ipaddr(intf->if_name, intf->if_protocol,
-	    &addr, ifindex, flags) == VRRP_EAGAIN)
-		err = ICFG_FAILURE;
-
-done:
-	icfg_close(ih);
-	return (err);
+	ipadm_free_addr_info(ainfo);
+	return (ipstatus);
 }
 
 /*

@@ -1264,7 +1264,7 @@ do_create_addr(int argc, char *argv[], const char *use)
 	ipadm_status_t	status;
 	int		option;
 	uint32_t	flags =
-	    IPADM_OPT_PERSIST|IPADM_OPT_ACTIVE|IPADM_OPT_UP;
+	    IPADM_OPT_PERSIST|IPADM_OPT_ACTIVE|IPADM_OPT_UP|IPADM_OPT_V46;
 	char		*cp;
 	char		*atype = NULL;
 	char		*static_arg = NULL;

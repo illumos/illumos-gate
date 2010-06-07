@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _NCU_H
@@ -29,10 +28,11 @@
 
 #include <dhcpagent_ipc.h>
 #include <dhcpagent_util.h>
-#include <inetcfg.h>
 #include <libdladm.h>
 #include <libdlpi.h>
 #include <libdlwlan.h>
+#include <libinetutil.h>
+#include <libipadm.h>
 #include <libnwam.h>
 #include <libnwam_priv.h>
 #include <libuutil.h>
@@ -111,13 +111,12 @@ typedef struct nwamd_link {
 } nwamd_link_t;
 
 struct nwamd_if_address {
-	size_t prefix;
-	struct sockaddr address;
-	char pad[sizeof (struct sockaddr_storage)];
+	sa_family_t family;
+	ipadm_addr_type_t ipaddr_atype;
+	ipadm_addrobj_t ipaddr;
 	boolean_t configured;
-	boolean_t dhcp_if;
-	boolean_t stateless_if;
-	char ifname[LIFNAMSIZ];
+	struct sockaddr_storage conf_addr;	/* address configured for */
+	struct sockaddr_storage conf_stateless_addr; /* this nwamd_if_address */
 	struct nwamd_if_address *next;
 };
 
@@ -156,7 +155,7 @@ typedef struct nwamd_ncu {
 struct nwamd_dhcp_thread_arg {
 	char *name;
 	dhcp_ipc_type_t type;
-	int timeout;
+	ipadm_addrobj_t ipaddr;
 	volatile uint32_t *guard;
 };
 
@@ -171,10 +170,11 @@ struct nwamd_dhcp_thread_arg {
 #define	NWAMD_READONLY_RETRY_INTERVAL		5
 
 /*
- * This dladm handle is opened before interfaces are initialized and
- * closed only when nwamd shuts down.
+ * This dladm and ipadm handles are opened before interfaces are initialized
+ * and closed only when nwamd shuts down.
  */
 extern dladm_handle_t dld_handle;
+extern ipadm_handle_t ipadm_handle;
 
 extern nwamd_object_t nwamd_ncu_object_find(nwam_ncu_type_t, const char *);
 extern void nwamd_log_ncus(void);
@@ -196,7 +196,8 @@ extern void nwamd_set_key_name(const char *, const char *, char *, size_t);
 
 /* Link functions */
 extern link_state_t nwamd_get_link_state(const char *);
-extern char *nwamd_sockaddr_to_str(const struct sockaddr *, char *, size_t);
+extern const char *nwamd_sockaddr_to_str(const struct sockaddr *, char *,
+    size_t);
 extern void nwamd_propogate_link_up_down_to_ip(const char *, boolean_t);
 extern void nwamd_set_unset_link_properties(nwamd_ncu_t *, boolean_t);
 /* DLPI event hooking */
@@ -204,12 +205,9 @@ extern void nwamd_dlpi_add_link(nwamd_object_t);
 extern void nwamd_dlpi_delete_link(nwamd_object_t);
 
 /* IP functions */
-extern void nwamd_update_addresses_unconfigured(nwamd_ncu_t *, sa_family_t);
 extern boolean_t nwamd_static_addresses_configured(nwamd_ncu_t *, sa_family_t);
-extern void nwamd_plumb_interface(nwamd_ncu_t *, uint_t, int);
-extern void nwamd_unplumb_interface(nwamd_ncu_t *, uint_t, int);
-extern void nwamd_start_dhcp(nwamd_ncu_t *);
-extern void nwamd_dhcp_inform(nwamd_ncu_t *);
+extern void nwamd_plumb_interface(nwamd_ncu_t *, sa_family_t);
+extern void nwamd_unplumb_interface(nwamd_ncu_t *, sa_family_t);
 extern boolean_t nwamd_dhcp_managing(int, nwamd_ncu_t *);
 extern void nwamd_configure_interface_addresses(nwamd_ncu_t *);
 extern char *nwamd_get_dhcpinfo_data(const char *, char *);
@@ -229,7 +227,5 @@ extern nwam_error_t nwamd_get_ncu_string(nwam_ncu_handle_t, nwam_value_t *,
     char ***, uint_t *, const char *);
 
 extern void nwamd_walk_physical_configuration(void);
-
-char *nwamd_link_to_ifname(const char *, int, char *, int);
 
 #endif /* _NCU_H */

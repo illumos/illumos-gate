@@ -51,6 +51,8 @@
 
 #define	VBOX_IFACE_PREFIX	"vboxnet"
 
+static void populate_ip_ncu_properties(nwam_ncu_handle_t, nwamd_ncu_t *);
+
 /*
  * Find ncu of specified type for link/interface name.
  */
@@ -149,7 +151,7 @@ nwamd_ncu_state_machine(const char *object_name)
 	}
 
 	ncu = object->nwamd_object_data;
-	link = &ncu->ncu_node.u_link;
+	link = &ncu->ncu_link;
 
 	switch (object->nwamd_object_aux_state) {
 	case NWAM_AUX_STATE_INITIALIZED:
@@ -217,8 +219,16 @@ nwamd_ncu_state_machine(const char *object_name)
 			 * would be good to try and minimize configuration
 			 * changes.
 			 */
-			nwamd_unplumb_interface(ncu, 0, AF_INET);
-			nwamd_unplumb_interface(ncu, 0, AF_INET6);
+			nwamd_unplumb_interface(ncu, AF_INET);
+			nwamd_unplumb_interface(ncu, AF_INET6);
+
+			/*
+			 * We may be restarting the state machine.  Re-read
+			 * the IP NCU properties as the ipadm_addrobj_t in
+			 * nwamd_if_address should not be reused.
+			 */
+			populate_ip_ncu_properties(object->nwamd_object_handle,
+			    ncu);
 
 			/*
 			 * Enqueue a WAITING_FOR_ADDR aux state change so that
@@ -231,26 +241,14 @@ nwamd_ncu_state_machine(const char *object_name)
 			    object_name, NWAM_STATE_OFFLINE_TO_ONLINE,
 			    NWAM_AUX_STATE_IF_WAITING_FOR_ADDR);
 
-			if (ncu->ncu_node.u_if.nwamd_if_ipv4)
-				nwamd_plumb_interface(ncu, 0, AF_INET);
+			if (ncu->ncu_if.nwamd_if_ipv4)
+				nwamd_plumb_interface(ncu, AF_INET);
 
-			if (ncu->ncu_node.u_if.nwamd_if_ipv6)
-				nwamd_plumb_interface(ncu, 0, AF_INET6);
+			if (ncu->ncu_if.nwamd_if_ipv6)
+				nwamd_plumb_interface(ncu, AF_INET6);
 
-			/*
-			 * Configure addresses.  Configure any static addresses
-			 * and start DHCP if required.  If DHCP is not required,
-			 * do a DHCPINFORM to get other networking config
-			 * parameters.  RTM_NEWADDRs - translated into IF_STATE
-			 * events - will then finish the job of bringing us
-			 * online.
-			 */
+			/* Configure addresses */
 			nwamd_configure_interface_addresses(ncu);
-
-			if (ncu->ncu_node.u_if.nwamd_if_dhcp_requested)
-				nwamd_start_dhcp(ncu);
-			else
-				nwamd_dhcp_inform(ncu);
 		}
 		break;
 
@@ -440,8 +438,8 @@ nwamd_ncu_state_machine(const char *object_name)
 			 * until we reconnect to a different WLAN (i.e. with
 			 * a different ESSID).
 			 */
-			nwamd_unplumb_interface(ncu, 0, AF_INET);
-			nwamd_unplumb_interface(ncu, 0, AF_INET6);
+			nwamd_unplumb_interface(ncu, AF_INET);
+			nwamd_unplumb_interface(ncu, AF_INET6);
 		}
 		if (object->nwamd_object_state != NWAM_STATE_OFFLINE) {
 			nwamd_object_set_state(NWAM_OBJECT_TYPE_NCU,
@@ -471,11 +469,11 @@ nwamd_ncu_state_machine(const char *object_name)
 			nwamd_dlpi_delete_link(object);
 		} else {
 			/* Unplumb here. */
-			if (ncu->ncu_node.u_if.nwamd_if_ipv4) {
-				nwamd_unplumb_interface(ncu, 0, AF_INET);
+			if (ncu->ncu_if.nwamd_if_ipv4) {
+				nwamd_unplumb_interface(ncu, AF_INET);
 			}
-			if (ncu->ncu_node.u_if.nwamd_if_ipv6) {
-				nwamd_unplumb_interface(ncu, 0, AF_INET6);
+			if (ncu->ncu_if.nwamd_if_ipv6) {
+				nwamd_unplumb_interface(ncu, AF_INET6);
 			}
 			/* trigger location condition checking */
 			nwamd_create_triggered_condition_check_event(0);
@@ -658,13 +656,12 @@ populate_link_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 		    "populate_link_ncu_properties: could not get %s value: %s",
 		    NWAM_NCU_PROP_ACTIVATION_MODE, nwam_strerror(err));
 	} else {
-		ncu_data->ncu_node.u_link.nwamd_link_activation_mode =
-		    uintval[0];
+		ncu_data->ncu_link.nwamd_link_activation_mode = uintval[0];
 		nwam_value_free(ncu_prop);
 	}
 
 	/* priority-group and priority-mode for prioritized activation */
-	if (ncu_data->ncu_node.u_link.nwamd_link_activation_mode ==
+	if (ncu_data->ncu_link.nwamd_link_activation_mode ==
 	    NWAM_ACTIVATION_MODE_PRIORITIZED) {
 		/* ncus with prioritized activation are always enabled */
 		ncu_data->ncu_enabled = B_TRUE;
@@ -675,7 +672,7 @@ populate_link_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 			    "could not get %s value: %s",
 			    NWAM_NCU_PROP_PRIORITY_MODE, nwam_strerror(err));
 		} else {
-			ncu_data->ncu_node.u_link.nwamd_link_priority_mode =
+			ncu_data->ncu_link.nwamd_link_priority_mode =
 			    uintval[0];
 			nwam_value_free(ncu_prop);
 		}
@@ -687,7 +684,7 @@ populate_link_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 			    "could not get %s value: %s",
 			    NWAM_NCU_PROP_PRIORITY_GROUP, nwam_strerror(err));
 		} else {
-			ncu_data->ncu_node.u_link.nwamd_link_priority_group =
+			ncu_data->ncu_link.nwamd_link_priority_group =
 			    uintval[0];
 			nwam_value_free(ncu_prop);
 		}
@@ -699,12 +696,10 @@ populate_link_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 		nlog(LOG_DEBUG,
 		    "populate_link_ncu_properties: could not get %s value: %s",
 		    NWAM_NCU_PROP_LINK_MAC_ADDR, nwam_strerror(err));
-		ncu_data->ncu_node.u_link.nwamd_link_mac_addr = NULL;
+		ncu_data->ncu_link.nwamd_link_mac_addr = NULL;
 	} else {
-		ncu_data->ncu_node.u_link.nwamd_link_mac_addr =
-		    strdup(*mac_addr);
-		ncu_data->ncu_node.u_link.nwamd_link_mac_addr_len =
-		    strlen(*mac_addr);
+		ncu_data->ncu_link.nwamd_link_mac_addr = strdup(*mac_addr);
+		ncu_data->ncu_link.nwamd_link_mac_addr_len = strlen(*mac_addr);
 		nwam_value_free(ncu_prop);
 	}
 
@@ -714,34 +709,35 @@ populate_link_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 		nlog(LOG_DEBUG,
 		    "populate_link_ncu_properties: could not get %s value: %s",
 		    NWAM_NCU_PROP_LINK_MTU, nwam_strerror(err));
-		ncu_data->ncu_node.u_link.nwamd_link_mtu = 0;
+		ncu_data->ncu_link.nwamd_link_mtu = 0;
 	} else {
-		ncu_data->ncu_node.u_link.nwamd_link_mtu = uintval[0];
+		ncu_data->ncu_link.nwamd_link_mtu = uintval[0];
 		nwam_value_free(ncu_prop);
 	}
 
 	/* link-autopush */
 	if ((err = nwamd_get_ncu_string(ncuh, &ncu_prop,
-	    &ncu_data->ncu_node.u_link.nwamd_link_autopush,
-	    &ncu_data->ncu_node.u_link.nwamd_link_num_autopush,
+	    &ncu_data->ncu_link.nwamd_link_autopush,
+	    &ncu_data->ncu_link.nwamd_link_num_autopush,
 	    NWAM_NCU_PROP_LINK_AUTOPUSH)) != NWAM_SUCCESS) {
 		nlog(LOG_DEBUG,
 		    "populate_link_ncu_properties: could not get %s value: %s",
 		    NWAM_NCU_PROP_LINK_AUTOPUSH, nwam_strerror(err));
-		ncu_data->ncu_node.u_link.nwamd_link_num_autopush = 0;
+		ncu_data->ncu_link.nwamd_link_num_autopush = 0;
 	}
 }
 
 static void
 populate_ip_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 {
-	nwamd_if_t *nif = &ncu_data->ncu_node.u_if;
+	nwamd_if_t *nif = &ncu_data->ncu_if;
 	struct nwamd_if_address **nifa, *nifai, *nifait;
-	char *prefix;
 	boolean_t static_addr = B_FALSE;
 	uint64_t *addrsrcvalue;
 	nwam_value_t ncu_prop;
 	nwam_error_t err;
+	ipadm_addrobj_t ipaddr;
+	ipadm_status_t ipstatus;
 	char **addrvalue;
 	uint_t numvalues;
 	uint64_t *ipversion;
@@ -783,6 +779,7 @@ populate_ip_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 	for (nifai = nif->nwamd_if_list; nifai != NULL; nifai = nifait) {
 		nifait = nifai->next;
 		nifai->next = NULL;
+		ipadm_destroy_addrobj(nifai->ipaddr);
 		free(nifai);
 	}
 	nif->nwamd_if_list = NULL;
@@ -813,14 +810,38 @@ populate_ip_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 		nwam_value_free(ncu_prop);
 	}
 	if (nif->nwamd_if_dhcp_requested) {
+		ipstatus = ipadm_create_addrobj(IPADM_ADDR_DHCP,
+		    ncu_data->ncu_name, &ipaddr);
+		if (ipstatus != IPADM_SUCCESS) {
+			nlog(LOG_ERR, "populate_ip_ncu_properties: "
+			    "ipadm_create_addrobj failed for v4 dhcp: %s",
+			    ipadm_status2str(ipstatus));
+			goto skip_ipv4_dhcp;
+		}
+
+		ipstatus = ipadm_set_wait_time(ipaddr, ncu_wait_time);
+		if (ipstatus != IPADM_SUCCESS) {
+			nlog(LOG_ERR, "populate_ip_ncu_properties: "
+			    "ipadm_set_wait_time failed for v4 dhcp: %s",
+			    ipadm_status2str(ipstatus));
+			ipadm_destroy_addrobj(ipaddr);
+			goto skip_ipv4_dhcp;
+		}
 		if ((*nifa = calloc(sizeof (**nifa), 1)) != NULL) {
-			(*nifa)->address.sa_family = AF_INET;
-			(*nifa)->dhcp_if = B_TRUE;
+			(*nifa)->family = AF_INET;
+			(*nifa)->ipaddr_atype = IPADM_ADDR_DHCP;
+			(*nifa)->ipaddr = ipaddr;
 			nifa = &((*nifa)->next);
 			*nifa = NULL;
+		} else {
+			nlog(LOG_ERR, "populate_ip_ncu_properties: "
+			    "couldn't allocate nwamd address for v4 dhcp: %s",
+			    strerror(errno));
+			ipadm_destroy_addrobj(ipaddr);
 		}
 	}
 
+skip_ipv4_dhcp:
 	/* ipv4-addr */
 	if (static_addr) {
 		if ((err = nwamd_get_ncu_string(ncuh, &ncu_prop, &addrvalue,
@@ -829,28 +850,46 @@ populate_ip_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 			    "could not get %s value; %s",
 			    NWAM_NCU_PROP_IPV4_ADDR, nwam_strerror(err));
 		} else {
-			struct sockaddr_in *s;
-
 			for (i = 0; i < numvalues; i++) {
-				if ((*nifa = calloc(sizeof (**nifa), 1))
-				    == NULL) {
-					nlog(LOG_ERR, "couldn't allocate nwamd"
-					    "address");
+				ipstatus = ipadm_create_addrobj(
+				    IPADM_ADDR_STATIC, ncu_data->ncu_name,
+				    &ipaddr);
+				if (ipstatus != IPADM_SUCCESS) {
+					nlog(LOG_ERR,
+					    "populate_ip_ncu_properties: "
+					    "ipadm_create_addrobj failed "
+					    "for %s: %s", addrvalue[i],
+					    ipadm_status2str(ipstatus));
 					continue;
 				}
-				(*nifa)->address.sa_family = AF_INET;
-				/*LINTED*/
-				s = (struct sockaddr_in *)&(*nifa)->address;
-				s->sin_family = AF_INET;
-				s->sin_port = 0;
-				prefix = strchr(addrvalue[i], '/');
-				if (prefix != NULL) {
-					*prefix++ = 0;
-					(*nifa)->prefix = atoi(prefix);
+				/* ipadm_set_addr takes <addr>[/<mask>] */
+				ipstatus = ipadm_set_addr(ipaddr, addrvalue[i],
+				    AF_INET);
+				if (ipstatus != IPADM_SUCCESS) {
+					nlog(LOG_ERR,
+					    "populate_ip_ncu_properties: "
+					    "ipadm_set_addr failed for %s: %s",
+					    addrvalue[i],
+					    ipadm_status2str(ipstatus));
+					ipadm_destroy_addrobj(ipaddr);
+					continue;
 				}
-				(void) inet_pton(AF_INET, addrvalue[i],
-				    &(s->sin_addr));
-				nifa = &((*nifa)->next);
+
+				if ((*nifa = calloc(sizeof (**nifa), 1))
+				    != NULL) {
+					(*nifa)->family = AF_INET;
+					(*nifa)->ipaddr_atype =
+					    IPADM_ADDR_STATIC;
+					(*nifa)->ipaddr = ipaddr;
+					nifa = &((*nifa)->next);
+				} else {
+					nlog(LOG_ERR,
+					    "populate_ip_ncu_properties: "
+					    "couldn't allocate nwamd address "
+					    "for %s: %s", addrvalue[i],
+					    strerror(errno));
+					ipadm_destroy_addrobj(ipaddr);
+				}
 			}
 			*nifa = NULL;
 
@@ -870,7 +909,6 @@ populate_ip_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 	}
 
 skip_ipv4:
-
 	if (!nif->nwamd_if_ipv6)
 		goto skip_ipv6;
 
@@ -899,23 +937,58 @@ skip_ipv4:
 		}
 		nwam_value_free(ncu_prop);
 	}
-	if (nif->nwamd_if_stateful_requested) {
-		if ((*nifa = calloc(sizeof (**nifa), 1)) != NULL) {
-			(*nifa)->address.sa_family = AF_INET6;
-			(*nifa)->dhcp_if = B_TRUE;
-			nifa = &((*nifa)->next);
-			*nifa = NULL;
+	/*
+	 * Both stateful and stateless share the same nwamd_if_address because
+	 * only one ipaddr for both of these addresses can be created.
+	 * ipadm_create_addr() adds both addresses from the same ipaddr.
+	 */
+	if (nif->nwamd_if_stateful_requested ||
+	    nif->nwamd_if_stateless_requested) {
+		ipstatus = ipadm_create_addrobj(IPADM_ADDR_IPV6_ADDRCONF,
+		    ncu_data->ncu_name, &ipaddr);
+		if (ipstatus != IPADM_SUCCESS) {
+			nlog(LOG_ERR, "populate_ip_ncu_properties: "
+			    "ipadm_create_addrobj failed for v6 "
+			    "stateless/stateful: %s",
+			    ipadm_status2str(ipstatus));
+			goto skip_ipv6_addrconf;
 		}
-	}
-	if (nif->nwamd_if_stateless_requested) {
+		/* create_addrobj sets both stateless and stateful to B_TRUE */
+		if (!nif->nwamd_if_stateful_requested) {
+			ipstatus = ipadm_set_stateful(ipaddr, B_FALSE);
+			if (ipstatus != IPADM_SUCCESS) {
+				nlog(LOG_ERR, "populate_ip_ncu_properties: "
+				    "ipadm_set_stateful failed for v6: %s",
+				    ipadm_status2str(ipstatus));
+				ipadm_destroy_addrobj(ipaddr);
+				goto skip_ipv6_addrconf;
+			}
+		}
+		if (!nif->nwamd_if_stateless_requested) {
+			ipstatus = ipadm_set_stateless(ipaddr, B_FALSE);
+			if (ipstatus != IPADM_SUCCESS) {
+				nlog(LOG_ERR, "populate_ip_ncu_properties: "
+				    "ipadm_set_stateless failed for v6: %s",
+				    ipadm_status2str(ipstatus));
+				ipadm_destroy_addrobj(ipaddr);
+				goto skip_ipv6_addrconf;
+			}
+		}
 		if ((*nifa = calloc(sizeof (**nifa), 1)) != NULL) {
-			(*nifa)->address.sa_family = AF_INET6;
-			(*nifa)->stateless_if = B_TRUE;
+			(*nifa)->family = AF_INET6;
+			(*nifa)->ipaddr_atype = IPADM_ADDR_IPV6_ADDRCONF;
+			(*nifa)->ipaddr = ipaddr;
 			nifa = &((*nifa)->next);
 			*nifa = NULL;
+		} else {
+			nlog(LOG_ERR, "populate_ip_ncu_properties: "
+			    "couldn't allocate nwamd address for "
+			    "v6 stateless/stateful: %s", strerror(errno));
+			ipadm_destroy_addrobj(ipaddr);
 		}
 	}
 
+skip_ipv6_addrconf:
 	/* ipv6-addr */
 	if (static_addr) {
 		if ((err = nwamd_get_ncu_string(ncuh, &ncu_prop, &addrvalue,
@@ -924,28 +997,46 @@ skip_ipv4:
 			    "could not get %s value; %s",
 			    NWAM_NCU_PROP_IPV6_ADDR, nwam_strerror(err));
 		} else {
-			struct sockaddr_in6 *s;
-
 			for (i = 0; i < numvalues; i++) {
-				if ((*nifa = calloc(sizeof (**nifa), 1))
-				    == NULL) {
-					nlog(LOG_ERR, "couldn't allocate nwamd"
-					    "address");
+				ipstatus = ipadm_create_addrobj(
+				    IPADM_ADDR_STATIC, ncu_data->ncu_name,
+				    &ipaddr);
+				if (ipstatus != IPADM_SUCCESS) {
+					nlog(LOG_ERR,
+					    "populate_ip_ncu_properties: "
+					    "ipadm_create_addrobj failed "
+					    "for %s: %s", addrvalue[i],
+					    ipadm_status2str(ipstatus));
 					continue;
 				}
-				(*nifa)->address.sa_family = AF_INET6;
-				/*LINTED*/
-				s = (struct sockaddr_in6 *)&(*nifa)->address;
-				s->sin6_family = AF_INET6;
-				s->sin6_port = 0;
-				prefix = strchr(addrvalue[i], '/');
-				if (prefix != NULL) {
-					*prefix++ = 0;
-					(*nifa)->prefix = atoi(prefix);
+				/* ipadm_set_addr takes <addr>[/<mask>] */
+				ipstatus = ipadm_set_addr(ipaddr, addrvalue[i],
+				    AF_INET6);
+				if (ipstatus != IPADM_SUCCESS) {
+					nlog(LOG_ERR,
+					    "populate_ip_ncu_properties: "
+					    "ipadm_set_addr failed for %s: %s",
+					    addrvalue[i],
+					    ipadm_status2str(ipstatus));
+					ipadm_destroy_addrobj(ipaddr);
+					continue;
 				}
-				(void) inet_pton(AF_INET6, addrvalue[i],
-				    &(s->sin6_addr));
-				nifa = &((*nifa)->next);
+
+				if ((*nifa = calloc(sizeof (**nifa), 1))
+				    != NULL) {
+					(*nifa)->family = AF_INET6;
+					(*nifa)->ipaddr_atype =
+					    IPADM_ADDR_STATIC;
+					(*nifa)->ipaddr = ipaddr;
+					nifa = &((*nifa)->next);
+				} else {
+					nlog(LOG_ERR,
+					    "populate_ip_ncu_properties: "
+					    "couldn't allocate nwamd address "
+					    "for %s: %s", addrvalue[i],
+					    strerror(errno));
+					ipadm_destroy_addrobj(ipaddr);
+				}
 			}
 			*nifa = NULL;
 
@@ -984,15 +1075,15 @@ nwamd_ncu_init(nwam_ncu_type_t ncu_type, const char *name)
 
 	/* Initialize link/interface-specific data */
 	if (rv->ncu_type == NWAM_NCU_TYPE_LINK) {
-		(void) bzero(&rv->ncu_node.u_link, sizeof (nwamd_link_t));
+		(void) bzero(&rv->ncu_link, sizeof (nwamd_link_t));
 		(void) dladm_name2info(dld_handle, name,
-		    &rv->ncu_node.u_link.nwamd_link_id, NULL, NULL,
-		    &rv->ncu_node.u_link.nwamd_link_media);
+		    &rv->ncu_link.nwamd_link_id, NULL, NULL,
+		    &rv->ncu_link.nwamd_link_media);
 		(void) pthread_mutex_init(
-		    &rv->ncu_node.u_link.nwamd_link_wifi_mutex, NULL);
-		rv->ncu_node.u_link.nwamd_link_wifi_priority = MAXINT;
+		    &rv->ncu_link.nwamd_link_wifi_mutex, NULL);
+		rv->ncu_link.nwamd_link_wifi_priority = MAXINT;
 	} else {
-		(void) bzero(&rv->ncu_node.u_if, sizeof (nwamd_if_t));
+		(void) bzero(&rv->ncu_if, sizeof (nwamd_if_t));
 	}
 
 	return (rv);
@@ -1005,7 +1096,7 @@ nwamd_ncu_free(nwamd_ncu_t *ncu)
 		assert(ncu->ncu_type == NWAM_NCU_TYPE_LINK ||
 		    ncu->ncu_type == NWAM_NCU_TYPE_INTERFACE);
 		if (ncu->ncu_type == NWAM_NCU_TYPE_LINK) {
-			struct nwamd_link *l = &ncu->ncu_node.u_link;
+			struct nwamd_link *l = &ncu->ncu_link;
 			int i;
 
 			free(l->nwamd_link_wifi_key);
@@ -1015,12 +1106,13 @@ nwamd_ncu_free(nwamd_ncu_t *ncu)
 		} else if (ncu->ncu_type == NWAM_NCU_TYPE_INTERFACE) {
 			struct nwamd_if_address *nifa;
 
-			nifa = ncu->ncu_node.u_if.nwamd_if_list;
+			nifa = ncu->ncu_if.nwamd_if_list;
 			while (nifa != NULL) {
 				struct nwamd_if_address *n;
 
 				n = nifa;
 				nifa = nifa->next;
+				ipadm_destroy_addrobj(n->ipaddr);
 				free(n);
 			}
 		}
@@ -1638,7 +1730,7 @@ nwamd_ncu_handle_init_event(nwamd_event_t event)
 			    NWAM_AUX_STATE_CONDITIONS_NOT_MET;
 		}
 	} else {
-		nwamd_link_t *link = &ncu->ncu_node.u_link;
+		nwamd_link_t *link = &ncu->ncu_link;
 
 		/*
 		 * Refresh NCU.  Deal with disabled cases first, moving NCUs
@@ -1689,7 +1781,7 @@ nwamd_ncu_handle_init_event(nwamd_event_t event)
 
 		switch (type) {
 		case NWAM_NCU_TYPE_LINK:
-			if (ncu->ncu_node.u_link.nwamd_link_media == DL_WIFI) {
+			if (ncu->ncu_link.nwamd_link_media == DL_WIFI) {
 				/*
 				 * Do rescan.  If the current state and the
 				 * active priority-group do not allow wireless
@@ -1926,7 +2018,7 @@ nwamd_ncu_handle_state_event(nwamd_event_t event)
 	if (is_link)
 		(void) strlcpy(linkname, ncu->ncu_name, sizeof (linkname));
 	prioritized = (ncu->ncu_type == NWAM_NCU_TYPE_LINK &&
-	    ncu->ncu_node.u_link.nwamd_link_activation_mode ==
+	    ncu->ncu_link.nwamd_link_activation_mode ==
 	    NWAM_ACTIVATION_MODE_PRIORITIZED);
 	enabled = ncu->ncu_enabled;
 

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
 #include <errno.h>
 #include <inet/ip.h>
-#include <inetcfg.h>
 #include <libdladm.h>
 #include <libdllink.h>
 #include <libdlwlan.h>

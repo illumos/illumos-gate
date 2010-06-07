@@ -26,7 +26,6 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <inet/ip.h>
-#include <inetcfg.h>
 #include <libdladm.h>
 #include <libdllink.h>
 #include <libdlwlan.h>

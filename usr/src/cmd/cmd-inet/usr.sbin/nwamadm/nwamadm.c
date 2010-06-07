@@ -36,6 +36,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <libdlwlan.h>
+#include <libinetutil.h>
 #include <libnwam.h>
 #include <libscf.h>
 #include <locale.h>
@@ -123,8 +124,8 @@ typedef struct profile_entry {
 #define	STATE_WIDTH		15	/* width of STATE column */
 #define	AUXSTATE_WIDTH		36	/* width of AUXILIARY STATE column */
 
-#define	EVENT_WIDTH		22	/* width of EVENT column */
-#define	DESCRIPTION_WIDTH	56	/* width of DESCRIPTION column */
+#define	EVENT_WIDTH		15	/* width of EVENT column */
+#define	DESCRIPTION_WIDTH	64	/* width of DESCRIPTION column */
 
 /* id for columns of "nwamadm list" */
 typedef enum {
@@ -1108,9 +1109,12 @@ eventhandler(nwam_event_t event)
 		if (event->nwe_data.nwe_if_state.nwe_addr_valid) {
 			struct sockaddr_storage *address =
 			    &(event->nwe_data.nwe_if_state.nwe_addr);
+			struct sockaddr_storage *netmask =
+			    &(event->nwe_data.nwe_if_state.nwe_netmask);
 			struct sockaddr_in *v4addr;
 			struct sockaddr_in6 *v6addr;
 			char addrstr[NWAM_MAX_VALUE_LEN];
+			int plen = mask2plen(netmask);
 
 			switch (address->ss_family) {
 			case AF_INET:
@@ -1125,14 +1129,12 @@ eventhandler(nwam_event_t event)
 				break;
 			}
 			(void) snprintf(statestr, sizeof (statestr),
-			    "index %d flags 0x%x address %s",
-			    event->nwe_data.nwe_if_state.nwe_index,
-			    event->nwe_data.nwe_if_state.nwe_flags, addrstr);
+			    "flags %x addr %s/%d",
+			    event->nwe_data.nwe_if_state.nwe_flags,
+			    addrstr, plen);
 		} else {
 			(void) snprintf(statestr, sizeof (statestr),
-			    "(%d) flags %x",
-			    event->nwe_data.nwe_if_state.nwe_index,
-			    event->nwe_data.nwe_if_state.nwe_flags);
+			    "flags %x", event->nwe_data.nwe_if_state.nwe_flags);
 		}
 		state = statestr;
 		break;

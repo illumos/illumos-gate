@@ -138,6 +138,9 @@ typedef enum {
  *
  *  - IPADM_OPT_UP
  *	Used to bring up a static address on creation
+ *
+ *  - IPADM_OPT_V46
+ *      Used to plumb both IPv4 and IPv6 interfaces by ipadm_create_addr()
  */
 #define	IPADM_OPT_PERSIST	0x00000001
 #define	IPADM_OPT_ACTIVE	0x00000002
@@ -152,6 +155,7 @@ typedef enum {
 #define	IPADM_OPT_RELEASE	0x00000400
 #define	IPADM_OPT_INFORM	0x00000800
 #define	IPADM_OPT_UP		0x00001000
+#define	IPADM_OPT_V46		0x00002000
 
 /* IPADM property class */
 #define	IPADMPROP_CLASS_MODULE	0x00000001	/* on 'protocol' only */
@@ -284,12 +288,16 @@ extern ipadm_status_t	ipadm_delete_addr(ipadm_handle_t, const char *,
 extern ipadm_status_t	ipadm_create_addrobj(ipadm_addr_type_t, const char *,
 			    ipadm_addrobj_t *);
 extern void		ipadm_destroy_addrobj(ipadm_addrobj_t);
+extern ipadm_status_t   ipadm_get_aobjname(const ipadm_addrobj_t, char *,
+			    size_t);
 
 /* Functions to set fields in addrobj for static addresses */
 extern ipadm_status_t	ipadm_set_addr(ipadm_addrobj_t, const char *,
 			    sa_family_t);
 extern ipadm_status_t	ipadm_set_dst_addr(ipadm_addrobj_t, const char *,
 			    sa_family_t);
+extern ipadm_status_t   ipadm_get_addr(const ipadm_addrobj_t,
+			    struct sockaddr_storage *);
 
 /* Functions to set fields in addrobj for IPv6 addrconf */
 extern ipadm_status_t	ipadm_set_interface_id(ipadm_addrobj_t, const char *);

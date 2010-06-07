@@ -258,17 +258,6 @@ usr/lib/llib-linstzones.ln
 usr/lib/llib-lpkg
 usr/lib/llib-lpkg.ln
 #
-# These files are installed in the proto area by the build of libinetcfg.
-# Only the shared object is shipped.
-#
-lib/libinetcfg.so
-lib/llib-linetcfg
-lib/llib-linetcfg.ln
-usr/include/inetcfg.h
-usr/lib/libinetcfg.so
-usr/lib/llib-linetcfg
-usr/lib/llib-linetcfg.ln
-#
 # Don't ship header files private to libipmp and in.mpathd
 #
 usr/include/ipmp_query_impl.h
