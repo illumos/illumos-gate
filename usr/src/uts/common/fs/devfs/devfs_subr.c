@@ -936,7 +936,11 @@ dv_find(struct dv_node *ddv, char *nm, struct vnode **vpp, struct pathname *pnp,
 
 	dcmn_err3(("dv_find %s\n", nm));
 
-	rw_enter(&ddv->dv_contents, RW_READER);
+	if (!rw_tryenter(&ddv->dv_contents, RW_READER)) {
+		if (tsd_get(devfs_clean_key))
+			return (EBUSY);
+		rw_enter(&ddv->dv_contents, RW_READER);
+	}
 start:
 	if (DV_STALE(ddv)) {
 		rw_exit(&ddv->dv_contents);
@@ -1241,10 +1245,16 @@ found:
 		*vpp = vp;
 
 notfound:
-	rw_enter(&ddv->dv_contents, RW_WRITER);
-	if (was_busy)
+	if (was_busy) {
+		/*
+		 * Non-zero was_busy tells us that we are not in the
+		 * devfs_clean() path which in turn means that we can afford
+		 * to take the contents lock unconditionally.
+		 */
+		rw_enter(&ddv->dv_contents, RW_WRITER);
 		ddv->dv_busy--;
-	rw_exit(&ddv->dv_contents);
+		rw_exit(&ddv->dv_contents);
+	}
 	return (rv);
 }
 
