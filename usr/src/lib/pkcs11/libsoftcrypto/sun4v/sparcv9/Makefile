@@ -17,10 +17,12 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # lib/pkcs11/libsoftcrypto/sun4v/sparcv9/Makefile
 #
@@ -30,7 +32,9 @@ CLASS = 64
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
-LINTFLAGS64 += -D$(PLATFORM)
+# E_NAME_MULTIPLY_DEF2 is for arcfour_key_init and arcfour_crypt in
+# different implementations of arcfour_crypt.c
+LINTFLAGS64 += -D$(PLATFORM) -erroff=E_NAME_MULTIPLY_DEF2
 
 install:  all $(SOFT_PSR64_LINKS) $(USR_PSM_LIBS64)
 

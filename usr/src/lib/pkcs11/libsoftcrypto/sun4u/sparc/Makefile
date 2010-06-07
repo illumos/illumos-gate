@@ -18,9 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # lib/pkcs11/libsoftcrypto/sun4u/sparc/Makefile
 #
@@ -30,7 +32,7 @@ CLASS = 32
 include ../Makefile.com
 
 ASFLAGS +=   -xarch=v8plus
-LINTFLAGS += -D$(PLATFORM)
+LINTFLAGS += -D$(PLATFORM) -erroff=E_STATIC_UNUSED
 
 install:  all $(SOFT_PSR_LINKS) $(USR_PSM_LIBS)
 

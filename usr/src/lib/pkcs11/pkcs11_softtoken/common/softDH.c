@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <stdlib.h>
 #include <string.h>
@@ -31,45 +29,27 @@
 #include <sys/types.h>
 #include <security/cryptoki.h>
 #include <sys/crypto/common.h>
-#include <bignum.h>
 #include <des_impl.h>
+#include <cryptoutil.h>
 #include "softGlobal.h"
 #include "softSession.h"
 #include "softObject.h"
 #include "softDH.h"
-#include "softRandom.h"
 #include "softCrypt.h"
 
 
 /*
- * This function converts the big integer of the specified attribute
- * to an octet string and store it in the corresponding key object.
+ * This function takes a converted big integer of the specified attribute
+ * as an octet string and stores it in the corresponding key object.
  */
-CK_RV
-soft_genDHkey_set_attribute(soft_object_t *key, BIGNUM *bn,
-    CK_ATTRIBUTE_TYPE type, uint32_t prime_len, boolean_t public)
+static CK_RV
+soft_genDHkey_set_attribute(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
+    uchar_t *buf, uint32_t buflen, boolean_t public)
 {
 
-	uchar_t	*buf;
-	uint32_t buflen;
 	CK_RV rv = CKR_OK;
 	biginteger_t *dst = NULL;
 	biginteger_t src;
-
-	/*
-	 * Allocate the buffer used to store the value of key fields
-	 * for bignum2bytestring. Since bignum only deals with a buffer
-	 * whose size is multiple of 4, prime_len is rounded up to be
-	 * multiple of 4.
-	 */
-	if ((buf = malloc((prime_len + sizeof (BIG_CHUNK_TYPE) - 1) &
-	    ~(sizeof (BIG_CHUNK_TYPE) - 1))) == NULL) {
-		rv = CKR_HOST_MEMORY;
-		goto cleanexit;
-	}
-
-	buflen = bn->len * (int)sizeof (BIG_CHUNK_TYPE);
-	bignum2bytestring(buf, bn, buflen);
 
 	switch (type) {
 
@@ -89,19 +69,14 @@ soft_genDHkey_set_attribute(soft_object_t *key, BIGNUM *bn,
 		break;
 	}
 
-	src.big_value_len = buflen;
-
-	if ((src.big_value = malloc(buflen)) == NULL) {
-		rv = CKR_HOST_MEMORY;
+	if ((rv = dup_bigint_attr(&src, buf, buflen)) != CKR_OK)
 		goto cleanexit;
-	}
-	(void) memcpy(src.big_value, buf, buflen);
 
 	/* Copy the attribute in the key object. */
 	copy_bigint_attr(&src, dst);
 
 cleanexit:
-	free(buf);
+	/* No need to free big_value because dst holds it now after copy. */
 	return (rv);
 
 }
@@ -113,18 +88,15 @@ CK_RV
 soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 {
 	CK_RV		rv;
-	BIG_ERR_CODE	brv;
+	CK_ATTRIBUTE 	template;
 	uchar_t		prime[MAX_KEY_ATTR_BUFLEN];
 	uint32_t	prime_len = sizeof (prime);
-	uint32_t	primebit_len;
-	uint32_t	value_bits;
 	uchar_t		base[MAX_KEY_ATTR_BUFLEN];
 	uint32_t	base_len = sizeof (base);
-	BIGNUM		bnprime;
-	BIGNUM		bnbase;
-	BIGNUM		bnprival;
-	BIGNUM		bnpubval;
-	CK_ATTRIBUTE 	template;
+	uint32_t	value_bits;
+	uchar_t		private_x[MAX_KEY_ATTR_BUFLEN];
+	uchar_t		public_y[MAX_KEY_ATTR_BUFLEN];
+	DHbytekey	k;
 
 	if ((pubkey->class != CKO_PUBLIC_KEY) ||
 	    (pubkey->key_type != CKK_DH)) {
@@ -136,73 +108,18 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		return (CKR_KEY_TYPE_INCONSISTENT);
 	}
 
-	/*
-	 * The input to the first phase shall be the Diffie-Hellman
-	 * parameters, which include prime, base, and private-value length.
-	 */
-	rv = soft_get_public_value(pubkey, CKA_PRIME, prime, &prime_len);
-
-	if (rv != CKR_OK) {
-		return (rv);
-	}
-
-	if ((prime_len < (MIN_DH_KEYLENGTH / 8)) ||
-	    (prime_len > (MAX_DH_KEYLENGTH / 8))) {
-		rv = CKR_ATTRIBUTE_VALUE_INVALID;
-		goto ret0;
-	}
-
-	if ((brv = big_init(&bnprime, CHARLEN2BIGNUMLEN(prime_len))) !=
-	    BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret0;
-	}
-
-	/* Convert the prime octet string to big integer format. */
-	bytestring2bignum(&bnprime, prime, prime_len);
-
-	rv = soft_get_public_value(pubkey, CKA_BASE, base, &base_len);
-
-	if (rv != CKR_OK) {
-		goto ret1;
-	}
-
-	if ((brv = big_init(&bnbase, CHARLEN2BIGNUMLEN(base_len))) != BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret1;
-	}
-
-	/* Convert the base octet string to big integer format. */
-	bytestring2bignum(&bnbase, base, base_len);
-
-	if (big_cmp_abs(&bnbase, &bnprime) >= 0) {
-		rv = CKR_ATTRIBUTE_VALUE_INVALID;
-		goto ret2;
-	}
-
-	primebit_len = big_bitlength(&bnprime);
-
+	/* Get private-value length in bits */
 	template.pValue = malloc(sizeof (CK_ULONG));
-
 	if (template.pValue == NULL) {
-		rv = CKR_HOST_MEMORY;
-		goto ret2;
+		return (CKR_HOST_MEMORY);
 	}
-
 	template.ulValueLen = sizeof (CK_ULONG);
-
 	rv = get_ulong_attr_from_object(OBJ_PRI_DH_VAL_BITS(prikey),
 	    &template);
-
 	if (rv != CKR_OK) {
-		goto ret2;
+		free(template.pValue);
+		return (rv);
 	}
-
-	/*
-	 * The intention of selecting a private-value length is to reduce
-	 * the computation time for key agreement, while maintaining a
-	 * given level of security.
-	 */
 
 #ifdef	__sparcv9
 	/* LINTED */
@@ -211,109 +128,87 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 	value_bits = *((CK_ULONG *)(template.pValue));
 #endif	/* __sparcv9 */
 
-	if (value_bits > primebit_len) {
-		rv = CKR_ATTRIBUTE_VALUE_INVALID;
-		goto ret3;
-	}
-
-	/* Generate DH key pair private and public values. */
-	if ((brv = big_init(&bnprival, CHARLEN2BIGNUMLEN(prime_len)))
-	    != BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret3;
-	}
-
-	if ((brv = big_init(&bnpubval, CHARLEN2BIGNUMLEN(prime_len)))
-	    != BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret4;
-	}
+	free(template.pValue);
 
 	/*
-	 * The big integer of the private value shall be generated privately
-	 * and randomly.
+	 * The input to the first phase shall be the Diffie-Hellman
+	 * parameters, which include prime, base, and private-value length.
 	 */
-	if ((brv = random_bignum(&bnprival, (value_bits == 0) ?
-	    primebit_len : value_bits, (IS_TOKEN_OBJECT(pubkey) ||
-	    IS_TOKEN_OBJECT(prikey)))) != BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret5;
+	rv = soft_get_public_value(pubkey, CKA_PRIME, prime, &prime_len);
+	if (rv != CKR_OK) {
+		return (rv);
 	}
 
-	/*
-	 * The base g shall be raised to the private value x modulo p to
-	 * give an integer y, the integer public value.
-	 */
-	if ((brv = big_modexp(&bnpubval,
-	    &bnbase, &bnprival, &bnprime, NULL)) != BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret5;
+	rv = soft_get_public_value(pubkey, CKA_BASE, base, &base_len);
+	if (rv != CKR_OK) {
+		goto ret;
+	}
+
+	/* Inputs to DH key pair generation. */
+	k.prime = prime;
+	k.prime_bits = CRYPTO_BYTES2BITS(prime_len);
+	k.base = base;
+	k.base_bytes = base_len;
+	k.value_bits = value_bits;
+	k.rfunc = (IS_TOKEN_OBJECT(pubkey) || IS_TOKEN_OBJECT(prikey)) ?
+	    pkcs11_get_random : pkcs11_get_urandom;
+
+	/* Outputs from DH key pair generation. */
+	k.private_x = private_x;
+	k.public_y = public_y;
+
+	/* If value_bits is 0, it will return as same size as prime */
+	if ((rv = dh_genkey_pair(&k)) != CKR_OK) {
+		goto ret;
 	}
 
 	/*
 	 * The integer public value y shall be converted to an octet
 	 * string PV of length k, the public value.
 	 */
-	if ((rv = soft_genDHkey_set_attribute(pubkey, &bnpubval,
-	    CKA_VALUE, prime_len, B_TRUE)) != CKR_OK) {
-		goto ret5;
+	if ((rv = soft_genDHkey_set_attribute(pubkey, CKA_VALUE, public_y,
+	    CRYPTO_BITS2BYTES(k.value_bits), B_TRUE)) != CKR_OK) {
+		goto ret;
 	}
 
 	/* Convert the big integer private value to an octet string. */
-	if ((rv = soft_genDHkey_set_attribute(prikey, &bnprival,
-	    CKA_VALUE, prime_len, B_FALSE)) != CKR_OK) {
-		goto ret5;
+	if ((rv = soft_genDHkey_set_attribute(prikey, CKA_VALUE, private_x,
+	    CRYPTO_BITS2BYTES(k.value_bits), B_FALSE)) != CKR_OK) {
+		goto ret;
 	}
 
 	/* Convert the big integer prime to an octet string. */
-	if ((rv = soft_genDHkey_set_attribute(prikey, &bnprime,
-	    CKA_PRIME, prime_len, B_FALSE)) != CKR_OK) {
-		goto ret5;
+	if ((rv = soft_genDHkey_set_attribute(prikey, CKA_PRIME, prime,
+	    CRYPTO_BITS2BYTES(k.prime_bits), B_FALSE)) != CKR_OK) {
+		goto ret;
 	}
 
 	/* Convert the big integer base to an octet string. */
-	if ((rv = soft_genDHkey_set_attribute(prikey, &bnbase,
-	    CKA_BASE, prime_len, B_FALSE)) != CKR_OK) {
-		goto ret5;
+	if ((rv = soft_genDHkey_set_attribute(prikey, CKA_BASE, base,
+	    k.base_bytes, B_FALSE)) != CKR_OK) {
+		goto ret;
 	}
 
-	if (value_bits == 0) {
-		OBJ_PRI_DH_VAL_BITS(prikey) = primebit_len;
-	}
+	/* Update private-value length in bits; could have been 0 before */
+	OBJ_PRI_DH_VAL_BITS(prikey) = k.value_bits;
 
-
-ret5:
-	big_finish(&bnpubval);
-ret4:
-	big_finish(&bnprival);
-ret3:
-	free(template.pValue);
-ret2:
-	big_finish(&bnbase);
-ret1:
-	big_finish(&bnprime);
-ret0:
+ret:
 	return (rv);
 }
 
+/* ARGSUSED3 */
 CK_RV
 soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
     void *publicvalue, size_t publicvaluelen)
 {
+	CK_RV		rv;
 	uchar_t		privatevalue[MAX_KEY_ATTR_BUFLEN];
 	uint32_t	privatevaluelen = sizeof (privatevalue);
 	uchar_t		privateprime[MAX_KEY_ATTR_BUFLEN];
 	uint32_t	privateprimelen = sizeof (privateprime);
-	uchar_t		*value;
-	uint32_t	valuelen;
+	uchar_t		key[MAX_KEY_ATTR_BUFLEN];
 	uint32_t	keylen;
-	uchar_t		*buf = NULL;
-	CK_RV		rv;
-	BIG_ERR_CODE	brv;
-	BIGNUM		bnprime;
-	BIGNUM		bnpublic;
-	BIGNUM		bnprivate;
-	BIGNUM		bnsecret;
+	DHbytekey	k;
 
 	rv = soft_get_private_value(basekey, CKA_VALUE, privatevalue,
 	    &privatevaluelen);
@@ -324,123 +219,38 @@ soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
 	rv = soft_get_private_value(basekey, CKA_PRIME, privateprime,
 	    &privateprimelen);
 	if (rv != CKR_OK) {
-		goto ret0;
+		goto ret;
 	}
 
-	if ((brv = big_init(&bnprime, CHARLEN2BIGNUMLEN(privateprimelen))) !=
-	    BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret0;
-	}
-
-	bytestring2bignum(&bnprime, privateprime, privateprimelen);
-
-	if ((brv = big_init(&bnprivate, CHARLEN2BIGNUMLEN(privatevaluelen))) !=
-	    BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret1;
-	}
-
-	bytestring2bignum(&bnprivate, privatevalue, privatevaluelen);
-
-#ifdef	__sparcv9
-	if ((brv = big_init(&bnpublic,
-	    (int)CHARLEN2BIGNUMLEN(publicvaluelen))) != BIG_OK) {
-#else	/* !__sparcv9 */
-	if ((brv = big_init(&bnpublic,
-	    CHARLEN2BIGNUMLEN(publicvaluelen))) != BIG_OK) {
-#endif	/* __sparcv9 */
-		rv = convert_rv(brv);
-		goto ret2;
-	}
-
-	bytestring2bignum(&bnpublic, (uchar_t *)publicvalue, publicvaluelen);
-
-	if ((brv = big_init(&bnsecret,
-	    CHARLEN2BIGNUMLEN(privateprimelen))) != BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret3;
-	}
-
-	if ((brv = big_modexp(&bnsecret, &bnpublic, &bnprivate, &bnprime,
-	    NULL)) != BIG_OK) {
-		rv = convert_rv(brv);
-		goto ret4;
-	}
-
-	if ((buf = malloc((privateprimelen + sizeof (BIG_CHUNK_TYPE) - 1) &
-	    ~(sizeof (BIG_CHUNK_TYPE) - 1))) == NULL) {
-		rv = CKR_HOST_MEMORY;
-		goto ret4;
-	}
-
-	value = buf;
-	valuelen = bnsecret.len * (int)sizeof (BIG_CHUNK_TYPE);
-	bignum2bytestring(value, &bnsecret, valuelen);
-
-	switch (secretkey->key_type) {
-
-	case CKK_DES:
-		keylen = DES_KEYSIZE;
-		break;
-	case CKK_DES2:
-		keylen = DES2_KEYSIZE;
-		break;
-	case CKK_DES3:
-		keylen = DES3_KEYSIZE;
-		break;
-	case CKK_RC4:
-	case CKK_AES:
-	case CKK_GENERIC_SECRET:
-#ifdef	__sparcv9
-		/* LINTED */
-		keylen = (uint32_t)OBJ_SEC_VALUE_LEN(secretkey);
-#else	/* !__sparcv9 */
-		keylen = OBJ_SEC_VALUE_LEN(secretkey);
-#endif	/* __sparcv9 */
-		break;
-	}
-
-	if (keylen == 0) {
-		/*
-		 * keylen == 0 only if CKA_VALUE_LEN did not specify.
-		 */
-		keylen = valuelen;
-	}
-	/*
-	 * Note: No need to have "default:" case here since invalid key type
-	 * if any has been detected at function soft_build_secret_key_object()
-	 * before it gets here.
-	 */
-
-	if (keylen > valuelen) {
+	/* keylen may be 0 if CKA_VALUE_LEN did not specify */
+	keylen = OBJ_SEC_VALUE_LEN(secretkey);
+	if (keylen > sizeof (key)) {		/* check for overflow */
 		rv = CKR_ATTRIBUTE_VALUE_INVALID;
-		goto ret5;
+		goto ret;
+	}
+
+	k.prime = privateprime;
+	k.prime_bits = CRYPTO_BYTES2BITS(privateprimelen);
+	k.value_bits = CRYPTO_BYTES2BITS(privatevaluelen);
+	k.private_x = privatevalue;
+	k.public_y = publicvalue;
+	k.rfunc = NULL;
+
+	/* keylen may be modified if it was 0 or conflicts with key type */
+	rv = dh_key_derive(&k, secretkey->key_type, key, &keylen);
+
+	if (rv != CKR_OK) {
+		goto ret;
 	}
 
 	if ((OBJ_SEC_VALUE(secretkey) = malloc(keylen)) == NULL) {
 		rv = CKR_HOST_MEMORY;
-		goto ret5;
+		goto ret;
 	}
+
 	OBJ_SEC_VALUE_LEN(secretkey) = keylen;
+	(void) memcpy(OBJ_SEC_VALUE(secretkey), key, keylen);
 
-	/*
-	 * The truncation removes bytes from the leading end of the
-	 * secret value.
-	 */
-	(void) memcpy(OBJ_SEC_VALUE(secretkey), (value + valuelen - keylen),
-	    keylen);
-
-ret5:
-	free(buf);
-ret4:
-	big_finish(&bnsecret);
-ret3:
-	big_finish(&bnpublic);
-ret2:
-	big_finish(&bnprivate);
-ret1:
-	big_finish(&bnprime);
-ret0:
+ret:
 	return (rv);
 }

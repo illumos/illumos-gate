@@ -18,9 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # lib/pkcs11/libsoftcrypto/i386/Makefile
 #
@@ -30,8 +32,9 @@ VERS= .1
 
 include ../Makefile.com
 
-LDLIBS  += -lc
+LDLIBS += -lcryptoutil
 LIBS += $(LINTLIB)
+
 DYNFLAGS += -Wl,-f/usr/lib/libsoftcrypto/\$$HWCAP
 
 install:  all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

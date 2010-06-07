@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -3146,4 +3146,49 @@ ret1:
 	if (t1.malloced) big_finish(&t1);
 
 	return (err);
+}
+
+/*
+ * Get a rlen-bit random number in BIGNUM format.  Caller-supplied
+ * (*rfunc)(void *dbuf, size_t dlen) must return 0 for success and
+ * -1 for failure.  Note:  (*rfunc)() takes length in bytes, not bits.
+ */
+BIG_ERR_CODE
+big_random(BIGNUM *r, size_t rlen, int (*rfunc)(void *, size_t))
+{
+	size_t	rwords, rbytes;
+	int	shift;
+
+	if (r == NULL || rlen == 0 || rfunc == NULL)
+		return (BIG_INVALID_ARGS);
+
+	/*
+	 * Convert rlen bits to r->len words (32- or 64-bit), rbytes bytes
+	 * and extend r if it's not big enough to hold the random number.
+	 */
+	rwords = BITLEN2BIGNUMLEN(rlen);
+	rbytes = rwords * sizeof (BIG_CHUNK_TYPE);
+	if (big_extend(r, rwords) != BIG_OK)
+		return (BIG_NO_MEM);
+#ifdef BIGNUM_CHUNK_32
+	r->len = rwords;
+#else
+	r->len = (uint32_t)rwords;
+#endif
+
+	if ((*rfunc)(r->value, rbytes) < 0)
+		return (BIG_NO_RANDOM);
+
+	r->value[rwords - 1] |= BIG_CHUNK_HIGHBIT;
+
+	/*
+	 * If the bit length is not a word boundary, shift the most
+	 * significant word so that we have an exactly rlen-long number.
+	 */
+	if ((shift = rlen % BIG_CHUNK_SIZE) != 0)
+		r->value[rwords - 1] >>= (BIG_CHUNK_SIZE - shift);
+
+	r->sign = 1;	/* non-negative */
+
+	return (BIG_OK);
 }

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "../arcfour.h"
@@ -119,8 +119,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 			tmp0 = base[i];
 			j = j + tmp0;
 			tmp1 = base[j];
-			base[i] = tmp1;
-			base[j] = tmp0;
+			base[i] = (uchar_t)tmp1;
+			base[j] = (uchar_t)tmp0;
 			tmp0 += tmp1;
 			tmp0 = tmp0 & 0xff;
 			out[ii] = in[ii] ^ base[tmp0];
@@ -144,8 +144,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 			j = j + tmp0;
 			tmp1 = base[j];
 
-			base[i] = tmp1;
-			base[j] = tmp0;
+			base[i] = (uchar_t)tmp1;
+			base[j] = (uchar_t)tmp0;
 
 			tmp0 += tmp1;
 			tmp0 = tmp0 & 0xff;
@@ -192,7 +192,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				 * Don't store [i] yet
 				 */
 				i_accum = tmp1;
-				base[j] = tmp0;
+				base[j] = (uchar_t)tmp0;
 
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
@@ -223,12 +223,12 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				 * If alias abort speculation
 				 */
 				if ((i1 ^ j) < 2) {
-					base1[0] = i_accum;
+					base1[0] = (uchar_t)i_accum;
 
 					tmp1 = base[j];
 
-					base1[1] = tmp1;
-					base[j] = tmp0;
+					base1[1] = (uchar_t)tmp1;
+					base[j] = (uchar_t)tmp0;
 
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
@@ -242,7 +242,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					i_accum = i_accum << 8;
 					i_accum |= tmp1;
 
-					base[j] = tmp0;
+					base[j] = (uchar_t)tmp0;
 
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
@@ -272,8 +272,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				tmp0 = base1[2];
 				j = j + tmp0;
 				tmp1 = base[j];
-				base1[2] = tmp1;
-				base[j] = tmp0;
+				base1[2] = (uchar_t)tmp1;
+				base[j] = (uchar_t)tmp0;
 				tmp1 += tmp0;
 				tmp1 = tmp1 & 0xff;
 				merge |= (unsigned long long)(base[tmp1]) << 40;
@@ -282,8 +282,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				tmp0 = base1[3];
 				j = j + tmp0;
 				tmp1 = base[j];
-				base1[3] = tmp1;
-				base[j] = tmp0;
+				base1[3] = (uchar_t)tmp1;
+				base[j] = (uchar_t)tmp0;
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
 				merge |= (unsigned long long)(base[tmp0]) << 32;
@@ -292,8 +292,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				tmp0 = base1[4];
 				j = j + tmp0;
 				tmp1 = base[j];
-				base1[4] = tmp1;
-				base[j] = tmp0;
+				base1[4] = (uchar_t)tmp1;
+				base[j] = (uchar_t)tmp0;
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
 				merge |= (unsigned long long)(base[tmp0]) << 24;
@@ -302,8 +302,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				tmp0 = base1[5];
 				j = j + tmp0;
 				tmp1 = base[j];
-				base1[5] = tmp1;
-				base[j] = tmp0;
+				base1[5] = (uchar_t)tmp1;
+				base[j] = (uchar_t)tmp0;
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
 				merge |= (unsigned long long)(base[tmp0]) << 16;
@@ -314,7 +314,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				j = j + tmp0;
 				tmp1 = base[j];
 				i_accum = tmp1;
-				base[j] = tmp0;
+				base[j] = (uchar_t)tmp0;
 
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
@@ -337,11 +337,11 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				 */
 				j = j + tmp0;
 				if ((i1 ^ j) < 2) {
-					base1[6] = i_accum;
+					base1[6] = (uchar_t)i_accum;
 					tmp1 = base[j];
 
-					base1[7] = tmp1;
-					base[j] = tmp0;
+					base1[7] = (uchar_t)tmp1;
+					base[j] = (uchar_t)tmp0;
 
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
@@ -355,7 +355,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					i_accum = i_accum << 8;
 					i_accum |= tmp1;
 
-					base[j] = tmp0;
+					base[j] = (uchar_t)tmp0;
 
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
@@ -380,14 +380,14 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 
 				/* BYTE 0 */
 				i1 = (i1 + 1) & 0xff;
-				jj = i1;
+				jj = (uchar_t)i1;
 
 				tmp0 = base[i1];
 				j = j + tmp0;
 
 				tmp1 = base[j];
 				i_accum = tmp1;
-				base[j] = tmp0;
+				base[j] = (uchar_t)tmp0;
 
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
@@ -407,12 +407,12 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				j = j + tmp0;
 
 				if ((jj ^ j) < 2) {
-					base[jj] = i_accum;
+					base[jj] = (uchar_t)i_accum;
 
 					tmp1 = base[j];
 
-					base[i1+1] = tmp1;
-					base[j] = tmp0;
+					base[i1+1] = (uchar_t)tmp1;
+					base[j] = (uchar_t)tmp0;
 
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
@@ -427,7 +427,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					i_accum = i_accum << 8;
 					i_accum |= tmp1;
 
-					base[j] = tmp0;
+					base[j] = (uchar_t)tmp0;
 
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
@@ -452,8 +452,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				tmp0 = base[i1];
 				j = j + tmp0;
 				tmp1 = base[j];
-				base[i1] = tmp1;
-				base[j] = tmp0;
+				base[i1] = (uchar_t)tmp1;
+				base[j] = (uchar_t)tmp0;
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
 				merge |= (unsigned long long)(base[tmp0]) << 40;
@@ -462,8 +462,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				tmp0 = base[i1+1];
 				j = j + tmp0;
 				tmp1 = base[j];
-				base[i1+1] = tmp1;
-				base[j] = tmp0;
+				base[i1+1] = (uchar_t)tmp1;
+				base[j] = (uchar_t)tmp0;
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
 				merge |= (unsigned long long)(base[tmp0]) << 32;
@@ -473,8 +473,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				tmp0 = base[i1];
 				j = j + tmp0;
 				tmp1 = base[j];
-				base[i1] = tmp1;
-				base[j] = tmp0;
+				base[i1] = (uchar_t)tmp1;
+				base[j] = (uchar_t)tmp0;
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
 				merge |= (unsigned long long)(base[tmp0]) << 24;
@@ -483,22 +483,22 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 				tmp0 = base[i1+1];
 				j = j + tmp0;
 				tmp1 = base[j];
-				base[i1+1] = tmp1;
-				base[j] = tmp0;
+				base[i1+1] = (uchar_t)tmp1;
+				base[j] = (uchar_t)tmp0;
 				tmp0 += tmp1;
 				tmp0 = tmp0 & 0xff;
 				merge |= (unsigned long long)(base[tmp0]) << 16;
 
 				/* BYTE 6 */
 				i1 = (i1+2) &0xff;
-				jj = i1;
+				jj = (uchar_t)i1;
 				tmp0 = base[i1];
 
 				j = j + tmp0;
 
 				tmp1 = base[j];
 				i_accum = tmp1;
-				base[j] = tmp0;
+				base[j] = (uchar_t)tmp0;
 
 
 				tmp0 += tmp1;
@@ -519,11 +519,11 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 
 				j = j + tmp0;
 				if ((jj ^ j) < 2) {
-					base[jj] = i_accum;
+					base[jj] = (uchar_t)i_accum;
 					tmp1 = base[j];
 
-					base[i1] = tmp1;
-					base[j] = tmp0;
+					base[i1] = (uchar_t)tmp1;
+					base[j] = (uchar_t)tmp0;
 
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
@@ -538,7 +538,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					i_accum = i_accum << 8;
 					i_accum |= tmp1;
 
-					base[j] = tmp0;
+					base[j] = (uchar_t)tmp0;
 
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
@@ -569,7 +569,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 			*((unsigned long long *) (&out[ii])) = in0;
 		}
 
-		i = i1;
+		i = (uchar_t)i1;
 
 		/*
 		 * Handle any overrun
@@ -588,8 +588,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 			j = j + tmp0;
 			tmp1 = base[j];
 
-			base[i] = tmp1;
-			base[j] = tmp0;
+			base[i] = (uchar_t)tmp1;
+			base[j] = (uchar_t)tmp0;
 
 			tmp0 += tmp1;
 			tmp0 = tmp0 & 0xff;

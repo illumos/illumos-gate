@@ -18,9 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # lib/pkcs11/libsoftcrypto/sun4u/sparcv9/Makefile
 #
@@ -30,7 +32,8 @@ CLASS = 64
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
-LINTFLAGS64 += -D$(PLATFORM)
+# E_STATIC_UNUSED is for bignumimpl.c, big_modexp_ncp_int/big_modexp_ncp_float
+LINTFLAGS64 += -D$(PLATFORM) -erroff=E_STATIC_UNUSED
 
 install:  all $(SOFT_PSR64_LINKS) $(USR_PSM_LIBS64)
 

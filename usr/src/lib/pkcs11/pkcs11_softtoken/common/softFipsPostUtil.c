@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -36,7 +36,6 @@
 #include <sys/sha2.h>
 #include <sys/crypto/common.h>
 #include <modes/modes.h>
-#include <bignum.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -47,12 +46,10 @@
 #include "softGlobal.h"
 #include "softRSA.h"
 #include "softDSA.h"
-#include "softRandom.h"
 #include "softOps.h"
 #include "softMAC.h"
 #include <fips_post.h>
 
-#define	FIPS_DSA_SIGNATURE_LENGTH	40 /*  320-bits */
 #define	MAX_ECKEY_LEN		72
 
 
@@ -62,7 +59,7 @@
  * This function returns
  *   CKR_OK               if pairwise consistency check passed
  *   CKR_GENERAL_ERROR    if pairwise consistency check failed
- *   other error codes    if paiswise consistency check could not be
+ *   other error codes    if pairwise consistency check could not be
  *                        performed, for example, CKR_HOST_MEMORY.
  *
  *                      Key type    Mechanism type

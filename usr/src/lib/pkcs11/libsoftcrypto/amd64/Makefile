@@ -18,9 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # lib/pkcs11/libsoftcrypto/amd64/Makefile
 #
@@ -47,7 +49,7 @@ BIGNUM_FLAGS	+= -DPSR_MUL
 LINTFLAGS64	+= $(BIGNUM_FLAGS) $(AES_FLAGS) $(ARCFOUR_FLAGS)
 CLEANFILES	+= arcfour-x86_64.s
 
-LDLIBS  += -lc
+LDLIBS += -lcryptoutil
 LIBS += $(LINTLIB)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)

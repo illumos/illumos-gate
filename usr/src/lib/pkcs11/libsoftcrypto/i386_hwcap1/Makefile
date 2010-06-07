@@ -18,9 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # lib/pkcs11/libsoftcrypto/i386_hwcap1/Makefile
 #
@@ -37,7 +39,8 @@ include ../Makefile.com
 
 BIGNUM_FLAGS += -DMMX_MANAGE -DHWCAP -DPSR_MUL
 LINTFLAGS += $(BIGNUM_FLAGS)
-LDLIBS  += -lc
+
+LDLIBS += -lcryptoutil
 
 $(ROOTHWCAPDIR)/% := FILEMODE= 755
 

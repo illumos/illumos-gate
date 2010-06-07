@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SOFTDSA_H
 #define	_SOFTDSA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,36 +32,16 @@ extern "C" {
 
 #include <sys/types.h>
 #include <security/pkcs11t.h>
-#include <bignum.h>
+#include <padding.h>
+#define	_DSA_FIPS_POST
+#include <dsa_impl.h>
 #include "softObject.h"
 #include "softSession.h"
 
-/* DSA Signature is always 40 bytes */
-#define	DSA_SIGNATURE_LENGTH	40
-#define	MAX_DSA_KEY_LEN		(1024 >> 3)
-#define	MIN_DSA_KEY_LEN		(512 >> 3)
-
-#define	DSA_SUBPRIME_BITS	160
-#define	DSA_SUBPRIME_BYTES	(DSA_SUBPRIME_BITS >> 3)
 
 typedef struct soft_dsa_ctx {
 	soft_object_t *key;
 } soft_dsa_ctx_t;
-
-typedef struct {
-	int 	size;		/* key size in bits */
-	BIGNUM	q;		/* q (160-bit prime) */
-	BIGNUM	p;		/* p (<size-bit> prime) */
-	BIGNUM	g;		/* g (the base) */
-	BIGNUM	x;		/* private key (< q) */
-	BIGNUM	y;		/* = g^x mod p */
-	BIGNUM	k;		/* k (random number < q) */
-	BIGNUM	r;		/* r (signiture 1st part) */
-	BIGNUM	s;		/* s (signiture 2nd part) */
-	BIGNUM	v;		/* v (verification value - should be = r ) */
-	BIGNUM	p_rr;		/* 2^(2*(32*p->len)) mod p */
-	BIGNUM	q_rr;		/* 2^(2*(32*q->len)) mod q */
-} DSAkey;
 
 
 /*
@@ -80,10 +58,6 @@ CK_RV soft_dsa_verify(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
 
 CK_RV soft_dsa_sign(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
 	CK_BYTE_PTR, CK_ULONG_PTR);
-
-BIG_ERR_CODE DSA_key_init(DSAkey *, int);
-
-void DSA_key_finish(DSAkey *);
 
 CK_RV soft_dsa_genkey_pair(soft_object_t *, soft_object_t *);
 

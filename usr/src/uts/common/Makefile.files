@@ -19,7 +19,9 @@
 # CDDL HEADER END
 #
 
+#
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+#
 
 #
 # This Makefile defines all file modules for the directory uts/common
@@ -1542,7 +1544,7 @@ ECCPROV_OBJS += ecc.o ec.o ec2_163.o ec2_mont.o ecdecode.o ecl_mult.o \
 		mpi.o mplogic.o mpmontg.o mpprime.o oid.o \
 		secitem.o ec2_test.o ecp_test.o fips_ecc_util.o
 
-RSAPROV_OBJS += rsa.o rsa_impl.o fips_rsa_util.o
+RSAPROV_OBJS += rsa.o rsa_impl.o pkcs1.o fips_rsa_util.o
 
 SWRANDPROV_OBJS += swrand.o fips_random_util.o
 

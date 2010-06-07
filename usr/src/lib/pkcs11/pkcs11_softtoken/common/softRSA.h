@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SOFTRSA_H
 #define	_SOFTRSA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,10 +32,10 @@ extern "C" {
 
 #include <sys/types.h>
 #include <security/pkcs11t.h>
-#include <bignum.h>
 #include "softObject.h"
 #include "softSession.h"
-#include "rsa_impl.h"
+#include <padding.h>
+#include <rsa_impl.h>
 
 
 typedef struct soft_rsa_ctx {

@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SOFTCRYPT_H
 #define	_SOFTCRYPT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,7 +36,6 @@ extern "C" {
 #include <aes_impl.h>
 #include <blowfish_impl.h>
 #include <des_impl.h>
-#include <bignum.h>
 #include "softObject.h"
 #include "softSession.h"
 
@@ -99,7 +96,7 @@ CK_RV soft_des_mac_sign_verify_update(soft_session_t *session_p,
 
 void soft_add_pkcs7_padding(CK_BYTE *, int, CK_ULONG);
 
-CK_RV soft_remove_pkcs7_padding(CK_BYTE *, CK_ULONG, CK_ULONG *, int);
+CK_RV soft_remove_pkcs7_padding(CK_BYTE *, CK_ULONG, CK_ULONG *);
 
 CK_RV soft_arcfour_crypt_init(soft_session_t *, CK_MECHANISM_PTR,
 	soft_object_t *, boolean_t);
@@ -129,10 +126,6 @@ CK_RV soft_blowfish_encrypt_common(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
 
 CK_RV soft_blowfish_decrypt_common(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
 	CK_BYTE_PTR, CK_ULONG_PTR, boolean_t);
-
-CK_RV convert_rv(BIG_ERR_CODE);
-
-BIG_ERR_CODE convert_brv(CK_RV);
 
 #ifdef	__cplusplus
 }

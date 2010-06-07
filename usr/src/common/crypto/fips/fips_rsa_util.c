@@ -18,323 +18,48 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
-#include <sys/param.h>
-#include <sys/errno.h>
-#include <sys/kmem.h>
-#include <sys/systm.h>
-#include <sys/sysmacros.h>
 #include <sys/sha1.h>
 #define	_SHA2_IMPL
 #include <sys/sha2.h>
-#include <sys/crypto/common.h>
-#define	_RSA_FIPS_POST
-#include <rsa/rsa_impl.h>
-#ifndef _KERNEL
-#include <stdlib.h>
-#include <string.h>
+
+#ifdef	_KERNEL
+
+#include <sys/param.h>
+#include <sys/kmem.h>
+
+#else
+
 #include <strings.h>
-#include <stdio.h>
-#include <security/cryptoki.h>
 #include <cryptoutil.h>
 #include "softMAC.h"
+
+#include <security/cryptoki.h>
+#include <sys/crypto/common.h>
+
 #endif
+
+#include <padding/padding.h>
 #include <sha2/sha2_impl.h>
+#define	_RSA_FIPS_POST
+#include <rsa/rsa_impl.h>
 
 int
-fips_rsa_encrypt(uint8_t *modulus, int modulus_len,
-	uint8_t *expo, int expo_len,
-	uint8_t *in, int in_len, uint8_t *out)
+fips_rsa_encrypt(RSAPrivateKey_t *key, uint8_t *in, int in_len, uint8_t *out)
 {
-
-	RSAkey *rsakey;
-	BIGNUM msg;
-	CK_RV rv = CKR_OK;
-
-#ifdef _KERNEL
-	if ((rsakey = kmem_zalloc(sizeof (RSAkey), KM_SLEEP)) == NULL) {
-#else
-	if ((rsakey = calloc(1, sizeof (RSAkey))) == NULL) {
-#endif
-		rv = CKR_HOST_MEMORY;
-		goto clean1;
-	}
-
-	if (RSA_key_init(rsakey, modulus_len * 4, modulus_len * 4) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean2;
-	}
-
-	/* Size for big_init is in (32-bit) words. */
-	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean3;
-	}
-
-	/* Convert octet string exponent to big integer format. */
-	bytestring2bignum(&(rsakey->e), expo, expo_len);
-
-	/* Convert octet string modulus to big integer format. */
-	bytestring2bignum(&(rsakey->n), modulus, modulus_len);
-
-	/* Convert octet string input data to big integer format. */
-	bytestring2bignum(&msg, (uchar_t *)in, in_len);
-
-	if (big_cmp_abs(&msg, &(rsakey->n)) > 0) {
-		rv = CKR_DATA_LEN_RANGE;
-		goto clean4;
-	}
-
-	/* Perform RSA computation on big integer input data. */
-	if (big_modexp(&msg, &msg, &(rsakey->e), &(rsakey->n), NULL) !=
-	    BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean4;
-	}
-
-	/* Convert the big integer output data to octet string. */
-	bignum2bytestring((uchar_t *)out, &msg, modulus_len);
-
-clean4:
-	big_finish(&msg);
-clean3:
-	RSA_key_finish(rsakey);
-clean2:
-#ifndef _KERNEL
-	free(rsakey);
-#else
-	kmem_free(rsakey, sizeof (RSAkey));
-#endif
-clean1:
-
-	return (rv);
+	return (rsa_encrypt(&(key->bkey), in, in_len, out));
 }
 
 int
 fips_rsa_decrypt(RSAPrivateKey_t *key, uint8_t *in, int in_len,
 	uint8_t *out)
 {
-
-	RSAkey *rsakey;
-	BIGNUM msg;
-	CK_RV rv = CKR_OK;
-
-#ifdef _KERNEL
-	if ((rsakey = kmem_zalloc(sizeof (RSAkey), KM_SLEEP)) == NULL) {
-#else
-	if ((rsakey = calloc(1, sizeof (RSAkey))) == NULL) {
-#endif
-		rv = CKR_HOST_MEMORY;
-		goto clean1;
-	}
-
-	/* psize and qsize for RSA_key_init is in bits. */
-	if (RSA_key_init(rsakey, key->prime2_len * 8, key->prime1_len * 8)
-	    != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean2;
-	}
-
-	/* Size for big_init is in (32-bit) words. */
-	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean3;
-	}
-
-	/* Convert octet string input data to big integer format. */
-	bytestring2bignum(&msg, (uchar_t *)in, in_len);
-
-	/* Convert octet string modulus to big integer format. */
-	bytestring2bignum(&(rsakey->n), key->modulus, key->modulus_len);
-
-	if (big_cmp_abs(&msg, &(rsakey->n)) > 0) {
-		rv = CKR_DATA_LEN_RANGE;
-		goto clean4;
-	}
-
-	/* Convert the rest of private key attributes to big integer format. */
-	bytestring2bignum(&(rsakey->dmodpminus1), key->exponent2,
-	    key->exponent2_len);
-	bytestring2bignum(&(rsakey->dmodqminus1), key->exponent1,
-	    key->exponent1_len);
-	bytestring2bignum(&(rsakey->p), key->prime2, key->prime2_len);
-	bytestring2bignum(&(rsakey->q), key->prime1, key->prime1_len);
-	bytestring2bignum(&(rsakey->pinvmodq), key->coef, key->coef_len);
-
-	if ((big_cmp_abs(&(rsakey->dmodpminus1), &(rsakey->p)) > 0) ||
-	    (big_cmp_abs(&(rsakey->dmodqminus1), &(rsakey->q)) > 0) ||
-	    (big_cmp_abs(&(rsakey->pinvmodq), &(rsakey->q)) > 0)) {
-#ifndef _KERNEL
-		rv = CKR_KEY_SIZE_RANGE;
-#else
-		rv = CRYPTO_KEY_SIZE_RANGE;
-#endif
-		goto clean4;
-	}
-
-	/* Perform RSA computation on big integer input data. */
-	if (big_modexp_crt(&msg, &msg, &(rsakey->dmodpminus1),
-	    &(rsakey->dmodqminus1), &(rsakey->p), &(rsakey->q),
-	    &(rsakey->pinvmodq), NULL, NULL) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean4;
-	}
-
-	/* Convert the big integer output data to octet string. */
-	bignum2bytestring((uchar_t *)out, &msg, key->modulus_len);
-
-clean4:
-	big_finish(&msg);
-clean3:
-	RSA_key_finish(rsakey);
-clean2:
-#ifndef _KERNEL
-	free(rsakey);
-#else
-	kmem_free(rsakey, sizeof (RSAkey));
-#endif
-clean1:
-
-	return (rv);
-
-}
-
-int
-fips_rsa_sign(RSAPrivateKey_t *rsa_params, uint8_t *in,
-	uint32_t inlen, uint8_t *out)
-{
-	BIGNUM msg;
-	RSAkey rsakey;
-	CK_RV rv = CKR_OK;
-
-	/* psize and qsize for RSA_key_init is in bits. */
-	if (RSA_key_init(&rsakey, rsa_params->prime2_len * 8,
-	    rsa_params->prime1_len * 8) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean1;
-	}
-
-	/* Size for big_init is in BIG_CHUNK_TYPE words. */
-	if (big_init(&msg, CHARLEN2BIGNUMLEN(inlen)) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean2;
-	}
-
-	/* Convert octet string input data to big integer format. */
-	bytestring2bignum(&msg, (uchar_t *)in, inlen);
-
-	/* Convert octet string modulus to big integer format. */
-	bytestring2bignum(&(rsakey.n), rsa_params->modulus,
-	    rsa_params->modulus_len);
-
-	if (big_cmp_abs(&msg, &(rsakey.n)) > 0) {
-		rv = CKR_DATA_LEN_RANGE;
-		goto clean3;
-	}
-
-	/* Convert the rest of private key attributes to big integer format. */
-	bytestring2bignum(&(rsakey.dmodpminus1), rsa_params->exponent2,
-	    rsa_params->exponent2_len);
-	bytestring2bignum(&(rsakey.dmodqminus1), rsa_params->exponent1,
-	    rsa_params->exponent1_len);
-	bytestring2bignum(&(rsakey.p), rsa_params->prime2,
-	    rsa_params->prime2_len);
-	bytestring2bignum(&(rsakey.q), rsa_params->prime1,
-	    rsa_params->prime1_len);
-	bytestring2bignum(&(rsakey.pinvmodq), rsa_params->coef,
-	    rsa_params->coef_len);
-
-	if ((big_cmp_abs(&(rsakey.dmodpminus1), &(rsakey.p)) > 0) ||
-	    (big_cmp_abs(&(rsakey.dmodqminus1), &(rsakey.q)) > 0) ||
-	    (big_cmp_abs(&(rsakey.pinvmodq), &(rsakey.q)) > 0)) {
-#ifndef _KERNEL
-		rv = CKR_KEY_SIZE_RANGE;
-#else
-		rv = CRYPTO_KEY_SIZE_RANGE;
-#endif
-		goto clean3;
-	}
-
-	/* Perform RSA computation on big integer input data. */
-	if (big_modexp_crt(&msg, &msg, &(rsakey.dmodpminus1),
-	    &(rsakey.dmodqminus1), &(rsakey.p), &(rsakey.q),
-	    &(rsakey.pinvmodq), NULL, NULL) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean3;
-	}
-
-	/* Convert the big integer output data to octet string. */
-	bignum2bytestring((uchar_t *)out, &msg, rsa_params->modulus_len);
-
-clean3:
-	big_finish(&msg);
-clean2:
-	RSA_key_finish(&rsakey);
-clean1:
-
-	return (rv);
-
-}
-
-int
-fips_rsa_verify(RSAPrivateKey_t *rsa_params, uint8_t *in, uint32_t in_len,
-    uint8_t *out)
-{
-
-	BIGNUM msg;
-	RSAkey rsakey;
-	CK_RV rv = CKR_OK;
-
-	if (RSA_key_init(&rsakey, rsa_params->modulus_len * 4,
-	    rsa_params->modulus_len * 4) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean1;
-	}
-
-	/* Size for big_init is in BIG_CHUNK_TYPE words. */
-	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean2;
-	}
-
-	/* Convert octet string exponent to big integer format. */
-	bytestring2bignum(&(rsakey.e), rsa_params->public_expo,
-	    rsa_params->public_expo_len);
-
-	/* Convert octet string modulus to big integer format. */
-	bytestring2bignum(&(rsakey.n), rsa_params->modulus,
-	    rsa_params->modulus_len);
-
-	/* Convert octet string input data to big integer format. */
-	bytestring2bignum(&msg, (uchar_t *)in, in_len);
-
-	if (big_cmp_abs(&msg, &(rsakey.n)) > 0) {
-		rv = CKR_DATA_LEN_RANGE;
-		goto clean3;
-	}
-
-	/* Perform RSA computation on big integer input data. */
-	if (big_modexp(&msg, &msg, &(rsakey.e), &(rsakey.n), NULL) !=
-	    BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean3;
-	}
-
-	/* Convert the big integer output data to octet string. */
-	bignum2bytestring((uchar_t *)out, &msg, rsa_params->modulus_len);
-
-clean3:
-	big_finish(&msg);
-clean2:
-	RSA_key_finish(&rsakey);
-clean1:
-
-	return (rv);
+	return (rsa_decrypt(&(key->bkey), in, in_len, out));
 }
 
 static CK_RV
@@ -487,17 +212,18 @@ fips_rsa_sign_verify_test(CK_MECHANISM_TYPE mechanism,
 	}
 	}
 
-	modulus_len = rsa_private_key->modulus_len;
+	modulus_len = CRYPTO_BITS2BYTES(rsa_private_key->bkey.modulus_bits);
 
 	if (sign) {
-		rv = soft_sign_rsa_pkcs_encode(der_data, der_data_len,
+		rv = pkcs1_encode(PKCS1_SIGN, der_data, der_data_len,
 		    plain_data, modulus_len);
 
 		if (rv != CKR_OK) {
 			return (CKR_DEVICE_ERROR);
 		}
 
-		rv = fips_rsa_sign(rsa_private_key, plain_data, modulus_len,
+		/* Sign operation uses decryption with private key */
+		rv = fips_rsa_decrypt(rsa_private_key, plain_data, modulus_len,
 			rsa_computed_signature);
 
 		if (rv != CKR_OK) {
@@ -508,7 +234,7 @@ fips_rsa_sign_verify_test(CK_MECHANISM_TYPE mechanism,
 		 * Perform RSA decryption with the signer's RSA public key
 		 * for verification process.
 		 */
-		rv = fips_rsa_verify(rsa_private_key, rsa_computed_signature,
+		rv = fips_rsa_encrypt(rsa_private_key, rsa_computed_signature,
 		    modulus_len, plain_data);
 
 		if (rv == CKR_OK) {
@@ -518,19 +244,15 @@ fips_rsa_sign_verify_test(CK_MECHANISM_TYPE mechanism,
 			 * recovered data, then compare the recovered data with
 			 * the original data.
 			 */
-			int data_len = modulus_len;
+			size_t data_len = modulus_len;
 
-			rv = soft_verify_rsa_pkcs_decode(plain_data, &data_len);
+			rv = pkcs1_decode(PKCS1_VERIFY, plain_data, &data_len);
 			if (rv != CKR_OK) {
 				return (CKR_DEVICE_ERROR);
 			}
 
 			if ((CK_ULONG)data_len != der_data_len) {
-#ifdef _KERNEL
-				return (CRYPTO_SIGNATURE_LEN_RANGE);
-#else
 				return (CKR_SIGNATURE_LEN_RANGE);
-#endif
 			} else if (memcmp(der_data,
 			    &plain_data[modulus_len - data_len],
 			    data_len) != 0) {
@@ -776,16 +498,21 @@ fips_rsa_post(void)
 	CK_RV rv;
 	uint8_t rsa_computed_ciphertext[FIPS_RSA_ENCRYPT_LENGTH];
 	uint8_t rsa_computed_plaintext[FIPS_RSA_DECRYPT_LENGTH];
-	uint8_t  rsa_computed_signature[FIPS_RSA_SIGNATURE_LENGTH];
+	uint8_t rsa_computed_signature[FIPS_RSA_SIGNATURE_LENGTH];
 	CK_BYTE der_data[SHA512_DIGEST_LENGTH + SHA2_DER_PREFIX_Len];
 
 	/*
 	 * RSA Known Answer Encryption Test.
 	 */
+	rsa_private_key.bkey.modulus = rsa_modulus;
+	rsa_private_key.bkey.modulus_bits =
+	    CRYPTO_BYTES2BITS(FIPS_RSA_MODULUS_LENGTH);
+	rsa_private_key.bkey.pubexpo = rsa_public_exponent;
+	rsa_private_key.bkey.pubexpo_bytes = FIPS_RSA_PUBLIC_EXPONENT_LENGTH;
+	rsa_private_key.bkey.rfunc = NULL;
 
 	/* Perform RSA Public Key Encryption. */
-	rv = fips_rsa_encrypt(rsa_modulus, FIPS_RSA_MODULUS_LENGTH,
-	    rsa_public_exponent, FIPS_RSA_PUBLIC_EXPONENT_LENGTH,
+	rv = fips_rsa_encrypt(&rsa_private_key,
 	    rsa_known_plaintext_msg, FIPS_RSA_MESSAGE_LENGTH,
 	    rsa_computed_ciphertext);
 
@@ -799,22 +526,23 @@ fips_rsa_post(void)
 	 */
 	rsa_private_key.version = rsa_version;
 	rsa_private_key.version_len = FIPS_RSA_PRIVATE_VERSION_LENGTH;
-	rsa_private_key.modulus = rsa_modulus;
-	rsa_private_key.modulus_len = FIPS_RSA_MODULUS_LENGTH;
-	rsa_private_key.public_expo = rsa_public_exponent;
-	rsa_private_key.public_expo_len = FIPS_RSA_PUBLIC_EXPONENT_LENGTH;
-	rsa_private_key.private_expo = rsa_private_exponent;
-	rsa_private_key.private_expo_len = FIPS_RSA_PRIVATE_EXPONENT_LENGTH;
-	rsa_private_key.prime1 = rsa_prime0;
-	rsa_private_key.prime1_len = FIPS_RSA_PRIME0_LENGTH;
-	rsa_private_key.prime2 = rsa_prime1;
-	rsa_private_key.prime2_len = FIPS_RSA_PRIME1_LENGTH;
-	rsa_private_key.exponent1 = rsa_exponent0;
-	rsa_private_key.exponent1_len = FIPS_RSA_EXPONENT0_LENGTH;
-	rsa_private_key.exponent2 = rsa_exponent1;
-	rsa_private_key.exponent2_len = FIPS_RSA_EXPONENT1_LENGTH;
-	rsa_private_key.coef = rsa_coefficient;
-	rsa_private_key.coef_len = FIPS_RSA_COEFFICIENT_LENGTH;
+	rsa_private_key.bkey.modulus = rsa_modulus;
+	rsa_private_key.bkey.modulus_bits =
+	    CRYPTO_BYTES2BITS(FIPS_RSA_MODULUS_LENGTH);
+	rsa_private_key.bkey.pubexpo = rsa_public_exponent;
+	rsa_private_key.bkey.pubexpo_bytes = FIPS_RSA_PUBLIC_EXPONENT_LENGTH;
+	rsa_private_key.bkey.privexpo = rsa_private_exponent;
+	rsa_private_key.bkey.privexpo_bytes = FIPS_RSA_PRIVATE_EXPONENT_LENGTH;
+	rsa_private_key.bkey.prime1 = rsa_prime0;
+	rsa_private_key.bkey.prime1_bytes = FIPS_RSA_PRIME0_LENGTH;
+	rsa_private_key.bkey.prime2 = rsa_prime1;
+	rsa_private_key.bkey.prime2_bytes = FIPS_RSA_PRIME1_LENGTH;
+	rsa_private_key.bkey.expo1 = rsa_exponent0;
+	rsa_private_key.bkey.expo1_bytes = FIPS_RSA_EXPONENT0_LENGTH;
+	rsa_private_key.bkey.expo2 = rsa_exponent1;
+	rsa_private_key.bkey.expo2_bytes = FIPS_RSA_EXPONENT1_LENGTH;
+	rsa_private_key.bkey.coeff = rsa_coefficient;
+	rsa_private_key.bkey.coeff_bytes = FIPS_RSA_COEFFICIENT_LENGTH;
 
 	/* Perform RSA Private Key Decryption. */
 	rv = fips_rsa_decrypt(&rsa_private_key, rsa_known_ciphertext,

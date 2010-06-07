@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <pthread.h>
@@ -1492,4 +1492,15 @@ cleanup:
 	delete_all_objs_in_list(mod_objs_list);
 	delete_all_objs_in_list(added_objs_list);
 	return (rv);
+}
+
+CK_RV
+dup_bigint_attr(biginteger_t *bi, CK_BYTE *buf, CK_ULONG buflen)
+{
+	bi->big_value_len = buflen;
+	if ((bi->big_value = malloc(buflen)) == NULL) {
+		return (CKR_HOST_MEMORY);
+	}
+	(void) memcpy(bi->big_value, buf, buflen);
+	return (CKR_OK);
 }

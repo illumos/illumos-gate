@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -29,15 +29,17 @@
  */
 
 #include <sys/types.h>
-#include "rsa_impl.h"
+#include <bignum.h>
 
 #ifdef _KERNEL
 #include <sys/param.h>
 #else
 #include <strings.h>
 #include <cryptoutil.h>
-#include "softRandom.h"
 #endif
+
+#include <sys/crypto/common.h>
+#include "rsa_impl.h"
 
 /*
  * DER encoding T of the DigestInfo values for MD5, SHA1, and SHA2
@@ -77,8 +79,32 @@ const CK_BYTE SHA512_DER_PREFIX[SHA2_DER_PREFIX_Len] = {0x30, 0x51, 0x30, 0x0d,
 
 const CK_BYTE DEFAULT_PUB_EXPO[DEFAULT_PUB_EXPO_Len] = { 0x01, 0x00, 0x01 };
 
+
+static CK_RV
+convert_rv(BIG_ERR_CODE err)
+{
+	switch (err) {
+
+	case BIG_OK:
+		return (CKR_OK);
+
+	case BIG_NO_MEM:
+		return (CKR_HOST_MEMORY);
+
+	case BIG_NO_RANDOM:
+		return (CKR_DEVICE_ERROR);
+
+	case BIG_INVALID_ARGS:
+		return (CKR_ARGUMENTS_BAD);
+
+	case BIG_DIV_BY_0:
+	default:
+		return (CKR_GENERAL_ERROR);
+	}
+}
+
 /* psize and qsize are in bits */
-BIG_ERR_CODE
+static BIG_ERR_CODE
 RSA_key_init(RSAkey *key, int psize, int qsize)
 {
 	BIG_ERR_CODE err = BIG_OK;
@@ -142,8 +168,7 @@ ret1:
 	return (err);
 }
 
-
-void
+static void
 RSA_key_finish(RSAkey *key)
 {
 
@@ -165,162 +190,472 @@ RSA_key_finish(RSAkey *key)
 
 }
 
-
 /*
- * To create a block type "02" encryption block for RSA PKCS encryption
- * process.
- *
- * The RSA PKCS Padding before encryption is in the following format:
- * +------+--------------------+----+-----------------------------+
- * |0x0002| 8 bytes or more RN |0x00|       DATA                  |
- * +------+--------------------+----+-----------------------------+
- *
+ * Generate RSA key
  */
-CK_RV
-soft_encrypt_rsa_pkcs_encode(uint8_t *databuf,
-    size_t datalen, uint8_t *padbuf, size_t padbuflen)
+static CK_RV
+generate_rsa_key(RSAkey *key, int psize, int qsize, BIGNUM *pubexp,
+    int (*rfunc)(void *, size_t))
 {
+	CK_RV		rv = CKR_OK;
 
 /* EXPORT DELETE START */
 
-	size_t	padlen;
-	CK_RV	rv;
+	int		(*rf)(void *, size_t);
+	BIGNUM		a, b, c, d, e, f, g, h;
+	int		len, keylen, size;
+	BIG_ERR_CODE	brv = BIG_OK;
 
-	padlen = padbuflen - datalen;
-	if (padlen < MIN_PKCS1_PADLEN) {
-		return (CKR_DATA_LEN_RANGE);
+	size = psize + qsize;
+	keylen = BITLEN2BIGNUMLEN(size);
+	len = keylen * 2 + 1;
+	key->size = size;
+
+	/*
+	 * Note: It is not really necessary to compute e, it is in pubexp:
+	 * 	(void) big_copy(&(key->e), pubexp);
+	 */
+
+	a.malloced = 0;
+	b.malloced = 0;
+	c.malloced = 0;
+	d.malloced = 0;
+	e.malloced = 0;
+	f.malloced = 0;
+	g.malloced = 0;
+	h.malloced = 0;
+
+	if ((big_init(&a, len) != BIG_OK) ||
+	    (big_init(&b, len) != BIG_OK) ||
+	    (big_init(&c, len) != BIG_OK) ||
+	    (big_init(&d, len) != BIG_OK) ||
+	    (big_init(&e, len) != BIG_OK) ||
+	    (big_init(&f, len) != BIG_OK) ||
+	    (big_init(&g, len) != BIG_OK) ||
+	    (big_init(&h, len) != BIG_OK)) {
+		big_finish(&h);
+		big_finish(&g);
+		big_finish(&f);
+		big_finish(&e);
+		big_finish(&d);
+		big_finish(&c);
+		big_finish(&b);
+		big_finish(&a);
+
+		return (CKR_HOST_MEMORY);
 	}
 
-	/* Pad with 0x0002+non-zero pseudorandom numbers+0x00. */
-	padbuf[0] = 0x00;
-	padbuf[1] = 0x02;
+	rf = rfunc;
+	if (rf == NULL) {
 #ifdef _KERNEL
-	rv = knzero_random_generator(padbuf + 2, padbuflen - 3);
+		rf = (int (*)(void *, size_t))random_get_pseudo_bytes;
 #else
-	rv = CKR_OK;
-	if (pkcs11_get_nzero_urandom(padbuf + 2, padbuflen - 3) < 0)
-		rv = CKR_DEVICE_ERROR;
+		rf = pkcs11_get_urandom;
 #endif
-	if (rv != CKR_OK) {
-		return (rv);
-	}
-	padbuf[padlen - 1] = 0x00;
-
-	bcopy(databuf, padbuf + padlen, datalen);
-
-/* EXPORT DELETE END */
-
-	return (CKR_OK);
-}
-
-
-/*
- * The RSA PKCS Padding after decryption is in the following format:
- * +------+--------------------+----+-----------------------------+
- * |0x0002| 8 bytes or more RN |0x00|       DATA                  |
- * +------+--------------------+----+-----------------------------+
- *
- * 'padbuf' points to the recovered message which is the modulus
- * length. As a result, 'plen' is changed to hold the actual data length.
- */
-CK_RV
-soft_decrypt_rsa_pkcs_decode(uint8_t *padbuf, int *plen)
-{
-
-/* EXPORT DELETE START */
-
-	int	i;
-
-	/* Check to see if the recovered data is padded is 0x0002. */
-	if (padbuf[0] != 0x00 || padbuf[1] != 0x02) {
-		return (CKR_ENCRYPTED_DATA_INVALID);
 	}
 
-	/* Remove all the random bits up to 0x00 (= NULL char) */
-	for (i = 2; (*plen - i) > 0; i++) {
-		if (padbuf[i] == 0x00) {
-			i++;
-			if (i < MIN_PKCS1_PADLEN) {
-				return (CKR_ENCRYPTED_DATA_INVALID);
-			}
-			*plen -= i;
+nextp:
+	if ((brv = big_random(&a, psize, rf)) != BIG_OK) {
+		goto ret;
+	}
 
-			return (CKR_OK);
+	if ((brv = big_nextprime_pos(&b, &a)) != BIG_OK) {
+		goto ret;
+	}
+	/* b now contains the potential prime p */
+
+	(void) big_sub_pos(&a, &b, &big_One);
+	if ((brv = big_ext_gcd_pos(&f, &d, &g, pubexp, &a)) != BIG_OK) {
+		goto ret;
+	}
+	if (big_cmp_abs(&f, &big_One) != 0) {
+		goto nextp;
+	}
+
+	if ((brv = big_random(&c, qsize, rf)) != BIG_OK) {
+		goto ret;
+	}
+
+nextq:
+	(void) big_add(&a, &c, &big_Two);
+
+	if (big_bitlength(&a) != qsize) {
+		goto nextp;
+	}
+	if (big_cmp_abs(&a, &b) == 0) {
+		goto nextp;
+	}
+	if ((brv = big_nextprime_pos(&c, &a)) != BIG_OK) {
+		goto ret;
+	}
+	/* c now contains the potential prime q */
+
+	if ((brv = big_mul(&g, &b, &c)) != BIG_OK) {
+		goto ret;
+	}
+	if (big_bitlength(&g) != size) {
+		goto nextp;
+	}
+	/* g now contains the potential modulus n */
+
+	(void) big_sub_pos(&a, &b, &big_One);
+	(void) big_sub_pos(&d, &c, &big_One);
+
+	if ((brv = big_mul(&a, &a, &d)) != BIG_OK) {
+		goto ret;
+	}
+	if ((brv = big_ext_gcd_pos(&f, &d, &h, pubexp, &a)) != BIG_OK) {
+		goto ret;
+	}
+	if (big_cmp_abs(&f, &big_One) != 0) {
+		goto nextq;
+	} else {
+		(void) big_copy(&e, pubexp);
+	}
+	if (d.sign == -1) {
+		if ((brv = big_add(&d, &d, &a)) != BIG_OK) {
+			goto ret;
 		}
 	}
+	(void) big_copy(&(key->p), &b);
+	(void) big_copy(&(key->q), &c);
+	(void) big_copy(&(key->n), &g);
+	(void) big_copy(&(key->d), &d);
+	(void) big_copy(&(key->e), &e);
+
+	if ((brv = big_ext_gcd_pos(&a, &f, &h, &b, &c)) != BIG_OK) {
+		goto ret;
+	}
+	if (f.sign == -1) {
+		if ((brv = big_add(&f, &f, &c)) != BIG_OK) {
+			goto ret;
+		}
+	}
+	(void) big_copy(&(key->pinvmodq), &f);
+
+	(void) big_sub(&a, &b, &big_One);
+	if ((brv = big_div_pos(&a, &f, &d, &a)) != BIG_OK) {
+		goto ret;
+	}
+	(void) big_copy(&(key->dmodpminus1), &f);
+	(void) big_sub(&a, &c, &big_One);
+	if ((brv = big_div_pos(&a, &f, &d, &a)) != BIG_OK) {
+		goto ret;
+	}
+	(void) big_copy(&(key->dmodqminus1), &f);
+
+	/* pairwise consistency check:  decrypt and encrypt restores value */
+	if ((brv = big_random(&h, size, rf)) != BIG_OK) {
+		goto ret;
+	}
+	if ((brv = big_div_pos(&a, &h, &h, &g)) != BIG_OK) {
+		goto ret;
+	}
+	if ((brv = big_modexp(&a, &h, &d, &g, NULL)) != BIG_OK) {
+		goto ret;
+	}
+
+	if ((brv = big_modexp(&b, &a, &e, &g, NULL)) != BIG_OK) {
+		goto ret;
+	}
+
+	if (big_cmp_abs(&b, &h) != 0) {
+		/* this should not happen */
+		rv = generate_rsa_key(key, psize, qsize, pubexp, rf);
+		goto ret1;
+	} else {
+		brv = BIG_OK;
+	}
+
+ret:
+	rv = convert_rv(brv);
+ret1:
+	big_finish(&h);
+	big_finish(&g);
+	big_finish(&f);
+	big_finish(&e);
+	big_finish(&d);
+	big_finish(&c);
+	big_finish(&b);
+	big_finish(&a);
 
 /* EXPORT DELETE END */
 
-	return (CKR_ENCRYPTED_DATA_INVALID);
+	return (rv);
+}
+
+CK_RV
+rsa_genkey_pair(RSAbytekey *bkey)
+{
+	/*
+	 * NOTE:  Whomever originally wrote this function swapped p and q.
+	 * This table shows the mapping between name convention used here
+	 * versus what is used in most texts that describe RSA key generation.
+	 *	This function:			Standard convention:
+	 *	--------------			--------------------
+	 *	modulus, n			-same-
+	 *	prime 1, q			prime 1, p
+	 *	prime 2, p			prime 2, q
+	 *	private exponent, d		-same-
+	 *	public exponent, e		-same-
+	 *	exponent 1, d mod (q-1)		d mod (p-1)
+	 *	exponent 2, d mod (p-1)		d mod (q-1)
+	 *	coefficient, p^-1 mod q		q^-1 mod p
+	 *
+	 * Also notice the struct member for coefficient is named .pinvmodq
+	 * rather than .qinvmodp, reflecting the switch.
+	 *
+	 * The code here wasn't unswapped, because "it works".  Further,
+	 * p and q are interchangeable as long as exponent 1 and 2 and
+	 * the coefficient are kept straight too.  This note is here to
+	 * make the reader aware of the switcheroo.
+	 */
+	CK_RV	rv = CKR_OK;
+
+/* EXPORT DELETE START */
+
+	BIGNUM	public_exponent = {0};
+	RSAkey	rsakey;
+	uint32_t modulus_bytes;
+
+	if (bkey == NULL)
+		return (CKR_ARGUMENTS_BAD);
+
+	/* Must have modulus bits set */
+	if (bkey->modulus_bits == 0)
+		return (CKR_ARGUMENTS_BAD);
+
+	/* Must have public exponent set */
+	if (bkey->pubexpo_bytes == 0 || bkey->pubexpo == NULL)
+		return (CKR_ARGUMENTS_BAD);
+
+	/* Note: modulus_bits may not be same as (8 * sizeof (modulus)) */
+	modulus_bytes = CRYPTO_BITS2BYTES(bkey->modulus_bits);
+
+	/* Modulus length needs to be between min key size and max key size. */
+	if ((modulus_bytes < MIN_RSA_KEYLENGTH_IN_BYTES) ||
+	    (modulus_bytes > MAX_RSA_KEYLENGTH_IN_BYTES)) {
+		return (CKR_KEY_SIZE_RANGE);
+	}
+
+	/*
+	 * Initialize the RSA key.
+	 */
+	if (RSA_key_init(&rsakey, modulus_bytes * 4, modulus_bytes * 4) !=
+	    BIG_OK) {
+		return (CKR_HOST_MEMORY);
+	}
+
+	/* Create a public exponent in bignum format. */
+	if (big_init(&public_exponent,
+	    CHARLEN2BIGNUMLEN(bkey->pubexpo_bytes)) != BIG_OK) {
+		rv = CKR_HOST_MEMORY;
+		goto clean1;
+	}
+	bytestring2bignum(&public_exponent, bkey->pubexpo, bkey->pubexpo_bytes);
+
+	/* Generate RSA key pair. */
+	if ((rv = generate_rsa_key(&rsakey,
+	    modulus_bytes * 4, modulus_bytes * 4, &public_exponent,
+	    bkey->rfunc)) != CKR_OK) {
+		big_finish(&public_exponent);
+		goto clean1;
+	}
+	big_finish(&public_exponent);
+
+	/* modulus_bytes = rsakey.n.len * (int)sizeof (BIG_CHUNK_TYPE); */
+	bignum2bytestring(bkey->modulus, &(rsakey.n), modulus_bytes);
+
+	bkey->privexpo_bytes = rsakey.d.len * (int)sizeof (BIG_CHUNK_TYPE);
+	bignum2bytestring(bkey->privexpo, &(rsakey.d), bkey->privexpo_bytes);
+
+	bkey->pubexpo_bytes = rsakey.e.len * (int)sizeof (BIG_CHUNK_TYPE);
+	bignum2bytestring(bkey->pubexpo, &(rsakey.e), bkey->pubexpo_bytes);
+
+	bkey->prime1_bytes = rsakey.q.len * (int)sizeof (BIG_CHUNK_TYPE);
+	bignum2bytestring(bkey->prime1, &(rsakey.q), bkey->prime1_bytes);
+
+	bkey->prime2_bytes = rsakey.p.len * (int)sizeof (BIG_CHUNK_TYPE);
+	bignum2bytestring(bkey->prime2, &(rsakey.p), bkey->prime2_bytes);
+
+	bkey->expo1_bytes =
+	    rsakey.dmodqminus1.len * (int)sizeof (BIG_CHUNK_TYPE);
+	bignum2bytestring(bkey->expo1, &(rsakey.dmodqminus1),
+	    bkey->expo1_bytes);
+
+	bkey->expo2_bytes =
+	    rsakey.dmodpminus1.len * (int)sizeof (BIG_CHUNK_TYPE);
+	bignum2bytestring(bkey->expo2,
+	    &(rsakey.dmodpminus1), bkey->expo2_bytes);
+
+	bkey->coeff_bytes =
+	    rsakey.pinvmodq.len * (int)sizeof (BIG_CHUNK_TYPE);
+	bignum2bytestring(bkey->coeff, &(rsakey.pinvmodq), bkey->coeff_bytes);
+
+clean1:
+	RSA_key_finish(&rsakey);
+
+/* EXPORT DELETE END */
+
+	return (rv);
 }
 
 /*
- * To create a block type "01" block for RSA PKCS signature process.
- *
- * The RSA PKCS Padding before Signing is in the following format:
- * +------+--------------+----+-----------------------------+
- * |0x0001| 0xFFFF.......|0x00|          DATA               |
- * +------+--------------+----+-----------------------------+
+ * RSA encrypt operation
  */
 CK_RV
-soft_sign_rsa_pkcs_encode(uint8_t *pData, size_t dataLen, uint8_t *data,
-    size_t mbit_l)
+rsa_encrypt(RSAbytekey *bkey, uchar_t *in, uint32_t in_len, uchar_t *out)
 {
+	CK_RV rv = CKR_OK;
 
 /* EXPORT DELETE START */
 
-	size_t	padlen;
+	BIGNUM msg;
+	RSAkey rsakey;
+	uint32_t modulus_bytes;
 
-	padlen = mbit_l - dataLen;
-	if (padlen < MIN_PKCS1_PADLEN) {
-		return (CKR_DATA_LEN_RANGE);
+	if (bkey == NULL)
+		return (CKR_ARGUMENTS_BAD);
+
+	/* Must have modulus and public exponent set */
+	if (bkey->modulus_bits == 0 || bkey->modulus == NULL ||
+	    bkey->pubexpo_bytes == 0 || bkey->pubexpo == NULL)
+		return (CKR_ARGUMENTS_BAD);
+
+	/* Note: modulus_bits may not be same as (8 * sizeof (modulus)) */
+	modulus_bytes = CRYPTO_BITS2BYTES(bkey->modulus_bits);
+
+	if (bkey->pubexpo_bytes > modulus_bytes) {
+		return (CKR_KEY_SIZE_RANGE);
 	}
 
-	padlen -= 3;
-	data[0] = 0x00;
-	data[1] = 0x01;
-#ifdef _KERNEL
-	kmemset(data + 2, 0xFF, padlen);
-#else
-	(void) memset(data + 2, 0xFF, padlen);
-#endif
-	data[padlen + 2] = 0x00;
-	bcopy(pData, data + padlen + 3, dataLen);
+	/* psize and qsize for RSA_key_init is in bits. */
+	if (RSA_key_init(&rsakey, modulus_bytes * 4, modulus_bytes * 4) !=
+	    BIG_OK) {
+		return (CKR_HOST_MEMORY);
+	}
+
+	/* Size for big_init is in BIG_CHUNK_TYPE words. */
+	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
+		rv = CKR_HOST_MEMORY;
+		goto clean2;
+	}
+	bytestring2bignum(&msg, in, in_len);
+
+	/* Convert public exponent and modulus to big integer format. */
+	bytestring2bignum(&(rsakey.e), bkey->pubexpo, bkey->pubexpo_bytes);
+	bytestring2bignum(&(rsakey.n), bkey->modulus, modulus_bytes);
+
+	if (big_cmp_abs(&msg, &(rsakey.n)) > 0) {
+		rv = CKR_DATA_LEN_RANGE;
+		goto clean3;
+	}
+
+	/* Perform RSA computation on big integer input data. */
+	if (big_modexp(&msg, &msg, &(rsakey.e), &(rsakey.n), NULL) !=
+	    BIG_OK) {
+		rv = CKR_HOST_MEMORY;
+		goto clean3;
+	}
+
+	/* Convert the big integer output data to octet string. */
+	bignum2bytestring(out, &msg, modulus_bytes);
+
+clean3:
+	big_finish(&msg);
+clean2:
+	RSA_key_finish(&rsakey);
 
 /* EXPORT DELETE END */
 
-	return (CKR_OK);
+	return (rv);
 }
 
-
+/*
+ * RSA decrypt operation
+ */
 CK_RV
-soft_verify_rsa_pkcs_decode(uint8_t *data, int *mbit_l)
+rsa_decrypt(RSAbytekey *bkey, uchar_t *in, uint32_t in_len, uchar_t *out)
 {
+	CK_RV rv = CKR_OK;
 
 /* EXPORT DELETE START */
 
-	int i;
+	BIGNUM msg;
+	RSAkey rsakey;
+	uint32_t modulus_bytes;
 
-	/* Check to see if the padding of recovered data starts with 0x0001. */
-	if ((data[0] != 0x00) || (data[1] != 0x01)) {
-		return (CKR_SIGNATURE_INVALID);
-	}
-	/* Check to see if the recovered data is padded with 0xFFF...00. */
-	for (i = 2; i < *mbit_l; i++) {
-		if (data[i] == 0x00) {
-			i++;
-			if (i < MIN_PKCS1_PADLEN) {
-				return (CKR_SIGNATURE_INVALID);
-			}
-			*mbit_l -= i;
+	if (bkey == NULL)
+		return (CKR_ARGUMENTS_BAD);
 
-			return (CKR_OK);
-		} else if (data[i] != 0xFF) {
-			return (CKR_SIGNATURE_INVALID);
-		}
+	/* Must have modulus, prime1, prime2, expo1, expo2, and coeff set */
+	if (bkey->modulus_bits == 0 || bkey->modulus == NULL ||
+	    bkey->prime1_bytes == 0 || bkey->prime1 == NULL ||
+	    bkey->prime2_bytes == 0 || bkey->prime2 == NULL ||
+	    bkey->expo1_bytes == 0 || bkey->expo1 == NULL ||
+	    bkey->expo2_bytes == 0 || bkey->expo2 == NULL ||
+	    bkey->coeff_bytes == 0 || bkey->coeff == NULL)
+		return (CKR_ARGUMENTS_BAD);
+
+	/* Note: modulus_bits may not be same as (8 * sizeof (modulus)) */
+	modulus_bytes = CRYPTO_BITS2BYTES(bkey->modulus_bits);
+
+	/* psize and qsize for RSA_key_init is in bits. */
+	if (RSA_key_init(&rsakey, CRYPTO_BYTES2BITS(bkey->prime2_bytes),
+	    CRYPTO_BYTES2BITS(bkey->prime1_bytes)) != BIG_OK) {
+		return (CKR_HOST_MEMORY);
 	}
+
+	/* Size for big_init is in BIG_CHUNK_TYPE words. */
+	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
+		rv = CKR_HOST_MEMORY;
+		goto clean3;
+	}
+	/* Convert octet string input data to big integer format. */
+	bytestring2bignum(&msg, in, in_len);
+
+	/* Convert octet string modulus to big integer format. */
+	bytestring2bignum(&(rsakey.n), bkey->modulus, modulus_bytes);
+
+	if (big_cmp_abs(&msg, &(rsakey.n)) > 0) {
+		rv = CKR_DATA_LEN_RANGE;
+		goto clean4;
+	}
+
+	/* Convert the rest of private key attributes to big integer format. */
+	bytestring2bignum(&(rsakey.q), bkey->prime1, bkey->prime1_bytes);
+	bytestring2bignum(&(rsakey.p), bkey->prime2, bkey->prime2_bytes);
+	bytestring2bignum(&(rsakey.dmodqminus1),
+	    bkey->expo1, bkey->expo1_bytes);
+	bytestring2bignum(&(rsakey.dmodpminus1),
+	    bkey->expo2, bkey->expo2_bytes);
+	bytestring2bignum(&(rsakey.pinvmodq),
+	    bkey->coeff, bkey->coeff_bytes);
+
+	if ((big_cmp_abs(&(rsakey.dmodpminus1), &(rsakey.p)) > 0) ||
+	    (big_cmp_abs(&(rsakey.dmodqminus1), &(rsakey.q)) > 0) ||
+	    (big_cmp_abs(&(rsakey.pinvmodq), &(rsakey.q)) > 0)) {
+		rv = CKR_KEY_SIZE_RANGE;
+		goto clean4;
+	}
+
+	/* Perform RSA computation on big integer input data. */
+	if (big_modexp_crt(&msg, &msg, &(rsakey.dmodpminus1),
+	    &(rsakey.dmodqminus1), &(rsakey.p), &(rsakey.q),
+	    &(rsakey.pinvmodq), NULL, NULL) != BIG_OK) {
+		rv = CKR_HOST_MEMORY;
+		goto clean4;
+	}
+
+	/* Convert the big integer output data to octet string. */
+	bignum2bytestring(out, &msg, modulus_bytes);
+
+clean4:
+	big_finish(&msg);
+clean3:
+	RSA_key_finish(&rsakey);
 
 /* EXPORT DELETE END */
 
-	return (CKR_SIGNATURE_INVALID);
+	return (rv);
 }

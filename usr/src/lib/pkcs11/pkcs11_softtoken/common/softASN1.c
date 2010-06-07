@@ -18,39 +18,37 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <lber.h>
 #include <security/cryptoki.h>
-#include <rsa_impl.h>
 #include "softDSA.h"
 #include "softDH.h"
+#include "softRSA.h"
 #include "softObject.h"
 #include "softASN1.h"
 
 #define	OID_TAG			0x06
 
-#define	MAX_DH_KEY	(MAX_DH_KEYLENGTH >> 3)	/* bytes in a DH key */
+#define	MAX_DH_KEY	MAX_DH_KEYLENGTH_IN_BYTES	/* bytes in DH key */
 static uchar_t	DH_OID[] = {
 	/* DH key agreement OID:  1 . 2 . 840 . 113549 . 1 . 3 . 1 */
 	0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x03, 0x01
 };
 
-#define	MAX_DH942_KEY	(MAX_DH_KEYLENGTH >> 3)	/* bytes in a DH X9.42 key */
+#define	MAX_DH942_KEY	MAX_DH_KEYLENGTH_IN_BYTES /* bytes in DH X9.42 key */
 static uchar_t	DH942_OID[] = {
 	/* DH X9.42 OID:  1 . 2 . 840 . 10046 . 1  */
 	0x2A, 0x86, 0x48, 0xCE, 0x3E, 0x01
 };
 
-#define	MAX_DSA_KEY	MAX_DSA_KEY_LEN 	/* bytes in a DSA key */
+#define	MAX_DSA_KEY	MAX_DSA_KEY_LEN 	/* bytes in DSA key */
 static uchar_t	DSA_OID[] = {
 	/* DSA algorithm OID:  1 . 2 . 840 . 10040 . 4 . 1  */
 	0x2A, 0x86, 0x48, 0xCE, 0x38, 0x04, 0x01
@@ -100,7 +98,7 @@ pad_bigint_attr(biginteger_t *src, biginteger_t *dst)
 	/* Set zero-pad at first byte, then append actual big_value. */
 	dst->big_value[0] = 0x0;
 	(void) memcpy(&(dst->big_value[padding]), src->big_value,
-		src->big_value_len);
+	    src->big_value_len);
 	return (CKR_OK);
 }
 
@@ -268,7 +266,7 @@ rsa_pri_to_asn1(soft_object_t *objp, uchar_t *buf, ulong_t *buf_len)
 		goto cleanup_rsapri2asn;
 	}
 
-	/* ... coeffient } end-sequence */
+	/* ... coefficient } end-sequence */
 	if ((rv = pad_bigint_attr(OBJ_PRI_RSA_COEF(objp), &tmp_pad)) != CKR_OK)
 		goto cleanup_rsapri2asn;
 	else if (ber_printf(key_asn, "to}", LBER_INTEGER,
@@ -534,16 +532,16 @@ cleanup_dsapri2asn:
 	}
 
 	if (key_asn != NULLBER)
-	    ber_free(key_asn, 1);
+		ber_free(key_asn, 1);
 
 	if (key_octs != NULL)
-	    ber_bvfree(key_octs);
+		ber_bvfree(key_octs);
 
 	if (p8obj_asn != NULLBER)
-	    ber_free(p8obj_asn, 1);
+		ber_free(p8obj_asn, 1);
 
 	if (p8obj_octs != NULL)
-	    ber_bvfree(p8obj_octs);
+		ber_bvfree(p8obj_octs);
 
 	return (rv);
 }
@@ -708,16 +706,16 @@ cleanup_dhpri2asn:
 	}
 
 	if (key_asn != NULLBER)
-	    ber_free(key_asn, 1);
+		ber_free(key_asn, 1);
 
 	if (key_octs != NULL)
-	    ber_bvfree(key_octs);
+		ber_bvfree(key_octs);
 
 	if (p8obj_asn != NULLBER)
-	    ber_free(p8obj_asn, 1);
+		ber_free(p8obj_asn, 1);
 
 	if (p8obj_octs != NULL)
-	    ber_bvfree(p8obj_octs);
+		ber_bvfree(p8obj_octs);
 
 	return (rv);
 }
@@ -900,16 +898,16 @@ cleanup_x942dhpri2asn:
 	}
 
 	if (key_asn != NULLBER)
-	    ber_free(key_asn, 1);
+		ber_free(key_asn, 1);
 
 	if (key_octs != NULL)
-	    ber_bvfree(key_octs);
+		ber_bvfree(key_octs);
 
 	if (p8obj_asn != NULLBER)
-	    ber_free(p8obj_asn, 1);
+		ber_free(p8obj_asn, 1);
 
 	if (p8obj_octs != NULL)
-	    ber_bvfree(p8obj_octs);
+		ber_bvfree(p8obj_octs);
 
 	return (rv);
 }

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SOFTOBJECT_H
@@ -921,6 +921,8 @@ CK_RV soft_add_extra_attr(CK_ATTRIBUTE_PTR template, soft_object_t *object_p);
 
 CK_RV get_bigint_attr_from_template(biginteger_t *big,
 	CK_ATTRIBUTE_PTR template);
+
+CK_RV dup_bigint_attr(biginteger_t *bi, CK_BYTE *buf, CK_ULONG buflen);
 
 #ifdef	__cplusplus
 }

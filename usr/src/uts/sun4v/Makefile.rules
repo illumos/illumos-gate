@@ -20,8 +20,9 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 #	This Makefile defines the build rules for the directory uts/sun4v
 #	and its children. These are the source files which sun4v
@@ -268,4 +269,7 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/mdesc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/arcfour/sun4v/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

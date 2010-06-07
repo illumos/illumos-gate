@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _RSA_IMPL_H
@@ -38,8 +38,6 @@ extern "C" {
 #define	RSA_MIN_KEY_LEN	256	/* RSA min key length in bits */
 #define	RSA_MAX_KEY_LEN	4096	/* RSA max key length in bits */
 
-#define	MIN_PKCS1_PADLEN	11
-
 #ifdef _KERNEL
 
 #include <sys/sunddi.h>
@@ -48,12 +46,17 @@ extern "C" {
 #define	CK_BYTE			uchar_t
 #define	CK_ULONG		ulong_t
 #define	CK_RV			int
+
 #define	CKR_OK			CRYPTO_SUCCESS
-#define	CKR_HOST_MEMORY		CRYPTO_HOST_MEMORY
+#define	CKR_ARGUMENTS_BAD	CRYPTO_ARGUMENTS_BAD
 #define	CKR_DATA_LEN_RANGE	CRYPTO_DATA_LEN_RANGE
-#define	CKR_ENCRYPTED_DATA_INVALID	CRYPTO_ENCRYPTED_DATA_INVALID
-#define	CKR_SIGNATURE_INVALID	CRYPTO_SIGNATURE_INVALID
-#define	CKR_FUNCTION_FAILED	CRYPTO_NOT_SUPPORTED
+#define	CKR_DEVICE_ERROR	CRYPTO_DEVICE_ERROR
+#define	CKR_GENERAL_ERROR	CRYPTO_GENERAL_ERROR
+#define	CKR_HOST_MEMORY		CRYPTO_HOST_MEMORY
+#define	CKR_KEY_SIZE_RANGE	CRYPTO_KEY_SIZE_RANGE
+
+int random_get_bytes(uint8_t *ran_out, size_t ran_len);
+int random_get_pseudo_bytes(uint8_t *ran_out, size_t ran_len);
 
 #else
 
@@ -76,6 +79,8 @@ extern const CK_BYTE SHA384_DER_PREFIX[SHA2_DER_PREFIX_Len];
 extern const CK_BYTE SHA512_DER_PREFIX[SHA2_DER_PREFIX_Len];
 extern const CK_BYTE DEFAULT_PUB_EXPO[DEFAULT_PUB_EXPO_Len];
 
+
+/* RSA key using BIGNUM representations */
 typedef struct {
 	int 	size;		/* key size in bits */
 	BIGNUM	p;		/* p */
@@ -83,29 +88,46 @@ typedef struct {
 	BIGNUM	n;		/* n = p * q (the modulus) */
 	BIGNUM	d;		/* private exponent */
 	BIGNUM	e;		/* public exponent */
-	BIGNUM	dmodpminus1;	/* d mod (p - 1) */
-	BIGNUM	dmodqminus1;	/* d mod (q - 1) */
-	BIGNUM	pinvmodq;	/* p^(-1) mod q */
+	BIGNUM	dmodpminus1;	/* d mod (p - 1) (exponent 1) */
+	BIGNUM	dmodqminus1;	/* d mod (q - 1) (exponent 2) */
+	BIGNUM	pinvmodq;	/* p^(-1) mod q (the coefficient) */
 	BIGNUM	p_rr;		/* 2^(2*(32*p->len)) mod p */
 	BIGNUM	q_rr;		/* 2^(2*(32*q->len)) mod q */
 	BIGNUM	n_rr;		/* 2^(2*(32*n->len)) mod n */
 } RSAkey;
 
-BIG_ERR_CODE RSA_key_init(RSAkey *key, int psize, int qsize);
-void RSA_key_finish(RSAkey *key);
+/* RSA key using byte string representations, useful for parameter lists */
+typedef struct {
+	uint32_t modulus_bits;	/* size */
+	uchar_t	*modulus;	/* n */
+	uint32_t privexpo_bytes;
+	uchar_t	*privexpo;	/* d */
+	uint32_t pubexpo_bytes;
+	uchar_t	*pubexpo;	/* e */
+	uint32_t prime1_bytes;
+	uchar_t	*prime1;	/* p */
+	uint32_t prime2_bytes;
+	uchar_t	*prime2;	/* q */
+	uint32_t expo1_bytes;
+	uchar_t	*expo1;		/* = d mod (p - 1) */
+	uint32_t expo2_bytes;
+	uchar_t	*expo2;		/* = d mod (q - 1) */
+	uint32_t coeff_bytes;	/* = q bytes, .... or = p bytes */
+	uchar_t *coeff;		/* = p^(-1) mod q, or = q^(-1) mod p */
+	int (*rfunc)(void *, size_t);	/* random function */
+} RSAbytekey;
 
-CK_RV soft_encrypt_rsa_pkcs_encode(uint8_t *databuf,
-    size_t datalen, uint8_t *padbuf, size_t padbuflen);
-CK_RV soft_decrypt_rsa_pkcs_decode(uint8_t *padbuf, int *plen);
 
-CK_RV soft_sign_rsa_pkcs_encode(uint8_t *pData, size_t dataLen,
-    uint8_t *data, size_t mbit_l);
-CK_RV soft_verify_rsa_pkcs_decode(uint8_t *data, int *mbit_l);
+CK_RV rsa_genkey_pair(RSAbytekey *bkey);
 
-#ifdef _KERNEL
-int knzero_random_generator(uint8_t *ran_out, size_t ran_len);
-void kmemset(uint8_t *buf, char pattern, size_t len);
-#endif
+CK_RV rsa_encrypt(RSAbytekey *bkey,
+    uchar_t *msg, uint32_t msglen, uchar_t *encrmsg);
+
+CK_RV rsa_decrypt(RSAbytekey *bkey,
+    uchar_t *encrmsg, uint32_t encrmsglen, uchar_t *msg);
+
+#define	rsa_sign(key, msg, len, sig)	rsa_decrypt((key), (msg), (len), (sig))
+#define	rsa_verify(key, msg, len, sig)	rsa_encrypt((key), (msg), (len), (sig))
 
 /*
  * The following definitions and declarations are only used by RSA FIPS POST
@@ -131,34 +153,13 @@ void kmemset(uint8_t *buf, char pattern, size_t len);
 typedef struct RSAPrivateKey_s {
 	uint8_t		*version;
 	int		version_len;
-	uint8_t		*modulus;
-	int		modulus_len;
-	uint8_t		*public_expo;
-	int		public_expo_len;
-	uint8_t		*private_expo;
-	int		private_expo_len;
-	uint8_t		*prime1;
-	int		prime1_len;
-	uint8_t		*prime2;
-	int		prime2_len;
-	uint8_t		*exponent1;
-	int		exponent1_len;
-	uint8_t		*exponent2;
-	int		exponent2_len;
-	uint8_t		*coef;
-	int		coef_len;
+	RSAbytekey	bkey;
 } RSAPrivateKey_t;
 
 /* RSA FIPS functions */
 extern int fips_rsa_post(void);
-extern int fips_rsa_encrypt(uint8_t *, int, uint8_t *,
-	int, uint8_t *, int, uint8_t *);
-extern int fips_rsa_decrypt(RSAPrivateKey_t *, uint8_t *,
-	int, uint8_t *);
-extern int fips_rsa_sign(RSAPrivateKey_t *, uint8_t *,
-	uint32_t, uint8_t *);
-extern int fips_rsa_verify(RSAPrivateKey_t *, uint8_t *, uint32_t,
-	uint8_t *);
+extern int fips_rsa_encrypt(RSAPrivateKey_t *, uint8_t *, int, uint8_t *);
+extern int fips_rsa_decrypt(RSAPrivateKey_t *, uint8_t *, int, uint8_t *);
 
 #endif /* _RSA_FIPS_POST */
 

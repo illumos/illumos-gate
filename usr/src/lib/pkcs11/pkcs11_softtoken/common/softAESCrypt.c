@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <pthread.h>
@@ -726,7 +726,7 @@ do_decryption:
 			 * plaintext.
 			 */
 			rv = soft_remove_pkcs7_padding(last_block,
-			    AES_BLOCK_LEN, &rem_len, AES_BLOCK_LEN);
+			    AES_BLOCK_LEN, &rem_len);
 			if (rv == CKR_OK) {
 				if (rem_len != 0)
 					(void) memcpy(out_buf + out_len,

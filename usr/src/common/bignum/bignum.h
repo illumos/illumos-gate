@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _BIGNUM_H
@@ -63,12 +63,13 @@ extern "C" {
 #define	BIG_CHUNK_HALF_HIGHBIT	0x80000000ULL
 #endif
 
-#define	BITLEN2BIGNUMLEN(x)	(((x) + BIG_CHUNK_SIZE - 1) / BIG_CHUNK_SIZE)
-#define	CHARLEN2BIGNUMLEN(x)	(((x) + sizeof (BIG_CHUNK_TYPE) - 1) / \
-				    sizeof (BIG_CHUNK_TYPE))
+#define	BITLEN2BIGNUMLEN(x)	((x) > 0 ? \
+				((((x) - 1) / BIG_CHUNK_SIZE) + 1) : 0)
+#define	CHARLEN2BIGNUMLEN(x)	((x) > 0 ? \
+				((((x) - 1) / sizeof (BIG_CHUNK_TYPE)) + 1) : 0)
 
 #define	BIGNUM_WORDSIZE	(BIG_CHUNK_SIZE / BITSINBYTE)  /* word size in bytes */
-#define	BIG_CHUNKS_FOR_160BITS	((160 + BIG_CHUNK_SIZE - 1) / BIG_CHUNK_SIZE)
+#define	BIG_CHUNKS_FOR_160BITS	BITLEN2BIGNUMLEN(160)
 
 
 /*
@@ -149,7 +150,7 @@ BIG_ERR_CODE big_modexp_crt_ext(BIGNUM *result, BIGNUM *a, BIGNUM *dmodpminus1,
     BIGNUM *dmodqminus1, BIGNUM *p, BIGNUM *q, BIGNUM *pinvmodq,
     BIGNUM *p_rr, BIGNUM *q_rr, big_modexp_ncp_info_t *info);
 int big_cmp_abs(BIGNUM *a, BIGNUM *b);
-BIG_ERR_CODE randombignum(BIGNUM *r, int length);
+BIG_ERR_CODE big_random(BIGNUM *r, size_t length, int (*rfunc)(void *, size_t));
 BIG_ERR_CODE big_div_pos(BIGNUM *result, BIGNUM *remainder,
     BIGNUM *aa, BIGNUM *bb);
 BIG_ERR_CODE big_ext_gcd_pos(BIGNUM *gcd, BIGNUM *cm, BIGNUM *ce,

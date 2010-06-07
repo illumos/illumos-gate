@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FIPS_POST_H
@@ -37,6 +37,7 @@ extern "C" {
 #define	CK_BYTE				uchar_t
 #define	CK_ULONG			ulong_t
 #define	CK_RV				int
+
 #define	CKR_OK				CRYPTO_SUCCESS
 #define	CKR_HOST_MEMORY			CRYPTO_HOST_MEMORY
 #define	CKR_DEVICE_ERROR		CRYPTO_DEVICE_ERROR
@@ -44,6 +45,7 @@ extern "C" {
 #define	CKR_ENCRYPTED_DATA_LEN_RANGE	CRYPTO_ENCRYPTED_DATA_LEN_RANGE
 #define	CKR_ENCRYPTED_DATA_INVALID	CRYPTO_ENCRYPTED_DATA_INVALID
 #define	CKR_SIGNATURE_INVALID		CRYPTO_SIGNATURE_INVALID
+#define	CKR_SIGNATURE_LEN_RANGE		CRYPTO_SIGNATURE_LEN_RANGE
 #define	CKR_ARGUMENTS_BAD		CRYPTO_ARGUMENTS_BAD
 
 #else

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -43,6 +43,7 @@
 #include <sys/crypto/impl.h>
 #include <sha1/sha1_impl.h>
 #include <sha2/sha2_impl.h>
+#include <padding/padding.h>
 #define	_RSA_FIPS_POST
 #include <rsa/rsa_impl.h>
 
@@ -180,12 +181,12 @@ static crypto_control_ops_t rsa_control_ops = {
 
 static int rsa_common_init(crypto_ctx_t *, crypto_mechanism_t *,
     crypto_key_t *, crypto_spi_ctx_template_t, crypto_req_handle_t);
-static int rsa_encrypt(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
+static int rsaprov_encrypt(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
     crypto_req_handle_t);
 static int rsa_encrypt_atomic(crypto_provider_handle_t, crypto_session_id_t,
     crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
     crypto_data_t *, crypto_spi_ctx_template_t, crypto_req_handle_t);
-static int rsa_decrypt(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
+static int rsaprov_decrypt(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
     crypto_req_handle_t);
 static int rsa_decrypt_atomic(crypto_provider_handle_t, crypto_session_id_t,
     crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
@@ -197,12 +198,12 @@ static int rsa_decrypt_atomic(crypto_provider_handle_t, crypto_session_id_t,
  */
 static crypto_cipher_ops_t rsa_cipher_ops = {
 	rsa_common_init,
-	rsa_encrypt,
+	rsaprov_encrypt,
 	NULL,
 	NULL,
 	rsa_encrypt_atomic,
 	rsa_common_init,
-	rsa_decrypt,
+	rsaprov_decrypt,
 	NULL,
 	NULL,
 	rsa_decrypt_atomic
@@ -210,7 +211,7 @@ static crypto_cipher_ops_t rsa_cipher_ops = {
 
 static int rsa_sign_verify_common_init(crypto_ctx_t *, crypto_mechanism_t *,
     crypto_key_t *, crypto_spi_ctx_template_t, crypto_req_handle_t);
-static int rsa_sign(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
+static int rsaprov_sign(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
     crypto_req_handle_t);
 static int rsa_sign_update(crypto_ctx_t *, crypto_data_t *,
     crypto_req_handle_t);
@@ -227,16 +228,16 @@ static int rsa_sign_atomic(crypto_provider_handle_t, crypto_session_id_t,
  */
 static crypto_sign_ops_t rsa_sign_ops = {
 	rsa_sign_verify_common_init,
-	rsa_sign,
+	rsaprov_sign,
 	rsa_sign_update,
 	rsa_sign_final,
 	rsa_sign_atomic,
 	rsa_sign_verify_common_init,
-	rsa_sign,
+	rsaprov_sign,
 	rsa_sign_atomic
 };
 
-static int rsa_verify(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
+static int rsaprov_verify(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
     crypto_req_handle_t);
 static int rsa_verify_update(crypto_ctx_t *, crypto_data_t *,
     crypto_req_handle_t);
@@ -258,7 +259,7 @@ static int rsa_verify_recover_atomic(crypto_provider_handle_t,
  */
 static crypto_verify_ops_t rsa_verify_ops = {
 	rsa_sign_verify_common_init,
-	rsa_verify,
+	rsaprov_verify,
 	rsa_verify_update,
 	rsa_verify_final,
 	rsa_verify_atomic,
@@ -312,21 +313,19 @@ static crypto_provider_info_t rsa_prov_info = {
 };
 
 static int rsa_encrypt_common(rsa_mech_type_t, crypto_key_t *,
-    crypto_data_t *, crypto_data_t *, int);
+    crypto_data_t *, crypto_data_t *);
 static int rsa_decrypt_common(rsa_mech_type_t, crypto_key_t *,
-    crypto_data_t *, crypto_data_t *, int);
+    crypto_data_t *, crypto_data_t *);
 static int rsa_sign_common(rsa_mech_type_t, crypto_key_t *,
-    crypto_data_t *, crypto_data_t *, int);
+    crypto_data_t *, crypto_data_t *);
 static int rsa_verify_common(rsa_mech_type_t, crypto_key_t *,
-    crypto_data_t *, crypto_data_t *, int);
+    crypto_data_t *, crypto_data_t *);
 static int compare_data(crypto_data_t *, uchar_t *);
 
 /* EXPORT DELETE START */
 
-static int core_rsa_encrypt(crypto_key_t *, uchar_t *,
-    int, uchar_t *, int, int);
-static int core_rsa_decrypt(crypto_key_t *, uchar_t *, int,
-    uchar_t *, int);
+static int core_rsa_encrypt(crypto_key_t *, uchar_t *, int, uchar_t *, int);
+static int core_rsa_decrypt(crypto_key_t *, uchar_t *, int, uchar_t *);
 
 /* EXPORT DELETE END */
 
@@ -536,7 +535,7 @@ rsa_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 
 /* ARGSUSED */
 static int
-rsa_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
+rsaprov_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
     crypto_data_t *ciphertext, crypto_req_handle_t req)
 {
 	int rv;
@@ -549,12 +548,12 @@ rsa_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 
 	/*
 	 * Note on the KM_SLEEP flag passed to the routine below -
-	 * rsa_encrypt() is a single-part encryption routine which is
+	 * rsaprov_encrypt() is a single-part encryption routine which is
 	 * currently usable only by /dev/crypto. Since /dev/crypto calls are
 	 * always synchronous, we can safely pass KM_SLEEP here.
 	 */
 	rv = rsa_encrypt_common(ctxp->mech_type, ctxp->key, plaintext,
-	    ciphertext, KM_SLEEP);
+	    ciphertext);
 
 	if (rv != CRYPTO_BUFFER_TOO_SMALL)
 		(void) rsa_free_context(ctx);
@@ -576,7 +575,7 @@ rsa_encrypt_atomic(crypto_provider_handle_t provider,
 	RSA_ARG_INPLACE(plaintext, ciphertext);
 
 	return (rsa_encrypt_common(mechanism->cm_type, key, plaintext,
-	    ciphertext, crypto_kmflag(req)));
+	    ciphertext));
 }
 
 static int
@@ -602,7 +601,7 @@ rsa_free_context(crypto_ctx_t *ctx)
 
 static int
 rsa_encrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
-    crypto_data_t *plaintext, crypto_data_t *ciphertext, int kmflag)
+    crypto_data_t *plaintext, crypto_data_t *ciphertext)
 {
 	int rv = CRYPTO_FAILED;
 
@@ -644,7 +643,7 @@ rsa_encrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		return (rv);
 
 	if (mech_type == RSA_PKCS_MECH_INFO_TYPE) {
-		rv = soft_encrypt_rsa_pkcs_encode(ptptr, plen,
+		rv = pkcs1_encode(PKCS1_ENCRYPT, ptptr, plen,
 		    plain_data, modulus_len);
 
 		if (rv != CRYPTO_SUCCESS)
@@ -654,8 +653,7 @@ rsa_encrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		bcopy(ptptr, &plain_data[modulus_len - plen], plen);
 	}
 
-	rv = core_rsa_encrypt(key, plain_data, modulus_len,
-	    cipher_data, kmflag, 1);
+	rv = core_rsa_encrypt(key, plain_data, modulus_len, cipher_data, 1);
 	if (rv == CRYPTO_SUCCESS) {
 		/* copy out to ciphertext */
 		if ((rv = crypto_put_output_data(cipher_data,
@@ -674,14 +672,13 @@ rsa_encrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 
 static int
 core_rsa_encrypt(crypto_key_t *key, uchar_t *in,
-    int in_len, uchar_t *out, int kmflag, int is_public)
+    int in_len, uchar_t *out, int is_public)
 {
 	int rv;
 	uchar_t *expo, *modulus;
 	ssize_t	expo_len;
 	ssize_t modulus_len;
-	BIGNUM msg;
-	RSAkey *rsakey;
+	RSAbytekey k;
 
 	if (is_public) {
 		if ((rv = crypto_get_key_attr(key, SUN_CKA_PUBLIC_EXPONENT,
@@ -703,56 +700,13 @@ core_rsa_encrypt(crypto_key_t *key, uchar_t *in,
 		return (rv);
 	}
 
-	rsakey = kmem_alloc(sizeof (RSAkey), kmflag);
-	if (rsakey == NULL)
-		return (CRYPTO_HOST_MEMORY);
+	k.modulus = modulus;
+	k.modulus_bits = CRYPTO_BYTES2BITS(modulus_len);
+	k.pubexpo = expo;
+	k.pubexpo_bytes = expo_len;
+	k.rfunc = NULL;
 
-	/* psize and qsize for RSA_key_init is in bits. */
-	if (RSA_key_init(rsakey, modulus_len * 4, modulus_len * 4) != BIG_OK) {
-		rv = CRYPTO_HOST_MEMORY;
-		goto clean1;
-	}
-
-	/* Size for big_init is in BIG_CHUNK_TYPE words. */
-	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
-		rv = CRYPTO_HOST_MEMORY;
-		goto clean2;
-	}
-
-	/* Convert octet string exponent to big integer format. */
-	bytestring2bignum(&(rsakey->e), expo, expo_len);
-
-	/* Convert octet string modulus to big integer format. */
-	bytestring2bignum(&(rsakey->n), modulus, modulus_len);
-
-	/* Convert octet string input data to big integer format. */
-	bytestring2bignum(&msg, in, in_len);
-
-	if (big_cmp_abs(&msg, &(rsakey->n)) > 0) {
-		rv = CRYPTO_DATA_LEN_RANGE;
-		goto clean3;
-	}
-
-	/* Perform RSA computation on big integer input data. */
-	if (big_modexp(&msg, &msg, &(rsakey->e), &(rsakey->n), NULL)
-	    != BIG_OK) {
-		rv = CRYPTO_HOST_MEMORY;
-		goto clean3;
-	}
-
-	/* Convert the big integer output data to octet string. */
-	bignum2bytestring(out, &msg, modulus_len);
-
-	/*
-	 * Should not free modulus and expo as both are just pointers
-	 * to an attribute value buffer from the caller.
-	 */
-clean3:
-	big_finish(&msg);
-clean2:
-	RSA_key_finish(rsakey);
-clean1:
-	kmem_free(rsakey, sizeof (RSAkey));
+	rv = rsa_encrypt(&k, in, in_len, out);
 
 	return (rv);
 }
@@ -761,7 +715,7 @@ clean1:
 
 /* ARGSUSED */
 static int
-rsa_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
+rsaprov_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
     crypto_data_t *plaintext, crypto_req_handle_t req)
 {
 	int rv;
@@ -772,9 +726,9 @@ rsa_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 
 	RSA_ARG_INPLACE(ciphertext, plaintext);
 
-	/* See the comments on KM_SLEEP flag in rsa_encrypt() */
+	/* See the comments on KM_SLEEP flag in rsaprov_encrypt() */
 	rv = rsa_decrypt_common(ctxp->mech_type, ctxp->key,
-	    ciphertext, plaintext, KM_SLEEP);
+	    ciphertext, plaintext);
 
 	if (rv != CRYPTO_BUFFER_TOO_SMALL)
 		(void) rsa_free_context(ctx);
@@ -796,18 +750,18 @@ rsa_decrypt_atomic(crypto_provider_handle_t provider,
 	RSA_ARG_INPLACE(ciphertext, plaintext);
 
 	return (rsa_decrypt_common(mechanism->cm_type, key, ciphertext,
-	    plaintext, crypto_kmflag(req)));
+	    plaintext));
 }
 
 static int
 rsa_decrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
-    crypto_data_t *ciphertext, crypto_data_t *plaintext, int kmflag)
+    crypto_data_t *ciphertext, crypto_data_t *plaintext)
 {
 	int rv = CRYPTO_FAILED;
 
 /* EXPORT DELETE START */
 
-	int plain_len;
+	size_t plain_len;
 	uchar_t *ctptr;
 	uchar_t *modulus;
 	ssize_t modulus_len;
@@ -830,13 +784,13 @@ rsa_decrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 	    != CRYPTO_SUCCESS)
 		return (rv);
 
-	rv = core_rsa_decrypt(key, ctptr, modulus_len, plain_data, kmflag);
+	rv = core_rsa_decrypt(key, ctptr, modulus_len, plain_data);
 	if (rv == CRYPTO_SUCCESS) {
 		plain_len = modulus_len;
 
 		if (mech_type == RSA_PKCS_MECH_INFO_TYPE) {
 			/* Strip off the PKCS block formatting data. */
-			rv = soft_decrypt_rsa_pkcs_decode(plain_data,
+			rv = pkcs1_decode(PKCS1_DECRYPT, plain_data,
 			    &plain_len);
 			if (rv != CRYPTO_SUCCESS)
 				return (rv);
@@ -863,16 +817,14 @@ rsa_decrypt_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 /* EXPORT DELETE START */
 
 static int
-core_rsa_decrypt(crypto_key_t *key, uchar_t *in, int in_len,
-    uchar_t *out, int kmflag)
+core_rsa_decrypt(crypto_key_t *key, uchar_t *in, int in_len, uchar_t *out)
 {
 	int rv;
 	uchar_t *modulus, *prime1, *prime2, *expo1, *expo2, *coef;
 	ssize_t modulus_len;
 	ssize_t	prime1_len, prime2_len;
 	ssize_t	expo1_len, expo2_len, coef_len;
-	BIGNUM msg;
-	RSAkey *rsakey;
+	RSAbytekey k;
 
 	if ((rv = crypto_get_key_attr(key, SUN_CKA_MODULUS, &modulus,
 	    &modulus_len)) != CRYPTO_SUCCESS) {
@@ -896,72 +848,24 @@ core_rsa_decrypt(crypto_key_t *key, uchar_t *in, int in_len,
 	    != CRYPTO_SUCCESS) ||
 	    (crypto_get_key_attr(key, SUN_CKA_COEFFICIENT, &coef, &coef_len)
 	    != CRYPTO_SUCCESS)) {
-		return (core_rsa_encrypt(key, in, in_len, out, kmflag, 0));
+		return (core_rsa_encrypt(key, in, in_len, out, 0));
 	}
 
-	rsakey = kmem_alloc(sizeof (RSAkey), kmflag);
-	if (rsakey == NULL)
-		return (CRYPTO_HOST_MEMORY);
+	k.modulus = modulus;
+	k.modulus_bits = CRYPTO_BYTES2BITS(modulus_len);
+	k.prime1 = prime1;
+	k.prime1_bytes = prime1_len;
+	k.prime2 = prime2;
+	k.prime2_bytes = prime2_len;
+	k.expo1 = expo1;
+	k.expo1_bytes = expo1_len;
+	k.expo2 = expo2;
+	k.expo2_bytes = expo2_len;
+	k.coeff = coef;
+	k.coeff_bytes = coef_len;
+	k.rfunc = NULL;
 
-	/* psize and qsize for RSA_key_init is in bits. */
-	if (RSA_key_init(rsakey, CRYPTO_BYTES2BITS(prime2_len),
-	    CRYPTO_BYTES2BITS(prime1_len)) != BIG_OK) {
-		rv = CRYPTO_HOST_MEMORY;
-		goto clean1;
-	}
-
-	/* Size for big_init is in BIG_CHUNK_TYPE words. */
-	if (big_init(&msg, CHARLEN2BIGNUMLEN(in_len)) != BIG_OK) {
-		rv = CRYPTO_HOST_MEMORY;
-		goto clean2;
-	}
-
-	/* Convert octet string input data to big integer format. */
-	bytestring2bignum(&msg, in, in_len);
-
-	/* Convert octet string modulus to big integer format. */
-	bytestring2bignum(&(rsakey->n), modulus, modulus_len);
-
-	if (big_cmp_abs(&msg, &(rsakey->n)) > 0) {
-		rv = CRYPTO_DATA_LEN_RANGE;
-		goto clean3;
-	}
-
-	/* Convert the rest of private key attributes to big integer format. */
-	bytestring2bignum(&(rsakey->dmodpminus1), expo2, expo2_len);
-	bytestring2bignum(&(rsakey->dmodqminus1), expo1, expo1_len);
-	bytestring2bignum(&(rsakey->p), prime2, prime2_len);
-	bytestring2bignum(&(rsakey->q), prime1, prime1_len);
-	bytestring2bignum(&(rsakey->pinvmodq), coef, coef_len);
-
-	if ((big_cmp_abs(&(rsakey->dmodpminus1), &(rsakey->p)) > 0) ||
-	    (big_cmp_abs(&(rsakey->dmodqminus1), &(rsakey->q)) > 0) ||
-	    (big_cmp_abs(&(rsakey->pinvmodq), &(rsakey->q)) > 0)) {
-		rv = CRYPTO_KEY_SIZE_RANGE;
-		goto clean3;
-	}
-
-	/* Perform RSA computation on big integer input data. */
-	if (big_modexp_crt(&msg, &msg, &(rsakey->dmodpminus1),
-	    &(rsakey->dmodqminus1), &(rsakey->p), &(rsakey->q),
-	    &(rsakey->pinvmodq), NULL, NULL) != BIG_OK) {
-		rv = CRYPTO_HOST_MEMORY;
-		goto clean3;
-	}
-
-	/* Convert the big integer output data to octet string. */
-	bignum2bytestring(out, &msg, modulus_len);
-
-	/*
-	 * Should not free modulus and friends as they are just pointers
-	 * to an attribute value buffer from the caller.
-	 */
-clean3:
-	big_finish(&msg);
-clean2:
-	RSA_key_finish(rsakey);
-clean1:
-	kmem_free(rsakey, sizeof (RSAkey));
+	rv = rsa_decrypt(&k, in, in_len, out);
 
 	return (rv);
 }
@@ -1060,7 +964,7 @@ rsa_sign_verify_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 
 static int
 rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
-    crypto_data_t *signature, int kmflag, uchar_t flag)
+    crypto_data_t *signature, uchar_t flag)
 {
 	int rv = CRYPTO_FAILED;
 
@@ -1166,10 +1070,10 @@ rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
 	 */
 	if (flag & CRYPTO_DO_SIGN)
 		rv = rsa_sign_common(mech_type, ctxp->key, &der_cd,
-		    signature, kmflag);
+		    signature);
 	else
 		rv = rsa_verify_common(mech_type, ctxp->key, &der_cd,
-		    signature, kmflag);
+		    signature);
 
 /* EXPORT DELETE END */
 
@@ -1178,7 +1082,7 @@ rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
 
 static int
 rsa_sign_common(rsa_mech_type_t mech_type, crypto_key_t *key,
-    crypto_data_t *data, crypto_data_t *signature, int kmflag)
+    crypto_data_t *data, crypto_data_t *signature)
 {
 	int rv = CRYPTO_FAILED;
 
@@ -1229,7 +1133,7 @@ rsa_sign_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		 * Add PKCS padding to the input data to format a block
 		 * type "01" encryption block.
 		 */
-		rv = soft_sign_rsa_pkcs_encode(dataptr, dlen, plain_data,
+		rv = pkcs1_encode(PKCS1_SIGN, dataptr, dlen, plain_data,
 		    modulus_len);
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -1242,8 +1146,7 @@ rsa_sign_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		break;
 	}
 
-	rv = core_rsa_decrypt(key, plain_data, modulus_len, signed_data,
-	    kmflag);
+	rv = core_rsa_decrypt(key, plain_data, modulus_len, signed_data);
 	if (rv == CRYPTO_SUCCESS) {
 		/* copy out to signature */
 		if ((rv = crypto_put_output_data(signed_data,
@@ -1260,7 +1163,7 @@ rsa_sign_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 
 /* ARGSUSED */
 static int
-rsa_sign(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
+rsaprov_sign(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
     crypto_req_handle_t req)
 {
 	int rv;
@@ -1269,7 +1172,7 @@ rsa_sign(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	ASSERT(ctx->cc_provider_private != NULL);
 	ctxp = ctx->cc_provider_private;
 
-	/* See the comments on KM_SLEEP flag in rsa_encrypt() */
+	/* See the comments on KM_SLEEP flag in rsaprov_encrypt() */
 	switch (ctxp->mech_type) {
 	case MD5_RSA_PKCS_MECH_INFO_TYPE:
 	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
@@ -1277,12 +1180,12 @@ rsa_sign(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
 	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
 		rv = rsa_digest_svrfy_common((digest_rsa_ctx_t *)ctxp, data,
-		    signature, KM_SLEEP, CRYPTO_DO_SIGN | CRYPTO_DO_UPDATE |
+		    signature, CRYPTO_DO_SIGN | CRYPTO_DO_UPDATE |
 		    CRYPTO_DO_FINAL);
 		break;
 	default:
 		rv = rsa_sign_common(ctxp->mech_type, ctxp->key, data,
-		    signature, KM_SLEEP);
+		    signature);
 		break;
 	}
 
@@ -1326,6 +1229,7 @@ rsa_sign_update(crypto_ctx_t *ctx, crypto_data_t *data, crypto_req_handle_t req)
 	return (rv);
 }
 
+/* ARGSUSED2 */
 static int
 rsa_sign_final(crypto_ctx_t *ctx, crypto_data_t *signature,
     crypto_req_handle_t req)
@@ -1337,7 +1241,7 @@ rsa_sign_final(crypto_ctx_t *ctx, crypto_data_t *signature,
 	ctxp = ctx->cc_provider_private;
 
 	rv = rsa_digest_svrfy_common(ctxp, NULL, signature,
-	    crypto_kmflag(req), CRYPTO_DO_SIGN | CRYPTO_DO_FINAL);
+	    CRYPTO_DO_SIGN | CRYPTO_DO_FINAL);
 	if (rv != CRYPTO_BUFFER_TOO_SMALL)
 		(void) rsa_free_context(ctx);
 
@@ -1360,7 +1264,7 @@ rsa_sign_atomic(crypto_provider_handle_t provider,
 	if (mechanism->cm_type == RSA_PKCS_MECH_INFO_TYPE ||
 	    mechanism->cm_type == RSA_X_509_MECH_INFO_TYPE)
 		rv = rsa_sign_common(mechanism->cm_type, key, data,
-		    signature, crypto_kmflag(req));
+		    signature);
 
 	else {
 		dctx.mech_type = mechanism->cm_type;
@@ -1388,8 +1292,7 @@ rsa_sign_atomic(crypto_provider_handle_t provider,
 		}
 
 		rv = rsa_digest_svrfy_common(&dctx, data, signature,
-		    crypto_kmflag(req), CRYPTO_DO_SIGN | CRYPTO_DO_UPDATE |
-		    CRYPTO_DO_FINAL);
+		    CRYPTO_DO_SIGN | CRYPTO_DO_UPDATE | CRYPTO_DO_FINAL);
 	}
 
 	return (rv);
@@ -1397,7 +1300,7 @@ rsa_sign_atomic(crypto_provider_handle_t provider,
 
 static int
 rsa_verify_common(rsa_mech_type_t mech_type, crypto_key_t *key,
-    crypto_data_t *data, crypto_data_t *signature, int kmflag)
+    crypto_data_t *data, crypto_data_t *signature)
 {
 	int rv = CRYPTO_FAILED;
 
@@ -1421,7 +1324,7 @@ rsa_verify_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 	    != CRYPTO_SUCCESS)
 		return (rv);
 
-	rv = core_rsa_encrypt(key, sigptr, modulus_len, plain_data, kmflag, 1);
+	rv = core_rsa_encrypt(key, sigptr, modulus_len, plain_data, 1);
 	if (rv != CRYPTO_SUCCESS)
 		return (rv);
 
@@ -1431,14 +1334,14 @@ rsa_verify_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 			rv = CRYPTO_SIGNATURE_INVALID;
 
 	} else {
-		int data_len = modulus_len;
+		size_t data_len = modulus_len;
 
 		/*
 		 * Strip off the encoded padding bytes in front of the
 		 * recovered data, then compare the recovered data with
 		 * the original data.
 		 */
-		rv = soft_verify_rsa_pkcs_decode(plain_data, &data_len);
+		rv = pkcs1_decode(PKCS1_VERIFY, plain_data, &data_len);
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
 
@@ -1457,8 +1360,8 @@ rsa_verify_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 
 /* ARGSUSED */
 static int
-rsa_verify(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
-    crypto_req_handle_t req)
+rsaprov_verify(crypto_ctx_t *ctx, crypto_data_t *data,
+    crypto_data_t *signature, crypto_req_handle_t req)
 {
 	int rv;
 	rsa_ctx_t *ctxp;
@@ -1466,7 +1369,7 @@ rsa_verify(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	ASSERT(ctx->cc_provider_private != NULL);
 	ctxp = ctx->cc_provider_private;
 
-	/* See the comments on KM_SLEEP flag in rsa_encrypt() */
+	/* See the comments on KM_SLEEP flag in rsaprov_encrypt() */
 	switch (ctxp->mech_type) {
 	case MD5_RSA_PKCS_MECH_INFO_TYPE:
 	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
@@ -1474,12 +1377,12 @@ rsa_verify(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
 	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
 		rv = rsa_digest_svrfy_common((digest_rsa_ctx_t *)ctxp, data,
-		    signature, KM_SLEEP, CRYPTO_DO_VERIFY | CRYPTO_DO_UPDATE |
+		    signature, CRYPTO_DO_VERIFY | CRYPTO_DO_UPDATE |
 		    CRYPTO_DO_FINAL);
 		break;
 	default:
 		rv = rsa_verify_common(ctxp->mech_type, ctxp->key, data,
-		    signature, KM_SLEEP);
+		    signature);
 		break;
 	}
 
@@ -1529,6 +1432,7 @@ rsa_verify_update(crypto_ctx_t *ctx, crypto_data_t *data,
 	return (rv);
 }
 
+/* ARGSUSED2 */
 static int
 rsa_verify_final(crypto_ctx_t *ctx, crypto_data_t *signature,
     crypto_req_handle_t req)
@@ -1540,7 +1444,7 @@ rsa_verify_final(crypto_ctx_t *ctx, crypto_data_t *signature,
 	ctxp = ctx->cc_provider_private;
 
 	rv = rsa_digest_svrfy_common(ctxp, NULL, signature,
-	    crypto_kmflag(req), CRYPTO_DO_VERIFY | CRYPTO_DO_FINAL);
+	    CRYPTO_DO_VERIFY | CRYPTO_DO_FINAL);
 	if (rv != CRYPTO_BUFFER_TOO_SMALL)
 		(void) rsa_free_context(ctx);
 
@@ -1565,7 +1469,7 @@ rsa_verify_atomic(crypto_provider_handle_t provider,
 	if (mechanism->cm_type == RSA_PKCS_MECH_INFO_TYPE ||
 	    mechanism->cm_type == RSA_X_509_MECH_INFO_TYPE)
 		rv = rsa_verify_common(mechanism->cm_type, key, data,
-		    signature, crypto_kmflag(req));
+		    signature);
 
 	else {
 		dctx.mech_type = mechanism->cm_type;
@@ -1593,8 +1497,7 @@ rsa_verify_atomic(crypto_provider_handle_t provider,
 			break;
 		}
 
-		rv = rsa_digest_svrfy_common(&dctx, data,
-		    signature, crypto_kmflag(req),
+		rv = rsa_digest_svrfy_common(&dctx, data, signature,
 		    CRYPTO_DO_VERIFY | CRYPTO_DO_UPDATE | CRYPTO_DO_FINAL);
 	}
 
@@ -1603,13 +1506,13 @@ rsa_verify_atomic(crypto_provider_handle_t provider,
 
 static int
 rsa_verify_recover_common(rsa_mech_type_t mech_type, crypto_key_t *key,
-    crypto_data_t *signature, crypto_data_t *data, int kmflag)
+    crypto_data_t *signature, crypto_data_t *data)
 {
 	int rv = CRYPTO_FAILED;
 
 /* EXPORT DELETE START */
 
-	int data_len;
+	size_t data_len;
 	uchar_t *sigptr, *modulus;
 	ssize_t modulus_len;
 	uchar_t plain_data[MAX_RSA_KEYLENGTH_IN_BYTES];
@@ -1628,7 +1531,7 @@ rsa_verify_recover_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 	    != CRYPTO_SUCCESS)
 		return (rv);
 
-	rv = core_rsa_encrypt(key, sigptr, modulus_len, plain_data, kmflag, 1);
+	rv = core_rsa_encrypt(key, sigptr, modulus_len, plain_data, 1);
 	if (rv != CRYPTO_SUCCESS)
 		return (rv);
 
@@ -1640,7 +1543,7 @@ rsa_verify_recover_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		 * recovered data, then compare the recovered data with
 		 * the original data.
 		 */
-		rv = soft_verify_rsa_pkcs_decode(plain_data, &data_len);
+		rv = pkcs1_decode(PKCS1_VERIFY, plain_data, &data_len);
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
 	}
@@ -1671,9 +1574,9 @@ rsa_verify_recover(crypto_ctx_t *ctx, crypto_data_t *signature,
 	ASSERT(ctx->cc_provider_private != NULL);
 	ctxp = ctx->cc_provider_private;
 
-	/* See the comments on KM_SLEEP flag in rsa_encrypt() */
+	/* See the comments on KM_SLEEP flag in rsaprov_encrypt() */
 	rv = rsa_verify_recover_common(ctxp->mech_type, ctxp->key,
-	    signature, data, KM_SLEEP);
+	    signature, data);
 
 	if (rv != CRYPTO_BUFFER_TOO_SMALL)
 		(void) rsa_free_context(ctx);
@@ -1694,11 +1597,11 @@ rsa_verify_recover_atomic(crypto_provider_handle_t provider,
 		return (rv);
 
 	return (rsa_verify_recover_common(mechanism->cm_type, key,
-	    signature, data, crypto_kmflag(req)));
+	    signature, data));
 }
 
 /*
- * RSA Power-Up Self-Test
+ * RSA Power-On Self-Test
  */
 void
 rsa_POST(int *rc)

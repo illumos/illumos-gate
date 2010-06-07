@@ -18,9 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # lib/pkcs11/libsoftcrypto/Makefile.com
 #
@@ -49,7 +51,7 @@ DES_COMMON_OBJS= des_impl.o des_ks.o
 DES_COMMON_SRC= $(DES_COMMON_OBJS:%.o=$(DES_DIR)/%.c)
 DES_FLAGS= -I$(DES_DIR)
 
-# BIGNUM
+# BIGNUM -- needed by DH, DSA, RSA
 BIGNUM_DIR= $(SRC)/common/bignum
 BIGNUM_COMMON_OBJS= bignumimpl.o
 BIGNUM_COMMON_SRC= $(BIGNUM_COMMON_OBJS:%.o=$(BIGNUM_DIR)/%.c)
@@ -59,7 +61,31 @@ BIGNUM_FLAGS= -I$(BIGNUM_DIR)
 MODES_DIR= $(SRC)/common/crypto/modes
 MODES_COMMON_OBJS= modes.o ecb.o cbc.o ctr.o
 MODES_COMMON_SRC= $(MODES_COMMON_OBJS:%.o=$(MODES_DIR)/%.c)
+MODES_FLAGS= -I$(MODES_DIR)
 
+# DH
+DH_DIR= $(SRC)/common/crypto/dh
+DH_COMMON_OBJS= dh_impl.o
+DH_COMMON_SRC= $(DH_COMMON_OBJS:%.o=$(DH_DIR)/%.c)
+DH_FLAGS= $(BIGNUM_FLAGS) -I$(DH_DIR)
+
+# DSA
+DSA_DIR= $(SRC)/common/crypto/dsa
+DSA_COMMON_OBJS= dsa_impl.o
+DSA_COMMON_SRC= $(DSA_COMMON_OBJS:%.o=$(DSA_DIR)/%.c)
+DSA_FLAGS= $(BIGNUM_FLAGS) -I$(DSA_DIR)
+
+# RSA
+RSA_DIR= $(SRC)/common/crypto/rsa
+RSA_COMMON_OBJS= rsa_impl.o
+RSA_COMMON_SRC= $(RSA_COMMON_OBJS:%.o=$(RSA_DIR)/%.c)
+RSA_FLAGS= $(BIGNUM_FLAGS) -I$(RSA_DIR)
+
+# PADDING -- needed by RSA
+PAD_DIR= $(SRC)/common/crypto/padding
+PAD_COMMON_OBJS= pkcs1.o pkcs7.o
+PAD_COMMON_SRC= $(PAD_COMMON_OBJS:%.o=$(PAD_DIR)/%.c)
+PAD_FLAGS= -I$(PAD_DIR)
 
 # Object setup
 AES_OBJS= $(AES_COMMON_OBJS) $(AES_PSM_OBJS)
@@ -67,10 +93,15 @@ ARCFOUR_OBJS= $(ARCFOUR_COMMON_OBJS) $(ARCFOUR_PSM_OBJS)
 BLOWFISH_OBJS= $(BLOWFISH_COMMON_OBJS) $(BLOWFISH_PSM_OBJS)
 DES_OBJS= $(DES_COMMON_OBJS) $(DES_PSM_OBJS)
 BIGNUM_OBJS= $(BIGNUM_COMMON_OBJS) $(BIGNUM_PSM_OBJS)
-MODES_OBJS= $(MODES_COMMON_OBJS)
+MODES_OBJS= $(MODES_COMMON_OBJS) $(MODES_PSM_OBJS)
+DH_OBJS= $(DH_COMMON_OBJS) $(DH_PSM_OBJS)
+DSA_OBJS= $(DSA_COMMON_OBJS) $(DSA_PSM_OBJS)
+RSA_OBJS= $(RSA_COMMON_OBJS) $(RSA_PSM_OBJS)
+PAD_OBJS= $(PAD_COMMON_OBJS) $(PAD_PSM_OBJS)
 
 OBJECTS= $(AES_OBJS) $(ARCFOUR_OBJS) $(BIGNUM_OBJS) $(BLOWFISH_OBJS) \
-	$(DES_OBJS) $(MODES_OBJS)
+	$(DES_OBJS) $(MODES_OBJS) $(DH_OBJS) $(DSA_OBJS) \
+	$(RSA_OBJS) $(PAD_OBJS)
 
 include $(SRC)/lib/Makefile.lib
 
@@ -80,10 +111,20 @@ ARCFOUR_SRC= $(ARCFOUR_COMMON_SRC) $(ARCFOUR_PSM_SRC)
 BLOWFISH_SRC= $(BLOWFISH_COMMON_SRC) $(BLOWFISH_PSM_SRC)
 DES_SRC= $(DES_COMMON_SRC) $(DES_PSM_SRC)
 BIGNUM_SRC= $(BIGNUM_COMMON_SRC) $(BIGNUM_PSM_SRC)
-MODES_SRC= $(MODES_COMMON_SRC)
+MODES_SRC= $(MODES_COMMON_SRC) $(MODES_PSM_SRC)
+DH_SRC= $(DH_COMMON_SRC) $(DH_PSM_SRC)
+DSA_SRC= $(DSA_COMMON_SRC) $(DSA_PSM_SRC)
+RSA_SRC= $(RSA_COMMON_SRC) $(RSA_PSM_SRC)
+PAD_SRC= $(PAD_COMMON_SRC) $(PAD_PSM_SRC)
 
 SRCS=	$(AES_SRC) $(ARCFOUR_SRC) $(BIGNUM_SRC) $(BLOWFISH_SRC) $(DES_SRC) \
-	$(MODES_SRC)
+	$(MODES_SRC) $(DH_SRC) $(DSA_SRC) $(RSA_SRC) \
+	$(PAD_SRC)
+
+# Do not lint ECC and MPI
+LINTABLE= \
+	$(AES_SRC) $(ARCFOUR_SRC) $(BIGNUM_SRC) $(BLOWFISH_SRC) $(DES_SRC) \
+	$(MODES_SRC) $(DH_SRC) $(DSA_SRC) $(RSA_SRC) $(PAD_SRC)
 
 #
 # Compiler settings
@@ -91,22 +132,36 @@ SRCS=	$(AES_SRC) $(ARCFOUR_SRC) $(BIGNUM_SRC) $(BLOWFISH_SRC) $(DES_SRC) \
 
 SRCDIR=	$(SRC)/lib/pkcs11/libsoftcrypto/common/
 CRYPTODIR= $(SRC)/common/crypto/
-MODESDIR= $(SRC)/uts/common/
+UTSDIR= $(SRC)/uts/common/
 ROOTLIBDIR= $(ROOT)/usr/lib
 ROOTLIBDIR64= $(ROOT)/usr/lib/$(MACH64)
 ROOTHWCAPDIR= $(ROOTLIBDIR)/libsoftcrypto
 
+# $(LINTLIB) is not included here;  i386_hwcap1/Makefile does not make
+# a lint library, so each of the other platform-specific Makefiles adds
+# the lint library target individually
 LIBS = $(DYNLIB)
+LDLIBS += -lc
 
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
-CPPFLAGS += -I$(SRCDIR) -I$(CRYPTODIR) -I$(MODESDIR) -D_POSIX_PTHREAD_SEMANTICS
+CPPFLAGS += -I$(SRCDIR) -I$(CRYPTODIR) -I$(UTSDIR) \
+	$(BIGNUM_FLAGS) \
+	-D_POSIX_PTHREAD_SEMANTICS
 ASFLAGS = $(AS_PICFLAGS) -P -D__STDC__ -D_ASM
-LINTFLAGS64 += -errchk=longptr64
+EXTRA_LINT_FLAGS = \
+	$(AES_FLAGS) $(BLOWFISH_FLAGS) $(ARCFOUR_FLAGS) $(DES_FLAGS) \
+	$(BIGNUM_FLAGS) $(MODES_FLAGS) $(DH_FLAGS) $(DSA_FLAGS) \
+	$(RSA_FLAGS) $(PAD_FLAGS)
+LINTFLAGS += $(EXTRA_LINT_FLAGS)
+LINTFLAGS64 += $(EXTRA_LINT_FLAGS) -errchk=longptr64
+
+LINTLIB=	llib-l$(LIBNAME).ln
+$(LINTLIB)	:= 	SRCS = $(LINTABLE)
+lintcheck	:=	SRCS = $(LINTABLE)
 
 all:	$(LIBS)
 
-lint:	$(SRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)
+lint:	lintcheck
 
 pics/%.o:	$(AES_DIR)/%.c
 	$(COMPILE.c) $(AES_FLAGS) -o $@ $<
@@ -129,9 +184,24 @@ pics/%.o:	$(DES_DIR)/%.c
 	$(POST_PROCESS_O)
 
 pics/%.o:	$(MODES_DIR)/%.c
-	$(COMPILE.c) -o $@ $<
+	$(COMPILE.c) $(MODES_FLAGS) -o $@ $<
 	$(POST_PROCESS_O)
 
+pics/%.o:	$(DH_DIR)/%.c
+	$(COMPILE.c) $(DH_FLAGS) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(DSA_DIR)/%.c
+	$(COMPILE.c) $(DSA_FLAGS) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(RSA_DIR)/%.c
+	$(COMPILE.c) $(RSA_FLAGS) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(PAD_DIR)/%.c
+	$(COMPILE.c) $(PAD_FLAGS) -o $@ $<
+	$(POST_PROCESS_O)
 
 #
 # Platform-specific targets

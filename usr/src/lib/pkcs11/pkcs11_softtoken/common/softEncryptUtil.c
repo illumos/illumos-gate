@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <pthread.h>
@@ -43,15 +43,7 @@
 void
 soft_add_pkcs7_padding(CK_BYTE *buf, int block_size, CK_ULONG data_len)
 {
-
-	ulong_t i, pad_len;
-	CK_BYTE pad_value;
-
-	pad_len = block_size - (data_len % block_size);
-	pad_value = (CK_BYTE)pad_len;
-
-	for (i = 0; i < pad_len; i++)
-		buf[i] = pad_value;
+	(void) pkcs7_encode(NULL, data_len, buf, block_size, block_size);
 }
 
 /*
@@ -844,7 +836,7 @@ clean1:
  * or by the 2nd tier of session close routine. Since the 1st tier
  * caller will always call this function without locking the session
  * mutex and the 2nd tier caller will call with the lock, we add the
- * third parameter "lock_held" to distiguish this case.
+ * third parameter "lock_held" to distinguish this case.
  */
 void
 soft_crypt_cleanup(soft_session_t *session_p, boolean_t encrypt,

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -35,6 +35,8 @@
 #define	_AES_FIPS_POST
 #define	_DES_FIPS_POST
 #include "softCrypt.h"
+#define	_DSA_FIPS_POST
+#include <dsa_impl.h>
 #define	_RSA_FIPS_POST
 #include <rsa_impl.h>
 #include <sha1_impl.h>
@@ -43,7 +45,6 @@
 
 
 extern int fips_ecdsa_post(void);
-extern CK_RV soft_fips_dsa_post(void);
 
 
 /*
@@ -143,7 +144,7 @@ soft_fips_post(void)
 	 * 1. DSA Sign on SHA-1 digest
 	 * 2. DSA Verification
 	 */
-	rv = soft_fips_dsa_post();
+	rv = fips_dsa_post();
 
 	if (rv != CKR_OK)
 		return (rv);

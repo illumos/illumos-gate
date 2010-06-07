@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -36,4 +35,8 @@
 #include <blowfish_impl.h>
 #include <des_cbc_crypt.h>
 #include <des_impl.h>
+#include <dh_impl.h>
+#include <dsa_impl.h>
 #include <modes.h>
+#include <padding.h>
+#include <rsa_impl.h>

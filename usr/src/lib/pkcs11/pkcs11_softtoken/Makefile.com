@@ -51,13 +51,11 @@ LCL_OBJECTS = \
 	softVerifyUtil.o	\
 	softMAC.o		\
 	softRSA.o		\
-	softRandUtil.o		\
 	softKeysUtil.o		\
 	softARCFourCrypt.o	\
 	softDSA.o		\
 	softDH.o		\
 	softAESCrypt.o		\
-	softCrypt.o		\
 	softKeystore.o		\
 	softKeystoreUtil.o	\
 	softSSL.o		\
@@ -65,8 +63,7 @@ LCL_OBJECTS = \
 	softBlowfishCrypt.o	\
 	softEC.o		\
 	softFipsPost.o		\
-	softFipsPostUtil.o	\
-	softFipsDSAUtil.o
+	softFipsPostUtil.o
 
 ASFLAGS = $(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS)
 
@@ -78,15 +75,14 @@ ECC_COBJECTS = \
 	ec2_test.o ecp_test.o
 
 MPI_COBJECTS = mp_gf2m.o mpi.o mplogic.o mpmontg.o mpprime.o
-RSA_COBJECTS = rsa_impl.o
 RNG_COBJECTS = fips_random.o
-FIPS_COBJECTS = fips_des_util.o \
-		fips_aes_util.o fips_sha1_util.o fips_sha2_util.o \
-		fips_rsa_util.o fips_ecc_util.o fips_random_util.o
+FIPS_COBJECTS = fips_aes_util.o fips_des_util.o \
+		fips_sha1_util.o fips_sha2_util.o \
+		fips_dsa_util.o fips_rsa_util.o \
+		fips_ecc_util.o fips_random_util.o
 
 ECC_OBJECTS = $(ECC_COBJECTS) $(ECC_PSR_OBJECTS)
 MPI_OBJECTS = $(MPI_COBJECTS) $(MPI_PSR_OBJECTS)
-RSA_OBJECTS = $(RSA_COBJECTS) $(RSA_PSR_OBJECTS)
 RNG_OBJECTS = $(RNG_COBJECTS)
 FIPS_OBJECTS = $(FIPS_COBJECTS)
 BER_OBJECTS = bprint.o decode.o encode.o io.o
@@ -94,7 +90,6 @@ BER_OBJECTS = bprint.o decode.o encode.o io.o
 OBJECTS = \
 	$(LCL_OBJECTS)		\
 	$(MPI_OBJECTS)		\
-	$(RSA_OBJECTS)		\
 	$(RNG_OBJECTS)		\
 	$(FIPS_OBJECTS)		\
 	$(BIGNUM_OBJECTS)       \
@@ -105,6 +100,8 @@ AESDIR=         $(SRC)/common/crypto/aes
 BLOWFISHDIR=    $(SRC)/common/crypto/blowfish
 ARCFOURDIR=     $(SRC)/common/crypto/arcfour
 DESDIR=         $(SRC)/common/crypto/des
+DHDIR=		$(SRC)/common/crypto/dh
+DSADIR=		$(SRC)/common/crypto/dsa
 ECCDIR=		$(SRC)/common/crypto/ecc
 MPIDIR=		$(SRC)/common/mpi
 RSADIR=		$(SRC)/common/crypto/rsa
@@ -113,6 +110,7 @@ FIPSDIR=	$(SRC)/common/crypto/fips
 SHA1DIR=	$(SRC)/common/crypto/sha1
 SHA2DIR=	$(SRC)/common/crypto/sha2
 BIGNUMDIR=	$(SRC)/common/bignum
+PADDIR=		$(SRC)/common/crypto/padding
 BERDIR=		../../../libldap5/sources/ldap/ber
 
 include $(SRC)/lib/Makefile.lib
@@ -125,7 +123,6 @@ SRCDIR= ../common
 SRCS =	\
 	$(LCL_OBJECTS:%.o=$(SRCDIR)/%.c) \
 	$(MPI_COBJECTS:%.o=$(MPIDIR)/%.c) \
-	$(RSA_COBJECTS:%.o=$(RSADIR)/%.c) \
 	$(ECC_COBJECTS:%.o=$(ECCDIR)/%.c) \
 	$(RNG_COBJECTS:%.o=$(RNGDIR)/%.c) \
 	$(FIPS_COBJECTS:%.o=$(FIPSDIR)/%.c)
@@ -137,9 +134,10 @@ LDLIBS  +=      -lc -lmd -lcryptoutil -lsoftcrypto -lgen
 CFLAGS 	+=      $(CCVERBOSE)
 
 CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \
-	    -I$(ECCDIR) -I$(SRC)/common/crypto -I$(MPIDIR) -I$(RSADIR) -I$(RNGDIR) \
+	    -I$(DHDIR) -I$(DSADIR) -I$(ECCDIR) -I$(SRC)/common/crypto \
+	    -I$(MPIDIR) -I$(RSADIR) -I$(RNGDIR) \
 	    -I$(FIPSDIR) -I$(SHA1DIR) -I$(SHA2DIR) -I$(SRCDIR) \
-	    -I$(BIGNUMDIR) -D_POSIX_PTHREAD_SEMANTICS \
+	    -I$(BIGNUMDIR) -I$(PADDIR) -D_POSIX_PTHREAD_SEMANTICS \
 	    -DMP_API_COMPATIBLE -DNSS_ECC_MORE_THAN_SUITE_B
 
 LINTFLAGS64 += -errchk=longptr64
@@ -149,7 +147,6 @@ ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)
 
 LINTSRC = \
 	$(LCL_OBJECTS:%.o=$(SRCDIR)/%.c) \
-	$(RSA_COBJECTS:%.o=$(RSADIR)/%.c) \
 	$(RNG_COBJECTS:%.o=$(RNGDIR)/%.c) \
 	$(FIPS_COBJECTS:%.o=$(FIPSDIR)/%.c)
 
@@ -170,10 +167,6 @@ pics/%.o:	$(ECCDIR)/%.c
 	$(POST_PROCESS_O)
 
 pics/%.o:	$(MPIDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-pics/%.o:	$(RSADIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

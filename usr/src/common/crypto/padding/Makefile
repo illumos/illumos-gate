@@ -20,22 +20,16 @@
 #
 
 #
-# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# lib/pkcs11/libsoftcrypto/sparcv9/Makefile
+# common/crypto/padding/Makefile
 #
+# include global definitions
+include $(SRC)/Makefile.master
 
-LIBRARY=	libsoftcrypto.a
-VERS= .1
+.KEEP_STATE:
 
-include ../Makefile.com
-include $(SRC)/lib/Makefile.lib.64
+FRC:
 
-LDLIBS	+= -lcryptoutil
-LIBS += $(LINTLIB)
-
-DYNFLAGS +=     -Wl,-f/usr/platform/\$$PLATFORM/lib/$(MACH64)/$(DYNLIBPSR)
-
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)

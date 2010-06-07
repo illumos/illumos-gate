@@ -18,9 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # lib/pkcs11/libsoftcrypto/sun4v/Makefile.com
 #
@@ -35,10 +37,17 @@ include ../Makefile.links
 include ../../Makefile.com
 
 # Platform-specific settings
+#
+# See the sun4u platform-specific Makefile.com for important information
+# that also relates to this file.
+#
+# Note:  This file is set up to compile the PSM objects for ARCFOUR to
+# *augment* (add onto) its common objects from libsoftcrypto, and to compile
+# BIGNUM to *supercede* (replaced) its common objects from libsoftcrypto.
+#
 ARCFOUR_PSM_OBJS=  arcfour_crypt.o
 ARCFOUR_PSM_SRC=   $(ARCFOUR_DIR)/sun4v/arcfour_crypt.c 
 BIGNUM_FLAGS += -DUMUL64
-SRCS= $(ARCFOUR_PSM_SRC) $(BIGNUM_SRC)
 
 MAPFILES= ../mapfile-vers
 OBJECTS= $(ARCFOUR_PSM_OBJS) $(BIGNUM_OBJS)
@@ -51,9 +60,6 @@ sparcv9_XARCH =    -m64 -xarch=sparcvis
 CFLAGS +=   -xO5 -xbuiltin=%all -dalign -D$(PLATFORM)
 CFLAGS64 += -D$(PLATFORM)
 ASFLAGS +=  -DPIC
-
-# For bignum
-LDLIBS +=   -lc
 
 $(USR_PSM_LIB_DIR)/% := FILEMODE = 755
 

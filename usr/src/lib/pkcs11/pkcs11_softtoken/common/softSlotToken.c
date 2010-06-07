@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -207,10 +208,10 @@ static CK_MECHANISM_INFO soft_mechanism_info[] = {
 	{256, 4096, CKF_SIGN|CKF_VERIFY}, /* CKM_SHA256_RSA_PKCS in bits */
 	{256, 4096, CKF_SIGN|CKF_VERIFY}, /* CKM_SHA384_RSA_PKCS in bits */
 	{256, 4096, CKF_SIGN|CKF_VERIFY}, /* CKM_SHA512_RSA_PKCS in bits */
-	{MIN_DH_KEYLENGTH, MAX_DH_KEYLENGTH, CKF_GENERATE_KEY_PAIR},
+	{DH_MIN_KEY_LEN, DH_MAX_KEY_LEN, CKF_GENERATE_KEY_PAIR},
 						/* CKM_DH_PKCS_KEY_PAIR_GEN */
 						/* in bits */
-	{MIN_DH_KEYLENGTH, MAX_DH_KEYLENGTH, CKF_DERIVE},
+	{DH_MIN_KEY_LEN, DH_MAX_KEY_LEN, CKF_DERIVE},
 						/* CKM_DH_PKCS_DERIVE; */
 						/* in bits */
 	{1, 16, CKF_DERIVE},			/* CKM_MD5_KEY_DERIVATION */

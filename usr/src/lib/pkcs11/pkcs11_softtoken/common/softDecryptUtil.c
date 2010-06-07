@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -44,24 +42,18 @@
  */
 CK_RV
 soft_remove_pkcs7_padding(CK_BYTE *pData, CK_ULONG padded_len,
-    CK_ULONG *pulDataLen, int block_size)
+    CK_ULONG *pulDataLen)
 {
+	CK_RV	rv;
 
-	CK_BYTE  pad_value;
-	ulong_t i;
+#ifdef	__sparcv9
+	if ((rv = pkcs7_decode(pData, (&padded_len))) != CKR_OK)
+#else	/* !__sparcv9 */
+	if ((rv = pkcs7_decode(pData, (size_t *)(&padded_len))) != CKR_OK)
+#endif	/* __sparcv9 */
+		return (rv);
 
-	pad_value = pData[padded_len - 1];
-
-
-	/* Make sure there is a valid padding value. */
-	if ((pad_value == 0) || (pad_value > block_size))
-		return (CKR_ENCRYPTED_DATA_INVALID);
-
-	for (i = padded_len - pad_value; i < padded_len; i++)
-		if (pad_value != pData[i])
-			return (CKR_ENCRYPTED_DATA_INVALID);
-
-	*pulDataLen = padded_len - pad_value;
+	*pulDataLen = padded_len;
 	return (CKR_OK);
 }
 
@@ -604,7 +596,7 @@ soft_decrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastPart,
 				 * plaintext.
 				 */
 				rv = soft_remove_pkcs7_padding(pLastPart,
-				    DES_BLOCK_LEN, &out_len, DES_BLOCK_LEN);
+				    DES_BLOCK_LEN, &out_len);
 				if (rv != CKR_OK)
 					*pulLastPartLen = 0;
 				else
@@ -713,7 +705,7 @@ soft_decrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastPart,
 				 * plaintext.
 				 */
 				rv = soft_remove_pkcs7_padding(pLastPart,
-				    AES_BLOCK_LEN, &out_len, AES_BLOCK_LEN);
+				    AES_BLOCK_LEN, &out_len);
 				if (rv != CKR_OK)
 					*pulLastPartLen = 0;
 				else

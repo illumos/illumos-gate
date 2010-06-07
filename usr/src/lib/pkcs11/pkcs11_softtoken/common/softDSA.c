@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <pthread.h>
@@ -29,12 +29,11 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
-#include <bignum.h>
+#include <cryptoutil.h>
 #include "softGlobal.h"
 #include "softSession.h"
 #include "softObject.h"
 #include "softDSA.h"
-#include "softRandom.h"
 #include "softOps.h"
 #include "softMAC.h"
 #include "softCrypt.h"
@@ -114,76 +113,11 @@ soft_dsa_sign_verify_init_common(soft_session_t *session_p,
 }
 
 
-/* size is in bits */
-BIG_ERR_CODE
-DSA_key_init(DSAkey *key, int size)
+static CK_RV
+local_dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen,
+    CK_BYTE_PTR out)
 {
-	BIG_ERR_CODE err;
-	int len, len160;
-
-	len = BITLEN2BIGNUMLEN(size);
-	len160 = BIG_CHUNKS_FOR_160BITS;
-	key->size = size;
-	if ((err = big_init1(&(key->q), len160, NULL, 0)) != BIG_OK)
-		return (err);
-	if ((err = big_init1(&(key->p), len, NULL, 0)) != BIG_OK)
-		goto ret1;
-	if ((err = big_init1(&(key->g), len, NULL, 0)) != BIG_OK)
-		goto ret2;
-	if ((err = big_init1(&(key->x), len160, NULL, 0)) != BIG_OK)
-		goto ret3;
-	if ((err = big_init1(&(key->y), len, NULL, 0)) != BIG_OK)
-		goto ret4;
-	if ((err = big_init1(&(key->k), len160, NULL, 0)) != BIG_OK)
-		goto ret5;
-	if ((err = big_init1(&(key->r), len160, NULL, 0)) != BIG_OK)
-		goto ret6;
-	if ((err = big_init1(&(key->s), len160, NULL, 0)) != BIG_OK)
-		goto ret7;
-	if ((err = big_init1(&(key->v), len160, NULL, 0)) != BIG_OK)
-		goto ret8;
-
-	return (BIG_OK);
-
-ret8:
-	big_finish(&(key->s));
-ret7:
-	big_finish(&(key->r));
-ret6:
-	big_finish(&(key->k));
-ret5:
-	big_finish(&(key->y));
-ret4:
-	big_finish(&(key->x));
-ret3:
-	big_finish(&(key->g));
-ret2:
-	big_finish(&(key->p));
-ret1:
-	big_finish(&(key->q));
-	return (err);
-}
-
-
-void
-DSA_key_finish(DSAkey *key)
-{
-	big_finish(&(key->v));
-	big_finish(&(key->s));
-	big_finish(&(key->r));
-	big_finish(&(key->k));
-	big_finish(&(key->y));
-	big_finish(&(key->x));
-	big_finish(&(key->g));
-	big_finish(&(key->p));
-	big_finish(&(key->q));
-}
-
-
-CK_RV
-dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
-{
-
+	CK_RV rv;
 	uchar_t q[MAX_KEY_ATTR_BUFLEN];
 	uchar_t p[MAX_KEY_ATTR_BUFLEN];
 	uchar_t g[MAX_KEY_ATTR_BUFLEN];
@@ -192,22 +126,14 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 	uint_t plen = sizeof (p);
 	uint_t glen = sizeof (g);
 	uint_t xlen = sizeof (x);
-	DSAkey dsakey;
-	BIGNUM msg, tmp, tmp1, tmp2;
-	BIG_ERR_CODE err;
-	CK_RV rv;
+	DSAbytekey k;
 
-	rv = soft_get_private_value(key, CKA_SUBPRIME, q, &qlen);
+	rv = soft_get_private_value(key, CKA_PRIME, p, &plen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
 
-	if (DSA_SUBPRIME_BYTES != qlen) {
-		rv = CKR_KEY_SIZE_RANGE;
-		goto clean1;
-	}
-
-	rv = soft_get_private_value(key, CKA_PRIME, p, &plen);
+	rv = soft_get_private_value(key, CKA_SUBPRIME, q, &qlen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -222,103 +148,26 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 		goto clean1;
 	}
 
-	if (DSA_SUBPRIME_BYTES < xlen) {
-		rv = CKR_KEY_SIZE_RANGE;
-		goto clean1;
-	}
+	k.prime = p;
+	k.prime_bits = CRYPTO_BYTES2BITS(plen);
+	k.subprime = q;
+	k.subprime_bits = CRYPTO_BYTES2BITS(qlen);
+	k.base = g;
+	k.base_bytes = glen;
+	k.private_x_bits = CRYPTO_BYTES2BITS(xlen);
+	k.private_x = x;
+	k.rfunc = NULL;
 
-	if ((err = DSA_key_init(&dsakey, plen * 8)) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean1;
-	}
+	rv = dsa_sign(&k, in, inlen, out);
 
-	if ((err = big_init(&msg, BIG_CHUNKS_FOR_160BITS)) != BIG_OK) {
-		goto clean6;
-	}
-	if ((err = big_init(&tmp, CHARLEN2BIGNUMLEN(plen) +
-	    2 * BIG_CHUNKS_FOR_160BITS + 1)) != BIG_OK) {
-		goto clean7;
-	}
-	if ((err = big_init(&tmp1, 2 * BIG_CHUNKS_FOR_160BITS + 1)) != BIG_OK) {
-		goto clean8;
-	}
-	if ((err = big_init(&tmp2, BIG_CHUNKS_FOR_160BITS)) != BIG_OK) {
-		goto clean9;
-	}
-
-	bytestring2bignum(&(dsakey.g), g, plen);
-	bytestring2bignum(&(dsakey.x), x, DSA_SUBPRIME_BYTES);
-	bytestring2bignum(&(dsakey.p), p, plen);
-	bytestring2bignum(&(dsakey.q), q, DSA_SUBPRIME_BYTES);
-	bytestring2bignum(&msg, (uchar_t *)in, inlen);
-
-	if ((err = random_bignum(&(dsakey.k), DSA_SUBPRIME_BITS,
-	    B_FALSE)) != BIG_OK)
-		goto clean10;
-
-	if ((err = big_div_pos(NULL, &(dsakey.k), &(dsakey.k),
-	    &(dsakey.q))) != BIG_OK)
-		goto clean10;
-
-	if ((err = big_modexp(&tmp, &(dsakey.g), &(dsakey.k), &(dsakey.p),
-	    NULL)) != BIG_OK)
-		goto clean10;
-
-	if ((err = big_div_pos(NULL, &(dsakey.r), &tmp, &(dsakey.q))) !=
-	    BIG_OK)
-		goto clean10;
-
-	if ((err = big_ext_gcd_pos(NULL, NULL, &tmp, &(dsakey.q),
-	    &(dsakey.k))) != BIG_OK)
-		goto clean10;
-
-	if (tmp.sign == -1)
-		if ((err = big_add(&tmp, &tmp, &(dsakey.q))) != BIG_OK)
-			goto clean10;			/* tmp <- k^-1 */
-
-	if ((err = big_mul(&tmp1, &(dsakey.x), &(dsakey.r))) != BIG_OK)
-		goto clean10;
-
-	if ((err = big_add(&tmp1, &tmp1, &msg)) != BIG_OK)
-		goto clean10;
-
-	if ((err = big_mul(&tmp, &tmp1, &tmp)) != BIG_OK)
-		goto clean10;
-
-	if ((err = big_div_pos(NULL, &(dsakey.s), &tmp, &(dsakey.q))) !=
-	    BIG_OK)
-		goto clean10;
-
-	bignum2bytestring((uchar_t *)out, &(dsakey.r), DSA_SUBPRIME_BYTES);
-	bignum2bytestring((uchar_t *)out + DSA_SUBPRIME_BYTES, &(dsakey.s),
-	    DSA_SUBPRIME_BYTES);
-
-	err = BIG_OK;
-
-clean10:
-	big_finish(&tmp2);
-clean9:
-	big_finish(&tmp1);
-clean8:
-	big_finish(&tmp);
-clean7:
-	big_finish(&msg);
-clean6:
-	DSA_key_finish(&dsakey);
-	if (err == BIG_OK)
-		rv = CKR_OK;
-	else if (err == BIG_NO_MEM)
-		rv = CKR_HOST_MEMORY;
-	else
-		rv = CKR_FUNCTION_FAILED;
 clean1:
 	return (rv);
 }
 
-CK_RV
-dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
+static CK_RV
+local_dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 {
-
+	CK_RV rv;
 	uchar_t g[MAX_KEY_ATTR_BUFLEN];
 	uchar_t y[MAX_KEY_ATTR_BUFLEN];
 	uchar_t p[MAX_KEY_ATTR_BUFLEN];
@@ -327,21 +176,14 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 	uint_t ylen = sizeof (y);
 	uint_t plen = sizeof (p);
 	uint_t qlen = sizeof (q);
-	DSAkey dsakey;
-	BIGNUM msg, tmp1, tmp2, tmp3;
-	CK_RV rv;
+	DSAbytekey k;
 
-	rv = soft_get_public_value(key, CKA_SUBPRIME, q, &qlen);
+	rv = soft_get_public_value(key, CKA_PRIME, p, &plen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
 
-	if (DSA_SUBPRIME_BYTES != qlen) {
-		rv = CKR_KEY_SIZE_RANGE;
-		goto clean1;
-	}
-
-	rv = soft_get_public_value(key, CKA_PRIME, p, &plen);
+	rv = soft_get_public_value(key, CKA_SUBPRIME, q, &qlen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -351,99 +193,23 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 		goto clean1;
 	}
 
-	if (plen < glen) {
-		rv = CKR_KEY_SIZE_RANGE;
-		goto clean1;
-	}
-
 	rv = soft_get_public_value(key, CKA_VALUE, y, &ylen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
 
-	if (plen < ylen) {
-		rv = CKR_KEY_SIZE_RANGE;
-		goto clean1;
-	}
+	k.prime = p;
+	k.prime_bits = CRYPTO_BYTES2BITS(plen);
+	k.subprime = q;
+	k.subprime_bits = CRYPTO_BYTES2BITS(qlen);
+	k.base = g;
+	k.base_bytes = glen;
+	k.public_y_bits = CRYPTO_BYTES2BITS(ylen);
+	k.public_y = y;
+	k.rfunc = NULL;
 
-	if (DSA_key_init(&dsakey, plen * 8) != BIG_OK) {
-		rv = CKR_HOST_MEMORY;
-		goto clean1;
-	}
+	rv = dsa_verify(&k, data, sig);
 
-	rv = CKR_HOST_MEMORY;
-	if (big_init(&msg, BIG_CHUNKS_FOR_160BITS) != BIG_OK) {
-		goto clean6;
-	}
-	if (big_init(&tmp1, 2 * CHARLEN2BIGNUMLEN(plen)) != BIG_OK) {
-		goto clean7;
-	}
-	if (big_init(&tmp2, CHARLEN2BIGNUMLEN(plen)) != BIG_OK) {
-		goto clean8;
-	}
-	if (big_init(&tmp3, 2 * BIG_CHUNKS_FOR_160BITS) != BIG_OK) {
-		goto clean9;
-	}
-
-	bytestring2bignum(&(dsakey.g), g, glen);
-	bytestring2bignum(&(dsakey.y), y, ylen);
-	bytestring2bignum(&(dsakey.p), p, plen);
-	bytestring2bignum(&(dsakey.q), q, DSA_SUBPRIME_BYTES);
-	bytestring2bignum(&(dsakey.r), (uchar_t *)sig, DSA_SUBPRIME_BYTES);
-	bytestring2bignum(&(dsakey.s), ((uchar_t *)sig) + DSA_SUBPRIME_BYTES,
-	    DSA_SUBPRIME_BYTES);
-	bytestring2bignum(&msg, (uchar_t *)data, DSA_SUBPRIME_BYTES);
-
-	if (big_ext_gcd_pos(NULL, &tmp2, NULL, &(dsakey.s), &(dsakey.q)) !=
-	    BIG_OK)
-		goto clean10;
-
-	if (tmp2.sign == -1)
-		if (big_add(&tmp2, &tmp2, &(dsakey.q)) != BIG_OK)
-			goto clean10;			/* tmp2 <- w */
-
-	if (big_mul(&tmp1, &msg, &tmp2) != BIG_OK)
-		goto clean10;
-
-	if (big_div_pos(NULL, &tmp1, &tmp1, &(dsakey.q)) != BIG_OK)
-		goto clean10;				/* tmp1 <- u_1 */
-
-	if (big_mul(&tmp2, &tmp2, &(dsakey.r)) != BIG_OK)
-		goto clean10;
-
-	if (big_div_pos(NULL, &tmp2, &tmp2, &(dsakey.q)) != BIG_OK)
-		goto clean10;				/* tmp2 <- u_2 */
-
-	if (big_modexp(&tmp1, &(dsakey.g), &tmp1, &(dsakey.p), NULL) != BIG_OK)
-		goto clean10;
-
-	if (big_modexp(&tmp2, &(dsakey.y), &tmp2, &(dsakey.p), NULL) != BIG_OK)
-		goto clean10;
-
-	if (big_mul(&tmp1, &tmp1, &tmp2) != BIG_OK)
-		goto clean10;
-
-	if (big_div_pos(NULL, &tmp1, &tmp1, &(dsakey.p)) != BIG_OK)
-		goto clean10;
-
-	if (big_div_pos(NULL, &tmp1, &tmp1, &(dsakey.q)) != BIG_OK)
-		goto clean10;
-
-	if (big_cmp_abs(&tmp1, &(dsakey.r)) == 0)
-		rv = CKR_OK;
-	else
-		rv = CKR_SIGNATURE_INVALID;
-
-clean10:
-	big_finish(&tmp3);
-clean9:
-	big_finish(&tmp2);
-clean8:
-	big_finish(&tmp1);
-clean7:
-	big_finish(&msg);
-clean6:
-	DSA_key_finish(&dsakey);
 clean1:
 	return (rv);
 }
@@ -538,7 +304,7 @@ soft_dsa_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 		return (CKR_BUFFER_TOO_SMALL);
 	}
 
-	rv = dsa_sign(key, pData, ulDataLen, pSigned);
+	rv = local_dsa_sign(key, pData, ulDataLen, pSigned);
 	if (rv == CKR_OK) {
 		*pulSignedLen = DSA_SIGNATURE_LENGTH;
 	}
@@ -569,19 +335,19 @@ soft_dsa_verify(soft_session_t *session_p, CK_BYTE_PTR pData,
 		goto clean_exit;
 	}
 
-	/* The signature length is always 40 bytes. */
-	if (ulSignatureLen != DSA_SIGNATURE_LENGTH) {
-		rv = CKR_SIGNATURE_LEN_RANGE;
-		goto clean_exit;
-	}
-
 	/* Input data length needs to be 20 bytes. */
 	if (ulDataLen != DSA_SUBPRIME_BYTES) {
 		rv = CKR_DATA_LEN_RANGE;
 		goto clean_exit;
 	}
 
-	rv = dsa_verify(key, pData, pSignature);
+	/* The signature length is always 40 bytes. */
+	if (ulSignatureLen != DSA_SIGNATURE_LENGTH) {
+		rv = CKR_SIGNATURE_LEN_RANGE;
+		goto clean_exit;
+	}
+
+	rv = local_dsa_verify(key, pData, pSignature);
 
 clean_exit:
 	(void) pthread_mutex_lock(&session_p->session_mutex);
@@ -635,7 +401,7 @@ clean_exit:
 }
 
 
-CK_RV
+static CK_RV
 soft_genDSAkey_set_attribute(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
     uchar_t *value, uint32_t value_len, boolean_t public)
 {
@@ -643,7 +409,6 @@ soft_genDSAkey_set_attribute(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
 	CK_RV rv = CKR_OK;
 	biginteger_t *dst = NULL;
 	biginteger_t src;
-
 
 	switch (type) {
 
@@ -676,13 +441,14 @@ soft_genDSAkey_set_attribute(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
 		break;
 	}
 
-	src.big_value_len = value_len;
-
-	if ((src.big_value = malloc(value_len)) == NULL) {
-		rv = CKR_HOST_MEMORY;
-		goto cleanexit;
+	/* Note: removal of preceding 0x00 imitates similar code in RSA */
+	while (value[0] == 0) {		/* remove preceding 0x00 */
+		value++;
+		value_len--;
 	}
-	(void) memcpy(src.big_value, value, value_len);
+
+	if ((rv = dup_bigint_attr(&src, value, value_len)) != CKR_OK)
+		goto cleanexit;
 
 	/* Copy the attribute in the key object. */
 	copy_bigint_attr(&src, dst);
@@ -695,44 +461,20 @@ cleanexit:
 
 
 CK_RV
-generate_dsa_key(DSAkey *key, boolean_t token_obj)
-{
-	BIG_ERR_CODE err;
-
-	do {
-		if ((err = random_bignum(&(key->x), DSA_SUBPRIME_BITS,
-		    token_obj)) != BIG_OK) {
-			return (convert_rv(err));
-		}
-	} while (big_cmp_abs(&(key->x), &(key->q)) > 0);
-
-	if ((err = big_modexp(&(key->y), &(key->g), (&key->x),
-	    (&key->p), NULL)) != BIG_OK)
-		return (convert_rv(err));
-
-	return (CKR_OK);
-}
-
-
-CK_RV
 soft_dsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 {
-	BIG_ERR_CODE brv;
 	CK_RV rv;
-	uchar_t	prime[MAX_KEY_ATTR_BUFLEN];
+	uchar_t prime[MAX_KEY_ATTR_BUFLEN];
 	uint32_t prime_len = sizeof (prime);
 	uchar_t	subprime[MAX_KEY_ATTR_BUFLEN];
 	uint32_t subprime_len = sizeof (subprime);
 	uchar_t	base[MAX_KEY_ATTR_BUFLEN];
 	uint32_t base_len = sizeof (base);
-	uchar_t	*pubvalue;
-	uint32_t pubvalue_len;
-	uchar_t	*privalue;
-	uint32_t privalue_len;
-	DSAkey	dsakey = {0};
-
-	pubvalue = NULL;
-	privalue = NULL;
+	uchar_t	pubvalue[MAX_KEY_ATTR_BUFLEN];
+	uint32_t pubvalue_len = sizeof (pubvalue);
+	uchar_t	privalue[DSA_SUBPRIME_BYTES];
+	uint32_t privalue_len = sizeof (privalue);
+	DSAbytekey k;
 
 	if ((pubkey == NULL) || (prikey == NULL)) {
 		return (CKR_ARGUMENTS_BAD);
@@ -745,21 +487,10 @@ soft_dsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto cleanexit;
 	}
 
-	if ((prime_len < MIN_DSA_KEY_LEN) ||
-	    (prime_len > MAX_DSA_KEY_LEN)) {
-		rv = CKR_ATTRIBUTE_VALUE_INVALID;
-		goto cleanexit;
-	}
-
 	rv = soft_get_public_value(pubkey, CKA_SUBPRIME, subprime,
 	    &subprime_len);
 	if (rv != CKR_OK) {
 		rv = CKR_TEMPLATE_INCOMPLETE;
-		goto cleanexit;
-	}
-
-	if (subprime_len != DSA_SUBPRIME_BYTES) {
-		rv = CKR_ATTRIBUTE_VALUE_INVALID;
 		goto cleanexit;
 	}
 
@@ -769,98 +500,54 @@ soft_dsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto cleanexit;
 	}
 
-	/*
-	 * initialize the dsa key
-	 * Note: big_extend takes length in words
-	 */
-	if ((brv = DSA_key_init(&dsakey, prime_len * 8)) != BIG_OK) {
-		rv = convert_rv(brv);
+	/* Inputs to DSA key pair generation. */
+	k.prime = prime;
+	k.prime_bits = CRYPTO_BYTES2BITS(prime_len);
+	k.subprime = subprime;
+	k.subprime_bits = CRYPTO_BYTES2BITS(subprime_len);
+	k.base = base;
+	k.base_bytes = base_len;
+	k.rfunc = (IS_TOKEN_OBJECT(pubkey) || IS_TOKEN_OBJECT(prikey)) ?
+	    pkcs11_get_random : pkcs11_get_urandom;
+
+	/* Outputs from DSA key pair generation. */
+	k.public_y = pubvalue;
+	k.public_y_bits = CRYPTO_BYTES2BITS(pubvalue_len);
+	k.private_x = privalue;
+	k.private_x_bits = CRYPTO_BYTES2BITS(privalue_len);
+
+	rv = dsa_genkey_pair(&k);
+
+	if (rv != CKR_OK) {
 		goto cleanexit;
 	}
-
-	if ((brv = big_extend(&dsakey.p,
-	    CHARLEN2BIGNUMLEN(prime_len))) != BIG_OK) {
-		rv = convert_rv(brv);
-		goto cleanexit;
-	}
-
-	bytestring2bignum(&dsakey.p, prime, prime_len);
-
-	if ((brv = big_extend(&dsakey.q, CHARLEN2BIGNUMLEN(subprime_len))) !=
-	    BIG_OK) {
-		rv = convert_rv(brv);
-		goto cleanexit;
-	}
-
-	bytestring2bignum(&dsakey.q, subprime, subprime_len);
-
-	if ((brv = big_extend(&dsakey.g, CHARLEN2BIGNUMLEN(base_len))) !=
-	    BIG_OK) {
-		rv = convert_rv(brv);
-		goto cleanexit;
-	}
-
-	bytestring2bignum(&dsakey.g, base, base_len);
-
-	/*
-	 * generate DSA key pair
-	 * Note: bignum.len is length of value in words
-	 */
-	if ((rv = generate_dsa_key(&dsakey, (IS_TOKEN_OBJECT(pubkey) ||
-	    IS_TOKEN_OBJECT(prikey)))) != CKR_OK) {
-		goto cleanexit;
-	}
-
-	pubvalue_len = prime_len;
-	if ((pubvalue = malloc(pubvalue_len)) == NULL) {
-		rv = CKR_HOST_MEMORY;
-		goto cleanexit;
-	}
-	bignum2bytestring(pubvalue, &dsakey.y, pubvalue_len);
-
-	privalue_len = DSA_SUBPRIME_BYTES;
-	if ((privalue = malloc(privalue_len)) == NULL) {
-		rv = CKR_HOST_MEMORY;
-		goto cleanexit;
-	}
-	bignum2bytestring(privalue, &dsakey.x, privalue_len);
 
 	/* Update attribute in public key. */
 	if ((rv = soft_genDSAkey_set_attribute(pubkey, CKA_VALUE,
-	    pubvalue, pubvalue_len, B_TRUE)) != CKR_OK) {
+	    pubvalue, CRYPTO_BITS2BYTES(k.public_y_bits), B_TRUE)) != CKR_OK) {
 		goto cleanexit;
 	}
 	/* Update attributes in private key. */
 	if ((rv = soft_genDSAkey_set_attribute(prikey, CKA_PRIME,
-	    prime, prime_len, B_FALSE)) != CKR_OK) {
+	    prime, CRYPTO_BITS2BYTES(k.prime_bits), B_FALSE)) != CKR_OK) {
 		goto cleanexit;
 	}
 
-	if ((rv = soft_genDSAkey_set_attribute(prikey, CKA_SUBPRIME,
-	    subprime, subprime_len, B_FALSE)) != CKR_OK) {
+	if ((rv = soft_genDSAkey_set_attribute(prikey, CKA_SUBPRIME, subprime,
+	    CRYPTO_BITS2BYTES(k.subprime_bits), B_FALSE)) != CKR_OK) {
 		goto cleanexit;
 	}
 
 	if ((rv = soft_genDSAkey_set_attribute(prikey, CKA_BASE,
-	    base, base_len, B_FALSE)) != CKR_OK) {
+	    base, k.base_bytes, B_FALSE)) != CKR_OK) {
 		goto cleanexit;
 	}
 
-	if ((rv = soft_genDSAkey_set_attribute(prikey, CKA_VALUE,
-	    privalue, privalue_len, B_FALSE)) != CKR_OK) {
+	if ((rv = soft_genDSAkey_set_attribute(prikey, CKA_VALUE, privalue,
+	    CRYPTO_BITS2BYTES(k.private_x_bits), B_FALSE)) != CKR_OK) {
 		goto cleanexit;
 	}
 
 cleanexit:
-	DSA_key_finish(&dsakey);
-
-	if (pubvalue != NULL) {
-		free(pubvalue);
-	}
-
-	if (privalue != NULL) {
-		free(privalue);
-	}
-
 	return (rv);
 }
