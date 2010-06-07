@@ -18,11 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights
-# reserved.
-#
-
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # MAPFILE HEADER START
 #
@@ -741,6 +737,8 @@ SUNWprivate_1.1 {
 	ovku_error_table;
 	prof_error_table;
 	profile_add_node;
+	profile_add_relation;
+	profile_clear_relation;
 	profile_close_file;
 	profile_create_node;
 	profile_find_node_relation;
@@ -763,6 +761,24 @@ SUNWprivate_1.1 {
 	profile_ser_internalize;
 	profile_ser_size;
 	profile_verify_node;
+	__profile_abandon;
+	__profile_add_domain_mapping;
+	__profile_add_realm;
+	__profile_add_realm_entry;
+	__profile_add_xrealm_mapping;
+	__profile_get_default_realm;
+	__profile_get_realm_entry;
+	__profile_get_realms;
+	__profile_init;
+	__profile_release;
+	__profile_remove_domain_mapping;
+	__profile_remove_realm;
+	__profile_remove_xrealm_mapping;
+	__profile_set_appdefaults;
+	__profile_set_kdc;
+	__profile_set_libdefaults;
+	__profile_set_logging;
+	__profile_validate;
 	pty_error_table;
 	rem_com_err_hook;
 	rem_default_com_err_hook;

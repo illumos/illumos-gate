@@ -1,9 +1,6 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * profile.h
@@ -39,7 +36,7 @@ typedef struct _profile_t *profile_t;
 
 #ifdef __cplusplus
 extern "C" {
-#endif /* __cplusplus */
+#endif
 
 typedef char* profile_filespec_t;	/* path as C string */
 typedef char* profile_filespec_list_t;	/* list of : separated paths, C string */
@@ -125,9 +122,32 @@ long KRB5_CALLCONV profile_add_relation
 	(profile_t profile, const char **names, 
 		   const char *new_value);
 
+/*
+ * Solaris Kerberos: Provide abstract declarations for applications, such as
+ * kconf and smb.
+ */
+long __profile_init(char *filename, profile_t *profile);
+long __profile_release(profile_t profile);
+void __profile_abandon(profile_t profile);
+long __profile_add_domain_mapping(profile_t profile, char *domain, char *realm);
+long __profile_remove_domain_mapping(profile_t profile, char *realm);
+long __profile_get_realm_entry(profile_t profile, char *realm, char *name,
+    char ***ret_value);
+long __profile_add_realm_entry(profile_t profile, char *realm, char *name,
+    char **values);
+long __profile_get_default_realm(profile_t profile, char **realm);
+long __profile_get_realms(profile_t profile, char ***realms);
+long __profile_add_realm(profile_t profile, char *realm, char *master,
+    char **kdcs, boolean_t set_change, boolean_t default_realm);
+long __profile_remove_xrealm_mapping(profile_t profile, char *realm);
+long __profile_remove_realm(profile_t profile, char *realm);
+long __profile_add_xrealm_mapping(profile_t profile, char *source, char *target,
+    char *inter);
+long __profile_validate(profile_t profile, int *val_err, char **val);
+
 #ifdef __cplusplus
 }
-#endif /* __cplusplus */
+#endif
 
 #endif /* _KRB5_PROFILE_H */
 

@@ -14,28 +14,23 @@
 #include <limits.h>
 
 /*
- * These functions --- init_list(), end_list(), and add_to_list() are
- * internal functions used to build up a null-terminated char ** list
- * of strings to be returned by functions like profile_get_values.
+ * Solaris Kerberos: The following functions are made public so that other
+ * profile functions can call upon these basic routines:
+ *	init_list(), end_list(), and add_to_list().
+ * Note: That profile_string_list is moved to prof_int.h as a result.
  *
- * The profile_string_list structure is used for internal booking
- * purposes to build up the list, which is returned in *ret_list by
- * the end_list() function.
+ * These functions --- init_list(), end_list(), and add_to_list() are
+ * publicy exported functions used to build up a null-terminated char ** list
+ * of strings to be returned by functions like profile_get_values.
  *
  * The publicly exported interface for freeing char** list is
  * profile_free_list().
  */
 
-struct profile_string_list {
-	char	**list;
-	int	num;
-	int	max;
-};
-
 /*
  * Initialize the string list abstraction.
  */
-static errcode_t init_list(struct profile_string_list *list)
+errcode_t init_list(struct profile_string_list *list)
 {
 	list->num = 0;
 	list->max = 10;
@@ -50,7 +45,7 @@ static errcode_t init_list(struct profile_string_list *list)
  * Free any memory left over in the string abstraction, returning the
  * built up list in *ret_list if it is non-null.
  */
-static void end_list(struct profile_string_list *list, char ***ret_list)
+void end_list(struct profile_string_list *list, char ***ret_list)
 {
 	char	**cp;
 
@@ -72,7 +67,7 @@ static void end_list(struct profile_string_list *list, char ***ret_list)
 /*
  * Add a string to the list.
  */
-static errcode_t add_to_list(struct profile_string_list *list, const char *str)
+errcode_t add_to_list(struct profile_string_list *list, const char *str)
 {
 	char 	*newstr, **newlist;
 	int	newmax;

@@ -18,17 +18,12 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights
-# reserved.
-#
-
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # This make file will build mech_krb5.so.1. This shared object
 # contains all the functionality needed to support the Kereros V5 GSS-API
 # mechanism. No other Kerberos libraries are needed.
 #
-
 
 LIBRARY= mech_krb5.a
 VERS = .1
@@ -188,7 +183,7 @@ MECH_UTS= delete_sec_context.o gssapi_krb5.o \
 GSSAPI_UTS= gen_oids.o
 
 PROFILE_OBJS= prof_tree.o prof_file.o prof_parse.o prof_init.o \
-	prof_set.o prof_get.o
+	prof_set.o prof_get.o prof_solaris.o
 
 SUPPORT_OBJS= fake-addrinfo.o init-addrinfo.o threads.o errors.o plugins.o \
 	      utf8_conv.o utf8.o

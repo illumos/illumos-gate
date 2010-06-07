@@ -1,8 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 /*
  * prof-int.h
@@ -10,6 +8,7 @@
 
 /* Solaris Kerberos */
 #ifndef __PROF_INT_H
+#define	__PROF_INT_H
 
 #include <time.h>
 #include <stdio.h>
@@ -107,6 +106,18 @@ typedef struct _profile_times {
 	char **value;
 	int  found;
 } profile_option_strings;
+
+/*
+ * Solaris Kerberos: Added here to provide to other non-prof_get functions.
+ * The profile_string_list structure is used for internal booking
+ * purposes to build up the list, which is returned in *ret_list by
+ * the end_list() function.
+ */
+struct profile_string_list {
+	char	**list;
+	int	num;
+	int	max;
+};
 
 /*
  * Used by the profile iterator in prof_get.c
@@ -260,10 +271,17 @@ errcode_t profile_ser_internalize
 errcode_t profile_get_value
 	(profile_t profile, const char **names,
 		    const char	**ret_value);
+
+/*
+ * Solaris Kerberos: Need basic routines for other functions besides prof_get.
+ */
+errcode_t init_list(struct profile_string_list *list);
+void end_list(struct profile_string_list *list, char ***ret_list);
+errcode_t add_to_list(struct profile_string_list *list, const char *str);
+
 /* Others included from profile.h */
 	
 /* prof_set.c -- included from profile.h */
 
 /* Solaris Kerberos */
-#define __PROF_INT_H
-#endif
+#endif /* __PROF_INT_H */
