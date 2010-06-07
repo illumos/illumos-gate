@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -59,6 +57,7 @@ SUNWprivate {
 	pkcs11_close_urandom;
 	pkcs11_close_urandom_seed;
 	pkcs11_default_token;
+	pkcs11_free_uri;
 	pkcs11_get_nzero_urandom;
 	pkcs11_get_pass;
 	pkcs11_get_random;
@@ -66,6 +65,7 @@ SUNWprivate {
 	pkcs11_mech2keytype;
 	pkcs11_mech2keygen;
 	pkcs11_mech2str;
+	pkcs11_parse_uri;
 	pkcs11_read_data;
 	pkcs11_seed_random;
 	pkcs11_seed_urandom;

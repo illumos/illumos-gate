@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,13 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 This is an internal library for use only by:
 	usr/src/cmd/cmd-crypto
 	usr/src/lib/pkcs11
+	usr/src/lib/libkmf
 
 The library and the header file are installed into the proto area but
 are not included in any pacakges.
@@ -191,12 +189,29 @@ Consumers:
 
 	pkcs11_strerror()
 
-This function returnes a string representation of any given PKCS11 return
+This function returns a string representation of any given PKCS11 return
 code.
 
 Consumer:
 
 	encrypt(1) and decrypt(1) uses this function for reporting errors.
+	
+2.5 PKCS#11 URI parsing code
+
+	pkcs11_parse_uri()
+	pkcs11_free_uri()
+
+This function parses a PKCS#11 URI and fills up a pkcs11_uri_t structure. It
+also reads the PIN if the PKCS#11 URI specifies a passphrase dialog. The
+pkcs11_uri_t is described in cryptoutil.h, explanation of the return codes for
+the pkcs11_parse_uri() function is in the function's comment in pk11_uri.c. The
+pkcs11_parse_uri() function allocates the URI's fields and the caller is
+responsible for calling pkcs11_free_uri() after it's done with the URI
+structure.
+
+Consumer:
+
+	SunSSH will use the functions for parsing PKCS#11 URIs.
 	
 3. Non-Contents
 	

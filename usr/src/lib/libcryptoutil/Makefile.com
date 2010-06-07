@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY= libcryptoutil.a
@@ -36,7 +35,8 @@ OBJECTS= \
 	passutils.o \
 	random.o \
 	keyfile.o \
-	util.o
+	util.o \
+	pkcs11_uri.o
 
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/lib/Makefile.rootfs

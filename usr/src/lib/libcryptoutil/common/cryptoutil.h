@@ -17,10 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ *
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _CRYPTOUTIL_H
@@ -114,6 +112,67 @@ typedef struct uentrylist {
 	struct uentrylist	*next;
 } uentrylist_t;
 
+/* Return codes for pkcs11_parse_uri() */
+#define	PK11_URI_OK		0
+#define	PK11_URI_INVALID	1
+#define	PK11_MALLOC_ERROR	2
+#define	PK11_URI_VALUE_OVERFLOW	3
+#define	PK11_NOT_PKCS11_URI	4
+
+/*
+ * There is no limit for the attribute length in the spec. 256 bytes should be
+ * enough for the object name.
+ */
+#define	PK11_MAX_OBJECT_LEN		256
+/*
+ * CKA_ID is of type "byte array" which can be of arbitrary length. 256 bytes
+ * should be sufficient though.
+ */
+#define	PK11_MAX_ID_LEN			256
+
+/* Structure for the PKCS#11 URI. */
+typedef struct pkcs11_uri_t {
+	/* CKA_LABEL attribute to the C_FindObjectsInit function. */
+	CK_UTF8CHAR_PTR	object;
+	/*
+	 * CKA_CLASS attribute to the C_FindObjectsInit function. The
+	 * "objecttype" URI attribute can have a value one of "private",
+	 * "public", "cert", "secretkey", and "data". The "objecttype" field can
+	 * have a value of CKO_PUBLIC_KEY, CKO_PRIVATE_KEY, CKO_CERTIFICATE,
+	 * CKO_SECRET_KEY, and CKO_DATA. This attribute cannot be empty in the
+	 * URI.
+	 */
+	CK_ULONG	objecttype;
+	/* CKO_DATA is 0 so we need this flag. Not part of the URI itself. */
+	boolean_t	objecttype_present;
+	/*
+	 * Token, manufufacturer, serial and model are of fixed size length in
+	 * the specification. We allocate memory on the fly to distinguish
+	 * between an attribute not present and an empty value. We check for
+	 * overflows. We always terminate the string with '\0' even when that is
+	 * not used in the PKCS#11's CK_TOKEN_INFO structure (fields are padded
+	 * with spaces).
+	 */
+	/* Token label from CK_TOKEN_INFO. */
+	CK_UTF8CHAR_PTR	token;
+	/* ManufacturerID from CK_TOKEN_INFO. */
+	CK_UTF8CHAR_PTR	manuf;
+	/* SerialNumber from CK_TOKEN_INFO. */
+	CK_CHAR_PTR	serial;
+	/* Model from CK_TOKEN_INFO. */
+	CK_UTF8CHAR_PTR	model;
+	/* This is a byte array, we need a length parameter as well. */
+	CK_BYTE_PTR	id;
+	int		id_len;
+	/*
+	 * Location of the file with a token PIN. Application can overload this,
+	 * eg. "/bin/askpass|" may mean to read the PIN from a command. However,
+	 * the pkcs11_parse_uri() function does not interpret this field in any
+	 * way.
+	 */
+	char		*pinfile;
+} pkcs11_uri_t;
+
 extern void cryptodebug(const char *fmt, ...);
 extern void cryptoerror(int priority, const char *fmt, ...);
 extern void cryptodebug_init(const char *prefix);
@@ -165,6 +224,9 @@ extern ssize_t writen_nointr(int fd, void *dbuf, size_t dlen);
 extern int update_conf(char *conf_file, char *entry);
 
 extern CK_RV get_fips_mode(int *);
+
+extern int pkcs11_parse_uri(const char *str, pkcs11_uri_t *uri);
+extern void pkcs11_free_uri(pkcs11_uri_t *uri);
 
 #ifdef __cplusplus
 }
