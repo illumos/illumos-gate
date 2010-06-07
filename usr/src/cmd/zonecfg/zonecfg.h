@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _ZONECFG_H
@@ -89,9 +88,10 @@ extern "C" {
 #define	RT_IPTYPE	24	/* really a property, but for info ... */
 #define	RT_PCAP		25
 #define	RT_HOSTID	26	/* really a property, but for info ... */
+#define	RT_ADMIN	27
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_HOSTID
+#define	RT_MAX		RT_ADMIN
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
@@ -131,9 +131,11 @@ extern "C" {
 #define	PT_IPTYPE	34
 #define	PT_DEFROUTER	35
 #define	PT_HOSTID	36
+#define	PT_USER		37
+#define	PT_AUTHS	38
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_HOSTID
+#define	PT_MAX		PT_AUTHS
 
 #define	MAX_EQ_PROP_PAIRS	3
 

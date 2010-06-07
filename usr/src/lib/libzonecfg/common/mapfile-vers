@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -50,6 +49,7 @@ SUNWprivate_1.1 {
 	zonecfg_add_ds;
 	zonecfg_add_filesystem;
 	zonecfg_add_fs_option;
+	zonecfg_add_admin;
 	zonecfg_add_ipd;
 	zonecfg_add_nwif;
 	zonecfg_add_patch;
@@ -62,6 +62,7 @@ SUNWprivate_1.1 {
 	zonecfg_aliased_rctl_ok;
 	zonecfg_apply_rctls;
 	zonecfg_attach_manifest;
+	zonecfg_authorize_users;
 	zonecfg_bind_pool;
 	zonecfg_bind_tmp_pool;
 	zonecfg_call_zoneadmd;
@@ -69,8 +70,12 @@ SUNWprivate_1.1 {
 	zonecfg_close_scratch;
 	zonecfg_construct_rctlblk;
 	zonecfg_create_snapshot;
+	zonecfg_deauthorize_user;
+	zonecfg_deauthorize_users;
 	zonecfg_default_brand;
 	zonecfg_default_privset;
+	zonecfg_delete_admin;
+	zonecfg_delete_admins;
 	zonecfg_delete_attr;
 	zonecfg_delete_dev;
 	zonecfg_delete_ds;
@@ -90,6 +95,7 @@ SUNWprivate_1.1 {
 	zonecfg_devperms_apply;
 	zonecfg_dev_manifest;
 	zonecfg_enable_rcapd;
+	zonecfg_endadminent;
 	zonecfg_endattrent;
 	zonecfg_enddevent;
 	zonecfg_enddevperment;
@@ -106,6 +112,7 @@ SUNWprivate_1.1 {
 	zonecfg_get_aliased_rctl;
 	zonecfg_get_attach_handle;
 	zonecfg_get_attr_boolean;
+	zonecfg_getadminent;
 	zonecfg_getattrent;
 	zonecfg_get_attr_int;
 	zonecfg_get_attr_string;
@@ -144,12 +151,14 @@ SUNWprivate_1.1 {
 	zonecfg_grab_lock_file;
 	zonecfg_ifname_exists;
 	zonecfg_in_alt_root;
+	zonecfg_insert_userauths;
 	zonecfg_init_handle;
 	zonecfg_init_lock_file;
 	zonecfg_is_rctl;
 	zonecfg_is_scratch;
 	zonecfg_lock_file_held;
 	zonecfg_lock_scratch;
+	zonecfg_lookup_admin;
 	zonecfg_lookup_attr;
 	zonecfg_lookup_dev;
 	zonecfg_lookup_ds;
@@ -159,6 +168,7 @@ SUNWprivate_1.1 {
 	zonecfg_lookup_nwif;
 	zonecfg_lookup_pset;
 	zonecfg_lookup_rctl;
+	zonecfg_modify_admin;
 	zonecfg_modify_attr;
 	zonecfg_modify_dev;
 	zonecfg_modify_ds;
@@ -179,11 +189,13 @@ SUNWprivate_1.1 {
 	zonecfg_release_lock_file;
 	zonecfg_remove_fs_option;
 	zonecfg_remove_rctl_value;
+	zonecfg_remove_userauths;
 	zonecfg_reverse_scratch;
 	zonecfg_rm_aliased_rctl;
 	zonecfg_rm_detached;
 	zonecfg_same_net_address;
 	zonecfg_save;
+	zonecfg_setadminent;
 	zonecfg_setattrent;
 	zonecfg_set_aliased_rctl;
 	zonecfg_set_autoboot;
@@ -207,7 +219,9 @@ SUNWprivate_1.1 {
 	zonecfg_set_zonepath;
 	zonecfg_strerror;
 	zonecfg_str_to_bytes;
+	zonecfg_update_userauths;
 	zonecfg_validate_zonename;
+	zonecfg_valid_auths;
 	zonecfg_valid_alias_limit;
 	zonecfg_valid_fs_type;
 	zonecfg_valid_hostid;

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LIBZONECFG_H
@@ -50,6 +49,8 @@ extern "C" {
 #include <sys/uuid.h>
 #include <libuutil.h>
 #include <sys/mnttab.h>
+#include <limits.h>
+#include <utmpx.h>
 
 #define	ZONE_ID_UNDEFINED	-1
 
@@ -121,6 +122,10 @@ extern "C" {
 
 #define	ZONE_CONFIG_ROOT	"/etc/zones"
 #define	ZONE_INDEX_FILE		ZONE_CONFIG_ROOT "/index"
+
+#define	MAXUSERNAME		(sizeof (((struct utmpx *)0)->ut_name))
+#define	MAXAUTHS		4096
+#define	ZONE_MGMT_PROF		"Zone Management"
 
 /* Owner, group, and mode (defined by packaging) for the config directory */
 #define	ZONE_CONFIG_UID		0		/* root */
@@ -243,6 +248,17 @@ struct zone_devpermtab {
 	mode_t	zone_devperm_mode;
 	char	*zone_devperm_acl;
 };
+
+struct zone_admintab {
+	char	zone_admin_user[MAXUSERNAME];
+	char	zone_admin_auths[MAXAUTHS];
+};
+
+typedef struct zone_userauths {
+	char			user[MAXUSERNAME];
+	char			zonename[ZONENAME_MAX];
+	struct zone_userauths	*next;
+} zone_userauths_t;
 
 typedef struct {
 	uu_avl_node_t	zpe_entry;
@@ -484,6 +500,9 @@ extern	int	zonecfg_setdevperment(zone_dochandle_t);
 extern	int	zonecfg_getdevperment(zone_dochandle_t,
     struct zone_devpermtab *);
 extern	int	zonecfg_enddevperment(zone_dochandle_t);
+extern	int	zonecfg_setadminent(zone_dochandle_t);
+extern	int	zonecfg_getadminent(zone_dochandle_t, struct zone_admintab *);
+extern	int	zonecfg_endadminent(zone_dochandle_t);
 
 /*
  * Privilege-related functions.
@@ -565,6 +584,22 @@ extern boolean_t zonecfg_lock_file_held(int *);
 extern int zonecfg_ping_zoneadmd(const char *);
 extern int zonecfg_call_zoneadmd(const char *, zone_cmd_arg_t *, char *,
     boolean_t);
+extern int zonecfg_insert_userauths(zone_dochandle_t, char *, char *);
+extern int zonecfg_remove_userauths(zone_dochandle_t, char *, char *,
+    boolean_t);
+extern int zonecfg_add_admin(zone_dochandle_t, struct zone_admintab *,
+    char *);
+extern int zonecfg_delete_admin(zone_dochandle_t,
+    struct zone_admintab *, char *);
+extern int zonecfg_modify_admin(zone_dochandle_t, struct zone_admintab *,
+    struct zone_admintab *, char *);
+extern int zonecfg_delete_admins(zone_dochandle_t, char *);
+extern int zonecfg_lookup_admin(zone_dochandle_t, struct zone_admintab *);
+extern int zonecfg_authorize_users(zone_dochandle_t, char *);
+extern int zonecfg_update_userauths(zone_dochandle_t, char *);
+extern int zonecfg_deauthorize_user(zone_dochandle_t, char *, char *);
+extern int zonecfg_deauthorize_users(zone_dochandle_t, char *);
+extern boolean_t zonecfg_valid_auths(const char *, const char *);
 
 #ifdef __cplusplus
 }

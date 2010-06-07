@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -58,6 +57,7 @@
 #define	DTD_ELEM_INSTALL	((const xmlChar *) "install")
 #define	DTD_ELEM_INSTALLOPTS	((const xmlChar *) "installopts")
 #define	DTD_ELEM_LOGIN_CMD	((const xmlChar *) "login_cmd")
+#define	DTD_ELEM_FORCELOGIN_CMD	((const xmlChar *) "forcedlogin_cmd")
 #define	DTD_ELEM_MODNAME	((const xmlChar *) "modname")
 #define	DTD_ELEM_MOUNT		((const xmlChar *) "mount")
 #define	DTD_ELEM_POSTATTACH	((const xmlChar *) "postattach")
@@ -517,6 +517,16 @@ brand_get_login_cmd(brand_handle_t bh, const char *username,
 	const char *curr_zone = get_curr_zone();
 	return (brand_get_value(bhp, NULL, NULL, username, curr_zone,
 	    buf, len, DTD_ELEM_LOGIN_CMD, B_TRUE, B_FALSE));
+}
+
+int
+brand_get_forcedlogin_cmd(brand_handle_t bh, const char *username,
+    char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	const char *curr_zone = get_curr_zone();
+	return (brand_get_value(bhp, NULL, NULL, username, curr_zone,
+	    buf, len, DTD_ELEM_FORCELOGIN_CMD, B_TRUE, B_FALSE));
 }
 
 int

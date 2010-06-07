@@ -86,6 +86,7 @@ HTMLENTS = \
 	RtZFSFileSysMngmnt.html \
 	RtZFSStorageMngmnt.html \
 	RtZoneMngmnt.html \
+	RtZoneSecurity.html \
 	RtInfoSec.html \
 	RtObjectLabelMngmnt.html \
 	RtOutsideAccred.html \

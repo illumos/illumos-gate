@@ -50,6 +50,8 @@ extern "C" {
 #define	KV_ACTION_WILDCARD	"*;*;*;*;*"
 #define	KV_SEPCHAR		','
 #define	KV_SEPSTR		","
+#define	KV_OBJECTCHAR		'/'
+#define	KV_OBJECT		"/"
 
 #define	KV_FLAG_NONE		0x0000
 #define	KV_FLAG_REQUIRED	0x0001

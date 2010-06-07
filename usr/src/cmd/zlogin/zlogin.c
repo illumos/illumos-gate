@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -85,6 +84,9 @@
 #include <libzonecfg.h>
 #include <libcontract.h>
 #include <libbrand.h>
+#include <auth_list.h>
+#include <auth_attr.h>
+#include <secdb.h>
 
 static int masterfd;
 static struct termios save_termios;
@@ -103,6 +105,13 @@ static char cmdchar = '~';
 static int pollerr = 0;
 
 static const char *pname;
+static char *username;
+
+/*
+ * When forced_login is true, the user is not prompted
+ * for an authentication password in the target zone.
+ */
+static boolean_t forced_login = B_FALSE;
 
 #if !defined(TEXT_DOMAIN)		/* should be defined by cc -D */
 #define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it wasn't */
@@ -1022,9 +1031,16 @@ zone_login_cmd(brand_handle_t bh, const char *login)
 
 	/* Get the login command for the target zone. */
 	bzero(result_buf, sizeof (result_buf));
-	if (brand_get_login_cmd(bh, login,
-	    result_buf, sizeof (result_buf)) != 0)
-		return (NULL);
+
+	if (forced_login) {
+		if (brand_get_forcedlogin_cmd(bh, login,
+		    result_buf, sizeof (result_buf)) != 0)
+			return (NULL);
+	} else {
+		if (brand_get_login_cmd(bh, login,
+		    result_buf, sizeof (result_buf)) != 0)
+			return (NULL);
+	}
 
 	/*
 	 * We got back a string that we'd like to execute.  But since
@@ -1114,6 +1130,10 @@ prep_args(brand_handle_t bh, const char *login, char **argv)
 				return (NULL);
 
 			new_argv[a++] = SUPATH;
+			if (strcmp(login, "root") != 0) {
+				new_argv[a++] = "-";
+				n++;
+			}
 			new_argv[a++] = (char *)login;
 		}
 		new_argv[a++] = "-c";
@@ -1637,6 +1657,15 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
 		 */
 		(void) setpgid(getpid(), getpid());
 
+		/*
+		 * The child needs to run as root to
+		 * execute the su program.
+		 */
+		if (setuid(0) == -1) {
+			zperror(gettext("insufficient privilege"));
+			return (1);
+		}
+
 		(void) execve(new_args[0], new_args, new_env);
 		zperror(gettext("exec failure"));
 		_exit(1);
@@ -1667,6 +1696,29 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
 	return (WEXITSTATUS(child_status));
 }
 
+static char *
+get_username()
+{
+	uid_t	uid;
+	struct passwd *nptr;
+
+	/*
+	 * Authorizations are checked to restrict access based on the
+	 * requested operation and zone name, It is assumed that the
+	 * program is running with all privileges, but that the real
+	 * user ID is that of the user or role on whose behalf we are
+	 * operating. So we start by getting the username that will be
+	 * used for subsequent authorization checks.
+	 */
+
+	uid = getuid();
+	if ((nptr = getpwuid(uid)) == NULL) {
+		zerror(gettext("could not get user name."));
+		_exit(1);
+	}
+	return (nptr->pw_name);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1689,11 +1741,13 @@ main(int argc, char **argv)
 	char kernzone[ZONENAME_MAX];
 	brand_handle_t bh;
 	char user_cmd[MAXPATHLEN];
+	char authname[MAXAUTHS];
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
 	(void) getpname(argv[0]);
+	username = get_username();
 
 	while ((arg = getopt(argc, argv, "ECR:Se:l:")) != EOF) {
 		switch (arg) {
@@ -1800,13 +1854,8 @@ main(int argc, char **argv)
 	 * In the console case, because we may need to startup zoneadmd.
 	 * In the non-console case in order to do zone_enter(2), zonept()
 	 * and other tasks.
-	 *
-	 * Future work: this solution is temporary.  Ultimately, we need to
-	 * move to a flexible system which allows the global admin to
-	 * designate that a particular user can zlogin (and probably zlogin
-	 * -C) to a particular zone.  This all-root business we have now is
-	 * quite sketchy.
 	 */
+
 	if ((privset = priv_allocset()) == NULL) {
 		zperror(gettext("priv_allocset failed"));
 		return (1);
@@ -1825,6 +1874,37 @@ main(int argc, char **argv)
 		return (1);
 	}
 	priv_freeset(privset);
+
+	/*
+	 * Check if user is authorized for requested usage of the zone
+	 */
+
+	(void) snprintf(authname, MAXAUTHS, "%s%s%s",
+	    ZONE_MANAGE_AUTH, KV_OBJECT, zonename);
+	if (chkauthattr(authname, username) == 0) {
+		if (console) {
+			zerror(gettext("%s is not authorized for console "
+			    "access to  %s zone."),
+			    username, zonename);
+			return (1);
+		} else {
+			(void) snprintf(authname, MAXAUTHS, "%s%s%s",
+			    ZONE_LOGIN_AUTH, KV_OBJECT, zonename);
+			if (failsafe || !interactive) {
+				zerror(gettext("%s is not authorized for  "
+				    "failsafe or non-interactive login "
+				    "to  %s zone."), username, zonename);
+				return (1);
+			} else if (chkauthattr(authname, username) == 0) {
+				zerror(gettext("%s is not authorized "
+				    " to login to %s zone."),
+				    username, zonename);
+				return (1);
+			}
+		}
+	} else {
+		forced_login = B_TRUE;
+	}
 
 	/*
 	 * The console is a separate case from the rest of the code; handle
@@ -2116,10 +2196,20 @@ main(int argc, char **argv)
 			if (setup_utmpx(slaveshortname) == -1)
 				return (1);
 
+		/*
+		 * The child needs to run as root to
+		 * execute the brand's login program.
+		 */
+		if (setuid(0) == -1) {
+			zperror(gettext("insufficient privilege"));
+			return (1);
+		}
+
 		(void) execve(new_args[0], new_args, new_env);
 		zperror(gettext("exec failure"));
 		return (1);
 	}
+
 	(void) ct_tmpl_clear(tmpl_fd);
 	(void) close(tmpl_fd);
 

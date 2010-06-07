@@ -21,8 +21,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <string.h>
@@ -38,8 +37,8 @@ extern void yyerror(char *s);
 char *safe_strdup(char *s);
 %}
 
-%a 6000
-%p 4000
+%a 7000
+%p 5000
 %e 2000
 %n 1000
 
@@ -164,6 +163,8 @@ char *safe_strdup(char *s);
 
 <TSTATE>attr	{ return ATTR; }
 
+<TSTATE>admin	{ return ADMIN; }
+
 <TSTATE>zonename	{ return ZONENAME; }
 <CSTATE>zonename	{ return ZONENAME; }
 
@@ -273,6 +274,12 @@ char *safe_strdup(char *s);
 
 <TSTATE>hostid		{ return HOSTID; }
 <CSTATE>hostid		{ return HOSTID; }
+
+<TSTATE>user	{ return USER; }
+<CSTATE>user	{ return USER; }
+
+<TSTATE>auths	{ return AUTHS; }
+<CSTATE>auths	{ return AUTHS; }
 
 <TSTATE>=	{ return EQUAL; }
 <LSTATE>=	{ return EQUAL; }

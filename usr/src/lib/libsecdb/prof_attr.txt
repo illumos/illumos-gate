@@ -95,6 +95,7 @@ STMF Administration:::Configure STMF service:auths=solaris.smf.modify.applicatio
 STMF Management:::Start/Stop STMF service:auths=solaris.smf.manage.stmf
 ZFS File System Management:::Create and Manage ZFS File Systems:help=RtZFSFileSysMngmnt.html
 ZFS Storage Management:::Create and Manage ZFS Storage Pools:help=RtZFSStorageMngmnt.html
+Zone Security:::Zones Virtual Application Environment Security:auths=solaris.zone.*,solaris.zone.grant;help=RtZoneSecurity.html
 Zone Management:::Zones Virtual Application Environment Administration:help=RtZoneMngmnt.html
 IP Filter Management:::IP Filter Administration:help=RtIPFilterMngmnt.html
 Project Management:::Add/Modify/Remove projects:help=RtProjManagement.html

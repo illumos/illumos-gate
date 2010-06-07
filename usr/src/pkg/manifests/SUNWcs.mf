@@ -1037,6 +1037,10 @@ file path=usr/lib/help/auths/locale/C/SysSyseventRead.html
 file path=usr/lib/help/auths/locale/C/SysSyseventWrite.html
 file path=usr/lib/help/auths/locale/C/WifiConfig.html
 file path=usr/lib/help/auths/locale/C/WifiWep.html
+file path=usr/lib/help/auths/locale/C/ZoneCloneFrom.html
+file path=usr/lib/help/auths/locale/C/ZoneHeader.html
+file path=usr/lib/help/auths/locale/C/ZoneLogin.html
+file path=usr/lib/help/auths/locale/C/ZoneManage.html
 file path=usr/lib/help/profiles/locale/C/RtAcctadm.html
 file path=usr/lib/help/profiles/locale/C/RtAll.html
 file path=usr/lib/help/profiles/locale/C/RtAuditCtrl.html
@@ -1109,6 +1113,7 @@ file path=usr/lib/help/profiles/locale/C/RtVscanMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtZFSFileSysMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtZFSStorageMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtZoneMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtZoneSecurity.html
 file path=usr/lib/hotplugd mode=0555
 file path=usr/lib/iconv/646da.8859.t mode=0444
 file path=usr/lib/iconv/646de.8859.t mode=0444

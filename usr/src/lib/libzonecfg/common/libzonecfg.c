@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <libsysevent.h>
@@ -53,6 +52,11 @@
 #include <libuutil.h>
 #include <wait.h>
 #include <bsm/adt.h>
+#include <auth_attr.h>
+#include <auth_list.h>
+#include <secdb.h>
+#include <user_attr.h>
+#include <prof_attr.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -92,6 +96,7 @@
 #define	DTD_ELEM_PATCH		(const xmlChar *) "patch"
 #define	DTD_ELEM_OBSOLETES	(const xmlChar *) "obsoletes"
 #define	DTD_ELEM_DEV_PERM	(const xmlChar *) "dev-perm"
+#define	DTD_ELEM_ADMIN		(const xmlChar *) "admin"
 
 #define	DTD_ATTR_ACTION		(const xmlChar *) "action"
 #define	DTD_ATTR_ADDRESS	(const xmlChar *) "address"
@@ -125,6 +130,8 @@
 #define	DTD_ATTR_ACL		(const xmlChar *) "acl"
 #define	DTD_ATTR_BRAND		(const xmlChar *) "brand"
 #define	DTD_ATTR_HOSTID		(const xmlChar *) "hostid"
+#define	DTD_ATTR_USER		(const xmlChar *) "user"
+#define	DTD_ATTR_AUTHS		(const xmlChar *) "auths"
 
 #define	DTD_ENTITY_BOOLEAN	"boolean"
 #define	DTD_ENTITY_DEVPATH	"devpath"
@@ -189,6 +196,7 @@ struct zone_dochandle {
 	boolean_t	zone_dh_newzone;
 	boolean_t	zone_dh_snapshot;
 	boolean_t	zone_dh_sw_inv;
+	zone_userauths_t	*zone_dh_userauths;
 	char		zone_dh_delete_name[ZONENAME_MAX];
 };
 
@@ -802,6 +810,27 @@ zonecfg_get_name(zone_dochandle_t handle, char *name, size_t namesize)
 	return (getrootattr(handle, DTD_ATTR_NAME, name, namesize));
 }
 
+static int
+insert_admins(zone_dochandle_t handle, char *zonename)
+{
+	int err;
+	struct zone_admintab admintab;
+
+	if ((err = zonecfg_setadminent(handle)) != Z_OK) {
+		return (err);
+	}
+	while (zonecfg_getadminent(handle, &admintab) == Z_OK) {
+		err = zonecfg_insert_userauths(handle,
+		    admintab.zone_admin_user, zonename);
+		if (err != Z_OK) {
+			(void) zonecfg_endadminent(handle);
+			return (err);
+		}
+	}
+	(void) zonecfg_endadminent(handle);
+	return (Z_OK);
+}
+
 int
 zonecfg_set_name(zone_dochandle_t handle, char *name)
 {
@@ -883,7 +912,14 @@ zonecfg_set_name(zone_dochandle_t handle, char *name)
 		return (err);
 	}
 
-	return (Z_OK);
+	/*
+	 * Record the old admins from the old zonename
+	 * so that they can be deleted when the operation is committed.
+	 */
+	if ((err = insert_admins(handle, curname)) != Z_OK)
+		return (err);
+	else
+		return (Z_OK);
 }
 
 int
@@ -1258,6 +1294,11 @@ zonecfg_save(zone_dochandle_t handle)
 	addcomment(handle, "\n    DO NOT EDIT THIS "
 	    "FILE.  Use zonecfg(1M) instead.\n");
 
+	/*
+	 * Update user_attr first so that it will be older
+	 * than the config file.
+	 */
+	(void) zonecfg_authorize_users(handle, zname);
 	err = zonecfg_save_impl(handle, path);
 
 	stripcomments(handle);
@@ -2571,6 +2612,157 @@ zonecfg_modify_dev(
 	return (Z_OK);
 }
 
+static int
+zonecfg_add_auth_core(zone_dochandle_t handle, struct zone_admintab *tabptr,
+    char *zonename)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_ADMIN, NULL);
+	err = newprop(newnode, DTD_ATTR_USER, tabptr->zone_admin_user);
+	if (err != Z_OK)
+		return (err);
+	err = newprop(newnode, DTD_ATTR_AUTHS, tabptr->zone_admin_auths);
+	if (err != Z_OK)
+		return (err);
+	if ((err = zonecfg_remove_userauths(
+	    handle, tabptr->zone_admin_user, zonename, B_FALSE)) != Z_OK)
+		return (err);
+	return (Z_OK);
+}
+
+int
+zonecfg_add_admin(zone_dochandle_t handle, struct zone_admintab *tabptr,
+    char *zonename)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_auth_core(handle, tabptr,
+	    zonename)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+static int
+zonecfg_delete_auth_core(zone_dochandle_t handle, struct zone_admintab *tabptr,
+    char *zonename)
+{
+	xmlNodePtr cur = handle->zone_dh_cur;
+	boolean_t auth_match;
+	int err;
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_ADMIN))
+			continue;
+		auth_match = match_prop(cur, DTD_ATTR_USER,
+		    tabptr->zone_admin_user);
+		if (auth_match) {
+			if ((err = zonecfg_insert_userauths(
+			    handle, tabptr->zone_admin_user,
+			    zonename)) != Z_OK)
+				return (err);
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_delete_admin(zone_dochandle_t handle, struct zone_admintab *tabptr,
+    char *zonename)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_auth_core(handle, tabptr, zonename)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_modify_admin(zone_dochandle_t handle, struct zone_admintab *oldtabptr,
+    struct zone_admintab *newtabptr, char *zonename)
+{
+	int err;
+
+	if (oldtabptr == NULL || newtabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_auth_core(handle, oldtabptr, zonename))
+	    != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_auth_core(handle, newtabptr,
+	    zonename)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_admin(zone_dochandle_t handle, struct zone_admintab *tabptr)
+{
+	xmlNodePtr cur, firstmatch;
+	int err;
+	char user[MAXUSERNAME];
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	firstmatch = NULL;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_ADMIN))
+			continue;
+		if (strlen(tabptr->zone_admin_user) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_USER, user,
+			    sizeof (user)) == Z_OK) &&
+			    (strcmp(tabptr->zone_admin_user, user) == 0)) {
+				if (firstmatch == NULL)
+					firstmatch = cur;
+				else
+					return (Z_INSUFFICIENT_SPEC);
+			}
+		}
+	}
+	if (firstmatch == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	cur = firstmatch;
+
+	if ((err = fetchprop(cur, DTD_ATTR_USER, tabptr->zone_admin_user,
+	    sizeof (tabptr->zone_admin_user))) != Z_OK)
+		return (err);
+
+	if ((err = fetchprop(cur, DTD_ATTR_AUTHS, tabptr->zone_admin_auths,
+	    sizeof (tabptr->zone_admin_auths))) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+
 /* Lock to serialize all devwalks */
 static pthread_mutex_t zonecfg_devwalk_lock = PTHREAD_MUTEX_INITIALIZER;
 /*
@@ -3699,6 +3891,8 @@ nm_to_dtd(char *nm)
 		return (DTD_ELEM_RCTL);
 	if (strcmp(nm, "dataset") == 0)
 		return (DTD_ELEM_DATASET);
+	if (strcmp(nm, "admin") == 0)
+		return (DTD_ELEM_ADMIN);
 
 	return (NULL);
 }
@@ -4807,6 +5001,55 @@ zonecfg_getattrent(zone_dochandle_t handle, struct zone_attrtab *tabptr)
 
 int
 zonecfg_endattrent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setadminent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getadminent(zone_dochandle_t handle, struct zone_admintab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_ADMIN))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_USER, tabptr->zone_admin_user,
+	    sizeof (tabptr->zone_admin_user))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+
+	if ((err = fetchprop(cur, DTD_ATTR_AUTHS, tabptr->zone_admin_auths,
+	    sizeof (tabptr->zone_admin_auths))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_endadminent(zone_dochandle_t handle)
 {
 	return (zonecfg_endent(handle));
 }
@@ -7481,4 +7724,548 @@ zonecfg_call_zoneadmd(const char *zone_name, zone_cmd_arg_t *arg, char *locale,
 
 	free(rvalp);
 	return (-1);
+}
+
+boolean_t
+zonecfg_valid_auths(const char *auths, const char *zonename)
+{
+	char *right;
+	char *tmpauths;
+	char *lasts;
+	char authname[MAXAUTHS];
+	boolean_t status = B_TRUE;
+
+	tmpauths = strdup(auths);
+	if (tmpauths == NULL) {
+		zerror(zonename, gettext("Out of memory"));
+		return (B_FALSE);
+	}
+	right = strtok_r(tmpauths, ",", &lasts);
+	while (right != NULL) {
+		(void) snprintf(authname, MAXAUTHS, "%s%s",
+		    ZONE_AUTH_PREFIX, right);
+		if (getauthnam(authname) == NULL) {
+			status = B_FALSE;
+			zerror(zonename, gettext("%s is not a valid right"),
+			    right);
+		}
+		right = strtok_r(NULL, ",", &lasts);
+	}
+	free(tmpauths);
+	return (status);
+}
+
+int
+zonecfg_delete_admins(zone_dochandle_t handle, char *zonename)
+{
+	int err;
+	struct zone_admintab admintab;
+	boolean_t changed = B_FALSE;
+
+	if ((err = zonecfg_setadminent(handle)) != Z_OK) {
+		return (err);
+	}
+	while (zonecfg_getadminent(handle, &admintab) == Z_OK) {
+		err = zonecfg_delete_admin(handle, &admintab,
+		    zonename);
+		if (err != Z_OK) {
+			(void) zonecfg_endadminent(handle);
+			return (err);
+		} else {
+			changed = B_TRUE;
+		}
+		if ((err = zonecfg_setadminent(handle)) != Z_OK) {
+			return (err);
+		}
+	}
+	(void) zonecfg_endadminent(handle);
+	return (changed? Z_OK:Z_NO_ENTRY);
+}
+
+/*
+ * Checks if a long authorization applies to this zone.
+ * If so, it returns true, after destructively stripping
+ * the authorization of its prefix and zone suffix.
+ */
+static boolean_t
+is_zone_auth(char **auth, char *zonename, char *oldzonename)
+{
+	char *suffix;
+	size_t offset;
+
+	offset = strlen(ZONE_AUTH_PREFIX);
+	if ((strncmp(*auth, ZONE_AUTH_PREFIX, offset) == 0) &&
+	    ((suffix = strchr(*auth, '/')) != NULL)) {
+		if (strncmp(suffix + 1, zonename, strlen(zonename)) == 0) {
+			*auth += offset;
+			suffix[0] = '\0';
+			return (B_TRUE);
+		} else if ((oldzonename != NULL) &&
+		    (strncmp(suffix + 1, oldzonename,
+		    strlen(oldzonename)) == 0)) {
+			*auth += offset;
+			suffix[0] = '\0';
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+/*
+ * This function determines whether the zone-specific authorization
+ * assignments in /etc/user_attr have been changed more recently
+ * than the equivalent data stored in the zone's configuration file.
+ * This should only happen if the zone-specific authorizations in
+ * the user_attr file were modified using a tool other than zonecfg.
+ * If the configuration file is out-of-date with respect to these
+ * authorization assignments, it is updated to match those specified
+ * in /etc/user_attr.
+ */
+
+int
+zonecfg_update_userauths(zone_dochandle_t handle, char *zonename)
+{
+	userattr_t *ua_ptr;
+	char *authlist;
+	char *lasts;
+	FILE  *uaf;
+	struct zone_admintab admintab;
+	struct stat config_st, ua_st;
+	char config_file[MAXPATHLEN];
+	boolean_t changed = B_FALSE;
+	int err;
+
+	if ((uaf = fopen(USERATTR_FILENAME, "r")) == NULL) {
+		zerror(zonename, gettext("could not open file %s: %s"),
+		    USERATTR_FILENAME, strerror(errno));
+		if (errno == EACCES)
+			return (Z_ACCES);
+		if (errno == ENOENT)
+			return (Z_NO_ZONE);
+		return (Z_MISC_FS);
+	}
+	if ((err = fstat(fileno(uaf), &ua_st)) != 0) {
+		zerror(zonename, gettext("could not stat file %s: %s"),
+		    USERATTR_FILENAME, strerror(errno));
+		(void) fclose(uaf);
+		return (Z_MISC_FS);
+	}
+	if (!config_file_path(zonename, config_file)) {
+		(void) fclose(uaf);
+		return (Z_MISC_FS);
+	}
+
+	if ((err = stat(config_file, &config_st)) != 0) {
+		zerror(zonename, gettext("could not stat file %s: %s"),
+		    config_file, strerror(errno));
+		(void) fclose(uaf);
+		return (Z_MISC_FS);
+	}
+	if (config_st.st_mtime >= ua_st.st_mtime) {
+		(void) fclose(uaf);
+		return (Z_NO_ENTRY);
+	}
+	if ((err = zonecfg_delete_admins(handle, zonename)) == Z_OK) {
+		changed = B_TRUE;
+	} else if (err != Z_NO_ENTRY) {
+		(void) fclose(uaf);
+		return (err);
+	}
+	while ((ua_ptr = fgetuserattr(uaf)) != NULL) {
+		if (ua_ptr->name[0] == '#') {
+			continue;
+		}
+		authlist = kva_match(ua_ptr->attr, USERATTR_AUTHS_KW);
+		if (authlist != NULL) {
+			char *cur_auth;
+			boolean_t first;
+
+			first = B_TRUE;
+			bzero(&admintab.zone_admin_auths, MAXAUTHS);
+			cur_auth = strtok_r(authlist, ",", &lasts);
+			while (cur_auth != NULL) {
+				if (is_zone_auth(&cur_auth, zonename,
+				    NULL)) {
+					/*
+					 * Add auths for this zone
+					 */
+					if (first) {
+						first = B_FALSE;
+					} else {
+						(void) strlcat(
+						    admintab.zone_admin_auths,
+						    ",", MAXAUTHS);
+					}
+					(void) strlcat(
+					    admintab.zone_admin_auths,
+					    cur_auth, MAXAUTHS);
+				}
+				cur_auth = strtok_r(NULL, ",", &lasts);
+			}
+			if (!first) {
+				/*
+				 * Add this right to config file
+				 */
+				(void) strlcpy(admintab.zone_admin_user,
+				    ua_ptr->name,
+				    sizeof (admintab.zone_admin_user));
+				err = zonecfg_add_admin(handle,
+				    &admintab, zonename);
+				if (err != Z_OK) {
+					(void) fclose(uaf);
+					return (err);
+				} else {
+					changed = B_TRUE;
+				}
+			}
+		}
+	} /* end-of-while-loop */
+	(void) fclose(uaf);
+	return (changed? Z_OK: Z_NO_ENTRY);
+}
+
+static void
+update_profiles(char *rbac_profs, boolean_t add)
+{
+	char new_profs[MAXPROFS];
+	char *cur_prof;
+	boolean_t first = B_TRUE;
+	boolean_t found = B_FALSE;
+	char *lasts;
+
+	cur_prof = strtok_r(rbac_profs, ",", &lasts);
+	while (cur_prof != NULL) {
+		if (strcmp(cur_prof, ZONE_MGMT_PROF) == 0) {
+			found = B_TRUE;
+			if (!add) {
+				cur_prof = strtok_r(NULL, ",", &lasts);
+				continue;
+			}
+		}
+		if (first) {
+			first = B_FALSE;
+		} else {
+			(void) strlcat(new_profs, ",",
+			    MAXPROFS);
+		}
+		(void) strlcat(new_profs, cur_prof,
+		    MAXPROFS);
+		cur_prof = strtok_r(NULL, ",", &lasts);
+	}
+	/*
+	 * Now prepend the Zone Management profile at the beginning
+	 * of the list if it is needed, and append the rest.
+	 * Return the updated list in the original buffer.
+	 */
+	if (add && !found) {
+		first = B_FALSE;
+		(void) strlcpy(rbac_profs, ZONE_MGMT_PROF, MAXPROFS);
+	} else {
+		first = B_TRUE;
+		rbac_profs[0] = '\0';
+	}
+	if (strlen(new_profs) > 0) {
+		if (!first)
+			(void) strlcat(rbac_profs, ",", MAXPROFS);
+		(void) strlcat(rbac_profs, new_profs, MAXPROFS);
+	}
+}
+
+#define	MAX_CMD_LEN	1024
+
+static int
+do_subproc(char *zonename, char *cmdbuf)
+{
+	char inbuf[MAX_CMD_LEN];
+	FILE *file;
+	int status;
+
+	file = popen(cmdbuf, "r");
+	if (file == NULL) {
+		zerror(zonename, gettext("Could not launch: %s"), cmdbuf);
+		return (-1);
+	}
+
+	while (fgets(inbuf, sizeof (inbuf), file) != NULL)
+		(void) fprintf(stderr, "%s", inbuf);
+	status = pclose(file);
+
+	if (WIFSIGNALED(status)) {
+		zerror(zonename, gettext("%s unexpectedly terminated "
+		    "due to signal %d"),
+		    cmdbuf, WTERMSIG(status));
+		return (-1);
+	}
+	assert(WIFEXITED(status));
+	return (WEXITSTATUS(status));
+}
+
+/*
+ * This function updates the local /etc/user_attr file to
+ * correspond to the admin settings that are currently being
+ * committed. The updates are done via usermod and/or rolemod
+ * depending on the type of the specified user. It is also
+ * invoked to remove entries from user_attr corresponding to
+ * removed admin assignments, using an empty auths string.
+ *
+ * Because the removed entries are no longer included in the
+ * cofiguration that is being committed, a linked list of
+ * removed admin entries is maintained to keep track of such
+ * transactions. The head of the list is stored in the zone_dh_userauths
+ * element of the handle strcture.
+ */
+static int
+zonecfg_authorize_user_impl(zone_dochandle_t handle, char *user,
+    char *auths, char *zonename)
+{
+	char *right;
+	char old_auths[MAXAUTHS];
+	char new_auths[MAXAUTHS];
+	char rbac_profs[MAXPROFS];
+	char *lasts;
+	userattr_t *u;
+	boolean_t first = B_TRUE;
+	boolean_t is_zone_admin = B_FALSE;
+	char user_cmd[] = "/usr/sbin/usermod";
+	char role_cmd[] = "/usr/sbin/rolemod";
+	char *auths_cmd = user_cmd;
+
+	/*
+	 * First get the existing authorizations for this user
+	 */
+
+	bzero(&old_auths, sizeof (old_auths));
+	bzero(&new_auths, sizeof (new_auths));
+	bzero(&rbac_profs, sizeof (rbac_profs));
+	if ((u = getusernam(user)) != NULL) {
+		char *current_auths;
+		char *current_profs;
+		char *type;
+
+		type = kva_match(u->attr, USERATTR_TYPE_KW);
+		if (type != NULL) {
+			if (strcmp(type, USERATTR_TYPE_NONADMIN_KW) == 0)
+				auths_cmd = role_cmd;
+		}
+
+		current_auths = kva_match(u->attr, USERATTR_AUTHS_KW);
+		if (current_auths != NULL) {
+			char *cur_auth;
+			char *delete_name;
+			size_t offset;
+
+			offset = strlen(ZONE_AUTH_PREFIX);
+
+			(void) strlcpy(old_auths, current_auths, MAXAUTHS);
+			cur_auth = strtok_r(current_auths, ",", &lasts);
+
+			/*
+			 * Next, remove any existing authorizations
+			 * for this zone, and determine if the
+			 * user still needs the Zone Management Profile.
+			 */
+			if (is_renaming(handle))
+				delete_name = handle->zone_dh_delete_name;
+			else
+				delete_name = NULL;
+			while (cur_auth != NULL) {
+				if (!is_zone_auth(&cur_auth, zonename,
+				    delete_name)) {
+					if (first) {
+						first = B_FALSE;
+					} else {
+						(void) strlcat(new_auths, ",",
+						    MAXAUTHS);
+					}
+					(void) strlcat(new_auths, cur_auth,
+					    MAXAUTHS);
+					/*
+					 * If the user has authorizations
+					 * for other zones, then set a
+					 * flag indicate that the Zone
+					 * Management profile should be
+					 * preserved in user_attr.
+					 */
+					if (strncmp(cur_auth,
+					    ZONE_AUTH_PREFIX, offset) == 0)
+						is_zone_admin = B_TRUE;
+				}
+				cur_auth = strtok_r(NULL, ",", &lasts);
+			}
+		}
+		current_profs = kva_match(u->attr, USERATTR_PROFILES_KW);
+		if (current_profs != NULL) {
+			(void) strlcpy(rbac_profs, current_profs, MAXPROFS);
+		}
+		free_userattr(u);
+	}
+	/*
+	 * The following is done to avoid revisiting the
+	 * user_attr entry for this user
+	 */
+	(void) zonecfg_remove_userauths(handle, user, "", B_FALSE);
+
+	/*
+	 * Convert each right into a properly formatted authorization
+	 */
+	right = strtok_r(auths, ",", &lasts);
+	while (right != NULL) {
+		char auth[MAXAUTHS];
+
+		(void) snprintf(auth, MAXAUTHS, "%s%s/%s",
+		    ZONE_AUTH_PREFIX, right, zonename);
+		if (first) {
+			first = B_FALSE;
+		} else {
+			(void) strlcat(new_auths, ",", MAXAUTHS);
+		}
+		(void) strlcat(new_auths, auth, MAXAUTHS);
+		is_zone_admin = B_TRUE;
+		right = strtok_r(NULL, ",", &lasts);
+	}
+
+	/*
+	 * If the user's previous authorizations have changed
+	 * execute the usermod progam to update them in user_attr
+	 */
+	if (strcmp(old_auths, new_auths) != 0) {
+		char    *cmdbuf;
+		size_t  cmd_len;
+
+		update_profiles(rbac_profs, is_zone_admin);
+		cmd_len = snprintf(NULL, 0, "%s -A \"%s\" -P \"%s\" %s",
+		    auths_cmd, new_auths, rbac_profs, user) + 1;
+		if ((cmdbuf = malloc(cmd_len)) == NULL) {
+			return (Z_NOMEM);
+		}
+		(void) snprintf(cmdbuf, cmd_len, "%s -A \"%s\" -P \"%s\" %s",
+		    auths_cmd, new_auths, rbac_profs, user);
+		if (do_subproc(zonename, cmdbuf) != 0) {
+			free(cmdbuf);
+			return (Z_SYSTEM);
+		}
+		free(cmdbuf);
+	}
+
+	return (Z_OK);
+}
+
+int
+zonecfg_authorize_users(zone_dochandle_t handle, char *zonename)
+{
+	xmlNodePtr cur;
+	int err;
+	char user[MAXUSERNAME];
+	char auths[MAXAUTHS];
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_ADMIN))
+			continue;
+		if (fetchprop(cur, DTD_ATTR_USER, user,
+		    sizeof (user)) != Z_OK)
+			continue;
+		if (fetchprop(cur, DTD_ATTR_AUTHS, auths,
+		    sizeof (auths)) != Z_OK)
+			continue;
+		if (zonecfg_authorize_user_impl(handle, user, auths, zonename)
+		    != Z_OK)
+			return (Z_SYSTEM);
+	}
+	(void) zonecfg_remove_userauths(handle, "", "", B_TRUE);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_deauthorize_user(zone_dochandle_t handle, char *user, char *zonename)
+{
+	return (zonecfg_authorize_user_impl(handle, user, "", zonename));
+}
+
+int
+zonecfg_deauthorize_users(zone_dochandle_t handle, char *zonename)
+{
+	xmlNodePtr cur;
+	int err;
+	char user[MAXUSERNAME];
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_ADMIN))
+			continue;
+		if (fetchprop(cur, DTD_ATTR_USER, user,
+		    sizeof (user)) != Z_OK)
+			continue;
+		if ((err = zonecfg_deauthorize_user(handle, user,
+		    zonename)) != Z_OK)
+			return (err);
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_insert_userauths(zone_dochandle_t handle, char *user, char *zonename)
+{
+	zone_userauths_t *new, **prev, *next;
+
+	prev = &handle->zone_dh_userauths;
+	next = *prev;
+	while (next) {
+		if ((strncmp(next->user, user, MAXUSERNAME) == 0) &&
+		    (strncmp(next->zonename, zonename,
+		    ZONENAME_MAX) == 0)) {
+			/*
+			 * user is already in list
+			 * which isn't supposed to happen!
+			 */
+			return (Z_OK);
+		}
+		prev = &next->next;
+		next = *prev;
+	}
+	new = (zone_userauths_t *)malloc(sizeof (zone_userauths_t));
+	if (new == NULL)
+		return (Z_NOMEM);
+
+	(void) strlcpy(new->user, user, sizeof (new->user));
+	(void) strlcpy(new->zonename, zonename, sizeof (new->zonename));
+	new->next = NULL;
+	*prev = new;
+	return (Z_OK);
+}
+
+int
+zonecfg_remove_userauths(zone_dochandle_t handle, char *user, char *zonename,
+	boolean_t deauthorize)
+{
+	zone_userauths_t *new, **prev, *next;
+
+	prev = &handle->zone_dh_userauths;
+	next = *prev;
+
+	while (next) {
+		if ((strlen(user) == 0 ||
+		    strncmp(next->user, user, MAXUSERNAME) == 0) &&
+		    (strlen(zonename) == 0 ||
+		    (strncmp(next->zonename, zonename, ZONENAME_MAX) == 0))) {
+			new = next;
+			*prev = next->next;
+			next =  *prev;
+			if (deauthorize)
+				(void) zonecfg_deauthorize_user(handle,
+				    new->user, new->zonename);
+			free(new);
+			continue;
+		}
+		prev = &next->next;
+		next = *prev;
+	}
+	return (Z_OK);
 }

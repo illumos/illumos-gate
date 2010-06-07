@@ -21,8 +21,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -128,15 +127,16 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 %token NAME MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
 %token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET PCAP
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
-%token MAXSEMIDS LOCKED SWAP SCHED CLEAR DEFROUTER
+%token MAXSEMIDS LOCKED SWAP SCHED CLEAR DEFROUTER ADMIN USER AUTHS
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
 %type <complex> complex_piece complex_prop_val
 %type <ival> resource_type NET FS IPD DEVICE RCTL ATTR DATASET PSET PCAP MCAP
+    ADMIN
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
     MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
-    ACTION BRAND SCHED IPTYPE DEFROUTER HOSTID
+    ACTION BRAND SCHED IPTYPE DEFROUTER HOSTID USER AUTHS
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -924,6 +924,7 @@ resource_type: NET	{ $$ = RT_NET; }
 	| PSET		{ $$ = RT_DCPU; }
 	| PCAP		{ $$ = RT_PCAP; }
 	| MCAP		{ $$ = RT_MCAP; }
+	| ADMIN		{ $$ = RT_ADMIN; }
 
 property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| RAW		{ $$ = PT_RAW; }
@@ -959,6 +960,8 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| MAXSEMIDS	{ $$ = PT_MAXSEMIDS; }
 	| SCHED		{ $$ = PT_SCHED; }
 	| HOSTID	{ $$ = PT_HOSTID; }
+	| USER		{ $$ = PT_USER; }
+	| AUTHS 	{ $$ = PT_AUTHS; }
 
 /*
  * The grammar builds data structures from the bottom up.  Thus various

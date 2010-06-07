@@ -202,3 +202,7 @@ solaris.smf.manage.isns:::Manage iSNS Service States::help=isnsStates.html
 solaris.smf.value.isns:::Modify iSNS Service Property Values::help=isnsValue.html
 solaris.isnsmgr.write:::Modify iSNS configuration::help=AuthISNSmgrWrite.html
 solaris.smf.manage.wusb:::Manage Wireless USB Service::help=SmfWusbStates.html
+solaris.zone.:::Zone Management::help=ZoneHeader.html
+solaris.zone.clonefrom:::Clone another Zone::help=ZoneCloneFrom.html
+solaris.zone.login:::Zone Login::help=ZoneLogin.html
+solaris.zone.manage:::Zone Deployment::help=ZoneManage.html

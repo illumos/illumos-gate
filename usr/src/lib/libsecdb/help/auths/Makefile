@@ -167,7 +167,11 @@ HTMLENTS = \
 	SysCpuPowerMgmt.html \
 	SysSyseventRead.html \
 	SysSyseventWrite.html \
-	SmfManageZFSSnap.html
+	SmfManageZFSSnap.html \
+	ZoneCloneFrom.html \
+	ZoneHeader.html \
+	ZoneLogin.html \
+	ZoneManage.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths

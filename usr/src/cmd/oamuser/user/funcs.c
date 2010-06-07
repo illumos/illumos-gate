@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -231,6 +228,10 @@ check_auth(const char *auths)
 	int have_grant = 0;
 
 	tmp = strdup(auths);
+	if (tmp == NULL) {
+		errmsg(M_NOSPACE);
+		exit(EX_FAILURE);
+	}
 
 	authname = strtok(tmp, AUTH_SEP);
 	pw = getpwuid(getuid());
@@ -241,6 +242,14 @@ check_auth(const char *auths)
 	while (authname != NULL) {
 		char *suffix;
 		char *authtoks;
+
+		/* Check if user has been granted this authorization */
+		if (!chkauthattr(authname, pw->pw_name))
+			return (authname);
+
+		/* Remove named object after slash */
+		if ((suffix = index(authname, KV_OBJECTCHAR)) != NULL)
+			*suffix = '\0';
 
 		/* Find the suffix */
 		if ((suffix = rindex(authname, '.')) == NULL)
@@ -256,11 +265,6 @@ check_auth(const char *auths)
 				return (authname);
 			}
 			free_authattr(result);
-		}
-
-		/* Check if user has been granted this authorization */
-		if (!chkauthattr(authname, pw->pw_name)) {
-			return (authname);
 		}
 
 		/* Check if user can delegate this authorization */
@@ -281,6 +285,7 @@ check_auth(const char *auths)
 		}
 		authname = strtok(NULL, AUTH_SEP);
 	}
+	free(tmp);
 	return (NULL);
 }
 
@@ -299,6 +304,10 @@ check_prof(const char *profs)
 	char *tmp;
 
 	tmp = strdup(profs);
+	if (tmp == NULL) {
+		errmsg(M_NOSPACE);
+		exit(EX_FAILURE);
+	}
 
 	profname = strtok(tmp, PROF_SEP);
 	while (profname != NULL) {
@@ -310,6 +319,7 @@ check_prof(const char *profs)
 		free_profattr(result);
 		profname = strtok(NULL, PROF_SEP);
 	}
+	free(tmp);
 	return (NULL);
 }
 
@@ -330,6 +340,10 @@ check_role(const char *roles)
 	char *tmp;
 
 	tmp = strdup(roles);
+	if (tmp == NULL) {
+		errmsg(M_NOSPACE);
+		exit(EX_FAILURE);
+	}
 
 	rolename = strtok(tmp, ROLE_SEP);
 	while (rolename != NULL) {
@@ -352,6 +366,7 @@ check_role(const char *roles)
 		free_userattr(result);
 		rolename = strtok(NULL, ROLE_SEP);
 	}
+	free(tmp);
 	return (NULL);
 }
 

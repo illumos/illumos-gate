@@ -75,6 +75,7 @@
 #include <sys/systeminfo.h>
 #include <libdladm.h>
 #include <libinetutil.h>
+#include <pwd.h>
 
 #include <libzonecfg.h>
 #include "zonecfg.h"
@@ -181,6 +182,7 @@ char *res_types[] = {
 	"ip-type",
 	"capped-cpu",
 	"hostid",
+	"admin",
 	NULL
 };
 
@@ -223,6 +225,8 @@ char *prop_types[] = {
 	"ip-type",
 	"defrouter",
 	"hostid",
+	"user",
+	"auths",
 	NULL
 };
 
@@ -271,6 +275,7 @@ static const char *add_cmds[] = {
 	"add dedicated-cpu",
 	"add capped-cpu",
 	"add capped-memory",
+	"add admin",
 	NULL
 };
 
@@ -301,6 +306,7 @@ static const char *remove_cmds[] = {
 	"remove dedicated-cpu ",
 	"remove capped-cpu ",
 	"remove capped-memory ",
+	"remove admin ",
 	NULL
 };
 
@@ -315,6 +321,7 @@ static const char *select_cmds[] = {
 	"select dedicated-cpu",
 	"select capped-cpu",
 	"select capped-memory",
+	"select admin",
 	NULL
 };
 
@@ -365,6 +372,7 @@ static const char *info_cmds[] = {
 	"info max-sem-ids",
 	"info cpu-shares",
 	"info hostid",
+	"info admin",
 	NULL
 };
 
@@ -486,6 +494,17 @@ static const char *mcap_res_scope_cmds[] = {
 	NULL
 };
 
+static const char *admin_res_scope_cmds[] = {
+	"cancel",
+	"end",
+	"exit",
+	"help",
+	"info",
+	"set user=",
+	"set auths=",
+	NULL
+};
+
 /* Global variables */
 
 /* set early in main(), never modified thereafter, used all over the place */
@@ -553,6 +572,7 @@ static struct zone_attrtab	old_attrtab, in_progress_attrtab;
 static struct zone_dstab	old_dstab, in_progress_dstab;
 static struct zone_psettab	old_psettab, in_progress_psettab;
 static struct zone_mcaptab	old_mcaptab, in_progress_mcaptab;
+static struct zone_admintab	old_admintab, in_progress_admintab;
 
 static GetLine *gl;	/* The gl_get_line() resource object */
 
@@ -630,6 +650,8 @@ CPL_MATCH_FN(cmd_cpl_fn)
 		return (add_stuff(cpl, line, pcap_res_scope_cmds, word_end));
 	case RT_MCAP:
 		return (add_stuff(cpl, line, mcap_res_scope_cmds, word_end));
+	case RT_ADMIN:
+		return (add_stuff(cpl, line, admin_res_scope_cmds, word_end));
 	}
 	return (0);
 }
@@ -1092,6 +1114,20 @@ usage(boolean_t verbose, uint_t flags)
 			    pt_to_str(PT_LOCKED),
 			    gettext("<qualified unsigned decimal>"));
 			break;
+		case RT_ADMIN:
+			(void) fprintf(fp, gettext("The '%s' resource scope is "
+			    "used to delegate specific zone management\n"
+			    "rights to users and roles. These rights are "
+			    "only applicable to this zone.\n"),
+			    rt_to_str(resource_scope));
+			(void) fprintf(fp, gettext("Valid commands:\n"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_USER),
+			    gettext("<single user or role name>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_AUTHS),
+			    gettext("<comma separated list>"));
+			break;
 		}
 		(void) fprintf(fp, gettext("And from any resource scope, you "
 		    "can:\n"));
@@ -1150,12 +1186,13 @@ usage(boolean_t verbose, uint_t flags)
 	}
 	if (flags & HELP_RESOURCES) {
 		(void) fprintf(fp, "<%s> := %s | %s | %s | %s | %s | %s |\n\t"
-		    "%s | %s | %s | %s\n\n",
+		    "%s | %s | %s | %s | %s\n\n",
 		    gettext("resource type"), rt_to_str(RT_FS),
 		    rt_to_str(RT_IPD), rt_to_str(RT_NET), rt_to_str(RT_DEVICE),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_ATTR),
 		    rt_to_str(RT_DATASET), rt_to_str(RT_DCPU),
-		    rt_to_str(RT_PCAP), rt_to_str(RT_MCAP));
+		    rt_to_str(RT_PCAP), rt_to_str(RT_MCAP),
+		    rt_to_str(RT_ADMIN));
 	}
 	if (flags & HELP_PROPS) {
 		(void) fprintf(fp, gettext("For resource type ... there are "
@@ -1217,6 +1254,8 @@ usage(boolean_t verbose, uint_t flags)
 		(void) fprintf(fp, "\t%s\t%s, %s, %s\n", rt_to_str(RT_MCAP),
 		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_SWAP),
 		    pt_to_str(PT_LOCKED));
+		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_ADMIN),
+		    pt_to_str(PT_USER), pt_to_str(PT_AUTHS));
 	}
 	if (need_to_close)
 		(void) pclose(fp);
@@ -1266,6 +1305,30 @@ initialize(boolean_t handle_expected)
 				    "  Unable to continue", zone, brandname);
 				exit(Z_ERR);
 			}
+			/*
+			 * If the user_attr file is newer than
+			 * the zone config file, the admins
+			 * may need to be updated since the
+			 * RBAC files are authoritative for
+			 * authorization checks.
+			 */
+			err = zonecfg_update_userauths(handle, zone);
+			if (err == Z_OK) {
+				zerr(gettext("The administrative rights "
+				    "were updated to match "
+				    "the current RBAC configuration.\n"
+				    "Use \"info admin\" and \"revert\" to "
+				    "compare with the previous settings."));
+				need_to_commit = B_TRUE;
+			} else if (err != Z_NO_ENTRY) {
+				zerr(gettext("failed to update "
+				    "admin  rights."));
+				exit(Z_ERR);
+			} else if (need_to_commit) {
+				zerr(gettext("admin rights were updated "
+				    "to match RBAC configuration."));
+			}
+
 		} else if (global_zone && err == Z_NO_ZONE && !got_handle &&
 		    !read_only_mode) {
 			/*
@@ -1635,6 +1698,7 @@ export_func(cmd_t *cmd)
 	struct zone_psettab psettab;
 	struct zone_mcaptab mcaptab;
 	struct zone_rctlvaltab *valptr;
+	struct zone_admintab admintab;
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
 	char bootargs[BOOTARGS_MAX];
@@ -1896,6 +1960,19 @@ export_func(cmd_t *cmd)
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
 
+	if ((err = zonecfg_setadminent(handle)) != Z_OK) {
+		zone_perror(zone, err, B_FALSE);
+		goto done;
+	}
+	while (zonecfg_getadminent(handle, &admintab) == Z_OK) {
+		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
+		    rt_to_str(RT_ADMIN));
+		export_prop(of, PT_USER, admintab.zone_admin_user);
+		export_prop(of, PT_AUTHS, admintab.zone_admin_auths);
+		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
+	}
+	(void) zonecfg_endadminent(handle);
+
 	/*
 	 * There is nothing to export for pcap since this resource is just
 	 * a container for an rctl alias.
@@ -2090,6 +2167,9 @@ add_resource(cmd_t *cmd)
 			    "this could render the system impossible\n"
 			    "to administer.  Please use caution."));
 		bzero(&in_progress_mcaptab, sizeof (in_progress_mcaptab));
+		return;
+	case RT_ADMIN:
+		bzero(&in_progress_admintab, sizeof (in_progress_admintab));
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
@@ -2413,7 +2493,7 @@ delete_func(cmd_t *cmd)
 		 * user if the zone is not configured.  In force mode, we don't
 		 * trust that evaluation, and hence skip it.  (We don't need the
 		 * handle to be loaded anyway, since zonecfg_destroy is done by
-		 * zonename).  However, we also have to take care to emulate the
+		 * zonename). However, we also have to take care to emulate the
 		 * messages spit out by initialize; see below.
 		 */
 		if (initialize(B_TRUE) != Z_OK)
@@ -2431,6 +2511,13 @@ delete_func(cmd_t *cmd)
 			return;
 	}
 
+	/*
+	 * This function removes the authorizations from user_attr
+	 * that correspond to those specified in the configuration
+	 */
+	if (initialize(B_TRUE) == Z_OK) {
+		(void) zonecfg_deauthorize_users(handle, zone);
+	}
 	if ((err = zonecfg_destroy(zone, force)) != Z_OK) {
 		if ((err == Z_BAD_ZONE_STATE) && !force) {
 			zerr(gettext("Zone %s not in %s state; %s not "
@@ -2740,6 +2827,45 @@ fill_in_dstab(cmd_t *cmd, struct zone_dstab *dstab, boolean_t fill_in_only)
 	if (fill_in_only)
 		return (Z_OK);
 	return (zonecfg_lookup_ds(handle, dstab));
+}
+
+static int
+fill_in_admintab(cmd_t *cmd, struct zone_admintab *admintab,
+    boolean_t fill_in_only)
+{
+	int err, i;
+	property_value_ptr_t pp;
+
+	if ((err = initialize(B_TRUE)) != Z_OK)
+		return (err);
+
+	bzero(admintab, sizeof (*admintab));
+	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
+		pp = cmd->cmd_property_ptr[i];
+		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
+			zerr(gettext("A simple value was expected here."));
+			saw_error = B_TRUE;
+			return (Z_INSUFFICIENT_SPEC);
+		}
+		switch (cmd->cmd_prop_name[i]) {
+		case PT_USER:
+			(void) strlcpy(admintab->zone_admin_user, pp->pv_simple,
+			    sizeof (admintab->zone_admin_user));
+			break;
+		case PT_AUTHS:
+			(void) strlcpy(admintab->zone_admin_auths,
+			    pp->pv_simple, sizeof (admintab->zone_admin_auths));
+			break;
+		default:
+			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
+			    Z_NO_PROPERTY_TYPE, B_TRUE);
+			return (Z_INSUFFICIENT_SPEC);
+		}
+	}
+	if (fill_in_only)
+		return (Z_OK);
+	err = zonecfg_lookup_admin(handle, admintab);
+	return (err);
 }
 
 static void
@@ -3144,6 +3270,46 @@ remove_mcap()
 }
 
 static void
+remove_admin(cmd_t *cmd)
+{
+	int err;
+
+	/* traditional, qualified attr removal */
+	if (cmd->cmd_prop_nv_pairs > 0) {
+		struct zone_admintab admintab;
+
+		if ((err = fill_in_admintab(cmd, &admintab, B_FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_ADMIN,
+			    err, B_TRUE);
+			return;
+		}
+		if ((err = zonecfg_delete_admin(handle, &admintab,
+		    zone))
+		    != Z_OK)
+			z_cmd_rt_perror(CMD_REMOVE, RT_ADMIN,
+			    err, B_TRUE);
+		else
+			need_to_commit = B_TRUE;
+		return;
+	} else {
+		/*
+		 * unqualified admin removal.
+		 * remove all admins but prompt if more
+		 * than one.
+		 */
+		if (!prompt_remove_resource(cmd, "admin"))
+			return;
+
+		if ((err = zonecfg_delete_admins(handle, zone))
+		    != Z_OK)
+			z_cmd_rt_perror(CMD_REMOVE, RT_ADMIN,
+			    err, B_TRUE);
+		else
+			need_to_commit = B_TRUE;
+	}
+}
+
+static void
 remove_resource(cmd_t *cmd)
 {
 	int type;
@@ -3206,6 +3372,9 @@ remove_resource(cmd_t *cmd)
 		return;
 	case RT_MCAP:
 		remove_mcap();
+		return;
+	case RT_ADMIN:
+		remove_admin(cmd);
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
@@ -3669,6 +3838,16 @@ select_func(cmd_t *cmd)
 		else
 			bzero(&in_progress_mcaptab,
 			    sizeof (in_progress_mcaptab));
+		return;
+	case RT_ADMIN:
+		if ((err = fill_in_admintab(cmd, &old_admintab, B_FALSE))
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_ADMIN, err,
+			    B_TRUE);
+			global_scope = B_TRUE;
+		}
+		bcopy(&old_admintab, &in_progress_admintab,
+		    sizeof (struct zone_admintab));
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, B_TRUE);
@@ -4535,8 +4714,26 @@ set_func(cmd_t *cmd)
 			usage(B_FALSE, HELP_PROPS);
 			return;
 		}
-
 		return;
+	case RT_ADMIN:
+		switch (prop_type) {
+		case PT_USER:
+			(void) strlcpy(in_progress_admintab.zone_admin_user,
+			    prop_id,
+			    sizeof (in_progress_admintab.zone_admin_user));
+			return;
+		case PT_AUTHS:
+			(void) strlcpy(in_progress_admintab.zone_admin_auths,
+			    prop_id,
+			    sizeof (in_progress_admintab.zone_admin_auths));
+			return;
+		default:
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    B_TRUE);
+			long_usage(CMD_SET, B_TRUE);
+			usage(B_FALSE, HELP_PROPS);
+			return;
+		}
 	default:
 		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, B_TRUE);
 		long_usage(CMD_SET, B_TRUE);
@@ -5160,6 +5357,48 @@ info_mcap(zone_dochandle_t handle, FILE *fp)
 		output_mcap(fp, &lookup, res2, swap_limit, res3, locked_limit);
 }
 
+static void
+output_auth(FILE *fp, struct zone_admintab *admintab)
+{
+	(void) fprintf(fp, "%s:\n", rt_to_str(RT_ADMIN));
+	output_prop(fp, PT_USER, admintab->zone_admin_user, B_TRUE);
+	output_prop(fp, PT_AUTHS, admintab->zone_admin_auths, B_TRUE);
+}
+
+static void
+info_auth(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
+{
+	struct zone_admintab lookup, user;
+	boolean_t output = B_FALSE;
+	int err;
+
+	if ((err = zonecfg_setadminent(handle)) != Z_OK) {
+		zone_perror(zone, err, B_TRUE);
+		return;
+	}
+	while (zonecfg_getadminent(handle, &lookup) == Z_OK) {
+		if (cmd->cmd_prop_nv_pairs == 0) {
+			output_auth(fp, &lookup);
+			continue;
+		}
+		if (fill_in_admintab(cmd, &user, B_TRUE) != Z_OK)
+			continue;
+		if (strlen(user.zone_admin_user) > 0 &&
+		    strcmp(user.zone_admin_user, lookup.zone_admin_user) != 0)
+			continue;	/* no match */
+		output_auth(fp, &lookup);
+		output = B_TRUE;
+	}
+	(void) zonecfg_endadminent(handle);
+	/*
+	 * If a property n/v pair was specified, warn the user if there was
+	 * nothing to output.
+	 */
+	if (!output && cmd->cmd_prop_nv_pairs > 0)
+		(void) printf(gettext("No such %s resource.\n"),
+		    rt_to_str(RT_ADMIN));
+}
+
 void
 info_func(cmd_t *cmd)
 {
@@ -5232,6 +5471,9 @@ info_func(cmd_t *cmd)
 			output_mcap(fp, &in_progress_mcaptab, res1, swap_limit,
 			    res2, locked_limit);
 			break;
+		case RT_ADMIN:
+			output_auth(fp, &in_progress_admintab);
+			break;
 		}
 		goto cleanup;
 	}
@@ -5284,6 +5526,7 @@ info_func(cmd_t *cmd)
 		if (!global_zone) {
 			info_attr(handle, fp, cmd);
 			info_ds(handle, fp, cmd);
+			info_auth(handle, fp, cmd);
 		}
 		info_rctl(handle, fp, cmd);
 		break;
@@ -5364,6 +5607,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_HOSTID:
 		info_hostid(handle, fp);
+		break;
+	case RT_ADMIN:
+		info_auth(handle, fp, cmd);
 		break;
 	default:
 		zone_perror(rt_to_str(cmd->cmd_res_type), Z_NO_RESOURCE_TYPE,
@@ -5499,6 +5745,7 @@ verify_func(cmd_t *cmd)
 	struct zone_rctltab rctltab;
 	struct zone_dstab dstab;
 	struct zone_psettab psettab;
+	struct zone_admintab admintab;
 	char zonepath[MAXPATHLEN];
 	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
@@ -5737,6 +5984,29 @@ verify_func(cmd_t *cmd)
 	}
 	(void) zonecfg_enddsent(handle);
 
+	if ((err = zonecfg_setadminent(handle)) != Z_OK) {
+		zone_perror(zone, err, B_TRUE);
+		return;
+	}
+	while (zonecfg_getadminent(handle, &admintab) == Z_OK) {
+		check_reqd_prop(admintab.zone_admin_user, RT_ADMIN,
+		    PT_USER, &ret_val);
+		check_reqd_prop(admintab.zone_admin_auths, RT_ADMIN,
+		    PT_AUTHS, &ret_val);
+		if ((ret_val == Z_OK) && (getpwnam(admintab.zone_admin_user)
+		    == NULL)) {
+			zerr(gettext("%s %s is not a valid username"),
+			    pt_to_str(PT_USER),
+			    admintab.zone_admin_user);
+			ret_val = Z_BAD_PROPERTY;
+		}
+		if ((ret_val == Z_OK) && (!zonecfg_valid_auths(
+		    admintab.zone_admin_auths, zone))) {
+			ret_val = Z_BAD_PROPERTY;
+		}
+	}
+	(void) zonecfg_endadminent(handle);
+
 	if (!global_scope) {
 		zerr(gettext("resource specification incomplete"));
 		saw_error = B_TRUE;
@@ -5895,6 +6165,7 @@ end_func(cmd_t *cmd)
 	struct zone_rctltab tmp_rctltab;
 	struct zone_attrtab tmp_attrtab;
 	struct zone_dstab tmp_dstab;
+	struct zone_admintab tmp_admintab;
 	int err, arg, res1, res2, res3;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
@@ -6289,6 +6560,58 @@ end_func(cmd_t *cmd)
 			(void) zonecfg_delete_mcap(handle);
 		}
 		break;
+	case RT_ADMIN:
+		/* First make sure everything was filled in. */
+		if (end_check_reqd(in_progress_admintab.zone_admin_user,
+		    PT_USER, &validation_failed) == Z_OK) {
+			if (getpwnam(in_progress_admintab.zone_admin_user)
+			    == NULL) {
+				zerr(gettext("%s %s is not a valid username"),
+				    pt_to_str(PT_USER),
+				    in_progress_admintab.zone_admin_user);
+				validation_failed = B_TRUE;
+			}
+		}
+
+		if (end_check_reqd(in_progress_admintab.zone_admin_auths,
+		    PT_AUTHS, &validation_failed) == Z_OK) {
+			if (!zonecfg_valid_auths(
+			    in_progress_admintab.zone_admin_auths,
+			    zone)) {
+				validation_failed = B_TRUE;
+			}
+		}
+
+		if (validation_failed) {
+			saw_error = B_TRUE;
+			return;
+		}
+
+		if (end_op == CMD_ADD) {
+			/* Make sure there isn't already one like this. */
+			bzero(&tmp_admintab, sizeof (tmp_admintab));
+			(void) strlcpy(tmp_admintab.zone_admin_user,
+			    in_progress_admintab.zone_admin_user,
+			    sizeof (tmp_admintab.zone_admin_user));
+			err = zonecfg_lookup_admin(
+			    handle, &tmp_admintab);
+			if (err == Z_OK) {
+				zerr(gettext("A %s resource "
+				    "with the %s '%s' already exists."),
+				    rt_to_str(RT_ADMIN),
+				    pt_to_str(PT_USER),
+				    in_progress_admintab.zone_admin_user);
+				saw_error = B_TRUE;
+				return;
+			}
+			err = zonecfg_add_admin(handle,
+			    &in_progress_admintab, zone);
+		} else {
+			err = zonecfg_modify_admin(handle,
+			    &old_admintab, &in_progress_admintab,
+			    zone);
+		}
+		break;
 	default:
 		zone_perror(rt_to_str(resource_scope), Z_NO_RESOURCE_TYPE,
 		    B_TRUE);
@@ -6416,6 +6739,12 @@ revert_func(cmd_t *cmd)
 	}
 
 	/*
+	 * Reset any pending admins that were
+	 * removed from the previous zone
+	 */
+	zonecfg_remove_userauths(handle, "", zone, B_FALSE);
+
+	/*
 	 * Time for a new handle: finish the old one off first
 	 * then get a new one properly to avoid leaks.
 	 */
@@ -6424,6 +6753,7 @@ revert_func(cmd_t *cmd)
 		zone_perror(execname, Z_NOMEM, B_TRUE);
 		exit(Z_ERR);
 	}
+
 	if ((err = zonecfg_get_handle(revert_zone, handle)) != Z_OK) {
 		saw_error = B_TRUE;
 		got_handle = B_FALSE;

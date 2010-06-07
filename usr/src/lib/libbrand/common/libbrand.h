@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBBRAND_H
@@ -62,6 +61,8 @@ extern int brand_get_install(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_installopts(brand_handle_t, char *, size_t);
 extern int brand_get_login_cmd(brand_handle_t, const char *, char *, size_t);
+extern int brand_get_forcedlogin_cmd(brand_handle_t, const char *,
+    char *, size_t);
 extern int brand_get_modname(brand_handle_t, char *, size_t);
 extern int brand_get_postattach(brand_handle_t, const char *, const char *,
     char *, size_t);

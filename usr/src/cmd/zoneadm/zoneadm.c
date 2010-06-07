@@ -79,10 +79,15 @@
 #include <sys/fsspriocntl.h>
 #include <libdladm.h>
 #include <libdllink.h>
+#include <pwd.h>
+#include <auth_list.h>
+#include <auth_attr.h>
+#include <secdb.h>
 
 #include "zoneadm.h"
 
 #define	MAXARGS	8
+#define	SOURCE_ZONE (CMD_MAX + 1)
 
 /* Reflects kernel zone entries */
 typedef struct zone_entry {
@@ -201,6 +206,7 @@ static char default_brand[MAXPATHLEN];
 static char *locale;
 char *target_zone;
 static char *target_uuid;
+char *username;
 
 char *
 cmd_to_str(int cmd_num)
@@ -1505,6 +1511,56 @@ subproc_status(const char *cmd, int status, boolean_t verbose_failure)
 	return (ZONE_SUBPROC_FATAL);
 }
 
+static int
+auth_check(char *user, char *zone, int cmd_num)
+{
+	char authname[MAXAUTHS];
+
+	switch (cmd_num) {
+	case CMD_LIST:
+	case CMD_HELP:
+		return (Z_OK);
+	case SOURCE_ZONE:
+		(void) strlcpy(authname, ZONE_CLONEFROM_AUTH, MAXAUTHS);
+		break;
+	case CMD_BOOT:
+	case CMD_HALT:
+	case CMD_READY:
+	case CMD_REBOOT:
+	case CMD_SYSBOOT:
+	case CMD_VERIFY:
+	case CMD_INSTALL:
+	case CMD_UNINSTALL:
+	case CMD_MOUNT:
+	case CMD_UNMOUNT:
+	case CMD_CLONE:
+	case CMD_MOVE:
+	case CMD_DETACH:
+	case CMD_ATTACH:
+	case CMD_MARK:
+	case CMD_APPLY:
+	default:
+		(void) strlcpy(authname, ZONE_MANAGE_AUTH, MAXAUTHS);
+		break;
+	}
+	(void) strlcat(authname, KV_OBJECT, MAXAUTHS);
+	(void) strlcat(authname, zone, MAXAUTHS);
+	if (chkauthattr(authname, user) == 0) {
+		return (Z_ERR);
+	} else {
+		/*
+		 * Some subcommands, e.g. install, run subcommands,
+		 * e.g. sysidcfg, that require a real uid of root,
+		 *  so switch to root, here.
+		 */
+		if (setuid(0) == -1) {
+			zperror(gettext("insufficient privilege"), B_TRUE);
+			return (Z_ERR);
+		}
+		return (Z_OK);
+	}
+}
+
 /*
  * Various sanity checks; make sure:
  * 1. We're in the global zone.
@@ -1565,6 +1621,12 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 
 	if (zone == NULL) {
 		zerror(gettext("no zone specified"));
+		return (Z_ERR);
+	}
+
+	if (auth_check(username, zone, cmd_num) == Z_ERR) {
+		zerror(gettext("User %s is not authorized to %s this zone."),
+		    username, cmd_to_str(cmd_num));
 		return (Z_ERR);
 	}
 
@@ -3594,6 +3656,13 @@ clone_func(int argc, char *argv[])
 			return (Z_ERR);
 		}
 
+		if (auth_check(username, source_zone, SOURCE_ZONE) == Z_ERR) {
+			zerror(gettext("%s operation is invalid because "
+			    "user is not authorized to read source zone."),
+			    cmd_to_str(CMD_CLONE));
+			return (Z_ERR);
+		}
+
 		zent = lookup_running_zone(source_zone);
 		if (zent != NULL) {
 			/* check whether the zone is ready or running */
@@ -5611,6 +5680,30 @@ get_execbasename(char *execfullname)
 	return (execbasename);
 }
 
+static char *
+get_username()
+{
+	uid_t uid;
+	struct passwd *nptr;
+
+
+	/*
+	 * Authorizations are checked to restrict access based on the
+	 * requested operation and zone name, It is assumed that the
+	 * program is running with all privileges, but that the real
+	 * user ID is that of the user or role on whose behalf we are
+	 * operating. So we start by getting the username that will be
+	 * used for subsequent authorization checks.
+	 */
+
+	uid = getuid();
+	if ((nptr = getpwuid(uid)) == NULL) {
+		zerror(gettext("could not get user name."));
+		exit(Z_ERR);
+	}
+	return (nptr->pw_name);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -5626,11 +5719,13 @@ main(int argc, char **argv)
 	setbuf(stdout, NULL);
 	(void) sigset(SIGHUP, SIG_IGN);
 	execname = get_execbasename(argv[0]);
+	username = get_username();
 	target_zone = NULL;
 	if (chdir("/") != 0) {
 		zerror(gettext("could not change directory to /."));
 		exit(Z_ERR);
 	}
+
 	/*
 	 * Use the default system mask rather than anything that may have been
 	 * set by the caller.

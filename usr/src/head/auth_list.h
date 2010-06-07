@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * This is an internal header file. Not to be shipped.
  */
@@ -56,7 +56,16 @@ extern "C" {
 #define	HP_MODIFY_AUTH		"solaris.hotplug.modify"
 
 /*
- * Authorizations used by Trusted Solaris.
+ * The following authorizations can be qualified by appending <zonename>
+ */
+#define	ZONE_CLONEFROM_AUTH	"solaris.zone.clonefrom"
+#define	ZONE_LOGIN_AUTH		"solaris.zone.login"
+#define	ZONE_MANAGE_AUTH	"solaris.zone.manage"
+
+#define	ZONE_AUTH_PREFIX	"solaris.zone."
+
+/*
+ * Authorizations used by Trusted Extensions.
  */
 #define	BYPASS_FILE_VIEW_AUTH	"solaris.label.win.noview"
 #define	DEVICE_CONFIG_AUTH	"solaris.device.config"

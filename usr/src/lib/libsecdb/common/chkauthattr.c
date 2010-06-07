@@ -82,6 +82,8 @@ static struct dfltplcy {
 /*
  * Enumerate profiles from listed profiles.
  */
+static int _auth_match_noun(const char *, const char *, size_t, const char *);
+
 int
 _enum_common_p(const char *cprofiles,
     int (*cb)(const char *, kva_t *, void *, void *),
@@ -288,45 +290,90 @@ _enum_auths(const char *username,
 }
 
 int
-_auth_match(const char *pattern, const char *auth)
+_auth_match_noun(const char *pattern, const char *auth,
+    size_t auth_len, const char *auth_noun)
 {
-	size_t len;
+	size_t pattern_len;
 	char *grant;
+	char *pattern_noun;
+	char *slash;
 
-	len = strlen(pattern);
+	pattern_len = strlen(pattern);
+	/*
+	 * If the specified authorization has a trailing object
+	 * and the current authorization we're checking also has
+	 * a trailing object, the object names must match.
+	 *
+	 * If there is no object name failure, then we must
+	 * check for an exact match of the two authorizations
+	 */
+	if (auth_noun != NULL) {
+		if ((slash = strchr(pattern, KV_OBJECTCHAR)) != NULL) {
+			pattern_noun = slash + 1;
+			pattern_len -= strlen(slash);
+			if (strcmp(pattern_noun, auth_noun) != 0)
+				return (0);
+		} else if ((auth_len == pattern_len) &&
+		    (strncmp(pattern, auth, pattern_len) == 0)) {
+			return (1);
+		}
+	}
 
 	/*
 	 * If the wildcard is not in the last position in the string, don't
 	 * match against it.
 	 */
-	if (pattern[len-1] != KV_WILDCHAR)
+	if (pattern[pattern_len-1] != KV_WILDCHAR)
 		return (0);
 
 	/*
 	 * If the strings are identical up to the wildcard and auth does not
 	 * end in "grant", then we have a match.
 	 */
-	if (strncmp(pattern, auth, len-1) == 0) {
+	if (strncmp(pattern, auth, pattern_len - 1) == 0) {
 		grant = strrchr(auth, '.');
 		if (grant != NULL) {
 			if (strncmp(grant + 1, "grant", 5) != NULL)
 				return (1);
 		}
 	}
-
 	return (0);
+}
+
+int
+_auth_match(const char *pattern, const char *auth)
+{
+	return (_auth_match_noun(pattern, auth, strlen(auth), NULL));
 }
 
 static int
 _is_authorized(const char *auth, void *authname, void *res)
 {
 	int *resp = res;
+	char	*authname_noun;
+	char	*slash;
+	size_t	auth_len;
+	size_t	noun_len;
 
-	if (strcmp(authname, auth) == 0 ||
-	    (strchr(auth, KV_WILDCHAR) != NULL &&
-	    _auth_match(auth, authname))) {
+	auth_len = strlen(authname);
+	if ((slash = strchr(authname, KV_OBJECTCHAR)) != NULL) {
+		authname_noun = slash + 1;
+		noun_len = strlen(slash);
+		auth_len -= noun_len;
+	} else {
+		authname_noun = NULL;
+	}
+
+	if (strcmp(authname, auth) == 0) {
+		/* exact match, we're done */
 		*resp = 1;
 		return (1);
+	} else if (noun_len || strchr(auth, KV_WILDCHAR) != NULL) {
+		if (_auth_match_noun(auth, authname,
+		    auth_len, authname_noun)) {
+			*resp = 1;
+			return (1);
+		}
 	}
 
 	return (0);

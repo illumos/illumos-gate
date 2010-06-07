@@ -20,8 +20,7 @@
 
  CDDL HEADER END
 
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
 -->
 
@@ -131,9 +130,15 @@
 
 <!ATTLIST mcap		physcap		CDATA #REQUIRED>
 
+<!ELEMENT admin 	EMPTY>
+
+<!ATTLIST admin     	user		CDATA #REQUIRED
+                    	auths		CDATA #REQUIRED>
+
 <!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device |
 			deleted-device | rctl | attr | dataset | package |
-			patch | dev-perm | tmp_pool | pset | mcap)*>
+			patch | dev-perm | tmp_pool | pset |
+			mcap | admin)*>
 
 <!ATTLIST zone		name		CDATA #REQUIRED
 			zonepath	CDATA #REQUIRED
