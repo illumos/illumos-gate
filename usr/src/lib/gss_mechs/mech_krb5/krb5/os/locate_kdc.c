@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -795,6 +794,18 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	 */
 
 	code = prof_locate_server(context, realm, &al, svc, socktype, family);
+
+	/*
+	 * Solaris Kerberos:
+	 * If kpasswd_server has not been configured and dns_lookup_kdc -
+	 * dns_fallback are not configured then admin_server should
+	 * be inferenced, per krb5.conf(4).
+	 */
+	if (code && svc == locate_service_kpasswd &&
+	    !maybe_use_dns(context, "dns_lookup_kdc", 0)) {
+		code = krb5_locate_srv_conf_1(context, realm, "admin_server",
+		    &al, 0, socktype, htons(DEFAULT_KPASSWD_PORT), 0, family);
+	}
 
 #ifdef KRB5_DNS_LOOKUP
 	/*
