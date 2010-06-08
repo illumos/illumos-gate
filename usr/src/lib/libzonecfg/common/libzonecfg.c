@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <libsysevent.h>
@@ -7746,7 +7746,8 @@ zonecfg_valid_auths(const char *auths, const char *zonename)
 		    ZONE_AUTH_PREFIX, right);
 		if (getauthnam(authname) == NULL) {
 			status = B_FALSE;
-			zerror(zonename, gettext("%s is not a valid right"),
+			zerror(zonename,
+			    gettext("%s is not a valid authorization"),
 			    right);
 		}
 		right = strtok_r(NULL, ",", &lasts);
