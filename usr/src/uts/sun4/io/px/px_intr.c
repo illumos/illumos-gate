@@ -988,9 +988,6 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	/* Sharing the INO using a new PIL */
 	if (ipil_list != NULL) {
-		intr_state_t	intr_state;
-		hrtime_t	start_time;
-
 		/*
 		 * disable INO to avoid lopil race condition with
 		 * px_intx_intr
@@ -1004,23 +1001,14 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 			goto fail1;
 		}
 
-		/* Disable the interrupt */
-		PX_INTR_DISABLE(dip, ino_p->ino_sysino);
-
-		/* Busy wait on pending interrupt */
-		for (start_time = gethrtime(); !panicstr &&
-		    ((ret = px_lib_intr_getstate(dip, ino_p->ino_sysino,
-		    &intr_state)) == DDI_SUCCESS) &&
-		    (intr_state == INTR_DELIVERED_STATE); /* */) {
-			if (gethrtime() - start_time > px_intrpend_timeout) {
-				cmn_err(CE_WARN, "%s%d: px_add_intx_intr: "
-				    "pending sysino 0x%lx(ino 0x%x) timeout",
-				    ddi_driver_name(dip), ddi_get_instance(dip),
-				    ino_p->ino_sysino, ino_p->ino_ino);
-
-				ret = DDI_FAILURE;
-				goto fail1;
-			}
+		/* Wait on pending interrupt */
+		if ((ret = px_ib_intr_pend(dip, ino_p->ino_sysino)) !=
+		    DDI_SUCCESS) {
+			cmn_err(CE_WARN, "%s%d: px_add_intx_intr: "
+			    "pending sysino 0x%lx(ino 0x%x) timeout",
+			    ddi_driver_name(dip), ddi_get_instance(dip),
+			    ino_p->ino_sysino, ino_p->ino_ino);
+			goto fail1;
 		}
 	}
 

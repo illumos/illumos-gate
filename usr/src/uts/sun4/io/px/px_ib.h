@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_PX_IB_H
@@ -133,6 +132,7 @@ extern int px_ib_attach(px_t *px_p);
 extern void px_ib_detach(px_t *px_p);
 extern void px_ib_intr_enable(px_t *px_p, cpuid_t cpuid, devino_t ino);
 extern void px_ib_intr_disable(px_ib_t *ib_p, devino_t ino, int wait);
+extern int px_ib_intr_pend(dev_info_t *dip, sysino_t sysino);
 extern void px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
     boolean_t wait_flag);
 

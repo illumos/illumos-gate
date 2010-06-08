@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -165,6 +164,45 @@ px_ib_intr_disable(px_ib_t *ib_p, devino_t ino, int wait)
 	mutex_exit(&ib_p->ib_intr_lock);
 }
 
+int
+px_ib_intr_pend(dev_info_t *dip, sysino_t sysino)
+{
+	int		ret = DDI_SUCCESS;
+	hrtime_t	start_time, prev, curr, interval, jump;
+	hrtime_t	intr_timeout;
+	intr_state_t	intr_state;
+
+	/* Disable the interrupt */
+	PX_INTR_DISABLE(dip, sysino);
+
+	intr_timeout = px_intrpend_timeout;
+	jump = TICK_TO_NSEC(xc_tick_jump_limit);
+
+	/* Busy wait on pending interrupt */
+	for (curr = start_time = gethrtime(); !panicstr &&
+	    ((ret = px_lib_intr_getstate(dip, sysino,
+	    &intr_state)) == DDI_SUCCESS) &&
+	    (intr_state == INTR_DELIVERED_STATE); /* */) {
+		/*
+		 * If we have a really large jump in hrtime, it is most
+		 * probably because we entered the debugger (or OBP,
+		 * in general). So, we adjust the timeout accordingly
+		 * to prevent declaring an interrupt timeout. The
+		 * master-interrupt mechanism in OBP should deliver
+		 * the interrupts properly.
+		 */
+		prev = curr;
+		curr = gethrtime();
+		interval = curr - prev;
+		if (interval > jump)
+			intr_timeout += interval;
+		if (curr - start_time > intr_timeout) {
+			ret = DDI_FAILURE;
+			break;
+		}
+	}
+	return (ret);
+}
 
 void
 px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
@@ -173,10 +211,6 @@ px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
 	uint32_t	old_cpu_id;
 	sysino_t	sysino;
 	intr_valid_state_t	enabled = 0;
-	hrtime_t	start_time, prev, curr, interval, jump;
-	hrtime_t	intr_timeout;
-	intr_state_t	intr_state;
-	int		e = DDI_SUCCESS;
 
 	DBG(DBG_IB, dip, "px_ib_intr_dist_en: ino=0x%x\n", ino);
 
@@ -204,49 +238,18 @@ px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
 	if (cpu_id == old_cpu_id)
 		return;
 
-	if (!wait_flag)
-		goto done;
+	/* Wait on pending interrupts */
+	if (wait_flag != 0 && px_ib_intr_pend(dip, sysino) != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "%s%d: px_ib_intr_dist_en: sysino 0x%lx(ino 0x%x) "
+		    "from cpu id 0x%x to 0x%x timeout",
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    sysino, ino, old_cpu_id, cpu_id);
 
-	/* Busy wait on pending interrupts */
-	PX_INTR_DISABLE(dip, sysino);
-
-	intr_timeout = px_intrpend_timeout;
-	jump = TICK_TO_NSEC(xc_tick_jump_limit);
-
-	for (curr = start_time = gethrtime(); !panicstr &&
-	    ((e = px_lib_intr_getstate(dip, sysino, &intr_state)) ==
-	    DDI_SUCCESS) &&
-	    (intr_state == INTR_DELIVERED_STATE); /* */) {
-		/*
-		 * If we have a really large jump in hrtime, it is most
-		 * probably because we entered the debugger (or OBP,
-		 * in general). So, we adjust the timeout accordingly
-		 * to prevent declaring an interrupt timeout. The
-		 * master-interrupt mechanism in OBP should deliver
-		 * the interrupts properly.
-		 */
-		prev = curr;
-		curr = gethrtime();
-		interval = curr - prev;
-		if (interval > jump)
-			intr_timeout += interval;
-		if (curr - start_time > intr_timeout) {
-			cmn_err(CE_WARN,
-			    "%s%d: px_ib_intr_dist_en: sysino 0x%lx(ino 0x%x) "
-			    "from cpu id 0x%x to 0x%x timeout",
-			    ddi_driver_name(dip), ddi_get_instance(dip),
-			    sysino, ino, old_cpu_id, cpu_id);
-
-			e = DDI_FAILURE;
-			break;
-		}
-	}
-
-	if (e != DDI_SUCCESS)
 		DBG(DBG_IB, dip, "px_ib_intr_dist_en: failed, "
 		    "ino 0x%x sysino 0x%x\n", ino, sysino);
+	}
 
-done:
 	PX_INTR_ENABLE(dip, sysino, cpu_id);
 }
 
@@ -602,8 +605,6 @@ px_ib_ino_add_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 	sysino_t	sysino = ino_p->ino_sysino;
 	dev_info_t	*dip = px_p->px_dip;
 	cpuid_t		curr_cpu;
-	hrtime_t	start_time;
-	intr_state_t	intr_state;
 	int		ret = DDI_SUCCESS;
 
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
@@ -620,21 +621,12 @@ px_ib_ino_add_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 		return (ret);
 	}
 
-	PX_INTR_DISABLE(dip, sysino);
-
-	/* Busy wait on pending interrupt */
-	for (start_time = gethrtime(); !panicstr &&
-	    ((ret = px_lib_intr_getstate(dip, sysino, &intr_state))
-	    == DDI_SUCCESS) && (intr_state == INTR_DELIVERED_STATE); /* */) {
-		if (gethrtime() - start_time > px_intrpend_timeout) {
-			cmn_err(CE_WARN, "%s%d: px_ib_ino_add_intr: pending "
-			    "sysino 0x%lx(ino 0x%x) timeout",
-			    ddi_driver_name(dip), ddi_get_instance(dip),
-			    sysino, ino);
-
-			ret = DDI_FAILURE;
-			break;
-		}
+	/* Wait on pending interrupt */
+	if ((ret = px_ib_intr_pend(dip, sysino)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s%d: px_ib_ino_add_intr: pending "
+		    "sysino 0x%lx(ino 0x%x) timeout",
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    sysino, ino);
 	}
 
 	/*
@@ -687,8 +679,6 @@ px_ib_ino_rem_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 	sysino_t	sysino = ino_p->ino_sysino;
 	dev_info_t	*dip = px_p->px_dip;
 	px_ih_t		*ih_lst = ipil_p->ipil_ih_head;
-	hrtime_t	start_time;
-	intr_state_t	intr_state;
 	int		i, ret = DDI_SUCCESS;
 
 	ASSERT(MUTEX_HELD(&ino_p->ino_ib_p->ib_ino_lst_mutex));
@@ -696,22 +686,12 @@ px_ib_ino_rem_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 	DBG(DBG_IB, px_p->px_dip, "px_ib_ino_rem_intr ino=%x\n",
 	    ino_p->ino_ino);
 
-	/* Disable the interrupt */
-	PX_INTR_DISABLE(px_p->px_dip, sysino);
-
-	/* Busy wait on pending interrupt */
-	for (start_time = gethrtime(); !panicstr &&
-	    ((ret = px_lib_intr_getstate(dip, sysino, &intr_state))
-	    == DDI_SUCCESS) && (intr_state == INTR_DELIVERED_STATE); /* */) {
-		if (gethrtime() - start_time > px_intrpend_timeout) {
-			cmn_err(CE_WARN, "%s%d: px_ib_ino_rem_intr: pending "
-			    "sysino 0x%lx(ino 0x%x) timeout",
-			    ddi_driver_name(dip), ddi_get_instance(dip),
-			    sysino, ino);
-
-			ret = DDI_FAILURE;
-			break;
-		}
+	/* Wait on pending interrupt */
+	if ((ret = px_ib_intr_pend(dip, sysino)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s%d: px_ib_ino_rem_intr: pending "
+		    "sysino 0x%lx(ino 0x%x) timeout",
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    sysino, ino);
 	}
 
 	/*
