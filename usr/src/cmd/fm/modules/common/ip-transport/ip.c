@@ -60,10 +60,13 @@ typedef struct ip_buf {
 	size_t ipb_size;	/* size of buffer */
 } ip_buf_t;
 
-typedef struct ip_cinfo {	/* Connection specific information */
-	struct addrinfo *addr;	/* Connection address(es) */
-	char *name;		/* The name of the server or interface */
-	int retry;		/* The number of connection retries */
+typedef struct ip_cinfo {	    /* Connection specific information */
+	struct addrinfo *ipc_addr;  /* Connection address(es) */
+	char *ipc_name;		    /* The name of the server or interface */
+	int ipc_retry;		    /* The number of connection retries */
+	boolean_t ipc_accept;	    /* Will connection accept clients */
+	id_t ipc_timer;		    /* FMD timer id for connection */
+	struct ip_cinfo *ipc_next;  /* Next conneciton in list */
 } ip_cinfo_t;
 
 typedef struct ip_xprt {
@@ -75,11 +78,12 @@ typedef struct ip_xprt {
 	ip_buf_t ipx_sndbuf;	/* buffer for sending events */
 	ip_buf_t ipx_rcvbuf;	/* buffer for receiving events */
 	ip_cinfo_t *ipx_cinfo;	/* info for reconnect */
+	id_t ipx_spnd_timer;	/* connection suspend timer */
 	char *ipx_addr;		/* address:port of remote connection */
 	struct ip_xprt *ipx_next;	/* next ip_xprt in global list */
 } ip_xprt_t;
 
-#define	IPX_ID(a) ((a)->ipx_addr)
+#define	IPX_ID(a) ((a)->ipx_addr == NULL ? "(Not connected)" : (a)->ipx_addr)
 
 typedef struct ip_stat {
 	fmd_stat_t ips_accfail;	/* failed accepts */
@@ -101,6 +105,8 @@ static ip_stat_t ip_stat = {
 static fmd_hdl_t *ip_hdl;	/* module handle */
 static pthread_mutex_t ip_lock;	/* lock for ip_xps list */
 static ip_xprt_t *ip_xps;	/* list of active transports */
+static pthread_mutex_t ip_conns_lock;	/* lock for ip_conns list */
+static ip_cinfo_t *ip_conns;	/* list of all configured connection info */
 static nvlist_t *ip_auth;	/* authority to use for transport(s) */
 static size_t ip_size;		/* default buffer size */
 static volatile int ip_quit;	/* signal to quit */
@@ -117,9 +123,6 @@ static int ip_translate;	/* call fmd_xprt_translate() before sending */
 static char *ip_port;		/* port to connect to (or bind to if server) */
 static int ip_retry;		/* retry count for ip_xprt_setup() -1=forever */
 static hrtime_t ip_sleep;	/* sleep delay for ip_xprt_setup() */
-static ip_cinfo_t ip_listen;	/* Transport service conn info for server */
-static ip_cinfo_t ip_server;    /* Remote server connection info for client */
-static ip_cinfo_t ip_server2;	/* Second remote server conn info for client */
 static int ip_debug_level;	/* level for printing debug messages */
 
 /*
@@ -166,7 +169,8 @@ ip_fmdo_send(fmd_hdl_t *hdl, fmd_xprt_t *xp, fmd_event_t *ep, nvlist_t *nvl)
 		if (ip_burp != 0) {
 			ip_debug(IP_DEBUG_FINE, "burping ipx %s", IPX_ID(ipx));
 			ipx->ipx_flags |= FMD_XPRT_SUSPENDED;
-			(void) fmd_timer_install(ip_hdl, ipx, NULL, ip_burp);
+			ipx->ipx_spnd_timer = fmd_timer_install(
+			    ip_hdl, ipx, NULL, ip_burp);
 			fmd_xprt_suspend(ip_hdl, xp);
 		}
 		return (FMD_SEND_RETRY);
@@ -240,7 +244,7 @@ ip_fmdo_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	int err;
 	ip_xprt_t *ipx;
 
-	if (ip_rdonly) {
+	if (ip_rdonly && !ip_quit) {
 		(void) pthread_mutex_lock(&ip_lock);
 
 		for (ipx = ip_xps; ipx != NULL; ipx = ipx->ipx_next) {
@@ -288,7 +292,7 @@ ip_xprt_recv(ip_xprt_t *ipx, size_t size)
 		}
 		/* Reset retry counter after a successful connection */
 		if (ipx->ipx_cinfo) {
-			ipx->ipx_cinfo->retry = ip_retry;
+			ipx->ipx_cinfo->ipc_retry = ip_retry;
 		}
 
 		buf += n;
@@ -389,7 +393,7 @@ ip_xprt_accept(ip_xprt_t *ipx)
 	ip_xprt_set_addr(ipx, (struct sockaddr *)&sa);
 	xp = fmd_xprt_open(ip_hdl, ipx->ipx_flags,
 	    ip_xprt_auth(ipx), NULL);
-	ip_xprt_create(xp, fd, ipx->ipx_flags, &ip_listen, ipx->ipx_addr);
+	ip_xprt_create(xp, fd, ipx->ipx_flags, ipx->ipx_cinfo, ipx->ipx_addr);
 }
 
 static void
@@ -445,7 +449,6 @@ ip_xprt_thread(void *arg)
 	struct sockaddr_storage sa;
 	socklen_t salen = sizeof (sa);
 	struct pollfd pfd;
-	id_t id;
 
 	ip_debug(IP_DEBUG_FINER, "Enter ip_xprt_thread");
 
@@ -477,8 +480,10 @@ ip_xprt_thread(void *arg)
 
 			if (getpeername(ipx->ipx_fd, (struct sockaddr *)&sa,
 			    &salen) != 0) {
-				fmd_hdl_error(ip_hdl, "failed to get peer name "
-				    "for fd %d", ipx->ipx_fd);
+				ip_debug(IP_DEBUG_FINE,
+				    "Not connected, no remote name for fd %d. "
+				    " Will retry.",
+				    ipx->ipx_fd);
 				bzero(&sa, sizeof (sa));
 				break;
 			}
@@ -499,8 +504,9 @@ ip_xprt_thread(void *arg)
 		}
 	}
 
-	id = fmd_timer_install(ip_hdl, ipx, NULL, 0);
-	ip_debug(IP_DEBUG_FINE, "close fd %d (timer %d)", ipx->ipx_fd, (int)id);
+	ipx->ipx_cinfo->ipc_timer = fmd_timer_install(ip_hdl, ipx, NULL, 0);
+	ip_debug(IP_DEBUG_FINE, "close fd %d (timer %d)", ipx->ipx_fd,
+	    (int)ipx->ipx_cinfo->ipc_timer);
 }
 
 static void
@@ -555,6 +561,9 @@ ip_xprt_destroy(ip_xprt_t *ipx)
 
 	(void) pthread_mutex_unlock(&ip_lock);
 
+	if (ipx->ipx_spnd_timer)
+		fmd_timer_remove(ip_hdl, ipx->ipx_spnd_timer);
+
 	fmd_thr_signal(ip_hdl, ipx->ipx_tid);
 	fmd_thr_destroy(ip_hdl, ipx->ipx_tid);
 
@@ -586,22 +595,19 @@ ip_xprt_setup(fmd_hdl_t *hdl, ip_cinfo_t *cinfo)
 	int err, fd, oflags, xflags, optval = 1;
 	struct addrinfo *aip;
 	const char *s1, *s2;
-	struct addrinfo *ail = cinfo->addr;
+	struct addrinfo *ail = cinfo->ipc_addr;
 
-	ip_debug(IP_DEBUG_FINER, "Enter ip_xprt_setup");
+	ip_debug(IP_DEBUG_FINER, "Enter ip_xprt_setup %s\n",
+	    cinfo->ipc_name == NULL ? "localhost" : cinfo->ipc_name);
 
 	/*
 	 * Set up flags as specified in the .conf file. Note that these are
 	 * mostly only used for testing purposes, allowing the transport to
 	 * be set up in various modes.
 	 */
-	if (ail != ip_listen.addr)
-		xflags = (ip_rdonly == FMD_B_TRUE) ? FMD_XPRT_RDONLY :
-		    FMD_XPRT_RDWR;
-	else
-		xflags = ((ip_rdonly == FMD_B_TRUE) ? FMD_XPRT_RDONLY :
-		    FMD_XPRT_RDWR) | FMD_XPRT_ACCEPT;
-
+	xflags = (ip_rdonly == FMD_B_TRUE) ? FMD_XPRT_RDONLY : FMD_XPRT_RDWR;
+	if (cinfo->ipc_accept)
+		xflags |= FMD_XPRT_ACCEPT;
 	if (ip_external == FMD_B_TRUE)
 		xflags |= FMD_XPRT_EXTERNAL;
 	if (ip_no_remote_repair == FMD_B_TRUE)
@@ -649,15 +655,15 @@ ip_xprt_setup(fmd_hdl_t *hdl, ip_cinfo_t *cinfo)
 		(void) close(fd);
 	}
 
-	if (cinfo->name != NULL) {
+	if (cinfo->ipc_name != NULL) {
 		s1 = "failed to connect to";
-		s2 = cinfo->name;
+		s2 = cinfo->ipc_name;
 	} else {
 		s1 = "failed to listen on";
 		s2 = ip_port;
 	}
 
-	if (err == EACCES || cinfo->retry-- == 0)
+	if (err == EACCES || cinfo->ipc_retry-- == 0)
 		fmd_hdl_abort(hdl, "%s %s: %s\n", s1, s2, strerror(err));
 
 	ip_debug(IP_DEBUG_FINE, "%s %s: %s (will retry)\n",
@@ -672,32 +678,65 @@ ip_xprt_setup(fmd_hdl_t *hdl, ip_cinfo_t *cinfo)
 static void
 ip_addr_cleanup()
 {
-	if (ip_listen.addr != NULL) {
-		freeaddrinfo(ip_listen.addr);
-		ip_listen.addr = NULL;
+	ip_cinfo_t *conn;
+
+	(void) pthread_mutex_lock(&ip_conns_lock);
+	conn = ip_conns;
+	while (conn != NULL) {
+		ip_conns = conn->ipc_next;
+		if (conn->ipc_addr != NULL)
+			freeaddrinfo(conn->ipc_addr);
+		conn->ipc_addr = NULL;
+		if (conn->ipc_timer)
+			fmd_timer_remove(ip_hdl, conn->ipc_timer);
+		fmd_hdl_strfree(ip_hdl, conn->ipc_name);
+		fmd_hdl_free(ip_hdl, conn, sizeof (ip_cinfo_t));
+		conn = ip_conns;
 	}
-	if (ip_server.addr != NULL) {
-		freeaddrinfo(ip_server.addr);
-		ip_server.addr = NULL;
-	}
-	if (ip_server2.addr != NULL) {
-		freeaddrinfo(ip_server2.addr);
-		ip_server2.addr = NULL;
-	}
-	fmd_prop_free_string(ip_hdl, ip_server.name);
-	fmd_prop_free_string(ip_hdl, ip_server2.name);
+	(void) pthread_mutex_unlock(&ip_conns_lock);
+
 	fmd_prop_free_string(ip_hdl, ip_port);
 }
 
-/*
- * Setup a single address for ip connection.
- */
-static int
-ip_setup_addr(ip_cinfo_t *cinfo)
+static boolean_t
+ip_argis_cinfo(void *arg)
 {
-	struct addrinfo aih;
-	char *server = cinfo->name;
+	boolean_t exists = B_FALSE;
+	ip_cinfo_t *conn;
+
+	(void) pthread_mutex_lock(&ip_conns_lock);
+	for (conn = ip_conns; conn != NULL; conn = conn->ipc_next) {
+		if (conn == arg) {
+			exists = B_TRUE;
+			break;
+		}
+	}
+	(void) pthread_mutex_unlock(&ip_conns_lock);
+
+	return (exists);
+}
+
+
+static ip_cinfo_t *
+ip_create_cinfo(char *server, boolean_t accept)
+{
 	int err;
+	struct addrinfo aih;
+	ip_cinfo_t *cinfo = fmd_hdl_zalloc(
+	    ip_hdl, sizeof (ip_cinfo_t), FMD_NOSLEEP);
+
+	if (cinfo == NULL)
+		return (NULL);
+
+	cinfo->ipc_accept = accept;
+	cinfo->ipc_retry = ip_retry;
+	if (server != NULL) {
+		cinfo->ipc_name = fmd_hdl_strdup(ip_hdl, server, FMD_NOSLEEP);
+		if (cinfo->ipc_name == NULL) {
+			fmd_hdl_free(ip_hdl, cinfo, sizeof (ip_cinfo_t));
+			return (NULL);
+		}
+	}
 
 	bzero(&aih, sizeof (aih));
 	aih.ai_flags = AI_ADDRCONFIG;
@@ -707,47 +746,97 @@ ip_setup_addr(ip_cinfo_t *cinfo)
 		ip_debug(IP_DEBUG_FINE, "resolving %s:%s\n", server, ip_port);
 	} else {
 		aih.ai_flags |= AI_PASSIVE;
-		cinfo->name = "localhost";
+		cinfo->ipc_name = fmd_hdl_strdup(
+		    ip_hdl, "localhost", FMD_NOSLEEP);
+		if (cinfo->ipc_name == NULL) {
+			fmd_hdl_free(ip_hdl, cinfo, sizeof (ip_cinfo_t));
+			return (NULL);
+		}
 	}
 
-	err = getaddrinfo(server, ip_port, &aih, &cinfo->addr);
+	err = getaddrinfo(server, ip_port, &aih, &cinfo->ipc_addr);
 	if (err != 0) {
 		fmd_hdl_error(ip_hdl, "failed to resolve host %s port %s: %s\n",
-		    cinfo->name, ip_port, gai_strerror(err));
-		cinfo->addr = NULL;
+		    cinfo->ipc_name, ip_port, gai_strerror(err));
+		cinfo->ipc_addr = NULL;
+		fmd_hdl_strfree(ip_hdl, cinfo->ipc_name);
+		fmd_hdl_free(ip_hdl, cinfo, sizeof (ip_cinfo_t));
+		cinfo = NULL;
+	}
+	return (cinfo);
+}
+
+/*
+ * Setup a single ip address for ip connection.
+ * If unable to setup any of the addresses then all addresses will be cleaned up
+ * and non-zero will be returned.
+ */
+static int
+ip_setup_addr(char *server, boolean_t accept)
+{
+	int err = 0;
+	ip_cinfo_t *cinfo = ip_create_cinfo(server, accept);
+
+	if (cinfo == NULL) {
+		ip_addr_cleanup();
+		err++;
+	} else {
+		(void) pthread_mutex_lock(&ip_conns_lock);
+		cinfo->ipc_next = ip_conns;
+		ip_conns = cinfo;
+		(void) pthread_mutex_unlock(&ip_conns_lock);
 	}
 	return (err);
 }
 
 /*
- * Setup all IP addresses for network configuration.
- * The listen address for for a service that will bind to clients.
- * A client can connect up to two servers using ip_server and ip_server2
- * properties.
+ * Setup a ip addresses for an ip connection.  The address can be a comma
+ * separated list of addresses as well.
+ * If unable to setup any of the addresses then all addresses will be cleaned up
+ * and non-zero will be returned.
  */
 static int
-ip_setup_addrs()
+ip_setup_addrs(char *server, boolean_t accept)
 {
 	int err = 0;
-	ip_listen.addr = NULL;
-	ip_server.addr = NULL;
-	ip_server.retry = ip_retry;
-	ip_server2.addr = NULL;
+	char *addr = server;
+	char *p;
 
-	if ((ip_server.name == NULL && ip_server2.name == NULL) ||
-	    ip_listen.name) {
-		err = ip_setup_addr(&ip_listen);
+	for (p = server; *p != '\0'; p++) {
+		if (*p == ',') {
+			*p = '\0';
+			err = ip_setup_addr(addr, accept);
+			*p = ',';
+			if (err)
+				return (err);
+			addr = ++p;
+			if (*addr == '\0')
+				break;
+		}
 	}
-	if (ip_server.name != NULL && err == 0) {
-		err = ip_setup_addr(&ip_server);
-	}
-	if (ip_server2.name != NULL && err == 0) {
-		err = ip_setup_addr(&ip_server2);
-	}
-	if (err != 0) {
-		ip_addr_cleanup();
+	if (*addr != '\0') {
+		err = ip_setup_addr(addr, accept);
 	}
 	return (err);
+}
+
+/*
+ * Starts all connections for each configured network address.  If there is an
+ * error starting a connection a timer will be started for a retry.
+ */
+static void
+ip_start_connections()
+{
+	ip_cinfo_t *conn;
+
+	(void) pthread_mutex_lock(&ip_conns_lock);
+	for (conn = ip_conns; conn != NULL; conn = conn->ipc_next) {
+		if (ip_xprt_setup(ip_hdl, conn) != 0) {
+			conn->ipc_timer = fmd_timer_install(ip_hdl, conn, NULL,
+			    ip_sleep);
+		}
+	}
+	(void) pthread_mutex_unlock(&ip_conns_lock);
 }
 
 /*
@@ -771,15 +860,19 @@ ip_timeout(fmd_hdl_t *hdl, id_t id, void *arg) {
 
 	if (arg == NULL) {
 		fmd_hdl_error(hdl, "ip_timeout failed because hg arg is NULL");
-	} else if (arg == &ip_server || arg == &ip_server2 ||
-	    arg == &ip_listen) {
+	} else if (ip_argis_cinfo(arg)) {
 		ip_debug(IP_DEBUG_FINER,
 			"Enter ip_timeout (a) install new timer");
-		if (ip_xprt_setup(hdl, arg) != 0)
-			(void) fmd_timer_install(hdl, arg, NULL, ip_sleep);
+		cinfo = arg;
+		if ((ip_xprt_setup(hdl, arg) != 0) && !ip_quit)
+			cinfo->ipc_timer = fmd_timer_install(
+				hdl, cinfo, NULL, ip_sleep);
+		else
+			cinfo->ipc_timer = NULL;
 	} else {
 		ipx = arg;
 		if (ipx->ipx_flags & FMD_XPRT_SUSPENDED) {
+			ipx->ipx_spnd_timer = NULL;
 			ip_debug(IP_DEBUG_FINE, "timer %d waking ipx %p",
 				(int)id, arg);
 			ipx->ipx_flags &= ~FMD_XPRT_SUSPENDED;
@@ -791,9 +884,11 @@ ip_timeout(fmd_hdl_t *hdl, id_t id, void *arg) {
 			install_timer = (ipx->ipx_flags & FMD_XPRT_ACCEPT) !=
 				FMD_XPRT_ACCEPT;
 			ip_xprt_destroy(ipx);
-			if (install_timer)
-				(void) fmd_timer_install(
+			if (install_timer && !ip_quit)
+				cinfo->ipc_timer = fmd_timer_install(
 					hdl, cinfo, NULL, ip_sleep);
+			else
+				cinfo->ipc_timer = NULL;
 		}
 	}
 }
@@ -814,7 +909,6 @@ static const fmd_prop_t fmd_props[] = {
 	{ "ip_qlen", FMD_TYPE_INT32, "32" },
 	{ "ip_retry", FMD_TYPE_INT32, "-1" },	    /* -1=forever */
 	{ "ip_server", FMD_TYPE_STRING, NULL },	    /* server name */
-	{ "ip_server2", FMD_TYPE_STRING, NULL },    /* secondary server name */
 	{ "ip_sleep", FMD_TYPE_TIME, "10s" },
 	{ "ip_translate", FMD_TYPE_BOOL, "false" },
 	{ "ip_bind_addr", FMD_TYPE_STRING, NULL },  /* network interface addr */
@@ -855,7 +949,8 @@ static const fmd_hdl_info_t fmd_info = {
 void
 _fmd_init(fmd_hdl_t *hdl)
 {
-	char *auth, *p, *q, *r, *s;
+	char *addr, *auth, *p, *q, *r, *s;
+	int err;
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return; /* failed to register handle */
@@ -886,18 +981,41 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	ip_size = (size_t)fmd_prop_get_int64(hdl, "ip_bufsize");
 	ip_size = MAX(ip_size, sizeof (ip_hdr_t));
-
-	ip_listen.name = fmd_prop_get_string(hdl, "ip_bind_addr");
-	ip_server.name = fmd_prop_get_string(hdl, "ip_server");
-	ip_server2.name = fmd_prop_get_string(hdl, "ip_server2");
 	ip_port = fmd_prop_get_string(hdl, "ip_port");
 	ip_debug_level = fmd_prop_get_int32(hdl, "ip_debug_level");
 
-	if (ip_setup_addrs()) {
-		fmd_hdl_abort(hdl, "Unable to setup IP addresses.");
-		return;
+	ip_conns = NULL;
+	addr = fmd_prop_get_string(hdl, "ip_bind_addr");
+	if (addr != NULL) {
+		err = ip_setup_addrs(addr, B_TRUE);
+		if (err) {
+			fmd_hdl_abort(hdl, "Unable to setup ip_bind_addr %s",
+			    addr);
+			return;
+		}
+		fmd_prop_free_string(hdl, addr);
+	}
+	addr = fmd_prop_get_string(hdl, "ip_server");
+	if (addr != NULL) {
+		err = ip_setup_addrs(addr, B_FALSE);
+		if (err) {
+			fmd_hdl_abort(hdl, "Unable to setup ip_server %s",
+			    addr);
+			return;
+		}
+		fmd_prop_free_string(hdl, addr);
 	}
 
+	/*
+	 * If no specific connecitons configured then set up general server
+	 * listening on all network ports.
+	 */
+	if (ip_conns == NULL) {
+		if (ip_setup_addr(NULL, B_TRUE) != 0) {
+			fmd_hdl_abort(hdl, "Unable to setup server.");
+			return;
+		}
+	}
 
 	/*
 	 * If ip_authority is set, tokenize this string and turn it into an
@@ -929,31 +1047,7 @@ _fmd_init(fmd_hdl_t *hdl)
 		}
 	}
 
-	/*
-	 * Start ip transport server to listen for clients
-	 */
-	if (ip_listen.addr != NULL) {
-		if (ip_xprt_setup(hdl, &ip_listen) != 0) {
-			(void) fmd_timer_install(hdl, &ip_listen, NULL,
-			    ip_sleep);
-		}
-	}
-
-	/*
-	 * Call ip_xprt_setup() to connect to server(s).  If it fails and
-	 * ip_retry is non-zero, install a timer to try again after
-	 * 'ip_sleep' nsecs.
-	 */
-	if (ip_server.addr != NULL) {
-		if (ip_xprt_setup(hdl, &ip_server) != 0)
-			(void) fmd_timer_install(hdl, &ip_server, NULL,
-			    ip_sleep);
-	}
-	if (ip_server2.addr != NULL) {
-		if (ip_xprt_setup(hdl, &ip_server2) != 0)
-			(void) fmd_timer_install(hdl, &ip_server2, NULL,
-			    ip_sleep);
-	}
+	ip_start_connections();
 }
 
 void
@@ -966,7 +1060,11 @@ _fmd_fini(fmd_hdl_t *hdl)
 
 	if (ip_auth != NULL)
 		nvlist_free(ip_auth);
+
 	ip_addr_cleanup();
+
+	if (ip_domain_name != NULL)
+		fmd_prop_free_string(ip_hdl, ip_domain_name);
 
 	fmd_hdl_unregister(hdl);
 }
