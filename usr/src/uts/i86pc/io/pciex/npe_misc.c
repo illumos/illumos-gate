@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -40,6 +39,7 @@
 #include <io/pciex/pcie_nvidia.h>
 #include <io/pciex/pcie_nb5000.h>
 #include <sys/pci_cfgacc_x86.h>
+#include <sys/cpuvar.h>
 
 /*
  * Prototype declaration
@@ -50,6 +50,10 @@ int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 void	npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl);
 void	npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl);
 boolean_t npe_is_child_pci(dev_info_t *dip);
+int	npe_enable_htmsi(ddi_acc_handle_t cfg_hdl);
+void	npe_enable_htmsi_children(dev_info_t *dip);
+
+int	npe_enable_htmsi_flag = 1;
 
 /*
  * Default ecfga base address
@@ -309,11 +313,24 @@ npe_enable_htmsi_children(dev_info_t *dip)
 	dev_info_t *cdip = ddi_get_child(dip);
 	ddi_acc_handle_t cfg_hdl;
 
+	if (!npe_enable_htmsi_flag)
+		return;
+
+	/*
+	 * Hypertransport MSI remapping only applies to AMD CPUs using
+	 * Hypertransport (K8 and above) and not other platforms with non-AMD
+	 * CPUs that may be using Hypertransport internally in the chipset(s)
+	 */
+	if (!(cpuid_getvendor(CPU) == X86_VENDOR_AMD &&
+	    cpuid_getfamily(CPU) >= 0xf))
+		return;
+
 	for (; cdip != NULL; cdip = ddi_get_next_sibling(cdip)) {
 		if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS) {
 			cmn_err(CE_NOTE, "!npe_enable_htmsi_children: "
 			    "pci_config_setup failed for %s",
 			    ddi_node_name(cdip));
+			return;
 		}
 
 		(void) npe_enable_htmsi(cfg_hdl);
