@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_MODCTL_H
@@ -595,7 +594,10 @@ extern modctl_t *mod_load_requisite(modctl_t *, char *);
 extern modctl_t *mod_find_by_filename(char *, char *);
 extern uintptr_t	modgetsymvalue(char *, int);
 
+extern int	major_valid(major_t);
 extern int	driver_installed(major_t);
+extern int	driver_active(major_t);
+
 extern void	mod_rele_dev_by_major(major_t);
 extern struct dev_ops *mod_hold_dev_by_major(major_t);
 extern struct dev_ops *mod_hold_dev_by_devi(dev_info_t *);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -73,10 +72,22 @@ static void hwc_hash(struct hwc_spec *, major_t);
 static void hwc_unhash(struct hwc_spec *);
 
 int
+major_valid(major_t major)
+{
+	return (major != DDI_MAJOR_T_NONE &&
+	    (major >= 0 && major < devcnt));
+}
+
+int
 driver_installed(major_t major)
 {
-	return ((major < devcnt) && (major != DDI_MAJOR_T_NONE) &&
-	    !(devnamesp[major].dn_flags &
+	return (major_valid(major) && devnamesp[major].dn_name != NULL);
+}
+
+int
+driver_active(major_t major)
+{
+	return (driver_installed(major) && !(devnamesp[major].dn_flags &
 	    (DN_DRIVER_REMOVED|DN_DRIVER_INACTIVE)));
 }
 
@@ -87,7 +98,7 @@ mod_hold_dev_by_major(major_t major)
 	int loaded;
 	char *drvname;
 
-	if (!driver_installed(major))
+	if (!driver_active(major))
 		return (NULL);
 
 	LOCK_DEV_OPS(&(devnamesp[major].dn_lock));
@@ -121,7 +132,7 @@ mod_rele_dev_by_major(major_t major)
 	struct dev_ops *ops;
 	struct devnames *dnp;
 
-	if (!driver_installed(major))
+	if (!driver_active(major))
 		return;
 
 	dnp = &devnamesp[major];
