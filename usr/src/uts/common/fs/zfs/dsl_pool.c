@@ -42,7 +42,7 @@
 
 int zfs_no_write_throttle = 0;
 int zfs_write_limit_shift = 3;			/* 1/8th of physical memory */
-int zfs_txg_synctime_ms = 5000;		/* target millisecs to sync a txg */
+int zfs_txg_synctime_ms = 1000;		/* target millisecs to sync a txg */
 
 uint64_t zfs_write_limit_min = 32 << 20;	/* min write limit is 32MB */
 uint64_t zfs_write_limit_max = 0;		/* max data payload per txg */

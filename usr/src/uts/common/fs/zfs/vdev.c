@@ -207,9 +207,6 @@ vdev_add_child(vdev_t *pvd, vdev_t *cvd)
 	 */
 	for (; pvd != NULL; pvd = pvd->vdev_parent)
 		pvd->vdev_guid_sum += cvd->vdev_guid_sum;
-
-	if (cvd->vdev_ops->vdev_op_leaf)
-		cvd->vdev_spa->spa_scrub_maxinflight += zfs_scrub_limit;
 }
 
 void
@@ -244,9 +241,6 @@ vdev_remove_child(vdev_t *pvd, vdev_t *cvd)
 	 */
 	for (; pvd != NULL; pvd = pvd->vdev_parent)
 		pvd->vdev_guid_sum -= cvd->vdev_guid_sum;
-
-	if (cvd->vdev_ops->vdev_op_leaf)
-		cvd->vdev_spa->spa_scrub_maxinflight -= zfs_scrub_limit;
 }
 
 /*
@@ -2541,7 +2535,7 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 		mutex_enter(&vd->vdev_stat_lock);
 
 		if (flags & ZIO_FLAG_IO_REPAIR) {
-			if (flags & ZIO_FLAG_SCRUB_THREAD) {
+			if (flags & ZIO_FLAG_SCAN_THREAD) {
 				dsl_scan_phys_t *scn_phys =
 				    &spa->spa_dsl_pool->dp_scan->scn_phys;
 				uint64_t *processed = &scn_phys->scn_processed;
@@ -2597,7 +2591,7 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 
 	if (type == ZIO_TYPE_WRITE && txg != 0 &&
 	    (!(flags & ZIO_FLAG_IO_REPAIR) ||
-	    (flags & ZIO_FLAG_SCRUB_THREAD) ||
+	    (flags & ZIO_FLAG_SCAN_THREAD) ||
 	    spa->spa_claiming)) {
 		/*
 		 * This is either a normal write (not a repair), or it's
@@ -2616,7 +2610,7 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 		 */
 		if (vd->vdev_ops->vdev_op_leaf) {
 			uint64_t commit_txg = txg;
-			if (flags & ZIO_FLAG_SCRUB_THREAD) {
+			if (flags & ZIO_FLAG_SCAN_THREAD) {
 				ASSERT(flags & ZIO_FLAG_IO_REPAIR);
 				ASSERT(spa_sync_pass(spa) == 1);
 				vdev_dtl_dirty(vd, DTL_SCRUB, txg, 1);

@@ -603,8 +603,7 @@ dnode_hold_impl(objset_t *os, uint64_t object, int flag,
 	 */
 	ASSERT(spa_config_held(os->os_spa, SCL_ALL, RW_WRITER) == 0 ||
 	    (spa_is_root(os->os_spa) &&
-	    spa_config_held(os->os_spa, SCL_STATE, RW_WRITER) &&
-	    !spa_config_held(os->os_spa, SCL_ZIO, RW_WRITER)));
+	    spa_config_held(os->os_spa, SCL_STATE, RW_WRITER)));
 
 	if (object == DMU_USERUSED_OBJECT || object == DMU_GROUPUSED_OBJECT) {
 		dn = (object == DMU_USERUSED_OBJECT) ?
