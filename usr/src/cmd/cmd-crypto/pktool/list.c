@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -424,10 +423,10 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 			    tokencred->cred == NULL) &&
 			    (cred.cred == NULL)) {
 				(void) get_token_password(kstype, token, &cred);
-				kmf_set_attr_at_index(attrlist, numattr,
+				kmf_set_attr_at_index(attrlist, num,
 				    KMF_CREDENTIAL_ATTR,
 				    &cred, sizeof (KMF_CREDENTIAL));
-				numattr++;
+				num++;
 			}
 
 			private = B_FALSE;
