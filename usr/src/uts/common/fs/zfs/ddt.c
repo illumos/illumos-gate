@@ -36,6 +36,11 @@
 #include <sys/zio_compress.h>
 #include <sys/dsl_scan.h>
 
+/*
+ * Enable/disable prefetching of dedup-ed blocks which are going to be freed.
+ */
+int zfs_dedup_prefetch = 1;
+
 static const ddt_ops_t *ddt_ops[DDT_TYPES] = {
 	&ddt_zap_ops,
 };
@@ -730,7 +735,7 @@ ddt_prefetch(spa_t *spa, const blkptr_t *bp)
 	ddt_t *ddt;
 	ddt_entry_t dde;
 
-	if (!BP_GET_DEDUP(bp))
+	if (!zfs_dedup_prefetch || bp == NULL || !BP_GET_DEDUP(bp))
 		return;
 
 	/*

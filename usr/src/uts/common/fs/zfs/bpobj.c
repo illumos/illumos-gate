@@ -113,16 +113,15 @@ bpobj_open(bpobj_t *bpo, objset_t *os, uint64_t object)
 	ASSERT3U(doi.doi_type, ==, DMU_OT_BPOBJ);
 	ASSERT3U(doi.doi_bonus_type, ==, DMU_OT_BPOBJ_HDR);
 
+	err = dmu_bonus_hold(os, object, bpo, &bpo->bpo_dbuf);
+	if (err)
+		return (err);
+
 	bpo->bpo_os = os;
 	bpo->bpo_object = object;
 	bpo->bpo_epb = doi.doi_data_block_size >> SPA_BLKPTRSHIFT;
 	bpo->bpo_havecomp = (doi.doi_bonus_size > BPOBJ_SIZE_V0);
 	bpo->bpo_havesubobj = (doi.doi_bonus_size > BPOBJ_SIZE_V1);
-
-	err = dmu_bonus_hold(bpo->bpo_os,
-	    bpo->bpo_object, bpo, &bpo->bpo_dbuf);
-	if (err)
-		return (err);
 	bpo->bpo_phys = bpo->bpo_dbuf->db_data;
 	return (0);
 }
@@ -140,6 +139,7 @@ bpobj_close(bpobj_t *bpo)
 	bpo->bpo_dbuf = NULL;
 	bpo->bpo_phys = NULL;
 	bpo->bpo_cached_dbuf = NULL;
+	bpo->bpo_object = 0;
 
 	mutex_destroy(&bpo->bpo_lock);
 }

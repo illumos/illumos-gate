@@ -865,10 +865,15 @@ dbuf_block_freeable(dmu_buf_impl_t *db)
 	else if (db->db_blkptr)
 		birth_txg = db->db_blkptr->blk_birth;
 
-	/* If we don't exist or are in a snapshot, we can't be freed */
+	/*
+	 * If we don't exist or are in a snapshot, we can't be freed.
+	 * Don't pass the bp to dsl_dataset_block_freeable() since we
+	 * are holding the db_mtx lock and might deadlock if we are
+	 * prefetching a dedup-ed block.
+	 */
 	if (birth_txg)
 		return (ds == NULL ||
-		    dsl_dataset_block_freeable(ds, db->db_blkptr, birth_txg));
+		    dsl_dataset_block_freeable(ds, NULL, birth_txg));
 	else
 		return (FALSE);
 }
@@ -1145,6 +1150,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		 * db_blkptr, but since this is just a guess,
 		 * it's OK if we get an odd answer.
 		 */
+		ddt_prefetch(os->os_spa, bp);
 		dnode_willuse_space(dn, -willfree, tx);
 	}
 
