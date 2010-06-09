@@ -1996,13 +1996,23 @@ removeif(char *str, int64_t param)
 		if (sockaddrcmp(ainfop->ia_ifa.ifa_addr, &laddr))
 			break;
 
-	if (ainfop != NULL && ainfop->ia_aobjname[0] != '\0') {
-		istatus = ipadm_delete_addr(iph, ainfop->ia_aobjname,
-		    IPADM_OPT_ACTIVE);
-		if (istatus != IPADM_SUCCESS)
-			ipadmerr_exit(istatus, "could not delete address");
-		ipadm_free_addr_info(ainfo);
-		return (0);
+	if (ainfop != NULL) {
+		if (strchr(ainfop->ia_ifa.ifa_name, ':') == NULL) {
+			(void) fprintf(stderr,
+			    "ifconfig: removeif: cannot remove interface: %s\n",
+			    name);
+			exit(1);
+		}
+		if (ainfop->ia_aobjname[0] != '\0') {
+			istatus = ipadm_delete_addr(iph, ainfop->ia_aobjname,
+			    IPADM_OPT_ACTIVE);
+			if (istatus != IPADM_SUCCESS) {
+				ipadmerr_exit(istatus,
+				    "could not delete address");
+			}
+			ipadm_free_addr_info(ainfo);
+			return (0);
+		}
 	}
 	ipadm_free_addr_info(ainfo);
 
@@ -2017,7 +2027,7 @@ delete:
 		if (errno == EBUSY) {
 			/* This can only happen if ipif_id = 0 */
 			(void) fprintf(stderr,
-			    "ifconfig: removeif: can't remove interface: %s\n",
+			    "ifconfig: removeif: cannot remove interface: %s\n",
 			    name);
 			exit(1);
 		}
@@ -3016,7 +3026,7 @@ configinfo(char *null, int64_t param)
 	}
 
 	/*
-	 * Build the interface name to print (we can't directly use `name'
+	 * Build the interface name to print (we cannot directly use `name'
 	 * because one cannot "plumb" ":0" interfaces).
 	 */
 	(void) strlcpy(lifname, name, LIFNAMSIZ);
