@@ -2256,6 +2256,7 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 			}
 		} else {
 			*err_ret = SBD_RET_FILE_ALREADY_REGISTERED;
+			bcopy(sl->sl_device_id + 4, ilu->ilu_ret_guid, 16);
 			sl->sl_trans_op = SL_OP_NONE;
 			return (EALREADY);
 		}
@@ -2289,6 +2290,7 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 	if (!no_register) {
 		if (sbd_link_lu(sl) != SBD_SUCCESS) {
 			*err_ret = SBD_RET_FILE_ALREADY_REGISTERED;
+			bcopy(sl->sl_device_id + 4, ilu->ilu_ret_guid, 16);
 			ret = EALREADY;
 			goto sim_err_out;
 		}

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -1414,6 +1413,13 @@ importDiskLu(char *fname, stmfGuid *createdGuid)
 
 	ioctlRet = ioctl(fd, SBD_IOCTL_IMPORT_LU, &sbdIoctl);
 	if (ioctlRet != 0) {
+
+		if (createdGuid && sbdIoctl.stmf_error ==
+		    SBD_RET_FILE_ALREADY_REGISTERED) {
+			bcopy(sbdLu->ilu_ret_guid, createdGuid->guid,
+			    sizeof (sbdLu->ilu_ret_guid));
+		}
+
 		savedErrno = errno;
 		switch (savedErrno) {
 			case EBUSY:
@@ -1434,6 +1440,7 @@ importDiskLu(char *fname, stmfGuid *createdGuid)
 				break;
 		}
 	}
+
 
 	if (ret != STMF_STATUS_SUCCESS) {
 		goto done;
