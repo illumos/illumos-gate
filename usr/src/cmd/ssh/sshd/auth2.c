@@ -22,8 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "includes.h"
@@ -111,12 +110,6 @@ do_authentication2(void)
 #ifdef HAVE_BSM
 	fatal_add_cleanup(audit_failed_login_cleanup, authctxt);
 #endif /* HAVE_BSM */
-
-	/* challenge-response is implemented via keyboard interactive */
-	if (options.challenge_response_authentication)
-		options.kbd_interactive_authentication = 1;
-	if (options.pam_authentication_via_kbd_int)
-		options.kbd_interactive_authentication = 1;
 
 	dispatch_init(&dispatch_protocol_error);
 	dispatch_set(SSH2_MSG_SERVICE_REQUEST, &input_service_request);

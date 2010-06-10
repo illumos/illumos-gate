@@ -1,8 +1,8 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Configuration file for sshd(1m) (see also sshd_config(4))
+#
 
 # Protocol versions supported
 #
@@ -109,13 +109,6 @@ PermitEmptyPasswords no
 
 # To disable tunneled clear text passwords, change PasswordAuthentication to no.
 PasswordAuthentication yes
-
-# Use PAM via keyboard interactive method for authentication.
-# Depending on the setup of pam.conf(4) this may allow tunneled clear text
-# passwords even when PasswordAuthentication is set to no. This is dependent
-# on what the individual modules request and is out of the control of sshd
-# or the protocol.
-PAMAuthenticationViaKBDInt yes
 
 # Are root logins permitted using sshd.
 # Note that sshd uses pam_authenticate(3PAM) so the root (or any other) user

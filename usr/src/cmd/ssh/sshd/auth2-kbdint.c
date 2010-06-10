@@ -22,14 +22,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: auth2-kbdint.c,v 1.2 2002/05/31 11:35:15 markus Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "packet.h"
 #include "auth.h"
@@ -55,7 +52,7 @@ userauth_kbdint(Authctxt *authctxt)
 	debug("keyboard-interactive devs %s", devs);
 
 #ifdef USE_PAM
-	if (options.pam_authentication_via_kbd_int)
+	if (options.kbd_interactive_authentication)
 		auth2_pam(authctxt);
 #else
 	if (options.challenge_response_authentication)
@@ -69,22 +66,7 @@ userauth_kbdint(Authctxt *authctxt)
 		return;
 	}
 #endif
-	return;
 }
-
-#if 0
-static int
-userauth_kbdint_abandon_chk(Authctxt *authctxt, Authmethod *method)
-{
-#ifdef USE_PAM
-	return kbdint_pam_abandon_chk(authctxt, method);
-#endif /* USE_PAM */
-	if (method->method_data || method->postponed)
-		return 1;
-
-	return 0;
-}
-#endif
 
 static void
 userauth_kbdint_abandon(Authctxt *authctxt, Authmethod *method)

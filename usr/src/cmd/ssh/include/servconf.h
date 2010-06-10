@@ -111,8 +111,11 @@ typedef struct {
 #endif
 	int     password_authentication;	/* If true, permit password
 						 * authentication. */
-	int     kbd_interactive_authentication;	/* If true, permit */
-	int     challenge_response_authentication;
+
+	int     kbd_interactive_authentication;
+	int	challenge_response_authentication;
+	int	pam_authentication_via_kbd_int;
+
 	int     permit_empty_passwd;	/* If false, do not permit empty
 					 * passwords. */
 	int     permit_user_env;	/* If true, read ~/.ssh/environment */
@@ -151,8 +154,6 @@ typedef struct {
 
 	char   *authorized_keys_file;	/* File containing public keys */
 	char   *authorized_keys_file2;
-
-	int	pam_authentication_via_kbd_int;
 
 	int	max_auth_tries;
 	int	max_auth_tries_log;

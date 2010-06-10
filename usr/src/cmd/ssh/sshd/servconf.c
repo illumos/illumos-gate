@@ -69,9 +69,6 @@ initialize_server_options(ServerOptions *options)
 {
 	(void) memset(options, 0, sizeof(*options));
 
-	/* Portable-specific options */
-	options->pam_authentication_via_kbd_int = -1;
-
 	/* Standard Options */
 	options->num_ports = 0;
 	options->ports_from_cmdline = 0;
@@ -121,6 +118,7 @@ initialize_server_options(ServerOptions *options)
 	options->password_authentication = -1;
 	options->kbd_interactive_authentication = -1;
 	options->challenge_response_authentication = -1;
+	options->pam_authentication_via_kbd_int = -1;
 	options->permit_empty_passwd = -1;
 	options->permit_user_env = -1;
 	options->compression = -1;
@@ -232,10 +230,6 @@ fill_default_server_options(ServerOptions *options)
 	deflt_fill_default_server_options(options);
 #endif /* HAVE_DEFOPEN */
 
-	/* Portable-specific options */
-	if (options->pam_authentication_via_kbd_int == -1)
-		options->pam_authentication_via_kbd_int = 0;
-
 	/* Standard Options */
 	if (options->protocol == SSH_PROTO_UNKNOWN)
 		options->protocol = SSH_PROTO_1|SSH_PROTO_2;
@@ -334,8 +328,12 @@ fill_default_server_options(ServerOptions *options)
 #endif
 	if (options->password_authentication == -1)
 		options->password_authentication = 1;
+	/*
+	 * options->pam_authentication_via_kbd_int has intentionally no default
+	 * value since we do not need it.
+	 */
 	if (options->kbd_interactive_authentication == -1)
-		options->kbd_interactive_authentication = 0;
+		options->kbd_interactive_authentication = 1;
 	if (options->challenge_response_authentication == -1)
 		options->challenge_response_authentication = 1;
 	if (options->permit_empty_passwd == -1)
@@ -770,6 +768,9 @@ process_server_config_line(ServerOptions *options, char *line,
 	switch (opcode) {
 	/* Portable-specific options */
 	case sPAMAuthenticationViaKbdInt:
+		log("%s line %d: PAMAuthenticationViaKbdInt has been "
+		    "deprecated. You should use KbdInteractiveAuthentication "
+		    "instead (which defaults to \"yes\").", filename, linenum);
 		intptr = &options->pam_authentication_via_kbd_int;
 		goto parse_flag;
 

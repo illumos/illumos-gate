@@ -41,8 +41,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "includes.h"
@@ -981,6 +980,39 @@ main(int ac, char **av)
 	buffer_init(&cfg);
 	load_server_config(config_file_name, &cfg);
 	parse_server_config(&options, config_file_name, &cfg, NULL, NULL, NULL);
+
+	/*
+	 * ChallengeResponseAuthentication is deprecated for protocol 2 which is
+	 * the default setting on Solaris. Warn the user about it. Note that
+	 * ChallengeResponseAuthentication is on by default but the option is
+	 * not set until fill_default_server_options() is called. If the option
+	 * is already set now, the user must have set it manually.
+	 */
+	if ((options.protocol & SSH_PROTO_2) &&
+	    !(options.protocol & SSH_PROTO_1) &&
+	    options.challenge_response_authentication != -1) {
+		log("ChallengeResponseAuthentication has been "
+		"deprecated for the SSH Protocol 2. You should use "
+		"KbdInteractiveAuthentication instead (which defaults to "
+		"\"yes\").");
+	}
+
+	/*
+	 * While PAMAuthenticationViaKbdInt was not documented, it was
+	 * previously set in our default sshd_config and also the only way to
+	 * switch off the keyboard-interactive authentication. To maintain
+	 * backward compatibility, if PAMAuthenticationViaKbdInt is manually set
+	 * to "no" and KbdInteractiveAuthentication is not set, switch off the
+	 * keyboard-interactive authentication method as before. As with the
+	 * challenge response auth situation dealt above, we have not called
+	 * fill_default_server_options() yet so if KbdInteractiveAuthentication
+	 * is already set to 1 here the admin must have set it manually and we
+	 * will honour it.
+	 */
+	if (options.kbd_interactive_authentication != 1 &&
+	    options.pam_authentication_via_kbd_int == 0) {
+		options.kbd_interactive_authentication = 0;
+	}
 
 	/* Fill in default values for those options not explicitly set. */
 	fill_default_server_options(&options);
