@@ -23,8 +23,7 @@
 
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -5892,6 +5891,7 @@ strdoioctl(
 	int sigflag = (flag & STR_NOSIG);
 	int errs;
 	uint_t waitflags;
+	boolean_t set_iocwaitne = B_FALSE;
 
 	ASSERT(copyflag == U_TO_K || copyflag == K_TO_K);
 	ASSERT((fflags & FMODELS) != 0);
@@ -5977,7 +5977,8 @@ strdoioctl(
 
 	error = 0;
 	mutex_enter(&stp->sd_lock);
-	while (stp->sd_flag & (IOCWAIT | IOCWAITNE)) {
+	while ((stp->sd_flag & IOCWAIT) ||
+	    (!set_iocwaitne && (stp->sd_flag & IOCWAITNE))) {
 		clock_t cv_rval;
 
 		TRACE_0(TR_FAC_STREAMS_FR,
@@ -5997,6 +5998,7 @@ strdoioctl(
 					 * operation completes.
 					 */
 					if (!(stp->sd_flag & IOCWAITNE)) {
+						set_iocwaitne = B_TRUE;
 						stp->sd_flag |= IOCWAITNE;
 						cv_broadcast(&stp->sd_monitor);
 					}
