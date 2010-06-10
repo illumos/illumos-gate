@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -791,6 +790,21 @@ c_format()
 	diskaddr_t		deflt;
 	int			status;
 	u_ioparam_t		ioparam;
+	struct scsi_inquiry	*inq;
+	char	rawbuf[MAX_MODE_SENSE_SIZE];
+	struct scsi_capacity_16	capacity;
+	struct vpd_hdr	*vpdhdr;
+	uint8_t	protect;
+	uint8_t	pagecode;
+	uint8_t	spt;
+	uint8_t	p_type;
+	uint8_t	prot_flag[NUM_PROT_TYPE] = {1, 0, 0, 0};
+	int	i;
+	char	*prot_descriptor[NUM_PROT_TYPE] = {
+	    "Protection Information is disabled.",
+	    "Protection Information is enabled.",
+	    "Protection Information is enabled.",
+	    "Protection Information is enabled.", };
 
 	/*
 	 * There must be a current disk type and a current disk
@@ -903,6 +917,107 @@ currently being used for swapping.\n");
 		if (check("Continue")) {
 			return (-1);
 		}
+	}
+
+	/*
+	 * set the default protection type
+	 */
+	prot_type = PROT_TYPE_0;
+
+	/*
+	 * Check if the protect information of this disk is enabled
+	 */
+	if (uscsi_inquiry(cur_file, rawbuf, sizeof (rawbuf))) {
+		err_print("Inquiry failed\n");
+		return (-1);
+	}
+	inq = (struct scsi_inquiry *)rawbuf;
+	protect = inq->inq_protect;
+	if (protect == 0) {
+		fmt_print("The protection information is not enabled\n");
+		fmt_print(
+		    "The disk will be formatted with protection type 0\n");
+	} else {
+		(void) memset(rawbuf, 0, MAX_MODE_SENSE_SIZE);
+		if (uscsi_inquiry_page_86h(cur_file, rawbuf, sizeof (rawbuf))) {
+			err_print("Inquiry with page 86h failed\n");
+			return (-1);
+		}
+		vpdhdr = (struct vpd_hdr *)rawbuf;
+		pagecode = vpdhdr->page_code;
+		if (pagecode != 0x86) {
+			err_print("Inquiry with page 86h failed\n");
+			return (-1);
+		}
+		spt = (rawbuf[4] << 2) >> 5;
+		fmt_print("This disk can support protection types:\n");
+
+		switch (spt) {
+		case 0:
+			prot_flag[1] = 1;
+			break;
+		case 1:
+			prot_flag[1] = 1;
+			prot_flag[2] = 1;
+			break;
+		case 2:
+			prot_flag[2] = 1;
+			break;
+		case 3:
+			prot_flag[1] = 1;
+			prot_flag[3] = 1;
+			break;
+		case 4:
+			prot_flag[3] = 1;
+			break;
+		case 5:
+			prot_flag[2] = 1;
+			prot_flag[3] = 1;
+			break;
+		case 7:
+			prot_flag[1] = 1;
+			prot_flag[2] = 1;
+			prot_flag[3] = 1;
+			break;
+		default:
+			err_print(
+			    "Invalid supported protection types\n");
+			return (-1);
+		}
+		for (i = 0; i < NUM_PROT_TYPE; i++) {
+			if (prot_flag[i] == 1) {
+				fmt_print("[%d] TYPE_%d : ", i, i);
+				fmt_print("%s\n", prot_descriptor[i]);
+			}
+		}
+
+		/*
+		 * Get the current protection type
+		 */
+		if (uscsi_read_capacity_16(cur_file, &capacity)) {
+			err_print("Read capacity_16 failed\n");
+			return (-1);
+		}
+		p_type = get_cur_protection_type(&capacity);
+		fmt_print("\nThe disk is currently formatted with TYPE_%d.\n",
+		    p_type);
+
+		/*
+		 * Ask user what protection type to use
+		 */
+		ioparam.io_bounds.lower = PROT_TYPE_0;
+		ioparam.io_bounds.upper = PROT_TYPE_3;
+		prot_type = input(FIO_INT, "Specify the New Protection Type",
+		    ':', &ioparam, NULL, DATA_INPUT);
+		/*
+		 * if get a unsupported protection type, then use the
+		 * current type: p_type.
+		 */
+		if (prot_flag[prot_type] == 0) {
+			fmt_print("Unsupported protection type.\n");
+			prot_type = p_type;
+		}
+		fmt_print("The disk will be formatted to type %d\n", prot_type);
 	}
 
 	if (SCSI && (format_time = scsi_format_time()) > 0) {

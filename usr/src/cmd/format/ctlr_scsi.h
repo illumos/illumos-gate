@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_CTLR_SCSI_H
@@ -142,12 +141,15 @@ int	uscsi_mode_sense(int, int, int, caddr_t, int,
 int	uscsi_mode_select(int, int, int, caddr_t, int,
 		struct scsi_ms_header *);
 int	uscsi_inquiry(int, caddr_t, int);
+int	uscsi_inquiry_page_86h(int, caddr_t, int);
 int	uscsi_read_capacity(int, struct scsi_capacity_16 *);
+int	uscsi_read_capacity_16(int, struct scsi_capacity_16 *);
 int	scsi_translate(int, struct scsi_bfi_defect *);
 int	scsi_dump_mode_sense_pages(int);
 int	scsi_supported_page(int);
 int	apply_chg_list(int, int, uchar_t *, uchar_t *, struct chg_list *);
 int	scsi_format_time(void);
+uint8_t	get_cur_protection_type(struct scsi_capacity_16 *);
 
 #else
 

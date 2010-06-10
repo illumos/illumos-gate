@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -335,11 +334,14 @@ scsi_format(start, end, list)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
-	struct scsi_defect_hdr	defect_hdr;
 	int			status;
 	int			flag;
-	struct scsi_inquiry	*inq;
 	char			rawbuf[MAX_MODE_SENSE_SIZE];
+	struct scsi_inquiry	*inq;
+	uint8_t	fmt_prot_info;
+	uint8_t	prot_field_usage;
+	uint8_t	param_long_list = 1;
+	uint8_t	fmt_long_param_header[8];
 
 	/*
 	 * Determine if the target appears to be SCSI-2
@@ -395,6 +397,33 @@ scsi_format(start, end, list)
 	}
 
 	/*
+	 * Determine the FMTPINFO field in format cdb, and the
+	 * PROTECTION FIELD USAGE in the long parameter list, via
+	 * the protection type input by users.
+	 */
+	switch (prot_type) {
+	case PROT_TYPE_0:
+		fmt_prot_info = 0x00;
+		prot_field_usage = 0x00;
+		break;
+	case PROT_TYPE_1:
+		fmt_prot_info = 0x02;
+		prot_field_usage = 0x00;
+		break;
+	case PROT_TYPE_2:
+		fmt_prot_info = 0x03;
+		prot_field_usage = 0x00;
+		break;
+	case PROT_TYPE_3:
+		fmt_prot_info = 0x03;
+		prot_field_usage = 0x01;
+		break;
+	default:
+		fmt_print("invalid protection type\n");
+		return (-1);
+	}
+
+	/*
 	 * Construct the uscsi format ioctl.  The form depends
 	 * upon the defect list the user extracted.  If s/he
 	 * extracted the "original" list, we format with only
@@ -408,15 +437,32 @@ scsi_format(start, end, list)
 	 */
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
 	(void) memset((char *)&cdb, 0, sizeof (union scsi_cdb));
-	(void) memset((char *)&defect_hdr, 0, sizeof (defect_hdr));
 
 	cdb.scc_cmd		= SCMD_FORMAT;
 	ucmd.uscsi_cdb		= (caddr_t)&cdb;
 	ucmd.uscsi_cdblen	= CDB_GROUP0;
-	ucmd.uscsi_bufaddr	= (caddr_t)&defect_hdr;
-	ucmd.uscsi_buflen	= sizeof (defect_hdr);
 	cdb.cdb_opaque[1]	= FPB_DATA;
-	defect_hdr.descriptor	= FDH_FOV | FDH_IMMED;
+
+	/*
+	 * Use the long parameter header in format command,
+	 * and set the FMTPINFO field., when type 1, 2, 3.
+	 */
+	cdb.cdb_opaque[1] |= (param_long_list << 5) | (fmt_prot_info << 6);
+	(void) memset((char *)fmt_long_param_header, 0,
+	    sizeof (fmt_long_param_header));
+
+	/*
+	 * Set the PROTECTION FIELD USAGE field in the long
+	 * parameter list header, which combines with FMTINFO to
+	 * determine the protection type.
+	 * The PROTECTION INTERVAL EXPONET field is set default 0.
+	 * So only one protection information interval is used
+	 * in type 1, 2, 3.
+	 */
+	fmt_long_param_header[0] = prot_field_usage;
+	fmt_long_param_header[1] = FDH_FOV | FDH_IMMED;
+	ucmd.uscsi_bufaddr = (caddr_t)fmt_long_param_header;
+	ucmd.uscsi_buflen = sizeof (fmt_long_param_header);
 
 	if ((list->list != NULL) && ((list->flags & LIST_PGLIST) == 0)) {
 		/*
@@ -440,7 +486,9 @@ scsi_format(start, end, list)
 		status = test_until_ready(cur_file);
 	} else {
 		/* clear defect header and try basecase format */
-		(void) memset((char *)&defect_hdr, 0, sizeof (defect_hdr));
+		(void) memset((char *)fmt_long_param_header, 0,
+		    sizeof (fmt_long_param_header));
+		fmt_long_param_header[0] = prot_field_usage;
 		status = uscsi_cmd(cur_file, &ucmd,
 			(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 	}
@@ -2485,10 +2533,110 @@ uscsi_inquiry(fd, inqbuf, inqbufsiz)
 	return (status);
 }
 
+/*
+ * Execute a uscsi inquiry command with page code 86h
+ */
+int
+uscsi_inquiry_page_86h(fd, inqbuf, inqbufsiz)
+	int	fd;
+	caddr_t	inqbuf;
+	int	inqbufsiz;
+{
+	struct uscsi_cmd	ucmd;
+	union scsi_cdb	cdb;
+	int	status;
+
+	assert(inqbuf);
+	assert(inqbufsiz >= sizeof (struct scsi_inquiry) &&
+	    inqbufsiz < 256);
+	/*
+	 * Build and execute uscsi ioctl
+	 */
+	(void) memset((char *)inqbuf, 0, inqbufsiz);
+	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
+	(void) memset((char *)&cdb, 0, sizeof (cdb));
+	cdb.scc_cmd = SCMD_INQUIRY;
+	FORMG0COUNT(&cdb, (uchar_t)inqbufsiz);
+	cdb.cdb_opaque[1] |= 0x01;
+	cdb.cdb_opaque[2] = 0x86;
+	ucmd.uscsi_cdb = (caddr_t)&cdb;
+	ucmd.uscsi_cdblen = CDB_GROUP0;
+	ucmd.uscsi_bufaddr = (caddr_t)inqbuf;
+	ucmd.uscsi_buflen = inqbufsiz;
+
+	status = uscsi_cmd(fd, &ucmd,
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+
+	if (status) {
+		if (option_msg) {
+			err_print("Inquriy with page_86h failed\n");
+		}
+	}
+	return (status);
+}
 
 /*
  * Return the Read Capacity information
  */
+int
+uscsi_read_capacity_16(fd, capacity)
+	int	fd;
+	struct scsi_capacity_16 *capacity;
+{
+	struct uscsi_cmd	ucmd;
+	union scsi_cdb	cdb;
+	int	status;
+
+	(void) memset((char *)capacity, 0, sizeof (struct scsi_capacity_16));
+	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
+	(void) memset((char *)&cdb, 0, sizeof (union scsi_cdb));
+
+	ucmd.uscsi_cdb = (caddr_t)&cdb;
+	ucmd.uscsi_cdblen = CDB_GROUP4;
+	ucmd.uscsi_bufaddr = (caddr_t)capacity;
+	ucmd.uscsi_buflen = sizeof (struct scsi_capacity_16);
+
+	/*
+	 * Read Capacity (16) is a Service Action In command.  One
+	 * command byte (0x9E) is overloaded for multiple operations,
+	 * with the second CDB byte specifying the desired operation
+	 */
+	cdb.scc_cmd = SCMD_SVC_ACTION_IN_G4;
+	cdb.cdb_opaque[1] = SSVC_ACTION_READ_CAPACITY_G4;
+
+	/*
+	 * Fill in allocation length field
+	 */
+	cdb.cdb_opaque[10] =
+	    (uchar_t)((ucmd.uscsi_buflen & 0xff000000) >> 24);
+	cdb.cdb_opaque[11] =
+	    (uchar_t)((ucmd.uscsi_buflen & 0x00ff0000) >> 16);
+	cdb.cdb_opaque[12] =
+	    (uchar_t)((ucmd.uscsi_buflen & 0x0000ff00) >> 8);
+	cdb.cdb_opaque[13] =
+	    (uchar_t)(ucmd.uscsi_buflen & 0x000000ff);
+
+	status = uscsi_cmd(fd, &ucmd,
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+
+	if (status) {
+		if (option_msg) {
+			err_print("Read capacity 16 failed\n");
+		}
+	} else if (option_msg && diag_msg) {
+		/*
+		 * Dump the capacity data if anyone's interested
+		 */
+		dump("Capacity: ", (caddr_t)capacity,
+		    sizeof (struct scsi_capacity_16), HEX_ONLY);
+	}
+
+	capacity->sc_capacity = BE_64(capacity->sc_capacity);
+	capacity->sc_lbasize = BE_32(capacity->sc_lbasize);
+
+	return (status);
+}
+
 int
 uscsi_read_capacity(fd, capacity)
 	int			fd;
@@ -3431,4 +3579,27 @@ static int test_until_ready(int fd) {
 		(void) sleep(RETRY_DELAY);
 	}
 	return (status);
+}
+
+/*
+ * Get the current protection type from the PROT_EN and P_TYPE
+ */
+uint8_t
+get_cur_protection_type(struct scsi_capacity_16 *capacity)
+{
+	uint8_t	cp13;
+	uint8_t	prot_en;
+	uint8_t	p_type;
+
+	cp13 = ((capacity->sc_rsvd0 & 0x3f) << 2)
+	    | ((capacity->sc_prot_en & 0x01) << 1)
+	    | (capacity->sc_rto_en & 0x01);
+	prot_en = cp13 & 0x01;
+	if (prot_en == 0) {
+		p_type = 0;
+	} else {
+		p_type = (cp13 << 4) >> 5;
+		p_type += 1;
+	}
+	return (p_type);
 }

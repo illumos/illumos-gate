@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_GLOBAL_H
@@ -127,6 +126,8 @@ uint_t	psect;				/* # physical sects/track */
 uint_t	apc;				/* # alternates/cyl */
 uint_t	solaris_offset;			/* Solaris offset, this value is zero */
 					/* for non-fdisk machines. */
+int	prot_type;			/* protection type to format disk */
+
 #if defined(_SUNOS_VTOC_16)
 uint_t	bcyl;				/* # other cyls */
 #endif		/* defined(_SUNOS_VTOC_16) */
@@ -261,6 +262,15 @@ struct	mctlr_list	*controlp;	/* master controller list ptr */
  * Base pathname for devfs names to be stripped from physical name.
  */
 #define	DEVFS_PREFIX	"/devices"
+
+/*
+ *  Protection type by SCSI-3
+ */
+#define	PROT_TYPE_0	0
+#define	PROT_TYPE_1	1
+#define	PROT_TYPE_2	2
+#define	PROT_TYPE_3	3
+#define	NUM_PROT_TYPE	4
 
 /*
  * Function prototypes ... Both for ANSI and non-ANSI C compilers
