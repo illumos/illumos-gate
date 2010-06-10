@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/picl/plugins/sun4u/chalupa/frudr/Makefile
 #
@@ -38,6 +37,7 @@ CONFS		= fru_PS0.conf fru_PS1.conf
 CONFS		+= fru_PSU0.conf fru_PSU1.conf fru_PSU2.conf fru_PSU3.conf
 CONFS		+= fru_HDD0.conf fru_HDD1.conf fru_HDD2.conf
 CONFS		+= fru_HDD3.conf
+CONFS		+= fru_FT0.conf fru_FT1.conf fru_FT2.conf fru_FT3.conf
 CONFS		+= fru_SC.conf
 ROOTCONF=	$(CONFS:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0644
@@ -66,9 +66,8 @@ install:	$(ROOTLIBDIR) $(ROOTCONF)
 
 $(CONFS): $(MAININFO) $(OTHERINFOS)
 	@$(RM) -f $@
-	@echo "# Copyright 2002 Sun Microsystems, Inc.  All rights reserved." \
+	@echo "# Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved." \
 	> $@
-	@echo "# Use is subject to license terms." >> $@
 	@echo "# This is a generated file. #ident lines identify sources" >> $@
 	$(CPP) -P $(@:%.conf=%.info) | \
 	$(SED) -e '/^[  ]*$$/d' >> $@

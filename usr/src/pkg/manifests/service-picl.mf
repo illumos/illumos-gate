@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/picl@$(PKGVERS)
@@ -495,6 +494,18 @@ $(sparc_ONLY)file \
     group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_PSU3.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_FT0.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_FT1.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_FT2.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_FT3.conf \
     group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_SC.conf group=sys

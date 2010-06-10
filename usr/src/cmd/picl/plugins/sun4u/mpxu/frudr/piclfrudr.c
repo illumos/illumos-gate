@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stddef.h>
@@ -131,7 +128,12 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	RMC_FRU_NAME		"sc"
 #define	FT_NAME			"FT"
 #define	FT_NAME_LEN		2
+#define	F0_NAME			"F0"
+#define	F0_NAME_LEN		2
+#define	F1_NAME			"F1"
+#define	F1_NAME_LEN		2
 #define	FT_FRU_NAME		"fan-tray"
+#define	FT_FRU_NAME_LEN	8
 #define	FT_ID_BUFSZ		(FT_NAME_LEN + 2)
 #define	DEV_PREFIX		"/devices"
 #define	ENXS_FRONT_SRVC_LED	0x20
@@ -483,7 +485,7 @@ piclfrudr_init(void)
 	 */
 
 	if ((sys_platform == PLAT_CHALUPA) ||
-		(sys_platform == PLAT_CHALUPA19)) {
+	    (sys_platform == PLAT_CHALUPA19)) {
 		sprintf_buf2(namebuf, CHASSIS_LOC_PATH, RMC_NAME);
 	} else {
 		sprintf_buf2(namebuf, SYS_BOARD_PATH, RMC_NAME);
@@ -1041,6 +1043,27 @@ get_config_file(char *outfilename, char *fru)
 	return (-1);
 }
 
+/*
+ * This helper function for Netra-440 fan tray removal removes
+ * the rmclomv-rooted nodes and their properties.
+ */
+static void
+delete_node_and_props(picl_nodehdl_t hdl)
+{
+	picl_prophdl_t prop;
+	int err;
+
+	do {
+		err = ptree_get_first_prop(hdl, &prop);
+		if (err == PICL_SUCCESS) {
+			if (ptree_delete_prop(prop) == PICL_SUCCESS)
+				(void) ptree_destroy_prop(prop);
+		}
+	} while (err == PICL_SUCCESS);
+	if (ptree_delete_node(hdl) == PICL_SUCCESS)
+		(void) ptree_destroy_node(hdl);
+}
+
 static void
 remove_fru_parents(picl_nodehdl_t fruh)
 {
@@ -1051,7 +1074,7 @@ remove_fru_parents(picl_nodehdl_t fruh)
 	picl_prophdl_t		tblh;
 	picl_prophdl_t		fruph;
 	picl_nodehdl_t		childh;
-	int			seabos_fanfru = 0;
+	int			fanfru = 0;
 
 	retval = ptree_get_propval_by_name(fruh, PICL_PROP_NAME, name,
 	    sizeof (name));
@@ -1063,9 +1086,10 @@ remove_fru_parents(picl_nodehdl_t fruh)
 	retval = ptree_get_prop_by_name(fruh, PICL_PROP_DEVICES, &tableh);
 	if (retval != PICL_SUCCESS) {
 		/*
-		 * No Devices table. However on Seattle and Boston (which
-		 * support fan fru hotplug), the Devices table will be
-		 * found under the child node (Fn) of the fru (fan-tray).
+		 * No Devices table. However on Seattle, Boston and
+		 * Netra-440 (Chalupa19) (which support fan fru hotplug),
+		 * the Devices table will be found under the child node (Fn)
+		 * of the fru (fan-tray).
 		 * Therefore, check the first child of the fru for the
 		 * Devices table on these platforms before returning.
 		 */
@@ -1075,24 +1099,26 @@ remove_fru_parents(picl_nodehdl_t fruh)
 		case PLAT_BOSTON:
 			if (strcmp(name, FT_FRU_NAME) != 0)
 				return;
-
-			retval = ptree_get_propval_by_name(fruh,
-			    PICL_PROP_CHILD, &childh, sizeof (picl_nodehdl_t));
-			if (retval != PICL_SUCCESS)
-				return;
-
-			retval = ptree_get_prop_by_name(childh,
-			    PICL_PROP_DEVICES, &tableh);
-			if (retval != PICL_SUCCESS)
-				return;
-
-			seabos_fanfru = 1;
+			fanfru = 1;
 			break;
-
+		case PLAT_CHALUPA19:
+			if (strncmp(name, F0_NAME, F0_NAME_LEN) &&
+			    strncmp(name, F1_NAME, F1_NAME_LEN))
+				return;
+			fanfru = 1;
+			break;
 		default:
 			/* nothing to do */
 			return;
 		}
+		retval = ptree_get_propval_by_name(fruh,
+		    PICL_PROP_CHILD, &childh, sizeof (picl_nodehdl_t));
+		if (retval != PICL_SUCCESS)
+			return;
+		retval = ptree_get_prop_by_name(childh,
+		    PICL_PROP_DEVICES, &tableh);
+		if (retval != PICL_SUCCESS)
+			return;
 	}
 
 	/*
@@ -1103,14 +1129,14 @@ remove_fru_parents(picl_nodehdl_t fruh)
 	retval = ptree_get_propval(tableh, &tblh, sizeof (tblh));
 	if (retval != PICL_SUCCESS) {
 		/* can't get value of table property */
-		return;
+		goto afterloop;
 	}
 
 	/* get first col, first row */
 	retval = ptree_get_next_by_col(tblh, &tblh);
 	if (retval != PICL_SUCCESS) {
 		/* no rows? */
-		return;
+		goto afterloop;
 	}
 
 	/*
@@ -1136,13 +1162,13 @@ remove_fru_parents(picl_nodehdl_t fruh)
 		    PICL_REFPROP_FRU_PARENT, &fruph);
 		if (retval != PICL_SUCCESS) {
 			/*
-			 * on Boston and Seattle, we should actually be
-			 * looking for the _location_parent property
-			 * for fan frus
+			 * on Boston, Seattle and Netra-440 we should
+			 * actually be looking for the _location_parent
+			 * property for fan frus
 			 */
-			if (seabos_fanfru) {
-			    retval = ptree_get_prop_by_name(nodeh,
-				PICL_REFPROP_LOC_PARENT, &fruph);
+			if (fanfru) {
+				retval = ptree_get_prop_by_name(nodeh,
+				    PICL_REFPROP_LOC_PARENT, &fruph);
 			}
 			if (retval != PICL_SUCCESS)
 				continue;
@@ -1150,14 +1176,24 @@ remove_fru_parents(picl_nodehdl_t fruh)
 		/*
 		 * got a _fru_parent node reference delete it
 		 */
-		retval = ptree_delete_prop(fruph);
-		if (retval != PICL_SUCCESS) {
-			continue;
+		if (ptree_delete_prop(fruph) == PICL_SUCCESS)
+			(void) ptree_destroy_prop(fruph);
+
+		/* On Netra-440, extra clean-up is required for fan trays */
+		if ((sys_platform == PLAT_CHALUPA19) && (fanfru)) {
+			/* remove the rmclomv node and its properties */
+			delete_node_and_props(nodeh);
 		}
-		retval = ptree_destroy_prop(fruph);
-		if (retval != PICL_SUCCESS) {
-			continue;
-		}
+	}
+afterloop:
+	/* More Netra-440 fan tray clean-up  */
+	if ((sys_platform == PLAT_CHALUPA19) && (fanfru)) {
+		/* remove the fru's child's table */
+		if (ptree_delete_prop(tableh) == PICL_SUCCESS)
+			(void) ptree_destroy_prop(tableh);
+		/* remove the child */
+		if (ptree_delete_node(childh) == PICL_SUCCESS)
+			(void) ptree_destroy_node(childh);
 	}
 }
 
@@ -1199,12 +1235,14 @@ remove_tables(picl_nodehdl_t rootnd)
 /*
  * Event completion handler for PICL_FRU_ADDED/PICL_FRU_REMOVED events
  */
+/* ARGSUSED */
 static void
 frudr_completion_handler(char *ename, void *earg, size_t size)
 {
 	picl_nodehdl_t	fruh;
 	picl_nodehdl_t	parh;
-	char	nodename[PICL_PROPNAMELEN_MAX];
+	picl_nodehdl_t	peerh = NULL;
+	char	nodename[PICL_PROPNAMELEN_MAX] = { '\0' };
 	int err;
 
 	if (strcmp(ename, PICL_FRU_REMOVED) == 0) {
@@ -1216,6 +1254,9 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 		(void) nvlist_lookup_uint64(earg,
 		    PICLEVENTARG_FRUHANDLE, &fruh);
 		if (fruh != NULL) {
+			(void) ptree_get_propval_by_name(fruh, PICL_PROP_PEER,
+			    &peerh, sizeof (peerh));
+
 			/*
 			 * first find name of the fru
 			 */
@@ -1256,6 +1297,26 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 				(void) ptree_destroy_node(fruh);
 			} else {
 				syslog(LOG_ERR, DELETE_PROP_FAIL, err);
+			}
+
+			if ((sys_platform == PLAT_CHALUPA19) &&
+			    (strncmp(nodename, FT_NAME, FT_NAME_LEN) == 0) &&
+			    (peerh != NULL)) {
+				/*
+				 * On Netra-440 platforms, a fan tray
+				 * may contain 2 fans (F0 and F1) but
+				 * we only receive a single notification
+				 * for removal of F0.  If F1 is present,
+				 * peerh will be valid and we need to
+				 * process it as well.
+				 */
+				remove_fru_parents(peerh);
+				err = ptree_delete_node(peerh);
+				if (err == PICL_SUCCESS) {
+					(void) ptree_destroy_node(peerh);
+				} else {
+					syslog(LOG_ERR, DELETE_PROP_FAIL, err);
+				}
 			}
 		}
 	}
@@ -1335,9 +1396,9 @@ add_ps_to_platform(char *unit)
 		res = ptree_get_propval_by_name(child_hdl, PICL_PROP_PEER,
 		    &child_hdl, sizeof (picl_nodehdl_t));
 		if ((res == PICL_SUCCESS) &&
-			ptree_get_propval_by_name(child_hdl,
-			PICL_PROP_UNIT_ADDRESS, unit_addr,
-			sizeof (unit_addr)) == PICL_SUCCESS) {
+		    ptree_get_propval_by_name(child_hdl,
+		    PICL_PROP_UNIT_ADDRESS, unit_addr,
+		    sizeof (unit_addr)) == PICL_SUCCESS) {
 			unit_addr[sizeof (unit_addr) - 1] = '\0';
 			if (strcmp(unit_addr, unit) == 0)
 				return;	/* unit address exists already */
@@ -1474,13 +1535,13 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 	 * OK - so this is an EC_DR event - let's handle it.
 	 */
 	if (rmc_flag && (sys_platform != PLAT_CHALUPA) &&
-		(sys_platform != PLAT_CHALUPA19))
+	    (sys_platform != PLAT_CHALUPA19))
 		sprintf_buf2(path, SYS_BOARD_PATH, ap_id);
 	else {
 		if ((sys_platform == PLAT_CHALUPA19) &&
-			(strncmp(ap_id, PS_NAME, PS_NAME_LEN) == 0)) {
+		    (strncmp(ap_id, PS_NAME, PS_NAME_LEN) == 0)) {
 			sprintf_buf2(path, CHASSIS_LOC_PATH,
-				ps_apid_to_nodename(ap_id));
+			    ps_apid_to_nodename(ap_id));
 		} else	if (strncmp(ap_id, DISK_NAME, DISK_NAME_LEN) == 0) {
 			switch (sys_platform)	{
 			case PLAT_SEATTLE1U:
@@ -1543,14 +1604,23 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 		}
 
 		/*
-		 * create requested fru node
+		 * On Netra-440, the fan-tray location nodes are
+		 * not deleted when fan-trays are physically
+		 * removed, so we do not need to create another
+		 * fru node.
 		 */
-		err = ptree_create_and_add_node(locnodeh, fru_name,
-		    PICL_CLASS_FRU, &childh);
-		if (err != PICL_SUCCESS) {
-			syslog(LOG_ERR, ADD_NODE_FAIL, ap_id, err);
-			nvlist_free(nvlp);
-			return;
+		if ((sys_platform != PLAT_CHALUPA19) ||
+		    (strncmp(fru_name, FT_FRU_NAME, FT_FRU_NAME_LEN) != 0)) {
+			/*
+			 * create requested fru node
+			 */
+			err = ptree_create_and_add_node(locnodeh, fru_name,
+			    PICL_CLASS_FRU, &childh);
+			if (err != PICL_SUCCESS) {
+				syslog(LOG_ERR, ADD_NODE_FAIL, ap_id, err);
+				nvlist_free(nvlp);
+				return;
+			}
 		}
 
 		/*
@@ -1560,7 +1630,7 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 		 */
 		if (strncmp(ap_id, PS_NAME, PS_NAME_LEN) == 0) {
 			index = find_vol_prop_by_name(
-					ps_apid_to_nodename(ap_id));
+			    ps_apid_to_nodename(ap_id));
 			if (index >= 0)
 				add_op_status_to_node(childh,
 				    &idprop->idp[index].volprop);
@@ -2349,7 +2419,7 @@ raid_ok2rem_policy(raid_config_t config, int target)
 			case RAID_DISKSTATUS_FAILED:
 				if (disk_ready[d] != B_FALSE) {
 					if (set_led(disk_name[d], REMOK_LED,
-					PICL_PROPVAL_ON) == PICL_SUCCESS) {
+					    PICL_PROPVAL_ON) == PICL_SUCCESS) {
 						disk_ready[d] = B_FALSE;
 					}
 				}
@@ -2382,9 +2452,9 @@ check_raid(int target)
 		break;
 	case PLAT_BOSTON:
 		if (boston_1068e_flag) {
-		    fd = open(BOSTON_DISK_DEVCTL_1068E, O_RDONLY);
+			fd = open(BOSTON_DISK_DEVCTL_1068E, O_RDONLY);
 		} else {
-		    fd = open(BOSTON_DISK_DEVCTL_1068X, O_RDONLY);
+			fd = open(BOSTON_DISK_DEVCTL_1068X, O_RDONLY);
 		}
 		break;
 	default:
@@ -2429,8 +2499,8 @@ disk_leds_thread(void *args)
 	devctl_hdl_t dhdl;
 
 	int 	n_disks = 0,
-		do_raid = 0,
-		err 	= 0;
+	    do_raid = 0,
+	    err 	= 0;
 	uint_t	statep	= 0;
 
 	static char *mpxu_devs[] = {
@@ -2518,7 +2588,7 @@ disk_leds_thread(void *args)
 		do_raid = 1;
 		disk_dev = seattle_devs;
 		n_disks = (sys_platform == PLAT_SEATTLE1U) ?
-			N_SEATTLE1U_DISKS : N_SEATTLE2U_DISKS;
+		    N_SEATTLE1U_DISKS : N_SEATTLE2U_DISKS;
 		break;
 
 	case PLAT_BOSTON:
@@ -2547,7 +2617,7 @@ disk_leds_thread(void *args)
 	default: /* PLAT_ENXS/PLAT_EN19 */
 		disk_dev = mpxu_devs;
 		n_disks = (sys_platform == PLAT_EN19) ?
-			N_EN19_DISKS : N_MPXU_DISKS;
+		    N_EN19_DISKS : N_MPXU_DISKS;
 	}
 
 	/*
@@ -2633,7 +2703,7 @@ ps_name_to_addr(char *name)
 {
 	int ps_addr = 0;
 	if ((strcmp(name, PS0_NAME) == 0) ||
-		(strcmp(name, PSU0_NAME) == 0))	{
+	    (strcmp(name, PSU0_NAME) == 0))	{
 		switch (sys_platform) {
 		case PLAT_SEATTLE1U:
 		case PLAT_SEATTLE2U:
@@ -2647,7 +2717,7 @@ ps_name_to_addr(char *name)
 			break;
 		}
 	} else if ((strcmp(name, PS1_NAME) == 0) ||
-		(strcmp(name, PSU1_NAME) == 0))	{
+	    (strcmp(name, PSU1_NAME) == 0))	{
 		switch (sys_platform) {
 		case PLAT_SEATTLE1U:
 		case PLAT_SEATTLE2U:
@@ -2661,7 +2731,7 @@ ps_name_to_addr(char *name)
 			break;
 		}
 	} else if ((strcmp(name, PS2_NAME) == 0) ||
-		(strcmp(name, PSU2_NAME) == 0))	{
+	    (strcmp(name, PSU2_NAME) == 0))	{
 		switch (sys_platform) {
 		case PLAT_BOSTON:
 			ps_addr = BOSTON_PS2_ADDR;
@@ -2671,7 +2741,7 @@ ps_name_to_addr(char *name)
 			break;
 		}
 	} else if ((strcmp(name, PS3_NAME) == 0) ||
-		(strcmp(name, PSU3_NAME) == 0))	{
+	    (strcmp(name, PSU3_NAME) == 0))	{
 		switch (sys_platform) {
 		case PLAT_BOSTON:
 			ps_addr = BOSTON_PS3_ADDR;
@@ -2875,19 +2945,19 @@ add_op_status(envmon_hpu_t *hpu, int *index)
 
 	rmc_flag = (strcmp(hpu->id.name, RMC_NAME) == 0);
 	ps_flag = (strncmp(hpu->id.name, PS_NAME,
-		PS_NAME_LEN) == 0);
+	    PS_NAME_LEN) == 0);
 	disk_flag = (strncmp(hpu->id.name, DISK_NAME,
-		DISK_NAME_LEN) == 0);
+	    DISK_NAME_LEN) == 0);
 	if (rmc_flag || ps_flag) {
 		idprop->idp[*index].envhandle = hpu->id;
 		flag = rmc_flag && ((sys_platform != PLAT_CHALUPA) &&
-			(sys_platform != PLAT_CHALUPA19));
+		    (sys_platform != PLAT_CHALUPA19));
 		sprintf_buf2(node_name,
-			flag ? SYS_BOARD_PATH : CHASSIS_LOC_PATH, ps_flag ?
-			ps_apid_to_nodename(hpu->id.name) : hpu->id.name);
+		    flag ? SYS_BOARD_PATH : CHASSIS_LOC_PATH, ps_flag ?
+		    ps_apid_to_nodename(hpu->id.name) : hpu->id.name);
 
 		add_op_status_by_name(node_name, ps_flag ? PS_FRU_NAME : NULL,
-			&idprop->idp[(*index)++].volprop);
+		    &idprop->idp[(*index)++].volprop);
 	} else if (disk_flag)	{
 		idprop->idp[*index].envhandle = hpu->id;
 		switch (sys_platform)	{
@@ -2897,21 +2967,21 @@ add_op_status(envmon_hpu_t *hpu, int *index)
 			break;
 		case PLAT_SEATTLE1U:
 			sprintf_buf2(node_name, SEATTLE1U_HDDBP_PATH, \
-				hpu->id.name);
+			    hpu->id.name);
 			break;
 		case PLAT_SEATTLE2U:
 			sprintf_buf2(node_name, SEATTLE2U_HDDBP_PATH, \
-				hpu->id.name);
+			    hpu->id.name);
 			break;
 		case PLAT_BOSTON:
 			sprintf_buf2(node_name, BOSTON_HDDBP_PATH, \
-				hpu->id.name);
+			    hpu->id.name);
 			break;
 		default:
 			sprintf_buf2(node_name, SYS_BOARD_PATH, hpu->id.name);
 			break;
 		}
 		add_op_status_by_name(node_name, DISK_FRU_NAME,
-			&idprop->idp[(*index)++].volprop);
+		    &idprop->idp[(*index)++].volprop);
 	}
 }
