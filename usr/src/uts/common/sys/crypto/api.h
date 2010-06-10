@@ -32,9 +32,6 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/crypto/common.h>
 
-#ifdef	_KERNEL
-
-
 typedef long crypto_req_id_t;
 typedef void *crypto_bc_t;
 typedef void *crypto_context_t;
@@ -387,8 +384,6 @@ extern int crypto_bufcall_free(crypto_bc_t bc);
 extern int crypto_bufcall(crypto_bc_t bc, void (*func)(void *arg), void *arg);
 extern int crypto_unbufcall(crypto_bc_t bc);
 
-#endif	/* _KERNEL */
-
 /*
  * To obtain the list of key size ranges supported by a mechanism.
  */
@@ -406,7 +401,6 @@ typedef struct crypto_mechanism_info {
 	crypto_mech_usage_t mi_usage;
 } crypto_mechanism_info_t;
 
-#ifdef	_KERNEL
 #ifdef	_SYSCALL32
 
 typedef struct crypto_mechanism_info32 {
@@ -417,7 +411,6 @@ typedef struct crypto_mechanism_info32 {
 } crypto_mechanism_info32_t;
 
 #endif	/* _SYSCALL32 */
-#endif	/* _KERNEL */
 
 extern int crypto_get_all_mech_info(crypto_mech_type_t,
     crypto_mechanism_info_t **, uint_t *, int);

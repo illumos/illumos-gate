@@ -49,15 +49,10 @@ usr/include/scsi/plugins/ses/vendor/sun_impl.h
 # Private/Internal libraries of the Cryptographic Framework.
 #
 lib/libkcfd.so
-lib/llib-lcryptoutil
-lib/llib-lcryptoutil.ln
-lib/amd64/llib-lcryptoutil.ln		i386
-lib/sparcv9/llib-lcryptoutil.ln		sparc
 lib/llib-lelfsign
 lib/llib-lelfsign.ln
 lib/llib-lkcfd
 lib/llib-lkcfd.ln
-usr/include/cryptoutil.h
 usr/include/libelfsign.h
 usr/lib/llib-lsoftcrypto
 usr/lib/llib-lsoftcrypto.ln
@@ -452,8 +447,6 @@ stand					sparc
 #
 usr/include/sys/crypto/elfsign.h
 usr/include/sys/crypto/impl.h
-usr/include/sys/crypto/ioctl.h
-usr/include/sys/crypto/ioctladmin.h
 usr/include/sys/crypto/ops_impl.h
 usr/include/sys/crypto/sched_impl.h
 #
