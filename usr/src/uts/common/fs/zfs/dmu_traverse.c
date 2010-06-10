@@ -36,6 +36,8 @@
 #include <sys/sa_impl.h>
 #include <sys/callb.h>
 
+int zfs_pd_blks_max = 100;
+
 struct prefetch_data {
 	kmutex_t pd_mtx;
 	kcondvar_t pd_cv;
@@ -370,7 +372,7 @@ traverse_impl(spa_t *spa, uint64_t objset, blkptr_t *rootbp,
 	td.td_pfd = &pd;
 	td.td_flags = flags;
 
-	pd.pd_blks_max = 100;
+	pd.pd_blks_max = zfs_pd_blks_max;
 	pd.pd_flags = flags;
 	mutex_init(&pd.pd_mtx, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&pd.pd_cv, NULL, CV_DEFAULT, NULL);
