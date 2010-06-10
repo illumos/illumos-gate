@@ -966,6 +966,9 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	ino_p = px_ib_locate_ino(ib_p, ino);
 	ipil_list = ino_p ? ino_p->ino_ipil_p : NULL;
 
+	if (hdlp->ih_pri == 0)
+		hdlp->ih_pri = pci_class_to_pil(rdip);
+
 	/* Sharing the INO using a PIL that already exists */
 	if (ino_p && (ipil_p = px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri))) {
 		if (px_ib_intr_locate_ih(ipil_p, rdip, hdlp->ih_inum, 0, 0)) {
@@ -1011,9 +1014,6 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 			goto fail1;
 		}
 	}
-
-	if (hdlp->ih_pri == 0)
-		hdlp->ih_pri = pci_class_to_pil(rdip);
 
 	ipil_p = px_ib_new_ino_pil(ib_p, ino, hdlp->ih_pri, ih_p);
 	ino_p = ipil_p->ipil_ino_p;
@@ -1190,6 +1190,9 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	ino_p = px_ib_locate_ino(ib_p, ino);
 	ipil_list = ino_p ? ino_p->ino_ipil_p : NULL;
 
+	if (hdlp->ih_pri == 0)
+		hdlp->ih_pri = pci_class_to_pil(rdip);
+
 	/* Sharing ino */
 	if (ino_p && (ipil_p = px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri))) {
 		if (px_ib_intr_locate_ih(ipil_p, rdip,
@@ -1210,9 +1213,6 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 
 		goto ino_done;
 	}
-
-	if (hdlp->ih_pri == 0)
-		hdlp->ih_pri = pci_class_to_pil(rdip);
 
 	ipil_p = px_ib_new_ino_pil(ib_p, ino, hdlp->ih_pri, ih_p);
 	ino_p = ipil_p->ipil_ino_p;
