@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -629,6 +628,9 @@ void
 sctp_free_reass(sctp_instr_t *sip)
 {
 	mblk_t *mp, *mpnext, *mctl;
+#ifdef	DEBUG
+	sctp_reass_t	*srp;
+#endif
 
 	for (mp = sip->istr_reass; mp != NULL; mp = mpnext) {
 		mpnext = mp->b_next;
@@ -636,7 +638,11 @@ sctp_free_reass(sctp_instr_t *sip)
 		mp->b_prev = NULL;
 		if (DB_TYPE(mp) == M_CTL) {
 			mctl = mp;
-			ASSERT(mp->b_cont != NULL);
+#ifdef	DEBUG
+			srp = (sctp_reass_t *)DB_BASE(mctl);
+			/* Partial delivery can leave empty srp */
+			ASSERT(mp->b_cont != NULL || srp->got == 0);
+#endif
 			mp = mp->b_cont;
 			mctl->b_cont = NULL;
 			freeb(mctl);
@@ -849,9 +855,14 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 		srp->msglen = 0;
 		srp->needed = 0;
 		srp->got = 0;
-		srp->partial_delivered = B_TRUE;
 		srp->tail = NULL;
 	} else {
+		/*
+		 * There is a gap then some ordered frags which are not
+		 * the next deliverable tsn. When the next deliverable
+		 * frag arrives it will be set as the new list head in
+		 * sctp_data_frag() by setting the B bit.
+		 */
 		dmp = hmp->b_cont;
 		hmp->b_cont = mp;
 	}
@@ -859,10 +870,9 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 	/*
 	 * mp now points at the last chunk in the sequence,
 	 * and prev points to mp's previous in the list.
-	 * We chop the list at prev, and convert mp into the
-	 * new list head by setting the B bit. Subsequence
-	 * fragment deliveries will follow the normal reassembly
-	 * path.
+	 * We chop the list at prev. Subsequent fragment
+	 * deliveries will follow the normal reassembly
+	 * path unless they too exceed the sctp_pd_point.
 	 */
 	prev->b_cont = NULL;
 	srp->partial_delivered = B_TRUE;
@@ -910,20 +920,20 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 }
 
 /*
- * Fragment list for ordered messages.
- * If no error occures, error is set to 0. If we run out of memory, error
- * is set to 1. If the peer commits a fatal error (like using different
- * sequence numbers for the same data fragment series), the association is
- * aborted and error is set to 2. tpfinished indicates whether we have
- * assembled a complete message, this is used in sctp_data_chunk() to
- * see if we can try to send any queued message for this stream.
+ * Handle received fragments for ordered delivery to upper layer protocol.
+ * Manage the per message reassembly queue and if this fragment completes
+ * reassembly of the message, or qualifies the already reassembled data
+ * for partial delivery, prepare the message for delivery upstream.
+ *
+ * tpfinished in the caller remains set only when the incoming fragment
+ * has completed the reassembly of the message associated with its ssn.
  */
 static mblk_t *
 sctp_data_frag(sctp_t *sctp, mblk_t *dmp, sctp_data_hdr_t **dc, int *error,
     sctp_instr_t *sip, boolean_t *tpfinished)
 {
-	mblk_t		*hmp;
-	mblk_t		*pmp;
+	mblk_t		*reassq_curr, *reassq_next, *reassq_prev;
+	mblk_t		*new_reassq;
 	mblk_t		*qmp;
 	mblk_t		*first_mp;
 	sctp_reass_t	*srp;
@@ -935,102 +945,152 @@ sctp_data_frag(sctp_t *sctp, mblk_t *dmp, sctp_data_hdr_t **dc, int *error,
 
 	*error = 0;
 
-	/* find the reassembly queue for this data chunk */
-	hmp = qmp = sip->istr_reass;
-	for (; hmp != NULL; hmp = hmp->b_next) {
-		srp = (sctp_reass_t *)DB_BASE(hmp);
-		if (ntohs((*dc)->sdh_ssn) == srp->ssn)
+	/*
+	 * Find the reassembly queue for this data chunk, if none
+	 * yet exists, a new per message queue will be created and
+	 * appended to the end of the list of per message queues.
+	 *
+	 * sip points on sctp_instr_t representing instream messages
+	 * as yet undelivered for this stream (sid) of the association.
+	 */
+	reassq_next = reassq_prev = sip->istr_reass;
+	for (; reassq_next != NULL; reassq_next = reassq_next->b_next) {
+		srp = (sctp_reass_t *)DB_BASE(reassq_next);
+		if (ntohs((*dc)->sdh_ssn) == srp->ssn) {
+			reassq_curr = reassq_next;
 			goto foundit;
-		else if (SSN_GT(srp->ssn, ntohs((*dc)->sdh_ssn)))
+		} else if (SSN_GT(srp->ssn, ntohs((*dc)->sdh_ssn)))
 			break;
-		qmp = hmp;
+		reassq_prev = reassq_next;
 	}
 
 	/*
-	 * Allocate a M_CTL that will contain information about this
-	 * fragmented message.
+	 * First fragment of this message received, allocate a M_CTL that
+	 * will head the reassembly queue for this message. The message
+	 * and all its fragments are identified by having the same ssn.
+	 *
+	 * Arriving fragments will be inserted in tsn order on the
+	 * reassembly queue for this message (ssn), linked by b_cont.
 	 */
-	if ((pmp = allocb(sizeof (*srp), BPRI_MED)) == NULL) {
-		*error = 1;
+	if ((new_reassq = allocb(sizeof (*srp), BPRI_MED)) == NULL) {
+		*error = ENOMEM;
 		return (NULL);
 	}
-	DB_TYPE(pmp) = M_CTL;
-	srp = (sctp_reass_t *)DB_BASE(pmp);
-	pmp->b_cont = dmp;
+	DB_TYPE(new_reassq) = M_CTL;
+	srp = (sctp_reass_t *)DB_BASE(new_reassq);
+	new_reassq->b_cont = dmp;
 
-	if (hmp != NULL) {
-		if (sip->istr_reass == hmp) {
-			sip->istr_reass = pmp;
-			pmp->b_next = hmp;
-			pmp->b_prev = NULL;
-			hmp->b_prev = pmp;
+	/*
+	 * All per ssn reassembly queues, (one for each message) on
+	 * this stream are doubly linked by b_next/b_prev back to the
+	 * instr_reass of the instream structure associated with this
+	 * stream id, (sip is initialized as sctp->sctp_instr[sid]).
+	 * Insert the new reassembly queue in the correct (ssn) order.
+	 */
+	if (reassq_next != NULL) {
+		if (sip->istr_reass == reassq_next) {
+			/* head insertion */
+			sip->istr_reass = new_reassq;
+			new_reassq->b_next = reassq_next;
+			new_reassq->b_prev = NULL;
+			reassq_next->b_prev = new_reassq;
 		} else {
-			qmp->b_next = pmp;
-			pmp->b_prev = qmp;
-			pmp->b_next = hmp;
-			hmp->b_prev = pmp;
+			/* mid queue insertion */
+			reassq_prev->b_next = new_reassq;
+			new_reassq->b_prev = reassq_prev;
+			new_reassq->b_next = reassq_next;
+			reassq_next->b_prev = new_reassq;
 		}
 	} else {
-		/* make a new reass head and stick it on the end */
+		/* place new reassembly queue at the end */
 		if (sip->istr_reass == NULL) {
-			sip->istr_reass = pmp;
-			pmp->b_prev = NULL;
+			sip->istr_reass = new_reassq;
+			new_reassq->b_prev = NULL;
 		} else {
-			qmp->b_next = pmp;
-			pmp->b_prev = qmp;
+			reassq_prev->b_next = new_reassq;
+			new_reassq->b_prev = reassq_prev;
 		}
-		pmp->b_next = NULL;
+		new_reassq->b_next = NULL;
 	}
 	srp->partial_delivered = B_FALSE;
 	srp->ssn = ntohs((*dc)->sdh_ssn);
+	srp->hasBchunk = B_FALSE;
 empty_srp:
 	srp->needed = 0;
 	srp->got = 1;
+	/* tail always the highest tsn on the reassembly queue for this ssn */
 	srp->tail = dmp;
 	if (SCTP_DATA_GET_BBIT(*dc)) {
+		/* Incoming frag is flagged as the beginning of message */
 		srp->msglen = ntohs((*dc)->sdh_len);
 		srp->nexttsn = ntohl((*dc)->sdh_tsn) + 1;
 		srp->hasBchunk = B_TRUE;
 	} else if (srp->partial_delivered &&
 	    srp->nexttsn == ntohl((*dc)->sdh_tsn)) {
+		/*
+		 * The real beginning fragment of the message was already
+		 * delivered upward, so this is the earliest frag expected.
+		 * Fake the B-bit then see if this frag also completes the
+		 * message.
+		 */
 		SCTP_DATA_SET_BBIT(*dc);
-		/* Last fragment */
-		if (SCTP_DATA_GET_EBIT(*dc)) {
-			srp->needed = 1;
-			goto frag_done;
-		}
 		srp->hasBchunk = B_TRUE;
 		srp->msglen = ntohs((*dc)->sdh_len);
+		if (SCTP_DATA_GET_EBIT(*dc)) {
+			/* This frag is marked as the end of message */
+			srp->needed = 1;
+			/* Got all fragments of this message now */
+			goto frag_done;
+		}
 		srp->nexttsn++;
 	}
+
+	/* The only fragment of this message currently queued */
+	*tpfinished = B_FALSE;
 	return (NULL);
 foundit:
 	/*
-	 * else already have a reassembly queue. Insert the new data chunk
-	 * in the reassemble queue. Try the tail first, on the assumption
-	 * that the fragments are coming in in order.
+	 * This message already has a reassembly queue. Insert the new frag
+	 * in the reassembly queue. Try the tail first, on the assumption
+	 * that the fragments are arriving in order.
 	 */
 	qmp = srp->tail;
 
 	/*
-	 * This means the message was partially delivered.
+	 * A NULL tail means all existing fragments of the message have
+	 * been entirely consumed during a partially delivery.
 	 */
 	if (qmp == NULL) {
 		ASSERT(srp->got == 0 && srp->needed == 0 &&
 		    srp->partial_delivered);
-		ASSERT(hmp->b_cont == NULL);
-		hmp->b_cont = dmp;
+		ASSERT(reassq_curr->b_cont == NULL);
+		reassq_curr->b_cont = dmp;
 		goto empty_srp;
+	} else {
+		/*
+		 * If partial delivery did take place but the next arriving
+		 * fragment was not the next to be delivered, or partial
+		 * delivery broke off due to a gap, fragments remain on the
+		 * tail. The next fragment due to be delivered still has to
+		 * be set as the new head of list upon arrival. Fake B-bit
+		 * on that frag then see if it also completes the message.
+		 */
+		if (srp->partial_delivered &&
+		    srp->nexttsn == ntohl((*dc)->sdh_tsn)) {
+			SCTP_DATA_SET_BBIT(*dc);
+			srp->hasBchunk = B_TRUE;
+			if (SCTP_DATA_GET_EBIT(*dc)) {
+				/* Got all fragments of this message now */
+				goto frag_done;
+			}
+		}
 	}
+
+	/* grab the frag header of already queued tail frag for comparison */
 	qdc = (sctp_data_hdr_t *)qmp->b_rptr;
 	ASSERT(qmp->b_cont == NULL);
 
-	/* XXXIs it fine to do this just here? */
-	if ((*dc)->sdh_sid != qdc->sdh_sid) {
-		/* our peer is fatally confused; XXX abort the assc */
-		*error = 2;
-		return (NULL);
-	}
+	/* check if the frag goes on the tail in order */
 	if (SEQ_GT(ntohl((*dc)->sdh_tsn), ntohl(qdc->sdh_tsn))) {
 		qmp->b_cont = dmp;
 		srp->tail = dmp;
@@ -1042,12 +1102,12 @@ foundit:
 		goto inserted;
 	}
 
-	/* Next check for insertion at the beginning */
-	qmp = hmp->b_cont;
+	/* Next check if we should insert this frag at the beginning */
+	qmp = reassq_curr->b_cont;
 	qdc = (sctp_data_hdr_t *)qmp->b_rptr;
 	if (SEQ_LT(ntohl((*dc)->sdh_tsn), ntohl(qdc->sdh_tsn))) {
 		dmp->b_cont = qmp;
-		hmp->b_cont = dmp;
+		reassq_curr->b_cont = dmp;
 		if (SCTP_DATA_GET_BBIT(*dc)) {
 			srp->hasBchunk = B_TRUE;
 			srp->nexttsn = ntohl((*dc)->sdh_tsn);
@@ -1055,7 +1115,7 @@ foundit:
 		goto preinserted;
 	}
 
-	/* Insert somewhere in the middle */
+	/* Insert this frag in it's correct order in the middle */
 	for (;;) {
 		/* Tail check above should have caught this */
 		ASSERT(qmp->b_cont != NULL);
@@ -1070,11 +1130,15 @@ foundit:
 		qmp = qmp->b_cont;
 	}
 preinserted:
+	/*
+	 * Need head of message and to be due to deliver, otherwise skip
+	 * the recalculation of the message length below.
+	 */
 	if (!srp->hasBchunk || ntohl((*dc)->sdh_tsn) != srp->nexttsn)
 		goto inserted;
 	/*
 	 * fraglen contains the length of consecutive chunks of fragments.
-	 * starting from the chunk inserted recently.
+	 * starting from the chunk we just inserted.
 	 */
 	tsn = srp->nexttsn;
 	for (qmp = dmp; qmp != NULL; qmp = qmp->b_cont) {
@@ -1088,13 +1152,17 @@ preinserted:
 	srp->msglen += fraglen;
 inserted:
 	srp->got++;
-	first_mp = hmp->b_cont;
+	first_mp = reassq_curr->b_cont;
+	/* Prior to this frag either the beginning or end frag was missing */
 	if (srp->needed == 0) {
-		/* check if we have the first and last fragments */
+		/* used to check if we have the first and last fragments */
 		bdc = (sctp_data_hdr_t *)first_mp->b_rptr;
 		edc = (sctp_data_hdr_t *)srp->tail->b_rptr;
 
-		/* calculate how many fragments are needed, if possible  */
+		/*
+		 * If we now have both the beginning and the end of the message,
+		 * calculate how many fragments in the complete message.
+		 */
 		if (SCTP_DATA_GET_BBIT(bdc) && SCTP_DATA_GET_EBIT(edc)) {
 			srp->needed = ntohl(edc->sdh_tsn) -
 			    ntohl(bdc->sdh_tsn) + 1;
@@ -1106,53 +1174,64 @@ inserted:
 	 * partial delivery point. Only do this if we can immediately
 	 * deliver the partially assembled message, and only partially
 	 * deliver one message at a time (i.e. messages cannot be
-	 * intermixed arriving at the upper layer). A simple way to
-	 * enforce this is to only try partial delivery if this TSN is
-	 * the next expected TSN. Partial Delivery not supported
-	 * for un-ordered message.
+	 * intermixed arriving at the upper layer).
+	 * sctp_try_partial_delivery() will return a message consisting
+	 * of only consecutive fragments.
 	 */
 	if (srp->needed != srp->got) {
+		/* we don't have the full message yet */
 		dmp = NULL;
-		if (ntohl((*dc)->sdh_tsn) == sctp->sctp_ftsn &&
-		    srp->msglen >= sctp->sctp_pd_point) {
-			dmp = sctp_try_partial_delivery(sctp, hmp, srp, dc);
-			*tpfinished = B_FALSE;
+		if (ntohl((*dc)->sdh_tsn) <= sctp->sctp_ftsn &&
+		    srp->msglen >= sctp->sctp_pd_point &&
+		    srp->ssn == sip->nextseq) {
+			dmp = sctp_try_partial_delivery(sctp, reassq_curr,
+			    srp, dc);
 		}
+		*tpfinished = B_FALSE;
+		/*
+		 * NULL unless a segment of the message now qualified for
+		 * partial_delivery and has been prepared for delivery by
+		 * sctp_try_partial_delivery().
+		 */
 		return (dmp);
 	}
 frag_done:
 	/*
-	 * else reassembly done; prepare the data for delivery.
-	 * First unlink hmp from the ssn list.
+	 * Reassembly complete for this message, prepare the data for delivery.
+	 * First unlink the reassembly queue for this ssn from the list of
+	 * messages in reassembly.
 	 */
-	if (sip->istr_reass == hmp) {
-		sip->istr_reass = hmp->b_next;
-		if (hmp->b_next)
-			hmp->b_next->b_prev = NULL;
+	if (sip->istr_reass == reassq_curr) {
+		sip->istr_reass = reassq_curr->b_next;
+		if (reassq_curr->b_next)
+			reassq_curr->b_next->b_prev = NULL;
 	} else {
-		ASSERT(hmp->b_prev != NULL);
-		hmp->b_prev->b_next = hmp->b_next;
-		if (hmp->b_next)
-			hmp->b_next->b_prev = hmp->b_prev;
+		ASSERT(reassq_curr->b_prev != NULL);
+		reassq_curr->b_prev->b_next = reassq_curr->b_next;
+		if (reassq_curr->b_next)
+			reassq_curr->b_next->b_prev = reassq_curr->b_prev;
 	}
 
 	/*
-	 * Using b_prev and b_next was a little sinful, but OK since
-	 * this mblk is never put*'d. However, freeb() will still
-	 * ASSERT that they are unused, so we need to NULL them out now.
+	 * Need to clean up b_prev and b_next as freeb() will
+	 * ASSERT that they are unused.
 	 */
-	hmp->b_next = NULL;
-	hmp->b_prev = NULL;
-	dmp = hmp;
+	reassq_curr->b_next = NULL;
+	reassq_curr->b_prev = NULL;
+
+	dmp = reassq_curr;
+	/* point to the head of the reassembled data message */
 	dmp = dmp->b_cont;
-	hmp->b_cont = NULL;
-	freeb(hmp);
+	reassq_curr->b_cont = NULL;
+	freeb(reassq_curr);
+	/* Tell our caller that we are returning a complete message. */
 	*tpfinished = B_TRUE;
 
 	/*
 	 * Adjust all mblk's except the lead so their rptr's point to the
-	 * payload. sctp_data_chunk() will need to process the lead's
-	 * data chunk section, so leave it's rptr pointing at the data chunk.
+	 * payload. sctp_data_chunk() will need to process the lead's data
+	 * data chunk section, so leave its rptr pointing at the data chunk
+	 * header.
 	 */
 	*dc = (sctp_data_hdr_t *)dmp->b_rptr;
 	for (qmp = dmp->b_cont; qmp != NULL; qmp = qmp->b_cont) {
@@ -1163,6 +1242,7 @@ frag_done:
 
 	return (dmp);
 }
+
 static void
 sctp_add_dup(uint32_t tsn, mblk_t **dups)
 {
@@ -1193,6 +1273,11 @@ sctp_add_dup(uint32_t tsn, mblk_t **dups)
 	ASSERT((mp->b_wptr - mp->b_rptr) <= bsize);
 }
 
+/*
+ * All incoming sctp data, complete messages and fragments are handled by
+ * this function. Unless the U-bit is set in the data chunk it will be
+ * delivered in order or queued until an in-order delivery can be made.
+ */
 static void
 sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
     sctp_faddr_t *fp, ip_pkt_t *ipp, ip_recv_attr_t *ira)
@@ -1201,6 +1286,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	mblk_t *dmp, *pmp;
 	sctp_instr_t *instr;
 	int ubit;
+	int sid;
 	int isfrag;
 	uint16_t ssn;
 	uint32_t oftsn;
@@ -1244,6 +1330,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		return;
 	}
 
+	/* Check for dups of sack'ed data */
 	if (sctp->sctp_sack_info != NULL) {
 		sctp_set_t *sp;
 
@@ -1260,7 +1347,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		}
 	}
 
-	/* We cannot deliver anything up now but we still need to handle it. */
+	/* We can no longer deliver anything up, but still need to handle it. */
 	if (SCTP_IS_DETACHED(sctp)) {
 		BUMP_MIB(&sctps->sctps_mib, sctpInClosed);
 		can_deliver = B_FALSE;
@@ -1285,7 +1372,10 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		return;
 	}
 
-	if (ntohs(dc->sdh_sid) >= sctp->sctp_num_istr) {
+	sid = ntohs(dc->sdh_sid);
+
+	/* Data received for a stream not negotiated for this association */
+	if (sid >= sctp->sctp_num_istr) {
 		sctp_bsc_t	inval_parm;
 
 		/* Will populate the CAUSE block in the ERROR chunk. */
@@ -1300,21 +1390,32 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		return;
 	}
 
+	/* unordered delivery OK for this data if ubit set */
 	ubit = SCTP_DATA_GET_UBIT(dc);
 	ASSERT(sctp->sctp_instr != NULL);
-	instr = &sctp->sctp_instr[ntohs(dc->sdh_sid)];
+
+	/* select per stream structure for this stream from the array */
+	instr = &sctp->sctp_instr[sid];
 	/* Initialize the stream, if not yet used */
 	if (instr->sctp == NULL)
 		instr->sctp = sctp;
 
+	/* Begin and End bit set would mean a complete message */
 	isfrag = !(SCTP_DATA_GET_BBIT(dc) && SCTP_DATA_GET_EBIT(dc));
+
+	/* The ssn of this sctp message and of any fragments in it */
 	ssn = ntohs(dc->sdh_ssn);
 
 	dmp = dupb(mp);
 	if (dmp == NULL) {
-		/* drop it and don't ack it, causing the peer to retransmit */
+		/* drop it and don't ack, let the peer retransmit */
 		return;
 	}
+	/*
+	 * Past header and payload, note: the underlying buffer may
+	 * contain further chunks from the same incoming IP packet,
+	 * if so db_ref will be greater than one.
+	 */
 	dmp->b_wptr = (uchar_t *)ch + ntohs(ch->sch_len);
 
 	sctp->sctp_rxqueued += dlen;
@@ -1327,51 +1428,52 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		/* fragmented data chunk */
 		dmp->b_rptr = (uchar_t *)dc;
 		if (ubit) {
+			/* prepare data for unordered delivery */
 			dmp = sctp_uodata_frag(sctp, dmp, &dc);
 #if	DEBUG
 			if (dmp != NULL) {
 				ASSERT(instr ==
-				    &sctp->sctp_instr[ntohs(dc->sdh_sid)]);
+				    &sctp->sctp_instr[sid]);
 			}
 #endif
 		} else {
+			/*
+			 * Assemble fragments and queue for ordered delivery,
+			 * dmp returned is NULL or the head of a complete or
+			 * "partial delivery" message. Any returned message
+			 * and all its fragments will have the same ssn as the
+			 * input fragment currently being handled.
+			 */
 			dmp = sctp_data_frag(sctp, dmp, &dc, &error, instr,
 			    &tpfinished);
 		}
-		if (error != 0) {
+		if (error == ENOMEM) {
+			/* back out the adjustment made earlier */
 			sctp->sctp_rxqueued -= dlen;
-			if (error == 1) {
-				/*
-				 * out of memory; don't ack it so
-				 * the peer retransmits
-				 */
-				return;
-			} else if (error == 2) {
-				/*
-				 * fatal error (i.e. peer used different
-				 * ssn's for same fragmented data) --
-				 * the association has been aborted.
-				 * XXX need to return errval so state
-				 * machine can also abort processing.
-				 */
-				dprint(0, ("error 2: must not happen!\n"));
-				return;
-			}
+			/*
+			 * Don't ack the segment,
+			 * the peer will retransmit.
+			 */
+			return;
 		}
 
 		if (dmp == NULL) {
 			/*
-			 * Can't process this data now, but the cumulative
-			 * TSN may be advanced, so do the checks at done.
+			 * The frag has been queued for later in-order delivery,
+			 * but the cumulative TSN may need to advance, so also
+			 * need to perform the gap ack checks at the done label.
 			 */
 			SCTP_ACK_IT(sctp, tsn);
+			DTRACE_PROBE4(sctp_data_frag_queued, sctp_t *, sctp,
+			    int, sid, int, tsn, uint16_t, ssn);
 			goto done;
 		}
 	}
 
 	/*
-	 * Insert complete messages in correct order for ordered delivery.
-	 * tpfinished is true when the incoming chunk contains a complete
+	 * Unless message is the next for delivery to the ulp, queue complete
+	 * message in the correct order for ordered delivery.
+	 * Note: tpfinished is true when the incoming chunk contains a complete
 	 * message or is the final missing fragment which completed a message.
 	 */
 	if (!ubit && tpfinished && ssn != instr->nextseq) {
@@ -1421,12 +1523,14 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		(instr->istr_nmsgs)++;
 		(sctp->sctp_istr_nmsgs)++;
 		SCTP_ACK_IT(sctp, tsn);
+		DTRACE_PROBE4(sctp_pqueue_completemsg, sctp_t *, sctp,
+		    int, sid, int, tsn, uint16_t, ssn);
 		return;
 	}
 
 	/*
-	 * Else we can deliver the data directly. Recalculate
-	 * dlen now since we may have reassembled data.
+	 * Deliver the data directly. Recalculate dlen now since
+	 * we may have just reassembled this data.
 	 */
 	dlen = dmp->b_wptr - (uchar_t *)dc - sizeof (*dc);
 	for (pmp = dmp->b_cont; pmp != NULL; pmp = pmp->b_cont)
@@ -1438,6 +1542,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 
 	if (can_deliver) {
 
+		/* step past header to the payload */
 		dmp->b_rptr = (uchar_t *)(dc + 1);
 		if (sctp_input_add_ancillary(sctp, &dmp, dc, fp,
 		    ipp, ira) == 0) {
@@ -1445,7 +1550,9 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 			    msgdsize(dmp)));
 			sctp->sctp_rwnd -= dlen;
 			/*
-			 * Override b_flag for SCTP sockfs internal use
+			 * We overload the meaning of b_flag for SCTP sockfs
+			 * internal use, to advise sockfs of partial delivery
+			 * semantics.
 			 */
 			dmp->b_flag = tpfinished ? 0 : SCTP_PARTIAL_DATA;
 			new_rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd, dmp,
@@ -1461,21 +1568,21 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 				sctp->sctp_rwnd = new_rwnd;
 			SCTP_ACK_IT(sctp, tsn);
 		} else {
-			/* Just free the message if we don't have memory. */
+			/* No memory don't ack, the peer will retransmit. */
 			freemsg(dmp);
 			return;
 		}
 	} else {
-		/* About to free the data */
+		/* Closed above, ack to peer and free the data */
 		freemsg(dmp);
 		SCTP_ACK_IT(sctp, tsn);
 	}
 
 	/*
-	 * data, now enqueued, may already have been processed and free'd
+	 * Data now enqueued, may already have been processed and free'd
 	 * by the ULP (or we may have just freed it above, if we could not
-	 * deliver it), so we must not reference it (this is why we kept
-	 * the ssn and ubit above).
+	 * deliver), so we must not reference it (this is why we saved the
+	 * ssn and ubit earlier).
 	 */
 	if (ubit != 0) {
 		BUMP_LOCAL(sctp->sctp_iudchunks);
@@ -1484,24 +1591,72 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	BUMP_LOCAL(sctp->sctp_idchunks);
 
 	/*
-	 * If there was a partial delivery and it has not finished,
-	 * don't pull anything from the pqueues.
+	 * There was a partial delivery and it has not finished,
+	 * don't pull anything from the pqueues or increment the
+	 * nextseq. This msg must complete before starting on
+	 * the next ssn and the partial message must have the
+	 * same ssn as the next expected message..
 	 */
 	if (!tpfinished) {
+		DTRACE_PROBE4(sctp_partial_delivery, sctp_t *, sctp,
+		    int, sid, int, tsn, uint16_t, ssn);
+		/*
+		 * Verify the partial delivery is part of the
+		 * message expected for ordered delivery.
+		 */
+		if (ssn != instr->nextseq) {
+			DTRACE_PROBE4(sctp_partial_delivery_error,
+			    sctp_t *, sctp, int, sid, int, tsn,
+			    uint16_t, ssn);
+			cmn_err(CE_WARN, "sctp partial"
+			    " delivery error, sctp 0x%p"
+			    " sid = 0x%x ssn != nextseq"
+			    " tsn 0x%x ftsn 0x%x"
+			    " ssn 0x%x nextseq 0x%x",
+			    (void *)sctp, sid,
+			    tsn, sctp->sctp_ftsn, ssn,
+			    instr->nextseq);
+		}
+
+		ASSERT(ssn == instr->nextseq);
 		goto done;
 	}
 
+	if (ssn != instr->nextseq) {
+		DTRACE_PROBE4(sctp_inorder_delivery_error,
+		    sctp_t *, sctp, int, sid, int, tsn,
+		    uint16_t, ssn);
+		cmn_err(CE_WARN, "sctp in-order delivery error, sctp 0x%p "
+		    "sid = 0x%x ssn != nextseq ssn 0x%x nextseq 0x%x",
+		    (void *)sctp, sid, ssn, instr->nextseq);
+	}
+
+	ASSERT(ssn == instr->nextseq);
+
+	DTRACE_PROBE4(sctp_deliver_completemsg, sctp_t *, sctp, int, sid,
+	    int, tsn, uint16_t, ssn);
+
 	instr->nextseq = ssn + 1;
-	/* Deliver any successive data chunks in the instr queue */
+
+	/*
+	 * Deliver any successive data chunks waiting in the instr pqueue
+	 * for the data just sent up.
+	 */
 	while (instr->istr_nmsgs > 0) {
 		dmp = (mblk_t *)instr->istr_msgs;
 		dc = (sctp_data_hdr_t *)dmp->b_rptr;
 		ssn = ntohs(dc->sdh_ssn);
-		/* Gap in the sequence */
+		tsn = ntohl(dc->sdh_tsn);
+		/* Stop at the first gap in the sequence */
 		if (ssn != instr->nextseq)
 			break;
 
-		/* Else deliver the data */
+		DTRACE_PROBE4(sctp_deliver_pqueuedmsg, sctp_t *, sctp,
+		    int, sid, int, tsn, uint16_t, ssn);
+		/*
+		 * Ready to deliver all data before the gap
+		 * to the upper layer.
+		 */
 		(instr->istr_nmsgs)--;
 		(instr->nextseq)++;
 		(sctp->sctp_istr_nmsgs)--;
@@ -1515,8 +1670,10 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		    ntohl(dc->sdh_tsn), (int)ssn));
 
 		/*
-		 * If this chunk was reassembled, each b_cont represents
-		 * another TSN; advance ftsn now.
+		 * Composite messages indicate this chunk was reassembled,
+		 * each b_cont represents another TSN; Follow the chain to
+		 * reach the frag with the last tsn in order to advance ftsn
+		 * shortly by calling SCTP_ACK_IT().
 		 */
 		dlen = dmp->b_wptr - dmp->b_rptr - sizeof (*dc);
 		for (pmp = dmp->b_cont; pmp; pmp = pmp->b_cont)
@@ -1533,7 +1690,9 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 				    "bytes\n", msgdsize(dmp)));
 				sctp->sctp_rwnd -= dlen;
 				/*
-				 * Override b_flag for SCTP sockfs internal use
+				 * Meaning of b_flag overloaded for SCTP sockfs
+				 * internal use, advise sockfs of partial
+				 * delivery semantics.
 				 */
 				dmp->b_flag = tpfinished ?
 				    0 : SCTP_PARTIAL_DATA;
@@ -1545,11 +1704,12 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 					sctp->sctp_rwnd = new_rwnd;
 				SCTP_ACK_IT(sctp, tsn);
 			} else {
+				/* don't ack, the peer will retransmit */
 				freemsg(dmp);
 				return;
 			}
 		} else {
-			/* About to free the data */
+			/* Closed above, ack and free the data */
 			freemsg(dmp);
 			SCTP_ACK_IT(sctp, tsn);
 		}
@@ -2073,6 +2233,13 @@ sctp_ftsn_check_frag(sctp_t *sctp, uint16_t ssn, sctp_instr_t *sip)
 		 * trypartial.
 		 */
 		if (srp->partial_delivered) {
+			if (srp->ssn != sip->nextseq)
+				cmn_err(CE_WARN, "sctp partial"
+				    " delivery notify, sctp 0x%p"
+				    " sip = 0x%p ssn != nextseq"
+				    " ssn 0x%x nextseq 0x%x",
+				    (void *)sctp, (void *)sip,
+				    srp->ssn, sip->nextseq);
 			ASSERT(sip->nextseq == srp->ssn);
 			sctp_partial_delivery_event(sctp);
 		}
@@ -2498,7 +2665,7 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 			SCTP_CHUNK_SET_SACKCNT(mp, SCTP_CHUNK_SACKCNT(mp) + 1);
 			if (SCTP_CHUNK_SACKCNT(mp) ==
 			    sctps->sctps_fast_rxt_thresh) {
-				SCTP_CHUNK_REXMIT(mp);
+				SCTP_CHUNK_REXMIT(sctp, mp);
 				sctp->sctp_chk_fast_rexmit = B_TRUE;
 				*trysend = 1;
 				if (!*fast_recovery) {
@@ -2756,7 +2923,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			SCTP_CHUNK_SET_SACKCNT(mp, SCTP_CHUNK_SACKCNT(mp) + 1);
 			if (SCTP_CHUNK_SACKCNT(mp) ==
 			    sctps->sctps_fast_rxt_thresh) {
-				SCTP_CHUNK_REXMIT(mp);
+				SCTP_CHUNK_REXMIT(sctp, mp);
 				sctp->sctp_chk_fast_rexmit = B_TRUE;
 				trysend = 1;
 				if (!fast_recovery) {
@@ -2787,7 +2954,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 				fp = SCTP_CHUNK_DEST(mp);
 				fp->suna += chunklen;
 				sctp->sctp_unacked += chunklen - sizeof (*sdc);
-				SCTP_CHUNK_CLEAR_ACKED(mp);
+				SCTP_CHUNK_CLEAR_ACKED(sctp, mp);
 				if (!fp->timer_running) {
 					SCTP_FADDR_TIMER_RESTART(sctp, fp,
 					    fp->rto);
@@ -4229,7 +4396,7 @@ sctp_recvd(sctp_t *sctp, int len)
 		WAKE_SCTP(sctp);
 		return;
 	}
-	ASSERT(sctp->sctp_rwnd >= sctp->sctp_rxqueued);
+
 	old = sctp->sctp_rwnd - sctp->sctp_rxqueued;
 	new = len - sctp->sctp_rxqueued;
 	sctp->sctp_rwnd = len;

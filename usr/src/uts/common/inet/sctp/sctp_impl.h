@@ -260,6 +260,8 @@ typedef struct {
 			}						\
 			(sdc)->sdh_ssn = mhdr->smh_ssn;			\
 		}							\
+		DTRACE_PROBE3(sctp__chunk__sent1, sctp_t *, sctp,	\
+		    mblk_t *, mp, mblk_t *, meta);			\
 		(sctp)->sctp_unacked += (chunkdata);			\
 		(sctp)->sctp_unsent -= (chunkdata);			\
 		(sctp)->sctp_frwnd -= (chunkdata);			\
@@ -272,6 +274,8 @@ typedef struct {
 			SCTP_CHUNK_DEST(mp)->suna -= ((chunkdata) + 	\
 					sizeof (*sdc));			\
 		}							\
+		DTRACE_PROBE3(sctp__chunk__sent2, sctp_t *, sctp,	\
+		    mblk_t *, mp, mblk_t *, meta);			\
 		(mp)->b_flag &= ~(SCTP_CHUNK_FLAG_REXMIT |		\
 			SCTP_CHUNK_FLAG_ACKED);				\
 		SCTP_CHUNK_SET_SACKCNT(mp, 0);				\
@@ -292,14 +296,22 @@ typedef struct {
 #define	SCTP_CHUNK_DEST(mp)		((sctp_faddr_t *)(mp)->b_queue)
 #define	SCTP_SET_CHUNK_DEST(mp, fp)	((mp)->b_queue = (queue_t *)fp)
 
-#define	SCTP_CHUNK_REXMIT(mp)	((mp)->b_flag |= SCTP_CHUNK_FLAG_REXMIT)
+#define	SCTP_CHUNK_REXMIT(sctp, mp) {					\
+	DTRACE_PROBE2(sctp__chunk__rexmit, sctp_t *, sctp, mblk_t *,	\
+	    mp);							\
+	(mp)->b_flag |= SCTP_CHUNK_FLAG_REXMIT; 			\
+}
 #define	SCTP_CHUNK_CLEAR_REXMIT(mp) ((mp)->b_flag &= ~SCTP_CHUNK_FLAG_REXMIT)
 #define	SCTP_CHUNK_WANT_REXMIT(mp) ((mp)->b_flag & SCTP_CHUNK_FLAG_REXMIT)
 
 #define	SCTP_CHUNK_ACKED(mp) \
 	((mp)->b_flag = (SCTP_CHUNK_FLAG_SENT|SCTP_CHUNK_FLAG_ACKED))
 #define	SCTP_CHUNK_ISACKED(mp)	((mp)->b_flag & SCTP_CHUNK_FLAG_ACKED)
-#define	SCTP_CHUNK_CLEAR_ACKED(mp) ((mp)->b_flag &= ~SCTP_CHUNK_FLAG_ACKED)
+#define	SCTP_CHUNK_CLEAR_ACKED(sctp, mp) {				\
+	DTRACE_PROBE2(sctp__chunk__clracked, sctp_t *, sctp, mblk_t *,	\
+	    mp);							\
+	(mp)->b_flag &= ~SCTP_CHUNK_FLAG_ACKED;				\
+}
 
 #define	SCTP_CHUNK_SACKCNT(mp)	((intptr_t)((mp)->b_prev))
 #define	SCTP_CHUNK_SET_SACKCNT(mp, val) ((mp)->b_prev = \

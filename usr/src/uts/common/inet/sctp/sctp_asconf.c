@@ -905,7 +905,7 @@ sctp_rc_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	 * be assigned or not, so once set we leave it there.
 	 */
 	if (!SCTP_CHUNK_WANT_REXMIT(sctp->sctp_cxmit_list))
-		SCTP_CHUNK_REXMIT(sctp->sctp_cxmit_list);
+		SCTP_CHUNK_REXMIT(sctp, sctp->sctp_cxmit_list);
 	sctp_wput_asconf(sctp, nfp);
 #undef	SCTP_CLR_SENT_FLAG
 }
