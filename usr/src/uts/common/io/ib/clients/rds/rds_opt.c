@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
 
 #include <sys/ib/clients/rds/rds.h>
@@ -131,7 +131,6 @@ rds_opt_set(queue_t *q, uint_t optset_context, int level,
 			}
 			if (!checkonly) {
 				q->q_hiwat = *i1;
-				q->q_next->q_hiwat = *i1;
 			}
 			break;
 		case SO_RCVBUF:
