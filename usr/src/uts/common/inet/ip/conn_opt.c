@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1386,7 +1385,7 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 		/* This is IP_PKTINFO option. */
 		mutex_enter(&connp->conn_lock);
 		pktinfo = (struct in_pktinfo *)invalp;
-		if (ipp->ipp_addr_v4 != INADDR_ANY) {
+		if (pktinfo->ipi_spec_dst.s_addr != INADDR_ANY) {
 			ipp->ipp_fields |= IPPF_ADDR;
 			IN6_INADDR_TO_V4MAPPED(&pktinfo->ipi_spec_dst,
 			    &ipp->ipp_addr);

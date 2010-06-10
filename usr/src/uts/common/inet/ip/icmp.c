@@ -3451,9 +3451,8 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		flowinfo = connp->conn_flowinfo;
 	}
 	mutex_exit(&connp->conn_lock);
-	/* Handle IPV6_PKTINFO setting source address. */
-	if (IN6_IS_ADDR_UNSPECIFIED(&v6src) &&
-	    (ipp->ipp_fields & IPPF_ADDR)) {
+	/* Handle IP_PKTINFO/IPV6_PKTINFO setting source address. */
+	if (ipp->ipp_fields & IPPF_ADDR) {
 		if (ixa->ixa_flags & IXAF_IS_IPV4) {
 			if (IN6_IS_ADDR_V4MAPPED(&ipp->ipp_addr))
 				v6src = ipp->ipp_addr;
@@ -4434,9 +4433,8 @@ icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		else
 			ixa->ixa_flags &= ~IXAF_IS_IPV4;
 	}
-	/* Handle IPV6_PKTINFO setting source address. */
-	if (IN6_IS_ADDR_UNSPECIFIED(&v6src) &&
-	    (connp->conn_xmit_ipp.ipp_fields & IPPF_ADDR)) {
+	/* Handle IP_PKTINFO/IPV6_PKTINFO setting source address. */
+	if (connp->conn_xmit_ipp.ipp_fields & IPPF_ADDR) {
 		ip_pkt_t *ipp = &connp->conn_xmit_ipp;
 
 		if (ixa->ixa_flags & IXAF_IS_IPV4) {
