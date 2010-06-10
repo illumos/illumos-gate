@@ -20,7 +20,8 @@
  */
 
 /*
- * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -1951,10 +1952,7 @@ nfs_enable_share(sa_share_t share)
 				break;
 			}
 			err = SA_NO_PERMISSION;
-			break;
-		case EEXIST:
-			err = SA_SHARE_EXISTS;
-			break;
+			/* FALLTHROUGH */
 		default:
 			break;
 		}

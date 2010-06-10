@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 
@@ -123,7 +124,6 @@
 #include <sys/sunddi.h>
 #include <sys/dnlc.h>
 #include <sys/sdt.h>
-#include <sys/pkp_hash.h>
 #include <nfs/nfs4.h>
 #include <nfs/rnode4.h>
 #include <nfs/nfsid_map.h>
@@ -137,6 +137,7 @@ zone_key_t			nfsidmap_zone_key;
 static list_t			nfsidmap_globals_list;
 static kmutex_t			nfsidmap_globals_lock;
 static kmem_cache_t		*nfsidmap_cache;
+static uint_t			pkp_tab[NFSID_CACHE_ANCHORS];
 static int			nfs4_idcache_tout;
 
 /*
@@ -146,10 +147,30 @@ static int			nfs4_idcache_tout;
 #define		_CACHE_TOUT		(60*60)		/* secs in 1 hour */
 #define		TIMEOUT(x)		(gethrestime_sec() > \
 					((x) + nfs4_idcache_tout))
+
 /*
  * Max length of valid id string including the trailing null
  */
 #define		_MAXIDSTRLEN		11
+
+/*
+ * Pearson's string hash
+ *
+ * See: Communications of the ACM, June 1990 Vol 33 pp 677-680
+ * http://www.acm.org/pubs/citations/journals/cacm/1990-33-6/p677-pearson
+ */
+#define		PS_HASH(msg, hash, len)					\
+{                                                                       \
+	uint_t		key = 0x12345678;	/* arbitrary value */	\
+	int		i;						\
+                                                                        \
+	(hash) = MOD2((key + (len)), NFSID_CACHE_ANCHORS);		\
+                                                                        \
+	for (i = 0; i < (len); i++) {					\
+		(hash) = MOD2(((hash) + (msg)[i]), NFSID_CACHE_ANCHORS); \
+		(hash) = pkp_tab[(hash)];				\
+	}                                                               \
+}
 
 #define		ID_HASH(id, hash)					\
 {									\
@@ -164,6 +185,7 @@ static void	*nfs_idmap_init_zone(zoneid_t);
 static void	 nfs_idmap_fini_zone(zoneid_t, void *);
 
 static int	 is_stringified_id(utf8string *);
+static void	 init_pkp_tab(void);
 static void	 nfs_idmap_i2s_literal(uid_t, utf8string *);
 static int	 nfs_idmap_s2i_literal(utf8string *, uid_t *, int);
 static void	 nfs_idmap_reclaim(void *);
@@ -192,6 +214,10 @@ static void	 nfs_idmap_cache_rment(nfsidmap_t *);
 void
 nfs_idmap_init(void)
 {
+	/*
+	 * Initialize Pearson's Table
+	 */
+	init_pkp_tab();
 	/*
 	 * Initialize the kmem cache
 	 */
@@ -1277,6 +1303,7 @@ nfs_idmap_cache_s2i_lkup(idmap_cache_info_t *cip,	/* cache info ptr */
 	nfsidmap_t	*p;
 	nfsidmap_t	*pnext;
 	nfsidhq_t	*hq;
+	uint_t		 hash;
 	char		*rqst_c_str;
 	uint_t		 rqst_len;
 	uint_t		 found_stat = 0;
@@ -1291,8 +1318,9 @@ nfs_idmap_cache_s2i_lkup(idmap_cache_info_t *cip,	/* cache info ptr */
 	/*
 	 * Compute hash queue
 	 */
-	*hashno = pkp_tab_hash(rqst_c_str, rqst_len - 1);
-	hq = &cip->table[*hashno];
+	PS_HASH(rqst_c_str, hash, rqst_len - 1);
+	*hashno = hash;
+	hq = &cip->table[hash];
 
 	/*
 	 * Look for the entry in the HQ
@@ -1379,7 +1407,7 @@ nfs_idmap_cache_s2i_insert(idmap_cache_info_t *cip,	/* cache info ptr */
 
 		case HQ_HASH_FIND:
 		default:
-			hashno = pkp_tab_hash(c_str, c_len - 1);
+			PS_HASH(c_str, hashno, c_len - 1);
 			break;
 	}
 	hq = &cip->table[hashno];
@@ -1675,6 +1703,33 @@ nfs_idmap_i2s_literal(uid_t id, utf8string *u8s)
 }
 
 /* -- Utility functions -- */
+
+/*
+ * Initialize table in pseudo-random fashion
+ * for use in Pearson's string hash algorithm.
+ *
+ * See: Communications of the ACM, June 1990 Vol 33 pp 677-680
+ * http://www.acm.org/pubs/citations/journals/cacm/1990-33-6/p677-pearson
+ */
+static void
+init_pkp_tab(void)
+{
+	int		i;
+	int		j;
+	int		k = 7;
+	uint_t		s;
+
+	for (i = 0; i < NFSID_CACHE_ANCHORS; i++)
+		pkp_tab[i] = i;
+
+	for (j = 0; j < 4; j++)
+		for (i = 0; i < NFSID_CACHE_ANCHORS; i++) {
+			s = pkp_tab[i];
+			k = MOD2((k + s), NFSID_CACHE_ANCHORS);
+			pkp_tab[i] = pkp_tab[k];
+			pkp_tab[k] = s;
+		}
+}
 
 char *
 utf8_strchr(utf8string *u8s, const char c)

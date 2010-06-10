@@ -221,9 +221,6 @@ sa_errorstr(int err)
 	case SA_PASSWORD_ENC:
 		ret = dgettext(TEXT_DOMAIN, "passwords must be encrypted");
 		break;
-	case SA_SHARE_EXISTS:
-		ret = dgettext(TEXT_DOMAIN, "path or file is already shared");
-		break;
 	default:
 		(void) snprintf(errstr, sizeof (errstr),
 		    dgettext(TEXT_DOMAIN, "unknown %d"), err);

@@ -1145,7 +1145,7 @@ exi_cache_reclaim(void *cdrarg)
 	rw_enter(&exported_lock, RW_READER);
 
 	for (i = 0; i < EXPTABLESIZE; i++) {
-		for (exi = exptable[i]; exi; exi = exi->fid_hash.next) {
+		for (exi = exptable[i]; exi; exi = exi->exi_hash) {
 			exi_cache_trim(exi);
 		}
 	}

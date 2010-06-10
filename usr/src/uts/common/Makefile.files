@@ -255,7 +255,6 @@ GENUNIX_OBJS +=	\
 		pgrp.o		\
 		pgrpsys.o	\
 		pid.o		\
-		pkp_hash.o	\
 		policy.o	\
 		poll.o		\
 		pool.o		\

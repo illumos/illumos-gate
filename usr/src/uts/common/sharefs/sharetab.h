@@ -18,14 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SHAREFS_SHARETAB_H
 #define	_SHAREFS_SHARETAB_H
 
-#include <sys/pkp_hash.h>
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This header defines the glue to keeping a sharetab in memory.
@@ -52,7 +54,7 @@ typedef struct sharefs_hash_head {
 	uint_t		ssh_count;
 } sharefs_hash_head_t;
 
-#define	SHARETAB_HASHES		PKP_HASH_SIZE
+#define	SHARETAB_HASHES		256
 
 typedef struct sharetab {
 	sharefs_hash_head_t	s_buckets[SHARETAB_HASHES];
@@ -60,6 +62,29 @@ typedef struct sharetab {
 	struct sharetab		*s_next;
 	uint_t			s_count;
 } sharetab_t;
+
+#define	MOD2(a, pow_of_2)	(a) & ((pow_of_2) - 1)
+
+/*
+ * Pearson's string hash
+ *
+ * See: Communications of the ACM, June 1990 Vol 33 pp 677-680
+ * http://www.acm.org/pubs/citations/journals/cacm/1990-33-6/p677-pearson
+ */
+#define	SHARETAB_HASH_IT(hash, path)					\
+{									\
+	uint_t		key = 0x12345678;	/* arbitrary value */	\
+	int		i, len;						\
+									\
+	len = strlen((path));						\
+									\
+	(hash) = MOD2((key + len), SHARETAB_HASHES);			\
+									\
+	for (i = 0; i < len; i++) {					\
+		(hash) = MOD2(((hash) + (path)[i]), SHARETAB_HASHES);	\
+		(hash) = pkp_tab[(hash)];				\
+	}								\
+}
 
 #ifdef __cplusplus
 }
