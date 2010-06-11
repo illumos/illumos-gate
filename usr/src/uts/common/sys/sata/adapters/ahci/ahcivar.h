@@ -156,17 +156,17 @@ typedef struct ahci_pmult_info ahci_pmult_info_t;
  * AHCI_PORT_FLAG_NODEV: this flag will be set when a device is found gone
  * during ahci_restart_port_wait_till_ready process.
  *
- * AHCI_PORT_FLAG_RDWR_PMULT: this flags will be set when a READ/WRITE
+ * AHCI_PORT_FLAG_RDWR_PMULT: this flag will be set when a READ/WRITE
  * PORTMULT command is being executed.
  *
- * AHCI_PORT_FLAG_IGNORE_IPMS: this flags will be set when enumerating a port
+ * AHCI_PORT_FLAG_IGNORE_IPMS: this flag will be set when enumerating a port
  * multiplier. According AHCI spec, IPMS error should be ignore during
  * enumeration of port multiplier.
  *
- * AHCI_PORT_FLAG_PMULT_SNTF: this flags will be set when the a asynchronous
+ * AHCI_PORT_FLAG_PMULT_SNTF: this flag will be set when the a asynchronous
  * notification event on the port multiplier is being handled.
  *
- * AHCI_PORT_FLAG_HOTPLUG: this flags will be set when a hot plug event is
+ * AHCI_PORT_FLAG_HOTPLUG: this flag will be set when a hot plug event is
  * being handled.
  */
 #define	AHCI_PORT_FLAG_SPINUP		0x01
@@ -249,6 +249,18 @@ typedef struct ahci_port {
 	/* Keep all the pending sata packets */
 	sata_pkt_t		*ahciport_slot_pkts[AHCI_PORT_MAX_CMD_SLOTS];
 
+	/* Used to check whether corresponding packet is timeout */
+	int			ahciport_slot_timeout[AHCI_PORT_MAX_CMD_SLOTS];
+
+	/* Queue of completed (done) sata packet */
+	sata_pkt_t		*ahciport_doneq;
+
+	/* Pointer of the tail of completed sata packet queue */
+	sata_pkt_t		**ahciport_doneqtail;
+
+	/* the length of the completed sata packet queue */
+	uint32_t		ahciport_doneq_len;
+
 	/* Keep the byte count of all PRD entries for every sata packet */
 	uint32_t		\
 			ahciport_prd_bytecounts[AHCI_PORT_MAX_CMD_SLOTS];
@@ -291,6 +303,14 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 				    ahci_port_t::ahciport_pending_tags))
 _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 				    ahci_port_t::ahciport_slot_pkts))
+_NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
+				    ahci_port_t::ahciport_slot_timeout))
+_NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
+				    ahci_port_t::ahciport_doneq))
+_NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
+				    ahci_port_t::ahciport_doneqtail))
+_NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
+				    ahci_port_t::ahciport_doneq_len))
 _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 				    ahci_port_t::ahciport_reset_in_progress))
 _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,

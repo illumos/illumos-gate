@@ -154,6 +154,8 @@ static  void ahci_copy_err_cnxt(sata_cmd_t *, ahci_fis_d2h_register_t *);
 static	void ahci_copy_ncq_err_page(sata_cmd_t *,
     struct sata_ncq_error_recovery_page *);
 static	void ahci_copy_out_regs(sata_cmd_t *, ahci_fis_d2h_register_t *);
+static	void ahci_add_doneq(ahci_port_t *, sata_pkt_t *, int);
+static	void ahci_flush_doneq(ahci_port_t *);
 
 static	int ahci_software_reset(ahci_ctl_t *, ahci_port_t *, ahci_addr_t *);
 static	int ahci_hba_reset(ahci_ctl_t *);
@@ -348,8 +350,8 @@ static  struct modlinkage modlinkage = {
 };
 
 /* The following variables are watchdog handler related */
-static int ahci_watchdog_timeout = 5; /* 5 seconds */
-static int ahci_watchdog_tick;
+static clock_t ahci_watchdog_timeout = 5; /* 5 seconds */
+static clock_t ahci_watchdog_tick;
 
 /*
  * This static variable indicates the size of command table,
@@ -1831,27 +1833,6 @@ ahci_do_sync_start(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	}
 }
 
-#define	SENDUP_PACKET(ahci_portp, satapkt, reason)			\
-	if (satapkt) {							\
-		satapkt->satapkt_reason = reason;			\
-		/*							\
-		 * We set the satapkt_reason in both sync and		\
-		 * non-sync cases.					\
-		 */							\
-	}								\
-	if (satapkt &&							\
-	    ! (satapkt->satapkt_op_mode & SATA_OPMODE_SYNCH) &&		\
-	    satapkt->satapkt_comp) {					\
-		mutex_exit(&ahci_portp->ahciport_mutex);		\
-		(*satapkt->satapkt_comp)(satapkt);			\
-		mutex_enter(&ahci_portp->ahciport_mutex);		\
-	} else {							\
-		if (satapkt &&						\
-		    (satapkt->satapkt_op_mode & SATA_OPMODE_SYNCH) &&	\
-		    ! (satapkt->satapkt_op_mode & SATA_OPMODE_POLLING))	\
-			cv_broadcast(&ahci_portp->ahciport_cv);		\
-	}
-
 /*
  * Searches for and claims a free command slot.
  *
@@ -2309,10 +2290,18 @@ ahci_deliver_satapkt(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 		ahci_portp->ahciport_slot_pkts[cmd_slot] = spkt;
 
 	/*
-	 * We are overloading satapkt_hba_driver_private with
-	 * watched_cycle count.
+	 * Keep the timeout value
 	 */
-	spkt->satapkt_hba_driver_private = (void *)(intptr_t)0;
+	ahci_portp->ahciport_slot_timeout[cmd_slot] = spkt->satapkt_time;
+
+	/*
+	 * If the intial timout is less than 1 tick, then make it longer by
+	 * 1 tick to avoid immediate timeout
+	 */
+	if (ahci_portp->ahciport_slot_timeout[cmd_slot] <=
+	    ahci_watchdog_timeout)
+		ahci_portp->ahciport_slot_timeout[cmd_slot] +=
+		    ahci_watchdog_timeout;
 
 #if AHCI_DEBUG
 	if (ahci_debug_flags & AHCIDBG_ATACMD &&
@@ -6069,6 +6058,11 @@ ahci_alloc_port_state(ahci_ctl_t *ahci_ctlp, uint8_t port)
 	if (ahci_portp->ahciport_event_args == NULL)
 		goto err_case4;
 
+	/* Initialize the done queue */
+	ahci_portp->ahciport_doneq = NULL;
+	ahci_portp->ahciport_doneqtail = &ahci_portp->ahciport_doneq;
+	ahci_portp->ahciport_doneq_len = 0;
+
 	mutex_exit(&ahci_portp->ahciport_mutex);
 
 	return (AHCI_SUCCESS);
@@ -6830,7 +6824,7 @@ ahci_intr_cmd_cmplt(ahci_ctl_t *ahci_ctlp,
 		    "ahci_intr_cmd_cmplt: sending up pkt 0x%p "
 		    "with SATA_PKT_COMPLETED", (void *)satapkt);
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_COMPLETED);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_COMPLETED);
 		goto out;
 	}
 
@@ -6852,7 +6846,7 @@ ahci_intr_cmd_cmplt(ahci_ctl_t *ahci_ctlp,
 			ahci_copy_out_regs(&satapkt->satapkt_cmd, rcvd_fisp);
 		}
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_COMPLETED);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_COMPLETED);
 		goto out;
 	}
 
@@ -6938,12 +6932,14 @@ ahci_intr_cmd_cmplt(ahci_ctl_t *ahci_ctlp,
 		CLEAR_BIT(finished_tags, finished_slot);
 		ahci_portp->ahciport_slot_pkts[finished_slot] = NULL;
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_COMPLETED);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_COMPLETED);
 	}
 out:
 	AHCIDBG(AHCIDBG_PKTCOMP, ahci_ctlp,
 	    "ahci_intr_cmd_cmplt: pending_tags = 0x%x",
 	    ahci_portp->ahciport_pending_tags);
+
+	ahci_flush_doneq(ahci_portp);
 
 	mutex_exit(&ahci_portp->ahciport_mutex);
 
@@ -7108,7 +7104,7 @@ next:
 		CLEAR_BIT(finished_tags, finished_slot);
 		ahci_portp->ahciport_slot_pkts[finished_slot] = NULL;
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_COMPLETED);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_COMPLETED);
 	}
 out:
 	AHCIDBG(AHCIDBG_PKTCOMP|AHCIDBG_NCQ, ahci_ctlp,
@@ -7116,6 +7112,8 @@ out:
 	    "pending_ncq_tags = 0x%x pending_tags = 0x%x",
 	    port, ahci_portp->ahciport_pending_ncq_tags,
 	    ahci_portp->ahciport_pending_tags);
+
+	ahci_flush_doneq(ahci_portp);
 
 	mutex_exit(&ahci_portp->ahciport_mutex);
 
@@ -8813,7 +8811,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 		CLEAR_BIT(finished_tags, tmp_slot);
 		ahci_portp->ahciport_slot_pkts[tmp_slot] = NULL;
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_COMPLETED);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_COMPLETED);
 	}
 
 	/* Send up failed packets with SATA_PKT_DEV_ERROR. */
@@ -8826,7 +8824,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 			AHCIDBG(AHCIDBG_ERRS, ahci_ctlp, "ahci_mop_commands: "
 			    "sending up pkt 0x%p with SATA_PKT_DEV_ERROR",
 			    (void *)satapkt);
-			SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_DEV_ERROR);
+			ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_DEV_ERROR);
 			break;
 		}
 		if (rdwr_pmult_cmd_in_progress) {
@@ -8836,7 +8834,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 			    "ahci_mop_commands: sending up "
 			    "rdwr pmult pkt 0x%p with SATA_PKT_DEV_ERROR",
 			    (void *)satapkt);
-			SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_DEV_ERROR);
+			ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_DEV_ERROR);
 			break;
 		}
 
@@ -8859,7 +8857,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 		CLEAR_BIT(failed_tags, tmp_slot);
 		ahci_portp->ahciport_slot_pkts[tmp_slot] = NULL;
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_DEV_ERROR);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_DEV_ERROR);
 	}
 
 	/* Send up timeout packets with SATA_PKT_TIMEOUT. */
@@ -8872,7 +8870,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 			AHCIDBG(AHCIDBG_ERRS, ahci_ctlp, "ahci_mop_commands: "
 			    "sending up pkt 0x%p with SATA_PKT_TIMEOUT",
 			    (void *)satapkt);
-			SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_TIMEOUT);
+			ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_TIMEOUT);
 			break;
 		}
 		if (rdwr_pmult_cmd_in_progress) {
@@ -8882,7 +8880,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 			    "ahci_mop_commands: sending up "
 			    "rdwr pmult pkt 0x%p with SATA_PKT_TIMEOUT",
 			    (void *)satapkt);
-			SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_TIMEOUT);
+			ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_TIMEOUT);
 			break;
 		}
 
@@ -8905,7 +8903,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 		CLEAR_BIT(timeout_tags, tmp_slot);
 		ahci_portp->ahciport_slot_pkts[tmp_slot] = NULL;
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_TIMEOUT);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_TIMEOUT);
 	}
 
 	/* Send up aborted packets with SATA_PKT_ABORTED */
@@ -8918,7 +8916,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 			AHCIDBG(AHCIDBG_ERRS, ahci_ctlp, "ahci_mop_commands: "
 			    "sending up pkt 0x%p with SATA_PKT_ABORTED",
 			    (void *)satapkt);
-			SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_ABORTED);
+			ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_ABORTED);
 			break;
 		}
 		if (rdwr_pmult_cmd_in_progress) {
@@ -8929,7 +8927,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 			    "ahci_mop_commands: sending up "
 			    "rdwr pmult pkt 0x%p with SATA_PKT_ABORTED",
 			    (void *)satapkt);
-			SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_ABORTED);
+			ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_ABORTED);
 			break;
 		}
 
@@ -8952,7 +8950,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 		CLEAR_BIT(aborted_tags, tmp_slot);
 		ahci_portp->ahciport_slot_pkts[tmp_slot] = NULL;
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_ABORTED);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_ABORTED);
 	}
 
 	/* Send up reset packets with SATA_PKT_RESET. */
@@ -8965,7 +8963,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 			    "ahci_mop_commands: sending up "
 			    "rdwr pmult pkt 0x%p with SATA_PKT_RESET",
 			    (void *)satapkt);
-			SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_RESET);
+			ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_RESET);
 			break;
 		}
 
@@ -8988,7 +8986,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 		CLEAR_BIT(reset_tags, tmp_slot);
 		ahci_portp->ahciport_slot_pkts[tmp_slot] = NULL;
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_RESET);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_RESET);
 	}
 
 	/* Send up unfinished packets with SATA_PKT_RESET */
@@ -9012,7 +9010,7 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 		CLEAR_BIT(unfinished_tags, tmp_slot);
 		ahci_portp->ahciport_slot_pkts[tmp_slot] = NULL;
 
-		SENDUP_PACKET(ahci_portp, satapkt, SATA_PKT_RESET);
+		ahci_add_doneq(ahci_portp, satapkt, SATA_PKT_RESET);
 	}
 
 	ahci_portp->ahciport_mop_in_progress--;
@@ -9020,6 +9018,8 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 
 	if (ahci_portp->ahciport_mop_in_progress == 0)
 		ahci_portp->ahciport_flags &= ~AHCI_PORT_FLAG_MOPPING;
+
+	ahci_flush_doneq(ahci_portp);
 }
 
 /*
@@ -9708,11 +9708,6 @@ ahci_watchdog_handler(ahci_ctl_t *ahci_ctlp)
 	int current_slot;
 	uint32_t current_tags;
 	int instance = ddi_get_instance(ahci_ctlp->ahcictl_dip);
-	/* max number of cycles this packet should survive */
-	int max_life_cycles;
-
-	/* how many cycles this packet survived so far */
-	int watched_cycles;
 
 	mutex_enter(&ahci_ctlp->ahcictl_mutex);
 
@@ -9779,24 +9774,15 @@ ahci_watchdog_handler(ahci_ctl_t *ahci_ctlp)
 			if ((spkt != NULL) && spkt->satapkt_time &&
 			    !(spkt->satapkt_op_mode & SATA_OPMODE_POLLING)) {
 				/*
-				 * We are overloading satapkt_hba_driver_private
-				 * with watched_cycle count.
-				 *
 				 * If a packet has survived for more than it's
 				 * max life cycles, it is a candidate for time
 				 * out.
 				 */
-				watched_cycles = (int)(intptr_t)
-				    spkt->satapkt_hba_driver_private;
-				watched_cycles++;
-				max_life_cycles = (spkt->satapkt_time +
-				    ahci_watchdog_timeout - 1) /
+				ahci_portp->ahciport_slot_timeout[tmp_slot] -=
 				    ahci_watchdog_timeout;
 
-				spkt->satapkt_hba_driver_private =
-				    (void *)(intptr_t)watched_cycles;
-
-				if (watched_cycles <= max_life_cycles)
+				if (ahci_portp->ahciport_slot_timeout[tmp_slot]
+				    > 0)
 					goto next;
 
 #if AHCI_DEBUG
@@ -9820,8 +9806,8 @@ ahci_watchdog_handler(ahci_ctl_t *ahci_ctlp)
 				    (tmp_slot != current_slot) ||
 				    NCQ_CMD_IN_PROGRESS(ahci_portp) &&
 				    ((0x1 << tmp_slot) & current_tags)) {
-					spkt->satapkt_hba_driver_private =
-					    (void *)(intptr_t)0;
+					ahci_portp->ahciport_slot_timeout \
+					    [tmp_slot] = spkt->satapkt_time;
 				} else {
 					timeout_tags |= (0x1 << tmp_slot);
 					cmn_err(CE_WARN, "!ahci%d: watchdog "
@@ -10192,4 +10178,73 @@ ahci_quiesce(dev_info_t *dip)
 	}
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * The function will add a sata packet to the done queue.
+ *
+ * WARNING!!! ahciport_mutex should be acquired before the function
+ * is called.
+ */
+static void
+ahci_add_doneq(ahci_port_t *ahci_portp, sata_pkt_t *satapkt, int reason)
+{
+	ASSERT(satapkt != NULL);
+
+	/* set the reason for all packets */
+	satapkt->satapkt_reason = reason;
+	satapkt->satapkt_hba_driver_private = NULL;
+
+	if (! (satapkt->satapkt_op_mode & SATA_OPMODE_SYNCH) &&
+	    satapkt->satapkt_comp) {
+		/*
+		 * only add to queue when mode is not synch and there is
+		 * completion callback
+		 */
+		*ahci_portp->ahciport_doneqtail = satapkt;
+		ahci_portp->ahciport_doneqtail =
+		    (sata_pkt_t **)&(satapkt->satapkt_hba_driver_private);
+		ahci_portp->ahciport_doneq_len ++;
+
+	} else if ((satapkt->satapkt_op_mode & SATA_OPMODE_SYNCH) &&
+	    ! (satapkt->satapkt_op_mode & SATA_OPMODE_POLLING))
+		/*
+		 * for sync/non-poll mode, just call cv_broadcast
+		 */
+		cv_broadcast(&ahci_portp->ahciport_cv);
+}
+
+/*
+ * The function will call completion callback of sata packet on the
+ * completed queue
+ *
+ * WARNING!!! ahciport_mutex should be acquired before the function
+ * is called.
+ */
+static void
+ahci_flush_doneq(ahci_port_t *ahci_portp)
+{
+	sata_pkt_t *satapkt, *next;
+
+	if (ahci_portp->ahciport_doneq) {
+		satapkt = ahci_portp->ahciport_doneq;
+
+		ahci_portp->ahciport_doneq = NULL;
+		ahci_portp->ahciport_doneqtail = &ahci_portp->ahciport_doneq;
+		ahci_portp->ahciport_doneq_len = 0;
+
+		mutex_exit(&ahci_portp->ahciport_mutex);
+
+		while (satapkt != NULL) {
+			next = satapkt->satapkt_hba_driver_private;
+			satapkt->satapkt_hba_driver_private = NULL;
+
+			/* Call the callback */
+			(*satapkt->satapkt_comp)(satapkt);
+
+			satapkt = next;
+		}
+
+		mutex_enter(&ahci_portp->ahciport_mutex);
+	}
 }
