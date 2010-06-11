@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -48,7 +47,6 @@
 #include <sys/mman.h>
 #include <sys/pathname.h>
 #include <sys/debug.h>
-#include <sys/vmmeter.h>
 #include <sys/vmsystm.h>
 #include <sys/cmn_err.h>
 #include <sys/acct.h>

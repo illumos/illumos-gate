@@ -73,7 +73,6 @@
 
 #define	SIZES	1
 
-#include <sys/vmmeter.h>
 #include <sys/mutex_impl.h>
 #include <sys/lockstat.h>
 #include <sys/ddi_isa.h>
@@ -325,14 +324,6 @@ regs	REGSIZE
 
 \ XXX - doesn't preserve case up above
 \#define	nPC_OFF		NPC_OFF
-
-flushmeter	FM_SIZE
-	f_ctx		FM_CTX
-	f_usr		FM_USR
-	f_region	FM_REGION
-	f_segment	FM_SEGMENT
-	f_page		FM_PAGE
-	f_partial	FM_PARTIAL
 
 autovec		AUTOVECSIZE
 	av_vector

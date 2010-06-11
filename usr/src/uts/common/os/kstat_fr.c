@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -46,7 +45,6 @@
 #include <sys/vfs.h>
 #include <sys/dnlc.h>
 #include <sys/var.h>
-#include <sys/vmmeter.h>
 #include <sys/debug.h>
 #include <sys/kobj.h>
 #include <sys/avl.h>
@@ -545,15 +543,6 @@ kstat_init(void)
 		ksp->ks_data = (void *) biostats_ptr;
 		kstat_install(ksp);
 	}
-
-#ifdef VAC
-	ksp = kstat_create("unix", 0, "flushmeter", "hat", KSTAT_TYPE_RAW,
-	    sizeof (struct flushmeter), KSTAT_FLAG_VIRTUAL);
-	if (ksp) {
-		ksp->ks_data = (void *) &flush_cnt;
-		kstat_install(ksp);
-	}
-#endif	/* VAC */
 
 	ksp = kstat_create("unix", 0, "var", "misc", KSTAT_TYPE_RAW,
 	    sizeof (struct var), KSTAT_FLAG_VIRTUAL);

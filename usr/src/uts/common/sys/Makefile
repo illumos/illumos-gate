@@ -628,7 +628,6 @@ CHKHDRS=			\
 	vm_usage.h		\
 	vmem.h			\
 	vmem_impl.h		\
-	vmmeter.h		\
 	vmsystm.h		\
 	vnic.h			\
 	vnic_impl.h		\

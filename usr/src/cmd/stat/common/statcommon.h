@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Common routines for acquiring snapshots of kstats for
  * iostat, mpstat, and vmstat.
@@ -40,7 +39,6 @@ extern "C" {
 #include <sys/buf.h>
 #include <sys/dnlc.h>
 #include <sys/sysinfo.h>
-#include <sys/vmmeter.h>
 #include <sys/processor.h>
 #include <sys/pset.h>
 #include <sys/avl.h>
@@ -72,22 +70,20 @@ enum snapshot_types {
 	SNAP_SYSTEM		= 1 << 2,
 	/* interrupt sources and counts */
 	SNAP_INTERRUPTS 	= 1 << 3,
-	/* cache flushes */
-	SNAP_FLUSHES		= 1 << 4,
 	/* disk etc. stats */
-	SNAP_IODEVS		= 1 << 5,
+	SNAP_IODEVS		= 1 << 4,
 	/* disk controller aggregates */
-	SNAP_CONTROLLERS	= 1 << 6,
+	SNAP_CONTROLLERS	= 1 << 5,
 	/* mpxio L I (multipath) paths: -X: Lun,LunInitiator */
-	SNAP_IOPATHS_LI		= 1 << 7,
+	SNAP_IOPATHS_LI		= 1 << 6,
 	/* mpxio LTI (multipath) paths: -Y: Lun,LunTarget,LunTargetInitiator */
-	SNAP_IOPATHS_LTI	= 1 << 8,
+	SNAP_IOPATHS_LTI	= 1 << 7,
 	/* disk error stats */
-	SNAP_IODEV_ERRORS	= 1 << 9,
+	SNAP_IODEV_ERRORS	= 1 << 8,
 	/* pretty names for iodevs */
-	SNAP_IODEV_PRETTY	= 1 << 10,
+	SNAP_IODEV_PRETTY	= 1 << 9,
 	/* devid for iodevs */
-	SNAP_IODEV_DEVID	= 1 << 11
+	SNAP_IODEV_DEVID	= 1 << 10
 };
 
 struct cpu_snapshot {
@@ -225,7 +221,6 @@ struct snapshot {
 	size_t s_iodevs_is_name_maxlen;
 	struct sys_snapshot s_sys;
 	struct biostats s_biostats;
-	struct flushmeter s_flushes;
 };
 
 /* print a message and exit with failure */

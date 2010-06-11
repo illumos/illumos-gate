@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "statcommon.h"
 #include "dsr.h"
@@ -158,7 +155,7 @@ acquire_psets(struct snapshot *ss)
 
 		ps->ps_id = pids[i - 1];
 		ps->ps_cpus =
-			calloc(ss->s_nr_cpus, sizeof (struct cpu_snapshot *));
+		    calloc(ss->s_nr_cpus, sizeof (struct cpu_snapshot *));
 		if (ps->ps_cpus == NULL)
 			goto out;
 	}
@@ -227,7 +224,7 @@ acquire_intrs(struct snapshot *ss, kstat_ctl_t *kc)
 		ki = KSTAT_INTR_PTR(ksp);
 
 		(void) strlcpy(ss->s_intrs[i].is_name, ksp->ks_name,
-			KSTAT_STRLEN);
+		    KSTAT_STRLEN);
 		ss->s_intrs[i].is_total = 0;
 
 		for (j = 0; j < KSTAT_NUM_INTRS; j++)
@@ -320,17 +317,6 @@ retry:
 			(void) poll(NULL, 0, RETRY_DELAY);
 		else
 			fail(1, "kstat_chain_update failed");
-	}
-
-	if (types & SNAP_FLUSHES) {
-		kstat_t *ksp;
-		ksp = kstat_lookup(kc, "unix", 0, "flushmeter");
-		if (ksp == NULL) {
-			fail(0, "This machine does not have "
-				"a virtual address cache");
-		}
-		if (kstat_read(kc, ksp, &ss->s_flushes) == -1)
-			err = errno;
 	}
 
 	if (!err && (types & SNAP_INTERRUPTS))
@@ -488,7 +474,7 @@ kstat_add(const kstat_t *src, kstat_t *dst)
 	for (i = 0; i < src->ks_ndata; i++) {
 		/* "addition" makes little sense for strings */
 		if (from->data_type != KSTAT_DATA_CHAR &&
-			from->data_type != KSTAT_DATA_STRING)
+		    from->data_type != KSTAT_DATA_STRING)
 			(to)->value.ui64 += (from)->value.ui64;
 		from++;
 		to++;

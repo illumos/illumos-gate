@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -50,7 +49,6 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uio.h>
-#include <sys/vmmeter.h>
 #include <sys/vmsystm.h>
 #include <sys/mman.h>
 #include <sys/vfs.h>

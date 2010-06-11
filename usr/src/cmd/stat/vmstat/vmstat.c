@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,7 +36,7 @@ static	int	hz;
 static	int	pagesize;
 static	double	etime;
 static	int	lines = 1;
-static	int	swflag = 0, cflag = 0, pflag = 0;
+static	int	swflag = 0, pflag = 0;
 static	int	suppress_state;
 static	long	iter = 0;
 static	hrtime_t period_n = 0;
@@ -53,7 +52,6 @@ static	void	dovmstats(struct snapshot *old, struct snapshot *new);
 static	void	printhdr(int);
 static	void	dosum(struct sys_snapshot *ss);
 static	void	dointr(struct snapshot *ss);
-static	void	docachestats(kstat_ctl_t *kc, hrtime_t interval, int forever);
 static	void	usage(void);
 
 int
@@ -77,7 +75,7 @@ main(int argc, char **argv)
 	pagesize = sysconf(_SC_PAGESIZE);
 	hz = sysconf(_SC_CLK_TCK);
 
-	while ((c = getopt(argc, argv, "cipqsST:")) != EOF)
+	while ((c = getopt(argc, argv, "ipqsST:")) != EOF)
 		switch (c) {
 		case 'S':
 			swflag = !swflag;
@@ -87,9 +85,6 @@ main(int argc, char **argv)
 			break;
 		case 'i':
 			intr = 1;
-			break;
-		case 'c':
-			cflag++;
 			break;
 		case 'q':
 			suppress_state = 1;
@@ -121,8 +116,6 @@ main(int argc, char **argv)
 
 	if (intr)
 		types |= SNAP_INTERRUPTS;
-	if (cflag)
-		types |= SNAP_FLUSHES;
 	if (!intr)
 		types |= SNAP_IODEVS;
 
@@ -182,12 +175,6 @@ main(int argc, char **argv)
 			forever = 1;
 		if (argc > 2)
 			usage();
-	}
-
-	if (cflag) {
-		free_snapshot(ss);
-		docachestats(kc, period_n, forever);
-		exit(0);
 	}
 
 	(void) sigset(SIGCONT, printhdr);
@@ -512,56 +499,10 @@ dointr(struct snapshot *ss)
 }
 
 static void
-docachestats(kstat_ctl_t *kc, hrtime_t interval, int forever)
-{
-	struct snapshot *old;
-	struct snapshot *new;
-	int i;
-	hrtime_t start;
-
-	start = gethrtime();
-	old = acquire_snapshot(kc, SNAP_FLUSHES, NULL);
-
-	if (iter == 0) {
-		(void) printf("flush statistics: (totals)\n");
-		(void) printf("%8s%8s%8s%8s%8s%8s\n",
-		    "usr", "ctx", "rgn", "seg", "pag", "par");
-		(void) printf(" %7d %7d %7d %7d %7d %7d\n",
-		    old->s_flushes.f_usr, old->s_flushes.f_ctx,
-		    old->s_flushes.f_region, old->s_flushes.f_segment,
-		    old->s_flushes.f_page, old->s_flushes.f_partial);
-		return;
-	}
-
-	(void) printf("flush statistics: (interval based)\n");
-	for (i = 0; i < iter; i++) {
-		if (i % REPRINT == 0)
-			(void) printf("%8s%8s%8s%8s%8s%8s\n",
-			    "usr", "ctx", "rgn", "seg", "pag", "par");
-
-		/* Have a kip */
-		sleep_until(&start, interval, forever, &caught_cont);
-
-		new = acquire_snapshot(kc, SNAP_FLUSHES, NULL);
-
-		(void) printf(" %7d %7d %7d %7d %7d %7d\n",
-		    new->s_flushes.f_usr - old->s_flushes.f_usr,
-		    new->s_flushes.f_ctx - old->s_flushes.f_ctx,
-		    new->s_flushes.f_region - old->s_flushes.f_region,
-		    new->s_flushes.f_segment - old->s_flushes.f_segment,
-		    new->s_flushes.f_page - old->s_flushes.f_page,
-		    new->s_flushes.f_partial- old->s_flushes.f_partial);
-		(void) fflush(stdout);
-		free_snapshot(old);
-		old = new;
-	}
-}
-
-static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: vmstat [-cipqsS] [-T d|u] [disk ...] "
+	    "Usage: vmstat [-ipqsS] [-T d|u] [disk ...] "
 	    "[interval [count]]\n");
 	exit(1);
 }

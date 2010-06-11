@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kstat.xs is a Perl XS (eXStension module) that makes the Solaris
@@ -80,7 +77,6 @@
 #include <sys/sysinfo.h>
 #include <sys/flock.h>
 #include <sys/dnlc.h>
-#include <sys/vmmeter.h>
 #include <nfs/nfs.h>
 #include <nfs/nfs_clnt.h>
 
@@ -323,27 +319,6 @@ save_var(HV *self, kstat_t *kp, int strip_str)
 	SAVE_INT32(self, varp, v_maxpmem);
 	SAVE_INT32(self, varp, v_autoup);
 	SAVE_INT32(self, varp, v_bufhwm);
-}
-
-/*
- * Definition in /usr/include/sys/vmmeter.h
- */
-
-static void
-save_flushmeter(HV *self, kstat_t *kp, int strip_str)
-{
-	struct flushmeter *flushmeterp;
-
-	/* PERL_ASSERT(kp->ks_ndata == 1); */
-	PERL_ASSERT(kp->ks_data_size == sizeof (struct flushmeter));
-	flushmeterp = (struct flushmeter *)(kp->ks_data);
-
-	SAVE_UINT32(self, flushmeterp, f_ctx);
-	SAVE_UINT32(self, flushmeterp, f_segment);
-	SAVE_UINT32(self, flushmeterp, f_page);
-	SAVE_UINT32(self, flushmeterp, f_partial);
-	SAVE_UINT32(self, flushmeterp, f_usr);
-	SAVE_UINT32(self, flushmeterp, f_region);
 }
 
 /*
@@ -760,7 +735,6 @@ build_raw_kstat_lookup()
 
 	SAVE_FNP(raw_kstat_lookup, save_cpu_stat, "cpu_stat:cpu_stat");
 	SAVE_FNP(raw_kstat_lookup, save_var, "unix:var");
-	SAVE_FNP(raw_kstat_lookup, save_flushmeter, "unix:flushmeter");
 	SAVE_FNP(raw_kstat_lookup, save_ncstats, "unix:ncstats");
 	SAVE_FNP(raw_kstat_lookup, save_sysinfo, "unix:sysinfo");
 	SAVE_FNP(raw_kstat_lookup, save_vminfo, "unix:vminfo");

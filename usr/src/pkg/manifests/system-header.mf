@@ -1574,7 +1574,6 @@ file path=usr/include/sys/vm_usage.h
 file path=usr/include/sys/vmem.h
 file path=usr/include/sys/vmem_impl.h
 file path=usr/include/sys/vmem_impl_user.h
-file path=usr/include/sys/vmmeter.h
 file path=usr/include/sys/vmparam.h
 file path=usr/include/sys/vmsystm.h
 file path=usr/include/sys/vnode.h
