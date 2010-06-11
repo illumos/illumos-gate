@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <libxml/parser.h>
@@ -1177,7 +1176,7 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 	int pgcnt = 0;
 	int dcnt = 0;
 	int ecnt = 0;
-	int joined_set = 0;
+	int joined_set = 0, inst;
 	xmlChar *set;
 	char *key;
 
@@ -1323,8 +1322,12 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 				    rd->rd_name) != 0)
 					continue;
 
+				inst = topo_node_instance(ct);
+				if (inst < rd->rd_min || inst > rd->rd_max)
+					continue;
+
 				if (fac_enum_process(mp, target, ct) < 0)
-						return (-1);
+					return (-1);
 
 				if (fac_process(mp, target, rd, ct) < 0)
 					return (-1);
@@ -1890,14 +1893,15 @@ topo_xml_walk(topo_mod_t *mp,
 				    troot)) == NULL) {
 					topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
 					    "topo_xml_walk: failed1\n");
-				}
-				if (pr == NULL) {
-					rr = pr = rdp;
 				} else {
-					pr->rd_next = rdp;
-					pr = rdp;
+					if (pr == NULL) {
+						rr = pr = rdp;
+					} else {
+						pr->rd_next = rdp;
+						pr = rdp;
+					}
+					rr->rd_cnt++;
 				}
-				rr->rd_cnt++;
 			}
 			xmlFree(set);
 		}
