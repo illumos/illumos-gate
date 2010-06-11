@@ -8565,8 +8565,7 @@ done:
 /*
  * Process I_{P}LINK and I_{P}UNLINK requests named by `ioccmd' and pointed to
  * by `mp' and `li' for the IP module stream (if li->q_bot is in fact an IP
- * module stream).  If `doconsist' is set, then do the extended consistency
- * checks requested by ifconfig(1M) and (atomically) set ill_muxid here.
+ * module stream).
  * Returns zero on success, EINPROGRESS if the operation is still pending, or
  * an error code on failure.
  */
@@ -8639,7 +8638,8 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 			 * second, but here we have arp being plumbed first.
 			 */
 			mutex_exit(&ill->ill_lock);
-			ipsq_exit(ipsq);
+			if (entered_ipsq)
+				ipsq_exit(ipsq);
 			ill_refrele(ill);
 			return (EINVAL);
 		}
