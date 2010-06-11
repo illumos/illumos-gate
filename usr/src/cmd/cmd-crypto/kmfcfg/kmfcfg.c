@@ -17,13 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
+ *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <strings.h>
@@ -94,7 +90,11 @@ static verbcmd cmds[] = {
 		"\t\tipsecEndSystem | ipsecTunnel |\n\t"
 		"\t\tipsecUser | timeStamping |\n\t"
 		"\t\tOCSPSigning],[...]\n"
-		"\t\t[ekuoids=OID,OID,OID...]\n" },
+		"\t\t[ekuoids=OID,OID,OID...]\n"
+		"\t\t[mapper-name=name of mapper library]\n"
+		"\t\t[mapper-directory=dir where mapper library resides]\n"
+		"\t\t[mapper-path=full pathname of mapper library]\n"
+		"\t\t[mapper-options=mapper options]\n"},
 	{ "modify",	kc_modify,
 		"modify [dbfile=dbfile] policy=policyname\n"
 		"\t\t[ignore-date=true|false]\n"
@@ -130,6 +130,10 @@ static verbcmd cmds[] = {
 		"\t\tOCSPSigning],[...]\n"
 		"\t\t[ekuoids=OID,OID,OID...]\n"
 		"\t\t[eku-none=true|false]\n\n"
+		"\t\t[mapper-name=name of mapper library]\n"
+		"\t\t[mapper-directory=dir where mapper library resides]\n"
+		"\t\t[mapper-path=full pathname of mapper library]\n"
+		"\t\t[mapper-options=mapper options]\n"
 		"\tmodify plugin keystore=keystorename option=optionstring\n"},
 
 	{ "import",	kc_import, "import [dbfile=dbfile] policy=policyname "

@@ -2,8 +2,7 @@
  * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _KMFTYPES_H
@@ -345,7 +344,11 @@ typedef enum {
 	KMF_ERR_UNEXTRACTABLE_KEY	= 0x52,
 	KMF_ERR_KEY_MISMATCH		= 0x53,
 	KMF_ERR_ATTR_NOT_FOUND		= 0x54,
-	KMF_ERR_KMF_CONF		= 0x55
+	KMF_ERR_KMF_CONF		= 0x55,
+	KMF_ERR_NAME_NOT_MATCHED	= 0x56,
+	KMF_ERR_MAPPER_OPEN		= 0x57,
+	KMF_ERR_MAPPER_NOT_FOUND	= 0x58,
+	KMF_ERR_MAPPING_FAILED		= 0x59
 } KMF_RETURN;
 
 /* Data structures for OCSP support */
@@ -795,7 +798,10 @@ typedef enum {
 	KMF_VALIDATE_RESULT_ATTR,
 	KMF_KEY_DATA_ATTR,
 	KMF_PK11_USER_TYPE_ATTR,
-	KMF_ECC_CURVE_OID_ATTR
+	KMF_ECC_CURVE_OID_ATTR,
+	KMF_MAPPER_NAME_ATTR,
+	KMF_MAPPER_PATH_ATTR,
+	KMF_MAPPER_OPTIONS_ATTR
 } KMF_ATTR_TYPE;
 
 typedef struct {

@@ -17,11 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -29,6 +26,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <errno.h>
+#include <libgen.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 
@@ -387,6 +385,31 @@ parseExtKeyUsage(xmlNodePtr node, KMF_EKU_POLICY *ekus)
 	return (ret);
 }
 
+static KMF_RETURN
+parseMapper(xmlNodePtr node, KMF_MAPPER_RECORD *mapper)
+{
+	xmlNodePtr n;
+
+	n = node;
+	mapper->mapname = (char *)xmlGetProp(n,
+	    (const xmlChar *)KMF_CERT_MAPPER_NAME_ATTR);
+	mapper->dir = (char *)xmlGetProp(n,
+	    (const xmlChar *)KMF_CERT_MAPPER_DIR_ATTR);
+	mapper->pathname = (char *)xmlGetProp(n,
+	    (const xmlChar *)KMF_CERT_MAPPER_PATH_ATTR);
+	mapper->options = (char *)xmlGetProp(n,
+	    (const xmlChar *)KMF_CERT_MAPPER_OPTIONS_ATTR);
+
+	/*
+	 * These are set according to whether mapper setting is taken from the
+	 * database or init function attributes.
+	 */
+	mapper->curpathname = NULL;
+	mapper->curoptions = NULL;
+
+	return (KMF_OK);
+}
+
 int
 parsePolicyElement(xmlNodePtr node, KMF_POLICY_RECORD *policy)
 {
@@ -447,6 +470,11 @@ parsePolicyElement(xmlNodePtr node, KMF_POLICY_RECORD *policy)
 			else if (!xmlStrcmp((const xmlChar *)n->name,
 			    (const xmlChar *)KMF_EKU_ELEMENT)) {
 				ret = parseExtKeyUsage(n, &policy->eku_set);
+				if (ret != KMF_OK)
+					return (ret);
+			} else if (!xmlStrcmp((const xmlChar *)n->name,
+			    (const xmlChar *)KMF_CERT_MAPPER_ELEMENT)) {
+				ret = parseMapper(n, &policy->mapper);
 				if (ret != KMF_OK)
 					return (ret);
 			}
@@ -637,6 +665,57 @@ end:
 }
 
 /*
+ * Add mapper policy info to the policy tree.
+ * Return non-zero on any failure, else 0 for success.
+ */
+static KMF_RETURN
+AddMapperPolicyNodes(xmlNodePtr parent, KMF_MAPPER_RECORD  *mapper)
+{
+	KMF_RETURN ret = KMF_OK;
+	xmlNodePtr mapper_node;
+
+	addFormatting(parent, "\n\t");
+	mapper_node = xmlNewChild(parent, NULL,
+	    (const xmlChar *)KMF_CERT_MAPPER_ELEMENT, NULL);
+	if (mapper_node == NULL)
+		return (KMF_ERR_POLICY_ENGINE);
+
+	if (mapper->mapname != NULL &&
+	    newprop(mapper_node, KMF_CERT_MAPPER_NAME_ATTR, mapper->mapname)) {
+		ret = KMF_ERR_POLICY_ENGINE;
+		goto end;
+	}
+
+	if (mapper->pathname != NULL &&
+	    newprop(mapper_node, KMF_CERT_MAPPER_PATH_ATTR, mapper->pathname)) {
+		ret = KMF_ERR_POLICY_ENGINE;
+		goto end;
+	}
+
+	if (mapper->dir != NULL &&
+	    newprop(mapper_node, KMF_CERT_MAPPER_DIR_ATTR, mapper->dir)) {
+		ret = KMF_ERR_POLICY_ENGINE;
+		goto end;
+	}
+
+	if (mapper->options != NULL &&
+	    newprop(mapper_node, KMF_CERT_MAPPER_OPTIONS_ATTR, mapper->options))
+		ret = KMF_ERR_POLICY_ENGINE;
+
+	if (ret == KMF_OK) {
+		addFormatting(mapper_node, "\n\t");
+		addFormatting(parent, "\n");
+	}
+
+end:
+	if (ret != KMF_OK) {
+		xmlUnlinkNode(mapper_node);
+		xmlFreeNode(mapper_node);
+	}
+	return (ret);
+}
+
+/*
  * Add Key Usage information to the policy tree.
  * Return non-zero on any failure, else 0 for success.
  */
@@ -760,6 +839,10 @@ kmf_free_policy_record(KMF_POLICY_RECORD *policy)
 	FREE_POLICY_STR(policy->validity_adjusttime)
 	FREE_POLICY_STR(policy->ta_name)
 	FREE_POLICY_STR(policy->ta_serial)
+	FREE_POLICY_STR(policy->mapper.mapname)
+	FREE_POLICY_STR(policy->mapper.pathname)
+	FREE_POLICY_STR(policy->mapper.options)
+	FREE_POLICY_STR(policy->mapper.dir)
 
 	kmf_free_eku_policy(&policy->eku_set);
 
@@ -1179,6 +1262,9 @@ addPolicyNode(xmlNodePtr pnode, KMF_POLICY_RECORD *policy)
 		}
 
 		if ((ret = AddExtKeyUsageNodes(pnode, &policy->eku_set))) {
+			goto out;
+		}
+		if ((ret = AddMapperPolicyNodes(pnode, &policy->mapper))) {
 			goto out;
 		}
 	} else {

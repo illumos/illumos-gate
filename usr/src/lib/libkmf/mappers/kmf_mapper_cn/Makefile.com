@@ -18,43 +18,45 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# KMF Prototype Makefile
+# KMF CN mapper. Maps a certificate to its Common Name value.
 #
-include	../Makefile.lib
 
-LIBRARY=	libkmf.a
-VERS=		1
+LIBRARY =	kmf_mapper_cn.a
+VERS =		.1
 
-SUBDIRS	=	ber_der libkmf plugins mappers
+OBJECTS =	mapper_cn.o
 
-HDRS=	kmfapi.h kmftypes.h
-HDRDIR= include
+include	$(SRC)/lib/Makefile.lib
 
-all :=          TARGET= all
-clean :=        TARGET= clean
-clobber :=      TARGET= clobber
-install :=      TARGET= install
-lint :=         TARGET= lint
-install_h :=    TARGET= install_h
+LIBLINKS =	$(DYNLIB:.so.1=.so)
+KMFINC =	-I../../../include
 
-all install: install_h $(SUBDIRS) THIRDPARTYLICENSE
+SRCDIR =	../common
+INCDIR =	../../include
 
-clean clobber lint:	$(SUBDIRS)
+SRCS =		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
-install_h:	$(ROOTHDRDIR) $(ROOTHDRS)
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-I../../../include -I$(INCDIR)
+LINTFLAGS64 +=	-errchk=longptr64
 
-check: $(CHECKHDRS)
+PICS =		$(OBJECTS:%=pics/%)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+LDLIBS +=	-lkmf -lc
+
+ROOTLIBDIR =	$(ROOTFS_LIBDIR)/crypto
+ROOTLIBDIR64 =	$(ROOTFS_LIBDIR)/crypto/$(MACH64)
+
+.KEEP_STATE:
+
+LIBS =		$(DYNLIB)
+
+all:		$(LIBS) $(LINTLIB)
+
+lint:		lintcheck
 
 FRC:
-
-THIRDPARTYLICENSE: cdsa_license.txt
-	$(SED) -n '/Intel Open Source/,$$p' cdsa_license.txt > $@
-
-CLOBBERFILES += THIRDPARTYLICENSE
 
 include $(SRC)/lib/Makefile.targ

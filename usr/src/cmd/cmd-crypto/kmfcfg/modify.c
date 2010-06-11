@@ -18,11 +18,8 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <strings.h>
@@ -61,9 +58,17 @@
 #define	KC_KEYUSAGE_NONE		0x0400000
 #define	KC_EKUS				0x0800000
 #define	KC_EKUS_NONE			0x1000000
+#define	KC_MAPPER_OPTIONS		0x2000000
 
 static int err; /* To store errno which may be overwritten by gettext() */
 
+#define	UPDATE_IF_DIFFERENT(old, new) \
+	if ((old != NULL && new != NULL && strcmp(old, new) != 0) || \
+	    (old == NULL && new != NULL)) { \
+		if (old != NULL) \
+			free(old); \
+		old = new; \
+	}
 
 int
 kc_modify_policy(int argc, char *argv[])
@@ -74,6 +79,9 @@ kc_modify_policy(int argc, char *argv[])
 	extern int	optind_av;
 	extern char	*optarg_av;
 	char		*filename = NULL;
+	char		*mapper_name = NULL;
+	char		*mapper_dir = NULL;
+	char		*mapper_pathname = NULL;
 	uint32_t	flags = 0;
 	boolean_t	ocsp_none_opt = B_FALSE;
 	boolean_t	crl_none_opt = B_FALSE;
@@ -114,6 +122,10 @@ kc_modify_policy(int argc, char *argv[])
 	    "Y:(keyusage-none)"
 	    "E:(ekunames)"
 	    "O:(ekuoids)"
+	    "m:(mapper-name)"
+	    "M:(mapper-directory)"
+	    "Q:(mapper-pathname)"
+	    "q:(mapper-options)"
 	    "Z:(eku-none)")) != EOF) {
 		switch (opt) {
 			case 'i':
@@ -485,6 +497,35 @@ kc_modify_policy(int argc, char *argv[])
 					flags |= KC_EKUS_NONE;
 				}
 				break;
+			case 'm':
+				mapper_name = get_string(optarg_av, &rv);
+				if (mapper_name == NULL) {
+					(void) fprintf(stderr,
+					    gettext("Error mapper-name "
+					    "input.\n"));
+				}
+				break;
+			case 'M':
+				mapper_dir = get_string(optarg_av, &rv);
+				if (mapper_dir == NULL) {
+					(void) fprintf(stderr,
+					    gettext("Error mapper-directory "
+					    "input.\n"));
+				}
+				break;
+			case 'Q':
+				mapper_pathname = get_string(optarg_av, &rv);
+				if (mapper_pathname == NULL) {
+					(void) fprintf(stderr,
+					    gettext("Error mapper-pathname "
+					    "input.\n"));
+				}
+				break;
+			case 'q':
+				plc.mapper.options = get_string(optarg_av, &rv);
+				rv = 0; /* its ok for this to be NULL */
+				flags |= KC_MAPPER_OPTIONS;
+				break;
 			default:
 				(void) fprintf(stderr,
 				    gettext("Error input option.\n"));
@@ -575,6 +616,55 @@ kc_modify_policy(int argc, char *argv[])
 		if (oplc.ta_serial)
 			free(oplc.ta_serial);
 		oplc.ta_serial = plc.ta_serial;
+	}
+
+	/*
+	 * There are some combinations of attributes that are not valid.
+	 *
+	 * First, setting mapper-name (with optional mapper-directory) and
+	 * mapper-pathname is mutually exclusive.
+	 */
+	if ((mapper_name != NULL && mapper_pathname != NULL) ||
+	    (mapper_name != NULL && oplc.mapper.pathname != NULL) ||
+	    (mapper_pathname != NULL && oplc.mapper.mapname != NULL) ||
+	    /* Mapper directory can be set only if mapper name is set. */
+	    (mapper_dir != NULL && mapper_pathname != NULL) ||
+	    (mapper_dir != NULL && mapper_name == NULL &&
+	    oplc.mapper.mapname == NULL) ||
+	    (mapper_dir != NULL && oplc.mapper.pathname != NULL) ||
+	    /* Options can be set only if mapper name or pathname is set. */
+	    ((plc.mapper.options != NULL || oplc.mapper.options != NULL) &&
+	    (mapper_name == NULL && oplc.mapper.mapname == NULL &&
+	    mapper_pathname == NULL && oplc.mapper.pathname == NULL))) {
+		(void) fprintf(stderr,
+		    gettext("Error in mapper input options\n"));
+		if (mapper_name != NULL)
+			free(mapper_name);
+		if (mapper_pathname != NULL)
+			free(mapper_pathname);
+		if (mapper_dir != NULL)
+			free(mapper_dir);
+		if (flags & KC_MAPPER_OPTIONS && plc.mapper.options != NULL)
+			free(plc.mapper.options);
+		rv = KC_ERR_USAGE;
+		goto out;
+	} else {
+		if (mapper_name != NULL)
+			plc.mapper.mapname = mapper_name;
+		if (mapper_pathname != NULL)
+			plc.mapper.pathname = mapper_pathname;
+		if (mapper_dir != NULL)
+			plc.mapper.dir = mapper_dir;
+	}
+
+	UPDATE_IF_DIFFERENT(oplc.mapper.mapname, plc.mapper.mapname);
+	UPDATE_IF_DIFFERENT(oplc.mapper.pathname, plc.mapper.pathname);
+	UPDATE_IF_DIFFERENT(oplc.mapper.dir, plc.mapper.dir);
+
+	if (flags & KC_MAPPER_OPTIONS) {
+		if (oplc.mapper.options != NULL)
+			free(oplc.mapper.options);
+		oplc.mapper.options = plc.mapper.options;
 	}
 
 	/* Update the OCSP policy */
@@ -848,7 +938,6 @@ out:
 
 	return (rv);
 }
-
 
 static int
 kc_modify_plugin(int argc, char *argv[])

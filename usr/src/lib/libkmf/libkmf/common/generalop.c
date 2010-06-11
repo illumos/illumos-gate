@@ -18,9 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -136,7 +134,11 @@ static kmf_error_map kmf_errcodes[] = {
 	{KMF_ERR_UNEXTRACTABLE_KEY,	"KMF_ERR_UNEXTRACTABLE_KEY"},
 	{KMF_ERR_KEY_MISMATCH,		"KMF_ERR_KEY_MISMATCH"},
 	{KMF_ERR_ATTR_NOT_FOUND,	"KMF_ERR_ATTR_NOT_FOUND"},
-	{KMF_ERR_KMF_CONF,		"KMF_ERR_KMF_CONF"}
+	{KMF_ERR_KMF_CONF,		"KMF_ERR_KMF_CONF"},
+	{KMF_ERR_NAME_NOT_MATCHED,	"KMF_ERR_NAME_NOT_MATCHED"},
+	{KMF_ERR_MAPPER_OPEN,		"KMF_ERR_MAPPER_OPEN"},
+	{KMF_ERR_MAPPER_NOT_FOUND,	"KMF_ERR_MAPPER_NOT_FOUND"},
+	{KMF_ERR_MAPPING_FAILED,	"KMF_ERR_MAPPING_FAILED"}
 };
 
 typedef struct {
@@ -490,6 +492,26 @@ kmf_initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 	    policyname == NULL ? KMF_DEFAULT_POLICY_NAME : policyname);
 	if (ret != KMF_OK)
 		goto errout;
+
+	/*
+	 * Let's have the mapper status structure even if no cert-to-name
+	 * mapping is initialized. It's better not to coredump in the
+	 * kmf_get_mapper_lasterror function, for example, when there is no
+	 * mapping initialized.
+	 */
+	handle->mapstate = malloc(sizeof (KMF_MAPPER_STATE));
+	if (handle->mapstate == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto errout;
+	}
+	handle->mapstate->lastmappererr = KMF_OK;
+	handle->mapstate->options = NULL;
+
+	/*
+	 * Initialize the mapping scheme according to the policy. If no mapping
+	 * is set in the policy database we silently ignore the error.
+	 */
+	(void) kmf_cert_to_name_mapping_initialize(handle, 0, NULL);
 
 	CLEAR_ERROR(handle, ret);
 errout:

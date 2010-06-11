@@ -18,11 +18,8 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <strings.h>
@@ -161,6 +158,14 @@ show_policy(KMF_POLICY_RECORD *plc)
 		    plc->validation_info.crl_info.ignore_crl_date ?
 		    gettext("true") : gettext("false"));
 	}
+	(void) printf(gettext("Mapper name: %s\n"),
+	    plc->mapper.mapname ? plc->mapper.mapname : "<null>");
+	(void) printf(gettext("Mapper pathname: %s\n"),
+	    plc->mapper.pathname ? plc->mapper.pathname : "<null>");
+	(void) printf(gettext("Mapper directory: %s\n"),
+	    plc->mapper.dir ? plc->mapper.dir : "<null>");
+	(void) printf(gettext("Mapper options: %s\n"),
+	    plc->mapper.options ? plc->mapper.options : "<null>");
 
 	(void) printf("\n");
 }

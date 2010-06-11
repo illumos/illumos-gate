@@ -17,11 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Constant definitions and function prototypes for the KMF library.
  * Commonly used data types are defined in "kmftypes.h".
@@ -339,6 +336,25 @@ KMF_RETURN kmf_get_string_attr(KMF_ATTR_TYPE, KMF_ATTRIBUTE *, int, char **);
 KMF_RETURN kmf_set_attr(KMF_ATTRIBUTE *, int, KMF_ATTR_TYPE, void *, uint32_t);
 void kmf_set_attr_at_index(KMF_ATTRIBUTE *, int, KMF_ATTR_TYPE,
 	void *, uint32_t);
+
+/*
+ * Certificate to name mapping functions.
+ */
+KMF_RETURN kmf_cert_to_name_mapping_initialize(KMF_HANDLE_T, int,
+	KMF_ATTRIBUTE *);
+KMF_RETURN kmf_cert_to_name_mapping_finalize(KMF_HANDLE_T);
+KMF_RETURN kmf_map_cert_to_name(KMF_HANDLE_T, KMF_DATA *, KMF_DATA *);
+KMF_RETURN kmf_match_cert_to_name(KMF_HANDLE_T, KMF_DATA *, KMF_DATA *,
+	KMF_DATA *);
+KMF_RETURN kmf_get_mapper_error_str(KMF_HANDLE_T, char **);
+/*
+ * Helper functions for handling the mapper internal state. They are part of the
+ * public interface, too.
+ */
+void kmf_set_mapper_lasterror(KMF_HANDLE_T, uint32_t);
+uint32_t kmf_get_mapper_lasterror(KMF_HANDLE_T);
+void kmf_set_mapper_options(KMF_HANDLE_T, void *);
+void *kmf_get_mapper_options(KMF_HANDLE_T);
 
 #ifdef __cplusplus
 }

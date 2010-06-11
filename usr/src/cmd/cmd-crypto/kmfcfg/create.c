@@ -18,11 +18,8 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <strings.h>
@@ -71,6 +68,10 @@ kc_create(int argc, char *argv[])
 	    "X:(crl-proxy)"
 	    "S:(crl-ignore-crl-sign)"
 	    "D:(crl-ignore-crl-date)"
+	    "m:(mapper-name)"
+	    "M:(mapper-directory)"
+	    "Q:(mapper-pathname)"
+	    "q:(mapper-options)"
 	    "u:(keyusage)"
 	    "E:(ekunames)"
 	    "O:(ekuoids)")) != EOF) {
@@ -374,6 +375,39 @@ kc_create(int argc, char *argv[])
 					rv = KC_ERR_USAGE;
 				}
 				break;
+			case 'm':
+				plc.mapper.mapname = get_string(optarg_av, &rv);
+				if (plc.mapper.mapname == NULL) {
+					(void) fprintf(stderr,
+					    gettext("Error mapper-name "
+					    "input.\n"));
+				}
+				break;
+			case 'M':
+				plc.mapper.dir = get_string(optarg_av, &rv);
+				if (plc.mapper.dir == NULL) {
+					(void) fprintf(stderr,
+					    gettext("Error mapper-dir "
+					    "input.\n"));
+				}
+				break;
+			case 'Q':
+				plc.mapper.pathname = get_string(optarg_av,
+				    &rv);
+				if (plc.mapper.pathname == NULL) {
+					(void) fprintf(stderr,
+					    gettext("Error mapper-pathname "
+					    "input.\n"));
+				}
+				break;
+			case 'q':
+				plc.mapper.options = get_string(optarg_av, &rv);
+				if (plc.mapper.options == NULL) {
+					(void) fprintf(stderr,
+					    gettext("Error mapper-options "
+					    "input.\n"));
+				}
+				break;
 			default:
 				(void) fprintf(stderr,
 				    gettext("Error input option.\n"));
@@ -460,6 +494,23 @@ kc_create(int argc, char *argv[])
 	if (plc.VAL_OCSP_RESP_CERT.name != NULL &&
 	    plc.VAL_OCSP_RESP_CERT.serial != NULL) {
 		plc.VAL_OCSP.has_resp_cert = B_TRUE;
+	}
+
+	/*
+	 * Setting mapper-name (with optional mapper-dir) and mapper-pathname is
+	 * mutually exclusive. Also, you cannot set options only, you need the
+	 * name or pathname, and you can set the directory only with the name,
+	 * not the pathname.
+	 */
+	if ((plc.mapper.mapname != NULL && plc.mapper.pathname != NULL) ||
+	    (plc.mapper.dir != NULL && plc.mapper.pathname != NULL) ||
+	    (plc.mapper.dir != NULL && plc.mapper.mapname == NULL) ||
+	    (plc.mapper.options != NULL && plc.mapper.mapname == NULL &&
+	    plc.mapper.pathname == NULL)) {
+		(void) fprintf(stderr,
+		    gettext("Error in mapper input options\n"));
+		rv = KC_ERR_USAGE;
+		goto out;
 	}
 
 	/*

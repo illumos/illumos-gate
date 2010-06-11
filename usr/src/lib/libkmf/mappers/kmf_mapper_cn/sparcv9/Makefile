@@ -18,43 +18,10 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# KMF Prototype Makefile
-#
-include	../Makefile.lib
 
-LIBRARY=	libkmf.a
-VERS=		1
+include ../Makefile.com
+include ../../../../Makefile.lib.64
 
-SUBDIRS	=	ber_der libkmf plugins mappers
-
-HDRS=	kmfapi.h kmftypes.h
-HDRDIR= include
-
-all :=          TARGET= all
-clean :=        TARGET= clean
-clobber :=      TARGET= clobber
-install :=      TARGET= install
-lint :=         TARGET= lint
-install_h :=    TARGET= install_h
-
-all install: install_h $(SUBDIRS) THIRDPARTYLICENSE
-
-clean clobber lint:	$(SUBDIRS)
-
-install_h:	$(ROOTHDRDIR) $(ROOTHDRS)
-
-check: $(CHECKHDRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-THIRDPARTYLICENSE: cdsa_license.txt
-	$(SED) -n '/Intel Open Source/,$$p' cdsa_license.txt > $@
-
-CLOBBERFILES += THIRDPARTYLICENSE
-
-include $(SRC)/lib/Makefile.targ
+install: $(ROOTLIBS64)

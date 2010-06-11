@@ -17,10 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _KMFAPIP_H
 #define	_KMFAPIP_H
@@ -182,6 +180,7 @@ typedef struct _kmf_handle {
 	KMF_ERROR		lasterr;
 	KMF_POLICY_RECORD	*policy;
 	KMF_PLUGIN_LIST		*plugins;
+	KMF_MAPPER_STATE	*mapstate;
 } KMF_HANDLE;
 
 #define	CLEAR_ERROR(h, rv) { \
@@ -348,8 +347,9 @@ extern conf_entry_t *dup_entry(conf_entry_t *);
 extern boolean_t is_valid_keystore_type(KMF_KEYSTORE_TYPE);
 extern KMF_BOOL is_eku_present(KMF_X509EXT_EKU *, KMF_OID *);
 extern KMF_RETURN parse_eku_data(const KMF_DATA *, KMF_X509EXT_EKU *);
-extern KMF_RETURN
-copy_extension_data(KMF_X509_EXTENSION *, KMF_X509_EXTENSION *);
+extern KMF_RETURN copy_extension_data(KMF_X509_EXTENSION *,
+	KMF_X509_EXTENSION *);
+extern char *get_mapper_pathname(char *, char *);
 
 #ifdef __cplusplus
 }

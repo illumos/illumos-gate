@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # MAPFILE HEADER START
@@ -237,6 +236,8 @@ SUNW_1.1 {
 	kmf_add_csr_eku;
 	kmf_add_policy_to_db;
 	kmf_build_pk12;
+	kmf_cert_to_name_mapping_initialize;
+	kmf_cert_to_name_mapping_finalize;
 	kmf_check_cert_date;
 	kmf_check_crl_date;
 	kmf_compare_rdns;
@@ -314,6 +315,9 @@ SUNW_1.1 {
 	kmf_get_encoded_ocsp_response;
 	kmf_get_file_format;
 	kmf_get_kmf_error_str;
+	kmf_get_mapper_error_str;
+	kmf_get_mapper_lasterror;
+	kmf_get_mapper_options;
 	kmf_get_ocsp_for_cert;
 	kmf_get_ocsp_status_for_cert;
 	kmf_get_pk11_handle;
@@ -332,6 +336,8 @@ SUNW_1.1 {
 	kmf_is_crl_file;
 	kmf_ku_to_string;
 	kmf_list_crl;
+	kmf_map_cert_to_name;
+	kmf_match_cert_to_name;
 	kmf_oid_to_ekuname;
 	kmf_oid_to_string;
 	kmf_pem_to_der;
@@ -359,6 +365,8 @@ SUNW_1.1 {
 	kmf_set_csr_subject;
 	kmf_set_csr_subject_altname;
 	kmf_set_csr_version;
+	kmf_set_mapper_lasterror;
+	kmf_set_mapper_options;
 	kmf_set_policy;
 	kmf_set_token_pin;
 	kmf_sign_cert;
@@ -381,20 +389,21 @@ SUNW_1.1 {
 
 SUNWprivate_1.1 {
     global:
-	GetIDFromSPKI;
-	IsEqualOid;
 	copy_extension_data;
 	dup_entry;
 	free_entry;
 	free_entrylist;
 	get_entrylist;
-	kmf_select_token;
+	get_mapper_pathname;
+	get_pk11_data;
+	GetIDFromSPKI;
+	IsEqualOid;
 	kmf_create_pk11_session;
+	kmf_select_token;
 	parsePolicyElement;
-	PKCS_VerifyData;
 	PKCS_DigestData;
 	PKCS_EncryptData;
-	get_pk11_data;
+	PKCS_VerifyData;
 	x509_algid_to_algoid;
 	x509_algoid_to_algid;
     local:

@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY= libkmf.a
@@ -34,6 +33,7 @@ OBJECTS= \
 	generalop.o \
 	keyop.o \
 	kmfoids.o \
+	mapping.o \
 	pem_encode.o \
 	pk11tokens.o \
 	policy.o \

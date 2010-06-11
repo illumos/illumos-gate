@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _KMFPOLICY_H
 #define	_KMFPOLICY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <kmfapi.h>
+#include <kmfmapper.h>
 #include <libxml/tree.h>
 #include <libxml/parser.h>
 
@@ -72,15 +70,14 @@ typedef struct {
 	KMF_OID		*ekulist;
 }KMF_EKU_POLICY;
 
-
 #define	KMF_REVOCATION_METHOD_CRL		0x1
 #define	KMF_REVOCATION_METHOD_OCSP		0x2
-
 
 typedef struct {
 	char			*name;
 	KMF_VALIDATION_POLICY	validation_info;
 	KMF_EKU_POLICY		eku_set;
+	KMF_MAPPER_RECORD	mapper; /* kmfmapper.h */
 	uint32_t		ku_bits;
 	boolean_t		ignore_date;
 	boolean_t		ignore_unknown_ekus;
@@ -172,6 +169,12 @@ typedef struct {
 #define	KMF_EKU_NAME_ATTR	"name"
 #define	KMF_EKU_OID_ELEMENT	"eku-oid"
 #define	KMF_EKU_OID_ATTR	"oid"
+
+#define	KMF_CERT_MAPPER_ELEMENT		"cert-to-name-mapping"
+#define	KMF_CERT_MAPPER_NAME_ATTR	"mapper-name"
+#define	KMF_CERT_MAPPER_DIR_ATTR	"mapper-directory"
+#define	KMF_CERT_MAPPER_PATH_ATTR	"mapper-pathname"
+#define	KMF_CERT_MAPPER_OPTIONS_ATTR	"mapper-options"
 
 #define	TMPFILE_TEMPLATE	"policyXXXXXX"
 

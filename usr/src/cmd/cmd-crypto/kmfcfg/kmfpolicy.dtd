@@ -1,8 +1,7 @@
 <?xml version='1.0' encoding='UTF-8' ?>
 
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -22,8 +21,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <!--Element Definitions-->
@@ -31,7 +28,7 @@
 <!ELEMENT kmf-policy-db (kmf-policy*)>
 <!ATTLIST kmf-policy-db allow-local-files (TRUE|FALSE) #IMPLIED>
 
-<!ELEMENT kmf-policy (validation-methods, key-usage-set?,  ext-key-usage?)>
+<!ELEMENT kmf-policy (validation-methods, key-usage-set?,  ext-key-usage?, cert-to-name-mapping?)>
 <!ATTLIST kmf-policy name CDATA #REQUIRED>
 <!ATTLIST kmf-policy ignore-date (TRUE|FALSE) #IMPLIED>
 <!ATTLIST kmf-policy ignore-unknown-eku (TRUE|FALSE) #IMPLIED>
@@ -82,3 +79,9 @@
 		timeStamping | OCSPSigning) #IMPLIED >
 <!ELEMENT eku-oid EMPTY>
 <!ATTLIST eku-oid oid CDATA #IMPLIED>
+
+<!ELEMENT cert-to-name-mapping ANY>
+<!ATTLIST cert-to-name-mapping mapper-name CDATA #IMPLIED>
+<!ATTLIST cert-to-name-mapping mapper-directory CDATA #IMPLIED>
+<!ATTLIST cert-to-name-mapping mapper-pathname CDATA #IMPLIED>
+<!ATTLIST cert-to-name-mapping mapper-options CDATA #IMPLIED>
