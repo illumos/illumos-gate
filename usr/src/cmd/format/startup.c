@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -147,7 +146,7 @@ static char	**search_path = NULL;
 
 static int name_represents_wholedisk(char *name);
 
-
+static void get_disk_name(int fd, char *disk_name);
 
 /*
  * This routine digests the options on the command line.  It returns
@@ -291,13 +290,10 @@ void
 sup_init()
 {
 	int		nopened_files = 0;
-
-#if defined(sparc)
 	char		fname[MAXPATHLEN];
 	char		*path;
 	char		*p;
 	struct stat	stbuf;
-#endif /* defined(sparc) */
 
 
 	/*
@@ -327,7 +323,6 @@ sup_init()
 		}
 	}
 
-#if defined(sparc)
 	/*
 	 * Now look for an environment variable FORMAT_PATH.
 	 * If found, we use it as a colon-separated list
@@ -376,7 +371,6 @@ sup_init()
 			}
 		}
 	}
-#endif	/* defined(sparc) */
 
 	/*
 	 * Check for duplicate disk or partitions definitions
@@ -1544,6 +1538,31 @@ search_for_logical_dev(char *devname)
 	add_device_to_disklist(devname, path);
 }
 
+/*
+ * Get the disk name from the inquiry data
+ */
+static void
+get_disk_name(int fd, char *disk_name)
+{
+	struct scsi_inquiry	inquiry;
+	char	*p;
+
+	if (uscsi_inquiry(fd, (char *)&inquiry, sizeof (inquiry))) {
+		err_print("Failed to inquiry this logical disk");
+		return;
+	}
+
+	p = disk_name;
+	(void) memset(p, 0, MAXNAMELEN);
+
+	(void) strncpy(p, inquiry.inq_vid, sizeof (inquiry.inq_vid));
+	p += sizeof (inquiry.inq_vid) - 1;
+	*p++ = '-';
+	p = strncpy(p, inquiry.inq_pid, sizeof (inquiry.inq_pid));
+	p += sizeof (inquiry.inq_pid) - 1;
+	*p++ = '-';
+	p = strncpy(p, inquiry.inq_revision, sizeof (inquiry.inq_revision));
+}
 
 /*
  * Add a device to the disk list, if it appears to be a disk,
@@ -1571,6 +1590,7 @@ add_device_to_disklist(char *devname, char *devpath)
 	int			status;
 	int			i;
 	int			access_flags = 0;
+	char			disk_name[MAXNAMELEN];
 
 	/*
 	 * Attempt to open the disk.  If it fails, skip it.
@@ -1620,8 +1640,7 @@ add_device_to_disklist(char *devname, char *devpath)
 	mlp = controlp;
 
 	while (mlp != NULL) {
-		if (mlp->ctlr_type->ctype_ctype == dkinfo.dki_ctype &&
-		    strcmp(mlp->ctlr_type->ctype_name, dkinfo.dki_cname) == 0) {
+		if (mlp->ctlr_type->ctype_ctype == dkinfo.dki_ctype) {
 			break;
 		}
 		mlp = mlp->next;
@@ -1909,23 +1928,23 @@ add_device_to_disklist(char *devname, char *devpath)
 			break;
 		}
 	}
-	/*
-	 * Close the file for this disk.
-	 */
-	(void) close(search_file);
+
 	/*
 	 * If we didn't successfully read the label, or the label
 	 * appears corrupt, just leave the disk as an unknown type.
 	 */
 	if (status == -1) {
+		(void) close(search_file);
 		return;
 	}
 
 	if (search_disk->label_type == L_TYPE_SOLARIS) {
 		if (!checklabel(&search_label)) {
+			(void) close(search_file);
 			return;
 		}
 		if (trim_id(search_label.dkl_asciilabel)) {
+			(void) close(search_file);
 			return;
 		}
 	}
@@ -1981,6 +2000,7 @@ add_device_to_disklist(char *devname, char *devpath)
 				break;
 			}
 		}
+		(void) close(search_file);
 		return;
 	}
 
@@ -2017,10 +2037,19 @@ add_device_to_disklist(char *devname, char *devpath)
 		 * Fill in the drive info from the disk label.
 		 */
 		search_dtype->dtype_next = NULL;
-		search_dtype->dtype_asciilabel = (char *)
-		    zalloc(strlen(search_label.dkl_asciilabel) + 1);
-		(void) strcpy(search_dtype->dtype_asciilabel,
-		    search_label.dkl_asciilabel);
+		if (strncmp(search_label.dkl_asciilabel, "DEFAULT",
+		    strlen("DEFAULT")) == 0) {
+			(void) get_disk_name(search_file, disk_name);
+			search_dtype->dtype_asciilabel = (char *)
+			    zalloc(strlen(disk_name) + 1);
+			(void) strcpy(search_dtype->dtype_asciilabel,
+			    disk_name);
+		} else {
+			search_dtype->dtype_asciilabel = (char *)
+			    zalloc(strlen(search_label.dkl_asciilabel) + 1);
+			(void) strcpy(search_dtype->dtype_asciilabel,
+			    search_label.dkl_asciilabel);
+		}
 		search_dtype->dtype_pcyl = search_label.dkl_pcyl;
 		search_dtype->dtype_ncyl = search_label.dkl_ncyl;
 		search_dtype->dtype_acyl = search_label.dkl_acyl;
@@ -2048,6 +2077,12 @@ add_device_to_disklist(char *devname, char *devpath)
 	 * to the disk type.
 	 */
 	search_disk->disk_type = search_dtype;
+
+	/*
+	 * Close the file for this disk
+	 */
+	(void) close(search_file);
+
 	/*
 	 * Attempt to match the partition map in the label with
 	 * a known partition map for this disk type.
