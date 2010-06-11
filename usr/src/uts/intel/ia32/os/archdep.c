@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -604,8 +603,6 @@ getuserpc()
 static greg_t
 fix_segreg(greg_t sr, int iscs, model_t datamodel)
 {
-	kthread_t *t = curthread;
-
 	switch (sr &= 0xffff) {
 
 	case 0:
@@ -639,19 +636,6 @@ fix_segreg(greg_t sr, int iscs, model_t datamodel)
 		return (sr);
 	default:
 		break;
-	}
-
-	/*
-	 * Allow this process's brand to do any necessary segment register
-	 * manipulation.
-	 */
-	if (PROC_IS_BRANDED(t->t_procp) && BRMOP(t->t_procp)->b_fixsegreg) {
-		greg_t bsr = BRMOP(t->t_procp)->b_fixsegreg(sr, datamodel);
-
-		if (bsr == 0 && iscs == IS_CS)
-			return (0 | SEL_UPL);
-		else
-			return (bsr);
 	}
 
 	/*

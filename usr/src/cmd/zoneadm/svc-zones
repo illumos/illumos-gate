@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 
 . /lib/svc/share/smf_include.sh
 
@@ -29,12 +28,10 @@
 # Return a list of running, non-global zones for which a shutdown via
 # "/sbin/init 0" may work (typically only Solaris zones.)
 #
-# At present, this means any running "lx" zones don't qualify.
-#
 shutdown_zones()
 {
 	zoneadm list -p | nawk -F: '{
-		if (($5 != "lx") && ($2 != "global")) {
+		if ($2 != "global") {
 			print $2
 		}
 	}'

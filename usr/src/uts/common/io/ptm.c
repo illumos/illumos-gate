@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -448,18 +447,6 @@ ptmclose(queue_t *rqp, int flag, cred_t *credp)
 	return (0);
 }
 
-static boolean_t
-ptmptsopencb(ptmptsopencb_arg_t arg)
-{
-	struct pt_ttys	*ptmp = (struct pt_ttys *)arg;
-	boolean_t rval;
-
-	PT_ENTER_READ(ptmp);
-	rval = (ptmp->pt_nullmsg != NULL);
-	PT_EXIT_READ(ptmp);
-	return (rval);
-}
-
 /*
  * The wput procedure will only handle ioctl and flush messages.
  */
@@ -585,41 +572,6 @@ ptmwput(queue_t *qp, mblk_t *mp)
 			ptmp->pt_rgid = ptop->pto_rgid;
 			mutex_exit(&ptmp->pt_lock);
 			miocack(qp, mp, 0, 0);
-			break;
-		}
-		case PTMPTSOPENCB:
-		{
-			mblk_t		*dp;	/* ioctl reply data */
-			ptmptsopencb_t	*ppocb;
-
-			/* only allow the kernel to invoke this ioctl */
-			if (iocp->ioc_cr != kcred) {
-				miocnak(qp, mp, 0, EINVAL);
-				break;
-			}
-
-			/* we don't support transparent ioctls */
-			ASSERT(iocp->ioc_count != TRANSPARENT);
-			if (iocp->ioc_count == TRANSPARENT) {
-				miocnak(qp, mp, 0, EINVAL);
-				break;
-			}
-
-			/* allocate a response message */
-			dp = allocb(sizeof (ptmptsopencb_t), BPRI_MED);
-			if (dp == NULL) {
-				miocnak(qp, mp, 0, EAGAIN);
-				break;
-			}
-
-			/* initialize the ioctl results */
-			ppocb = (ptmptsopencb_t *)dp->b_rptr;
-			ppocb->ppocb_func = ptmptsopencb;
-			ppocb->ppocb_arg = (ptmptsopencb_arg_t)ptmp;
-
-			/* send the reply data */
-			mioc2ack(mp, dp, sizeof (ptmptsopencb_t), 0);
-			qreply(qp, mp);
 			break;
 		}
 		}

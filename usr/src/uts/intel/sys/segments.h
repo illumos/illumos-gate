@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SEGMENTS_H
@@ -681,8 +680,6 @@ extern void _start(), cmnint();
 extern void achktrap(), mcetrap();
 extern void xmtrap();
 extern void fasttrap();
-extern void sys_int80();
-extern void brand_sys_int80();
 extern void dtrace_ret();
 
 #if !defined(__amd64)

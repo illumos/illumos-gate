@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_MACHBRAND_H
 #define	_SYS_MACHBRAND_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -38,20 +35,17 @@ extern "C" {
 
 struct brand_mach_ops {
 	void	(*b_sysenter)(void);
-	void	(*b_int80)(void);
 	void	(*b_int91)(void);
 	void	(*b_syscall)(void);
 	void	(*b_syscall32)(void);
-	greg_t	(*b_fixsegreg)(greg_t, model_t);
 };
 
 #endif	/* _ASM */
 
 #define	BRAND_CB_SYSENTER	0
-#define	BRAND_CB_INT80		1
-#define	BRAND_CB_INT91		2
-#define	BRAND_CB_SYSCALL	3
-#define	BRAND_CB_SYSCALL32	4
+#define	BRAND_CB_INT91		1
+#define	BRAND_CB_SYSCALL	2
+#define	BRAND_CB_SYSCALL32	3
 
 #ifdef	__cplusplus
 }

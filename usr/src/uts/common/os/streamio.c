@@ -3183,7 +3183,6 @@ job_control_type(int cmd)
 	case JAGENT:	/* Obsolete */
 	case JTRUN:	/* Obsolete */
 	case JXTPROTO:	/* Obsolete */
-	case TIOCSETLD:
 		return (JCSETP);
 	}
 

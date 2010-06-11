@@ -480,7 +480,6 @@ i386_SUBDIRS= \
 	cmd/biosdev \
 	cmd/rtc \
 	cmd/ucodeadm \
-	lib/brand/lx \
 	lib/cfgadm_plugins/sata \
 	lib/cfgadm_plugins/sbd \
 	lib/libfdisk

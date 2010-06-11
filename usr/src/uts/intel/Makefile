@@ -76,7 +76,7 @@ install_h.prereq	:=	TARGET= install_h
 .PARALLEL:	$(PARALLEL_KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) \
 		$(CLOSED_XMODS) config $(LINT_DEPS)
 
-def all install clean clobber modlist: genassym $(KMODS) $(CLOSED_KMODS) \
+def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) \
 	$(SVVS) $(XMODS) $(CLOSED_XMODS) config
 
 
@@ -116,7 +116,7 @@ $(PRIVS_C): $(PRIVS_AWK) $(PRIVS_DEF)
 # intel/dtrace depends on i86pc/genassym, so we need to build both
 # i86pc/genassym and intel/genassym.
 #
-all.prereq install.prereq def.prereq: genassym genunix FRC
+all.prereq install.prereq def.prereq: genunix FRC
 	@cd ../i86pc/genassym; pwd; $(MAKE) $(@:%.prereq=%)
 
 #
@@ -135,7 +135,7 @@ genunix: $(PRIVS_C)
 modlintlib clean.lint: $(LINT_KMODS) $(CLOSED_LINT_KMODS) $(SVVS) \
 	$(XMODS) $(CLOSED_XMODS)
 
-genassym $(KMODS) $(SUBDIRS) config:	FRC
+$(KMODS) $(SUBDIRS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(CLOSED_KMODS):	FRC

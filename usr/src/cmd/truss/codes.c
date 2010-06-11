@@ -382,9 +382,6 @@ const struct ioc {
 	{ (uint_t)TIOCSILOOP,	"TIOCSILOOP",	NULL },
 	{ (uint_t)TIOCCILOOP,	"TIOCSILOOP",	NULL },
 
-	{ (uint_t)TIOCSETLD,	"TIOCSETLD",	NULL },
-	{ (uint_t)TIOCGETLD,	"TIOCGETLD",	NULL },
-
 	{ (uint_t)TIOCGPPS,	"TIOCGPPS",	NULL },
 	{ (uint_t)TIOCSPPS,	"TIOCSPPS",	NULL },
 	{ (uint_t)TIOCGPPSEV,	"TIOCGPPSEV",	NULL },

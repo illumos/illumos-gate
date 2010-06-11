@@ -23,8 +23,7 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_TERMIOS_H
@@ -377,24 +376,6 @@ extern pid_t tcgetsid();
 #define	TCSADRAIN	(_TIOC|15) /* same as TCSETSW */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 #define	TCSETSF		(_TIOC|16)
-
-/*
- * linux terminal ioctls we need to be aware of
- */
-#define	TIOCSETLD	(_TIOC|123)	/* set line discipline parms */
-#define	TIOCGETLD	(_TIOC|124)	/* get line discipline parms */
-
-/*
- * The VMIN and VTIME and solaris overlap with VEOF and VEOL - This is
- * perfectly legal except, linux expects them to be separate. So we keep
- * them separately.
- */
-struct lx_cc {
-	unsigned char veof;	/* veof value */
-	unsigned char veol;	/* veol value */
-	unsigned char vmin;	/* vmin value */
-	unsigned char vtime;	/* vtime value */
-};
 
 /*
  * NTP PPS ioctls
