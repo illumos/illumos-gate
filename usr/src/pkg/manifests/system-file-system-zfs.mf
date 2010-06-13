@@ -35,27 +35,19 @@ set name=info.classification \
 #
 set name=org.opensolaris.nodepend value=true
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/fs group=sys
 dir path=etc/fs/zfs group=sys
 dir path=etc/sysevent group=sys
 dir path=etc/sysevent/config group=sys
 dir path=etc/zfs group=sys
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/fs group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/fs/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/kmdb group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/kmdb/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/fs group=sys
+dir path=kernel/fs/$(ARCH64) group=sys
+dir path=kernel/kmdb group=sys
+dir path=kernel/kmdb/$(ARCH64) group=sys
 dir path=lib
 dir path=lib/$(ARCH64)
 dir path=sbin group=sys
@@ -82,16 +74,11 @@ dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
 driver name=zfs perms="* 0600 root sys" perms="zfs 0666 root sys"
-file path=kernel/drv/$(ARCH64)/zfs group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/drv/zfs group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=kernel/drv/zfs.conf group=sys opensolaris.zone=global \
-    reboot-needed=false variant.opensolaris.zone=global
-file path=kernel/kmdb/$(ARCH64)/zfs group=sys mode=0555 opensolaris.zone=global \
-    reboot-needed=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/kmdb/zfs group=sys mode=0555 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+file path=kernel/drv/$(ARCH64)/zfs group=sys
+$(i386_ONLY)file path=kernel/drv/zfs group=sys
+file path=kernel/drv/zfs.conf group=sys
+file path=kernel/kmdb/$(ARCH64)/zfs group=sys mode=0555
+$(i386_ONLY)file path=kernel/kmdb/zfs group=sys mode=0555
 file path=lib/$(ARCH64)/libzfs.so.1
 file path=lib/$(ARCH64)/llib-lzfs.ln
 file path=lib/libzfs.so.1
@@ -135,10 +122,8 @@ file path=usr/lib/zfs/pyzfs.pyc mode=0555
 $(i386_ONLY)file path=usr/sbin/$(ARCH32)/zdb mode=0555
 file path=usr/sbin/$(ARCH64)/zdb mode=0555
 file path=usr/sbin/zstreamdump mode=0555
-hardlink path=kernel/fs/$(ARCH64)/zfs opensolaris.zone=global \
-    target=../../../kernel/drv/$(ARCH64)/zfs variant.opensolaris.zone=global
-$(i386_ONLY)hardlink path=kernel/fs/zfs opensolaris.zone=global \
-    target=../../kernel/drv/zfs variant.opensolaris.zone=global
+hardlink path=kernel/fs/$(ARCH64)/zfs target=../../../kernel/drv/$(ARCH64)/zfs
+$(i386_ONLY)hardlink path=kernel/fs/zfs target=../../kernel/drv/zfs
 hardlink path=usr/lib/fs/zfs/fstyp target=../../../sbin/fstyp
 hardlink path=usr/sbin/zdb target=../../usr/lib/isaexec
 legacy pkg=SUNWzfskr arch=$(ARCH) category=system \
@@ -159,7 +144,8 @@ link path=etc/fs/zfs/mount target=../../../sbin/zfs
 link path=etc/fs/zfs/umount target=../../../sbin/zfs
 link path=lib/$(ARCH64)/libzfs.so target=libzfs.so.1
 link path=lib/libzfs.so target=libzfs.so.1
-link path=usr/lib/$(ARCH64)/libzfs.so target=../../../lib/$(ARCH64)/libzfs.so.1
+link path=usr/lib/$(ARCH64)/libzfs.so \
+    target=../../../lib/$(ARCH64)/libzfs.so.1
 link path=usr/lib/$(ARCH64)/libzfs.so.1 \
     target=../../../lib/$(ARCH64)/libzfs.so.1
 link path=usr/lib/$(ARCH64)/libzfs_jni.so target=libzfs_jni.so.1

@@ -20,22 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/sdpib@$(PKGVERS)
 set name=pkg.description value="Sun InfiniBand Sockets Direct Protocol"
 set name=pkg.summary value="Sun InfiniBand Sockets Direct Protocol"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -44,7 +43,7 @@ dir path=kernel/strmod/$(ARCH64) group=sys
 driver name=sdpib perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/sdpib group=sys
 $(i386_ONLY)file path=kernel/drv/sdpib group=sys
-file path=kernel/drv/sdpib.conf group=sys reboot-needed=false
+file path=kernel/drv/sdpib.conf group=sys
 hardlink path=kernel/strmod/$(ARCH64)/sdpib \
     target=../../../kernel/drv/$(ARCH64)/sdpib
 $(i386_ONLY)hardlink path=kernel/strmod/sdpib target=../../kernel/drv/sdpib

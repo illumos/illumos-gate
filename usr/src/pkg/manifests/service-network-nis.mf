@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/nis@$(PKGVERS)
@@ -30,24 +29,27 @@ set name=pkg.summary value="NIS Server for Solaris"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/default group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/nis group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/netsvc group=sys
 dir path=usr/lib/netsvc/yp
 dir path=usr/sbin
 dir path=var group=sys
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/manifest/network/nis group=sys
 dir path=var/yp
 dir path=var/yp/binding
 file path=etc/default/yppasswdd group=sys \
     original_name=SUNWyp:etc/default/yppasswdd preserve=renamenew
+file path=lib/svc/manifest/network/nis/passwd.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nis/server.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nis/update.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nis/xfr.xml group=sys mode=0444
 file path=usr/lib/netsvc/yp/inityp2l mode=0555
 file path=usr/lib/netsvc/yp/mkalias mode=0555
 file path=usr/lib/netsvc/yp/multi mode=0555
@@ -66,10 +68,6 @@ file path=usr/lib/netsvc/yp/ypxfr_2perday mode=0555
 file path=usr/lib/netsvc/yp/ypxfrd mode=0555
 file path=usr/sbin/mknetid mode=0555
 file path=usr/sbin/revnetgroup mode=0555
-file path=lib/svc/manifest/network/nis/passwd.xml group=sys mode=0444
-file path=lib/svc/manifest/network/nis/server.xml group=sys mode=0444
-file path=lib/svc/manifest/network/nis/update.xml group=sys mode=0444
-file path=lib/svc/manifest/network/nis/xfr.xml group=sys mode=0444
 file path=var/yp/Makefile mode=0555 original_name=SUNWyp:var/yp/Makefile \
     preserve=renamenew
 file path=var/yp/updaters mode=0500

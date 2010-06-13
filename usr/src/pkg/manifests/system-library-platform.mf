@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/library/platform@$(PKGVERS)
@@ -30,7 +29,6 @@ set name=pkg.description \
 set name=pkg.summary value="Core Architecture, (Kvm)"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/platform group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,A70 group=sys
@@ -161,10 +159,12 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise/lib/$(ARCH64)
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/$(ARCH64)
+$(sparc_ONLY)dir \
+    path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/$(ARCH64)
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/$(ARCH64)
+$(sparc_ONLY)dir \
+    path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/$(ARCH64)
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/$(ARCH64)
@@ -203,7 +203,8 @@ $(sparc_ONLY)file \
 $(sparc_ONLY)file path=usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm/scsi.so.1
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,SPARC-Enterprise/lib/libprtdiag_psr.so.1
-$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-15000/lib/libprtdiag_psr.so.1
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-15000/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-280R/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-480R/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-880/lib/libprtdiag_psr.so.1
@@ -285,7 +286,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/lib/fs \
     target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Netra-CP2300/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/sbin/prtdiag \
     target=../../sun4u/sbin/prtdiag
@@ -298,7 +300,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3010/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3010/lib/fs \
     target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3010/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Netra-CP3010/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3010/sbin/prtdiag \
     target=../../sun4u/sbin/prtdiag
@@ -313,7 +316,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3060/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3060/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3060/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Netra-CP3060/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4v/lib/libsoftcrypto_psr.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3060/sbin/prtdiag \
     target=../../sun4v/sbin/prtdiag
@@ -328,7 +332,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3260/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3260/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3260/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Netra-CP3260/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4v/lib/libsoftcrypto_psr.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3260/sbin/prtdiag \
     target=../../sun4v/sbin/prtdiag
@@ -366,7 +371,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5220/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5220/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5220/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Netra-T5220/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4v/lib/libsoftcrypto_psr.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5220/lib/libtsalarm.so \
     target=../../sun4v/lib/libtsalarm.so
@@ -384,7 +390,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5440/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5440/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5440/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Netra-T5440/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4v/lib/libsoftcrypto_psr.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5440/lib/libtsalarm.so \
     target=../../sun4v/lib/libtsalarm.so
@@ -402,7 +409,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fs \
     target=../../sun4v/lib/fs
 $(sparc_ONLY)link path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
-$(sparc_ONLY)link path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libpcp.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libsoftcrypto_psr.so.1 \
@@ -429,9 +437,11 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/lib/fs \
     target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Serverblade1/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/sbin target=../sun4u/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/sbin \
+    target=../sun4u/sbin
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Blade-100/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libsoftcrypto_psr.so.1
@@ -442,7 +452,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-100/lib/fs \
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Blade-100/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-100/sbin target=../sun4u/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-100/sbin \
+    target=../sun4u/sbin
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Blade-1000/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libsoftcrypto_psr.so.1
@@ -488,7 +499,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-T6300/lib/libprtdiag_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-T6300/lib/libprtdiag_psr.so.1 \
     target=../../SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Blade-T6300/lib/libsoftcrypto_psr.so.1 \
@@ -532,7 +544,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-280R/lib/fs \
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-280R/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-280R/sbin target=../sun4u/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-280R/sbin \
+    target=../sun4u/sbin
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-480R/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libsoftcrypto_psr.so.1
@@ -543,7 +556,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-480R/lib/fs \
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-480R/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-480R/sbin target=../sun4u/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-480R/sbin \
+    target=../sun4u/sbin
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-880/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libsoftcrypto_psr.so.1
@@ -551,9 +565,11 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-880/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-880/lib/fs \
     target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-880/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Fire-880/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-880/sbin target=../sun4u/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-880/sbin \
+    target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-T1000 \
     target=SUNW,Sun-Fire-T200
 $(sparc_ONLY)link \
@@ -568,8 +584,10 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1 \
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-T200/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4v/lib/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-T200/sbin target=../sun4v/sbin
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V210 target=SUNW,Sun-Fire-V240
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-T200/sbin \
+    target=../sun4v/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V210 \
+    target=SUNW,Sun-Fire-V240
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-V215/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libsoftcrypto_psr.so.1
@@ -608,7 +626,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V240/sbin/prtdiag \
     target=../../sun4u/sbin/prtdiag
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V240/sbin/trapstat \
     target=../../sun4u/sbin/trapstat
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V245 target=SUNW,Sun-Fire-V215
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V245 \
+    target=SUNW,Sun-Fire-V215
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-V250/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libsoftcrypto_psr.so.1
@@ -683,7 +702,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V490/lib/libprtdiag_psr.so.1 \
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-V490/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V490/sbin target=../sun4u/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V490/sbin \
+    target=../sun4u/sbin
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-V890/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libsoftcrypto_psr.so.1
@@ -696,7 +716,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V890/lib/libprtdiag_psr.so.1 \
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire-V890/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4u/lib/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V890/sbin target=../sun4u/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V890/sbin \
+    target=../sun4u/sbin
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Fire/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libsoftcrypto_psr.so.1
@@ -710,7 +731,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire/sbin target=../sun4u/sbin
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,T5140/lib/$(ARCH64)/libsoftcrypto_psr.so.1 \
     target=../../../sun4v/lib/$(ARCH64)/libsoftcrypto_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/fs target=../../sun4v/lib/fs
+$(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/fs \
+    target=../../sun4v/lib/fs
 $(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/libpcp.so.1 \
@@ -729,7 +751,8 @@ $(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/lib/libsoftcrypto_psr.so.1 \
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,USBRDT-5240/lib/libsoftcrypto_psr.so.1 \
     target=../../sun4v/lib/libsoftcrypto_psr.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/sbin target=../sun4v/sbin
 $(sparc_ONLY)link \

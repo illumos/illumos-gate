@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/fru-id@$(PKGVERS)
@@ -30,7 +29,6 @@ set name=pkg.summary value="FRU ID Utility and Library"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
@@ -57,7 +55,8 @@ legacy pkg=SUNWfruid arch=$(ARCH) category=system \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libfru.so target=./libfru.so.1
-$(sparc_ONLY)link path=usr/lib/$(ARCH64)/libfrupicl.so target=./libfrupicl.so.1
+$(sparc_ONLY)link path=usr/lib/$(ARCH64)/libfrupicl.so \
+    target=./libfrupicl.so.1
 link path=usr/lib/$(ARCH64)/libfruraw.so target=./libfruraw.so.1
 link path=usr/lib/$(ARCH64)/libfrureg.so target=./libfrureg.so.1
 link path=usr/lib/$(ARCH64)/libfruutils.so target=./libfruutils.so.1

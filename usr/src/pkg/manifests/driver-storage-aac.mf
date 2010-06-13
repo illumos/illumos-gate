@@ -20,22 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/aac@$(PKGVERS)
-set name=pkg.description value="Adaptec AdvanceRaid Controller SCSI HBA Driver"
+set name=pkg.description \
+    value="Adaptec AdvanceRaid Controller SCSI HBA Driver"
 set name=pkg.summary value="Adaptec AdvanceRaid Controller SCSI HBA Driver"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -49,7 +48,7 @@ driver name=aac class=scsi \
 file path=kernel/drv/$(ARCH64)/aac group=sys
 $(i386_ONLY)file path=kernel/drv/aac group=sys
 file path=kernel/drv/aac.conf group=sys \
-    original_name=SUNWaac:kernel/drv/aac.conf preserve=true reboot-needed=false
+    original_name=SUNWaac:kernel/drv/aac.conf preserve=true
 legacy pkg=SUNWaac arch=$(ARCH) category=system \
     desc="Adaptec AdvanceRaid Controller SCSI HBA Driver" \
     hotline="Please contact your local service provider" \

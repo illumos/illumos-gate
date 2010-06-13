@@ -20,22 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/sf@$(PKGVERS)
 set name=pkg.description value="Sun Enterprise Network Array sf Device Driver"
 set name=pkg.summary value="Sun Enterprise Network Array sf Device Driver"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=platform group=sys
 dir path=platform/sun4u group=sys
 dir path=platform/sun4u/kernel group=sys
@@ -43,7 +42,7 @@ dir path=platform/sun4u/kernel/drv group=sys
 dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
 driver name=sf
 file path=platform/sun4u/kernel/drv/$(ARCH64)/sf group=sys
-file path=platform/sun4u/kernel/drv/sf.conf group=sys reboot-needed=false
+file path=platform/sun4u/kernel/drv/sf.conf group=sys
 legacy pkg=SUNWluxd.u arch=$(ARCH).sun4u category=system \
     desc="Sun Enterprise Network Array sf Device Driver" \
     hotline="Please contact your local service provider" \

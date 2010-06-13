@@ -20,36 +20,32 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/service/storage/fibre-channel/fc-fabric@$(PKGVERS)
+set name=pkg.fmri \
+    value=pkg:/service/storage/fibre-channel/fc-fabric@$(PKGVERS)
 set name=pkg.description value="Provides the fp plug-in library of libcfgadm."
 set name=pkg.summary value="fp cfgadm plug-in library"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system/device group=sys \
+    variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/cfgadm
 dir path=usr/lib/cfgadm/$(ARCH64)
-dir path=lib/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system/device group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=lib/svc/method/fc-fabric mode=0555 opensolaris.zone=global \
-    variant.opensolaris.zone=global
+file path=lib/svc/manifest/system/device/devices-fc-fabric.xml group=sys \
+    mode=0444 variant.opensolaris.zone=global
+file path=lib/svc/method/fc-fabric mode=0555 variant.opensolaris.zone=global
 file path=usr/lib/cfgadm/$(ARCH64)/fp.so.1
 file path=usr/lib/cfgadm/fp.so.1
-file path=lib/svc/manifest/system/device/devices-fc-fabric.xml group=sys \
-    mode=0444 opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWcfpl arch=$(ARCH) category=system \
     desc="Provides the fp plug-in library of libcfgadm." \
     hotline="Please contact your local service provider" \

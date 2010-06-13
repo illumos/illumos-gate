@@ -20,14 +20,12 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Renamed in 133.
 set name=pkg.fmri value=pkg:/SUNWpd@0.5.11,5.11-0.133
 set name=pkg.renamed value=true
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 $(sparc_ONLY)depend fmri=pkg:/driver/sparc/platform type=require
 $(i386_ONLY)depend fmri=pkg:/driver/storage/glm type=require

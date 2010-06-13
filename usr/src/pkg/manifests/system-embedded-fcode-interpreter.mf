@@ -20,73 +20,55 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/embedded-fcode-interpreter@$(PKGVERS)
 set name=pkg.description value="Embedded FCode Interpreter Drivers"
 set name=pkg.summary value="Embedded FCode Interpreter Drivers"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/flash group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/flash/postdeployment group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/misc group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/misc/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=platform group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=platform/sun4u group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=platform/sun4u/kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=platform/sun4u/kernel/misc group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=platform/sun4u/kernel/misc/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=etc group=sys
+dir path=etc/flash group=sys
+dir path=etc/flash/postdeployment group=sys
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/$(ARCH64) group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/platform group=sys
+dir path=lib/svc/manifest/platform/sun4u group=sys
+dir path=lib/svc/manifest/platform/sun4v group=sys
+dir path=platform group=sys
+dir path=platform/sun4u group=sys
+dir path=platform/sun4u/kernel group=sys
+dir path=platform/sun4u/kernel/misc group=sys
+dir path=platform/sun4u/kernel/misc/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/efcode
 dir path=usr/lib/efcode/$(ARCH64)
-dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/platform group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/platform/sun4v group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
 driver name=fcode
-file path=etc/flash/postdeployment/efcode.cleanup group=sys mode=0744 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=kernel/drv/$(ARCH64)/fcode group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=kernel/drv/fcode.conf group=sys opensolaris.zone=global \
-    reboot-needed=false variant.opensolaris.zone=global
-file path=kernel/misc/$(ARCH64)/fcodem group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-file path=kernel/misc/$(ARCH64)/fcpci group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-file path=kernel/misc/$(ARCH64)/pcicfg group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-file path=platform/sun4u/kernel/misc/$(ARCH64)/gptwo_cpu group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-file path=platform/sun4u/kernel/misc/$(ARCH64)/gptwocfg group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+file path=etc/flash/postdeployment/efcode.cleanup group=sys mode=0744
+file path=kernel/drv/$(ARCH64)/fcode group=sys
+file path=kernel/drv/fcode.conf group=sys
+file path=kernel/misc/$(ARCH64)/fcodem group=sys mode=0755
+file path=kernel/misc/$(ARCH64)/fcpci group=sys mode=0755
+file path=kernel/misc/$(ARCH64)/pcicfg group=sys mode=0755
+file path=lib/svc/manifest/platform/sun4u/efdaemon.xml group=sys mode=0444
+file path=lib/svc/manifest/platform/sun4v/efdaemon.xml group=sys mode=0444
+file path=platform/sun4u/kernel/misc/$(ARCH64)/gptwo_cpu group=sys mode=0755
+file path=platform/sun4u/kernel/misc/$(ARCH64)/gptwocfg group=sys mode=0755
 file path=usr/lib/efcode/$(ARCH64)/efdaemon mode=0555
 file path=usr/lib/efcode/$(ARCH64)/fcdriver.so
 file path=usr/lib/efcode/$(ARCH64)/fcode.so
@@ -98,10 +80,6 @@ file path=usr/lib/efcode/$(ARCH64)/lfc_jupiter.so
 file path=usr/lib/efcode/$(ARCH64)/lfc_upa.so
 file path=usr/lib/efcode/$(ARCH64)/lfc_upa_pci.so
 file path=usr/lib/efcode/efcode.sh mode=0555
-file path=lib/svc/manifest/platform/sun4u/efdaemon.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=lib/svc/manifest/platform/sun4v/efdaemon.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWefc.u arch=$(ARCH).sun4u category=system \
     desc="Embedded FCode Interpreter Drivers" \
     hotline="Please contact your local service provider" \
@@ -112,7 +90,8 @@ legacy pkg=SUNWefck arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Embedded FCode Interpreter Drivers" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-legacy pkg=SUNWefcl arch=$(ARCH) category=system desc="Embedded FCode Libraries" \
+legacy pkg=SUNWefcl arch=$(ARCH) category=system \
+    desc="Embedded FCode Libraries" \
     hotline="Please contact your local service provider" \
     name="Embedded FCode Libraries" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
@@ -130,7 +109,8 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/efcode/$(ARCH64)/lfc_gptwo_gptwo.so target=lfc_gptwo.so
 link path=usr/lib/efcode/$(ARCH64)/lfc_gptwo_pci.so target=lfc_upa_pci.so
-link path=usr/lib/efcode/$(ARCH64)/lfc_jupiter_jupiter.so target=lfc_jupiter.so
+link path=usr/lib/efcode/$(ARCH64)/lfc_jupiter_jupiter.so \
+    target=lfc_jupiter.so
 link path=usr/lib/efcode/$(ARCH64)/lfc_jupiter_pciex.so target=lfc_upa_pci.so
 link path=usr/lib/efcode/$(ARCH64)/lfc_pci_pci.so target=lfc_upa_pci.so
 link path=usr/lib/efcode/$(ARCH64)/lfc_pci_pciex.so target=lfc_upa_pci.so

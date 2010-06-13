@@ -26,4 +26,3 @@
 set name=pkg.fmri value=pkg:/SUNWpdu@0.5.11,5.11-0.142
 set name=pkg.obsolete value=true
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal

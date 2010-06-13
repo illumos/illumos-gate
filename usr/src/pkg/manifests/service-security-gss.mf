@@ -27,9 +27,9 @@ set name=pkg.fmri value=pkg:/service/security/gss@$(PKGVERS)
 set name=pkg.description \
     value="Generic Security Service Application Program Interface, Version 2 - config"
 set name=pkg.summary value="GSSAPI CONFIG V2"
-set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/gss group=sys
 dir path=lib
@@ -41,7 +41,8 @@ file path=etc/gss/gsscred.conf group=sys \
     original_name=SUNWgssc:etc/gss/gsscred.conf preserve=true
 file path=etc/gss/mech group=sys original_name=SUNWgssc:etc/gss/mech \
     preserve=true
-file path=etc/gss/qop group=sys original_name=SUNWgssc:etc/gss/qop preserve=true
+file path=etc/gss/qop group=sys original_name=SUNWgssc:etc/gss/qop \
+    preserve=true
 file path=lib/svc/manifest/network/rpc/gss.xml group=sys mode=0444
 legacy pkg=SUNWgssc arch=$(ARCH) category=system \
     desc="Generic Security Service Application Program Interface, Version 2 - config" \
@@ -52,7 +53,7 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 #
 # These dependencies can be removed once there is a mechanism in place
-# to configure gss plugins, rather than delivering a fully populated 
+# to configure gss plugins, rather than delivering a fully populated
 # etc/gss/mech file.
 #
 depend fmri=service/security/kerberos-5 type=require

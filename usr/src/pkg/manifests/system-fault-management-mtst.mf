@@ -20,18 +20,17 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/fault-management/mtst@$(PKGVERS)
-set name=pkg.description value="CPU/memory error injector for internal testing"
+set name=pkg.description \
+    value="CPU/memory error injector for internal testing"
 set name=pkg.summary value="CPU/memory error injector"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=org.opensolaris.redist value=internal
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 $(i386_ONLY)dir path=kernel group=sys
 $(i386_ONLY)dir path=kernel/drv group=sys
 $(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
@@ -61,13 +60,11 @@ $(sparc_ONLY)dir path=usr/platform/sun4v/include/sys
 driver name=memtest perms="* 0660 root sys"
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/memtest group=sys
 $(i386_ONLY)file path=kernel/drv/memtest group=sys
-$(i386_ONLY)file path=kernel/drv/memtest.conf group=sys reboot-needed=false
+$(i386_ONLY)file path=kernel/drv/memtest.conf group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/memtest group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/memtest.conf group=sys \
-    reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/memtest.conf group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/memtest group=sys
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/memtest.conf group=sys \
-    reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/memtest.conf group=sys
 file path=usr/bin/mtst mode=0555
 $(i386_ONLY)file path=usr/include/sys/memtest.h group=sys
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mtst/mtst_AuthenticAMD.so

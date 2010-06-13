@@ -20,16 +20,15 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/audio/audio810@$(PKGVERS)
 set name=pkg.description \
     value="SunOS audio device driver for W1100z & W2100z workstations"
@@ -37,7 +36,6 @@ set name=pkg.summary value="SUNW W1100z & W2100z Audio Drivers"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Media
 set name=info.keyword value=audioi810
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -67,8 +65,7 @@ driver name=audio810 \
 file path=kernel/drv/$(ARCH64)/audio810 group=sys
 file path=kernel/drv/audio810 group=sys
 file path=kernel/drv/audio810.conf group=sys \
-    original_name=SUNWad810:kernel/drv/audio810.conf preserve=true \
-    reboot-needed=false
+    original_name=SUNWad810:kernel/drv/audio810.conf preserve=true
 legacy pkg=SUNWad810 arch=$(ARCH) category=system \
     desc="SunOS audio device driver for W1100z & W2100z workstations" \
     hotline="Please contact your local service provider" \

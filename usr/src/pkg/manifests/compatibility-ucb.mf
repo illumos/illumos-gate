@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/compatibility/ucb@$(PKGVERS)
@@ -30,7 +29,6 @@ set name=pkg.description \
 set name=pkg.summary value="Source Compatibility"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/mail group=mail
 dir path=export group=sys
@@ -44,7 +42,8 @@ $(i386_ONLY)dir path=usr/ucb/$(ARCH32)
 dir path=usr/ucb/$(ARCH64)
 dir path=usr/ucblib
 dir path=usr/ucblib/$(ARCH64)
-file path=etc/mail/Mail.rc original_name=SUNWscp:etc/mail/Mail.rc preserve=true
+file path=etc/mail/Mail.rc original_name=SUNWscp:etc/mail/Mail.rc \
+    preserve=true
 file path=usr/ucb/basename mode=0755
 file path=usr/ucb/biff mode=0755
 file path=usr/ucb/chown mode=0755
@@ -104,7 +103,8 @@ license ucbcmd/basename/THIRDPARTYLICENSE \
     license=ucbcmd/basename/THIRDPARTYLICENSE
 license ucbcmd/echo/THIRDPARTYLICENSE license=ucbcmd/echo/THIRDPARTYLICENSE
 license ucbcmd/from/THIRDPARTYLICENSE license=ucbcmd/from/THIRDPARTYLICENSE
-license ucbcmd/groups/THIRDPARTYLICENSE license=ucbcmd/groups/THIRDPARTYLICENSE
+license ucbcmd/groups/THIRDPARTYLICENSE \
+    license=ucbcmd/groups/THIRDPARTYLICENSE
 license ucbcmd/ln/THIRDPARTYLICENSE license=ucbcmd/ln/THIRDPARTYLICENSE
 license ucbcmd/ls/THIRDPARTYLICENSE license=ucbcmd/ls/THIRDPARTYLICENSE
 license ucbcmd/sum/THIRDPARTYLICENSE license=ucbcmd/sum/THIRDPARTYLICENSE
@@ -113,12 +113,14 @@ license ucbcmd/tset/THIRDPARTYLICENSE license=ucbcmd/tset/THIRDPARTYLICENSE
 license ucbcmd/users/THIRDPARTYLICENSE license=ucbcmd/users/THIRDPARTYLICENSE
 license ucbcmd/whereis/THIRDPARTYLICENSE \
     license=ucbcmd/whereis/THIRDPARTYLICENSE
-license ucbcmd/whoami/THIRDPARTYLICENSE license=ucbcmd/whoami/THIRDPARTYLICENSE
+license ucbcmd/whoami/THIRDPARTYLICENSE \
+    license=ucbcmd/whoami/THIRDPARTYLICENSE
 license ucblib/libcurses/THIRDPARTYLICENSE \
     license=ucblib/libcurses/THIRDPARTYLICENSE
 license ucblib/libtermcap/THIRDPARTYLICENSE \
     license=ucblib/libtermcap/THIRDPARTYLICENSE
-license ucblib/libucb/THIRDPARTYLICENSE license=ucblib/libucb/THIRDPARTYLICENSE
+license ucblib/libucb/THIRDPARTYLICENSE \
+    license=ucblib/libucb/THIRDPARTYLICENSE
 link path=etc/chroot target=../usr/sbin/chroot
 link path=etc/fuser target=../usr/sbin/fuser
 link path=etc/link target=../usr/sbin/link

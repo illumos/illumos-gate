@@ -29,7 +29,6 @@ set name=pkg.summary value="SCSI/SES plugins"
 set name=info.classification \
     value="org.opensolaris.category.2008:Applications/Plug-ins and Run-times"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/scsi
@@ -52,11 +51,11 @@ legacy pkg=SUNWscsip arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)/SUN-Storage-J4200.so \
-    target=SUN-Storage-J4400.so
-link path=usr/lib/scsi/plugins/ses/vendor/SUN-Storage-J4200.so \
-    target=SUN-Storage-J4400.so
 link path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)/LSILOGIC-SASX28-A.1.so \
     target=LSILOGIC-SASX28-A.0.so
+link path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)/SUN-Storage-J4200.so \
+    target=SUN-Storage-J4400.so
 link path=usr/lib/scsi/plugins/ses/vendor/LSILOGIC-SASX28-A.1.so \
     target=LSILOGIC-SASX28-A.0.so
+link path=usr/lib/scsi/plugins/ses/vendor/SUN-Storage-J4200.so \
+    target=SUN-Storage-J4400.so

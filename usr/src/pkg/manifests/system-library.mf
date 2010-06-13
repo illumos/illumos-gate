@@ -29,7 +29,6 @@ set name=pkg.description \
 set name=pkg.summary value="Core Solaris, (Shared Libs)"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 $(i386_ONLY)dir path=etc group=sys
 $(i386_ONLY)dir path=etc/flash group=sys
 $(i386_ONLY)dir path=etc/flash/postcreation group=sys mode=0700
@@ -74,10 +73,10 @@ dir path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)
 dir path=usr/lib/scsi/plugins/ses/vendor
 $(sparc_ONLY)dir path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)
 dir path=usr/lib/scsi/plugins/smp
-dir path=usr/lib/scsi/plugins/smp/framework
-dir path=usr/lib/scsi/plugins/smp/framework/$(ARCH64)
 dir path=usr/lib/scsi/plugins/smp/engine
 dir path=usr/lib/scsi/plugins/smp/engine/$(ARCH64)
+dir path=usr/lib/scsi/plugins/smp/framework
+dir path=usr/lib/scsi/plugins/smp/framework/$(ARCH64)
 dir path=usr/lib/security
 dir path=usr/lib/security/$(ARCH64)
 dir path=usr/xpg4
@@ -150,14 +149,14 @@ file path=lib/$(ARCH64)/nss_files.so.1
 file path=lib/$(ARCH64)/nss_nis.so.1
 file path=lib/$(ARCH64)/nss_user.so.1
 file path=lib/c_synonyms.so.1
+file path=lib/crypto/$(ARCH64)/kmf_mapper_cn.so.1
 file path=lib/crypto/$(ARCH64)/kmf_nss.so.1
 file path=lib/crypto/$(ARCH64)/kmf_openssl.so.1
 file path=lib/crypto/$(ARCH64)/kmf_pkcs11.so.1
+file path=lib/crypto/kmf_mapper_cn.so.1
 file path=lib/crypto/kmf_nss.so.1
 file path=lib/crypto/kmf_openssl.so.1
 file path=lib/crypto/kmf_pkcs11.so.1
-file path=lib/crypto/$(ARCH64)/kmf_mapper_cn.so.1
-file path=lib/crypto/kmf_mapper_cn.so.1
 file path=lib/ld.so.1
 file path=lib/libadm.so.1
 file path=lib/libaio.so.1
@@ -371,9 +370,9 @@ file path=usr/lib/libzoneinfo.so.1
 file path=usr/lib/nss_ad.so.1
 file path=usr/lib/nss_ldap.so.1
 file path=usr/lib/passwdutil.so.1
-file path=usr/lib/python2.4/vendor-packages/solaris/misc.so
 file path=usr/lib/python2.4/vendor-packages/solaris/__init__.py
 file path=usr/lib/python2.4/vendor-packages/solaris/__init__.pyc
+file path=usr/lib/python2.4/vendor-packages/solaris/misc.so
 file path=usr/lib/raidcfg/$(ARCH64)/mpt.so.1
 file path=usr/lib/raidcfg/mpt.so.1
 file path=usr/lib/scsi/$(ARCH64)/libscsi.so.1
@@ -384,12 +383,12 @@ file path=usr/lib/scsi/libses.so.1
 file path=usr/lib/scsi/libsmp.so.1
 file path=usr/lib/scsi/plugins/scsi/engines/$(ARCH64)/uscsi.so
 file path=usr/lib/scsi/plugins/scsi/engines/uscsi.so
-file path=usr/lib/scsi/plugins/smp/engine/$(ARCH64)/usmp.so
-file path=usr/lib/scsi/plugins/smp/engine/usmp.so
 file path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)/libses.so
 file path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)/ses2.so
 file path=usr/lib/scsi/plugins/ses/framework/libses.so
 file path=usr/lib/scsi/plugins/ses/framework/ses2.so
+file path=usr/lib/scsi/plugins/smp/engine/$(ARCH64)/usmp.so
+file path=usr/lib/scsi/plugins/smp/engine/usmp.so
 file path=usr/lib/scsi/plugins/smp/framework/$(ARCH64)/sas2.so
 file path=usr/lib/scsi/plugins/smp/framework/sas2.so
 file path=usr/lib/security/$(ARCH64)/crypt_bsdbf.so.1
@@ -486,7 +485,8 @@ license lib/libkmf/THIRDPARTYLICENSE license=lib/libkmf/THIRDPARTYLICENSE
 license lib/libldap5/THIRDPARTYLICENSE license=lib/libldap5/THIRDPARTYLICENSE
 license lib/libmp/common/THIRDPARTYLICENSE \
     license=lib/libmp/common/THIRDPARTYLICENSE
-license lib/libresolv/THIRDPARTYLICENSE license=lib/libresolv/THIRDPARTYLICENSE
+license lib/libresolv/THIRDPARTYLICENSE \
+    license=lib/libresolv/THIRDPARTYLICENSE
 license lib/libresolv2/THIRDPARTYLICENSE \
     license=lib/libresolv2/THIRDPARTYLICENSE
 license lib/libshell/THIRDPARTYLICENSE license=lib/libshell/THIRDPARTYLICENSE
@@ -636,7 +636,8 @@ link path=usr/ccs/lib/$(ARCH64)/libform.so \
     target=../../../lib/$(ARCH64)/libform.so.1
 link path=usr/ccs/lib/$(ARCH64)/libgen.so \
     target=../../../../lib/$(ARCH64)/libgen.so.1
-link path=usr/ccs/lib/$(ARCH64)/libl.so target=../../../lib/$(ARCH64)/libl.so.1
+link path=usr/ccs/lib/$(ARCH64)/libl.so \
+    target=../../../lib/$(ARCH64)/libl.so.1
 link path=usr/ccs/lib/$(ARCH64)/libmalloc.so \
     target=../../../lib/$(ARCH64)/libmalloc.so.1
 link path=usr/ccs/lib/$(ARCH64)/libmenu.so \
@@ -647,7 +648,8 @@ link path=usr/ccs/lib/$(ARCH64)/libtermcap.so \
     target=../../../../lib/$(ARCH64)/libcurses.so.1
 link path=usr/ccs/lib/$(ARCH64)/libtermlib.so \
     target=../../../../lib/$(ARCH64)/libcurses.so.1
-link path=usr/ccs/lib/$(ARCH64)/liby.so target=../../../lib/$(ARCH64)/liby.so.1
+link path=usr/ccs/lib/$(ARCH64)/liby.so \
+    target=../../../lib/$(ARCH64)/liby.so.1
 link path=usr/ccs/lib/libcurses.so target=../../../lib/libcurses.so.1
 link path=usr/ccs/lib/libform.so target=../../lib/libform.so.1
 link path=usr/ccs/lib/libgen.so target=../../../lib/libgen.so.1
@@ -662,17 +664,20 @@ link path=usr/lib/$(ARCH64)/lib300.so target=./lib300.so.1
 link path=usr/lib/$(ARCH64)/lib300s.so target=./lib300s.so.1
 link path=usr/lib/$(ARCH64)/lib4014.so target=./lib4014.so.1
 link path=usr/lib/$(ARCH64)/lib450.so target=./lib450.so.1
-link path=usr/lib/$(ARCH64)/libadm.so target=../../../lib/$(ARCH64)/libadm.so.1
+link path=usr/lib/$(ARCH64)/libadm.so \
+    target=../../../lib/$(ARCH64)/libadm.so.1
 link path=usr/lib/$(ARCH64)/libadm.so.1 \
     target=../../../lib/$(ARCH64)/libadm.so.1
 link path=usr/lib/$(ARCH64)/libadutils.so target=./libadutils.so.1
-link path=usr/lib/$(ARCH64)/libaio.so target=../../../lib/$(ARCH64)/libaio.so.1
+link path=usr/lib/$(ARCH64)/libaio.so \
+    target=../../../lib/$(ARCH64)/libaio.so.1
 link path=usr/lib/$(ARCH64)/libaio.so.1 \
     target=../../../lib/$(ARCH64)/libaio.so.1
 link path=usr/lib/$(ARCH64)/libavl.so.1 \
     target=../../../lib/$(ARCH64)/libavl.so.1
 link path=usr/lib/$(ARCH64)/libbsdmalloc.so target=libbsdmalloc.so.1
-link path=usr/lib/$(ARCH64)/libbsm.so target=../../../lib/$(ARCH64)/libbsm.so.1
+link path=usr/lib/$(ARCH64)/libbsm.so \
+    target=../../../lib/$(ARCH64)/libbsm.so.1
 link path=usr/lib/$(ARCH64)/libbsm.so.1 \
     target=../../../lib/$(ARCH64)/libbsm.so.1
 link path=usr/lib/$(ARCH64)/libc.so target=../../../lib/$(ARCH64)/libc.so.1
@@ -695,7 +700,8 @@ link path=usr/lib/$(ARCH64)/libcrypt_d.so target=./libcrypt.so
 link path=usr/lib/$(ARCH64)/libcrypt_d.so.1 target=./libcrypt.so.1
 link path=usr/lib/$(ARCH64)/libcrypt_i.so target=./libcrypt.so
 link path=usr/lib/$(ARCH64)/libcrypt_i.so.1 target=./libcrypt.so.1
-link path=usr/lib/$(ARCH64)/libctf.so target=../../../lib/$(ARCH64)/libctf.so.1
+link path=usr/lib/$(ARCH64)/libctf.so \
+    target=../../../lib/$(ARCH64)/libctf.so.1
 link path=usr/lib/$(ARCH64)/libctf.so.1 \
     target=../../../lib/$(ARCH64)/libctf.so.1
 link path=usr/lib/$(ARCH64)/libcurses.so \
@@ -716,7 +722,8 @@ link path=usr/lib/$(ARCH64)/libdevinfo.so.1 \
     target=../../../lib/$(ARCH64)/libdevinfo.so.1
 link path=usr/lib/$(ARCH64)/libdisasm.so target=libdisasm.so.1
 link path=usr/lib/$(ARCH64)/libdl.so target=../../../lib/$(ARCH64)/libdl.so.1
-link path=usr/lib/$(ARCH64)/libdl.so.1 target=../../../lib/$(ARCH64)/libdl.so.1
+link path=usr/lib/$(ARCH64)/libdl.so.1 \
+    target=../../../lib/$(ARCH64)/libdl.so.1
 link path=usr/lib/$(ARCH64)/libdlpi.so \
     target=../../../lib/$(ARCH64)/libdlpi.so.1
 link path=usr/lib/$(ARCH64)/libdlpi.so.1 \
@@ -725,10 +732,12 @@ link path=usr/lib/$(ARCH64)/libdoor.so \
     target=../../../lib/$(ARCH64)/libdoor.so.1
 link path=usr/lib/$(ARCH64)/libdoor.so.1 \
     target=../../../lib/$(ARCH64)/libdoor.so.1
-link path=usr/lib/$(ARCH64)/libefi.so target=../../../lib/$(ARCH64)/libefi.so.1
+link path=usr/lib/$(ARCH64)/libefi.so \
+    target=../../../lib/$(ARCH64)/libefi.so.1
 link path=usr/lib/$(ARCH64)/libefi.so.1 \
     target=../../../lib/$(ARCH64)/libefi.so.1
-link path=usr/lib/$(ARCH64)/libelf.so target=../../../lib/$(ARCH64)/libelf.so.1
+link path=usr/lib/$(ARCH64)/libelf.so \
+    target=../../../lib/$(ARCH64)/libelf.so.1
 link path=usr/lib/$(ARCH64)/libelf.so.1 \
     target=../../../lib/$(ARCH64)/libelf.so.1
 link path=usr/lib/$(ARCH64)/libexacct.so target=libexacct.so.1
@@ -737,7 +746,8 @@ $(i386_ONLY)link path=usr/lib/$(ARCH64)/libfdisk.so \
 $(i386_ONLY)link path=usr/lib/$(ARCH64)/libfdisk.so.1 \
     target=../../../lib/$(ARCH64)/libfdisk.so.1
 link path=usr/lib/$(ARCH64)/libform.so target=libform.so.1
-link path=usr/lib/$(ARCH64)/libgen.so target=../../../lib/$(ARCH64)/libgen.so.1
+link path=usr/lib/$(ARCH64)/libgen.so \
+    target=../../../lib/$(ARCH64)/libgen.so.1
 link path=usr/lib/$(ARCH64)/libgen.so.1 \
     target=../../../lib/$(ARCH64)/libgen.so.1
 link path=usr/lib/$(ARCH64)/libhotplug.so target=libhotplug.so.1
@@ -765,23 +775,28 @@ link path=usr/lib/$(ARCH64)/libmail.so target=libmail.so.1
 link path=usr/lib/$(ARCH64)/libmalloc.so target=libmalloc.so.1
 link path=usr/lib/$(ARCH64)/libmapmalloc.so target=libmapmalloc.so.1
 link path=usr/lib/$(ARCH64)/libmd.so target=../../../lib/$(ARCH64)/libmd.so.1
-link path=usr/lib/$(ARCH64)/libmd.so.1 target=../../../lib/$(ARCH64)/libmd.so.1
-link path=usr/lib/$(ARCH64)/libmd5.so target=../../../lib/$(ARCH64)/libmd5.so.1
+link path=usr/lib/$(ARCH64)/libmd.so.1 \
+    target=../../../lib/$(ARCH64)/libmd.so.1
+link path=usr/lib/$(ARCH64)/libmd5.so \
+    target=../../../lib/$(ARCH64)/libmd5.so.1
 link path=usr/lib/$(ARCH64)/libmd5.so.1 \
     target=../../../lib/$(ARCH64)/libmd5.so.1
 link path=usr/lib/$(ARCH64)/libmenu.so target=libmenu.so.1
 link path=usr/lib/$(ARCH64)/libmp.so target=../../../lib/$(ARCH64)/libmp.so.2
-link path=usr/lib/$(ARCH64)/libmp.so.2 target=../../../lib/$(ARCH64)/libmp.so.2
+link path=usr/lib/$(ARCH64)/libmp.so.2 \
+    target=../../../lib/$(ARCH64)/libmp.so.2
 link path=usr/lib/$(ARCH64)/libmtmalloc.so target=libmtmalloc.so.1
 link path=usr/lib/$(ARCH64)/libnls.so target=libnls.so.1
-link path=usr/lib/$(ARCH64)/libnsl.so target=../../../lib/$(ARCH64)/libnsl.so.1
+link path=usr/lib/$(ARCH64)/libnsl.so \
+    target=../../../lib/$(ARCH64)/libnsl.so.1
 link path=usr/lib/$(ARCH64)/libnsl.so.1 \
     target=../../../lib/$(ARCH64)/libnsl.so.1
 link path=usr/lib/$(ARCH64)/libnvpair.so \
     target=../../../lib/$(ARCH64)/libnvpair.so.1
 link path=usr/lib/$(ARCH64)/libnvpair.so.1 \
     target=../../../lib/$(ARCH64)/libnvpair.so.1
-link path=usr/lib/$(ARCH64)/libpam.so target=../../../lib/$(ARCH64)/libpam.so.1
+link path=usr/lib/$(ARCH64)/libpam.so \
+    target=../../../lib/$(ARCH64)/libpam.so.1
 link path=usr/lib/$(ARCH64)/libpam.so.1 \
     target=../../../lib/$(ARCH64)/libpam.so.1
 link path=usr/lib/$(ARCH64)/libpanel.so target=libpanel.so.1
@@ -800,7 +815,8 @@ link path=usr/lib/$(ARCH64)/libpthread.so \
     target=../../../lib/$(ARCH64)/libpthread.so.1
 link path=usr/lib/$(ARCH64)/libpthread.so.1 \
     target=../../../lib/$(ARCH64)/libpthread.so.1
-link path=usr/lib/$(ARCH64)/librcm.so target=../../../lib/$(ARCH64)/librcm.so.1
+link path=usr/lib/$(ARCH64)/librcm.so \
+    target=../../../lib/$(ARCH64)/librcm.so.1
 link path=usr/lib/$(ARCH64)/librcm.so.1 \
     target=../../../lib/$(ARCH64)/librcm.so.1
 link path=usr/lib/$(ARCH64)/libreparse.so target=libreparse.so.1
@@ -817,19 +833,22 @@ link path=usr/lib/$(ARCH64)/librpcsvc.so \
 link path=usr/lib/$(ARCH64)/librpcsvc.so.1 \
     target=../../../lib/$(ARCH64)/librpcsvc.so.1
 link path=usr/lib/$(ARCH64)/librt.so target=../../../lib/$(ARCH64)/librt.so.1
-link path=usr/lib/$(ARCH64)/librt.so.1 target=../../../lib/$(ARCH64)/librt.so.1
+link path=usr/lib/$(ARCH64)/librt.so.1 \
+    target=../../../lib/$(ARCH64)/librt.so.1
 link path=usr/lib/$(ARCH64)/librtld.so.1 \
     target=../../../lib/$(ARCH64)/librtld.so.1
 link path=usr/lib/$(ARCH64)/librtld_db.so \
     target=../../../lib/$(ARCH64)/librtld_db.so.1
 link path=usr/lib/$(ARCH64)/librtld_db.so.1 \
     target=../../../lib/$(ARCH64)/librtld_db.so.1
-link path=usr/lib/$(ARCH64)/libscf.so target=../../../lib/$(ARCH64)/libscf.so.1
+link path=usr/lib/$(ARCH64)/libscf.so \
+    target=../../../lib/$(ARCH64)/libscf.so.1
 link path=usr/lib/$(ARCH64)/libscf.so.1 \
     target=../../../lib/$(ARCH64)/libscf.so.1
 link path=usr/lib/$(ARCH64)/libsched.so target=libsched.so.1
 link path=usr/lib/$(ARCH64)/libsctp.so target=./libsctp.so.1
-link path=usr/lib/$(ARCH64)/libsec.so target=../../../lib/$(ARCH64)/libsec.so.1
+link path=usr/lib/$(ARCH64)/libsec.so \
+    target=../../../lib/$(ARCH64)/libsec.so.1
 link path=usr/lib/$(ARCH64)/libsec.so.1 \
     target=../../../lib/$(ARCH64)/libsec.so.1
 link path=usr/lib/$(ARCH64)/libsecdb.so \
@@ -1106,10 +1125,14 @@ link path=usr/lib/scsi/libscsi.so target=./libscsi.so.1
 link path=usr/lib/scsi/libses.so target=./libses.so.1
 link path=usr/lib/scsi/libsmp.so target=./libsmp.so.1
 link path=usr/lib/security/$(ARCH64)/crypt_bsdbf.so target=./crypt_bsdbf.so.1
-link path=usr/lib/security/$(ARCH64)/crypt_bsdmd5.so target=./crypt_bsdmd5.so.1
-link path=usr/lib/security/$(ARCH64)/crypt_sha256.so target=./crypt_sha256.so.1
-link path=usr/lib/security/$(ARCH64)/crypt_sha512.so target=./crypt_sha512.so.1
-link path=usr/lib/security/$(ARCH64)/crypt_sunmd5.so target=./crypt_sunmd5.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_bsdmd5.so \
+    target=./crypt_bsdmd5.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_sha256.so \
+    target=./crypt_sha256.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_sha512.so \
+    target=./crypt_sha512.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_sunmd5.so \
+    target=./crypt_sunmd5.so.1
 link path=usr/lib/security/$(ARCH64)/pam_allow.so target=./pam_allow.so.1
 link path=usr/lib/security/$(ARCH64)/pam_authtok_check.so \
     target=./pam_authtok_check.so.1
@@ -1154,9 +1177,11 @@ link path=usr/lib/security/crypt_sha256.so target=./crypt_sha256.so.1
 link path=usr/lib/security/crypt_sha512.so target=./crypt_sha512.so.1
 link path=usr/lib/security/crypt_sunmd5.so target=./crypt_sunmd5.so.1
 link path=usr/lib/security/pam_allow.so target=./pam_allow.so.1
-link path=usr/lib/security/pam_authtok_check.so target=./pam_authtok_check.so.1
+link path=usr/lib/security/pam_authtok_check.so \
+    target=./pam_authtok_check.so.1
 link path=usr/lib/security/pam_authtok_get.so target=./pam_authtok_get.so.1
-link path=usr/lib/security/pam_authtok_store.so target=./pam_authtok_store.so.1
+link path=usr/lib/security/pam_authtok_store.so \
+    target=./pam_authtok_store.so.1
 link path=usr/lib/security/pam_deny.so target=./pam_deny.so.1
 link path=usr/lib/security/pam_dhkeys.so target=./pam_dhkeys.so.1
 link path=usr/lib/security/pam_dial_auth.so target=./pam_dial_auth.so.1

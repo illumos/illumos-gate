@@ -20,23 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/hermon@$(PKGVERS)
 set name=pkg.description value="Hermon HCA driver"
 set name=pkg.summary value="Sun IB Hermon HCA driver"
 set name=info.classification \
     value="org.opensolaris.category.2008:Drivers/Other Peripherals"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -47,7 +45,7 @@ driver name=hermon perms="* 0666 root sys" \
     alias=pciex15b3,673c
 file path=kernel/drv/$(ARCH64)/hermon group=sys
 $(i386_ONLY)file path=kernel/drv/hermon group=sys
-file path=kernel/drv/hermon.conf group=sys reboot-needed=false
+file path=kernel/drv/hermon.conf group=sys
 legacy pkg=SUNWhermon arch=$(ARCH) category=system desc="Hermon HCA driver" \
     hotline="Please contact your local service provider" \
     name="Sun IB Hermon HCA driver" vendor="Sun Microsystems, Inc." \

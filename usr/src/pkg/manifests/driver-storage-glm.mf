@@ -20,29 +20,28 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/glm@$(PKGVERS)
 set name=pkg.description value="Drivers for the PCI bus"
 set name=pkg.summary value="PCI Drivers"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=glm alias=pci1000,b class=scsi perms="* 0755 root sys"
 file path=kernel/drv/$(ARCH64)/glm group=sys
 file path=kernel/drv/glm group=sys
-file path=kernel/drv/glm.conf group=sys reboot-needed=false
+file path=kernel/drv/glm.conf group=sys
 legacy pkg=SUNWpd arch=$(ARCH) category=system desc="Drivers for the PCI bus" \
     hotline="Please contact your local service provider" name="PCI Drivers" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11

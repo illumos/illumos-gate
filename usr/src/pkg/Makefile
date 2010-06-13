@@ -198,7 +198,7 @@ sparc_ARCH64= sparcv9
 # complete reprocessing of all manifests because they'll fail command
 # dependency checking.
 #
-PM_TRANSFORMS= publish restart_fmri defaults extract_metadata
+PM_TRANSFORMS= common_actions publish restart_fmri defaults extract_metadata
 PM_INC= transforms
 
 PKGMOG_DEFINES= \
@@ -512,10 +512,13 @@ $(REPOS:%=$(PKGDEST)/repo.%):
 #   characters.
 #
 # - The extract_metadata transforms are designed to spit out shell
-#   variable assignments to stdout.  So the eval statement should
-#   begin with the default values, and any output from pkgmogrify
-#   should be in the form of a variable assignment to override those
-#   defaults.
+#   variable assignments to stdout.  Those are published to the
+#   .vars temporary files, and then used as input to the eval
+#   statement.  This is done in stages specifically so that pkgmogrify
+#   can signal failure if the manifest has a syntactic or other error.
+#   The eval statement should begin with the default values, and the
+#   output from pkgmogrify (if any) should be in the form of a
+#   variable assignment to override those defaults.
 #
 # - When this rule completes execution, it must leave an updated
 #   target file ($@) in place, or make will reprocess the package
@@ -534,11 +537,12 @@ $(REPOS:%=$(PKGDEST)/repo.%):
 $(PDIR)/%.mog: manifests/%.mf
 	@print "Processing manifest $(<F)"
 	$(PKGDEBUG)$(RM) $(@) $(@:%.mog=%) $(@:%.mog=%.nodepend) \
-		$(PDIR)/$(@F:%.mog=%).metadata.*
-	$(PKGDEBUG)eval REPO=redist PKGSTAT=current \
-		NODEPEND=$(SUPPRESSPKGDEP) \
-		`$(PKGMOGRIFY) $(PKGMOG_VERBOSE) $(PM_INC:%= -I %) \
-		$(PKGMOG_DEFINES:%=-D %) -O $(@) $(<) $(PM_TRANSFORMS)`; \
+		$(PDIR)/$(@F:%.mog=%).metadata.* $(@).vars
+	$(PKGDEBUG)$(PKGMOGRIFY) $(PKGMOG_VERBOSE) $(PM_INC:%= -I %) \
+		$(PKGMOG_DEFINES:%=-D %) -P $(@).vars -O $(@) \
+		$(<) $(PM_TRANSFORMS)
+	$(PKGDEBUG)eval REPO=redist PKGSTAT=current NODEPEND=$(SUPPRESSPKGDEP) \
+		`$(CAT) -s $(@).vars`; \
 	if [ -f $(@) ]; then \
 		if [ "$$NODEPEND" != "false" ]; then \
 			 $(TOUCH) $(@:%.mog=%.nodepend); \
@@ -552,6 +556,7 @@ $(PDIR)/%.mog: manifests/%.mf
 	else \
 		$(TOUCH) $(@); \
 	fi
+	$(PKGDEBUG)$(RM) $(@).vars
 
 $(PDIR)/%.dep: $(PDIR)/%.mog
 	@print "Generating dependencies for $(<F)"
@@ -595,17 +600,19 @@ $(PDIR)/%.pub: $(PDIR)/%.res
 #
 $(PROC_SYNTH_PKGS): $(PKGLISTS) $$(@F:%.mog=%.mf)
 	@print "Processing synthetic manifest $(@F:%.mog=%.mf)"
-	$(PKGDEBUG)$(RM) $(@) $(PDIR)/$(@F:%.mog=%).metadata.*
-	$(PKGDEBUG)eval REPO=redist PKGSTAT=current \
-		`$(PKGMOGRIFY) $(PKGMOG_VERBOSE) -I transforms -I $(PDIR) \
+	$(PKGDEBUG)$(RM) $(@) $(PDIR)/$(@F:%.mog=%).metadata.* $(@).vars
+	$(PKGDEBUG)$(PKGMOGRIFY) $(PKGMOG_VERBOSE) -I transforms -I $(PDIR) \
 		$(PKGMOG_DEFINES:%=-D %) -D PKGDEP_TYPE=$(PKGDEP_TYPE) \
-		-O $(@) $(@F:%.mog=%.mf) $(PM_TRANSFORMS) synthetic` ; \
+		-P $(@).vars -O $(@) $(@F:%.mog=%.mf) \
+		$(PM_TRANSFORMS) synthetic
+	$(PKGDEBUG)eval REPO=redist PKGSTAT=current `$(CAT) -s $(@).vars`; \
 	if [ -f $(@) ]; then \
 		$(LN) -s $(@F) \
 			$(PDIR)/$(@F:%.mog=%).metadata.$$PKGSTAT.$$REPO; \
 	else \
 		$(TOUCH) $(@); \
 	fi
+	$(PKGDEBUG)$(RM) $(@).vars
 
 $(DEP_SYNTH_PKGS): $$(@:%.dep=%.mog)
 	@print "Skipping dependency generation for $(@F:%.dep=%)"

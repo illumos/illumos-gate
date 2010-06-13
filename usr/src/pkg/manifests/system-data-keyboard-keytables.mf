@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/data/keyboard/keytables@$(PKGVERS)
 set name=pkg.description \
     value="Configuration tables that specify keyboard attributes such as localized meanings for individual keys"
 set name=pkg.summary value="Keyboard configuration tables"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/share group=sys
@@ -125,8 +124,8 @@ $(sparc_ONLY)file path=usr/share/lib/keytables/type_4/us
 $(sparc_ONLY)file path=usr/share/lib/keytables/type_4/us101a_pc
 $(sparc_ONLY)file path=usr/share/lib/keytables/type_4/us_5
 $(sparc_ONLY)file path=usr/share/lib/keytables/type_4/us_hobo
-file path=usr/share/lib/keytables/type_6/arabia
 file path=usr/share/lib/keytables/type_6/albania
+file path=usr/share/lib/keytables/type_6/arabia
 file path=usr/share/lib/keytables/type_6/belarus
 file path=usr/share/lib/keytables/type_6/belgium
 file path=usr/share/lib/keytables/type_6/brazil

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/resource-pools@$(PKGVERS)
@@ -29,10 +28,11 @@ set name=pkg.description value="core software for resource pools"
 set name=pkg.summary value="Resource Pools"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/include
@@ -48,20 +48,16 @@ dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/adm/pool group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/log/pool group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=var group=sys variant.opensolaris.zone=global
+dir path=var/adm/pool group=sys variant.opensolaris.zone=global
+dir path=var/log/pool group=sys variant.opensolaris.zone=global
 driver name=pool perms="pool 0666 root sys" perms="poolctl 0666 root sys"
-file path=lib/svc/method/svc-poold mode=0555 opensolaris.zone=global \
+file path=lib/svc/manifest/system/poold.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
-file path=lib/svc/method/svc-pools mode=0555 opensolaris.zone=global \
+file path=lib/svc/manifest/system/pools.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
+file path=lib/svc/method/svc-poold mode=0555 variant.opensolaris.zone=global
+file path=lib/svc/method/svc-pools mode=0555 variant.opensolaris.zone=global
 file path=usr/bin/poolstat mode=0555
 file path=usr/include/pool.h
 file path=usr/kernel/drv/$(ARCH64)/pool group=sys
@@ -77,14 +73,11 @@ file path=usr/sbin/pooladm mode=0555
 file path=usr/sbin/poolbind mode=0555
 file path=usr/sbin/poolcfg mode=0555
 file path=usr/share/lib/xml/dtd/rm_pool.dtd.1
-file path=lib/svc/manifest/system/poold.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=lib/svc/manifest/system/pools.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWpool arch=$(ARCH) category=system \
     desc="core software for resource pools" \
-    hotline="Please contact your local service provider" name="Resource Pools" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    hotline="Please contact your local service provider" \
+    name="Resource Pools" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
 legacy pkg=SUNWpoolr arch=$(ARCH) category=system \
     desc="core software for resource pools (Root)" \
     hotline="Please contact your local service provider" \

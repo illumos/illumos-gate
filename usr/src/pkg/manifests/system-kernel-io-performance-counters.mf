@@ -20,22 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/io-performance-counters@$(PKGVERS)
-set name=pkg.description value="Kernel support for IO chip performance counters"
+set name=pkg.description \
+    value="Kernel support for IO chip performance counters"
 set name=pkg.summary value="sun4u IO chip performance counter modules"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=platform group=sys
 dir path=platform/SUNW,A70 group=sys
 dir path=platform/SUNW,A70/kernel group=sys
@@ -61,13 +60,13 @@ driver name=n2piupc perms="* 0666 root sys" \
     alias=SUNW,n2piu-pr \
     alias=SUNW,vfpiu-pr
 file path=platform/SUNW,A70/kernel/drv/$(ARCH64)/fpc group=sys
-file path=platform/SUNW,A70/kernel/drv/fpc.conf group=sys reboot-needed=false
+file path=platform/SUNW,A70/kernel/drv/fpc.conf group=sys
 file path=platform/sun4v/kernel/drv/$(ARCH64)/fpc group=sys
 file path=platform/sun4v/kernel/drv/$(ARCH64)/iospc group=sys
 file path=platform/sun4v/kernel/drv/$(ARCH64)/n2piupc group=sys
-file path=platform/sun4v/kernel/drv/fpc.conf group=sys reboot-needed=false
-file path=platform/sun4v/kernel/drv/iospc.conf group=sys reboot-needed=false
-file path=platform/sun4v/kernel/drv/n2piupc.conf group=sys reboot-needed=false
+file path=platform/sun4v/kernel/drv/fpc.conf group=sys
+file path=platform/sun4v/kernel/drv/iospc.conf group=sys
+file path=platform/sun4v/kernel/drv/n2piupc.conf group=sys
 legacy pkg=SUNWiopc.u arch=$(ARCH).sun4u category=system \
     desc="Kernel support for IO chip performance counters" \
     hotline="Please contact your local service provider" \

@@ -20,10 +20,15 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/llc2@$(PKGVERS)
 set name=pkg.description \
     value="LLC2 driver implementing IEEE 802.2 Logical Link Control 2 service"
@@ -31,22 +36,14 @@ set name=pkg.summary value="LLC2 driver and its initialization programs"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/init.d group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/llc2 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/llc2/default group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/rc0.d group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/rc1.d group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/rc2.d group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/rcS.d group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=etc group=sys
+dir path=etc/init.d group=sys
+dir path=etc/llc2 group=sys
+dir path=etc/llc2/default group=sys
+dir path=etc/rc0.d group=sys
+dir path=etc/rc1.d group=sys
+dir path=etc/rc2.d group=sys
+dir path=etc/rcS.d group=sys
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/include/sys
@@ -56,11 +53,9 @@ dir path=usr/kernel/drv/$(ARCH64) group=sys
 dir path=usr/lib
 dir path=usr/lib/llc2
 driver name=llc2 perms="* 0666 root sys"
-file path=etc/init.d/llc2 group=sys mode=0744 opensolaris.zone=global \
-    original_name=SUNWllc:etc/init.d/llc2 preserve=true \
-    variant.opensolaris.zone=global
-file path=etc/llc2/llc2_start.default group=sys mode=0744 \
-    opensolaris.zone=global variant.opensolaris.zone=global
+file path=etc/init.d/llc2 group=sys mode=0744 \
+    original_name=SUNWllc:etc/init.d/llc2 preserve=true
+file path=etc/llc2/llc2_start.default group=sys mode=0744
 file path=usr/kernel/drv/$(ARCH64)/llc2 group=sys
 $(i386_ONLY)file path=usr/kernel/drv/llc2 group=sys
 file path=usr/kernel/drv/llc2.conf group=sys
@@ -72,14 +67,10 @@ file path=usr/lib/llc2/llc2_loop4 mode=0555
 file path=usr/lib/llc2/llc2_stats mode=0555
 file path=usr/lib/llc2/llc2_tcap mode=0555
 file path=usr/lib/llc2/llc2_tparser mode=0555
-hardlink path=etc/rc0.d/K52llc2 opensolaris.zone=global \
-    target=../../etc/init.d/llc2 variant.opensolaris.zone=global
-hardlink path=etc/rc1.d/K52llc2 opensolaris.zone=global \
-    target=../../etc/init.d/llc2 variant.opensolaris.zone=global
-hardlink path=etc/rc2.d/S40llc2 opensolaris.zone=global \
-    target=../../etc/init.d/llc2 variant.opensolaris.zone=global
-hardlink path=etc/rcS.d/K52llc2 opensolaris.zone=global \
-    target=../../etc/init.d/llc2 variant.opensolaris.zone=global
+hardlink path=etc/rc0.d/K52llc2 target=../../etc/init.d/llc2
+hardlink path=etc/rc1.d/K52llc2 target=../../etc/init.d/llc2
+hardlink path=etc/rc2.d/S40llc2 target=../../etc/init.d/llc2
+hardlink path=etc/rcS.d/K52llc2 target=../../etc/init.d/llc2
 legacy pkg=SUNWllc arch=$(ARCH) category=system \
     desc="LLC2 driver implementing IEEE 802.2 Logical Link Control 2 service" \
     hotline="Please contact your local service provider" \

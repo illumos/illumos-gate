@@ -20,22 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/mega_sas@$(PKGVERS)
 set name=pkg.description value="LSI MegaSAS RAID Controller HBA Driver"
 set name=pkg.summary value="LSI MegaSAS RAID Controller HBA Driver"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -145,7 +144,7 @@ driver name=mega_sas class=scsi \
     alias=pci1028,15.1028.1f03
 file path=kernel/drv/$(ARCH64)/mega_sas group=sys
 file path=kernel/drv/mega_sas group=sys
-file path=kernel/drv/mega_sas.conf group=sys reboot-needed=false
+file path=kernel/drv/mega_sas.conf group=sys
 legacy pkg=SUNWmegasas arch=$(ARCH) category=system \
     desc="LSI MegaSAS RAID Controller HBA Driver" \
     hotline="Please contact your local service provider" \

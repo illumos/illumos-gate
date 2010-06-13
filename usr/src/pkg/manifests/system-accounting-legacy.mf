@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/accounting/legacy@$(PKGVERS)
@@ -31,12 +30,13 @@ set name=pkg.summary value="System Accounting"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/acct group=adm owner=adm
 dir path=etc/init.d group=sys
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/bin
@@ -54,12 +54,11 @@ dir path=var/adm/sa group=sys mode=0775 owner=adm
 dir path=var/spool
 dir path=var/spool/cron group=sys
 dir path=var/spool/cron/crontabs group=sys
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/system group=sys
 file path=etc/acct/holidays original_name=SUNWacc:etc/acct/holidays \
     preserve=true
 file path=etc/init.d/acct group=sys mode=0744 \
     original_name=SUNWacc:etc/init.d/acct preserve=true
+file path=lib/svc/manifest/system/sar.xml group=sys mode=0444
 file path=lib/svc/method/svc-sar group=sys mode=0555
 file path=usr/bin/acctcom mode=0555
 file path=usr/bin/timex group=sys mode=0555
@@ -101,7 +100,6 @@ file path=usr/lib/sa/sadc mode=0555
 file path=usr/sbin/sar mode=0555
 file path=var/spool/cron/crontabs/sys group=sys mode=0600 \
     original_name=SUNWacc:var/spool/cron/crontabs/sys preserve=true
-file path=lib/svc/manifest/system/sar.xml group=sys mode=0444
 legacy pkg=SUNWaccr arch=$(ARCH) category=system \
     desc="utilities for accounting and reporting of system activity" \
     hotline="Please contact your local service provider" \

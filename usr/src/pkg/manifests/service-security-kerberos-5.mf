@@ -20,18 +20,22 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/security/kerberos-5@$(PKGVERS)
 set name=pkg.description value="Kerberos version 5 support"
 set name=pkg.summary value="Kerberos version 5 support"
-set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/krb5 group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/security group=sys
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
@@ -48,15 +52,13 @@ dir path=var group=sys
 dir path=var/krb5 group=sys
 dir path=var/krb5/rcache group=sys mode=1777
 dir path=var/krb5/rcache/root group=sys mode=0700
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/manifest/network/security group=sys
-file path=etc/krb5/krb5.conf group=sys original_name=SUNWkrb:etc/krb5/krb5.conf \
-    preserve=true
-file path=etc/krb5/warn.conf group=sys original_name=SUNWkrb:etc/krb5/warn.conf \
-    preserve=true
+file path=etc/krb5/krb5.conf group=sys \
+    original_name=SUNWkrb:etc/krb5/krb5.conf preserve=true
+file path=etc/krb5/warn.conf group=sys \
+    original_name=SUNWkrb:etc/krb5/warn.conf preserve=true
+file path=lib/svc/manifest/network/security/kadmin.xml group=sys mode=0444
+file path=lib/svc/manifest/network/security/krb5kdc.xml group=sys mode=0444
+file path=lib/svc/manifest/network/security/ktkt_warn.xml group=sys mode=0444
 file path=usr/bin/kdestroy mode=0555
 file path=usr/bin/kinit mode=0555
 file path=usr/bin/klist mode=0555
@@ -76,9 +78,6 @@ file path=usr/lib/security/$(ARCH64)/pam_krb5.so.1
 file path=usr/lib/security/$(ARCH64)/pam_krb5_migrate.so.1
 file path=usr/lib/security/pam_krb5.so.1
 file path=usr/lib/security/pam_krb5_migrate.so.1
-file path=lib/svc/manifest/network/security/kadmin.xml group=sys mode=0444
-file path=lib/svc/manifest/network/security/krb5kdc.xml group=sys mode=0444
-file path=lib/svc/manifest/network/security/ktkt_warn.xml group=sys mode=0444
 legacy pkg=SUNWkrbr arch=$(ARCH) category=system \
     desc="Kerberos version 5 support (Root)" \
     hotline="Please contact your local service provider" \

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/network/netcat@$(PKGVERS)
@@ -30,12 +29,12 @@ set name=pkg.summary value="Netcat Command"
 set name=info.classification \
     value=org.opensolaris.category.2008:Applications/Internet
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/bin
 file path=usr/bin/nc mode=0555
 legacy pkg=SUNWnetcat arch=$(ARCH) category=system desc="Netcat Command" \
-    hotline="Please contact your local service provider" name="Netcat Command" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    hotline="Please contact your local service provider" \
+    name="Netcat Command" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
 license cmd/cmd-inet/usr.bin/nc/THIRDPARTYLICENSE \
     license=cmd/cmd-inet/usr.bin/nc/THIRDPARTYLICENSE

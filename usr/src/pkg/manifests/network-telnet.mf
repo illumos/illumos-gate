@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/network/telnet@$(PKGVERS)
@@ -30,11 +29,11 @@ set name=pkg.summary value="Telnet Command (client)"
 set name=info.classification \
     value="org.opensolaris.category.2008:Applications/System Utilities"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/bin
 file path=usr/bin/telnet mode=0555
-legacy pkg=SUNWtnetc arch=$(ARCH) category=system desc="Telnet Command (client)" \
+legacy pkg=SUNWtnetc arch=$(ARCH) category=system \
+    desc="Telnet Command (client)" \
     hotline="Please contact your local service provider" \
     name="Telnet Command (client)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11

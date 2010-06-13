@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/network/ftp@$(PKGVERS)
@@ -30,7 +29,6 @@ set name=pkg.summary value="Basic IP commands"
 set name=info.classification \
     value="org.opensolaris.category.2008:Applications/System Utilities"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/default group=sys
 dir path=usr group=sys
@@ -45,7 +43,8 @@ legacy pkg=SUNWbip arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Basic IP commands (Usr)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-legacy pkg=SUNWbipr arch=$(ARCH) category=system desc="Basic IP commands (Root)" \
+legacy pkg=SUNWbipr arch=$(ARCH) category=system \
+    desc="Basic IP commands (Root)" \
     hotline="Please contact your local service provider" \
     name="Basic IP commands (Root)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11

@@ -20,23 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/i86pc/ioat@$(PKGVERS)
 set name=pkg.description value="Sun dcopy DMA drivers"
 set name=pkg.summary value="Sun dcopy DMA drivers"
 set name=info.classification \
     value="org.opensolaris.category.2008:Drivers/Other Peripherals"
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
@@ -53,14 +51,14 @@ driver name=ioat \
     alias=pciex8086,1a38 \
     alias=pciex8086,360b \
     alias=pciex8086,402f
-file path=kernel/misc/$(ARCH64)/dcopy group=sys mode=0755 reboot-needed=true
-file path=kernel/misc/dcopy group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/$(ARCH64)/dcopy group=sys mode=0755
+file path=kernel/misc/dcopy group=sys mode=0755
 file path=platform/i86pc/kernel/drv/$(ARCH64)/ioat group=sys
 file path=platform/i86pc/kernel/drv/ioat group=sys
-file path=platform/i86pc/kernel/drv/ioat.conf group=sys reboot-needed=false
+file path=platform/i86pc/kernel/drv/ioat.conf group=sys
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/ioat group=sys
 file path=platform/i86xpv/kernel/drv/ioat group=sys
-file path=platform/i86xpv/kernel/drv/ioat.conf group=sys reboot-needed=false
+file path=platform/i86xpv/kernel/drv/ioat.conf group=sys
 legacy pkg=SUNWdcopy arch=$(ARCH) category=system desc="Sun dcopy DMA drivers" \
     hotline="Please contact your local service provider" \
     name="Sun dcopy DMA drivers" vendor="Sun Microsystems, Inc." \

@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/developer/debug/mdb/module/module-qlc@$(PKGVERS)
 set name=pkg.description \
     value="Utilties associated with the Qlogic Fibre Channel Adapter"
 set name=pkg.summary value="Qlogic Fibre Channel Adapter Utilities"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/mdb group=sys

@@ -20,18 +20,17 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/header/header-ifp@$(PKGVERS)
 set name=pkg.description value="SunOS Header Files For QLogic FC-AL Family"
 set name=pkg.summary \
     value="Sun Fibre Channel Arbitrated Loop Driver Header Files"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
 set name=org.opensolaris.redist value=nonredist
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/include/sys

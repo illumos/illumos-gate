@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/zfs/tests@$(PKGVERS)
@@ -30,13 +29,9 @@ set name=pkg.summary value="ZFS unbundled utilities"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/bin
 $(i386_ONLY)dir path=usr/bin/$(ARCH32)
@@ -51,12 +46,9 @@ dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
 driver name=zut perms="* 0666 root sys"
-file path=kernel/drv/$(ARCH64)/zut group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/drv/zut group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=kernel/drv/zut.conf group=sys opensolaris.zone=global \
-    reboot-needed=false variant.opensolaris.zone=global
+file path=kernel/drv/$(ARCH64)/zut group=sys
+$(i386_ONLY)file path=kernel/drv/zut group=sys
+file path=kernel/drv/zut.conf group=sys
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/zlook mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/ztest mode=0555
 file path=usr/bin/$(ARCH64)/zlook mode=0555

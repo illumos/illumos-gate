@@ -30,7 +30,6 @@ set name=info.classification \
     value="org.opensolaris.category.2008:Development/Distribution Tools"
 set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 depend fmri=SUNWadmj type=require
 depend fmri=SUNWjsnmp type=require
 depend fmri=SUNWwbapi type=require

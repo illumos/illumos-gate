@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/driver/crypto/dprov@$(PKGVERS)
@@ -31,7 +30,6 @@ set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=org.opensolaris.redist value=internal
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 # CRYPT DELETE START
 dir path=etc group=sys
 dir path=etc/certs group=sys
@@ -49,12 +47,12 @@ file path=etc/crypto/certs/SUNWosnet group=sys
 file path=etc/crypto/certs/SUNWosnetCF group=sys
 file path=kernel/drv/$(ARCH64)/dprov group=sys
 $(i386_ONLY)file path=kernel/drv/dprov group=sys
-file path=kernel/drv/dprov.conf group=sys reboot-needed=false
+file path=kernel/drv/dprov.conf group=sys
 legacy pkg=SUNWcryptoint arch=$(ARCH) category=system \
     desc="Kernel Crypto Framework Test Driver" \
     hotline="Please contact your local service provider" \
-    name="Kernel Crypto Framework Test Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Kernel Crypto Framework Test Driver" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=kernel/crypto/$(ARCH64)/dprov \

@@ -20,22 +20,20 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/serial/usbftdi@$(PKGVERS)
 set name=pkg.description value="FTDI FT232R USB serial driver"
 set name=pkg.summary value="FT232R USB UART"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -67,11 +65,11 @@ driver name=usbftdi perms="* 0666 root sys" \
 file path=kernel/drv/$(ARCH64)/usbftdi group=sys
 $(i386_ONLY)file path=kernel/drv/usbftdi group=sys
 file path=kernel/drv/usbftdi.conf group=sys \
-    original_name=SUNWuftdi:kernel/drv/usbftdi.conf preserve=true \
-    reboot-needed=false
+    original_name=SUNWuftdi:kernel/drv/usbftdi.conf preserve=true
 legacy pkg=SUNWuftdi arch=$(ARCH) category=system \
     desc="FTDI FT232R USB serial driver" \
-    hotline="Please contact your local service provider" name="FT232R USB UART" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    hotline="Please contact your local service provider" \
+    name="FT232R USB UART" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

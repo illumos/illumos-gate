@@ -27,7 +27,6 @@ set name=pkg.description \
 set name=pkg.summary value="Core Solaris"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=dev group=sys
 dir path=etc group=sys
 dir path=etc/certs group=sys
@@ -87,10 +86,6 @@ dir path=lib/inet
 dir path=lib/svc
 dir path=lib/svc/bin
 dir path=lib/svc/capture
-dir path=lib/svc/method
-dir path=lib/svc/monitor
-dir path=lib/svc/seed
-dir path=lib/svc/share
 dir path=lib/svc/manifest group=sys
 dir path=lib/svc/manifest/application group=sys
 dir path=lib/svc/manifest/application/management group=sys
@@ -113,6 +108,10 @@ dir path=lib/svc/manifest/system/device group=sys
 dir path=lib/svc/manifest/system/filesystem group=sys
 dir path=lib/svc/manifest/system/security group=sys
 dir path=lib/svc/manifest/system/svc group=sys
+dir path=lib/svc/method
+dir path=lib/svc/monitor
+dir path=lib/svc/seed
+dir path=lib/svc/share
 dir path=mnt group=sys
 dir path=opt group=sys
 dir path=proc group=root mode=0555
@@ -320,20 +319,20 @@ dir path=var/svc/manifest/network/ipsec group=sys
 dir path=var/svc/manifest/network/ldap group=sys
 dir path=var/svc/manifest/network/nfs group=sys
 dir path=var/svc/manifest/network/nis group=sys
-dir path=var/svc/manifest/network/rpc group=sys
 dir path=var/svc/manifest/network/routing group=sys
+dir path=var/svc/manifest/network/rpc group=sys
 dir path=var/svc/manifest/network/security group=sys
 dir path=var/svc/manifest/network/shares group=sys
 dir path=var/svc/manifest/network/ssl group=sys
 dir path=var/svc/manifest/platform group=sys
 $(sparc_ONLY)dir path=var/svc/manifest/platform/sun4u group=sys
 $(sparc_ONLY)dir path=var/svc/manifest/platform/sun4v group=sys
+dir path=var/svc/manifest/site group=sys
 dir path=var/svc/manifest/system group=sys
 dir path=var/svc/manifest/system/device group=sys
 dir path=var/svc/manifest/system/filesystem group=sys
 dir path=var/svc/manifest/system/security group=sys
 dir path=var/svc/manifest/system/svc group=sys
-dir path=var/svc/manifest/site group=sys
 dir path=var/svc/profile group=sys
 dir path=var/tmp group=sys mode=1777
 driver name=dump perms="dump 0660 root sys"
@@ -474,6 +473,31 @@ file path=etc/skel/.profile group=other preserve=true
 file path=etc/skel/local.cshrc group=sys preserve=true
 file path=etc/skel/local.login group=sys preserve=true
 file path=etc/skel/local.profile group=sys preserve=true
+file path=etc/svc/profile/generic_limited_net.xml group=sys mode=0444
+file path=etc/svc/profile/generic_open.xml group=sys mode=0444
+file path=etc/svc/profile/inetd_generic.xml group=sys mode=0444
+file path=etc/svc/profile/inetd_upgrade.xml group=sys mode=0444
+file path=etc/svc/profile/ns_dns.xml group=sys mode=0444
+file path=etc/svc/profile/ns_files.xml group=sys mode=0444
+file path=etc/svc/profile/ns_ldap.xml group=sys mode=0444
+file path=etc/svc/profile/ns_nis.xml group=sys mode=0444
+file path=etc/svc/profile/ns_none.xml group=sys mode=0444
+$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,SPARC-Enterprise.xml \
+    group=sys mode=0444
+$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-15000.xml \
+    group=sys mode=0444
+$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-880.xml \
+    group=sys mode=0444
+$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire.xml group=sys \
+    mode=0444
+$(sparc_ONLY)file \
+    path=etc/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml group=sys \
+    mode=0444
+$(sparc_ONLY)file \
+    path=etc/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml group=sys \
+    mode=0444
+file path=etc/svc/profile/platform_none.xml group=sys mode=0444
+$(sparc_ONLY)file path=etc/svc/profile/platform_sun4v.xml group=sys mode=0444
 file path=etc/sysevent/config/README group=sys mode=0444
 file path=etc/sysevent/config/SUNW,EC_dr,ESC_dr_req,sysevent.conf group=sys
 file path=etc/syslog.conf group=sys preserve=true
@@ -494,6 +518,77 @@ file path=lib/svc/bin/sqlite group=sys mode=0555
 file path=lib/svc/bin/svc.configd group=sys mode=0555
 file path=lib/svc/bin/svc.ipfd group=sys mode=0555
 file path=lib/svc/bin/svc.startd group=sys mode=0555
+file path=lib/svc/manifest/milestone/multi-user-server.xml group=sys mode=0444
+file path=lib/svc/manifest/milestone/multi-user.xml group=sys mode=0444
+file path=lib/svc/manifest/milestone/name-services.xml group=sys mode=0444
+file path=lib/svc/manifest/milestone/network.xml group=sys mode=0444
+file path=lib/svc/manifest/milestone/single-user.xml group=sys mode=0444
+file path=lib/svc/manifest/milestone/sysconfig.xml group=sys mode=0444
+file path=lib/svc/manifest/network/dlmgmt.xml group=sys mode=0444
+file path=lib/svc/manifest/network/dns/client.xml group=sys mode=0444
+file path=lib/svc/manifest/network/forwarding.xml group=sys mode=0444
+file path=lib/svc/manifest/network/inetd-upgrade.xml group=sys mode=0444
+file path=lib/svc/manifest/network/inetd.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ipsec/ike.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ipsec/ipsecalgs.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ipsec/manual-key.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ipsec/policy.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ldap/client.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-initial.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-ipmgmt.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-ipqos.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-iptun.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-location.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-loopback.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-netcfg.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-netmask.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-physical.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-routing-setup.xml group=sys \
+    mode=0444
+file path=lib/svc/manifest/network/network-service.xml group=sys mode=0444
+file path=lib/svc/manifest/network/routing/legacy-routing.xml group=sys \
+    mode=0444
+file path=lib/svc/manifest/network/rpc/bind.xml group=sys mode=0444
+file path=lib/svc/manifest/network/rpc/keyserv.xml group=sys mode=0444
+file path=lib/svc/manifest/network/shares/group.xml group=sys mode=0444
+file path=lib/svc/manifest/network/shares/reparsed.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ssl/kssl-proxy.xml group=sys mode=0444
+file path=lib/svc/manifest/system/auditd.xml group=sys mode=0444
+file path=lib/svc/manifest/system/boot-archive-update.xml group=sys mode=0444
+file path=lib/svc/manifest/system/boot-archive.xml group=sys mode=0444
+file path=lib/svc/manifest/system/boot-config.xml group=sys mode=0444
+file path=lib/svc/manifest/system/consadm.xml group=sys mode=0444
+file path=lib/svc/manifest/system/console-login.xml group=sys mode=0444
+file path=lib/svc/manifest/system/coreadm.xml group=sys mode=0444
+file path=lib/svc/manifest/system/cron.xml group=sys mode=0444
+file path=lib/svc/manifest/system/cryptosvc.xml group=sys mode=0444
+file path=lib/svc/manifest/system/device/devices-audio.xml group=sys mode=0444
+file path=lib/svc/manifest/system/device/devices-local.xml group=sys mode=0444
+file path=lib/svc/manifest/system/device/mpxio-upgrade.xml group=sys mode=0444
+file path=lib/svc/manifest/system/early-manifest-import.xml group=sys \
+    mode=0444
+file path=lib/svc/manifest/system/extended-accounting.xml group=sys mode=0444
+file path=lib/svc/manifest/system/filesystem/local-fs.xml group=sys mode=0444
+file path=lib/svc/manifest/system/filesystem/minimal-fs.xml group=sys \
+    mode=0444
+file path=lib/svc/manifest/system/filesystem/root-fs.xml group=sys mode=0444
+file path=lib/svc/manifest/system/filesystem/usr-fs.xml group=sys mode=0444
+$(i386_ONLY)file path=lib/svc/manifest/system/hostid.xml group=sys mode=0444
+file path=lib/svc/manifest/system/hotplug.xml group=sys mode=0444
+file path=lib/svc/manifest/system/identity.xml group=sys mode=0444
+file path=lib/svc/manifest/system/idmap.xml group=sys mode=0444
+file path=lib/svc/manifest/system/keymap.xml group=sys mode=0444
+file path=lib/svc/manifest/system/manifest-import.xml group=sys mode=0444
+file path=lib/svc/manifest/system/name-service-cache.xml group=sys mode=0444
+file path=lib/svc/manifest/system/pfexecd.xml group=sys mode=0444
+file path=lib/svc/manifest/system/rbac.xml group=sys mode=0444
+file path=lib/svc/manifest/system/rmtmpfiles.xml group=sys mode=0444
+file path=lib/svc/manifest/system/sac.xml group=sys mode=0444
+file path=lib/svc/manifest/system/svc/global.xml group=sys mode=0444
+file path=lib/svc/manifest/system/svc/restarter.xml group=sys mode=0444
+file path=lib/svc/manifest/system/system-log.xml group=sys mode=0444
+file path=lib/svc/manifest/system/utmp.xml group=sys mode=0444
+file path=lib/svc/manifest/system/vtdaemon.xml group=sys mode=0444
 file path=lib/svc/method/boot-archive mode=0555
 file path=lib/svc/method/boot-archive-update mode=0555
 file path=lib/svc/method/console-login mode=0555
@@ -538,8 +633,12 @@ file path=lib/svc/method/svc-utmpd mode=0555
 file path=lib/svc/method/system-log mode=0555
 file path=lib/svc/method/vtdaemon mode=0555
 file path=lib/svc/method/yp mode=0555
-file path=lib/svc/seed/global.db group=sys mode=0444
-file path=lib/svc/seed/nonglobal.db group=sys mode=0444
+# global.db is not needed in non-global zones, and it's pretty large.
+file path=lib/svc/seed/global.db group=sys mode=0444 \
+    variant.opensolaris.zone=global
+# symmetrically, nonglobal.db is not needed in global zones.
+file path=lib/svc/seed/nonglobal.db group=sys mode=0444 \
+    variant.opensolaris.zone=nonglobal
 file path=lib/svc/share/README mode=0444
 file path=lib/svc/share/fs_include.sh mode=0444
 file path=lib/svc/share/ipf_include.sh mode=0444
@@ -1157,6 +1256,7 @@ file path=usr/lib/rcm/modules/SUNW_aggr_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_cluster_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_dump_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_filesys_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_ibpart_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_ip_anon_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_ip_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_mpxio_rcm.so mode=0555
@@ -1165,7 +1265,6 @@ file path=usr/lib/rcm/modules/SUNW_swap_rcm.so mode=0555
 $(sparc_ONLY)file path=usr/lib/rcm/modules/SUNW_ttymux_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_vlan_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_vnic_rcm.so mode=0555
-file path=usr/lib/rcm/modules/SUNW_ibpart_rcm.so mode=0555
 file path=usr/lib/rcm/rcm_daemon mode=0555
 file path=usr/lib/reparse/reparsed group=sys mode=0555
 file path=usr/lib/saf/listen group=sys mode=0755
@@ -1913,104 +2012,22 @@ file path=var/sadm/system/admin/default_java group=sys mode=0444
 file path=var/saf/zsmon/log group=sys preserve=true
 file path=var/spool/cron/crontabs/adm group=sys mode=0600 preserve=true
 file path=var/spool/cron/crontabs/root group=sys mode=0600 preserve=true
-file path=lib/svc/manifest/milestone/multi-user-server.xml group=sys mode=0444
-file path=lib/svc/manifest/milestone/multi-user.xml group=sys mode=0444
-file path=lib/svc/manifest/milestone/name-services.xml group=sys mode=0444
-file path=lib/svc/manifest/milestone/network.xml group=sys mode=0444
-file path=lib/svc/manifest/milestone/single-user.xml group=sys mode=0444
-file path=lib/svc/manifest/milestone/sysconfig.xml group=sys mode=0444
-file path=lib/svc/manifest/network/dlmgmt.xml group=sys mode=0444
-file path=lib/svc/manifest/network/dns/client.xml group=sys mode=0444
-file path=lib/svc/manifest/network/forwarding.xml group=sys mode=0444
-file path=lib/svc/manifest/network/inetd-upgrade.xml group=sys mode=0444
-file path=lib/svc/manifest/network/inetd.xml group=sys mode=0444
-file path=lib/svc/manifest/network/ipsec/ike.xml group=sys mode=0444
-file path=lib/svc/manifest/network/ipsec/ipsecalgs.xml group=sys mode=0444
-file path=lib/svc/manifest/network/ipsec/manual-key.xml group=sys mode=0444
-file path=lib/svc/manifest/network/ipsec/policy.xml group=sys mode=0444
-file path=lib/svc/manifest/network/ldap/client.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-initial.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-ipmgmt.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-ipqos.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-iptun.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-location.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-loopback.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-netcfg.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-netmask.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-physical.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-routing-setup.xml group=sys mode=0444
-file path=lib/svc/manifest/network/network-service.xml group=sys mode=0444
-file path=lib/svc/manifest/network/routing/legacy-routing.xml group=sys \
-    mode=0444
-file path=lib/svc/manifest/network/rpc/bind.xml group=sys mode=0444
-file path=lib/svc/manifest/network/rpc/keyserv.xml group=sys mode=0444
-file path=lib/svc/manifest/network/shares/group.xml group=sys mode=0444
-file path=lib/svc/manifest/network/shares/reparsed.xml group=sys mode=0444
-file path=lib/svc/manifest/network/ssl/kssl-proxy.xml group=sys mode=0444
-file path=lib/svc/manifest/system/auditd.xml group=sys mode=0444
-file path=lib/svc/manifest/system/boot-archive-update.xml group=sys mode=0444
-file path=lib/svc/manifest/system/boot-archive.xml group=sys mode=0444
-file path=lib/svc/manifest/system/boot-config.xml group=sys mode=0444
-file path=lib/svc/manifest/system/consadm.xml group=sys mode=0444
-file path=lib/svc/manifest/system/console-login.xml group=sys mode=0444
-file path=lib/svc/manifest/system/coreadm.xml group=sys mode=0444
-file path=lib/svc/manifest/system/cron.xml group=sys mode=0444
-file path=lib/svc/manifest/system/cryptosvc.xml group=sys mode=0444
-file path=lib/svc/manifest/system/device/devices-audio.xml group=sys mode=0444
-file path=lib/svc/manifest/system/device/devices-local.xml group=sys mode=0444
-file path=lib/svc/manifest/system/device/mpxio-upgrade.xml group=sys mode=0444
-file path=lib/svc/manifest/system/extended-accounting.xml group=sys mode=0444
-file path=lib/svc/manifest/system/filesystem/local-fs.xml group=sys mode=0444
-file path=lib/svc/manifest/system/filesystem/minimal-fs.xml group=sys mode=0444
-file path=lib/svc/manifest/system/filesystem/root-fs.xml group=sys mode=0444
-file path=lib/svc/manifest/system/filesystem/usr-fs.xml group=sys mode=0444
-$(i386_ONLY)file path=lib/svc/manifest/system/hostid.xml group=sys mode=0444
-file path=lib/svc/manifest/system/hotplug.xml group=sys mode=0444
-file path=lib/svc/manifest/system/identity.xml group=sys mode=0444
-file path=lib/svc/manifest/system/idmap.xml group=sys mode=0444
-file path=lib/svc/manifest/system/keymap.xml group=sys mode=0444
-file path=lib/svc/manifest/system/early-manifest-import.xml group=sys mode=0444
-file path=lib/svc/manifest/system/manifest-import.xml group=sys mode=0444
-file path=lib/svc/manifest/system/name-service-cache.xml group=sys mode=0444
-file path=lib/svc/manifest/system/pfexecd.xml group=sys mode=0444
-file path=lib/svc/manifest/system/rbac.xml group=sys mode=0444
-file path=lib/svc/manifest/system/rmtmpfiles.xml group=sys mode=0444
-file path=lib/svc/manifest/system/sac.xml group=sys mode=0444
-file path=lib/svc/manifest/system/svc/global.xml group=sys mode=0444
-file path=lib/svc/manifest/system/svc/restarter.xml group=sys mode=0444
-file path=lib/svc/manifest/system/system-log.xml group=sys mode=0444
-file path=lib/svc/manifest/system/utmp.xml group=sys mode=0444
-file path=lib/svc/manifest/system/vtdaemon.xml group=sys mode=0444
-file path=etc/svc/profile/generic_limited_net.xml group=sys mode=0444
-file path=etc/svc/profile/generic_open.xml group=sys mode=0444
-file path=etc/svc/profile/inetd_generic.xml group=sys mode=0444
-file path=etc/svc/profile/inetd_upgrade.xml group=sys mode=0444
-file path=etc/svc/profile/ns_dns.xml group=sys mode=0444
-file path=etc/svc/profile/ns_files.xml group=sys mode=0444
-file path=etc/svc/profile/ns_ldap.xml group=sys mode=0444
-file path=etc/svc/profile/ns_nis.xml group=sys mode=0444
-file path=etc/svc/profile/ns_none.xml group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,SPARC-Enterprise.xml \
-    group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-15000.xml \
-    group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-880.xml group=sys \
-    mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire.xml group=sys \
-    mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml \
-    group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml \
-    group=sys mode=0444
-file path=etc/svc/profile/platform_none.xml group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_sun4v.xml group=sys mode=0444
 hardlink path=etc/crypto/certs/SUNWObjectCA \
     target=../../../etc/certs/SUNWObjectCA
 hardlink path=etc/rc2.d/S20sysetup target=../../etc/init.d/sysetup
-hardlink path=etc/rc2.d/S73cachefs.daemon target=../../etc/init.d/cachefs.daemon
+hardlink path=etc/rc2.d/S73cachefs.daemon \
+    target=../../etc/init.d/cachefs.daemon
 hardlink path=etc/rc2.d/S82mkdtab target=../../etc/init.d/mkdtab
 hardlink path=etc/rc2.d/S89PRESERVE target=../../etc/init.d/PRESERVE
 hardlink path=etc/rc2.d/S98deallocate target=../../etc/init.d/deallocate
+$(sparc_ONLY)hardlink path=etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
+    target=./platform_SUNW,Sun-Fire-880.xml
+$(sparc_ONLY)hardlink \
+    path=etc/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml \
+    target=./platform_SUNW,UltraSPARC-IIi-Netract.xml
+$(sparc_ONLY)hardlink \
+    path=etc/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml \
+    target=./platform_SUNW,UltraSPARC-IIi-Netract.xml
 hardlink path=sbin/rc5 target=../sbin/rc0
 hardlink path=sbin/rc6 target=../sbin/rc0
 hardlink path=usr/bin/$(ARCH32)/encrypt target=decrypt
@@ -2127,7 +2144,8 @@ hardlink path=usr/has/bin/view target=edit
 hardlink path=usr/lib/fs/hsfs/fstyp target=../../../sbin/fstyp
 hardlink path=usr/lib/fs/ufs/dcopy target=../../../../usr/lib/fs/ufs/clri
 hardlink path=usr/lib/fs/ufs/fstyp target=../../../sbin/fstyp
-hardlink path=usr/lib/fs/ufs/quotaon target=../../../../usr/lib/fs/ufs/quotaoff
+hardlink path=usr/lib/fs/ufs/quotaon \
+    target=../../../../usr/lib/fs/ufs/quotaoff
 hardlink path=usr/lib/inet/in.iked target=../../../usr/lib/isaexec
 hardlink path=usr/sadm/bin/dispgid target=../../../usr/bin/ckgid
 hardlink path=usr/sadm/bin/dispuid target=../../../usr/bin/ckuid
@@ -2509,14 +2527,6 @@ hardlink path=usr/share/lib/zoneinfo/W-SU \
 hardlink path=usr/share/lib/zoneinfo/Zulu \
     target=../../../../usr/share/lib/zoneinfo/Etc/UTC
 hardlink path=usr/xpg4/bin/pfsh target=../../bin/pfexec
-$(sparc_ONLY)hardlink path=etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
-    target=./platform_SUNW,Sun-Fire-880.xml
-$(sparc_ONLY)hardlink \
-    path=etc/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml \
-    target=./platform_SUNW,UltraSPARC-IIi-Netract.xml
-$(sparc_ONLY)hardlink \
-    path=etc/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml \
-    target=./platform_SUNW,UltraSPARC-IIi-Netract.xml
 legacy pkg=SUNWcsr arch=$(ARCH) category=system \
     desc="core software for a specific instruction-set architecture" \
     hotline="Please contact your local service provider" \
@@ -2717,12 +2727,12 @@ link path=usr/src target=./share/src
 link path=usr/tmp target=../var/tmp
 link path=var/ld/32 target=.
 link path=var/ld/64 target=$(ARCH64)
+#
+# The bootadm binary needs the etc/release file.
+#
+depend fmri=release/name type=require
 depend fmri=runtime/perl-584 type=require
 #
 # The loadkeys binary needs the keytables.
 #
 depend fmri=system/data/keyboard/keytables type=require
-#
-# The bootadm binary needs the etc/release file.
-#
-depend fmri=release/name type=require

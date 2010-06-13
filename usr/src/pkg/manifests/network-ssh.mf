@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/network/ssh@$(PKGVERS)
 set name=pkg.description \
     value="Secure Shell protocol Client and associated Utilities"
 set name=pkg.summary value="SSH Client and utilities"
-set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/ssh group=sys
 dir path=usr group=sys
@@ -38,8 +37,8 @@ dir path=usr/bin
 dir path=usr/lib
 dir path=usr/lib/ssh
 file path=etc/ssh/moduli group=sys
-file path=etc/ssh/ssh_config group=sys original_name=SUNWssh:etc/ssh/ssh_config \
-    preserve=true
+file path=etc/ssh/ssh_config group=sys \
+    original_name=SUNWssh:etc/ssh/ssh_config preserve=true
 file path=usr/bin/scp mode=0555
 file path=usr/bin/sftp mode=0555
 file path=usr/bin/ssh mode=0555

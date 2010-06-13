@@ -20,16 +20,15 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/diagnostic/cpu-counters@$(PKGVERS)
-set name=pkg.description value="CPU Performance Counter libraries and utilities"
+set name=pkg.description \
+    value="CPU Performance Counter libraries and utilities"
 set name=pkg.summary value="CPU Performance Counter libraries and utilities"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/bin
 $(i386_ONLY)dir path=usr/bin/$(ARCH32)
@@ -54,12 +53,13 @@ $(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.15 group=sys \
     mode=0755
 $(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6 group=sys \
     mode=0755
-$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.15 group=sys \
-    mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.15 \
+    group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/pcbe/pcbe.AuthenticAMD group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.15 group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.6 group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.6.15 group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.6.15 group=sys \
+    mode=0755
 file path=usr/lib/$(ARCH64)/libcpc.so.1
 file path=usr/lib/$(ARCH64)/libpctx.so.1
 file path=usr/lib/$(ARCH64)/llib-lcpc.ln

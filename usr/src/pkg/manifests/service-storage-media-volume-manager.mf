@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/storage/media-volume-manager@$(PKGVERS)
@@ -29,29 +28,26 @@ set name=pkg.description value="Non-graphical removable volume manager"
 set name=pkg.summary value="Removable volume manager"
 set name=info.classification value=org.opensolaris.category.2008:System/Media
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system/filesystem group=sys \
+    variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
 dir path=usr/sbin
-dir path=lib/svc/manifest group=sys opensolaris.zone=global \
+file path=lib/svc/manifest/system/filesystem/rmvolmgr.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system/filesystem group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=lib/svc/method/svc-rmvolmgr mode=0555 opensolaris.zone=global \
+file path=lib/svc/method/svc-rmvolmgr mode=0555 \
     variant.opensolaris.zone=global
 file path=usr/bin/rmformat mode=4555
 file path=usr/bin/rmmount mode=0555
 file path=usr/bin/volcheck mode=0555
 file path=usr/bin/volrmmount mode=0555
 file path=usr/lib/rmvolmgr mode=0555
-file path=lib/svc/manifest/system/filesystem/rmvolmgr.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWrmvolmgr arch=$(ARCH) category=system \
     desc="Non-graphical removable volume manager" \
     hotline="Please contact your local service provider" \

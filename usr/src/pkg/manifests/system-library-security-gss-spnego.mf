@@ -20,16 +20,15 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/library/security/gss/spnego@$(PKGVERS)
 set name=pkg.description value="SPNEGO GSS-API Mechanism"
 set name=pkg.summary value="SPNEGO GSS-API Mechanism"
-set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)

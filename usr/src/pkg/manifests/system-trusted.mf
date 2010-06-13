@@ -20,18 +20,19 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/trusted@$(PKGVERS)
 set name=pkg.description value="Solaris Trusted Extensions"
 set name=pkg.summary value="Trusted Extensions"
-set name=info.classification value=org.opensolaris.category.2008:System/Trusted
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Trusted
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 dir path=lib/svc/method
 dir path=sbin group=sys
 dir path=usr group=sys
@@ -56,8 +57,7 @@ dir path=usr/lib/lp/model group=lp
 dir path=usr/lib/lp/postscript group=lp
 dir path=usr/lib/zones
 dir path=usr/sbin
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/system group=sys
+file path=lib/svc/manifest/system/tsol-zones.xml group=sys mode=0444
 file path=lib/svc/method/svc-tsol-zones mode=0555
 file path=sbin/tnctl group=sys mode=0555
 file path=usr/bin/getlabel mode=0555
@@ -119,7 +119,6 @@ file path=usr/sbin/tnchkdb group=sys mode=0555
 file path=usr/sbin/tnd group=sys mode=0555
 file path=usr/sbin/tninfo group=sys mode=0555
 file path=usr/sbin/txzonemgr group=sys mode=0555
-file path=lib/svc/manifest/system/tsol-zones.xml group=sys mode=0444
 hardlink path=usr/sbin/remove_allocatable target=add_allocatable
 legacy pkg=SUNWtsr arch=$(ARCH) category=system \
     desc="Solaris Trusted Extensions, (Root)" \

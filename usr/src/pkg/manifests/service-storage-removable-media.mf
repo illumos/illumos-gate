@@ -29,17 +29,17 @@ set name=pkg.summary value="Storage media management library"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/smedia
-dir path=usr/lib/smedia/$(ARCH64)
 dir path=lib
 dir path=lib/svc
 dir path=lib/svc/manifest group=sys
 dir path=lib/svc/manifest/network group=sys
 dir path=lib/svc/manifest/network/rpc group=sys
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/smedia
+dir path=usr/lib/smedia/$(ARCH64)
+file path=lib/svc/manifest/network/rpc/smserver.xml group=sys mode=0444
 file path=usr/lib/$(ARCH64)/libsmedia.so.1
 file path=usr/lib/$(ARCH64)/llib-lsmedia.ln
 file path=usr/lib/libsmedia.so.1
@@ -54,7 +54,6 @@ file path=usr/lib/smedia/sm_blkdev.so.1 mode=0555
 file path=usr/lib/smedia/sm_fd.so.1 mode=0555
 file path=usr/lib/smedia/sm_pcata.so.1 mode=0555
 file path=usr/lib/smedia/sm_scsi.so.1 mode=0555
-file path=lib/svc/manifest/network/rpc/smserver.xml group=sys mode=0444
 legacy pkg=SUNWsmedia arch=$(ARCH) category=system \
     desc="Storage media management library" \
     hotline="Please contact your local service provider" \

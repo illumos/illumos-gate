@@ -20,23 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/platform/netra@$(PKGVERS)
 set name=pkg.description \
     value="I2C and System Controller and Status Drivers for Netra ct cPCI platform"
 set name=pkg.summary value="Netra ct I2C and System Drivers"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=platform group=sys
 dir path=platform/SUNW,Netra-CP2300 group=sys
 dir path=platform/SUNW,Netra-CP2300/kernel group=sys
@@ -46,13 +44,16 @@ dir path=platform/SUNW,Netra-CP2300/kernel/drv group=sys
 dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
 dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel group=sys
 dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/dacf group=sys
-dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/dacf/$(ARCH64) group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/dacf/$(ARCH64) \
+    group=sys
 dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv group=sys
-dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/$(ARCH64) group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/$(ARCH64) \
+    group=sys
 dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
 dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel group=sys
 dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/dacf group=sys
-dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/dacf/$(ARCH64) group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/dacf/$(ARCH64) \
+    group=sys
 dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/drv group=sys
 dir path=platform/SUNW,UltraSPARC-IIi-Netract group=sys
 dir path=platform/SUNW,UltraSPARC-IIi-Netract/kernel group=sys
@@ -63,9 +64,10 @@ dir path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64) group=sys
 driver name=acebus
 driver name=scsb alias=nct-ATML,at27c64
 file path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/acebus.conf \
-    group=sys reboot-needed=false
-file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/dacf/$(ARCH64)/ttymux_dacf \
-    group=sys reboot-needed=true
+    group=sys
+file \
+    path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/dacf/$(ARCH64)/ttymux_dacf \
+    group=sys
 file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/acebus \
     group=sys
 file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/pcf8574 \
@@ -74,12 +76,10 @@ file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/pcf8591 \
     group=sys
 file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/scsb \
     group=sys
-file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/scsb.conf group=sys \
-    reboot-needed=false
-file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/se.conf group=sys \
-    reboot-needed=false
-file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/ttymux.conf group=sys \
-    reboot-needed=false
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/scsb.conf group=sys
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/se.conf group=sys
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/ttymux.conf \
+    group=sys
 legacy pkg=SUNWcti2.u arch=$(ARCH).sun4u category=system \
     desc="I2C and System Controller and Status Drivers for Netra ct cPCI platform" \
     hotline="Please contact your local service provider" \

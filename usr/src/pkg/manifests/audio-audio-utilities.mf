@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/audio/audio-utilities@$(PKGVERS)
@@ -29,7 +28,6 @@ set name=pkg.description value="SunOS audio applications"
 set name=pkg.summary value="Audio Applications"
 set name=info.classification value=org.opensolaris.category.2008:System/Media
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/bin
 file path=usr/bin/audioconvert mode=0555
@@ -37,7 +35,8 @@ file path=usr/bin/audioctl mode=0555
 file path=usr/bin/audioplay mode=0555
 file path=usr/bin/audiorecord mode=0555
 file path=usr/bin/audiotest mode=0555
-legacy pkg=SUNWauda arch=$(ARCH) category=system desc="SunOS audio applications" \
+legacy pkg=SUNWauda arch=$(ARCH) category=system \
+    desc="SunOS audio applications" \
     hotline="Please contact your local service provider" \
     name="Audio Applications" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11

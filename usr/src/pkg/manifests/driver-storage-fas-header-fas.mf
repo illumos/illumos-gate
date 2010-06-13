@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/driver/storage/fas/header-fas@$(PKGVERS)
@@ -30,7 +29,6 @@ set name=pkg.summary value="SunSwift Adapter Headers"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/include/sys
@@ -40,7 +38,8 @@ file path=usr/include/sys/scsi/adapters/fascmd.h
 file path=usr/include/sys/scsi/adapters/fasdma.h
 file path=usr/include/sys/scsi/adapters/fasreg.h
 file path=usr/include/sys/scsi/adapters/fasvar.h
-legacy pkg=SUNWhmdu arch=$(ARCH) category=system desc="SunSwift Adapter Headers" \
+legacy pkg=SUNWhmdu arch=$(ARCH) category=system \
+    desc="SunSwift Adapter Headers" \
     hotline="Please contact your local service provider" \
     name="SunSwift Adapter Headers" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11

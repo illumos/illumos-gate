@@ -20,24 +20,23 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/zones@$(PKGVERS)
-set name=pkg.description value="Solaris Zones Configuration and Administration"
+set name=pkg.description \
+    value="Solaris Zones Configuration and Administration"
 set name=pkg.summary value="Solaris Zones"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/brand group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/zones group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=etc group=sys variant.opensolaris.zone=global
+dir path=etc/brand group=sys variant.opensolaris.zone=global
+dir path=etc/zones group=sys variant.opensolaris.zone=global
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/kernel group=sys
@@ -54,20 +53,18 @@ dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
-dir path=lib/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
 driver name=zcons
 file path=etc/zones/SUNWblank.xml mode=0444
 file path=etc/zones/SUNWdefault.xml mode=0444
-file path=etc/zones/index group=sys opensolaris.zone=global \
-    original_name=SUNWzone:etc/zones/index preserve=true \
+file path=etc/zones/index group=sys original_name=SUNWzone:etc/zones/index \
+    preserve=true variant.opensolaris.zone=global
+file path=lib/svc/manifest/system/resource-mgmt.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
-file path=lib/svc/method/svc-resource-mgmt mode=0555 opensolaris.zone=global \
+file path=lib/svc/manifest/system/zones.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
-file path=lib/svc/method/svc-zones mode=0555 opensolaris.zone=global \
+file path=lib/svc/method/svc-resource-mgmt mode=0555 \
     variant.opensolaris.zone=global
+file path=lib/svc/method/svc-zones mode=0555 variant.opensolaris.zone=global
 file path=usr/kernel/drv/$(ARCH64)/zcons group=sys
 $(i386_ONLY)file path=usr/kernel/drv/zcons group=sys
 file path=usr/lib/$(ARCH64)/libbrand.so.1
@@ -86,10 +83,6 @@ file path=usr/sbin/zonecfg mode=0555
 file path=usr/share/lib/xml/dtd/brand.dtd.1 mode=0644
 file path=usr/share/lib/xml/dtd/zone_platform.dtd.1 mode=0644
 file path=usr/share/lib/xml/dtd/zonecfg.dtd.1
-file path=lib/svc/manifest/system/resource-mgmt.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=lib/svc/manifest/system/zones.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWzoner arch=$(ARCH) category=system \
     desc="Solaris Zones Configuration Files" \
     hotline="Please contact your local service provider" \

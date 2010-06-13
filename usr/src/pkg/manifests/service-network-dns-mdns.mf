@@ -20,19 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/dns/mdns@$(PKGVERS)
 set name=pkg.description \
     value="Root components for Multicast DNS daemon and service discovery support"
 set name=pkg.summary value="Multicast DNS and Service Discovery"
-set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Services
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/dns group=sys
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/include
@@ -50,9 +52,7 @@ dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple group=other
 dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd group=other
 dir path=usr/share/lib/java/javadoc/dnssd/api/resources group=other
 dir path=usr/share/lib/java/javadoc/dnssd/examples group=other
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/manifest/network/dns group=sys
+file path=lib/svc/manifest/network/dns/multicast.xml group=sys mode=0444
 file path=usr/bin/dns-sd mode=0555
 file path=usr/include/dns_sd.h
 file path=usr/lib/$(ARCH64)/libdns_sd.so.1
@@ -66,10 +66,12 @@ file path=usr/lib/llib-ldns_sd
 file path=usr/lib/llib-ldns_sd.ln
 file path=usr/lib/nss_mdns.so.1
 file path=usr/share/lib/java/dnssd.jar group=sys
-file path=usr/share/lib/java/javadoc/dnssd/api/allclasses-frame.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/allclasses-frame.html \
+    group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/allclasses-noframe.html \
     group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/BaseListener.html \
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/BaseListener.html \
     group=other
 file \
     path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/BrowseListener.html \
@@ -87,7 +89,8 @@ file \
 file \
     path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDRegistration.html \
     group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDService.html \
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDService.html \
     group=other
 file \
     path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DomainListener.html \
@@ -112,21 +115,25 @@ file \
 file \
     path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-summary.html \
     group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-tree.html \
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-tree.html \
     group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/constant-values.html group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/deprecated-list.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/constant-values.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/deprecated-list.html \
+    group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/help-doc.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/index-all.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/index.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/overview-tree.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/package-list group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/resources/inherit.gif group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/serialized-form.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/resources/inherit.gif \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/serialized-form.html \
+    group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/stylesheet.css group=other
 file path=usr/share/lib/java/javadoc/dnssd/examples/BrowserApp.jar group=sys
 file path=usr/share/lib/java/javadoc/dnssd/examples/SimpleChat.jar group=sys
-file path=lib/svc/manifest/network/dns/multicast.xml group=sys mode=0444
 legacy pkg=SUNWdsdr arch=$(ARCH) category=system \
     desc="Root components for Multicast DNS daemon and service discovery support" \
     hotline="Please contact your local service provider" \
@@ -140,7 +147,8 @@ legacy pkg=SUNWdsdu arch=$(ARCH) category=system \
 license cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE \
     license=cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
-license lib/libdns_sd/THIRDPARTYLICENSE license=lib/libdns_sd/THIRDPARTYLICENSE
+license lib/libdns_sd/THIRDPARTYLICENSE \
+    license=lib/libdns_sd/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libdns_sd.so target=libdns_sd.so.1
 link path=usr/lib/$(ARCH64)/libjdns_sd.so target=libjdns_sd.so.1

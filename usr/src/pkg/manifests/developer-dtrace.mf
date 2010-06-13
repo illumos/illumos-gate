@@ -29,7 +29,6 @@ set name=pkg.summary value="DTrace Clients"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/demo
 dir path=usr/demo/dtrace
@@ -217,8 +216,10 @@ file path=usr/share/lib/java/javadoc/dtrace/api/allclasses-frame.html \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/allclasses-noframe.html \
     group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/constant-values.html group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/deprecated-list.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/constant-values.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/deprecated-list.html \
+    group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/help-doc.html group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/index-all.html group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/index.html group=other
@@ -610,26 +611,31 @@ file path=usr/share/lib/java/javadoc/dtrace/api/overview-tree.html group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/package-list group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/resources/inherit.gif \
     group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/serialized-form.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/serialized-form.html \
+    group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/stylesheet.css group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/TestAPI.java group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/TestAPI2.java group=other
-file path=usr/share/lib/java/javadoc/dtrace/examples/TestTarget.java group=other
+file path=usr/share/lib/java/javadoc/dtrace/examples/TestTarget.java \
+    group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/hello.d group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/intrstat.d group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/syscall.d group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/target.d group=other
-file path=usr/share/lib/java/javadoc/dtrace/html/JavaDTraceAPI.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/html/JavaDTraceAPI.html \
+    group=other
 file path=usr/share/lib/java/javadoc/dtrace/html/fast.html group=other
-file path=usr/share/lib/java/javadoc/dtrace/images/JavaDTraceAPI.gif group=other
+file path=usr/share/lib/java/javadoc/dtrace/images/JavaDTraceAPI.gif \
+    group=other
 hardlink path=usr/sbin/dtrace target=../../usr/lib/isaexec
 hardlink path=usr/sbin/intrstat target=../../usr/lib/isaexec
 hardlink path=usr/sbin/lockstat target=../../usr/lib/isaexec
 hardlink path=usr/sbin/plockstat target=../../usr/lib/isaexec
 legacy pkg=SUNWdtrc arch=$(ARCH) category=system \
     desc="Dynamic Tracing (DTrace) Clients" \
-    hotline="Please contact your local service provider" name="DTrace Clients" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    hotline="Please contact your local service provider" \
+    name="DTrace Clients" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license lic_iprb license=lic_iprb

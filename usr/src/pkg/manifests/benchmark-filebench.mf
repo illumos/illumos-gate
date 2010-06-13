@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/benchmark/filebench@$(PKGVERS)
@@ -31,7 +30,6 @@ set name=pkg.summary value=FileBench
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/benchmarks
 dir path=usr/benchmarks/filebench
@@ -71,7 +69,8 @@ file path=usr/benchmarks/filebench/workloads/filemicro_rwritedsync.f mode=0444
 file path=usr/benchmarks/filebench/workloads/filemicro_rwritefsync.f mode=0444
 file path=usr/benchmarks/filebench/workloads/filemicro_seqread.f mode=0444
 file path=usr/benchmarks/filebench/workloads/filemicro_seqwrite.f mode=0444
-file path=usr/benchmarks/filebench/workloads/filemicro_seqwriterand.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_seqwriterand.f \
+    mode=0444
 file path=usr/benchmarks/filebench/workloads/filemicro_seqwriterandvargam.f \
     mode=0444
 file path=usr/benchmarks/filebench/workloads/filemicro_seqwriterandvartab.f \
@@ -85,7 +84,8 @@ file path=usr/benchmarks/filebench/workloads/mongo.f mode=0444
 file path=usr/benchmarks/filebench/workloads/multistreamread.f mode=0444
 file path=usr/benchmarks/filebench/workloads/multistreamreaddirect.f mode=0444
 file path=usr/benchmarks/filebench/workloads/multistreamwrite.f mode=0444
-file path=usr/benchmarks/filebench/workloads/multistreamwritedirect.f mode=0444
+file path=usr/benchmarks/filebench/workloads/multistreamwritedirect.f \
+    mode=0444
 file path=usr/benchmarks/filebench/workloads/networkfs.f mode=0444
 file path=usr/benchmarks/filebench/workloads/oltp.f mode=0444
 file path=usr/benchmarks/filebench/workloads/openfiles.f mode=0444
@@ -96,9 +96,11 @@ file path=usr/benchmarks/filebench/workloads/randomwrite.f mode=0444
 file path=usr/benchmarks/filebench/workloads/ratelimcopyfiles.f mode=0444
 file path=usr/benchmarks/filebench/workloads/removedirs.f mode=0444
 file path=usr/benchmarks/filebench/workloads/singlestreamread.f mode=0444
-file path=usr/benchmarks/filebench/workloads/singlestreamreaddirect.f mode=0444
+file path=usr/benchmarks/filebench/workloads/singlestreamreaddirect.f \
+    mode=0444
 file path=usr/benchmarks/filebench/workloads/singlestreamwrite.f mode=0444
-file path=usr/benchmarks/filebench/workloads/singlestreamwritedirect.f mode=0444
+file path=usr/benchmarks/filebench/workloads/singlestreamwritedirect.f \
+    mode=0444
 file path=usr/benchmarks/filebench/workloads/tpcso.f mode=0444
 file path=usr/benchmarks/filebench/workloads/varmail.f mode=0444
 file path=usr/benchmarks/filebench/workloads/videoserver.f mode=0444

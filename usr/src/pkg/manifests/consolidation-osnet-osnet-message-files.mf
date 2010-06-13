@@ -21,7 +21,8 @@
 
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 
-set name=pkg.fmri value=pkg:/consolidation/osnet/osnet-message-files@$(PKGVERS)
+set name=pkg.fmri \
+    value=pkg:/consolidation/osnet/osnet-message-files@$(PKGVERS)
 set name=pkg.description \
     value="localizable message files for the OS-Networking consolidation"
 set name=pkg.summary value="Localizable ON message files"
@@ -34,7 +35,6 @@ set name=info.classification \
 #
 set name=org.opensolaris.nodepend value=true
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/help
@@ -332,8 +332,10 @@ file path=usr/lib/locale/C/LC_TIME/SUNW_OST_OSCMD.po group=sys
 file path=usr/lib/locale/C/LC_TIME/SUNW_OST_OSLIB.po group=sys
 file path=usr/share/lib/locale/com/sun/admin/pm/client/pmHelpResources.java \
     group=lp
-file path=usr/share/lib/locale/com/sun/admin/pm/client/pmResources.java group=lp
-file path=usr/share/lib/locale/com/sun/dhcpmgr/bridge/ResourceBundle.properties
+file path=usr/share/lib/locale/com/sun/admin/pm/client/pmResources.java \
+    group=lp
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/bridge/ResourceBundle.properties
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/cli/common/ResourceBundle.properties
 file \
@@ -346,7 +348,8 @@ file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm/ResourceBundle.properties
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/OptionDescriptions.properties
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/ResourceBundle.properties
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/ResourceBundle.properties
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWbinfiles/ResourceBundle.properties
 file \
@@ -358,20 +361,26 @@ file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/folder.gif
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/macro2.gif
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/macroflow.gif
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/tip2.gif
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_create.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_create.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_del.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_dup.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_how.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_mod.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_multi.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_multi.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_ref.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_rel.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_view.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_wiz.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_config_wiz.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_convert_wiz.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_export_wiz.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_import_wiz.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_config_wiz.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_convert_wiz.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_export_wiz.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_import_wiz.html
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_create.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_del.html
@@ -379,26 +388,35 @@ file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_dup.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_how.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_mod.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_ref.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_view.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_view.html
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macros_about.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_hlp.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_how.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_idx.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_menus.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_menus.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_top.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_del.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_ref.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_wiz.html
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_create.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_del.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_dup.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_how.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_mod.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_ref.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_tags.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_view.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_del.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_dup.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_how.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_mod.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_ref.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_tags.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_view.html
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_choose.html
 file \
@@ -408,17 +426,21 @@ file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_enable.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_how.html
 file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_ref.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_serv.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_serv.html
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_unconfig.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_server_serv.html
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_server_serv.html
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_server_unconfig.html
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_solaris_about.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/common/ResourceBundle.properties
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/common/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/dhcpmgr/data/ResourceBundle.properties
-file path=usr/share/lib/locale/com/sun/dhcpmgr/server/ResourceBundle.properties
+file \
+    path=usr/share/lib/locale/com/sun/dhcpmgr/server/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/dhcpmgr/ui/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/slp/ClientLib_en.properties group=sys
 file path=usr/share/lib/locale/com/sun/slp/Server_en.properties group=sys

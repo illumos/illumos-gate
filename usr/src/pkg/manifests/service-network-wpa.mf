@@ -20,26 +20,25 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/wpa@$(PKGVERS)
 set name=pkg.description \
     value="The service implements the IEEE802.11i (WPA/WPA2) specification."
 set name=pkg.summary value="Wireless WPA Supplicant"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/inet
 dir path=lib
 dir path=lib/svc
 dir path=lib/svc/manifest group=sys
 dir path=lib/svc/manifest/network group=sys
-file path=usr/lib/inet/wpad mode=0555
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/inet
 file path=lib/svc/manifest/network/wpa.xml group=sys mode=0444
+file path=usr/lib/inet/wpad mode=0555
 legacy pkg=SUNWwpar arch=$(ARCH) category=system \
     desc="The service implements the IEEE802.11i (WPA/WPA2) specification." \
     hotline="Please contact your local service provider" \

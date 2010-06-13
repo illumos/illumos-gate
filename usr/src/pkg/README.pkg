@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 Introduction
@@ -57,7 +56,7 @@ for DEBUG and non-DEBUG, and are thus available at
 	    non-redistributable (without a proper legal agreement) pieces
 	    which may or may not be suitable for inclusion in the
 	    pkg.sun.com/opensolaris/extra repository, including the
-	    SUNWcryptoint bits necessary for working crypto in a Closed
+	    internal crypto bits necessary for working crypto in a Closed
 	    build.  Do not distribute any of the bits in repo.extra
 	    without prior agreement from the appropriate lawyers.
 
@@ -96,10 +95,16 @@ The build behavior may modified by the following variables:
 	ON_CRYPTO_BINS or CODESIGN_USER
 	    If ON_CRYPTO_BINS or CODESIGN_USER is set in your build env,
 	    no packages will depend on the internal crypto certificates.
+
 	    If neither is set, your bits depend on the internal crypto
 	    certificates being available and packages will depend on
 	    pkg:/driver/crypto/dprov, which is only available in the
 	    on-extra repository.
+
+	    *** Important *** This means that, if you build using
+	    internal crypto, but you try to do an image-update with
+	    only repo.redist, you will be told that there are no  
+	    updates available.
 
 	SUPPRESSPKGDEP
 	    If SUPPRESSPKGDEP is set to "true" in your environment,
@@ -190,10 +195,19 @@ serve the generated repositories to multiple test machines.
 	    The depot can be started across NFS as well if you
 	    have a fast pipe.
 
+	    If you used internal crypto in your builds, then you must
+	    do this step for both repo.redist and repo.extra, picking
+	    different ports for each.  Otherwise, you will be unable to
+	    image-update.
+
 	Configure your test system.
 	    pkg set-publisher -P -g http://<your server host>:<port> on-nightly
 	    pkg set-publisher --non-sticky opensolaris.org
 	    pkg uninstall entire
+
+	    If you used internal crypto in your builds, then you must also:
+	        pkg set-publisher -P \
+		    -g http://<your server host>:<extra-port> on-extra
 
 	pkg image-update your test system.
 	    pkg image-update will upgrade all packages on your test system
@@ -217,6 +231,13 @@ There are various tactics for troubleshooting a failed upgrade.
 	Obsolete and renamed packages can cause trouble.
 	    pkg search -l ::pkg.renamed:true
 	    pkg search -l ::pkg.obsolete:true
+
+	Check to see if you used internal crypto, but failed to provide
+	a server for repo.extra.
+	    Use a web browser to view the system/kernel manifest from
+	    your on-nightly publisher and look for a dependency on the
+	    driver/crypto/dprov package.
+
 
 Making Packaging Changes
 ------------------------
@@ -382,21 +403,65 @@ You should also test install yourself.  You can do this by replacing
 the "slim_install" in your Distro Constructor manifest with the
 explicit list of packages to install.
 
-To remove a package, you must mark it as obsolete.  The obsoleted
-package manifest should include 
+To remove a package, you must mark it as obsolete.  You must *also* mark
+as obsolete any packages which are renamed ancestors of this package, and
+remove their rename dependencies.  Here is what you must do.
 
-	set name=pkg.fmri with the version set explicitly to the
+To find rename ancestors, select all of the manifests which are renames,
+then look for the one which was renamed to the package you care about.
+For example, to find rename ancestors of 'system/zones', do the following:
+
+    $ cd usr/src/pkg/manifests
+    $ mypkgname=system/zones
+    $ grep -l "fmri=pkg:/$mypkgname@" `grep -l pkg.renamed *.mf` /dev/null
+    SUNWzone.mf
+
+Make sure to check that the package has not undergone multiple renames!
+
+    $ mypkgname=SUNWzone
+    $ grep -l "fmri=pkg:/$mypkgname@" `grep -l pkg.renamed *.mf` /dev/null
+    $
+
+Once you have the renamed ancestor list, for *each* of the packages (the
+newly obsolete package, and its renamed ancestors), edit the package as
+follows:
+
+	Update 'set name=pkg.fmri' with the version set explicitly to the
 	    build you're integrating into.  For example, if you wanted
 	    to remove SUNWwbsd in build 133 you'd change the pkg.fmri
-	    line to read
-	    set name=pkg.fmri value=pkg:/SUNWwbsd@0.5.11,5.11-0.133
+	    line to read:
+	    'set name=pkg.fmri value=pkg:/SUNWwbsd@0.5.11,5.11-0.133'
 
+	Add 'set name=pkg.obsolete value=true'.
+
+	Maintain the architecture and variant declarations in the
+	    package you are obsoleting.  Note that you must obsolete a
+	    package on all architectures and variants simultaneously.
+
+	Maintain 'set name=org.opensolaris.redist' actions if present.
+
+	Delete everything else.
+
+	If the package is a renamed ancestor, leave a comment behind as
+        follows:
+
+	   # Was renamed to <other-pkg-name>, both now obsolete.
+
+Here is a complete example.  SUNWfoobar was a package which was renamed
+to system/foobar in build 140, and then later obsoleted in build 150.
+Note that in all cases the package FMRI is updated to the obsoletion
+build, 150.
+
+    SUNWfoobar.mf:
+        # Was renamed to system/foobar, both now obsolete.
+        set name=pkg.fmri value=pkg:/SUNWfoobar@0.5.11,5.11-0.150
+        set name=pkg.obsolete value=true
+        set name=variant.arch value=$(ARCH)
+
+    system-foobar.mf:
+	set name=pkg.fmri value=pkg:/system/foobar@0.5.11,5.11-0.150
 	set name=pkg.obsolete value=true
-
-	The architectures and variants you're obsoleting.  These
-	    should just be copied from your old package, as you
-	    must obsolete a package on all architectures and
-	    variants simultaneously.
+	set name=variant.arch value=$(ARCH)
 
 Creating a Package
 ------------------
@@ -420,10 +485,6 @@ The following actions are required for all packages in ON.
 	set name=variant.arch
 	    Every package must specify which architectures it delivers.
 
-	set name=variant.opensolaris.zone
-	    Every package must specify whether it can be installed in
-	    global zones, non-global zones, or both.
-
 	set name=info.classification
 	    Every package must specify a category for the packaging GUI.
 	    You must use an existing category, and may not invent new ones.
@@ -445,6 +506,17 @@ The following actions are uncommon but specific to ON.
 	    at all are strongly discouraged.  If you're adding
 	    content to a package with this action, you should have
 	    modified bindrop.sh, and test open-only builds.
+
+You don't need to set the following.  They're taken care of for all OS/Net
+packages in the transforms/common_actions file.
+
+	set name=variant.opensolaris.zone
+	    Every package must specify whether it can be installed in
+	    global zones, non-global zones, or both.  All ON packages are
+	    delivered in both global and non-global zones.
+
+	set name=org.opensolaris.consolidation value=osnet
+	    All packages from OS/Net come from OS/Net...
 
 Drivers and Packages
 --------------------

@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri \
     value=pkg:/source/system/grub@0.97,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="Source for GNU GRUB"
-set name=pkg.summary value="Source for GNU GRUB - GNU GRand Unified Bootloader"
+set name=pkg.summary \
+    value="Source for GNU GRUB - GNU GRand Unified Bootloader"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/share group=sys
 dir path=usr/share/src group=sys

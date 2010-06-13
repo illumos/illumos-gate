@@ -20,23 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/SUNWcsd@$(PKGVERS)
 set name=pkg.description \
     value="core entries for /dev and /devices needed for the initial boot of Solaris"
 set name=pkg.summary value="Core Solaris Devices"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=dev group=sys
 dir path=dev/dsk group=sys
 dir path=dev/fd group=root mode=0555
@@ -59,9 +57,9 @@ dir path=etc/rcm/scripts group=sys
 dir path=etc/security group=sys
 dir path=lib
 dir path=lib/svc
-dir path=lib/svc/method
 dir path=lib/svc/manifest group=sys
 dir path=lib/svc/manifest/system group=sys
+dir path=lib/svc/method
 file path=etc/dacf.conf group=sys
 file path=etc/devlink.tab group=sys preserve=true
 file path=etc/driver_aliases group=sys preserve=true
@@ -74,8 +72,8 @@ file path=etc/name_to_major group=sys preserve=true
 file path=etc/path_to_inst group=root mode=0444 preserve=true
 file path=etc/security/device_policy group=sys preserve=true
 file path=etc/security/extra_privs group=sys preserve=true
-file path=lib/svc/method/svc-syseventd mode=0555
 file path=lib/svc/manifest/system/sysevent.xml group=sys mode=0444
+file path=lib/svc/method/svc-syseventd mode=0555
 legacy pkg=SUNWcsd arch=$(ARCH) category=system \
     desc="core entries for /dev and /devices needed for the initial boot of Solaris" \
     hotline="Please contact your local service provider" \

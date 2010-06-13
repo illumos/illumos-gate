@@ -20,29 +20,25 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/secure-rpc@$(PKGVERS)
 set name=pkg.description value="kernel GSS-API services for ONC RPC"
 set name=pkg.summary value="kernel RPCSEC_GSS"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
-file path=kernel/misc/$(ARCH64)/rpcsec_gss group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=kernel/misc/rpcsec_gss group=sys mode=0755 \
-    reboot-needed=true
+file path=kernel/misc/$(ARCH64)/rpcsec_gss group=sys mode=0755
+$(i386_ONLY)file path=kernel/misc/rpcsec_gss group=sys mode=0755
 legacy pkg=SUNWrsgk arch=$(ARCH) category=system \
     desc="kernel GSS-API services for ONC RPC" \
     hotline="Please contact your local service provider" \

@@ -20,47 +20,43 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/network/udapl/udapl-tavor@$(PKGVERS)
 set name=pkg.description value="Sun uDAPL provider for Tavor"
 set name=pkg.summary value="Sun uDAPL for Tavor (User)"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/init.d group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/rc2.d group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=etc group=sys
+dir path=etc/init.d group=sys
+dir path=etc/rc2.d group=sys
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/share group=sys
 dir path=usr/share/dat group=sys
 driver name=daplt perms="* 0644 root sys"
-file path=etc/init.d/dodatadm.udaplt group=sys mode=0744 opensolaris.zone=global \
-    original_name=SUNWudaplt:etc/init.d/dodatadm.udaplt preserve=true \
-    variant.opensolaris.zone=global
-file path=kernel/drv/$(ARCH64)/daplt group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/drv/daplt group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=kernel/drv/daplt.conf group=sys opensolaris.zone=global \
-    reboot-needed=false variant.opensolaris.zone=global
+file path=etc/init.d/dodatadm.udaplt group=sys mode=0744 \
+    original_name=SUNWudaplt:etc/init.d/dodatadm.udaplt preserve=true
+file path=kernel/drv/$(ARCH64)/daplt group=sys
+$(i386_ONLY)file path=kernel/drv/daplt group=sys
+file path=kernel/drv/daplt.conf group=sys
 file path=usr/lib/$(ARCH64)/udapl_tavor.so.1
 file path=usr/lib/udapl_tavor.so.1
 file path=usr/share/dat/SUNWudaplt.conf group=sys mode=0644
-hardlink path=etc/rc2.d/S81dodatadm.udaplt opensolaris.zone=global \
-    target=../../etc/init.d/dodatadm.udaplt variant.opensolaris.zone=global
+hardlink path=etc/rc2.d/S81dodatadm.udaplt \
+    target=../../etc/init.d/dodatadm.udaplt
 legacy pkg=SUNWudapltr arch=$(ARCH) category=system \
     desc="Sun uDAPL provider for Tavor driver and registration script" \
     hotline="Please contact your local service provider" \

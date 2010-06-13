@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/autofs@$(PKGVERS)
@@ -31,11 +30,13 @@ set name=pkg.summary value=AutoFS
 set name=info.classification \
     value="org.opensolaris.category.2008:System/File System"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/default group=sys
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
+dir path=lib/svc/manifest/system/filesystem group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/lib
@@ -43,13 +44,11 @@ dir path=usr/lib/autofs group=sys
 dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/autofs group=sys
 dir path=usr/sbin
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/system group=sys
-dir path=lib/svc/manifest/system/filesystem group=sys
 file path=etc/auto_home original_name=SUNWatfs:etc/auto_home preserve=true
 file path=etc/auto_master original_name=SUNWatfs:etc/auto_master preserve=true
-file path=etc/default/autofs group=sys original_name=SUNWatfs:etc/default/autofs \
-    preserve=true
+file path=etc/default/autofs group=sys \
+    original_name=SUNWatfs:etc/default/autofs preserve=true
+file path=lib/svc/manifest/system/filesystem/autofs.xml group=sys mode=0444
 file path=lib/svc/method/svc-autofs mode=0555
 file path=usr/lib/autofs/automountd mode=0555
 file path=usr/lib/fs/autofs/automount mode=0555
@@ -57,11 +56,11 @@ file path=usr/lib/fs/autofs/dfshares mode=0555
 file path=usr/lib/fs/autofs/mount mode=0555
 file path=usr/lib/fs/autofs/share mode=0555
 file path=usr/lib/fs/autofs/unshare mode=0555
-file path=lib/svc/manifest/system/filesystem/autofs.xml group=sys mode=0444
 legacy pkg=SUNWatfsr arch=$(ARCH) category=system \
     desc="configuration and start-up files for the AutoFS filesystem" \
-    hotline="Please contact your local service provider" name="AutoFS, (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    hotline="Please contact your local service provider" \
+    name="AutoFS, (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
 legacy pkg=SUNWatfsu arch=$(ARCH) category=system \
     desc="utilities and a daemon (automountd) for the AutoFS filesystem" \
     hotline="Please contact your local service provider" name="AutoFS, (Usr)" \

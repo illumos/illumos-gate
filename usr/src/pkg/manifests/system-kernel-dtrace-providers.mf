@@ -20,23 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/dtrace/providers@$(PKGVERS)
 set name=pkg.description value="Dynamic Tracing (DTrace) Providers"
 set name=pkg.summary value="DTrace Providers"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -59,21 +57,21 @@ file path=kernel/drv/$(ARCH64)/profile group=sys
 file path=kernel/drv/$(ARCH64)/sdt group=sys
 file path=kernel/drv/$(ARCH64)/systrace group=sys
 $(i386_ONLY)file path=kernel/drv/dcpc group=sys
-file path=kernel/drv/dcpc.conf group=sys reboot-needed=false
+file path=kernel/drv/dcpc.conf group=sys
 $(i386_ONLY)file path=kernel/drv/dtrace group=sys
-file path=kernel/drv/dtrace.conf group=sys reboot-needed=false
+file path=kernel/drv/dtrace.conf group=sys
 $(i386_ONLY)file path=kernel/drv/fasttrap group=sys
-file path=kernel/drv/fasttrap.conf group=sys reboot-needed=false
+file path=kernel/drv/fasttrap.conf group=sys
 $(i386_ONLY)file path=kernel/drv/fbt group=sys
-file path=kernel/drv/fbt.conf group=sys reboot-needed=false
+file path=kernel/drv/fbt.conf group=sys
 $(i386_ONLY)file path=kernel/drv/lockstat group=sys
-file path=kernel/drv/lockstat.conf group=sys reboot-needed=false
+file path=kernel/drv/lockstat.conf group=sys
 $(i386_ONLY)file path=kernel/drv/profile group=sys
-file path=kernel/drv/profile.conf group=sys reboot-needed=false
+file path=kernel/drv/profile.conf group=sys
 $(i386_ONLY)file path=kernel/drv/sdt group=sys
-file path=kernel/drv/sdt.conf group=sys reboot-needed=false
+file path=kernel/drv/sdt.conf group=sys
 $(i386_ONLY)file path=kernel/drv/systrace group=sys
-file path=kernel/drv/systrace.conf group=sys reboot-needed=false
+file path=kernel/drv/systrace.conf group=sys
 hardlink path=kernel/dtrace/$(ARCH64)/dcpc \
     target=../../../kernel/drv/$(ARCH64)/dcpc
 hardlink path=kernel/dtrace/$(ARCH64)/fasttrap \
@@ -94,7 +92,8 @@ $(i386_ONLY)hardlink path=kernel/dtrace/fasttrap \
 $(i386_ONLY)hardlink path=kernel/dtrace/fbt target=../../kernel/drv/fbt
 $(i386_ONLY)hardlink path=kernel/dtrace/lockstat \
     target=../../kernel/drv/lockstat
-$(i386_ONLY)hardlink path=kernel/dtrace/profile target=../../kernel/drv/profile
+$(i386_ONLY)hardlink path=kernel/dtrace/profile \
+    target=../../kernel/drv/profile
 $(i386_ONLY)hardlink path=kernel/dtrace/sdt target=../../kernel/drv/sdt
 $(i386_ONLY)hardlink path=kernel/dtrace/systrace \
     target=../../kernel/drv/systrace

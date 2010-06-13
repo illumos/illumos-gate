@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/driver/x11/winlock@$(PKGVERS)
@@ -29,7 +28,6 @@ set name=pkg.description value="kernel device drivers for X Windows System"
 set name=pkg.summary value="X Windows System Window Drivers"
 set name=info.classification value=org.opensolaris.category.2008:System/X11
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/kernel group=sys
 dir path=usr/kernel/drv group=sys

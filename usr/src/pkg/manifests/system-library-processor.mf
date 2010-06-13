@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/library/processor@$(PKGVERS)
@@ -30,7 +29,6 @@ set name=pkg.description \
 set name=pkg.summary value="Core Architecture"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 $(sparc_ONLY)dir path=etc group=sys
 $(sparc_ONLY)dir path=etc/flash group=sys
 $(sparc_ONLY)dir path=etc/flash/postcreation group=sys mode=0700
@@ -50,7 +48,8 @@ $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/lib/$(ARCH64)
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3060 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3060/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3060/kernel/misc group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP3060/kernel/misc/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Netra-CP3060/kernel/misc/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12/lib
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12/lib/$(ARCH64)
@@ -178,33 +177,34 @@ $(sparc_ONLY)dir path=platform/sun4v/lib/libc_psr
 $(sparc_ONLY)file path=etc/flash/postdeployment/ttydefs.cleanup group=sys \
     mode=0744
 $(sparc_ONLY)file path=etc/flash/precreation/caplib group=sys mode=0500
-$(sparc_ONLY)file path=platform/SUNW,Netra-CP3060/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-T200/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+$(sparc_ONLY)file \
+    path=platform/SUNW,Netra-CP3060/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-T200/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u-opl/lib/$(ARCH64)/libc_psr.so.1 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u-opl/lib/libc_psr.so.1 reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u-us3/lib/$(ARCH64)/libc_psr.so.1 \
-    original_name=SUNWcar:platform/sun4u-us3/lib/$(ARCH64)/libc_psr.so.1 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 $(sparc_ONLY)file \
     path=platform/sun4u-us3/lib/$(ARCH64)/libc_psr/libc_psr_hwcap1.so.1 \
     reboot-needed=true
 $(sparc_ONLY)file \
     path=platform/sun4u-us3/lib/$(ARCH64)/libc_psr/libc_psr_hwcap2.so.1 \
     reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u-us3/lib/libc_psr.so.1 \
-    original_name=SUNWcar:platform/sun4u-us3/lib/libc_psr.so.1 preserve=true \
-    reboot-needed=true
+$(sparc_ONLY)file path=platform/sun4u-us3/lib/libc_psr.so.1 reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u-us3/lib/libc_psr/libc_psr_hwcap1.so.1 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u-us3/lib/libc_psr/libc_psr_hwcap2.so.1 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/lib/$(ARCH64)/libc_psr.so.1 \
     reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/lib/$(ARCH64)/libmd_psr.so.1 \
-    reboot-needed=true
+$(sparc_ONLY)file path=platform/sun4u/lib/$(ARCH64)/libmd_psr.so.1
+# We force bootblks into a new BE because we want to make sure
+# the user can recover from a pre-existing copy of the bootblk
+# in the event that something goes horribly wrong.
 $(sparc_ONLY)file path=platform/sun4u/lib/fs/hsfs/bootblk group=sys mode=0444 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/lib/fs/ufs/bootblk group=sys mode=0444 \
@@ -212,18 +212,19 @@ $(sparc_ONLY)file path=platform/sun4u/lib/fs/ufs/bootblk group=sys mode=0444 \
 $(sparc_ONLY)file path=platform/sun4u/lib/fs/zfs/bootblk group=sys mode=0444 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/lib/libc_psr.so.1 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/lib/libmd_psr.so.1 reboot-needed=true
+$(sparc_ONLY)file path=platform/sun4u/lib/libmd_psr.so.1
 $(sparc_ONLY)file path=platform/sun4v/lib/$(ARCH64)/libc_psr.so.1 mode=0644 \
-    original_name=SUNWcar:platform/sun4v/lib/$(ARCH64)/libc_psr.so.1 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 $(sparc_ONLY)file \
     path=platform/sun4v/lib/$(ARCH64)/libc_psr/libc_psr_hwcap1.so.1 \
     reboot-needed=true
 $(sparc_ONLY)file \
     path=platform/sun4v/lib/$(ARCH64)/libc_psr/libc_psr_hwcap2.so.1 \
     reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4v/lib/$(ARCH64)/libmd_psr.so.1 \
-    reboot-needed=true
+$(sparc_ONLY)file path=platform/sun4v/lib/$(ARCH64)/libmd_psr.so.1
+# We force bootblks into a new BE because we want to make sure
+# the user can recover from a pre-existing copy of the bootblk
+# in the event that something goes horribly wrong.
 $(sparc_ONLY)file path=platform/sun4v/lib/fs/hsfs/bootblk group=sys mode=0444 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/lib/fs/ufs/bootblk group=sys mode=0444 \
@@ -231,13 +232,12 @@ $(sparc_ONLY)file path=platform/sun4v/lib/fs/ufs/bootblk group=sys mode=0444 \
 $(sparc_ONLY)file path=platform/sun4v/lib/fs/zfs/bootblk group=sys mode=0444 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/lib/libc_psr.so.1 mode=0644 \
-    original_name=SUNWcar:platform/sun4v/lib/libc_psr.so.1 preserve=true \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/lib/libc_psr/libc_psr_hwcap1.so.1 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/lib/libc_psr/libc_psr_hwcap2.so.1 \
     reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4v/lib/libmd_psr.so.1 reboot-needed=true
+$(sparc_ONLY)file path=platform/sun4v/lib/libmd_psr.so.1
 $(i386_ONLY)legacy pkg=SUNWcar.i arch=$(ARCH).i86pc category=system \
     desc="core software for a specific hardware platform group" \
     hotline="Please contact your local service provider" \
@@ -333,31 +333,38 @@ $(sparc_ONLY)link path=platform/SUNW,Serverblade1/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-100/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-100/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-100/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-100/lib/libc_psr.so.1 \
     target=../../sun4u/lib/libc_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-100/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1000/lib/$(ARCH64)/libc_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-1000/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1000/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-1000/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1000/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1000/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1500/lib/$(ARCH64)/libc_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-1500/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1500/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-1500/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1500/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1500/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-2500/lib/$(ARCH64)/libc_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-2500/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-2500/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-2500/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-2500/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -366,9 +373,11 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-2500/lib/libmd_psr.so.1 \
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-T6300 target=sun4v
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-T6320 target=sun4v
 $(sparc_ONLY)link path=platform/SUNW,Sun-Blade-T6340 target=sun4v
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-15000/lib/$(ARCH64)/libc_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-15000/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-15000/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-15000/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-15000/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -376,7 +385,8 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-15000/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-280R/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-280R/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-280R/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-280R/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -384,7 +394,8 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-280R/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-480R/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-480R/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-480R/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-480R/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -403,7 +414,8 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-T200/lib target=../sun4v/lib
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V210 target=SUNW,Sun-Fire-V240
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V215/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V215/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-V215/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V215/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -411,7 +423,8 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V215/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V240/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V240/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-V240/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V240/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -420,7 +433,8 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V240/lib/libmd_psr.so.1 \
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V245 target=SUNW,Sun-Fire-V215
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V250/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V250/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-V250/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V250/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -428,7 +442,8 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V250/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V440/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V440/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-V440/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V440/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -436,7 +451,8 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V440/lib/libmd_psr.so.1 \
     target=../../sun4u/lib/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V445/lib/$(ARCH64)/libc_psr.so.1 \
     target=../../../sun4u-us3/lib/$(ARCH64)/libc_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V445/lib/$(ARCH64)/libmd_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-V445/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V445/lib/libc_psr.so.1 \
     target=../../sun4u-us3/lib/libc_psr.so.1
@@ -546,7 +562,8 @@ $(sparc_ONLY)link \
 $(sparc_ONLY)link \
     path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libc_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libc_psr.so.1 \
     target=../../sun4u/lib/libc_psr.so.1
 $(sparc_ONLY)link \
     path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libmd_psr.so.1 \
@@ -557,7 +574,8 @@ $(sparc_ONLY)link \
 $(sparc_ONLY)link \
     path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/$(ARCH64)/libmd_psr.so.1 \
     target=../../../sun4u/lib/$(ARCH64)/libmd_psr.so.1
-$(sparc_ONLY)link path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/libc_psr.so.1 \
+$(sparc_ONLY)link \
+    path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/libc_psr.so.1 \
     target=../../sun4u/lib/libc_psr.so.1
 $(sparc_ONLY)link \
     path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/libmd_psr.so.1 \

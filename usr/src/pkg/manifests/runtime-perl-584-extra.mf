@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri \
@@ -31,7 +30,6 @@ set name=pkg.summary value="Perl 5.8.4 (non-core)"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/Perl
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/perl5
@@ -92,14 +90,18 @@ $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/Peek
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Byte
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/CN
-$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/EBCDIC
+$(i386_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/EBCDIC
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/JP
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/KR
-$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Symbol
+$(i386_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Symbol
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/TW
-$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Unicode
+$(i386_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Unicode
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/I18N
-$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/I18N/Langinfo
+$(i386_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/I18N/Langinfo
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Opcode
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Unicode
 $(i386_ONLY)dir \
@@ -126,14 +128,18 @@ $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/Peek
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Byte
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/CN
-$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/EBCDIC
+$(sparc_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/EBCDIC
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/JP
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/KR
-$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Symbol
+$(sparc_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Symbol
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/TW
-$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Unicode
+$(sparc_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Unicode
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N
-$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N/Langinfo
+$(sparc_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N/Langinfo
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Opcode
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Unicode
 $(sparc_ONLY)dir \
@@ -173,7 +179,8 @@ file path=usr/perl5/5.8.4/bin/s2p mode=0555
 file path=usr/perl5/5.8.4/bin/splain mode=0555
 file path=usr/perl5/5.8.4/bin/xsubpp mode=0555
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/Demo.pm mode=0444
-file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/Descriptions.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/Descriptions.pm \
+    mode=0444
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/MyClass.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo.pl mode=0444
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo2.pl mode=0444
@@ -182,10 +189,12 @@ file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo4.pl mode=0444
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_call.pl mode=0444
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_chain.pl mode=0444
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_cycle.pl mode=0444
-file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_hashdir.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_hashdir.pl \
+    mode=0444
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_phases.pl mode=0444
 file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_range.pl mode=0444
-file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_rawdata.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_rawdata.pl \
+    mode=0444
 file path=usr/perl5/5.8.4/lib/B/assemble mode=0444
 file path=usr/perl5/5.8.4/lib/B/cc_harness mode=0444
 file path=usr/perl5/5.8.4/lib/B/disassemble mode=0444
@@ -400,15 +409,16 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Bblock.pm \
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Bytecode.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/C.pm mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/CC.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/CC.pm \
+    mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Concise.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Debug.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Deparse.pm \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Disassembler.pm \
-    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Disassembler.pm mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Lint.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Showlex.pm \
@@ -431,8 +441,8 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/XSUB.h \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/av.h \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/cc_runtime.h \
-    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/cc_runtime.h mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/config.h \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/cop.h \
@@ -463,8 +473,8 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/iperlsys.h \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/keywords.h \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/malloc_ctl.h \
-    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/malloc_ctl.h mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/mg.h \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/nostdio.h \
@@ -477,8 +487,8 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/opnames.h \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/pad.h \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/patchlevel.h \
-    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/patchlevel.h mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perl.h \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perlapi.h \
@@ -554,10 +564,10 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Config.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/EBCDIC.pm \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Encoder.pm \
-    mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Encoding.pm \
-    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Encoder.pm mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Encoding.pm mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Guess.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/JP.pm \
@@ -568,16 +578,18 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Symbol.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/TW.pm \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Unicode.pm \
-    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Unicode.pm mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/O.pm mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Opcode.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/POSIX.pod \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Safe.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Safe.pm \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Unicode/Normalize.pm mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Unicode/Normalize.pm \
+    mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/XS/APItest.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/XS/Typemap.pm \
@@ -621,9 +633,11 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Byte/Byte.so \
     mode=0555
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/CN/CN.bs mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/CN/CN.bs \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/CN/CN.so mode=0555
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/CN/CN.so \
+    mode=0555
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/EBCDIC/EBCDIC.bs \
     mode=0444
@@ -637,13 +651,17 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Encode.so \
     mode=0555
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/JP/JP.bs mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/JP/JP.bs \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/JP/JP.so mode=0555
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/JP/JP.so \
+    mode=0555
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/KR/KR.bs mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/KR/KR.bs \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/KR/KR.so mode=0555
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/KR/KR.so \
+    mode=0555
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Symbol/Symbol.bs \
     mode=0444
@@ -651,9 +669,11 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Symbol/Symbol.so \
     mode=0555
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/TW/TW.bs mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/TW/TW.bs \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/TW/TW.so mode=0555
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/TW/TW.so \
+    mode=0555
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Unicode/Unicode.bs \
     mode=0444
@@ -818,15 +838,16 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Bblock.pm \
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Bytecode.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/C.pm mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/CC.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/CC.pm \
+    mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Concise.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Debug.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Deparse.pm \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Disassembler.pm \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Disassembler.pm mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Lint.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Showlex.pm \
@@ -849,8 +870,8 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/XSUB.h \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/av.h \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/cc_runtime.h \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/cc_runtime.h mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/config.h \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/cop.h \
@@ -881,8 +902,8 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/iperlsys.h \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/keywords.h \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/malloc_ctl.h \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/malloc_ctl.h mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/mg.h \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/nostdio.h \
@@ -895,8 +916,8 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/opnames.h \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/pad.h \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/patchlevel.h \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/patchlevel.h mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perl.h \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perlapi.h \
@@ -972,10 +993,10 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Config.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/EBCDIC.pm \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Encoder.pm \
-    mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Encoding.pm \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Encoder.pm mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Encoding.pm mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Guess.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/JP.pm \
@@ -986,16 +1007,18 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Symbol.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/TW.pm \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Unicode.pm \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Unicode.pm mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/O.pm mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Opcode.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/POSIX.pod \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Safe.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Safe.pm \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Unicode/Normalize.pm mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Unicode/Normalize.pm \
+    mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/XS/APItest.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/XS/Typemap.pm \
@@ -1039,9 +1062,11 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Byte/Byte.so \
     mode=0555
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/CN/CN.bs mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/CN/CN.bs \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/CN/CN.so mode=0555
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/CN/CN.so \
+    mode=0555
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/EBCDIC/EBCDIC.bs \
     mode=0444
@@ -1049,17 +1074,23 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/EBCDIC/EBCDIC.so \
     mode=0555
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Encode.bs mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Encode.bs \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Encode.so mode=0555
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Encode.so \
+    mode=0555
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/JP/JP.bs mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/JP/JP.bs \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/JP/JP.so mode=0555
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/JP/JP.so \
+    mode=0555
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/KR/KR.bs mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/KR/KR.bs \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/KR/KR.so mode=0555
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/KR/KR.so \
+    mode=0555
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Symbol/Symbol.bs \
     mode=0444
@@ -1067,9 +1098,11 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Symbol/Symbol.so \
     mode=0555
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/TW/TW.bs mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/TW/TW.bs \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/TW/TW.so mode=0555
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/TW/TW.so \
+    mode=0555
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Unicode/Unicode.bs \
     mode=0444
@@ -1086,9 +1119,11 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N/Langinfo/autosplit.ix \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Opcode/Opcode.bs mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Opcode/Opcode.bs \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Opcode/Opcode.so mode=0555
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Opcode/Opcode.so \
+    mode=0555
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Unicode/Normalize/Normalize.bs \
     mode=0444

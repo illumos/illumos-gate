@@ -20,19 +20,22 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/storage/metassist@$(PKGVERS)
 set name=pkg.description value="Solaris Volume Manager Assistant"
 set name=pkg.summary value="Solaris Volume Manager Assistant"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/default group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=etc group=sys
+dir path=etc/default group=sys
 dir path=usr group=sys
 dir path=usr/sbin
 dir path=usr/share group=sys
@@ -40,8 +43,7 @@ dir path=usr/share/lib group=sys
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
 dir path=usr/share/lib/xml/style group=sys
-file path=etc/default/metassist.xml group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+file path=etc/default/metassist.xml group=sys
 file path=usr/sbin/metassist mode=0555
 file path=usr/share/lib/xml/dtd/volume-config.dtd group=sys
 file path=usr/share/lib/xml/dtd/volume-defaults.dtd group=sys

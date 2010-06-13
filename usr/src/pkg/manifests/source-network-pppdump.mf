@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/source/network/pppdump@$(PKGVERS)
 set name=pkg.description \
     value="Source for the optional GNU utilities for use with PPP"
 set name=pkg.summary value="Source for the GNU utilities for PPP"
-set name=info.classification value=org.opensolaris.category.2008:Development/GNU
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/GNU
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/share group=sys
 dir path=usr/share/src group=sys
@@ -58,8 +57,8 @@ file path=usr/share/src/ppputil/pppdump/zlib.h
 legacy pkg=SUNWpppgS arch=$(ARCH) category=system \
     desc="Source for the optional GNU utilities for use with PPP" \
     hotline="Please contact your local service provider" \
-    name="Source for the GNU utilities for PPP" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Source for the GNU utilities for PPP" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect \
     license=cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect
 license cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.passwd \

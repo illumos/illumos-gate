@@ -20,10 +20,15 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/storage/sasinfo@$(PKGVERS)
 set name=pkg.description \
     value="T11 Storage Management HBA API Libraries and CLI"
@@ -31,16 +36,14 @@ set name=pkg.summary value="SM-HBA Libraries and CLI"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=etc group=sys
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/sbin
-file path=etc/smhba.conf group=sys opensolaris.zone=global \
-    original_name=SUNWsmhba:etc/smhba.conf preserve=true \
-    variant.opensolaris.zone=global
+file path=etc/smhba.conf group=sys original_name=SUNWsmhba:etc/smhba.conf \
+    preserve=true
 file path=usr/include/smhbaapi.h
 file path=usr/lib/$(ARCH64)/libSMHBAAPI.so.1
 file path=usr/lib/$(ARCH64)/libsun_sas.so.1

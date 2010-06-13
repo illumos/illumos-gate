@@ -20,32 +20,31 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/ssh@$(PKGVERS)
 set name=pkg.description value="Secure Shell protocol Server"
 set name=pkg.summary value="SSH Server"
-set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Security
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/ssh group=sys
 dir path=lib
 dir path=lib/svc
 dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/ssh
-dir path=lib/svc/manifest/network group=sys
 file path=etc/ssh/sshd_config group=sys \
     original_name=SUNWsshd:etc/ssh/sshd_config preserve=true
+file path=lib/svc/manifest/network/ssh.xml group=sys mode=0444
 file path=lib/svc/method/sshd mode=0555
 file path=usr/lib/ssh/sftp-server mode=0555
 file path=usr/lib/ssh/sshd mode=0555
-file path=lib/svc/manifest/network/ssh.xml group=sys mode=0444
 legacy pkg=SUNWsshdr arch=$(ARCH) category=system \
     desc="Secure Shell protocol Server" \
     hotline="Please contact your local service provider" \

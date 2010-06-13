@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/library/libfcoe@$(PKGVERS)
 set name=pkg.description \
     value="Sun FCoE (Fibre Channel over Ethernet) Port Management Library"
 set name=pkg.summary value="Sun FCoE Port Management Library"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib

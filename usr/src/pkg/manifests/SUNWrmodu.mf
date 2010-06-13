@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/SUNWrmodu@0.5.11,5.11-0.133
@@ -31,5 +30,4 @@ set name=pkg.fmri value=pkg:/SUNWrmodu@0.5.11,5.11-0.133
 # one variant and rename the other, so we rename both to SUNrmod.
 set name=pkg.renamed value=true
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 depend fmri=system/boot/real-mode type=require

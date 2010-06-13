@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/header/header-storage@$(PKGVERS)
@@ -31,7 +30,6 @@ set name=pkg.summary value="Platform Support, Driver Header Files"
 set name=info.classification \
     value="org.opensolaris.category.2008:Drivers/Other Peripherals"
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/include/sys

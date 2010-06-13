@@ -20,20 +20,23 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/uucp@$(PKGVERS)
 set name=pkg.description value="UUCP utilities and daemon"
 set name=pkg.summary value="Networking UUCP Utilities"
-set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Services
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/init.d group=sys
 dir path=etc/rc2.d group=sys
 dir path=etc/uucp group=uucp owner=uucp
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
@@ -46,10 +49,6 @@ dir path=var/spool/uucp/.Corrupt group=uucp owner=uucp
 dir path=var/spool/uucp/.Workspace group=uucp owner=uucp
 dir path=var/spool/uucp/.Xqtdir group=uucp owner=uucp
 dir path=var/spool/uucppublic group=uucp mode=1777 owner=uucp
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
 dir path=var/uucp group=uucp owner=uucp
 dir path=var/uucp/.Admin group=uucp owner=uucp
 dir path=var/uucp/.Log group=uucp owner=uucp
@@ -64,12 +63,12 @@ file path=etc/init.d/uucp group=sys mode=0744 \
     original_name=SUNWbnu:etc/init.d/uucp preserve=true
 file path=etc/uucp/Config group=uucp original_name=SUNWbnu:etc/uucp/Config \
     owner=uucp preserve=true
-file path=etc/uucp/Devconfig group=uucp original_name=SUNWbnu:etc/uucp/Devconfig \
-    owner=uucp preserve=true
+file path=etc/uucp/Devconfig group=uucp \
+    original_name=SUNWbnu:etc/uucp/Devconfig owner=uucp preserve=true
 file path=etc/uucp/Devices group=uucp original_name=SUNWbnu:etc/uucp/Devices \
     owner=uucp preserve=true
-file path=etc/uucp/Dialcodes group=uucp original_name=SUNWbnu:etc/uucp/Dialcodes \
-    owner=uucp preserve=true
+file path=etc/uucp/Dialcodes group=uucp \
+    original_name=SUNWbnu:etc/uucp/Dialcodes owner=uucp preserve=true
 file path=etc/uucp/Dialers group=uucp original_name=SUNWbnu:etc/uucp/Dialers \
     owner=uucp preserve=true
 file path=etc/uucp/Grades group=uucp original_name=SUNWbnu:etc/uucp/Grades \
@@ -84,6 +83,7 @@ file path=etc/uucp/Sysfiles group=uucp original_name=SUNWbnu:etc/uucp/Sysfiles \
     owner=uucp preserve=true
 file path=etc/uucp/Systems group=uucp mode=0600 \
     original_name=SUNWbnu:etc/uucp/Systems owner=uucp preserve=true
+file path=lib/svc/manifest/network/uucp.xml group=sys mode=0444
 file path=usr/bin/ct group=uucp mode=4511
 file path=usr/bin/cu group=uucp mode=4511 owner=uucp
 file path=usr/bin/uucp group=uucp mode=4511 owner=uucp
@@ -108,7 +108,6 @@ file path=usr/lib/uucp/uudemon.poll group=uucp mode=0555
 file path=usr/lib/uucp/uusched group=uucp mode=4511 owner=uucp
 file path=usr/lib/uucp/uuxqt group=uucp mode=4511 owner=uucp
 file path=usr/sbin/in.uucpd group=uucp mode=0555
-file path=lib/svc/manifest/network/uucp.xml group=sys mode=0444
 hardlink path=etc/rc2.d/S70uucp target=../../etc/init.d/uucp
 legacy pkg=SUNWbnur arch=$(ARCH) category=system \
     desc="configuration and start-up files for UUCP utilities" \

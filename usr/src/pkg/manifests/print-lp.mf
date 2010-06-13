@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/print/lp@$(PKGVERS)
 set name=pkg.description \
     value="client configuration files and utilities for the print service"
 set name=pkg.summary value="Solaris Print - LP Server"
-set name=info.classification value=org.opensolaris.category.2008:System/Printing
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Printing
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/lp group=lp mode=0775 owner=lp
 dir path=etc/lp/classes group=lp mode=0775 owner=lp
@@ -42,6 +41,9 @@ dir path=etc/lp/printers group=lp mode=0775 owner=lp
 dir path=etc/lp/pwheels group=lp mode=0775 owner=lp
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/application group=sys
+dir path=lib/svc/manifest/application/print group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/bin
@@ -71,9 +73,6 @@ dir path=var/spool/lp/admins group=lp mode=0775 owner=lp
 dir path=var/spool/lp/requests group=lp mode=0775 owner=lp
 dir path=var/spool/lp/system group=lp mode=0775 owner=lp
 dir path=var/spool/print group=lp
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/application group=sys
-dir path=lib/svc/manifest/application/print group=sys
 file path=etc/lp/fd/catv.fd group=lp
 file path=etc/lp/fd/download.fd group=lp
 file path=etc/lp/fd/dpost.fd group=lp
@@ -90,6 +89,8 @@ file path=etc/lp/fd/posttek.fd group=lp
 file path=etc/lp/fd/pr.fd group=lp
 file path=etc/printers.conf group=sys original_name=SUNWpc:etc/printers.conf \
     preserve=true
+file path=lib/svc/manifest/application/print/rfc1179.xml group=sys mode=0444
+file path=lib/svc/manifest/application/print/server.xml group=sys mode=0444
 file path=lib/svc/method/print-svc mode=0555
 file path=usr/bin/lpget group=lp mode=0511
 file path=usr/bin/lpset group=lp mode=4511
@@ -216,8 +217,6 @@ file path=usr/share/lib/terminfo/a/att477+basic2
 file path=usr/share/lib/terminfo/a/att583+basic
 file path=var/spool/cron/crontabs/lp group=root mode=0400 \
     original_name=SUNWps:var/spool/cron/crontabs/lp preserve=true
-file path=lib/svc/manifest/application/print/rfc1179.xml group=sys mode=0444
-file path=lib/svc/manifest/application/print/server.xml group=sys mode=0444
 hardlink path=usr/share/lib/terminfo/4/458 \
     target=../../../../../usr/share/lib/terminfo/4/457
 hardlink path=usr/share/lib/terminfo/4/477qume \

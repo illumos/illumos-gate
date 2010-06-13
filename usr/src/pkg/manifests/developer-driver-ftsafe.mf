@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/developer/driver/ftsafe@$(PKGVERS)
@@ -30,23 +29,16 @@ set name=pkg.summary value="ftSafe developer utilities package"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/sbin
 driver name=bofi perms="* 0600 bin bin"
-file path=kernel/drv/$(ARCH64)/bofi group=sys mode=0644 opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/drv/bofi group=sys mode=0644 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=kernel/drv/bofi.conf group=sys opensolaris.zone=global \
-    reboot-needed=false variant.opensolaris.zone=global
+file path=kernel/drv/$(ARCH64)/bofi group=sys mode=0644
+$(i386_ONLY)file path=kernel/drv/bofi group=sys mode=0644
+file path=kernel/drv/bofi.conf group=sys
 file path=usr/lib/th_script mode=0555
 file path=usr/sbin/th_define mode=0555
 file path=usr/sbin/th_manage mode=0555

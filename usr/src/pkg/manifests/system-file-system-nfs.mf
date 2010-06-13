@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/nfs@$(PKGVERS)
@@ -30,27 +29,22 @@ set name=pkg.summary value="Network File System (NFS) client support"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/File System"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/default group=sys
 dir path=etc/fs group=sys
 dir path=etc/fs/nfs group=sys
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/fs group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/fs/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/misc group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/misc/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/sys group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/sys/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=kernel group=sys
+dir path=kernel/fs group=sys
+dir path=kernel/fs/$(ARCH64) group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/$(ARCH64) group=sys
+dir path=kernel/sys group=sys
+dir path=kernel/sys/$(ARCH64) group=sys
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/nfs group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/bin
@@ -63,30 +57,24 @@ dir path=var group=sys
 dir path=var/nfs
 dir path=var/nfs/v4_oldstate group=daemon owner=daemon
 dir path=var/nfs/v4_state group=daemon owner=daemon
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/manifest/network/nfs group=sys
 file path=etc/default/nfs group=sys original_name=SUNWnfsc:etc/default/nfs \
     preserve=true
 file path=etc/fs/nfs/mount mode=0555
 file path=etc/nfssec.conf group=sys original_name=SUNWnfsc:etc/nfssec.conf \
     preserve=true
-file path=kernel/fs/$(ARCH64)/nfs group=sys mode=0755 opensolaris.zone=global \
-    reboot-needed=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/fs/nfs group=sys mode=0755 opensolaris.zone=global \
-    reboot-needed=true variant.opensolaris.zone=global
-file path=kernel/misc/$(ARCH64)/klmmod group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-file path=kernel/misc/$(ARCH64)/klmops group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-file path=kernel/misc/$(ARCH64)/nfs_dlboot group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/misc/klmmod group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/misc/klmops group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/misc/nfs_dlboot group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+file path=kernel/fs/$(ARCH64)/nfs group=sys mode=0755
+$(i386_ONLY)file path=kernel/fs/nfs group=sys mode=0755
+file path=kernel/misc/$(ARCH64)/klmmod group=sys mode=0755
+file path=kernel/misc/$(ARCH64)/klmops group=sys mode=0755
+file path=kernel/misc/$(ARCH64)/nfs_dlboot group=sys mode=0755
+$(i386_ONLY)file path=kernel/misc/klmmod group=sys mode=0755
+$(i386_ONLY)file path=kernel/misc/klmops group=sys mode=0755
+$(i386_ONLY)file path=kernel/misc/nfs_dlboot group=sys mode=0755
+file path=lib/svc/manifest/network/nfs/cbd.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/client.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/mapid.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/nlockmgr.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/status.xml group=sys mode=0444
 file path=lib/svc/method/nfs-client mode=0555
 file path=lib/svc/method/nlockmgr mode=0555
 file path=usr/bin/nfsstat mode=0555
@@ -103,16 +91,9 @@ file path=usr/lib/nfs/lockd mode=0555
 file path=usr/lib/nfs/nfs4cbd mode=0555
 file path=usr/lib/nfs/nfsmapid mode=0555
 file path=usr/lib/nfs/statd mode=0555
-file path=lib/svc/manifest/network/nfs/cbd.xml group=sys mode=0444
-file path=lib/svc/manifest/network/nfs/client.xml group=sys mode=0444
-file path=lib/svc/manifest/network/nfs/mapid.xml group=sys mode=0444
-file path=lib/svc/manifest/network/nfs/nlockmgr.xml group=sys mode=0444
-file path=lib/svc/manifest/network/nfs/status.xml group=sys mode=0444
 group groupname=unknown gid=96
-hardlink path=kernel/sys/$(ARCH64)/nfs opensolaris.zone=global \
-    target=../../../kernel/fs/$(ARCH64)/nfs variant.opensolaris.zone=global
-$(i386_ONLY)hardlink path=kernel/sys/nfs opensolaris.zone=global \
-    target=../../kernel/fs/nfs variant.opensolaris.zone=global
+hardlink path=kernel/sys/$(ARCH64)/nfs target=../../../kernel/fs/$(ARCH64)/nfs
+$(i386_ONLY)hardlink path=kernel/sys/nfs target=../../kernel/fs/nfs
 legacy pkg=SUNWnfsckr arch=$(ARCH) category=system \
     desc="Network File System (NFS) client kernel support (Root)" \
     hotline="Please contact your local service provider" \

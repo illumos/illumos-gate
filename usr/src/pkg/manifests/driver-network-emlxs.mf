@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/driver/network/emlxs@$(PKGVERS)
@@ -33,23 +32,14 @@ set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking \
     value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/kmdb group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/kmdb/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/misc group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/misc/emlxs group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/misc/emlxs/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/kmdb group=sys
+dir path=kernel/kmdb/$(ARCH64) group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/emlxs group=sys
+dir path=kernel/misc/emlxs/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/mdb group=sys
@@ -79,25 +69,16 @@ driver name=emlxs class=fibre-channel perms="* 0666 root sys" \
 driver name=oce perms="* 0666 root sys" \
     alias=pciex19a2,700 \
     alias=pciex19a2,710
-file path=kernel/drv/$(ARCH64)/emlxs group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=kernel/drv/$(ARCH64)/oce group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/drv/emlxs group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=kernel/drv/emlxs.conf group=sys opensolaris.zone=global \
-    original_name=SUNWemlxs:kernel/drv/emlxs.conf preserve=true \
-    reboot-needed=false variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/drv/oce group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=kernel/kmdb/$(ARCH64)/emlxs group=sys mode=0555 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/kmdb/emlxs group=sys mode=0555 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-file path=kernel/misc/emlxs/$(ARCH64)/emlxs_fw group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/misc/emlxs/emlxs_fw group=sys mode=0755 \
-    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+file path=kernel/drv/$(ARCH64)/emlxs group=sys
+file path=kernel/drv/$(ARCH64)/oce group=sys
+$(i386_ONLY)file path=kernel/drv/emlxs group=sys
+file path=kernel/drv/emlxs.conf group=sys \
+    original_name=SUNWemlxs:kernel/drv/emlxs.conf preserve=true
+$(i386_ONLY)file path=kernel/drv/oce group=sys
+file path=kernel/kmdb/$(ARCH64)/emlxs group=sys mode=0555
+$(i386_ONLY)file path=kernel/kmdb/emlxs group=sys mode=0555
+file path=kernel/misc/emlxs/$(ARCH64)/emlxs_fw group=sys mode=0755
+$(i386_ONLY)file path=kernel/misc/emlxs/emlxs_fw group=sys mode=0755
 file path=usr/lib/mdb/kvm/$(ARCH64)/emlxs.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/emlxs.so group=sys mode=0555
 legacy pkg=SUNWemlxs arch=$(ARCH) category=system \

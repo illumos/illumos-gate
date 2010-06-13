@@ -20,10 +20,15 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/storage/mpathadm@$(PKGVERS)
 set name=pkg.description \
     value="Path Administration Utility for a Solaris Multipathing device"
@@ -31,7 +36,6 @@ set name=pkg.summary value="Solaris Multipathing CLI"
 set name=info.classification \
     value="org.opensolaris.category.2008:Applications/System Utilities"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/sbin
 file path=usr/sbin/mpathadm mode=0555

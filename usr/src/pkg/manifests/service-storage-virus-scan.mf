@@ -20,45 +20,38 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/storage/virus-scan@$(PKGVERS)
 set name=pkg.description value="Virus Scan Service Kernel Root Components"
 set name=pkg.summary value="Virus Scan Service Kernel"
-set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Services
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
+dir path=lib/svc/manifest/system/filesystem group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/devfsadm group=sys
 dir path=usr/lib/devfsadm/linkmod group=sys
 dir path=usr/lib/vscan
 dir path=usr/sbin
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/system group=sys
-dir path=lib/svc/manifest/system/filesystem group=sys
 driver name=vscan perms="* 0640 root sys"
-file path=kernel/drv/$(ARCH64)/vscan group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/drv/vscan group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=kernel/drv/vscan.conf group=sys opensolaris.zone=global \
-    reboot-needed=false variant.opensolaris.zone=global
+file path=kernel/drv/$(ARCH64)/vscan group=sys
+$(i386_ONLY)file path=kernel/drv/vscan group=sys
+file path=kernel/drv/vscan.conf group=sys
+file path=lib/svc/manifest/system/filesystem/vscan.xml group=sys mode=0444
 file path=usr/lib/devfsadm/linkmod/SUNW_vscan_link.so group=sys
 file path=usr/lib/vscan/libvscan.so.1
 file path=usr/lib/vscan/vscand mode=0555
 file path=usr/sbin/vscanadm mode=0555
-file path=lib/svc/manifest/system/filesystem/vscan.xml group=sys mode=0444
 legacy pkg=SUNWvscankr arch=$(ARCH) category=system \
     desc="Virus Scan Service Kernel Root Components" \
     hotline="Please contact your local service provider" \

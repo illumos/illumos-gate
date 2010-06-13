@@ -20,50 +20,39 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/hal@$(PKGVERS)
 set name=pkg.description \
     value="Hardware Abstraction Layer, HAL (freedesktop.org)"
 set name=pkg.summary value="Hardware Abstraction Layer"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/dbus-1 opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/dbus-1/system.d opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/hal/fdi opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/hal/fdi/information opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/information/10freedesktop opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/information/20thirdparty opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/information/30user opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/policy opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/policy/10osvendor opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/policy/20thirdparty opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/policy/30user opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/preprobe opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/preprobe/10osvendor opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/preprobe/20thirdparty opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=etc/hal/fdi/preprobe/30user opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=etc group=sys variant.opensolaris.zone=global
+dir path=etc/dbus-1 variant.opensolaris.zone=global
+dir path=etc/dbus-1/system.d variant.opensolaris.zone=global
+dir path=etc/hal variant.opensolaris.zone=global
+dir path=etc/hal/fdi variant.opensolaris.zone=global
+dir path=etc/hal/fdi/information variant.opensolaris.zone=global
+dir path=etc/hal/fdi/information/10freedesktop variant.opensolaris.zone=global
+dir path=etc/hal/fdi/information/20thirdparty variant.opensolaris.zone=global
+dir path=etc/hal/fdi/information/30user variant.opensolaris.zone=global
+dir path=etc/hal/fdi/policy variant.opensolaris.zone=global
+dir path=etc/hal/fdi/policy/10osvendor variant.opensolaris.zone=global
+dir path=etc/hal/fdi/policy/20thirdparty variant.opensolaris.zone=global
+dir path=etc/hal/fdi/policy/30user variant.opensolaris.zone=global
+dir path=etc/hal/fdi/preprobe variant.opensolaris.zone=global
+dir path=etc/hal/fdi/preprobe/10osvendor variant.opensolaris.zone=global
+dir path=etc/hal/fdi/preprobe/20thirdparty variant.opensolaris.zone=global
+dir path=etc/hal/fdi/preprobe/30user variant.opensolaris.zone=global
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/network group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
@@ -76,53 +65,49 @@ dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
-dir path=lib/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/network group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=etc/dbus-1/system.d/hal.conf opensolaris.zone=global \
-    variant.opensolaris.zone=global
+file path=etc/dbus-1/system.d/hal.conf variant.opensolaris.zone=global
 file path=etc/hal/fdi/information/10freedesktop/10-camera-ptp.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/information/10freedesktop/10-cd-dvd-burner.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/information/10freedesktop/10-usb-card-readers.fdi \
-    mode=0444 opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/information/10freedesktop/10-usb-music-players.fdi \
-    mode=0444 opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/information/10freedesktop/10-usb-pda.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/information/10freedesktop/10-usb-zip-drives.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/information/10freedesktop/10-wireless-mice.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/policy/10osvendor/10-cpufreq.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/policy/10osvendor/10-laptop-panel-mgmt-policy.fdi \
-    mode=0444 opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/policy/10osvendor/10-network-attached.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/policy/10osvendor/10-power-mgmt-policy.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/policy/10osvendor/10-toshiba-buttons.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/policy/10osvendor/20-storage-methods.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/policy/10osvendor/20-zfs-methods.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/preprobe/10osvendor/10-ide-drives.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/preprobe/10osvendor/20-ignore-fixed-storage.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/preprobe/10osvendor/20-ignore-lofi.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=etc/hal/fdi/preprobe/10osvendor/20-printers.fdi mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=lib/svc/method/svc-hal mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
-file path=lib/svc/method/svc-network-discovery mode=0555 opensolaris.zone=global \
+file path=etc/hal/fdi/information/10freedesktop/10-cd-dvd-burner.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/information/10freedesktop/10-usb-card-readers.fdi \
+    mode=0444 variant.opensolaris.zone=global
+file path=etc/hal/fdi/information/10freedesktop/10-usb-music-players.fdi \
+    mode=0444 variant.opensolaris.zone=global
+file path=etc/hal/fdi/information/10freedesktop/10-usb-pda.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/information/10freedesktop/10-usb-zip-drives.fdi \
+    mode=0444 variant.opensolaris.zone=global
+file path=etc/hal/fdi/information/10freedesktop/10-wireless-mice.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/policy/10osvendor/10-cpufreq.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/policy/10osvendor/10-laptop-panel-mgmt-policy.fdi \
+    mode=0444 variant.opensolaris.zone=global
+file path=etc/hal/fdi/policy/10osvendor/10-network-attached.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/policy/10osvendor/10-power-mgmt-policy.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/policy/10osvendor/10-toshiba-buttons.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/policy/10osvendor/20-storage-methods.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/policy/10osvendor/20-zfs-methods.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/preprobe/10osvendor/10-ide-drives.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/preprobe/10osvendor/20-ignore-fixed-storage.fdi \
+    mode=0444 variant.opensolaris.zone=global
+file path=etc/hal/fdi/preprobe/10osvendor/20-ignore-lofi.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=etc/hal/fdi/preprobe/10osvendor/20-printers.fdi mode=0444 \
+    variant.opensolaris.zone=global
+file path=lib/svc/manifest/network/network-discovery.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
+file path=lib/svc/manifest/system/hal.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/svc-hal mode=0555 variant.opensolaris.zone=global
+file path=lib/svc/method/svc-network-discovery mode=0555 \
     variant.opensolaris.zone=global
 file path=usr/lib/$(ARCH64)/libhal-storage.so.1.0.0
 file path=usr/lib/$(ARCH64)/libhal.so.1.0.0
@@ -180,10 +165,6 @@ file path=usr/sbin/hal-get-property mode=0555
 file path=usr/sbin/hal-set-property mode=0555
 file path=usr/sbin/lshal mode=0555
 file path=usr/share/lib/xml/dtd/fdi.dtd.1
-file path=lib/svc/manifest/network/network-discovery.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-file path=lib/svc/manifest/system/hal.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWhal arch=$(ARCH) category=system \
     desc="Hardware Abstraction Layer, HAL (freedesktop.org)" \
     hotline="Please contact your local service provider" \
@@ -198,7 +179,8 @@ license cmd/hal/LICENSE license=cmd/hal/LICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libhal-storage.so target=./libhal-storage.so.1.0.0
-link path=usr/lib/$(ARCH64)/libhal-storage.so.1 target=./libhal-storage.so.1.0.0
+link path=usr/lib/$(ARCH64)/libhal-storage.so.1 \
+    target=./libhal-storage.so.1.0.0
 link path=usr/lib/$(ARCH64)/libhal.so target=./libhal.so.1.0.0
 link path=usr/lib/$(ARCH64)/libhal.so.1 target=./libhal.so.1.0.0
 link path=usr/lib/libhal-storage.so target=./libhal-storage.so.1.0.0

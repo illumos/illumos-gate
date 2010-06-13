@@ -29,4 +29,3 @@ set name=pkg.fmri value=pkg:/SUNWspwr@0.5.11,5.11-0.141
 set name=pkg.obsolete value=true
 set name=org.opensolaris.redist value=nonredist
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal

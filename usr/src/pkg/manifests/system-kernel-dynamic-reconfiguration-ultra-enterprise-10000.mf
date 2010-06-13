@@ -20,16 +20,15 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri \
     value=pkg:/system/kernel/dynamic-reconfiguration/ultra-enterprise-10000@$(PKGVERS)
 set name=pkg.description \
@@ -39,7 +38,6 @@ set name=pkg.summary \
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Enterprise Management"
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=platform group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000 group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/kernel group=sys
@@ -52,9 +50,9 @@ file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64)/ngdr \
     group=sys
 file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/ngdr.conf group=sys \
     original_name=SUNWdrr:platform/SUNW,Ultra-Enterprise-10000/kernel/drv/ngdr.conf \
-    preserve=true reboot-needed=false
+    preserve=true
 file path=platform/SUNW,Ultra-Enterprise-10000/kernel/misc/$(ARCH64)/ngdrmach \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 legacy pkg=SUNWdrr.u arch=$(ARCH).sun4u category=system \
     desc="Dynamic Reconfiguration Modules for Sun Enterprise 10000" \
     hotline="Please contact your local service provider" \

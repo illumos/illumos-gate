@@ -24,20 +24,20 @@
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/sdcard@$(PKGVERS)
 set name=pkg.description value="SD/MMC Drivers"
 set name=pkg.summary value="SD/MMC Drivers"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
 # SUNWsdcard doesn't deliver anything for sparc, but we keep delivering
 # the package on sparc because we can't use direct obsolete support to
 # obsolete only one variant.
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 $(i386_ONLY)dir path=kernel group=sys
 $(i386_ONLY)dir path=kernel/drv group=sys
 $(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
@@ -48,11 +48,11 @@ $(i386_ONLY)driver name=sdhost perms="* 0644 root root" \
     alias=pciclass,080501
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/sdhost group=sys
 $(i386_ONLY)file path=kernel/drv/sdhost group=sys
-$(i386_ONLY)file path=kernel/misc/$(ARCH64)/sda group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=kernel/misc/sda group=sys mode=0755 reboot-needed=true
+$(i386_ONLY)file path=kernel/misc/$(ARCH64)/sda group=sys mode=0755
+$(i386_ONLY)file path=kernel/misc/sda group=sys mode=0755
 $(i386_ONLY)legacy pkg=SUNWsdcard arch=$(ARCH) category=system \
-    desc="SD/MMC Drivers" hotline="Please contact your local service provider" \
+    desc="SD/MMC Drivers" \
+    hotline="Please contact your local service provider" \
     name="SD/MMC Drivers" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 $(i386_ONLY)license cr_Sun license=cr_Sun

@@ -20,30 +20,30 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/fcsm@$(PKGVERS)
 set name=pkg.description value="Provides the FCSM driver"
 set name=pkg.summary value="FCSM driver"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=fcsm perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/fcsm group=sys
 $(i386_ONLY)file path=kernel/drv/fcsm group=sys
-file path=kernel/drv/fcsm.conf group=sys reboot-needed=false
-legacy pkg=SUNWfcsm arch=$(ARCH) category=system desc="Provides the FCSM driver" \
+file path=kernel/drv/fcsm.conf group=sys
+legacy pkg=SUNWfcsm arch=$(ARCH) category=system \
+    desc="Provides the FCSM driver" \
     hotline="Please contact your local service provider" name="FCSM driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun

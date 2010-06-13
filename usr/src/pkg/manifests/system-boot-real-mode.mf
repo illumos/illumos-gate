@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/boot/real-mode@$(PKGVERS)
@@ -33,21 +32,16 @@ set name=info.classification value=org.opensolaris.category.2008:System/Core
 # another, so SUNWrmod continues to be delivered as sparc, but
 # empty to satisfy the rename.
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-$(i386_ONLY)dir path=boot group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)dir path=boot/solaris group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)dir path=boot/solaris/devicedb group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+$(i386_ONLY)dir path=boot group=sys
+$(i386_ONLY)dir path=boot/solaris group=sys
+$(i386_ONLY)dir path=boot/solaris/devicedb group=sys
 $(i386_ONLY)dir path=usr group=sys
 $(i386_ONLY)dir path=usr/lib
 $(i386_ONLY)dir path=usr/lib/fs group=sys
 $(i386_ONLY)dir path=usr/lib/fs/ufs group=sys
 $(i386_ONLY)file path=boot/solaris.xpm group=sys
-$(i386_ONLY)file path=boot/solaris/bootenv.rc group=sys opensolaris.zone=global \
-    original_name=SUNWrmodr:boot/solaris/bootenv.rc preserve=true \
-    variant.opensolaris.zone=global
+$(i386_ONLY)file path=boot/solaris/bootenv.rc group=sys \
+    original_name=SUNWrmodr:boot/solaris/bootenv.rc preserve=true
 $(i386_ONLY)file path=boot/solaris/devicedb/master group=sys \
     original_name=SUNWrmod:boot/solaris/devicedb/master preserve=true
 $(i386_ONLY)file path=usr/lib/fs/ufs/mboot mode=0444

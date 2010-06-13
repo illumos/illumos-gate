@@ -29,7 +29,6 @@ set name=pkg.summary value="Solaris 10 Containers: solaris10 brand support"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Virtualization
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/brand group=sys
 dir path=etc/brand/solaris10 group=sys
@@ -58,10 +57,10 @@ file path=etc/brand/solaris10/smf_disable.conf group=sys \
     original_name=SUNWs10brand:etc/brand/solaris10/smf_disable.conf \
     preserve=true
 file path=etc/zones/SUNWsolaris10.xml mode=0444
-$(sparc_ONLY)file path=platform/sun4u/kernel/brand/$(ARCH64)/s10_brand group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4v/kernel/brand/$(ARCH64)/s10_brand group=sys \
-    mode=0755 reboot-needed=true
+$(sparc_ONLY)file path=platform/sun4u/kernel/brand/$(ARCH64)/s10_brand \
+    group=sys mode=0755
+$(sparc_ONLY)file path=platform/sun4v/kernel/brand/$(ARCH64)/s10_brand \
+    group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/brand/$(ARCH64)/s10_brand group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/brand/s10_brand group=sys mode=0755
 file path=usr/lib/$(ARCH64)/s10_brand.so.1

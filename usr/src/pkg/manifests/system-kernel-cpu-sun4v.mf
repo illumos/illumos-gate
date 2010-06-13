@@ -20,22 +20,20 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/cpu/sun4v@$(PKGVERS)
 set name=pkg.description value="UltraSPARC-T1 core kernel software"
 set name=pkg.summary value=UltraSPARC-T1
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=platform group=sys
 dir path=platform/sun4v group=sys
 dir path=platform/sun4v/kernel group=sys
@@ -44,21 +42,21 @@ dir path=platform/sun4v/kernel/cpu/$(ARCH64) group=sys
 dir path=platform/sun4v/kernel/pcbe group=sys
 dir path=platform/sun4v/kernel/pcbe/$(ARCH64) group=sys
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T1 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T2 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T2+ group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T3 group=sys \
-    mode=0755 reboot-needed=true
-file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T1 group=sys \
-    mode=0755 reboot-needed=true
-file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T2 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
+file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T1 \
+    group=sys mode=0755
+file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T2 \
+    group=sys mode=0755
 file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T2+ \
-    group=sys mode=0755 reboot-needed=true
-file path=platform/sun4v/kernel/pcbe/sparcv9/pcbe.SUNW,UltraSPARC-T3 \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
+file path=platform/sun4v/kernel/pcbe/sparcv9/pcbe.SUNW,UltraSPARC-T3 group=sys \
+    mode=0755
 legacy pkg=SUNWust1.v arch=$(ARCH).sun4v category=system \
     desc="UltraSPARC-T1 core kernel software" \
     hotline="Please contact your local service provider" \

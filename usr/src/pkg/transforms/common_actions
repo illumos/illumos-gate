@@ -20,12 +20,20 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# A hollow package is one that installs into all zones, but only
-# delivers content to the global zone.
+# These actions represent settings which should appear in every package.
 #
-<transform dir driver file link hardlink -> set variant.opensolaris.zone global>
+
+#
+# Name the consolidation this package came from.
+#
+set name=org.opensolaris.consolidation value=osnet
+
+#
+# Indicate that the package was published in a zones aware
+# fashion.
+#
+set name=variant.opensolaris.zone value=global value=nonglobal

@@ -28,4 +28,3 @@
 set name=pkg.fmri value=pkg:/SUNWlx@0.5.11,5.11-0.143
 set name=pkg.obsolete value=true
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal

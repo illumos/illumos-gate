@@ -20,27 +20,29 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/network/udapl@$(PKGVERS)
 set name=pkg.description value="Sun DAT registry library and datadm"
 set name=pkg.summary value="Sun User Direct Access Programming Library (User)"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/dat group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=etc group=sys
+dir path=etc/dat group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/sbin
-file path=etc/dat/dat.conf group=sys opensolaris.zone=global \
-    original_name=SUNWudapl:etc/dat/dat.conf preserve=true \
-    variant.opensolaris.zone=global
+file path=etc/dat/dat.conf group=sys original_name=SUNWudapl:etc/dat/dat.conf \
+    preserve=true
 file path=usr/lib/$(ARCH64)/libdat.so.1
 file path=usr/lib/$(ARCH64)/llib-ldat.ln
 file path=usr/lib/libdat.so.1

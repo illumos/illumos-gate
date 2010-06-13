@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/udfs@$(PKGVERS)
@@ -29,21 +28,15 @@ set name=pkg.description value="Universal Disk Format 1.50 File System"
 set name=pkg.summary value="Universal Disk Format 1.50"
 set name=info.classification value=org.opensolaris.category.2008:System/Media
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/fs group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=kernel/fs/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=kernel group=sys
+dir path=kernel/fs group=sys
+dir path=kernel/fs/$(ARCH64) group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/udfs group=sys
-file path=kernel/fs/$(ARCH64)/udfs group=sys mode=0755 opensolaris.zone=global \
-    reboot-needed=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=kernel/fs/udfs group=sys mode=0755 opensolaris.zone=global \
-    reboot-needed=true variant.opensolaris.zone=global
+file path=kernel/fs/$(ARCH64)/udfs group=sys mode=0755
+$(i386_ONLY)file path=kernel/fs/udfs group=sys mode=0755
 file path=usr/lib/fs/udfs/fsck mode=0555
 file path=usr/lib/fs/udfs/fsdb mode=0555
 file path=usr/lib/fs/udfs/fstyp.so.1 mode=0555

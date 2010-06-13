@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/management/snmp/sea@$(PKGVERS)
@@ -32,7 +31,6 @@ set name=pkg.summary \
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Enterprise Management"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)

@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/library/print/open-printing/ipp@$(PKGVERS)
 set name=pkg.description \
     value="Client side support for communicating with IPP based print servers"
 set name=pkg.summary value="FSG Open Printing API IPP Print Service Module"
-set name=info.classification value=org.opensolaris.category.2008:System/Printing
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Printing
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/print group=lp

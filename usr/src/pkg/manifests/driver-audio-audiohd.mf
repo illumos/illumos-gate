@@ -20,23 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/audio/audiohd@$(PKGVERS)
 set name=pkg.description \
     value="SunOS audio device driver for Munich workstation"
 set name=pkg.summary value="SUNW High Definition Audio Drivers"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Media
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -47,7 +45,7 @@ driver name=audiohd \
     alias=pciexclass,0403
 file path=kernel/drv/$(ARCH64)/audiohd group=sys
 file path=kernel/drv/audiohd group=sys
-file path=kernel/drv/audiohd.conf group=sys reboot-needed=false
+file path=kernel/drv/audiohd.conf group=sys
 legacy pkg=SUNWaudiohd arch=$(ARCH) category=system \
     desc="SunOS audio device driver for Munich workstation" \
     hotline="Please contact your local service provider" \

@@ -29,7 +29,6 @@ set name=pkg.description \
 set name=pkg.summary value="Lint Libraries"
 set name=info.classification value=org.opensolaris.category.2008:Development/C
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=lib
 dir path=lib/$(ARCH64)
 dir path=usr group=sys
@@ -49,10 +48,10 @@ file path=lib/$(ARCH64)/llib-lbsm.ln
 file path=lib/$(ARCH64)/llib-lc.ln
 file path=lib/$(ARCH64)/llib-lc_db.ln
 file path=lib/$(ARCH64)/llib-lcontract.ln
+file path=lib/$(ARCH64)/llib-lcryptoutil.ln
 file path=lib/$(ARCH64)/llib-lctf.ln
 file path=lib/$(ARCH64)/llib-lcurses
 file path=lib/$(ARCH64)/llib-lcurses.ln
-file path=lib/$(ARCH64)/llib-lcryptoutil.ln
 file path=lib/$(ARCH64)/llib-ldevice.ln
 file path=lib/$(ARCH64)/llib-ldevid.ln
 file path=lib/$(ARCH64)/llib-ldevinfo.ln
@@ -104,12 +103,12 @@ file path=lib/llib-lc_db
 file path=lib/llib-lc_db.ln
 file path=lib/llib-lcontract
 file path=lib/llib-lcontract.ln
+file path=lib/llib-lcryptoutil
+file path=lib/llib-lcryptoutil.ln
 file path=lib/llib-lctf
 file path=lib/llib-lctf.ln
 file path=lib/llib-lcurses
 file path=lib/llib-lcurses.ln
-file path=lib/llib-lcryptoutil
-file path=lib/llib-lcryptoutil.ln
 file path=lib/llib-ldevice
 file path=lib/llib-ldevice.ln
 file path=lib/llib-ldevid
@@ -232,6 +231,7 @@ file path=usr/lib/$(ARCH64)/llib-lsldap.ln
 file path=usr/lib/$(ARCH64)/llib-lsmbios.ln
 file path=usr/lib/$(ARCH64)/llib-lssagent.ln
 file path=usr/lib/$(ARCH64)/llib-lssasnmp.ln
+$(sparc_ONLY)file path=usr/lib/$(ARCH64)/llib-lv12n.ln
 file path=usr/lib/$(ARCH64)/llib-lvolmgt.ln
 file path=usr/lib/$(ARCH64)/llib-lvt0.ln
 file path=usr/lib/$(ARCH64)/values-Xa.o
@@ -327,7 +327,6 @@ file path=usr/lib/llib-lssasnmp
 file path=usr/lib/llib-lssasnmp.ln
 $(sparc_ONLY)file path=usr/lib/llib-lv12n
 $(sparc_ONLY)file path=usr/lib/llib-lv12n.ln
-$(sparc_ONLY)file path=usr/lib/$(ARCH64)/llib-lv12n.ln
 file path=usr/lib/llib-lvolmgt
 file path=usr/lib/llib-lvolmgt.ln
 file path=usr/lib/llib-lvt0
@@ -433,7 +432,8 @@ link path=usr/lib/$(ARCH64)/llib-laio.ln \
     target=../../../lib/$(ARCH64)/llib-laio.ln
 link path=usr/lib/$(ARCH64)/llib-lbsm.ln \
     target=../../../lib/$(ARCH64)/llib-lbsm.ln
-link path=usr/lib/$(ARCH64)/llib-lc.ln target=../../../lib/$(ARCH64)/llib-lc.ln
+link path=usr/lib/$(ARCH64)/llib-lc.ln \
+    target=../../../lib/$(ARCH64)/llib-lc.ln
 link path=usr/lib/$(ARCH64)/llib-lcontract.ln \
     target=../../../lib/$(ARCH64)/llib-lcontract.ln
 link path=usr/lib/$(ARCH64)/llib-lctf.ln \

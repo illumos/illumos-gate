@@ -20,73 +20,53 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri \
     value=pkg:/system/boot/grub@0.97,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 $(sparc_ONLY)set name=pkg.description value="GRUB libraries"
 $(i386_ONLY)set name=pkg.description value="Multiboot Boot Loader"
-$(i386_ONLY)set name=pkg.summary value="GNU GRUB - GNU GRand Unified Bootloader"
+$(i386_ONLY)set name=pkg.summary \
+    value="GNU GRUB - GNU GRand Unified Bootloader"
 $(sparc_ONLY)set name=pkg.summary value=GRUB
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-$(i386_ONLY)dir path=boot group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)dir path=boot/grub group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)dir path=boot/grub/bin group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+$(i386_ONLY)dir path=boot group=sys
+$(i386_ONLY)dir path=boot/grub group=sys
+$(i386_ONLY)dir path=boot/grub/bin group=sys
 dir path=lib
-$(i386_ONLY)file path=boot/grub/bin/grub group=sys mode=0555 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/capability group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
+$(i386_ONLY)file path=boot/grub/bin/grub group=sys mode=0555
+$(i386_ONLY)file path=boot/grub/capability group=sys mode=0444
 $(i386_ONLY)file path=boot/grub/default group=sys mode=0444 \
-    opensolaris.zone=global original_name=SUNWgrub:boot/grub/default \
-    preserve=true variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/e2fs_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/fat_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/ffs_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/install_menu group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/iso9660_stage1_5 group=sys \
-    opensolaris.zone=global variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/jfs_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/menu.lst group=sys opensolaris.zone=global \
-    original_name=SUNWgrub:boot/grub/menu.lst preserve=true \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/minix_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/nbgrub group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/pxegrub group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/reiserfs_stage1_5 group=sys \
-    opensolaris.zone=global variant.opensolaris.zone=global
+    original_name=SUNWgrub:boot/grub/default preserve=true
+$(i386_ONLY)file path=boot/grub/e2fs_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/fat_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/ffs_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/install_menu group=sys
+$(i386_ONLY)file path=boot/grub/iso9660_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/jfs_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/menu.lst group=sys \
+    original_name=SUNWgrub:boot/grub/menu.lst preserve=true
+$(i386_ONLY)file path=boot/grub/minix_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/nbgrub group=sys
+$(i386_ONLY)file path=boot/grub/pxegrub group=sys
+$(i386_ONLY)file path=boot/grub/reiserfs_stage1_5 group=sys
 $(i386_ONLY)file path=boot/grub/splash.xpm.gz group=sys
-$(i386_ONLY)file path=boot/grub/stage1 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/stage2 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/stage2_eltorito group=sys \
-    opensolaris.zone=global variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/ufs2_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/ufs_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/vstafs_stage1_5 group=sys \
-    opensolaris.zone=global variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/xfs_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=boot/grub/zfs_stage1_5 group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+$(i386_ONLY)file path=boot/grub/stage1 group=sys
+$(i386_ONLY)file path=boot/grub/stage2 group=sys
+$(i386_ONLY)file path=boot/grub/stage2_eltorito group=sys
+$(i386_ONLY)file path=boot/grub/ufs2_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/ufs_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/vstafs_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/xfs_stage1_5 group=sys
+$(i386_ONLY)file path=boot/grub/zfs_stage1_5 group=sys
 file path=lib/libgrubmgmt.so.1
 file path=lib/llib-lgrubmgmt
 file path=lib/llib-lgrubmgmt.ln

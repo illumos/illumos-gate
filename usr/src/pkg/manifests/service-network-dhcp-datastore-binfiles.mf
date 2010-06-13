@@ -20,18 +20,18 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/service/network/dhcp/datastore/binfiles@$(PKGVERS)
+set name=pkg.fmri \
+    value=pkg:/service/network/dhcp/datastore/binfiles@$(PKGVERS)
 set name=pkg.description \
     value="Binary File Format Public module exporting Version 1 of the Service Provider Interface. Used to store DHCP data, this module has much better performance than the ASCII files and nisplus public modules."
 set name=pkg.summary \
     value="Binary File Format Data Module for BOOTP/DHCP Services"
-set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Services
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/inet
@@ -49,4 +49,5 @@ legacy pkg=SUNWdhcsb arch=$(ARCH) category=system \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so target=./ds_SUNWbinfiles.so.1
+link path=usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so \
+    target=./ds_SUNWbinfiles.so.1

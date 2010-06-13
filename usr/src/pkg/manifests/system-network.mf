@@ -29,7 +29,6 @@ set name=pkg.description \
 set name=pkg.summary value="Core Solaris Network Infrastructure"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/default group=sys
 dir path=etc/dladm group=netadm owner=dladm
@@ -48,8 +47,8 @@ file path=etc/default/dhcpagent group=sys \
     original_name=SUNWcnetr:etc/default/dhcpagent preserve=true
 file path=etc/default/inetinit group=sys \
     original_name=SUNWcnetr:etc/default/inetinit preserve=true
-file path=etc/default/ipsec group=sys original_name=SUNWcnetr:etc/default/ipsec \
-    preserve=true
+file path=etc/default/ipsec group=sys \
+    original_name=SUNWcnetr:etc/default/ipsec preserve=true
 file path=etc/default/mpathd group=sys \
     original_name=SUNWcnetr:etc/default/mpathd preserve=true
 file path=etc/dladm/datalink.conf group=netadm \
@@ -76,13 +75,14 @@ file path=etc/nwam/loc/NoNet/ipf.conf.dfl group=netadm owner=netadm \
 file path=etc/nwam/loc/NoNet/ipf6.conf.dfl group=netadm owner=netadm \
     preserve=true
 file path=etc/nwam/loc/create_loc_auto group=netadm owner=netadm preserve=true
-file path=etc/nwam/loc/create_loc_nonet group=netadm owner=netadm preserve=true
+file path=etc/nwam/loc/create_loc_nonet group=netadm owner=netadm \
+    preserve=true
 file path=sbin/dladm mode=0555
 file path=sbin/dlstat mode=0555
 file path=sbin/flowadm mode=0555
 file path=sbin/flowstat mode=0555
-group groupname=netadm gid=65
 file path=sbin/ipadm mode=0555
+group groupname=netadm gid=65
 legacy pkg=SUNWcnetr arch=$(ARCH) category=system \
     desc="core software for network infrastructure configuration" \
     hotline="Please contact your local service provider" \

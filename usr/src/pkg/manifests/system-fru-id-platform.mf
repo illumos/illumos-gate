@@ -20,17 +20,16 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/fru-id/platform@$(PKGVERS)
-set name=pkg.description value="FRU ID platform data module and access library"
+set name=pkg.description \
+    value="FRU ID platform data module and access library"
 set name=pkg.summary value="FRU ID Platform Modules"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 $(i386_ONLY)dir path=usr/lib
 $(i386_ONLY)dir path=usr/lib/picl group=sys
@@ -46,7 +45,8 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12/lib
@@ -59,7 +59,8 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000/lib/picl group=sys
@@ -78,47 +79,57 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-2500/lib/picl/plugins \
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V215/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V240/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V250/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V445/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins \
+    group=sys
 $(sparc_ONLY)dir path=usr/platform/sun4u group=sys
 $(sparc_ONLY)dir path=usr/platform/sun4u/lib
 $(sparc_ONLY)dir path=usr/platform/sun4u/lib/picl group=sys

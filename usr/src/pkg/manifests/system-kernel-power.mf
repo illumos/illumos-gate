@@ -20,23 +20,28 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/power@$(PKGVERS)
 set name=pkg.description value="Power Management binaries"
 set name=pkg.summary value="Power Management binaries"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=etc/default group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=etc group=sys
+dir path=etc/default group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
+dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/kernel group=sys
@@ -45,18 +50,12 @@ dir path=usr/kernel/drv/$(ARCH64) group=sys
 dir path=usr/lib
 dir path=usr/lib/power group=sys
 dir path=usr/sbin
-dir path=lib/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
 driver name=pm perms="* 0666 root sys"
-file path=etc/default/power group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=etc/power.conf group=sys opensolaris.zone=global \
-    original_name=SUNWpm:etc/power.conf preserve=true \
-    variant.opensolaris.zone=global
-file path=lib/svc/method/svc-power mode=0555 opensolaris.zone=global \
-    variant.opensolaris.zone=global
+file path=etc/default/power group=sys
+file path=etc/power.conf group=sys original_name=SUNWpm:etc/power.conf \
+    preserve=true
+file path=lib/svc/manifest/system/power.xml group=sys mode=0444
+file path=lib/svc/method/svc-power mode=0555
 file path=usr/bin/sys-suspend mode=4555
 file path=usr/kernel/drv/$(ARCH64)/pm group=sys
 $(i386_ONLY)file path=usr/kernel/drv/pm group=sys
@@ -64,14 +63,13 @@ file path=usr/kernel/drv/pm.conf group=sys
 file path=usr/lib/power/powerd mode=0555
 file path=usr/sbin/pmconfig mode=4555
 file path=usr/sbin/sysidpm group=sys mode=0755
-file path=lib/svc/manifest/system/power.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWpmr arch=$(ARCH) category=system \
     desc="Power Management config file and rc script" \
     hotline="Please contact your local service provider" \
     name="Power Management config file and rc script" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWpmu arch=$(ARCH) category=system desc="Power Management binaries" \
+legacy pkg=SUNWpmu arch=$(ARCH) category=system \
+    desc="Power Management binaries" \
     hotline="Please contact your local service provider" \
     name="Power Management binaries" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11

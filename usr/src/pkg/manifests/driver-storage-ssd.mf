@@ -20,22 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/ssd@$(PKGVERS)
 set name=pkg.description value="ssd kernel device driver"
 set name=pkg.summary value="SPARCstorage Array Drivers"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -45,9 +44,9 @@ driver name=ssd perms="* 0640 root sys" \
     alias=scsa,00.bvhci
 file path=kernel/drv/$(ARCH64)/ssd group=sys
 file path=kernel/drv/ssd.conf group=sys \
-    original_name=SUNWssad:kernel/drv/ssd.conf preserve=true \
-    reboot-needed=false
-legacy pkg=SUNWssad arch=$(ARCH) category=system desc="ssd kernel device driver" \
+    original_name=SUNWssad:kernel/drv/ssd.conf preserve=true
+legacy pkg=SUNWssad arch=$(ARCH) category=system \
+    desc="ssd kernel device driver" \
     hotline="Please contact your local service provider" \
     name="SPARCstorage Array Drivers" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11

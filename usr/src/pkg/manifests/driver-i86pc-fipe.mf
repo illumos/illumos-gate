@@ -20,22 +20,22 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/i86pc/fipe@$(PKGVERS)
-set name=pkg.description value="Intel 5000/7300 memory power management driver"
+set name=pkg.description \
+    value="Intel 5000/7300 memory power management driver"
 set name=pkg.summary value="Intel 5000/7300 memory power management driver"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=platform group=sys
 dir path=platform/i86pc group=sys
 dir path=platform/i86pc/kernel group=sys
@@ -46,7 +46,7 @@ driver name=fipe \
     alias=pci8086,360c
 file path=platform/i86pc/kernel/drv/$(ARCH64)/fipe group=sys
 file path=platform/i86pc/kernel/drv/fipe group=sys
-file path=platform/i86pc/kernel/drv/fipe.conf group=sys reboot-needed=false
+file path=platform/i86pc/kernel/drv/fipe.conf group=sys
 legacy pkg=SUNWfipe arch=$(ARCH) category=system \
     desc="Intel 5000/7300 memory power management driver" \
     hotline="Please contact your local service provider" \

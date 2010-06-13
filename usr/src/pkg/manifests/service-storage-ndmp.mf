@@ -20,25 +20,26 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/service/storage/ndmp@$(PKGVERS)
 set name=pkg.description \
     value="Network Data Management Protocol Service (user components)"
 set name=pkg.summary value="Network Data Management Protocol Service (User)"
-set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Services
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/include
@@ -46,8 +47,7 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/ndmp
 dir path=usr/sbin
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/system group=sys
+file path=lib/svc/manifest/system/ndmp.xml group=sys mode=0444
 file path=lib/svc/method/svc-ndmp mode=0555
 file path=usr/include/libndmp.h
 file path=usr/lib/$(ARCH64)/libndmp.so.1
@@ -58,7 +58,6 @@ file path=usr/lib/llib-lndmp.ln
 file path=usr/lib/ndmp/ndmpd mode=0555
 file path=usr/sbin/ndmpadm mode=0555
 file path=usr/sbin/ndmpstat mode=0555
-file path=lib/svc/manifest/system/ndmp.xml group=sys mode=0444
 legacy pkg=SUNWndmpr arch=$(ARCH) category=system \
     desc="Network Data Management Protocol Service (root components)" \
     hotline="Please contact your local service provider" \

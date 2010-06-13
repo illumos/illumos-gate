@@ -20,41 +20,34 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri \
     value=pkg:/system/storage/fibre-channel/port-utility@$(PKGVERS)
 set name=pkg.description value="Utility for Fibre Channel Host Bus Adapters"
 set name=pkg.summary value="Fibre Channel HBA Port utility"
-set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
-dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
-dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/network group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/sbin
-dir path=lib/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/network group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=lib/svc/method/npivconfig mode=0555 opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=lib/svc/method/svc-fcoei mode=0555 opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=lib/svc/method/svc-fcoet mode=0555 opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=usr/sbin/fcinfo mode=0555
 file path=lib/svc/manifest/network/npiv_config.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
+    variant.opensolaris.zone=global
 file path=lib/svc/manifest/system/fcoe_initiator.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
+    variant.opensolaris.zone=global
 file path=lib/svc/manifest/system/fcoe_target.xml group=sys mode=0444 \
-    opensolaris.zone=global variant.opensolaris.zone=global
+    variant.opensolaris.zone=global
+file path=lib/svc/method/npivconfig mode=0555 variant.opensolaris.zone=global
+file path=lib/svc/method/svc-fcoei mode=0555 variant.opensolaris.zone=global
+file path=lib/svc/method/svc-fcoet mode=0555 variant.opensolaris.zone=global
+file path=usr/sbin/fcinfo mode=0555
 hardlink path=usr/sbin/fcadm target=../../usr/sbin/fcinfo
 legacy pkg=SUNWfcprt arch=$(ARCH) category=system \
     desc="Utility for Fibre Channel Host Bus Adapters" \

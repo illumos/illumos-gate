@@ -20,23 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/ixgbe@$(PKGVERS)
 set name=pkg.description value="Intel 10GbE PCIE NIC Driver"
 set name=pkg.summary value="Intel 10GbE PCIE NIC Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -65,8 +63,7 @@ driver name=ixgbe clone_perms="ixgbe 0666 root sys" perms="* 0666 root sys" \
 file path=kernel/drv/$(ARCH64)/ixgbe group=sys
 $(i386_ONLY)file path=kernel/drv/ixgbe group=sys
 file path=kernel/drv/ixgbe.conf group=sys \
-    original_name=SUNWixgbe:kernel/drv/ixgbe.conf preserve=renamenew \
-    reboot-needed=false
+    original_name=SUNWixgbe:kernel/drv/ixgbe.conf preserve=renamenew
 legacy pkg=SUNWixgbe arch=$(ARCH) category=system \
     desc="Intel 10GbE PCIE NIC Driver" \
     hotline="Please contact your local service provider" \

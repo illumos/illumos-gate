@@ -20,23 +20,25 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/floating-point-scrubber@$(PKGVERS)
 set name=pkg.description value="FP Scrubber configuration files"
 set name=pkg.summary value="FP Scrubber configuration files"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/fps
@@ -46,13 +48,9 @@ dir path=usr/lib/fps/sun4u/UltraSPARC-III+
 dir path=usr/lib/fps/sun4u/UltraSPARC-IIIi
 dir path=usr/lib/fps/sun4u/UltraSPARC-IV
 dir path=usr/lib/fps/sun4u/UltraSPARC-IV+
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/system group=sys
+file path=lib/svc/manifest/system/fpsd.xml group=sys mode=0444
 file path=usr/lib/fps/fpsd mode=0555
 file path=usr/lib/fps/sun4u/UltraSPARC-III/fptest mode=0555
-file path=lib/svc/manifest/system/fpsd.xml group=sys mode=0444
 legacy pkg=SUNWfsr arch=$(ARCH) category=system \
     desc="FP Scrubber configuration files (ROOT)" \
     hotline="Please contact your local service provider" \
@@ -71,4 +69,5 @@ link path=usr/lib/fps/sun4u/UltraSPARC-IIIi/fptest \
     target=../UltraSPARC-III/fptest
 link path=usr/lib/fps/sun4u/UltraSPARC-IV+/fptest \
     target=../UltraSPARC-III/fptest
-link path=usr/lib/fps/sun4u/UltraSPARC-IV/fptest target=../UltraSPARC-III/fptest
+link path=usr/lib/fps/sun4u/UltraSPARC-IV/fptest \
+    target=../UltraSPARC-III/fptest

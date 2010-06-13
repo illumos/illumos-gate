@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/driver/network/bpf@$(PKGVERS)
@@ -30,36 +29,25 @@ set name=pkg.summary value="Solaris Kernel Packet"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/include/net
 dir path=usr/include/netpacket
-dir path=usr/kernel group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=usr/kernel/drv group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=usr/kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=usr/kernel/socketmod group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=usr/kernel/socketmod/$(ARCH64) group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
+dir path=usr/kernel group=sys
+dir path=usr/kernel/drv group=sys
+dir path=usr/kernel/drv/$(ARCH64) group=sys
+dir path=usr/kernel/socketmod group=sys
+dir path=usr/kernel/socketmod/$(ARCH64) group=sys
 driver name=bpf perms="bpf 0666 root sys"
 file path=usr/include/net/bpf.h
 file path=usr/include/net/bpfdesc.h
 file path=usr/include/net/dlt.h
 file path=usr/include/netpacket/packet.h
-file path=usr/kernel/drv/$(ARCH64)/bpf group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-$(i386_ONLY)file path=usr/kernel/drv/bpf group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=usr/kernel/drv/bpf.conf group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-file path=usr/kernel/socketmod/$(ARCH64)/sockpfp group=sys mode=0755 \
-    opensolaris.zone=global variant.opensolaris.zone=global
-$(i386_ONLY)file path=usr/kernel/socketmod/sockpfp group=sys mode=0755 \
-    opensolaris.zone=global variant.opensolaris.zone=global
+file path=usr/kernel/drv/$(ARCH64)/bpf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/bpf group=sys
+file path=usr/kernel/drv/bpf.conf group=sys
+file path=usr/kernel/socketmod/$(ARCH64)/sockpfp group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/socketmod/sockpfp group=sys mode=0755
 legacy pkg=SUNWpacketh arch=$(ARCH) category=system \
     desc="C header files for BPF/PF_PACKET" \
     hotline="Please contact your local service provider" \

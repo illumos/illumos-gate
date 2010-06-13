@@ -20,23 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/kernel/platform@$(PKGVERS)
 set name=pkg.description \
     value="core kernel software for a specific hardware platform group"
 set name=pkg.summary value="Core Solaris Kernel Architecture"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=platform group=sys
 $(sparc_ONLY)dir path=platform/SUNW,A70 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,A70/kernel group=sys
@@ -48,20 +46,24 @@ $(sparc_ONLY)dir path=platform/SUNW,A70/kernel/misc/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/misc group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/misc/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/misc/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/tod group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/tod/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/tod/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/kernel/crypto group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/kernel/crypto/$(ARCH64) \
     group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/kernel/misc group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/kernel/misc/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/kernel/misc/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12/kernel/crypto group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-T12/kernel/crypto/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Netra-T12/kernel/crypto/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12/kernel/drv group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12/kernel/drv/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T12/kernel/misc group=sys
@@ -76,7 +78,8 @@ $(sparc_ONLY)dir path=platform/SUNW,Netra-T4/kernel/misc group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-T4/kernel/misc/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/SUNW,SPARC-Enterprise group=sys
 $(sparc_ONLY)dir path=platform/SUNW,SPARC-Enterprise/kernel group=sys
-$(sparc_ONLY)dir path=platform/SUNW,SPARC-Enterprise/kernel/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,SPARC-Enterprise/kernel/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,SPARC-Enterprise/kernel/cpu group=sys
 $(sparc_ONLY)dir path=platform/SUNW,SPARC-Enterprise/kernel/cpu/$(ARCH64) \
     group=sys
@@ -92,13 +95,16 @@ $(sparc_ONLY)dir path=platform/SUNW,SPARC-Enterprise/kernel/misc/$(ARCH64) \
 $(sparc_ONLY)dir path=platform/SUNW,Serverblade1 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Serverblade1/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Serverblade1/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Serverblade1/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Serverblade1/kernel/drv/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Serverblade1/kernel/misc group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Serverblade1/kernel/misc/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Serverblade1/kernel/misc/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Blade-100 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Blade-100/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Blade-100/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Sun-Blade-100/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Sun-Blade-100/kernel/drv/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Blade-100/kernel/misc group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Blade-100/kernel/misc/$(ARCH64) \
     group=sys
@@ -153,7 +159,8 @@ $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-280R/kernel/crypto group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-280R/kernel/crypto/$(ARCH64) \
     group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-280R/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-280R/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-280R/kernel/drv/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-280R/kernel/misc group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-280R/kernel/misc/$(ARCH64) \
     group=sys
@@ -171,13 +178,16 @@ $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-880/kernel/crypto group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-880/kernel/crypto/$(ARCH64) \
     group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-880/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-880/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-880/kernel/drv/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-880/kernel/misc group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-880/kernel/misc/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-880/kernel/misc/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-T200 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-T200/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-T200/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-T200/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-T200/kernel/drv/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V215 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V215/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V215/kernel/crypto group=sys
@@ -193,7 +203,8 @@ $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V240/kernel/crypto group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V240/kernel/crypto/$(ARCH64) \
     group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V240/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V240/kernel/misc group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V240/kernel/misc/$(ARCH64) \
     group=sys
@@ -211,7 +222,8 @@ $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V440/kernel/crypto group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V440/kernel/crypto/$(ARCH64) \
     group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V440/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V440/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V440/kernel/drv/$(ARCH64) \
+    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V440/kernel/misc group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Sun-Fire-V440/kernel/misc/$(ARCH64) \
     group=sys
@@ -258,15 +270,18 @@ $(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/$(ARCH64) \
     group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/cpu group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/cpu/$(ARCH64) \
+$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/cpu \
     group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64) \
+$(sparc_ONLY)dir \
+    path=platform/SUNW,Ultra-Enterprise-10000/kernel/cpu/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv \
     group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/misc group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/misc/$(ARCH64) \
+$(sparc_ONLY)dir \
+    path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/misc \
     group=sys
+$(sparc_ONLY)dir \
+    path=platform/SUNW,Ultra-Enterprise-10000/kernel/misc/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise/kernel/drv group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64) \
@@ -540,16 +555,18 @@ $(i386_ONLY)driver name=xpvtap perms="* 0666 root sys"
 $(sparc_ONLY)driver name=zs perms="[a-z] 0666 root sys" \
     perms="[a-z],cu 0600 uucp uucp"
 $(sparc_ONLY)driver name=zsh perms="* 0666 root sys"
-$(sparc_ONLY)file path=platform/SUNW,A70/kernel/drv/ppm.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,A70/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Netra-CP2300/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Netra-CP2300/kernel/tod/$(ARCH64)/todds1307 \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Netra-CP3010/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+$(sparc_ONLY)file path=platform/SUNW,A70/kernel/drv/ppm.conf group=sys
+$(sparc_ONLY)file path=platform/SUNW,A70/kernel/misc/$(ARCH64)/platmod \
+    group=sys mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Netra-CP2300/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Netra-CP2300/kernel/tod/$(ARCH64)/todds1307 group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Netra-CP3010/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/$(ARCH64)/lw8 \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/$(ARCH64)/ntwdt \
@@ -558,25 +575,20 @@ $(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/$(ARCH64)/sgenv \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/$(ARCH64)/sgfru \
     group=sys
-$(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/lw8.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/ntwdt.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/sgenv.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/sgfru.conf group=sys \
-    reboot-needed=false
+$(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/lw8.conf group=sys
+$(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/ntwdt.conf group=sys
+$(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/sgenv.conf group=sys
+$(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/drv/sgfru.conf group=sys
 $(sparc_ONLY)file path=platform/SUNW,Netra-T12/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Netra-T4/kernel/drv/$(ARCH64)/lombus \
     group=sys
-$(sparc_ONLY)file path=platform/SUNW,Netra-T4/kernel/drv/lombus.conf group=sys \
-    reboot-needed=false
+$(sparc_ONLY)file path=platform/SUNW,Netra-T4/kernel/drv/lombus.conf group=sys
 $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/$(ARCH64)/unix \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,SPARC-Enterprise/kernel/cpu/$(ARCH64)/FJSV,SPARC64-VI \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/dr \
     group=sys
 $(sparc_ONLY)file \
@@ -584,168 +596,181 @@ $(sparc_ONLY)file \
 $(sparc_ONLY)file \
     path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/oplmsu group=sys
 $(sparc_ONLY)file \
-    path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/oplpanel group=sys
+    path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/oplpanel \
+    group=sys
 $(sparc_ONLY)file \
     path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/pcicmu group=sys
-$(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/scfd \
-    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/scfd group=sys
 $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/dr.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/mc-opl.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/oplpanel.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/options.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/scfd.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file \
-    path=platform/SUNW,SPARC-Enterprise/kernel/misc/$(ARCH64)/drmach group=sys \
-    mode=0755 reboot-needed=true
+    path=platform/SUNW,SPARC-Enterprise/kernel/misc/$(ARCH64)/drmach \
+    group=sys mode=0755
 $(sparc_ONLY)file \
-    path=platform/SUNW,SPARC-Enterprise/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
+    path=platform/SUNW,SPARC-Enterprise/kernel/misc/$(ARCH64)/platmod \
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Serverblade1/kernel/drv/$(ARCH64)/bscbus \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Serverblade1/kernel/drv/$(ARCH64)/bscv \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Serverblade1/kernel/drv/bscbus.conf \
-    group=sys reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Serverblade1/kernel/drv/bscv.conf group=sys \
-    reboot-needed=false
+    group=sys
+$(sparc_ONLY)file path=platform/SUNW,Serverblade1/kernel/drv/bscv.conf \
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,Serverblade1/kernel/drv/options.conf \
-    group=sys reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Serverblade1/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Serverblade1/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Blade-100/kernel/drv/$(ARCH64)/grfans \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Blade-100/kernel/drv/$(ARCH64)/grppm \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Blade-100/kernel/drv/grppm.conf \
-    group=sys reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Sun-Blade-100/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Blade-1000/kernel/drv/$(ARCH64)/xcalppm \
     group=sys
-$(sparc_ONLY)file path=platform/SUNW,Sun-Blade-1000/kernel/drv/$(ARCH64)/xcalwd \
-    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Blade-100/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Blade-1000/kernel/drv/$(ARCH64)/xcalppm group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Blade-1000/kernel/drv/$(ARCH64)/xcalwd group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Blade-1000/kernel/drv/xcalppm.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Blade-1000/kernel/drv/xcalwd.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Blade-1000/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Blade-1500/kernel/drv/ppm.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Blade-1500/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Blade-2500/kernel/drv/ppm.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Blade-2500/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/$(ARCH64)/unix \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire-15000/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire-15000/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III+ \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/axq \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/dman \
     group=sys
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/iosram \
-    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/iosram group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/schpc \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/drv/dman.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/drv/schpc.conf \
-    group=sys reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/misc/$(ARCH64)/mboxsc \
-    group=sys mode=0755 reboot-needed=true
+    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-15000/kernel/misc/$(ARCH64)/mboxsc group=sys \
+    mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire-15000/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-15000/kernel/misc/$(ARCH64)/scosmb \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-280R/kernel/drv/$(ARCH64)/pcf8574 \
-    group=sys
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-280R/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-480R/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-15000/kernel/misc/$(ARCH64)/scosmb group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-280R/kernel/drv/$(ARCH64)/pcf8574 group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-280R/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-480R/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-880/kernel/drv/$(ARCH64)/hpc3130 \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-880/kernel/drv/hpc3130.conf \
-    group=sys reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-880/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-T200/kernel/drv/$(ARCH64)/tsalarm \
     group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-880/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-T200/kernel/drv/$(ARCH64)/tsalarm group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-T200/kernel/drv/tsalarm.conf \
-    group=sys reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V215/kernel/drv/su.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V215/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys
+$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V215/kernel/drv/su.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-V215/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64)/ntwdt \
     group=sys
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64)/tsalarm \
-    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64)/tsalarm group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V240/kernel/drv/ntwdt.conf \
-    group=sys reboot-needed=false
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V240/kernel/drv/tsalarm.conf \
-    group=sys reboot-needed=false
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V240/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V250/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V440/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V445/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-V240/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-V250/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-V440/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/SUNW,Sun-Fire-V445/kernel/misc/$(ARCH64)/platmod group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/$(ARCH64)/unix group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III+ \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/drv/$(ARCH64)/sgcn \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/drv/$(ARCH64)/sghsc \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/drv/$(ARCH64)/sgsbbc \
     group=sys
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/drv/$(ARCH64)/ssm group=sys
-$(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/drv/sghsc.conf group=sys \
-    reboot-needed=false
+$(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/drv/$(ARCH64)/ssm \
+    group=sys
+$(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/drv/sghsc.conf group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/misc/$(ARCH64)/sbdp \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Ultra-250/kernel/drv/$(ARCH64)/envctrltwo \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Ultra-250/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Ultra-4/kernel/drv/$(ARCH64)/envctrl \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Ultra-4/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Ultra-5_10/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Ultra-Enterprise-10000/kernel/$(ARCH64)/unix group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Ultra-Enterprise-10000/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-II \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64)/pcipsy \
     group=sys
@@ -757,55 +782,59 @@ $(sparc_ONLY)file \
     group=sys
 $(sparc_ONLY)file \
     path=platform/SUNW,Ultra-Enterprise-10000/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/ac \
     group=sys
 $(sparc_ONLY)file \
-    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/central group=sys
+    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/central \
+    group=sys
 $(sparc_ONLY)file \
-    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/environ group=sys
+    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/environ \
+    group=sys
 $(sparc_ONLY)file path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/fhc \
     group=sys
 $(sparc_ONLY)file \
-    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/simmstat group=sys
-$(sparc_ONLY)file path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/sram \
+    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/simmstat \
     group=sys
 $(sparc_ONLY)file \
-    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/sysctrl group=sys
-$(sparc_ONLY)file path=platform/SUNW,Ultra-Enterprise/kernel/drv/fhc.conf \
-    group=sys reboot-needed=false
+    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/sram group=sys
 $(sparc_ONLY)file \
-    path=platform/SUNW,Ultra-Enterprise/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
+    path=platform/SUNW,Ultra-Enterprise/kernel/drv/$(ARCH64)/sysctrl \
+    group=sys
+$(sparc_ONLY)file path=platform/SUNW,Ultra-Enterprise/kernel/drv/fhc.conf \
+    group=sys
+$(sparc_ONLY)file \
+    path=platform/SUNW,Ultra-Enterprise/kernel/misc/$(ARCH64)/platmod \
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,UltraAX-i2/kernel/misc/$(ARCH64)/platmod \
-    group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/$(ARCH64)/unix group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu.generic group=sys \
-    mode=0755 reboot-needed=true
+    group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/$(ARCH64)/unix group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu.generic \
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.AuthenticAMD \
-    group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.AuthenticAMD.15 \
-    group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(i386_ONLY)file \
-    path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.46 group=sys \
-    mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu.generic group=sys mode=0755 \
-    reboot-needed=true
+    path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.AuthenticAMD.15 group=sys \
+    mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel \
+    group=sys mode=0755
+$(i386_ONLY)file \
+    path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.46 \
+    group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu.generic group=sys \
+    mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD group=sys \
-    mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD.15 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD.15 \
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.46 \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/dacf/$(ARCH64)/consconfig_dacf \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/dacf/consconfig_dacf group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/acpinex group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/acpippm group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/amd_iommu group=sys
@@ -818,42 +847,33 @@ $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/ppm group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/rootnex group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/acpinex group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/acpippm group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/acpippm.conf group=sys \
-    reboot-needed=false
+$(i386_ONLY)file path=platform/i86pc/kernel/drv/acpippm.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/amd_iommu group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/amd_iommu.conf group=sys \
-    reboot-needed=false
+$(i386_ONLY)file path=platform/i86pc/kernel/drv/amd_iommu.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/cpudrv group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/isa group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/npe group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/pci group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/pit_beep group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/pit_beep.conf group=sys \
-    reboot-needed=false
+$(i386_ONLY)file path=platform/i86pc/kernel/drv/pit_beep.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/ppm group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/ppm.conf group=sys \
-    reboot-needed=false
+$(i386_ONLY)file path=platform/i86pc/kernel/drv/ppm.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex.conf group=sys \
-    reboot-needed=false
+$(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/pcplusmp group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/uppc group=sys \
-    mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/mach/pcplusmp group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/mach/uppc group=sys mode=0755 \
-    reboot-needed=true
+    mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/mach/pcplusmp group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/mach/uppc group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/acpidev group=sys \
-    mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/gfx_private group=sys \
-    mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/misc/acpidev group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/misc/gfx_private group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=platform/i86pc/kernel/unix group=sys mode=0755 \
-    reboot-needed=true
+    mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/gfx_private \
+    group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/misc/acpidev group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/misc/gfx_private group=sys \
+    mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/unix group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/multiboot group=sys mode=0755 \
     reboot-needed=true
 $(i386_ONLY)file path=platform/i86pc/ucode/amd-ucode.bin group=sys mode=0444 \
@@ -862,29 +882,29 @@ $(i386_ONLY)file path=platform/i86pc/ucode/amd-ucode.bin group=sys mode=0444 \
 $(i386_ONLY)file path=platform/i86pc/ucode/intel-ucode.txt group=sys mode=0444 \
     original_name=SUNWcakr:platform/i86pc/ucode/intel-ucode.txt preserve=true \
     reboot-needed=true
-$(i386_ONLY)file path=platform/i86xpv/kernel/$(ARCH64)/unix group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu.generic group=sys \
-    mode=0755 reboot-needed=true
+$(i386_ONLY)file path=platform/i86xpv/kernel/$(ARCH64)/unix group=sys \
+    mode=0755
+$(i386_ONLY)file path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu.generic \
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu_ms.AuthenticAMD \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(i386_ONLY)file \
-    path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu_ms.AuthenticAMD.15 group=sys \
-    mode=0755 reboot-needed=true
+    path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu_ms.AuthenticAMD.15 \
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel \
-    group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu.generic group=sys mode=0755 \
-    reboot-needed=true
+    group=sys mode=0755
+$(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu.generic group=sys \
+    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu_ms.AuthenticAMD group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu_ms.AuthenticAMD.15 \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu_ms.GenuineIntel group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/dacf/$(ARCH64)/consconfig_dacf \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/dacf/consconfig_dacf group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/balloon group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/domcaps group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/evtchn group=sys
@@ -911,68 +931,65 @@ $(i386_ONLY)file path=platform/i86xpv/kernel/drv/isa group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/npe group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/pci group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/pit_beep group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/pit_beep.conf group=sys \
-    reboot-needed=false
+$(i386_ONLY)file path=platform/i86xpv/kernel/drv/pit_beep.conf group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/privcmd group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/rootnex group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/xdf group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/xenbus group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/xencons group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/xencons.conf group=sys \
-    reboot-needed=false
+$(i386_ONLY)file path=platform/i86xpv/kernel/drv/xencons.conf group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/xnf group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/xpvd group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/mach/$(ARCH64)/xpv_psm group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/mach/$(ARCH64)/xpv_uppc group=sys \
-    mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86xpv/kernel/mach/xpv_psm group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=platform/i86xpv/kernel/mach/xpv_uppc group=sys mode=0755 \
-    reboot-needed=true
+    mode=0755
+$(i386_ONLY)file path=platform/i86xpv/kernel/mach/xpv_psm group=sys mode=0755
+$(i386_ONLY)file path=platform/i86xpv/kernel/mach/xpv_uppc group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/misc/$(ARCH64)/gfx_private \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/misc/$(ARCH64)/xnb group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/misc/$(ARCH64)/xpv_autoconfig \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/misc/gfx_private group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/misc/xpv_autoconfig group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/tod/$(ARCH64)/xpvtod group=sys \
-    mode=0755 reboot-needed=true
-$(i386_ONLY)file path=platform/i86xpv/kernel/tod/xpvtod group=sys mode=0755 \
-    reboot-needed=true
-$(i386_ONLY)file path=platform/i86xpv/kernel/unix group=sys mode=0755 \
-    reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u-us3/kernel/crypto/$(ARCH64)/aes group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
+$(i386_ONLY)file path=platform/i86xpv/kernel/tod/xpvtod group=sys mode=0755
+$(i386_ONLY)file path=platform/i86xpv/kernel/unix group=sys mode=0755
+$(sparc_ONLY)file path=platform/sun4u-us3/kernel/crypto/$(ARCH64)/aes \
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/bootlst group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/kernel/$(ARCH64)/genunix group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/kernel/$(ARCH64)/unix group=sys mode=0755 \
-    reboot-needed=true
+    mode=0755
+$(sparc_ONLY)file path=platform/sun4u/kernel/$(ARCH64)/unix group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-II \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III+ \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-IIIi \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-IIIi+ \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
+$(sparc_ONLY)file \
+    path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III+ group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-IIIi group=sys \
+    mode=0755
+$(sparc_ONLY)file \
+    path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-IIIi+ group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-IIe \
-    group=sys mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/kernel/crypto/$(ARCH64)/arcfour group=sys \
-    mode=0755 reboot-needed=true
+    group=sys mode=0755
+$(sparc_ONLY)file path=platform/sun4u/kernel/crypto/$(ARCH64)/arcfour \
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/crypto/$(ARCH64)/des group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/crypto/$(ARCH64)/md5 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/crypto/$(ARCH64)/sha1 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/adm1026 group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/adm1031 group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/bbc_beep group=sys
@@ -981,7 +998,8 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/db21554 group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/ebus group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/epic group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/fd group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/gpio_87317 group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/gpio_87317 \
+    group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/grbeep group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/i2bsc group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/ics951601 group=sys
@@ -1029,84 +1047,76 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/trapstat group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/upa64s group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/zs group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/zsh group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/i2bsc.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/mem_cache.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/rmc_comm.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/rmcadm.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/rmclomv.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/sbusmem.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/trapstat.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/zsh.conf group=sys \
-    reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/i2bsc.conf group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/mem_cache.conf group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/rmc_comm.conf group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/rmcadm.conf group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/rmclomv.conf group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/sbusmem.conf group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/trapstat.conf group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/zsh.conf group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/bignum group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/bootdev group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/forthdebug group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
+$(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/forthdebug \
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/i2c_svc group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/kmdbmod group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/obpsym group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/opl_cfg group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/pcie group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/sbd group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/vis group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/zuluvm group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/strmod/$(ARCH64)/kb group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todblade group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todbq4802 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todds1287 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todds1337 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todm5819 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todm5819p_rmc \
-    group=sys mode=0755 reboot-needed=true
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todm5823 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todmostek group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todopl group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todsg group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todstarcat group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todstarfire group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
+$(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todstarcat \
+    group=sys mode=0755
+$(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todstarfire \
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/wanboot group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/bootlst group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/kernel/$(ARCH64)/genunix group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4v/kernel/$(ARCH64)/unix group=sys mode=0755 \
-    reboot-needed=true
+    mode=0755
+$(sparc_ONLY)file path=platform/sun4v/kernel/$(ARCH64)/unix group=sys \
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/cpu/$(ARCH64)/generic group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4v/kernel/crypto/$(ARCH64)/arcfour group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
+$(sparc_ONLY)file path=platform/sun4v/kernel/crypto/$(ARCH64)/arcfour \
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/crypto/$(ARCH64)/md5 group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/bge group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/bmc group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/ebus group=sys
@@ -1121,34 +1131,27 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/rootnex group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/su group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/trapstat group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/vnex group=sys
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/bge.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/bmc.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/mdesc.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/n2rng.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/ncp.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/ntwdt.conf group=sys \
-    reboot-needed=false
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/trapstat.conf group=sys \
-    reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/bge.conf group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/bmc.conf group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/mdesc.conf group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/n2rng.conf group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/ncp.conf group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/ntwdt.conf group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/trapstat.conf group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/bootdev group=sys \
-    mode=0755 reboot-needed=true
-$(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/forthdebug group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
+$(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/forthdebug \
+    group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/kmdbmod group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/obpsym group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/pcie group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/vis group=sys \
-    mode=0755 reboot-needed=true
+    mode=0755
 $(sparc_ONLY)file path=platform/sun4v/wanboot group=sys reboot-needed=true
 $(sparc_ONLY)hardlink path=platform/sun4u/kernel/misc/$(ARCH64)/md5 \
     target=../../../kernel/crypto/$(ARCH64)/md5
@@ -1214,11 +1217,14 @@ $(sparc_ONLY)link \
 $(sparc_ONLY)link \
     path=platform/SUNW,SPARC-Enterprise/kernel/crypto/$(ARCH64)/aes \
     target=../../../../sun4u-us3/kernel/crypto/$(ARCH64)/aes
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1000/kernel/crypto/$(ARCH64)/aes \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-1000/kernel/crypto/$(ARCH64)/aes \
     target=../../../../sun4u-us3/kernel/crypto/$(ARCH64)/aes
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-1500/kernel/crypto/$(ARCH64)/aes \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-1500/kernel/crypto/$(ARCH64)/aes \
     target=../../../../sun4u-us3/kernel/crypto/$(ARCH64)/aes
-$(sparc_ONLY)link path=platform/SUNW,Sun-Blade-2500/kernel/crypto/$(ARCH64)/aes \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Blade-2500/kernel/crypto/$(ARCH64)/aes \
     target=../../../../sun4u-us3/kernel/crypto/$(ARCH64)/aes
 $(sparc_ONLY)link \
     path=platform/SUNW,Sun-Fire-15000/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-IV \
@@ -1226,7 +1232,8 @@ $(sparc_ONLY)link \
 $(sparc_ONLY)link \
     path=platform/SUNW,Sun-Fire-15000/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-IV+ \
     target=SUNW,UltraSPARC-III+
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-15000/kernel/crypto/$(ARCH64)/aes \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-15000/kernel/crypto/$(ARCH64)/aes \
     target=../../../../sun4u-us3/kernel/crypto/$(ARCH64)/aes
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-280R/kernel/crypto/$(ARCH64)/aes \
     target=../../../../sun4u-us3/kernel/crypto/$(ARCH64)/aes
@@ -1244,7 +1251,8 @@ $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V440/kernel/crypto/$(ARCH64)/aes \
     target=../../../../sun4u-us3/kernel/crypto/$(ARCH64)/aes
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V440/kernel/drv/$(ARCH64)/ntwdt \
     target=../../../../SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64)/ntwdt
-$(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V440/kernel/drv/$(ARCH64)/tsalarm \
+$(sparc_ONLY)link \
+    path=platform/SUNW,Sun-Fire-V440/kernel/drv/$(ARCH64)/tsalarm \
     target=../../../../SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64)/tsalarm
 $(sparc_ONLY)link path=platform/SUNW,Sun-Fire-V440/kernel/drv/ntwdt.conf \
     target=../../../SUNW,Sun-Fire-V240/kernel/drv/ntwdt.conf
@@ -1273,5 +1281,6 @@ $(sparc_ONLY)link path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-IV+ \
 $(sparc_ONLY)link path=platform/sun4u/kernel/misc/$(ARCH64)/des \
     target=../../../kernel/crypto/$(ARCH64)/des
 $(sparc_ONLY)link path=platform/sun4u/kernel/unix target=$(ARCH64)/unix
-$(sparc_ONLY)link path=platform/sun4v/kernel/cpu/$(ARCH64)/sun4v target=generic
+$(sparc_ONLY)link path=platform/sun4v/kernel/cpu/$(ARCH64)/sun4v \
+    target=generic
 $(sparc_ONLY)link path=platform/sun4v/kernel/unix target=$(ARCH64)/unix

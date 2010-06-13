@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/library/demo/audio-samples@$(PKGVERS)
@@ -29,7 +28,6 @@ set name=pkg.description value="SunOS audio sound files"
 set name=pkg.summary value="Audio Sound Files"
 set name=info.classification value=org.opensolaris.category.2008:System/Media
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/demo
 dir path=usr/demo/SOUND
@@ -73,7 +71,8 @@ file path=usr/share/audio/samples/au/touchtone.pound.au
 file path=usr/share/audio/samples/au/touchtone.star.au
 file path=usr/share/audio/samples/au/train.au
 file path=usr/share/audio/samples/au/whistle.au
-legacy pkg=SUNWaudf arch=$(ARCH) category=system desc="SunOS audio sound files" \
+legacy pkg=SUNWaudf arch=$(ARCH) category=system \
+    desc="SunOS audio sound files" \
     hotline="Please contact your local service provider" \
     name="Audio Sound Files" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11

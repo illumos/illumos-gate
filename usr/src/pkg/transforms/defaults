@@ -20,14 +20,8 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-
-#
-# This isn't really a transform, but it's a valid default.
-#
-set name=org.opensolaris.consolidation value=osnet
 
 #
 # For kernel/drv, set .conf files to mode 0644.  Assume all other
@@ -41,6 +35,18 @@ set name=org.opensolaris.consolidation value=osnet
 <transform file path=.*kernel/drv/.+\.conf -> default mode 0644>
 <transform file path=.*kernel/drv/.+ -> default mode 0755>
 <transform file path=.*kernel/.+(?<!\.conf)$ -> default reboot-needed true>
+
+
+#
+# Non-global zones should not have content in kernel, usr/kernel (and
+# other kernel dirs) or in boot/.
+#
+<transform file dir link hardlink path=.*kernel/.* -> set variant.opensolaris.zone global>
+<transform dir path=kernel$ -> set variant.opensolaris.zone global>
+<transform dir path=.*/kernel$ -> set variant.opensolaris.zone global>
+
+<transform file dir link hardlink path=boot/.* -> set variant.opensolaris.zone global>
+<transform dir path=boot$ -> set variant.opensolaris.zone global>
 
 #
 # shared objects should generally have mode 0755

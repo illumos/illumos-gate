@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/load-balancer/ilb@$(PKGVERS)
@@ -31,9 +30,11 @@ set name=pkg.summary value="Integrated IP layer 3/4 load balancer for Solaris"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/loadbalancer group=sys
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
@@ -41,9 +42,7 @@ dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/inet
 dir path=usr/lib/inet/ilb
 dir path=usr/sbin
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/manifest/network/loadbalancer group=sys
+file path=lib/svc/manifest/network/loadbalancer/ilbd.xml group=sys mode=0444
 file path=usr/include/libilb.h
 file path=usr/lib/$(ARCH64)/libilb.so.1
 file path=usr/lib/$(ARCH64)/llib-lilb.ln
@@ -53,7 +52,6 @@ file path=usr/lib/libilb.so.1
 file path=usr/lib/llib-lilb
 file path=usr/lib/llib-lilb.ln
 file path=usr/sbin/ilbadm mode=0555
-file path=lib/svc/manifest/network/loadbalancer/ilbd.xml group=sys mode=0444
 legacy pkg=SUNWilb arch=$(ARCH) category=system \
     desc="Integrated IP layer 3/4 load balancer for Solaris (usr)" \
     hotline="Please contact your local service provider" \

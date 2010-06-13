@@ -20,22 +20,21 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/nv_sata@$(PKGVERS)
-set name=pkg.description value="Nvidia ck804 pro / mcp55 pro combo SATA driver"
+set name=pkg.description \
+    value="Nvidia ck804 pro / mcp55 pro combo SATA driver"
 set name=pkg.summary value="Nvidia ck804 pro / mcp55 pro combo SATA driver"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -47,7 +46,7 @@ driver name=nv_sata class=scsi-self-identifying perms="* 0644 root sys" \
     alias=pci10de,55
 file path=kernel/drv/$(ARCH64)/nv_sata group=sys
 file path=kernel/drv/nv_sata group=sys
-file path=kernel/drv/nv_sata.conf group=sys reboot-needed=false
+file path=kernel/drv/nv_sata.conf group=sys
 legacy pkg=SUNWnvsata arch=$(ARCH) category=system \
     desc="Nvidia ck804 pro / mcp55 pro combo SATA driver" \
     hotline="Please contact your local service provider" \

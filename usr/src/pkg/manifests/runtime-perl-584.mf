@@ -30,7 +30,6 @@ set name=pkg.summary value="Perl 5.8.4 (core)"
 set name=info.classification \
     value=org.opensolaris.category.2008:Development/Perl
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/perl5
@@ -114,7 +113,8 @@ $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/PerlIO
 $(i386_ONLY)dir \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/PerlIO/encoding
-$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/PerlIO/scalar
+$(i386_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/PerlIO/scalar
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/PerlIO/via
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/SDBM_File
 $(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Socket
@@ -194,7 +194,8 @@ $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/PerlIO
 $(sparc_ONLY)dir \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/PerlIO/encoding
-$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/PerlIO/scalar
+$(sparc_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/PerlIO/scalar
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/PerlIO/via
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/SDBM_File
 $(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Socket
@@ -382,8 +383,8 @@ file path=usr/perl5/5.8.4/lib/constant.pm mode=0444
 file path=usr/perl5/5.8.4/lib/diagnostics.pm mode=0444
 file path=usr/perl5/5.8.4/lib/fields.pm mode=0444
 file path=usr/perl5/5.8.4/lib/filetest.pm mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/libperl.so.1 \
-    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/libperl.so.1 mode=0555
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Config.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Cwd.pm mode=0444
@@ -393,12 +394,15 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Digest/MD5.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/DynaLoader.pm \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Errno.pm mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Fcntl.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Errno.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Fcntl.pm \
+    mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/File/Glob.pm \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Filter/Util/Call.pm mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Filter/Util/Call.pm \
+    mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/I18N/Langinfo.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/IO.pm mode=0444
@@ -427,14 +431,16 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/IPC/SysV.pm \
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/MIME/Base64.pm \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/MIME/QuotedPrint.pm mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/MIME/QuotedPrint.pm \
+    mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/NDBM_File.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/ODBM_File.pm \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/POSIX.pm mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/PerlIO/encoding.pm \
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/POSIX.pm \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/PerlIO/encoding.pm mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/PerlIO/scalar.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/PerlIO/via.pm \
@@ -453,7 +459,8 @@ $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Time/HiRes.pm \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/XSLoader.pm \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/attrs.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/attrs.pm \
+    mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Cwd/Cwd.bs \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Cwd/Cwd.so \
@@ -489,9 +496,11 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/DynaLoader/extralibs.ld \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Fcntl/Fcntl.bs mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Fcntl/Fcntl.bs \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Fcntl/Fcntl.so mode=0555
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Fcntl/Fcntl.so \
+    mode=0555
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/File/Glob/Glob.bs \
     mode=0444
@@ -539,25 +548,31 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/ODBM_File/ODBM_File.so \
     mode=0555
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/POSIX.bs mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/POSIX.so mode=0555
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/abs.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/POSIX.bs \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/alarm.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/POSIX.so \
+    mode=0555
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/assert.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/abs.al mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atan2.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/alarm.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atexit.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atof.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/assert.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atoi.al \
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atan2.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atol.al \
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atexit.al \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atof.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atoi.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/atol.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/autosplit.ix \
     mode=0444
@@ -565,101 +580,131 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/bsearch.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/calloc.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/calloc.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/chdir.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/chdir.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/chmod.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/chmod.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/chown.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/chown.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/clearerr.al \
     mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/closedir.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/cos.al \
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/cos.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/creat.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/creat.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/div.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/div.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/errno.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/errno.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execl.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execle.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execlp.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execv.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execve.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execvp.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/exit.al \
-    mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/exp.al \
-    mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fabs.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execl.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fclose.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fcntl.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fdopen.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/feof.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execle.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/ferror.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execlp.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fflush.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execv.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fgetc.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execve.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/execvp.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/exit.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/exp.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fabs.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fclose.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fcntl.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fdopen.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/feof.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/ferror.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fflush.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fgetc.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fgetpos.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fgets.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fileno.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fopen.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fork.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fgets.al \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fileno.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fopen.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fork.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fprintf.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fputc.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fputs.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fread.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/free.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fputc.al \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fputs.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fread.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/free.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/freopen.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fscanf.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fscanf.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fseek.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fseek.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fsetpos.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fstat.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fsync.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/ftell.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fwrite.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getc.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fstat.al \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fsync.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/ftell.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/fwrite.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getc.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getchar.al \
     mode=0444
@@ -667,12 +712,14 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getegid.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getenv.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getenv.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/geteuid.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getgid.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getgid.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getgrgid.al \
     mode=0444
@@ -689,7 +736,8 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getpgrp.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getpid.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getpid.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getppid.al \
     mode=0444
@@ -699,48 +747,57 @@ $(i386_ONLY)file \
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getpwuid.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/gets.al \
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/gets.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getuid.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/getuid.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/gmtime.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/gmtime.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/isatty.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/isatty.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/kill.al \
-    mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/labs.al \
-    mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/ldiv.al \
-    mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/link.al \
-    mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/kill.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/labs.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/ldiv.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/link.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/load_imports.al \
     mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/localtime.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/log.al \
-    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/log.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/longjmp.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/malloc.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/malloc.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memchr.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memchr.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memcmp.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memcmp.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memcpy.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memcpy.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memmove.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memset.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/memset.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/mkdir.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/mkdir.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/offsetof.al \
     mode=0444
@@ -748,24 +805,28 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/opendir.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/perror.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/pow.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/perror.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/printf.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/putc.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/pow.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/printf.al \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/putc.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/putchar.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/puts.al \
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/puts.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/qsort.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/qsort.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/raise.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rand.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/raise.al \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rand.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/readdir.al \
     mode=0444
@@ -773,24 +834,32 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/realloc.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/redef.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/redef.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/remove.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/remove.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rename.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rename.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rewind.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rewind.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rewinddir.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rmdir.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/rmdir.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/scanf.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/scanf.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/setbuf.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/setbuf.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/setjmp.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/setjmp.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/setvbuf.al \
     mode=0444
@@ -800,29 +869,36 @@ $(i386_ONLY)file \
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sigsetjmp.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sin.al \
-    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sleep.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sin.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sleep.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sprintf.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sqrt.al \
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sqrt.al mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/srand.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/srand.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sscanf.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/stat.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/sscanf.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strcat.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/stat.al mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strchr.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strcat.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strcmp.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strchr.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strcpy.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strcmp.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strcpy.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strcspn.al \
     mode=0444
@@ -830,7 +906,8 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strerror.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strlen.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strlen.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strncat.al \
     mode=0444
@@ -847,15 +924,19 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strrchr.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strspn.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strstr.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strtok.al mode=0444
-$(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/system.al mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/time.al \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strspn.al \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strstr.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/strtok.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/system.al \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/time.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/tmpfile.al \
     mode=0444
@@ -866,17 +947,23 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/toupper.al \
     mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/umask.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/umask.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/ungetc.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/ungetc.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/unimpl.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/unimpl.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/unlink.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/unlink.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/usage.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/usage.al \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/utime.al mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/utime.al \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/vfprintf.al \
     mode=0444
@@ -886,8 +973,8 @@ $(i386_ONLY)file \
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/vsprintf.al \
     mode=0444
-$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/wait.al \
-    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/wait.al mode=0444
 $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/POSIX/waitpid.al \
     mode=0444
@@ -1087,9 +1174,11 @@ $(i386_ONLY)file \
     path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Time/HiRes/HiRes.so \
     mode=0555
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/attrs/attrs.bs mode=0444
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/attrs/attrs.bs \
+    mode=0444
 $(i386_ONLY)file \
-    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/attrs/attrs.so mode=0555
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/attrs/attrs.so \
+    mode=0555
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/re/re.bs \
     mode=0444
 $(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/re/re.so \
@@ -1109,8 +1198,8 @@ file path=usr/perl5/5.8.4/lib/sigtrap.pm mode=0444
 file path=usr/perl5/5.8.4/lib/sort.pm mode=0444
 file path=usr/perl5/5.8.4/lib/strict.pm mode=0444
 file path=usr/perl5/5.8.4/lib/subs.pm mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/libperl.so.1 \
-    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/libperl.so.1 mode=0555
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Config.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Cwd.pm mode=0444
@@ -1120,8 +1209,10 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Digest/MD5.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/DynaLoader.pm \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Errno.pm mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Fcntl.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Errno.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Fcntl.pm \
+    mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/File/Glob.pm \
     mode=0444
 $(sparc_ONLY)file \
@@ -1159,9 +1250,10 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/NDBM_File.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/ODBM_File.pm \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/POSIX.pm mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/PerlIO/encoding.pm \
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/POSIX.pm \
     mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/PerlIO/encoding.pm mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/PerlIO/scalar.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/PerlIO/via.pm \
@@ -1180,7 +1272,8 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Time/HiRes.pm \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/XSLoader.pm \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/attrs.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/attrs.pm \
+    mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Cwd/Cwd.bs \
     mode=0444
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Cwd/Cwd.so \
@@ -1236,9 +1329,11 @@ $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/IO/IO.bs \
 $(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/IO/IO.so \
     mode=0555
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/IPC/SysV/SysV.bs mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/IPC/SysV/SysV.bs \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/IPC/SysV/SysV.so mode=0555
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/IPC/SysV/SysV.so \
+    mode=0555
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/List/Util/Util.bs \
     mode=0444
@@ -1267,29 +1362,33 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/POSIX.bs mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/POSIX.so mode=0555
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/abs.al \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/abs.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/alarm.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/assert.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/assert.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atan2.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atexit.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atof.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atexit.al \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atoi.al \
-    mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atol.al \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atof.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atoi.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/atol.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/autosplit.ix \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/bsearch.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/bsearch.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/calloc.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/calloc.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/chdir.al mode=0444
 $(sparc_ONLY)file \
@@ -1302,74 +1401,88 @@ $(sparc_ONLY)file \
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/closedir.al \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/cos.al \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/cos.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/creat.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/div.al \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/div.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/errno.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execl.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execle.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execle.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execlp.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execlp.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execv.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execve.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execvp.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/exit.al \
-    mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/exp.al \
-    mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fabs.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execve.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fclose.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/execvp.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/exit.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/exp.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fabs.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fclose.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fcntl.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fdopen.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/feof.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fdopen.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/ferror.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/feof.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fflush.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/ferror.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fflush.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fgetc.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fgetpos.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fgetpos.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fgets.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fileno.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fopen.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fork.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fileno.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fprintf.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fopen.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fork.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fprintf.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fputc.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fputs.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fread.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/free.al \
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/free.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/freopen.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/freopen.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fscanf.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fscanf.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fseek.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fsetpos.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fsetpos.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fstat.al mode=0444
 $(sparc_ONLY)file \
@@ -1377,19 +1490,25 @@ $(sparc_ONLY)file \
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/ftell.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fwrite.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getc.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/fwrite.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getchar.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getc.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getegid.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getchar.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getenv.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getegid.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/geteuid.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getenv.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getgid.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/geteuid.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getgid.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getgrgid.al \
     mode=0444
@@ -1403,92 +1522,114 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getlogin.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getpgrp.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getpgrp.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getpid.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getpid.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getppid.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getppid.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getpwnam.al \
     mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getpwuid.al \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/gets.al \
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/gets.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getuid.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/getuid.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/gmtime.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/gmtime.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/isatty.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/isatty.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/kill.al \
-    mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/labs.al \
-    mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/ldiv.al \
-    mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/link.al \
-    mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/kill.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/labs.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/ldiv.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/link.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/load_imports.al \
     mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/localtime.al \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/log.al \
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/log.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/longjmp.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/longjmp.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/malloc.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/malloc.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memchr.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memchr.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memcmp.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memcmp.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memcpy.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memcpy.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memmove.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memmove.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memset.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/memset.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/mkdir.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/offsetof.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/opendir.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/perror.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/pow.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/opendir.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/printf.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/putc.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/perror.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/putchar.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/puts.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/pow.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/printf.al \
     mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/putc.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/putchar.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/puts.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/qsort.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/raise.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/rand.al \
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/rand.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/readdir.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/readdir.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/realloc.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/realloc.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/redef.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/remove.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/remove.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/rename.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/rename.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/rewind.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/rewind.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/rewinddir.al \
     mode=0444
@@ -1497,80 +1638,106 @@ $(sparc_ONLY)file \
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/scanf.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/setbuf.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/setbuf.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/setjmp.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/setjmp.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/setvbuf.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/setvbuf.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/siglongjmp.al \
     mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sigsetjmp.al \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sin.al \
-    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sin.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sleep.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sprintf.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sqrt.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sprintf.al \
     mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sqrt.al mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/srand.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sscanf.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/stat.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/sscanf.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strcat.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/stat.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strchr.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strcat.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strcmp.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strchr.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strcpy.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strcmp.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strcspn.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strcpy.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strcspn.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strerror.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strlen.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strncat.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strncmp.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strncpy.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strpbrk.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strrchr.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strspn.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strstr.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strtok.al mode=0444
-$(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/system.al mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/time.al \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strlen.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/tmpfile.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strncat.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/tolower.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strncmp.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/toupper.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strncpy.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strpbrk.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strrchr.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strspn.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strstr.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/strtok.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/system.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/time.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/tmpfile.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/tolower.al \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/toupper.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/umask.al mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/ungetc.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/ungetc.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/unimpl.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/unimpl.al \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/unlink.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/unlink.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/usage.al mode=0444
 $(sparc_ONLY)file \
@@ -1579,14 +1746,16 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/vfprintf.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/vprintf.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/vprintf.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/vsprintf.al \
     mode=0444
-$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/wait.al \
-    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/waitpid.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/wait.al mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/POSIX/waitpid.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/PerlIO/encoding/encoding.bs \
     mode=0444
@@ -1612,9 +1781,11 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/SDBM_File/SDBM_File.so \
     mode=0555
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Socket/Socket.bs mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Socket/Socket.bs \
+    mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Socket/Socket.so mode=0555
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Socket/Socket.so \
+    mode=0555
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Storable/CAN_FLOCK.al \
     mode=0444
@@ -1685,7 +1856,8 @@ $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Storable/store_fd.al \
     mode=0444
 $(sparc_ONLY)file \
-    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Storable/thaw.al mode=0444
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Storable/thaw.al \
+    mode=0444
 $(sparc_ONLY)file \
     path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Exacct/Catalog/Catalog.bs \
     mode=0444

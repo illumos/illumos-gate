@@ -20,23 +20,22 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/graphics/drm@$(PKGVERS)
 set name=pkg.description \
     value="Direct Rendering Manager kernel drivers and modules"
 set name=pkg.summary value="DRM Kernel Drivers"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Display
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Display
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -71,8 +70,8 @@ file path=kernel/drv/$(ARCH64)/i915 group=sys
 file path=kernel/drv/$(ARCH64)/radeon group=sys
 file path=kernel/drv/i915 group=sys
 file path=kernel/drv/radeon group=sys
-file path=kernel/misc/$(ARCH64)/drm group=sys mode=0755 reboot-needed=true
-file path=kernel/misc/drm group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/$(ARCH64)/drm group=sys mode=0755
+file path=kernel/misc/drm group=sys mode=0755
 legacy pkg=SUNWdrmr arch=$(ARCH) category=system \
     desc="Direct Rendering Manager kernel drivers and modules" \
     hotline="Please contact your local service provider" \

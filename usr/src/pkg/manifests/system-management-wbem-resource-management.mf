@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri \
@@ -31,7 +30,6 @@ set name=pkg.summary value="Resource Management WBEM Instrumentation"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/sadm
 dir path=usr/sadm/lib
@@ -43,7 +41,8 @@ dir path=usr/sadm/lib/wbem/com/sun group=sys
 dir path=usr/sadm/lib/wbem/com/sun/wbem group=sys
 dir path=usr/sadm/lib/wbem/com/sun/wbem/solarisprovider group=sys
 dir path=usr/sadm/lib/wbem/com/sun/wbem/solarisprovider/srm group=sys
-dir path=usr/sadm/lib/wbem/com/sun/wbem/solarisprovider/srm/resources group=sys
+dir path=usr/sadm/lib/wbem/com/sun/wbem/solarisprovider/srm/resources \
+    group=sys
 dir path=usr/sadm/mof group=sys
 file path=usr/sadm/lib/wbem/$(ARCH32)/rds mode=0555
 file path=usr/sadm/lib/wbem/$(ARCH64)/rds mode=0555

@@ -29,7 +29,6 @@ set name=pkg.description \
 set name=pkg.summary value="SunOS Header Files"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/include
 $(i386_ONLY)dir path=usr/include/$(ARCH64)
@@ -472,10 +471,10 @@ file path=usr/include/libdevice.h
 file path=usr/include/libdevinfo.h
 file path=usr/include/libdladm.h
 file path=usr/include/libdlbridge.h
+file path=usr/include/libdlib.h
 file path=usr/include/libdllink.h
 file path=usr/include/libdlpi.h
 file path=usr/include/libdlvlan.h
-file path=usr/include/libdlib.h
 file path=usr/include/libelf.h
 $(i386_ONLY)file path=usr/include/libfdisk.h
 file path=usr/include/libfstyp.h
@@ -484,9 +483,9 @@ file path=usr/include/libgen.h
 file path=usr/include/libgrubmgmt.h
 file path=usr/include/libintl.h
 file path=usr/include/libipmi.h
-file path=usr/include/libnwam.h
 file path=usr/include/libipp.h
 file path=usr/include/libnvpair.h
+file path=usr/include/libnwam.h
 file path=usr/include/libpolkit/libpolkit.h
 file path=usr/include/librcm.h
 file path=usr/include/libscf.h
@@ -1076,7 +1075,6 @@ $(i386_ONLY)file path=usr/include/sys/hypervisor.h
 $(i386_ONLY)file path=usr/include/sys/i8272A.h
 file path=usr/include/sys/ia.h
 file path=usr/include/sys/iapriocntl.h
-file path=usr/include/sys/ibpart.h
 file path=usr/include/sys/ib/adapters/hermon/hermon_ioctl.h
 file path=usr/include/sys/ib/adapters/tavor/tavor_ioctl.h
 file path=usr/include/sys/ib/clients/ibd/ibd.h
@@ -1088,8 +1086,8 @@ file path=usr/include/sys/ib/clients/of/rdma/rdma_cm.h
 file path=usr/include/sys/ib/clients/of/rdma/rdma_user_cm.h
 file path=usr/include/sys/ib/clients/of/sol_ofs/sol_cma.h
 file path=usr/include/sys/ib/clients/of/sol_ofs/sol_ib_cma.h
-file path=usr/include/sys/ib/clients/of/sol_ofs/sol_ofs_common.h
 file path=usr/include/sys/ib/clients/of/sol_ofs/sol_kverb_impl.h
+file path=usr/include/sys/ib/clients/of/sol_ofs/sol_ofs_common.h
 file path=usr/include/sys/ib/clients/of/sol_ucma/sol_rdma_user_cm.h
 file path=usr/include/sys/ib/clients/of/sol_ucma/sol_ucma.h
 file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs.h
@@ -1118,6 +1116,7 @@ file path=usr/include/sys/ib/mgt/ibmf/ibmf_saa.h
 file path=usr/include/sys/ib/mgt/ibmf/ibmf_utils.h
 file path=usr/include/sys/ib/mgt/sa_recs.h
 file path=usr/include/sys/ib/mgt/sm_attr.h
+file path=usr/include/sys/ibpart.h
 file path=usr/include/sys/id32.h
 file path=usr/include/sys/id_space.h
 file path=usr/include/sys/idmap.h
@@ -1894,10 +1893,12 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V890/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire/include \
     target=../sun4u/include
-$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-2/include target=../sun4u/include
+$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-2/include \
+    target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-250/include \
     target=../sun4u/include
-$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-4/include target=../sun4u/include
+$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-4/include \
+    target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise-10000/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/include \

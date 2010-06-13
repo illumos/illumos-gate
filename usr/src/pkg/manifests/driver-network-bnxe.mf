@@ -20,16 +20,15 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This package will install successfully into any zone, global or
-# non-global.  The files, directories, links, and hardlinks, however,
-# will only be installed into the global zone.
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/bnxe@$(PKGVERS)
 set name=pkg.description \
     value="Broadcom NetXtreme II 10 Gigabit Ethernet PCI-X/PCIE Adapter Driver"
@@ -37,7 +36,6 @@ set name=pkg.summary value="Broadcom NetXtreme II 10GbE NIC Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -51,8 +49,7 @@ driver name=bnxe perms="* 0666 root sys" \
 file path=kernel/drv/$(ARCH64)/bnxe group=sys
 file path=kernel/drv/bnxe group=sys
 file path=kernel/drv/bnxe.conf group=sys \
-    original_name=BRCMbnxe:kernel/drv/bnxe.conf preserve=renameold \
-    reboot-needed=false
+    original_name=BRCMbnxe:kernel/drv/bnxe.conf preserve=renameold
 legacy pkg=BRCMbnxe arch=$(ARCH) category=system \
     desc="Broadcom NetXtreme II 10 Gigabit Ethernet PCI-X/PCIE Adapter Driver" \
     hotline="Please contact your local service provider" \

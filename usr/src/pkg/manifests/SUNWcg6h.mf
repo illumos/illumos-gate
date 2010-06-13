@@ -20,11 +20,9 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/SUNWcg6h@0.5.11,5.11-0.130
 set name=pkg.obsolete value=true
 set name=variant.arch value=sparc
-set name=variant.opensolaris.zone value=global value=nonglobal
