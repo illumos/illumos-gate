@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <limits.h>
 #include <stddef.h>
@@ -62,7 +59,7 @@ fmd_scheme_fmd_present(nvlist_t *nvl)
 {
 	char *name, *version;
 	fmd_module_t *mp;
-	int rv = 0;
+	int rv = 1;
 
 	if (nvlist_lookup_string(nvl, FM_FMRI_FMD_NAME, &name) != 0 ||
 	    nvlist_lookup_string(nvl, FM_FMRI_FMD_VERSION, &version) != 0)
@@ -82,7 +79,7 @@ fmd_scheme_fmd_replaced(nvlist_t *nvl)
 {
 	char *name, *version;
 	fmd_module_t *mp;
-	int rv = 0;
+	int rv = 1;
 
 	if (nvlist_lookup_string(nvl, FM_FMRI_FMD_NAME, &name) != 0 ||
 	    nvlist_lookup_string(nvl, FM_FMRI_FMD_VERSION, &version) != 0)
@@ -94,7 +91,7 @@ fmd_scheme_fmd_replaced(nvlist_t *nvl)
 		fmd_module_rele(mp);
 	}
 
-	return (rv ? FMD_OBJ_STATE_STILL_PRESENT : FMD_OBJ_STATE_NOT_PRESENT);
+	return (rv ? FMD_OBJ_STATE_STILL_PRESENT : FMD_OBJ_STATE_REPLACED);
 }
 
 static int

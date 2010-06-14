@@ -353,12 +353,22 @@ config_cook(struct cfgdata *cdata)
 		 * If this property is a device path, tp or devid, cache it
 		 * for quick lookup.
 		 */
-		if (pn == stable(TOPO_IO_DEV)) {
+		if (config_lastcomp == stable(SCSI_DEVICE) ||
+		    config_lastcomp == stable(SMP_DEVICE)) {
+			/*
+			 * we can't get ereports on SCSI_DEVICE or SMP_DEVICE
+			 * nodes, so don't cache.
+			 */
+			out(O_ALTFP|O_VERB3, "not caching %s for %s",
+			    pn, config_lastcomp);
+		} else if (pn == stable(TOPO_IO_DEV)) {
 			sv = stable(equals + 1);
 			out(O_ALTFP|O_VERB3, "caching dev %s", sv);
 			cdata->devcache = lut_add(cdata->devcache,
 			    (void *)sv, (void *)newnode, NULL);
-		} else if (pn == stable(TOPO_IO_DEVID)) {
+		} else if (pn == stable(TOPO_IO_DEVID) ||
+		    pn == stable(TOPO_PROP_SES_DEVID) ||
+		    pn == stable(TOPO_PROP_SMP_DEVID)) {
 			sv = stable(equals + 1);
 			out(O_ALTFP|O_VERB3, "caching devid %s", sv);
 			cdata->devidcache = lut_add(cdata->devidcache,

@@ -166,6 +166,12 @@ int driver_conf_allow_path_alias = 1;
  */
 int identify_9e = 0;
 
+/*
+ * Add flag so behaviour of preventing attach for retired persistant nodes
+ * can be disabled.
+ */
+int retire_prevents_attach = 1;
+
 int mtc_off;					/* turn off mt config */
 
 int quiesce_debug = 0;
@@ -213,7 +219,7 @@ static void ndi_devi_exit_and_wait(dev_info_t *dip,
     int circular, clock_t end_time);
 static int ndi_devi_unbind_driver(dev_info_t *dip);
 
-static void i_ddi_check_retire(dev_info_t *dip);
+static int i_ddi_check_retire(dev_info_t *dip);
 
 static void quiesce_one_device(dev_info_t *, void *);
 
@@ -1560,7 +1566,17 @@ i_ndi_config_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
 				i_ddi_set_node_state(dip, DS_PROBED);
 			break;
 		case DS_PROBED:
-			i_ddi_check_retire(dip);
+			/*
+			 * If node is retired and persistent, then prevent
+			 * attach. We can't do this for non-persistent nodes
+			 * as we would lose evidence that the node existed.
+			 */
+			if (i_ddi_check_retire(dip) == 1 &&
+			    ndi_dev_is_persistent_node(dip) &&
+			    retire_prevents_attach == 1) {
+				rv = DDI_FAILURE;
+				break;
+			}
 			atomic_add_long(&devinfo_attach_detach, 1);
 			if ((rv = attach_node(dip)) == DDI_SUCCESS)
 				i_ddi_set_node_state(dip, DS_ATTACHED);
@@ -8579,7 +8595,7 @@ mark_and_fence(dev_info_t *dip, void *arg)
  * To be called only by framework attach code on first attach attempt.
  *
  */
-static void
+static int
 i_ddi_check_retire(dev_info_t *dip)
 {
 	char		*path;
@@ -8611,8 +8627,10 @@ i_ddi_check_retire(dev_info_t *dip)
 	 */
 	if (e_ddi_device_retired(path) == 0) {
 		RIO_VERBOSE((CE_NOTE, "device is NOT retired: path=%s", path));
+		if (DEVI(dip)->devi_flags & DEVI_RETIRED)
+			(void) e_ddi_unretire_device(path);
 		kmem_free(path, MAXPATHLEN);
-		return;
+		return (0);
 	}
 
 	RIO_DEBUG((CE_NOTE, "attach: device is retired: path=%s", path));
@@ -8638,6 +8656,7 @@ i_ddi_check_retire(dev_info_t *dip)
 	constraint = 1;
 	if (MDI_PHCI(dip))
 		mdi_phci_retire_finalize(dip, phci_only, &constraint);
+	return (1);
 }
 
 

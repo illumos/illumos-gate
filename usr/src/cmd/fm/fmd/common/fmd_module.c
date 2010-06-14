@@ -1314,8 +1314,16 @@ fmd_modstat_snapshot(fmd_module_t *mp, fmd_ustat_snap_t *uss)
 	 */
 	(void) pthread_mutex_lock(&mp->mod_lock);
 
-	while (mp->mod_error == 0 && !(mp->mod_flags & FMD_MOD_STPUB))
+	while (mp->mod_error == 0 && !(mp->mod_flags & FMD_MOD_STPUB)) {
+		struct timespec tms;
+
 		(void) pthread_cond_wait(&mp->mod_cv, &mp->mod_lock);
+		(void) pthread_mutex_unlock(&mp->mod_lock);
+		tms.tv_sec = 0;
+		tms.tv_nsec = 10000000;
+		(void) nanosleep(&tms, NULL);
+		(void) pthread_mutex_lock(&mp->mod_lock);
+	}
 
 	if (mp->mod_error != 0) {
 		(void) pthread_mutex_unlock(&mp->mod_lock);

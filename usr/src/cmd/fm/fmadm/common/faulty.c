@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -234,11 +233,6 @@ typedef struct resource_list {
 	uint8_t max_pct;
 } resource_list_t;
 
-typedef struct tgetlabel_data {
-	char *label;
-	char *fru;
-} tgetlabel_data_t;
-
 sr_list_t *status_rec_list;
 resource_list_t *status_fru_list;
 resource_list_t *status_asru_list;
@@ -246,7 +240,6 @@ resource_list_t *status_asru_list;
 static int max_display;
 static int max_fault = 0;
 static topo_hdl_t *topo_handle;
-static char *topo_handle_uuid;
 static host_id_list_t *host_list;
 static int n_server;
 static int opt_g;
@@ -342,116 +335,6 @@ find_hostid(nvlist_t *nvl)
 	return (rt);
 }
 
-/*
- * compare two fru strings which are made up of substrings seperated by '/'
- * return true if every substring is the same in the two strings, or if a
- * substring is null in one.
- */
-
-static int
-frucmp(char *f1, char *f2)
-{
-	char c1, c2;
-	int i = 0;
-
-	for (;;) {
-		c1 = *f1;
-		c2 = *f2;
-		if (c1 == c2) {
-			i = (c1 == '/') ? 0 : i + 1;
-		} else if (i == 0) {
-			if (c1 == '/') {
-				do {
-					f2++;
-				} while ((c2 = *f2) != 0 && c2 != '/');
-				if (c2 == NULL)
-					break;
-			} else if (c2 == '/') {
-				do {
-					f1++;
-				} while ((c1 = *f1) != 0 && c1 != '/');
-				if (c1 == NULL)
-					break;
-			} else
-				break;
-		} else
-			break;
-		if (c1 == NULL)
-			return (0);
-		f1++;
-		f2++;
-	}
-	return (1);
-}
-
-static int
-tgetlabel(topo_hdl_t *thp, tnode_t *node, void *arg)
-{
-	int err;
-	char *fru_name, *lname;
-	nvlist_t *fru = NULL;
-	int rt = TOPO_WALK_NEXT;
-	tgetlabel_data_t *tdp = (tgetlabel_data_t *)arg;
-
-	if (topo_node_fru(node, &fru, NULL, &err) == 0) {
-		if (topo_fmri_nvl2str(thp, fru, &fru_name, &err) == 0) {
-			if (frucmp(tdp->fru, fru_name) == 0 &&
-			    topo_node_label(node, &lname, &err) == 0) {
-				tdp->label = strdup(lname);
-				topo_hdl_strfree(thp, lname);
-				rt = TOPO_WALK_TERMINATE;
-			}
-			topo_hdl_strfree(thp, fru_name);
-		}
-		nvlist_free(fru);
-	}
-	return (rt);
-}
-
-static void
-label_get_topo(void)
-{
-	int err;
-
-	topo_handle = topo_open(TOPO_VERSION, 0, &err);
-	if (topo_handle) {
-		topo_handle_uuid = topo_snap_hold(topo_handle, NULL, &err);
-	}
-}
-
-static void
-label_release_topo(void)
-{
-	if (topo_handle_uuid)
-		topo_hdl_strfree(topo_handle, topo_handle_uuid);
-	if (topo_handle) {
-		topo_snap_release(topo_handle);
-		topo_close(topo_handle);
-	}
-}
-
-static char *
-get_fmri_label(char *fru)
-{
-	topo_walk_t *twp;
-	tgetlabel_data_t td;
-	int err;
-
-	td.label = NULL;
-	td.fru = fru;
-	if (topo_handle == NULL)
-		label_get_topo();
-	if (topo_handle_uuid) {
-		twp = topo_walk_init(topo_handle, FM_FMRI_SCHEME_HC,
-		    tgetlabel, &td, &err);
-		if (twp) {
-			(void) topo_walk_step(twp, TOPO_WALK_CHILD);
-			topo_walk_fini(twp);
-		}
-	}
-	return (td.label);
-}
-
 static char *
 get_nvl2str_topo(nvlist_t *nvl)
 {
@@ -463,7 +346,7 @@ get_nvl2str_topo(nvlist_t *nvl)
 	char buf[128];
 
 	if (topo_handle == NULL)
-		label_get_topo();
+		topo_handle = topo_open(TOPO_VERSION, 0, &err);
 	if (topo_fmri_nvl2str(topo_handle, nvl, &tname, &err) == 0) {
 		name = strdup(tname);
 		topo_hdl_strfree(topo_handle, tname);
@@ -1073,19 +956,14 @@ print_dict_info(nvlist_t *nvl)
 }
 
 static void
-print_name(name_list_t *list, char *(func)(char *), char *padding, int *np,
-    int pct, int full)
+print_name(name_list_t *list, char *padding, int *np, int pct, int full)
 {
-	char *name, *fru_label = NULL;
+	char *name;
 
 	name = list->name;
 	if (list->label) {
 		(void) printf("%s \"%s\" (%s)", padding, list->label, name);
 		*np += 1;
-	} else if (func && (fru_label = func(list->name)) != NULL) {
-		(void) printf("%s \"%s\" (%s)", padding, fru_label, name);
-		*np += 1;
-		free(fru_label);
 	} else {
 		(void) printf("%s %s", padding, name);
 		*np += 1;
@@ -1192,10 +1070,10 @@ print_rsrc_status(int status, char *label)
 }
 
 static void
-print_name_list(name_list_t *list, char *label, char *(func)(char *),
+print_name_list(name_list_t *list, char *label,
     int limit, int pct, void (func1)(int, char *), int full)
 {
-	char *name, *fru_label = NULL;
+	char *name;
 	char *padding;
 	int i, j, l, n;
 	name_list_t *end = list;
@@ -1209,10 +1087,7 @@ print_name_list(name_list_t *list, char *label, char *(func)(char *),
 	name = list->name;
 	if (list->label)
 		(void) printf(" \"%s\" (%s)", list->label, name);
-	else if (func && (fru_label = func(list->name)) != NULL) {
-		(void) printf(" \"%s\" (%s)", fru_label, name);
-		free(fru_label);
-	} else
+	else
 		(void) printf(" %s", name);
 	if (list->pct && pct > 0 && pct < 100) {
 		if (list->count > 1) {
@@ -1235,14 +1110,14 @@ print_name_list(name_list_t *list, char *label, char *(func)(char *),
 	j = 0;
 	while ((list = list->next) != end) {
 		if (limit == 0 || n < limit) {
-			print_name(list, func, padding, &n, pct, full);
+			print_name(list, padding, &n, pct, full);
 			if (func1)
 				func1(list->status, padding);
 		} else
 			j++;
 	}
 	if (j == 1) {
-		print_name(list->prev, func, padding, &n, pct, full);
+		print_name(list->prev, padding, &n, pct, full);
 	} else if (j > 1) {
 		(void) printf("%s... %d %s\n", padding, j,
 		    dgettext("FMD", "more entries suppressed,"
@@ -1352,18 +1227,18 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 	    srp->host->product_sn? srp->host->product_sn : "");
 	if (srp->class)
 		print_name_list(srp->class,
-		    dgettext("FMD", "Fault class :"), NULL, 0, srp->class->pct,
+		    dgettext("FMD", "Fault class :"), 0, srp->class->pct,
 		    NULL, full);
 	if (srp->asru) {
 		status = asru_same_status(srp->asru);
 		if (status != -1) {
 			print_name_list(srp->asru,
-			    dgettext("FMD", "Affects     :"), NULL,
+			    dgettext("FMD", "Affects     :"),
 			    full ? 0 : max_display, 0, NULL, full);
 			print_asru_status(status, "             ");
 		} else
 			print_name_list(srp->asru,
-			    dgettext("FMD", "Affects     :"), NULL,
+			    dgettext("FMD", "Affects     :"),
 			    full ? 0 : max_display, 0, print_asru_status, full);
 	}
 	if (full || srp->fru == NULL || srp->asru == NULL) {
@@ -1371,13 +1246,13 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 			status = asru_same_status(srp->resource);
 			if (status != -1) {
 				print_name_list(srp->resource,
-				    dgettext("FMD", "Problem in  :"), NULL,
+				    dgettext("FMD", "Problem in  :"),
 				    full ? 0 : max_display, 0, NULL, full);
 				print_rsrc_status(status, "             ");
 			} else
 				print_name_list(srp->resource,
 				    dgettext("FMD", "Problem in  :"),
-				    NULL, full ? 0 : max_display, 0,
+				    full ? 0 : max_display, 0,
 				    print_rsrc_status, full);
 		}
 	}
@@ -1385,20 +1260,20 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 		status = asru_same_status(srp->fru);
 		if (status != -1) {
 			print_name_list(srp->fru, dgettext("FMD",
-			    "FRU         :"), get_fmri_label, 0,
+			    "FRU         :"), 0,
 			    srp->fru->pct == 100 ? 100 : srp->fru->max_pct,
 			    NULL, full);
 			print_fru_status(status, "             ");
 		} else
 			print_name_list(srp->fru, dgettext("FMD",
-			    "FRU         :"), get_fmri_label, 0,
+			    "FRU         :"), 0,
 			    srp->fru->pct == 100 ? 100 : srp->fru->max_pct,
 			    print_fru_status, full);
 	}
 	if (srp->serial && !serial_in_fru(srp->fru, srp->serial) &&
 	    !serial_in_fru(srp->asru, srp->serial)) {
 		print_name_list(srp->serial, dgettext("FMD", "Serial ID.  :"),
-		    NULL, 0, 0, NULL, full);
+		    0, 0, NULL, full);
 	}
 	print_dict_info(srp->uurec->event);
 	(void) printf("\n");
@@ -1516,7 +1391,6 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 	resource_list_t *tp = status_fru_list;
 	status_record_t *srp;
 	sr_list_t *slp, *end;
-	char *fru_label;
 	uurec_t *uurp;
 	name_list_t *fru;
 	int status;
@@ -1543,12 +1417,7 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 					if (fru->label)
 						(void) printf("\"%s\" (%s) ",
 						    fru->label, fru->name);
-					else if ((fru_label = get_fmri_label(
-					    fru->name)) != NULL) {
-						(void) printf("\"%s\" (%s) ",
-						    fru_label, fru->name);
-						free(fru_label);
-					} else
+					else
 						(void) printf("%s ",
 						    fru->name);
 					break;
@@ -1635,7 +1504,7 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 						print_name_list(srp->serial,
 						    dgettext("FMD",
 						    "Serial ID.  :"),
-						    NULL, 0, 0, NULL, 1);
+						    0, 0, NULL, 1);
 						break;
 					}
 					slp = slp->next;
@@ -1864,7 +1733,8 @@ cmd_faulty(fmd_adm_t *adm, int argc, char *argv[])
 	if (opt_f == 0 && opt_r == 0)
 		print_catalog(opt_s, opt_a, opt_v, opt_i, opt_p && !opt_s);
 	fmd_msg_fini(fmadm_msghdl);
-	label_release_topo();
+	if (topo_handle)
+		topo_close(topo_handle);
 	if (opt_p) {
 		(void) fclose(stdout);
 		(void) wait(&stat);

@@ -485,19 +485,19 @@ dev_fmri_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		if (stat(path, &sb) != -1)
 			rval = FMD_OBJ_STATE_UNKNOWN;
 		else if ((dnode = di_init("/", DINFOCACHE)) == DI_NODE_NIL)
-			rval = FMD_OBJ_STATE_NOT_PRESENT;
+			rval = FMD_OBJ_STATE_UNKNOWN;
 		else {
 			if (di_lookup_node(dnode, devpath) == DI_NODE_NIL)
-				rval = FMD_OBJ_STATE_NOT_PRESENT;
+				rval = FMD_OBJ_STATE_UNKNOWN;
 			else
 				rval = FMD_OBJ_STATE_UNKNOWN;
 			di_fini(dnode);
 		}
 	} else {
 		if (stat(path, &sb) == -1)
-			rval = FMD_OBJ_STATE_NOT_PRESENT;
+			rval = FMD_OBJ_STATE_UNKNOWN;
 		else if ((dnode = di_init(devpath, DINFOCPYONE)) == DI_NODE_NIL)
-			rval = FMD_OBJ_STATE_NOT_PRESENT;
+			rval = FMD_OBJ_STATE_UNKNOWN;
 		else {
 			if ((id = di_devid(dnode)) == NULL ||
 			    devid_str_decode(devid, &matchid, NULL) != 0)
