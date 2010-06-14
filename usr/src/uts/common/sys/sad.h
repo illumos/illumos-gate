@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -29,8 +28,6 @@
 
 #ifndef _SYS_SAD_H
 #define	_SYS_SAD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
 #include <sys/types.h>
 #ifdef	_KERNEL
@@ -208,9 +205,6 @@ struct autopush {
 /*
  * function prototypes
  */
-void audit_stropen(struct vnode *, dev_t *, int, cred_t *);
-void audit_strclose(struct vnode *, int, cred_t *);
-void audit_strioctl(struct vnode *, int, intptr_t, int, int, cred_t *, int *);
 struct strbuf;
 void audit_strputmsg(struct vnode *, struct strbuf *, struct strbuf *,
 						unsigned char, int, int);

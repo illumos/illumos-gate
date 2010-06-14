@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -200,8 +199,6 @@ copen(int startfd, char *fname, int filemode, int createmode)
 			if (startvp != NULL)
 				VN_RELE(startvp);
 			if (error == 0) {
-				if (auditing)
-					audit_copen(fd, fp, vp);
 				if ((vp->v_flag & VDUP) == 0) {
 					fp->f_vnode = vp;
 					mutex_exit(&fp->f_tlock);

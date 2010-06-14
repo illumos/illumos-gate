@@ -91,8 +91,6 @@ lookupnameatcred(
 
 	error = pn_get_buf(fnamep, seg, &lookpn, namebuf, sizeof (namebuf));
 	if (error == 0) {
-		if (AU_AUDITING())
-			audit_lookupname();
 		error = lookuppnatcred(&lookpn, NULL, followlink,
 		    dirvpp, compvpp, startvp, cr);
 	}
@@ -276,8 +274,6 @@ next:
 	 * Process the next component of the pathname.
 	 */
 	if (error = pn_getcomponent(pnp, component)) {
-		if (auditing)
-			audit_addcomponent(pnp);
 		goto bad;
 	}
 
@@ -409,9 +405,10 @@ checkforroot:
 		if (pn_pathleft(pnp) || dirvpp == NULL || error != ENOENT)
 			goto bad;
 		if (auditing) {	/* directory access */
-			if (error = audit_savepath(pnp, vp, error, cr))
+			if (error = audit_savepath(pnp, vp, vp, error, cr))
 				goto bad_noaudit;
 		}
+
 		pn_setlast(pnp);
 		/*
 		 * We inform the caller that the desired entry must be
@@ -466,10 +463,6 @@ checkforroot:
 	 */
 	if (cvp->v_type == VLNK && ((flags & FOLLOW) || pn_pathleft(pnp))) {
 		struct pathname linkpath;
-		if (auditing) {
-			if (error = audit_pathcomp(pnp, cvp, cr))
-				goto bad;
-		}
 
 		if (++nlink > MAXSYMLINKS) {
 			error = ELOOP;
@@ -579,7 +572,7 @@ checkforroot:
 			 */
 			if (vn_compare(vp, cvp)) {
 				if (auditing)
-					(void) audit_savepath(pnp, cvp,
+					(void) audit_savepath(pnp, cvp, vp,
 					    EINVAL, cr);
 				pn_setlast(pnp);
 				VN_RELE(vp);
@@ -590,15 +583,11 @@ checkforroot:
 					pn_free(pp);
 				return (EINVAL);
 			}
-			if (auditing) {
-				if (error = audit_pathcomp(pnp, vp, cr))
-					goto bad;
-			}
 			*dirvpp = vp;
 		} else
 			VN_RELE(vp);
 		if (auditing)
-			(void) audit_savepath(pnp, cvp, 0, cr);
+			(void) audit_savepath(pnp, cvp, vp, 0, cr);
 		if (pnp->pn_path == pnp->pn_buf)
 			(void) pn_set(pnp, ".");
 		else
@@ -621,11 +610,6 @@ checkforroot:
 		return (0);
 	}
 
-	if (auditing) {
-		if (error = audit_pathcomp(pnp, cvp, cr))
-			goto bad;
-	}
-
 	/*
 	 * Skip over slashes from end of last component.
 	 */
@@ -646,7 +630,7 @@ checkforroot:
 
 bad:
 	if (auditing)	/* reached end of path */
-		(void) audit_savepath(pnp, cvp, error, cr);
+		(void) audit_savepath(pnp, cvp, vp, error, cr);
 bad_noaudit:
 	/*
 	 * Error.  Release vnodes and return.

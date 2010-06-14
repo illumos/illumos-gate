@@ -86,6 +86,7 @@ int
 audit_savepath(
 	struct pathname *pnp,		/* pathname to lookup */
 	struct vnode *vp,		/* vnode of the last component */
+	struct vnode *pvp,		/* vnode of the last parent component */
 	int    flag,			/* status of the last access */
 	cred_t *cr)			/* cred of requestor */
 {
@@ -96,33 +97,53 @@ audit_savepath(
 	tad = U2A(u);
 
 	/*
+	 * Noise elimination in audit trails - this event will be discarded if:
+	 * - the public policy is not active AND
+	 * - the system call is a public operation AND
+	 * - the file was not found: VFS lookup failed with ENOENT error AND
+	 * - the missing file would have been located in the public directory
+	 *   owned by root if it had existed
+	 */
+	if (tad->tad_flag != 0 && flag == ENOENT && pvp != NULL &&
+	    (tad->tad_ctrl & TAD_PUBLIC_EV) &&
+	    !(kctx->auk_policy & AUDIT_PUBLIC)) {
+		struct vattr attr;
+
+		attr.va_mask = AT_ALL;
+		if (VOP_GETATTR(pvp, &attr, 0, CRED(), NULL) == 0) {
+			if (object_is_public(&attr)) {
+				tad->tad_ctrl |= TAD_NOAUDIT;
+			}
+		}
+	}
+
+	/*
 	 * this event being audited or do we need path information
 	 * later? This might be for a chdir/chroot or open (add path
 	 * to file pointer. If the path has already been found for an
 	 * open/creat then we don't need to process the path.
 	 *
-	 * S2E_SP (PAD_SAVPATH) flag comes from audit_s2e[].au_ctrl. Used with
+	 * S2E_SP (TAD_SAVPATH) flag comes from audit_s2e[].au_ctrl. Used with
 	 *	chroot, chdir, open, creat system call processing. It determines
 	 *	if audit_savepath() will discard the path or we need it later.
-	 * PAD_PATHFND means path already included in this audit record. It
+	 * TAD_PATHFND means path already included in this audit record. It
 	 *	is used in cases where multiple path lookups are done per
 	 *	system call. The policy flag, AUDIT_PATH, controls if multiple
 	 *	paths are allowed.
-	 * S2E_NPT (PAD_NOPATH) flag comes from audit_s2e[].au_ctrl. Used with
+	 * S2E_NPT (TAD_NOPATH) flag comes from audit_s2e[].au_ctrl. Used with
 	 *	exit processing to inhibit any paths that may be added due to
 	 *	closes.
 	 */
-	if ((tad->tad_flag == 0 && !(tad->tad_ctrl & PAD_SAVPATH)) ||
-	    ((tad->tad_ctrl & PAD_PATHFND) &&
+	if ((tad->tad_flag == 0 && !(tad->tad_ctrl & TAD_SAVPATH)) ||
+	    ((tad->tad_ctrl & TAD_PATHFND) &&
 	    !(kctx->auk_policy & AUDIT_PATH)) ||
-	    (tad->tad_ctrl & PAD_NOPATH)) {
+	    (tad->tad_ctrl & TAD_NOPATH)) {
 		return (0);
 	}
 
-	tad->tad_ctrl |= PAD_NOPATH;		/* prevent possible reentry */
+	tad->tad_ctrl |= TAD_NOPATH;		/* prevent possible reentry */
 
 	audit_pathbuild(pnp);
-	tad->tad_vn = vp;
 
 	/*
 	 * are we auditing only if error, or if it is not open or create
@@ -135,7 +156,7 @@ audit_savepath(
 		    tad->tad_scid == SYS_open64 ||
 		    tad->tad_scid == SYS_openat ||
 		    tad->tad_scid == SYS_openat64)) {
-			tad->tad_ctrl |= PAD_TRUE_CREATE;
+			tad->tad_ctrl |= TAD_TRUE_CREATE;
 		}
 
 		/* add token to audit record for this name */
@@ -153,23 +174,22 @@ audit_savepath(
 			 * then don't add attribute,
 			 * it will be added at end of vn_create().
 			 */
-			if (!flag && !(tad->tad_ctrl & PAD_NOATTRB))
+			if (!flag && !(tad->tad_ctrl & TAD_NOATTRB))
 				audit_attributes(vp);
 		}
 	}
 
 	/* free up space if we're not going to save path (open, creat) */
-	if ((tad->tad_ctrl & PAD_SAVPATH) == 0) {
+	if ((tad->tad_ctrl & TAD_SAVPATH) == 0) {
 		if (tad->tad_aupath != NULL) {
 			au_pathrele(tad->tad_aupath);
 			tad->tad_aupath = NULL;
-			tad->tad_vn = NULL;
 		}
 	}
-	if (tad->tad_ctrl & PAD_MLD)
-		tad->tad_ctrl |= PAD_PATHFND;
+	if (tad->tad_ctrl & TAD_MLD)
+		tad->tad_ctrl |= TAD_PATHFND;
 
-	tad->tad_ctrl &= ~PAD_NOPATH;		/* restore */
+	tad->tad_ctrl &= ~TAD_NOPATH;		/* restore */
 	return (0);
 }
 
@@ -196,10 +216,10 @@ audit_pathbuild(struct pathname *pnp)
 	mutex_enter(&pad->pad_lock);
 	if (tad->tad_aupath != NULL) {
 		pfxapp = tad->tad_aupath;
-	} else if ((tad->tad_ctrl & PAD_ATCALL) && pnp->pn_buf[0] != '/') {
+	} else if ((tad->tad_ctrl & TAD_ATCALL) && pnp->pn_buf[0] != '/') {
 		ASSERT(tad->tad_atpath != NULL);
 		pfxapp = tad->tad_atpath;
-	} else if (tad->tad_ctrl & PAD_ABSPATH) {
+	} else if (tad->tad_ctrl & TAD_ABSPATH) {
 		pfxapp = pad->pad_root;
 	} else {
 		pfxapp = pad->pad_cwd;
@@ -208,7 +228,7 @@ audit_pathbuild(struct pathname *pnp)
 	mutex_exit(&pad->pad_lock);
 
 	/* get an expanded buffer to hold the anchored path */
-	newsect = tad->tad_ctrl & PAD_ATTPATH;
+	newsect = tad->tad_ctrl & TAD_ATTPATH;
 	newapp = au_pathdup(pfxapp, newsect, len);
 	au_pathrele(pfxapp);
 
@@ -230,52 +250,8 @@ audit_pathbuild(struct pathname *pnp)
 	tad->tad_aupath = newapp;
 
 	/* for case where multiple lookups in one syscall (rename) */
-	tad->tad_ctrl &= ~(PAD_ABSPATH | PAD_ATTPATH);
+	tad->tad_ctrl &= ~(TAD_ABSPATH | TAD_ATTPATH);
 }
-
-
-
-/*ARGSUSED*/
-
-/*
- * ROUTINE:	AUDIT_ADDCOMPONENT
- * PURPOSE:	extend the path by the component accepted
- * CALLBY:	LOOKUPPN
- * NOTE:	This function is called only when there is an error in
- *		parsing a path component
- * TODO:	Add the error component to audit record
- * QUESTION:	what is this for
- */
-
-void
-audit_addcomponent(struct pathname *pnp)
-{
-	au_kcontext_t	*kctx = GET_KCTX_PZ;
-	t_audit_data_t *tad;
-
-	tad = U2A(u);
-	/*
-	 * S2E_SP (PAD_SAVPATH) flag comes from audit_s2e[].au_ctrl. Used with
-	 *	chroot, chdir, open, creat system call processing. It determines
-	 *	if audit_savepath() will discard the path or we need it later.
-	 * PAD_PATHFND means path already included in this audit record. It
-	 *	is used in cases where multiple path lookups are done per
-	 *	system call. The policy flag, AUDIT_PATH, controls if multiple
-	 *	paths are allowed.
-	 * S2E_NPT (PAD_NOPATH) flag comes from audit_s2e[].au_ctrl. Used with
-	 *	exit processing to inhibit any paths that may be added due to
-	 *	closes.
-	 */
-	if ((tad->tad_flag == 0 && !(tad->tad_ctrl & PAD_SAVPATH)) ||
-	    ((tad->tad_ctrl & PAD_PATHFND) &&
-	    !(kctx->auk_policy & AUDIT_PATH)) ||
-	    (tad->tad_ctrl & PAD_NOPATH)) {
-		return;
-	}
-
-	return;
-
-}	/* AUDIT_ADDCOMPONENT */
 
 
 /*
@@ -287,7 +263,7 @@ audit_addcomponent(struct pathname *pnp)
  * first time we will throw away any saved path if path is anchored.
  *
  * flag = 0, path is relative.
- * flag = 1, path is absolute. Free any saved path and set flag to PAD_ABSPATH.
+ * flag = 1, path is absolute. Free any saved path and set flag to TAD_ABSPATH.
  *
  * If the (new) path is absolute, then we have to throw away whatever we have
  * already accumulated since it is being superseded by new path which is
@@ -311,30 +287,29 @@ audit_anchorpath(struct pathname *pnp, int flag)
 	 * to file pointer. If the path has already been found for an
 	 * open/creat then we don't need to process the path.
 	 *
-	 * S2E_SP (PAD_SAVPATH) flag comes from audit_s2e[].au_ctrl. Used with
+	 * S2E_SP (TAD_SAVPATH) flag comes from audit_s2e[].au_ctrl. Used with
 	 *	chroot, chdir, open, creat system call processing. It determines
 	 *	if audit_savepath() will discard the path or we need it later.
-	 * PAD_PATHFND means path already included in this audit record. It
+	 * TAD_PATHFND means path already included in this audit record. It
 	 *	is used in cases where multiple path lookups are done per
 	 *	system call. The policy flag, AUDIT_PATH, controls if multiple
 	 *	paths are allowed.
-	 * S2E_NPT (PAD_NOPATH) flag comes from audit_s2e[].au_ctrl. Used with
+	 * S2E_NPT (TAD_NOPATH) flag comes from audit_s2e[].au_ctrl. Used with
 	 *	exit processing to inhibit any paths that may be added due to
 	 *	closes.
 	 */
-	if ((tad->tad_flag == 0 && !(tad->tad_ctrl & PAD_SAVPATH)) ||
-	    ((tad->tad_ctrl & PAD_PATHFND) &&
+	if ((tad->tad_flag == 0 && !(tad->tad_ctrl & TAD_SAVPATH)) ||
+	    ((tad->tad_ctrl & TAD_PATHFND) &&
 	    !(kctx->auk_policy & AUDIT_PATH)) ||
-	    (tad->tad_ctrl & PAD_NOPATH)) {
+	    (tad->tad_ctrl & TAD_NOPATH)) {
 		return;
 	}
 
 	if (flag) {
-		tad->tad_ctrl |= PAD_ABSPATH;
+		tad->tad_ctrl |= TAD_ABSPATH;
 		if (tad->tad_aupath != NULL) {
 			au_pathrele(tad->tad_aupath);
 			tad->tad_aupath = NULL;
-			tad->tad_vn = NULL;
 		}
 	}
 }
@@ -382,22 +357,22 @@ audit_symlink(struct pathname *pnp, struct pathname *sympath)
 	 * to file pointer. If the path has already been found for an
 	 * open/creat then we don't need to process the path.
 	 *
-	 * S2E_SP (PAD_SAVPATH) flag comes from audit_s2e[].au_ctrl. Used with
+	 * S2E_SP (TAD_SAVPATH) flag comes from audit_s2e[].au_ctrl. Used with
 	 *	chroot, chdir, open, creat system call processing. It determines
 	 *	if audit_savepath() will discard the path or we need it later.
-	 * PAD_PATHFND means path already included in this audit record. It
+	 * TAD_PATHFND means path already included in this audit record. It
 	 *	is used in cases where multiple path lookups are done per
 	 *	system call. The policy flag, AUDIT_PATH, controls if multiple
 	 *	paths are allowed.
-	 * S2E_NPT (PAD_NOPATH) flag comes from audit_s2e[].au_ctrl. Used with
+	 * S2E_NPT (TAD_NOPATH) flag comes from audit_s2e[].au_ctrl. Used with
 	 *	exit processing to inhibit any paths that may be added due to
 	 *	closes.
 	 */
 	if ((tad->tad_flag == 0 &&
-	    !(tad->tad_ctrl & PAD_SAVPATH)) ||
-	    ((tad->tad_ctrl & PAD_PATHFND) &&
+	    !(tad->tad_ctrl & TAD_SAVPATH)) ||
+	    ((tad->tad_ctrl & TAD_PATHFND) &&
 	    !(kctx->auk_policy & AUDIT_PATH)) ||
-	    (tad->tad_ctrl & PAD_NOPATH)) {
+	    (tad->tad_ctrl & TAD_NOPATH)) {
 		return;
 	}
 
@@ -431,11 +406,12 @@ audit_symlink(struct pathname *pnp, struct pathname *sympath)
 }
 
 /*
- * file_is_public : determine whether events for the file (corresponding to
- * 			the specified file attr) should be audited or ignored.
+ * object_is_public : determine whether events for the object (corresponding to
+ *			the specified file/directory attr) should be audited or
+ *			ignored.
  *
- * returns: 	1 - if audit policy and file attributes indicate that
- *			file is effectively public. read events for
+ * returns: 	1 - if audit policy and object attributes indicate that
+ *			file/directory is effectively public. read events for
  *			the file should not be audited.
  *		0 - otherwise
  *
@@ -447,7 +423,7 @@ audit_symlink(struct pathname *pnp, struct pathname *sympath)
  *   (mode doesn't need to be checked for symlinks)
  */
 int
-file_is_public(struct vattr *attr)
+object_is_public(struct vattr *attr)
 {
 	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
@@ -484,7 +460,8 @@ audit_attributes(struct vnode *vp)
 		if (VOP_GETATTR(vp, &attr, 0, CRED(), NULL) != 0)
 			return;
 
-		if (file_is_public(&attr) && (tad->tad_ctrl & PAD_PUBLIC_EV)) {
+		if (object_is_public(&attr) &&
+		    (tad->tad_ctrl & TAD_PUBLIC_EV)) {
 			/*
 			 * This is a public object and a "public" event
 			 * (i.e., read only) -- either by definition
@@ -492,7 +469,7 @@ audit_attributes(struct vnode *vp)
 			 * not being requested (e.g. mmap).
 			 * Flag it in the tad to prevent this audit at the end.
 			 */
-			tad->tad_ctrl |= PAD_NOAUDIT;
+			tad->tad_ctrl |= TAD_NOAUDIT;
 		} else {
 			au_uwrite(au_to_attr(&attr));
 			audit_sec_attributes(&(u_ad), vp);
@@ -581,7 +558,7 @@ audit_core_start(int sig)
 		return;
 
 	/* reset the flags for non-user attributable events */
-	tad->tad_ctrl   = PAD_CORE;
+	tad->tad_ctrl   = TAD_CORE;
 	tad->tad_scid   = 0;
 
 	/* if auditing not enabled, then don't generate an audit record */
@@ -661,30 +638,10 @@ audit_core_finish(int code)
 	if (tad->tad_aupath != NULL) {
 		au_pathrele(tad->tad_aupath);
 		tad->tad_aupath = NULL;
-		tad->tad_vn = NULL;
 	}
 	tad->tad_event = 0;
 	tad->tad_evmod = 0;
 	tad->tad_ctrl  = 0;
-}
-
-/*ARGSUSED*/
-void
-audit_stropen(struct vnode *vp, dev_t *devp, int flag, cred_t *crp)
-{
-}
-
-/*ARGSUSED*/
-void
-audit_strclose(struct vnode *vp, int flag, cred_t *crp)
-{
-}
-
-/*ARGSUSED*/
-void
-audit_strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
-    int copyflag, cred_t *crp, int *rvalp)
-{
 }
 
 
@@ -826,7 +783,7 @@ audit_closef(struct file *fp)
 	 * then skip the audit.
 	 */
 	if ((getattr_ret == 0) && ((fp->f_flag & FWRITE) == 0)) {
-		if (file_is_public(&attr)) {
+		if (object_is_public(&attr)) {
 			return;
 		}
 	}
@@ -909,14 +866,13 @@ audit_setf(file_t *fp, int fd)
 	 */
 	fad->fad_aupath = tad->tad_aupath;
 	tad->tad_aupath = NULL;
-	tad->tad_vn = NULL;
 
-	if (!(tad->tad_ctrl & PAD_TRUE_CREATE)) {
+	if (!(tad->tad_ctrl & TAD_TRUE_CREATE)) {
 		/* adjust event type by dropping the 'creat' part */
 		switch (tad->tad_event) {
 		case AUE_OPEN_RC:
 			tad->tad_event = AUE_OPEN_R;
-			tad->tad_ctrl |= PAD_PUBLIC_EV;
+			tad->tad_ctrl |= TAD_PUBLIC_EV;
 			break;
 		case AUE_OPEN_RTC:
 			tad->tad_event = AUE_OPEN_RT;
@@ -939,20 +895,6 @@ audit_setf(file_t *fp, int fd)
 	}
 }
 
-
-/*
- * ROUTINE:	AUDIT_COPEN
- * PURPOSE:
- * CALLBY:	COPEN
- * NOTE:
- * TODO:
- * QUESTION:
- */
-/*ARGSUSED*/
-void
-audit_copen(int fd, file_t *fp, vnode_t *vp)
-{
-}
 
 void
 audit_ipc(int type, int id, void *vp)
@@ -1110,13 +1052,13 @@ audit_setfsat_path(int argnum)
 	}
 	if (fd != AT_FDCWD) {
 		if ((fp = getf(fd)) == NULL) {
-			tad->tad_ctrl |= PAD_NOPATH;
+			tad->tad_ctrl |= TAD_NOPATH;
 			return;
 		}
 		fad = F2A(fp);
 		ASSERT(fad);
 		if (fad->fad_aupath == NULL) {
-			tad->tad_ctrl |= PAD_NOPATH;
+			tad->tad_ctrl |= TAD_NOPATH;
 			releasef(fd);
 			return;
 		}
@@ -1172,7 +1114,7 @@ audit_vncreate_start()
 	t_audit_data_t *tad;
 
 	tad = U2A(u);
-	tad->tad_ctrl |= PAD_NOATTRB;
+	tad->tad_ctrl |= TAD_NOATTRB;
 }
 
 /*
@@ -1197,13 +1139,13 @@ audit_vncreate_finish(struct vnode *vp, int error)
 	if (tad->tad_flag == 0)
 		return;
 
-	if (tad->tad_ctrl & PAD_TRUE_CREATE) {
+	if (tad->tad_ctrl & TAD_TRUE_CREATE) {
 		audit_attributes(vp);
 	}
 
-	if (tad->tad_ctrl & PAD_CORE) {
+	if (tad->tad_ctrl & TAD_CORE) {
 		audit_attributes(vp);
-		tad->tad_ctrl &= ~PAD_CORE;
+		tad->tad_ctrl &= ~TAD_CORE;
 	}
 
 	if (!error && ((tad->tad_event == AUE_MKNOD) ||
@@ -1212,7 +1154,7 @@ audit_vncreate_finish(struct vnode *vp, int error)
 	}
 
 	/* for case where multiple lookups in one syscall (rename) */
-	tad->tad_ctrl &= ~PAD_NOATTRB;
+	tad->tad_ctrl &= ~TAD_NOATTRB;
 }
 
 
@@ -1367,22 +1309,6 @@ struct fcntla {
 	intptr_t arg;
 };
 
-/*
- * ROUTINE:	AUDIT_C2_REVOKE
- * PURPOSE:
- * CALLBY:	FCNTL
- * NOTE:
- * TODO:
- * QUESTION:	are we keeping this func
- */
-
-/*ARGSUSED*/
-int
-audit_c2_revoke(struct fcntla *uap, rval_t *rvp)
-{
-	return (0);
-}
-
 
 /*
  * ROUTINE:	AUDIT_CHDIREC
@@ -1448,38 +1374,6 @@ audit_chdirec(vnode_t *vp, vnode_t **vpp)
 	}
 }
 
-/*
- * ROUTINE:	AUDIT_GETF
- * PURPOSE:
- * CALLBY:	GETF_INTERNAL
- * NOTE:	The main function of GETF_INTERNAL is to associate a given
- *		file descriptor with a file structure and increment the
- *		file pointer reference count.
- * TODO:	remove pass in of fpp.
- * increment a reference count so that even if a thread with same process delete
- * the same object, it will not panic our system
- * QUESTION:
- * where to decrement the f_count?????????????????
- * seems like I need to set a flag if f_count incremented through audit_getf
- */
-
-/*ARGSUSED*/
-int
-audit_getf(int fd)
-{
-#ifdef NOTYET
-	t_audit_data_t *tad;
-
-	tad = T2A(curthread);
-
-	if (!(tad->tad_scid == SYS_openat ||
-	    tad->tad_scid == SYS_openat64 ||
-	    tad->tad_scid == SYS_open ||
-	    tad->tad_scid == SYS_open64))
-		return (0);
-#endif
-	return (0);
-}
 
 /*
  *	Audit hook for stream based socket and tli request.
@@ -1643,17 +1537,6 @@ audit_sock(
 	}
 }
 
-void
-audit_lookupname()
-{
-}
-
-/*ARGSUSED*/
-int
-audit_pathcomp(struct pathname *pnp, vnode_t *cvp, cred_t *cr)
-{
-	return (0);
-}
 
 static void
 add_return_token(caddr_t *ad, unsigned int scid, int err, int rval)

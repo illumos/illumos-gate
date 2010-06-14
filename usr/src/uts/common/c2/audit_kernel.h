@@ -79,11 +79,11 @@ extern "C" {
 /*
  * Defines for au_ctrl
  */
-#define	S2E_SP  PAD_SAVPATH	/* save path for later use */
-#define	S2E_MLD PAD_MLD		/* only one lookup per system call */
-#define	S2E_NPT PAD_NOPATH	/* force no path in audit record */
-#define	S2E_PUB PAD_PUBLIC_EV	/* syscall is defined as a public op */
-#define	S2E_ATC	PAD_ATCALL	/* syscall is one of the *at() family */
+#define	S2E_SP  TAD_SAVPATH	/* save path for later use */
+#define	S2E_MLD TAD_MLD		/* only one lookup per system call */
+#define	S2E_NPT TAD_NOPATH	/* force no path in audit record */
+#define	S2E_PUB TAD_PUBLIC_EV	/* syscall is defined as a public op */
+#define	S2E_ATC	TAD_ATCALL	/* syscall is one of the *at() family */
 
 /*
  * At present, we are using the audit classes imbedded with in the kernel. Each
@@ -162,35 +162,28 @@ typedef struct p_audit_data p_audit_data_t;
 #define	pad_flags	pad_data.pad_flags
 
 /*
- * Defines for pad_flags
+ * Defines for process audit flags (pad_flags)
  */
 #define	PAD_SETMASK 	0x00000001	/* need to complete pending setmask */
 
 extern kmem_cache_t *au_pad_cache;
 
 /*
- * Defines for tad_ctrl
+ * Defines for thread audit control/status flags (tad_ctrl)
  */
-#define	PAD_SAVPATH 	0x00000001	/* save path for further processing */
-#define	PAD_MLD		0x00000002	/* system call involves MLD */
-#define	PAD_NOPATH  	0x00000004	/* force no paths in audit record */
-#define	PAD_ABSPATH 	0x00000008	/* path from lookup is absolute */
-#define	PAD_NOATTRB 	0x00000010	/* do not automatically add attribute */
-					/* 0x20 unused */
-#define	PAD_ATCALL	0x00000040	/* *at() syscall, like openat() */
-#define	PAD_LFLOAT  	0x00000080	/* Label float */
-#define	PAD_NOAUDIT 	0x00000100	/* discard audit record */
-#define	PAD_PATHFND 	0x00000200	/* found path, don't retry lookup */
-#define	PAD_SPRIV   	0x00000400	/* succ priv use. extra audit_finish */
-#define	PAD_FPRIV   	0x00000800	/* fail priv use. extra audit_finish */
-#define	PAD_SMAC    	0x00001000	/* succ mac use. extra audit_finish */
-#define	PAD_FMAC    	0x00002000	/* fail mac use. extra audit_finish */
-#define	PAD_AUDITME 	0x00004000	/* audit me because of NFS operation */
-#define	PAD_ATTPATH  	0x00008000	/* attribute file lookup */
-#define	PAD_TRUE_CREATE 0x00010000	/* true create, file not found */
-#define	PAD_CORE	0x00020000	/* save attribute during core dump */
-#define	PAD_ERRJMP	0x00040000	/* abort record generation on error */
-#define	PAD_PUBLIC_EV	0x00080000	/* syscall is defined as a public op */
+#define	TAD_ABSPATH 	0x00000001	/* path from lookup is absolute */
+#define	TAD_ATCALL	0x00000002	/* *at() syscall, like openat() */
+#define	TAD_ATTPATH  	0x00000004	/* attribute file lookup */
+#define	TAD_CORE	0x00000008	/* save attribute during core dump */
+#define	TAD_ERRJMP	0x00000010	/* abort record generation on error */
+#define	TAD_MLD		0x00000020	/* system call involves MLD */
+#define	TAD_NOATTRB 	0x00000040	/* do not automatically add attribute */
+#define	TAD_NOAUDIT 	0x00000080	/* discard audit record */
+#define	TAD_NOPATH  	0x00000100	/* force no paths in audit record */
+#define	TAD_PATHFND 	0x00000200	/* found path, don't retry lookup */
+#define	TAD_PUBLIC_EV	0x00000400	/* syscall is defined as a public op */
+#define	TAD_SAVPATH 	0x00000800	/* save path for further processing */
+#define	TAD_TRUE_CREATE 0x00001000	/* true create, file not found */
 
 /*
  * The structure t_audit_data hangs off of the thread structure. It contains
@@ -210,7 +203,6 @@ struct t_audit_data {
 	uint32_t tad_audit;	/* auditing enabled/disabled */
 	struct audit_path	*tad_aupath;	/* captured at vfs_lookup */
 	struct audit_path	*tad_atpath;	/* openat prefix, path of fd */
-	struct vnode *tad_vn;	/* saved inode from vfs_lookup */
 	caddr_t tad_ad;		/* base of accumulated audit data */
 	au_defer_info_t	*tad_defer_head;	/* queue of records to defer */
 						/* until syscall end: */

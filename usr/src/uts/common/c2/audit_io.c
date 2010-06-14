@@ -19,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Routines for writing audit records.
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Routines for writing audit records.
+ */
 
 #include <sys/door.h>
 #include <sys/param.h>
@@ -736,9 +736,9 @@ audit_async_done(caddr_t *rpp, int flags)
 	/* clean up the tad unless called from softcall backend */
 	if (!(flags & AU_BACKEND)) {
 		ASSERT(tad != NULL);
-		ASSERT(tad->tad_ctrl & PAD_ERRJMP);
+		ASSERT(tad->tad_ctrl & TAD_ERRJMP);
 
-		tad->tad_ctrl &= ~PAD_ERRJMP;
+		tad->tad_ctrl &= ~TAD_ERRJMP;
 		tad->tad_errjmp = NULL;
 	}
 
@@ -817,7 +817,7 @@ audit_async_start(label_t *jb, au_event_t event, int sorf)
 
 	ASSERT(tad->tad_errjmp == NULL);
 	tad->tad_errjmp = (void *)jb;
-	tad->tad_ctrl |= PAD_ERRJMP;
+	tad->tad_ctrl |= TAD_ERRJMP;
 
 	return (0);
 }

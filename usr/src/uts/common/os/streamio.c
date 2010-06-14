@@ -250,9 +250,6 @@ stropen(vnode_t *vp, dev_t *devp, int flag, cred_t *crp)
 	zoneid_t zoneid;
 	uint_t anchor;
 
-	if (AU_AUDITING())
-		audit_stropen(vp, devp, flag, crp);
-
 	/*
 	 * If the stream already exists, wait for any open in progress
 	 * to complete, then call the open function of each module and
@@ -618,9 +615,6 @@ strclose(struct vnode *vp, int flag, cred_t *crp)
 	int rval;
 	int freestp = 1;
 	queue_t *rmq;
-
-	if (AU_AUDITING())
-		audit_strclose(vp, flag, crp);
 
 	TRACE_1(TR_FAC_STREAMS_FR,
 	    TR_STRCLOSE, "strclose:%p", vp);
@@ -3221,9 +3215,6 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 
 	TRACE_3(TR_FAC_STREAMS_FR, TR_IOCTL_ENTER,
 	    "strioctl:stp %p cmd %X arg %lX", stp, cmd, arg);
-
-	if (auditing)
-		audit_strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp);
 
 	/*
 	 * If the copy is kernel to kernel, make sure that the FNATIVE

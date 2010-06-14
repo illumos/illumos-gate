@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -57,7 +56,7 @@ au_get_buff(void)
 	 * If asynchronous (interrupt) thread, then we can't sleep
 	 * (the tad ERRJMP flag is set at the start of async processing).
 	 */
-	if (tad->tad_ctrl & PAD_ERRJMP) {
+	if (tad->tad_ctrl & TAD_ERRJMP) {
 		buffer = kmem_cache_alloc(au_buf_cache, KM_NOSLEEP);
 		if (buffer == NULL) {
 			/* return to top of stack & report an error */
@@ -89,7 +88,7 @@ au_free_rec(au_buff_t *buf)
 	 * If asynchronous (interrupt) thread, schedule the release
 	 * (the tad ERRJMP flag is set at the start of async processing).
 	 */
-	if (tad->tad_ctrl & PAD_ERRJMP) {
+	if (tad->tad_ctrl & TAD_ERRJMP) {
 		/* Discard async events via softcall. */
 		softcall(audit_async_discard_backend, buf);
 	}

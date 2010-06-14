@@ -18,10 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1024,7 +1022,7 @@ aui_open(au_event_t e)
 
 	/* convert to appropriate au_ctrl */
 	if (fm & (FXATTR | FXATTRDIROPEN))
-		tad->tad_ctrl |= PAD_ATTPATH;
+		tad->tad_ctrl |= TAD_ATTPATH;
 
 	return (open_event(fm));
 }
@@ -1045,7 +1043,7 @@ aus_open(struct t_audit_data *tad)
 
 	/* If no write, create, or trunc modes, mark as a public op */
 	if ((fm & (O_RDONLY|O_WRONLY|O_RDWR|O_CREAT|O_TRUNC)) == O_RDONLY)
-		tad->tad_ctrl |= PAD_PUBLIC_EV;
+		tad->tad_ctrl |= TAD_PUBLIC_EV;
 }
 
 /* ARGSUSED */
@@ -1067,7 +1065,7 @@ aui_openat(au_event_t e)
 
 	/* convert to appropriate au_ctrl */
 	if (fm & (FXATTR | FXATTRDIROPEN))
-		tad->tad_ctrl |= PAD_ATTPATH;
+		tad->tad_ctrl |= TAD_ATTPATH;
 
 	return (open_event(fm));
 }
@@ -1089,7 +1087,7 @@ aus_openat(struct t_audit_data *tad)
 
 	/* If no write, create, or trunc modes, mark as a public op */
 	if ((fm & (O_RDONLY|O_WRONLY|O_RDWR|O_CREAT|O_TRUNC)) == O_RDONLY)
-		tad->tad_ctrl |= PAD_PUBLIC_EV;
+		tad->tad_ctrl |= TAD_PUBLIC_EV;
 }
 
 static au_event_t
@@ -1552,7 +1550,7 @@ auf_mknod(struct t_audit_data *tad, int error, rval_t *rval)
 
 	/* do the lookup to force generation of path token */
 	pnamep = (caddr_t)uap->pnamep;
-	tad->tad_ctrl |= PAD_NOATTRB;
+	tad->tad_ctrl |= TAD_NOATTRB;
 	error = lookupname(pnamep, UIO_USERSPACE, NO_FOLLOW, &dvp, NULLVPP);
 	if (error == 0)
 		VN_RELE(dvp);
@@ -1839,7 +1837,7 @@ aus_close(struct t_audit_data *tad)
 				 * considered public, skip the audit.
 				 */
 				if (((fp->f_flag & FWRITE) == 0) &&
-				    file_is_public(&attr)) {
+				    object_is_public(&attr)) {
 					tad->tad_flag = 0;
 					tad->tad_evmod = 0;
 					/* free any residual audit data */
@@ -2318,7 +2316,7 @@ aus_mmap(struct t_audit_data *tad)
 	 * public object, the mmap event may be discarded.
 	 */
 	if (((uap->prot) & PROT_WRITE) == 0) {
-		tad->tad_ctrl |= PAD_PUBLIC_EV;
+		tad->tad_ctrl |= TAD_PUBLIC_EV;
 	}
 
 	fad = F2A(fp);

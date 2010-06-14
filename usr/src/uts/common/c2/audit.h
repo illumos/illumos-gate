@@ -501,30 +501,24 @@ void	audit_newproc(struct proc *);
 void	audit_pfree(struct proc *);
 void	audit_thread_create(kthread_id_t);
 void	audit_thread_free(kthread_id_t);
-int	audit_savepath(struct pathname *, struct vnode *, int, cred_t *);
-void	audit_addcomponent(struct pathname *);
+int	audit_savepath(struct pathname *, struct vnode *, struct vnode *,
+		int, cred_t *);
 void	audit_anchorpath(struct pathname *, int);
 void	audit_symlink(struct pathname *, struct pathname *);
 void	audit_symlink_create(struct vnode *, char *, char *, int);
-int	file_is_public(struct vattr *);
+int	object_is_public(struct vattr *);
 void	audit_attributes(struct vnode *);
 void	audit_falloc(struct file *);
 void	audit_unfalloc(struct file *);
 void	audit_exit(int, int);
 void	audit_core_start(int);
 void	audit_core_finish(int);
-void	audit_stropen(struct vnode *, dev_t *, int, struct cred *);
-void	audit_strclose(struct vnode *, int, struct cred *);
-void	audit_strioctl(struct vnode *, int, intptr_t, int, int, struct cred *,
-		int *);
 void	audit_strgetmsg(struct vnode *, struct strbuf *, struct strbuf *,
 		unsigned char *, int *, int);
 void	audit_strputmsg(struct vnode *, struct strbuf *, struct strbuf *,
 		unsigned char, int, int);
 void	audit_closef(struct file *);
-int	audit_getf(int);
 void	audit_setf(struct file *, int);
-void	audit_copen(int, struct file *, struct vnode *);
 void	audit_reboot(void);
 void	audit_vncreate_start(void);
 void	audit_setfsat_path(int argnum);
@@ -567,8 +561,8 @@ int	    au_zone_getstate(const au_kcontext_t *);
  * Get the given zone audit status. zcontext != NULL serves
  * as a protection when c2audit module is not loaded.
  */
-#define	AU_ZONE_AUDITING(zcontext)   \
-	(audit_active == C2AUDIT_LOADED && \
+#define	AU_ZONE_AUDITING(zcontext)	    \
+	(audit_active == C2AUDIT_LOADED &&  \
 	    ((AU_AUDIT_MASK) & au_zone_getstate((zcontext))))
 
 /*
@@ -581,11 +575,8 @@ int	auditme(au_kcontext_t *, struct t_audit_data *, au_state_t);
 void	audit_fixpath(struct audit_path *, int);
 void	audit_ipc(int, int, void *);
 void	audit_ipcget(int, void *);
-void	audit_lookupname();
-int	audit_pathcomp(struct pathname *, vnode_t *, cred_t *);
 void	audit_fdsend(int, struct file *, int);
 void	audit_fdrecv(int, struct file *);
-int	audit_c2_revoke(struct fcntla *, rval_t *);
 void	audit_priv(int, const struct priv_set *, int);
 void	audit_setppriv(int, int, const struct priv_set *, const cred_t *);
 void	audit_devpolicy(int, const struct devplcysys *);

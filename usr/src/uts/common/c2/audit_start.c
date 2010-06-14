@@ -102,7 +102,7 @@ audit_init_module()
 
 	ASSERT(tad->tad_errjmp == NULL);
 	tad->tad_errjmp = (void *)&jb;
-	tad->tad_ctrl |= PAD_ERRJMP;
+	tad->tad_ctrl |= TAD_ERRJMP;
 
 	/* generate a system-booted audit record */
 	au_write((caddr_t *)&rp, au_to_text("booting kernel"));
@@ -265,7 +265,7 @@ audit_finish(
 	}
 	tad->tad_defer_head = tad->tad_defer_tail = NULL;
 
-	if (tad->tad_flag == 0 && !(tad->tad_ctrl & PAD_SAVPATH)) {
+	if (tad->tad_flag == 0 && !(tad->tad_ctrl & TAD_SAVPATH)) {
 		/*
 		 * clear the ctrl flag so that we don't have spurious
 		 * collection of audit information.
@@ -375,7 +375,6 @@ audit_finish(
 	if (tad->tad_aupath != NULL) {
 		au_pathrele(tad->tad_aupath);
 		tad->tad_aupath = NULL;
-		tad->tad_vn = NULL;
 	}
 
 	/* free up any space remaining with openat path's */
@@ -410,16 +409,8 @@ audit_success(au_kcontext_t *kctx, struct t_audit_data *tad, int error,
 		tad->tad_evmod |= PAD_FAILURE;
 
 	/* see if we really want to generate an audit record */
-	if (tad->tad_ctrl & PAD_NOAUDIT)
+	if (tad->tad_ctrl & TAD_NOAUDIT)
 		return (0);
-
-	/*
-	 * nfs operation and we're auditing privilege or MAC. This
-	 * is so we have a client audit record to match a nfs server
-	 * audit record.
-	 */
-	if (tad->tad_ctrl & PAD_AUDITME)
-		return (AU_OK);
 
 	/*
 	 * Used passed cred if available, otherwise use cred from kernel thread

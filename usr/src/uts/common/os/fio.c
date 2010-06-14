@@ -606,12 +606,6 @@ getf(int fd)
 	}
 	ufp->uf_refcnt++;
 
-	/*
-	 * archive per file audit data
-	 */
-	if (AU_AUDITING())
-		(void) audit_getf(fd);
-
 	set_active_fd(fd);	/* record the active file descriptor */
 
 	UF_EXIT(ufp);
@@ -684,11 +678,6 @@ closeandsetf(int fd, file_t *newfp)
 		}
 	}
 
-	/*
-	 * archive per file audit data
-	 */
-	if (AU_AUDITING())
-		(void) audit_getf(fd);
 	ASSERT(ufp->uf_busy);
 	ufp->uf_file = NULL;
 	ufp->uf_flag = 0;
