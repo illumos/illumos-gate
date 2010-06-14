@@ -580,6 +580,17 @@ brand_solaris_copy_procdata(proc_t *child, proc_t *parent, struct brand *pbrand)
 	child->p_brand_data = spd;
 }
 
+static void
+restoreexecenv(struct execenv *ep, stack_t *sp)
+{
+	klwp_t *lwp = ttolwp(curthread);
+
+	setexecenv(ep);
+	lwp->lwp_sigaltstack.ss_sp = sp->ss_sp;
+	lwp->lwp_sigaltstack.ss_size = sp->ss_size;
+	lwp->lwp_sigaltstack.ss_flags = sp->ss_flags;
+}
+
 /*ARGSUSED*/
 int
 brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
@@ -595,7 +606,11 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 	int		interp;
 	int		i, err;
 	struct execenv	env;
+	struct execenv	origenv;
+	stack_t		orig_sigaltstack;
 	struct user	*up = PTOU(curproc);
+	proc_t		*p = ttoproc(curthread);
+	klwp_t		*lwp = ttolwp(curthread);
 	brand_proc_data_t	*spd;
 	brand_elf_data_t sed, *sedp;
 	char		*linker;
@@ -630,6 +645,26 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 		return (err);
 	}
 
+	/*
+	 * The following elf{32}exec call changes the execenv in the proc
+	 * struct which includes changing the p_exec member to be the vnode
+	 * for the brand library (e.g. /.SUNWnative/usr/lib/s10_brand.so.1).
+	 * We will eventually set the p_exec member to be the vnode for the new
+	 * executable when we call setexecenv().  However, if we get an error
+	 * before that call we need to restore the execenv to its original
+	 * values so that when we return to the caller fop_close() works
+	 * properly while cleaning up from the failed exec().  Restoring the
+	 * original value will also properly decrement the 2nd VN_RELE that we
+	 * took on the brand library.
+	 */
+	origenv.ex_bssbase = p->p_bssbase;
+	origenv.ex_brkbase = p->p_brkbase;
+	origenv.ex_brksize = p->p_brksize;
+	origenv.ex_vp = p->p_exec;
+	orig_sigaltstack.ss_sp = lwp->lwp_sigaltstack.ss_sp;
+	orig_sigaltstack.ss_size = lwp->lwp_sigaltstack.ss_size;
+	orig_sigaltstack.ss_flags = lwp->lwp_sigaltstack.ss_flags;
+
 	if (args->to_model == DATAMODEL_NATIVE) {
 		err = elfexec(nvp, uap, args, idatap, level + 1, execsz,
 		    setid, exec_file, cred, brand_action);
@@ -641,8 +676,10 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 	}
 #endif  /* _LP64 */
 	VN_RELE(nvp);
-	if (err != 0)
+	if (err != 0) {
+		restoreexecenv(&origenv, &orig_sigaltstack);
 		return (err);
+	}
 
 	/*
 	 * The u_auxv veCTors are set up by elfexec to point to the
@@ -699,8 +736,10 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 			uphdr_vaddr = uphdr_vaddr32;
 	}
 #endif  /* _LP64 */
-	if (err != 0)
+	if (err != 0) {
+		restoreexecenv(&origenv, &orig_sigaltstack);
 		return (err);
+	}
 
 	/*
 	 * Save off the important properties of the executable. The
@@ -735,6 +774,7 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 		if ((err = lookupname(linker, UIO_SYSSPACE,
 		    FOLLOW, NULLVPP, &nvp)) != 0) {
 			uprintf("%s: not found.", brandlinker);
+			restoreexecenv(&origenv, &orig_sigaltstack);
 			return (err);
 		}
 		if (args->to_model == DATAMODEL_NATIVE) {
@@ -758,8 +798,10 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 		}
 #endif  /* _LP64 */
 		VN_RELE(nvp);
-		if (err != 0)
+		if (err != 0) {
+			restoreexecenv(&origenv, &orig_sigaltstack);
 			return (err);
+		}
 
 		/*
 		 * Now that we know the base address of the brand's
