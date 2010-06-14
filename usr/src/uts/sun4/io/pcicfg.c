@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -770,6 +769,16 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 				DEBUG3("no device : bus "
 				    "[0x%x] slot [0x%x] func [0x%x]\n",
 				    bus, trans_device, func & 7);
+
+				/*
+				 * When walking the list of ARI functions
+				 * we don't expect to see a non-present
+				 * function, so we will stop walking
+				 * the function list.
+				 */
+				if (ari_mode == B_TRUE)
+					break;
+
 				if (func)
 					goto next;
 				break;
