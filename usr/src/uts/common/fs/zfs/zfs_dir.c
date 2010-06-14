@@ -630,7 +630,7 @@ zfs_rmnode(znode_t *zp)
 		ASSERT(error == 0);
 	}
 
-	acl_obj = ZFS_EXTERNAL_ACL(zp);
+	acl_obj = zfs_external_acl(zp);
 
 	/*
 	 * Set up the final transaction.

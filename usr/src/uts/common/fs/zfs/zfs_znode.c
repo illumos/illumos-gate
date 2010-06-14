@@ -1226,13 +1226,13 @@ zfs_rezget(znode_t *zp)
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MODE(zfsvfs), NULL,
 	    &mode, sizeof (mode));
 
-	zp->z_mode = mode;
-
 	if (sa_bulk_lookup(zp->z_sa_hdl, bulk, count)) {
 		zfs_znode_dmu_fini(zp);
 		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
 		return (EIO);
 	}
+
+	zp->z_mode = mode;
 
 	if (gen != zp->z_gen) {
 		zfs_znode_dmu_fini(zp);
@@ -1256,11 +1256,13 @@ zfs_znode_delete(znode_t *zp, dmu_tx_t *tx)
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	objset_t *os = zfsvfs->z_os;
 	uint64_t obj = zp->z_id;
-	uint64_t acl_obj = ZFS_EXTERNAL_ACL(zp);
+	uint64_t acl_obj = zfs_external_acl(zp);
 
 	ZFS_OBJ_HOLD_ENTER(zfsvfs, obj);
-	if (acl_obj)
+	if (acl_obj) {
+		VERIFY(!zp->z_is_sa);
 		VERIFY(0 == dmu_object_free(os, acl_obj, tx));
+	}
 	VERIFY(0 == dmu_object_free(os, obj, tx));
 	zfs_znode_dmu_fini(zp);
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj);

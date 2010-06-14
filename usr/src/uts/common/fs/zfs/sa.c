@@ -713,7 +713,7 @@ sa_build_layouts(sa_handle_t *hdl, sa_bulk_attr_t *attr_desc, int attr_count,
 			length = attr_desc[i].sa_length;
 
 		if (buf_space < length) {  /* switch to spill buffer */
-			ASSERT(bonustype != DMU_OT_ZNODE);
+			VERIFY(bonustype == DMU_OT_SA);
 			if (buftype == SA_BONUS && !sa->sa_force_spill) {
 				sa_find_layout(hdl->sa_os, hash, attrs_start,
 				    lot_count, tx, &lot);
@@ -747,6 +747,14 @@ sa_build_layouts(sa_handle_t *hdl, sa_bulk_attr_t *attr_desc, int attr_count,
 	}
 
 	sa_find_layout(hdl->sa_os, hash, attrs_start, lot_count, tx, &lot);
+
+	/*
+	 * Verify that old znodes always have layout number 0.
+	 * Must be DMU_OT_SA for arbitrary layouts
+	 */
+	VERIFY((bonustype == DMU_OT_ZNODE && lot->lot_num == 0) ||
+	    (bonustype == DMU_OT_SA && lot->lot_num > 1));
+
 	if (bonustype == DMU_OT_SA) {
 		SA_SET_HDR(sahdr, lot->lot_num,
 		    buftype == SA_BONUS ? hdrsize : spillhdrsize);
