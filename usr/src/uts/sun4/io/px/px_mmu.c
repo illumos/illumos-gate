@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PX mmu initialization and configuration
@@ -152,6 +149,8 @@ void
 px_mmu_detach(px_t *px_p)
 {
 	px_mmu_t *mmu_p = px_p->px_mmu_p;
+
+	(void) px_lib_iommu_detach(px_p);
 
 	/*
 	 * Free the dvma resource map.

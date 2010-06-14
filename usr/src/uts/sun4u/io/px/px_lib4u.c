@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -574,6 +573,17 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
 	return (DDI_SUCCESS);
 }
 
+int
+px_lib_iommu_detach(px_t *px_p)
+{
+	/*
+	 * Deallocate DVMA addr space that was reserved for OBP TTE's
+	 * during Attach.
+	 */
+	hvio_obptsb_detach(px_p);
+
+	return (DDI_SUCCESS);
+}
 
 /*
  * Checks dma attributes against system bypass ranges

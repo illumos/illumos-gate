@@ -555,6 +555,13 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
 }
 
 /*ARGSUSED*/
+int
+px_lib_iommu_detach(px_t *px_p)
+{
+	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
 uint64_t
 px_get_rng_parent_hi_mask(px_t *px_p)
 {

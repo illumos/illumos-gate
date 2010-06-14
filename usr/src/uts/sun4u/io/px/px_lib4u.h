@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_PX_LIB4U_H
@@ -111,6 +110,8 @@ typedef struct pxu {
 	/* sun4u specific vars */
 	caddr_t			px_address[4];
 	ddi_acc_handle_t	px_ac[4];
+	uint64_t		obp_tsb_paddr;
+	uint_t			obp_tsb_entries;
 
 	/* PCItool */
 	caddr_t		pcitool_addr;
@@ -328,6 +329,8 @@ extern uint64_t hvio_iommu_getbypass(devhandle_t dev_hdl, pxu_t *pxu_p,
 extern uint64_t hvio_get_bypass_base(pxu_t *pxu_p);
 extern uint64_t hvio_get_bypass_end(pxu_t *pxu_p);
 extern uint64_t px_get_range_prop(px_t *px_p, pci_ranges_t *rp, int bank);
+extern void hvio_obptsb_attach(pxu_t *pxu_p);
+extern void hvio_obptsb_detach(px_t *px_p);
 
 
 /*

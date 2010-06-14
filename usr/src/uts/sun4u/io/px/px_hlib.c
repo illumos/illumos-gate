@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1697,7 +1697,7 @@ mmu_tsb_entries(caddr_t csr_base, pxu_t *pxu_p)
 void
 hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 {
-	uint64_t	val, i, obp_tsb_pa, *base_tte_addr;
+	uint64_t	val, i, obp_tsb_pa;
 	uint_t obp_tsb_entries;
 
 	bzero(pxu_p->tsb_vaddr, pxu_p->tsb_size);
@@ -1709,17 +1709,12 @@ hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 
 	obp_tsb_entries = mmu_tsb_entries(csr_base, pxu_p);
 
-	base_tte_addr = pxu_p->tsb_vaddr +
-	    ((pxu_p->tsb_size >> 3) - obp_tsb_entries);
+	/* save "shape" of OBP's TSB for use during Detach */
+	pxu_p->obp_tsb_paddr = obp_tsb_pa;
+	pxu_p->obp_tsb_entries = obp_tsb_entries;
 
-	for (i = 0; i < obp_tsb_entries; i++) {
-		uint64_t tte = lddphys(obp_tsb_pa + i * 8);
-
-		if (!MMU_TTE_VALID(tte))
-			continue;
-
-		base_tte_addr[i] = tte;
-	}
+	/* For each Valid TTE in OBP's TSB, save its value in px's IOTSB */
+	hvio_obptsb_attach(pxu_p);
 
 	/*
 	 * Invalidate the TLB through the diagnostic register.
@@ -1904,6 +1899,80 @@ hvio_iommu_getmap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
 	}
 
 	return (ret);
+}
+
+/*
+ * Copy each Valid OBP TTE from OBP's IOTSB to px's IOTSB.
+ */
+void
+hvio_obptsb_attach(pxu_t *pxu_p)
+{
+	uint64_t	obp_tsb_pa;
+	uint64_t	*base_tte_addr;
+	uint64_t	i;
+	uint_t		obp_tsb_entries;
+
+	obp_tsb_pa = pxu_p->obp_tsb_paddr;
+	obp_tsb_entries = pxu_p->obp_tsb_entries;
+
+	/*
+	 * Compute the starting addr of the area reserved for
+	 * OBP's TTEs; OBP's TTEs are stored at the highest addrs
+	 * of px's IOTSB.
+	 */
+	base_tte_addr = pxu_p->tsb_vaddr +
+	    ((pxu_p->tsb_size >> 3) - obp_tsb_entries);
+
+	for (i = 0; i < obp_tsb_entries; i++) {
+		uint64_t tte = lddphys(obp_tsb_pa + i * 8);
+
+		if (!MMU_TTE_VALID(tte))
+			continue;
+
+		base_tte_addr[i] = tte;
+	}
+}
+
+/*
+ * For each Valid OBP TTE, deallocate space from the vmem Arena used
+ * to manage the TTE's associated DVMA addr space.  (Allocation from
+ * the DVMA Arena was done in px_mmu_attach).
+ */
+void
+hvio_obptsb_detach(px_t *px_p)
+{
+	uint64_t	obp_tsb_pa;
+	uint64_t	i;
+	uint_t		obp_tsb_entries;
+	uint_t		obp_tsb_bias;
+	px_mmu_t	*mmu_p = px_p->px_mmu_p;
+	vmem_t		*dvma_map;
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	dvma_map = mmu_p->mmu_dvma_map;
+
+	obp_tsb_pa = pxu_p->obp_tsb_paddr;
+	obp_tsb_entries = pxu_p->obp_tsb_entries;
+	/*
+	 * OBP's TTEs are located at the high end of px's IOTSB.
+	 * Equivalently, OBP's DVMA space is allocated at the high end
+	 * of px's DVMA space.  Compute the bias that references
+	 * OBP's first possible page of DVMA space.
+	 */
+	obp_tsb_bias = (pxu_p->tsb_size >> 3) - obp_tsb_entries;
+
+	for (i = 0; i < obp_tsb_entries; i++) {
+		caddr_t va;
+		uint64_t tte = lddphys(obp_tsb_pa + i * 8);
+
+		if (!MMU_TTE_VALID(tte))
+			continue;
+
+		/* deallocate the TTE's associated page of DVMA space */
+		va = (caddr_t)(MMU_PTOB(mmu_p->dvma_base_pg + obp_tsb_bias +
+		    i));
+		vmem_xfree(dvma_map, va, MMU_PAGE_SIZE);
+	}
 }
 
 /* ARGSUSED */
