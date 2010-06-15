@@ -400,6 +400,7 @@ static const char *net_res_scope_cmds[] = {
 	"info",
 	"set address=",
 	"set physical=",
+	"set defrouter=",
 	NULL
 };
 
@@ -1887,6 +1888,17 @@ export_func(cmd_t *cmd)
 	}
 	(void) zonecfg_enddevent(handle);
 
+	if (zonecfg_getmcapent(handle, &mcaptab) == Z_OK) {
+		char buf[128];
+
+		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
+		    rt_to_str(RT_MCAP));
+		bytes_to_units(mcaptab.zone_physmem_cap, buf, sizeof (buf));
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_PHYSICAL), buf);
+		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
+	}
+
 	if ((err = zonecfg_setrctlent(handle)) != Z_OK) {
 		zone_perror(zone, err, B_FALSE);
 		goto done;
@@ -1946,17 +1958,6 @@ export_func(cmd_t *cmd)
 		if (psettab.zone_importance[0] != '\0')
 			(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_IMPORTANCE), psettab.zone_importance);
-		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
-	}
-
-	if (zonecfg_getmcapent(handle, &mcaptab) == Z_OK) {
-		char buf[128];
-
-		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
-		    rt_to_str(RT_MCAP));
-		bytes_to_units(mcaptab.zone_physmem_cap, buf, sizeof (buf));
-		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
-		    pt_to_str(PT_PHYSICAL), buf);
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
 
