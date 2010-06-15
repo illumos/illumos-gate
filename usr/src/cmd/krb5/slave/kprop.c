@@ -1,9 +1,6 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * slave/kprop.c
@@ -275,7 +272,7 @@ void get_tickets(context)
 	 * Initialize cache file which we're going to be using
 	 */
 	(void) mktemp(tkstring);
-	snprintf(buf, sizeof (buf), gettext("FILE:%s"), tkstring);
+	snprintf(buf, sizeof (buf), "FILE:%s", tkstring);
 
 	retval = krb5_cc_resolve(context, buf, &ccache);
 	if (retval) {
