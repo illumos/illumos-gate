@@ -1768,12 +1768,17 @@ kssl_mac_encrypt_record(ssl_t *ssl,
 	return (ret);
 }
 
+/*
+ * Produce SSL alert message (SSLv3/TLS) or error message (SSLv2). For SSLv2
+ * it is only done to tear down the SSL connection so it has fixed encoding.
+ */
 void
 kssl_send_alert(ssl_t *ssl, SSL3AlertLevel level, SSL3AlertDescription desc)
 {
 	mblk_t *mp;
 	uchar_t *buf;
 	KSSLCipherSpec *spec;
+	size_t len;
 
 	ASSERT(ssl != NULL);
 
@@ -1794,7 +1799,11 @@ kssl_send_alert(ssl_t *ssl, SSL3AlertLevel level, SSL3AlertDescription desc)
 	spec = &ssl->spec[KSSL_WRITE];
 
 	ASSERT(ssl->alert_sendbuf == NULL);
-	ssl->alert_sendbuf = mp = allocb(7 + spec->mac_hashsz +
+	if (ssl->major_version == 0x03)
+		len = 7;
+	else
+		len = 5;
+	ssl->alert_sendbuf = mp = allocb(len + spec->mac_hashsz +
 	    spec->cipher_bsize, BPRI_HI);
 	if (mp == NULL) {
 		KSSL_COUNTER(alloc_fails, 1);
@@ -1802,19 +1811,36 @@ kssl_send_alert(ssl_t *ssl, SSL3AlertLevel level, SSL3AlertDescription desc)
 	}
 	buf = mp->b_wptr;
 
-	/* 5 byte record header */
-	buf[0] = content_alert;
-	buf[1] = ssl->major_version;
-	buf[2] = ssl->minor_version;
-	buf[3] = 0;
-	buf[4] = 2;
-	buf += SSL3_HDR_LEN;
+	/* SSLv3/TLS */
+	if (ssl->major_version == 0x03) {
+		/* 5 byte record header */
+		buf[0] = content_alert;
+		buf[1] = ssl->major_version;
+		buf[2] = ssl->minor_version;
+		buf[3] = 0;
+		buf[4] = 2;
+		buf += SSL3_HDR_LEN;
 
-	/* alert contents */
-	buf[0] = (uchar_t)level;
-	buf[1] = (uchar_t)desc;
+		/* alert contents */
+		buf[0] = (uchar_t)level;
+		buf[1] = (uchar_t)desc;
+		buf += 2;
+	} else {
+	/* SSLv2 has different encoding. */
+		/* 2-byte encoding of the length */
+		buf[0] = 0x80;
+		buf[1] = 0x03;
+		buf += 2;
 
-	mp->b_wptr = buf + 2;
+		/* Protocol Message Code = Error */
+		buf[0] = 0;
+		/* Error Message Code = Undefined Error */
+		buf[1] = 0;
+		buf[2] = 0;
+		buf += 3;
+	}
+
+	mp->b_wptr = buf;
 }
 
 /* Assumes RSA encryption */

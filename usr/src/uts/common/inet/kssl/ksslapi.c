@@ -870,6 +870,8 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 			} else {
 			/* We don't support "pure" SSLv2 */
 				DTRACE_PROBE(kssl_err__no_SSLv2);
+				ssl->major_version = mp->b_rptr[3];
+				ssl->minor_version = mp->b_rptr[4];
 				desc = protocol_version;
 				goto sendalert;
 			}
