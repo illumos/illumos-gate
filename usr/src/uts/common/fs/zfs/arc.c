@@ -1819,8 +1819,9 @@ arc_adjust(void)
 	 * Adjust MRU size
 	 */
 
-	adjustment = MIN(arc_size - arc_c,
-	    arc_anon->arcs_size + arc_mru->arcs_size + arc_meta_used - arc_p);
+	adjustment = MIN((int64_t)(arc_size - arc_c),
+	    (int64_t)(arc_anon->arcs_size + arc_mru->arcs_size + arc_meta_used -
+	    arc_p));
 
 	if (adjustment > 0 && arc_mru->arcs_lsize[ARC_BUFC_DATA] > 0) {
 		delta = MIN(arc_mru->arcs_lsize[ARC_BUFC_DATA], adjustment);
@@ -2107,9 +2108,7 @@ arc_reclaim_thread(void)
 			arc_no_grow = FALSE;
 		}
 
-		if (2 * arc_c < arc_size +
-		    arc_mru_ghost->arcs_size + arc_mfu_ghost->arcs_size)
-			arc_adjust();
+		arc_adjust();
 
 		if (arc_eviction_list != NULL)
 			arc_do_user_evicts();
@@ -2153,6 +2152,7 @@ arc_adapt(int bytes, arc_state_t *state)
 	if (state == arc_mru_ghost) {
 		mult = ((arc_mru_ghost->arcs_size >= arc_mfu_ghost->arcs_size) ?
 		    1 : (arc_mfu_ghost->arcs_size/arc_mru_ghost->arcs_size));
+		mult = MIN(mult, 10); /* avoid wild arc_p adjustment */
 
 		arc_p = MIN(arc_c - arc_p_min, arc_p + bytes * mult);
 	} else if (state == arc_mfu_ghost) {
@@ -2160,6 +2160,7 @@ arc_adapt(int bytes, arc_state_t *state)
 
 		mult = ((arc_mfu_ghost->arcs_size >= arc_mru_ghost->arcs_size) ?
 		    1 : (arc_mru_ghost->arcs_size/arc_mfu_ghost->arcs_size));
+		mult = MIN(mult, 10);
 
 		delta = MIN(bytes * mult, arc_p);
 		arc_p = MAX(arc_p_min, arc_p - delta);
