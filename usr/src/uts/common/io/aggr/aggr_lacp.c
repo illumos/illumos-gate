@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2360,14 +2359,13 @@ aggr_lacp_rx_thread(void *arg)
 	 * We cannot use freemsgchain() here since we need to clear the
 	 * b_prev field.
 	 */
-	while ((mp = grp->lg_lacp_head) != NULL) {
+	for (mp = grp->lg_lacp_head; mp != NULL; mp = nextmp) {
 		port = (aggr_port_t *)mp->b_prev;
 		AGGR_PORT_REFRELE(port);
 		nextmp = mp->b_next;
 		mp->b_next = NULL;
 		mp->b_prev = NULL;
 		freemsg(mp);
-		mp = nextmp;
 	}
 
 	grp->lg_lacp_head = grp->lg_lacp_tail = NULL;
