@@ -35,6 +35,13 @@ extern "C" {
  */
 #define	SUN_DIAGPAGE_FRUID	SES2_DIAGPAGE_VENDOR_0
 
+typedef enum sun_element_type {
+	SES_ET_SUNW_FANMODULE = 0x90,
+	SES_ET_SUNW_POWERBOARD = 0x94,
+	SES_ET_SUNW_POWERMODULE = 0x95,
+	SES_ET_SUNW_FANBOARD = 0x96
+} sun_element_type;
+
 #ifdef	__cplusplus
 }
 #endif

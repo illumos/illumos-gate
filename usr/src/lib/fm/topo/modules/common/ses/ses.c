@@ -46,6 +46,7 @@
 #include <sys/contract/device.h>
 #include <libsysevent.h>
 #include <sys/sysevent/eventdefs.h>
+#include <scsi/plugins/ses/vendor/sun.h>
 
 #include "disk.h"
 #include "ses.h"
@@ -59,6 +60,8 @@ static int ses_snap_freq = 250;		/* in milliseconds */
 
 #define	SES_STATUS_UNAVAIL(s)	\
 	((s) == SES_ESC_UNSUPPORTED || (s) >= SES_ESC_NOT_INSTALLED)
+
+#define	HR_SECOND   1000000000
 
 /*
  * Because multiple SES targets can be part of a single chassis, we construct
@@ -109,13 +112,13 @@ typedef struct ses_enum_data {
 } ses_enum_data_t;
 
 typedef struct sas_connector_phy_data {
-	uint64_t    index;
-	uint64_t    phy_mask;
+	uint64_t    scpd_index;
+	uint64_t    scpd_pm;
 } sas_connector_phy_data_t;
 
 typedef struct sas_connector_type {
-	uint64_t    type;
-	char	    *name;
+	uint64_t    sct_type;
+	char	    *sct_name;
 } sas_connector_type_t;
 
 static const sas_connector_type_t sas_connector_type_list[] = {
@@ -157,12 +160,52 @@ static const sas_connector_type_t sas_connector_type_list[] = {
 #define	SAS_CONNECTOR_TYPE_RESERVED \
 	"Connector type reserved by SES-2 standard"
 
+typedef struct phys_enum_type {
+	uint64_t    pet_type;
+	char	    *pet_nodename;
+	char	    *pet_defaultlabel;
+	boolean_t   pet_dorange;
+} phys_enum_type_t;
+
+static const phys_enum_type_t phys_enum_type_list[] = {
+	{   SES_ET_ARRAY_DEVICE, BAY, "BAY", B_TRUE  },
+	{   SES_ET_COOLING, FAN, "FAN", B_TRUE  },
+	{   SES_ET_DEVICE, BAY, "BAY", B_TRUE  },
+	{   SES_ET_ESC_ELECTRONICS, CONTROLLER, "CONTROLLER", B_TRUE  },
+	{   SES_ET_POWER_SUPPLY, PSU, "PSU", B_TRUE  },
+	{   SES_ET_SUNW_FANBOARD, FANBOARD, "FANBOARD", B_TRUE  },
+	{   SES_ET_SUNW_FANMODULE, FANMODULE, "FANMODULE", B_TRUE  },
+	{   SES_ET_SUNW_POWERBOARD, POWERBOARD, "POWERBOARD", B_TRUE  },
+	{   SES_ET_SUNW_POWERMODULE, POWERMODULE, "POWERMODULE", B_TRUE  }
+};
+
+#define	N_PHYS_ENUM_TYPES (sizeof (phys_enum_type_list) / \
+	sizeof (phys_enum_type_list[0]))
+
+/*
+ * Structure for the hierarchical tree for element nodes.
+ */
+typedef struct ses_phys_tree {
+    ses_node_t	*spt_snode;
+    ses_enum_node_t	*spt_senumnode;
+    boolean_t	spt_isfru;
+    uint64_t	spt_eonlyindex;
+    uint64_t	spt_cindex;
+    uint64_t	spt_pindex;
+    uint64_t	spt_maxinst;
+    struct ses_phys_tree    *spt_parent;
+    struct ses_phys_tree    *spt_child;
+    struct ses_phys_tree    *spt_sibling;
+    tnode_t	*spt_tnode;
+} ses_phys_tree_t;
+
 typedef enum {
 	SES_NEW_CHASSIS		= 0x1,
 	SES_NEW_SUBCHASSIS	= 0x2,
 	SES_DUP_CHASSIS		= 0x4,
 	SES_DUP_SUBCHASSIS	= 0x8
 } ses_chassis_type_e;
+
 
 static const topo_pgroup_info_t storage_pgroup = {
 	TOPO_PGROUP_STORAGE,
@@ -1258,8 +1301,9 @@ error:
  * Callback to create a basic node (bay, psu, fan, or controller and expander).
  */
 static int
-ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
-    tnode_t *pnode, const char *nodename, const char *labelname, tnode_t **node)
+ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp, tnode_t *pnode,
+    tnode_t *frutn, const char *nodename, const char *labelname,
+    tnode_t **node)
 {
 	ses_node_t *np = snp->sen_node;
 	ses_node_t *parent;
@@ -1267,7 +1311,7 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	topo_mod_t *mod = sdp->sed_mod;
 	nvlist_t *props, *aprops;
 	nvlist_t *auth = NULL, *fmri = NULL;
-	tnode_t *tn = NULL, *frutn = NULL;
+	tnode_t *tn = NULL;
 	char label[128];
 	int err;
 	char *part = NULL, *serial = NULL, *revision = NULL;
@@ -1347,16 +1391,6 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 
 	if (topo_node_label_set(tn, desc, &err) != 0)
 		goto error;
-
-	/*
-	 * For an expander node, set the FRU to its parent(controller).
-	 * For a connector node, set the FRU to its grand parent(controller).
-	 */
-	if (strcmp(nodename, SASEXPANDER) == 0) {
-		frutn = pnode;
-	} else if (strcmp(nodename, RECEPTACLE) == 0) {
-		frutn = topo_node_parent(pnode);
-	}
 
 	if (ses_set_standard_props(mod, frutn, tn, NULL, ses_node_id(np),
 	    snp->sen_target->set_devpath) != 0)
@@ -1506,7 +1540,7 @@ ses_set_expander_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	}
 
 	/* update the ses property group with SES target info */
-	if ((topo_pgroup_create(tnode, &ses_pgroup, &err) == NULL) &&
+	if ((topo_pgroup_create(tnode, &ses_pgroup, &err) != 0) &&
 	    (err != ETOPO_PROP_DEFD)) {
 		/* SES prop group doesn't exist but failed to be created. */
 		topo_mod_dprintf(mod, "ses_set_expander_props: "
@@ -1717,14 +1751,14 @@ ses_set_connector_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 		} else {
 			found = B_FALSE;
 			for (i = 0; ; i++) {
-				if (sas_connector_type_list[i].type ==
+				if (sas_connector_type_list[i].sct_type ==
 				    SAS_CONNECTOR_TYPE_CODE_NOT_DEFINED) {
 					break;
 				}
-				if (sas_connector_type_list[i].type ==
+				if (sas_connector_type_list[i].sct_type ==
 				    conntype) {
 					conntype_str =
-					    sas_connector_type_list[i].name;
+					    sas_connector_type_list[i].sct_name;
 					found = B_TRUE;
 					break;
 				}
@@ -1869,7 +1903,7 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 		 * element - binding to parent node and
 		 * allocating FMRI...
 		 */
-		if (ses_create_generic(sdp, xsnp, pnode, SASEXPANDER,
+		if (ses_create_generic(sdp, xsnp, pnode, pnode, SASEXPANDER,
 		    "SAS-EXPANDER", &exptn) != 0)
 			continue;
 		/*
@@ -1905,7 +1939,7 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 			if (cidxlist[i] != -1) {
 				/* connector index is valid. */
 				for (j = 0; j < count; j++) {
-					if (connectors[j].index ==
+					if (connectors[j].scpd_index ==
 					    cidxlist[i]) {
 						/*
 						 * Just update phy mask.
@@ -1913,8 +1947,8 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 						 * index lists(cidxlist index)
 						 * is set.
 						 */
-						connectors[j].phy_mask =
-						    connectors[j].phy_mask |
+						connectors[j].scpd_pm =
+						    connectors[j].scpd_pm |
 						    (1ULL << i);
 						break;
 					}
@@ -1925,9 +1959,10 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 				 */
 				if (j == count) {
 					/* add a new index and phy mask. */
-					connectors[count].index = cidxlist[i];
-					connectors[count].phy_mask =
-					    connectors[count].phy_mask |
+					connectors[count].scpd_index =
+					    cidxlist[i];
+					connectors[count].scpd_pm =
+					    connectors[count].scpd_pm |
 					    (1ULL << i);
 					count++;
 				}
@@ -1988,7 +2023,7 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 					    SES_PROP_ELEMENT_ONLY_INDEX,
 					    &conindex) == 0) {
 						if (conindex ==
-						    connectors[i].index) {
+						    connectors[i].scpd_index) {
 							found = B_TRUE;
 							break;
 						}
@@ -2000,13 +2035,14 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 			if (found) {
 				/* Create generic props. */
 				if (ses_create_generic(sdp, consnp, exptn,
+				    topo_node_parent(exptn),
 				    RECEPTACLE, "RECEPTACLE", &contn) !=
 				    0) {
 					continue;
 				}
 				/* Create connector specific props. */
 				if (ses_set_connector_props(sdp, consnp,
-				    contn, connectors[i].phy_mask) != 0) {
+				    contn, connectors[i].scpd_pm) != 0) {
 					continue;
 				}
 			}
@@ -2090,7 +2126,14 @@ ses_create_children(ses_enum_data_t *sdp, tnode_t *pnode, uint64_t type,
 	for (snp = topo_list_next(&cp->sec_nodes); snp != NULL;
 	    snp = topo_list_next(snp)) {
 		if (snp->sen_type == type) {
-			if (ses_create_generic(sdp, snp, pnode,
+			/*
+			 * With flat layout of ses nodes there is no
+			 * way to find out the direct FRU for a node.
+			 * Passing NULL for fru topo node.  Note that
+			 * ses_create_children_from_phys_tree() provides
+			 * the actual direct FRU for a node.
+			 */
+			if (ses_create_generic(sdp, snp, pnode, NULL,
 			    nodename, defaultlabel, &tn) != 0)
 				return (-1);
 			/*
@@ -2251,6 +2294,407 @@ error:
 }
 
 /*
+ * Function we use to insert a node.
+ */
+static int
+ses_phys_tree_insert(topo_mod_t *mod, ses_phys_tree_t **sproot,
+    ses_phys_tree_t *child)
+{
+	uint64_t ppindex, eindex, pindex;
+	ses_phys_tree_t *node_ptr;
+	int ret = 0;
+
+	assert(sproot != NULL);
+	assert(child != NULL);
+
+	if (*sproot == NULL) {
+		*sproot = child;
+		return (0);
+	}
+
+	pindex = child->spt_pindex;
+	ppindex = (*sproot)->spt_pindex;
+	eindex = (*sproot)->spt_eonlyindex;
+
+	/*
+	 * If the element only index of the root is same as the physical
+	 * parent index of a node to be added, add the node as a child of
+	 * the current root.
+	 */
+	if (eindex == pindex) {
+		(void) ses_phys_tree_insert(mod, &(*sproot)->spt_child, child);
+		child->spt_parent = *sproot;
+	} else if (ppindex == pindex) {
+		/*
+		 * if the physical parent of the current root and the child
+		 * is same, then this should be a sibling node.
+		 * Siblings can be different element types and arrange
+		 * them by group.
+		 */
+		if ((*sproot)->spt_senumnode->sen_type ==
+		    child->spt_senumnode->sen_type) {
+			child->spt_sibling = *sproot;
+			*sproot = child;
+		} else {
+			/* add a node in front of matching element type. */
+			node_ptr = *sproot;
+			while (node_ptr->spt_sibling != NULL) {
+				if (node_ptr->spt_sibling->
+				    spt_senumnode->sen_type ==
+				    child->spt_senumnode->sen_type) {
+					child->spt_sibling =
+					    node_ptr->spt_sibling;
+					node_ptr->spt_sibling = child;
+					break;
+				}
+				node_ptr = node_ptr->spt_sibling;
+			}
+			/* no matching.  Add the child at the end. */
+			if (node_ptr->spt_sibling == NULL) {
+				node_ptr->spt_sibling = child;
+			}
+		}
+		child->spt_parent = (*sproot)->spt_parent;
+	} else {
+		/*
+		 * The root and the node is not directly related.
+		 * Try to insert to the child sub-tree first and then try to
+		 * insert to the sibling sub-trees.  If fails for both
+		 * the caller will retry insertion later.
+		 */
+		if ((*sproot)->spt_child) {
+			ret = ses_phys_tree_insert(mod, &(*sproot)->spt_child,
+			    child);
+		}
+		if ((*sproot)->spt_child == NULL || ret != 0) {
+			if ((*sproot)->spt_sibling) {
+				ret = ses_phys_tree_insert(mod,
+				    &(*sproot)->spt_sibling, child);
+			} else {
+				ret = 1;
+			}
+		}
+		return (ret);
+	}
+	return (0);
+}
+
+/*
+ * Construct tree view of ses elements through parent phyiscal element index.
+ * The root of tree is already constructed using the enclosure element.
+ */
+static int
+ses_construct_phys_tree(ses_enum_data_t *sdp, ses_enum_chassis_t *cp,
+    ses_phys_tree_t *sproot)
+{
+	ses_enum_node_t *snp;
+	ses_phys_tree_t	*child;
+	ses_phys_tree_t	*u_watch = NULL;
+	ses_phys_tree_t	*u_head = NULL;
+	ses_phys_tree_t	*u_tail = NULL;
+	int u_inserted = 0, u_left = 0;
+	nvlist_t *props;
+	topo_mod_t *mod = sdp->sed_mod;
+
+	for (snp = topo_list_next(&cp->sec_nodes); snp != NULL;
+	    snp = topo_list_next(snp)) {
+		if ((child = topo_mod_zalloc(mod,
+		    sizeof (ses_phys_tree_t))) == NULL) {
+			topo_mod_dprintf(mod,
+			    "failed to allocate root.");
+			return (-1);
+		}
+		child->spt_snode = snp->sen_node;
+		props = ses_node_props(snp->sen_node);
+		if (nvlist_lookup_uint64(props,
+		    LIBSES_PROP_PHYS_PARENT, &child->spt_pindex) != 0) {
+			/*
+			 * the prop should exist. continue to see if
+			 * we can build a partial tree with other elements.
+			 */
+			topo_mod_dprintf(mod,
+			    "ses_construct_phys_tree(): Failed to find prop %s "
+			    "on ses element type %d and instance %d "
+			    "(CSN %s).", LIBSES_PROP_PHYS_PARENT,
+			    snp->sen_type, snp->sen_instance, cp->sec_csn);
+			topo_mod_free(mod, child, sizeof (ses_phys_tree_t));
+			continue;
+		} else {
+			if (nvlist_lookup_boolean_value(props,
+			    LIBSES_PROP_FRU, &child->spt_isfru) != 0) {
+				topo_mod_dprintf(mod,
+				    "ses_construct_phys_tree(): Failed to "
+				    "find prop %s on ses element type %d "
+				    "and instance %d (CSN %s).",
+				    LIBSES_PROP_FRU,
+				    snp->sen_type, snp->sen_instance,
+				    cp->sec_csn);
+				/*
+				 * Ignore if the prop doesn't exist.
+				 * Note that the enclosure itself should be
+				 * a FRU so if no FRU found the enclosure FRU
+				 * can be a direct FRU.
+				 */
+			}
+			verify(nvlist_lookup_uint64(props,
+			    SES_PROP_ELEMENT_ONLY_INDEX,
+			    &child->spt_eonlyindex) == 0);
+			verify(nvlist_lookup_uint64(props,
+			    SES_PROP_ELEMENT_CLASS_INDEX,
+			    &child->spt_cindex) == 0);
+		}
+		child->spt_senumnode = snp;
+		if (ses_phys_tree_insert(mod, &sproot, child) != 0) {
+			/* collect unresolved element to process later. */
+			if (u_head == NULL) {
+				u_head = child;
+				u_tail = child;
+			} else {
+				child->spt_sibling = u_head;
+				u_head = child;
+			}
+		}
+	}
+
+	/*
+	 * The parent of a child node may not be inserted yet.
+	 * Trying to insert the child until no child is left or
+	 * no child is not added further.  For the latter
+	 * the hierarchical relationship between elements
+	 * should be checked through SUNW,FRUID page.
+	 * u_watch is a watch dog to check the prgress of unresolved
+	 * node.
+	 */
+	u_watch = u_tail;
+	while (u_head) {
+		child = u_head;
+		u_head = u_head->spt_sibling;
+		if (u_head == NULL)
+			u_tail = NULL;
+		child->spt_sibling = NULL;
+		if (ses_phys_tree_insert(mod, &sproot, child) != 0) {
+			u_tail->spt_sibling = child;
+			u_tail = child;
+			if (child == u_watch) {
+				/*
+				 * We just scanned one round for the
+				 * unresolved list. Check to see whether we
+				 * have nodes inserted, if none, we should
+				 * break in case of an indefinite loop.
+				 */
+				if (u_inserted == 0) {
+					/*
+					 * Indicate there is unhandled node.
+					 * Chain free the whole unsolved
+					 * list here.
+					 */
+					u_left++;
+					break;
+				} else {
+					u_inserted = 0;
+					u_watch = u_tail;
+				}
+			}
+		} else {
+			/*
+			 * We just inserted one rpnode, increment the
+			 * unsolved_inserted counter. We will utilize this
+			 * counter to detect an indefinite insertion loop.
+			 */
+			u_inserted++;
+		}
+	}
+
+	/* check if there is left out unresolved nodes. */
+	if (u_left) {
+		topo_mod_dprintf(mod, "ses_construct_phys_tree(): "
+		    "Failed to construct physical view of the following "
+		    "ses elements of Chassis CSN %s.", cp->sec_csn);
+		while (u_head) {
+			u_tail = u_head->spt_sibling;
+			topo_mod_dprintf(mod,
+			    "\telement type (%d) and instance (%d)",
+			    u_head->spt_senumnode->sen_type,
+			    u_head->spt_senumnode->sen_instance);
+			topo_mod_free(mod, u_head, sizeof (ses_phys_tree_t));
+			u_head = u_tail;
+		}
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * Free the whole phys tree.
+ */
+static void ses_phys_tree_free(topo_mod_t *mod, ses_phys_tree_t *sproot)
+{
+	if (sproot == NULL)
+		return;
+
+	/* Free child tree. */
+	if (sproot->spt_child) {
+		ses_phys_tree_free(mod, sproot->spt_child);
+	}
+
+	/* Free sibling trees. */
+	if (sproot->spt_sibling) {
+		ses_phys_tree_free(mod, sproot->spt_sibling);
+	}
+
+	/* Free root node itself. */
+	topo_mod_free(mod, sproot, sizeof (ses_phys_tree_t));
+}
+
+/*
+ * Parses phys_enum_type table to get the index of the given type.
+ */
+static boolean_t
+is_type_enumerated(ses_phys_tree_t *node, int *index)
+{
+	int i;
+
+	for (i = 0; i < N_PHYS_ENUM_TYPES; i++) {
+		if (node->spt_senumnode->sen_type ==
+		    phys_enum_type_list[i].pet_type) {
+			*index = i;
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+/*
+ * Recusrive routine for top-down enumeration of the tree.
+ */
+static int
+ses_enumerate_node(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp,
+    ses_phys_tree_t *parent, int mrange[])
+{
+	topo_mod_t *mod = sdp->sed_mod;
+	ses_phys_tree_t *child = NULL;
+	int i, ret = 0, ret_ch;
+	uint64_t prevtype = SES_ET_UNSPECIFIED;
+	ses_phys_tree_t *dirfru = NULL;
+	tnode_t *tn = NULL, *frutn = NULL;
+
+	if (parent == NULL) {
+		return (0);
+	}
+
+	for (child = parent->spt_child; child != NULL;
+	    child = child->spt_sibling) {
+		if (is_type_enumerated(child, &i)) {
+			if (prevtype != phys_enum_type_list[i].pet_type) {
+				/* check if range needs to be created. */
+				if (phys_enum_type_list[i].pet_dorange &&
+				    topo_node_range_create(mod, pnode,
+				    phys_enum_type_list[i].pet_nodename, 0,
+				    mrange[i]) != 0) {
+					topo_mod_dprintf(mod,
+					    "topo_node_create_range() failed: "
+					    "%s", topo_mod_errmsg(mod));
+					return (-1);
+				}
+				prevtype = phys_enum_type_list[i].pet_type;
+			}
+
+			if (!(child->spt_isfru)) {
+				for (dirfru = parent; dirfru != NULL;
+				    dirfru = dirfru->spt_parent) {
+					if (dirfru->spt_isfru) {
+						break;
+					}
+				}
+				/* found direct FRU node. */
+				if (dirfru) {
+					frutn = dirfru->spt_tnode;
+				} else {
+					frutn = NULL;
+				}
+			} else {
+				frutn = NULL;
+			}
+
+			if (ses_create_generic(sdp, child->spt_senumnode,
+			    pnode, frutn, phys_enum_type_list[i].pet_nodename,
+			    phys_enum_type_list[i].pet_defaultlabel, &tn) != 0)
+				return (-1);
+
+			child->spt_tnode = tn;
+			/*
+			 * For some SES element there may be protocol specific
+			 * information to process.   Here we are processing
+			 * the association between enclosure controller and
+			 * SAS expanders.
+			 */
+			if (phys_enum_type_list[i].pet_type ==
+			    SES_ET_ESC_ELECTRONICS) {
+				/* create SAS expander node */
+				if (ses_create_protocol_specific(sdp,
+				    child->spt_senumnode, tn,
+				    phys_enum_type_list[i].pet_type,
+				    cp, phys_enum_type_list[i].pet_dorange) !=
+				    0) {
+					return (-1);
+				}
+			}
+		} else {
+			continue;
+		}
+		ret_ch = ses_enumerate_node(sdp, tn, cp, child, mrange);
+		if (ret_ch)
+			ret = ret_ch; /* there was an error and set the ret. */
+	}
+
+	return (ret);
+}
+
+/*
+ * Instantiate types of nodes that are specified in the hierarchy
+ * element type list.
+ */
+static int
+ses_create_children_from_phys_tree(ses_enum_data_t *sdp, tnode_t *pnode,
+    ses_enum_chassis_t *cp, ses_phys_tree_t *phys_tree)
+{
+	topo_mod_t *mod = sdp->sed_mod;
+	int mrange[N_PHYS_ENUM_TYPES] = { 0 };
+	ses_enum_node_t *snp;
+	int i, ret;
+
+	/*
+	 * First get max range for each type of element to be enumerated.
+	 */
+	for (i = 0; i < N_PHYS_ENUM_TYPES; i++) {
+		if (phys_enum_type_list[i].pet_dorange) {
+			for (snp = topo_list_next(&cp->sec_nodes); snp != NULL;
+			    snp = topo_list_next(snp)) {
+				if (snp->sen_type ==
+				    phys_enum_type_list[i].pet_type) {
+					if (snp->sen_instance > mrange[i])
+						mrange[i] =
+						    snp->sen_instance;
+				}
+			}
+		}
+	}
+
+	topo_mod_dprintf(mod, "%s: creating nodes from FRU hierarchy tree.",
+	    cp->sec_csn);
+
+	if ((ret = ses_enumerate_node(sdp, pnode, cp, phys_tree, mrange)) !=
+	    0) {
+		topo_mod_dprintf(mod,
+		    "ses_create_children_from_phys_tree() failed: ");
+		return (ret);
+	}
+
+	return (0);
+}
+
+/*
  * Instantiate a new chassis instance in the topology.
  */
 static int
@@ -2271,7 +2715,11 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	ses_enum_target_t *stp;
 	ses_enum_chassis_t *scp;
 	int i, err;
-	uint64_t sc_count = 0;
+	uint64_t sc_count = 0, pindex;
+	ses_phys_tree_t	*sproot = NULL;
+	hrtime_t start;
+	hrtime_t end;
+	double duration;
 
 	/*
 	 * Ignore any internal enclosures.
@@ -2398,22 +2846,95 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 		goto error;
 	}
 
-	/*
-	 * Create the nodes for power supplies, fans, controllers and devices.
-	 * Note that SAS exopander nodes and connector nodes are handled
-	 * through protocol specific processing of controllers.
-	 */
-	if (ses_create_children(sdp, tn, SES_ET_POWER_SUPPLY,
-	    PSU, "PSU", cp, B_TRUE) != 0 ||
-	    ses_create_children(sdp, tn, SES_ET_COOLING,
-	    FAN, "FAN", cp, B_TRUE) != 0 ||
-	    ses_create_children(sdp, tn, SES_ET_ESC_ELECTRONICS,
-	    CONTROLLER, "CONTROLLER", cp, B_TRUE) != 0 ||
-	    ses_create_children(sdp, tn, SES_ET_DEVICE,
-	    BAY, "BAY", cp, B_TRUE) != 0 ||
-	    ses_create_children(sdp, tn, SES_ET_ARRAY_DEVICE,
-	    BAY, "BAY", cp, B_TRUE) != 0)
-		goto error;
+	if (nvlist_lookup_uint64(props,
+	    LIBSES_PROP_PHYS_PARENT, &pindex) == 0) {
+		start = gethrtime(); /* to mearusre performance */
+		/*
+		 * The enclosure is supported through SUNW,FRUID.
+		 * Need to enumerate the nodes through hierarchical order.
+		 */
+		if ((sproot = topo_mod_zalloc(mod,
+		    sizeof (ses_phys_tree_t))) == NULL) {
+			topo_mod_dprintf(mod,
+			    "failed to allocate root: %s\n",
+			    topo_strerror(err));
+			goto error;
+		}
+		sproot->spt_pindex = pindex;
+		if (nvlist_lookup_boolean_value(props,
+		    LIBSES_PROP_FRU, &sproot->spt_isfru) != 0) {
+			topo_mod_dprintf(mod,
+			    "ses_create_chassis(): Failed to find prop %s "
+			    "on enclosure element (CSN %s).",
+			    LIBSES_PROP_FRU, cp->sec_csn);
+			/* an enclosure should be a FRU. continue to process. */
+			sproot->spt_isfru = B_TRUE;
+		}
+		if (nvlist_lookup_uint64(props,
+		    SES_PROP_ELEMENT_ONLY_INDEX,
+		    &sproot->spt_eonlyindex) != 0) {
+			topo_mod_dprintf(mod,
+			    "ses_create_chassis(): Failed to find prop %s "
+			    "on enclosure element (CSN %s).",
+			    LIBSES_PROP_PHYS_PARENT, cp->sec_csn);
+			topo_mod_free(mod, sproot, sizeof (ses_phys_tree_t));
+			goto error;
+		}
+		if (sproot->spt_pindex != sproot->spt_eonlyindex) {
+			topo_mod_dprintf(mod, "ses_create_chassis(): "
+			    "Enclosure element(CSN %s) should have "
+			    "itself as the parent to be the root node "
+			    "of FRU hierarchical tree.)", cp->sec_csn);
+			topo_mod_free(mod, sproot, sizeof (ses_phys_tree_t));
+			goto error;
+		} else {
+			sproot->spt_snode = cp->sec_enclosure;
+			sproot->spt_tnode = tn;
+			/* construct a tree. */
+			if (ses_construct_phys_tree(sdp, cp, sproot) != 0) {
+				topo_mod_dprintf(mod, "ses_create_chassis(): "
+				    "Failed to construct FRU hierarchical "
+				    "tree on enclosure (CSN %s.)",
+				    cp->sec_csn);
+			}
+
+			/* enumerate elements from the tree. */
+			if (ses_create_children_from_phys_tree(sdp, tn, cp,
+			    sproot) != 0) {
+				topo_mod_dprintf(mod, "ses_create_chassis(): "
+				    "Failed to create children topo nodes out "
+				    "of FRU hierarchical tree on enclosure "
+				    "(CSN %s).", cp->sec_csn);
+			}
+			/* destroy the phys tree. */
+			ses_phys_tree_free(mod, sproot);
+		}
+
+		end = gethrtime();
+		duration = end - start;
+		duration /= HR_SECOND;
+		topo_mod_dprintf(mod,
+		    "FRU boundary tree based enumeration: %.6f seconds",
+		    duration);
+	} else {
+		/*
+		 * Create the nodes for power supplies, fans, controllers and
+		 * devices.  Note that SAS exopander nodes and connector nodes
+		 * are handled through protocol specific processing of
+		 * controllers.
+		 */
+		if (ses_create_children(sdp, tn, SES_ET_POWER_SUPPLY,
+		    PSU, "PSU", cp, B_TRUE) != 0 ||
+		    ses_create_children(sdp, tn, SES_ET_COOLING,
+		    FAN, "FAN", cp, B_TRUE) != 0 ||
+		    ses_create_children(sdp, tn, SES_ET_ESC_ELECTRONICS,
+		    CONTROLLER, "CONTROLLER", cp, B_TRUE) != 0 ||
+		    ses_create_children(sdp, tn, SES_ET_DEVICE,
+		    BAY, "BAY", cp, B_TRUE) != 0 ||
+		    ses_create_children(sdp, tn, SES_ET_ARRAY_DEVICE,
+		    BAY, "BAY", cp, B_TRUE) != 0)
+			goto error;
+	}
 
 	if (cp->sec_maxinstance >= 0 &&
 	    (topo_node_range_create(mod, tn, SUBCHASSIS, 0,
@@ -2761,7 +3282,11 @@ ses_enum_gather(ses_node_t *np, void *data)
 		    &type) == 0);
 		if (type != SES_ET_DEVICE &&
 		    type != SES_ET_ARRAY_DEVICE &&
+		    type != SES_ET_SUNW_FANBOARD &&
+		    type != SES_ET_SUNW_FANMODULE &&
 		    type != SES_ET_COOLING &&
+		    type != SES_ET_SUNW_POWERBOARD &&
+		    type != SES_ET_SUNW_POWERMODULE &&
 		    type != SES_ET_POWER_SUPPLY &&
 		    type != SES_ET_ESC_ELECTRONICS &&
 		    type != SES_ET_SAS_EXPANDER &&

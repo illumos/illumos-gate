@@ -21,31 +21,32 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 echo "/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident\t\"@(#)mkelemtype.sh\t1.1\t07/01/19 SMI\"
 
 #include <sys/types.h>
 #include <string.h>
 #include <scsi/libses.h>
+#include <scsi/plugins/ses/vendor/sun.h>
 
 static const struct {
-\tses2_element_type_t se_type;\t/* element type */
+\tint se_type;\t/* element type */
 \tconst char *se_name;\t\t/* element type name */
 } _ses_elemtypestr[] = {"
 
 pattern='^	\(SES_ET_\([A-Z0-9_]*\)\).*'
 replace='	{ \1, "\2" },'
+pattern2=', "SUNW_'
+replace2=', "'
 
-( sed -n "s/$pattern/$replace/p" ) || exit 1
+( for file in $*
+  do 
+    cat $file | sed -n "s/$pattern/$replace/p" | sed "s/$pattern2/$replace2/"
+  done ) || exit 1
 
 echo "\
 };\n\

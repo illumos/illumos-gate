@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSES_H
 #define	_LIBSES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,6 +41,12 @@ extern "C" {
 #include <scsi/plugins/ses/framework/libses.h>
 
 #define	LIBSES_VERSION	1
+
+/*
+ * element type prop can be created by any plugin.  The ses2 plugin created
+ * SES-2 defined element types and SUN plugin defines vendor specific types.
+ */
+#define	SES_PROP_ELEMENT_TYPE	"ses-element-type"
 
 typedef enum ses_node_type {
 	SES_NODE_NONE = 0x0,

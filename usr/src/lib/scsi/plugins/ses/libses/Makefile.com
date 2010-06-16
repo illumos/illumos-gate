@@ -32,8 +32,9 @@ PLUGINTYPE =	framework
 include ../../Makefile.lib
 
 SES2HDR =	$(ROOTPLUGINHDRDIR)/ses/framework/ses2.h
+SUNPLUGINHDR =	$(ROOTPLUGINHDRDIR)/ses/vendor/sun.h
 
 CLEANFILES +=	../common/libses_elemtype.c
 
-../common/libses_elemtype.c: ../common/mkelemtype.sh $(SES2HDR)
-	sh ../common/mkelemtype.sh < $(SES2HDR) > $@
+../common/libses_elemtype.c: ../common/mkelemtype.sh $(SES2HDR) $(SUNPLUGINHDR)
+	sh ../common/mkelemtype.sh $(SES2HDR) $(SUNPLUGINHDR) > $@

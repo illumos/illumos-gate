@@ -33,7 +33,6 @@ extern "C" {
 /*
  * Node properties
  */
-#define	SES_PROP_ELEMENT_TYPE		"ses-element-type"
 typedef enum ses2_element_type {
 	SES_ET_UNSPECIFIED = 0,
 	SES_ET_DEVICE = 0x1,
