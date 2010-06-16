@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -356,9 +355,11 @@ mirror_geterror(mm_unit_t *un, int *smi, int *cip, int clr_error,
 			open_comp = (frm_probe) ?
 			    (shared->ms_flags & MDM_S_PROBEOPEN):
 			    (shared->ms_flags & MDM_S_ISOPEN);
-			if ((shared->ms_flags & MDM_S_IOERR || !open_comp) &&
+			if (((shared->ms_flags & MDM_S_IOERR || !open_comp) &&
 			    ((shared->ms_state == CS_OKAY) ||
-			    (shared->ms_state == CS_RESYNC))) {
+			    (shared->ms_state == CS_RESYNC))) ||
+			    (!open_comp &&
+			    (shared->ms_state == CS_LAST_ERRED))) {
 				if (clr_error) {
 					shared->ms_flags &= ~MDM_S_IOERR;
 				}
