@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -4109,6 +4108,25 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 	return (Z_OK);
 }
 
+static void
+report_prop_err(zlog_t *zlogp, const char *name, const char *value, int res)
+{
+	switch (res) {
+	case Z_TOO_BIG:
+		zerror(zlogp, B_FALSE, "%s property value is too large.", name);
+		break;
+
+	case Z_INVALID_PROPERTY:
+		zerror(zlogp, B_FALSE, "%s property value \"%s\" is not valid",
+		    name, value);
+		break;
+
+	default:
+		zerror(zlogp, B_TRUE, "fetching property %s: %d", name, res);
+		break;
+	}
+}
+
 /*
  * Sets the hostid of the new zone based on its configured value.  The zone's
  * zone_t structure must already exist in kernel memory.  'zlogp' refers to the
@@ -4119,12 +4137,62 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
  * This function returns zero on success and a nonzero error code on failure.
  */
 static int
-setup_zone_hostid(zlog_t *zlogp, char *zone_namep, zoneid_t zoneid)
+setup_zone_hostid(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
 {
 	int res;
-	zone_dochandle_t handle;
 	char hostidp[HW_HOSTID_LEN];
 	unsigned int hostid;
+
+	res = zonecfg_get_hostid(handle, hostidp, sizeof (hostidp));
+
+	if (res == Z_BAD_PROPERTY) {
+		return (Z_OK);
+	} else if (res != Z_OK) {
+		report_prop_err(zlogp, "hostid", hostidp, res);
+		return (res);
+	}
+
+	hostid = (unsigned int)strtoul(hostidp, NULL, 16);
+	if ((res = zone_setattr(zoneid, ZONE_ATTR_HOSTID, &hostid,
+	    sizeof (hostid))) != 0) {
+		zerror(zlogp, B_TRUE,
+		    "zone hostid is not valid: %s: %d", hostidp, res);
+		return (Z_SYSTEM);
+	}
+
+	return (res);
+}
+
+static int
+setup_zone_fs_allowed(zone_dochandle_t handle, zlog_t *zlogp, zoneid_t zoneid)
+{
+	char fsallowedp[ZONE_FS_ALLOWED_MAX];
+	int res;
+
+	res = zonecfg_get_fs_allowed(handle, fsallowedp, sizeof (fsallowedp));
+
+	if (res == Z_BAD_PROPERTY) {
+		return (Z_OK);
+	} else if (res != Z_OK) {
+		report_prop_err(zlogp, "fs-allowed", fsallowedp, res);
+		return (res);
+	}
+
+	if (zone_setattr(zoneid, ZONE_ATTR_FS_ALLOWED, &fsallowedp,
+	    sizeof (fsallowedp)) != 0) {
+		zerror(zlogp, B_TRUE,
+		    "fs-allowed couldn't be set: %s: %d", fsallowedp, res);
+		return (Z_SYSTEM);
+	}
+
+	return (res);
+}
+
+static int
+setup_zone_attrs(zlog_t *zlogp, char *zone_namep, zoneid_t zoneid)
+{
+	zone_dochandle_t handle;
+	int res = Z_OK;
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		zerror(zlogp, B_TRUE, "getting zone configuration handle");
@@ -4132,44 +4200,18 @@ setup_zone_hostid(zlog_t *zlogp, char *zone_namep, zoneid_t zoneid)
 	}
 	if ((res = zonecfg_get_snapshot_handle(zone_namep, handle)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (res);
+		goto out;
 	}
 
-	if ((res = zonecfg_get_hostid(handle, hostidp, sizeof (hostidp))) ==
-	    Z_OK) {
-		if (zonecfg_valid_hostid(hostidp) != Z_OK) {
-			zerror(zlogp, B_FALSE,
-			    "zone hostid is not valid: %s", hostidp);
-			zonecfg_fini_handle(handle);
-			return (Z_HOSTID_FUBAR);
-		}
-		hostid = (unsigned int)strtoul(hostidp, NULL, 16);
-		if (zone_setattr(zoneid, ZONE_ATTR_HOSTID, &hostid,
-		    sizeof (hostid)) != 0) {
-			zerror(zlogp, B_TRUE,
-			    "zone hostid is not valid: %s", hostidp);
-			zonecfg_fini_handle(handle);
-			return (Z_SYSTEM);
-		}
-	} else if (res != Z_BAD_PROPERTY) {
-		/*
-		 * Z_BAD_PROPERTY is an acceptable error value (from
-		 * zonecfg_get_hostid()) because it indicates that the zone
-		 * doesn't have a hostid.
-		 */
-		if (res == Z_TOO_BIG)
-			zerror(zlogp, B_FALSE, "hostid string in zone "
-			    "configuration is too large.");
-		else
-			zerror(zlogp, B_TRUE, "fetching zone hostid from "
-			    "configuration");
-		zonecfg_fini_handle(handle);
-		return (res);
-	}
+	if ((res = setup_zone_hostid(handle, zlogp, zoneid)) != Z_OK)
+		goto out;
 
+	if ((res = setup_zone_fs_allowed(handle, zlogp, zoneid)) != Z_OK)
+		goto out;
+
+out:
 	zonecfg_fini_handle(handle);
-	return (Z_OK);
+	return (res);
 }
 
 zoneid_t
@@ -4366,7 +4408,7 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		struct brand_attr attr;
 		char modname[MAXPATHLEN];
 
-		if (setup_zone_hostid(zlogp, zone_name, zoneid) != Z_OK)
+		if (setup_zone_attrs(zlogp, zone_name, zoneid) != Z_OK)
 			goto error;
 
 		if ((bh = brand_open(brand_name)) == NULL) {

@@ -132,6 +132,7 @@
 #define	DTD_ATTR_HOSTID		(const xmlChar *) "hostid"
 #define	DTD_ATTR_USER		(const xmlChar *) "user"
 #define	DTD_ATTR_AUTHS		(const xmlChar *) "auths"
+#define	DTD_ATTR_FS_ALLOWED	(const xmlChar *) "fs-allowed"
 
 #define	DTD_ENTITY_BOOLEAN	"boolean"
 #define	DTD_ENTITY_DEVPATH	"devpath"
@@ -2384,6 +2385,113 @@ zonecfg_modify_nwif(
 }
 
 /*
+ * Must be a comma-separated list of alpha-numeric file system names.
+ */
+static int
+zonecfg_valid_fs_allowed(const char *fsallowedp)
+{
+	char tmp[ZONE_FS_ALLOWED_MAX];
+	char *cp = tmp;
+	char *p;
+
+	if (strlen(fsallowedp) > ZONE_FS_ALLOWED_MAX)
+		return (Z_TOO_BIG);
+
+	(void) strlcpy(tmp, fsallowedp, sizeof (tmp));
+
+	while (*cp != '\0') {
+		p = cp;
+		while (*p != '\0' && *p != ',') {
+			if (!isalnum(*p))
+				return (Z_INVALID_PROPERTY);
+			p++;
+		}
+
+		if (*p == ',') {
+			if (p == cp)
+				return (Z_INVALID_PROPERTY);
+
+			p++;
+
+			if (*p == '\0')
+				return (Z_INVALID_PROPERTY);
+		}
+
+		cp = p;
+	}
+
+	return (Z_OK);
+}
+
+int
+zonecfg_get_fs_allowed(zone_dochandle_t handle, char *bufp, size_t buflen)
+{
+	int err;
+
+	if ((err = getrootattr(handle, DTD_ATTR_FS_ALLOWED,
+	    bufp, buflen)) != Z_OK)
+		return (err);
+	if (bufp[0] == '\0')
+		return (Z_BAD_PROPERTY);
+	return (zonecfg_valid_fs_allowed(bufp));
+}
+
+int
+zonecfg_set_fs_allowed(zone_dochandle_t handle, const char *bufp)
+{
+	int err;
+
+	if (bufp == NULL || (err = zonecfg_valid_fs_allowed(bufp)) == Z_OK)
+		return (setrootattr(handle, DTD_ATTR_FS_ALLOWED, bufp));
+	return (err);
+}
+
+/*
+ * Determines if the specified string is a valid hostid string.  This function
+ * returns Z_OK if the string is a valid hostid string.  It returns Z_INVAL if
+ * 'hostidp' is NULL, Z_TOO_BIG if 'hostidp' refers to a string buffer
+ * containing a hex string with more than 8 digits, and Z_INVALID_PROPERTY if
+ * the string has an invalid format.
+ */
+static int
+zonecfg_valid_hostid(const char *hostidp)
+{
+	char *currentp;
+	u_longlong_t hostidval;
+	size_t len;
+
+	if (hostidp == NULL)
+		return (Z_INVAL);
+
+	/* Empty strings and strings with whitespace are invalid. */
+	if (*hostidp == '\0')
+		return (Z_INVALID_PROPERTY);
+	for (currentp = (char *)hostidp; *currentp != '\0'; ++currentp) {
+		if (isspace(*currentp))
+			return (Z_INVALID_PROPERTY);
+	}
+	len = (size_t)(currentp - hostidp);
+
+	/*
+	 * The caller might pass a hostid that is larger than the maximum
+	 * unsigned 32-bit integral value.  Check for this!  Also, make sure
+	 * that the whole string is converted (this helps us find illegal
+	 * characters) and that the whole string fits within a buffer of size
+	 * HW_HOSTID_LEN.
+	 */
+	currentp = (char *)hostidp;
+	if (strncmp(hostidp, "0x", 2) == 0 || strncmp(hostidp, "0X", 2) == 0)
+		currentp += 2;
+	hostidval = strtoull(currentp, &currentp, 16);
+	if ((size_t)(currentp - hostidp) >= HW_HOSTID_LEN)
+		return (Z_TOO_BIG);
+	if (hostidval > UINT_MAX || hostidval == HW_INVALID_HOSTID ||
+	    currentp != hostidp + len)
+		return (Z_INVALID_PROPERTY);
+	return (Z_OK);
+}
+
+/*
  * Gets the zone hostid string stored in the specified zone configuration
  * document.  This function returns Z_OK on success.  Z_BAD_PROPERTY is returned
  * if the config file doesn't specify a hostid or if the hostid is blank.
@@ -2399,7 +2507,7 @@ zonecfg_get_hostid(zone_dochandle_t handle, char *bufp, size_t buflen)
 		return (err);
 	if (bufp[0] == '\0')
 		return (Z_BAD_PROPERTY);
-	return (Z_OK);
+	return (zonecfg_valid_hostid(bufp));
 }
 
 /*
@@ -2420,51 +2528,6 @@ zonecfg_set_hostid(zone_dochandle_t handle, const char *hostidp)
 	if (hostidp == NULL || (err = zonecfg_valid_hostid(hostidp)) == Z_OK)
 		return (setrootattr(handle, DTD_ATTR_HOSTID, hostidp));
 	return (err);
-}
-
-/*
- * Determines if the specified string is a valid hostid string.  This function
- * returns Z_OK if the string is a valid hostid string.  It returns Z_INVAL if
- * 'hostidp' is NULL, Z_TOO_BIG if 'hostidp' refers to a string buffer
- * containing a hex string with more than 8 digits, and Z_HOSTID_FUBAR if the
- * string has an invalid format.
- */
-int
-zonecfg_valid_hostid(const char *hostidp)
-{
-	char *currentp;
-	u_longlong_t hostidval;
-	size_t len;
-
-	if (hostidp == NULL)
-		return (Z_INVAL);
-
-	/* Empty strings and strings with whitespace are invalid. */
-	if (*hostidp == '\0')
-		return (Z_HOSTID_FUBAR);
-	for (currentp = (char *)hostidp; *currentp != '\0'; ++currentp) {
-		if (isspace(*currentp))
-			return (Z_HOSTID_FUBAR);
-	}
-	len = (size_t)(currentp - hostidp);
-
-	/*
-	 * The caller might pass a hostid that is larger than the maximum
-	 * unsigned 32-bit integral value.  Check for this!  Also, make sure
-	 * that the whole string is converted (this helps us find illegal
-	 * characters) and that the whole string fits within a buffer of size
-	 * HW_HOSTID_LEN.
-	 */
-	currentp = (char *)hostidp;
-	if (strncmp(hostidp, "0x", 2) == 0 || strncmp(hostidp, "0X", 2) == 0)
-		currentp += 2;
-	hostidval = strtoull(currentp, &currentp, 16);
-	if ((size_t)(currentp - hostidp) >= HW_HOSTID_LEN)
-		return (Z_TOO_BIG);
-	if (hostidval > UINT_MAX || hostidval == HW_INVALID_HOSTID ||
-	    currentp != hostidp + len)
-		return (Z_HOSTID_FUBAR);
-	return (Z_OK);
 }
 
 int
@@ -3651,8 +3714,8 @@ zonecfg_strerror(int errnum)
 		    "Could not create a temporary pool"));
 	case Z_POOL_BIND:
 		return (dgettext(TEXT_DOMAIN, "Could not bind zone to pool"));
-	case Z_HOSTID_FUBAR:
-		return (dgettext(TEXT_DOMAIN, "Specified hostid is invalid"));
+	case Z_INVALID_PROPERTY:
+		return (dgettext(TEXT_DOMAIN, "Specified property is invalid"));
 	case Z_SYSTEM:
 		return (strerror(errno));
 	default:

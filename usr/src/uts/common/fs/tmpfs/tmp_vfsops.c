@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -77,7 +76,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"tmpfs",
 	tmpfsinit,
-	VSW_HASPROTO|VSW_STATS,
+	VSW_HASPROTO|VSW_STATS|VSW_ZMOUNT,
 	&tmpfs_proto_opttbl
 };
 

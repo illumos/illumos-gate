@@ -159,6 +159,8 @@
  *	 related to the zone.max-lwps rctl.
  *   zone_mem_lock: This is a per-zone lock used to protect the fields
  *	 related to the zone.max-locked-memory and zone.max-swap rctls.
+ *   zone_rctl_lock: This is a per-zone lock used to protect other rctls,
+ *       currently just max_lofi
  *   zsd_key_lock: This is a global lock protecting the key state for ZSD.
  *   zone_deathrow_lock: This is a global lock protecting the "deathrow"
  *       list (a list of zones in the ZONE_IS_DEAD state).
@@ -340,6 +342,7 @@ const char  *zone_status_table[] = {
 rctl_hndl_t rc_zone_cpu_shares;
 rctl_hndl_t rc_zone_locked_mem;
 rctl_hndl_t rc_zone_max_swap;
+rctl_hndl_t rc_zone_max_lofi;
 rctl_hndl_t rc_zone_cpu_cap;
 rctl_hndl_t rc_zone_nlwps;
 rctl_hndl_t rc_zone_shmmax;
@@ -1584,6 +1587,57 @@ static rctl_ops_t zone_max_swap_ops = {
 	zone_max_swap_test
 };
 
+/*ARGSUSED*/
+static rctl_qty_t
+zone_max_lofi_usage(rctl_t *rctl, struct proc *p)
+{
+	rctl_qty_t q;
+	zone_t *z = p->p_zone;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	mutex_enter(&z->zone_rctl_lock);
+	q = z->zone_max_lofi;
+	mutex_exit(&z->zone_rctl_lock);
+	return (q);
+}
+
+/*ARGSUSED*/
+static int
+zone_max_lofi_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e,
+    rctl_val_t *rcntl, rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t q;
+	zone_t *z;
+
+	z = e->rcep_p.zone;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(MUTEX_HELD(&z->zone_rctl_lock));
+	q = z->zone_max_lofi;
+	if (q + incr > rcntl->rcv_value)
+		return (1);
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+zone_max_lofi_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	if (e->rcep_p.zone == NULL)
+		return (0);
+	e->rcep_p.zone->zone_max_lofi_ctl = nv;
+	return (0);
+}
+
+static rctl_ops_t zone_max_lofi_ops = {
+	rcop_no_action,
+	zone_max_lofi_usage,
+	zone_max_lofi_set,
+	zone_max_lofi_test
+};
+
 /*
  * Helper function to brand the zone with a unique ID.
  */
@@ -1732,6 +1786,8 @@ zone_zsd_init(void)
 	zone0.zone_locked_mem_ctl = UINT64_MAX;
 	ASSERT(zone0.zone_max_swap == 0);
 	zone0.zone_max_swap_ctl = UINT64_MAX;
+	zone0.zone_max_lofi = 0;
+	zone0.zone_max_lofi_ctl = UINT64_MAX;
 	zone0.zone_shmmax = 0;
 	zone0.zone_ipc.ipcq_shmmni = 0;
 	zone0.zone_ipc.ipcq_semmni = 0;
@@ -1740,6 +1796,7 @@ zone_zsd_init(void)
 	zone0.zone_nodename = utsname.nodename;
 	zone0.zone_domain = srpc_domain;
 	zone0.zone_hostid = HW_INVALID_HOSTID;
+	zone0.zone_fs_allowed = NULL;
 	zone0.zone_ref = 1;
 	zone0.zone_id = GLOBAL_ZONEID;
 	zone0.zone_status = ZONE_IS_RUNNING;
@@ -1902,6 +1959,11 @@ zone_init(void)
 	    RCTL_GLOBAL_DENY_ALWAYS, UINT64_MAX, UINT64_MAX,
 	    &zone_max_swap_ops);
 
+	rc_zone_max_lofi = rctl_register("zone.max-lofi",
+	    RCENTITY_ZONE, RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT |
+	    RCTL_GLOBAL_DENY_ALWAYS, UINT64_MAX, UINT64_MAX,
+	    &zone_max_lofi_ops);
+
 	/*
 	 * Initialize the ``global zone''.
 	 */
@@ -2040,9 +2102,11 @@ zone_free(zone_t *zone)
 	if (zone->zone_rctls != NULL)
 		rctl_set_free(zone->zone_rctls);
 	if (zone->zone_bootargs != NULL)
-		kmem_free(zone->zone_bootargs, strlen(zone->zone_bootargs) + 1);
+		strfree(zone->zone_bootargs);
 	if (zone->zone_initname != NULL)
-		kmem_free(zone->zone_initname, strlen(zone->zone_initname) + 1);
+		strfree(zone->zone_initname);
+	if (zone->zone_fs_allowed != NULL)
+		strfree(zone->zone_fs_allowed);
 	if (zone->zone_pfexecd != NULL)
 		klpd_freelist(&zone->zone_pfexecd);
 	id_free(zoneid_space, zone->zone_id);
@@ -2104,21 +2168,20 @@ zone_status_get(zone_t *zone)
 static int
 zone_set_bootargs(zone_t *zone, const char *zone_bootargs)
 {
-	char *bootargs = kmem_zalloc(BOOTARGS_MAX, KM_SLEEP);
+	char *buf = kmem_zalloc(BOOTARGS_MAX, KM_SLEEP);
 	int err = 0;
 
 	ASSERT(zone != global_zone);
-	if ((err = copyinstr(zone_bootargs, bootargs, BOOTARGS_MAX, NULL)) != 0)
+	if ((err = copyinstr(zone_bootargs, buf, BOOTARGS_MAX, NULL)) != 0)
 		goto done;	/* EFAULT or ENAMETOOLONG */
 
 	if (zone->zone_bootargs != NULL)
-		kmem_free(zone->zone_bootargs, strlen(zone->zone_bootargs) + 1);
+		strfree(zone->zone_bootargs);
 
-	zone->zone_bootargs = kmem_alloc(strlen(bootargs) + 1, KM_SLEEP);
-	(void) strcpy(zone->zone_bootargs, bootargs);
+	zone->zone_bootargs = strdup(buf);
 
 done:
-	kmem_free(bootargs, BOOTARGS_MAX);
+	kmem_free(buf, BOOTARGS_MAX);
 	return (err);
 }
 
@@ -2164,6 +2227,27 @@ zone_set_brand(zone_t *zone, const char *brand)
 }
 
 static int
+zone_set_fs_allowed(zone_t *zone, const char *zone_fs_allowed)
+{
+	char *buf = kmem_zalloc(ZONE_FS_ALLOWED_MAX, KM_SLEEP);
+	int err = 0;
+
+	ASSERT(zone != global_zone);
+	if ((err = copyinstr(zone_fs_allowed, buf,
+	    ZONE_FS_ALLOWED_MAX, NULL)) != 0)
+		goto done;
+
+	if (zone->zone_fs_allowed != NULL)
+		strfree(zone->zone_fs_allowed);
+
+	zone->zone_fs_allowed = strdup(buf);
+
+done:
+	kmem_free(buf, ZONE_FS_ALLOWED_MAX);
+	return (err);
+}
+
+static int
 zone_set_initname(zone_t *zone, const char *zone_initname)
 {
 	char initname[INITNAME_SZ];
@@ -2175,7 +2259,7 @@ zone_set_initname(zone_t *zone, const char *zone_initname)
 		return (err);	/* EFAULT or ENAMETOOLONG */
 
 	if (zone->zone_initname != NULL)
-		kmem_free(zone->zone_initname, strlen(zone->zone_initname) + 1);
+		strfree(zone->zone_initname);
 
 	zone->zone_initname = kmem_alloc(strlen(initname) + 1, KM_SLEEP);
 	(void) strcpy(zone->zone_initname, initname);
@@ -3856,6 +3940,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_ipc.ipcq_semmni = 0;
 	zone->zone_ipc.ipcq_msgmni = 0;
 	zone->zone_bootargs = NULL;
+	zone->zone_fs_allowed = NULL;
 	zone->zone_initname =
 	    kmem_alloc(strlen(zone_default_initname) + 1, KM_SLEEP);
 	(void) strcpy(zone->zone_initname, zone_default_initname);
@@ -3865,6 +3950,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_locked_mem_ctl = UINT64_MAX;
 	zone->zone_max_swap = 0;
 	zone->zone_max_swap_ctl = UINT64_MAX;
+	zone->zone_max_lofi = 0;
+	zone->zone_max_lofi_ctl = UINT64_MAX;
 	zone0.zone_lockedmem_kstat = NULL;
 	zone0.zone_swapresv_kstat = NULL;
 
@@ -4790,6 +4877,20 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 			error = EINVAL;
 		}
 		break;
+	case ZONE_ATTR_FS_ALLOWED:
+		if (zone->zone_fs_allowed == NULL)
+			outstr = "";
+		else
+			outstr = zone->zone_fs_allowed;
+		size = strlen(outstr) + 1;
+		if (bufsize > size)
+			bufsize = size;
+		if (buf != NULL) {
+			err = copyoutstr(outstr, buf, bufsize, NULL);
+			if (err != 0 && err != ENAMETOOLONG)
+				error = EFAULT;
+		}
+		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {
 			size = bufsize;
@@ -4852,6 +4953,9 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		break;
 	case ZONE_ATTR_BRAND:
 		err = zone_set_brand(zone, (const char *)buf);
+		break;
+	case ZONE_ATTR_FS_ALLOWED:
+		err = zone_set_fs_allowed(zone, (const char *)buf);
 		break;
 	case ZONE_ATTR_PHYS_MCAP:
 		err = zone_set_phys_mcap(zone, (const uint64_t *)buf);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_RCTL_H
@@ -336,6 +335,9 @@ void rctl_decr_locked_mem(struct proc *, struct kproject *, rctl_qty_t,
     int);
 int rctl_incr_swap(struct proc *, struct zone *, size_t);
 void rctl_decr_swap(struct zone *, size_t);
+
+int rctl_incr_lofi(struct proc *, struct zone *, size_t);
+void rctl_decr_lofi(struct zone *, size_t);
 
 struct kstat *rctl_kstat_create_zone(struct zone *, char *, uchar_t, uint_t,
     uchar_t);

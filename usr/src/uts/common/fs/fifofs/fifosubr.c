@@ -21,11 +21,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The routines defined in this file are supporting routines for FIFOFS
@@ -80,7 +77,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"fifofs",
 	fifoinit,
-	0,
+	VSW_ZMOUNT,
 	NULL
 };
 

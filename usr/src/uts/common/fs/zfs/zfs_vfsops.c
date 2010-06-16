@@ -2277,7 +2277,7 @@ static vfsdef_t vfw = {
 	MNTTYPE_ZFS,
 	zfs_vfsinit,
 	VSW_HASPROTO|VSW_CANRWRO|VSW_CANREMOUNT|VSW_VOLATILEDEV|VSW_STATS|
-	    VSW_XID,
+	    VSW_XID|VSW_ZMOUNT,
 	&zfs_mntopts
 };
 

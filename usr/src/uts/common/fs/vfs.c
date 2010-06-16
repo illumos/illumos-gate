@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1014,8 +1013,7 @@ lofi_add(const char *fsname, struct vfs *vfsp,
 	int minor;
 	int err = 0;
 
-	if (fsname == NULL ||
-	    (vfssw = vfs_getvfssw(fsname)) == NULL)
+	if ((vfssw = vfs_getvfssw(fsname)) == NULL)
 		return (0);
 
 	if (!(vfssw->vsw_flag & VSW_CANLOFI)) {
@@ -1049,29 +1047,16 @@ lofi_add(const char *fsname, struct vfs *vfsp,
 	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
 	(void) strlcpy(li->li_filename, pn.pn_path, MAXPATHLEN);
 
-	/*
-	 * The lofi control node is currently exclusive-open.  We'd like
-	 * to improve this, but in the meantime, we'll loop waiting for
-	 * access.
-	 */
-	for (;;) {
-		err = ldi_open_by_name("/dev/lofictl", FREAD | FWRITE | FEXCL,
-		    kcred, &ldi_hdl, ldi_id);
-
-		if (err != EBUSY)
-			break;
-
-		if ((err = delay_sig(hz / 8)) == EINTR)
-			break;
-	}
+	err = ldi_open_by_name("/dev/lofictl", FREAD | FWRITE, kcred,
+	    &ldi_hdl, ldi_id);
 
 	if (err)
 		goto out2;
 
 	err = ldi_ioctl(ldi_hdl, LOFI_MAP_FILE, (intptr_t)li,
-	    FREAD | FWRITE | FEXCL | FKIOCTL, kcred, &minor);
+	    FREAD | FWRITE | FKIOCTL, kcred, &minor);
 
-	(void) ldi_close(ldi_hdl, FREAD | FWRITE | FEXCL, kcred);
+	(void) ldi_close(ldi_hdl, FREAD | FWRITE, kcred);
 
 	if (!err)
 		vfsp->vfs_lofi_minor = minor;
@@ -1104,18 +1089,16 @@ lofi_remove(struct vfs *vfsp)
 	li->li_minor = vfsp->vfs_lofi_minor;
 	li->li_cleanup = B_TRUE;
 
-	do {
-		err = ldi_open_by_name("/dev/lofictl", FREAD | FWRITE | FEXCL,
-		    kcred, &ldi_hdl, ldi_id);
-	} while (err == EBUSY);
+	err = ldi_open_by_name("/dev/lofictl", FREAD | FWRITE, kcred,
+	    &ldi_hdl, ldi_id);
 
 	if (err)
 		goto out;
 
 	err = ldi_ioctl(ldi_hdl, LOFI_UNMAP_FILE_MINOR, (intptr_t)li,
-	    FREAD | FWRITE | FEXCL | FKIOCTL, kcred, NULL);
+	    FREAD | FWRITE | FKIOCTL, kcred, NULL);
 
-	(void) ldi_close(ldi_hdl, FREAD | FWRITE | FEXCL, kcred);
+	(void) ldi_close(ldi_hdl, FREAD | FWRITE, kcred);
 
 	if (!err)
 		vfsp->vfs_lofi_minor = 0;
@@ -1251,9 +1234,16 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	} else {
 		if ((vswp = vfs_getvfsswbyvfsops(vfs_getops(rootvfs))) == NULL)
 			return (EINVAL);
+		fsname = vswp->vsw_name;
 	}
 	if (!VFS_INSTALLED(vswp))
 		return (EINVAL);
+
+	if ((error = secpolicy_fs_allowed_mount(fsname)) != 0)  {
+		vfs_unrefvfssw(vswp);
+		return (error);
+	}
+
 	vfsops = &vswp->vsw_vfsops;
 
 	vfs_copyopttbl(&vswp->vsw_optproto, &mnt_mntopts);
@@ -4782,7 +4772,7 @@ vfs_propagate_features(vfs_t *from, vfs_t *to)
 	}
 }
 
-#define	LOFICTL_PATH "/devices/pseudo/lofi@0:%d"
+#define	LOFINODE_PATH "/dev/lofi/%d"
 
 /*
  * Return the vnode for the lofi node if there's a lofi mount in place.
@@ -4801,11 +4791,23 @@ vfs_get_lofi(vfs_t *vfsp, vnode_t **vpp)
 		return (-1);
 	}
 
-	strsize = snprintf(NULL, 0, LOFICTL_PATH, vfsp->vfs_lofi_minor);
+	strsize = snprintf(NULL, 0, LOFINODE_PATH, vfsp->vfs_lofi_minor);
 	path = kmem_alloc(strsize + 1, KM_SLEEP);
-	(void) snprintf(path, strsize + 1, LOFICTL_PATH, vfsp->vfs_lofi_minor);
+	(void) snprintf(path, strsize + 1, LOFINODE_PATH, vfsp->vfs_lofi_minor);
 
-	err = lookupname(path, UIO_SYSSPACE, FOLLOW, NULLVPP, vpp);
+	/*
+	 * We may be inside a zone, so we need to use the /dev path, but
+	 * it's created asynchronously, so we wait here.
+	 */
+	for (;;) {
+		err = lookupname(path, UIO_SYSSPACE, FOLLOW, NULLVPP, vpp);
+
+		if (err != ENOENT)
+			break;
+
+		if ((err = delay_sig(hz / 8)) == EINTR)
+			break;
+	}
 
 	if (err)
 		*vpp = NULL;

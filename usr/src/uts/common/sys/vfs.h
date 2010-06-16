@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -439,6 +438,7 @@ enum {
 #define	VSW_STATS	0x20	/* file system can collect stats */
 #define	VSW_XID		0x40	/* file system supports extended ids */
 #define	VSW_CANLOFI	0x80	/* file system supports lofi mounts */
+#define	VSW_ZMOUNT	0x100	/* file system always allowed in a zone */
 
 #define	VSW_INSTALLED	0x8000	/* this vsw is associated with a file system */
 

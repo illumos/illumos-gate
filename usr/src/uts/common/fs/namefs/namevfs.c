@@ -730,7 +730,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"namefs",
 	nameinit,
-	VSW_HASPROTO,
+	VSW_HASPROTO | VSW_ZMOUNT,
 	&nm_mntopts
 };
 

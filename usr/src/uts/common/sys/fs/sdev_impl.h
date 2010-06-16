@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SDEV_IMPL_H
@@ -230,6 +229,7 @@ typedef enum {
 #define	SDEV_ATTR_INVALID	0x0080	/* invalid node attributes, */
 					/* need update */
 #define	SDEV_SUBDIR		0x0100	/* match all subdirs under here */
+#define	SDEV_ZONED		0x0200  /* zoned subdir */
 
 /* sdev_lookup_flags */
 #define	SDEV_LOOKUP	0x0001	/* node creation in progress */

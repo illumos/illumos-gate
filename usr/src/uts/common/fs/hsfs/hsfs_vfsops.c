@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VFS operations for High Sierra filesystem
@@ -151,7 +148,7 @@ static vfsdef_t vfw = {
 	"hsfs",
 	hsfsinit,
 	/* We don't suppport remounting */
-	VSW_HASPROTO|VSW_STATS|VSW_CANLOFI,
+	VSW_HASPROTO|VSW_STATS|VSW_CANLOFI|VSW_ZMOUNT,
 	&hsfs_proto_opttbl
 };
 

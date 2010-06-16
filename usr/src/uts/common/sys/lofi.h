@@ -34,6 +34,7 @@
 #include <sys/vnode.h>
 #include <sys/list.h>
 #include <sys/crypto/api.h>
+#include <sys/zone.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -176,15 +177,6 @@ struct lofi_comp_cache {
 	uint64_t	lc_index;		/* segment index */
 };
 
-/*
- * We limit the maximum number of active lofi devices to 128, which seems very
- * large. You can tune this by changing lofi_max_files in /etc/system.
- * If you change it dynamically, which you probably shouldn't do, make sure
- * to only _increase_ it.
- */
-#define	LOFI_MAX_FILES	128
-extern uint32_t lofi_max_files;
-
 #define	V_ISLOFIABLE(vtype) \
 	((vtype == VREG) || (vtype == VBLK) || (vtype == VCHR))
 
@@ -219,9 +211,8 @@ struct crypto_meta {
 };
 
 struct lofi_state {
-	char		*ls_filename;	/* filename to open */
-	size_t		ls_filename_sz;
-	struct vnode	*ls_vp;		/* open vnode */
+	vnode_t		*ls_vp;		/* open real vnode */
+	vnode_t		*ls_stacked_vp;	/* open vnode */
 	kmutex_t	ls_vp_lock;	/* protects ls_vp */
 	kcondvar_t	ls_vp_cv;	/* signal changes to ls_vp */
 	uint32_t	ls_vp_iocount;	/* # pending I/O requests */
@@ -238,6 +229,9 @@ struct lofi_state {
 	struct dk_geom	ls_dkg;
 	struct vtoc	ls_vtoc;
 	struct dk_cinfo	ls_ci;
+	zone_t 		*ls_zone;
+	list_node_t	ls_list;	/* all lofis */
+	dev_t		ls_dev;		/* this node's dev_t */
 
 	/* the following fields are required for compression support */
 	int		ls_comp_algorithm_index; /* idx into compress_table */

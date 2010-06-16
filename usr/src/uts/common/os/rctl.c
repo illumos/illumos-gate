@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -3055,6 +3054,64 @@ rctl_decr_swap(zone_t *zone, size_t swap)
 	ASSERT(zone->zone_max_swap >= swap);
 	zone->zone_max_swap -= swap;
 	mutex_exit(&zone->zone_mem_lock);
+}
+
+/*
+ * rctl_incr_lofi(proc_t *, zone_t *, size_t)
+ *
+ * Overview
+ *   Increments the number of lofi devices for the zone.
+ *
+ * Return values
+ *   0 on success.  EAGAIN if increment fails due an rctl value
+ *   on the zone.
+ *
+ * Callers context
+ *   p_lock held on specified proc.
+ */
+int
+rctl_incr_lofi(proc_t *proc, zone_t *zone, size_t incr)
+{
+	rctl_entity_p_t e;
+
+	ASSERT(MUTEX_HELD(&proc->p_lock));
+	ASSERT(incr > 0);
+
+	e.rcep_p.zone = zone;
+	e.rcep_t = RCENTITY_ZONE;
+
+	mutex_enter(&zone->zone_rctl_lock);
+
+	/* Check for overflow */
+	if ((zone->zone_max_lofi + incr) < zone->zone_max_lofi) {
+		mutex_exit(&zone->zone_rctl_lock);
+		return (EAGAIN);
+	}
+	if ((zone->zone_max_lofi + incr) > zone->zone_max_lofi_ctl) {
+		if (rctl_test_entity(rc_zone_max_lofi, zone->zone_rctls,
+		    proc, &e, incr, 0) & RCT_DENY) {
+			mutex_exit(&zone->zone_rctl_lock);
+			return (EAGAIN);
+		}
+	}
+	zone->zone_max_lofi += incr;
+	mutex_exit(&zone->zone_rctl_lock);
+	return (0);
+}
+
+/*
+ * rctl_decr_lofi(zone_t *, size_t)
+ *
+ * Overview
+ *   Decrements the number of lofi devices for the zone.
+ */
+void
+rctl_decr_lofi(zone_t *zone, size_t decr)
+{
+	mutex_enter(&zone->zone_rctl_lock);
+	ASSERT(zone->zone_max_lofi >= decr);
+	zone->zone_max_lofi -= decr;
+	mutex_exit(&zone->zone_rctl_lock);
 }
 
 /*

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_ID_SPACE_H
@@ -46,6 +45,7 @@ id_t id_alloc(id_space_t *);
 id_t id_alloc_nosleep(id_space_t *);
 id_t id_allocff(id_space_t *);
 id_t id_allocff_nosleep(id_space_t *);
+id_t id_alloc_specific_nosleep(id_space_t *, id_t);
 void id_free(id_space_t *, id_t);
 
 #endif /* _KERNEL */

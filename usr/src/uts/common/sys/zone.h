@@ -96,9 +96,12 @@ extern "C" {
 #define	ZONE_ATTR_SCHED_CLASS	13
 #define	ZONE_ATTR_FLAGS		14
 #define	ZONE_ATTR_HOSTID	15
+#define	ZONE_ATTR_FS_ALLOWED	16
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
+
+#define	ZONE_FS_ALLOWED_MAX	1024
 
 #define	ZONE_EVENT_CHANNEL	"com.sun:zones:status"
 #define	ZONE_EVENT_STATUS_CLASS	"status"
@@ -379,6 +382,11 @@ typedef struct zone {
 	rctl_qty_t	zone_max_swap_ctl;	/* current swap limit. */
 						/* Protected by */
 						/* zone_rctls->rcs_lock */
+	kmutex_t	zone_rctl_lock;	/* protects zone_max_lofi */
+	rctl_qty_t	zone_max_lofi; /* lofi devs for zone */
+	rctl_qty_t	zone_max_lofi_ctl;	/* current lofi limit. */
+						/* Protected by */
+						/* zone_rctls->rcs_lock */
 	list_t		zone_zsd;	/* list of Zone-Specific Data values */
 	kcondvar_t	zone_cv;	/* used to signal state changes */
 	struct proc	*zone_zsched;	/* Dummy kernel "zsched" process */
@@ -443,6 +451,8 @@ typedef struct zone {
 	krwlock_t	zone_mntfs_db_lock;
 
 	struct klpd_reg		*zone_pfexecd;
+
+	char		*zone_fs_allowed;
 } zone_t;
 
 /*
@@ -664,6 +674,7 @@ extern int zone_walk(int (*)(zone_t *, void *), void *);
 
 extern rctl_hndl_t rc_zone_locked_mem;
 extern rctl_hndl_t rc_zone_max_swap;
+extern rctl_hndl_t rc_zone_max_lofi;
 
 #endif	/* _KERNEL */
 

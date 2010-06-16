@@ -183,6 +183,7 @@ char *res_types[] = {
 	"capped-cpu",
 	"hostid",
 	"admin",
+	"fs-allowed",
 	NULL
 };
 
@@ -227,6 +228,7 @@ char *prop_types[] = {
 	"hostid",
 	"user",
 	"auths",
+	"fs-allowed",
 	NULL
 };
 
@@ -342,6 +344,7 @@ static const char *set_cmds[] = {
 	"set " ALIAS_MAXSEMIDS "=",
 	"set " ALIAS_SHARES "=",
 	"set hostid=",
+	"set fs-allowed=",
 	NULL
 };
 
@@ -373,6 +376,7 @@ static const char *info_cmds[] = {
 	"info cpu-shares",
 	"info hostid",
 	"info admin",
+	"info fs-allowed",
 	NULL
 };
 
@@ -1219,6 +1223,8 @@ usage(boolean_t verbose, uint_t flags)
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_HOSTID));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_FS_ALLOWED));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_MAXLWPS));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_MAXSHMMEM));
@@ -1706,6 +1712,7 @@ export_func(cmd_t *cmd)
 	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
 	char hostidp[HW_HOSTID_LEN];
+	char fsallowedp[ZONE_FS_ALLOWED_MAX];
 	char *limitpriv;
 	FILE *of;
 	boolean_t autoboot;
@@ -1812,6 +1819,12 @@ export_func(cmd_t *cmd)
 	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) == Z_OK) {
 		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
 		    pt_to_str(PT_HOSTID), hostidp);
+	}
+
+	if (zonecfg_get_fs_allowed(handle, fsallowedp,
+	    sizeof (fsallowedp)) == Z_OK) {
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_FS_ALLOWED), fsallowedp);
 	}
 
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
@@ -2383,7 +2396,7 @@ gz_invalid_rt_property(int type)
 	return (global_zone && (type == RT_ZONENAME || type == RT_ZONEPATH ||
 	    type == RT_AUTOBOOT || type == RT_LIMITPRIV ||
 	    type == RT_BOOTARGS || type == RT_BRAND || type == RT_SCHED ||
-	    type == RT_IPTYPE || type == RT_HOSTID));
+	    type == RT_IPTYPE || type == RT_HOSTID || type == RT_FS_ALLOWED));
 }
 
 static boolean_t
@@ -2392,7 +2405,7 @@ gz_invalid_property(int type)
 	return (global_zone && (type == PT_ZONENAME || type == PT_ZONEPATH ||
 	    type == PT_AUTOBOOT || type == PT_LIMITPRIV ||
 	    type == PT_BOOTARGS || type == PT_BRAND || type == PT_SCHED ||
-	    type == PT_IPTYPE || type == PT_HOSTID));
+	    type == PT_IPTYPE || type == PT_HOSTID || type == PT_FS_ALLOWED));
 }
 
 void
@@ -3679,6 +3692,12 @@ clear_global(cmd_t *cmd)
 		else
 			need_to_commit = B_TRUE;
 		return;
+	case PT_FS_ALLOWED:
+		if ((err = zonecfg_set_fs_allowed(handle, NULL)) != Z_OK)
+			z_cmd_rt_perror(CMD_CLEAR, RT_FS_ALLOWED, err, B_TRUE);
+		else
+			need_to_commit = B_TRUE;
+		return;
 	default:
 		zone_perror(pt_to_str(type), Z_NO_PROPERTY_TYPE, B_TRUE);
 		long_usage(CMD_CLEAR, B_TRUE);
@@ -4146,6 +4165,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_SHARES;
 		} else if (prop_type == PT_HOSTID) {
 			res_type = RT_HOSTID;
+		} else if (prop_type == PT_FS_ALLOWED) {
+			res_type = RT_FS_ALLOWED;
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
@@ -4360,6 +4381,12 @@ set_func(cmd_t *cmd)
 			return;
 		}
 		need_to_commit = B_TRUE;
+		return;
+	case RT_FS_ALLOWED:
+		if ((err = zonecfg_set_fs_allowed(handle, prop_id)) != Z_OK)
+			zone_perror(zone, err, B_TRUE);
+		else
+			need_to_commit = B_TRUE;
 		return;
 	case RT_FS:
 		switch (prop_type) {
@@ -4896,15 +4923,33 @@ static void
 info_hostid(zone_dochandle_t handle, FILE *fp)
 {
 	char hostidp[HW_HOSTID_LEN];
+	int err;
 
-	/*
-	 * This will display "hostid: " if there isn't a hostid or an
-	 * error occurs while retrieving the hostid from the configuration
-	 * file.
-	 */
-	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) != Z_OK)
-		hostidp[0] = '\0';
-	(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_HOSTID), hostidp);
+	if ((err = zonecfg_get_hostid(handle, hostidp,
+	    sizeof (hostidp))) == Z_OK) {
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_HOSTID), hostidp);
+	} else if (err == Z_BAD_PROPERTY) {
+		(void) fprintf(fp, "%s: \n", pt_to_str(PT_HOSTID));
+	} else {
+		zone_perror(zone, err, B_TRUE);
+	}
+}
+
+static void
+info_fs_allowed(zone_dochandle_t handle, FILE *fp)
+{
+	char fsallowedp[ZONE_FS_ALLOWED_MAX];
+	int err;
+
+	if ((err = zonecfg_get_fs_allowed(handle, fsallowedp,
+	    sizeof (fsallowedp))) == Z_OK) {
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_FS_ALLOWED),
+		    fsallowedp);
+	} else if (err == Z_BAD_PROPERTY) {
+		(void) fprintf(fp, "%s: \n", pt_to_str(PT_FS_ALLOWED));
+	} else {
+		zone_perror(zone, err, B_TRUE);
+	}
 }
 
 static void
@@ -5508,6 +5553,7 @@ info_func(cmd_t *cmd)
 			info_sched(handle, fp);
 			info_iptype(handle, fp);
 			info_hostid(handle, fp);
+			info_fs_allowed(handle, fp);
 		}
 		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXSHMMEM);
@@ -5611,6 +5657,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_ADMIN:
 		info_auth(handle, fp, cmd);
+		break;
+	case RT_FS_ALLOWED:
+		info_fs_allowed(handle, fp);
 		break;
 	default:
 		zone_perror(rt_to_str(cmd->cmd_res_type), Z_NO_RESOURCE_TYPE,
@@ -5751,6 +5800,7 @@ verify_func(cmd_t *cmd)
 	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
 	char hostidp[HW_HOSTID_LEN];
+	char fsallowedp[ZONE_FS_ALLOWED_MAX];
 	int err, ret_val = Z_OK, arg;
 	int pset_res;
 	boolean_t save = B_FALSE;
@@ -5825,9 +5875,17 @@ verify_func(cmd_t *cmd)
 	}
 	(void) zonecfg_endipdent(handle);
 
-	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) == Z_OK &&
-	    (err = zonecfg_valid_hostid(hostidp)) != Z_OK) {
-		zone_perror(zone, err, B_TRUE);
+	if (zonecfg_get_hostid(handle, hostidp,
+	    sizeof (hostidp)) == Z_INVALID_PROPERTY) {
+		zerr(gettext("%s: invalid hostid: %s"),
+		    zone, hostidp);
+		return;
+	}
+
+	if (zonecfg_get_fs_allowed(handle, fsallowedp,
+	    sizeof (fsallowedp)) == Z_INVALID_PROPERTY) {
+		zerr(gettext("%s: invalid fs-allowed: %s"),
+		    zone, fsallowedp);
 		return;
 	}
 

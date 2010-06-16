@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -47,7 +46,7 @@
  *   As an ID space is designed for representing a range of id_t's, there
  *   is a preexisting maximal range: [0, MAXUID].  ID space requests outside
  *   that range will fail on a DEBUG kernel.  The id_allocff*() functions
- *   return the first available id, and should be used when there is benifit
+ *   return the first available id, and should be used when there is benefit
  *   to having a compact allocated range.
  *
  *   (Presently, the id_space_t abstraction supports only direct allocations; ID
@@ -55,6 +54,9 @@
  *   dictionary for later use, should be added when a consuming subsystem
  *   arrives.)
  */
+
+#define	ID_TO_ADDR(id) ((void *)(uintptr_t)(id + 1))
+#define	ADDR_TO_ID(addr) ((id_t)((uintptr_t)addr - 1))
 
 /*
  * Create an arena to represent the range [low, high).
@@ -66,7 +68,7 @@ id_space_create(const char *name, id_t low, id_t high)
 	ASSERT(low >= 0);
 	ASSERT(low < high);
 
-	return (vmem_create(name, (void *)(uintptr_t)(low + 1), high - low, 1,
+	return (vmem_create(name, ID_TO_ADDR(low), high - low, 1,
 	    NULL, NULL, NULL, 0, VM_SLEEP | VMC_IDENTIFIER));
 }
 
@@ -83,8 +85,7 @@ id_space_destroy(id_space_t *isp)
 void
 id_space_extend(id_space_t *isp, id_t low, id_t high)
 {
-	(void) vmem_add(isp,
-	    (void *)(uintptr_t)(low + 1), high - low, VM_SLEEP);
+	(void) vmem_add(isp, ID_TO_ADDR(low), high - low, VM_SLEEP);
 }
 
 /*
@@ -94,8 +95,7 @@ id_space_extend(id_space_t *isp, id_t low, id_t high)
 id_t
 id_alloc(id_space_t *isp)
 {
-	return ((id_t)(uintptr_t)
-	    vmem_alloc(isp, 1, VM_SLEEP | VM_NEXTFIT) - 1);
+	return (ADDR_TO_ID(vmem_alloc(isp, 1, VM_SLEEP | VM_NEXTFIT)));
 }
 
 /*
@@ -106,8 +106,7 @@ id_alloc(id_space_t *isp)
 id_t
 id_alloc_nosleep(id_space_t *isp)
 {
-	return ((id_t)(uintptr_t)
-	    vmem_alloc(isp, 1, VM_NOSLEEP | VM_NEXTFIT) - 1);
+	return (ADDR_TO_ID(vmem_alloc(isp, 1, VM_NOSLEEP | VM_NEXTFIT)));
 }
 
 /*
@@ -117,8 +116,7 @@ id_alloc_nosleep(id_space_t *isp)
 id_t
 id_allocff(id_space_t *isp)
 {
-	return ((id_t)(uintptr_t)
-	    vmem_alloc(isp, 1, VM_SLEEP | VM_FIRSTFIT) - 1);
+	return (ADDR_TO_ID(vmem_alloc(isp, 1, VM_SLEEP | VM_FIRSTFIT)));
 }
 
 /*
@@ -129,8 +127,25 @@ id_allocff(id_space_t *isp)
 id_t
 id_allocff_nosleep(id_space_t *isp)
 {
-	return ((id_t)(uintptr_t)
-	    vmem_alloc(isp, 1, VM_NOSLEEP | VM_FIRSTFIT) - 1);
+	return (ADDR_TO_ID(vmem_alloc(isp, 1, VM_NOSLEEP | VM_FIRSTFIT)));
+}
+
+/*
+ * Allocate a specific identifier if possible, returning the id if
+ * successful, or -1 on failure.
+ */
+id_t
+id_alloc_specific_nosleep(id_space_t *isp, id_t id)
+{
+	void *minaddr = ID_TO_ADDR(id);
+	void *maxaddr = ID_TO_ADDR(id + 1);
+
+	/*
+	 * Note that even though we're vmem_free()ing this later, it
+	 * should be OK, since there's no quantum cache.
+	 */
+	return (ADDR_TO_ID(vmem_xalloc(isp, 1, 1, 0, 0,
+	    minaddr, maxaddr, VM_NOSLEEP)));
 }
 
 /*
@@ -140,5 +155,5 @@ id_allocff_nosleep(id_space_t *isp)
 void
 id_free(id_space_t *isp, id_t id)
 {
-	vmem_free(isp, (void *)(uintptr_t)(id + 1), 1);
+	vmem_free(isp, ID_TO_ADDR(id), 1);
 }

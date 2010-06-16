@@ -281,6 +281,9 @@ char *safe_strdup(char *s);
 <TSTATE>auths	{ return AUTHS; }
 <CSTATE>auths	{ return AUTHS; }
 
+<TSTATE>fs-allowed	{ return FS_ALLOWED; }
+<CSTATE>fs-allowed	{ return FS_ALLOWED; }
+
 <TSTATE>=	{ return EQUAL; }
 <LSTATE>=	{ return EQUAL; }
 <CSTATE>=	{ return EQUAL; }

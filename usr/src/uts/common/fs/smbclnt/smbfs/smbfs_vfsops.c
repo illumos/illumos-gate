@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -116,7 +115,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	(char *)fs_type_name,
 	smbfsinit,		/* init routine */
-	VSW_HASPROTO|VSW_NOTZONESAFE,	/* flags */
+	VSW_HASPROTO|VSW_NOTZONESAFE|VSW_ZMOUNT,	/* flags */
 	&smbfs_mntopts			/* mount options table prototype */
 };
 

@@ -89,9 +89,10 @@ extern "C" {
 #define	RT_PCAP		25
 #define	RT_HOSTID	26	/* really a property, but for info ... */
 #define	RT_ADMIN	27
+#define	RT_FS_ALLOWED	28
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_ADMIN
+#define	RT_MAX		RT_FS_ALLOWED
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
@@ -133,9 +134,10 @@ extern "C" {
 #define	PT_HOSTID	36
 #define	PT_USER		37
 #define	PT_AUTHS	38
+#define	PT_FS_ALLOWED	39
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_AUTHS
+#define	PT_MAX		PT_FS_ALLOWED
 
 #define	MAX_EQ_PROP_PAIRS	3
 

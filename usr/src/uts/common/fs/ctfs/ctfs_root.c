@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/types.h>
@@ -111,7 +108,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"ctfs",
 	ctfs_init,
-	VSW_HASPROTO,
+	VSW_HASPROTO|VSW_ZMOUNT,
 	&ctfs_mntopts,
 };
 
@@ -241,10 +238,10 @@ ctfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 */
 	vfsp->vfs_bsize = DEV_BSIZE;
 	vfsp->vfs_fstype = ctfs_fstype;
-	do
+	do {
 		dev = makedevice(ctfs_major,
 		    atomic_add_32_nv(&ctfs_minor, 1) & L_MAXMIN32);
-	while (vfs_devismounted(dev));
+	} while (vfs_devismounted(dev));
 	vfs_make_fsid(&vfsp->vfs_fsid, dev, ctfs_fstype);
 	vfsp->vfs_data = data;
 	vfsp->vfs_dev = dev;

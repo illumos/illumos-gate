@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements /dev filesystem operations for non-global
@@ -245,9 +242,6 @@ static void
 prof_lookup_globaldev(struct sdev_node *dir, struct sdev_node *gdir,
     char *name, char *rename)
 {
-	/* global OS rootdir */
-	extern vnode_t *rootdir;
-
 	int error;
 	struct vnode *avp, *gdv, *gddv;
 	struct sdev_node *newdv;
@@ -269,7 +263,6 @@ prof_lookup_globaldev(struct sdev_node *dir, struct sdev_node *gdir,
 	/* perform a relative lookup of the global /dev instance */
 	gddv = SDEVTOV(gdir);
 	VN_HOLD(gddv);
-	VN_HOLD(rootdir);
 	error = lookuppnvp(&pn, NULL, FOLLOW, NULLVPP, &gdv,
 	    rootdir, gddv, kcred);
 	pn_free(&pn);
@@ -528,25 +521,96 @@ end:
 	kmem_free(dbuf, dlen);
 }
 
+/*
+ * Last chance for a zone to see a node.  If our parent dir is
+ * SDEV_ZONED, then we look up the "zone" property for the node.  If the
+ * property is found and matches the current zone name, we allow it.
+ * Note that this isn't quite correct for the global zone peeking inside
+ * a zone's /dev - for that to work, we'd have to have a per-dev-mount
+ * zone ref squirreled away.
+ */
 static int
-prof_make_name(char *nm, void *arg)
+prof_zone_matched(char *name, struct sdev_node *dir)
+{
+	vnode_t *gvn = SDEVTOV(dir->sdev_origin);
+	struct pathname pn;
+	vnode_t *vn = NULL;
+	char zonename[ZONENAME_MAX];
+	int znlen = ZONENAME_MAX;
+	int ret;
+
+	ASSERT((dir->sdev_flags & SDEV_ZONED) != 0);
+
+	sdcmn_err10(("sdev_node %p is zoned, looking for %s\n",
+	    (void *)dir, name));
+
+	if (pn_get(name, UIO_SYSSPACE, &pn))
+		return (0);
+
+	VN_HOLD(gvn);
+
+	ret = lookuppnvp(&pn, NULL, FOLLOW, NULLVPP, &vn, rootdir, gvn, kcred);
+
+	pn_free(&pn);
+
+	if (ret != 0) {
+		sdcmn_err10(("prof_zone_matched: %s not found\n", name));
+		return (0);
+	}
+
+	/*
+	 * VBLK doesn't matter, and the property name is in fact treated
+	 * as a const char *.
+	 */
+	ret = e_ddi_getlongprop_buf(vn->v_rdev, VBLK, (char *)"zone",
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, (caddr_t)zonename, &znlen);
+
+	VN_RELE(vn);
+
+	if (ret == DDI_PROP_NOT_FOUND) {
+		sdcmn_err10(("vnode %p: no zone prop\n", (void *)vn));
+		return (0);
+	} else if (ret != DDI_PROP_SUCCESS) {
+		sdcmn_err10(("vnode %p: zone prop error: %d\n",
+		    (void *)vn, ret));
+		return (0);
+	}
+
+	sdcmn_err10(("vnode %p zone prop: %s\n", (void *)vn, zonename));
+	return (strcmp(zonename, curproc->p_zone->zone_name) == 0);
+}
+
+static int
+prof_make_name_glob(char *nm, void *arg)
 {
 	struct sdev_node *ddv = (struct sdev_node *)arg;
 
 	if (prof_name_matched(nm, ddv))
 		prof_lookup_globaldev(ddv, ddv->sdev_origin, nm, nm);
+
+	return (WALK_DIR_CONTINUE);
+}
+
+static int
+prof_make_name_zone(char *nm, void *arg)
+{
+	struct sdev_node *ddv = (struct sdev_node *)arg;
+
+	if (prof_zone_matched(nm, ddv))
+		prof_lookup_globaldev(ddv, ddv->sdev_origin, nm, nm);
+
 	return (WALK_DIR_CONTINUE);
 }
 
 static void
-prof_make_names_glob(struct sdev_node *ddv)
+prof_make_names_walk(struct sdev_node *ddv, int (*cb)(char *, void *))
 {
 	struct sdev_node *gdir;
 
 	gdir = ddv->sdev_origin;
 	if (gdir == NULL)
 		return;
-	walk_dir(SDEVTOV(gdir), (void *)ddv, prof_make_name);
+	walk_dir(SDEVTOV(gdir), (void *)ddv, cb);
 }
 
 static void
@@ -559,11 +623,14 @@ prof_make_names(struct sdev_node *dir)
 
 	ASSERT(RW_WRITE_HELD(&dir->sdev_contents));
 
+	if ((dir->sdev_flags & SDEV_ZONED) != 0)
+		prof_make_names_walk(dir, prof_make_name_zone);
+
 	if (nvl == NULL)
 		return;
 
 	if (dir->sdev_prof.has_glob) {
-		prof_make_names_glob(dir);
+		prof_make_names_walk(dir, prof_make_name_glob);
 		return;
 	}
 

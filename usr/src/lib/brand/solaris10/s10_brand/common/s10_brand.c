@@ -56,6 +56,7 @@
 #include <sys/mntio.h>
 #include <sys/mnttab.h>
 #include <sys/attr.h>
+#include <sys/lofi.h>
 #include <atomic.h>
 #include <sys/acl.h>
 
@@ -118,6 +119,41 @@ brand_sysent_table_t brand_sysent_table[];
 
 #define	S10_UTS_RELEASE	"5.10"
 #define	S10_UTS_VERSION	"Generic_Virtual"
+
+/*
+ * If the ioctl fd's major doesn't match "major", then pass through the
+ * ioctl, since it is not the expected device.  major should be a
+ * pointer to a static dev_t initialized to -1, and devname should be
+ * the path of the device.
+ *
+ * Returns 1 if the ioctl was handled (in which case *err contains the
+ * error code), or 0 if it still needs handling.
+ */
+static int
+passthru_otherdev_ioctl(dev_t *majordev, const char *devname, int *err,
+    sysret_t *rval, int fdes, int cmd, intptr_t arg)
+{
+	struct stat sbuf;
+
+	if (*majordev == (dev_t)-1) {
+		if ((*err = __systemcall(rval, SYS_fstatat + 1024,
+		    AT_FDCWD, devname, &sbuf, 0) != 0) != 0)
+			goto doioctl;
+
+		*majordev = major(sbuf.st_rdev);
+	}
+
+	if ((*err = __systemcall(rval, SYS_fstatat + 1024, fdes,
+	    NULL, &sbuf, 0)) != 0)
+		goto doioctl;
+
+	if (major(sbuf.st_rdev) == *majordev)
+		return (0);
+
+doioctl:
+	*err = (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
+	return (1);
+}
 
 /*
  * Figures out the PID of init for the zone.  Also returns a boolean
@@ -414,20 +450,10 @@ crypto_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	s10_crypto_get_function_list_t	s10_param;
 	crypto_get_function_list_t	native_param;
 	static dev_t			crypto_dev = (dev_t)-1;
-	struct stat			sbuf;
 
-	if (crypto_dev == (dev_t)-1) {
-		if ((err = __systemcall(rval, SYS_fstatat + 1024,
-		    AT_FDCWD, "/dev/crypto", &sbuf, 0)) != 0)
-			goto nonemuioctl;
-		crypto_dev = major(sbuf.st_rdev);
-	}
-	if ((err = __systemcall(rval, SYS_fstatat + 1024,
-	    fdes, NULL, &sbuf, 0)) != 0)
+	if (passthru_otherdev_ioctl(&crypto_dev, "/dev/crypto", &err,
+	    rval, fdes, cmd, arg) == 1)
 		return (err);
-	/* Each open fd of /dev/crypto gets a new minor device. */
-	if (major(sbuf.st_rdev) != crypto_dev)
-		goto nonemuioctl;
 
 	if (brand_uucopy((const void *)arg, &s10_param, sizeof (s10_param))
 	    != 0)
@@ -518,9 +544,6 @@ crypto_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	struct_assign(s10_param, native_param, fl_list.prov_hash_limit);
 
 	return (brand_uucopy(&s10_param, (void *)arg, sizeof (s10_param)));
-
-nonemuioctl:
-	return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
 }
 
 /*
@@ -584,27 +607,70 @@ ctfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 static int
 zfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 {
-	dev_t		zfs_dev;
-	struct stat	sbuf;
+	static dev_t zfs_dev = (dev_t)-1;
+	int err;
 
-	/*
-	 * See if the ioctl is targeting the ZFS device, /dev/zfs.
-	 * If it isn't, then s10_ioctl() mistook the ioctl for a ZFS ioctl.
-	 * In that case, we don't want to abort, so we pass it along to the
-	 * kernel.
-	 */
-	if (__systemcall(rval, SYS_fstatat + 1024, AT_FDCWD, ZFS_DEV, &sbuf, 0)
-	    != 0)
-		return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
-	zfs_dev = major(sbuf.st_rdev);
-
-	if (__systemcall(rval, SYS_fstatat + 1024, fdes, NULL, &sbuf, 0) != 0 ||
-	    major(sbuf.st_rdev) != zfs_dev)
-		return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
+	if (passthru_otherdev_ioctl(&zfs_dev, ZFS_DEV, &err,
+	    rval, fdes, cmd, arg) == 1)
+		return (err);
 
 	brand_abort(0, "ZFS ioctl!");
 	/*NOTREACHED*/
 	return (0);
+}
+
+struct s10_lofi_ioctl {
+	uint32_t li_minor;
+	boolean_t li_force;
+	char li_filename[MAXPATHLEN + 1];
+};
+
+static int
+lofi_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
+{
+	static dev_t lofi_dev = (dev_t)-1;
+	struct s10_lofi_ioctl s10_param;
+	struct lofi_ioctl native_param;
+	int err;
+
+	if (passthru_otherdev_ioctl(&lofi_dev, "/dev/lofictl", &err,
+	    rval, fdes, cmd, arg) == 1)
+		return (err);
+
+	if (brand_uucopy((const void *)arg, &s10_param,
+	    sizeof (s10_param)) != 0)
+		return (EFAULT);
+
+	/*
+	 * Somewhat weirdly, EIO is what the S10 lofi driver would
+	 * return for unrecognised cmds.
+	 */
+	if (cmd >= LOFI_CHECK_COMPRESSED)
+		return (EIO);
+
+	bzero(&native_param, sizeof (native_param));
+
+	struct_assign(native_param, s10_param, li_minor);
+	struct_assign(native_param, s10_param, li_force);
+
+	/*
+	 * Careful here, this has changed from [MAXPATHLEN + 1] to
+	 * [MAXPATHLEN].
+	 */
+	bcopy(s10_param.li_filename, native_param.li_filename,
+	    sizeof (native_param.li_filename));
+	native_param.li_filename[MAXPATHLEN - 1] = '\0';
+
+	err = __systemcall(rval, SYS_ioctl + 1024, fdes, cmd, &native_param);
+
+	struct_assign(s10_param, native_param, li_minor);
+	/* li_force is input-only */
+
+	bcopy(native_param.li_filename, s10_param.li_filename,
+	    sizeof (native_param.li_filename));
+
+	(void) brand_uucopy(&s10_param, (void *)arg, sizeof (s10_param));
+	return (err);
 }
 
 int
@@ -625,8 +691,16 @@ s10_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 		return (mntfs_ioctl(rval, fdes, cmd, arg));
 	}
 
-	if ((cmd & 0xff00) == ZFS_IOC)
+	switch (cmd & ~0xff) {
+	case ZFS_IOC:
 		return (zfs_ioctl(rval, fdes, cmd, arg));
+
+	case LOFI_IOC_BASE:
+		return (lofi_ioctl(rval, fdes, cmd, arg));
+
+	default:
+		break;
+	}
 
 	return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
 }

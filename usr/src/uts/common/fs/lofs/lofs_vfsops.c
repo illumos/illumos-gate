@@ -58,7 +58,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"lofs",
 	lofsinit,
-	VSW_HASPROTO|VSW_STATS,
+	VSW_HASPROTO|VSW_STATS|VSW_ZMOUNT,
 	&lofs_mntopts
 };
 

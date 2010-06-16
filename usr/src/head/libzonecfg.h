@@ -100,7 +100,7 @@ extern "C" {
 #define	Z_NO_POOL		47	/* no such pool configured */
 #define	Z_POOL_CREATE		48	/* pool create failed */
 #define	Z_POOL_BIND		49	/* pool bind failed */
-#define	Z_HOSTID_FUBAR		50	/* invalid hostid provided */
+#define	Z_INVALID_PROPERTY	50	/* invalid property value */
 
 /*
  * Warning: these are shared with the admin/install consolidation.
@@ -362,7 +362,12 @@ extern	int	zonecfg_lookup_nwif(zone_dochandle_t, struct zone_nwiftab *);
  */
 extern	int	zonecfg_get_hostid(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_hostid(zone_dochandle_t, const char *);
-extern	int	zonecfg_valid_hostid(const char *);
+
+/*
+ * Allowed FS mounts configuration.
+ */
+extern int	zonecfg_get_fs_allowed(zone_dochandle_t, char *, size_t);
+extern int	zonecfg_set_fs_allowed(zone_dochandle_t, const char *);
 
 /*
  * Device configuration and rule matching.

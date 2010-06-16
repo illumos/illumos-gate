@@ -87,7 +87,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"autofs",
 	autofs_init,
-	VSW_HASPROTO|VSW_CANRWRO|VSW_CANREMOUNT|VSW_STATS,
+	VSW_HASPROTO|VSW_CANRWRO|VSW_CANREMOUNT|VSW_STATS|VSW_ZMOUNT,
 	&auto_mntopts
 };
 

@@ -125,6 +125,7 @@ SUNWprivate_1.1 {
 	zonecfg_getdevperment;
 	zonecfg_getdsent;
 	zonecfg_getfsent;
+	zonecfg_get_fs_allowed;
 	zonecfg_get_handle;
 	zonecfg_get_hostid;
 	zonecfg_getipdent;
@@ -205,6 +206,7 @@ SUNWprivate_1.1 {
 	zonecfg_setdevperment;
 	zonecfg_setdsent;
 	zonecfg_setfsent;
+	zonecfg_set_fs_allowed;
 	zonecfg_set_hostid;
 	zonecfg_setipdent;
 	zonecfg_set_iptype;
@@ -224,7 +226,6 @@ SUNWprivate_1.1 {
 	zonecfg_valid_auths;
 	zonecfg_valid_alias_limit;
 	zonecfg_valid_fs_type;
-	zonecfg_valid_hostid;
 	zonecfg_valid_importance;
 	zonecfg_valid_memlimit;
 	zonecfg_valid_ncpus;

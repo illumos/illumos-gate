@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/atomic.h>
 #include <sys/cmn_err.h>
@@ -76,7 +73,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"objfs",
 	objfs_init,
-	VSW_HASPROTO,
+	VSW_HASPROTO | VSW_ZMOUNT,
 	&objfs_mntopts,
 };
 

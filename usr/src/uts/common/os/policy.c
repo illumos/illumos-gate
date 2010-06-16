@@ -755,6 +755,48 @@ secpolicy_fs_mount_clearopts(cred_t *cr, struct vfs *vfsp)
 
 }
 
+int
+secpolicy_fs_allowed_mount(const char *fsname)
+{
+	struct vfssw *vswp;
+	const char *p;
+	size_t len;
+
+	ASSERT(fsname != NULL);
+	ASSERT(fsname[0] != '\0');
+
+	if (INGLOBALZONE(curproc))
+		return (0);
+
+	vswp = vfs_getvfssw(fsname);
+	if (vswp == NULL)
+		return (ENOENT);
+
+	if ((vswp->vsw_flag & VSW_ZMOUNT) != 0) {
+		vfs_unrefvfssw(vswp);
+		return (0);
+	}
+
+	vfs_unrefvfssw(vswp);
+
+	p = curzone->zone_fs_allowed;
+	len = strlen(fsname);
+
+	while (p != NULL && *p != '\0') {
+		if (strncmp(p, fsname, len) == 0) {
+			char c = *(p + len);
+			if (c == '\0' || c == ',')
+				return (0);
+		}
+
+		/* skip to beyond the next comma */
+		if ((p = strchr(p, ',')) != NULL)
+			p++;
+	}
+
+	return (EPERM);
+}
+
 extern vnode_t *rootvp;
 extern vfs_t *rootvfs;
 

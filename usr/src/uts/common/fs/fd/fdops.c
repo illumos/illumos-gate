@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All rights reserved.  	*/
@@ -549,7 +546,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"fd",
 	fdinit,
-	VSW_HASPROTO,
+	VSW_HASPROTO | VSW_ZMOUNT,
 	&fdfs_mntopts
 };
 
