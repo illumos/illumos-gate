@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -741,8 +740,10 @@ rfs4_dss_clear_oldstate(rfs4_servinst_t *sip)
 	rw_enter(&sip->oldstate_lock, RW_WRITER);
 	os_head = sip->oldstate;
 
-	if (os_head == NULL)
+	if (os_head == NULL) {
+		rw_exit(&sip->oldstate_lock);
 		return;
+	}
 
 	/* skip dummy entry */
 	osp = os_head->next;
@@ -754,19 +755,13 @@ rfs4_dss_clear_oldstate(rfs4_servinst_t *sip)
 
 		if (osp->cl_id4.id_val)
 			kmem_free(osp->cl_id4.id_val, osp->cl_id4.id_len);
-		if (osp->ss_pn)
-			kmem_free(osp->ss_pn, sizeof (rfs4_ss_pn_t));
+		rfs4_ss_pnfree(osp->ss_pn);
 
 		os_next = osp->next;
 		remque(osp);
 		kmem_free(osp, sizeof (rfs4_oldstate_t));
 		osp = os_next;
 	}
-
-	/* free dummy entry */
-	kmem_free(osp, sizeof (rfs4_oldstate_t));
-
-	sip->oldstate = NULL;
 
 	rw_exit(&sip->oldstate_lock);
 }
@@ -2910,6 +2905,9 @@ rfs4_deleg_state_expiry(rfs4_entry_t u_entry)
 	if (rfs4_dbe_is_invalid(dsp->rds_dbe))
 		return (TRUE);
 
+	if (dsp->rds_dtype == OPEN_DELEGATE_NONE)
+		return (TRUE);
+
 	if ((gethrestime_sec() - dsp->rds_client->rc_last_access
 	    > rfs4_lease_time)) {
 		rfs4_dbe_invalidate(dsp->rds_dbe);
@@ -3529,8 +3527,8 @@ rfs4_state_has_access(rfs4_state_t *sp, int mode, vnode_t *vp)
 				 */
 				if (sp->rs_share_deny & OPEN4_SHARE_DENY_READ)
 					deny_read = 1;
-				ASSERT(fp->rf_deny_read - deny_read >= 0);
-				if (fp->rf_deny_read - deny_read > 0)
+				ASSERT(fp->rf_deny_read >= deny_read);
+				if (fp->rf_deny_read > deny_read)
 					stat = NFS4ERR_OPENMODE;
 				rfs4_dbe_unlock(fp->rf_dbe);
 				rfs4_file_rele(fp);
