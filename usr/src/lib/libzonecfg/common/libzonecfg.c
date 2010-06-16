@@ -7810,7 +7810,7 @@ zonecfg_valid_auths(const char *auths, const char *zonename)
 		if (getauthnam(authname) == NULL) {
 			status = B_FALSE;
 			zerror(zonename,
-			    gettext("%s is not a valid authorization"),
+			    gettext("'%s' is not a valid authorization"),
 			    right);
 		}
 		right = strtok_r(NULL, ",", &lasts);
@@ -7860,13 +7860,12 @@ is_zone_auth(char **auth, char *zonename, char *oldzonename)
 	offset = strlen(ZONE_AUTH_PREFIX);
 	if ((strncmp(*auth, ZONE_AUTH_PREFIX, offset) == 0) &&
 	    ((suffix = strchr(*auth, '/')) != NULL)) {
-		if (strncmp(suffix + 1, zonename, strlen(zonename)) == 0) {
+		if (strcmp(suffix + 1, zonename) == 0) {
 			*auth += offset;
 			suffix[0] = '\0';
 			return (B_TRUE);
 		} else if ((oldzonename != NULL) &&
-		    (strncmp(suffix + 1, oldzonename,
-		    strlen(oldzonename)) == 0)) {
+		    (strcmp(suffix + 1, oldzonename) == 0)) {
 			*auth += offset;
 			suffix[0] = '\0';
 			return (B_TRUE);
@@ -8092,7 +8091,9 @@ zonecfg_authorize_user_impl(zone_dochandle_t handle, char *user,
 	boolean_t is_zone_admin = B_FALSE;
 	char user_cmd[] = "/usr/sbin/usermod";
 	char role_cmd[] = "/usr/sbin/rolemod";
-	char *auths_cmd = user_cmd;
+	char *auths_cmd = user_cmd;	/* either usermod or rolemod */
+	char *new_auth_start;		/* string containing the new auths */
+	int new_auth_cnt = 0;		/* delta of changed authorizations */
 
 	/*
 	 * First get the existing authorizations for this user
@@ -8153,6 +8154,8 @@ zonecfg_authorize_user_impl(zone_dochandle_t handle, char *user,
 					if (strncmp(cur_auth,
 					    ZONE_AUTH_PREFIX, offset) == 0)
 						is_zone_admin = B_TRUE;
+				} else {
+					new_auth_cnt++;
 				}
 				cur_auth = strtok_r(NULL, ",", &lasts);
 			}
@@ -8172,6 +8175,9 @@ zonecfg_authorize_user_impl(zone_dochandle_t handle, char *user,
 	/*
 	 * Convert each right into a properly formatted authorization
 	 */
+	new_auth_start = new_auths + strlen(new_auths);
+	if (!first)
+		new_auth_start++;
 	right = strtok_r(auths, ",", &lasts);
 	while (right != NULL) {
 		char auth[MAXAUTHS];
@@ -8185,14 +8191,20 @@ zonecfg_authorize_user_impl(zone_dochandle_t handle, char *user,
 		}
 		(void) strlcat(new_auths, auth, MAXAUTHS);
 		is_zone_admin = B_TRUE;
+		new_auth_cnt--;
 		right = strtok_r(NULL, ",", &lasts);
 	}
 
 	/*
+	 * Need to update the authorizations in user_attr unless
+	 * the number of old and new authorizations is unchanged
+	 * and the new auths are a substrings of the old auths.
+	 *
 	 * If the user's previous authorizations have changed
-	 * execute the usermod progam to update them in user_attr
+	 * execute the usermod progam to update them in user_attr.
 	 */
-	if (strcmp(old_auths, new_auths) != 0) {
+	if ((new_auth_cnt != 0) ||
+	    (strstr(old_auths, new_auth_start) == NULL)) {
 		char    *cmdbuf;
 		size_t  cmd_len;
 
