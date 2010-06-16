@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	lint
 #define	_REENTRANT	/* for localtime_r */
@@ -1564,8 +1562,19 @@ get_install_devlink(char *physpath, char *buf, size_t bufsz)
 {
 	di_devlink_handle_t devlink_hdl;
 	char devname[MAXPATHLEN];
+	int tries = 0;
+	int sleeptime = 2; /* number of seconds to sleep between retries */
+	int maxtries = 10; /* maximum number of tries */
 
 	logdmsg(("get_install_devlink: physpath = %s\n", physpath));
+
+	/*
+	 * devlink_db sync happens after MINOR_FINI_TIMEOUT_DEFAULT secs
+	 * after dev link creation. So wait for minimum that amout of time.
+	 */
+
+retry:
+	(void) sleep(sleeptime);
 
 	if ((devlink_hdl = di_devlink_init(NULL, 0)) == NULL) {
 		logdmsg(("get_install_devlink: di_devlink_init() failed: %s\n",
@@ -1575,7 +1584,18 @@ get_install_devlink(char *physpath, char *buf, size_t bufsz)
 
 	devname[0] = '\0';
 	if (di_devlink_walk(devlink_hdl, NULL, physpath, DI_PRIMARY_LINK,
-	    devname, devlink_callback) != 0 || devname[0] == '\0') {
+	    devname, devlink_callback) == 0) {
+		if (devname[0] == '\0' && tries < maxtries) {
+			tries++;
+			(void) di_devlink_fini(&devlink_hdl);
+			goto retry;
+		} else if (devname[0] == '\0') {
+			logdmsg(("get_install_devlink: di_devlink_walk"
+			    " failed: %s\n", strerror(errno)));
+			(void) di_devlink_fini(&devlink_hdl);
+			return (-1);
+		}
+	} else {
 		logdmsg(("get_install_devlink: di_devlink_walk failed: %s\n",
 		    strerror(errno)));
 		(void) di_devlink_fini(&devlink_hdl);
