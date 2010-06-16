@@ -102,6 +102,7 @@ typedef struct stmf_data_buf {
 #define	DB_DONT_CACHE			0x0010
 #define	DB_DONT_REUSE			0x0020
 #define	DB_LU_DATA_BUF			0x0040
+#define	DB_LPORT_XFER_ACTIVE		0x8000
 
 typedef struct scsi_task {
 	void		*task_stmf_private;

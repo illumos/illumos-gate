@@ -74,6 +74,10 @@ static void stmf_abort_task_offline(scsi_task_t *task, int offline_lu,
     char *info);
 static int stmf_set_alua_state(stmf_alua_state_desc_t *alua_state);
 static void stmf_get_alua_state(stmf_alua_state_desc_t *alua_state);
+
+static void stmf_task_audit(stmf_i_scsi_task_t *itask,
+    task_audit_event_t te, uint32_t cmd_or_iof, stmf_data_buf_t *dbuf);
+
 stmf_xfer_data_t *stmf_prepare_tpgs_data(uint8_t ilu_alua);
 void stmf_svc_init();
 stmf_status_t stmf_svc_fini();
@@ -4246,6 +4250,7 @@ stmf_alloc_dbuf(scsi_task_t *task, uint32_t size, uint32_t *pminsize,
 	if (dbuf) {
 		task->task_cur_nbufs++;
 		itask->itask_allocated_buf_map |= (1 << ndx);
+		dbuf->db_flags &= ~DB_LPORT_XFER_ACTIVE;
 		dbuf->db_handle = ndx;
 		return (dbuf);
 	}
@@ -4428,6 +4433,7 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 		}
 		itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
 		itask->itask_cdb_buf_size = cdb_length;
+		mutex_init(&itask->itask_audit_mutex, NULL, MUTEX_DRIVER, NULL);
 	}
 	task->task_session = ss;
 	task->task_lport = lport;
@@ -4437,6 +4443,7 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	itask->itask_lu_read_time = itask->itask_lu_write_time = 0;
 	itask->itask_lport_read_time = itask->itask_lport_write_time = 0;
 	itask->itask_read_xfer = itask->itask_write_xfer = 0;
+	itask->itask_audit_index = 0;
 
 	if (new_task) {
 		if (lu->lu_task_alloc(task) != STMF_SUCCESS) {
@@ -4707,6 +4714,8 @@ stmf_task_free(scsi_task_t *task)
 	stmf_i_scsi_session_t *iss = (stmf_i_scsi_session_t *)
 	    task->task_session->ss_stmf_private;
 
+	stmf_task_audit(itask, TE_TASK_FREE, CMD_OR_IOF_NA, NULL);
+
 	stmf_free_task_bufs(itask, lport);
 	stmf_itl_task_done(itask);
 	DTRACE_PROBE2(stmf__task__end, scsi_task_t *, task,
@@ -4833,6 +4842,7 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	atomic_add_32(&w->worker_ref_count, 1);
 	itask->itask_cmd_stack[0] = ITASK_CMD_NEW_TASK;
 	itask->itask_ncmds = 1;
+	stmf_task_audit(itask, TE_TASK_START, CMD_OR_IOF_NA, dbuf);
 	if (dbuf) {
 		itask->itask_allocated_buf_map = 1;
 		itask->itask_dbufs[0] = dbuf;
@@ -4860,6 +4870,24 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	}
 }
 
+static void
+stmf_task_audit(stmf_i_scsi_task_t *itask,
+    task_audit_event_t te, uint32_t cmd_or_iof, stmf_data_buf_t *dbuf)
+{
+	stmf_task_audit_rec_t *ar;
+
+	mutex_enter(&itask->itask_audit_mutex);
+	ar = &itask->itask_audit_records[itask->itask_audit_index++];
+	itask->itask_audit_index &= (ITASK_TASK_AUDIT_DEPTH - 1);
+	ar->ta_event = te;
+	ar->ta_cmd_or_iof = cmd_or_iof;
+	ar->ta_itask_flags = itask->itask_flags;
+	ar->ta_dbuf = dbuf;
+	gethrestime(&ar->ta_timestamp);
+	mutex_exit(&itask->itask_audit_mutex);
+}
+
+
 /*
  * ++++++++++++++ ABORT LOGIC ++++++++++++++++++++
  * Once ITASK_BEING_ABORTED is set, ITASK_KNOWN_TO_LU can be reset already
@@ -4879,10 +4907,12 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 stmf_status_t
 stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 {
-	stmf_status_t ret;
+	stmf_status_t ret = STMF_SUCCESS;
 
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
+
+	stmf_task_audit(itask, TE_XFER_START, ioflags, dbuf);
 
 	if (ioflags & STMF_IOF_LU_DONE) {
 		uint32_t new, old;
@@ -4911,14 +4941,17 @@ stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		return (STMF_SUCCESS);
 	}
 
+	dbuf->db_flags |= DB_LPORT_XFER_ACTIVE;
 	ret = task->task_lport->lport_xfer_data(task, dbuf, ioflags);
 
 	/*
 	 * Port provider may have already called the buffer callback in
 	 * which case dbuf->db_xfer_start_timestamp will be 0.
 	 */
-	if ((ret != STMF_SUCCESS) && (dbuf->db_xfer_start_timestamp != 0)) {
-		stmf_lport_xfer_done(itask, dbuf);
+	if (ret != STMF_SUCCESS) {
+		dbuf->db_flags &= ~DB_LPORT_XFER_ACTIVE;
+		if (dbuf->db_xfer_start_timestamp != 0)
+			stmf_lport_xfer_done(itask, dbuf);
 	}
 
 	return (ret);
@@ -4929,11 +4962,28 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 {
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
+	stmf_i_local_port_t *ilport;
 	stmf_worker_t *w = itask->itask_worker;
 	uint32_t new, old;
 	uint8_t update_queue_flags, free_it, queue_it;
 
 	stmf_lport_xfer_done(itask, dbuf);
+
+	stmf_task_audit(itask, TE_XFER_DONE, iof, dbuf);
+
+	/* Guard against unexpected completions from the lport */
+	if (dbuf->db_flags & DB_LPORT_XFER_ACTIVE) {
+		dbuf->db_flags &= ~DB_LPORT_XFER_ACTIVE;
+	} else {
+		/*
+		 * This should never happen.
+		 */
+		ilport = task->task_lport->lport_stmf_private;
+		ilport->ilport_unexpected_comp++;
+		cmn_err(CE_PANIC, "Unexpected xfer completion task %p dbuf %p",
+		    (void *)task, (void *)dbuf);
+		return;
+	}
 
 	mutex_enter(&w->worker_lock);
 	do {
@@ -5012,6 +5062,9 @@ stmf_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
+
+	stmf_task_audit(itask, TE_SEND_STATUS, ioflags, NULL);
+
 	if (ioflags & STMF_IOF_LU_DONE) {
 		uint32_t new, old;
 		do {
@@ -5057,6 +5110,8 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	stmf_worker_t *w = itask->itask_worker;
 	uint32_t new, old;
 	uint8_t free_it, queue_it;
+
+	stmf_task_audit(itask, TE_SEND_STATUS_DONE, iof, NULL);
 
 	mutex_enter(&w->worker_lock);
 	do {
@@ -5171,6 +5226,8 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s)
 	stmf_worker_t *w;
 	uint32_t old, new;
 
+	stmf_task_audit(itask, TE_TASK_ABORT, CMD_OR_IOF_NA, NULL);
+
 	do {
 		old = new = itask->itask_flags;
 		if ((old & ITASK_BEING_ABORTED) ||
@@ -5255,6 +5312,8 @@ stmf_task_lu_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	stmf_i_scsi_task_t	*itask = TASK_TO_ITASK(task);
 	unsigned long long	st;
 
+	stmf_task_audit(itask, TE_TASK_LU_ABORTED, iof, NULL);
+
 	st = s;	/* gcc fix */
 	if ((s != STMF_ABORT_SUCCESS) && (s != STMF_NOT_FOUND)) {
 		(void) snprintf(info, sizeof (info),
@@ -5281,6 +5340,8 @@ stmf_task_lport_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	stmf_i_scsi_task_t	*itask = TASK_TO_ITASK(task);
 	unsigned long long	st;
 	uint32_t		old, new;
+
+	stmf_task_audit(itask, TE_TASK_LPORT_ABORTED, iof, NULL);
 
 	st = s;
 	if ((s != STMF_ABORT_SUCCESS) && (s != STMF_NOT_FOUND)) {
@@ -6582,6 +6643,7 @@ out_itask_flag_loop:
 		dbuf = itask->itask_dbufs[ITASK_CMD_BUF_NDX(curcmd)];
 		mutex_exit(&w->worker_lock);
 		curcmd &= ITASK_CMD_MASK;
+		stmf_task_audit(itask, TE_PROCESS_CMD, curcmd, dbuf);
 		switch (curcmd) {
 		case ITASK_CMD_NEW_TASK:
 			iss = (stmf_i_scsi_session_t *)

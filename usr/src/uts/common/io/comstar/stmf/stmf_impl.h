@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _STMF_IMPL_H
 #define	_STMF_IMPL_H
@@ -137,6 +136,7 @@ typedef struct stmf_i_local_port {
 	uint16_t		ilport_proxy_registered;
 	uint64_t		ilport_reg_msgid;
 	uint8_t			ilport_no_standby_lu;
+	uint32_t		ilport_unexpected_comp;
 	stmf_event_handle_t	ilport_event_hdl;
 	clock_t			ilport_last_online_clock;
 	clock_t			ilport_avg_interval;
@@ -215,6 +215,33 @@ typedef struct stmf_i_scsi_session {
 
 #define	ITASK_MAX_NCMDS			14
 #define	ITASK_DEFAULT_POLL_TIMEOUT	0
+
+#define	ITASK_TASK_AUDIT_DEPTH		32 /* Must be a power of 2 */
+
+typedef enum {
+	TE_UNDEFINED,
+	TE_TASK_START,
+	TE_XFER_START,
+	TE_XFER_DONE,
+	TE_SEND_STATUS,
+	TE_SEND_STATUS_DONE,
+	TE_TASK_FREE,
+	TE_TASK_ABORT,
+	TE_TASK_LPORT_ABORTED,
+	TE_TASK_LU_ABORTED,
+	TE_PROCESS_CMD
+} task_audit_event_t;
+
+#define	CMD_OR_IOF_NA	0xffffffff
+
+typedef struct stmf_task_audit_rec {
+	task_audit_event_t	ta_event;
+	uint32_t		ta_cmd_or_iof;
+	uint32_t		ta_itask_flags;
+	stmf_data_buf_t		*ta_dbuf;
+	timespec_t		ta_timestamp;
+} stmf_task_audit_rec_t;
+
 struct stmf_worker;
 typedef struct stmf_i_scsi_task {
 	scsi_task_t		*itask_task;
@@ -250,6 +277,9 @@ typedef struct stmf_i_scsi_task {
 	hrtime_t		itask_lport_write_time;
 	uint64_t		itask_read_xfer;
 	uint64_t		itask_write_xfer;
+	kmutex_t		itask_audit_mutex;
+	uint8_t			itask_audit_index;
+	stmf_task_audit_rec_t	itask_audit_records[ITASK_TASK_AUDIT_DEPTH];
 } stmf_i_scsi_task_t;
 
 #define	ITASK_DEFAULT_ABORT_TIMEOUT	5
