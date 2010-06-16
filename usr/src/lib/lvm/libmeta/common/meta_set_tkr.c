@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Metadevice diskset interfaces
@@ -520,6 +518,7 @@ meta_set_take(
 	mddrivenamelist_t	*dnlp = NULL;
 	int			retake_flag = 0;
 	unsigned long 		node_active[BT_BITOUL(MD_MAXSIDES)];
+	mdnamelist_t		*nlp = NULL;
 
 	bzero(node_active, sizeof (unsigned long) * BT_BITOUL(MD_MAXSIDES));
 
@@ -593,10 +592,10 @@ meta_set_take(
 	side = getnodeside(mynode(), sd);
 
 	if (side == MD_SIDEWILD) {
-	    (void) mddserror(ep, MDE_DS_HOSTNOSIDE, sp->setno, mynode(),
-		NULL, mynode());
-	    rval = -1;
-	    goto out;
+		(void) mddserror(ep, MDE_DS_HOSTNOSIDE, sp->setno, mynode(),
+		    NULL, mynode());
+		rval = -1;
+		goto out;
 	}
 
 	/*
@@ -697,10 +696,10 @@ meta_set_take(
 
 		if (sd->sd_flags & MD_SR_MB_DEVID)
 			dd = metaget_drivedesc(sp,
-				MD_BASICNAME_OK | PRINT_FAST, ep);
+			    MD_BASICNAME_OK | PRINT_FAST, ep);
 		else
 			dd = metaget_drivedesc(sp,
-				MD_BASICNAME_OK, ep);
+			    MD_BASICNAME_OK, ep);
 		/* If ep has error, then there was a failure, set rval */
 		if (!mdisok(ep)) {
 			rval = -1;
@@ -775,7 +774,7 @@ meta_set_take(
 				 * namespace and the local set namespace.
 				 */
 				d->dd_flags |= (MD_DR_FIX_MB_DID |
-						MD_DR_FIX_LB_NM_DID);
+				    MD_DR_FIX_LB_NM_DID);
 				retake_flag = 1;
 			}
 		}
@@ -842,7 +841,7 @@ meta_set_take(
 				 */
 				newname = NULL;
 				ret = meta_make_sidenmlist(sp,
-					    d->dd_dnp, 0, NULL, ep);
+				    d->dd_dnp, 0, NULL, ep);
 				d->dd_dnp->side_names_key = side_names_key;
 				if (ret == -1) {
 					rval = -1;
@@ -970,6 +969,20 @@ meta_set_take(
 		mdclrerror(ep);
 
 	}
+
+	/*
+	 * meta_getalldevs() will ultimately force devfsadmd to create
+	 * the /dev links for all the configured metadevices if they
+	 * do not already exist. This ensures that once the set is
+	 * owned all the metadevices are accessible as opposed to waiting
+	 * for devfsadmd to create them.
+	 */
+	if (meta_getalldevs(sp, &nlp, FALSE, ep) != 0) {
+		metafreenamelist(nlp);
+		goto rollback;
+	}
+
+	metafreenamelist(nlp);
 
 	pathname_return = pathname_reload(&sp, sp->setno, ep);
 	if ((pathname_return == METADEVADM_ERR) ||
