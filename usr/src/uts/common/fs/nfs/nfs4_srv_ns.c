@@ -501,21 +501,23 @@ more_visible(struct exportinfo *exi, treenode_t *tree_head)
 		 * connect_point for the curr->tree_vis. No need for EQFID.
 		 */
 		child = tree_find_child_by_vis(connect_point, curr->tree_vis);
-		if (child) { /* Merging */
+
+		/*
+		 * Merging cannot be done if a valid child->tree_exi would
+		 * be overwritten by a new curr->tree_exi.
+		 */
+		if (child &&
+		    (child->tree_exi == NULL || curr->tree_exi == NULL)) {
 			if (curr->tree_exi) { /* Transfer the exportinfo */
-				/*
-				 * more_visible() is not called for a reshare,
-				 * so the existing tree_exi must be NULL.
-				 */
-				ASSERT(child->tree_exi == NULL);
 				child->tree_exi = curr->tree_exi;
 				child->tree_exi->exi_tree = child;
 			}
 			kmem_free(curr, sizeof (treenode_t));
+			connect_point = child;
 		} else { /* Branching */
 			tree_add_child(connect_point, curr);
+			connect_point = NULL;
 		}
-		connect_point = child;
 	}
 }
 
