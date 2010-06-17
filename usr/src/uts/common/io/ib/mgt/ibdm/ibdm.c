@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1052,6 +1051,8 @@ ibdm_handle_hca_detach(ib_guid_t hca_guid)
 	ibdm_hca_list_t		*head, *prev = NULL;
 	size_t			len;
 	ibdm_dp_gidinfo_t	*gidinfo;
+	ibdm_port_attr_t	*port_attr;
+	int			i;
 
 	IBTF_DPRINTF_L4("ibdm",
 	    "\thandle_hca_detach: hca_guid = 0x%llx", hca_guid);
@@ -1097,7 +1098,14 @@ ibdm_handle_hca_detach(ib_guid_t hca_guid)
 					    head->hl_next;
 				else
 					prev->hl_next = head->hl_next;
-
+				for (i = 0; i < head->hl_nports; i++) {
+					port_attr = &head->hl_port_attr[i];
+					if (port_attr->pa_pkey_tbl != NULL)
+						kmem_free(
+						    port_attr->pa_pkey_tbl,
+						    port_attr->pa_npkeys *
+						    sizeof (ibdm_pkey_tbl_t));
+				}
 				len = sizeof (ibdm_hca_list_t) +
 				    (head->hl_nports *
 				    sizeof (ibdm_port_attr_t));
