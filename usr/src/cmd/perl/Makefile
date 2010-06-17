@@ -20,9 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.cmd
@@ -33,8 +31,13 @@ clobber := TARGET = clobber
 clean	:= TARGET = clean
 test	:= TARGET = test
 
-PERL_VERSIONS = \
-    5.8.4
+# PERL_LEGACY is versions of Perl still delivered through ON
+PERL_LEGACY = 5.8.4
+
+# WOS_PERL is non-ON Perl
+WOS_PERL = 5.10.0
+
+PERL_VERSIONS = $(PERL_LEGACY) $(WOS_PERL)
 
 .PARALLEL: $(PERL_VERSIONS)
 
@@ -51,7 +54,7 @@ all install: THIRDPARTYLICENSE
 clean: $(PERL_VERSIONS)
 
 clobber: $(PERL_VERSIONS)
-	$(RM) contrib/copy_contrib THIRDPARTYLICENSE
+	$(RM) -r contrib/copy_contrib THIRDPARTYLICENSE $(WOS_PERL)
 
 #
 # Perl is not lint-clean.  Fake up a target.
@@ -61,7 +64,10 @@ lint:
 	@ $(TRUE)
 
 $(PERL_VERSIONS): FRC
-	@ cd $@; pwd; $(MAKE) $(TARGET)
+	@ if [ ! -d $@ ]; then \
+	    $(CP) -r skel $@; \
+	fi
+	@ cd $@; pwd; PERL_VERSION=$@ $(MAKE) $(TARGET)
 
 PODDIR = 5.8.4/distrib/pod
 ARTLIC_SRC = $(PODDIR)/perlartistic.pod

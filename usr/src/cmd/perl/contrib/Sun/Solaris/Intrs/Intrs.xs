@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -34,7 +33,7 @@
 #include <errno.h>
 
 /* Non-shipping header - see Makefile.PL */
-#include <pci_tools.h>
+#include <sys/pci_tools.h>
 
 #include "EXTERN.h"
 #include "perl.h"

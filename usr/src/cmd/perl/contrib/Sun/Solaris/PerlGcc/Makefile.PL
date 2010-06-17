@@ -20,9 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 require 5.8.4;
@@ -51,7 +49,9 @@ my $arch = qx{uname -p}; chomp($arch);
 my $pver = sprintf('%vd', $^V);
 
 # Figure out the appropriate Config.pm.  Use an older version if necessary.
-my $configpm = "config/$pver/$rel/$arch/Config.pm";
+my $perlarch = ($arch eq "sparc") ? "sun4-solaris-64int":"i86pc-solaris-64int";
+
+my $configpm = "/usr/perl5/$pver/lib/$perlarch/Config.pm";
 if (! -f $configpm) {
 	my $p = "config/$pver";
 	my $dh;
@@ -68,6 +68,19 @@ if (! -f $configpm) {
 		die("Unsupported version of Perl/OS/Architecture " .
 		    "$pver/$rel/$arch\n");
 	}
+} else {
+	open CONFIGPM, "<", $configpm or die $!;
+	open CONFIGPM_OUT, ">", "Config.pm" or die $!;
+	while(<CONFIGPM>) {
+		if (/'cc/) {
+			s/=>\s*'cc/=> 'gcc/;
+			s/=\s*'cc/='gcc/;
+		}
+		print CONFIGPM_OUT $_;
+	}
+	close CONFIGPM;
+	close CONFIGPM_OUT;
+	$configpm = "Config.pm";
 }
 
 our %man1pods;
