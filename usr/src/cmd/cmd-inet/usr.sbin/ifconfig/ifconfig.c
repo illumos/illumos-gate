@@ -1808,8 +1808,11 @@ addif(char *str, int64_t param)
 	int prefixlen = 0;
 	struct sockaddr_storage laddr;
 	struct sockaddr_storage mask;
+	struct sockaddr_in6 *sin6;
+	struct sockaddr_in *sin;
 	ipadm_status_t istatus;
 	char cidraddr[BUFSIZ];
+	char addrstr[INET6_ADDRSTRLEN];
 
 	(void) strncpy(name, origname, sizeof (name));
 
@@ -1839,7 +1842,6 @@ addif(char *str, int64_t param)
 		(void) memset(&mask, 0, sizeof (mask));
 		mask.ss_family = afp->af_af;
 		if (afp->af_af == AF_INET6) {
-			struct sockaddr_in6 *sin6;
 			sin6 = (struct sockaddr_in6 *)&mask;
 			if (!in_prefixlentomask(prefixlen, IPV6_ABITS,
 			    (uchar_t *)&sin6->sin6_addr)) {
@@ -1849,8 +1851,6 @@ addif(char *str, int64_t param)
 				exit(1);
 			}
 		} else {
-			struct sockaddr_in *sin;
-
 			sin = (struct sockaddr_in *)&mask;
 			if (!in_prefixlentomask(prefixlen, IP_ABITS,
 			    (uchar_t *)&sin->sin_addr)) {
@@ -1907,17 +1907,25 @@ addif(char *str, int64_t param)
 		if (istatus != IPADM_SUCCESS)
 			ipadmerr_exit(istatus, "addif");
 
-		if (strchr(str, '/') == NULL) {
-			/*
-			 * lifr.lifr_addr, which is updated by set_mask_lifreq()
-			 * will contain the right mask to use.
-			 */
-			prefixlen = mask2plen(&lifr.lifr_addr);
-			(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
-			    str, prefixlen);
-			str = cidraddr;
+		if (af == AF_INET) {
+			sin = (struct sockaddr_in *)&laddr;
+			(void) inet_ntop(AF_INET, &sin->sin_addr, addrstr,
+			    sizeof (addrstr));
+		} else {
+			sin6 = (struct sockaddr_in6 *)&laddr;
+			(void) inet_ntop(AF_INET6, &sin6->sin6_addr, addrstr,
+			    sizeof (addrstr));
 		}
-		istatus = ipadm_set_addr(ipaddr, str, af);
+		/*
+		 * lifr.lifr_addr, which is updated by set_mask_lifreq()
+		 * will contain the right mask to use.
+		 */
+		prefixlen = mask2plen(&lifr.lifr_addr);
+		(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
+		    addrstr, prefixlen);
+
+		istatus = ipadm_set_addr(ipaddr, cidraddr, af);
+
 		if (istatus != IPADM_SUCCESS)
 			ipadmerr_exit(istatus, "could not set address");
 		setaddr++;
