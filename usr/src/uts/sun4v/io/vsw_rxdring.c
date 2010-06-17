@@ -20,9 +20,9 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/sysmacros.h>
@@ -247,7 +247,7 @@ fail:
 static int
 vsw_setup_rx_dring(vsw_ldc_t *ldcp, dring_info_t *dp)
 {
-	int				i;
+	int				i, j;
 	int				rv;
 	size_t				data_sz;
 	vio_mblk_t			*vmp;
@@ -314,6 +314,16 @@ vsw_setup_rx_dring(vsw_ldc_t *ldcp, dring_info_t *dp)
 		goto fail;
 	}
 	dp->data_ncookies = ncookies;
+
+	for (j = 1; j < ncookies; j++) {
+		rv = ldc_mem_nextcookie(dp->data_handle,
+		    &(dp->data_cookie[j]));
+		if (rv != 0) {
+			DERR(vswp, "%s: ldc_mem_nextcookie "
+			    "failed rv (%d)", name, rv);
+			goto fail;
+		}
+	}
 
 	/*
 	 * Successful in binding the handle to rx data area. Now setup mblks

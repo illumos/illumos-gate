@@ -20,9 +20,9 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/sysmacros.h>
@@ -113,7 +113,7 @@ extern boolean_t vgen_inject_error(vgen_ldc_t *ldcp, int error);
 int
 vgen_create_rx_dring(vgen_ldc_t *ldcp)
 {
-	int 				i;
+	int 				i, j;
 	int 				rv;
 	uint32_t			ncookies;
 	ldc_mem_info_t			minfo;
@@ -206,6 +206,16 @@ vgen_create_rx_dring(vgen_ldc_t *ldcp)
 		goto fail;
 	}
 	ldcp->rx_data_ncookies = ncookies;
+
+	for (j = 1; j < ncookies; j++) {
+		rv = ldc_mem_nextcookie(ldcp->rx_data_handle,
+		    &(ldcp->rx_data_cookie[j]));
+		if (rv != 0) {
+			DERR(vgenp, ldcp, "ldc_mem_nextcookie "
+			    "failed rv (%d)", rv);
+			goto fail;
+		}
+	}
 
 	/*
 	 * Successful in binding the handle to rx data area. Now setup mblks
