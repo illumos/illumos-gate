@@ -1679,20 +1679,6 @@ mrsas_isr(struct mrsas_instance *instance)
 	}
 	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
-	producer = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
-	    instance->producer);
-	consumer = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
-	    instance->consumer);
-
-	con_log(CL_ANN1, (CE_NOTE, " producer %x consumer %x ",
-	    producer, consumer));
-	if (producer == consumer) {
-		con_log(CL_ANN1, (CE_WARN, "producer =  consumer case"));
-		DTRACE_PROBE2(isr_pc_err, uint32_t, producer,
-		    uint32_t, consumer);
-		return (DDI_INTR_CLAIMED);
-	}
-
 #ifdef OCRDEBUG
 	if (debug_consecutive_timeout_after_ocr_g == 1) {
 		con_log(CL_ANN1, (CE_NOTE,
@@ -1715,6 +1701,22 @@ mrsas_isr(struct mrsas_instance *instance)
 
 	mutex_enter(&instance->completed_pool_mtx);
 	mutex_enter(&instance->cmd_pend_mtx);
+
+	producer = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
+	    instance->producer);
+	consumer = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
+	    instance->consumer);
+
+	con_log(CL_ANN1, (CE_NOTE, " producer %x consumer %x ",
+	    producer, consumer));
+	if (producer == consumer) {
+		con_log(CL_ANN1, (CE_WARN, "producer =  consumer case"));
+		DTRACE_PROBE2(isr_pc_err, uint32_t, producer,
+		    uint32_t, consumer);
+		mutex_exit(&instance->completed_pool_mtx);
+		mutex_exit(&instance->cmd_pend_mtx);
+		return (DDI_INTR_CLAIMED);
+	}
 
 	while (consumer != producer) {
 		context = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
@@ -1740,11 +1742,11 @@ mrsas_isr(struct mrsas_instance *instance)
 			consumer = 0;
 		}
 	}
+	ddi_put32(instance->mfi_internal_dma_obj.acc_handle,
+	    instance->consumer, consumer);
 	mutex_exit(&instance->cmd_pend_mtx);
 	mutex_exit(&instance->completed_pool_mtx);
 
-	ddi_put32(instance->mfi_internal_dma_obj.acc_handle,
-	    instance->consumer, consumer);
 	(void) ddi_dma_sync(instance->mfi_internal_dma_obj.dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORDEV);
 

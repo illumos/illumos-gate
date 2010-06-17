@@ -49,7 +49,7 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"LSIv2.6"
+#define	MRSAS_VERSION				"LSIv2.7"
 #define	MRSAS_RELDATE				"Apr 21, 2010"
 
 #define	MRSAS_TRUE				1
