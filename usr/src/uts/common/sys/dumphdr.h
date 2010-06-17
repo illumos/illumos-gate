@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_DUMPHDR_H
@@ -183,6 +182,7 @@ extern void dump_page(pfn_t);
 extern void dump_addpage(struct as *, void *, pfn_t);
 extern void dumpsys(void);
 extern void dumpsys_helper(void);
+extern void dumpsys_helper_nw(void);
 extern void dump_messages(void);
 extern void dump_ereports(void);
 extern void dumpvp_write(const void *, size_t);

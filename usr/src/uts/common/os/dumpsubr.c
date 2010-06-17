@@ -2098,6 +2098,13 @@ dumpsys_lzjbcompress(helper_t *hp)
  * panic dump the helper CPUs communicate with the panic CPU using
  * memory variables. All memory mapping and I/O is performed by the
  * panic CPU.
+ *
+ * At dump configuration time, helper_lock is set and helpers_wanted
+ * is 0. dumpsys() decides whether to set helpers_wanted before
+ * clearing helper_lock.
+ *
+ * At panic time, idle CPUs spin-wait on helper_lock, then alternately
+ * take the lock and become a helper, or return.
  */
 void
 dumpsys_helper()
@@ -2122,8 +2129,26 @@ dumpsys_helper()
 				return;
 			}
 		}
+
+		/* No more helpers are needed. */
+		dumpcfg.helpers_wanted = 0;
+
 	}
 	dumpsys_spinunlock(&dumpcfg.helper_lock);
+}
+
+/*
+ * No-wait helper callable in spin loops.
+ *
+ * Do not wait for helper_lock. Just check helpers_wanted. The caller
+ * may decide to continue. This is the "c)ontinue, s)ync, r)eset? s"
+ * case.
+ */
+void
+dumpsys_helper_nw()
+{
+	if (dumpcfg.helpers_wanted)
+		dumpsys_helper();
 }
 
 /*
