@@ -277,12 +277,22 @@ lo_mount(struct vfs *vfsp,
 	}
 
 	/*
-	 * realrootvp may be an AUTOFS node, in which case we
-	 * perform a VOP_ACCESS() to trigger the mount of the
-	 * intended filesystem, so we loopback mount the intended
-	 * filesystem instead of the AUTOFS filesystem.
+	 * realrootvp may be an AUTOFS node, in which case we perform a
+	 * VOP_ACCESS() to trigger the mount of the intended filesystem.
+	 * This causes a loopback mount of the intended filesystem instead
+	 * of the AUTOFS filesystem.
+	 *
+	 * If a lofs mount creates a mount loop (such that a lofs vfs is
+	 * mounted on an autofs node and that lofs vfs points back to the
+	 * autofs node which it is mounted on) then a VOP_ACCESS call will
+	 * create a deadlock. Once this deadlock is released, VOP_ACCESS will
+	 * return EINTR. In such a case we don't want the lofs vfs to be
+	 * created as the loop could panic the system.
 	 */
-	(void) VOP_ACCESS(realrootvp, 0, 0, cr, NULL);
+	if ((error = VOP_ACCESS(realrootvp, 0, 0, cr, NULL)) != 0) {
+		VN_RELE(realrootvp);
+		return (error);
+	}
 
 	/*
 	 * We're interested in the top most filesystem.
