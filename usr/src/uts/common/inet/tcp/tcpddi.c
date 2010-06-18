@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -41,6 +40,8 @@
 #define	INET_SOCKDESC	"TCP socket module"
 #define	INET_SOCK_PROTO_CREATE_FUNC	(*tcp_create)
 #define	INET_SOCK_PROTO_FB_FUNC		(*tcp_fallback)
+#define	INET_SOCK_FALLBACK_DEV_V4	"/dev/tcp"
+#define	INET_SOCK_FALLBACK_DEV_V6	"/dev/tcp6"
 #define	INET_DEVMINOR	0
 #define	INET_MODMTFLAGS	D_MP
 #define	INET_DEVMTFLAGS	(D_MP|_D_DIRECT)

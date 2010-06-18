@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SOCKFS_SOCKTPI_H
@@ -251,12 +250,6 @@ typedef struct sotpi_info {
 	kssl_endpt_type_t	sti_kssl_type;	/* is proxy/is proxied/none */
 	kssl_ent_t		sti_kssl_ent;	/* SSL config entry */
 	kssl_ctx_t		sti_kssl_ctx;	/* SSL session context */
-
-	/*
-	 * The mblks below are only allocated and used during fallback.
-	 */
-	mblk_t	*sti_exdata_mp;		/* T_EXDATA_IND or SIGURG */
-	mblk_t	*sti_urgmark_mp;	/* mark indication */
 } sotpi_info_t;
 
 struct T_capability_ack;

@@ -926,3 +926,7 @@ usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
 #
 opt/onbld/bin/i386/elfsign	i386
 opt/onbld/bin/sparc/elfsign	sparc
+#
+# Private socket filter API
+#
+usr/include/sys/sockfilter.h

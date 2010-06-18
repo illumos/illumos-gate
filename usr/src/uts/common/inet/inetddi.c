@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -88,6 +87,12 @@ INET_SOCKDESC must be defined!
 #elif	defined(INET_SOCKDESC) && !defined(INET_SOCK_PROTO_CREATE_FUNC)
 #error  inetddi.c: INET_SOCKDESC is defined but INET_SOCK_PROTO_CREATE_FUNC \
 is not!
+#elif	defined(INET_SOCK_PROTO_FB_FUNC) && !defined(INET_SOCK_FALLBACK_DEV_V4)
+#error	inetddi.c: INET_SOCK_PROTO_FB_FUNC is defined but \
+INET_SOCK_FALLBACK_DEV_V4 is not!
+#elif	defined(INET_SOCK_PROTO_FB_FUNC) && !defined(INET_SOCK_FALLBACK_DEV_V6)
+#error	inetddi.c: INET_SOCK_PROTO_FB_FUNC is defined but \
+INET_SOCK_FALLBACK_DEV_V6 is not!
 #endif
 
 #ifdef	INET_DEVDESC
@@ -216,7 +221,9 @@ static struct modlstrmod modlstrmod = {
 static __smod_priv_t smodpriv = {
 	NULL,
 	NULL,
-	INET_SOCK_PROTO_FB_FUNC
+	INET_SOCK_PROTO_FB_FUNC,
+	INET_SOCK_FALLBACK_DEV_V4,
+	INET_SOCK_FALLBACK_DEV_V6
 };
 #endif	/* INET_SOCK_PROTO_FB_FUNC */
 

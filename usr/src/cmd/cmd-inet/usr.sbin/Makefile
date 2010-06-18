@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 SYNCPROG=	syncinit syncloop syncstat
@@ -38,6 +37,7 @@ PROG=		6to4relay arp gettable if_mpadm \
 
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
 		login.xml shell.xml rexec.xml 
+SVCMETHOD=	svc-sockfilter
 
 ROOTFS_PROG=	hostconfig route soconfig
 SBINLINKS=	hostconfig route
@@ -106,7 +106,8 @@ SRCS+=		$(COMMONSRCS)
 #
 # Message catalog
 #
-POFILES=	6to4relay.po if_mpadm.po in.comsat.po ipaddrsel.po route.po
+POFILES=	6to4relay.po if_mpadm.po in.comsat.po ipaddrsel.po route.po \
+		soconfig.po
 POFILE=		usr.sbin.po
 
 all:=		TARGET= all
@@ -199,7 +200,7 @@ $(ROOTUSRSBINLINKS):
 
 install: $(PROG) $(ROOTFS_PROG) $(SUBDIRS) .WAIT $(ROOTUSRSBINPROG) \
 	$(ROOTSBINPROG) $(ROOTUSRSBINLINKS) $(ROOTETCDEFAULTFILES) \
-	$(ROOTMANIFEST) THIRDPARTYLICENSE.arp
+	$(ROOTMANIFEST) $(ROOTSVCMETHOD) THIRDPARTYLICENSE.arp
 
 THIRDPARTYLICENSE.arp: arp.c
 	$(SED) -n '/University of California/,/SUCH DAMAGE/p' arp.c > $@

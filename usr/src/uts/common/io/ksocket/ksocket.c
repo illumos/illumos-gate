@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/file.h>
@@ -166,7 +165,7 @@ ksocket_accept(ksocket_t ks, struct sockaddr *addr,
 }
 
 int
-ksocket_connect(ksocket_t ks, const struct sockaddr *addr, socklen_t addrlen,
+ksocket_connect(ksocket_t ks, struct sockaddr *addr, socklen_t addrlen,
     struct cred *cr)
 {
 	/* All Solaris components should pass a cred for this operation. */

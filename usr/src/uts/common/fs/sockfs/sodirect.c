@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -78,7 +77,7 @@ sod_rcv_init(struct sonode *so, int flags, struct uio **uiopp)
 	if (uiop->uio_resid >= uioasync.mincnt &&
 	    sodp != NULL && sodp->sod_enabled &&
 	    uioasync.enabled && !(flags & MSG_PEEK) &&
-	    !so->so_proto_props.sopp_loopback &&
+	    !so->so_proto_props.sopp_loopback && so->so_filter_active == 0 &&
 	    !(so->so_state & SS_CANTRCVMORE)) {
 		/*
 		 * Big enough I/O for uioa min setup and an sodirect socket

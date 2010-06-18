@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -40,8 +39,10 @@
 #define	INET_DEVSTRTAB	icmpinfov4
 #define	INET_MODSTRTAB	dummymodinfo
 #define	INET_SOCKDESC	"Rawip socket module"
-#define	INET_SOCK_PROTO_CREATE_FUNC (*rawip_create)
-#define	INET_SOCK_PROTO_FB_FUNC (*rawip_fallback)
+#define	INET_SOCK_PROTO_CREATE_FUNC 	(*rawip_create)
+#define	INET_SOCK_PROTO_FB_FUNC 	(*rawip_fallback)
+#define	INET_SOCK_FALLBACK_DEV_V4	"/dev/icmp"
+#define	INET_SOCK_FALLBACK_DEV_V6	"/dev/icmp6"
 #define	INET_DEVMTFLAGS	D_MP
 #define	INET_MODMTFLAGS D_MP
 

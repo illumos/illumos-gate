@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -45,6 +44,7 @@
 
 #include <inet/ipclassifier.h>
 #include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/sockfilter_impl.h>
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/socktpi.h>
 #include <fs/sockfs/sodirect.h>
@@ -216,7 +216,7 @@ socket_accept(struct sonode *lso, int fflag, cred_t *cr, struct sonode **nsop)
  * Active open.
  */
 int
-socket_connect(struct sonode *so, const struct sockaddr *name,
+socket_connect(struct sonode *so, struct sockaddr *name,
     socklen_t namelen, int fflag, int flags, cred_t *cr)
 {
 	int error;
@@ -471,13 +471,22 @@ sonode_constructor(void *buf, void *cdrarg, int kmflags)
 	so->so_rcv_timer_tid	= 0;
 	so->so_rcv_thresh	= 0;
 
-	so->so_acceptq_head	= NULL;
-	so->so_acceptq_tail	= &so->so_acceptq_head;
-	so->so_acceptq_next	= NULL;
+	list_create(&so->so_acceptq_list, sizeof (struct sonode),
+	    offsetof(struct sonode, so_acceptq_node));
+	list_create(&so->so_acceptq_defer, sizeof (struct sonode),
+	    offsetof(struct sonode, so_acceptq_node));
+	list_link_init(&so->so_acceptq_node);
 	so->so_acceptq_len	= 0;
 	so->so_backlog		= 0;
+	so->so_listener		= NULL;
 
 	so->so_snd_qfull	= B_FALSE;
+
+	so->so_filter_active	= 0;
+	so->so_filter_tx	= 0;
+	so->so_filter_defertime = 0;
+	so->so_filter_top	= NULL;
+	so->so_filter_bottom	= NULL;
 
 	mutex_init(&so->so_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&so->so_acceptq_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -509,9 +518,15 @@ sonode_destructor(void *buf, void *cdrarg)
 
 	ASSERT(so->so_rcv_q_head == NULL);
 
-	ASSERT(so->so_acceptq_head == NULL);
-	ASSERT(so->so_acceptq_tail == &so->so_acceptq_head);
-	ASSERT(so->so_acceptq_next == NULL);
+	list_destroy(&so->so_acceptq_list);
+	list_destroy(&so->so_acceptq_defer);
+	ASSERT(!list_link_active(&so->so_acceptq_node));
+	ASSERT(so->so_listener == NULL);
+
+	ASSERT(so->so_filter_active == 0);
+	ASSERT(so->so_filter_tx == 0);
+	ASSERT(so->so_filter_top == NULL);
+	ASSERT(so->so_filter_bottom == NULL);
 
 	ASSERT(vp->v_data == so);
 	ASSERT(vn_matchops(vp, socket_vnodeops));
@@ -581,20 +596,10 @@ sonode_init(struct sonode *so, struct sockparams *sp, int family,
 
 	so->so_copyflag = 0;
 
-	ASSERT(so->so_acceptq_head == NULL);
-	ASSERT(so->so_acceptq_tail == &so->so_acceptq_head);
-	ASSERT(so->so_acceptq_next == NULL);
-
 	vn_reinit(vp);
 	vp->v_vfsp	= rootvfs;
 	vp->v_type	= VSOCK;
 	vp->v_rdev	= sockdev;
-
-	so->so_rcv_queued = 0;
-	so->so_rcv_q_head = NULL;
-	so->so_rcv_q_last_head = NULL;
-	so->so_rcv_head	= NULL;
-	so->so_rcv_last_head = NULL;
 
 	so->so_snd_qfull = B_FALSE;
 	so->so_minpsz = 0;
@@ -620,7 +625,6 @@ sonode_init(struct sonode *so, struct sockparams *sp, int family,
 void
 sonode_fini(struct sonode *so)
 {
-	mblk_t *mp;
 	vnode_t *vp;
 
 	ASSERT(so->so_count == 0);
@@ -629,15 +633,6 @@ sonode_fini(struct sonode *so)
 		ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 		(void) untimeout(so->so_rcv_timer_tid);
 		so->so_rcv_timer_tid = 0;
-	}
-
-	so_acceptq_flush(so, B_FALSE);
-
-	if ((mp = so->so_oobmsg) != NULL) {
-		freemsg(mp);
-		so->so_oobmsg = NULL;
-		so->so_state &= ~(SS_OOBPEND|SS_HAVEOOBDATA|SS_HADOOBDATA|
-		    SS_RCVATMARK);
 	}
 
 	if (so->so_poll_list.ph_list != NULL) {
@@ -655,4 +650,17 @@ sonode_fini(struct sonode *so)
 		crfree(so->so_peercred);
 		so->so_peercred = NULL;
 	}
+	/* Detach and destroy filters */
+	if (so->so_filter_top != NULL)
+		sof_sonode_cleanup(so);
+
+	ASSERT(list_is_empty(&so->so_acceptq_list));
+	ASSERT(list_is_empty(&so->so_acceptq_defer));
+	ASSERT(!list_link_active(&so->so_acceptq_node));
+
+	ASSERT(so->so_rcv_queued == 0);
+	ASSERT(so->so_rcv_q_head == NULL);
+	ASSERT(so->so_rcv_q_last_head == NULL);
+	ASSERT(so->so_rcv_head == NULL);
+	ASSERT(so->so_rcv_last_head == NULL);
 }

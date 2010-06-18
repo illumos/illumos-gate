@@ -6498,7 +6498,8 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 
 int
 udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
-    boolean_t issocket, so_proto_quiesced_cb_t quiesced_cb)
+    boolean_t issocket, so_proto_quiesced_cb_t quiesced_cb,
+    sock_quiesce_arg_t *arg)
 {
 	conn_t 	*connp = (conn_t *)proto_handle;
 	udp_t	*udp;
@@ -6507,7 +6508,7 @@ udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	socklen_t laddrlen, faddrlen;
 	short opts;
 	struct stroptions *stropt;
-	mblk_t *stropt_mp;
+	mblk_t *mp, *stropt_mp;
 	int error;
 
 	udp = connp->conn_udp;
@@ -6563,17 +6564,21 @@ udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	if (connp->conn_ixa->ixa_flags & IXAF_DONTROUTE)
 		opts |= SO_DONTROUTE;
 
-	(*quiesced_cb)(connp->conn_upper_handle, q, &tca,
+	mp = (*quiesced_cb)(connp->conn_upper_handle, arg, &tca,
 	    (struct sockaddr *)&laddr, laddrlen,
 	    (struct sockaddr *)&faddr, faddrlen, opts);
 
 	mutex_enter(&udp->udp_recv_lock);
 	/*
 	 * Attempts to send data up during fallback will result in it being
-	 * queued in udp_t. Now we push up any queued packets.
+	 * queued in udp_t. First push up the datagrams obtained from the
+	 * socket, then any packets queued in udp_t.
 	 */
+	if (mp != NULL) {
+		mp->b_next = udp->udp_fallback_queue_head;
+		udp->udp_fallback_queue_head = mp;
+	}
 	while (udp->udp_fallback_queue_head != NULL) {
-		mblk_t *mp;
 		mp = udp->udp_fallback_queue_head;
 		udp->udp_fallback_queue_head = mp->b_next;
 		mutex_exit(&udp->udp_recv_lock);
@@ -6598,7 +6603,7 @@ udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 
 /* ARGSUSED3 */
 int
-udp_getpeername(sock_lower_handle_t  proto_handle, struct sockaddr *sa,
+udp_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *sa,
     socklen_t *salenp, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;

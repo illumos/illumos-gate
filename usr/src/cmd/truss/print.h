@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -135,7 +134,8 @@ extern "C" {
 #define	UN1	95		/* unsigned except for -1 */
 #define	MOB	96		/* print mmapobj() flags */
 #define	UTF	97		/* print utimensat() flag */
-#define	HID	98		/* hidden argument, don't print */
+#define	SKC	98		/* print sockconfig subcode */
+#define	HID	99		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

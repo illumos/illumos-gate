@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -464,7 +463,7 @@ const struct systable systable[] = {
 {"getsockname", 4, DEC, NOV, DEC, HEX, HEX, SKV},		/* 244 */
 {"getsockopt",	6, DEC, NOV, DEC, SOL, SON, HEX, HEX, SKV},	/* 245 */
 {"setsockopt",	6, DEC, NOV, DEC, SOL, SON, HEX, DEC, SKV},	/* 246 */
-{"sockconfig",	4, DEC, NOV, DEC, DEC, DEC, STG},		/* 247 */
+{"sockconfig",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/* 247 */
 {"ntp_gettime",	1, DEC, NOV, HEX},				/* 248 */
 {"ntp_adjtime",	1, DEC, NOV, HEX},				/* 249 */
 {"lwp_mutex_unlock", 1, DEC, NOV, HEX},				/* 250 */
@@ -873,6 +872,14 @@ const	struct systable utimesystable[] = {
 };
 #define	NUTIMESYSCODE	(sizeof (utimesystable) / sizeof (struct systable))
 
+const	struct systable sockconfigtable[] = {
+{"sockconfig", 5, DEC, NOV, SKC, DEC, DEC, DEC, STG},	/* 0 */
+{"sockconfig", 4, DEC, NOV, SKC, DEC, DEC, DEC},	/* 1 */
+{"sockconfig", 3, DEC, NOV, SKC, STG, HEX },		/* 2 */
+{"sockconfig", 2, DEC, NOV, SKC, STG },			/* 3 */
+};
+#define	NSOCKCONFIGCODE	(sizeof (sockconfigtable) / sizeof (struct systable))
+
 const	struct sysalias sysalias[] = {
 	{ "exit",	SYS_exit	},
 	{ "fork",	SYS_forksys	},
@@ -1204,6 +1211,10 @@ subsys(int syscall, int subcode)
 			if ((unsigned)subcode < NUTIMESYSCODE)
 				stp = &utimesystable[subcode];
 			break;
+		case SYS_sockconfig:	/* sockconfig family */
+			if ((unsigned)subcode < NSOCKCONFIGCODE)
+				stp = &sockconfigtable[subcode];
+			break;
 		}
 	}
 
@@ -1383,6 +1394,7 @@ getsubcode(private_t *pri)
 		case SYS_rctlsys:	/* rctlsys */
 		case SYS_sidsys:	/* sidsys */
 		case SYS_utimesys:	/* utimesys */
+		case SYS_sockconfig:	/* sockconfig */
 			subcode = arg0;
 			break;
 		case SYS_fcntl:		/* fcntl() */
@@ -1453,7 +1465,8 @@ maxsyscalls()
 	    + NRCTLCODE - 1
 	    + NFORKCODE - 1
 	    + NSIDSYSCODE - 1
-	    + NUTIMESYSCODE - 1);
+	    + NUTIMESYSCODE - 1
+	    + NSOCKCONFIGCODE - 1);
 }
 
 /*
@@ -1545,6 +1558,8 @@ nsubcodes(int syscall)
 		return (NSIDSYSCODE);
 	case SYS_utimesys:
 		return (NUTIMESYSCODE);
+	case SYS_sockconfig:
+		return (NSOCKCONFIGCODE);
 	default:
 		return (1);
 	}

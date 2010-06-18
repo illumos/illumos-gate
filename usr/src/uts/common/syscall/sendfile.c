@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -781,8 +780,16 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					size_t iov_len;
 
 					iov_len = sfv_len;
-					if (!SOCK_IS_NONSTR(so) &&
-					    SOTOTPI(so)->sti_kssl_ctx != NULL)
+					/*
+					 * Socket filters can limit the mblk
+					 * size, so limit reads to maxblk if
+					 * there are filters present.
+					 */
+					if ((!SOCK_IS_NONSTR(so) &&
+					    _SOTOTPI(so)->sti_kssl_ctx
+					    != NULL) ||
+					    (so->so_filter_active > 0 &&
+					    maxblk != INFPSZ))
 						iov_len = MIN(iov_len, maxblk);
 
 					aiov.iov_len = iov_len;
@@ -928,13 +935,16 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 
 				copyflag = stp != NULL ? stp->sd_copyflag :
 				    so->so_proto_props.sopp_zcopyflag;
+
 				/*
-				 * For sockets acting as an SSL proxy, we
-				 * need to adjust the size to the maximum
-				 * SSL record size set in the stream head.
+				 * Socket filters can limit the mblk size,
+				 * so limit reads to maxblk if there are
+				 * filters present.
 				 */
-				if (!SOCK_IS_NONSTR(so) &&
-				    _SOTOTPI(so)->sti_kssl_ctx != NULL)
+				if ((!SOCK_IS_NONSTR(so) &&
+				    _SOTOTPI(so)->sti_kssl_ctx != NULL) ||
+				    (so->so_filter_active > 0 &&
+				    maxblk != INFPSZ))
 					size = MIN(size, maxblk);
 
 				if (vn_has_flocks(readvp) ||

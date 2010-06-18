@@ -515,8 +515,6 @@ extern uint_t tcp_free_list_max_cnt;
 /*
  * Functions in tcp.c.
  */
-extern int	tcp_accept_common(conn_t *, conn_t *, cred_t *);
-extern void	tcp_accept_finish(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_acceptor_hash_insert(t_uscalar_t, tcp_t *);
 extern tcp_t	*tcp_acceptor_hash_lookup(t_uscalar_t, tcp_stack_t *);
 extern void	tcp_acceptor_hash_remove(tcp_t *);
@@ -565,6 +563,7 @@ extern void	tcp_update_pmtu(tcp_t *, boolean_t);
 extern mblk_t	*tcp_zcopy_backoff(tcp_t *, mblk_t *, boolean_t);
 extern boolean_t	tcp_zcopy_check(tcp_t *);
 extern void	tcp_zcopy_notify(tcp_t *);
+extern void	tcp_get_proto_props(tcp_t *, struct sock_proto_props *);
 
 /*
  * Bind related functions in tcp_bind.c
@@ -630,8 +629,9 @@ extern boolean_t	tcp_verifyicmp(conn_t *, void *, icmph_t *, icmp6_t *,
 /*
  * Kernel socket related functions in tcp_socket.c.
  */
-extern int tcp_fallback(sock_lower_handle_t, queue_t *, boolean_t,
-    so_proto_quiesced_cb_t);
+extern int	tcp_fallback(sock_lower_handle_t, queue_t *, boolean_t,
+		    so_proto_quiesced_cb_t, sock_quiesce_arg_t *);
+extern boolean_t tcp_newconn_notify(tcp_t *, ip_recv_attr_t *);
 
 /*
  * Timer related functions in tcp_timers.c.
@@ -657,9 +657,6 @@ extern boolean_t	tcp_conn_con(tcp_t *, uchar_t *, mblk_t *,
 			    mblk_t **, ip_recv_attr_t *);
 extern void	tcp_err_ack(tcp_t *, mblk_t *, int, int);
 extern void	tcp_err_ack_prim(tcp_t *, mblk_t *, int, int, int);
-extern void	tcp_fallback_eager(tcp_t *, boolean_t);
-extern void	tcp_fallback_noneager(tcp_t *, mblk_t *, queue_t *,
-		    boolean_t, so_proto_quiesced_cb_t);
 extern void	tcp_info_req(tcp_t *, mblk_t *);
 extern void	tcp_send_conn_ind(void *, mblk_t *, void *);
 extern void	tcp_send_pending(void *, mblk_t *, void *, ip_recv_attr_t *);
@@ -674,6 +671,8 @@ extern int	tcp_tpi_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
 extern void	tcp_tpi_unbind(tcp_t *, mblk_t *);
 extern void	tcp_tli_accept(tcp_t *, mblk_t *);
 extern void	tcp_use_pure_tpi(tcp_t *);
+extern void	tcp_do_capability_ack(tcp_t *, struct T_capability_ack *,
+		    t_uscalar_t);
 
 /*
  * TCP option processing related functions in tcp_opt_data.c

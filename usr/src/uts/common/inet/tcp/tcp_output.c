@@ -1465,13 +1465,24 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	clock_t	delta = 0;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	ASSERT((connp->conn_fanout != NULL && connp->conn_ref >= 4) ||
-	    (connp->conn_fanout == NULL && connp->conn_ref >= 3));
+	/*
+	 * When a non-STREAMS socket is being closed, it does not always
+	 * stick around waiting for tcp_close_output to run and can therefore
+	 * have dropped a reference already. So adjust the asserts accordingly.
+	 */
+	ASSERT((connp->conn_fanout != NULL &&
+	    connp->conn_ref >= (IPCL_IS_NONSTR(connp) ? 3 : 4)) ||
+	    (connp->conn_fanout == NULL &&
+	    connp->conn_ref >= (IPCL_IS_NONSTR(connp) ? 2 : 3)));
 
 	mutex_enter(&tcp->tcp_eager_lock);
 	if (tcp->tcp_conn_req_cnt_q0 != 0 || tcp->tcp_conn_req_cnt_q != 0) {
-		/* Cleanup for listener */
-		tcp_eager_cleanup(tcp, 0);
+		/*
+		 * Cleanup for listener. For non-STREAM sockets sockfs will
+		 * close all the eagers on 'q', so in that case only deal
+		 * with 'q0'.
+		 */
+		tcp_eager_cleanup(tcp, IPCL_IS_NONSTR(connp) ? 1 : 0);
 		tcp->tcp_wait_for_eagers = 1;
 	}
 	mutex_exit(&tcp->tcp_eager_lock);
@@ -1516,14 +1527,37 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 			msg = "tcp_close, unread data";
 			break;
 		}
+
 		/*
-		 * We have done a qwait() above which could have possibly
-		 * drained more messages in turn causing transition to a
-		 * different state. Check whether we have to do the rest
-		 * of the processing or not.
+		 * Abort connection if it is being closed without first
+		 * being accepted. This can happen if a listening non-STREAM
+		 * socket wants to get rid of the socket, for example, if the
+		 * listener is closing.
 		 */
-		if (tcp->tcp_state <= TCPS_LISTEN)
+		if (tcp->tcp_listener != NULL) {
+			ASSERT(IPCL_IS_NONSTR(connp));
+			msg = "tcp_close, close before accept";
+
+			/*
+			 * Unlink from the listener and drop the reference
+			 * put on it by the eager. tcp_closei_local will not
+			 * do it because tcp_tconnind_started is TRUE.
+			 */
+			mutex_enter(&tcp->tcp_saved_listener->tcp_eager_lock);
+			tcp_eager_unlink(tcp);
+			mutex_exit(&tcp->tcp_saved_listener->tcp_eager_lock);
+			CONN_DEC_REF(tcp->tcp_saved_listener->tcp_connp);
+
+			/*
+			 * If the conn has received a RST, the only thing
+			 * left to do is to drop the ref.
+			 */
+			if (tcp->tcp_state <= TCPS_BOUND) {
+				CONN_DEC_REF(tcp->tcp_connp);
+				return;
+			}
 			break;
+		}
 
 		/*
 		 * Transmit the FIN before detaching the tcp_t.
@@ -1593,7 +1627,8 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 		if (tcp->tcp_state == TCPS_TIME_WAIT) {
 			tcp_time_wait_append(tcp);
 			TCP_DBGSTAT(tcps, tcp_detach_time_wait);
-			ASSERT(connp->conn_ref >= 3);
+			ASSERT(connp->conn_ref >=
+			    (IPCL_IS_NONSTR(connp) ? 2 : 3));
 			goto finish;
 		}
 
@@ -1606,7 +1641,7 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 			tcp->tcp_timer_tid = TCP_TIMER(tcp, tcp_timer,
 			    delta ? delta : 1);
 
-		ASSERT(connp->conn_ref >= 3);
+		ASSERT(connp->conn_ref >= (IPCL_IS_NONSTR(connp) ? 2 : 3));
 		goto finish;
 	}
 
@@ -1623,22 +1658,35 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 
 	tcp_closei_local(tcp);
 	CONN_DEC_REF(connp);
-	ASSERT(connp->conn_ref >= 2);
+	ASSERT(connp->conn_ref >= (IPCL_IS_NONSTR(connp) ? 1 : 2));
 
 finish:
-	mutex_enter(&tcp->tcp_closelock);
 	/*
 	 * Don't change the queues in the case of a listener that has
 	 * eagers in its q or q0. It could surprise the eagers.
 	 * Instead wait for the eagers outside the squeue.
+	 *
+	 * For non-STREAMS sockets tcp_wait_for_eagers implies that
+	 * we should delay the su_closed upcall until all eagers have
+	 * dropped their references.
 	 */
 	if (!tcp->tcp_wait_for_eagers) {
 		tcp->tcp_detached = B_TRUE;
 		connp->conn_rq = NULL;
 		connp->conn_wq = NULL;
+
+		/* non-STREAM socket, release the upper handle */
+		if (IPCL_IS_NONSTR(connp)) {
+			ASSERT(connp->conn_upper_handle != NULL);
+			(*connp->conn_upcalls->su_closed)
+			    (connp->conn_upper_handle);
+			connp->conn_upper_handle = NULL;
+			connp->conn_upcalls = NULL;
+		}
 	}
 
 	/* Signal tcp_close() to finish closing. */
+	mutex_enter(&tcp->tcp_closelock);
 	tcp->tcp_closed = 1;
 	cv_signal(&tcp->tcp_closecv);
 	mutex_exit(&tcp->tcp_closelock);

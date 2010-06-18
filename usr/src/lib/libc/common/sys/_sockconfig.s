@@ -23,16 +23,14 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 	.file	"_sockconfig.s"
 
 /* C library -- _sockconfig					*/
 /*
- * int _sockconfig (int domain, int type, int protocol,
- *			dev_t dev, int version);
+ * int _sockconfig (int cmd, void *arg1, void *arg2, void *arg3, void *arg4);
  */
 
 #include "SYS.h"

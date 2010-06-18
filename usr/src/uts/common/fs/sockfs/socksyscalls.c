@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -67,6 +66,7 @@
 
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/sockfilter_impl.h>
 #include <fs/sockfs/socktpi.h>
 
 #ifdef SOCK_TEST
@@ -75,7 +75,10 @@ int do_useracc = 1;		/* Controlled by setting SO_DEBUG to 4 */
 #define	do_useracc	1
 #endif /* SOCK_TEST */
 
-extern int xnet_truncate_print;
+extern int 	xnet_truncate_print;
+
+extern void	nl7c_init(void);
+extern int	sockfs_defer_nl7c_init;
 
 /*
  * Note: DEF_IOV_MAX is defined and used as it is in "fs/vncalls.c"
@@ -1519,143 +1522,291 @@ done2:
 	return (0);
 }
 
+static int
+sockconf_add_sock(int family, int type, int protocol, char *name)
+{
+	int error = 0;
+	char *kdevpath = NULL;
+	char *kmodule = NULL;
+	char *buf = NULL;
+	size_t pathlen = 0;
+	struct sockparams *sp;
+
+	if (name == NULL)
+		return (EINVAL);
+	/*
+	 * Copyin the name.
+	 * This also makes it possible to check for too long pathnames.
+	 * Compress the space needed for the name before passing it
+	 * to soconfig - soconfig will store the string until
+	 * the configuration is removed.
+	 */
+	buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	if ((error = copyinstr(name, buf, MAXPATHLEN, &pathlen)) != 0) {
+		kmem_free(buf, MAXPATHLEN);
+		return (error);
+	}
+	if (strncmp(buf, "/dev", strlen("/dev")) == 0) {
+		/* For device */
+
+		/*
+		 * Special handling for NCA:
+		 *
+		 * DEV_NCA is never opened even if an application
+		 * requests for AF_NCA. The device opened is instead a
+		 * predefined AF_INET transport (NCA_INET_DEV).
+		 *
+		 * Prior to Volo (PSARC/2007/587) NCA would determine
+		 * the device using a lookup, which worked then because
+		 * all protocols were based on TPI. Since TPI is no
+		 * longer the default, we have to explicitly state
+		 * which device to use.
+		 */
+		if (strcmp(buf, NCA_DEV) == 0) {
+			/* only support entry <28, 2, 0> */
+			if (family != AF_NCA || type != SOCK_STREAM ||
+			    protocol != 0) {
+				kmem_free(buf, MAXPATHLEN);
+				return (EINVAL);
+			}
+
+			pathlen = strlen(NCA_INET_DEV) + 1;
+			kdevpath = kmem_alloc(pathlen, KM_SLEEP);
+			bcopy(NCA_INET_DEV, kdevpath, pathlen);
+			kdevpath[pathlen - 1] = '\0';
+		} else {
+			kdevpath = kmem_alloc(pathlen, KM_SLEEP);
+			bcopy(buf, kdevpath, pathlen);
+			kdevpath[pathlen - 1] = '\0';
+		}
+	} else {
+		/* For socket module */
+		kmodule = kmem_alloc(pathlen, KM_SLEEP);
+		bcopy(buf, kmodule, pathlen);
+		kmodule[pathlen - 1] = '\0';
+		pathlen = 0;
+	}
+	kmem_free(buf, MAXPATHLEN);
+
+	/* sockparams_create frees mod name and devpath upon failure */
+	sp = sockparams_create(family, type, protocol, kmodule,
+	    kdevpath, pathlen, 0, KM_SLEEP, &error);
+	if (sp != NULL) {
+		error = sockparams_add(sp);
+		if (error != 0)
+			sockparams_destroy(sp);
+	}
+
+	return (error);
+}
+
+static int
+sockconf_remove_sock(int family, int type, int protocol)
+{
+	return (sockparams_delete(family, type, protocol));
+}
+
+static int
+sockconfig_remove_filter(const char *uname)
+{
+	char kname[SOF_MAXNAMELEN];
+	size_t len;
+	int error;
+	sof_entry_t *ent;
+
+	if ((error = copyinstr(uname, kname, SOF_MAXNAMELEN, &len)) != 0)
+		return (error);
+
+	ent = sof_entry_remove_by_name(kname);
+	if (ent == NULL)
+		return (ENXIO);
+
+	mutex_enter(&ent->sofe_lock);
+	ASSERT(!(ent->sofe_flags & SOFEF_CONDEMED));
+	if (ent->sofe_refcnt == 0) {
+		mutex_exit(&ent->sofe_lock);
+		sof_entry_free(ent);
+	} else {
+		/* let the last socket free the filter */
+		ent->sofe_flags |= SOFEF_CONDEMED;
+		mutex_exit(&ent->sofe_lock);
+	}
+
+	return (0);
+}
+
+static int
+sockconfig_add_filter(const char *uname, void *ufilpropp)
+{
+	struct sockconfig_filter_props filprop;
+	sof_entry_t *ent;
+	int error;
+	size_t tuplesz, len;
+	char hintbuf[SOF_MAXNAMELEN];
+
+	ent = kmem_zalloc(sizeof (sof_entry_t), KM_SLEEP);
+	mutex_init(&ent->sofe_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	if ((error = copyinstr(uname, ent->sofe_name, SOF_MAXNAMELEN,
+	    &len)) != 0) {
+		sof_entry_free(ent);
+		return (error);
+	}
+
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (copyin(ufilpropp, &filprop, sizeof (filprop)) != 0) {
+			sof_entry_free(ent);
+			return (EFAULT);
+		}
+	}
+#ifdef	_SYSCALL32_IMPL
+	else {
+		struct sockconfig_filter_props32 filprop32;
+
+		if (copyin(ufilpropp, &filprop32, sizeof (filprop32)) != 0) {
+			sof_entry_free(ent);
+			return (EFAULT);
+		}
+		filprop.sfp_modname = (char *)(uintptr_t)filprop32.sfp_modname;
+		filprop.sfp_autoattach = filprop32.sfp_autoattach;
+		filprop.sfp_hint = filprop32.sfp_hint;
+		filprop.sfp_hintarg = (char *)(uintptr_t)filprop32.sfp_hintarg;
+		filprop.sfp_socktuple_cnt = filprop32.sfp_socktuple_cnt;
+		filprop.sfp_socktuple =
+		    (sof_socktuple_t *)(uintptr_t)filprop32.sfp_socktuple;
+	}
+#endif	/* _SYSCALL32_IMPL */
+
+	if ((error = copyinstr(filprop.sfp_modname, ent->sofe_modname,
+	    sizeof (ent->sofe_modname), &len)) != 0) {
+		sof_entry_free(ent);
+		return (error);
+	}
+
+	/*
+	 * A filter must specify at least one socket tuple.
+	 */
+	if (filprop.sfp_socktuple_cnt == 0 ||
+	    filprop.sfp_socktuple_cnt > SOF_MAXSOCKTUPLECNT) {
+		sof_entry_free(ent);
+		return (EINVAL);
+	}
+	ent->sofe_flags = filprop.sfp_autoattach ? SOFEF_AUTO : SOFEF_PROG;
+	ent->sofe_hint = filprop.sfp_hint;
+
+	/*
+	 * Verify the hint, and copy in the hint argument, if necessary.
+	 */
+	switch (ent->sofe_hint) {
+	case SOF_HINT_BEFORE:
+	case SOF_HINT_AFTER:
+		if ((error = copyinstr(filprop.sfp_hintarg, hintbuf,
+		    sizeof (hintbuf), &len)) != 0) {
+			sof_entry_free(ent);
+			return (error);
+		}
+		ent->sofe_hintarg = kmem_alloc(len, KM_SLEEP);
+		bcopy(hintbuf, ent->sofe_hintarg, len);
+		/* FALLTHRU */
+	case SOF_HINT_TOP:
+	case SOF_HINT_BOTTOM:
+		/* hints cannot be used with programmatic filters */
+		if (ent->sofe_flags & SOFEF_PROG) {
+			sof_entry_free(ent);
+			return (EINVAL);
+		}
+		break;
+	case SOF_HINT_NONE:
+		break;
+	default:
+		/* bad hint value */
+		sof_entry_free(ent);
+		return (EINVAL);
+	}
+
+	ent->sofe_socktuple_cnt = filprop.sfp_socktuple_cnt;
+	tuplesz = sizeof (sof_socktuple_t) * ent->sofe_socktuple_cnt;
+	ent->sofe_socktuple = kmem_alloc(tuplesz, KM_SLEEP);
+
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (copyin(filprop.sfp_socktuple, ent->sofe_socktuple,
+		    tuplesz)) {
+			sof_entry_free(ent);
+			return (EFAULT);
+		}
+	}
+#ifdef	_SYSCALL32_IMPL
+	else {
+		int i;
+		caddr_t data = (caddr_t)filprop.sfp_socktuple;
+		sof_socktuple_t	*tup = ent->sofe_socktuple;
+		sof_socktuple32_t tup32;
+
+		tup = ent->sofe_socktuple;
+		for (i = 0; i < ent->sofe_socktuple_cnt; i++, tup++) {
+			ASSERT(tup < ent->sofe_socktuple + tuplesz);
+
+			if (copyin(data, &tup32, sizeof (tup32)) != 0) {
+				sof_entry_free(ent);
+				return (EFAULT);
+			}
+			tup->sofst_family = tup32.sofst_family;
+			tup->sofst_type = tup32.sofst_type;
+			tup->sofst_protocol = tup32.sofst_protocol;
+
+			data += sizeof (tup32);
+		}
+	}
+#endif	/* _SYSCALL32_IMPL */
+
+	/* Sockets can start using the filter as soon as the filter is added */
+	if ((error = sof_entry_add(ent)) != 0)
+		sof_entry_free(ent);
+
+	return (error);
+}
+
 /*
- * Add config info when name is non-NULL; delete info when name is NULL.
- * name could be a device name or a module name and are user address.
+ * Socket configuration system call. It is used to add and remove
+ * socket types.
  */
 int
-sockconfig(int family, int type, int protocol, char *name)
+sockconfig(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 {
-	char *kdevpath = NULL;		/* Copied in devpath string */
-	char *kmodule = NULL;
-	size_t pathlen = 0;
 	int error = 0;
-
-	dprint(1, ("sockconfig(%d, %d, %d, %p)\n",
-	    family, type, protocol, (void *)name));
 
 	if (secpolicy_net_config(CRED(), B_FALSE) != 0)
 		return (set_errno(EPERM));
 
-	/*
-	 * By default set the kdevpath and kmodule to NULL to delete an entry.
-	 * Otherwise when name is not NULL, set the kdevpath or kmodule
-	 * value to add an entry.
-	 */
-	if (name != NULL) {
-		/*
-		 * Adding an entry.
-		 * Copyin the name.
-		 * This also makes it possible to check for too long pathnames.
-		 * Compress the space needed for the name before passing it
-		 * to soconfig - soconfig will store the string until
-		 * the configuration is removed.
-		 */
-		char *buf;
-		buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		if ((error = copyinstr(name, buf, MAXPATHLEN, &pathlen)) != 0) {
-			kmem_free(buf, MAXPATHLEN);
-			goto done;
-		}
-		if (strncmp(buf, "/dev", strlen("/dev")) == 0) {
-			/* For device */
-
-			/*
-			 * Special handling for NCA:
-			 *
-			 * DEV_NCA is never opened even if an application
-			 * requests for AF_NCA. The device opened is instead a
-			 * predefined AF_INET transport (NCA_INET_DEV).
-			 *
-			 * Prior to Volo (PSARC/2007/587) NCA would determine
-			 * the device using a lookup, which worked then because
-			 * all protocols were based on TPI. Since TPI is no
-			 * longer the default, we have to explicitly state
-			 * which device to use.
-			 */
-			if (strcmp(buf, NCA_DEV) == 0) {
-				/* only support entry <28, 2, 0> */
-				if (family != AF_NCA || type != SOCK_STREAM ||
-				    protocol != 0) {
-					kmem_free(buf, MAXPATHLEN);
-					error = EINVAL;
-					goto done;
-				}
-
-				pathlen = strlen(NCA_INET_DEV) + 1;
-				kdevpath = kmem_alloc(pathlen, KM_SLEEP);
-				bcopy(NCA_INET_DEV, kdevpath, pathlen);
-				kdevpath[pathlen - 1] = '\0';
-			} else {
-				kdevpath = kmem_alloc(pathlen, KM_SLEEP);
-				bcopy(buf, kdevpath, pathlen);
-				kdevpath[pathlen - 1] = '\0';
-			}
-		} else {
-			/* For socket module */
-			kmodule = kmem_alloc(pathlen, KM_SLEEP);
-			bcopy(buf, kmodule, pathlen);
-			kmodule[pathlen - 1] = '\0';
-
-			pathlen = 0;
-			if (strcmp(kmodule, "tcp") == 0) {
-				/* Get the tcp device name for fallback */
-				if (family == 2) {
-					pathlen = strlen("/dev/tcp") + 1;
-					kdevpath = kmem_alloc(pathlen,
-					    KM_SLEEP);
-					bcopy("/dev/tcp", kdevpath,
-					    pathlen);
-					kdevpath[pathlen - 1] = '\0';
-				} else {
-					ASSERT(family == 26);
-					pathlen = strlen("/dev/tcp6") + 1;
-					kdevpath = kmem_alloc(pathlen,
-					    KM_SLEEP);
-					bcopy("/dev/tcp6", kdevpath, pathlen);
-					kdevpath[pathlen - 1] = '\0';
-				}
-			} else if (strcmp(kmodule, "udp") == 0) {
-				/* Get the udp device name for fallback */
-				if (family == 2) {
-					pathlen = strlen("/dev/udp") + 1;
-					kdevpath = kmem_alloc(pathlen,
-					    KM_SLEEP);
-					bcopy("/dev/udp", kdevpath, pathlen);
-					kdevpath[pathlen - 1] = '\0';
-				} else {
-					ASSERT(family == 26);
-					pathlen = strlen("/dev/udp6") + 1;
-					kdevpath = kmem_alloc(pathlen,
-					    KM_SLEEP);
-					bcopy("/dev/udp6", kdevpath, pathlen);
-					kdevpath[pathlen - 1] = '\0';
-				}
-			} else if (strcmp(kmodule, "icmp") == 0) {
-				/* Get the icmp device name for fallback */
-				if (family == 2) {
-					pathlen = strlen("/dev/rawip") + 1;
-					kdevpath = kmem_alloc(pathlen,
-					    KM_SLEEP);
-					bcopy("/dev/rawip", kdevpath, pathlen);
-					kdevpath[pathlen - 1] = '\0';
-				} else {
-					ASSERT(family == 26);
-					pathlen = strlen("/dev/rawip6") + 1;
-					kdevpath = kmem_alloc(pathlen,
-					    KM_SLEEP);
-					bcopy("/dev/rawip6", kdevpath, pathlen);
-					kdevpath[pathlen - 1] = '\0';
-				}
-			}
-		}
-
-		kmem_free(buf, MAXPATHLEN);
+	if (sockfs_defer_nl7c_init) {
+		nl7c_init();
+		sockfs_defer_nl7c_init = 0;
 	}
-	error = soconfig(family, type, protocol, kdevpath, (int)pathlen,
-	    kmodule);
-done:
-	if (error) {
+
+	switch (cmd) {
+	case SOCKCONFIG_ADD_SOCK:
+		error = sockconf_add_sock((int)(uintptr_t)arg1,
+		    (int)(uintptr_t)arg2, (int)(uintptr_t)arg3, arg4);
+		break;
+	case SOCKCONFIG_REMOVE_SOCK:
+		error = sockconf_remove_sock((int)(uintptr_t)arg1,
+		    (int)(uintptr_t)arg2, (int)(uintptr_t)arg3);
+		break;
+	case SOCKCONFIG_ADD_FILTER:
+		error = sockconfig_add_filter((const char *)arg1, arg2);
+		break;
+	case SOCKCONFIG_REMOVE_FILTER:
+		error = sockconfig_remove_filter((const char *)arg1);
+		break;
+	default:
+#ifdef	DEBUG
+		cmn_err(CE_NOTE, "sockconfig: unkonwn subcommand %d", cmd);
+#endif
+		error = EINVAL;
+		break;
+	}
+
+	if (error != 0) {
 		eprintline(error);
 		return (set_errno(error));
 	}
@@ -1943,9 +2094,15 @@ snf_async_read(snf_req_t *sr)
 		 * For sockets acting as an SSL proxy, we
 		 * need to adjust the size to the maximum
 		 * SSL record size set in the stream head.
+		 *
+		 * Socket filters can limit the mblk size,
+		 * so limit reads to maxblk if there are
+		 * filters present.
 		 */
-		if (vp->v_type == VSOCK && !SOCK_IS_NONSTR(so) &&
-		    SOTOTPI(so)->sti_kssl_ctx != NULL)
+		if (vp->v_type == VSOCK &&
+		    (!SOCK_IS_NONSTR(so) &&
+		    SOTOTPI(so)->sti_kssl_ctx != NULL) ||
+		    (so->so_filter_active > 0 && maxblk != INFPSZ))
 			iosize = (int)MIN(iosize, maxblk);
 
 		if (is_system_labeled()) {
@@ -2550,9 +2707,14 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		 * For sockets acting as an SSL proxy, we
 		 * need to adjust the size to the maximum
 		 * SSL record size set in the stream head.
+		 *
+		 * Socket filters can limit the mblk size,
+		 * so limit reads to maxblk if there are
 		 */
-		if (vp->v_type == VSOCK && !SOCK_IS_NONSTR(so) &&
-		    SOTOTPI(so)->sti_kssl_ctx != NULL)
+		if (vp->v_type == VSOCK &&
+		    (!SOCK_IS_NONSTR(so) &&
+		    SOTOTPI(so)->sti_kssl_ctx != NULL) ||
+		    so->so_filter_active > 0 && maxblk != INFPSZ)
 			iosize = (int)MIN(iosize, maxblk);
 
 		if (is_system_labeled()) {
@@ -2804,7 +2966,7 @@ solisten(struct sonode *so, int backlog)
 }
 
 int
-soconnect(struct sonode *so, const struct sockaddr *name, socklen_t namelen,
+soconnect(struct sonode *so, struct sockaddr *name, socklen_t namelen,
     int fflag, int flags)
 {
 	return (socket_connect(so, name, namelen, fflag, flags, CRED()));

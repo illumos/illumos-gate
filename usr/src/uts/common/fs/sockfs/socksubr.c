@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -72,6 +71,7 @@
 
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/sockfilter_impl.h>
 #include <fs/sockfs/socktpi.h>
 #include <fs/sockfs/socktpi_impl.h>
 #include <fs/sockfs/sodirect.h>
@@ -96,6 +96,12 @@ int sockfs_defer_nl7c_init = 0;
 struct socklist socklist;
 
 struct kmem_cache *socket_cache;
+
+/*
+ * sockconf_lock protects the socket configuration (socket types and
+ * socket filters) which is changed via the sockconfig system call.
+ */
+krwlock_t sockconf_lock;
 
 static int sockfs_update(kstat_t *, int);
 static int sockfs_snapshot(kstat_t *, void *, int);
@@ -239,6 +245,8 @@ sockinit(int fstype, char *name)
 	    sizeof (struct sonode), 0, sonode_constructor,
 	    sonode_destructor, NULL, NULL, NULL, 0);
 
+	rw_init(&sockconf_lock, NULL, RW_DEFAULT, NULL);
+
 	error = socktpi_init();
 	if (error != 0) {
 		err_str = NULL;
@@ -287,6 +295,9 @@ sockinit(int fstype, char *name)
 	} else {
 		nl7c_init();
 	}
+
+	/* Initialize socket filters */
+	sof_init();
 
 	return (0);
 

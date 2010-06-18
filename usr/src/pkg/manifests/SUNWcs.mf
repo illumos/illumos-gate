@@ -629,6 +629,7 @@ file path=lib/svc/method/svc-hotplug mode=0555
 file path=lib/svc/method/svc-legacy-routing mode=0555
 file path=lib/svc/method/svc-nscd mode=0555
 file path=lib/svc/method/svc-rbac mode=0555
+file path=lib/svc/method/svc-sockfilter mode=0555
 file path=lib/svc/method/svc-utmpd mode=0555
 file path=lib/svc/method/system-log mode=0555
 file path=lib/svc/method/vtdaemon mode=0555

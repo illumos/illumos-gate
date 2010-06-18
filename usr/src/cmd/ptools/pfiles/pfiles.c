@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -650,6 +649,70 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 		(void) printf("\t%s\n", buf+1);
 }
 
+#define	MAXNALLOC	32
+static void
+show_sockfilters(struct ps_prochandle *Pr, int fd)
+{
+	struct fil_info *fi;
+	int i = 0, nalloc = 2, len = nalloc * sizeof (*fi);
+	boolean_t printhdr = B_TRUE;
+
+	fi = calloc(nalloc, sizeof (*fi));
+	if (fi == NULL) {
+		perror("calloc");
+		return;
+	}
+	/* CONSTCOND */
+	while (1) {
+		if (pr_getsockopt(Pr, fd, SOL_FILTER, FIL_LIST, fi, &len) != 0)
+			break;
+		/* No filters */
+		if (len == 0)
+			break;
+		/* Make sure buffer was large enough */
+		if (fi->fi_pos >= nalloc) {
+			struct fil_info *new;
+
+			nalloc = fi->fi_pos + 1;
+			if (nalloc > MAXNALLOC)
+				break;
+			len = nalloc * sizeof (*fi);
+			new = realloc(fi, nalloc * sizeof (*fi));
+			if (new == NULL) {
+				perror("realloc");
+				break;
+			}
+			fi = new;
+			continue;
+		}
+
+		for (i = 0; (i + 1) * sizeof (*fi) <= len; i++) {
+			if (fi[i].fi_flags & FILF_BYPASS)
+				continue;
+			if (printhdr) {
+				(void) printf("\tfilters: ");
+				printhdr = B_FALSE;
+			}
+			(void) printf("%s", fi[i].fi_name);
+			if (fi[i].fi_flags != 0) {
+				(void) printf("(");
+				if (fi[i].fi_flags & FILF_AUTO)
+					(void) printf("auto,");
+				if (fi[i].fi_flags & FILF_PROG)
+					(void) printf("prog,");
+				(void) printf("\b)");
+			}
+			if (fi[i].fi_pos == 0) /* last one */
+				break;
+			(void) printf(",");
+		}
+		if (!printhdr)
+			(void) printf("\n");
+		break;
+	}
+	free(fi);
+}
+
 /* the file is a socket */
 static void
 dosocket(struct ps_prochandle *Pr, int fd)
@@ -666,6 +729,7 @@ dosocket(struct ps_prochandle *Pr, int fd)
 		show_socktype((uint_t)type);
 
 	show_sockopts(Pr, fd);
+	show_sockfilters(Pr, fd);
 
 	len = sizeof (buf);
 	if (pr_getsockname(Pr, fd, sa, &len) == 0)

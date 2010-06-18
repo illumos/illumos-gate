@@ -162,12 +162,13 @@ struct sonode {
 
 	/* Accept queue */
 	kmutex_t	so_acceptq_lock;	/* protects accept queue */
-	struct sonode	*so_acceptq_next;	/* acceptq list node */
-	struct sonode 	*so_acceptq_head;
-	struct sonode	**so_acceptq_tail;
-	unsigned int	so_acceptq_len;
+	list_t		so_acceptq_list;	/* pending conns */
+	list_t		so_acceptq_defer;	/* deferred conns */
+	list_node_t	so_acceptq_node;	/* acceptq list node */
+	unsigned int	so_acceptq_len;		/* # of conns (both lists) */
 	unsigned int	so_backlog;		/* Listen backlog */
 	kcondvar_t	so_acceptq_cv;		/* wait for new conn. */
+	struct sonode	*so_listener;		/* parent socket */
 
 	/* Options */
 	short	so_options;		/* From socket call, see socket.h */
@@ -233,6 +234,13 @@ struct sonode {
 
 	/* != NULL for sodirect enabled socket */
 	struct sodirect_s	*so_direct;
+
+	/* socket filters */
+	uint_t			so_filter_active;	/* # of active fil */
+	uint_t			so_filter_tx;		/* pending tx ops */
+	struct sof_instance	*so_filter_top;		/* top of stack */
+	struct sof_instance	*so_filter_bottom;	/* bottom of stack */
+	clock_t			so_filter_defertime;	/* time when deferred */
 };
 
 #define	SO_HAVE_DATA(so)						\
@@ -288,10 +296,10 @@ struct sonode {
 #define	SS_HADOOBDATA		0x00008000 /* OOB data consumed */
 #define	SS_CLOSING		0x00010000 /* in process of closing */
 
-/*	unused			0x00020000 */	/* was SS_FADDR_NOXLATE */
-/*	unused			0x00040000 */	/* was SS_HASDATA */
-/*	unused 			0x00080000 */	/* was SS_DONEREAD */
-/*	unused 			0x00100000 */	/* was SS_MOREDATA */
+#define	SS_FIL_DEFER		0x00020000 /* filter deferred notification */
+#define	SS_FILOP_OK		0x00040000 /* socket can attach filters */
+#define	SS_FIL_RCV_FLOWCTRL	0x00080000 /* filter asserted rcv flow ctrl */
+#define	SS_FIL_SND_FLOWCTRL	0x00100000 /* filter asserted snd flow ctrl */
 /*	unused 			0x00200000 */	/* was SS_DIRECT */
 
 #define	SS_SODIRECT		0x00400000 /* transport supports sodirect */
@@ -312,18 +320,26 @@ struct sonode {
  * Sockets that can fall back to TPI must ensure that fall back is not
  * initiated while a thread is using a socket.
  */
-#define	SO_BLOCK_FALLBACK(so, fn) {			\
-	ASSERT(MUTEX_NOT_HELD(&(so)->so_lock));		\
-	rw_enter(&(so)->so_fallback_rwlock, RW_READER);	\
-	if ((so)->so_state & SS_FALLBACK_COMP) {	\
-		rw_exit(&(so)->so_fallback_rwlock);	\
-		return (fn);				\
-	}						\
-}
+#define	SO_BLOCK_FALLBACK(so, fn)				\
+	ASSERT(MUTEX_NOT_HELD(&(so)->so_lock));			\
+	rw_enter(&(so)->so_fallback_rwlock, RW_READER);		\
+	if ((so)->so_state & (SS_FALLBACK_COMP|SS_FILOP_OK)) {	\
+		if ((so)->so_state & SS_FALLBACK_COMP) {	\
+			rw_exit(&(so)->so_fallback_rwlock);	\
+			return (fn);				\
+		} else {					\
+			mutex_enter(&(so)->so_lock);		\
+			(so)->so_state &= ~SS_FILOP_OK;		\
+			mutex_exit(&(so)->so_lock);		\
+		}						\
+	}
 
 #define	SO_UNBLOCK_FALLBACK(so)	{			\
 	rw_exit(&(so)->so_fallback_rwlock);		\
 }
+
+#define	SO_SND_FLOWCTRLD(so)	\
+	((so)->so_snd_qfull || (so)->so_state & SS_FIL_SND_FLOWCTRL)
 
 /* Poll events */
 #define	SO_POLLEV_IN		0x1	/* POLLIN wakeup needed */
@@ -375,7 +391,9 @@ typedef struct sdev_info {
 	vnode_t	*sd_vnode;
 } sdev_info_t;
 
-#define	SOCKMOD_VERSION		1
+#define	SOCKMOD_VERSION_1	1
+#define	SOCKMOD_VERSION		2
+
 /* name of the TPI pseudo socket module */
 #define	SOTPI_SMOD_NAME		"socktpi"
 
@@ -383,6 +401,8 @@ typedef struct __smod_priv_s {
 	so_create_func_t	smodp_sock_create_func;
 	so_destroy_func_t	smodp_sock_destroy_func;
 	so_proto_fallback_func_t smodp_proto_fallback_func;
+	const char		*smodp_fallback_devpath_v4;
+	const char		*smodp_fallback_devpath_v6;
 } __smod_priv_t;
 
 /*
@@ -410,6 +430,8 @@ typedef struct smod_info {
 	size_t		smod_dc_version;	/* down call version */
 	so_proto_create_func_t	smod_proto_create_func;
 	so_proto_fallback_func_t smod_proto_fallback_func;
+	const char		*smod_fallback_devpath_v4;
+	const char		*smod_fallback_devpath_v6;
 	so_create_func_t	smod_sock_create_func;
 	so_destroy_func_t	smod_sock_destroy_func;
 	list_node_t	smod_node;
@@ -448,11 +470,21 @@ struct sockparams {
 
 	/*
 	 * The entries below are only modified while holding
-	 * splist_lock as a writer.
+	 * sockconf_lock as a writer.
 	 */
 	int		sp_flags;	/* see below */
 	list_node_t	sp_node;
+
+	list_t		sp_auto_filters; /* list of automatic filters */
+	list_t		sp_prog_filters; /* list of programmatic filters */
 };
+
+struct sof_entry;
+
+typedef struct sp_filter {
+	struct sof_entry *spf_filter;
+	list_node_t	spf_node;
+} sp_filter_t;
 
 
 /*
@@ -466,6 +498,14 @@ extern struct sockparams *sockparams_hold_ephemeral_bydev(int, int, int,
 extern struct sockparams *sockparams_hold_ephemeral_bymod(int, int, int,
     const char *, int, int *);
 extern void sockparams_ephemeral_drop_last_ref(struct sockparams *);
+
+extern struct sockparams *sockparams_create(int, int, int, char *, char *, int,
+    int, int, int *);
+extern void 	sockparams_destroy(struct sockparams *);
+extern int 	sockparams_add(struct sockparams *);
+extern int	sockparams_delete(int, int, int);
+extern int	sockparams_new_filter(struct sof_entry *);
+extern void	sockparams_filter_cleanup(struct sof_entry *);
 
 extern void smod_init(void);
 extern void smod_add(smod_info_t *);
@@ -614,7 +654,7 @@ struct sonodeops {
 	int	(*sop_bind)(struct sonode *, struct sockaddr *, socklen_t,
 		    int, cred_t *);
 	int	(*sop_listen)(struct sonode *, int, cred_t *);
-	int	(*sop_connect)(struct sonode *, const struct sockaddr *,
+	int	(*sop_connect)(struct sonode *, struct sockaddr *,
 		    socklen_t, int, int, cred_t *);
 	int	(*sop_recvmsg)(struct sonode *, struct msghdr *,
 		    struct uio *, cred_t *);
@@ -833,6 +873,8 @@ extern const struct fs_operation_def	socket_vnodeops_template[];
 
 extern dev_t				sockdev;
 
+extern krwlock_t			sockconf_lock;
+
 /*
  * sockfs functions
  */
@@ -842,7 +884,6 @@ extern int	sock_putmsg(vnode_t *, struct strbuf *, struct strbuf *,
 			uchar_t, int, int);
 extern int	sogetvp(char *, vnode_t **, int);
 extern int	sockinit(int, char *);
-extern int	soconfig(int, int, int,	char *, int, char *);
 extern int	solookup(int, int, int, struct sockparams **);
 extern void	so_lock_single(struct sonode *);
 extern void	so_unlock_single(struct sonode *, int);
@@ -885,7 +926,7 @@ extern int	soaccept(struct sonode *, int, struct sonode **);
 extern int	sobind(struct sonode *, struct sockaddr *, socklen_t,
 		    int, int);
 extern int	solisten(struct sonode *, int);
-extern int	soconnect(struct sonode *, const struct sockaddr *, socklen_t,
+extern int	soconnect(struct sonode *, struct sockaddr *, socklen_t,
 		    int, int);
 extern int	sorecvmsg(struct sonode *, struct nmsghdr *, struct uio *);
 extern int	sosendmsg(struct sonode *, struct nmsghdr *, struct uio *);
@@ -926,6 +967,70 @@ struct sockinfo {
 	boolean_t	si_faddr_noxlate;
 	zoneid_t	si_szoneid;
 };
+
+/*
+ * Subcodes for sockconf() system call
+ */
+#define	SOCKCONFIG_ADD_SOCK		0
+#define	SOCKCONFIG_REMOVE_SOCK		1
+#define	SOCKCONFIG_ADD_FILTER		2
+#define	SOCKCONFIG_REMOVE_FILTER	3
+
+/*
+ * Data structures for configuring socket filters.
+ */
+
+/*
+ * Placement hint for automatic filters
+ */
+typedef enum {
+	SOF_HINT_NONE,
+	SOF_HINT_TOP,
+	SOF_HINT_BOTTOM,
+	SOF_HINT_BEFORE,
+	SOF_HINT_AFTER
+} sof_hint_t;
+
+/*
+ * Socket tuple. Used by sockconfig_filter_props to list socket
+ * types of interest.
+ */
+typedef struct sof_socktuple {
+	int	sofst_family;
+	int	sofst_type;
+	int	sofst_protocol;
+} sof_socktuple_t;
+
+/*
+ * Socket filter properties used by sockconfig() system call.
+ */
+struct sockconfig_filter_props {
+	char		*sfp_modname;
+	boolean_t	sfp_autoattach;
+	sof_hint_t	sfp_hint;
+	char		*sfp_hintarg;
+	uint_t		sfp_socktuple_cnt;
+	sof_socktuple_t	*sfp_socktuple;
+};
+
+#ifdef	_SYSCALL32
+
+typedef struct sof_socktuple32 {
+	int32_t	sofst_family;
+	int32_t	sofst_type;
+	int32_t	sofst_protocol;
+} sof_socktuple32_t;
+
+struct sockconfig_filter_props32 {
+	caddr32_t	sfp_modname;
+	boolean_t	sfp_autoattach;
+	sof_hint_t	sfp_hint;
+	caddr32_t	sfp_hintarg;
+	uint32_t	sfp_socktuple_cnt;
+	caddr32_t	sfp_socktuple;
+};
+
+#endif	/* _SYSCALL32 */
 
 #define	SOCKMOD_PATH	"socketmod"	/* dir where sockmods are stored */
 

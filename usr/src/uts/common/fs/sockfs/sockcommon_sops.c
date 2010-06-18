@@ -46,6 +46,7 @@
 #include <inet/ip.h>
 
 #include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/sockfilter_impl.h>
 
 #include <sys/socket_proto.h>
 
@@ -59,7 +60,7 @@
 extern int xnet_skip_checks;
 extern int xnet_check_print;
 
-static void so_queue_oob(sock_upper_handle_t, mblk_t *, size_t);
+static void so_queue_oob(struct sonode *, mblk_t *, size_t);
 
 
 /*ARGSUSED*/
@@ -291,8 +292,11 @@ so_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 	}
 
 dobind:
-	error = (*so->so_downcalls->sd_bind)
-	    (so->so_proto_handle, name, namelen, cr);
+	if (so->so_filter_active == 0 ||
+	    (error = sof_filter_bind(so, name, &namelen, cr)) < 0) {
+		error = (*so->so_downcalls->sd_bind)
+		    (so->so_proto_handle, name, namelen, cr);
+	}
 done:
 	SO_UNBLOCK_FALLBACK(so);
 
@@ -307,8 +311,10 @@ so_listen(struct sonode *so, int backlog, struct cred *cr)
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 	SO_BLOCK_FALLBACK(so, SOP_LISTEN(so, backlog, cr));
 
-	error = (*so->so_downcalls->sd_listen)(so->so_proto_handle, backlog,
-	    cr);
+	if ((so)->so_filter_active == 0 ||
+	    (error = sof_filter_listen(so, &backlog, cr)) < 0)
+		error = (*so->so_downcalls->sd_listen)(so->so_proto_handle,
+		    backlog, cr);
 
 	SO_UNBLOCK_FALLBACK(so);
 
@@ -317,7 +323,7 @@ so_listen(struct sonode *so, int backlog, struct cred *cr)
 
 
 int
-so_connect(struct sonode *so, const struct sockaddr *name,
+so_connect(struct sonode *so, struct sockaddr *name,
     socklen_t namelen, int fflag, int flags, struct cred *cr)
 {
 	int error = 0;
@@ -339,12 +345,16 @@ so_connect(struct sonode *so, const struct sockaddr *name,
 			goto done;
 	}
 
-	error = (*so->so_downcalls->sd_connect)(so->so_proto_handle,
-	    name, namelen, &id, cr);
+	if (so->so_filter_active == 0 ||
+	    (error = sof_filter_connect(so, (struct sockaddr *)name,
+	    &namelen, cr)) < 0) {
+		error = (*so->so_downcalls->sd_connect)(so->so_proto_handle,
+		    name, namelen, &id, cr);
 
-	if (error == EINPROGRESS)
-		error = so_wait_connected(so, fflag & (FNONBLOCK|FNDELAY), id);
-
+		if (error == EINPROGRESS)
+			error = so_wait_connected(so,
+			    fflag & (FNONBLOCK|FNDELAY), id);
+	}
 done:
 	SO_UNBLOCK_FALLBACK(so);
 	return (error);
@@ -371,9 +381,10 @@ so_accept(struct sonode *so, int fflag, struct cred *cr, struct sonode **nsop)
 		ASSERT(nso != NULL);
 
 		/* finish the accept */
-		error = (*so->so_downcalls->sd_accept)(so->so_proto_handle,
-		    nso->so_proto_handle, (sock_upper_handle_t)nso, cr);
-		if (error != 0) {
+		if ((so->so_filter_active > 0 &&
+		    (error = sof_filter_accept(nso, cr)) > 0) ||
+		    (error = (*so->so_downcalls->sd_accept)(so->so_proto_handle,
+		    nso->so_proto_handle, (sock_upper_handle_t)nso, cr)) != 0) {
 			(void) socket_close(nso, 0, cr);
 			socket_destroy(nso);
 		} else {
@@ -442,7 +453,7 @@ so_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 				error = EOPNOTSUPP;
 				break;
 			}
-		} else if (so->so_snd_qfull) {
+		} else if (SO_SND_FLOWCTRLD(so)) {
 			/*
 			 * Need to wait until the protocol is ready to receive
 			 * more data for transmission.
@@ -474,6 +485,13 @@ so_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 			}
 			ASSERT(uiop->uio_resid >= 0);
 
+			if (so->so_filter_active > 0 &&
+			    ((mp = SOF_FILTER_DATA_OUT(so, mp, msg, cr,
+			    &error)) == NULL)) {
+				if (error != 0)
+					break;
+				continue;
+			}
 			error = (*so->so_downcalls->sd_send)
 			    (so->so_proto_handle, mp, msg, cr);
 			if (error != 0) {
@@ -495,26 +513,22 @@ so_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 }
 
 int
-so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
-    struct cred *cr, mblk_t **mpp)
+so_sendmblk_impl(struct sonode *so, struct nmsghdr *msg, int fflag,
+    struct cred *cr, mblk_t **mpp, sof_instance_t *fil,
+    boolean_t fil_inject)
 {
 	int error;
 	boolean_t dontblock;
 	size_t size;
 	mblk_t *mp = *mpp;
 
-	SO_BLOCK_FALLBACK(so, SOP_SENDMBLK(so, msg, fflag, cr, mpp));
+	if (so->so_downcalls->sd_send == NULL)
+		return (EOPNOTSUPP);
 
 	error = 0;
 	dontblock = (msg->msg_flags & MSG_DONTWAIT) ||
 	    (fflag & (FNONBLOCK|FNDELAY));
 	size = msgdsize(mp);
-
-	if ((so->so_mode & SM_SENDFILESUPP) == 0 ||
-	    so->so_downcalls->sd_send == NULL) {
-		SO_UNBLOCK_FALLBACK(so);
-		return (EOPNOTSUPP);
-	}
 
 	if ((so->so_mode & SM_ATOMIC) &&
 	    size > so->so_proto_props.sopp_maxpsz &&
@@ -538,7 +552,8 @@ so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
 			if (error != 0)
 				break;
 		}
-		if (so->so_snd_qfull) {
+		/* Socket filters are not flow controlled */
+		if (SO_SND_FLOWCTRLD(so) && !fil_inject) {
 			/*
 			 * Need to wait until the protocol is ready to receive
 			 * more data for transmission.
@@ -564,6 +579,14 @@ so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
 			nmp = nmp->b_cont;
 		}
 
+		if (so->so_filter_active > 0 &&
+		    (mp = SOF_FILTER_DATA_OUT_FROM(so, fil, mp, msg,
+		    cr, &error)) == NULL) {
+			*mpp = mp = nmp;
+			if (error != 0)
+				break;
+			continue;
+		}
 		error = (*so->so_downcalls->sd_send)
 		    (so->so_proto_handle, mp, msg, cr);
 		if (error != 0) {
@@ -578,6 +601,30 @@ so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
 
 		*mpp = mp = nmp;
 	}
+	/* Let the filter know whether the protocol is flow controlled */
+	if (fil_inject && error == 0 && SO_SND_FLOWCTRLD(so))
+		error = ENOSPC;
+
+	return (error);
+}
+
+#pragma inline(so_sendmblk_impl)
+
+int
+so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
+    struct cred *cr, mblk_t **mpp)
+{
+	int error;
+
+	SO_BLOCK_FALLBACK(so, SOP_SENDMBLK(so, msg, fflag, cr, mpp));
+
+	if ((so->so_mode & SM_SENDFILESUPP) == 0) {
+		SO_UNBLOCK_FALLBACK(so);
+		return (EOPNOTSUPP);
+	}
+
+	error = so_sendmblk_impl(so, msg, fflag, cr, mpp, so->so_filter_top,
+	    B_FALSE);
 
 	SO_UNBLOCK_FALLBACK(so);
 
@@ -607,8 +654,10 @@ so_shutdown(struct sonode *so, int how, struct cred *cr)
 		goto done;
 	}
 
-	error = ((*so->so_downcalls->sd_shutdown)(so->so_proto_handle,
-	    how, cr));
+	if (so->so_filter_active == 0 ||
+	    (error = sof_filter_shutdown(so, &how, cr)) < 0)
+		error = ((*so->so_downcalls->sd_shutdown)(so->so_proto_handle,
+		    how, cr));
 
 	/*
 	 * Protocol agreed to shutdown. We need to flush the
@@ -638,8 +687,10 @@ so_getsockname(struct sonode *so, struct sockaddr *addr,
 
 	SO_BLOCK_FALLBACK(so, SOP_GETSOCKNAME(so, addr, addrlen, cr));
 
-	error = (*so->so_downcalls->sd_getsockname)
-	    (so->so_proto_handle, addr, addrlen, cr);
+	if (so->so_filter_active == 0 ||
+	    (error = sof_filter_getsockname(so, addr, addrlen, cr)) < 0)
+		error = (*so->so_downcalls->sd_getsockname)
+		    (so->so_proto_handle, addr, addrlen, cr);
 
 	SO_UNBLOCK_FALLBACK(so);
 	return (error);
@@ -664,7 +715,8 @@ so_getpeername(struct sonode *so, struct sockaddr *addr,
 		if (xnet_check_print) {
 			printf("sockfs: X/Open getpeername check => EINVAL\n");
 		}
-	} else {
+	} else if (so->so_filter_active == 0 ||
+	    (error = sof_filter_getpeername(so, addr, addrlen, cr)) < 0) {
 		error = (*so->so_downcalls->sd_getpeername)
 		    (so->so_proto_handle, addr, addrlen, cr);
 	}
@@ -679,13 +731,17 @@ so_getsockopt(struct sonode *so, int level, int option_name,
 {
 	int error = 0;
 
-	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
+	if (level == SOL_FILTER)
+		return (sof_getsockopt(so, option_name, optval, optlenp, cr));
+
 	SO_BLOCK_FALLBACK(so,
 	    SOP_GETSOCKOPT(so, level, option_name, optval, optlenp, flags, cr));
 
-	error = socket_getopt_common(so, level, option_name, optval, optlenp,
-	    flags);
-	if (error < 0) {
+	if ((so->so_filter_active == 0 ||
+	    (error = sof_filter_getsockopt(so, level, option_name, optval,
+	    optlenp, cr)) < 0) &&
+	    (error = socket_getopt_common(so, level, option_name, optval,
+	    optlenp, flags)) < 0) {
 		error = (*so->so_downcalls->sd_getsockopt)
 		    (so->so_proto_handle, level, option_name, optval, optlenp,
 		    cr);
@@ -764,6 +820,9 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 	struct timeval tl;
 	const void *opt = optval;
 
+	if (level == SOL_FILTER)
+		return (sof_setsockopt(so, option_name, optval, optlen, cr));
+
 	SO_BLOCK_FALLBACK(so,
 	    SOP_SETSOCKOPT(so, level, option_name, optval, optlen, cr));
 
@@ -774,6 +833,11 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 			printf("sockfs: X/Open setsockopt check => EINVAL\n");
 		return (EINVAL);
 	}
+
+	if (so->so_filter_active > 0 &&
+	    (error = sof_filter_setsockopt(so, level, option_name,
+	    (void *)optval, &optlen, cr)) >= 0)
+		goto done;
 
 	if (level == SOL_SOCKET) {
 		switch (option_name) {
@@ -856,7 +920,10 @@ so_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 	 * calling strioc can result in the socket falling back to TPI,
 	 * if that is supported.
 	 */
-	if ((error = socket_ioctl_common(so, cmd, arg, mode, cr, rvalp)) < 0 &&
+	if ((so->so_filter_active == 0 ||
+	    (error = sof_filter_ioctl(so, cmd, arg, mode,
+	    rvalp, cr)) < 0) &&
+	    (error = socket_ioctl_common(so, cmd, arg, mode, cr, rvalp)) < 0 &&
 	    (error = socket_strioc_common(so, cmd, arg, mode, cr, rvalp)) < 0) {
 		error = (*so->so_downcalls->sd_ioctl)(so->so_proto_handle,
 		    cmd, arg, mode, rvalp, cr);
@@ -894,7 +961,7 @@ so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 		 * is flow controlled
 		 */
 		*reventsp |= POLLWRBAND & events;
-		if (!so->so_snd_qfull) {
+		if (!SO_SND_FLOWCTRLD(so)) {
 			/*
 			 * As long as there is buffer to send data
 			 * turn on POLLOUT events
@@ -915,7 +982,7 @@ so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 	 */
 
 	/* Pending connections */
-	if (so->so_acceptq_len > 0)
+	if (!list_is_empty(&so->so_acceptq_list))
 		*reventsp |= (POLLIN|POLLRDNORM) & events;
 
 	/* Data */
@@ -941,7 +1008,8 @@ so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 		/* Check for read events again, but this time under lock */
 		if (events & (POLLIN|POLLRDNORM)) {
 			mutex_enter(&so->so_lock);
-			if (SO_HAVE_DATA(so) || so->so_acceptq_len > 0) {
+			if (SO_HAVE_DATA(so) ||
+			    !list_is_empty(&so->so_acceptq_list)) {
 				mutex_exit(&so->so_lock);
 				*reventsp |= (POLLIN|POLLRDNORM) & events;
 				return (0);
@@ -987,12 +1055,13 @@ int
 so_disconnected(sock_upper_handle_t sock_handle, sock_connid_t id, int error)
 {
 	struct sonode *so = (struct sonode *)sock_handle;
+	boolean_t connect_failed;
 
 	mutex_enter(&so->so_lock);
-
+	connect_failed = so->so_state & SS_ISCONNECTED;
 	so->so_proto_connid = id;
 	soisdisconnected(so, error);
-	so_notify_disconnected(so, error);
+	so_notify_disconnected(so, connect_failed, error);
 
 	return (0);
 }
@@ -1019,6 +1088,16 @@ so_opctl(sock_upper_handle_t sock_handle, sock_opctl_action_t action,
 		mutex_enter(&so->so_lock);
 		so->so_state |= SS_ACCEPTCONN;
 		so->so_backlog = (unsigned int)arg;
+		/*
+		 * The protocol can stop generating newconn upcalls when
+		 * the backlog is full, so to make sure the listener does
+		 * not end up with a queue full of deferred connections
+		 * we reduce the backlog by one. Thus the listener will
+		 * start closing deferred connections before the backlog
+		 * is full.
+		 */
+		if (so->so_filter_active > 0)
+			so->so_backlog = MAX(1, so->so_backlog - 1);
 		mutex_exit(&so->so_lock);
 		break;
 	default:
@@ -1037,6 +1116,7 @@ so_txq_full(sock_upper_handle_t sock_handle, boolean_t qfull)
 	} else {
 		so_snd_qnotfull(so);
 		mutex_enter(&so->so_lock);
+		/* so_notify_writable drops so_lock */
 		so_notify_writable(so);
 	}
 }
@@ -1053,8 +1133,10 @@ so_newconn(sock_upper_handle_t parenthandle,
 	ASSERT(proto_handle != NULL);
 
 	if ((so->so_state & SS_ACCEPTCONN) == 0 ||
-	    so->so_acceptq_len >= so->so_backlog)
-		return (NULL);
+	    (so->so_acceptq_len >= so->so_backlog &&
+	    (so->so_filter_active == 0 || !sof_sonode_drop_deferred(so)))) {
+			return (NULL);
+	}
 
 	nso = socket_newconn(so, proto_handle, sock_downcalls, SOCKET_NOSLEEP,
 	    &error);
@@ -1066,6 +1148,7 @@ so_newconn(sock_upper_handle_t parenthandle,
 		nso->so_peercred = peer_cred;
 		nso->so_cpid = peer_cpid;
 	}
+	nso->so_listener = so;
 
 	/*
 	 * The new socket (nso), proto_handle and sock_upcallsp are all
@@ -1075,12 +1158,30 @@ so_newconn(sock_upper_handle_t parenthandle,
 	 */
 	*sock_upcallsp = &so_upcalls;
 
-	(void) so_acceptq_enqueue(so, nso);
+	mutex_enter(&so->so_acceptq_lock);
+	if (so->so_state & (SS_CLOSING|SS_FALLBACK_PENDING|SS_FALLBACK_COMP)) {
+		mutex_exit(&so->so_acceptq_lock);
+		ASSERT(nso->so_count == 1);
+		nso->so_count--;
+		/* drop proto ref */
+		VN_RELE(SOTOV(nso));
+		socket_destroy(nso);
+		return (NULL);
+	} else {
+		so->so_acceptq_len++;
+		if (nso->so_state & SS_FIL_DEFER) {
+			list_insert_tail(&so->so_acceptq_defer, nso);
+			mutex_exit(&so->so_acceptq_lock);
+		} else {
+			list_insert_tail(&so->so_acceptq_list, nso);
+			cv_signal(&so->so_acceptq_cv);
+			mutex_exit(&so->so_acceptq_lock);
+			mutex_enter(&so->so_lock);
+			so_notify_newconn(so);
+		}
 
-	mutex_enter(&so->so_lock);
-	so_notify_newconn(so);
-
-	return ((sock_upper_handle_t)nso);
+		return ((sock_upper_handle_t)nso);
+	}
 }
 
 void
@@ -1132,6 +1233,27 @@ so_set_prop(sock_upper_handle_t sock_handle, struct sock_proto_props *soppp)
 
 	mutex_exit(&so->so_lock);
 
+	if (so->so_filter_active > 0) {
+		sof_instance_t *inst;
+		ssize_t maxblk;
+		ushort_t wroff, tail;
+		maxblk = so->so_proto_props.sopp_maxblk;
+		wroff = so->so_proto_props.sopp_wroff;
+		tail = so->so_proto_props.sopp_tail;
+		for (inst = so->so_filter_bottom; inst != NULL;
+		    inst = inst->sofi_prev) {
+			if (SOF_INTERESTED(inst, mblk_prop)) {
+				(*inst->sofi_ops->sofop_mblk_prop)(
+				    (sof_handle_t)inst, inst->sofi_cookie,
+				    &maxblk, &wroff, &tail);
+			}
+		}
+		mutex_enter(&so->so_lock);
+		so->so_proto_props.sopp_maxblk = maxblk;
+		so->so_proto_props.sopp_wroff = wroff;
+		so->so_proto_props.sopp_tail = tail;
+		mutex_exit(&so->so_lock);
+	}
 #ifdef DEBUG
 	soppp->sopp_flags &= ~(SOCKOPT_MAXBLK | SOCKOPT_WROFF | SOCKOPT_TAIL |
 	    SOCKOPT_RCVHIWAT | SOCKOPT_RCVLOWAT | SOCKOPT_MAXPSZ |
@@ -1144,10 +1266,10 @@ so_set_prop(sock_upper_handle_t sock_handle, struct sock_proto_props *soppp)
 
 /* ARGSUSED */
 ssize_t
-so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
-    size_t msg_size, int flags, int *errorp,  boolean_t *force_pushp)
+so_queue_msg_impl(struct sonode *so, mblk_t *mp,
+    size_t msg_size, int flags, int *errorp,  boolean_t *force_pushp,
+    sof_instance_t *filter)
 {
-	struct sonode *so = (struct sonode *)sock_handle;
 	boolean_t force_push = B_TRUE;
 	int space_left;
 	sodirect_t *sodp = so->so_direct;
@@ -1165,30 +1287,13 @@ so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
 			return (0);
 		}
 		ASSERT(msg_size == 0);
-		/*
-		 * recv space check
-		 */
 		mutex_enter(&so->so_lock);
-		space_left = so->so_rcvbuf - so->so_rcv_queued;
-		if (space_left <= 0) {
-			so->so_flowctrld = B_TRUE;
-			*errorp = ENOSPC;
-			space_left = -1;
-		}
-		goto done_unlock;
+		goto space_check;
 	}
 
 	ASSERT(mp->b_next == NULL);
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_PROTO);
 	ASSERT(msg_size == msgdsize(mp));
-
-	if (flags & MSG_OOB) {
-		so_queue_oob(sock_handle, mp, msg_size);
-		return (0);
-	}
-
-	if (force_pushp != NULL)
-		force_push = *force_pushp;
 
 	if (DB_TYPE(mp) == M_PROTO && !__TPI_PRIM_ISALIGNED(mp->b_rptr)) {
 		/* The read pointer is not aligned correctly for TPI */
@@ -1199,10 +1304,35 @@ so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
 		mutex_enter(&so->so_lock);
 		if (sodp != NULL)
 			SOD_UIOAFINI(sodp);
-		mutex_exit(&so->so_lock);
-
-		return (so->so_rcvbuf - so->so_rcv_queued);
+		goto space_check;
 	}
+
+	if (so->so_filter_active > 0) {
+		for (; filter != NULL; filter = filter->sofi_prev) {
+			if (!SOF_INTERESTED(filter, data_in))
+				continue;
+			mp = (*filter->sofi_ops->sofop_data_in)(
+			    (sof_handle_t)filter, filter->sofi_cookie, mp,
+			    flags, &msg_size);
+			ASSERT(msgdsize(mp) == msg_size);
+			DTRACE_PROBE2(filter__data, (sof_instance_t), filter,
+			    (mblk_t *), mp);
+			/* Data was consumed/dropped, just do space check */
+			if (msg_size == 0) {
+				mutex_enter(&so->so_lock);
+				goto space_check;
+			}
+		}
+	}
+
+	if (flags & MSG_OOB) {
+		so_queue_oob(so, mp, msg_size);
+		mutex_enter(&so->so_lock);
+		goto space_check;
+	}
+
+	if (force_pushp != NULL)
+		force_push = *force_pushp;
 
 	mutex_enter(&so->so_lock);
 	if (so->so_state & (SS_FALLBACK_DRAIN | SS_FALLBACK_COMP)) {
@@ -1212,7 +1342,7 @@ so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
 		*errorp = EOPNOTSUPP;
 		return (-1);
 	}
-	if (so->so_state & SS_CANTRCVMORE) {
+	if (so->so_state & (SS_CANTRCVMORE | SS_CLOSING)) {
 		freemsg(mp);
 		if (sodp != NULL)
 			SOD_DISABLE(sodp);
@@ -1270,6 +1400,27 @@ done_unlock:
 	mutex_exit(&so->so_lock);
 done:
 	return (space_left);
+
+space_check:
+	space_left = so->so_rcvbuf - so->so_rcv_queued;
+	if (space_left <= 0) {
+		so->so_flowctrld = B_TRUE;
+		*errorp = ENOSPC;
+		space_left = -1;
+	}
+	goto done_unlock;
+}
+
+#pragma	inline(so_queue_msg_impl)
+
+ssize_t
+so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
+    size_t msg_size, int flags, int *errorp,  boolean_t *force_pushp)
+{
+	struct sonode *so = (struct sonode *)sock_handle;
+
+	return (so_queue_msg_impl(so, mp, msg_size, flags, errorp, force_pushp,
+	    so->so_filter_bottom));
 }
 
 /*
@@ -1320,11 +1471,8 @@ so_signal_oob(sock_upper_handle_t sock_handle, ssize_t offset)
  * Queue the OOB byte
  */
 static void
-so_queue_oob(sock_upper_handle_t sock_handle, mblk_t *mp, size_t len)
+so_queue_oob(struct sonode *so, mblk_t *mp, size_t len)
 {
-	struct sonode *so;
-
-	so = (struct sonode *)sock_handle;
 	mutex_enter(&so->so_lock);
 	if (so->so_direct != NULL)
 		SOD_UIOAFINI(so->so_direct);
@@ -1345,19 +1493,60 @@ so_close(struct sonode *so, int flag, struct cred *cr)
 {
 	int error;
 
-	error = (*so->so_downcalls->sd_close)(so->so_proto_handle, flag, cr);
-
 	/*
-	 * At this point there will be no more upcalls from the protocol
+	 * No new data will be enqueued once the CLOSING flag is set.
 	 */
 	mutex_enter(&so->so_lock);
-
+	so->so_state |= SS_CLOSING;
 	ASSERT(so_verify_oobstate(so));
-
 	so_rcv_flush(so);
 	mutex_exit(&so->so_lock);
 
+	if (so->so_state & SS_ACCEPTCONN) {
+		/*
+		 * We grab and release the accept lock to ensure that any
+		 * thread about to insert a socket in so_newconn completes
+		 * before we flush the queue. Any thread calling so_newconn
+		 * after we drop the lock will observe the SS_CLOSING flag,
+		 * which will stop it from inserting the socket in the queue.
+		 */
+		mutex_enter(&so->so_acceptq_lock);
+		mutex_exit(&so->so_acceptq_lock);
+
+		so_acceptq_flush(so, B_TRUE);
+	}
+
+	if (so->so_filter_active > 0)
+		sof_sonode_closing(so);
+
+	error = (*so->so_downcalls->sd_close)(so->so_proto_handle, flag, cr);
+	switch (error) {
+	default:
+		/* Protocol made a synchronous close; remove proto ref */
+		VN_RELE(SOTOV(so));
+		break;
+	case EINPROGRESS:
+		/*
+		 * Protocol is in the process of closing, it will make a
+		 * 'closed' upcall to remove the reference.
+		 */
+		error = 0;
+		break;
+	}
+
 	return (error);
+}
+
+/*
+ * Upcall made by the protocol when it's doing an asynchronous close. It
+ * will drop the protocol's reference on the socket.
+ */
+void
+so_closed(sock_upper_handle_t sock_handle)
+{
+	struct sonode *so = (struct sonode *)sock_handle;
+
+	VN_RELE(SOTOV(so));
 }
 
 void
@@ -1759,5 +1948,6 @@ sock_upcalls_t so_upcalls = {
 	so_txq_full,
 	so_signal_oob,
 	so_zcopy_notify,
-	so_set_error
+	so_set_error,
+	so_closed
 };

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SOCKCOMMON_H_
@@ -54,7 +53,7 @@ extern int socket_bind(struct sonode *, struct sockaddr *, socklen_t, int,
     struct cred *);
 extern int socket_accept(struct sonode *, int, struct cred *, struct sonode **);
 extern int socket_listen(struct sonode *, int, struct cred *);
-extern int socket_connect(struct sonode *, const struct sockaddr *,
+extern int socket_connect(struct sonode *, struct sockaddr *,
     socklen_t, int, int, struct cred *);
 extern int socket_getpeername(struct sonode *, struct sockaddr *, socklen_t *,
     boolean_t, struct cred *);
@@ -120,7 +119,7 @@ extern int so_accept(struct sonode *, int, struct cred *, struct sonode **);
 extern int so_bind(struct sonode *, struct sockaddr *, socklen_t, int,
     struct cred *);
 extern int so_listen(struct sonode *, int, struct cred *);
-extern int so_connect(struct sonode *, const struct sockaddr *,
+extern int so_connect(struct sonode *, struct sockaddr *,
     socklen_t, int, int, struct cred *);
 extern int so_getsockopt(struct sonode *, int, int, void *,
     socklen_t *, int, struct cred *);
@@ -136,6 +135,8 @@ extern int so_poll(struct sonode *, short, int, short *,
     struct pollhead **);
 extern int so_sendmsg(struct sonode *, struct nmsghdr *, struct uio *,
     struct cred *);
+extern int so_sendmblk_impl(struct sonode *, struct nmsghdr *, int,
+    struct cred *, mblk_t **, struct sof_instance *, boolean_t);
 extern int so_sendmblk(struct sonode *, struct nmsghdr *, int,
     struct cred *, mblk_t **);
 extern int so_recvmsg(struct sonode *, struct nmsghdr *, struct uio *,
@@ -153,6 +154,8 @@ extern void	so_set_prop(sock_upper_handle_t,
 	struct sock_proto_props *);
 extern ssize_t	so_queue_msg(sock_upper_handle_t, mblk_t *, size_t, int,
     int *, boolean_t *);
+extern ssize_t	so_queue_msg_impl(struct sonode *, mblk_t *, size_t, int,
+    int *, boolean_t *, struct sof_instance *);
 extern void	so_signal_oob(sock_upper_handle_t, ssize_t);
 
 extern void	so_connected(sock_upper_handle_t, sock_connid_t, struct cred *,
@@ -183,6 +186,7 @@ extern int	so_dequeue_msg(struct sonode *, mblk_t **, struct uio *,
     rval_t *, int);
 extern void	so_enqueue_msg(struct sonode *, mblk_t *, size_t);
 extern void	so_process_new_message(struct sonode *, mblk_t *, mblk_t *);
+extern void	so_check_flow_control(struct sonode *);
 
 extern mblk_t	*socopyinuio(uio_t *, ssize_t, size_t, ssize_t, size_t, int *);
 extern mblk_t 	*socopyoutuio(mblk_t *, struct uio *, ssize_t, int *);
@@ -213,7 +217,7 @@ extern int so_get_mod_version(struct sockparams *);
 /* Notification functions */
 extern void	so_notify_connected(struct sonode *);
 extern void	so_notify_disconnecting(struct sonode *);
-extern void	so_notify_disconnected(struct sonode *, int);
+extern void	so_notify_disconnected(struct sonode *, boolean_t, int);
 extern void	so_notify_writable(struct sonode *);
 extern void	so_notify_data(struct sonode *, size_t);
 extern void	so_notify_oobsig(struct sonode *);

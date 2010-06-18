@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SOCKET_PROTO_H_
@@ -128,11 +127,15 @@ struct sock_downcalls_s {
 typedef sock_lower_handle_t (*so_proto_create_func_t)(int, int, int,
     sock_downcalls_t **, uint_t *, int *, int, cred_t *);
 
-typedef void (*so_proto_quiesced_cb_t)(sock_upper_handle_t, queue_t *,
-    struct T_capability_ack *, struct sockaddr *, socklen_t,
-    struct sockaddr *, socklen_t, short);
+typedef struct sock_quiesce_arg {
+	mblk_t *soqa_exdata_mp;
+	mblk_t *soqa_urgmark_mp;
+} sock_quiesce_arg_t;
+typedef mblk_t *(*so_proto_quiesced_cb_t)(sock_upper_handle_t,
+    sock_quiesce_arg_t *, struct T_capability_ack *, struct sockaddr *,
+    socklen_t, struct sockaddr *, socklen_t, short);
 typedef int (*so_proto_fallback_func_t)(sock_lower_handle_t, queue_t *,
-    boolean_t, so_proto_quiesced_cb_t);
+    boolean_t, so_proto_quiesced_cb_t, sock_quiesce_arg_t *);
 
 /*
  * These functions return EOPNOTSUPP and are intended for the sockfs
@@ -196,6 +199,7 @@ struct sock_upcalls_s {
 	void	(*su_signal_oob)(sock_upper_handle_t, ssize_t);
 	void	(*su_zcopy_notify)(sock_upper_handle_t);
 	void	(*su_set_error)(sock_upper_handle_t, int);
+	void	(*su_closed)(sock_upper_handle_t);
 };
 
 #define	SOCK_UC_VERSION		sizeof (sock_upcalls_t)

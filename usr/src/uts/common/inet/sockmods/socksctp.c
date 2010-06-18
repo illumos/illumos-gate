@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -63,7 +62,7 @@ static int sosctp_accept(struct sonode *, int, struct cred *, struct sonode **);
 static int sosctp_bind(struct sonode *, struct sockaddr *, socklen_t, int,
     struct cred *);
 static int sosctp_listen(struct sonode *, int, struct cred *);
-static int sosctp_connect(struct sonode *, const struct sockaddr *, socklen_t,
+static int sosctp_connect(struct sonode *, struct sockaddr *, socklen_t,
     int, int, struct cred *);
 static int sosctp_recvmsg(struct sonode *, struct nmsghdr *, struct uio *,
     struct cred *);
@@ -86,7 +85,7 @@ void sosctp_fini(struct sonode *, struct cred *);
 /*
  * SCTP sockfs sonode operations, 1-N socket
  */
-static int sosctp_seq_connect(struct sonode *, const struct sockaddr *,
+static int sosctp_seq_connect(struct sonode *, struct sockaddr *,
     socklen_t, int, int, struct cred *);
 static int sosctp_seq_sendmsg(struct sonode *, struct nmsghdr *, struct uio *,
     struct cred *);
@@ -352,7 +351,7 @@ done:
  */
 /*ARGSUSED*/
 static int
-sosctp_connect(struct sonode *so, const struct sockaddr *name,
+sosctp_connect(struct sonode *so, struct sockaddr *name,
     socklen_t namelen, int fflag, int flags, struct cred *cr)
 {
 	int error = 0;
@@ -433,7 +432,7 @@ done:
  * make it so.
  */
 static int
-sosctp_seq_connect(struct sonode *so, const struct sockaddr *name,
+sosctp_seq_connect(struct sonode *so, struct sockaddr *name,
     socklen_t namelen, int fflag, int flags, struct cred *cr)
 {
 	struct sctp_soassoc *ssa;

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -185,6 +184,27 @@ struct so_snd_bufinfo {
 #define	SO_UNIX_CLOSE	0x2003		/* Internal: AF_UNIX peer closed */
 #endif	/* _KERNEL */
 
+/*
+ * Socket filter options
+ */
+#define	FIL_ATTACH	0x1		/* attach filter */
+#define	FIL_DETACH	0x2		/* detach filter */
+#define	FIL_LIST	0x3		/* list attached filters */
+
+#define	FILNAME_MAX	32
+/*
+ * Structure returned by FIL_LIST
+ */
+struct fil_info {
+	int	fi_flags;		/* see below (FILF_*) */
+	int	fi_pos;			/* position (0 is bottom) */
+	char	fi_name[FILNAME_MAX];	/* filter name */
+};
+
+#define	FILF_PROG	0x1		/* programmatic attach */
+#define	FILF_AUTO	0x2		/* automatic attach */
+#define	FILF_BYPASS	0x4		/* filter is not active */
+
 #ifdef	_KERNEL
 /*
  * new socket open flags to identify socket and acceptor streams
@@ -198,13 +218,6 @@ struct so_snd_bufinfo {
  */
 #define	SOCKET_SLEEP	KM_SLEEP
 #define	SOCKET_NOSLEEP	KM_NOSLEEP
-
-
-/*
- * flags used by sockfs when falling back to tpi socket
- */
-#define	SO_FB_START	0x1
-#define	SO_FB_FINISH	0x2
 
 #endif	/* _KERNEL */
 
@@ -224,6 +237,7 @@ struct	linger {
 #define	SOL_ROUTE	0xfffe		/* options for routing socket level */
 #endif
 #define	SOL_PACKET	0xfffd		/* options for packet level */
+#define	SOL_FILTER	0xfffc		/* options for socket filter level */
 
 /*
  * Address families.

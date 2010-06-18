@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -214,7 +213,7 @@ static int	sotpi_accept(struct sonode *, int, struct cred *,
 static int	sotpi_bind(struct sonode *, struct sockaddr *, socklen_t,
 		    int, struct cred *);
 static int	sotpi_listen(struct sonode *, int, struct cred *);
-static int	sotpi_connect(struct sonode *, const struct sockaddr *,
+static int	sotpi_connect(struct sonode *, struct sockaddr *,
 		    socklen_t, int, int, struct cred *);
 extern int	sotpi_recvmsg(struct sonode *, struct nmsghdr *,
 		    struct uio *, struct cred *);
@@ -2231,7 +2230,7 @@ e_bad:
  */
 int
 sotpi_connect(struct sonode *so,
-	const struct sockaddr *name,
+	struct sockaddr *name,
 	socklen_t namelen,
 	int fflag,
 	int flags,
@@ -6484,23 +6483,6 @@ sotpi_convert_sonode(struct sonode *so, struct sockparams *newsp,
 		*direct = B_TRUE;
 
 	/*
-	 * When it comes to urgent data we have two cases to deal with;
-	 * (1) The oob byte has already arrived, or (2) the protocol has
-	 * notified that oob data is pending, but it has not yet arrived.
-	 *
-	 * For (1) all we need to do is send a T_EXDATA_IND to indicate were
-	 * in the byte stream the oob byte is. For (2) we have to send a
-	 * SIGURG (M_PCSIG), followed by a zero-length mblk indicating whether
-	 * the oob byte will be the next byte from the protocol.
-	 *
-	 * So in the worst case we need two mblks, one for the signal, another
-	 * for mark indication. In that case we use the exdata_mp for the sig.
-	 */
-	sti->sti_exdata_mp = allocb_wait(sizeof (struct T_exdata_ind), BPRI_MED,
-	    STR_NOSIG, NULL);
-	sti->sti_urgmark_mp = allocb_wait(0, BPRI_MED, STR_NOSIG, NULL);
-
-	/*
 	 * Keep the original sp around so we can properly dispose of the
 	 * sonode when the socket is being closed.
 	 */
@@ -6559,16 +6541,6 @@ sotpi_revert_sonode(struct sonode *so, struct cred *cr)
 	    SS_FALLBACK_PENDING);
 	ASSERT(!SOCK_IS_NONSTR(so));
 	ASSERT(vp->v_stream != NULL);
-
-	if (SOTOTPI(so)->sti_exdata_mp != NULL) {
-		freeb(SOTOTPI(so)->sti_exdata_mp);
-		SOTOTPI(so)->sti_exdata_mp = NULL;
-	}
-
-	if (SOTOTPI(so)->sti_urgmark_mp != NULL) {
-		freeb(SOTOTPI(so)->sti_urgmark_mp);
-		SOTOTPI(so)->sti_urgmark_mp = NULL;
-	}
 
 	strclean(vp);
 	(void) strclose(vp, FREAD|FWRITE|SO_FALLBACK, cr);
@@ -6677,9 +6649,6 @@ i_sotpi_info_constructor(sotpi_info_t *sti)
 	sti->sti_nl7c_uri	= NULL;
 	sti->sti_nl7c_rcv_mp	= NULL;
 
-	sti->sti_exdata_mp	= NULL;
-	sti->sti_urgmark_mp	= NULL;
-
 	mutex_init(&sti->sti_plumb_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&sti->sti_ack_cv, NULL, CV_DEFAULT, NULL);
 
@@ -6704,9 +6673,6 @@ i_sotpi_info_destructor(sotpi_info_t *sti)
 	ASSERT(sti->sti_nl7c_flags == 0);
 	ASSERT(sti->sti_nl7c_uri == NULL);
 	ASSERT(sti->sti_nl7c_rcv_mp == NULL);
-
-	ASSERT(sti->sti_exdata_mp == NULL);
-	ASSERT(sti->sti_urgmark_mp == NULL);
 
 	mutex_destroy(&sti->sti_plumb_lock);
 	cv_destroy(&sti->sti_ack_cv);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_KSOCKET_H_
@@ -88,7 +87,7 @@ extern int 	ksocket_bind(ksocket_t, struct sockaddr *, socklen_t,
 extern int 	ksocket_listen(ksocket_t, int, struct cred *);
 extern int 	ksocket_accept(ksocket_t, struct sockaddr *, socklen_t *,
 		    ksocket_t *, struct cred *);
-extern int 	ksocket_connect(ksocket_t, const struct sockaddr *, socklen_t,
+extern int 	ksocket_connect(ksocket_t, struct sockaddr *, socklen_t,
 		    struct cred *);
 extern int 	ksocket_send(ksocket_t, void *, size_t, int, size_t *,
 		    struct cred *);

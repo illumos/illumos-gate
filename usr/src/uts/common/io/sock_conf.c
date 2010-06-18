@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -127,6 +126,10 @@ smod_register(const smod_reg_t *reg)
 		if (reg->__smod_priv != NULL) {
 			smodp->smod_proto_fallback_func =
 			    reg->__smod_priv->smodp_proto_fallback_func;
+			smodp->smod_fallback_devpath_v4 =
+			    reg->__smod_priv->smodp_fallback_devpath_v4;
+			smodp->smod_fallback_devpath_v6 =
+			    reg->__smod_priv->smodp_fallback_devpath_v6;
 		}
 	}
 	smod_add(smodp);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -33,6 +32,7 @@
 #include <io/ksocket/ksocket_impl.h>
 #include <fs/sockfs/sockcommon.h>
 #include <fs/sockfs/sodirect.h>
+#include <fs/sockfs/sockfilter_impl.h>
 
 /*
  * There can only be a single thread waiting for data (enforced by
@@ -78,6 +78,7 @@ so_notify_connected(struct sonode *so)
 		mutex_exit(&so->so_lock);
 		pollwakeup(&so->so_poll_list, POLLOUT);
 	}
+	sof_sonode_notify_filters(so, SOF_EV_CONNECTED, 0);
 
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 }
@@ -93,18 +94,19 @@ so_notify_disconnecting(struct sonode *so)
 	int sigev = 0;
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
+	(void) i_so_notify_last_tx(so, &pollev, &sigev);
 
 	if (IS_KERNEL_SOCKET(so)) {
-		SO_WAKEUP_WRITER(so);
 		KSOCKET_CALLBACK(so, cantsendmore, 0);
 		mutex_exit(&so->so_lock);
-	} else if (i_so_notify_last_tx(so, &pollev, &sigev)) {
-		socket_sendsig(so, sigev);
-		mutex_exit(&so->so_lock);
-		pollwakeup(&so->so_poll_list, pollev);
 	} else {
+		if (sigev != 0)
+			socket_sendsig(so, sigev);
 		mutex_exit(&so->so_lock);
+		if (pollev != 0)
+			pollwakeup(&so->so_poll_list, pollev);
 	}
+	sof_sonode_notify_filters(so, SOF_EV_CANTSENDMORE, 0);
 
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 }
@@ -114,7 +116,7 @@ so_notify_disconnecting(struct sonode *so)
  * Wake up anyone that is waiting to send or receive data.
  */
 void
-so_notify_disconnected(struct sonode *so, int error)
+so_notify_disconnected(struct sonode *so, boolean_t connfailed, int error)
 {
 	int pollev = 0;
 	int sigev = 0;
@@ -125,7 +127,11 @@ so_notify_disconnected(struct sonode *so, int error)
 	(void) i_so_notify_last_rx(so, &pollev, &sigev);
 
 	if (IS_KERNEL_SOCKET(so)) {
-		KSOCKET_CALLBACK(so, disconnected, error);
+		if (connfailed) {
+			KSOCKET_CALLBACK(so, disconnected, error);
+		} else {
+			KSOCKET_CALLBACK(so, connectfailed, error);
+		}
 		mutex_exit(&so->so_lock);
 	} else {
 		if (sigev != 0)
@@ -134,6 +140,8 @@ so_notify_disconnected(struct sonode *so, int error)
 		if (pollev != 0)
 			pollwakeup(&so->so_poll_list, pollev);
 	}
+	sof_sonode_notify_filters(so, (connfailed) ? SOF_EV_CONNECTFAILED :
+	    SOF_EV_DISCONNECTED, error);
 
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 }
@@ -158,6 +166,10 @@ so_notify_writable(struct sonode *so)
 	}
 
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
+
+	/* filters can start injecting data */
+	if (so->so_filter_active > 0)
+		sof_sonode_notify_filters(so, SOF_EV_INJECT_DATA_OUT_OK, 0);
 }
 
 /*
@@ -270,7 +282,6 @@ so_notify_eof(struct sonode *so)
 	(void) i_so_notify_last_rx(so, &pollev, &sigev);
 
 	if (IS_KERNEL_SOCKET(so)) {
-		SO_WAKEUP_READER(so);
 		KSOCKET_CALLBACK(so, cantrecvmore, 0);
 		mutex_exit(&so->so_lock);
 	} else {
@@ -281,6 +292,7 @@ so_notify_eof(struct sonode *so)
 			pollwakeup(&so->so_poll_list, pollev);
 
 	}
+	sof_sonode_notify_filters(so, SOF_EV_CANTRECVMORE, 0);
 
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 }
@@ -294,7 +306,7 @@ so_notify_newconn(struct sonode *so)
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	if (IS_KERNEL_SOCKET(so)) {
-		KSOCKET_CALLBACK(so, newconn, so->so_rcv_queued);
+		KSOCKET_CALLBACK(so, newconn, 0);
 		mutex_exit(&so->so_lock);
 	} else {
 		socket_sendsig(so, SOCKETSIG_READ);

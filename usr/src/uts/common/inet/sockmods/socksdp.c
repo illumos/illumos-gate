@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -63,7 +62,7 @@ static int sosdp_accept(struct sonode *, int, struct cred *, struct sonode **);
 static int sosdp_bind(struct sonode *, struct sockaddr *, socklen_t, int,
     struct cred *);
 static int sosdp_listen(struct sonode *, int, struct cred *);
-static int sosdp_connect(struct sonode *, const struct sockaddr *, socklen_t,
+static int sosdp_connect(struct sonode *, struct sockaddr *, socklen_t,
     int, int, struct cred *);
 static int sosdp_recvmsg(struct sonode *, struct nmsghdr *, struct uio *,
     struct cred *);
@@ -325,7 +324,7 @@ done:
  */
 /*ARGSUSED*/
 static int
-sosdp_connect(struct sonode *so, const struct sockaddr *name,
+sosdp_connect(struct sonode *so, struct sockaddr *name,
     socklen_t namelen, int fflag, int flags, struct cred *cr)
 {
 	int error = 0;
@@ -1120,7 +1119,7 @@ sosdp_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 		*reventsp |= (POLLIN|POLLRDNORM) & events;
 	}
 
-	if ((so_state & SS_CANTRCVMORE) || (so->so_acceptq_head != NULL)) {
+	if ((so_state & SS_CANTRCVMORE) || (so->so_acceptq_len > 0)) {
 		*reventsp |= (POLLIN|POLLRDNORM) & events;
 	}
 
@@ -1158,7 +1157,7 @@ sosdp_close(struct sonode *so, int flag, struct cred *cr)
 
 	mutex_enter(&so->so_lock);
 	so_unlock_single(so, SOLOCKED);
-	so_notify_disconnected(so, error);
+	so_notify_disconnected(so, B_FALSE, error);
 
 	return (error);
 }
@@ -1266,7 +1265,7 @@ sdp_sock_disconnected(void *handle, int error)
 	ASSERT(so->so_proto_handle != NULL); /* closed conn */
 
 	soisdisconnected(so, error);
-	so_notify_disconnected(so, error);
+	so_notify_disconnected(so, B_FALSE, error);
 }
 
 /*

@@ -3822,38 +3822,60 @@ aus_sockconfig(tad)
 	struct t_audit_data *tad;
 {
 	struct a {
-		long	domain;
-		long	type;
-		long	protocol;
-		long	devpath;
+		long	cmd;
+		long	arg1;
+		long	arg2;
+		long	arg3;
+		long	arg4;
 	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
 
-	char	*kdevpath;
-	int	kdevpathlen = MAXPATHLEN + 1;
+	char	*buf;
+	int	buflen;
 	size_t	size;
 
-	au_uwrite(au_to_arg32(1, "domain", (uint32_t)uap->domain));
-	au_uwrite(au_to_arg32(2, "type", (uint32_t)uap->type));
-	au_uwrite(au_to_arg32(3, "protocol", (uint32_t)uap->protocol));
+	au_uwrite(au_to_arg32(1, "cmd", (uint_t)uap->cmd));
+	switch (uap->cmd) {
+	case SOCKCONFIG_ADD_SOCK:
+	case SOCKCONFIG_REMOVE_SOCK:
+		au_uwrite(au_to_arg32(2, "domain", (uint32_t)uap->arg1));
+		au_uwrite(au_to_arg32(3, "type", (uint32_t)uap->arg2));
+		au_uwrite(au_to_arg32(4, "protocol", (uint32_t)uap->arg3));
 
-	if (uap->devpath == 0) {
-		au_uwrite(au_to_arg32(3, "devpath", (uint32_t)0));
-	} else {
-		kdevpath = kmem_alloc(kdevpathlen, KM_SLEEP);
+		if (uap->arg4 == 0) {
+			au_uwrite(au_to_arg32(5, "devpath", (uint32_t)0));
+		} else {
+			buflen = MAXPATHLEN + 1;
+			buf = kmem_alloc(buflen, KM_SLEEP);
+			if (copyinstr((caddr_t)uap->arg4, buf, buflen,
+			    &size)) {
+				kmem_free(buf, buflen);
+				return;
+			}
 
-		if (copyinstr((caddr_t)uap->devpath, kdevpath, kdevpathlen,
-			&size)) {
-			kmem_free(kdevpath, kdevpathlen);
+			if (size > MAXPATHLEN) {
+				kmem_free(buf, buflen);
+				return;
+			}
+
+			au_uwrite(au_to_text(buf));
+			kmem_free(buf, buflen);
+		}
+		break;
+	case SOCKCONFIG_ADD_FILTER:
+	case SOCKCONFIG_REMOVE_FILTER:
+		buflen = FILNAME_MAX;
+		buf = kmem_alloc(buflen, KM_SLEEP);
+
+		if (copyinstr((caddr_t)uap->arg1, buf, buflen, &size)) {
+			kmem_free(buf, buflen);
 			return;
 		}
 
-		if (size > MAXPATHLEN) {
-			kmem_free(kdevpath, kdevpathlen);
-			return;
-		}
-
-		au_uwrite(au_to_text(kdevpath));
-		kmem_free(kdevpath, kdevpathlen);
+		au_uwrite(au_to_text(buf));
+		kmem_free(buf, buflen);
+		break;
+	default:
+		break;
 	}
 }
 

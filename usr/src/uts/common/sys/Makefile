@@ -506,6 +506,7 @@ CHKHDRS=			\
 	socket_impl.h		\
 	socket_proto.h		\
 	socketvar.h		\
+	sockfilter.h		\
 	sockio.h		\
 	soundcard.h		\
 	squeue.h		\

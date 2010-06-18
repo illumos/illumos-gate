@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -30,6 +29,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <locale.h>
+#include <sys/socket.h>
+#include <sys/socketvar.h>
+#include <errno.h>
 
 #define	MAXLINELEN	4096
 
@@ -47,6 +49,15 @@
  *
  *	soconfig <fam> <type> <protocol>
  *		deregisters
+ *
+ * Filter Operations (Consolidation Private):
+ *
+ *	soconfig -F <name> <modname> {auto [top | bottom | before:filter |
+ *		after:filter] | prog} <fam>:<type>:<proto>,...
+ *		configure filter
+ *
+ *	soconfig -F <name>
+ *		unconfigures filter
  */
 
 static int	parse_file(char *filename);
@@ -59,6 +70,8 @@ static int	parse_params(char *famstr, char *typestr, char *protostr,
 static int	parse_int(char *str);
 
 static void	usage(void);
+
+static int	parse_filter_params(int argc, char **argv);
 
 int
 main(argc, argv)
@@ -75,6 +88,11 @@ main(argc, argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
+	if (argc >= 2 && strcmp(argv[0], "-F") == 0) {
+		argc--; argv++;
+		ret = parse_filter_params(argc, argv);
+		exit(ret);
+	}
 	if (argc == 2 && strcmp(argv[0], "-f") == 0) {
 		ret = parse_file(argv[1]);
 		exit(ret);
@@ -213,7 +231,7 @@ split_line(char *line, char *argvec[], int maxargvec)
 static int
 parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 {
-	int fam, type, protocol;
+	int cmd, fam, type, protocol;
 
 	fam = parse_int(famstr);
 	if (fam == -1) {
@@ -272,13 +290,17 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 			}
 			return (1);
 		}
+
+		cmd = SOCKCONFIG_ADD_SOCK;
+	} else {
+		cmd = SOCKCONFIG_REMOVE_SOCK;
 	}
 
 #ifdef DEBUG
-	printf("not calling sockconfig(%d, %d, %d, %s)\n",
-	    fam, type, protocol, path == NULL ? "(null)" : path);
+	printf("not calling sockconfig(%d, %d, %d, %d, %s)\n",
+	    cmd, fam, type, protocol, path == NULL ? "(null)" : path);
 #else
-	if (_sockconfig(fam, type, protocol, path) == -1) {
+	if (_sockconfig(cmd, fam, type, protocol, path) == -1) {
 		perror("sockconfig");
 		return (1);
 	}
@@ -296,4 +318,182 @@ parse_int(char *str)
 	if (end == str)
 		return (-1);
 	return (res);
+}
+
+/*
+ * Add and remove socket filters.
+ */
+static int
+parse_filter_params(int argc, char **argv)
+{
+	struct sockconfig_filter_props filprop;
+	sof_socktuple_t *socktuples;
+	size_t tupcnt, nalloc;
+	char *hintarg, *socktup, *tupstr;
+	int i;
+
+	if (argc == 1) {
+		if (_sockconfig(SOCKCONFIG_REMOVE_FILTER, argv[0], 0,
+		    0, 0) < 0) {
+			switch (errno) {
+			case ENXIO:
+				fprintf(stderr,
+				    gettext("socket filter is not configured "
+				    "'%s'\n"), argv[0]);
+				break;
+			default:
+				perror("sockconfig");
+				break;
+			}
+			return (1);
+		}
+		return (0);
+	}
+
+	if (argc < 4 || argc > 5)
+		return (1);
+
+
+	if (strlen(argv[1]) >= MODMAXNAMELEN) {
+		fprintf(stderr,
+		    gettext("invalid module name '%s': name too long\n"),
+		    argv[1]);
+		return (1);
+	}
+	filprop.sfp_modname = argv[1];
+
+	/* Check the attach semantics */
+	if (strcmp(argv[2], "auto") == 0) {
+		filprop.sfp_autoattach = B_TRUE;
+		if (argc == 5) {
+			/* placement hint */
+			if (strcmp(argv[3], "top") == 0) {
+				filprop.sfp_hint = SOF_HINT_TOP;
+			} else if (strcmp(argv[3], "bottom") == 0) {
+				filprop.sfp_hint = SOF_HINT_BOTTOM;
+			} else {
+				if (strncmp(argv[3], "before", 6) == 0) {
+					filprop.sfp_hint = SOF_HINT_BEFORE;
+				} else if (strncmp(argv[3], "after", 5) == 0) {
+					filprop.sfp_hint = SOF_HINT_AFTER;
+				} else {
+					fprintf(stderr,
+					    gettext("invalid placement hint "
+					    "'%s'\n"), argv[3]);
+					return (1);
+				}
+
+				hintarg = strchr(argv[3], ':');
+				if (hintarg == NULL ||
+				    (strlen(++hintarg) == 0) ||
+				    (strlen(hintarg) >= FILNAME_MAX)) {
+					fprintf(stderr,
+					    gettext("invalid placement hint "
+					    "argument '%s': name too long\n"),
+					    argv[3]);
+					return (1);
+				}
+
+				filprop.sfp_hintarg = hintarg;
+			}
+		} else {
+			filprop.sfp_hint = SOF_HINT_NONE;
+		}
+	} else if (strcmp(argv[2], "prog") == 0) {
+		filprop.sfp_autoattach = B_FALSE;
+		filprop.sfp_hint = SOF_HINT_NONE;
+		/* cannot specify placement hint for programmatic filter */
+		if (argc == 5) {
+			fprintf(stderr,
+			    gettext("placement hint specified for programmatic "
+			    "filter\n"));
+			return (1);
+		}
+	} else {
+		fprintf(stderr, gettext("invalid attach semantic '%s'\n"),
+		    argv[2]);
+		return (1);
+	}
+
+	/* parse the socket tuples */
+	nalloc = 4;
+	socktuples = calloc(nalloc, sizeof (sof_socktuple_t));
+	if (socktuples == NULL) {
+		perror("calloc");
+		return (1);
+	}
+
+	tupcnt = 0;
+	tupstr = argv[(argc == 4) ? 3 : 4];
+	while ((socktup = strsep(&tupstr, ",")) != NULL) {
+		int val;
+		char *valstr;
+
+		if (tupcnt == nalloc) {
+			sof_socktuple_t *new;
+
+			nalloc *= 2;
+			new = realloc(socktuples,
+			    nalloc * sizeof (sof_socktuple_t));
+			if (new == NULL) {
+				perror("realloc");
+				free(socktuples);
+				return (1);
+			}
+			socktuples = new;
+		}
+		i = 0;
+		while ((valstr = strsep(&socktup, ":")) != NULL && i < 3) {
+			val = parse_int(valstr);
+			if (val == -1) {
+				fprintf(stderr, gettext("bad socket tuple\n"));
+				free(socktuples);
+				return (1);
+			}
+			switch (i) {
+			case 0:	socktuples[tupcnt].sofst_family = val; break;
+			case 1:	socktuples[tupcnt].sofst_type = val; break;
+			case 2:	socktuples[tupcnt].sofst_protocol = val; break;
+			}
+			i++;
+		}
+		if (i != 3) {
+			fprintf(stderr, gettext("bad socket tuple\n"));
+			free(socktuples);
+			return (1);
+		}
+		tupcnt++;
+	}
+	if (tupcnt == 0) {
+		fprintf(stderr, gettext("no socket tuples specified\n"));
+		free(socktuples);
+		return (1);
+	}
+	filprop.sfp_socktuple_cnt = tupcnt;
+	filprop.sfp_socktuple = socktuples;
+
+	if (_sockconfig(SOCKCONFIG_ADD_FILTER, argv[0], &filprop, 0, 0) < 0) {
+		switch (errno) {
+		case EINVAL:
+			fprintf(stderr,
+			    gettext("invalid socket filter configuration\n"));
+			break;
+		case EEXIST:
+			fprintf(stderr,
+			    gettext("socket filter is already configured "
+			    "'%s'\n"), argv[0]);
+			break;
+		case ENOSPC:
+			fprintf(stderr, gettext("unable to satisfy placement "
+			    "constraint\n"));
+			break;
+		default:
+			perror("sockconfig");
+			break;
+		}
+		free(socktuples);
+		return (1);
+	}
+	free(socktuples);
+	return (0);
 }

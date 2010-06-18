@@ -21,8 +21,7 @@
 
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -731,7 +730,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 244 */ SYSENT_CI("getsockname",	getsockname,	4),
 	/* 245 */ SYSENT_CI("getsockopt",	getsockopt,	6),
 	/* 246 */ SYSENT_CI("setsockopt",	setsockopt,	6),
-	/* 247 */ SYSENT_CI("sockconfig",	sockconfig,	4),
+	/* 247 */ SYSENT_CI("sockconfig",	sockconfig,	5),
 	/* 248 */ SYSENT_CI("ntp_gettime",	ntp_gettime,	1),
 	/* 249 */ SYSENT_CI("ntp_adjtime",	ntp_adjtime,	1),
 	/* 250 */ SYSENT_CI("lwp_mutex_unlock",	lwp_mutex_unlock,	1),
@@ -1057,7 +1056,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 244 */ SYSENT_CI("getsockname",	getsockname,	4),
 	/* 245 */ SYSENT_CI("getsockopt",	getsockopt,	6),
 	/* 246 */ SYSENT_CI("setsockopt",	setsockopt,	6),
-	/* 247 */ SYSENT_CI("sockconfig",	sockconfig,	4),
+	/* 247 */ SYSENT_CI("sockconfig",	sockconfig,	5),
 	/* 248 */ SYSENT_CI("ntp_gettime",	ntp_gettime,	1),
 	/* 249 */ SYSENT_CI("ntp_adjtime",	ntp_adjtime,	1),
 	/* 250 */ SYSENT_CI("lwp_mutex_unlock",	lwp_mutex_unlock,	1),

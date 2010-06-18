@@ -233,8 +233,9 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcpha_t *tcpha)
 			mp->b_wptr += sizeof (*stropt);
 
 			stropt = (struct stroptions *)mp->b_rptr;
-			stropt->so_flags = SO_WROFF;
+			stropt->so_flags = SO_WROFF | SO_MAXBLK;
 			stropt->so_wroff = 0;
+			stropt->so_maxblk = INFPSZ;
 
 			/* Send the options up */
 			putnext(peer_rq, mp);
@@ -244,8 +245,9 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcpha_t *tcpha)
 			/* The peer is a non-STREAMS end point */
 			ASSERT(IPCL_IS_TCP(peer_connp));
 
-			sopp.sopp_flags = SOCKOPT_WROFF;
+			sopp.sopp_flags = SOCKOPT_WROFF | SOCKOPT_MAXBLK;
 			sopp.sopp_wroff = 0;
+			sopp.sopp_maxblk = INFPSZ;
 			(*peer_connp->conn_upcalls->su_set_proto_props)
 			    (peer_connp->conn_upper_handle, &sopp);
 		}

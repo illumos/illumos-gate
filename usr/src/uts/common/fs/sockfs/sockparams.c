@@ -36,6 +36,7 @@
 #include <sys/socketvar.h>
 
 #include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/sockfilter_impl.h>
 #include <fs/sockfs/socktpi.h>
 
 /*
@@ -53,12 +54,9 @@
  * supplied device path, or when a socket is falling back to TPI.
  *
  * Lock order:
- *   The lock order is splist_lock -> sp_lock.
- *   The lock order is sp_ephem_lock -> sp_lock.
+ *   The lock order is sockconf_lock -> sp_lock.
  */
 extern int 	kobj_path_exists(char *, int);
-extern void	nl7c_init(void);
-extern int	sockfs_defer_nl7c_init;
 
 static int 	sockparams_sdev_init(struct sockparams *, char *, int);
 static void 	sockparams_sdev_fini(struct sockparams *);
@@ -67,13 +65,11 @@ static void 	sockparams_sdev_fini(struct sockparams *);
  * Global sockparams list (populated via soconfig(1M)).
  */
 static list_t sphead;
-static krwlock_t splist_lock;
 
 /*
  * List of ephemeral sockparams.
  */
 static list_t sp_ephem_list;
-static krwlock_t sp_ephem_lock;
 
 /* Global kstats for sockparams */
 typedef struct sockparams_g_stats {
@@ -92,9 +88,6 @@ sockparams_init(void)
 	    offsetof(struct sockparams, sp_node));
 	list_create(&sp_ephem_list, sizeof (struct sockparams),
 	    offsetof(struct sockparams, sp_node));
-
-	rw_init(&splist_lock, NULL, RW_DEFAULT, NULL);
-	rw_init(&sp_ephem_lock, NULL, RW_DEFAULT, NULL);
 
 	kstat_named_init(&sp_g_stats.spgs_ephem_nalloc, "ephemeral_nalloc",
 	    KSTAT_DATA_UINT64);
@@ -170,9 +163,8 @@ sockparams_kstat_fini(struct sockparams *sp)
  *   modname: Name of the module associated with the socket type. The
  *            module can be NULL if a device path is given, in which
  *            case the TPI module is used.
- *   devpath: Path to the STREAMS device. May be NULL for non-STREAMS
- *            based transports, or those transports that do not provide
- *            the capability to fallback to STREAMS.
+ *   devpath: Path to the STREAMS device. Must be NULL for non-STREAMS
+ *            based transports.
  *   devpathlen: Length of the devpath string. The argument can be 0,
  *            indicating that devpath was allocated statically, and should
  *            not be freed when the sockparams entry is destroyed.
@@ -202,7 +194,7 @@ sockparams_create(int family, int type, int protocol, char *modname,
 		goto error;
 	}
 
-	/* either a module or device must be given */
+	/* either a module or device must be given, but not both */
 	if (modname == NULL && devpath == NULL) {
 		*errorp = EINVAL;
 		goto error;
@@ -218,6 +210,11 @@ sockparams_create(int family, int type, int protocol, char *modname,
 	sp->sp_protocol = protocol;
 	sp->sp_refcnt = 0;
 	sp->sp_flags = flags;
+
+	list_create(&sp->sp_auto_filters, sizeof (sp_filter_t),
+	    offsetof(sp_filter_t, spf_node));
+	list_create(&sp->sp_prog_filters, sizeof (sp_filter_t),
+	    offsetof(sp_filter_t, spf_node));
 
 	kstat_named_init(&sp->sp_stats.sps_nfallback, "nfallback",
 	    KSTAT_DATA_UINT64);
@@ -322,6 +319,10 @@ sockparams_destroy(struct sockparams *sp)
 	mutex_destroy(&sp->sp_lock);
 	sockparams_kstat_fini(sp);
 
+	sof_sockparams_fini(sp);
+	list_destroy(&sp->sp_auto_filters);
+	list_destroy(&sp->sp_prog_filters);
+
 	kmem_free(sp, sizeof (*sp));
 }
 
@@ -404,12 +405,12 @@ sockparams_hold_ephemeral(int family, int type, int protocol,
 	/*
 	 * First look for an existing entry
 	 */
-	rw_enter(&sp_ephem_lock, RW_READER);
+	rw_enter(&sockconf_lock, RW_READER);
 	sp = sockparams_find(&sp_ephem_list, family, type, protocol,
 	    by_devpath, name);
 	if (sp != NULL) {
 		SOCKPARAMS_INC_REF(sp);
-		rw_exit(&sp_ephem_lock);
+		rw_exit(&sockconf_lock);
 		sp_g_stats.spgs_ephem_nreuse.value.ui64++;
 
 		return (sp);
@@ -418,7 +419,7 @@ sockparams_hold_ephemeral(int family, int type, int protocol,
 		char *namebuf = NULL;
 		int namelen = 0;
 
-		rw_exit(&sp_ephem_lock);
+		rw_exit(&sockconf_lock);
 
 		namelen = strlen(name) + 1;
 		namebuf = kmem_alloc(namelen, kmflag);
@@ -460,7 +461,7 @@ sockparams_hold_ephemeral(int family, int type, int protocol,
 		 * The sockparams entry was created, now try to add it
 		 * to the list. We need to hold the lock as a WRITER.
 		 */
-		rw_enter(&sp_ephem_lock, RW_WRITER);
+		rw_enter(&sockconf_lock, RW_WRITER);
 		sp = sockparams_find(&sp_ephem_list, family, type, protocol,
 		    by_devpath, name);
 		if (sp != NULL) {
@@ -469,13 +470,19 @@ sockparams_hold_ephemeral(int family, int type, int protocol,
 			 * place a hold on it and release the entry we alloc'ed.
 			 */
 			SOCKPARAMS_INC_REF(sp);
-			rw_exit(&sp_ephem_lock);
+			rw_exit(&sockconf_lock);
 
 			sockparams_destroy(newsp);
 		} else {
+			*errorp = sof_sockparams_init(newsp);
+			if (*errorp != 0) {
+				rw_exit(&sockconf_lock);
+				sockparams_destroy(newsp);
+				return (NULL);
+			}
 			SOCKPARAMS_INC_REF(newsp);
 			list_insert_tail(&sp_ephem_list, newsp);
-			rw_exit(&sp_ephem_lock);
+			rw_exit(&sockconf_lock);
 
 			sp = newsp;
 		}
@@ -514,18 +521,18 @@ sockparams_ephemeral_drop_last_ref(struct sockparams *sp)
 	ASSERT(sp->sp_flags & SOCKPARAMS_EPHEMERAL);
 	ASSERT(MUTEX_NOT_HELD(&sp->sp_lock));
 
-	rw_enter(&sp_ephem_lock, RW_WRITER);
+	rw_enter(&sockconf_lock, RW_WRITER);
 	mutex_enter(&sp->sp_lock);
 
 	if (--sp->sp_refcnt == 0) {
 		list_remove(&sp_ephem_list, sp);
 		mutex_exit(&sp->sp_lock);
-		rw_exit(&sp_ephem_lock);
+		rw_exit(&sockconf_lock);
 
 		sockparams_destroy(sp);
 	} else {
 		mutex_exit(&sp->sp_lock);
-		rw_exit(&sp_ephem_lock);
+		rw_exit(&sockconf_lock);
 	}
 }
 
@@ -542,21 +549,37 @@ sockparams_ephemeral_drop_last_ref(struct sockparams *sp)
  *   is returned.
  *
  * Locking:
- *   The caller can not be holding splist_lock.
+ *   The caller can not be holding sockconf_lock.
  */
-static int
+int
 sockparams_add(struct sockparams *sp)
 {
+	int error;
+
 	ASSERT(!(sp->sp_flags & SOCKPARAMS_EPHEMERAL));
 
-	rw_enter(&splist_lock, RW_WRITER);
+	rw_enter(&sockconf_lock, RW_WRITER);
 	if (sockparams_find(&sphead, sp->sp_family, sp->sp_type,
 	    sp->sp_protocol, B_TRUE, NULL) != 0) {
-		rw_exit(&splist_lock);
+		rw_exit(&sockconf_lock);
 		return (EEXIST);
 	} else {
+		/*
+		 * Unique sockparams entry, so init the kstats.
+		 */
+		sockparams_kstat_init(sp);
+
+		/*
+		 * Before making the socket type available we must make
+		 * sure that interested socket filters are aware of it.
+		 */
+		error = sof_sockparams_init(sp);
+		if (error != 0) {
+			rw_exit(&sockconf_lock);
+			return (error);
+		}
 		list_insert_tail(&sphead, sp);
-		rw_exit(&splist_lock);
+		rw_exit(&sockconf_lock);
 		return (0);
 	}
 }
@@ -575,15 +598,15 @@ sockparams_add(struct sockparams *sp)
  *   On success 0, otherwise ENXIO.
  *
  * Locking:
- *   Caller can not be holding splist_lock or the sp_lock of
+ *   Caller can not be holding sockconf_lock or the sp_lock of
  *   any sockparams entry.
  */
-static int
+int
 sockparams_delete(int family, int type, int protocol)
 {
 	struct sockparams *sp;
 
-	rw_enter(&splist_lock, RW_WRITER);
+	rw_enter(&sockconf_lock, RW_WRITER);
 	sp = sockparams_find(&sphead, family, type, protocol, B_TRUE, NULL);
 
 	if (sp != NULL) {
@@ -595,97 +618,22 @@ sockparams_delete(int family, int type, int protocol)
 		mutex_enter(&sp->sp_lock);
 		if (sp->sp_refcnt != 0) {
 			mutex_exit(&sp->sp_lock);
-			rw_exit(&splist_lock);
+			rw_exit(&sockconf_lock);
 			return (EBUSY);
 		}
 		mutex_exit(&sp->sp_lock);
 		/* Delete the sockparams entry. */
 		list_remove(&sphead, sp);
-		rw_exit(&splist_lock);
+		rw_exit(&sockconf_lock);
 
 		sockparams_destroy(sp);
 		return (0);
 	} else {
-		rw_exit(&splist_lock);
+		rw_exit(&sockconf_lock);
 		return (ENXIO);
 	}
 }
 
-/*
- * soconfig(int family, int type, int protocol,
- *     char *devpath, int devpathlen, char *module)
- *
- * Add or delete an entry to the sockparams table.
- * When devpath and module both are NULL, it will delete an entry.
- *
- * Arguments:
- *   family, type, protocol: the tuple in question
- *   devpath: STREAMS device path. Can be NULL for module based sockets.
- *   module : Name of the socket module. Can be NULL for STREAMS
- *            based sockets.
- *   devpathlen: length of the devpath string, or 0 if devpath
- *            was statically allocated.
- *
- * Note:
- *   This routine assumes that the caller has kmem_alloced
- *   devpath (if devpathlen > 0) and module for this routine to
- *   consume.
- */
-int
-soconfig(int family, int type, int protocol,
-    char *devpath, int devpathlen, char *module)
-{
-	struct sockparams *sp;
-	int error = 0;
-
-	dprint(0, ("soconfig(%d,%d,%d,%s,%d,%s)\n",
-	    family, type, protocol, devpath, devpathlen,
-	    module == NULL ? "NULL" : module));
-
-	if (sockfs_defer_nl7c_init) {
-		nl7c_init();
-		sockfs_defer_nl7c_init = 0;
-	}
-
-	if (devpath == NULL && module == NULL) {
-		/*
-		 * Delete existing entry,
-		 * both socket module and STEAMS device.
-		 */
-		ASSERT(module == NULL);
-		error = sockparams_delete(family, type, protocol);
-	} else {
-		/*
-		 * Adding an entry
-		 * sockparams_create frees mod name and devpath upon failure.
-		 */
-		sp = sockparams_create(family, type, protocol, module,
-		    devpath, devpathlen, 0, KM_SLEEP, &error);
-
-		if (sp != NULL) {
-			/*
-			 * The sockparams entry becomes globally visible once
-			 * we call sockparams_add(). So we add a reference so
-			 * we do not have to worry about the entry being
-			 * immediately deleted.
-			 */
-			SOCKPARAMS_INC_REF(sp);
-			error = sockparams_add(sp);
-			if (error != 0) {
-				SOCKPARAMS_DEC_REF(sp);
-				sockparams_destroy(sp);
-			} else {
-				/*
-				 * Unique sockparams entry, so init the kstats.
-				 */
-				sockparams_kstat_init(sp);
-				SOCKPARAMS_DEC_REF(sp);
-			}
-		}
-	}
-
-	return (error);
-}
 
 /*
  * solookup(int family, int type, int protocol, struct sockparams **spp)
@@ -716,7 +664,7 @@ solookup(int family, int type, int protocol, struct sockparams **spp)
 	int error = 0;
 
 	*spp = NULL;
-	rw_enter(&splist_lock, RW_READER);
+	rw_enter(&sockconf_lock, RW_READER);
 
 	/*
 	 * Search the sockparams list for an appropiate entry.
@@ -740,7 +688,7 @@ solookup(int family, int type, int protocol, struct sockparams **spp)
 			    sp->sp_protocol == protocol && found < 2)
 				found = 2;
 		}
-		rw_exit(&splist_lock);
+		rw_exit(&sockconf_lock);
 		switch (found) {
 		case 0:
 			error = EAFNOSUPPORT;
@@ -760,13 +708,13 @@ solookup(int family, int type, int protocol, struct sockparams **spp)
 	 *
 	 * We put a hold on the entry early on, so if the
 	 * sockmod is not loaded, and we have to exit
-	 * splist_lock to call modload(), we know that the
+	 * sockconf_lock to call modload(), we know that the
 	 * sockparams entry wont go away. That way we don't
 	 * have to look up the entry once we come back from
 	 * modload().
 	 */
 	SOCKPARAMS_INC_REF(sp);
-	rw_exit(&splist_lock);
+	rw_exit(&sockconf_lock);
 
 	if (sp->sp_smod_info == NULL) {
 		smod_info_t *smod = smod_lookup_byname(sp->sp_smod_name);
@@ -806,4 +754,74 @@ solookup(int family, int type, int protocol, struct sockparams **spp)
 	 */
 	*spp = sp;
 	return (0);
+}
+
+/*
+ * Called when filter entry `ent' is going away. All sockparams remove
+ * their references to `ent'.
+ */
+static void
+sockparams_filter_cleanup_impl(sof_entry_t *ent, list_t *list)
+{
+	struct sockparams *sp;
+	sp_filter_t *fil;
+	list_t *flist;
+
+	ASSERT(RW_WRITE_HELD(&sockconf_lock));
+
+	for (sp = list_head(list); sp != NULL;
+	    sp = list_next(list, sp)) {
+		flist = (ent->sofe_flags & SOFEF_AUTO) ?
+		    &sp->sp_auto_filters : &sp->sp_prog_filters;
+		fil = list_head(flist);
+		for (fil = list_head(flist); fil != NULL;
+		    fil = list_next(flist, fil)) {
+			if (fil->spf_filter == ent) {
+				list_remove(flist, fil);
+				kmem_free(fil, sizeof (sp_filter_t));
+				break;
+			}
+		}
+	}
+}
+void
+sockparams_filter_cleanup(sof_entry_t *ent)
+{
+	sockparams_filter_cleanup_impl(ent, &sphead);
+	sockparams_filter_cleanup_impl(ent, &sp_ephem_list);
+}
+
+/*
+ * New filter is being added; walk the list of sockparams to see if
+ * the filter is interested in any of the sockparams.
+ */
+static int
+sockparams_new_filter_impl(sof_entry_t *ent, list_t *list)
+{
+	struct sockparams *sp;
+	int err;
+
+	ASSERT(RW_WRITE_HELD(&sockconf_lock));
+
+	for (sp = list_head(list); sp != NULL;
+	    sp = list_next(list, sp)) {
+		if ((err = sof_entry_proc_sockparams(ent, sp)) != 0) {
+			sockparams_filter_cleanup(ent);
+			return (err);
+		}
+	}
+	return (0);
+}
+
+int
+sockparams_new_filter(sof_entry_t *ent)
+{
+	int error;
+
+	if ((error = sockparams_new_filter_impl(ent, &sphead)) != 0)
+		return (error);
+
+	if ((error = sockparams_new_filter_impl(ent, &sp_ephem_list)) != 0)
+		sockparams_filter_cleanup_impl(ent, &sphead);
+	return (error);
 }

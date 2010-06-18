@@ -1542,14 +1542,14 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		eager->tcp_kssl_pending = B_TRUE;
 	}
 
+	ASSERT(eager->tcp_ordrel_mp == NULL);
+
 	/* Inherit the listener's non-STREAMS flag */
 	if (IPCL_IS_NONSTR(lconnp)) {
 		econnp->conn_flags |= IPCL_NONSTR;
-	}
-
-	ASSERT(eager->tcp_ordrel_mp == NULL);
-
-	if (!IPCL_IS_NONSTR(econnp)) {
+		/* All non-STREAMS tcp_ts are sockets */
+		eager->tcp_issocket = B_TRUE;
+	} else {
 		/*
 		 * Pre-allocate the T_ordrel_ind mblk for TPI socket so that
 		 * at close time, we will always have that to send up.
@@ -1632,7 +1632,7 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	/*
 	 * Since we will clear tcp_listener before we clear tcp_detached
 	 * in the accept code we need tcp_hard_binding aka tcp_accept_inprogress
-	 * so we can tell a TCP_DETACHED_NONEAGER apart.
+	 * so we can tell a TCP_IS_DETACHED_NONEAGER apart.
 	 */
 	eager->tcp_hard_binding = B_TRUE;
 
@@ -2003,8 +2003,6 @@ tcp_rcv_drain(tcp_t *tcp)
 	 * some work.
 	 */
 	if ((tcp->tcp_fused || tcp->tcp_fused_sigurg)) {
-		ASSERT(IPCL_IS_NONSTR(tcp->tcp_connp) ||
-		    tcp->tcp_fused_sigurg_mp != NULL);
 		if (tcp_fuse_rcv_drain(q, tcp, tcp->tcp_fused ? NULL :
 		    &tcp->tcp_fused_sigurg_mp))
 			return (ret);
@@ -3588,14 +3586,79 @@ process_ack:
 	if (bytes_acked > 0)
 		tcp->tcp_ip_forward_progress = B_TRUE;
 	if (tcp->tcp_state == TCPS_SYN_RCVD) {
-		if ((tcp->tcp_conn.tcp_eager_conn_ind != NULL) &&
-		    ((tcp->tcp_kssl_ent == NULL) || !tcp->tcp_kssl_pending)) {
-			/* 3-way handshake complete - pass up the T_CONN_IND */
+		/*
+		 * tcp_sendmsg() checks tcp_state without entering
+		 * the squeue so tcp_state should be updated before
+		 * sending up a connection confirmation or a new
+		 * connection indication.
+		 */
+		tcp->tcp_state = TCPS_ESTABLISHED;
+
+		/*
+		 * We are seeing the final ack in the three way
+		 * hand shake of a active open'ed connection
+		 * so we must send up a T_CONN_CON
+		 */
+		if (tcp->tcp_active_open) {
+			if (!tcp_conn_con(tcp, iphdr, mp, NULL, ira)) {
+				freemsg(mp);
+				tcp->tcp_state = TCPS_SYN_RCVD;
+				return;
+			}
+			/*
+			 * Don't fuse the loopback endpoints for
+			 * simultaneous active opens.
+			 */
+			if (tcp->tcp_loopback) {
+				TCP_STAT(tcps, tcp_fusion_unfusable);
+				tcp->tcp_unfusable = B_TRUE;
+			}
+			/*
+			 * For simultaneous active open, trace receipt of final
+			 * ACK as tcp:::connect-established.
+			 */
+			DTRACE_TCP5(connect__established, mblk_t *, NULL,
+			    ip_xmit_attr_t *, connp->conn_ixa, void_ip_t *,
+			    iphdr, tcp_t *, tcp, tcph_t *, tcpha);
+		} else if (IPCL_IS_NONSTR(connp)) {
+			/*
+			 * 3-way handshake has completed, so notify socket
+			 * of the new connection.
+			 *
+			 * We are here means eager is fine but it can
+			 * get a TH_RST at any point between now and till
+			 * accept completes and disappear. We need to
+			 * ensure that reference to eager is valid after
+			 * we get out of eager's perimeter. So we do
+			 * an extra refhold.
+			 */
+			CONN_INC_REF(connp);
+
+			if (!tcp_newconn_notify(tcp, ira)) {
+				freemsg(mp);
+				/* notification did not go up, so drop ref */
+				CONN_DEC_REF(connp);
+				return;
+			}
+			/*
+			 * For passive open, trace receipt of final ACK as
+			 * tcp:::accept-established.
+			 */
+			DTRACE_TCP5(accept__established, mlbk_t *, NULL,
+			    ip_xmit_attr_t *, connp->conn_ixa, void_ip_t *,
+			    iphdr, tcp_t *, tcp, tcph_t *, tcpha);
+		} else if (((tcp->tcp_kssl_ent == NULL) ||
+		    !tcp->tcp_kssl_pending)) {
+			/*
+			 * 3-way handshake complete - this is a STREAMS based
+			 * socket, so pass up the T_CONN_IND.
+			 */
 			tcp_t	*listener = tcp->tcp_listener;
 			mblk_t	*mp = tcp->tcp_conn.tcp_eager_conn_ind;
 
 			tcp->tcp_tconnind_started = B_TRUE;
 			tcp->tcp_conn.tcp_eager_conn_ind = NULL;
+			ASSERT(mp != NULL);
 			/*
 			 * We are here means eager is fine but it can
 			 * get a TH_RST at any point between now and till
@@ -3638,43 +3701,6 @@ process_ack:
 				    listener->tcp_connp, NULL, SQ_NODRAIN,
 				    SQTAG_TCP_CONN_IND);
 			}
-		}
-
-		/*
-		 * We are seeing the final ack in the three way
-		 * hand shake of a active open'ed connection
-		 * so we must send up a T_CONN_CON
-		 *
-		 * tcp_sendmsg() checks tcp_state without entering
-		 * the squeue so tcp_state should be updated before
-		 * sending up connection confirmation.  Probe the state
-		 * change below when we are sure sending of the confirmation
-		 * has succeeded.
-		 */
-		tcp->tcp_state = TCPS_ESTABLISHED;
-
-		if (tcp->tcp_active_open) {
-			if (!tcp_conn_con(tcp, iphdr, mp, NULL, ira)) {
-				freemsg(mp);
-				tcp->tcp_state = TCPS_SYN_RCVD;
-				return;
-			}
-			/*
-			 * Don't fuse the loopback endpoints for
-			 * simultaneous active opens.
-			 */
-			if (tcp->tcp_loopback) {
-				TCP_STAT(tcps, tcp_fusion_unfusable);
-				tcp->tcp_unfusable = B_TRUE;
-			}
-			/*
-			 * For simultaneous active open, trace receipt of final
-			 * ACK as tcp:::connect-established.
-			 */
-			DTRACE_TCP5(connect__established, mblk_t *, NULL,
-			    ip_xmit_attr_t *, connp->conn_ixa, void_ip_t *,
-			    iphdr, tcp_t *, tcp, tcph_t *, tcpha);
-		} else {
 			/*
 			 * For passive open, trace receipt of final ACK as
 			 * tcp:::accept-established.
@@ -4454,13 +4480,14 @@ est:
 			tcpha->tha_ack = htonl(tcp->tcp_rnxt);
 
 			/*
-			 * Generate the ordrel_ind at the end unless we
-			 * are an eager guy.
-			 * In the eager case tcp_rsrv will do this when run
-			 * after tcp_accept is done.
+			 * Generate the ordrel_ind at the end unless the
+			 * conn is detached or it is a STREAMS based eager.
+			 * In the eager case we defer the notification until
+			 * tcp_accept_finish has run.
 			 */
-			if (tcp->tcp_listener == NULL &&
-			    !TCP_IS_DETACHED(tcp) && !tcp->tcp_hard_binding)
+			if (!TCP_IS_DETACHED(tcp) && (IPCL_IS_NONSTR(connp) ||
+			    (tcp->tcp_listener == NULL &&
+			    !tcp->tcp_hard_binding)))
 				flags |= TH_ORDREL_NEEDED;
 			switch (tcp->tcp_state) {
 			case TCPS_SYN_RCVD:
@@ -4599,25 +4626,7 @@ update_ack:
 			return;
 	}
 
-	if (tcp->tcp_listener != NULL || tcp->tcp_hard_binding) {
-		/*
-		 * Side queue inbound data until the accept happens.
-		 * tcp_accept/tcp_rput drains this when the accept happens.
-		 * M_DATA is queued on b_cont. Otherwise (T_OPTDATA_IND or
-		 * T_EXDATA_IND) it is queued on b_next.
-		 * XXX Make urgent data use this. Requires:
-		 *	Removing tcp_listener check for TH_URG
-		 *	Making M_PCPROTO and MARK messages skip the eager case
-		 */
-
-		if (tcp->tcp_kssl_pending) {
-			DTRACE_PROBE1(kssl_mblk__ksslinput_pending,
-			    mblk_t *, mp);
-			tcp_kssl_input(tcp, mp, ira->ira_cred);
-		} else {
-			tcp_rcv_enqueue(tcp, mp, seg_len, ira->ira_cred);
-		}
-	} else if (IPCL_IS_NONSTR(connp)) {
+	if (IPCL_IS_NONSTR(connp)) {
 		/*
 		 * Non-STREAMS socket
 		 *
@@ -4641,8 +4650,26 @@ update_ack:
 			/* PUSH bit set and sockfs is not flow controlled */
 			flags |= tcp_rwnd_reopen(tcp);
 		}
+	} else if (tcp->tcp_listener != NULL || tcp->tcp_hard_binding) {
+		/*
+		 * Side queue inbound data until the accept happens.
+		 * tcp_accept/tcp_rput drains this when the accept happens.
+		 * M_DATA is queued on b_cont. Otherwise (T_OPTDATA_IND or
+		 * T_EXDATA_IND) it is queued on b_next.
+		 * XXX Make urgent data use this. Requires:
+		 *	Removing tcp_listener check for TH_URG
+		 *	Making M_PCPROTO and MARK messages skip the eager case
+		 */
+
+		if (tcp->tcp_kssl_pending) {
+			DTRACE_PROBE1(kssl_mblk__ksslinput_pending,
+			    mblk_t *, mp);
+			tcp_kssl_input(tcp, mp, ira->ira_cred);
+		} else {
+			tcp_rcv_enqueue(tcp, mp, seg_len, ira->ira_cred);
+		}
 	} else {
-		/* STREAMS socket */
+		/* Active STREAMS socket */
 		if (mp->b_datap->db_type != M_DATA ||
 		    (flags & TH_MARKNEXT_NEEDED)) {
 			if (tcp->tcp_rcv_list != NULL) {
@@ -4858,11 +4885,14 @@ ack_check:
 	}
 	if (flags & TH_ORDREL_NEEDED) {
 		/*
-		 * Send up the ordrel_ind unless we are an eager guy.
-		 * In the eager case tcp_rsrv will do this when run
-		 * after tcp_accept is done.
+		 * Notify upper layer about an orderly release. If this is
+		 * a non-STREAMS socket, then just make an upcall. For STREAMS
+		 * we send up an ordrel_ind, unless this is an eager, in which
+		 * case the ordrel will be sent when tcp_accept_finish runs.
+		 * Note that for non-STREAMS we make an upcall even if it is an
+		 * eager, because we have an upper handle to send it to.
 		 */
-		ASSERT(tcp->tcp_listener == NULL);
+		ASSERT(IPCL_IS_NONSTR(connp) || tcp->tcp_listener == NULL);
 		ASSERT(!tcp->tcp_detached);
 
 		if (IPCL_IS_NONSTR(connp)) {

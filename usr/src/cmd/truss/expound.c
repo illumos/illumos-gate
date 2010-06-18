@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -90,6 +89,7 @@
 #include <sys/nvpair.h>
 #include <libnvpair.h>
 #include <sys/rctl_impl.h>
+#include <sys/socketvar.h>
 
 #include "ramdata.h"
 #include "systable.h"
@@ -4721,6 +4721,132 @@ show_utimesys(private_t *pri)
 	}
 }
 
+#ifdef _LP64
+static void
+show_sockconfig_filter_prop32(private_t *pri, long addr)
+{
+	struct sockconfig_filter_props32 props;
+	const char *s = NULL;
+	char buf[MAX(FILNAME_MAX, MODMAXNAMELEN)];
+	sof_socktuple32_t *tup;
+	size_t sz;
+	int i;
+
+	if (Pread(Proc, &props, sizeof (props), addr) == sizeof (props)) {
+		if (Pread_string(Proc, buf, sizeof (buf),
+		    (uintptr_t)props.sfp_modname) == -1)
+			(void) strcpy(buf, "<?>");
+		(void) printf("%s\tmodule name: %s\n", pri->pname, buf);
+		(void) printf("%s\tattach semantics: %s", pri->pname,
+		    props.sfp_autoattach ? "automatic" : "progammatic");
+		if (props.sfp_autoattach) {
+			buf[0] = '\0';
+			switch (props.sfp_hint) {
+			case SOF_HINT_TOP:	s = "top"; break;
+			case SOF_HINT_BOTTOM:	s = "bottom"; break;
+			case SOF_HINT_BEFORE:
+			case SOF_HINT_AFTER:
+				s = (props.sfp_hint == SOF_HINT_BEFORE) ?
+				    "before" : "after";
+				if (Pread_string(Proc, buf, sizeof (buf),
+				    (uintptr_t)props.sfp_hintarg) == -1)
+					(void) strcpy(buf, "<?>");
+			}
+			if (s != NULL) {
+				(void) printf(", placement: %s %s", s, buf);
+			}
+		}
+		(void) printf("\n");
+		(void) printf("%s\tsocket tuples:\n", pri->pname);
+		if (props.sfp_socktuple_cnt == 0) {
+			(void) printf("\t\t<empty>\n");
+			return;
+		}
+		sz = props.sfp_socktuple_cnt * sizeof (*tup);
+		tup = my_malloc(sz, "socket tuple buffer");
+		if (Pread(Proc, tup, sz, (uintptr_t)props.sfp_socktuple) == sz)
+			for (i = 0; i < props.sfp_socktuple_cnt; i++) {
+				(void) printf(
+				    "\t\tfamily: %d, type: %d, proto: %d\n",
+				    tup[i].sofst_family, tup[i].sofst_type,
+				    tup[i].sofst_protocol);
+			}
+	}
+}
+#endif	/* _LP64 */
+static void
+show_sockconfig_filter_prop(private_t *pri, long addr)
+{
+	struct sockconfig_filter_props props;
+	const char *s = NULL;
+	char buf[MAX(FILNAME_MAX, MODMAXNAMELEN)];
+	sof_socktuple_t *tup;
+	size_t sz;
+	int i;
+
+	if (Pread(Proc, &props, sizeof (props), addr) == sizeof (props)) {
+		if (Pread_string(Proc, buf, sizeof (buf),
+		    (uintptr_t)props.sfp_modname) == -1)
+			(void) strcpy(buf, "<?>");
+		(void) printf("%s\tmodule name: %s\n", pri->pname, buf);
+		(void) printf("%s\tattach semantics: %s", pri->pname,
+		    props.sfp_autoattach ? "automatic" : "progammatic");
+		if (props.sfp_autoattach) {
+			buf[0] = '\0';
+			switch (props.sfp_hint) {
+			case SOF_HINT_TOP:	s = "top"; break;
+			case SOF_HINT_BOTTOM:	s = "bottom"; break;
+			case SOF_HINT_BEFORE:
+			case SOF_HINT_AFTER:
+				s = (props.sfp_hint == SOF_HINT_BEFORE) ?
+				    "before" : "after";
+				if (Pread_string(Proc, buf, sizeof (buf),
+				    (uintptr_t)props.sfp_hintarg) == -1)
+					(void) strcpy(buf, "<?>");
+			}
+			if (s != NULL) {
+				(void) printf(", placement: %s", s);
+			}
+		}
+		(void) printf("\n");
+		(void) printf("%s\tsocket tuples:\n", pri->pname);
+		if (props.sfp_socktuple_cnt == 0) {
+			(void) printf("\t\t<empty>\n");
+			return;
+		}
+		sz = props.sfp_socktuple_cnt * sizeof (*tup);
+		tup = my_malloc(sz, "socket tuple buffer");
+		if (Pread(Proc, tup, sz, (uintptr_t)props.sfp_socktuple) == sz)
+			for (i = 0; i < props.sfp_socktuple_cnt; i++) {
+				(void) printf(
+				    "\t\tfamily: %d, type: %d, proto: %d\n",
+				    tup[i].sofst_family, tup[i].sofst_type,
+				    tup[i].sofst_protocol);
+			}
+	}
+}
+
+void
+show_sockconfig(private_t *pri)
+{
+	switch (pri->sys_args[0]) {
+	case SOCKCONFIG_ADD_FILTER:
+#ifdef _LP64
+		if (data_model == PR_MODEL_LP64)
+			show_sockconfig_filter_prop(pri,
+			    (long)pri->sys_args[2]);
+		else
+			show_sockconfig_filter_prop32(pri,
+			    (long)pri->sys_args[2]);
+#else
+		show_sockconfig_filter_prop(pri, (long)pri->sys_args[2]);
+#endif
+		break;
+	default:
+		break;
+	}
+}
+
 /* expound verbosely upon syscall arguments */
 /*ARGSUSED*/
 void
@@ -5198,6 +5324,9 @@ expound(private_t *pri, long r0, int raw)
 		break;
 	case SYS_utimesys:
 		show_utimesys(pri);
+		break;
+	case SYS_sockconfig:
+		show_sockconfig(pri);
 		break;
 	}
 }

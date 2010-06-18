@@ -1649,7 +1649,32 @@ prt_pfm(private_t *pri, int raw, long val)
 	}
 }
 
+/*
+ * Print sockconfig() subcode.
+ */
+/*ARGSUSED*/
+void
+prt_skc(private_t *pri, int raw, long val)
+{
+	const char *s = NULL;
 
+	if (!raw) {
+		switch (val) {
+		case SOCKCONFIG_ADD_SOCK:
+			s = "SOCKCONFIG_ADD_SOCK"; break;
+		case SOCKCONFIG_REMOVE_SOCK:
+			s = "SOCKCONFIG_REMOVE_SOCK"; break;
+		case SOCKCONFIG_ADD_FILTER:
+			s = "SOCKCONFIG_ADD_FILTER"; break;
+		case SOCKCONFIG_REMOVE_FILTER:
+			s = "SOCKCONFIG_REMOVE_FILTER"; break;
+		}
+	}
+	if (s == NULL)
+		prt_dec(pri, 0, val);
+	else
+		outstring(pri, s);
+}
 /*
  * Print so_socket() 2nd argument.
  */
@@ -2709,5 +2734,6 @@ void (* const Print[])() = {
 	prt_un1,	/* UN1 -- as prt_uns except for -1 */
 	prt_mob,	/* MOB -- print mmapobj() flags */
 	prt_utf,	/* UTF -- print utimensat() flag */
+	prt_skc,	/* SKC -- print sockconfig() subcode */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

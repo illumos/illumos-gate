@@ -33,6 +33,7 @@
 #include <sys/strsun.h>
 #include <sys/squeue_impl.h>
 #include <sys/squeue.h>
+#define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
 #include <sys/timod.h>
 #include <sys/tpicommon.h>
@@ -121,6 +122,7 @@ tcp_activate(sock_lower_handle_t proto_handle, sock_upper_handle_t sock_handle,
 	(*sock_upcalls->su_set_proto_props)(sock_handle, &sopp);
 }
 
+/*ARGSUSED*/
 static int
 tcp_accept(sock_lower_handle_t lproto_handle,
     sock_lower_handle_t eproto_handle, sock_upper_handle_t sock_handle,
@@ -135,18 +137,59 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 	econnp = (conn_t *)eproto_handle;
 	eager = econnp->conn_tcp;
 	ASSERT(eager->tcp_listener != NULL);
+	ASSERT(IPCL_IS_NONSTR(econnp));
+	ASSERT(lconnp->conn_upper_handle != NULL);
 
 	/*
-	 * It is OK to manipulate these fields outside the eager's squeue
-	 * because they will not start being used until tcp_accept_finish
-	 * has been called.
+	 * It is possible for the accept thread to race with the thread that
+	 * made the su_newconn upcall in tcp_newconn_notify. Both
+	 * tcp_newconn_notify and tcp_accept require that conn_upper_handle
+	 * and conn_upcalls be set before returning, so they both write to
+	 * them. However, we're guaranteed that the value written is the same
+	 * for both threads.
 	 */
-	ASSERT(lconnp->conn_upper_handle != NULL);
-	ASSERT(econnp->conn_upper_handle == NULL);
+	ASSERT(econnp->conn_upper_handle == NULL ||
+	    econnp->conn_upper_handle == sock_handle);
+	ASSERT(econnp->conn_upcalls == NULL ||
+	    econnp->conn_upcalls == lconnp->conn_upcalls);
 	econnp->conn_upper_handle = sock_handle;
 	econnp->conn_upcalls = lconnp->conn_upcalls;
-	ASSERT(IPCL_IS_NONSTR(econnp));
-	return (tcp_accept_common(lconnp, econnp, cr));
+
+	ASSERT(econnp->conn_netstack ==
+	    listener->tcp_connp->conn_netstack);
+	ASSERT(eager->tcp_tcps == listener->tcp_tcps);
+
+	/*
+	 * We should have a minimum of 2 references on the conn at this
+	 * point. One for TCP and one for the newconn notification
+	 * (which is now taken over by IP). In the normal case we would
+	 * also have another reference (making a total of 3) for the conn
+	 * being in the classifier hash list. However the eager could have
+	 * received an RST subsequently and tcp_closei_local could have
+	 * removed the eager from the classifier hash list, hence we can't
+	 * assert that reference.
+	 */
+	ASSERT(econnp->conn_ref >= 2);
+
+	/*
+	 * An error is returned if this conn has been reset, which will
+	 * cause the socket to be closed immediately. The eager will be
+	 * unlinked from the listener during close.
+	 */
+	if (eager->tcp_state < TCPS_ESTABLISHED)
+		return (ECONNABORTED);
+
+	mutex_enter(&listener->tcp_eager_lock);
+	/*
+	 * Non-STREAMS listeners never defer the notification of new
+	 * connections.
+	 */
+	ASSERT(!listener->tcp_eager_prev_q0->tcp_conn_def_q0);
+	tcp_eager_unlink(eager);
+	mutex_exit(&listener->tcp_eager_lock);
+	CONN_DEC_REF(listener->tcp_connp);
+
+	return (0);
 }
 
 static int
@@ -188,14 +231,12 @@ tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	return (error);
 }
 
-/*
- * SOP_LISTEN() calls into tcp_listen().
- */
 /* ARGSUSED */
 static int
 tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;
+	tcp_t	*tcp = connp->conn_tcp;
 	int 	error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
@@ -211,8 +252,14 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 
 	error = tcp_do_listen(connp, NULL, 0, backlog, cr, B_FALSE);
 	if (error == 0) {
+		/*
+		 * sockfs needs to know what's the maximum number of socket
+		 * that can be queued on the listener.
+		 */
 		(*connp->conn_upcalls->su_opctl)(connp->conn_upper_handle,
-		    SOCK_OPCTL_ENAB_ACCEPT, (uintptr_t)backlog);
+		    SOCK_OPCTL_ENAB_ACCEPT,
+		    (uintptr_t)(tcp->tcp_conn_req_max +
+		    tcp->tcp_tcps->tcps_conn_req_max_q0));
 	} else if (error < 0) {
 		if (error == -TOUTSTATE)
 			error = EINVAL;
@@ -296,7 +343,6 @@ tcp_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
 	conn_t	*connp = (conn_t *)proto_handle;
 	tcp_t	*tcp = connp->conn_tcp;
 
-	ASSERT(connp->conn_upper_handle != NULL);
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
@@ -317,7 +363,6 @@ tcp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
-	ASSERT(connp->conn_upper_handle != NULL);
 	return (conn_getsockname(connp, addr, addrlenp));
 }
 
@@ -694,7 +739,12 @@ tcp_close(sock_lower_handle_t proto_handle, int flags, cred_t *cr)
 	 * packets in squeue for the timewait state.
 	 */
 	CONN_DEC_REF(connp);
-	return (0);
+
+	/*
+	 * EINPROGRESS tells sockfs to wait for a 'closed' upcall before
+	 * freeing the socket.
+	 */
+	return (EINPROGRESS);
 }
 
 /* ARGSUSED */
@@ -737,9 +787,206 @@ tcp_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 	return ((sock_lower_handle_t)connp);
 }
 
+/*
+ * tcp_fallback
+ *
+ * A direct socket is falling back to using STREAMS. The queue
+ * that is being passed down was created using tcp_open() with
+ * the SO_FALLBACK flag set. As a result, the queue is not
+ * associated with a conn, and the q_ptrs instead contain the
+ * dev and minor area that should be used.
+ *
+ * The 'issocket' flag indicates whether the FireEngine
+ * optimizations should be used. The common case would be that
+ * optimizations are enabled, and they might be subsequently
+ * disabled using the _SIOCSOCKFALLBACK ioctl.
+ */
+
+/*
+ * An active connection is falling back to TPI. Gather all the information
+ * required by the STREAM head and TPI sonode and send it up.
+ */
+static void
+tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
+    boolean_t issocket, so_proto_quiesced_cb_t quiesced_cb,
+    sock_quiesce_arg_t *arg)
+{
+	conn_t			*connp = tcp->tcp_connp;
+	struct stroptions	*stropt;
+	struct T_capability_ack tca;
+	struct sockaddr_in6	laddr, faddr;
+	socklen_t 		laddrlen, faddrlen;
+	short			opts;
+	int			error;
+	mblk_t			*mp, *mpnext;
+
+	connp->conn_dev = (dev_t)RD(q)->q_ptr;
+	connp->conn_minor_arena = WR(q)->q_ptr;
+
+	RD(q)->q_ptr = WR(q)->q_ptr = connp;
+
+	connp->conn_rq = RD(q);
+	connp->conn_wq = WR(q);
+
+	WR(q)->q_qinfo = &tcp_sock_winit;
+
+	if (!issocket)
+		tcp_use_pure_tpi(tcp);
+
+	/*
+	 * free the helper stream
+	 */
+	ip_free_helper_stream(connp);
+
+	/*
+	 * Notify the STREAM head about options
+	 */
+	DB_TYPE(stropt_mp) = M_SETOPTS;
+	stropt = (struct stroptions *)stropt_mp->b_rptr;
+	stropt_mp->b_wptr += sizeof (struct stroptions);
+	stropt->so_flags = SO_HIWAT | SO_WROFF | SO_MAXBLK;
+
+	stropt->so_wroff = connp->conn_ht_iphc_len + (tcp->tcp_loopback ? 0 :
+	    tcp->tcp_tcps->tcps_wroff_xtra);
+	if (tcp->tcp_snd_sack_ok)
+		stropt->so_wroff += TCPOPT_MAX_SACK_LEN;
+	stropt->so_hiwat = connp->conn_rcvbuf;
+	stropt->so_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
+
+	putnext(RD(q), stropt_mp);
+
+	/*
+	 * Collect the information needed to sync with the sonode
+	 */
+	tcp_do_capability_ack(tcp, &tca, TC1_INFO|TC1_ACCEPTOR_ID);
+
+	laddrlen = faddrlen = sizeof (sin6_t);
+	(void) tcp_getsockname((sock_lower_handle_t)connp,
+	    (struct sockaddr *)&laddr, &laddrlen, CRED());
+	error = tcp_getpeername((sock_lower_handle_t)connp,
+	    (struct sockaddr *)&faddr, &faddrlen, CRED());
+	if (error != 0)
+		faddrlen = 0;
+
+	opts = 0;
+	if (connp->conn_oobinline)
+		opts |= SO_OOBINLINE;
+	if (connp->conn_ixa->ixa_flags & IXAF_DONTROUTE)
+		opts |= SO_DONTROUTE;
+
+	/*
+	 * Notify the socket that the protocol is now quiescent,
+	 * and it's therefore safe move data from the socket
+	 * to the stream head.
+	 */
+	mp = (*quiesced_cb)(connp->conn_upper_handle, arg, &tca,
+	    (struct sockaddr *)&laddr, laddrlen,
+	    (struct sockaddr *)&faddr, faddrlen, opts);
+
+	while (mp != NULL) {
+		mpnext = mp->b_next;
+		tcp->tcp_rcv_list = mp->b_next;
+		mp->b_next = NULL;
+		putnext(q, mp);
+		mp = mpnext;
+	}
+	ASSERT(tcp->tcp_rcv_last_head == NULL);
+	ASSERT(tcp->tcp_rcv_last_tail == NULL);
+	ASSERT(tcp->tcp_rcv_cnt == 0);
+
+	/*
+	 * All eagers in q0 are marked as being non-STREAM, so they will
+	 * make su_newconn upcalls when the handshake completes, which
+	 * will fail (resulting in the conn being closed). So we just blow
+	 * off everything in q0 instead of waiting for the inevitable.
+	 */
+	if (tcp->tcp_conn_req_cnt_q0 != 0)
+		tcp_eager_cleanup(tcp, B_TRUE);
+}
+
+/*
+ * An eager is falling back to TPI. All we have to do is send
+ * up a T_CONN_IND.
+ */
+static void
+tcp_fallback_eager(tcp_t *eager, boolean_t issocket,
+    so_proto_quiesced_cb_t quiesced_cb, sock_quiesce_arg_t *arg)
+{
+	conn_t *connp = eager->tcp_connp;
+	tcp_t *listener = eager->tcp_listener;
+	mblk_t *mp;
+
+	ASSERT(listener != NULL);
+
+	/*
+	 * Notify the socket that the protocol is now quiescent,
+	 * and it's therefore safe move data from the socket
+	 * to tcp's rcv queue.
+	 */
+	mp = (*quiesced_cb)(connp->conn_upper_handle, arg, NULL, NULL, 0,
+	    NULL, 0, 0);
+
+	if (mp != NULL) {
+		ASSERT(eager->tcp_rcv_cnt == 0);
+
+		eager->tcp_rcv_list = mp;
+		eager->tcp_rcv_cnt = msgdsize(mp);
+		while (mp->b_next != NULL) {
+			mp = mp->b_next;
+			eager->tcp_rcv_cnt += msgdsize(mp);
+		}
+		eager->tcp_rcv_last_head = mp;
+		while (mp->b_cont)
+			mp = mp->b_cont;
+		eager->tcp_rcv_last_tail = mp;
+		if (eager->tcp_rcv_cnt > eager->tcp_rwnd)
+			eager->tcp_rwnd = 0;
+		else
+			eager->tcp_rwnd -= eager->tcp_rcv_cnt;
+	}
+
+	if (!issocket)
+		eager->tcp_issocket = B_FALSE;
+	/*
+	 * The stream for this eager does not yet exist, so mark it as
+	 * being detached.
+	 */
+	eager->tcp_detached = B_TRUE;
+	eager->tcp_hard_binding = B_TRUE;
+	connp->conn_rq = listener->tcp_connp->conn_rq;
+	connp->conn_wq = listener->tcp_connp->conn_wq;
+
+	/* Send up the connection indication */
+	mp = eager->tcp_conn.tcp_eager_conn_ind;
+	ASSERT(mp != NULL);
+	eager->tcp_conn.tcp_eager_conn_ind = NULL;
+
+	/*
+	 * TLI/XTI applications will get confused by
+	 * sending eager as an option since it violates
+	 * the option semantics. So remove the eager as
+	 * option since TLI/XTI app doesn't need it anyway.
+	 */
+	if (!issocket) {
+		struct T_conn_ind *conn_ind;
+
+		conn_ind = (struct T_conn_ind *)mp->b_rptr;
+		conn_ind->OPT_length = 0;
+		conn_ind->OPT_offset = 0;
+	}
+
+	/*
+	 * Sockfs guarantees that the listener will not be closed
+	 * during fallback. So we can safely use the listener's queue.
+	 */
+	putnext(listener->tcp_connp->conn_rq, mp);
+}
+
+
 int
 tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
-    boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
+    boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb,
+    sock_quiesce_arg_t *arg)
 {
 	tcp_t			*tcp;
 	conn_t 			*connp = (conn_t *)proto_handle;
@@ -768,14 +1015,6 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 		/* failed to enter, free all the pre-allocated messages. */
 		freeb(stropt_mp);
 		freeb(ordrel_mp);
-		/*
-		 * We cannot process the eager, so at least send out a
-		 * RST so the peer can reconnect.
-		 */
-		if (tcp->tcp_listener != NULL) {
-			(void) tcp_eager_blowoff(tcp->tcp_listener,
-			    tcp->tcp_conn_req_seqnum);
-		}
 		return (ENOMEM);
 	}
 
@@ -787,20 +1026,23 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	if (tcp->tcp_fused)
 		tcp_unfuse(tcp);
 
-	/*
-	 * No longer a direct socket
-	 */
-	connp->conn_flags &= ~IPCL_NONSTR;
-	tcp->tcp_ordrel_mp = ordrel_mp;
-
 	if (tcp->tcp_listener != NULL) {
 		/* The eager will deal with opts when accept() is called */
 		freeb(stropt_mp);
-		tcp_fallback_eager(tcp, direct_sockfs);
+		tcp_fallback_eager(tcp, direct_sockfs, quiesced_cb, arg);
 	} else {
 		tcp_fallback_noneager(tcp, stropt_mp, q, direct_sockfs,
-		    quiesced_cb);
+		    quiesced_cb, arg);
 	}
+
+	/*
+	 * No longer a direct socket
+	 *
+	 * Note that we intentionally leave the upper_handle and upcalls
+	 * intact, since eagers may still be using them.
+	 */
+	connp->conn_flags &= ~IPCL_NONSTR;
+	tcp->tcp_ordrel_mp = ordrel_mp;
 
 	/*
 	 * There should be atleast two ref's (IP + TCP)
@@ -809,4 +1051,142 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	squeue_synch_exit(connp);
 
 	return (0);
+}
+
+/*
+ * Notifies a non-STREAMS based listener about a new connection. This
+ * function is executed on the *eager*'s squeue once the 3 way handshake
+ * has completed. Note that the behavior differs from STREAMS, where the
+ * T_CONN_IND is sent up by tcp_send_conn_ind while on the *listener*'s
+ * squeue.
+ *
+ * Returns B_TRUE if the notification succeeded, in which case `tcp' will
+ * be moved over to the ESTABLISHED list (q) of the listener. Othwerise,
+ * B_FALSE is returned and `tcp' is killed.
+ */
+boolean_t
+tcp_newconn_notify(tcp_t *tcp, ip_recv_attr_t *ira)
+{
+	tcp_t *listener = tcp->tcp_listener;
+	conn_t *lconnp = listener->tcp_connp;
+	conn_t *econnp = tcp->tcp_connp;
+	tcp_t *tail;
+	ipaddr_t *addr_cache;
+	sock_upper_handle_t upper;
+	struct sock_proto_props sopp;
+	mblk_t *mp;
+
+	mutex_enter(&listener->tcp_eager_lock);
+	/*
+	 * Take the eager out, if it is in the list of droppable eagers
+	 * as we are here because the 3W handshake is over.
+	 */
+	MAKE_UNDROPPABLE(tcp);
+	/*
+	 * The eager already has an extra ref put in tcp_input_data
+	 * so that it stays till accept comes back even though it
+	 * might get into TCPS_CLOSED as a result of a TH_RST etc.
+	 */
+	ASSERT(listener->tcp_conn_req_cnt_q0 > 0);
+	listener->tcp_conn_req_cnt_q0--;
+	listener->tcp_conn_req_cnt_q++;
+
+	/* Move from SYN_RCVD to ESTABLISHED list  */
+	tcp->tcp_eager_next_q0->tcp_eager_prev_q0 = tcp->tcp_eager_prev_q0;
+	tcp->tcp_eager_prev_q0->tcp_eager_next_q0 = tcp->tcp_eager_next_q0;
+	tcp->tcp_eager_prev_q0 = NULL;
+	tcp->tcp_eager_next_q0 = NULL;
+
+	/*
+	 * Insert at end of the queue because connections are accepted
+	 * in chronological order. Leaving the older connections at front
+	 * of the queue helps reducing search time.
+	 */
+	tail = listener->tcp_eager_last_q;
+	if (tail != NULL)
+		tail->tcp_eager_next_q = tcp;
+	else
+		listener->tcp_eager_next_q = tcp;
+	listener->tcp_eager_last_q = tcp;
+	tcp->tcp_eager_next_q = NULL;
+
+	/* we have timed out before */
+	if (tcp->tcp_syn_rcvd_timeout != 0) {
+		tcp->tcp_syn_rcvd_timeout = 0;
+		listener->tcp_syn_rcvd_timeout--;
+		if (listener->tcp_syn_defense &&
+		    listener->tcp_syn_rcvd_timeout <=
+		    (listener->tcp_tcps->tcps_conn_req_max_q0 >> 5) &&
+		    10*MINUTES < TICK_TO_MSEC(ddi_get_lbolt64() -
+		    listener->tcp_last_rcv_lbolt)) {
+			/*
+			 * Turn off the defense mode if we
+			 * believe the SYN attack is over.
+			 */
+			listener->tcp_syn_defense = B_FALSE;
+			if (listener->tcp_ip_addr_cache) {
+				kmem_free((void *)listener->tcp_ip_addr_cache,
+				    IP_ADDR_CACHE_SIZE * sizeof (ipaddr_t));
+				listener->tcp_ip_addr_cache = NULL;
+			}
+		}
+	}
+	addr_cache = (ipaddr_t *)(listener->tcp_ip_addr_cache);
+	if (addr_cache != NULL) {
+		/*
+		 * We have finished a 3-way handshake with this
+		 * remote host. This proves the IP addr is good.
+		 * Cache it!
+		 */
+		addr_cache[IP_ADDR_CACHE_HASH(tcp->tcp_connp->conn_faddr_v4)] =
+		    tcp->tcp_connp->conn_faddr_v4;
+	}
+	mutex_exit(&listener->tcp_eager_lock);
+
+	/*
+	 * Notify the ULP about the newconn. It is guaranteed that no
+	 * tcp_accept() call will be made for the eager if the
+	 * notification fails.
+	 */
+	if ((upper = (*lconnp->conn_upcalls->su_newconn)
+	    (lconnp->conn_upper_handle, (sock_lower_handle_t)econnp,
+	    &sock_tcp_downcalls, ira->ira_cred, ira->ira_cpid,
+	    &econnp->conn_upcalls)) == NULL) {
+		/*
+		 * Normally this should not happen, but the listener might
+		 * have done a fallback to TPI followed by a close(), in
+		 * which case tcp_closemp for this conn might have been
+		 * used by tcp_eager_cleanup().
+		 */
+		mutex_enter(&listener->tcp_eager_lock);
+		if (tcp->tcp_closemp_used) {
+			mutex_exit(&listener->tcp_eager_lock);
+			return (B_FALSE);
+		}
+		tcp->tcp_closemp_used = B_TRUE;
+		TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
+		mp = &tcp->tcp_closemp;
+		mutex_exit(&listener->tcp_eager_lock);
+		tcp_eager_kill(econnp, mp, NULL, NULL);
+		return (B_FALSE);
+	}
+	econnp->conn_upper_handle = upper;
+
+	tcp->tcp_detached = B_FALSE;
+	tcp->tcp_hard_binding = B_FALSE;
+	tcp->tcp_tconnind_started = B_TRUE;
+
+	if (econnp->conn_keepalive) {
+		tcp->tcp_ka_last_intrvl = 0;
+		tcp->tcp_ka_tid = TCP_TIMER(tcp, tcp_keepalive_timer,
+		    tcp->tcp_ka_interval);
+	}
+
+	/* Update the necessary parameters */
+	tcp_get_proto_props(tcp, &sopp);
+
+	(*econnp->conn_upcalls->su_set_proto_props)
+	    (econnp->conn_upper_handle, &sopp);
+
+	return (B_TRUE);
 }

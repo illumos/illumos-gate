@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_UDP_IMPL_H
@@ -227,7 +226,7 @@ extern uint_t		udp_max_optsize;
 extern sock_lower_handle_t udp_create(int, int, int, sock_downcalls_t **,
     uint_t *, int *, int, cred_t *);
 extern int udp_fallback(sock_lower_handle_t, queue_t *, boolean_t,
-    so_proto_quiesced_cb_t);
+    so_proto_quiesced_cb_t, sock_quiesce_arg_t *);
 
 extern sock_downcalls_t sock_udp_downcalls;
 

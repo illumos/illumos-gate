@@ -5215,7 +5215,8 @@ rawip_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 /* ARGSUSED2 */
 int
 rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
-    boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
+    boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb,
+    sock_quiesce_arg_t *arg)
 {
 	conn_t  *connp = (conn_t *)proto_handle;
 	icmp_t	*icmp;
@@ -5224,7 +5225,7 @@ rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	socklen_t laddrlen, faddrlen;
 	short opts;
 	struct stroptions *stropt;
-	mblk_t *stropt_mp;
+	mblk_t *mp, *stropt_mp;
 	int error;
 
 	icmp = connp->conn_icmp;
@@ -5276,7 +5277,7 @@ rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	if (connp->conn_ixa->ixa_flags & IXAF_DONTROUTE)
 		opts |= SO_DONTROUTE;
 
-	(*quiesced_cb)(connp->conn_upper_handle, q, &tca,
+	mp = (*quiesced_cb)(connp->conn_upper_handle, arg, &tca,
 	    (struct sockaddr *)&laddr, laddrlen,
 	    (struct sockaddr *)&faddr, faddrlen, opts);
 
@@ -5285,9 +5286,11 @@ rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	 * queued in icmp_t. Now we push up any queued packets.
 	 */
 	mutex_enter(&icmp->icmp_recv_lock);
+	if (mp != NULL) {
+		mp->b_next = icmp->icmp_fallback_queue_head;
+		icmp->icmp_fallback_queue_head = mp;
+	}
 	while (icmp->icmp_fallback_queue_head != NULL) {
-		mblk_t	*mp;
-
 		mp = icmp->icmp_fallback_queue_head;
 		icmp->icmp_fallback_queue_head = mp->b_next;
 		mp->b_next = NULL;
