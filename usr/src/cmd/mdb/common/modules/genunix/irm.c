@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/mdb_modapi.h>
@@ -51,6 +50,28 @@ irm_get_type(int type)
 	default:
 		return ("Unknown");
 	}
+}
+
+static int
+check_irm_enabled(void)
+{
+	GElf_Sym	sym;
+	uintptr_t	addr;
+	int		value;
+
+	if (mdb_lookup_by_name("irm_enable", &sym) == -1) {
+		mdb_warn("couldn't find irm_enable");
+		return (0);
+	}
+
+	addr = (uintptr_t)sym.st_value;
+
+	if (mdb_vread(&value, sizeof (value), addr) != sizeof (value)) {
+		mdb_warn("couldn't read irm_enable at %p", addr);
+		return (0);
+	}
+
+	return (value);
 }
 
 int
@@ -87,6 +108,11 @@ irmpools_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (argc != 0)
 		return (DCMD_USAGE);
+
+	if (check_irm_enabled() == 0) {
+		mdb_warn("IRM is not enabled");
+		return (DCMD_ERR);
+	}
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		if (mdb_walk_dcmd("irmpools", "irmpools", argc, argv) == -1) {
@@ -129,6 +155,11 @@ irmreqs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	if (argc != 0)
 		return (DCMD_USAGE);
+
+	if (check_irm_enabled() == 0) {
+		mdb_warn("IRM is not enabled");
+		return (DCMD_ERR);
+	}
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		mdb_warn("can't perform global interrupt request walk");
