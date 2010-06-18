@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -34,6 +33,12 @@
 # executable below, we explicitly specify /.SUNWnative/lib/ld.so.1 as our 32-
 # bit linker and /.SUNWnative/lib/64/ld.so.1 as our 64-bit linker.
 # For convience we define "n" to be the native path prefix.
+# The initial s10_native argument is used as a way to tell the brand
+# emulation that it needs to set up the process to run as an unbranded
+# process.
+#
+# If this script gets setup with a mode that makes it suid, then things won't
+# work because the script will be running with the incorrect name.
 #
 bname=`/usr/bin/basename $0`
 dname=`/usr/bin/dirname $0`
@@ -44,6 +49,27 @@ LC_ALL=C /usr/bin/file /.SUNWnative/$dname/$bname | /usr/bin/grep "64-bit" \
     >/dev/null && arch64=/64/
 n=/.SUNWnative
 
+unset LD_AUDIT
+unset LD_AUDIT_32
+unset LD_AUDIT_64
+unset LD_CONFIG
+unset LD_CONFIG_32
+unset LD_CONFIG_64
+unset LD_FLAGS
+unset LD_FLAGS_32
+unset LD_FLAGS_64
+unset LD_LOADFLTR
+unset LD_LOADFLTR_32
+unset LD_LOADFLTR_64
+unset LD_ORIGIN
+unset LD_ORIGIN_32
+unset LD_ORIGIN_64
+unset LD_SIGNAL
+unset LD_SIGNAL_32
+unset LD_SIGNAL_64
+unset LD_PRELOAD
+unset LD_LIBRARY_PATH
+
 LD_NOCONFIG=1
 LD_LIBRARY_PATH_32=$n/lib:$n/usr/lib:$n/usr/lib/mps
 LD_LIBRARY_PATH_64=$n/lib/64:$n/usr/lib/64:$n/usr/lib/mps/64
@@ -53,4 +79,3 @@ export LD_NOCONFIG
 export LD_LIBRARY_PATH_32 LD_LIBRARY_PATH_64 LD_PRELOAD_32 LD_PRELOAD_64
 exec /.SUNWnative/usr/lib/brand/solaris10/s10_native \
     /.SUNWnative/lib${arch64}ld.so.1 /.SUNWnative$dname/$bname "$@"
-

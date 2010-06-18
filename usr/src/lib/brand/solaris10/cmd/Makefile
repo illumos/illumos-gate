@@ -22,8 +22,7 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-PROGS =		s10_native s10_isaexec_wrapper s10_python_wrapper \
-		s10_automount s10_automountd
+PROGS =		s10_native s10_isaexec_wrapper s10_python_wrapper
 
 include $(SRC)/cmd/Makefile.cmd
 include ../Makefile.s10

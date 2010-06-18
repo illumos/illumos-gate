@@ -135,7 +135,9 @@ wrap_with_native() {
 #
 safe_dir /usr
 safe_dir /usr/lib
+safe_dir /usr/lib/autofs
 safe_dir /usr/lib/fs
+safe_dir /usr/lib/fs/autofs
 safe_dir /usr/lib/fs/ufs
 safe_dir /usr/lib/fs/zfs
 safe_dir /usr/lib/zfs
@@ -182,14 +184,8 @@ replace_with_native_py /usr/lib/zfs/pyzfs.py 0555 root:bin
 #
 # Replace automount and automountd with native wrappers.
 #
-if [ ! -h $ZONEROOT/usr/lib/fs/autofs -a -d $ZONEROOT/usr/lib/fs/autofs ]; then
-	safe_replace $ZONEROOT/usr/lib/fs/autofs/automount \
-	    $BRANDDIR/s10_automount 0555 root:bin remove
-fi
-if [ ! -h $ZONEROOT/usr/lib/autofs -a -d $ZONEROOT/usr/lib/autofs ]; then
-	safe_replace $ZONEROOT/usr/lib/autofs/automountd \
-	    $BRANDDIR/s10_automountd 0555 root:bin remove
-fi
+replace_with_native /usr/lib/fs/autofs/automount 0555 root:bin
+replace_with_native /usr/lib/autofs/automountd 0555 root:bin
 
 #
 # The class-specific dispadmin(1M) and priocntl(1) binaries must be native

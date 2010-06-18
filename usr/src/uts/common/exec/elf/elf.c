@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -729,6 +728,22 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 */
 		if ((setid &= ~EXECSETID_SETID) != 0)
 			auxf |= AF_SUN_SETUGID;
+
+		/*
+		 * If we're running a native process from within a branded
+		 * zone under pfexec then we clear the AF_SUN_SETUGID flag so
+		 * that the native ld.so.1 is able to link with the native
+		 * libraries instead of using the brand libraries that are
+		 * installed in the zone.  We only do this for processes
+		 * which we trust because we see they are already running
+		 * under pfexec (where uid != euid).  This prevents a
+		 * malicious user within the zone from crafting a wrapper to
+		 * run native suid commands with unsecure libraries interposed.
+		 */
+		if ((brand_action == EBA_NATIVE) && (PROC_IS_BRANDED(p) &&
+		    (setid &= ~EXECSETID_SETID) != 0))
+			auxf &= ~AF_SUN_SETUGID;
+
 		/*
 		 * Record the user addr of the auxflags aux vector entry
 		 * since brands may optionally want to manipulate this field.

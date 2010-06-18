@@ -186,7 +186,7 @@ safe_replace()
 	fi
 
 	cat <<-END >$filename || exit 1
-	#!/bin/sh
+	#!/bin/sh -p
 	#
 	# Solaris Brand Replacement
 	#
