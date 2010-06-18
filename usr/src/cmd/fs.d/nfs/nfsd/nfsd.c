@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
@@ -534,7 +533,7 @@ main(int ac, char *av[])
 	protobp->next = (struct protob *)NULL;
 
 	if (allflag) {
-		if (do_all(protobp0, nfssvc, 0) == -1) {
+		if (do_all(protobp0, nfssvc) == -1) {
 			fprintf(stderr, "setnetconfig failed : %s",
 			    strerror(errno));
 			exit(1);
@@ -553,7 +552,7 @@ main(int ac, char *av[])
 			if (strcmp(nconf->nc_proto, proto) == 0) {
 				protoFound = TRUE;
 				do_one(nconf->nc_device, NULL,
-				    protobp0, nfssvc, 0);
+				    protobp0, nfssvc);
 			}
 		}
 		(void) endnetconfig(nc);
@@ -563,12 +562,12 @@ main(int ac, char *av[])
 			    proto);
 		}
 	} else if (provider)
-		do_one(provider, proto, protobp0, nfssvc, 0);
+		do_one(provider, proto, protobp0, nfssvc);
 	else {
 		for (providerp = defaultproviders;
 		    *providerp != NULL; providerp++) {
 			provider = *providerp;
-			do_one(provider, NULL, protobp0, nfssvc, 0);
+			do_one(provider, NULL, protobp0, nfssvc);
 		}
 	}
 done:

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -108,18 +107,6 @@ pid_lookup(pid_t pid)
 			break;
 		}
 	}
-	return (pidp);
-}
-
-struct pid *
-pid_find(pid_t pid)
-{
-	struct pid *pidp;
-
-	mutex_enter(&pidlinklock);
-	pidp = pid_lookup(pid);
-	mutex_exit(&pidlinklock);
-
 	return (pidp);
 }
 

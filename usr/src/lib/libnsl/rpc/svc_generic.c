@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T */
 /*	All Rights Reserved   */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svc_generic.c, Server side for RPC.
@@ -70,8 +67,6 @@ extern bool_t __svc_add_to_xlist(SVCXPRT_LIST **, SVCXPRT *, mutex_t *);
 extern void __svc_free_xlist(SVCXPRT_LIST **, mutex_t *);
 
 extern bool_t __rpc_try_doors(const char *, bool_t *);
-
-extern int use_portmapper;
 
 /*
  * The highest level interface for server creation.
@@ -141,25 +136,8 @@ svc_create(void (*dispatch)(), const rpcprog_t prognum, const rpcvers_t versnum,
 		(void) mutex_lock(&xprtlist_lock);
 		for (l = _svc_xprtlist; l; l = l->next) {
 			if (strcmp(l->xprt->xp_netid, nconf->nc_netid) == 0) {
-				/*
-				 * Note that if we're using a portmapper
-				 * instead of rpcbind then we can't do an
-				 * unregister operation here.
-				 *
-				 * The reason is that the portmapper unset
-				 * operation removes all the entries for a
-				 * given program/version regardelss of
-				 * transport protocol.
-				 *
-				 * The caller of this routine needs to ensure
-				 * that __pmap_unset() has been called for all
-				 * program/version service pairs they plan
-				 * to support before they start registering
-				 * each program/version/protocol triplet.
-				 */
-				if (!use_portmapper)
-					(void) rpcb_unset(prognum,
-					    versnum, nconf);
+				/* Found an old one, use it */
+				(void) rpcb_unset(prognum, versnum, nconf);
 				if (svc_reg(l->xprt, prognum, versnum,
 					dispatch, nconf) == FALSE)
 					(void) syslog(LOG_ERR,
@@ -219,24 +197,7 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 	if (xprt == NULL)
 		return (NULL);
 
-	/*
-	 * Note that if we're using a portmapper
-	 * instead of rpcbind then we can't do an
-	 * unregister operation here.
-	 *
-	 * The reason is that the portmapper unset
-	 * operation removes all the entries for a
-	 * given program/version regardelss of
-	 * transport protocol.
-	 *
-	 * The caller of this routine needs to ensure
-	 * that __pmap_unset() has been called for all
-	 * program/version service pairs they plan
-	 * to support before they start registering
-	 * each program/version/protocol triplet.
-	 */
-	if (!use_portmapper)
-		(void) rpcb_unset(prognum, versnum, (struct netconfig *)nconf);
+	(void) rpcb_unset(prognum, versnum, (struct netconfig *)nconf);
 	if (svc_reg(xprt, prognum, versnum, dispatch, nconf) == FALSE) {
 		(void) syslog(LOG_ERR,
 		"svc_tp_create: Could not register prog %d vers %d on %s",

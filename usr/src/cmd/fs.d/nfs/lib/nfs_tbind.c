@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * nfs_tbind.c, common part for nfsd and lockd.
  */
-
-#define	PORTMAP
 
 #include <tiuser.h>
 #include <fcntl.h>
@@ -36,7 +33,6 @@
 #include <errno.h>
 #include <syslog.h>
 #include <rpc/rpc.h>
-#include <rpc/pmap_prot.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <signal.h>
@@ -127,9 +123,6 @@ int		(*Mysvc4)(int, struct netbuf *, struct netconfig *, int,
 static int	setopt(int fd, int level, int name, int value);
 static int	get_opt(int fd, int level, int name);
 static void	nfslib_set_sockbuf(int fd);
-
-extern bool_t __pmap_set(const rpcprog_t program, const rpcvers_t version,
-    const struct netconfig *nconf, const struct netbuf *address);
 
 /*
  * Called to create and prepare a transport descriptor for in-kernel
@@ -552,7 +545,7 @@ nfslib_log_tli_error(char *tli_name, int fd, struct netconfig *nconf)
  */
 void
 do_one(char *provider, NETSELDECL(proto), struct protob *protobp0,
-	int (*svc)(int, struct netbuf, struct netconfig *), int use_pmap)
+	int (*svc)(int, struct netbuf, struct netconfig *))
 {
 	register int sock;
 	struct protob *protobp;
@@ -596,31 +589,9 @@ do_one(char *provider, NETSELDECL(proto), struct protob *protobp0,
 			    strncasecmp(retnconf->nc_proto, NC_UDP, l) == 0)
 				continue;
 
-			if (use_pmap) {
-				/*
-				 * Note that if we're using a portmapper
-				 * instead of rpcbind then we can't do an
-				 * unregister operation here.
-				 *
-				 * The reason is that the portmapper unset
-				 * operation removes all the entries for a
-				 * given program/version regardelss of
-				 * transport protocol.
-				 *
-				 * The caller of this routine needs to ensure
-				 * that __pmap_unset() has been called for all
-				 * program/version service pairs they plan
-				 * to support before they start registering
-				 * each program/version/protocol triplet.
-				 */
-				(void) __pmap_set(protobp->program, vers,
-				    retnconf, retaddr);
-			} else {
-				(void) rpcb_unset(protobp->program, vers,
-				    retnconf);
-				(void) rpcb_set(protobp->program, vers,
-				    retnconf, retaddr);
-			}
+			(void) rpcb_unset(protobp->program, vers, retnconf);
+			(void) rpcb_set(protobp->program, vers, retnconf,
+			    retaddr);
 		}
 	}
 
@@ -660,7 +631,7 @@ do_one(char *provider, NETSELDECL(proto), struct protob *protobp0,
  */
 int
 do_all(struct protob *protobp,
-	int (*svc)(int, struct netbuf, struct netconfig *), int use_pmap)
+	int (*svc)(int, struct netbuf, struct netconfig *))
 {
 	struct netconfig *nconf;
 	NCONF_HANDLE *nc;
@@ -678,7 +649,7 @@ do_all(struct protob *protobp,
 		    (protobp->program != NFS4_CALLBACK ||
 		    strncasecmp(nconf->nc_proto, NC_UDP, l) != 0))
 			do_one(nconf->nc_device, nconf->nc_proto,
-			    protobp, svc, use_pmap);
+			    protobp, svc);
 	}
 	(void) endnetconfig(nc);
 	return (0);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -624,7 +623,6 @@ extern void sigdefault(proc_t *);
 
 extern void pid_setmin(void);
 extern pid_t pid_allocate(proc_t *, pid_t, int);
-extern struct pid *pid_find(pid_t);
 extern int pid_rele(struct pid *);
 extern void pid_exit(proc_t *);
 extern void proc_entry_free(struct pid *);

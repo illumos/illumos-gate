@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
@@ -33,8 +32,6 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svc.c, Server-side remote procedure call interface.
@@ -67,11 +64,6 @@
 
 extern bool_t __svc_get_door_cred();
 extern bool_t __rpc_get_local_cred();
-
-extern int use_portmapper;
-extern bool_t __pmap_set(const rpcprog_t, const rpcvers_t,
-    const struct netconfig *, const struct netbuf *);
-extern bool_t __pmap_unset(const rpcprog_t, const rpcvers_t);
 
 SVCXPRT **svc_xports;
 static int nsvc_xports; 	/* total number of svc_xports allocated */
@@ -925,14 +917,11 @@ svc_reg(const SVCXPRT *xprt, const rpcprog_t prog, const rpcvers_t vers,
 
 rpcb_it:
 	(void) rw_unlock(&svc_lock);
-	if (!nconf)
-		return (TRUE);
 
 	/* now register the information with the local binder service */
-	if (!use_portmapper)
+	if (nconf)
 		return (rpcb_set(prog, vers, nconf, &xprt->xp_ltaddr));
-	else
-		return (__pmap_set(prog, vers, nconf, &xprt->xp_ltaddr));
+	return (TRUE);
 	/*NOTREACHED*/
 }
 
@@ -946,10 +935,8 @@ svc_unreg(const rpcprog_t prog, const rpcvers_t vers)
 	struct svc_callout *s;
 
 	/* unregister the information anyway */
-	if (!use_portmapper)
-		(void) rpcb_unset(prog, vers, NULL);
-	else
-		(void) __pmap_unset(prog, vers);
+	(void) rpcb_unset(prog, vers, NULL);
+
 	(void) rw_wrlock(&svc_lock);
 	while ((s = svc_find(prog, vers, &prev, NULL)) != NULL_SVC) {
 		if (prev == NULL_SVC) {

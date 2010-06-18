@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -30,8 +29,6 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svc_simple.c
@@ -55,8 +52,6 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <rpc/nettype.h>
-
-extern int use_portmapper;
 
 static struct proglst {
 	char *(*p_progname)();
@@ -176,24 +171,7 @@ rpc_reg(const rpcprog_t prognum, const rpcvers_t versnum,
 				(strcmp(pl->p_netid, netid) == 0))
 				break;
 		if (pl == NULL) { /* Not yet */
-			/*
-			 * Note that if we're using a portmapper
-			 * instead of rpcbind then we can't do an
-			 * unregister operation here.
-			 *
-			 * The reason is that the portmapper unset
-			 * operation removes all the entries for a
-			 * given program/version regardelss of
-			 * transport protocol.
-			 *
-			 * The caller of this routine needs to ensure
-			 * that __pmap_unset() has been called for all
-			 * program/version service pairs they plan
-			 * to support before they start registering
-			 * each program/version/protocol triplet.
-			 */
-			if (!use_portmapper)
-				(void) rpcb_unset(prognum, versnum, nconf);
+			(void) rpcb_unset(prognum, versnum, nconf);
 		} else {
 			/* so that svc_reg does not call rpcb_set() */
 			nconf = NULL;
