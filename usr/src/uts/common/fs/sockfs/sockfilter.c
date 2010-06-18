@@ -1768,3 +1768,45 @@ sof_inject_data_in(sof_handle_t handle, mblk_t *mp, size_t len, int flags,
 	*flowctrld = (avail > 0) ? B_FALSE : B_TRUE;
 	return (error);
 }
+
+/*
+ * sof_newconn_move(handle, newparent)
+ *
+ * Private interface only to be used by KSSL.
+ *
+ * Moves the socket associated with `handle' from its current listening
+ * socket to the listener associated with `newparent'. The socket being
+ * moved must be in a deferred state and it is up to the consumer of the
+ * interface to ensure that the `newparent' does not go away while this
+ * operation is pending.
+ */
+boolean_t
+sof_newconn_move(sof_handle_t handle, sof_handle_t newparent)
+{
+	sof_instance_t *inst = (sof_instance_t *)handle;
+	sof_instance_t *newpinst = (sof_instance_t *)newparent;
+	struct sonode *so, *old, *new;
+
+	so = inst->sofi_sonode;
+	ASSERT(so->so_state & SS_FIL_DEFER);
+
+	if (inst->sofi_next != NULL || inst->sofi_prev != NULL ||
+	    !(so->so_state & SS_FIL_DEFER))
+		return (B_FALSE);
+
+	old = so->so_listener;
+	mutex_enter(&old->so_acceptq_lock);
+	list_remove(&old->so_acceptq_defer, so);
+	old->so_acceptq_len--;
+	mutex_exit(&old->so_acceptq_lock);
+
+	new = newpinst->sofi_sonode;
+	mutex_enter(&new->so_acceptq_lock);
+	list_insert_tail(&new->so_acceptq_defer, so);
+	new->so_acceptq_len++;
+	mutex_exit(&new->so_acceptq_lock);
+
+	so->so_listener = new;
+
+	return (B_TRUE);
+}

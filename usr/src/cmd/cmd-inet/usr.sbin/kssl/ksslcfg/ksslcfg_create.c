@@ -20,12 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <libscf.h>
 #include <netinet/in.h>
@@ -41,26 +37,26 @@ usage_create(boolean_t do_print)
 	if (do_print)
 		(void) fprintf(stderr, gettext("Usage:\n"));
 	(void) fprintf(stderr, "ksslcfg create"
-		" -f pkcs11 [-d softtoken_directory] -T <token_label>"
-		" -C <certificate_label> -x <proxy_port>"
-		" [-h <ca_certchain_file>]"
-		" [options] [<server_address>] <server_port>\n");
+	    " -f pkcs11 [-d softtoken_directory] -T <token_label>"
+	    " -C <certificate_label> -x <proxy_port>"
+	    " [-h <ca_certchain_file>]"
+	    " [options] [<server_address>] <server_port>\n");
 
 	(void) fprintf(stderr, "ksslcfg create"
-		" -f pkcs12 -i <cert_and_key_pk12file> -x <proxy_port>"
-		" [options] [<server_address>] <server_port>\n");
+	    " -f pkcs12 -i <cert_and_key_pk12file> -x <proxy_port>"
+	    " [options] [<server_address>] <server_port>\n");
 
 	(void) fprintf(stderr, "ksslcfg create"
-		" -f pem -i <cert_and_key_pemfile> -x <proxy_port>"
-		" [options] [<server_address>] <server_port>\n");
+	    " -f pem -i <cert_and_key_pemfile> -x <proxy_port>"
+	    " [options] [<server_address>] <server_port>\n");
 
 	(void) fprintf(stderr, gettext("options are:\n"));
 	(void) fprintf(stderr, "\t[-c <ciphersuites>]\n"
-		"\t[-p <password_file>]\n"
-		"\t[-t <ssl_session_cache_timeout>]\n"
-		"\t[-u <username>]\n"
-		"\t[-z <ssl_session_cache_size>]\n"
-		"\t[-v]\n");
+	    "\t[-p <password_file>]\n"
+	    "\t[-t <ssl_session_cache_timeout>]\n"
+	    "\t[-u <username>]\n"
+	    "\t[-z <ssl_session_cache_size>]\n"
+	    "\t[-v]\n");
 }
 
 static scf_propertygroup_t *
@@ -154,23 +150,23 @@ set_method_context(scf_handle_t *handle, scf_transaction_t *tran,
     const char *value_str)
 {
 	if ((add_new_property(handle, SCF_PROPERTY_USE_PROFILE,
-		SCF_TYPE_BOOLEAN, "false", tran) != SUCCESS) ||
+	    SCF_TYPE_BOOLEAN, "false", tran) != SUCCESS) ||
 	    (add_new_property(handle, SCF_PROPERTY_USER, SCF_TYPE_ASTRING,
-		value_str, tran) != SUCCESS) ||
+	    value_str, tran) != SUCCESS) ||
 	    (add_new_property(handle, SCF_PROPERTY_GROUP, SCF_TYPE_ASTRING,
-		":default", tran) != SUCCESS) ||
+	    ":default", tran) != SUCCESS) ||
 	    (add_new_property(handle, SCF_PROPERTY_LIMIT_PRIVILEGES,
-		SCF_TYPE_ASTRING, ":default", tran) != SUCCESS) ||
+	    SCF_TYPE_ASTRING, ":default", tran) != SUCCESS) ||
 	    (add_new_property(handle, SCF_PROPERTY_WORKING_DIRECTORY,
-		SCF_TYPE_ASTRING, ":default", tran) != SUCCESS) ||
+	    SCF_TYPE_ASTRING, ":default", tran) != SUCCESS) ||
 	    (add_new_property(handle, SCF_PROPERTY_SUPP_GROUPS,
-		SCF_TYPE_ASTRING, ":default", tran) != SUCCESS) ||
+	    SCF_TYPE_ASTRING, ":default", tran) != SUCCESS) ||
 	    (add_new_property(handle, SCF_PROPERTY_RESOURCE_POOL,
-		SCF_TYPE_ASTRING, ":default", tran) != SUCCESS) ||
+	    SCF_TYPE_ASTRING, ":default", tran) != SUCCESS) ||
 	    (add_new_property(handle, SCF_PROPERTY_PROJECT, SCF_TYPE_ASTRING,
-		":default", tran) != SUCCESS) ||
+	    ":default", tran) != SUCCESS) ||
 	    (add_new_property(handle, SCF_PROPERTY_PRIVILEGES,
-		SCF_TYPE_ASTRING, "basic,sys_net_config", tran) != SUCCESS))
+	    SCF_TYPE_ASTRING, "basic,sys_net_config", tran) != SUCCESS))
 		return (FAILURE);
 
 	return (SUCCESS);
@@ -340,11 +336,11 @@ create_instance(scf_handle_t *handle, scf_service_t *svc,
 	KSSL_DEBUG("scf_service_add_instance succeeded\n");
 
 	if ((add_pg_method(handle, instance, kssl_entry, "start",
-		command, username) != SUCCESS) ||
+	    command, username) != SUCCESS) ||
 	    (add_pg_method(handle, instance, kssl_entry, "refresh",
-		command, username) != SUCCESS) ||
+	    command, username) != SUCCESS) ||
 	    (add_pg_method(handle, instance, kssl_entry, "stop",
-		"", username) != SUCCESS)) {
+	    "", username) != SUCCESS)) {
 		scf_instance_destroy(instance);
 		return (status);
 	}
@@ -655,6 +651,19 @@ do_create(int argc, char *argv[])
 			status = create_service(instance_name, address_port,
 			    buf, username, inaddr_any_name);
 		}
+	}
+
+	/*
+	 * network/ssl/proxy depends on network/socket-filter:kssl;
+	 * enable that service now.
+	 */
+	if (smf_enable_instance(KSSL_FILTER_SVC_NAME, 0) != 0) {
+		KSSL_DEBUG(
+		    "smf_enable_instance failed: %s\n" KSSL_FILTER_SVC_NAME);
+		(void) fprintf(stderr, gettext(
+		    "Unable to enable required service \"%s\". Error: %s"),
+		    KSSL_FILTER_SVC_NAME, scf_strerror(scf_error()));
+		status = FAILURE;
 	}
 
 	free(instance_name);

@@ -165,8 +165,6 @@ static void	tcp_rsrv_input(void *, mblk_t *, void *, ip_recv_attr_t *);
 static void	tcp_set_rto(tcp_t *, time_t);
 static void	tcp_setcred_data(mblk_t *, ip_recv_attr_t *);
 
-extern void	tcp_kssl_input(tcp_t *, mblk_t *, cred_t *);
-
 /*
  * Set the MSS associated with a particular tcp based on its current value,
  * and a new one passed in. Observe minimums and maximums, and reset other
@@ -1535,13 +1533,6 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		mblk_setcred(tpi_mp, ira->ira_cred, ira->ira_cpid);
 
 	eager->tcp_conn.tcp_eager_conn_ind = tpi_mp;
-
-	/* Inherit the listener's SSL protection state */
-	if ((eager->tcp_kssl_ent = listener->tcp_kssl_ent) != NULL) {
-		kssl_hold_ent(eager->tcp_kssl_ent);
-		eager->tcp_kssl_pending = B_TRUE;
-	}
-
 	ASSERT(eager->tcp_ordrel_mp == NULL);
 
 	/* Inherit the listener's non-STREAMS flag */
@@ -2014,13 +2005,6 @@ tcp_rcv_drain(tcp_t *tcp)
 #ifdef DEBUG
 		cnt += msgdsize(mp);
 #endif
-		/* Does this need SSL processing first? */
-		if ((tcp->tcp_kssl_ctx != NULL) && (DB_TYPE(mp) == M_DATA)) {
-			DTRACE_PROBE1(kssl_mblk__ksslinput_rcvdrain,
-			    mblk_t *, mp);
-			tcp_kssl_input(tcp, mp, NULL);
-			continue;
-		}
 		putnext(q, mp);
 	}
 #ifdef DEBUG
@@ -2787,22 +2771,7 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	    (seg_len > 0 && SEQ_GT(seg_seq + seg_len, tcp->tcp_rnxt))) {
 		TCPS_BUMP_MIB(tcps, tcpInClosed);
 		DTRACE_PROBE2(tcp__trace__recv, mblk_t *, mp, tcp_t *, tcp);
-
 		freemsg(mp);
-		/*
-		 * This could be an SSL closure alert. We're detached so just
-		 * acknowledge it this last time.
-		 */
-		if (tcp->tcp_kssl_ctx != NULL) {
-			kssl_release_ctx(tcp->tcp_kssl_ctx);
-			tcp->tcp_kssl_ctx = NULL;
-
-			tcp->tcp_rnxt += seg_len;
-			tcp->tcp_tcpha->tha_ack = htonl(tcp->tcp_rnxt);
-			flags |= TH_ACK_NEEDED;
-			goto ack_check;
-		}
-
 		tcp_xmit_ctl("new data when detached", tcp,
 		    tcp->tcp_snxt, 0, TH_RST);
 		(void) tcp_clean_death(tcp, EPROTO);
@@ -3647,8 +3616,7 @@ process_ack:
 			DTRACE_TCP5(accept__established, mlbk_t *, NULL,
 			    ip_xmit_attr_t *, connp->conn_ixa, void_ip_t *,
 			    iphdr, tcp_t *, tcp, tcph_t *, tcpha);
-		} else if (((tcp->tcp_kssl_ent == NULL) ||
-		    !tcp->tcp_kssl_pending)) {
+		} else {
 			/*
 			 * 3-way handshake complete - this is a STREAMS based
 			 * socket, so pass up the T_CONN_IND.
@@ -4629,9 +4597,6 @@ update_ack:
 	if (IPCL_IS_NONSTR(connp)) {
 		/*
 		 * Non-STREAMS socket
-		 *
-		 * Note that no KSSL processing is done here, because
-		 * KSSL is not supported for non-STREAMS sockets.
 		 */
 		boolean_t push = flags & (TH_PUSH|TH_FIN);
 		int error;
@@ -4661,13 +4626,7 @@ update_ack:
 		 *	Making M_PCPROTO and MARK messages skip the eager case
 		 */
 
-		if (tcp->tcp_kssl_pending) {
-			DTRACE_PROBE1(kssl_mblk__ksslinput_pending,
-			    mblk_t *, mp);
-			tcp_kssl_input(tcp, mp, ira->ira_cred);
-		} else {
-			tcp_rcv_enqueue(tcp, mp, seg_len, ira->ira_cred);
-		}
+		tcp_rcv_enqueue(tcp, mp, seg_len, ira->ira_cred);
 	} else {
 		/* Active STREAMS socket */
 		if (mp->b_datap->db_type != M_DATA ||
@@ -4689,25 +4648,12 @@ update_ack:
 				flags &= ~TH_MARKNEXT_NEEDED;
 			}
 
-			/* Does this need SSL processing first? */
-			if ((tcp->tcp_kssl_ctx != NULL) &&
-			    (DB_TYPE(mp) == M_DATA)) {
-				DTRACE_PROBE1(kssl_mblk__ksslinput_data1,
-				    mblk_t *, mp);
-				tcp_kssl_input(tcp, mp, ira->ira_cred);
-			} else {
-				if (is_system_labeled())
-					tcp_setcred_data(mp, ira);
+			if (is_system_labeled())
+				tcp_setcred_data(mp, ira);
 
-				putnext(connp->conn_rq, mp);
-				if (!canputnext(connp->conn_rq))
-					tcp->tcp_rwnd -= seg_len;
-			}
-		} else if ((tcp->tcp_kssl_ctx != NULL) &&
-		    (DB_TYPE(mp) == M_DATA)) {
-			/* Does this need SSL processing first? */
-			DTRACE_PROBE1(kssl_mblk__ksslinput_data2, mblk_t *, mp);
-			tcp_kssl_input(tcp, mp, ira->ira_cred);
+			putnext(connp->conn_rq, mp);
+			if (!canputnext(connp->conn_rq))
+				tcp->tcp_rwnd -= seg_len;
 		} else if ((flags & (TH_PUSH|TH_FIN)) ||
 		    tcp->tcp_rcv_cnt + seg_len >= connp->conn_rcvbuf >> 3) {
 			if (tcp->tcp_rcv_list != NULL) {

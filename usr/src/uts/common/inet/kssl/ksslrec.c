@@ -110,7 +110,6 @@ static uchar_t kssl_pad_2[60] = {
     0x5c, 0x5c, 0x5c, 0x5c
 };
 
-int kssl_cache_count;
 static boolean_t kssl_synchronous = B_FALSE;
 
 static void kssl_update_handshake_hashes(ssl_t *, uchar_t *, uint_t);
@@ -232,14 +231,12 @@ kssl_compute_record_mac(
 
 		/*
 		 * The calling context can tolerate a blocking call here.
-		 * For outgoing traffic, we are in user context
-		 * when called from strsock_kssl_output(). For incoming
-		 * traffic past the SSL handshake, we are in user
-		 * context when called from strsock_kssl_input(). During the
-		 * SSL handshake, we are called for client_finished message
-		 * handling from a squeue worker thread that gets scheduled
-		 * by an SQ_FILL call. This thread is not in interrupt
-		 * context and so can block.
+		 * For outgoing traffic, we are in user context when called
+		 * from kssl_data_out_cb(). For incoming traffic past the
+		 * SSL handshake, we are in user context when called from
+		 * kssl_data_in_proc_cb(). During the SSL handshake, we are
+		 * called for client_finished message handling from a taskq
+		 * thread.
 		 */
 		rv = crypto_mac(&spec->hmac_mech, &dd, &spec->hmac_key,
 		    NULL, &mac, NULL);
@@ -1077,7 +1074,7 @@ kssl_tls_P_hash(crypto_mechanism_t *mech, crypto_key_t *key,
 {
 	int rv = 0;
 	uchar_t A1[MAX_HASH_LEN], result[MAX_HASH_LEN];
-	int bytes_left = datalen;
+	int bytes_left = (int)datalen;
 	crypto_data_t dd, mac;
 	crypto_context_t ctx;
 
@@ -1625,7 +1622,7 @@ kssl_send_finished(ssl_t *ssl, int update_hsh)
 	uchar_t *rstart;
 	uchar_t *versionp;
 	SSL3Hashes ssl3hashes;
-	size_t finish_len;
+	uchar_t finish_len;
 	int ret;
 	uint16_t adj_len = 0;
 
@@ -1911,9 +1908,6 @@ kssl_handle_client_key_exchange(ssl_t *ssl, mblk_t *mp, int msglen,
 		creq.cr_flag = kssl_call_flag;
 		creq.cr_callback_func = kssl_cke_done;
 		creq.cr_callback_arg = ssl;
-
-		/* The callback routine will release this one */
-		KSSL_SSL_REFHOLD(ssl);
 
 		creqp = &creq;
 	}
@@ -2295,21 +2289,14 @@ out:
 
 	ssl->activeinput = B_FALSE;
 
-	/* If we're the only ones left, then we won't callback */
-	if (ssl->kssl_refcnt == 1) {
-		mutex_exit(&ssl->kssl_lock);
-		KSSL_SSL_REFRELE(ssl);
-		return;
-	}
-
 	cbfn = ssl->cke_callback_func;
 	cbarg = ssl->cke_callback_arg;
 	alertmp = ssl->alert_sendbuf;
 	ssl->alert_sendbuf = NULL;
 
+	/* dropped by callback when it has completed */
+	ssl->async_ops_pending++;
 	mutex_exit(&ssl->kssl_lock);
-
-	KSSL_SSL_REFRELE(ssl);
 
 	/* Now call the callback routine */
 	(*(cbfn))(cbarg, alertmp, kssl_cmd);
@@ -2485,20 +2472,42 @@ kssl_specsfree(ssl_t *ssl)
 void
 kssl_free_context(ssl_t *ssl)
 {
+	crypto_req_id_t reqid;
+
 	ASSERT(ssl != NULL);
 	if (!(MUTEX_HELD(&ssl->kssl_lock))) {
 		/* we're coming from an external API entry point */
 		mutex_enter(&ssl->kssl_lock);
 	}
 
-	if (ssl->job.kjob != NULL) {
-		crypto_cancel_req(ssl->job.kjob);
-		kmem_free(ssl->job.buf, ssl->job.buflen);
+	/*
+	 * Cancel any active crypto request and wait for pending async
+	 * operations to complete. We loop here because the async thread
+	 * might submit a new cryto request.
+	 */
+	do {
+		if (ssl->job.kjob != NULL) {
+			/*
+			 * Drop the lock before canceling the request;
+			 * otherwise we might deadlock if the completion
+			 * callback is running.
+			 */
+			reqid = ssl->job.kjob;
+			mutex_exit(&ssl->kssl_lock);
+			crypto_cancel_req(reqid);
+			mutex_enter(&ssl->kssl_lock);
 
-		ssl->job.kjob = 0;
-		ssl->job.buf = NULL;
-		ssl->job.buflen = 0;
-	}
+			/* completion callback might have done the cleanup */
+			if (ssl->job.kjob != NULL) {
+				kmem_free(ssl->job.buf, ssl->job.buflen);
+				ssl->job.kjob = 0;
+				ssl->job.buf = NULL;
+				ssl->job.buflen = 0;
+			}
+		}
+		while (ssl->async_ops_pending > 0)
+			cv_wait(&ssl->async_cv, &ssl->kssl_lock);
+	} while (ssl->job.kjob != NULL);
 
 	kssl_mblksfree(ssl);
 	kssl_specsfree(ssl);
@@ -2509,5 +2518,4 @@ kssl_free_context(ssl_t *ssl)
 	mutex_exit(&ssl->kssl_lock);
 
 	kmem_cache_free(kssl_cache, ssl);
-	kssl_cache_count--;
 }

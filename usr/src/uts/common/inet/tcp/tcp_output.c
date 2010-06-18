@@ -933,28 +933,6 @@ tcp_wput_proto(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 non_urgent_data:
 
 	switch ((int)tprim->type) {
-	case T_SSL_PROXY_BIND_REQ:	/* an SSL proxy endpoint bind request */
-		/*
-		 * save the kssl_ent_t from the next block, and convert this
-		 * back to a normal bind_req.
-		 */
-		if (mp->b_cont != NULL) {
-			ASSERT(MBLKL(mp->b_cont) >= sizeof (kssl_ent_t));
-
-			if (tcp->tcp_kssl_ent != NULL) {
-				kssl_release_ent(tcp->tcp_kssl_ent, NULL,
-				    KSSL_NO_PROXY);
-				tcp->tcp_kssl_ent = NULL;
-			}
-			bcopy(mp->b_cont->b_rptr, &tcp->tcp_kssl_ent,
-			    sizeof (kssl_ent_t));
-			kssl_hold_ent(tcp->tcp_kssl_ent);
-			freemsg(mp->b_cont);
-			mp->b_cont = NULL;
-		}
-		tprim->type = T_BIND_REQ;
-
-	/* FALLTHROUGH */
 	case O_T_BIND_REQ:	/* bind request */
 	case T_BIND_REQ:	/* new semantics bind request */
 		tcp_tpi_bind(tcp, mp);

@@ -95,7 +95,6 @@
 #include <inet/ip_netinfo.h>
 #include <sys/squeue_impl.h>
 #include <sys/squeue.h>
-#include <inet/kssl/ksslapi.h>
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 #include <rpc/pmap_prot.h>
@@ -526,18 +525,6 @@ tcp_cleanup(tcp_t *tcp)
 	ip_pkt_free(&connp->conn_xmit_ipp);
 
 	tcp_free(tcp);
-
-	/* Release any SSL context */
-	if (tcp->tcp_kssl_ent != NULL) {
-		kssl_release_ent(tcp->tcp_kssl_ent, NULL, KSSL_NO_PROXY);
-		tcp->tcp_kssl_ent = NULL;
-	}
-
-	if (tcp->tcp_kssl_ctx != NULL) {
-		kssl_release_ctx(tcp->tcp_kssl_ctx);
-		tcp->tcp_kssl_ctx = NULL;
-	}
-	tcp->tcp_kssl_pending = B_FALSE;
 
 	/*
 	 * Since we will bzero the entire structure, we need to
@@ -1355,17 +1342,6 @@ tcp_closei_local(tcp_t *tcp)
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
 	ASSERT(tcp->tcp_time_wait_expire == 0);
 
-	/* Release any SSL context */
-	if (tcp->tcp_kssl_ent != NULL) {
-		kssl_release_ent(tcp->tcp_kssl_ent, NULL, KSSL_NO_PROXY);
-		tcp->tcp_kssl_ent = NULL;
-	}
-	if (tcp->tcp_kssl_ctx != NULL) {
-		kssl_release_ctx(tcp->tcp_kssl_ctx);
-		tcp->tcp_kssl_ctx = NULL;
-	}
-	tcp->tcp_kssl_pending = B_FALSE;
-
 	tcp_ipsec_cleanup(tcp);
 }
 
@@ -1996,20 +1972,6 @@ tcp_reinit(tcp_t *tcp)
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
 	ASSERT(tcp->tcp_time_wait_expire == 0);
 
-	if (tcp->tcp_kssl_pending) {
-		tcp->tcp_kssl_pending = B_FALSE;
-
-		/* Don't reset if the initialized by bind. */
-		if (tcp->tcp_kssl_ent != NULL) {
-			kssl_release_ent(tcp->tcp_kssl_ent, NULL,
-			    KSSL_NO_PROXY);
-		}
-	}
-	if (tcp->tcp_kssl_ctx != NULL) {
-		kssl_release_ctx(tcp->tcp_kssl_ctx);
-		tcp->tcp_kssl_ctx = NULL;
-	}
-
 	/*
 	 * Reset/preserve other values
 	 */
@@ -2335,10 +2297,6 @@ tcp_reinit_values(tcp)
 
 	PRESERVE(tcp->tcp_squeue_bytes);
 
-	ASSERT(tcp->tcp_kssl_ctx == NULL);
-	ASSERT(!tcp->tcp_kssl_pending);
-	PRESERVE(tcp->tcp_kssl_ent);
-
 	tcp->tcp_closemp_used = B_FALSE;
 
 	PRESERVE(tcp->tcp_rsrv_mp);
@@ -2583,10 +2541,7 @@ tcp_maxpsz_set(tcp_t *tcp, boolean_t set_maxblk)
 		 * chunks.  We round up the buffer size to the nearest SMSS.
 		 */
 		maxpsz = MSS_ROUNDUP(connp->conn_sndbuf, mss);
-		if (tcp->tcp_kssl_ctx == NULL)
-			mss = INFPSZ;
-		else
-			mss = SSL3_MAX_RECORD_LEN;
+		mss = INFPSZ;
 	} else {
 		/*
 		 * Set sd_qn_maxpsz to approx half the (receivers) buffer
@@ -3183,28 +3138,6 @@ tcp_get_proto_props(tcp_t *tcp, struct sock_proto_props *sopp)
 		    (tcp->tcp_loopback ? 0 : tcp->tcp_tcps->tcps_wroff_xtra);
 	}
 
-	/*
-	 * If this is endpoint is handling SSL, then reserve extra
-	 * offset and space at the end.
-	 * Also have the stream head allocate SSL3_MAX_RECORD_LEN packets,
-	 * overriding the previous setting. The extra cost of signing and
-	 * encrypting multiple MSS-size records (12 of them with Ethernet),
-	 * instead of a single contiguous one by the stream head
-	 * largely outweighs the statistical reduction of ACKs, when
-	 * applicable. The peer will also save on decryption and verification
-	 * costs.
-	 */
-	if (tcp->tcp_kssl_ctx != NULL) {
-		sopp.sopp_wroff += SSL3_WROFFSET;
-
-		sopp.sopp_flags |= SOCKOPT_TAIL;
-		sopp.sopp_tail = SSL3_MAX_TAIL_LEN;
-
-		sopp.sopp_flags |= SOCKOPT_ZCOPY;
-		sopp.sopp_zcopyflag = ZCVMUNSAFE;
-
-		sopp.sopp_maxblk = SSL3_MAX_RECORD_LEN;
-	}
 	if (tcp->tcp_loopback) {
 		sopp->sopp_flags |= SOCKOPT_LOOPBACK;
 		sopp->sopp_loopback = B_TRUE;

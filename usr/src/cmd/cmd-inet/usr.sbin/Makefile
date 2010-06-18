@@ -36,7 +36,7 @@ PROG=		6to4relay arp gettable if_mpadm \
 		ndd $(SYNCPROG) $(DHCPPROG) $(XMODPROG)
 
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
-		login.xml shell.xml rexec.xml 
+		login.xml shell.xml rexec.xml socket-filter-kssl.xml
 SVCMETHOD=	svc-sockfilter
 
 ROOTFS_PROG=	hostconfig route soconfig
@@ -71,8 +71,8 @@ SUBDIRS=	bootconfchk htable ifconfig ilbadm in.ftpd in.rdisc in.routed \
 		snoop sppptun traceroute wificonfig
 
 MSGSUBDIRS=	bootconfchk htable ifconfig ilbadm in.ftpd in.routed in.talkd \
-		inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils kssl/ksslcfg \
-		nwamadm nwamcfg routeadm sppptun snoop wificonfig
+		inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils \
+		kssl/ksslcfg nwamadm nwamcfg routeadm sppptun snoop wificonfig
 
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be
@@ -85,8 +85,9 @@ LINTCLEAN=	6to4relay arp in.rlogind in.rshd in.telnetd in.tftpd \
 # with SUBDIRS.  Also (sigh) deal with the commented-out build lines
 # for the lint rule.
 LINTSUBDIRS=	bootconfchk ilbadm in.rdisc in.routed in.talkd inetadm \
-		inetconv ipmpstat ipqosconf ipsecutils nwamadm nwamcfg ping \
-		routeadm sppptun traceroute wificonfig
+		inetconv ipmpstat ipqosconf ipsecutils kssl/kssladm \
+		kssl/ksslcfg nwamadm nwamcfg ping routeadm sppptun traceroute \
+		wificonfig
 # And as programs are verified not to attempt to write into constants,
 # -xstrconst should be used to ensure they stay that way.
 CONSTCLEAN=

@@ -552,6 +552,7 @@ file path=lib/svc/manifest/network/rpc/bind.xml group=sys mode=0444
 file path=lib/svc/manifest/network/rpc/keyserv.xml group=sys mode=0444
 file path=lib/svc/manifest/network/shares/group.xml group=sys mode=0444
 file path=lib/svc/manifest/network/shares/reparsed.xml group=sys mode=0444
+file path=lib/svc/manifest/network/socket-filter-kssl.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ssl/kssl-proxy.xml group=sys mode=0444
 file path=lib/svc/manifest/system/auditd.xml group=sys mode=0444
 file path=lib/svc/manifest/system/boot-archive-update.xml group=sys mode=0444

@@ -43,7 +43,6 @@ extern "C" {
 #include <inet/mib2.h>
 #include <inet/tcp_stack.h>
 #include <inet/tcp_sack.h>
-#include <inet/kssl/ksslapi.h>
 
 /* TCP states */
 #define	TCPS_CLOSED		-6
@@ -423,13 +422,6 @@ typedef struct tcp_s {
 
 	/* protected by the tcp_non_sq_lock lock */
 	uint32_t	tcp_squeue_bytes;
-	/*
-	 * Kernel SSL session information
-	 */
-	boolean_t		tcp_kssl_pending; /* waiting for 1st SSL rec. */
-	boolean_t		tcp_kssl_inhandshake; /* during SSL handshake */
-	kssl_ent_t		tcp_kssl_ent;	/* SSL table entry */
-	kssl_ctx_t		tcp_kssl_ctx;	/* SSL session */
 
 	/*
 	 * tcp_closemp_used is protected by listener's tcp_eager_lock

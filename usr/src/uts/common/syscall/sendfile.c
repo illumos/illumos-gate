@@ -785,11 +785,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					 * size, so limit reads to maxblk if
 					 * there are filters present.
 					 */
-					if ((!SOCK_IS_NONSTR(so) &&
-					    _SOTOTPI(so)->sti_kssl_ctx
-					    != NULL) ||
-					    (so->so_filter_active > 0 &&
-					    maxblk != INFPSZ))
+					if (so->so_filter_active > 0 &&
+					    maxblk != INFPSZ)
 						iov_len = MIN(iov_len, maxblk);
 
 					aiov.iov_len = iov_len;
@@ -941,10 +938,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				 * so limit reads to maxblk if there are
 				 * filters present.
 				 */
-				if ((!SOCK_IS_NONSTR(so) &&
-				    _SOTOTPI(so)->sti_kssl_ctx != NULL) ||
-				    (so->so_filter_active > 0 &&
-				    maxblk != INFPSZ))
+				if (so->so_filter_active > 0 &&
+				    maxblk != INFPSZ)
 					size = MIN(size, maxblk);
 
 				if (vn_has_flocks(readvp) ||

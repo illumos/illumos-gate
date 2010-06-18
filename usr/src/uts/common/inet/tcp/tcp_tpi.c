@@ -1141,14 +1141,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	stropt->so_wroff = sopp.sopp_wroff;
 	stropt->so_maxblk = sopp.sopp_maxblk;
 
-	if (sopp.sopp_flags & SOCKOPT_TAIL) {
-		ASSERT(tcp->tcp_kssl_ctx != NULL);
-
-		stropt->so_flags |= SO_TAIL | SO_COPYOPT;
-		stropt->so_tail = sopp.sopp_tail;
-		stropt->so_copyopt = sopp.sopp_zcopyflag;
-	}
-
 	/* Send the options up */
 	putnext(q, mp);
 
@@ -1224,6 +1216,71 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	    (connp->conn_fanout == NULL && connp->conn_ref >= 3));
 }
 
+/*
+ * Pull a deferred connection indication off of the listener. The caller
+ * must verify that there is a deferred conn ind under eager_lock before
+ * calling this function.
+ */
+static mblk_t *
+tcp_get_def_conn_ind(tcp_t *listener)
+{
+	tcp_t *tail;
+	tcp_t *tcp;
+	mblk_t *conn_ind;
+
+	ASSERT(MUTEX_HELD(&listener->tcp_eager_lock));
+	ASSERT(listener->tcp_eager_prev_q0->tcp_conn_def_q0);
+
+	tcp = listener->tcp_eager_prev_q0;
+	/*
+	 * listener->tcp_eager_prev_q0 points to the TAIL of the
+	 * deferred T_conn_ind queue. We need to get to the head
+	 * of the queue in order to send up T_conn_ind the same
+	 * order as how the 3WHS is completed.
+	 */
+	while (tcp != listener) {
+		if (!tcp->tcp_eager_prev_q0->tcp_conn_def_q0)
+			break;
+		else
+			tcp = tcp->tcp_eager_prev_q0;
+	}
+
+	conn_ind = tcp->tcp_conn.tcp_eager_conn_ind;
+	tcp->tcp_conn.tcp_eager_conn_ind = NULL;
+	/* Move from q0 to q */
+	ASSERT(listener->tcp_conn_req_cnt_q0 > 0);
+	listener->tcp_conn_req_cnt_q0--;
+	listener->tcp_conn_req_cnt_q++;
+	tcp->tcp_eager_next_q0->tcp_eager_prev_q0 =
+	    tcp->tcp_eager_prev_q0;
+	tcp->tcp_eager_prev_q0->tcp_eager_next_q0 =
+	    tcp->tcp_eager_next_q0;
+	tcp->tcp_eager_prev_q0 = NULL;
+	tcp->tcp_eager_next_q0 = NULL;
+	tcp->tcp_conn_def_q0 = B_FALSE;
+
+	/* Make sure the tcp isn't in the list of droppables */
+	ASSERT(tcp->tcp_eager_next_drop_q0 == NULL &&
+	    tcp->tcp_eager_prev_drop_q0 == NULL);
+
+	/*
+	 * Insert at end of the queue because sockfs sends
+	 * down T_CONN_RES in chronological order. Leaving
+	 * the older conn indications at front of the queue
+	 * helps reducing search time.
+	 */
+	tail = listener->tcp_eager_last_q;
+	if (tail != NULL) {
+		tail->tcp_eager_next_q = tcp;
+	} else {
+		listener->tcp_eager_next_q = tcp;
+	}
+	listener->tcp_eager_last_q = tcp;
+	tcp->tcp_eager_next_q = NULL;
+
+	return (conn_ind);
+}
+
 
 /*
  * Reply to a clients T_CONN_RES TPI message. This function
@@ -1236,7 +1293,6 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 {
 	tcp_t		*acceptor;
 	tcp_t		*eager;
-	tcp_t   	*tcp;
 	struct T_conn_res	*tcr;
 	t_uscalar_t	acceptor_id;
 	t_scalar_t	seqnum;
@@ -1564,7 +1620,6 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 
 	mutex_enter(&listener->tcp_eager_lock);
 	if (listener->tcp_eager_prev_q0->tcp_conn_def_q0) {
-		tcp_t	*tail;
 		mblk_t	*conn_ind;
 
 		/*
@@ -1572,56 +1627,9 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 		 * acceptor streams are the same.
 		 */
 		ASSERT(listener != acceptor);
-
-		tcp = listener->tcp_eager_prev_q0;
-		/*
-		 * listener->tcp_eager_prev_q0 points to the TAIL of the
-		 * deferred T_conn_ind queue. We need to get to the head of
-		 * the queue in order to send up T_conn_ind the same order as
-		 * how the 3WHS is completed.
-		 */
-		while (tcp != listener) {
-			if (!tcp->tcp_eager_prev_q0->tcp_conn_def_q0)
-				break;
-			else
-				tcp = tcp->tcp_eager_prev_q0;
-		}
-		ASSERT(tcp != listener);
-		conn_ind = tcp->tcp_conn.tcp_eager_conn_ind;
-		ASSERT(conn_ind != NULL);
-		tcp->tcp_conn.tcp_eager_conn_ind = NULL;
-
-		/* Move from q0 to q */
-		ASSERT(listener->tcp_conn_req_cnt_q0 > 0);
-		listener->tcp_conn_req_cnt_q0--;
-		listener->tcp_conn_req_cnt_q++;
-		tcp->tcp_eager_next_q0->tcp_eager_prev_q0 =
-		    tcp->tcp_eager_prev_q0;
-		tcp->tcp_eager_prev_q0->tcp_eager_next_q0 =
-		    tcp->tcp_eager_next_q0;
-		tcp->tcp_eager_prev_q0 = NULL;
-		tcp->tcp_eager_next_q0 = NULL;
-		tcp->tcp_conn_def_q0 = B_FALSE;
-
-		/* Make sure the tcp isn't in the list of droppables */
-		ASSERT(tcp->tcp_eager_next_drop_q0 == NULL &&
-		    tcp->tcp_eager_prev_drop_q0 == NULL);
-
-		/*
-		 * Insert at end of the queue because sockfs sends
-		 * down T_CONN_RES in chronological order. Leaving
-		 * the older conn indications at front of the queue
-		 * helps reducing search time.
-		 */
-		tail = listener->tcp_eager_last_q;
-		if (tail != NULL)
-			tail->tcp_eager_next_q = tcp;
-		else
-			listener->tcp_eager_next_q = tcp;
-		listener->tcp_eager_last_q = tcp;
-		tcp->tcp_eager_next_q = NULL;
+		conn_ind = tcp_get_def_conn_ind(listener);
 		mutex_exit(&listener->tcp_eager_lock);
-		putnext(tcp->tcp_connp->conn_rq, conn_ind);
+		putnext(listener->tcp_connp->conn_rq, conn_ind);
 	} else {
 		mutex_exit(&listener->tcp_eager_lock);
 	}
@@ -1783,69 +1791,14 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 
 		mutex_enter(&listener->tcp_eager_lock);
 		if (listener->tcp_eager_prev_q0->tcp_conn_def_q0) {
-
-			tcp_t *tail;
-			tcp_t *tcp;
-			mblk_t *mp1;
-
-			tcp = listener->tcp_eager_prev_q0;
-			/*
-			 * listener->tcp_eager_prev_q0 points to the TAIL of the
-			 * deferred T_conn_ind queue. We need to get to the head
-			 * of the queue in order to send up T_conn_ind the same
-			 * order as how the 3WHS is completed.
-			 */
-			while (tcp != listener) {
-				if (!tcp->tcp_eager_prev_q0->tcp_conn_def_q0 &&
-				    !tcp->tcp_kssl_pending)
-					break;
-				else
-					tcp = tcp->tcp_eager_prev_q0;
-			}
-			/* None of the pending eagers can be sent up now */
-			if (tcp == listener)
-				goto no_more_eagers;
-
-			mp1 = tcp->tcp_conn.tcp_eager_conn_ind;
-			tcp->tcp_conn.tcp_eager_conn_ind = NULL;
-			/* Move from q0 to q */
-			ASSERT(listener->tcp_conn_req_cnt_q0 > 0);
-			listener->tcp_conn_req_cnt_q0--;
-			listener->tcp_conn_req_cnt_q++;
-			tcp->tcp_eager_next_q0->tcp_eager_prev_q0 =
-			    tcp->tcp_eager_prev_q0;
-			tcp->tcp_eager_prev_q0->tcp_eager_next_q0 =
-			    tcp->tcp_eager_next_q0;
-			tcp->tcp_eager_prev_q0 = NULL;
-			tcp->tcp_eager_next_q0 = NULL;
-			tcp->tcp_conn_def_q0 = B_FALSE;
-
-			/* Make sure the tcp isn't in the list of droppables */
-			ASSERT(tcp->tcp_eager_next_drop_q0 == NULL &&
-			    tcp->tcp_eager_prev_drop_q0 == NULL);
-
-			/*
-			 * Insert at end of the queue because sockfs sends
-			 * down T_CONN_RES in chronological order. Leaving
-			 * the older conn indications at front of the queue
-			 * helps reducing search time.
-			 */
-			tail = listener->tcp_eager_last_q;
-			if (tail != NULL) {
-				tail->tcp_eager_next_q = tcp;
-			} else {
-				listener->tcp_eager_next_q = tcp;
-			}
-			listener->tcp_eager_last_q = tcp;
-			tcp->tcp_eager_next_q = NULL;
+			mblk_t *conn_ind = tcp_get_def_conn_ind(listener);
 
 			/* Need to get inside the listener perimeter */
 			CONN_INC_REF(listener->tcp_connp);
-			SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp, mp1,
-			    tcp_send_pending, listener->tcp_connp, NULL,
-			    SQ_FILL, SQTAG_TCP_SEND_PENDING);
+			SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp,
+			    conn_ind, tcp_send_pending, listener->tcp_connp,
+			    NULL, SQ_FILL, SQTAG_TCP_SEND_PENDING);
 		}
-no_more_eagers:
 		tcp_eager_unlink(eager);
 		mutex_exit(&listener->tcp_eager_lock);
 

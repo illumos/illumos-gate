@@ -1219,24 +1219,6 @@ stubs_base:
 #endif
 
 /*
- * Stubs for kssl, the kernel SSL proxy
- */
-#ifndef KSSL_MODULE
-	MODULE(kssl,drv);
-	NO_UNLOAD_STUB(kssl, kssl_check_proxy, nomod_zero);
-	NO_UNLOAD_STUB(kssl, kssl_handle_mblk, nomod_zero);
-	NO_UNLOAD_STUB(kssl, kssl_input, nomod_zero);
-	NO_UNLOAD_STUB(kssl, kssl_build_record, nomod_zero);
-	NO_UNLOAD_STUB(kssl, kssl_hold_ent, nomod_void);
-	NO_UNLOAD_STUB(kssl, kssl_release_ent, nomod_void);
-	NO_UNLOAD_STUB(kssl, kssl_find_fallback, nomod_zero);
-	NO_UNLOAD_STUB(kssl, kssl_init_context, nomod_zero);
-	NO_UNLOAD_STUB(kssl, kssl_hold_ctx, nomod_void);
-	NO_UNLOAD_STUB(kssl, kssl_release_ctx, nomod_void);
-	END_MODULE(kssl);
-#endif
-
-/*
  * Stubs for dcopy, for Intel IOAT KAPIs
  */
 #ifndef DCOPY_MODULE

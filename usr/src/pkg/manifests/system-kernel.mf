@@ -716,8 +716,10 @@ file path=kernel/sched/$(ARCH64)/TS_DPTBL group=sys mode=0755
 $(i386_ONLY)file path=kernel/sched/SDC group=sys mode=0755
 $(i386_ONLY)file path=kernel/sched/TS group=sys mode=0755
 $(i386_ONLY)file path=kernel/sched/TS_DPTBL group=sys mode=0755
+file path=kernel/socketmod/$(ARCH64)/ksslf group=sys mode=0755
 file path=kernel/socketmod/$(ARCH64)/socksctp group=sys mode=0755
 file path=kernel/socketmod/$(ARCH64)/trill group=sys mode=0755
+$(i386_ONLY)file path=kernel/socketmod/ksslf group=sys mode=0755
 $(i386_ONLY)file path=kernel/socketmod/socksctp group=sys mode=0755
 $(i386_ONLY)file path=kernel/socketmod/trill group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/bufmod group=sys mode=0755

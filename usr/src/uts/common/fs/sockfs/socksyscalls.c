@@ -2091,18 +2091,12 @@ snf_async_read(snf_req_t *sr)
 		iosize = (int)MIN(sr->sr_maxpsz, size);
 
 		/*
-		 * For sockets acting as an SSL proxy, we
-		 * need to adjust the size to the maximum
-		 * SSL record size set in the stream head.
-		 *
 		 * Socket filters can limit the mblk size,
 		 * so limit reads to maxblk if there are
 		 * filters present.
 		 */
 		if (vp->v_type == VSOCK &&
-		    (!SOCK_IS_NONSTR(so) &&
-		    SOTOTPI(so)->sti_kssl_ctx != NULL) ||
-		    (so->so_filter_active > 0 && maxblk != INFPSZ))
+		    so->so_filter_active > 0 && maxblk != INFPSZ)
 			iosize = (int)MIN(iosize, maxblk);
 
 		if (is_system_labeled()) {
@@ -2704,16 +2698,11 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		iosize = (int)MIN(maxpsz, size);
 
 		/*
-		 * For sockets acting as an SSL proxy, we
-		 * need to adjust the size to the maximum
-		 * SSL record size set in the stream head.
-		 *
 		 * Socket filters can limit the mblk size,
 		 * so limit reads to maxblk if there are
+		 * filters present.
 		 */
 		if (vp->v_type == VSOCK &&
-		    (!SOCK_IS_NONSTR(so) &&
-		    SOTOTPI(so)->sti_kssl_ctx != NULL) ||
 		    so->so_filter_active > 0 && maxblk != INFPSZ)
 			iosize = (int)MIN(iosize, maxblk);
 

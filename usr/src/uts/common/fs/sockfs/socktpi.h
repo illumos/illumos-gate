@@ -26,8 +26,6 @@
 #ifndef _SOCKFS_SOCKTPI_H
 #define	_SOCKFS_SOCKTPI_H
 
-#include <inet/kssl/ksslapi.h>
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -245,11 +243,6 @@ typedef struct sotpi_info {
 	void		*sti_nl7c_uri;
 	time_t		sti_nl7c_rtime;
 	void		*sti_nl7c_addr;
-
-	/* For sockets acting as an in-kernel SSL proxy */
-	kssl_endpt_type_t	sti_kssl_type;	/* is proxy/is proxied/none */
-	kssl_ent_t		sti_kssl_ent;	/* SSL config entry */
-	kssl_ctx_t		sti_kssl_ctx;	/* SSL session context */
 } sotpi_info_t;
 
 struct T_capability_ack;

@@ -131,13 +131,19 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 	conn_t *lconnp, *econnp;
 	tcp_t *listener, *eager;
 
-	lconnp = (conn_t *)lproto_handle;
-	listener = lconnp->conn_tcp;
-	ASSERT(listener->tcp_state == TCPS_LISTEN);
+	/*
+	 * KSSL can move a socket from one listener to another, in which
+	 * case `lproto_handle' points to the new listener. To ensure that
+	 * the original listener is used the information is obtained from
+	 * the eager.
+	 */
 	econnp = (conn_t *)eproto_handle;
 	eager = econnp->conn_tcp;
-	ASSERT(eager->tcp_listener != NULL);
 	ASSERT(IPCL_IS_NONSTR(econnp));
+	ASSERT(eager->tcp_listener != NULL);
+	listener = eager->tcp_listener;
+	lconnp = (conn_t *)listener->tcp_connp;
+	ASSERT(listener->tcp_state == TCPS_LISTEN);
 	ASSERT(lconnp->conn_upper_handle != NULL);
 
 	/*

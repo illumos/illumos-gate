@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_KSSL_KSSLAPI_H
@@ -74,17 +73,19 @@ typedef	void *kssl_ent_t;
 #define	SSL3_MAX_RECORD_LEN	16384 - 1 - SSL3_HDR_LEN - SSL3_MAX_TAIL_LEN
 
 
-kssl_endpt_type_t kssl_check_proxy(mblk_t *, void *, kssl_ent_t *);
+kssl_endpt_type_t kssl_check_proxy(struct sockaddr *, socklen_t, void *,
+    kssl_ent_t *);
 
-kssl_status_t kssl_init_context(kssl_ent_t, void *, boolean_t,
-    int, kssl_ctx_t *);
+kssl_status_t kssl_init_context(kssl_ent_t, struct sockaddr *, int,
+    kssl_ctx_t *);
+void kssl_set_mss(kssl_ctx_t, uint32_t);
 
 void kssl_hold_ent(kssl_ent_t);
 void kssl_release_ent(kssl_ent_t, void *, kssl_endpt_type_t);
 void *kssl_find_fallback(kssl_ent_t);
 
-void kssl_hold_ctx(kssl_ctx_t);
 void kssl_release_ctx(kssl_ctx_t);
+void kssl_async_done(kssl_ctx_t);
 
 typedef void (*kssl_callback_t)(void *arg, mblk_t *mp, kssl_cmd_t cmd);
 

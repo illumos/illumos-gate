@@ -524,10 +524,9 @@ RTS_OBJS +=	rtsddi.o
 
 IP_ICMP_OBJS =	icmp.o icmp_opt_data.o
 IP_RTS_OBJS =	rts.o rts_opt_data.o
-IP_TCP_OBJS =	tcp.o tcp_fusion.o tcp_kssl.o tcp_opt_data.o tcp_sack.o \
-		tcp_stats.o tcp_misc.o tcp_timers.o tcp_time_wait.o tcp_tpi.o \
-		tcp_output.o tcp_input.o tcp_socket.o tcp_bind.o tcp_cluster.o \
-		tcp_tunables.o
+IP_TCP_OBJS =	tcp.o tcp_fusion.o tcp_opt_data.o tcp_sack.o tcp_stats.o \
+		tcp_misc.o tcp_timers.o tcp_time_wait.o tcp_tpi.o tcp_output.o \
+		tcp_input.o tcp_socket.o tcp_bind.o tcp_cluster.o tcp_tunables.o
 IP_UDP_OBJS =	udp.o udp_opt_data.o udp_tunables.o
 IP_SCTP_OBJS =	sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_init.o sctp_input.o sctp_cookie.o \
@@ -1258,7 +1257,7 @@ SHAREFS_OBJS +=	sharetab.o	sharefs_vfsops.o	sharefs_vnops.o
 SPEC_OBJS +=	specsubr.o	specvfsops.o	specvnops.o
 
 SOCK_OBJS +=	socksubr.o	sockvfsops.o	sockparams.o	\
-		socksyscalls.o	socktpi.o	sockstr.o	sockssl.o \
+		socksyscalls.o	socktpi.o	sockstr.o \
 		sockcommon_vnops.o	sockcommon_subr.o \
 		sockcommon_sops.o	sockcommon.o	\
 		sock_notsupp.o	socknotify.o \
@@ -1544,7 +1543,9 @@ SWRANDPROV_OBJS += swrand.o fips_random_util.o
 #
 #			kernel SSL
 #
-KSSL_OBJS +=	kssl.o ksslioctl.o ksslapi.o ksslrec.o
+KSSL_OBJS +=	kssl.o ksslioctl.o 
+
+KSSL_SOCKFIL_MOD_OBJS += ksslfilter.o ksslapi.o ksslrec.o
 
 #
 #			misc. modules

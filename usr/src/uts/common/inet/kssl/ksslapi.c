@@ -48,7 +48,7 @@ static void kssl_dequeue(kssl_chain_t **head, void *item);
 static kssl_status_t kssl_build_single_record(ssl_t *ssl, mblk_t *mp);
 
 /*
- * The socket T_bind_req message is intercepted and re-routed here
+ * The socket bind request is intercepted and re-routed here
  * to see is there is SSL relevant job to do, based on the kssl config
  * in the kssl_entry_tab.
  * Looks up the kernel SSL proxy table, to find an entry that matches the
@@ -72,14 +72,14 @@ static kssl_status_t kssl_build_single_record(ssl_t *ssl, mblk_t *mp);
  */
 
 kssl_endpt_type_t
-kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
+kssl_check_proxy(struct sockaddr *addr, socklen_t len, void *cookie,
+    kssl_ent_t *ksslent)
 {
 	int i;
 	kssl_endpt_type_t ret;
 	kssl_entry_t *ep;
 	sin_t *sin;
 	sin6_t *sin6;
-	struct T_bind_req *tbr;
 	in6_addr_t mapped_v4addr;
 	in6_addr_t *v6addr;
 	in_port_t in_port;
@@ -89,11 +89,9 @@ kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
 	}
 
 	ret = KSSL_NO_PROXY;
+	sin = (struct sockaddr_in *)addr;
 
-	tbr = (struct T_bind_req *)bindmp->b_rptr;
-	sin = (sin_t *)(bindmp->b_rptr + tbr->ADDR_offset);
-
-	switch (tbr->ADDR_length) {
+	switch (len) {
 	case sizeof (sin_t):
 		in_port = ntohs(sin->sin_port);
 		IN6_IPADDR_TO_V4MAPPED(sin->sin_addr.s_addr, &mapped_v4addr);
@@ -138,13 +136,6 @@ kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
 					break;
 				}
 
-				/*
-				 * Now transform the T_BIND_REQ into
-				 * a T_BIND_ACK.
-				 */
-				tbr->PRIM_type = T_BIND_ACK;
-				bindmp->b_datap->db_type = M_PCPROTO;
-
 				KSSL_ENTRY_REFHOLD(ep);
 				*ksslent = (kssl_ent_t)ep;
 
@@ -154,27 +145,10 @@ kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
 
 			/* This is a proxy port. */
 			if (ep->ke_proxy_port == in_port) {
-				mblk_t *entmp;
-
-				/* Append this entry to the bind_req mblk */
-
-				entmp = allocb(sizeof (kssl_entry_t),
-				    BPRI_MED);
-				if (entmp == NULL)
-					break;
-				*((kssl_entry_t **)entmp->b_rptr) = ep;
-
-				entmp->b_wptr = entmp->b_rptr +
-				    sizeof (kssl_entry_t);
-
-				bindmp->b_cont = entmp;
-
 				/* Add the caller's cookie to proxies list */
 
 				if (!kssl_enqueue((kssl_chain_t **)
 				    &(ep->ke_proxy_head), cookie)) {
-					freeb(bindmp->b_cont);
-					bindmp->b_cont = NULL;
 					break;
 				}
 
@@ -183,8 +157,6 @@ kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
 				 * transport below
 				 */
 				sin->sin_port = htons(ep->ke_ssl_port);
-
-				tbr->PRIM_type = T_SSL_PROXY_BIND_REQ;
 
 				KSSL_ENTRY_REFHOLD(ep);
 				*ksslent = (kssl_ent_t)ep;
@@ -310,23 +282,26 @@ kssl_release_ent(kssl_ent_t ksslent, void *cookie, kssl_endpt_type_t endpt_type)
 }
 
 /*
- * Holds the kssl context
- */
-void
-kssl_hold_ctx(kssl_ctx_t ksslctx)
-{
-	ssl_t *ssl = (ssl_t *)ksslctx;
-
-	KSSL_SSL_REFHOLD(ssl);
-}
-
-/*
  * Releases the kssl_context
  */
 void
 kssl_release_ctx(kssl_ctx_t ksslctx)
 {
-	KSSL_SSL_REFRELE((ssl_t *)ksslctx);
+	kssl_free_context((ssl_t *)ksslctx);
+}
+
+/*
+ * Done with asynchronous processing
+ */
+void
+kssl_async_done(kssl_ctx_t ksslctx)
+{
+	ssl_t *ssl = (ssl_t *)ksslctx;
+
+	mutex_enter(&ssl->kssl_lock);
+	if (--ssl->async_ops_pending == 0)
+		cv_signal(&ssl->async_cv);
+	mutex_exit(&ssl->kssl_lock);
 }
 
 /*
@@ -403,7 +378,6 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 
 			if ((mp->b_cont == NULL) && (mplen == rec_sz)) {
 
-				DB_FLAGS(mp) &= ~DBLK_COOKED;
 				*decrmp = mp;
 				mutex_exit(&ssl->kssl_lock);
 				return (KSSL_CMD_DELIVER_PROXY);
@@ -541,19 +515,8 @@ sendalert:
 }
 
 /*
- * Process mblk b_cont chain returned from stream head. The chain could
- * contain a mixture (albeit continuous) of processed and unprocessed
- * mblks. This situation could happen when more data was available in
- * stream head queue than requested. In such case the rest of processed
- * data would be putback().
- *
- * Processed mblks in this function contain either a full or partial portion
- * of a decrypted and verified SSL record. The former case is produced
- * by the function itself, the latter case is explained above.
- *
- * In case of unprocessed mblks, decrypt and verify the MAC of an incoming
- * chain of application_data record. Each block has exactly one SSL record.
- * This routine recycles incoming mblks, and flags them as DBLK_COOKED.
+ * Decrypt and verify the MAC of an incoming chain of application_data record.
+ * Each block has exactly one SSL record.
  */
 kssl_cmd_t
 kssl_handle_mblk(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
@@ -579,23 +542,10 @@ kssl_handle_mblk(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
 
 	mp = firstmp = *mpp;
 	*outmp = NULL;
-
-	/*
-	 * Skip over already processed mblks. This prevents a case where
-	 * struiocopyout() copies unprocessed data to userland.
-	 */
-	while ((mp != NULL) && (DB_FLAGS(mp) & DBLK_COOKED)) {
-		ASSERT(DB_TYPE(mp) == M_DATA);
-		DTRACE_PROBE1(kssl_mblk__already_processed_mblk, mblk_t *, mp);
-		mp = mp->b_cont;
-	}
-
 more:
 
 	while (mp != NULL) {
-		/* only unprocessed mblks should reach us */
 		ASSERT(DB_TYPE(mp) == M_DATA);
-		ASSERT(!(DB_FLAGS(mp) & DBLK_COOKED));
 
 		if (DB_REF(mp) > 1) {
 			/*
@@ -771,7 +721,6 @@ more:
 		}
 		mp->b_wptr = recend;
 
-		DB_FLAGS(mp) |= DBLK_COOKED;
 		DTRACE_PROBE1(kssl_mblk__dblk_cooked, mblk_t *, mp);
 		KSSL_COUNTER(appdata_record_ins, 1);
 
@@ -1186,26 +1135,26 @@ error:
  * address. The ssl structure is returned held.
  */
 kssl_status_t
-kssl_init_context(kssl_ent_t kssl_ent, void *addr, boolean_t is_v4,
-    int mss, kssl_ctx_t *kssl_ctxp)
+kssl_init_context(kssl_ent_t kssl_ent, struct sockaddr *addr, int mss,
+    kssl_ctx_t *kssl_ctxp)
 {
 	ssl_t *ssl = kmem_cache_alloc(kssl_cache, KM_NOSLEEP);
+	struct sockaddr_in *sin = (struct sockaddr_in *)addr;
 
 	if (ssl == NULL) {
 		return (KSSL_STS_ERR);
 	}
-
-	kssl_cache_count++;
 
 	bzero(ssl, sizeof (ssl_t));
 
 	ssl->kssl_entry = (kssl_entry_t *)kssl_ent;
 	KSSL_ENTRY_REFHOLD(ssl->kssl_entry);
 
-	if (is_v4) {
-		IN6_IPADDR_TO_V4MAPPED(*((ipaddr_t *)addr), &ssl->faddr);
+	if (sin->sin_family == AF_INET) {
+		IN6_IPADDR_TO_V4MAPPED(sin->sin_addr.s_addr, &ssl->faddr);
 	} else {
-		ssl->faddr = *((in6_addr_t *)addr);	/* struct assignment */
+		/* struct assignment */
+		ssl->faddr = ((struct sockaddr_in6 *)addr)->sin6_addr;
 	}
 	ssl->tcp_mss = mss;
 	ssl->sendalert_level = alert_warning;
@@ -1213,8 +1162,14 @@ kssl_init_context(kssl_ent_t kssl_ent, void *addr, boolean_t is_v4,
 	ssl->sid.cached = B_FALSE;
 
 	*kssl_ctxp = (kssl_ctx_t)ssl;
-	KSSL_SSL_REFHOLD(ssl);
 	return (KSSL_STS_OK);
+}
+
+void
+kssl_set_mss(kssl_ctx_t ctx, uint32_t mss)
+{
+	ssl_t *ssl = (ssl_t *)ctx;
+	ssl->tcp_mss = mss;
 }
 
 /*

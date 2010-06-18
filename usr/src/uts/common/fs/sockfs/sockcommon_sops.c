@@ -54,8 +54,6 @@
 #include <fs/sockfs/sodirect.h>
 #include <sys/tihdr.h>
 #include <fs/sockfs/nl7c.h>
-#include <inet/kssl/ksslapi.h>
-
 
 extern int xnet_skip_checks;
 extern int xnet_check_print;
@@ -248,40 +246,6 @@ so_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		 */
 		if (so->so_zoneid == GLOBAL_ZONEID) {
 			/* NCA should be used, so fall back to TPI */
-			error = so_tpi_fallback(so, cr);
-			SO_UNBLOCK_FALLBACK(so);
-			if (error)
-				return (error);
-			else
-				return (SOP_BIND(so, name, namelen, flags, cr));
-		}
-	} else if (so->so_type == SOCK_STREAM) {
-		/* Check if KSSL has been configured for this address */
-		kssl_ent_t ent;
-		kssl_endpt_type_t type;
-		struct T_bind_req bind_req;
-		mblk_t *mp;
-
-		/*
-		 * TODO: Check with KSSL team if we could add a function call
-		 * that only queries whether KSSL is enabled for the given
-		 * address.
-		 */
-		bind_req.PRIM_type = T_BIND_REQ;
-		bind_req.ADDR_length = namelen;
-		bind_req.ADDR_offset = (t_scalar_t)sizeof (bind_req);
-		mp = soallocproto2(&bind_req, sizeof (bind_req),
-		    name, namelen, 0, _ALLOC_SLEEP, cr);
-
-		type = kssl_check_proxy(mp, so, &ent);
-		freemsg(mp);
-
-		if (type != KSSL_NO_PROXY) {
-			/*
-			 * KSSL has been configured for this address, so
-			 * we must fall back to TPI.
-			 */
-			kssl_release_ent(ent, so, type);
 			error = so_tpi_fallback(so, cr);
 			SO_UNBLOCK_FALLBACK(so);
 			if (error)

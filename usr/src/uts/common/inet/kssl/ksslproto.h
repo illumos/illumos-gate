@@ -275,14 +275,13 @@ typedef struct KSSLCipherSpecStr {
 } KSSLCipherSpec;
 
 /*
- * SSL connection state. This one hangs off of a tcp_t structure.
+ * SSL connection state. This one hangs off of a ksslf_t structure.
  */
 typedef struct ssl_s {
 	kmutex_t		kssl_lock;
 	struct kssl_entry_s	*kssl_entry;
 	mblk_t			*rec_ass_head;
 	mblk_t			*rec_ass_tail;
-	uint_t			kssl_refcnt;
 	in6_addr_t		faddr;
 	uint32_t		tcp_mss;
 	SSL3WaitState		hs_waitstate;
@@ -320,6 +319,8 @@ typedef struct ssl_s {
 	uchar_t			major_version;
 	uchar_t			minor_version;
 	boolean_t		secure_renegotiation;
+	uint_t			async_ops_pending;
+	kcondvar_t		async_cv;
 } ssl_t;
 
 #define	IS_TLS(s) (s->major_version == 3 && s->minor_version == 1)

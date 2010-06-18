@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -145,8 +144,10 @@ KSSLCipherDef cipher_defs[] = { /* indexed by SSL3BulkCipher */
 };
 
 struct kmem_cache *kssl_cache;
+static crypto_notify_handle_t prov_update_handle = NULL;
 
 static void kssl_global_init();
+static void kssl_global_fini();
 static void kssl_init_mechs();
 static void kssl_event_callback(uint32_t, void *);
 
@@ -156,7 +157,31 @@ static void kssl_event_callback(uint32_t, void *);
 int
 _init(void)
 {
-	return (mod_install(&modlinkage));
+	int error;
+
+	kssl_global_init();
+
+	if ((error = mod_install(&modlinkage)) != 0) {
+		kssl_global_fini();
+		return (error);
+	}
+	return (0);
+}
+
+int
+_fini(void)
+{
+	int error;
+
+	if ((error = mod_remove(&modlinkage)) != 0)
+		return (error);
+
+	if (prov_update_handle != NULL)
+		crypto_unnotify_events(prov_update_handle);
+
+	kssl_global_fini();
+
+	return (0);
 }
 
 int
@@ -203,8 +228,6 @@ kssl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	kssl_dip = dip;
 
-	kssl_global_init();
-
 	return (DDI_SUCCESS);
 }
 
@@ -216,28 +239,15 @@ kssl_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
-	if (kssl_entry_tab_nentries != 0 || kssl_cache_count != 0)
+	if (kssl_entry_tab_nentries != 0)
 		return (DDI_FAILURE);
 
-	mutex_destroy(&kssl_tab_mutex);
 	kssl_dip = NULL;
-
-	if (kssl_cache != NULL) {
-		kmem_cache_destroy(kssl_cache);
-		kssl_cache = NULL;
-	}
-
-	if (kssl_ksp != NULL) {
-		kstat_delete(kssl_ksp);
-		kssl_ksp = NULL;
-	}
 
 	ddi_remove_minor_node(dip, NULL);
 
 	return (DDI_SUCCESS);
 }
-
-static crypto_notify_handle_t prov_update_handle = NULL;
 
 /* ARGSUSED */
 static int
@@ -586,6 +596,22 @@ kssl_global_init()
 	};
 }
 
+static void
+kssl_global_fini(void)
+{
+	mutex_destroy(&kssl_tab_mutex);
+
+	if (kssl_cache != NULL) {
+		kmem_cache_destroy(kssl_cache);
+		kssl_cache = NULL;
+	}
+
+	if (kssl_ksp != NULL) {
+		kstat_delete(kssl_ksp);
+		kssl_ksp = NULL;
+	}
+}
+
 /*ARGSUSED*/
 static int
 kssl_constructor(void *buf, void *arg, int kmflags)
@@ -593,6 +619,7 @@ kssl_constructor(void *buf, void *arg, int kmflags)
 	ssl_t *ssl = buf;
 
 	mutex_init(&ssl->kssl_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&ssl->async_cv, NULL, CV_DEFAULT, NULL);
 
 	return (0);
 }
@@ -603,6 +630,7 @@ kssl_destructor(void *buf, void *arg)
 {
 	ssl_t *ssl = buf;
 	mutex_destroy(&ssl->kssl_lock);
+	cv_destroy(&ssl->async_cv);
 }
 
 /*

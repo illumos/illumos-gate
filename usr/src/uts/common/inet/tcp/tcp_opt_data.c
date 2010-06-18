@@ -620,7 +620,6 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 		case SO_SND_COPYAVOID:
 			if (!checkonly) {
 				if (tcp->tcp_loopback ||
-				    (tcp->tcp_kssl_ctx != NULL) ||
 				    (onoff != 1) || !tcp_zcopy_check(tcp)) {
 					*outlenp = 0;
 					return (EOPNOTSUPP);

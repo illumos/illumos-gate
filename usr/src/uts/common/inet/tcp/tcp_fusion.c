@@ -153,21 +153,18 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcpha_t *tcpha)
 	/*
 	 * Fuse the endpoints; we perform further checks against both
 	 * tcp endpoints to ensure that a fusion is allowed to happen.
-	 * In particular we bail out if kernel SSL exists.
 	 */
 	ns = tcps->tcps_netstack;
 	ipst = ns->netstack_ip;
 
 	if (!tcp->tcp_unfusable && !peer_tcp->tcp_unfusable &&
-	    (tcp->tcp_kssl_ent == NULL) && (tcp->tcp_xmit_head == NULL) &&
-	    (peer_tcp->tcp_xmit_head == NULL)) {
+	    tcp->tcp_xmit_head == NULL && peer_tcp->tcp_xmit_head == NULL) {
 		mblk_t *mp;
 		queue_t *peer_rq = peer_connp->conn_rq;
 
 		ASSERT(!TCP_IS_DETACHED(peer_tcp));
 		ASSERT(tcp->tcp_fused_sigurg_mp == NULL);
 		ASSERT(peer_tcp->tcp_fused_sigurg_mp == NULL);
-		ASSERT(tcp->tcp_kssl_ctx == NULL);
 
 		/*
 		 * We need to drain data on both endpoints during unfuse.

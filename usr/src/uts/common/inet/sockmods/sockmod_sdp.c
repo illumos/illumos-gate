@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -30,10 +29,7 @@
 #include <sys/socketvar.h>
 #include <sys/modctl.h>
 #include <sys/cmn_err.h>
-#include <sys/tihdr.h>
 #include <sys/vfs.h>
-#include <fs/sockfs/nl7c.h>
-#include <inet/kssl/ksslapi.h>
 #include <inet/sdp_itf.h>
 #include <fs/sockfs/sockcommon.h>
 #include "socksdp.h"

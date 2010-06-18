@@ -79,8 +79,6 @@
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/nl7curi.h>
 
-#include <inet/kssl/ksslapi.h>
-
 #include <fs/sockfs/sockcommon.h>
 #include <fs/sockfs/socktpi.h>
 #include <fs/sockfs/socktpi_impl.h>
@@ -196,12 +194,6 @@ static struct kmem_cache *socktpi_cache, *socktpi_unix_cache;
 
 extern	void sigintr(k_sigset_t *, int);
 extern	void sigunintr(k_sigset_t *);
-
-/* Sockets acting as an in-kernel SSL proxy */
-extern mblk_t	*strsock_kssl_input(vnode_t *, mblk_t *, strwakeup_t *,
-		    strsigset_t *, strsigset_t *, strpollset_t *);
-extern mblk_t	*strsock_kssl_output(vnode_t *, mblk_t *, strwakeup_t *,
-		    strsigset_t *, strsigset_t *, strpollset_t *);
 
 static int	sotpi_unbind(struct sonode *, int);
 
@@ -1088,38 +1080,6 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	/* Done using sti_laddr_sa - can drop the lock */
 	mutex_exit(&so->so_lock);
 
-	/*
-	 * Intercept the bind_req message here to check if this <address/port>
-	 * was configured as an SSL proxy server, or if another endpoint was
-	 * already configured to act as a proxy for us.
-	 *
-	 * Note, only if NL7C not enabled for this socket.
-	 */
-	if (nl7c == NULL &&
-	    (so->so_family == AF_INET || so->so_family == AF_INET6) &&
-	    so->so_type == SOCK_STREAM) {
-
-		if (sti->sti_kssl_ent != NULL) {
-			kssl_release_ent(sti->sti_kssl_ent, so,
-			    sti->sti_kssl_type);
-			sti->sti_kssl_ent = NULL;
-		}
-
-		sti->sti_kssl_type = kssl_check_proxy(mp, so,
-		    &sti->sti_kssl_ent);
-		switch (sti->sti_kssl_type) {
-		case KSSL_NO_PROXY:
-			break;
-
-		case KSSL_HAS_PROXY:
-			mutex_enter(&so->so_lock);
-			goto skip_transport;
-
-		case KSSL_IS_PROXY:
-			break;
-		}
-	}
-
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
 	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
 	if (error) {
@@ -1135,7 +1095,6 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 		eprintsoline(so, error);
 		goto done;
 	}
-skip_transport:
 	ASSERT(mp);
 	/*
 	 * Even if some TPI message (e.g. T_DISCON_IND) was received in
@@ -1493,17 +1452,6 @@ sotpi_unbind(struct sonode *so, int flags)
 		vnode_t *vp;
 
 		if ((vp = sti->sti_ux_bound_vp) != NULL) {
-
-			/* Undo any SSL proxy setup */
-			if ((so->so_family == AF_INET ||
-			    so->so_family == AF_INET6) &&
-			    (so->so_type == SOCK_STREAM) &&
-			    (sti->sti_kssl_ent != NULL)) {
-				kssl_release_ent(sti->sti_kssl_ent, so,
-				    sti->sti_kssl_type);
-				sti->sti_kssl_ent = NULL;
-				sti->sti_kssl_type = KSSL_NO_PROXY;
-			}
 			sti->sti_ux_bound_vp = NULL;
 			vn_rele_stream(vp);
 		}
@@ -1694,7 +1642,7 @@ sotpi_accept(struct sonode *so, int fflag, struct cred *cr,
 	struct T_conn_ind	*conn_ind;
 	struct T_conn_res	*conn_res;
 	int			error = 0;
-	mblk_t			*mp, *ctxmp, *ack_mp;
+	mblk_t			*mp, *ack_mp;
 	struct sonode		*nso;
 	vnode_t			*nvp;
 	void			*src;
@@ -1726,7 +1674,6 @@ again:
 
 	ASSERT(mp != NULL);
 	conn_ind = (struct T_conn_ind *)mp->b_rptr;
-	ctxmp = mp->b_cont;
 
 	/*
 	 * Save SEQ_number for error paths.
@@ -1818,23 +1765,6 @@ again:
 	nvp = SOTOV(nso);
 	nsti = SOTOTPI(nso);
 
-	/*
-	 * If the transport sent up an SSL connection context, then attach
-	 * it the new socket, and set the (sd_wputdatafunc)() and
-	 * (sd_rputdatafunc)() stream head hooks to intercept and process
-	 * SSL records.
-	 */
-	if (ctxmp != NULL) {
-		/*
-		 * This kssl_ctx_t is already held for us by the transport.
-		 * So, we don't need to do a kssl_hold_ctx() here.
-		 */
-		nsti->sti_kssl_ctx = *((kssl_ctx_t *)ctxmp->b_rptr);
-		freemsg(ctxmp);
-		mp->b_cont = NULL;
-		strsetrwputdatahooks(nvp, strsock_kssl_input,
-		    strsock_kssl_output);
-	}
 #ifdef DEBUG
 	/*
 	 * SO_DEBUG is used to trigger the dprint* and eprint* macros thus
@@ -5767,19 +5697,6 @@ sotpi_close(struct sonode *so, int flag, struct cred *cr)
 			sti->sti_ux_bound_vp = NULL;
 			vn_rele_stream(ux_vp);
 		}
-		if (so->so_family == AF_INET || so->so_family == AF_INET6) {
-			strsetrwputdatahooks(SOTOV(so), NULL, NULL);
-			if (sti->sti_kssl_ent != NULL) {
-				kssl_release_ent(sti->sti_kssl_ent, so,
-				    sti->sti_kssl_type);
-				sti->sti_kssl_ent = NULL;
-			}
-			if (sti->sti_kssl_ctx != NULL) {
-				kssl_release_ctx(sti->sti_kssl_ctx);
-				sti->sti_kssl_ctx = NULL;
-			}
-			sti->sti_kssl_type = KSSL_NO_PROXY;
-		}
 		error = strclose(vp, flag, cr);
 		vp->v_stream = NULL;
 		mutex_enter(&so->so_lock);
@@ -6749,11 +6666,6 @@ sotpi_info_init(struct sonode *so)
 
 	ASSERT(sti->sti_conn_ind_head == NULL);
 	ASSERT(sti->sti_conn_ind_tail == NULL);
-
-	/* Initialize the kernel SSL proxy fields */
-	sti->sti_kssl_type = KSSL_NO_PROXY;
-	sti->sti_kssl_ent = NULL;
-	sti->sti_kssl_ctx = NULL;
 }
 
 /*

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_KSSL_KSSLIMPL_H
@@ -136,21 +135,6 @@ typedef struct mech_to_cipher_s {
 	}								\
 }
 
-#define	KSSL_SSL_REFHOLD(ssl) {						\
-	atomic_add_32(&(ssl)->kssl_refcnt, 1);				\
-	ASSERT((ssl)->kssl_refcnt != 0);				\
-	ASSERT((ssl)->kssl_refcnt < 100000);				\
-}
-
-#define	KSSL_SSL_REFRELE(ssl) {						\
-	ASSERT((ssl)->kssl_refcnt != 0);				\
-	ASSERT((ssl)->kssl_refcnt < 100000);				\
-	membar_exit();							\
-	if (atomic_add_32_nv(&(ssl)->kssl_refcnt, -1) == 0) {		\
-		kssl_free_context((ssl));				\
-	}								\
-}
-
 #define	CRYPTO_ERR(r) ((r) != CRYPTO_SUCCESS && (r) != CRYPTO_QUEUED)
 
 /*
@@ -181,7 +165,6 @@ extern crypto_mechanism_t hmac_sha1_mech;
 extern crypto_call_flag_t kssl_call_flag;
 extern KSSLCipherDef cipher_defs[];
 
-extern int kssl_cache_count;
 extern struct kmem_cache *kssl_cache;
 
 #define	KSSL_TAB_INITSIZE	4
