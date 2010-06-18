@@ -1,6 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -24,8 +23,6 @@
  *
  * Contributor(s):
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * clientinit.c
@@ -238,6 +235,56 @@ ldapssl_free( void **pp )
 }
 
 
+#ifdef _SOLARIS_SDK
+/*
+ * Disable strict fork detection of NSS library to allow safe fork of
+ * consumers. Otherwise NSS will not work after fork because it was not
+ * deinitialized before fork and there is no safe way how to do it after fork.
+ *
+ * Return values:
+ *     1 - DISABLED was already set, no modification to environment
+ *     0 - successfully modified environment, old value saved to enval if there
+ *         was some
+ *    -1 - setenv or strdup failed, the environment was left unchanged
+ *
+ */
+static int
+update_nss_strict_fork_env(char **enval)
+{
+	char *temps = getenv("NSS_STRICT_NOFORK");
+	if (temps == NULL) {
+		*enval = NULL;
+	} else if (strncmp(temps, "DISABLED", 9) == 0) {
+		/* Do not need to set as DISABLED, it is already set. */
+		*enval = NULL;
+		return (1);
+	} else {
+		if ((*enval = ldapssl_strdup(temps)) == NULL)
+			return (-1);
+	}
+	return (setenv("NSS_STRICT_NOFORK", "DISABLED", 1));
+}
+
+/*
+ * Reset environment variable NSS_STRICT_NOFORK to value before
+ * update_nss_strict_fork_env() call or remove it from environment if it did
+ * not exist.
+ * NSS_STRICT_NOFORK=DISABLED is needed only during NSS initialization to
+ * disable activation of atfork handler in NSS which is invalidating
+ * initialization in child process after fork.
+ */
+static int
+reset_nss_strict_fork_env(char *enval)
+{
+	if (enval != NULL) {
+		return (setenv("NSS_STRICT_NOFORK", enval, 1));
+	} else {
+		return (unsetenv("NSS_STRICT_NOFORK"));
+	}
+}
+#endif
+
+
 static char *
 buildDBName(const char *basename, const char *dbname)
 {
@@ -371,8 +418,11 @@ ldapssl_clientauth_init( const char *certdbpath, void *certdbhandle,
     const int needkeydb, const char *keydbpath, void *keydbhandle )
 
 {
-
     int	rc;
+#ifdef _SOLARIS_SDK
+    char *enval;
+    int rcenv = 0;
+#endif
      
     /*
      *     LDAPDebug(LDAP_DEBUG_TRACE, "ldapssl_clientauth_init\n",0 ,0 ,0);
@@ -386,9 +436,24 @@ ldapssl_clientauth_init( const char *certdbpath, void *certdbhandle,
 
     ldapssl_basic_init();
 
+#ifdef _SOLARIS_SDK
+    if ((rcenv = update_nss_strict_fork_env(&enval)) == -1) {
+	mutex_unlock(&inited_mutex);
+	return (-1);
+    }
+#endif
 
     /* Open the certificate database */
     rc = NSS_Init(certdbpath);
+#ifdef _SOLARIS_SDK
+    /* Error from NSS_Init() more important! */
+    if ((rcenv != 1) && (reset_nss_strict_fork_env(enval) != 0) && (rc == 0)) {
+	ldapssl_free(&enval);
+	mutex_unlock(&inited_mutex);
+	return (-1);
+    }
+    ldapssl_free(&enval);
+#endif
     if (rc != 0) {
 	if ((rc = PR_GetError()) >= 0)
 	    rc = -1;
@@ -470,6 +535,10 @@ ldapssl_advclientauth_init(
     const int sslstrength )
 {
     int	rc;
+#ifdef _SOLARIS_SDK
+    char *enval;
+    int rcenv = 0;
+#endif
 
     mutex_lock(&inited_mutex);
     if ( inited ) {
@@ -483,7 +552,23 @@ ldapssl_advclientauth_init(
 
     ldapssl_basic_init();
 
+#ifdef _SOLARIS_SDK
+    if ((rcenv = update_nss_strict_fork_env(&enval)) == -1) {
+	mutex_unlock(&inited_mutex);
+	return (-1);
+    }
+#endif
+
     rc = NSS_Init(certdbpath);
+#ifdef _SOLARIS_SDK
+    /* Error from NSS_Init() more important! */
+    if ((rcenv != 1) && (reset_nss_strict_fork_env(enval) != 0) && (rc == 0)) {
+	ldapssl_free(&enval);
+	mutex_unlock(&inited_mutex);
+	return (-1);
+    }
+    ldapssl_free(&enval);
+#endif
     if (rc != 0) {
 	if ((rc = PR_GetError()) >= 0)
 	    rc = -1;
@@ -535,6 +620,10 @@ ldapssl_pkcs_init( const struct ldapssl_pkcs_fns *pfns )
     char		*confDir, *keydbName;
     static char         *secmodname =  "secmod.db";
     int			rc;
+#ifdef _SOLARIS_SDK
+    char *enval;
+    int rcenv = 0;
+#endif
     
     mutex_lock(&inited_mutex);
     if ( inited ) {
@@ -575,12 +664,29 @@ ldapssl_pkcs_init( const struct ldapssl_pkcs_fns *pfns )
     ldapssl_free((void **)&keydbName);
     ldapssl_free((void **)&keydbpath);
 
+#ifdef _SOLARIS_SDK
+    if ((rcenv = update_nss_strict_fork_env(&enval)) == -1) {
+	mutex_unlock(&inited_mutex);
+	return (-1);
+    }
+#endif
+
     rc = NSS_Initialize(confDir,certdbPrefix,keydbPrefix,secmodname,
 		NSS_INIT_READONLY);
 
     ldapssl_free((void **)&certdbPrefix);
     ldapssl_free((void **)&keydbPrefix);
     ldapssl_free((void **)&confDir);
+
+#ifdef _SOLARIS_SDK
+    /* Error from NSS_Initialize() more important! */
+    if ((rcenv != 1) && (reset_nss_strict_fork_env(enval) != 0) && (rc == 0)) {
+	ldapssl_free(&enval);
+	mutex_unlock(&inited_mutex);
+	return (-1);
+    }
+    ldapssl_free(&enval);
+#endif
     
     if (rc != 0) {
 	if ((rc = PR_GetError()) >= 0)
