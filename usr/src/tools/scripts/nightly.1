@@ -18,7 +18,7 @@
 .\" "
 .\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "
-.TH nightly 1 "27 April 2010"
+.TH nightly 1 "28 May 2010"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -255,10 +255,12 @@ a time.
 .B Miscellaneous options
 .TP 10
 .B \-O
-generate deliverables for OpenSolaris.  Tarballs containing binaries
-of closed-source components are put in $CODEMGR_WS.  A tarball containing
-signed cryptographic binaries is put in the parent directory of
-$PKGARCHIVE (by default they are put in $CODEMGR_WS/packages/$MACH).
+generate deliverables for OpenSolaris.  Tarballs containing signed
+cryptographic binaries and binaries
+of closed-source components are put in $CODEMGR_WS.  (The
+cryptographic tarballs are copies of the
+ones that are put in the parent directory of
+$PKGARCHIVE.)
 .TP 10
 .B \-V VERS
 set the build version string to VERS, overriding VERSION

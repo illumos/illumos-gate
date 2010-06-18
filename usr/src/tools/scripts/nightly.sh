@@ -2097,10 +2097,10 @@ function create_lock {
 # options.
 #
 function allprotos {
-	roots="$ROOT"
-	
-	if [[ $D_FLAG = y && $F_FLAG = n ]]; then
-		[ $MULTI_PROTO = yes ] && roots="$roots $ROOT-nd"
+	typeset roots="$ROOT"
+
+	if [[ "$F_FLAG" = n && "$MULTI_PROTO" = yes ]]; then
+		roots="$roots $ROOT-nd"
 	fi
 
 	if [[ $O_FLAG = y ]]; then
@@ -2417,7 +2417,9 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 		mkdir -p ${TOOLS_PROTO}
 	fi
 
-	rm -rf `allprotos`
+	typeset roots=$(allprotos)
+	echo "\n\nClearing $roots" >> "$LOGFILE"
+	rm -rf $roots
 
 	# Get back to a clean workspace as much as possible to catch
 	# problems that only occur on fresh workspaces.
@@ -2987,7 +2989,7 @@ if [ "$SD_FLAG" = "y" -a $build_ok = y ]; then
 
 fi
 
-if [ "$SO_FLAG" = "y" -a $build_ok = y ]; then
+if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
 	#
 	# Copy the open sources into their own tree, set up the closed
 	# binaries, and set up the environment.  The build looks for
@@ -3001,7 +3003,7 @@ if [ "$SO_FLAG" = "y" -a $build_ok = y ]; then
 	copy_source $CODEMGR_WS $OPEN_SRCDIR OPEN_SOURCE usr/src
 fi
 
-if [ "$SO_FLAG" = "y" -a $build_ok = y ]; then
+if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
 
 	echo "\n==== Generating skeleton closed binaries for" \
 	    "open-only build ====\n" | \
@@ -3440,10 +3442,10 @@ fi
 #
 # Copy an input crypto tarball to the canonical destination (with
 # datestamp), and point the non-stamped symlink at it.
-# Usage: copycrypto from_path suffix
+# Usage: copyin_crypto from_path suffix
 # Returns 0 if successful, non-zero if not.
 #
-function copycrypto {
+function copyin_crypto {
 	typeset from=$1
 	typeset suffix=$2
 	typeset to=$(cryptodest "$suffix").bz2
@@ -3458,26 +3460,45 @@ function copycrypto {
 }
 
 #
+# Copy a crypto tarball to $CODEMGR_WS to go with the other
+# OpenSolaris deliverables.
+# Usage: copyout_crypto suffix
+# where $suffix is "" or "-nd".
+#
+function copyout_crypto {
+	typeset suffix=$1
+	typeset cryptof=on-crypto$suffix.$MACH.tar.bz2
+	[ -f $cryptof ] && rm $cryptof
+	cp $(cryptodest "$suffix").bz2 $cryptof
+}
+
+#
 # Pass through the crypto tarball(s) that we were given, putting it in
 # the same place that crypto_from_proto puts things.
+# Returns with non-zero status if there is a problem.
 #
 function crypto_passthrough {
 	echo "Reusing $ON_CRYPTO_BINS for crypto tarball(s)..." >> "$LOGFILE"
+	typeset -i stat=0
 	if [ "$D_FLAG" = y ]; then
-		copycrypto "$ON_CRYPTO_BINS" "" >> "$LOGFILE" 2>&1
+		copyin_crypto "$ON_CRYPTO_BINS" "" >> "$LOGFILE" 2>&1
 		if (( $? != 0 )) ; then
 			echo "Couldn't create DEBUG crypto tarball." |
 			    tee -a "$mail_msg_file" >> "$LOGFILE"
+			stat=1
 		fi
 	fi
 	if [ "$F_FLAG" = n ]; then
-		copycrypto $(ndcrypto "$ON_CRYPTO_BINS") "-nd" \
+		copyin_crypto $(ndcrypto "$ON_CRYPTO_BINS") "-nd" \
 		    >> "$LOGFILE" 2>&1
 		if (( $? != 0 )) ; then
 			echo "Couldn't create non-DEBUG crypto tarball." |
 			    tee -a "$mail_msg_file" >> "$LOGFILE"
+			stat=1
 		fi
 	fi
+
+	return $stat
 }
 
 # If we are doing an OpenSolaris _source_ build (-S O) then we do
@@ -3505,6 +3526,7 @@ if [ "$SO_FLAG" = n -a "$O_FLAG" = y -a "$build_ok" = y ]; then
 		if (( $? != 0 )) ; then
 			echo "Couldn't create DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
+			build_ok=n
 		fi
 	fi
 	if [ "$F_FLAG" = n ]; then
@@ -3512,6 +3534,7 @@ if [ "$SO_FLAG" = n -a "$O_FLAG" = y -a "$build_ok" = y ]; then
 		if (( $? != 0 )) ; then
 			echo "Couldn't create non-DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
+			build_ok=n
 		fi
 	fi
 
@@ -3521,10 +3544,38 @@ if [ "$SO_FLAG" = n -a "$O_FLAG" = y -a "$build_ok" = y ]; then
 	if (( $? != 0 )) ; then
 		echo "Couldn't create README.opensolaris." |
 		    tee -a $mail_msg_file >> $LOGFILE
+		build_ok=n
 	fi
 
+	typeset have_crypto=y
 	if [ -n "$ON_CRYPTO_BINS" ]; then
-		crypto_passthrough
+		crypto_passthrough || have_crypto=n
+	fi
+	#
+	# Make another copy of the crypto so that all the OpenSolaris
+	# deliverables are in $CODEMGR_WS.
+	#
+	if [ "$have_crypto" != y ]; then
+		build_ok=n
+	else
+		echo "Copying crypto tarball to $CODEMGR_WS" >> "$LOGFILE"
+		if [ "$D_FLAG" = y ]; then
+			copyout_crypto "" >> "$LOGFILE" 2>&1
+			if (( $? != 0 )) ; then
+				echo "Couldn't create DEBUG crypto tarball" |
+				    tee -a $mail_msg_file >> "$LOGFILE"
+				build_ok=n
+			fi
+		fi
+		if [ "$F_FLAG" = n ]; then
+			copyout_crypto "-nd" >> "$LOGFILE" 2>&1
+			if (( $? != 0 )) ; then
+				echo "Couldn't create non-DEBUG" \
+				    "crypto tarball" |
+				    tee -a $mail_msg_file >> "$LOGFILE"
+				build_ok=n
+			fi
+		fi
 	fi
 fi
 
