@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_HW_H
@@ -596,11 +595,15 @@ struct hermon_hw_queryfw_s {
 #endif
 
 /*
- * need to have min 2.3.0 to include config_spec_qp and SMA in FW
+ * 2.6.000 is critical for some performance features, e.g., Reserved_Lkey,
+ * and 2.7.000 is needed for FRWR and FCoIB.  Requiring 2.6.000 now so that
+ * existing customers get the performance, but are not required to upgrade
+ * to the latest.  Less than 2.6.000 will cause the driver to attach in
+ * maintenance mode, and throw an FMA event about upgrading the firmware.
  */
 
-#define	HERMON_FW_VER_MAJOR		0x0002	/* TBD for Hermon */
-#define	HERMON_FW_VER_MINOR		0x0005
+#define	HERMON_FW_VER_MAJOR		0x0002
+#define	HERMON_FW_VER_MINOR		0x0006
 #define	HERMON_FW_VER_SUBMINOR		0x0000
 
 /*
