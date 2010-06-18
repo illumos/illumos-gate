@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -204,6 +203,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	mmapobj_result_t	*mpp;
 	Fdesc			fdr = { 0 }, fdm = { 0 };
 	Rej_desc		rej = { 0 };
+	APlist			*ealp = NULL;
 
 	/*
 	 * Now that ld.so has relocated itself, initialize our own 'environ' so
@@ -344,25 +344,68 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	security(uid, euid, gid, egid, auxflags);
 
 	/*
-	 * Look for environment strings (allows things like LD_NOAUDIT to be
-	 * established, although debugging isn't enabled until later).
+	 * Make an initial pass of environment variables to pick off those
+	 * related to locale processing.  At the same time, collect and save
+	 * any LD_XXXX variables for later processing.  Note that this later
+	 * processing will be skipped if ld.so.1 is invoked from the command
+	 * line with -e LD_NOENVIRON.
 	 */
-	if ((readenv_user((const char **)envp, &(lml_main.lm_flags),
-	    &(lml_main.lm_tflags), (aoutdyn != 0))) == 1)
+	if (envp && (readenv_user((const char **)envp, &ealp) == 1))
 		return (0);
+
+	/*
+	 * If ld.so.1 has been invoked directly, process its arguments.
+	 */
+	if (ldsoexec) {
+		/*
+		 * Process any arguments that are specific to ld.so.1, and
+		 * reorganize the process stack to effectively remove ld.so.1
+		 * from the stack.  Reinitialize the environment pointer, as
+		 * this pointer may have been shifted after skipping ld.so.1's
+		 * arguments.
+		 */
+		if (rtld_getopt(argv, &envp, &auxv, &(lml_main.lm_flags),
+		    &(lml_main.lm_tflags), (aoutdyn != 0)) == 1) {
+			eprintf(&lml_main, ERR_NONE, MSG_INTL(MSG_USG_BADOPT));
+			return (0);
+		}
+		_environ = envp;
+
+		/*
+		 * Open the object that ld.so.1 is to execute.
+		 */
+		argvname = execname = argv[0];
+
+		if ((fd = open(argvname, O_RDONLY)) == -1) {
+			int	err = errno;
+			eprintf(&lml_main, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+			    argvname, strerror(err));
+			return (0);
+		}
+	}
+
+	/*
+	 * Having processed any ld.so.1 command line options, return to process
+	 * any LD_XXXX environment variables.
+	 */
+	if (ealp) {
+		if (((rtld_flags & RT_FL_NOENVIRON) == 0) &&
+		    (procenv_user(ealp, &(lml_main.lm_flags),
+		    &(lml_main.lm_tflags), (aoutdyn != 0)) == 1))
+			return (0);
+		free(ealp);
+	}
 
 	/*
 	 * Initialize a hardware capability descriptor for use in comparing
 	 * each loaded object.  The aux vector must provide AF_SUN_HWCAPVERIFY,
 	 * as prior to this setting any hardware capabilities that were found
-	 * could not be relied upon.  Set any alternative system capabilities.
+	 * could not be relied upon.
 	 */
 	if (auxflags & AF_SUN_HWCAPVERIFY) {
 		rtld_flags2 |= RT_FL2_HWCAP;
 		org_scapset->sc_hw_1 = (Xword)hwcap_1;
 	}
-	if (cap_alternative() == 0)
-		return (0);
 
 	/*
 	 * Create a mapping descriptor for ld.so.1.  We can determine our
@@ -406,36 +449,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	ldso_plt_init(rlmp);
 
 	/*
-	 * If ld.so.1 has been invoked directly, process its arguments.
-	 */
-	if (ldsoexec) {
-		/*
-		 * Process any arguments that are specific to ld.so.1, and
-		 * reorganize the process stack to effectively remove ld.so.1
-		 * from it.  Reinitialize the environment pointer, as this may
-		 * have been shifted after skipping ld.so.1's arguments.
-		 */
-		if (rtld_getopt(argv, &envp, &auxv, &(lml_main.lm_flags),
-		    &(lml_main.lm_tflags), (aoutdyn != 0)) == 1) {
-			eprintf(&lml_main, ERR_NONE, MSG_INTL(MSG_USG_BADOPT));
-			return (0);
-		}
-		_environ = envp;
-
-		/*
-		 * Open the object that ld.so.1 is to execute.
-		 */
-		argvname = execname = argv[0];
-
-		if ((fd = open(argvname, O_RDONLY)) == -1) {
-			int	err = errno;
-			eprintf(&lml_main, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
-			    argvname, strerror(err));
-			return (0);
-		}
-	}
-
-	/*
 	 * Map in the file, if exec has not already done so, or if the file
 	 * was passed as an argument to an explicit execution of ld.so.1 from
 	 * the command line.
@@ -446,6 +459,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 * the file descriptor.
 		 */
 		(void) rtld_fstat(fd, &status);
+		fdm.fd_oname = argvname;
 		fdm.fd_ftp = map_obj(&lml_main, &fdm, status.st_size, argvname,
 		    fd, &rej);
 		(void) close(fd);
@@ -724,34 +738,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		return (0);
 	procname = str;
 
-#if	defined(_ELF64)
-	/*
-	 * If this is a 64-bit process, determine whether this process has
-	 * restricted the process address space to 32-bits.  Any dependencies
-	 * that are restricted to a 32-bit address space can only be loaded if
-	 * the executable has established this requirement.
-	 */
-	if (CAPSET(mlmp).sc_sf_1 & SF1_SUNW_ADDR32)
-		rtld_flags2 |= RT_FL2_ADDR32;
-#endif
-	/*
-	 * Establish any alternative capabilities, and validate this object
-	 * if it defines it's own capabilities information.
-	 */
-	if (cap_check_lmp(mlmp, &rej) == 0) {
-		if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
-			/* LINTED */
-			(void) printf(MSG_INTL(ldd_warn[rej.rej_type]),
-			    NAME(mlmp), rej.rej_str);
-		} else {
-			/* LINTED */
-			eprintf(&lml_main, ERR_FATAL,
-			    MSG_INTL(err_reject[rej.rej_type]),
-			    NAME(mlmp), rej.rej_str);
-			return (0);
-		}
-	}
-
 	FLAGS(mlmp) |= (FLG_RT_ISMAIN | FLG_RT_MODESET);
 	FLAGS1(mlmp) |= FL1_RT_USED;
 
@@ -825,9 +811,37 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	if (!(rtld_flags & RT_FL_NOCFG)) {
 		if ((features = elf_config(mlmp, (aoutdyn != 0))) == -1)
 			return (0);
+	}
 
-		if (cap_alternative() == 0)
+#if	defined(_ELF64)
+	/*
+	 * If this is a 64-bit process, determine whether this process has
+	 * restricted the process address space to 32-bits.  Any dependencies
+	 * that are restricted to a 32-bit address space can only be loaded if
+	 * the executable has established this requirement.
+	 */
+	if (CAPSET(mlmp).sc_sf_1 & SF1_SUNW_ADDR32)
+		rtld_flags2 |= RT_FL2_ADDR32;
+#endif
+	/*
+	 * Establish any alternative capabilities, and validate this object
+	 * if it defines it's own capabilities information.
+	 */
+	if (cap_alternative() == 0)
+		return (0);
+
+	if (cap_check_lmp(mlmp, &rej) == 0) {
+		if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
+			/* LINTED */
+			(void) printf(MSG_INTL(ldd_warn[rej.rej_type]),
+			    NAME(mlmp), rej.rej_str);
+		} else {
+			/* LINTED */
+			eprintf(&lml_main, ERR_FATAL,
+			    MSG_INTL(err_reject[rej.rej_type]),
+			    NAME(mlmp), rej.rej_str);
 			return (0);
+		}
 	}
 
 	/*

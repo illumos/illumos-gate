@@ -40,7 +40,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.80 {
+SUNWprivate_4.81 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -88,6 +88,8 @@ SUNWprivate_4.80 {
 		Dbg64_cap_filter;
 		Dbg32_cap_id;
 		Dbg64_cap_id;
+		Dbg32_cap_identical;
+		Dbg64_cap_identical;
 		Dbg32_cap_mapfile_title;
 		Dbg64_cap_mapfile_title;
 		Dbg32_cap_post_title;

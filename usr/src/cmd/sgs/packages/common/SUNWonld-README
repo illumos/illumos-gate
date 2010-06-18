@@ -1592,3 +1592,6 @@ Bugid   Risk Synopsis
 6954032 Support library with ld_open and -z allextract in snv_139 do not mix
 6949596 wrong section alignment generated in joint compilation with shared
 	library
+6961755 ld.so.1's -e arguments should take precedence over environment
+	variables. (D)
+6748925 moe returns wrong hwcap library in some circumstances

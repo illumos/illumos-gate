@@ -1183,6 +1183,9 @@
 @ MSG_CAP_FILTER_1	"dir=%s;  capability directory filtered by %s"
 @ MSG_CAP_FILTER_2	"dir=%s;  no capability objects found"
 
+@ MSG_CAP_IDENTICAL	"obj=%s and obj=%s: have identical capabilities: both \
+			 objects ignored"
+
 @ MSG_ELF_HEADER	"ELF Header"
 
 # Capabilities entries.

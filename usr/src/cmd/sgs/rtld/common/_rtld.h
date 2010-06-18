@@ -161,6 +161,7 @@ struct fct {
 #define	AL_CNT_PENDING	2		/* pending tsort list (INITFIRST) */
 #define	AL_CNT_PLTPAD	10		/* plt padding */
 #define	AL_CNT_AUDITORS	2		/* auditing list */
+#define	AL_CNT_ENVIRON	20		/* environment list (enough for ldd) */
 
 /*
  * Size of buffer for building error messages.
@@ -226,6 +227,7 @@ typedef struct {
  */
 struct fdesc {
 	Rt_map		*fd_lmp;	/* existing link-map pointer */
+	Lm_list		*fd_lml;	/* callers link-map list */
 	Fct		*fd_ftp;	/* file functions pointer */
 	const char	*fd_oname;	/* original file name */
 	const char	*fd_odir;	/* original directory name */
@@ -233,11 +235,11 @@ struct fdesc {
 	const char	*fd_pname;	/* new path (resolved) name */
 	dev_t		fd_dev;		/* file device number */
 	rtld_ino_t	fd_ino;		/* file inode number */
-	uint_t		fd_flags;
 	avl_index_t	fd_avlwhere;	/* avl tree insertion index */
 	Syscapset	fd_scapset;	/* capabilities */
 	mmapobj_result_t *fd_mapp;	/* mapping pointer */
 	uint_t		fd_mapn;	/* mapping number */
+	uint_t		fd_flags;
 };
 
 #define	FLG_FD_ALTER	0x0001		/* file is an alternate */
@@ -247,6 +249,7 @@ struct fdesc {
 					/*	checked */
 #define	FLG_FD_ALTCAP	0x0010		/* alternative system capabilities */
 					/*	should be used */
+#define	FLG_FD_IGNORE	0x0020		/* descriptor should be ignored */
 
 /*
  * File descriptor availability flag.
@@ -274,9 +277,10 @@ struct fdesc {
 #define	RT_FL_NOVERSION	0x00000020	/* disable version checking */
 #define	RT_FL_SECURE	0x00000040	/* setuid/segid flag */
 #define	RT_FL_APPLIC	0x00000080	/* are we executing user code */
-
+#define	RT_FL_NOENVIRON	0x00000100	/* don't process environment */
+					/*	variables (ld.so.1 -e) */
 #define	RT_FL_CONFGEN	0x00000200	/* don't relocate initiating object */
-					/*	set by crle(1). */
+					/*	set by crle(1) */
 #define	RT_FL_CONFAPP	0x00000400	/* application specific configuration */
 					/*	cache required */
 #define	RT_FL_DEBUGGER	0x00000800	/* a debugger is monitoring us */
@@ -720,8 +724,9 @@ extern int		platcap_check(Syscapset *, const char *, Rej_desc *);
 extern void		platform_name(Syscapset *);
 extern int		pnavl_recorded(avl_tree_t **, const char *, uint_t,
 			    avl_index_t *);
+extern int		procenv_user(APlist *, Word *, Word *, int);
 extern void		rd_event(Lm_list *, rd_event_e, r_state_e);
-extern int		readenv_user(const char **, Word *, Word *, int);
+extern int		readenv_user(const char **, APlist **);
 extern int		readenv_config(Rtc_env *, Addr, int);
 extern void		rejection_inherit(Rej_desc *, Rej_desc *);
 extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *, Rt_map *,

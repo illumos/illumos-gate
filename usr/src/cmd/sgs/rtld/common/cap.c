@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<sys/types.h>
@@ -43,16 +42,17 @@
  * qsort(3c) capability comparison function.
  */
 static int
-compare(const void *fdp_a, const void *fdp_b)
+compare(const void *vp_a, const void *vp_b)
 {
+	Fdesc	*fdp_a = (Fdesc *)vp_a, *fdp_b = (Fdesc *)vp_b;
 	char	*strcap_a, *strcap_b;
 	Xword	hwcap_a, hwcap_b;
 
 	/*
 	 * First, investigate any platform capability.
 	 */
-	strcap_a = ((Fdesc *)fdp_a)->fd_scapset.sc_plat;
-	strcap_b = ((Fdesc *)fdp_b)->fd_scapset.sc_plat;
+	strcap_a = fdp_a->fd_scapset.sc_plat;
+	strcap_b = fdp_b->fd_scapset.sc_plat;
 
 	if (strcap_a && (strcap_b == NULL))
 		return (-1);
@@ -62,8 +62,8 @@ compare(const void *fdp_a, const void *fdp_b)
 	/*
 	 * Second, investigate any machine capability.
 	 */
-	strcap_a = ((Fdesc *)fdp_a)->fd_scapset.sc_mach;
-	strcap_b = ((Fdesc *)fdp_b)->fd_scapset.sc_mach;
+	strcap_a = fdp_a->fd_scapset.sc_mach;
+	strcap_b = fdp_b->fd_scapset.sc_mach;
 
 	if (strcap_a && (strcap_b == NULL))
 		return (-1);
@@ -73,8 +73,8 @@ compare(const void *fdp_a, const void *fdp_b)
 	/*
 	 * Third, investigate any CA_SUNW_HW_2 hardware capabilities.
 	 */
-	hwcap_a = ((Fdesc *)fdp_a)->fd_scapset.sc_hw_2;
-	hwcap_b = ((Fdesc *)fdp_b)->fd_scapset.sc_hw_2;
+	hwcap_a = fdp_a->fd_scapset.sc_hw_2;
+	hwcap_b = fdp_b->fd_scapset.sc_hw_2;
 
 	if (hwcap_a > hwcap_b)
 		return (-1);
@@ -84,13 +84,28 @@ compare(const void *fdp_a, const void *fdp_b)
 	/*
 	 * Finally, investigate any CA_SUNW_HW_1 hardware capabilities.
 	 */
-	hwcap_a = ((Fdesc *)fdp_a)->fd_scapset.sc_hw_1;
-	hwcap_b = ((Fdesc *)fdp_b)->fd_scapset.sc_hw_1;
+	hwcap_a = fdp_a->fd_scapset.sc_hw_1;
+	hwcap_b = fdp_b->fd_scapset.sc_hw_1;
 
 	if (hwcap_a > hwcap_b)
 		return (-1);
 	if (hwcap_a < hwcap_b)
 		return (1);
+
+	/*
+	 * Normally, a capabilities directory contains one or more capabilities
+	 * files, each with different capabilities.  The role of ld.so.1 is to
+	 * select the best candidate from these variants.  However, we've come
+	 * across cases where files containing the same capabilities have been
+	 * placed in the same capabilities directory.  As we can't tell which
+	 * file is the best, we select neither, and diagnose this suspicious
+	 * scenario.
+	 */
+	DBG_CALL(Dbg_cap_identical(fdp_a->fd_lml, fdp_a->fd_nname,
+	    fdp_b->fd_nname));
+
+	fdp_a->fd_flags |= FLG_FD_IGNORE;
+	fdp_b->fd_flags |= FLG_FD_IGNORE;
 
 	return (0);
 }
@@ -442,7 +457,8 @@ cap_check_fdesc(Fdesc *fdp, Cap *cptr, char *strs, Rej_desc *rej)
 		 * (soname), however try all of the names that this file is
 		 * known by.
 		 */
-		if ((file = strrchr(fdp->fd_oname, '/')) != NULL)
+		if (fdp->fd_oname &&
+		    ((file = strrchr(fdp->fd_oname, '/')) != NULL))
 			file++;
 		else
 			file = NULL;
@@ -504,6 +520,8 @@ cap_dir(Alist **fdalpp, Lm_list *lml, const char *dname, Rt_map *clmp,
 	DIR		*dir;
 	struct dirent	*dirent;
 	Alist		*fdalp = NULL;
+	Aliste		idx;
+	Fdesc		*fdp;
 	int		error = 0;
 
 	/*
@@ -579,6 +597,7 @@ cap_dir(Alist **fdalpp, Lm_list *lml, const char *dname, Rt_map *clmp,
 		 */
 		if (fd.fd_lmp)
 			fd.fd_scapset = CAPSET(fd.fd_lmp);
+		fd.fd_lml = lml;
 
 		/*
 		 * Duplicate the original name, as this may be required for
@@ -611,6 +630,21 @@ cap_dir(Alist **fdalpp, Lm_list *lml, const char *dname, Rt_map *clmp,
 	 * sort them, based on the precedence of their hardware capabilities.
 	 */
 	qsort(fdalp->al_data, fdalp->al_nitems, fdalp->al_size, compare);
+
+	/*
+	 * If any objects were found to have the same capabilities, then these
+	 * objects must be rejected, as we can't tell which object is more
+	 * appropriate.
+	 */
+	for (ALIST_TRAVERSE(fdalp, idx, fdp)) {
+		if (fdp->fd_flags & FLG_FD_IGNORE)
+			alist_delete(fdalp, &idx);
+	}
+
+	if (fdalp->al_nitems == 0) {
+		free_fd(fdalp);
+		return (0);
+	}
 
 	*fdalpp = fdalp;
 	return (1);

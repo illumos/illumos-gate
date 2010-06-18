@@ -78,6 +78,8 @@ void	Dbg32_cap_filter(Lm_list *, const char *, Rt_map *);
 void	Dbg64_cap_filter(Lm_list *, const char *, Rt_map *);
 void	Dbg32_cap_id(Lm_list *, Lineno, const char *, const char *);
 void	Dbg64_cap_id(Lm_list *, Lineno, const char *, const char *);
+void	Dbg32_cap_identical(Lm_list *, const char *, const char *);
+void	Dbg64_cap_identical(Lm_list *, const char *, const char *);
 void	Dbg32_cap_mapfile_title(Lm_list *, Lineno);
 void	Dbg64_cap_mapfile_title(Lm_list *, Lineno);
 void	Dbg32_cap_post_title(Lm_list *, int *);

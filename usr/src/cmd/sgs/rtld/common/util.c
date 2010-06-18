@@ -52,8 +52,6 @@
 #include	"_elf.h"
 #include	"msg.h"
 
-static int ld_flags_env(const char *, Word *, Word *, uint_t, int);
-
 /*
  * Null function used as place where a debugger can set a breakpoint.
  */
@@ -279,62 +277,6 @@ stack_cleanup(char **argv, char ***envp, auxv_t **auxv, int rmcnt)
  */
 #error	unsupported architecture!
 #endif
-
-/*
- * The only command line argument recognized is -e, followed by a runtime
- * linker environment variable.
- */
-int
-rtld_getopt(char **argv, char ***envp, auxv_t **auxv, Word *lmflags,
-    Word *lmtflags, int aout)
-{
-	int	ndx;
-
-	for (ndx = 1; argv[ndx]; ndx++) {
-		char	*str;
-
-		if (argv[ndx][0] != '-')
-			break;
-
-		if (argv[ndx][1] == '\0') {
-			ndx++;
-			break;
-		}
-
-		if (argv[ndx][1] != 'e')
-			return (1);
-
-		if (argv[ndx][2] == '\0') {
-			ndx++;
-			if (argv[ndx] == NULL)
-				return (1);
-			str = argv[ndx];
-		} else
-			str = &argv[ndx][2];
-
-		/*
-		 * If the environment variable starts with LD_, strip the LD_.
-		 * Otherwise, take things as is.
-		 */
-		if ((str[0] == 'L') && (str[1] == 'D') && (str[2] == '_') &&
-		    (str[3] != '\0'))
-			str += 3;
-		if (ld_flags_env(str, lmflags, lmtflags, 0, aout) == 1)
-			return (1);
-	}
-
-	/*
-	 * Make sure an object file has been specified.
-	 */
-	if (argv[ndx] == NULL)
-		return (1);
-
-	/*
-	 * Having gotten the arguments, clean ourselves off of the stack.
-	 */
-	stack_cleanup(argv, envp, auxv, ndx);
-	return (0);
-}
 
 /*
  * Compare function for PathNode AVL tree.
@@ -748,7 +690,6 @@ call_array(Addr *array, uint_t arraysz, Rt_map *lmp, Word shtype)
 	}
 }
 
-
 /*
  * Execute any .init sections.  These are passed to us in an lmp array which
  * (by default) will have been sorted.
@@ -1017,7 +958,6 @@ atexit_fini()
 
 	leave(&lml_main, 0);
 }
-
 
 /*
  * This routine is called to complete any runtime linker activity which may have
@@ -1399,24 +1339,30 @@ create_cntl(Lm_list *lml, int dlopen)
  * Environment variables can be defined without a value (ie. LD_XXXX=) so as to
  * override any replaceable environment variables from a configuration file.
  */
-static	u_longlong_t		rplgen;		/* replaceable generic */
+static	u_longlong_t		rplgen = 0;	/* replaceable generic */
 						/*	variables */
-static	u_longlong_t		rplisa;		/* replaceable ISA specific */
+static	u_longlong_t		rplisa = 0;	/* replaceable ISA specific */
 						/*	variables */
-static	u_longlong_t		prmgen;		/* permanent generic */
+static	u_longlong_t		prmgen = 0;	/* permanent generic */
 						/*	variables */
-static	u_longlong_t		prmisa;		/* permanent ISA specific */
+static	u_longlong_t		prmisa = 0;	/* permanent ISA specific */
 						/*	variables */
+static	u_longlong_t		cmdgen = 0;	/* command line (-e) generic */
+						/*	variables */
+static	u_longlong_t		cmdisa = 0;	/* command line (-e) ISA */
+						/*	specific variables */
 
 /*
  * Classify an environment variables type.
  */
-#define	ENV_TYP_IGNORE		0x1		/* ignore - variable is for */
+#define	ENV_TYP_IGNORE		0x01		/* ignore - variable is for */
 						/*	the wrong ISA */
-#define	ENV_TYP_ISA		0x2		/* variable is ISA specific */
-#define	ENV_TYP_CONFIG		0x4		/* variable obtained from a */
+#define	ENV_TYP_ISA		0x02		/* variable is ISA specific */
+#define	ENV_TYP_CONFIG		0x04		/* variable obtained from a */
 						/*	config file */
-#define	ENV_TYP_PERMANT		0x8		/* variable is permanent */
+#define	ENV_TYP_PERMANT		0x08		/* variable is permanent */
+#define	ENV_TYP_CMDLINE		0x10		/* variable provide with -e */
+#define	ENV_TYP_NULL		0x20		/* variable is null */
 
 /*
  * Identify all environment variables.
@@ -1466,6 +1412,7 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 #define	ENV_FLG_PLATCAP		0x0040000000000ULL
 #define	ENV_FLG_CAP_FILES	0x0080000000000ULL
 #define	ENV_FLG_DEFERRED	0x0100000000000ULL
+#define	ENV_FLG_NOENVIRON	0x0200000000000ULL
 
 #define	SEL_REPLACE		0x0001
 #define	SEL_PERMANT		0x0002
@@ -1779,6 +1726,14 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			select |= SEL_ACT_LML;
 			val = LML_FLG_TRC_NOPAREXT;
 			variable = ENV_FLG_NOPAREXT;
+		} else if ((len == MSG_LD_NOENVIRON_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_NOENVIRON), MSG_LD_NOENVIRON_SIZE) == 0)) {
+			/*
+			 * LD_NOENVIRON can only be set with ld.so.1 -e.
+			 */
+			select |= SEL_ACT_RT;
+			val = RT_FL_NOENVIRON;
+			variable = ENV_FLG_NOENVIRON;
 		}
 	}
 	/*
@@ -1929,6 +1884,22 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		return;
 
 	/*
+	 * If this variable has already been set via the command line, then
+	 * ignore this variable.  The command line, -e, takes precedence.
+	 */
+	if (env_flags & ENV_TYP_ISA) {
+		if (cmdisa & variable)
+			return;
+		if (env_flags & ENV_TYP_CMDLINE)
+			cmdisa |= variable;
+	} else {
+		if (cmdgen & variable)
+			return;
+		if (env_flags & ENV_TYP_CMDLINE)
+			cmdgen |= variable;
+	}
+
+	/*
 	 * Mark the appropriate variables.
 	 */
 	if (env_flags & ENV_TYP_ISA) {
@@ -1968,7 +1939,10 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		else
 			rtld_flags2 &= ~val;
 	} else if (select & SEL_ACT_STR) {
-		*str = s2;
+		if (env_flags & ENV_TYP_NULL)
+			*str = NULL;
+		else
+			*str = s2;
 	} else if (select & SEL_ACT_LML) {
 		if (s2)
 			*lmflags |= val;
@@ -1983,7 +1957,10 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		/*
 		 * variable is either ENV_FLG_FLAGS or ENV_FLG_LIBPATH
 		 */
-		*str = s2;
+		if (env_flags & ENV_TYP_NULL)
+			*str = NULL;
+		else
+			*str = s2;
 		if ((select & SEL_REPLACE) && (env_flags & ENV_TYP_CONFIG)) {
 			if (s2) {
 				if (variable == ENV_FLG_FLAGS)
@@ -2109,13 +2086,14 @@ ld_arch_env(const char *s1, size_t *len)
 	return (0);
 }
 
-
 /*
  * Process an LD_FLAGS environment variable.  The value can be a comma
  * separated set of tokens, which are sent (in upper case) into the generic
  * LD_XXXX environment variable engine.  For example:
  *
+ *	LD_FLAGS=bind_now=		->	LD_BIND_NOW=
  *	LD_FLAGS=bind_now		->	LD_BIND_NOW=1
+ *	LD_FLAGS=library_path=		->	LD_LIBRARY_PATH=
  *	LD_FLAGS=library_path=/foo:.	->	LD_LIBRARY_PATH=/foo:.
  *	LD_FLAGS=debug=files:detail	->	LD_DEBUG=files:detail
  * or
@@ -2141,7 +2119,7 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
 	(void) strcpy(nstr, str);
 
 	for (sstr = nstr; sstr; sstr++, len--) {
-		int	flags;
+		int	flags = 0;
 
 		if ((*sstr != '\0') && (*sstr != ',')) {
 			if (estr == NULL) {
@@ -2161,165 +2139,279 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
 		}
 
 		*sstr = '\0';
-		if (estr) {
-			nlen = estr - nstr;
-			if ((*++estr == '\0') || (*estr == ','))
-				estr = NULL;
-		} else
-			nlen = sstr - nstr;
 
 		/*
-		 * Fabricate a boolean definition for any unqualified variable.
-		 * Thus LD_FLAGS=bind_now is represented as BIND_NOW=(null).
-		 * The value is sufficient to assert any boolean variables, plus
-		 * the term "(null)" is specifically chosen in case someone
-		 * mistakenly supplies something like LD_FLAGS=library_path.
+		 * Have we discovered an "=" string.
 		 */
-		if (estr == NULL)
-			estr = (char *)MSG_INTL(MSG_STR_NULL);
+		if (estr) {
+			nlen = estr - nstr;
+
+			/*
+			 * If this is an unqualified "=", then this variable
+			 * is intended to ensure a feature is disabled.
+			 */
+			if ((*++estr == '\0') || (*estr == ','))
+				estr = NULL;
+		} else {
+			nlen = sstr - nstr;
+
+			/*
+			 * If there is no "=" found, fabricate a boolean
+			 * definition for any unqualified variable.  Thus,
+			 * LD_FLAGS=bind_now is represented as BIND_NOW=1.
+			 * The value "1" is sufficient to assert any boolean
+			 * variables.  Setting of ENV_TYP_NULL ensures any
+			 * string usage is reset to a NULL string, thus
+			 * LD_FLAGS=library_path is equivalent to
+			 * LIBRARY_PATH='\0'.
+			 */
+			flags |= ENV_TYP_NULL;
+			estr = (char *)MSG_ORIG(MSG_STR_ONE);
+		}
 
 		/*
 		 * Determine whether the environment variable is 32- or 64-bit
 		 * specific.  The length, len, will reflect the architecture
 		 * neutral portion of the string.
 		 */
-		if ((flags = ld_arch_env(nstr, &nlen)) != ENV_TYP_IGNORE) {
+		if ((flags |= ld_arch_env(nstr, &nlen)) != ENV_TYP_IGNORE) {
 			ld_generic_env(nstr, nlen, estr, lmflags,
 			    lmtflags, (env_flags | flags), aout);
 		}
 		if (len == 0)
-			return (0);
+			break;
 
 		nstr = sstr + 1;
 		estr = NULL;
 	}
+
 	return (0);
 }
 
+/*
+ * Variant of getopt(), intended for use when ld.so.1 is invoked directly
+ * from the command line.  The only command line option allowed is -e followed
+ * by a runtime linker environment variable.
+ */
+int
+rtld_getopt(char **argv, char ***envp, auxv_t **auxv, Word *lmflags,
+    Word *lmtflags, int aout)
+{
+	int	ndx;
+
+	for (ndx = 1; argv[ndx]; ndx++) {
+		char	*str;
+
+		if (argv[ndx][0] != '-')
+			break;
+
+		if (argv[ndx][1] == '\0') {
+			ndx++;
+			break;
+		}
+
+		if (argv[ndx][1] != 'e')
+			return (1);
+
+		if (argv[ndx][2] == '\0') {
+			ndx++;
+			if (argv[ndx] == NULL)
+				return (1);
+			str = argv[ndx];
+		} else
+			str = &argv[ndx][2];
+
+		/*
+		 * If the environment variable starts with LD_, strip the LD_.
+		 * Otherwise, take things as is.  Indicate that this variable
+		 * originates from the command line, as these variables take
+		 * precedence over any environment variables, or configuration
+		 * file variables.
+		 */
+		if ((str[0] == 'L') && (str[1] == 'D') && (str[2] == '_') &&
+		    (str[3] != '\0'))
+			str += 3;
+		if (ld_flags_env(str, lmflags, lmtflags,
+		    ENV_TYP_CMDLINE, aout) == 1)
+			return (1);
+	}
+
+	/*
+	 * Make sure an object file has been specified.
+	 */
+	if (argv[ndx] == NULL)
+		return (1);
+
+	/*
+	 * Having gotten the arguments, clean ourselves off of the stack.
+	 * This results in a process that looks as if it was executed directly
+	 * from the application.
+	 */
+	stack_cleanup(argv, envp, auxv, ndx);
+	return (0);
+}
 
 /*
- * Process a single environment string.  Only strings starting with `LD_' are
- * reserved for our use.  By convention, all strings should be of the form
- * `LD_XXXX=', if the string is followed by a non-null value the appropriate
- * functionality is enabled.  Also pick off applicable locale variables.
+ * Process a single LD_XXXX string.
  */
-#define	LOC_LANG	1
-#define	LOC_MESG	2
-#define	LOC_ALL		3
-
 static void
 ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
     int aout)
 {
 	const char	*s2;
-	static		size_t	loc = 0;
-
-	if (*s1++ != 'L')
-		return;
+	size_t		len;
+	int		flags;
 
 	/*
-	 * See if we have any locale environment settings.  These environment
-	 * variables have a precedence, LC_ALL is higher than LC_MESSAGES which
-	 * is higher than LANG.
+	 * In a branded process we must ignore all LD_XXXX variables because
+	 * they are intended for the brand's linker.  To affect the native
+	 * linker, use LD_BRAND_XXXX instead.
 	 */
-	s2 = s1;
-	if ((*s2++ == 'C') && (*s2++ == '_') && (*s2 != '\0')) {
-		if (strncmp(s2, MSG_ORIG(MSG_LC_ALL), MSG_LC_ALL_SIZE) == 0) {
-			s2 += MSG_LC_ALL_SIZE;
-			if ((*s2 != '\0') && (loc < LOC_ALL)) {
-				glcs[CI_LCMESSAGES].lc_un.lc_ptr = (char *)s2;
-				loc = LOC_ALL;
-			}
-		} else if (strncmp(s2, MSG_ORIG(MSG_LC_MESSAGES),
-		    MSG_LC_MESSAGES_SIZE) == 0) {
-			s2 += MSG_LC_MESSAGES_SIZE;
-			if ((*s2 != '\0') && (loc < LOC_MESG)) {
-				glcs[CI_LCMESSAGES].lc_un.lc_ptr = (char *)s2;
-				loc = LOC_MESG;
-			}
-		}
-		return;
-	}
-
-	s2 = s1;
-	if ((*s2++ == 'A') && (*s2++ == 'N') && (*s2++ == 'G') &&
-	    (*s2++ == '=') && (*s2 != '\0') && (loc < LOC_LANG)) {
-		glcs[CI_LCMESSAGES].lc_un.lc_ptr = (char *)s2;
-		loc = LOC_LANG;
-		return;
-	}
-
-	/*
-	 * Pick off any LD_XXXX environment variables.
-	 */
-	if ((*s1++ == 'D') && (*s1++ == '_') && (*s1 != '\0')) {
-		size_t	len;
-		int	flags;
-
-		/*
-		 * In a branded process we must ignore all LD_XXXX env vars
-		 * because they are intended for the brand's linker.
-		 * To affect the Solaris linker, use LD_BRAND_XXXX instead.
-		 */
-		if (rtld_flags2 & RT_FL2_BRANDED) {
-			if (strncmp(s1, MSG_ORIG(MSG_LD_BRAND_PREFIX),
-			    MSG_LD_BRAND_PREFIX_SIZE) != 0)
-				return;
-			s1 += MSG_LD_BRAND_PREFIX_SIZE;
-		}
-
-		/*
-		 * Environment variables with no value (ie. LD_XXXX=) typically
-		 * have no impact, however if environment variables are defined
-		 * within a configuration file, these null user settings can be
-		 * used to disable any configuration replaceable definitions.
-		 */
-		if ((s2 = strchr(s1, '=')) == NULL) {
-			len = strlen(s1);
-			s2 = NULL;
-		} else if (*++s2 == '\0') {
-			len = strlen(s1) - 1;
-			s2 = NULL;
-		} else {
-			len = s2 - s1 - 1;
-			while (conv_strproc_isspace(*s2))
-				s2++;
-		}
-
-		/*
-		 * Determine whether the environment variable is 32- or 64-bit
-		 * specific.  The length, len, will reflect the architecture
-		 * neutral portion of the string.
-		 */
-		if ((flags = ld_arch_env(s1, &len)) == ENV_TYP_IGNORE)
+	if (rtld_flags2 & RT_FL2_BRANDED) {
+		if (strncmp(s1, MSG_ORIG(MSG_LD_BRAND_PREFIX),
+		    MSG_LD_BRAND_PREFIX_SIZE) != 0)
 			return;
-		env_flags |= flags;
-
-		ld_generic_env(s1, len, s2, lmflags, lmtflags, env_flags, aout);
+		s1 += MSG_LD_BRAND_PREFIX_SIZE;
 	}
+
+	/*
+	 * Variables with no value (ie. LD_XXXX=) turn a capability off.
+	 */
+	if ((s2 = strchr(s1, '=')) == NULL) {
+		len = strlen(s1);
+		s2 = NULL;
+	} else if (*++s2 == '\0') {
+		len = strlen(s1) - 1;
+		s2 = NULL;
+	} else {
+		len = s2 - s1 - 1;
+		while (conv_strproc_isspace(*s2))
+			s2++;
+	}
+
+	/*
+	 * Determine whether the environment variable is 32-bit or 64-bit
+	 * specific.  The length, len, will reflect the architecture neutral
+	 * portion of the string.
+	 */
+	if ((flags = ld_arch_env(s1, &len)) == ENV_TYP_IGNORE)
+		return;
+	env_flags |= flags;
+
+	ld_generic_env(s1, len, s2, lmflags, lmtflags, env_flags, aout);
 }
 
 /*
  * Internal getenv routine.  Called immediately after ld.so.1 initializes
- * itself.
+ * itself to process any locale specific environment variables, and collect
+ * any LD_XXXX variables for later processing.
+ */
+#define	LOC_LANG	1
+#define	LOC_MESG	2
+#define	LOC_ALL		3
+
+int
+readenv_user(const char **envp, APlist **ealpp)
+{
+	char		*locale;
+	const char	*s1;
+	int		loc = 0;
+
+	for (s1 = *envp; s1; envp++, s1 = *envp) {
+		const char	*s2;
+
+		if (*s1++ != 'L')
+			continue;
+
+		/*
+		 * See if we have any locale environment settings.  These
+		 * environment variables have a precedence, LC_ALL is higher
+		 * than LC_MESSAGES which is higher than LANG.
+		 */
+		s2 = s1;
+		if ((*s2++ == 'C') && (*s2++ == '_') && (*s2 != '\0')) {
+			if (strncmp(s2, MSG_ORIG(MSG_LC_ALL),
+			    MSG_LC_ALL_SIZE) == 0) {
+				s2 += MSG_LC_ALL_SIZE;
+				if ((*s2 != '\0') && (loc < LOC_ALL)) {
+					glcs[CI_LCMESSAGES].lc_un.lc_ptr =
+					    (char *)s2;
+					loc = LOC_ALL;
+				}
+			} else if (strncmp(s2, MSG_ORIG(MSG_LC_MESSAGES),
+			    MSG_LC_MESSAGES_SIZE) == 0) {
+				s2 += MSG_LC_MESSAGES_SIZE;
+				if ((*s2 != '\0') && (loc < LOC_MESG)) {
+					glcs[CI_LCMESSAGES].lc_un.lc_ptr =
+					    (char *)s2;
+					loc = LOC_MESG;
+				}
+			}
+			continue;
+		}
+
+		s2 = s1;
+		if ((*s2++ == 'A') && (*s2++ == 'N') && (*s2++ == 'G') &&
+		    (*s2++ == '=') && (*s2 != '\0') && (loc < LOC_LANG)) {
+			glcs[CI_LCMESSAGES].lc_un.lc_ptr = (char *)s2;
+			loc = LOC_LANG;
+			continue;
+		}
+
+		/*
+		 * Pick off any LD_XXXX environment variables.
+		 */
+		if ((*s1++ == 'D') && (*s1++ == '_') && (*s1 != '\0')) {
+			if (aplist_append(ealpp, s1, AL_CNT_ENVIRON) == NULL)
+				return (1);
+		}
+	}
+
+	/*
+	 * If we have a locale setting make sure it's worth processing further.
+	 * C and POSIX locales don't need any processing.  In addition, to
+	 * ensure no one escapes the /usr/lib/locale hierarchy, don't allow
+	 * the locale to contain a segment that leads upward in the file system
+	 * hierarchy (i.e. no '..' segments).   Given that we'll be confined to
+	 * the /usr/lib/locale hierarchy, there is no need to extensively
+	 * validate the mode or ownership of any message file (as libc's
+	 * generic handling of message files does), or be concerned with
+	 * symbolic links that might otherwise send us elsewhere.  Duplicate
+	 * the string so that new locale setting can generically cleanup any
+	 * previous locales.
+	 */
+	if ((locale = glcs[CI_LCMESSAGES].lc_un.lc_ptr) != NULL) {
+		if (((*locale == 'C') && (*(locale + 1) == '\0')) ||
+		    (strcmp(locale, MSG_ORIG(MSG_TKN_POSIX)) == 0) ||
+		    (strstr(locale, MSG_ORIG(MSG_TKN_DOTDOT)) != NULL))
+			glcs[CI_LCMESSAGES].lc_un.lc_ptr = NULL;
+		else
+			glcs[CI_LCMESSAGES].lc_un.lc_ptr = strdup(locale);
+	}
+	return (0);
+}
+
+/*
+ * Process any LD_XXXX environment variables collected by readenv_user().
  */
 int
-readenv_user(const char **envp, Word *lmflags, Word *lmtflags, int aout)
+procenv_user(APlist *ealp, Word *lmflags, Word *lmtflags, int aout)
 {
-	char	*locale;
+	Aliste		idx;
+	const char	*s1;
 
-	if (envp == NULL)
-		return (0);
-
-	while (*envp != NULL)
-		ld_str_env(*envp++, lmflags, lmtflags, 0, aout);
+	for (APLIST_TRAVERSE(ealp, idx, s1))
+		ld_str_env(s1, lmflags, lmtflags, 0, aout);
 
 	/*
 	 * Having collected the best representation of any LD_FLAGS, process
 	 * these strings.
 	 */
-	if (ld_flags_env(rpl_ldflags, lmflags, lmtflags, 0, aout) == 1)
-		return (1);
+	if (rpl_ldflags) {
+		if (ld_flags_env(rpl_ldflags, lmflags, lmtflags, 0, aout) == 1)
+			return (1);
+		rpl_ldflags = NULL;
+	}
 
 	/*
 	 * Don't allow environment controlled auditing when tracing or if
@@ -2345,25 +2437,6 @@ readenv_user(const char **envp, Word *lmflags, Word *lmtflags, int aout)
 	    (LML_FLG_TRC_WARN | LML_FLG_TRC_LDDSTUB)) == LML_FLG_TRC_WARN)
 		*lmflags |= LML_FLG_TRC_NOPAREXT;
 
-	/*
-	 * If we have a locale setting make sure its worth processing further.
-	 * C and POSIX locales don't need any processing.  In addition, to
-	 * ensure no one escapes the /usr/lib/locale hierarchy, don't allow
-	 * the locale to contain a segment that leads upward in the file system
-	 * hierarchy (i.e. no '..' segments).   Given that we'll be confined to
-	 * the /usr/lib/locale hierarchy, there is no need to extensively
-	 * validate the mode or ownership of any message file (as libc's
-	 * generic handling of message files does).  Duplicate the string so
-	 * that new locale setting can generically cleanup any previous locales.
-	 */
-	if ((locale = glcs[CI_LCMESSAGES].lc_un.lc_ptr) != NULL) {
-		if (((*locale == 'C') && (*(locale + 1) == '\0')) ||
-		    (strcmp(locale, MSG_ORIG(MSG_TKN_POSIX)) == 0) ||
-		    (strstr(locale, MSG_ORIG(MSG_TKN_DOTDOT)) != NULL))
-			glcs[CI_LCMESSAGES].lc_un.lc_ptr = NULL;
-		else
-			glcs[CI_LCMESSAGES].lc_un.lc_ptr = strdup(locale);
-	}
 	return (0);
 }
 
@@ -2374,20 +2447,23 @@ readenv_user(const char **envp, Word *lmflags, Word *lmtflags, int aout)
 int
 readenv_config(Rtc_env * envtbl, Addr addr, int aout)
 {
-	Word	*lmflags = &(lml_main.lm_flags);
-	Word	*lmtflags = &(lml_main.lm_tflags);
+	Word		*lmflags = &(lml_main.lm_flags);
+	Word		*lmtflags = &(lml_main.lm_tflags);
 
 	if (envtbl == NULL)
 		return (0);
 
 	while (envtbl->env_str) {
-		uint_t	env_flags = ENV_TYP_CONFIG;
+		uint_t		env_flags = ENV_TYP_CONFIG;
+		const char	*s1 = (const char *)(envtbl->env_str + addr);
 
 		if (envtbl->env_flags & RTC_ENV_PERMANT)
 			env_flags |= ENV_TYP_PERMANT;
 
-		ld_str_env((const char *)(envtbl->env_str + addr),
-		    lmflags, lmtflags, env_flags, 0);
+		if ((*s1++ == 'L') && (*s1++ == 'D') &&
+		    (*s1++ == '_') && (*s1 != '\0'))
+			ld_str_env(s1, lmflags, lmtflags, env_flags, 0);
+
 		envtbl++;
 	}
 
@@ -2957,7 +3033,6 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	lock = 0;
 }
 
-
 #if	DEBUG
 /*
  * Provide assfail() for ASSERT() statements.  See <sys/debug.h> for further
@@ -3522,9 +3597,17 @@ int
 is_rtld_setuid()
 {
 	rtld_stat_t	status;
+	const char	*name;
 
-	if ((rtld_flags2 & RT_FL2_SETUID) ||
-	    ((rtld_stat(NAME(lml_rtld.lm_head), &status) == 0) &&
+	if (rtld_flags2 & RT_FL2_SETUID)
+		return (1);
+
+	if (interp && interp->i_name)
+		name = interp->i_name;
+	else
+		name = NAME(lml_rtld.lm_head);
+
+	if (((rtld_stat(name, &status) == 0) &&
 	    (status.st_uid == 0) && (status.st_mode & S_ISUID))) {
 		rtld_flags2 |= RT_FL2_SETUID;
 		return (1);

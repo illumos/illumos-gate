@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
@@ -51,6 +50,15 @@ Dbg_cap_filter(Lm_list *lml, const char *dir, Rt_map *flmp)
 		dbg_print(lml, MSG_INTL(MSG_CAP_FILTER_1), dir, NAME(flmp));
 	else
 		dbg_print(lml, MSG_INTL(MSG_CAP_FILTER_2), dir);
+}
+
+void
+Dbg_cap_identical(Lm_list *lml, const char *file1, const char *file2)
+{
+	if (DBG_NOTCLASS(DBG_C_CAP | DBG_C_FILES))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_CAP_IDENTICAL), file1, file2);
 }
 
 void

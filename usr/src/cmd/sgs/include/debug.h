@@ -295,6 +295,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_cap_candidate	Dbg64_cap_candidate
 #define	Dbg_cap_filter		Dbg64_cap_filter
 #define	Dbg_cap_id		Dbg64_cap_id
+#define	Dbg_cap_identical	Dbg64_cap_identical
 #define	Dbg_cap_mapfile_title	Dbg64_cap_mapfile_title
 #define	Dbg_cap_post_title	Dbg64_cap_post_title
 #define	Dbg_cap_sec_title	Dbg64_cap_sec_title
@@ -527,6 +528,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_cap_candidate	Dbg32_cap_candidate
 #define	Dbg_cap_filter		Dbg32_cap_filter
 #define	Dbg_cap_id		Dbg32_cap_id
+#define	Dbg_cap_identical	Dbg32_cap_identical
 #define	Dbg_cap_mapfile_title	Dbg32_cap_mapfile_title
 #define	Dbg_cap_post_title	Dbg32_cap_post_title
 #define	Dbg_cap_sec_title	Dbg32_cap_sec_title
@@ -789,6 +791,7 @@ extern	void	Dbg_bind_weak(Rt_map *, Addr, Addr, const char *);
 extern	void	Dbg_cap_candidate(Lm_list *, const char *);
 extern	void	Dbg_cap_filter(Lm_list *, const char *, Rt_map *);
 extern	void	Dbg_cap_id(Lm_list *, Lineno, const char *, const char *);
+extern	void	Dbg_cap_identical(Lm_list *, const char *, const char *);
 extern	void	Dbg_cap_mapfile_title(Lm_list *, Lineno);
 extern	void	Dbg_cap_post_title(Lm_list *, int *);
 extern	void	Dbg_cap_sec_title(Lm_list *, const char *);
