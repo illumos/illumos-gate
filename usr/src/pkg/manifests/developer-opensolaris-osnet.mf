@@ -55,6 +55,8 @@ depend fmri=library/security/trousers@0.3.2-0.133 type=require
 depend fmri=library/tooltalk@0.5.11-0.133 type=require
 depend fmri=package/svr4@0.5.11-0.133 type=require
 depend fmri=runtime/perl-584/extra@5.8.4-0.133 type=require
+depend fmri=runtime/perl-510@5.10.0-0.133 type=require
+depend fmri=runtime/perl-510/extra@5.10.0-0.133 type=require
 depend fmri=storage/svm@0.5.11-0.133 type=require
 depend fmri=system/data/terminfo@0.5.11-0.133 type=require
 depend fmri=system/header@0.5.11-0.133 type=require
