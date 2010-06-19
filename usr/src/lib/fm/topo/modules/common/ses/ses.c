@@ -1128,7 +1128,6 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 {
 	topo_mod_t *mod = sdp->sed_mod;
 	uint64_t status;
-	nvlist_t **sas;
 	uint_t s, nsas;
 	char **paths;
 	int err, ret;
@@ -1164,11 +1163,9 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	 * Look through all SAS addresses and attempt to correlate them to a
 	 * known Solaris device.  If we don't find a matching node, then we
 	 * don't enumerate the disk node.
+	 * Note that TOPO_PROP_SAS_ADDR prop includes SAS address from
+	 * alternate elements that represent the same device.
 	 */
-	if (nvlist_lookup_nvlist_array(props, SES_SAS_PROP_PHYS,
-	    &sas, &nsas) != 0)
-		return (0);
-
 	if (topo_prop_get_string_array(pnode, TOPO_PGROUP_SES,
 	    TOPO_PROP_SAS_ADDR, &paths, &nsas, &err) != 0)
 		return (0);
