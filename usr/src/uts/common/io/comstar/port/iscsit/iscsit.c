@@ -1096,12 +1096,15 @@ iscsit_build_hdr(idm_task_t *idm_task, idm_pdu_t *pdu, uint8_t opcode)
 	 */
 	ASSERT(MUTEX_HELD(&itask->it_ict->ict_sess->ist_sn_mutex));
 	/*
-	 * Lun is only required if the opcode == ISCSI_OP_SCSI_DATA_RSP
-	 * and the 'A' bit is to be set
+	 * On incoming data, the target transfer tag and Lun is only
+	 * provided by the target if the A bit is set, Since the target
+	 * does not currently support Error Recovery Level 1, the A
+	 * bit is never set.
 	 */
 	dh->opcode = opcode;
 	dh->itt = itask->it_itt;
-	dh->ttt = itask->it_ttt;
+	dh->ttt = ((opcode & ISCSI_OPCODE_MASK) == ISCSI_OP_SCSI_DATA_RSP) ?
+	    ISCSI_RSVD_TASK_TAG : itask->it_ttt;
 
 	dh->expcmdsn = htonl(itask->it_ict->ict_sess->ist_expcmdsn);
 	dh->maxcmdsn = htonl(itask->it_ict->ict_sess->ist_maxcmdsn);
