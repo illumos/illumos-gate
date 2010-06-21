@@ -635,6 +635,7 @@ ipcl_conn_destroy(conn_t *connp)
 
 	ASSERT(!MUTEX_HELD(&connp->conn_lock));
 	ASSERT(connp->conn_ref == 0);
+	ASSERT(connp->conn_ioctlref == 0);
 
 	DTRACE_PROBE1(conn__destroy, conn_t *, connp);
 

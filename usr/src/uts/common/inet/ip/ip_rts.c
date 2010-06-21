@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1206,6 +1205,7 @@ done:
 	(connp->conn_recv)(connp, ioc_mp, NULL, NULL);
 
 	/* conn was refheld in ip_wput_ioctl. */
+	CONN_DEC_IOCTLREF(connp);
 	CONN_OPER_PENDING_DONE(connp);
 
 	return (error);

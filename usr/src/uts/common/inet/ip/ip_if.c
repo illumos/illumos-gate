@@ -8551,15 +8551,16 @@ ip_sioctl_plink(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	err = ip_sioctl_plink_ipmod(ipsq, q, mp, ioccmd, li);
 	if (err == EINPROGRESS)
 		return;
-done:
 	if (err == 0)
 		miocack(q, mp, 0, 0);
 	else
 		miocnak(q, mp, 0, err);
 
 	/* Conn was refheld in ip_sioctl_copyin_setup */
-	if (CONN_Q(q))
+	if (CONN_Q(q)) {
+		CONN_DEC_IOCTLREF(Q_TO_CONN(q));
 		CONN_OPER_PENDING_DONE(Q_TO_CONN(q));
+	}
 }
 
 /*
@@ -9150,8 +9151,10 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 		 * Request can be enqueued in the 'ipsq' while waiting
 		 * to become exclusive. So bump up the conn ref.
 		 */
-		if (CONN_Q(q))
+		if (CONN_Q(q)) {
 			CONN_INC_REF(Q_TO_CONN(q));
+			CONN_INC_IOCTLREF(Q_TO_CONN(q))
+		}
 		ip_sioctl_plink(NULL, q, mp, NULL);
 		return;
 
@@ -11690,6 +11693,7 @@ ip_wput_ioctl(queue_t *q, mblk_t *mp)
 	ASSERT(CONN_Q(q));
 	connp = Q_TO_CONN(q);
 	CONN_INC_REF(connp);
+	CONN_INC_IOCTLREF(connp);
 	if (ipft->ipft_pfi &&
 	    ((mp1->b_wptr - mp1->b_rptr) >= ipft->ipft_min_size ||
 	    pullupmsg(mp1, ipft->ipft_min_size))) {
@@ -11704,6 +11708,7 @@ ip_wput_ioctl(queue_t *q, mblk_t *mp)
 		return;
 	}
 
+	CONN_DEC_IOCTLREF(connp);
 	CONN_OPER_PENDING_DONE(connp);
 	if (ipft->ipft_flags & IPFT_F_NO_REPLY) {
 		freemsg(mp);
