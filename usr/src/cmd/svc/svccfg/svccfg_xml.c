@@ -319,23 +319,24 @@ lxml_element_to_type(element_t type)
 	/* NOTREACHED */
 }
 
-static scf_type_t
-lxml_element_to_scf_type(element_t type)
+static element_t
+lxml_type_to_element(scf_type_t type)
 {
 	switch (type) {
-	case SC_ASTRING:	return (SCF_TYPE_ASTRING);
-	case SC_BOOLEAN:	return (SCF_TYPE_BOOLEAN);
-	case SC_COUNT:		return (SCF_TYPE_COUNT);
-	case SC_FMRI:		return (SCF_TYPE_FMRI);
-	case SC_HOST:		return (SCF_TYPE_HOST);
-	case SC_HOSTNAME:	return (SCF_TYPE_HOSTNAME);
-	case SC_INTEGER:	return (SCF_TYPE_INTEGER);
-	case SC_NET_ADDR_V4:	return (SCF_TYPE_NET_ADDR_V4);
-	case SC_NET_ADDR_V6:	return (SCF_TYPE_NET_ADDR_V6);
-	case SC_OPAQUE:		return (SCF_TYPE_OPAQUE);
-	case SC_TIME:		return (SCF_TYPE_TIME);
-	case SC_URI:		return (SCF_TYPE_URI);
-	case SC_USTRING:	return (SCF_TYPE_USTRING);
+	case SCF_TYPE_ASTRING:		return (SC_ASTRING);
+	case SCF_TYPE_BOOLEAN:		return (SC_BOOLEAN);
+	case SCF_TYPE_COUNT:		return (SC_COUNT);
+	case SCF_TYPE_FMRI:		return (SC_FMRI);
+	case SCF_TYPE_HOST:		return (SC_HOST);
+	case SCF_TYPE_HOSTNAME:		return (SC_HOSTNAME);
+	case SCF_TYPE_INTEGER:		return (SC_INTEGER);
+	case SCF_TYPE_NET_ADDR_V4:	return (SC_NET_ADDR_V4);
+	case SCF_TYPE_NET_ADDR_V6:	return (SC_NET_ADDR_V6);
+	case SCF_TYPE_OPAQUE:		return (SC_OPAQUE);
+	case SCF_TYPE_TIME:		return (SC_TIME);
+	case SCF_TYPE_URI:		return (SC_URI);
+	case SCF_TYPE_USTRING:		return (SC_USTRING);
+
 	default:
 		uu_die(gettext("unknown value type (%d)\n"), type);
 	}
@@ -445,6 +446,39 @@ lxml_ignorable_block(xmlNodePtr n)
 	    xmlStrcmp(n->name, (xmlChar *)"comment") == 0) ? 1 : 0);
 }
 
+static void
+lxml_validate_element(xmlNodePtr n)
+{
+	xmlValidCtxtPtr	vcp;
+
+	if (n->doc == NULL)
+		uu_die(gettext("Could not validate element\n"));
+
+	if (n->doc->extSubset == NULL) {
+		xmlDtdPtr dtd;
+		dtd = xmlParseDTD(NULL, n->doc->intSubset->SystemID);
+
+		if (dtd == NULL) {
+			uu_die(gettext("Could not parse DTD \"%s\".\n"),
+			    n->doc->intSubset->SystemID);
+		}
+
+		n->doc->extSubset = dtd;
+	}
+
+	vcp = xmlNewValidCtxt();
+	if (vcp == NULL)
+		uu_die(gettext("could not allocate memory"));
+
+	vcp->warning = xmlParserValidityWarning;
+	vcp->error = xmlParserValidityError;
+
+	if (xmlValidateElement(vcp, n->doc, n) == 0)
+		uu_die(gettext("Document is not valid.\n"));
+
+	xmlFreeValidCtxt(vcp);
+}
+
 static int
 lxml_validate_string_value(scf_type_t type, const char *v)
 {
@@ -468,16 +502,29 @@ lxml_free_str(value_t *val)
 	free(val->sc_u.sc_string);
 }
 
-static value_t *
-lxml_make_value(element_t type, const xmlChar *value)
+/*
+ * Take a value_t structure and a type and value.  Based on the type
+ * ensure that the value is of that type.  If so store the value in
+ * the correct location of the value_t structure.
+ *
+ * If the value is NULL, the value_t structure will have been created
+ * and the value would have ultimately been stored as a string value
+ * but at the time the type was unknown.  Now the type should be known
+ * so take the type and value from value_t and validate and store
+ * the value correctly if the value is of the stated type.
+ */
+void
+lxml_store_value(value_t *v, element_t type, const xmlChar *value)
 {
-	value_t *v;
 	char *endptr;
+	int fov = 0;
 	scf_type_t scf_type = SCF_TYPE_INVALID;
 
-	v = internal_value_new();
-
-	v->sc_type = lxml_element_to_type(type);
+	if (value == NULL) {
+		type = lxml_type_to_element(v->sc_type);
+		value = (const xmlChar *)v->sc_u.sc_string;
+		fov = 1;
+	}
 
 	switch (type) {
 	case SC_COUNT:
@@ -514,7 +561,7 @@ lxml_make_value(element_t type, const xmlChar *value)
 	case SC_TIME:
 	case SC_ASTRING:
 	case SC_USTRING:
-		scf_type = lxml_element_to_scf_type(type);
+		scf_type = lxml_element_to_type(type);
 
 		if ((v->sc_u.sc_string = strdup((char *)value)) == NULL)
 			uu_die(gettext("string duplication failed (%s)\n"),
@@ -535,6 +582,22 @@ lxml_make_value(element_t type, const xmlChar *value)
 		uu_die(gettext("unknown value type (%d)\n"), type);
 		break;
 	}
+
+	/* Free the old value */
+	if (fov && v->sc_free != NULL)
+		free((char *)value);
+}
+
+static value_t *
+lxml_make_value(element_t type, const xmlChar *value)
+{
+	value_t *v;
+
+	v = internal_value_new();
+
+	v->sc_type = lxml_element_to_type(type);
+
+	lxml_store_value(v, type, value);
 
 	return (v);
 }
@@ -581,6 +644,7 @@ lxml_get_propval(pgroup_t *pgrp, xmlNodePtr propval)
 	element_t r;
 	value_t *v;
 	xmlChar *type, *val, *override;
+	int op = pgrp->sc_parent->sc_op;
 
 	p = internal_property_new();
 
@@ -590,20 +654,33 @@ lxml_get_propval(pgroup_t *pgrp, xmlNodePtr propval)
 		    pgrp->sc_pgroup_name);
 
 	type = xmlGetProp(propval, (xmlChar *)type_attr);
-	if ((type == NULL) || (*type == 0))
+	if ((type != NULL) && (*type != 0)) {
+		for (r = 0;
+		    r < sizeof (lxml_prop_types) / sizeof (char *); ++r) {
+			if (xmlStrcmp(type,
+			    (const xmlChar *)lxml_prop_types[r]) == 0)
+				break;
+		}
+
+		if (r >= sizeof (lxml_prop_types) / sizeof (char *))
+			uu_die(gettext("property type invalid for "
+			    "property '%s/%s'\n"), pgrp->sc_pgroup_name,
+			    p->sc_property_name);
+
+		p->sc_value_type = lxml_element_to_type(r);
+	} else if (op == SVCCFG_OP_APPLY) {
+		/*
+		 * Store the property type as invalid, and the value
+		 * as an ASTRING and let the bundle apply code validate
+		 * the type/value once the type is found.
+		 */
+		est->sc_miss_type = B_TRUE;
+		p->sc_value_type = SCF_TYPE_INVALID;
+		r = SC_ASTRING;
+	} else {
 		uu_die(gettext("property type missing for property '%s/%s'\n"),
 		    pgrp->sc_pgroup_name, p->sc_property_name);
-
-	for (r = 0; r < sizeof (lxml_prop_types) / sizeof (char *); ++r) {
-		if (xmlStrcmp(type, (const xmlChar *)lxml_prop_types[r]) == 0)
-			break;
 	}
-	xmlFree(type);
-	if (r >= sizeof (lxml_prop_types) / sizeof (char *))
-		uu_die(gettext("property type invalid for property '%s/%s'\n"),
-		    pgrp->sc_pgroup_name, p->sc_property_name);
-
-	p->sc_value_type = lxml_element_to_type(r);
 
 	val = xmlGetProp(propval, (xmlChar *)value_attr);
 	if (val == NULL)
@@ -613,6 +690,8 @@ lxml_get_propval(pgroup_t *pgrp, xmlNodePtr propval)
 	v = lxml_make_value(r, val);
 	xmlFree(val);
 	internal_attach_value(p, v);
+
+	xmlFree(type);
 
 	override = xmlGetProp(propval, (xmlChar *)override_attr);
 	p->sc_property_override = (xmlStrcmp(override, (xmlChar *)true) == 0);
@@ -628,6 +707,7 @@ lxml_get_property(pgroup_t *pgrp, xmlNodePtr property)
 	xmlNodePtr cursor;
 	element_t r;
 	xmlChar *type, *override;
+	int op = pgrp->sc_parent->sc_op;
 
 	p = internal_property_new();
 
@@ -636,24 +716,33 @@ lxml_get_property(pgroup_t *pgrp, xmlNodePtr property)
 		uu_die(gettext("property name missing in group \'%s\'\n"),
 		    pgrp->sc_pgroup_name);
 
-	if (((type = xmlGetProp(property, (xmlChar *)type_attr)) == NULL) ||
-	    (*type == 0)) {
+	type = xmlGetProp(property, (xmlChar *)type_attr);
+	if ((type != NULL) && (*type != 0)) {
+		for (r = 0;
+		    r < sizeof (lxml_prop_types) / sizeof (char *); r++) {
+			if (xmlStrcmp(type,
+			    (const xmlChar *)lxml_prop_types[r]) == 0)
+				break;
+		}
+
+		if (r >= sizeof (lxml_prop_types) / sizeof (char *))
+			uu_die(gettext("property type invalid for "
+			    "property '%s/%s'\n"), pgrp->sc_pgroup_name,
+			    p->sc_property_name);
+
+		p->sc_value_type = lxml_element_to_type(r);
+	} else if (op == SVCCFG_OP_APPLY) {
+		/*
+		 * Store the property type as invalid, and let the bundle apply
+		 * code validate the type/value once the type is found.
+		 */
+		p->sc_value_type = SCF_TYPE_INVALID;
+		est->sc_miss_type = B_TRUE;
+	} else {
 		uu_die(gettext("property type missing for "
 		    "property \'%s/%s\'\n"), pgrp->sc_pgroup_name,
 		    p->sc_property_name);
 	}
-
-	for (r = 0; r < sizeof (lxml_prop_types) / sizeof (char *); r++) {
-		if (xmlStrcmp(type, (const xmlChar *)lxml_prop_types[r]) == 0)
-			break;
-	}
-
-	if (r >= sizeof (lxml_prop_types) / sizeof (char *)) {
-		uu_die(gettext("property type invalid for property '%s/%s'\n"),
-		    pgrp->sc_pgroup_name, p->sc_property_name);
-	}
-
-	p->sc_value_type = lxml_element_to_type(r);
 
 	for (cursor = property->xmlChildrenNode; cursor != NULL;
 	    cursor = cursor->next) {
@@ -674,10 +763,22 @@ lxml_get_property(pgroup_t *pgrp, xmlNodePtr property)
 		case SC_TIME:
 		case SC_URI:
 		case SC_USTRING:
-			if (strcmp(lxml_prop_types[r], (const char *)type) != 0)
+			/*
+			 * If the type is invalid then this is an apply
+			 * operation and the type can be taken from the
+			 * value list.
+			 */
+			if (p->sc_value_type == SCF_TYPE_INVALID) {
+				p->sc_value_type = lxml_element_to_type(r);
+				type = xmlStrdup((const
+				    xmlChar *)lxml_prop_types[r]);
+
+			} else if (strcmp(lxml_prop_types[r],
+			    (const char *)type) != 0) {
 				uu_die(gettext("property \'%s\' "
 				    "type-to-list mismatch\n"),
 				    p->sc_property_name);
+			}
 
 			(void) lxml_get_value(p, r, cursor);
 			break;
@@ -700,6 +801,9 @@ lxml_get_property(pgroup_t *pgrp, xmlNodePtr property)
 static int
 lxml_get_pgroup_stability(pgroup_t *pgrp, xmlNodePtr stab)
 {
+	if (pgrp->sc_parent->sc_op == SVCCFG_OP_APPLY)
+		lxml_validate_element(stab);
+
 	return (new_str_prop_from_attr(pgrp, SCF_PROPERTY_STABILITY,
 	    SCF_TYPE_ASTRING, stab, value_attr));
 }
@@ -935,6 +1039,9 @@ lxml_get_exec_method(entity_t *entity, xmlNodePtr emeth)
 	xmlNodePtr cursor;
 	int r = 0;
 
+	if (entity->sc_op == SVCCFG_OP_APPLY)
+		lxml_validate_element(emeth);
+
 	name = xmlGetProp(emeth, (xmlChar *)name_attr);
 	pg = internal_pgroup_find_or_create(entity, (char *)name,
 	    (char *)SCF_GROUP_METHOD);
@@ -1030,6 +1137,9 @@ lxml_get_dependency(entity_t *entity, xmlNodePtr dependency)
 	 * type:  service / path /host
 	 */
 
+	if (entity->sc_op == SVCCFG_OP_APPLY)
+		lxml_validate_element(dependency);
+
 	name = xmlGetProp(dependency, (xmlChar *)name_attr);
 	pg = internal_pgroup_find_or_create(entity, (char *)name,
 	    (char *)SCF_GROUP_DEPENDENCY);
@@ -1122,6 +1232,9 @@ lxml_get_dependent(entity_t *entity, xmlNodePtr dependent)
 	property_t *p;
 	xmlNodePtr n;
 	char *myfmri;
+
+	if (entity->sc_op == SVCCFG_OP_APPLY)
+		lxml_validate_element(dependent);
 
 	name = xmlGetProp(dependent, (xmlChar *)name_attr);
 
@@ -2791,6 +2904,7 @@ lxml_get_default_instance(entity_t *service, xmlNodePtr definst)
 	 * New general property group with enabled boolean property set.
 	 */
 
+	i->sc_op = service->sc_op;
 	pg = internal_pgroup_new();
 	(void) internal_attach_pgroup(i, pg);
 
@@ -2820,6 +2934,9 @@ lxml_get_default_instance(entity_t *service, xmlNodePtr definst)
  * Translate an instance element into an internal property tree, added to
  * service.  If op is SVCCFG_OP_APPLY (i.e., apply a profile), set the
  * enabled property to override.
+ *
+ * If op is SVCCFG_OP_APPLY (i.e., apply a profile), do not allow for
+ * modification of template data.
  */
 static int
 lxml_get_instance(entity_t *service, xmlNodePtr inst, bundle_type_t bt,
@@ -2846,6 +2963,7 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, bundle_type_t bt,
 	if (r != 0)
 		return (r);
 
+	i->sc_op = op;
 	enabled = xmlGetProp(inst, (xmlChar *)enabled_attr);
 
 	if (enabled == NULL) {
@@ -2907,6 +3025,14 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, bundle_type_t bt,
 			(void) lxml_get_pgroup(i, cursor);
 			break;
 		case SC_TEMPLATE:
+			if (op == SVCCFG_OP_APPLY) {
+				semerr(gettext("Template data for \"%s\" may "
+				    "not be modified in a profile.\n"),
+				    i->sc_name);
+
+				return (-1);
+			}
+
 			if (lxml_get_template(i, cursor) != 0)
 				return (-1);
 			break;
@@ -3004,7 +3130,10 @@ out:
 
 /*
  * Translate a service element into an internal instance/property tree, added
- * to bundle.  If op is SVCCFG_OP_APPLY, allow only instance subelements.
+ * to bundle.
+ *
+ * If op is SVCCFG_OP_APPLY (i.e., apply a profile), do not allow for
+ * modification of template data.
  */
 static int
 lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
@@ -3030,6 +3159,12 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 	type = xmlGetProp(svc, (xmlChar *)type_attr);
 	s->sc_u.sc_service.sc_service_type = lxml_xlate_service_type(type);
 	xmlFree(type);
+
+	/*
+	 * Set the global missing type to false before processing the service
+	 */
+	est->sc_miss_type = B_FALSE;
+	s->sc_op = op;
 
 	/*
 	 * Now that the service is created create the manifest
@@ -3092,6 +3227,14 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 				return (-1);
 			break;
 		case SC_TEMPLATE:
+			if (op == SVCCFG_OP_APPLY) {
+				semerr(gettext("Template data for \"%s\" may "
+				    "not be modified in a profile.\n"),
+				    s->sc_name);
+
+				return (-1);
+			}
+
 			if (lxml_get_template(s, cursor) != 0)
 				return (-1);
 			break;
@@ -3130,6 +3273,15 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 		}
 	}
 
+	/*
+	 * Now that the service has been processed set the missing type
+	 * for the service.  So that only the services with missing
+	 * types are processed.
+	 */
+	s->sc_miss_type = est->sc_miss_type;
+	if (est->sc_miss_type)
+		est->sc_miss_type = B_FALSE;
+
 	return (internal_attach_service(bundle, s));
 }
 
@@ -3138,7 +3290,7 @@ void
 lxml_dump(int g, xmlNodePtr p)
 {
 	if (p && p->name) {
-		printf("%d %s\n", g, p->name);
+		(void) printf("%d %s\n", g, p->name);
 
 		for (p = p->xmlChildrenNode; p != NULL; p = p->next)
 			lxml_dump(g + 1, p);
@@ -3281,6 +3433,12 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, svccfg_op_t op)
 	if ((dtd = xmlGetIntSubset(document)) == NULL) {
 		semerr(gettext("document has no DTD\n"));
 		return (-1);
+	} else if (dtdpath == NULL && !do_validate) {
+		/*
+		 * If apply then setup so that some validation
+		 * for specific elements can be done.
+		 */
+		dtdpath = (char *)document->intSubset->SystemID;
 	}
 
 	if (!lxml_is_known_dtd(dtd->SystemID)) {
@@ -3338,7 +3496,6 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, svccfg_op_t op)
 			return (-1);
 		}
 	}
-
 
 #ifdef DEBUG
 	lxml_dump(0, cursor);

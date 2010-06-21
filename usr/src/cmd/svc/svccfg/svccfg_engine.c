@@ -504,6 +504,7 @@ engine_init()
 	cp = getenv("SVCCFG_CONFIGD_PATH");
 	est->sc_repo_server = cp ? cp : "/lib/svc/bin/svc.configd";
 
+	est->sc_miss_type = B_FALSE;
 	est->sc_in_emi = 0;
 	cp = getenv("SMF_FMRI");
 	if ((cp != NULL) && (strcmp(cp, SCF_INSTANCE_EMI) == 0))

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -281,6 +280,7 @@ internal_entity_new(entity_type_t entity)
 
 	e->sc_etype = entity;
 	e->sc_pgroups = uu_list_create(pgroup_pool, e, 0);
+	e->sc_op = SVCCFG_OP_NONE;
 	if (e->sc_pgroups == NULL) {
 		uu_die(gettext("Unable to create list for entity property "
 		    "groups.  %s\n"), uu_strerror(uu_error()));
@@ -475,10 +475,16 @@ internal_pgroup_create_common(entity_t *e, const char *name, const char *type,
 	pg = internal_pgroup_new();
 	(void) internal_attach_pgroup(e, pg);
 	pg->sc_pgroup_name = strdup(name);
-	pg->sc_pgroup_type = strdup(type);
 	pg->sc_pgroup_flags = 0;
+	if (type != NULL) {
+		pg->sc_pgroup_type = strdup(type);
+	} else {
+		est->sc_miss_type = B_TRUE;
+		pg->sc_pgroup_type = NULL;
+	}
 
-	if (pg->sc_pgroup_name == NULL || pg->sc_pgroup_type == NULL)
+	if (pg->sc_pgroup_name == NULL ||
+	    (e->sc_op != SVCCFG_OP_APPLY && pg->sc_pgroup_type == NULL))
 		uu_die(gettext("Could not duplicate string"));
 
 	return (pg);
@@ -656,6 +662,7 @@ internal_attach_entity(entity_t *svc, entity_t *ent)
 
 	(void) uu_list_prepend(svc->sc_u.sc_service.sc_service_instances, ent);
 	ent->sc_parent = svc;
+	ent->sc_op = svc->sc_op;
 	ent->sc_fmri = uu_msprintf("%s:%s", svc->sc_fmri, ent->sc_name);
 	if (ent->sc_fmri == NULL)
 		uu_die(gettext("couldn't allocate memory"));

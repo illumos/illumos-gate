@@ -21,8 +21,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -262,7 +261,14 @@ restore_cmd : SCC_RESTORE SCV_WORD terminator
 
 apply_cmd : SCC_APPLY SCV_WORD terminator
 	{
-		(void) engine_apply($2, 1);
+		if (engine_apply($2, 1) == -1) {
+			if ((est->sc_cmd_flags & (SC_CMD_IACTIVE|SC_CMD_DONT_EXIT)) == 0)
+				exit(1);
+
+			free($2);
+			return (0);
+		}
+
 		free($2);
 	}
 	| SCC_APPLY SCV_WORD SCV_WORD terminator

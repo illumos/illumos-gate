@@ -1772,6 +1772,436 @@ stash_scferror(scf_callback_t *cbp)
 	return (stash_scferror_err(cbp, scf_error()));
 }
 
+static int select_inst(const char *);
+static int select_svc(const char *);
+
+/*
+ * Take a property that does not have a type and check to see if a type
+ * exists or can be gleened from the current data.  Set the type.
+ *
+ * Check the current level (instance) and then check the higher level
+ * (service).  This could be the case for adding a new property to
+ * the instance that's going to "override" a service level property.
+ *
+ * For a property :
+ * 1. Take the type from an existing property
+ * 2. Take the type from a template entry
+ *
+ * If the type can not be found, then leave the type as is, and let the import
+ * report the problem of the missing type.
+ */
+static int
+find_current_prop_type(void *p, void *g)
+{
+	property_t *prop = p;
+	scf_callback_t *lcb = g;
+	pgroup_t *pg = NULL;
+
+	const char *fmri = NULL;
+	char *lfmri = NULL;
+	char *cur_selection = NULL;
+
+	scf_propertygroup_t *sc_pg = NULL;
+	scf_property_t *sc_prop = NULL;
+	scf_pg_tmpl_t *t_pg = NULL;
+	scf_prop_tmpl_t *t_prop = NULL;
+	scf_type_t prop_type;
+
+	value_t *vp;
+	int issvc = lcb->sc_service;
+	int r = UU_WALK_ERROR;
+
+	if (prop->sc_value_type != SCF_TYPE_INVALID)
+		return (UU_WALK_NEXT);
+
+	t_prop = scf_tmpl_prop_create(g_hndl);
+	sc_prop = scf_property_create(g_hndl);
+	if (sc_prop == NULL || t_prop == NULL) {
+		warn(gettext("Unable to create the property to attempt and "
+		    "find a missing type.\n"));
+
+		scf_property_destroy(sc_prop);
+		scf_tmpl_prop_destroy(t_prop);
+
+		return (UU_WALK_ERROR);
+	}
+
+	if (lcb->sc_flags == 1) {
+		pg = lcb->sc_parent;
+		issvc = (pg->sc_parent->sc_etype == SVCCFG_SERVICE_OBJECT);
+		fmri = pg->sc_parent->sc_fmri;
+retry_pg:
+		if (cur_svc && cur_selection == NULL) {
+			cur_selection = safe_malloc(max_scf_fmri_len + 1);
+			lscf_get_selection_str(cur_selection,
+			    max_scf_fmri_len + 1);
+
+			if (strcmp(cur_selection, fmri) != 0) {
+				lscf_select(fmri);
+			} else {
+				free(cur_selection);
+				cur_selection = NULL;
+			}
+		} else {
+			lscf_select(fmri);
+		}
+
+		if (sc_pg == NULL && (sc_pg = scf_pg_create(g_hndl)) == NULL) {
+			warn(gettext("Unable to create property group to "
+			    "find a missing property type.\n"));
+
+			goto out;
+		}
+
+		if (get_pg(pg->sc_pgroup_name, sc_pg) != SCF_SUCCESS) {
+			/*
+			 * If this is the sc_pg from the parent
+			 * let the caller clean up the sc_pg,
+			 * and just throw it away in this case.
+			 */
+			if (sc_pg != lcb->sc_parent)
+				scf_pg_destroy(sc_pg);
+
+			sc_pg = NULL;
+			if ((t_pg = scf_tmpl_pg_create(g_hndl)) == NULL) {
+				warn(gettext("Unable to create template "
+				    "property group to find a property "
+				    "type.\n"));
+
+				goto out;
+			}
+
+			if (scf_tmpl_get_by_pg_name(fmri, NULL,
+			    pg->sc_pgroup_name, NULL, t_pg,
+			    SCF_PG_TMPL_FLAG_EXACT) != SCF_SUCCESS) {
+				/*
+				 * if instance get service and jump back
+				 */
+				scf_tmpl_pg_destroy(t_pg);
+				t_pg = NULL;
+				if (issvc == 0) {
+					entity_t *e = pg->sc_parent->sc_parent;
+
+					fmri = e->sc_fmri;
+					issvc = 1;
+					goto retry_pg;
+				} else {
+					goto out;
+				}
+			}
+		}
+	} else {
+		sc_pg = lcb->sc_parent;
+	}
+
+	/*
+	 * Attempt to get the type from an existing property.  If the property
+	 * cannot be found then attempt to get the type from a template entry
+	 * for the property.
+	 *
+	 * Finally, if at the instance level look at the service level.
+	 */
+	if (sc_pg != NULL &&
+	    pg_get_prop(sc_pg, prop->sc_property_name,
+	    sc_prop) == SCF_SUCCESS &&
+	    scf_property_type(sc_prop, &prop_type) == SCF_SUCCESS) {
+		prop->sc_value_type = prop_type;
+
+		/*
+		 * Found a type, update the value types and validate
+		 * the actual value against this type.
+		 */
+		for (vp = uu_list_first(prop->sc_property_values);
+		    vp != NULL;
+		    vp = uu_list_next(prop->sc_property_values, vp)) {
+			vp->sc_type = prop->sc_value_type;
+			lxml_store_value(vp, 0, NULL);
+		}
+
+		r = UU_WALK_NEXT;
+		goto out;
+	}
+
+	/*
+	 * If we get here with t_pg set to NULL then we had to have
+	 * gotten an sc_pg but that sc_pg did not have the property
+	 * we are looking for.   So if the t_pg is not null look up
+	 * the template entry for the property.
+	 *
+	 * If the t_pg is null then need to attempt to get a matching
+	 * template entry for the sc_pg, and see if there is a property
+	 * entry for that template entry.
+	 */
+do_tmpl :
+	if (t_pg != NULL &&
+	    scf_tmpl_get_by_prop(t_pg, prop->sc_property_name,
+	    t_prop, 0) == SCF_SUCCESS) {
+		if (scf_tmpl_prop_type(t_prop, &prop_type) == SCF_SUCCESS) {
+			prop->sc_value_type = prop_type;
+
+			/*
+			 * Found a type, update the value types and validate
+			 * the actual value against this type.
+			 */
+			for (vp = uu_list_first(prop->sc_property_values);
+			    vp != NULL;
+			    vp = uu_list_next(prop->sc_property_values, vp)) {
+				vp->sc_type = prop->sc_value_type;
+				lxml_store_value(vp, 0, NULL);
+			}
+
+			r = UU_WALK_NEXT;
+			goto out;
+		}
+	} else {
+		if (t_pg == NULL && sc_pg) {
+			if ((t_pg = scf_tmpl_pg_create(g_hndl)) == NULL) {
+				warn(gettext("Unable to create template "
+				    "property group to find a property "
+				    "type.\n"));
+
+				goto out;
+			}
+
+			if (scf_tmpl_get_by_pg(sc_pg, t_pg, 0) != SCF_SUCCESS) {
+				scf_tmpl_pg_destroy(t_pg);
+				t_pg = NULL;
+			} else {
+				goto do_tmpl;
+			}
+		}
+	}
+
+	if (issvc == 0) {
+		scf_instance_t *i;
+		scf_service_t *s;
+
+		issvc = 1;
+		if (lcb->sc_flags == 1) {
+			entity_t *e = pg->sc_parent->sc_parent;
+
+			fmri = e->sc_fmri;
+			goto retry_pg;
+		}
+
+		/*
+		 * because lcb->sc_flags was not set then this means
+		 * the pg was not used and can be used here.
+		 */
+		if ((pg = internal_pgroup_new()) == NULL) {
+			warn(gettext("Could not create internal property group "
+			    "to find a missing type."));
+
+			goto out;
+		}
+
+		pg->sc_pgroup_name = safe_malloc(max_scf_name_len + 1);
+		if (scf_pg_get_name(sc_pg, (char *)pg->sc_pgroup_name,
+		    max_scf_name_len + 1) < 0)
+				goto out;
+
+		i = scf_instance_create(g_hndl);
+		s = scf_service_create(g_hndl);
+		if (i == NULL || s == NULL ||
+		    scf_pg_get_parent_instance(sc_pg, i) != SCF_SUCCESS) {
+			warn(gettext("Could not get a service for the instance "
+			    "to find a missing type."));
+
+			goto out;
+		}
+
+		/*
+		 * Check to see truly at the instance level.
+		 */
+		lfmri = safe_malloc(max_scf_fmri_len + 1);
+		if (scf_instance_get_parent(i, s) == SCF_SUCCESS &&
+		    scf_service_to_fmri(s, lfmri, max_scf_fmri_len + 1) < 0)
+			goto out;
+		else
+			fmri = (const char *)lfmri;
+
+		goto retry_pg;
+	}
+
+out :
+	if (sc_pg != lcb->sc_parent) {
+		scf_pg_destroy(sc_pg);
+	}
+
+	/*
+	 * If this is true then the pg was allocated
+	 * here, and the name was set so need to free
+	 * the name and the pg.
+	 */
+	if (pg != NULL && pg != lcb->sc_parent) {
+		free((char *)pg->sc_pgroup_name);
+		internal_pgroup_free(pg);
+	}
+
+	if (cur_selection) {
+		lscf_select(cur_selection);
+		free(cur_selection);
+	}
+
+	scf_tmpl_pg_destroy(t_pg);
+	scf_tmpl_prop_destroy(t_prop);
+	scf_property_destroy(sc_prop);
+
+	if (r != UU_WALK_NEXT)
+		warn(gettext("Could not find property type for \"%s\" "
+		    "from \"%s\"\n"), prop->sc_property_name,
+		    fmri != NULL ? fmri : lcb->sc_source_fmri);
+
+	free(lfmri);
+
+	return (r);
+}
+
+/*
+ * Take a property group that does not have a type and check to see if a type
+ * exists or can be gleened from the current data.  Set the type.
+ *
+ * Check the current level (instance) and then check the higher level
+ * (service).  This could be the case for adding a new property to
+ * the instance that's going to "override" a service level property.
+ *
+ * For a property group
+ * 1. Take the type from an existing property group
+ * 2. Take the type from a template entry
+ *
+ * If the type can not be found, then leave the type as is, and let the import
+ * report the problem of the missing type.
+ */
+static int
+find_current_pg_type(void *p, void *sori)
+{
+	entity_t *si = sori;
+	pgroup_t *pg = p;
+
+	const char *ofmri, *fmri;
+	char *cur_selection = NULL;
+	char *pg_type = NULL;
+
+	scf_propertygroup_t *sc_pg = NULL;
+	scf_pg_tmpl_t *t_pg = NULL;
+
+	int issvc = (si->sc_etype == SVCCFG_SERVICE_OBJECT);
+	int r = UU_WALK_ERROR;
+
+	ofmri = fmri = si->sc_fmri;
+	if (pg->sc_pgroup_type != NULL) {
+		r = UU_WALK_NEXT;
+
+		goto out;
+	}
+
+	sc_pg = scf_pg_create(g_hndl);
+	if (sc_pg == NULL) {
+		warn(gettext("Unable to create property group to attempt "
+		    "and find a missing type.\n"));
+
+		return (UU_WALK_ERROR);
+	}
+
+	/*
+	 * Using get_pg() requires that the cur_svc/cur_inst be
+	 * via lscf_select.  Need to preserve the current selection
+	 * if going to use lscf_select() to set up the cur_svc/cur_inst
+	 */
+	if (cur_svc) {
+		cur_selection = safe_malloc(max_scf_fmri_len + 1);
+		lscf_get_selection_str(cur_selection, max_scf_fmri_len + 1);
+	}
+
+	/*
+	 * If the property group exists get the type, and set
+	 * the pgroup_t type of that type.
+	 *
+	 * If not the check for a template pg_pattern entry
+	 * and take the type from that.
+	 */
+retry_svc:
+	lscf_select(fmri);
+
+	if (get_pg(pg->sc_pgroup_name, sc_pg) == SCF_SUCCESS) {
+		pg_type = safe_malloc(max_scf_pg_type_len + 1);
+		if (pg_type != NULL && scf_pg_get_type(sc_pg, pg_type,
+		    max_scf_pg_type_len + 1) != -1) {
+			pg->sc_pgroup_type = pg_type;
+
+			r = UU_WALK_NEXT;
+			goto out;
+		} else {
+			free(pg_type);
+		}
+	} else {
+		if ((t_pg == NULL) &&
+		    (t_pg = scf_tmpl_pg_create(g_hndl)) == NULL)
+			goto out;
+
+		if (scf_tmpl_get_by_pg_name(fmri, NULL, pg->sc_pgroup_name,
+		    NULL, t_pg, SCF_PG_TMPL_FLAG_EXACT) == SCF_SUCCESS &&
+		    scf_tmpl_pg_type(t_pg, &pg_type) != -1) {
+			pg->sc_pgroup_type = pg_type;
+
+			r = UU_WALK_NEXT;
+			goto out;
+		}
+	}
+
+	/*
+	 * If type is not found at the instance level then attempt to
+	 * find the type at the service level.
+	 */
+	if (!issvc) {
+		si = si->sc_parent;
+		fmri = si->sc_fmri;
+		issvc = (si->sc_etype == SVCCFG_SERVICE_OBJECT);
+		goto retry_svc;
+	}
+
+out :
+	if (cur_selection) {
+		lscf_select(cur_selection);
+		free(cur_selection);
+	}
+
+	/*
+	 * Now walk the properties of the property group to make sure that
+	 * all properties have the correct type and values are valid for
+	 * those types.
+	 */
+	if (r == UU_WALK_NEXT) {
+		scf_callback_t cb;
+
+		cb.sc_service = issvc;
+		cb.sc_source_fmri = ofmri;
+		if (sc_pg != NULL) {
+			cb.sc_parent = sc_pg;
+			cb.sc_flags = 0;
+		} else {
+			cb.sc_parent = pg;
+			cb.sc_flags = 1;
+		}
+
+		if (uu_list_walk(pg->sc_pgroup_props, find_current_prop_type,
+		    &cb, UU_DEFAULT) != 0) {
+			if (uu_error() != UU_ERROR_CALLBACK_FAILED)
+				bad_error("uu_list_walk", uu_error());
+
+			r = UU_WALK_ERROR;
+		}
+	} else {
+		warn(gettext("Could not find property group type for "
+		    "\"%s\" from \"%s\"\n"), pg->sc_pgroup_name, fmri);
+	}
+
+	scf_tmpl_pg_destroy(t_pg);
+	scf_pg_destroy(sc_pg);
+
+	return (r);
+}
+
 /*
  * Import.  These functions import a bundle into the repository.
  */
@@ -1957,8 +2387,13 @@ entity_pgroup_import(void *v, void *pvt)
 	    "(new property group \"%s\" changed).\n");
 
 	/* Never import deleted property groups. */
-	if (p->sc_pgroup_delete)
+	if (p->sc_pgroup_delete) {
+		if ((lcbdata->sc_flags & SCI_OP_APPLY) == SCI_OP_APPLY &&
+		    entity_get_pg(ent, issvc, p->sc_pgroup_name, imp_pg) == 0) {
+			goto delete_pg;
+		}
 		return (UU_WALK_NEXT);
+	}
 
 	if (!issvc && (lcbdata->sc_flags & SCI_GENERALLAST) &&
 	    strcmp(p->sc_pgroup_name, SCF_PG_GENERAL) == 0) {
@@ -2034,6 +2469,7 @@ add_pg:
 		if (lcbdata->sc_flags & SCI_KEEP)
 			goto props;
 
+delete_pg:
 		if (scf_pg_delete(imp_pg) != 0) {
 			switch (scf_error()) {
 			case SCF_ERROR_DELETED:
@@ -2057,6 +2493,9 @@ add_pg:
 				bad_error("scf_pg_delete", scf_error());
 			}
 		}
+
+		if (p->sc_pgroup_delete)
+			return (UU_WALK_NEXT);
 
 		goto add_pg;
 	}
@@ -2245,6 +2684,28 @@ lscf_import_service_pgs(scf_service_t *svc, const char *target_fmri,
 	cbdata.sc_source_fmri = isvc->sc_fmri;
 	cbdata.sc_target_fmri = target_fmri;
 
+	/*
+	 * If the op is set, then add the flag to the callback
+	 * flags for later use.
+	 */
+	if (isvc->sc_op != SVCCFG_OP_NONE) {
+		switch (isvc->sc_op) {
+		case SVCCFG_OP_IMPORT :
+			cbdata.sc_flags |= SCI_OP_IMPORT;
+			break;
+		case SVCCFG_OP_APPLY :
+			cbdata.sc_flags |= SCI_OP_APPLY;
+			break;
+		case SVCCFG_OP_RESTORE :
+			cbdata.sc_flags |= SCI_OP_RESTORE;
+			break;
+		default :
+			uu_die(gettext("lscf_import_service_pgs : "
+			    "Unknown op stored in the service entity\n"));
+
+		}
+	}
+
 	if (uu_list_walk(isvc->sc_pgroups, entity_pgroup_import, &cbdata,
 	    UU_DEFAULT) != 0) {
 		if (uu_error() != UU_ERROR_CALLBACK_FAILED)
@@ -2287,6 +2748,27 @@ lscf_import_instance_pgs(scf_instance_t *inst, const char *target_fmri,
 	cbdata.sc_flags = flags;
 	cbdata.sc_source_fmri = iinst->sc_fmri;
 	cbdata.sc_target_fmri = target_fmri;
+
+	/*
+	 * If the op is set, then add the flag to the callback
+	 * flags for later use.
+	 */
+	if (iinst->sc_op != SVCCFG_OP_NONE) {
+		switch (iinst->sc_op) {
+		case SVCCFG_OP_IMPORT :
+			cbdata.sc_flags |= SCI_OP_IMPORT;
+			break;
+		case SVCCFG_OP_APPLY :
+			cbdata.sc_flags |= SCI_OP_APPLY;
+			break;
+		case SVCCFG_OP_RESTORE :
+			cbdata.sc_flags |= SCI_OP_RESTORE;
+			break;
+		default :
+			uu_die(gettext("lscf_import_instance_pgs : "
+			    "Unknown op stored in the instance entity\n"));
+		}
+	}
 
 	if (uu_list_walk(iinst->sc_pgroups, entity_pgroup_import, &cbdata,
 	    UU_DEFAULT) != 0) {
@@ -2860,7 +3342,7 @@ lscf_dependent_import(void *a1, void *pvt)
 	/* Add the property group to the target entity. */
 
 	dependent_cbdata.sc_handle = lcbdata->sc_handle;
-	dependent_cbdata.sc_flags = 0;
+	dependent_cbdata.sc_flags = lcbdata->sc_flags;
 	dependent_cbdata.sc_source_fmri = lcbdata->sc_source_fmri;
 	dependent_cbdata.sc_target_fmri = pgrp->sc_pgroup_fmri;
 
@@ -3473,23 +3955,6 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 			    prop_get_val(ud_prop, fname_value) == 0 &&
 			    scf_value_get_astring(fname_value, fval,
 			    MAXPATHLEN) != -1)  {
-				/*
-				 * If the filesystem/minimal service is
-				 * online check to see if the manifest is
-				 * there.  If not then there is no need to
-				 * add it.
-				 *
-				 * If filesystem/minimal service is not
-				 * online, we go ahead and record the
-				 * manifest file name.  We don't check for
-				 * its existence because it may be on a
-				 * file system that is not yet mounted.
-				 */
-				if ((est->sc_fs_minimal) &&
-				    (access(fval, F_OK) == -1)) {
-					continue;
-				}
-
 				old_pname = safe_strdup(pname);
 				old_fval = safe_strdup(fval);
 				old_prop = internal_property_create(old_pname,
@@ -3561,6 +4026,7 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 	pgroup_t *new_dpt_pgroup;
 	pgroup_t *old_dpt_pgroup = NULL;
 	pgroup_t *current_pg;
+	pgroup_t *dpt;
 	scf_callback_t cbdata;
 	int tissvc;
 	void *target_ent;
@@ -3625,8 +4091,6 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 
 	/* If it's not, delete it... if it hasn't been customized. */
 	if (new_dpt_pgroup == NULL) {
-		pgroup_t *dpt;
-
 		if (!ud_run_dpts_pg_set)
 			return (0);
 
@@ -3967,9 +4431,25 @@ delprop:
 	    0)
 		bad_error("scf_value_get_as_string", scf_error());
 
+	/*
+	 * If the fmri's are not equal then the old fmri will need to
+	 * be refreshed to ensure that the changes are properly updated
+	 * in that service.
+	 */
 	r = fmri_equal(ud_oldtarg, new_dpt_pgroup->sc_pgroup_fmri);
 	switch (r) {
 	case 0:
+		dpt = internal_pgroup_new();
+		if (dpt == NULL)
+			return (ENOMEM);
+		dpt->sc_pgroup_name = strdup(ud_name);
+		dpt->sc_pgroup_fmri = strdup(ud_oldtarg);
+		if (dpt->sc_pgroup_name == NULL || dpt->sc_pgroup_fmri == NULL)
+			return (ENOMEM);
+		dpt->sc_parent = (entity_t *)ient;
+		if (uu_list_insert_after(imp_deleted_dpts, NULL, dpt) != 0)
+			uu_die(gettext("libuutil error: %s\n"),
+			    uu_strerror(uu_error()));
 		break;
 
 	case 1:
@@ -4039,8 +4519,10 @@ delprop:
 	 * If new_dpt_pgroup->sc_override, then act as though the property
 	 * group hasn't been customized.
 	 */
-	if (new_dpt_pgroup->sc_pgroup_override)
+	if (new_dpt_pgroup->sc_pgroup_override) {
+		(void) strcpy(ud_ctarg, ud_oldtarg);
 		goto nocust;
+	}
 
 	if (!ud_run_dpts_pg_set) {
 		warn(cf_missing, ient->sc_fmri, ud_name);
@@ -4253,7 +4735,6 @@ nocust:
 			bad_error("load_pg", r);
 		}
 	}
-
 	serr = fmri_to_entity(g_hndl, ud_ctarg, &target_ent, &tissvc);
 	switch (serr) {
 	case SCF_ERROR_NONE:
@@ -4514,6 +4995,7 @@ nocust:
 		/* import new one */
 		cbdata.sc_handle = g_hndl;
 		cbdata.sc_trans = NULL;		/* handled below */
+		cbdata.sc_flags = 0;
 
 		r = lscf_dependent_import(new_dpt_pgroup, &cbdata);
 		if (r != UU_WALK_NEXT) {
@@ -6104,6 +6586,7 @@ nosnap:
 		ctx.sc_parent = imp_inst;
 		ctx.sc_service = 0;
 		ctx.sc_trans = NULL;
+		ctx.sc_flags = 0;
 		if (uu_list_walk(inst->sc_dependents, lscf_dependent_import,
 		    &ctx, UU_DEFAULT) != 0) {
 			if (uu_error() != UU_ERROR_CALLBACK_FAILED)
@@ -6533,6 +7016,7 @@ lscf_service_import(void *v, void *pvt)
 		}
 
 		cbdata.sc_trans = NULL;
+		cbdata.sc_flags = 0;
 		if (uu_list_walk(s->sc_dependents, lscf_dependent_import,
 		    &cbdata, UU_DEFAULT) != 0) {
 			if (uu_error() != UU_ERROR_CALLBACK_FAILED)
@@ -6877,6 +7361,7 @@ lscf_service_import(void *v, void *pvt)
 			}
 
 			cbdata.sc_trans = NULL;
+			cbdata.sc_flags = 0;
 			if (uu_list_walk(s->sc_dependents,
 			    lscf_dependent_import, &cbdata, UU_DEFAULT) != 0) {
 				if (uu_error() != UU_ERROR_CALLBACK_FAILED)
@@ -7283,23 +7768,14 @@ imp_refresh_fmri(const char *fmri, const char *name, const char *d_fmri)
 	return (0);
 }
 
-int
-lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
+static int
+alloc_imp_globals()
 {
-	scf_callback_t cbdata;
-	int result = 0;
-	entity_t *svc, *inst;
-	uu_list_t *insts;
 	int r;
-	pgroup_t *old_dpt;
-	void *cookie;
-	int annotation_set = 0;
 
 	const char * const emsg_nomem = gettext("Out of memory.\n");
 	const char * const emsg_nores =
 	    gettext("svc.configd is out of resources.\n");
-
-	lscf_prep_hndl();
 
 	imp_str_sz = ((max_scf_name_len > max_scf_fmri_len) ?
 	    max_scf_name_len : max_scf_fmri_len) + 1;
@@ -7345,8 +7821,8 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 			warn(emsg_nores);
 		else
 			warn(emsg_nomem);
-		result = -1;
-		goto out;
+
+		return (-1);
 	}
 
 	r = load_init();
@@ -7356,12 +7832,112 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 
 	case ENOMEM:
 		warn(emsg_nomem);
-		result = -1;
-		goto out;
+		return (-1);
 
 	default:
 		bad_error("load_init", r);
 	}
+
+	return (0);
+}
+
+static void
+free_imp_globals()
+{
+	pgroup_t *old_dpt;
+	void *cookie;
+
+	load_fini();
+
+	free(ud_ctarg);
+	free(ud_oldtarg);
+	free(ud_name);
+	ud_ctarg = ud_oldtarg = ud_name = NULL;
+
+	scf_transaction_destroy(ud_tx);
+	ud_tx = NULL;
+	scf_iter_destroy(ud_iter);
+	scf_iter_destroy(ud_iter2);
+	ud_iter = ud_iter2 = NULL;
+	scf_value_destroy(ud_val);
+	ud_val = NULL;
+	scf_property_destroy(ud_prop);
+	scf_property_destroy(ud_dpt_prop);
+	ud_prop = ud_dpt_prop = NULL;
+	scf_pg_destroy(ud_pg);
+	scf_pg_destroy(ud_cur_depts_pg);
+	scf_pg_destroy(ud_run_dpts_pg);
+	ud_pg = ud_cur_depts_pg = ud_run_dpts_pg = NULL;
+	scf_snaplevel_destroy(ud_snpl);
+	ud_snpl = NULL;
+	scf_instance_destroy(ud_inst);
+	ud_inst = NULL;
+
+	free(imp_str);
+	free(imp_tsname);
+	free(imp_fe1);
+	free(imp_fe2);
+	imp_str = imp_tsname = imp_fe1 = imp_fe2 = NULL;
+
+	cookie = NULL;
+	while ((old_dpt = uu_list_teardown(imp_deleted_dpts, &cookie)) !=
+	    NULL) {
+		free((char *)old_dpt->sc_pgroup_name);
+		free((char *)old_dpt->sc_pgroup_fmri);
+		internal_pgroup_free(old_dpt);
+	}
+	uu_list_destroy(imp_deleted_dpts);
+
+	scf_transaction_destroy(imp_tx);
+	imp_tx = NULL;
+	scf_iter_destroy(imp_iter);
+	scf_iter_destroy(imp_rpg_iter);
+	scf_iter_destroy(imp_up_iter);
+	imp_iter = imp_rpg_iter = imp_up_iter = NULL;
+	scf_property_destroy(imp_prop);
+	imp_prop = NULL;
+	scf_pg_destroy(imp_pg);
+	scf_pg_destroy(imp_pg2);
+	imp_pg = imp_pg2 = NULL;
+	scf_snaplevel_destroy(imp_snpl);
+	scf_snaplevel_destroy(imp_rsnpl);
+	imp_snpl = imp_rsnpl = NULL;
+	scf_snapshot_destroy(imp_snap);
+	scf_snapshot_destroy(imp_lisnap);
+	scf_snapshot_destroy(imp_tlisnap);
+	scf_snapshot_destroy(imp_rsnap);
+	imp_snap = imp_lisnap = imp_tlisnap = imp_rsnap = NULL;
+	scf_instance_destroy(imp_inst);
+	scf_instance_destroy(imp_tinst);
+	imp_inst = imp_tinst = NULL;
+	scf_service_destroy(imp_svc);
+	scf_service_destroy(imp_tsvc);
+	imp_svc = imp_tsvc = NULL;
+	scf_scope_destroy(imp_scope);
+	imp_scope = NULL;
+
+	load_fini();
+}
+
+int
+lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
+{
+	scf_callback_t cbdata;
+	int result = 0;
+	entity_t *svc, *inst;
+	uu_list_t *insts;
+	int r;
+	pgroup_t *old_dpt;
+	int annotation_set = 0;
+
+	const char * const emsg_nomem = gettext("Out of memory.\n");
+	const char * const emsg_nores =
+	    gettext("svc.configd is out of resources.\n");
+
+	lscf_prep_hndl();
+
+	if (alloc_imp_globals())
+		goto out;
 
 	if (scf_handle_get_scope(g_hndl, SCF_SCOPE_LOCAL, imp_scope) != 0) {
 		switch (scf_error()) {
@@ -7565,74 +8141,8 @@ out:
 		/* Turn off annotation.  It is no longer needed. */
 		(void) _scf_set_annotation(g_hndl, NULL, NULL);
 	}
-	load_fini();
 
-	free(ud_ctarg);
-	free(ud_oldtarg);
-	free(ud_name);
-	ud_ctarg = ud_oldtarg = ud_name = NULL;
-
-	scf_transaction_destroy(ud_tx);
-	ud_tx = NULL;
-	scf_iter_destroy(ud_iter);
-	scf_iter_destroy(ud_iter2);
-	ud_iter = ud_iter2 = NULL;
-	scf_value_destroy(ud_val);
-	ud_val = NULL;
-	scf_property_destroy(ud_prop);
-	scf_property_destroy(ud_dpt_prop);
-	ud_prop = ud_dpt_prop = NULL;
-	scf_pg_destroy(ud_pg);
-	scf_pg_destroy(ud_cur_depts_pg);
-	scf_pg_destroy(ud_run_dpts_pg);
-	ud_pg = ud_cur_depts_pg = ud_run_dpts_pg = NULL;
-	scf_snaplevel_destroy(ud_snpl);
-	ud_snpl = NULL;
-	scf_instance_destroy(ud_inst);
-	ud_inst = NULL;
-
-	free(imp_str);
-	free(imp_tsname);
-	free(imp_fe1);
-	free(imp_fe2);
-	imp_str = imp_tsname = imp_fe1 = imp_fe2 = NULL;
-
-	cookie = NULL;
-	while ((old_dpt = uu_list_teardown(imp_deleted_dpts, &cookie)) !=
-	    NULL) {
-		free((char *)old_dpt->sc_pgroup_name);
-		free((char *)old_dpt->sc_pgroup_fmri);
-		internal_pgroup_free(old_dpt);
-	}
-	uu_list_destroy(imp_deleted_dpts);
-
-	scf_transaction_destroy(imp_tx);
-	imp_tx = NULL;
-	scf_iter_destroy(imp_iter);
-	scf_iter_destroy(imp_rpg_iter);
-	scf_iter_destroy(imp_up_iter);
-	imp_iter = imp_rpg_iter = imp_up_iter = NULL;
-	scf_property_destroy(imp_prop);
-	imp_prop = NULL;
-	scf_pg_destroy(imp_pg);
-	scf_pg_destroy(imp_pg2);
-	imp_pg = imp_pg2 = NULL;
-	scf_snaplevel_destroy(imp_snpl);
-	scf_snaplevel_destroy(imp_rsnpl);
-	imp_snpl = imp_rsnpl = NULL;
-	scf_snapshot_destroy(imp_snap);
-	scf_snapshot_destroy(imp_lisnap);
-	scf_snapshot_destroy(imp_tlisnap);
-	scf_snapshot_destroy(imp_rsnap);
-	imp_snap = imp_lisnap = imp_tlisnap = imp_rsnap = NULL;
-	scf_instance_destroy(imp_inst);
-	scf_instance_destroy(imp_tinst);
-	imp_inst = imp_tinst = NULL;
-	scf_service_destroy(imp_svc);
-	scf_service_destroy(imp_tsvc);
-	imp_svc = imp_tsvc = NULL;
-	scf_scope_destroy(imp_scope);
-	imp_scope = NULL;
+	free_imp_globals();
 
 	return (result);
 }
@@ -7702,6 +8212,162 @@ _lscf_import_err(int err, const char *fmri)
 }
 
 /*
+ * The global imp_svc and imp_inst should be set by the caller in the
+ * check to make sure the service and instance exist that the apply is
+ * working on.
+ */
+static int
+lscf_dependent_apply(void *dpg, void *e)
+{
+	scf_callback_t cb;
+	pgroup_t *dpt_pgroup = dpg;
+	pgroup_t *deldpt;
+	entity_t *ent = e;
+	int tissvc;
+	void *sc_ent, *tent;
+	scf_error_t serr;
+	int r;
+
+	const char * const dependents = "dependents";
+	const int issvc = (ent->sc_etype == SVCCFG_SERVICE_OBJECT);
+
+	if (issvc)
+		sc_ent = imp_svc;
+	else
+		sc_ent = imp_inst;
+
+	if (entity_get_running_pg(sc_ent, issvc, dependents, imp_pg,
+	    imp_iter, imp_tinst, imp_snap, imp_snpl) != 0 ||
+	    scf_pg_get_property(imp_pg, dpt_pgroup->sc_pgroup_name,
+	    imp_prop) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_NOT_FOUND:
+		case SCF_ERROR_DELETED:
+			break;
+
+		case SCF_ERROR_CONNECTION_BROKEN:
+		case SCF_ERROR_NOT_SET:
+		case SCF_ERROR_INVALID_ARGUMENT:
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		default:
+			bad_error("entity_get_pg", scf_error());
+		}
+	} else {
+		/*
+		 * Found the dependents/<wip dep> so check to
+		 * see if the service is different.  If so
+		 * store the service for later refresh, and
+		 * delete the wip dependency from the service
+		 */
+		if (scf_property_get_value(imp_prop, ud_val) != 0) {
+			switch (scf_error()) {
+				case SCF_ERROR_DELETED:
+					break;
+
+				case SCF_ERROR_CONNECTION_BROKEN:
+				case SCF_ERROR_NOT_SET:
+				case SCF_ERROR_INVALID_ARGUMENT:
+				case SCF_ERROR_HANDLE_MISMATCH:
+				case SCF_ERROR_NOT_BOUND:
+				default:
+					bad_error("scf_property_get_value",
+					    scf_error());
+			}
+		}
+
+		if (scf_value_get_as_string(ud_val, ud_oldtarg,
+		    max_scf_value_len + 1) < 0)
+			bad_error("scf_value_get_as_string", scf_error());
+
+		r = fmri_equal(dpt_pgroup->sc_pgroup_fmri, ud_oldtarg);
+		switch (r) {
+		case 1:
+			break;
+		case 0:
+			if ((serr = fmri_to_entity(g_hndl, ud_oldtarg, &tent,
+			    &tissvc)) != SCF_ERROR_NONE) {
+				if (serr == SCF_ERROR_NOT_FOUND) {
+					break;
+				} else {
+					bad_error("fmri_to_entity", serr);
+				}
+			}
+
+			if (entity_get_pg(tent, tissvc,
+			    dpt_pgroup->sc_pgroup_name, imp_pg) != 0) {
+				serr = scf_error();
+				if (serr == SCF_ERROR_NOT_FOUND ||
+				    serr == SCF_ERROR_DELETED) {
+					break;
+				} else {
+					bad_error("entity_get_pg", scf_error());
+				}
+			}
+
+			if (scf_pg_delete(imp_pg) != 0) {
+				serr = scf_error();
+				if (serr == SCF_ERROR_NOT_FOUND ||
+				    serr == SCF_ERROR_DELETED) {
+					break;
+				} else {
+					bad_error("scf_pg_delete", scf_error());
+				}
+			}
+
+			deldpt = internal_pgroup_new();
+			if (deldpt == NULL)
+				return (ENOMEM);
+			deldpt->sc_pgroup_name =
+			    strdup(dpt_pgroup->sc_pgroup_name);
+			deldpt->sc_pgroup_fmri = strdup(ud_oldtarg);
+			if (deldpt->sc_pgroup_name == NULL ||
+			    deldpt->sc_pgroup_fmri == NULL)
+				return (ENOMEM);
+			deldpt->sc_parent = (entity_t *)ent;
+			if (uu_list_insert_after(imp_deleted_dpts, NULL,
+			    deldpt) != 0)
+				uu_die(gettext("libuutil error: %s\n"),
+				    uu_strerror(uu_error()));
+
+			break;
+		default:
+			bad_error("fmri_equal", r);
+		}
+	}
+
+	cb.sc_handle = g_hndl;
+	cb.sc_parent = ent;
+	cb.sc_service = ent->sc_etype == SVCCFG_SERVICE_OBJECT;
+	cb.sc_source_fmri = ent->sc_fmri;
+	cb.sc_target_fmri = ent->sc_fmri;
+	cb.sc_trans = NULL;
+	cb.sc_flags = SCI_FORCE;
+
+	if (lscf_dependent_import(dpt_pgroup, &cb) != UU_WALK_NEXT)
+		return (UU_WALK_ERROR);
+
+	r = imp_refresh_fmri(dpt_pgroup->sc_pgroup_fmri, NULL, NULL);
+	switch (r) {
+	case 0:
+		break;
+
+	case ENOMEM:
+	case ECONNABORTED:
+	case EPERM:
+	case -1:
+		warn(gettext("Unable to refresh \"%s\"\n"),
+		    dpt_pgroup->sc_pgroup_fmri);
+		return (UU_WALK_ERROR);
+
+	default:
+		bad_error("imp_refresh_fmri", r);
+	}
+
+	return (UU_WALK_NEXT);
+}
+
+/*
  * Returns
  *   0 - success
  *   -1 - lscf_import_instance_pgs() failed.
@@ -7709,28 +8375,18 @@ _lscf_import_err(int err, const char *fmri)
 int
 lscf_bundle_apply(bundle_t *bndl, const char *file)
 {
+	pgroup_t *old_dpt;
 	entity_t *svc, *inst;
-	scf_scope_t *rscope;
-	scf_service_t *rsvc;
-	scf_instance_t *rinst;
-	scf_snapshot_t *rsnap;
-	scf_iter_t *iter;
 	int annotation_set = 0;
-	int r;
+	int ret = 0;
+	int r = 0;
 
 	lscf_prep_hndl();
 
-	if ((rscope = scf_scope_create(g_hndl)) == NULL ||
-	    (rsvc = scf_service_create(g_hndl)) == NULL ||
-	    (rinst = scf_instance_create(g_hndl)) == NULL ||
-	    (rsnap = scf_snapshot_create(g_hndl)) == NULL ||
-	    (iter = scf_iter_create(g_hndl)) == NULL ||
-	    (imp_pg = scf_pg_create(g_hndl)) == NULL ||
-	    (imp_prop = scf_property_create(g_hndl)) == NULL ||
-	    (imp_tx = scf_transaction_create(g_hndl)) == NULL)
-		scfdie();
+	if ((ret = alloc_imp_globals()))
+		goto out;
 
-	if (scf_handle_get_scope(g_hndl, SCF_SCOPE_LOCAL, rscope) != 0)
+	if (scf_handle_get_scope(g_hndl, SCF_SCOPE_LOCAL, imp_scope) != 0)
 		scfdie();
 
 	/*
@@ -7768,7 +8424,8 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 	    svc = uu_list_next(bndl->sc_bundle_services, svc)) {
 		int refresh = 0;
 
-		if (scf_scope_get_service(rscope, svc->sc_name, rsvc) != 0) {
+		if (scf_scope_get_service(imp_scope, svc->sc_name,
+		    imp_svc) != 0) {
 			switch (scf_error()) {
 			case SCF_ERROR_NOT_FOUND:
 				if (g_verbose)
@@ -7782,12 +8439,55 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 		}
 
 		/*
+		 * If there were missing types in the profile, then need to
+		 * attempt to find the types.
+		 */
+		if (svc->sc_miss_type) {
+			if (uu_list_numnodes(svc->sc_pgroups) &&
+			    uu_list_walk(svc->sc_pgroups, find_current_pg_type,
+			    svc, UU_DEFAULT) != 0) {
+				if (uu_error() != UU_ERROR_CALLBACK_FAILED)
+					bad_error("uu_list_walk", uu_error());
+
+				ret = -1;
+				continue;
+			}
+
+			for (inst = uu_list_first(
+			    svc->sc_u.sc_service.sc_service_instances);
+			    inst != NULL;
+			    inst = uu_list_next(
+			    svc->sc_u.sc_service.sc_service_instances, inst)) {
+				/*
+				 * If the instance doesn't exist just
+				 * skip to the next instance and let the
+				 * import note the missing instance.
+				 */
+				if (scf_service_get_instance(imp_svc,
+				    inst->sc_name, imp_inst) != 0)
+					continue;
+
+				if (uu_list_walk(inst->sc_pgroups,
+				    find_current_pg_type, inst,
+				    UU_DEFAULT) != 0) {
+					if (uu_error() !=
+					    UU_ERROR_CALLBACK_FAILED)
+						bad_error("uu_list_walk",
+						    uu_error());
+
+					ret = -1;
+					inst->sc_miss_type = B_TRUE;
+				}
+			}
+		}
+
+		/*
 		 * if we have pgs in the profile, we need to refresh ALL
 		 * instances of the service
 		 */
 		if (uu_list_numnodes(svc->sc_pgroups) != 0) {
 			refresh = 1;
-			r = lscf_import_service_pgs(rsvc, svc->sc_fmri, svc,
+			r = lscf_import_service_pgs(imp_svc, svc->sc_fmri, svc,
 			    SCI_FORCE | SCI_KEEP);
 			switch (_lscf_import_err(r, svc->sc_fmri)) {
 			case IMPORT_NEXT:
@@ -7802,13 +8502,32 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 			}
 		}
 
+		if (uu_list_numnodes(svc->sc_dependents) != 0) {
+			uu_list_walk(svc->sc_dependents,
+			    lscf_dependent_apply, svc, UU_DEFAULT);
+		}
+
 		for (inst = uu_list_first(
 		    svc->sc_u.sc_service.sc_service_instances);
 		    inst != NULL;
 		    inst = uu_list_next(
 		    svc->sc_u.sc_service.sc_service_instances, inst)) {
-			if (scf_service_get_instance(rsvc, inst->sc_name,
-			    rinst) != 0) {
+			/*
+			 * This instance still has missing types
+			 * so skip it.
+			 */
+			if (inst->sc_miss_type) {
+				if (g_verbose)
+					warn(gettext("Ignoring instance "
+					    "%s:%s with missing types\n"),
+					    inst->sc_parent->sc_name,
+					    inst->sc_name);
+
+				continue;
+			}
+
+			if (scf_service_get_instance(imp_svc, inst->sc_name,
+			    imp_inst) != 0) {
 				switch (scf_error()) {
 				case SCF_ERROR_NOT_FOUND:
 					if (g_verbose)
@@ -7832,11 +8551,13 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 			 *
 			 * This could happen if a service/instance declares
 			 * a dependent on behalf of another service/instance.
+			 *
 			 */
-			if (scf_instance_get_snapshot(rinst, snap_lastimport,
-			    rsnap) != 0) {
-				if (scf_instance_get_pg(rinst, SCF_PG_GENERAL,
-				    imp_pg) != 0 || scf_pg_get_property(imp_pg,
+			if (scf_instance_get_snapshot(imp_inst, snap_lastimport,
+			    imp_snap) != 0) {
+				if (scf_instance_get_pg(imp_inst,
+				    SCF_PG_GENERAL, imp_pg) != 0 ||
+				    scf_pg_get_property(imp_pg,
 				    SCF_PROPERTY_ENABLED, imp_prop) != 0) {
 					if (g_verbose)
 						warn(gettext("Ignoreing "
@@ -7848,8 +8569,8 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 				}
 			}
 
-			r = lscf_import_instance_pgs(rinst, inst->sc_fmri, inst,
-			    SCI_FORCE | SCI_KEEP);
+			r = lscf_import_instance_pgs(imp_inst, inst->sc_fmri,
+			    inst, SCI_FORCE | SCI_KEEP);
 			switch (_lscf_import_err(r, inst->sc_fmri)) {
 			case IMPORT_NEXT:
 				break;
@@ -7862,18 +8583,34 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 				bad_error("lscf_import_instance_pgs", r);
 			}
 
+			if (uu_list_numnodes(inst->sc_dependents) != 0) {
+				uu_list_walk(inst->sc_dependents,
+				    lscf_dependent_apply, inst, UU_DEFAULT);
+			}
+
 			/* refresh only if there is no pgs in the service */
 			if (refresh == 0)
-				(void) refresh_entity(0, rinst, inst->sc_fmri,
-				    NULL, NULL, NULL);
+				(void) refresh_entity(0, imp_inst,
+				    inst->sc_fmri, NULL, NULL, NULL);
 		}
 
 		if (refresh == 1) {
 			char *name_buf = safe_malloc(max_scf_name_len + 1);
 
-			(void) refresh_entity(1, rsvc, svc->sc_name, rinst,
-			    iter, name_buf);
+			(void) refresh_entity(1, imp_svc, svc->sc_name,
+			    imp_inst, imp_iter, name_buf);
 			free(name_buf);
+		}
+
+		for (old_dpt = uu_list_first(imp_deleted_dpts);
+		    old_dpt != NULL;
+		    old_dpt = uu_list_next(imp_deleted_dpts, old_dpt)) {
+			if (imp_refresh_fmri(old_dpt->sc_pgroup_fmri,
+			    old_dpt->sc_pgroup_name,
+			    old_dpt->sc_parent->sc_fmri) != 0) {
+				warn(gettext("Unable to refresh \"%s\"\n"),
+				    old_dpt->sc_pgroup_fmri);
+			}
 		}
 	}
 
@@ -7883,19 +8620,8 @@ out:
 		(void) _scf_set_annotation(g_hndl, NULL, NULL);
 	}
 
-	scf_transaction_destroy(imp_tx);
-	imp_tx = NULL;
-	scf_pg_destroy(imp_pg);
-	imp_pg = NULL;
-	scf_property_destroy(imp_prop);
-	imp_prop = NULL;
-
-	scf_snapshot_destroy(rsnap);
-	scf_iter_destroy(iter);
-	scf_instance_destroy(rinst);
-	scf_service_destroy(rsvc);
-	scf_scope_destroy(rscope);
-	return (0);
+	free_imp_globals();
+	return (ret);
 }
 
 

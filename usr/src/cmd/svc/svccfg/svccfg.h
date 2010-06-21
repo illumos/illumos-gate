@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_CMD_SVCCFG_H
@@ -57,6 +56,10 @@ extern "C" {
 #define	SCI_KEEP	0x40		/* Don't delete when SCI_FORCEing */
 #define	SCI_NOSNAP	0x80		/* Don't take last-import snapshot */
 #define	SCI_DELAYENABLE	0x100		/* Delay the general/enable property */
+
+#define	SCI_OP_IMPORT	0x1000
+#define	SCI_OP_APPLY	0x2000
+#define	SCI_OP_RESTORE	0x4000
 
 #define	HASH_SVC		"smf/manifest"
 
@@ -128,6 +131,7 @@ enum import_state {
 };
 
 typedef enum svccfg_op {
+	SVCCFG_OP_NONE = -1,
 	SVCCFG_OP_IMPORT = 0,
 	SVCCFG_OP_APPLY,
 	SVCCFG_OP_RESTORE
@@ -178,7 +182,9 @@ typedef struct entity {
 	uu_list_t	*sc_dependents;
 	struct entity	*sc_parent;
 	enum import_state  sc_import_state;
+	boolean_t	sc_miss_type;
 	int		sc_seen;
+	svccfg_op_t	sc_op;
 
 	union {
 		struct {
@@ -293,6 +299,7 @@ typedef struct engine_state {
 	GetLine		*sc_gl;
 	boolean_t	sc_fs_minimal;	/* SCF_INSTANCE_FS_MINIMAL is online. */
 	boolean_t	sc_in_emi;	/* During early import */
+	boolean_t	sc_miss_type;	/* Apply profile found missing types */
 
 	pid_t		sc_repo_pid;
 	const char	*sc_repo_filename;
@@ -423,6 +430,7 @@ CPL_MATCH_FN(complete_command);
 
 int lxml_init(void);
 int lxml_get_bundle_file(bundle_t *, const char *, svccfg_op_t);
+void lxml_store_value(value_t *, element_t, const xmlChar *);
 
 void engine_init(void);
 int engine_exec_cmd(void);

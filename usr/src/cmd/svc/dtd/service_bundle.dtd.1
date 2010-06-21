@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -37,6 +36,16 @@
     A series of service bundles may be composed via the xi:include tag.
     smf(5) tools enforce that all bundles be of the same type.
 -->
+
+<!--
+     These entities are used for the property, propval and property_group
+     elements, that require type attributes for manifest, while for profiles
+     the type attributes are only implied.
+-->
+
+<!ENTITY % profile "IGNORE">
+<!ENTITY % manifest "INCLUDE">
+
 <!ELEMENT xi:include
   (xi:fallback)
   >
@@ -196,6 +205,22 @@
 		repository.
 -->
 
+<![%profile;[
+<!ELEMENT property
+	( count_list | integer_list | opaque_list | host_list | hostname_list |
+	net_address_v4_list | net_address_v6_list | time_list |
+	astring_list | ustring_list | boolean_list | fmri_list |
+	uri_list )? >
+
+<!ATTLIST property
+	name		CDATA #REQUIRED
+	type		( count | integer | opaque | host | hostname |
+			net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #IMPLIED
+	override	( true | false ) "false" >
+]]>
+	
+<![%manifest;[
 <!ELEMENT property
 	( count_list | integer_list | opaque_list | host_list | hostname_list |
 	net_address_v4_list | net_address_v6_list | time_list |
@@ -208,6 +233,7 @@
 			net_address_v4 | net_address_v6 | time |
 			astring | ustring | boolean | fmri | uri ) #REQUIRED
 	override	( true | false ) "false" >
+]]>
 
 <!--
    propval
@@ -228,6 +254,19 @@
 		repository.
 -->
 
+<![%profile;[
+<!ELEMENT propval EMPTY>
+
+<!ATTLIST propval
+	name		CDATA #REQUIRED
+	type		( count | integer | opaque | host | hostname |
+			net_address_v4 | net_address_v6 | time | astring |
+			ustring | boolean | fmri | uri ) #IMPLIED
+	value		CDATA #REQUIRED
+	override	( true | false ) "false" >
+]]>
+
+<![%manifest;[
 <!ELEMENT propval EMPTY>
 
 <!ATTLIST propval
@@ -237,6 +276,7 @@
 			ustring | boolean | fmri | uri ) #REQUIRED
 	value		CDATA #REQUIRED
 	override	( true | false ) "false" >
+]]>
 
 <!--
   property_group
@@ -260,6 +300,17 @@
 	delete	If in the repository, this property group should be removed.
 -->
 
+<![%profile;[
+<!ELEMENT property_group
+	( stability?, ( propval | property )* )>
+
+<!ATTLIST property_group
+	name		CDATA #REQUIRED
+	type		CDATA #IMPLIED
+	delete		( true | false ) "false" >
+]]>
+
+<![%manifest;[
 <!ELEMENT property_group
 	( stability?, ( propval | property )* )>
 
@@ -267,6 +318,7 @@
 	name		CDATA #REQUIRED
 	type		CDATA #REQUIRED
 	delete		( true | false ) "false" >
+]]>
 
 <!--
   service_fmri
