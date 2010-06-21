@@ -1591,7 +1591,7 @@ icmp_tpi_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	connp = rawip_do_open(family, credp, &error, KM_SLEEP);
 	if (connp == NULL) {
 		ASSERT(error != 0);
-		inet_minor_free(ip_minor_arena_sa, connp->conn_dev);
+		inet_minor_free(ip_minor_arena_sa, conn_dev);
 		return (error);
 	}
 
