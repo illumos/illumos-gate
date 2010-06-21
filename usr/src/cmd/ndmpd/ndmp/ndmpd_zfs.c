@@ -100,6 +100,7 @@ static int ndmpd_zfs_getenv_update(ndmpd_zfs_args_t *);
 static int ndmpd_zfs_getenv_dmp_name(ndmpd_zfs_args_t *);
 static boolean_t ndmpd_zfs_dmp_name_valid(ndmpd_zfs_args_t *, char *);
 static boolean_t ndmpd_zfs_is_incremental(ndmpd_zfs_args_t *);
+static int ndmpd_zfs_send_fhist(ndmpd_zfs_args_t *);
 
 static int ndmpd_zfs_snapshot_prepare(ndmpd_zfs_args_t *);
 static int ndmpd_zfs_snapshot_cleanup(ndmpd_zfs_args_t *, int);
@@ -483,7 +484,8 @@ ndmpd_zfs_backup_starter(void *arg)
 	    "data bytes_total(including header):%llu",
 	    session->ns_data.dd_module.dm_stats.ms_bytes_processed);
 
-	err |= cleanup_err;
+	if (err == 0)
+		err = ndmpd_zfs_send_fhist(ndmpd_zfs_args);
 
 _done:
 	NS_DEC(nbk);
@@ -492,6 +494,49 @@ _done:
 	ndmpd_zfs_fini(ndmpd_zfs_args);
 
 	return (err);
+}
+
+static int
+ndmpd_zfs_send_fhist(ndmpd_zfs_args_t *ndmpd_zfs_args)
+{
+	ndmpd_session_t *session = (ndmpd_session_t *)
+	    (ndmpd_zfs_params->mp_daemon_cookie);
+	struct stat64 st;
+	char *envp;
+	zfs_handle_t *zhp;
+	char mountpoint[PATH_MAX];
+
+	envp = MOD_GETENV(ndmpd_zfs_params, "HIST");
+	if (!envp)
+		return (0);
+
+	if (!(strchr("YT", toupper(*envp)))) {
+		ndmpd_zfs_dma_log(ndmpd_zfs_args, NDMP_LOG_WARNING,
+		    "HIST is not set.  No file history will be "
+		    "generated.\n");
+		return (0);
+	}
+
+	if ((zhp = zfs_open(ndmpd_zfs_args->nz_zlibh,
+	    ndmpd_zfs_args->nz_dataset, ndmpd_zfs_args->nz_type)) == NULL ||
+	    zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint, PATH_MAX, NULL,
+	    NULL, 0, B_FALSE) != 0 ||
+	    stat64(mountpoint, &st) != 0)
+		(void) memset(&st, 0, sizeof (struct stat64));
+	if (zhp)
+		zfs_close(zhp);
+
+	if (ndmpd_api_file_history_dir_v3(session, ".", ROOT_INODE,
+	    ROOT_INODE) != 0)
+		return (-1);
+	if (ndmpd_api_file_history_dir_v3(session, "..", ROOT_INODE,
+	    ROOT_INODE) != 0)
+		return (-1);
+	if (ndmpd_api_file_history_node_v3(session, ROOT_INODE, &st, 0) != 0)
+		return (-1);
+
+	ndmpd_file_history_cleanup(session, TRUE);
+	return (0);
 }
 
 static int
@@ -670,6 +715,7 @@ ndmpd_zfs_backup_tape_write(ndmpd_zfs_args_t *ndmpd_zfs_args)
 			free(buf);
 			return (-1);
 		}
+		NS_ADD(rdisk, count);
 
 		if (MOD_WRITE(ndmpd_zfs_params, buf, count) != 0) {
 			(void) ndmpd_zfs_abort((void *) ndmpd_zfs_args);
@@ -787,6 +833,7 @@ ndmpd_zfs_restore_tape_read(ndmpd_zfs_args_t *ndmpd_zfs_args)
 			    *bytes_totalp);
 			(void) write(ndmpd_zfs_args->nz_pipe_fd[PIPE_TAPE],
 			    buf, bufsize);
+			NS_ADD(wdisk, bufsize);
 			break;
 		}
 
@@ -811,6 +858,7 @@ ndmpd_zfs_restore_tape_read(ndmpd_zfs_args_t *ndmpd_zfs_args)
 
 			return (-1);
 		}
+		NS_ADD(wdisk, count);
 
 		*bytes_totalp += count;
 

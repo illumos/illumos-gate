@@ -495,6 +495,7 @@ ndmpd_config_get_butype_info_v3(ndmp_connection_t *connection, void *body)
 
 	zfs_attrs = NDMP_BUTYPE_BACKUP_UTF8 |
 	    NDMP_BUTYPE_RECOVER_UTF8 |
+	    NDMP_BUTYPE_BACKUP_DIRECT |
 	    NDMP_BUTYPE_BACKUP_INCREMENTAL;
 
 	/* zfs backup type */
@@ -553,8 +554,10 @@ ndmpd_config_get_fs_info_v3(ndmp_connection_t *connection, void *body)
 		NDMP_LOG(LOG_ERR, "No file system found.");
 		ndmp_send_reply(connection, (void *)&reply,
 		    "sending ndmp_config_get_fs_info reply");
+		(void) close(fd);
 		return;
 	}
+	(void) close(fd);
 
 	fp = fopen(MNTTAB, "r");
 	if (!fp) {
@@ -1007,6 +1010,7 @@ ndmpd_config_get_butype_info_v4(ndmp_connection_t *connection, void *body)
 
 	zfs_attrs = NDMP_BUTYPE_BACKUP_UTF8 |
 	    NDMP_BUTYPE_RECOVER_UTF8 |
+	    NDMP_BUTYPE_BACKUP_DIRECT |
 	    NDMP_BUTYPE_BACKUP_INCREMENTAL;
 
 	/* zfs backup type */
