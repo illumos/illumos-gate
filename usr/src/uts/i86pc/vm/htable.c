@@ -1475,6 +1475,26 @@ htable_attach(
 
 	pp = boot_claim_page(pfn);
 	ASSERT(pp != NULL);
+
+	/*
+	 * Page table pages that were allocated by dboot or
+	 * in very early startup didn't go through boot_mapin()
+	 * and so won't have vnode/offsets. Fix that here.
+	 */
+	if (pp->p_vnode == NULL) {
+		/* match offset calculation in page_get_physical() */
+		u_offset_t offset = (uintptr_t)ht;
+		if (offset > kernelbase)
+			offset -= kernelbase;
+		offset <<= MMU_PAGESHIFT;
+#if defined(__amd64)
+		offset += mmu.hole_start;       /* something in VA hole */
+#else
+		offset += 1ULL << 40;   	/* something > 4 Gig */
+#endif
+		ASSERT(page_exists(&kvp, offset) == NULL);
+		(void) page_hashin(pp, &kvp, offset, NULL);
+	}
 	page_downgrade(pp);
 #if defined(__xpv) && defined(__amd64)
 	/*
