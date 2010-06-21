@@ -3033,6 +3033,18 @@ sign_cert(KMF_HANDLE_T handle,
 		    signature_oid);
 		if (ret)
 			goto cleanup;
+
+		/* Free the previous "data to be signed" block */
+		kmf_free_data(&data_to_sign);
+
+		/*
+		 * We changed the cert (updated the signature OID), so we
+		 * need to re-encode it so the correct data gets signed.
+		 */
+		ret = DerEncodeTbsCertificate(&subj_cert->certificate,
+		    &data_to_sign);
+		if (ret != KMF_OK)
+			goto cleanup;
 	}
 	kmf_set_attr_at_index(attrlist, i, KMF_KEYSTORE_TYPE_ATTR,
 	    &Signkey->kstype, sizeof (KMF_KEYSTORE_TYPE));
@@ -3088,7 +3100,11 @@ sign_cert(KMF_HANDLE_T handle,
 
 		subj_cert->signature.encrypted = signature;
 	} else {
-		subj_cert->signature.encrypted = signed_data;
+		ret = copy_data(&subj_cert->signature.encrypted, &signed_data);
+		kmf_free_data(&signed_data);
+
+		if (ret != KMF_OK)
+			goto cleanup;
 	}
 
 	/* Now, re-encode the cert with the new signature */
