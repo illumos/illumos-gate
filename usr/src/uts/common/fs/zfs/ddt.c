@@ -739,9 +739,9 @@ ddt_prefetch(spa_t *spa, const blkptr_t *bp)
 		return;
 
 	/*
-	 * We remove the DDT once it's empty and only prefetch dedup blocks
-	 * when there are entries in the DDT.  Thus no locking is required
-	 * as the DDT can't disappear on us.
+	 * We only remove the DDT once all tables are empty and only
+	 * prefetch dedup blocks when there are entries in the DDT.
+	 * Thus no locking is required as the DDT can't disappear on us.
 	 */
 	ddt = ddt_select(spa, bp);
 	ddt_key_fill(&dde.dde_key, bp);
@@ -1077,11 +1077,15 @@ ddt_sync_table(ddt_t *ddt, dmu_tx_t *tx, uint64_t txg)
 	}
 
 	for (enum ddt_type type = 0; type < DDT_TYPES; type++) {
+		uint64_t count = 0;
 		for (enum ddt_class class = 0; class < DDT_CLASSES; class++) {
-			if (!ddt_object_exists(ddt, type, class))
-				continue;
-			ddt_object_sync(ddt, type, class, tx);
-			if (ddt_object_count(ddt, type, class) == 0)
+			if (ddt_object_exists(ddt, type, class)) {
+				ddt_object_sync(ddt, type, class, tx);
+				count += ddt_object_count(ddt, type, class);
+			}
+		}
+		for (enum ddt_class class = 0; class < DDT_CLASSES; class++) {
+			if (count == 0 && ddt_object_exists(ddt, type, class))
 				ddt_object_destroy(ddt, type, class, tx);
 		}
 	}
