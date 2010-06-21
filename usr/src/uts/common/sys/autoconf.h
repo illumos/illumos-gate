@@ -88,6 +88,7 @@ struct devnames {
 #define	DN_OPEN_RETURNS_EINTR	0x4000	/* DDI_OPEN_RETURNS_EINTR prop */
 #define	DN_SCSI_SIZE_CLEAN	0x8000	/* driver is scsi_size_clean() */
 #define	DN_NETWORK_PHYSDRIVER	0x10000	/* physical network driver */
+#define	DN_DEVID_REGISTRANT	0x20000	/* ddi-devid-registrant prop */
 
 #ifdef _KERNEL
 

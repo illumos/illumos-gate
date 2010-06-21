@@ -426,6 +426,11 @@ impl_make_parlist(major_t major)
 	    DDI_PROP_TYPE_STRING, &props))
 		dnp->dn_flags |= DN_PHCI_DRIVER;
 
+	if (i_ddi_prop_search(DDI_DEV_T_ANY, DDI_DEVID_REGISTRANT,
+	    DDI_PROP_TYPE_INT, &props)) {
+		dnp->dn_flags |= DN_DEVID_REGISTRANT;
+	}
+
 	dnp->dn_flags |= DN_CONF_PARSED;
 	dnp->dn_pl = pl;
 	return (pl);

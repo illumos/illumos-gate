@@ -391,11 +391,11 @@ e_ddi_devid_hold_by_major(major_t major)
 	ddi_rele_driver(major);
 }
 
-static char *e_ddi_devid_hold_driver_list[] = { "sd", "ssd", "dad" };
+/* legacy support - see below */
+static char *e_ddi_devid_hold_driver_list[] = { "sd", "ssd" };
 
 #define	N_DRIVERS_TO_HOLD	\
 	(sizeof (e_ddi_devid_hold_driver_list) / sizeof (char *))
-
 
 static void
 e_ddi_devid_hold_installed_driver(ddi_devid_t devid)
@@ -403,6 +403,7 @@ e_ddi_devid_hold_installed_driver(ddi_devid_t devid)
 	impl_devid_t	*id = (impl_devid_t *)devid;
 	major_t		major, hint_major;
 	char		hint[DEVID_HINT_SIZE + 1];
+	struct devnames	*dnp;
 	char		**drvp;
 	int		i;
 
@@ -421,6 +422,23 @@ e_ddi_devid_hold_installed_driver(ddi_devid_t devid)
 		e_ddi_devid_hold_by_major(hint_major);
 	}
 
+	/*
+	 * search for the devid with each driver declaring
+	 * itself as a devid registrant.
+	 */
+	for (major = 0; major < devcnt; major++) {
+		if (major == hint_major)
+			continue;
+		dnp = &devnamesp[major];
+		if (dnp->dn_flags & DN_DEVID_REGISTRANT) {
+			e_ddi_devid_hold_by_major(major);
+		}
+	}
+
+	/*
+	 * Legacy support: may be removed once an upgrade mechanism
+	 * for driver conf files is available.
+	 */
 	drvp = e_ddi_devid_hold_driver_list;
 	for (i = 0; i < N_DRIVERS_TO_HOLD; i++, drvp++) {
 		major = ddi_name_to_major(*drvp);
@@ -429,7 +447,6 @@ e_ddi_devid_hold_installed_driver(ddi_devid_t devid)
 		}
 	}
 }
-
 
 /*
  * Return success if discovery was attempted, to indicate
