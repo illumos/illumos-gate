@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1201,7 +1200,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
     boolean_t unspec_src, uint64_t *buffer, int buffer_size, uint32_t spi,
     char *ebuf)
 {
-	boolean_t single_dst;
+	boolean_t last_dst;
 	struct sockaddr_in6 *sin6;
 	struct sadb_msg *msgp;
 	int i, rc;
@@ -1237,10 +1236,6 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 	 *
 	 *	If a source or proxy address explodes, keep unspecified
 	 *	(and mention unspecified).
-	 *
-	 * If dsthp is == dummy.he, then go through the loop once.
-	 * If any other hp is == dummy.he, then you don't have to apply any
-	 * silly rules.
 	 *
 	 * DELETE is different, because you can leave either "src" or "dst"
 	 * blank!  You need to explode if one of them is full, and not assume
@@ -1334,8 +1329,12 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 		return;
 	}
 
-	single_dst = (dsthp == &dummy.he || dsthp->h_addr_list[1] == NULL);
-
+	/*
+	 * Go through the list of all dst addresses, trying to find matching
+	 * src address for each. If the first address is == dummy.he we will go
+	 * through the loop just once. If any other hp is == dummy.he, then we
+	 * don't have to apply any silly rules.
+	 */
 	for (i = 0; dsthp->h_addr_list[i] != NULL; i++) {
 		if (dsthp == &dummy.he) {
 			/* Just to be sure... */
@@ -1351,6 +1350,8 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_port = htons(dstport);
 		}
+
+		last_dst = (dsthp->h_addr_list[i + 1] == NULL);
 
 		/*
 		 * Try and assign src, if there's any ambiguity.
@@ -1381,15 +1382,15 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 
 				if (first_match == NULL) {
 					/*
-					 * No IPv4 hits.  Is this a single
-					 * dest?
+					 * No IPv4 hits. Is this the last
+					 * destination address in the list ?
 					 */
-					WARN1(ep, ebuf, gettext(
+					ERROR1(ep, ebuf, gettext(
 					    "No IPv4 source address "
 					    "for name %s.\n"), srchp->h_name);
-					if (single_dst) {
-						ERROR(ep, ebuf, gettext(
-						    "Only single destination "
+					if (last_dst) {
+						FATAL(ep, ebuf, gettext(
+						    "No match for destination "
 						    "IP address.\n"));
 					} else {
 						/* Continue, but do I print? */
@@ -1463,16 +1464,16 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 				sin6->sin6_port = htons(srcport);
 				if (first_match == NULL) {
 					/*
-					 * No IPv6 hits.  Is this a single
-					 * dest?
+					 * No IPv6 hits. Is this the last
+					 * destination address in the list ?
 					 */
-					WARN1(ep, ebuf, gettext(
+					ERROR1(ep, ebuf, gettext(
 					    "No IPv6 source address of "
 					    "matching scope for name %s.\n"),
 					    srchp->h_name);
-					if (single_dst) {
-						ERROR(ep, ebuf, gettext(
-						    "Only a single IPV6 "
+					if (last_dst) {
+						FATAL(ep, ebuf, gettext(
+						    "No match for IPV6 "
 						    "destination "
 						    "address.\n"));
 					} else {

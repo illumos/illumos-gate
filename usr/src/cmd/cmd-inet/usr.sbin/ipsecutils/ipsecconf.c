@@ -2653,9 +2653,9 @@ pfp_delete_rule(uint64_t index)
 
 	if (cnt != len) {
 		if (cnt < 0) {
+			warn(gettext("Delete failed: write"));
 			(void) close(sfd);
 			free(msg);
-			warn(gettext("Delete failed: write"));
 			return (-1);
 		} else {
 			(void) close(sfd);
@@ -2668,9 +2668,9 @@ pfp_delete_rule(uint64_t index)
 	cnt = read(sfd, msg, len);
 	if (cnt != len) {
 		if (cnt < 0) {
+			warn(gettext("Delete failed: read"));
 			(void) close(sfd);
 			free(msg);
-			warn(gettext("Delete failed: read"));
 			return (-1);
 		} else {
 			(void) close(sfd);
@@ -2681,9 +2681,9 @@ pfp_delete_rule(uint64_t index)
 	}
 	(void) close(sfd);
 	if (msg->spd_msg_errno != 0) {
-		free(msg);
 		errno = msg->spd_msg_errno;
 		warn(gettext("Delete failed: SPD_FLUSH"));
+		free(msg);
 		return (-1);
 	}
 
