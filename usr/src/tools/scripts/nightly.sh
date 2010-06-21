@@ -1234,11 +1234,12 @@ if [ "$TEAMWARE" = "" ]; then
 	export TEAMWARE
 fi
 
-USAGE='Usage: nightly [-in] [-V VERS ] [ -S E|D|H|O ] <env_file>
+USAGE='Usage: nightly [-in] [+t] [-V VERS ] [ -S E|D|H|O ] <env_file>
 
 Where:
 	-i	Fast incremental options (no clobber, lint, check)
 	-n      Do not do a bringover
+	+t	Use the build tools in $ONBLD_TOOLS/bin
 	-V VERS set the build version string to VERS
 	-S	Build a variant of the source product
 		E - build exportable source
@@ -1276,7 +1277,8 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-o	build using root privileges to set OWNER/GROUP (old style)
 	-p	create packages
 	-r	check ELF runtime attributes in the proto area
-	-t	build and use the tools in $SRC/tools
+	-t	build and use the tools in $SRC/tools (default setting)
+	+t	Use the build tools in $ONBLD_TOOLS/bin
 	-u	update proto_list_$MACH and friends in the parent workspace;
 		when used with -f, also build an unrefmaster.out in the parent
 	-w	report on differences between previous and current proto areas
@@ -1367,7 +1369,7 @@ function set_S_flag {
 }
 
 OPTIND=1
-while getopts inS:tV: FLAG
+while getopts +inS:tV: FLAG
 do
 	case $FLAG in
 	  i )	i_FLAG=y; i_CMD_LINE_FLAG=y
@@ -1532,7 +1534,7 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
+while getopts +AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
