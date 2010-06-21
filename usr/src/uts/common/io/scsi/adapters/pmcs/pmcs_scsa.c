@@ -227,6 +227,8 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	tgt = pmcs_get_target(iport, tgt_port, B_TRUE);
 
 	if (tgt == NULL) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "%s: "
+		    "No tgt for tgt_port (%s)", __func__, tgt_port);
 		goto tgt_init_fail;
 	}
 

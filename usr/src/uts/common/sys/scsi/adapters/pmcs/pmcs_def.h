@@ -125,6 +125,7 @@ struct pmcs_phy {
 	pmcs_iport_t	*iport;		/* back ptr to the iport handle */
 	pmcs_iport_t	*last_iport;	/* last iport this PHY was on */
 	pmcs_xscsi_t	*target;	/* back ptr to current target */
+	pmcs_xscsi_t	**target_addr;	/* address of real target pointer */
 	kstat_t		*phy_stats;	/* kstats for this phy */
 	/*
 	 * Attached port phy mask and target port phymask.  With 16 bytes

@@ -3571,6 +3571,7 @@ pmcs_configure_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr, pmcs_iport_t *iport)
 		 */
 		while (clist) {
 			ctmp = clist->sibling;
+			clist->target_addr = NULL;
 			kmem_cache_free(pwp->phy_cache, clist);
 			clist = ctmp;
 		}
@@ -3661,6 +3662,7 @@ out:
 	while (clist) {
 		ctmp = clist->sibling;
 		pmcs_unlock_phy(clist);
+		clist->target_addr = NULL;
 		kmem_cache_free(pwp->phy_cache, clist);
 		clist = ctmp;
 	}
@@ -4822,6 +4824,7 @@ pmcwork_t *
 pmcs_tag2wp(pmcs_hw_t *pwp, uint32_t htag, boolean_t lock_phy)
 {
 	pmcwork_t *p;
+	pmcs_phy_t *phyp;
 	uint32_t idx = PMCS_TAG_INDEX(htag);
 
 	p = &pwp->work[idx];
@@ -4829,9 +4832,28 @@ pmcs_tag2wp(pmcs_hw_t *pwp, uint32_t htag, boolean_t lock_phy)
 	mutex_enter(&p->lock);
 	if (p->htag == htag) {
 		if (lock_phy) {
-			mutex_exit(&p->lock);
-			mutex_enter(&p->phy->phy_lock);
-			mutex_enter(&p->lock);
+			phyp = p->phy;
+			if (phyp != NULL) {
+				/* phy lock should be held before work lock */
+				mutex_exit(&p->lock);
+				mutex_enter(&phyp->phy_lock);
+				mutex_enter(&p->lock);
+			}
+			/*
+			 * Check htag again, in case the work got completed
+			 * while we dropped the work lock and got the phy lock
+			 */
+			if (p->htag != htag) {
+				if (phyp != NULL) {
+					mutex_exit(&p->lock);
+					mutex_exit(&phyp->phy_lock);
+				}
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL, "%s: "
+				    "HTAG (0x%x) found, but work (0x%p) "
+				    "is already complete", __func__, htag,
+				    (void *)p);
+				return (NULL);
+			}
 		}
 		return (p);
 	}
@@ -7502,6 +7524,7 @@ pmcs_free_all_phys(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		}
 
 		if (!IS_ROOT_PHY(tphyp)) {
+			tphyp->target_addr = NULL;
 			kmem_cache_free(pwp->phy_cache, tphyp);
 		}
 	}
@@ -7509,6 +7532,7 @@ pmcs_free_all_phys(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 	mutex_enter(&pwp->dead_phylist_lock);
 	for (tphyp = pwp->dead_phys; tphyp; tphyp = nphyp) {
 		nphyp = tphyp->dead_next;
+		tphyp->target_addr = NULL;
 		kmem_cache_free(pwp->phy_cache, tphyp);
 	}
 	pwp->dead_phys = NULL;
@@ -7528,6 +7552,7 @@ pmcs_free_phys(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 	while (phyp) {
 		next_phy = phyp->sibling;
 		ASSERT(!mutex_owned(&phyp->phy_lock));
+		phyp->target_addr = NULL;
 		kmem_cache_free(pwp->phy_cache, phyp);
 		phyp = next_phy;
 	}
@@ -7554,6 +7579,7 @@ pmcs_clone_phy(pmcs_phy_t *orig_phy)
 	 * Go ahead and just copy everything...
 	 */
 	*local = *orig_phy;
+	local->target_addr = &orig_phy->target;
 
 	/*
 	 * But the following must be set appropriately for this copy
@@ -7755,6 +7781,7 @@ pmcs_handle_dead_phys(pmcs_hw_t *pwp)
 				mutex_exit(&phyp->target->statlock);
 			}
 			pmcs_unlock_phy(phyp);
+			phyp->target_addr = NULL;
 			kmem_cache_free(pwp->phy_cache, phyp);
 		}
 
@@ -8042,6 +8069,8 @@ void
 pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
     boolean_t prop_add_val)
 {
+	pmcs_xscsi_t	*tgt;
+
 	if (prop_add_val) {
 		/*
 		 * If the values are currently 0, then we're setting the
@@ -8078,15 +8107,19 @@ pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
 		}
 	}
 
-	if (phyp->target == NULL) {
+	if ((phyp->target_addr) && (*phyp->target_addr != NULL)) {
+		tgt = *phyp->target_addr;
+	} else if (phyp->target != NULL) {
+		tgt = phyp->target;
+	} else {
 		return;
 	}
 
-	mutex_enter(&phyp->target->statlock);
-	if (!list_is_empty(&phyp->target->lun_list)) {
+	mutex_enter(&tgt->statlock);
+	if (!list_is_empty(&tgt->lun_list)) {
 		pmcs_lun_t *lunp;
 
-		lunp = list_head(&phyp->target->lun_list);
+		lunp = list_head(&tgt->lun_list);
 		while (lunp) {
 			(void) scsi_device_prop_update_string(lunp->sd,
 			    SCSI_DEVICE_PROP_PATH,
@@ -8096,17 +8129,17 @@ pmcs_update_phy_pm_props(pmcs_phy_t *phyp, uint64_t att_bv, uint64_t tgt_bv,
 			    SCSI_DEVICE_PROP_PATH,
 			    SCSI_ADDR_PROP_TARGET_PORT_PM,
 			    phyp->tgt_port_pm_str);
-			lunp = list_next(&phyp->target->lun_list, lunp);
+			lunp = list_next(&tgt->lun_list, lunp);
 		}
-	} else if (phyp->target->smpd) {
-		(void) smp_device_prop_update_string(phyp->target->smpd,
+	} else if (tgt->smpd) {
+		(void) smp_device_prop_update_string(tgt->smpd,
 		    SCSI_ADDR_PROP_ATTACHED_PORT_PM,
 		    phyp->att_port_pm_str);
-		(void) smp_device_prop_update_string(phyp->target->smpd,
+		(void) smp_device_prop_update_string(tgt->smpd,
 		    SCSI_ADDR_PROP_TARGET_PORT_PM,
 		    phyp->tgt_port_pm_str);
 	}
-	mutex_exit(&phyp->target->statlock);
+	mutex_exit(&tgt->statlock);
 }
 
 /* ARGSUSED */
