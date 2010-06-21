@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -133,12 +133,11 @@ writen_nointr(int fd, void *dbuf, size_t dlen)
 static int
 pkcs11_open_common(int *fd, pthread_mutex_t *mtx, const char *dev, int oflag)
 {
-	if (*fd < 0) {
-		(void) pthread_mutex_lock(mtx);
-		if (*fd < 0)
-			*fd = open_nointr(dev, oflag);
-		(void) pthread_mutex_unlock(mtx);
-	}
+	(void) pthread_mutex_lock(mtx);
+	if (*fd < 0)
+		*fd = open_nointr(dev, oflag);
+	(void) pthread_mutex_unlock(mtx);
+
 	return (*fd);
 }
 
@@ -176,8 +175,6 @@ pkcs11_open_urandom_seed(void)
 static void
 pkcs11_close_common(int *fd, pthread_mutex_t *mtx)
 {
-	if (*fd < 0)
-		return;
 	(void) pthread_mutex_lock(mtx);
 	(void) close(*fd);
 	*fd = -1;
@@ -209,11 +206,69 @@ pkcs11_close_urandom_seed(void)
 }
 
 /*
+ * Read from the random number generator devices.
+ */
+static size_t
+pkcs11_read_common(int *fd, pthread_mutex_t *mtx, void *dbuf, size_t dlen)
+{
+	size_t	n;
+
+	(void) pthread_mutex_lock(mtx);
+	n = readn_nointr(*fd, dbuf, dlen);
+	(void) pthread_mutex_unlock(mtx);
+
+	return (n);
+}
+
+static size_t
+pkcs11_read_random(void *dbuf, size_t dlen)
+{
+	return (pkcs11_read_common(&random_fd, &random_mutex, dbuf, dlen));
+}
+
+static size_t
+pkcs11_read_urandom(void *dbuf, size_t dlen)
+{
+	return (pkcs11_read_common(&urandom_fd, &urandom_mutex, dbuf, dlen));
+}
+
+/*
+ * Write to the random number generator devices.
+ */
+static size_t
+pkcs11_write_common(int *fd, pthread_mutex_t *mtx, void *dbuf, size_t dlen)
+{
+	size_t	n;
+
+	(void) pthread_mutex_lock(mtx);
+	n = writen_nointr(*fd, dbuf, dlen);
+	(void) pthread_mutex_unlock(mtx);
+
+	return (n);
+}
+
+static size_t
+pkcs11_write_random_seed(void *dbuf, size_t dlen)
+{
+	return (pkcs11_write_common(&random_seed_fd, &random_seed_mutex,
+	    dbuf, dlen));
+}
+
+static size_t
+pkcs11_write_urandom_seed(void *dbuf, size_t dlen)
+{
+	return (pkcs11_write_common(&urandom_seed_fd, &urandom_seed_mutex,
+	    dbuf, dlen));
+}
+
+/*
  * Seed /dev/random with the data in the buffer.
  */
 int
 pkcs11_seed_random(void *sbuf, size_t slen)
 {
+	int	rv;
+
 	if (sbuf == NULL || slen == 0)
 		return (0);
 
@@ -221,11 +276,12 @@ pkcs11_seed_random(void *sbuf, size_t slen)
 	if (pkcs11_open_random_seed() < 0)
 		return (-1);
 
-	if (writen_nointr(random_seed_fd, sbuf, slen) == slen) {
-		pkcs11_close_random_seed();
-		return (0);
-	}
-	return (-1);
+	rv = -1;
+	if (pkcs11_write_random_seed(sbuf, slen) == slen)
+		rv = 0;
+
+	pkcs11_close_random_seed();
+	return (rv);
 }
 
 /*
@@ -234,6 +290,8 @@ pkcs11_seed_random(void *sbuf, size_t slen)
 int
 pkcs11_seed_urandom(void *sbuf, size_t slen)
 {
+	int	rv;
+
 	if (sbuf == NULL || slen == 0)
 		return (0);
 
@@ -241,11 +299,12 @@ pkcs11_seed_urandom(void *sbuf, size_t slen)
 	if (pkcs11_open_urandom_seed() < 0)
 		return (-1);
 
-	if (writen_nointr(urandom_seed_fd, sbuf, slen) == slen) {
-		pkcs11_close_urandom_seed();
-		return (0);
-	}
-	return (-1);
+	rv = -1;
+	if (pkcs11_write_urandom_seed(sbuf, slen) == slen)
+		rv = 0;
+
+	pkcs11_close_urandom_seed();
+	return (rv);
 }
 
 /*
@@ -262,7 +321,7 @@ pkcs11_get_random(void *dbuf, size_t dlen)
 	if (pkcs11_open_random() < 0)
 		return (-1);
 
-	if (readn_nointr(random_fd, dbuf, dlen) == dlen)
+	if (pkcs11_read_random(dbuf, dlen) == dlen)
 		return (0);
 	return (-1);
 }
@@ -281,7 +340,7 @@ pkcs11_get_urandom(void *dbuf, size_t dlen)
 	if (pkcs11_open_urandom() < 0)
 		return (-1);
 
-	if (readn_nointr(urandom_fd, dbuf, dlen) == dlen)
+	if (pkcs11_read_urandom(dbuf, dlen) == dlen)
 		return (0);
 	return (-1);
 }
