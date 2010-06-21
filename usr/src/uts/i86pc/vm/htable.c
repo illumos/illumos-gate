@@ -1488,9 +1488,9 @@ htable_attach(
 			offset -= kernelbase;
 		offset <<= MMU_PAGESHIFT;
 #if defined(__amd64)
-		offset += mmu.hole_start;       /* something in VA hole */
+		offset += mmu.hole_start;	/* something in VA hole */
 #else
-		offset += 1ULL << 40;   	/* something > 4 Gig */
+		offset += 1ULL << 40;		/* something > 4 Gig */
 #endif
 		ASSERT(page_exists(&kvp, offset) == NULL);
 		(void) page_hashin(pp, &kvp, offset, NULL);
