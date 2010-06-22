@@ -121,7 +121,8 @@ rdsv3_trans_get_preferred(uint32_be_t addr)
 
 	rw_enter(&trans_sem, RW_READER);
 	for (i = 0; i < RDS_TRANS_COUNT; i++) {
-		if (transports[i] && (transports[i]->laddr_check(addr) == 0)) {
+		if (transports[i] &&
+		    transports[i]->laddr_check(addr) == 0) {
 			ret = transports[i];
 			break;
 		}

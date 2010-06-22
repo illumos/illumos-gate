@@ -176,24 +176,6 @@ rdsv3_rdma_drop_keys(struct rdsv3_sock *rs)
 		rs->rs_transport->flush_mrs();
 }
 
-/*
- * Helper function to pin user pages.
- */
-#if 0
-static int
-rds_pin_pages(unsigned long user_addr, unsigned int nr_pages,
-	struct page **pages, int write)
-{
-	unsigned long l_user_addr = user_addr;
-	unsigned int l_nr_pages = nr_pages;
-	struct page **l_pages = pages;
-	int l_write = write;
-
-	/* memory pin in rds_ib_get_mr() */
-	return (0);
-}
-#endif
-
 static int
 __rdsv3_rdma_map(struct rdsv3_sock *rs, struct rdsv3_get_mr_args *args,
 	uint64_t *cookie_ret, struct rdsv3_mr **mr_ret)
@@ -209,13 +191,13 @@ __rdsv3_rdma_map(struct rdsv3_sock *rs, struct rdsv3_get_mr_args *args,
 		goto out;
 	}
 
-	if (rs->rs_transport->get_mr == NULL) {
+	if (!rs->rs_transport->get_mr) {
 		ret = -EOPNOTSUPP;
 		goto out;
 	}
 
 	mr = kmem_zalloc(sizeof (struct rdsv3_mr), KM_NOSLEEP);
-	if (mr == NULL) {
+	if (!mr) {
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -418,12 +400,18 @@ rdsv3_rdma_unuse(struct rdsv3_sock *rs, uint32_t r_key, int force)
 
 	mutex_enter(&rs->rs_rdma_lock);
 	mr = rdsv3_mr_tree_walk(&rs->rs_rdma_keys, r_key, NULL);
-	if (mr && (mr->r_use_once || force)) {
+	if (!mr) {
+		RDSV3_DPRINTF4("rdsv3_rdma_unuse",
+		    "rdsv3: trying to unuse MR with unknown r_key %u!", r_key);
+		mutex_exit(&rs->rs_rdma_lock);
+		return;
+	}
+
+	if (mr->r_use_once || force) {
 		avl_remove(&rs->rs_rdma_keys, &mr->r_rb_node);
 		RB_CLEAR_NODE(&mr->r_rb_node);
 		zot_me = 1;
-	} else if (mr)
-		atomic_add_32(&mr->r_refcount, 1);
+	}
 	mutex_exit(&rs->rs_rdma_lock);
 
 	/*
@@ -431,21 +419,16 @@ rdsv3_rdma_unuse(struct rdsv3_sock *rs, uint32_t r_key, int force)
 	 * Note we could avoid this if the operation was a RDMA READ,
 	 * but at this point we can't tell.
 	 */
-	if (mr != NULL) {
-		RDSV3_DPRINTF4("rdsv3_rdma_unuse", "mr: %p zot_me %d",
-		    mr, zot_me);
-		if (mr->r_trans->sync_mr)
-			mr->r_trans->sync_mr(mr->r_trans_private,
-			    DMA_FROM_DEVICE);
+	if (mr->r_trans->sync_mr)
+		mr->r_trans->sync_mr(mr->r_trans_private, DMA_FROM_DEVICE);
 
-		/*
-		 * If the MR was marked as invalidate, this will
-		 * trigger an async flush.
-		 */
-		if (zot_me)
-			rdsv3_destroy_mr(mr);
-		rdsv3_mr_put(mr);
-	}
+	/*
+	 * If the MR was marked as invalidate, this will
+	 * trigger an async flush.
+	 */
+	if (zot_me)
+		rdsv3_destroy_mr(mr);
+	rdsv3_mr_put(mr);
 	RDSV3_DPRINTF4("rdsv3_rdma_unuse", "Return");
 }
 
@@ -455,7 +438,6 @@ rdsv3_rdma_free_op(struct rdsv3_rdma_op *ro)
 	unsigned int i;
 
 	/* deallocate RDMA resources on rdsv3_message */
-
 	for (i = 0; i < ro->r_nents; i++) {
 		ddi_umem_unlock(ro->r_rdma_sg[i].umem_cookie);
 	}
@@ -660,7 +642,7 @@ rdsv3_cmsg_rdma_dest(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 
 	mutex_enter(&rs->rs_rdma_lock);
 	mr = rdsv3_mr_tree_walk(&rs->rs_rdma_keys, r_key, NULL);
-	if (mr == NULL)
+	if (!mr)
 		err = -EINVAL;	/* invalid r_key */
 	else
 		atomic_add_32(&mr->r_refcount, 1);

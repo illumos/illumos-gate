@@ -256,7 +256,7 @@ rdsv3_recv_incoming(struct rdsv3_connection *conn, uint32_be_t saddr,
 	}
 
 	rs = rdsv3_find_bound(daddr, inc->i_hdr.h_dport);
-	if (rs == NULL) {
+	if (!rs) {
 		rdsv3_stats_inc(s_recv_drop_no_sock);
 		goto out;
 	}
@@ -308,7 +308,7 @@ out:
 static int
 rdsv3_next_incoming(struct rdsv3_sock *rs, struct rdsv3_incoming **inc)
 {
-	if (*inc == NULL) {
+	if (!*inc) {
 		rw_enter(&rs->rs_recv_lock, RW_READER);
 		if (!list_is_empty(&rs->rs_recv_queue)) {
 			*inc = list_head(&rs->rs_recv_queue);

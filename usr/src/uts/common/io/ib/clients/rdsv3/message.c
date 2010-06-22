@@ -60,8 +60,6 @@
 #include <sys/ib/clients/rdsv3/rdma.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
-static rdsv3_wait_queue_t rdsv3_message_flush_waitq;
-
 #ifndef __lock_lint
 static unsigned int	rdsv3_exthdr_size[__RDSV3_EXTHDR_MAX] = {
 [RDSV3_EXTHDR_NONE]	= 0,
@@ -129,14 +127,6 @@ rdsv3_message_purge(struct rdsv3_message *rm)
 
 	RDSV3_DPRINTF4("rdsv3_message_purge", "Return(rm: %p)", rm);
 
-}
-
-void
-rdsv3_message_inc_purge(struct rdsv3_incoming *inc)
-{
-	struct rdsv3_message *rm =
-	    container_of(inc, struct rdsv3_message, m_inc);
-	rdsv3_message_purge(rm);
 }
 
 void
@@ -313,6 +303,7 @@ rdsv3_message_alloc(unsigned int nents, int gfp)
 	list_link_init(&rm->m_sock_item);
 	list_link_init(&rm->m_conn_item);
 	mutex_init(&rm->m_rs_lock, NULL, MUTEX_DRIVER, NULL);
+	rdsv3_init_waitqueue(&rm->m_flush_wait);
 
 	RDSV3_DPRINTF4("rdsv3_message_alloc", "Return(rm: %p)", rm);
 out:
@@ -399,7 +390,6 @@ rdsv3_message_copy_from_user(struct uio *uiop,
 		total_len -= rdsv3_sg_len(sg);
 		sg++;
 	}
-
 	ret = 0;
 out:
 	if (ret) {
@@ -462,10 +452,11 @@ rdsv3_message_inc_copy_to_user(struct rdsv3_incoming *inc,
  * If the message is still on the send queue, wait until the transport
  * is done with it. This is particularly important for RDMA operations.
  */
+/* ARGSUSED */
 void
 rdsv3_message_wait(struct rdsv3_message *rm)
 {
-	rdsv3_wait_event(&rdsv3_message_flush_waitq,
+	rdsv3_wait_event(&rm->m_flush_wait,
 	    !test_bit(RDSV3_MSG_MAPPED, &rm->m_flags));
 }
 
@@ -473,5 +464,5 @@ void
 rdsv3_message_unmapped(struct rdsv3_message *rm)
 {
 	clear_bit(RDSV3_MSG_MAPPED, &rm->m_flags);
-	rdsv3_wake_up_all(&rdsv3_message_flush_waitq);
+	rdsv3_wake_up_all(&rm->m_flush_wait);
 }

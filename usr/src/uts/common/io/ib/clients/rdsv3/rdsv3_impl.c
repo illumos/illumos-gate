@@ -763,7 +763,7 @@ rdsv3_rdma_init_worker(struct rdsv3_work_s *work)
 	rdsv3_rdma_init();
 }
 
-#define	RDSV3_NUM_TASKQ_THREADS	4
+#define	RDSV3_NUM_TASKQ_THREADS	1
 rdsv3_workqueue_struct_t *
 rdsv3_create_task_workqueue(char *name)
 {
@@ -825,6 +825,10 @@ rdsv3_sock_exit_data(struct rsock *sk)
 	mutex_destroy(&rs->rs_rdma_lock);
 	avl_destroy(&rs->rs_rdma_keys);
 
+	mutex_destroy(&rs->rs_conn_lock);
+	mutex_destroy(&rs->rs_congested_lock);
+	cv_destroy(&rs->rs_congested_cv);
+
 	rdsv3_exit_waitqueue(sk->sk_sleep);
 	kmem_free(sk->sk_sleep, sizeof (rdsv3_wait_queue_t));
 	mutex_destroy(&sk->sk_lock);
@@ -881,6 +885,9 @@ rdsv3_conn_constructor(void *buf, void *arg, int kmflags)
 	conn->c_next_tx_seq = 1;
 	mutex_init(&conn->c_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&conn->c_send_lock, NULL, MUTEX_DRIVER, NULL);
+	conn->c_send_generation = 1;
+	conn->c_senders = 0;
+
 	list_create(&conn->c_send_queue, sizeof (struct rdsv3_message),
 	    offsetof(struct rdsv3_message, m_conn_item));
 	list_create(&conn->c_retrans, sizeof (struct rdsv3_message),
@@ -1317,7 +1324,6 @@ rdsv3_ib_alloc_hdrs(ib_device_t *dev, struct rdsv3_ib_connection *ic)
 	    (ic->i_send_ring.w_nr * sizeof (struct rdsv3_header)));
 	ic->i_recv_hdrs_dma = (uint64_t)(uintptr_t)(addr +
 	    (ic->i_send_ring.w_nr * sizeof (struct rdsv3_header)));
-	ic->i_recv_tasklet_cpuid = -1;
 
 	ic->i_ack = (struct rdsv3_header *)(addr +
 	    ((ic->i_send_ring.w_nr + ic->i_recv_ring.w_nr) *

@@ -601,7 +601,7 @@ RDSV3_OBJS +=	af_rds.o rdsv3_ddi.o bind.o loop.o threads.o connection.o \
 		transport.o cong.o sysctl.o message.o rds_recv.o send.o \
 		stats.o info.o page.o rdma_transport.o ib_ring.o ib_rdma.o \
 		ib_recv.o ib.o ib_send.o ib_sysctl.o ib_stats.o ib_cm.o \
-		rdsv3_sc.o rdsv3_debug.o rdsv3_impl.o rdma.o
+		rdsv3_sc.o rdsv3_debug.o rdsv3_impl.o rdma.o rdsv3_af_thr.o
 
 ISER_OBJS +=	iser.o iser_cm.o iser_cq.o iser_ib.o iser_idm.o \
 		iser_resource.o iser_xfer.o

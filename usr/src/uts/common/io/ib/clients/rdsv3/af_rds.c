@@ -85,7 +85,6 @@ extern struct rdma_cm_id *rdsv3_rdma_listen_id;
 kmutex_t rdsv3_sock_lock;
 static unsigned long rdsv3_sock_count;
 list_t rdsv3_sock_list;
-rdsv3_wait_queue_t rdsv3_poll_waitq;
 
 /*
  * This is called as the final descriptor referencing this socket is closed.
@@ -103,7 +102,7 @@ rdsv3_release(sock_lower_handle_t proto_handle, int flgs, cred_t *cr)
 	struct rsock *sk = (struct rsock *)proto_handle;
 	struct rdsv3_sock *rs;
 
-	if (sk == NULL)
+	if (!sk)
 		goto out;
 
 	rs = rdsv3_sk_to_rs(sk);
@@ -112,10 +111,15 @@ rdsv3_release(sock_lower_handle_t proto_handle, int flgs, cred_t *cr)
 	rdsv3_sk_sock_orphan(sk);
 	rdsv3_cong_remove_socket(rs);
 	rdsv3_remove_bound(rs);
+
 	/*
 	 * Note - rdsv3_clear_recv_queue grabs rs_recv_lock, so
 	 * that ensures the recv path has completed messing
 	 * with the socket.
+	 *
+	 * Note2 - rdsv3_clear_recv_queue(rs) should be called first
+	 * to prevent some race conditions, which is different from
+	 * the Linux code.
 	 */
 	rdsv3_clear_recv_queue(rs);
 	rdsv3_send_drop_to(rs, NULL);
@@ -224,12 +228,12 @@ rdsv3_poll(sock_lower_handle_t proto_handle, short events, int anyyet,
 	 * 	if (rs->rs_seen_congestion)
 	 *		poll_wait(file, &rds_poll_waitq, wait);
 	 */
-	mutex_enter(&rdsv3_poll_waitq.waitq_mutex);
+	mutex_enter(&rs->rs_congested_lock);
 	while (rs->rs_seen_congestion) {
-		cv_wait(&rdsv3_poll_waitq.waitq_cv,
-		    &rdsv3_poll_waitq.waitq_mutex);
+		cv_wait(&rs->rs_congested_cv,
+		    &rs->rs_congested_lock);
 	}
-	mutex_exit(&rdsv3_poll_waitq.waitq_mutex);
+	mutex_exit(&rs->rs_congested_lock);
 
 	rw_enter(&rs->rs_recv_lock, RW_READER);
 	if (!rs->rs_cong_monitor) {
@@ -251,14 +255,15 @@ rdsv3_poll(sock_lower_handle_t proto_handle, short events, int anyyet,
 		mask |= (POLLIN | POLLRDNORM);
 	if (rs->rs_snd_bytes < rdsv3_sk_sndbuf(rs))
 		mask |= (POLLOUT | POLLWRNORM);
-	rw_exit(&rs->rs_recv_lock);
 
 	/* clear state any time we wake a seen-congested socket */
 	if (mask) {
-		mutex_enter(&rdsv3_poll_waitq.waitq_mutex);
+		mutex_enter(&rs->rs_congested_lock);
 		rs->rs_seen_congestion = 0;
-		mutex_exit(&rdsv3_poll_waitq.waitq_mutex);
+		mutex_exit(&rs->rs_congested_lock);
 	}
+
+	rw_exit(&rs->rs_recv_lock);
 
 #if 0
 	RDSV3_DPRINTF4("rdsv3_poll", "return(%p %x)", rs, mask);
@@ -840,6 +845,8 @@ rdsv3_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 	avl_create(&rs->rs_rdma_keys, rdsv3_mr_compare,
 	    sizeof (struct rdsv3_mr), offsetof(struct rdsv3_mr, r_rb_node));
 	mutex_init(&rs->rs_conn_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&rs->rs_congested_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&rs->rs_congested_cv, NULL, CV_DRIVER, NULL);
 	rs->rs_cred = credp;
 	rs->rs_zoneid = getzoneid();
 	crhold(credp);

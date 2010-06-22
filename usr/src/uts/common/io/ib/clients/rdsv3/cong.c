@@ -160,7 +160,7 @@ rdsv3_cong_from_addr(uint32_be_t addr)
 	RDSV3_DPRINTF4("rdsv3_cong_from_addr", "Enter(addr: %x)", ntohl(addr));
 
 	map = kmem_zalloc(sizeof (struct rdsv3_cong_map), KM_NOSLEEP);
-	if (map == NULL)
+	if (!map)
 		return (NULL);
 
 	map->m_addr = addr;
@@ -179,7 +179,7 @@ rdsv3_cong_from_addr(uint32_be_t addr)
 	ret = rdsv3_cong_tree_walk(addr, map);
 	mutex_exit(&rdsv3_cong_lock);
 
-	if (ret == NULL) {
+	if (!ret) {
 		ret = map;
 		map = NULL;
 	}
@@ -236,7 +236,7 @@ rdsv3_cong_get_maps(struct rdsv3_connection *conn)
 	conn->c_lcong = rdsv3_cong_from_addr(conn->c_laddr);
 	conn->c_fcong = rdsv3_cong_from_addr(conn->c_faddr);
 
-	if (conn->c_lcong == NULL || conn->c_fcong == NULL)
+	if (!(conn->c_lcong && conn->c_fcong))
 		return (-ENOMEM);
 
 	return (0);
@@ -254,7 +254,7 @@ rdsv3_cong_queue_updates(struct rdsv3_cong_map *map)
 	RDSV3_FOR_EACH_LIST_NODE(conn, &map->m_conn_list, c_map_item) {
 		if (!test_and_set_bit(0, &conn->c_map_queued)) {
 			rdsv3_stats_inc(s_cong_update_queued);
-			rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_send_w, 0);
+			(void) rdsv3_send_xmit(conn);
 		}
 	}
 

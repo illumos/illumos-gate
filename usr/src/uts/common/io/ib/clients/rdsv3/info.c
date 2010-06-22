@@ -93,6 +93,7 @@ rdsv3_info_register_func(int optname, rdsv3_info_func func)
 	ASSERT(optname >= RDSV3_INFO_FIRST && optname <= RDSV3_INFO_LAST);
 
 	mutex_enter(&rdsv3_info_lock);
+	ASSERT(!rdsv3_info_funcs[offset]);
 	rdsv3_info_funcs[offset] = func;
 	mutex_exit(&rdsv3_info_lock);
 }

@@ -34,6 +34,7 @@
 #include <sys/ib/ibtl/ibti.h>
 #include <sys/ib/clients/rdsv3/rdsv3.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
+#include <sys/ib/clients/rdsv3/rdsv3_af_thr.h>
 
 extern int rdsv3_init(void);
 extern void rdsv3_exit(void);
@@ -116,6 +117,7 @@ rdsv3_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&rdsv3_rdma_listen_id_lock, NULL, MUTEX_DRIVER, NULL);
 	rdsv3_rdma_listen_id = NULL;
 
+	rdsv3_af_init(dip);
 	rdsv3_trans_init();
 	ret = rdsv3_init();
 	if (ret) {

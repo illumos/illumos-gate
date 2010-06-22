@@ -83,11 +83,6 @@
  * more entries.
  */
 
-/*
- * This only happens on shutdown.
- */
-rdsv3_wait_queue_t rdsv3_ib_ring_empty_wait;
-
 void
 rdsv3_ib_ring_init(struct rdsv3_ib_work_ring *ring, uint32_t nr)
 {
@@ -155,7 +150,7 @@ rdsv3_ib_ring_free(struct rdsv3_ib_work_ring *ring, uint32_t val)
 	atomic_add_32(&ring->w_free_ctr, val);
 
 	if (__rdsv3_ib_ring_empty(ring))
-		rdsv3_wake_up(&rdsv3_ib_ring_empty_wait);
+		rdsv3_wake_up(&ring->w_empty_wait);
 }
 
 void

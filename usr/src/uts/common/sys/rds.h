@@ -67,6 +67,7 @@
 #define	_RDSV3_RDS_H
 
 #include <sys/types.h>
+#include <sys/socket.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -341,15 +342,12 @@ struct rdsv3_get_mr_args {
 	uint64_t	flags;
 };
 
-#if 1 /* 1 at 1.5.1 */
-#include <sys/socket_impl.h>
 struct rdsv3_get_mr_for_dest_args {
 	struct sockaddr_storage	dest_addr;
 	struct rdsv3_iovec 	vec;
 	uint64_t		cookie_addr;
 	uint64_t		flags;
 };
-#endif
 
 struct rdsv3_free_mr_args {
 	rdsv3_rdma_cookie_t cookie;

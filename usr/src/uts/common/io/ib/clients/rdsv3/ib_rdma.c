@@ -66,11 +66,10 @@
  * This is stored as mr->r_trans_private.
  */
 struct rdsv3_ib_mr {
-	struct rdsv3_ib_device	*device;
-	struct rdsv3_ib_mr_pool	*pool;
-	struct ib_fmr		*fmr;
-	struct list		list;
-	unsigned int		remap_count;
+	list_node_t		m_obj; /* list obj of rdsv3_fmr_pool list */
+	struct rdsv3_ib_device	*m_device;
+	struct rdsv3_fmr_pool	*m_pool; /* hca fmr pool */
+	unsigned int		m_inval:1;
 
 	struct rdsv3_scatterlist	*sg;
 	unsigned int		sg_len;
@@ -80,6 +79,7 @@ struct rdsv3_ib_mr {
 	/* DDI pinned memory */
 	ddi_umem_cookie_t	umem_cookie;
 	/* IBTF type definitions */
+	ibt_hca_hdl_t		rc_hca_hdl;
 	ibt_fmr_pool_hdl_t	fmr_pool_hdl;
 	ibt_ma_hdl_t		rc_ma_hdl;
 	ibt_mr_hdl_t		rc_fmr_hdl;
@@ -87,23 +87,12 @@ struct rdsv3_ib_mr {
 };
 
 /*
- * Our own little FMR pool
+ * delayed freed fmr's
  */
-struct rdsv3_ib_mr_pool {
-	struct mutex		flush_lock;	/* serialize fmr invalidate */
-	struct rdsv3_work_s	flush_worker;	/* flush worker */
-
-	kmutex_t		list_lock;	/* protect variables below */
-	atomic_t		item_count;	/* total # of MRs */
-	atomic_t		dirty_count;	/* # dirty of MRs */
-	/* MRs that have reached their max_maps limit */
-	struct list		drop_list;
-	struct list		free_list;	/* unused MRs */
-	struct list		clean_list;	/* unused & unamapped MRs */
-	atomic_t		free_pinned;	/* memory pinned by free MRs */
-	unsigned long		max_items;
-	unsigned long		max_items_soft;
-	unsigned long		max_free_pinned;
+struct rdsv3_fmr_pool {
+	list_t			f_list;	/* list of freed mr */
+	kmutex_t		f_lock; /* lock of fmr pool */
+	int32_t			f_listcnt;
 };
 
 static int rdsv3_ib_flush_mr_pool(struct rdsv3_ib_device *rds_ibdev,
@@ -124,15 +113,15 @@ rdsv3_ib_get_device(uint32_be_t ipaddr)
 	RDSV3_DPRINTF4("rdsv3_ib_get_device", "Enter: ipaddr: 0x%x", ipaddr);
 
 	RDSV3_FOR_EACH_LIST_NODE(rds_ibdev, &rdsv3_ib_devices, list) {
-		mutex_enter(&rds_ibdev->spinlock);
+		rw_enter(&rds_ibdev->rwlock, RW_READER);
 		RDSV3_FOR_EACH_LIST_NODE(i_ipaddr, &rds_ibdev->ipaddr_list,
 		    list) {
 			if (i_ipaddr->ipaddr == ipaddr) {
-				mutex_exit(&rds_ibdev->spinlock);
+				rw_exit(&rds_ibdev->rwlock);
 				return (rds_ibdev);
 			}
 		}
-		mutex_exit(&rds_ibdev->spinlock);
+		rw_exit(&rds_ibdev->rwlock);
 	}
 
 	RDSV3_DPRINTF4("rdsv3_ib_get_device", "Return: ipaddr: 0x%x", ipaddr);
@@ -154,9 +143,9 @@ rdsv3_ib_add_ipaddr(struct rdsv3_ib_device *rds_ibdev, uint32_be_t ipaddr)
 
 	i_ipaddr->ipaddr = ipaddr;
 
-	mutex_enter(&rds_ibdev->spinlock);
+	rw_enter(&rds_ibdev->rwlock, RW_WRITER);
 	list_insert_tail(&rds_ibdev->ipaddr_list, i_ipaddr);
-	mutex_exit(&rds_ibdev->spinlock);
+	rw_exit(&rds_ibdev->rwlock);
 
 	return (0);
 }
@@ -165,20 +154,25 @@ static void
 rdsv3_ib_remove_ipaddr(struct rdsv3_ib_device *rds_ibdev, uint32_be_t ipaddr)
 {
 	struct rdsv3_ib_ipaddr *i_ipaddr, *next;
+	struct rdsv3_ib_ipaddr *to_free = NULL;
 
 	RDSV3_DPRINTF4("rdsv3_ib_remove_ipaddr", "rds_ibdev: %p, ipaddr: %x",
 	    rds_ibdev, ipaddr);
 
-	mutex_enter(&rds_ibdev->spinlock);
+	rw_enter(&rds_ibdev->rwlock, RW_WRITER);
 	RDSV3_FOR_EACH_LIST_NODE_SAFE(i_ipaddr, next, &rds_ibdev->ipaddr_list,
 	    list) {
 		if (i_ipaddr->ipaddr == ipaddr) {
 			list_remove_node(&i_ipaddr->list);
-			kmem_free(i_ipaddr, sizeof (*i_ipaddr));
+			to_free = i_ipaddr;
 			break;
 		}
 	}
-	mutex_exit(&rds_ibdev->spinlock);
+	rw_exit(&rds_ibdev->rwlock);
+
+	if (to_free) {
+		kmem_free(i_ipaddr, sizeof (*i_ipaddr));
+	}
 
 	RDSV3_DPRINTF4("rdsv3_ib_remove_ipaddr",
 	    "Return: rds_ibdev: %p, ipaddr: %x", rds_ibdev, ipaddr);
@@ -270,11 +264,18 @@ __rdsv3_ib_destroy_conns(struct list *list, kmutex_t *list_lock)
 void
 rdsv3_ib_destroy_mr_pool(struct rdsv3_ib_device *rds_ibdev)
 {
+	struct rdsv3_fmr_pool *pool = rds_ibdev->fmr_pool;
+
 	RDSV3_DPRINTF4("rdsv3_ib_destroy_mr_pool", "Enter: ibdev: %p",
 	    rds_ibdev);
 
 	if (rds_ibdev->fmr_pool_hdl == NULL)
 		return;
+
+	if (pool) {
+		list_destroy(&pool->f_list);
+		kmem_free((void *) pool, sizeof (*pool));
+	}
 
 	(void) rdsv3_ib_flush_mr_pool(rds_ibdev, rds_ibdev->fmr_pool_hdl, 1);
 	(void) ibt_destroy_fmr_pool(ib_get_ibt_hca_hdl(rds_ibdev->dev),
@@ -288,15 +289,13 @@ rdsv3_ib_create_mr_pool(struct rdsv3_ib_device *rds_ibdev)
 	uint_t h_page_sz;
 	ibt_fmr_pool_attr_t fmr_attr;
 	ibt_status_t ibt_status;
-	ibt_hca_hdl_t hca_hdl;
+	struct rdsv3_fmr_pool *pool;
 
 	RDSV3_DPRINTF4("rdsv3_ib_create_mr_pool",
 	    "Enter: ibdev: %p", rds_ibdev);
 
-	hca_hdl = ib_get_ibt_hca_hdl(rds_ibdev->dev);
-	/* get hca attributes */
-	ibt_status = ibt_query_hca(hca_hdl, &rds_ibdev->hca_attr);
-	if (ibt_status != IBT_SUCCESS) {
+	pool = (struct rdsv3_fmr_pool *)kmem_zalloc(sizeof (*pool), KM_NOSLEEP);
+	if (pool == NULL) {
 		return (-ENOMEM);
 	}
 
@@ -314,13 +313,23 @@ rdsv3_ib_create_mr_pool(struct rdsv3_ib_device *rds_ibdev)
 	fmr_attr.fmr_func_arg = (void *) NULL;
 
 	/* create the FMR pool */
-	ibt_status = ibt_create_fmr_pool(hca_hdl, rds_ibdev->pd->ibt_pd,
-	    &fmr_attr, &rds_ibdev->fmr_pool_hdl);
+	ibt_status = ibt_create_fmr_pool(rds_ibdev->ibt_hca_hdl,
+	    rds_ibdev->pd->ibt_pd, &fmr_attr, &rds_ibdev->fmr_pool_hdl);
 	if (ibt_status != IBT_SUCCESS) {
+		kmem_free((void *) pool, sizeof (*pool));
+		rds_ibdev->fmr_pool = NULL;
 		return (-ENOMEM);
 	}
+
+	list_create(&pool->f_list, sizeof (struct rdsv3_ib_mr),
+	    offsetof(struct rdsv3_ib_mr, m_obj));
+	mutex_init(&pool->f_lock, NULL, MUTEX_DRIVER, NULL);
+	rds_ibdev->fmr_pool = pool;
 	rds_ibdev->max_fmrs = fmr_attr.fmr_pool_size;
 	rds_ibdev->fmr_message_size = fmr_attr.fmr_max_pages_per_fmr;
+
+	RDSV3_DPRINTF2("rdsv3_ib_create_mr_pool",
+	    "Exit: ibdev: %p fmr_pool: %p", rds_ibdev, pool);
 	return (0);
 }
 
@@ -377,7 +386,8 @@ rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
 	if (ret == 0) {
 		ibmr->umem_cookie = umem_cookie;
 		*key_ret = (uint32_t)ibmr->rc_mem_desc.pmd_rkey;
-		ibmr->device = rds_ibdev;
+		ibmr->m_device = rds_ibdev;
+		ibmr->m_pool = rds_ibdev->fmr_pool;
 		RDSV3_DPRINTF4("rdsv3_ib_get_mr",
 		    "Return: ibmr: %p umem_cookie %p", ibmr, ibmr->umem_cookie);
 		return (ibmr);
@@ -400,6 +410,7 @@ rdsv3_ib_alloc_fmr(struct rdsv3_ib_device *rds_ibdev)
 	if (rds_ibdev->fmr_pool_hdl) {
 		ibmr = (struct rdsv3_ib_mr *)kmem_zalloc(sizeof (*ibmr),
 		    KM_SLEEP);
+		ibmr->rc_hca_hdl = ib_get_ibt_hca_hdl(rds_ibdev->dev);
 		ibmr->fmr_pool_hdl = rds_ibdev->fmr_pool_hdl;
 		return (ibmr);
 	}
@@ -430,18 +441,20 @@ rdsv3_ib_map_fmr(struct rdsv3_ib_device *rds_ibdev, struct rdsv3_ib_mr *ibmr,
 	paddr_list_len = (bp->b_bcount / page_sz) + 2; /* start + end pg */
 
 	/* map user buffer to HCA address */
-	ibt_status = ibt_map_mem_area(ib_get_ibt_hca_hdl(rds_ibdev->dev),
+	ibt_status = ibt_map_mem_area(ibmr->rc_hca_hdl,
 	    &va_attr, paddr_list_len, &reg_req, &ibmr->rc_ma_hdl);
 	if (ibt_status != IBT_SUCCESS) {
 		return (-ENOMEM);
 	}
 
 	/*  use a free entry from FMR pool to register the specified memory */
-	ibt_status = ibt_register_physical_fmr(
-	    ib_get_ibt_hca_hdl(rds_ibdev->dev), ibmr->fmr_pool_hdl,
+	ibt_status = ibt_register_physical_fmr(ibmr->rc_hca_hdl,
+	    ibmr->fmr_pool_hdl,
 	    &reg_req.fn_arg, &ibmr->rc_fmr_hdl, &ibmr->rc_mem_desc);
 	if (ibt_status != IBT_SUCCESS) {
-		(void) ibt_unmap_mem_area(ib_get_ibt_hca_hdl(rds_ibdev->dev),
+		RDSV3_DPRINTF2("rdsv3_ib_map_fmr", "reg_phy_fmr failed %d",
+		    ibt_status);
+		(void) ibt_unmap_mem_area(ibmr->rc_hca_hdl,
 		    ibmr->rc_ma_hdl);
 		if (ibt_status == IBT_INSUFF_RESOURCE) {
 			return (-ENOBUFS);
@@ -482,37 +495,67 @@ rdsv3_ib_flush_mrs(void)
 }
 
 static void
-__rdsv3_ib_teardown_mr(struct rdsv3_ib_mr *ibmr)
+rdsv3_ib_drop_mr(struct rdsv3_ib_mr *ibmr)
 {
-	RDSV3_DPRINTF4("__rdsv3_ib_teardown_mr",
-	    "Enter: ibmr: %p umem_cookie %p", ibmr, ibmr->umem_cookie);
-
-	/* unpin memory pages */
+	/* return the fmr to the IBTF pool */
+	(void) ibt_deregister_fmr(ibmr->rc_hca_hdl, ibmr->rc_fmr_hdl);
+	(void) ibt_unmap_mem_area(ibmr->rc_hca_hdl, ibmr->rc_ma_hdl);
 	(void) ddi_umem_unlock(ibmr->umem_cookie);
+	kmem_free((void *) ibmr, sizeof (*ibmr));
+}
+
+void
+rdsv3_ib_drain_mrlist_fn(void *data)
+{
+	struct rdsv3_fmr_pool *pool = (struct rdsv3_fmr_pool *)data;
+	ibt_hca_hdl_t hca_hdl;
+	ibt_fmr_pool_hdl_t fmr_pool_hdl;
+	unsigned int inval;
+	struct rdsv3_ib_mr *ibmr;
+	list_t *listp = &pool->f_list;
+	kmutex_t *lockp = &pool->f_lock;
+	int i;
+
+	inval = 0;
+	i = 0;
+	for (;;) {
+		mutex_enter(lockp);
+		ibmr = (struct rdsv3_ib_mr *)list_remove_head(listp);
+		if (ibmr)
+			pool->f_listcnt--;
+		mutex_exit(lockp);
+		if (!ibmr)
+			break;
+		if ((inval == 0) && ibmr->m_inval) {
+			inval = 1;
+			hca_hdl = ibmr->rc_hca_hdl;
+			fmr_pool_hdl = ibmr->fmr_pool_hdl;
+		}
+		i++;
+		rdsv3_ib_drop_mr(ibmr);
+	}
+	if (inval)
+		(void) ibt_flush_fmr_pool(hca_hdl, fmr_pool_hdl);
 }
 
 void
 rdsv3_ib_free_mr(void *trans_private, int invalidate)
 {
 	struct rdsv3_ib_mr *ibmr = trans_private;
-	struct rdsv3_ib_device *rds_ibdev = ibmr->device;
+	rdsv3_af_thr_t *af_thr;
 
 	RDSV3_DPRINTF4("rdsv3_ib_free_mr", "Enter: ibmr: %p inv: %d",
 	    ibmr, invalidate);
 
-	/* return the fmr to the IBTF pool */
-	/* the final punch will come from the ibt_flush_fmr_pool() */
-	(void) ibt_deregister_fmr(ib_get_ibt_hca_hdl(rds_ibdev->dev),
-	    ibmr->rc_fmr_hdl);
-	(void) ibt_unmap_mem_area(ib_get_ibt_hca_hdl(rds_ibdev->dev),
-	    ibmr->rc_ma_hdl);
-	__rdsv3_ib_teardown_mr(ibmr);
-	if (invalidate) {
-		rds_ibdev = ibmr->device;
-		(void) rdsv3_ib_flush_mr_pool(rds_ibdev,
-		    rds_ibdev->fmr_pool_hdl, 0);
-	}
-	kmem_free((void *) ibmr, sizeof (*ibmr));
+	/* save af_thr at local as ibmr might be freed at mutex_exit */
+	af_thr = ibmr->m_device->fmr_soft_cq;
+	ibmr->m_inval = (unsigned int) invalidate;
+	mutex_enter(&ibmr->m_pool->f_lock);
+	list_insert_tail(&ibmr->m_pool->f_list, ibmr);
+	ibmr->m_pool->f_listcnt++;
+	mutex_exit(&ibmr->m_pool->f_lock);
+
+	rdsv3_af_thr_fire(af_thr);
 }
 
 static int

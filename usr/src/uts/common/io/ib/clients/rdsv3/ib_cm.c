@@ -64,7 +64,7 @@
 #include <sys/ib/clients/rdsv3/ib.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
-extern ddi_taskq_t	*rdsv3_taskq;
+extern int rdsv3_enable_snd_cq;
 
 /*
  * Set the selected protocol version
@@ -140,7 +140,8 @@ rdsv3_ib_cm_connect_complete(struct rdsv3_connection *conn,
 {
 	const struct rdsv3_ib_connect_private *dp = NULL;
 	struct rdsv3_ib_connection *ic = conn->c_transport_data;
-	struct rdsv3_ib_device *rds_ibdev;
+	struct rdsv3_ib_device *rds_ibdev =
+	    ib_get_client_data(ic->i_cm_id->device, &rdsv3_ib_client);
 	struct ib_qp_attr qp_attr;
 	int err;
 
@@ -160,12 +161,41 @@ rdsv3_ib_cm_connect_complete(struct rdsv3_connection *conn,
 		}
 	}
 
-	RDSV3_DPRINTF2("rdsv3_ib_cm_connect_complete",
-	    "RDS/IB: connected to %u.%u.%u.%u version %u.%u%s",
-	    NIPQUAD(conn->c_faddr),
-	    RDS_PROTOCOL_MAJOR(conn->c_version),
-	    RDS_PROTOCOL_MINOR(conn->c_version),
-	    ic->i_flowctl ? ", flow control" : "");
+	if (conn->c_version < RDS_PROTOCOL(3, 1)) {
+		RDSV3_DPRINTF2("rdsv3_ib_cm_connect_complete",
+		    "RDS/IB: Connection to %u.%u.%u.%u version %u.%u failed",
+		    NIPQUAD(conn->c_faddr),
+		    RDS_PROTOCOL_MAJOR(conn->c_version),
+		    RDS_PROTOCOL_MINOR(conn->c_version));
+		rdsv3_conn_destroy(conn);
+		return;
+	} else {
+		RDSV3_DPRINTF2("rdsv3_ib_cm_connect_complete",
+		    "RDS/IB: connected to %u.%u.%u.%u version %u.%u%s",
+		    NIPQUAD(conn->c_faddr),
+		    RDS_PROTOCOL_MAJOR(conn->c_version),
+		    RDS_PROTOCOL_MINOR(conn->c_version),
+		    ic->i_flowctl ? ", flow control" : "");
+	}
+
+	ASSERT(ic->i_soft_cq == NULL);
+	ic->i_soft_cq = rdsv3_af_intr_thr_create(rdsv3_ib_tasklet_fn,
+	    (void *)ic, SCQ_INTR_BIND_CPU, rds_ibdev->aft_hcagp,
+	    ic->i_cq->ibt_cq);
+	if (rdsv3_enable_snd_cq) {
+		ic->i_snd_soft_cq = rdsv3_af_intr_thr_create(
+		    rdsv3_ib_snd_tasklet_fn,
+		    (void *)ic, SCQ_INTR_BIND_CPU, rds_ibdev->aft_hcagp,
+		    ic->i_snd_cq->ibt_cq);
+	}
+	ic->i_refill_rq = rdsv3_af_thr_create(rdsv3_ib_refill_fn, (void *)conn,
+	    SCQ_WRK_BIND_CPU, rds_ibdev->aft_hcagp);
+	rdsv3_af_grp_draw(rds_ibdev->aft_hcagp);
+
+	(void) ib_req_notify_cq(ic->i_cq, IB_CQ_SOLICITED);
+	if (rdsv3_enable_snd_cq) {
+		(void) ib_req_notify_cq(ic->i_snd_cq, IB_CQ_NEXT_COMP);
+	}
 
 	/*
 	 * Init rings and fill recv. this needs to wait until protocol
@@ -178,7 +208,7 @@ rdsv3_ib_cm_connect_complete(struct rdsv3_connection *conn,
 	 * Post receive buffers - as a side effect, this will update
 	 * the posted credit count.
 	 */
-	(void) rdsv3_ib_recv_refill(conn, KM_NOSLEEP, 1);
+	(void) rdsv3_ib_recv_refill(conn, 1);
 
 	/* Tune RNR behavior */
 	rdsv3_ib_tune_rnr(ic, &qp_attr);
@@ -190,7 +220,6 @@ rdsv3_ib_cm_connect_complete(struct rdsv3_connection *conn,
 		    "ib_modify_qp(IB_QP_STATE, RTS): err=%d", err);
 
 	/* update ib_device with this local ipaddr & conn */
-	rds_ibdev = ib_get_client_data(ic->i_cm_id->device, &rdsv3_ib_client);
 	err = rdsv3_ib_update_ipaddr(rds_ibdev, conn->c_laddr);
 	if (err)
 		RDSV3_DPRINTF2("rdsv3_ib_cm_connect_complete",
@@ -215,22 +244,29 @@ static void
 rdsv3_ib_cm_fill_conn_param(struct rdsv3_connection *conn,
     struct rdma_conn_param *conn_param,
     struct rdsv3_ib_connect_private *dp,
-    uint32_t protocol_version)
+    uint32_t protocol_version,
+    uint32_t max_responder_resources,
+    uint32_t max_initiator_depth)
 {
+	struct rdsv3_ib_connection *ic = conn->c_transport_data;
+	struct rdsv3_ib_device *rds_ibdev;
+
 	RDSV3_DPRINTF2("rdsv3_ib_cm_fill_conn_param",
 	    "Enter conn: %p conn_param: %p private: %p version: %d",
 	    conn, conn_param, dp, protocol_version);
 
 	(void) memset(conn_param, 0, sizeof (struct rdma_conn_param));
-	/* XXX tune these? */
-	conn_param->responder_resources = 1;
-	conn_param->initiator_depth = 1;
+
+	rds_ibdev = ib_get_client_data(ic->i_cm_id->device, &rdsv3_ib_client);
+
+	conn_param->responder_resources =
+	    MIN(rds_ibdev->max_responder_resources, max_responder_resources);
+	conn_param->initiator_depth =
+	    MIN(rds_ibdev->max_initiator_depth, max_initiator_depth);
 	conn_param->retry_count = min(rdsv3_ib_retry_count, 7);
 	conn_param->rnr_retry_count = 7;
 
 	if (dp) {
-		struct rdsv3_ib_connection *ic = conn->c_transport_data;
-
 		(void) memset(dp, 0, sizeof (*dp));
 		dp->dp_saddr = conn->c_laddr;
 		dp->dp_daddr = conn->c_faddr;
@@ -265,6 +301,122 @@ rdsv3_ib_cq_event_handler(struct ib_event *event, void *data)
 {
 	RDSV3_DPRINTF3("rdsv3_ib_cq_event_handler", "event %u data %p",
 	    event->event, data);
+}
+
+static void
+rdsv3_ib_snd_cq_comp_handler(struct ib_cq *cq, void *context)
+{
+	struct rdsv3_connection *conn = context;
+	struct rdsv3_ib_connection *ic = conn->c_transport_data;
+
+	RDSV3_DPRINTF4("rdsv3_ib_snd_cq_comp_handler",
+	    "Enter(conn: %p ic: %p cq: %p)", conn, ic, cq);
+
+	rdsv3_af_thr_fire(ic->i_snd_soft_cq);
+}
+
+void
+rdsv3_ib_snd_tasklet_fn(void *data)
+{
+	struct rdsv3_ib_connection *ic = (struct rdsv3_ib_connection *)data;
+	struct rdsv3_connection *conn = ic->conn;
+	struct rdsv3_ib_ack_state ack_state = { 0, };
+	ibt_wc_t wc;
+	uint_t polled;
+
+	RDSV3_DPRINTF4("rdsv3_ib_snd_tasklet_fn",
+	    "Enter(conn: %p ic: %p)", conn, ic);
+
+	/*
+	 * Poll in a loop before and after enabling the next event
+	 */
+	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_snd_cq), &wc, 1, &polled) ==
+	    IBT_SUCCESS) {
+		RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
+		    "wc_id 0x%llx type %d status %u byte_len %u imm_data %u\n",
+		    (unsigned long long)wc.wc_id, wc.wc_type, wc.wc_status,
+		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
+
+		ASSERT(wc.wc_id & RDSV3_IB_SEND_OP);
+		rdsv3_ib_send_cqe_handler(ic, &wc);
+	}
+	(void) ibt_enable_cq_notify(RDSV3_CQ2CQHDL(ic->i_snd_cq),
+	    IBT_NEXT_COMPLETION);
+	if (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_snd_cq), &wc, 1, &polled) ==
+	    IBT_SUCCESS) {
+		ASSERT(wc.wc_id & RDSV3_IB_SEND_OP);
+		rdsv3_ib_send_cqe_handler(ic, &wc);
+	}
+}
+
+static void
+rdsv3_ib_cq_comp_handler(struct ib_cq *cq, void *context)
+{
+	struct rdsv3_connection *conn = context;
+	struct rdsv3_ib_connection *ic = conn->c_transport_data;
+
+	RDSV3_DPRINTF4("rdsv3_ib_cq_comp_handler",
+	    "Enter(conn: %p cq: %p)", conn, cq);
+
+	rdsv3_ib_stats_inc(s_ib_evt_handler_call);
+
+	rdsv3_af_thr_fire(ic->i_soft_cq);
+}
+
+void
+rdsv3_ib_refill_fn(void *data)
+{
+	struct rdsv3_connection *conn = (struct rdsv3_connection *)data;
+
+	(void) rdsv3_ib_recv_refill(conn, 0);
+}
+
+void
+rdsv3_ib_tasklet_fn(void *data)
+{
+	struct rdsv3_ib_connection *ic = (struct rdsv3_ib_connection *)data;
+	struct rdsv3_connection *conn = ic->conn;
+	struct rdsv3_ib_ack_state ack_state = { 0, };
+	ibt_wc_t wc;
+	uint_t polled;
+
+	RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
+	    "Enter(conn: %p ic: %p)", conn, ic);
+
+	rdsv3_ib_stats_inc(s_ib_tasklet_call);
+
+	/*
+	 * Poll in a loop before and after enabling the next event
+	 */
+	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_cq), &wc, 1, &polled) ==
+	    IBT_SUCCESS) {
+		RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
+		    "wc_id 0x%llx type %d status %u byte_len %u imm_data %u\n",
+		    (unsigned long long)wc.wc_id, wc.wc_type, wc.wc_status,
+		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
+
+		if (wc.wc_id & RDSV3_IB_SEND_OP) {
+			rdsv3_ib_send_cqe_handler(ic, &wc);
+		} else {
+			rdsv3_ib_recv_cqe_handler(ic, &wc, &ack_state);
+		}
+	}
+	(void) ibt_enable_cq_notify(RDSV3_CQ2CQHDL(ic->i_cq),
+	    IBT_NEXT_SOLICITED);
+
+	if (ack_state.ack_next_valid) {
+		rdsv3_ib_set_ack(ic, ack_state.ack_next,
+		    ack_state.ack_required);
+	}
+	if (ack_state.ack_recv_valid && ack_state.ack_recv > ic->i_ack_recv) {
+		rdsv3_send_drop_acked(conn, ack_state.ack_recv, NULL);
+		ic->i_ack_recv = ack_state.ack_recv;
+	}
+	if (rdsv3_conn_up(conn)) {
+		if (!test_bit(RDSV3_LL_SEND_FULL, &conn->c_flags))
+			(void) rdsv3_send_xmit(ic->conn);
+		rdsv3_ib_attempt_ack(ic);
+	}
 }
 
 static void
@@ -330,7 +482,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	 * the rds_ibdev at all.
 	 */
 	rds_ibdev = ib_get_client_data(dev, &rdsv3_ib_client);
-	if (rds_ibdev == NULL) {
+	if (!rds_ibdev) {
 		RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
 		    "RDS/IB: No client_data for device %s", dev->name);
 		return (-EOPNOTSUPP);
@@ -350,47 +502,30 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	 * not implmeneted in Hermon yet, but we can pass it to ib_create_cq()
 	 * anyway.
 	 */
-	ic->i_send_cq = ib_create_cq(dev, rdsv3_ib_send_cq_comp_handler,
+	ic->i_cq = ib_create_cq(dev, rdsv3_ib_cq_comp_handler,
 	    rdsv3_ib_cq_event_handler, conn,
-	    ic->i_send_ring.w_nr + 1,
-	    IB_CQ_VECTOR_LEAST_ATTACHED);
-	if (IS_ERR(ic->i_send_cq)) {
-		ret = PTR_ERR(ic->i_send_cq);
-		ic->i_send_cq = NULL;
+	    ic->i_recv_ring.w_nr + ic->i_send_ring.w_nr + 1,
+	    (intptr_t)rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
+	if (IS_ERR(ic->i_cq)) {
+		ret = PTR_ERR(ic->i_cq);
+		ic->i_cq = NULL;
 		RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
-		    "ib_create_cq send failed: %d", ret);
+		    "ib_create_cq failed: %d", ret);
 		goto out;
 	}
-
-	/*
-	 * IB_CQ_VECTOR_LEAST_ATTACHED and/or the corresponding feature is
-	 * not implmeneted in Hermon yet, but we can pass it to ib_create_cq()
-	 * anyway.
-	 */
-	ic->i_recv_cq = ib_create_cq(dev, rdsv3_ib_recv_cq_comp_handler,
-	    rdsv3_ib_cq_event_handler, conn,
-	    ic->i_recv_ring.w_nr,
-	    IB_CQ_VECTOR_LEAST_ATTACHED);
-	if (IS_ERR(ic->i_recv_cq)) {
-		ret = PTR_ERR(ic->i_recv_cq);
-		ic->i_recv_cq = NULL;
-		RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
-		    "ib_create_cq recv failed: %d", ret);
-		goto out;
-	}
-
-	ret = ib_req_notify_cq(ic->i_send_cq, IB_CQ_NEXT_COMP);
-	if (ret) {
-		RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
-		    "ib_req_notify_cq send failed: %d", ret);
-		goto out;
-	}
-
-	ret = ib_req_notify_cq(ic->i_recv_cq, IB_CQ_SOLICITED);
-	if (ret) {
-		RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
-		    "ib_req_notify_cq recv failed: %d", ret);
-		goto out;
+	if (rdsv3_enable_snd_cq) {
+		ic->i_snd_cq = ib_create_cq(dev, rdsv3_ib_snd_cq_comp_handler,
+		    rdsv3_ib_cq_event_handler, conn, ic->i_send_ring.w_nr + 1,
+		    (intptr_t)rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
+		if (IS_ERR(ic->i_snd_cq)) {
+			ret = PTR_ERR(ic->i_snd_cq);
+			(void) ib_destroy_cq(ic->i_cq);
+			ic->i_cq = NULL;
+			ic->i_snd_cq = NULL;
+			RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
+			    "ib_create_cq send cq failed: %d", ret);
+			goto out;
+		}
 	}
 
 	/* XXX negotiate max send/recv with remote? */
@@ -404,8 +539,12 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	attr.cap.max_recv_sge = RDSV3_IB_RECV_SGE;
 	attr.sq_sig_type = IB_SIGNAL_REQ_WR;
 	attr.qp_type = IB_QPT_RC;
-	attr.send_cq = ic->i_send_cq;
-	attr.recv_cq = ic->i_recv_cq;
+	if (rdsv3_enable_snd_cq) {
+		attr.send_cq = ic->i_snd_cq;
+	} else {
+		attr.send_cq = ic->i_cq;
+	}
+	attr.recv_cq = ic->i_cq;
 
 	/*
 	 * XXX this can fail if max_*_wr is too large?  Are we supposed
@@ -476,8 +615,8 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 
 	rdsv3_ib_recv_init_ack(ic);
 
-	RDSV3_DPRINTF2("rdsv3_ib_setup_qp", "conn %p pd %p mr %p cq %p %p",
-	    conn, ic->i_pd, ic->i_mr, ic->i_send_cq, ic->i_recv_cq);
+	RDSV3_DPRINTF2("rdsv3_ib_setup_qp", "conn %p pd %p mr %p cq %p",
+	    conn, ic->i_pd, ic->i_mr, ic->i_cq);
 
 out:
 	return (ret);
@@ -649,7 +788,9 @@ rdsv3_ib_cm_handle_connect(struct rdma_cm_id *cm_id,
 		goto out;
 	}
 
-	rdsv3_ib_cm_fill_conn_param(conn, &conn_param, &dp_rep, version);
+	rdsv3_ib_cm_fill_conn_param(conn, &conn_param, &dp_rep, version,
+	    event->param.conn.responder_resources,
+	    event->param.conn.initiator_depth);
 
 	/* rdma_accept() calls rdma_reject() internally if it fails */
 	err = rdma_accept(cm_id, &conn_param);
@@ -700,8 +841,8 @@ rdsv3_ib_cm_initiate_connect(struct rdma_cm_id *cm_id)
 		goto out;
 	}
 
-	(void) rdsv3_ib_cm_fill_conn_param(conn, &conn_param, &dp,
-	    RDS_PROTOCOL_VERSION);
+	rdsv3_ib_cm_fill_conn_param(conn, &conn_param, &dp,
+	    RDS_PROTOCOL_VERSION, UINT_MAX, UINT_MAX);
 
 	ret = rdma_connect(cm_id, &conn_param);
 	if (ret) {
@@ -798,9 +939,8 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 	int err = 0;
 
 	RDSV3_DPRINTF2("rdsv3_ib_conn_shutdown",
-	    "cm %p pd %p cq %p %p qp %p", ic->i_cm_id,
-	    ic->i_pd, ic->i_send_cq, ic->i_recv_cq,
-	    ic->i_cm_id ? ic->i_cm_id->qp : NULL);
+	    "cm %p pd %p cq %p qp %p", ic->i_cm_id,
+	    ic->i_pd, ic->i_cq, ic->i_cm_id ? ic->i_cm_id->qp : NULL);
 
 	if (ic->i_cm_id) {
 		struct ib_device *dev = ic->i_cm_id->device;
@@ -821,15 +961,38 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 		if (ic->i_cm_id->qp) {
 			(void) ibt_flush_qp(
 			    ib_get_ibt_channel_hdl(ic->i_cm_id));
-
-			/* wait until all WRs are flushed */
-			rdsv3_wait_event(&rdsv3_ib_ring_empty_wait,
-			    rdsv3_ib_ring_empty(&ic->i_send_ring) &&
+			/*
+			 * Don't wait for the send ring to be empty -- there
+			 * may be completed non-signaled entries sitting on
+			 * there. We unmap these below.
+			 */
+			rdsv3_wait_event(&ic->i_recv_ring.w_empty_wait,
 			    rdsv3_ib_ring_empty(&ic->i_recv_ring));
-
+			/*
+			 * Note that Linux original code calls
+			 * rdma_destroy_qp() after rdsv3_ib_recv_clear_ring(ic).
+			 */
 			rdma_destroy_qp(ic->i_cm_id);
 		}
 
+		if (rdsv3_enable_snd_cq) {
+			if (ic->i_snd_soft_cq) {
+				rdsv3_af_thr_destroy(ic->i_snd_soft_cq);
+				ic->i_snd_soft_cq = NULL;
+			}
+			if (ic->i_snd_cq)
+				(void) ib_destroy_cq(ic->i_snd_cq);
+		}
+		if (ic->i_soft_cq) {
+			rdsv3_af_thr_destroy(ic->i_soft_cq);
+			ic->i_soft_cq = NULL;
+		}
+		if (ic->i_refill_rq) {
+			rdsv3_af_thr_destroy(ic->i_refill_rq);
+			ic->i_refill_rq = NULL;
+		}
+		if (ic->i_cq)
+			(void) ib_destroy_cq(ic->i_cq);
 
 		if (ic->i_mr)
 			rdsv3_ib_free_hdrs(dev, ic);
@@ -839,10 +1002,6 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 		if (ic->i_recvs)
 			rdsv3_ib_recv_clear_ring(ic);
 
-		if (ic->i_send_cq)
-			(void) ib_destroy_cq(ic->i_send_cq);
-		if (ic->i_recv_cq)
-			(void) ib_destroy_cq(ic->i_recv_cq);
 		rdma_destroy_id(ic->i_cm_id);
 
 		/*
@@ -854,13 +1013,12 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 		ic->i_cm_id = NULL;
 		ic->i_pd = NULL;
 		ic->i_mr = NULL;
-		ic->i_send_cq = NULL;
-		ic->i_recv_cq = NULL;
+		ic->i_cq = NULL;
+		ic->i_snd_cq = NULL;
 		ic->i_send_hdrs = NULL;
 		ic->i_recv_hdrs = NULL;
 		ic->i_ack = NULL;
 	}
-
 	ASSERT(!ic->i_on_dev_list);
 
 	/* Clear pending transmit */
@@ -902,6 +1060,11 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 		    ic->i_recv_ring.w_nr * sizeof (struct rdsv3_ib_recv_work));
 		ic->i_recvs = NULL;
 	}
+	if (ic->i_recv_wrs) {
+		kmem_free(ic->i_recv_wrs, ic->i_recv_ring.w_nr *
+		    (sizeof (ibt_recv_wr_t)));
+		ic->i_recv_wrs = NULL;
+	}
 
 	RDSV3_DPRINTF2("rdsv3_ib_conn_shutdown", "Return conn: %p", conn);
 }
@@ -923,21 +1086,15 @@ int
 rdsv3_ib_conn_alloc(struct rdsv3_connection *conn, int gfp)
 {
 	struct rdsv3_ib_connection *ic;
-	char tq_name[TASKQ_NAMELEN];
 
 	RDSV3_DPRINTF2("rdsv3_ib_conn_alloc", "conn: %p", conn);
 
 	/* XXX too lazy? */
 	ic = kmem_zalloc(sizeof (struct rdsv3_ib_connection), gfp);
-	if (ic == NULL)
+	if (!ic)
 		return (-ENOMEM);
 
 	list_link_init(&ic->ib_node);
-	(void) snprintf(tq_name, TASKQ_NAMELEN, "RDSV3_CONN_to_%x:%u",
-	    htonl(conn->c_faddr), conn_cnt++ % 100);
-	ic->i_recv_tasklet =
-	    ddi_taskq_create(NULL, tq_name, 1, TASKQ_DEFAULTPRI, 0);
-
 
 	mutex_init(&ic->i_recv_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ic->i_ack_lock, NULL, MUTEX_DRIVER, NULL);
@@ -955,7 +1112,6 @@ rdsv3_ib_conn_alloc(struct rdsv3_connection *conn, int gfp)
 	mutex_enter(&ib_nodev_conns_lock);
 	list_insert_tail(&ib_nodev_conns, ic);
 	mutex_exit(&ib_nodev_conns_lock);
-
 
 	RDSV3_DPRINTF2("rdsv3_ib_conn_alloc", "conn %p conn ic %p",
 	    conn, conn->c_transport_data);
@@ -986,8 +1142,6 @@ rdsv3_ib_conn_free(void *arg)
 	list_remove_node(&ic->ib_node);
 	mutex_exit(lock_ptr);
 #endif
-
-	ddi_taskq_destroy(ic->i_recv_tasklet);
 	kmem_free(ic, sizeof (*ic));
 }
 

@@ -85,12 +85,18 @@ rdsv3_loop_xmit(struct rdsv3_connection *conn, struct rdsv3_message *rm,
     unsigned int hdr_off, unsigned int sg,
     unsigned int off)
 {
+	/* Do not send cong updates to loopback */
+	if (rm->m_inc.i_hdr.h_flags & RDSV3_FLAG_CONG_BITMAP) {
+		rdsv3_cong_map_updated(conn->c_fcong, ~(uint64_t)0);
+		return (sizeof (struct rdsv3_header) + RDSV3_CONG_MAP_BYTES);
+	}
 	ASSERT(!(hdr_off || sg || off));
 
 	RDSV3_DPRINTF4("rdsv3_loop_xmit", "Enter(conn: %p, rm: %p)", conn, rm);
 
 	rdsv3_inc_init(&rm->m_inc, conn, conn->c_laddr);
-	rdsv3_message_addref(rm); /* for the inc */
+	/* For the embedded inc. Matching put is in loop_inc_free() */
+	rdsv3_message_addref(rm);
 
 	rdsv3_recv_incoming(conn, conn->c_laddr, conn->c_faddr, &rm->m_inc,
 	    KM_NOSLEEP);
@@ -104,6 +110,18 @@ rdsv3_loop_xmit(struct rdsv3_connection *conn, struct rdsv3_message *rm,
 
 	return (sizeof (struct rdsv3_header) +
 	    ntohl(rm->m_inc.i_hdr.h_len));
+}
+
+/*
+ * See rds_loop_xmit(). Since our inc is embedded in the rm, we
+ * make sure the rm lives at least until the inc is done.
+ */
+static void
+rdsv3_loop_inc_free(struct rdsv3_incoming *inc)
+{
+	struct rdsv3_message *rm = container_of(inc, struct rdsv3_message,
+	    m_inc);
+	rdsv3_message_put(rm);
 }
 
 static int
@@ -151,7 +169,7 @@ rdsv3_loop_conn_alloc(struct rdsv3_connection *conn, int gfp)
 	RDSV3_DPRINTF4("rdsv3_loop_conn_alloc", "Enter(conn: %p)", conn);
 
 	lc = kmem_zalloc(sizeof (struct rdsv3_loop_connection), KM_NOSLEEP);
-	if (lc == NULL)
+	if (!lc)
 		return (-ENOMEM);
 
 	list_link_init(&lc->loop_node);
@@ -232,8 +250,7 @@ struct rdsv3_transport rdsv3_loop_transport = {
 	.conn_connect		= rdsv3_loop_conn_connect,
 	.conn_shutdown		= rdsv3_loop_conn_shutdown,
 	.inc_copy_to_user	= rdsv3_message_inc_copy_to_user,
-	.inc_purge		= rdsv3_message_inc_purge,
-	.inc_free		= rdsv3_message_inc_free,
+	.inc_free		= rdsv3_loop_inc_free,
 	.t_name			= "loopback",
 };
 #else

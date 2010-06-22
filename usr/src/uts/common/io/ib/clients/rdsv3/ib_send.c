@@ -122,8 +122,13 @@ rdsv3_ib_send_unmap_rm(struct rdsv3_ib_connection *ic,
 	RDSV3_DPRINTF4("rdsv3_ib_send_unmap_rm", "ic %p send %p rm %p\n",
 	    ic, send, rm);
 
-	rdsv3_ib_dma_unmap_sg(ic->i_cm_id->device,
-	    rm->m_sg, rm->m_nents);
+	mutex_enter(&rm->m_rs_lock);
+	if (rm->m_count) {
+		rdsv3_ib_dma_unmap_sg(ic->i_cm_id->device,
+		    rm->m_sg, rm->m_count);
+		rm->m_count = 0;
+	}
+	mutex_exit(&rm->m_rs_lock);
 
 	if (rm->m_rdma_op != NULL) {
 		rdsv3_ib_send_unmap_rdma(ic, rm->m_rdma_op);
@@ -213,128 +218,110 @@ rdsv3_ib_send_clear_ring(struct rdsv3_ib_connection *ic)
  * the next to be freed, which is what this is concerned with.
  */
 void
-rdsv3_ib_send_cq_comp_handler(struct ib_cq *cq, void *context)
+rdsv3_ib_send_cqe_handler(struct rdsv3_ib_connection *ic, ibt_wc_t *wc)
 {
-	struct rdsv3_connection *conn = context;
-	struct rdsv3_ib_connection *ic = conn->c_transport_data;
-	ibt_wc_t wc;
+	struct rdsv3_connection *conn = ic->conn;
 	struct rdsv3_ib_send_work *send;
 	uint32_t completed, polled;
 	uint32_t oldest;
 	uint32_t i = 0;
 	int ret;
 
-	RDSV3_DPRINTF4("rdsv3_ib_send_cq_comp_handler", "conn: %p cq: %p",
-	    conn, cq);
+	RDSV3_DPRINTF4("rdsv3_ib_send_cqe_handler",
+	    "wc wc_id 0x%llx status %u byte_len %u imm_data %u\n",
+	    (unsigned long long)wc->wc_id, wc->wc_status,
+	    wc->wc_bytes_xfer, ntohl(wc->wc_immed_data));
 
-	rdsv3_ib_stats_inc(s_ib_tx_cq_call);
-	ret = ibt_enable_cq_notify(RDSV3_CQ2CQHDL(cq), IBT_NEXT_COMPLETION);
-	if (ret)
-		RDSV3_DPRINTF2("rdsv3_ib_send_cq_comp_handler",
-		    "ib_req_notify_cq send failed: %d", ret);
+	rdsv3_ib_stats_inc(s_ib_tx_cq_event);
 
-	while (ibt_poll_cq(RDSV3_CQ2CQHDL(cq), &wc, 1, &polled) ==
-	    IBT_SUCCESS) {
-		RDSV3_DPRINTF5("rdsv3_ib_send_cq_comp_handler",
-		    "swc wr_id 0x%llx status %u byte_len %u imm_data %u\n",
-		    (unsigned long long)wc.wc_id, wc.wc_status,
-		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
-		rdsv3_ib_stats_inc(s_ib_tx_cq_event);
-
-		if (wc.wc_id == RDSV3_IB_ACK_WR_ID) {
-			if (ic->i_ack_queued + HZ/2 < jiffies)
-				rdsv3_ib_stats_inc(s_ib_tx_stalled);
-			rdsv3_ib_ack_send_complete(ic);
-			continue;
-		}
-
-		oldest = rdsv3_ib_ring_oldest(&ic->i_send_ring);
-
-		completed = rdsv3_ib_ring_completed(&ic->i_send_ring,
-		    wc.wc_id, oldest);
-
-		for (i = 0; i < completed; i++) {
-			send = &ic->i_sends[oldest];
-
-			/*
-			 * In the error case, wc.opcode sometimes contains
-			 * garbage
-			 */
-			switch (send->s_opcode) {
-			case IBT_WRC_SEND:
-				if (send->s_rm)
-					rdsv3_ib_send_unmap_rm(ic, send,
-					    wc.wc_status);
-				break;
-			case IBT_WRC_RDMAW:
-			case IBT_WRC_RDMAR:
-				/*
-				 * Nothing to be done - the SG list will
-				 * be unmapped
-				 * when the SEND completes.
-				 */
-				break;
-			default:
-#ifndef __lock_lint
-				RDSV3_DPRINTF2("rdsv3_ib_send_cq_comp_handler",
-				    "RDS/IB: %s: unexpected opcode "
-				    "0x%x in WR!",
-				    __func__, send->s_opcode);
-#endif
-				break;
-			}
-
-			send->s_opcode = 0xdd;
-			if (send->s_queued + HZ/2 < jiffies)
-				rdsv3_ib_stats_inc(s_ib_tx_stalled);
-
-			/*
-			 * If a RDMA operation produced an error, signal
-			 * this right
-			 * away. If we don't, the subsequent SEND that goes
-			 * with this
-			 * RDMA will be canceled with ERR_WFLUSH, and the
-			 * application
-			 * never learn that the RDMA failed.
-			 */
-			if (wc.wc_status ==
-			    IBT_WC_REMOTE_ACCESS_ERR && send->s_op) {
-				struct rdsv3_message *rm;
-
-				rm = rdsv3_send_get_message(conn, send->s_op);
-				if (rm) {
-					if (rm->m_rdma_op != NULL)
-						rdsv3_ib_send_unmap_rdma(ic,
-						    rm->m_rdma_op);
-					rdsv3_ib_send_rdma_complete(rm,
-					    wc.wc_status);
-					rdsv3_message_put(rm);
-				}
-			}
-
-			oldest = (oldest + 1) % ic->i_send_ring.w_nr;
-		}
-
-		RDSV3_DPRINTF4("rdsv3_ib_send_cq_comp_handler", "compl: %d",
-		    completed);
-		rdsv3_ib_ring_free(&ic->i_send_ring, completed);
-
-		if (test_and_clear_bit(RDSV3_LL_SEND_FULL, &conn->c_flags) ||
-		    test_bit(0, &conn->c_map_queued))
-			rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_send_w, 0);
-
-		/* We expect errors as the qp is drained during shutdown */
-		if (wc.wc_status != IBT_WC_SUCCESS && rdsv3_conn_up(conn)) {
-			RDSV3_DPRINTF2("rdsv3_ib_send_cq_comp_handler",
-			    "send completion on %u.%u.%u.%u "
-			    "had status %u, disconnecting and reconnecting\n",
-			    NIPQUAD(conn->c_faddr), wc.wc_status);
-			rdsv3_conn_drop(conn);
-		}
+	if (wc->wc_id == RDSV3_IB_ACK_WR_ID) {
+		if (ic->i_ack_queued + HZ/2 < jiffies)
+			rdsv3_ib_stats_inc(s_ib_tx_stalled);
+		rdsv3_ib_ack_send_complete(ic);
+		return;
 	}
 
-	RDSV3_DPRINTF4("rdsv3_ib_send_cq_comp_handler",
-	    "Return: conn: %p, cq: %p", conn, cq);
+	oldest = rdsv3_ib_ring_oldest(&ic->i_send_ring);
+
+	completed = rdsv3_ib_ring_completed(&ic->i_send_ring,
+	    (wc->wc_id & ~RDSV3_IB_SEND_OP), oldest);
+
+	for (i = 0; i < completed; i++) {
+		send = &ic->i_sends[oldest];
+
+		/*
+		 * In the error case, wc->opcode sometimes contains
+		 * garbage
+		 */
+		switch (send->s_opcode) {
+		case IBT_WRC_SEND:
+			if (send->s_rm)
+				rdsv3_ib_send_unmap_rm(ic, send,
+				    wc->wc_status);
+			break;
+		case IBT_WRC_RDMAW:
+		case IBT_WRC_RDMAR:
+			/*
+			 * Nothing to be done - the SG list will
+			 * be unmapped
+			 * when the SEND completes.
+			 */
+			break;
+		default:
+#ifndef __lock_lint
+			RDSV3_DPRINTF2("rdsv3_ib_send_cq_comp_handler",
+			    "RDS/IB: %s: unexpected opcode "
+			    "0x%x in WR!",
+			    __func__, send->s_opcode);
+#endif
+			break;
+		}
+
+		send->s_opcode = 0xdd;
+		if (send->s_queued + HZ/2 < jiffies)
+			rdsv3_ib_stats_inc(s_ib_tx_stalled);
+
+		/*
+		 * If a RDMA operation produced an error, signal
+		 * this right
+		 * away. If we don't, the subsequent SEND that goes
+		 * with this
+		 * RDMA will be canceled with ERR_WFLUSH, and the
+		 * application
+		 * never learn that the RDMA failed.
+		 */
+		if (wc->wc_status ==
+		    IBT_WC_REMOTE_ACCESS_ERR && send->s_op) {
+			struct rdsv3_message *rm;
+
+			rm = rdsv3_send_get_message(conn, send->s_op);
+			if (rm) {
+				if (rm->m_rdma_op != NULL)
+					rdsv3_ib_send_unmap_rdma(ic,
+					    rm->m_rdma_op);
+				rdsv3_ib_send_rdma_complete(rm,
+				    wc->wc_status);
+				rdsv3_message_put(rm);
+			}
+		}
+
+		oldest = (oldest + 1) % ic->i_send_ring.w_nr;
+	}
+
+	rdsv3_ib_ring_free(&ic->i_send_ring, completed);
+
+	clear_bit(RDSV3_LL_SEND_FULL, &conn->c_flags);
+
+	/* We expect errors as the qp is drained during shutdown */
+	if (wc->wc_status != IBT_WC_SUCCESS && rdsv3_conn_up(conn)) {
+		RDSV3_DPRINTF2("rdsv3_ib_send_cqe_handler",
+		    "send completion on %u.%u.%u.%u "
+		    "had status %u, disconnecting and reconnecting\n",
+		    NIPQUAD(conn->c_faddr), wc->wc_status);
+		rdsv3_conn_drop(conn);
+	}
+
+	RDSV3_DPRINTF4("rdsv3_ib_send_cqe_handler", "Return: conn: %p", ic);
 }
 
 /*
@@ -512,7 +499,7 @@ rdsv3_ib_xmit_populate_wr(struct rdsv3_ib_connection *ic,
 	    "ic: %p, wr: %p scat: %p %d %d %d %d",
 	    ic, wr, scat, pos, off, length, send_flags);
 
-	wr->wr_id = pos;
+	wr->wr_id = pos | RDSV3_IB_SEND_OP;
 	wr->wr_trans = IBT_RC_SRV;
 	wr->wr_flags = send_flags;
 	wr->wr_opcode = IBT_WRC_SEND;
@@ -622,7 +609,8 @@ rdsv3_ib_xmit(struct rdsv3_connection *conn, struct rdsv3_message *rm,
 #endif
 
 	work_alloc = rdsv3_ib_ring_alloc(&ic->i_send_ring, i, &pos);
-	if (work_alloc == 0) {
+	if (work_alloc != i) {
+		rdsv3_ib_ring_unalloc(&ic->i_send_ring, work_alloc);
 		set_bit(RDSV3_LL_SEND_FULL, &conn->c_flags);
 		rdsv3_ib_stats_inc(s_ib_tx_ring_full);
 		ret = -ENOMEM;
@@ -886,6 +874,7 @@ add_header:
 		}
 		RDSV3_DPRINTF2("rdsv3_ib_xmit", "ibt_post_send failed\n");
 		rdsv3_conn_drop(ic->conn);
+		ret = -EAGAIN;
 		goto out;
 	}
 
@@ -1052,6 +1041,7 @@ rdsv3_ib_xmit_rdma(struct rdsv3_connection *conn, struct rdsv3_rdma_op *op)
 		return (-ENOMEM);
 	}
 
+	RDSV3_DPRINTF4("rdsv3_ib_xmit_rdma", "pos %u cnt %u", pos, op->r_count);
 	/*
 	 * take the scatter list and transpose into a list of
 	 * send wr's each with a scatter list of RDSV3_IB_MAX_SGE
@@ -1071,7 +1061,7 @@ rdsv3_ib_xmit_rdma(struct rdsv3_connection *conn, struct rdsv3_rdma_op *op)
 
 			wr = &ic->i_send_wrs[k];
 			wr->wr_flags = 0;
-			wr->wr_id = pos;
+			wr->wr_id = pos | RDSV3_IB_SEND_OP;
 			wr->wr_trans = IBT_RC_SRV;
 			wr->wr_opcode = op->r_write ? IBT_WRC_RDMAW :
 			    IBT_WRC_RDMAR;
@@ -1093,11 +1083,11 @@ rdsv3_ib_xmit_rdma(struct rdsv3_connection *conn, struct rdsv3_rdma_op *op)
 				remote_addr += scat[i].swr.wr_sgl[idx].ds_len;
 				sent += scat[i].swr.wr_sgl[idx].ds_len;
 				idx++;
-				RDSV3_DPRINTF4("xmit_rdma",
+				RDSV3_DPRINTF5("xmit_rdma",
 				    "send_wrs[%d]sgl[%d] va %llx len %x",
 				    k, j, sge->ds_va, sge->ds_len);
 			}
-			RDSV3_DPRINTF4("rdsv3_ib_xmit_rdma",
+			RDSV3_DPRINTF5("rdsv3_ib_xmit_rdma",
 			    "wr[%d] %p key: %x code: %d tlen: %d",
 			    k, wr, wr->wr.rc.rcwr.rdma.rdma_rkey,
 			    wr->wr_opcode, sent);
@@ -1125,6 +1115,7 @@ rdsv3_ib_xmit_rdma(struct rdsv3_connection *conn, struct rdsv3_rdma_op *op)
 		    "returned %d", NIPQUAD(conn->c_faddr), status);
 		rdsv3_ib_ring_unalloc(&ic->i_send_ring, work_alloc);
 	}
+	RDSV3_DPRINTF4("rdsv3_ib_xmit_rdma", "Ret: %p", ic);
 	return (status);
 }
 

@@ -90,6 +90,8 @@ rdsv3_send_reset(struct rdsv3_connection *conn)
 
 	RDSV3_DPRINTF4("rdsv3_send_reset", "Enter(conn: %p)", conn);
 
+	ASSERT(MUTEX_HELD(&conn->c_send_lock));
+
 	if (conn->c_xmit_rm) {
 		rm = conn->c_xmit_rm;
 		ro = rm->m_rdma_op;
@@ -111,11 +113,11 @@ rdsv3_send_reset(struct rdsv3_connection *conn)
 		rdsv3_message_put(conn->c_xmit_rm);
 		conn->c_xmit_rm = NULL;
 	}
+
 	conn->c_xmit_sg = 0;
 	conn->c_xmit_hdr_off = 0;
 	conn->c_xmit_data_off = 0;
 	conn->c_xmit_rdma_sent = 0;
-
 	conn->c_map_queued = 0;
 
 	conn->c_unacked_packets = rdsv3_sysctl_max_unacked_packets;
@@ -164,6 +166,10 @@ rdsv3_send_xmit(struct rdsv3_connection *conn)
 	int was_empty = 0;
 	list_t to_be_dropped;
 
+restart:
+	if (!rdsv3_conn_up(conn))
+		goto out;
+
 	RDSV3_DPRINTF4("rdsv3_send_xmit", "Enter(conn: %p)", conn);
 
 	list_create(&to_be_dropped, sizeof (struct rdsv3_message),
@@ -175,10 +181,6 @@ rdsv3_send_xmit(struct rdsv3_connection *conn)
 	 * another thread is already feeding the queue then we back off.  This
 	 * avoids blocking the caller and trading per-connection data between
 	 * caches per message.
-	 *
-	 * The sem holder will issue a retry if they notice that someone queued
-	 * a message after they stopped walking the send queue but before they
-	 * dropped the sem.
 	 */
 	if (!mutex_tryenter(&conn->c_send_lock)) {
 		RDSV3_DPRINTF4("rdsv3_send_xmit",
@@ -187,13 +189,14 @@ rdsv3_send_xmit(struct rdsv3_connection *conn)
 		ret = -ENOMEM;
 		goto out;
 	}
+	atomic_add_32(&conn->c_senders, 1);
 
 	if (conn->c_trans->xmit_prepare)
 		conn->c_trans->xmit_prepare(conn);
 
 	/*
 	 * spin trying to push headers and data down the connection until
-	 * the connection doens't make forward progress.
+	 * the connection doesn't make forward progress.
 	 */
 	while (--send_quota) {
 		/*
@@ -406,6 +409,8 @@ rdsv3_send_xmit(struct rdsv3_connection *conn)
 		ret = -EAGAIN;
 	}
 
+	atomic_dec_32(&conn->c_senders);
+
 	if (ret == 0 && was_empty) {
 		/*
 		 * A simple bit test would be way faster than taking the
@@ -508,7 +513,6 @@ rdsv3_rdma_send_complete(struct rdsv3_message *rm, int status)
 		mutex_enter(&rs->rs_lock);
 		list_insert_tail(&rs->rs_notify_queue, notifier);
 		mutex_exit(&rs->rs_lock);
-
 		ro->r_notifier = NULL;
 	}
 
@@ -734,7 +738,6 @@ rdsv3_send_drop_to(struct rdsv3_sock *rs, struct sockaddr_in *dest)
 		if (dest && (dest->sin_addr.s_addr != rm->m_daddr ||
 		    dest->sin_port != rm->m_inc.i_hdr.h_dport))
 			continue;
-
 		wake = 1;
 		list_remove(&rs->rs_send_queue, rm);
 		list_insert_tail(&list, rm);
@@ -1029,10 +1032,10 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 
 	ret = rdsv3_cong_wait(conn->c_fcong, dport, nonblock, rs);
 	if (ret) {
-		mutex_enter(&rdsv3_poll_waitq.waitq_mutex);
+		mutex_enter(&rs->rs_congested_lock);
 		rs->rs_seen_congestion = 1;
-		cv_signal(&rdsv3_poll_waitq.waitq_cv);
-		mutex_exit(&rdsv3_poll_waitq.waitq_mutex);
+		cv_signal(&rs->rs_congested_cv);
+		mutex_exit(&rs->rs_congested_lock);
 
 		RDSV3_DPRINTF2("rdsv3_sendmsg",
 		    "rdsv3_cong_wait (dport: %d) returned: %d", dport, ret);
@@ -1105,7 +1108,7 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 	rdsv3_stats_inc(s_send_queued);
 
 	if (!test_bit(RDSV3_LL_SEND_FULL, &conn->c_flags))
-		rdsv3_send_worker(&conn->c_send_w.work);
+		(void) rdsv3_send_xmit(conn);
 
 	rdsv3_message_put(rm);
 	RDSV3_DPRINTF4("rdsv3_sendmsg", "Return(rs: %p, len: %d)",
@@ -1139,7 +1142,7 @@ rdsv3_send_pong(struct rdsv3_connection *conn, uint16_be_t dport)
 	RDSV3_DPRINTF4("rdsv3_send_pong", "Enter(conn: %p)", conn);
 
 	rm = rdsv3_message_alloc(0, KM_NOSLEEP);
-	if (rm == NULL) {
+	if (!rm) {
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -1173,7 +1176,9 @@ rdsv3_send_pong(struct rdsv3_connection *conn, uint16_be_t dport)
 	rdsv3_stats_inc(s_send_queued);
 	rdsv3_stats_inc(s_send_pong);
 
-	rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_send_w, 0);
+	if (!test_bit(RDSV3_LL_SEND_FULL, &conn->c_flags))
+		(void) rdsv3_send_xmit(conn);
+
 	rdsv3_message_put(rm);
 
 	RDSV3_DPRINTF4("rdsv3_send_pong", "Return(conn: %p)", conn);

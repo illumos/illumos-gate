@@ -119,6 +119,8 @@ rdsv3_connect_complete(struct rdsv3_connection *conn)
 	    conn, NIPQUAD(conn->c_laddr), NIPQUAD(conn->c_faddr));
 
 	conn->c_reconnect_jiffies = 0;
+	conn->c_last_connect_jiffies = ddi_get_lbolt();
+
 	set_bit(0, &conn->c_map_queued);
 	rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_send_w, 0);
 	rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_recv_w, 0);
@@ -144,7 +146,7 @@ rdsv3_connect_complete(struct rdsv3_connection *conn)
  * We should *always* start with a random backoff; otherwise a broken connection
  * will always take several iterations to be re-established.
  */
-static void
+void
 rdsv3_queue_reconnect(struct rdsv3_connection *conn)
 {
 	unsigned long rand;
@@ -213,80 +215,6 @@ rdsv3_connect_worker(struct rdsv3_work_s *work)
 	RDSV3_DPRINTF2("rdsv3_connect_worker", "Return(work: %p)", work);
 }
 
-extern struct avl_tree	rdsv3_conn_hash;
-
-void
-rdsv3_shutdown_worker(struct rdsv3_work_s *work)
-{
-	struct rdsv3_connection *conn = container_of(work,
-	    struct rdsv3_connection, c_down_w);
-	struct rdsv3_conn_info_s conn_info;
-
-	RDSV3_DPRINTF2("rdsv3_shutdown_worker", "Enter(work: %p)", work);
-
-	/* shut it down unless it's down already */
-	if (!rdsv3_conn_transition(conn, RDSV3_CONN_DOWN, RDSV3_CONN_DOWN)) {
-		/*
-		 * Quiesce the connection mgmt handlers before we start tearing
-		 * things down. We don't hold the mutex for the entire
-		 * duration of the shutdown operation, else we may be
-		 * deadlocking with the CM handler. Instead, the CM event
-		 * handler is supposed to check for state DISCONNECTING
-		 */
-		mutex_enter(&conn->c_cm_lock);
-		if (!rdsv3_conn_transition(conn, RDSV3_CONN_UP,
-		    RDSV3_CONN_DISCONNECTING) &&
-		    !rdsv3_conn_transition(conn, RDSV3_CONN_ERROR,
-		    RDSV3_CONN_DISCONNECTING)) {
-			RDSV3_DPRINTF2("rdsv3_shutdown_worker",
-			    "RDS: connect failed: conn: %p, state: %d",
-			    conn, atomic_get(&conn->c_state));
-			rdsv3_conn_drop(conn);
-			mutex_exit(&conn->c_cm_lock);
-			return;
-		}
-		mutex_exit(&conn->c_cm_lock);
-
-		mutex_enter(&conn->c_send_lock);
-		conn->c_trans->conn_shutdown(conn);
-		rdsv3_conn_reset(conn);
-		mutex_exit(&conn->c_send_lock);
-
-		if (!rdsv3_conn_transition(conn, RDSV3_CONN_DISCONNECTING,
-		    RDSV3_CONN_DOWN)) {
-			/*
-			 * This can happen - eg when we're in the middle of
-			 * tearing down the connection, and someone unloads
-			 * the rds module. Quite reproduceable with loopback
-			 * connections. Mostly harmless.
-			 */
-#ifndef __lock_lint
-			RDSV3_DPRINTF2("rdsv3_shutdown_worker",
-			    "failed to transition to state DOWN, "
-			    "current statis is: %d conn: %p",
-			    atomic_get(&conn->c_state), conn);
-			rdsv3_conn_drop(conn);
-#endif
-			return;
-		}
-	}
-
-	/*
-	 * Then reconnect if it's still live.
-	 * The passive side of an IB loopback connection is never added
-	 * to the conn hash, so we never trigger a reconnect on this
-	 * conn - the reconnect is always triggered by the active peer.
-	 */
-	rdsv3_cancel_delayed_work(&conn->c_conn_w);
-
-	conn_info.c_laddr = conn->c_laddr;
-	conn_info.c_faddr = conn->c_faddr;
-	if (avl_find(&rdsv3_conn_hash, &conn_info, NULL) == conn)
-		rdsv3_queue_reconnect(conn);
-
-	RDSV3_DPRINTF2("rdsv3_shutdown_worker", "Return(work: %p)", work);
-}
-
 void
 rdsv3_send_worker(struct rdsv3_work_s *work)
 {
@@ -344,6 +272,32 @@ rdsv3_recv_worker(struct rdsv3_work_s *work)
 }
 
 void
+rdsv3_shutdown_worker(struct rdsv3_work_s *work)
+{
+	struct rdsv3_connection *conn = container_of(work,
+	    struct rdsv3_connection, c_down_w);
+	rdsv3_conn_shutdown(conn);
+}
+
+#define	time_after(a, b)	((long)(b) - (long)(a) < 0)
+
+void
+rdsv3_reaper_worker(struct rdsv3_work_s *work)
+{
+	struct rdsv3_connection *conn = container_of(work,
+	    struct rdsv3_connection, c_reap_w.work);
+
+	if (rdsv3_conn_state(conn) != RDSV3_CONN_UP &&
+	    !time_after(conn->c_last_connect_jiffies,
+	    ddi_get_lbolt() - RDSV3_REAPER_WAIT_JIFFIES)) {
+		rdsv3_conn_destroy(conn);
+	} else {
+		rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_reap_w,
+		    RDSV3_REAPER_WAIT_JIFFIES);
+	}
+}
+
+void
 rdsv3_threads_exit(void)
 {
 	rdsv3_destroy_task_workqueue(rdsv3_wq);
@@ -353,7 +307,7 @@ int
 rdsv3_threads_init(void)
 {
 	rdsv3_wq = rdsv3_create_task_workqueue("krdsd");
-	if (rdsv3_wq == NULL)
+	if (!rdsv3_wq)
 		return (-ENOMEM);
 
 	return (0);

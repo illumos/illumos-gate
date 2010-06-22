@@ -73,18 +73,6 @@ static struct kmem_cache *rdsv3_conn_slab = NULL;
 		var |= RDSV3_INFO_CONNECTION_FLAG_##suffix;     \
 } while (0)
 
-static inline int
-rdsv3_conn_is_sending(struct rdsv3_connection *conn)
-{
-	int ret = 0;
-
-	if (!mutex_tryenter(&conn->c_send_lock))
-		ret = 1;
-	else
-		mutex_exit(&conn->c_send_lock);
-
-	return (ret);
-}
 
 static struct rdsv3_connection *
 rdsv3_conn_lookup(uint32_be_t laddr, uint32_be_t faddr, avl_index_t *pos)
@@ -143,8 +131,7 @@ rdsv3_conn_reset(struct rdsv3_connection *conn)
  */
 static struct rdsv3_connection *
 __rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
-    struct rdsv3_transport *trans, int gfp,
-    int is_outgoing)
+    struct rdsv3_transport *trans, int gfp, int is_outgoing)
 {
 	struct rdsv3_connection *conn, *parent = NULL;
 	avl_index_t pos;
@@ -173,7 +160,7 @@ __rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
 	    ntohl(laddr), ntohl(faddr));
 
 	conn = kmem_cache_alloc(rdsv3_conn_slab, gfp);
-	if (conn == NULL) {
+	if (!conn) {
 		conn = ERR_PTR(-ENOMEM);
 		goto out;
 	}
@@ -220,6 +207,7 @@ __rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
 	RDSV3_INIT_DELAYED_WORK(&conn->c_send_w, rdsv3_send_worker);
 	RDSV3_INIT_DELAYED_WORK(&conn->c_recv_w, rdsv3_recv_worker);
 	RDSV3_INIT_DELAYED_WORK(&conn->c_conn_w, rdsv3_connect_worker);
+	RDSV3_INIT_DELAYED_WORK(&conn->c_reap_w, rdsv3_reaper_worker);
 	RDSV3_INIT_WORK(&conn->c_down_w, rdsv3_shutdown_worker);
 	mutex_init(&conn->c_cm_lock, NULL, MUTEX_DRIVER, NULL);
 	conn->c_flags = 0;
@@ -261,6 +249,8 @@ __rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
 		} else {
 			avl_insert(&rdsv3_conn_hash, conn, pos);
 			rdsv3_cong_add_conn(conn);
+			rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_reap_w,
+			    RDSV3_REAPER_WAIT_JIFFIES);
 			rdsv3_conn_count++;
 		}
 	}
@@ -287,10 +277,95 @@ rdsv3_conn_create_outgoing(uint32_be_t laddr, uint32_be_t faddr,
 	return (__rdsv3_conn_create(laddr, faddr, trans, gfp, 1));
 }
 
+extern struct avl_tree	rdsv3_conn_hash;
+
+void
+rdsv3_conn_shutdown(struct rdsv3_connection *conn)
+{
+	RDSV3_DPRINTF2("rdsv3_conn_shutdown", "Enter(conn: %p)", conn);
+
+	/* shut it down unless it's down already */
+	if (!rdsv3_conn_transition(conn, RDSV3_CONN_DOWN, RDSV3_CONN_DOWN)) {
+		/*
+		 * Quiesce the connection mgmt handlers before we start tearing
+		 * things down. We don't hold the mutex for the entire
+		 * duration of the shutdown operation, else we may be
+		 * deadlocking with the CM handler. Instead, the CM event
+		 * handler is supposed to check for state DISCONNECTING
+		 */
+		mutex_enter(&conn->c_cm_lock);
+		if (!rdsv3_conn_transition(conn, RDSV3_CONN_UP,
+		    RDSV3_CONN_DISCONNECTING) &&
+		    !rdsv3_conn_transition(conn, RDSV3_CONN_ERROR,
+		    RDSV3_CONN_DISCONNECTING)) {
+			RDSV3_DPRINTF2("rdsv3_conn_shutdown",
+			    "shutdown called in state %d",
+			    atomic_get(&conn->c_state));
+			rdsv3_conn_drop(conn);
+			mutex_exit(&conn->c_cm_lock);
+			return;
+		}
+		mutex_exit(&conn->c_cm_lock);
+
+		/* verify everybody's out of rds_send_xmit() */
+		mutex_enter(&conn->c_send_lock);
+		while (atomic_get(&conn->c_senders)) {
+			mutex_exit(&conn->c_send_lock);
+			delay(1);
+			mutex_enter(&conn->c_send_lock);
+		}
+
+		conn->c_trans->conn_shutdown(conn);
+		rdsv3_conn_reset(conn);
+		mutex_exit(&conn->c_send_lock);
+
+		if (!rdsv3_conn_transition(conn, RDSV3_CONN_DISCONNECTING,
+		    RDSV3_CONN_DOWN)) {
+			/*
+			 * This can happen - eg when we're in the middle of
+			 * tearing down the connection, and someone unloads
+			 * the rds module.
+			 * Quite reproduceable with loopback connections.
+			 * Mostly harmless.
+			 */
+#ifndef __lock_lint
+			RDSV3_DPRINTF2("rdsv3_conn_shutdown",
+			    "failed to transition to state DOWN, "
+			    "current statis is: %d",
+			    atomic_get(&conn->c_state));
+			rdsv3_conn_drop(conn);
+#endif
+			return;
+		}
+	}
+
+	/*
+	 * Then reconnect if it's still live.
+	 * The passive side of an IB loopback connection is never added
+	 * to the conn hash, so we never trigger a reconnect on this
+	 * conn - the reconnect is always triggered by the active peer.
+	 */
+	rdsv3_cancel_delayed_work(&conn->c_conn_w);
+
+	{
+		struct rdsv3_conn_info_s conn_info;
+
+		conn_info.c_laddr = conn->c_laddr;
+		conn_info.c_faddr = conn->c_faddr;
+		if (avl_find(&rdsv3_conn_hash, &conn_info, NULL) == conn)
+			rdsv3_queue_reconnect(conn);
+	}
+	RDSV3_DPRINTF2("rdsv3_conn_shutdown", "Exit");
+}
+
+/*
+ * Stop and free a connection.
+ */
 void
 rdsv3_conn_destroy(struct rdsv3_connection *conn)
 {
 	struct rdsv3_message *rm, *rtmp;
+	list_t to_be_dropped;
 
 	RDSV3_DPRINTF4("rdsv3_conn_destroy",
 	    "freeing conn %p for %u.%u.%u.%u -> %u.%u.%u.%u",
@@ -298,22 +373,34 @@ rdsv3_conn_destroy(struct rdsv3_connection *conn)
 
 	avl_remove(&rdsv3_conn_hash, conn);
 
-	/* wait for the rds thread to shut it down */
-	conn->c_state = RDSV3_CONN_ERROR;
-	rdsv3_cancel_delayed_work(&conn->c_conn_w);
+	rdsv3_cancel_delayed_work(&conn->c_reap_w);
 	rdsv3_cancel_delayed_work(&conn->c_send_w);
 	rdsv3_cancel_delayed_work(&conn->c_recv_w);
-	rdsv3_shutdown_worker(&conn->c_down_w);
-	rdsv3_flush_workqueue(rdsv3_wq);
+
+	rdsv3_conn_shutdown(conn);
 
 	/* tear down queued messages */
-	RDSV3_FOR_EACH_LIST_NODE_SAFE(rm, rtmp,
-	    &conn->c_send_queue,
+
+	list_create(&to_be_dropped, sizeof (struct rdsv3_message),
+	    offsetof(struct rdsv3_message, m_conn_item));
+
+	RDSV3_FOR_EACH_LIST_NODE_SAFE(rm, rtmp, &conn->c_retrans, m_conn_item) {
+		list_remove_node(&rm->m_conn_item);
+		list_insert_tail(&to_be_dropped, rm);
+	}
+
+	RDSV3_FOR_EACH_LIST_NODE_SAFE(rm, rtmp, &conn->c_send_queue,
 	    m_conn_item) {
 		list_remove_node(&rm->m_conn_item);
-		ASSERT(!list_link_active(&rm->m_sock_item));
+		list_insert_tail(&to_be_dropped, rm);
+	}
+
+	RDSV3_FOR_EACH_LIST_NODE_SAFE(rm, rtmp, &to_be_dropped, m_conn_item) {
+		clear_bit(RDSV3_MSG_ON_CONN, &rm->m_flags);
+		list_remove_node(&rm->m_conn_item);
 		rdsv3_message_put(rm);
 	}
+
 	if (conn->c_xmit_rm)
 		rdsv3_message_put(conn->c_xmit_rm);
 
@@ -378,7 +465,6 @@ rdsv3_conn_message_info(struct rsock *sock, unsigned int len,
 
 		conn = AVL_NEXT(&rdsv3_conn_hash, conn);
 	} while (conn != NULL);
-
 	rw_exit(&rdsv3_conn_lock);
 
 	lens->nr = total;
@@ -450,7 +536,6 @@ rdsv3_for_each_conn_info(struct rsock *sock, unsigned int len,
 		}
 		conn = AVL_NEXT(&rdsv3_conn_hash, conn);
 	} while (conn != NULL);
-
 	rw_exit(&rdsv3_conn_lock);
 
 	kmem_free(buffer, item_len + 8);
@@ -470,7 +555,8 @@ rdsv3_conn_info_visitor(struct rdsv3_connection *conn, void *buffer)
 	cinfo->flags = 0;
 
 	rdsv3_conn_info_set(cinfo->flags,
-	    rdsv3_conn_is_sending(conn), SENDING);
+	    MUTEX_HELD(&conn->c_send_lock), SENDING);
+
 	/* XXX Future: return the state rather than these funky bits */
 	rdsv3_conn_info_set(cinfo->flags,
 	    atomic_get(&conn->c_state) == RDSV3_CONN_CONNECTING,
@@ -497,10 +583,10 @@ rdsv3_conn_init()
 	rdsv3_conn_slab = kmem_cache_create("rdsv3_connection",
 	    sizeof (struct rdsv3_connection), 0, rdsv3_conn_constructor,
 	    rdsv3_conn_destructor, NULL, NULL, NULL, 0);
-	if (rdsv3_conn_slab == NULL) {
+	if (!rdsv3_conn_slab) {
 		RDSV3_DPRINTF2("rdsv3_conn_init",
 		    "kmem_cache_create(rdsv3_conn_slab) failed");
-		return (-1);
+		return (-ENOMEM);
 	}
 
 	avl_create(&rdsv3_conn_hash, rdsv3_conn_compare,

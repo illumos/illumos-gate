@@ -109,6 +109,7 @@ rdsv3_add_bound(struct rdsv3_sock *rs, uint32_be_t addr, uint16_be_t *port)
 	do {
 		if (rover == 0)
 			rover++;
+
 		if (rdsv3_bind_tree_walk(addr, htons(rover), rs) == NULL) {
 			*port = htons(rover);
 			ret = 0;
@@ -190,7 +191,7 @@ rdsv3_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	}
 
 	rs->rs_transport = rdsv3_trans_get_preferred(sin->sin_addr.s_addr);
-	if (rs->rs_transport == NULL) {
+	if (!rs->rs_transport) {
 		rdsv3_remove_bound(rs);
 		if (rdsv3_printk_ratelimit()) {
 			RDSV3_DPRINTF1("rdsv3_bind",

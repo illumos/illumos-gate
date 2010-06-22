@@ -29,6 +29,7 @@
 
 #include <sys/ib/clients/rdsv3/rdsv3.h>
 #include <sys/ib/clients/rdsv3/rdma_transport.h>
+#include <sys/ib/clients/rdsv3/rdsv3_af_thr.h>
 
 #define	RDSV3_FMR_SIZE			256
 #define	RDSV3_FMR_POOL_SIZE		(12 * 1024)
@@ -65,8 +66,11 @@ struct rdsv3_page_frag {
 };
 
 struct rdsv3_ib_incoming {
+	list_node_t		ii_obj;	/* list obj of rdsv3_inc_pool list */
 	struct list		ii_frags;
 	struct rdsv3_incoming	ii_inc;
+	struct rdsv3_inc_pool	*ii_pool;
+	struct rdsv3_ib_device	*ii_ibdev;
 };
 
 struct rdsv3_ib_connect_private {
@@ -95,11 +99,26 @@ struct rdsv3_ib_recv_work {
 };
 
 struct rdsv3_ib_work_ring {
-	uint32_t	w_nr;
-	uint32_t	w_alloc_ptr;
-	uint32_t	w_alloc_ctr;
-	uint32_t	w_free_ptr;
-	atomic_t	w_free_ctr;
+	uint32_t		w_nr;
+	uint32_t		w_alloc_ptr;
+	uint32_t		w_alloc_ctr;
+	uint32_t		w_free_ptr;
+	atomic_t		w_free_ctr;
+	rdsv3_wait_queue_t	w_empty_wait;
+};
+
+/*
+ * Rings are posted with all the allocations they'll need to queue the
+ * incoming message to the receiving socket so this can't fail.
+ * All fragments start with a header, so we can make sure we're not receiving
+ * garbage, and we can tell a small 8 byte fragment from an ACK frame.
+ */
+struct rdsv3_ib_ack_state {
+	uint64_t	ack_next;
+	uint64_t	ack_recv;
+	unsigned int	ack_required:1;
+	unsigned int	ack_next_valid:1;
+	unsigned int	ack_recv_valid:1;
 };
 
 struct rdsv3_ib_device;
@@ -115,8 +134,8 @@ struct rdsv3_ib_connection {
 	struct rdma_cm_id	*i_cm_id;
 	struct ib_pd		*i_pd;
 	struct rdsv3_hdrs_mr	*i_mr;
-	struct ib_cq		*i_send_cq;
-	struct ib_cq		*i_recv_cq;
+	struct ib_cq		*i_cq;
+	struct ib_cq		*i_snd_cq;
 
 	/* tx */
 	struct rdsv3_ib_work_ring	i_send_ring;
@@ -126,8 +145,12 @@ struct rdsv3_ib_connection {
 	struct rdsv3_ib_send_work *i_sends;
 	ibt_send_wr_t		*i_send_wrs;
 
+	/* soft CQ */
+	rdsv3_af_thr_t		*i_soft_cq;
+	rdsv3_af_thr_t		*i_snd_soft_cq;
+	rdsv3_af_thr_t		*i_refill_rq;
+
 	/* rx */
-	ddi_taskq_t		*i_recv_tasklet;
 	struct mutex		i_recv_mutex;
 	struct rdsv3_ib_work_ring	i_recv_ring;
 	struct rdsv3_ib_incoming	*i_ibinc;
@@ -138,8 +161,6 @@ struct rdsv3_ib_connection {
 	ibt_recv_wr_t		*i_recv_wrs;
 	struct rdsv3_page_frag	i_frag;
 	uint64_t		i_ack_recv;	/* last ACK received */
-	processorid_t		i_recv_tasklet_cpuid;
-	/* CPU to which the tasklet taskq should be bound */
 
 	/* sending acks */
 	unsigned long		i_ack_flags;
@@ -192,20 +213,30 @@ struct rdsv3_ib_device {
 	ib_device_t		*dev;
 	struct ib_pd		*pd;
 	struct kmem_cache	*ib_frag_slab;
-	struct rds_ib_mr_pool	*mr_pool;
+	kmutex_t		spinlock;	/* protect the above */
+	krwlock_t		rwlock;		/* protect paddr_list */
 	unsigned int		fmr_max_remaps;
 	unsigned int		max_fmrs;
 	unsigned int		fmr_message_size;
 	int			max_sge;
 	unsigned int		max_wrs;
+	unsigned int		max_initiator_depth;
+	unsigned int		max_responder_resources;
+	struct rdsv3_fmr_pool	*fmr_pool;
+	struct rdsv3_inc_pool	*inc_pool;
 	ibt_fmr_pool_hdl_t	fmr_pool_hdl;
-	kmutex_t		spinlock;	/* protect the above */
 	ibt_hca_attr_t		hca_attr;
+	rdsv3_af_thr_t		*fmr_soft_cq;
+	rdsv3_af_thr_t		*inc_soft_cq;
+	ibt_hca_hdl_t		ibt_hca_hdl;
+	rdsv3_af_grp_t		*aft_hcagp;
 };
 
 /* bits for i_ack_flags */
 #define	IB_ACK_IN_FLIGHT	0
 #define	IB_ACK_REQUESTED	1
+
+#define	RDSV3_IB_SEND_OP	(1ULL << 63)
 
 /* Magic WR_ID for ACKs */
 #define	RDSV3_IB_ACK_WR_ID	(~(uint64_t)0)
@@ -213,14 +244,14 @@ struct rdsv3_ib_device {
 struct rdsv3_ib_statistics {
 	uint64_t	s_ib_connect_raced;
 	uint64_t	s_ib_listen_closed_stale;
-	uint64_t	s_ib_tx_cq_call;
+	uint64_t	s_ib_evt_handler_call;
+	uint64_t	s_ib_tasklet_call;
 	uint64_t	s_ib_tx_cq_event;
 	uint64_t	s_ib_tx_ring_full;
 	uint64_t	s_ib_tx_throttle;
 	uint64_t	s_ib_tx_sg_mapping_failure;
 	uint64_t	s_ib_tx_stalled;
 	uint64_t	s_ib_tx_credit_updates;
-	uint64_t	s_ib_rx_cq_call;
 	uint64_t	s_ib_rx_cq_event;
 	uint64_t	s_ib_rx_ring_empty;
 	uint64_t	s_ib_rx_refill_from_cq;
@@ -266,6 +297,9 @@ int rdsv3_ib_cm_handle_connect(struct rdma_cm_id *cm_id,
 int rdsv3_ib_cm_initiate_connect(struct rdma_cm_id *cm_id);
 void rdsv3_ib_cm_connect_complete(struct rdsv3_connection *conn,
     struct rdma_cm_event *event);
+void rdsv3_ib_tasklet_fn(void *data);
+void rdsv3_ib_snd_tasklet_fn(void *data);
+void rdsv3_ib_refill_fn(void *data);
 
 /* ib_rdma.c */
 int rdsv3_ib_update_ipaddr(struct rdsv3_ib_device *rds_ibdev,
@@ -293,25 +327,29 @@ void *rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
 void rdsv3_ib_sync_mr(void *trans_private, int dir);
 void rdsv3_ib_free_mr(void *trans_private, int invalidate);
 void rdsv3_ib_flush_mrs(void);
+void rdsv3_ib_drain_mrlist_fn(void *data);
 
 /* ib_recv.c */
 int rdsv3_ib_recv_init(void);
 void rdsv3_ib_recv_exit(void);
 int rdsv3_ib_recv(struct rdsv3_connection *conn);
-int rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kmflags,
-    int prefill);
-void rdsv3_ib_inc_purge(struct rdsv3_incoming *inc);
+int rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int prefill);
 void rdsv3_ib_inc_free(struct rdsv3_incoming *inc);
 int rdsv3_ib_inc_copy_to_user(struct rdsv3_incoming *inc, uio_t *uiop,
     size_t size);
-void rdsv3_ib_recv_cq_comp_handler(struct ib_cq *cq, void *context);
-void rdsv3_ib_recv_tasklet_fn(void *data);
+void rdsv3_ib_recv_cqe_handler(struct rdsv3_ib_connection *ic, ibt_wc_t *wc,
+    struct rdsv3_ib_ack_state *state);
 void rdsv3_ib_recv_init_ring(struct rdsv3_ib_connection *ic);
 void rdsv3_ib_recv_clear_ring(struct rdsv3_ib_connection *ic);
 void rdsv3_ib_recv_init_ack(struct rdsv3_ib_connection *ic);
 void rdsv3_ib_attempt_ack(struct rdsv3_ib_connection *ic);
 void rdsv3_ib_ack_send_complete(struct rdsv3_ib_connection *ic);
 uint64_t rdsv3_ib_piggyb_ack(struct rdsv3_ib_connection *ic);
+void rdsv3_ib_set_ack(struct rdsv3_ib_connection *ic, uint64_t seq,
+    int ack_required);
+int rdsv3_ib_create_inc_pool(struct rdsv3_ib_device *);
+void rdsv3_ib_destroy_inc_pool(struct rdsv3_ib_device *);
+void rdsv3_ib_drain_inclist(void *);
 
 /* ib_ring.c */
 void rdsv3_ib_ring_init(struct rdsv3_ib_work_ring *ring, uint32_t nr);
@@ -325,13 +363,12 @@ int rdsv3_ib_ring_low(struct rdsv3_ib_work_ring *ring);
 uint32_t rdsv3_ib_ring_oldest(struct rdsv3_ib_work_ring *ring);
 uint32_t rdsv3_ib_ring_completed(struct rdsv3_ib_work_ring *ring,
     uint32_t wr_id, uint32_t oldest);
-extern rdsv3_wait_queue_t rdsv3_ib_ring_empty_wait;
 
 /* ib_send.c */
 void rdsv3_ib_xmit_complete(struct rdsv3_connection *conn);
 int rdsv3_ib_xmit(struct rdsv3_connection *conn, struct rdsv3_message *rm,
     unsigned int hdr_off, unsigned int sg, unsigned int off);
-void rdsv3_ib_send_cq_comp_handler(struct ib_cq *cq, void *context);
+void rdsv3_ib_send_cqe_handler(struct rdsv3_ib_connection *ic, ibt_wc_t *wc);
 void rdsv3_ib_send_init_ring(struct rdsv3_ib_connection *ic);
 void rdsv3_ib_send_clear_ring(struct rdsv3_ib_connection *ic);
 int rdsv3_ib_xmit_rdma(struct rdsv3_connection *conn, struct rdsv3_rdma_op *op);

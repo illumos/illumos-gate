@@ -42,6 +42,7 @@ extern "C" {
 #include <inet/ip.h>
 #include <sys/avl.h>
 #include <sys/param.h>
+#include <sys/time.h>
 #include <sys/rds.h>
 
 #include <sys/ib/ibtl/ibti.h>
@@ -76,6 +77,9 @@ extern "C" {
  * port 18633 was the version that had ack frames on the wire.
  */
 #define	RDSV3_PORT	18634
+
+#define	RDSV3_REAPER_WAIT_SECS		(5*60)
+#define	RDSV3_REAPER_WAIT_JIFFIES	SEC_TO_TICK(RDSV3_REAPER_WAIT_SECS)
 
 /*
  * This is the sad making.  Some kernels have a bug in the per_cpu() api which
@@ -139,6 +143,9 @@ struct rdsv3_connection {
 	struct rdsv3_cong_map	*c_fcong;
 
 	struct mutex		c_send_lock;    /* protect send ring */
+	atomic_t		c_send_generation;
+	atomic_t		c_senders;
+
 	struct rdsv3_message	*c_xmit_rm;
 	unsigned long		c_xmit_sg;
 	unsigned int		c_xmit_hdr_off;
@@ -158,9 +165,12 @@ struct rdsv3_connection {
 	atomic_t		c_state;
 	unsigned long		c_flags;
 	unsigned long		c_reconnect_jiffies;
+	clock_t			c_last_connect_jiffies;
+
 	struct rdsv3_delayed_work_s	c_send_w;
 	struct rdsv3_delayed_work_s	c_recv_w;
 	struct rdsv3_delayed_work_s	c_conn_w;
+	struct rdsv3_delayed_work_s	c_reap_w;
 	struct rdsv3_work_s	c_down_w;
 	struct mutex		c_cm_lock;	/* protect conn state & cm */
 
@@ -301,6 +311,8 @@ struct rdsv3_message {
 	 *   -> rs->rs_lock
 	 */
 	kmutex_t		m_rs_lock;
+	rdsv3_wait_queue_t	m_flush_wait;
+
 	struct rdsv3_sock	*m_rs;
 	struct rdsv3_rdma_op	*m_rdma_op;
 	rdsv3_rdma_cookie_t	m_rdma_cookie;
@@ -381,7 +393,6 @@ struct rdsv3_transport {
 	int (*recv)(struct rdsv3_connection *conn);
 	int (*inc_copy_to_user)(struct rdsv3_incoming *inc, uio_t *uio,
 	    size_t size);
-	void (*inc_purge)(struct rdsv3_incoming *inc);
 	void (*inc_free)(struct rdsv3_incoming *inc);
 
 	int (*cm_handle_connect)(struct rdma_cm_id *cm_id,
@@ -433,6 +444,8 @@ struct rdsv3_sock {
 	int			rs_congested;
 	/* seen congestion (ENOBUFS) when sending? */
 	int			rs_seen_congestion;
+	kmutex_t 		rs_congested_lock;
+	kcondvar_t		rs_congested_cv;
 
 	/* rs_lock protects all these adjacent members before the newline */
 	kmutex_t		rs_lock;
@@ -548,8 +561,6 @@ void rdsv3_sock_put(struct rdsv3_sock *rs);
 void rdsv3_wake_sk_sleep(struct rdsv3_sock *rs);
 void __rdsv3_wake_sk_sleep(struct rsock *sk);
 
-extern rdsv3_wait_queue_t rdsv3_poll_waitq;
-
 /* bind.c */
 int rdsv3_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
     socklen_t len, cred_t *cr);
@@ -564,6 +575,7 @@ struct rdsv3_connection *rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
 struct rdsv3_connection *rdsv3_conn_create_outgoing(uint32_be_t laddr,
     uint32_be_t faddr,
     struct rdsv3_transport *trans, int gfp);
+void rdsv3_conn_shutdown(struct rdsv3_connection *conn);
 void rdsv3_conn_destroy(struct rdsv3_connection *conn);
 void rdsv3_conn_reset(struct rdsv3_connection *conn);
 void rdsv3_conn_drop(struct rdsv3_connection *conn);
@@ -690,10 +702,12 @@ extern unsigned int  rdsv3_sysctl_trace_level;
 int rdsv3_threads_init();
 void rdsv3_threads_exit(void);
 extern struct rdsv3_workqueue_struct_s *rdsv3_wq;
+void rdsv3_queue_reconnect(struct rdsv3_connection *conn);
 void rdsv3_connect_worker(struct rdsv3_work_s *);
 void rdsv3_shutdown_worker(struct rdsv3_work_s *);
 void rdsv3_send_worker(struct rdsv3_work_s *);
 void rdsv3_recv_worker(struct rdsv3_work_s *);
+void rdsv3_reaper_worker(struct rdsv3_work_s *);
 void rdsv3_connect_complete(struct rdsv3_connection *conn);
 
 /* transport.c */
@@ -724,7 +738,6 @@ int rdsv3_message_add_rdma_dest_extension(struct rdsv3_header *hdr,
     uint32_t r_key, uint32_t offset);
 int rdsv3_message_inc_copy_to_user(struct rdsv3_incoming *inc,
     uio_t *uio, size_t size);
-void rdsv3_message_inc_purge(struct rdsv3_incoming *inc);
 void rdsv3_message_inc_free(struct rdsv3_incoming *inc);
 void rdsv3_message_addref(struct rdsv3_message *rm);
 void rdsv3_message_put(struct rdsv3_message *rm);

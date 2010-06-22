@@ -33,7 +33,7 @@ set name=pkg.fmri value=pkg:/driver/network/rdsv3@$(PKGVERS)
 set name=pkg.description \
     value="The RDS driver is an implementation of the Reliable Datagram Sockets API. It provides reliable, in-order datagram and RDMA data delivery between sockets."
 set name=pkg.summary value="Solaris Reliable Datagram Sockets"
-set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys

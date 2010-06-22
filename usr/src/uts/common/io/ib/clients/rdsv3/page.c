@@ -75,7 +75,7 @@ rdsv3_page_remainder_alloc(struct rdsv3_scatterlist *scat, unsigned long bytes,
 
 	if (bytes >= PAGE_SIZE) {
 		page = kmem_alloc(PAGE_SIZE, gfp);
-		if (page == NULL) {
+		if (!page) {
 			ret = -ENOMEM;
 		} else {
 			rdsv3_sg_set_page(scat, page, PAGE_SIZE, 0);
@@ -88,7 +88,7 @@ rdsv3_page_remainder_alloc(struct rdsv3_scatterlist *scat, unsigned long bytes,
 	 * XXX - This is not same as linux.
 	 */
 	page = kmem_alloc(bytes, KM_NOSLEEP);
-	if (page == NULL) {
+	if (!page) {
 		ret = -ENOMEM;
 		goto out;
 	}

@@ -109,10 +109,18 @@ rdsv3_ib_add_one(ib_device_t *device)
 	if (!rds_ibdev)
 		goto free_attr;
 
+	rds_ibdev->ibt_hca_hdl = ib_get_ibt_hca_hdl(device);
+	rds_ibdev->hca_attr =  *dev_attr;
+
+	rw_init(&rds_ibdev->rwlock, NULL, RW_DRIVER, NULL);
 	mutex_init(&rds_ibdev->spinlock, NULL, MUTEX_DRIVER, NULL);
 
 	rds_ibdev->max_wrs = dev_attr->hca_max_chan_sz;
 	rds_ibdev->max_sge = min(dev_attr->hca_max_sgl, RDSV3_IB_MAX_SGE);
+
+	rds_ibdev->max_initiator_depth = (uint_t)dev_attr->hca_max_rdma_in_qp;
+	rds_ibdev->max_responder_resources =
+	    (uint_t)dev_attr->hca_max_rdma_in_qp;
 
 	rds_ibdev->dev = device;
 	rds_ibdev->pd = ib_alloc_pd(device);
@@ -120,6 +128,11 @@ rdsv3_ib_add_one(ib_device_t *device)
 		goto free_dev;
 
 	if (rdsv3_ib_create_mr_pool(rds_ibdev) != 0) {
+		goto free_dev;
+	}
+
+	if (rdsv3_ib_create_inc_pool(rds_ibdev) != 0) {
+		rdsv3_ib_destroy_mr_pool(rds_ibdev);
 		goto free_dev;
 	}
 
@@ -133,9 +146,40 @@ rdsv3_ib_add_one(ib_device_t *device)
 		    "kmem_cache_create for ib_frag_slab failed for device: %s",
 		    device->name);
 		rdsv3_ib_destroy_mr_pool(rds_ibdev);
+		rdsv3_ib_destroy_inc_pool(rds_ibdev);
 		goto free_dev;
 	}
 
+	rds_ibdev->aft_hcagp = rdsv3_af_grp_create(rds_ibdev->ibt_hca_hdl,
+	    (uint64_t)rds_ibdev->hca_attr.hca_node_guid);
+	if (rds_ibdev->aft_hcagp == NULL) {
+		rdsv3_ib_destroy_mr_pool(rds_ibdev);
+		rdsv3_ib_destroy_inc_pool(rds_ibdev);
+		kmem_cache_destroy(rds_ibdev->ib_frag_slab);
+		goto free_dev;
+	}
+	rds_ibdev->fmr_soft_cq = rdsv3_af_thr_create(rdsv3_ib_drain_mrlist_fn,
+	    (void *)rds_ibdev->fmr_pool, SCQ_HCA_BIND_CPU,
+	    rds_ibdev->aft_hcagp);
+	if (rds_ibdev->fmr_soft_cq == NULL) {
+		rdsv3_af_grp_destroy(rds_ibdev->aft_hcagp);
+		rdsv3_ib_destroy_mr_pool(rds_ibdev);
+		rdsv3_ib_destroy_inc_pool(rds_ibdev);
+		kmem_cache_destroy(rds_ibdev->ib_frag_slab);
+		goto free_dev;
+	}
+
+	rds_ibdev->inc_soft_cq = rdsv3_af_thr_create(rdsv3_ib_drain_inclist,
+	    (void *)rds_ibdev->inc_pool, SCQ_HCA_BIND_CPU,
+	    rds_ibdev->aft_hcagp);
+	if (rds_ibdev->inc_soft_cq == NULL) {
+		rdsv3_af_thr_destroy(rds_ibdev->fmr_soft_cq);
+		rdsv3_af_grp_destroy(rds_ibdev->aft_hcagp);
+		rdsv3_ib_destroy_mr_pool(rds_ibdev);
+		rdsv3_ib_destroy_inc_pool(rds_ibdev);
+		kmem_cache_destroy(rds_ibdev->ib_frag_slab);
+		goto free_dev;
+	}
 
 	list_create(&rds_ibdev->ipaddr_list, sizeof (struct rdsv3_ib_ipaddr),
 	    offsetof(struct rdsv3_ib_ipaddr, list));
@@ -153,6 +197,8 @@ rdsv3_ib_add_one(ib_device_t *device)
 err_pd:
 	(void) ib_dealloc_pd(rds_ibdev->pd);
 free_dev:
+	mutex_destroy(&rds_ibdev->spinlock);
+	rw_destroy(&rds_ibdev->rwlock);
 	kmem_free(rds_ibdev, sizeof (*rds_ibdev));
 free_attr:
 	kmem_free(dev_attr, sizeof (*dev_attr));
@@ -178,9 +224,17 @@ rdsv3_ib_remove_one(struct ib_device *device)
 
 	rdsv3_ib_destroy_conns(rds_ibdev);
 
+	if (rds_ibdev->fmr_soft_cq)
+		rdsv3_af_thr_destroy(rds_ibdev->fmr_soft_cq);
+	if (rds_ibdev->inc_soft_cq)
+		rdsv3_af_thr_destroy(rds_ibdev->inc_soft_cq);
+
 	rdsv3_ib_destroy_mr_pool(rds_ibdev);
+	rdsv3_ib_destroy_inc_pool(rds_ibdev);
 
 	kmem_cache_destroy(rds_ibdev->ib_frag_slab);
+
+	rdsv3_af_grp_destroy(rds_ibdev->aft_hcagp);
 
 #if 0
 	while (ib_dealloc_pd(rds_ibdev->pd)) {
@@ -203,6 +257,8 @@ rdsv3_ib_remove_one(struct ib_device *device)
 	list_destroy(&rds_ibdev->ipaddr_list);
 	list_destroy(&rds_ibdev->conn_list);
 	list_remove_node(&rds_ibdev->list);
+	mutex_destroy(&rds_ibdev->spinlock);
+	rw_destroy(&rds_ibdev->rwlock);
 	kmem_free(rds_ibdev, sizeof (*rds_ibdev));
 
 	RDSV3_DPRINTF2("rdsv3_ib_remove_one", "Return: device: %p", device);
@@ -362,7 +418,6 @@ struct rdsv3_transport rdsv3_ib_transport = {
 	.conn_connect		= rdsv3_ib_conn_connect,
 	.conn_shutdown		= rdsv3_ib_conn_shutdown,
 	.inc_copy_to_user	= rdsv3_ib_inc_copy_to_user,
-	.inc_purge		= rdsv3_ib_inc_purge,
 	.inc_free		= rdsv3_ib_inc_free,
 	.cm_initiate_connect	= rdsv3_ib_cm_initiate_connect,
 	.cm_handle_connect	= rdsv3_ib_cm_handle_connect,

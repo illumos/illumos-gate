@@ -98,6 +98,7 @@ rdsv3_ib_recv_clear_one(struct rdsv3_ib_connection *ic,
 		rdsv3_inc_put(&recv->r_ibinc->ii_inc);
 		recv->r_ibinc = NULL;
 	}
+
 	if (recv->r_frag) {
 		kmem_cache_free(ic->rds_ibdev->ib_frag_slab, recv->r_frag);
 		recv->r_frag = NULL;
@@ -122,7 +123,7 @@ extern int atomic_add_unless(atomic_t *, uint_t, ulong_t);
 
 static int
 rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
-    struct rdsv3_ib_recv_work *recv, int kmflags)
+    struct rdsv3_ib_recv_work *recv)
 {
 	struct rdsv3_ib_connection *ic = conn->c_transport_data;
 	ibt_mi_hdl_t mi_hdl;
@@ -132,25 +133,27 @@ rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
 	RDSV3_DPRINTF5("rdsv3_ib_recv_refill_one", "conn: %p, recv: %p",
 	    conn, recv);
 
-	if (recv->r_ibinc == NULL) {
+	if (!recv->r_ibinc) {
 		if (!atomic_add_unless(&rdsv3_ib_allocation, 1,
 		    rdsv3_ib_sysctl_max_recv_allocation)) {
 			rdsv3_ib_stats_inc(s_ib_rx_alloc_limit);
 			goto out;
 		}
 		recv->r_ibinc = kmem_cache_alloc(rdsv3_ib_incoming_slab,
-		    kmflags);
+		    KM_NOSLEEP);
 		if (recv->r_ibinc == NULL) {
 			atomic_add_32(&rdsv3_ib_allocation, -1);
 			goto out;
 		}
 		rdsv3_inc_init(&recv->r_ibinc->ii_inc, conn, conn->c_faddr);
+		recv->r_ibinc->ii_ibdev = ic->rds_ibdev;
+		recv->r_ibinc->ii_pool = ic->rds_ibdev->inc_pool;
 	}
 
-	if (recv->r_frag == NULL) {
+	if (!recv->r_frag) {
 		recv->r_frag = kmem_cache_alloc(ic->rds_ibdev->ib_frag_slab,
-		    kmflags);
-		if (recv->r_frag == NULL)
+		    KM_NOSLEEP);
+		if (!recv->r_frag)
 			goto out;
 	}
 
@@ -162,6 +165,11 @@ rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
 
 	return (0);
 out:
+	if (recv->r_ibinc) {
+		kmem_cache_free(rdsv3_ib_incoming_slab, recv->r_ibinc);
+		atomic_add_32(&rdsv3_ib_allocation, -1);
+		recv->r_ibinc = NULL;
+	}
 	return (-ENOMEM);
 }
 
@@ -174,7 +182,7 @@ out:
  * -1 is returned if posting fails due to temporary resource exhaustion.
  */
 int
-rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kmflags, int prefill)
+rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int prefill)
 {
 	struct rdsv3_ib_connection *ic = conn->c_transport_data;
 	struct rdsv3_ib_recv_work *recv;
@@ -199,13 +207,13 @@ rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kmflags, int prefill)
 		/* populate the WRs */
 		for (i = 0; i < avail; i++) {
 			recv = &ic->i_recvs[pos];
-			ret = rdsv3_ib_recv_refill_one(conn, recv, kmflags);
+			ret = rdsv3_ib_recv_refill_one(conn, recv);
 			if (ret) {
 				rdsv3_ib_ring_unalloc(&ic->i_recv_ring,
 				    avail - i);
 				break;
 			}
-			ic->i_recv_wrs[i].wr_id = (ibt_wrid_t)(uintptr_t)recv;
+			ic->i_recv_wrs[i].wr_id = (ibt_wrid_t)pos;
 			ic->i_recv_wrs[i].wr_nds = RDSV3_IB_RECV_SGE;
 			ic->i_recv_wrs[i].wr_sgl = &recv->r_sge[0];
 
@@ -239,46 +247,98 @@ rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kmflags, int prefill)
 	return (ret);
 }
 
+/*
+ * delayed freed incoming's
+ */
+struct rdsv3_inc_pool {
+	list_t			f_list;	/* list of freed incoming */
+	kmutex_t		f_lock; /* lock of fmr pool */
+	int32_t			f_listcnt;
+};
+
 void
-rdsv3_ib_inc_purge(struct rdsv3_incoming *inc)
+rdsv3_ib_destroy_inc_pool(struct rdsv3_ib_device *rds_ibdev)
 {
-	struct rdsv3_ib_incoming *ibinc;
+	struct rdsv3_inc_pool *pool = rds_ibdev->inc_pool;
+
+	if (pool) {
+		list_destroy(&pool->f_list);
+		kmem_free((void *) pool, sizeof (*pool));
+	}
+}
+
+int
+rdsv3_ib_create_inc_pool(struct rdsv3_ib_device *rds_ibdev)
+{
+	struct rdsv3_inc_pool *pool;
+
+	pool = (struct rdsv3_inc_pool *)kmem_zalloc(sizeof (*pool), KM_NOSLEEP);
+	if (pool == NULL) {
+		return (-ENOMEM);
+	}
+	list_create(&pool->f_list, sizeof (struct rdsv3_ib_incoming),
+	    offsetof(struct rdsv3_ib_incoming, ii_obj));
+	mutex_init(&pool->f_lock, NULL, MUTEX_DRIVER, NULL);
+	rds_ibdev->inc_pool = pool;
+	return (0);
+}
+
+static void
+rdsv3_ib_inc_drop(struct rdsv3_ib_incoming *ibinc)
+{
 	struct rdsv3_page_frag *frag;
 	struct rdsv3_page_frag *pos;
-	struct rdsv3_ib_connection *ic =
-	    (struct rdsv3_ib_connection *)inc->i_conn->c_transport_data;
-
-	RDSV3_DPRINTF4("rdsv3_ib_inc_purge", "inc: %p", inc);
-
-	ibinc = container_of(inc, struct rdsv3_ib_incoming, ii_inc);
-	RDSV3_DPRINTF5("rdsv3_ib_inc_purge",
-	    "purging ibinc %p inc %p\n", ibinc, inc);
 
 	RDSV3_FOR_EACH_LIST_NODE_SAFE(frag, pos, &ibinc->ii_frags, f_item) {
 		list_remove_node(&frag->f_item);
-		kmem_cache_free(ic->rds_ibdev->ib_frag_slab, frag);
+		kmem_cache_free(ibinc->ii_ibdev->ib_frag_slab, frag);
 	}
 
-	RDSV3_DPRINTF4("rdsv3_ib_inc_purge", "Return: inc: %p", inc);
+	ASSERT(list_is_empty(&ibinc->ii_frags));
+	kmem_cache_free(rdsv3_ib_incoming_slab, ibinc);
+	atomic_dec_uint(&rdsv3_ib_allocation);
+}
+
+void
+rdsv3_ib_drain_inclist(void *data)
+{
+	struct rdsv3_inc_pool *pool = (struct rdsv3_inc_pool *)data;
+	struct rdsv3_ib_incoming *ibinc;
+	list_t *listp = &pool->f_list;
+	kmutex_t *lockp = &pool->f_lock;
+	int i = 0;
+
+	for (;;) {
+		mutex_enter(lockp);
+		ibinc = (struct rdsv3_ib_incoming *)list_remove_head(listp);
+		if (ibinc)
+			pool->f_listcnt--;
+		mutex_exit(lockp);
+		if (!ibinc)
+			break;
+		i++;
+		rdsv3_ib_inc_drop(ibinc);
+	}
 }
 
 void
 rdsv3_ib_inc_free(struct rdsv3_incoming *inc)
 {
 	struct rdsv3_ib_incoming *ibinc;
+	rdsv3_af_thr_t *af_thr;
 
 	RDSV3_DPRINTF4("rdsv3_ib_inc_free", "inc: %p", inc);
 
 	ibinc = container_of(inc, struct rdsv3_ib_incoming, ii_inc);
+	/* save af_thr in a local as ib_inc might be freed at mutex_exit */
+	af_thr = ibinc->ii_ibdev->inc_soft_cq;
 
-	rdsv3_ib_inc_purge(inc);
-	RDSV3_DPRINTF5("rdsv3_ib_inc_free", "freeing ibinc %p inc %p",
-	    ibinc, inc);
-	ASSERT(list_is_empty(&ibinc->ii_frags));
-	kmem_cache_free(rdsv3_ib_incoming_slab, ibinc);
-	atomic_dec_uint(&rdsv3_ib_allocation);
+	mutex_enter(&ibinc->ii_pool->f_lock);
+	list_insert_tail(&ibinc->ii_pool->f_list, ibinc);
+	ibinc->ii_pool->f_listcnt++;
+	mutex_exit(&ibinc->ii_pool->f_lock);
 
-	RDSV3_DPRINTF4("rdsv3_ib_inc_free", "Return: inc: %p", inc);
+	rdsv3_af_thr_fire(af_thr);
 }
 
 int
@@ -375,7 +435,7 @@ rdsv3_ib_recv_init_ack(struct rdsv3_ib_connection *ic)
  * room for it beyond the ring size.  Send completion notices its special
  * wr_id and avoids working with the ring in that case.
  */
-static void
+void
 rdsv3_ib_set_ack(struct rdsv3_ib_connection *ic, uint64_t seq,
     int ack_required)
 {
@@ -536,42 +596,6 @@ rdsv3_ib_piggyb_ack(struct rdsv3_ib_connection *ic)
 	return (rdsv3_ib_get_ack(ic));
 }
 
-static struct rdsv3_header *
-rdsv3_ib_get_header(struct rdsv3_connection *conn,
-    struct rdsv3_ib_recv_work *recv,
-    uint32_t data_len)
-{
-	struct rdsv3_ib_connection *ic = conn->c_transport_data;
-	void *hdr_buff = &ic->i_recv_hdrs[recv - ic->i_recvs];
-
-	RDSV3_DPRINTF4("rdsv3_ib_get_header", "conn: %p, recv: %p len: %d",
-	    conn, recv, data_len);
-
-	/*
-	 * Support header at the front (RDS 3.1+) as well as header-at-end.
-	 *
-	 * Cases:
-	 * 1) header all in header buff (great!)
-	 * 2) header all in data page (copy all to header buff)
-	 * 3) header split across hdr buf + data page
-	 *    (move bit in hdr buff to end before copying other bit from
-	 *    data page)
-	 */
-	if (conn->c_version > RDS_PROTOCOL_3_0 || data_len == RDSV3_FRAG_SIZE)
-		return (hdr_buff);
-	/*
-	 * XXX - Need to discuss the support for version < RDS_PROTOCOL_3_1.
-	 */
-	if (conn->c_version == RDS_PROTOCOL_3_0)
-		return (hdr_buff);
-
-	/* version < RDS_PROTOCOL_3_0 */
-	RDSV3_DPRINTF2("rdsv3_ib_get_header",
-	    "NULL header (version: 0x%x, data_len: %d)", conn->c_version,
-	    data_len);
-	return (NULL);
-}
-
 /*
  * It's kind of lame that we're copying from the posted receive pages into
  * long-lived bitmaps.  We could have posted the bitmaps and rdma written into
@@ -661,20 +685,6 @@ XXX
 	    conn, ibinc);
 }
 
-/*
- * Rings are posted with all the allocations they'll need to queue the
- * incoming message to the receiving socket so this can't fail.
- * All fragments start with a header, so we can make sure we're not receiving
- * garbage, and we can tell a small 8 byte fragment from an ACK frame.
- */
-struct rdsv3_ib_ack_state {
-	uint64_t		ack_next;
-	uint64_t		ack_recv;
-	unsigned int	ack_required:1;
-	unsigned int	ack_next_valid:1;
-	unsigned int	ack_recv_valid:1;
-};
-
 static void
 rdsv3_ib_process_recv(struct rdsv3_connection *conn,
     struct rdsv3_ib_recv_work *recv, uint32_t data_len,
@@ -699,15 +709,7 @@ rdsv3_ib_process_recv(struct rdsv3_connection *conn,
 	}
 	data_len -= sizeof (struct rdsv3_header);
 
-	if ((ihdr = rdsv3_ib_get_header(conn, recv, data_len)) == NULL) {
-		RDSV3_DPRINTF2("rdsv3_ib_process_recv", "incoming message "
-		    "from %u.%u.%u.%u didn't have a proper version (0x%x) or"
-		    "data_len (0x%x), disconnecting and "
-		    "reconnecting",
-		    NIPQUAD(conn->c_faddr), conn->c_version, data_len);
-		rdsv3_conn_drop(conn);
-		return;
-	}
+	ihdr = &ic->i_recv_hdrs[recv - ic->i_recvs];
 
 	/* Validate the checksum. */
 	if (!rdsv3_message_verify_checksum(ihdr)) {
@@ -735,7 +737,6 @@ rdsv3_ib_process_recv(struct rdsv3_connection *conn,
 		 * were rather special beasts.
 		 */
 		rdsv3_ib_stats_inc(s_ib_ack_received);
-
 		return;
 	}
 
@@ -745,7 +746,7 @@ rdsv3_ib_process_recv(struct rdsv3_connection *conn,
 	 * into the inc and save the inc so we can hang upcoming fragments
 	 * off its list.
 	 */
-	if (ibinc == NULL) {
+	if (!ibinc) {
 		ibinc = recv->r_ibinc;
 		recv->r_ibinc = NULL;
 		ic->i_ibinc = ibinc;
@@ -810,131 +811,57 @@ rdsv3_ib_process_recv(struct rdsv3_connection *conn,
 	    conn, recv, data_len, state);
 }
 
-/*
- * Plucking the oldest entry from the ring can be done concurrently with
- * the thread refilling the ring.  Each ring operation is protected by
- * spinlocks and the transient state of refilling doesn't change the
- * recording of which entry is oldest.
- *
- * This relies on IB only calling one cq comp_handler for each cq so that
- * there will only be one caller of rdsv3_recv_incoming() per RDS connection.
- */
-
 void
-rdsv3_ib_recv_cq_comp_handler(struct ib_cq *cq, void *context)
-{
-	struct rdsv3_connection *conn = context;
-	struct rdsv3_ib_connection *ic = conn->c_transport_data;
-
-	RDSV3_DPRINTF4("rdsv3_ib_recv_cq_comp_handler",
-	    "Enter(conn: %p cq: %p)", conn, cq);
-
-	rdsv3_ib_stats_inc(s_ib_rx_cq_call);
-
-	(void) ddi_taskq_dispatch(ic->i_recv_tasklet, rdsv3_ib_recv_tasklet_fn,
-	    (void *)ic, DDI_SLEEP);
-}
-
-static inline void
-rdsv3_poll_cq(struct rdsv3_ib_connection *ic, struct rdsv3_ib_ack_state *state)
+rdsv3_ib_recv_cqe_handler(struct rdsv3_ib_connection *ic, ibt_wc_t *wc,
+    struct rdsv3_ib_ack_state *state)
 {
 	struct rdsv3_connection *conn = ic->conn;
-	ibt_wc_t wc;
 	struct rdsv3_ib_recv_work *recv;
-	uint_t polled;
+	struct rdsv3_ib_work_ring *recv_ringp = &ic->i_recv_ring;
 
-	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_recv_cq), &wc, 1, &polled) ==
-	    IBT_SUCCESS) {
-		RDSV3_DPRINTF5("rdsv3_ib_recv_cq_comp_handler",
-		    "rwc wr_id 0x%llx status %u byte_len %u imm_data %u\n",
-		    (unsigned long long)wc.wc_id, wc.wc_status,
-		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
-		rdsv3_ib_stats_inc(s_ib_rx_cq_event);
+	RDSV3_DPRINTF4("rdsv3_ib_recv_cqe_handler",
+	    "rwc wc_id 0x%llx status %u byte_len %u imm_data %u\n",
+	    (unsigned long long)wc->wc_id, wc->wc_status,
+	    wc->wc_bytes_xfer, ntohl(wc->wc_immed_data));
 
-		recv = (struct rdsv3_ib_recv_work *)(uintptr_t)wc.wc_id;
+	rdsv3_ib_stats_inc(s_ib_rx_cq_event);
 
-		/*
-		 * Also process recvs in connecting state because it is possible
-		 * to get a recv completion _before_ the rdmacm ESTABLISHED
-		 * event is processed.
-		 */
-		if (rdsv3_conn_up(conn) || rdsv3_conn_connecting(conn)) {
-			/*
-			 * We expect errors as the qp is drained during
-			 * shutdown
-			 */
-			if (wc.wc_status == IBT_WC_SUCCESS) {
-				rdsv3_ib_process_recv(conn, recv,
-				    wc.wc_bytes_xfer, state);
-			} else {
-				RDSV3_DPRINTF2("rdsv3_ib_recv_cq_comp_handler",
-				    "recv completion on "
-				    "%u.%u.%u.%u had status %u, "
-				    "disconnecting and reconnecting\n",
-				    NIPQUAD(conn->c_faddr),
-				    wc.wc_status);
-				rdsv3_conn_drop(conn);
-			}
+	recv = &ic->i_recvs[rdsv3_ib_ring_oldest(recv_ringp)];
+
+	/*
+	 * Also process recvs in connecting state because it is possible
+	 * to get a recv completion _before_ the rdmacm ESTABLISHED
+	 * event is processed.
+	 */
+	if (rdsv3_conn_up(conn) || rdsv3_conn_connecting(conn)) {
+		/* We expect errors as the qp is drained during shutdown */
+		if (wc->wc_status == IBT_WC_SUCCESS) {
+			rdsv3_ib_process_recv(conn, recv,
+			    wc->wc_bytes_xfer, state);
+		} else {
+			RDSV3_DPRINTF2("rdsv3_ib_recv_cqe_handler",
+			    "recv completion on "
+			    "%u.%u.%u.%u had status %u, "
+			    "disconnecting and reconnecting\n",
+			    NIPQUAD(conn->c_faddr),
+			    wc->wc_status);
+			rdsv3_conn_drop(conn);
 		}
-
-		rdsv3_ib_ring_free(&ic->i_recv_ring, 1);
-	}
-}
-
-static processorid_t rdsv3_taskq_bind_cpuid = 0;
-void
-rdsv3_ib_recv_tasklet_fn(void *data)
-{
-	struct rdsv3_ib_connection *ic = (struct rdsv3_ib_connection *)data;
-	struct rdsv3_connection *conn = ic->conn;
-	struct rdsv3_ib_ack_state state = { 0, };
-	cpu_t   *cp;
-
-	RDSV3_DPRINTF4("rdsv3_ib_recv_tasklet_fn", "Enter: ic: %p", ic);
-
-	/* If not already bound, bind this thread to a CPU */
-	if (ic->i_recv_tasklet_cpuid != rdsv3_taskq_bind_cpuid) {
-		cp = cpu[rdsv3_taskq_bind_cpuid];
-		mutex_enter(&cpu_lock);
-		if (cpu_is_online(cp)) {
-			if (ic->i_recv_tasklet_cpuid >= 0)
-				thread_affinity_clear(curthread);
-			thread_affinity_set(curthread, rdsv3_taskq_bind_cpuid);
-			ic->i_recv_tasklet_cpuid = rdsv3_taskq_bind_cpuid;
-		}
-		mutex_exit(&cpu_lock);
 	}
 
-	rdsv3_poll_cq(ic, &state);
-	(void) ibt_enable_cq_notify(RDSV3_CQ2CQHDL(ic->i_recv_cq),
-	    IBT_NEXT_SOLICITED);
-	rdsv3_poll_cq(ic, &state);
-
-	if (state.ack_next_valid)
-		rdsv3_ib_set_ack(ic, state.ack_next, state.ack_required);
-	if (state.ack_recv_valid && state.ack_recv > ic->i_ack_recv) {
-		rdsv3_send_drop_acked(conn, state.ack_recv, NULL);
-		ic->i_ack_recv = state.ack_recv;
-	}
-	if (rdsv3_conn_up(conn))
-		rdsv3_ib_attempt_ack(ic);
+	rdsv3_ib_ring_free(recv_ringp, 1);
 
 	/*
 	 * If we ever end up with a really empty receive ring, we're
 	 * in deep trouble, as the sender will definitely see RNR
 	 * timeouts.
 	 */
-	if (rdsv3_ib_ring_empty(&ic->i_recv_ring))
+	if (rdsv3_ib_ring_empty(recv_ringp))
 		rdsv3_ib_stats_inc(s_ib_rx_ring_empty);
 
-	/*
-	 * If the ring is running low, then schedule the thread to refill.
-	 */
-	if (rdsv3_ib_ring_low(&ic->i_recv_ring) &&
-	    (rdsv3_conn_up(conn) || rdsv3_conn_connecting(conn)))
-		rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_recv_w, 0);
-
-	RDSV3_DPRINTF4("rdsv3_ib_recv_tasklet_fn", "Return: ic: %p", ic);
+	if (rdsv3_ib_ring_low(recv_ringp)) {
+		rdsv3_af_thr_fire(ic->i_refill_rq);
+	}
 }
 
 int
@@ -944,17 +871,6 @@ rdsv3_ib_recv(struct rdsv3_connection *conn)
 	int ret = 0;
 
 	RDSV3_DPRINTF4("rdsv3_ib_recv", "conn %p\n", conn);
-
-	/*
-	 * If we get a temporary posting failure in this context then
-	 * we're really low and we want the caller to back off for a bit.
-	 */
-	mutex_enter(&ic->i_recv_mutex);
-	if (rdsv3_ib_recv_refill(conn, KM_NOSLEEP, 0))
-		ret = -ENOMEM;
-	else
-		rdsv3_ib_stats_inc(s_ib_rx_refill_from_thread);
-	mutex_exit(&ic->i_recv_mutex);
 
 	if (rdsv3_conn_up(conn))
 		rdsv3_ib_attempt_ack(ic);
@@ -975,7 +891,7 @@ rdsv3_ib_recv_init(void)
 	rdsv3_ib_incoming_slab = kmem_cache_create("rdsv3_ib_incoming",
 	    sizeof (struct rdsv3_ib_incoming), 0, rdsv3_ib_inc_constructor,
 	    rdsv3_ib_inc_destructor, NULL, NULL, NULL, 0);
-	if (rdsv3_ib_incoming_slab == NULL) {
+	if (!rdsv3_ib_incoming_slab) {
 		RDSV3_DPRINTF2("rdsv3_ib_recv_init", "kmem_cache_create "
 		    "failed");
 		return (-ENOMEM);
