@@ -461,9 +461,6 @@ ddt_get_dedup_object_stats(spa_t *spa, ddt_object_t *ddo_total)
 	if (ddo_total->ddo_count != 0) {
 		ddo_total->ddo_dspace /= ddo_total->ddo_count;
 		ddo_total->ddo_mspace /= ddo_total->ddo_count;
-	} else {
-		ASSERT(ddo_total->ddo_dspace == 0);
-		ASSERT(ddo_total->ddo_mspace == 0);
 	}
 }
 

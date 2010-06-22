@@ -695,11 +695,11 @@ dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 		return;
 	ASSERT(error == 0);
 
-	count = ddt_object_count(ddt, type, class);
+	if ((count = ddt_object_count(ddt, type, class)) == 0)
+		return;
+
 	dspace = doi.doi_physical_blocks_512 << 9;
 	mspace = doi.doi_fill_count * doi.doi_data_block_size;
-
-	ASSERT(count != 0);	/* we should have destroyed it */
 
 	ddt_object_name(ddt, type, class, name);
 
