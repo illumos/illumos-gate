@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <regex.h>
@@ -101,8 +100,8 @@ static devfsadm_create_t misc_cbt[] = {
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name
 	},
 	{ "pseudo", "ddi_pseudo",
-	    "(^ip$)|(^tcp$)|(^udp$)|(^icmp$)|(^sctp$)|"
-	    "(^ip6$)|(^tcp6$)|(^udp6$)|(^icmp6$)|(^sctp6$)|"
+	    "(^ip$)|(^tcp$)|(^udp$)|(^icmp$)|"
+	    "(^ip6$)|(^tcp6$)|(^udp6$)|(^icmp6$)|"
 	    "(^rts$)|(^arp$)|(^ipsecah$)|(^ipsecesp$)|(^keysock$)|(^spdsock$)|"
 	    "(^nca$)|(^rds$)|(^sdp$)|(^ipnet$)|(^dlpistub$)|(^bpf$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name
@@ -224,6 +223,9 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	{ "pseudo", "^tpm$",
 	    RM_PRE | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
+	{ "pseudo", "^sctp|sctp6$",
+	    RM_PRE | RM_ALWAYS, ILEVEL_0, devfsadm_rm_link
+	}
 };
 
 /* Rules for gpio devices */
