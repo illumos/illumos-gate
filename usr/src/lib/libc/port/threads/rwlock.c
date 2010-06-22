@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "lint.h"
@@ -254,6 +253,29 @@ rwlock_destroy(rwlock_t *rwlp)
 }
 
 /*
+ * The following four functions:
+ *	read_lock_try()
+ *	read_unlock_try()
+ *	write_lock_try()
+ *	write_unlock_try()
+ * lie at the heart of the fast-path code for rwlocks,
+ * both process-private and process-shared.
+ *
+ * They are called once without recourse to any other locking primitives.
+ * If they succeed, we are done and the fast-path code was successful.
+ * If they fail, we have to deal with lock queues, either to enqueue
+ * ourself and sleep or to dequeue and wake up someone else (slow paths).
+ *
+ * Unless 'ignore_waiters_flag' is true (a condition that applies only
+ * when read_lock_try() or write_lock_try() is called from code that
+ * is already in the slow path and has already acquired the queue lock),
+ * these functions will always fail if the waiters flag, URW_HAS_WAITERS,
+ * is set in the 'rwstate' word.  Thus, setting the waiters flag on the
+ * rwlock and acquiring the queue lock guarantees exclusive access to
+ * the rwlock (and is the only way to guarantee exclusive access).
+ */
+
+/*
  * Attempt to acquire a readers lock.  Return true on success.
  */
 static int
@@ -344,16 +366,16 @@ write_unlock_try(rwlock_t *rwlp)
 }
 
 /*
- * Wake up thread(s) sleeping on the rwlock queue and then
- * drop the queue lock.  Return non-zero if we wake up someone.
+ * Release a process-private rwlock and wake up any thread(s) sleeping on it.
  * This is called when a thread releases a lock that appears to have waiters.
  */
-static int
-rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
+static void
+rw_queue_release(rwlock_t *rwlp)
 {
 	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	queue_head_t *qp;
 	uint32_t readers;
-	uint32_t writers;
+	uint32_t writer;
 	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
 	ulwp_t *prev;
@@ -363,14 +385,35 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 	lwpid_t buffer[MAXLWPS];
 	lwpid_t *lwpid = buffer;
 
+	qp = queue_lock(rwlp, MX);
+
+	/*
+	 * Here is where we actually drop the lock,
+	 * but we retain the URW_HAS_WAITERS flag, if it is already set.
+	 */
 	readers = *rwstate;
 	ASSERT_CONSISTENT_STATE(readers);
-	if (!(readers & URW_HAS_WAITERS)) {
+	if (readers & URW_WRITE_LOCKED)	/* drop the writer lock */
+		atomic_and_32(rwstate, ~URW_WRITE_LOCKED);
+	else				/* drop the readers lock */
+		atomic_dec_32(rwstate);
+	if (!(readers & URW_HAS_WAITERS)) {	/* no waiters */
 		queue_unlock(qp);
-		return (0);
+		return;
 	}
-	readers &= URW_READERS_MASK;
-	writers = 0;
+
+	/*
+	 * The presence of the URW_HAS_WAITERS flag causes all rwlock
+	 * code to go through the slow path, acquiring queue_lock(qp).
+	 * Therefore, the rest of this code is safe because we are
+	 * holding the queue lock and the URW_HAS_WAITERS flag is set.
+	 */
+
+	readers = *rwstate;		/* must fetch the value again */
+	ASSERT_CONSISTENT_STATE(readers);
+	ASSERT(readers & URW_HAS_WAITERS);
+	readers &= URW_READERS_MASK;	/* count of current readers */
+	writer = 0;			/* no current writer */
 
 	/*
 	 * Examine the queue of waiters in priority order and prepare
@@ -394,12 +437,12 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 		ulwp = *ulwpp;
 		ASSERT(ulwp->ul_wchan == rwlp);
 		if (ulwp->ul_writer) {
-			if (writers != 0 || readers != 0)
+			if (writer != 0 || readers != 0)
 				break;
 			/* one writer to wake */
-			writers++;
+			writer++;
 		} else {
-			if (writers != 0)
+			if (writer != 0)
 				break;
 			/* at least one reader to wake */
 			readers++;
@@ -409,10 +452,27 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 		queue_unlink(qp, ulwpp, prev);
 		ulwp->ul_sleepq = NULL;
 		ulwp->ul_wchan = NULL;
+		if (writer) {
+			/*
+			 * Hand off the lock to the writer we will be waking.
+			 */
+			ASSERT((*rwstate & ~URW_HAS_WAITERS) == 0);
+			atomic_or_32(rwstate, URW_WRITE_LOCKED);
+			rwlp->rwlock_owner = (uintptr_t)ulwp;
+		}
 		lwpid[nlwpid++] = ulwp->ul_lwpid;
 	}
+
+	/*
+	 * This modification of rwstate must be done last.
+	 * The presence of the URW_HAS_WAITERS flag causes all rwlock
+	 * code to go through the slow path, acquiring queue_lock(qp).
+	 * Otherwise the read_lock_try() and write_lock_try() fast paths
+	 * are effective.
+	 */
 	if (ulwpp == NULL)
 		atomic_and_32(rwstate, ~URW_HAS_WAITERS);
+
 	if (nlwpid == 0) {
 		queue_unlock(qp);
 	} else {
@@ -427,7 +487,6 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 	}
 	if (lwpid != buffer)
 		(void) munmap((caddr_t)lwpid, maxlwps * sizeof (lwpid_t));
-	return (nlwpid != 0);
 }
 
 /*
@@ -555,7 +614,8 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 			/* EMPTY */;	/* somebody holds the lock */
 		else if ((ulwp = queue_waiter(qp)) == NULL) {
 			atomic_and_32(rwstate, ~URW_HAS_WAITERS);
-			continue;	/* no queued waiters, try again */
+			ignore_waiters_flag = 0;
+			continue;	/* no queued waiters, start over */
 		} else {
 			/*
 			 * Do a priority check on the queued waiter (the
@@ -570,8 +630,12 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 				 * We defer to a queued thread that has
 				 * a higher priority than ours.
 				 */
-				if (his_pri <= our_pri)
-					continue;	/* try again */
+				if (his_pri <= our_pri) {
+					/*
+					 * Don't defer, just grab the lock.
+					 */
+					continue;
+				}
 			} else {
 				/*
 				 * We defer to a queued thread that has
@@ -579,8 +643,12 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 				 * is a writer whose priority equals ours.
 				 */
 				if (his_pri < our_pri ||
-				    (his_pri == our_pri && !ulwp->ul_writer))
-					continue;	/* try again */
+				    (his_pri == our_pri && !ulwp->ul_writer)) {
+					/*
+					 * Don't defer, just grab the lock.
+					 */
+					continue;
+				}
 			}
 		}
 		/*
@@ -599,13 +667,32 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 		set_parking_flag(self, 1);
 		queue_unlock(qp);
 		if ((error = __lwp_park(tsp, 0)) == EINTR)
-			error = ignore_waiters_flag = 0;
+			error = 0;
 		set_parking_flag(self, 0);
 		qp = queue_lock(rwlp, MX);
-		if (self->ul_sleepq && dequeue_self(qp) == 0)
+		if (self->ul_sleepq && dequeue_self(qp) == 0) {
 			atomic_and_32(rwstate, ~URW_HAS_WAITERS);
+			ignore_waiters_flag = 0;
+		}
 		self->ul_writer = 0;
+		if (rd_wr == WRITE_LOCK &&
+		    (*rwstate & URW_WRITE_LOCKED) &&
+		    rwlp->rwlock_owner == (uintptr_t)self) {
+			/*
+			 * We acquired the lock by hand-off
+			 * from the previous owner,
+			 */
+			error = 0;	/* timedlock did not fail */
+			break;
+		}
 	}
+
+	/*
+	 * Make one final check to see if there are any threads left
+	 * on the rwlock queue.  Clear the URW_HAS_WAITERS flag if not.
+	 */
+	if (qp->qh_root == NULL || qp->qh_root->qr_head == NULL)
+		atomic_and_32(rwstate, ~URW_HAS_WAITERS);
 
 	queue_unlock(qp);
 
@@ -925,9 +1012,7 @@ rw_unlock(rwlock_t *rwlp)
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	tdb_rwlock_stats_t *rwsp;
-	queue_head_t *qp;
 	int rd_wr;
-	int waked = 0;
 
 	readers = *rwstate;
 	ASSERT_CONSISTENT_STATE(readers);
@@ -1002,32 +1087,12 @@ rw_unlock(rwlock_t *rwlp)
 		(void) mutex_lock(&rwlp->mutex);
 		(void) __lwp_rwlock_unlock(rwlp);
 		(void) mutex_unlock(&rwlp->mutex);
-		waked = 1;
 	} else {
-		qp = queue_lock(rwlp, MX);
-		if (rd_wr == READ_LOCK)
-			atomic_dec_32(rwstate);
-		else
-			atomic_and_32(rwstate, ~URW_WRITE_LOCKED);
-		waked = rw_queue_release(qp, rwlp);
+		rw_queue_release(rwlp);
 	}
 
 out:
 	DTRACE_PROBE2(plockstat, rw__release, rwlp, rd_wr);
-
-	/*
-	 * Yield to the thread we just waked up, just in case we might
-	 * be about to grab the rwlock again immediately upon return.
-	 * This is pretty weak but it helps on a uniprocessor and also
-	 * when cpu affinity has assigned both ourself and the other
-	 * thread to the same CPU.  Note that lwp_yield() will yield
-	 * the processor only if the writer is at the same or higher
-	 * priority than ourself.  This provides more balanced program
-	 * behavior; it doesn't guarantee acquisition of the lock by
-	 * the pending writer.
-	 */
-	if (waked)
-		yield();
 	return (0);
 }
 
