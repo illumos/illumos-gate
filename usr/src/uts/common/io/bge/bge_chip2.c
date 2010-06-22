@@ -2598,6 +2598,7 @@ bge_chip_poll_engine(bge_t *bgep, bge_regno_t regno,
 		drv_usecwait(100);
 	}
 
+	bge_problem(bgep, "bge_chip_poll_engine failed: regno = 0x%lx", regno);
 	bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
 	return (B_FALSE);
 }
@@ -3168,26 +3169,11 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
 	bge_regno_t regno;
 	bge_regno_t *rbp;
 	boolean_t ok;
-	uint_t asf_mode;
 
 	BGE_TRACE(("bge_chip_stop($%p)",
 	    (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
-
-	/*
-	 * In some case, some chips' internal engines may fail to reset,
-	 * so we call bge_chip_reset as a workaround.
-	 */
-	bgep->bge_chip_state = BGE_CHIP_RESET;
-#ifdef BGE_IPMI_ASF
-	asf_mode = bgep->asf_enabled? ASF_MODE_POST_INIT: ASF_MODE_NONE;
-	if (bge_chip_reset(bgep, B_TRUE, asf_mode) != DDI_SUCCESS)
-#else
-	if (bge_chip_reset(bgep, B_TRUE) != DDI_SUCCESS)
-#endif
-		ddi_fm_service_impact(bgep->devinfo,
-		    DDI_SERVICE_UNAFFECTED);
 
 	rbp = shutdown_engine_regs;
 	/*

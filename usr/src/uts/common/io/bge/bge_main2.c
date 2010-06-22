@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "bge_impl.h"
@@ -3503,6 +3502,8 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	mac_free(macp);
 	if (err != 0)
 		goto attach_fail;
+
+	mac_link_update(bgep->mh, LINK_STATE_UNKNOWN);
 
 	/*
 	 * Register a periodical handler.

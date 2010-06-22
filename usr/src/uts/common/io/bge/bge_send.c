@@ -614,8 +614,9 @@ bge_m_tx(void *arg, mblk_t *mp)
 	ASSERT(bgep->bge_mac_state == BGE_MAC_STARTED);
 
 	rw_enter(bgep->errlock, RW_READER);
-	if (bgep->bge_chip_state != BGE_CHIP_RUNNING) {
-		BGE_DEBUG(("bge_m_tx: chip not running"));
+	if ((bgep->bge_chip_state != BGE_CHIP_RUNNING) ||
+	    !(bgep->param_link_up)) {
+		BGE_DEBUG(("bge_m_tx: chip not running or link down"));
 		freemsgchain(mp);
 		mp = NULL;
 	}
