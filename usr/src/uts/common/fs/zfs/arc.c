@@ -1744,6 +1744,7 @@ static void
 arc_evict_ghost(arc_state_t *state, uint64_t spa, int64_t bytes)
 {
 	arc_buf_hdr_t *ab, *ab_prev;
+	arc_buf_hdr_t marker = { 0 };
 	list_t *list = &state->arcs_list[ARC_BUFC_DATA];
 	kmutex_t *hash_lock;
 	uint64_t bytes_deleted = 0;
@@ -1756,6 +1757,11 @@ top:
 		ab_prev = list_prev(list, ab);
 		if (spa && ab->b_spa != spa)
 			continue;
+
+		/* ignore markers */
+		if (ab->b_spa == 0)
+			continue;
+
 		hash_lock = HDR_LOCK(ab);
 		/* caller may be trying to modify this buffer, skip it */
 		if (MUTEX_HELD(hash_lock))
@@ -1782,15 +1788,21 @@ top:
 			DTRACE_PROBE1(arc__delete, arc_buf_hdr_t *, ab);
 			if (bytes >= 0 && bytes_deleted >= bytes)
 				break;
-		} else {
-			if (bytes < 0) {
-				mutex_exit(&state->arcs_mtx);
-				mutex_enter(hash_lock);
-				mutex_exit(hash_lock);
-				goto top;
-			}
+		} else if (bytes < 0) {
+			/*
+			 * Insert a list marker and then wait for the
+			 * hash lock to become available. Once its
+			 * available, restart from where we left off.
+			 */
+			list_insert_after(list, ab, &marker);
+			mutex_exit(&state->arcs_mtx);
+			mutex_enter(hash_lock);
+			mutex_exit(hash_lock);
+			mutex_enter(&state->arcs_mtx);
+			ab_prev = list_prev(list, &marker);
+			list_remove(list, &marker);
+		} else
 			bufs_skipped += 1;
-		}
 	}
 	mutex_exit(&state->arcs_mtx);
 
