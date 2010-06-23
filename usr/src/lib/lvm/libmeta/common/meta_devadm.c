@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdarg.h>
@@ -292,6 +289,7 @@ meta_update_namespace(
 	nm.devname = (uintptr_t)devname;
 	nm.devname_len = strlen(devname);
 	nm.mnum = meta_getminor(dev);
+	nm.major = meta_getmajor(dev);
 	nm.key = key;
 	nm.pathname = (uintptr_t)pname;
 	nm.pathname_len = strlen(pname);

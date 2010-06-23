@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -714,7 +713,7 @@ update_namespace_ioctl(
 		side = nm->side;
 
 	return (md_update_namespace(nm->setno, side, nm->key,
-	    dname, pname, nm->mnum));
+	    dname, pname, nm->major, nm->mnum));
 
 }
 

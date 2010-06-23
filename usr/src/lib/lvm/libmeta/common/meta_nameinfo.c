@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <dlfcn.h>
@@ -96,13 +95,28 @@ meta_geom_to_md(
  * convert efi to md types
  */
 static void
-meta_efi_to_mdgeom(struct dk_gpt *gpt, mdgeom_t	*mdgp)
+meta_efi_to_mdgeom(md_unit_t *mdev, struct dk_gpt *gpt, mdgeom_t *mdgp)
 {
 	(void) memset(mdgp, '\0', sizeof (*mdgp));
-	mdgp->ncyl = (gpt->efi_last_u_lba - gpt->efi_first_u_lba) /
-	    (MD_EFI_FG_HEADS * MD_EFI_FG_SECTORS);
-	mdgp->nhead = MD_EFI_FG_HEADS;
-	mdgp->nsect = MD_EFI_FG_SECTORS;
+
+	/*
+	 * Should always get geom from metadevice unit if metadevice.
+	 * If metadevice is built on top of efi disks then it will
+	 * have MD_EFI_FG_ values, otherwise it will have geom from
+	 * the first component.
+	 */
+	if (mdev) {
+		mdgp->ncyl = (mdev->c.un_total_blocks) /
+		    (mdev->c.un_nhead * mdev->c.un_nsect);
+		mdgp->nhead = mdev->c.un_nhead;
+		mdgp->nsect = mdev->c.un_nsect;
+	} else {
+		mdgp->ncyl = (gpt->efi_last_u_lba - gpt->efi_first_u_lba)
+		    / (MD_EFI_FG_HEADS * MD_EFI_FG_SECTORS);
+		mdgp->nhead = MD_EFI_FG_HEADS;
+		mdgp->nsect = MD_EFI_FG_SECTORS;
+	}
+
 	mdgp->rpm = MD_EFI_FG_RPM;
 	mdgp->write_reinstruct = MD_EFI_FG_WRI;
 	mdgp->read_reinstruct = MD_EFI_FG_RRI;
@@ -589,6 +603,8 @@ metagetvtoc(
 		/* DKIOCGGEOM yielded ENOTSUP => try efi_alloc_and_read */
 		struct dk_gpt	*gpt;
 		int		save_errno;
+		md_unit_t	*mdev = NULL;
+		mdsetname_t	*sp = NULL;
 
 		/* this also sets errno */
 		partno = efi_alloc_and_read(fd, &gpt);
@@ -610,6 +626,7 @@ metagetvtoc(
 		metafreevtoc(&dnp->vtoc);
 		meta_efi_to_mdvtoc(gpt, &dnp->vtoc);
 		if (dnp->vtoc.nparts > MD_MAX_PARTS) {
+			efi_free(gpt);
 			(void) mddeverror(ep, MDE_TOO_MANY_PARTS, NODEV64,
 			    rname);
 			return (NULL);
@@ -623,7 +640,24 @@ metagetvtoc(
 		if (dnp->vtoc.nparts < V_NUMPAR) {
 			dnp->vtoc.nparts = V_NUMPAR;
 		}
-		meta_efi_to_mdgeom(gpt, &dnp->geom);
+
+		/*
+		 * Is np a metadevice?
+		 */
+		if (metaismeta(np)) {
+			sp = metasetnosetname(MD_MIN2SET(meta_getminor
+			    (np->dev)), ep);
+			if (!sp || (mdev = meta_get_mdunit(sp, np, ep)) ==
+			    NULL) {
+				efi_free(gpt);
+				(void) mddeverror(ep, MDE_NOT_META,
+				    NODEV64, rname);
+				return (NULL);
+			}
+		}
+
+		meta_efi_to_mdgeom(mdev, gpt, &dnp->geom);
+		Free(mdev);
 		efi_free(gpt);
 	} else {
 		/* no error on DKIOCGGEOM, try meta_getvtoc */

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -39,19 +38,8 @@ extern md_set_t	md_set[];
 extern int	*md_nm_snarfed;
 void		*lookup_entry(struct nm_next_hdr *, set_t,
 			side_t, mdkey_t, md_dev64_t, int);
-void		*lookup_entry_common(struct nm_next_hdr *, set_t,
-			side_t, mdkey_t, md_dev64_t, int, void **, size_t *);
-void		*lookup_entry_record_offset(struct nm_next_hdr *, set_t,
-			side_t, mdkey_t, md_dev64_t, int, void *, size_t *);
-
 void		*lookup_shared_entry(struct nm_next_hdr *,
 			mdkey_t, char *, mddb_recid_t *, int);
-void		*lookup_shared_entry_common(struct nm_next_hdr *,
-			mdkey_t, char *, mddb_recid_t *, int, void **,
-			size_t *);
-void		*lookup_shared_entry_record_offset(struct nm_next_hdr *,
-			mdkey_t, char *, mddb_recid_t *, int, void *, size_t *);
-
 static void	add_to_devid_list(ddi_devid_t did);
 static int	devid_is_unique(ddi_devid_t did);
 static size_t	free_devid_list(int *count);
@@ -157,6 +145,14 @@ destroy_key(struct nm_next_hdr *nh, int shared, mdkey_t key)
 	struct nm_rec_hdr *rh = (struct nm_rec_hdr *)nh->nmn_record;
 
 	if ((key + 1) != rh->r_next_key)
+		return;
+
+	/*
+	 * Here the key is the highest allocated key.
+	 * Check to see if this key is recycled or not and if yes,
+	 * then keep r_next_key intact.
+	 */
+	if (shared & NM_KEY_RECYCLE)
 		return;
 
 	while (unused_key(nh, shared, key))
@@ -562,7 +558,7 @@ rem_entry(
 	void *ent,		/* address of entry to be removed */
 	size_t ent_size,	/* size of entry to be removed */
 	size_t offset,		/* offset of entry within record */
-	int devid_nm)		/* which name space? 0 - primary */
+	int devid_nm)		/* bitwise of NM_DEVID, NM_KEY_RECYCLE */
 {
 	struct nm_next_hdr	*first_nh;
 	mddb_recid_t		recids[3];
@@ -597,8 +593,8 @@ rem_entry(
 	/*
 	 * We don't keep track of keys in the device id nonshared namespace
 	 */
-	if (!devid_nm)
-		destroy_key(first_nh, NM_NOTSHARED, ent_key);
+	if (!(devid_nm & NM_DEVID))
+		destroy_key(first_nh, devid_nm | NM_NOTSHARED, ent_key);
 
 	mddb_commitrecs_wrapper(recids);
 	return (0);
@@ -611,7 +607,8 @@ rem_shr_entry(
 	void *ent,		/* address of entry to be removed */
 	size_t ent_size,	/* size of entry to be removed */
 	size_t offset,		/* offset of entry within record */
-	int devid_nm)		/* which name space? 0 - primary */
+	int devid_nm)		/* bitwise of NM_DEVID, NM_IMP_SHARED,  */
+				/* NM_NOCOMMIT, NM_KEY_RECYCLE */
 {
 	struct nm_next_hdr	*first_nh;
 	mddb_recid_t		recids[3];
@@ -895,10 +892,10 @@ update_entry(
 
 int
 remove_entry(
-	struct nm_next_hdr	*nh,		/* head record header */
-	side_t			side,		/* (key 1) side number */
-	mdkey_t			key,		/* (key 2) via md_setdevname */
-	int			devid_nm)	/* which name space? */
+	struct nm_next_hdr *nh,	/* head record header */
+	side_t side,		/* (key 1) side number */
+	mdkey_t key,		/* (key 2) via md_setdevname */
+	int devid_nm)		/* bitwise of NM_DEVID, NM_KEY_RECYCLE */
 {
 	struct nm_rec_hdr	*rh = (struct nm_rec_hdr *)nh->nmn_record;
 	struct nm_next_hdr	*this_nh = nh->nmn_nextp;
@@ -967,10 +964,11 @@ remove_entry(
 
 int
 remove_shared_entry(
-	struct nm_next_hdr *nh,	/* First record header to start lookup */
-	mdkey_t key,		/* Shared key, used as key if nm is NULL */
-	char *nm,		/* Shared name, used as key if non-NULL */
-	int devid_nm)		/* which name space? */
+	struct nm_next_hdr *nh,	/* first record header to start lookup */
+	mdkey_t key,		/* shared key, used as key if nm is NULL */
+	char *nm,		/* shared name, used as key if non-NULL */
+	int devid_nm)		/* bitwise of NM_DEVID, NM_IMP_SHARED, */
+				/* NM_NOCOMMIT, NM_KEY_RECYCLE */
 {
 	struct nm_rec_hdr	*rh = (struct nm_rec_hdr *)nh->nmn_record;
 	struct nm_next_hdr	*this_nh = nh->nmn_nextp;
@@ -1027,7 +1025,7 @@ remove_shared_entry(
 			    shn_size, offset, devid_nm));
 
 		if (nm_len == shn_namlen) {
-			if (!devid_nm) {
+			if (!(devid_nm & NM_DEVID)) {
 				if (strcmp(nm, ((struct nm_shared_name *)
 				    shn)->sn_name) == 0)
 				return (rem_shr_entry(this_nh, recid,
@@ -1100,45 +1098,13 @@ build_device_number(set_t setno, struct nm_name *n)
 }
 
 void *
-lookup_entry_record_offset(
-struct	nm_next_hdr	*nh, /* head record header */
-	set_t		setno, /* set to lookup in */
-	side_t		side, /* (key 1) side number */
-	mdkey_t		key, /* (key 2) from md_setdevname */
-	md_dev64_t	dev, /* (alt. key 2) use if key == KEYWILD */
-	int		devid_nm, /* Which name space? */
-	void		*recp, /* pointer to the record containing the result */
-	size_t		*offsetp /* offset in the above record of result */
-)
-{
-	return (lookup_entry_common(nh, setno, side, key, dev, devid_nm,
-	    &recp, offsetp));
-}
-
-void *
 lookup_entry(
 	struct nm_next_hdr	*nh,	/* head record header */
 	set_t			setno,	/* set to lookup in */
 	side_t			side,	/* (key 1) side number */
 	mdkey_t			key,	/* (key 2) from md_setdevname */
 	md_dev64_t		dev,	/* (alt. key 2) use if key == KEYWILD */
-	int			devid_nm /* Which name space? */
-)
-{
-	return (lookup_entry_common(nh, setno, side, key, dev, devid_nm,
-	    NULL, NULL));
-}
-
-void *
-lookup_entry_common(
-	struct nm_next_hdr	*nh,	/* head record header */
-	set_t			setno,	/* set to lookup in */
-	side_t			side,	/* (key 1) side number */
-	mdkey_t			key,	/* (key 2) from md_setdevname */
-	md_dev64_t		dev,	/* (alt. key 2) use if key == KEYWILD */
-	int			devid_nm,	/* Which name space? */
-	void			**recp, /* record containing the result */
-	size_t			*offsetp /* offset in the record of result */
+	int			devid_nm	/* Which name space? */
 )
 {
 	struct nm_next_hdr	*this_nh = nh->nmn_nextp;
@@ -1199,23 +1165,13 @@ lookup_entry_common(
 
 		if ((side == n_side) || (side == MD_SIDEWILD)) {
 
-			if ((key != MD_KEYWILD) && (key == n_key)) {
-				if (recp)
-					*recp = record;
-				if (offsetp)
-					*offsetp = offset;
+			if ((key != MD_KEYWILD) && (key == n_key))
 				return ((void *)n);
-			}
 
 			if ((key == MD_KEYWILD) && !devid_nm &&
 			    (dev == build_device_number(setno,
-			    (struct nm_name *)n))) {
-				if (recp)
-					*recp = record;
-				if (offsetp)
-					*offsetp = offset;
+			    (struct nm_name *)n)))
 				return ((void *)n);
-			}
 
 		}
 
@@ -1419,41 +1375,12 @@ lookup_deventry(
 }
 
 void *
-lookup_shared_entry_record_offset(
-	struct nm_next_hdr *nh,	/* First record header to start lookup */
-	mdkey_t		key,	/* Shared key, used as key if nm is NULL */
-	char *nm,		/* Shared name, used as key if non-NULL */
-	mddb_recid_t *id,	/* mddb record id of record entry is found in */
-	int devid_nm,		/* which name space? */
-	void *recp,		/* pointer to record containing the result */
-	size_t *offset_p	/* offest in the above record of the result */
-)
-{
-	return (lookup_shared_entry_common(nh, key, nm, id, devid_nm, &recp,
-	    offset_p));
-}
-
-void *
 lookup_shared_entry(
-	struct nm_next_hdr *nh,	/* First record header to start lookup */
-	mdkey_t key,		/* Shared key, used as key if nm is NULL */
-	char *nm,		/* Shared name, used as key if non-NULL */
-	mddb_recid_t *id,	/* mddb record id of record entry is found in */
-	int	devid_nm)	/* which name space? */
-{
-	return (lookup_shared_entry_common(nh, key, nm, id, devid_nm, NULL,
-	    NULL));
-}
-
-void *
-lookup_shared_entry_common(
 	struct nm_next_hdr *nh, /* First record header to start lookup */
 	mdkey_t key,		/* Shared key, used as key if nm is NULL */
 	char *nm,		/* Shared name, used as key if non-NULL */
 	mddb_recid_t *id,	/* mddb record id of record entry is found in */
-	int	devid_nm,	/* which name space? */
-	void	**recp,		/* pointer to record containing the result */
-	size_t	*offsetp	/* offest in the above record of the result */
+	int	devid_nm	/* which name space? */
 )
 {
 
@@ -1523,13 +1450,8 @@ lookup_shared_entry_common(
 			shn_size = SHR_NAMSIZ((struct nm_shared_name *)shn);
 		}
 
-		if ((key != 0) && (key == shn_key)) {
-			if (recp)
-				*recp = record;
-			if (offsetp)
-				*offsetp = offset;
+		if ((key != 0) && (key == shn_key))
 			return ((void *)shn);
-		}
 
 		/* Lookup by name */
 		if (nm != NULL) {
@@ -1539,34 +1461,19 @@ lookup_shared_entry_common(
 			 * and we want to do a partial match on that.
 			 */
 			if (strncmp(nm, ((struct nm_shared_name *)shn)->sn_name,
-			    strlen(nm)) == 0) {
-				if (recp)
-					*recp = record;
-				if (offsetp)
-					*offsetp = offset;
+			    strlen(nm)) == 0)
 				return ((void *)shn);
-			}
 			} else if (nm_len == shn_namlen) {
-			if (devid_nm & NM_DEVID) {
+				if (devid_nm & NM_DEVID) {
 				if (ddi_devid_compare((ddi_devid_t)nm,
 				    (ddi_devid_t)(((struct did_shr_name *)shn)->
-				    did_devid)) == 0) {
-					if (recp)
-						*recp = record;
-					if (offsetp)
-						*offsetp = offset;
+				    did_devid)) == 0)
 					return ((void *)shn);
-				}
-			} else {
+				} else {
 				if (strcmp(nm, ((struct nm_shared_name *)
-				    shn)->sn_name) == 0) {
-					if (recp)
-						*recp = record;
-					if (offsetp)
-						*offsetp = offset;
+				    shn)->sn_name) == 0)
 					return ((void *)shn);
 				}
-			}
 			}
 		}
 
@@ -3308,16 +3215,11 @@ md_update_namespace_did(
 	mdkey_t			ent_did_key;
 	uint32_t		ent_did_count;
 	uint32_t		ent_did_data;
-	void			*record, *n_record;
-	size_t			offset;
 	struct did_shr_name	*shn;
 	mddb_recid_t		recids[3];
-	struct nm_next_hdr	*nh;
-	struct nm_next_hdr	*this_did_nh;
+	struct nm_next_hdr	*did_nh;
 	struct did_min_name	*n;
 	struct did_shr_name	*shr_n;
-	mdkey_t			devid_key;
-	size_t			ent_size, size;
 
 	(void) md_load_namespace(setno, NULL, NM_DEVID);
 	if (!md_load_namespace(setno, NULL, 0L)) {
@@ -3326,34 +3228,20 @@ md_update_namespace_did(
 	}
 	rw_enter(&nm_lock.lock, RW_WRITER);
 
-	offset = (sizeof (struct devid_shr_rec) - sizeof (struct did_shr_name));
-	if ((nh = get_first_record(setno, 0, NM_DEVID | NM_NOTSHARED)) ==
+	if ((did_nh = get_first_record(setno, 0, NM_DEVID | NM_NOTSHARED)) ==
 	    NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
 
-	this_did_nh = nh->nmn_nextp;
-	if (this_did_nh  == NULL) {
-		rw_exit(&nm_lock.lock);
-		return (ENOENT);
-	}
-	record = this_did_nh->nmn_record;
-	if (record == NULL) {
-		rw_exit(&nm_lock.lock);
-		return (ENOENT);
-	}
-
-	if ((n = (struct did_min_name *)lookup_entry(nh, setno, side, key,
+	if ((n = (struct did_min_name *)lookup_entry(did_nh, setno, side, key,
 	    NODEV64, NM_DEVID)) == NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
-	devid_key = n->min_devid_key;
-	rw_exit(&nm_lock.lock);
 
-	devt = md_dev64_to_dev(
-	    md_getdevnum(setno, side, key, MD_TRUST_DEVT));
+	rw_exit(&nm_lock.lock);
+	devt = md_dev64_to_dev(md_getdevnum(setno, side, key, MD_TRUST_DEVT));
 
 	rw_enter(&nm_lock.lock, RW_WRITER);
 	if (ddi_lyr_get_devid(devt, &rtn_devid) == DDI_SUCCESS) {
@@ -3364,12 +3252,9 @@ md_update_namespace_did(
 			return ((int)NODEV64);
 		}
 
-		n_record = did_shr_nh->nmn_nextp->nmn_record;
-
-		shr_n = (struct did_shr_name *)
-		    lookup_shared_entry_record_offset(did_shr_nh, devid_key,
-		    (char *)0, &recids[0], NM_DEVID, n_record, &offset);
-
+		shr_n = (struct did_shr_name *)lookup_shared_entry(
+		    did_shr_nh, n->min_devid_key, (char *)0,
+		    &recids[0], NM_DEVID);
 		if (shr_n == NULL) {
 			ddi_devid_free(rtn_devid);
 			rw_exit(&nm_lock.lock);
@@ -3382,29 +3267,10 @@ md_update_namespace_did(
 			ent_did_key = shr_n->did_key;
 			ent_did_count = shr_n->did_count;
 			ent_did_data = shr_n->did_data;
-			ent_size = DID_SHR_NAMSIZ(shr_n);
+			(void) remove_shared_entry(did_shr_nh,
+			    shr_n->did_key, NULL, NM_DEVID |
+			    NM_KEY_RECYCLE);
 
-			/*
-			 * So we're going to overwrite this record; if it's the
-			 * last entry, just bzero() it. If it's not, then copy
-			 * the remaining entries back to the start of our entry
-			 */
-
-			size = ((struct nm_rec_hdr *)n_record)->r_used_size
-			    - offset - ent_size;
-
-			ASSERT(size + offset <= ((struct nm_rec_hdr *)
-			    n_record)->r_used_size);
-
-			if (size == 0) {
-				(void) bzero(shr_n, ent_size);
-			} else {
-				(void) ovbcopy((caddr_t)shr_n + ent_size, shr_n,
-				    size);
-				(void) bzero((caddr_t)shr_n + size, ent_size);
-			}
-			((struct nm_rec_hdr *)n_record)->r_used_size -=
-			    ent_size;
 			/* add in new devid info */
 			if ((shn = (struct did_shr_name *)alloc_entry(
 			    did_shr_nh, md_set[setno].s_did_nmid,
@@ -3449,6 +3315,7 @@ md_update_namespace(
 	mdkey_t	key,		/* (key 2) key provided by md_setdevname() */
 	char	*devname,	/* device name */
 	char	*pathname,	/* pathname to device */
+	major_t major,		/* major number */
 	minor_t	mnum		/* minor numer */
 )
 {
@@ -3456,15 +3323,12 @@ md_update_namespace(
 	struct nm_name		*n;
 	struct nm_next_hdr	*snh;
 	struct nm_shared_name	*shn;
-	void			*n_record;
 	mddb_recid_t		recids[3];
-	size_t			size;
-	mdkey_t			ent_key, ent_drv_key, ent_dir_key, new_dir_key;
+	mdkey_t			ent_key, ent_drv_key, ent_dir_key;
 	uint32_t		ent_count;
 	side_t			ent_side;
-	size_t			offset;
-	char			*old_pathname;
-	int			ent_size;
+	char			*old_pathname, *old_drvnm;
+	char			*drvnm;
 
 	if (!md_load_namespace(setno, NULL, 0L)) {
 		return (ENOENT);
@@ -3472,65 +3336,73 @@ md_update_namespace(
 
 	rw_enter(&nm_lock.lock, RW_WRITER);
 
-	offset = sizeof (struct nm_rec) - sizeof (struct nm_name);
-	if ((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL) {
+	if ((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL ||
+	    (snh = get_first_record(setno, 0, NM_SHARED)) == NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
 
-	n_record = nh->nmn_nextp->nmn_record;
-
-	if ((n = (struct nm_name *)lookup_entry_record_offset(nh, setno, side,
-	    key, NODEV64, 0L, n_record, &offset)) == NULL) {
+	if ((n = (struct nm_name *)lookup_entry(nh, setno, side, key, NODEV64,
+	    0L)) == NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
 
-	/* save the values from the old record */
+	/* Save the values from the old record */
 	ent_side = n->n_side;
 	ent_key = n->n_key;
 	ent_count = n->n_count;
-	ent_drv_key = n->n_drv_key;
-	ent_dir_key = n->n_dir_key;
-	ent_size = NAMSIZ(n);
 
 	/*
-	 * So we're going to overwrite this record; if it's the last
-	 * entry, just bzero() it. If it's not, then copy the
-	 * remaining entries back to the start of our entry
+	 * These can be overwritten
 	 */
+	ent_drv_key = n->n_drv_key;
+	ent_dir_key = n->n_dir_key;
 
-	size = ((struct nm_rec_hdr *)n_record)->r_used_size - offset - ent_size;
-
-	ASSERT(offset + size <= ((struct nm_rec_hdr *)n_record)->r_alloc_size);
-
-	if (size == 0) {
-		(void) bzero(n, ent_size);    /* last entry */
-	} else {
-		(void) ovbcopy((caddr_t)n + ent_size, n, size);
-		(void) bzero((caddr_t)n + size, ent_size);
-	}
-	((struct nm_rec_hdr *)n_record)->r_used_size -= ent_size;
+	/*
+	 * Now can safely remove the entry
+	 * If the entry is there it will be removed,
+	 * otherwise nothing will happen to mddb
+	 */
+	(void) remove_entry(nh, n->n_side, n->n_key, 0L | NM_KEY_RECYCLE);
 
 	rw_exit(&nm_lock.lock);
-	/* check to see if we have a new pathname */
+	/* The old path and drvnm has to be there */
 	old_pathname = md_getshared_name(setno, ent_dir_key);
+	old_drvnm = md_getshared_name(setno, ent_drv_key);
+	if (!old_pathname || !old_drvnm) {
+		return (ENOENT);
+	}
+
+	/* Check to see if we have a new pathname */
 	if (strcmp(old_pathname, pathname)) {
 		/* now see if the new pathname actually exists in our nsp */
-		if ((snh = get_first_record(setno, 0, NM_SHARED)) == NULL)
-			return (ENOENT);
 		shn = (struct nm_shared_name *)lookup_shared_entry(
 		    snh, NULL, pathname, &recids[0], 0L);
 		if (shn) {
 			/* pathname exists so get it's key */
-			new_dir_key = shn->sn_key;
+			ent_dir_key = shn->sn_key;
 		} else {
 			/* pathname doesn't exist so create it */
-			new_dir_key =
+			ent_dir_key =
 			    md_setshared_name(setno, pathname, NM_NOCOMMIT);
 		}
-		/* update dir key */
-		ent_dir_key = new_dir_key;
+	}
+
+	/*
+	 * Check and update n_drv_key as well since we can't
+	 * blindly use the old one for the new drvnm
+	 */
+	drvnm = ddi_major_to_name(major);
+	if (strcmp(old_drvnm, drvnm)) {
+		shn = (struct nm_shared_name *)lookup_shared_entry(
+		    snh, NULL, drvnm, &recids[0], 0L);
+		if (shn) {
+			ent_drv_key = shn->sn_key;
+		} else {
+			ent_drv_key =
+			    md_setshared_name(setno, drvnm, NM_NOCOMMIT);
+		}
 	}
 
 	rw_enter(&nm_lock.lock, RW_WRITER);
@@ -3548,13 +3420,11 @@ md_update_namespace(
 	n->n_key = ent_key;
 	n->n_count = ent_count;
 	n->n_drv_key = ent_drv_key;
+	n->n_dir_key = ent_dir_key;
 
 	/* fill-in filename */
 	(void) strcpy(n->n_name, devname);
 	n->n_namlen = (ushort_t)(strlen(devname) + 1);
-
-	/* directory name */
-	n->n_dir_key = ent_dir_key;
 
 	recids[1] = md_set[setno].s_nmid;
 	recids[2] = 0;

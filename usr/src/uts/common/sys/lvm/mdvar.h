@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_MDVAR_H
@@ -810,7 +809,8 @@ extern int	md_getdevid(set_t setno, side_t side, mdkey_t key,
 extern int	md_getdevidminor(set_t setno, side_t side, mdkey_t key,
 		    char *minorname, size_t minorname_len);
 extern int	md_update_namespace(set_t setno, side_t side, mdkey_t key,
-		    caddr_t devname, caddr_t pathname, minor_t mnum);
+		    caddr_t devname, caddr_t pathname, major_t major,
+		    minor_t mnum);
 extern int	md_update_locator_namespace(set_t setno, side_t side,
 		    caddr_t devname, caddr_t pathname, md_dev64_t devt);
 extern int	md_update_namespace_did(set_t setno, side_t side, mdkey_t key,
@@ -843,6 +843,7 @@ extern void	*lookup_shared_entry(struct nm_next_hdr *,
 		    mdkey_t key, char *, mddb_recid_t *, int);
 extern int	remove_shared_entry(struct nm_next_hdr *, mdkey_t key,
 		    char *, int);
+extern int	remove_entry(struct nm_next_hdr *, side_t, mdkey_t, int);
 extern void	*alloc_entry(struct nm_next_hdr *, mddb_recid_t, size_t, int,
 		    mddb_recid_t *);
 extern void	*getshared_name(set_t, mdkey_t, int);

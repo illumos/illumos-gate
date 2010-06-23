@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -274,11 +273,7 @@ extern	void	med_fini(void);
 extern  void	md_devid_cleanup(set_t, uint_t);
 
 /* md_names.c */
-extern void			*lookup_entry(struct nm_next_hdr *, set_t,
-					side_t, mdkey_t, md_dev64_t, int);
 extern struct nm_next_hdr	*get_first_record(set_t, int, int);
-extern int			remove_entry(struct nm_next_hdr *,
-					side_t, mdkey_t, int);
 
 int		md_maxphys	= 0;	/* maximum io size in bytes */
 #define		MD_MAXBCOUNT	(1024 * 1024)

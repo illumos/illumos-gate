@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -12272,6 +12271,7 @@ md_update_minor(
 	struct nm_name		*n;
 	char			*shn;
 	int			retval = 1;
+	side_t			s;
 
 	/*
 	 * Load the devid name space if it exists
@@ -12295,18 +12295,26 @@ md_update_minor(
 	/*
 	 * Look up the key
 	 */
-	if ((n = lookup_entry(nh, setno, side, key, NODEV64, 0L)) != NULL) {
+	for (s = 0; s < MD_MAXSIDES; s++) {
 		/*
-		 * Find the entry, update its n_minor if metadevice
+		 * For side other than the import 'side', cleanup its entry
 		 */
-		if ((shn = (char *)getshared_name(setno, n->n_drv_key, 0L))
-		    == NULL) {
-			retval = 0;
-			goto out;
-		}
-
-		if (strcmp(shn, "md") == 0) {
-			n->n_minor = MD_MKMIN(setno, MD_MIN2UNIT(n->n_minor));
+		if ((n = lookup_entry(nh, setno, s, key, NODEV64, 0L)) !=
+		    NULL) {
+			if (n->n_side == side) {
+				/*
+				 * Update its n_minor if metadevice
+				 */
+				if (((shn = (char *)getshared_name(setno,
+				    n->n_drv_key, 0L)) != NULL) &&
+				    (strcmp(shn, "md") == 0)) {
+					n->n_minor = MD_MKMIN(setno,
+					    MD_MIN2UNIT(n->n_minor));
+				}
+			} else {
+				/* We are not the import side, cleanup */
+				(void) remove_entry(nh, n->n_side, key, 0L);
+			}
 		}
 	}
 
@@ -12542,7 +12550,7 @@ update_setname(
 	o_data = shn->sn_data;
 
 	if (remove_shared_entry(nh, o_key, NULL, 0L | NM_IMP_SHARED |
-	    NM_NOCOMMIT)) {
+	    NM_NOCOMMIT | NM_KEY_RECYCLE)) {
 		err = MDDB_E_NORECORD;
 		goto out;
 	}
@@ -12729,11 +12737,8 @@ md_update_namespace_rr_did(
 	mdkey_t			ent_did_key;
 	uint32_t		ent_did_count;
 	uint32_t		ent_did_data;
-	size_t			ent_size, size;
 	ddi_devid_t		devid = NULL;
 	struct did_shr_name	*shn;
-	size_t			offset;
-	struct nm_next_hdr	*this_did_shr_nh;
 	void			*old_devid, *new_devid;
 
 	if (!(md_get_setstatus(setno) & MD_SET_NM_LOADED))
@@ -12745,7 +12750,6 @@ md_update_namespace_rr_did(
 	/*
 	 * It is okay if we dont have any configuration
 	 */
-	offset = (sizeof (struct devid_shr_rec) - sizeof (struct did_shr_name));
 	if ((nh = get_first_record(setno, 0, NM_DEVID | NM_NOTSHARED))
 	    == NULL) {
 		return (0);
@@ -12761,7 +12765,7 @@ md_update_namespace_rr_did(
 			if (did_shr_nh == NULL) {
 				return (ENOENT);
 			}
-			this_did_shr_nh = did_shr_nh->nmn_nextp;
+
 			shr_n = (struct did_shr_name *)lookup_shared_entry(
 			    did_shr_nh, n->min_devid_key, (char *)0,
 			    &recids[0], NM_DEVID);
@@ -12780,21 +12784,10 @@ md_update_namespace_rr_did(
 				ent_did_key = shr_n ->did_key;
 				ent_did_count = shr_n->did_count;
 				ent_did_data = shr_n->did_data;
-				ent_size = DID_SHR_NAMSIZ(shr_n);
-				size = ((struct nm_rec_hdr *)
-				    this_did_shr_nh->nmn_record)->
-				    r_used_size - offset - ent_size;
-				if (size == 0) {
-					(void) bzero(shr_n, ent_size);
-				} else {
-					(void) ovbcopy((caddr_t)shr_n +
-					    ent_size, shr_n, size);
-					(void) bzero((caddr_t)shr_n +
-					    size, ent_size);
-				}
-				((struct nm_rec_hdr *)this_did_shr_nh->
-				    nmn_record)->r_used_size -=
-				    ent_size;
+				(void) remove_shared_entry(did_shr_nh,
+				    shr_n->did_key, NULL, NM_DEVID |
+				    NM_IMP_SHARED | NM_KEY_RECYCLE);
+
 				/* add in new devid info */
 				if ((shn = (struct did_shr_name *)
 				    alloc_entry(did_shr_nh,

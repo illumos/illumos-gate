@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_MD_NAMES_H
 #define	_SYS_MD_NAMES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -41,6 +37,7 @@ extern "C" {
 #define	NM_NOTSHARED	0
 #define	NM_DEVID	0x0010
 #define	NM_IMP_SHARED	0x0020
+#define	NM_KEY_RECYCLE	0x0040
 #define	NM_DEVID_VALID		1
 #define	NM_DEVID_INVALID	0
 
