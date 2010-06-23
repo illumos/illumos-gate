@@ -137,38 +137,21 @@ nfs4_vget_pseudo(struct exportinfo *exi, vnode_t **vpp, fid_t *fidp)
  * a) its export root is VROOT
  * b) a descendant of the export root is shared
  */
-int
-pseudo_exportfs(vnode_t *vp, struct exp_visible *vis_head,
-	    struct exportdata *exdata, struct exportinfo **exi_retp)
+struct exportinfo *
+pseudo_exportfs(vnode_t *vp, fid_t *fid, struct exp_visible *vis_head,
+	    struct exportdata *exdata)
 {
 	struct exportinfo *exi;
 	struct exportdata *kex;
-	fid_t fid;
 	fsid_t fsid;
-	int error, vpathlen;
+	int vpathlen;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
-
-	/*
-	 * Get the vfs id
-	 */
-	bzero(&fid, sizeof (fid));
-	fid.fid_len = MAXFIDSZ;
-	error = vop_fid_pseudo(vp, &fid);
-	if (error) {
-		/*
-		 * If VOP_FID returns ENOSPC then the fid supplied
-		 * is too small.  For now we simply return EREMOTE.
-		 */
-		if (error == ENOSPC)
-			error = EREMOTE;
-		return (error);
-	}
 
 	fsid = vp->v_vfsp->vfs_fsid;
 	exi = kmem_zalloc(sizeof (*exi), KM_SLEEP);
 	exi->exi_fsid = fsid;
-	exi->exi_fid = fid;
+	exi->exi_fid = *fid;
 	exi->exi_vp = vp;
 	VN_HOLD(exi->exi_vp);
 	exi->exi_visible = vis_head;
@@ -212,14 +195,7 @@ pseudo_exportfs(vnode_t *vp, struct exp_visible *vis_head,
 	 */
 	export_link(exi);
 
-	/*
-	 * If exi_retp is non-NULL return a pointer to the new
-	 * exportinfo structure.
-	 */
-	if (exi_retp)
-		*exi_retp = exi;
-
-	return (0);
+	return (exi);
 }
 
 /*
@@ -339,7 +315,7 @@ tree_remove_node(treenode_t *node)
  * share  /x/y/a/b
  *
  * When more_visible() is called during the second share,
- * the existing namespace is folowing:
+ * the existing namespace is following:
  *                                   exp_visible_t
  *   treenode_t       exportinfo_t      v0     v1
  * ns_root+---+        +------------+  +---+  +---+
@@ -381,7 +357,7 @@ tree_remove_node(treenode_t *node)
  * - add t4, t5, t6 as a child of t1 (t4 will become sibling of t2)
  * - add v3 to the end of E0->exi_visible
  *
- * Note that v4 and v5 were already proccesed in pseudo_exportfs() and
+ * Note that v4 and v5 were already processed in pseudo_exportfs() and
  * added to E2. The outer loop of more_visible() will loop only over v2
  * and v3. The inner loop of more_visible() always loops over v0 and v1.
  *
@@ -681,10 +657,8 @@ treeclimb_export(struct exportinfo *exip)
 				 * this as a pseudo export so that an NFS v4
 				 * client can do lookups in it.
 				 */
-				error = pseudo_exportfs(vp, vis_head, NULL,
-				    &new_exi);
-				if (error)
-					break;
+				new_exi = pseudo_exportfs(vp, &fid, vis_head,
+				    NULL);
 				vis_head = NULL;
 			}
 
@@ -765,9 +739,8 @@ treeclimb_export(struct exportinfo *exip)
 	/*
 	 * We can have set error due to error in:
 	 * 1. vop_fid_pseudo()
-	 * 2. pseudo_exportfs() which can fail only in vop_fid_pseudo()
-	 * 3. VOP_GETATTR()
-	 * 4. VOP_LOOKUP()
+	 * 2. VOP_GETATTR()
+	 * 3. VOP_LOOKUP()
 	 * We must free pseudo exportinfos, visibles and treenodes.
 	 * Visibles are referenced from treenode_t::tree_vis and
 	 * exportinfo_t::exi_visible. To avoid double freeing, only
@@ -787,8 +760,7 @@ treeclimb_export(struct exportinfo *exip)
 			exportinfo_t *e  = tree_head->tree_exi;
 			/* exip will be freed in exportfs() */
 			if (e && e != exip) {
-				(void) export_unlink(&e->exi_fsid, &e->exi_fid,
-				    e->exi_vp, NULL);
+				export_unlink(e);
 				exi_rele(e);
 			}
 			tree_head = tree_head->tree_child_first;
@@ -814,7 +786,6 @@ treeclimb_export(struct exportinfo *exip)
 void
 treeclimb_unexport(struct exportinfo *exip)
 {
-	struct exportinfo *exi;
 	treenode_t *tnode, *old_nd;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
@@ -839,17 +810,13 @@ treeclimb_unexport(struct exportinfo *exip)
 		/* Release pseudo export if it has no child */
 		if (TREE_ROOT(tnode) && !TREE_EXPORTED(tnode) &&
 		    tnode->tree_child_first == 0) {
-			exi = tnode->tree_exi;
-			(void) export_unlink(&exi->exi_fsid, &exi->exi_fid,
-			    exi->exi_vp, NULL);
+			export_unlink(tnode->tree_exi);
 			exi_rele(tnode->tree_exi);
 		}
 
 		/* Release visible in parent's exportinfo */
-		if (tnode->tree_vis) {
-			exi = vis2exi(tnode);
-			less_visible(exi, tnode->tree_vis);
-		}
+		if (tnode->tree_vis)
+			less_visible(vis2exi(tnode), tnode->tree_vis);
 
 		/* Continue with parent */
 		old_nd = tnode;

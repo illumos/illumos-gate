@@ -419,7 +419,13 @@ typedef struct treenode {
 /* Root of nfs pseudo namespace */
 extern treenode_t *ns_root;
 
-#define	EXPTABLESIZE	16
+#define	EXPTABLESIZE   256
+
+struct exp_hash {
+	struct exportinfo	*prev;  /* ptr to the previous exportinfo */
+	struct exportinfo	*next;  /* ptr to the next exportinfo */
+	struct exportinfo	**bckt; /* backpointer to the hash bucket */
+};
 
 /*
  * A node associated with an export entry on the
@@ -441,7 +447,8 @@ struct exportinfo {
 	struct exportdata	exi_export;
 	fsid_t			exi_fsid;
 	struct fid		exi_fid;
-	struct exportinfo	*exi_hash;
+	struct exp_hash		fid_hash;
+	struct exp_hash		path_hash;
 	struct treenode		*exi_tree;
 	fhandle_t		exi_fh;
 	krwlock_t		exi_cache_lock;
@@ -505,6 +512,7 @@ struct exp_visible {
 typedef struct exp_visible exp_visible_t;
 
 #define	PSEUDO(exi)	((exi)->exi_export.ex_flags & EX_PSEUDO)
+#define	EXP_LINKED(exi)	((exi)->fid_hash.bckt != NULL)
 
 #define	EQFSID(fsidp1, fsidp2)	\
 	(((fsidp1)->val[0] == (fsidp2)->val[0]) && \
@@ -533,7 +541,6 @@ extern int	nfsauth4_access(struct exportinfo *, vnode_t *,
 				struct svc_req *);
 extern int	nfsauth4_secinfo_access(struct exportinfo *,
 				struct svc_req *, int, int);
-extern int	nfs_fhhash(fsid_t *, fid_t *);
 extern int	nfs_fhbcmp(char *, char *, int);
 extern int	nfs_exportinit(void);
 extern void	nfs_exportfini(void);
@@ -555,8 +562,7 @@ extern struct exportinfo *nfs_vptoexi(vnode_t *, vnode_t *, cred_t *, int *,
 extern int	nfs_check_vpexi(vnode_t *, vnode_t *, cred_t *,
 			struct exportinfo **);
 extern void	export_link(struct exportinfo *);
-extern int	export_unlink(fsid_t *, fid_t *, vnode_t *,
-			struct exportinfo **);
+extern void	export_unlink(struct exportinfo *);
 extern vnode_t *untraverse(vnode_t *);
 extern int	vn_is_nfs_reparse(vnode_t *, cred_t *);
 extern int	client_is_downrev(struct svc_req *);
@@ -573,8 +579,8 @@ extern int	nfs_visible_inode(struct exportinfo *, ino64_t, int *);
 extern int	has_visible(struct exportinfo *, vnode_t *);
 extern void	free_visible(struct exp_visible *);
 extern int	nfs_exported(struct exportinfo *, vnode_t *);
-extern int	pseudo_exportfs(vnode_t *, struct exp_visible *,
-    struct exportdata *, struct exportinfo **);
+extern struct exportinfo *pseudo_exportfs(vnode_t *, fid_t *,
+    struct exp_visible *, struct exportdata *);
 extern int	vop_fid_pseudo(vnode_t *, fid_t *fidp);
 extern int	nfs4_vget_pseudo(struct exportinfo *, vnode_t **, fid_t *);
 /*

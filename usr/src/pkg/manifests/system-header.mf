@@ -1283,6 +1283,7 @@ file path=usr/include/sys/pghw.h
 file path=usr/include/sys/physmem.h
 $(i386_ONLY)file path=usr/include/sys/pic.h
 $(i386_ONLY)file path=usr/include/sys/pit.h
+file path=usr/include/sys/pkp_hash.h
 file path=usr/include/sys/pm.h
 $(i386_ONLY)file path=usr/include/sys/pmem.h
 file path=usr/include/sys/policy.h
