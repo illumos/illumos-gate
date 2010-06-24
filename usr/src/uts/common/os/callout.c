@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/callo.h>
@@ -36,6 +35,8 @@
 #include <sys/vtrace.h>
 #include <sys/sysmacros.h>
 #include <sys/sdt.h>
+
+int callout_init_done;				/* useful during boot */
 
 /*
  * Callout tables.  See timeout(9F) for details.
@@ -2190,4 +2191,7 @@ callout_init(void)
 	callout_boot_ct = &callout_table[CALLOUT_TABLE(0, CPU->cpu_seqid)];
 	callout_cpu_online(CPU);
 	mutex_exit(&cpu_lock);
+
+	/* heads-up to boot-time clients that timeouts now available */
+	callout_init_done = 1;
 }

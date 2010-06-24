@@ -832,6 +832,7 @@
 extern void streams_msg_init(void);
 extern int segkp_fromheap;
 extern void segkp_cache_free(void);
+extern int callout_init_done;
 
 struct kmem_cache_kstat {
 	kstat_named_t	kmc_buf_size;
@@ -3124,7 +3125,12 @@ kmem_reap_timeout(void *flag_arg)
 static void
 kmem_reap_done(void *flag)
 {
-	(void) timeout(kmem_reap_timeout, flag, kmem_reap_interval);
+	if (!callout_init_done) {
+		/* can't schedule a timeout at this point */
+		kmem_reap_timeout(flag);
+	} else {
+		(void) timeout(kmem_reap_timeout, flag, kmem_reap_interval);
+	}
 }
 
 static void
