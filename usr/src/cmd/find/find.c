@@ -750,13 +750,11 @@ struct FTW *state;
 		(void) fprintf(stderr, gettext("%s: cannot read dir %s: %s\n"),
 			cmdname, name, strerror(errno));
 		error = 1;
-		return (0);
-	} else if (type == FTW_SLN && lflag == 0) {
+	} else if (type == FTW_SLN && lflag == 1) {
 		(void) fprintf(stderr,
 			gettext("%s: cannot follow symbolic link %s: %s\n"),
 			cmdname, name, strerror(errno));
 		error = 1;
-		return (0);
 	} else if (type == FTW_DL) {
 		(void) fprintf(stderr, gettext("%s: cycle detected for %s\n"),
 			cmdname, name);
