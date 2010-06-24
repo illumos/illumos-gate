@@ -2564,8 +2564,25 @@ si_deliver_satapkt(
 
 	switch (cmd->satacmd_addr_type) {
 
+	case 0:
+		/*
+		 * satacmd_addr_type will be 0 for the commands below:
+		 * 	SATAC_PACKET
+		 * 	SATAC_IDLE_IM
+		 * 	SATAC_STANDBY_IM
+		 * 	SATAC_DOWNLOAD_MICROCODE
+		 * 	SATAC_FLUSH_CACHE
+		 * 	SATAC_SET_FEATURES
+		 * 	SATAC_SMART
+		 * 	SATAC_ID_PACKET_DEVICE
+		 * 	SATAC_ID_DEVICE
+		 * 	SATAC_READ_PORTMULT
+		 * 	SATAC_WRITE_PORTMULT
+		 */
+		/* FALLTHRU */
+
 	case ATA_ADDR_LBA:
-		/* fallthru */
+		/* FALLTHRU */
 
 	case ATA_ADDR_LBA28:
 		/* LBA[7:0] */
