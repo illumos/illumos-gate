@@ -19,15 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = pcplusmp.so
 MDBTGT = kvm
 
-MODSRCS = apic.c intr_common.c
+MODSRCS = pcplusmp.c apic_common.c intr_common.c
 
 include ../../../../../Makefile.cmd
 include ../../../../intel/Makefile.ia32

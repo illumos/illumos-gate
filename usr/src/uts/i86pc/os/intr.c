@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -82,6 +81,11 @@ ulong_t laststi[NCPU];
 ulong_t lastcli[NCPU];
 
 #endif
+
+void do_interrupt(struct regs *rp, trap_trace_rec_t *ttp);
+
+void (*do_interrupt_common)(struct regs *, trap_trace_rec_t *) = do_interrupt;
+uintptr_t (*get_intr_handler)(int, short) = NULL;
 
 /*
  * Set cpu's base SPL level to the highest active interrupt level
@@ -1103,6 +1107,11 @@ send_dirint(int cpuid, int int_level)
 	(*send_dirintf)(cpuid, int_level);
 }
 
+#define	IS_FAKE_SOFTINT(flag, newpri)		\
+	(((flag) & PS_IE) &&				\
+	    (((*get_pending_spl)() > (newpri)) ||	\
+	    bsrw_insn((uint16_t)cpu->cpu_softinfo.st_pending) > (newpri)))
+
 /*
  * do_splx routine, takes new ipl to set
  * returns the old ipl.
@@ -1130,8 +1139,7 @@ do_splx(int newpri)
 	 * If we are going to reenable interrupts see if new priority level
 	 * allows pending softint delivery.
 	 */
-	if ((flag & PS_IE) &&
-	    bsrw_insn((uint16_t)cpu->cpu_softinfo.st_pending) > newpri)
+	if (IS_FAKE_SOFTINT(flag, newpri))
 		fakesoftint();
 	ASSERT(!interrupts_enabled());
 	intr_restore(flag);
@@ -1164,8 +1172,7 @@ splr(int newpri)
 		/*
 		 * See if new priority level allows pending softint delivery
 		 */
-		if ((flag & PS_IE) &&
-		    bsrw_insn((uint16_t)cpu->cpu_softinfo.st_pending) > newpri)
+		if (IS_FAKE_SOFTINT(flag, newpri))
 			fakesoftint();
 	}
 	intr_restore(flag);

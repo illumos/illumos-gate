@@ -19,12 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Kstat support for X86 PCI driver
  */
@@ -68,6 +64,9 @@ static char ih_buspath[MAXPATHLEN];
 static uint32_t pci_ks_inst;
 static kmutex_t pci_ks_template_lock;
 
+extern int		(*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
+			    psm_intr_op_t, int *);
+
 /*ARGSUSED*/
 static int
 pci_ih_ks_update(kstat_t *ksp, int rw)
@@ -75,7 +74,7 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 	pci_kstat_private_t *private_data =
 	    (pci_kstat_private_t *)ksp->ks_private;
 	dev_info_t *rootnex_dip = private_data->rootnex_dip;
-	ddi_intr_handle_impl_t *ih_p = private_data->hdlp;
+	ddi_intr_handle_impl_t tmp_hdl, *ih_p = private_data->hdlp;
 	dev_info_t *dip = ih_p->ih_dip;
 	int maxlen = sizeof (pci_ks_template.ihks_name.value.c);
 	apic_get_intr_t	intrinfo;
@@ -88,11 +87,6 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 	kstat_named_setstr(&pci_ks_template.ihks_buspath, ih_buspath);
 
 	/*
-	 * ih_p->ih_vector really has an IRQ.  Ask pci_get_intr_from_vecirq to
-	 * return a vector since that's what PCItool will require intrd to use.
-	 *
-	 * PCItool will change the CPU routing of the IRQ that vector maps to.
-	 *
 	 * Note that although possibly multiple vectors can map to an IRQ, the
 	 * vector returned below will always be the same for a given IRQ
 	 * specified, and so all kstats for a given IRQ will report the same
@@ -107,10 +101,14 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 	 * It is also possible that the vector is for a dummy interrupt.
 	 * pci_get_intr_from_vecirq will return failure in this case.
 	 */
-	intrinfo.avgi_cpu_id = 0; /* In case pci_get_intr_from_vecirq fails */
+	bcopy(ih_p, &tmp_hdl, sizeof (ddi_intr_handle_impl_t));
+	tmp_hdl.ih_private = (void *)&intrinfo;
+	intrinfo.avgi_cpu_id = 0; /* In case psm_intr_ops fails */
 	intrinfo.avgi_req_flags = PSMGI_REQ_CPUID | PSMGI_REQ_VECTOR;
+	intrinfo.avgi_req_flags |= PSMGI_INTRBY_DEFAULT;
+
 	if ((ih_p->ih_state != DDI_IHDL_STATE_ENABLE) ||
-	    (pci_get_intr_from_vecirq(&intrinfo,  ih_p->ih_vector, IS_IRQ) !=
+	    ((*psm_intr_ops)(NULL, &tmp_hdl, PSM_INTR_OP_GET_INTR, NULL) !=
 	    DDI_SUCCESS) ||
 	    (intrinfo.avgi_cpu_id & PSMGI_CPU_FLAGS)) {
 

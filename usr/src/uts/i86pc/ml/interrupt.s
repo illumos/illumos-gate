@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -29,8 +28,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation		*/
 /*	  All Rights Reserved					*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
@@ -102,7 +99,7 @@ _interrupt(void)
 #endif
 
 	movq	%rsp, %rdi		/* pass struct regs pointer */
-	call	do_interrupt
+	call	*do_interrupt_common
 
 	jmp	_sys_rtt_ints_disabled
 	/*NOTREACHED*/
@@ -131,7 +128,7 @@ _interrupt(void)
 
 	pushl	%esi			/* pass traptrace record pointer */
 	pushl	%ebp			/* pass struct regs pointer */
-	call	do_interrupt		/* interrupt service routine */
+	call	*do_interrupt_common	/* interrupt service routine */
 	addl	$8, %esp		/* pop args off of stack */
 
 	jmp	_sys_rtt_ints_disabled

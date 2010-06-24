@@ -27,6 +27,7 @@
  * All rights reserved.
  */
 
+
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.
  * PSMI 1.2 extensions are supported only in 2.7 and later versions.
@@ -73,94 +74,32 @@
 #include <sys/x_call.h>
 #include <sys/reboot.h>
 #include <sys/hpet.h>
+#include <sys/apic_common.h>
 
 /*
  *	Local Function Prototypes
  */
-static void apic_init_intr();
-static void apic_nmi_intr(caddr_t arg, struct regs *rp);
-static processorid_t apic_find_cpu(int flag);
+static void apic_init_intr(void);
 
 /*
  *	standard MP entries
  */
-static int	apic_probe();
-static int	apic_clkinit();
+static int	apic_probe(void);
 static int	apic_getclkirq(int ipl);
 static uint_t	apic_calibrate(volatile uint32_t *addr,
     uint16_t *pit_ticks_adj);
-static hrtime_t apic_gettime();
-static hrtime_t apic_gethrtime();
-static void	apic_init();
+static void	apic_init(void);
 static void	apic_picinit(void);
-static int	apic_cpu_start(processorid_t cpuid, caddr_t ctx);
-static int	apic_cpu_stop(processorid_t cpuid, caddr_t ctx);
-static int	apic_cpu_add(psm_cpu_request_t *reqp);
-static int	apic_cpu_remove(psm_cpu_request_t *reqp);
-static int	apic_cpu_ops(psm_cpu_request_t *reqp);
 static int	apic_post_cpu_start(void);
-static void	apic_send_ipi(int cpun, int ipl);
-static void	apic_set_idlecpu(processorid_t cpun);
-static void	apic_unset_idlecpu(processorid_t cpun);
 static int	apic_intr_enter(int ipl, int *vect);
 static void	apic_setspl(int ipl);
 static void	x2apic_setspl(int ipl);
-static void	apic_switch_ipi_callback(boolean_t enter);
 static int	apic_addspl(int ipl, int vector, int min_ipl, int max_ipl);
 static int	apic_delspl(int ipl, int vector, int min_ipl, int max_ipl);
-static void	apic_shutdown(int cmd, int fcn);
-static void	apic_preshutdown(int cmd, int fcn);
 static int	apic_disable_intr(processorid_t cpun);
 static void	apic_enable_intr(processorid_t cpun);
-static processorid_t	apic_get_next_processorid(processorid_t cpun);
 static int		apic_get_ipivect(int ipl, int type);
-static void	apic_timer_reprogram(hrtime_t time);
-static void	apic_timer_enable(void);
-static void	apic_timer_disable(void);
 static void	apic_post_cyclic_setup(void *arg);
-static void	apic_intrmap_init(int apic_mode);
-static void	apic_record_ioapic_rdt(apic_irq_t *irq_ptr, ioapic_rdt_t *irdt);
-static void	apic_record_msi(apic_irq_t *irq_ptr, msi_regs_t *mregs);
-
-static int	apic_oneshot = 0;
-int	apic_oneshot_enable = 1; /* to allow disabling one-shot capability */
-
-/* Now the ones for Dynamic Interrupt distribution */
-int	apic_enable_dynamic_migration = 0;
-
-extern int apic_have_32bit_cr8;
-
-/*
- * These variables are frequently accessed in apic_intr_enter(),
- * apic_intr_exit and apic_setspl, so group them together
- */
-volatile uint32_t *apicadr =  NULL;	/* virtual addr of local APIC	*/
-int apic_setspl_delay = 1;		/* apic_setspl - delay enable	*/
-int apic_clkvect;
-
-/* vector at which error interrupts come in */
-int apic_errvect;
-int apic_enable_error_intr = 1;
-int apic_error_display_delay = 100;
-
-/* vector at which performance counter overflow interrupts come in */
-int apic_cpcovf_vect;
-int apic_enable_cpcovf_intr = 1;
-
-/* maximum loop count when sending Start IPIs. */
-int apic_sipi_max_loop_count = 0x1000;
-
-/* vector at which CMCI interrupts come in */
-int apic_cmci_vect;
-extern int cmi_enable_cmci;
-extern void cmi_cmci_trap(void);
-
-static kmutex_t cmci_cpu_setup_lock;	/* protects cmci_cpu_setup_registered */
-static int cmci_cpu_setup_registered;
-
-/* number of CPUs in power-on transition state */
-static int apic_poweron_cnt = 0;
-static lock_t apic_mode_switch_lock;
 
 /*
  * The following vector assignments influence the value of ipltopri and
@@ -212,20 +151,8 @@ uchar_t apic_ipls[APIC_AVAIL_VECTOR];
 /*
  * Patchable global variables.
  */
-int	apic_forceload = 0;
-
-int	apic_coarse_hrtime = 1;		/* 0 - use accurate slow gethrtime() */
-					/* 1 - use gettime() for performance */
-int	apic_flat_model = 0;		/* 0 - clustered. 1 - flat */
 int	apic_enable_hwsoftint = 0;	/* 0 - disable, 1 - enable	*/
 int	apic_enable_bind_log = 1;	/* 1 - display interrupt binding log */
-int	apic_panic_on_nmi = 0;
-int	apic_panic_on_apic_error = 0;
-
-int	apic_verbose = 0;
-
-/* minimum number of timer ticks to program to */
-int apic_min_timer_ticks = 1;
 
 /*
  *	Local static data
@@ -273,6 +200,7 @@ static struct	psm_ops apic_ops = {
 	apic_cpu_ops,			/* CPU control interface. */
 };
 
+struct psm_ops *psmops = &apic_ops;
 
 static struct	psm_info apic_psm_info = {
 	PSM_INFO_VER01_7,			/* version */
@@ -284,25 +212,6 @@ static struct	psm_info apic_psm_info = {
 
 static void *apic_hdlp;
 
-#ifdef DEBUG
-int	apic_debug = 0;
-int	apic_restrict_vector = 0;
-
-int	apic_debug_msgbuf[APIC_DEBUG_MSGBUFSIZE];
-int	apic_debug_msgbufindex = 0;
-
-#endif /* DEBUG */
-
-apic_cpus_info_t	*apic_cpus;
-
-cpuset_t	apic_cpumask;
-uint_t	apic_picinit_called;
-
-/* Flag to indicate that we need to shut down all processors */
-static uint_t	apic_shutdown_processors;
-
-uint_t apic_nsec_per_intr = 0;
-
 /*
  * apic_let_idle_redistribute can have the following values:
  * 0 - If clock decremented it from 1 to 0, clock has to call redistribute.
@@ -310,92 +219,9 @@ uint_t apic_nsec_per_intr = 0;
  */
 int	apic_num_idle_redistributions = 0;
 static	int apic_let_idle_redistribute = 0;
-static	uint_t apic_nticks = 0;
-static	uint_t apic_skipped_redistribute = 0;
 
 /* to gather intr data and redistribute */
 static void apic_redistribute_compute(void);
-
-static	uint_t last_count_read = 0;
-static	lock_t	apic_gethrtime_lock;
-volatile int	apic_hrtime_stamp = 0;
-volatile hrtime_t apic_nsec_since_boot = 0;
-static uint_t apic_hertz_count;
-
-uint64_t apic_ticks_per_SFnsecs;	/* # of ticks in SF nsecs */
-
-static hrtime_t apic_nsec_max;
-
-static	hrtime_t	apic_last_hrtime = 0;
-int		apic_hrtime_error = 0;
-int		apic_remote_hrterr = 0;
-int		apic_num_nmis = 0;
-int		apic_apic_error = 0;
-int		apic_num_apic_errors = 0;
-int		apic_num_cksum_errors = 0;
-
-int	apic_error = 0;
-static	int	apic_cmos_ssb_set = 0;
-
-/* use to make sure only one cpu handles the nmi */
-static	lock_t	apic_nmi_lock;
-/* use to make sure only one cpu handles the error interrupt */
-static	lock_t	apic_error_lock;
-
-static	struct {
-	uchar_t	cntl;
-	uchar_t	data;
-} aspen_bmc[] = {
-	{ CC_SMS_WR_START,	0x18 },		/* NetFn/LUN */
-	{ CC_SMS_WR_NEXT,	0x24 },		/* Cmd SET_WATCHDOG_TIMER */
-	{ CC_SMS_WR_NEXT,	0x84 },		/* DataByte 1: SMS/OS no log */
-	{ CC_SMS_WR_NEXT,	0x2 },		/* DataByte 2: Power Down */
-	{ CC_SMS_WR_NEXT,	0x0 },		/* DataByte 3: no pre-timeout */
-	{ CC_SMS_WR_NEXT,	0x0 },		/* DataByte 4: timer expir. */
-	{ CC_SMS_WR_NEXT,	0xa },		/* DataByte 5: init countdown */
-	{ CC_SMS_WR_END,	0x0 },		/* DataByte 6: init countdown */
-
-	{ CC_SMS_WR_START,	0x18 },		/* NetFn/LUN */
-	{ CC_SMS_WR_END,	0x22 }		/* Cmd RESET_WATCHDOG_TIMER */
-};
-
-static	struct {
-	int	port;
-	uchar_t	data;
-} sitka_bmc[] = {
-	{ SMS_COMMAND_REGISTER,	SMS_WRITE_START },
-	{ SMS_DATA_REGISTER,	0x18 },		/* NetFn/LUN */
-	{ SMS_DATA_REGISTER,	0x24 },		/* Cmd SET_WATCHDOG_TIMER */
-	{ SMS_DATA_REGISTER,	0x84 },		/* DataByte 1: SMS/OS no log */
-	{ SMS_DATA_REGISTER,	0x2 },		/* DataByte 2: Power Down */
-	{ SMS_DATA_REGISTER,	0x0 },		/* DataByte 3: no pre-timeout */
-	{ SMS_DATA_REGISTER,	0x0 },		/* DataByte 4: timer expir. */
-	{ SMS_DATA_REGISTER,	0xa },		/* DataByte 5: init countdown */
-	{ SMS_COMMAND_REGISTER,	SMS_WRITE_END },
-	{ SMS_DATA_REGISTER,	0x0 },		/* DataByte 6: init countdown */
-
-	{ SMS_COMMAND_REGISTER,	SMS_WRITE_START },
-	{ SMS_DATA_REGISTER,	0x18 },		/* NetFn/LUN */
-	{ SMS_COMMAND_REGISTER,	SMS_WRITE_END },
-	{ SMS_DATA_REGISTER,	0x22 }		/* Cmd RESET_WATCHDOG_TIMER */
-};
-
-/* Patchable global variables. */
-int		apic_kmdb_on_nmi = 0;		/* 0 - no, 1 - yes enter kmdb */
-uint32_t	apic_divide_reg_init = 0;	/* 0 - divide by 2 */
-
-/* default apic ops without interrupt remapping */
-static apic_intrmap_ops_t apic_nointrmap_ops = {
-	(int (*)(int))return_instr,
-	(void (*)(int))return_instr,
-	(void (*)(apic_irq_t *))return_instr,
-	(void (*)(apic_irq_t *, void *))return_instr,
-	(void (*)(apic_irq_t *))return_instr,
-	apic_record_ioapic_rdt,
-	apic_record_msi,
-};
-
-apic_intrmap_ops_t *apic_vt_ops = &apic_nointrmap_ops;
 
 /*
  *	This is the loadable module wrapper
@@ -421,18 +247,36 @@ _info(struct modinfo *modinfop)
 	return (psm_mod_info(&apic_hdlp, &apic_psm_info, modinfop));
 }
 
-
 static int
-apic_probe()
+apic_probe(void)
 {
+	/* check if apix is initialized */
+	if (apix_enable && apix_loaded())
+		return (PSM_FAILURE);
+	else
+		apix_enable = 0; /* continue using pcplusmp PSM */
+
 	return (apic_probe_common(apic_psm_info.p_mach_idstring));
 }
 
+static uchar_t
+apic_xlate_vector_by_irq(uchar_t irq)
+{
+	if (apic_irq_table[irq] == NULL)
+		return (0);
+
+	return (apic_irq_table[irq]->airq_vector);
+}
+
 void
-apic_init()
+apic_init(void)
 {
 	int i;
 	int	j = 1;
+
+	psm_get_ioapicid = apic_get_ioapicid;
+	psm_get_localapicid = apic_get_localapicid;
+	psm_xlate_vector_by_irq = apic_xlate_vector_by_irq;
 
 	apic_ipltopri[0] = APIC_VECTOR_PER_IPL; /* leave 0 for idle */
 	for (i = 0; i < (APIC_AVAIL_VECTOR / APIC_VECTOR_PER_IPL); i++) {
@@ -462,141 +306,8 @@ apic_init()
 #endif	/* __amd64 */
 }
 
-/*
- * handler for APIC Error interrupt. Just print a warning and continue
- */
-static int
-apic_error_intr()
-{
-	uint_t	error0, error1, error;
-	uint_t	i;
-
-	/*
-	 * We need to write before read as per 7.4.17 of system prog manual.
-	 * We do both and or the results to be safe
-	 */
-	error0 = apic_reg_ops->apic_read(APIC_ERROR_STATUS);
-	apic_reg_ops->apic_write(APIC_ERROR_STATUS, 0);
-	error1 = apic_reg_ops->apic_read(APIC_ERROR_STATUS);
-	error = error0 | error1;
-
-	/*
-	 * Clear the APIC error status (do this on all cpus that enter here)
-	 * (two writes are required due to the semantics of accessing the
-	 * error status register.)
-	 */
-	apic_reg_ops->apic_write(APIC_ERROR_STATUS, 0);
-	apic_reg_ops->apic_write(APIC_ERROR_STATUS, 0);
-
-	/*
-	 * Prevent more than 1 CPU from handling error interrupt causing
-	 * double printing (interleave of characters from multiple
-	 * CPU's when using prom_printf)
-	 */
-	if (lock_try(&apic_error_lock) == 0)
-		return (error ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
-	if (error) {
-#if	DEBUG
-		if (apic_debug)
-			debug_enter("pcplusmp: APIC Error interrupt received");
-#endif /* DEBUG */
-		if (apic_panic_on_apic_error)
-			cmn_err(CE_PANIC,
-			    "APIC Error interrupt on CPU %d. Status = %x\n",
-			    psm_get_cpu_id(), error);
-		else {
-			if ((error & ~APIC_CS_ERRORS) == 0) {
-				/* cksum error only */
-				apic_error |= APIC_ERR_APIC_ERROR;
-				apic_apic_error |= error;
-				apic_num_apic_errors++;
-				apic_num_cksum_errors++;
-			} else {
-				/*
-				 * prom_printf is the best shot we have of
-				 * something which is problem free from
-				 * high level/NMI type of interrupts
-				 */
-				prom_printf("APIC Error interrupt on CPU %d. "
-				    "Status 0 = %x, Status 1 = %x\n",
-				    psm_get_cpu_id(), error0, error1);
-				apic_error |= APIC_ERR_APIC_ERROR;
-				apic_apic_error |= error;
-				apic_num_apic_errors++;
-				for (i = 0; i < apic_error_display_delay; i++) {
-					tenmicrosec();
-				}
-				/*
-				 * provide more delay next time limited to
-				 * roughly 1 clock tick time
-				 */
-				if (apic_error_display_delay < 500)
-					apic_error_display_delay *= 2;
-			}
-		}
-		lock_clear(&apic_error_lock);
-		return (DDI_INTR_CLAIMED);
-	} else {
-		lock_clear(&apic_error_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-	/* NOTREACHED */
-}
-
-/*
- * Turn off the mask bit in the performance counter Local Vector Table entry.
- */
 static void
-apic_cpcovf_mask_clear(void)
-{
-	apic_reg_ops->apic_write(APIC_PCINT_VECT,
-	    (apic_reg_ops->apic_read(APIC_PCINT_VECT) & ~APIC_LVT_MASK));
-}
-
-/*ARGSUSED*/
-static int
-apic_cmci_enable(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
-{
-	apic_reg_ops->apic_write(APIC_CMCI_VECT, apic_cmci_vect);
-	return (0);
-}
-
-/*ARGSUSED*/
-static int
-apic_cmci_disable(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
-{
-	apic_reg_ops->apic_write(APIC_CMCI_VECT, apic_cmci_vect | AV_MASK);
-	return (0);
-}
-
-/*ARGSUSED*/
-static int
-cmci_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
-{
-	cpuset_t	cpu_set;
-
-	CPUSET_ONLY(cpu_set, cpuid);
-
-	switch (what) {
-		case CPU_ON:
-			xc_call(NULL, NULL, NULL, CPUSET2BV(cpu_set),
-			    (xc_func_t)apic_cmci_enable);
-			break;
-
-		case CPU_OFF:
-			xc_call(NULL, NULL, NULL, CPUSET2BV(cpu_set),
-			    (xc_func_t)apic_cmci_disable);
-			break;
-
-		default:
-			break;
-	}
-
-	return (0);
-}
-
-static void
-apic_init_intr()
+apic_init_intr(void)
 {
 	processorid_t	cpun = psm_get_cpu_id();
 	uint_t nlvt;
@@ -748,27 +459,6 @@ apic_init_intr()
 }
 
 static void
-apic_disable_local_apic()
-{
-	apic_reg_ops->apic_write_task_reg(APIC_MASK_ALL);
-	apic_reg_ops->apic_write(APIC_LOCAL_TIMER, AV_MASK);
-
-	/* local intr reg 0 */
-	apic_reg_ops->apic_write(APIC_INT_VECT0, AV_MASK);
-
-	/* disable NMI */
-	apic_reg_ops->apic_write(APIC_INT_VECT1, AV_MASK);
-
-	/* and error interrupt */
-	apic_reg_ops->apic_write(APIC_ERR_VECT, AV_MASK);
-
-	/* and perf counter intr */
-	apic_reg_ops->apic_write(APIC_PCINT_VECT, AV_MASK);
-
-	apic_reg_ops->apic_write(APIC_SPUR_INT_REG, APIC_SPUR_INTR);
-}
-
-static void
 apic_picinit(void)
 {
 	int i, j;
@@ -834,184 +524,9 @@ apic_picinit(void)
 	ioapic_init_intr(IOAPIC_MASK);
 }
 
-static void
-apic_cpu_send_SIPI(processorid_t cpun, boolean_t start)
-{
-	int		loop_count;
-	uint32_t	vector;
-	uint_t		apicid;
-	ulong_t		iflag;
-
-	apicid =  apic_cpus[cpun].aci_local_id;
-
-	/*
-	 * Interrupts on current CPU will be disabled during the
-	 * steps in order to avoid unwanted side effects from
-	 * executing interrupt handlers on a problematic BIOS.
-	 */
-	iflag = intr_clear();
-
-	if (start) {
-		outb(CMOS_ADDR, SSB);
-		outb(CMOS_DATA, BIOS_SHUTDOWN);
-	}
-
-	/*
-	 * According to X2APIC specification in section '2.3.5.1' of
-	 * Interrupt Command Register Semantics, the semantics of
-	 * programming the Interrupt Command Register to dispatch an interrupt
-	 * is simplified. A single MSR write to the 64-bit ICR is required
-	 * for dispatching an interrupt. Specifically, with the 64-bit MSR
-	 * interface to ICR, system software is not required to check the
-	 * status of the delivery status bit prior to writing to the ICR
-	 * to send an IPI. With the removal of the Delivery Status bit,
-	 * system software no longer has a reason to read the ICR. It remains
-	 * readable only to aid in debugging.
-	 */
 #ifdef	DEBUG
-	APIC_AV_PENDING_SET();
-#else
-	if (apic_mode == LOCAL_APIC) {
-		APIC_AV_PENDING_SET();
-	}
-#endif /* DEBUG */
-
-	/* for integrated - make sure there is one INIT IPI in buffer */
-	/* for external - it will wake up the cpu */
-	apic_reg_ops->apic_write_int_cmd(apicid, AV_ASSERT | AV_RESET);
-
-	/* If only 1 CPU is installed, PENDING bit will not go low */
-	for (loop_count = apic_sipi_max_loop_count; loop_count; loop_count--) {
-		if (apic_mode == LOCAL_APIC &&
-		    apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
-			apic_ret();
-		else
-			break;
-	}
-
-	apic_reg_ops->apic_write_int_cmd(apicid, AV_DEASSERT | AV_RESET);
-	drv_usecwait(20000);		/* 20 milli sec */
-
-	if (apic_cpus[cpun].aci_local_ver >= APIC_INTEGRATED_VERS) {
-		/* integrated apic */
-
-		vector = (rm_platter_pa >> MMU_PAGESHIFT) &
-		    (APIC_VECTOR_MASK | APIC_IPL_MASK);
-
-		/* to offset the INIT IPI queue up in the buffer */
-		apic_reg_ops->apic_write_int_cmd(apicid, vector | AV_STARTUP);
-		drv_usecwait(200);		/* 20 micro sec */
-
-		/*
-		 * send the second SIPI (Startup IPI) as recommended by Intel
-		 * software development manual.
-		 */
-		apic_reg_ops->apic_write_int_cmd(apicid, vector | AV_STARTUP);
-		drv_usecwait(200);	/* 20 micro sec */
-	}
-
-	intr_restore(iflag);
-}
-
-/*ARGSUSED1*/
-static int
-apic_cpu_start(processorid_t cpun, caddr_t arg)
-{
-	ASSERT(MUTEX_HELD(&cpu_lock));
-
-	if (!apic_cpu_in_range(cpun)) {
-		return (EINVAL);
-	}
-
-	/*
-	 * Switch to apic_common_send_ipi for safety during starting other CPUs.
-	 */
-	if (apic_mode == LOCAL_X2APIC) {
-		apic_switch_ipi_callback(B_TRUE);
-	}
-
-	apic_cmos_ssb_set = 1;
-	apic_cpu_send_SIPI(cpun, B_TRUE);
-
-	return (0);
-}
-
-/*
- * Put CPU into halted state with interrupts disabled.
- */
-/*ARGSUSED1*/
-static int
-apic_cpu_stop(processorid_t cpun, caddr_t arg)
-{
-	int		rc;
-	cpu_t 		*cp;
-	extern cpuset_t cpu_ready_set;
-	extern void cpu_idle_intercept_cpu(cpu_t *cp);
-
-	ASSERT(MUTEX_HELD(&cpu_lock));
-
-	if (!apic_cpu_in_range(cpun)) {
-		return (EINVAL);
-	}
-	if (apic_cpus[cpun].aci_local_ver < APIC_INTEGRATED_VERS) {
-		return (ENOTSUP);
-	}
-
-	cp = cpu_get(cpun);
-	ASSERT(cp != NULL);
-	ASSERT((cp->cpu_flags & CPU_OFFLINE) != 0);
-	ASSERT((cp->cpu_flags & CPU_QUIESCED) != 0);
-	ASSERT((cp->cpu_flags & CPU_ENABLE) == 0);
-
-	/* Clear CPU_READY flag to disable cross calls. */
-	cp->cpu_flags &= ~CPU_READY;
-	CPUSET_ATOMIC_DEL(cpu_ready_set, cpun);
-	rc = xc_flush_cpu(cp);
-	if (rc != 0) {
-		CPUSET_ATOMIC_ADD(cpu_ready_set, cpun);
-		cp->cpu_flags |= CPU_READY;
-		return (rc);
-	}
-
-	/* Intercept target CPU at a safe point before powering it off. */
-	cpu_idle_intercept_cpu(cp);
-
-	apic_cpu_send_SIPI(cpun, B_FALSE);
-	cp->cpu_flags &= ~CPU_RUNNING;
-
-	return (0);
-}
-
-static int
-apic_cpu_ops(psm_cpu_request_t *reqp)
-{
-	if (reqp == NULL) {
-		return (EINVAL);
-	}
-
-	switch (reqp->pcr_cmd) {
-	case PSM_CPU_ADD:
-		return (apic_cpu_add(reqp));
-
-	case PSM_CPU_REMOVE:
-		return (apic_cpu_remove(reqp));
-
-	case PSM_CPU_STOP:
-		return (apic_cpu_stop(reqp->req.cpu_stop.cpuid,
-		    reqp->req.cpu_stop.ctx));
-
-	default:
-		return (ENOTSUP);
-	}
-}
-
-#ifdef	DEBUG
-int	apic_break_on_cpu = 9;
-int	apic_stretch_interrupts = 0;
-int	apic_stretch_ISR = 1 << 3;	/* IPL of 3 matches nothing now */
-
 void
-apic_break()
+apic_break(void)
 {
 }
 #endif /* DEBUG */
@@ -1250,225 +765,6 @@ x2apic_setspl(int ipl)
 	apic_cpus[psm_get_cpu_id()].aci_ISR_in_progress &= (2 << ipl) - 1;
 }
 
-/*
- * generates an interprocessor interrupt to another CPU. Any changes made to
- * this routine must be accompanied by similar changes to
- * apic_common_send_ipi().
- */
-static void
-apic_send_ipi(int cpun, int ipl)
-{
-	int vector;
-	ulong_t flag;
-
-	vector = apic_resv_vector[ipl];
-
-	ASSERT((vector >= APIC_BASE_VECT) && (vector <= APIC_SPUR_INTR));
-
-	flag = intr_clear();
-
-	APIC_AV_PENDING_SET();
-
-	apic_reg_ops->apic_write_int_cmd(apic_cpus[cpun].aci_local_id,
-	    vector);
-
-	intr_restore(flag);
-}
-
-
-/*ARGSUSED*/
-static void
-apic_set_idlecpu(processorid_t cpun)
-{
-}
-
-/*ARGSUSED*/
-static void
-apic_unset_idlecpu(processorid_t cpun)
-{
-}
-
-
-void
-apic_ret()
-{
-}
-
-/*
- * If apic_coarse_time == 1, then apic_gettime() is used instead of
- * apic_gethrtime().  This is used for performance instead of accuracy.
- */
-
-static hrtime_t
-apic_gettime()
-{
-	int old_hrtime_stamp;
-	hrtime_t temp;
-
-	/*
-	 * In one-shot mode, we do not keep time, so if anyone
-	 * calls psm_gettime() directly, we vector over to
-	 * gethrtime().
-	 * one-shot mode MUST NOT be enabled if this psm is the source of
-	 * hrtime.
-	 */
-
-	if (apic_oneshot)
-		return (gethrtime());
-
-
-gettime_again:
-	while ((old_hrtime_stamp = apic_hrtime_stamp) & 1)
-		apic_ret();
-
-	temp = apic_nsec_since_boot;
-
-	if (apic_hrtime_stamp != old_hrtime_stamp) {	/* got an interrupt */
-		goto gettime_again;
-	}
-	return (temp);
-}
-
-/*
- * Here we return the number of nanoseconds since booting.  Note every
- * clock interrupt increments apic_nsec_since_boot by the appropriate
- * amount.
- */
-static hrtime_t
-apic_gethrtime()
-{
-	int curr_timeval, countval, elapsed_ticks;
-	int old_hrtime_stamp, status;
-	hrtime_t temp;
-	uint32_t cpun;
-	ulong_t oflags;
-
-	/*
-	 * In one-shot mode, we do not keep time, so if anyone
-	 * calls psm_gethrtime() directly, we vector over to
-	 * gethrtime().
-	 * one-shot mode MUST NOT be enabled if this psm is the source of
-	 * hrtime.
-	 */
-
-	if (apic_oneshot)
-		return (gethrtime());
-
-	oflags = intr_clear();	/* prevent migration */
-
-	cpun = apic_reg_ops->apic_read(APIC_LID_REG);
-	if (apic_mode == LOCAL_APIC)
-		cpun >>= APIC_ID_BIT_OFFSET;
-
-	lock_set(&apic_gethrtime_lock);
-
-gethrtime_again:
-	while ((old_hrtime_stamp = apic_hrtime_stamp) & 1)
-		apic_ret();
-
-	/*
-	 * Check to see which CPU we are on.  Note the time is kept on
-	 * the local APIC of CPU 0.  If on CPU 0, simply read the current
-	 * counter.  If on another CPU, issue a remote read command to CPU 0.
-	 */
-	if (cpun == apic_cpus[0].aci_local_id) {
-		countval = apic_reg_ops->apic_read(APIC_CURR_COUNT);
-	} else {
-#ifdef	DEBUG
-		APIC_AV_PENDING_SET();
-#else
-		if (apic_mode == LOCAL_APIC)
-			APIC_AV_PENDING_SET();
-#endif /* DEBUG */
-
-		apic_reg_ops->apic_write_int_cmd(
-		    apic_cpus[0].aci_local_id, APIC_CURR_ADD | AV_REMOTE);
-
-		while ((status = apic_reg_ops->apic_read(APIC_INT_CMD1))
-		    & AV_READ_PENDING) {
-			apic_ret();
-		}
-
-		if (status & AV_REMOTE_STATUS)	/* 1 = valid */
-			countval = apic_reg_ops->apic_read(APIC_REMOTE_READ);
-		else {	/* 0 = invalid */
-			apic_remote_hrterr++;
-			/*
-			 * return last hrtime right now, will need more
-			 * testing if change to retry
-			 */
-			temp = apic_last_hrtime;
-
-			lock_clear(&apic_gethrtime_lock);
-
-			intr_restore(oflags);
-
-			return (temp);
-		}
-	}
-	if (countval > last_count_read)
-		countval = 0;
-	else
-		last_count_read = countval;
-
-	elapsed_ticks = apic_hertz_count - countval;
-
-	curr_timeval = APIC_TICKS_TO_NSECS(elapsed_ticks);
-	temp = apic_nsec_since_boot + curr_timeval;
-
-	if (apic_hrtime_stamp != old_hrtime_stamp) {	/* got an interrupt */
-		/* we might have clobbered last_count_read. Restore it */
-		last_count_read = apic_hertz_count;
-		goto gethrtime_again;
-	}
-
-	if (temp < apic_last_hrtime) {
-		/* return last hrtime if error occurs */
-		apic_hrtime_error++;
-		temp = apic_last_hrtime;
-	}
-	else
-		apic_last_hrtime = temp;
-
-	lock_clear(&apic_gethrtime_lock);
-	intr_restore(oflags);
-
-	return (temp);
-}
-
-/* apic NMI handler */
-/*ARGSUSED*/
-static void
-apic_nmi_intr(caddr_t arg, struct regs *rp)
-{
-	if (apic_shutdown_processors) {
-		apic_disable_local_apic();
-		return;
-	}
-
-	apic_error |= APIC_ERR_NMI;
-
-	if (!lock_try(&apic_nmi_lock))
-		return;
-	apic_num_nmis++;
-
-	if (apic_kmdb_on_nmi && psm_debugger()) {
-		debug_enter("NMI received: entering kmdb\n");
-	} else if (apic_panic_on_nmi) {
-		/* Keep panic from entering kmdb. */
-		nopanicdebug = 1;
-		panic("NMI received\n");
-	} else {
-		/*
-		 * prom_printf is the best shot we have of something which is
-		 * problem free from high level/NMI type of interrupts
-		 */
-		prom_printf("NMI received\n");
-	}
-
-	lock_clear(&apic_nmi_lock);
-}
-
 /*ARGSUSED*/
 static int
 apic_addspl(int irqno, int ipl, int min_ipl, int max_ipl)
@@ -1483,7 +779,7 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 }
 
 static int
-apic_post_cpu_start()
+apic_post_cpu_start(void)
 {
 	int cpun;
 	static int cpus_started = 1;
@@ -1539,241 +835,6 @@ apic_post_cpu_start()
 	return (PSM_SUCCESS);
 }
 
-processorid_t
-apic_get_next_processorid(processorid_t cpu_id)
-{
-
-	int i;
-
-	if (cpu_id == -1)
-		return ((processorid_t)0);
-
-	for (i = cpu_id + 1; i < NCPU; i++) {
-		if (apic_cpu_in_range(i))
-			return (i);
-	}
-
-	return ((processorid_t)-1);
-}
-
-static int
-apic_cpu_add(psm_cpu_request_t *reqp)
-{
-	int i, rv = 0;
-	ulong_t iflag;
-	boolean_t first = B_TRUE;
-	uchar_t localver;
-	uint32_t localid, procid;
-	processorid_t cpuid = (processorid_t)-1;
-	mach_cpu_add_arg_t *ap;
-
-	ASSERT(reqp != NULL);
-	reqp->req.cpu_add.cpuid = (processorid_t)-1;
-
-	/* Check whether CPU hotplug is supported. */
-	if (!plat_dr_support_cpu() || apic_max_nproc == -1) {
-		return (ENOTSUP);
-	}
-
-	ap = (mach_cpu_add_arg_t *)reqp->req.cpu_add.argp;
-	switch (ap->type) {
-	case MACH_CPU_ARG_LOCAL_APIC:
-		localid = ap->arg.apic.apic_id;
-		procid = ap->arg.apic.proc_id;
-		if (localid >= 255 || procid > 255) {
-			cmn_err(CE_WARN,
-			    "!apic: apicid(%u) or procid(%u) is invalid.",
-			    localid, procid);
-			return (EINVAL);
-		}
-		break;
-
-	case MACH_CPU_ARG_LOCAL_X2APIC:
-		localid = ap->arg.apic.apic_id;
-		procid = ap->arg.apic.proc_id;
-		if (localid >= UINT32_MAX) {
-			cmn_err(CE_WARN,
-			    "!apic: x2apicid(%u) is invalid.", localid);
-			return (EINVAL);
-		} else if (localid >= 255 && apic_mode == LOCAL_APIC) {
-			cmn_err(CE_WARN, "!apic: system is in APIC mode, "
-			    "can't support x2APIC processor.");
-			return (ENOTSUP);
-		}
-		break;
-
-	default:
-		cmn_err(CE_WARN,
-		    "!apic: unknown argument type %d to apic_cpu_add().",
-		    ap->type);
-		return (EINVAL);
-	}
-
-	/* Use apic_ioapic_lock to sync with apic_find_next_cpu_intr. */
-	iflag = intr_clear();
-	lock_set(&apic_ioapic_lock);
-
-	/* Check whether local APIC id already exists. */
-	for (i = 0; i < apic_nproc; i++) {
-		if (!CPU_IN_SET(apic_cpumask, i))
-			continue;
-		if (apic_cpus[i].aci_local_id == localid) {
-			lock_clear(&apic_ioapic_lock);
-			intr_restore(iflag);
-			cmn_err(CE_WARN,
-			    "!apic: local apic id %u already exists.",
-			    localid);
-			return (EEXIST);
-		} else if (apic_cpus[i].aci_processor_id == procid) {
-			lock_clear(&apic_ioapic_lock);
-			intr_restore(iflag);
-			cmn_err(CE_WARN,
-			    "!apic: processor id %u already exists.",
-			    (int)procid);
-			return (EEXIST);
-		}
-
-		/*
-		 * There's no local APIC version number available in MADT table,
-		 * so assume that all CPUs are homogeneous and use local APIC
-		 * version number of the first existing CPU.
-		 */
-		if (first) {
-			first = B_FALSE;
-			localver = apic_cpus[i].aci_local_ver;
-		}
-	}
-	ASSERT(first == B_FALSE);
-
-	/*
-	 * Try to assign the same cpuid if APIC id exists in the dirty cache.
-	 */
-	for (i = 0; i < apic_max_nproc; i++) {
-		if (CPU_IN_SET(apic_cpumask, i)) {
-			ASSERT((apic_cpus[i].aci_status & APIC_CPU_FREE) == 0);
-			continue;
-		}
-		ASSERT(apic_cpus[i].aci_status & APIC_CPU_FREE);
-		if ((apic_cpus[i].aci_status & APIC_CPU_DIRTY) &&
-		    apic_cpus[i].aci_local_id == localid &&
-		    apic_cpus[i].aci_processor_id == procid) {
-			cpuid = i;
-			break;
-		}
-	}
-
-	/* Avoid the dirty cache and allocate fresh slot if possible. */
-	if (cpuid == (processorid_t)-1) {
-		for (i = 0; i < apic_max_nproc; i++) {
-			if ((apic_cpus[i].aci_status & APIC_CPU_FREE) &&
-			    (apic_cpus[i].aci_status & APIC_CPU_DIRTY) == 0) {
-				cpuid = i;
-				break;
-			}
-		}
-	}
-
-	/* Try to find any free slot as last resort. */
-	if (cpuid == (processorid_t)-1) {
-		for (i = 0; i < apic_max_nproc; i++) {
-			if (apic_cpus[i].aci_status & APIC_CPU_FREE) {
-				cpuid = i;
-				break;
-			}
-		}
-	}
-
-	if (cpuid == (processorid_t)-1) {
-		lock_clear(&apic_ioapic_lock);
-		intr_restore(iflag);
-		cmn_err(CE_NOTE,
-		    "!apic: failed to allocate cpu id for processor %u.",
-		    procid);
-		rv = EAGAIN;
-	} else if (ACPI_FAILURE(acpica_map_cpu(cpuid, procid))) {
-		lock_clear(&apic_ioapic_lock);
-		intr_restore(iflag);
-		cmn_err(CE_NOTE,
-		    "!apic: failed to build mapping for processor %u.",
-		    procid);
-		rv = EBUSY;
-	} else {
-		ASSERT(cpuid >= 0 && cpuid < NCPU);
-		ASSERT(cpuid < apic_max_nproc && cpuid < max_ncpus);
-		bzero(&apic_cpus[cpuid], sizeof (apic_cpus[0]));
-		apic_cpus[cpuid].aci_processor_id = procid;
-		apic_cpus[cpuid].aci_local_id = localid;
-		apic_cpus[cpuid].aci_local_ver = localver;
-		CPUSET_ATOMIC_ADD(apic_cpumask, cpuid);
-		if (cpuid >= apic_nproc) {
-			apic_nproc = cpuid + 1;
-		}
-		lock_clear(&apic_ioapic_lock);
-		intr_restore(iflag);
-		reqp->req.cpu_add.cpuid = cpuid;
-	}
-
-	return (rv);
-}
-
-static int
-apic_cpu_remove(psm_cpu_request_t *reqp)
-{
-	int i;
-	ulong_t iflag;
-	processorid_t cpuid;
-
-	/* Check whether CPU hotplug is supported. */
-	if (!plat_dr_support_cpu() || apic_max_nproc == -1) {
-		return (ENOTSUP);
-	}
-
-	cpuid = reqp->req.cpu_remove.cpuid;
-
-	/* Use apic_ioapic_lock to sync with apic_find_next_cpu_intr. */
-	iflag = intr_clear();
-	lock_set(&apic_ioapic_lock);
-
-	if (!apic_cpu_in_range(cpuid)) {
-		lock_clear(&apic_ioapic_lock);
-		intr_restore(iflag);
-		cmn_err(CE_WARN,
-		    "!apic: cpuid %d doesn't exist in apic_cpus array.",
-		    cpuid);
-		return (ENODEV);
-	}
-	ASSERT((apic_cpus[cpuid].aci_status & APIC_CPU_FREE) == 0);
-
-	if (ACPI_FAILURE(acpica_unmap_cpu(cpuid))) {
-		lock_clear(&apic_ioapic_lock);
-		intr_restore(iflag);
-		return (ENOENT);
-	}
-
-	if (cpuid == apic_nproc - 1) {
-		/*
-		 * We are removing the highest numbered cpuid so we need to
-		 * find the next highest cpuid as the new value for apic_nproc.
-		 */
-		for (i = apic_nproc; i > 0; i--) {
-			if (CPU_IN_SET(apic_cpumask, i - 1)) {
-				apic_nproc = i;
-				break;
-			}
-		}
-		/* at least one CPU left */
-		ASSERT(i > 0);
-	}
-	CPUSET_ATOMIC_DEL(apic_cpumask, cpuid);
-	/* mark slot as free and keep it in the dirty cache */
-	apic_cpus[cpuid].aci_status = APIC_CPU_FREE | APIC_CPU_DIRTY;
-
-	lock_clear(&apic_ioapic_lock);
-	intr_restore(iflag);
-
-	return (0);
-}
-
 /*
  * type == -1 indicates it is an internal request. Do not change
  * resv_vector for these requests
@@ -1813,359 +874,6 @@ apic_getclkirq(int ipl)
 	APIC_VERBOSE_IOAPIC((CE_NOTE, "get_clkirq: vector = %x\n",
 	    apic_clkvect));
 	return (irq);
-}
-
-
-/*
- * Return the number of APIC clock ticks elapsed for 8245 to decrement
- * (APIC_TIME_COUNT + pit_ticks_adj) ticks.
- */
-static uint_t
-apic_calibrate(volatile uint32_t *addr, uint16_t *pit_ticks_adj)
-{
-	uint8_t		pit_tick_lo;
-	uint16_t	pit_tick, target_pit_tick;
-	uint32_t	start_apic_tick, end_apic_tick;
-	ulong_t		iflag;
-	uint32_t	reg;
-
-	reg = addr + APIC_CURR_COUNT - apicadr;
-
-	iflag = intr_clear();
-
-	do {
-		pit_tick_lo = inb(PITCTR0_PORT);
-		pit_tick = (inb(PITCTR0_PORT) << 8) | pit_tick_lo;
-	} while (pit_tick < APIC_TIME_MIN ||
-	    pit_tick_lo <= APIC_LB_MIN || pit_tick_lo >= APIC_LB_MAX);
-
-	/*
-	 * Wait for the 8254 to decrement by 5 ticks to ensure
-	 * we didn't start in the middle of a tick.
-	 * Compare with 0x10 for the wrap around case.
-	 */
-	target_pit_tick = pit_tick - 5;
-	do {
-		pit_tick_lo = inb(PITCTR0_PORT);
-		pit_tick = (inb(PITCTR0_PORT) << 8) | pit_tick_lo;
-	} while (pit_tick > target_pit_tick || pit_tick_lo < 0x10);
-
-	start_apic_tick = apic_reg_ops->apic_read(reg);
-
-	/*
-	 * Wait for the 8254 to decrement by
-	 * (APIC_TIME_COUNT + pit_ticks_adj) ticks
-	 */
-	target_pit_tick = pit_tick - APIC_TIME_COUNT;
-	do {
-		pit_tick_lo = inb(PITCTR0_PORT);
-		pit_tick = (inb(PITCTR0_PORT) << 8) | pit_tick_lo;
-	} while (pit_tick > target_pit_tick || pit_tick_lo < 0x10);
-
-	end_apic_tick = apic_reg_ops->apic_read(reg);
-
-	*pit_ticks_adj = target_pit_tick - pit_tick;
-
-	intr_restore(iflag);
-
-	return (start_apic_tick - end_apic_tick);
-}
-
-/*
- * Initialise the APIC timer on the local APIC of CPU 0 to the desired
- * frequency.  Note at this stage in the boot sequence, the boot processor
- * is the only active processor.
- * hertz value of 0 indicates a one-shot mode request.  In this case
- * the function returns the resolution (in nanoseconds) for the hardware
- * timer interrupt.  If one-shot mode capability is not available,
- * the return value will be 0. apic_enable_oneshot is a global switch
- * for disabling the functionality.
- * A non-zero positive value for hertz indicates a periodic mode request.
- * In this case the hardware will be programmed to generate clock interrupts
- * at hertz frequency and returns the resolution of interrupts in
- * nanosecond.
- */
-
-static int
-apic_clkinit(int hertz)
-{
-	uint_t		apic_ticks = 0;
-	uint_t		pit_ticks;
-	int		ret;
-	uint16_t	pit_ticks_adj;
-	static int	firsttime = 1;
-
-	if (firsttime) {
-		/* first time calibrate on CPU0 only */
-
-		apic_reg_ops->apic_write(APIC_DIVIDE_REG, apic_divide_reg_init);
-		apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
-		apic_ticks = apic_calibrate(apicadr, &pit_ticks_adj);
-
-		/* total number of PIT ticks corresponding to apic_ticks */
-		pit_ticks = APIC_TIME_COUNT + pit_ticks_adj;
-
-		/*
-		 * Determine the number of nanoseconds per APIC clock tick
-		 * and then determine how many APIC ticks to interrupt at the
-		 * desired frequency
-		 * apic_ticks / (pitticks / PIT_HZ) = apic_ticks_per_s
-		 * (apic_ticks * PIT_HZ) / pitticks = apic_ticks_per_s
-		 * apic_ticks_per_ns = (apic_ticks * PIT_HZ) / (pitticks * 10^9)
-		 * pic_ticks_per_SFns =
-		 *   (SF * apic_ticks * PIT_HZ) / (pitticks * 10^9)
-		 */
-		apic_ticks_per_SFnsecs =
-		    ((SF * apic_ticks * PIT_HZ) /
-		    ((uint64_t)pit_ticks * NANOSEC));
-
-		/* the interval timer initial count is 32 bit max */
-		apic_nsec_max = APIC_TICKS_TO_NSECS(APIC_MAXVAL);
-		firsttime = 0;
-	}
-
-	if (hertz != 0) {
-		/* periodic */
-		apic_nsec_per_intr = NANOSEC / hertz;
-		apic_hertz_count = APIC_NSECS_TO_TICKS(apic_nsec_per_intr);
-	}
-
-	apic_int_busy_mark = (apic_int_busy_mark *
-	    apic_sample_factor_redistribution) / 100;
-	apic_int_free_mark = (apic_int_free_mark *
-	    apic_sample_factor_redistribution) / 100;
-	apic_diff_for_redistribution = (apic_diff_for_redistribution *
-	    apic_sample_factor_redistribution) / 100;
-
-	if (hertz == 0) {
-		/* requested one_shot */
-		if (!tsc_gethrtime_enable || !apic_oneshot_enable)
-			return (0);
-		apic_oneshot = 1;
-		ret = (int)APIC_TICKS_TO_NSECS(1);
-	} else {
-		/* program the local APIC to interrupt at the given frequency */
-		apic_reg_ops->apic_write(APIC_INIT_COUNT, apic_hertz_count);
-		apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
-		    (apic_clkvect + APIC_BASE_VECT) | AV_TIME);
-		apic_oneshot = 0;
-		ret = NANOSEC / hertz;
-	}
-
-	return (ret);
-
-}
-
-/*
- * apic_preshutdown:
- * Called early in shutdown whilst we can still access filesystems to do
- * things like loading modules which will be required to complete shutdown
- * after filesystems are all unmounted.
- */
-static void
-apic_preshutdown(int cmd, int fcn)
-{
-	APIC_VERBOSE_POWEROFF(("apic_preshutdown(%d,%d); m=%d a=%d\n",
-	    cmd, fcn, apic_poweroff_method, apic_enable_acpi));
-
-	if ((cmd != A_SHUTDOWN) || (fcn != AD_POWEROFF)) {
-		return;
-	}
-}
-
-static void
-apic_shutdown(int cmd, int fcn)
-{
-	int restarts, attempts;
-	int i;
-	uchar_t	byte;
-	ulong_t iflag;
-
-	hpet_acpi_fini();
-
-	/* Send NMI to all CPUs except self to do per processor shutdown */
-	iflag = intr_clear();
-#ifdef	DEBUG
-	APIC_AV_PENDING_SET();
-#else
-	if (apic_mode == LOCAL_APIC)
-		APIC_AV_PENDING_SET();
-#endif /* DEBUG */
-	apic_shutdown_processors = 1;
-	apic_reg_ops->apic_write(APIC_INT_CMD1,
-	    AV_NMI | AV_LEVEL | AV_SH_ALL_EXCSELF);
-
-	/* restore cmos shutdown byte before reboot */
-	if (apic_cmos_ssb_set) {
-		outb(CMOS_ADDR, SSB);
-		outb(CMOS_DATA, 0);
-	}
-
-	ioapic_disable_redirection();
-
-	/*	disable apic mode if imcr present	*/
-	if (apic_imcrp) {
-		outb(APIC_IMCR_P1, (uchar_t)APIC_IMCR_SELECT);
-		outb(APIC_IMCR_P2, (uchar_t)APIC_IMCR_PIC);
-	}
-
-	apic_disable_local_apic();
-
-	intr_restore(iflag);
-
-	/* remainder of function is for shutdown cases only */
-	if (cmd != A_SHUTDOWN)
-		return;
-
-	/*
-	 * Switch system back into Legacy-Mode if using ACPI and
-	 * not powering-off.  Some BIOSes need to remain in ACPI-mode
-	 * for power-off to succeed (Dell Dimension 4600)
-	 * Do not disable ACPI while doing fastreboot
-	 */
-	if (apic_enable_acpi && fcn != AD_POWEROFF && fcn != AD_FASTREBOOT)
-		(void) AcpiDisable();
-
-	if (fcn == AD_FASTREBOOT) {
-		apic_reg_ops->apic_write(APIC_INT_CMD1,
-		    AV_ASSERT | AV_RESET | AV_SH_ALL_EXCSELF);
-	}
-
-	/* remainder of function is for shutdown+poweroff case only */
-	if (fcn != AD_POWEROFF)
-		return;
-
-	switch (apic_poweroff_method) {
-		case APIC_POWEROFF_VIA_RTC:
-
-			/* select the extended NVRAM bank in the RTC */
-			outb(CMOS_ADDR, RTC_REGA);
-			byte = inb(CMOS_DATA);
-			outb(CMOS_DATA, (byte | EXT_BANK));
-
-			outb(CMOS_ADDR, PFR_REG);
-
-			/* for Predator must toggle the PAB bit */
-			byte = inb(CMOS_DATA);
-
-			/*
-			 * clear power active bar, wakeup alarm and
-			 * kickstart
-			 */
-			byte &= ~(PAB_CBIT | WF_FLAG | KS_FLAG);
-			outb(CMOS_DATA, byte);
-
-			/* delay before next write */
-			drv_usecwait(1000);
-
-			/* for S40 the following would suffice */
-			byte = inb(CMOS_DATA);
-
-			/* power active bar control bit */
-			byte |= PAB_CBIT;
-			outb(CMOS_DATA, byte);
-
-			break;
-
-		case APIC_POWEROFF_VIA_ASPEN_BMC:
-			restarts = 0;
-restart_aspen_bmc:
-			if (++restarts == 3)
-				break;
-			attempts = 0;
-			do {
-				byte = inb(MISMIC_FLAG_REGISTER);
-				byte &= MISMIC_BUSY_MASK;
-				if (byte != 0) {
-					drv_usecwait(1000);
-					if (attempts >= 3)
-						goto restart_aspen_bmc;
-					++attempts;
-				}
-			} while (byte != 0);
-			outb(MISMIC_CNTL_REGISTER, CC_SMS_GET_STATUS);
-			byte = inb(MISMIC_FLAG_REGISTER);
-			byte |= 0x1;
-			outb(MISMIC_FLAG_REGISTER, byte);
-			i = 0;
-			for (; i < (sizeof (aspen_bmc)/sizeof (aspen_bmc[0]));
-			    i++) {
-				attempts = 0;
-				do {
-					byte = inb(MISMIC_FLAG_REGISTER);
-					byte &= MISMIC_BUSY_MASK;
-					if (byte != 0) {
-						drv_usecwait(1000);
-						if (attempts >= 3)
-							goto restart_aspen_bmc;
-						++attempts;
-					}
-				} while (byte != 0);
-				outb(MISMIC_CNTL_REGISTER, aspen_bmc[i].cntl);
-				outb(MISMIC_DATA_REGISTER, aspen_bmc[i].data);
-				byte = inb(MISMIC_FLAG_REGISTER);
-				byte |= 0x1;
-				outb(MISMIC_FLAG_REGISTER, byte);
-			}
-			break;
-
-		case APIC_POWEROFF_VIA_SITKA_BMC:
-			restarts = 0;
-restart_sitka_bmc:
-			if (++restarts == 3)
-				break;
-			attempts = 0;
-			do {
-				byte = inb(SMS_STATUS_REGISTER);
-				byte &= SMS_STATE_MASK;
-				if ((byte == SMS_READ_STATE) ||
-				    (byte == SMS_WRITE_STATE)) {
-					drv_usecwait(1000);
-					if (attempts >= 3)
-						goto restart_sitka_bmc;
-					++attempts;
-				}
-			} while ((byte == SMS_READ_STATE) ||
-			    (byte == SMS_WRITE_STATE));
-			outb(SMS_COMMAND_REGISTER, SMS_GET_STATUS);
-			i = 0;
-			for (; i < (sizeof (sitka_bmc)/sizeof (sitka_bmc[0]));
-			    i++) {
-				attempts = 0;
-				do {
-					byte = inb(SMS_STATUS_REGISTER);
-					byte &= SMS_IBF_MASK;
-					if (byte != 0) {
-						drv_usecwait(1000);
-						if (attempts >= 3)
-							goto restart_sitka_bmc;
-						++attempts;
-					}
-				} while (byte != 0);
-				outb(sitka_bmc[i].port, sitka_bmc[i].data);
-			}
-			break;
-
-		case APIC_POWEROFF_NONE:
-
-			/* If no APIC direct method, we will try using ACPI */
-			if (apic_enable_acpi) {
-				if (acpi_poweroff() == 1)
-					return;
-			} else
-				return;
-
-			break;
-	}
-	/*
-	 * Wait a limited time here for power to go off.
-	 * If the power does not go off, then there was a
-	 * problem and we should continue to the halt which
-	 * prints a message for the user to press a key to
-	 * reboot.
-	 */
-	drv_usecwait(7000000); /* wait seven seconds */
-
 }
 
 /*
@@ -2267,143 +975,12 @@ apic_enable_intr(processorid_t cpun)
 		}
 	}
 
+	if (apic_cpus[cpun].aci_status & APIC_CPU_SUSPEND)
+		apic_cpus[cpun].aci_status &= ~APIC_CPU_SUSPEND;
+
 	lock_clear(&apic_ioapic_lock);
 	intr_restore(iflag);
 }
-
-
-/*
- * This function will reprogram the timer.
- *
- * When in oneshot mode the argument is the absolute time in future to
- * generate the interrupt at.
- *
- * When in periodic mode, the argument is the interval at which the
- * interrupts should be generated. There is no need to support the periodic
- * mode timer change at this time.
- */
-static void
-apic_timer_reprogram(hrtime_t time)
-{
-	hrtime_t now;
-	uint_t ticks;
-	int64_t delta;
-
-	/*
-	 * We should be called from high PIL context (CBE_HIGH_PIL),
-	 * so kpreempt is disabled.
-	 */
-
-	if (!apic_oneshot) {
-		/* time is the interval for periodic mode */
-		ticks = APIC_NSECS_TO_TICKS(time);
-	} else {
-		/* one shot mode */
-
-		now = gethrtime();
-		delta = time - now;
-
-		if (delta <= 0) {
-			/*
-			 * requested to generate an interrupt in the past
-			 * generate an interrupt as soon as possible
-			 */
-			ticks = apic_min_timer_ticks;
-		} else if (delta > apic_nsec_max) {
-			/*
-			 * requested to generate an interrupt at a time
-			 * further than what we are capable of. Set to max
-			 * the hardware can handle
-			 */
-
-			ticks = APIC_MAXVAL;
-#ifdef DEBUG
-			cmn_err(CE_CONT, "apic_timer_reprogram, request at"
-			    "  %lld  too far in future, current time"
-			    "  %lld \n", time, now);
-#endif
-		} else
-			ticks = APIC_NSECS_TO_TICKS(delta);
-	}
-
-	if (ticks < apic_min_timer_ticks)
-		ticks = apic_min_timer_ticks;
-
-	apic_reg_ops->apic_write(APIC_INIT_COUNT, ticks);
-}
-
-/*
- * This function will enable timer interrupts.
- */
-static void
-apic_timer_enable(void)
-{
-	/*
-	 * We should be Called from high PIL context (CBE_HIGH_PIL),
-	 * so kpreempt is disabled.
-	 */
-
-	if (!apic_oneshot) {
-		apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
-		    (apic_clkvect + APIC_BASE_VECT) | AV_TIME);
-	} else {
-		/* one shot */
-		apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
-		    (apic_clkvect + APIC_BASE_VECT));
-	}
-}
-
-/*
- * This function will disable timer interrupts.
- */
-static void
-apic_timer_disable(void)
-{
-	/*
-	 * We should be Called from high PIL context (CBE_HIGH_PIL),
-	 * so kpreempt is disabled.
-	 */
-	apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
-	    (apic_clkvect + APIC_BASE_VECT) | AV_MASK);
-}
-
-/*
- * Set timer far into the future and return timer
- * current Count in nanoseconds.
- */
-hrtime_t
-apic_timer_stop_count(void)
-{
-	hrtime_t	ns_val;
-	int		enable_val, count_val;
-
-	/*
-	 * Should be called with interrupts disabled.
-	 */
-	ASSERT(!interrupts_enabled());
-
-	enable_val = apic_reg_ops->apic_read(APIC_LOCAL_TIMER);
-	if ((enable_val & AV_MASK) == AV_MASK)
-		return ((hrtime_t)-1);		/* timer is disabled */
-
-	count_val = apic_reg_ops->apic_read(APIC_CURR_COUNT);
-	ns_val = APIC_TICKS_TO_NSECS(count_val);
-
-	apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
-
-	return (ns_val);
-}
-
-/*
- * Reprogram timer after Deep C-State.
- */
-void
-apic_timer_restart(hrtime_t time)
-{
-	apic_timer_reprogram(time);
-}
-
-ddi_periodic_t apic_periodic_id;
 
 /*
  * If this module needs a periodic handler for the interrupt distribution, it
@@ -2498,37 +1075,6 @@ apic_redistribute_compute(void)
  * can be different functions depending on whether we are running on
  * bare metal or a hypervisor.
  */
-
-/*
- * map an apic for memory-mapped access
- */
-uint32_t *
-mapin_apic(uint32_t addr, size_t len, int flags)
-{
-	/*LINTED: pointer cast may result in improper alignment */
-	return ((uint32_t *)psm_map_phys(addr, len, flags));
-}
-
-uint32_t *
-mapin_ioapic(uint32_t addr, size_t len, int flags)
-{
-	return (mapin_apic(addr, len, flags));
-}
-
-/*
- * unmap an apic
- */
-void
-mapout_apic(caddr_t addr, size_t len)
-{
-	psm_unmap_phys(addr, len);
-}
-
-void
-mapout_ioapic(caddr_t addr, size_t len)
-{
-	mapout_apic(addr, len);
-}
 
 /*
  * Check to make sure there are enough irq slots
@@ -2763,71 +1309,6 @@ apic_free_vector(uchar_t vector)
 	apic_vector_to_irq[vector] = APIC_RESV_IRQ;
 }
 
-uint32_t
-ioapic_read(int ioapic_ix, uint32_t reg)
-{
-	volatile uint32_t *ioapic;
-
-	ioapic = apicioadr[ioapic_ix];
-	ioapic[APIC_IO_REG] = reg;
-	return (ioapic[APIC_IO_DATA]);
-}
-
-void
-ioapic_write(int ioapic_ix, uint32_t reg, uint32_t value)
-{
-	volatile uint32_t *ioapic;
-
-	ioapic = apicioadr[ioapic_ix];
-	ioapic[APIC_IO_REG] = reg;
-	ioapic[APIC_IO_DATA] = value;
-}
-
-void
-ioapic_write_eoi(int ioapic_ix, uint32_t value)
-{
-	volatile uint32_t *ioapic;
-
-	ioapic = apicioadr[ioapic_ix];
-	ioapic[APIC_IO_EOI] = value;
-}
-
-/*
- * Round-robin algorithm to find the next CPU with interrupts enabled.
- * It can't share the same static variable apic_next_bind_cpu with
- * apic_get_next_bind_cpu(), since that will cause all interrupts to be
- * bound to CPU1 at boot time.  During boot, only CPU0 is online with
- * interrupts enabled when apic_get_next_bind_cpu() and apic_find_cpu()
- * are called.  However, the pcplusmp driver assumes that there will be
- * boot_ncpus CPUs configured eventually so it tries to distribute all
- * interrupts among CPU0 - CPU[boot_ncpus - 1].  Thus to prevent all
- * interrupts being targetted at CPU1, we need to use a dedicated static
- * variable for find_next_cpu() instead of sharing apic_next_bind_cpu.
- */
-
-static processorid_t
-apic_find_cpu(int flag)
-{
-	int i;
-	static processorid_t acid = 0;
-
-	ASSERT(LOCK_HELD(&apic_ioapic_lock));
-
-	/* Find the first CPU with the passed-in flag set */
-	for (i = 0; i < apic_nproc; i++) {
-		if (++acid >= apic_nproc) {
-			acid = 0;
-		}
-		if (apic_cpu_in_range(acid) &&
-		    (apic_cpus[acid].aci_status & flag)) {
-			break;
-		}
-	}
-
-	ASSERT((apic_cpus[acid].aci_status & flag) != 0);
-	return (acid);
-}
-
 /*
  * Call rebind to do the actual programming.
  * Must be called with interrupts disabled and apic_ioapic_lock held
@@ -2837,7 +1318,7 @@ apic_find_cpu(int flag)
  * p is of the type 'apic_irq_t *'.
  *
  * apic_ioapic_lock must be held across this call, as it protects apic_rebind
- * and it protects apic_find_next_cpu_intr() from a race in which a CPU can be
+ * and it protects apic_get_next_bind_cpu() from a race in which a CPU can be
  * taken offline after a cpu is selected, but before apic_rebind is called to
  * bind interrupts to it.
  */
@@ -2879,52 +1360,13 @@ apic_modify_vector(uchar_t vector, int irq)
 }
 
 char *
-apic_get_apic_type()
+apic_get_apic_type(void)
 {
 	return (apic_psm_info.p_mach_idstring);
 }
 
-/*
- * Switch between safe and x2APIC IPI sending method.
- * CPU may power on in xapic mode or x2apic mode. If CPU needs to send IPI to
- * other CPUs before entering x2APIC mode, it still needs to xAPIC method.
- * Before sending StartIPI to target CPU, psm_send_ipi will be changed to
- * apic_common_send_ipi, which detects current local APIC mode and use right
- * method to send IPI. If some CPUs fail to start up, apic_poweron_cnt
- * won't return to zero, so apic_common_send_ipi will always be used.
- * psm_send_ipi can't be simply changed back to x2apic_send_ipi if some CPUs
- * failed to start up because those failed CPUs may recover itself later at
- * unpredictable time.
- */
-static void
-apic_switch_ipi_callback(boolean_t enter)
-{
-	ulong_t iflag;
-	struct psm_ops *pops = &apic_ops;
-
-	iflag = intr_clear();
-	lock_set(&apic_mode_switch_lock);
-	if (enter) {
-		ASSERT(apic_poweron_cnt >= 0);
-		if (apic_poweron_cnt == 0) {
-			pops->psm_send_ipi = apic_common_send_ipi;
-			send_dirintf = pops->psm_send_ipi;
-		}
-		apic_poweron_cnt++;
-	} else {
-		ASSERT(apic_poweron_cnt > 0);
-		apic_poweron_cnt--;
-		if (apic_poweron_cnt == 0) {
-			pops->psm_send_ipi = x2apic_send_ipi;
-			send_dirintf = pops->psm_send_ipi;
-		}
-	}
-	lock_clear(&apic_mode_switch_lock);
-	intr_restore(iflag);
-}
-
 void
-x2apic_update_psm()
+x2apic_update_psm(void)
 {
 	struct psm_ops *pops = &apic_ops;
 
@@ -2932,67 +1374,10 @@ x2apic_update_psm()
 
 	pops->psm_intr_exit = x2apic_intr_exit;
 	pops->psm_setspl = x2apic_setspl;
+
 	pops->psm_send_ipi =  x2apic_send_ipi;
 	send_dirintf = pops->psm_send_ipi;
 
 	apic_mode = LOCAL_X2APIC;
 	apic_change_ops();
-}
-
-static void
-apic_intrmap_init(int apic_mode)
-{
-	int suppress_brdcst_eoi = 0;
-
-	if (psm_vt_ops != NULL) {
-		/*
-		 * Since X2APIC requires the use of interrupt remapping
-		 * (though this is not documented explicitly in the Intel
-		 * documentation (yet)), initialize interrupt remapping
-		 * support before initializing the X2APIC unit.
-		 */
-		if (((apic_intrmap_ops_t *)psm_vt_ops)->
-		    apic_intrmap_init(apic_mode) == DDI_SUCCESS) {
-
-			apic_vt_ops = psm_vt_ops;
-
-			/*
-			 * We leverage the interrupt remapping engine to
-			 * suppress broadcast EOI; thus we must send the
-			 * directed EOI with the directed-EOI handler.
-			 */
-			if (apic_directed_EOI_supported() == 0) {
-				suppress_brdcst_eoi = 1;
-			}
-
-			apic_vt_ops->apic_intrmap_enable(suppress_brdcst_eoi);
-
-			if (apic_detect_x2apic()) {
-				apic_enable_x2apic();
-			}
-
-			if (apic_directed_EOI_supported() == 0) {
-				apic_set_directed_EOI_handler();
-			}
-		}
-	}
-}
-
-/*ARGSUSED*/
-static void
-apic_record_ioapic_rdt(apic_irq_t *irq_ptr, ioapic_rdt_t *irdt)
-{
-	irdt->ir_hi <<= APIC_ID_BIT_OFFSET;
-}
-
-/*ARGSUSED*/
-static void
-apic_record_msi(apic_irq_t *irq_ptr, msi_regs_t *mregs)
-{
-	mregs->mr_addr = MSI_ADDR_HDR |
-	    (MSI_ADDR_RH_FIXED << MSI_ADDR_RH_SHIFT) |
-	    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT) |
-	    (mregs->mr_addr << MSI_ADDR_DEST_SHIFT);
-	mregs->mr_data = (MSI_DATA_TM_EDGE << MSI_DATA_TM_SHIFT) |
-	    mregs->mr_data;
 }

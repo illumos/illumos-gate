@@ -1410,18 +1410,19 @@ print_intr_info(pcitool_intr_get_t *iget_p)
 {
 	int i;
 
-	if (iget_p->flags & PCITOOL_INTR_FLAG_GET_MSI)
-		(void) printf("\nmsi 0x%x mapped to cpu 0x%x\n",
-		    iget_p->msi,  iget_p->cpu_id);
-	else
-		(void) printf("\nino 0x%x mapped to cpu 0x%x\n",
-		    iget_p->ino,  iget_p->cpu_id);
-
 	for (i = 0; i < iget_p->num_devs; i++) {
-		(void) printf("Device: %s\n", iget_p->dev[i].path);
-		(void) printf("  Driver: %s, instance %d\n",
-		    iget_p->dev[i].driver_name, iget_p->dev[i].dev_inst);
+		if (iget_p->flags & PCITOOL_INTR_FLAG_GET_MSI)
+			(void) printf("0x%x,0x%x: %-10s%d\t %s\n",
+			    iget_p->cpu_id, iget_p->msi & 0xff,
+			    iget_p->dev[i].driver_name, iget_p->dev[i].dev_inst,
+			    iget_p->dev[i].path);
+		else
+			(void) printf("0x%x,0x%x: %-10s%d\t %s\n",
+			    iget_p->cpu_id, iget_p->ino & 0xff,
+			    iget_p->dev[i].driver_name, iget_p->dev[i].dev_inst,
+			    iget_p->dev[i].path);
 	}
+
 }
 
 /*
@@ -1511,6 +1512,7 @@ static int
 get_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 {
 	int rval = SUCCESS;	/* Return status. */
+	int ino, cpu_id;
 
 	/*
 	 * Start with a struct with space for info of INIT_NUM_DEVS devs
@@ -1559,6 +1561,7 @@ get_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 		/* Explicit INO requested. */
 	} else if (input_args_p->flags & INO_SPEC_FLAG) {
 		iget_p->ino = input_args_p->intr_ino;
+		iget_p->cpu_id = input_args_p->old_cpu;
 		rval = get_single_interrupt(fd, &iget_p, input_args_p);
 		/* Return all INOs. */
 	} else if (input_args_p->flags & INO_ALL_FLAG) {
@@ -1571,19 +1574,41 @@ get_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 				    "intr info ioctl failed: %s\n",
 				    strerror(errno));
 			}
-		} else {
-			int ino;
+			free(iget_p);
+			return (rval);
+		}
 
-			/*
-			 * Search through all interrupts.
-			 * Display info on enabled ones.
-			 */
+		/*
+		 * Search through all interrupts.
+		 * Display info on enabled ones.
+		 */
+		if (intr_info.ctlr_type == PCITOOL_CTLR_TYPE_APIX) {
+			for (cpu_id = 0;
+			    ((cpu_id < intr_info.num_cpu) && (rval == SUCCESS));
+			    cpu_id++) {
+				for (ino = 0;
+				    ((ino < intr_info.num_intr) &&
+				    (rval == SUCCESS));
+				    ino++) {
+					bzero(iget_p,
+					    sizeof (pcitool_intr_get_t));
+					iget_p->num_devs_ret = INIT_NUM_DEVS;
+					iget_p->user_version = PCITOOL_VERSION;
+					iget_p->cpu_id = cpu_id;
+					iget_p->ino = ino;
+					rval = get_single_interrupt(
+					    fd, &iget_p, input_args_p);
+				}
+			}
+		} else {
 			for (ino = 0;
-			    ((ino < intr_info.num_intr) && (rval == SUCCESS));
+			    (ino < intr_info.num_intr) && (rval == SUCCESS);
 			    ino++) {
-				bzero(iget_p, sizeof (pcitool_intr_get_t));
+				bzero(iget_p,
+				    sizeof (pcitool_intr_get_t));
 				iget_p->num_devs_ret = INIT_NUM_DEVS;
 				iget_p->user_version = PCITOOL_VERSION;
+				iget_p->cpu_id = input_args_p->old_cpu;
 				iget_p->ino = ino;
 				rval = get_single_interrupt(
 				    fd, &iget_p, input_args_p);
@@ -1623,6 +1648,10 @@ get_interrupt_ctlr(int fd, pcitool_uiargs_t *input_args_p)
 		case PCITOOL_CTLR_TYPE_PCPLUSMP:
 			ctlr_type = "PCPLUSMP";
 			break;
+		case PCITOOL_CTLR_TYPE_APIX:
+			ctlr_type = "APIX";
+			break;
+
 		default:
 			break;
 		}
@@ -1677,6 +1706,7 @@ set_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 	}
 
 	iset.cpu_id = input_args_p->intr_cpu;
+	iset.old_cpu = input_args_p->old_cpu;
 	iset.user_version = PCITOOL_VERSION;
 	iset.flags |= (input_args_p->flags & SETGRP_FLAG) ?
 	    PCITOOL_INTR_FLAG_SET_GROUP : 0;
@@ -1693,14 +1723,29 @@ set_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 		rval = errno;
 	} else {
 		if (input_args_p->flags & SETGRP_FLAG) {
-			(void) printf("\nInterrupts on %s group starting "
-			    "at %s 0x%x reassigned:", str_type, str_type, intr);
+			if (iset.flags == PCITOOL_INTR_FLAG_SET_MSI)
+				(void) printf("0x%x,0x%x => 0x%x,0x%x\n",
+				    iset.cpu_id,
+				    (input_args_p->intr_msi) & 0xff,
+				    input_args_p->intr_cpu, iset.msi);
+			else
+				(void) printf("0x%x,0x%x => 0x%x,0x%x\n",
+				    iset.cpu_id,
+				    (input_args_p->intr_ino) & 0xff,
+				    input_args_p->intr_cpu, iset.ino);
 		} else {
-			(void) printf("\nInterrupts on %s 0x%x reassigned:",
-			    str_type, intr);
+			if (iset.flags == PCITOOL_INTR_FLAG_SET_MSI)
+				(void) printf("0x%x,0x%x -> 0x%x,0x%x\n",
+				    iset.cpu_id,
+				    (input_args_p->intr_msi) & 0xff,
+				    input_args_p->intr_cpu, iset.msi);
+			else
+				(void) printf("0x%x,0x%x -> 0x%x,0x%x\n",
+				    iset.cpu_id,
+				    (input_args_p->intr_ino) & 0xff,
+				    input_args_p->intr_cpu, iset.ino);
 		}
-		(void) printf(" Old cpu: 0x%x, New cpu: 0x%x\n", iset.cpu_id,
-		    input_args_p->intr_cpu);
+
 	}
 
 	return (rval);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Portions Copyright (c) 2010, Oracle and/or its affiliates.
- * All rights reserved.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -43,8 +42,7 @@ typedef struct intrmap_private {
 	uint32_t	ir_sid_svt_sq;
 } intrmap_private_t;
 
-#define	INTRMAP_PRIVATE(airq) ((intrmap_private_t *)airq->airq_intrmap_private)
-#define	AIRQ_PRIVATE(airq) (airq->airq_intrmap_private)
+#define	INTRMAP_PRIVATE(intrmap) ((intrmap_private_t *)intrmap)
 
 /* interrupt remapping table entry */
 typedef struct intrmap_rte {
@@ -135,11 +133,13 @@ static char *immu_intrmap_faults[] = {
 /* Function prototypes */
 static int immu_intrmap_init(int apic_mode);
 static void immu_intrmap_switchon(int suppress_brdcst_eoi);
-static void immu_intrmap_alloc(apic_irq_t *irq_ptr);
-static void immu_intrmap_map(apic_irq_t *irq_ptr, void *intrmap_data);
-static void immu_intrmap_free(apic_irq_t *irq_ptr);
-static void immu_intrmap_rdt(apic_irq_t *irq_ptr, ioapic_rdt_t *irdt);
-static void immu_intrmap_msi(apic_irq_t *irq_ptr, msi_regs_t *mregs);
+static void immu_intrmap_alloc(void **intrmap_private_tbl, dev_info_t *dip,
+    uint16_t type, int count, uchar_t ioapic_index);
+static void immu_intrmap_map(void *intrmap_private, void *intrmap_data,
+    uint16_t type, int count);
+static void immu_intrmap_free(void **intrmap_privatep);
+static void immu_intrmap_rdt(void *intrmap_private, ioapic_rdt_t *irdt);
+static void immu_intrmap_msi(void *intrmap_private, msi_regs_t *mregs);
 
 static struct apic_intrmap_ops intrmap_ops = {
 	immu_intrmap_init,
@@ -383,24 +383,19 @@ init_unit(immu_t *immu)
 	return (DDI_SUCCESS);
 }
 
-static void
-get_immu(apic_irq_t *irq_ptr)
+static immu_t *
+get_immu(dev_info_t *dip, uint16_t type, uchar_t ioapic_index)
 {
 	immu_t	*immu = NULL;
 
-	ASSERT(INTRMAP_PRIVATE(irq_ptr)->ir_immu == NULL);
-
-	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
-		immu = immu_dmar_ioapic_immu(irq_ptr->airq_ioapicindex);
+	if (!DDI_INTR_IS_MSI_OR_MSIX(type)) {
+		immu = immu_dmar_ioapic_immu(ioapic_index);
 	} else {
-		if (irq_ptr->airq_dip != NULL) {
-			immu = immu_dmar_get_immu(irq_ptr->airq_dip);
-		}
+		if (dip != NULL)
+			immu = immu_dmar_get_immu(dip);
 	}
 
-	if (immu && (immu->immu_intrmap_running == B_TRUE)) {
-		INTRMAP_PRIVATE(irq_ptr)->ir_immu = immu;
-	}
+	return (immu);
 }
 
 static int
@@ -437,26 +432,25 @@ intrmap_top_pcibridge(dev_info_t *rdip)
 }
 
 /* function to get interrupt request source id */
-static void
-get_sid(apic_irq_t *irq_ptr)
+static uint32_t
+get_sid(dev_info_t *dip, uint16_t type, uchar_t ioapic_index)
 {
-	dev_info_t	*dip, *pdip;
+	dev_info_t	*pdip;
 	immu_devi_t	*immu_devi;
 	uint16_t	sid;
 	uchar_t		svt, sq;
 
 	if (!intrmap_enable_sid_verify) {
-		return;
+		return (0);
 	}
 
-	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
+	if (!DDI_INTR_IS_MSI_OR_MSIX(type)) {
 		/* for interrupt through I/O APIC */
-		sid = immu_dmar_ioapic_sid(irq_ptr->airq_ioapicindex);
+		sid = immu_dmar_ioapic_sid(ioapic_index);
 		svt = SVT_ALL_VERIFY;
 		sq = SQ_VERIFY_ALL;
 	} else {
 		/* MSI/MSI-X interrupt */
-		dip = irq_ptr->airq_dip;
 		ASSERT(dip);
 		pdip = intrmap_top_pcibridge(dip);
 		ASSERT(pdip);
@@ -476,8 +470,7 @@ get_sid(apic_irq_t *irq_ptr)
 		}
 	}
 
-	INTRMAP_PRIVATE(irq_ptr)->ir_sid_svt_sq =
-	    sid | (svt << 18) | (sq << 16);
+	return (sid | (svt << 18) | (sq << 16));
 }
 
 static void
@@ -667,52 +660,49 @@ immu_intrmap_switchon(int suppress_brdcst_eoi)
 
 /* alloc remapping entry for the interrupt */
 static void
-immu_intrmap_alloc(apic_irq_t *irq_ptr)
+immu_intrmap_alloc(void **intrmap_private_tbl, dev_info_t *dip,
+    uint16_t type, int count, uchar_t ioapic_index)
 {
 	immu_t	*immu;
 	intrmap_t *intrmap;
-	uint32_t		idx, cnt, i;
-	uint_t			vector, irqno;
+	uint32_t		idx, i;
 	uint32_t		sid_svt_sq;
+	intrmap_private_t	*intrmap_private;
 
-	if (AIRQ_PRIVATE(irq_ptr) == INTRMAP_DISABLE ||
-	    AIRQ_PRIVATE(irq_ptr) != NULL) {
+	if (intrmap_private_tbl[0] == INTRMAP_DISABLE ||
+	    intrmap_private_tbl[0] != NULL) {
 		return;
 	}
 
-	AIRQ_PRIVATE(irq_ptr) =
+	intrmap_private_tbl[0] =
 	    kmem_zalloc(sizeof (intrmap_private_t), KM_SLEEP);
+	intrmap_private = INTRMAP_PRIVATE(intrmap_private_tbl[0]);
 
-	get_immu(irq_ptr);
-
-	immu = INTRMAP_PRIVATE(irq_ptr)->ir_immu;
-	if (immu == NULL) {
+	immu = get_immu(dip, type, ioapic_index);
+	if ((immu != NULL) && (immu->immu_intrmap_running == B_TRUE)) {
+		intrmap_private->ir_immu = immu;
+	} else {
 		goto intrmap_disable;
 	}
 
 	intrmap = immu->immu_intrmap;
 
-	if (irq_ptr->airq_mps_intr_index == MSI_INDEX) {
-		cnt = irq_ptr->airq_intin_no;
-	} else {
-		cnt = 1;
-	}
-
-	if (cnt == 1) {
+	if (count == 1) {
 		idx = alloc_tbl_entry(intrmap);
 	} else {
-		idx = alloc_tbl_multi_entries(intrmap, cnt);
+		idx = alloc_tbl_multi_entries(intrmap, count);
 	}
 
 	if (idx == INTRMAP_IDX_FULL) {
 		goto intrmap_disable;
 	}
 
-	INTRMAP_PRIVATE(irq_ptr)->ir_idx = idx;
+	intrmap_private->ir_idx = idx;
 
-	get_sid(irq_ptr);
+	sid_svt_sq = intrmap_private->ir_sid_svt_sq =
+	    get_sid(dip, type, ioapic_index);
 
-	if (cnt == 1) {
+	if (count == 1) {
 		if (IMMU_CAP_GET_CM(immu->immu_regs_cap)) {
 			immu_qinv_intr_one_cache(immu, idx);
 		} else {
@@ -721,26 +711,18 @@ immu_intrmap_alloc(apic_irq_t *irq_ptr)
 		return;
 	}
 
-	sid_svt_sq = INTRMAP_PRIVATE(irq_ptr)->ir_sid_svt_sq;
-
-	vector = irq_ptr->airq_vector;
-
-	for (i = 1; i < cnt; i++) {
-		irqno = apic_vector_to_irq[vector + i];
-		irq_ptr = apic_irq_table[irqno];
-
-		ASSERT(irq_ptr);
-
-		AIRQ_PRIVATE(irq_ptr) =
+	for (i = 1; i < count; i++) {
+		intrmap_private_tbl[i] =
 		    kmem_zalloc(sizeof (intrmap_private_t), KM_SLEEP);
 
-		INTRMAP_PRIVATE(irq_ptr)->ir_immu = immu;
-		INTRMAP_PRIVATE(irq_ptr)->ir_sid_svt_sq = sid_svt_sq;
-		INTRMAP_PRIVATE(irq_ptr)->ir_idx = idx + i;
+		INTRMAP_PRIVATE(intrmap_private_tbl[i])->ir_immu = immu;
+		INTRMAP_PRIVATE(intrmap_private_tbl[i])->ir_sid_svt_sq =
+		    sid_svt_sq;
+		INTRMAP_PRIVATE(intrmap_private_tbl[i])->ir_idx = idx + i;
 	}
 
 	if (IMMU_CAP_GET_CM(immu->immu_regs_cap)) {
-		immu_qinv_intr_caches(immu, idx, cnt);
+		immu_qinv_intr_caches(immu, idx, count);
 	} else {
 		immu_regs_wbf_flush(immu);
 	}
@@ -748,41 +730,34 @@ immu_intrmap_alloc(apic_irq_t *irq_ptr)
 	return;
 
 intrmap_disable:
-	kmem_free(AIRQ_PRIVATE(irq_ptr), sizeof (intrmap_private_t));
-	AIRQ_PRIVATE(irq_ptr) = INTRMAP_DISABLE;
+	kmem_free(intrmap_private_tbl[0], sizeof (intrmap_private_t));
+	intrmap_private_tbl[0] = INTRMAP_DISABLE;
 }
 
 
 /* remapping the interrupt */
 static void
-immu_intrmap_map(apic_irq_t *irq_ptr, void *intrmap_data)
+immu_intrmap_map(void *intrmap_private, void *intrmap_data, uint16_t type,
+    int count)
 {
 	immu_t	*immu;
 	intrmap_t	*intrmap;
 	ioapic_rdt_t	*irdt = (ioapic_rdt_t *)intrmap_data;
 	msi_regs_t	*mregs = (msi_regs_t *)intrmap_data;
 	intrmap_rte_t	irte;
-	uint_t		idx, i, cnt;
+	uint_t		idx, i;
 	uint32_t	dst, sid_svt_sq;
 	uchar_t		vector, dlm, tm, rh, dm;
 
-	if (AIRQ_PRIVATE(irq_ptr) == INTRMAP_DISABLE) {
+	if (intrmap_private == INTRMAP_DISABLE)
 		return;
-	}
 
-	if (irq_ptr->airq_mps_intr_index == MSI_INDEX) {
-		cnt = irq_ptr->airq_intin_no;
-	} else {
-		cnt = 1;
-	}
-
-	idx = INTRMAP_PRIVATE(irq_ptr)->ir_idx;
-	immu = INTRMAP_PRIVATE(irq_ptr)->ir_immu;
+	idx = INTRMAP_PRIVATE(intrmap_private)->ir_idx;
+	immu = INTRMAP_PRIVATE(intrmap_private)->ir_immu;
 	intrmap = immu->immu_intrmap;
-	sid_svt_sq = INTRMAP_PRIVATE(irq_ptr)->ir_sid_svt_sq;
-	vector = irq_ptr->airq_vector;
+	sid_svt_sq = INTRMAP_PRIVATE(intrmap_private)->ir_sid_svt_sq;
 
-	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
+	if (!DDI_INTR_IS_MSI_OR_MSIX(type)) {
 		dm = RDT_DM(irdt->ir_lo);
 		rh = 0;
 		tm = RDT_TM(irdt->ir_lo);
@@ -795,18 +770,22 @@ immu_intrmap_map(apic_irq_t *irq_ptr, void *intrmap_data)
 		if (intrmap_suppress_brdcst_eoi) {
 			tm = TRIGGER_MODE_EDGE;
 		}
+
+		vector = RDT_VECTOR(irdt->ir_lo);
 	} else {
 		dm = MSI_ADDR_DM_PHYSICAL;
 		rh = MSI_ADDR_RH_FIXED;
 		tm = TRIGGER_MODE_EDGE;
 		dlm = 0;
 		dst = mregs->mr_addr;
+
+		vector = mregs->mr_data & 0xff;
 	}
 
 	if (intrmap_apic_mode == LOCAL_APIC)
 		dst = (dst & 0xFF) << 8;
 
-	if (cnt == 1) {
+	if (count == 1) {
 		irte.lo = IRTE_LOW(dst, vector, dlm, tm, rh, dm, 0, 1);
 		irte.hi = IRTE_HIGH(sid_svt_sq);
 
@@ -818,8 +797,7 @@ immu_intrmap_map(apic_irq_t *irq_ptr, void *intrmap_data)
 		immu_qinv_intr_one_cache(immu, idx);
 
 	} else {
-		vector = irq_ptr->airq_vector;
-		for (i = 0; i < cnt; i++) {
+		for (i = 0; i < count; i++) {
 			irte.lo = IRTE_LOW(dst, vector, dlm, tm, rh, dm, 0, 1);
 			irte.hi = IRTE_HIGH(sid_svt_sq);
 
@@ -831,26 +809,26 @@ immu_intrmap_map(apic_irq_t *irq_ptr, void *intrmap_data)
 			idx++;
 		}
 
-		immu_qinv_intr_caches(immu, idx, cnt);
+		immu_qinv_intr_caches(immu, idx, count);
 	}
 }
 
 /* free the remapping entry */
 static void
-immu_intrmap_free(apic_irq_t *irq_ptr)
+immu_intrmap_free(void **intrmap_privatep)
 {
 	immu_t *immu;
 	intrmap_t *intrmap;
 	uint32_t idx;
 
-	if (AIRQ_PRIVATE(irq_ptr) == INTRMAP_DISABLE) {
-		AIRQ_PRIVATE(irq_ptr) = NULL;
+	if (*intrmap_privatep == INTRMAP_DISABLE || *intrmap_privatep == NULL) {
+		*intrmap_privatep = NULL;
 		return;
 	}
 
-	immu = INTRMAP_PRIVATE(irq_ptr)->ir_immu;
+	immu = INTRMAP_PRIVATE(*intrmap_privatep)->ir_immu;
 	intrmap = immu->immu_intrmap;
-	idx = INTRMAP_PRIVATE(irq_ptr)->ir_idx;
+	idx = INTRMAP_PRIVATE(*intrmap_privatep)->ir_idx;
 
 	bzero(intrmap->intrmap_vaddr + idx * INTRMAP_RTE_SIZE,
 	    INTRMAP_RTE_SIZE);
@@ -864,24 +842,23 @@ immu_intrmap_free(apic_irq_t *irq_ptr)
 	}
 	mutex_exit(&intrmap->intrmap_lock);
 
-	kmem_free(AIRQ_PRIVATE(irq_ptr), sizeof (intrmap_private_t));
-	AIRQ_PRIVATE(irq_ptr) = NULL;
+	kmem_free(*intrmap_privatep, sizeof (intrmap_private_t));
+	*intrmap_privatep = NULL;
 }
 
 /* record the ioapic rdt entry */
 static void
-immu_intrmap_rdt(apic_irq_t *irq_ptr, ioapic_rdt_t *irdt)
+immu_intrmap_rdt(void *intrmap_private, ioapic_rdt_t *irdt)
 {
 	uint32_t rdt_entry, tm, pol, idx, vector;
 
 	rdt_entry = irdt->ir_lo;
 
-	if (INTRMAP_PRIVATE(irq_ptr) != NULL &&
-	    INTRMAP_PRIVATE(irq_ptr) != INTRMAP_DISABLE) {
-		idx = INTRMAP_PRIVATE(irq_ptr)->ir_idx;
+	if (intrmap_private != INTRMAP_DISABLE && intrmap_private != NULL) {
+		idx = INTRMAP_PRIVATE(intrmap_private)->ir_idx;
 		tm = RDT_TM(rdt_entry);
 		pol = RDT_POL(rdt_entry);
-		vector = irq_ptr->airq_vector;
+		vector = RDT_VECTOR(rdt_entry);
 		irdt->ir_lo = (tm << INTRMAP_IOAPIC_TM_SHIFT) |
 		    (pol << INTRMAP_IOAPIC_POL_SHIFT) |
 		    ((idx >> 15) << INTRMAP_IOAPIC_IDX15_SHIFT) |
@@ -896,13 +873,12 @@ immu_intrmap_rdt(apic_irq_t *irq_ptr, ioapic_rdt_t *irdt)
 /* record the msi interrupt structure */
 /*ARGSUSED*/
 static void
-immu_intrmap_msi(apic_irq_t *irq_ptr, msi_regs_t *mregs)
+immu_intrmap_msi(void *intrmap_private, msi_regs_t *mregs)
 {
 	uint_t	idx;
 
-	if (INTRMAP_PRIVATE(irq_ptr) != NULL &&
-	    INTRMAP_PRIVATE(irq_ptr) != INTRMAP_DISABLE) {
-		idx = INTRMAP_PRIVATE(irq_ptr)->ir_idx;
+	if (intrmap_private != INTRMAP_DISABLE && intrmap_private != NULL) {
+		idx = INTRMAP_PRIVATE(intrmap_private)->ir_idx;
 
 		mregs->mr_data = 0;
 		mregs->mr_addr = MSI_ADDR_HDR |
@@ -979,21 +955,27 @@ immu_intr_register(immu_t *immu)
 	uint32_t msi_data;
 	uint32_t uaddr;
 	uint32_t msi_addr;
+	uint32_t localapic_id = 0;
+
+	if (psm_get_localapicid)
+		localapic_id = psm_get_localapicid(0);
 
 	msi_addr = (MSI_ADDR_HDR |
-	    apic_cpus[0].aci_local_id & 0xFF) << ((MSI_ADDR_DEST_SHIFT) |
+	    ((localapic_id & 0xFF) << MSI_ADDR_DEST_SHIFT) |
 	    (MSI_ADDR_RH_FIXED << MSI_ADDR_RH_SHIFT) |
 	    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT));
 
 	if (intrmap_apic_mode == LOCAL_X2APIC) {
-		uaddr = (apic_cpus[0].aci_local_id & 0xFFFFFF00);
+		uaddr = localapic_id & 0xFFFFFF00;
 	} else {
 		uaddr = 0;
 	}
 
 	/* Dont need to hold immu_intr_lock since we are in boot */
-	irq = psm_get_ipivect(IMMU_INTR_IPL, -1);
-	vect = apic_irq_table[irq]->airq_vector;
+	irq = vect = psm_get_ipivect(IMMU_INTR_IPL, -1);
+	if (psm_xlate_vector_by_irq != NULL)
+		vect = psm_xlate_vector_by_irq(irq);
+
 	msi_data = ((MSI_DATA_DELIVERY_FIXED <<
 	    MSI_DATA_DELIVERY_SHIFT) | vect);
 

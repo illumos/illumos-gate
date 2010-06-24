@@ -1411,6 +1411,15 @@ fcnname/**/_info:							\
 	END_MODULE(elfexec);
 #endif
 
+/*
+ * Stub(s) for APIX module.
+ */
+#ifndef APIX_MODULE
+	MODULE(apix,mach);
+	WSTUB(apix, apix_loaded, nomod_zero);
+	END_MODULE(apix);
+#endif
+
 / this is just a marker for the area of text that contains stubs 
 
 	ENTRY_NP(stubs_end)

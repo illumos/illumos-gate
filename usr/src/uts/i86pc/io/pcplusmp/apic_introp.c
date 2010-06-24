@@ -38,6 +38,7 @@
 #include <sys/trap.h>
 #include <sys/pci.h>
 #include <sys/pci_intr_lib.h>
+#include <sys/apic_common.h>
 
 extern struct av_head autovect[];
 
@@ -45,24 +46,6 @@ extern struct av_head autovect[];
  *	Local Function Prototypes
  */
 apic_irq_t	*apic_find_irq(dev_info_t *, struct intrspec *, int);
-
-/*
- * MSI support flag:
- * reflects whether MSI is supported at APIC level
- * it can also be patched through /etc/system
- *
- *  0 = default value - don't know and need to call apic_check_msi_support()
- *      to find out then set it accordingly
- *  1 = supported
- * -1 = not supported
- */
-int	apic_support_msi = 0;
-
-/* Multiple vector support for MSI */
-int	apic_multi_msi_enable = 1;
-
-/* Multiple vector support for MSI-X */
-int	apic_msix_enable = 1;
 
 /*
  * apic_pci_msi_enable_vector:
@@ -79,9 +62,9 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 	dev_info_t		*dip = irq_ptr->airq_dip;
 	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(dip);
 	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(dip);
-#if !defined(__xpv)
 	msi_regs_t		msi_regs;
-#endif	/* ! __xpv */
+	int			irqno, i;
+	void			*intrmap_tbl[PCI_MSI_MAX_INTRS];
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_pci_msi_enable_vector: dip=0x%p\n"
 	    "\tdriver = %s, inum=0x%x vector=0x%x apicid=0x%x\n", (void *)dip,
@@ -89,29 +72,28 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 
 	ASSERT((handle != NULL) && (cap_ptr != 0));
 
-#if !defined(__xpv)
 	msi_regs.mr_data = vector;
 	msi_regs.mr_addr = target_apic_id;
 
-	apic_vt_ops->apic_intrmap_alloc_entry(irq_ptr);
-	apic_vt_ops->apic_intrmap_map_entry(irq_ptr, (void *)&msi_regs);
-	apic_vt_ops->apic_intrmap_record_msi(irq_ptr, &msi_regs);
+	intrmap_tbl[0] = irq_ptr->airq_intrmap_private;
+	apic_vt_ops->apic_intrmap_alloc_entry(intrmap_tbl, dip, type,
+	    count, 0xff);
+	for (i = 0; i < count; i++) {
+		irqno = apic_vector_to_irq[vector + i];
+		apic_irq_table[irqno]->airq_intrmap_private =
+		    intrmap_tbl[i];
+	}
+
+	apic_vt_ops->apic_intrmap_map_entry(irq_ptr->airq_intrmap_private,
+	    (void *)&msi_regs, type, count);
+	apic_vt_ops->apic_intrmap_record_msi(irq_ptr->airq_intrmap_private,
+	    &msi_regs);
 
 	/* MSI Address */
 	msi_addr = msi_regs.mr_addr;
 
 	/* MSI Data: MSI is edge triggered according to spec */
 	msi_data = msi_regs.mr_data;
-#else
-	/* MSI Address */
-	msi_addr = (MSI_ADDR_HDR |
-	    (target_apic_id << MSI_ADDR_DEST_SHIFT));
-	msi_addr |= ((MSI_ADDR_RH_FIXED << MSI_ADDR_RH_SHIFT) |
-	    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT));
-
-	/* MSI Data: MSI is edge triggered according to spec */
-	msi_data = ((MSI_DATA_TM_EDGE << MSI_DATA_TM_SHIFT) | vector);
-#endif	/* ! __xpv */
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_pci_msi_enable_vector: addr=0x%lx "
 	    "data=0x%lx\n", (long)msi_addr, (long)msi_data));
@@ -123,7 +105,6 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 		msi_ctrl |= ((highbit(count) -1) << PCI_MSI_MME_SHIFT);
 		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
 
-#if !defined(__xpv)
 		/*
 		 * Only set vector if not on hypervisor
 		 */
@@ -154,12 +135,8 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), msi_data);
 		ddi_put64(msix_p->msix_tbl_hdl,
 		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), msi_addr);
-#endif	/* ! __xpv */
 	}
 }
-
-
-#if !defined(__xpv)
 
 /*
  * This function returns the no. of vectors available for the pri.
@@ -197,8 +174,6 @@ apic_navail_vector(dev_info_t *dip, int pri)
 	}
 	return (navail);
 }
-
-#endif	/* ! __xpv */
 
 /*
  * Finds "count" contiguous MSI vectors starting at the proper alignment
@@ -287,9 +262,6 @@ apic_find_irq(dev_info_t *dip, struct intrspec *ispec, int type)
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_find_irq: return NULL\n"));
 	return (NULL);
 }
-
-
-#if !defined(__xpv)
 
 /*
  * This function will return the pending bit of the irqp.
@@ -424,117 +396,6 @@ apic_free_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
 	}
 }
 
-#endif	/* ! __xpv */
-
-/*
- * check whether the system supports MSI
- *
- * If PCI-E capability is found, then this must be a PCI-E system.
- * Since MSI is required for PCI-E system, it returns PSM_SUCCESS
- * to indicate this system supports MSI.
- */
-int
-apic_check_msi_support()
-{
-	dev_info_t *cdip;
-	char dev_type[16];
-	int dev_len;
-
-	DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support:\n"));
-
-	/*
-	 * check whether the first level children of root_node have
-	 * PCI-E capability
-	 */
-	for (cdip = ddi_get_child(ddi_root_node()); cdip != NULL;
-	    cdip = ddi_get_next_sibling(cdip)) {
-
-		DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: cdip: 0x%p,"
-		    " driver: %s, binding: %s, nodename: %s\n", (void *)cdip,
-		    ddi_driver_name(cdip), ddi_binding_name(cdip),
-		    ddi_node_name(cdip)));
-		dev_len = sizeof (dev_type);
-		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-		    "device_type", (caddr_t)dev_type, &dev_len)
-		    != DDI_PROP_SUCCESS)
-			continue;
-		if (strcmp(dev_type, "pciex") == 0)
-			return (PSM_SUCCESS);
-	}
-
-	/* MSI is not supported on this system */
-	DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: no 'pciex' "
-	    "device_type found\n"));
-	return (PSM_FAILURE);
-}
-
-#if !defined(__xpv)
-
-/*
- * apic_pci_msi_unconfigure:
- *
- * This and next two interfaces are copied from pci_intr_lib.c
- * Do ensure that these two files stay in sync.
- * These needed to be copied over here to avoid a deadlock situation on
- * certain mp systems that use MSI interrupts.
- *
- * IMPORTANT regards next three interfaces:
- * i) are called only for MSI/X interrupts.
- * ii) called with interrupts disabled, and must not block
- */
-void
-apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
-{
-	ushort_t		msi_ctrl;
-	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
-	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
-
-	ASSERT((handle != NULL) && (cap_ptr != 0));
-
-	if (type == DDI_INTR_TYPE_MSI) {
-		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
-		msi_ctrl &= (~PCI_MSI_MME_MASK);
-		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
-		pci_config_put32(handle, cap_ptr + PCI_MSI_ADDR_OFFSET, 0);
-
-		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
-			pci_config_put16(handle,
-			    cap_ptr + PCI_MSI_64BIT_DATA, 0);
-			pci_config_put32(handle,
-			    cap_ptr + PCI_MSI_ADDR_OFFSET + 4, 0);
-		} else {
-			pci_config_put16(handle,
-			    cap_ptr + PCI_MSI_32BIT_DATA, 0);
-		}
-
-	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uintptr_t	off;
-		uint32_t	mask;
-		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
-
-		ASSERT(msix_p != NULL);
-
-		/* Offset into "inum"th entry in the MSI-X table & mask it */
-		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
-		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
-
-		mask = ddi_get32(msix_p->msix_tbl_hdl, (uint32_t *)off);
-
-		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, (mask | 1));
-
-		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uintptr_t)msix_p->msix_tbl_addr +
-		    (inum * PCI_MSIX_VECTOR_SIZE);
-
-		/* Reset the "data" and "addr" bits */
-		ddi_put32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), 0);
-		ddi_put64(msix_p->msix_tbl_hdl, (uint64_t *)off, 0);
-	}
-}
-
-#endif	/* __xpv */
-
 /*
  * apic_pci_msi_enable_mode:
  */
@@ -581,38 +442,6 @@ apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 		}
 	}
 }
-
-/*
- * apic_pci_msi_disable_mode:
- */
-void
-apic_pci_msi_disable_mode(dev_info_t *rdip, int type)
-{
-	ushort_t		msi_ctrl;
-	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
-	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
-
-	ASSERT((handle != NULL) && (cap_ptr != 0));
-
-	if (type == DDI_INTR_TYPE_MSI) {
-		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
-		if (!(msi_ctrl & PCI_MSI_ENABLE_BIT))
-			return;
-
-		msi_ctrl &= ~PCI_MSI_ENABLE_BIT;	/* MSI disable */
-		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
-
-	} else if (type == DDI_INTR_TYPE_MSIX) {
-		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSIX_CTRL);
-		if (msi_ctrl & PCI_MSIX_ENABLE_BIT) {
-			msi_ctrl &= ~PCI_MSIX_ENABLE_BIT;
-			pci_config_put16(handle, cap_ptr + PCI_MSIX_CTRL,
-			    msi_ctrl);
-		}
-	}
-}
-
-#if !defined(__xpv)
 
 static int
 apic_set_cpu(int irqno, int cpu, int *result)
@@ -800,21 +629,6 @@ set_grp_intr_done:
 	return (PSM_SUCCESS);
 }
 
-#else	/* __xpv */
-
-/*
- * We let the hypervisor deal with msi configutation
- * so just stub this out.
- */
-
-/* ARGSUSED */
-void
-apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
-{
-}
-
-#endif	/* __xpv */
-
 int
 apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 {
@@ -914,9 +728,6 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 
 	return (PSM_SUCCESS);
 }
-
-
-#if !defined(__xpv)
 
 /*
  * This function provides external interface to the nexus for all
@@ -1093,7 +904,7 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			*result = EINVAL;
 			return (PSM_FAILURE);
 		}
-		if (!(hdlp->ih_flags & PSMGI_INTRBY_IRQ))
+		if ((hdlp->ih_flags & PSMGI_INTRBY_FLAGS) == PSMGI_INTRBY_VEC)
 			hdlp->ih_vector = apic_vector_to_irq[hdlp->ih_vector];
 		if (intr_op == PSM_INTR_OP_SET_CPU) {
 			if (apic_set_cpu(hdlp->ih_vector, new_cpu, result) !=
@@ -1116,7 +927,12 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			return (PSM_FAILURE);
 		break;
 	case PSM_INTR_OP_APIC_TYPE:
-		hdlp->ih_private = apic_get_apic_type();
+		((apic_get_type_t *)(hdlp->ih_private))->avgi_type =
+		    apic_get_apic_type();
+		((apic_get_type_t *)(hdlp->ih_private))->avgi_num_intr =
+		    APIC_MAX_VECTOR;
+		((apic_get_type_t *)(hdlp->ih_private))->avgi_num_cpu =
+		    boot_ncpus;
 		hdlp->ih_ver = apic_get_apic_version();
 		break;
 	case PSM_INTR_OP_SET_CAP:
@@ -1125,4 +941,3 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 	}
 	return (PSM_SUCCESS);
 }
-#endif	/* !__xpv */

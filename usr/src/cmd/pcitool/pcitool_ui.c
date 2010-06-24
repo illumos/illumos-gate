@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -86,7 +85,8 @@ static int extract_bdf(char *value, char **bvalue_p, char **dvalue_p,
 static int parse_device_opts(char *input, uint64_t *flags_arg,
     uint8_t *bus_arg, uint8_t *device_arg, uint8_t *func_arg,
     uint8_t *bank_arg);
-static int parse_ino_opts(char *input, uint64_t *flags_arg, uint8_t *ino_arg);
+static int parse_ino_opts(char *input, uint64_t *flags_arg,
+    uint32_t *cpu_arg, uint8_t *ino_arg);
 static int parse_msi_opts(char *input, uint64_t *flags_arg, uint16_t *msi_arg);
 static int parse_intr_set_opts(char *input, uint64_t *flags_arg,
     uint32_t *cpu_arg);
@@ -259,6 +259,7 @@ get_commandline_args(int argc, char *argv[], pcitool_uiargs_t *parsed_args)
 
 			/* parse input to get ino value. */
 			if (parse_ino_opts(optarg, &parsed_args->flags,
+			    &parsed_args->old_cpu,
 			    &parsed_args->intr_ino) != SUCCESS) {
 				(void) fprintf(stderr,
 				    "%s: Error parsing interrupt options\n",
@@ -1286,15 +1287,47 @@ parse_device_opts(
  * specified options set.  Other args return their respective values.
  */
 static int
-parse_ino_opts(char *input, uint64_t *flags_arg, uint8_t *ino_arg)
+parse_ino_opts(char *input, uint64_t *flags_arg, uint32_t *cpu_arg,
+    uint8_t *ino_arg)
 {
 	uint64_t	value;
+	char		*charvalue;
 	int		rval = SUCCESS;
 
 	if (strcmp(input, "all") == 0) {
 		*flags_arg |= INO_ALL_FLAG;
-	} else if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS) {
-		*ino_arg = (uint8_t)value;
+#ifdef __x86
+	} else if (strstr(input, ",") == NULL) {
+		(void) fprintf(stderr,
+		    "Interrupt format should be <cpu#,ino#>.\n");
+		rval = FAILURE;
+#else
+	} else if (strstr(input, ",") == NULL) {
+		if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS)
+			*ino_arg = (uint8_t)value;
+
+		if (*ino_arg != value) {
+			(void) fprintf(stderr,
+			    "ino argument must fit into 8 bits.\n");
+			rval = FAILURE;
+		} else {
+			*flags_arg |= INO_SPEC_FLAG;
+		}
+#endif
+	} else if (charvalue = strtok(input, ",")) {
+		if ((rval =
+		    get_value64(charvalue, &value, HEX_ONLY)) == SUCCESS) {
+			*cpu_arg = (int)value;
+		}
+
+		input = strtok(NULL, ",");
+		if (input == NULL) {
+			(void) fprintf(stderr, "ino argument is need.\n");
+			return (FAILURE);
+		}
+
+		if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS)
+			*ino_arg = (uint8_t)value;
 
 		if (*ino_arg != value) {
 			(void) fprintf(stderr,
@@ -1328,8 +1361,26 @@ parse_msi_opts(char *input, uint64_t *flags_arg, uint16_t *msi_arg)
 
 	if (strcmp(input, "all") == 0) {
 		*flags_arg |= MSI_ALL_FLAG;
-	} else if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS) {
-		*msi_arg = (uint16_t)value;
+	} else if (strstr(input, ",") == NULL) {
+		if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS)
+			*msi_arg = (uint16_t)value;
+
+		if (*msi_arg != value) {
+			(void) fprintf(stderr,
+			    "msi argument must fit into 16 bits.\n");
+			rval = FAILURE;
+		} else {
+			*flags_arg |= MSI_SPEC_FLAG;
+		}
+	} else if (strtok(input, ",")) {
+		input = strtok(NULL, ",");
+		if (input == NULL) {
+			(void) fprintf(stderr, "msi argument is need.\n");
+			return (FAILURE);
+		}
+
+		if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS)
+			*msi_arg = (uint16_t)value;
 
 		if (*msi_arg != value) {
 			(void) fprintf(stderr,

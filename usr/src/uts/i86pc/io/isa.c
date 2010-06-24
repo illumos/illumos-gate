@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -48,12 +47,14 @@
 #include <sys/pci.h>
 #include <sys/note.h>
 #include <sys/boot_console.h>
+#include <sys/apic.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #include <sys/evtchn_impl.h>
 
 extern int console_hypervisor_device;
 #endif
+
 
 extern int pseudo_isa;
 extern int isa_resource_setup(void);
@@ -157,6 +158,8 @@ isa_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *, void *);
 static int
 isa_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result);
+static int isa_alloc_intr_fixed(dev_info_t *, ddi_intr_handle_impl_t *, void *);
+static int isa_free_intr_fixed(dev_info_t *, ddi_intr_handle_impl_t *);
 
 struct bus_ops isa_bus_ops = {
 	BUSO_REV,
@@ -774,13 +777,11 @@ isa_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			return (DDI_FAILURE);
 		break;
 	case DDI_INTROP_ALLOC:
-		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
-			return (DDI_FAILURE);
-		hdlp->ih_pri = ispec->intrspec_pri;
-		*(int *)result = hdlp->ih_scratch1;
-		break;
+		ASSERT(hdlp->ih_type == DDI_INTR_TYPE_FIXED);
+		return (isa_alloc_intr_fixed(rdip, hdlp, result));
 	case DDI_INTROP_FREE:
-		break;
+		ASSERT(hdlp->ih_type == DDI_INTR_TYPE_FIXED);
+		return (isa_free_intr_fixed(rdip, hdlp));
 	case DDI_INTROP_GETPRI:
 		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
 			return (DDI_FAILURE);
@@ -898,6 +899,97 @@ isa_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	}
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * Allocate interrupt vector for FIXED (legacy) type.
+ */
+static int
+isa_alloc_intr_fixed(dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp,
+    void *result)
+{
+	struct intrspec		*ispec;
+	ddi_intr_handle_impl_t	info_hdl;
+	int			ret;
+	int			free_phdl = 0;
+	apic_get_type_t		type_info;
+
+	if (psm_intr_ops == NULL)
+		return (DDI_FAILURE);
+
+	if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * If the PSM module is "APIX" then pass the request for it
+	 * to allocate the vector now.
+	 */
+	bzero(&info_hdl, sizeof (ddi_intr_handle_impl_t));
+	info_hdl.ih_private = &type_info;
+	if ((*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_APIC_TYPE, NULL) ==
+	    PSM_SUCCESS && strcmp(type_info.avgi_type, APIC_APIX_NAME) == 0) {
+		if (hdlp->ih_private == NULL) { /* allocate phdl structure */
+			free_phdl = 1;
+			i_ddi_alloc_intr_phdl(hdlp);
+		}
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		ret = (*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_ALLOC_VECTORS, result);
+		if (free_phdl) { /* free up the phdl structure */
+			free_phdl = 0;
+			i_ddi_free_intr_phdl(hdlp);
+			hdlp->ih_private = NULL;
+		}
+	} else {
+		/*
+		 * No APIX module; fall back to the old scheme where the
+		 * interrupt vector is allocated during ddi_enable_intr() call.
+		 */
+		hdlp->ih_pri = ispec->intrspec_pri;
+		*(int *)result = hdlp->ih_scratch1;
+		ret = DDI_SUCCESS;
+	}
+
+	return (ret);
+}
+
+/*
+ * Free up interrupt vector for FIXED (legacy) type.
+ */
+static int
+isa_free_intr_fixed(dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
+{
+	struct intrspec			*ispec;
+	ddi_intr_handle_impl_t		info_hdl;
+	int				ret;
+	apic_get_type_t			type_info;
+
+	if (psm_intr_ops == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * If the PSM module is "APIX" then pass the request for it
+	 * to free up the vector now.
+	 */
+	bzero(&info_hdl, sizeof (ddi_intr_handle_impl_t));
+	info_hdl.ih_private = &type_info;
+	if ((*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_APIC_TYPE, NULL) ==
+	    PSM_SUCCESS && strcmp(type_info.avgi_type, APIC_APIX_NAME) == 0) {
+		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+			return (DDI_FAILURE);
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		ret = (*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_FREE_VECTORS, NULL);
+	} else {
+		/*
+		 * No APIX module; fall back to the old scheme where
+		 * the interrupt vector was already freed during
+		 * ddi_disable_intr() call.
+		 */
+		ret = DDI_SUCCESS;
+	}
+
+	return (ret);
 }
 
 static void

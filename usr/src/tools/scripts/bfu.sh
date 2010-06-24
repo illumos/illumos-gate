@@ -852,9 +852,17 @@ update_etc_mach_i386()
 {
 	etc_mach=$rootprefix/etc/mach
 	test -f $etc_mach || return
+
 	grep -w "xpv_psm" $etc_mach > /dev/null 2>&1
 	if [ $? -ne 0 ] ; then
 	    echo 'xpv_psm' >> $etc_mach
+	fi
+
+	grep -w "apix" $etc_mach > /dev/null 2>&1
+	if [ $? -ne 0 ] ; then
+		awk '/^[ 	]*xpv_psm[ 	]*$/{print "apix"}
+			{print $0}' $etc_mach > $etc_mach.tmp
+		mv $etc_mach.tmp $etc_mach
 	fi
 }
 

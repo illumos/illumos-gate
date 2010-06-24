@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SMP_IMPLDEFS_H
@@ -70,6 +69,9 @@ extern void (*psm_timer_enable)(void);		/* timer enable		*/
 extern void (*psm_timer_disable)(void);		/* timer disable	*/
 extern void (*psm_post_cyclic_setup)(void *arg); /* psm cyclic setup	*/
 extern int (*psm_state)(psm_state_request_t *); /* psm state save/restore */
+extern uchar_t (*psm_get_ioapicid)(uchar_t);	/* get io-apic id */
+extern uint32_t (*psm_get_localapicid)(uint32_t);	/* get local-apic id */
+extern uchar_t (*psm_xlate_vector_by_irq)(uchar_t); /* get vector for an irq */
 
 extern int (*slvltovect)(int);	/* ipl interrupt priority level		*/
 extern int (*setlvl)(int, int *); /* set intr pri represented by vect	*/
@@ -77,6 +79,10 @@ extern void (*setlvlx)(int, int); /* set intr pri to specified level	*/
 extern void (*setspl)(int);	/* mask intr below or equal given ipl	*/
 extern int (*addspl)(int, int, int, int); /* add intr mask of vector 	*/
 extern int (*delspl)(int, int, int, int); /* delete intr mask of vector */
+extern int (*get_pending_spl)(void);	/* get highest pending ipl */
+extern int (*addintr)(void *, int, avfunc, char *, int, caddr_t, caddr_t,
+    uint64_t *, dev_info_t *);	/* replacement of add_avintr */
+extern void (*remintr)(void *, int, avfunc, int); /* replace of rem_avintr */
 
 /* trigger a software intr */
 extern void (*setsoftint)(int, struct av_softinfo *);

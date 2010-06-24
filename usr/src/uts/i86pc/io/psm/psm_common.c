@@ -102,7 +102,7 @@ extern int goany(void);
 
 
 #define	NEXT_PRT_ITEM(p)	\
-		(ACPI_PCI_ROUTING_TABLE *)(((char *)(p)) + (p)->Length)
+		(void *)(((char *)(p)) + (p)->Length)
 
 static int
 acpi_get_gsiv(dev_info_t *dip, ACPI_HANDLE pciobj, int devno, int ipin,
@@ -384,6 +384,7 @@ psm_node_has_prt(ACPI_HANDLE *ah)
 	return (AcpiGetHandle(ah, "_PRT", &rh) == AE_OK);
 }
 
+
 /*
  * Look first for an ACPI PCI bus node matching busid, then for a _PRT on the
  * parent node; then drop into the bridge-chasing code (which will also
@@ -512,7 +513,7 @@ acpi_set_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int irq)
 	switch (srsp->Type) {
 	case ACPI_RESOURCE_TYPE_IRQ:
 		srsp->Data.Irq.InterruptCount = 1;
-		srsp->Data.Irq.Interrupts[0] = irq;
+		srsp->Data.Irq.Interrupts[0] = (uint8_t)irq;
 		break;
 	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
 		srsp->Data.ExtendedIrq.InterruptCount = 1;
@@ -855,7 +856,7 @@ acpi_new_irq_cache_ent(int bus, int dev, int ipin, int pci_irq,
 	ep->dev = (uchar_t)dev;
 	ep->ipin = (uchar_t)ipin;
 	ep->flags = *intr_flagp;
-	ep->irq = pci_irq;
+	ep->irq = (uchar_t)pci_irq;
 	ASSERT(acpipsmlnkp != NULL);
 	ep->lnkobj = acpipsmlnkp->lnkobj;
 	mutex_exit(&acpi_irq_cache_mutex);

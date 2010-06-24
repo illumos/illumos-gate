@@ -36,6 +36,7 @@ extern "C" {
 #include <sys/psm_common.h>
 
 #define	APIC_PCPLUSMP_NAME	"pcplusmp"
+#define	APIC_APIX_NAME		"apix"
 
 #define	APIC_IO_ADDR	0xfec00000
 #define	APIC_LOCAL_ADDR	0xfee00000
@@ -525,10 +526,11 @@ typedef struct apic_cpus_info {
 } apic_cpus_info_t;
 #pragma	pack()
 
-#define	APIC_CPU_ONLINE		1
-#define	APIC_CPU_INTR_ENABLE	2
-#define	APIC_CPU_FREE		4	/* APIC CPU slot is free */
-#define	APIC_CPU_DIRTY		8	/* Slot was once used */
+#define	APIC_CPU_ONLINE		0x1
+#define	APIC_CPU_INTR_ENABLE	0x2
+#define	APIC_CPU_FREE		0x4	/* APIC CPU slot is free */
+#define	APIC_CPU_DIRTY		0x8	/* Slot was once used */
+#define	APIC_CPU_SUSPEND	0x10
 
 /*
  * APIC ops to support various flavors of APIC like APIC and x2APIC.
@@ -561,11 +563,12 @@ typedef struct msi_regs {
 typedef struct apic_intrmap_ops {
 	int	(*apic_intrmap_init)(int);
 	void	(*apic_intrmap_enable)(int);
-	void	(*apic_intrmap_alloc_entry)(apic_irq_t *);
-	void	(*apic_intrmap_map_entry)(apic_irq_t *, void *);
-	void	(*apic_intrmap_free_entry)(apic_irq_t *);
-	void	(*apic_intrmap_record_rdt)(apic_irq_t *, ioapic_rdt_t *);
-	void	(*apic_intrmap_record_msi)(apic_irq_t *, msi_regs_t *);
+	void	(*apic_intrmap_alloc_entry)(void **, dev_info_t *, uint16_t,
+		    int, uchar_t);
+	void	(*apic_intrmap_map_entry)(void *, void *, uint16_t, int);
+	void	(*apic_intrmap_free_entry)(void **);
+	void	(*apic_intrmap_record_rdt)(void *, ioapic_rdt_t *);
+	void	(*apic_intrmap_record_msi)(void *, msi_regs_t *);
 } apic_intrmap_ops_t;
 
 /*
@@ -642,6 +645,13 @@ typedef struct {
 					/* Contains num_devs elements. */
 } apic_get_intr_t;
 
+/* Used by PSM_INTR_OP_GET_TYPE to return platform information. */
+typedef struct {
+	char		*avgi_type;	/*  platform type - from kernel */
+	uint32_t	avgi_num_intr;	/*  max intr number - from kernel */
+	uint32_t	avgi_num_cpu;	/*  max cpu number - from kernel */
+} apic_get_type_t;
+
 /* Masks for avgi_req_flags. */
 #define	PSMGI_REQ_CPUID		0x1	/* Request CPU ID */
 #define	PSMGI_REQ_NUM_DEVS	0x2	/* Request num of devices on vector */
@@ -652,7 +662,8 @@ typedef struct {
 /* Other flags */
 #define	PSMGI_INTRBY_VEC	0	/* Vec passed.  xlate to IRQ needed */
 #define	PSMGI_INTRBY_IRQ	0x8000	/* IRQ passed.  no xlate needed */
-#define	PSMGI_INTRBY_FLAGS	0x8000	/* Mask for this flag */
+#define	PSMGI_INTRBY_DEFAULT	0x4000	/* PSM specific default value */
+#define	PSMGI_INTRBY_FLAGS	0xc000	/* Mask for this flag */
 
 /*
  * Use scaled-fixed-point arithmetic to calculate apic ticks.
@@ -674,25 +685,19 @@ extern int	apic_verbose;
 #define	APIC_VERBOSE_IRQ_FLAG			0x00000002
 #define	APIC_VERBOSE_POWEROFF_FLAG		0x00000004
 #define	APIC_VERBOSE_POWEROFF_PAUSE_FLAG	0x00000008
+#define	APIC_VERBOSE_INIT			0x00000010
+#define	APIC_VERBOSE_REBIND			0x00000020
+#define	APIC_VERBOSE_ALLOC			0x00000040
+#define	APIC_VERBOSE_IPI			0x00000080
+#define	APIC_VERBOSE_INTR			0x00000100
 
-
-#define	APIC_VERBOSE_IOAPIC(fmt) \
-	if (apic_verbose & APIC_VERBOSE_IOAPIC_FLAG) \
-		cmn_err fmt;
-
+/* required test to wait until APIC command is sent on the bus */
 #define	APIC_AV_PENDING_SET() \
 	while (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING) \
 		apic_ret();
 
-#define	APIC_VERBOSE_IRQ(fmt) \
-	if (apic_verbose & APIC_VERBOSE_IRQ_FLAG) \
-		cmn_err fmt;
+#ifdef	DEBUG
 
-#define	APIC_VERBOSE_POWEROFF(fmt) \
-	if (apic_verbose & APIC_VERBOSE_POWEROFF_FLAG) \
-		prom_printf fmt;
-
-#ifdef DEBUG
 #define	DENT		0x0001
 extern int	apic_debug;
 /*
@@ -714,7 +719,23 @@ extern int	apic_debug_msgbufindex;
 	if (apic_debug_msgbufindex >= (APIC_DEBUG_MSGBUFSIZE - NCPU)) \
 		apic_debug_msgbufindex = 0;
 
-#endif /* DEBUG */
+#define	APIC_VERBOSE(flag, fmt)			     \
+	if (apic_verbose & APIC_VERBOSE_##flag) \
+		cmn_err fmt;
+
+#define	APIC_VERBOSE_POWEROFF(fmt) \
+	if (apic_verbose & APIC_VERBOSE_POWEROFF_FLAG) \
+		prom_printf fmt;
+
+#else	/* DEBUG */
+
+#define	APIC_VERBOSE(flag, fmt)
+#define	APIC_VERBOSE_POWEROFF(fmt)
+
+#endif	/* DEBUG */
+
+#define	APIC_VERBOSE_IOAPIC(fmt)	APIC_VERBOSE(IOAPIC_FLAG, fmt)
+#define	APIC_VERBOSE_IRQ(fmt)		APIC_VERBOSE(IRQ_FLAG, fmt)
 
 extern int	apic_error;
 /* values which apic_error can take. Not catastrophic, but may help debug */
@@ -747,8 +768,6 @@ extern int	apic_error;
 #define	INTR_ROUND_ROBIN_WITH_AFFINITY	0
 #define	INTR_ROUND_ROBIN		1
 #define	INTR_LOWEST_PRIORITY		2
-
-
 
 struct ioapic_reprogram_data {
 	boolean_t			done;
@@ -856,6 +875,7 @@ extern int apic_next_bind_cpu;
 extern int apic_redistribute_sample_interval;
 extern int apic_multi_msi_enable;
 extern int apic_sci_vect;
+extern int apic_hpet_vect;
 extern uchar_t apic_ipls[];
 extern apic_reg_ops_t *apic_reg_ops;
 extern int apic_mode;

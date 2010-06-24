@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/hpet_acpi.h>
@@ -35,6 +34,52 @@
 #include <sys/clock.h>
 #include <sys/archsystm.h>
 #include <sys/cpupart.h>
+
+static int hpet_init_proxy(int *hpet_vect, iflag_t *hpet_flags);
+static boolean_t hpet_install_proxy(void);
+static boolean_t hpet_callback(int code);
+static boolean_t hpet_cpr(int code);
+static boolean_t hpet_resume(void);
+static void hpet_cst_callback(uint32_t code);
+static boolean_t hpet_deep_idle_config(int code);
+static int hpet_validate_table(ACPI_TABLE_HPET *hpet_table);
+static boolean_t hpet_checksum_table(unsigned char *table, unsigned int len);
+static void *hpet_memory_map(ACPI_TABLE_HPET *hpet_table);
+static int hpet_start_main_counter(hpet_info_t *hip);
+static int hpet_stop_main_counter(hpet_info_t *hip);
+static uint64_t hpet_read_main_counter_value(hpet_info_t *hip);
+static uint64_t hpet_set_leg_rt_cnf(hpet_info_t *hip, uint32_t new_value);
+static uint64_t hpet_read_gen_cap(hpet_info_t *hip);
+static uint64_t hpet_read_gen_config(hpet_info_t *hip);
+static uint64_t hpet_read_gen_intrpt_stat(hpet_info_t *hip);
+static uint64_t hpet_read_timer_N_config(hpet_info_t *hip, uint_t n);
+static hpet_TN_conf_cap_t hpet_convert_timer_N_config(uint64_t conf);
+/* LINTED E_STATIC_UNUSED */
+static uint64_t hpet_read_timer_N_comp(hpet_info_t *hip, uint_t n);
+/* LINTED E_STATIC_UNUSED */
+static void hpet_write_gen_cap(hpet_info_t *hip, uint64_t l);
+static void hpet_write_gen_config(hpet_info_t *hip, uint64_t l);
+static void hpet_write_gen_intrpt_stat(hpet_info_t *hip, uint64_t l);
+static void hpet_write_timer_N_config(hpet_info_t *hip, uint_t n, uint64_t l);
+static void hpet_write_timer_N_comp(hpet_info_t *hip, uint_t n, uint64_t l);
+static void hpet_disable_timer(hpet_info_t *hip, uint32_t timer_n);
+static void hpet_enable_timer(hpet_info_t *hip, uint32_t timer_n);
+/* LINTED E_STATIC_UNUSED */
+static void hpet_write_main_counter_value(hpet_info_t *hip, uint64_t l);
+static int hpet_get_IOAPIC_intr_capable_timer(hpet_info_t *hip);
+static int hpet_timer_available(uint32_t allocated_timers, uint32_t n);
+static void hpet_timer_alloc(uint32_t *allocated_timers, uint32_t n);
+static void hpet_timer_set_up(hpet_info_t *hip, uint32_t timer_n,
+    uint32_t interrupt);
+static uint_t hpet_isr(char *arg);
+static uint32_t hpet_install_interrupt_handler(uint_t (*func)(char *),
+    int vector);
+static void hpet_uninstall_interrupt_handler(void);
+static void hpet_expire_all(void);
+static boolean_t hpet_guaranteed_schedule(hrtime_t required_wakeup_time);
+static boolean_t hpet_use_hpet_timer(hrtime_t *expire);
+static void hpet_use_lapic_timer(hrtime_t expire);
+static void hpet_init_proxy_data(void);
 
 /*
  * hpet_state_lock is used to synchronize disabling/enabling deep c-states

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -123,6 +123,10 @@ void (*send_dirintf)() 		= return_instr;
 void (*setspl)(int)		= (void (*)(int))return_instr;
 int (*addspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
 int (*delspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
+int (*get_pending_spl)(void)	= (int (*)(void))return_instr;
+int (*addintr)(void *, int, avfunc, char *, int, caddr_t, caddr_t,
+    uint64_t *, dev_info_t *) = NULL;
+void (*remintr)(void *, int, avfunc, int) = NULL;
 void (*kdisetsoftint)(int, struct av_softinfo *)=
 	(void (*)(int, struct av_softinfo *))return_instr;
 void (*setsoftint)(int, struct av_softinfo *)=
@@ -141,6 +145,9 @@ void (*gethrestimef)(timestruc_t *) = pc_gethrestime;
 void (*psm_notify_error)(int, char *) = (void (*)(int, char *))NULL;
 int (*psm_get_clockirq)(int) = NULL;
 int (*psm_get_ipivect)(int, int) = NULL;
+uchar_t (*psm_get_ioapicid)(uchar_t) = NULL;
+uint32_t (*psm_get_localapicid)(uint32_t) = NULL;
+uchar_t (*psm_xlate_vector_by_irq)(uchar_t) = NULL;
 
 int (*psm_clkinit)(int) = NULL;
 void (*psm_timer_reprogram)(hrtime_t) = NULL;
@@ -157,6 +164,9 @@ void (*hrtime_tick)(void)	= return_instr;
 
 int (*psm_cpu_create_devinfo)(cpu_t *, dev_info_t **) = mach_cpu_create_devinfo;
 int (*psm_cpu_get_devinfo)(cpu_t *, dev_info_t **) = NULL;
+
+/* global IRM pool for APIX (PSM) module */
+ddi_irm_pool_t *apix_irm_pool_p = NULL;
 
 /*
  * True if the generic TSC code is our source of hrtime, rather than whatever

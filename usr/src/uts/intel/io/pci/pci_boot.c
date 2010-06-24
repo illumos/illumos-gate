@@ -99,6 +99,7 @@ struct pci_devfunc {
 	boolean_t reprogram;	/* this device needs to be reprogrammed */
 };
 
+extern int apic_nvidia_io_max;
 extern int pseudo_isa;
 extern int pci_bios_maxbus;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
@@ -2058,15 +2059,17 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		pci_bus_res[bus].privdata = entry;
 	}
 
-	if (config_op == CONFIG_INFO &&
-	    IS_CLASS_IOAPIC(basecl, subcl, progcl)) {
+	if (IS_CLASS_IOAPIC(basecl, subcl, progcl)) {
 		create_ioapic_node(bus, dev, func, vendorid, deviceid);
 	}
 
-	/* check for ck8-04 based PCI ISA bridge only */
+	/* check for NVIDIA CK8-04/MCP55 based LPC bridge */
 	if (NVIDIA_IS_LPC_BRIDGE(vendorid, deviceid) && (dev == 1) &&
-	    (func == 0))
+	    (func == 0)) {
 		add_nvidia_isa_bridge_props(dip, bus, dev, func);
+		/* each LPC bridge has an integrated IOAPIC */
+		apic_nvidia_io_max++;
+	}
 
 	if (pciex && is_pci_bridge)
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, "model",

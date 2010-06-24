@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -125,6 +124,12 @@ extern void trap(struct regs *, caddr_t, processorid_t);
 
 extern void do_interrupt(struct regs *, trap_trace_rec_t *);
 extern void memscrub_disable(void);
+
+/*
+ * Interrupt handling hooks
+ */
+extern void (*do_interrupt_common)(struct regs *, trap_trace_rec_t *);
+extern uintptr_t (*get_intr_handler)(int, short);
 
 /*
  * Dispatcher hooks.

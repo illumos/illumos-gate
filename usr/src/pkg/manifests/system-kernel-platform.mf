@@ -862,10 +862,13 @@ $(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/pcplusmp group=sys \
     mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/apix group=sys \
+    mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/uppc group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/pcplusmp group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/uppc group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/mach/apix group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/acpidev group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/gfx_private \

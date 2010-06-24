@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 require 5.8.4;
@@ -66,7 +65,7 @@ while ($_ = shift @ARGV) {
 if ($using_scengen == 0) {
 	require Sun::Solaris::Kstat;
 	require Sun::Solaris::Intrs;
-	import Sun::Solaris::Intrs(qw(intrmove is_pcplusmp));
+	import Sun::Solaris::Intrs(qw(intrmove is_apic));
 	require Sys::Syslog;
 	import Sys::Syslog;
 	openlog($cmdname, 'pid', 'daemon');
@@ -937,8 +936,8 @@ sub do_reconfig($)
 		while (my ($inum, $ivec) = each %{$cpu->{ivecs}}) {
 			next if ($ivec->{origcpu} == $cpuid);
 
-			if (!intrmove($ivec->{buspath}, $ivec->{ino},
-			    $cpuid, $ivec->{num_ino})) {
+			if (!intrmove($ivec->{buspath}, $ivec->{origcpu},
+			    $ivec->{ino}, $cpuid, $ivec->{num_ino})) {
 				syslog('warning', "Unable to move interrupts")
 				    if $warned++ == 0;
 				syslog('debug', "Unable to move buspath ".
@@ -1275,8 +1274,8 @@ my $elem0 = $elem[0];
 my $elemval = (values(%$elem0))[0];
 
 # Use its buspath to query the system.  It is assumed that either all or none
-# of the busses on a system are hosted by the pcplusmp APIC.
-my $pcplusmp_sys = is_pcplusmp($elemval->{buspath});
+# of the busses on a system are hosted by the pcplusmp APIC or APIX.
+my $pcplusmp_sys = is_apic($elemval->{buspath});
 
 my $stat = getstat($ks, $pcplusmp_sys);
 

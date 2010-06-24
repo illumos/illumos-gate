@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_PCI_TOOLS_H
@@ -128,6 +127,7 @@ typedef struct pcitool_intr_set {
 	uint32_t ino;		/* interrupt to set - to kernel */
 	uint32_t msi;		/* Specific MSI to set - to kernel */
 	uint32_t cpu_id;	/* to: cpu to set / from: old cpu returned */
+	uint32_t old_cpu;	/* to/from kernel: old cpu id */
 	uint32_t flags;		/* to kernel */
 	pcitool_errno_t status;	/* from kernel */
 } pcitool_intr_set_t;
@@ -182,6 +182,7 @@ typedef struct pcitool_intr_info {
 	uint16_t drvr_version;		/* Driver version - from kernel */
 	uint32_t flags;			/* to kernel */
 	uint32_t num_intr;		/* Number of intrs suppt by nexus */
+	uint32_t num_cpu;
 	uint32_t ctlr_version;		/* Intr ctlr HW version - from kernel */
 	uchar_t	ctlr_type;		/* A PCITOOL_CTLR_TYPE - from kernel */
 } pcitool_intr_info_t;
@@ -193,6 +194,7 @@ typedef struct pcitool_intr_info {
 #define	PCITOOL_CTLR_TYPE_RISC		1
 #define	PCITOOL_CTLR_TYPE_UPPC		2
 #define	PCITOOL_CTLR_TYPE_PCPLUSMP	3
+#define	PCITOOL_CTLR_TYPE_APIX		4
 
 /*
  * Size and endian fields for acc_attr bitmask.

@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _MDB_INTR_COMMON_H
 #define	_MDB_INTR_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +37,7 @@ extern "C" {
 #include <sys/psm_common.h>
 #include <sys/pic.h>
 #include <sys/apic.h>
+#include <sys/apix.h>
 
 /*
  * Function prototypes
@@ -48,6 +46,12 @@ void interrupt_help(void);
 void interrupt_print_isr(uintptr_t, uintptr_t, uintptr_t);
 void apic_interrupt_dump(apic_irq_t *, struct av_head *, int i,
 	ushort_t *, char);
+void apix_interrupt_dump(apix_vector_t *, apic_irq_t *,
+    struct autovec *, ushort_t *, char);
+void apix_interrupt_ipi_dump(apix_vector_t *, struct autovec *,
+    ushort_t *);
+int ioapic(uintptr_t, uint_t, int, const mdb_arg_t *);
+int apic(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv);
 
 void soft_interrupt_help(void);
 int soft_interrupt_dump(uintptr_t, uint_t, int, const mdb_arg_t *);
@@ -60,6 +64,9 @@ int soft_interrupt_dump(uintptr_t, uint_t, int, const mdb_arg_t *);
 #define	INTR_DISPLAY_INTRSTAT	0x2	/* -i option */
 
 extern int	option_flags;
+
+#define	BUSTYPE_PCI	0x0d
+#define	BUSTYPE_NONE	0x00
 
 /*
  * gld_intr_addr is used to save address of gld_intr() ISR

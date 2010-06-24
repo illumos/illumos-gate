@@ -34,6 +34,13 @@
 #include <sys/sunndi.h>
 #include <sys/ndi_impldefs.h>	/* include prototypes */
 
+#if defined(__i386) || defined(__amd64)
+/*
+ * MSI-X allocation limit.
+ */
+extern uint_t		ddi_msix_alloc_limit;
+#endif
+
 /*
  * Interrupt Resource Management (IRM).
  */
@@ -195,6 +202,90 @@ ndi_irm_create(dev_info_t *dip, ddi_irm_params_t *paramsp,
 
 	*pool_retp = pool_p;
 	return (NDI_SUCCESS);
+}
+
+/*
+ * ndi_irm_resize_pool()
+ *
+ *	Nexus interface to resize IRM pool. If the pool size drops
+ *	below  the allocated number of vectors then initiate rebalance
+ *	operation before resizing the pool. If rebalance operation fails
+ *	then return NDI_FAILURE.
+ */
+int
+ndi_irm_resize_pool(ddi_irm_pool_t *pool_p, uint_t new_size)
+{
+	uint_t prev_size;
+
+	ASSERT(pool_p != NULL);
+
+	DDI_INTR_IRMDBG((CE_CONT, "ndi_irm_resize_pool: pool_p %p"
+	    " current-size 0x%x new-size 0x%x\n",
+	    (void *)pool_p, pool_p->ipool_totsz, new_size));
+
+	if (pool_p == NULL)
+		return (NDI_EINVAL);
+
+	/* Check if IRM is enabled */
+	if (!irm_enable)
+		return (NDI_FAILURE);
+
+	mutex_enter(&pool_p->ipool_lock);
+
+	/*
+	 * If we are increasing the pool size or if the reserved
+	 * number of vectors is <= the new pool size then simply
+	 * update the pool size and enqueue a reblance operation
+	 * if necessary to use the new vectors.
+	 */
+	if ((pool_p->ipool_totsz < new_size) ||
+	    (pool_p->ipool_resno <= new_size)) {
+		/* set new pool size */
+		pool_p->ipool_totsz = new_size;
+		/* adjust the default allocation limit */
+		pool_p->ipool_defsz = MIN(DDI_MAX_MSIX_ALLOC,
+		    MAX(DDI_MIN_MSIX_ALLOC, new_size / DDI_MSIX_ALLOC_DIVIDER));
+		/* queue a rebalance operation to use the new vectors */
+		if (pool_p->ipool_reqno > pool_p->ipool_resno)
+			i_ddi_irm_enqueue(pool_p, B_FALSE);
+		mutex_exit(&pool_p->ipool_lock);
+		return (NDI_SUCCESS);
+	}
+
+	DDI_INTR_IRMDBG((CE_CONT, "ndi_irm_resize_pool: pool_p %p"
+	    " needs a rebalance operation\n", (void *)pool_p));
+
+	/*
+	 * requires a rebalance operation
+	 */
+	/* save the current pool size */
+	prev_size = pool_p->ipool_totsz;
+	/* set the pool size to the desired new value */
+	pool_p->ipool_totsz = new_size;
+	/* perform the rebalance operation */
+	i_ddi_irm_enqueue(pool_p, B_TRUE);
+
+	/*
+	 * If rebalance operation couldn't free up enough
+	 * vectors then fail the resize operation.
+	 */
+	if (pool_p->ipool_resno > new_size) { /* rebalance failed */
+		/* restore the pool size to the previous value */
+		pool_p->ipool_totsz = prev_size;
+		/* enqueue a rebalance operation for the original pool size */
+		i_ddi_irm_enqueue(pool_p, B_FALSE);
+		mutex_exit(&pool_p->ipool_lock);
+		return (NDI_FAILURE);
+	} else { /* rebalance worked */
+		/* adjust the default allocation limit */
+		pool_p->ipool_defsz = MIN(DDI_MAX_MSIX_ALLOC,
+		    MAX(DDI_MIN_MSIX_ALLOC, new_size / DDI_MSIX_ALLOC_DIVIDER));
+		mutex_exit(&pool_p->ipool_lock);
+		DDI_INTR_IRMDBG((CE_CONT, "ndi_irm_resize_pool: pool_p %p"
+		    " resized from %x to %x\n",
+		    (void *)pool_p, prev_size, pool_p->ipool_totsz));
+		return (NDI_SUCCESS);
+	}
 }
 
 /*
@@ -675,6 +766,12 @@ i_ddi_irm_set_cb(dev_info_t *dip, boolean_t has_cb_flag)
 
 		/* Determine new request size */
 		nreq = MIN(req_p->ireq_nreq, pool_p->ipool_defsz);
+
+#if defined(__i386) || defined(__amd64)
+		/* Use the default static limit for non-IRM drivers */
+		if (req_p->ireq_type == DDI_INTR_TYPE_MSIX)
+			nreq = MIN(nreq, ddi_msix_alloc_limit);
+#endif
 
 		/* Update pool statistics */
 		pool_p->ipool_reqno -= req_p->ireq_nreq;

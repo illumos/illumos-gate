@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -139,6 +138,13 @@
 
 extern void audit_enterprom(int);
 extern void audit_exitprom(int);
+
+/*
+ * Tunable to enable apix PSM; if set to 0, pcplusmp PSM will be used.
+ */
+int	apix_enable = 1;
+
+int	apic_nvidia_io_max = 0;	/* no. of NVIDIA i/o apics */
 
 /*
  * Occassionally the kernel knows better whether to power-off or reboot.

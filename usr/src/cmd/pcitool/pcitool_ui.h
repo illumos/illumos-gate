@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PCITOOL_UI_H
@@ -93,6 +92,7 @@ typedef struct uiargs {
 	uint32_t	offset;
 	uint32_t	bytedump_amt;
 	uint32_t	intr_cpu;
+	uint32_t	old_cpu;
 	uint8_t		bus;
 	uint8_t		device;
 	uint8_t		function;

@@ -22,8 +22,8 @@
 #
 # uts/i86pc/Makefile.i86pc
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
 #
 #	This makefile contains the common definitions for the i86pc unix
 #	and all i86pc implementation architecture dependent modules.
@@ -250,6 +250,7 @@ MACH_NOT_YET_KMODS	= $(AUTOCONF_OBJS)
 DRV_KMODS	+= rootnex
 DRV_KMODS	+= isa
 DRV_KMODS	+= pcplusmp
+DRV_KMODS	+= apix
 DRV_KMODS	+= cpc
 DRV_KMODS	+= pci
 DRV_KMODS	+= npe

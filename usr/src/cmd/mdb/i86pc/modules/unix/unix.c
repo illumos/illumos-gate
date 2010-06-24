@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -36,8 +35,14 @@
 #include <sys/mutex.h>
 #include <sys/mutex_impl.h>
 #include "i86mmu.h"
+#include <sys/apix.h>
 
 #define	TT_HDLR_WIDTH	17
+
+
+/* apix only */
+static apix_impl_t *d_apixs[NCPU];
+static int use_apix = 0;
 
 static int
 ttrace_ttr_size_check(void)
@@ -266,6 +271,53 @@ ttrace_interrupt(trap_trace_rec_t *rec)
 
 	return (0);
 }
+
+static int
+ttrace_apix_interrupt(trap_trace_rec_t *rec)
+{
+	struct autovec av;
+	apix_impl_t apix;
+	apix_vector_t apix_vector;
+
+	switch (rec->ttr_regs.r_trapno) {
+	case T_SOFTINT:
+		mdb_printf("%-3s %-*s", "-", TT_HDLR_WIDTH, "(fakesoftint)");
+		return (0);
+	default:
+		break;
+	}
+
+	mdb_printf("%-3x ", rec->ttr_vector);
+
+	/* Read the per CPU apix entry */
+	if (mdb_vread(&apix, sizeof (apix_impl_t),
+	    (uintptr_t)d_apixs[rec->ttr_cpuid]) == -1) {
+		mdb_warn("\ncouldn't read apix[%d]", rec->ttr_cpuid);
+		return (-1);
+	}
+	if (mdb_vread(&apix_vector, sizeof (apix_vector_t),
+	    (uintptr_t)apix.x_vectbl[rec->ttr_vector]) == -1) {
+		mdb_warn("\ncouldn't read apix_vector_t[%d]", rec->ttr_vector);
+		return (-1);
+	}
+	if (apix_vector.v_share == 0) {
+		if (rec->ttr_ipl == XC_CPUPOKE_PIL)
+			mdb_printf("%-*s", TT_HDLR_WIDTH, "(cpupoke)");
+		else
+			mdb_printf("%-*s", TT_HDLR_WIDTH, "(spurious)");
+	} else {
+		if (mdb_vread(&av, sizeof (struct autovec),
+		    (uintptr_t)(apix_vector.v_autovect)) == -1) {
+			mdb_warn("couldn't read autovec at %p",
+			    (uintptr_t)apix_vector.v_autovect);
+		}
+
+		mdb_printf("%-*a", TT_HDLR_WIDTH, av.av_vector);
+	}
+
+	return (0);
+}
+
 
 static struct {
 	int tt_trapno;
@@ -503,6 +555,20 @@ ttrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_OK);
 		}
 		dcmd.ttd_cpu = addr;
+	}
+
+	if (mdb_readvar(&use_apix, "apix_enable") == -1) {
+		mdb_warn("failed to read apix_enable");
+		use_apix = 0;
+	}
+
+	if (use_apix) {
+		if (mdb_readvar(&d_apixs, "apixs") == -1) {
+			mdb_warn("\nfailed to read apixs.");
+			return (DCMD_ERR);
+		}
+		/* change to apix ttrace interrupt handler */
+		ttrace_hdlr[4].t_hdlr = ttrace_apix_interrupt;
 	}
 
 	if (mdb_walk("ttrace", (mdb_walk_cb_t)ttrace_walk, &dcmd) == -1) {

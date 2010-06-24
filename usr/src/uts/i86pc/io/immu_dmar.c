@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright (c) 2010, Oracle and/or its affiliates.
- * All rights reserved.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -49,6 +48,7 @@
 #include <sys/acpica.h>
 #include <sys/iommulib.h>
 #include <sys/immu.h>
+#include <sys/smp_impldefs.h>
 
 static void dmar_table_destroy(dmar_table_t *tbl);
 
@@ -1274,7 +1274,7 @@ immu_dmar_ioapic_sid(int ioapic_ix)
 {
 	ioapic_drhd_t *idt;
 
-	idt = ioapic_drhd_lookup(apic_io_id[ioapic_ix]);
+	idt = ioapic_drhd_lookup(psm_get_ioapicid(ioapic_ix));
 	if (idt == NULL) {
 		ddi_err(DER_PANIC, NULL, "cannot determine source-id for "
 		    "IOAPIC (index = %d)", ioapic_ix);
@@ -1290,7 +1290,7 @@ immu_dmar_ioapic_immu(int ioapic_ix)
 {
 	ioapic_drhd_t *idt;
 
-	idt = ioapic_drhd_lookup(apic_io_id[ioapic_ix]);
+	idt = ioapic_drhd_lookup(psm_get_ioapicid(ioapic_ix));
 	if (idt) {
 		return (idt->ioapic_drhd ? idt->ioapic_drhd->dr_immu : NULL);
 	}

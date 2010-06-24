@@ -54,8 +54,9 @@ MODULE = Sun::Solaris::Intrs		PACKAGE = Sun::Solaris::Intrs
 PROTOTYPES: ENABLE
 
 int
-intrmove(path, ino, cpu, num_ino)
+intrmove(path, oldcpu, ino, cpu, num_ino)
 	char *path
+	int oldcpu 
 	int ino
 	int cpu
 	int num_ino
@@ -67,6 +68,7 @@ intrmove(path, ino, cpu, num_ino)
 	if ((fd = open_dev(path)) == -1) {
 		XSRETURN_UNDEF;
 	}
+	iset.old_cpu = oldcpu;
 	iset.ino = ino;
 	iset.cpu_id = cpu;
 	iset.flags = (num_ino > 1) ? PCITOOL_INTR_FLAG_SET_GROUP : 0;
@@ -81,7 +83,7 @@ intrmove(path, ino, cpu, num_ino)
 	XSRETURN_YES;
 
 int
-is_pcplusmp(path)
+is_apic(path)
 	char *path
 
     INIT:
@@ -101,7 +103,8 @@ is_pcplusmp(path)
 		XSRETURN_UNDEF;
 	}
 
-	if (iinfo.ctlr_type == PCITOOL_CTLR_TYPE_PCPLUSMP) {
+	if (iinfo.ctlr_type == PCITOOL_CTLR_TYPE_PCPLUSMP ||
+	    iinfo.ctlr_type == PCITOOL_CTLR_TYPE_APIX) {
 		XSRETURN_YES;
 	}
 

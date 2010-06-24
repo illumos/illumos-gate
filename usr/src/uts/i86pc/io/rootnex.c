@@ -60,6 +60,7 @@
 #include <vm/hat_i86.h>
 #include <sys/ddifm.h>
 #include <sys/ddi_isa.h>
+#include <sys/apic.h>
 
 #ifdef __xpv
 #include <sys/bootinfo.h>
@@ -157,7 +158,7 @@ typedef paddr_t rootnex_addr_t;
 #endif
 
 #if !defined(__xpv)
-char _depends_on[] = "mach/pcplusmp misc/iommulib misc/acpica";
+char _depends_on[] = "misc/iommulib misc/acpica";
 #endif
 
 static struct cb_ops rootnex_cb_ops = {
@@ -212,6 +213,9 @@ static int rootnex_fm_init(dev_info_t *dip, dev_info_t *tdip, int tcap,
     ddi_iblock_cookie_t *ibc);
 static int rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip,
     ddi_intr_op_t intr_op, ddi_intr_handle_impl_t *hdlp, void *result);
+static int rootnex_alloc_intr_fixed(dev_info_t *, ddi_intr_handle_impl_t *,
+    void *);
+static int rootnex_free_intr_fixed(dev_info_t *, ddi_intr_handle_impl_t *);
 
 static int rootnex_coredma_allochdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_attr_t *attr, int (*waitfp)(caddr_t), caddr_t arg,
@@ -1361,7 +1365,6 @@ rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
 	struct intrspec			*ispec;
-	struct ddi_parent_private_data	*pdp;
 
 	DDI_INTR_NEXDBG((CE_CONT,
 	    "rootnex_intr_ops: pdip = %p, rdip = %p, intr_op = %x, hdlp = %p\n",
@@ -1387,30 +1390,11 @@ rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			return (DDI_FAILURE);
 		break;
 	case DDI_INTROP_ALLOC:
-		if ((ispec = rootnex_get_ispec(rdip, hdlp->ih_inum)) == NULL)
-			return (DDI_FAILURE);
-		hdlp->ih_pri = ispec->intrspec_pri;
-		*(int *)result = hdlp->ih_scratch1;
-		break;
+		ASSERT(hdlp->ih_type == DDI_INTR_TYPE_FIXED);
+		return (rootnex_alloc_intr_fixed(rdip, hdlp, result));
 	case DDI_INTROP_FREE:
-		pdp = ddi_get_parent_data(rdip);
-		/*
-		 * Special case for 'pcic' driver' only.
-		 * If an intrspec was created for it, clean it up here
-		 * See detailed comments on this in the function
-		 * rootnex_get_ispec().
-		 */
-		if (pdp->par_intr && strcmp(ddi_get_name(rdip), "pcic") == 0) {
-			kmem_free(pdp->par_intr, sizeof (struct intrspec) *
-			    pdp->par_nintr);
-			/*
-			 * Set it to zero; so that
-			 * DDI framework doesn't free it again
-			 */
-			pdp->par_intr = NULL;
-			pdp->par_nintr = 0;
-		}
-		break;
+		ASSERT(hdlp->ih_type == DDI_INTR_TYPE_FIXED);
+		return (rootnex_free_intr_fixed(rdip, hdlp));
 	case DDI_INTROP_GETPRI:
 		if ((ispec = rootnex_get_ispec(rdip, hdlp->ih_inum)) == NULL)
 			return (DDI_FAILURE);
@@ -1588,6 +1572,117 @@ rootnex_get_ispec(dev_info_t *rdip, int inum)
 
 	/* Get the interrupt structure pointer and return that */
 	return ((struct intrspec *)&pdp->par_intr[inum]);
+}
+
+/*
+ * Allocate interrupt vector for FIXED (legacy) type.
+ */
+static int
+rootnex_alloc_intr_fixed(dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp,
+    void *result)
+{
+	struct intrspec		*ispec;
+	ddi_intr_handle_impl_t	info_hdl;
+	int			ret;
+	int			free_phdl = 0;
+	apic_get_type_t		type_info;
+
+	if (psm_intr_ops == NULL)
+		return (DDI_FAILURE);
+
+	if ((ispec = rootnex_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * If the PSM module is "APIX" then pass the request for it
+	 * to allocate the vector now.
+	 */
+	bzero(&info_hdl, sizeof (ddi_intr_handle_impl_t));
+	info_hdl.ih_private = &type_info;
+	if ((*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_APIC_TYPE, NULL) ==
+	    PSM_SUCCESS && strcmp(type_info.avgi_type, APIC_APIX_NAME) == 0) {
+		if (hdlp->ih_private == NULL) { /* allocate phdl structure */
+			free_phdl = 1;
+			i_ddi_alloc_intr_phdl(hdlp);
+		}
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		ret = (*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_ALLOC_VECTORS, result);
+		if (free_phdl) { /* free up the phdl structure */
+			free_phdl = 0;
+			i_ddi_free_intr_phdl(hdlp);
+			hdlp->ih_private = NULL;
+		}
+	} else {
+		/*
+		 * No APIX module; fall back to the old scheme where the
+		 * interrupt vector is allocated during ddi_enable_intr() call.
+		 */
+		hdlp->ih_pri = ispec->intrspec_pri;
+		*(int *)result = hdlp->ih_scratch1;
+		ret = DDI_SUCCESS;
+	}
+
+	return (ret);
+}
+
+/*
+ * Free up interrupt vector for FIXED (legacy) type.
+ */
+static int
+rootnex_free_intr_fixed(dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
+{
+	struct intrspec			*ispec;
+	struct ddi_parent_private_data	*pdp;
+	ddi_intr_handle_impl_t		info_hdl;
+	int				ret;
+	apic_get_type_t			type_info;
+
+	if (psm_intr_ops == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * If the PSM module is "APIX" then pass the request for it
+	 * to free up the vector now.
+	 */
+	bzero(&info_hdl, sizeof (ddi_intr_handle_impl_t));
+	info_hdl.ih_private = &type_info;
+	if ((*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_APIC_TYPE, NULL) ==
+	    PSM_SUCCESS && strcmp(type_info.avgi_type, APIC_APIX_NAME) == 0) {
+		if ((ispec = rootnex_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+			return (DDI_FAILURE);
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		ret = (*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_FREE_VECTORS, NULL);
+	} else {
+		/*
+		 * No APIX module; fall back to the old scheme where
+		 * the interrupt vector was already freed during
+		 * ddi_disable_intr() call.
+		 */
+		ret = DDI_SUCCESS;
+	}
+
+	pdp = ddi_get_parent_data(rdip);
+
+	/*
+	 * Special case for 'pcic' driver' only.
+	 * If an intrspec was created for it, clean it up here
+	 * See detailed comments on this in the function
+	 * rootnex_get_ispec().
+	 */
+	if (pdp->par_intr && strcmp(ddi_get_name(rdip), "pcic") == 0) {
+		kmem_free(pdp->par_intr, sizeof (struct intrspec) *
+		    pdp->par_nintr);
+		/*
+		 * Set it to zero; so that
+		 * DDI framework doesn't free it again
+		 */
+		pdp->par_intr = NULL;
+		pdp->par_nintr = 0;
+	}
+
+	return (ret);
 }
 
 

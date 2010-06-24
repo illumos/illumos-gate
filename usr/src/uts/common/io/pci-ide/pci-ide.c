@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -45,6 +44,7 @@
 #include <sys/pci.h>
 #include <sys/promif.h>
 #include <sys/pci_intr_lib.h>
+#include <sys/apic.h>
 
 int	pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 int	pciide_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
@@ -110,7 +110,13 @@ static	void	pciide_compat_setup(dev_info_t *mydip, dev_info_t *cdip,
 static	int	pciide_pre26_rnumber_map(dev_info_t *mydip, int rnumber);
 static	int	pciide_map_rnumber(int canonical_rnumber, int pri_native,
 				    int sec_native);
+static int pciide_alloc_intr(dev_info_t *, dev_info_t *,
+    ddi_intr_handle_impl_t *, void *);
+static int pciide_free_intr(dev_info_t *, dev_info_t *,
+    ddi_intr_handle_impl_t *);
 
+extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
+    psm_intr_op_t, int *);
 
 /*
  * Config information
@@ -716,13 +722,9 @@ pciide_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		    i_ddi_get_intx_nintrs(rdip) : 1;
 		break;
 	case DDI_INTROP_ALLOC:
-		if ((ispecp = pciide_get_ispec(dip, rdip, hdlp->ih_inum)) ==
-		    NULL)
-			return (DDI_FAILURE);
-		*(int *)result = hdlp->ih_scratch1;
-		break;
+		return (pciide_alloc_intr(dip, rdip, hdlp, result));
 	case DDI_INTROP_FREE:
-		break;
+		return (pciide_free_intr(dip, rdip, hdlp));
 	case DDI_INTROP_GETPRI:
 		if (pciide_get_pri(dip, rdip, hdlp, &pri) != DDI_SUCCESS) {
 			*(int *)result = 0;
@@ -767,6 +769,100 @@ pciide_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		return (DDI_FAILURE);
 	}
 
+	return (DDI_SUCCESS);
+}
+
+int
+pciide_alloc_intr(dev_info_t *dip, dev_info_t *rdip,
+    ddi_intr_handle_impl_t *hdlp, void *result)
+{
+	struct intrspec		*ispec;
+	ddi_intr_handle_impl_t	info_hdl;
+	int			ret;
+	int			free_phdl = 0;
+	apic_get_type_t		type_info;
+
+	if (psm_intr_ops == NULL)
+		return (DDI_FAILURE);
+
+	if ((ispec = pciide_get_ispec(dip, rdip, hdlp->ih_inum)) == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * If the PSM module is "APIX" then pass the request for it
+	 * to allocate the vector now.
+	 */
+	bzero(&info_hdl, sizeof (ddi_intr_handle_impl_t));
+	info_hdl.ih_private = &type_info;
+	if ((*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_APIC_TYPE, NULL) ==
+	    PSM_SUCCESS && strcmp(type_info.avgi_type, APIC_APIX_NAME) == 0) {
+		if (hdlp->ih_private == NULL) { /* allocate phdl structure */
+			free_phdl = 1;
+			i_ddi_alloc_intr_phdl(hdlp);
+		}
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		if (PCIIDE_NATIVE_MODE(rdip)) {
+			rdip = dip;
+			dip = ddi_get_parent(dip);
+		} else {	/* get ptr to the root node */
+			dip = ddi_root_node();
+		}
+		ret = (*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_ALLOC_VECTORS, result);
+		if (free_phdl) { /* free up the phdl structure */
+			free_phdl = 0;
+			i_ddi_free_intr_phdl(hdlp);
+		}
+	} else {
+		/*
+		 * No APIX module; fall back to the old scheme where the
+		 * interrupt vector is allocated during ddi_enable_intr() call.
+		 */
+		*(int *)result = hdlp->ih_scratch1;
+		ret = DDI_SUCCESS;
+	}
+
+	return (ret);
+}
+
+int
+pciide_free_intr(dev_info_t *dip, dev_info_t *rdip,
+    ddi_intr_handle_impl_t *hdlp)
+{
+	struct intrspec			*ispec;
+	ddi_intr_handle_impl_t		info_hdl;
+	apic_get_type_t			type_info;
+
+	if (psm_intr_ops == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * If the PSM module is "APIX" then pass the request for it
+	 * to free up the vector now.
+	 */
+	bzero(&info_hdl, sizeof (ddi_intr_handle_impl_t));
+	info_hdl.ih_private = &type_info;
+	if ((*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_APIC_TYPE, NULL) ==
+	    PSM_SUCCESS && strcmp(type_info.avgi_type, APIC_APIX_NAME) == 0) {
+		if ((ispec = pciide_get_ispec(dip, rdip, hdlp->ih_inum)) ==
+		    NULL)
+			return (DDI_FAILURE);
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		if (PCIIDE_NATIVE_MODE(rdip)) {
+			rdip = dip;
+			dip = ddi_get_parent(dip);
+		} else {	/* get ptr to the root node */
+			dip = ddi_root_node();
+		}
+		return ((*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_FREE_VECTORS, NULL));
+	}
+
+	/*
+	 * No APIX module; fall back to the old scheme where
+	 * the interrupt vector was already freed during
+	 * ddi_disable_intr() call.
+	 */
 	return (DDI_SUCCESS);
 }
 

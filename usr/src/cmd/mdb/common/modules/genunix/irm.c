@@ -140,8 +140,17 @@ irmpools_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_devinfo2driver((uintptr_t)pool.ipool_owner, driver,
 	    sizeof (driver));
-	mdb_snprintf(devname, sizeof (devname), "%s#%d", driver,
-	    dev.devi_instance);
+	/*
+	 * Include driver instance number only if the node has an
+	 * instance number assigned (i.e. instance != -1) to it.
+	 * This will cover cases like rootnex driver which doesn't
+	 * have instance number assigned to it.
+	 */
+	if (dev.devi_instance != -1)
+		mdb_snprintf(devname, sizeof (devname), "%s#%d", driver,
+		    dev.devi_instance);
+	else
+		mdb_snprintf(devname, sizeof (devname), "%s", driver);
 
 	mdb_printf("%0?p  %-18s  %-8s  %-6d  %-9d  %-8d\n", addr, devname,
 	    irm_get_type(pool.ipool_types), pool.ipool_totsz,

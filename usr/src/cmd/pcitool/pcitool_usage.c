@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PCITOOL_USAGE_TEXT_H
@@ -148,15 +147,15 @@ NULL
 static char *pcitool_usage_intr[] = {
 "Usage:",
 "Interrupt mode:",
-" %s pci@<unit-address> -i <ino#> | all [ -r [ -c ] | -w <cpu#> [ -g ] ]",
-"       [ -v ] [ -q ]",
-" %s pci@<unit-address> -m <msi#> | all [ -r [ -c ] | -w <cpu#> [ -g ] ]",
-"       [ -v ] [ -q ]",
+" %s pci@<unit-address> -i <[cpu#],ino#> | all",
+"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
+" %s pci@<unit-address> -m <[cpu#],msi#> | all",
+"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
 "",
 "where",
 "",
 "pci@<unit-address> is a node from /devices, with \"/devices\" stripped off.",
-"For example: /pci@1e,600000",
+"For example: /pci@0,0",
 "",
 "-v gives verbose output for all modes.",
 "",
@@ -171,12 +170,16 @@ static char *pcitool_usage_intr[] = {
 "Interrupt mode",
 "--------------",
 "",
-"-i <ino#> changes or retrieves current CPU for interrupts of given nexus",
-"   and given INO. The special value of 'all' can be used to select all INOs.",
+"-i <[cpu#],ino#> changes or retrieves current interrupts information of given",
+"   nexus and given INO. The special value of 'all' can be used to select all",
+"   INOs.",
 "",
-"-m <msi#> changes or retrieves current CPU for interrupts of given nexus",
-"   and given MSI/X. The special value of 'all' can be used to select all",
-"   MSI/Xs.",
+"-m <[cpu#],msi#> changes or retrieves current interrupts information of given",
+"   nexus and given MSI/X. The special value of 'all' can be used to select",
+"   all MSI/Xs.",
+"",
+"   Note: [cpu#] is available on x86 platform, is to identify exclusive vector",
+"   with ino# at the same time. [cpu#] is not supported on SPARC platform.",
 "",
 "   Note: On x86 platforms, both INOs and MSI/Xs are mapped to the same",
 "   interrupt vectors. Use -i option to retrieve and reroute any interrupt",

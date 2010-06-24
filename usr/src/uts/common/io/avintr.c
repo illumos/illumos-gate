@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -217,6 +216,13 @@ add_nmintr(int lvl, avfunc nmintr, char *name, caddr_t arg)
 
 /*
  * register a hardware interrupt handler.
+ *
+ * The autovect data structure only supports globally 256 interrupts.
+ * In order to support 256 * #LocalAPIC interrupts, a new PSM module
+ * apix is introduced. It defines PSM private data structures for the
+ * interrupt handlers. The PSM module initializes addintr to a PSM
+ * private function so that it could override add_avintr() to operate
+ * on its private data structures.
  */
 int
 add_avintr(void *intr_id, int lvl, avfunc xxintr, char *name, int vect,
@@ -226,6 +232,11 @@ add_avintr(void *intr_id, int lvl, avfunc xxintr, char *name, int vect,
 	avfunc f;
 	int s, vectindex;			/* save old spl value */
 	ushort_t hi_pri;
+
+	if (addintr) {
+		return ((*addintr)(intr_id, lvl, xxintr, name, vect,
+		    arg1, arg2, ticksp, dip));
+	}
 
 	if ((f = xxintr) == NULL) {
 		printf("Attempt to add null vect for %s on vector %d\n",
@@ -327,7 +338,10 @@ add_avsoftintr(void *intr_id, int lvl, avfunc xxintr, char *name,
 	return (1);
 }
 
-/* insert an interrupt vector into chain */
+/*
+ * insert an interrupt vector into chain by its priority from high
+ * to low
+ */
 static void
 insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
     caddr_t arg2, uint64_t *ticksp, int pri_level, dev_info_t *dip)
@@ -335,7 +349,7 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 	/*
 	 * Protect rewrites of the list
 	 */
-	struct autovec *p, *mem;
+	struct autovec *p, *prep, *mem;
 
 	mem = kmem_zalloc(sizeof (struct autovec), KM_SLEEP);
 	mem->av_vector = f;
@@ -358,8 +372,15 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 	}
 
 	/* find where it goes in list */
+	prep = NULL;
 	for (p = vectp->avh_link; p != NULL; p = p->av_link) {
-		if (p->av_vector == NULL) {	/* freed struct available */
+		if (p->av_vector && p->av_prilevel <= pri_level)
+			break;
+		prep = p;
+	}
+	if (prep != NULL) {
+		if (prep->av_vector == NULL) {	/* freed struct available */
+			p = prep;
 			p->av_intarg1 = arg1;
 			p->av_intarg2 = arg2;
 			p->av_ticksp = ticksp;
@@ -381,10 +402,14 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 			kmem_free(mem, sizeof (struct autovec));
 			return;
 		}
+
+		mem->av_link = prep->av_link;
+		prep->av_link = mem;
+	} else {
+		/* insert new intpt at beginning of chain */
+		mem->av_link = vectp->avh_link;
+		vectp->avh_link = mem;
 	}
-	/* insert new intpt at beginning of chain */
-	mem->av_link = vectp->avh_link;
-	vectp->avh_link = mem;
 	if (pri_level > (int)vectp->avh_hi_pri) {
 		vectp->avh_hi_pri = (ushort_t)pri_level;
 	}
@@ -450,12 +475,24 @@ rem_avsoftintr(void *intr_id, int lvl, avfunc xxintr)
 	return (av_rem_softintr(intr_id, lvl, xxintr, B_TRUE));
 }
 
+/*
+ * Remove specified interrupt handler.
+ *
+ * PSM module could initialize remintr to some PSM private function
+ * so that it could override rem_avintr() to operate on its private
+ * data structures.
+ */
 void
 rem_avintr(void *intr_id, int lvl, avfunc xxintr, int vect)
 {
 	struct av_head *vecp = (struct av_head *)0;
 	avfunc f;
 	int s, vectindex;			/* save old spl value */
+
+	if (remintr) {
+		(*remintr)(intr_id, lvl, xxintr, vect);
+		return;
+	}
 
 	if ((f = xxintr) == NULL)
 		return;
@@ -476,7 +513,7 @@ rem_avintr(void *intr_id, int lvl, avfunc xxintr, int vect)
  * seen each cpu not executing an interrupt at that level--so we know our
  * change has taken effect completely (no old state in registers, etc).
  */
-static void
+void
 wait_till_seen(int ipl)
 {
 	int cpu_in_chain, cix;

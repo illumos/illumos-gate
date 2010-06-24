@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _IA32_SYS_TRAPTRACE_H
@@ -64,6 +63,7 @@ typedef struct {
 	greg_t		ttr_cr2;
 	union _ttr_info {
 		struct _idt_entry {
+			int	cpuid;
 			short	vector;
 			uchar_t	ipl;
 			uchar_t	spl;
@@ -81,6 +81,7 @@ typedef struct {
 	pc_t		ttr_stack[TTR_STACK_DEPTH];
 } trap_trace_rec_t;
 
+#define	ttr_cpuid	ttr_info.idt_entry.cpuid
 #define	ttr_vector	ttr_info.idt_entry.vector
 #define	ttr_ipl		ttr_info.idt_entry.ipl
 #define	ttr_spl		ttr_info.idt_entry.spl

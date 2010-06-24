@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #	This Makefile defines file modules in the directory uts/i86xpv
@@ -199,7 +198,8 @@ PRIVCMD_OBJS += seg_mf.o privcmd.o privcmd_hcall.o
 ROOTNEX_OBJS += rootnex.o
 XPVTOD_OBJS += xpvtod.o
 XPV_AUTOCONFIG_OBJS += xpv_autoconfig.o
-XPV_PSM_OBJS += xpv_psm.o mp_platform_common.o apic_introp.o apic_regops.o psm_common.o
+XPV_PSM_OBJS += xpv_psm.o mp_platform_common.o mp_platform_xpv.o \
+		apic_regops.o psm_common.o xpv_intr.o
 XPV_UPPC_OBJS += xpv_uppc.o psm_common.o
 XENBUS_OBJS += xenbus_dev.o
 XENCONS_OBJS += xencons.o

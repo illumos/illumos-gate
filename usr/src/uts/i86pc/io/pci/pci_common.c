@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -59,10 +58,15 @@ static int	pci_enable_intr(dev_info_t *, dev_info_t *,
 		    ddi_intr_handle_impl_t *, uint32_t);
 static void	pci_disable_intr(dev_info_t *, dev_info_t *,
 		    ddi_intr_handle_impl_t *, uint32_t);
+static int	pci_alloc_intr_fixed(dev_info_t *, dev_info_t *,
+		    ddi_intr_handle_impl_t *, void *);
+static int	pci_free_intr_fixed(dev_info_t *, dev_info_t *,
+		    ddi_intr_handle_impl_t *);
 
-/* Extern decalration for pcplusmp module */
+/* Extern declarations for PSM module */
 extern int	(*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
 		    psm_intr_op_t, int *);
+extern ddi_irm_pool_t *apix_irm_pool_p;
 
 /*
  * pci_name_child:
@@ -205,6 +209,7 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	ihdl_plat_t		*ihdl_plat_datap;
 	ddi_intr_handle_t	*h_array;
 	ddi_acc_handle_t	handle;
+	apic_get_intr_t		intrinfo;
 
 	DDI_INTR_NEXDBG((CE_CONT,
 	    "pci_common_intr_ops: pdip 0x%p, rdip 0x%p, op %x handle 0x%p\n",
@@ -264,7 +269,7 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: "
 		    "rdip: 0x%p supported types: 0x%x\n", (void *)rdip,
-		    *(int *)result));
+		    types));
 
 		/*
 		 * Export any MSI/MSI-X cap locations via properties
@@ -302,9 +307,14 @@ SUPPORTED_TYPES_OUT:
 		}
 		break;
 	case DDI_INTROP_ALLOC:
+
+		/*
+		 * FIXED type
+		 */
+		if (hdlp->ih_type == DDI_INTR_TYPE_FIXED)
+			return (pci_alloc_intr_fixed(pdip, rdip, hdlp, result));
 		/*
 		 * MSI or MSIX (figure out number of vectors available)
-		 * FIXED interrupts: just return available interrupts
 		 */
 		if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type) &&
 		    (psm_intr_ops != NULL) &&
@@ -411,12 +421,6 @@ SUPPORTED_TYPES_OUT:
 				++pcieb_intr_pri_counter;
 			}
 
-		} else if (hdlp->ih_type == DDI_INTR_TYPE_FIXED) {
-			/* Figure out if this device supports MASKING */
-			pci_rval = pci_intx_get_cap(rdip, &pci_status);
-			if (pci_rval == DDI_SUCCESS && pci_status)
-				hdlp->ih_cap |= pci_status;
-			*(int *)result = 1;	/* DDI_INTR_TYPE_FIXED */
 		} else
 			return (DDI_FAILURE);
 		break;
@@ -446,7 +450,10 @@ SUPPORTED_TYPES_OUT:
 					i_ddi_set_msix(hdlp->ih_dip, NULL);
 				}
 			}
-		}
+		} else if (hdlp->ih_type == DDI_INTR_TYPE_FIXED) {
+			return (pci_free_intr_fixed(pdip, rdip, hdlp));
+		} else
+			return (DDI_FAILURE);
 		break;
 	case DDI_INTROP_GETPRI:
 		/* Get the priority */
@@ -532,7 +539,7 @@ SUPPORTED_TYPES_OUT:
 		else if (hdlp->ih_type == DDI_INTR_TYPE_FIXED)
 			pci_rval = pci_intx_get_cap(rdip, &pci_status);
 
-		/* next check with pcplusmp */
+		/* next check with PSM module */
 		if (psm_intr_ops != NULL)
 			psm_rval = (*psm_intr_ops)(rdip, hdlp,
 			    PSM_INTR_OP_GET_CAP, &psm_status);
@@ -660,7 +667,7 @@ SUPPORTED_TYPES_OUT:
 				pci_status = pci_intx_clr_mask(rdip);
 		}
 
-		/* For MSI/X; no need to check with pcplusmp */
+		/* For MSI/X; no need to check with PSM module */
 		if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
 			return (pci_status);
 
@@ -669,7 +676,7 @@ SUPPORTED_TYPES_OUT:
 		    pci_status == DDI_SUCCESS)
 			break;
 
-		/* For fixed interrupts only: confer with pcplusmp next */
+		/* For fixed interrupts only: confer with PSM module next */
 		if (psm_intr_ops != NULL) {
 			/* If interrupt is shared; do nothing */
 			psm_rval = (*psm_intr_ops)(rdip, hdlp,
@@ -678,7 +685,7 @@ SUPPORTED_TYPES_OUT:
 			if (psm_rval == PSM_FAILURE || psm_status == 1)
 				return (pci_status);
 
-			/* Now, pcplusmp should try to set/clear the mask */
+			/* Now, PSM module should try to set/clear the mask */
 			if (intr_op == DDI_INTROP_SETMASK)
 				psm_rval = (*psm_intr_ops)(rdip, hdlp,
 				    PSM_INTR_OP_SET_MASK, NULL);
@@ -698,7 +705,7 @@ SUPPORTED_TYPES_OUT:
 		else if (hdlp->ih_type == DDI_INTR_TYPE_FIXED)
 			pci_rval = pci_intx_get_pending(rdip, &pci_status);
 
-		/* On failure; next try with pcplusmp */
+		/* On failure; next try with PSM module */
 		if (pci_rval != DDI_SUCCESS && psm_intr_ops != NULL)
 			psm_rval = (*psm_intr_ops)(rdip, hdlp,
 			    PSM_INTR_OP_GET_PENDING, &psm_status);
@@ -722,32 +729,150 @@ SUPPORTED_TYPES_OUT:
 	case DDI_INTROP_GETTARGET:
 		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: GETTARGET\n"));
 
-		/* Note hdlp->ih_vector is actually an irq */
-		if ((rv = pci_get_cpu_from_vecirq(hdlp->ih_vector, IS_IRQ)) ==
-		    -1)
+		bcopy(hdlp, &tmp_hdl, sizeof (ddi_intr_handle_impl_t));
+		tmp_hdl.ih_private = (void *)&intrinfo;
+		intrinfo.avgi_req_flags = PSMGI_INTRBY_DEFAULT;
+		intrinfo.avgi_req_flags |= PSMGI_REQ_CPUID;
+
+		if ((*psm_intr_ops)(rdip, &tmp_hdl, PSM_INTR_OP_GET_INTR,
+		    NULL) == PSM_FAILURE)
 			return (DDI_FAILURE);
-		*(int *)result = rv;
+
+		*(int *)result = intrinfo.avgi_cpu_id;
 		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: GETTARGET "
-		    "vector = 0x%x, cpu = 0x%x\n", hdlp->ih_vector, rv));
+		    "vector = 0x%x, cpu = 0x%x\n", hdlp->ih_vector,
+		    *(int *)result));
 		break;
 	case DDI_INTROP_SETTARGET:
 		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: SETTARGET\n"));
 
-		/* hdlp->ih_vector is actually an irq */
-		tmp_hdl.ih_vector = hdlp->ih_vector;
-		tmp_hdl.ih_flags = PSMGI_INTRBY_IRQ;
+		bcopy(hdlp, &tmp_hdl, sizeof (ddi_intr_handle_impl_t));
 		tmp_hdl.ih_private = (void *)(uintptr_t)*(int *)result;
-		psm_rval = (*psm_intr_ops)(rdip, &tmp_hdl, PSM_INTR_OP_SET_CPU,
-		    &psm_status);
+		tmp_hdl.ih_flags = PSMGI_INTRBY_DEFAULT;
 
-		if (psm_rval != PSM_SUCCESS)
+		if ((*psm_intr_ops)(rdip, &tmp_hdl, PSM_INTR_OP_SET_CPU,
+		    &psm_status) == PSM_FAILURE)
 			return (DDI_FAILURE);
+
+		hdlp->ih_vector = tmp_hdl.ih_vector;
+		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: SETTARGET "
+		    "vector = 0x%x\n", hdlp->ih_vector));
 		break;
+	case DDI_INTROP_GETPOOL:
+		/*
+		 * For MSI/X interrupts use global IRM pool if available.
+		 */
+		if (apix_irm_pool_p && DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type)) {
+			*(ddi_irm_pool_t **)result = apix_irm_pool_p;
+			return (DDI_SUCCESS);
+		}
+		return (DDI_ENOTSUP);
 	default:
 		return (i_ddi_intr_ops(pdip, rdip, intr_op, hdlp, result));
 	}
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * Allocate a vector for FIXED type interrupt.
+ */
+int
+pci_alloc_intr_fixed(dev_info_t *pdip, dev_info_t *rdip,
+    ddi_intr_handle_impl_t *hdlp, void *result)
+{
+	struct intrspec		*ispec;
+	ddi_intr_handle_impl_t	info_hdl;
+	int			ret;
+	int			free_phdl = 0;
+	int			pci_rval;
+	int			pci_status = 0;
+	apic_get_type_t		type_info;
+
+	if (psm_intr_ops == NULL)
+		return (DDI_FAILURE);
+
+	/* Figure out if this device supports MASKING */
+	pci_rval = pci_intx_get_cap(rdip, &pci_status);
+	if (pci_rval == DDI_SUCCESS && pci_status)
+		hdlp->ih_cap |= pci_status;
+
+	/*
+	 * If the PSM module is "APIX" then pass the request for
+	 * allocating the vector now.
+	 */
+	bzero(&info_hdl, sizeof (ddi_intr_handle_impl_t));
+	info_hdl.ih_private = &type_info;
+	if ((*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_APIC_TYPE, NULL) ==
+	    PSM_SUCCESS && strcmp(type_info.avgi_type, APIC_APIX_NAME) == 0) {
+		ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip,
+		    (int)hdlp->ih_inum);
+		if (ispec == NULL)
+			return (DDI_FAILURE);
+		if (hdlp->ih_private == NULL) { /* allocate phdl structure */
+			free_phdl = 1;
+			i_ddi_alloc_intr_phdl(hdlp);
+		}
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		ret = (*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_ALLOC_VECTORS, result);
+		if (free_phdl) { /* free up the phdl structure */
+			free_phdl = 0;
+			i_ddi_free_intr_phdl(hdlp);
+			hdlp->ih_private = NULL;
+		}
+	} else {
+		/*
+		 * No APIX module; fall back to the old scheme where the
+		 * interrupt vector is allocated during ddi_enable_intr() call.
+		 */
+		*(int *)result = 1;
+		ret = DDI_SUCCESS;
+	}
+
+	return (ret);
+}
+
+/*
+ * Free up the vector for FIXED (legacy) type interrupt.
+ */
+static int
+pci_free_intr_fixed(dev_info_t *pdip, dev_info_t *rdip,
+    ddi_intr_handle_impl_t *hdlp)
+{
+	struct intrspec			*ispec;
+	ddi_intr_handle_impl_t		info_hdl;
+	int				ret;
+	apic_get_type_t			type_info;
+
+	if (psm_intr_ops == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * If the PSM module is "APIX" then pass the request to it
+	 * to free up the vector now.
+	 */
+	bzero(&info_hdl, sizeof (ddi_intr_handle_impl_t));
+	info_hdl.ih_private = &type_info;
+	if ((*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_APIC_TYPE, NULL) ==
+	    PSM_SUCCESS && strcmp(type_info.avgi_type, APIC_APIX_NAME) == 0) {
+		ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip,
+		    (int)hdlp->ih_inum);
+		if (ispec == NULL)
+			return (DDI_FAILURE);
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		ret = (*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_FREE_VECTORS, NULL);
+	} else {
+		/*
+		 * No APIX module; fall back to the old scheme where
+		 * the interrupt vector was already freed during
+		 * ddi_disable_intr() call.
+		 */
+		ret = DDI_SUCCESS;
+	}
+
+	return (ret);
 }
 
 int
@@ -765,7 +890,7 @@ pci_get_intr_from_vecirq(apic_get_intr_t *intrinfo_p,
 	 * global interrupt handling.
 	 */
 	get_info_ii_hdl.ih_private = intrinfo_p;
-	get_info_ii_hdl.ih_vector = (ushort_t)vecirq;
+	get_info_ii_hdl.ih_vector = vecirq;
 
 	if ((*psm_intr_ops)(NULL, &get_info_ii_hdl,
 	    PSM_INTR_OP_GET_INTR, NULL) == PSM_FAILURE)
@@ -779,8 +904,8 @@ int
 pci_get_cpu_from_vecirq(int vecirq, boolean_t is_irq)
 {
 	int rval;
-
 	apic_get_intr_t	intrinfo;
+
 	intrinfo.avgi_req_flags = PSMGI_REQ_CPUID;
 	rval = pci_get_intr_from_vecirq(&intrinfo, vecirq, is_irq);
 
@@ -825,8 +950,7 @@ pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
 	    hdlp->ih_cb_arg2, &ihdl_plat_datap->ip_ticks, rdip))
 		return (DDI_FAILURE);
 
-	/* Note this really is an irq. */
-	hdlp->ih_vector = (ushort_t)irq;
+	hdlp->ih_vector = irq;
 
 	return (DDI_SUCCESS);
 }

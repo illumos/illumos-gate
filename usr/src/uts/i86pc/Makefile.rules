@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #	This Makefile defines the build rules for the directory uts/i86pc
@@ -137,6 +136,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pcplusmp/%.c
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pcplusmp/%.s
 	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/apix/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/ppm/%.c
 	$(COMPILE.c) -o $@ $<
@@ -364,6 +367,12 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pcplusmp/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pcplusmp/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/apix/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/apix/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ppm/%.c

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SUNNDI_H
@@ -280,7 +279,7 @@ boolean_t
 ndi_port_type(dev_info_t *dip, boolean_t up, uint32_t port_type);
 
 /*
- * Create/Destroy Interrupt Resource Management (IRM) Pools.
+ * Interrupt Resource Management (IRM) Pools.
  */
 int
 ndi_irm_create(dev_info_t *dip, ddi_irm_params_t *paramsp,
@@ -288,6 +287,9 @@ ndi_irm_create(dev_info_t *dip, ddi_irm_params_t *paramsp,
 
 int
 ndi_irm_destroy(ddi_irm_pool_t *poolp);
+
+int
+ndi_irm_resize_pool(ddi_irm_pool_t *poolp, uint_t newsize);
 
 /*
  * Take a device node "Offline".

@@ -359,6 +359,8 @@ int32_t i_ddi_set_intr_weight(dev_info_t *, int32_t);
 void	i_ddi_alloc_intr_phdl(ddi_intr_handle_impl_t *);
 void	i_ddi_free_intr_phdl(ddi_intr_handle_impl_t *);
 
+extern	int irm_enable; /* global flag for IRM */
+
 #define	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, func, arg1, arg2) \
 	hdlp->ih_cb_func = func; \
 	hdlp->ih_cb_arg1 = arg1; \

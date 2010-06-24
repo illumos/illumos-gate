@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "intr_common.h"
 
@@ -89,10 +86,10 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 	}
 
 	/*
-	 * By default, on all x86 systems ::interrupts from uppc(7d) gets
-	 * loaded first. For APIC systems the ::interrupts from pcplusmp(7d)
-	 * ought to be executed. Confusion stems as both modules export the
-	 * same dcmd.
+	 * By default, on all x86 systems ::interrupts from uppc gets
+	 * loaded first. For APIC systems the ::interrupts from either
+	 * apix or pcplusmp ought to be executed. Confusion stems as
+	 * these three modules export the same dcmd.
 	 */
 	for (i = 0; i < MAX_ISA_IRQ + 1; i++)
 		if (shared_tbl[i]) {
@@ -101,7 +98,10 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 		}
 
 	if (found == B_FALSE) {
-		if (mdb_lookup_by_obj("pcplusmp", "apic_irq_table",
+		if (mdb_lookup_by_obj("apix", "apixs", NULL) == 0) {
+			return (mdb_call_dcmd("apix`interrupts",
+			    addr, flags, argc, argv));
+		} else if (mdb_lookup_by_obj("pcplusmp", "apic_irq_table",
 		    NULL) == 0) {
 			return (mdb_call_dcmd("pcplusmp`interrupts",
 			    addr, flags, argc, argv));

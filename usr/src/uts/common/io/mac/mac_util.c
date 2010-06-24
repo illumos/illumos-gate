@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -582,11 +581,12 @@ typedef struct mac_dladm_intr {
 
 /* Bind the interrupt to cpu_num */
 static int
-mac_set_intr(ldi_handle_t lh, processorid_t cpu_num, int ino)
+mac_set_intr(ldi_handle_t lh, processorid_t cpu_num, int oldcpuid, int ino)
 {
 	pcitool_intr_set_t	iset;
 	int			err;
 
+	iset.old_cpu = oldcpuid;
 	iset.ino = ino;
 	iset.cpu_id = cpu_num;
 	iset.user_version = PCITOOL_VERSION;
@@ -625,7 +625,8 @@ mac_search_intrinfo(pcitool_intr_get_t *iget_p, mac_dladm_intr_t *dln)
  * device and where it is bound etc.
  */
 static boolean_t
-mac_get_single_intr(ldi_handle_t lh, int ino, mac_dladm_intr_t *dln)
+mac_get_single_intr(ldi_handle_t lh, int oldcpuid, int ino,
+    mac_dladm_intr_t *dln)
 {
 	pcitool_intr_get_t	*iget_p;
 	int			ipsz;
@@ -643,6 +644,7 @@ mac_get_single_intr(ldi_handle_t lh, int ino, mac_dladm_intr_t *dln)
 
 	iget_p->num_devs_ret = 0;
 	iget_p->user_version = PCITOOL_VERSION;
+	iget_p->cpu_id = oldcpuid;
 	iget_p->ino = ino;
 
 	err = ldi_ioctl(lh, PCITOOL_DEVICE_GET_INTR, (intptr_t)iget_p,
@@ -665,6 +667,7 @@ mac_get_single_intr(ldi_handle_t lh, int ino, mac_dladm_intr_t *dln)
 		iget_p = kmem_zalloc(ipsz, KM_SLEEP);
 
 		iget_p->num_devs_ret = inum;
+		iget_p->cpu_id = oldcpuid;
 		iget_p->ino = ino;
 		iget_p->user_version = PCITOOL_VERSION;
 		err = ldi_ioctl(lh, PCITOOL_DEVICE_GET_INTR, (intptr_t)iget_p,
@@ -697,17 +700,20 @@ mac_validate_intr(ldi_handle_t lh, mac_dladm_intr_t *dln, processorid_t cpuid)
 	pcitool_intr_info_t	intr_info;
 	int			err;
 	int			ino;
+	int			oldcpuid;
 
 	err = ldi_ioctl(lh, PCITOOL_SYSTEM_INTR_INFO, (intptr_t)&intr_info,
 	    FKIOCTL, kcred, NULL);
 	if (err != 0)
 		return (-1);
 
-	for (ino = 0; ino < intr_info.num_intr; ino++) {
-		if (mac_get_single_intr(lh, ino, dln)) {
-			if (dln->cpu_id == cpuid)
-				return (0);
-			return (1);
+	for (oldcpuid = 0; oldcpuid < intr_info.num_cpu; oldcpuid++) {
+		for (ino = 0; ino < intr_info.num_intr; ino++) {
+			if (mac_get_single_intr(lh, oldcpuid, ino, dln)) {
+				if (dln->cpu_id == cpuid)
+					return (0);
+				return (1);
+			}
 		}
 	}
 	return (-1);
@@ -804,7 +810,8 @@ mac_check_interrupt_binding(dev_info_t *mdip, int32_t cpuid)
 	}
 	/* cmn_note? */
 	if (ret != 0)
-		if ((err = (mac_set_intr(lh, cpuid, dln.ino))) != 0) {
+		if ((err = (mac_set_intr(lh, cpuid, dln.cpu_id, dln.ino)))
+		    != 0) {
 			(void) ldi_close(lh, FREAD|FWRITE, kcred);
 			return (B_FALSE);
 		}

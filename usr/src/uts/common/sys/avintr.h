@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_AVINTR_H
@@ -69,7 +68,14 @@ struct autovec {
 	 */
 	void	*av_intr_id;
 	dev_info_t *av_dip;
+	ushort_t	av_flags;	/* pending flags */
+	struct autovec *av_ipl_link;	/* pointer to next on ipl chain */
 };
+
+#define	AV_PENTRY_VECTMASK	0xff	/* low 8 bit used for irqno */
+#define	AV_PENTRY_PEND	0x100	/* pending hardware interrupt */
+#define	AV_PENTRY_ONPROC	0x200	/* being serviced by CPU */
+#define	AV_PENTRY_LEVEL	0x8000	/* level-triggered interrupt */
 
 struct av_head {
 	struct 	autovec	*avh_link;
@@ -96,6 +102,7 @@ extern int rem_avsoftintr(void *intr_id, int lvl, avfunc xxintr);
 extern int av_softint_movepri(void *intr_id, int old_lvl);
 extern void update_avsoftintr_args(void *intr_id, int lvl, caddr_t arg2);
 extern void rem_avintr(void *intr_id, int lvl, avfunc xxintr, int vect);
+extern void wait_till_seen(int ipl);
 extern uint_t softlevel1(caddr_t, caddr_t);
 
 #endif	/* _KERNEL */

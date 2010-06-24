@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -2132,7 +2131,14 @@ dump_ttrace(void)
 
 			case TT_INTERRUPT:
 				printf(fmt2, "intr", rec->ttr_vector);
-				vec = (&autovect[rec->ttr_vector])->avh_link;
+				if (get_intr_handler != NULL)
+					vec = (struct autovec *)
+					    (*get_intr_handler)
+					    (rec->ttr_cpuid, rec->ttr_vector);
+				else
+					vec =
+					    autovect[rec->ttr_vector].avh_link;
+
 				if (vec != NULL) {
 					sym = kobj_getsymname(
 					    (uintptr_t)vec->av_vector, &off);

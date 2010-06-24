@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "intr_common.h"
 #include <sys/multidata.h>
@@ -196,6 +193,21 @@ get_interrupt_type(short index)
 		return ("Fixed");
 }
 
+static char *
+get_apix_interrupt_type(short type)
+{
+	if (type == APIX_TYPE_IPI)
+		return ("IPI");
+	else if (type == APIX_TYPE_FIXED)
+		return ("Fixed");
+	else if (type == APIX_TYPE_MSI)
+		return ("MSI");
+	else if (type == APIX_TYPE_MSIX)
+		return ("MSI-X");
+	else
+		return ("Fixed");
+}
+
 void
 apic_interrupt_dump(apic_irq_t *irqp, struct av_head *avp,
     int i, ushort_t *evtchnp, char level)
@@ -296,5 +308,148 @@ apic_interrupt_dump(apic_irq_t *irqp, struct av_head *avp,
 		    (uintptr_t)avp->avh_link) != -1)
 			mdb_printf("%a", avhp.av_vector);
 	}
+	mdb_printf("\n");
+}
+
+void
+apix_interrupt_dump(apix_vector_t *vectp, apic_irq_t *irqp,
+    struct autovec *avp, ushort_t *evtchnp, char level)
+{
+	int		j;
+	int		bus_type;
+	char		*intr_type;
+	char		irq[4];
+	char		ioapic_iline[10];
+	char		ipl[3];
+	char		cpu_assigned[4];
+	char		cpu_vector[10];
+	char		evtchn[8];
+
+
+	/* If invalid vector state; continue */
+	if (vectp->v_state == APIX_STATE_FREED ||
+	    vectp->v_state == APIX_STATE_OBSOLETED)
+		return;
+
+	/* use apic_interrupt_ipi_dump for IPIs */
+	if (vectp->v_type == APIX_TYPE_IPI)
+		return;
+
+	/* Figure out interrupt type and trigger information */
+	intr_type = get_apix_interrupt_type(vectp->v_type);
+
+	/* Figure out IOAPIC number and ILINE number */
+	if (vectp->v_type != APIX_TYPE_FIXED) {
+		level = 0; /* MSI/MSI-X are Edge trigger */
+		(void) mdb_snprintf(irq, 4, "-   ");
+		(void) mdb_snprintf(ioapic_iline, 10, "-    ");
+		if (vectp->v_type == APIX_TYPE_IPI)
+			bus_type = BUSTYPE_NONE;
+		else
+			/* statically assign MSI/X with "PCI" */
+			bus_type = BUSTYPE_PCI;
+	} else {
+		(void) mdb_snprintf(irq, 4, "%d", vectp->v_inum);
+		bus_type = irqp->airq_iflag.bustype;
+		if (!irqp->airq_ioapicindex && !irqp->airq_intin_no) {
+			if (strcmp(intr_type, "Fixed") == 0)
+				(void) mdb_snprintf(ioapic_iline, 10,
+				    "0x%x/0x%x", irqp->airq_ioapicindex,
+				    irqp->airq_intin_no);
+			else
+				(void) mdb_snprintf(ioapic_iline, 10, "-    ");
+		} else
+			(void) mdb_snprintf(ioapic_iline, 10, "0x%x/0x%x",
+			    irqp->airq_ioapicindex, irqp->airq_intin_no);
+	}
+
+	evtchn[0] = '\0';
+	if (evtchnp != NULL)
+		(void) mdb_snprintf(evtchn, 8, "%-7hd", *evtchnp);
+
+	(void) mdb_snprintf(cpu_assigned, 4, "%d", vectp->v_cpuid);
+	(void) mdb_snprintf(cpu_vector, 10, "%d/0x%x",
+	    vectp->v_cpuid, vectp->v_vector);
+
+	/* Loop all the shared vectors */
+	for (j = 0; j < vectp->v_share; ) {
+		/* shared interrupts with one or more ISR removed afterwards */
+		if (avp->av_vector == NULL) {
+			if (mdb_vread(avp, sizeof (struct autovec),
+			    (uintptr_t)avp->av_link) == -1)
+				break;
+			else
+				continue;
+		}
+
+		(void) mdb_snprintf(ipl, 3, "%d", avp->av_prilevel);
+		/* Print each interrupt entry */
+		if (option_flags & INTR_DISPLAY_INTRSTAT)
+			mdb_printf("%-4s", cpu_assigned);
+		else
+			mdb_printf("%-9s %-3s %s%-3s %-6s %-3s %-6s %-3d   "
+			    "%-9s ", cpu_vector, irq, evtchn, ipl,
+			    (bus_type ? businfo_array[bus_type] : "-"),
+			    (level ? "Lvl" : "Edg"),
+			    intr_type, vectp->v_share, ioapic_iline);
+
+		interrupt_print_isr((uintptr_t)avp->av_vector,
+		    (uintptr_t)avp->av_intarg1, (uintptr_t)avp->av_dip);
+		mdb_printf("\n");
+
+		if (++j == vectp->v_share)
+			break; /* done */
+
+		if (mdb_vread(avp, sizeof (struct autovec),
+		    (uintptr_t)avp->av_link) == -1)
+			break;
+	}
+}
+
+void
+apix_interrupt_ipi_dump(apix_vector_t *vectp, struct autovec *avp,
+    ushort_t *evtchnp)
+{
+	char		*intr_type = "IPI";
+	char		ioapic_iline[10];
+	char		ipl[3];
+	char		cpu_assigned[4];
+	char		cpu_vector[10];
+	char		evtchn[8];
+
+	/* If invalid vector state; continue */
+	if (vectp->v_state == APIX_STATE_FREED ||
+	    vectp->v_state == APIX_STATE_OBSOLETED)
+		return;
+
+	if (vectp->v_type != APIX_TYPE_IPI)
+		return;
+
+	/* No IOAPIC number and ILINE number info */
+	(void) mdb_snprintf(ioapic_iline, 10, "-    ");
+
+	evtchn[0] = '\0';
+	if (evtchnp != NULL)
+		(void) mdb_snprintf(evtchn, 8, "%-7hd", *evtchnp);
+
+	/* IPI targeted ALL cpus */
+	mdb_snprintf(cpu_assigned, 4, "all");
+	(void) mdb_snprintf(cpu_vector, 10, "%s/0x%x",
+	    "all", vectp->v_vector);
+	/* IPI is not shared interrupt, so we can get the IPL from v_pri */
+	(void) mdb_snprintf(ipl, 3, "%d", vectp->v_pri);
+
+	/* Print each interrupt entry */
+	if (option_flags & INTR_DISPLAY_INTRSTAT)
+		mdb_printf("%-4s", cpu_assigned);
+	else
+		mdb_printf("%-9s %-3s %s%-3s %-6s %-3s %-6s %-3d   %-9s ",
+		    cpu_vector, "-  ", evtchn, ipl, "-   ", "Edg",
+		    intr_type, vectp->v_share, ioapic_iline);
+	if (!vectp->v_share)
+		mdb_printf("poke_cpu");
+	else
+		mdb_printf("%a", avp->av_vector);
+
 	mdb_printf("\n");
 }

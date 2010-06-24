@@ -1,7 +1,3 @@
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,8 +17,18 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# CAUTION!  The order of modules specified here is very important. If the
+# order is not correct it can result in unexpected system behavior. The
+# loading of modules is in the reverse order specified here (i.e. the last
+# entry is loaded first and the first entry loaded last).
+#
 pcplusmp
+apix
 xpv_psm
 
