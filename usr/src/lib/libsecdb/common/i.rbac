@@ -21,8 +21,7 @@
 #
 # i.rbac
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # class action script for "rbac" class files
 # installed by pkgadd
@@ -152,6 +151,33 @@ BEGIN {
 	continue;
 }
 
+{
+	# For each input line, nawk automatically assigns the complete
+	# line to $0 and also splits the line at field separators and
+	# assigns each field to a variable $1..$n.  Assignment to $0
+	# re-splits the line into the field variables.  Conversely,
+	# assgnment to a variable $1..$n will cause $0 to be recomputed
+	# from the field variable values.
+	#
+	# This code adds awareness of escaped field separators by using
+	# a custom function to split the line into a temporary array.
+	# It assigns the empty string to $0 to clear any excess field
+	# variables, and assigns the desired elements of the temporary
+	# array back to the field variables $1..$7.
+	#
+	# Subsequent code must not assign directly to $0 or the fields
+	# will be re-split without regard to escaped field separators.
+	split_escape($0, f, ":");
+	$0 = "";
+	$1 = f[1];
+	$2 = f[2];
+	$3 = f[3];
+	$4 = f[4];
+	$5 = f[5];
+	$6 = f[6];
+	$7 = f[7];
+}
+
 type == "auth" {
 	key = $1 ":" $2 ":" $3 ;
 	if (NR == FNR) {
@@ -223,8 +249,8 @@ END {
 
 function merge_attrs(old, new, cnt, new_cnt, i, j, list, new_list, keyword)
 {
-	cnt = split(old, list, ";");
-	new_cnt = split(new, new_list, ";");
+	cnt = split_escape(old, list, ";");
+	new_cnt = split_escape(new, new_list, ";");
 	for (i = 1; i <= new_cnt; i++) {
 		keyword = substr(new_list[i], 1, index(new_list[i], "=")-1);
 		for (j = 1; j <= cnt; j++) {
@@ -273,6 +299,50 @@ function merge_values(keyword, old, new, cnt, new_cnt, i, j, list, new_list, d)
 	}
 
 	return keyword "=" unsplit(list, cnt, ",");
+}
+
+# This function is similar to the nawk built-in split() function,
+# except that a "\" character may be used to escape any subsequent
+# character, so that the escaped character will not be treated as a
+# field separator or as part of a field separator regular expression.
+# The "\" characters will remain in the elements of the output array
+# variable upon completion.
+function split_escape(str, list, fs, cnt, saved, sep)
+{
+	# default to global FS
+	if (fs == "")
+		fs = FS;
+	# initialize empty list, cnt, saved
+	split("", list, " ");
+	cnt = 0;
+	saved = "";
+	# track whether last token was a field separator
+	sep = 0;
+	# nonzero str length indicates more string left to scan
+	while (length(str)) {
+		if (match(str, fs) == 1) {
+			# field separator, terminates current field
+			list[++cnt] = saved;
+			saved = "";
+			str = substr(str, RLENGTH + 1);
+			sep = 1;
+		} else if (substr(str, 1, 1) == "\\") {
+			# escaped character
+			saved = saved substr(str, 1, 2);
+			str = substr(str, 3);
+			sep = 0;
+		} else {
+			# regular character
+			saved = saved substr(str, 1, 1);
+			str = substr(str, 2);
+			sep = 0;
+		}
+	}
+	# if required, append final field to list
+	if (sep || length(saved))
+		list[++cnt] = saved;
+
+	return cnt;
 }
 
 function unsplit(list, cnt, delim, str)

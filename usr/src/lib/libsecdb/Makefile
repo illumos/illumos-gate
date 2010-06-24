@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.lib
@@ -83,7 +82,7 @@ install_data:	$(ETCSECURITYFILES) $(ETCSECURITYDFILES) $(ETCFILES) \
 		$(METHODDIR) $(METHOD)
 
 ATTR_FILES =	auth_attr exec_attr prof_attr user_attr
-${ATTR_FILES}:	$$@.txt
+${ATTR_FILES}:	$$@.txt ${CLASS_SCR_SRC_DIR}/i.rbac
 	> $@
 	$(ECHO) $@.txt $@ | $(SHELL) ${CLASS_SCR_SRC_DIR}/i.rbac
 
