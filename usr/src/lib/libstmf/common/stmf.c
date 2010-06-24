@@ -142,6 +142,7 @@ static int setDiskStandby(stmfGuid *luGuid);
 static int setDiskGlobalProp(uint32_t, const char *);
 static int viewEntryCompare(const void *, const void *);
 static void deleteNonActiveLus();
+static int loadStmfProp(int fd);
 
 static pthread_mutex_t persistenceTypeLock = PTHREAD_MUTEX_INITIALIZER;
 static int iPersistType = 0;
@@ -5541,6 +5542,208 @@ setStmfState(int fd, stmf_state_desc_t *stmfState, int objectType)
 		}
 	}
 done:
+	return (ret);
+}
+int
+stmfSetStmfProp(uint8_t propType, char *propVal)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	switch (propType) {
+		case STMF_DEFAULT_LU_STATE:
+			break;
+		case STMF_DEFAULT_TARGET_PORT_STATE:
+			break;
+		default:
+			return (STMF_ERROR_INVALID_ARG);
+	}
+	ret = psSetStmfProp(propType, propVal);
+	switch (ret) {
+		case STMF_PS_SUCCESS:
+			ret = STMF_STATUS_SUCCESS;
+			break;
+		case STMF_PS_ERROR_BUSY:
+			ret = STMF_ERROR_BUSY;
+			break;
+		default:
+			syslog(LOG_DEBUG,
+			    "stmfSetStmfProp:psSetStmfProp:error(%d)",
+			    ret);
+			ret = STMF_STATUS_ERROR;
+			break;
+	}
+	return (ret);
+}
+
+
+int
+stmfGetStmfProp(uint8_t propType, char *propVal, size_t *propLen)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	char prop[MAXNAMELEN] = {0};
+	size_t reqLen;
+
+	if (propVal == NULL || propLen == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+	switch (propType) {
+		case STMF_DEFAULT_LU_STATE:
+			break;
+		case STMF_DEFAULT_TARGET_PORT_STATE:
+			break;
+		default:
+			return (STMF_ERROR_INVALID_ARG);
+	}
+	ret = psGetStmfProp(propType, prop);
+	if ((reqLen = strlcpy(propVal, prop, *propLen)) >= *propLen) {
+		*propLen = reqLen + 1;
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	switch (ret) {
+		case STMF_PS_SUCCESS:
+			ret = STMF_STATUS_SUCCESS;
+			break;
+		case STMF_PS_ERROR_BUSY:
+			ret = STMF_ERROR_BUSY;
+			break;
+		case STMF_PS_ERROR_NOT_FOUND:
+			ret = STMF_ERROR_NOT_FOUND;
+			break;
+		default:
+			syslog(LOG_DEBUG,
+			    "stmfGetStmfProp:psGetStmfProp:error(%d)",
+			    ret);
+			ret = STMF_STATUS_ERROR;
+			break;
+	}
+	return (ret);
+}
+
+static int
+setStmfProp(stmf_set_props_t *stmf_set_props)
+{
+	char propVal[MAXNAMELEN] = {0};
+	int ret;
+	if ((ret = psGetStmfProp(STMF_DEFAULT_LU_STATE, propVal)) ==
+	    STMF_PS_SUCCESS) {
+		if (strncmp(propVal, "offline", strlen(propVal)) == 0) {
+			stmf_set_props->default_lu_state_value =
+			    STMF_STATE_OFFLINE;
+		} else {
+			stmf_set_props->default_lu_state_value =
+			    STMF_STATE_ONLINE;
+		}
+	} else {
+		syslog(LOG_DEBUG,
+		    "DefaultLuState:psSetStmfProp:error(%d)", ret);
+		goto done;
+	}
+
+	if ((ret = psGetStmfProp(STMF_DEFAULT_TARGET_PORT_STATE, propVal)) ==
+	    STMF_PS_SUCCESS) {
+		if (strncmp(propVal, "offline", strlen(propVal)) == 0) {
+			stmf_set_props->default_target_state_value =
+			    STMF_STATE_OFFLINE;
+		} else {
+			stmf_set_props->default_target_state_value =
+			    STMF_STATE_ONLINE;
+		}
+	} else {
+		syslog(LOG_DEBUG,
+		    "DefaultTargetPortState:psSetStmfProp:error(%d)", ret);
+		goto done;
+	}
+done:
+	switch (ret) {
+		case STMF_PS_SUCCESS:
+			ret = STMF_STATUS_SUCCESS;
+			break;
+		case STMF_PS_ERROR_NOT_FOUND:
+			ret = STMF_ERROR_NOT_FOUND;
+			break;
+		case STMF_PS_ERROR_BUSY:
+			ret = STMF_ERROR_BUSY;
+			break;
+		default:
+			ret = STMF_STATUS_ERROR;
+			break;
+	}
+	return (ret);
+}
+
+static int
+loadStmfProp(int fd)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int ioctlRet;
+	stmf_iocdata_t stmfIoctl = {0};
+	stmf_set_props_t *stmf_set_props = NULL;
+
+	stmf_set_props = (stmf_set_props_t *)
+	    calloc(1, (sizeof (stmf_set_props_t)));
+	if (stmf_set_props == NULL) {
+		ret = STMF_ERROR_NOMEM;
+		goto done;
+	}
+
+	/* Loading the default property values from smf */
+
+	if ((ret = setStmfProp(stmf_set_props)) != STMF_STATUS_SUCCESS)
+		goto done;
+
+	stmfIoctl.stmf_version = STMF_VERSION_1;
+	stmfIoctl.stmf_ibuf_size = sizeof (stmf_set_props_t);
+	stmfIoctl.stmf_ibuf =
+	    (uint64_t)(unsigned long)stmf_set_props;
+
+	ioctlRet = ioctl(fd, STMF_IOCTL_SET_STMF_PROPS,
+	    &stmfIoctl);
+
+	if (ioctlRet != 0) {
+		switch (errno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			case ENOENT:
+				ret = STMF_ERROR_NOT_FOUND;
+				break;
+			default:
+				syslog(LOG_DEBUG,
+				    "setDefaultStmfState:"
+				    "ioctl errno(%d)", errno);
+				ret = STMF_STATUS_ERROR;
+				break;
+		}
+	}
+done:
+	if (stmf_set_props != NULL) {
+		free(stmf_set_props);
+	}
+	return (ret);
+}
+
+int
+stmfLoadStmfProps(void)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int fd;
+	/* open control node for stmf */
+	if ((ret = openStmf(OPEN_EXCL_STMF, &fd))
+	    != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+	ret = loadStmfProp(fd);
+
+	(void) close(fd);
+done:
+	if (ret != STMF_STATUS_SUCCESS) {
+		syslog(LOG_DEBUG,
+		    "stmfLoadStmfProps:Failed");
+	}
 	return (ret);
 }
 

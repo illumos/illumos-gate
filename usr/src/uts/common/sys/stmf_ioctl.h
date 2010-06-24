@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_STMF_IOCTL_H
 #define	_STMF_IOCTL_H
@@ -69,6 +68,7 @@ extern "C" {
 #define	STMF_IOCTL_VALIDATE_VIEW		(STMF_IOCTL | 35)
 #define	STMF_IOCTL_SET_ALUA_STATE		(STMF_IOCTL | 36)
 #define	STMF_IOCTL_GET_ALUA_STATE		(STMF_IOCTL | 37)
+#define	STMF_IOCTL_SET_STMF_PROPS		(STMF_IOCTL | 38)
 
 typedef	struct stmf_iocdata {
 	uint32_t	stmf_version;
@@ -214,6 +214,11 @@ typedef struct stmf_ppioctl_data {
 	uint64_t	ppi_data_size;
 	uint8_t		ppi_data[8];
 } stmf_ppioctl_data_t;
+
+typedef struct stmf_set_props {
+	uint32_t	default_lu_state_value;
+	uint32_t	default_target_state_value;
+} stmf_set_props_t;
 
 /*
  * SCSI device ID descriptor as per SPC3 7.6.3

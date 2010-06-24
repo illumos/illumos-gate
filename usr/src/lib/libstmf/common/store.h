@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_STORE_H
 #define	_STORE_H
@@ -75,6 +74,8 @@ int psGetProviderDataList(stmfProviderList **providerList);
 int psClearProviderData(char *providerName, int providerType);
 int psSetServicePersist(uint8_t persistType);
 int psGetServicePersist(uint8_t *persistType);
+int psSetStmfProp(int propType, char *propVal);
+int psGetStmfProp(int propType, char *propVal);
 
 #ifdef	__cplusplus
 }

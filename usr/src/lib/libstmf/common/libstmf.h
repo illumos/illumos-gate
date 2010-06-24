@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSTMF_H
@@ -55,6 +54,8 @@ extern "C" {
 #define	STMF_CONFIG_STATE_INIT		15
 #define	STMF_CONFIG_STATE_INIT_DONE	16
 #define	STMF_CONFIG_STATE_UNKNOWN	17
+#define	STMF_DEFAULT_LU_STATE		18
+#define	STMF_DEFAULT_TARGET_PORT_STATE	19
 
 #define	STMF_IDENT_LENGTH   255
 
@@ -380,6 +381,9 @@ int stmfSetProviderData(char *providerName, nvlist_t *nvl, int providerType);
 int stmfSetProviderDataProt(char *providerName, nvlist_t *nvl,
     int providerType, uint64_t *setToken);
 int stmfValidateView(stmfViewEntry *viewEntry);
+int stmfSetStmfProp(uint8_t propType, char *propVal);
+int stmfGetStmfProp(uint8_t propType, char *propVal, size_t *propLen);
+int stmfLoadStmfProps(void);
 
 #ifdef	__cplusplus
 }

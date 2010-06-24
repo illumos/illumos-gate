@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <libscf.h>
@@ -155,6 +154,7 @@ static int iPsGetActualGroupName(char *, char *, char *);
 static int iPsGetServiceVersion(uint64_t *, scf_handle_t *, scf_service_t *);
 static int iPsGetSetPersistType(uint8_t *, scf_handle_t *, scf_service_t *,
     int);
+static int iPsGetSetStmfProp(int, char *, int);
 static int viewEntryCompare(const void *, const void *);
 static int holdSignal(sigset_t *);
 static int releaseSignal(sigset_t *);
@@ -203,6 +203,11 @@ boolean_t actionSet = B_FALSE;
 #define	STMF_VERSION_NAME	"version_name"
 #define	STMF_PERSIST_TYPE	"persist_method"
 
+/* Property names for stmf properties */
+
+#define	DEFAULT_LU_STATE		"default_lu_state"
+#define	DEFAULT_TARGET_PORT_STATE	"default_target_state"
+
 /*
  * Property names for view entry
  */
@@ -226,6 +231,12 @@ boolean_t actionSet = B_FALSE;
 #define	STMF_PS_PERSIST_NONE	"none"
 #define	STMF_PS_PERSIST_SMF	"smf"
 #define	STMF_PROVIDER_DATA_PROP_SIZE 4000
+
+#define	STMF_PS_LU_ONLINE		"default_lu_online"
+#define	STMF_PS_LU_OFFLINE		"default_lu_offline"
+#define	STMF_PS_TARGET_PORT_ONLINE	"default_target_online"
+#define	STMF_PS_TARGET_PORT_OFFLINE	"default_target_offline"
+
 /* END STORE PROPERTY DEFINITIONS */
 
 /* service name */
@@ -2238,6 +2249,277 @@ out:
 	 * handle and svc should not be free'd here. They're
 	 * free'd elsewhere
 	 */
+	if (pg != NULL) {
+		scf_pg_destroy(pg);
+	}
+	if (prop != NULL) {
+		scf_property_destroy(prop);
+	}
+	if (entry != NULL) {
+		scf_entry_destroy(entry);
+	}
+	if (tran != NULL) {
+		scf_transaction_destroy(tran);
+	}
+	if (value != NULL) {
+		scf_value_destroy(value);
+	}
+	return (ret);
+}
+
+int
+psSetStmfProp(int propType, char *propVal)
+{
+	return (iPsGetSetStmfProp(propType, propVal, SET));
+}
+
+int
+psGetStmfProp(int propType, char *propVal)
+{
+	return (iPsGetSetStmfProp(propType, propVal, GET));
+}
+
+static int
+iPsGetSetStmfProp(int propType, char *propVal, int getSet)
+{
+	scf_handle_t	*handle = NULL;
+	scf_service_t	*svc = NULL;
+	scf_property_t *prop = NULL;
+	scf_propertygroup_t	*pg = NULL;
+	scf_transaction_t *tran = NULL;
+	scf_transaction_entry_t *entry = NULL;
+	scf_value_t	*value = NULL;
+	char *psStmfPropVal;
+	char *psStmfProp;
+	char stmfPropGet[MAXNAMELEN] = {0};
+	int ret = STMF_PS_SUCCESS;
+	int commitRet;
+
+	if (propVal == NULL || (getSet != GET && getSet != SET)) {
+		ret = STMF_PS_ERROR;
+		goto out;
+	}
+
+	/*
+	 * Init the service handle
+	 */
+
+	ret = iPsInit(&handle, &svc);
+	if (ret != STMF_PS_SUCCESS) {
+		goto out;
+	}
+
+	/*
+	 * Allocate scf resources
+	 */
+
+	if (((pg = scf_pg_create(handle)) == NULL) ||
+	    ((prop = scf_property_create(handle)) == NULL) ||
+	    ((entry = scf_entry_create(handle)) == NULL) ||
+	    ((tran = scf_transaction_create(handle)) == NULL) ||
+	    ((value = scf_value_create(handle)) == NULL)) {
+		syslog(LOG_ERR, "scf alloc resource failed - %s",
+		    scf_strerror(scf_error()));
+		ret = STMF_PS_ERROR;
+		goto out;
+	}
+	if (getSet == GET) {
+		switch (propType) {
+			case STMF_DEFAULT_LU_STATE :
+				psStmfProp = DEFAULT_LU_STATE;
+				psStmfPropVal = STMF_PS_LU_ONLINE;
+				(void) strcpy(stmfPropGet, psStmfPropVal);
+				break;
+			case STMF_DEFAULT_TARGET_PORT_STATE :
+				psStmfProp = DEFAULT_TARGET_PORT_STATE;
+				psStmfPropVal = STMF_PS_TARGET_PORT_ONLINE;
+				(void) strcpy(stmfPropGet, psStmfPropVal);
+				break;
+			default :
+				ret = STMF_PS_ERROR;
+				goto out;
+				break;
+		}
+	}
+	if (getSet == SET) {
+		switch (propType) {
+			case STMF_DEFAULT_LU_STATE :
+				psStmfProp = DEFAULT_LU_STATE;
+				if (strcasecmp(propVal, "online") == 0)
+					psStmfPropVal = STMF_PS_LU_ONLINE;
+				else if (strcasecmp(propVal, "offline") == 0)
+					psStmfPropVal = STMF_PS_LU_OFFLINE;
+				else
+					ret = STMF_PS_ERROR;
+					goto out;
+				break;
+			case STMF_DEFAULT_TARGET_PORT_STATE :
+				psStmfProp = DEFAULT_TARGET_PORT_STATE;
+				if (strcasecmp(propVal, "online") == 0)
+					psStmfPropVal =
+					    STMF_PS_TARGET_PORT_ONLINE;
+				else if (strcasecmp(propVal, "offline") == 0)
+					psStmfPropVal =
+					    STMF_PS_TARGET_PORT_OFFLINE;
+				else
+					ret = STMF_PS_ERROR;
+					goto out;
+				break;
+			default :
+				ret = STMF_PS_ERROR;
+				goto out;
+				break;
+		}
+	}
+
+	/*
+	 * get stmf data property group
+	 */
+
+	if (scf_service_get_pg(svc, STMF_DATA_GROUP, pg) == -1) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			ret = STMF_PS_ERROR_NOT_FOUND;
+		} else {
+			ret = STMF_PS_ERROR;
+		}
+		syslog(LOG_ERR, "get pg %s failed - %s",
+		    STMF_DATA_GROUP, scf_strerror(scf_error()));
+		goto out;
+	}
+
+	/*
+	 * get the stmf props property, if exists
+	 */
+
+	if (scf_pg_get_property(pg, psStmfProp, prop) == -1) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			ret = STMF_PS_ERROR_NOT_FOUND;
+		} else {
+			syslog(LOG_ERR, "start transaction for %s/%s "
+			    "failed - %s", STMF_DATA_GROUP, psStmfProp,
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+	}
+
+	/* if stmf prop is not found or while setting the prop */
+
+	if (ret == STMF_PS_ERROR_NOT_FOUND || getSet == SET) {
+		/*
+		 * Begin the transaction
+		 */
+		if (scf_transaction_start(tran, pg) == -1) {
+			syslog(LOG_ERR, "start transaction for %s failed - %s",
+			    STMF_DATA_GROUP, scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+		if (ret) {
+			if (scf_transaction_property_new(tran, entry,
+			    psStmfProp, SCF_TYPE_ASTRING) == -1) {
+				syslog(LOG_ERR, "transaction property new "
+				    "%s/%s failed - %s", STMF_DATA_GROUP,
+				    psStmfProp, scf_strerror(scf_error()));
+				ret = STMF_PS_ERROR;
+				goto out;
+			}
+		} else {
+			if (scf_transaction_property_change(tran, entry,
+			    psStmfProp, SCF_TYPE_ASTRING) == -1) {
+					syslog(LOG_ERR,
+					    "transaction property change "
+					    "%s/%s failed - %s",
+					    STMF_DATA_GROUP, psStmfProp,
+					    scf_strerror(scf_error()));
+					ret = STMF_PS_ERROR;
+					goto out;
+			}
+		}
+
+		/*
+		 * set stmf prop value
+		 */
+
+		if (scf_value_set_astring(value, psStmfPropVal) == -1) {
+			syslog(LOG_ERR, "set value %s/%s failed - %s",
+			    STMF_DATA_GROUP, psStmfProp,
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+
+		/*
+		 * add the value to the transaction
+		 */
+
+		if (scf_entry_add_value(entry, value) == -1) {
+			syslog(LOG_ERR, "add value %s/%s failed - %s",
+			    STMF_DATA_GROUP, psStmfProp,
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+		if ((commitRet = scf_transaction_commit(tran)) != 1) {
+			syslog(LOG_ERR, "transaction commit for %s"
+			    "failed - %s", STMF_DATA_GROUP,
+			    scf_strerror(scf_error()));
+			if (commitRet == 0) {
+				ret = STMF_PS_ERROR_BUSY;
+			} else {
+				ret = STMF_PS_ERROR;
+			}
+			goto out;
+		}
+		ret = STMF_PS_SUCCESS;
+	} else if (getSet == GET) {
+		if (scf_property_get_value(prop, value) == -1) {
+			syslog(LOG_ERR, "get property value "
+			    "%s/%s failed - %s",
+			    STMF_DATA_GROUP, psStmfProp,
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+
+		/* get stmfProp */
+
+		if (scf_value_get_astring(value, stmfPropGet, MAXNAMELEN)
+		    == -1) {
+			syslog(LOG_ERR, "get string value %s/%s failed - %s",
+			    STMF_DATA_GROUP, psStmfProp,
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+	}
+	if (getSet == GET) {
+		if (strcmp(stmfPropGet, STMF_PS_LU_ONLINE) == 0) {
+			(void) strcpy(propVal, "online");
+		} else if (strcmp(stmfPropGet, STMF_PS_LU_OFFLINE) == 0) {
+			(void) strcpy(propVal, "offline");
+		} else if (strcmp(stmfPropGet, STMF_PS_TARGET_PORT_ONLINE)
+		    == 0) {
+			(void) strcpy(propVal, "online");
+		} else if (strcmp(stmfPropGet, STMF_PS_TARGET_PORT_OFFLINE)
+		    == 0) {
+			(void) strcpy(propVal, "offline");
+		} else {
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+	}
+out:
+	/*
+	 * Free resources.
+	 */
+
+	if (handle != NULL) {
+		scf_handle_destroy(handle);
+	}
+	if (svc != NULL) {
+		scf_service_destroy(svc);
+	}
 	if (pg != NULL) {
 		scf_pg_destroy(pg);
 	}

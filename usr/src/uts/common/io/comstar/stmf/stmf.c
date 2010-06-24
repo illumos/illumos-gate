@@ -288,6 +288,9 @@ _init(void)
 	bzero(&stmf_state, sizeof (stmf_state_t));
 	/* STMF service is off by default */
 	stmf_state.stmf_service_running = 0;
+	/* default lu/lport states are online */
+	stmf_state.stmf_default_lu_state = STMF_STATE_ONLINE;
+	stmf_state.stmf_default_lport_state = STMF_STATE_ONLINE;
 	mutex_init(&stmf_state.stmf_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&stmf_state.stmf_cv, NULL, CV_DRIVER, NULL);
 	stmf_session_counter = (uint64_t)ddi_get_lbolt();
@@ -551,8 +554,8 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 	stmf_id_data_t *id_entry;
 	stmf_id_list_t	*id_list;
 	stmf_view_entry_t *view_entry;
+	stmf_set_props_t *stmf_set_props;
 	uint32_t	veid;
-
 	if ((cmd & 0xff000000) != STMF_IOCTL) {
 		return (ENOTTY);
 	}
@@ -843,6 +846,32 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 			ret = EIO;
 		mutex_enter(&stmf_state.stmf_lock);
 		stmf_state.stmf_inventory_locked = 0;
+		mutex_exit(&stmf_state.stmf_lock);
+		break;
+
+	case STMF_IOCTL_SET_STMF_PROPS:
+		if ((ibuf == NULL) ||
+		    (iocd->stmf_ibuf_size < sizeof (stmf_set_props_t))) {
+			ret = EINVAL;
+			break;
+		}
+		stmf_set_props = (stmf_set_props_t *)ibuf;
+		mutex_enter(&stmf_state.stmf_lock);
+		if ((stmf_set_props->default_lu_state_value ==
+		    STMF_STATE_OFFLINE) ||
+		    (stmf_set_props->default_lu_state_value ==
+		    STMF_STATE_ONLINE)) {
+			stmf_state.stmf_default_lu_state =
+			    stmf_set_props->default_lu_state_value;
+		}
+		if ((stmf_set_props->default_target_state_value ==
+		    STMF_STATE_OFFLINE) ||
+		    (stmf_set_props->default_target_state_value ==
+		    STMF_STATE_ONLINE)) {
+			stmf_state.stmf_default_lport_state =
+			    stmf_set_props->default_target_state_value;
+		}
+
 		mutex_exit(&stmf_state.stmf_lock);
 		break;
 
@@ -1491,7 +1520,8 @@ stmf_set_stmf_state(stmf_state_desc_t *std)
 
 		for (ilport = stmf_state.stmf_ilportlist; ilport != NULL;
 		    ilport = ilport->ilport_next) {
-			if (ilport->ilport_prev_state != STMF_STATE_ONLINE)
+			if (stmf_state.stmf_default_lport_state !=
+			    STMF_STATE_ONLINE)
 				continue;
 			(void) stmf_ctl(STMF_CMD_LPORT_ONLINE,
 			    ilport->ilport_lport, &ssi);
@@ -1499,7 +1529,8 @@ stmf_set_stmf_state(stmf_state_desc_t *std)
 
 		for (ilu = stmf_state.stmf_ilulist; ilu != NULL;
 		    ilu = ilu->ilu_next) {
-			if (ilu->ilu_prev_state != STMF_STATE_ONLINE)
+			if (stmf_state.stmf_default_lu_state !=
+			    STMF_STATE_ONLINE)
 				continue;
 			(void) stmf_ctl(STMF_CMD_LU_ONLINE, ilu->ilu_lu, &ssi);
 		}
@@ -1550,7 +1581,6 @@ stmf_get_stmf_state(stmf_state_desc_t *std)
 
 	return (0);
 }
-
 /*
  * handles registration message from pppt for a logical unit
  */
@@ -3045,12 +3075,16 @@ stmf_register_lu(stmf_lu_t *lu)
 	}
 	mutex_exit(&stmf_state.stmf_lock);
 
-	/* XXX we should probably check if this lu can be brought online */
-	ilu->ilu_prev_state = STMF_STATE_ONLINE;
-	if (stmf_state.stmf_service_running) {
-		ssci.st_rflags = 0;
-		ssci.st_additional_info = NULL;
-		(void) stmf_ctl(STMF_CMD_LU_ONLINE, lu, &ssci);
+	/*  check the default state for lu */
+	if (stmf_state.stmf_default_lu_state == STMF_STATE_OFFLINE) {
+		ilu->ilu_prev_state = STMF_STATE_OFFLINE;
+	} else {
+		ilu->ilu_prev_state = STMF_STATE_ONLINE;
+		if (stmf_state.stmf_service_running) {
+			ssci.st_rflags = 0;
+			ssci.st_additional_info = NULL;
+			(void) stmf_ctl(STMF_CMD_LU_ONLINE, lu, &ssci);
+		}
 	}
 
 	/* XXX: Generate event */
@@ -3248,12 +3282,17 @@ stmf_register_local_port(stmf_local_port_t *lport)
 	if (start_workers)
 		stmf_worker_init();
 
-	/* XXX we should probably check if this lport can be brought online */
-	ilport->ilport_prev_state = STMF_STATE_ONLINE;
-	if (stmf_state.stmf_service_running) {
-		ssci.st_rflags = 0;
-		ssci.st_additional_info = NULL;
-		(void) stmf_ctl(STMF_CMD_LPORT_ONLINE, lport, &ssci);
+	/*  the default state of LPORT */
+
+	if (stmf_state.stmf_default_lport_state == STMF_STATE_OFFLINE) {
+		ilport->ilport_prev_state = STMF_STATE_OFFLINE;
+	} else {
+		ilport->ilport_prev_state = STMF_STATE_ONLINE;
+		if (stmf_state.stmf_service_running) {
+			ssci.st_rflags = 0;
+			ssci.st_additional_info = NULL;
+			(void) stmf_ctl(STMF_CMD_LPORT_ONLINE, lport, &ssci);
+		}
 	}
 
 	/* XXX: Generate event */

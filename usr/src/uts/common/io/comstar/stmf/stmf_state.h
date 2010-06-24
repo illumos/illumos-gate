@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_STMF_STATE_H
 #define	_STMF_STATE_H
@@ -54,6 +53,8 @@ typedef struct stmf_state {
 	uint8_t			stmf_config_state; /* See stmf_ioctl.h */
 	uint8_t			stmf_alua_state;
 	uint16_t		stmf_alua_node;
+	uint8_t			stmf_default_lu_state;
+	uint8_t			stmf_default_lport_state;
 	ddi_taskq_t		*stmf_svc_taskq;
 	uint32_t		stmf_svc_flags;
 	stmf_i_lu_t		*stmf_svc_ilu_draining;
