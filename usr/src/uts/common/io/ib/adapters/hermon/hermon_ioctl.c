@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2482,8 +2481,7 @@ hermon_flash_cfi_init(hermon_state_t *state, uint32_t *cfi_info,
 	int		status;
 
 	/* Right now, all hermon cards use SPI. */
-	if (HERMON_IS_MAINTENANCE_MODE(state->hs_dip) ||
-	    HERMON_IS_HCA_MODE(state->hs_dip)) {
+	if (hermon_device_mode(state)) {
 		/*
 		 * Don't use CFI for SPI part. Just fill in what we need
 		 * and return.

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -146,7 +145,7 @@ static struct cb_ops hermon_cb_ops = {
 	ddi_prop_op,		/* prop_op */
 	NULL,			/* streams */
 	D_NEW | D_MP |
-	D_64BIT | /* D_HOTPLUG | */
+	D_64BIT | D_HOTPLUG |
 	D_DEVMAP,		/* flags */
 	CB_REV			/* rev */
 };
@@ -1150,6 +1149,38 @@ hermon_icm_free(hermon_state_t *state, hermon_rsrc_type_t type,
 	}
 }
 
+
+/*
+ * hermon_device_mode()
+ *    Context: Can be called from base or interrupt context.
+ *
+ * Return HERMON_HCA_MODE for operational mode
+ * Return HERMON_MAINTENANCE_MODE for maintenance mode
+ * Return 0 otherwise
+ *
+ * A non-zero return for either operational or maintenance mode simplifies
+ * one of the 2 uses of this function.
+ */
+int
+hermon_device_mode(hermon_state_t *state)
+{
+	if (state->hs_vendor_id != PCI_VENID_MLX)
+		return (0);
+
+	switch (state->hs_device_id) {
+	case PCI_DEVID_HERMON_SDR:
+	case PCI_DEVID_HERMON_DDR:
+	case PCI_DEVID_HERMON_DDRG2:
+	case PCI_DEVID_HERMON_QDRG2:
+	case PCI_DEVID_HERMON_QDRG2V:
+		return (HERMON_HCA_MODE);
+	case PCI_DEVID_HERMON_MAINT:
+		return (HERMON_MAINTENANCE_MODE);
+	default:
+		return (0);
+	}
+}
+
 /*
  * hermon_drv_init()
  *    Context: Only called from attach() path context
@@ -1160,6 +1191,11 @@ hermon_drv_init(hermon_state_t *state, dev_info_t *dip, int instance)
 {
 	int	status;
 
+	/* Retrieve PCI device, vendor and rev IDs */
+	state->hs_vendor_id	 = HERMON_GET_VENDOR_ID(state->hs_dip);
+	state->hs_device_id	 = HERMON_GET_DEVICE_ID(state->hs_dip);
+	state->hs_revision_id	 = HERMON_GET_REVISION_ID(state->hs_dip);
+
 	/*
 	 * Check and set the operational mode of the device. If the driver is
 	 * bound to the Hermon device in "maintenance mode", then this generally
@@ -1168,18 +1204,16 @@ hermon_drv_init(hermon_state_t *state, dev_info_t *dip, int instance)
 	 * successfully load either the primary or the secondary firmware
 	 * image.
 	 */
-	if (HERMON_IS_HCA_MODE(state->hs_dip)) {
-		state->hs_operational_mode = HERMON_HCA_MODE;
+	state->hs_operational_mode = hermon_device_mode(state);
+	switch (state->hs_operational_mode) {
+	case HERMON_HCA_MODE:
 		state->hs_cfg_profile_setting = HERMON_CFG_MEMFREE;
-
-	} else if (HERMON_IS_MAINTENANCE_MODE(state->hs_dip)) {
+		break;
+	case HERMON_MAINTENANCE_MODE:
 		HERMON_FMANOTE(state, HERMON_FMA_MAINT);
-		state->hs_operational_mode = HERMON_MAINTENANCE_MODE;
 		state->hs_fm_degraded_reason = HCA_FW_MISC; /* not fw reason */
 		return (DDI_FAILURE);
-
-	} else {
-		state->hs_operational_mode = 0;	/* invalid operational mode */
+	default:
 		HERMON_FMANOTE(state, HERMON_FMA_PCIID);
 		HERMON_WARNING(state, "unexpected device type detected");
 		return (DDI_FAILURE);
@@ -1555,11 +1589,6 @@ hermon_hw_init(hermon_state_t *state)
 	state->hs_cmd_regs.sw_semaphore = (uint32_t *)
 	    ((uintptr_t)state->hs_reg_cmd_baseaddr +
 	    HERMON_CMD_SW_SEMAPHORE_OFFSET);
-
-	/* Retrieve PCI device, vendor and rev IDs */
-	state->hs_vendor_id	 = HERMON_GET_VENDOR_ID(state->hs_dip);
-	state->hs_device_id	 = HERMON_GET_DEVICE_ID(state->hs_dip);
-	state->hs_revision_id	 = HERMON_GET_REVISION_ID(state->hs_dip);
 
 	/* make sure init'd before we start filling things in */
 	bzero(&state->hs_hcaparams, sizeof (struct hermon_hw_initqueryhca_s));
@@ -4538,6 +4567,7 @@ hermon_set_msix_info(hermon_state_t *state)
 	}
 	ASSERT(rnumber != 0);
 	state->hs_msix_pba_rnumber = rnumber;
+	ddi_prop_free(regs_list);
 
 	/* Map in the MSI-X Pending Bit Array */
 	if (hermon_regs_map_setup(state, state->hs_msix_pba_rnumber,

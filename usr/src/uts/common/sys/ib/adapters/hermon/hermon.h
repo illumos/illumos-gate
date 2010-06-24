@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_H
@@ -229,37 +228,17 @@ extern "C" {
 #define	HERMON_GET_DEVICE_ID(dip)	HERMON_DDI_PROP_GET(dip, "device-id")
 #define	HERMON_GET_REVISION_ID(dip)	HERMON_DDI_PROP_GET(dip, "revision-id")
 
-
-
 /*
- * Define used to determine the device mode to which Hermon driver has been
- * attached.  HERMON_IS_MAINTENANCE_MODE() returns true when the device has
+ * Defines used to record the device mode to which Hermon driver has been
+ * attached.  HERMON_MAINTENANCE_MODE is used when the device has
  * come up in the "maintenance mode".  In this mode, no InfiniBand interfaces
  * are enabled, but the device's firmware can be updated/flashed (and
  * test/debug interfaces should be useable).
- * HERMON_IS_HCA_MODE() returns true when the device has come up in the
+ * HERMON_HCA_MODE isused when the device has come up in the
  * normal HCA mode.  In this mode, all necessary InfiniBand interfaces are
  * enabled (and, if necessary, HERMON firmware can be updated/flashed).
  */
-#define	HERMON_IS_MAINTENANCE_MODE(dip)			\
-	((ddi_prop_get_int(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS,	\
-	"device-id", -1) == PCI_DEVID_HERMON_MAINT) &&			\
-	(ddi_prop_get_int(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS,	\
-	"vendor-id", -1) == PCI_VENID_MLX))
-
-#define	HERMON_IS_HCA_MODE(dip)			\
-	(((ddi_prop_get_int(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS,	\
-	"device-id", -1) == PCI_DEVID_HERMON_SDR) ||			\
-	(ddi_prop_get_int(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS,	\
-	"device-id", -1) == PCI_DEVID_HERMON_DDR) ||			\
-	(ddi_prop_get_int(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS,	\
-	"device-id", -1) == PCI_DEVID_HERMON_DDRG2) ||			\
-	(ddi_prop_get_int(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS,	\
-	"device-id", -1) == PCI_DEVID_HERMON_QDRG2)) &&			\
-	(ddi_prop_get_int(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS,	\
-	"vendor-id", -1) == PCI_VENID_MLX))
-
-#define	HERMON_MAINTENANCE_MODE		1
+#define	HERMON_MAINTENANCE_MODE	1
 #define	HERMON_HCA_MODE		2
 
 /*
@@ -980,6 +959,7 @@ int hermon_icm_alloc(hermon_state_t *state, hermon_rsrc_type_t type,
     uint32_t icm_index1, uint32_t icm_index2);
 void hermon_icm_free(hermon_state_t *state, hermon_rsrc_type_t type,
     uint32_t icm_index1, uint32_t icm_index2);
+int hermon_device_mode(hermon_state_t *state);
 
 /* Defined in hermon_umap.c */
 int hermon_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,

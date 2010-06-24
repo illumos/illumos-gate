@@ -52,6 +52,7 @@ extern "C" {
 #define	PCI_DEVID_HERMON_DDR	0x634A	/* Mellanox MT25208-DDR PCIe Gen1 */
 #define	PCI_DEVID_HERMON_DDRG2	0x6732	/* Mellanox MT25208-DDR PCIe Gen2 */
 #define	PCI_DEVID_HERMON_QDRG2	0x673C	/* Mellanox MT25208-QDR PCIe Gen2 */
+#define	PCI_DEVID_HERMON_QDRG2V	0x6746	/* Mellanox MT25208-QDR PCIe Gen2 */
 #define	PCI_DEVID_HERMON_MAINT	0x0191  /* Maintenance/Mem Controller Mode */
 
 /*
