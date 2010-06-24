@@ -3601,8 +3601,8 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 		(void) strlcpy(ca->snapname, snapname, sizeof (ca->snapname));
 		(void) strlcpy(ca->htag, htag, sizeof (ca->htag));
 		ca->recursive = recursive;
-		ASSERT3U(0, ==, zfs_onexit_add_cb(cleanup_fd,
-		    dsl_dataset_user_release_onexit, ca, &action_handle));
+		(void) zfs_onexit_add_cb(cleanup_fd,
+		    dsl_dataset_user_release_onexit, ca, &action_handle);
 	}
 
 	kmem_free(ha, sizeof (struct dsl_ds_holdarg));
