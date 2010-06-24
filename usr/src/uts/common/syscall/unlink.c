@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -80,7 +79,7 @@ unlinkat(int fd, char *name, int flags)
 		}
 	}
 
-	if (AU_AUDITING())
+	if (AU_AUDITING() && (dirvp != NULL))
 		audit_setfsat_path(1);
 
 	error = vn_removeat(dirvp, name,

@@ -287,7 +287,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 43 times */
 aui_null,	AUE_NULL,	aus_null,	/* 44 profil */
 		auf_null,	0,
 aui_null,	AUE_ACCESS,	aus_null,	/* 45 faccessat */
-		auf_null,	S2E_PUB | S2E_ATC,
+		auf_null,	S2E_PUB,
 aui_null,	AUE_SETGID,	aus_setgid,	/* 46 setgid */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 47 getgid */
@@ -314,7 +314,7 @@ aui_null,	AUE_IOCTL,	aus_ioctl,	/* 54 ioctl */
 aui_null,	AUE_NULL,	aus_null,	/* 55 uadmin */
 		auf_null,	0,
 aui_fchownat,	AUE_NULL,	aus_fchownat,	/* 56 fchownat */
-		auf_null,	S2E_ATC,
+		auf_null,	0,
 aui_utssys,	AUE_FUSERS,	aus_null,	/* 57 utssys */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 58 fsync */
@@ -330,17 +330,17 @@ aui_fcntl,	AUE_FCNTL,	aus_fcntl,	/* 62 fcntl */
 aui_null,	AUE_NULL,	aus_null,	/* 63 ulimit */
 		auf_null,	0,
 aui_null,	AUE_RENAME,	aus_null,	/* 64 renameat */
-		auf_null,	S2E_ATC,
+		auf_null,	0,
 aui_unlinkat,	AUE_NULL,	aus_null,	/* 65 unlinkat */
-		auf_null,	S2E_ATC,
+		auf_null,	0,
 aui_fstatat,	AUE_NULL,	aus_null,	/* 66 fstatat */
-		auf_null,	S2E_PUB | S2E_ATC,
+		auf_null,	S2E_PUB,
 aui_fstatat,	AUE_NULL,	aus_null,	/* 67 fstatat64 */
-		auf_null,	S2E_PUB | S2E_ATC,
+		auf_null,	S2E_PUB,
 aui_openat,	AUE_OPEN,	aus_openat,	/* 68 openat */
-		auf_null,	S2E_SP | S2E_ATC,
+		auf_null,	S2E_SP,
 aui_openat,	AUE_OPEN,	aus_openat,	/* 69 openat64 */
-		auf_null,	S2E_SP | S2E_ATC,
+		auf_null,	S2E_SP,
 aui_null,	AUE_NULL,	aus_null,	/* 70 tasksys */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 71 (loadable) acctctl */
@@ -427,7 +427,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 109 (loadable) */
 		auf_null,	0,
 #endif /* __x86 */
 aui_null,	AUE_UTIMES,	aus_null,	/* 110 utimesys */
-		auf_null,	S2E_ATC,
+		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 111 sigresend */
 		auf_null,	0,
 aui_null,	AUE_PRIOCNTLSYS, aus_priocntlsys, /* 112 priocntlsys */
@@ -1008,7 +1008,6 @@ open_event(uint_t fm)
 static au_event_t
 aui_open(au_event_t e)
 {
-	t_audit_data_t *tad = T2A(curthread);
 	klwp_t *clwp = ttolwp(curthread);
 	uint_t fm;
 
@@ -1019,10 +1018,6 @@ aui_open(au_event_t e)
 	} *uap = (struct a *)clwp->lwp_ap;
 
 	fm = (uint_t)uap->fmode;
-
-	/* convert to appropriate au_ctrl */
-	if (fm & (FXATTR | FXATTRDIROPEN))
-		tad->tad_ctrl |= TAD_ATTPATH;
 
 	return (open_event(fm));
 }
@@ -1063,9 +1058,13 @@ aui_openat(au_event_t e)
 
 	fm = (uint_t)uap->fmode;
 
-	/* convert to appropriate au_ctrl */
-	if (fm & (FXATTR | FXATTRDIROPEN))
-		tad->tad_ctrl |= TAD_ATTPATH;
+	/*
+	 * __openattrdirat() does an extra pathname lookup in order to
+	 * enter the extended system attribute namespace of the referenced
+	 * extended attribute filename.
+	 */
+	if (fm & FXATTRDIROPEN)
+		tad->tad_ctrl |= TAD_MLD;
 
 	return (open_event(fm));
 }

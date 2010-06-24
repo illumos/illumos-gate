@@ -482,9 +482,11 @@ sysentry(private_t *pri, int dotrace)
 			    ((i == 0 && x == STG) ||
 			    (i == 1 && (what == SYS_openat ||
 			    what == SYS_openat64)))) {	/* already fetched */
+				if (argprinted)
+					outstring(pri, ", ");
 				escape_string(pri, pri->sys_path);
 				argprinted = TRUE;
-			} else if (x != HID || raw) {
+			} else if (x != NOV && (x != HID || raw)) {
 				if (argprinted)
 					outstring(pri, ", ");
 				if (x == LLO)
@@ -492,13 +494,7 @@ sysentry(private_t *pri, int dotrace)
 					    pri->sys_args[++i]);
 				else
 					(*Print[x])(pri, raw, arg);
-				/*
-				 * if nothing printed, then don't print ", "
-				 */
-				if (x == NOV)
-					argprinted = FALSE;
-				else
-					argprinted = TRUE;
+				argprinted = TRUE;
 			}
 		}
 		outstring(pri, ")");

@@ -1652,7 +1652,7 @@ top:
 	 * use the lib directory for the rename.
 	 */
 
-	if (auditing)
+	if (auditing && (fdvp != NULL))
 		audit_setfsat_path(1);
 	/*
 	 * Lookup to and from directories.
@@ -1669,7 +1669,7 @@ top:
 		goto out;
 	}
 
-	if (auditing)
+	if (auditing && (tdvp != NULL))
 		audit_setfsat_path(3);
 	if (error = lookuppnat(&tpn, NULL, NO_FOLLOW, &tovp, &targvp, tdvp)) {
 		goto out;

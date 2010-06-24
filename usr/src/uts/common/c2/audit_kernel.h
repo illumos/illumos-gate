@@ -83,7 +83,6 @@ extern "C" {
 #define	S2E_MLD TAD_MLD		/* only one lookup per system call */
 #define	S2E_NPT TAD_NOPATH	/* force no path in audit record */
 #define	S2E_PUB TAD_PUBLIC_EV	/* syscall is defined as a public op */
-#define	S2E_ATC	TAD_ATCALL	/* syscall is one of the *at() family */
 
 /*
  * At present, we are using the audit classes imbedded with in the kernel. Each

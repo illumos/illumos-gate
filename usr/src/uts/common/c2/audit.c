@@ -1008,6 +1008,7 @@ audit_setfsat_path(int argnum)
 	t_audit_data_t *tad;
 	struct f_audit_data *fad;
 	p_audit_data_t *pad;	/* current process */
+	uint_t fm;
 	struct a {
 		long arg1;
 		long arg2;
@@ -1042,6 +1043,10 @@ audit_setfsat_path(int argnum)
 	case SYS_utimesys:
 		fd = uap->arg2;
 		break;
+	case SYS_open:
+	case SYS_open64:
+		fd = AT_FDCWD;
+		break;
 	default:
 		return;
 	}
@@ -1050,7 +1055,18 @@ audit_setfsat_path(int argnum)
 		au_pathrele(tad->tad_atpath);
 		tad->tad_atpath = NULL;
 	}
+
 	if (fd != AT_FDCWD) {
+		tad->tad_ctrl |= TAD_ATCALL;
+
+		if (tad->tad_scid == SYS_openat ||
+		    tad->tad_scid == SYS_openat64) {
+			fm = (uint_t)uap->arg3;
+			if (fm & (FXATTR | FXATTRDIROPEN)) {
+				tad->tad_ctrl |= TAD_ATTPATH;
+			}
+		}
+
 		if ((fp = getf(fd)) == NULL) {
 			tad->tad_ctrl |= TAD_NOPATH;
 			return;
@@ -1066,6 +1082,14 @@ audit_setfsat_path(int argnum)
 		tad->tad_atpath = fad->fad_aupath;
 		releasef(fd);
 	} else {
+		if (tad->tad_scid == SYS_open ||
+		    tad->tad_scid == SYS_open64) {
+			fm = (uint_t)uap->arg2;
+			if (fm & FXATTR) {
+				tad->tad_ctrl |= TAD_ATTPATH;
+			}
+			return;
+		}
 		pad = P2A(curproc);
 		mutex_enter(&pad->pad_lock);
 		au_pathhold(pad->pad_cwd);

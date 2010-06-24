@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -84,7 +83,7 @@ cfutimesat(int fd, char *fname, int nmflag, vattr_t *vap, int flags, int follow)
 		}
 	}
 
-	if (AU_AUDITING())
+	if (AU_AUDITING() && (startvp != NULL))
 		audit_setfsat_path(1);
 
 	if ((nmflag == 1) || ((nmflag == 2) && (fname != NULL))) {

@@ -67,6 +67,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	uio_seg_t seg = UIO_USERSPACE;
 	char *open_filename = fname;
 	uint32_t auditing = AU_AUDITING();
+	char startchar;
 
 	if (startfd == AT_FDCWD) {
 		/*
@@ -77,8 +78,6 @@ copen(int startfd, char *fname, int filemode, int createmode)
 		/*
 		 * We're here via openat()
 		 */
-		char startchar;
-
 		if (copyin(fname, &startchar, sizeof (char)))
 			return (set_errno(EFAULT));
 
@@ -97,19 +96,17 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	}
 
 	/*
-	 * Handle openattrdirat request
+	 * Handle __openattrdirat() requests
 	 */
 	if (filemode & FXATTRDIROPEN) {
-		if (auditing)
+		if (auditing && (startvp != NULL))
 			audit_setfsat_path(1);
 
 		if (error = lookupnameat(fname, seg, FOLLOW,
 		    NULLVPP, &vp, startvp))
 			return (set_errno(error));
-		if (startvp) {
+		if (startvp != NULL)
 			VN_RELE(startvp);
-			startvp = NULL;
-		}
 
 		startvp = vp;
 	}
@@ -117,35 +114,46 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	/*
 	 * Do we need to go into extended attribute space?
 	 */
+	if (filemode & FXATTR) {
+		if (startfd == AT_FDCWD) {
+			if (copyin(fname, &startchar, sizeof (char)))
+				return (set_errno(EFAULT));
+
+			/*
+			 * If startchar == '/' then no extended attributes
+			 * are looked up.
+			 */
+			if (startchar == '/') {
+				startvp = NULL;
+			} else {
+				mutex_enter(&p->p_lock);
+				startvp = PTOU(p)->u_cdir;
+				VN_HOLD(startvp);
+				mutex_exit(&p->p_lock);
+			}
+		}
+
+		/*
+		 * Make sure we have a valid extended attribute request.
+		 * We must either have a real fd or AT_FDCWD and a relative
+		 * pathname.
+		 */
+		if (startvp == NULL) {
+			goto noxattr;
+		}
+	}
+
 	if (filemode & (FXATTR|FXATTRDIROPEN)) {
 		vattr_t vattr;
 
-		/*
-		 * Make sure we have a valid request.
-		 * We must either have a real fd or AT_FDCWD
-		 */
-
-		if (startfd != AT_FDCWD && startvp == NULL) {
-			error = EINVAL;
-			goto out;
-		}
-
 		if (error = pn_get(fname, UIO_USERSPACE, &pn)) {
 			goto out;
-		}
-
-		if (startfd == AT_FDCWD && !(filemode & FXATTRDIROPEN)) {
-			mutex_enter(&p->p_lock);
-			startvp = PTOU(p)->u_cdir;
-			VN_HOLD(startvp);
-			mutex_exit(&p->p_lock);
 		}
 
 		/*
 		 * In order to access hidden attribute directory the
 		 * user must be able to stat() the file
 		 */
-
 		vattr.va_mask = AT_ALL;
 		if (error = VOP_GETATTR(startvp, &vattr, 0, CRED(), NULL)) {
 			pn_free(&pn);
@@ -163,7 +171,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 		}
 
 		/*
-		 * For openattrdirat use "." as filename to open
+		 * For __openattrdirat() use "." as filename to open
 		 * as part of vn_openat()
 		 */
 		if (error == 0 && (filemode & FXATTRDIROPEN)) {
@@ -179,18 +187,18 @@ copen(int startfd, char *fname, int filemode, int createmode)
 		startvp = sdvp;
 	}
 
+noxattr:
 	if ((filemode & (FREAD|FWRITE|FXATTRDIROPEN)) != 0) {
 		if ((filemode & (FNONBLOCK|FNDELAY)) == (FNONBLOCK|FNDELAY))
 			filemode &= ~FNDELAY;
 		error = falloc((vnode_t *)NULL, filemode, &fp, &fd);
 		if (error == 0) {
-			if (auditing)
+			if (auditing && (startvp != NULL))
 				audit_setfsat_path(1);
 			/*
 			 * Last arg is a don't-care term if
 			 * !(filemode & FCREAT).
 			 */
-
 			error = vn_openat(open_filename, seg, filemode,
 			    (int)(createmode & MODEMASK),
 			    &vp, CRCREAT, PTOU(curproc)->u_cmask,
