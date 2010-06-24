@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -47,6 +46,7 @@ SUNWprivate_1.1 {
 	avl_first;
 	avl_insert;
 	avl_insert_here;
+	avl_is_empty;
 	avl_last;
 	avl_nearest;
 	avl_numnodes;

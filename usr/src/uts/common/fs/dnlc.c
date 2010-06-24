@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -278,7 +277,8 @@ vnode_t negative_cache_vnode;
  */
 #define	DNLC_DIR_HASH(name, hash, namelen)			\
 	{							\
-		char Xc, *Xcp;					\
+		char Xc;					\
+		const char *Xcp;				\
 		hash = *name;					\
 		for (Xcp = (name + 1); (Xc = *Xcp) != 0; Xcp++)	\
 			hash = (hash << 4) + hash + Xc;		\
@@ -322,7 +322,8 @@ static dchead_t dc_head; /* anchor of cached directories */
 
 /* Prototypes */
 static ncache_t *dnlc_get(uchar_t namlen);
-static ncache_t *dnlc_search(vnode_t *dp, char *name, uchar_t namlen, int hash);
+static ncache_t *dnlc_search(vnode_t *dp, const char *name, uchar_t namlen,
+    int hash);
 static void dnlc_dir_reclaim(void *unused);
 static void dnlc_dir_abort(dircache_t *dcp);
 static void dnlc_dir_adjust_fhash(dircache_t *dcp);
@@ -431,7 +432,7 @@ dnlc_init()
  * Add a name to the directory cache.
  */
 void
-dnlc_enter(vnode_t *dp, char *name, vnode_t *vp)
+dnlc_enter(vnode_t *dp, const char *name, vnode_t *vp)
 {
 	ncache_t *ncp;
 	nc_hash_t *hp;
@@ -497,7 +498,7 @@ dnlc_enter(vnode_t *dp, char *name, vnode_t *vp)
  * it just frees up the newly allocated dnlc entry.
  */
 void
-dnlc_update(vnode_t *dp, char *name, vnode_t *vp)
+dnlc_update(vnode_t *dp, const char *name, vnode_t *vp)
 {
 	ncache_t *ncp;
 	ncache_t *tcp;
@@ -579,7 +580,7 @@ dnlc_update(vnode_t *dp, char *name, vnode_t *vp)
  * lost before the caller can use the vnode.
  */
 vnode_t *
-dnlc_lookup(vnode_t *dp, char *name)
+dnlc_lookup(vnode_t *dp, const char *name)
 {
 	ncache_t *ncp;
 	nc_hash_t *hp;
@@ -660,7 +661,7 @@ dnlc_lookup(vnode_t *dp, char *name)
  * Remove an entry in the directory name cache.
  */
 void
-dnlc_remove(vnode_t *dp, char *name)
+dnlc_remove(vnode_t *dp, const char *name)
 {
 	ncache_t *ncp;
 	nc_hash_t *hp;
@@ -968,7 +969,7 @@ dnlc_reverse_lookup(vnode_t *vp, char *buf, size_t buflen)
  * ncache entry if found, NULL otherwise.
  */
 static ncache_t *
-dnlc_search(vnode_t *dp, char *name, uchar_t namlen, int hash)
+dnlc_search(vnode_t *dp, const char *name, uchar_t namlen, int hash)
 {
 	nc_hash_t *hp;
 	ncache_t *ncp;
@@ -1141,7 +1142,7 @@ found:
  * Lookup up an entry in a complete or partial directory cache.
  */
 dcret_t
-dnlc_dir_lookup(dcanchor_t *dcap, char *name, uint64_t *handle)
+dnlc_dir_lookup(dcanchor_t *dcap, const char *name, uint64_t *handle)
 {
 	dircache_t *dcp;
 	dcentry_t *dep;
@@ -1282,7 +1283,7 @@ error:
  * Add a directopry entry to a partial or complete directory cache.
  */
 dcret_t
-dnlc_dir_add_entry(dcanchor_t *dcap, char *name, uint64_t handle)
+dnlc_dir_add_entry(dcanchor_t *dcap, const char *name, uint64_t handle)
 {
 	dircache_t *dcp;
 	dcentry_t **hp, *dep;
@@ -1583,7 +1584,7 @@ dnlc_dir_purge(dcanchor_t *dcap)
  * Return the handle if it's non null.
  */
 dcret_t
-dnlc_dir_rem_entry(dcanchor_t *dcap, char *name, uint64_t *handlep)
+dnlc_dir_rem_entry(dcanchor_t *dcap, const char *name, uint64_t *handlep)
 {
 	dircache_t *dcp;
 	dcentry_t **prevpp, *te;
@@ -1782,7 +1783,7 @@ dnlc_dir_rem_space_by_handle(dcanchor_t *dcap, uint64_t handle)
  * Update the handle of an directory cache entry.
  */
 dcret_t
-dnlc_dir_update(dcanchor_t *dcap, char *name, uint64_t handle)
+dnlc_dir_update(dcanchor_t *dcap, const char *name, uint64_t handle)
 {
 	dircache_t *dcp;
 	dcentry_t *dep;

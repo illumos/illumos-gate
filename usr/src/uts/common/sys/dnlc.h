@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -38,8 +37,6 @@
 
 #ifndef _SYS_DNLC_H
 #define	_SYS_DNLC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -163,7 +160,8 @@ struct nc_stats {
  */
 #define	DNLCHASH(name, dvp, hash, namlen)			\
 	{							\
-		char Xc, *Xcp;					\
+		char Xc;					\
+		const char *Xcp;				\
 		hash = (int)((uintptr_t)(dvp)) >> 8;		\
 		for (Xcp = (name); (Xc = *Xcp) != 0; Xcp++)	\
 			(hash) = ((hash) << 4) + (hash) + Xc;	\
@@ -181,13 +179,13 @@ extern vnode_t negative_cache_vnode;
 #define	DNLC_NO_VNODE &negative_cache_vnode
 
 void	dnlc_init(void);
-void	dnlc_enter(vnode_t *, char *, vnode_t *);
-void	dnlc_update(vnode_t *, char *, vnode_t *);
-vnode_t	*dnlc_lookup(vnode_t *, char *);
+void	dnlc_enter(vnode_t *, const char *, vnode_t *);
+void	dnlc_update(vnode_t *, const char *, vnode_t *);
+vnode_t	*dnlc_lookup(vnode_t *, const char *);
 void	dnlc_purge(void);
 void	dnlc_purge_vp(vnode_t *);
 int	dnlc_purge_vfsp(vfs_t *, int);
-void	dnlc_remove(vnode_t *, char *);
+void	dnlc_remove(vnode_t *, const char *);
 int	dnlc_fs_purge1(struct vnodeops *);
 vnode_t	*dnlc_reverse_lookup(vnode_t *, char *, size_t);
 void	dnlc_reduce_cache(void *);
@@ -296,7 +294,7 @@ dcret_t dnlc_dir_start(dcanchor_t *dcap, uint_t num_entries);
  * For example, "handle" for ufs holds the inumber and a directory
  * entry offset. Returns DOK, DNOCACHE, DTOOBIG.
  */
-dcret_t dnlc_dir_add_entry(dcanchor_t *dcap, char *name, uint64_t handle);
+dcret_t dnlc_dir_add_entry(dcanchor_t *dcap, const char *name, uint64_t handle);
 
 /*
  * dnlc_dir_add_space adds free space (length and file system specific
@@ -322,21 +320,22 @@ void dnlc_dir_purge(dcanchor_t *dcap);
  * and returns the file system handle specified on dnlc_dir_add_entry()
  * in "handlep". Returns DFOUND, DNOENT, DNOCACHE.
  */
-dcret_t dnlc_dir_lookup(dcanchor_t *dcap, char *name, uint64_t *handlep);
+dcret_t dnlc_dir_lookup(dcanchor_t *dcap, const char *name, uint64_t *handlep);
 
 /*
  * dnlc_dir_update() amends the handle for an entry in a directory cache
  * "handle" is the new file system specific handle for the file "name".
  * Returns DFOUND, DNOENT, DNOCACHE.
  */
-dcret_t dnlc_dir_update(dcanchor_t *dcap, char *name, uint64_t handle);
+dcret_t dnlc_dir_update(dcanchor_t *dcap, const char *name, uint64_t handle);
 
 /*
  * dnlc_dir_rem_entry() removes an entry form a directory cache.
  * Returns the handle if "handlep" non null.
  * Returns DFOUND, DNOENT, DNOCACHE.
  */
-dcret_t dnlc_dir_rem_entry(dcanchor_t *dcap, char *name, uint64_t *handlep);
+dcret_t dnlc_dir_rem_entry(dcanchor_t *dcap, const char *name,
+    uint64_t *handlep);
 
 /*
  * dnlc_dir_rem_space_by_len() looks up and returns free space in a

@@ -1459,7 +1459,7 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	}
 
 	if (object == 0) {
-		dn = os->os_meta_dnode;
+		dn = DMU_META_DNODE(os);
 	} else {
 		error = dmu_bonus_hold(os, object, FTAG, &db);
 		if (error)
@@ -1467,7 +1467,7 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 			    object, error);
 		bonus = db->db_data;
 		bsize = db->db_size;
-		dn = ((dmu_buf_impl_t *)db)->db_dnode;
+		dn = DB_DNODE((dmu_buf_impl_t *)db);
 	}
 	dmu_object_info_from_dnode(dn, &doi);
 
@@ -1631,8 +1631,8 @@ dump_dir(objset_t *os)
 
 	dump_object(os, 0, verbosity, &print_header);
 	object_count = 0;
-	if (os->os_userused_dnode &&
-	    os->os_userused_dnode->dn_type != 0) {
+	if (DMU_USERUSED_DNODE(os) != NULL &&
+	    DMU_USERUSED_DNODE(os)->dn_type != 0) {
 		dump_object(os, DMU_USERUSED_OBJECT, verbosity, &print_header);
 		dump_object(os, DMU_GROUPUSED_OBJECT, verbosity, &print_header);
 	}

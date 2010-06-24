@@ -335,6 +335,7 @@ int dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **);
 int dmu_bonus_max(void);
 int dmu_set_bonus(dmu_buf_t *, int, dmu_tx_t *);
 int dmu_set_bonustype(dmu_buf_t *, dmu_object_type_t, dmu_tx_t *);
+dmu_object_type_t dmu_get_bonustype(dmu_buf_t *);
 int dmu_rm_spill(objset_t *, uint64_t, dmu_tx_t *);
 
 /*

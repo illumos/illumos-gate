@@ -41,8 +41,25 @@
 #include <sys/zil.h>
 #include <sys/dmu_impl.h>
 #include <sys/zfs_ioctl.h>
-#include <sys/sunddi.h>
 #include <sys/sa.h>
+
+/*
+ * Needed to close a window in dnode_move() that allows the objset to be freed
+ * before it can be safely accessed.
+ */
+krwlock_t os_lock;
+
+void
+dmu_objset_init(void)
+{
+	rw_init(&os_lock, NULL, RW_DEFAULT, NULL);
+}
+
+void
+dmu_objset_fini(void)
+{
+	rw_destroy(&os_lock);
+}
 
 spa_t *
 dmu_objset_spa(objset_t *os)
@@ -368,13 +385,16 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	mutex_init(&os->os_obj_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&os->os_user_ptr_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	os->os_meta_dnode = dnode_special_open(os,
-	    &os->os_phys->os_meta_dnode, DMU_META_DNODE_OBJECT);
+	DMU_META_DNODE(os) = dnode_special_open(os,
+	    &os->os_phys->os_meta_dnode, DMU_META_DNODE_OBJECT,
+	    &os->os_meta_dnode);
 	if (arc_buf_size(os->os_phys_buf) >= sizeof (objset_phys_t)) {
-		os->os_userused_dnode = dnode_special_open(os,
-		    &os->os_phys->os_userused_dnode, DMU_USERUSED_OBJECT);
-		os->os_groupused_dnode = dnode_special_open(os,
-		    &os->os_phys->os_groupused_dnode, DMU_GROUPUSED_OBJECT);
+		DMU_USERUSED_DNODE(os) = dnode_special_open(os,
+		    &os->os_phys->os_userused_dnode, DMU_USERUSED_OBJECT,
+		    &os->os_userused_dnode);
+		DMU_GROUPUSED_DNODE(os) = dnode_special_open(os,
+		    &os->os_phys->os_groupused_dnode, DMU_GROUPUSED_OBJECT,
+		    &os->os_groupused_dnode);
 	}
 
 	/*
@@ -470,8 +490,8 @@ dmu_objset_evict_dbufs(objset_t *os)
 	mutex_enter(&os->os_lock);
 
 	/* process the mdn last, since the other dnodes have holds on it */
-	list_remove(&os->os_dnodes, os->os_meta_dnode);
-	list_insert_tail(&os->os_dnodes, os->os_meta_dnode);
+	list_remove(&os->os_dnodes, DMU_META_DNODE(os));
+	list_insert_tail(&os->os_dnodes, DMU_META_DNODE(os));
 
 	/*
 	 * Find the first dnode with holds.  We have to do this dance
@@ -497,8 +517,9 @@ dmu_objset_evict_dbufs(objset_t *os)
 		mutex_enter(&os->os_lock);
 		dn = next_dn;
 	}
+	dn = list_head(&os->os_dnodes);
 	mutex_exit(&os->os_lock);
-	return (list_head(&os->os_dnodes) != os->os_meta_dnode);
+	return (dn != DMU_META_DNODE(os));
 }
 
 void
@@ -539,16 +560,26 @@ dmu_objset_evict(objset_t *os)
 	 */
 	(void) dmu_objset_evict_dbufs(os);
 
-	dnode_special_close(os->os_meta_dnode);
-	if (os->os_userused_dnode) {
-		dnode_special_close(os->os_userused_dnode);
-		dnode_special_close(os->os_groupused_dnode);
+	dnode_special_close(&os->os_meta_dnode);
+	if (DMU_USERUSED_DNODE(os)) {
+		dnode_special_close(&os->os_userused_dnode);
+		dnode_special_close(&os->os_groupused_dnode);
 	}
 	zil_free(os->os_zil);
 
 	ASSERT3P(list_head(&os->os_dnodes), ==, NULL);
 
 	VERIFY(arc_buf_remove_ref(os->os_phys_buf, &os->os_phys_buf) == 1);
+
+	/*
+	 * This is a barrier to prevent the objset from going away in
+	 * dnode_move() until we can safely ensure that the objset is still in
+	 * use. We consider the objset valid before the barrier and invalid
+	 * after the barrier.
+	 */
+	rw_enter(&os_lock, RW_READER);
+	rw_exit(&os_lock);
+
 	mutex_destroy(&os->os_lock);
 	mutex_destroy(&os->os_obj_lock);
 	mutex_destroy(&os->os_user_ptr_lock);
@@ -575,7 +606,7 @@ dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	VERIFY(0 == dmu_objset_open_impl(spa, ds, bp, &os));
 	if (ds)
 		mutex_exit(&ds->ds_opening_lock);
-	mdn = os->os_meta_dnode;
+	mdn = DMU_META_DNODE(os);
 
 	dnode_allocate(mdn, DMU_OT_DNODE, 1 << DNODE_BLOCK_SHIFT,
 	    DN_MAX_INDBLKSHIFT, DMU_OT_NONE, 0, tx);
@@ -1035,17 +1066,17 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 	/*
 	 * Sync special dnodes - the parent IO for the sync is the root block
 	 */
-	os->os_meta_dnode->dn_zio = zio;
-	dnode_sync(os->os_meta_dnode, tx);
+	DMU_META_DNODE(os)->dn_zio = zio;
+	dnode_sync(DMU_META_DNODE(os), tx);
 
 	os->os_phys->os_flags = os->os_flags;
 
-	if (os->os_userused_dnode &&
-	    os->os_userused_dnode->dn_type != DMU_OT_NONE) {
-		os->os_userused_dnode->dn_zio = zio;
-		dnode_sync(os->os_userused_dnode, tx);
-		os->os_groupused_dnode->dn_zio = zio;
-		dnode_sync(os->os_groupused_dnode, tx);
+	if (DMU_USERUSED_DNODE(os) &&
+	    DMU_USERUSED_DNODE(os)->dn_type != DMU_OT_NONE) {
+		DMU_USERUSED_DNODE(os)->dn_zio = zio;
+		dnode_sync(DMU_USERUSED_DNODE(os), tx);
+		DMU_GROUPUSED_DNODE(os)->dn_zio = zio;
+		dnode_sync(DMU_GROUPUSED_DNODE(os), tx);
 	}
 
 	txgoff = tx->tx_txg & TXG_MASK;
@@ -1063,7 +1094,7 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 	dmu_objset_sync_dnodes(&os->os_free_dnodes[txgoff], newlist, tx);
 	dmu_objset_sync_dnodes(&os->os_dirty_dnodes[txgoff], newlist, tx);
 
-	list = &os->os_meta_dnode->dn_dirty_records[txgoff];
+	list = &DMU_META_DNODE(os)->dn_dirty_records[txgoff];
 	while (dr = list_head(list)) {
 		ASSERT(dr->dr_dbuf->db_level == 0);
 		list_remove(list, dr);
@@ -1085,7 +1116,7 @@ dmu_objset_is_dirty(objset_t *os, uint64_t txg)
 	    !list_is_empty(&os->os_free_dnodes[txg & TXG_MASK]));
 }
 
-objset_used_cb_t *used_cbs[DMU_OST_NUMTYPES];
+static objset_used_cb_t *used_cbs[DMU_OST_NUMTYPES];
 
 void
 dmu_objset_register_type(dmu_objset_type_t ost, objset_used_cb_t *cb)
@@ -1097,8 +1128,8 @@ boolean_t
 dmu_objset_userused_enabled(objset_t *os)
 {
 	return (spa_version(os->os_spa) >= SPA_VERSION_USERSPACE &&
-	    used_cbs[os->os_phys->os_type] &&
-	    os->os_userused_dnode);
+	    used_cbs[os->os_phys->os_type] != NULL &&
+	    DMU_USERUSED_DNODE(os) != NULL);
 }
 
 static void
@@ -1132,7 +1163,7 @@ dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 		    DNODE_FLAG_USERUSED_ACCOUNTED);
 
 		/* Allocate the user/groupused objects if necessary. */
-		if (os->os_userused_dnode->dn_type == DMU_OT_NONE) {
+		if (DMU_USERUSED_DNODE(os)->dn_type == DMU_OT_NONE) {
 			VERIFY(0 == zap_create_claim(os,
 			    DMU_USERUSED_OBJECT,
 			    DMU_OT_USERGROUP_USED, DMU_OT_NONE, 0, tx));
@@ -1201,13 +1232,23 @@ dmu_objset_userquota_find_data(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		if (dr->dr_txg == tx->tx_txg)
 			break;
 
-	if (dr == NULL)
+	if (dr == NULL) {
 		data = NULL;
-	else if (dr->dr_dbuf->db_dnode->dn_bonuslen == 0 &&
-	    dr->dr_dbuf->db_blkid == DMU_SPILL_BLKID)
-		data = dr->dt.dl.dr_data->b_data;
-	else
-		data = dr->dt.dl.dr_data;
+	} else {
+		dnode_t *dn;
+
+		DB_DNODE_ENTER(dr->dr_dbuf);
+		dn = DB_DNODE(dr->dr_dbuf);
+
+		if (dn->dn_bonuslen == 0 &&
+		    dr->dr_dbuf->db_blkid == DMU_SPILL_BLKID)
+			data = dr->dt.dl.dr_data->b_data;
+		else
+			data = dr->dt.dl.dr_data;
+
+		DB_DNODE_EXIT(dr->dr_dbuf);
+	}
+
 	return (data);
 }
 

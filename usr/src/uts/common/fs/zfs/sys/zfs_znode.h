@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_FS_ZFS_ZNODE_H
@@ -188,6 +187,7 @@ typedef struct znode {
 	uint8_t		z_unlinked;	/* file has been unlinked */
 	uint8_t		z_atime_dirty;	/* atime needs to be synced */
 	uint8_t		z_zn_prefetch;	/* Prefetch znodes? */
+	uint8_t		z_moved;	/* Has this znode been moved? */
 	uint_t		z_blksz;	/* block size in bytes */
 	uint_t		z_seq;		/* modification sequence number */
 	uint64_t	z_mapcnt;	/* number of pages mapped to file */

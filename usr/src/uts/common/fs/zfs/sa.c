@@ -1612,6 +1612,8 @@ sa_modify_attrs(sa_handle_t *hdl, sa_attr_type_t newattr,
     uint16_t buflen, dmu_tx_t *tx)
 {
 	sa_os_t *sa = hdl->sa_os->os_sa;
+	dmu_buf_impl_t *db = (dmu_buf_impl_t *)hdl->sa_bonus;
+	dnode_t *dn;
 	sa_bulk_attr_t *attr_desc;
 	void *old_data[2];
 	int bonus_attr_count = 0;
@@ -1629,7 +1631,9 @@ sa_modify_attrs(sa_handle_t *hdl, sa_attr_type_t newattr,
 
 	/* First make of copy of the old data */
 
-	if (((dmu_buf_impl_t *)hdl->sa_bonus)->db_dnode->dn_bonuslen) {
+	DB_DNODE_ENTER(db);
+	dn = DB_DNODE(db);
+	if (dn->dn_bonuslen != 0) {
 		bonus_data_size = hdl->sa_bonus->db_size;
 		old_data[0] = kmem_alloc(bonus_data_size, KM_SLEEP);
 		bcopy(hdl->sa_bonus->db_data, old_data[0],
@@ -1638,6 +1642,7 @@ sa_modify_attrs(sa_handle_t *hdl, sa_attr_type_t newattr,
 	} else {
 		old_data[0] = NULL;
 	}
+	DB_DNODE_EXIT(db);
 
 	/* Bring spill buffer online if it isn't currently */
 

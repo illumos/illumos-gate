@@ -95,6 +95,15 @@ typedef enum kmem_cbrc {
 
 #ifdef _KERNEL
 
+/*
+ * Helps clients implementing the move() callback to recognize known objects by
+ * testing a client-designated pointer member. Takes advantage of the fact that
+ * any scribbling to freed memory done by kmem is guaranteed to set one of the
+ * two low order bits.
+ */
+#define	POINTER_IS_VALID(p)	(!((uintptr_t)(p) & 0x3))
+#define	POINTER_INVALIDATE(pp)	(*(pp) = (void *)((uintptr_t)(*(pp)) | 0x1))
+
 extern int kmem_ready;
 extern pgcnt_t kmem_reapahead;
 

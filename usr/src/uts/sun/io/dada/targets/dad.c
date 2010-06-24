@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -3465,6 +3464,7 @@ dcdioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		bp->b_un.b_addr = 0;
 		bp->b_iodone = NULL;
 		bp->b_list = NULL;
+		bp->b_private = NULL;
 
 		if ((flag & FKIOCTL) && dkc != NULL &&
 		    dkc->dkc_callback != NULL) {
@@ -3472,7 +3472,7 @@ dcdioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 			    kmem_zalloc(sizeof (*dkc2), KM_SLEEP);
 			bcopy(dkc, dkc2, sizeof (*dkc2));
 
-			bp->b_list = (struct buf *)dkc2;
+			bp->b_private = dkc2;
 			bp->b_iodone = dcdflushdone;
 			is_sync = 0;
 		}
@@ -3500,7 +3500,7 @@ dcdflushdone(struct buf *bp)
 	struct dcd_disk *un = ddi_get_soft_state(dcd_state,
 	    DCDUNIT(bp->b_edev));
 	struct dcd_pkt *pkt = BP_PKT(bp);
-	struct dk_callback *dkc = (struct dk_callback *)bp->b_list;
+	struct dk_callback *dkc = bp->b_private;
 
 	ASSERT(un != NULL);
 	ASSERT(bp == un->un_sbufp);
@@ -3514,7 +3514,7 @@ dcdflushdone(struct buf *bp)
 		(*dkc->dkc_callback)(dkc->dkc_cookie, geterror(bp));
 		kmem_free(dkc, sizeof (*dkc));
 		bp->b_iodone = NULL;
-		bp->b_list = NULL;
+		bp->b_private = NULL;
 	}
 
 	/*

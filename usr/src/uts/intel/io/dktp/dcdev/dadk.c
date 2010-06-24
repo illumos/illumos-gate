@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -868,11 +867,7 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 				    sizeof (struct dk_callback), KM_SLEEP);
 
 				bcopy(dkc, dkc2, sizeof (*dkc2));
-				/*
-				 * Borrow b_list to carry private data
-				 * to the b_iodone func.
-				 */
-				bp->b_list = (struct buf *)dkc2;
+				bp->b_private = dkc2;
 				bp->b_iodone = dadk_flushdone;
 				is_sync = 0;
 			}
@@ -988,7 +983,7 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 int
 dadk_flushdone(struct buf *bp)
 {
-	struct dk_callback *dkc = (struct dk_callback *)bp->b_list;
+	struct dk_callback *dkc = bp->b_private;
 
 	ASSERT(dkc != NULL && dkc->dkc_callback != NULL);
 
