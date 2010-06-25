@@ -36,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.4 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.4 {
     global:
 	di_alias2curr;
 	di_path_bus_addr;
@@ -65,7 +67,7 @@ SUNW_1.4 {
 	di_path_state;
 } SUNW_1.3;
 
-SUNW_1.3 {
+SYMBOL_VERSION SUNW_1.3 {
     global:
 	di_devfs_minor_path;
 	di_driver_major;
@@ -93,12 +95,12 @@ SUNW_1.3 {
 # no SUNW_1.2 symbols, but the version is now kept as a placeholder.
 # Don't add any symbols to this version.
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	SUNW_1.2;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	di_binding_name;
 	di_bus_addr;
@@ -149,7 +151,7 @@ SUNW_1.1 {
 	di_walk_node;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	devfs_add_minor_perm;
 	devfs_resolve_link;

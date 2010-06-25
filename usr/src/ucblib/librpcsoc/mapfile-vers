@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,12 +36,14 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	SUNW_1.1;
 } SUNW_0.7;
 
-SUNW_0.7 {
+SYMBOL_VERSION SUNW_0.7 {
     global:
 	clnttcp_create;
 	clntudp_bufcreate;

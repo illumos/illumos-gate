@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # External declarations - used to suppress -zdefs errors.
 
@@ -18,13 +17,15 @@
 # MAPFILE HEADER END
 #
 
-{
-	add_options	= FUNCTION extern;	# Provided by pppd.
-	detached	= DATA extern;		#    "     "
-	error		= FUNCTION extern;	#    "     "
-	pap_passwd_hook = DATA extern;		#    "     "
-	remote_name	= DATA extern;		#    "     "
-	slprintf	= FUNCTION extern;	#    "     "
-	sys_close	= FUNCTION extern;	#    "     "
-	warn		= FUNCTION extern;	#    "     "
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	add_options	{ TYPE = FUNCTION; FLAGS = extern };	#  From  pppd
+	detached	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	error		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	pap_passwd_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	remote_name	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	slprintf	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	sys_close	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	warn		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
 };

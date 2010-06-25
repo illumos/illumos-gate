@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -38,7 +37,9 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	sh_bltin_tree;
 	sh_subfork;
@@ -130,7 +131,7 @@ SUNWprivate_1.1 {
 # (see libshell/common/include/builtins.h)
 # Note: We have to export all the |b_*()| symbols that the "builtin" command
 # can load builtins which are not enabled by the default OS/Net configuration.
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	B_echo;
 	B_login;

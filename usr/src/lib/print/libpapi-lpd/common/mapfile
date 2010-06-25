@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -42,38 +41,112 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 #
 # Common interfaces that are most likely to be shared amongst the various
 # PAPI implementations.
 #
 
-SUNW_1.0 {
+SYMBOL_VERSION SUNW_1.0 {
     global:
 	# PAPI Attribute Calls
-	papiAttributeListAddValue  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListAddBoolean  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListAddCollection  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListAddDatetime  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListAddInteger  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListAddMetadata  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListAddRange  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListAddResolution  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListAddString  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListDelete  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetValue  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetNext  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListFind  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetBoolean  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetCollection  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetDatetime  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetInteger  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetMetadata  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetRange  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetResolution  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListGetString  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListFromString  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListToString  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListFree  = FUNCTION FILTER libpapi-common.so ;
+	papiAttributeListAddValue {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListAddBoolean {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListAddCollection {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListAddDatetime {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListAddInteger {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListAddMetadata {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListAddRange {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListAddResolution {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListAddString {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListDelete {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetValue {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetNext {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListFind {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetBoolean {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetCollection {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetDatetime {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetInteger {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetMetadata {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetRange {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetResolution {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListGetString {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListFromString {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListToString {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListFree {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
 
 	# PAPI Service Calls
         papiServiceCreate ;
@@ -92,11 +165,23 @@ SUNW_1.0 {
         papiServiceGetStatusMessage ;
 
 	# PAPI Printer Calls
-	papiPrintersList  = FUNCTION FILTER libpapi-common.so ;
+	papiPrintersList {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
         papiPrinterQuery ;
-	papiPrinterAdd  = FUNCTION FILTER libpapi-common.so ;
-	papiPrinterModify  = FUNCTION FILTER libpapi-common.so ;
-	papiPrinterRemove  = FUNCTION FILTER libpapi-common.so ;
+	papiPrinterAdd {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiPrinterModify {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiPrinterRemove {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
 	papiPrinterDisable ;
 	papiPrinterEnable ;
 	papiPrinterPause ;
@@ -110,55 +195,127 @@ SUNW_1.0 {
 	# PAPI Job Calls
         papiJobSubmit ;
         papiJobSubmitByReference ;
-	papiJobValidate  = FUNCTION FILTER libpapi-common.so ;
+	papiJobValidate {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
         papiJobStreamOpen ;
         papiJobStreamWrite ;
         papiJobStreamClose ;
         papiJobQuery ;
-	papiJobModify  = FUNCTION FILTER libpapi-common.so ;
-	papiJobMove  = FUNCTION FILTER libpapi-common.so ;
+	papiJobModify {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiJobMove {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
         papiJobCancel ;
-	papiJobHold  = FUNCTION FILTER libpapi-common.so ;
-	papiJobRelease  = FUNCTION FILTER libpapi-common.so ;
-	papiJobRestart  = FUNCTION FILTER libpapi-common.so ;
-	papiJobPromote  = FUNCTION FILTER libpapi-common.so ;
+	papiJobHold {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiJobRelease {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiJobRestart {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiJobPromote {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
         papiJobGetAttributeList ;
         papiJobGetPrinterName ;
         papiJobGetId ;
-	papiJobGetJobTicket  = FUNCTION FILTER libpapi-common.so ;
+	papiJobGetJobTicket {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
         papiJobFree ;
         papiJobListFree ;
 
 	# Misc. PAPI Calls
-	papiStatusString  = FUNCTION FILTER libpapi-common.so ;
+	papiStatusString {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
         papiLibrarySupportedCall ;
         papiLibrarySupportedCalls ;
-};
+} ;
 
-SUNWprivate_1.0 {
+SYMBOL_VERSION SUNWprivate_1.0 {
     global:
-	papiServiceSetPeer  = FUNCTION FILTER libpapi-common.so ;
-	papiJobCreate  = FUNCTION FILTER libpapi-common.so ;
-	papiJobStreamAdd  = FUNCTION FILTER libpapi-common.so ;
-	papiJobCommit  = FUNCTION FILTER libpapi-common.so ;
+	papiServiceSetPeer {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiJobCreate {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiJobStreamAdd {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiJobCommit {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
 
 	# Misc. supporting calls
 	#     URI
-	uri_from_string  = FUNCTION FILTER libpapi-common.so ;
-	uri_to_string  = FUNCTION FILTER libpapi-common.so ;
-	uri_free  = FUNCTION FILTER libpapi-common.so ;
+	uri_from_string {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	uri_to_string {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	uri_free {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
 	#    list
-	list_remove  = FUNCTION FILTER libpapi-common.so ;
-	list_append  = FUNCTION FILTER libpapi-common.so ;
-	list_concatenate  = FUNCTION FILTER libpapi-common.so ;
+	list_remove {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	list_append {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	list_concatenate {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
 	#    NS
-	getprinterbyname  = FUNCTION FILTER libpapi-common.so ;
-	is_localhost  = FUNCTION FILTER libpapi-common.so ;
+	getprinterbyname {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	is_localhost {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
 
 	#    extra Attribute Calls
-	copy_attributes  = FUNCTION FILTER libpapi-common.so ;
-	split_and_copy_attributes  = FUNCTION FILTER libpapi-common.so ;
-	papiAttributeListPrint  = FUNCTION FILTER libpapi-common.so ;
+	copy_attributes {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	split_and_copy_attributes {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
+	papiAttributeListPrint {
+		TYPE = FUNCTION;
+		FILTER = libpapi-common.so;
+	} ;
 
     local:
         * ;

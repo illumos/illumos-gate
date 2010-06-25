@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,6 +36,8 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 #
 # The instances of "tecla_l.5" below (note "l" vs "1") are by design;
 # quoting the author:
@@ -47,7 +48,7 @@
 # Thus I now have to derive tecla_1.6 from tecla_l.5, in the map file.
 #
 
-tecla_1.6 {
+SYMBOL_VERSION tecla_1.6 {
     global:
 	gl_append_history;
 	gl_automatic_history;
@@ -55,7 +56,7 @@ tecla_1.6 {
 	gl_read_char;
 } tecla_l.5;
 
-tecla_l.5 {
+SYMBOL_VERSION tecla_l.5 {
     global:
 	cpl_recall_matches;
 	gl_abandon_line;
@@ -78,7 +79,7 @@ tecla_l.5 {
 	gl_tty_signals;
 } tecla_1.4;
 
-tecla_1.4 {
+SYMBOL_VERSION tecla_1.4 {
     global:
 	gl_clear_history;
 	gl_configure_getline;
@@ -104,12 +105,12 @@ tecla_1.4 {
 	libtecla_version;
 } tecla_1.3;
 
-tecla_1.3 {
+SYMBOL_VERSION tecla_1.3 {
     global:
 	ef_list_expansions;
 } tecla_1.2;
 
-tecla_1.2 {
+SYMBOL_VERSION tecla_1.2 {
     global:
 	cfc_file_start;
 	cfc_literal_escapes;

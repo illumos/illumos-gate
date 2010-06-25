@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	addipsecalg;
 	addipsecproto;
@@ -56,8 +57,8 @@ SUNWprivate_1.1 {
 	dump_sadb_idtype;
 	dump_sockaddr;
 	env;
-	_errfp = FUNCTION FILTER libc.so.1;
-	_errxfp = FUNCTION FILTER libc.so.1;
+	_errfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_errxfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	getipsecalgs;
 	getipsecprotos;
 	in_masktoprefix;
@@ -115,12 +116,12 @@ SUNWprivate_1.1 {
 	secs2str;
 	spdsock_diag;
 	spdsock_get_ext;
-	_verrfp = FUNCTION FILTER libc.so.1;
-	_verrxfp = FUNCTION FILTER libc.so.1;
-	_vwarnfp = FUNCTION FILTER libc.so.1;
-	_vwarnxfp = FUNCTION FILTER libc.so.1;
-	_warnfp = FUNCTION FILTER libc.so.1;
-	_warnxfp = FUNCTION FILTER libc.so.1;
+	_verrfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_verrxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_vwarnfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_vwarnxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_warnfp			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	_warnxfp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
     local:
 	*;
 };

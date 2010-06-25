@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBCDIR=	$(SRC)/lib/libc
@@ -925,8 +924,7 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR64)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS)
 
-MAPFILES =	$(LIBCDIR)/port/mapfile-vers $(LIBCDIR)/sparcv9/mapfile-vers \
-		$(MAPFILE_AUX)
+MAPFILES =	$(LIBCDIR)/port/mapfile-vers $(MAPFILE_AUX)
 
 sparcv9_C_PICFLAGS= -K PIC
 CFLAGS64 +=	$(EXTN_CFLAGS)

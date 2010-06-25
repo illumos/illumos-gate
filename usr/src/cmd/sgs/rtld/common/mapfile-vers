@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Generic interface definition for usr/src/cmd/sgs/rtld.
 #
@@ -40,10 +39,12 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 #
 # All symbols in ld.so.1 are private as no-one should bind to these directly.
 #
-SUNWprivate_1.3 {
+SYMBOL_VERSION SUNWprivate_1.3 {
 	protected:
 		 dladdr;		# Standard dlopen(3x) family
 		 dladdr1;
@@ -110,6 +111,24 @@ SUNWprivate_1.3 {
 	      ___errno;
 		 qsort;
 		dl_iterate_phdr;
+
+$if _x86 && _ELF64
+		# amd64 ABI exception unwinding
+		_dlamd64getunwind;
+		dlamd64getunwind;
+$endif
+
+		# doXX_reloc_rtld and relocXX_table are required to
+		# support librtld.so.
+$if _ELF32
+		do32_reloc_rtld;
+		reloc32_table;
+$elif _ELF64
+		do64_reloc_rtld;
+		reloc64_table;
+$else
+$error unknown ELFCLASS
+$endif
 	local:
 		*;
 };

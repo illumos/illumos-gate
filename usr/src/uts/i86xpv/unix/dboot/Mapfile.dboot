@@ -20,23 +20,40 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+$mapfile_version 2
 
+LOAD_SEGMENT dboot {
+	NOHDR;
+	FLAGS = READ WRITE EXECUTE;
+	VADDR = 0x40800000;
+	PADDR = 0x40800000;
+	ALIGN = 0x1000;
 
-dboot = LOAD ?NRWXO V0x40800000 P0x40800000 A0x1000;
-#
-# Make sure that dboot_xen.s`_start is the first thing in the dboot
-# .text segment, since when we boot that's where the boot loader will
-# start execution
-#
-dboot : .text : *dboot_xen.o;
-dboot : $PROGBITS ?A;
-dboot : $NOBITS ?A;
+	#
+	# Make sure that dboot_xen.s`_start is the first thing in the dboot
+	# .text segment, since when we boot that's where the boot loader will
+	# start execution
+	#
+	ASSIGN_SECTION is_text {
+		IS_NAME = .text;
+		FILE_BASENAME = dboot_xen.o;
+	};
+	ASSIGN_SECTION is_progbits {
+		TYPE = PROGBITS;
+		FLAGS = ALLOC;
+	};
+	ASSIGN_SECTION is_nobits {
+		TYPE = NOBITS;
+		FLAGS = ALLOC;
+	};
+	IS_ORDER = is_text is_progbits is_nobits;
+};
 
-otherstuff : ?A;
+LOAD_SEGMENT otherstuff {
+	ASSIGN_SECTION {
+		FLAGS = ALLOC;
+	};
+};

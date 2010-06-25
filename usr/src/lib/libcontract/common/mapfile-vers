@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.2 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	ct_ctl_nack;
 	ct_dev_status_get_aset;
@@ -61,7 +62,7 @@ SUNW_1.2 {
 	ct_pr_tmpl_set_svc_fmri;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	ct_ctl_abandon;
 	ct_ctl_ack;
@@ -123,7 +124,7 @@ SUNW_1.1 {
 	ct_tmpl_set_informative;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	contract_abandon_id;
 	contract_event_dump;

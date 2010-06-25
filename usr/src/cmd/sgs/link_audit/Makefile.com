@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		../../../../lib/Makefile.lib
@@ -84,11 +83,11 @@ $(WHOLIB):=	SONAME = $(WHOLIB)
 $(SYMBINDREP):=	SONAME = $(SYMBINDREP)
 $(BINDLIB):=	SONAME = $(BINDLIB)
 
-$(TRUSSLIB):=	MAPFILES = mapfile-vers-truss
-$(PERFLIB):=	MAPFILES = mapfile-vers-perfcnt
-$(WHOLIB):=	MAPFILES = mapfile-vers-who
-$(SYMBINDREP):=	MAPFILES = mapfile-vers-symbindrep
-$(BINDLIB):=	MAPFILES = mapfile-vers-bindings
+$(TRUSSLIB):=	MAPFILES = ../common/mapfile-vers-truss
+$(PERFLIB):=	MAPFILES = ../common/mapfile-vers-perfcnt
+$(WHOLIB):=	MAPFILES = ../common/mapfile-vers-who
+$(SYMBINDREP):=	MAPFILES = ../common/mapfile-vers-symbindrep
+$(BINDLIB):=	MAPFILES = ../common/mapfile-vers-bindings
 
 $(ROOTCCSLIB) :=	DIRMODE =	755
 

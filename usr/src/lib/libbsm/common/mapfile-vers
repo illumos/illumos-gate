@@ -36,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.2 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	au_to_arg32;
 	au_to_arg64;
@@ -52,12 +54,12 @@ SUNW_1.2 {
 # no SUNW_1.1 symbols, but the version is now kept as a placeholder.
 # Don't add any symbols to this version.
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	SUNW_1.1;
 } SUNW_0.8;
 
-SUNW_0.8 {
+SYMBOL_VERSION SUNW_0.8 {
     global:
 	au_to_newgroups;
 	getauclassent_r;
@@ -69,7 +71,7 @@ SUNW_0.8 {
 	getauusernam_r;
 } SUNW_0.7;
 
-SUNW_0.7 {
+SYMBOL_VERSION SUNW_0.7 {
     global:
 	au_close;
 	audit;
@@ -123,7 +125,7 @@ SUNW_0.7 {
 	setauuser;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	adr_char;
 	adr_count;
@@ -336,11 +338,11 @@ SUNWprivate_1.1 {
     local:
 	# These functions are aliased to "int" versions. Let those
 	# go into .SUNW_dynsymsort, and keep these out.
-	adrm_long =	NODYNSORT;
-	adrm_u_long =	NODYNSORT;
-	adrf_long =	NODYNSORT;
-	adrf_u_long =	NODYNSORT;
-	adrm_putlong =	NODYNSORT;
+	adrm_long		{ FLAGS = NODYNSORT };
+	adrm_u_long		{ FLAGS = NODYNSORT };
+	adrf_long		{ FLAGS = NODYNSORT };
+	adrf_u_long		{ FLAGS = NODYNSORT };
+	adrm_putlong		{ FLAGS = NODYNSORT };
 
 	# Reduce all remaining global symbols to local scope
 	*;

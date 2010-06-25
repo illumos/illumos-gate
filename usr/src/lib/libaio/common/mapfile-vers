@@ -1,0 +1,92 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+#
+# DO NOT TOUCH THIS FILE.
+# This file declares interfaces that are cast in stone.
+# They offer interfaces that will never change.
+# DO NOT TOUCH THIS FILE.
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+	assfail			{ TYPE = FUNCTION };
+    local:
+	*;
+} SUNW_1.0;
+
+SYMBOL_VERSION SUNW_1.0 {
+    global:
+$if _ELF32
+	aioread64		{ TYPE = FUNCTION };
+	aiowrite64		{ TYPE = FUNCTION };
+$elif _ELF64
+	SUNW_1.0;
+$else
+$error unknown ELFCLASS
+$endif
+} SUNW_0.7;
+
+#
+# For most platforms, SUNW_0.7 contains aiocancel, aioread, aiowait, and
+# aiowrite. For ABI reasons, 32-bit sparc puts them in SISCD_2.3, and
+# SUNW_0.7 inherits it.
+#
+SYMBOL_VERSION SUNW_0.7 {
+    global:
+	close			{ TYPE = FUNCTION; FLAGS = NODIRECT };
+	fork			{ TYPE = FUNCTION; FLAGS = NODIRECT };
+	sigaction		{ TYPE = FUNCTION };
+$if _sparc && _ELF32
+} SISCD_2.3;
+
+SYMBOL_VERSION SISCD_2.3 {
+    global:
+$endif
+	aiocancel		{ TYPE = FUNCTION };
+	aioread			{ TYPE = FUNCTION };
+	aiowait			{ TYPE = FUNCTION };
+	aiowrite		{ TYPE = FUNCTION };
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_sigaction		{ TYPE = FUNCTION };
+};

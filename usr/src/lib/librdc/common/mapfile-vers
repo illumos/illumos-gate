@@ -18,8 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -40,7 +39,9 @@
 # Generic interface definition for usr/src/lib/librdc.
 #
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
 	global:
 		Is_ipv6present;
 		convert_nconf_to_knconf;

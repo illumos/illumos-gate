@@ -20,19 +20,28 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+$mapfile_version 2
 
-dboot = LOAD ?RWXO V0xC00000 P0xC00000 A0x1000;
-#
-# Make sure that dboot_grub.s`_start is the first thing in the dboot
-# .text segment, since when we boot that's where the boot loader will
-# start execution
-#
-dboot : .text : *dboot_grub.o;
-dboot : ?A;
+LOAD_SEGMENT dboot {
+	FLAGS = READ WRITE EXECUTE;
+	VADDR = 0xC00000;
+	PADDR = 0xC00000;
+	ALIGN = 0x1000;
+
+	#
+	# Make sure that dboot_grub.s`_start is the first thing in the dboot
+	# .text segment, since when we boot that's where the boot loader will
+	# start execution
+	#
+	ASSIGN_SECTION is_text {
+		IS_NAME = .text;
+		FILE_BASENAME = dboot_grub.o;
+	};
+	ASSIGN_SECTION is_alloc {
+		FLAGS = ALLOC;
+	};
+	IS_ORDER = is_text is_alloc;
+};

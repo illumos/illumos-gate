@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,13 +36,15 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 # This mapfile is used along with mapfile-vers for the sun4u
 # libc_psr. Some of the other versions of sun4u libc_psr also use
 # mapfile-vers, but the contents of this file do not apply to them.
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     local:
 	# __align_cpy_1 is an alias for memcpy. Filter it out of
 	# the .SUNW_dynsymsort section.
-	__align_cpy_1 = NODYNSORT;
+	__align_cpy_1	{ FLAGS = NODYNSORT };
 };

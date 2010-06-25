@@ -20,6 +20,8 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+
+#
 # MAPFILE HEADER START
 #
 # WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
@@ -37,12 +39,14 @@
 # no SUNW_1.1 symbols, but the version is now kept as a placeholder.
 # Don't add any symbols to this version.
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	SUNW_1.1;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	adb_error_table;
 	add_com_err_hook;

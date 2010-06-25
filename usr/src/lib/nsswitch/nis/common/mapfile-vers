@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -40,7 +39,9 @@
 # Generic interface definition for usr/src/lib/nsswitch/nis.
 #
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
 	global:
 		_nss_nis_bootparams_constr;
 		_nss_nis_auth_attr_constr;

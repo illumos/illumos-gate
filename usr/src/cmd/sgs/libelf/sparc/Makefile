@@ -20,14 +20,10 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include		../Makefile.com
-
-MAPFILES +=	../common/mapfile-32
 
 SGSMSGTARG +=	$(SGSMSG32)
 

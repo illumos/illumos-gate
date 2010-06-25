@@ -37,8 +37,10 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 # functions
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_Sfextern;
 	_Sfi;
@@ -688,7 +690,7 @@ SUNWprivate_1.1 {
 };
 
 # data
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	Dtbag;
 	Dthash;

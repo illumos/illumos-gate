@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -37,13 +36,16 @@
 #
 # MAPFILE HEADER END
 #
-SUNW_1.1 {		# update to libima, Solaris 11
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {		# update to libima, Solaris 11
     global:
 	SUN_IMA_SetTunableProperties;
 	SUN_IMA_GetTunableProperties;
 } SUNW_1.0;
 	
-SUNW_1.0 {		# first release of libima in S10u2_02
+SYMBOL_VERSION SUNW_1.0 {		# first release of libima in S10u2_02
     global:
 	IMA_GetErrorRecoveryLevelProperties;
 	IMA_GetNetworkPortalProperties;

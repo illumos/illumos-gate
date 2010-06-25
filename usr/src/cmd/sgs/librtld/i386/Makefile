@@ -20,16 +20,12 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		$(SRC)/cmd/sgs/librtld/Makefile.com
 
 CPPFLAGS +=	-I../../../../uts/intel/ia32/krtld
-MAPFILES +=	../common/mapfile-32-vers
 
 .KEEP_STATE:
 

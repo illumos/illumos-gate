@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -30,11 +29,16 @@ ROOTDIR=	$(ROOT)/usr/lib/ld
 
 DIRS=		$(ROOTDIR)
 FILES=	\
-		$(ROOTDIR)/map.execdata \
-		$(ROOTDIR)/map.filter \
+		$(ROOTDIR)/map.above4G \
+		$(ROOTDIR)/map.below4G \
 		$(ROOTDIR)/map.bssalign \
+		$(ROOTDIR)/map.execdata \
+		$(ROOTDIR)/map.default \
+		$(ROOTDIR)/map.filter \
 		$(ROOTDIR)/map.noexbss \
-		$(ROOTDIR)/map.noexstk
+		$(ROOTDIR)/map.noexdata \
+		$(ROOTDIR)/map.noexstk \
+		$(ROOTDIR)/map.pagealign
 
 install:	$(DIRS) $(FILES)
 

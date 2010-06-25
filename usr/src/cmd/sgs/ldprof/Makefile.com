@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY=	ldprof.a
@@ -37,7 +36,7 @@ ROOTLIBDIR=	$(ROOT)/usr/lib/link_audit
 
 SGSPROTO=	../../proto/$(MACH)
 
-MAPFILES =	mapfile-vers
+MAPFILES =	../common/mapfile-vers
 
 DYNFLAGS +=	$(CC_USE_PROTO)
 CPPFLAGS=	-I. -I../common -I../../include \

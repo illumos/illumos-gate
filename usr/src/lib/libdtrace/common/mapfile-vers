@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	dtrace_addr2str;
 	dtrace_aggregate_clear;

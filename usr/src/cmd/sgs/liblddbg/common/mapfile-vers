@@ -40,10 +40,16 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.81 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_4.81 {
 	global:
-		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
-		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
+		dbg_desc {	# interposed - ld.so.1(1)
+			FLAGS = NODIRECT;
+		};
+		dbg_print {	# interposed - ld(1) and ld.so.1(1)
+			FLAGS = NODIRECT;
+		};
 
 		Dbg_args_file;
 		Dbg_args_option;
@@ -524,7 +530,7 @@ SUNWprivate_4.81 {
 # this interface, and thus by separating in from the ever changing Dbg_*
 # interfaces we can provide a stable versioning environment for this utility.
 
-SUNWprivate_3.23 {
+SYMBOL_VERSION SUNWprivate_3.23 {
 	global:
 		Elf_syminfo_entry;
 		Elf_syminfo_title;

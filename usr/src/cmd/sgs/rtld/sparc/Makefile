@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Object lists are organized into primary (most frequently used code) and
@@ -75,8 +74,6 @@ ADBGENCFLAGS +=	-erroff=%all
 ADBGENFLAGS +=	-milp32
 ADBSUB=		$(ADBSUB32)
 SONAME=		$(VAR_RTLD_SONAME)
-
-MAPFILES +=	../common/mapfile-32-vers
 
 SGSMSGTARG +=	$(SGSMSGSPARC) $(SGSMSGSPARC32) $(SGSMSG32)
 

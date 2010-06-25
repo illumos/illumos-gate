@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libaio.a
@@ -30,4 +29,3 @@ include		$(SRC)/lib/Makefile.rootfs
 
 LIBS +=		$(LINTLIB)
 DYNFLAGS +=	-F libc.so.1
-MAPFILEDIR =	.				# redirect mapfile-vers

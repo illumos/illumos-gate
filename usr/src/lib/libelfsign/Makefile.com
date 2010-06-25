@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY = libelfsign.a
@@ -39,9 +38,6 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 LDLIBS +=	-lmd -lelf -lkmf -lcryptoutil -lc
 
-MAPFILE =	mapfile
-MAPFILES =	$(MAPFILE)
-
 CFLAGS +=	$(CCMT) $(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS
 
@@ -50,11 +46,5 @@ CPPFLAGS +=	-D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS
 all:		$(LIBS)
 
 lint:		lintcheck
-
-$(MAPFILE):	$(SRCDIR)/$(MAPFILE).map
-		$(RM) $@
-		$(CPP) $(SRCDIR)/$(MAPFILE).map > $@
-
-CLEANFILES +=	$(MAPFILE)
 
 include $(SRC)/lib/Makefile.targ

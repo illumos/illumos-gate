@@ -18,31 +18,61 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
+$mapfile_version 2
 
 #
 # this is the 32 bit 1:1 mapped code to which grub jumps.
 #
-dboot	= LOAD ?RWXN P0xC00000 V0xC00000;
-dboot	: $PROGBITS ?AW : *dboot.o;
+LOAD_SEGMENT dboot {
+	FLAGS = READ WRITE EXECUTE;
+	NOHDR;
+	PADDR = 0xC00000;
+	VADDR = 0xC00000;
+	ASSIGN_SECTION {
+		TYPE = PROGBITS;
+		FLAGS = ALLOC WRITE;
+		FILE_BASENAME = dboot.o;
+	};
+};
 
 #
 # this is the kernel text
 #
-text	= LOAD ?RXN P0x400000 V0xFE800000;
-text	| .text;
-text	: $PROGBITS ?A!W;
+LOAD_SEGMENT text {
+	FLAGS = READ EXECUTE;
+	NOHDR;
+	PADDR = 0x400000;
+	VADDR = 0xFE800000;
+	OS_ORDER = .text;
+	ASSIGN_SECTION {
+		TYPE = PROGBITS;
+		FLAGS = ALLOC !WRITE;
+	};
+};
 
 #
 # start the data segment on a new 4MB page boundary
 #
-data	= LOAD ?RWX P0x800000 V0xFEc00000;
-data	| .data;
-data	: $PROGBITS ?AW;
-data	: $NOBITS ?AW;
+LOAD_SEGMENT data {
+	FLAGS = READ WRITE EXECUTE;
+	PADDR = 0x800000;
+	VADDR = 0xFEc00000;
+	OS_ORDER = .data;
+	ASSIGN_SECTION {
+		TYPE = PROGBITS;
+		FLAGS = ALLOC WRITE;
+	};
+	ASSIGN_SECTION {
+		TYPE = NOBITS;
+		FLAGS = ALLOC WRITE;
+	};
+};
 
-note	= NOTE;
-note	: $NOTE;
+NOTE_SEGMENT note {
+	ASSIGN_SECTION {
+		TYPE = NOTE;
+	};
+};

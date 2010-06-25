@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -46,7 +45,9 @@
 # The routines exported by elfedit for use by the modules
 # are also defined here, using the PARENT mapfile keyword.
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
 	global:
 		# Standard init routines exported by every module
 		elfedit32_init;
@@ -54,158 +55,158 @@ SUNWprivate_1.1 {
 
 
 		# liblddbg dbg_print() function
-		dbg_print =			PARENT NODIRECT;
+		dbg_print			{ FLAGS = PARENT NODIRECT };
 
 
 		# Core API
-		elfedit_command_usage =		PARENT;
-		elfedit_cpl_match =		PARENT;
-		elfedit_cpl_ndx =		PARENT;
-		elfedit_elferr =		PARENT;
-		elfedit_flags =			PARENT;
-		elfedit_malloc =		PARENT;
-		elfedit_msg =			PARENT;
-		elfedit_outstyle =		PARENT;
-		elfedit_pager_init =		PARENT;
-		elfedit_printf =		PARENT;
-		elfedit_realloc =		PARENT;
-		elfedit_str_to_c_literal =	PARENT;
-		elfedit_write =			PARENT;
+		elfedit_command_usage		{ FLAGS = PARENT };
+		elfedit_cpl_match		{ FLAGS = PARENT };
+		elfedit_cpl_ndx			{ FLAGS = PARENT };
+		elfedit_elferr			{ FLAGS = PARENT };
+		elfedit_flags			{ FLAGS = PARENT };
+		elfedit_malloc			{ FLAGS = PARENT };
+		elfedit_msg			{ FLAGS = PARENT };
+		elfedit_outstyle		{ FLAGS = PARENT };
+		elfedit_pager_init		{ FLAGS = PARENT };
+		elfedit_printf			{ FLAGS = PARENT };
+		elfedit_realloc			{ FLAGS = PARENT };
+		elfedit_str_to_c_literal	{ FLAGS = PARENT };
+		elfedit_write			{ FLAGS = PARENT };
 
 
 
 		# ato[u]i routines
-		elfedit_const_to_atoui =	PARENT;
+		elfedit_const_to_atoui		{ FLAGS = PARENT };
 
-		elfedit_atoi =			PARENT;
-		elfedit_atoui =			PARENT;
-		elfedit_atoconst =		PARENT;
+		elfedit_atoi			{ FLAGS = PARENT };
+		elfedit_atoui			{ FLAGS = PARENT };
+		elfedit_atoconst		{ FLAGS = PARENT };
 
-		elfedit_atoi2 =			PARENT;
-		elfedit_atoui2 =		PARENT;
-		elfedit_atoconst2 =		PARENT;
+		elfedit_atoi2			{ FLAGS = PARENT };
+		elfedit_atoui2			{ FLAGS = PARENT };
+		elfedit_atoconst2		{ FLAGS = PARENT };
 
-		elfedit_atoi_range =		PARENT;
-		elfedit_atoui_range =		PARENT;
-		elfedit_atoconst_range =	PARENT;
+		elfedit_atoi_range		{ FLAGS = PARENT };
+		elfedit_atoui_range		{ FLAGS = PARENT };
+		elfedit_atoconst_range		{ FLAGS = PARENT };
 
-		elfedit_atoi_range2 =		PARENT;
-		elfedit_atoui_range2 =		PARENT;
-		elfedit_atoconst_range2 =	PARENT;
+		elfedit_atoi_range2		{ FLAGS = PARENT };
+		elfedit_atoui_range2		{ FLAGS = PARENT };
+		elfedit_atoconst_range2		{ FLAGS = PARENT };
 
-		elfedit_atoi_value_to_str =	PARENT;
-		elfedit_atoui_value_to_str =	PARENT;
-		elfedit_atoconst_value_to_str =	PARENT;
+		elfedit_atoi_value_to_str	{ FLAGS = PARENT };
+		elfedit_atoui_value_to_str	{ FLAGS = PARENT };
+		elfedit_atoconst_value_to_str	{ FLAGS = PARENT };
 
-		elfedit_cpl_atoi =		PARENT;
-		elfedit_cpl_atoui =		PARENT;
-		elfedit_cpl_atoconst =		PARENT;
+		elfedit_cpl_atoi		{ FLAGS = PARENT };
+		elfedit_cpl_atoui		{ FLAGS = PARENT };
+		elfedit_cpl_atoconst		{ FLAGS = PARENT };
 
 
 
 		# Convenience functions built on top of the ato[u]i routines
-		elfedit_atobool =		PARENT;
-		elfedit_atoshndx =		PARENT;
+		elfedit_atobool			{ FLAGS = PARENT };
+		elfedit_atoshndx		{ FLAGS = PARENT };
 
 
 
 		# Getopt
-		elfedit_getopt_init =		PARENT;
-		elfedit_getopt =		PARENT;
+		elfedit_getopt_init		{ FLAGS = PARENT };
+		elfedit_getopt			{ FLAGS = PARENT };
 
 
 
 		# Utilities
-		elfedit_array_elts_delete =	PARENT;
+		elfedit_array_elts_delete	{ FLAGS = PARENT };
 
-		elfedit_array_elts_move =	PARENT;
+		elfedit_array_elts_move		{ FLAGS = PARENT };
 
-		elfedit_bits_set =		PARENT;
+		elfedit_bits_set		{ FLAGS = PARENT };
 
-		elfedit32_dyn_elt_init =	PARENT;
-		elfedit64_dyn_elt_init =	PARENT;
+		elfedit32_dyn_elt_init		{ FLAGS = PARENT };
+		elfedit64_dyn_elt_init		{ FLAGS = PARENT };
 
-		elfedit32_dyn_elt_save =	PARENT;
-		elfedit64_dyn_elt_save =	PARENT;
+		elfedit32_dyn_elt_save		{ FLAGS = PARENT };
+		elfedit64_dyn_elt_save		{ FLAGS = PARENT };
 
-		elfedit32_dyn_offset_to_str =	PARENT;
-		elfedit64_dyn_offset_to_str =	PARENT;
+		elfedit32_dyn_offset_to_str	{ FLAGS = PARENT };
+		elfedit64_dyn_offset_to_str	{ FLAGS = PARENT };
 
-		elfedit32_dynstr_getpad =	PARENT;
-		elfedit64_dynstr_getpad =	PARENT;
+		elfedit32_dynstr_getpad		{ FLAGS = PARENT };
+		elfedit64_dynstr_getpad		{ FLAGS = PARENT };
 
-		elfedit32_dynstr_insert =	PARENT;
-		elfedit64_dynstr_insert =	PARENT;
+		elfedit32_dynstr_insert		{ FLAGS = PARENT };
+		elfedit64_dynstr_insert		{ FLAGS = PARENT };
 
-		elfedit32_modified_data =	PARENT;
-		elfedit64_modified_data =	PARENT;
+		elfedit32_modified_data		{ FLAGS = PARENT };
+		elfedit64_modified_data		{ FLAGS = PARENT };
 
-		elfedit32_modified_ehdr =	PARENT;
-		elfedit64_modified_ehdr =	PARENT;
+		elfedit32_modified_ehdr		{ FLAGS = PARENT };
+		elfedit64_modified_ehdr		{ FLAGS = PARENT };
 
-		elfedit32_modified_phdr =	PARENT;
-		elfedit64_modified_phdr =	PARENT;
+		elfedit32_modified_phdr		{ FLAGS = PARENT };
+		elfedit64_modified_phdr		{ FLAGS = PARENT };
 
-		elfedit32_modified_shdr =	PARENT;
-		elfedit64_modified_shdr =	PARENT;
+		elfedit32_modified_shdr		{ FLAGS = PARENT };
+		elfedit64_modified_shdr		{ FLAGS = PARENT };
 
-		elfedit32_name_to_shndx =	PARENT;
-		elfedit64_name_to_shndx =	PARENT;
+		elfedit32_name_to_shndx		{ FLAGS = PARENT };
+		elfedit64_name_to_shndx		{ FLAGS = PARENT };
 
-		elfedit32_name_to_symndx =	PARENT;
-		elfedit64_name_to_symndx =	PARENT;
+		elfedit32_name_to_symndx	{ FLAGS = PARENT };
+		elfedit64_name_to_symndx	{ FLAGS = PARENT };
 
-		elfedit32_offset_to_str =	PARENT;
-		elfedit64_offset_to_str =	PARENT;
+		elfedit32_offset_to_str		{ FLAGS = PARENT };
+		elfedit64_offset_to_str		{ FLAGS = PARENT };
 
-		elfedit32_sec_findstr =		PARENT;
-		elfedit64_sec_findstr =		PARENT;
+		elfedit32_sec_findstr		{ FLAGS = PARENT };
+		elfedit64_sec_findstr		{ FLAGS = PARENT };
 
-		elfedit32_sec_get =		PARENT;
-		elfedit64_sec_get =		PARENT;
+		elfedit32_sec_get		{ FLAGS = PARENT };
+		elfedit64_sec_get		{ FLAGS = PARENT };
 
-		elfedit32_sec_getcap =		PARENT;
-		elfedit64_sec_getcap =		PARENT;
+		elfedit32_sec_getcap		{ FLAGS = PARENT };
+		elfedit64_sec_getcap		{ FLAGS = PARENT };
 
-		elfedit32_sec_getdyn =		PARENT;
-		elfedit64_sec_getdyn =		PARENT;
+		elfedit32_sec_getdyn		{ FLAGS = PARENT };
+		elfedit64_sec_getdyn		{ FLAGS = PARENT };
 
-		elfedit32_sec_getstr =		PARENT;
-		elfedit64_sec_getstr =		PARENT;
+		elfedit32_sec_getstr		{ FLAGS = PARENT };
+		elfedit64_sec_getstr		{ FLAGS = PARENT };
 
-		elfedit32_sec_getsyminfo =	PARENT;
-		elfedit64_sec_getsyminfo =	PARENT;
+		elfedit32_sec_getsyminfo	{ FLAGS = PARENT };
+		elfedit64_sec_getsyminfo	{ FLAGS = PARENT };
 
-		elfedit32_sec_getsymtab =	PARENT;
-		elfedit64_sec_getsymtab =	PARENT;
+		elfedit32_sec_getsymtab		{ FLAGS = PARENT };
+		elfedit64_sec_getsymtab		{ FLAGS = PARENT };
 
-		elfedit32_sec_getversym =	PARENT;
-		elfedit64_sec_getversym =	PARENT;
+		elfedit32_sec_getversym		{ FLAGS = PARENT };
+		elfedit64_sec_getversym		{ FLAGS = PARENT };
 
-		elfedit32_sec_getxshndx =	PARENT;
-		elfedit64_sec_getxshndx =	PARENT;
+		elfedit32_sec_getxshndx		{ FLAGS = PARENT };
+		elfedit64_sec_getxshndx		{ FLAGS = PARENT };
 
-		elfedit32_sec_issymtab =	PARENT;
-		elfedit64_sec_issymtab =	PARENT;
+		elfedit32_sec_issymtab		{ FLAGS = PARENT };
+		elfedit64_sec_issymtab		{ FLAGS = PARENT };
 
-		elfedit32_shndx_to_name =	PARENT;
-		elfedit64_shndx_to_name =	PARENT;
+		elfedit32_shndx_to_name		{ FLAGS = PARENT };
+		elfedit64_shndx_to_name		{ FLAGS = PARENT };
 
-		elfedit32_sec_msgprefix =	PARENT;
-		elfedit64_sec_msgprefix =	PARENT;
+		elfedit32_sec_msgprefix		{ FLAGS = PARENT };
+		elfedit64_sec_msgprefix		{ FLAGS = PARENT };
 
-		elfedit32_strtab_insert =	PARENT;
-		elfedit64_strtab_insert =	PARENT;
+		elfedit32_strtab_insert		{ FLAGS = PARENT };
+		elfedit64_strtab_insert		{ FLAGS = PARENT };
 
-		elfedit32_strtab_insert_test =	PARENT;
-		elfedit64_strtab_insert_test =	PARENT;
+		elfedit32_strtab_insert_test	{ FLAGS = PARENT };
+		elfedit64_strtab_insert_test	{ FLAGS = PARENT };
 
-		elfedit32_test_osabi =		PARENT;
-		elfedit64_test_osabi =		PARENT;
+		elfedit32_test_osabi		{ FLAGS = PARENT };
+		elfedit64_test_osabi		{ FLAGS = PARENT };
 
-		elfedit32_type_to_shndx =	PARENT;
-		elfedit64_type_to_shndx =	PARENT;
+		elfedit32_type_to_shndx		{ FLAGS = PARENT };
+		elfedit64_type_to_shndx		{ FLAGS = PARENT };
 
-local:
+	local:
 		*;
 };

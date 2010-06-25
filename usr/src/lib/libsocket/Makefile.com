@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY	=	libsocket.a
@@ -49,8 +48,6 @@ LDLIBS +=	-lnsl -lc
 
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-MAPFILES +=	mapfile-vers
 
 # Make string literals read-only to save memory.
 CFLAGS +=	$(XSTRCONST)

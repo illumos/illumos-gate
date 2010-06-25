@@ -20,16 +20,16 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Template mapfile for generating a final mapfile to demote all user global
 # symbols to local within a dynamic executable.  This mapfile also provides
 # the "MAP-" commented entries to select lines for the final mapfile.
 #
-{				# MAP-HEAD
+
+$mapfile_version 2		# MAP-HEAD
+				# MAP-HEAD
+SYMBOL_SCOPE {			# MAP-HEAD
     global:			# MAP-HEAD
         _lib_version;		# MAP-HEAD
     local:			# MAP-TAIL

@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -48,5 +47,12 @@
 # Override the default alignment so that this single paged object can be mapped
 # more flexibly.
 
-filter = LOAD ?RX A0x1000;
-filter : ?A;
+$mapfile_version 2
+
+LOAD_SEGMENT filter {
+	FLAGS = READ EXECUTE;
+	ALIGN = 0x1000;
+	ASSIGN_SECTION {
+		FLAGS = ALLOC;
+	};
+};

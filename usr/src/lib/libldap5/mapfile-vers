@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,17 +36,19 @@
 # MAPFILE HEADER END
 #
 
-SUNW_5.2 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_5.2 {
     global:
 	ldap_sasl_interactive_bind_s;
 } SUNW_5.1.1;
 
-SUNW_5.1.1 {
+SYMBOL_VERSION SUNW_5.1.1 {
     global:
 	ldap_url_parse_nodn;
 } SUNW_5.1;
 
-SUNW_5.1 {
+SYMBOL_VERSION SUNW_5.1 {
     global:
 	ber_alloc;
 	ber_alloc_t;
@@ -221,7 +222,7 @@ SUNW_5.1 {
 	ldap_version;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	ldap_charray_add;
 	ldap_charray_dup;

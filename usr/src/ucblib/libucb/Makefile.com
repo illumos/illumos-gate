@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY=	libucb.a
@@ -79,7 +78,7 @@ include $(SRC)/lib/Makefile.lib
 ROOTLIBDIR=	$(ROOT)/usr/ucblib
 ROOTLIBDIR64=	$(ROOT)/usr/ucblib/$(MACH64)
 
-MAPFILES =	../port/mapfile-vers mapfile-vers
+MAPFILES =	../port/mapfile-vers
 
 SRCS=		$(PORTGENOBJS:%.o=../port/gen/%.c) \
 		$(PORTSTDIOOBJS:%.o=../port/stdio/%.c) \

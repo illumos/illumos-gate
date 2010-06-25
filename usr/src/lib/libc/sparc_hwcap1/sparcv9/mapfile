@@ -19,8 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-hwcap_1 = V0x10000;
+$mapfile_version 2
+
+CAPABILITY {
+	hw_1 += 0x10000;
+};

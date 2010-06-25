@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,22 +36,24 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1.1 {
     global:
-	calloc = NODIRECT;
+	calloc			{ FLAGS = NODIRECT };
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
-	free = NODIRECT;
-	malloc = NODIRECT;
-	mallocctl = NODIRECT;
-	memalign = NODIRECT;
-	realloc = NODIRECT;
-	valloc = NODIRECT;
+	free			{ FLAGS = NODIRECT };
+	malloc			{ FLAGS = NODIRECT };
+	mallocctl		{ FLAGS = NODIRECT };
+	memalign		{ FLAGS = NODIRECT };
+	realloc			{ FLAGS = NODIRECT };
+	valloc			{ FLAGS = NODIRECT };
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	SUNWprivate_1.1;
     local:

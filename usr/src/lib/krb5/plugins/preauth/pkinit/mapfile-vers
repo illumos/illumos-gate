@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -42,7 +41,9 @@
 # no SUNW_1.1 symbols, but the version is now kept as a placeholder.
 # Don't add any symbols to this version.
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	preauthentication_client_1;
 	preauthentication_server_1;

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -38,25 +37,27 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 # rpc.yppasswdd interposes on a number of routines from libnisdb and libnsl, so
 # define these as interposers.  Note, libnisdb is itself an interposer, so
 # these rpc.yppasswdd definitions are required to override libnisdb.
-{
+SYMBOL_SCOPE {
 	global:
-		delete_map = INTERPOSE;
-		hash = INTERPOSE;
-		init_lock_map = INTERPOSE;
-		lock_core = INTERPOSE;
-		lock_map = INTERPOSE;
-		mflag = INTERPOSE;
-		nogecos = INTERPOSE;
-		nopw = INTERPOSE;
-		noshell = INTERPOSE;
-		rename_map = INTERPOSE;
-		single = INTERPOSE;
-		unlock_core = INTERPOSE;
-		unlock_map = INTERPOSE;
-		validloginshell = INTERPOSE;
-		validstr = INTERPOSE;
-		xdr_yppasswd = INTERPOSE;
+		delete_map		{ FLAGS = INTERPOSE };
+		hash			{ FLAGS = INTERPOSE };
+		init_lock_map		{ FLAGS = INTERPOSE };
+		lock_core		{ FLAGS = INTERPOSE };
+		lock_map		{ FLAGS = INTERPOSE };
+		mflag			{ FLAGS = INTERPOSE };
+		nogecos			{ FLAGS = INTERPOSE };
+		nopw			{ FLAGS = INTERPOSE };
+		noshell			{ FLAGS = INTERPOSE };
+		rename_map		{ FLAGS = INTERPOSE };
+		single			{ FLAGS = INTERPOSE };
+		unlock_core		{ FLAGS = INTERPOSE };
+		unlock_map		{ FLAGS = INTERPOSE };
+		validloginshell		{ FLAGS = INTERPOSE };
+		validstr		{ FLAGS = INTERPOSE };
+		xdr_yppasswd		{ FLAGS = INTERPOSE };
 };

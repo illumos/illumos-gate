@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,20 +36,22 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.3 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
     global:
 	picl_find_node;
 	picl_get_frutree_parent;
 	picl_get_node_by_path;
 } SUNW_1.2;
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	picl_get_propinfo_by_name;
 	picl_walk_tree_by_class;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	picl_get_first_prop;
 	picl_get_next_by_col;

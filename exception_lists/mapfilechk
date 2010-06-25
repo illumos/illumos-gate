@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # By default, mapfilechk operates on any file in the
@@ -33,15 +32,6 @@
 syntax: glob
 exception_lists/mapfilechk
 usr/src/cmd/mdb/common/kmdb/mapfile_skel
-usr/src/cmd/sgs/rtld/common/mapfile-order-*
-usr/src/common/bignum/*/cap_mapfile
-usr/src/common/mapfiles/*
-usr/src/common/mapfiles/*/*
 usr/src/lib/README.mapfiles
-usr/src/lib/libc/*_hwcap*/mapfile
-usr/src/lib/libc/sparc_hwcap1/sparc*/mapfile
-usr/src/lib/libc_psr/*_hwcap*/mapfile
-usr/src/psm/stand/boot/sparc/common/mapfile
-usr/src/psm/stand/bootlst/sparc/mapfile
-usr/src/psm/stand/cpr/sparcv9/sun4u/mapfile
+usr/src/tools/onbld/Checks/Mapfile*
 usr/src/tools/scripts/*

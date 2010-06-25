@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY = c_synonyms.a
@@ -55,7 +52,9 @@ synonym_list:	../syn_common ../syn2_common syn_isa
 $(DYNLIB):	mapfile-vers $(PICS)
 
 mapfile-vers:	../syn_common ../syn2_common syn_isa
-	echo "SUNWprivate_1.1 {\n    global:" >mapfile-vers
+	echo "\$$mapfile_version 2\n\nSYMBOL_VERSION SUNWprivate_1.1 {\n" \
+		>mapfile-vers
+	echo "    global:" >>mapfile-vers
 	$(CAT) ../syn_common syn_isa | \
 		$(SED) -e '/^#/d' -e '/^$$/d' -e 's/.*/	_&;/' >>mapfile-vers
 	$(CAT) ../syn2_common | \

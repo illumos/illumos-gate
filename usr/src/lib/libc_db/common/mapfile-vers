@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.3 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
     global:
 	td_thr_tlsbase;
 } SUNW_1.2;
@@ -46,12 +47,12 @@ SUNW_1.3 {
 # no SUNW_1.2 symbols, but the version is now kept as a placeholder.
 # Don't add any symbols to this version.
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	SUNW_1.2;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	td_sync_get_info;
 	td_sync_setstate;
@@ -76,7 +77,7 @@ SUNW_1.1 {
 	td_thr_sleepinfo;
 } SUNW_0.9;
 
-SUNW_0.9 {
+SYMBOL_VERSION SUNW_0.9 {
     global:
 	td_init;
 	td_log;
@@ -103,7 +104,7 @@ SUNW_0.9 {
 	td_thr_validate;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	td_sync_get_stats;
 	td_ta_sync_tracking_enable;
@@ -113,20 +114,20 @@ SUNWprivate_1.1 {
 
 # External interface requirements
 
-{
+SYMBOL_SCOPE {
     global:
-	ps_lcontinue =		EXTERN;
-	ps_lgetfpregs =		EXTERN;
-	ps_lgetregs =		EXTERN;
-	ps_lgetxregs =		EXTERN;
-	ps_lgetxregsize =	EXTERN;
-	ps_lsetfpregs =		EXTERN;
-	ps_lsetregs =		EXTERN;
-	ps_lsetxregs =		EXTERN;
-	ps_lstop =		EXTERN;
-	ps_pcontinue =		EXTERN;
-	ps_pdread =		EXTERN;
-	ps_pdwrite =		EXTERN;
-	ps_pglobal_lookup =	EXTERN;
-	ps_pstop =		EXTERN;
+	ps_lcontinue		{ FLAGS = EXTERN };
+	ps_lgetfpregs		{ FLAGS = EXTERN };
+	ps_lgetregs		{ FLAGS = EXTERN };
+	ps_lgetxregs		{ FLAGS = EXTERN };
+	ps_lgetxregsize		{ FLAGS = EXTERN };
+	ps_lsetfpregs		{ FLAGS = EXTERN };
+	ps_lsetregs		{ FLAGS = EXTERN };
+	ps_lsetxregs		{ FLAGS = EXTERN };
+	ps_lstop		{ FLAGS = EXTERN };
+	ps_pcontinue		{ FLAGS = EXTERN };
+	ps_pdread		{ FLAGS = EXTERN };
+	ps_pdwrite		{ FLAGS = EXTERN };
+	ps_pglobal_lookup	{ FLAGS = EXTERN };
+	ps_pstop		{ FLAGS = EXTERN };
 };

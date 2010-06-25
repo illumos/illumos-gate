@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # try-from interposes on numerous routines, and must export other data
 # structures to satisfy external dependency requirements.
@@ -39,12 +38,15 @@
 #
 # MAPFILE HEADER END
 #
-{
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
 	global:
-		closelog = INTERPOSE;
-		openlog = INTERPOSE;
-		syslog = INTERPOSE;
-		vsyslog = INTERPOSE;
+		closelog		{ FLAGS = INTERPOSE };
+		openlog			{ FLAGS = INTERPOSE };
+		syslog			{ FLAGS = INTERPOSE };
+		vsyslog			{ FLAGS = INTERPOSE };
 
 		allow_severity;		# required by libwrap
 		deny_severity;		# required by libwrap

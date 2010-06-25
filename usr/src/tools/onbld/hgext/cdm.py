@@ -30,7 +30,7 @@ Run pre-putback checks					- pbchk
 Collapse all your changes into a single changeset	- recommit'''
 
 
-import atexit, os, stat, sys, termios
+import atexit, os, re, stat, sys, termios
 
 #
 # Adjust the load path based on the location of cdm.py and the version
@@ -344,12 +344,22 @@ def cdm_mapfilechk(ui, repo, *args, **opts):
     exclude = not_check(repo, 'mapfilechk')
     ret = 0
 
+    # We are interested in examining any file that has the following
+    # in its final path segment:
+    #    - Contains the word 'mapfile'
+    #    - Begins with 'map.'
+    #    - Ends with '.map'
+    # We don't want to match unless these things occur in final path segment
+    # because directory names with these strings don't indicate a mapfile.
+    MapfileRE = re.compile(r'.*((mapfile[^/]*)|(/map\.*[^/]*)|(\.map))$',
+    	re.IGNORECASE)
+
     ui.write('Mapfile comment check:\n')
 
     for f, e in filelist:
         if e and e.is_removed():
             continue
-        elif f.find('mapfile') == -1:
+        elif not MapfileRE.match(f):
             continue
         elif (e or opts.get('honour_nots')) and exclude(f):
             ui.status('Skipping %s...\n' % f)

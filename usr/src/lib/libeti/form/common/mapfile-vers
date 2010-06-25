@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	current_field;
 	data_ahead;
@@ -112,7 +113,7 @@ SUNW_1.1 {
 	unpost_form;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_adjust_cursor;
 	__advance;
@@ -158,7 +159,7 @@ SUNWprivate_1.1 {
 	_ins_char;
 	_ins_line;
 	_ins_mode;
-	__i_size = DATA FILTER libc.so.1 S0x4;
+	__i_size	{ TYPE = DATA; FILTER = libc.so.1; SIZE = 0x4 };
 	_last_field;
 	_last_page;
 	_left_char;
@@ -232,6 +233,19 @@ SUNWprivate_1.1 {
 	_win_to_buf;
 	__xpop;
 	__xpush;
+
+	__loc1	{
+		TYPE = DATA;
+		FILTER = libc.so.1;
+$if _ELF32
+		SIZE = 0x4;
+$elif _ELF64
+		SIZE = 0x8;
+$else
+$error unknown ELFCLASS
+$endif
+	};
+
     local:
 	*;
 };

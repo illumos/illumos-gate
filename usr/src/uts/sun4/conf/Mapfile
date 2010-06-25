@@ -1,6 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -20,37 +19,59 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+$mapfile_version 2
 
 #
 # Some four meg of kernel virtual address space
 # is mapped via a locked 4-meg mapping in the ITLB
 #
-text	= LOAD ?RXN V0x01000000;
-text	| .text;
-text	: $PROGBITS ?A!W;
+LOAD_SEGMENT text {
+	FLAGS = READ EXECUTE;
+	NOHDR;
+	VADDR = 0x01000000;
+	OS_ORDER = .text;
+	ASSIGN_SECTION {
+		TYPE = PROGBITS;
+		FLAGS = ALLOC !WRITE;
+	};
+};
 
 #
 # Another four meg of kernel virtual address space
 # is mapped via a locked 4-meg mapping in the DTLB
 #
-data	= LOAD ?RWX V0x01800000 A0x00400000;
-data	| .data;
-data	: $PROGBITS ?AW;
-data	: $NOBITS ?AW;
+LOAD_SEGMENT data {
+	FLAGS = READ WRITE EXECUTE;
+	VADDR = 0x01800000;
+	ALIGN = 0x00400000;
+	OS_ORDER = .data;
+	ASSIGN_SECTION {
+		TYPE = PROGBITS;
+		FLAGS = ALLOC WRITE;
+	};
+	ASSIGN_SECTION {
+		TYPE = NOBITS;
+		FLAGS = ALLOC WRITE;
+	};
+};
 
 #
 # put reloc seg in space between text and data
 # it will be freed by the kernel after use
 #
-reloc	= LOAD ?RW V0x01402000;
-reloc	: $DYNSYM;
-reloc	: $HASH;
-reloc	: .dynstr;
-reloc	: .rela.text;
-reloc	: .rela.data;
+LOAD_SEGMENT reloc {
+	FLAGS = READ WRITE;
+	VADDR = 0x01402000;
+	ASSIGN_SECTION { TYPE = DYNSYM };
+	ASSIGN_SECTION { TYPE = HASH };
+	ASSIGN_SECTION { IS_NAME = .dynstr };
+	ASSIGN_SECTION { IS_NAME = .rela.text };
+	ASSIGN_SECTION { IS_NAME = .rela.data };
+};
 
-note	= NOTE;
-note	: $NOTE;
+NOTE_SEGMENT note {
+	ASSIGN_SECTION {
+		TYPE = NOTE;
+	};
+};

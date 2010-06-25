@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,15 +36,17 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate { 
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate { 
     global:
-	fw_devices = PARENT;
-	fw_pluginlist = PARENT;
-	fwflash_debug = PARENT;
-	rootnode = PARENT;
-	self = PARENT;
-	verifier = PARENT;
-	logmsg = PARENT;
+	fw_devices		{ FLAGS = PARENT };
+	fw_pluginlist		{ FLAGS = PARENT };
+	fwflash_debug		{ FLAGS = PARENT };
+	rootnode		{ FLAGS = PARENT };
+	self			{ FLAGS = PARENT };
+	verifier		{ FLAGS = PARENT };
+	logmsg			{ FLAGS = PARENT };
 	vendorvrfy;
 	vendor;
     local:

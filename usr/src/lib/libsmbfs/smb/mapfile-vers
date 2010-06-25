@@ -18,8 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -36,7 +35,9 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate {
     global:
 	convert_leunicode_to_utf8;
 	convert_unicode_to_utf8;
@@ -91,7 +92,7 @@ SUNWprivate {
 	smb_ctx_setuser;
 	smb_ctx_setwins;
 
-	smb_debug	= NODIRECT;	# data
+	smb_debug		{ FLAGS = NODIRECT };	# data
 	smb_error;
 #
 # Functions to support named pipes
@@ -126,7 +127,7 @@ SUNWprivate {
 	smb_rap_setNparam;
 	smb_rap_setPparam;
 #
-	smb_verbose	= NODIRECT;	# data
+	smb_verbose		{ FLAGS = NODIRECT };	# data
 #
 # Functions to support Access Control Lists (ACLs)
 	smbfs_acl_free_sd;

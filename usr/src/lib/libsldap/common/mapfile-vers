@@ -19,15 +19,30 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+#
+
+$mapfile_version 2
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
 #
 
 # There really should be only one SUNWprivate version.
 # Don't add any more.  Add new private symbols to SUNWprivate_1.1
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	__ns_ldap_cancelStandalone;
 	__ns_ldap_check_all_preq;
@@ -48,7 +63,7 @@ SUNWprivate_1.1 {
 	__s_api_ip2hostname;
 } SUNWprivate_1.0;
 
-SUNWprivate_1.0 {
+SYMBOL_VERSION SUNWprivate_1.0 {
     global:
 	__getldapaliasbyname;
 	__ns_ldap_addAttr;

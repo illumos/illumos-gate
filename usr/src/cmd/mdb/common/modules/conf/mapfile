@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -36,13 +35,15 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 #
 # Module mapfile
 #
 # Modules aren't allowed to export any symbols
 #
 
-{
+SYMBOL_SCOPE {
 	local:
 		*;
 };

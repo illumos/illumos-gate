@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.2 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	acl_check;
 	acl_free;
@@ -55,12 +56,12 @@ SUNW_1.2 {
 # no SUNW_1.1 symbols, but the version is now kept as a placeholder.
 # Don't add any symbols to this version.
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	SUNW_1.1;
 } SUNW_0.9;
 
-SUNW_0.9 {
+SYMBOL_VERSION SUNW_0.9 {
     global:
 	aclcheck;
 	aclfrommode;
@@ -70,7 +71,7 @@ SUNW_0.9 {
 	acltotext;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	acl_addentries;
 	acl_alloc;

@@ -1,6 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -21,21 +20,22 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
-{
-	fmd_fmri_alloc = FUNCTION extern;
-	fmd_fmri_zalloc = FUNCTION extern;
-	fmd_fmri_free = FUNCTION extern;
-	fmd_fmri_set_errno = FUNCTION extern;
-	fmd_fmri_warn = FUNCTION extern;
-	fmd_fmri_auth2str = FUNCTION extern;
-	fmd_fmri_strescape = FUNCTION extern;
-	fmd_fmri_strdup = FUNCTION extern;
-	fmd_fmri_strfree = FUNCTION extern;
-	fmd_fmri_get_rootdir = FUNCTION extern;
-	fmd_fmri_get_platform = FUNCTION extern;
-	fmd_fmri_get_drgen = FUNCTION extern;
-	fmd_fmri_topo_hold = FUNCTION extern;
-	fmd_fmri_topo_rele = FUNCTION extern;
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	fmd_fmri_alloc		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_zalloc		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_free		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_set_errno	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_warn		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_auth2str	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_strescape	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_strdup		{ TYPE = function; FLAGS = extern };
+	fmd_fmri_strfree	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_get_rootdir	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_get_platform	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_get_drgen	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_topo_hold	{ TYPE = function; FLAGS = extern };
+	fmd_fmri_topo_rele	{ TYPE = function; FLAGS = extern };
 };

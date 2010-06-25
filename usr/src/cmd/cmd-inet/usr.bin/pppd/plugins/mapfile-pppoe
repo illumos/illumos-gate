@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -40,44 +39,46 @@
 
 # External declarations - used to suppress -zdefs errors.
 
-{
-	script_setenv	= FUNCTION extern;	# Provided by pppd.
-	script_getenv	= FUNCTION extern;	#    "     "
-	slprintf	= FUNCTION extern;	#    "     "
-	option_error	= FUNCTION extern;	#    "     "
-	warn		= FUNCTION extern;	#    "     "
-	fatal		= FUNCTION extern;	#    "     "
-	dbglog		= FUNCTION extern;	#    "     "
-	absmax_mtu	= DATA extern;		#    "     "
-	absmax_mru	= DATA extern;		#    "     "
-	updown_script_hook = DATA extern;	#    "     "
-	devnam_info	= DATA extern;		#    "     "
-	check_options_hook = DATA extern;	#    "     "
-	device_pipe_hook = DATA extern;		#    "     "
-	already_ppp	= DATA extern;		#    "     "
-	devnam		= DATA extern;		#    "     "
-	sys_read_packet_hook = DATA extern;	#    "     "
-	ifname		= DATA extern;		#    "     "
-	fclose		= FUNCTION extern;	#    "     "
-	ioctl		= FUNCTION extern;	#    "     "
-	fdopen		= FUNCTION extern;	#    "     "
-	close		= FUNCTION extern;	#    "     "
-	open		= FUNCTION extern;	#    "     "
-	strcmp		= FUNCTION extern;	#    "     "
-	fgets		= FUNCTION extern;	#    "     "
-	strlen		= FUNCTION extern;	#    "     "
-	seteuid		= FUNCTION extern;	#    "     "
-	ether_ntoa	= FUNCTION extern;	#    "     "
-	___errno	= FUNCTION extern;	#    "     "
-	strdup		= FUNCTION extern;	#    "     "
-	run_program	= FUNCTION extern;	#    "     "
-	malloc		= FUNCTION extern;	#    "     "
-	strrchr		= FUNCTION extern;	#    "     "
-	strchr		= FUNCTION extern;	#    "     "
-	error		= FUNCTION extern;	#    "     "
-	free		= FUNCTION extern;	#    "     "
-	strcpy		= FUNCTION extern;	#    "     "
-	memcpy		= FUNCTION extern;	#    "     "
-	script_unsetenv	= FUNCTION extern;	#    "     "
-	ntohs		= FUNCTION extern;	#    "     "
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	script_setenv	{ TYPE = FUNCTION; FLAGS = extern };	# From pppd
+	script_getenv	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	slprintf	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	option_error	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	warn		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	fatal		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	dbglog		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	absmax_mtu	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	absmax_mru	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	updown_script_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	devnam_info	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	check_options_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	device_pipe_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	already_ppp	{ TYPE = DATA; FLAGS = extern };	#    "     "
+	devnam		{ TYPE = DATA; FLAGS = extern };	#    "     "
+	sys_read_packet_hook { TYPE = DATA; FLAGS = extern };	#    "     "
+	ifname		{ TYPE = DATA; FLAGS = extern };	#    "     "
+	fclose		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	ioctl		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	fdopen		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	close		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	open		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strcmp		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	fgets		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strlen		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	seteuid		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	ether_ntoa	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	___errno	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strdup		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	run_program	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	malloc		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strrchr		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strchr		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	error		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	free		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	strcpy		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	memcpy		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	script_unsetenv	{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
+	ntohs		{ TYPE = FUNCTION; FLAGS = extern };	#    "     "
 };

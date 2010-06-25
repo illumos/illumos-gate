@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -41,24 +40,26 @@
 # no SUNW_1.2 or SUNW_1.3 symbols, but they are now kept as placeholders.
 # Don't add any symbols to these versions.
 
-SUNW_1.3 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
     global:
 	SUNW_1.3;
 } SUNW_1.2;
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	SUNW_1.2;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	volmgt_acquire;
 	volmgt_feature_enabled;
 	volmgt_release;
 } SUNW_0.7;
 
-SUNW_0.7 {
+SYMBOL_VERSION SUNW_0.7 {
     global:
 	media_findname;
 	media_getattr;
@@ -73,7 +74,7 @@ SUNW_0.7 {
 	volmgt_symname;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_dev_mounted;
 	_dev_unmount;

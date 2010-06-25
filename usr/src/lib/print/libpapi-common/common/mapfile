@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -42,12 +41,14 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 #
 # Common interfaces that are most likely to be shared amongst the various
 # PAPI implementations.
 #
 
-SUNW_1.0 {
+SYMBOL_VERSION SUNW_1.0 {
     global:
 	# PAPI Attribute Calls
         papiAttributeListAddValue;
@@ -76,58 +77,58 @@ SUNW_1.0 {
         papiAttributeListFree;
 
 	# PAPI Service Calls
-        papiServiceCreate =		NODYNSORT;
-        papiServiceDestroy =		NODYNSORT;
-        papiServiceSetUserName =	NODYNSORT;
-        papiServiceSetPassword =	NODYNSORT;
-        papiServiceSetEncryption =	NODYNSORT;
-        papiServiceSetAuthCB =		NODYNSORT;
-        papiServiceSetAppData =		NODYNSORT;
-        papiServiceGetUserName =	NODYNSORT;
-        papiServiceGetPassword =	NODYNSORT;
+        papiServiceCreate		{ FLAGS = NODYNSORT };
+        papiServiceDestroy		{ FLAGS = NODYNSORT };
+        papiServiceSetUserName		{ FLAGS = NODYNSORT };
+        papiServiceSetPassword		{ FLAGS = NODYNSORT };
+        papiServiceSetEncryption	{ FLAGS = NODYNSORT };
+        papiServiceSetAuthCB		{ FLAGS = NODYNSORT };
+        papiServiceSetAppData		{ FLAGS = NODYNSORT };
+        papiServiceGetUserName		{ FLAGS = NODYNSORT };
+        papiServiceGetPassword		{ FLAGS = NODYNSORT };
         papiServiceGetEncryption;
-        papiServiceGetAppData =		NODYNSORT;
-        papiServiceGetServiceName =	NODYNSORT;
-        papiServiceGetAttributeList =	NODYNSORT;
-        papiServiceGetStatusMessage =	NODYNSORT;
+        papiServiceGetAppData		{ FLAGS = NODYNSORT };
+        papiServiceGetServiceName	{ FLAGS = NODYNSORT };
+        papiServiceGetAttributeList	{ FLAGS = NODYNSORT };
+        papiServiceGetStatusMessage	{ FLAGS = NODYNSORT };
 
 	# PAPI Printer Calls
-        papiPrintersList =		NODYNSORT;
-        papiPrinterQuery =		NODYNSORT;
-        papiPrinterAdd =		NODYNSORT;
-        papiPrinterModify =		NODYNSORT;
-        papiPrinterRemove =		NODYNSORT;
-        papiPrinterDisable =		NODYNSORT;
-        papiPrinterEnable =		NODYNSORT;
-        papiPrinterPause =		NODYNSORT;
-        papiPrinterResume =		NODYNSORT;
-        papiPrinterPurgeJobs =		NODYNSORT;
-        papiPrinterListJobs =		NODYNSORT;
-        papiPrinterGetAttributeList =	NODYNSORT;
-        papiPrinterFree =		NODYNSORT;
-        papiPrinterListFree =		NODYNSORT;
+        papiPrintersList		{ FLAGS = NODYNSORT };
+        papiPrinterQuery		{ FLAGS = NODYNSORT };
+        papiPrinterAdd			{ FLAGS = NODYNSORT };
+        papiPrinterModify		{ FLAGS = NODYNSORT };
+        papiPrinterRemove		{ FLAGS = NODYNSORT };
+        papiPrinterDisable		{ FLAGS = NODYNSORT };
+        papiPrinterEnable		{ FLAGS = NODYNSORT };
+        papiPrinterPause		{ FLAGS = NODYNSORT };
+        papiPrinterResume		{ FLAGS = NODYNSORT };
+        papiPrinterPurgeJobs		{ FLAGS = NODYNSORT };
+        papiPrinterListJobs		{ FLAGS = NODYNSORT };
+        papiPrinterGetAttributeList	{ FLAGS = NODYNSORT };
+        papiPrinterFree			{ FLAGS = NODYNSORT };
+        papiPrinterListFree		{ FLAGS = NODYNSORT };
 
 	# PAPI Job Calls
-        papiJobSubmit =			NODYNSORT;
-        papiJobSubmitByReference =	NODYNSORT;
-        papiJobValidate =		NODYNSORT;
-        papiJobStreamOpen =		NODYNSORT;
-        papiJobStreamWrite =		NODYNSORT;
-        papiJobStreamClose =		NODYNSORT;
-        papiJobQuery =			NODYNSORT;
-        papiJobModify =			NODYNSORT;
-        papiJobMove =			NODYNSORT;
-        papiJobCancel =			NODYNSORT;
-        papiJobHold =			NODYNSORT;
-        papiJobRelease =		NODYNSORT;
-        papiJobRestart =		NODYNSORT;
-        papiJobPromote =		NODYNSORT;
-        papiJobGetAttributeList =	NODYNSORT;
-        papiJobGetPrinterName =		NODYNSORT;
+        papiJobSubmit			{ FLAGS = NODYNSORT };
+        papiJobSubmitByReference	{ FLAGS = NODYNSORT };
+        papiJobValidate			{ FLAGS = NODYNSORT };
+        papiJobStreamOpen		{ FLAGS = NODYNSORT };
+        papiJobStreamWrite		{ FLAGS = NODYNSORT };
+        papiJobStreamClose		{ FLAGS = NODYNSORT };
+        papiJobQuery			{ FLAGS = NODYNSORT };
+        papiJobModify			{ FLAGS = NODYNSORT };
+        papiJobMove			{ FLAGS = NODYNSORT };
+        papiJobCancel			{ FLAGS = NODYNSORT };
+        papiJobHold			{ FLAGS = NODYNSORT };
+        papiJobRelease			{ FLAGS = NODYNSORT };
+        papiJobRestart			{ FLAGS = NODYNSORT };
+        papiJobPromote			{ FLAGS = NODYNSORT };
+        papiJobGetAttributeList		{ FLAGS = NODYNSORT };
+        papiJobGetPrinterName		{ FLAGS = NODYNSORT };
         papiJobGetId;
-        papiJobGetJobTicket =		NODYNSORT;
-        papiJobFree =			NODYNSORT;
-        papiJobListFree =		NODYNSORT;
+        papiJobGetJobTicket		{ FLAGS = NODYNSORT };
+        papiJobFree			{ FLAGS = NODYNSORT };
+        papiJobListFree			{ FLAGS = NODYNSORT };
 
 	# Misc. PAPI Calls
         papiStatusString;
@@ -135,12 +136,12 @@ SUNW_1.0 {
         papiLibrarySupportedCalls;
 };
 
-SUNWprivate_1.0 { # Misc. semi-private supporting calls
+SYMBOL_VERSION SUNWprivate_1.0 { # Misc. semi-private supporting calls
     global:
-        papiServiceSetPeer =		NODYNSORT;
-        papiJobCreate =			NODYNSORT;
-        papiJobStreamAdd =		NODYNSORT;
-        papiJobCommit =			NODYNSORT;
+        papiServiceSetPeer		{ FLAGS = NODYNSORT };
+        papiJobCreate			{ FLAGS = NODYNSORT };
+        papiJobStreamAdd		{ FLAGS = NODYNSORT };
+        papiJobCommit			{ FLAGS = NODYNSORT };
 
 	#     URI
         uri_from_string;
@@ -153,7 +154,7 @@ SUNWprivate_1.0 { # Misc. semi-private supporting calls
         list_concatenate;
 
 	#	NS
-	getprinterbyname =		NODYNSORT;
+	getprinterbyname		{ FLAGS = NODYNSORT };
 
 	#    extra Attribute Calls
         copy_attributes;

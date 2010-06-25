@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY = libcpc.a
@@ -43,8 +40,6 @@ $(LINTLIB) :=	SRCS = ../common/llib-lcpc
 LDLIBS +=	-lpctx -lnvpair -lc
 
 SRCDIR =	../common
-
-MAPFILES +=	mapfile-vers
 
 ASFLAGS +=	-P -D_ASM -I../common
 CPPFLAGS +=	-D_REENTRANT -I../common

@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -31,12 +30,17 @@
 #
 #       cc -M /usr/lib/ld/map.execdata myprogram.c
 #
-data = ?RWX;
+
+$mapfile_version 2
+
+LOAD_SEGMENT data {
+	FLAGS = READ WRITE EXECUTE;
+};
 
 #
 # Executables can also create a separate executable bss segment.  Adding
 # the following line creates a bss segment.
 #
-# bss = ?RWX;
+# LOAD_SEGMENT bss { FLAGS = READ WRITE EXECUTE };
 #
 # See also /usr/lib/ld/map.noexdata.

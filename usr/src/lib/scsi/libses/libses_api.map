@@ -20,51 +20,51 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
-{
-	ses_close = FUNCTION extern;
-	ses_errno = FUNCTION extern;
-	ses_errmsg = FUNCTION extern;
-	ses_node_child = FUNCTION extern;
-	ses_node_id = FUNCTION extern;
-	ses_node_lookup = FUNCTION extern;
-	ses_node_parent = FUNCTION extern;
-	ses_node_props = FUNCTION extern;
-	ses_node_prev_sibling = FUNCTION extern;
-	ses_node_sibling = FUNCTION extern;
-	ses_node_snapshot = FUNCTION extern;
-	ses_node_target = FUNCTION extern;
-	ses_node_type = FUNCTION extern;
-	ses_open = FUNCTION extern;
-	ses_root_node = FUNCTION extern;
-	ses_scsi_target = FUNCTION extern;
-	ses_snap_primary_enclosure = FUNCTION extern;
-	ses_snap_generation = FUNCTION extern;
-	ses_strerror = FUNCTION extern;
-	ses_walk = FUNCTION extern;
+$mapfile_version 2
 
-	nvlist_add_fixed_string = FUNCTION extern;
-	nvlist_add_fixed_string_trunc = FUNCTION extern;
+SYMBOL_SCOPE {
+	ses_close			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_errno			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_errmsg			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_child			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_id			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_lookup			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_parent			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_props			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_prev_sibling		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_sibling		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_snapshot		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_target			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_node_type			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_open			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_root_node			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_scsi_target			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_snap_primary_enclosure	{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_snap_generation		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_strerror			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_walk			{ TYPE	= FUNCTION; FLAGS = extern };
 
-	ses_alloc = FUNCTION extern;
-	ses_assert = FUNCTION extern;
-	ses_error = FUNCTION extern;
-	ses_free = FUNCTION extern;
-	ses_nverror = FUNCTION extern;
-	ses_panic = FUNCTION extern;
-	ses_realloc = FUNCTION extern;
-	ses_set_nverrno = FUNCTION extern;
-	ses_set_errno = FUNCTION extern;
-	ses_strdup = FUNCTION extern;
-	ses_zalloc = FUNCTION extern;
+	nvlist_add_fixed_string		{ TYPE	= FUNCTION; FLAGS = extern };
+	nvlist_add_fixed_string_trunc	{ TYPE	= FUNCTION; FLAGS = extern };
 
-	ses_plugin_ctlpage_lookup = FUNCTION extern;
-	ses_plugin_page_lookup = FUNCTION extern;
-	ses_plugin_register = FUNCTION extern;
-	ses_plugin_setspecific = FUNCTION extern;
-	ses_plugin_getspecific = FUNCTION extern;
+	ses_alloc			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_assert			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_error			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_free			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_nverror			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_panic			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_realloc			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_set_nverrno			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_set_errno			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_strdup			{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_zalloc			{ TYPE	= FUNCTION; FLAGS = extern };
+
+	ses_plugin_ctlpage_lookup	{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_plugin_page_lookup		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_plugin_register		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_plugin_setspecific		{ TYPE	= FUNCTION; FLAGS = extern };
+	ses_plugin_getspecific		{ TYPE	= FUNCTION; FLAGS = extern };
 };

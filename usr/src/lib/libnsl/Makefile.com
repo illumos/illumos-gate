@@ -166,7 +166,6 @@ include ../../Makefile.rootfs
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCDIR=		../common
-MAPFILES +=	mapfile-vers
 
 # Override the position-independent code generation flags.
 #

@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,13 +36,15 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.7 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.7 {
     global:
 	freeifaddrs;
 	getifaddrs;
 } SUNW_1.6;
 
-SUNW_1.6 {
+SYMBOL_VERSION SUNW_1.6 {
     global:
 	getipv4sourcefilter;
 	getsourcefilter;
@@ -51,7 +52,7 @@ SUNW_1.6 {
 	setsourcefilter;
 } SUNW_1.5;
 
-SUNW_1.5 {
+SYMBOL_VERSION SUNW_1.5 {
     global:
 	inet6_opt_append;
 	inet6_opt_find;
@@ -70,7 +71,7 @@ SUNW_1.5 {
 	__xnet_getaddrinfo;
 } SUNW_1.4;
 
-SUNW_1.4 {
+SYMBOL_VERSION SUNW_1.4 {
     global:
 	freeaddrinfo;
 	gai_strerror;
@@ -91,17 +92,17 @@ SUNW_1.4 {
 # no SUNW_1.2 or SUNW_1.3 symbols, but they are now kept as placeholders.
 # Don't add any symbols to these versions.
 
-SUNW_1.3 {
+SYMBOL_VERSION SUNW_1.3 {
     global:
 	SUNW_1.3;
 } SUNW_1.2;
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	SUNW_1.2;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	__xnet_bind;
 	__xnet_connect;
@@ -114,7 +115,7 @@ SUNW_1.1 {
 	__xnet_socketpair;
 } SUNW_0.7;
 
-SUNW_0.7 {
+SYMBOL_VERSION SUNW_0.7 {
     global:
 	endnetent;
 	endprotoent;
@@ -137,10 +138,10 @@ SUNW_0.7 {
 	getservbyport_r;
 	getservent;
 	getservent_r;
-	htonl = FUNCTION FILTER libc.so.1;
-	htons = FUNCTION FILTER libc.so.1;
-	ntohl = FUNCTION FILTER libc.so.1;
-	ntohs = FUNCTION FILTER libc.so.1;
+	htonl			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	htons			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	ntohl			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	ntohs			{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	rcmd;
 	rexec;
 	rresvport;
@@ -149,12 +150,46 @@ SUNW_0.7 {
 	setprotoent;
 	setservent;
 	socketpair;
+
+	# For ABI reasons, the following symbols are in SISCD_2.3 on 32-bit
+	# sparc, which is inherited by SUNW_0.7. On all other platforms,
+	# they are simply in SUNW_0.7
+$if _sparc && _ELF32
+} SISCD_2.3;
+
+SYMBOL_VERSION SISCD_2.3 {
+    global:
+$endif
+	accept;
+	bind;
+	connect;
+	getpeername;
+	getprotobyname;
+	getprotobynumber;
+	getprotoent;
+	getservbyname;
+	getservbyport;
+	getsockname;
+	getsockopt;
+	inet_lnaof;
+	inet_makeaddr;
+	inet_network;
+	listen;
+	recv;
+	recvfrom;
+	recvmsg;
+	send;
+	sendmsg;
+	sendto;
+	setsockopt;
+	shutdown;
+	socket;
 };
 
 # There really should be only one SUNWprivate version.
 # Don't add any more.  Add new private symbols to SUNWprivate_1.3
 
-SUNWprivate_1.3 {
+SYMBOL_VERSION SUNWprivate_1.3 {
     global:
 	_link_aton;
 	_link_ntoa;
@@ -171,13 +206,13 @@ SUNWprivate_1.3 {
 	str2protoent;
 } SUNWprivate_1.2;
 
-SUNWprivate_1.2 {
+SYMBOL_VERSION SUNWprivate_1.2 {
     global:
 	getnetmaskbyaddr;
 	getnetmaskbynet;
 } SUNWprivate_1.1;
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_accept;
 	_bind;

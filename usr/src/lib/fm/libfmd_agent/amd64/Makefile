@@ -19,13 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.com
 include ../../../Makefile.lib.64
-
-MAPFILES += mapfile-vers
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)

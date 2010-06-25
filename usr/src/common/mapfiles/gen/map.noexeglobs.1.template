@@ -20,15 +20,15 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Template mapfile for generating a final mapfile to demote all user global
 # symbols to local within a dynamic executable.
 #
-{
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
     local:
         _fini;
         _init;

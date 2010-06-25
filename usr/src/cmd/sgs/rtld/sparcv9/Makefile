@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Object lists are organized into primary (most frequently used code) and
@@ -76,8 +75,6 @@ ADBSUB=		$(ADBSUB64)
 CPPFLAGS +=	-D_ELF64
 LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 SONAME=		$(VAR_RTLD_V9_SONAME)
-
-MAPFILES +=	../common/mapfile-64-vers
 
 SGSMSGTARG +=	$(SGSMSGSPARC) $(SGSMSGSPARC64) $(SGSMSG64)
 

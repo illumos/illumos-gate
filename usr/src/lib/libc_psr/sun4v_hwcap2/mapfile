@@ -19,9 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-hwcap_1 = vis asi_blk_init;
+
+$mapfile_version 2
+
+CAPABILITY {
+	hw += vis asi_blk_init;
+};

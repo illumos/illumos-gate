@@ -20,10 +20,18 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+$mapfile_version 2
 
-fb_swtch = LOAD ?NRWX V0x5000 P0x5000 A0x2000;
-fb_swtch : ?A;
+LOAD_SEGMENT fb_swtch {
+	NOHDR;
+	FLAGS = READ WRITE EXECUTE;
+	VADDR = 0x5000;
+	PADDR = 0x5000;
+	ALIGN = 0x2000;
+	ASSIGN_SECTION {
+		FLAGS = ALLOC;
+	};
+};

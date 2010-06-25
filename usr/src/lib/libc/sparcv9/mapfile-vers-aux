@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,19 +36,23 @@
 # MAPFILE HEADER END
 #
 
-SUNW_0.7 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_0.7 {	# SunOS 5.3 (Solaris 2.3)
     global:
-	memcmp = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	memcpy = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	memmove = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	memset = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
+	memcmp	{ AUXILIARY = /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1 };
+	memcpy	{ AUXILIARY = /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1 };
+	memmove	{ AUXILIARY = /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1 };
+	memset	{ AUXILIARY = /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1 };
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	_memcmp = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	_memcpy = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	_memcpy = NODYNSORT;
-	_memmove = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	_memset = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
+	_memcmp	{ AUXILIARY = /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1 };
+	_memcpy	{
+		AUXILIARY = /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
+		FLAGS = NODYNSORT;
+	};
+	_memmove { AUXILIARY = /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1 };
+	_memset	{ AUXILIARY = /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1 };
 };

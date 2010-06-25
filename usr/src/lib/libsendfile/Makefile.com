@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libsendfile.a
@@ -35,8 +32,6 @@ include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 SRCDIR =	../common
-
-MAPFILES +=	$(MAPFILE32)
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 

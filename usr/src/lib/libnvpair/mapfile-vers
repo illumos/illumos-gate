@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.3 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
     global:
 	nvlist_add_double;
 	nvlist_empty;
@@ -47,17 +48,17 @@ SUNW_1.3 {
 	nvpair_value_double;
 } SUNW_1.2.2;
 
-SUNW_1.2.2 {		# s10u8 - SunOS 5.10 (Solaris 10) patch additions
+SYMBOL_VERSION SUNW_1.2.2 {	# s10u8 - SunOS 5.10 (Solaris 10) patch additions
     global:
 	nvlist_lookup_nvpair;
 } SUNW_1.2.1;
 
-SUNW_1.2.1 {		# s10u7 - SunOS 5.10 (Solaris 10) patch additions
+SYMBOL_VERSION SUNW_1.2.1 {	# s10u7 - SunOS 5.10 (Solaris 10) patch additions
     global:
 	nvlist_exists;
 } SUNW_1.2;
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	nv_alloc_fini;
 	nv_alloc_init;
@@ -94,7 +95,7 @@ SUNW_1.2 {
 	nvpair_value_uint8_array;
 } SUNW_1.1.1;
 
-SUNW_1.1.1 {
+SYMBOL_VERSION SUNW_1.1.1 {
     global:
 	nvlist_add_nvlist;
 	nvlist_add_nvlist_array;
@@ -104,7 +105,7 @@ SUNW_1.1.1 {
 	nvpair_value_nvlist_array;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	nvlist_add_boolean;
 	nvlist_add_byte;
@@ -167,7 +168,7 @@ SUNW_1.1 {
 	nvpair_value_uint64_array;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	dump_nvlist;
 	nvlist_add_hrtime;

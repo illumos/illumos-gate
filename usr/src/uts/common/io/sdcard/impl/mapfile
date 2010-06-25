@@ -37,7 +37,9 @@
 # MAPFILE HEADER END
 #
 
-{
+$mapfile_version 2
+
+SYMBOL_SCOPE {
 	global:
 		# consolidation private nexus interfaces 
 		sda_host_init_ops;

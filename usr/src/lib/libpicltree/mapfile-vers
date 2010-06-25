@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,12 +36,14 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.3 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.3 {
     global:
 	ptree_get_frutree_parent;
 } SUNW_1.2;
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	ptree_create_and_add_node;
 	ptree_create_and_add_prop;
@@ -55,7 +56,7 @@ SUNW_1.2 {
 	ptree_walk_tree_by_class;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	picld_plugin_register;
 	ptree_add_node;
@@ -84,14 +85,14 @@ SUNW_1.1 {
 # There really should be only one SUNWprivate version.
 # Don't add any more.  Add new private symbols to SUNWprivate_1.2
 
-SUNWprivate_1.2 {
+SYMBOL_VERSION SUNWprivate_1.2 {
     global:
 	dbg_exec;
 	dbg_print;
 	verbose_level;
 } SUNWprivate_1.1;
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	cvt_picl2ptree;
 	cvt_ptree2picl;

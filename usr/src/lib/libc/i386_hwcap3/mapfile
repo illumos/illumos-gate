@@ -1,6 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -21,6 +20,9 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-hwcap_1 = fpu cmov mmx sse;
+
+$mapfile_version 2
+
+CAPABILITY {
+	hw += fpu cmov mmx sse;
+};

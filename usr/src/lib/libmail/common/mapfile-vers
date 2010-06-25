@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,14 +36,16 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	maillock;
 	mailunlock;
 	touchlock;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	casncmp;
 	copystream;
@@ -59,6 +60,27 @@ SUNWprivate_1.1 {
 	Xgetenv;
 	xgetenv;
 	xsetenv;
+
+$if _ELF32	# only for 32-bit applications
+	abspath;
+	notify;
+	s_append;
+	s_array;
+	s_copy;
+	setup_exec;
+	s_free;
+	s_grow;
+	s_new;
+	s_parse;
+	s_read_line;
+	s_read_to_eof;
+	s_seq_read;
+	s_skipwhite;
+	s_tok;
+	s_tolower;
+	systemvp;
+$endif
+
     local:
 	*;
 };

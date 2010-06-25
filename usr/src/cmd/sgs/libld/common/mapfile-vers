@@ -39,9 +39,13 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.6 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_4.6 {
 	global:
-		dbg_print  = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
+		dbg_print {	# interposed - ld(1) and ld.so.1(1)
+			FLAGS = NODIRECT;
+		};
 
 		ld_getopt;
 
@@ -77,7 +81,10 @@ SUNWprivate_4.6 {
 # The following functions must be provided by our caller, or one of the
 # callers dependencies.
 
-{
+SYMBOL_SCOPE {
 	global:
-		eprintf =	FUNCTION extern;
+		eprintf {
+			TYPE = FUNCTION;
+			FLAGS = extern;
+		};
 };

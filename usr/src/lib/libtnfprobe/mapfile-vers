@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,9 +36,11 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
-	fork = NODIRECT;
+	fork				{ FLAGS = NODIRECT };
 	fork1;
 	pthread_create;
 	pthread_exit;
@@ -100,6 +101,11 @@ SUNWprivate_1.1 {
 	tnf_uint8_tag_data;
 	tnf_user_struct_properties;
 	_tnfw_b_control;
+
+$if _sparc
+	thr_stksegment;
+$endif
+
     local:
 	*;
 };

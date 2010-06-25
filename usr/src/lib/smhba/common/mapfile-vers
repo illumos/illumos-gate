@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,8 +36,9 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	HBA_GetVersion;
 	HBA_GetWrapperLibraryAttributes;

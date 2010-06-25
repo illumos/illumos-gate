@@ -36,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	chkauthattr;
 	endauthattr;
@@ -68,7 +70,7 @@ SUNW_1.1 {
 	setuserattr;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_argv_to_csl;
 	_auth_match;

@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -36,7 +35,9 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
 	global:
 #
 # Exported Interface
@@ -46,20 +47,20 @@ SUNWprivate_1.1 {
 		*;
 };
 
-{
+SYMBOL_SCOPE {
 #
 # Imported Interface
 #
-		mdb_alloc = EXTERN;
-		mdb_call_dcmd = EXTERN;
-		mdb_dec_indent = EXTERN;
-		mdb_getopts = EXTERN;
-		mdb_inc_indent = EXTERN;
-		mdb_lookup_by_obj = EXTERN;
-		mdb_printf = EXTERN;
-		mdb_pwalk = EXTERN;
-		mdb_readstr = EXTERN;
-		mdb_set_dot = EXTERN;
-		mdb_vread = EXTERN;
-		mdb_warn = EXTERN;
+		mdb_alloc		{ FLAGS = EXTERN };
+		mdb_call_dcmd		{ FLAGS = EXTERN };
+		mdb_dec_indent		{ FLAGS = EXTERN };
+		mdb_getopts		{ FLAGS = EXTERN };
+		mdb_inc_indent		{ FLAGS = EXTERN };
+		mdb_lookup_by_obj	{ FLAGS = EXTERN };
+		mdb_printf		{ FLAGS = EXTERN };
+		mdb_pwalk		{ FLAGS = EXTERN };
+		mdb_readstr		{ FLAGS = EXTERN };
+		mdb_set_dot		{ FLAGS = EXTERN };
+		mdb_vread		{ FLAGS = EXTERN };
+		mdb_warn		{ FLAGS = EXTERN };
 };

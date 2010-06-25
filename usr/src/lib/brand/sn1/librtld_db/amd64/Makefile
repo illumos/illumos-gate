@@ -28,6 +28,5 @@ include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
 CLOBBERFILES =	$(ROOTLIBDIR64)/$(DYNLIB)
-DYNFLAGS +=	-M$(BRAND_SHARED)/librtld_db/common/mapfile-vers.64
 
 install: all $(ROOTLIBS64)

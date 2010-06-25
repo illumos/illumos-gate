@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -36,7 +35,10 @@
 #
 # MAPFILE HEADER END
 #
-SUNW_1.1 {
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
 	global:
 		it_config_load;
 		it_config_commit;
@@ -59,7 +61,7 @@ SUNW_1.1 {
 		it_portal_create;
 };
 
-SUNWprivate {
+SYMBOL_VERSION SUNWprivate {
 	global:
 		it_config_to_nv;
 		it_nv_to_config;

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIB_PIC= libc_pic.a
@@ -954,7 +953,7 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(LDLIBS)
 
-MAPFILES =	../port/mapfile-vers ../i386/mapfile-vers
+MAPFILES =	../port/mapfile-vers
 
 #
 # EXTN_CPPFLAGS and EXTN_CFLAGS set in enclosing Makefile

@@ -1,6 +1,5 @@
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -22,8 +21,10 @@
 # defined by the application.
 #
 
-{
+$mapfile_version 2
+
+SYMBOL_SCOPE {
 	global:
-		allow_severity = extern;
-		deny_severity = extern;
+		allow_severity		{ FLAGS = extern };
+		deny_severity		{ FLAGS = extern };
 };

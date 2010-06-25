@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -36,11 +35,13 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 # External interface requirements
-{
+SYMBOL_SCOPE {
 	global:
-		debug_level =		EXTERN;
-		root_dir =		EXTERN;
-		syseventd_err_print =	EXTERN;
-		syseventd_print =	EXTERN;
+		debug_level		{ FLAGS = EXTERN };
+		root_dir		{ FLAGS = EXTERN };
+		syseventd_err_print	{ FLAGS = EXTERN };
+		syseventd_print		{ FLAGS = EXTERN };
 };

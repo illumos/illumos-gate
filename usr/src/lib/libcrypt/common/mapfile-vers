@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,17 +36,19 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
     global:
-	crypt = FUNCTION FILTER libc.so.1;
-	encrypt = FUNCTION FILTER libc.so.1;
-	setkey = FUNCTION FILTER libc.so.1;
+	crypt		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	encrypt		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	setkey		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	cbc_crypt;
-	_crypt = FUNCTION FILTER libc.so.1;
+	_crypt		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	crypt_close;
 	_crypt_close;
 	crypt_close_nolock;
@@ -63,7 +64,7 @@ SUNWprivate_1.1 {
 	_des_setkey;
 	des_setparity;
 	ecb_crypt;
-	_encrypt = FUNCTION FILTER libc.so.1;
+	_encrypt	{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	_lib_version;
 	makekey;
 	_makekey;
@@ -71,7 +72,7 @@ SUNWprivate_1.1 {
 	_run_crypt;
 	run_setkey;
 	_run_setkey;
-	_setkey = FUNCTION FILTER libc.so.1;
+	_setkey		{ TYPE = FUNCTION; FILTER = libc.so.1 };
     local:
 	*;
 };

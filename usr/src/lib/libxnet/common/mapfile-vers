@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -36,127 +35,138 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.4 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.4 {
     global:
-	freeaddrinfo =		FUNCTION FILTER libsocket.so.1;
-	gai_strerror =		FUNCTION FILTER libsocket.so.1;
-	getaddrinfo =		FUNCTION FILTER libsocket.so.1;
-	getnameinfo =		FUNCTION FILTER libsocket.so.1;
-	inet_ntop =		FUNCTION FILTER libnsl.so.1;
-	inet_pton =		FUNCTION FILTER libnsl.so.1;
+	freeaddrinfo		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	gai_strerror		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getaddrinfo		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getnameinfo		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	inet_ntop		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	inet_pton		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
 } SUNW_1.3;
 
-SUNW_1.3 {
+SYMBOL_VERSION SUNW_1.3 {
     global:
-	if_freenameindex =	FUNCTION FILTER libsocket.so.1;
-	if_indextoname =	FUNCTION FILTER libsocket.so.1;
-	if_nameindex =		FUNCTION FILTER libsocket.so.1;
-	if_nametoindex =	FUNCTION FILTER libsocket.so.1;
-	sockatmark =		FUNCTION FILTER libsocket.so.1;
+	if_freenameindex	{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	if_indextoname		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	if_nameindex		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	if_nametoindex		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	sockatmark		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
 } SUNW_1.2;
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
-	_xti_rcvreldata =	FUNCTION FILTER libnsl.so.1;
-	_xti_rcvv =		FUNCTION FILTER libnsl.so.1;
-	_xti_rcvvudata =	FUNCTION FILTER libnsl.so.1;
-	_xti_sndreldata =	FUNCTION FILTER libnsl.so.1;
-	_xti_sndv =		FUNCTION FILTER libnsl.so.1;
-	_xti_sndvudata =	FUNCTION FILTER libnsl.so.1;
-	_xti_sysconf =		FUNCTION FILTER libnsl.so.1;
-	_xti_xns5_accept =	FUNCTION FILTER libnsl.so.1;
-	_xti_xns5_snd =		FUNCTION FILTER libnsl.so.1;
+	_xti_rcvreldata		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_rcvv		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_rcvvudata		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_sndreldata		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_sndv		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_sndvudata		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_sysconf		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_xns5_accept	{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_xns5_snd		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
-	__t_errno =		FUNCTION FILTER libnsl.so.1;
-	__xnet_bind = 		FUNCTION FILTER libsocket.so.1;
-	__xnet_connect = 	FUNCTION FILTER libsocket.so.1;
-	__xnet_getsockopt = 	FUNCTION FILTER libsocket.so.1;
-	__xnet_listen = 	FUNCTION FILTER libsocket.so.1;
-	__xnet_recvmsg =	FUNCTION FILTER libsocket.so.1;
-	__xnet_sendmsg =	FUNCTION FILTER libsocket.so.1;
-	__xnet_sendto =		FUNCTION FILTER libsocket.so.1;
-	__xnet_socket = 	FUNCTION FILTER libsocket.so.1;
-	__xnet_socketpair = 	FUNCTION FILTER libsocket.so.1;
-	_xti_accept =		FUNCTION FILTER libnsl.so.1;
-	_xti_alloc =		FUNCTION FILTER libnsl.so.1;
-	_xti_bind =		FUNCTION FILTER libnsl.so.1;
-	_xti_close =		FUNCTION FILTER libnsl.so.1;
-	_xti_connect =		FUNCTION FILTER libnsl.so.1;
-	_xti_error =		FUNCTION FILTER libnsl.so.1;
-	_xti_free =		FUNCTION FILTER libnsl.so.1;
-	_xti_getinfo =		FUNCTION FILTER libnsl.so.1;
-	_xti_getprotaddr =	FUNCTION FILTER libnsl.so.1;
-	_xti_getstate =		FUNCTION FILTER libnsl.so.1;
-	_xti_listen =		FUNCTION FILTER libnsl.so.1;
-	_xti_look =		FUNCTION FILTER libnsl.so.1;
-	_xti_open =		FUNCTION FILTER libnsl.so.1;
-	_xti_optmgmt =		FUNCTION FILTER libnsl.so.1;
-	_xti_rcv =		FUNCTION FILTER libnsl.so.1;
-	_xti_rcvconnect =	FUNCTION FILTER libnsl.so.1;
-	_xti_rcvdis =		FUNCTION FILTER libnsl.so.1;
-	_xti_rcvrel =		FUNCTION FILTER libnsl.so.1;
-	_xti_rcvudata =		FUNCTION FILTER libnsl.so.1;
-	_xti_rcvuderr =		FUNCTION FILTER libnsl.so.1;
-	_xti_snd =		FUNCTION FILTER libnsl.so.1;
-	_xti_snddis =		FUNCTION FILTER libnsl.so.1;
-	_xti_sndrel =		FUNCTION FILTER libnsl.so.1;
-	_xti_sndudata =		FUNCTION FILTER libnsl.so.1;
-	_xti_strerror =		FUNCTION FILTER libnsl.so.1;
-	_xti_sync =		FUNCTION FILTER libnsl.so.1;
-	_xti_unbind =		FUNCTION FILTER libnsl.so.1;
-	accept =		FUNCTION FILTER libsocket.so.1;
-	bind =			FUNCTION FILTER libsocket.so.1;
-	connect = 		FUNCTION FILTER libsocket.so.1;
-	endhostent =		FUNCTION FILTER libnsl.so.1;
-	endnetent =		FUNCTION FILTER libsocket.so.1;
-	endprotoent =		FUNCTION FILTER libsocket.so.1;
-	endservent =		FUNCTION FILTER libsocket.so.1;
-	gethostbyaddr =		FUNCTION FILTER libnsl.so.1;
-	gethostbyname =		FUNCTION FILTER libnsl.so.1;
-	gethostent =		FUNCTION FILTER libnsl.so.1;
-	gethostname =		FUNCTION FILTER libc.so.1;
-	getnetbyaddr =		FUNCTION FILTER libsocket.so.1;
-	getnetbyname =		FUNCTION FILTER libsocket.so.1;
-	getnetent =		FUNCTION FILTER libsocket.so.1;
-	getpeername = 		FUNCTION FILTER libsocket.so.1;
-	getprotobyname =	FUNCTION FILTER libsocket.so.1;
-	getprotobynumber =	FUNCTION FILTER libsocket.so.1;
-	getprotoent =		FUNCTION FILTER libsocket.so.1;
-	getservbyname =		FUNCTION FILTER libsocket.so.1;
-	getservbyport =		FUNCTION FILTER libsocket.so.1;
-	getservent =		FUNCTION FILTER libsocket.so.1;
-	getsockname = 		FUNCTION FILTER libsocket.so.1;
-	getsockopt = 		FUNCTION FILTER libsocket.so.1;
-	h_errno =		DATA S0x4 NODIRECT FILTER libnsl.so.1;
-	htonl =			FUNCTION FILTER libc.so.1;
-	htons =			FUNCTION FILTER libc.so.1;
-	inet_addr =		FUNCTION FILTER libnsl.so.1;
-	inet_lnaof =		FUNCTION FILTER libsocket.so.1;
-	inet_makeaddr =		FUNCTION FILTER libsocket.so.1;
-	inet_netof =		FUNCTION FILTER libnsl.so.1;
-	inet_network =		FUNCTION FILTER libsocket.so.1;
-	inet_ntoa =		FUNCTION FILTER libnsl.so.1;
-	listen = 		FUNCTION FILTER libsocket.so.1;
-	ntohl =			FUNCTION FILTER libc.so.1;
-	ntohs =			FUNCTION FILTER libc.so.1;
-	recv =			FUNCTION FILTER libsocket.so.1;
-	recvfrom =		FUNCTION FILTER libsocket.so.1;
-	recvmsg =		FUNCTION FILTER libsocket.so.1;
-	send =			FUNCTION FILTER libsocket.so.1;
-	sendmsg =		FUNCTION FILTER libsocket.so.1;
-	sendto = 		FUNCTION FILTER libsocket.so.1;
-	sethostent =		FUNCTION FILTER libnsl.so.1;
-	setnetent =		FUNCTION FILTER libsocket.so.1;
-	setprotoent =		FUNCTION FILTER libsocket.so.1;
-	setservent =		FUNCTION FILTER libsocket.so.1;
-	setsockopt = 		FUNCTION FILTER libsocket.so.1;
-	shutdown = 		FUNCTION FILTER libsocket.so.1;
-	socket = 		FUNCTION FILTER libsocket.so.1;
-	socketpair = 		FUNCTION FILTER libsocket.so.1;
-	t_errno	=		DATA S0x4 FILTER libnsl.so.1;
+	__t_errno		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	__xnet_bind		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	__xnet_connect		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	__xnet_getsockopt	{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	__xnet_listen		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	__xnet_recvmsg		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	__xnet_sendmsg		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	__xnet_sendto		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	__xnet_socket		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	__xnet_socketpair	{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	_xti_accept		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_alloc		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_bind		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_close		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_connect		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_error		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_free		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_getinfo		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_getprotaddr	{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_getstate		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_listen		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_look		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_open		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_optmgmt		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_rcv		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_rcvconnect		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_rcvdis		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_rcvrel		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_rcvudata		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_rcvuderr		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_snd		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_snddis		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_sndrel		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_sndudata		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_strerror		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_sync		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	_xti_unbind		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	accept			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	bind			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	connect			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	endhostent		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	endnetent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	endprotoent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	endservent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	gethostbyaddr		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	gethostbyname		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	gethostent		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	gethostname		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	getnetbyaddr		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getnetbyname		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getnetent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getpeername		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getprotobyname		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getprotobynumber	{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getprotoent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getservbyname		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getservbyport		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getservent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getsockname		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	getsockopt		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	h_errno {
+		TYPE = DATA;
+		SIZE = 0x4;
+		FLAGS = NODIRECT;
+		FILTER = libnsl.so.1;
+	};
+	htonl			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	htons			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_addr		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	inet_lnaof		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	inet_makeaddr		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	inet_netof		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	inet_network		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	inet_ntoa		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	listen	 		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	ntohl			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	ntohs			{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	recv			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	recvfrom		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	recvmsg			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	send			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	sendmsg			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	sendto			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	sethostent		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	setnetent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	setprotoent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	setservent		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	setsockopt		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	shutdown		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	socket			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	socketpair		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	t_errno {
+		TYPE = DATA;
+		SIZE = 0x4;
+		FILTER = libnsl.so.1;
+	};
     local:
 	*;
 };

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 BASEPLAT =	i386
@@ -70,8 +69,6 @@ ADBSUB=		$(ADBSUB32)
 SONAME=		$(VAR_RTLD_SONAME)
 
 SGSMSGTARG +=	$(SGSMSGINTEL) $(SGSMSGINTEL32) $(SGSMSG32)
-
-MAPFILES +=	../common/mapfile-32-vers
 
 .KEEP_STATE:
 

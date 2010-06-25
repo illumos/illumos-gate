@@ -36,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.2 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.2 {
     global:
         scf_count_ranges_destroy;
 	scf_int_ranges_destroy;
@@ -92,7 +94,7 @@ SUNW_1.2 {
 	scf_values_destroy;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	scf_entry_add_value;
 	scf_entry_create;
@@ -270,7 +272,7 @@ SUNW_1.1 {
 	smf_restore_instance;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	gen_filenms_from_fmri;
 	scf_canonify_fmri;

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBCBASE=.
@@ -912,7 +911,7 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR64)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS)
 
-MAPFILES =	../port/mapfile-vers mapfile-vers
+MAPFILES =	../port/mapfile-vers
 
 CPPFLAGS=	-D_REENTRANT -D$(MACH64) -D__$(MACH64) $(THREAD_DEBUG) \
 		-I. -I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master) -I/usr/include

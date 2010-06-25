@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -40,7 +39,9 @@
 # There really should be only one SUNWprivate version.
 # Don't add any more.  Add new private symbols to SUNWprivate_1.2
 
-SUNWprivate_1.2 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.2 {
     global:
 	pool_conf_update;
 	pool_get_status;
@@ -48,7 +49,7 @@ SUNWprivate_1.2 {
 	pool_set_status;
 } SUNWprivate_1.1;
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	pool_associate;
 	pool_component_info;

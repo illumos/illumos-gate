@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	ncad_addr.a
@@ -32,8 +29,6 @@ OBJECTS =	ncad_addr.o
 include ../../Makefile.lib
 
 SRCDIR =	../common
-
-MAPFILES +=	mapfile-vers
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lnsl

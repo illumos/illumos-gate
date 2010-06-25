@@ -20,16 +20,15 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+$mapfile_version 2
 
 # lex generates a lex.yy.c for use in building applications.  A number of
 # interfaces within this file are intended for libl.so to bind to, and thus
 # should remain exported from any application using lex.yy.c.
-{
+SYMBOL_SCOPE {
 	global:
 		yyback;
 		yyextra;
@@ -49,7 +48,7 @@
 # Some applications use the -e option of lex, which generates additional lex
 # interfaces that are not defined in the generic $(MAPFILE.LEX).  Export the
 # following interfaces to satisfy -e use.
-#{
+#SYMBOL_SCOPE {
 #	global:
 #		yywinput;
 #		yywleng;

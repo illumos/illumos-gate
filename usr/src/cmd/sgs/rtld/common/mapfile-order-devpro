@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Note: This mapfile is used to place r_debug as the
 # very first data item inside of the run-time linker.
@@ -41,6 +38,21 @@
 #	devpro mapfile: rtld/common/mapfile-order-devpro
 #
 
-data = LOAD ?RWXO;
-data : .data : pics/debugdata.o;
-data | .data;
+$mapfile_version 2
+
+LOAD_SEGMENT data {
+	FLAGS = READ WRITE EXECUTE;
+
+	# .data sections from pics/debugdata.o go to data segment
+	ASSIGN_SECTION dbg_data {
+		IS_NAME = .data;
+		FILE_PATH = pics/debugdata.o;
+	};
+
+	# Put .data sections from pics/debugdata.o ahead of any other
+	# .data input sections in the .data output section.
+	IS_ORDER = dbg_data;
+
+	# Put .data output section at top of data segment
+	OS_ORDER = .data;
+};

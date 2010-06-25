@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -38,7 +37,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	rd_delete;
 	rd_errstr;
@@ -57,23 +58,30 @@ SUNW_1.1 {
 	*;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_rd_get_dyns32;
 	_rd_get_ehdr32;
 	_rd_loadobj_iter32;
 	rd_get_dyns;
 	validate_rdebug32;
+
+$if _ELF64
+	_rd_get_dyns64;
+	_rd_get_ehdr64;
+	_rd_loadobj_iter64;
+	validate_rdebug64;
+$endif
 };
 
 #Externally defined symbols
-{
+SYMBOL_SCOPE {
     global:
-	ps_pauxv =		NODIRECT PARENT;
-	ps_pdmodel =		NODIRECT PARENT;
-	ps_pglobal_lookup =	NODIRECT PARENT;
-	ps_pglobal_sym =	NODIRECT PARENT;
-	ps_plog =		NODIRECT PARENT;
-	ps_pread =		NODIRECT PARENT;
-	ps_pwrite =		NODIRECT PARENT;
+	ps_pauxv		{ FLAGS = NODIRECT PARENT };
+	ps_pdmodel		{ FLAGS = NODIRECT PARENT };
+	ps_pglobal_lookup	{ FLAGS = NODIRECT PARENT };
+	ps_pglobal_sym		{ FLAGS = NODIRECT PARENT };
+	ps_plog			{ FLAGS = NODIRECT PARENT };
+	ps_pread		{ FLAGS = NODIRECT PARENT };
+	ps_pwrite		{ FLAGS = NODIRECT PARENT };
 };

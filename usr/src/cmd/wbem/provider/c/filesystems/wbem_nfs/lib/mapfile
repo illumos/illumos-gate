@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -35,7 +34,10 @@
 #
 # MAPFILE HEADER END
 #
-SUNWprivate_1.1 {
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	cp_associatorNames ;
 	cp_associators ;

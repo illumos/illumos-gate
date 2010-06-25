@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY=	libtnfprobe.a
@@ -50,7 +47,6 @@ SRCS= $(OBJECTS.c:%.o=../%.c) $(UFSOBJS:%.o=$(UFSDIR)/%.c)
 
 LIBS=		$(DYNLIB)
 
-MAPFILES +=	mapfile-vers
 DYNFLAGS +=	$(ZINTERPOSE)
 
 HDRS=		com.h writer.h probe.h

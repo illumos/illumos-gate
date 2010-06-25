@@ -20,33 +20,59 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
+$mapfile_version 2
 
 #
 # This is 1:1 mapped code to setup the kernel memory image.
 # It needs to be after (in physical) the kernel bits, so that
 # they have full 8 Meg of memory.
 # 
-dboot	= LOAD ?RWXN P0x40800000 V0x40800000;
-dboot	: .data : *dboot.o;
+LOAD_SEGMENT dboot {
+	FLAGS = READ WRITE EXECUTE;
+	NOHDR;
+	PADDR = 0x40800000;
+	VADDR = 0x40800000;
+	ASSIGN_SECTION {
+		IS_NAME = .data;
+		FILE_BASENAME = dboot.o;
+	};
+};
 
-text    = LOAD ?RXN P0x40000000 V0xFFFFFFFFFB800000;
-text    | .text;
-text    : $PROGBITS ?A!W;
+LOAD_SEGMENT text {
+	FLAGS = READ EXECUTE;
+	NOHDR;
+	PADDR = 0x40000000;
+	VADDR = 0xFFFFFFFFFB800000;
+	OS_ORDER = .text;
+	ASSIGN_SECTION {
+		TYPE = PROGBITS;
+		FLAGS = ALLOC !WRITE;
+	};
+};
 
 #
 # start the data segment on a new 4MB page boundary
 #
-data	= LOAD ?RWX P0x40400000 V0xFFFFFFFFFBC00000;
-data	| .data;
-data	: $PROGBITS ?AW;
-data	: $NOBITS ?AW;
+LOAD_SEGMENT data {
+	FLAGS = READ WRITE EXECUTE;
+	PADDR = 0x40400000;
+	VADDR = 0xFFFFFFFFFBC00000;
+	OS_ORDER = .data;
+	ASSIGN_SECTION {
+		TYPE = PROGBITS;
+		FLAGS = ALLOC WRITE;
+	};
+	ASSIGN_SECTION {
+		TYPE = NOBITS;
+		FLAGS = ALLOC WRITE;
+	};
+};
 
-note	= NOTE;
-note	: $NOTE;
+NOTE_SEGMENT note {
+	ASSIGN_SECTION {
+		TYPE = NOTE;
+	};
+};

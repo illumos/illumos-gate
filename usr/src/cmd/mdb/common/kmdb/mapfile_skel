@@ -20,11 +20,8 @@
  */
 /* BEGIN PROLOGUE */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is used to limit the symbols that are to be exported from the
@@ -36,7 +33,9 @@
  * entries for __ctype and errno below.
  */
 
-{
+$mapfile_version 2
+
+SYMBOL_SCOPE {
 	global:
 
 /* END PROLOGUE */

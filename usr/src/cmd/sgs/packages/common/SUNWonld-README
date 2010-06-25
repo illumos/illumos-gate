@@ -1595,3 +1595,4 @@ Bugid   Risk Synopsis
 6961755 ld.so.1's -e arguments should take precedence over environment
 	variables. (D)
 6748925 moe returns wrong hwcap library in some circumstances
+6916796 OSnet mapfiles should use version 2 link-editor syntax

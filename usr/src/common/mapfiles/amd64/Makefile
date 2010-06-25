@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -30,7 +29,7 @@ ROOTDIR=	$(ROOT)/usr/lib/ld
 ROOTDIR64=	$(ROOT)/usr/lib/ld/$(MACH64)
 
 DIRS=		$(ROOTDIR) $(ROOTDIR64)
-FILES=		$(ROOTDIR64)/map.above4G $(ROOTDIR64)/map.below4G
+FILES=
 
 install: $(DIRS) $(FILES) map.link
 
@@ -39,8 +38,11 @@ $(FILES):=	FILEMODE=444
 $(DIRS):=	DIRMODE=755
 
 map.link:
-	$(RM) $(ROOTDIR64)/map.default
-	$(SYMLINK) ./map.below4G $(ROOTDIR64)/map.default
+	$(RM) $(ROOTDIR64)/map.default \
+		$(ROOTDIR64)/map.above4G $(ROOTDIR64)/map.below4G
+	$(SYMLINK) ../map.default $(ROOTDIR64)/map.default
+	$(SYMLINK) ../map.above4G $(ROOTDIR64)/map.above4G
+	$(SYMLINK) ../map.below4G $(ROOTDIR64)/map.below4G
 
 $(DIRS):
 	$(INS.dir)

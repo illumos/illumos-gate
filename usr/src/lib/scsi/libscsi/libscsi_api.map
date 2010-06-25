@@ -20,30 +20,30 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
-{
-	libscsi_strerror = FUNCTION extern;
-	libscsi_errname = FUNCTION extern;
-	libscsi_errcode = FUNCTION extern;
-	libscsi_alloc = FUNCTION extern;
-	libscsi_zalloc = FUNCTION extern;
-	libscsi_strdup = FUNCTION extern;
-	libscsi_free = FUNCTION extern;
-	libscsi_set_errno = FUNCTION extern;
-	libscsi_verror = FUNCTION extern;
-	libscsi_error = FUNCTION extern;
-	libscsi_cmd_cdblen = FUNCTION extern;
-	libscsi_action_get_timeout = FUNCTION extern;
-	libscsi_action_get_flags = FUNCTION extern;
-	libscsi_action_get_cdb = FUNCTION extern;
-	libscsi_action_get_buffer = FUNCTION extern;
-	libscsi_action_get_sense = FUNCTION extern;
-	libscsi_action_set_status = FUNCTION extern;
-	libscsi_action_set_datalen = FUNCTION extern;
-	libscsi_action_set_senselen = FUNCTION extern;
-	libscsi_assert = FUNCTION extern;
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	libscsi_strerror		{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_errname			{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_errcode			{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_alloc			{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_zalloc			{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_strdup			{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_free			{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_set_errno		{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_verror			{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_error			{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_cmd_cdblen		{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_action_get_timeout	{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_action_get_flags	{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_action_get_cdb		{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_action_get_buffer	{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_action_get_sense	{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_action_set_status	{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_action_set_datalen	{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_action_set_senselen	{ TYPE	= FUNCTION; FLAGS = extern };
+	libscsi_assert			{ TYPE	= FUNCTION; FLAGS = extern };
 };

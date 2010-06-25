@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -35,30 +34,31 @@
 #
 # MAPFILE HEADER END
 #
+$mapfile_version 2
 
 # External interface requirements
-{
+SYMBOL_SCOPE {
 	global:
-		devfsadm_devlink_cache =	EXTERN;
-		devfsadm_enumerate_char_start =	EXTERN;
-		devfsadm_enumerate_int =	EXTERN;
-		devfsadm_errprint =		EXTERN;
-		devfsadm_free_dev_names =	EXTERN;
-		devfsadm_have_reserved =	EXTERN;
-		devfsadm_is_reserved =		EXTERN;
-		devfsadm_link_valid =		EXTERN;
-		devfsadm_lookup_dev_names =	EXTERN;
-		devfsadm_mklink =		EXTERN;
-		devfsadm_noupdate =		EXTERN;
-		devfsadm_print =		EXTERN;
-		devfsadm_read_link =		EXTERN;
-		devfsadm_reserve_id_cache =	EXTERN;
-		devfsadm_rm_all =		EXTERN;
-		devfsadm_rm_link =		EXTERN;
-		devfsadm_rm_stale_links =	EXTERN;
-		devfsadm_root_path =		EXTERN;
-		devfsadm_secondary_link =	EXTERN;
-		disk_enumerate_int =		EXTERN;
-		s_strdup =			EXTERN;
-		system_labeled =		EXTERN;
+		devfsadm_devlink_cache		{ FLAGS = EXTERN };
+		devfsadm_enumerate_char_start	{ FLAGS = EXTERN };
+		devfsadm_enumerate_int		{ FLAGS = EXTERN };
+		devfsadm_errprint		{ FLAGS = EXTERN };
+		devfsadm_free_dev_names		{ FLAGS = EXTERN };
+		devfsadm_have_reserved		{ FLAGS = EXTERN };
+		devfsadm_is_reserved		{ FLAGS = EXTERN };
+		devfsadm_link_valid		{ FLAGS = EXTERN };
+		devfsadm_lookup_dev_names	{ FLAGS = EXTERN };
+		devfsadm_mklink			{ FLAGS = EXTERN };
+		devfsadm_noupdate		{ FLAGS = EXTERN };
+		devfsadm_print			{ FLAGS = EXTERN };
+		devfsadm_read_link		{ FLAGS = EXTERN };
+		devfsadm_reserve_id_cache	{ FLAGS = EXTERN };
+		devfsadm_rm_all			{ FLAGS = EXTERN };
+		devfsadm_rm_link		{ FLAGS = EXTERN };
+		devfsadm_rm_stale_links		{ FLAGS = EXTERN };
+		devfsadm_root_path		{ FLAGS = EXTERN };
+		devfsadm_secondary_link		{ FLAGS = EXTERN };
+		disk_enumerate_int		{ FLAGS = EXTERN };
+		s_strdup			{ FLAGS = EXTERN };
+		system_labeled			{ FLAGS = EXTERN };
 };

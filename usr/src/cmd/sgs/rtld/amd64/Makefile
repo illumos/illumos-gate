@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 BASEPLAT =	amd64
@@ -61,8 +60,6 @@ include		$(SRC)/lib/Makefile.lib.64
 MAPFILE-ORDER =			../common/mapfile-order-devpro
 $(__GNUC64)MAPFILE-ORDER =	../common/mapfile-order-gcc
 
-MAPFILE-PLAT =	 mapfile-amd64-vers
-
 # Add any machine specific flags.
 
 CFLAGS +=	-xregs=no%appl
@@ -82,8 +79,6 @@ RTLDLIB =	-L ../../librtld/$(MACH64)
 CPICLIB =	$(CPICLIB64)
 LDDBGLIBDIR =	$(LDDBGLIBDIR64)
 CONVLIBDIR =	$(CONVLIBDIR64)
-
-MAPFILES +=	../common/mapfile-64-vers
 
 .KEEP_STATE:
 

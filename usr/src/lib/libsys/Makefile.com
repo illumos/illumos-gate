@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libsys.a
@@ -30,7 +29,6 @@ VERS =		.1
 # the soname.
 SONAME =	/usr/lib/ld.so.1
 DYNFLAGS +=	-F /usr/lib/libc.so.1
-MAPFILEDIR =	.				# redirect mapfile-vers
 
 COMSRC =	$(COMOBJ:%.o=%.c)
 MACHSRC =	$(MACHOBJ:%.o=%.s)

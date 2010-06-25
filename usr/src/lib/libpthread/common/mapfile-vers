@@ -1,0 +1,277 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+#
+# DO NOT TOUCH THIS FILE.
+# This file declares interfaces that are cast in stone.
+# They offer interfaces that will never change.
+# DO NOT TOUCH THIS FILE.
+#
+
+SYMBOL_VERSION SUNW_1.4 {
+    global:
+	cond_reltimedwait			{ TYPE = FUNCTION };
+	pthread_cond_reltimedwait_np		{ TYPE = FUNCTION };
+    local:
+	*;
+} SUNW_1.3;
+
+SYMBOL_VERSION SUNW_1.3 {
+    global:
+	pthread_mutexattr_getrobust_np		{ TYPE = FUNCTION };
+	pthread_mutexattr_setrobust_np		{ TYPE = FUNCTION };
+	pthread_mutex_consistent_np		{ TYPE = FUNCTION };
+} SUNW_1.2;
+
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	getmsg					{ TYPE = FUNCTION };
+	getpmsg					{ TYPE = FUNCTION };
+	lockf					{ TYPE = FUNCTION };
+	msgrcv					{ TYPE = FUNCTION };
+	msgsnd					{ TYPE = FUNCTION };
+	poll					{ TYPE = FUNCTION };
+	pread					{ TYPE = FUNCTION };
+	pthread_attr_getguardsize		{ TYPE = FUNCTION };
+	pthread_attr_setguardsize		{ TYPE = FUNCTION };
+	pthread_getconcurrency			{ TYPE = FUNCTION };
+	pthread_mutexattr_gettype		{ TYPE = FUNCTION };
+	pthread_mutexattr_settype		{ TYPE = FUNCTION };
+	pthread_rwlockattr_destroy		{ TYPE = FUNCTION };
+	pthread_rwlockattr_getpshared		{ TYPE = FUNCTION };
+	pthread_rwlockattr_init			{ TYPE = FUNCTION };
+	pthread_rwlockattr_setpshared		{ TYPE = FUNCTION };
+	pthread_rwlock_destroy			{ TYPE = FUNCTION };
+	pthread_rwlock_init			{ TYPE = FUNCTION };
+	pthread_rwlock_rdlock			{ TYPE = FUNCTION };
+	pthread_rwlock_tryrdlock		{ TYPE = FUNCTION };
+	pthread_rwlock_trywrlock		{ TYPE = FUNCTION };
+	pthread_rwlock_unlock			{ TYPE = FUNCTION };
+	pthread_rwlock_wrlock			{ TYPE = FUNCTION };
+	pthread_setconcurrency			{ TYPE = FUNCTION };
+	putmsg					{ TYPE = FUNCTION };
+	putpmsg					{ TYPE = FUNCTION };
+	pwrite					{ TYPE = FUNCTION };
+	readv					{ TYPE = FUNCTION };
+	select					{ TYPE = FUNCTION };
+	sigpause				{ TYPE = FUNCTION };
+	usleep					{ TYPE = FUNCTION };
+	wait3					{ TYPE = FUNCTION };
+	waitid					{ TYPE = FUNCTION };
+	writev					{ TYPE = FUNCTION };
+	__xpg4_putmsg				{ TYPE = FUNCTION };
+	__xpg4_putpmsg				{ TYPE = FUNCTION };
+
+$if _ELF32		# largefile APIs
+	lockf64					{ TYPE = FUNCTION };
+	pread64					{ TYPE = FUNCTION };
+	pwrite64				{ TYPE = FUNCTION };
+$endif
+} SUNW_1.1;
+
+SYMBOL_VERSION SUNW_1.1 {
+    global:
+$if _ELF32		# largefile APIs
+	creat64					{ TYPE = FUNCTION };
+	open64					{ TYPE = FUNCTION };
+$else
+	SUNW_1.1;
+$endif
+} SUNW_0.9;
+
+SYMBOL_VERSION SUNW_0.9 {
+    global:
+	alarm					{ TYPE = FUNCTION };
+	close					{ TYPE = FUNCTION };
+	cond_broadcast				{ TYPE = FUNCTION };
+	cond_destroy				{ TYPE = FUNCTION };
+	cond_init				{ TYPE = FUNCTION };
+	cond_signal				{ TYPE = FUNCTION };
+	cond_timedwait				{ TYPE = FUNCTION };
+	cond_wait				{ TYPE = FUNCTION };
+	creat					{ TYPE = FUNCTION };
+	fcntl					{ TYPE = FUNCTION };
+	fork					{ TYPE = FUNCTION };
+	fork1					{ TYPE = FUNCTION };
+	fsync					{ TYPE = FUNCTION };
+	_getfp					{ TYPE = FUNCTION };
+	msync					{ TYPE = FUNCTION };
+	mutex_destroy				{ TYPE = FUNCTION };
+	mutex_init				{ TYPE = FUNCTION };
+	_mutex_lock				{ TYPE = FUNCTION };
+	mutex_lock				{ TYPE = FUNCTION };
+	mutex_trylock				{ TYPE = FUNCTION };
+	mutex_unlock				{ TYPE = FUNCTION };
+	open					{ TYPE = FUNCTION };
+	pause					{ TYPE = FUNCTION };
+	pthread_attr_destroy			{ TYPE = FUNCTION };
+	pthread_attr_getdetachstate		{ TYPE = FUNCTION };
+	pthread_attr_getinheritsched		{ TYPE = FUNCTION };
+	pthread_attr_getschedparam		{ TYPE = FUNCTION };
+	pthread_attr_getschedpolicy		{ TYPE = FUNCTION };
+	pthread_attr_getscope			{ TYPE = FUNCTION };
+	pthread_attr_getstackaddr		{ TYPE = FUNCTION };
+	pthread_attr_getstacksize		{ TYPE = FUNCTION };
+	pthread_attr_init			{ TYPE = FUNCTION };
+	pthread_attr_setdetachstate		{ TYPE = FUNCTION };
+	pthread_attr_setinheritsched		{ TYPE = FUNCTION };
+	pthread_attr_setschedparam		{ TYPE = FUNCTION };
+	pthread_attr_setschedpolicy		{ TYPE = FUNCTION };
+	pthread_attr_setscope			{ TYPE = FUNCTION };
+	pthread_attr_setstackaddr		{ TYPE = FUNCTION };
+	pthread_attr_setstacksize		{ TYPE = FUNCTION };
+	pthread_cancel				{ TYPE = FUNCTION };
+	__pthread_cleanup_pop			{ TYPE = FUNCTION };
+	__pthread_cleanup_push			{ TYPE = FUNCTION };
+	pthread_condattr_destroy		{ TYPE = FUNCTION };
+	pthread_condattr_getpshared		{ TYPE = FUNCTION };
+	pthread_condattr_init			{ TYPE = FUNCTION };
+	pthread_condattr_setpshared		{ TYPE = FUNCTION };
+	pthread_cond_broadcast			{ TYPE = FUNCTION };
+	pthread_cond_destroy			{ TYPE = FUNCTION };
+	pthread_cond_init			{ TYPE = FUNCTION };
+	pthread_cond_signal			{ TYPE = FUNCTION };
+	pthread_cond_timedwait			{ TYPE = FUNCTION };
+	pthread_cond_wait			{ TYPE = FUNCTION };
+	pthread_create				{ TYPE = FUNCTION };
+	pthread_detach				{ TYPE = FUNCTION };
+	pthread_equal				{ TYPE = FUNCTION };
+	pthread_exit				{ TYPE = FUNCTION };
+	pthread_getschedparam			{ TYPE = FUNCTION };
+	pthread_getspecific			{ TYPE = FUNCTION };
+	pthread_join				{ TYPE = FUNCTION };
+	pthread_key_create			{ TYPE = FUNCTION };
+	pthread_key_delete			{ TYPE = FUNCTION };
+	pthread_kill				{ TYPE = FUNCTION };
+	pthread_mutexattr_destroy		{ TYPE = FUNCTION };
+	pthread_mutexattr_getprioceiling	{ TYPE = FUNCTION };
+	pthread_mutexattr_getprotocol		{ TYPE = FUNCTION };
+	pthread_mutexattr_getpshared		{ TYPE = FUNCTION };
+	pthread_mutexattr_init			{ TYPE = FUNCTION };
+	pthread_mutexattr_setprioceiling	{ TYPE = FUNCTION };
+	pthread_mutexattr_setprotocol		{ TYPE = FUNCTION };
+	pthread_mutexattr_setpshared		{ TYPE = FUNCTION };
+	pthread_mutex_destroy			{ TYPE = FUNCTION };
+	pthread_mutex_getprioceiling		{ TYPE = FUNCTION };
+	pthread_mutex_init			{ TYPE = FUNCTION };
+	pthread_mutex_lock			{ TYPE = FUNCTION };
+	pthread_mutex_setprioceiling		{ TYPE = FUNCTION };
+	pthread_mutex_trylock			{ TYPE = FUNCTION };
+	pthread_mutex_unlock			{ TYPE = FUNCTION };
+	pthread_once				{ TYPE = FUNCTION };
+	pthread_self				{ TYPE = FUNCTION };
+	pthread_setcancelstate			{ TYPE = FUNCTION };
+	pthread_setcanceltype			{ TYPE = FUNCTION };
+	pthread_setschedparam			{ TYPE = FUNCTION };
+	pthread_setspecific			{ TYPE = FUNCTION };
+	pthread_sigmask				{ TYPE = FUNCTION };
+	pthread_testcancel			{ TYPE = FUNCTION };
+	read					{ TYPE = FUNCTION };
+	rwlock_init				{ TYPE = FUNCTION };
+	rw_rdlock				{ TYPE = FUNCTION };
+	rw_tryrdlock				{ TYPE = FUNCTION };
+	rw_trywrlock				{ TYPE = FUNCTION };
+	rw_unlock				{ TYPE = FUNCTION };
+	rw_wrlock				{ TYPE = FUNCTION };
+	sema_destroy				{ TYPE = FUNCTION };
+	sema_init				{ TYPE = FUNCTION };
+	sema_post				{ TYPE = FUNCTION };
+	sema_trywait				{ TYPE = FUNCTION };
+	sema_wait				{ TYPE = FUNCTION };
+	setitimer				{ TYPE = FUNCTION };
+	sigaction				{ TYPE = FUNCTION };
+	siglongjmp				{ TYPE = FUNCTION };
+	sigprocmask				{ TYPE = FUNCTION };
+	sigsetjmp				{ TYPE = FUNCTION };
+	sigsuspend				{ TYPE = FUNCTION };
+	sigwait					{ TYPE = FUNCTION };
+	sleep					{ TYPE = FUNCTION };
+	tcdrain					{ TYPE = FUNCTION };
+	thr_continue				{ TYPE = FUNCTION };
+	thr_create				{ TYPE = FUNCTION };
+	thr_exit				{ TYPE = FUNCTION };
+	thr_getconcurrency			{ TYPE = FUNCTION };
+	thr_getprio				{ TYPE = FUNCTION };
+	thr_getspecific				{ TYPE = FUNCTION };
+	thr_join				{ TYPE = FUNCTION };
+	thr_keycreate				{ TYPE = FUNCTION };
+	thr_kill				{ TYPE = FUNCTION };
+	thr_main				{ TYPE = FUNCTION };
+	thr_min_stack				{ TYPE = FUNCTION };
+	thr_self				{ TYPE = FUNCTION };
+	thr_setconcurrency			{ TYPE = FUNCTION };
+	thr_setprio				{ TYPE = FUNCTION };
+	thr_setspecific				{ TYPE = FUNCTION };
+	thr_sigsetmask				{ TYPE = FUNCTION };
+	thr_stksegment				{ TYPE = FUNCTION };
+	thr_suspend				{ TYPE = FUNCTION };
+	thr_yield				{ TYPE = FUNCTION };
+	wait					{ TYPE = FUNCTION };
+	waitpid					{ TYPE = FUNCTION };
+	write					{ TYPE = FUNCTION };
+};
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	_alarm					{ TYPE = FUNCTION };
+	_fork					{ TYPE = FUNCTION };
+	_mutex_destroy				{ TYPE = FUNCTION };
+	_mutex_init				{ TYPE = FUNCTION };
+	_mutex_unlock				{ TYPE = FUNCTION };
+	_pthread_setcleanupinit			{ TYPE = FUNCTION };
+	_resume					{ TYPE = FUNCTION };
+	_resume_ret				{ TYPE = FUNCTION };
+	_sema_destroy				{ TYPE = FUNCTION };
+	_setitimer				{ TYPE = FUNCTION };
+	_sigaction				{ TYPE = FUNCTION };
+	_siglongjmp				{ TYPE = FUNCTION };
+	_sigprocmask				{ TYPE = FUNCTION };
+	_sigsetjmp				{ TYPE = FUNCTION };
+	_sigsuspend				{ TYPE = FUNCTION };
+	_sleep					{ TYPE = FUNCTION };
+	_thr_create				{ TYPE = FUNCTION };
+	_thr_getspecific			{ TYPE = FUNCTION };
+	_thr_join				{ TYPE = FUNCTION };
+	_thr_keycreate				{ TYPE = FUNCTION };
+	_thr_main				{ TYPE = FUNCTION };
+	thr_probe_setup				{ TYPE = FUNCTION };
+	_thr_self				{ TYPE = FUNCTION };
+	_thr_setspecific			{ TYPE = FUNCTION };
+};
+

@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,16 +36,18 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 # Due to mistakes made early in the history of this library, there are
 # no SUNW_1.1 symbols, but the version is now kept as a placeholder.
 # Don't add any symbols to this version.
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	SUNW_1.1;
 } SUNW_0.7;
 
-SUNW_0.7 {
+SYMBOL_VERSION SUNW_0.7 {
     global:
 	dn_comp;
 	dn_expand;
@@ -54,7 +55,7 @@ SUNW_0.7 {
 	fp_query;
 	_getlong;
 	_getshort;
-	h_errno = NODIRECT FILTER libnsl.so.1;
+	h_errno			{ FLAGS = NODIRECT; FILTER = libnsl.so.1 };
 	hostalias;
 	p_cdname;
 	p_class;
@@ -70,11 +71,11 @@ SUNW_0.7 {
 	res_querydomain;
 	res_search;
 	res_send;
-	strcasecmp = FUNCTION FILTER libc.so.1;
-	strncasecmp = FUNCTION FILTER libc.so.1;
+	strcasecmp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	strncasecmp		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	res_endhostent;
 	res_gethostbyaddr;

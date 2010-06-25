@@ -20,11 +20,18 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+$mapfile_version 2
 
-bios = LOAD ?NRWX V0x5000 P0x5000 A0x1000;
-bios : ?A;
+LOAD_SEGMENT bios {
+	NOHDR;
+	FLAGS = READ WRITE EXECUTE;
+	VADDR = 0x5000;
+	PADDR = 0x5000;
+	ALIGN = 0x1000;
+	ASSIGN_SECTION {
+		FLAGS = ALLOC;
+	};
+};

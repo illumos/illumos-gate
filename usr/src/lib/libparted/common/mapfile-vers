@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,7 +36,9 @@
 # MAPFILE HEADER END
 #
 
-SUNW_8.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_8.1 {
     global:
 	close_stdout;
 	error;
@@ -144,7 +145,7 @@ SUNW_8.1 {
 	ped_unit_get_name;
 	ped_unit_parse;
 	ped_unit_set_default;
-	program_name = PARENT;
+	program_name			{ FLAGS = PARENT };
 	version_etc;
 	xalloc_die;
 	xmalloc;

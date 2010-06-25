@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 RTLD=		ld.so.1
@@ -54,7 +53,7 @@ PLAT =		$(VAR_PLAT_$(BASEPLAT))
 # DTrace needs an executable data segment.
 MAPFILE.NED=
 
-MAPFILES +=	$(MAPFILE-ORDER) $(MAPFILE-PLAT)
+MAPFILES +=	$(MAPFILE-ORDER)
 
 # For the libc/libthread unified world:
 # This library needs to be placed in /lib to allow

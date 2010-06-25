@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -46,10 +45,12 @@
 #
 
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
 	global:
-		MD5Init = FUNCTION;
-		MD5Update = FUNCTION;
-		MD5Final = FUNCTION;
-		md5_calc = FUNCTION;
+		MD5Init		{ TYPE = FUNCTION };
+		MD5Update	{ TYPE = FUNCTION };
+		MD5Final	{ TYPE = FUNCTION };
+		md5_calc	{ TYPE = FUNCTION };
 };

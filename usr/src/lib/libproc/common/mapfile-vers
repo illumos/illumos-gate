@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -37,31 +36,33 @@
 # MAPFILE HEADER END
 #
 
+$mapfile_version 2
+
 # Due to mistakes made early in the history of this library, there are no
 # SUNW_1.1 through SUNW_1.4 symbols, but they are now kept as placeholders.
 # Don't add any symbols to these versions.
 
-SUNW_1.4 {
+SYMBOL_VERSION SUNW_1.4 {
     global:
 	SUNW_1.4;
 } SUNW_1.3;
 
-SUNW_1.3 {
+SYMBOL_VERSION SUNW_1.3 {
     global:
 	SUNW_1.3;
 } SUNW_1.2;
 
-SUNW_1.2 {
+SYMBOL_VERSION SUNW_1.2 {
     global:
 	SUNW_1.2;
 } SUNW_1.1;
 
-SUNW_1.1 {
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	SUNW_1.1;
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	Lalt_stack;
 	Lclearfault;
@@ -257,15 +258,15 @@ SUNWprivate_1.1 {
 	ps_pbrandname;
 	ps_pcontinue;
 	ps_pdmodel;
-	ps_pdread = NODYNSORT;		# Alias of ps_pread
-	ps_pdwrite = NODYNSORT;		# Alias of ps_pwrite
+	ps_pdread		{ FLAGS = NODYNSORT };	# Alias of ps_pread
+	ps_pdwrite		{ FLAGS = NODYNSORT };	# Alias of ps_pwrite
 	ps_pglobal_lookup;
 	ps_pglobal_sym;
 	ps_plog;
 	ps_pread;
 	ps_pstop;
-	ps_ptread = NODYNSORT;		# Alias of ps_pread
-	ps_ptwrite = NODYNSORT;		# Alias of ps_pwrite
+	ps_ptread		{ FLAGS = NODYNSORT };	# Alias of ps_pread
+	ps_ptwrite		{ FLAGS = NODYNSORT };	# Alias of ps_pwrite
 	ps_pwrite;
 	Pstack_iter;
 	Pstate;
@@ -296,6 +297,27 @@ SUNWprivate_1.1 {
 	Pzonename;
 	Pzonepath;
 	Pzoneroot;
+
+$if _x86 && _ELF32
+	Pldt;
+	proc_get_ldt;
+	ps_lgetLDT;
+$endif
+
+$if _sparc
+	Plwp_getgwindows;
+	Plwp_getxregs;
+	Plwp_setxregs;
+	ps_lgetxregs;
+	ps_lgetxregsize;
+	ps_lsetxregs;
+
+$if _ELF64
+	Plwp_getasrs;
+	Plwp_setasrs;
+$endif
+$endif
+
     local:
 	*;
 };

@@ -1,5 +1,4 @@
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -35,27 +34,29 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
     global:
 	SUNW_1.1;
     local:
 	*;
 } SUNW_0.8;
 
-SUNW_0.8 {
+SYMBOL_VERSION SUNW_0.8 {
     global:
-	dcgettext = FUNCTION;
+	dcgettext		{ TYPE = FUNCTION };
 } SUNW_0.7;
 
-SUNW_0.7 {
+SYMBOL_VERSION SUNW_0.7 {
     global:
-	gettext = FUNCTION;
-	dgettext = FUNCTION;
-	textdomain = FUNCTION;
-	bindtextdomain = FUNCTION;
+	gettext			{ TYPE = FUNCTION };
+	dgettext		{ TYPE = FUNCTION };
+	textdomain		{ TYPE = FUNCTION };
+	bindtextdomain		{ TYPE = FUNCTION };
 };
 
-SUNWprivate_1.1 {
+SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	SUNWprivate_1.1;
 };
