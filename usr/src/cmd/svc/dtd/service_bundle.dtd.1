@@ -105,6 +105,7 @@
   opaque_list
   host_list
   hostname_list
+  net_address_list
   net_address_v4_list
   net_address_v6_list
   time_list
@@ -145,6 +146,11 @@
 	( value_node+ )>
 
 <!ATTLIST hostname_list>
+
+<!ELEMENT net_address_list
+	( value_node+ )>
+
+<!ATTLIST net_address_list>
 
 <!ELEMENT net_address_v4_list
 	( value_node+ )>
@@ -208,14 +214,14 @@
 <![%profile;[
 <!ELEMENT property
 	( count_list | integer_list | opaque_list | host_list | hostname_list |
-	net_address_v4_list | net_address_v6_list | time_list |
-	astring_list | ustring_list | boolean_list | fmri_list |
+	net_address_list | net_address_v4_list | net_address_v6_list |
+	time_list | astring_list | ustring_list | boolean_list | fmri_list |
 	uri_list )? >
 
 <!ATTLIST property
 	name		CDATA #REQUIRED
 	type		( count | integer | opaque | host | hostname |
-			net_address_v4 | net_address_v6 | time |
+			net_address | net_address_v4 | net_address_v6 | time |
 			astring | ustring | boolean | fmri | uri ) #IMPLIED
 	override	( true | false ) "false" >
 ]]>
@@ -223,14 +229,14 @@
 <![%manifest;[
 <!ELEMENT property
 	( count_list | integer_list | opaque_list | host_list | hostname_list |
-	net_address_v4_list | net_address_v6_list | time_list |
-	astring_list | ustring_list | boolean_list | fmri_list |
+	net_address_list | net_address_v4_list | net_address_v6_list |
+	time_list | astring_list | ustring_list | boolean_list | fmri_list |
 	uri_list )? >
 
 <!ATTLIST property
 	name		CDATA #REQUIRED
 	type		( count | integer | opaque | host | hostname |
-			net_address_v4 | net_address_v6 | time |
+			net_address | net_address_v4 | net_address_v6 | time |
 			astring | ustring | boolean | fmri | uri ) #REQUIRED
 	override	( true | false ) "false" >
 ]]>
@@ -260,8 +266,8 @@
 <!ATTLIST propval
 	name		CDATA #REQUIRED
 	type		( count | integer | opaque | host | hostname |
-			net_address_v4 | net_address_v6 | time | astring |
-			ustring | boolean | fmri | uri ) #IMPLIED
+			net_address | net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #IMPLIED
 	value		CDATA #REQUIRED
 	override	( true | false ) "false" >
 ]]>
@@ -272,8 +278,8 @@
 <!ATTLIST propval
 	name		CDATA #REQUIRED
 	type		( count | integer | opaque | host | hostname |
-			net_address_v4 | net_address_v6 | time | astring |
-			ustring | boolean | fmri | uri ) #REQUIRED
+			net_address | net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #REQUIRED
 	value		CDATA #REQUIRED
 	override	( true | false ) "false" >
 ]]>
@@ -872,8 +878,8 @@
 <!ATTLIST prop_pattern
 	name		CDATA	#REQUIRED
 	type		( count | integer | opaque | host | hostname |
-			net_address_v4 | net_address_v6 | time | astring |
-			ustring | boolean | fmri | uri ) #IMPLIED
+			net_address | net_address_v4 | net_address_v6 | time |
+			astring | ustring | boolean | fmri | uri ) #IMPLIED
 	required	( true | false )	"false" >
 
 <!--

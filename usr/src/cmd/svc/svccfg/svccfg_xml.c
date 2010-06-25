@@ -133,6 +133,7 @@ static const char *lxml_elements[] = {
 	"method_profile",		/* SC_METHOD_PROFILE */
 	"method_environment",		/* SC_METHOD_ENVIRONMENT */
 	"envvar",			/* SC_METHOD_ENVVAR */
+	"net_address_list",		/* SC_NET_ADDR */
 	"net_address_v4_list",		/* SC_NET_ADDR_V4 */
 	"net_address_v6_list",		/* SC_NET_ADDR_V6 */
 	"opaque_list",			/* SC_OPAQUE */
@@ -195,6 +196,7 @@ static const char *lxml_prop_types[] = {
 	"",				/* SC_METHOD_PROFILE */
 	"",				/* SC_METHOD_ENVIRONMENT */
 	"",				/* SC_METHOD_ENVVAR */
+	"net_address",			/* SC_NET_ADDR */
 	"net_address_v4",		/* SC_NET_ADDR_V4 */
 	"net_address_v6",		/* SC_NET_ADDR_V6 */
 	"opaque",			/* SC_OPAQUE */
@@ -305,6 +307,7 @@ lxml_element_to_type(element_t type)
 	case SC_HOST:		return (SCF_TYPE_HOST);
 	case SC_HOSTNAME:	return (SCF_TYPE_HOSTNAME);
 	case SC_INTEGER:	return (SCF_TYPE_INTEGER);
+	case SC_NET_ADDR:	return (SCF_TYPE_NET_ADDR);
 	case SC_NET_ADDR_V4:	return (SCF_TYPE_NET_ADDR_V4);
 	case SC_NET_ADDR_V6:	return (SCF_TYPE_NET_ADDR_V6);
 	case SC_OPAQUE:		return (SCF_TYPE_OPAQUE);
@@ -330,6 +333,7 @@ lxml_type_to_element(scf_type_t type)
 	case SCF_TYPE_HOST:		return (SC_HOST);
 	case SCF_TYPE_HOSTNAME:		return (SC_HOSTNAME);
 	case SCF_TYPE_INTEGER:		return (SC_INTEGER);
+	case SCF_TYPE_NET_ADDR:		return (SC_NET_ADDR);
 	case SCF_TYPE_NET_ADDR_V4:	return (SC_NET_ADDR_V4);
 	case SCF_TYPE_NET_ADDR_V6:	return (SC_NET_ADDR_V6);
 	case SCF_TYPE_OPAQUE:		return (SC_OPAQUE);
@@ -554,6 +558,7 @@ lxml_store_value(value_t *v, element_t type, const xmlChar *value)
 	case SC_OPAQUE:
 	case SC_HOST:
 	case SC_HOSTNAME:
+	case SC_NET_ADDR:
 	case SC_NET_ADDR_V4:
 	case SC_NET_ADDR_V6:
 	case SC_FMRI:
@@ -757,6 +762,7 @@ lxml_get_property(pgroup_t *pgrp, xmlNodePtr property)
 		case SC_HOST:
 		case SC_HOSTNAME:
 		case SC_INTEGER:
+		case SC_NET_ADDR:
 		case SC_NET_ADDR_V4:
 		case SC_NET_ADDR_V6:
 		case SC_OPAQUE:
