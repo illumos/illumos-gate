@@ -466,13 +466,32 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 	 * Make sure we understand the format of this data
 	 */
 
-	if (vpd_header->eeprom_version < PMCS_VPD_VERSION) {
+	/*
+	 * Only VPD version 1 is VALID for Thebe-INT cards and
+	 * Only VPD version 2 is valid for Thebe-EXT cards
+	 */
+	if ((vpd_header->eeprom_version == PMCS_EEPROM_INT_VERSION &&
+	    vpd_header->subsys_pid[0] == PMCS_EEPROM_INT_SSID_BYTE1 &&
+	    vpd_header->subsys_pid[1] == PMCS_EEPROM_INT_SSID_BYTE2) ||
+	    (vpd_header->eeprom_version == PMCS_EEPROM_EXT_VERSION &&
+	    vpd_header->subsys_pid[0] == PMCS_EEPROM_EXT_SSID_BYTE1 &&
+	    vpd_header->subsys_pid[1] == PMCS_EEPROM_EXT_SSID_BYTE2)) {
+			goto valid_version;
+	} else {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: VPD version(%d) unsupported; requires version %d.",
-		    __func__, vpd_header->eeprom_version, PMCS_VPD_VERSION);
+		    "%s: Detected Thebe card with SSID(%02x%02x)", __func__,
+		    vpd_header->subsys_pid[0], vpd_header->subsys_pid[1]);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: EEPROM(%d) unsupported; requires %d for INT(%02x%02x) "
+		    " and %d for EXT(%02x%02x) cards.", __func__,
+		    vpd_header->eeprom_version,
+		    PMCS_EEPROM_INT_VERSION, PMCS_EEPROM_INT_SSID_BYTE1,
+		    PMCS_EEPROM_INT_SSID_BYTE2, PMCS_EEPROM_EXT_VERSION,
+		    PMCS_EEPROM_EXT_SSID_BYTE1, PMCS_EEPROM_EXT_SSID_BYTE2);
 		return (B_FALSE);
 	}
 
+valid_version:
 	/*
 	 * Do we have a valid SAS WWID?
 	 */

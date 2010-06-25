@@ -323,11 +323,17 @@ typedef enum {
  * VPD data layout
  */
 
+#define	PMCS_EEPROM_INT_VERSION	1	/* supported version for Thebe INT */
+#define	PMCS_EEPROM_EXT_VERSION	2	/* supported version for Thebe EXT */
 #define	PMCS_VPD_DATA_PAGE	2	/* VPD starts at offset 512 */
-#define	PMCS_VPD_VERSION	2	/* Expected version number */
 #define	PMCS_VPD_RO_BYTE	0x90	/* Start of "read-only" data */
 #define	PMCS_VPD_START		0x82	/* VPD start byte */
 #define	PMCS_VPD_END		0x78	/* VPD end byte */
+
+#define	PMCS_EEPROM_INT_SSID_BYTE1	0x02	/* Byte 1 of Thebe INT SSID */
+#define	PMCS_EEPROM_INT_SSID_BYTE2	0x02	/* Byte 2 of Thebe INT SSID */
+#define	PMCS_EEPROM_EXT_SSID_BYTE1	0x00	/* Byte 1 of Thebe EXT SSID */
+#define	PMCS_EEPROM_EXT_SSID_BYTE2	0x22	/* Byte 2 of Thebe EXT SSID */
 
 /*
  * This structure defines the "header" for the VPD data.  Everything
