@@ -85,6 +85,8 @@ DIRS= \
 	/etc/brand  \
 	/etc/brand/solaris10  \
 	/etc/certs	\
+	/etc/certs/CA	\
+	/etc/openssl/certs/	\
 	/etc/cron.d \
 	/etc/crypto \
 	/etc/crypto/certs \

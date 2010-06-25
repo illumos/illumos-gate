@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 RELEASECERTS =		SUNW_SunOS_5.10
@@ -43,16 +42,24 @@ ANNOTATEDFILES = \
 	certs/SUNWObjectCA.annot
 
 include ../../Makefile.cmd
-
 .KEEP_STATE:
 
-ROOTCRYPTODIR=		$(ROOT)/etc/crypto
+ROOTETC=		$(ROOT)/etc
+ROOTCRYPTODIR=		$(ROOTETC)/crypto
 ROOTCRYPTOCERTSDIR=	$(ROOTCRYPTODIR)/certs
 
-ROOTETCCERTSDIR=	$(ROOT)/etc/certs
+ROOTETCCERTSDIR=	$(ROOTETC)/certs
+
+CADIR=			certs/CA
+ROOTETCCADIR=		$(ROOTETC)/$(CADIR)
+
+ROOTETCCALINKDIR=	$(ROOTETC)/openssl/certs
+CATARGDIR=		../../$(CADIR)
 
 IETCCRYPTOFILES=	$(ETCCRYPTOFILES:%=$(ROOTCRYPTODIR)/%)
 IETCCERTSFILES=		$(ETCCERTSFILES:%=$(ROOTETCCERTSDIR)/%)
+
+include Makefile.ca-links
 
 $(ROOTCRYPTOCERTSDIR)/SUNWObjectCA: \
 			$(ROOTETCCERTSDIR)/SUNWObjectCA
@@ -89,8 +96,11 @@ $(ANNOTATEDFILES:%.annot=%): \
 
 $(IETCCRYPTOFILES):=	FILEMODE= 644
 $(IETCCERTSFILES):=	FILEMODE= 644
+$(IETCCAFILES):=	FILEMODE= 644
 
-install:	$(IETCCRYPTOFILES) $(IETCCERTSFILES)
+.PARALLEL:	$(IETCCAFILES)
+
+install:	$(IETCCAFILES) $(IETCCRYPTOFILES) $(IETCCERTSFILES)
 
 clean clobber:
 		$(RM) $(ANNOTATEDFILES:%.annot=%)
