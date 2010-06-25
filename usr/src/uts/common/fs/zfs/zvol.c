@@ -1028,7 +1028,7 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t resid,
 		itx->itx_private = zv;
 		itx->itx_sync = sync;
 
-		(void) zil_itx_assign(zilog, itx, tx);
+		zil_itx_assign(zilog, itx, tx);
 
 		off += len;
 		resid -= len;
@@ -1221,7 +1221,7 @@ zvol_strategy(buf_t *bp)
 		bioerror(bp, off > volsize ? EINVAL : error);
 
 	if (sync)
-		zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
+		zil_commit(zv->zv_zilog, ZVOL_OBJ);
 	biodone(bp);
 
 	return (0);
@@ -1375,7 +1375,7 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 	}
 	zfs_range_unlock(rl);
 	if (sync)
-		zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
+		zil_commit(zv->zv_zilog, ZVOL_OBJ);
 	return (error);
 }
 
@@ -1569,7 +1569,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	case DKIOCFLUSHWRITECACHE:
 		dkc = (struct dk_callback *)arg;
 		mutex_exit(&zfsdev_state_lock);
-		zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
+		zil_commit(zv->zv_zilog, ZVOL_OBJ);
 		if ((flag & FKIOCTL) && dkc != NULL && dkc->dkc_callback) {
 			(*dkc->dkc_callback)(dkc->dkc_cookie, error);
 			error = 0;
@@ -1598,7 +1598,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 			} else {
 				zv->zv_flags &= ~ZVOL_WCE;
 				mutex_exit(&zfsdev_state_lock);
-				zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
+				zil_commit(zv->zv_zilog, ZVOL_OBJ);
 			}
 			return (0);
 		}

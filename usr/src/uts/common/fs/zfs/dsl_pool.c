@@ -451,7 +451,7 @@ dsl_pool_sync_done(dsl_pool_t *dp, uint64_t txg)
 	while (ds = list_head(&dp->dp_synced_datasets)) {
 		list_remove(&dp->dp_synced_datasets, ds);
 		os = ds->ds_objset;
-		zil_clean(os->os_zil);
+		zil_clean(os->os_zil, txg);
 		ASSERT(!dmu_objset_is_dirty(os, txg));
 		dmu_buf_rele(ds->ds_dbuf, ds);
 	}

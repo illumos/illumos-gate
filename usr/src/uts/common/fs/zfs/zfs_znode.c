@@ -194,7 +194,6 @@ zfs_znode_move_impl(znode_t *ozp, znode_t *nzp)
 	nzp->z_blksz = ozp->z_blksz;
 	nzp->z_seq = ozp->z_seq;
 	nzp->z_mapcnt = ozp->z_mapcnt;
-	nzp->z_last_itx = ozp->z_last_itx;
 	nzp->z_gen = ozp->z_gen;
 	nzp->z_sync_cnt = ozp->z_sync_cnt;
 	nzp->z_is_sa = ozp->z_is_sa;
@@ -643,7 +642,6 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	zp->z_unlinked = 0;
 	zp->z_atime_dirty = 0;
 	zp->z_mapcnt = 0;
-	zp->z_last_itx = 0;
 	zp->z_id = db->db_object;
 	zp->z_blksz = blksz;
 	zp->z_seq = 0x7A4653;

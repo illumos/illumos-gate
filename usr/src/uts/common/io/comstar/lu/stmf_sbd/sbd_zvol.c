@@ -378,7 +378,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	    sizeof (arc_buf_t *) * dbuf->db_sglist_length);
 	zvio->zvio_abp = NULL;
 	if (sync && (flags & ZVIO_COMMIT))
-		zil_commit(sl->sl_zvol_zil_hdl, UINT64_MAX, ZVOL_OBJ);
+		zil_commit(sl->sl_zvol_zil_hdl, ZVOL_OBJ);
 	return (0);
 }
 
@@ -454,7 +454,7 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags)
 	}
 	zfs_range_unlock(rl);
 	if (sync && (flags & ZVIO_COMMIT))
-		zil_commit(sl->sl_zvol_zil_hdl, UINT64_MAX, ZVOL_OBJ);
+		zil_commit(sl->sl_zvol_zil_hdl, ZVOL_OBJ);
 	if (error == ECKSUM)
 		error = EIO;
 	return (error);

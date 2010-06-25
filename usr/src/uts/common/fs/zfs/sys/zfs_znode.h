@@ -191,7 +191,6 @@ typedef struct znode {
 	uint_t		z_blksz;	/* block size in bytes */
 	uint_t		z_seq;		/* modification sequence number */
 	uint64_t	z_mapcnt;	/* number of pages mapped to file */
-	uint64_t	z_last_itx;	/* last ZIL itx on this znode */
 	uint64_t	z_gen;		/* generation (cached) */
 	uint64_t	z_size;		/* file size (cached) */
 	uint64_t	z_atime[2];	/* atime (cached) */
@@ -321,13 +320,14 @@ extern void zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
 extern int zfs_log_create_txtype(zil_create_t, vsecattr_t *vsecp,
     vattr_t *vap);
 extern void zfs_log_remove(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
-    znode_t *dzp, char *name);
+    znode_t *dzp, char *name, uint64_t foid);
+#define	ZFS_NO_OBJECT	0	/* no object id */
 extern void zfs_log_link(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
     znode_t *dzp, znode_t *zp, char *name);
 extern void zfs_log_symlink(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
     znode_t *dzp, znode_t *zp, char *name, char *link);
 extern void zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
-    znode_t *sdzp, char *sname, znode_t *tdzp, char *dname, znode_t *szp);
+    znode_t *sdzp, char *sname, znode_t *tdzp, char *dname);
 extern void zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
     znode_t *zp, offset_t off, ssize_t len, int ioflag);
 extern void zfs_log_truncate(zilog_t *zilog, dmu_tx_t *tx, int txtype,

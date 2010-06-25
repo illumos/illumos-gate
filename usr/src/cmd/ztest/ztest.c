@@ -1102,7 +1102,7 @@ ztest_bt_bonus(dmu_buf_t *db)
 #define	lrz_bonustype	lr_rdev
 #define	lrz_bonuslen	lr_crtime[1]
 
-static uint64_t
+static void
 ztest_log_create(ztest_ds_t *zd, dmu_tx_t *tx, lr_create_t *lr)
 {
 	char *name = (void *)(lr + 1);		/* name follows lr */
@@ -1110,40 +1110,41 @@ ztest_log_create(ztest_ds_t *zd, dmu_tx_t *tx, lr_create_t *lr)
 	itx_t *itx;
 
 	if (zil_replaying(zd->zd_zilog, tx))
-		return (0);
+		return;
 
 	itx = zil_itx_create(TX_CREATE, sizeof (*lr) + namesize);
 	bcopy(&lr->lr_common + 1, &itx->itx_lr + 1,
 	    sizeof (*lr) + namesize - sizeof (lr_t));
 
-	return (zil_itx_assign(zd->zd_zilog, itx, tx));
+	zil_itx_assign(zd->zd_zilog, itx, tx);
 }
 
-static uint64_t
-ztest_log_remove(ztest_ds_t *zd, dmu_tx_t *tx, lr_remove_t *lr)
+static void
+ztest_log_remove(ztest_ds_t *zd, dmu_tx_t *tx, lr_remove_t *lr, uint64_t object)
 {
 	char *name = (void *)(lr + 1);		/* name follows lr */
 	size_t namesize = strlen(name) + 1;
 	itx_t *itx;
 
 	if (zil_replaying(zd->zd_zilog, tx))
-		return (0);
+		return;
 
 	itx = zil_itx_create(TX_REMOVE, sizeof (*lr) + namesize);
 	bcopy(&lr->lr_common + 1, &itx->itx_lr + 1,
 	    sizeof (*lr) + namesize - sizeof (lr_t));
 
-	return (zil_itx_assign(zd->zd_zilog, itx, tx));
+	itx->itx_private = (void *)object;
+	zil_itx_assign(zd->zd_zilog, itx, tx);
 }
 
-static uint64_t
+static void
 ztest_log_write(ztest_ds_t *zd, dmu_tx_t *tx, lr_write_t *lr)
 {
 	itx_t *itx;
 	itx_wr_state_t write_state = ztest_random(WR_NUM_STATES);
 
 	if (zil_replaying(zd->zd_zilog, tx))
-		return (0);
+		return;
 
 	if (lr->lr_length > ZIL_MAX_LOG_DATA)
 		write_state = WR_INDIRECT;
@@ -1166,37 +1167,39 @@ ztest_log_write(ztest_ds_t *zd, dmu_tx_t *tx, lr_write_t *lr)
 	bcopy(&lr->lr_common + 1, &itx->itx_lr + 1,
 	    sizeof (*lr) - sizeof (lr_t));
 
-	return (zil_itx_assign(zd->zd_zilog, itx, tx));
+	zil_itx_assign(zd->zd_zilog, itx, tx);
 }
 
-static uint64_t
+static void
 ztest_log_truncate(ztest_ds_t *zd, dmu_tx_t *tx, lr_truncate_t *lr)
 {
 	itx_t *itx;
 
 	if (zil_replaying(zd->zd_zilog, tx))
-		return (0);
+		return;
 
 	itx = zil_itx_create(TX_TRUNCATE, sizeof (*lr));
 	bcopy(&lr->lr_common + 1, &itx->itx_lr + 1,
 	    sizeof (*lr) - sizeof (lr_t));
 
-	return (zil_itx_assign(zd->zd_zilog, itx, tx));
+	itx->itx_sync = B_FALSE;
+	zil_itx_assign(zd->zd_zilog, itx, tx);
 }
 
-static uint64_t
+static void
 ztest_log_setattr(ztest_ds_t *zd, dmu_tx_t *tx, lr_setattr_t *lr)
 {
 	itx_t *itx;
 
 	if (zil_replaying(zd->zd_zilog, tx))
-		return (0);
+		return;
 
 	itx = zil_itx_create(TX_SETATTR, sizeof (*lr));
 	bcopy(&lr->lr_common + 1, &itx->itx_lr + 1,
 	    sizeof (*lr) - sizeof (lr_t));
 
-	return (zil_itx_assign(zd->zd_zilog, itx, tx));
+	itx->itx_sync = B_FALSE;
+	zil_itx_assign(zd->zd_zilog, itx, tx);
 }
 
 /*
@@ -1328,7 +1331,7 @@ ztest_replay_remove(ztest_ds_t *zd, lr_remove_t *lr, boolean_t byteswap)
 
 	VERIFY3U(0, ==, zap_remove(os, lr->lr_doid, name, tx));
 
-	(void) ztest_log_remove(zd, tx, lr);
+	(void) ztest_log_remove(zd, tx, lr, object);
 
 	dmu_tx_commit(tx);
 
@@ -2045,7 +2048,7 @@ ztest_zil_commit(ztest_ds_t *zd, uint64_t id)
 {
 	zilog_t *zilog = zd->zd_zilog;
 
-	zil_commit(zilog, UINT64_MAX, ztest_random(ZTEST_OBJECTS));
+	zil_commit(zilog, ztest_random(ZTEST_OBJECTS));
 
 	/*
 	 * Remember the committed values in zd, which is in parent/child
@@ -5266,7 +5269,7 @@ ztest_freeze(ztest_shared_t *zs)
 	 */
 	while (BP_IS_HOLE(&zd->zd_zilog->zl_header->zh_log)) {
 		ztest_dmu_object_alloc_free(zd, 0);
-		zil_commit(zd->zd_zilog, UINT64_MAX, 0);
+		zil_commit(zd->zd_zilog, 0);
 	}
 
 	txg_wait_synced(spa_get_dsl(spa), 0);
@@ -5293,7 +5296,7 @@ ztest_freeze(ztest_shared_t *zs)
 	/*
 	 * Commit all of the changes we just generated.
 	 */
-	zil_commit(zd->zd_zilog, UINT64_MAX, 0);
+	zil_commit(zd->zd_zilog, 0);
 	txg_wait_synced(spa_get_dsl(spa), 0);
 
 	/*
