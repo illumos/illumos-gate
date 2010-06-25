@@ -282,9 +282,6 @@ idm_parse_login_rsp(idm_conn_t *ic, idm_pdu_t *login_rsp_pdu, boolean_t rx)
 		} else {
 			new_event = (rx ? CE_MISC_RX : CE_MISC_TX);
 		}
-	} else if (rx && login_rsp->status_class ==
-	    ISCSI_STATUS_CLASS_REDIRECT) {
-		new_event = CE_MISC_RX;
 	} else {
 		new_event = (rx ? CE_LOGIN_FAIL_RCV : CE_LOGIN_FAIL_SND);
 	}

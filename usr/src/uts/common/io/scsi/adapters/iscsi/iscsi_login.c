@@ -507,6 +507,7 @@ iscsi_login(iscsi_conn_t *icp, uint8_t *status_class, uint8_t *status_detail)
 			goto iscsi_login_done;
 		}
 
+		icp->conn_login_resp_hdr.opcode = 0;
 		iscsi_login_update_state_locked(icp, LOGIN_TX);
 		icp->conn_login_data = data;
 		icp->conn_login_max_data_length = max_data_length;
@@ -534,7 +535,14 @@ iscsi_login(iscsi_conn_t *icp, uint8_t *status_class, uint8_t *status_detail)
 				break;
 		}
 
-		if (icp->conn_login_state != LOGIN_RX) {
+		/*
+		 * We have either received a login response or the connection
+		 * has gone down or both.  If a login response is present,
+		 * then process it.
+		 */
+		ilrhp = (iscsi_login_rsp_hdr_t *)&icp->conn_login_resp_hdr;
+		if (icp->conn_login_state != LOGIN_RX && ilrhp->opcode == 0) {
+			/* connection down, with no login response */
 			mutex_exit(&icp->conn_login_mutex);
 			rval = (ISCSI_STATUS_INTERNAL_ERROR);
 			goto iscsi_login_done;
@@ -542,7 +550,6 @@ iscsi_login(iscsi_conn_t *icp, uint8_t *status_class, uint8_t *status_detail)
 		mutex_exit(&icp->conn_login_mutex);
 
 		/* check the PDU response type */
-		ilrhp = (iscsi_login_rsp_hdr_t *)&icp->conn_login_resp_hdr;
 		if (ilrhp->opcode != ISCSI_OP_LOGIN_RSP) {
 			cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
 			    "received invalid login response (0x%02x)",
