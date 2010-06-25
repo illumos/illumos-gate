@@ -306,6 +306,42 @@ kssl_data_out_cb(sof_handle_t handle, void *cookie, mblk_t *mp,
 }
 
 /*
+ * Called from shutdown() processing. This will produce close_notify message
+ * to indicate the end of data to the client.
+ */
+sof_rval_t
+kssl_shutdown_cb(sof_handle_t handle, void *cookie, int *howp, cred_t *cr)
+{
+	ksslf_t *kssl = (ksslf_t *)cookie;
+	kssl_ctx_t kssl_ctx = kssl->ksslf_ctx;
+	mblk_t *outmp;
+	boolean_t flowctrld;
+	struct nmsghdr msg;
+
+	_NOTE(ARGUNUSED(cr));
+
+	if (kssl_ctx == NULL)
+		return (SOF_RVAL_EINVAL);
+
+	/*
+	 * We only want to send close_notify when doing SHUT_WR/SHUT_RDWR
+	 * because it signals that server is done writing data.
+	 */
+	if (*howp == SHUT_RD)
+		return (SOF_RVAL_CONTINUE);
+
+	/* Go on if we fail to build the record. */
+	if ((outmp = kssl_build_record(kssl_ctx, NULL)) == NULL)
+		return (SOF_RVAL_CONTINUE);
+
+	bzero(&msg, sizeof (msg));
+	(void) sof_inject_data_out(handle, outmp, &msg,
+	    &flowctrld);
+
+	return (SOF_RVAL_CONTINUE);
+}
+
+/*
  * Called for each incoming segment.
  *
  * A packet may carry multiple SSL records, so the function calls
@@ -544,6 +580,7 @@ sof_ops_t ksslf_ops = {
 	.sofop_data_out = kssl_data_out_cb,
 	.sofop_mblk_prop = kssl_mblk_prop_cb,
 	.sofop_getsockname = kssl_getsockname_cb,
+	.sofop_shutdown = kssl_shutdown_cb,
 };
 
 int

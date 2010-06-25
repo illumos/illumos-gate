@@ -42,6 +42,7 @@ extern "C" {
 #define	SSL3_RANDOM_LENGTH		32
 #define	SSL3_SESSIONID_BYTES		32
 #define	SSL3_HDR_LEN			5
+#define	SSL3_ALERT_LEN			2
 #define	SSL3_MAX_RECORD_LENGTH		16384
 #define	SSL3_PRE_MASTER_SECRET_LEN	48
 #define	SSL3_MASTER_SECRET_LEN		48
@@ -286,7 +287,8 @@ typedef struct ssl_s {
 	uint32_t		tcp_mss;
 	SSL3WaitState		hs_waitstate;
 	boolean_t		resumed;
-	boolean_t		close_notify;
+	boolean_t		close_notify_clnt;
+	boolean_t		close_notify_srvr;
 	boolean_t		fatal_alert;
 	boolean_t		fatal_error;
 	boolean_t		alert_sent;

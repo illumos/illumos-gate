@@ -345,7 +345,7 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 
 	mutex_enter(&ssl->kssl_lock);
 
-	if (ssl->close_notify == B_TRUE) {
+	if (ssl->close_notify_clnt == B_TRUE) {
 		DTRACE_PROBE(kssl_err__close_notify);
 		goto sendnewalert;
 	}
@@ -1052,7 +1052,7 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 				error = EBADMSG;
 				goto error;
 			} else {
-				ssl->close_notify = B_TRUE;
+				ssl->close_notify_clnt = B_TRUE;
 				ssl->activeinput = B_FALSE;
 				freeb(mp);
 				return (KSSL_CMD_NONE);
@@ -1187,7 +1187,31 @@ kssl_build_record(kssl_ctx_t ctx, mblk_t *mp)
 	mblk_t *retmp = mp, *bp = mp, *prevbp = mp, *copybp;
 
 	ASSERT(ssl != NULL);
+
+	/*
+	 * Produce new close_notify message. This is necessary to perform
+	 * proper cleanup w.r.t. SSL protocol spec by sending close_notify SSL
+	 * alert record if running with KSSL proxy.
+	 * This should be done prior to sending the FIN so the client side can
+	 * attempt to do graceful cleanup. Ideally, we should wait for client's
+	 * close_notify but not all clients send it which would hang the
+	 * connection. This way of closing the SSL session (Incomplete Close)
+	 * prevents truncation attacks for protocols without end-of-data
+	 * markers (as opposed to the Premature Close).
+	 * Checking the close_notify_srvr flag will prevent from sending the
+	 * close_notify message twice in case of duplicate shutdown() calls.
+	 */
+	if (mp == NULL && !ssl->close_notify_srvr) {
+		kssl_send_alert(ssl, alert_warning, close_notify);
+		if (ssl->alert_sendbuf == NULL)
+			return (NULL);
+		mp = bp = retmp = prevbp = ssl->alert_sendbuf;
+		ssl->alert_sendbuf = NULL;
+		ssl->close_notify_srvr = B_TRUE;
+	}
+
 	ASSERT(mp != NULL);
+	ASSERT(bp != NULL);
 
 	do {
 		if (DB_REF(bp) > 1) {
@@ -1220,8 +1244,14 @@ kssl_build_record(kssl_ctx_t ctx, mblk_t *mp)
 }
 
 /*
- * Builds a single SSL record.
- * In-line encryption of the record.
+ * Builds a single SSL record by prepending SSL header (optional) and performing
+ * encryption and MAC. The encryption of the record is done in-line.
+ * Expects an mblk with associated dblk's base to have space for the SSL header
+ * or an mblk which already has the header present. In both cases it presumes
+ * that the mblk's dblk limit has space for the MAC + padding.
+ * If the close_notify_srvr flag is set it is presumed that the mblk already
+ * contains SSL header in which case only the record length field will be
+ * adjusted with the MAC/padding size.
  */
 static kssl_status_t
 kssl_build_single_record(ssl_t *ssl, mblk_t *mp)
@@ -1237,19 +1267,28 @@ kssl_build_single_record(ssl_t *ssl, mblk_t *mp)
 	mac_sz = spec->mac_hashsz;
 
 	ASSERT(DB_REF(mp) == 1);
-	ASSERT((mp->b_rptr - mp->b_datap->db_base >= SSL3_HDR_LEN) &&
-	    (mp->b_datap->db_lim - mp->b_wptr >= mac_sz + spec->cipher_bsize));
+	/* The dblk must always have space for the padding and MAC suffix. */
+	ASSERT(mp->b_datap->db_lim - mp->b_wptr >= mac_sz + spec->cipher_bsize);
 
-	len = MBLKL(mp);
+	/* kssl_send_alert() constructs the SSL header by itself. */
+	if (!ssl->close_notify_srvr)
+		len = MBLKL(mp) - SSL3_HDR_LEN;
+	else
+		len = MBLKL(mp);
 
 	ASSERT(len > 0);
 
 	mutex_enter(&ssl->kssl_lock);
 
-	recstart = mp->b_rptr = mp->b_rptr - SSL3_HDR_LEN;
-	recstart[0] = content_application_data;
-	recstart[1] = ssl->major_version;
-	recstart[2] = ssl->minor_version;
+	recstart = mp->b_rptr;
+	if (!ssl->close_notify_srvr) {
+		/* The dblk must have space for the SSL header prefix. */
+		ASSERT(mp->b_rptr - mp->b_datap->db_base >= SSL3_HDR_LEN);
+		recstart = mp->b_rptr = mp->b_rptr - SSL3_HDR_LEN;
+		recstart[0] = content_application_data;
+		recstart[1] = ssl->major_version;
+		recstart[2] = ssl->minor_version;
+	}
 	versionp = &recstart[1];
 
 	reclen = len + mac_sz;
@@ -1263,14 +1302,16 @@ kssl_build_single_record(ssl_t *ssl, mblk_t *mp)
 	recstart[3] = (reclen >> 8) & 0xff;
 	recstart[4] = reclen & 0xff;
 
-	if (kssl_mac_encrypt_record(ssl, content_application_data, versionp,
+	if (kssl_mac_encrypt_record(ssl, recstart[0], versionp,
 	    recstart, mp) != 0) {
 		/* Do we need an internal_error Alert here? */
 		mutex_exit(&ssl->kssl_lock);
 		return (KSSL_STS_ERR);
 	}
 
-	KSSL_COUNTER(appdata_record_outs, 1);
+	/* Alert messages are accounted in kssl_send_alert(). */
+	if (recstart[0] == content_application_data)
+		KSSL_COUNTER(appdata_record_outs, 1);
 	mutex_exit(&ssl->kssl_lock);
 	return (KSSL_STS_OK);
 }

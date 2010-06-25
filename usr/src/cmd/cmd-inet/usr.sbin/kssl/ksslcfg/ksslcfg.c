@@ -202,6 +202,7 @@ create_instance_name(const char *arg, char **inaddr_any_name,
 		if ((*inaddr_any_name = malloc(len)) == NULL) {
 			(void) fprintf(stderr,
 			    gettext("Error: memory allocation failure.\n"));
+			free(instance_name);
 			free(cname);
 			return (NULL);
 		}

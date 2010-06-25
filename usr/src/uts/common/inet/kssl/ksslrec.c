@@ -1796,10 +1796,12 @@ kssl_send_alert(ssl_t *ssl, SSL3AlertLevel level, SSL3AlertDescription desc)
 	spec = &ssl->spec[KSSL_WRITE];
 
 	ASSERT(ssl->alert_sendbuf == NULL);
-	if (ssl->major_version == 0x03)
-		len = 7;
-	else
+	if (ssl->major_version == 0x03) {
+		len = SSL3_HDR_LEN + SSL3_ALERT_LEN;
+	} else {
+		/* KSSL generates 5 byte SSLv2 alert messages only. */
 		len = 5;
+	}
 	ssl->alert_sendbuf = mp = allocb(len + spec->mac_hashsz +
 	    spec->cipher_bsize, BPRI_HI);
 	if (mp == NULL) {
@@ -1821,7 +1823,7 @@ kssl_send_alert(ssl_t *ssl, SSL3AlertLevel level, SSL3AlertDescription desc)
 		/* alert contents */
 		buf[0] = (uchar_t)level;
 		buf[1] = (uchar_t)desc;
-		buf += 2;
+		buf += SSL3_ALERT_LEN;
 	} else {
 	/* SSLv2 has different encoding. */
 		/* 2-byte encoding of the length */
