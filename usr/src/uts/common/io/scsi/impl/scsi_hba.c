@@ -6555,6 +6555,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 done:		ASSERT(child);
 		sdchild = ddi_get_driver_private(child);
 		ASSERT(sdchild);
+
 		/*
 		 * We may have ended up here after promotion of a previously
 		 * demoted node, where demotion deleted sd_inq data in
@@ -6564,7 +6565,7 @@ done:		ASSERT(child);
 		 * detect new device_insert.
 		 */
 		if ((sdchild->sd_inq == NULL) ||
-		    ndi_devi_device_isremoved(child)) {
+		    ((pi == NULL) && ndi_devi_device_isremoved(child))) {
 
 			/* hotplug_node can only be revived via hotplug. */
 			if ((se == SE_HP) || !ndi_dev_is_hotplug_node(child)) {
@@ -6583,7 +6584,7 @@ done:		ASSERT(child);
 					 * new reinsert.
 					 */
 					chg = ndi_devi_device_insert(child);
-					SCSI_HBA_LOG((_LOGCFG, self, NULL,
+					SCSI_HBA_LOG((_LOGCFG, NULL, child,
 					    "devinfo %s@%s device_reinsert%s",
 					    name ? name : "", addr,
 					    chg ? "" : "ed already"));
@@ -6689,6 +6690,16 @@ fail:		ASSERT(child == NULL);
 						(void) mdi_pi_online(psearch,
 						    0);
 
+					/*
+					 * Report client reinsert and note if
+					 * this was a new reinsert.
+					 */
+					chg = ndi_devi_device_insert(child);
+					SCSI_HBA_LOG((_LOGCFG, NULL, child,
+					    "client devinfo %s@%s "
+					    "device_reinsert%s",
+					    name ? name : "", addr,
+					    chg ? "" : "ed already"));
 				} else {
 					scsi_enumeration_failed(child, se,
 					    mdi_pi_spathname(psearch),
