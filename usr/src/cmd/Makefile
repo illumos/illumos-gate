@@ -180,7 +180,6 @@ COMMON_SUBDIRS=		\
 	getopt		\
 	gettext		\
 	gettxt		\
-	graph		\
 	grep		\
 	grep_xpg4	\
 	groups		\
@@ -367,7 +366,6 @@ COMMON_SUBDIRS=		\
 	soelim		\
 	sort		\
 	spell		\
-	spline		\
 	split		\
 	sqlite		\
 	srchtxt		\

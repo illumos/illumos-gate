@@ -106,7 +106,6 @@ file path=usr/bin/dircmp mode=0555
 file path=usr/bin/dos2unix mode=0555
 file path=usr/bin/expand mode=0555
 file path=usr/bin/factor mode=0555
-file path=usr/bin/graph mode=0555
 file path=usr/bin/kstat mode=0555
 file path=usr/bin/last mode=0555
 file path=usr/bin/lastcomm mode=0555
@@ -120,7 +119,6 @@ file path=usr/bin/nl mode=0555
 file path=usr/bin/pack mode=0555
 file path=usr/bin/sdiff mode=0555
 file path=usr/bin/spell mode=0555
-file path=usr/bin/spline mode=0555
 file path=usr/bin/split mode=0555
 file path=usr/bin/tcopy mode=0555
 file path=usr/bin/unexpand mode=0555
