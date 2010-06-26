@@ -1171,6 +1171,9 @@ plat_ioaliases_init(void)
 			cmn_err(CE_PANIC, "malformed aliases");
 			/*NOTREACHED*/
 		}
+		DDI_MP_DBG((CE_NOTE, "path: %s aliases %s",
+		    pali->pali_current, str));
+
 		split_alias(pali, str);
 		pali++;
 	}

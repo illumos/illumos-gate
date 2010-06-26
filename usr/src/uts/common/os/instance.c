@@ -1602,17 +1602,29 @@ e_ddi_borrow_instance(dev_info_t *cdip, in_node_t *cnp)
 	(void) ddi_pathname(cdip, curr);
 
 	if (cnp->in_drivers) {
-		ddi_err(DER_PANIC, cdip, "cnp has instance: %p", cnp);
-		/*NOTREACHED*/
+		/* there can be multiple drivers bound */
+		ddi_err(DER_LOG, cdip, "%s has previous binding: %s", curr,
+		    cnp->in_drivers->ind_driver_name);
 	}
 
 	alias = ddi_curr_redirect(curr);
-	kmem_free(curr, MAXPATHLEN);
+
+	/* bail here if the alias matches any other current path or itself */
+	if (alias && ((strcmp(curr, alias) == 0) ||
+	    (ddi_curr_redirect(alias) != 0))) {
+		DDI_MP_DBG((CE_NOTE, "not borrowing current: %s alias: %s",
+		    curr, alias));
+		goto out;
+	}
 
 	if (alias && (anp = e_ddi_path_to_instance(alias)) != NULL) {
+		DDI_MP_DBG((CE_NOTE, "borrowing current: %s alias: %s",
+		    curr, alias));
 		cnp->in_drivers = anp->in_drivers;
 		anp->in_drivers = NULL;
 	}
+out:
+	kmem_free(curr, MAXPATHLEN);
 }
 
 void

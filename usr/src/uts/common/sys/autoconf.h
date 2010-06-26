@@ -116,6 +116,7 @@ struct devnames {
 #define	DDI_HP_API		0x40000	/* Hotplug interface messages  */
 #define	DDI_HP_IMPL		0x80000	/* Hotplug implementation msgs */
 #define	DDI_HP_NEXUS		0x100000 /* Hotplug messages from nexuses */
+#define	DDI_MP_DEBUG		0x200000 /* ddi-mp translations */
 
 extern int ddidebug;
 
@@ -160,6 +161,7 @@ extern int ddidebug;
 #define	DDI_HP_IMPLDBG(args)
 #define	DDI_HP_NEXDBG(args)
 #endif
+#define	DDI_MP_DBG(args)	if (ddidebug & DDI_MP_DEBUG) cmn_err args
 
 
 /*
