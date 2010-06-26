@@ -1178,7 +1178,7 @@ zil_itx_assign(zilog_t *zilog, itx_t *itx, dmu_tx_t *tx)
 	 * the new file data and flushes a write record for the old object.
 	 */
 	if ((itx->itx_lr.lrc_txtype & ~TX_CI) == TX_REMOVE)
-		zil_remove_async(zilog, (uint64_t)itx->itx_private);
+		zil_remove_async(zilog, itx->itx_oid);
 
 	if (spa_freeze_txg(zilog->zl_spa) !=  UINT64_MAX)
 		txg = ZILTEST_TXG;

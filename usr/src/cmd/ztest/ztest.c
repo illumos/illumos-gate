@@ -1133,7 +1133,7 @@ ztest_log_remove(ztest_ds_t *zd, dmu_tx_t *tx, lr_remove_t *lr, uint64_t object)
 	bcopy(&lr->lr_common + 1, &itx->itx_lr + 1,
 	    sizeof (*lr) + namesize - sizeof (lr_t));
 
-	itx->itx_private = (void *)object;
+	itx->itx_oid = object;
 	zil_itx_assign(zd->zd_zilog, itx, tx);
 }
 

@@ -353,8 +353,7 @@ zfs_log_remove(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
 	lr->lr_doid = dzp->z_id;
 	bcopy(name, (char *)(lr + 1), namesize);
 
-	/* pass the object id through itx_private */
-	itx->itx_private = (void *)foid;
+	itx->itx_oid = foid;
 
 	zil_itx_assign(zilog, itx, tx);
 }
