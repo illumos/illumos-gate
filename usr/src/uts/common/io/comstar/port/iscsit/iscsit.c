@@ -116,6 +116,8 @@ kmem_cache_t	*iscsit_status_pdu_cache;
 
 boolean_t	iscsit_sm_logging = B_FALSE;
 
+kmutex_t	login_sm_session_mutex;
+
 static idm_status_t iscsit_init(dev_info_t *dip);
 static idm_status_t iscsit_enable_svc(iscsit_hostinfo_t *hostinfo);
 static void iscsit_disable_svc(void);
@@ -271,6 +273,7 @@ _init(void)
 
 	mutex_init(&iscsit_rxpdu_queue_monitor_mutex, NULL,
 	    MUTEX_DRIVER, NULL);
+	mutex_init(&login_sm_session_mutex, NULL, MUTEX_DRIVER, NULL);
 	iscsit_rxpdu_queue_monitor_thr_id = NULL;
 	iscsit_rxpdu_queue_monitor_thr_running = B_FALSE;
 	cv_init(&iscsit_rxpdu_queue_monitor_cv, NULL, CV_DEFAULT, NULL);
@@ -299,6 +302,7 @@ _fini(void)
 
 	if (rc == 0) {
 		mutex_destroy(&iscsit_rxpdu_queue_monitor_mutex);
+		mutex_destroy(&login_sm_session_mutex);
 		cv_destroy(&iscsit_rxpdu_queue_monitor_cv);
 		mutex_destroy(&iscsit_global.global_state_mutex);
 		rw_destroy(&iscsit_global.global_rwlock);

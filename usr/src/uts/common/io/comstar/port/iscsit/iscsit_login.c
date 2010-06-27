@@ -193,6 +193,12 @@ iscsit_add_declarative_keys(iscsit_conn_t *ict);
 
 uint64_t max_dataseglen_target = ISCSIT_MAX_RECV_DATA_SEGMENT_LENGTH;
 
+/*
+ * global mutex defined in iscsit.c to enforce
+ * login_sm_session_bind as a critical section
+ */
+extern kmutex_t login_sm_session_mutex;
+
 idm_status_t
 iscsit_login_sm_init(iscsit_conn_t *ict)
 {
@@ -1266,6 +1272,18 @@ login_sm_session_bind(iscsit_conn_t *ict)
 	uint8_t			error_detail;
 
 	/*
+	 * The multi-threaded execution of binding login sessions to target
+	 * introduced race conditions in the session creation/binding and
+	 * allowed duplicate sessions to tbe created. The addition of the
+	 * global mutex login_sm_session_mutex makes this function single
+	 * threaded to avoid such race conditions. Although this causes
+	 * a small portion of the login to be serialized, it is unlikely
+	 * that there would be numerous simultaneous logins to become a
+	 * performance issue.
+	 */
+	mutex_enter(&login_sm_session_mutex);
+
+	/*
 	 * Look up target and then check if there are sessions or connections
 	 * that match this request (see below).  Any holds taken on objects
 	 * must be released at the end of the function (let's keep things
@@ -1503,6 +1521,7 @@ login_sm_session_bind(iscsit_conn_t *ict)
 	if (existing_ict != NULL)
 		iscsit_conn_rele(existing_ict);
 
+	mutex_exit(&login_sm_session_mutex);
 	return (IDM_STATUS_SUCCESS);
 
 session_bind_error:
@@ -1517,6 +1536,7 @@ session_bind_error:
 	 * If session bind fails we will fail the login but don't destroy
 	 * the session until later.
 	 */
+	mutex_exit(&login_sm_session_mutex);
 	return (IDM_STATUS_FAIL);
 }
 
