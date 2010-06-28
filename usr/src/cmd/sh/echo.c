@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,15 +20,13 @@
  */
 
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	UNIX shell
@@ -65,7 +62,8 @@ echo(int argc, unsigned char **argv)
 #endif /* _iBCS2 */
 
 		nflg = 0;
-		if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'n') {
+		if (argc > 1 && argv[1][0] == '-' &&
+		    argv[1][1] == 'n' && !argv[1][2]) {
 			nflg++;
 			argc--;
 			argv++;
@@ -93,7 +91,7 @@ echo(int argc, unsigned char **argv)
 #ifdef  _iBCS2
 		if (do_sysv3) {
 			if (argc > 1 && argv[1][0] == '-' &&
-					argv[1][1] == 'n') {
+			    argv[1][1] == 'n' && !argv[1][2]) {
 				nflg++;
 				/* Step past the -n */
 				argc--;
@@ -106,7 +104,7 @@ echo(int argc, unsigned char **argv)
 			sigchk();
 			for (cp = argv[i]; *cp; cp++) {
 				if ((len = mbtowc(&wc, (char *)cp,
-						MB_LEN_MAX)) <= 0) {
+				    MB_LEN_MAX)) <= 0) {
 					prc_buff(*cp);
 					continue;
 				}
@@ -145,7 +143,7 @@ echo(int argc, unsigned char **argv)
 					case '0':
 						j = wd = 0;
 						while ((*++cp >= '0' &&
-						*cp <= '7') && j++ < 3) {
+						    *cp <= '7') && j++ < 3) {
 							wd <<= 3;
 							wd |= (*cp - '0');
 						}
