@@ -36,8 +36,6 @@ $a
 #ifndef _CURSES_H
 #define	_CURSES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * curses.h - this file is automatically made from caps and
  *	curses.ed. Don't make changes directly to curses.h!
@@ -82,13 +80,6 @@ typedef struct termios SGTTYS;
 #endif /* _SGTTYB_ */
 typedef struct sgttyb SGTTY;
 
-/*
- * Here we attempt to improve portability by providing some #defines
- * for SYSV functions on non-SYSV systems.
- */
-#define	memcpy(dst, src, len)	bcopy((src), (dst), (len))
-#define	strchr			index
-#define	strrchr			rindex
 #endif /* SYSV */
 
 /*
@@ -1438,6 +1429,5 @@ $a
 #endif	/* _CURSES_H */
 .
 0r copyright.h
-1,.g/#pragma ident/d
 g/\@(\#)curses\.ed/s//\@(\#)curses\.h/
 w curses.h
