@@ -915,8 +915,14 @@ lscf_init()
 		max_scf_len = max_scf_name_len;
 	if (max_scf_pg_type_len > max_scf_len)
 		max_scf_len = max_scf_pg_type_len;
-	if (max_scf_value_len > max_scf_len)
-		max_scf_len = max_scf_value_len;
+	/*
+	 * When a value of type opaque is represented as a string, the
+	 * string contains 2 characters for every byte of data.  That is
+	 * because the string contains the hex representation of the opaque
+	 * value.
+	 */
+	if (2 * max_scf_value_len > max_scf_len)
+		max_scf_len = 2 * max_scf_value_len;
 
 	if (atexit(remove_tempfile) != 0)
 		uu_die(gettext("Could not register atexit() function"));
