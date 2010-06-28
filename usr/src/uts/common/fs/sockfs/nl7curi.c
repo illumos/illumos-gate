@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/strsubr.h>
@@ -1858,7 +1857,8 @@ uri_response(struct sonode *so, uri_desc_t *uri)
 	return (0);
 
 invalidate:
-	uri_delete(uri);
+	if (uri->hash != URI_TEMP)
+		uri_delete(uri);
 	return (error);
 }
 
