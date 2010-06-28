@@ -2051,7 +2051,8 @@ validate_zonepath_syntax(char *path)
 		zerr(gettext("%s is not an absolute path."), path);
 		return (Z_ERR);
 	}
-	if (strcmp(path, "/") == 0) {
+	/* If path is all slashes, then fail */
+	if (strspn(path, "/") == strlen(path)) {
 		zerr(gettext("/ is not allowed as a %s."),
 		    pt_to_str(PT_ZONEPATH));
 		return (Z_ERR);

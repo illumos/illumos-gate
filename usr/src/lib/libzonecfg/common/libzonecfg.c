@@ -938,6 +938,26 @@ int
 zonecfg_set_zonepath(zone_dochandle_t handle, char *zonepath)
 {
 	size_t len;
+	char *modpath, *copy_mp, *curr_mp;	/* modified path ptrs */
+	char last_copied;
+	int ret;
+
+	/*
+	 * Collapse multiple contiguous slashes and remove trailing slash.
+	 */
+	modpath = strdup(zonepath);
+	if (modpath == NULL)
+		return (Z_NOMEM);
+	last_copied = '\0';
+	for (copy_mp = curr_mp = modpath; *curr_mp != '\0'; curr_mp++) {
+		if (*curr_mp != '/' || last_copied != '/') {
+			last_copied = *copy_mp = *curr_mp;
+			copy_mp++;
+		}
+	}
+	if (last_copied == '/')
+		copy_mp--;
+	*copy_mp = '\0';
 
 	/*
 	 * The user deals in absolute paths in the running global zone, but the
@@ -945,10 +965,14 @@ zonecfg_set_zonepath(zone_dochandle_t handle, char *zonepath)
 	 * paths.  Strip out the alternate root when specified.
 	 */
 	len = strlen(zonecfg_root);
-	if (strncmp(zonepath, zonecfg_root, len) != 0 || zonepath[len] != '/')
+	if (strncmp(modpath, zonecfg_root, len) != 0 || modpath[len] != '/') {
+		free(modpath);
 		return (Z_BAD_PROPERTY);
-	zonepath += len;
-	return (setrootattr(handle, DTD_ATTR_ZONEPATH, zonepath));
+	}
+	curr_mp = modpath + len;
+	ret = setrootattr(handle, DTD_ATTR_ZONEPATH, curr_mp);
+	free(modpath);
+	return (ret);
 }
 
 static int
