@@ -19,40 +19,52 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-LIBRARY= libmd.a
+LIBRARY =	libmd.a
+VERS =		.1
 
-MD5_PSR_OBJECTS = md5_amd64.o
-SHA1_PSR_OBJECTS = sha1-x86_64.o
-SHA2_PSR_OBJECTS = sha512-x86_64.o sha256-x86_64.o
+OBJECTS =	md4.o md5.o sha1.o sha2.o
 
-include ../Makefile.com
-include $(SRC)/lib/Makefile.lib.64
+include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.rootfs
+include		$(SRC)/lib/Makefile.lib.64
+include		../Makefile.com
 
-CLEANFILES += md5_amd64.s sha1-x86_64.s sha512-x86_64.s sha256-x86_64.s
+EXTPICS =	pics/md5_amd64.o \
+		pics/sha1-x86_64.o \
+		pics/sha512-x86_64.o \
+		pics/sha256-x86_64.o
+
+CLEANFILES +=	$(EXTPICS) \
+		$(EXTPICS:pics/%.o=%.s)
 
 # This prevents <sys/asm_linkage.h> from including C source:
 AS_CPPFLAGS += -D_ASM
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+.KEPP_STATE:
+
+all:		$(LIBS)
+
+install:	all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+
+lint:		lintcheck
 
 pics/%.o: %.s
-	$(COMPILE.s) -o $@ ${@F:.o=.s}
-	$(POST_PROCESS_O)
+		$(COMPILE.s) -o $@ ${@F:.o=.s}
+		$(POST_PROCESS_O)
 
 md5_amd64.s: $(COMDIR)/md5/amd64/md5_amd64.pl
-	$(PERL) $? $@
+		$(PERL) $? $@
 
 sha1-x86_64.s: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
-	$(PERL) $? $@
+		$(PERL) $? $@
 
 sha512-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
-	$(PERL) $? $@
+		$(PERL) $? $@
 
 sha256-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
-	$(PERL) $? $@
+		$(PERL) $? $@
+
+include		../Makefile.targ

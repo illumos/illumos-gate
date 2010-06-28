@@ -23,12 +23,13 @@
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-LIB_PIC= libc_pic.a
-VERS=	.1
-CPP=	/usr/lib/cpp
+LIBCDIR=	$(SRC)/lib/libc
+LIB_PIC=	libc_pic.a
+VERS=		.1
+CPP=		/usr/lib/cpp
 TARGET_ARCH=	i386
 
-VALUES=	values-Xa.o
+VALUES=		values-Xa.o
 
 # objects are grouped by source directory
 
@@ -316,7 +317,7 @@ SYSOBJS=			\
 	vforkx.o		\
 	xstat.o
 
-# objects under ../port which contain transitional large file interfaces
+# objects under $(LIBCDIR)/port which contain transitional large file interfaces
 PORTGEN64=			\
 	_xftw64.o		\
 	attropen64.o		\
@@ -326,7 +327,7 @@ PORTGEN64=			\
 	tell64.o		\
 	truncate64.o
 
-# objects from source under ../port
+# objects from source under $(LIBCDIR)/port
 PORTFP=				\
 	__flt_decim.o		\
 	__flt_rounds.o		\
@@ -951,16 +952,17 @@ CFLAGS += $(XSTRCONST)
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR)/libc_i18n.a
-$(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(LDLIBS)
+$(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) \
+		$(EXTPICS) $(LDLIBS)
 
-MAPFILES =	../port/mapfile-vers
+MAPFILES =	$(LIBCDIR)/port/mapfile-vers
 
 #
 # EXTN_CPPFLAGS and EXTN_CFLAGS set in enclosing Makefile
 #
 CFLAGS +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Di386 $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
-		-I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master)
+		-I$(LIBCBASE)/inc -I$(LIBCDIR)/inc $(CPPFLAGS.master)
 ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) $(i386_AS_XARCH)
 
 # As a favor to the dtrace syscall provider, libc still calls the
@@ -1001,8 +1003,8 @@ BUILD.AR= $(RM) $@ ; \
 
 # extra files for the clean target
 CLEANFILES=			\
-	../port/gen/errlst.c	\
-	../port/gen/new_list.c	\
+	$(LIBCDIR)/port/gen/errlst.c	\
+	$(LIBCDIR)/port/gen/new_list.c	\
 	assym.h			\
 	genassym		\
 	crt/_rtld.s		\
@@ -1020,21 +1022,21 @@ SRCS=							\
 	$(XATTROBJS:%.o=$(SRC)/common/xattr/%.c)	\
 	$(COMOBJS:%.o=$(SRC)/common/util/%.c)		\
 	$(DTRACEOBJS:%.o=$(SRC)/common/dtrace/%.c)	\
-	$(PORTFP:%.o=../port/fp/%.c)			\
-	$(PORTGEN:%.o=../port/gen/%.c)			\
-	$(PORTI18N:%.o=../port/i18n/%.c)		\
-	$(PORTPRINT:%.o=../port/print/%.c)		\
-	$(PORTREGEX:%.o=../port/regex/%.c)		\
-	$(PORTSTDIO:%.o=../port/stdio/%.c)		\
-	$(PORTSYS:%.o=../port/sys/%.c)			\
-	$(AIOOBJS:%.o=../port/aio/%.c)			\
-	$(RTOBJS:%.o=../port/rt/%.c)			\
-	$(TPOOLOBJS:%.o=../port/tpool/%.c)		\
-	$(THREADSOBJS:%.o=../port/threads/%.c)		\
-	$(THREADSMACHOBJS:%.o=../$(MACH)/threads/%.c)	\
+	$(PORTFP:%.o=$(LIBCDIR)/port/fp/%.c)			\
+	$(PORTGEN:%.o=$(LIBCDIR)/port/gen/%.c)			\
+	$(PORTI18N:%.o=$(LIBCDIR)/port/i18n/%.c)		\
+	$(PORTPRINT:%.o=$(LIBCDIR)/port/print/%.c)		\
+	$(PORTREGEX:%.o=$(LIBCDIR)/port/regex/%.c)		\
+	$(PORTSTDIO:%.o=$(LIBCDIR)/port/stdio/%.c)		\
+	$(PORTSYS:%.o=$(LIBCDIR)/port/sys/%.c)			\
+	$(AIOOBJS:%.o=$(LIBCDIR)/port/aio/%.c)			\
+	$(RTOBJS:%.o=$(LIBCDIR)/port/rt/%.c)			\
+	$(TPOOLOBJS:%.o=$(LIBCDIR)/port/tpool/%.c)		\
+	$(THREADSOBJS:%.o=$(LIBCDIR)/port/threads/%.c)		\
+	$(THREADSMACHOBJS:%.o=$(LIBCDIR)/$(MACH)/threads/%.c)	\
 	$(UNICODEOBJS:%.o=$(SRC)/common/unicode/%.c)	\
-	$(UNWINDMACHOBJS:%.o=../port/unwind/%.c)	\
-	$(FPOBJS:%.o=../$(MACH)/fp/%.c)			\
+	$(UNWINDMACHOBJS:%.o=$(LIBCDIR)/port/unwind/%.c)	\
+	$(FPOBJS:%.o=$(LIBCDIR)/$(MACH)/fp/%.c)			\
 	$(LIBCBASE)/gen/ecvt.c				\
 	$(LIBCBASE)/gen/makectxt.c			\
 	$(LIBCBASE)/gen/siginfolst.c			\
@@ -1127,7 +1129,7 @@ $(PORTI18N_COND:%=pics/%) := \
 
 all: $(LIBS) $(LIB_PIC)
 
-lint	:=	CPPFLAGS += -I../$(MACH)/fp
+lint	:=	CPPFLAGS += -I$(LIBCDIR)/$(MACH)/fp
 lint	:=	CPPFLAGS += -D_MSE_INT_H -D_LCONV_C99
 lint	:=	LINTFLAGS += -mn -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 
@@ -1135,7 +1137,7 @@ lint:
 	@echo $(LINT.c) ...
 	@$(LINT.c) $(SRCS) $(LDLIBS)
 
-$(LINTLIB):= SRCS=../port/llib-lc
+$(LINTLIB):= SRCS=$(LIBCDIR)/port/llib-lc
 $(LINTLIB):= CPPFLAGS += -D_MSE_INT_H
 $(LINTLIB):= LINTFLAGS=-nvx
 
@@ -1144,7 +1146,7 @@ $(TIL:%=pics/%): $(LIBCBASE)/threads/i386.il
 # pics/mul64.o: $(LIBCBASE)/crt/mul64.il
 
 # include common libc targets
-include ../Makefile.targ
+include $(LIBCDIR)/Makefile.targ
 
 # We need to strip out all CTF and DOF data from the static library
 $(LIB_PIC) := DIR = pics
@@ -1180,7 +1182,7 @@ $(ASSYMDEP_OBJS:%=pics/%): assym.h
 
 # assym.h build rules
 
-GENASSYM_C = ../$(MACH)/genassym.c
+GENASSYM_C = $(LIBCDIR)/$(MACH)/genassym.c
 
 # XXX	A hack.  Perhaps this should be 'CPPFLAGS.native' and
 #	live in Makefile.master
@@ -1189,20 +1191,20 @@ CPPFLAGS.genassym = \
 	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4)
 
 genassym: $(GENASSYM_C)
-	$(NATIVECC) -I$(LIBCBASE)/inc -I../inc	\
+	$(NATIVECC) -I$(LIBCBASE)/inc -I$(LIBCDIR)/inc	\
 		-D__EXTENSIONS__ $(CPPFLAGS.genassym) -o $@ $(GENASSYM_C)
 
-OFFSETS = ../$(MACH)/offsets.in
+OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
 
 assym.h: $(OFFSETS) genassym
 	$(OFFSETS_CREATE) <$(OFFSETS) >$@
 	./genassym >>$@
 
 # derived C source and related explicit dependencies
-../port/gen/errlst.c + \
-../port/gen/new_list.c: ../port/gen/errlist ../port/gen/errlist.awk
-	cd ../port/gen; pwd; $(AWK) -f errlist.awk < errlist
+$(LIBCDIR)/port/gen/errlst.c + \
+$(LIBCDIR)/port/gen/new_list.c: $(LIBCDIR)/port/gen/errlist $(LIBCDIR)/port/gen/errlist.awk
+	cd $(LIBCDIR)/port/gen; pwd; $(AWK) -f errlist.awk < errlist
 
-pics/errlst.o: ../port/gen/errlst.c
+pics/errlst.o: $(LIBCDIR)/port/gen/errlst.c
 
-pics/new_list.o: ../port/gen/new_list.c
+pics/new_list.o: $(LIBCDIR)/port/gen/new_list.c

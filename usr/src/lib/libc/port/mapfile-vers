@@ -101,6 +101,11 @@ $error unknown platform
 $endif
 
     protected:
+
+$if sparc32
+	__align_cpy_1;
+$endif
+
 	addrtosymstr;
 	aio_cancel;
 	aiocancel;
@@ -1794,6 +1799,10 @@ $endif
 	ldexp			{ TYPE = FUNCTION; FILTER = libm.so.2 };
 	logb			{ TYPE = FUNCTION; FILTER = libm.so.2 };
 	malloc			{ FLAGS = NODIRECT };
+	memcmp;
+	memcpy;
+	memmove;
+	memset;
 	modf			{ TYPE = FUNCTION; FILTER = libm.so.2 };
 	_modf			{ TYPE = FUNCTION; FILTER = libm.so.2 };
 	nextafter		{ TYPE = FUNCTION; FILTER = libm.so.2 };
@@ -1810,14 +1819,6 @@ $endif
 	_timezone;
 	tzname;
 	_tzname;
-
-$if _x86
-	memcmp;
-	memcpy;
-	memmove;
-	memset;
-$endif
-
 $if i386
 	_fp_hw;
 $endif
@@ -2507,6 +2508,10 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_lten			{ FLAGS = NODYNSORT };
 	_lzero			{ FLAGS = NODYNSORT };
 	__malloc_lock;
+	_memcmp;
+	_memcpy			{ FLAGS = NODYNSORT };
+	_memmove;
+	_memset;
 	_modff			{ TYPE = FUNCTION; FILTER = libm.so.2 };
 	__nan_read;
 	__nan_written;
@@ -2576,14 +2581,6 @@ $if _sparc
 	__mon_lengths;
 	__yday_to_month;
 $endif
-
-$if _x86
-	_memcmp;
-	_memcpy;
-	_memmove;
-	_memset;
-$endif
-
 $if i386
 	_sse_hw;
 $endif

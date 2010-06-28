@@ -20,10 +20,7 @@
 #
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	Global definitions for sun4v Monza implementation specific modules.
 #
@@ -36,4 +33,3 @@ USR_SUN4V_PLAT_DIR	= $(USR_PLAT_DIR)/$(PLATFORM)
 USR_MONZA_DIR		= $(USR_PLAT_DIR)/SUNW,Netra-CP3260
 USR_MONZA_SBIN_DIR	= $(USR_MONZA_DIR)/sbin
 USR_MONZA_SBIN_LINKS	= $(USR_MONZA_SBIN_DIR)/prtdiag
-USR_MONZA_SBIN_LINKS	+= $(USR_MONZA_SBIN_DIR)/trapstat

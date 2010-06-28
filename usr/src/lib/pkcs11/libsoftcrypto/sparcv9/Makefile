@@ -23,19 +23,39 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-# lib/pkcs11/libsoftcrypto/sparcv9/Makefile
-#
+LIBRARY =	libsoftcrypto.a
+VERS =		.1
 
-LIBRARY=	libsoftcrypto.a
-VERS= .1
+include		../Makefile.com
 
-include ../Makefile.com
-include $(SRC)/lib/Makefile.lib.64
+include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.lib.64
 
-LDLIBS	+= -lcryptoutil
-LIBS += $(LINTLIB)
+# Sources need to be redefined after Makefile.lib inclusion.
+SRCS =		$(AES_SRC) $(ARCFOUR_SRC) $(BIGNUM_SRC) $(BLOWFISH_SRC) \
+		$(DES_SRC) $(MODES_SRC) $(DH_SRC) $(DSA_SRC) $(RSA_SRC) \
+		$(PAD_SRC)
 
-DYNFLAGS +=     -Wl,-f/usr/platform/\$$PLATFORM/lib/$(MACH64)/$(DYNLIBPSR)
+SRCDIR =	$(SRC)/lib/pkcs11/libsoftcrypto/common
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+LIBS =		$(DYNLIB) $(LINTLIB)
+MAPFILEDIR =	../common
+
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-I$(CRYPTODIR) -I$(UTSDIR) -D_POSIX_PTHREAD_SEMANTICS
+LDLIBS +=	-lcryptoutil -lc
+LINTFLAGS64 +=	$(EXTRA_LINT_FLAGS)
+
+# Symbol capabilities objects are added for sun4u and sun4v.
+EXTPICS =	../capabilities/sun4u/sparcv9/pics/symcap.o \
+		../capabilities/sun4v/sparcv9/pics/symcap.o
+
+.KEEP_STATE:
+
+all:		$(LIBS)
+
+lint:		$(SRCS)
+
+install:	all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+
+include		../Makefile.targ

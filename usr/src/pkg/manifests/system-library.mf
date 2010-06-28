@@ -48,12 +48,10 @@ dir path=usr/ccs/lib
 dir path=usr/ccs/lib/$(ARCH64)
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
-$(sparc_ONLY)dir path=usr/lib/$(ARCH64)/libc
 dir path=usr/lib/cfgadm
 dir path=usr/lib/cfgadm/$(ARCH64)
 dir path=usr/lib/iconv/$(ARCH64)
-dir path=usr/lib/libc
-$(i386_ONLY)dir path=usr/lib/libsoftcrypto
+$(i386_ONLY)dir path=usr/lib/libc
 dir path=usr/lib/lwp
 dir path=usr/lib/lwp/$(ARCH64)
 dir path=usr/lib/python2.4
@@ -239,7 +237,6 @@ file path=usr/lib/$(ARCH64)/lib450.so.1
 file path=usr/lib/$(ARCH64)/libadutils.so.1
 file path=usr/lib/$(ARCH64)/libast.so.1
 file path=usr/lib/$(ARCH64)/libbsdmalloc.so.1
-$(sparc_ONLY)file path=usr/lib/$(ARCH64)/libc/libc_hwcap1.so.1
 file path=usr/lib/$(ARCH64)/libcfgadm.so.1
 file path=usr/lib/$(ARCH64)/libcmd.so.1
 file path=usr/lib/$(ARCH64)/libcommputil.so.1
@@ -312,7 +309,6 @@ file path=usr/lib/lib450.so.1
 file path=usr/lib/libadutils.so.1
 file path=usr/lib/libast.so.1
 file path=usr/lib/libbsdmalloc.so.1
-$(sparc_ONLY)file path=usr/lib/libc/libc_hwcap1.so.1
 $(i386_ONLY)file path=usr/lib/libc/libc_hwcap1.so.1 reboot-needed=true
 $(i386_ONLY)file path=usr/lib/libc/libc_hwcap2.so.1 reboot-needed=true
 $(i386_ONLY)file path=usr/lib/libc/libc_hwcap3.so.1 reboot-needed=true
@@ -358,7 +354,6 @@ file path=usr/lib/libsip.so.1
 file path=usr/lib/libsldap.so.1
 file path=usr/lib/libsmbios.so.1
 file path=usr/lib/libsoftcrypto.so.1
-$(i386_ONLY)file path=usr/lib/libsoftcrypto/libsoftcrypto_hwcap1.so.1
 file path=usr/lib/libsum.so.1
 file path=usr/lib/libsys.so.1
 $(sparc_ONLY)file path=usr/lib/libv12n.so.1

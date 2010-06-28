@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	Global definitions for sun4u snowbird implementation specific modules.
 # uts/sun4u/snowbird/Makefile.snowbird
@@ -67,7 +65,6 @@ USR_SNOWBIRD_DIR		= $(USR_PLAT_DIR)/SUNW,Netra-CP2300
 USR_SNOWBIRD_INC_DIR		= $(USR_SNOWBIRD_DIR)/include
 USR_SNOWBIRD_SBIN_DIR		= $(USR_SNOWBIRD_DIR)/sbin
 USR_SNOWBIRD_SBIN_PRTDIAG	= $(USR_SNOWBIRD_SBIN_DIR)/prtdiag
-USR_SNOWBIRD_SBIN_TRAPSTAT	= $(USR_SNOWBIRD_SBIN_DIR)/trapstat
 USR_SNOWBIRD_SBIN_FRUADM	= $(USR_SNOWBIRD_SBIN_DIR)/fruadm
 USR_SNOWBIRD_LIB_DIR		= $(USR_SNOWBIRD_DIR)/lib
 USR_SNOWBIRD_ISYS_DIR		= $(USR_SNOWBIRD_INC_DIR)/sys

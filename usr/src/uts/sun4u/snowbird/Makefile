@@ -19,11 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/snowbird/Makefile
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the sun4u snowbird platform
 #	module.
@@ -71,7 +67,6 @@ install:	$(ROOT_SNOWBIRD_DIR) $(USR_SNOWBIRD_DIR) \
 		$(USR_SNOWBIRD_INC_DIR) \
 		$(USR_SNOWBIRD_SBIN_DIR) \
 		$(USR_SNOWBIRD_SBIN_PRTDIAG) \
-		$(USR_SNOWBIRD_SBIN_TRAPSTAT) \
 		$(USR_SNOWBIRD_SBIN_FRUADM) \
 		$(USR_SNOWBIRD_LIB_DIR) \
 		.WAIT $(SNOWBIRD_KMODS) \

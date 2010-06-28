@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the sun4u schumacher platform
 #	module.
@@ -67,7 +64,6 @@ install:	$(ROOT_SCHUMACHER_DIR) \
 		$(USR_SCHUMACHER_INC_DIR) \
 		$(USR_SCHUMACHER_SBIN_DIR) \
 		$(USR_SCHUMACHER_SBIN_PRTDIAG) \
-		$(USR_SCHUMACHER_SBIN_TRAPSTAT) \
 		$(USR_SCHUMACHER_SBIN_FRUADM) \
 		$(USR_SCHUMACHER_LIB_DIR) \
 		$(SCHUMACHER_CRYPTO_LINKS) \

@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # uts/sun4u/boston/Makefile
 #
@@ -71,7 +68,6 @@ install:	$(ROOT_BOSTON_DIR) \
 		$(USR_BOSTON_INC_DIR) \
 		$(USR_BOSTON_SBIN_PRTDIAG) \
 		$(USR_BOSTON_SBIN_FRUADM) \
-		$(USR_BOSTON_SBIN_TRAPSTAT) \
 		$(USR_BOSTON_LIB_DIR) \
 		$(BOSTON_CRYPTO_LINKS) \
 		.WAIT $(BOSTON_KMODS)

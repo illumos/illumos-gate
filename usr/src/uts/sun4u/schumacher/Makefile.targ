@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	Common targets for sun4u implementation specific modules.
 #
@@ -66,9 +65,6 @@ $(USR_SCHUMACHER_SBIN_DIR): $(USR_SCHUMACHER_DIR)
 
 $(USR_SCHUMACHER_SBIN_PRTDIAG): $(USR_SCHUMACHER_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@
-
-$(USR_SCHUMACHER_SBIN_TRAPSTAT): $(USR_SCHUMACHER_SBIN_DIR)
-	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/trapstat $@
 
 $(USR_SCHUMACHER_SBIN_FRUADM): $(USR_SCHUMACHER_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/fruadm $@

@@ -23,12 +23,12 @@
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-LIBCBASE=.
-
-LIBRARY= libc.a
-LIB_PIC= libc_pic.a
-VERS=	.1
-CPP=	/usr/lib/cpp
+LIBCBASE=	.
+LIBCDIR=	$(SRC)/lib/libc
+LIBRARY=	libc.a
+LIB_PIC=	libc_pic.a
+VERS=		.1
+CPP=		/usr/lib/cpp
 TARGET_ARCH=	amd64
 
 # objects are grouped by source directory
@@ -297,7 +297,7 @@ SYSOBJS=			\
 # This macro should ALWAYS be empty; native APIs are already 'large file'.
 PORTGEN64=
 
-# objects from source under ../port
+# objects from source under $(LIBCDIR)/port
 PORTFP=				\
 	__flt_decim.o		\
 	__flt_rounds.o		\
@@ -909,12 +909,12 @@ CFLAGS64 += $(XSTRCONST)
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR64)/libc_i18n.a
-$(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS)
+$(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(EXTPICS)
 
-MAPFILES =	../port/mapfile-vers
+MAPFILES =	$(LIBCDIR)/port/mapfile-vers
 
 CPPFLAGS=	-D_REENTRANT -D$(MACH64) -D__$(MACH64) $(THREAD_DEBUG) \
-		-I. -I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master) -I/usr/include
+		-I. -I$(LIBCBASE)/inc -I$(LIBCDIR)/inc $(CPPFLAGS.master)
 ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) \
 		$(amd64_AS_XARCH)
 
@@ -948,8 +948,8 @@ BUILD.AR= $(RM) $@ ; \
 
 # extra files for the clean target
 CLEANFILES=			\
-	../port/gen/errlst.c	\
-	../port/gen/new_list.c	\
+	$(LIBCDIR)/port/gen/errlst.c	\
+	$(LIBCDIR)/port/gen/new_list.c	\
 	assym.h			\
 	genassym		\
 	crt/_rtld.s		\
@@ -964,22 +964,22 @@ SRCS=							\
 	$(ATOMICOBJS:%.o=$(SRC)/common/atomic/%.c)	\
 	$(XATTROBJS:%.o=$(SRC)/common/xattr/%.c)	\
 	$(COMOBJS:%.o=$(SRC)/common/util/%.c)		\
-	$(PORTFP:%.o=../port/fp/%.c)			\
-	$(PORTGEN:%.o=../port/gen/%.c)			\
-	$(PORTI18N:%.o=../port/i18n/%.c)		\
-	$(PORTPRINT:%.o=../port/print/%.c)		\
-	$(PORTREGEX:%.o=../port/regex/%.c)		\
-	$(PORTSTDIO:%.o=../port/stdio/%.c)		\
-	$(PORTSYS:%.o=../port/sys/%.c)			\
-	$(AIOOBJS:%.o=../port/aio/%.c)			\
-	$(RTOBJS:%.o=../port/rt/%.c)			\
-	$(TPOOLOBJS:%.o=../port/tpool/%.c)		\
-	$(THREADSOBJS:%.o=../port/threads/%.c)		\
+	$(PORTFP:%.o=$(LIBCDIR)/port/fp/%.c)			\
+	$(PORTGEN:%.o=$(LIBCDIR)/port/gen/%.c)			\
+	$(PORTI18N:%.o=$(LIBCDIR)/port/i18n/%.c)		\
+	$(PORTPRINT:%.o=$(LIBCDIR)/port/print/%.c)		\
+	$(PORTREGEX:%.o=$(LIBCDIR)/port/regex/%.c)		\
+	$(PORTSTDIO:%.o=$(LIBCDIR)/port/stdio/%.c)		\
+	$(PORTSYS:%.o=$(LIBCDIR)/port/sys/%.c)			\
+	$(AIOOBJS:%.o=$(LIBCDIR)/port/aio/%.c)			\
+	$(RTOBJS:%.o=$(LIBCDIR)/port/rt/%.c)			\
+	$(TPOOLOBJS:%.o=$(LIBCDIR)/port/tpool/%.c)		\
+	$(THREADSOBJS:%.o=$(LIBCDIR)/port/threads/%.c)		\
 	$(THREADSMACHOBJS:%.o=threads/%.c)		\
 	$(UNICODEOBJS:%.o=$(SRC)/common/unicode/%.c)	\
 	$(UNWINDMACHOBJS:%.o=unwind/%.c)		\
 	$(FPOBJS:%.o=fp/%.c)				\
-	$(I386FPOBJS:%.o=../i386/fp/%.c)		\
+	$(I386FPOBJS:%.o=$(LIBCDIR)/i386/fp/%.c)		\
 	$(LIBCBASE)/gen/ecvt.c				\
 	$(LIBCBASE)/gen/makectxt.c			\
 	$(LIBCBASE)/gen/siginfolst.c			\
@@ -1070,7 +1070,7 @@ $(PORTI18N_COND:%=pics/%) := \
 
 all: $(LIBS) $(LIB_PIC)
 
-lint	:=	CPPFLAGS += -I../$(MACH)/fp
+lint	:=	CPPFLAGS += -I$(LIBCDIR)/$(MACH)/fp
 lint	:=	CPPFLAGS += -D_MSE_INT_H -D_LCONV_C99
 lint	:=	LINTFLAGS64 += -mn -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 
@@ -1078,7 +1078,7 @@ lint:
 	@echo $(LINT.c) ... $(LDLIBS)
 	@$(LINT.c) $(SRCS) $(LDLIBS)
 
-$(LINTLIB):= SRCS=../port/llib-lc
+$(LINTLIB):= SRCS=$(LIBCDIR)/port/llib-lc
 $(LINTLIB):= CPPFLAGS += -D_MSE_INT_H
 $(LINTLIB):= LINTFLAGS64=-nvx -m64
 
@@ -1119,19 +1119,19 @@ CPPFLAGS.genassym = \
 	$(ENVCPPFLAGS1) $(ENVCPPFLAGS2) $(ENVCPPFLAGS3) $(ENVCPPFLAGS4)
 
 genassym: $(GENASSYM_C)
-	$(NATIVECC) -Iinc -I../inc $(CPPFLAGS.genassym) -o $@ $(GENASSYM_C)
+	$(NATIVECC) -Iinc -I$(LIBCDIR)/inc $(CPPFLAGS.genassym) -o $@ $(GENASSYM_C)
 
-OFFSETS = ../$(MACH)/offsets.in
+OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
 
 assym.h: $(OFFSETS) genassym
 	$(OFFSETS_CREATE) <$(OFFSETS) >$@
 	./genassym >>$@
 
 # derived C source and related explicit dependencies
-../port/gen/errlst.c + \
-../port/gen/new_list.c: ../port/gen/errlist ../port/gen/errlist.awk
-	cd ../port/gen; pwd; $(AWK) -f errlist.awk < errlist
+$(LIBCDIR)/port/gen/errlst.c + \
+$(LIBCDIR)/port/gen/new_list.c: $(LIBCDIR)/port/gen/errlist $(LIBCDIR)/port/gen/errlist.awk
+	cd $(LIBCDIR)/port/gen; pwd; $(AWK) -f errlist.awk < errlist
 
-pics/errlst.o: ../port/gen/errlst.c
+pics/errlst.o: $(LIBCDIR)/port/gen/errlst.c
 
-pics/new_list.o: ../port/gen/new_list.c
+pics/new_list.o: $(LIBCDIR)/port/gen/new_list.c

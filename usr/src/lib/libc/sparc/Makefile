@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBCBASE=.
@@ -34,7 +33,5 @@ PRFOBJS=		\
 	memmove.o       \
 	strlen.o	\
 	strcpy.o
-
-MAPFILE_AUX =	mapfile-vers-aux
 
 include Makefile.com

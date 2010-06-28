@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the sun4u opl platform
 #	module.
@@ -75,7 +72,6 @@ install: $(ROOT_OPL_DIR) $(USR_OPL_DIR) \
 	$(USR_OPL_INC_DIR) \
 	$(USR_OPL_SBIN_DIR) \
 	$(USR_OPL_SBIN_PRTDIAG) \
-	$(USR_OPL_SBIN_TRAPSTAT) \
 	$(USR_OPL_SBIN_FRUADM) \
 	$(USR_OPL_LIB_DIR) \
 	$(OPL_CRYPTO_LINKS) \

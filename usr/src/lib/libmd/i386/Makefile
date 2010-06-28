@@ -18,14 +18,26 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
-LIBRARY= libmd.a
+LIBRARY =	libmd.a
+VERS =		.1
 
-include ../Makefile.com
+OBJECTS =	md4.o md5.o sha1.o sha2.o
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.rootfs
+include		../Makefile.com
+
+.KEEP_STATE:
+
+all:		$(LIBS)
+
+install:	all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+
+lint:		lintcheck
+
+include		../Makefile.targ

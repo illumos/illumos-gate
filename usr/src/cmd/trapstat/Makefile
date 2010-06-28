@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,41 +18,40 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-PROG= trapstat
+include		$(SRC)/cmd/Makefile.cmd
 
-include ../Makefile.cmd
+sparc_CAPDIR =	capabilities
+i386_CAPDIR =	i386
+CAPDIR =	$($(MACH)_CAPDIR)
 
-sparc_SUBDIRS = sun4u sun4v
-i386_SUBDIRS = 
+sparc_SUBDIRS =	sun4
+i386_SUBDIRS =
+SUBDIRS =	$($(MACH)_SUBDIRS)
 
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+install :=	TARGET= install
+lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
+.PARALLEL:	$(SUBDIRS)
 
-clean clobber lint:	$(SUBDIRS)
+all clean clobber install lint: \
+		$(CAPDIR) .WAIT $(SUBDIRS)
 
-install:	$(SUBDIRS)
-	$(RM) $(ROOTUSRSBINPROG)
-	$(LN) $(PLATEXEC) $(ROOTUSRSBINPROG)
+install_h check:
 
+$(CAPDIR) \
 $(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+		@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
-include ../Makefile.targ
+include		$(SRC)/cmd/Makefile.targ

@@ -273,7 +273,6 @@ i386_SUBDIRS=		\
 
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
-	libc_psr	.WAIT	\
 	libds		\
 	libdscp		\
 	libprtdiag	.WAIT	\

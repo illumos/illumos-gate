@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 	.file	"memcpy.s"
@@ -54,6 +53,7 @@
 	ANSI_PRAGMA_WEAK(memcpy,function)
 
 	ENTRY(memcpy)
+        ENTRY(__align_cpy_1)
 	st	%o0, [%sp + 68]		! save des address for return val
 	cmp	%o2, 17			! for small counts copy bytes
 	bleu	.dbytecp

@@ -23,56 +23,72 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-# lib/pkcs11/libsoftcrypto/amd64/Makefile
-#
+LIBRARY =	libsoftcrypto.a
+VERS =		.1
 
-LIBRARY=	libsoftcrypto.a
-VERS= .1
+include		../Makefile.com
 
-AES_PSM_OBJS= aes_amd64.o aes_intel.o aeskey.o
-AES_PSM_SRC= $(AES_DIR)/$(MACH64)/aes_amd64.s $(AES_DIR)/$(MACH64)/aes_intel.s \
+AES_PSM_OBJS = 	aes_amd64.o aes_intel.o aeskey.o
+ARCFOUR_PSM_OBJS = arcfour-x86_64.o
+BIGNUM_PSM_OBJS = bignum_amd64.o bignum_amd64_asm.o
+
+include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.lib.64
+
+AES_PSM_SRC =	$(AES_DIR)/$(MACH64)/aes_amd64.s \
+		$(AES_DIR)/$(MACH64)/aes_intel.s \
 		$(AES_DIR)/$(MACH64)/aeskey.c
-
-ARCFOUR_PSM_OBJS= arcfour-x86_64.o
-ARCFOUR_PSM_SRC= arcfour-x86_64.s
-
-BIGNUM_PSM_OBJS= bignum_amd64.o bignum_amd64_asm.o
-BIGNUM_PSM_SRC= $(BIGNUM_DIR)/$(MACH64)/bignum_amd64.c \
+ARCFOUR_PSM_SRC = arcfour-x86_64.s
+BIGNUM_PSM_SRC = $(BIGNUM_DIR)/$(MACH64)/bignum_amd64.c \
 		$(BIGNUM_DIR)/$(MACH64)/bignum_amd64_asm.s
 
-include ../Makefile.com
-include $(SRC)/lib/Makefile.lib.64
+# Sources need to be redefined after Makefile.lib inclusion.
+SRCS =		$(AES_SRC) $(ARCFOUR_SRC) $(BIGNUM_SRC) $(BLOWFISH_SRC) \
+		$(DES_SRC) $(MODES_SRC) $(DH_SRC) $(DSA_SRC) $(RSA_SRC) \
+		$(PAD_SRC)
 
-CFLAGS		+= -xO4 -xcrossfile
-BIGNUM_FLAGS	+= -DPSR_MUL
-LINTFLAGS64	+= $(BIGNUM_FLAGS) $(AES_FLAGS) $(ARCFOUR_FLAGS)
-CLEANFILES	+= arcfour-x86_64.s
+SRCDIR =	$(SRC)/lib/pkcs11/libsoftcrypto/common
 
-LDLIBS += -lcryptoutil
-LIBS += $(LINTLIB)
+LIBS =		$(DYNLIB) $(LINTLIB)
+MAPFILEDIR =	../common
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+CFLAGS +=	-xO4 -xcrossfile
+CPPFLAGS +=	-I$(CRYPTODIR) -I$(UTSDIR) -D_POSIX_PTHREAD_SEMANTICS
+ASFLAGS +=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM
+BIGNUM_FLAGS +=	-DPSR_MUL
+CLEANFILES +=	arcfour-x86_64.s
+LDLIBS +=	-lcryptoutil -lc
+LINTFLAGS64 +=	$(EXTRA_LINT_FLAGS)
 
-arcfour-x86_64.s:	$(ARCFOUR_DIR)/amd64/arcfour-x86_64.pl
-	$(PERL) $? $@
+.KEEP_STATE:
 
-pics/%.o:	$(AES_DIR)/$(MACH64)/%.c
-	$(COMPILE.c) $(AES_FLAGS) -o $@ $<
-	$(POST_PROCESS_O)
+all:		$(LIBS)
 
-pics/%.o:	$(AES_DIR)/$(MACH64)/%.s
-	$(COMPILE.s) $(AES_FLAGS) -o $@ $<
-	$(POST_PROCESS_O)
+lint:		$(SRCS)
 
-pics/%.o:	$(BIGNUM_DIR)/$(MACH64)/%.c
-	$(COMPILE.c) $(BIGNUM_FLAGS) -o $@ $<
-	$(POST_PROCESS_O)
+install:	all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
 
-pics/%.o:	$(BIGNUM_DIR)/$(MACH64)/%.s
-	$(COMPILE64.s) $(BIGNUM_FLAGS) -o $@ $<
-	$(POST_PROCESS_O)
+pics/%.o: $(AES_DIR)/$(MACH64)/%.c
+		$(COMPILE.c) $(AES_FLAGS) -o $@ $<
+		$(POST_PROCESS_O)
 
-pics/%.o:	arcfour-x86_64.s
-	$(COMPILE64.s) $(ARCFOUR_FLAGS) -o $@ $<
-	$(POST_PROCESS_O)
+pics/%.o: $(AES_DIR)/$(MACH64)/%.s
+		$(COMPILE.s) $(AES_FLAGS) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%.o: $(BIGNUM_DIR)/$(MACH64)/%.c
+		$(COMPILE.c) $(BIGNUM_FLAGS) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%.o: $(BIGNUM_DIR)/$(MACH64)/%.s
+		$(COMPILE64.s) $(BIGNUM_FLAGS) -o $@ $<
+		$(POST_PROCESS_O)
+
+include		../Makefile.targ
+
+arcfour-x86_64.s: $(ARCFOUR_DIR)/amd64/arcfour-x86_64.pl
+		$(PERL) $? $@
+
+pics/%.o: arcfour-x86_64.s
+		$(COMPILE64.s) $(ARCFOUR_FLAGS) -o $@ $<
+		$(POST_PROCESS_O)

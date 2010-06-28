@@ -155,8 +155,8 @@ SRCS=		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 # default build of an archive and a shared object,
 # overridden locally when extra processing is needed
 BUILD.AR=	$(AR) $(ARFLAGS) $@ $(AROBJS)
-BUILD.SO=	$(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
-BUILDCCC.SO=	$(CCC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
+BUILD.SO=	$(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(EXTPICS) $(LDLIBS)
+BUILDCCC.SO=	$(CCC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(EXTPICS) $(LDLIBS)
 
 # default dynamic library symlink
 # IMPORTANT:: If you change INS.liblink OR INS.liblink64 here, then you 

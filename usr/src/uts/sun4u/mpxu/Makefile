@@ -19,11 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/mpxu/Makefile
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -78,7 +74,6 @@ LINKED_PLATFORMS	+= SUNW,Netra-210
 install:	$(ROOT_MPXU_DIR) $(USR_MPXU_DIR) \
 		$(USR_MPXU_INC_DIR) \
 		$(USR_MPXU_SBIN_PRTDIAG) \
-		$(USR_MPXU_SBIN_TRAPSTAT) \
 		$(USR_MPXU_SBIN_FRUADM) \
 		$(USR_MPXU_LIB_DIR) \
 		$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%) \

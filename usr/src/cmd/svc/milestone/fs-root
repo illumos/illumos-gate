@@ -20,10 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Make sure that the libraries essential to this stage of booting can be found.
@@ -53,114 +50,6 @@ libc_mount() {
 	fi
 }
 
-# This mount function is sun4v only. It may be melded with the sun4u-us3
-# version later.
-sun4v_libc_psr_mount() {
-	LIBC_MOE_32=`/usr/bin/moe -32 /platform/$PLAT/lib/libc_psr/'$HWCAP'`
-	if [ -n "$LIBC_MOE_32" ]; then
-		/usr/sbin/mount |
-		    egrep -s "^/platform/[^/]*/lib/libc_psr.so.1 on "
-		if [ $? -ne 0 ]; then
-			/usr/sbin/mount -O -F lofs $LIBC_MOE_32 \
-			    /platform/$PLAT/lib/libc_psr.so.1
-		fi
-	fi
-
-	LIBC_MOE_64=`/usr/bin/moe -64 \
-	    /platform/$PLAT/lib/sparcv9/libc_psr/'$HWCAP'`
-	if [ -n "$LIBC_MOE_64" ]; then
-		/usr/sbin/mount |
-		    egrep -s "^/platform/[^/]*/lib/sparcv9/libc_psr.so.1 on "
-		if [ $? -ne 0 ]; then
-			/usr/sbin/mount -O -F lofs $LIBC_MOE_64 \
-			    /platform/$PLAT/lib/sparcv9/libc_psr.so.1
-		fi
-	fi
-}
-
-# This is specific to sun4u[-us3].
-# try to intelligently handle the various ways that a hwcap library can
-# be present for libc_psr for sun4u.
-sun4u_libc_psr_mount() {
-	# first look for $PLAT specific
-	# the string $HWCAP is not an env var but part of the argument to moe
-	LIBC_MOE_32=`/usr/bin/moe -32 /platform/$PLAT/lib/libc_psr/'$HWCAP'`
-	if [ -n "$LIBC_MOE_32" ]; then
-		/usr/sbin/mount |
-		    egrep -s "^/platform/$PLAT/lib/libc_psr.so.1 on "
-		if [ $? -ne 0 ]; then
-			/usr/sbin/mount -O -F lofs $LIBC_MOE_32 \
-			    /platform/$PLAT/lib/libc_psr.so.1
-		fi
-	else
-		# try the 'generic' one under $ARCH
-		LIBC_MOE_32=`/usr/bin/moe -32 \
-		    /platform/$ARCH/lib/libc_psr/'$HWCAP'`
-		if [ -n "$LIBC_MOE_32" ]; then
-			/usr/sbin/mount |
-			    egrep -s "^/platform/$ARCH/lib/libc_psr.so.1 on "
-			if [ $? -ne 0 ]; then
-				/usr/sbin/mount -O -F lofs $LIBC_MOE_32 \
-				    /platform/$ARCH/lib/libc_psr.so.1
-			fi
-		fi
-
-	fi
-
-	# now repeat for 64 bit.
-
-	LIBC_MOE_64=`/usr/bin/moe -64 \
-	    /platform/$PLAT/lib/sparcv9/libc_psr/'$HWCAP'`
-	if [ -n "$LIBC_MOE_64" ]; then
-		/usr/sbin/mount |
-		    egrep -s "^/platform/$PLAT/lib/sparcv9/libc_psr.so.1 on "
-		if [ $? -ne 0 ]; then
-			/usr/sbin/mount -O -F lofs $LIBC_MOE_64 \
-			    /platform/$PLAT/lib/sparcv9/libc_psr.so.1
-		fi
-	else
-		# now try $ARCH version
-		LIBC_MOE_64=`/usr/bin/moe -64 \
-		    /platform/$ARCH/lib/sparcv9/libc_psr/'$HWCAP'`
-		if [ -n "$LIBC_MOE_64" ]; then
-			/usr/sbin/mount |
-			    egrep -s \
-			    "^/platform/$ARCH/lib/sparcv9/libc_psr.so.1 on "
-			if [ $? -ne 0 ]; then
-				/usr/sbin/mount -O -F lofs $LIBC_MOE_64 \
-				    /platform/$ARCH/lib/sparcv9/libc_psr.so.1
-			fi
-		fi
-	fi
-}
-
-# 
-# Discover architecture and find and mount optimal libc_psr 
-#  
-libc_psr_mount() {
-	PLAT=`/usr/bin/uname -i` 
-	ARCH=`/usr/bin/uname -m` 
-	if [ "$ARCH" = "sun4v" ]; then 
-		# Check if we already loaded libc_hwcapX.so.1 thru libc_mount
-		# We can get rid of this check (and the libc_psr mount),
-		# if all the sun4v platforms start using libc_hwcap.
-		if [ ! -n "$LIBC_MOE_32" ]; then
-			sun4v_libc_psr_mount
-		fi
-	elif [ "$ARCH" = "sun4u" ]; then 
-		if [ -h /platform/$PLAT/lib/libc_psr.so.1 ]; then 
-			LINKSTO=`/usr/bin/ls -l \
-			    /platform/$PLAT/lib/libc_psr.so.1 | 
-			    /usr/bin/awk '{print $NF}'` 
-			if [ "$LINKSTO" = \
-			    "../../sun4u-us3/lib/libc_psr.so.1" ]; then 
-				ARCH=sun4u-us3 
-			fi
-		fi
-		sun4u_libc_psr_mount 
-	fi
-}
-
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
 
@@ -171,7 +60,6 @@ libc_psr_mount() {
 #
 if smf_is_nonglobalzone; then
 	libc_mount
-	libc_psr_mount
 	exit $SMF_EXIT_OK
 fi
 
@@ -295,6 +183,5 @@ fi
 /usr/sbin/devfsadm -I -P
 
 libc_mount
-libc_psr_mount
 
 exit $SMF_EXIT_OK

@@ -18,19 +18,16 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-include ../Makefile.lib
+include		$(SRC)/lib/Makefile.lib
 
-$(SPARC_BLD)PLATFORMS= sun4u sun4v
+$(SPARC_BLD)CAPDIR = capabilities
 
-SUBDIRS=	$(MACH) $(PLATFORMS)
-$(BUILD64)SUBDIRS += $(MACH64)
+SUBDIRS=	$(MACH) $(BUILD64) $(MACH64)
 
 HDRS =		md4.h md5.h sha1.h sha2.h
 HDRDIR =	common
@@ -43,16 +40,19 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-.PARALLEL: $(SUBDIRS)
+.PARALLEL:	$(SUBDIRS)
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install lint: \
+		$(CAPDIR) .WAIT $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
 check:		$(CHECKHDRS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(CAPDIR) \
+$(SUBDIRS):	FRC
+		@cd $@; pwd; $(MAKE) $(TARGET)
+
 FRC:
 
-include ../Makefile.targ
+include		$(SRC)/lib/Makefile.targ

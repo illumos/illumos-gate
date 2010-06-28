@@ -18,38 +18,35 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# lib/libsoftcrypto/Makefile
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-include $(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.lib
 
-$(SPARC_BLD)PLATFORMS = sun4u sun4v
-$(INTEL_BLD)PLATFORMS = i386_hwcap1
-
-SUBDIRS = $(MACH) $(MACH64) $(PLATFORMS)
+CAPDIR =	capabilities
+SUBDIRS =	$(MACH) $(BUILD64) $(MACH64) $(PLATFORMS)
 
 all :=		TARGET= all
-check :=	TARGET= check
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
 lint :=		TARGET= lint
 
+.KEEP_STATE:
 
-.PARALLEL: $(SUBDIRS)
+.PARALLEL:	$(SUBDIRS)
 
-all check clean clobber install lint: $(SUBDIRS)
+all clean clobber install lint: \
+		$(CAPDIR) .WAIT $(SUBDIRS)
 
-install_h:      $(ROOTHDRS)
+install_h:	$(ROOTHDRS)
 
-check:          $(CHECKHDRS)
+check:		$(CHECKHDRS)
 
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(CAPDIR) \
+$(SUBDIRS):	FRC
+		@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

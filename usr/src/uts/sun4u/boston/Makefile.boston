@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	Global definitions for sun4u implementation specific modules.
 #
@@ -55,7 +52,6 @@ USR_BOSTON_ISYS_DIR	= $(USR_BOSTON_INC_DIR)/sys
 USR_BOSTON_SBIN_DIR	= $(USR_BOSTON_DIR)/sbin
 USR_BOSTON_SBIN_PRTDIAG	= $(USR_BOSTON_SBIN_DIR)/prtdiag
 USR_BOSTON_SBIN_FRUADM	= $(USR_BOSTON_SBIN_DIR)/fruadm
-USR_BOSTON_SBIN_TRAPSTAT = $(USR_BOSTON_SBIN_DIR)/trapstat
 USR_BOSTON_LIB_DIR	= $(USR_BOSTON_DIR)/lib
 
 BOSTON_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/boston/lint-libs/$(OBJS_DIR)

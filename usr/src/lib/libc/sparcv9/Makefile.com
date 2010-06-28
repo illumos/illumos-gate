@@ -24,12 +24,21 @@
 #
 
 LIBCDIR=	$(SRC)/lib/libc
-LIB_PIC= libc_pic.a
-VERS=	.1
-CPP=	/usr/lib/cpp
+LIB_PIC=	libc_pic.a
+VERS=		.1
+CPP=		/usr/lib/cpp
 TARGET_ARCH=	sparc
 
 # objects are grouped by source directory
+
+# Symbol capabilities objects.
+EXTPICS=			\
+        $(LIBCDIR)/capabilities/sun4u/sparcv9/pics/symcap.o \
+        $(LIBCDIR)/capabilities/sun4u-opl/sparcv9/pics/symcap.o \
+        $(LIBCDIR)/capabilities/sun4u-us3-hwcap1/sparcv9/pics/symcap.o \
+        $(LIBCDIR)/capabilities/sun4u-us3-hwcap2/sparcv9/pics/symcap.o \
+        $(LIBCDIR)/capabilities/sun4v-hwcap1/sparcv9/pics/symcap.o \
+        $(LIBCDIR)/capabilities/sun4v-hwcap2/sparcv9/pics/symcap.o
 
 # local objects
 STRETS=
@@ -922,9 +931,9 @@ CFLAGS64 += $(XSTRCONST)
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR64)/libc_i18n.a
-$(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS)
+$(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(EXTPICS)
 
-MAPFILES =	$(LIBCDIR)/port/mapfile-vers $(MAPFILE_AUX)
+MAPFILES =	$(LIBCDIR)/port/mapfile-vers
 
 sparcv9_C_PICFLAGS= -K PIC
 CFLAGS64 +=	$(EXTN_CFLAGS)

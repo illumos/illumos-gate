@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # uts/sun4u/seattle/Makefile
 #
@@ -72,7 +69,6 @@ install:	$(ROOT_SEATTLE_DIR) \
 		$(USR_SEATTLE_DIR) \
 		$(USR_SEATTLE_INC_DIR) \
 		$(USR_SEATTLE_SBIN_PRTDIAG) \
-		$(USR_SEATTLE_SBIN_TRAPSTAT) \
 		$(USR_SEATTLE_SBIN_FRUADM) \
 		$(USR_SEATTLE_LIB_DIR) \
 		$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%) \

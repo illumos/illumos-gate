@@ -19,11 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/mpxu/Makefile.mpxu
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -57,7 +53,6 @@ USR_MPXU_INC_DIR	= $(USR_MPXU_DIR)/include
 USR_MPXU_ISYS_DIR	= $(USR_MPXU_INC_DIR)/sys
 USR_MPXU_SBIN_DIR	= $(USR_MPXU_DIR)/sbin
 USR_MPXU_SBIN_PRTDIAG	= $(USR_MPXU_SBIN_DIR)/prtdiag
-USR_MPXU_SBIN_TRAPSTAT	= $(USR_MPXU_SBIN_DIR)/trapstat
 USR_MPXU_SBIN_FRUADM	= $(USR_MPXU_SBIN_DIR)/fruadm
 USR_MPXU_LIB_DIR	= $(USR_MPXU_DIR)/lib
 

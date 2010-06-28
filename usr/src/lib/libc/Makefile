@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -73,8 +72,13 @@ VAR1_DYNLIB64 =	$(LIBRARY:%.a=%_$(VAR1).so$(VERS))
 VAR1_BLDDIR64 =	$(MACH)_$(VAR1)/$(VARBLD64)
 
 i386_VARIANTS=	$(VAR1) $(VAR2) $(VAR3)
-sparc_VARIANTS= $(VAR1)
-sparcv9_VARIANTS= $(VAR1)
+sparc_VARIANTS=
+sparcv9_VARIANTS=
+
+i386_COMP=
+sparc_COMP=	capabilities
+
+MACH_COMP=	$($(MACH)_COMP)
 
 i386_ETC=	$(MACH)/etc
 sparc_ETC=
@@ -85,7 +89,7 @@ VARIANT_SUBDIRS	= $(VARIANTS:%=$(MACH)_%/$(VARBLD))
 VARIANTS64=	$($(MACH64)_VARIANTS)
 VARIANT_SUBDIRS64	= $(VARIANTS64:%=$(MACH)_%/$(VARBLD64))
 
-SUBDIRS=	$(MACH) $(MACH_ETC) $(VARIANT_SUBDIRS)
+SUBDIRS=	$(MACH_CAP) $(MACH) $(MACH_ETC) $(VARIANT_SUBDIRS)
 $(BUILD64)SUBDIRS += $(MACH64) $(VARIANT_SUBDIRS64)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
@@ -140,7 +144,7 @@ check_i18n:
 
 etc:	$($(MACH)_ETC)
 
-lib32:	$(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
+lib32:	$(MACH_COMP) $(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 	mkdir -p $(MACH)/i18n_pics
 	cd $(MACH)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR)/libc_i18n.a
 	@if $(ELFDUMP) -r $(MACH)/$(DYNLIB) | $(GREP) -w environ ; then \
@@ -149,7 +153,7 @@ lib32:	$(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 		exit 1; \
 	fi
 
-lib64:	$(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS64)
+lib64:	$(MACH_COMP) $(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS64)
 	mkdir -p $(MACH64)/i18n_pics
 	cd $(MACH64)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR64)/libc_i18n.a
 	@if $(ELFDUMP) -r $(MACH64)/$(DYNLIB) | $(GREP) -w environ ; then \
@@ -165,6 +169,9 @@ $(VARIANTLIBS64): FRC
 	@cd $(@D); pwd; VERSION='$(VERSION)' $(MAKE) $(@F)
 
 $($(MACH)_ETC): FRC
+	@cd $(@); pwd; $(MAKE) $(TARGET)
+
+$($(MACH)_COMP): FRC
 	@cd $(@); pwd; $(MAKE) $(TARGET)
 
 install:	all			\

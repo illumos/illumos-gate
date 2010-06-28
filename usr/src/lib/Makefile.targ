@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -93,11 +90,11 @@ $(LIBRARY): objs .WAIT $$(OBJS)
 
 $(DYNLIB): $$(MAPFILES)
 
-$(DYNLIB): pics .WAIT $$(PICS) $$(ALTPICS)
+$(DYNLIB): pics .WAIT $$(PICS) $$(ALTPICS) $$(EXTPICS)
 	$(BUILD.SO)
 	$(POST_PROCESS_SO)
 
-$(DYNLIBCCC): pics .WAIT $$(PICS) $$(ALTPICS)
+$(DYNLIBCCC): pics .WAIT $$(PICS) $$(ALTPICS) $$(EXTPICS)
 	$(BUILDCCC.SO)
 	$(POST_PROCESS_SO)
 

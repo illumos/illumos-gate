@@ -1435,6 +1435,7 @@ file path=usr/sbin/syncstat mode=0555
 file path=usr/sbin/syseventadm group=sys mode=0555
 file path=usr/sbin/syslogd group=sys mode=0555
 file path=usr/sbin/tar mode=0555
+file path=usr/sbin/trapstat mode=0555
 file path=usr/sbin/traceroute mode=4555
 file path=usr/sbin/ttyadm group=sys mode=0755
 $(i386_ONLY)file path=usr/sbin/ucodeadm mode=0555
@@ -2208,7 +2209,6 @@ hardlink path=usr/sbin/share target=../../usr/sbin/sharemgr
 hardlink path=usr/sbin/swap target=../../usr/lib/isaexec
 hardlink path=usr/sbin/sysdef target=../../usr/lib/isaexec
 hardlink path=usr/sbin/tapes target=./devfsadm
-hardlink path=usr/sbin/trapstat target=../../usr/lib/platexec
 hardlink path=usr/sbin/unshare target=../../usr/sbin/sharemgr
 hardlink path=usr/sbin/update_drv target=../../usr/lib/isaexec
 hardlink path=usr/sbin/whodo target=../../usr/lib/isaexec

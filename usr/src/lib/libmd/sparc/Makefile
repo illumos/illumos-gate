@@ -18,15 +18,29 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
 
-LIBRARY= libmd.a
+LIBRARY =	libmd.a
+VERS =		.1
 
-include ../Makefile.com
+OBJECTS =	md4.o md5.o sha1.o sha2.o
 
-DYNFLAGS += -Wl,-f/platform/\$$PLATFORM/lib/$(DYNLIBPSR)
+include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.rootfs
+include		../Makefile.com
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+# Symbol capabilities objects are added for sun4u and sun4v.
+EXTPICS =	../capabilities/sun4u/sparc/pics/symcap.o \
+		../capabilities/sun4v/sparc/pics/symcap.o
+
+.KEEP_STATE:
+
+all:		$(LIBS)
+
+install:	all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+
+lint:		lintcheck
+
+include		../Makefile.targ

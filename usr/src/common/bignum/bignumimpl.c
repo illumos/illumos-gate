@@ -2498,10 +2498,14 @@ big_modexp_crt(BIGNUM *result, BIGNUM *a, BIGNUM *dmodpminus1,
 
 
 static BIG_CHUNK_TYPE onearr[1] = {(BIG_CHUNK_TYPE)1};
+#if	!defined(NO_BIG_ONE)
 BIGNUM big_One = {1, 1, 1, 0, onearr};
+#endif
 
 static BIG_CHUNK_TYPE twoarr[1] = {(BIG_CHUNK_TYPE)2};
+#if	!defined(NO_BIG_TWO)
 BIGNUM big_Two = {1, 1, 1, 0, twoarr};
+#endif
 
 static BIG_CHUNK_TYPE fourarr[1] = {(BIG_CHUNK_TYPE)4};
 static BIGNUM big_Four = {1, 1, 1, 0, fourarr};

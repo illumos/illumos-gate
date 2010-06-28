@@ -1,0 +1,66 @@
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+$mapfile_version 2
+
+CAPABILITY {
+	PLATFORM  = "SUNW,A70";
+	PLATFORM += "SUNW,Netra-210";
+	PLATFORM += "SUNW,Netra-240";
+	PLATFORM += "SUNW,Netra-440";
+	PLATFORM += "SUNW,Netra-CP3010";
+	PLATFORM += "SUNW,Netra-T12";
+	PLATFORM += "SUNW,Netra-T4";
+	PLATFORM += "SUNW,Sun-Blade-1000";
+	PLATFORM += "SUNW,Sun-Blade-1500";
+	PLATFORM += "SUNW,Sun-Blade-2500";
+	PLATFORM += "SUNW,Sun-Fire-15000";
+	PLATFORM += "SUNW,Sun-Fire-280R";
+	PLATFORM += "SUNW,Sun-Fire-480R";
+	PLATFORM += "SUNW,Sun-Fire-880";
+	PLATFORM += "SUNW,Sun-Fire-V210";
+	PLATFORM += "SUNW,Sun-Fire-V215";
+	PLATFORM += "SUNW,Sun-Fire-V240";
+	PLATFORM += "SUNW,Sun-Fire-V245";
+	PLATFORM += "SUNW,Sun-Fire-V250";
+	PLATFORM += "SUNW,Sun-Fire-V440";
+	PLATFORM += "SUNW,Sun-Fire-V445";
+	PLATFORM += "SUNW,Sun-Fire-V490";
+	PLATFORM += "SUNW,Sun-Fire-V890";
+	PLATFORM += "SUNW,Sun-Fire";
+	MACHINE = sun4u;
+};
+
+SYMBOL_SCOPE {
+	global:
+		_memcmp;
+		_memcpy;
+		_memmove;
+		_memset;
+		memcmp;
+		memcpy;
+		memmove;
+		memset;
+	local:
+		*;
+};
