@@ -88,15 +88,22 @@ devvt_str2minor(const char *nm, minor_t *mp)
 	return (0);
 }
 
-/*ARGSUSED*/
+/*
+ * Validate that a node is up-to-date and correct.
+ * A validator may not update the node state or
+ * contents as a read lock permits entry by
+ * multiple threads.
+ */
 int
 devvt_validate(struct sdev_node *dv)
 {
 	minor_t min;
 	char *nm = dv->sdev_name;
+	int rval;
 
 	ASSERT(!(dv->sdev_flags & SDEV_STALE));
 	ASSERT(dv->sdev_state == SDEV_READY);
+	ASSERT(RW_LOCK_HELD(&(dv->sdev_dotdot)->sdev_contents));
 
 	/* validate only READY nodes */
 	if (dv->sdev_state != SDEV_READY) {
@@ -110,28 +117,20 @@ devvt_validate(struct sdev_node *dv)
 
 	if (strcmp(nm, DEVVT_ACTIVE_NAME) == 0) {
 		char *link = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-
 		(void) vt_getactive(link, MAXPATHLEN);
-		if (strcmp(link, dv->sdev_symlink) != 0) {
-			strfree(dv->sdev_symlink);
-			dv->sdev_symlink = strdup(link);
-			dv->sdev_attr->va_size = strlen(link);
-		}
+		rval = (strcmp(link, dv->sdev_symlink) == 0) ?
+		    SDEV_VTOR_VALID : SDEV_VTOR_STALE;
 		kmem_free(link, MAXPATHLEN);
-		return (SDEV_VTOR_VALID);
+		return (rval);
 	}
 
 	if (strcmp(nm, DEVVT_CONSUSER_NAME) == 0) {
 		char *link = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-
 		(void) vt_getconsuser(link, MAXPATHLEN);
-		if (strcmp(link, dv->sdev_symlink) != 0) {
-			strfree(dv->sdev_symlink);
-			dv->sdev_symlink = strdup(link);
-			dv->sdev_attr->va_size = strlen(link);
-		}
+		rval = (strcmp(link, dv->sdev_symlink) == 0) ?
+		    SDEV_VTOR_VALID : SDEV_VTOR_STALE;
 		kmem_free(link, MAXPATHLEN);
-		return (SDEV_VTOR_VALID);
+		return (rval);
 	}
 
 	if (devvt_str2minor(nm, &min) != 0) {
@@ -238,6 +237,8 @@ devvt_create_snode(struct sdev_node *ddv, char *nm, struct cred *cred, int type)
 	major_t maj;
 	minor_t min;
 
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+
 	if ((maj = vt_wc_attached()) == (major_t)-1)
 		return;
 
@@ -279,6 +280,36 @@ devvt_create_snode(struct sdev_node *ddv, char *nm, struct cred *cred, int type)
 }
 
 static void
+devvt_rebuild_stale_link(struct sdev_node *ddv, struct sdev_node *dv)
+{
+	char *link;
+
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+
+	ASSERT((strcmp(dv->sdev_name, DEVVT_ACTIVE_NAME) == 0) ||
+	    (strcmp(dv->sdev_name, DEVVT_CONSUSER_NAME) == 0));
+
+	link = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	if (strcmp(dv->sdev_name, DEVVT_ACTIVE_NAME) == 0) {
+		(void) vt_getactive(link, MAXPATHLEN);
+	} else if (strcmp(dv->sdev_name, DEVVT_CONSUSER_NAME) == 0) {
+		(void) vt_getconsuser(link, MAXPATHLEN);
+	}
+
+	if (strcmp(link, dv->sdev_symlink) != 0) {
+		strfree(dv->sdev_symlink);
+		dv->sdev_symlink = strdup(link);
+		dv->sdev_attr->va_size = strlen(link);
+	}
+	kmem_free(link, MAXPATHLEN);
+}
+
+/*
+ * First step in refreshing directory contents.
+ * Remove each invalid entry and rebuild the link
+ * reference for each stale entry.
+ */
+static void
 devvt_prunedir(struct sdev_node *ddv)
 {
 	struct vnode *vp;
@@ -293,31 +324,24 @@ devvt_prunedir(struct sdev_node *ddv)
 	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = next) {
 		next = SDEV_NEXT_ENTRY(ddv, dv);
 
-		/* skip stale nodes */
-		if (dv->sdev_flags & SDEV_STALE)
-			continue;
-
-		/* validate and prune only ready nodes */
-		if (dv->sdev_state != SDEV_READY)
-			continue;
-
 		switch (vtor(dv)) {
 		case SDEV_VTOR_VALID:
+			break;
 		case SDEV_VTOR_SKIP:
-			continue;
+			break;
 		case SDEV_VTOR_INVALID:
+			vp = SDEVTOV(dv);
+			if (vp->v_count != 0)
+				break;
+			/* remove the cached node */
+			SDEV_HOLD(dv);
+			(void) sdev_cache_update(ddv, &dv,
+			    dv->sdev_name, SDEV_CACHE_DELETE);
+			break;
 		case SDEV_VTOR_STALE:
-			sdcmn_err7(("destroy invalid "
-			    "node: %s(%p)\n", dv->sdev_name, (void *)dv));
+			devvt_rebuild_stale_link(ddv, dv);
 			break;
 		}
-		vp = SDEVTOV(dv);
-		if (vp->v_count > 0)
-			continue;
-		SDEV_HOLD(dv);
-		/* remove the cache node */
-		(void) sdev_cache_update(ddv, &dv, dv->sdev_name,
-		    SDEV_CACHE_DELETE);
 	}
 }
 
@@ -343,7 +367,10 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 	rw_enter(&sdvp->sdev_contents, RW_WRITER);
 #endif
 
-	/* 1. create missed nodes */
+	/* 1.  prune invalid nodes and rebuild stale symlinks */
+	devvt_prunedir(sdvp);
+
+	/* 2. create missing nodes */
 	for (min = 0; min < cnt; min++) {
 		char nm[16];
 
@@ -358,7 +385,7 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 			/* skip stale nodes */
 			if (dv->sdev_flags & SDEV_STALE)
 				continue;
-			/* validate and prune only ready nodes */
+			/* validate only ready nodes */
 			if (dv->sdev_state != SDEV_READY)
 				continue;
 			if (strcmp(nm, dv->sdev_name) == 0) {
@@ -371,7 +398,7 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 		}
 	}
 
-	/* 2. create active link node and console user link node */
+	/* 3. create active link node and console user link node */
 	found = 0;
 	for (dv = SDEV_FIRST_ENTRY(sdvp); dv; dv = next) {
 		next = SDEV_NEXT_ENTRY(sdvp, dv);
@@ -379,7 +406,7 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 		/* skip stale nodes */
 		if (dv->sdev_flags & SDEV_STALE)
 			continue;
-		/* validate and prune only ready nodes */
+		/* validate only ready nodes */
 		if (dv->sdev_state != SDEV_READY)
 			continue;
 		if ((strcmp(dv->sdev_name, DEVVT_ACTIVE_NAME) == NULL))
@@ -392,12 +419,8 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 	}
 	if (!(found & 0x01))
 		devvt_create_snode(sdvp, DEVVT_ACTIVE_NAME, cred, SDEV_VLINK);
-
 	if (!(found & 0x02))
 		devvt_create_snode(sdvp, DEVVT_CONSUSER_NAME, cred, SDEV_VLINK);
-
-	/* 3. cleanup invalid nodes */
-	devvt_prunedir(sdvp);
 
 #ifndef	__lock_lint
 	rw_downgrade(&sdvp->sdev_contents);

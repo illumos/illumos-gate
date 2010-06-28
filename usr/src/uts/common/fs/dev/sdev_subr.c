@@ -2573,6 +2573,15 @@ get_cache:
 
 		/*
 		 * Check validity of node
+		 * Drop invalid and nodes to be skipped.
+		 * A node the validator indicates as stale needs
+		 * to be returned as presumably the node name itself
+		 * is valid and the node data itself will be refreshed
+		 * on lookup.  An application performing a readdir then
+		 * stat on each entry should thus always see consistent
+		 * data.  In any case, it is not possible to synchronize
+		 * with dynamic kernel state, and any view we return can
+		 * never be anything more than a snapshot at a point in time.
 		 */
 		if (vtor) {
 			switch (vtor(dv)) {
@@ -2581,6 +2590,10 @@ get_cache:
 			case SDEV_VTOR_INVALID:
 			case SDEV_VTOR_SKIP:
 				continue;
+			case SDEV_VTOR_STALE:
+				sdcmn_err3(("sdev_readir: %s stale\n",
+				    dv->sdev_name));
+				break;
 			default:
 				cmn_err(CE_PANIC,
 				    "dev fs: validator failed: %s(%p)\n",
