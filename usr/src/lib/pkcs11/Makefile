@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # lib/pkcs11/Makefile
 
@@ -38,6 +36,7 @@ SUBDIRS = \
 	libsoftcrypto   \
 	libkcfd		\
 	pkcs11_kernel	\
+	pkcs11_kms	\
 	pkcs11_softtoken \
 	pkcs11_tpm
 

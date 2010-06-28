@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.cmd
@@ -29,8 +28,9 @@ SUBDIRS1 = \
 	decrypt \
 	digest \
 	elfsign \
-	pktool \
 	kmfcfg \
+	kmscfg \
+	pktool \
 	tpmadm
 
 $(CLOSED_BUILD)SUBDIRS1 += \
