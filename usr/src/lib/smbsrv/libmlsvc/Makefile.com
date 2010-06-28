@@ -82,12 +82,11 @@ INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lresolv -lnsl -lpkcs11 -lscf	\
-	-lavl -lnvpair -lsec -luutil -luuid -lgen -lzfs -lc
+	-lavl -lcmdutils -lnvpair -lsec -luutil -luuid -lgen -lzfs -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT
 
-SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)        	\
-        $(OBJS_SHARED:%.o=$(SRC)/common/smbsrv/%.c)
+SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)
 
 include ../../Makefile.targ
 include ../../../Makefile.targ

@@ -42,10 +42,6 @@
 #include <sys/zfs_acl.h>
 #include <sys/sa_impl.h>
 
-#ifndef _KERNEL
-#include "../genunix/list.h"
-#endif
-
 #ifdef _KERNEL
 #define	ZFS_OBJ_NAME	"zfs"
 #else
@@ -3019,14 +3015,6 @@ static const mdb_dcmd_t dcmds[] = {
 };
 
 static const mdb_walker_t walkers[] = {
-	/*
-	 * In userland, there is no generic provider of list_t walkers, so we
-	 * need to add it.
-	 */
-#ifndef _KERNEL
-	{ LIST_WALK_NAME, LIST_WALK_DESC,
-		list_walk_init, list_walk_step, list_walk_fini },
-#endif
 	{ "zms_freelist", "walk ZFS metaslab freelist",
 		freelist_walk_init, freelist_walk_step, NULL },
 	{ "txg_list", "given any txg_list_t *, walk all entries in all txgs",

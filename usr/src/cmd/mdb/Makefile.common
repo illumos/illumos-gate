@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # MDB modules used for debugging user processes that every ISA's build
 # subdirectory will need to build.
@@ -29,6 +28,7 @@ COMMON_MODULES_PROC = \
 	dof \
 	libavl \
 	libc \
+	libcmdutils \
 	libnvpair \
 	libproc \
 	libpython2.6 \

@@ -19,15 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY=	libcmdutils.a
 VERS=		.1
-OBJECTS=	avltree.o sysattrs.o writefile.o process_xattrs.o
+CMD_OBJS=	avltree.o sysattrs.o writefile.o process_xattrs.o
+COM_OBJS=	list.o
+OBJECTS=	$(CMD_OBJS) $(COM_OBJS)
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
@@ -37,6 +36,12 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lavl -lnvpair
 
 SRCDIR =	../common
+
+COMDIR= $(SRC)/common/list
+SRCS=	\
+	$(CMD_OBJS:%.o=$(SRCDIR)/%.c)   \
+	$(COM_OBJS:%.o=$(COMDIR)/%.c)
+
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
@@ -50,5 +55,9 @@ CPPFLAGS +=	-I.. -I../../common/inc -D_REENTRANT -D_FILE_OFFSET_BITS=64
 all: $(LIBS)
 
 lint: lintcheck
+
+pics/%.o: $(COMDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 include ../../Makefile.targ

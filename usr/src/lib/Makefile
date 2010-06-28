@@ -610,7 +610,7 @@ sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket
 libshell:	libast libcmd libdll libsocket libsecdb
 libsip:		libmd5
-libsmbfs:	libsocket libnsl libkrb5
+libsmbfs:	libcmdutils libsocket libnsl libkrb5
 libsocket:	libnsl
 libstmfproxy: 	libstmf libsocket libnsl libpthread
 libsum: 	libast
@@ -640,14 +640,15 @@ udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevid libgen libnvpair libuutil \
 		libadm libavl libefi libidmap libmd
 libzfs_jni:	libdiskmgt libnvpair libzfs
-libzpool:	libavl libumem libnvpair
+libzpool:	libavl libumem libnvpair libcmdutils
 libsec:		libavl libidmap
 brand:		libc libsocket
 libshare:	libscf libzfs libuuid libfsmgt libsecdb libumem libsmbfs
 libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
-		libshare libidmap pkcs11 libsqlite libcryptoutil libreparse
+		libshare libidmap pkcs11 libsqlite libcryptoutil \
+		libreparse libcmdutils
 libv12n:	libds libuuid
 libvrrpadm:	libsocket libdladm libscf
 libvscan:	libscf

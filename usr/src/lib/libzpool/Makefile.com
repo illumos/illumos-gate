@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY= libzpool.a
@@ -29,9 +28,8 @@ VERS= .1
 # include the list of ZFS sources
 include ../../../uts/common/Makefile.files
 KERNEL_OBJS = kernel.o taskq.o util.o
-LIST_OBJS = list.o
 
-OBJECTS=$(ZFS_COMMON_OBJS) $(ZFS_SHARED_OBJS) $(KERNEL_OBJS) $(LIST_OBJS)
+OBJECTS=$(ZFS_COMMON_OBJS) $(ZFS_SHARED_OBJS) $(KERNEL_OBJS)
 
 # include library definitions
 include ../../Makefile.lib
@@ -41,7 +39,7 @@ ZFS_SHARED_SRCS=	$(ZFS_SHARED_OBJS:%.o=../../../common/zfs/%.c)
 KERNEL_SRCS=		$(KERNEL_OBJS:%.o=../common/%.c)
 LIST_SRCS=		$(LIST_OBJS:%.o=../../../uts/common/os/%.c)
 
-SRCS=$(ZFS_COMMON_SRCS) $(ZFS_SHARED_SRCS) $(KERNEL_SRCS) $(LIST_SRCS)
+SRCS=$(ZFS_COMMON_SRCS) $(ZFS_SHARED_SRCS) $(KERNEL_SRCS)
 SRCDIR=		../common
 
 # There should be a mapfile here
@@ -61,7 +59,7 @@ C99LMODE=	-Xc99=%all
 
 CFLAGS +=	-g $(CCVERBOSE) $(CNOGLOBAL)
 CFLAGS64 +=	-g $(CCVERBOSE) $(CNOGLOBAL)
-LDLIBS +=	-lumem -lavl -lnvpair -lz -lc -lsysevent -lmd
+LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lsysevent -lmd
 CPPFLAGS +=	$(INCS)
 
 .KEEP_STATE:
@@ -77,9 +75,5 @@ pics/%.o: ../../../uts/common/fs/zfs/%.c
 	$(POST_PROCESS_O)
 
 pics/%.o: ../../../common/zfs/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-pics/%.o: ../../../uts/common/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

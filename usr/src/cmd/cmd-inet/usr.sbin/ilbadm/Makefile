@@ -25,11 +25,9 @@ PROG=		ilbadm
 
 ILB_OBJS =	ilbadm.o ilbadm_sg.o ilbadm_rules.o ilbadm_hc.o
 ILB_OBJS +=	ilbadm_subr.o ilbadm_import.o ilbadm_nat.o ilbadm_stats.o
-LIST_OBJS =	list.o
-OBJS =		$(ILB_OBJS) $(LIST_OBJS)
+OBJS =		$(ILB_OBJS)
 
 ILB_SRCS=	$(ILB_OBJS:.o=.c)
-LIST_SRCS=	$(LIST_OBJS:%.o=../../../../uts/common/os/%.c)
 
 SRCS=		$(ILB_SRC) $(LIST_SRCS)
 
@@ -37,7 +35,7 @@ include	../../../Makefile.cmd
 include	../../../Makefile.ctf
 include ../../Makefile.cmd-inet
 
-LDLIBS +=	-lsocket -lnsl -lilb -linetutil -lkstat
+LDLIBS +=	-lcmdutils -lsocket -lnsl -lilb -linetutil -lkstat
 CPPFLAGS +=	-I$(SRC)/lib/libilb/common -I$(SRC)/uts/common
 
 C99MODE =	$(C99_ENABLE)
@@ -71,8 +69,3 @@ check:	$(ILB_SRCS) $(PROG).h
 	$(HDRCHK) $(PROG).h
 
 include ../../../Makefile.targ
-
-# the below is needed to get list.o built
-%.o: ../../../../uts/common/os/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)

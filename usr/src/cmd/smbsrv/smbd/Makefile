@@ -51,7 +51,7 @@ $(ROOTVARSMBDLL):= FILEMODE = 0755
 include ../Makefile.smbsrv.defs
 
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lmlsvc -lmlrpc -lsmbns -lsmb \
-	-lzfs -lbsm -lsocket -lnsl -lscf -lumem
+	-lzfs -lbsm -lsocket -lnsl -lscf -lumem -lcmdutils
 LDFLAGS += -R/usr/lib/smbsrv
 
 ROOTSMBDDIR = $(ROOTLIB)/smbsrv

@@ -53,7 +53,6 @@ OBJS_COMMON = 			\
 	smb_idmap.o		\
 	smb_info.o		\
 	smb_kmod.o		\
-	smb_list.o		\
 	smb_lgrp.o		\
 	smb_mac.o		\
 	smb_nic.o		\
@@ -76,7 +75,7 @@ INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lscf -lmd -luuid -lnsl -lpkcs11 -lsec -lsocket -lresolv
-LDLIBS +=	-lidmap -lreparse -lnvpair -lavl -lc
+LDLIBS +=	-lidmap -lreparse -lnvpair -lcmdutils -lavl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

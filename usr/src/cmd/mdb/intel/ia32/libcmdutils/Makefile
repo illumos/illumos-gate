@@ -19,38 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-LIBRARY =	libilb.a
-VERS =		.1
+MODULE = libcmdutils.so
+MDBTGT = proc
 
-LIB_OBJS =	ilb_sg.o ilb_comm.o ilb_subr.o ilb_rules.o
-LIB_OBJS +=	ilb_hc.o ilb_nat.o
+MODSRCS = libcmdutils.c \
+	  list.c
 
-OBJECTS = 	$(LIB_OBJS)
-
-include ../../Makefile.lib
-
-LIB_SRCS=	$(LIB_OBJS:%.o=$(SRCDIR)/%.c)
-LIBS =		$(DYNLIB) $(LINTLIB)
-INCS +=		-I../common -I$(SRC)/uts/common
-LDLIBS +=	-lc
-
-SRCDIR =	../common
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-C99MODE =	$(C99_ENABLE)
-
-CFLAGS +=	-mt $(CCVERBOSE)
-CPPFLAGS +=	$(INCS)
-LDLIBS +=	-lsocket
-
-.KEEP_STATE:
-
-all: $(LIBS)
-
-lint: $(LIB_SRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(LIB_SRCS) $(LDLIBS)
-
-include ../../Makefile.targ
+include ../../../../Makefile.cmd
+include ../../Makefile.ia32
+include ../../../Makefile.module

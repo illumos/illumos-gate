@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-# 
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # 
 
 LIBRARY= libsmbns.a
@@ -50,7 +48,8 @@ SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRC)/common/smbsrv/%.c)
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lsmb -lgss -lldap -lresolv -lnsl -lsocket -lc -lcryptoutil
+LDLIBS +=	-lsmb -lgss -lcmdutils -lldap -lresolv -lnsl -lsocket
+LDLIBS +=	-lc -lcryptoutil
 CPPFLAGS +=	-D_REENTRANT
 
 # DYNLIB libraries do not have lint libs and are not linted

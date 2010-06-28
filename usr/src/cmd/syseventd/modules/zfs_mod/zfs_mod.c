@@ -69,9 +69,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <sys/list.h>
 #include <sys/sunddi.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dev.h>
+#include <thread_pool.h>
 #include <unistd.h>
 #include "syseventd.h"
 
@@ -88,6 +90,41 @@
 typedef void (*zfs_process_func_t)(zpool_handle_t *, nvlist_t *, boolean_t);
 
 libzfs_handle_t *g_zfshdl;
+list_t g_pool_list;
+tpool_t *g_tpool;
+
+typedef struct unavailpool {
+	zpool_handle_t	*uap_zhp;
+	list_node_t	uap_node;
+} unavailpool_t;
+
+int
+zfs_toplevel_state(zpool_handle_t *zhp)
+{
+	nvlist_t *nvroot;
+	vdev_stat_t *vs;
+	unsigned int c;
+
+	verify(nvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
+	    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
+	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_VDEV_STATS,
+	    (uint64_t **)&vs, &c) == 0);
+	return (vs->vs_state);
+}
+
+static int
+zfs_unavail_pool(zpool_handle_t *zhp, void *data)
+{
+	if (zfs_toplevel_state(zhp) < VDEV_STATE_DEGRADED) {
+		unavailpool_t *uap;
+		uap = malloc(sizeof (unavailpool_t));
+		uap->uap_zhp = zhp;
+		list_insert_tail((list_t *)data, uap);
+	} else {
+		zpool_close(zhp);
+	}
+	return (0);
+}
 
 /*
  * The device associated with the given vdev (either by devid or physical path)
@@ -278,12 +315,23 @@ zfs_iter_vdev(zpool_handle_t *zhp, nvlist_t *nvl, void *data)
 	(dp->dd_func)(zhp, nvl, dp->dd_isdisk);
 }
 
+void
+zfs_enable_ds(void *arg)
+{
+	unavailpool_t *pool = (unavailpool_t *)arg;
+
+	(void) zpool_enable_datasets(pool->uap_zhp, NULL, 0);
+	zpool_close(pool->uap_zhp);
+	free(pool);
+}
+
 static int
 zfs_iter_pool(zpool_handle_t *zhp, void *data)
 {
 	nvlist_t *config, *nvl;
 	dev_data_t *dp = data;
 	uint64_t pool_guid;
+	unavailpool_t *pool;
 
 	if ((config = zpool_get_config(zhp, NULL)) != NULL) {
 		if (dp->dd_pool_guid == 0 ||
@@ -292,6 +340,18 @@ zfs_iter_pool(zpool_handle_t *zhp, void *data)
 			(void) nvlist_lookup_nvlist(config,
 			    ZPOOL_CONFIG_VDEV_TREE, &nvl);
 			zfs_iter_vdev(zhp, nvl, data);
+		}
+	}
+	for (pool = list_head(&g_pool_list); pool != NULL;
+	    pool = list_next(&g_pool_list, pool)) {
+
+		if (strcmp(zpool_get_name(zhp),
+		    zpool_get_name(pool->uap_zhp)))
+			continue;
+		if (zfs_toplevel_state(zhp) >= VDEV_STATE_DEGRADED) {
+			list_remove(&g_pool_list, pool);
+			(void) tpool_dispatch(g_tpool, zfs_enable_ds, pool);
+			break;
 		}
 	}
 
@@ -530,7 +590,6 @@ zfs_deliver_dle(nvlist_t *nvl)
 		    " found\n", devname);
 		return (1);
 	}
-	nvlist_free(nvl);
 	return (0);
 }
 
@@ -596,12 +655,30 @@ slm_init()
 {
 	if ((g_zfshdl = libzfs_init()) == NULL)
 		return (NULL);
-
+	/* collect a list of unavailable pools */
+	list_create(&g_pool_list, sizeof (struct unavailpool),
+	    offsetof(struct unavailpool, uap_node));
+	(void) zpool_iter(g_zfshdl, zfs_unavail_pool, (void *)&g_pool_list);
+	if (!list_is_empty(&g_pool_list))
+		g_tpool = tpool_create(1, sysconf(_SC_NPROCESSORS_ONLN),
+		    0, NULL);
 	return (&zfs_mod_ops);
 }
 
 void
 slm_fini()
 {
+	unavailpool_t *pool;
+
+	if (g_tpool) {
+		tpool_wait(g_tpool);
+		tpool_destroy(g_tpool);
+	}
+	while ((pool = (list_head(&g_pool_list))) != NULL) {
+		list_remove(&g_pool_list, pool);
+		zpool_close(pool->uap_zhp);
+		free(pool);
+	}
+	list_destroy(&g_pool_list);
 	libzfs_fini(g_zfshdl);
 }

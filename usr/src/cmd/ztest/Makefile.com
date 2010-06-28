@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG= ztest
@@ -33,7 +32,7 @@ include ../../Makefile.ctf
 INCS += -I../../../lib/libzpool/common 
 INCS += -I../../../uts/common/fs/zfs 
 
-LDLIBS += -lumem -lzpool -lm -lnvpair
+LDLIBS += -lumem -lzpool -lcmdutils -lm -lnvpair
 
 C99MODE= -xc99=%all
 C99LMODE= -Xc99=%all

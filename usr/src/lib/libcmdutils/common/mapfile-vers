@@ -42,6 +42,23 @@ SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	add_tnode;
 	destroy_tree;
+	list_create;
+	list_destroy;
+	list_head;
+	list_insert_after;
+	list_insert_before;
+	list_insert_head;
+	list_insert_tail;
+	list_is_empty;
+	list_link_active;
+	list_link_init;
+	list_move_tail;
+	list_next;
+	list_prev;
+	list_remove;
+	list_remove_head;
+	list_remove_tail;
+	list_tail;
 	tnode_compare;
 	sysattr_type;
 	sysattr_support;

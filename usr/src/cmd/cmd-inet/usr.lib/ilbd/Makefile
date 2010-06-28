@@ -30,13 +30,10 @@ ILBD_OBJS=	ilbd_main.o ilbd_support.o ilbd_sg.o ilbd_rules.o ilbd_hc.o \
 ILBD_SRCS=	$(ILBD_OBJS:%.o=%.c)
 HDRS=		ilbd.h
 
-LIST_OBJS=	list.o
-LIST_SRCS=	$(LIST_OBJS:%.o=../../../uts/common/os/%.c) 
-
 LIB_INC=	$(SRC)/lib/libilb/common
 
-OBJS=		$(ILBD_OBJS) $(LIST_OBJS)
-SRCS=		$(ILBD_SRCS) $(LIST_SRCS)
+OBJS=		$(ILBD_OBJS)
+SRCS=		$(ILBD_SRCS)
 
 ILBSUBDIRS=	ilb
 
@@ -65,7 +62,7 @@ clobber:=	TARGET= clobber
 lint:=		TARGET= lint
 
 
-LDLIBS +=	-lsocket -lsecdb -lnsl -lilb -lscf -linetutil -lbsm
+LDLIBS +=	-lcmdutils -lsocket -lsecdb -lnsl -lilb -lscf -linetutil -lbsm
 
 .KEEP_STATE:
 
@@ -94,11 +91,6 @@ $(POFILE):	$(POFILES)
 all install clean clobber lint: $(ILBSUBDIRS)
 
 include		../../../Makefile.targ
-
-# the below is needed to get list.o built
-%.o: ../../../../uts/common/os/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
 $(ILBSUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
