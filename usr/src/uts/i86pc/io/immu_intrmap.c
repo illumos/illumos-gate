@@ -280,6 +280,7 @@ alloc_tbl_multi_entries(intrmap_t *intrmap, uint_t cnt)
 				bitset_add(&intrmap->intrmap_map, idx + i);
 			}
 			mutex_exit(&intrmap->intrmap_lock);
+			break;
 		}
 
 		mutex_exit(&intrmap->intrmap_lock);
@@ -305,13 +306,13 @@ init_unit(immu_t *immu)
 	ddi_dma_attr_t intrmap_dma_attr = {
 		DMA_ATTR_V0,
 		0U,
-		0xffffffffU,
+		0xffffffffffffffffULL,
 		0xffffffffU,
 		MMU_PAGESIZE,	/* page aligned */
 		0x1,
 		0x1,
 		0xffffffffU,
-		0xffffffffU,
+		0xffffffffffffffffULL,
 		1,
 		4,
 		0

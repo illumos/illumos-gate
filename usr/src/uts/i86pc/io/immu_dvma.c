@@ -88,13 +88,13 @@ extern struct memlist  *phys_install;
 static ddi_dma_attr_t immu_dma_attr = {
 	DMA_ATTR_V0,
 	0U,
-	0xffffffffU,
+	0xffffffffffffffffULL,
 	0xffffffffU,
 	MMU_PAGESIZE, /* MMU page aligned */
 	0x1,
 	0x1,
 	0xffffffffU,
-	0xffffffffU,
+	0xffffffffffffffffULL,
 	1,
 	4,
 	0

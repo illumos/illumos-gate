@@ -861,7 +861,7 @@ int immu_intr_handler(immu_t *immu);
 
 
 /* immu_qinv.c interfaces */
-void immu_qinv_setup(list_t *immu_list);
+int immu_qinv_setup(list_t *immu_list);
 void immu_qinv_startup(immu_t *immu);
 void immu_qinv_shutdown(immu_t *immu);
 void immu_qinv_destroy(list_t *immu_list);

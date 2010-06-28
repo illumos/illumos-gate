@@ -502,13 +502,13 @@ qinv_setup(immu_t *immu)
 	ddi_dma_attr_t qinv_dma_attr = {
 		DMA_ATTR_V0,
 		0U,
-		0xffffffffU,
+		0xffffffffffffffffULL,
 		0xffffffffU,
 		MMU_PAGESIZE, /* page aligned */
 		0x1,
 		0x1,
 		0xffffffffU,
-		0xffffffffU,
+		0xffffffffffffffffULL,
 		1,
 		4,
 		0
@@ -651,21 +651,28 @@ queue_table_handle_failed:
 /*
  * initialize invalidation request queue structure.
  */
-void
+int
 immu_qinv_setup(list_t *listp)
 {
 	immu_t *immu;
+	int nerr;
 
 	if (immu_qinv_enable == B_FALSE) {
-		return;
+		return (DDI_FAILURE);
 	}
 
+	nerr = 0;
 	immu = list_head(listp);
 	for (; immu; immu = list_next(listp, immu)) {
 		if (qinv_setup(immu) == DDI_SUCCESS) {
 			immu->immu_qinv_setup = B_TRUE;
+		} else {
+			nerr++;
+			break;
 		}
 	}
+
+	return (nerr > 0 ? DDI_FAILURE : DDI_SUCCESS);
 }
 
 void

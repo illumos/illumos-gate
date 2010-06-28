@@ -849,8 +849,10 @@ immu_subsystems_setup(void)
 
 	immu_regs_setup(&immu_list);	/* subsequent code needs this first */
 	immu_dvma_setup(&immu_list);
-	immu_intrmap_setup(&immu_list);
-	immu_qinv_setup(&immu_list);
+	if (immu_qinv_setup(&immu_list) == DDI_SUCCESS)
+		immu_intrmap_setup(&immu_list);
+	else
+		immu_intrmap_enable = B_FALSE;
 
 	mutex_exit(&immu_lock);
 }
