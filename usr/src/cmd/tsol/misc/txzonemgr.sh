@@ -24,15 +24,36 @@
 #
 
 # This script provides a simple GUI for managing labeled zones.
-# It takes no arguments, but provides contextual menus which
-# provide appropriate choices. It must be run in the global
-# zone as root.
+# It provides contextual menus which provide appropriate choices.
+# It must be run in the global zone as root.
+
+# These arguments are accepted, and will result in non-interactive
+# (text-only) mode:
+#
+#	txzonemgr [-c | -d[f]]
+#
+#	-c	create default zones
+#	-d	destroy all zones; prompts for confirmation unless
+#		the -f flag is also specified
+#	-f	force
+#
+
+# DISP - use GUI (otherwise use non-interactive mode)
+DISP=1
+# CREATEDEF - make default zones (non-interactive)
+CREATEDEF=0
+# DESTROYZONES - tear down all zones (non-interactive)
+DESTROYZONES=0
+# FORCE - force
+FORCE=0
 
 NSCD_PER_LABEL=0
 NSCD_INDICATOR=/var/tsol/doors/nscd_per_label
 if [ -f $NSCD_INDICATOR ] ; then
 	NSCD_PER_LABEL=1
 fi
+
+myname=$(basename $0)
 
 TXTMP=/tmp/txzonemgr
 TNRHTP=/etc/security/tsol/tnrhtp
@@ -58,6 +79,59 @@ msg_getmin=$(gettext "Select the minimum network label for the")
 msg_getmax=$(gettext "Select the maximum network label for the")
 msg_badip=$(gettext " is not a valid IP address")
 
+
+process_options()
+{
+	typeset opt optlist
+
+	optlist='cdf'
+
+	while getopts ":$optlist" opt
+	do
+		case $opt in
+		c)	CREATEDEF=1
+			DISP=0
+			;;
+		d)	DESTROYZONES=1
+			DISP=0
+			;;
+		f)	FORCE=1
+			;;
+		*)	gettext "invalid option -$OPTARG\n"
+			usage
+			return 2
+			;;
+		esac
+	done
+
+	if [ $CREATEDEF -eq 1 -a $DESTROYZONES -eq 1 ] ; then
+		gettext "cannot combine options -c and -d\n"
+		usage
+		return 2
+	fi
+	if [ $CREATEDEF -eq 1 -a $FORCE -eq 1 ] ; then
+		gettext "option -f not allowed with -c\n"
+		usage
+		return 2
+	fi
+	if [ $FORCE -eq 1 -a $CREATEDEF -eq 0 -a $DESTROYZONES -eq 0 ] ; then
+		gettext "option -f specified without any other options\n"
+		usage
+		return 2
+	fi
+
+	shift $((OPTIND - 1))
+	if [ "x$1" != "x" ] ; then
+		usage
+		return 2
+	fi
+
+	return 0
+}
+
+usage() {
+	gettext "usage: $myname [-c | -d[f]]\n"
+}
 
 consoleCheck() {
 	if [ $zonename != global ] ; then
@@ -286,8 +360,7 @@ createZDSET() {
 	# First check if ZFS encrytption support is available
 	pversion=$(zpool list -H -o version $pool)
 	cversion=$(zpool upgrade -v | grep Crypto | awk '{ print $1 }')
-
-	if [[ $cversion == "" || $pversion -lt $cversion ]]; then
+	if (( cversion == 0 || pversion < cversion )); then
 		zfs create $options $ZDSET
 		return
 	fi
@@ -331,7 +404,7 @@ createZDSET() {
 
 	options="$options -o encryption=$encryption -o keysource=$keysource"
 	zfs create $options $ZDSET
-	if [[ $removefile -eq 1 ]]; then
+	if (( removefile == 1 )); then
 		zfs set keysource=passphrase,prompt $ZDSET
 		rm $file
 	fi
@@ -484,13 +557,33 @@ snapshot of one of the following halted zones:")
 
 install() {
 	removeZoneBEs
-	gnome-terminal \
-	    --title="$title: Installing $zonename zone" \
-	    --command "zoneadm -z $zonename install" \
-	    --disable-factory \
-	    --hide-menubar
+	if [ $DISP -eq 0 ] ; then
+		gettext "installing zone $zonename ...\n"
+		zoneadm -z $zonename install
+	else
+		# sleep is needed here to avoid occasional timing
+		# problem with gnome-terminal display...
+		sleep 2
+		gnome-terminal \
+		    --title="$title: Installing $zonename zone" \
+		    --command "zoneadm -z $zonename install" \
+		    --disable-factory \
+		    --hide-menubar
+	fi
+
+	zonestate=$(zoneadm -z $zonename list -p | cut -d : -f 3)
+	if [ $zonestate != installed ] ; then
+		gettext "error installing zone $zonename.\n"
+		return 1
+	fi
 
 	zoneadm -z $zonename ready
+	zonestate=$(zoneadm -z $zonename list -p | cut -d : -f 3)
+	if [ $zonestate != ready ] ; then
+		gettext "error making zone $zonename ready.\n"
+		return 1
+	fi
+
 	initialize
 	zoneadm -z $zonename halt
 }
@@ -555,18 +648,17 @@ validateIPaddr () {
 		while (( octet_cnt < ${#octets[*]} )); do
 			dummy=${octets[octet_cnt]}
 			if [ $dummy = ${octets[octet_cnt]} ] ; then
-				if (( $dummy >= 0 && \
-				    $dummy < 256 )) ; then
+				if (( dummy >= 0 && \
+				    dummy < 256 )) ; then
 					octet_cnt+=1
 					continue
 				fi
-			else
-				x=$(zenity --error \
-				    --title="$title" \
-				    --text="$ipaddr $msg_badip")
-				ipaddr=
-				return
 			fi
+			x=$(zenity --error \
+			    --title="$title" \
+			    --text="$ipaddr $msg_badip")
+			ipaddr=
+			return
 		done
 	else
 		x=$(zenity --error \
@@ -1247,16 +1339,33 @@ createLDAPclient() {
 }
 
 tearDownZones() {
-	killall=$(zenity --question \
-	    --title="$title" \
-	    --width=330 \
-	    --text="$msg_confirmkill")
-	if [[ $? != 0 ]]; then
-		return
+	if [ $DISP -eq 0 ] ; then
+		if [ $FORCE -eq 0 ] ; then
+			gettext "OK to destroy all zones [y|N]? "
+			read ans
+			printf "%s\n" "$ans" \
+			    | /usr/xpg4/bin/grep -Eq "$(locale yesexpr)"
+			if [ $? -ne 0 ] ; then
+				gettext "canceled.\n"
+				return 1
+			fi
+		fi
+		gettext "destroying all zones ...\n"
+	else
+		killall=$(zenity --question \
+		    --title="$title" \
+		    --width=330 \
+		    --text="$msg_confirmkill")
+		if [[ $? != 0 ]]; then
+			return
+		fi
 	fi
 
 	for p in $(zoneadm list -cp|grep -v global:) ; do
 		zonename=$(echo "$p"|cut -d : -f2)
+		if [ $DISP -eq 0 ] ; then
+			gettext "destroying zone $zonename ...\n"
+		fi
 		zoneadm -z $zonename halt 1>/dev/null 2>&1
 		zoneadm -z $zonename uninstall -F 1>/dev/null 2>&1
 		delete -rRf
@@ -1265,6 +1374,16 @@ tearDownZones() {
 }
 
 createDefaultZones() {
+	# If GUI display is not used, skip the dialog
+	if [ $DISP -eq 0 ] ; then
+		createDefaultPublic
+		if [ $? -ne 0 ] ; then
+			return 1
+		fi
+		createDefaultInternal
+		return
+	fi
+
 	msg_choose1=$(gettext "Choose one:")
 	defpub=$(gettext "$PUBZONE zone only")
 	defboth=$(gettext "$PUBZONE and $INTZONE zones")
@@ -1286,6 +1405,9 @@ createDefaultZones() {
 
 	    " $defboth")
 		createDefaultPublic
+		if [ $? -ne 0 ] ; then
+			return 1
+		fi
 		createDefaultInternal ;;
 
 	    *)
@@ -1295,17 +1417,30 @@ createDefaultZones() {
 
 createDefaultPublic() {
 	zonename=$PUBZONE
+	if [ $DISP -eq 0 ] ; then
+		gettext "creating default $zonename zone ...\n"
+	fi
 	newZone	
 	zone_cnt+=1 
 	hexlabel=$DEFAULTLABEL
 	setTNdata
 	sharePrimaryNic
+
 	install
-	zoneadm -z $zonename boot &
-	gnome-terminal \
-	    --disable-factory \
-	    --title="Zone Console: $zonename $msg_continue" \
-	    --command "zlogin -C $zonename"
+	if [ $? -ne 0 ] ; then
+		return 1
+	fi
+
+	if [ $DISP -eq 0 ] ; then
+		gettext "booting zone $zonename ...\n"
+		zoneadm -z $zonename boot
+	else
+		zoneadm -z $zonename boot &
+		gnome-terminal \
+		    --disable-factory \
+		    --title="Zone Console: $zonename $msg_continue" \
+		    --command "zlogin -C $zonename"
+	fi
 }
 
 createDefaultInternal() {
@@ -1320,14 +1455,29 @@ createDefaultInternal() {
 	zoneadm -z $PUBZONE boot &
 
 	zonename=$INTZONE
+	if [ $DISP -eq 0 ] ; then
+		gettext "creating default $zonename zone ...\n"
+	fi
 	newZone	
 	zone_cnt+=1 
-	selectLabel
+
+	hexlabel=$INTLABEL
+	x=$(grep -i :{$hexlabel}: $TNZONECFG)
+	if [ $? = 0 ] ; then
+		z=$(print $x|cut -d : -f1)
+		echo "$msg_inuse $z zone."
+	else
+		setTNdata
+	fi
 
 	clone snapshot
-	gnome-terminal \
-	    --title="Zone Console: $zonename" \
-	    --command "zlogin -C $zonename" &
+	if [ $DISP -eq 0 ] ; then
+		gettext "booting zone $zonename ...\n"
+	else
+		gnome-terminal \
+		    --title="Zone Console: $zonename" \
+		    --command "zlogin -C $zonename" &
+	fi
 	zoneadm -z $zonename boot &
 }
 
@@ -1596,20 +1746,26 @@ file_downgrade_sl,file_upgrade_sl,sys_trans_label ;;
 
 /usr/bin/plabel $$ 1>/dev/null 2>&1
 if [ $? != 0 ] ; then
-	echo "$0 : Trusted Extensions must be enabled."
+	gettext "$0 : Trusted Extensions must be enabled.\n"
 	exit 1
 fi
 
 myzone=$(/sbin/zonename)
 if [ $myzone != "global" ] ; then
-	echo "$0 : must be in global zone to run."
+	gettext "$0 : must be in global zone to run.\n"
 	exit 1
 fi
+
+
+process_options "$@" || exit
 
 mkdir $TXTMP 2>/dev/null
 deflabel=$(chk_encodings -a|grep "Default User Sensitivity"|\
    sed 's/= /=/'|sed 's/"/'''/g|cut -d"=" -f2)
 DEFAULTLABEL=$(atohexlabel ${deflabel})
+intlabel=$(chk_encodings -a|grep "Default User Clearance"|\
+   sed 's/= /=/'|sed 's/"/'''/g|cut -d"=" -f2)
+INTLABEL=$(atohexlabel -c "${intlabel}")
 
 # are there any zfs pools?
 ZDSET=none
@@ -1634,7 +1790,25 @@ if [ $? = 0 ] ; then
 	fi
 fi
 
-if [ $NSCD_PER_LABEL -eq 0 ]  ; then
+if [ $DISP -eq 0 ] ; then
+	gettext "non-interactive mode ...\n"
+
+	if [ $DESTROYZONES -eq 1 ] ; then
+		tearDownZones
+	fi
+
+	if [ $CREATEDEF -eq 1 ] ; then
+		if [[ $(zoneadm list -c) == global ]] ; then
+			createDefaultZones
+		else
+			gettext "cannot create default zones because there are existing zones.\n"
+		fi
+	fi
+
+	exit
+fi
+
+if [ $NSCD_PER_LABEL -eq 0 ] ; then
 	NSCD_OPT="Configure per-zone name service"
 else
 	NSCD_OPT="Unconfigure per-zone name service"
