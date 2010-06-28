@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/mutex.h>
@@ -804,25 +803,41 @@ contract_device_abandon(contract_t *ct)
 static void
 contract_device_destroy(contract_t *ct)
 {
-	cont_device_t	*ctd = ct->ct_data;
-	dev_info_t	*dip = ctd->cond_dip;
+	cont_device_t	*ctd;
+	dev_info_t	*dip;
 
 	ASSERT(MUTEX_HELD(&ct->ct_lock));
 
-	if (dip == NULL) {
-		/*
-		 * The dip has been removed, this is a dangling contract
-		 * Check that dip linkages are NULL
-		 */
-		ASSERT(!list_link_active(&ctd->cond_next));
-		CT_DEBUG((CE_NOTE, "contract_device_destroy: contract has no "
-		    "devinfo node. contract ctid : %d", ct->ct_id));
-		return;
-	}
+	for (;;) {
+		ctd = ct->ct_data;
+		dip = ctd->cond_dip;
+		if (dip == NULL) {
+			/*
+			 * The dip has been removed, this is a dangling contract
+			 * Check that dip linkages are NULL
+			 */
+			ASSERT(!list_link_active(&ctd->cond_next));
+			CT_DEBUG((CE_NOTE, "contract_device_destroy:"
+			    " contract has no devinfo node. contract ctid : %d",
+			    ct->ct_id));
+			return;
+		}
 
-	/*
-	 * Need to have lock order: devi_ct_lock -> ct_count barrier -> ct_lock
-	 */
+		/*
+		 * The intended lock order is : devi_ct_lock -> ct_count
+		 * barrier -> ct_lock.
+		 * However we can't do this here as dropping the ct_lock allows
+		 * a race condition with i_ddi_free_node()/
+		 * contract_device_remove_dip() which may free off dip before
+		 * we can take devi_ct_lock. So use mutex_tryenter to avoid
+		 * dropping ct_lock until we have acquired devi_ct_lock.
+		 */
+		if (mutex_tryenter(&(DEVI(dip)->devi_ct_lock)) != 0)
+			break;
+		mutex_exit(&ct->ct_lock);
+		delay(drv_usectohz(1000));
+		mutex_enter(&ct->ct_lock);
+	}
 	mutex_exit(&ct->ct_lock);
 
 	/*
@@ -831,7 +846,6 @@ contract_device_destroy(contract_t *ct)
 	 * contract_device_publish() by establishing the invariant that
 	 * device contracts cannot go away during negotiation.
 	 */
-	mutex_enter(&(DEVI(dip)->devi_ct_lock));
 	ct_barrier_wait_for_release(dip);
 	mutex_enter(&ct->ct_lock);
 

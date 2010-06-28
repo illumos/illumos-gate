@@ -431,7 +431,7 @@ static void
 ses_ct_print(char *ptr)
 {
 	(void) pthread_mutex_lock(&sesthread.mt);
-	if (ses_smod->smod_mod)
+	if (ses_smod != NULL && ses_smod->smod_mod != NULL)
 		topo_mod_dprintf(ses_smod->smod_mod, ptr);
 	(void) pthread_mutex_unlock(&sesthread.mt);
 }

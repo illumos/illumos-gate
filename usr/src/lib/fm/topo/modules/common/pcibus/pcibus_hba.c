@@ -210,7 +210,8 @@ pci_iports_instantiate(topo_mod_t *mod, tnode_t *parent, di_node_t pn,
 				j++;
 		for (pi = di_path_phci_next_path(cn, DI_PATH_NIL);
 		    pi != DI_PATH_NIL; pi = di_path_phci_next_path(cn, pi))
-			if (strcmp(di_node_name(di_path_client_node(pi)),
+			if (di_path_client_node(pi) != NULL &&
+			    strcmp(di_node_name(di_path_client_node(pi)),
 			    "smp") != 0)
 				j++;
 		if (topo_node_range_create(mod, iport, SCSI_DEVICE, 0, j) < 0)
@@ -222,7 +223,8 @@ pci_iports_instantiate(topo_mod_t *mod, tnode_t *parent, di_node_t pn,
 				    j++, NULL);
 		for (pi = di_path_phci_next_path(cn, DI_PATH_NIL);
 		    pi != DI_PATH_NIL; pi = di_path_phci_next_path(cn, pi))
-			if (strcmp(di_node_name(di_path_client_node(pi)),
+			if (di_path_client_node(pi) != NULL &&
+			    strcmp(di_node_name(di_path_client_node(pi)),
 			    "smp") != 0)
 				pci_scsi_device_create(mod, auth, iport,
 				    di_path_client_node(pi),  j++, pi);
