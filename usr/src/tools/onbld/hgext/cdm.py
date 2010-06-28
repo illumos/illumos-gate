@@ -351,15 +351,18 @@ def cdm_mapfilechk(ui, repo, *args, **opts):
     #    - Ends with '.map'
     # We don't want to match unless these things occur in final path segment
     # because directory names with these strings don't indicate a mapfile.
-    MapfileRE = re.compile(r'.*((mapfile[^/]*)|(/map\.*[^/]*)|(\.map))$',
+    # We also ignore files with suffixes that tell us that the files
+    # are not mapfiles.
+    MapfileRE = re.compile(r'.*((mapfile[^/]*)|(/map\.+[^/]*)|(\.map))$',
     	re.IGNORECASE)
+    NotMapSuffixRE = re.compile(r'.*\.[ch]$', re.IGNORECASE)
 
     ui.write('Mapfile comment check:\n')
 
     for f, e in filelist:
         if e and e.is_removed():
             continue
-        elif not MapfileRE.match(f):
+        elif (not MapfileRE.match(f)) or NotMapSuffixRE.match(f):
             continue
         elif (e or opts.get('honour_nots')) and exclude(f):
             ui.status('Skipping %s...\n' % f)

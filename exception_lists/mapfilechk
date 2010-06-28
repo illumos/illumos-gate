@@ -23,15 +23,25 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-# By default, mapfilechk operates on any file in the
-# workspace that matches the pattern "*mapfile*". This
-# file provides an exception mechanism for specifying
-# files that match that pattern that should not be checked.
+# By default, mapfilechk operates on any file in the workspace
+# in which the final path segment:
+#	- Contains the word 'mapfile'
+#	- Begins with 'map.'
+#	- Ends with '.map'
+# as long as it does not have a .c or .h suffix.
+#
+# This file provides an exception mechanism for specifying files
+# that match this pattern that should be skipped.
 # 
 
 syntax: glob
 exception_lists/mapfilechk
+usr/src/cmd/lp/filter/postscript/font/devpost/charlib/*
 usr/src/cmd/mdb/common/kmdb/mapfile_skel
+usr/src/cmd/sgs/libconv/common/map.msg
+usr/src/cmd/troff/troff.d/tmac.d/*
 usr/src/lib/README.mapfiles
+usr/src/lib/fm/topo/maps/Makefile.map
+usr/src/cmd/perl/*
 usr/src/tools/onbld/Checks/Mapfile*
 usr/src/tools/scripts/*
