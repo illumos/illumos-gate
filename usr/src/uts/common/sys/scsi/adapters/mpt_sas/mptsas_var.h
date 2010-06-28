@@ -657,6 +657,7 @@ typedef struct mptsas {
 	scsi_hba_tran_t		*m_tran;
 	smp_hba_tran_t		*m_smptran;
 	kmutex_t		m_mutex;
+	kmutex_t		m_passthru_mutex;
 	kcondvar_t		m_cv;
 	kcondvar_t		m_passthru_cv;
 	kcondvar_t		m_fw_cv;
@@ -709,7 +710,6 @@ typedef struct mptsas {
 	uchar_t		m_sync_offset;	/* default offset for this chip. */
 
 	timeout_id_t	m_quiesce_timeid;
-	timeout_id_t	m_pm_timeid;
 
 	ddi_dma_handle_t m_dma_req_frame_hdl;
 	ddi_acc_handle_t m_acc_req_frame_hdl;
@@ -812,11 +812,8 @@ typedef struct mptsas {
 	 * MPI handshake protocol. only one handshake cmd can run at a time.
 	 */
 	ddi_dma_handle_t	m_hshk_dma_hdl;
-
 	ddi_acc_handle_t	m_hshk_acc_hdl;
-
 	caddr_t			m_hshk_memp;
-
 	size_t			m_hshk_dma_size;
 
 	/* Firmware version on the card at boot time */
@@ -858,7 +855,6 @@ typedef struct mptsas {
 	int			m_mpxio_enable;
 	uint8_t			m_done_traverse_dev;
 	uint8_t			m_done_traverse_smp;
-	int			m_passthru_in_progress;
 	int			m_diag_action_in_progress;
 	uint16_t		m_dev_handle;
 	uint16_t		m_smp_devhdl;
@@ -978,6 +974,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
 #define	MPTSAS_SS_DRAINING		0x02
 #define	MPTSAS_SS_QUIESCED		0x04
 #define	MPTSAS_SS_MSG_UNIT_RESET	0x08
+#define	MPTSAS_DID_MSG_UNIT_RESET	0x10
 
 /*
  * regspec defines.
@@ -1197,6 +1194,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
 #define	MPTSAS_RESET_FAIL	-1
 #define	MPTSAS_NO_RESET		0
 #define	MPTSAS_SUCCESS_HARDRESET	1
+#define	MPTSAS_SUCCESS_MUR	2
 
 /*
  * throttle support.
@@ -1233,8 +1231,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
 int mptsas_save_cmd(struct mptsas *mpt, struct mptsas_cmd *cmd);
 void mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd);
 void mptsas_waitq_add(mptsas_t *mpt, mptsas_cmd_t *cmd);
-int mptsas_config_space_init(struct mptsas *mpt);
-int mptsas_init_chip(mptsas_t *mpt, int first_time);
 void mptsas_log(struct mptsas *mpt, int level, char *fmt, ...);
 int mptsas_poll(mptsas_t *mpt, mptsas_cmd_t *poll_cmd, int polltime);
 int mptsas_do_dma(mptsas_t *mpt, uint32_t size, int var, int (*callback)());
@@ -1259,6 +1255,10 @@ void mptsas_fma_check(mptsas_t *mpt, mptsas_cmd_t *cmd);
 int mptsas_check_acc_handle(ddi_acc_handle_t handle);
 int mptsas_check_dma_handle(ddi_dma_handle_t handle);
 void mptsas_fm_ereport(mptsas_t *mpt, char *detail);
+int mptsas_dma_addr_create(mptsas_t *mpt, ddi_dma_attr_t dma_attr,
+    ddi_dma_handle_t *dma_hdp, ddi_acc_handle_t *acc_hdp, caddr_t *dma_memp,
+    uint32_t alloc_size, ddi_dma_cookie_t *cookiep);
+void mptsas_dma_addr_destroy(ddi_dma_handle_t *, ddi_acc_handle_t *);
 
 /*
  * impl functions

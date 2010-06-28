@@ -61,7 +61,7 @@ extern "C" {
  * _add_xxx_prop() interfaces add only 1 prop that is specified in the args.
  * _set_xxx_props() interfaces add more than 1 prop for a set of phys/devices.
  */
-void mptsas_smhba_add_hba_prop(mptsas_t *, data_type_t, char *, void *);
+int mptsas_smhba_setup(mptsas_t *);
 void mptsas_smhba_show_phy_info(mptsas_t *);
 void mptsas_smhba_set_phy_props(mptsas_t *mpt, char *iport, dev_info_t *dip,
     uint8_t phy_nums, uint16_t *attached_devhdl);

@@ -297,10 +297,9 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 {
 	va_list			ap;
 	ddi_dma_attr_t		attrs;
-	uint_t			ncookie;
 	ddi_dma_cookie_t	cookie;
 	ddi_acc_handle_t	accessp;
-	size_t			len = 0, alloc_len;
+	size_t			len = 0;
 	mptsas_config_request_t	config;
 	int			rval = DDI_SUCCESS, config_flags = 0;
 	mptsas_cmd_t		*cmd;
@@ -462,33 +461,9 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 	attrs.dma_attr_sgllen = 1;
 	attrs.dma_attr_granular = (uint32_t)len;
 
-	if (ddi_dma_alloc_handle(mpt->m_dip, &attrs,
-	    DDI_DMA_SLEEP, NULL, &cmd->cmd_dmahandle) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN, "unable to allocate dma handle for "
-		    "config page.");
-		rval = DDI_FAILURE;
-		goto page_done;
-	}
-	if (ddi_dma_mem_alloc(cmd->cmd_dmahandle, len,
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &page_memp, &alloc_len, &accessp) != DDI_SUCCESS) {
-		ddi_dma_free_handle(&cmd->cmd_dmahandle);
-		cmd->cmd_dmahandle = NULL;
-		mptsas_log(mpt, CE_WARN, "unable to allocate config page "
-		    "structure.");
-		rval = DDI_FAILURE;
-		goto page_done;
-	}
-
-	if (ddi_dma_addr_bind_handle(cmd->cmd_dmahandle, NULL, page_memp,
-	    alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &cookie, &ncookie) != DDI_DMA_MAPPED) {
-		(void) ddi_dma_mem_free(&accessp);
-		ddi_dma_free_handle(&cmd->cmd_dmahandle);
-		cmd->cmd_dmahandle = NULL;
-		mptsas_log(mpt, CE_WARN, "unable to bind DMA resources for "
-		    "config page.");
-		rval = DDI_FAILURE;
+	if (mptsas_dma_addr_create(mpt, attrs,
+	    &cmd->cmd_dmahandle, &accessp, &page_memp,
+	    len, &cookie) == FALSE) {
 		goto page_done;
 	}
 	cmd->cmd_dma_addr = cookie.dmac_laddress;
@@ -608,11 +583,7 @@ page_done:
 		    mpt->m_free_index);
 	}
 
-	if (cmd->cmd_dmahandle != NULL) {
-		(void) ddi_dma_unbind_handle(cmd->cmd_dmahandle);
-		(void) ddi_dma_mem_free(&accessp);
-		ddi_dma_free_handle(&cmd->cmd_dmahandle);
-	}
+	mptsas_dma_addr_destroy(&cmd->cmd_dmahandle, &accessp);
 
 	if (cmd && (cmd->cmd_flags & CFLAG_PREPARED)) {
 		mptsas_remove_cmd(mpt, cmd);
@@ -622,6 +593,7 @@ page_done:
 		mptsas_return_to_pool(mpt, cmd);
 
 	if (config_flags & MPTSAS_CMD_TIMEOUT) {
+		mpt->m_softstate &= ~MPTSAS_SS_MSG_UNIT_RESET;
 		if ((mptsas_restart_ioc(mpt)) == DDI_FAILURE) {
 			mptsas_log(mpt, CE_WARN, "mptsas_restart_ioc failed");
 		}
@@ -984,12 +956,10 @@ mptsas_kick_start(mptsas_t *mpt)
 int
 mptsas_ioc_reset(mptsas_t *mpt)
 {
-#ifdef SLM
 	int		polls = 0;
 	uint32_t	reset_msg;
-
-#endif
 	uint32_t	ioc_state;
+
 	ioc_state = ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell);
 	/*
 	 * If chip is already in ready state then there is nothing to do.
@@ -997,46 +967,52 @@ mptsas_ioc_reset(mptsas_t *mpt)
 	if (ioc_state == MPI2_IOC_STATE_READY) {
 		return (MPTSAS_NO_RESET);
 	}
-
-/*
- * SLM-test; skip MUR for now
- */
-#ifdef SLM
 	/*
 	 * If the chip is already operational, we just need to send
 	 * it a message unit reset to put it back in the ready state
 	 */
 	if (ioc_state & MPI2_IOC_STATE_OPERATIONAL) {
-		reset_msg = MPI2_FUNCTION_IOC_MESSAGE_UNIT_RESET;
-		ddi_put32(mpt->m_datap, &mpt->m_reg->Doorbell,
-		    (reset_msg << MPI2_DOORBELL_FUNCTION_SHIFT));
-		if (mptsas_ioc_wait_for_response(mpt)) {
-			NDBG19(("mptsas_ioc_reset failure sending "
-			    "message_unit_reset\n"));
-			goto hard_reset;
-		}
-
-		/*
-		 * Wait no more than 60 seconds for chip to become ready.
-		 */
-		while ((ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell) &
-		    MPI2_IOC_STATE_READY) == 0x0) {
-			drv_usecwait(1000);
-			if (polls++ > 60000) {
+		if (mpt->m_event_replay && (mpt->m_softstate &
+		    MPTSAS_SS_MSG_UNIT_RESET)) {
+			mpt->m_softstate &= ~MPTSAS_SS_MSG_UNIT_RESET;
+			reset_msg = MPI2_FUNCTION_IOC_MESSAGE_UNIT_RESET;
+			ddi_put32(mpt->m_datap, &mpt->m_reg->Doorbell,
+			    (reset_msg << MPI2_DOORBELL_FUNCTION_SHIFT));
+			if (mptsas_ioc_wait_for_response(mpt)) {
+				NDBG19(("mptsas_ioc_reset failure sending "
+				    "message_unit_reset\n"));
 				goto hard_reset;
 			}
-		}
-		/*
-		 * the message unit reset would do reset operations
-		 * clear reply and request queue, so we should clear
-		 * ACK event cmd.
-		 */
-		mptsas_destroy_ioc_event_cmd(mpt);
-		return (MPTSAS_NO_RESET);
-	}
 
+			/*
+			 * Wait no more than 60 seconds for chip to become
+			 * ready.
+			 */
+			while ((ddi_get32(mpt->m_datap, &mpt->m_reg->Doorbell) &
+			    MPI2_IOC_STATE_READY) == 0x0) {
+				drv_usecwait(1000);
+				if (polls++ > 60000) {
+					goto hard_reset;
+				}
+			}
+
+			/*
+			 * Save the last reset mode done on IOC which will be
+			 * helpful while resuming from suspension.
+			 */
+			mpt->m_softstate |= MPTSAS_DID_MSG_UNIT_RESET;
+
+			/*
+			 * the message unit reset would do reset operations
+			 * clear reply and request queue, so we should clear
+			 * ACK event cmd.
+			 */
+			mptsas_destroy_ioc_event_cmd(mpt);
+			return (MPTSAS_SUCCESS_MUR);
+		}
+	}
 hard_reset:
-#endif
+	mpt->m_softstate &= ~MPTSAS_DID_MSG_UNIT_RESET;
 	if (mptsas_kick_start(mpt) == DDI_FAILURE) {
 		mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
@@ -1204,6 +1180,7 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	if (rval == FALSE) {
 		mptsas_log(mpt, CE_WARN, "mptsas_ioc_task_management failed "
 		    "try to reset ioc to recovery!");
+		mpt->m_softstate &= ~MPTSAS_SS_MSG_UNIT_RESET;
 		if (mptsas_restart_ioc(mpt)) {
 			mptsas_log(mpt, CE_WARN, "mptsas_restart_ioc failed");
 			rval = FAILED;
@@ -1226,11 +1203,9 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	 */
 
 	ddi_dma_attr_t		flsh_dma_attrs;
-	uint_t			flsh_ncookie;
 	ddi_dma_cookie_t	flsh_cookie;
 	ddi_dma_handle_t	flsh_dma_handle;
 	ddi_acc_handle_t	flsh_accessp;
-	size_t			flsh_alloc_len;
 	caddr_t			memp, flsh_memp;
 	uint32_t		flagslength;
 	pMpi2FWDownloadRequest	fwdownload;
@@ -1259,33 +1234,14 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	flsh_dma_attrs = mpt->m_msg_dma_attr;
 	flsh_dma_attrs.dma_attr_sgllen = 1;
 
-	if (ddi_dma_alloc_handle(mpt->m_dip, &flsh_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &flsh_dma_handle) != DDI_SUCCESS) {
+	if (mptsas_dma_addr_create(mpt, flsh_dma_attrs, &flsh_dma_handle,
+	    &flsh_accessp, &flsh_memp, size, &flsh_cookie) == FALSE) {
 		mptsas_log(mpt, CE_WARN,
-		    "(unable to allocate dma handle.");
+		    "(unable to allocate dma resource.");
 		mptsas_return_to_pool(mpt, cmd);
 		return (-1);
 	}
 
-	if (ddi_dma_mem_alloc(flsh_dma_handle, size,
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &flsh_memp, &flsh_alloc_len, &flsh_accessp) != DDI_SUCCESS) {
-		ddi_dma_free_handle(&flsh_dma_handle);
-		mptsas_log(mpt, CE_WARN,
-		    "unable to allocate flash structure.");
-		mptsas_return_to_pool(mpt, cmd);
-		return (-1);
-	}
-
-	if (ddi_dma_addr_bind_handle(flsh_dma_handle, NULL, flsh_memp,
-	    flsh_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &flsh_cookie, &flsh_ncookie) != DDI_DMA_MAPPED) {
-		(void) ddi_dma_mem_free(&flsh_accessp);
-		ddi_dma_free_handle(&flsh_dma_handle);
-		mptsas_log(mpt, CE_WARN, "unable to bind DMA resources.");
-		mptsas_return_to_pool(mpt, cmd);
-		return (-1);
-	}
 	bzero(flsh_memp, size);
 
 	for (i = 0; i < size; i++) {
@@ -1309,9 +1265,7 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	 * Save the command in a slot
 	 */
 	if (mptsas_save_cmd(mpt, cmd) == FALSE) {
-		(void) ddi_dma_unbind_handle(flsh_dma_handle);
-		(void) ddi_dma_mem_free(&flsh_accessp);
-		ddi_dma_free_handle(&flsh_dma_handle);
+		mptsas_dma_addr_destroy(&flsh_dma_handle, &flsh_accessp);
 		mptsas_return_to_pool(mpt, cmd);
 		return (-1);
 	}
@@ -1366,16 +1320,14 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	(void) cv_reltimedwait(&mpt->m_fw_cv, &mpt->m_mutex,
 	    drv_usectohz(60 * MICROSEC), TR_CLOCK_TICK);
 	if (!(cmd->cmd_flags & CFLAG_FINISHED)) {
+		mpt->m_softstate &= ~MPTSAS_SS_MSG_UNIT_RESET;
 		if ((mptsas_restart_ioc(mpt)) == DDI_FAILURE) {
 			mptsas_log(mpt, CE_WARN, "mptsas_restart_ioc failed");
 		}
 		rvalue = -1;
 	}
 	mptsas_remove_cmd(mpt, cmd);
-
-	(void) ddi_dma_unbind_handle(flsh_dma_handle);
-	(void) ddi_dma_mem_free(&flsh_accessp);
-	ddi_dma_free_handle(&flsh_dma_handle);
+	mptsas_dma_addr_destroy(&flsh_dma_handle, &flsh_accessp);
 
 	return (rvalue);
 }
@@ -1873,18 +1825,14 @@ int
 mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 {
 	ddi_dma_attr_t		recv_dma_attrs, page_dma_attrs;
-	uint_t			recv_ncookie, page_ncookie;
-	ddi_dma_cookie_t	recv_cookie, page_cookie;
+	ddi_dma_cookie_t	page_cookie;
 	ddi_dma_handle_t	recv_dma_handle, page_dma_handle;
 	ddi_acc_handle_t	recv_accessp, page_accessp;
-	size_t			recv_alloc_len, page_alloc_len;
 	pMpi2ConfigReply_t	configreply;
 	pMpi2SasIOUnitPage0_t	sasioupage0;
 	pMpi2SasIOUnitPage1_t	sasioupage1;
 	int			recv_numbytes;
 	caddr_t			recv_memp, page_memp;
-	int			recv_dmastate = 0;
-	int			page_dmastate = 0;
 	int			i, num_phys, start_phy = 0;
 	int			page0_size =
 	    sizeof (MPI2_CONFIG_PAGE_SASIOUNIT_0) +
@@ -1919,60 +1867,25 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 	recv_dma_attrs.dma_attr_sgllen = 1;
 	recv_dma_attrs.dma_attr_granular = (sizeof (MPI2_CONFIG_REPLY));
 
-	if (ddi_dma_alloc_handle(mpt->m_dip, &recv_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &recv_dma_handle) != DDI_SUCCESS) {
+	if (mptsas_dma_addr_create(mpt, recv_dma_attrs,
+	    &recv_dma_handle, &recv_accessp, &recv_memp,
+	    (sizeof (MPI2_CONFIG_REPLY)), NULL) == FALSE) {
+		mptsas_log(mpt, CE_WARN,
+		    "mptsas_get_sas_io_unit_page_hndshk: recv dma failed");
 		goto cleanup;
 	}
-
-	recv_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
-
-	if (ddi_dma_mem_alloc(recv_dma_handle,
-	    (sizeof (MPI2_CONFIG_REPLY)),
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &recv_memp, &recv_alloc_len, &recv_accessp) != DDI_SUCCESS) {
-		goto cleanup;
-	}
-
-	recv_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
-
-	if (ddi_dma_addr_bind_handle(recv_dma_handle, NULL, recv_memp,
-	    recv_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &recv_cookie, &recv_ncookie) != DDI_DMA_MAPPED) {
-		goto cleanup;
-	}
-
-	recv_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
 
 	page_dma_attrs = mpt->m_msg_dma_attr;
 	page_dma_attrs.dma_attr_sgllen = 1;
 	page_dma_attrs.dma_attr_granular = reply_size;
 
-	if (ddi_dma_alloc_handle(mpt->m_dip, &page_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &page_dma_handle) != DDI_SUCCESS) {
+	if (mptsas_dma_addr_create(mpt, page_dma_attrs,
+	    &page_dma_handle, &page_accessp, &page_memp,
+	    reply_size, &page_cookie) == FALSE) {
+		mptsas_log(mpt, CE_WARN,
+		    "mptsas_get_sas_io_unit_page_hndshk: page dma failed");
 		goto cleanup;
 	}
-
-	page_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
-
-	/*
-	 * Page 0 size is larger, so just use that for both.
-	 */
-
-	if (ddi_dma_mem_alloc(page_dma_handle, reply_size,
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &page_memp, &page_alloc_len, &page_accessp) != DDI_SUCCESS) {
-		goto cleanup;
-	}
-
-	page_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
-
-	if (ddi_dma_addr_bind_handle(page_dma_handle, NULL, page_memp,
-	    page_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &page_cookie, &page_ncookie) != DDI_DMA_MAPPED) {
-		goto cleanup;
-	}
-
-	page_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
 
 	/*
 	 * Now we cycle through the state machine.  Here's what happens:
@@ -2208,19 +2121,8 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 	}
 
 cleanup:
-	if (recv_dmastate & MPTSAS_DMA_HANDLE_BOUND)
-		(void) ddi_dma_unbind_handle(recv_dma_handle);
-	if (page_dmastate & MPTSAS_DMA_HANDLE_BOUND)
-		(void) ddi_dma_unbind_handle(page_dma_handle);
-	if (recv_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
-		(void) ddi_dma_mem_free(&recv_accessp);
-	if (page_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
-		(void) ddi_dma_mem_free(&page_accessp);
-	if (recv_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
-		ddi_dma_free_handle(&recv_dma_handle);
-	if (page_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
-		ddi_dma_free_handle(&page_dma_handle);
-
+	mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
+	mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
 	if (rval != DDI_SUCCESS) {
 		mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
@@ -2238,17 +2140,13 @@ int
 mptsas_get_manufacture_page5(mptsas_t *mpt)
 {
 	ddi_dma_attr_t			recv_dma_attrs, page_dma_attrs;
-	ddi_dma_cookie_t		recv_cookie, page_cookie;
+	ddi_dma_cookie_t		page_cookie;
 	ddi_dma_handle_t		recv_dma_handle, page_dma_handle;
 	ddi_acc_handle_t		recv_accessp, page_accessp;
-	size_t				recv_alloc_len, page_alloc_len;
 	pMpi2ConfigReply_t		configreply;
-	uint_t				recv_ncookie, page_ncookie;
 	caddr_t				recv_memp, page_memp;
 	int				recv_numbytes;
 	pMpi2ManufacturingPage5_t	m5;
-	int				recv_dmastate = 0;
-	int				page_dmastate = 0;
 	uint32_t			flagslength;
 	int				rval = DDI_SUCCESS;
 	uint_t				iocstatus;
@@ -2269,34 +2167,12 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	recv_dma_attrs.dma_attr_sgllen = 1;
 	recv_dma_attrs.dma_attr_granular = (sizeof (MPI2_CONFIG_REPLY));
 
-	if (ddi_dma_alloc_handle(mpt->m_dip, &recv_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &recv_dma_handle) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN,
-		    "(unable to allocate dma handle.");
-		rval = DDI_FAILURE;
+	if (mptsas_dma_addr_create(mpt, recv_dma_attrs,
+	    &recv_dma_handle, &recv_accessp, &recv_memp,
+	    (sizeof (MPI2_CONFIG_REPLY)), NULL) == FALSE) {
 		goto done;
 	}
-	recv_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
 
-	if (ddi_dma_mem_alloc(recv_dma_handle,
-	    (sizeof (MPI2_CONFIG_REPLY)),
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &recv_memp, &recv_alloc_len, &recv_accessp) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN,
-		    "unable to allocate config_reply structure.");
-		rval = DDI_FAILURE;
-		goto done;
-	}
-	recv_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
-
-	if (ddi_dma_addr_bind_handle(recv_dma_handle, NULL, recv_memp,
-	    recv_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &recv_cookie, &recv_ncookie) != DDI_DMA_MAPPED) {
-		mptsas_log(mpt, CE_WARN, "unable to bind DMA resources.");
-		rval = DDI_FAILURE;
-		goto done;
-	}
-	recv_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
 	bzero(recv_memp, sizeof (MPI2_CONFIG_REPLY));
 	configreply = (pMpi2ConfigReply_t)recv_memp;
 	recv_numbytes = sizeof (MPI2_CONFIG_REPLY);
@@ -2325,34 +2201,11 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	page_dma_attrs.dma_attr_sgllen = 1;
 	page_dma_attrs.dma_attr_granular = (sizeof (MPI2_CONFIG_PAGE_MAN_5));
 
-	if (ddi_dma_alloc_handle(mpt->m_dip, &page_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &page_dma_handle) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN,
-		    "(unable to allocate dma handle.");
-		rval = DDI_FAILURE;
+	if (mptsas_dma_addr_create(mpt, page_dma_attrs, &page_dma_handle,
+	    &page_accessp, &page_memp, (sizeof (MPI2_CONFIG_PAGE_MAN_5)),
+	    &page_cookie) == FALSE) {
 		goto done;
 	}
-	page_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
-
-	if (ddi_dma_mem_alloc(page_dma_handle,
-	    (sizeof (MPI2_CONFIG_PAGE_MAN_5)),
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &page_memp, &page_alloc_len, &page_accessp) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN,
-		    "unable to allocate manufacturing page structure.");
-		rval = DDI_FAILURE;
-		goto done;
-	}
-	page_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
-
-	if (ddi_dma_addr_bind_handle(page_dma_handle, NULL, page_memp,
-	    page_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &page_cookie, &page_ncookie) != DDI_DMA_MAPPED) {
-		mptsas_log(mpt, CE_WARN, "unable to bind DMA resources.");
-		rval = DDI_FAILURE;
-		goto done;
-	}
-	page_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
 	bzero(page_memp, sizeof (MPI2_CONFIG_PAGE_MAN_5));
 	m5 = (pMpi2ManufacturingPage5_t)page_memp;
 
@@ -2441,19 +2294,8 @@ done:
 	/*
 	 * free up memory
 	 */
-	if (recv_dmastate & MPTSAS_DMA_HANDLE_BOUND)
-		(void) ddi_dma_unbind_handle(recv_dma_handle);
-	if (page_dmastate & MPTSAS_DMA_HANDLE_BOUND)
-		(void) ddi_dma_unbind_handle(page_dma_handle);
-	if (recv_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
-		(void) ddi_dma_mem_free(&recv_accessp);
-	if (page_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
-		(void) ddi_dma_mem_free(&page_accessp);
-	if (recv_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
-		ddi_dma_free_handle(&recv_dma_handle);
-	if (page_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
-		ddi_dma_free_handle(&page_dma_handle);
-
+	mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
+	mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
 	MPTSAS_ENABLE_INTR(mpt);
 
 	return (rval);
@@ -2663,17 +2505,13 @@ int
 mptsas_get_manufacture_page0(mptsas_t *mpt)
 {
 	ddi_dma_attr_t			recv_dma_attrs, page_dma_attrs;
-	ddi_dma_cookie_t		recv_cookie, page_cookie;
+	ddi_dma_cookie_t		page_cookie;
 	ddi_dma_handle_t		recv_dma_handle, page_dma_handle;
 	ddi_acc_handle_t		recv_accessp, page_accessp;
-	size_t				recv_alloc_len, page_alloc_len;
 	pMpi2ConfigReply_t		configreply;
-	uint_t				recv_ncookie, page_ncookie;
 	caddr_t				recv_memp, page_memp;
 	int				recv_numbytes;
 	pMpi2ManufacturingPage0_t	m0;
-	int				recv_dmastate = 0;
-	int				page_dmastate = 0;
 	uint32_t			flagslength;
 	int				rval = DDI_SUCCESS;
 	uint_t				iocstatus;
@@ -2695,34 +2533,11 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	recv_dma_attrs.dma_attr_sgllen = 1;
 	recv_dma_attrs.dma_attr_granular = (sizeof (MPI2_CONFIG_REPLY));
 
-	if (ddi_dma_alloc_handle(mpt->m_dip, &recv_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &recv_dma_handle) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN,
-		    "(unable to allocate dma handle.");
-		rval = DDI_FAILURE;
+	if (mptsas_dma_addr_create(mpt, recv_dma_attrs, &recv_dma_handle,
+	    &recv_accessp, &recv_memp, (sizeof (MPI2_CONFIG_REPLY)),
+	    NULL) == FALSE) {
 		goto done;
 	}
-	recv_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
-
-	if (ddi_dma_mem_alloc(recv_dma_handle,
-	    (sizeof (MPI2_CONFIG_REPLY)),
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &recv_memp, &recv_alloc_len, &recv_accessp) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN,
-		    "unable to allocate config_reply structure.");
-		rval = DDI_FAILURE;
-		goto done;
-	}
-	recv_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
-
-	if (ddi_dma_addr_bind_handle(recv_dma_handle, NULL, recv_memp,
-	    recv_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &recv_cookie, &recv_ncookie) != DDI_DMA_MAPPED) {
-		mptsas_log(mpt, CE_WARN, "unable to bind DMA resources.");
-		rval = DDI_FAILURE;
-		goto done;
-	}
-	recv_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
 	bzero(recv_memp, sizeof (MPI2_CONFIG_REPLY));
 	configreply = (pMpi2ConfigReply_t)recv_memp;
 	recv_numbytes = sizeof (MPI2_CONFIG_REPLY);
@@ -2751,34 +2566,11 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	page_dma_attrs.dma_attr_sgllen = 1;
 	page_dma_attrs.dma_attr_granular = (sizeof (MPI2_CONFIG_PAGE_MAN_0));
 
-	if (ddi_dma_alloc_handle(mpt->m_dip, &page_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &page_dma_handle) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN,
-		    "(unable to allocate dma handle.");
-		rval = DDI_FAILURE;
+	if (mptsas_dma_addr_create(mpt, page_dma_attrs, &page_dma_handle,
+	    &page_accessp, &page_memp, (sizeof (MPI2_CONFIG_PAGE_MAN_0)),
+	    &page_cookie) == FALSE) {
 		goto done;
 	}
-	page_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
-
-	if (ddi_dma_mem_alloc(page_dma_handle,
-	    (sizeof (MPI2_CONFIG_PAGE_MAN_0)),
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &page_memp, &page_alloc_len, &page_accessp) != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN,
-		    "unable to allocate manufacturing page structure.");
-		rval = DDI_FAILURE;
-		goto done;
-	}
-	page_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
-
-	if (ddi_dma_addr_bind_handle(page_dma_handle, NULL, page_memp,
-	    page_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &page_cookie, &page_ncookie) != DDI_DMA_MAPPED) {
-		mptsas_log(mpt, CE_WARN, "unable to bind DMA resources.");
-		rval = DDI_FAILURE;
-		goto done;
-	}
-	page_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
 	bzero(page_memp, sizeof (MPI2_CONFIG_PAGE_MAN_0));
 	m0 = (pMpi2ManufacturingPage0_t)page_memp;
 
@@ -2872,19 +2664,8 @@ done:
 	/*
 	 * free up memory
 	 */
-	if (recv_dmastate & MPTSAS_DMA_HANDLE_BOUND)
-		(void) ddi_dma_unbind_handle(recv_dma_handle);
-	if (page_dmastate & MPTSAS_DMA_HANDLE_BOUND)
-		(void) ddi_dma_unbind_handle(page_dma_handle);
-	if (recv_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
-		(void) ddi_dma_mem_free(&recv_accessp);
-	if (page_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
-		(void) ddi_dma_mem_free(&page_accessp);
-	if (recv_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
-		ddi_dma_free_handle(&recv_dma_handle);
-	if (page_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
-		ddi_dma_free_handle(&page_dma_handle);
-
+	mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
+	mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
 	MPTSAS_ENABLE_INTR(mpt);
 
 	return (rval);

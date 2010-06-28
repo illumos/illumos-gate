@@ -36,6 +36,8 @@
 #include <sys/note.h>
 #include <sys/scsi/scsi.h>
 #include <sys/pci.h>
+#include <sys/scsi/generic/sas.h>
+#include <sys/scsi/impl/scsi_sas.h>
 
 #pragma pack(1)
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h>
@@ -52,14 +54,19 @@
 #include <sys/scsi/adapters/mpt_sas/mptsas_var.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_smhba.h>
 
-void
+/*
+ * SM - HBA statics
+ */
+extern char *mptsas_driver_rev;
+
+static void
 mptsas_smhba_add_hba_prop(mptsas_t *mpt, data_type_t dt,
     char *prop_name, void *prop_val);
 
 void
 mptsas_smhba_show_phy_info(mptsas_t *mpt);
 
-void
+static void
 mptsas_smhba_add_hba_prop(mptsas_t *mpt, data_type_t dt,
     char *prop_name, void *prop_val)
 {
@@ -449,6 +456,66 @@ mptsas_smhba_phy_init(mptsas_t *mpt)
 		    mpt->un.m_base_wwid + i;
 		mpt->m_phy_info[i].smhba_info.mpt = mpt;
 	}
+	return (DDI_SUCCESS);
+}
+
+int
+mptsas_smhba_setup(mptsas_t *mpt)
+{
+	int		sm_hba = 1;
+	char		chiprev, hw_rev[24];
+	char		serial_number[72];
+	int		protocol = 0;
+
+	mutex_enter(&mpt->m_mutex);
+	if (mptsas_smhba_phy_init(mpt)) {
+		mutex_exit(&mpt->m_mutex);
+		return (DDI_FAILURE);
+	}
+	mutex_exit(&mpt->m_mutex);
+
+	/* SM-HBA support */
+	mptsas_smhba_add_hba_prop(mpt, DATA_TYPE_INT32, MPTSAS_SMHBA_SUPPORTED,
+	    &sm_hba);
+
+	/* SM-HBA driver version */
+	mptsas_smhba_add_hba_prop(mpt, DATA_TYPE_STRING, MPTSAS_DRV_VERSION,
+	    mptsas_driver_rev);
+
+	/* SM-HBA hardware version */
+	chiprev = 'A' + mpt->m_revid;
+	(void) snprintf(hw_rev, 2, "%s", &chiprev);
+	mptsas_smhba_add_hba_prop(mpt, DATA_TYPE_STRING, MPTSAS_HWARE_VERSION,
+	    hw_rev);
+
+	/* SM-HBA phy number per HBA */
+	mptsas_smhba_add_hba_prop(mpt, DATA_TYPE_INT32, MPTSAS_NUM_PHYS_HBA,
+	    &(mpt->m_num_phys));
+
+	/* SM-HBA protocal support */
+	protocol = SAS_SSP_SUPPORT | SAS_SATA_SUPPORT | SAS_SMP_SUPPORT;
+	mptsas_smhba_add_hba_prop(mpt, DATA_TYPE_INT32,
+	    MPTSAS_SUPPORTED_PROTOCOL, &protocol);
+
+	mptsas_smhba_add_hba_prop(mpt, DATA_TYPE_STRING, MPTSAS_MANUFACTURER,
+	    mpt->m_MANU_page0.ChipName);
+
+	mptsas_smhba_add_hba_prop(mpt, DATA_TYPE_STRING, MPTSAS_MODEL_NAME,
+	    mpt->m_MANU_page0.BoardName);
+
+	/*
+	 * VPD data is not available, we make a serial number for this.
+	 */
+
+	(void) sprintf(serial_number, "%s%s%s%s%s",
+	    mpt->m_MANU_page0.ChipName,
+	    mpt->m_MANU_page0.ChipRevision,
+	    mpt->m_MANU_page0.BoardName,
+	    mpt->m_MANU_page0.BoardAssembly,
+	    mpt->m_MANU_page0.BoardTracerNumber);
+
+	mptsas_smhba_add_hba_prop(mpt, DATA_TYPE_STRING, MPTSAS_SERIAL_NUMBER,
+	    &serial_number[0]);
 
 	return (DDI_SUCCESS);
 }
