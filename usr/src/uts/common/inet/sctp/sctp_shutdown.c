@@ -147,10 +147,8 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
     boolean_t rexmit, sctp_faddr_t *fp)
 {
 	mblk_t *samp;
-	sctp_chunk_hdr_t *sach;
 	uint32_t *tsn;
 	int trysend = 0;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_state != SCTPS_SHUTDOWN_ACK_SENT)
 		sctp->sctp_state = SCTPS_SHUTDOWN_RECEIVED;
@@ -184,45 +182,8 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
 		else
 			fp = sctp_rotate_faddr(sctp, sctp->sctp_shutdown_faddr);
 	}
-	sctp->sctp_shutdown_faddr = fp;
 
-	samp = sctp_make_mp(sctp, fp, sizeof (*sach));
-	if (samp == NULL) {
-		SCTP_KSTAT(sctps, sctp_send_shutdown_ack_failed);
-		goto dotimer;
-	}
-
-	sach = (sctp_chunk_hdr_t *)samp->b_wptr;
-	sach->sch_id = CHUNK_SHUTDOWN_ACK;
-	sach->sch_flags = 0;
-	sach->sch_len = htons(sizeof (*sach));
-
-	samp->b_wptr += sizeof (*sach);
-
-	/*
-	 * bundle a "cookie received while shutting down" error if
-	 * the caller asks for it.
-	 */
-	if (crwsd) {
-		mblk_t *errmp;
-
-		errmp = sctp_make_err(sctp, SCTP_ERR_COOKIE_SHUT, NULL, 0);
-		if (errmp != NULL) {
-			linkb(samp, errmp);
-			BUMP_LOCAL(sctp->sctp_obchunks);
-		}
-	}
-
-	BUMP_LOCAL(sctp->sctp_obchunks);
-
-	sctp_set_iplen(sctp, samp, fp->ixa);
-	(void) conn_ip_output(samp, fp->ixa);
-	BUMP_LOCAL(sctp->sctp_opkts);
-
-dotimer:
-	sctp->sctp_state = SCTPS_SHUTDOWN_ACK_SENT;
-	SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
-	    sctp->sctp_current->rto);
+	sctp_send_shutdown_ack(sctp, fp, crwsd);
 
 	return (trysend);
 }
@@ -395,4 +356,60 @@ sctp_ootb_shutdown_ack(mblk_t *mp, uint_t ip_hdr_len, ip_recv_attr_t *ira,
 
 	(void) ip_output_simple(mp, &ixas);
 	ixa_cleanup(&ixas);
+}
+
+/*
+ * Called from sctp_input_data() and sctp_shutdown_received().
+ * Send a SHUTDOWN ACK chunk to the peer SCTP endpoint and change SCTP state.
+ * This should be done after all data (unacked and unsend) has been
+ * acknowledged.
+ */
+void
+sctp_send_shutdown_ack(sctp_t *sctp, sctp_faddr_t *fp, boolean_t crwsd)
+{
+	mblk_t *samp;
+	sctp_chunk_hdr_t *sach;
+	sctp_stack_t	*sctps = sctp->sctp_sctps;
+
+	ASSERT(sctp->sctp_xmit_unacked == NULL);
+	ASSERT(sctp->sctp_lastack_rxd == (sctp->sctp_ltsn - 1));
+	ASSERT(fp != NULL);
+
+	sctp->sctp_shutdown_faddr = fp;
+
+	samp = sctp_make_mp(sctp, fp, sizeof (*sach));
+	if (samp == NULL) {
+		SCTP_KSTAT(sctps, sctp_send_shutdown_ack_failed);
+		goto dotimer;
+	}
+
+	sach = (sctp_chunk_hdr_t *)samp->b_wptr;
+	sach->sch_id = CHUNK_SHUTDOWN_ACK;
+	sach->sch_flags = 0;
+	sach->sch_len = htons(sizeof (*sach));
+
+	samp->b_wptr += sizeof (*sach);
+	/*
+	 * bundle a "cookie received while shutting down" error if
+	 * the caller asks for it.
+	 */
+	if (crwsd) {
+		mblk_t *errmp;
+
+		errmp = sctp_make_err(sctp, SCTP_ERR_COOKIE_SHUT, NULL, 0);
+		if (errmp != NULL) {
+			linkb(samp, errmp);
+			BUMP_LOCAL(sctp->sctp_obchunks);
+		}
+	}
+
+	BUMP_LOCAL(sctp->sctp_obchunks);
+
+	sctp_set_iplen(sctp, samp, fp->ixa);
+	(void) conn_ip_output(samp, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
+
+dotimer:
+	sctp->sctp_state = SCTPS_SHUTDOWN_ACK_SENT;
+	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 }

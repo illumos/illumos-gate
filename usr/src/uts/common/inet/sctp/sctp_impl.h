@@ -1080,6 +1080,7 @@ extern int	sctp_xmit_list_clean(sctp_t *, ssize_t);
 extern void	sctp_zap_addrs(sctp_t *);
 extern void	sctp_zap_faddrs(sctp_t *, int);
 extern sctp_chunk_hdr_t	*sctp_first_chunk(uchar_t *, ssize_t);
+extern void	sctp_send_shutdown_ack(sctp_t *, sctp_faddr_t *, boolean_t);
 
 /* Contract private interface between SCTP and Clustering - PSARC/2005/602 */
 

@@ -3615,6 +3615,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 	pid_t			cpid;
 	uchar_t			*rptr;
 	conn_t			*connp = sctp->sctp_connp;
+	boolean_t		shutdown_ack_needed = B_FALSE;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	ASSERT(ira->ira_ill == NULL);
@@ -4280,6 +4281,18 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 			case CHUNK_SHUTDOWN:
 				trysend = sctp_shutdown_received(sctp, ch,
 				    B_FALSE, B_FALSE, fp);
+				/*
+				 * shutdown_ack_needed may have been set as
+				 * mentioned in the case CHUNK_SACK below.
+				 * If sctp_shutdown_received() above found
+				 * the xmit queue empty the SHUTDOWN ACK chunk
+				 * has already been sent (or scheduled to be
+				 * sent on the timer) and the SCTP state
+				 * changed, so reset shutdown_ack_needed.
+				 */
+				if (shutdown_ack_needed && (sctp->sctp_state ==
+				    SCTPS_SHUTDOWN_ACK_SENT))
+					shutdown_ack_needed = B_FALSE;
 				break;
 			case CHUNK_SACK:
 				trysend = sctp_got_sack(sctp, ch);
@@ -4292,6 +4305,20 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 					    ECONNABORTED);
 					goto done;
 				}
+
+				/*
+				 * All data acknowledgement after a shutdown
+				 * should be done with SHUTDOWN chunk.
+				 * However some peer SCTP do not conform with
+				 * this and can unexpectedly send a SACK chunk.
+				 * If all data are acknowledged, set
+				 * shutdown_ack_needed here indicating that
+				 * SHUTDOWN ACK needs to be sent later by
+				 * sctp_send_shutdown_ack().
+				 */
+				if ((sctp->sctp_xmit_head == NULL) &&
+				    (sctp->sctp_xmit_unsent == NULL))
+					shutdown_ack_needed = B_TRUE;
 				break;
 			case CHUNK_ABORT:
 				sctp_process_abort(sctp, ch, ECONNRESET);
@@ -4327,6 +4354,10 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 	/* Finished processing all chunks in packet */
 
 nomorechunks:
+
+	if (shutdown_ack_needed)
+		sctp_send_shutdown_ack(sctp, fp, B_FALSE);
+
 	/* SACK if necessary */
 	if (gotdata) {
 		boolean_t sack_sent;
