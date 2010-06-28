@@ -276,6 +276,10 @@ struct dev_info  {
 	struct ddi_hp_cn_handle *devi_hp_hdlp;   /* hotplug handle list */
 
 	struct in_node  *devi_in_node; /* pointer to devinfo node's in_node_t */
+
+	/* detach event data */
+	char	*devi_ev_path;
+	int	devi_ev_instance;
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))
