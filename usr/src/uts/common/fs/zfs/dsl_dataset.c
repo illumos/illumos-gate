@@ -3139,9 +3139,14 @@ dsl_dataset_clone_swap(dsl_dataset_t *clone, dsl_dataset_t *origin_head,
 	ASSERT(clone->ds_owner);
 	ASSERT(origin_head->ds_owner);
 retry:
-	/* Need exclusive access for the swap */
-	rw_enter(&clone->ds_rwlock, RW_WRITER);
-	if (!rw_tryenter(&origin_head->ds_rwlock, RW_WRITER)) {
+	/*
+	 * Need exclusive access for the swap. If we're swapping these
+	 * datasets back after an error, we already hold the locks.
+	 */
+	if (!RW_WRITE_HELD(&clone->ds_rwlock))
+		rw_enter(&clone->ds_rwlock, RW_WRITER);
+	if (!RW_WRITE_HELD(&origin_head->ds_rwlock) &&
+	    !rw_tryenter(&origin_head->ds_rwlock, RW_WRITER)) {
 		rw_exit(&clone->ds_rwlock);
 		rw_enter(&origin_head->ds_rwlock, RW_WRITER);
 		if (!rw_tryenter(&clone->ds_rwlock, RW_WRITER)) {
