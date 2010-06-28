@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This module contains functions used for reading and writing the index file.
@@ -281,6 +279,16 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	const char *zone_name, *zone_state, *zone_path, *zone_uuid;
 
 	assert(ze != NULL);
+
+	/*
+	 * Don't allow modification of Global Zone entry
+	 * in index file
+	 */
+	if ((operation == PZE_MODIFY) &&
+	    (strcmp(ze->zone_name, GLOBAL_ZONENAME) == 0)) {
+		return (Z_OK);
+	}
+
 	if (operation == PZE_ADD &&
 	    (ze->zone_state < 0 || strlen(ze->zone_path) == 0))
 		return (Z_INVAL);
