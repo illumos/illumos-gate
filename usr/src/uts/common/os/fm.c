@@ -610,8 +610,8 @@ fm_nvlist_create(nv_alloc_t *nva)
 
 	if (nvlist_xalloc(&nvl, NV_UNIQUE_NAME, nvhdl) != 0) {
 		if (hdl_alloced) {
-			kmem_free(nvhdl, sizeof (nv_alloc_t));
 			nv_alloc_fini(nvhdl);
+			kmem_free(nvhdl, sizeof (nv_alloc_t));
 		}
 		return (NULL);
 	}

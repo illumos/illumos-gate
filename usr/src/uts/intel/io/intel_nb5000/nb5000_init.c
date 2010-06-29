@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -255,7 +254,7 @@ nb_fini()
 				kmem_free(dimmp, sizeof (nb_dimm_t));
 				*dimmpp = NULL;
 			}
-			dimmp++;
+			dimmpp++;
 		}
 	}
 	kmem_free(nb_dimms, sizeof (nb_dimm_t *) * nb_dimm_slots);
@@ -1590,7 +1589,7 @@ nb_dev_reinit()
 				kmem_free(dimmp, sizeof (nb_dimm_t));
 				*dimmpp = NULL;
 			}
-			dimmp++;
+			dimmpp++;
 		}
 	}
 	kmem_free(old_nb_dimms, sizeof (nb_dimm_t *) * dimm_slot);

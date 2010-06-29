@@ -649,6 +649,7 @@ cpuid_amd_getids(cpu_t *cpu)
 	} else {
 		/* Assume single-core part */
 		cpi->cpi_ncore_per_chip = 1;
+		coreidsz = 1;
 	}
 
 	cpi->cpi_clogid = cpi->cpi_pkgcoreid =
