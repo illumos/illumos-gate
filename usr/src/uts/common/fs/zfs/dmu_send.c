@@ -662,7 +662,6 @@ recv_existing_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	    dp->dp_spa, tx, "dataset = %lld", dsobj);
 }
 
-
 static boolean_t
 dmu_recv_verify_features(dsl_dataset_t *ds, struct drr_begin *drrb)
 {
@@ -787,7 +786,7 @@ dmu_recv_begin(char *tofs, char *tosnap, char *top_ds, struct drr_begin *drrb,
 			return (err);
 
 		if (dmu_recv_verify_features(ds, drrb)) {
-			dsl_dataset_rele(ds, dmu_recv_tag);
+			dsl_dataset_rele(ds, FTAG);
 			return (ENOTSUP);
 		}
 
