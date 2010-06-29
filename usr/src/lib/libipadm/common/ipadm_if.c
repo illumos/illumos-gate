@@ -1252,15 +1252,17 @@ i_ipadm_create_if(ipadm_handle_t iph, char *ifname, sa_family_t af,
 	if (ipadm_if_enabled(iph, ifname, af))
 		return (IPADM_IF_EXISTS);
 
-	status = i_ipadm_if_pexists(iph, ifname, af, &p_exists);
-	if (status != IPADM_SUCCESS)
-		return (status);
-	other_af = (af == AF_INET ? AF_INET6 : AF_INET);
-	if (p_exists) {
-		if (!ipadm_if_enabled(iph, ifname, other_af))
-			return (IPADM_OP_DISABLE_OBJ);
-		else
-			ipadm_flags &= ~IPADM_OPT_PERSIST;
+	if (!(iph->iph_flags & IPH_LEGACY)) {
+		status = i_ipadm_if_pexists(iph, ifname, af, &p_exists);
+		if (status != IPADM_SUCCESS)
+			return (status);
+		other_af = (af == AF_INET ? AF_INET6 : AF_INET);
+		if (p_exists) {
+			if (!ipadm_if_enabled(iph, ifname, other_af))
+				return (IPADM_OP_DISABLE_OBJ);
+			else
+				ipadm_flags &= ~IPADM_OPT_PERSIST;
+		}
 	}
 
 	return (i_ipadm_plumb_if(iph, ifname, af, ipadm_flags));
