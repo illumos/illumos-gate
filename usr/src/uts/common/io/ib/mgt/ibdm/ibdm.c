@@ -159,6 +159,7 @@ int	ibdm_dft_retry_cnt	= IBDM_DFT_NRETRIES;
 #ifdef DEBUG
 int	ibdm_ignore_saa_event = 0;
 #endif
+int	ibdm_enumerate_iocs = 0;
 
 /* Modload support */
 static struct modlmisc ibdm_modlmisc	= {
@@ -735,7 +736,7 @@ ibdm_initialize_port(ibdm_port_attr_t *port)
 	    NULL) != IBT_SUCCESS)
 		return;
 
-	if (port->pa_sa_hdl != NULL)
+	if (port->pa_sa_hdl != NULL || port->pa_pkey_tbl != NULL)
 		return;
 
 	if (ibt_query_hca_ports(port->pa_hca_hdl, port->pa_port_num,
@@ -758,31 +759,40 @@ ibdm_initialize_port(ibdm_port_attr_t *port)
 
 	ibt_free_portinfo(pinfop, size);
 
-	event_args.is_event_callback = ibdm_saa_event_cb;
-	event_args.is_event_callback_arg = port;
-	if (ibmf_sa_session_open(port->pa_port_guid, 0, &event_args,
-	    IBMF_VERSION, 0, &port->pa_sa_hdl) != IBMF_SUCCESS) {
-		IBTF_DPRINTF_L2("ibdm", "\tinitialize_port: "
-		    "sa access registration failed");
-		return;
-	}
-	ibmf_reg.ir_ci_guid		= port->pa_hca_guid;
-	ibmf_reg.ir_port_num		= port->pa_port_num;
-	ibmf_reg.ir_client_class	= DEV_MGT_MANAGER;
+	if (ibdm_enumerate_iocs) {
+		event_args.is_event_callback = ibdm_saa_event_cb;
+		event_args.is_event_callback_arg = port;
+		if (ibmf_sa_session_open(port->pa_port_guid, 0, &event_args,
+		    IBMF_VERSION, 0, &port->pa_sa_hdl) != IBMF_SUCCESS) {
+			IBTF_DPRINTF_L2("ibdm", "\tinitialize_port: "
+			    "sa access registration failed");
+			(void) ibdm_fini_port(port);
+			return;
+		}
 
-	if (ibmf_register(&ibmf_reg, IBMF_VERSION, 0, NULL, NULL,
-	    &port->pa_ibmf_hdl, &port->pa_ibmf_caps) != IBMF_SUCCESS) {
-		IBTF_DPRINTF_L2("ibdm", "\tinitialize_port: "
-		    "IBMF registration failed");
-		(void) ibdm_fini_port(port);
-		return;
-	}
-	if (ibmf_setup_async_cb(port->pa_ibmf_hdl, IBMF_QP_HANDLE_DEFAULT,
-	    ibdm_ibmf_recv_cb, 0, 0) != IBMF_SUCCESS) {
-		IBTF_DPRINTF_L2("ibdm", "\tinitialize_port: "
-		    "IBMF setup recv cb failed");
-		(void) ibdm_fini_port(port);
-		return;
+		ibmf_reg.ir_ci_guid		= port->pa_hca_guid;
+		ibmf_reg.ir_port_num		= port->pa_port_num;
+		ibmf_reg.ir_client_class	= DEV_MGT_MANAGER;
+
+		if (ibmf_register(&ibmf_reg, IBMF_VERSION, 0, NULL, NULL,
+		    &port->pa_ibmf_hdl, &port->pa_ibmf_caps) != IBMF_SUCCESS) {
+			IBTF_DPRINTF_L2("ibdm", "\tinitialize_port: "
+			    "IBMF registration failed");
+			(void) ibdm_fini_port(port);
+			return;
+		}
+
+		if (ibmf_setup_async_cb(port->pa_ibmf_hdl,
+		    IBMF_QP_HANDLE_DEFAULT,
+		    ibdm_ibmf_recv_cb, 0, 0) != IBMF_SUCCESS) {
+			IBTF_DPRINTF_L2("ibdm", "\tinitialize_port: "
+			    "IBMF setup recv cb failed");
+			(void) ibdm_fini_port(port);
+			return;
+		}
+	} else {
+		port->pa_sa_hdl = NULL;
+		port->pa_ibmf_hdl = NULL;
 	}
 
 	for (ii = 0; ii < port->pa_npkeys; ii++) {
@@ -804,6 +814,11 @@ static void
 ibdm_port_attr_ibmf_init(ibdm_port_attr_t *port, ib_pkey_t pkey, int ii)
 {
 	int ret;
+
+	if (ibdm_enumerate_iocs == 0) {
+		port->pa_pkey_tbl[ii].pt_qp_hdl = NULL;
+		return;
+	}
 
 	if ((ret = ibmf_alloc_qp(port->pa_ibmf_hdl, pkey, IB_GSI_QKEY,
 	    IBMF_ALT_QP_MAD_NO_RMPP, &port->pa_pkey_tbl[ii].pt_qp_hdl)) !=
@@ -1084,6 +1099,12 @@ ibdm_handle_hca_detach(ib_guid_t hca_guid)
 	if (ibdm_uninit_hca(head) != IBDM_SUCCESS)
 		(void) ibdm_handle_hca_attach(hca_guid);
 
+#ifdef DEBUG
+	if (ibdm_enumerate_iocs == 0) {
+		ASSERT(ibdm.ibdm_dp_gidlist_head == NULL);
+	}
+#endif
+
 	/*
 	 * Now clean up the HCA lists in the gidlist.
 	 */
@@ -1227,6 +1248,11 @@ ibdm_port_attr_ibmf_fini(ibdm_port_attr_t *port_attr, int ii)
 	int ibmf_status;
 
 	IBTF_DPRINTF_L5("ibdm", "\tport_attr_ibmf_fini:");
+
+	if (ibdm_enumerate_iocs == 0) {
+		ASSERT(port_attr->pa_pkey_tbl[ii].pt_qp_hdl == NULL);
+		return (IBDM_SUCCESS);
+	}
 
 	if (port_attr->pa_pkey_tbl[ii].pt_qp_hdl) {
 		ibmf_status = ibmf_tear_down_async_cb(port_attr->pa_ibmf_hdl,
@@ -4691,7 +4717,8 @@ ibdm_get_waittime(ib_guid_t hca_guid, int dft_wait)
 			}
 			hca = hca->hl_next;
 		}
-		IBTF_DPRINTF_L4("ibdm", "\tget_waittime %llx", wait_time);
+		IBTF_DPRINTF_L2("ibdm", "\tget_waittime: wait_time = %ld secs",
+		    (long)wait_time);
 		return (wait_time);
 	}
 
@@ -4701,8 +4728,10 @@ ibdm_get_waittime(ib_guid_t hca_guid, int dft_wait)
 			temp = ((temp >= dft_wait) ? 0 : (dft_wait - temp));
 			wait_time = (temp > wait_time) ? temp : wait_time;
 		}
+		hca = hca->hl_next;
 	}
-	IBTF_DPRINTF_L4("ibdm", "\tget_waittime %llx", wait_time);
+	IBTF_DPRINTF_L2("ibdm", "\tget_waittime: wait_time = %ld secs",
+	    (long)wait_time);
 	return (wait_time);
 }
 
@@ -4715,6 +4744,13 @@ ibdm_ibnex_port_settle_wait(ib_guid_t hca_guid, int dft_wait)
 	mutex_enter(&ibdm.ibdm_hl_mutex);
 
 	while ((wait_time = ibdm_get_waittime(hca_guid, dft_wait)) > 0) {
+		if (wait_time > dft_wait) {
+			IBTF_DPRINTF_L1("ibdm",
+			    "\tibnex_port_settle_wait: wait_time = %ld secs; "
+			    "Resetting to %d secs",
+			    (long)wait_time, dft_wait);
+			wait_time = dft_wait;
+		}
 		delta = drv_usectohz(wait_time * 1000000);
 		(void) cv_reltimedwait(&ibdm.ibdm_port_settle_cv,
 		    &ibdm.ibdm_hl_mutex, delta, TR_CLOCK_TICK);
@@ -4961,6 +4997,10 @@ ibdm_ibnex_probe_ioc(ib_guid_t iou, ib_guid_t ioc_guid, int reprobe_flag)
 
 	IBTF_DPRINTF_L4("ibdm", "\tibnex_probe_ioc: (%llX, %llX, %d) Begin",
 	    iou, ioc_guid, reprobe_flag);
+
+	if (ibdm_enumerate_iocs == 0)
+		return (NULL);
+
 	/* Check whether we know this already */
 	ioc_info = ibdm_get_ioc_info_with_gid(ioc_guid, &gid_info);
 	if (ioc_info == NULL) {
@@ -5157,6 +5197,9 @@ ibdm_get_ioc_info_with_gid(ib_guid_t ioc_guid,
 ibdm_ioc_info_t *
 ibdm_ibnex_get_ioc_info(ib_guid_t ioc_guid)
 {
+	if (ibdm_enumerate_iocs == 0)
+		return (NULL);
+
 	/* will not use the gid_info pointer, so the second arg is NULL */
 	return (ibdm_get_ioc_info_with_gid(ioc_guid, NULL));
 }
@@ -5171,6 +5214,9 @@ ibdm_ibnex_get_ioc_count(void)
 	int			count = 0, k;
 	ibdm_ioc_info_t		*ioc;
 	ibdm_dp_gidinfo_t	*gid_list;
+
+	if (ibdm_enumerate_iocs == 0)
+		return (0);
 
 	mutex_enter(&ibdm.ibdm_mutex);
 	ibdm_sweep_fabric(0);
@@ -5219,6 +5265,9 @@ ibdm_ibnex_get_ioc_list(ibdm_ibnex_get_ioclist_mtd_t list_flag)
 	ib_dm_io_unitinfo_t	*iou;
 
 	IBTF_DPRINTF_L4("ibdm", "\tget_ioc_list: Enter");
+
+	if (ibdm_enumerate_iocs == 0)
+		return (NULL);
 
 	mutex_enter(&ibdm.ibdm_mutex);
 	if (list_flag != IBDM_IBNEX_DONOT_PROBE)
@@ -5705,6 +5754,7 @@ ibdm_saa_event_cb(ibmf_saa_handle_t ibmf_saa_handle,
 	IBTF_DPRINTF_L4("ibdm", "\tsaa_event_cb(%x, %x, %x, %x)\n",
 	    ibmf_saa_handle, ibmf_saa_event, event_details,
 	    callback_arg);
+
 #ifdef DEBUG
 	if (ibdm_ignore_saa_event)
 		return;
@@ -6682,6 +6732,9 @@ ibdm_reset_all_dgids(ibmf_saa_handle_t port_sa_hdl)
 {
 	IBTF_DPRINTF_L4(ibdm_string, "\treset_all_dgids(%X)",
 	    port_sa_hdl);
+
+	if (ibdm_enumerate_iocs == 0)
+		return;
 
 	ASSERT(!MUTEX_HELD(&ibdm.ibdm_mutex));
 	ASSERT(!MUTEX_HELD(&ibdm.ibdm_hl_mutex));
