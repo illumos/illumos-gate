@@ -484,6 +484,7 @@ static cmd_stat_t cmd_stats = {
 	{ "dimm_creat", FMD_TYPE_UINT64, "created new mem module structure" },
 	{ "bank_creat", FMD_TYPE_UINT64, "created new mem bank structure" },
 	{ "page_creat", FMD_TYPE_UINT64, "created new page structure" },
+	{ "cache_creat", FMD_TYPE_UINT64, "created new cache structure" },
 	{ "ce_unknown", FMD_TYPE_UINT64, "unknown CEs" },
 	{ "ce_interm", FMD_TYPE_UINT64, "intermittent CEs" },
 	{ "ce_ppersis", FMD_TYPE_UINT64, "possibly persistent CEs" },

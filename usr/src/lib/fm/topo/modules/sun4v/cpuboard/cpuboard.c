@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -251,11 +250,6 @@ cpuboard_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	    NULL, auth, cpubc->pn, NULL, cpubc->sn);
 	nvlist_free(auth);
 
-	topo_mod_strfree(mod, cpubc->sn);
-	topo_mod_strfree(mod, cpubc->pn);
-
-	cpubc->sn = cpubc->pn = NULL;
-
 	if (fmri == NULL) {
 		topo_mod_dprintf(mod,
 		    "Unable to make nvlist for %s bind: %s.\n",
@@ -442,6 +436,22 @@ cpuboard_findrc(topo_mod_t *mod, uint64_t id)
 	return (NULL);
 }
 
+static void
+cpuboard_free_pri_info(topo_mod_t *mod, cpuboard_contents_t cpuboard_list[],
+    topo_instance_t min, topo_instance_t max)
+{
+	int i;
+
+	for (i = min; i <= max; i++) {
+		if (cpuboard_list[i].present == 0)
+			continue;
+		if (cpuboard_list[i].sn != NULL)
+			topo_mod_strfree(mod, cpuboard_list[i].sn);
+		if (cpuboard_list[i].pn != NULL)
+			topo_mod_strfree(mod, cpuboard_list[i].pn);
+	}
+}
+
 /*ARGSUSED*/
 static int
 cpuboard_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
@@ -487,8 +497,10 @@ cpuboard_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
 		}
 	}
 
-	if (chip_enum_load(mod) == NULL)
+	if (chip_enum_load(mod) == NULL) {
+		cpuboard_free_pri_info(mod, cpuboard_list, min, max);
 		return (-1);
+	}
 
 	for (i = min; i <= max; i++) {
 		if (cpuboard_list[i].present == 0)
@@ -500,6 +512,7 @@ cpuboard_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
 			topo_mod_dprintf(mod,
 			    "Enumeration of cpuboard failed: %s\n",
 			    topo_strerror(topo_mod_errno(mod)));
+			cpuboard_free_pri_info(mod, cpuboard_list, min, max);
 			return (-1); /* mod_errno already set */
 		}
 		if (topo_node_range_create(mod, cpuboardn, CHIP, 0,
@@ -507,12 +520,14 @@ cpuboard_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
 			topo_node_unbind(cpuboardn);
 			topo_mod_dprintf(mod, "topo_node_range_create CHIP "
 			    "failed: %s\n", topo_strerror(topo_mod_errno(mod)));
+			cpuboard_free_pri_info(mod, cpuboard_list, min, max);
 			return (-1); /* mod_errno already set */
 		}
 		if (chip_instantiate(cpuboardn, CPUBOARD, mod, i) < 0) {
 			topo_mod_dprintf(mod, "Enumeration of chip "
 			    "failed %s\n",
 			    topo_strerror(topo_mod_errno(mod)));
+			cpuboard_free_pri_info(mod, cpuboard_list, min, max);
 			return (-1);
 		}
 		if (topo_node_range_create(mod, cpuboardn, HOSTBRIDGE, 0,
@@ -521,6 +536,7 @@ cpuboard_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
 			topo_mod_dprintf(mod, "topo_node_range_create: "
 			    "HOSTBRIDGE failed: %s\n",
 			    topo_strerror(topo_mod_errno(mod)));
+			cpuboard_free_pri_info(mod, cpuboard_list, min, max);
 			return (-1);
 		}
 		if (cpuboard_hb_enum(mod, cpuboard_findrc(mod, i), cpub_rcs[i],
@@ -529,8 +545,10 @@ cpuboard_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
 			topo_mod_dprintf(mod, "cpuboard_hb_enum: "
 			    "failed: %s\n",
 			    topo_strerror(topo_mod_errno(mod)));
+			cpuboard_free_pri_info(mod, cpuboard_list, min, max);
 			return (-1);
 		}
 	}
+	cpuboard_free_pri_info(mod, cpuboard_list, min, max);
 	return (0);
 }
