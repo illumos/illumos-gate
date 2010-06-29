@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -835,6 +834,7 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct,
 		tk = task_create(0, p->p_zone);
 		mutex_enter(&tk->tk_zone->zone_nlwps_lock);
 		tk->tk_proj->kpj_ntasks++;
+		tk->tk_nprocs++;
 		mutex_exit(&tk->tk_zone->zone_nlwps_lock);
 
 		default_gp = rctl_rlimit_set_prealloc(RLIM_NLIMITS);
@@ -848,6 +848,10 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct,
 		task_detach(p);
 		task_begin(tk, p);
 		mutex_exit(&pidlock);
+
+		mutex_enter(&tk_old->tk_zone->zone_nlwps_lock);
+		tk_old->tk_nprocs--;
+		mutex_exit(&tk_old->tk_zone->zone_nlwps_lock);
 
 		e.rcep_p.proc = p;
 		e.rcep_t = RCENTITY_PROCESS;
@@ -912,6 +916,10 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	struct cred	*cr;
 	uid_t		ruid;
 	zoneid_t	zoneid;
+	task_t		*task;
+	kproject_t	*proj;
+	zone_t		*zone;
+	int		rctlfail = 0;
 
 	if (!page_mem_avail(tune.t_minarmem))
 		return (-1);
@@ -919,6 +927,40 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 		return (-1);	/* no point in starting new processes */
 
 	pp = (flags & GETPROC_KERNEL) ? &p0 : curproc;
+	task = pp->p_task;
+	proj = task->tk_proj;
+	zone = pp->p_zone;
+
+	mutex_enter(&pp->p_lock);
+	mutex_enter(&zone->zone_nlwps_lock);
+	if (proj != proj0p) {
+		if (task->tk_nprocs >= task->tk_nprocs_ctl)
+			if (rctl_test(rc_task_nprocs, task->tk_rctls,
+			    pp, 1, 0) & RCT_DENY)
+				rctlfail = 1;
+
+		if (proj->kpj_nprocs >= proj->kpj_nprocs_ctl)
+			if (rctl_test(rc_project_nprocs, proj->kpj_rctls,
+			    pp, 1, 0) & RCT_DENY)
+				rctlfail = 1;
+
+		if (zone->zone_nprocs >= zone->zone_nprocs_ctl)
+			if (rctl_test(rc_zone_nprocs, zone->zone_rctls,
+			    pp, 1, 0) & RCT_DENY)
+				rctlfail = 1;
+
+		if (rctlfail) {
+			mutex_exit(&zone->zone_nlwps_lock);
+			mutex_exit(&pp->p_lock);
+			goto punish;
+		}
+	}
+	task->tk_nprocs++;
+	proj->kpj_nprocs++;
+	zone->zone_nprocs++;
+	mutex_exit(&zone->zone_nlwps_lock);
+	mutex_exit(&pp->p_lock);
+
 	cp = kmem_cache_alloc(process_cache, KM_SLEEP);
 	bzero(cp, sizeof (proc_t));
 
@@ -1178,6 +1220,13 @@ bad:
 	}
 	kmem_cache_free(process_cache, cp);
 
+	mutex_enter(&zone->zone_nlwps_lock);
+	task->tk_nprocs--;
+	proj->kpj_nprocs--;
+	zone->zone_nprocs--;
+	mutex_exit(&zone->zone_nlwps_lock);
+
+punish:
 	/*
 	 * We most likely got into this situation because some process is
 	 * forking out of control.  As punishment, put it to sleep for a

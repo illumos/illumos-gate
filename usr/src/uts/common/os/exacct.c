@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/exacct.h>
@@ -1735,6 +1734,7 @@ exacct_init()
 	exacct_queue = system_taskq;
 	exacct_object_cache = kmem_cache_create("exacct_object_cache",
 	    sizeof (ea_object_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+	task_commit_thread_init();
 }
 
 /*

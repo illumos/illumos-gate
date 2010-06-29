@@ -19,15 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/atomic.h>
+#include <sys/callb.h>
 #include <sys/cmn_err.h>
 #include <sys/exacct.h>
 #include <sys/id_space.h>
 #include <sys/kmem.h>
+#include <sys/kstat.h>
 #include <sys/modhash.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
@@ -100,7 +101,23 @@ static id_space_t *taskid_space;	/* global taskid space */
 static kmem_cache_t *task_cache;	/* kmem cache for task structures */
 
 rctl_hndl_t rc_task_lwps;
+rctl_hndl_t rc_task_nprocs;
 rctl_hndl_t rc_task_cpu_time;
+
+/*
+ * Resource usage is committed using task queues; if taskq_dispatch() fails
+ * due to resource constraints, the task is placed on a list for background
+ * processing by the task_commit_thread() backup thread.
+ */
+static kmutex_t task_commit_lock;	/* protects list pointers and cv */
+static kcondvar_t task_commit_cv;	/* wakeup task_commit_thread */
+static task_t *task_commit_head = NULL;
+static task_t *task_commit_tail = NULL;
+kthread_t *task_commit_thread;
+
+static void task_commit();
+static kstat_t *task_kstat_create(task_t *, zone_t *);
+static void task_kstat_delete(task_t *);
 
 /*
  * static rctl_qty_t task_usage_lwps(void *taskp)
@@ -167,6 +184,7 @@ task_lwps_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rcntl,
 
 	return (0);
 }
+
 /*ARGSUSED*/
 static int
 task_lwps_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e, rctl_qty_t nv) {
@@ -177,6 +195,58 @@ task_lwps_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e, rctl_qty_t nv) {
 		return (0);
 
 	e->rcep_p.task->tk_nlwps_ctl = nv;
+	return (0);
+}
+
+/*ARGSUSED*/
+static rctl_qty_t
+task_nprocs_usage(rctl_t *r, proc_t *p)
+{
+	task_t *t;
+	rctl_qty_t nprocs;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	t = p->p_task;
+	mutex_enter(&p->p_zone->zone_nlwps_lock);
+	nprocs = t->tk_nprocs;
+	mutex_exit(&p->p_zone->zone_nlwps_lock);
+
+	return (nprocs);
+}
+
+/*ARGSUSED*/
+static int
+task_nprocs_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rcntl,
+    rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t nprocs;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_TASK);
+	if (e->rcep_p.task == NULL)
+		return (0);
+
+	ASSERT(MUTEX_HELD(&(e->rcep_p.task->tk_zone->zone_nlwps_lock)));
+	nprocs = e->rcep_p.task->tk_nprocs;
+
+	if (nprocs + incr > rcntl->rcv_value)
+		return (1);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+task_nprocs_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv) {
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_TASK);
+	if (e->rcep_p.task == NULL)
+		return (0);
+
+	e->rcep_p.task->tk_nprocs_ctl = nv;
 	return (0);
 }
 
@@ -353,7 +423,6 @@ task_hold(task_t *tk)
  *
  * Caller's context
  *   Caller must not be holding the task_hash_lock.
- *   Caller's context must be acceptable for KM_SLEEP allocations.
  */
 void
 task_rele(task_t *tk)
@@ -364,9 +433,13 @@ task_rele(task_t *tk)
 		return;
 	}
 
+	ASSERT(tk->tk_nprocs == 0);
+
 	mutex_enter(&tk->tk_zone->zone_nlwps_lock);
 	tk->tk_proj->kpj_ntasks--;
 	mutex_exit(&tk->tk_zone->zone_nlwps_lock);
+
+	task_kstat_delete(tk);
 
 	if (mod_hash_destroy(task_hash,
 	    (mod_hash_key_t)(uintptr_t)tk->tk_tkid) != 0)
@@ -377,8 +450,22 @@ task_rele(task_t *tk)
 	 * At this point, there are no members or observers of the task, so we
 	 * can safely send it on for commitment to the accounting subsystem.
 	 * The task will be destroyed in task_end() subsequent to commitment.
+	 * Since we may be called with pidlock held, taskq_dispatch() cannot
+	 * sleep. Commitment is handled by a backup thread in case dispatching
+	 * the task fails.
 	 */
-	(void) taskq_dispatch(exacct_queue, exacct_commit_task, tk, KM_SLEEP);
+	if (taskq_dispatch(exacct_queue, exacct_commit_task, tk,
+	    TQ_NOSLEEP | TQ_NOQUEUE) == NULL) {
+		mutex_enter(&task_commit_lock);
+		if (task_commit_head == NULL) {
+			task_commit_head = task_commit_tail = tk;
+		} else {
+			task_commit_tail->tk_commit_next = tk;
+			task_commit_tail = tk;
+		}
+		cv_signal(&task_commit_cv);
+		mutex_exit(&task_commit_lock);
+	}
 }
 
 /*
@@ -414,10 +501,13 @@ task_create(projid_t projid, zone_t *zone)
 	tk->tk_tkid = tkid = id_alloc(taskid_space);
 	tk->tk_nlwps = 0;
 	tk->tk_nlwps_ctl = INT_MAX;
+	tk->tk_nprocs = 0;
+	tk->tk_nprocs_ctl = INT_MAX;
 	tk->tk_usage = tu;
 	tk->tk_inherited = kmem_zalloc(sizeof (task_usage_t), KM_SLEEP);
 	tk->tk_proj = project_hold_by_id(projid, zone, PROJECT_HOLD_INSERT);
 	tk->tk_flags = TASK_NORMAL;
+	tk->tk_commit_next = NULL;
 
 	/*
 	 * Copy ancestor task's resource controls.
@@ -473,6 +563,7 @@ task_create(projid_t projid, zone_t *zone)
 	}
 	mutex_exit(&task_hash_lock);
 
+	tk->tk_nprocs_kstat = task_kstat_create(tk, zone);
 	return (tk);
 }
 
@@ -495,7 +586,6 @@ void
 task_attach(task_t *tk, proc_t *p)
 {
 	proc_t *first, *prev;
-	rctl_entity_p_t e;
 	ASSERT(tk != NULL);
 	ASSERT(p != NULL);
 	ASSERT(MUTEX_HELD(&pidlock));
@@ -515,22 +605,6 @@ task_attach(task_t *tk, proc_t *p)
 	tk->tk_memb_list = p;
 	task_hold(tk);
 	p->p_task = tk;
-
-	/*
-	 * Now that the linkage from process to task and project is
-	 * complete, do the required callbacks for the task and project
-	 * rctl sets.
-	 */
-	e.rcep_p.proj = tk->tk_proj;
-	e.rcep_t = RCENTITY_PROJECT;
-	(void) rctl_set_dup(NULL, NULL, p, &e, tk->tk_proj->kpj_rctls, NULL,
-	    RCD_CALLBACK);
-
-	e.rcep_p.task = tk;
-	e.rcep_t = RCENTITY_TASK;
-	(void) rctl_set_dup(NULL, NULL, p, &e, tk->tk_rctls, NULL,
-	    RCD_CALLBACK);
-
 }
 
 /*
@@ -551,6 +625,7 @@ task_begin(task_t *tk, proc_t *p)
 {
 	timestruc_t ts;
 	task_usage_t *tu;
+	rctl_entity_p_t e;
 
 	ASSERT(MUTEX_HELD(&pidlock));
 	ASSERT(MUTEX_HELD(&p->p_lock));
@@ -566,6 +641,15 @@ task_begin(task_t *tk, proc_t *p)
 	 * Join process to the task as a member.
 	 */
 	task_attach(tk, p);
+
+	/*
+	 * Now that the linkage from process to task is complete, do the
+	 * required callback for the task rctl set.
+	 */
+	e.rcep_p.task = tk;
+	e.rcep_t = RCENTITY_TASK;
+	(void) rctl_set_dup(NULL, NULL, p, &e, tk->tk_rctls, NULL,
+	    RCD_CALLBACK);
 }
 
 /*
@@ -638,10 +722,12 @@ task_change(task_t *newtk, proc_t *p)
 
 	mutex_enter(&oldtk->tk_zone->zone_nlwps_lock);
 	oldtk->tk_nlwps -= p->p_lwpcnt;
+	oldtk->tk_nprocs--;
 	mutex_exit(&oldtk->tk_zone->zone_nlwps_lock);
 
 	mutex_enter(&newtk->tk_zone->zone_nlwps_lock);
 	newtk->tk_nlwps += p->p_lwpcnt;
+	newtk->tk_nprocs++;
 	mutex_exit(&newtk->tk_zone->zone_nlwps_lock);
 
 	task_detach(p);
@@ -828,6 +914,13 @@ static rctl_ops_t task_lwps_ops = {
 	task_lwps_test
 };
 
+static rctl_ops_t task_procs_ops = {
+	rcop_no_action,
+	task_nprocs_usage,
+	task_nprocs_set,
+	task_nprocs_test
+};
+
 static rctl_ops_t task_cpu_time_ops = {
 	rcop_no_action,
 	task_cpu_time_usage,
@@ -858,6 +951,7 @@ task_init(void)
 	rctl_set_t *set;
 	rctl_alloc_gp_t *gp;
 	rctl_entity_p_t e;
+
 	/*
 	 * Initialize task_cache and taskid_space.
 	 */
@@ -877,6 +971,9 @@ task_init(void)
 	rc_task_lwps = rctl_register("task.max-lwps", RCENTITY_TASK,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_COUNT, INT_MAX, INT_MAX,
 	    &task_lwps_ops);
+	rc_task_nprocs = rctl_register("task.max-processes", RCENTITY_TASK,
+	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_COUNT, INT_MAX, INT_MAX,
+	    &task_procs_ops);
 	rc_task_cpu_time = rctl_register("task.max-cpu-time", RCENTITY_TASK,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_DENY_NEVER |
 	    RCTL_GLOBAL_CPU_TIME | RCTL_GLOBAL_INFINITE |
@@ -896,7 +993,9 @@ task_init(void)
 	    PROJECT_HOLD_INSERT);
 	task0p->tk_flags = TASK_NORMAL;
 	task0p->tk_nlwps = p->p_lwpcnt;
+	task0p->tk_nprocs = 1;
 	task0p->tk_zone = global_zone;
+	task0p->tk_commit_next = NULL;
 
 	set = rctl_set_create();
 	gp = rctl_set_init_prealloc(RCENTITY_TASK);
@@ -921,6 +1020,8 @@ task_init(void)
 
 	task0p->tk_memb_list = p;
 
+	task0p->tk_nprocs_kstat = task_kstat_create(task0p, task0p->tk_zone);
+
 	/*
 	 * Initialize task pointers for p0, including doubly linked list of task
 	 * members.
@@ -928,4 +1029,100 @@ task_init(void)
 	p->p_task = task0p;
 	p->p_taskprev = p->p_tasknext = p;
 	task_hold(task0p);
+}
+
+static int
+task_nprocs_kstat_update(kstat_t *ksp, int rw)
+{
+	task_t *tk = ksp->ks_private;
+	task_kstat_t *ktk = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	ktk->ktk_usage.value.ui64 = tk->tk_nprocs;
+	ktk->ktk_value.value.ui64 = tk->tk_nprocs_ctl;
+	return (0);
+}
+
+static kstat_t *
+task_kstat_create(task_t *tk, zone_t *zone)
+{
+	kstat_t	*ksp;
+	task_kstat_t *ktk;
+	char *zonename = zone->zone_name;
+
+	ksp = rctl_kstat_create_task(tk, "nprocs", KSTAT_TYPE_NAMED,
+	    sizeof (task_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+
+	if (ksp == NULL)
+		return (NULL);
+
+	ktk = ksp->ks_data = kmem_alloc(sizeof (task_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zonename) + 1;
+	kstat_named_init(&ktk->ktk_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&ktk->ktk_zonename, zonename);
+	kstat_named_init(&ktk->ktk_usage, "usage", KSTAT_DATA_UINT64);
+	kstat_named_init(&ktk->ktk_value, "value", KSTAT_DATA_UINT64);
+	ksp->ks_update = task_nprocs_kstat_update;
+	ksp->ks_private = tk;
+	kstat_install(ksp);
+
+	return (ksp);
+}
+
+static void
+task_kstat_delete(task_t *tk)
+{
+	void *data;
+
+	if (tk->tk_nprocs_kstat != NULL) {
+		data = tk->tk_nprocs_kstat->ks_data;
+		kstat_delete(tk->tk_nprocs_kstat);
+		kmem_free(data, sizeof (task_kstat_t));
+		tk->tk_nprocs_kstat = NULL;
+	}
+}
+
+void
+task_commit_thread_init()
+{
+	mutex_init(&task_commit_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&task_commit_cv, NULL, CV_DEFAULT, NULL);
+	task_commit_thread = thread_create(NULL, 0, task_commit, NULL, 0,
+	    &p0, TS_RUN, minclsyspri);
+}
+
+/*
+ * Backup thread to commit task resource usage when taskq_dispatch() fails.
+ */
+static void
+task_commit()
+{
+	callb_cpr_t cprinfo;
+
+	CALLB_CPR_INIT(&cprinfo, &task_commit_lock, callb_generic_cpr,
+	    "task_commit_thread");
+
+	mutex_enter(&task_commit_lock);
+
+	for (;;) {
+		while (task_commit_head == NULL) {
+			CALLB_CPR_SAFE_BEGIN(&cprinfo);
+			cv_wait(&task_commit_cv, &task_commit_lock);
+			CALLB_CPR_SAFE_END(&cprinfo, &task_commit_lock);
+		}
+		while (task_commit_head != NULL) {
+			task_t *tk;
+
+			tk = task_commit_head;
+			task_commit_head = task_commit_head->tk_commit_next;
+			if (task_commit_head == NULL)
+				task_commit_tail = NULL;
+			mutex_exit(&task_commit_lock);
+			exacct_commit_task(tk);
+			mutex_enter(&task_commit_lock);
+		}
+	}
 }

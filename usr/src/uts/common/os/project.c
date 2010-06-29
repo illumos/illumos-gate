@@ -50,6 +50,7 @@ static kproject_t *projects_list;
 rctl_hndl_t rc_project_cpu_shares;
 rctl_hndl_t rc_project_cpu_cap;
 rctl_hndl_t rc_project_nlwps;
+rctl_hndl_t rc_project_nprocs;
 rctl_hndl_t rc_project_ntasks;
 rctl_hndl_t rc_project_msgmni;
 rctl_hndl_t rc_project_semmni;
@@ -104,7 +105,7 @@ struct project_zone {
  *   acquired, the hash lock is to be acquired first.
  */
 
-static kstat_t *project_kstat_create(kproject_t *pj, zone_t *zone);
+static void project_kstat_create(kproject_t *pj, zone_t *zone);
 static void project_kstat_delete(kproject_t *pj);
 
 static void
@@ -123,6 +124,7 @@ project_data_init(kproject_data_t *data)
 	data->kpd_crypto_mem = 0;
 	data->kpd_crypto_mem_ctl = UINT64_MAX;
 	data->kpd_lockedmem_kstat = NULL;
+	data->kpd_nprocs_kstat = NULL;
 }
 
 /*ARGSUSED*/
@@ -218,7 +220,6 @@ project_hold_by_id(projid_t id, zone_t *zone, int flag)
 	rctl_entity_p_t e;
 	struct project_zone pz;
 	boolean_t create = B_FALSE;
-	kstat_t *ksp;
 
 	pz.kpj_id = id;
 	pz.kpj_zoneid = zone->zone_id;
@@ -257,8 +258,10 @@ project_hold_by_id(projid_t id, zone_t *zone, int flag)
 		p->kpj_count = 0;
 		p->kpj_shares = 1;
 		p->kpj_nlwps = 0;
+		p->kpj_nprocs = 0;
 		p->kpj_ntasks = 0;
 		p->kpj_nlwps_ctl = INT_MAX;
+		p->kpj_nprocs_ctl = INT_MAX;
 		p->kpj_ntasks_ctl = INT_MAX;
 		project_data_init(&p->kpj_data);
 		e.rcep_p.proj = p;
@@ -313,11 +316,7 @@ project_hold_by_id(projid_t id, zone_t *zone, int flag)
 		/*
 		 * Set up project kstats
 		 */
-		ksp = project_kstat_create(p, zone);
-		mutex_enter(&project_hash_lock);
-		ASSERT(p->kpj_data.kpd_lockedmem_kstat == NULL);
-		p->kpj_data.kpd_lockedmem_kstat = ksp;
-		mutex_exit(&project_hash_lock);
+		project_kstat_create(p, zone);
 	}
 	return (p);
 }
@@ -345,6 +344,8 @@ project_rele(kproject_t *p)
 		/*
 		 * Remove project from global list.
 		 */
+		ASSERT(p->kpj_nprocs == 0);
+
 		mutex_enter(&projects_list_lock);
 		p->kpj_next->kpj_prev = p->kpj_prev;
 		p->kpj_prev->kpj_next = p->kpj_next;
@@ -544,6 +545,63 @@ static rctl_ops_t project_lwps_ops = {
 	project_lwps_usage,
 	project_lwps_set,
 	project_lwps_test,
+};
+
+/*ARGSUSED*/
+static rctl_qty_t
+project_procs_usage(rctl_t *r, proc_t *p)
+{
+	kproject_t *pj;
+	rctl_qty_t nprocs;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	pj = p->p_task->tk_proj;
+	mutex_enter(&p->p_zone->zone_nlwps_lock);
+	nprocs = pj->kpj_nprocs;
+	mutex_exit(&p->p_zone->zone_nlwps_lock);
+
+	return (nprocs);
+}
+
+/*ARGSUSED*/
+static int
+project_procs_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rcntl,
+    rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t nprocs;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(MUTEX_HELD(&p->p_zone->zone_nlwps_lock));
+	ASSERT(e->rcep_t == RCENTITY_PROJECT);
+	if (e->rcep_p.proj == NULL)
+		return (0);
+
+	nprocs = e->rcep_p.proj->kpj_nprocs;
+	if (nprocs + incr > rcntl->rcv_value)
+		return (1);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+project_procs_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv) {
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_PROJECT);
+	if (e->rcep_p.proj == NULL)
+		return (0);
+
+	e->rcep_p.proj->kpj_nprocs_ctl = nv;
+	return (0);
+}
+
+static rctl_ops_t project_procs_ops = {
+	rcop_no_action,
+	project_procs_usage,
+	project_procs_set,
+	project_procs_test,
 };
 
 /*ARGSUSED*/
@@ -865,6 +923,10 @@ project_init(void)
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
 	    INT_MAX, INT_MAX, &project_lwps_ops);
 
+	rc_project_nprocs = rctl_register("project.max-processes",
+	    RCENTITY_PROJECT, RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC |
+	    RCTL_GLOBAL_COUNT, INT_MAX, INT_MAX, &project_procs_ops);
+
 	rc_project_ntasks = rctl_register("project.max-tasks", RCENTITY_PROJECT,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
 	    INT_MAX, INT_MAX, &project_tasks_ops);
@@ -969,6 +1031,7 @@ project_init(void)
 	mutex_enter(&p0.p_lock);
 	proj0p->kpj_nlwps = p0.p_lwpcnt;
 	mutex_exit(&p0.p_lock);
+	proj0p->kpj_nprocs = 1;
 	proj0p->kpj_ntasks = 1;
 }
 
@@ -986,14 +1049,28 @@ project_lockedmem_kstat_update(kstat_t *ksp, int rw)
 	return (0);
 }
 
+static int
+project_nprocs_kstat_update(kstat_t *ksp, int rw)
+{
+	kproject_t *pj = ksp->ks_private;
+	kproject_kstat_t *kpk = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	kpk->kpk_usage.value.ui64 = pj->kpj_nprocs;
+	kpk->kpk_value.value.ui64 = pj->kpj_nprocs_ctl;
+	return (0);
+}
+
 static kstat_t *
-project_kstat_create(kproject_t *pj, zone_t *zone)
+project_kstat_create_common(kproject_t *pj, char *name, char *zonename,
+    int (*updatefunc) (kstat_t *, int))
 {
 	kstat_t *ksp;
 	kproject_kstat_t *kpk;
-	char *zonename = zone->zone_name;
 
-	ksp = rctl_kstat_create_project(pj, "lockedmem", KSTAT_TYPE_NAMED,
+	ksp = rctl_kstat_create_project(pj, name, KSTAT_TYPE_NAMED,
 	    sizeof (kproject_kstat_t) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL);
 
@@ -1006,22 +1083,47 @@ project_kstat_create(kproject_t *pj, zone_t *zone)
 	kstat_named_setstr(&kpk->kpk_zonename, zonename);
 	kstat_named_init(&kpk->kpk_usage, "usage", KSTAT_DATA_UINT64);
 	kstat_named_init(&kpk->kpk_value, "value", KSTAT_DATA_UINT64);
-	ksp->ks_update = project_lockedmem_kstat_update;
+	ksp->ks_update = updatefunc;
 	ksp->ks_private = pj;
 	kstat_install(ksp);
-
 	return (ksp);
+}
+
+static void
+project_kstat_create(kproject_t *pj, zone_t *zone)
+{
+	kstat_t *ksp_lockedmem;
+	kstat_t *ksp_nprocs;
+
+	ksp_lockedmem = project_kstat_create_common(pj, "lockedmem",
+	    zone->zone_name, project_lockedmem_kstat_update);
+	ksp_nprocs = project_kstat_create_common(pj, "nprocs",
+	    zone->zone_name, project_nprocs_kstat_update);
+
+	mutex_enter(&project_hash_lock);
+	ASSERT(pj->kpj_data.kpd_lockedmem_kstat == NULL);
+	pj->kpj_data.kpd_lockedmem_kstat = ksp_lockedmem;
+	ASSERT(pj->kpj_data.kpd_nprocs_kstat == NULL);
+	pj->kpj_data.kpd_nprocs_kstat = ksp_nprocs;
+	mutex_exit(&project_hash_lock);
+}
+
+static void
+project_kstat_delete_common(kstat_t **kstat)
+{
+	void *data;
+
+	if (*kstat != NULL) {
+		data = (*kstat)->ks_data;
+		kstat_delete(*kstat);
+		kmem_free(data, sizeof (kproject_kstat_t));
+		*kstat = NULL;
+	}
 }
 
 static void
 project_kstat_delete(kproject_t *pj)
 {
-	void *data;
-
-	if (pj->kpj_data.kpd_lockedmem_kstat != NULL) {
-		data = pj->kpj_data.kpd_lockedmem_kstat->ks_data;
-		kstat_delete(pj->kpj_data.kpd_lockedmem_kstat);
-		kmem_free(data, sizeof (kproject_kstat_t));
-	}
-	pj->kpj_data.kpd_lockedmem_kstat = NULL;
+	project_kstat_delete_common(&pj->kpj_data.kpd_lockedmem_kstat);
+	project_kstat_delete_common(&pj->kpj_data.kpd_nprocs_kstat);
 }

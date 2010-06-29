@@ -127,7 +127,7 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 %token NAME MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
 %token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET PCAP
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
-%token MAXSEMIDS LOCKED SWAP SCHED CLEAR DEFROUTER ADMIN USER AUTHS
+%token MAXSEMIDS LOCKED SWAP SCHED CLEAR DEFROUTER ADMIN USER AUTHS MAXPROCS
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
@@ -571,6 +571,15 @@ info_command:	INFO
 		$$->cmd_res_type = RT_MAXLWPS;
 		$$->cmd_prop_nv_pairs = 0;
 	}
+	|	INFO MAXPROCS
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_MAXPROCS;
+		$$->cmd_prop_nv_pairs = 0;
+	}
 	|	INFO MAXSHMMEM
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -963,6 +972,7 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| IMPORTANCE	{ $$ = PT_IMPORTANCE; }
 	| SHARES	{ $$ = PT_SHARES; }
 	| MAXLWPS	{ $$ = PT_MAXLWPS; }
+	| MAXPROCS	{ $$ = PT_MAXPROCS; }
 	| MAXSHMMEM	{ $$ = PT_MAXSHMMEM; }
 	| MAXSHMIDS	{ $$ = PT_MAXSHMIDS; }
 	| MAXMSGIDS	{ $$ = PT_MAXMSGIDS; }

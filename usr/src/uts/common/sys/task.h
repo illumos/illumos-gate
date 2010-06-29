@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_TASK_H
 #define	_SYS_TASK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -75,10 +72,22 @@ typedef struct task {
 					/* member process		*/
 	rctl_qty_t	tk_cpu_ticks;	/* accumulated CPU ticks	*/
 	kmutex_t	tk_cpu_time_lock; /* accumulated CPU seconds lock */
+	rctl_qty_t	tk_nprocs;	/* protected by			*/
+					/* tk_zone->zone_nlwps_lock	*/
+	rctl_qty_t	tk_nprocs_ctl;	/* protected by tk_rctls->rcs_lock */
+	kstat_t		*tk_nprocs_kstat; /* max-processes rctl kstat   */
+	struct task	*tk_commit_next;  /* next task on task commit list */
 } task_t;
+
+typedef struct task_kstat {
+	kstat_named_t	ktk_zonename;
+	kstat_named_t	ktk_usage;
+	kstat_named_t	ktk_value;
+} task_kstat_t;
 
 extern task_t *task0p;
 extern rctl_hndl_t rc_task_lwps;
+extern rctl_hndl_t rc_task_nprocs;
 extern rctl_hndl_t rc_task_cpu_time;
 
 extern void task_init(void);
@@ -94,6 +103,7 @@ extern void task_rele(task_t *);
 extern void task_hold(task_t *);
 extern void task_end(task_t *);
 extern rctl_qty_t task_cpu_time_incr(task_t *, rctl_qty_t);
+extern void task_commit_thread_init(void);
 
 #else /* _KERNEL */
 

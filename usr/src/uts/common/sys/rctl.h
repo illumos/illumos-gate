@@ -345,6 +345,9 @@ struct kstat *rctl_kstat_create_zone(struct zone *, char *, uchar_t, uint_t,
 struct kstat *rctl_kstat_create_project(struct kproject *, char *, uchar_t,
     uint_t, uchar_t);
 
+struct kstat *rctl_kstat_create_task(struct task *, char *, uchar_t,
+    uint_t, uchar_t);
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

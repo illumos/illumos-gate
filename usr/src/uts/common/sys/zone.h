@@ -453,6 +453,10 @@ typedef struct zone {
 	struct klpd_reg		*zone_pfexecd;
 
 	char		*zone_fs_allowed;
+	rctl_qty_t	zone_nprocs;	/* number of processes in the zone */
+	rctl_qty_t	zone_nprocs_ctl;	/* current limit protected by */
+						/* zone_rctls->rcs_lock */
+	kstat_t		*zone_nprocs_kstat;
 } zone_t;
 
 /*
@@ -465,6 +469,7 @@ extern zone_t zone0;
 extern zone_t *global_zone;
 extern uint_t maxzones;
 extern rctl_hndl_t rc_zone_nlwps;
+extern rctl_hndl_t rc_zone_nprocs;
 
 extern long zone(int, void *, void *, void *, void *);
 extern void zone_zsd_init(void);

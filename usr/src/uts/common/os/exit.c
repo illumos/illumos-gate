@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -766,11 +765,13 @@ proc_exit(int why, int what)
 	rctl_set_free(p->p_rctls);
 
 	/*
-	 * Give up task and project memberships.  Decrement tk_nlwps counter
-	 * for our task.max-lwps resource control.  An extended accounting
-	 * record, if that facility is active, is scheduled to be written.
-	 * Zombie processes are false members of task0 for the remainder of
-	 * their lifetime; no accounting information is recorded for them.
+	 * Decrement tk_nlwps counter for our task.max-lwps resource control.
+	 * An extended accounting record, if that facility is active, is
+	 * scheduled to be written.  We cannot give up task and project
+	 * membership at this point because that would allow zombies to escape
+	 * from the max-processes resource controls.  Zombies stay in their
+	 * current task and project until the process table slot is released
+	 * in freeproc().
 	 */
 	tk = p->p_task;
 
@@ -779,8 +780,6 @@ proc_exit(int why, int what)
 	tk->tk_proj->kpj_nlwps--;
 	p->p_zone->zone_nlwps--;
 	mutex_exit(&p->p_zone->zone_nlwps_lock);
-	task_detach(p);
-	p->p_task = task0p;
 
 	/*
 	 * Clear the lwp directory and the lwpid hash table
@@ -867,7 +866,6 @@ proc_exit(int why, int what)
 	 * no longer point at zsched.
 	 */
 	t->t_procp = &p0;
-	task_rele(tk);
 
 	kmem_free(lwpdir, lwpdir_sz * sizeof (lwpdir_t));
 	kmem_free(tidhash, tidhash_sz * sizeof (tidhash_t));
@@ -1205,6 +1203,8 @@ void
 freeproc(proc_t *p)
 {
 	proc_t *q;
+	task_t *tk;
+	zone_t *zone;
 
 	ASSERT(p->p_stat == SZOMB);
 	ASSERT(p->p_tlist == NULL);
@@ -1291,8 +1291,27 @@ freeproc(proc_t *p)
 		q->p_nextorph = p->p_nextorph;
 	}
 
+	/*
+	 * The process table slot is being freed, so it is now safe to give up
+	 * task and project membership.
+	 */
+	zone = p->p_zone;
+	mutex_enter(&p->p_lock);
+	tk = p->p_task;
+	task_detach(p);
+	p->p_task = task0p;
+	mutex_exit(&p->p_lock);
+
 	proc_detach(p);
 	pid_exit(p);	/* frees pid and proc structure */
+
+	mutex_enter(&zone->zone_nlwps_lock);
+	tk->tk_nprocs--;
+	tk->tk_proj->kpj_nprocs--;
+	zone->zone_nprocs--;
+	mutex_exit(&zone->zone_nlwps_lock);
+
+	task_rele(tk);
 }
 
 /*

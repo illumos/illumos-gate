@@ -171,7 +171,7 @@
  *
  *   When taking zone_mem_lock or zone_nlwps_lock, the lock ordering is:
  *	zonehash_lock --> a_lock --> pidlock --> p_lock --> zone_mem_lock
- *	zonehash_lock --> a_lock --> pidlock --> p_lock --> zone_mem_lock
+ *	zonehash_lock --> a_lock --> pidlock --> p_lock --> zone_nlwps_lock
  *
  *   Blocking memory allocations are permitted while holding any of the
  *   zone locks.
@@ -345,6 +345,7 @@ rctl_hndl_t rc_zone_max_swap;
 rctl_hndl_t rc_zone_max_lofi;
 rctl_hndl_t rc_zone_cpu_cap;
 rctl_hndl_t rc_zone_nlwps;
+rctl_hndl_t rc_zone_nprocs;
 rctl_hndl_t rc_zone_shmmax;
 rctl_hndl_t rc_zone_shmmni;
 rctl_hndl_t rc_zone_semmni;
@@ -1404,6 +1405,61 @@ static rctl_ops_t zone_lwps_ops = {
 };
 
 /*ARGSUSED*/
+static rctl_qty_t
+zone_procs_usage(rctl_t *r, proc_t *p)
+{
+	rctl_qty_t nprocs;
+	zone_t *zone = p->p_zone;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	mutex_enter(&zone->zone_nlwps_lock);
+	nprocs = zone->zone_nprocs;
+	mutex_exit(&zone->zone_nlwps_lock);
+
+	return (nprocs);
+}
+
+/*ARGSUSED*/
+static int
+zone_procs_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rcntl,
+    rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t nprocs;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	if (e->rcep_p.zone == NULL)
+		return (0);
+	ASSERT(MUTEX_HELD(&(e->rcep_p.zone->zone_nlwps_lock)));
+	nprocs = e->rcep_p.zone->zone_nprocs;
+
+	if (nprocs + incr > rcntl->rcv_value)
+		return (1);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+zone_procs_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e, rctl_qty_t nv)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	if (e->rcep_p.zone == NULL)
+		return (0);
+	e->rcep_p.zone->zone_nprocs_ctl = nv;
+	return (0);
+}
+
+static rctl_ops_t zone_procs_ops = {
+	rcop_no_action,
+	zone_procs_usage,
+	zone_procs_set,
+	zone_procs_test,
+};
+
+/*ARGSUSED*/
 static int
 zone_shmmax_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
     rctl_qty_t incr, uint_t flags)
@@ -1682,6 +1738,20 @@ zone_lockedmem_kstat_update(kstat_t *ksp, int rw)
 }
 
 static int
+zone_nprocs_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_kstat_t *zk = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	zk->zk_usage.value.ui64 = zone->zone_nprocs;
+	zk->zk_value.value.ui64 = zone->zone_nprocs_ctl;
+	return (0);
+}
+
+static int
 zone_swapresv_kstat_update(kstat_t *ksp, int rw)
 {
 	zone_t *zone = ksp->ks_private;
@@ -1695,18 +1765,19 @@ zone_swapresv_kstat_update(kstat_t *ksp, int rw)
 	return (0);
 }
 
-static void
-zone_kstat_create(zone_t *zone)
+static kstat_t *
+zone_kstat_create_common(zone_t *zone, char *name,
+    int (*updatefunc) (kstat_t *, int))
 {
 	kstat_t *ksp;
 	zone_kstat_t *zk;
 
-	ksp = rctl_kstat_create_zone(zone, "lockedmem", KSTAT_TYPE_NAMED,
+	ksp = rctl_kstat_create_zone(zone, name, KSTAT_TYPE_NAMED,
 	    sizeof (zone_kstat_t) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL);
 
 	if (ksp == NULL)
-		return;
+		return (NULL);
 
 	zk = ksp->ks_data = kmem_alloc(sizeof (zone_kstat_t), KM_SLEEP);
 	ksp->ks_data_size += strlen(zone->zone_name) + 1;
@@ -1714,47 +1785,42 @@ zone_kstat_create(zone_t *zone)
 	kstat_named_setstr(&zk->zk_zonename, zone->zone_name);
 	kstat_named_init(&zk->zk_usage, "usage", KSTAT_DATA_UINT64);
 	kstat_named_init(&zk->zk_value, "value", KSTAT_DATA_UINT64);
-	ksp->ks_update = zone_lockedmem_kstat_update;
+	ksp->ks_update = updatefunc;
 	ksp->ks_private = zone;
 	kstat_install(ksp);
+	return (ksp);
+}
 
-	zone->zone_lockedmem_kstat = ksp;
+static void
+zone_kstat_create(zone_t *zone)
+{
+	zone->zone_lockedmem_kstat = zone_kstat_create_common(zone,
+	    "lockedmem", zone_lockedmem_kstat_update);
+	zone->zone_swapresv_kstat = zone_kstat_create_common(zone,
+	    "swapresv", zone_swapresv_kstat_update);
+	zone->zone_nprocs_kstat = zone_kstat_create_common(zone,
+	    "nprocs", zone_nprocs_kstat_update);
+}
 
-	ksp = rctl_kstat_create_zone(zone, "swapresv", KSTAT_TYPE_NAMED,
-	    sizeof (zone_kstat_t) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL);
+static void
+zone_kstat_delete_common(kstat_t **pkstat)
+{
+	void *data;
 
-	if (ksp == NULL)
-		return;
-
-	zk = ksp->ks_data = kmem_alloc(sizeof (zone_kstat_t), KM_SLEEP);
-	ksp->ks_data_size += strlen(zone->zone_name) + 1;
-	kstat_named_init(&zk->zk_zonename, "zonename", KSTAT_DATA_STRING);
-	kstat_named_setstr(&zk->zk_zonename, zone->zone_name);
-	kstat_named_init(&zk->zk_usage, "usage", KSTAT_DATA_UINT64);
-	kstat_named_init(&zk->zk_value, "value", KSTAT_DATA_UINT64);
-	ksp->ks_update = zone_swapresv_kstat_update;
-	ksp->ks_private = zone;
-	kstat_install(ksp);
-
-	zone->zone_swapresv_kstat = ksp;
+	if (*pkstat != NULL) {
+		data = (*pkstat)->ks_data;
+		kstat_delete(*pkstat);
+		kmem_free(data, sizeof (zone_kstat_t));
+		*pkstat = NULL;
+	}
 }
 
 static void
 zone_kstat_delete(zone_t *zone)
 {
-	void *data;
-
-	if (zone->zone_lockedmem_kstat != NULL) {
-		data = zone->zone_lockedmem_kstat->ks_data;
-		kstat_delete(zone->zone_lockedmem_kstat);
-		kmem_free(data, sizeof (zone_kstat_t));
-	}
-	if (zone->zone_swapresv_kstat != NULL) {
-		data = zone->zone_swapresv_kstat->ks_data;
-		kstat_delete(zone->zone_swapresv_kstat);
-		kmem_free(data, sizeof (zone_kstat_t));
-	}
+	zone_kstat_delete_common(&zone->zone_lockedmem_kstat);
+	zone_kstat_delete_common(&zone->zone_swapresv_kstat);
+	zone_kstat_delete_common(&zone->zone_nprocs_kstat);
 }
 
 /*
@@ -1782,6 +1848,8 @@ zone_zsd_init(void)
 	zone0.zone_shares = 1;
 	zone0.zone_nlwps = 0;
 	zone0.zone_nlwps_ctl = INT_MAX;
+	zone0.zone_nprocs = 0;
+	zone0.zone_nprocs_ctl = INT_MAX;
 	zone0.zone_locked_mem = 0;
 	zone0.zone_locked_mem_ctl = UINT64_MAX;
 	ASSERT(zone0.zone_max_swap == 0);
@@ -1809,6 +1877,7 @@ zone_zsd_init(void)
 	zone0.zone_initname = initname;
 	zone0.zone_lockedmem_kstat = NULL;
 	zone0.zone_swapresv_kstat = NULL;
+	zone0.zone_nprocs_kstat = NULL;
 	list_create(&zone0.zone_zsd, sizeof (struct zsd_entry),
 	    offsetof(struct zsd_entry, zsd_linkage));
 	list_insert_head(&zone_active, &zone0);
@@ -1916,6 +1985,11 @@ zone_init(void)
 	rc_zone_nlwps = rctl_register("zone.max-lwps", RCENTITY_ZONE,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
 	    INT_MAX, INT_MAX, &zone_lwps_ops);
+
+	rc_zone_nprocs = rctl_register("zone.max-processes", RCENTITY_ZONE,
+	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
+	    INT_MAX, INT_MAX, &zone_procs_ops);
+
 	/*
 	 * System V IPC resource controls
 	 */
@@ -1976,6 +2050,7 @@ zone_init(void)
 	    gp);
 
 	zone0.zone_nlwps = p0.p_lwpcnt;
+	zone0.zone_nprocs = 1;
 	zone0.zone_ntasks = 1;
 	mutex_exit(&p0.p_lock);
 	zone0.zone_restart_init = B_TRUE;
@@ -2061,6 +2136,7 @@ zone_free(zone_t *zone)
 	ASSERT(zone != global_zone);
 	ASSERT(zone->zone_ntasks == 0);
 	ASSERT(zone->zone_nlwps == 0);
+	ASSERT(zone->zone_nprocs == 0);
 	ASSERT(zone->zone_cred_ref == 0);
 	ASSERT(zone->zone_kcred == NULL);
 	ASSERT(zone_status_get(zone) == ZONE_IS_DEAD ||
@@ -3352,12 +3428,14 @@ zsched(void *arg)
 	mutex_exit(&pidlock);
 
 	/*
-	 * getting out of global zone, so decrement lwp counts
+	 * getting out of global zone, so decrement lwp and process counts
 	 */
 	pj = pp->p_task->tk_proj;
 	mutex_enter(&global_zone->zone_nlwps_lock);
 	pj->kpj_nlwps -= pp->p_lwpcnt;
 	global_zone->zone_nlwps -= pp->p_lwpcnt;
+	pj->kpj_nprocs--;
+	global_zone->zone_nprocs--;
 	mutex_exit(&global_zone->zone_nlwps_lock);
 
 	/*
@@ -3388,14 +3466,16 @@ zsched(void *arg)
 	mutex_exit(&zone->zone_mem_lock);
 
 	/*
-	 * add lwp counts to zsched's zone, and increment project's task count
-	 * due to the task created in the above tasksys_settaskid
+	 * add lwp and process counts to zsched's zone, and increment
+	 * project's task and process count due to the task created in
+	 * the above task_create.
 	 */
-
 	mutex_enter(&zone->zone_nlwps_lock);
 	pj->kpj_nlwps += pp->p_lwpcnt;
 	pj->kpj_ntasks += 1;
 	zone->zone_nlwps += pp->p_lwpcnt;
+	pj->kpj_nprocs++;
+	zone->zone_nprocs++;
 	mutex_exit(&zone->zone_nlwps_lock);
 
 	mutex_exit(&curproc->p_lock);
@@ -3946,6 +4026,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	(void) strcpy(zone->zone_initname, zone_default_initname);
 	zone->zone_nlwps = 0;
 	zone->zone_nlwps_ctl = INT_MAX;
+	zone->zone_nprocs = 0;
+	zone->zone_nprocs_ctl = INT_MAX;
 	zone->zone_locked_mem = 0;
 	zone->zone_locked_mem_ctl = UINT64_MAX;
 	zone->zone_max_swap = 0;
@@ -5259,6 +5341,9 @@ zone_enter(zoneid_t zoneid)
 	zone->zone_nlwps += pp->p_lwpcnt;
 	/* add 1 task to zone's proj0 */
 	zone_proj0->kpj_ntasks += 1;
+
+	zone_proj0->kpj_nprocs++;
+	zone->zone_nprocs++;
 	mutex_exit(&zone->zone_nlwps_lock);
 
 	mutex_enter(&zone->zone_mem_lock);
@@ -5271,10 +5356,12 @@ zone_enter(zoneid_t zoneid)
 	zone_proj0->kpj_data.kpd_crypto_mem += pp->p_crypto_mem;
 	mutex_exit(&(zone_proj0->kpj_data.kpd_crypto_lock));
 
-	/* remove lwps from proc's old zone and old project */
+	/* remove lwps and process from proc's old zone and old project */
 	mutex_enter(&pp->p_zone->zone_nlwps_lock);
 	pp->p_zone->zone_nlwps -= pp->p_lwpcnt;
 	pp->p_task->tk_proj->kpj_nlwps -= pp->p_lwpcnt;
+	pp->p_task->tk_proj->kpj_nprocs--;
+	pp->p_zone->zone_nprocs--;
 	mutex_exit(&pp->p_zone->zone_nlwps_lock);
 
 	mutex_enter(&pp->p_zone->zone_mem_lock);

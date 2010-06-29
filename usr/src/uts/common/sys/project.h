@@ -19,15 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_PROJECT_H
 #define	_SYS_PROJECT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #ifdef	__cplusplus
 extern "C" {
@@ -57,7 +53,7 @@ typedef struct kproject_data {		/* Datum protected by: */
 	rctl_qty_t	kpd_crypto_mem;	/* kpd_crypto_lock above */
 	rctl_qty_t	kpd_crypto_mem_ctl; /* kpj_rctls->rcs_lock */
 	kstat_t		*kpd_lockedmem_kstat; /* locked memory kstat */
-
+	kstat_t		*kpd_nprocs_kstat;
 } kproject_data_t;
 
 struct cpucap;
@@ -85,6 +81,9 @@ typedef struct kproject {
 	struct cpucap	*kpj_cpucap;	/* CPU cap data			*/
 	struct klpd_reg	*kpj_klpd;	/* our extended policy */
 					/* protected by klpd_mutex */
+	rctl_qty_t	kpj_nprocs;	/* protected by project's zone's */
+					/* zone_nlwps_lock */
+	rctl_qty_t	kpj_nprocs_ctl;	/* protected by kpj_rctls->rcs_lock */
 } kproject_t;
 
 #ifdef _KERNEL
@@ -104,6 +103,7 @@ projid_t curprojid(void);
 
 extern kproject_t *proj0p;
 extern rctl_hndl_t rc_project_nlwps;
+extern rctl_hndl_t rc_project_nprocs;
 extern rctl_hndl_t rc_project_ntasks;
 extern rctl_hndl_t rc_project_locked_mem;
 extern rctl_hndl_t rc_project_crypto_mem;

@@ -184,6 +184,7 @@ char *res_types[] = {
 	"hostid",
 	"admin",
 	"fs-allowed",
+	ALIAS_MAXPROCS,
 	NULL
 };
 
@@ -229,6 +230,7 @@ char *prop_types[] = {
 	"user",
 	"auths",
 	"fs-allowed",
+	ALIAS_MAXPROCS,
 	NULL
 };
 
@@ -294,6 +296,7 @@ static const char *clear_cmds[] = {
 	"clear " ALIAS_MAXMSGIDS,
 	"clear " ALIAS_MAXSEMIDS,
 	"clear " ALIAS_SHARES,
+	"clear " ALIAS_MAXPROCS,
 	NULL
 };
 
@@ -345,6 +348,7 @@ static const char *set_cmds[] = {
 	"set " ALIAS_SHARES "=",
 	"set hostid=",
 	"set fs-allowed=",
+	"set " ALIAS_MAXPROCS "=",
 	NULL
 };
 
@@ -377,6 +381,7 @@ static const char *info_cmds[] = {
 	"info hostid",
 	"info admin",
 	"info fs-allowed",
+	"info max-processes",
 	NULL
 };
 
@@ -1226,6 +1231,8 @@ usage(boolean_t verbose, uint_t flags)
 		    pt_to_str(PT_FS_ALLOWED));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_MAXLWPS));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_MAXPROCS));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_MAXSHMMEM));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
@@ -3672,6 +3679,9 @@ clear_global(cmd_t *cmd)
 	case PT_MAXLWPS:
 		remove_aliased_rctl(PT_MAXLWPS, ALIAS_MAXLWPS);
 		return;
+	case PT_MAXPROCS:
+		remove_aliased_rctl(PT_MAXPROCS, ALIAS_MAXPROCS);
+		return;
 	case PT_MAXSHMMEM:
 		remove_aliased_rctl(PT_MAXSHMMEM, ALIAS_MAXSHMMEM);
 		return;
@@ -4154,6 +4164,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_IPTYPE;
 		} else if (prop_type == PT_MAXLWPS) {
 			res_type = RT_MAXLWPS;
+		} else if (prop_type == PT_MAXPROCS) {
+			res_type = RT_MAXPROCS;
 		} else if (prop_type == PT_MAXSHMMEM) {
 			res_type = RT_MAXSHMMEM;
 		} else if (prop_type == PT_MAXSHMIDS) {
@@ -4354,6 +4366,9 @@ set_func(cmd_t *cmd)
 		return;
 	case RT_MAXLWPS:
 		set_aliased_rctl(ALIAS_MAXLWPS, prop_type, prop_id);
+		return;
+	case RT_MAXPROCS:
+		set_aliased_rctl(ALIAS_MAXPROCS, prop_type, prop_id);
 		return;
 	case RT_MAXSHMMEM:
 		set_aliased_rctl(ALIAS_MAXSHMMEM, prop_type, prop_id);
@@ -5557,6 +5572,7 @@ info_func(cmd_t *cmd)
 			info_fs_allowed(handle, fp);
 		}
 		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
+		info_aliased_rctl(handle, fp, ALIAS_MAXPROCS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXSHMMEM);
 		info_aliased_rctl(handle, fp, ALIAS_MAXSHMIDS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXMSGIDS);
@@ -5607,6 +5623,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_MAXLWPS:
 		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
+		break;
+	case RT_MAXPROCS:
+		info_aliased_rctl(handle, fp, ALIAS_MAXPROCS);
 		break;
 	case RT_MAXSHMMEM:
 		info_aliased_rctl(handle, fp, ALIAS_MAXSHMMEM);

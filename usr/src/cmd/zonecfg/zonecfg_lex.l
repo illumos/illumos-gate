@@ -257,6 +257,9 @@ char *safe_strdup(char *s);
 <TSTATE>max-lwps	{ return MAXLWPS; }
 <CSTATE>max-lwps	{ return MAXLWPS; }
 
+<TSTATE>max-processes	{ return MAXPROCS; }
+<CSTATE>max-processes	{ return MAXPROCS; }
+
 <TSTATE>max-shm-memory	{ return MAXSHMMEM; }
 <CSTATE>max-shm-memory	{ return MAXSHMMEM; }
 

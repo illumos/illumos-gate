@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -124,6 +121,11 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 		    1, 0) & RCT_DENY)
 			rctlfail = 1;
 
+	if (kpj != proj0p && kpj->kpj_nprocs + 1 > kpj->kpj_nprocs_ctl)
+		if (rctl_test_entity(rc_project_nprocs, kpj->kpj_rctls, p, &e,
+		    1, 0) & RCT_DENY)
+			rctlfail = 1;
+
 	if (kpj->kpj_data.kpd_locked_mem + p->p_locked_mem >
 	    kpj->kpj_data.kpd_locked_mem_ctl)
 		if (rctl_test_entity(rc_project_locked_mem, kpj->kpj_rctls, p,
@@ -151,12 +153,14 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 	kpj->kpj_data.kpd_locked_mem += p->p_locked_mem;
 	kpj->kpj_nlwps += p->p_lwpcnt;
 	kpj->kpj_ntasks++;
+	kpj->kpj_nprocs++;
 
 	oldpj->kpj_data.kpd_locked_mem -= p->p_locked_mem;
 	mutex_enter(&(oldpj->kpj_data.kpd_crypto_lock));
 	oldpj->kpj_data.kpd_crypto_mem -= p->p_crypto_mem;
 	mutex_exit(&(oldpj->kpj_data.kpd_crypto_lock));
 	oldpj->kpj_nlwps -= p->p_lwpcnt;
+	oldpj->kpj_nprocs--;
 
 	mutex_exit(&zone->zone_mem_lock);
 	mutex_exit(&zone->zone_nlwps_lock);

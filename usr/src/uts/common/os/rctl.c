@@ -3164,3 +3164,18 @@ rctl_kstat_create_project(kproject_t *kpj, char *ks_name, uchar_t ks_type,
 	return (rctl_kstat_create_common(name, kpj->kpj_id, "project_caps",
 	    ks_type, ks_ndata, ks_flags, kpj->kpj_zoneid));
 }
+
+/*
+ * Create task-specific resource kstat
+ */
+kstat_t *
+rctl_kstat_create_task(task_t *tk, char *ks_name, uchar_t ks_type,
+    uint_t ks_ndata, uchar_t ks_flags)
+{
+	char name[KSTAT_STRLEN];
+
+	(void) snprintf(name, KSTAT_STRLEN, "%s_task", ks_name);
+
+	return (rctl_kstat_create_common(name, tk->tk_tkid, "task_caps",
+	    ks_type, ks_ndata, ks_flags, tk->tk_proj->kpj_zoneid));
+}

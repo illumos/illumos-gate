@@ -131,6 +131,9 @@
 
 #define	ALT_MOUNT(mount_cmd) 	((mount_cmd) != Z_MNT_BOOT)
 
+/* a reasonable estimate for the number of lwps per process */
+#define	LWPS_PER_PROCESS	10
+
 /* for routing socket */
 static int rts_seqno = 0;
 
@@ -2924,6 +2927,8 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	zone_dochandle_t handle;
 	struct zone_rctltab rctltab;
 	rctlblk_t *rctlblk = NULL;
+	uint64_t maxlwps;
+	uint64_t maxprocs;
 
 	*bufp = NULL;
 	*bufsizep = 0;
@@ -2942,6 +2947,23 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
 		zerror(zlogp, B_TRUE, "%s failed", "nvlist_alloc");
 		goto out;
+	}
+
+	/*
+	 * Allow the administrator to control both the maximum number of
+	 * process table slots and the maximum number of lwps with just the
+	 * max-processes property.  If only the max-processes property is set,
+	 * we add a max-lwps property with a limit derived from max-processes.
+	 */
+	if (zonecfg_get_aliased_rctl(handle, ALIAS_MAXPROCS, &maxprocs)
+	    == Z_OK &&
+	    zonecfg_get_aliased_rctl(handle, ALIAS_MAXLWPS, &maxlwps)
+	    == Z_NO_ENTRY) {
+		if (zonecfg_set_aliased_rctl(handle, ALIAS_MAXLWPS,
+		    maxprocs * LWPS_PER_PROCESS) != Z_OK) {
+			zerror(zlogp, B_FALSE, "unable to set max-lwps alias");
+			goto out;
+		}
 	}
 
 	if (zonecfg_setrctlent(handle) != Z_OK) {
