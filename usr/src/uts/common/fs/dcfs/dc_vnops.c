@@ -205,6 +205,7 @@ static int dc_fid(struct vnode *, struct fid *, caller_context_t *);
 static int dc_seek(struct vnode *, offset_t, offset_t *, caller_context_t *);
 static int dc_frlock(struct vnode *, int, struct flock64 *, int, offset_t,
     struct flk_callback *, struct cred *, caller_context_t *);
+static int dc_realvp(struct vnode *, struct vnode **, caller_context_t *);
 static int dc_getpage(struct vnode *, offset_t, size_t, uint_t *,
     struct page **, size_t, struct seg *, caddr_t, enum seg_rw,
     struct cred *, caller_context_t *);
@@ -231,6 +232,7 @@ const fs_operation_def_t dc_vnodeops_template[] = {
 	VOPNAME_FID,			{ .vop_fid = dc_fid },
 	VOPNAME_SEEK,			{ .vop_seek = dc_seek },
 	VOPNAME_FRLOCK,			{ .vop_frlock = dc_frlock },
+	VOPNAME_REALVP,			{ .vop_realvp = dc_realvp },
 	VOPNAME_GETPAGE,		{ .vop_getpage = dc_getpage },
 	VOPNAME_PUTPAGE,		{ .vop_putpage = dc_putpage },
 	VOPNAME_MAP,			{ .vop_map = dc_map },
@@ -509,6 +511,18 @@ dc_getblock(struct vnode *vp, offset_t off, size_t len, struct page **ppp,
 		pvn_io_done(plist);
 
 	return (dc_getblock_miss(vp, off, len, ppp, seg, addr, rw, cr));
+}
+
+static int
+dc_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
+{
+	struct vnode *rvp;
+
+	vp = VTODC(vp)->dc_subvp;
+	if (VOP_REALVP(vp, &rvp, ct) == 0)
+		vp = rvp;
+	*vpp = vp;
+	return (0);
 }
 
 /*ARGSUSED10*/
