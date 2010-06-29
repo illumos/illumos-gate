@@ -865,9 +865,6 @@ exec(int type, ...)
 
 			if (ridno != NULL)
 				free(ridno);
-
-			if (tmprid != NULL)
-				free(tmprid);
 		}
 
 		av[ac++] = arg_string(UNTRUSTED, "%s", request->request->user);
