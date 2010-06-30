@@ -18,11 +18,18 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
+
+CCNEEDED = -lCrun -lCstd
+$(__GNUC)CCNEEDED       = -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
+
+LDLIBS64  +=    $(CCNEEDED) -lpam -lc -lsoftcrypto -lcrypto -lssl -lsocket
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

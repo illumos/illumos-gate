@@ -85,8 +85,11 @@ CCOBJS = $(LIB_CPP_OBJECTS:%.o=pics/%.o) \
 
 LIBS	=	$(DYNLIB)
 
-LDLIBS  +=      -lCstd -lCrun -lpam -lc -lsoftcrypto -lcrypto -lssl -lsocket
-LDLIBS64  +=    -lCstd -lCrun -lpam -lc -lsoftcrypto -lcrypto -lssl -lsocket
+CCNEEDED =	-lCstd -lCrun
+$(__GNUC)CCNEEDED       = -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
+
+LDLIBS  +=      $(CCNEEDED) -lpam -lc -lsoftcrypto -lcrypto -lssl -lsocket
+LDLIBS64  +=    $(CCNEEDED) -lpam -lc -lsoftcrypto -lcrypto -lssl -lsocket
 
 DEFINES =	-DKMSUSERPKCS12 -D_REENTRANT -DNOWCSICMP -DUNIX \
 		-DWITH_OPENSSL -DHAVE_OPENSSL_SSL_H \
