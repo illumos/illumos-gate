@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
+/*
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 /*
  * EHCI Host Controller Driver (EHCI)
@@ -493,6 +492,9 @@ ehci_allocate_itw(
 	    "ehci_create_itw: itw = 0x%p real_length = 0x%lx",
 	    (void *)itw, real_length);
 
+	ehcip->ehci_periodic_req_count++;
+	ehci_toggle_scheduler(ehcip);
+
 	return (itw);
 }
 
@@ -563,6 +565,9 @@ ehci_deallocate_itw(
 
 	/* Free this iTWs dma resources */
 	ehci_free_itw_dma(ehcip, pp, itw);
+
+	ehcip->ehci_periodic_req_count--;
+	ehci_toggle_scheduler(ehcip);
 }
 
 

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -1095,6 +1095,7 @@ ehci_init_hardware(ehci_state_t	*ehcip)
 
 			ehcip->ehci_head_of_async_sched_list = dummy_async_qh;
 			ehcip->ehci_open_async_count++;
+			ehcip->ehci_async_req_count++;
 		}
 	}
 
@@ -4013,8 +4014,31 @@ ehci_wait_for_sof(ehci_state_t	*ehcip)
  * Turn scheduler based on pipe open count.
  */
 void
-ehci_toggle_scheduler(ehci_state_t *ehcip) {
+ehci_toggle_scheduler(ehci_state_t *ehcip)
+{
 	uint_t	temp_reg, cmd_reg;
+
+	/*
+	 * For performance optimization, we need to change the bits
+	 * if (async == 1||async == 0) OR (periodic == 1||periodic == 0)
+	 *
+	 * Related bits already enabled if
+	 *	async and periodic req counts are > 1
+	 *	OR async req count > 1 & no periodic pipe
+	 *	OR periodic req count > 1 & no async pipe
+	 */
+	if (((ehcip->ehci_async_req_count > 1) &&
+	    (ehcip->ehci_periodic_req_count > 1)) ||
+	    ((ehcip->ehci_async_req_count > 1) &&
+	    (ehcip->ehci_open_periodic_count == 0)) ||
+	    ((ehcip->ehci_periodic_req_count > 1) &&
+	    (ehcip->ehci_open_async_count == 0))) {
+		USB_DPRINTF_L4(PRINT_MASK_ATTA,
+		    ehcip->ehci_log_hdl, "ehci_toggle_scheduler:"
+		    "async/periodic bits no need to change");
+
+		return;
+	}
 
 	cmd_reg = Get_OpReg(ehci_command);
 	temp_reg = cmd_reg;
@@ -4023,15 +4047,25 @@ ehci_toggle_scheduler(ehci_state_t *ehcip) {
 	 * Enable/Disable asynchronous scheduler, and
 	 * turn on/off async list door bell
 	 */
-	if (ehcip->ehci_open_async_count) {
+	if (ehcip->ehci_async_req_count > 1) {
+		/* we already enable the async bit */
+		USB_DPRINTF_L4(PRINT_MASK_ATTA,
+		    ehcip->ehci_log_hdl, "ehci_toggle_scheduler:"
+		    "async bit already enabled: cmd_reg=0x%x", cmd_reg);
+	} else if (ehcip->ehci_async_req_count == 1) {
 		if (!(cmd_reg & EHCI_CMD_ASYNC_SCHED_ENABLE)) {
 			/*
 			 * For some reason this address might get nulled out by
 			 * the ehci chip. Set it here just in case it is null.
+			 * If it's not null, we should not reset the
+			 * ASYNCLISTADDR, because it's updated by hardware to
+			 * point to the next queue head to be executed.
 			 */
-			Set_OpReg(ehci_async_list_addr,
-			    ehci_qh_cpu_to_iommu(ehcip,
-				ehcip->ehci_head_of_async_sched_list));
+			if (!Get_OpReg(ehci_async_list_addr)) {
+				Set_OpReg(ehci_async_list_addr,
+				    ehci_qh_cpu_to_iommu(ehcip,
+				    ehcip->ehci_head_of_async_sched_list));
+			}
 
 			/*
 			 * For some reason this register might get nulled out by
@@ -4065,10 +4099,10 @@ ehci_toggle_scheduler(ehci_state_t *ehcip) {
 					    "ehci_toggle_scheduler: "
 					    "ASYNCLISTADDR write failed.");
 
-				USB_DPRINTF_L2(PRINT_MASK_ATTA,
+				USB_DPRINTF_L3(PRINT_MASK_ATTA,
 				    ehcip->ehci_log_hdl,
 				    "ehci_toggle_scheduler: ASYNCLISTADDR "
-					"write failed, retry=%d", retry);
+				    "write failed, retry=%d", retry);
 			}
 		}
 		cmd_reg |= EHCI_CMD_ASYNC_SCHED_ENABLE;
@@ -4076,7 +4110,12 @@ ehci_toggle_scheduler(ehci_state_t *ehcip) {
 		cmd_reg &= ~EHCI_CMD_ASYNC_SCHED_ENABLE;
 	}
 
-	if (ehcip->ehci_open_periodic_count) {
+	if (ehcip->ehci_periodic_req_count > 1) {
+		/* we already enable the periodic bit. */
+		USB_DPRINTF_L4(PRINT_MASK_ATTA,
+		    ehcip->ehci_log_hdl, "ehci_toggle_scheduler:"
+		    "periodic bit already enabled: cmd_reg=0x%x", cmd_reg);
+	} else if (ehcip->ehci_periodic_req_count == 1) {
 		if (!(cmd_reg & EHCI_CMD_PERIODIC_SCHED_ENABLE)) {
 			/*
 			 * For some reason this address get's nulled out by
@@ -4084,7 +4123,7 @@ ehci_toggle_scheduler(ehci_state_t *ehcip) {
 			 */
 			Set_OpReg(ehci_periodic_list_base,
 			    (uint32_t)(ehcip->ehci_pflt_cookie.dmac_address &
-				0xFFFFF000));
+			    0xFFFFF000));
 		}
 		cmd_reg |= EHCI_CMD_PERIODIC_SCHED_ENABLE;
 	} else {
@@ -4094,6 +4133,19 @@ ehci_toggle_scheduler(ehci_state_t *ehcip) {
 	/* Just an optimization */
 	if (temp_reg != cmd_reg) {
 		Set_OpReg(ehci_command, cmd_reg);
+
+		/* To make sure the command register is updated correctly */
+		if ((ehcip->ehci_vendor_id == PCI_VENDOR_ULi_M1575) &&
+		    (ehcip->ehci_device_id == PCI_DEVICE_ULi_M1575)) {
+			int retry = 0;
+
+			Set_OpRegRetry(ehci_command, cmd_reg, retry);
+			USB_DPRINTF_L3(PRINT_MASK_ATTA,
+			    ehcip->ehci_log_hdl,
+			    "ehci_toggle_scheduler: CMD write failed, retry=%d",
+			    retry);
+		}
+
 	}
 }
 

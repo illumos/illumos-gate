@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
+/*
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 /*
  * EHCI Host Controller Driver (EHCI)
@@ -557,7 +556,6 @@ ehci_insert_qh(
 		ehcip->ehci_open_periodic_count++;
 		break;
 	}
-	ehci_toggle_scheduler(ehcip);
 }
 
 
@@ -1142,7 +1140,6 @@ ehci_remove_qh(
 		ehcip->ehci_open_periodic_count--;
 		break;
 	}
-	ehci_toggle_scheduler(ehcip);
 }
 
 
@@ -2991,6 +2988,7 @@ ehci_create_transfer_wrapper(
 	ehci_trans_wrapper_t	*tw;
 	int			kmem_flag;
 	int			(*dmamem_wait)(caddr_t);
+	usb_ep_descr_t		*eptd = &pp->pp_pipe_handle->p_ep;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_create_transfer_wrapper: length = 0x%lx flags = 0x%x",
@@ -3103,6 +3101,14 @@ dmadone:
 	tw->tw_id = EHCI_GET_ID((void *)tw);
 
 	ASSERT(tw->tw_id != NULL);
+
+	/* isoc ep will not come here */
+	if (EHCI_INTR_ENDPOINT(eptd)) {
+		ehcip->ehci_periodic_req_count++;
+	} else {
+		ehcip->ehci_async_req_count++;
+	}
+	ehci_toggle_scheduler(ehcip);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
 	    "ehci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
@@ -3515,6 +3521,7 @@ ehci_free_tw(
 	ehci_trans_wrapper_t	*tw)
 {
 	int	rval;
+	usb_ep_descr_t	*eptd = &pp->pp_pipe_handle->p_ep;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
 	    "ehci_free_tw: tw = 0x%p", (void *)tw);
@@ -3532,6 +3539,14 @@ ehci_free_tw(
 		ddi_dma_mem_free(&tw->tw_accesshandle);
 		ddi_dma_free_handle(&tw->tw_dmahandle);
 	}
+
+	/* interrupt ep will come to this point */
+	if (EHCI_INTR_ENDPOINT(eptd)) {
+		ehcip->ehci_periodic_req_count--;
+	} else {
+		ehcip->ehci_async_req_count--;
+	}
+	ehci_toggle_scheduler(ehcip);
 
 	/* Free transfer wrapper */
 	kmem_free(tw, sizeof (ehci_trans_wrapper_t));

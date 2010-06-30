@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_USB_EHCID_H
@@ -165,6 +164,10 @@ typedef struct ehci_state {
 	uint_t			ehci_open_pipe_count;
 	uint_t			ehci_open_async_count;
 	uint_t			ehci_open_periodic_count;
+
+	/* No. of async and periodic requests */
+	uint_t			ehci_async_req_count;
+	uint_t			ehci_periodic_req_count;
 
 	/*
 	 * Endpoint Reclamation List
