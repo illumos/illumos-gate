@@ -82,7 +82,7 @@ static int ndmpd_zfs_restore_recv_write(ndmpd_zfs_args_t *);
 
 static int ndmpd_zfs_reader_writer(ndmpd_zfs_args_t *, int **, int **);
 
-static int ndmpd_zfs_is_spanning(ndmpd_zfs_args_t *);
+static int ndmpd_zfs_addenv_backup_size(ndmpd_zfs_args_t *, u_longlong_t);
 
 static boolean_t ndmpd_zfs_backup_pathvalid(ndmpd_zfs_args_t *);
 static int ndmpd_zfs_backup_getpath(ndmpd_zfs_args_t *, char *, int);
@@ -98,6 +98,8 @@ static int ndmpd_zfs_getenv_zfs_force(ndmpd_zfs_args_t *);
 static int ndmpd_zfs_getenv_level(ndmpd_zfs_args_t *);
 static int ndmpd_zfs_getenv_update(ndmpd_zfs_args_t *);
 static int ndmpd_zfs_getenv_dmp_name(ndmpd_zfs_args_t *);
+static int ndmpd_zfs_getenv_zfs_backup_size(ndmpd_zfs_args_t *);
+
 static boolean_t ndmpd_zfs_dmp_name_valid(ndmpd_zfs_args_t *, char *);
 static boolean_t ndmpd_zfs_is_incremental(ndmpd_zfs_args_t *);
 static int ndmpd_zfs_send_fhist(ndmpd_zfs_args_t *);
@@ -404,7 +406,6 @@ ndmpd_zfs_header_read(ndmpd_zfs_args_t *ndmpd_zfs_args)
 
 	(void) memcpy(tape_header, buf, sizeof (ndmpd_zfs_header_t));
 
-
 	if (strcmp(tape_header->nzh_magic, NDMPUTF8MAGIC) != 0) {
 		ndmpd_zfs_dma_log(ndmpd_zfs_args, NDMP_LOG_ERROR,
 		    "bad magic string\n");
@@ -703,10 +704,13 @@ ndmpd_zfs_backup_tape_write(ndmpd_zfs_args_t *ndmpd_zfs_args)
 
 		if (count == 0) /* EOF */ {
 			NDMP_LOG(LOG_DEBUG,
-			    "zfs_send stream size: %llu bytes (sans header)",
-			    *bytes_totalp - bufsize);
+			    "zfs_send stream size: %llu bytes; "
+			    "full backup size (including header): %llu",
+			    *bytes_totalp - bufsize, *bytes_totalp);
 			free(buf);
-			return (0);
+
+			return (ndmpd_zfs_addenv_backup_size(ndmpd_zfs_args,
+			    *bytes_totalp));
 		}
 
 		if (count == -1) {
@@ -727,6 +731,28 @@ ndmpd_zfs_backup_tape_write(ndmpd_zfs_args_t *ndmpd_zfs_args)
 		*bytes_totalp += count;
 	}
 	/* NOTREACHED */
+}
+
+static int
+ndmpd_zfs_addenv_backup_size(ndmpd_zfs_args_t *ndmpd_zfs_args,
+    u_longlong_t bytes_total)
+{
+	char zfs_backup_size[32];
+	int err;
+
+	(void) snprintf(zfs_backup_size, sizeof (zfs_backup_size), "%llu",
+	    bytes_total);
+
+	err = MOD_ADDENV(ndmpd_zfs_params, "ZFS_BACKUP_SIZE", zfs_backup_size);
+
+	if (err) {
+		NDMP_LOG(LOG_ERR, "Failed to add ZFS_BACKUP_SIZE env");
+		return (-1);
+	}
+
+	NDMP_LOG(LOG_DEBUG, "Added ZFS_BACKUP_SIZE env: %s", zfs_backup_size);
+
+	return (0);
 }
 
 int
@@ -812,7 +838,9 @@ ndmpd_zfs_restore_tape_read(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	ndmpd_session_t *session = (ndmpd_session_t *)
 	    (ndmpd_zfs_params->mp_daemon_cookie);
 	int bufsize = ndmpd_zfs_args->nz_bufsize;
+	u_longlong_t backup_size = ndmpd_zfs_args->nz_zfs_backup_size;
 	u_longlong_t *bytes_totalp;
+	u_longlong_t bytes;
 	char *buf;
 	int count;
 	int err;
@@ -825,66 +853,44 @@ ndmpd_zfs_restore_tape_read(ndmpd_zfs_args_t *ndmpd_zfs_args)
 
 	bytes_totalp = &ndmpd_zfs_args->nz_nlp->nlp_bytes_total;
 
-	for (;;) {
-		err = MOD_READ(ndmpd_zfs_params, buf, bufsize);
+	while (*bytes_totalp < backup_size) {
 
-		if (err == -1) {
-			NDMP_LOG(LOG_DEBUG, "end of data (%llu) bytes",
-			    *bytes_totalp);
-			(void) write(ndmpd_zfs_args->nz_pipe_fd[PIPE_TAPE],
-			    buf, bufsize);
-			NS_ADD(wdisk, bufsize);
-			break;
+		bytes = backup_size - *bytes_totalp;
+
+		if (bytes >= bufsize)
+			bytes = bufsize;
+
+		err = MOD_READ(ndmpd_zfs_params, buf, bytes);
+
+		if (err != 0) {
+			NDMP_LOG(LOG_ERR, "MOD_READ error: %d; returning -1",
+			    err);
+			free(buf);
+			return (-1);
 		}
 
 		count = write(ndmpd_zfs_args->nz_pipe_fd[PIPE_TAPE], buf,
-		    bufsize);
+		    bytes);
 
-		if (count == -1) {
-			free(buf);
+		if (count != bytes) {
+			NDMP_LOG(LOG_ERR, "count (%d) != bytes (%d)",
+			    count, bytes);
 
-			if ((errno == EPIPE) && !session->ns_data.dd_abort) {
-				NDMP_LOG(LOG_DEBUG, "EPIPE; count == -1; "
-				    "[%llu bytes] returning success",
-				    *bytes_totalp);
-				return (0);
+			if (count == -1) {
+				NDMP_LOG(LOG_ERR, "pipe write error: errno: %d",
+				    errno);
+
+				if (session->ns_data.dd_abort)
+					NDMP_LOG(LOG_DEBUG, "abort set");
 			}
 
-			if (session->ns_data.dd_abort)
-				NDMP_LOG(LOG_DEBUG, "abort set");
-
-			NDMP_LOG(LOG_DEBUG, "pipe write error:"
-			    "errno: %d", errno);
-
+			free(buf);
 			return (-1);
 		}
+
 		NS_ADD(wdisk, count);
 
 		*bytes_totalp += count;
-
-		/*
-		 * A short write to the pipe indicates the
-		 * other peer is terminated so we should exit
-		 */
-
-		if (count != bufsize) {
-			NDMP_LOG(LOG_DEBUG, "count != bufsize:"
-			    "count: %d; bufsize: %d",
-			    count, bufsize);
-			free(buf);
-			return (0);
-		}
-
-		/* Checks for local mover */
-		if (*bytes_totalp == ndmpd_zfs_args->nz_window_len) {
-			NDMP_LOG(LOG_DEBUG, "Reached EOW at %lld",
-			    *bytes_totalp);
-			if (ndmpd_zfs_is_spanning(ndmpd_zfs_args) == 0) {
-				NDMP_LOG(LOG_DEBUG, "Exit");
-				break;
-			}
-			NDMP_LOG(LOG_DEBUG, "Continue through spanning");
-		}
 	}
 
 	free(buf);
@@ -921,33 +927,6 @@ ndmpd_zfs_restore_recv_write(ndmpd_zfs_args_t *ndmpd_zfs_args)
 		NDMPD_ZFS_LOG_ZERR(ndmpd_zfs_args, "zfs_receive: %d", err);
 
 	return (err);
-}
-
-/*
- * ndmpd_zfs_is_spanning()
- *
- * Check to see if the tape is at spanning point
- */
-
-static int
-ndmpd_zfs_is_spanning(ndmpd_zfs_args_t *ndmpd_zfs_args)
-{
-	ndmpd_session_t *session = (ndmpd_session_t *)
-	    (ndmpd_zfs_params->mp_daemon_cookie);
-	int count = session->ns_mover.md_record_size;
-	char *buf;
-
-	if ((buf = ndmp_malloc(count)) == NULL)
-		return (0);
-
-	if (read(session->ns_tape.td_fd, buf, count) == 0) {
-		free(buf);
-		return (1);
-	}
-
-	(void) ndmp_mtioctl(session->ns_tape.td_fd, MTBSR, 1);
-	free(buf);
-	return (0);
 }
 
 /*
@@ -1439,6 +1418,9 @@ ndmpd_zfs_restore_getpath(ndmpd_zfs_args_t *ndmpd_zfs_args)
 static int
 ndmpd_zfs_restore_getenv(ndmpd_zfs_args_t *ndmpd_zfs_args)
 {
+	if (ndmpd_zfs_getenv_zfs_backup_size(ndmpd_zfs_args) != 0)
+		return (-1);
+
 	return (ndmpd_zfs_getenv(ndmpd_zfs_args));
 }
 
@@ -1640,6 +1622,26 @@ ndmpd_zfs_getenv_dmp_name(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	    NDMPD_ZFS_DMP_NAME_MAX);
 
 	NDMP_LOG(LOG_DEBUG, "env(DMP_NAME): \"%s\"", envp);
+
+	return (0);
+}
+
+static int
+ndmpd_zfs_getenv_zfs_backup_size(ndmpd_zfs_args_t *ndmpd_zfs_args)
+{
+	char *zfs_backup_size;
+
+	zfs_backup_size = MOD_GETENV(ndmpd_zfs_params, "ZFS_BACKUP_SIZE");
+
+	if (zfs_backup_size == NULL) {
+		NDMP_LOG(LOG_ERR, "ZFS_BACKUP_SIZE env is NULL");
+		return (-1);
+	}
+
+	NDMP_LOG(LOG_DEBUG, "ZFS_BACKUP_SIZE: %s\n", zfs_backup_size);
+
+	(void) sscanf(zfs_backup_size, "%llu",
+	    &ndmpd_zfs_args->nz_zfs_backup_size);
 
 	return (0);
 }

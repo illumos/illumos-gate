@@ -485,6 +485,7 @@ typedef struct ndmpd_zfs_args {
 	boolean_t nz_zfs_force;			/* val of ZFS_FORCE env var */
 	boolean_t nz_update;			/* val of UPDATE env var */
 	char nz_dmp_name[NDMPD_ZFS_DMP_NAME_MAX]; /* val of DMP_NAME env var */
+	u_longlong_t nz_zfs_backup_size;	/* used for restore only */
 
 	ndmpd_module_params_t nz_params;
 	ndmp_lbr_params_t *nz_nlp;

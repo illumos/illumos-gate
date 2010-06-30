@@ -239,6 +239,8 @@ typedef struct ndmpd_module_params {
 	ndmpd_log_func_v3_t *mp_log_func_v3;
 } ndmpd_module_params_t;
 
+#define	MOD_ADDENV(m, n, v) \
+	(*(m)->mp_add_env_func)((m)->mp_daemon_cookie, n, v)
 
 #define	MOD_SETENV(m, n, v) \
 	(*(m)->mp_set_env_func)((m)->mp_daemon_cookie, n, v)
