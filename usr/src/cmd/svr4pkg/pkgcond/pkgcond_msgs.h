@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PKGCOND_MSGS_H
@@ -197,9 +196,6 @@ extern "C" {
 
 #define	DBG_PARSED_ENVIRONMENT					gettext(\
 "global data parsed from environment variable <%s>")
-
-#define	DBG_DUMP_GLOBAL_LINE					gettext(\
-"inherited file system <%d> is <%s>")
 
 #define	DBG_DUMP_GLOBAL_ENTRY					gettext(\
 "global data settings")
@@ -378,17 +374,6 @@ extern "C" {
 #define	DBG_WRNG_IS						gettext(\
 "root path <%s> is a whole root non-global zone")
 
-#define	DBG_WRNG_IS_NOT						gettext(\
-"root path <%s> is not a whole root non-global zones: " \
-"file systems are inherited")
-
-#define	DBG_SRNG_IS_NOT						gettext(\
-"root path <%s> is not a sparse root non-global zones: " \
-"file systems are not inherited")
-
-#define	DBG_SRNG_IS						gettext(\
-"root path <%s> is a sparse root non-global zone")
-
 #define	DBG_BENV_INITIAL_INSTALL				gettext(\
 "path <%s> is not an alternative boot environment: initial " \
 "installation in progress")
@@ -414,9 +399,6 @@ extern "C" {
 #define	DBG_BENV_BAD_ROOTPATH					gettext(\
 "path <%s> is not an alternative boot environment: root directory is <%s>")
 
-#define	DBG_PWRT_INHERITED					gettext(\
-"root path <%s> is not writeable: is inherited with <%s>")
-
 #define	DBG_PWRT_READONLY					gettext(\
 "root path <%s> is not writeable: is read only <%s>")
 
@@ -431,12 +413,6 @@ extern "C" {
 
 #define	DBG_CKSR_FSREADONLY					gettext(\
 "file system <%s> type <%s> is read-only")
-
-#define	DBG_CALCSCFG_ENTRY					gettext(\
-"analyzing inherited and mounted file systems")
-
-#define	DBG_CALCSCFG_INHERITED					gettext(\
-"analyzing inherited file systems")
 
 #define	DBG_CALCSCFG_MOUNTED					gettext(\
 "analyzing mounted file systems")

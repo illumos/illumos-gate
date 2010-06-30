@@ -338,11 +338,6 @@ extern	int	zonecfg_modify_filesystem(zone_dochandle_t,
     struct zone_fstab *, struct zone_fstab *);
 extern	int	zonecfg_lookup_filesystem(zone_dochandle_t,
     struct zone_fstab *);
-extern	int	zonecfg_add_ipd(zone_dochandle_t, struct zone_fstab *);
-extern	int	zonecfg_delete_ipd(zone_dochandle_t, struct zone_fstab *);
-extern	int	zonecfg_modify_ipd(zone_dochandle_t,
-    struct zone_fstab *, struct zone_fstab *);
-extern	int	zonecfg_lookup_ipd(zone_dochandle_t, struct zone_fstab *);
 extern	int	zonecfg_add_fs_option(struct zone_fstab *, char *);
 extern	int	zonecfg_remove_fs_option(struct zone_fstab *, char *);
 extern	void	zonecfg_free_fs_option_list(zone_fsopt_t *);
@@ -480,9 +475,6 @@ extern	int	zonecfg_verify_save(zone_dochandle_t, char *);
 extern	int	zonecfg_setfsent(zone_dochandle_t);
 extern	int	zonecfg_getfsent(zone_dochandle_t, struct zone_fstab *);
 extern	int	zonecfg_endfsent(zone_dochandle_t);
-extern	int	zonecfg_setipdent(zone_dochandle_t);
-extern	int	zonecfg_getipdent(zone_dochandle_t, struct zone_fstab *);
-extern	int	zonecfg_endipdent(zone_dochandle_t);
 extern	int	zonecfg_setnwifent(zone_dochandle_t);
 extern	int	zonecfg_getnwifent(zone_dochandle_t, struct zone_nwiftab *);
 extern	int	zonecfg_endnwifent(zone_dochandle_t);

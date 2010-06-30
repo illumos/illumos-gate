@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -61,8 +60,6 @@
  *  z_verify_zone_spec - Verify list of zones on which actions will be performed
  *  z_zlist_change_zone_state - Change the current state of the specified zone
  *  z_zlist_get_current_state - Determine the current kernel state of the
- *	specified zone
- *  z_zlist_get_inherited_pkg_dirs - Determine directories inherited by
  *	specified zone
  *  z_zlist_get_original_state - Return the original kernal state of the
  *	specified zone
@@ -328,18 +325,6 @@ z_free_zone_list(zoneList_t a_zlst)
 			free(zelm->_zlPath);
 		}
 
-		/* free list of inherited package directories */
-
-		if (zelm->_zlInheritedDirs != (char **)NULL) {
-			int	n;
-
-			for (n = 0;
-			    (zelm->_zlInheritedDirs)[n] != (char *)NULL;
-			    n++) {
-				(void) free((zelm->_zlInheritedDirs)[n]);
-			}
-			(void) free(zelm->_zlInheritedDirs);
-		}
 	}
 
 	/* free handle to the list */
@@ -564,9 +549,6 @@ z_get_nonglobal_zone_list_by_brand(zoneBrandList_t *brands)
 
 		zlst[numzones]._zlOrigKernelStatus = st;
 		zlst[numzones]._zlCurrKernelStatus = st;
-
-		zlst[numzones]._zlInheritedDirs =
-		    _z_get_inherited_dirs(ze->zone_name);
 
 		numzones++;
 		free(ze);
@@ -1783,54 +1765,6 @@ z_zlist_get_current_state(zoneList_t a_zlst, int a_zoneIndex)
 	    a_zlst[i]._zlCurrKernelStatus);
 
 	return (a_zlst[i]._zlCurrKernelStatus);
-}
-
-/*
- * Name:	z_zlist_get_inherited_pkg_dirs
- * Description:	Determine directories inherited by specified zone
- * Arguments:	a_zlst - handle to zoneList_t object describing all zones
- *		a_zoneIndex - index into a_zlst of the zone to return the
- *			inherited directories list
- * Returns:	char **
- *			== NULL - zone does not inherit any directories
- *				- zone index is invalid
- *			!= NULL - array of inherited directories
- * NOTE:    	Any directory list returned is located in static storage that
- *		must NEVER be free()ed by the caller.
- */
-
-extern char **
-z_zlist_get_inherited_pkg_dirs(zoneList_t a_zlst, int a_zoneIndex)
-{
-	int	i;
-
-	/* if zones are not implemented, return empty list */
-
-	if (z_zones_are_implemented() == B_FALSE) {
-		return (NULL);
-	}
-
-	/* ignore empty list */
-
-	if (a_zlst == (zoneList_t)NULL) {
-		return (NULL);
-	}
-
-	/* find the specified zone in the list */
-
-	for (i = 0; (i != a_zoneIndex) &&
-	    (a_zlst[i]._zlName != (char *)NULL); i++)
-		;
-
-	/* return error if the specified zone does not exist */
-
-	if (a_zlst[i]._zlName == (char *)NULL) {
-		return (NULL);
-	}
-
-	/* return selected zone's inherited directories */
-
-	return (a_zlst[i]._zlInheritedDirs);
 }
 
 /*

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -49,7 +48,6 @@
  *			is_nonglobal_zone [path]
  *			is_path_writable path
  *			is_running_system [path]
- *			is_sparse_root_nonglobal_zone [path]
  *			is_what [path]
  *			is_whole_root_nonglobal_zone [path]
  *
@@ -136,8 +134,6 @@ typedef struct fsi_t	FSI_T;
 /* holds parsed global data */
 
 struct globalData_t {
-		/* sparse root (are any file systems mounted read-only)? */
-	boolean_t gd_srFsMountedRO;
 		/* initial install: PKG_INIT_INSTALL=true */
 	boolean_t gd_initialInstall;
 		/* global zone install: SUNW_PKG_INSTALL_ZONENAME=global */
@@ -164,8 +160,6 @@ struct globalData_t {
 	char	*gd_currentZoneName;
 		/* SUNW_PKGCOND_GLOBAL_DATA:currentZone:zoneType */
 	char	*gd_currentZoneType;
-		/* list of inherited file systems */
-	char	**gd_inheritedFileSystems;
 		/* path provided on command line */
 	char	*gd_cmdline_path;
 };
@@ -206,19 +200,13 @@ static int		cmd_is_path_writable(int argc, char **argv,
 				GLOBALDATA_T *a_gdt);
 static int		cmd_is_running_system(int argc, char **argv,
 				GLOBALDATA_T *a_gdt);
-static int		cmd_is_sparse_root_ng_zone(int argc, char **argv,
-				GLOBALDATA_T *a_gdt);
 static int		cmd_is_what(int argc, char **argv,
-				GLOBALDATA_T *a_gdt);
-static int		cmd_is_whole_root_ng_zone(int argc, char **argv,
 				GLOBALDATA_T *a_gdt);
 
 /* Utility function Prototypes */
 
 static boolean_t	getNegateResults(void);
 static boolean_t	recursionCheck(int *r_recursion, char *a_function);
-static boolean_t	checkForReadOnlyMount(GLOBALDATA_T *a_gdt,
-    char *a_mntPoint, char *a_fsType, char *a_mntOptions);
 static int		adjustResults(int a_result);
 static int		calculateFileSystemConfig(GLOBALDATA_T *a_gdt);
 static int		getRootPath(char **r_rootPath);
@@ -273,14 +261,10 @@ static CMD_T cmds[] = {
 		cmd_is_path_writable },
 	{ "is_running_system",		" [path]",
 		cmd_is_running_system },
-	{ "is_sparse_root_nonglobal_zone", " [path]",
-		cmd_is_sparse_root_ng_zone },
 	{ "is_what", " [path]",
 		cmd_is_what },
-	{ "is_whole_root_nonglobal_zone", " [path]",
-		cmd_is_whole_root_ng_zone },
 	/* last one must be all NULLs */
-	{ NULL, NULL }
+	{ NULL, NULL, NULL }
 };
 
 /*
@@ -553,15 +537,9 @@ static	int	recursion = 0;
 		 * a diskless client cannot be any of the following
 		 */
 
-		/* cannot be whole root non-global zone */
+		/* cannot be non-global zone */
 
-		r = cmd_is_whole_root_ng_zone(argc, argv, a_gdt);
-
-		/* cannot be nonglobal zone */
-
-		if (r != R_SUCCESS) {
-			r = cmd_is_nonglobal_zone(argc, argv, a_gdt);
-		}
+		r = cmd_is_nonglobal_zone(argc, argv, a_gdt);
 
 		/* cannot be mounted miniroot */
 
@@ -1495,13 +1473,11 @@ static	int	recursion = 0;
 	}
 
 	/*
-	 * In non-global zone if inherited FS's exits
-	 * or zone specific read only FS's exist
+	 * In non-global zone if zone specific read only FS's exist
 	 * or it is in a mounted state.
 	 */
 
-	if (a_gdt->gd_inheritedFileSystems != NULL ||
-		a_gdt->gd_srFsMountedRO || a_gdt->inMountedState) {
+	if (a_gdt->inMountedState) {
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_IS_NONGLOBAL_ZONE, rootPath);
 		return (R_SUCCESS);
 	}
@@ -2097,7 +2073,7 @@ static	int	recursion = 0;
 
 /*
  * Name:	cmd_is_path_writable
- * Description:	determine if target path is writable (not inherited)
+ * Description:	determine if target path is writable
  * Scope:	public
  * Arguments:	argc,argv:
  *		  - optional path to target to test
@@ -2106,7 +2082,6 @@ static	int	recursion = 0;
  *			!= 0 - failure
  * IMPLEMENTATION:
  * - path must be found in the file systems configured
- * - file system type must not be "inherited"
  * - mount options must not include "read only"
  */
 
@@ -2201,14 +2176,7 @@ static	int	recursion = 0;
 
 	/*
 	 * need to determine if the mount point is writeable:
-	 * If parent mount point is "inherited" then it is not writeable
 	 */
-
-	if (strcmp(list[nn].fsi_fsType, FSTYPE_INHERITED) == 0) {
-		log_msg(LOG_MSG_DEBUG, DBG_PWRT_INHERITED, rootPath,
-			list[nn].fsi_mntOptions);
-		return (R_FAILURE);
-	}
 
 	/* see if the file system is mounted with the "read only" option */
 
@@ -2578,123 +2546,6 @@ static	int	recursion = 0;
 }
 
 /*
- * Name:	cmd_is_sparse_root_ng_zone
- * Description:	determine if target is a sparse non-global zone
- * Scope:	public
- * Arguments:	argc,argv:
- *		  - optional path to target to test
- * Returns:	int
- *			== 0 - success
- *			!= 0 - failure
- * IMPLEMENATION:
- *  - must be a non-global zone
- *  - inherited file systems must be present, and/or
- *  - read-only lofs file systems must be present
- */
-
-static int
-cmd_is_sparse_root_ng_zone(int argc, char **argv, GLOBALDATA_T *a_gdt)
-{
-	char	*rootPath = NULL;
-	int	c;
-	int	r;
-static	char	*cmdName = "is_sparse_root_nonglobal_zone";
-static	int	recursion = 0;
-
-	/* process any command line options */
-
-	while ((c = getopt(argc, argv, ":")) != EOF) {
-		switch (c) {
-		case '\0':	/* prevent end-of-loop not reached warning */
-			break;
-		case '?':
-		default:
-			(void) usage(MSG_IS_INVALID_OPTION, optopt, cmdName);
-			return (R_USAGE);
-		}
-	}
-
-	/* prevent recursion */
-
-	if (recursionCheck(&recursion, cmdName) == B_FALSE) {
-
-		/* see if this is a non-global zone */
-
-		r = cmd_is_nonglobal_zone(argc, argv, a_gdt);
-
-		/* no need to guard against recursion any more */
-
-		recursion--;
-
-		switch (r) {
-			case R_SUCCESS:
-				/* is a non-global zone */
-				break;
-			case R_FAILURE:
-				/* not a non-global zone */
-				return (R_FAILURE);
-			case R_USAGE:
-			case R_ERROR:
-			default:
-				/* cannot determine if non-global zone */
-				return (r);
-		}
-	}
-
-	/* normalize argc/argv */
-
-	argc -= optind;
-	argv += optind;
-
-	/* error if more than one argument */
-
-	if (argc > 1) {
-		log_msg(LOG_MSG_ERR, ERR_UNRECOGNIZED_OPTION, argv[1]);
-		(void) usage(MSG_IS_INVALID_OPTION, argv[1]);
-		return (R_USAGE);
-	}
-
-	/* process root path if first argument present */
-
-	if (argc == 1) {
-		if (setRootPath(argv[0], "argv[0]", B_TRUE) != R_SUCCESS) {
-			return (R_ERROR);
-		}
-	}
-
-	/* get current root path */
-
-	r = getRootPath(&rootPath);
-	if (r != R_SUCCESS) {
-		return (r);
-	}
-
-	/* start of command debugging information */
-
-	echoDebug(DBG_ROOTPATH_IS, rootPath);
-
-	/*
-	 * in a non-global zone:
-	 * if any file systems are inherited, or if /usr is read only,
-	 * then the target is a sparse root non-global zone.
-	 */
-
-	if ((a_gdt->gd_inheritedFileSystems != (char **)NULL) ||
-		(a_gdt->gd_srFsMountedRO == B_TRUE)) {
-		/* no inherited file systems */
-		log_msg(LOG_MSG_DEBUG, DBG_SRNG_IS, rootPath);
-		return (R_SUCCESS);
-	}
-
-	/* target is not a sparse root non-global zone */
-
-	log_msg(LOG_MSG_DEBUG, DBG_SRNG_IS_NOT, rootPath);
-
-	return (R_FAILURE);
-
-}
-
-/*
  * Name:	cmd_is_what
  * Description:	determine what the target is
  * Scope:	public
@@ -2789,122 +2640,6 @@ static	char	*cmdName = "is_what";
 			cmds[cur_cmd].c_name, result);
 	}
 	return (R_SUCCESS);
-}
-
-/*
- * Name:	cmd_is_whole_root_ng_zone
- * Description:	determine if target is a global zone
- * Scope:	public
- * Arguments:	argc,argv:
- *		  - optional path to target to test
- * Returns:	int
- *			== 0 - success
- *			!= 0 - failure
- * IMPLEMENTATION:
- *  - must be a non-global zone
- *  - no inherited file systems may be present
- *  - no read-only lofs file systems may be present
- */
-
-static int
-cmd_is_whole_root_ng_zone(int argc, char **argv, GLOBALDATA_T *a_gdt)
-{
-	char	*rootPath = NULL;
-	int	c;
-	int	r;
-static	char	*cmdName = "is_whole_root_nonglobal_zone";
-static	int	recursion = 0;
-
-	/* process any command line options */
-
-	while ((c = getopt(argc, argv, ":")) != EOF) {
-		switch (c) {
-		case '\0':	/* prevent end-of-loop not reached warning */
-			break;
-		case '?':
-		default:
-			(void) usage(MSG_IS_INVALID_OPTION, optopt, cmdName);
-			return (R_USAGE);
-		}
-	}
-
-	/* prevent recursion */
-
-	if (recursionCheck(&recursion, cmdName) == B_FALSE) {
-
-		/* see if this is a non-global zone */
-
-		r = cmd_is_nonglobal_zone(argc, argv, a_gdt);
-
-		/* no need to guard against recursion any more */
-
-		recursion--;
-
-		switch (r) {
-			case R_SUCCESS:
-				/* is a non-global zone */
-				break;
-			case R_FAILURE:
-				/* not a non-global zone */
-				return (R_FAILURE);
-			case R_USAGE:
-			case R_ERROR:
-			default:
-				/* cannot determine if non-global zone */
-				return (r);
-		}
-	}
-
-	/* normalize argc/argv */
-
-	argc -= optind;
-	argv += optind;
-
-	/* error if more than one argument */
-
-	if (argc > 1) {
-		log_msg(LOG_MSG_ERR, ERR_UNRECOGNIZED_OPTION, argv[1]);
-		(void) usage(MSG_IS_INVALID_OPTION, argv[1]);
-		return (R_USAGE);
-	}
-
-	/* process root path if first argument present */
-
-	if (argc == 1) {
-		if (setRootPath(argv[0], "argv[0]", B_TRUE) != R_SUCCESS) {
-			return (R_ERROR);
-		}
-	}
-
-	/* get current root path */
-
-	r = getRootPath(&rootPath);
-	if (r != R_SUCCESS) {
-		return (r);
-	}
-
-	/* start of command debugging information */
-
-	echoDebug(DBG_ROOTPATH_IS, rootPath);
-
-	/*
-	 * in a non-global zone:
-	 * if no file systems are inherited, and if /usr is not
-	 * read only, then the target is a whole root non-global zone.
-	 */
-
-	if ((a_gdt->gd_inheritedFileSystems == (char **)NULL) &&
-		(a_gdt->gd_srFsMountedRO == B_FALSE)) {
-		/* no inherited file systems */
-		log_msg(LOG_MSG_DEBUG, DBG_WRNG_IS, rootPath);
-		return (R_SUCCESS);
-	}
-
-	/* target is not a whole-root non-global zone */
-
-	log_msg(LOG_MSG_DEBUG, DBG_WRNG_IS_NOT, rootPath);
-
-	return (R_FAILURE);
 }
 
 /*
@@ -3174,15 +2909,10 @@ calculateFileSystemConfig(GLOBALDATA_T *a_gdt)
 	struct mnttab	mntbuf;
 	FSI_T		*list;
 	long		listSize;
-	boolean_t	readOnlyMountFound = B_FALSE;
 
 	/* entry assetions */
 
 	assert(a_gdt != (GLOBALDATA_T *)NULL);
-
-	/* entry debugging info */
-
-	echoDebug(DBG_CALCSCFG_ENTRY);
 
 	/* allocate a list that has one termination entry */
 
@@ -3191,24 +2921,6 @@ calculateFileSystemConfig(GLOBALDATA_T *a_gdt)
 	list[0].fsi_fsType = NULL;
 	list[0].fsi_mntOptions = NULL;
 	listSize = 0;
-
-	/* insert entries for all inherited file systems */
-
-	if (a_gdt->gd_inheritedFileSystems) {
-		int n;
-		char **ifs = a_gdt->gd_inheritedFileSystems;
-
-		/* debugging info */
-
-		echoDebug(DBG_CALCSCFG_INHERITED);
-
-		/* insert all inherited file systems */
-
-		for (n = 0; ifs[n]; n++) {
-			sortedInsert(&list, &listSize, ifs[n],
-				FSTYPE_INHERITED, MNTOPT_RO);
-		}
-	}
 
 	/* open the mount table for reading */
 
@@ -3242,11 +2954,6 @@ calculateFileSystemConfig(GLOBALDATA_T *a_gdt)
 			a_gdt->inMountedState = B_TRUE;
 		}
 
-		if (!readOnlyMountFound) {
-			readOnlyMountFound = checkForReadOnlyMount(a_gdt,
-			    mntbuf.mnt_mountp, mntbuf.mnt_fstype,
-			    mntbuf.mnt_mntopts);
-		}
 	}
 
 	/* close mount table file */
@@ -3259,99 +2966,6 @@ calculateFileSystemConfig(GLOBALDATA_T *a_gdt)
 	a_gdt->gd_fileSystemConfigLen = listSize;
 
 	return (R_SUCCESS);
-}
-
-/*
- * Name:	checkForReadOnlyMount
- * Description:	given a mount point, type and options, determine if the
- *              mounted file system is part of a "sparse root" configuration
- *              by checking if the known Zone directories a ro LOFS mounted.
- * Arguments:	a_gdt - global data structure to place sorted entries into
- *		a_mntPoint - pointer to string representing mount point
- *		a_fsType - pointer to string representing file system type
- *		a_mntOptions - pointer to string representing the options
- *			used to mount the file system
- * Returns:	B_TRUE - if sparse root mount is found
- * 		B_FLASE - if no sparse root mount's are found
- * Side Effects: set:
- *			a_gdt->gd_srFsMountedRO = B_TRUE
- *		if the mounted file system is part of a 'sparse root' config
- */
-
-static boolean_t
-checkForReadOnlyMount(GLOBALDATA_T *a_gdt, char *a_mntPoint,
-	char *a_fsType, char *a_mntOptions)
-{
-	/* entry assertions */
-	int	i;
-	char mntPoint[MAXPATHLEN];
-	char *zDirs[] = { "/usr", "/lib", "/platform", "/sbin", NULL };
-	char *aZDirs[] = { "/a/usr", "/a/lib", "/a/platform", "/a/sbin", NULL };
-
-	assert(a_gdt != (GLOBALDATA_T *)NULL);
-	assert(a_mntPoint != NULL);
-	assert(a_fsType != NULL);
-
-	/* return if no read-only mount option */
-
-	if (mountOptionPresent(a_mntOptions, MNTOPT_RO) != R_SUCCESS) {
-		return (B_FALSE);
-	}
-
-	/* return if file system is not read-only mounted */
-
-	if (strcmp(a_fsType, MNTTYPE_LOFS) != 0) {
-		return (B_FALSE);
-	}
-
-	/* file system is a read-only lofs mounted.  */
-
-	/* Check read-only lofs mount's appended to the command line path */
-
-	if (a_gdt->gd_cmdline_path != NULL) {
-		if (strncmp(a_mntPoint, a_gdt->gd_cmdline_path,
-			strlen(a_gdt->gd_cmdline_path)) == 0) {
-			for (i = 0; zDirs[i] != NULL; i++) {
-				(void) snprintf(mntPoint, sizeof (mntPoint),
-				    "%s%s", a_gdt->gd_cmdline_path,
-				    zDirs[i]);
-				if (strcmp(a_mntPoint, mntPoint) == 0) {
-					echoDebug(DBG_CKSR_FSREADONLY,
-					    a_mntPoint, a_fsType);
-					a_gdt->gd_srFsMountedRO = B_TRUE;
-					return (B_TRUE);
-				}
-			}
-		}
-
-	/* Check read-only lofs mount's in the mounted state */
-
-	} else if (a_gdt->inMountedState) {
-		for (i = 0; aZDirs[i] != NULL; i++) {
-			if (strncmp(a_mntPoint, aZDirs[i],
-			    sizeof (aZDirs[i])) == 0) {
-				echoDebug(DBG_CKSR_FSREADONLY, a_mntPoint,
-				    a_fsType);
-				a_gdt->gd_srFsMountedRO = B_TRUE;
-				return (B_TRUE);
-			}
-		}
-
-	/* Check read-only lofs mount's for live system */
-
-	} else {
-		for (i = 0; zDirs[i] != NULL; i++) {
-			if (strncmp(a_mntPoint, zDirs[i],
-			    sizeof (zDirs[i])) == 0) {
-				echoDebug(DBG_CKSR_FSREADONLY, a_mntPoint,
-				    a_fsType);
-				a_gdt->gd_srFsMountedRO = B_TRUE;
-				return (B_TRUE);
-			}
-		}
-	}
-
-	return (B_FALSE);
 }
 
 /*
@@ -4344,33 +3958,6 @@ parseGlobalData(char *a_envVar, GLOBALDATA_T **r_gdt)
 		TAG_COND_ZONE_TYPE);
 	(*r_gdt)->gd_currentZoneType = a;
 
-	/* extract any inherited file systems */
-
-	for (n = 0; ; n++) {
-		char	**ifs;
-
-		a = smlGetParamByTag(ntag, n, TAG_COND_INHERITED_FS,
-			TAG_COND_FS_NAME);
-
-		if (a == NULL) {
-			if (n > 0) {
-				/* LINTED warning: variable may be used */
-				(*r_gdt)->gd_inheritedFileSystems = ifs;
-			}
-			break;
-		}
-
-		if (n == 0) {
-			ifs = (char **)calloc(1, sizeof (char **)*(n+2));
-			ifs[n] = a;
-			ifs[n+1] = NULL;
-		} else {
-			ifs = (char **)realloc(ifs, sizeof (char **)*(n+2));
-			ifs[n] = a;
-			ifs[n+1] = NULL;
-		}
-	}
-
 	return (R_SUCCESS);
 }
 
@@ -4399,13 +3986,6 @@ dumpGlobalData(GLOBALDATA_T *a_gdt)
 		a_gdt->gd_currentZoneName ? a_gdt->gd_currentZoneName : "",
 		a_gdt->gd_currentZoneType ? a_gdt->gd_currentZoneType : "");
 
-	if (a_gdt->gd_inheritedFileSystems) {
-		int n;
-		char **ifs = a_gdt->gd_inheritedFileSystems;
-		for (n = 0; ifs[n]; n++) {
-			echoDebug(DBG_DUMP_GLOBAL_LINE, n, ifs[n]);
-		}
-	}
 }
 
 /*

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -179,7 +178,6 @@ struct _zoneBrandList {
 typedef unsigned long _zone_status_t;
 
 struct _zoneListElement_t {
-	char		**_zlInheritedDirs;
 	char		*_zlName;
 	char		*_zlPath;
 	char		*_zlScratchName;
@@ -307,7 +305,6 @@ void		_z_echo(char *fmt, ...);
 /*PRINTFLIKE1*/
 void		_z_echoDebug(char *a_fmt, ...);
 int		_z_is_directory(char *path);
-char		**_z_get_inherited_dirs(char *a_zoneName);
 boolean_t	_z_running_in_global_zone(void);
 boolean_t	_z_zones_are_implemented(void);
 void		_z_sig_trap(int a_signo);

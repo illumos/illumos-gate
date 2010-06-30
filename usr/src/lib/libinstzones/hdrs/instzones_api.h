@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _INSTZONES_API_H
@@ -102,8 +101,6 @@ extern boolean_t	z_zlist_change_zone_state(zoneList_t a_zoneList,
 extern char		*z_get_zonename(void);
 extern zone_state_t	z_zlist_get_current_state(zoneList_t a_zoneList,
 				int a_zoneIndex);
-extern char 		**z_zlist_get_inherited_pkg_dirs(zoneList_t a_zoneList,
-				int a_zoneIndex);
 extern zone_state_t	z_zlist_get_original_state(zoneList_t a_zoneList,
 				int a_zoneIndex);
 extern int		z_zoneExecCmdArray(int *r_status, char **r_results,
@@ -157,15 +154,9 @@ extern int		z_ExecCmdList(int *r_status, char **r_results,
 				char *a_inputFile, char *a_cmd, ...);
 
 /* zones_paths.c */
-extern boolean_t	z_add_inherited_file_system(
-				char *a_inheritedFileSystem);
-extern boolean_t	z_path_is_inherited(char *a_path, char a_ftype,
-				char *a_rootDir);
-extern char **		z_get_inherited_file_systems(void);
 extern char		*z_make_zone_root(char *);
 extern void		z_path_canonize(char *file);
 extern void		z_canoninplace(char *file);
-extern void		z_free_inherited_file_systems(void);
 
 /* zones_lofs.c */
 extern void z_destroyMountTable(void);

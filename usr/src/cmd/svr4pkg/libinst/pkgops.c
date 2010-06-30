@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -888,186 +887,6 @@ pkgGetPackageList(char ***r_pkgList, char **a_argv, int a_optind,
 }
 
 /*
- * Name:	pkgMatchInherited
- * Description:	given a pointer to a "source" and a "destination" for an object,
- *		along with other attributes of the object, determine if the
- *		object is already installed and is current.
- * Arguments:	a_src - pointer to string representing the "source" file to
- *			verify - this would be the current temporary location of
- *			the file that would be installed
- *		a_dst - pointer to string representing the "destination" file to
- *			verify - this would be the ultimate destination for the
- *			file if installed
- *		a_rootDir - pointer to string representing the "root directory"
- *			where the package is being installed
- *		a_mode - final "mode" file should have when installed
- *		a_modtime - final "modtime" file should have when installed
- *		a_ftype - contents "type" of file (f/e/v/s/l)
- *		a_cksum - final "checksum" file should have when installed
- * Returns:	boolean_t
- *			B_TRUE - the specified source file MATCHES the file
- *				located at the specified destination
- *			B_FALSE - the specified source files does NOT match
- *				the file located at the specified destination
- */
-
-boolean_t
-pkgMatchInherited(char *a_src, char *a_dst, char *a_rootDir,
-	char a_mode, time_t a_modtime, char a_ftype, unsigned long a_cksum)
-{
-	char		cwd[PATH_MAX+1] = {'\0'};
-	char		dstpath[PATH_MAX+1];
-	int		cksumerr;
-	int		n;
-	struct stat	statbufDst;
-	struct stat	statbufSrc;
-	unsigned long	dstcksum;
-	unsigned long	srcksum;
-
-	/* entry assertions */
-
-	assert(a_src != (char *)NULL);
-	assert(*a_src != '\0');
-	assert(a_dst != (char *)NULL);
-	assert(*a_dst != '\0');
-
-	/* normalize root directory */
-
-	if ((a_rootDir == (char *)NULL) || (*a_rootDir == '\0')) {
-		a_rootDir = "/";
-	}
-
-	/* entry debugging */
-
-	echoDebug(DBG_PKGOPS_MATCHINHERIT_ENTRY);
-	echoDebug(DBG_PKGOPS_MATCHINHERIT_ARGS, a_src, a_dst, a_rootDir,
-		a_mode, a_modtime, a_ftype, a_cksum);
-
-	/* save current working directory - resolvepath can change it */
-
-	(void) getcwd(cwd, sizeof (cwd));
-
-	n = resolvepath(a_dst, dstpath, sizeof (dstpath));
-	if (n <= 0) {
-		if (errno != ENOENT) {
-			progerr(ERR_RESOLVEPATH, a_dst, strerror(errno));
-		}
-		(void) chdir(cwd);
-		return (B_FALSE);
-	}
-	dstpath[n++] = '\0';	/* make sure string is terminated */
-
-	/* return false if path is not in inherited file system space */
-
-	if (!z_path_is_inherited(dstpath, a_ftype, a_rootDir)) {
-		return (B_FALSE);
-	}
-
-	/*
-	 * path is in inherited file system space: verify existence
-	 */
-
-	/* return false if source file cannot be stat()ed */
-
-	if (stat(a_src, &statbufSrc) != 0) {
-		progerr(ERR_STAT, a_src, strerror(errno));
-		return (B_FALSE);
-	}
-
-	/* return false if destination file cannot be stat()ed */
-
-	if (stat(dstpath, &statbufDst) != 0) {
-		progerr(ERR_STAT, dstpath, strerror(errno));
-		return (B_FALSE);
-	}
-
-	/*
-	 * if this is an editable or volatile file, then the only
-	 * thing to guarantee is that the file exists - the file
-	 * attributes do not need to match
-	 */
-
-	/* editable file only needs to exist */
-
-	if (a_ftype == 'e') {
-		echoDebug(DBG_PKGOPS_EDITABLE_EXISTS, dstpath);
-		return (B_TRUE);
-	}
-
-	/* volatile file only needs to exist */
-
-	if (a_ftype == 'v') {
-		echoDebug(DBG_PKGOPS_VOLATILE_EXISTS, dstpath);
-		return (B_TRUE);
-	}
-
-	/*
-	 * verify modtime if file is not modifiable after install
-	 */
-
-	/* return false if source and destination have different mod times */
-
-	if (statbufSrc.st_mtim.tv_sec != statbufDst.st_mtim.tv_sec) {
-		echoDebug(DBG_PKGOPS_MOD_MISMATCH,  a_src,
-			statbufSrc.st_mtim.tv_sec, dstpath,
-			statbufDst.st_mtim.tv_sec);
-		return (B_FALSE);
-	}
-
-	/* return false if destination does not have required mod time */
-
-	if (statbufDst.st_mtim.tv_sec != a_modtime) {
-		echoDebug(DBG_PKGOPS_MOD_MISMATCH, dstpath,
-			statbufDst.st_mtim.tv_sec, "source", a_modtime);
-		return (B_FALSE);
-	}
-
-	/*
-	 * verify checksums of both files
-	 */
-
-	/* generate checksum of installed file */
-
-	cksumerr = 0;
-	dstcksum = compute_checksum(&cksumerr, dstpath);
-	if (cksumerr != 0) {
-		progerr(ERR_CANNOT_CKSUM_FILE, dstpath, strerror(errno));
-		return (B_FALSE);
-	}
-
-	/* return false if destination does not match recorded checksum */
-
-	if (dstcksum != a_cksum) {
-		echoDebug(DBG_PKGOPS_CKSUM_MISMATCH, dstpath, dstcksum,
-				"source", a_cksum);
-		return (B_FALSE);
-	}
-
-	/* generate checksum of file to install */
-
-	cksumerr = 0;
-	srcksum = compute_checksum(&cksumerr, a_src);
-	if (cksumerr != 0) {
-		progerr(ERR_CANNOT_CKSUM_FILE, a_src, strerror(errno));
-		return (B_FALSE);
-	}
-
-	/* return false if source to install does not match recorded checksum */
-
-	if (srcksum != dstcksum) {
-		echoDebug(DBG_PKGOPS_CKSUM_MISMATCH, a_src, srcksum, dstpath,
-				dstcksum);
-		return (B_FALSE);
-	}
-
-	/* src/dest identical - return true */
-
-	echoDebug(DBG_PKGOPS_IS_INHERITED, dstpath, "");
-
-	return (B_TRUE);
-}
-
-/*
  * return string representing path to "global zone only file"
  */
 
@@ -1155,13 +974,6 @@ pkgPackageIsThisZone(char *a_pkgInst)
 
 	assert(a_pkgInst != (char *)NULL);
 	assert(*a_pkgInst != '\0');
-
-	/* if no inherited file systems, there can be no match */
-
-	if (numThisZonePackages == 0) {
-		echoDebug(DBG_PKGOPS_NOT_THISZONE, a_pkgInst);
-		return (B_FALSE);
-	}
 
 	/*
 	 * see if this package is in the "this zone only" list

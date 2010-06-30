@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef __PKG_PKGINSTALL_H__
@@ -68,8 +67,7 @@ extern void	set_infoloc __P((char *real_pkgsav));
 extern int	pkgenv __P((char *pkginst, char *p_pkginfo, char *p_pkgmap));
 extern void	instvol __P((struct cfextra **extlist, char *srcinst, int part,
 			int nparts, PKGserver server, VFP_T **a_cfTmpVfp,
-			char **r_updated, char **r_skipped,
-			char *a_zoneName));
+			char **r_updated, char *a_zoneName));
 extern int	reqexec __P((int update, char *script, int non_abi_scripts,
 			boolean_t enable_root_user));
 extern int	chkexec __P((int update, char *script));

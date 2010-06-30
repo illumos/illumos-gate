@@ -161,7 +161,6 @@ char *res_types[] = {
 	"autoboot",
 	"pool",
 	"fs",
-	"inherit-pkg-dir",
 	"net",
 	"device",
 	"rctl",
@@ -270,7 +269,6 @@ static const char *global_scope_cmds[] = {
 
 static const char *add_cmds[] = {
 	"add fs",
-	"add inherit-pkg-dir",
 	"add net",
 	"add device",
 	"add rctl",
@@ -302,7 +300,6 @@ static const char *clear_cmds[] = {
 
 static const char *remove_cmds[] = {
 	"remove fs ",
-	"remove inherit-pkg-dir ",
 	"remove net ",
 	"remove device ",
 	"remove rctl ",
@@ -317,7 +314,6 @@ static const char *remove_cmds[] = {
 
 static const char *select_cmds[] = {
 	"select fs ",
-	"select inherit-pkg-dir ",
 	"select net ",
 	"select device ",
 	"select rctl ",
@@ -354,7 +350,6 @@ static const char *set_cmds[] = {
 
 static const char *info_cmds[] = {
 	"info fs ",
-	"info inherit-pkg-dir ",
 	"info net ",
 	"info device ",
 	"info rctl ",
@@ -410,16 +405,6 @@ static const char *net_res_scope_cmds[] = {
 	"set address=",
 	"set physical=",
 	"set defrouter=",
-	NULL
-};
-
-static const char *ipd_res_scope_cmds[] = {
-	"cancel",
-	"end",
-	"exit",
-	"help",
-	"info",
-	"set dir=",
 	NULL
 };
 
@@ -574,7 +559,6 @@ int num_prop_vals;		/* for grammar */
  * select_func() and filled in by add_property() or set_func().
  */
 static struct zone_fstab	old_fstab, in_progress_fstab;
-static struct zone_fstab	old_ipdtab, in_progress_ipdtab;
 static struct zone_nwiftab	old_nwiftab, in_progress_nwiftab;
 static struct zone_devtab	old_devtab, in_progress_devtab;
 static struct zone_rctltab	old_rctltab, in_progress_rctltab;
@@ -642,8 +626,6 @@ CPL_MATCH_FN(cmd_cpl_fn)
 	switch (resource_scope) {
 	case RT_FS:
 		return (add_stuff(cpl, line, fs_res_scope_cmds, word_end));
-	case RT_IPD:
-		return (add_stuff(cpl, line, ipd_res_scope_cmds, word_end));
 	case RT_NET:
 		return (add_stuff(cpl, line, net_res_scope_cmds, word_end));
 	case RT_DEVICE:
@@ -986,15 +968,6 @@ usage(boolean_t verbose, uint_t flags)
 			    /*CSTYLED*/
 			    "such as \"%s=5\".\n"), MNTOPT_RETRY);
 			break;
-		case RT_IPD:
-			(void) fprintf(fp, gettext("The '%s' resource scope is "
-			    "used to configure a directory\ninherited from the "
-			    "global zone into a non-global zone in read-only "
-			    "mode.\n"), rt_to_str(resource_scope));
-			(void) fprintf(fp, gettext("Valid commands:\n"));
-			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
-			    pt_to_str(PT_DIR), gettext("<path>"));
-			break;
 		case RT_NET:
 			(void) fprintf(fp, gettext("The '%s' resource scope is "
 			    "used to configure a network interface.\n"),
@@ -1195,10 +1168,10 @@ usage(boolean_t verbose, uint_t flags)
 		    gettext("<hostname> := [A-Za-z0-9][A-Za-z0-9-.]*\n"));
 	}
 	if (flags & HELP_RESOURCES) {
-		(void) fprintf(fp, "<%s> := %s | %s | %s | %s | %s | %s |\n\t"
+		(void) fprintf(fp, "<%s> := %s | %s | %s | %s | %s |\n\t"
 		    "%s | %s | %s | %s | %s\n\n",
 		    gettext("resource type"), rt_to_str(RT_FS),
-		    rt_to_str(RT_IPD), rt_to_str(RT_NET), rt_to_str(RT_DEVICE),
+		    rt_to_str(RT_NET), rt_to_str(RT_DEVICE),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_ATTR),
 		    rt_to_str(RT_DATASET), rt_to_str(RT_DCPU),
 		    rt_to_str(RT_PCAP), rt_to_str(RT_MCAP),
@@ -1247,8 +1220,6 @@ usage(boolean_t verbose, uint_t flags)
 		    rt_to_str(RT_FS), pt_to_str(PT_DIR),
 		    pt_to_str(PT_SPECIAL), pt_to_str(PT_RAW),
 		    pt_to_str(PT_TYPE), pt_to_str(PT_OPTIONS));
-		(void) fprintf(fp, "\t%s\t%s\n", rt_to_str(RT_IPD),
-		    pt_to_str(PT_DIR));
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s\n", rt_to_str(RT_NET),
 		    pt_to_str(PT_ADDRESS), pt_to_str(PT_PHYSICAL),
 		    pt_to_str(PT_DEFROUTER));
@@ -1834,18 +1805,6 @@ export_func(cmd_t *cmd)
 		    pt_to_str(PT_FS_ALLOWED), fsallowedp);
 	}
 
-	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
-		zone_perror(zone, err, B_FALSE);
-		goto done;
-	}
-	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
-		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
-		    rt_to_str(RT_IPD));
-		export_prop(of, PT_DIR, fstab.zone_fs_dir);
-		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
-	}
-	(void) zonecfg_endipdent(handle);
-
 	if ((err = zonecfg_setfsent(handle)) != Z_OK) {
 		zone_perror(zone, err, B_FALSE);
 		goto done;
@@ -2085,15 +2044,6 @@ add_resource(cmd_t *cmd)
 	switch (type) {
 	case RT_FS:
 		bzero(&in_progress_fstab, sizeof (in_progress_fstab));
-		return;
-	case RT_IPD:
-		if (state_atleast(ZONE_STATE_INSTALLED)) {
-			zerr(gettext("Zone %s already installed; %s %s not "
-			    "allowed."), zone, cmd_to_str(CMD_ADD),
-			    rt_to_str(RT_IPD));
-			goto bad;
-		}
-		bzero(&in_progress_ipdtab, sizeof (in_progress_ipdtab));
 		return;
 	case RT_NET:
 		bzero(&in_progress_nwiftab, sizeof (in_progress_nwiftab));
@@ -2393,7 +2343,7 @@ add_property(cmd_t *cmd)
 static boolean_t
 gz_invalid_resource(int type)
 {
-	return (global_zone && (type == RT_FS || type == RT_IPD ||
+	return (global_zone && (type == RT_FS ||
 	    type == RT_NET || type == RT_DEVICE || type == RT_ATTR ||
 	    type == RT_DATASET));
 }
@@ -2626,39 +2576,6 @@ fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, boolean_t fill_in_only)
 	if (fill_in_only)
 		return (Z_OK);
 	return (zonecfg_lookup_filesystem(handle, fstab));
-}
-
-static int
-fill_in_ipdtab(cmd_t *cmd, struct zone_fstab *ipdtab, boolean_t fill_in_only)
-{
-	int err, i;
-	property_value_ptr_t pp;
-
-	if ((err = initialize(B_TRUE)) != Z_OK)
-		return (err);
-
-	bzero(ipdtab, sizeof (*ipdtab));
-	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
-		pp = cmd->cmd_property_ptr[i];
-		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
-			zerr(gettext("A simple value was expected here."));
-			saw_error = B_TRUE;
-			return (Z_INSUFFICIENT_SPEC);
-		}
-		switch (cmd->cmd_prop_name[i]) {
-		case PT_DIR:
-			(void) strlcpy(ipdtab->zone_fs_dir, pp->pv_simple,
-			    sizeof (ipdtab->zone_fs_dir));
-			break;
-		default:
-			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
-			    Z_NO_PROPERTY_TYPE, B_TRUE);
-			return (Z_INSUFFICIENT_SPEC);
-		}
-	}
-	if (fill_in_only)
-		return (Z_OK);
-	return (zonecfg_lookup_ipd(handle, ipdtab));
 }
 
 static int
@@ -3001,46 +2918,6 @@ remove_fs(cmd_t *cmd)
 }
 
 static void
-remove_ipd(cmd_t *cmd)
-{
-	int err;
-
-	if (state_atleast(ZONE_STATE_INSTALLED)) {
-		zerr(gettext("Zone %s already installed; %s %s not allowed."),
-		    zone, cmd_to_str(CMD_REMOVE), rt_to_str(RT_IPD));
-		return;
-	}
-
-	/* traditional, qualified ipd removal */
-	if (cmd->cmd_prop_nv_pairs > 0) {
-		struct zone_fstab fstab;
-
-		if ((err = fill_in_ipdtab(cmd, &fstab, B_FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, B_TRUE);
-			return;
-		}
-		if ((err = zonecfg_delete_ipd(handle, &fstab)) != Z_OK)
-			z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, B_TRUE);
-		else
-			need_to_commit = B_TRUE;
-		return;
-	}
-
-	/*
-	 * unqualified ipd removal.  remove all ipds but prompt if more
-	 * than one.
-	 */
-	if (!prompt_remove_resource(cmd, "inherit-pkg-dir"))
-		return;
-
-	if ((err = zonecfg_del_all_resources(handle, "inherit-pkg-dir"))
-	    != Z_OK)
-		z_cmd_rt_perror(CMD_REMOVE, RT_IPD, err, B_TRUE);
-	else
-		need_to_commit = B_TRUE;
-}
-
-static void
 remove_net(cmd_t *cmd)
 {
 	int err;
@@ -3367,9 +3244,6 @@ remove_resource(cmd_t *cmd)
 	switch (type) {
 	case RT_FS:
 		remove_fs(cmd);
-		return;
-	case RT_IPD:
-		remove_ipd(cmd);
 		return;
 	case RT_NET:
 		remove_net(cmd);
@@ -3775,23 +3649,6 @@ select_func(cmd_t *cmd)
 			global_scope = B_TRUE;
 		}
 		bcopy(&old_fstab, &in_progress_fstab,
-		    sizeof (struct zone_fstab));
-		return;
-	case RT_IPD:
-		if (state_atleast(ZONE_STATE_INCOMPLETE)) {
-			zerr(gettext("Zone %s not in %s state; %s %s not "
-			    "allowed."), zone,
-			    zone_state_str(ZONE_STATE_CONFIGURED),
-			    cmd_to_str(CMD_SELECT), rt_to_str(RT_IPD));
-			global_scope = B_TRUE;
-			end_op = -1;
-			return;
-		}
-		if ((err = fill_in_ipdtab(cmd, &old_ipdtab, B_FALSE)) != Z_OK) {
-			z_cmd_rt_perror(CMD_SELECT, RT_IPD, err, B_TRUE);
-			global_scope = B_TRUE;
-		}
-		bcopy(&old_ipdtab, &in_progress_ipdtab,
 		    sizeof (struct zone_fstab));
 		return;
 	case RT_NET:
@@ -4452,19 +4309,6 @@ set_func(cmd_t *cmd)
 		long_usage(CMD_SET, B_TRUE);
 		usage(B_FALSE, HELP_PROPS);
 		return;
-	case RT_IPD:
-		switch (prop_type) {
-		case PT_DIR:
-			(void) strlcpy(in_progress_ipdtab.zone_fs_dir, prop_id,
-			    sizeof (in_progress_ipdtab.zone_fs_dir));
-			return;
-		default:
-			break;
-		}
-		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, B_TRUE);
-		long_usage(CMD_SET, B_TRUE);
-		usage(B_FALSE, HELP_PROPS);
-		return;
 	case RT_NET:
 		switch (prop_type) {
 		case PT_ADDRESS:
@@ -4992,13 +4836,6 @@ output_fs(FILE *fp, struct zone_fstab *fstab)
 }
 
 static void
-output_ipd(FILE *fp, struct zone_fstab *ipdtab)
-{
-	(void) fprintf(fp, "%s:\n", rt_to_str(RT_IPD));
-	output_prop(fp, PT_DIR, ipdtab->zone_fs_dir, B_TRUE);
-}
-
-static void
 info_fs(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 {
 	struct zone_fstab lookup, user;
@@ -5035,37 +4872,6 @@ loopend:
 	if (!output && cmd->cmd_prop_nv_pairs > 0)
 		(void) printf(gettext("No such %s resource.\n"),
 		    rt_to_str(RT_FS));
-}
-
-static void
-info_ipd(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
-{
-	struct zone_fstab lookup, user;
-	boolean_t output = B_FALSE;
-
-	if (zonecfg_setipdent(handle) != Z_OK)
-		return;
-	while (zonecfg_getipdent(handle, &lookup) == Z_OK) {
-		if (cmd->cmd_prop_nv_pairs == 0) {
-			output_ipd(fp, &lookup);
-			continue;
-		}
-		if (fill_in_ipdtab(cmd, &user, B_TRUE) != Z_OK)
-			continue;
-		if (strlen(user.zone_fs_dir) > 0 &&
-		    strcmp(user.zone_fs_dir, lookup.zone_fs_dir) != 0)
-			continue;	/* no match */
-		output_ipd(fp, &lookup);
-		output = B_TRUE;
-	}
-	(void) zonecfg_endipdent(handle);
-	/*
-	 * If a property n/v pair was specified, warn the user if there was
-	 * nothing to output.
-	 */
-	if (!output && cmd->cmd_prop_nv_pairs > 0)
-		(void) printf(gettext("No such %s resource.\n"),
-		    rt_to_str(RT_IPD));
 }
 
 static void
@@ -5501,9 +5307,6 @@ info_func(cmd_t *cmd)
 		case RT_FS:
 			output_fs(fp, &in_progress_fstab);
 			break;
-		case RT_IPD:
-			output_ipd(fp, &in_progress_ipdtab);
-			break;
 		case RT_NET:
 			output_net(fp, &in_progress_nwiftab);
 			break;
@@ -5579,7 +5382,6 @@ info_func(cmd_t *cmd)
 		info_aliased_rctl(handle, fp, ALIAS_MAXSEMIDS);
 		info_aliased_rctl(handle, fp, ALIAS_SHARES);
 		if (!global_zone) {
-			info_ipd(handle, fp, cmd);
 			info_fs(handle, fp, cmd);
 			info_net(handle, fp, cmd);
 			info_dev(handle, fp, cmd);
@@ -5644,9 +5446,6 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_FS:
 		info_fs(handle, fp, cmd);
-		break;
-	case RT_IPD:
-		info_ipd(handle, fp, cmd);
 		break;
 	case RT_NET:
 		info_net(handle, fp, cmd);
@@ -5886,14 +5685,6 @@ verify_func(cmd_t *cmd)
 		ret_val = Z_REQD_RESOURCE_MISSING;
 		saw_error = B_TRUE;
 	}
-	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
-		zone_perror(zone, err, B_TRUE);
-		return;
-	}
-	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
-		check_reqd_prop(fstab.zone_fs_dir, RT_IPD, PT_DIR, &ret_val);
-	}
-	(void) zonecfg_endipdent(handle);
 
 	if (zonecfg_get_hostid(handle, hostidp,
 	    sizeof (hostidp)) == Z_INVALID_PROPERTY) {
@@ -6143,7 +5934,6 @@ cancel_func(cmd_t *cmd)
 	zonecfg_free_fs_option_list(in_progress_fstab.zone_fs_options);
 	bzero(&in_progress_fstab, sizeof (in_progress_fstab));
 	bzero(&in_progress_nwiftab, sizeof (in_progress_nwiftab));
-	bzero(&in_progress_ipdtab, sizeof (in_progress_ipdtab));
 	bzero(&in_progress_devtab, sizeof (in_progress_devtab));
 	zonecfg_free_rctl_value_list(in_progress_rctltab.zone_rctl_valptr);
 	bzero(&in_progress_rctltab, sizeof (in_progress_rctltab));
@@ -6338,43 +6128,6 @@ end_func(cmd_t *cmd)
 		in_progress_fstab.zone_fs_options = NULL;
 		break;
 
-	case RT_IPD:
-		/* First make sure everything was filled in. */
-		if (end_check_reqd(in_progress_ipdtab.zone_fs_dir, PT_DIR,
-		    &validation_failed) == Z_OK) {
-			if (in_progress_ipdtab.zone_fs_dir[0] != '/') {
-				zerr(gettext("%s %s is not an absolute path."),
-				    pt_to_str(PT_DIR),
-				    in_progress_ipdtab.zone_fs_dir);
-				validation_failed = B_TRUE;
-			}
-		}
-		if (validation_failed) {
-			saw_error = B_TRUE;
-			return;
-		}
-
-		if (end_op == CMD_ADD) {
-			/* Make sure there isn't already one like this. */
-			bzero(&tmp_fstab, sizeof (tmp_fstab));
-			(void) strlcpy(tmp_fstab.zone_fs_dir,
-			    in_progress_ipdtab.zone_fs_dir,
-			    sizeof (tmp_fstab.zone_fs_dir));
-			err = zonecfg_lookup_ipd(handle, &tmp_fstab);
-			if (err == Z_OK) {
-				zerr(gettext("An %s resource "
-				    "with the %s '%s' already exists."),
-				    rt_to_str(RT_IPD), pt_to_str(PT_DIR),
-				    in_progress_ipdtab.zone_fs_dir);
-				saw_error = B_TRUE;
-				return;
-			}
-			err = zonecfg_add_ipd(handle, &in_progress_ipdtab);
-		} else {
-			err = zonecfg_modify_ipd(handle, &old_ipdtab,
-			    &in_progress_ipdtab);
-		}
-		break;
 	case RT_NET:
 		/*
 		 * First make sure everything was filled in.

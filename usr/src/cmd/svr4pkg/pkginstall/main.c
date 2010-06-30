@@ -215,11 +215,6 @@ static char		*parentZoneType = (char *)NULL;
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
 
-/* This is the text for the "-O inherited-filesystem=" option */
-
-#define	INHERITFS	"inherited-filesystem="
-#define	INHERITFS_LEN	((sizeof (INHERITFS))-1)
-
 /* This is the text for the "-O parent-zone-name=" option */
 
 #define	PARENTZONENAME	"parent-zone-name="
@@ -257,7 +252,6 @@ main(int argc, char *argv[])
 	char			*p;
 	char			*prog_full_name = NULL;
 	char			*pt;
-	char			*skipped = (char *)NULL;
 	char			*updated = (char *)NULL;
 	char			*vfstab_file = NULL;
 	char			*zoneName = (char *)NULL;
@@ -597,19 +591,6 @@ main(int argc, char *argv[])
 				if (strcmp(p,
 					"enable-hollow-package-support") == 0) {
 					set_depend_pkginfo_DB(B_TRUE);
-					continue;
-				}
-
-				/* process inherited-filesystem= option */
-
-				if (strncmp(p, INHERITFS, INHERITFS_LEN) == 0) {
-					if (z_add_inherited_file_system(
-						p+INHERITFS_LEN) == B_FALSE) {
-						progerr(ERR_NOSUCH_INHERITED,
-							p+INHERITFS_LEN);
-						quit(1);
-						/* NOTREACHED */
-					}
 					continue;
 				}
 
@@ -2165,8 +2146,7 @@ main(int argc, char *argv[])
 		}
 
 		instvol(extlist, srcinst, part, nparts,
-			pkgserver, &cfTmpVfp, &updated,
-			&skipped, zoneName);
+			pkgserver, &cfTmpVfp, &updated, zoneName);
 
 		if (part++ >= nparts) {
 			break;
@@ -2198,7 +2178,6 @@ main(int argc, char *argv[])
 	echoDebug(DBG_PKGINSTALL_INSDONE, is_depend_pkginfo_DB(),
 		is_depend_pkginfo_DB(), saveSpoolInstall,
 		updated ? updated : "",
-		skipped ? skipped : "",
 		script ? script : "",
 		script ? access(script, F_OK) : -1);
 
@@ -2214,16 +2193,13 @@ main(int argc, char *argv[])
 	} else if (is_depend_pkginfo_DB()) {
 		echoDebug(DBG_PKGINSTALL_POIS_DBUPD, pkginst, script,
 			zoneName ? zoneName : "global");
-	} else if ((saveSpoolInstall != 0) && (updated == (char *)NULL) &&
-				(skipped != (char *)NULL)) {
+	} else if ((saveSpoolInstall != 0) && (updated == (char *)NULL)) {
 		/*
 		 * fresh installing into non-global zone, no object was
-		 * updated (installed/verified in non-inherited area),
-		 * and and at least one object was skipped (verified in
-		 * inherited area) - this means all objects were skipped
-		 * so do not run the postinstall script.
+		 * updated (installed/verified in area), so do not run
+		 * the postinstall script.
 		 */
-		echoDebug(DBG_PKGINSTALL_POIS_SKIPPING,
+		echoDebug(DBG_PKGINSTALL_POIS_NOUPDATING,
 			zoneName ? zoneName : "global", pkginst, script);
 	} else {
 		/* script present and ok to run: run the script */

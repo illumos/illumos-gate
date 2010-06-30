@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -71,10 +70,6 @@ extern "C" {
 #define	DBG_ARG				ILIBSTR("argument <%d> = <%s>")
 #define	DBG_LIBRARY_NOT_FOUND		ILIBSTR("unable to dlopen library <%s>: %s")
 #define	DBG_MNTPT_NAMES			ILIBSTR("mount point for global zone path <%s> in zone <%s> is global zone mount point <%s> non-global zone mount point <%s>")
-#define	DBG_PATHS_ADD_FS		ILIBSTR("add inherited file system entry <%d> path <%s>")
-#define	DBG_PATHS_IS_INHERITED		ILIBSTR("path <%s> is inherited from <%s>")
-#define	DBG_PATHS_IS_NOT_INHERITED	ILIBSTR("path <%s> in root <%s> not inherited")
-#define	DBG_PATHS_NOT_INHERITED		ILIBSTR("path <%s> not inherited: no inherited file systems")
 #define	DBG_TO_ZONEHALT			ILIBSTR("halting zone <%s>")
 #define	DBG_TO_ZONEREADY		ILIBSTR("readying zone <%s>")
 #define	DBG_TO_ZONERUNNING		ILIBSTR("running zone <%s>")
@@ -143,9 +138,6 @@ extern "C" {
 #define	ERR_GZPATH_NOT_ABSOLUTE		ILIBSTR("unable to mount global zone path <%s>: path must be absolute")
 #define	ERR_GZPATH_NOT_DIR		ILIBSTR("unable to mount global zone path <%s>: %s")
 #define	ERR_GZUMOUNT_FAILED		ILIBSTR("unable to unmount <%s>: %s")
-#define	ERR_INHERITED_PATH_NOT_ABSOLUTE	ILIBSTR("inherited file system must be absolute path: <%s>")
-#define	ERR_INHERITED_PATH_NOT_DIR	ILIBSTR("inherited file system <%s> must be absolute path to directory: %s")
-#define	ERR_INHERITED_PATH_NULL		ILIBSTR("empty path specified for inherited file system: must be absolute path")
 #define	ERR_LZMNTPT_NOTDIR		ILIBSTR("unable to unmount global zone mount point <%s>: %s")
 #define	ERR_LZMNTPT_NOT_ABSOLUTE	ILIBSTR("unable to unmount <%s>: path must be absolute")
 #define	ERR_LZROOT_NOTDIR		ILIBSTR("unable to use <%s> as zone root path: %s")
@@ -154,9 +146,6 @@ extern "C" {
 #define	ERR_MEMORY	 		ILIBSTR("memory allocation failure, errno=%d")
 #define	ERR_MNTPT_MKDIR			ILIBSTR("unable to create temporary mount point <%s> in zone <%s>: %s")
 #define	ERR_NO_ZONE_ROOTPATH		ILIBSTR("unable to get root path of zone <%s>: %s")
-#define	ERR_PKGDIR_GETHANDLE		ILIBSTR("unable to get inherited directories: zonecfg_get_handle: %s")
-#define	ERR_PKGDIR_NOHANDLE		ILIBSTR("unable to get inherited directories: zonecfg_init_handle: %s")
-#define	ERR_PKGDIR_SETIPDENT		ILIBSTR("unable to get inherited directories: zonecfg_setipdent: %s")
 #define	ERR_ROOTPATH_EMPTY		ILIBSTR("unable to get root path of zone <%s>: empty path returned")
 #define	ERR_ZEXEC_ASSEMBLE		ILIBSTR("unable to establish connection with zone <%s>: could not assemble new environment")
 #define	ERR_ZEXEC_BADSTATE		ILIBSTR("unable to establish connection with zone <%s>: zone is in state '%s'")
@@ -196,7 +185,6 @@ extern "C" {
 #define	ERR_ZONE_LIST_EMPTY		ILIBSTR("empty zone list specified")
 #define	ERR_ZONE_NAME_ILLEGAL		ILIBSTR("illegal zone name %.*s")
 #define	ERR_ZONE_NONEXISTENT		ILIBSTR("zone %s does not exist")
-#define ERR_INHERITED_PATH_TOO_LONG     ILIBSTR("inherited path too long current length <%d> maximum length <%d> bytes: <%s>")
 #define	ERR_OPEN_READ			ILIBSTR("unable to open <%s> for reading: (%d) %s")
 #define	ERR_ZONEUNMOUNT_CMD_SIGNAL	ILIBSTR("unable to unmount zone: problem running <%s> on zone <%s>: terminated by signal")
 #define	ERR_ZONEUNMOUNT_EXEC		ILIBSTR("unable to unmount zone: could not execute zone administration command <%s>: %s")

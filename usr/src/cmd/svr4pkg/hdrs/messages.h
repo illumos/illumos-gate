@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_MESSAGES_H
@@ -127,12 +126,10 @@ extern "C" {
 #define	DBG_INSTALL_SKIP_THISZONE	gettext("skipping installation of package <%s>: marked this zone only")
 #define	DBG_INSTINONEZONE_ARGS		gettext("zone <%s> ids <%s> admin <%s> tempdir <%s> altbindir <%s>")
 #define	DBG_INSTINONEZONE_ENTRY		gettext("install_in_one_zone:")
-#define	DBG_INSTVOL_CAS_INFO		gettext("is partial <%d> updated <%s> skipped <%s> local <%s>\n")
+#define	DBG_INSTVOL_CAS_INFO		gettext("is partial <%d> updated <%s>\n")
 #define	DBG_INSTVOL_NOT_RUNNING_CAS	gettext("not running zone <%s> object <%s> class <%s> action script <%s>")
 #define	DBG_INSTVOL_OBJ_LOCAL		gettext("objects local <%s>")
-#define	DBG_INSTVOL_OBJ_SKIPPED		gettext("objects skipped <%s>")
 #define	DBG_INSTVOL_OBJ_UPDATED		gettext("objects updated <%s>")
-#define	DBG_INSTVOL_PARTIAL_INST	gettext("partial install check: pkgMatchInherited(srcp <%s>, dstp <%s>, get_inst_root() <%s>, ept->ainfo.mode <0%04lo>, ept->cinfo.modtime <%lx>, ept->ftype <%c>, ept->cinfo.cksum <%lx>) = %d")
 #define	DBG_INSTVOL_RUNNING_CAS		gettext("running zone <%s> object <%s> class <%s> action script <%s>")
 #define	DBG_IN_GZ_NO_LZ			gettext("running in global zone with NO non-global zones")
 #define	DBG_IN_GZ_WITH_LZ		gettext("running in global zone with non-global zones")
@@ -187,14 +184,14 @@ extern "C" {
 #define	DBG_PKGINSTALL_EXEPOC_GZ	gettext("executing preinstall package <%s> script <%s>")
 #define	DBG_PKGINSTALL_EXEPOC_LZ	gettext("executing preinstall package <%s> script <%s> zone <%s>")
 #define	DBG_PKGINSTALL_HAS_LOCKFILE	gettext("before removing package <%s> found existing lockfile <%s> zone <%s>")
-#define	DBG_PKGINSTALL_INSDONE		gettext("install completed: hollow support <%d> is hollow <%d> fresh install <%d> updated <%s> skipped <%s> script <%s> access <%d>")
+#define	DBG_PKGINSTALL_INSDONE		gettext("install completed: hollow support <%d> is hollow <%d> fresh install <%d> updated <%s> script <%s> access <%d>")
 #define	DBG_PKGINSTALL_POCALT_NONE	gettext("no pkgbin preinstall package <%s> script <%s> zone <%s>")
 #define	DBG_PKGINSTALL_POC_DBUPD	gettext("skipping preinstall package <%s> script <%s> zone <%s> (db update only)")
 #define	DBG_PKGINSTALL_POC_NONE		gettext("has no media preinstall package <%s> script <%s> zone <%s>")
 #define	DBG_PKGINSTALL_POIS_DBUPD	gettext("skipping postinstall package <%s> script <%s> zone <%s> (db update only)")
 #define	DBG_PKGINSTALL_POIS_NONE	gettext("no postinstall in package <%s> script <%s> zone <%s>")
 #define	DBG_PKGINSTALL_POIS_NOPATH	gettext("no postinstall in package <%s> zone <%s>")
-#define	DBG_PKGINSTALL_POIS_SKIPPING	gettext("all objects skipped when installing in zone <%s>: skipping postinstall package <%s> script <%s>")
+#define	DBG_PKGINSTALL_POIS_NOUPDATING	gettext("no objects updated when installing in zone <%s>: skipping postinstall package <%s> script <%s>")
 #define	DBG_PKGINSTALL_PREINSCHK	gettext("preinstallation check of package <%s> zone <%s>")
 #define	DBG_PKGINSTALL_PREINSCHK_OK	gettext("preinstall check successful")
 #define	DBG_PKGINSTALL_RSCRIPT_IS_ROOT	gettext("request script run as root = <%d>")
@@ -526,7 +523,6 @@ extern "C" {
 #define	ERR_NOPKGS			gettext("no packages were found in <%s>")
 #define	ERR_NOREQUEST  			gettext("package does not contain an interactive request script")
 #define	ERR_NORESP			gettext("response file <%s> must not exist")
-#define	ERR_NOSUCH_INHERITED		gettext("cannot use inherited file system <%s>")
 #define	ERR_NOTABLE			gettext("unable to open %s table <%s>: %s")
 #define	ERR_NOT_IN_GZ_AND_Z_USED	gettext("The package <%s> is not currently installed\nin the global zone only; you may not specify the -Z option to install the\npackage in all non-global zones until the package is first install in the\nglobal zone only. You may optionally install the package without the -Z option\nto install the package in all zones.")
 #define	ERR_NOT_ROOT			gettext("You must be \"root\" for %s to execute properly.")
@@ -749,7 +745,6 @@ extern "C" {
 #define	MSG_NOCHANGE			gettext("No changes were made to the system.")
 #define	MSG_NODENAME			gettext("(unknown)")
 #define	MSG_NOTEMPTY			gettext("%s <non-empty directory not removed>")
-#define	MSG_NOTREMOVED_INHERITED	gettext("%s <not removed - inherited from global zone>")
 #define	MSG_N_PKGS_NOT_PROCESSED	gettext("\n%d packages were not processed!\n")
 #define	MSG_PASSPROMPT			gettext("Enter keystore password:")
 #define	MSG_PKGADDCHK_ABADFILE		gettext("\\nPackaging file <%s> is corrupt for %s <%s> on %s <%s>")
@@ -856,8 +851,7 @@ extern "C" {
 #define	WRN_RSCRIPTALT_BAD		gettext("WARNING: the admin parameter <%s> is set to <%s> which is not recognized; the parameter may only be set to <%s> or <%s>")
 #define	WRN_RSCRIPTALT_USING		gettext("WARNING: the admin parameter <%s> is assumed to be set to <%s>")
 #define	WRN_UNKNOWN_ADM_PARAM		gettext("WARNING: unknown admin parameter <%s>")
-
-#define	NOTE_INSTVOL_FINALCKFAIL	gettext("NOTE: When the package <%s> was installed in the global zone,\nthe file <%s> was also installed. After the file was\ninstalled in the global zone, the contents and/or attributes of the file\nchanged. The contents of this file must never be changed. As a result,\nthe changes in this file have been duplicated in the non-global zone\n<%s> in the file <%s>.")
+#define	NOTE_INSTVOL_FINALCKFAIL	gettext("NOTE: When the package <%s> was installed in the zone,\nthe file <%s> was also installed. After the file was\ninstalled in the zone, the contents and/or attributes of the file\nchanged. The contents of this file must never be changed.")
 
 #define	MSG_REBOOT			gettext("\\n*** IMPORTANT NOTICE ***\\n" \
 			"\\tThis machine must now be rebooted in order to " \

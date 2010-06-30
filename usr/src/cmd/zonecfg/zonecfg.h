@@ -67,30 +67,29 @@ extern "C" {
 #define	RT_AUTOBOOT	3	/* really a property, but for info ... */
 #define	RT_POOL		4	/* really a property, but for info ... */
 #define	RT_FS		5
-#define	RT_IPD		6
-#define	RT_NET		7
-#define	RT_DEVICE	8
-#define	RT_RCTL		9
-#define	RT_ATTR		10
-#define	RT_DATASET	11
-#define	RT_LIMITPRIV	12	/* really a property, but for info ... */
-#define	RT_BOOTARGS	13	/* really a property, but for info ... */
-#define	RT_BRAND	14	/* really a property, but for info ... */
-#define	RT_DCPU		15
-#define	RT_MCAP		16
-#define	RT_MAXLWPS	17	/* really a rctl alias property, but for info */
-#define	RT_MAXSHMMEM	18	/* really a rctl alias property, but for info */
-#define	RT_MAXSHMIDS	19	/* really a rctl alias property, but for info */
-#define	RT_MAXMSGIDS	20	/* really a rctl alias property, but for info */
-#define	RT_MAXSEMIDS	21	/* really a rctl alias property, but for info */
-#define	RT_SHARES	22	/* really a rctl alias property, but for info */
-#define	RT_SCHED	23	/* really a property, but for info ... */
-#define	RT_IPTYPE	24	/* really a property, but for info ... */
-#define	RT_PCAP		25
-#define	RT_HOSTID	26	/* really a property, but for info ... */
-#define	RT_ADMIN	27
-#define	RT_FS_ALLOWED	28
-#define	RT_MAXPROCS	29	/* really a rctl alias property, but for info */
+#define	RT_NET		6
+#define	RT_DEVICE	7
+#define	RT_RCTL		8
+#define	RT_ATTR		9
+#define	RT_DATASET	10
+#define	RT_LIMITPRIV	11	/* really a property, but for info ... */
+#define	RT_BOOTARGS	12	/* really a property, but for info ... */
+#define	RT_BRAND	13	/* really a property, but for info ... */
+#define	RT_DCPU		14
+#define	RT_MCAP		15
+#define	RT_MAXLWPS	16	/* really a rctl alias property, but for info */
+#define	RT_MAXSHMMEM	17	/* really a rctl alias property, but for info */
+#define	RT_MAXSHMIDS	18	/* really a rctl alias property, but for info */
+#define	RT_MAXMSGIDS	19	/* really a rctl alias property, but for info */
+#define	RT_MAXSEMIDS	20	/* really a rctl alias property, but for info */
+#define	RT_SHARES	21	/* really a rctl alias property, but for info */
+#define	RT_SCHED	22	/* really a property, but for info ... */
+#define	RT_IPTYPE	23	/* really a property, but for info ... */
+#define	RT_PCAP		24
+#define	RT_HOSTID	25	/* really a property, but for info ... */
+#define	RT_ADMIN	26
+#define	RT_FS_ALLOWED	27
+#define	RT_MAXPROCS	28	/* really a rctl alias property, but for info */
 
 #define	RT_MIN		RT_UNKNOWN
 #define	RT_MAX		RT_MAXPROCS

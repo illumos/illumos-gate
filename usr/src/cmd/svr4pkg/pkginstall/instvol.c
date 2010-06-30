@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -108,8 +107,7 @@ static int	repl_permitted = 0;
 
 static int	domerg(struct cfextra **extlist, int part, int nparts,
 			int myclass, char **srcp, char **dstp,
-			char **r_updated, char **r_skipped,
-			char **r_anyPathLocal);
+			char **r_updated);
 static void	endofclass(struct cfextra **extlist, int myclass,
 			int ckflag, PKGserver server, VFP_T **a_cfTmpVfp);
 static int	fix_attributes(struct cfextra **, int);
@@ -138,13 +136,10 @@ static struct reg_files *regfiles_head = NULL;
 void
 instvol(struct cfextra **extlist, char *srcinst, int part,
 	int nparts, PKGserver pkgserver, VFP_T **a_cfTmpVfp,
-	char **r_updated, char **r_skipped,
-	char *a_zoneName)
+	char **r_updated, char *a_zoneName)
 {
 	FILE		*listfp;
 	char		*updated = (char *)NULL;
-	char		*skipped = (char *)NULL;
-	char		*anyPathLocal = (char *)NULL;
 	char		*relocpath = (char *)NULL;
 	char		*dstp;
 	char		*listfile;
@@ -163,14 +158,13 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 	struct reg_files *rfp = NULL;
 
 	/*
-	 * r_updated and r_skipped are optional parameters that can be passed in
-	 * by the caller if the caller wants to know if any objects are either
-	 * updated or skipped. Do not initialize either r_updated or r_skipped;
-	 * the call to instvol could be cumulative and any previous update or
-	 * skipped indication must not be disturbed - these flags are only set,
-	 * they must never be reset. These flags are "char *" pointers so that
-	 * the object that was skipped or updated can be displayed in debugging
-	 * output.
+	 * r_updated is an optional parameter that can be passed in
+	 * by the caller if the caller wants to know if any objects are 
+	 * updated. Do not initialize r_updated; the call to instvol
+	 * could be cumulative and any previous update indication must not
+	 * be disturbed - this flag is only set, it must never be reset.
+	 * This flag is a "char *" pointer so that the object that was
+	 * updated can be displayed in debugging output.
 	 */
 
 	if (part == 1) {
@@ -241,8 +235,7 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 			 */
 
 			entryidx = domerg(extlist, (pass++ ? 0 : part), nparts,
-				classidx, &srcp, &dstp, &updated, &skipped,
-				&anyPathLocal);
+				classidx, &srcp, &dstp, &updated);
 
 			/* Evaluate the return code */
 			if (entryidx == DMRG_DONE) {
@@ -496,43 +489,16 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 			 * If doing a partial installation (creating a
 			 * non-global zone), extra steps need to be taken:
 			 *
-			 * 1) if the file is not type 'e' and not type 'v' and
+			 * If the file is not type 'e' and not type 'v' and
 			 * the class is "none": then the file must already
 			 * exist (as a result of the initial non-global zone
 			 * installation which caused all non-e/v files to be
 			 * copied from the global zone to the non-global
 			 * zone). If this is the case, verify that the file
 			 * exists and has the correct attributes.
-			 *
-			 * 2) if the file is not type 'e' and not type 'v'
-			 * and the class is NOT "none", *OR* if the file is
-			 * type 'e' or type 'v': then check to see if the
-			 * file is located in an area inherited from the
-			 * global zone. If so, then there is no ability to
-			 * change the file since inherited file systems are
-			 * "read only" - just verify that the file exists and
-			 * verify attributes only if not 'e' or 'v'.
 			 */
 
 			if (is_partial_inst() != 0) {
-
-				/*
-				 * determine if the destination package is in an
-				 * area inherited from the global zone
-				 */
-
-				n = pkgMatchInherited(srcp, dstp,
-					get_inst_root(), ept->ainfo.mode,
-					ept->cinfo.modtime, ept->ftype,
-					ept->cinfo.cksum);
-
-				echoDebug(DBG_INSTVOL_PARTIAL_INST,
-					srcp ? srcp : "", dstp ? dstp: "",
-					((get_inst_root()) &&
-					(strcmp(get_inst_root(), "/") != 0)) ?
-					get_inst_root() : "",
-					ept->ainfo.mode, ept->cinfo.modtime,
-					ept->ftype, ept->cinfo.cksum, n);
 
 				/*
 				 * if not type 'e|v' and class 'none', then the
@@ -544,69 +510,14 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 					(strcmp(cl_nam(ept->pkg_class_idx),
 								"none") == 0)) {
 
-					/*
-					 * if the file is in a space inherited
-					 * from the global zone, and if the
-					 * contents or attributes are incorrect,
-					 * then generate a warning that the
-					 * global zone file contents and/or file
-					 * attributes have been modified and
-					 * that the modifications are extended
-					 * to the non-global zone (inherited
-					 * from the global zone).
-					 */
+					/* is file changed? */
+					n = finalck(ept, 1, 1, B_TRUE);
 
-					if (n == 0) {
-						/* is file changed? */
-						n = finalck(ept, 1, 1, B_TRUE);
-
-						/* no - ok - continue */
-						if (n == 0) {
-							continue;
-						}
-
+					/* not - ok - warn */
+					if (n != 0) {
 						/* output warning message */
 						logerr(NOTE_INSTVOL_FINALCKFAIL,
-							pkginst, ext->map_path,
-							a_zoneName, ept->path);
-						continue;
-					} else if (!finalck(ept, 1, 1,
-								B_FALSE)) {
-						/*
-						 * non-e/v file of class "none"
-						 * not inherited from the global
-						 * zone: verify file already
-						 * exists:everything checks here
-						 */
-						mstat->attrchg = 0;
-						mstat->contchg = 0;
-					}
-					continue;
-				}
-
-				/*
-				 * non-e/v file with class action script, or
-				 * e/v file: if the file is in an area inherited
-				 * from the global zone, then no need (or the
-				 * ability) to update just accept the file as is
-				 */
-
-				if (n == B_TRUE) {
-					/*
-					 * the object is in an area inherited
-					 * from the global zone and the objects
-					 * attributes are verified
-					 */
-
-					mstat->attrchg = 0;
-					mstat->contchg = 0;
-
-					/* NOTE: package object skipped */
-
-					if (skipped == (char *)NULL) {
-						skipped = dstp;
-					echoDebug(DBG_INSTVOL_OBJ_SKIPPED,
-								skipped);
+						    pkginst, ext->map_path);
 					}
 					continue;
 				}
@@ -617,39 +528,29 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 			 * mode and permission now in case installation halted.
 			 */
 
-			if (z_path_is_inherited(dstp, ept->ftype,
-			    get_inst_root()) == B_FALSE) {
+			/*
+			 * If the filesystem is read-only don't attempt
+			 * to copy a file. Just check that the content
+			 * and attributes of the file are correct.
+			 *
+			 * Normally this doesn't happen, because files,
+			 * which don't change, are not returned by
+			 * domerg().
+			 */
+			n = 0;
+			if (is_fs_writeable(ept->path,
+			    &(ext->fsys_value)))
+				n = cppath(MODE_SET|DIR_DISPLAY, srcp,
+				    dstp, ept->ainfo.mode);
 
+			if (n != 0) {
+				warnflag++;
+			} else if (!finalck(ept, 1, 1, B_FALSE)) {
 				/*
-				 * If the filesystem is read-only don't attempt
-				 * to copy a file. Just check that the content
-				 * and attributes of the file are correct.
-				 *
-				 * Normally this doesn't happen, because files,
-				 * which don't change, are not returned by
-				 * domerg(). However when installing a patch in
-				 * a sparse zone, which was already installed
-				 * in global zone with -G option, NGZ's
-				 * contents db still contains the old record
-				 * for this file and therefore domerg()
-				 * considers these files to be different even
-				 * though they are the same.
+				 * everything checks here
 				 */
-				n = 0;
-				if (is_fs_writeable(ept->path,
-				    &(ext->fsys_value)))
-					n = cppath(MODE_SET|DIR_DISPLAY, srcp,
-					    dstp, ept->ainfo.mode);
-
-				if (n != 0) {
-					warnflag++;
-				} else if (!finalck(ept, 1, 1, B_FALSE)) {
-					/*
-					 * everything checks here
-					 */
-					mstat->attrchg = 0;
-					mstat->contchg = 0;
-				}
+				mstat->attrchg = 0;
+				mstat->contchg = 0;
 			}
 
 			/* NOTE: a package object was updated */
@@ -680,34 +581,18 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 				(void) fclose(listfp);
 			}
 
-			/*
-			 * if the object associated with the class action script
-			 * is in an area inherited from the global zone, then
-			 * there is no need to run the class action script -
-			 * assume that anything the script would do has already
-			 * been done in the area shared from the global zone.
-			 */
-
-			/* nothing updated, nothing skipped */
+			/* nothing updated */
 
 			echoDebug(DBG_INSTVOL_CAS_INFO, is_partial_inst(),
-				updated ? updated : "",
-				skipped ? skipped : "",
-				anyPathLocal ? anyPathLocal : "");
+				updated ? updated : "");
 
 			if ((is_partial_inst() != 0) &&
-					(updated == (char *)NULL) &&
-					(anyPathLocal == (char *)NULL)) {
+					(updated == (char *)NULL)) {
 
 				/*
 				 * installing in non-global zone, and no object
-				 * has been updated (installed/verified in non-
-				 * inherited area), and no path delivered by the
-				 * package is in an area not inherited from the
-				 * global zone (all paths delivered are in
-				 * areas inherited from the global zone): do not
-				 * run the class action script because the only
-				 * affected areas are inherited (read only).
+				 * has been updated (installed/verified):
+				 * do not run the class action script.
 				 */
 
 				echoDebug(DBG_INSTVOL_NOT_RUNNING_CAS,
@@ -717,13 +602,6 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 					cl_nam(classidx),
 					cl_iscript(classidx));
 
-				if ((r_skipped != (char **)NULL) &&
-					(*r_skipped == (char *)NULL) &&
-					(skipped == (char *)NULL)) {
-					skipped = "postinstall";
-					echoDebug(DBG_INSTVOL_OBJ_SKIPPED,
-								skipped);
-				}
 			} else {
 				/* run the class action script */
 
@@ -902,9 +780,8 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 	}
 
 	/*
-	 * if any package objects were updated (not inherited from the
-	 * global zone or otherwise already in existence), set the updated
-	 * flag as appropriate
+	 * if any package objects were updated (not otherwise already in
+	 * existence), set the updated flag as appropriate
 	 */
 
 	if (updated != (char *)NULL) {
@@ -914,17 +791,6 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 		}
 	}
 
-	/*
-	 * if any package objects were skipped (verified inherited from the
-	 * global zone), set the skipped flag as appropriate
-	 */
-
-	if (skipped != (char *)NULL) {
-		echoDebug(DBG_INSTVOL_OBJ_SKIPPED, skipped);
-		if (r_skipped != (char **)NULL) {
-			*r_skipped = skipped;
-		}
-	}
 }
 
 /*
@@ -959,33 +825,9 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
  *			  path for the next object from the package to process
  *		char **r_updated - [RO, *RW]
  *			- pointer to pointer to string - set if the last path
- *			  returned exists or does not need updating and the
- *			  object is NOT located in an area inherited from the
- *			  global zone. This is used to determine if the last
- *			  path object returned DOES exist in an area that is
- *			  inherited from the global zone. If no paths are
- *			  inherited from the global zone, this is always set
- *			  when a path to be installed exists and has the
- *			  correct contents.
- *		char **r_skipped - [RO, *RW]
- *			- pointer to pointer to string - set if the last path
- *			  returned exists or does not need updating and the
- *			  object IS located in an area inherited from the
- *			  global zone. This is used to determine if the last
- *			  path object returned does NOT exist in an area that
- *			  is inherited from the global zone. If no paths are
- *			  inherited from the global zone, this is never set.
- *		char **r_anyPathLocal - [RO, *RW]
- *			- pointer to pointer to string - set if any object
- *			  belonging to the package is NOT located in an area
- *			  inherited from the global zone. This is used to
- *			  determine if the package references ANY objects that
- *			  are NOT located in an area inherited from the global
- *			  zone - regardless of whether or not they need to be
- *			  updated (installed/copied). If no paths are inherited
- *			  from the global zone, this is always set when a path
- *			  to be installed already exists and has the correct
- *			  contents.
+ *			  returned exists or does not need updating. This is
+ *			  always set when a path to be installed exists and
+ *			  has the correct contents.
  * Returns:	int
  *			!= DMRG_DONE - index into extlist of the next path to
  *				be processed - that needs to be installed/copied
@@ -995,8 +837,7 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 static int
 domerg(struct cfextra **extlist, int part, int nparts,
 	int myclass, char **srcp, char **dstp,
-	char **r_updated, char **r_skipped,
-	char **r_anyPathLocal)
+	char **r_updated)
 {
 	boolean_t	stateFlag = B_FALSE;
 	int		i;
@@ -1031,24 +872,6 @@ domerg(struct cfextra **extlist, int part, int nparts,
 	for (i = svindx; extlist[i]; i++) {
 		ept = &(extlist[i]->cf_ent);
 		mstat = &(extlist[i]->mstat);
-
-		/*
-		 * as paths are processed, if the "anyPathLocal" flag has not
-		 * been set, if the object is not of type 'i' (package script),
-		 * check to see if the object is in an area inherited from the
-		 * global zone - if not, set "anyPathLocal" to the path found,
-		 * indicating that at least one path is in an area that is not
-		 * inherited from the global zone.
-		 */
-
-		if ((r_anyPathLocal != (char **)NULL) &&
-			(*r_anyPathLocal == (char *)NULL) &&
-			(ept->ftype != 'i') &&
-			(z_path_is_inherited(ept->path, ept->ftype,
-						get_inst_root()) == B_FALSE)) {
-			echoDebug(DBG_INSTVOL_OBJ_LOCAL, ept->path);
-			*r_anyPathLocal = ept->path;
-		}
 
 		/* if this isn't the class of current interest, skip it */
 
@@ -1173,9 +996,7 @@ domerg(struct cfextra **extlist, int part, int nparts,
 				 * If we can't get to it for legitimate reasons,
 				 * don't try to verify it.
 				 */
-				if ((z_path_is_inherited(ept->path, ept->ftype,
-				    get_inst_root())) ||
-				    is_remote_fs(ept->path,
+				if (is_remote_fs(ept->path,
 				    &(extlist[i]->fsys_value)) &&
 				    !is_fs_writeable(ept->path,
 				    &(extlist[i]->fsys_value))) {
@@ -1311,11 +1132,8 @@ domerg(struct cfextra **extlist, int part, int nparts,
 		}
 
 		/*
-		 * package object exists, or does not need updating: if the path
-		 * is in an area inherited from the global zone, then treat
-		 * the object as if it were "skipped" - if the path is not in an
-		 * area inherited from the global zone, then treat the object as
-		 * if it were "updated"
+		 * package object exists, or does not need updating:
+		 * treat the object as if it were "updated"
 		 */
 
 		/* LINTED warning: statement has no consequent: if */
@@ -1324,21 +1142,10 @@ domerg(struct cfextra **extlist, int part, int nparts,
 			 * the object in question is a directory or special
 			 * file - the fact that this type of object already
 			 * exists or does not need updating must not trigger
-			 * the object updated/object skipped indication -
-			 * that would cause class action scripts to be run
-			 * when installing a new non-global zone - that action
-			 * must only be done when a file object that is in
-			 * an area inherited from the global zone is present.
+			 * the object updated indication - that would cause
+			 * class action scripts to be run when installing a
+			 * new non-global zone
 			 */
-		} else if (z_path_is_inherited(ept->path, ept->ftype,
-						get_inst_root()) == B_TRUE) {
-			if (r_skipped != (char **)NULL) {
-				if (*r_skipped == (char *)NULL) {
-					echoDebug(DBG_INSTVOL_OBJ_SKIPPED,
-								ept->path);
-					*r_skipped = ept->path;
-				}
-			}
 		} else {
 			if (r_updated != (char **)NULL) {
 				if (*r_updated == (char *)NULL) {
@@ -1520,13 +1327,9 @@ endofclass(struct cfextra **extlist, int myclass, int ckflag,
 					&(extlist[idx]->fsys_value))) {
 					flag = -1;
 				} else {
-					boolean_t inheritedFlag;
-					inheritedFlag =
-					    z_path_is_inherited(ept->path,
-						ept->ftype, get_inst_root());
 					flag = finalck(ept, mstat->attrchg,
 						(ckflag ? mstat->contchg :
-						(-1)), inheritedFlag);
+						(-1)), B_FALSE);
 				}
 
 				pinfo = entry.cf_ent.pinfo;

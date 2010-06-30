@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _PKGCOND_H
@@ -45,9 +44,6 @@ extern "C" {
 #define	ENV_VAR_PKGZONENAME	"SUNW_PKG_INSTALL_ZONENAME"
 #define	ENV_VAR_INITIAL_INSTALL	"PKG_INIT_INSTALL"
 #define	ENV_VAR_PATCH_CLIENTVER	"PATCH_CLIENT_VERSION"
-
-/* file system types */
-#define	FSTYPE_INHERITED	"inherited"
 
 /* return codes used with pkgcond itself */
 #define	R_SUCCESS	0x0	/* condition match / success */

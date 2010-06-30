@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -972,20 +971,7 @@ merg(struct cfextra *el_ent, struct cfent *cf_ent)
 		 * set later.
 		 */
 
-		/*
-		 * for type f/v files, if the file is in an area that is
-		 * inherited from the global zone, that area is read only
-		 * and the object cannot be changed - ignore any settings
-		 * in the current package database that may be present for
-		 * any existing object because they are irrelevant - since
-		 * the object is in a read-only area shared from the global
-		 * zone, accept that file's actual attributes as being correct.
-		 */
-
-		if (z_path_is_inherited(el_ent->cf_ent.path,
-			el_ent->cf_ent.ftype, get_inst_root()) == B_TRUE) {
-			echoDebug(DBG_PKGDBMRG_INHERITED, el_ent->cf_ent.path);
-		} else if (cf_ent->cinfo.size != el_ent->cf_ent.cinfo.size) {
+		if (cf_ent->cinfo.size != el_ent->cf_ent.cinfo.size) {
 			changed++;
 			el_ent->mstat.contchg = 1;
 		} else if (cf_ent->cinfo.modtime !=

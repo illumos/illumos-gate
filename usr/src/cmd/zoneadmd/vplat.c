@@ -123,7 +123,7 @@
 #define	V4_ADDR_LEN	32
 #define	V6_ADDR_LEN	128
 
-#define	IPD_DEFAULT_OPTS \
+#define	RESOURCE_DEFAULT_OPTS \
 	MNTOPT_RO "," MNTOPT_LOFS_NOSUB "," MNTOPT_NODEVICES
 
 #define	DFSTYPES	"/etc/dfs/fstypes"
@@ -396,8 +396,8 @@ check_lofs_needed(zlog_t *zlogp, struct zone_fstab *fsptr)
 	fsptr->zone_fs_raw[0] = '\0';
 
 	/*
-	 * Discard all but one of the original options and set that to be the
-	 * same set of options used for inherit package directory resources.
+	 * Discard all but one of the original options and set that to our
+	 * default set of options used for resources.
 	 */
 	optptr = fsptr->zone_fs_options;
 	if (optptr == NULL) {
@@ -413,7 +413,7 @@ check_lofs_needed(zlog_t *zlogp, struct zone_fstab *fsptr)
 			free(onext);
 		}
 	}
-	(void) strcpy(optptr->zone_fsopt_opt, IPD_DEFAULT_OPTS);
+	(void) strcpy(optptr->zone_fsopt_opt, RESOURCE_DEFAULT_OPTS);
 	optptr->zone_fsopt_next = NULL;
 	fsptr->zone_fs_options = optptr;
 	return (0);
@@ -969,19 +969,10 @@ valid_mount_path(zlog_t *zlogp, const char *rootpath, const char *spec,
 	 * It must be a non-null string that starts with a '/'.
 	 */
 	if (dir[0] != '/') {
-		if (spec[0] == '\0') {
-			/*
-			 * This must be an invalid ipd entry (see comments
-			 * in mount_filesystems_ipdent()).
-			 */
-			zerror(zlogp, B_FALSE,
-			    "invalid inherit-pkg-dir entry: \"%s\"", dir);
-		} else {
-			/* Something went wrong. */
-			zerror(zlogp, B_FALSE, "invalid mount directory, "
-			    "type: \"%s\", special: \"%s\", dir: \"%s\"",
-			    fstype, spec, dir);
-		}
+		/* Something went wrong. */
+		zerror(zlogp, B_FALSE, "invalid mount directory, "
+		    "type: \"%s\", special: \"%s\", dir: \"%s\"",
+		    fstype, spec, dir);
 		return (-1);
 	}
 
@@ -1174,7 +1165,6 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath,
     zone_mnt_t mount_cmd)
 {
 	char path[MAXPATHLEN];
-	char specpath[MAXPATHLEN];
 	char optstr[MAX_MNTOPT_STR];
 	zone_fsopt_t *optptr;
 	int rv;
@@ -1212,30 +1202,6 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath,
 
 	(void) snprintf(path, sizeof (path), "%s%s", rootpath,
 	    fsptr->zone_fs_dir);
-
-	if (strlen(fsptr->zone_fs_special) == 0) {
-		/*
-		 * A zero-length special is how we distinguish IPDs from
-		 * general-purpose FSs.  Make sure it mounts from a place that
-		 * can be seen via the alternate zone's root.
-		 */
-		if (snprintf(specpath, sizeof (specpath), "%s%s",
-		    zonecfg_get_root(), fsptr->zone_fs_dir) >=
-		    sizeof (specpath)) {
-			zerror(zlogp, B_FALSE, "cannot mount %s: path too "
-			    "long in alternate root", fsptr->zone_fs_dir);
-			return (-1);
-		}
-		if (zonecfg_in_alt_root())
-			resolve_lofs(zlogp, specpath, sizeof (specpath));
-		if (domount(zlogp, MNTTYPE_LOFS, IPD_DEFAULT_OPTS,
-		    specpath, path) != 0) {
-			zerror(zlogp, B_TRUE, "failed to loopback mount %s",
-			    specpath);
-			return (-1);
-		}
-		return (0);
-	}
 
 	/*
 	 * In general the strategy here is to do just as much verification as
@@ -1410,7 +1376,7 @@ build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
 			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
 			return (B_FALSE);
 		}
-		if (domount(zlogp, MNTTYPE_LOFS, IPD_DEFAULT_OPTS, fromdir,
+		if (domount(zlogp, MNTTYPE_LOFS, RESOURCE_DEFAULT_OPTS, fromdir,
 		    tmp) != 0) {
 			zerror(zlogp, B_TRUE, "cannot mount %s on %s", tmp,
 			    fromdir);
@@ -1517,7 +1483,7 @@ build_mounted_post_var(zlog_t *zlogp, zone_mnt_t mount_cmd, char *rootpath,
 			if (!S_ISDIR(st.st_mode))
 				continue;
 		}
-		if (domount(zlogp, MNTTYPE_LOFS, IPD_DEFAULT_OPTS, *cpp,
+		if (domount(zlogp, MNTTYPE_LOFS, RESOURCE_DEFAULT_OPTS, *cpp,
 		    tmp) != 0) {
 			zerror(zlogp, B_TRUE, "cannot mount %s on %s", tmp,
 			    *cpp);
@@ -1604,50 +1570,6 @@ plat_gmount_cb(void *data, const char *spec, const char *dir,
 		return (-1);
 	}
 
-	return (0);
-}
-
-static int
-mount_filesystems_ipdent(zone_dochandle_t handle, zlog_t *zlogp,
-    struct zone_fstab **fs_tabp, int *num_fsp)
-{
-	struct zone_fstab *tmp_ptr, *fs_ptr, *fsp, fstab;
-	int num_fs;
-
-	num_fs = *num_fsp;
-	fs_ptr = *fs_tabp;
-
-	if (zonecfg_setipdent(handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		return (-1);
-	}
-	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
-		num_fs++;
-		if ((tmp_ptr = realloc(fs_ptr,
-		    num_fs * sizeof (*tmp_ptr))) == NULL) {
-			zerror(zlogp, B_TRUE, "memory allocation failed");
-			(void) zonecfg_endipdent(handle);
-			return (-1);
-		}
-
-		/* update the pointers passed in */
-		*fs_tabp = tmp_ptr;
-		*num_fsp = num_fs;
-
-		/*
-		 * IPDs logically only have a mount point; all other properties
-		 * are implied.
-		 */
-		fs_ptr = tmp_ptr;
-		fsp = &fs_ptr[num_fs - 1];
-		(void) strlcpy(fsp->zone_fs_dir,
-		    fstab.zone_fs_dir, sizeof (fsp->zone_fs_dir));
-		fsp->zone_fs_special[0] = '\0';
-		fsp->zone_fs_raw[0] = '\0';
-		fsp->zone_fs_type[0] = '\0';
-		fsp->zone_fs_options = NULL;
-	}
-	(void) zonecfg_endipdent(handle);
 	return (0);
 }
 
@@ -1795,14 +1717,11 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	brand_close(bh);
 
 	/*
-	 * Iterate through the rest of the filesystems, first the IPDs, then
-	 * the general FSs.  Sort them all, then mount them in sorted order.
-	 * This is to make sure the higher level directories (e.g., /usr)
-	 * get mounted before any beneath them (e.g., /usr/local).
+	 * Iterate through the rest of the filesystems. Sort them all,
+	 * then mount them in sorted order. This is to make sure the
+	 * higher level directories (e.g., /usr) get mounted before
+	 * any beneath them (e.g., /usr/local).
 	 */
-	if (mount_filesystems_ipdent(handle, zlogp, &fs_ptr, &num_fs) != 0)
-		goto bad;
-
 	if (mount_filesystems_fsent(handle, zlogp, &fs_ptr, &num_fs,
 	    mount_cmd) != 0)
 		goto bad;

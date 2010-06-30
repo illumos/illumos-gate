@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	__HDRS_LIBINST_H__
@@ -414,9 +413,6 @@ extern void		pkgLocateHighestInst(char *r_path, int r_pathLen,
 				char *r_pkgInst, int r_pkgInstLen,
 				char *a_rootPath, char *a_pkgInst);
 extern boolean_t	pkgPackageIsThisZone(char *a_pkgInst);
-extern boolean_t	pkgMatchInherited(char *a_src, char *a_dst,
-				char *a_rootDir, char a_mode, time_t a_modtime,
-				char a_ftype, unsigned long a_cksum);
 extern char		*pkgGetGzOnlyPath(void);
 extern boolean_t	pkgTestInstalled(char *a_packageName, char *a_rootPath);
 
@@ -509,7 +505,6 @@ typedef void (ckreturnFunc_t)(int a_retcode);
 #define	TAG_COND_CURRENT_ZONE	"currentZone"
 #define	TAG_COND_ZONE_NAME	"zoneName"
 #define	TAG_COND_ZONE_TYPE	"zoneType"
-#define	TAG_COND_INHERITED_FS	"inheritedFileSystem"
 #define	TAG_COND_FS_NAME	"fileSystemName"
 #define	TAG_VALUE_GLOBAL_ZONE	"global"
 #define	TAG_VALUE_NONGLOBAL_ZONE	"nonglobal"

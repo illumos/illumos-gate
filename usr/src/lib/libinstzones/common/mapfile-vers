@@ -42,7 +42,6 @@ $mapfile_version 2
 SYMBOL_VERSION SUNWprivate {
     global:
 	UmountAllZones;
-	z_add_inherited_file_system;
 	z_brands_are_implemented;
 	z_canoninplace;
 	z_createMountTable;
@@ -51,9 +50,7 @@ SYMBOL_VERSION SUNWprivate {
 	z_ExecCmdArray;
 	z_ExecCmdList;
 	z_free_brand_list;
-	z_free_inherited_file_systems;
 	z_free_zone_list;
-	z_get_inherited_file_systems;
 	z_get_nonglobal_zone_list;
 	z_get_nonglobal_zone_list_by_brand;
 	z_get_zonename;
@@ -69,7 +66,6 @@ SYMBOL_VERSION SUNWprivate {
 	z_non_global_zones_exist;
 	z_on_zone_spec;
 	z_path_canonize;
-	z_path_is_inherited;
 	z_resolve_lofs;
 	z_running_in_global_zone;
 	z_set_output_functions;
@@ -81,7 +77,6 @@ SYMBOL_VERSION SUNWprivate {
 	z_verify_zone_spec;
 	z_zlist_change_zone_state;
 	z_zlist_get_current_state;
-	z_zlist_get_inherited_pkg_dirs;
 	z_zlist_get_original_state;
 	z_zlist_get_scratch;
 	z_zlist_get_zonename;

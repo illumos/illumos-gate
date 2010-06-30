@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -36,8 +35,6 @@
  *	list "a_fds"
  *  _z_echo - Output an interactive message if interaction is enabled
  *  _z_echoDebug - Output a debugging message if debugging is enabled
- *  _z_get_inherited_dirs - return array of directories inherited by
- *	specified zone
  *  _z_is_directory - determine if specified path exists and is a directory
  *  _z_program_error - Output an error message to the appropriate destinations
  *  _z_pluginCatchSigint - SIGINT/SIGHUP interrupt handler
@@ -274,83 +271,6 @@ _z_echoDebug(char *a_format, ...)
 	/* pass message to registered function */
 
 	(_z_global_data._z_echo_debug)("%s", message);
-}
-
-/*
- * Name:	_z_get_inherited_dirs
- * Description:	return array of directories inherited by specified zone
- * Arguments:	a_zoneName - [RO, *RO] - (char *)
- *			Pointer to string representing the name of the zone
- *			to return the list of inherited directories for
- * Returns:	char **
- *			!= NULL - list of inherited directories, terminated
- *					by a NULL pointer
- *			== NULL - error - unable to retrieve list
- */
-
-char **
-_z_get_inherited_dirs(char *a_zoneName)
-{
-	char			**dirs = NULL;
-	int			err;
-	int			numIpdents = 0;
-	struct zone_fstab	lookup;
-	zone_dochandle_t	handle = NULL;
-
-	/* entry assertions */
-
-	assert(a_zoneName != NULL);
-	assert(*a_zoneName != '\0');
-
-	/* initialize the zone configuration interface handle */
-
-	handle = zonecfg_init_handle();
-	if (handle == NULL) {
-		_z_program_error(ERR_PKGDIR_NOHANDLE,
-		    zonecfg_strerror(Z_NOMEM));
-		return (NULL);
-	}
-
-	/* get handle to configuration information for the specified zone */
-
-	err = zonecfg_get_handle(a_zoneName, handle);
-	if (err != Z_OK) {
-		/* If there was no zone before, that's OK */
-		if (err != Z_NO_ZONE) {
-			_z_program_error(ERR_PKGDIR_GETHANDLE,
-			    zonecfg_strerror(err));
-			zonecfg_fini_handle(handle);
-			return (NULL);
-		}
-	}
-	assert(handle != NULL);
-
-	/* get handle to non-global zone ipd enumerator */
-
-	err = zonecfg_setipdent(handle);
-	if (err != Z_OK) {
-		_z_program_error(ERR_PKGDIR_SETIPDENT, zonecfg_strerror(err));
-		zonecfg_fini_handle(handle);
-		return (NULL);
-	}
-
-	/* enumerate the non-global zone ipd's */
-
-	while (zonecfg_getipdent(handle, &lookup) == Z_OK) {
-		dirs = _z_realloc(dirs, sizeof (char **)*(numIpdents+1));
-		dirs[numIpdents++] = strdup(lookup.zone_fs_dir);
-	}
-
-	if (dirs != NULL) {
-		dirs = _z_realloc(dirs, sizeof (char **)*(numIpdents+1));
-		dirs[numIpdents] = NULL;
-	}
-
-	/* toss non-global zone ipd enumerator handle */
-
-	(void) zonecfg_endipdent(handle);
-
-	return (dirs);
 }
 
 /*

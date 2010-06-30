@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
- Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 
 -->
 
@@ -35,6 +35,12 @@
 			raw		CDATA ""
 			directory	CDATA #REQUIRED
 			type		CDATA #REQUIRED>
+
+<!--
+ The "inherited-pkg-dir" element may no longer be specified in a
+ configuration, however we retain the definition to aid with migration
+ of existing configurations.
+-->
 
 <!ELEMENT inherited-pkg-dir	EMPTY>
 

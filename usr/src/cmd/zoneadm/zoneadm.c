@@ -2076,58 +2076,6 @@ verify_pool(zone_dochandle_t handle)
 	return (Z_OK);
 }
 
-static int
-verify_ipd(zone_dochandle_t handle)
-{
-	int return_code = Z_OK;
-	struct zone_fstab fstab;
-	struct stat st;
-	char specdir[MAXPATHLEN];
-
-	if (zonecfg_setipdent(handle) != Z_OK) {
-		/*
-		 * TRANSLATION_NOTE
-		 * inherit-pkg-dirs is a literal that should not be translated.
-		 */
-		(void) fprintf(stderr, gettext("could not verify "
-		    "inherit-pkg-dirs: unable to enumerate mounts\n"));
-		return (Z_ERR);
-	}
-	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
-		/*
-		 * Verify fs_dir exists.
-		 */
-		(void) snprintf(specdir, sizeof (specdir), "%s%s",
-		    zonecfg_get_root(), fstab.zone_fs_dir);
-		if (stat(specdir, &st) != 0) {
-			/*
-			 * TRANSLATION_NOTE
-			 * inherit-pkg-dir is a literal that should not be
-			 * translated.
-			 */
-			(void) fprintf(stderr, gettext("could not verify "
-			    "inherit-pkg-dir %s: %s\n"),
-			    fstab.zone_fs_dir, strerror(errno));
-			return_code = Z_ERR;
-		}
-		if (strcmp(st.st_fstype, MNTTYPE_NFS) == 0) {
-			/*
-			 * TRANSLATION_NOTE
-			 * inherit-pkg-dir and NFS are literals that should
-			 * not be translated.
-			 */
-			(void) fprintf(stderr, gettext("cannot verify "
-			    "inherit-pkg-dir %s: NFS mounted file system.\n"
-			    "\tA local file system must be used.\n"),
-			    fstab.zone_fs_dir);
-			return_code = Z_ERR;
-		}
-	}
-	(void) zonecfg_endipdent(handle);
-
-	return (return_code);
-}
-
 /*
  * Verify that the special device/file system exists and is valid.
  */
@@ -2190,10 +2138,6 @@ verify_filesystems(zone_dochandle_t handle)
 	struct stat st;
 
 	/*
-	 * No need to verify inherit-pkg-dir fs types, as their type is
-	 * implicitly lofs, which is known.  Therefore, the types are only
-	 * verified for regular file systems below.
-	 *
 	 * Since the actual mount point is not known until the dependent mounts
 	 * are performed, we don't attempt any path validation here: that will
 	 * happen later when zoneadmd actually does the mounts.
@@ -2702,8 +2646,6 @@ no_net:
 
 	if (verify_filesystems(handle) != Z_OK)
 		return_code = Z_ERR;
-	if (verify_ipd(handle) != Z_OK)
-		return_code = Z_ERR;
 	if (!in_alt_root && verify_rctls(handle) != Z_OK)
 		return_code = Z_ERR;
 	if (!in_alt_root && verify_pool(handle) != Z_OK)
@@ -3063,95 +3005,6 @@ done:
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
 
-/*
- * Check that the inherited pkg dirs are the same for the clone and its source.
- * The easiest way to do that is check that the list of ipds is the same
- * by matching each one against the other.  This algorithm should be fine since
- * the list of ipds should not be that long.
- */
-static int
-valid_ipd_clone(zone_dochandle_t s_handle, char *source_zone,
-	zone_dochandle_t t_handle, char *target_zone)
-{
-	int err;
-	int res = Z_OK;
-	int s_cnt = 0;
-	int t_cnt = 0;
-	struct zone_fstab s_fstab;
-	struct zone_fstab t_fstab;
-
-	/*
-	 * First check the source of the clone against the target.
-	 */
-	if ((err = zonecfg_setipdent(s_handle)) != Z_OK) {
-		errno = err;
-		zperror2(source_zone, gettext("could not enumerate "
-		    "inherit-pkg-dirs"));
-		return (Z_ERR);
-	}
-
-	while (zonecfg_getipdent(s_handle, &s_fstab) == Z_OK) {
-		boolean_t match = B_FALSE;
-
-		s_cnt++;
-
-		if ((err = zonecfg_setipdent(t_handle)) != Z_OK) {
-			errno = err;
-			zperror2(target_zone, gettext("could not enumerate "
-			    "inherit-pkg-dirs"));
-			(void) zonecfg_endipdent(s_handle);
-			return (Z_ERR);
-		}
-
-		while (zonecfg_getipdent(t_handle, &t_fstab) == Z_OK) {
-			if (strcmp(s_fstab.zone_fs_dir, t_fstab.zone_fs_dir)
-			    == 0) {
-				match = B_TRUE;
-				break;
-			}
-		}
-		(void) zonecfg_endipdent(t_handle);
-
-		if (!match) {
-			(void) fprintf(stderr, gettext("inherit-pkg-dir "
-			    "'%s' is not configured in zone %s.\n"),
-			    s_fstab.zone_fs_dir, target_zone);
-			res = Z_ERR;
-		}
-	}
-
-	(void) zonecfg_endipdent(s_handle);
-
-	/* skip the next check if we already have errors */
-	if (res == Z_ERR)
-		return (res);
-
-	/*
-	 * Now check the number of ipds in the target so we can verify
-	 * that the source is not a subset of the target.
-	 */
-	if ((err = zonecfg_setipdent(t_handle)) != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not enumerate "
-		    "inherit-pkg-dirs"));
-		return (Z_ERR);
-	}
-
-	while (zonecfg_getipdent(t_handle, &t_fstab) == Z_OK)
-		t_cnt++;
-
-	(void) zonecfg_endipdent(t_handle);
-
-	if (t_cnt != s_cnt) {
-		(void) fprintf(stderr, gettext("Zone %s is configured "
-		    "with inherit-pkg-dirs that are not configured in zone "
-		    "%s.\n"), target_zone, source_zone);
-		res = Z_ERR;
-	}
-
-	return (res);
-}
-
 static void
 warn_dev_match(zone_dochandle_t s_handle, char *source_zone,
 	zone_dochandle_t t_handle, char *target_zone)
@@ -3476,9 +3329,6 @@ validate_clone(char *source_zone, char *target_zone)
 	err = valid_brand_clone(source_zone, target_zone);
 	if (err != Z_OK)
 		goto done;
-
-	/* verify new zone has same inherit-pkg-dirs */
-	err = valid_ipd_clone(s_handle, source_zone, t_handle, target_zone);
 
 	/* warn about imported fs's which are the same */
 	warn_fs_match(s_handle, source_zone, t_handle, target_zone);

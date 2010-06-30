@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -88,11 +87,6 @@ extern int delmap(int flag, char *pkginst, PKGserver *server, VFP_T **tfp);
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
-
-/* This is the text for the "-O inherited-filesystem=" option */
-
-#define	INHERITFS	"inherited-filesystem="
-#define	INHERITFS_LEN	((sizeof (INHERITFS))-1)
 
 /* This is the text for the "-O parent-zone-name=" option */
 
@@ -356,19 +350,6 @@ main(int argc, char *argv[])
 				if (strcmp(p,
 					"enable-hollow-package-support") == 0) {
 					set_depend_pkginfo_DB(B_TRUE);
-					continue;
-				}
-
-				/* process inherited-filesystem= option */
-
-				if (strncmp(p, INHERITFS, INHERITFS_LEN) == 0) {
-					if (z_add_inherited_file_system(
-						p+INHERITFS_LEN) == B_FALSE) {
-						progerr(ERR_NOSUCH_INHERITED,
-							p+INHERITFS_LEN);
-						quit(1);
-						/* NOTREACHED */
-					}
 					continue;
 				}
 
@@ -973,8 +954,6 @@ main(int argc, char *argv[])
 	 * Run a preremove script if one is provided by the package.
 	 * Don't execute preremove script if only updating the DB.
 	 * Don't execute preremove script if files are not being deleted.
-	 * Don't execute preremove script if one or more files reside in
-	 * an inherited FS.
 	 */
 
 	/* update the lock - at the preremove script */
@@ -1261,14 +1240,6 @@ rmclass(char *aclass, int rm_remote, char *a_zoneName)
 			 * requested through the "-f" option.
 			 */
 			echo(MSG_SERVER, ept->path);
-		} else if (z_path_is_inherited(ept->path, ept->ftype,
-		    get_inst_root())) {
-			/*
-			 * object is in an area inherited from the global zone,
-			 * and the object cannot be removed - output a message
-			 * indicating the object cannot be removed and continue.
-			 */
-			echo(MSG_NOTREMOVED_INHERITED, ept->path);
 		} else if (script[0]) {
 			/*
 			 * If there's a class action script, just put the
