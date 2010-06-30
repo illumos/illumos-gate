@@ -40,7 +40,7 @@
 	<install>/usr/lib/brand/ipkg/pkgcreatezone -z %z -R %R</install>
 	<boot>/usr/lib/brand/sn1/sn1_boot %R</boot>
 	<sysboot>/usr/lib/brand/ipkg/prestate %z %R 2 0</sysboot>
-	<verify_cfg>/usr/lib/brand/ipkg/support verify</verify_cfg>
+	<verify_cfg></verify_cfg>
 	<verify_adm></verify_adm>
 	<attach>/usr/lib/brand/ipkg/attach %z %R</attach>
 	<detach>/usr/lib/brand/ipkg/detach -z %z -R %R</detach>
