@@ -1713,6 +1713,7 @@ setDiskStandby(stmfGuid *luGuid)
 				break;
 		}
 	}
+	(void) close(fd);
 	return (ret);
 }
 
