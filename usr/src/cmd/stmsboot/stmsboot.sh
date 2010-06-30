@@ -43,6 +43,7 @@ USAGE=`gettext "Usage: stmsboot [-D $SUPPORTED_DRIVERS] -e | -d | -u | -L | -l c
 TEXTDOMAIN=SUNW_OST_OSCMD
 export TEXTDOMAIN
 STMSINSTANCE=svc:system/device/mpxio-upgrade:default
+FASTBOOTINSTANCE=svc:system/boot-config:default
 STMSBOOT=/usr/sbin/stmsboot
 BOOTADM=/sbin/bootadm
 MOUNT=/usr/sbin/mount
@@ -259,6 +260,20 @@ update_sysfiles()
 			$CP /boot/solaris/$BOOTENV_FILE $SAVEDIR/$BOOTENV_FILE.$cmd.$NOW
 			$EEPROM bootpath="$new_bootpath"
 		fi
+
+		if [ "$MACH" = "i386" ]; then
+			# Disable Fast Reboot temporarily for the next reboot only.
+			HASZFSROOT=`$DF -g / |$GREP zfs`
+			if [ -n "$HASZFSROOT" ]; then
+				$SVCCFG -s $FASTBOOTINSTANCE addpg config_ovr application P > /dev/null 2>&1
+				$SVCCFG -s $FASTBOOTINSTANCE \
+				    setprop config_ovr/fastreboot_default=boolean:\"false\"
+				$SVCCFG -s $FASTBOOTINSTANCE \
+				    setprop config_ovr/fastreboot_onpanic=boolean:\"false\"
+				$SVCADM refresh $FASTBOOTINSTANCE 
+			fi
+		fi
+
 		# Enable the mpxio-upgrade service for the reboot
 		$SVCADM disable -t $STMSINSTANCE
 		$SVCCFG -s $STMSINSTANCE "setprop general/enabled=true"
