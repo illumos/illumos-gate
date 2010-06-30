@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 @ _START_
@@ -621,14 +620,14 @@
 @ MSG_PHDRNAM_DYN		".dynamic(phdr)"
 @ MSG_PHDRNAM_DYNSTR		".dynstr(phdr)"
 @ MSG_PHDRNAM_DYNSYM		".dynsym(phdr)"
-@ MSG_PHDRNAM_FINIARR		".finiarray(phdr)"
+@ MSG_PHDRNAM_FINIARR		".fini_array(phdr)"
 @ MSG_PHDRNAM_HASH		".hash(phdr)"
-@ MSG_PHDRNAM_INITARR		".initarray(phdr)"
+@ MSG_PHDRNAM_INITARR		".init_array(phdr)"
 @ MSG_PHDRNAM_INTERP		".interp(phdr)"
 @ MSG_PHDRNAM_LDYNSYM		".SUNW_ldynsym(phdr)"
 @ MSG_PHDRNAM_MOVE		".move(phdr)"
 @ MSG_PHDRNAM_NOTE		".note(phdr)"
-@ MSG_PHDRNAM_PREINITARR	".preinitarray(phdr)"
+@ MSG_PHDRNAM_PREINITARR	".preinit_array(phdr)"
 @ MSG_PHDRNAM_REL		".rel(phdr)"
 @ MSG_PHDRNAM_RELA		".rela(phdr)"
 @ MSG_PHDRNAM_SYMINFO		".syminfo(phdr)"

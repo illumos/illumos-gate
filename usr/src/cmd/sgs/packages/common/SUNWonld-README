@@ -1596,3 +1596,6 @@ Bugid   Risk Synopsis
 	variables. (D)
 6748925 moe returns wrong hwcap library in some circumstances
 6916796 OSnet mapfiles should use version 2 link-editor syntax
+6964517 OSnet mapfiles should use version 2 link-editor syntax (2nd pass)
+6948720 SHT_INIT_ARRAY etc. section names don't follow ELF gABI (D)
+6962343 sgsmsg should use mkstemp() for temporary file creation

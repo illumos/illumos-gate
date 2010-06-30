@@ -156,7 +156,7 @@
 			 terminate a filters\n\t\t\tsearch\n"
 @ MSG_ARG_DETAIL_ZFA	"\t[-z finiarray=function]\n\
 			 \t\t\tname of function to be appended to the \
-			 .finiarray\n"
+			 .fini_array\n"
 @ MSG_ARG_DETAIL_ZGP	"\t[-z groupperm | nogroupperm]\n\
 			 \t\t\tenable|disable setting of group permissions\n\
 			 \t\t\ton dynamic dependencies\n"
@@ -166,7 +166,7 @@
 			 \t\t\tignore|record unused dynamic dependencies\n"
 @ MSG_ARG_DETAIL_ZINA	"\t[-z initarray=function]\n\
 			 \t\t\tname of function to be appended to the \
-			 .initarray\n"
+			 .init_array\n"
 @ MSG_ARG_DETAIL_ZINI	"\t[-z initfirst]\tmark object to indicate that its \
 			 .init section should\n\
 			 \t\t\tbe executed before the .init section of any \
@@ -205,7 +205,7 @@
 			 processing\n"
 @ MSG_ARG_DETAIL_ZPIA	"\t[-z preinitarray=function]\n\
 			 \t\t\tname of function to be appended to the \
-			 .preinitarray\n"
+			 .preinit_array\n"
 @ MSG_ARG_DETAIL_ZRL	"\t[-z redlocsym]\treduce local syms in .symtab to \
 			 a minimum\n"
 @ MSG_ARG_DETAIL_ZRREL	"\t[-z relaxreloc]\trelax rules used for relocations \
@@ -749,20 +749,20 @@
 @ MSG_SCN_EX_RANGES	".exception_ranges"
 @ MSG_SCN_EXCL		".excl"
 @ MSG_SCN_FINI		".fini"
-@ MSG_SCN_FINIARRAY	".finiarray"
+@ MSG_SCN_FINIARRAY	".fini_array"
 @ MSG_SCN_GOT		".got"
 @ MSG_SCN_GNU_LINKONCE	".gnu.linkonce."
 @ MSG_SCN_HASH		".hash"
 @ MSG_SCN_INDEX		".index"
 @ MSG_SCN_INIT		".init"
-@ MSG_SCN_INITARRAY	".initarray"
+@ MSG_SCN_INITARRAY	".init_array"
 @ MSG_SCN_INTERP	".interp"
 @ MSG_SCN_LBSS		".lbss"
 @ MSG_SCN_LDATA		".ldata"
 @ MSG_SCN_LINE		".line"
 @ MSG_SCN_LRODATA	".lrodata"
 @ MSG_SCN_PLT		".plt"
-@ MSG_SCN_PREINITARRAY	".preinitarray"
+@ MSG_SCN_PREINITARRAY	".preinit_array"
 @ MSG_SCN_REL		".rel"
 @ MSG_SCN_RELA		".rela"
 @ MSG_SCN_RODATA	".rodata"

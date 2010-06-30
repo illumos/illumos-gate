@@ -364,9 +364,9 @@ struct ofl_desc {
 	Os_desc		*ofl_osdyntlssort; /* .SUNW_dyntlssort output section */
 	Os_desc		*ofl_osgot;	/* .got output section */
 	Os_desc		*ofl_oshash;	/* .hash output section */
-	Os_desc		*ofl_osinitarray; /* .initarray output section */
-	Os_desc		*ofl_osfiniarray; /* .finiarray output section */
-	Os_desc		*ofl_ospreinitarray; /* .preinitarray output section */
+	Os_desc		*ofl_osinitarray; /* .init_array output section */
+	Os_desc		*ofl_osfiniarray; /* .fini_array output section */
+	Os_desc		*ofl_ospreinitarray; /* .preinit_array output section */
 	Os_desc		*ofl_osinterp;	/* .interp output section */
 	Os_desc		*ofl_oscap;	/* .SUNW_cap output section */
 	Os_desc		*ofl_oscapinfo;	/* .SUNW_capinfo output section */

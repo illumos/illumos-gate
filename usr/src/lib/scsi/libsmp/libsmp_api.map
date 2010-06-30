@@ -23,29 +23,31 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-{
-	smp_strerror = FUNCTION extern;
-	smp_errname = FUNCTION extern;
-	smp_errcode = FUNCTION extern;
-	smp_alloc = FUNCTION extern;
-	smp_zalloc = FUNCTION extern;
-	smp_strdup = FUNCTION extern;
-	smp_free = FUNCTION extern;
-	smp_set_errno = FUNCTION extern;
-	smp_verror = FUNCTION extern;
-	smp_error = FUNCTION extern;
-	smp_action_get_timeout = FUNCTION extern;
-	smp_action_get_request = FUNCTION extern;
-	smp_action_get_response = FUNCTION extern;
-	smp_action_get_request_frame = FUNCTION extern;
-	smp_action_get_response_frame = FUNCTION extern;
-	smp_action_get_function_def = FUNCTION extern;
-	smp_action_set_response_len = FUNCTION extern;
-	smp_action_set_result = FUNCTION extern;
-	smp_target_getcap = FUNCTION extern;
-	smp_target_set_change_count = FUNCTION extern;
-	smp_target_get_change_count = FUNCTION extern;
-	smp_assert = FUNCTION extern;
-	smp_engine_register = FUNCTION extern;
-	smp_plugin_register = FUNCTION extern;
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	smp_strerror			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_errname			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_errcode			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_alloc			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_zalloc			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_strdup			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_free			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_set_errno			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_verror			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_error			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_action_get_timeout		{ TYPE = FUNCTION; FLAGS = extern };
+	smp_action_get_request		{ TYPE = FUNCTION; FLAGS = extern };
+	smp_action_get_response		{ TYPE = FUNCTION; FLAGS = extern };
+	smp_action_get_request_frame	{ TYPE = FUNCTION; FLAGS = extern };
+	smp_action_get_response_frame	{ TYPE = FUNCTION; FLAGS = extern };
+	smp_action_get_function_def	{ TYPE = FUNCTION; FLAGS = extern };
+	smp_action_set_response_len	{ TYPE = FUNCTION; FLAGS = extern };
+	smp_action_set_result		{ TYPE = FUNCTION; FLAGS = extern };
+	smp_target_getcap		{ TYPE = FUNCTION; FLAGS = extern };
+	smp_target_set_change_count	{ TYPE = FUNCTION; FLAGS = extern };
+	smp_target_get_change_count	{ TYPE = FUNCTION; FLAGS = extern };
+	smp_assert			{ TYPE = FUNCTION; FLAGS = extern };
+	smp_engine_register		{ TYPE = FUNCTION; FLAGS = extern };
+	smp_plugin_register		{ TYPE = FUNCTION; FLAGS = extern };
 };

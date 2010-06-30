@@ -34,7 +34,10 @@
 #
 # MAPFILE HEADER END
 #
-SUNW_1.1 {
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNW_1.1 {
 	global:
 		srpt_GetConfig;
 		srpt_SetConfig;
@@ -47,10 +50,3 @@ SUNW_1.1 {
 	local:
 		*;
 };
-
-SUNWprivate {
-	global:
-	local:
-	    *;
-};
-

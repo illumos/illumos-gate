@@ -702,14 +702,14 @@ struct rt_map {
 	Syminfo		*rt_syminfo;	/* elf .syminfo section - here */
 					/*	because it is checked in */
 					/*	common code */
-	Addr		*rt_initarray;	/* .initarray table */
-	Addr		*rt_finiarray;	/* .finiarray table */
-	Addr		*rt_preinitarray; /* .preinitarray table */
+	Addr		*rt_initarray;	/* .init_array table */
+	Addr		*rt_finiarray;	/* .fini_array table */
+	Addr		*rt_preinitarray; /* .preinit_array table */
 	mmapobj_result_t *rt_mmaps;	/* array of mapping information */
 	uint_t		rt_mmapcnt;	/*	and associated number */
-	uint_t		rt_initarraysz;	/* size of .initarray table */
-	uint_t		rt_finiarraysz;	/* size of .finiarray table */
-	uint_t		rt_preinitarraysz; /* size of .preinitarray table */
+	uint_t		rt_initarraysz;	/* size of .init_array table */
+	uint_t		rt_finiarraysz;	/* size of .fini_array table */
+	uint_t		rt_preinitarraysz; /* size of .preinit_array table */
 	Dyninfo		*rt_dyninfo;	/* .dynamic information descriptors */
 	uint_t		rt_dyninfocnt;	/* count of dyninfo entries */
 	uint_t		rt_relacount;	/* no. of RELATIVE relocations */

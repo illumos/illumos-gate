@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * sgsmsg generates several message files from an input template file.  Messages
  * are constructed for use with gettext(3i) - the default - or catgets(3c).  The
@@ -1129,8 +1128,9 @@ main(int argc, char ** argv)
 		}
 	}
 	if (fddefs && fddata) {
-		(void) sprintf(fllint, "%s.%d", nmlint, (int)getpid());
-		if ((fdlint = fopen(fllint, "w+")) == NULL) {
+		(void) sprintf(fllint, "%s.%d.XXXXXX", nmlint, (int)getpid());
+		if ((mkstemp(fllint) == -1) ||
+		    ((fdlint = fopen(fllint, "w+")) == NULL)) {
 			(void) fprintf(stderr, Errmsg_opne, fllint,
 			    strerror(errno));
 			return (1);

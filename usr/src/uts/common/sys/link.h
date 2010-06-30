@@ -95,10 +95,10 @@ typedef struct {
 #define	DT_TEXTREL	22	/* text relocations remain for this object */
 #define	DT_JMPREL	23	/* pointer to the PLT relocation entries */
 #define	DT_BIND_NOW	24	/* perform all relocations at load of object */
-#define	DT_INIT_ARRAY	25	/* pointer to .initarray */
-#define	DT_FINI_ARRAY	26	/* pointer to .finiarray */
-#define	DT_INIT_ARRAYSZ	27	/* size of .initarray */
-#define	DT_FINI_ARRAYSZ	28	/* size of .finiarray */
+#define	DT_INIT_ARRAY	25	/* pointer to .init_array */
+#define	DT_FINI_ARRAY	26	/* pointer to .fini_array */
+#define	DT_INIT_ARRAYSZ	27	/* size of .init_array */
+#define	DT_FINI_ARRAYSZ	28	/* size of .fini_array */
 #define	DT_RUNPATH	29	/* run-time search path */
 #define	DT_FLAGS	30	/* state flags - see DF_* */
 
@@ -120,8 +120,8 @@ typedef struct {
  */
 #define	DT_ENCODING		32	/* positive tag DT_* encoding rules */
 					/*	start after this */
-#define	DT_PREINIT_ARRAY	32    /* pointer to .preinitarray segment */
-#define	DT_PREINIT_ARRAYSZ	33    /* size of .preinitarray segment */
+#define	DT_PREINIT_ARRAY	32	/* pointer to .preinit_array */
+#define	DT_PREINIT_ARRAYSZ	33	/* size of .preinit_array */
 
 #define	DT_MAXPOSTAGS		34	/* number of positive tags */
 
