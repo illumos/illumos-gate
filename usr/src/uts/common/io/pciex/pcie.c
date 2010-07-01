@@ -182,7 +182,11 @@ _init(void)
 	pcie_nvap = fm_nva_xcreate(pcie_nv_buf, ERPT_DATA_SZ);
 	pcie_nvl = fm_nvlist_create(pcie_nvap);
 
-	rval = mod_install(&modlinkage);
+	if ((rval = mod_install(&modlinkage)) != 0) {
+		fm_nvlist_destroy(pcie_nvl, FM_NVA_RETAIN);
+		fm_nva_xdestroy(pcie_nvap);
+		kmem_free(pcie_nv_buf, ERPT_DATA_SZ);
+	}
 	return (rval);
 }
 
@@ -191,11 +195,11 @@ _fini()
 {
 	int		rval;
 
-	fm_nvlist_destroy(pcie_nvl, FM_NVA_RETAIN);
-	fm_nva_xdestroy(pcie_nvap);
-	kmem_free(pcie_nv_buf, ERPT_DATA_SZ);
-
-	rval = mod_remove(&modlinkage);
+	if ((rval = mod_remove(&modlinkage)) == 0) {
+		fm_nvlist_destroy(pcie_nvl, FM_NVA_RETAIN);
+		fm_nva_xdestroy(pcie_nvap);
+		kmem_free(pcie_nv_buf, ERPT_DATA_SZ);
+	}
 	return (rval);
 }
 
