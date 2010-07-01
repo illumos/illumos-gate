@@ -117,5 +117,6 @@ license lic_OSBL_preamble license=lic_OSBL_preamble
 link path=usr/lib/fs/nfs/mount target=../../../../etc/fs/nfs/mount
 link path=usr/lib/nfs/libmapid.so target=libmapid.so.1
 link path=usr/sbin/showmount target=../lib/fs/nfs/showmount
-user username=unknown gcos-field="Unknown Remote UID" group=unknown uid=96
+user username=unknown ftpuser=false gcos-field="Unknown Remote UID" \
+    group=unknown uid=96
 depend fmri=system/kernel/secure-rpc type=require
