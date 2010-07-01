@@ -30,6 +30,7 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/sysmacros.h>
+#include <sys/scsi/generic/persist.h>
 
 #include <sys/socket.h>
 #include <sys/strsubr.h>
@@ -208,6 +209,7 @@ static void
 iscsit_sess_unref(void *ist_void)
 {
 	iscsit_sess_t *ist = ist_void;
+	stmf_scsi_session_t *iss;
 
 	/*
 	 * State machine has run to completion, destroy session
@@ -220,13 +222,13 @@ iscsit_sess_unref(void *ist_void)
 	 */
 	mutex_enter(&ist->ist_mutex);
 	ASSERT(ist->ist_conn_count == 0);
-	if (ist->ist_stmf_sess != NULL) {
-		stmf_deregister_scsi_session(ist->ist_lport,
-		    ist->ist_stmf_sess);
-		kmem_free(ist->ist_stmf_sess->ss_rport_id,
-		    sizeof (scsi_devid_desc_t) +
+	iss = ist->ist_stmf_sess;
+	if (iss != NULL) {
+		stmf_deregister_scsi_session(ist->ist_lport, iss);
+		kmem_free(iss->ss_rport_id, sizeof (scsi_devid_desc_t) +
 		    strlen(ist->ist_initiator_name) + 1);
-		stmf_free(ist->ist_stmf_sess);
+		stmf_remote_port_free(iss->ss_rport);
+		stmf_free(iss);
 	}
 	mutex_exit(&ist->ist_mutex);
 

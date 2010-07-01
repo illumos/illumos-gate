@@ -82,6 +82,27 @@ typedef struct stmf_local_port {
 		uint32_t flags);
 } stmf_local_port_t;
 
+typedef struct stmf_remote_port {
+	struct scsi_transport_id	*rport_tptid;
+	uint16_t			rport_tptid_sz;
+} stmf_remote_port_t;
+
+typedef struct stmf_dflt_scsi_tptid {
+#if defined(_BIT_FIELDS_LTOH)
+	uint8_t			protocol_id : 4,
+				resbits : 2,
+				format_code : 2;
+#elif defined(_BIT_FIELDS_HTOL)
+	uint8_t			format_code : 2,
+				resbits : 2,
+				protocol_id : 4;
+#else
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif	/* _BIT_FIELDS_LTOH */
+	uint8_t			rsvbyte1;
+	uint8_t			ident_len[2];
+	char			ident[1];
+} stmf_dflt_scsi_tptid_t;
 /*
  * abort cmd
  */
@@ -108,6 +129,7 @@ typedef struct stmf_scsi_session {
 	char			*ss_rport_alias;
 	struct stmf_local_port	*ss_lport;
 	uint64_t		ss_session_id;
+	struct stmf_remote_port	*ss_rport;
 } stmf_scsi_session_t;
 
 stmf_status_t stmf_register_port_provider(stmf_port_provider_t *pp);

@@ -212,6 +212,7 @@ typedef struct stmf_i_scsi_session {
 #define	ISS_BEING_CREATED			0x0004
 #define	ISS_GOT_INITIAL_LUNS			0x0008
 #define	ISS_EVENT_ACTIVE			0x0010
+#define	ISS_NULL_TPTID				0x0020
 
 #define	ITASK_MAX_NCMDS			14
 #define	ITASK_DEFAULT_POLL_TIMEOUT	0

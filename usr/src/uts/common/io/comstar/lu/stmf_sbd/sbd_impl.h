@@ -110,14 +110,15 @@ typedef struct sm_v0_section_hdr {
  * PGR key flags
  */
 #define	SBD_PGR_KEY_ALL_TG_PT		0x01
+#define	SBD_PGR_KEY_TPT_ID_FLAG		0x02
 
 typedef struct sbd_pgr_key_info {
 	uint64_t	pgr_key;
 	uint16_t	pgr_key_lpt_len;
 	uint16_t	pgr_key_rpt_len;
 	uint8_t		pgr_key_flags;
-	uint8_t		pgr_key_it[1];	/* devid_desc of initiator will be */
-					/* followed by devid_desc of target */
+	uint8_t		pgr_key_it[1];	/* order:- initiator info followed by */
+					/* scsi_devid_desc of local port */
 } sbd_pgr_key_info_t;
 
 typedef struct sbd_pgr_info {
@@ -143,7 +144,7 @@ typedef struct sbd_pgr_key {
 	uint16_t		pgr_key_rpt_len;
 	uint8_t			pgr_key_flags;
 	struct scsi_devid_desc	*pgr_key_lpt_id;
-	struct scsi_devid_desc	*pgr_key_rpt_id;
+	struct scsi_transport_id *pgr_key_rpt_id;
 	struct sbd_it_data	*pgr_key_it;
 	struct sbd_pgr_key	*pgr_key_next;
 	struct sbd_pgr_key	*pgr_key_prev;

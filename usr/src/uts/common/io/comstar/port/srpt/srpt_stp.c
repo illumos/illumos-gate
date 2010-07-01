@@ -45,6 +45,7 @@
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
 
+#include <sys/scsi/generic/persist.h>
 #include <sys/ib/mgt/ibdma/ibdma.h>
 
 #include "srp.h"
@@ -1249,6 +1250,7 @@ srpt_stp_alloc_session(srpt_target_port_t *tgt,
 	srpt_session_t		*ss;
 	stmf_scsi_session_t	*stmf_ss;
 	uint64_t		i_guid;
+	scsi_srp_transport_id_t *srptpd;
 
 	ASSERT(tgt != NULL);
 	SRPT_DPRINTF_L3("stp_alloc_session, invoked");
@@ -1268,12 +1270,19 @@ srpt_stp_alloc_session(srpt_target_port_t *tgt,
 	ss = stmf_ss->ss_port_private;
 	ASSERT(ss != NULL);
 
-
 	rw_init(&ss->ss_rwlock, NULL, RW_DRIVER, NULL);
 	list_create(&ss->ss_task_list, sizeof (srpt_iu_t),
 	    offsetof(srpt_iu_t, iu_ss_task_node));
 
 	stmf_ss->ss_rport_id = srpt_stp_alloc_scsi_devid_desc(i_guid);
+	/* Setup remote port transport id */
+	stmf_ss->ss_rport = stmf_remote_port_alloc(
+	    sizeof (scsi_srp_transport_id_t));
+	stmf_ss->ss_rport->rport_tptid->protocol_id = PROTOCOL_SRP;
+	stmf_ss->ss_rport->rport_tptid->format_code = 0;
+	srptpd = (scsi_srp_transport_id_t *)stmf_ss->ss_rport->rport_tptid;
+	bcopy(i_id, srptpd->srp_name, SRP_PORT_ID_LEN);
+
 	stmf_ss->ss_lport    = tgt->tp_lport;
 
 	ss->ss_ss	= stmf_ss;
@@ -1295,7 +1304,6 @@ srpt_stp_alloc_session(srpt_target_port_t *tgt,
 	    BE_IN64(&ss->ss_i_id[8]));
 	ALIAS_STR(ss->ss_t_alias, BE_IN64(&ss->ss_t_id[0]),
 	    BE_IN64(&ss->ss_t_id[8]));
-
 	stmf_ss->ss_rport_alias = ss->ss_i_alias;
 
 	status = stmf_register_scsi_session(tgt->tp_lport, stmf_ss);
@@ -1304,6 +1312,8 @@ srpt_stp_alloc_session(srpt_target_port_t *tgt,
 		    " err(0x%llx)", (u_longlong_t)status);
 		list_destroy(&ss->ss_task_list);
 		rw_destroy(&ss->ss_rwlock);
+		srpt_stp_free_scsi_devid_desc(stmf_ss->ss_rport_id);
+		stmf_remote_port_free(stmf_ss->ss_rport);
 		stmf_free(stmf_ss);
 		mutex_exit(&tgt->tp_sess_list_lock);
 		return (NULL);
@@ -1340,7 +1350,7 @@ srpt_stp_free_session(srpt_session_t *session)
 
 	stmf_deregister_scsi_session(tgt->tp_lport, stmf_ss);
 	srpt_stp_free_scsi_devid_desc(stmf_ss->ss_rport_id);
-
+	stmf_remote_port_free(stmf_ss->ss_rport);
 	list_remove(&tgt->tp_sess_list, session);
 	cv_signal(&tgt->tp_sess_complete);
 	mutex_exit(&tgt->tp_sess_list_lock);

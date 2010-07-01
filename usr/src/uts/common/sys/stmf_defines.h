@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_STMF_DEFINES_H
 #define	_STMF_DEFINES_H
@@ -136,9 +135,11 @@ struct stmf_lu_provider;
 struct stmf_lu;
 struct stmf_port_provider;
 struct stmf_local_port;
+struct stmf_remote_port;
 struct stmf_scsi_session;
 struct scsi_task;
 struct scsi_devid_desc;
+struct scsi_transport_id;
 struct stmf_data_buf;
 struct stmf_lun_map;
 struct scsi_devid_desc;

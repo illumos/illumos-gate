@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _PPPT_H
 #define	_PPPT_H
@@ -248,13 +247,13 @@ void pppt_lport_ctl(stmf_local_port_t *lport, int cmd, void *arg);
 
 pppt_sess_t *pppt_sess_lookup_locked(uint64_t session_id,
     scsi_devid_desc_t *lport_devid,
-    scsi_devid_desc_t *rport_devid);
+    stmf_remote_port_t *rport);
 
 pppt_sess_t *pppt_sess_lookup_by_id_locked(uint64_t session_id);
 
 pppt_sess_t *pppt_sess_lookup_create(scsi_devid_desc_t *lport_devid,
-    scsi_devid_desc_t *rport_devid, uint64_t session_id,
-    stmf_status_t *statusp);
+    scsi_devid_desc_t *rport_devid, stmf_remote_port_t *rport,
+    uint64_t session_id, stmf_status_t *statusp);
 
 void pppt_sess_rele(pppt_sess_t *sks);
 

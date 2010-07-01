@@ -848,13 +848,11 @@ pppt_lport_ctl(stmf_local_port_t *lport, int cmd, void *arg)
 
 pppt_sess_t *
 pppt_sess_lookup_locked(uint64_t session_id,
-    scsi_devid_desc_t *lport_devid,
-    scsi_devid_desc_t *rport_devid)
+    scsi_devid_desc_t *lport_devid, stmf_remote_port_t *rport)
 {
 	pppt_tgt_t				*tgt;
 	pppt_sess_t				*ps;
 	int					lport_cmp;
-	int					rport_cmp;
 
 	ASSERT(mutex_owned(&pppt_global.global_lock));
 
@@ -874,8 +872,8 @@ pppt_sess_lookup_locked(uint64_t session_id,
 	/* Validate local/remote port names */
 	if ((lport_devid->ident_length !=
 	    tgt->target_stmf_lport->lport_id->ident_length) ||
-	    (rport_devid->ident_length !=
-	    ps->ps_stmf_sess->ss_rport_id->ident_length)) {
+	    (rport->rport_tptid_sz !=
+	    ps->ps_stmf_sess->ss_rport->rport_tptid_sz)) {
 		mutex_exit(&tgt->target_mutex);
 		PPPT_INC_STAT(es_sess_lookup_ident_mismatch);
 		return (NULL);
@@ -883,10 +881,9 @@ pppt_sess_lookup_locked(uint64_t session_id,
 		lport_cmp = bcmp(lport_devid->ident,
 		    tgt->target_stmf_lport->lport_id->ident,
 		    lport_devid->ident_length);
-		rport_cmp = bcmp(rport_devid->ident,
-		    ps->ps_stmf_sess->ss_rport_id->ident,
-		    rport_devid->ident_length);
-		if (lport_cmp || rport_cmp) {
+		if (lport_cmp != 0 ||
+		    (stmf_scsilib_tptid_compare(rport->rport_tptid,
+		    ps->ps_stmf_sess->ss_rport->rport_tptid) != B_TRUE)) {
 			mutex_exit(&tgt->target_mutex);
 			PPPT_INC_STAT(es_sess_lookup_ident_mismatch);
 			return (NULL);
@@ -929,8 +926,8 @@ pppt_sess_lookup_by_id_locked(uint64_t session_id)
 /* New session */
 pppt_sess_t *
 pppt_sess_lookup_create(scsi_devid_desc_t *lport_devid,
-    scsi_devid_desc_t *rport_devid, uint64_t session_id,
-    stmf_status_t *statusp)
+    scsi_devid_desc_t *rport_devid, stmf_remote_port_t *rport,
+    uint64_t session_id, stmf_status_t *statusp)
 {
 	pppt_tgt_t		*tgt;
 	pppt_sess_t		*ps;
@@ -944,7 +941,7 @@ pppt_sess_lookup_create(scsi_devid_desc_t *lport_devid,
 	/*
 	 * Look for existing session for this ID
 	 */
-	ps = pppt_sess_lookup_locked(session_id, lport_devid, rport_devid);
+	ps = pppt_sess_lookup_locked(session_id, lport_devid, rport);
 
 	if (ps != NULL) {
 		PPPT_GLOBAL_UNLOCK();
@@ -974,7 +971,7 @@ pppt_sess_lookup_create(scsi_devid_desc_t *lport_devid,
 	bzero(&tmp_ps, sizeof (tmp_ps));
 	bzero(&tmp_ss, sizeof (tmp_ss));
 	tmp_ps.ps_stmf_sess = &tmp_ss;
-	tmp_ss.ss_rport_id = rport_devid;
+	tmp_ss.ss_rport = rport;
 
 	/*
 	 * Look for an existing session on this IT nexus
@@ -1035,13 +1032,17 @@ pppt_sess_lookup_create(scsi_devid_desc_t *lport_devid,
 
 	ss->ss_lport = tgt->target_stmf_lport;
 
+	ss->ss_rport = stmf_remote_port_alloc(rport->rport_tptid_sz);
+	bcopy(rport->rport_tptid, ss->ss_rport->rport_tptid,
+	    rport->rport_tptid_sz);
+
 	if (stmf_register_scsi_session(tgt->target_stmf_lport, ss) !=
 	    STMF_SUCCESS) {
 		mutex_exit(&tgt->target_mutex);
 		PPPT_GLOBAL_UNLOCK();
 		kmem_free(ss->ss_rport_id,
-		    sizeof (scsi_devid_desc_t) +
-		    rport_devid->ident_length + 1);
+		    sizeof (scsi_devid_desc_t) + rport_devid->ident_length + 1);
+		stmf_remote_port_free(ss->ss_rport);
 		stmf_free(ss);
 		kmem_free(ps, sizeof (*ps));
 		*statusp = STMF_TARGET_FAILURE;
@@ -1093,8 +1094,8 @@ static void pppt_sess_destroy_task(void *ps_void)
 	mutex_enter(&ps->ps_mutex);
 	stmf_deregister_scsi_session(ss->ss_lport, ss);
 	kmem_free(ss->ss_rport_id,
-	    sizeof (scsi_devid_desc_t) +
-	    ss->ss_rport_id->ident_length + 1);
+	    sizeof (scsi_devid_desc_t) + ss->ss_rport_id->ident_length + 1);
+	stmf_remote_port_free(ss->ss_rport);
 	avl_destroy(&ps->ps_task_list);
 	mutex_exit(&ps->ps_mutex);
 	cv_destroy(&ps->ps_cv);
@@ -1133,28 +1134,19 @@ pppt_sess_avl_compare_by_name(const void *void_sess1, const void *void_sess2)
 	const	pppt_sess_t	*psess2 = void_sess2;
 	int			result;
 
-	/* Sort by code set then ident */
-	if (psess1->ps_stmf_sess->ss_rport_id->code_set <
-	    psess2->ps_stmf_sess->ss_rport_id->code_set) {
+	/* Compare by tptid size */
+	if (psess1->ps_stmf_sess->ss_rport->rport_tptid_sz <
+	    psess2->ps_stmf_sess->ss_rport->rport_tptid_sz) {
 		return (-1);
-	} else if (psess1->ps_stmf_sess->ss_rport_id->code_set >
-	    psess2->ps_stmf_sess->ss_rport_id->code_set) {
+	} else if (psess1->ps_stmf_sess->ss_rport->rport_tptid_sz >
+	    psess2->ps_stmf_sess->ss_rport->rport_tptid_sz) {
 		return (1);
 	}
 
-	/* Next by ident length */
-	if (psess1->ps_stmf_sess->ss_rport_id->ident_length <
-	    psess2->ps_stmf_sess->ss_rport_id->ident_length) {
-		return (-1);
-	} else if (psess1->ps_stmf_sess->ss_rport_id->ident_length >
-	    psess2->ps_stmf_sess->ss_rport_id->ident_length) {
-		return (1);
-	}
-
-	/* Code set and ident length both match, now compare idents */
-	result = memcmp(psess1->ps_stmf_sess->ss_rport_id->ident,
-	    psess2->ps_stmf_sess->ss_rport_id->ident,
-	    psess1->ps_stmf_sess->ss_rport_id->ident_length);
+	/* Now compare tptid */
+	result = memcmp(psess1->ps_stmf_sess->ss_rport->rport_tptid,
+	    psess2->ps_stmf_sess->ss_rport->rport_tptid,
+	    psess1->ps_stmf_sess->ss_rport->rport_tptid_sz);
 
 	if (result < 0) {
 		return (-1);

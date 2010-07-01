@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_PERSIST_H
@@ -66,6 +65,35 @@ extern "C" {
 #define	PGR_TYPE_EX_AC_AR	0x8	/* Exclusive Access, All Registrants */
 
 /*
+ * SPC-3 revision 23, Section 6.12.2, Table 113
+ * Persistent Reservations
+ * Persistent Reserve Out service action codes
+ */
+#define	PR_OUT_REGISTER		0x0	/* Register/unregister a reservation */
+					/* key with the device server */
+#define	PR_OUT_RESERVE		0x1	/* Create a persistent reservation */
+					/* having a specified SCOPE & TYPE */
+#define	PR_OUT_RELEASE		0x2	/* Release the selected persistent */
+					/* reservation */
+#define	PR_OUT_CLEAR		0x3	/* Clears all reservation keys and */
+					/* all persistent reservations */
+#define	PR_OUT_PREEMPT		0x4	/* Preempts persistent reservations */
+					/* and/or removes reservations */
+#define	PR_OUT_PREEMPT_ABORT	0x5	/* Preempts persistent reservations */
+					/* and/or removes reservations, and */
+					/* aborts all tasks for all preempted */
+					/* I_T nexuses */
+#define	PR_OUT_REGISTER_AND_IGNORE_EXISTING_KEY	0x06
+					/* Register a reservation key with */
+					/* the device server, or unregister a */
+					/* reservation key */
+#define	PR_OUT_REGISTER_MOVE	0x7	/* Register a reservation key for */
+					/* another I_T nexus with the device */
+					/* server and move a persistent */
+					/* reservation to the I_T nexus */
+
+
+/*
  * Information obtained from:
  *	SPC-3, Revision 23
  *	Section 6.11.5 PERSISTENCE RESERVE IN
@@ -76,6 +104,17 @@ extern "C" {
 #define	iSCSI_PROTOCOL_ID	0x5	/* Table 262 - iSCSI Protocol ID  */
 #define	WW_UID_DEVICE_NAME	0x0	/* Table 288 - iSCSI Transport IDs */
 
+/*
+ * Definitions related SCSI Transport ID
+ * SPC3 rev 23, Tables 284-287
+ */
+#define	SCSI_TPTID_SIZE			24
+#define	SCSI_TPTID_FC_PORT_NAME_SIZE	8
+#define	SCSI_TPTID_SPI_ADDRESS_LEN	2
+#define	SCSI_TPTID_SPI_REL_TGTPTID_LEN	2
+#define	SCSI_TPTID_SBP_PORT_NAME_LEN	8
+#define	SCSI_TPTID_SRP_PORT_NAME_LEN	16
+#define	SCSI_TPTID_ISCSI_ISID_SEPERATOR	",i,0x"
 
 #if defined(_BIT_FIELDS_LTOH)
 /*
@@ -473,37 +512,6 @@ typedef struct scsi_prout_reg_move_plist {
 #else
 #error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
 #endif	/* _BIT_FIELDS_LTOH */
-
-
-/*
- * SPC-3 revision 23, Section 6.12.2, Table 113
- * Persistent Reservations
- * Persistent Reserve Out service action codes
- */
-#define	PR_OUT_REGISTER		0x0	/* Register/unregister a reservation */
-					/* key with the device server */
-#define	PR_OUT_RESERVE		0x1	/* Create a persistent reservation */
-					/* having a specified SCOPE & TYPE */
-#define	PR_OUT_RELEASE		0x2	/* Release the selected persistent */
-					/* reservation */
-#define	PR_OUT_CLEAR		0x3	/* Clears all reservation keys and */
-					/* all persistent reservations */
-#define	PR_OUT_PREEMPT		0x4	/* Preempts persistent reservations */
-					/* and/or removes reservations */
-#define	PR_OUT_PREEMPT_ABORT	0x5	/* Preempts persistent reservations */
-					/* and/or removes reservations, and */
-					/* aborts all tasks for all preempted */
-					/* I_T nexuses */
-#define	PR_OUT_REGISTER_AND_IGNORE_EXISTING_KEY	0x06
-					/* Register a reservation key with */
-					/* the device server, or unregister a */
-					/* reservation key */
-#define	PR_OUT_REGISTER_MOVE	0x7	/* Register a reservation key for */
-					/* another I_T nexus with the device */
-					/* server and move a persistent */
-					/* reservation to the I_T nexus */
-
-
 #ifdef	__cplusplus
 }
 #endif

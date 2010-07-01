@@ -2612,10 +2612,10 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			it->sbd_it_ua_conditions = SBD_UA_POR;
 		}
 	} else if (it->sbd_it_flags & SBD_IT_PGR_CHECK_FLAG) {
-		sbd_pgr_initialize_it(task, it);
 		mutex_enter(&sl->sl_lock);
 		it->sbd_it_flags &= ~SBD_IT_PGR_CHECK_FLAG;
 		mutex_exit(&sl->sl_lock);
+		sbd_pgr_initialize_it(task, it);
 	}
 
 	if (task->task_mgmt_function) {

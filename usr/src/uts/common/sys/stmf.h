@@ -409,6 +409,14 @@ struct scsi_devid_desc *stmf_scsilib_get_devid_desc(uint16_t rtpid);
 void stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf);
 void stmf_scsilib_handle_task_mgmt(scsi_task_t *task);
 
+struct stmf_remote_port *stmf_scsilib_devid_to_remote_port(
+    struct scsi_devid_desc *);
+boolean_t stmf_scsilib_tptid_validate(struct scsi_transport_id *,
+    uint32_t, uint16_t *);
+boolean_t stmf_scsilib_tptid_compare(struct scsi_transport_id *,
+    struct scsi_transport_id *);
+struct stmf_remote_port *stmf_remote_port_alloc(uint16_t);
+void stmf_remote_port_free(struct stmf_remote_port *);
 #ifdef	__cplusplus
 }
 #endif

@@ -117,7 +117,6 @@ pppt_msg_tgt_register(stmf_ic_msg_t *msg)
 
 	reg_port = msg->icm_msg;
 
-
 	PPPT_GLOBAL_LOCK();
 	if (pppt_global.global_svc_state != PSS_ENABLED) {
 		stmf_status = STMF_FAILURE;
@@ -215,7 +214,7 @@ pppt_msg_session_destroy(stmf_ic_msg_t *msg)
 	 * Look for existing session for this ID
 	 */
 	ps = pppt_sess_lookup_locked(sess_destroy->icscd_session_id,
-	    sess_destroy->icscd_tgt_devid, sess_destroy->icscd_ini_devid);
+	    sess_destroy->icscd_tgt_devid, sess_destroy->icscd_rport);
 
 	if (ps == NULL) {
 		PPPT_GLOBAL_UNLOCK();
@@ -278,7 +277,8 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	 * IT nexus
 	 */
 	pppt_sess = pppt_sess_lookup_create(scmd->icsc_tgt_devid,
-	    scmd->icsc_ini_devid, scmd->icsc_session_id, &stmf_status);
+	    scmd->icsc_ini_devid, scmd->icsc_rport,
+	    scmd->icsc_session_id, &stmf_status);
 	if (pppt_sess == NULL) {
 		pppt_task_free(ptask);
 		pppt_msg_tx_status(msg, stmf_status);

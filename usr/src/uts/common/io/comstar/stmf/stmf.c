@@ -28,6 +28,7 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/scsi/scsi.h>
+#include <sys/scsi/generic/persist.h>
 #include <sys/scsi/impl/scsi_reset_notify.h>
 #include <sys/disp.h>
 #include <sys/byteorder.h>
@@ -59,6 +60,7 @@ static uint16_t stmf_rtpid_counter = 0;
 /* start messages at 1 */
 static uint64_t stmf_proxy_msg_id = 1;
 #define	MSG_ID_TM_BIT	0x8000000000000000
+#define	ALIGNED_TO_8BYTE_BOUNDARY(i)	(((i) + 7) & ~7)
 
 static int stmf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int stmf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
@@ -78,6 +80,8 @@ static void stmf_get_alua_state(stmf_alua_state_desc_t *alua_state);
 static void stmf_task_audit(stmf_i_scsi_task_t *itask,
     task_audit_event_t te, uint32_t cmd_or_iof, stmf_data_buf_t *dbuf);
 
+static boolean_t stmf_base16_str_to_binary(char *c, int dplen, uint8_t *dp);
+static char stmf_ctoi(char c);
 stmf_xfer_data_t *stmf_prepare_tpgs_data(uint8_t ilu_alua);
 void stmf_svc_init();
 stmf_status_t stmf_svc_fini();
@@ -3550,6 +3554,26 @@ stmf_register_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 
 	iss->iss_flags |= ISS_BEING_CREATED;
 
+	if (ss->ss_rport == NULL) {
+		iss->iss_flags |= ISS_NULL_TPTID;
+		ss->ss_rport = stmf_scsilib_devid_to_remote_port(
+		    ss->ss_rport_id);
+		if (ss->ss_rport == NULL) {
+			iss->iss_flags &= ~(ISS_NULL_TPTID | ISS_BEING_CREATED);
+			stmf_trace(lport->lport_alias, "Device id to "
+			    "remote port conversion failed");
+			return (STMF_FAILURE);
+		}
+	} else {
+		if (!stmf_scsilib_tptid_validate(ss->ss_rport->rport_tptid,
+		    ss->ss_rport->rport_tptid_sz, NULL)) {
+			iss->iss_flags &= ~ISS_BEING_CREATED;
+			stmf_trace(lport->lport_alias, "Remote port "
+			    "transport id validation failed");
+			return (STMF_FAILURE);
+		}
+	}
+
 	/* sessions use the ilport_lock. No separate lock is required */
 	iss->iss_lockp = &ilport->ilport_lock;
 
@@ -3638,6 +3662,10 @@ try_dereg_ss_again:
 	(void) stmf_session_destroy_lun_map(ilport, iss);
 	rw_exit(&ilport->ilport_lock);
 	mutex_exit(&stmf_state.stmf_lock);
+
+	if (iss->iss_flags & ISS_NULL_TPTID) {
+		stmf_remote_port_free(ss->ss_rport);
+	}
 }
 
 stmf_i_scsi_session_t *
@@ -5999,7 +6027,7 @@ stmf_scsilib_get_devid_desc(uint16_t rtpid)
 	    ilport = ilport->ilport_next) {
 		if (ilport->ilport_rtpid == rtpid) {
 			scsi_devid_desc_t *id = ilport->ilport_lport->lport_id;
-			uint32_t id_sz = sizeof (scsi_devid_desc_t) - 1 +
+			uint32_t id_sz = sizeof (scsi_devid_desc_t) +
 			    id->ident_length;
 			devid = (scsi_devid_desc_t *)kmem_zalloc(id_sz,
 			    KM_NOSLEEP);
@@ -8082,4 +8110,310 @@ stmf_abort_task_offline(scsi_task_t *task, int offline_lu, char *info)
 		    "<no additional info>");
 	}
 	(void) stmf_ctl(ctl_cmd, ctl_private, &change_info);
+}
+
+static char
+stmf_ctoi(char c)
+{
+	if ((c >= '0') && (c <= '9'))
+		c -= '0';
+	else if ((c >= 'A') && (c <= 'F'))
+		c = c - 'A' + 10;
+	else if ((c >= 'a') && (c <= 'f'))
+		c = c - 'a' + 10;
+	else
+		c = -1;
+	return (c);
+}
+
+/* Convert from Hex value in ASCII format to the equivalent bytes */
+static boolean_t
+stmf_base16_str_to_binary(char *c, int dplen, uint8_t *dp)
+{
+	int		ii;
+
+	for (ii = 0; ii < dplen; ii++) {
+		char nibble1, nibble2;
+		char enc_char = *c++;
+		nibble1 = stmf_ctoi(enc_char);
+
+		enc_char = *c++;
+		nibble2 = stmf_ctoi(enc_char);
+		if (nibble1 == -1 || nibble2 == -1)
+			return (B_FALSE);
+
+		dp[ii] = (nibble1 << 4) | nibble2;
+	}
+	return (B_TRUE);
+}
+
+boolean_t
+stmf_scsilib_tptid_validate(scsi_transport_id_t *tptid, uint32_t total_sz,
+				uint16_t *tptid_sz)
+{
+	uint16_t tpd_len = SCSI_TPTID_SIZE;
+
+	if (tptid_sz)
+		*tptid_sz = 0;
+	if (total_sz < sizeof (scsi_transport_id_t))
+		return (B_FALSE);
+
+	switch (tptid->protocol_id) {
+
+	case PROTOCOL_FIBRE_CHANNEL:
+		/* FC Transport ID validation checks. SPC3 rev23, Table 284 */
+		if (total_sz < tpd_len || tptid->format_code != 0)
+			return (B_FALSE);
+		break;
+
+	case PROTOCOL_iSCSI:
+		{
+		iscsi_transport_id_t	*iscsiid;
+		uint16_t		adn_len, name_len;
+
+		/* Check for valid format code, SPC3 rev 23 Table 288 */
+		if ((total_sz < tpd_len) ||
+		    (tptid->format_code != 0 && tptid->format_code != 1))
+			return (B_FALSE);
+
+		iscsiid = (iscsi_transport_id_t *)tptid;
+		adn_len = READ_SCSI16(iscsiid->add_len, uint16_t);
+		tpd_len = sizeof (iscsi_transport_id_t) + adn_len - 1;
+
+		/*
+		 * iSCSI Transport ID validation checks.
+		 * As per SPC3 rev 23 Section 7.5.4.6 and Table 289 & Table 290
+		 */
+		if (adn_len < 20 || (adn_len % 4 != 0))
+			return (B_FALSE);
+
+		name_len = strnlen(iscsiid->iscsi_name, adn_len);
+		if (name_len == 0 || name_len >= adn_len)
+			return (B_FALSE);
+
+		/* If the format_code is 1 check for ISID seperator */
+		if ((tptid->format_code == 1) && (strstr(iscsiid->iscsi_name,
+		    SCSI_TPTID_ISCSI_ISID_SEPERATOR) == NULL))
+			return (B_FALSE);
+
+		}
+		break;
+
+	case PROTOCOL_SRP:
+		/* SRP Transport ID validation checks. SPC3 rev23, Table 287 */
+		if (total_sz < tpd_len || tptid->format_code != 0)
+			return (B_FALSE);
+		break;
+
+	case PROTOCOL_PARALLEL_SCSI:
+	case PROTOCOL_SSA:
+	case PROTOCOL_IEEE_1394:
+	case PROTOCOL_SAS:
+	case PROTOCOL_ADT:
+	case PROTOCOL_ATAPI:
+	default:
+		{
+		stmf_dflt_scsi_tptid_t *dflttpd;
+
+		tpd_len = sizeof (stmf_dflt_scsi_tptid_t);
+		if (total_sz < tpd_len)
+			return (B_FALSE);
+		dflttpd = (stmf_dflt_scsi_tptid_t *)tptid;
+		tpd_len = tpd_len + SCSI_READ16(&dflttpd->ident_len) - 1;
+		if (total_sz < tpd_len)
+			return (B_FALSE);
+		}
+		break;
+	}
+	if (tptid_sz)
+		*tptid_sz = tpd_len;
+	return (B_TRUE);
+}
+
+boolean_t
+stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1,
+				scsi_transport_id_t *tpd2)
+{
+	if ((tpd1->protocol_id != tpd2->protocol_id) ||
+	    (tpd1->format_code != tpd2->format_code))
+		return (B_FALSE);
+
+	switch (tpd1->protocol_id) {
+
+	case PROTOCOL_iSCSI:
+		{
+		iscsi_transport_id_t *iscsitpd1, *iscsitpd2;
+		uint16_t len;
+
+		iscsitpd1 = (iscsi_transport_id_t *)tpd1;
+		iscsitpd2 = (iscsi_transport_id_t *)tpd2;
+		len = SCSI_READ16(&iscsitpd1->add_len);
+		if ((memcmp(iscsitpd1->add_len, iscsitpd2->add_len, 2) != 0) ||
+		    (memcmp(iscsitpd1->iscsi_name, iscsitpd2->iscsi_name, len)
+		    != 0))
+			return (B_FALSE);
+		}
+		break;
+
+	case PROTOCOL_SRP:
+		{
+		scsi_srp_transport_id_t *srptpd1, *srptpd2;
+
+		srptpd1 = (scsi_srp_transport_id_t *)tpd1;
+		srptpd2 = (scsi_srp_transport_id_t *)tpd2;
+		if (memcmp(srptpd1->srp_name, srptpd2->srp_name,
+		    sizeof (srptpd1->srp_name)) != 0)
+			return (B_FALSE);
+		}
+		break;
+
+	case PROTOCOL_FIBRE_CHANNEL:
+		{
+		scsi_fc_transport_id_t *fctpd1, *fctpd2;
+
+		fctpd1 = (scsi_fc_transport_id_t *)tpd1;
+		fctpd2 = (scsi_fc_transport_id_t *)tpd2;
+		if (memcmp(fctpd1->port_name, fctpd2->port_name,
+		    sizeof (fctpd1->port_name)) != 0)
+			return (B_FALSE);
+		}
+		break;
+
+	case PROTOCOL_PARALLEL_SCSI:
+	case PROTOCOL_SSA:
+	case PROTOCOL_IEEE_1394:
+	case PROTOCOL_SAS:
+	case PROTOCOL_ADT:
+	case PROTOCOL_ATAPI:
+	default:
+		{
+		stmf_dflt_scsi_tptid_t *dflt1, *dflt2;
+		uint16_t len;
+
+		dflt1 = (stmf_dflt_scsi_tptid_t *)tpd1;
+		dflt2 = (stmf_dflt_scsi_tptid_t *)tpd2;
+		len = SCSI_READ16(&dflt1->ident_len);
+		if ((memcmp(dflt1->ident_len, dflt2->ident_len, 2) != 0) ||
+		    (memcmp(dflt1->ident, dflt2->ident, len) != 0))
+			return (B_FALSE);
+		}
+		break;
+	}
+	return (B_TRUE);
+}
+
+/*
+ * Changes devid_desc to corresponding TransportID format
+ * Returns :- pointer to stmf_remote_port_t
+ * Note    :- Allocates continous memory for stmf_remote_port_t and TransportID,
+ *            This memory need to be freed when this remote_port is no longer
+ *            used.
+ */
+stmf_remote_port_t *
+stmf_scsilib_devid_to_remote_port(scsi_devid_desc_t *devid)
+{
+	struct scsi_fc_transport_id	*fc_tpd;
+	struct iscsi_transport_id	*iscsi_tpd;
+	struct scsi_srp_transport_id	*srp_tpd;
+	struct stmf_dflt_scsi_tptid	*dflt_tpd;
+	uint16_t ident_len,  sz = 0;
+	stmf_remote_port_t *rpt = NULL;
+
+	ident_len = devid->ident_length;
+	ASSERT(ident_len);
+	switch (devid->protocol_id) {
+	case PROTOCOL_FIBRE_CHANNEL:
+		sz = sizeof (scsi_fc_transport_id_t);
+		rpt = stmf_remote_port_alloc(sz);
+		rpt->rport_tptid->format_code = 0;
+		rpt->rport_tptid->protocol_id = devid->protocol_id;
+		fc_tpd = (scsi_fc_transport_id_t *)rpt->rport_tptid;
+		/*
+		 * convert from "wwn.xxxxxxxxxxxxxxxx" to 8-byte binary
+		 * skip first 4 byte for "wwn."
+		 */
+		ASSERT(strncmp("wwn.", (char *)devid->ident, 4) == 0);
+		if ((ident_len < SCSI_TPTID_FC_PORT_NAME_SIZE * 2 + 4) ||
+		    !stmf_base16_str_to_binary((char *)devid->ident + 4,
+		    SCSI_TPTID_FC_PORT_NAME_SIZE, fc_tpd->port_name))
+			goto devid_to_remote_port_fail;
+		break;
+
+	case PROTOCOL_iSCSI:
+		sz = ALIGNED_TO_8BYTE_BOUNDARY(sizeof (iscsi_transport_id_t) +
+		    ident_len - 1);
+		rpt = stmf_remote_port_alloc(sz);
+		rpt->rport_tptid->format_code = 0;
+		rpt->rport_tptid->protocol_id = devid->protocol_id;
+		iscsi_tpd = (iscsi_transport_id_t *)rpt->rport_tptid;
+		SCSI_WRITE16(iscsi_tpd->add_len, ident_len);
+		(void) memcpy(iscsi_tpd->iscsi_name, devid->ident, ident_len);
+		break;
+
+	case PROTOCOL_SRP:
+		sz = sizeof (scsi_srp_transport_id_t);
+		rpt = stmf_remote_port_alloc(sz);
+		rpt->rport_tptid->format_code = 0;
+		rpt->rport_tptid->protocol_id = devid->protocol_id;
+		srp_tpd = (scsi_srp_transport_id_t *)rpt->rport_tptid;
+		/*
+		 * convert from "eui.xxxxxxxxxxxxxxx" to 8-byte binary
+		 * skip first 4 byte for "eui."
+		 * Assume 8-byte initiator-extension part of srp_name is NOT
+		 * stored in devid and hence will be set as zero
+		 */
+		ASSERT(strncmp("eui.", (char *)devid->ident, 4) == 0);
+		if ((ident_len < (SCSI_TPTID_SRP_PORT_NAME_LEN - 8) * 2 + 4) ||
+		    !stmf_base16_str_to_binary((char *)devid->ident+4,
+		    SCSI_TPTID_SRP_PORT_NAME_LEN, srp_tpd->srp_name))
+			goto devid_to_remote_port_fail;
+		break;
+
+	case PROTOCOL_PARALLEL_SCSI:
+	case PROTOCOL_SSA:
+	case PROTOCOL_IEEE_1394:
+	case PROTOCOL_SAS:
+	case PROTOCOL_ADT:
+	case PROTOCOL_ATAPI:
+	default :
+		ident_len = devid->ident_length;
+		sz = ALIGNED_TO_8BYTE_BOUNDARY(sizeof (stmf_dflt_scsi_tptid_t) +
+		    ident_len - 1);
+		rpt = stmf_remote_port_alloc(sz);
+		rpt->rport_tptid->format_code = 0;
+		rpt->rport_tptid->protocol_id = devid->protocol_id;
+		dflt_tpd = (stmf_dflt_scsi_tptid_t *)rpt->rport_tptid;
+		SCSI_WRITE16(dflt_tpd->ident_len, ident_len);
+		(void) memcpy(dflt_tpd->ident, devid->ident, ident_len);
+		break;
+	}
+	return (rpt);
+
+devid_to_remote_port_fail:
+	stmf_remote_port_free(rpt);
+	return (NULL);
+
+}
+
+stmf_remote_port_t *
+stmf_remote_port_alloc(uint16_t tptid_sz) {
+	stmf_remote_port_t *rpt;
+	rpt = (stmf_remote_port_t *)kmem_zalloc(
+	    sizeof (stmf_remote_port_t) + tptid_sz, KM_SLEEP);
+	rpt->rport_tptid_sz = tptid_sz;
+	rpt->rport_tptid = (scsi_transport_id_t *)(rpt + 1);
+	return (rpt);
+}
+
+void
+stmf_remote_port_free(stmf_remote_port_t *rpt)
+{
+	/*
+	 * Note: stmf_scsilib_devid_to_remote_port() function allocates
+	 *	remote port structures for all transports in the same way, So
+	 *	it is safe to deallocate it in a protocol independent manner.
+	 *	If any of the allocation method changes, corresponding changes
+	 *	need to be made here too.
+	 */
+	kmem_free(rpt, sizeof (stmf_remote_port_t) + rpt->rport_tptid_sz);
 }

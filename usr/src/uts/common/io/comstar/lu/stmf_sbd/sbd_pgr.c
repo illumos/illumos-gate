@@ -46,11 +46,7 @@ void sbd_handle_pgr_in_cmd(scsi_task_t *, stmf_data_buf_t *);
 void sbd_handle_pgr_out_cmd(scsi_task_t *, stmf_data_buf_t *);
 void sbd_handle_pgr_out_data(scsi_task_t *, stmf_data_buf_t *);
 void sbd_pgr_keylist_dealloc(sbd_lu_t *);
-uint32_t sbd_get_tptid_length_for_devid(scsi_devid_desc_t *);
-uint32_t sbd_devid_desc_to_tptid(scsi_devid_desc_t *, scsi_transport_id_t *);
-scsi_devid_desc_t *sbd_tptid_to_devid_desc(scsi_transport_id_t *, uint32_t *);
 char *sbd_get_devid_string(sbd_lu_t *);
-void sbd_base16_str_to_binary(char *c, int, uint8_t *);
 
 sbd_status_t sbd_pgr_meta_init(sbd_lu_t *);
 sbd_status_t sbd_pgr_meta_load(sbd_lu_t *);
@@ -62,9 +58,9 @@ static void sbd_pgr_remove_key(sbd_lu_t *, sbd_pgr_key_t *);
 static uint32_t sbd_pgr_remove_keys(sbd_lu_t *, sbd_it_data_t *,
 	sbd_pgr_key_t *, uint64_t, boolean_t);
 static boolean_t sbd_pgr_key_compare(sbd_pgr_key_t *, scsi_devid_desc_t *,
-	scsi_devid_desc_t *rpt);
+	stmf_remote_port_t *);
 static sbd_pgr_key_t *sbd_pgr_key_alloc(scsi_devid_desc_t *,
-	scsi_devid_desc_t *, int8_t, int8_t);
+	scsi_transport_id_t *, int16_t, int16_t);
 
 static void sbd_pgr_set_pgr_check_flag(sbd_lu_t *, boolean_t);
 static void sbd_pgr_set_ua_conditions(sbd_lu_t *, sbd_it_data_t *, uint8_t);
@@ -80,7 +76,7 @@ static void sbd_pgr_out_preempt(scsi_task_t *, stmf_data_buf_t *);
 static void sbd_pgr_out_register_and_move(scsi_task_t *, stmf_data_buf_t *);
 
 static sbd_pgr_key_t *sbd_pgr_do_register(sbd_lu_t *, sbd_it_data_t *,
-	scsi_devid_desc_t *, scsi_devid_desc_t *, uint8_t, uint64_t);
+	scsi_devid_desc_t *, stmf_remote_port_t *, uint8_t, uint64_t);
 static void sbd_pgr_do_unregister(sbd_lu_t *, sbd_it_data_t *, sbd_pgr_key_t *);
 static void sbd_pgr_do_release(sbd_lu_t *, sbd_it_data_t *, uint8_t);
 static void sbd_pgr_do_reserve(sbd_pgr_t *, sbd_pgr_key_t *, sbd_it_data_t *it,
@@ -259,7 +255,7 @@ extern char sbd_ctoi(char c);
 				((type) == PGR_TYPE_WR_EX_AR)	|| \
 				((type) == PGR_TYPE_EX_AC_AR))
 
-#define	ALIGNED_TO_WORD_BOUNDARY(i)	(((i) + 7) & ~7)
+#define	ALIGNED_TO_8BYTE_BOUNDARY(i)	(((i) + 7) & ~7)
 
 static void
 sbd_swap_pgr_info(sbd_pgr_info_t *spi)
@@ -307,7 +303,7 @@ sbd_pgr_meta_load(sbd_lu_t *slu)
 	sbd_pgr_key_t		*key, *last_key = NULL;
 	sbd_pgr_key_info_t	*spi_key;
 	sbd_status_t		ret = SBD_SUCCESS;
-	scsi_devid_desc_t	*lpt, *rpt;
+	scsi_devid_desc_t	*lpt;
 	uint8_t			*ptr, *keyoffset,  *endoffset;
 	uint32_t		i, sz;
 
@@ -321,6 +317,7 @@ sbd_pgr_meta_load(sbd_lu_t *slu)
 		}
 		return (ret);
 	}
+
 	if (spi->pgr_data_order != SMS_DATA_ORDER) {
 		sbd_swap_pgr_info(spi);
 	}
@@ -332,6 +329,7 @@ sbd_pgr_meta_load(sbd_lu_t *slu)
 	} else {
 		PGR_CLEAR_RSV_FLAG(pgr->pgr_flags);
 	}
+
 	PGR_CLEAR_FLAG(slu->sl_pgr->pgr_flags, SBD_PGR_ALL_KEYS_HAS_IT);
 
 	endoffset	= (uint8_t *)spi;
@@ -345,7 +343,7 @@ sbd_pgr_meta_load(sbd_lu_t *slu)
 		}
 
 		/* Calculate the size and next offset */
-		sz = ALIGNED_TO_WORD_BOUNDARY(sizeof (sbd_pgr_key_info_t) - 1 +
+		sz = ALIGNED_TO_8BYTE_BOUNDARY(sizeof (sbd_pgr_key_info_t) - 1 +
 		    spi_key->pgr_key_lpt_len + spi_key->pgr_key_rpt_len);
 		keyoffset += sz;
 
@@ -353,20 +351,46 @@ sbd_pgr_meta_load(sbd_lu_t *slu)
 		if (spi_key->pgr_key_rpt_len == 0 || endoffset < keyoffset ||
 		    (spi_key->pgr_key_lpt_len == 0 &&
 		    !(spi_key->pgr_key_flags & SBD_PGR_KEY_ALL_TG_PT))) {
-			char *lun_name = sbd_get_devid_string(slu);
-			sbd_pgr_keylist_dealloc(slu);
-			kmem_free(spi, spi->pgr_sms_header.sms_size);
-			cmn_err(CE_WARN, "sbd_pgr_meta_load: Failed to load "
-			    "PGR meta data for lun %s.", lun_name);
-			kmem_free(lun_name, strlen(lun_name) + 1);
-			return (SBD_META_CORRUPTED);
+			ret = SBD_META_CORRUPTED;
+			goto sbd_pgr_meta_load_failed;
 		}
 
 		lpt = (scsi_devid_desc_t *)spi_key->pgr_key_it;
 		ptr = (uint8_t *)spi_key->pgr_key_it + spi_key->pgr_key_lpt_len;
-		rpt = (scsi_devid_desc_t *)ptr;
-		key = sbd_pgr_key_alloc(lpt, rpt, spi_key->pgr_key_lpt_len,
-		    spi_key->pgr_key_rpt_len);
+
+		if (spi_key->pgr_key_flags & SBD_PGR_KEY_TPT_ID_FLAG) {
+			uint16_t tpd_len = 0;
+
+			if (!stmf_scsilib_tptid_validate(
+			    (scsi_transport_id_t *)ptr,
+			    spi_key->pgr_key_rpt_len, &tpd_len)) {
+				ret = SBD_META_CORRUPTED;
+				goto sbd_pgr_meta_load_failed;
+			}
+			if (tpd_len != spi_key->pgr_key_rpt_len) {
+				ret = SBD_META_CORRUPTED;
+				goto sbd_pgr_meta_load_failed;
+			}
+			key = sbd_pgr_key_alloc(lpt, (scsi_transport_id_t *)ptr,
+			    spi_key->pgr_key_lpt_len, spi_key->pgr_key_rpt_len);
+		} else {
+			stmf_remote_port_t	*rpt = NULL;
+
+			/*
+			 * This block is executed only if the metadata was
+			 * stored before the implementation of Transport ID
+			 * support.
+			 */
+			rpt = stmf_scsilib_devid_to_remote_port(
+			    (scsi_devid_desc_t *)ptr);
+			if (rpt == NULL) {
+				ret = SBD_META_CORRUPTED;
+				goto sbd_pgr_meta_load_failed;
+			}
+			key = sbd_pgr_key_alloc(lpt, rpt->rport_tptid,
+			    spi_key->pgr_key_lpt_len, rpt->rport_tptid_sz);
+			stmf_remote_port_free(rpt);
+		}
 
 		key->pgr_key		= spi_key->pgr_key;
 		key->pgr_key_flags	= spi_key->pgr_key_flags;
@@ -387,6 +411,17 @@ sbd_pgr_meta_load(sbd_lu_t *slu)
 
 	kmem_free(spi, spi->pgr_sms_header.sms_size);
 	return (ret);
+
+sbd_pgr_meta_load_failed:
+	{
+	char *lun_name = sbd_get_devid_string(slu);
+	sbd_pgr_keylist_dealloc(slu);
+	kmem_free(spi, spi->pgr_sms_header.sms_size);
+	cmn_err(CE_WARN, "sbd_pgr_meta_load: Failed to load PGR meta data "
+	    "for lun %s.", lun_name);
+	kmem_free(lun_name, strlen(lun_name) + 1);
+	return (ret);
+	}
 }
 
 sbd_status_t
@@ -404,7 +439,7 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 	if (pgr->pgr_flags & SBD_PGR_APTPL) {
 		key = pgr->pgr_keylist;
 		while (key != NULL) {
-			sz = ALIGNED_TO_WORD_BOUNDARY(sz +
+			sz = ALIGNED_TO_8BYTE_BOUNDARY(sz +
 			    sizeof (sbd_pgr_key_info_t) - 1 +
 			    key->pgr_key_lpt_len + key->pgr_key_rpt_len);
 			key = key->pgr_key_next;
@@ -430,6 +465,7 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 		while (key != NULL) {
 			spi_key = (sbd_pgr_key_info_t *)((uint8_t *)spi + sz);
 			spi_key->pgr_key = key->pgr_key;
+			spi_key->pgr_key_flags = key->pgr_key_flags;
 			spi_key->pgr_key_lpt_len = key->pgr_key_lpt_len;
 			spi_key->pgr_key_rpt_len = key->pgr_key_rpt_len;
 			ptr = spi_key->pgr_key_it;
@@ -442,7 +478,7 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 				spi->pgr_rsvholder_indx = spi->pgr_numkeys;
 			}
 
-			sz = ALIGNED_TO_WORD_BOUNDARY(sz +
+			sz = ALIGNED_TO_8BYTE_BOUNDARY(sz +
 			    sizeof (sbd_pgr_key_info_t) - 1 +
 			    key->pgr_key_lpt_len + key->pgr_key_rpt_len);
 			key = key->pgr_key_next;
@@ -476,25 +512,24 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 }
 
 static sbd_pgr_key_t *
-sbd_pgr_key_alloc(scsi_devid_desc_t *lptid, scsi_devid_desc_t *rptid,
-					int8_t lpt_len, int8_t rpt_len)
+sbd_pgr_key_alloc(scsi_devid_desc_t *lptid, scsi_transport_id_t *rptid,
+					int16_t lpt_len, int16_t rpt_len)
 {
 	sbd_pgr_key_t *key;
 
 	key = (sbd_pgr_key_t *)kmem_zalloc(sizeof (sbd_pgr_key_t), KM_SLEEP);
 
-	if (lpt_len >= sizeof (scsi_devid_desc_t)) {
-		ASSERT(lptid);
+	if (lptid && lpt_len >= sizeof (scsi_devid_desc_t)) {
 		key->pgr_key_lpt_len = lpt_len;
 		key->pgr_key_lpt_id  = (scsi_devid_desc_t *)kmem_zalloc(
 		    lpt_len, KM_SLEEP);
 		bcopy(lptid, key->pgr_key_lpt_id, lpt_len);
 	}
 
-	if (rpt_len >= sizeof (scsi_devid_desc_t)) {
-		ASSERT(rptid);
+	if (rptid && rpt_len >= sizeof (scsi_transport_id_t)) {
+		key->pgr_key_flags |= SBD_PGR_KEY_TPT_ID_FLAG;
 		key->pgr_key_rpt_len = rpt_len;
-		key->pgr_key_rpt_id  = (scsi_devid_desc_t *)kmem_zalloc(
+		key->pgr_key_rpt_id  = (scsi_transport_id_t *)kmem_zalloc(
 		    rpt_len, KM_SLEEP);
 		bcopy(rptid, key->pgr_key_rpt_id, rpt_len);
 	}
@@ -673,15 +708,12 @@ sbd_pgr_set_pgr_check_flag(sbd_lu_t *slu, boolean_t registered)
 
 static boolean_t
 sbd_pgr_key_compare(sbd_pgr_key_t *key, scsi_devid_desc_t *lpt,
-					scsi_devid_desc_t *rpt)
+					stmf_remote_port_t *rpt)
 {
 	scsi_devid_desc_t *id;
 
-	id = key->pgr_key_rpt_id;
-	if ((rpt->ident_length != id->ident_length) ||
-	    (memcmp(id->ident, rpt->ident, id->ident_length) != 0)) {
+	if (!stmf_scsilib_tptid_compare(rpt->rport_tptid, key->pgr_key_rpt_id))
 			return (B_FALSE);
-	}
 
 	/*
 	 * You can skip target port name comparison if ALL_TG_PT flag
@@ -691,7 +723,7 @@ sbd_pgr_key_compare(sbd_pgr_key_t *key, scsi_devid_desc_t *lpt,
 		id = key->pgr_key_lpt_id;
 		if ((lpt->ident_length != id->ident_length) ||
 		    (memcmp(id->ident, lpt->ident, id->ident_length) != 0)) {
-				return (B_FALSE);
+			return (B_FALSE);
 		}
 	}
 	return (B_TRUE);
@@ -700,7 +732,7 @@ sbd_pgr_key_compare(sbd_pgr_key_t *key, scsi_devid_desc_t *lpt,
 
 sbd_pgr_key_t *
 sbd_pgr_key_registered(sbd_pgr_t *pgr, scsi_devid_desc_t *lpt,
-					scsi_devid_desc_t *rpt)
+					stmf_remote_port_t *rpt)
 {
 	sbd_pgr_key_t *key;
 
@@ -719,11 +751,13 @@ sbd_pgr_initialize_it(scsi_task_t *task, sbd_it_data_t *it)
 	stmf_scsi_session_t	*ses = task->task_session;
 	sbd_pgr_t		*pgr = slu->sl_pgr;
 	sbd_pgr_key_t		*key;
-	scsi_devid_desc_t	*lpt, *rpt, *id;
+	scsi_devid_desc_t	*lpt, *id;
+	stmf_remote_port_t	*rpt;
 
 	if (pgr->pgr_flags & SBD_PGR_ALL_KEYS_HAS_IT)
 		return;
-	rpt = ses->ss_rport_id;
+
+	rpt = ses->ss_rport;
 	lpt = ses->ss_lport->lport_id;
 
 	rw_enter(&pgr->pgr_lock, RW_WRITER);
@@ -929,7 +963,8 @@ sbd_handle_pgr_out_data(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	sbd_pgr_key_t		*key;
 	scsi_prout_plist_t	*plist;
 	uint64_t		rsv_key;
-	uint8_t			*buf, buflen;
+	uint32_t		buflen;
+	uint8_t			*buf;
 
 	ASSERT(task->task_cdb[0] == SCMD_PERSISTENT_RESERVE_OUT);
 
@@ -1125,6 +1160,11 @@ sbd_pgr_in_report_capabilities(scsi_task_t *task,
 	    cdb_len, 8);
 }
 
+/* Minimum required size, SPC3 rev23 Table 110 */
+#define	PGR_IN_READ_FULL_STATUS_MINBUFSZ	8
+/* Full Satus Descriptor Fromat size, SPC3 rev23 Table 111 */
+#define	PGR_IN_READ_FULL_STATUS_DESCFMTSZ	24
+
 static void
 sbd_pgr_in_read_full_status(scsi_task_t *task,
 				stmf_data_buf_t *initial_dbuf)
@@ -1134,23 +1174,25 @@ sbd_pgr_in_read_full_status(scsi_task_t *task,
 	sbd_pgr_key_t	*key;
 	scsi_prin_status_t 	*sts;
 	scsi_prin_full_status_t	*buf;
-	uint32_t 		i, buf_size, cdb_len, tptid_len;
+	uint32_t 		i, buf_size, cdb_len;
 	uint8_t			*offset;
 
 	ASSERT(task->task_cdb[0] == SCMD_PERSISTENT_RESERVE_IN);
 	ASSERT(pgr != NULL);
 
+	/* 4 byte allocation length for CDB, SPC3 rev23, Table 101 */
 	cdb_len = READ_SCSI16(&task->task_cdb[7], uint16_t);
 
-	buf_size = 8; /* PRgeneration and additional length fields */
+	/* PRgeneration and additional length fields */
+	buf_size = PGR_IN_READ_FULL_STATUS_MINBUFSZ;
 	for (key = pgr->pgr_keylist; key != NULL; key = key->pgr_key_next) {
-		tptid_len = sbd_get_tptid_length_for_devid(key->pgr_key_rpt_id);
-		buf_size  = buf_size + 24 + tptid_len;
+		buf_size  = buf_size + PGR_IN_READ_FULL_STATUS_DESCFMTSZ +
+		    key->pgr_key_rpt_len;
 	}
 
 	buf = kmem_zalloc(buf_size, KM_SLEEP);
 	SCSI_WRITE32(buf->PRgeneration, pgr->pgr_PRgeneration);
-	SCSI_WRITE32(buf->add_len, buf_size - 8);
+	SCSI_WRITE32(buf->add_len, buf_size - PGR_IN_READ_FULL_STATUS_MINBUFSZ);
 
 	offset	= (uint8_t *)&buf->full_desc[0];
 	key	= pgr->pgr_keylist;
@@ -1171,10 +1213,11 @@ sbd_pgr_in_read_full_status(scsi_task_t *task,
 			SCSI_WRITE16(sts->rel_tgt_port_id,
 			    stmf_scsilib_get_lport_rtid(key->pgr_key_lpt_id));
 		}
-		tptid_len = sbd_devid_desc_to_tptid(key->pgr_key_rpt_id,
-		    &sts->trans_id);
-		SCSI_WRITE32(sts->add_len, tptid_len);
-		offset = offset + tptid_len + 24;
+		SCSI_WRITE32(sts->add_len, key->pgr_key_rpt_len);
+		offset += PGR_IN_READ_FULL_STATUS_DESCFMTSZ;
+		(void) memcpy(offset, key->pgr_key_rpt_id,
+		    key->pgr_key_rpt_len);
+		offset += key->pgr_key_rpt_len;
 		key = key->pgr_key_next;
 		++i;
 	}
@@ -1194,8 +1237,11 @@ sbd_pgr_out_register(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	sbd_it_data_t		*it	= task->task_lu_itl_handle;
 	sbd_pgr_key_t		*key	= it->pgr_key_ptr;
 	scsi_cdb_prout_t	*pr_out	= (scsi_cdb_prout_t *)task->task_cdb;
+	scsi_devid_desc_t	*lpt	= ses->ss_lport->lport_id;
 	scsi_prout_plist_t	*plist;
-	uint8_t			*buf, buflen;
+	stmf_remote_port_t	rport;
+	uint8_t			*buf, keyflag;
+	uint32_t		buflen;
 	uint64_t		rsv_key, svc_key;
 
 	buf = dbuf->db_sglist[0].seg_addr;
@@ -1248,11 +1294,18 @@ sbd_pgr_out_register(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		return;
 	}
 
+	keyflag = SBD_PGR_KEY_TPT_ID_FLAG;
+	if (plist->all_tg_pt) {
+		keyflag |= SBD_PGR_KEY_ALL_TG_PT;
+		lpt = NULL;
+	}
+
 	if (plist->spec_i_pt) {
-		uint8_t *tpd, *tpdmax;
-		uint32_t tpdlen, max_tpdnum, tpdnum, i, adnlen = 0;
-		scsi_devid_desc_t **newdevids;
-		scsi_devid_desc_t *rpt, *lpt = ses->ss_lport->lport_id;
+		uint32_t max_tpdnum, tpdnum, i, adn_len = 0;
+		uint16_t tpd_sz = 0;
+		uint8_t *adn_dat;
+		scsi_transport_id_t *tpd;
+		stmf_remote_port_t *rpt_ary;
 
 		if (pr_out->action == PR_OUT_REGISTER_AND_IGNORE_EXISTING_KEY) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
@@ -1260,70 +1313,76 @@ sbd_pgr_out_register(scsi_task_t *task, stmf_data_buf_t *dbuf)
 			return;
 		}
 
-		if (plist->all_tg_pt)
-			lpt = NULL;
-
-		/* Validate the given length */
-		if (buflen >= sizeof (scsi_prout_plist_t) - 1 + 4)
-			adnlen = READ_SCSI32(plist->apd, uint32_t);
-		if (adnlen < sizeof (scsi_transport_id_t) + 4 ||
-		    buflen < sizeof (scsi_prout_plist_t) - 1 + adnlen) {
+		/* Length validation SPC3 rev23 Section 6.12.3 and Table 115 */
+		if (buflen >= sizeof (scsi_prout_plist_t) - 1 +
+		    sizeof (uint32_t))
+			adn_len = READ_SCSI32(plist->apd, uint32_t);
+		/* SPC3 rev23, adn_len should be multiple of 4 */
+		if (adn_len % 4 != 0 ||
+		    adn_len < sizeof (scsi_transport_id_t) +
+		    sizeof (uint32_t) ||
+		    buflen < sizeof (scsi_prout_plist_t) - 1 + adn_len) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
 			    STMF_SAA_PARAM_LIST_LENGTH_ERROR);
 			return;
 		}
-		tpdmax = plist->apd + adnlen + 4;
-		tpdlen = adnlen;
-		max_tpdnum = tpdlen / sizeof (scsi_transport_id_t);
-		newdevids  = kmem_zalloc(sizeof (scsi_devid_desc_t *) *
-		    max_tpdnum, KM_SLEEP);
+
 		tpdnum = 0;
+		adn_dat = plist->apd + sizeof (uint32_t);
+		max_tpdnum = adn_len / sizeof (scsi_transport_id_t);
+		rpt_ary = (stmf_remote_port_t *)kmem_zalloc(
+		    sizeof (stmf_remote_port_t) * max_tpdnum, KM_SLEEP);
+
 		/* Check the validity of given TransportIDs */
-		while (tpdlen != 0) {
-			tpd = tpdmax - tpdlen;
-			rpt = sbd_tptid_to_devid_desc((scsi_transport_id_t *)
-			    tpd, &tpdlen);
-			if (rpt == NULL)
+		while (adn_len != 0) {
+			if (!stmf_scsilib_tptid_validate(
+			    (scsi_transport_id_t *)adn_dat, adn_len, &tpd_sz))
 				break;
+			/* SPC3 rev23, tpd_sz should be multiple of 4 */
+			if (tpd_sz == 0 || tpd_sz % 4 != 0)
+				break;
+			tpd = (scsi_transport_id_t *)adn_dat;
+
 			/* make sure that there is no duplicates */
 			for (i = 0; i < tpdnum; i++) {
-				if (rpt->ident_length ==
-				    newdevids[i]->ident_length &&
-				    (memcmp(rpt->ident, newdevids[i]->ident,
-				    rpt->ident_length) == 0)) {
+				if (stmf_scsilib_tptid_compare(
+				    rpt_ary[i].rport_tptid, tpd))
 					break;
-				}
 			}
-			newdevids[tpdnum] = rpt;
-			tpdnum++;
-			if (i < tpdnum - 1)
+			if (i < tpdnum)
 				break;
+
+			rpt_ary[tpdnum].rport_tptid = tpd;
+			rpt_ary[tpdnum].rport_tptid_sz = tpd_sz;
+
 			/* Check if the given IT nexus is already registered */
-			if (sbd_pgr_key_registered(pgr, lpt, rpt))
+			if (sbd_pgr_key_registered(pgr, lpt, &rpt_ary[tpdnum]))
 				break;
+
+			adn_len -= tpd_sz;
+			adn_dat += tpd_sz;
+			tpdnum++;
 		}
 
-		for (i = 0; i < tpdnum; i++) {
-			rpt = newdevids[i];
-			if (tpdlen == 0) {
-				(void) sbd_pgr_do_register(slu, NULL,
-				    ses->ss_lport->lport_id, rpt,
-				    plist->all_tg_pt, svc_key);
-			}
-			kmem_free(rpt, sizeof (scsi_devid_desc_t) - 1 +
-			    rpt->ident_length);
-		}
-		kmem_free(newdevids,
-		    sizeof (scsi_devid_desc_t *) * max_tpdnum);
-		if (tpdlen != 0) {
+		if (adn_len != 0) {
+			kmem_free(rpt_ary,
+			    sizeof (stmf_remote_port_t) * max_tpdnum);
 			stmf_scsilib_send_status(task, STATUS_CHECK,
 			    STMF_SAA_INVALID_FIELD_IN_CDB);
 			return;
 		}
+
+		for (i = 0; i < tpdnum; i++) {
+			(void) sbd_pgr_do_register(slu, NULL, lpt, &rpt_ary[i],
+			    keyflag, svc_key);
+		}
+		kmem_free(rpt_ary, sizeof (stmf_remote_port_t) * max_tpdnum);
 	}
 
-	(void) sbd_pgr_do_register(slu, it, ses->ss_lport->lport_id,
-	    ses->ss_rport_id, plist->all_tg_pt, svc_key);
+	rport.rport_tptid = ses->ss_rport->rport_tptid;
+	rport.rport_tptid_sz = ses->ss_rport->rport_tptid_sz;
+
+	(void) sbd_pgr_do_register(slu, it, lpt, &rport, keyflag, svc_key);
 
 sbd_pgr_reg_done:
 
@@ -1346,20 +1405,21 @@ sbd_pgr_reg_done:
 
 static sbd_pgr_key_t *
 sbd_pgr_do_register(sbd_lu_t *slu, sbd_it_data_t *it, scsi_devid_desc_t *lpt,
-		scsi_devid_desc_t *rpt,	uint8_t all_tg_pt, uint64_t svc_key)
+		stmf_remote_port_t *rpt, uint8_t keyflag, uint64_t svc_key)
 {
 	sbd_pgr_t		*pgr = slu->sl_pgr;
 	sbd_pgr_key_t		*key;
-	uint16_t		lpt_len, rpt_len;
+	uint16_t		lpt_len = 0;
 
-	lpt_len	= sizeof (scsi_devid_desc_t) - 1 + lpt->ident_length;
-	rpt_len	= sizeof (scsi_devid_desc_t) - 1 + rpt->ident_length;
+	if (lpt)
+		lpt_len	= sizeof (scsi_devid_desc_t) + lpt->ident_length;
 
-	key = sbd_pgr_key_alloc(lpt, rpt, lpt_len, rpt_len);
+	key = sbd_pgr_key_alloc(lpt, rpt->rport_tptid,
+	    lpt_len, rpt->rport_tptid_sz);
 	key->pgr_key = svc_key;
+	key->pgr_key_flags |= keyflag;
 
-	if (all_tg_pt) {
-		key->pgr_key_flags |= SBD_PGR_KEY_ALL_TG_PT;
+	if (key->pgr_key_flags & SBD_PGR_KEY_ALL_TG_PT) {
 		/* set PGR_CHECK flag for all unregistered IT nexus */
 		sbd_pgr_set_pgr_check_flag(slu, B_FALSE);
 	} else {
@@ -1370,6 +1430,8 @@ sbd_pgr_do_register(sbd_lu_t *slu, sbd_it_data_t *it, scsi_devid_desc_t *lpt,
 		mutex_enter(&slu->sl_lock);
 		it->pgr_key_ptr = key;
 		mutex_exit(&slu->sl_lock);
+	} else {
+		sbd_pgr_set_pgr_check_flag(slu, B_FALSE);
 	}
 
 	key->pgr_key_next = pgr->pgr_keylist;
@@ -1461,7 +1523,7 @@ sbd_pgr_do_reserve(sbd_pgr_t *pgr, sbd_pgr_key_t *key, sbd_it_data_t *it,
 				kmem_free(lpt, lpt_len);
 			}
 			lpt = ses->ss_lport->lport_id;
-			lpt_len = sizeof (scsi_devid_desc_t) - 1 +
+			lpt_len = sizeof (scsi_devid_desc_t) +
 			    lpt->ident_length;
 			key->pgr_key_lpt_len = lpt_len;
 			key->pgr_key_lpt_id = (scsi_devid_desc_t *)
@@ -1679,11 +1741,13 @@ sbd_pgr_out_register_and_move(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	sbd_it_data_t		*it	= task->task_lu_itl_handle;
 	sbd_pgr_t		*pgr	= slu->sl_pgr;
 	sbd_pgr_key_t		*key	= it->pgr_key_ptr;
-	scsi_devid_desc_t	*lpt, *rpt;
+	scsi_devid_desc_t	*lpt;
+	stmf_remote_port_t	rport;
 	sbd_pgr_key_t		*newkey;
 	scsi_prout_reg_move_plist_t *plist;
 	uint8_t			*buf, lpt_len;
-	uint32_t		tpd_len;
+	uint16_t		tpd_len;
+	uint32_t		adn_len;
 	uint64_t		svc_key;
 
 	/*
@@ -1712,24 +1776,26 @@ sbd_pgr_out_register_and_move(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		return;
 	}
 
-	tpd_len = READ_SCSI32(plist->tptid_len, uint32_t);
-	rpt = sbd_tptid_to_devid_desc((scsi_transport_id_t *)plist->tptid,
-	    &tpd_len);
-	if (rpt == NULL) {
-		stmf_scsilib_send_status(task, STATUS_CHECK,
-		    STMF_SAA_INVALID_FIELD_IN_PARAM_LIST);
-		return;
-	} else if (rpt->ident_length == key->pgr_key_rpt_id->ident_length &&
-	    (memcmp(rpt->ident, key->pgr_key_rpt_id->ident, rpt->ident_length)
-	    == 0)) {
-		kmem_free(rpt, sizeof (rpt) - 1 + rpt->ident_length);
-		kmem_free(lpt, sizeof (lpt) - 1 + lpt->ident_length);
+	adn_len = READ_SCSI32(plist->tptid_len, uint32_t);
+	if (!stmf_scsilib_tptid_validate(
+	    (scsi_transport_id_t *)plist->tptid, adn_len, &tpd_len)) {
+		kmem_free(lpt, sizeof (scsi_devid_desc_t) + lpt->ident_length);
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_INVALID_FIELD_IN_PARAM_LIST);
 		return;
 	}
 
-	newkey = sbd_pgr_key_registered(pgr, lpt, rpt);
+	rport.rport_tptid = (scsi_transport_id_t *)plist->tptid;
+	rport.rport_tptid_sz = tpd_len;
+
+	if (sbd_pgr_key_compare(key, lpt, &rport)) {
+		kmem_free(lpt, sizeof (scsi_devid_desc_t) + lpt->ident_length);
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_PARAM_LIST);
+		return;
+	}
+
+	newkey = sbd_pgr_key_registered(pgr, lpt, &rport);
 	if (newkey) {
 		/* Set the pgr_key, irrespective of what it currently holds */
 		newkey->pgr_key = svc_key;
@@ -1741,19 +1807,21 @@ sbd_pgr_out_register_and_move(scsi_task_t *task, stmf_data_buf_t *dbuf)
 				kmem_free(newkey->pgr_key_lpt_id,
 				    newkey->pgr_key_lpt_len);
 			}
-			lpt_len = sizeof (scsi_devid_desc_t) - 1 +
+			lpt_len = sizeof (scsi_devid_desc_t) +
 			    lpt->ident_length;
 			newkey->pgr_key_lpt_len = lpt_len;
 			newkey->pgr_key_lpt_id = (scsi_devid_desc_t *)
 			    kmem_zalloc(lpt_len, KM_SLEEP);
 			bcopy(lpt, newkey->pgr_key_lpt_id, lpt_len);
 		}
+		/* No IT nexus information, hence set PGR_CHEK flag */
+		sbd_pgr_set_pgr_check_flag(slu, B_TRUE);
 	} else  {
-		newkey = sbd_pgr_do_register(slu, NULL, lpt, rpt, 0, svc_key);
+		newkey = sbd_pgr_do_register(slu, NULL, lpt, &rport,
+		    SBD_PGR_KEY_TPT_ID_FLAG, svc_key);
 	}
 
-	kmem_free(rpt, sizeof (scsi_devid_desc_t) - 1 + rpt->ident_length);
-	kmem_free(lpt, sizeof (scsi_devid_desc_t) - 1 + lpt->ident_length);
+	kmem_free(lpt, sizeof (scsi_devid_desc_t) + lpt->ident_length);
 
 	/* Now reserve the key corresponding to the specified IT nexus */
 	pgr->pgr_rsvholder = newkey;
@@ -1762,8 +1830,6 @@ sbd_pgr_out_register_and_move(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		sbd_pgr_do_unregister(slu, it, key);
 	}
 
-	/* Since we do not have IT nexus information, set PGR_CHEK flag */
-	sbd_pgr_set_pgr_check_flag(slu, B_TRUE);
 
 	/* Write to disk if currenty aptpl is set or given task is setting it */
 	if (pgr->pgr_flags & SBD_PGR_APTPL || plist->aptpl) {
@@ -1807,155 +1873,6 @@ sbd_pgr_remove_it_handle(sbd_lu_t *sl, sbd_it_data_t *my_it) {
 
 }
 
-scsi_devid_desc_t *
-sbd_tptid_to_devid_desc(scsi_transport_id_t *tptid, uint32_t *tptid_len)
-{
-
-	scsi_devid_desc_t *devid = NULL;
-	uint16_t ident_len,  sz;
-
-	struct scsi_fc_transport_id	*fcid;
-	struct iscsi_transport_id	*iscsiid;
-	struct scsi_srp_transport_id	*srpid;
-	char	eui_str[20+1];
-
-	switch (tptid->protocol_id) {
-
-	case PROTOCOL_FIBRE_CHANNEL:
-
-		if (*tptid_len < 24 || tptid->format_code != 0) {
-			return (NULL);
-		}
-		*tptid_len -= 24;
-		ident_len = 20; /* wwn.XXXXXXXXXXXXXXXX */
-		fcid	= (scsi_fc_transport_id_t *)tptid;
-		sz	= sizeof (scsi_devid_desc_t) - 1 + ident_len;
-		devid	= (scsi_devid_desc_t *)kmem_zalloc(sz, KM_SLEEP);
-		stmf_wwn_to_devid_desc(devid, fcid->port_name,
-		    PROTOCOL_FIBRE_CHANNEL);
-		return (devid);
-
-	case PROTOCOL_iSCSI:
-
-		if (tptid->format_code != 0 && tptid->format_code != 1) {
-			return (NULL);
-		}
-		iscsiid 	= (iscsi_transport_id_t *)tptid;
-		ident_len 	= READ_SCSI16(iscsiid->add_len, uint16_t);
-		if (*tptid_len < sizeof (iscsi_transport_id_t) + ident_len) {
-			return (NULL);
-		}
-		*tptid_len -= (sizeof (iscsi_transport_id_t) + ident_len);
-		sz	= sizeof (scsi_devid_desc_t) - 1 + ident_len;
-		devid	= (scsi_devid_desc_t *)kmem_zalloc(sz, KM_SLEEP);
-		(void) memcpy(devid->ident, iscsiid->iscsi_name, ident_len);
-		/* LINTED E_ASSIGN_NARROW_CONV */
-		devid->ident_length	= ident_len;
-		devid->protocol_id	= tptid->protocol_id;
-		devid->code_set		= CODE_SET_ASCII;
-		return (devid);
-
-	case PROTOCOL_SRP:
-		if (*tptid_len < 24 || tptid->format_code != 0) {
-			return (NULL);
-		}
-		*tptid_len -= 24;
-		srpid	= (scsi_srp_transport_id_t *)tptid;
-		ident_len = sizeof (eui_str) - 1; /* eui.XXXXXXXXXXXXXXXX */
-		sz	= sizeof (scsi_devid_desc_t) - 1 + ident_len;
-		devid	= (scsi_devid_desc_t *)kmem_zalloc(sz, KM_SLEEP);
-		/* ASSUME: initiator-extension of srp_name is zero */
-		(void) snprintf(eui_str, sizeof (eui_str), "eui.%016llX",
-		    (u_longlong_t)BE_IN64(srpid->srp_name));
-		bcopy(eui_str, devid->ident, ident_len);
-		/* LINTED E_ASSIGN_NARROW_CONV */
-		devid->ident_length	= ident_len;
-		devid->protocol_id	= tptid->protocol_id;
-		devid->code_set		= CODE_SET_ASCII;
-		return (devid);
-
-	default:
-		cmn_err(CE_NOTE, "sbd_tptid_to_devid_desc: received unknown"
-		    "protocol id 0x%x", tptid->protocol_id);
-		return (NULL);
-	}
-}
-
-/*
- * Changes devid_desc to corresponding TransportID format
- * Returns : Total length used by TransportID
- * Note    :- No buffer length checking
- */
-uint32_t
-sbd_devid_desc_to_tptid(scsi_devid_desc_t *devid, scsi_transport_id_t *tptid)
-{
-	struct scsi_fc_transport_id	*fcid;
-	struct iscsi_transport_id	*iscsiid;
-	struct scsi_srp_transport_id	*srpid;
-	uint32_t ident_len,  sz = 0;
-
-	switch (devid->protocol_id) {
-	case PROTOCOL_FIBRE_CHANNEL:
-		fcid = (scsi_fc_transport_id_t *)tptid;
-		tptid->format_code = 0;
-		tptid->protocol_id = devid->protocol_id;
-		/* convert from "wwn.XXXXXXXXXXXXXXXX" to 8-byte binary */
-		ASSERT(strncmp("wwn.", (char *)devid->ident, 4) == 0);
-		sbd_base16_str_to_binary((char *)devid->ident + 4, 16,
-		    fcid->port_name);
-		sz = 24;
-		break;
-
-	case PROTOCOL_iSCSI:
-		iscsiid = (iscsi_transport_id_t *)tptid;
-		ident_len = devid->ident_length;
-		tptid->format_code = 0;
-		tptid->protocol_id = devid->protocol_id;
-		SCSI_WRITE16(iscsiid->add_len, ident_len);
-		(void) memcpy(iscsiid->iscsi_name, devid->ident, ident_len);
-		sz = ALIGNED_TO_WORD_BOUNDARY(4 + ident_len);
-		break;
-
-	case PROTOCOL_SRP:
-		srpid = (scsi_srp_transport_id_t *)tptid;
-		tptid->format_code = 0;
-		tptid->protocol_id = devid->protocol_id;
-		/* convert from "eui.XXXXXXXXXXXXXXXX" to 8-byte binary */
-		ASSERT(strncmp("eui.", (char *)devid->ident, 4) == 0);
-		sbd_base16_str_to_binary((char *)devid->ident+4, 16,
-		    srpid->srp_name);
-		/* ASSUME: initiator-extension part of srp_name is zero */
-		sz = 24;
-		break;
-
-	default :
-		cmn_err(CE_NOTE, "sbd_devid_desc_to_tptid: received unknown"
-		    " protocol id 0x%x", devid->protocol_id);
-		break;
-	}
-
-	return (sz);
-}
-
-uint32_t
-sbd_get_tptid_length_for_devid(scsi_devid_desc_t *devid)
-{
-	uint32_t sz = 0;
-	switch (devid->protocol_id) {
-	case PROTOCOL_SRP:
-	case PROTOCOL_FIBRE_CHANNEL:
-		sz = 24;
-		break;
-	case PROTOCOL_iSCSI:
-		sz = 4 + devid->ident_length;
-		break;
-	}
-	sz = ALIGNED_TO_WORD_BOUNDARY(sz);
-	sz = (sz > 0 && sz < 24) ? 24 : sz;
-
-	return (sz);
-}
-
 char *
 sbd_get_devid_string(sbd_lu_t *sl)
 {
@@ -1969,24 +1886,4 @@ sbd_get_devid_string(sbd_lu_t *sl)
 	    sl->sl_device_id[16], sl->sl_device_id[17], sl->sl_device_id[18],
 	    sl->sl_device_id[19]);
 	return (str);
-}
-
-/* Convert from Hex value in ASCII format to the equivalent bytes */
-void
-sbd_base16_str_to_binary(char *c, int len, uint8_t *dp)
-{
-	int		ii;
-
-	ASSERT((len & 1) == 0);
-
-	for (ii = 0; ii < len / 2; ii++) {
-		char nibble1, nibble2;
-		char enc_char = *c++;
-		nibble1 = sbd_ctoi(enc_char);
-
-		enc_char = *c++;
-		nibble2 = sbd_ctoi(enc_char);
-
-		dp[ii] = (nibble1 << 4) | nibble2;
-	}
 }

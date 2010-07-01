@@ -32,6 +32,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/scsi/scsi.h>
+#include <sys/scsi/generic/persist.h>
 #include <sys/byteorder.h>
 #include <sys/nvpair.h>
 #include <sys/door.h>
@@ -94,6 +95,14 @@
 #define	NVLIST_ADD_DEVID(structure, field)				\
 	do {								\
 		rc = stmf_ic_scsi_devid_desc_marshal(nvl, #field,	\
+		    structure->field);					\
+		if (rc) goto done;					\
+		_NOTE(CONSTCOND)					\
+	} while (0)
+
+#define	NVLIST_ADD_RPORT(structure, field)				\
+	do {								\
+		rc = stmf_ic_remote_port_marshal(nvl, #field,		\
 		    structure->field);					\
 		if (rc) goto done;					\
 		_NOTE(CONSTCOND)					\
@@ -260,6 +269,8 @@ static int stmf_ic_session_create_destroy_msg_marshal(nvlist_t *nvl, void *msg);
 static int stmf_ic_echo_request_reply_msg_marshal(nvlist_t *nvl, void *msg);
 static int stmf_ic_scsi_devid_desc_marshal(nvlist_t *parent_nvl,
 	char *sdid_name, scsi_devid_desc_t *sdid);
+static int stmf_ic_remote_port_marshal(nvlist_t *parent_nvl,
+	char *rport_name, stmf_remote_port_t *rport);
 
 /*
  * Unmarshaling routines.
@@ -283,6 +294,9 @@ static scsi_devid_desc_t *stmf_ic_scsi_devid_desc_unmarshal(
 static uint8_t *stmf_ic_uint8_array_unmarshal(nvlist_t *nvl, char *field_name,
 	uint64_t len, uint8_t *buf);
 static char *stmf_ic_string_unmarshal(nvlist_t *nvl, char *field_name);
+static stmf_remote_port_t *stmf_ic_lookup_remote_port_and_unmarshal(
+	nvlist_t *nvl, char *field_name);
+static stmf_remote_port_t *stmf_ic_remote_port_unmarshal(nvlist_t *nvl);
 
 /*
  * Transmit and recieve routines.
@@ -297,6 +311,7 @@ static stmf_ic_msg_t *stmf_ic_alloc_msg_header(stmf_ic_msg_type_t msg_type,
 static size_t sizeof_scsi_devid_desc(int ident_length);
 static char *stmf_ic_strdup(char *str);
 static scsi_devid_desc_t *scsi_devid_desc_dup(scsi_devid_desc_t *did);
+static stmf_remote_port_t *remote_port_dup(stmf_remote_port_t *rport);
 static void scsi_devid_desc_free(scsi_devid_desc_t *did);
 static inline void stmf_ic_nvlookup_warn(const char *func, char *field);
 
@@ -628,6 +643,7 @@ stmf_ic_scsi_cmd_msg_alloc(
 	stmf_ic_scsi_cmd_msg_t *icsc = NULL;
 	scsi_devid_desc_t *ini_devid = task->task_session->ss_rport_id;
 	scsi_devid_desc_t *tgt_devid = task->task_lport->lport_id;
+	stmf_remote_port_t *rport = task->task_session->ss_rport;
 
 	icm = stmf_ic_alloc_msg_header(STMF_ICM_SCSI_CMD, msgid);
 	icsc = (stmf_ic_scsi_cmd_msg_t *)kmem_zalloc(sizeof (*icsc), KM_SLEEP);
@@ -636,6 +652,7 @@ stmf_ic_scsi_cmd_msg_alloc(
 	icsc->icsc_task_msgid = task_msgid;
 	icsc->icsc_ini_devid = scsi_devid_desc_dup(ini_devid);
 	icsc->icsc_tgt_devid = scsi_devid_desc_dup(tgt_devid);
+	icsc->icsc_rport = remote_port_dup(rport);
 	icsc->icsc_session_id = task->task_session->ss_session_id;
 
 	if (!task->task_mgmt_function && task->task_lu->lu_id) {
@@ -827,6 +844,7 @@ stmf_ic_session_create_destroy_msg_alloc(
 	icscd->icscd_session_id = session->ss_session_id;
 	icscd->icscd_ini_devid = scsi_devid_desc_dup(ini_devid);
 	icscd->icscd_tgt_devid = scsi_devid_desc_dup(tgt_devid);
+	icscd->icscd_rport = remote_port_dup(session->ss_rport);
 
 	return (icm);
 }
@@ -1000,6 +1018,7 @@ stmf_ic_scsi_cmd_msg_free(stmf_ic_scsi_cmd_msg_t *m,
 {
 	scsi_devid_desc_free(m->icsc_ini_devid);
 	scsi_devid_desc_free(m->icsc_tgt_devid);
+	stmf_remote_port_free(m->icsc_rport);
 	if (cmethod == STMF_CONSTRUCTOR) {
 		kmem_free(m->icsc_task_cdb, m->icsc_task_cdb_length);
 	}
@@ -1059,6 +1078,7 @@ stmf_ic_session_create_destroy_msg_free(stmf_ic_session_create_destroy_msg_t *m,
 {
 	scsi_devid_desc_free(m->icscd_ini_devid);
 	scsi_devid_desc_free(m->icscd_tgt_devid);
+	stmf_remote_port_free(m->icscd_rport);
 
 	kmem_free(m, sizeof (*m));
 }
@@ -1230,6 +1250,7 @@ stmf_ic_scsi_cmd_msg_marshal(nvlist_t *nvl, void *msg)
 	NVLIST_ADD_FIELD(uint64, m, icsc_task_msgid);
 	NVLIST_ADD_DEVID(m, icsc_ini_devid);
 	NVLIST_ADD_DEVID(m, icsc_tgt_devid);
+	NVLIST_ADD_RPORT(m, icsc_rport);
 	NVLIST_ADD_ARRAY(uint8, m, icsc_lun_id);
 	NVLIST_ADD_FIELD(uint64, m, icsc_session_id);
 	NVLIST_ADD_ARRAY_LEN(uint8, m, icsc_task_lun_no, 8);
@@ -1343,6 +1364,7 @@ stmf_ic_session_create_destroy_msg_marshal(nvlist_t *nvl, void *msg)
 
 	NVLIST_ADD_DEVID(m, icscd_ini_devid);
 	NVLIST_ADD_DEVID(m, icscd_tgt_devid);
+	NVLIST_ADD_RPORT(m, icscd_rport);
 	NVLIST_ADD_FIELD(uint64, m, icscd_session_id);
 
 done:
@@ -1392,7 +1414,35 @@ stmf_ic_scsi_devid_desc_marshal(nvlist_t *parent_nvl,
 		goto done;
 
 	rc = nvlist_add_nvlist(parent_nvl, sdid_name, nvl);
+done:
+	if (nvl) {
+		nvlist_free(nvl);
+	}
+	return (rc);
+}
 
+/*
+ * Allocate a new nvlist representing the stmf_remote_port and add it
+ * to the nvlist.
+ */
+static int
+stmf_ic_remote_port_marshal(nvlist_t *parent_nvl, char *rport_name,
+	stmf_remote_port_t *rport) {
+
+	int rc = 0;
+	nvlist_t *nvl = NULL;
+
+	rc = nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
+	if (rc)
+		goto done;
+
+	NVLIST_ADD_FIELD(uint16, rport, rport_tptid_sz);
+	rc = nvlist_add_uint8_array(nvl, "rport_tptid",
+	    (uint8_t *)rport->rport_tptid, rport->rport_tptid_sz);
+	if (rc)
+		goto done;
+
+	rc = nvlist_add_nvlist(parent_nvl, rport_name, nvl);
 done:
 	if (nvl) {
 		nvlist_free(nvl);
@@ -1666,6 +1716,14 @@ stmf_ic_scsi_cmd_msg_unmarshal(nvlist_t *nvl)
 		goto done;
 	}
 
+	m->icsc_rport = stmf_ic_lookup_remote_port_and_unmarshal(
+	    nvl, "icsc_rport");
+	if (m->icsc_rport == NULL) {
+		stmf_ic_nvlookup_warn(__func__, "icsc_rport");
+		rc = ENOMEM;
+		goto done;
+	}
+
 	/* icsc_lun_id */
 	if (!stmf_ic_uint8_array_unmarshal(nvl, "icsc_lun_id",
 	    sizeof (m->icsc_lun_id), m->icsc_lun_id)) {
@@ -1879,6 +1937,14 @@ stmf_ic_session_create_destroy_msg_unmarshal(nvlist_t *nvl)
 		goto done;
 	}
 
+	m->icscd_rport = stmf_ic_lookup_remote_port_and_unmarshal(
+	    nvl, "icscd_rport");
+	if (m->icscd_rport == NULL) {
+		stmf_ic_nvlookup_warn(__func__, "icscd_rport");
+		rc = ENOMEM;
+		goto done;
+	}
+
 done:
 	if (!rc)
 		return (m);
@@ -2007,6 +2073,37 @@ done:
 	kmem_free(sdid, sdid_size);
 
 	return (NULL);
+}
+
+static stmf_remote_port_t *
+stmf_ic_lookup_remote_port_and_unmarshal(nvlist_t *nvl, char *field_name)
+{
+	nvlist_t *nvl_rport = NULL;
+
+	if (nvlist_lookup_nvlist(nvl, field_name, &nvl_rport) != 0)
+		return (NULL);
+
+	return (stmf_ic_remote_port_unmarshal(nvl_rport));
+}
+
+static stmf_remote_port_t *
+stmf_ic_remote_port_unmarshal(nvlist_t *nvl)
+{
+	stmf_remote_port_t *rport = NULL;
+	uint16_t rport_tptid_sz = 0;
+	int rc = 0;
+
+	rc = nvlist_lookup_uint16(nvl, "rport_tptid_sz", &rport_tptid_sz);
+	if (rc || rport_tptid_sz < sizeof (scsi_transport_id_t))
+		return (NULL);
+
+	rport = stmf_remote_port_alloc(rport_tptid_sz);
+	if (!stmf_ic_uint8_array_unmarshal(nvl, "rport_tptid", rport_tptid_sz,
+	    (uint8_t *)rport->rport_tptid)) {
+		stmf_remote_port_free(rport);
+		rport = NULL;
+	}
+	return (rport);
 }
 
 /*
@@ -2148,6 +2245,21 @@ scsi_devid_desc_free(scsi_devid_desc_t *did)
 		return;
 
 	kmem_free(did, sizeof_scsi_devid_desc(did->ident_length));
+}
+
+/*
+ * Duplicate the stmf_remote_port_t.
+ */
+static stmf_remote_port_t *
+remote_port_dup(stmf_remote_port_t *rport)
+{
+	stmf_remote_port_t *dup = NULL;
+	if (rport) {
+		dup = stmf_remote_port_alloc(rport->rport_tptid_sz);
+		bcopy(rport->rport_tptid, dup->rport_tptid,
+		    rport->rport_tptid_sz);
+	}
+	return (dup);
 }
 
 /*

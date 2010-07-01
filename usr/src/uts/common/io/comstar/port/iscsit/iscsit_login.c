@@ -29,6 +29,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
+#include <sys/scsi/generic/persist.h>
 
 #include <sys/socket.h>
 #include <sys/strsubr.h>
@@ -1725,6 +1726,8 @@ login_sm_session_register(iscsit_conn_t *ict)
 {
 	iscsit_sess_t		*ist = ict->ict_sess;
 	stmf_scsi_session_t	*ss;
+	iscsi_transport_id_t	*iscsi_tptid;
+	uint16_t		ident_len, adn_len, tptid_sz;
 
 	/*
 	 * Hold target mutex until we have finished registering with STMF
@@ -1746,14 +1749,26 @@ login_sm_session_register(iscsit_conn_t *ict)
 		return (IDM_STATUS_FAIL);
 	}
 
+	ident_len = strlen(ist->ist_initiator_name) + 1;
 	ss->ss_rport_id = kmem_zalloc(sizeof (scsi_devid_desc_t) +
-	    strlen(ist->ist_initiator_name) + 1, KM_SLEEP);
+	    ident_len, KM_SLEEP);
 	(void) strcpy((char *)ss->ss_rport_id->ident, ist->ist_initiator_name);
-	ss->ss_rport_id->ident_length = strlen(ist->ist_initiator_name);
+	ss->ss_rport_id->ident_length = ident_len - 1;
 	ss->ss_rport_id->protocol_id = PROTOCOL_iSCSI;
 	ss->ss_rport_id->piv = 1;
 	ss->ss_rport_id->code_set = CODE_SET_ASCII;
 	ss->ss_rport_id->association = ID_IS_TARGET_PORT;
+
+	/* adn_len should be 4 byte aligned, SPC3 rev 23, section 7.54.6 */
+	adn_len = (ident_len + 3) & ~ 3;
+	tptid_sz = sizeof (iscsi_transport_id_t) - 1 + adn_len;
+	ss->ss_rport = stmf_remote_port_alloc(tptid_sz);
+	ss->ss_rport->rport_tptid->protocol_id = PROTOCOL_iSCSI;
+	ss->ss_rport->rport_tptid->format_code = 0;
+	iscsi_tptid = (iscsi_transport_id_t *)ss->ss_rport->rport_tptid;
+	SCSI_WRITE16(&iscsi_tptid->add_len, adn_len);
+	(void) strlcpy((char *)iscsi_tptid->iscsi_name,
+	    ist->ist_initiator_name, ident_len);
 
 	ss->ss_lport = ist->ist_lport;
 
@@ -1763,6 +1778,7 @@ login_sm_session_register(iscsit_conn_t *ict)
 		kmem_free(ss->ss_rport_id,
 		    sizeof (scsi_devid_desc_t) +
 		    strlen(ist->ist_initiator_name) + 1);
+		stmf_remote_port_free(ss->ss_rport);
 		stmf_free(ss);
 		SET_LOGIN_ERROR(ict, ISCSI_STATUS_CLASS_TARGET_ERR,
 		    ISCSI_LOGIN_STATUS_TARGET_ERROR);

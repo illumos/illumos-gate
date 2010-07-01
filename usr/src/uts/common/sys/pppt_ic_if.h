@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _SYS_PPPT_IC_IF_H
 #define	_SYS_PPPT_IC_IF_H
@@ -120,6 +119,7 @@ typedef struct {
 	stmf_ic_msgid_t		icsc_task_msgid;
 	scsi_devid_desc_t	*icsc_ini_devid;
 	scsi_devid_desc_t	*icsc_tgt_devid;
+	stmf_remote_port_t	*icsc_rport;
 	uint8_t 		icsc_lun_id[16];
 	/*
 	 * fields from scsi_task_t
@@ -197,6 +197,7 @@ typedef struct {
 	uint64_t		icscd_session_id;
 	scsi_devid_desc_t	*icscd_ini_devid;
 	scsi_devid_desc_t	*icscd_tgt_devid;
+	stmf_remote_port_t	*icscd_rport;
 } stmf_ic_session_create_destroy_msg_t;
 
 /*

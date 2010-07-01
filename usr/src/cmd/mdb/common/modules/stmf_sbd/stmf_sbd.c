@@ -35,16 +35,18 @@
 #include <sbd_impl.h>
 #include <scsi/generic/persist.h>
 
-#define	STMF_SBD_FLAG_ARY_SZ	32
 #define	STMF_SBD_STR_MAX	2048
 #define	STMF_SBD_VERBOSE	0x00000001
+
+#define	ARRAY_SIZE(a)	(sizeof (a) / sizeof (*a))
 
 /* structure to pass arguments to mdb_walker callback function */
 typedef struct stmf_sbd_cb_s {
 	uint32_t flag;
 } stmf_sbd_cb_t;
 
-char stmf_protocol_str [9][STMF_SBD_FLAG_ARY_SZ] = {
+
+static const char *stmf_protocol_str[] = {
 	"FIBRE_CHANNEL",	/* PROTOCOL_FIBRE_CHANNEL	0 */
 	"PARALLEL_SCSI",	/* PROTOCOL_PARALLEL_SCSI	1 */
 	"SSA",			/* PROTOCOL_SSA			2 */
@@ -53,21 +55,29 @@ char stmf_protocol_str [9][STMF_SBD_FLAG_ARY_SZ] = {
 	"iSCSI",		/* PROTOCOL_iSCSI		5 */
 	"SAS",			/* PROTOCOL_SAS			6 */
 	"ADT",			/* PROTOCOL_ADT			7 */
-	"ATAPI",		/* PROTOCOL_ATAPI		8 */
+	"ATAPI"			/* PROTOCOL_ATAPI		8 */
 };
+
 
 /*
  * Support functions.
  */
 
+static uint64_t
+nhconvert_8bytes(const void *src) {
+	uint64_t dest;
+	mdb_nhconvert(&dest, src, 8);
+	return (dest);
+}
+
 /*
  *        Variable 'bits' is a collection of flags for which a corresponding
  *        description string is available at flag_ary.
- *        So flag_ary should be an ary of strings with total_bits + 1 strings.
+ *        So flag_ary should be an ary of strings with total_bits strings.
  */
 static void
-stmf_sbd_print_bit_flags(char flag_ary[][STMF_SBD_FLAG_ARY_SZ],
-					int total_bits, uint32_t bits) {
+stmf_sbd_print_bit_flags(const char *flag_ary[],
+				int total_bits, uint32_t bits) {
 	uint32_t curbit = 0x01;
 	int i, delim = 0;
 
@@ -85,26 +95,28 @@ stmf_sbd_print_bit_flags(char flag_ary[][STMF_SBD_FLAG_ARY_SZ],
 static void
 stmf_sbd_print_pgr_info(sbd_pgr_t *pgr)
 {
-	char pgr_flag_str [5][STMF_SBD_FLAG_ARY_SZ] = {
+	static const char *pgr_flag_str[] = {
 		"SBD_PGR_APTPL",			/* 0x01 */
 		"SBD_PGR_RSVD_ONE",			/* 0x02 */
 		"SBD_PGR_RSVD_ALL_REGISTRANTS",		/* 0x04 */
 		"SBD_PGR_ALL_KEYS_HAS_IT"		/* 0x08 */
 	};
-	char pgr_type_desc[9][48] = {"ILLEGAL",
-	    "Write Exclusive",				/* 0x1 */
-	    "ILLEGAL",
-	    "Exclusive Access",				/* 0x3 */
-	    "Write Exclusive, Registrants Only",	/* 0x5 */
-	    "Exclusive Access, Registrants Only",	/* 0x6 */
-	    "Write Exclusive, All Registrants",		/* 0x7 */
-	    "Exclusive Access, All Registrants"		/* 0x8 */
-	};
-	char *type_str = pgr_type_desc[0];
 
+	static const char *pgr_type_desc[] = {
+		"ILLEGAL",				/* 0x0 */
+		"Write Exclusive",			/* 0x1 */
+		"ILLEGAL",				/* 0x2 */
+		"Exclusive Access",			/* 0x3 */
+		"ILLEGAL",				/* 0x4 */
+		"Write Exclusive, Registrants Only",	/* 0x5 */
+		"Exclusive Access, Registrants Only",	/* 0x6 */
+		"Write Exclusive, All Registrants",	/* 0x7 */
+		"Exclusive Access, All Registrants"	/* 0x8 */
+	};
 
 	mdb_printf("PGR flags: ");
-	stmf_sbd_print_bit_flags(pgr_flag_str, 4, pgr->pgr_flags);
+	stmf_sbd_print_bit_flags(pgr_flag_str, ARRAY_SIZE(pgr_flag_str),
+	    pgr->pgr_flags);
 	if (pgr->pgr_rsvholder || pgr->pgr_flags &
 	    SBD_PGR_RSVD_ALL_REGISTRANTS) {
 		mdb_printf("Reservation Details \n");
@@ -113,10 +125,11 @@ stmf_sbd_print_pgr_info(sbd_pgr_t *pgr)
 			mdb_printf("%p\n", pgr->pgr_rsvholder);
 		else
 			mdb_printf("All Registrants\n");
-		if (pgr->pgr_rsv_type < 8)
-			type_str = pgr_type_desc[pgr->pgr_rsv_type];
+
 		mdb_printf("\t            type  : %d => %s\n",
-		    pgr->pgr_rsv_type, type_str);
+		    pgr->pgr_rsv_type,
+		    (pgr->pgr_rsv_type < ARRAY_SIZE(pgr_type_desc)) ?
+		    pgr_type_desc[pgr->pgr_rsv_type] : "ILLEGAL");
 		mdb_printf("\t            scope : %d\n", pgr->pgr_rsv_scope);
 	} else {
 		mdb_printf("No reservations.\n");
@@ -124,9 +137,15 @@ stmf_sbd_print_pgr_info(sbd_pgr_t *pgr)
 }
 
 void
-print_scsi_devid_desc(uintptr_t addr, uint16_t len, char *s)
+print_scsi_devid_desc(uintptr_t addr, uint16_t len, char *spacer)
 {
 	scsi_devid_desc_t   *id;
+
+	if (len < sizeof (*id)) {
+		mdb_warn("%sError: Devid Size = %d < sizeof(scsi_devid_desc_t)"
+		    "\n", spacer, len);
+		return;
+	}
 
 	id = mdb_zalloc(len, UM_SLEEP);
 	if (mdb_vread(id, len, addr) == -1) {
@@ -135,20 +154,83 @@ print_scsi_devid_desc(uintptr_t addr, uint16_t len, char *s)
 		return;
 	}
 
-	mdb_printf("%sTotal length:\t%d\n", s, len);
-	mdb_printf("%sProtocol:\t%d => %-16s\n", s, id->protocol_id,
-	    (id->protocol_id < 8) ? stmf_protocol_str[id->protocol_id] : "");
-	mdb_printf("%sCode Set:\t%d\n", s, id->code_set);
-	mdb_printf("%sIdent Length:\t%d\n", s, id->ident_length);
+	mdb_printf("%sTotal length:\t%d\n", spacer, len);
+	mdb_printf("%sProtocol:\t%d => %-16s\n", spacer, id->protocol_id,
+	    (id->protocol_id < ARRAY_SIZE(stmf_protocol_str)) ?
+	    stmf_protocol_str[id->protocol_id] : "");
+	mdb_printf("%sCode Set:\t%d\n", spacer, id->code_set);
+	mdb_printf("%sIdent Length:\t%d\n", spacer, id->ident_length);
 
-	if (len > id->ident_length + 3) {
-		id->ident[id->ident_length] = '\0';
-		mdb_printf("%sIdent:\t%s\n", s, id->ident);
+	if (len < sizeof (*id) + id->ident_length - 1) {
+		mdb_printf("%s(Can not recognize ident data)\n", spacer);
 	} else {
-		mdb_printf("%s(Can not recognize ident data)\n", s);
+		id->ident[id->ident_length] = '\0';
+		mdb_printf("%sIdent:\t\t%s\n", spacer, id->ident);
 	}
 	mdb_free(id, len);
 	mdb_printf("\n");
+}
+
+/*
+ * Decipher and print transport id  which is pointed by addr variable.
+ */
+static int
+print_transport_id(uintptr_t addr, uint16_t tpd_len, char *spacer)
+{
+	scsi_transport_id_t *tpd;
+
+	if (tpd_len < sizeof (*tpd)) {
+		mdb_warn("%sError: Transport ID Size = %d < "
+		    "sizeof (scsi_transport_id_t)\n", spacer, tpd_len);
+		return (DCMD_ERR);
+	}
+
+	tpd = mdb_zalloc(tpd_len, UM_SLEEP);
+	if (mdb_vread(tpd, tpd_len, addr) == -1) {
+		mdb_warn("failed to read scsi_transport_id at %p\n", addr);
+		mdb_free(tpd, tpd_len);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%sTotal length:\t%d\n", spacer, tpd_len);
+	mdb_printf("%sProtocol:\t%d => %16s\n", spacer, tpd->protocol_id,
+	    (tpd->protocol_id < ARRAY_SIZE(stmf_protocol_str)) ?
+	    stmf_protocol_str[tpd->protocol_id] : "");
+	mdb_printf("%sFormat Code:\t0x%x\n", spacer, tpd->format_code);
+
+	switch (tpd->protocol_id) {
+	case PROTOCOL_FIBRE_CHANNEL:
+		{
+		uint8_t *p = ((scsi_fc_transport_id_t *)tpd)->port_name;
+		mdb_printf("%sFC Port Name:\t%016llX\n", spacer,
+		    nhconvert_8bytes(p));
+		}
+		break;
+	case PROTOCOL_PARALLEL_SCSI:
+	case PROTOCOL_SSA:
+	case PROTOCOL_IEEE_1394:
+		break;
+	case PROTOCOL_SRP:
+		{
+		uint8_t *p = ((scsi_srp_transport_id_t *)tpd)->srp_name;
+		/* Print 8 byte initiator extention and guid in order */
+		mdb_printf("%sSRP Name:\t%016llX:%016llX\n", spacer,
+		    nhconvert_8bytes(&p[8]), nhconvert_8bytes(&p[0]));
+		}
+		break;
+	case PROTOCOL_iSCSI:
+		mdb_printf("%sISCSI Name:\t%s\n", spacer,
+		    ((iscsi_transport_id_t *)tpd)->iscsi_name);
+		break;
+	case PROTOCOL_SAS:
+	case PROTOCOL_ADT:
+	case PROTOCOL_ATAPI:
+	default:
+		break;
+	}
+
+	mdb_free(tpd, tpd_len);
+	return (DCMD_OK);
 }
 
 void
@@ -214,7 +296,12 @@ stmf_sbd_lu_cb(uintptr_t addr, const sbd_lu_t *slu, stmf_sbd_cb_t *cb_st)
 	if (cb_st->flag & STMF_SBD_VERBOSE) {
 		char str[STMF_SBD_STR_MAX];
 
-		mdb_printf("sbd_lu - %p\n", addr);
+		mdb_printf("\nsbd_lu - %p\n", addr);
+
+		/* sl_device_id contains 4 bytes hdr + 16 bytes(GUID) */
+		mdb_printf("\tsl_deviceid:      %-?p  GUID => %016llX%016llX\n",
+		    slu->sl_device_id, nhconvert_8bytes(&slu->sl_device_id[4]),
+		    nhconvert_8bytes(&slu->sl_device_id[12]));
 		mdb_printf("\tsl_name:          %-?p  %s\n", slu->sl_name,
 		    stmf_sbd_getstr((uintptr_t)slu->sl_name, str));
 		mdb_printf("\tsl_alias:         %-?p  %s\n", slu->sl_alias,
@@ -230,7 +317,6 @@ stmf_sbd_lu_cb(uintptr_t addr, const sbd_lu_t *slu, stmf_sbd_cb_t *cb_st)
 		mdb_printf("\tsl_zfs_meta:      %-?p\n", slu->sl_zfs_meta);
 		mdb_printf("\tsl_it_list:       %-?p\n", slu->sl_it_list);
 		mdb_printf("\tsl_pgr:           %-?p\n", slu->sl_pgr);
-		mdb_printf("\n");
 	} else {
 		mdb_printf("%p\n", addr);
 	}
@@ -268,24 +354,25 @@ static int
 stmf_sbd_pgr_key_cb(uintptr_t addr, const sbd_pgr_key_t *key,
 					stmf_sbd_cb_t *cb_st)
 {
-	char key_flag_str [5][STMF_SBD_FLAG_ARY_SZ] = {
+	static const char *key_flag_str [] = {
 		"SBD_PGR_KEY_ALL_TG_PT",   /* 0x01 */
-		"SBD_PGR_KEY_TPT_ID_FLAG", /* 0x02 */
+		"SBD_PGR_KEY_TPT_ID_FLAG"  /* 0x02 */
 	};
 
 	if (cb_st->flag & STMF_SBD_VERBOSE) {
 		mdb_printf("sbd_pgr_key - %p\n", addr);
-		mdb_printf("\tRegistered key:      0x%llx\n", key->pgr_key);
+		mdb_printf("\tRegistered key:      0x%016llx\n", key->pgr_key);
 		mdb_printf("\tKey Flags:           ");
-		stmf_sbd_print_bit_flags(key_flag_str, 2, key->pgr_key_flags);
+		stmf_sbd_print_bit_flags(key_flag_str, ARRAY_SIZE(key_flag_str),
+		    key->pgr_key_flags);
 		mdb_printf("\tpgr_key_it:          %?-p\n", key->pgr_key_it);
 		mdb_printf("\tLocal Device ID:     %?-p\n",
 		    key->pgr_key_lpt_id);
 		print_scsi_devid_desc((uintptr_t)key->pgr_key_lpt_id,
 		    key->pgr_key_lpt_len, "		");
-		mdb_printf("\tRemote scsi devid desc: %?-p\n",
+		mdb_printf("\tRemote Transport ID: %?-p\n",
 		    key->pgr_key_rpt_id);
-		print_scsi_devid_desc((uintptr_t)key->pgr_key_rpt_id,
+		print_transport_id((uintptr_t)key->pgr_key_rpt_id,
 		    key->pgr_key_rpt_len, "		");
 	} else {
 		mdb_printf("%p\n", addr);
@@ -323,20 +410,20 @@ stmf_sbd_it_walk_step(mdb_walk_state_t *wsp)
 static int
 stmf_sbd_it_cb(uintptr_t addr, const sbd_it_data_t *it, stmf_sbd_cb_t *cb_st)
 {
-	char it_flag_str [5][STMF_SBD_FLAG_ARY_SZ] = {
+	static const char *it_flag_str [] = {
 		"SBD_IT_HAS_SCSI2_RESERVATION",		/* 0x0001 */
 		"SBD_IT_PGR_REGISTERED",		/* 0x0002 */
 		"SBD_IT_PGR_EXCLUSIVE_RSV_HOLDER",	/* 0x0004 */
-		"SBD_IT_PGR_CHECK_FLAG",		/* 0x0008 */
+		"SBD_IT_PGR_CHECK_FLAG"			/* 0x0008 */
 	};
 
 	if (cb_st->flag & STMF_SBD_VERBOSE) {
 		mdb_printf("SBD IT DATA - %p\n", addr);
 		mdb_printf("\tSession ID: 0x%0-lx\n", it->sbd_it_session_id);
 		mdb_printf("\tIT Flags:   ");
-		stmf_sbd_print_bit_flags(it_flag_str, 4, it->sbd_it_flags);
+		stmf_sbd_print_bit_flags(it_flag_str, ARRAY_SIZE(it_flag_str),
+		    it->sbd_it_flags);
 		mdb_printf("\tPGR Key:    %-p\n", it->pgr_key_ptr);
-		mdb_printf("\n");
 	} else {
 		mdb_printf("%p\n", addr);
 	}
@@ -451,6 +538,26 @@ stmf_sbd_pgr_key(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/*ARGSUSED*/
+static int
+stmf_remote_port(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	stmf_remote_port_t rpt;
+	int	ret = DCMD_OK;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&rpt, sizeof (stmf_remote_port_t), addr) == -1) {
+		mdb_warn("failed to read stmf_remote_port_t at %p\n", addr);
+		return (DCMD_ERR);
+	}
+
+	ret = print_transport_id((uintptr_t)rpt.rport_tptid,
+	    rpt.rport_tptid_sz, "		");
+	return (ret);
+}
+
 static int
 stmf_sbd_it(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -467,7 +574,7 @@ stmf_sbd_it(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (verbose) {
 		cb_st.flag |= STMF_SBD_VERBOSE;
-		mdb_printf("LU:- %p\n", addr);
+		mdb_printf("\nLU:- %p\n", addr);
 	}
 
 	/* If address of pgr_key is given, just print that key and return */
@@ -479,7 +586,7 @@ stmf_sbd_it(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* Just a sanity check, not necessarily needed */
 	if (slu.sl_it_list == NULL) {
 		if (verbose)
-			mdb_warn("sbd_it_list is empty%p\n", addr);
+			mdb_printf("sbd_it_list is empty\n", addr);
 		return (DCMD_OK);
 	}
 
@@ -502,6 +609,8 @@ static const mdb_dcmd_t dcmds[] = {
 	    stmf_sbd_it, NULL },
 	{ "stmf_sbd_pgr_key", ":[-kov]", "Print the list of pgr keys",
 	    stmf_sbd_pgr_key, stmf_sbd_pgr_key_dcmd_help },
+	{ "stmf_remote_port", ":", "decipher info in a stmf_remote_port",
+	    stmf_remote_port, NULL },
 	{ NULL }
 };
 
