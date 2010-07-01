@@ -17,20 +17,12 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG = pcitool
 OBJS = pcitool.o pcitool_ui.o pcitool_usage.o
 SRCS = $(OBJS:%.o=../%.c)
-
-#
-# Manpage is in the directory above platform-specific directory
-# from which this makefile is called.
-#
-MAN1MFILES = pcitool.1m
-MANFILE_SRC_PATH = ../$(MAN1MFILES)
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -44,7 +36,7 @@ LINTFLAGS += -I$(UTSBASE)/common
 
 .KEEP_STATE:
 
-all: $(PROG) $(MANFILE_SRC_PATH)
+all: $(PROG)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -53,13 +45,7 @@ $(PROG):	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(ROOTMAN1M):
-	mkdir -p $(ROOTMAN1M)
-
-$(ROOTMAN1MFILES): $(MANFILE_SRC_PATH) $(ROOTMAN1M)
-	$(INS.file) $(MANFILE_SRC_PATH)
-
-install: all $(PROG) $(MANFILE_SRC_PATH)
+install: all $(PROG)
 
 clean:
 	$(RM) $(OBJS) $(PROG)
