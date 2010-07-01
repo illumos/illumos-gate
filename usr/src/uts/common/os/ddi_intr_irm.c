@@ -845,16 +845,15 @@ irm_balance_thread(ddi_irm_pool_t *pool_p)
 	/* Activate the pool */
 	pool_p->ipool_flags |= DDI_IRM_FLAG_ACTIVE;
 
-	/* Main loop */
+	/*
+	 * Main loop.
+	 * Iterate once first before wait on signal, in case there is signal
+	 * sent before this thread being created
+	 */
 	for (;;) {
 
 		/* Compute the delay interval */
 		interval = drv_usectohz(irm_balance_delay * 1000000);
-
-		/* Sleep until queued */
-		cv_wait(&pool_p->ipool_cv, &pool_p->ipool_lock);
-
-		DDI_INTR_IRMDBG((CE_CONT, "irm_balance_thread: signaled.\n"));
 
 		/* Wait one interval, or until there are waiters */
 		if ((interval > 0) &&
@@ -883,6 +882,11 @@ irm_balance_thread(ddi_irm_pool_t *pool_p)
 
 		/* Clear QUEUED condition */
 		pool_p->ipool_flags &= ~(DDI_IRM_FLAG_QUEUED);
+
+		/* Sleep until queued */
+		cv_wait(&pool_p->ipool_cv, &pool_p->ipool_lock);
+
+		DDI_INTR_IRMDBG((CE_CONT, "irm_balance_thread: signaled.\n"));
 	}
 }
 
@@ -908,6 +912,16 @@ i_ddi_irm_balance(ddi_irm_pool_t *pool_p)
 
 	DDI_INTR_IRMDBG((CE_CONT, "i_ddi_irm_balance: pool_p %p\n",
 	    (void *)pool_p));
+
+#ifndef DEBUG
+	if ((pool_p->ipool_reqno == pool_p->ipool_resno)) {
+#else
+	if ((pool_p->ipool_reqno == pool_p->ipool_resno) && !irm_debug_size) {
+#endif  /* DEBUG */
+		DDI_INTR_IRMDBG((CE_CONT,
+		    "i_ddi_irm_balance: pool already balanced\n"));
+		return;
+	}
 
 #ifdef	DEBUG	/* Adjust size and policy settings */
 	if (irm_debug_size > pool_p->ipool_minno) {
