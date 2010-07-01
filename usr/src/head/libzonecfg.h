@@ -192,7 +192,8 @@ struct zone_fstab {
 };
 
 struct zone_nwiftab {
-	char	zone_nwif_address[INET6_ADDRSTRLEN];
+	char	zone_nwif_address[INET6_ADDRSTRLEN]; /* shared-ip only */
+	char	zone_nwif_allowed_address[INET6_ADDRSTRLEN]; /* excl-ip only */
 	char	zone_nwif_physical[LIFNAMSIZ];
 	char	zone_nwif_defrouter[INET6_ADDRSTRLEN];
 };

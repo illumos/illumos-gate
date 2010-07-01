@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -63,6 +62,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "ipmgmt_impl.h"
+#include <zone.h>
+#include <libipadm.h>
+#include <libdladm.h>
+#include <libdllink.h>
+#include <net/route.h>
+#include <ipadm_ipmgmt.h>
+#include <sys/brand.h>
 
 const char		*progname;
 
@@ -81,6 +87,18 @@ static int		ipmgmt_door_fd = -1;
 static void		ipmgmt_exit(int);
 static int		ipmgmt_init();
 static int		ipmgmt_init_privileges();
+static void		ipmgmt_ngz_init();
+static void		ipmgmt_ngz_persist_if();
+
+static ipadm_handle_t iph;
+typedef struct ipmgmt_pif_s {
+	struct ipmgmt_pif_s	*pif_next;
+	char			pif_ifname[LIFNAMSIZ];
+	boolean_t		pif_v4;
+	boolean_t		pif_v6;
+} ipmgmt_pif_t;
+
+static ipmgmt_pif_t *ngz_pifs;
 
 static int
 ipmgmt_db_init()
@@ -115,6 +133,9 @@ ipmgmt_db_init()
 	}
 
 	(void) pthread_rwlock_init(&ipmgmt_dbconf_lock, NULL);
+
+	ipmgmt_ngz_persist_if(); /* create persistent interface info for NGZ */
+
 	return (err);
 }
 
@@ -214,11 +235,89 @@ ipmgmt_exit(int signo)
 }
 
 /*
- * Set the uid of this daemon to the "ipadm" user. Finish the following
+ * On the first reboot after installation of an ipkg zone,
+ * ipmgmt_persist_if_cb() is used in non-global zones to track the interfaces
+ * that have IP address configuration assignments from the global zone.
+ * Persistent configuration for the interfaces is created on the first boot
+ * by ipmgmtd, and the addresses assigned to the interfaces by the GZ
+ * will be subsequently configured when the interface is enabled.
+ * Note that ipmgmt_persist_if_cb() only sets up a list of interfaces
+ * that need to be persisted- the actual update of the ipadm data-store happens
+ * in ipmgmt_persist_if() after the appropriate privs/uid state has been set up.
+ */
+static void
+ipmgmt_persist_if_cb(char *ifname, boolean_t v4, boolean_t v6)
+{
+	ipmgmt_pif_t *pif;
+
+	pif = calloc(1, sizeof (*pif));
+	if (pif == NULL) {
+		ipmgmt_log(LOG_WARNING,
+		    "Could not allocate memory to configure %s", ifname);
+		return;
+	}
+	(void) strlcpy(pif->pif_ifname, ifname, sizeof (pif->pif_ifname));
+	pif->pif_v4 = v4;
+	pif->pif_v6 = v6;
+	pif->pif_next = ngz_pifs;
+	ngz_pifs = pif;
+}
+
+/*
+ * ipmgmt_ngz_init() initializes exclusive-IP stack non-global zones by
+ * extracting configuration that has been saved in the kernel and applying
+ * it at zone boot.
+ */
+static void
+ipmgmt_ngz_init()
+{
+	zoneid_t zoneid;
+	boolean_t firstboot = B_TRUE, s10c = B_FALSE;
+	char brand[MAXNAMELEN];
+	ipadm_status_t ipstatus;
+
+	zoneid = getzoneid();
+	if (zoneid != GLOBAL_ZONEID) {
+
+		if (zone_getattr(zoneid, ZONE_ATTR_BRAND, brand,
+		    sizeof (brand)) < 0) {
+			ipmgmt_log(LOG_ERR, "Could not get brand name");
+			return;
+		}
+		/*
+		 * firstboot is always true for S10C zones, where ipadm is not
+		 * available for restoring persistent configuration.
+		 */
+		if (strcmp(brand, NATIVE_BRAND_NAME) == 0)
+			firstboot = ipmgmt_first_boot();
+		else
+			s10c = B_TRUE;
+
+		if (!firstboot)
+			return;
+
+		ipstatus = ipadm_open(&iph, IPH_IPMGMTD);
+		if (ipstatus != IPADM_SUCCESS) {
+			ipmgmt_log(LOG_ERR, "could not open ipadm handle",
+			    ipadm_status2str(ipstatus));
+			return;
+		}
+		/*
+		 * Only pass down the callback to persist the interface
+		 * for NATIVE (ipkg) zones.
+		 */
+		(void) ipadm_init_net_from_gz(iph, NULL,
+		    (s10c ? NULL : ipmgmt_persist_if_cb));
+		ipadm_close(iph);
+	}
+}
+
+/*
+ * Set the uid of this daemon to the "netadm" user. Finish the following
  * operations before setuid() because they need root privileges:
  *
  *    - create the /etc/svc/volatile/ipadm directory;
- *    - change its uid/gid to "ipadm"/"sys";
+ *    - change its uid/gid to "netadm"/"netadm";
  */
 static int
 ipmgmt_init_privileges()
@@ -244,6 +343,14 @@ ipmgmt_init_privileges()
 		err = errno;
 		goto fail;
 	}
+
+	/*
+	 * initialize any NGZ specific network information before dropping
+	 * privileges. We need these privileges to plumb IP interfaces handed
+	 * down from the GZ (for dlpi_open() etc.) and also to configure the
+	 * address itself (for any IPI_PRIV ioctls like SLIFADDR)
+	 */
+	ipmgmt_ngz_init();
 
 	/*
 	 * limit the privileges of this daemon and set the uid of this
@@ -379,4 +486,62 @@ child_out:
 	/* return from main() forcibly exits an MT process */
 	ipmgmt_inform_parent_exit(EXIT_FAILURE);
 	return (EXIT_FAILURE);
+}
+
+/*
+ * Return TRUE if `ifname' has persistent configuration for the `af' address
+ * family in the datastore
+ */
+static boolean_t
+ipmgmt_persist_if_exists(char *ifname, sa_family_t af)
+{
+	ipmgmt_getif_cbarg_t cbarg;
+	boolean_t exists = B_FALSE;
+	ipadm_if_info_t *ifp;
+
+	bzero(&cbarg, sizeof (cbarg));
+	cbarg.cb_ifname = ifname;
+	(void) ipmgmt_db_walk(ipmgmt_db_getif, &cbarg, IPADM_DB_READ);
+	if ((ifp = cbarg.cb_ifinfo) != NULL) {
+		if ((af == AF_INET && (ifp->ifi_pflags & IFIF_IPV4)) ||
+		    (af == AF_INET6 && (ifp->ifi_pflags & IFIF_IPV6))) {
+			exists = B_TRUE;
+		}
+	}
+	free(ifp);
+	return (exists);
+}
+
+/*
+ * Persist any NGZ interfaces assigned to us from the global zone if they do
+ * not already exist in the persistent db. We need to
+ * do this before any calls to ipadm_enable_if() can succeed (i.e.,
+ * before opening up for door_calls), and after setuid to 'netadm' so that
+ * the persistent db is created with the right permissions.
+ */
+static void
+ipmgmt_ngz_persist_if()
+{
+	ipmgmt_pif_t *pif, *next;
+	ipmgmt_if_arg_t ifarg;
+
+	for (pif = ngz_pifs; pif != NULL; pif = next) {
+		next = pif->pif_next;
+		bzero(&ifarg, sizeof (ifarg));
+		(void) strlcpy(ifarg.ia_ifname, pif->pif_ifname,
+		    sizeof (ifarg.ia_ifname));
+		ifarg.ia_flags = IPMGMT_PERSIST;
+		if (pif->pif_v4 &&
+		    !ipmgmt_persist_if_exists(pif->pif_ifname, AF_INET)) {
+			ifarg.ia_family = AF_INET;
+			(void) ipmgmt_persist_if(&ifarg);
+		}
+		if (pif->pif_v6 &&
+		    !ipmgmt_persist_if_exists(pif->pif_ifname, AF_INET6)) {
+			ifarg.ia_family = AF_INET6;
+			(void) ipmgmt_persist_if(&ifarg);
+		}
+		free(pif);
+	}
+	ngz_pifs = NULL; /* no red herrings */
 }

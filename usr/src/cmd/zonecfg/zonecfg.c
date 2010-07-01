@@ -76,6 +76,7 @@
 #include <libdladm.h>
 #include <libinetutil.h>
 #include <pwd.h>
+#include <inet/ip.h>
 
 #include <libzonecfg.h>
 #include "zonecfg.h"
@@ -230,6 +231,7 @@ char *prop_types[] = {
 	"auths",
 	"fs-allowed",
 	ALIAS_MAXPROCS,
+	"allowed-address",
 	NULL
 };
 
@@ -500,7 +502,17 @@ static const char *admin_res_scope_cmds[] = {
 	NULL
 };
 
+struct xif {
+	struct xif	*xif_next;
+	char		xif_name[LIFNAMSIZ];
+	boolean_t	xif_has_address;
+	boolean_t	xif_has_defrouter;
+};
+
 /* Global variables */
+
+/* list of network interfaces specified for exclusive IP zone */
+struct xif *xif;
 
 /* set early in main(), never modified thereafter, used all over the place */
 static char *execname;
@@ -976,17 +988,30 @@ usage(boolean_t verbose, uint_t flags)
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_ADDRESS), gettext("<IP-address>"));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_ALLOWED_ADDRESS),
+			    gettext("<IP-address>"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_PHYSICAL), gettext("<interface>"));
 			(void) fprintf(fp, gettext("See ifconfig(1M) for "
 			    "details of the <interface> string.\n"));
-			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
-			    pt_to_str(PT_DEFROUTER), gettext("<IP-address>"));
-			(void) fprintf(fp, gettext("%s %s and %s %s are valid "
-			    "if the %s property is set to %s, otherwise they "
+			(void) fprintf(fp, gettext("%s %s is valid "
+			    "if the %s property is set to %s, otherwise it "
 			    "must not be set.\n"),
 			    cmd_to_str(CMD_SET), pt_to_str(PT_ADDRESS),
+			    pt_to_str(PT_IPTYPE), gettext("shared"));
+			(void) fprintf(fp, gettext("%s %s is valid "
+			    "if the %s property is set to %s, otherwise it "
+			    "must not be set.\n"),
+			    cmd_to_str(CMD_SET), pt_to_str(PT_ALLOWED_ADDRESS),
+			    pt_to_str(PT_IPTYPE), gettext("exclusive"));
+			(void) fprintf(fp, gettext("\t%s %s=%s\n%s %s "
+			    "is valid if the %s or %s property is set, "
+			    "otherwise it must not be set\n"),
+			    cmd_to_str(CMD_SET),
+			    pt_to_str(PT_DEFROUTER), gettext("<IP-address>"),
 			    cmd_to_str(CMD_SET), pt_to_str(PT_DEFROUTER),
-			    pt_to_str(PT_IPTYPE), "shared");
+			    gettext(pt_to_str(PT_ADDRESS)),
+			    gettext(pt_to_str(PT_ALLOWED_ADDRESS)));
 			break;
 		case RT_DEVICE:
 			(void) fprintf(fp, gettext("The '%s' resource scope is "
@@ -1220,9 +1245,9 @@ usage(boolean_t verbose, uint_t flags)
 		    rt_to_str(RT_FS), pt_to_str(PT_DIR),
 		    pt_to_str(PT_SPECIAL), pt_to_str(PT_RAW),
 		    pt_to_str(PT_TYPE), pt_to_str(PT_OPTIONS));
-		(void) fprintf(fp, "\t%s\t\t%s, %s, %s\n", rt_to_str(RT_NET),
-		    pt_to_str(PT_ADDRESS), pt_to_str(PT_PHYSICAL),
-		    pt_to_str(PT_DEFROUTER));
+		(void) fprintf(fp, "\t%s\t\t%s, %s, %s|%s\n", rt_to_str(RT_NET),
+		    pt_to_str(PT_ADDRESS), pt_to_str(PT_ALLOWED_ADDRESS),
+		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_DEFROUTER));
 		(void) fprintf(fp, "\t%s\t\t%s\n", rt_to_str(RT_DEVICE),
 		    pt_to_str(PT_MATCH));
 		(void) fprintf(fp, "\t%s\t\t%s, %s\n", rt_to_str(RT_RCTL),
@@ -1849,6 +1874,8 @@ export_func(cmd_t *cmd)
 		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
 		    rt_to_str(RT_NET));
 		export_prop(of, PT_ADDRESS, nwiftab.zone_nwif_address);
+		export_prop(of, PT_ALLOWED_ADDRESS,
+		    nwiftab.zone_nwif_allowed_address);
 		export_prop(of, PT_PHYSICAL, nwiftab.zone_nwif_physical);
 		export_prop(of, PT_DEFROUTER, nwiftab.zone_nwif_defrouter);
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
@@ -2600,6 +2627,11 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab,
 		case PT_ADDRESS:
 			(void) strlcpy(nwiftab->zone_nwif_address,
 			    pp->pv_simple, sizeof (nwiftab->zone_nwif_address));
+			break;
+		case PT_ALLOWED_ADDRESS:
+			(void) strlcpy(nwiftab->zone_nwif_allowed_address,
+			    pp->pv_simple,
+			    sizeof (nwiftab->zone_nwif_allowed_address));
 			break;
 		case PT_PHYSICAL:
 			(void) strlcpy(nwiftab->zone_nwif_physical,
@@ -3758,10 +3790,14 @@ select_func(cmd_t *cmd)
  * IPv4 addresses and host names, 0 to 128 for IPv6 addresses.
  * Host names must start with an alpha-numeric character, and all subsequent
  * characters must be either alpha-numeric or "-".
+ *
+ * In some cases, e.g., the nexthop for the defrouter, the context indicates
+ * that this is the IPV4_ABITS or IPV6_ABITS netmask, in which case we don't
+ * require the /<prefix length> (and should ignore it if provided).
  */
 
 static int
-validate_net_address_syntax(char *address)
+validate_net_address_syntax(char *address, boolean_t ishost)
 {
 	char *slashp, part1[MAXHOSTNAMELEN];
 	struct in6_addr in6;
@@ -3781,8 +3817,17 @@ validate_net_address_syntax(char *address)
 		(void) strlcpy(part1, address, sizeof (part1));
 	}
 
+	if (ishost && slashp != NULL) {
+		zerr(gettext("Warning: prefix length in %s is not required and "
+		    "will be ignored. The default host-prefix length "
+		    "will be used"), address);
+	}
+
+
 	if (inet_pton(AF_INET6, part1, &in6) == 1) {
-		if (slashp == NULL) {
+		if (ishost) {
+			prefixlen = IPV6_ABITS;
+		} else if (slashp == NULL) {
 			zerr(gettext("%s: IPv6 addresses "
 			    "require /prefix-length suffix."), address);
 			return (Z_ERR);
@@ -3796,13 +3841,16 @@ validate_net_address_syntax(char *address)
 	}
 
 	/* At this point, any /prefix must be for IPv4. */
-	if (slashp != NULL) {
+	if (ishost)
+		prefixlen = IPV4_ABITS;
+	else if (slashp != NULL) {
 		if (prefixlen < 0 || prefixlen > 32) {
 			zerr(gettext("%s: IPv4 address "
 			    "prefix lengths must be 0 - 32."), address);
 			return (Z_ERR);
 		}
 	}
+
 	if (inet_pton(AF_INET, part1, &in4) == 1)
 		return (Z_OK);
 
@@ -3950,6 +3998,20 @@ set_aliased_rctl(char *alias, int prop_type, char *s)
 		saw_error = B_TRUE;
 	} else {
 		need_to_commit = B_TRUE;
+	}
+}
+
+static void
+set_in_progress_nwiftab_address(char *prop_id, int prop_type)
+{
+	if (prop_type == PT_ADDRESS) {
+		(void) strlcpy(in_progress_nwiftab.zone_nwif_address, prop_id,
+		    sizeof (in_progress_nwiftab.zone_nwif_address));
+	} else {
+		assert(prop_type == PT_ALLOWED_ADDRESS);
+		(void) strlcpy(in_progress_nwiftab.zone_nwif_allowed_address,
+		    prop_id,
+		    sizeof (in_progress_nwiftab.zone_nwif_allowed_address));
 	}
 }
 
@@ -4312,13 +4374,13 @@ set_func(cmd_t *cmd)
 	case RT_NET:
 		switch (prop_type) {
 		case PT_ADDRESS:
-			if (validate_net_address_syntax(prop_id) != Z_OK) {
+		case PT_ALLOWED_ADDRESS:
+			if (validate_net_address_syntax(prop_id, B_FALSE)
+			    != Z_OK) {
 				saw_error = B_TRUE;
 				return;
 			}
-			(void) strlcpy(in_progress_nwiftab.zone_nwif_address,
-			    prop_id,
-			    sizeof (in_progress_nwiftab.zone_nwif_address));
+			set_in_progress_nwiftab_address(prop_id, prop_type);
 			break;
 		case PT_PHYSICAL:
 			if (validate_net_physical_syntax(prop_id) != Z_OK) {
@@ -4330,7 +4392,8 @@ set_func(cmd_t *cmd)
 			    sizeof (in_progress_nwiftab.zone_nwif_physical));
 			break;
 		case PT_DEFROUTER:
-			if (validate_net_address_syntax(prop_id) != Z_OK) {
+			if (validate_net_address_syntax(prop_id, B_TRUE)
+			    != Z_OK) {
 				saw_error = B_TRUE;
 				return;
 			}
@@ -4879,6 +4942,8 @@ output_net(FILE *fp, struct zone_nwiftab *nwiftab)
 {
 	(void) fprintf(fp, "%s:\n", rt_to_str(RT_NET));
 	output_prop(fp, PT_ADDRESS, nwiftab->zone_nwif_address, B_TRUE);
+	output_prop(fp, PT_ALLOWED_ADDRESS,
+	    nwiftab->zone_nwif_allowed_address, B_TRUE);
 	output_prop(fp, PT_PHYSICAL, nwiftab->zone_nwif_physical, B_TRUE);
 	output_prop(fp, PT_DEFROUTER, nwiftab->zone_nwif_defrouter, B_TRUE);
 }
@@ -5597,6 +5662,41 @@ brand_verify(zone_dochandle_t handle)
 }
 
 /*
+ * Track the network interfaces listed in zonecfg(1m) in a linked list
+ * so that we can later check that defrouter is specified for an exclusive IP
+ * zone if and only if at least one allowed-address has been specified.
+ */
+static boolean_t
+add_nwif(struct zone_nwiftab *nwif)
+{
+	struct xif *tmp;
+
+	for (tmp = xif; tmp != NULL; tmp = tmp->xif_next) {
+		if (strcmp(tmp->xif_name, nwif->zone_nwif_physical) == 0) {
+			if (strlen(nwif->zone_nwif_allowed_address) > 0)
+				tmp->xif_has_address = B_TRUE;
+			if (strlen(nwif->zone_nwif_defrouter) > 0)
+				tmp->xif_has_defrouter = B_TRUE;
+			return (B_TRUE);
+		}
+	}
+
+	tmp = malloc(sizeof (*tmp));
+	if (tmp == NULL) {
+		zerr(gettext("memory allocation failed for %s"),
+		    nwif->zone_nwif_physical);
+		return (B_FALSE);
+	}
+	strlcpy(tmp->xif_name, nwif->zone_nwif_physical,
+	    sizeof (tmp->xif_name));
+	tmp->xif_has_defrouter = (strlen(nwif->zone_nwif_defrouter) > 0);
+	tmp->xif_has_address = (strlen(nwif->zone_nwif_allowed_address) > 0);
+	tmp->xif_next = xif;
+	xif = tmp;
+	return (B_TRUE);
+}
+
+/*
  * See the DTD for which attributes are required for which resources.
  *
  * This function can be called by commit_func(), which needs to save things,
@@ -5627,6 +5727,7 @@ verify_func(cmd_t *cmd)
 	zone_iptype_t iptype;
 	boolean_t has_cpu_shares = B_FALSE;
 	boolean_t has_cpu_cap = B_FALSE;
+	struct xif *tmp;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
@@ -5740,6 +5841,15 @@ verify_func(cmd_t *cmd)
 		case ZS_SHARED:
 			check_reqd_prop(nwiftab.zone_nwif_address, RT_NET,
 			    PT_ADDRESS, &ret_val);
+			if (strlen(nwiftab.zone_nwif_allowed_address) > 0) {
+				zerr(gettext("%s: %s cannot be specified "
+				    "for a shared IP type"),
+				    rt_to_str(RT_NET),
+				    pt_to_str(PT_ALLOWED_ADDRESS));
+				saw_error = B_TRUE;
+				if (ret_val == Z_OK)
+					ret_val = Z_INVAL;
+			}
 			break;
 		case ZS_EXCLUSIVE:
 			if (strlen(nwiftab.zone_nwif_address) > 0) {
@@ -5749,18 +5859,28 @@ verify_func(cmd_t *cmd)
 				saw_error = B_TRUE;
 				if (ret_val == Z_OK)
 					ret_val = Z_INVAL;
-			}
-			if (strlen(nwiftab.zone_nwif_defrouter) > 0) {
-				zerr(gettext("%s: %s cannot be specified "
-				    "for an exclusive IP type"),
-				    rt_to_str(RT_NET), pt_to_str(PT_DEFROUTER));
-				saw_error = B_TRUE;
-				if (ret_val == Z_OK)
-					ret_val = Z_INVAL;
+			} else {
+				if (!add_nwif(&nwiftab)) {
+					saw_error = B_TRUE;
+					if (ret_val == Z_OK)
+						ret_val = Z_INVAL;
+				}
 			}
 			break;
 		}
 	}
+	for (tmp = xif; tmp != NULL; tmp = tmp->xif_next) {
+		if (!tmp->xif_has_address && tmp->xif_has_defrouter) {
+			zerr(gettext("%s: %s for %s cannot be specified "
+			    "without %s for an exclusive IP type"),
+			    rt_to_str(RT_NET), pt_to_str(PT_DEFROUTER),
+			    tmp->xif_name, pt_to_str(PT_ALLOWED_ADDRESS));
+			saw_error = B_TRUE;
+			ret_val = Z_INVAL;
+		}
+	}
+	free(xif);
+	xif = NULL;
 	(void) zonecfg_endnwifent(handle);
 
 	if ((err = zonecfg_setrctlent(handle)) != Z_OK) {
@@ -6023,6 +6143,28 @@ end_check_reqd(char *attr, int pt, boolean_t *validation_failed)
 	return (Z_OK);
 }
 
+static void
+net_exists_error(struct zone_nwiftab nwif)
+{
+	if (strlen(nwif.zone_nwif_address) > 0) {
+		zerr(gettext("A %s resource with the %s '%s', "
+		    "and %s '%s' already exists."),
+		    rt_to_str(RT_NET),
+		    pt_to_str(PT_PHYSICAL),
+		    nwif.zone_nwif_physical,
+		    pt_to_str(PT_ADDRESS),
+		    in_progress_nwiftab.zone_nwif_address);
+	} else {
+		zerr(gettext("A %s resource with the %s '%s', "
+		    "and %s '%s' already exists."),
+		    rt_to_str(RT_NET),
+		    pt_to_str(PT_PHYSICAL),
+		    nwif.zone_nwif_physical,
+		    pt_to_str(PT_ALLOWED_ADDRESS),
+		    nwif.zone_nwif_allowed_address);
+	}
+}
+
 void
 end_func(cmd_t *cmd)
 {
@@ -6151,14 +6293,14 @@ end_func(cmd_t *cmd)
 			(void) strlcpy(tmp_nwiftab.zone_nwif_address,
 			    in_progress_nwiftab.zone_nwif_address,
 			    sizeof (tmp_nwiftab.zone_nwif_address));
+			(void) strlcpy(tmp_nwiftab.zone_nwif_allowed_address,
+			    in_progress_nwiftab.zone_nwif_allowed_address,
+			    sizeof (tmp_nwiftab.zone_nwif_allowed_address));
+			(void) strlcpy(tmp_nwiftab.zone_nwif_defrouter,
+			    in_progress_nwiftab.zone_nwif_defrouter,
+			    sizeof (tmp_nwiftab.zone_nwif_defrouter));
 			if (zonecfg_lookup_nwif(handle, &tmp_nwiftab) == Z_OK) {
-				zerr(gettext("A %s resource with the %s '%s', "
-				    "and %s '%s' already exists."),
-				    rt_to_str(RT_NET),
-				    pt_to_str(PT_PHYSICAL),
-				    in_progress_nwiftab.zone_nwif_physical,
-				    pt_to_str(PT_ADDRESS),
-				    in_progress_nwiftab.zone_nwif_address);
+				net_exists_error(in_progress_nwiftab);
 				saw_error = B_TRUE;
 				return;
 			}

@@ -169,6 +169,8 @@ i_ipadm_active_if_info(ipadm_handle_t iph, const char *ifname,
 			ifp->ifi_cflags |= IFIF_IPV4;
 		if (lifrl.lifr_flags & IFF_IPV6)
 			ifp->ifi_cflags |= IFIF_IPV6;
+		if (lifrl.lifr_flags & IFF_L3PROTECT)
+			ifp->ifi_cflags |= IFIF_L3PROTECT;
 	}
 	free(buf);
 	return (IPADM_SUCCESS);
@@ -376,6 +378,15 @@ i_ipadm_if_pexists(ipadm_handle_t iph, const char *ifname, sa_family_t af,
 	ipadm_if_info_t	*ifinfo;
 	ipadm_status_t	status;
 
+	/*
+	 * if IPH_IPMGMTD is set, we know that the caller (ipmgmtd) already
+	 * knows about persistent configuration in the first place, so we
+	 * just return success.
+	 */
+	if (iph->iph_flags & IPH_IPMGMTD) {
+		*exists = B_FALSE;
+		return (IPADM_SUCCESS);
+	}
 	status = i_ipadm_persist_if_info(iph, ifname, &ifinfo);
 	if (status == IPADM_SUCCESS) {
 		*exists = ((af == AF_INET &&
@@ -688,7 +699,7 @@ i_ipadm_plumb_if(ipadm_handle_t iph, char *ifname, sa_family_t af,
 	 * that the non-global zones don't need this check, because zoneadm
 	 * has taken care of this when the zones boot.
 	 */
-	if (getzoneid() == GLOBAL_ZONEID && dlstatus == DLADM_STATUS_OK) {
+	if (iph->iph_zoneid == GLOBAL_ZONEID && dlstatus == DLADM_STATUS_OK) {
 		zoneid = ALL_ZONES;
 		if (zone_check_datalink(&zoneid, linkid) == 0) {
 			/* interface is in use by a non-global zone. */

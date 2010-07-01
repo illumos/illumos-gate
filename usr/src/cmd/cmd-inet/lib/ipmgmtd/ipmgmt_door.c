@@ -554,33 +554,9 @@ i_ipmgmt_delif_aobjs(char *ifname, sa_family_t af, uint32_t flags)
 static void
 ipmgmt_setif_handler(void *argp)
 {
-	ipmgmt_if_arg_t		*sargp = argp;
 	ipmgmt_retval_t		rval;
-	ipadm_dbwrite_cbarg_t	cb;
-	uint32_t		flags = sargp->ia_flags;
-	nvlist_t		*nvl = NULL;
-	int			err = 0;
-	char			strval[IPMGMT_STRSIZE];
 
-	if (!(flags & IPMGMT_PERSIST) || sargp->ia_family == AF_UNSPEC ||
-	    sargp->ia_ifname[0] == '\0') {
-		err = EINVAL;
-		goto ret;
-	}
-	if ((err = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0)) != 0)
-		goto ret;
-	if ((err = nvlist_add_string(nvl, IPADM_NVP_IFNAME,
-	    sargp->ia_ifname)) != 0)
-		goto ret;
-	(void) snprintf(strval, IPMGMT_STRSIZE, "%d", sargp->ia_family);
-	if ((err = nvlist_add_string(nvl, IPADM_NVP_FAMILY, strval)) != 0)
-		goto ret;
-	cb.dbw_nvl = nvl;
-	cb.dbw_flags = 0;
-	err = ipmgmt_db_walk(ipmgmt_db_add, &cb, IPADM_DB_WRITE);
-ret:
-	rval.ir_err = err;
-	nvlist_free(nvl);
+	rval.ir_err = ipmgmt_persist_if(argp);
 	(void) door_return((char *)&rval, sizeof (rval), NULL, 0);
 }
 
@@ -855,4 +831,34 @@ fail:
 	nvlist_free(cbarg.cb_onvl);
 	rvalp->ir_err = err;
 	(void) door_return((char *)rvalp, sizeof (*rvalp), NULL, 0);
+}
+
+int
+ipmgmt_persist_if(ipmgmt_if_arg_t *sargp)
+{
+	ipadm_dbwrite_cbarg_t	cb;
+	uint32_t		flags = sargp->ia_flags;
+	nvlist_t		*nvl = NULL;
+	int			err = 0;
+	char			strval[IPMGMT_STRSIZE];
+
+	if (!(flags & IPMGMT_PERSIST) || sargp->ia_family == AF_UNSPEC ||
+	    sargp->ia_ifname[0] == '\0') {
+		err = EINVAL;
+		goto ret;
+	}
+	if ((err = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0)) != 0)
+		goto ret;
+	if ((err = nvlist_add_string(nvl, IPADM_NVP_IFNAME,
+	    sargp->ia_ifname)) != 0)
+		goto ret;
+	(void) snprintf(strval, IPMGMT_STRSIZE, "%d", sargp->ia_family);
+	if ((err = nvlist_add_string(nvl, IPADM_NVP_FAMILY, strval)) != 0)
+		goto ret;
+	cb.dbw_nvl = nvl;
+	cb.dbw_flags = 0;
+	err = ipmgmt_db_walk(ipmgmt_db_add, &cb, IPADM_DB_WRITE);
+ret:
+	nvlist_free(nvl);
+	return (err);
 }

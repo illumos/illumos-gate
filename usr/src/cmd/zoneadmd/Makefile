@@ -22,10 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG= zoneadmd
@@ -41,7 +38,8 @@ POFILES= $(OBJS:%.o=%.po)
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
-	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol
+	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
+	-linetutil
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:

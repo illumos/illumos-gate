@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -171,6 +170,7 @@ struct ifnet {
 #define	IFF_VRRP	0x10000000000ll	/* Managed by VRRP */
 
 #define	IFF_NOLINKLOCAL	0x20000000000ll	/* No default linklocal */
+#define	IFF_L3PROTECT	0x40000000000ll	/* Layer-3 protection enforced */
 
 /* flags that cannot be changed by userland on any interface */
 #define	IFF_CANTCHANGE \
@@ -178,7 +178,7 @@ struct ifnet {
 	IFF_MULTICAST | IFF_MULTI_BCAST | IFF_UNNUMBERED | IFF_IPV4 | \
 	IFF_IPV6 | IFF_IPMP | IFF_FIXEDMTU | IFF_VIRTUAL | \
 	IFF_LOOPBACK | IFF_ALLMULTI | IFF_DUPLICATE | IFF_COS_ENABLED | \
-	IFF_VRRP | IFF_NOLINKLOCAL)
+	IFF_VRRP | IFF_NOLINKLOCAL | IFF_L3PROTECT)
 
 /* flags that cannot be changed by userland on an IPMP interface */
 #define	IFF_IPMP_CANTCHANGE 	IFF_FAILED

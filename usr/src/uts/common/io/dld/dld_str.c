@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -38,6 +37,7 @@
 #include	<sys/list.h>
 #include	<sys/mac_client.h>
 #include	<sys/mac_client_priv.h>
+#include	<sys/mac_flow.h>
 
 static int	str_constructor(void *, void *, int);
 static void	str_destructor(void *, void *);
@@ -1719,6 +1719,35 @@ str_notify_fastpath_flush(dld_str_t *dsp)
 	qreply(dsp->ds_wq, mp);
 }
 
+static void
+str_notify_allowed_ips(dld_str_t *dsp)
+{
+	mblk_t		*mp;
+	dl_notify_ind_t	*dlip;
+	size_t		mp_size;
+	mac_protect_t	mrp;
+
+	if (!(dsp->ds_notifications & DL_NOTE_ALLOWED_IPS))
+		return;
+
+	mp_size = sizeof (mac_protect_t) + sizeof (dl_notify_ind_t);
+	if ((mp = mexchange(dsp->ds_wq, NULL, mp_size, M_PROTO, 0)) == NULL)
+		return;
+
+	mac_protect_get(dsp->ds_mh, &mrp);
+	bzero(mp->b_rptr, mp_size);
+	dlip = (dl_notify_ind_t *)mp->b_rptr;
+	dlip->dl_primitive = DL_NOTIFY_IND;
+	dlip->dl_notification = DL_NOTE_ALLOWED_IPS;
+	dlip->dl_data = 0;
+	dlip->dl_addr_offset = sizeof (dl_notify_ind_t);
+	dlip->dl_addr_length = sizeof (mac_protect_t);
+	bcopy(&mrp, mp->b_rptr + sizeof (dl_notify_ind_t),
+	    sizeof (mac_protect_t));
+
+	qreply(dsp->ds_wq, mp);
+}
+
 /*
  * MAC notification callback.
  */
@@ -1847,6 +1876,10 @@ str_notify(void *arg, mac_notify_type_t type)
 
 	/* Unused notifications */
 	case MAC_NOTE_MARGIN:
+		break;
+
+	case MAC_NOTE_ALLOWED_IPS:
+		str_notify_allowed_ips(dsp);
 		break;
 
 	default:

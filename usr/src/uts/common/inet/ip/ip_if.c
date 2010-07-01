@@ -94,6 +94,7 @@
 #include <inet/ipclassifier.h>
 #include <sys/mac_client.h>
 #include <sys/dld.h>
+#include <sys/mac_flow.h>
 
 #include <sys/systeminfo.h>
 #include <sys/bootconf.h>
@@ -544,6 +545,15 @@ ill_delete_tail(ill_t *ill)
 	if (ill->ill_dld_capab != NULL) {
 		kmem_free(ill->ill_dld_capab, sizeof (ill_dld_capab_t));
 		ill->ill_dld_capab = NULL;
+	}
+
+	/* Clean up ill_allowed_ips* related state */
+	if (ill->ill_allowed_ips != NULL) {
+		ASSERT(ill->ill_allowed_ips_cnt > 0);
+		kmem_free(ill->ill_allowed_ips,
+		    ill->ill_allowed_ips_cnt * sizeof (in6_addr_t));
+		ill->ill_allowed_ips = NULL;
+		ill->ill_allowed_ips_cnt = 0;
 	}
 
 	while (ill->ill_ipif != NULL)
@@ -2682,6 +2692,9 @@ ill_forward_set(ill_t *ill, boolean_t enable)
 
 	if (IS_LOOPBACK(ill))
 		return (EINVAL);
+
+	if (enable && ill->ill_allowed_ips_cnt > 0)
+		return (EPERM);
 
 	if (IS_IPMP(ill) || IS_UNDER_IPMP(ill)) {
 		/*
@@ -9656,15 +9669,17 @@ ip_sioctl_addr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	int err = 0;
 	in6_addr_t v6addr;
 	boolean_t need_up = B_FALSE;
+	ill_t *ill;
+	int i;
 
 	ip1dbg(("ip_sioctl_addr(%s:%u %p)\n",
 	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
 
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
+	ill = ipif->ipif_ill;
 	if (ipif->ipif_isv6) {
 		sin6_t *sin6;
-		ill_t *ill;
 		phyint_t *phyi;
 
 		if (sin->sin_family != AF_INET6)
@@ -9672,7 +9687,6 @@ ip_sioctl_addr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 		sin6 = (sin6_t *)sin;
 		v6addr = sin6->sin6_addr;
-		ill = ipif->ipif_ill;
 		phyi = ill->ill_phyint;
 
 		/*
@@ -9731,7 +9745,21 @@ ip_sioctl_addr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 		IN6_IPADDR_TO_V4MAPPED(addr, &v6addr);
 	}
-
+	/*
+	 * verify that the address being configured is permitted by the
+	 * ill_allowed_ips[] for the interface.
+	 */
+	if (ill->ill_allowed_ips_cnt > 0) {
+		for (i = 0; i < ill->ill_allowed_ips_cnt; i++) {
+			if (IN6_ARE_ADDR_EQUAL(&ill->ill_allowed_ips[i],
+			    &v6addr))
+				break;
+		}
+		if (i == ill->ill_allowed_ips_cnt) {
+			pr_addr_dbg("!allowed addr %s\n", AF_INET6, &v6addr);
+			return (EPERM);
+		}
+	}
 	/*
 	 * Even if there is no change we redo things just to rerun
 	 * ipif_set_default.
@@ -10373,8 +10401,11 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * If ILLF_ROUTER changes, we need to change the ip forwarding
 	 * status of the interface.
 	 */
-	if ((turn_on | turn_off) & ILLF_ROUTER)
-		(void) ill_forward_set(ill, ((turn_on & ILLF_ROUTER) != 0));
+	if ((turn_on | turn_off) & ILLF_ROUTER) {
+		err = ill_forward_set(ill, ((turn_on & ILLF_ROUTER) != 0));
+		if (err != 0)
+			return (err);
+	}
 
 	/*
 	 * If the interface is not UP and we are not going to
@@ -17778,6 +17809,51 @@ ill_set_phys_addr(ill_t *ill, mblk_t *mp)
 
 	ill_set_phys_addr_tail(ipsq, ill->ill_rq, mp, NULL);
 	return (0);
+}
+
+/*
+ * When the allowed-ips link property is set on the datalink, IP receives a
+ * DL_NOTE_ALLOWED_IPS notification that is processed in ill_set_allowed_ips()
+ * to initialize the ill_allowed_ips[] array in the ill_t. This array is then
+ * used to vet addresses passed to ip_sioctl_addr() and to ensure that the
+ * only IP addresses configured on the ill_t are those in the ill_allowed_ips[]
+ * array.
+ */
+void
+ill_set_allowed_ips(ill_t *ill, mblk_t *mp)
+{
+	ipsq_t *ipsq = ill->ill_phyint->phyint_ipsq;
+	dl_notify_ind_t	*dlip = (dl_notify_ind_t *)mp->b_rptr;
+	mac_protect_t *mrp;
+	int i;
+
+	ASSERT(IAM_WRITER_IPSQ(ipsq));
+	mrp = (mac_protect_t *)&dlip[1];
+
+	if (mrp->mp_ipaddrcnt == 0) { /* reset allowed-ips */
+		kmem_free(ill->ill_allowed_ips,
+		    ill->ill_allowed_ips_cnt * sizeof (in6_addr_t));
+		ill->ill_allowed_ips_cnt = 0;
+		ill->ill_allowed_ips = NULL;
+		mutex_enter(&ill->ill_phyint->phyint_lock);
+		ill->ill_phyint->phyint_flags &= ~PHYI_L3PROTECT;
+		mutex_exit(&ill->ill_phyint->phyint_lock);
+		return;
+	}
+
+	if (ill->ill_allowed_ips != NULL) {
+		kmem_free(ill->ill_allowed_ips,
+		    ill->ill_allowed_ips_cnt * sizeof (in6_addr_t));
+	}
+	ill->ill_allowed_ips_cnt = mrp->mp_ipaddrcnt;
+	ill->ill_allowed_ips = kmem_alloc(
+	    ill->ill_allowed_ips_cnt * sizeof (in6_addr_t), KM_SLEEP);
+	for (i = 0; i < mrp->mp_ipaddrcnt;  i++)
+		ill->ill_allowed_ips[i] = mrp->mp_ipaddrs[i].ip_addr;
+
+	mutex_enter(&ill->ill_phyint->phyint_lock);
+	ill->ill_phyint->phyint_flags |= PHYI_L3PROTECT;
+	mutex_exit(&ill->ill_phyint->phyint_lock);
 }
 
 /*

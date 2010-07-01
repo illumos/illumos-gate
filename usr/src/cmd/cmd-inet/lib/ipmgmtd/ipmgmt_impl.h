@@ -38,6 +38,7 @@ extern "C" {
 #include <pthread.h>
 
 #define	IPMGMT_STRSIZE		256
+#define	IPMGMTD_FMRI		"svc:/network/ip-interface-management:default"
 
 /* ipmgmt_door.c */
 extern void	ipmgmt_handler(void *, char *, size_t, door_desc_t *, uint_t);
@@ -145,6 +146,8 @@ extern boolean_t	ipmgmt_aobjmap_init(void *, nvlist_t *, char *,
 extern int 		ipmgmt_persist_aobjmap(ipmgmt_aobjmap_t *,
 			    ipadm_db_op_t);
 
+extern boolean_t	ipmgmt_first_boot();
+extern int		ipmgmt_persist_if(ipmgmt_if_arg_t *);
 #ifdef  __cplusplus
 }
 #endif

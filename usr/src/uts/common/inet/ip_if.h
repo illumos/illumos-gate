@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
-/* Copyright (c) 1990 Mentat Inc. */
 
 #ifndef	_INET_IP_IF_H
 #define	_INET_IP_IF_H
@@ -76,7 +75,7 @@ extern "C" {
  */
 #define	IFF_PHYINT_FLAGS	(IFF_LOOPBACK|IFF_RUNNING|IFF_PROMISC| \
     IFF_ALLMULTI|IFF_INTELLIGENT|IFF_MULTI_BCAST|IFF_FAILED|IFF_STANDBY| \
-    IFF_INACTIVE|IFF_OFFLINE|IFF_VIRTUAL|IFF_IPMP)
+    IFF_INACTIVE|IFF_OFFLINE|IFF_VIRTUAL|IFF_IPMP|IFF_L3PROTECT)
 
 #define	IFF_PHYINTINST_FLAGS	(IFF_DEBUG|IFF_NOTRAILERS|IFF_NOARP| \
     IFF_MULTICAST|IFF_ROUTER|IFF_NONUD|IFF_NORTEXCH|IFF_IPV4|IFF_IPV6| \
@@ -99,6 +98,7 @@ extern "C" {
 #define	PHYI_OFFLINE		IFF_OFFLINE	/* NIC has been offlined */
 #define	PHYI_VIRTUAL		IFF_VIRTUAL	/* Will not send or recv pkts */
 #define	PHYI_IPMP		IFF_IPMP	/* IPMP meta-interface */
+#define	PHYI_L3PROTECT		IFF_L3PROTECT	/* Layer-3 protected */
 
 #define	ILLF_DEBUG		IFF_DEBUG	/* turn on debugging */
 #define	ILLF_NOTRAILERS		IFF_NOTRAILERS	/* avoid use of trailers */
@@ -195,6 +195,7 @@ extern	void	ill_setdesttoken(ill_t *);
 extern	void	ill_set_inputfn(ill_t *);
 extern	void	ill_set_inputfn_all(ip_stack_t *);
 extern	int	ill_set_phys_addr(ill_t *, mblk_t *);
+extern	void	ill_set_allowed_ips(ill_t *, mblk_t *);
 extern	int	ill_replumb(ill_t *, mblk_t *);
 extern	void	ill_set_ndmp(ill_t *, mblk_t *, uint_t, uint_t);
 

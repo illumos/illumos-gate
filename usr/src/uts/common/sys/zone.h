@@ -36,6 +36,8 @@
 #include <sys/netstack.h>
 #include <sys/uadmin.h>
 #include <sys/ksynch.h>
+#include <sys/socket_impl.h>
+#include <netinet/in.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -97,6 +99,7 @@ extern "C" {
 #define	ZONE_ATTR_FLAGS		14
 #define	ZONE_ATTR_HOSTID	15
 #define	ZONE_ATTR_FS_ALLOWED	16
+#define	ZONE_ATTR_NETWORK	17
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -278,6 +281,21 @@ typedef struct zone_cmd_rval {
 
 /* zone_create flags */
 #define	ZCF_NET_EXCL		0x1	/* Create a zone with exclusive IP */
+
+/* zone network properties */
+#define	ZONE_NETWORK_ADDRESS	1
+#define	ZONE_NETWORK_DEFROUTER	2
+
+#define	ZONE_NET_ADDRNAME	"address"
+#define	ZONE_NET_RTRNAME	"route"
+
+typedef struct zone_net_data {
+	int zn_type;
+	int zn_len;
+	datalink_id_t zn_linkid;
+	uint8_t zn_val[1];
+} zone_net_data_t;
+
 
 #ifdef _KERNEL
 /*

@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  */
 
@@ -2302,7 +2299,7 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	    (DL_NOTE_PHYS_ADDR | DL_NOTE_SDU_SIZE | DL_NOTE_FASTPATH_FLUSH |
 	    DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN | DL_NOTE_CAPAB_RENEG |
 	    DL_NOTE_PROMISC_ON_PHYS | DL_NOTE_PROMISC_OFF_PHYS |
-	    DL_NOTE_REPLUMB);
+	    DL_NOTE_REPLUMB | DL_NOTE_ALLOWED_IPS);
 
 	phys_mp = ip_dlpi_alloc(sizeof (dl_phys_addr_req_t) +
 	    sizeof (t_scalar_t), DL_PHYS_ADDR_REQ);

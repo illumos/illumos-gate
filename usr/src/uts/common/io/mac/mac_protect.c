@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/strsun.h>
@@ -194,6 +193,7 @@ typedef struct dhcpv6_txn {
 } dhcpv6_txn_t;
 
 static void	start_txn_cleanup_timer(mac_client_impl_t *);
+static boolean_t allowed_ips_set(mac_resource_props_t *, uint32_t);
 
 #define	BUMP_STAT(m, s)	(m)->mci_misc_stat.mms_##s++
 
@@ -552,29 +552,34 @@ txn_cleanup_v4(mac_client_impl_t *mcip)
 /*
  * Core logic for intercepting outbound DHCPv4 packets.
  */
-static void
+static boolean_t
 intercept_dhcpv4_outbound(mac_client_impl_t *mcip, ipha_t *ipha, uchar_t *end)
 {
-	struct dhcp	*dh4;
-	uchar_t		*opt;
-	dhcpv4_txn_t	*txn, *ctxn;
-	ipaddr_t	ipaddr;
-	uint8_t		opt_len, mtype, cid[DHCP_MAX_OPT_SIZE], cid_len;
+	struct dhcp		*dh4;
+	uchar_t			*opt;
+	dhcpv4_txn_t		*txn, *ctxn;
+	ipaddr_t		ipaddr;
+	uint8_t			opt_len, mtype, cid[DHCP_MAX_OPT_SIZE], cid_len;
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
 
 	if (get_dhcpv4_info(ipha, end, &dh4) != 0)
-		return;
+		return (B_TRUE);
+
+	/* ip_nospoof/allowed-ips and DHCP are mutually exclusive by default */
+	if (allowed_ips_set(mrp, IPV4_VERSION))
+		return (B_FALSE);
 
 	if (get_dhcpv4_option(dh4, end, CD_DHCP_TYPE, &opt, &opt_len) != 0 ||
 	    opt_len != 1) {
 		DTRACE_PROBE2(mtype__not__found, mac_client_impl_t *, mcip,
 		    struct dhcp *, dh4);
-		return;
+		return (B_TRUE);
 	}
 	mtype = *opt;
 	if (mtype != REQUEST && mtype != RELEASE) {
 		DTRACE_PROBE3(ignored__mtype, mac_client_impl_t *, mcip,
 		    struct dhcp *, dh4, uint8_t, mtype);
-		return;
+		return (B_TRUE);
 	}
 
 	/* client ID is optional for IPv4 */
@@ -639,6 +644,7 @@ intercept_dhcpv4_outbound(mac_client_impl_t *mcip, ipha_t *ipha, uchar_t *end)
 
 done:
 	mutex_exit(&mcip->mci_protect_lock);
+	return (B_TRUE);
 }
 
 /*
@@ -1208,7 +1214,7 @@ txn_cleanup_v6(mac_client_impl_t *mcip)
 /*
  * Core logic for intercepting outbound DHCPv6 packets.
  */
-static void
+static boolean_t
 intercept_dhcpv6_outbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end)
 {
 	dhcpv6_message_t	*dh6;
@@ -1216,17 +1222,22 @@ intercept_dhcpv6_outbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end)
 	dhcpv6_cid_t		*cid = NULL;
 	uint32_t		xid;
 	uint8_t			mtype;
+	mac_resource_props_t *mrp = MCIP_RESOURCE_PROPS(mcip);
 
 	if (get_dhcpv6_info(ip6h, end, &dh6) != 0)
-		return;
+		return (B_TRUE);
+
+	/* ip_nospoof/allowed-ips and DHCP are mutually exclusive by default */
+	if (allowed_ips_set(mrp, IPV6_VERSION))
+		return (B_FALSE);
 
 	mtype = dh6->d6m_msg_type;
 	if (mtype != DHCPV6_MSG_REQUEST && mtype != DHCPV6_MSG_RENEW &&
 	    mtype != DHCPV6_MSG_REBIND && mtype != DHCPV6_MSG_RELEASE)
-		return;
+		return (B_TRUE);
 
 	if ((cid = create_dhcpv6_cid(dh6, end)) == NULL)
-		return;
+		return (B_TRUE);
 
 	mutex_enter(&mcip->mci_protect_lock);
 	if (mtype == DHCPV6_MSG_RELEASE) {
@@ -1260,6 +1271,7 @@ done:
 		free_dhcpv6_cid(cid);
 
 	mutex_exit(&mcip->mci_protect_lock);
+	return (B_TRUE);
 }
 
 /*
@@ -1524,7 +1536,8 @@ ipnospoof_check_v4(mac_client_impl_t *mcip, mac_protect_t *protect,
 		    V4_PART_OF_V6(v4addr->ip_addr) == *addr)
 			return (B_TRUE);
 	}
-	return (check_dhcpv4_dyn_ip(mcip, *addr));
+	return (protect->mp_ipaddrcnt == 0 ?
+	    check_dhcpv4_dyn_ip(mcip, *addr) : B_FALSE);
 }
 
 static boolean_t
@@ -1549,7 +1562,8 @@ ipnospoof_check_v6(mac_client_impl_t *mcip, mac_protect_t *protect,
 		    IN6_ARE_ADDR_EQUAL(&v6addr->ip_addr, addr))
 			return (B_TRUE);
 	}
-	return (check_dhcpv6_dyn_ip(mcip, addr));
+	return (protect->mp_ipaddrcnt == 0 ?
+	    check_dhcpv6_dyn_ip(mcip, addr) : B_FALSE);
 }
 
 /*
@@ -1694,7 +1708,8 @@ ipnospoof_check(mac_client_impl_t *mcip, mac_protect_t *protect,
 		if (!ipnospoof_check_v4(mcip, protect, &ipha->ipha_src))
 			goto fail;
 
-		intercept_dhcpv4_outbound(mcip, ipha, end);
+		if (!intercept_dhcpv4_outbound(mcip, ipha, end))
+			goto fail;
 		break;
 	}
 	case ETHERTYPE_ARP: {
@@ -1739,7 +1754,8 @@ ipnospoof_check(mac_client_impl_t *mcip, mac_protect_t *protect,
 		if (!ipnospoof_check_ndp(mcip, protect, ip6h, end))
 			goto fail;
 
-		intercept_dhcpv6_outbound(mcip, ip6h, end);
+		if (!intercept_dhcpv6_outbound(mcip, ip6h, end))
+			goto fail;
 		break;
 	}
 	}
@@ -2187,7 +2203,12 @@ mac_protect_set(mac_client_handle_t mch, mac_resource_props_t *mrp)
 	if ((err = mac_protect_validate(mrp)) != 0)
 		return (err);
 
+	if (err != 0)
+		return (err);
+
 	mac_update_resources(mrp, MCIP_RESOURCE_PROPS(mcip), B_FALSE);
+	i_mac_notify(((mcip->mci_state_flags & MCIS_IS_VNIC) != 0 ?
+	    mcip->mci_upper_mip : mip), MAC_NOTE_ALLOWED_IPS);
 	return (0);
 }
 
@@ -2260,4 +2281,24 @@ mac_protect_fini(mac_client_impl_t *mcip)
 	mcip->mci_txn_cleanup_tid = 0;
 	mcip->mci_protect_flags = 0;
 	mutex_destroy(&mcip->mci_protect_lock);
+}
+
+static boolean_t
+allowed_ips_set(mac_resource_props_t *mrp, uint32_t af)
+{
+	int i;
+
+	for (i = 0; i < mrp->mrp_protect.mp_ipaddrcnt; i++) {
+		if (mrp->mrp_protect.mp_ipaddrs[i].ip_version == af)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+void
+mac_protect_get(mac_handle_t mh, mac_protect_t *mrp)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	*mrp = mip->mi_resource_props.mrp_protect;
 }

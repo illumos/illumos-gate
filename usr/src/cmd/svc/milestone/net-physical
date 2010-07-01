@@ -305,21 +305,35 @@ if [ -n "$ipmp6_list" ]; then
 fi
 
 #
-# Finally configure interfaces set up with ipadm.
+# Finally configure interfaces set up with ipadm. Any /etc/hostname*.intf
+# files take precedence over ipadm defined configurations except when
+# we are in a non-global zone and Layer-3 protection of IP addresses is
+# enforced on the interface by the global zone.
 #
-for showif_output in `/sbin/ipadm show-if -p -o ifname,state`; do
+for showif_output in `/sbin/ipadm show-if -p -o ifname,state,current`; do
 	intf=`echo $showif_output | /usr/bin/cut -f1 -d:`
 	state=`echo $showif_output | /usr/bin/cut -f2 -d:`
-	if  [ "$state" != "disabled" ]; then
-		# skip if not a persistent interface
+	current=`echo $showif_output | /usr/bin/cut -f3 -d:`
+	if  [[ "$state" != "disabled" && $current != *Z* ]]; then
+		#
+		# skip if not a persistent interface, or if it should get IP
+		# configuration from the global zone ('Z' flag is set)
+		#
 		continue;
 	elif is_iptun $intf; then
 		# skip IP tunnel interfaces plumbed by net-iptun
 		continue;
 	elif [ -f /etc/hostname.$intf ] || [ -f /etc/hostname6.$intf ]; then
-		echo "found /etc/hostname.$intf or /etc/hostname6.$intf, "\
-		    "ignoring ipadm configuration" > /dev/msglog
-		continue;
+		if [[ $current != *Z* ]]; then
+			echo "found /etc/hostname.$intf "\
+			    "or /etc/hostname6.$intf, "\
+			    "ignoring ipadm configuration" > /dev/msglog
+			continue;
+		else
+			echo "Ignoring /etc/hostname*.$intf" > /dev/msglog 
+			/sbin/ifconfig $intf unplumb > /dev/null 2>&1
+			/sbin/ifconfig $intf inet6 unplumb > /dev/null 2>&1
+		fi
 	fi
 
 	# Enable the interface managed by ipadm

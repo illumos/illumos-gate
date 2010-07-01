@@ -97,7 +97,8 @@ static struct ipadm_error_info {
 	{ IPADM_IPC_ERROR,	"Could not communicate with ipmgmtd" },
 	{ IPADM_NOTSUP,		"Operation not supported" },
 	{ IPADM_OP_DISABLE_OBJ, "Operation not supported on disabled object" },
-	{ IPADM_EBADE,		"Invalid data exchange with daemon" }
+	{ IPADM_EBADE,		"Invalid data exchange with daemon" },
+	{ IPADM_GZ_PERM,	"Operation not permitted on from-gz interface"}
 };
 
 #define	IPADM_NUM_ERRORS	(sizeof (ipadm_errors) / sizeof (*ipadm_errors))
@@ -186,7 +187,7 @@ ipadm_open(ipadm_handle_t *handle, uint32_t flags)
 		return (IPADM_INVALID_ARG);
 	*handle = NULL;
 
-	if (flags & ~(IPH_VRRP|IPH_LEGACY|IPH_INIT))
+	if (flags & ~(IPH_VRRP|IPH_LEGACY|IPH_INIT|IPH_IPMGMTD))
 		return (IPADM_INVALID_ARG);
 
 	if ((iph = calloc(1, sizeof (struct ipadm_handle))) == NULL)
@@ -194,6 +195,7 @@ ipadm_open(ipadm_handle_t *handle, uint32_t flags)
 	iph->iph_sock = -1;
 	iph->iph_sock6 = -1;
 	iph->iph_door_fd = -1;
+	iph->iph_rtsock = -1;
 	iph->iph_flags = flags;
 	(void) pthread_mutex_init(&iph->iph_lock, NULL);
 
@@ -213,6 +215,7 @@ ipadm_open(ipadm_handle_t *handle, uint32_t flags)
 	 * dladm_open() for such zones.
 	 */
 	zoneid = getzoneid();
+	iph->iph_zoneid = zoneid;
 	if (zoneid != GLOBAL_ZONEID) {
 		if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &zflags,
 		    sizeof (zflags)) < 0) {
@@ -223,6 +226,14 @@ ipadm_open(ipadm_handle_t *handle, uint32_t flags)
 		if (dladm_open(&iph->iph_dlh) != DLADM_STATUS_OK) {
 			ipadm_close(iph);
 			return (IPADM_DLADM_FAILURE);
+		}
+		if (zoneid != GLOBAL_ZONEID) {
+			iph->iph_rtsock = socket(PF_ROUTE, SOCK_RAW, 0);
+			/*
+			 * Failure to open rtsock is ignored as this is
+			 * only used in non-global zones to initialize
+			 * routing socket information.
+			 */
 		}
 	} else {
 		assert(zoneid != GLOBAL_ZONEID);
@@ -256,6 +267,8 @@ ipadm_close(ipadm_handle_t iph)
 		(void) close(iph->iph_sock);
 	if (iph->iph_sock6 != -1)
 		(void) close(iph->iph_sock6);
+	if (iph->iph_rtsock != -1)
+		(void) close(iph->iph_rtsock);
 	if (iph->iph_door_fd != -1)
 		(void) close(iph->iph_door_fd);
 	dladm_close(iph->iph_dlh);
@@ -494,7 +507,7 @@ i_ipadm_is_6to4(ipadm_handle_t iph, char *ifname)
 	datalink_id_t		linkid;
 
 	if (iph->iph_dlh == NULL) {
-		assert(getzoneid() != GLOBAL_ZONEID);
+		assert(iph->iph_zoneid != GLOBAL_ZONEID);
 		return (B_FALSE);
 	}
 	dlstatus = dladm_name2info(iph->iph_dlh, ifname, &linkid, NULL,
@@ -682,6 +695,8 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 	ipadm_status_t	ret_status = IPADM_SUCCESS;
 	char		newifname[LIFNAMSIZ];
 	char		*aobjstr;
+	sa_family_t	af = AF_UNSPEC;
+	boolean_t	is_ngz = (iph->iph_zoneid != GLOBAL_ZONEID);
 
 	(void) strlcpy(newifname, ifname, sizeof (newifname));
 	/*
@@ -705,6 +720,9 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 			 */
 			if (status == IPADM_IF_EXISTS)
 				status = IPADM_SUCCESS;
+
+			if (is_ngz)
+				af = atoi(afstr);
 		} else if (nvlist_lookup_string(nvl, IPADM_NVP_AOBJNAME,
 		    &aobjstr) == 0) {
 			/*
@@ -736,6 +754,9 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 		if (status != IPADM_SUCCESS)
 			return (status);
 	}
+
+	if (is_ngz && af != AF_UNSPEC)
+		ret_status = ipadm_init_net_from_gz(iph, newifname, NULL);
 	return (ret_status);
 }
 

@@ -19,11 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990  Mentat Inc.
  * netstat.c 2.2, last change 9/9/91
  * MROUTING Revision 3.5
@@ -314,8 +310,9 @@ static m_label_t *zone_security_label = NULL;
 #define	FLF_I		0x00000400	/* RTF_INDIRECT */
 #define	FLF_R		0x00000800	/* RTF_REJECT */
 #define	FLF_B		0x00001000	/* RTF_BLACKHOLE */
+#define	FLF_Z		0x00100000	/* RTF_ZONE */
 
-static const char flag_list[] = "AbDGHLUMSCIRB";
+static const char flag_list[] = "AbDGHLUMSCIRBZ";
 
 typedef struct filter_rule filter_t;
 
@@ -4342,6 +4339,10 @@ form_v4_route_flags(const mib2_ipRouteEntry_t *rp, char *flags)
 		(void) strcat(flags, "B");
 		flag_b |= FLF_B;
 	}
+	if (rp->ipRouteInfo.re_flags & RTF_ZONE) {
+		(void) strcat(flags, "Z");
+		flag_b |= FLF_Z;
+	}
 	return (flag_b);
 }
 
@@ -4588,6 +4589,10 @@ form_v6_route_flags(const mib2_ipv6RouteEntry_t *rp6, char *flags)
 	if (rp6->ipv6RouteInfo.re_flags & RTF_BLACKHOLE) {
 		(void) strcat(flags, "B");
 		flag_b |= FLF_B;
+	}
+	if (rp6->ipv6RouteInfo.re_flags & RTF_ZONE) {
+		(void) strcat(flags, "Z");
+		flag_b |= FLF_Z;
 	}
 	return (flag_b);
 }

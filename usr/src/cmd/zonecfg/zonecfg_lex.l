@@ -204,6 +204,9 @@ char *safe_strdup(char *s);
 <TSTATE>options	{ return OPTIONS; }
 <CSTATE>options	{ return OPTIONS; }
 
+<TSTATE>allowed-address { return ALLOWED_ADDRESS; }
+<CSTATE>allowed-address { return ALLOWED_ADDRESS; }
+
 <TSTATE>address	{ return ADDRESS; }
 <CSTATE>address	{ return ADDRESS; }
 

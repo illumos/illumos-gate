@@ -8579,6 +8579,10 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			ill_capability_reset(ill, B_TRUE);
 			ipsq_current_finish(ipsq);
 			break;
+
+		case DL_NOTE_ALLOWED_IPS:
+			ill_set_allowed_ips(ill, mp);
+			break;
 		default:
 			ip0dbg(("ip_rput_dlpi_writer: unknown notification "
 			    "type 0x%x for DL_NOTIFY_IND\n",

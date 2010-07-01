@@ -119,6 +119,7 @@
 #include <tsol/label.h>
 #include <libtsnet.h>
 #include <sys/priv.h>
+#include <libinetutil.h>
 
 #define	V4_ADDR_LEN	32
 #define	V6_ADDR_LEN	128
@@ -159,10 +160,28 @@ extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);
 extern char query_hook[];
 
 /*
+ * For each "net" resource configured in zonecfg, we track a zone_addr_list_t
+ * node in a linked list that is sorted by linkid.  The list is constructed as
+ * the xml configuration file is parsed, and the information
+ * contained in each node is added to the kernel before the zone is
+ * booted, to be retrieved and applied from within the exclusive-IP NGZ
+ * on boot.
+ */
+typedef struct zone_addr_list {
+	struct zone_addr_list *za_next;
+	datalink_id_t za_linkid;	/* datalink_id_t of interface */
+	struct zone_nwiftab za_nwiftab; /* address, defrouter properties */
+} zone_addr_list_t;
+
+/*
  * An optimization for build_mnttable: reallocate (and potentially copy the
  * data) only once every N times through the loop.
  */
 #define	MNTTAB_HUNK	32
+
+/* some handy macros */
+#define	SIN(s)	((struct sockaddr_in *)s)
+#define	SIN6(s)	((struct sockaddr_in6 *)s)
 
 /*
  * Private autofs system call
@@ -2502,13 +2521,369 @@ add_datalink(zlog_t *zlogp, char *zone_name, datalink_id_t linkid, char *dlname)
 	return (0);
 }
 
+static boolean_t
+sockaddr_to_str(sa_family_t af, const struct sockaddr *sockaddr,
+    char *straddr, size_t len)
+{
+	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
+	const char *str = NULL;
+
+	if (af == AF_INET) {
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sin = SIN(sockaddr);
+		str = inet_ntop(AF_INET, (void *)&sin->sin_addr, straddr, len);
+	} else if (af == AF_INET6) {
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sin6 = SIN6(sockaddr);
+		str = inet_ntop(AF_INET6, (void *)&sin6->sin6_addr, straddr,
+		    len);
+	}
+
+	return (str != NULL);
+}
+
+static int
+ipv4_prefixlen(struct sockaddr_in *sin)
+{
+	struct sockaddr_in *m;
+	struct sockaddr_storage mask;
+
+	m = SIN(&mask);
+	m->sin_family = AF_INET;
+	if (getnetmaskbyaddr(sin->sin_addr, &m->sin_addr) == 0) {
+		return (mask2plen(&mask));
+	} else if (IN_CLASSA(htonl(sin->sin_addr.s_addr))) {
+		return (8);
+	} else if (IN_CLASSB(ntohl(sin->sin_addr.s_addr))) {
+		return (16);
+	} else if (IN_CLASSC(ntohl(sin->sin_addr.s_addr))) {
+		return (24);
+	}
+	return (0);
+}
+
+static int
+zone_setattr_network(int type, zoneid_t zoneid, datalink_id_t linkid,
+    void *buf, size_t bufsize)
+{
+	zone_net_data_t *zndata;
+	size_t znsize;
+	int err;
+
+	znsize = sizeof (*zndata) + bufsize;
+	zndata = calloc(1, znsize);
+	if (zndata == NULL)
+		return (ENOMEM);
+	zndata->zn_type = type;
+	zndata->zn_len = bufsize;
+	zndata->zn_linkid = linkid;
+	bcopy(buf, zndata->zn_val, zndata->zn_len);
+	err = zone_setattr(zoneid, ZONE_ATTR_NETWORK, zndata, znsize);
+	free(zndata);
+	return (err);
+}
+
+static int
+add_net_for_linkid(zlog_t *zlogp, zoneid_t zoneid, zone_addr_list_t *start)
+{
+	struct lifreq lifr;
+	char **astr, *address;
+	dladm_status_t dlstatus;
+	char *ip_nospoof = "ip-nospoof";
+	int nnet, naddr, err = 0, j;
+	size_t zlen, cpleft;
+	zone_addr_list_t *ptr, *end;
+	char  tmp[INET6_ADDRSTRLEN], *maskstr;
+	char *zaddr, *cp;
+	struct in6_addr *routes = NULL;
+	boolean_t is_set;
+	datalink_id_t linkid;
+
+	assert(start != NULL);
+	naddr = 0; /* number of addresses */
+	nnet = 0; /* number of net resources */
+	linkid = start->za_linkid;
+	for (ptr = start; ptr != NULL && ptr->za_linkid == linkid;
+	    ptr = ptr->za_next) {
+		nnet++;
+	}
+	end = ptr;
+	zlen = nnet * (INET6_ADDRSTRLEN + 1);
+	astr = calloc(1, nnet * sizeof (uintptr_t));
+	zaddr = calloc(1, zlen);
+	if (astr == NULL || zaddr == NULL) {
+		err = ENOMEM;
+		goto done;
+	}
+	cp = zaddr;
+	cpleft = zlen;
+	j = 0;
+	for (ptr = start; ptr != end; ptr = ptr->za_next) {
+		address = ptr->za_nwiftab.zone_nwif_allowed_address;
+		if (address[0] == '\0')
+			continue;
+		(void) snprintf(tmp, sizeof (tmp), "%s", address);
+		/*
+		 * Validate the data. zonecfg_valid_net_address() clobbers
+		 * the /<mask> in the address string.
+		 */
+		if (zonecfg_valid_net_address(address, &lifr) != Z_OK) {
+			zerror(zlogp, B_FALSE, "invalid address [%s]\n",
+			    address);
+			err = EINVAL;
+			goto done;
+		}
+		/*
+		 * convert any hostnames to numeric address strings.
+		 */
+		if (!sockaddr_to_str(lifr.lifr_addr.ss_family,
+		    (const struct sockaddr *)&lifr.lifr_addr, cp, cpleft)) {
+			err = EINVAL;
+			goto done;
+		}
+		/*
+		 * make a copy of the numeric string for the data needed
+		 * by the "allowed-ips" datalink property.
+		 */
+		astr[j] = strdup(cp);
+		if (astr[j] == NULL) {
+			err = ENOMEM;
+			goto done;
+		}
+		j++;
+		/*
+		 * compute the default netmask from the address, if necessary
+		 */
+		if ((maskstr = strchr(tmp, '/')) == NULL) {
+			int prefixlen;
+
+			if (lifr.lifr_addr.ss_family == AF_INET) {
+				prefixlen = ipv4_prefixlen(
+				    SIN(&lifr.lifr_addr));
+			} else {
+				struct sockaddr_in6 *sin6;
+
+				sin6 = SIN6(&lifr.lifr_addr);
+				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+					prefixlen = 10;
+				else
+					prefixlen = 64;
+			}
+			(void) snprintf(tmp, sizeof (tmp), "%d", prefixlen);
+			maskstr = tmp;
+		} else {
+			maskstr++;
+		}
+		/* append the "/<netmask>" */
+		(void) strlcat(cp, "/", cpleft);
+		(void) strlcat(cp, maskstr, cpleft);
+		(void) strlcat(cp, ",", cpleft);
+		cp += strnlen(cp, zlen);
+		cpleft = &zaddr[INET6_ADDRSTRLEN] - cp;
+	}
+	naddr = j; /* the actual number of addresses in the net resource */
+	assert(naddr <= nnet);
+
+	/*
+	 * zonecfg has already verified that the defrouter property can only
+	 * be set if there is at least one address defined for the net resource.
+	 * If j is 0, there are no addresses defined, and therefore no routers
+	 * to configure, and we are done at that point.
+	 */
+	if (j == 0)
+		goto done;
+
+	/* over-write last ',' with '\0' */
+	zaddr[strnlen(zaddr, zlen) + 1] = '\0';
+
+	/*
+	 * First make sure L3 protection is not already set on the link.
+	 */
+	dlstatus = dladm_linkprop_is_set(dld_handle, linkid, DLADM_OPT_ACTIVE,
+	    "protection", &is_set);
+	if (dlstatus != DLADM_STATUS_OK) {
+		err = EINVAL;
+		zerror(zlogp, B_FALSE, "unable to check if protection is set");
+		goto done;
+	}
+	if (is_set) {
+		err = EINVAL;
+		zerror(zlogp, B_FALSE, "Protection is already set");
+		goto done;
+	}
+	dlstatus = dladm_linkprop_is_set(dld_handle, linkid, DLADM_OPT_ACTIVE,
+	    "allowed-ips", &is_set);
+	if (dlstatus != DLADM_STATUS_OK) {
+		err = EINVAL;
+		zerror(zlogp, B_FALSE, "unable to check if allowed-ips is set");
+		goto done;
+	}
+	if (is_set) {
+		zerror(zlogp, B_FALSE, "allowed-ips is already set");
+		err = EINVAL;
+		goto done;
+	}
+
+	/*
+	 * Enable ip-nospoof for the link, and add address to the allowed-ips
+	 * list.
+	 */
+	dlstatus = dladm_set_linkprop(dld_handle, linkid, "protection",
+	    &ip_nospoof, 1, DLADM_OPT_ACTIVE);
+	if (dlstatus != DLADM_STATUS_OK) {
+		zerror(zlogp, B_FALSE, "could not set protection\n");
+		err = EINVAL;
+		goto done;
+	}
+	dlstatus = dladm_set_linkprop(dld_handle, linkid, "allowed-ips",
+	    astr, naddr, DLADM_OPT_ACTIVE);
+	if (dlstatus != DLADM_STATUS_OK) {
+		zerror(zlogp, B_FALSE, "could not set allowed-ips\n");
+		err = EINVAL;
+		goto done;
+	}
+
+	/* now set the address in the data-store */
+	err = zone_setattr_network(ZONE_NETWORK_ADDRESS, zoneid, linkid,
+	    zaddr, strnlen(zaddr, zlen) + 1);
+	if (err != 0)
+		goto done;
+
+	/*
+	 * add the defaultrouters
+	 */
+	routes = calloc(1, nnet * sizeof (*routes));
+	j = 0;
+	for (ptr = start; ptr != end; ptr = ptr->za_next) {
+		address = ptr->za_nwiftab.zone_nwif_defrouter;
+		if (address[0] == '\0')
+			continue;
+		if (strchr(address, '/') == NULL && strchr(address, ':') != 0) {
+			/*
+			 * zonecfg_valid_net_address() expects numeric IPv6
+			 * addresses to have a CIDR format netmask.
+			 */
+			(void) snprintf(tmp, sizeof (tmp), "/%d", V6_ADDR_LEN);
+			(void) strlcat(address, tmp, INET6_ADDRSTRLEN);
+		}
+		if (zonecfg_valid_net_address(address, &lifr) != Z_OK) {
+			zerror(zlogp, B_FALSE,
+			    "invalid router [%s]\n", address);
+			err = EINVAL;
+			goto done;
+		}
+		if (lifr.lifr_addr.ss_family == AF_INET6) {
+			routes[j] = SIN6(&lifr.lifr_addr)->sin6_addr;
+		} else {
+			IN6_INADDR_TO_V4MAPPED(&SIN(&lifr.lifr_addr)->sin_addr,
+			    &routes[j]);
+		}
+		j++;
+	}
+	assert(j <= nnet);
+	if (j > 0) {
+		err = zone_setattr_network(ZONE_NETWORK_DEFROUTER, zoneid,
+		    linkid, routes, j * sizeof (*routes));
+	}
+done:
+	free(routes);
+	for (j = 0; j < naddr; j++)
+		free(astr[j]);
+	free(astr);
+	free(zaddr);
+	return (err);
+
+}
+
+static int
+add_net(zlog_t *zlogp, zoneid_t zoneid, zone_addr_list_t *zalist)
+{
+	zone_addr_list_t *ptr;
+	datalink_id_t linkid;
+	int err;
+
+	if (zalist == NULL)
+		return (0);
+
+	linkid = zalist->za_linkid;
+
+	err = add_net_for_linkid(zlogp, zoneid, zalist);
+	if (err != 0)
+		return (err);
+
+	for (ptr = zalist; ptr != NULL; ptr = ptr->za_next) {
+		if (ptr->za_linkid == linkid)
+			continue;
+		linkid = ptr->za_linkid;
+		err = add_net_for_linkid(zlogp, zoneid, ptr);
+		if (err != 0)
+			return (err);
+	}
+	return (0);
+}
+
+/*
+ * Add "new" to the list of network interfaces to be configured  by
+ * add_net on zone boot in "old". The list of interfaces in "old" is
+ * sorted by datalink_id_t, with interfaces sorted FIFO for a given
+ * datalink_id_t.
+ *
+ * Returns the merged list of IP interfaces containing "old" and "new"
+ */
+static zone_addr_list_t *
+add_ip_interface(zone_addr_list_t *old, zone_addr_list_t *new)
+{
+	zone_addr_list_t *ptr, *next;
+	datalink_id_t linkid = new->za_linkid;
+
+	assert(old != new);
+
+	if (old == NULL)
+		return (new);
+	for (ptr = old; ptr != NULL; ptr = ptr->za_next) {
+		if (ptr->za_linkid == linkid)
+			break;
+	}
+	if (ptr == NULL) {
+		/* linkid does not already exist, add to the beginning */
+		new->za_next = old;
+		return (new);
+	}
+	/*
+	 * adding to the middle of the list; ptr points at the first
+	 * occurrence of linkid. Find the last occurrence.
+	 */
+	while ((next = ptr->za_next) != NULL) {
+		if (next->za_linkid != linkid)
+			break;
+		ptr = next;
+	}
+	/* insert new after ptr */
+	new->za_next = next;
+	ptr->za_next = new;
+	return (old);
+}
+
+void
+free_ip_interface(zone_addr_list_t *zalist)
+{
+	zone_addr_list_t *ptr, *new;
+
+	for (ptr = zalist; ptr != NULL; ) {
+		new = ptr;
+		ptr = ptr->za_next;
+		free(new);
+	}
+}
+
 /*
  * Add the kernel access control information for the interface names.
  * If anything goes wrong, we log a general error message, attempt to tear down
  * whatever we set up, and return an error.
  */
 static int
-configure_exclusive_network_interfaces(zlog_t *zlogp)
+configure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 {
 	zone_dochandle_t handle;
 	struct zone_nwiftab nwiftab;
@@ -2517,6 +2892,7 @@ configure_exclusive_network_interfaces(zlog_t *zlogp)
 	datalink_id_t linkid;
 	di_prof_t prof = NULL;
 	boolean_t added = B_FALSE;
+	zone_addr_list_t *zalist = NULL, *new;
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		zerror(zlogp, B_TRUE, "getting zone configuration handle");
@@ -2579,6 +2955,28 @@ configure_exclusive_network_interfaces(zlog_t *zlogp)
 			zerror(zlogp, B_TRUE, "failed to add network device");
 			return (-1);
 		}
+		/* set up the new IP interface, and add them all later */
+		new = malloc(sizeof (*new));
+		if (new == NULL) {
+			zerror(zlogp, B_TRUE, "no memory for %s",
+			    nwiftab.zone_nwif_physical);
+			zonecfg_fini_handle(handle);
+			free_ip_interface(zalist);
+		}
+		bzero(new, sizeof (*new));
+		new->za_nwiftab = nwiftab;
+		new->za_linkid = linkid;
+		zalist = add_ip_interface(zalist, new);
+	}
+	if (zalist != NULL) {
+		if ((errno = add_net(zlogp, zoneid, zalist)) != 0) {
+			(void) zonecfg_endnwifent(handle);
+			zonecfg_fini_handle(handle);
+			zerror(zlogp, B_TRUE, "failed to add address");
+			free_ip_interface(zalist);
+			return (-1);
+		}
+		free_ip_interface(zalist);
 	}
 	(void) zonecfg_endnwifent(handle);
 	zonecfg_fini_handle(handle);
@@ -2610,8 +3008,7 @@ remove_datalink_pool(zlog_t *zlogp, zoneid_t zoneid)
 	if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &flags,
 	    sizeof (flags)) < 0) {
 		if (vplat_get_iptype(zlogp, &iptype) < 0) {
-			zerror(zlogp, B_TRUE, "unable to determine "
-			    "ip-type");
+			zerror(zlogp, B_FALSE, "unable to determine ip-type");
 			return (-1);
 		}
 	} else {
@@ -2658,6 +3055,74 @@ remove_datalink_pool(zlog_t *zlogp, zoneid_t zoneid)
 		}
 		free(dllinks);
 	}
+	return (0);
+}
+
+static int
+remove_datalink_protect(zlog_t *zlogp, zoneid_t zoneid)
+{
+	ushort_t flags;
+	zone_iptype_t iptype;
+	int i, dlnum = 0;
+	dladm_status_t dlstatus;
+	datalink_id_t *dllink, *dllinks = NULL;
+
+	if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &flags,
+	    sizeof (flags)) < 0) {
+		if (vplat_get_iptype(zlogp, &iptype) < 0) {
+			zerror(zlogp, B_FALSE, "unable to determine ip-type");
+			return (-1);
+		}
+	} else {
+		if (flags & ZF_NET_EXCL)
+			iptype = ZS_EXCLUSIVE;
+		else
+			iptype = ZS_SHARED;
+	}
+
+	if (iptype != ZS_EXCLUSIVE)
+		return (0);
+
+	/*
+	 * Get the datalink count and for each datalink,
+	 * attempt to clear the pool property and clear
+	 * the pool_name.
+	 */
+	if (zone_list_datalink(zoneid, &dlnum, NULL) != 0) {
+		zerror(zlogp, B_TRUE, "unable to count network interfaces");
+		return (-1);
+	}
+
+	if (dlnum == 0)
+		return (0);
+
+	if ((dllinks = malloc(dlnum * sizeof (datalink_id_t))) == NULL) {
+		zerror(zlogp, B_TRUE, "memory allocation failed");
+		return (-1);
+	}
+	if (zone_list_datalink(zoneid, &dlnum, dllinks) != 0) {
+		zerror(zlogp, B_TRUE, "unable to list network interfaces");
+		free(dllinks);
+		return (-1);
+	}
+
+	for (i = 0, dllink = dllinks; i < dlnum; i++, dllink++) {
+		dlstatus = dladm_set_linkprop(dld_handle, *dllink,
+		    "protection", NULL, 0, DLADM_OPT_ACTIVE);
+		if (dlstatus != DLADM_STATUS_OK) {
+			zerror(zlogp, B_TRUE, "could not reset protection\n");
+			free(dllinks);
+			return (-1);
+		}
+		dlstatus = dladm_set_linkprop(dld_handle, *dllink,
+		    "allowed-ips", NULL, 0, DLADM_OPT_ACTIVE);
+		if (dlstatus != DLADM_STATUS_OK) {
+			zerror(zlogp, B_TRUE, "could not reset allowed-ips\n");
+			free(dllinks);
+			return (-1);
+		}
+	}
+	free(dllinks);
 	return (0);
 }
 
@@ -4542,7 +5007,8 @@ vplat_bringup(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zoneid)
 			}
 			break;
 		case ZS_EXCLUSIVE:
-			if (configure_exclusive_network_interfaces(zlogp) !=
+			if (configure_exclusive_network_interfaces(zlogp,
+			    zoneid) !=
 			    0) {
 				lofs_discard_mnttab();
 				return (-1);
@@ -4667,6 +5133,19 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 		goto error;
 	}
 
+	if (remove_datalink_protect(zlogp, zoneid) != 0) {
+		zerror(zlogp, B_FALSE,
+		    "unable clear datalink protect property");
+		goto error;
+	}
+
+	/*
+	 * The datalinks assigned to the zone will be removed from the NGZ as
+	 * part of zone_shutdown() so that we need to remove protect/pool etc.
+	 * before zone_shutdown(). Even if the shutdown itself fails, the zone
+	 * will not be able to violate any constraints applied because the
+	 * datalinks are no longer available to the zone.
+	 */
 	if (zone_shutdown(zoneid) != 0) {
 		zerror(zlogp, B_TRUE, "unable to shutdown zone");
 		goto error;

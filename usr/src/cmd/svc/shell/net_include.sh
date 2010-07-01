@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
@@ -547,6 +546,38 @@ move_addresses()
 }
 
 #
+# ipadm_from_gz_if ifname
+#
+# Return true if we are in a non-global zone and Layer-3 protection of
+# IP addresses is being enforced on the interface by the global zone
+#
+ipadm_from_gz_if()
+{ 
+	pif=`/sbin/ipadm show-if -o persistent -p $1 2>/dev/null | egrep '4|6'`
+	if smf_is_globalzone || ![[ $pif == *4* || $pif == *6* ]]; then
+		return 1
+	else
+		#
+		# In the non-global zone, plumb the interface to show current
+		# flags and check if Layer-3 protection has been enforced by
+		# the global zone. Note that this function may return
+		# with a plumbed interface. Ideally, we would not have to
+		# plumb the interface to check l3protect, but since we
+		# the `allowed-ips' datalink property cannot currently be
+		# examined in any other way from the non-global zone, we
+		# resort to plumbing the interface
+		# 
+		/sbin/ifconfig $1 plumb > /dev/null 2>&1
+		l3protect=`/sbin/ipadm show-if -o current -p $1|grep -c 'Z'`
+		if [ $l3protect = 0 ]; then
+			return 1
+		else
+			return 0
+		fi
+	fi
+}
+
+#
 # if_configure type class interface_list
 #
 # Configure all of the interfaces of type `type' (e.g., "inet6") in
@@ -575,7 +606,10 @@ if_configure()
 	while [ $# -gt 0 ]; do
 		$process_func /sbin/ifconfig $1 $type < $hostpfx.$1 >/dev/null
 		if [ $? != 0 ]; then
-			fail="$fail $1"
+			ipadm_from_gz_if $1
+			if [ $? != 0 ]; then
+				fail="$fail $1"
+			fi
 		elif [ "$type" = inet6 ]; then
 			#
 			# only bring the interface up if it is not a

@@ -308,7 +308,7 @@ static ofmt_field_t show_if_fields[] = {
 /* name,	field width,	id,		callback */
 { "IFNAME",	11,		SI_IFNAME,	print_si_cb},
 { "STATE",	9,		SI_STATE,	print_si_cb},
-{ "CURRENT",	12,		SI_CURRENT,	print_si_cb},
+{ "CURRENT",	13,		SI_CURRENT,	print_si_cb},
 { "PERSISTENT",	11,		SI_PERSISTENT,	print_si_cb},
 { NULL,		0,		0,		NULL}
 };
@@ -1604,6 +1604,43 @@ flags2str(uint64_t flags, fmask_t *tbl, boolean_t is_bits,
 	}
 }
 
+/*
+ * return true if the address for lifname comes to us from the global zone
+ * with 'allowed-ips' constraints.
+ */
+static boolean_t
+is_from_gz(const char *lifname)
+{
+	ipadm_if_info_t		*if_info;
+	char			phyname[LIFNAMSIZ], *cp;
+	boolean_t		ret = _B_FALSE;
+	ipadm_status_t		status;
+	zoneid_t		zoneid;
+	ushort_t		zflags;
+
+	if ((zoneid = getzoneid()) == GLOBAL_ZONEID)
+		return (_B_FALSE); /* from-gz only  makes sense in a NGZ */
+
+	if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &zflags, sizeof (zflags)) < 0)
+		return (_B_FALSE);
+
+	if (!(zflags & ZF_NET_EXCL))
+		return (_B_TRUE);  /* everything is from the GZ for shared-ip */
+
+	(void) strncpy(phyname, lifname, sizeof (phyname));
+	if ((cp = strchr(phyname, ':')) != NULL)
+		*cp = '\0';
+	status = ipadm_if_info(iph, phyname, &if_info, 0, LIFC_DEFAULT);
+	if (status != IPADM_SUCCESS)
+		return (ret);
+
+	if (if_info->ifi_cflags & IFIF_L3PROTECT)
+		ret = _B_TRUE;
+	if (if_info)
+		ipadm_free_if_info(if_info);
+	return (ret);
+}
+
 static boolean_t
 print_sa_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
@@ -1668,7 +1705,11 @@ print_sa_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		    buf, bufsize);
 		break;
 	case SA_TYPE:
-		flags2str(ainfo->ia_atype, type, _B_FALSE, buf, bufsize);
+		if (is_from_gz(ifa->ifa_name))
+			(void) snprintf(buf, bufsize, "from-gz");
+		else
+			flags2str(ainfo->ia_atype, type, _B_FALSE, buf,
+			    bufsize);
 		break;
 	case SA_CURRENT:
 		flags2str(ainfo->ia_cflags, cflags_mask, _B_TRUE, buf, bufsize);
@@ -1877,6 +1918,7 @@ print_si_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		{ "i",	IFIF_INACTIVE,		IFIF_INACTIVE	},
 		{ "V",	IFIF_VRRP,		IFIF_VRRP	},
 		{ "a",	IFIF_NOACCEPT,		IFIF_NOACCEPT	},
+		{ "Z",	IFIF_L3PROTECT,		IFIF_L3PROTECT	},
 		{ "4",	IFIF_IPV4,		IFIF_IPV4	},
 		{ "6",	IFIF_IPV6,		IFIF_IPV6	},
 		{ NULL,	0,			0		}

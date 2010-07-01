@@ -1312,7 +1312,7 @@ i_ipadm_get_zone(ipadm_handle_t iph, const void *arg,
 	int		s;
 	size_t		nbytes = 0;
 
-	if (getzoneid() != GLOBAL_ZONEID) {
+	if (iph->iph_zoneid != GLOBAL_ZONEID) {
 		buf[0] = '\0';
 		return (IPADM_SUCCESS);
 	}
@@ -1660,7 +1660,7 @@ i_ipadm_get_default_prefixlen(struct sockaddr_storage *addr, uint32_t *plen)
 	return (IPADM_SUCCESS);
 }
 
-static ipadm_status_t
+ipadm_status_t
 i_ipadm_resolve_addr(const char *name, sa_family_t af,
     struct sockaddr_storage *ss)
 {
@@ -1934,6 +1934,9 @@ i_ipadm_setlifnum_addrobj(ipadm_handle_t iph, ipadm_addrobj_t ipaddr)
 	ipmgmt_aobjop_arg_t	larg;
 	ipmgmt_retval_t		rval, *rvalp;
 	int			err;
+
+	if (iph->iph_flags & IPH_IPMGMTD)
+		return (IPADM_SUCCESS);
 
 	bzero(&larg, sizeof (larg));
 	larg.ia_cmd = IPMGMT_CMD_ADDROBJ_SETLIFNUM;
@@ -2266,6 +2269,8 @@ i_ipadm_addrobj2lifname(ipadm_addrobj_t ipaddr, char *lifname, int lifnamesize)
  * also checks if the interface is under DHCP control. If the condition is true,
  * the output argument `exists' will be set to B_TRUE. Otherwise, `exists'
  * is set to B_FALSE.
+ *
+ * Note that *exists will not be initialized if an error is encountered.
  */
 static ipadm_status_t
 i_ipadm_addr_exists_on_if(ipadm_handle_t iph, const char *ifname,
@@ -2405,6 +2410,7 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	boolean_t		is_6to4;
 	struct lifreq		lifr;
 	uint64_t		ifflags;
+	boolean_t		is_boot = (iph->iph_flags & IPH_IPMGMTD);
 
 	/* check for solaris.network.interface.config authorization */
 	if (!ipadm_check_auth())
@@ -2450,10 +2456,16 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	af = addr->ipadm_af;
 	/*
 	 * Create a placeholder for this address object in the daemon.
-	 * Skip this step for IPH_LEGACY case if the addrobj already
-	 * exists.
+	 * Skip this step if we are booting a zone (and therefore being called
+	 * from ipmgmtd itself), and, for IPH_LEGACY case if the
+	 * addrobj already exists.
+	 *
+	 * Note that the placeholder is not needed in the NGZ boot case,
+	 * when zoneadmd has itself applied the "allowed-ips" property to clamp
+	 * down any interface configuration, so the namespace for the interface
+	 * is fully controlled by the GZ.
 	 */
-	if (!legacy || !aobjfound) {
+	if (!is_boot && (!legacy || !aobjfound)) {
 		status = i_ipadm_lookupadd_addrobj(iph, addr);
 		if (status != IPADM_SUCCESS)
 			return (status);
@@ -2479,11 +2491,23 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 			created_other_af = B_TRUE;
 	}
 
-	/* Validate static addresses for IFF_POINTOPOINT interfaces. */
+	/*
+	 * Some input validation based on the interface flags:
+	 * 1. in non-global zones, make sure that we are not persistently
+	 *    creating addresses on interfaces that are acquiring
+	 *    address from the global zone.
+	 * 2. Validate static addresses for IFF_POINTOPOINT interfaces.
+	 */
 	if (addr->ipadm_atype == IPADM_ADDR_STATIC) {
 		status = i_ipadm_get_flags(iph, ifname, af, &ifflags);
 		if (status != IPADM_SUCCESS)
 			goto fail;
+
+		if (iph->iph_zoneid != GLOBAL_ZONEID &&
+		    (ifflags & IFF_L3PROTECT) && (flags & IPADM_OPT_PERSIST)) {
+			status = IPADM_GZ_PERM;
+			goto fail;
+		}
 		daf = addr->ipadm_static_dst_addr.ss_family;
 		if (ifflags & IFF_POINTOPOINT) {
 			if (is_6to4) {
@@ -2596,7 +2620,9 @@ i_ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t ipaddr, uint32_t flags)
 	boolean_t			legacy = (iph->iph_flags & IPH_LEGACY);
 	struct ipadm_addrobj_s		legacy_addr;
 	boolean_t			default_prefixlen = B_FALSE;
+	boolean_t			is_boot;
 
+	is_boot = ((iph->iph_flags & IPH_IPMGMTD) != 0);
 	af = ipaddr->ipadm_af;
 	sock = (af == AF_INET ? iph->iph_sock : iph->iph_sock6);
 
@@ -2668,7 +2694,7 @@ retry:
 			status = IPADM_SUCCESS;
 	}
 
-	if (status == IPADM_SUCCESS) {
+	if (status == IPADM_SUCCESS && !is_boot) {
 		/*
 		 * For IPH_LEGACY, we might be modifying the address on
 		 * an address object that already exists e.g. by doing

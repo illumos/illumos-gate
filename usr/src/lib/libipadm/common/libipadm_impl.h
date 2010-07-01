@@ -55,9 +55,11 @@ struct ipadm_handle {
 	int		iph_sock;	/* socket to interface */
 	int		iph_sock6;	/* socket to interface */
 	int		iph_door_fd;	/* door descriptor to ipmgmtd */
+	int		iph_rtsock;	/* routing socket */
 	dladm_handle_t	iph_dlh;	/* handle to libdladm library */
 	uint32_t	iph_flags;	/* internal flags */
 	pthread_mutex_t	iph_lock;	/* lock to set door_fd */
+	zoneid_t	iph_zoneid;	/* zoneid where handle was opened */
 };
 
 /*
@@ -210,6 +212,8 @@ extern ipadm_status_t	i_ipadm_delete_addrobj(ipadm_handle_t,
 			    const ipadm_addrobj_t, uint32_t);
 extern boolean_t	i_ipadm_name2atype(const char *, sa_family_t *,
 			    ipadm_addr_type_t *);
+extern ipadm_status_t	i_ipadm_resolve_addr(const char *, sa_family_t,
+			    struct sockaddr_storage *);
 
 /* ipadm_if.c */
 extern ipadm_status_t	i_ipadm_create_if(ipadm_handle_t, char *,  sa_family_t,

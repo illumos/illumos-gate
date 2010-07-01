@@ -99,6 +99,7 @@
 
 #define	DTD_ATTR_ACTION		(const xmlChar *) "action"
 #define	DTD_ATTR_ADDRESS	(const xmlChar *) "address"
+#define	DTD_ATTR_ALLOWED_ADDRESS	(const xmlChar *) "allowed-address"
 #define	DTD_ATTR_AUTOBOOT	(const xmlChar *) "autoboot"
 #define	DTD_ATTR_IPTYPE		(const xmlChar *) "ip-type"
 #define	DTD_ATTR_DEFROUTER	(const xmlChar *) "defrouter"
@@ -2090,6 +2091,8 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	size_t addrspec;		/* nonzero if tabptr has IP addr */
 	size_t physspec;		/* nonzero if tabptr has interface */
 	size_t defrouterspec;		/* nonzero if tabptr has def. router */
+	size_t allowed_addrspec;
+	zone_iptype_t iptype;
 
 	if (tabptr == NULL)
 		return (Z_INVAL);
@@ -2104,12 +2107,18 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	addrspec = strlen(tabptr->zone_nwif_address);
 	physspec = strlen(tabptr->zone_nwif_physical);
 	defrouterspec = strlen(tabptr->zone_nwif_defrouter);
-	if (addrspec == 0 && physspec == 0 && defrouterspec == 0)
+	allowed_addrspec = strlen(tabptr->zone_nwif_allowed_address);
+	if (addrspec != 0 && allowed_addrspec != 0)
+		return (Z_INVAL); /* can't specify both */
+	if (addrspec == 0 && physspec == 0 && defrouterspec == 0 &&
+	    allowed_addrspec == 0)
 		return (Z_INSUFFICIENT_SPEC);
 
 	if ((err = operation_prep(handle)) != Z_OK)
 		return (err);
 
+	if ((err = zonecfg_get_iptype(handle, &iptype)) != Z_OK)
+		return (err);
 	/*
 	 * Iterate over the configuration's elements and look for net elements
 	 * that match the query.
@@ -2129,9 +2138,16 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 		    physical, sizeof (physical)) != Z_OK ||
 		    strcmp(tabptr->zone_nwif_physical, physical) != 0))
 			continue;
-		if (addrspec != 0 && (fetchprop(cur, DTD_ATTR_ADDRESS, address,
+		if (iptype == ZS_SHARED && addrspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_ADDRESS, address,
 		    sizeof (address)) != Z_OK ||
 		    !zonecfg_same_net_address(tabptr->zone_nwif_address,
+		    address)))
+			continue;
+		if (iptype == ZS_EXCLUSIVE && allowed_addrspec != 0 &&
+		    (fetchprop(cur, DTD_ATTR_ALLOWED_ADDRESS, address,
+		    sizeof (address)) != Z_OK ||
+		    !zonecfg_same_net_address(tabptr->zone_nwif_allowed_address,
 		    address)))
 			continue;
 		if (defrouterspec != 0 && (fetchprop(cur, DTD_ATTR_DEFROUTER,
@@ -2158,8 +2174,15 @@ zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	    sizeof (tabptr->zone_nwif_physical))) != Z_OK)
 		return (err);
 
-	if ((err = fetchprop(cur, DTD_ATTR_ADDRESS, tabptr->zone_nwif_address,
+	if (iptype == ZS_SHARED &&
+	    (err = fetchprop(cur, DTD_ATTR_ADDRESS, tabptr->zone_nwif_address,
 	    sizeof (tabptr->zone_nwif_address))) != Z_OK)
+		return (err);
+
+	if (iptype == ZS_EXCLUSIVE &&
+	    (err = fetchprop(cur, DTD_ATTR_ALLOWED_ADDRESS,
+	    tabptr->zone_nwif_allowed_address,
+	    sizeof (tabptr->zone_nwif_allowed_address))) != Z_OK)
 		return (err);
 
 	if ((err = fetchprop(cur, DTD_ATTR_DEFROUTER,
@@ -2177,8 +2200,13 @@ zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 	int err;
 
 	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_NET, NULL);
-	if ((err = newprop(newnode, DTD_ATTR_ADDRESS,
+	if (strlen(tabptr->zone_nwif_address) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_ADDRESS,
 	    tabptr->zone_nwif_address)) != Z_OK)
+		return (err);
+	if (strlen(tabptr->zone_nwif_allowed_address) > 0 &&
+	    (err = newprop(newnode, DTD_ATTR_ALLOWED_ADDRESS,
+	    tabptr->zone_nwif_allowed_address)) != Z_OK)
 		return (err);
 	if ((err = newprop(newnode, DTD_ATTR_PHYSICAL,
 	    tabptr->zone_nwif_physical)) != Z_OK)
@@ -2215,7 +2243,7 @@ static int
 zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
 	xmlNodePtr cur = handle->zone_dh_cur;
-	boolean_t addr_match, phys_match;
+	boolean_t addr_match, phys_match, allowed_addr_match;
 
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
 		if (xmlStrcmp(cur->name, DTD_ELEM_NET))
@@ -2223,10 +2251,12 @@ zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 
 		addr_match = match_prop(cur, DTD_ATTR_ADDRESS,
 		    tabptr->zone_nwif_address);
+		allowed_addr_match = match_prop(cur, DTD_ATTR_ALLOWED_ADDRESS,
+		    tabptr->zone_nwif_allowed_address);
 		phys_match = match_prop(cur, DTD_ATTR_PHYSICAL,
 		    tabptr->zone_nwif_physical);
 
-		if (addr_match && phys_match) {
+		if ((addr_match || allowed_addr_match) && phys_match) {
 			xmlUnlinkNode(cur);
 			xmlFreeNode(cur);
 			return (Z_OK);
@@ -4730,6 +4760,13 @@ zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 
 	if ((err = fetchprop(cur, DTD_ATTR_ADDRESS, tabptr->zone_nwif_address,
 	    sizeof (tabptr->zone_nwif_address))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_ALLOWED_ADDRESS,
+	    tabptr->zone_nwif_allowed_address,
+	    sizeof (tabptr->zone_nwif_allowed_address))) != Z_OK) {
 		handle->zone_dh_cur = handle->zone_dh_top;
 		return (err);
 	}

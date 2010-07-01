@@ -56,6 +56,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "ipmgmt_impl.h"
+#include <libscf.h>
 
 #define	ATYPE	"_atype"		/* name of the address type nvpair */
 #define	FLAGS	"_flags"		/* name of the flags nvpair */
@@ -1163,4 +1164,204 @@ ipmgmt_persist_aobjmap(ipmgmt_aobjmap_t *nodep, ipadm_db_op_t op)
 		    ADDROBJ_MAPPING_DB_FILE, IPADM_FILE_MODE, IPADM_DB_DELETE);
 	}
 	return (err);
+}
+
+typedef struct scf_resources {
+	scf_handle_t *sr_handle;
+	scf_instance_t *sr_inst;
+	scf_propertygroup_t *sr_pg;
+	scf_property_t *sr_prop;
+	scf_value_t *sr_val;
+	scf_transaction_t *sr_tx;
+	scf_transaction_entry_t *sr_ent;
+} scf_resources_t;
+
+/*
+ * Inputs:
+ *   res is a pointer to the scf_resources_t to be released.
+ */
+static void
+ipmgmt_release_scf_resources(scf_resources_t *res)
+{
+	scf_entry_destroy(res->sr_ent);
+	scf_transaction_destroy(res->sr_tx);
+	scf_value_destroy(res->sr_val);
+	scf_property_destroy(res->sr_prop);
+	scf_pg_destroy(res->sr_pg);
+	scf_instance_destroy(res->sr_inst);
+	(void) scf_handle_unbind(res->sr_handle);
+	scf_handle_destroy(res->sr_handle);
+}
+
+/*
+ * Inputs:
+ *   fmri is the instance to look up
+ * Outputs:
+ *   res is a pointer to an scf_resources_t.  This is an internal
+ *   structure that holds all the handles needed to get a specific
+ *   property from the running snapshot; on a successful return it
+ *   contains the scf_value_t that should be passed to the desired
+ *   scf_value_get_foo() function, and must be freed after use by
+ *   calling release_scf_resources().  On a failure return, any
+ *   resources that may have been assigned to res are released, so
+ *   the caller does not need to do any cleanup in the failure case.
+ * Returns:
+ *    0 on success
+ *   -1 on failure
+ */
+
+static int
+ipmgmt_create_scf_resources(const char *fmri, scf_resources_t *res)
+{
+	res->sr_tx = NULL;
+	res->sr_ent = NULL;
+	res->sr_inst = NULL;
+	res->sr_pg = NULL;
+	res->sr_prop = NULL;
+	res->sr_val = NULL;
+
+	if ((res->sr_handle = scf_handle_create(SCF_VERSION)) == NULL) {
+		return (-1);
+	}
+
+	if (scf_handle_bind(res->sr_handle) != 0) {
+		scf_handle_destroy(res->sr_handle);
+		return (-1);
+	}
+	if ((res->sr_inst = scf_instance_create(res->sr_handle)) == NULL) {
+		goto failure;
+	}
+	if (scf_handle_decode_fmri(res->sr_handle, fmri, NULL, NULL,
+	    res->sr_inst, NULL, NULL, SCF_DECODE_FMRI_REQUIRE_INSTANCE) != 0) {
+		goto failure;
+	}
+	if ((res->sr_pg = scf_pg_create(res->sr_handle)) == NULL) {
+		goto failure;
+	}
+	if ((res->sr_prop = scf_property_create(res->sr_handle)) == NULL) {
+		goto failure;
+	}
+	if ((res->sr_val = scf_value_create(res->sr_handle)) == NULL) {
+		goto failure;
+	}
+	if ((res->sr_tx = scf_transaction_create(res->sr_handle)) == NULL) {
+		goto failure;
+	}
+	if ((res->sr_ent = scf_entry_create(res->sr_handle)) == NULL) {
+		goto failure;
+	}
+	return (0);
+
+failure:
+	ipmgmt_release_scf_resources(res);
+	return (-1);
+}
+
+static int
+ipmgmt_set_property_value(scf_resources_t *res, const char *propname,
+    scf_type_t proptype)
+{
+	int result = -1;
+	boolean_t new;
+
+retry:
+	new = (scf_pg_get_property(res->sr_pg, propname, res->sr_prop) != 0);
+
+	if (scf_transaction_start(res->sr_tx, res->sr_pg) == -1) {
+		goto failure;
+	}
+	if (new) {
+		if (scf_transaction_property_new(res->sr_tx, res->sr_ent,
+		    propname, proptype) == -1) {
+			goto failure;
+		}
+	} else {
+		if (scf_transaction_property_change(res->sr_tx, res->sr_ent,
+		    propname, proptype) == -1) {
+			goto failure;
+		}
+	}
+
+	if (scf_entry_add_value(res->sr_ent, res->sr_val) != 0) {
+		goto failure;
+	}
+
+	result = scf_transaction_commit(res->sr_tx);
+	if (result == 0) {
+		scf_transaction_reset(res->sr_tx);
+		if (scf_pg_update(res->sr_pg) == -1) {
+			goto failure;
+		}
+		goto retry;
+	}
+	if (result == -1)
+		goto failure;
+	return (0);
+
+failure:
+	return (-1);
+}
+
+/*
+ * Returns TRUE if this is the first boot, else return FALSE. The
+ * "ipmgmtd/first_boot_done" property is persistently set up on
+ * IPMGMTD_FMRI on the first boot. Note that the presence of
+ * "first_boot_done" itself is sufficient to indicate that this is
+ * not the first boot i.e., the value of the property is immaterial.
+ */
+extern boolean_t
+ipmgmt_first_boot()
+{
+	scf_simple_prop_t *prop;
+	ssize_t	numvals;
+	scf_resources_t res;
+	scf_error_t err;
+
+	if (ipmgmt_create_scf_resources(IPMGMTD_FMRI, &res) != 0)
+		return (B_TRUE); /* err on the side of caution */
+	prop = scf_simple_prop_get(res.sr_handle,
+	    IPMGMTD_FMRI, "ipmgmtd", "first_boot_done");
+	numvals = scf_simple_prop_numvalues(prop);
+	if (numvals > 0) {
+		scf_simple_prop_free(prop);
+		ipmgmt_release_scf_resources(&res);
+		return (B_FALSE);
+	}
+
+	/*
+	 * mark the first boot by setting ipmgmtd/first_boot_done to true
+	 */
+	if (scf_instance_add_pg(res.sr_inst, "ipmgmtd", SCF_GROUP_APPLICATION,
+	    0, res.sr_pg) != 0) {
+		if ((err = scf_error()) != SCF_ERROR_EXISTS)
+			goto failure;
+		/*
+		 * err == SCF_ERROR_EXISTS is by itself sufficient to declare
+		 * that this is not the first boot, but we create a simple
+		 * property as a place-holder, so that we don't leave an
+		 * empty process group behind.
+		 */
+		if (scf_instance_get_pg_composed(res.sr_inst, NULL, "ipmgmtd",
+		    res.sr_pg) != 0) {
+			err = scf_error();
+			goto failure;
+		}
+	}
+
+	if (scf_value_set_astring(res.sr_val, "true") != 0) {
+		err = scf_error();
+		goto failure;
+	}
+
+	if (ipmgmt_set_property_value(&res, "first_boot_done",
+	    SCF_TYPE_ASTRING) != 0) {
+		ipmgmt_log(LOG_WARNING,
+		    "Could not set rval of first_boot_done");
+	}
+
+failure:
+	ipmgmt_log(LOG_WARNING, "ipmgmt_first_boot scf error %s",
+	    scf_strerror(err));
+	ipmgmt_release_scf_resources(&res);
+	return (B_TRUE);
 }

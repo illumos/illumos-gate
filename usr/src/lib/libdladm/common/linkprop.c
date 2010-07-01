@@ -4503,11 +4503,13 @@ dladm_linkprop_is_set(dladm_handle_t handle, datalink_id_t linkid,
 	uint_t		valcnt = DLADM_MAX_PROP_VALCNT;
 	int		i;
 	dladm_status_t	status = DLADM_STATUS_OK;
+	size_t		bufsize;
 
 	*is_set = B_FALSE;
 
-	if ((buf = malloc((sizeof (char *) + DLADM_PROP_VAL_MAX) *
-	    DLADM_MAX_PROP_VALCNT)) == NULL)
+	bufsize = (sizeof (char *) + DLADM_PROP_VAL_MAX) *
+	    DLADM_MAX_PROP_VALCNT;
+	if ((buf = calloc(1, bufsize)) == NULL)
 		return (DLADM_STATUS_NOMEM);
 
 	propvals = (char **)(void *)buf;
@@ -4522,7 +4524,15 @@ dladm_linkprop_is_set(dladm_handle_t handle, datalink_id_t linkid,
 		goto done;
 	}
 
-	if ((strcmp(prop_name, "pool") == 0) && (strlen(*propvals) != 0)) {
+	/*
+	 * valcnt is always set to 1 by get_pool(), hence we need to check
+	 * for a non-null string to see if it is set. For protection and
+	 * allowed-ips, we can check either the *propval or the valcnt.
+	 */
+	if ((strcmp(prop_name, "pool") == 0 ||
+	    strcmp(prop_name, "protection") == 0 ||
+	    strcmp(prop_name, "allowed-ips") == 0) &&
+	    (strlen(*propvals) != 0)) {
 		*is_set = B_TRUE;
 	} else if ((strcmp(prop_name, "cpus") == 0) && (valcnt != 0)) {
 		*is_set = B_TRUE;

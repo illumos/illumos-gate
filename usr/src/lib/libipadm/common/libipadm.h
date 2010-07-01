@@ -91,7 +91,8 @@ typedef enum {
 	IPADM_IPC_ERROR,	/* Cannot communicate with ipmgmtd */
 	IPADM_OP_DISABLE_OBJ,	/* Operation on disable object */
 	IPADM_NOTSUP,		/* Operation not supported */
-	IPADM_EBADE		/* Invalid data exchange with ipmgmtd */
+	IPADM_EBADE,		/* Invalid data exchange with ipmgmtd */
+	IPADM_GZ_PERM		/* Operation not permitted on from-gz intf */
 } ipadm_status_t;
 
 /*
@@ -171,6 +172,7 @@ typedef struct ipadm_handle	*ipadm_handle_t;
 /* ipadm_handle flags */
 #define	IPH_VRRP		0x00000001	/* Caller is VRRP */
 #define	IPH_LEGACY		0x00000002	/* Caller is legacy app */
+#define	IPH_IPMGMTD		0x00000004	/* Caller is ipmgmtd itself */
 
 /* opaque address object structure */
 typedef struct ipadm_addrobj_s	*ipadm_addrobj_t;
@@ -204,6 +206,7 @@ typedef struct ipadm_if_info_s {
 #define	IFIF_NOACCEPT		0x00000100
 #define	IFIF_IPV4		0x00000200
 #define	IFIF_IPV6		0x00000400
+#define	IFIF_L3PROTECT		0x00000800
 
 /* ipadm_addr_info_t state */
 typedef enum {

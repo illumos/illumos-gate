@@ -73,7 +73,8 @@ static if_flags_t	if_flags_tbl[] = {
 	{ IFF_DUPLICATE,	"DUPLICATE" },
 	{ IFF_IPMP,		"IPMP"},
 	{ IFF_VRRP,		"VRRP"},
-	{ IFF_NOACCEPT,		"NOACCEPT"}
+	{ IFF_NOACCEPT,		"NOACCEPT"},
+	{ IFF_L3PROTECT,	"L3PROTECT"}
 };
 
 typedef struct {

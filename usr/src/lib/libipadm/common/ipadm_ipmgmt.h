@@ -265,6 +265,17 @@ typedef boolean_t	db_wfunc_t(void *, nvlist_t *, char *, size_t, int *);
 extern int		ipadm_rw_db(db_wfunc_t *, void *, const char *, mode_t,
 			    ipadm_db_op_t);
 
+/* zone related functions */
+/*
+ *  callback function to persist an interface in ipmgmtd data store
+ */
+typedef void (*persist_cb_t)(char *, boolean_t, boolean_t);
+/*
+ * ipmgmtd/libipadm network initialization interface.
+ */
+extern ipadm_status_t	ipadm_init_net_from_gz(ipadm_handle_t, char *,
+			    persist_cb_t);
+
 #ifdef	__cplusplus
 }
 #endif

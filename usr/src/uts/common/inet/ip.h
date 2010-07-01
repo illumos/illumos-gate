@@ -1801,6 +1801,8 @@ typedef struct ill_s {
 	timeout_id_t	ill_refresh_tid; /* ill refresh retry timeout id */
 
 	uint32_t	ill_mrouter_cnt; /* mrouter allmulti joins */
+	uint32_t	ill_allowed_ips_cnt;
+	in6_addr_t	*ill_allowed_ips;
 } ill_t;
 
 /*

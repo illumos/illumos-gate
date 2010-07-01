@@ -349,6 +349,7 @@ typedef enum {
 	MAC_NOTE_MARGIN,
 	MAC_NOTE_CAPAB_CHG,
 	MAC_NOTE_LOWLINK,
+	MAC_NOTE_ALLOWED_IPS,
 	MAC_NNOTE	/* must be the last entry */
 } mac_notify_type_t;
 

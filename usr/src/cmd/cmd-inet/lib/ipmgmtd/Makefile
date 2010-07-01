@@ -44,7 +44,7 @@ $(ROOTCFGFILES)	:= FILEMODE= 644
 
 ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
 
-LDLIBS += -lipadm -lnvpair -lsecdb -lnsl -lumem
+LDLIBS += -lipadm -lnvpair -lsecdb -lnsl -lumem -lscf
 
 #
 # Instrument ipmgmtd with CTF data to ease debugging.

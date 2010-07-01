@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 1980, 1986, 1993
@@ -132,6 +131,7 @@ struct rtentry {
 #define	RTF_SETSRC	0x20000		/* set default outgoing src address */
 #define	RTF_INDIRECT	0x40000		/* gateway not directly reachable */
 #define	RTF_KERNEL	0x80000		/* created by kernel; can't delete */
+#define	RTF_ZONE	0x100000	/* (NGZ only) route from global zone */
 
 /*
  * OLD statistics not used by the kernel. The kernel uses <inet/mib2.h>.

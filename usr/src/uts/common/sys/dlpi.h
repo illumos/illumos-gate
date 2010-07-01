@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -407,6 +406,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_NOTE_FASTPATH_FLUSH	0x0200	/* Fast Path info changes */
 #define	DL_NOTE_CAPAB_RENEG	0x0400	/* Initiate capability renegotiation */
 #define	DL_NOTE_REPLUMB		0x0800	/* Inform the link to replumb */
+#define	DL_NOTE_ALLOWED_IPS	0x1000	/* "allowed-ips"  notification */
 
 /*
  * DLPI notification codes for DL_NOTIFY_CONF primitives.

@@ -19,15 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
 LIBRARY = libipadm.a
 VERS    = .1
 OBJECTS = libipadm.o ipadm_prop.o ipadm_persist.o ipadm_addr.o ipadm_if.o \
-	  ipadm_ndpd.o
+	  ipadm_ndpd.o ipadm_ngz.o
 
 include ../../Makefile.lib
 

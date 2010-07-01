@@ -252,6 +252,7 @@
 /* List of data link IDs which are accessible from the zone */
 typedef struct zone_dl {
 	datalink_id_t	zdl_id;
+	nvlist_t	*zdl_net;
 	list_node_t	zdl_linkage;
 } zone_dl_t;
 
@@ -364,6 +365,8 @@ static int zone_shutdown(zoneid_t zoneid);
 static int zone_add_datalink(zoneid_t, datalink_id_t);
 static int zone_remove_datalink(zoneid_t, datalink_id_t);
 static int zone_list_datalink(zoneid_t, int *, datalink_id_t *);
+static int zone_set_network(zoneid_t, zone_net_data_t *);
+static int zone_get_network(zoneid_t, zone_net_data_t *);
 
 typedef boolean_t zsd_applyfn_t(kmutex_t *, boolean_t, zone_t *, zone_key_t);
 
@@ -4719,6 +4722,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	boolean_t global = (curzone == global_zone);
 	boolean_t inzone = (curzone->zone_id == zoneid);
 	ushort_t flags;
+	zone_net_data_t *zbuf;
 
 	mutex_enter(&zonehash_lock);
 	if ((zone = zone_find_all_by_id(zoneid)) == NULL) {
@@ -4973,6 +4977,17 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 				error = EFAULT;
 		}
 		break;
+	case ZONE_ATTR_NETWORK:
+		zbuf = kmem_alloc(bufsize, KM_SLEEP);
+		if (copyin(buf, zbuf, bufsize) != 0) {
+			error = EFAULT;
+		} else {
+			error = zone_get_network(zoneid, zbuf);
+			if (error == 0 && copyout(zbuf, buf, bufsize) != 0)
+				error = EFAULT;
+		}
+		kmem_free(zbuf, bufsize);
+		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {
 			size = bufsize;
@@ -4998,6 +5013,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	zone_t *zone;
 	zone_status_t zone_status;
 	int err;
+	zone_net_data_t *zbuf;
 
 	if (secpolicy_zone_config(CRED()) != 0)
 		return (set_errno(EPERM));
@@ -5054,6 +5070,19 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		} else {
 			err = EINVAL;
 		}
+		break;
+	case ZONE_ATTR_NETWORK:
+		if (bufsize > (PIPE_BUF + sizeof (zone_net_data_t))) {
+			err = EINVAL;
+			goto done;
+		}
+		zbuf = kmem_alloc(bufsize, KM_SLEEP);
+		if (copyin(buf, zbuf, bufsize) != 0) {
+			err = EFAULT;
+			goto done;
+		}
+		err = zone_set_network(zoneid, zbuf);
+		kmem_free(zbuf, bufsize);
 		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone))
@@ -6328,6 +6357,7 @@ zone_add_datalink(zoneid_t zoneid, datalink_id_t linkid)
 
 	zdl = kmem_zalloc(sizeof (*zdl), KM_SLEEP);
 	zdl->zdl_id = linkid;
+	zdl->zdl_net = NULL;
 	mutex_enter(&thiszone->zone_lock);
 	list_insert_head(&thiszone->zone_dl_list, zdl);
 	mutex_exit(&thiszone->zone_lock);
@@ -6351,6 +6381,8 @@ zone_remove_datalink(zoneid_t zoneid, datalink_id_t linkid)
 		err = ENXIO;
 	} else {
 		list_remove(&zone->zone_dl_list, zdl);
+		if (zdl->zdl_net != NULL)
+			nvlist_free(zdl->zdl_net);
 		kmem_free(zdl, sizeof (zone_dl_t));
 	}
 	mutex_exit(&zone->zone_lock);
@@ -6523,4 +6555,126 @@ zone_datalink_walk(zoneid_t zoneid, int (*cb)(datalink_id_t, void *),
 	zone_rele(zone);
 	kmem_free(idarray, sizeof (datalink_id_t) * idcount);
 	return (ret);
+}
+
+static char *
+zone_net_type2name(int type)
+{
+	switch (type) {
+	case ZONE_NETWORK_ADDRESS:
+		return (ZONE_NET_ADDRNAME);
+	case ZONE_NETWORK_DEFROUTER:
+		return (ZONE_NET_RTRNAME);
+	default:
+		return (NULL);
+	}
+}
+
+static int
+zone_set_network(zoneid_t zoneid, zone_net_data_t *znbuf)
+{
+	zone_t *zone;
+	zone_dl_t *zdl;
+	nvlist_t *nvl;
+	int err = 0;
+	uint8_t *new = NULL;
+	char *nvname;
+	int bufsize;
+	datalink_id_t linkid = znbuf->zn_linkid;
+
+	if (secpolicy_zone_config(CRED()) != 0)
+		return (set_errno(EPERM));
+
+	if (zoneid == GLOBAL_ZONEID)
+		return (set_errno(EINVAL));
+
+	nvname = zone_net_type2name(znbuf->zn_type);
+	bufsize = znbuf->zn_len;
+	new = znbuf->zn_val;
+	if (nvname == NULL)
+		return (set_errno(EINVAL));
+
+	if ((zone = zone_find_by_id(zoneid)) == NULL) {
+		return (set_errno(EINVAL));
+	}
+
+	mutex_enter(&zone->zone_lock);
+	if ((zdl = zone_find_dl(zone, linkid)) == NULL) {
+		err = ENXIO;
+		goto done;
+	}
+	if ((nvl = zdl->zdl_net) == NULL) {
+		if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP)) {
+			err = ENOMEM;
+			goto done;
+		} else {
+			zdl->zdl_net = nvl;
+		}
+	}
+	if (nvlist_exists(nvl, nvname)) {
+		err = EINVAL;
+		goto done;
+	}
+	err = nvlist_add_uint8_array(nvl, nvname, new, bufsize);
+	ASSERT(err == 0);
+done:
+	mutex_exit(&zone->zone_lock);
+	zone_rele(zone);
+	if (err != 0)
+		return (set_errno(err));
+	else
+		return (0);
+}
+
+static int
+zone_get_network(zoneid_t zoneid, zone_net_data_t *znbuf)
+{
+	zone_t *zone;
+	zone_dl_t *zdl;
+	nvlist_t *nvl;
+	uint8_t *ptr;
+	uint_t psize;
+	int err = 0;
+	char *nvname;
+	int bufsize;
+	void *buf;
+	datalink_id_t linkid = znbuf->zn_linkid;
+
+	if (zoneid == GLOBAL_ZONEID)
+		return (set_errno(EINVAL));
+
+	nvname = zone_net_type2name(znbuf->zn_type);
+	bufsize = znbuf->zn_len;
+	buf = znbuf->zn_val;
+
+	if (nvname == NULL)
+		return (set_errno(EINVAL));
+	if ((zone = zone_find_by_id(zoneid)) == NULL)
+		return (set_errno(EINVAL));
+
+	mutex_enter(&zone->zone_lock);
+	if ((zdl = zone_find_dl(zone, linkid)) == NULL) {
+		err = ENXIO;
+		goto done;
+	}
+	if ((nvl = zdl->zdl_net) == NULL || !nvlist_exists(nvl, nvname)) {
+		err = ENOENT;
+		goto done;
+	}
+	err = nvlist_lookup_uint8_array(nvl, nvname, &ptr, &psize);
+	ASSERT(err == 0);
+
+	if (psize > bufsize) {
+		err = ENOBUFS;
+		goto done;
+	}
+	znbuf->zn_len = psize;
+	bcopy(ptr, buf, psize);
+done:
+	mutex_exit(&zone->zone_lock);
+	zone_rele(zone);
+	if (err != 0)
+		return (set_errno(err));
+	else
+		return (0);
 }

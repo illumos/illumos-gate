@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_MAC_PROVIDER_H
@@ -33,6 +32,7 @@
 #include <sys/stream.h>
 #include <sys/mkdev.h>
 #include <sys/mac.h>
+#include <sys/mac_flow.h>
 
 /*
  * MAC Provider Interface
@@ -455,6 +455,7 @@ typedef struct mac_register_s {
 /*
  * Driver interface functions.
  */
+extern void			mac_protect_get(mac_handle_t, mac_protect_t *);
 extern void			mac_sdu_get(mac_handle_t, uint_t *, uint_t *);
 extern int			mac_maxsdu_update(mac_handle_t, uint_t);
 
