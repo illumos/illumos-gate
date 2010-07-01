@@ -41,6 +41,7 @@
 #include <sys/sysmacros.h>
 #include <sys/file.h>
 #include <sys/stream.h>
+#include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/tihdr.h>
 #include <sys/tiuser.h>
@@ -325,6 +326,7 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	 * handle at the address in the request. We will have only
 	 * the local IP address in options.
 	 */
+	((sin_t *)(clone_xprt->xp_lcladdr.buf))->sin_family = AF_UNSPEC;
 	if (pptr->unitdata_ind.OPT_length && pptr->unitdata_ind.OPT_offset) {
 		char *dstopt = (char *)mp->b_rptr +
 		    pptr->unitdata_ind.OPT_offset;
@@ -338,11 +340,15 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 			pkti = (struct in6_pktinfo *)dstopt;
 			((sin6_t *)(clone_xprt->xp_lcladdr.buf))->sin6_addr
 			    = pkti->ipi6_addr;
+			((sin6_t *)(clone_xprt->xp_lcladdr.buf))->sin6_family
+			    = AF_INET6;
 		} else if (toh->level == IPPROTO_IP && toh->status == 0 &&
 		    toh->name == IP_RECVDSTADDR) {
 			dstopt += sizeof (struct T_opthdr);
 			((sin_t *)(clone_xprt->xp_lcladdr.buf))->sin_addr
 			    = *(struct in_addr *)dstopt;
+			((sin_t *)(clone_xprt->xp_lcladdr.buf))->sin_family
+			    = AF_INET;
 		}
 	}
 
@@ -392,8 +398,7 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	return (TRUE);
 
 bad:
-	if (mp)
-		freemsg(mp);
+	freemsg(mp);
 	if (ud->ud_resp) {
 		/*
 		 * There should not be any left over results buffer.
@@ -512,18 +517,69 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 	}
 
 	/*
-	 * Construct the T_unitdata_req.  We take advantage
-	 * of the fact that T_unitdata_ind looks just like
-	 * T_unitdata_req, except for the primitive type.
-	 * Reusing it means we preserve any options, and we must preserve
-	 * the SCM_UCRED option for TX to work.
-	 * This has the side effect of also passing certain receive-side
-	 * options like IP_RECVDSTADDR back down the send side. This
-	 * implies that we can not ASSERT on a non-NULL db_credp when
-	 * we have send-side options in UDP.
+	 * Construct the T_unitdata_req.  We take advantage of the fact that
+	 * T_unitdata_ind looks just like T_unitdata_req, except for the
+	 * primitive type.  Reusing it means we preserve the SCM_UCRED, and
+	 * we must preserve it for TX to work.
+	 *
+	 * This has the side effect that we can also pass certain receive-side
+	 * options like IPV6_PKTINFO back down the send side.  This implies
+	 * that we can not ASSERT on a non-NULL db_credp when we have send-side
+	 * options in UDP.
 	 */
+	ASSERT(MBLKL(ud->ud_resp) >= TUNITDATAREQSZ);
 	udreq = (struct T_unitdata_req *)ud->ud_resp->b_rptr;
+	ASSERT(udreq->PRIM_type == T_UNITDATA_IND);
 	udreq->PRIM_type = T_UNITDATA_REQ;
+
+	/*
+	 * If the local IPv4 transport address is known use it as a source
+	 * address for the outgoing UDP packet.
+	 */
+	if (((sin_t *)(clone_xprt->xp_lcladdr.buf))->sin_family == AF_INET) {
+		struct T_opthdr *opthdr;
+		in_pktinfo_t *pktinfo;
+		size_t size;
+
+		if (udreq->DEST_length == 0)
+			udreq->OPT_offset = _TPI_ALIGN_TOPT(TUNITDATAREQSZ);
+		else
+			udreq->OPT_offset = _TPI_ALIGN_TOPT(udreq->DEST_offset +
+			    udreq->DEST_length);
+
+		udreq->OPT_length = sizeof (struct T_opthdr) +
+		    sizeof (in_pktinfo_t);
+
+		size = udreq->OPT_length + udreq->OPT_offset;
+
+		/* make sure we have enough space for the option data */
+		mp = reallocb(ud->ud_resp, size, 1);
+		if (mp == NULL)
+			goto out;
+		ud->ud_resp = mp;
+		udreq = (struct T_unitdata_req *)mp->b_rptr;
+
+		/* set desired option header */
+		opthdr = (struct T_opthdr *)(mp->b_rptr + udreq->OPT_offset);
+		opthdr->len = udreq->OPT_length;
+		opthdr->level = IPPROTO_IP;
+		opthdr->name = IP_PKTINFO;
+
+		/*
+		 * 1. set source IP of outbound packet
+		 * 2. value '0' for index means IP layer uses this as source
+		 *    address
+		 */
+		pktinfo = (in_pktinfo_t *)(opthdr + 1);
+		(void) memset(pktinfo, 0, sizeof (in_pktinfo_t));
+		pktinfo->ipi_spec_dst.s_addr =
+		    ((sin_t *)(clone_xprt->xp_lcladdr.buf))->sin_addr.s_addr;
+		pktinfo->ipi_ifindex = 0;
+
+		/* adjust the end of active data */
+		mp->b_wptr = mp->b_rptr + size;
+	}
+
 	put(clone_xprt->xp_wq, ud->ud_resp);
 	stat = TRUE;
 	ud->ud_resp = NULL;
