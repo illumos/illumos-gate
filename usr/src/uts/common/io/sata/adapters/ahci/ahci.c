@@ -212,8 +212,8 @@ static	int ahci_intr_cold_port_detect(ahci_ctl_t *, ahci_port_t *, uint8_t);
 
 static	void ahci_get_ahci_addr(ahci_ctl_t *, sata_device_t *, ahci_addr_t *);
 static	int ahci_get_num_implemented_ports(uint32_t);
-static  void ahci_log_fatal_error_message(ahci_ctl_t *, uint8_t port,
-    uint32_t);
+static  void ahci_log_fatal_error_message(ahci_ctl_t *, uint8_t, uint32_t);
+static	void ahci_dump_commands(ahci_ctl_t *, uint8_t, uint32_t);
 static	void ahci_log_serror_message(ahci_ctl_t *, uint8_t, uint32_t, int);
 #if AHCI_DEBUG
 static	void ahci_log(ahci_ctl_t *, uint_t, char *, ...);
@@ -7781,6 +7781,9 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 	uint8_t err_byte;
 	ahci_event_arg_t *args;
 	int instance = ddi_get_instance(ahci_ctlp->ahcictl_dip);
+	uint32_t failed_tags = 0;
+	int task_fail_flag = 0, task_abort_flag = 0;
+	uint32_t slot_status;
 
 	mutex_enter(&ahci_portp->ahciport_mutex);
 
@@ -7801,31 +7804,36 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 		AHCIDBG(AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
 		    "ahci_intr_fatal_error: port %d "
 		    "task_file_status = 0x%x", port, task_file_status);
+		task_fail_flag = 1;
+
+		err_byte = (task_file_status & AHCI_TFD_ERR_MASK)
+		    >> AHCI_TFD_ERR_SHIFT;
+		if (err_byte == SATA_ERROR_ABORT)
+			task_abort_flag = 1;
 	}
 
 	/*
 	 * Here we just log the fatal error info in interrupt context.
 	 * Misc recovery processing will be handled in task queue.
 	 */
-	if (NON_NCQ_CMD_IN_PROGRESS(ahci_portp)) {
-		/*
-		 * Read PxCMD.CCS to determine the slot that the HBA
-		 * was processing when the error occurred.
-		 */
-		port_cmd_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
-		    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port));
-		failed_slot = (port_cmd_status & AHCI_CMD_STATUS_CCS) >>
-		    AHCI_CMD_STATUS_CCS_SHIFT;
+	if (task_fail_flag  == 1) {
+		if (NON_NCQ_CMD_IN_PROGRESS(ahci_portp)) {
+			/*
+			 * Read PxCMD.CCS to determine the slot that the HBA
+			 * was processing when the error occurred.
+			 */
+			port_cmd_status = ddi_get32(
+			    ahci_ctlp->ahcictl_ahci_acc_handle,
+			    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port));
+			failed_slot = (port_cmd_status & AHCI_CMD_STATUS_CCS) >>
+			    AHCI_CMD_STATUS_CCS_SHIFT;
+			failed_tags = 0x1 << failed_slot;
 
-		spkt = ahci_portp->ahciport_slot_pkts[failed_slot];
-		AHCIDBG(AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
-		    "ahci_intr_fatal_error: spkt 0x%p is being processed when "
-		    "fatal error occurred for port %d", spkt, port);
-
-		/* A Task File Data error. */
-		if (intr_status & AHCI_INTR_STATUS_TFES) {
-			err_byte = (task_file_status & AHCI_TFD_ERR_MASK)
-			    >> AHCI_TFD_ERR_SHIFT;
+			spkt = ahci_portp->ahciport_slot_pkts[failed_slot];
+			AHCIDBG(AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
+			    "ahci_intr_fatal_error: spkt 0x%p is being "
+			    "processed when fatal error occurred for port %d",
+			    spkt, port);
 
 			/*
 			 * Won't emit the error message if it is an IDENTIFY
@@ -7834,8 +7842,8 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 			if ((spkt != NULL) &&
 			    (spkt->satapkt_cmd.satacmd_cmd_reg ==
 			    SATAC_ID_DEVICE) &&
-			    (err_byte == SATA_ERROR_ABORT))
-				goto out1;
+			    (task_abort_flag == 1))
+			goto out1;
 
 			/*
 			 * Won't emit the error message if it is an ATAPI PACKET
@@ -7844,11 +7852,20 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 			if ((spkt != NULL) &&
 			    (spkt->satapkt_cmd.satacmd_cmd_reg == SATAC_PACKET))
 				goto out1;
+
+		} else if (NCQ_CMD_IN_PROGRESS(ahci_portp)) {
+			slot_status = ddi_get32(
+			    ahci_ctlp->ahcictl_ahci_acc_handle,
+			    (uint32_t *)AHCI_PORT_PxSACT(ahci_ctlp, port));
+			failed_tags = slot_status &
+			    AHCI_NCQ_SLOT_MASK(ahci_portp);
 		}
 	}
 
 	/* print the fatal error type */
 	ahci_log_fatal_error_message(ahci_ctlp, port, intr_status);
+	ahci_portp->ahciport_flags |= AHCI_PORT_FLAG_ERRPRINT;
+
 	port_serror = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxSERR(ahci_ctlp, port));
 
@@ -7856,9 +7873,14 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 	ahci_log_serror_message(ahci_ctlp, port, port_serror, 0);
 
 	/* print task file register value */
-	if (intr_status & AHCI_INTR_STATUS_TFES) {
+	if (task_fail_flag == 1) {
 		cmn_err(CE_WARN, "!ahci%d: ahci port %d task_file_status "
 		    "= 0x%x", instance, port, task_file_status);
+		if (task_abort_flag == 1) {
+			cmn_err(CE_WARN, "!ahci%d: the below command (s) on "
+			    "port %d are aborted", instance, port);
+			ahci_dump_commands(ahci_ctlp, port, failed_tags);
+		}
 	}
 
 out1:
@@ -7873,8 +7895,9 @@ out1:
 	if ((ddi_taskq_dispatch(ahci_portp->ahciport_event_taskq,
 	    ahci_events_handler,
 	    (void *)args, DDI_NOSLEEP)) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!ahci%d: ahci start taskq for event handler "
-		    "failed", instance);
+		ahci_portp->ahciport_flags &= ~AHCI_PORT_FLAG_ERRPRINT;
+		cmn_err(CE_WARN, "!ahci%d: start taskq for error recovery "
+		    "port %d failed", instance, port);
 	}
 out0:
 	mutex_exit(&ahci_portp->ahciport_mutex);
@@ -9287,7 +9310,9 @@ ahci_fatal_error_recovery_handler(ahci_ctl_t *ahci_ctlp,
 #if AHCI_DEBUG
 	ahci_cmd_header_t *cmd_header;
 #endif
-	uint8_t 	port = addrp->aa_port;
+	uint8_t		port = addrp->aa_port;
+	int		instance = ddi_get_instance(ahci_ctlp->ahcictl_dip);
+	int		rval;
 
 	AHCIDBG(AHCIDBG_ENTRY, ahci_ctlp,
 	    "ahci_fatal_error_recovery_handler enter: port %d", port);
@@ -9396,8 +9421,18 @@ next:
 	ahci_portp->ahciport_flags |= AHCI_PORT_FLAG_MOPPING;
 	ahci_portp->ahciport_mop_in_progress++;
 
-	(void) ahci_restart_port_wait_till_ready(ahci_ctlp, ahci_portp,
+	rval = ahci_restart_port_wait_till_ready(ahci_ctlp, ahci_portp,
 	    port, flag, &reset_flag);
+
+	if (ahci_portp->ahciport_flags & AHCI_PORT_FLAG_ERRPRINT) {
+		ahci_portp->ahciport_flags &= ~AHCI_PORT_FLAG_ERRPRINT;
+		if (rval == AHCI_SUCCESS)
+			cmn_err(CE_WARN, "!ahci%d: error recovery for port %d "
+			    "succeed", instance, port);
+		else
+			cmn_err(CE_WARN, "!ahci%d: error recovery for port %d "
+			    "failed", instance, port);
+	}
 
 	/*
 	 * Won't retrieve error information:
@@ -9549,6 +9584,7 @@ ahci_events_handler(void *args)
 	ahci_port_t *ahci_portp;
 	ahci_addr_t *addrp;
 	uint32_t event;
+	int instance;
 
 	ahci_event_arg = (ahci_event_arg_t *)args;
 
@@ -9556,6 +9592,7 @@ ahci_events_handler(void *args)
 	ahci_portp = ahci_event_arg->ahciea_portp;
 	addrp = ahci_event_arg->ahciea_addrp;
 	event = ahci_event_arg->ahciea_event;
+	instance = ddi_get_instance(ahci_ctlp->ahcictl_dip);
 
 	AHCIDBG(AHCIDBG_ENTRY|AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
 	    "ahci_events_handler enter: port %d intr_status = 0x%x",
@@ -9572,6 +9609,13 @@ ahci_events_handler(void *args)
 		    "ahci_events_handler: port %d no device attached, "
 		    "and just return without doing anything",
 		    ahci_portp->ahciport_port_num);
+
+		if (ahci_portp->ahciport_flags & AHCI_PORT_FLAG_ERRPRINT) {
+			ahci_portp->ahciport_flags &= ~AHCI_PORT_FLAG_ERRPRINT;
+			cmn_err(CE_WARN, "!ahci%d: error recovery for port %d "
+			    "succeed", instance, ahci_portp->ahciport_port_num);
+		}
+
 		goto out;
 	}
 
@@ -9937,6 +9981,47 @@ ahci_log_fatal_error_message(ahci_ctl_t *ahci_ctlp, uint8_t port,
 	    "recovery", instance, port);
 }
 
+static void
+ahci_dump_commands(ahci_ctl_t *ahci_ctlp, uint8_t port,
+    uint32_t slot_tags)
+{
+	ahci_port_t *ahci_portp;
+	int tmp_slot;
+	sata_pkt_t *spkt;
+	sata_cmd_t cmd;
+
+	ahci_portp = ahci_ctlp->ahcictl_ports[port];
+	ASSERT(ahci_portp != NULL);
+
+	while (slot_tags) {
+		tmp_slot = ddi_ffs(slot_tags) - 1;
+		if (tmp_slot == -1) {
+			break;
+		}
+
+		spkt = ahci_portp->ahciport_slot_pkts[tmp_slot];
+		ASSERT(spkt != NULL);
+		cmd = spkt->satapkt_cmd;
+
+		cmn_err(CE_WARN, "!satapkt 0x%p: cmd_reg = 0x%x "
+		    "features_reg = 0x%x sec_count_msb = 0x%x "
+		    "lba_low_msb = 0x%x lba_mid_msb = 0x%x "
+		    "lba_high_msb = 0x%x sec_count_lsb = 0x%x "
+		    "lba_low_lsb = 0x%x lba_mid_lsb = 0x%x "
+		    "lba_high_lsb = 0x%x device_reg = 0x%x "
+		    "addr_type = 0x%x cmd_flags = 0x%x", (void *)spkt,
+		    cmd.satacmd_cmd_reg, cmd.satacmd_features_reg,
+		    cmd.satacmd_sec_count_msb, cmd.satacmd_lba_low_msb,
+		    cmd.satacmd_lba_mid_msb, cmd.satacmd_lba_high_msb,
+		    cmd.satacmd_sec_count_lsb, cmd.satacmd_lba_low_lsb,
+		    cmd.satacmd_lba_mid_lsb, cmd.satacmd_lba_high_lsb,
+		    cmd.satacmd_device_reg, cmd.satacmd_addr_type,
+		    *((uint32_t *)&(cmd.satacmd_flags)));
+
+		CLEAR_BIT(slot_tags, tmp_slot);
+	}
+}
+
 /*
  * Dump the serror message to the log.
  */
@@ -10024,7 +10109,7 @@ ahci_log_serror_message(ahci_ctl_t *ahci_ctlp, uint8_t port,
 		err_msg = strcat(err_msg, "\tExchanged (X)\n");
 	}
 
-	if (err_msg == NULL)
+	if (*err_msg == '\0')
 		return;
 
 	if (debug_only) {

@@ -168,6 +168,10 @@ typedef struct ahci_pmult_info ahci_pmult_info_t;
  *
  * AHCI_PORT_FLAG_HOTPLUG: this flag will be set when a hot plug event is
  * being handled.
+ *
+ * AHCI_PORT_FLAG_ERRPRINT: this flag will be set when error recovery message
+ * will be printed. Note that, for INDENTIFY DEVICE command sent to ATAPI
+ * device or ATAPI PACKET command, this flag won't be set.
  */
 #define	AHCI_PORT_FLAG_SPINUP		0x01
 #define	AHCI_PORT_FLAG_MOPPING		0x02
@@ -180,6 +184,7 @@ typedef struct ahci_pmult_info ahci_pmult_info_t;
 #define	AHCI_PORT_FLAG_IGNORE_IPMS	0x100
 #define	AHCI_PORT_FLAG_PMULT_SNTF	0x200
 #define	AHCI_PORT_FLAG_HOTPLUG		0x400
+#define	AHCI_PORT_FLAG_ERRPRINT		0x800
 
 typedef struct ahci_port {
 	/* The physical port number */
@@ -205,6 +210,7 @@ typedef struct ahci_port {
 	 * AHCI_PORT_FLAG_IGNORE_IPMS
 	 * AHCI_PORT_FLAG_PMULT_SNTF
 	 * AHCI_PORT_FLAG_HOTPLUG
+	 * AHCI_PORT_FLAG_ERRPRINT
 	 */
 	int			ahciport_flags;
 
