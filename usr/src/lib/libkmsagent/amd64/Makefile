@@ -27,9 +27,17 @@
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
-CCNEEDED = -lCrun -lCstd
-$(__GNUC)CCNEEDED       = -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
+#
+# CCNEEDED must be modified for 64-bit because the default only includes
+# -lCrun
+#
+CCNEEDED = -lCstd -lCrun
 
-LDLIBS64  +=    $(CCNEEDED) -lpam -lc -lsoftcrypto -lcrypto -lssl -lsocket
+#
+# If linking with gcc, we must fix the CCNEEDED and LDLIBS64
+# to get a clean link without duplicates.
+#
+$(__GNUC)CCNEEDED       = -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
+$(__GNUC)LDLIBS64 += $(CCNEEDED)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)
