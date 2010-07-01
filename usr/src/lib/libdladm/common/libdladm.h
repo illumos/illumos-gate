@@ -131,9 +131,11 @@ typedef enum {
 	DLADM_STATUS_MACFACTORYNOTSUP,
 	DLADM_STATUS_INVALIDMACPREFIX,
 	DLADM_STATUS_INVALIDMACPREFIXLEN,
-	DLADM_STATUS_CPUMAX,
+	DLADM_STATUS_BADCPUID,
 	DLADM_STATUS_CPUERR,
 	DLADM_STATUS_CPUNOTONLINE,
+	DLADM_STATUS_BADRANGE,
+	DLADM_STATUS_TOOMANYELEMENTS,
 	DLADM_STATUS_DB_NOTFOUND,
 	DLADM_STATUS_DB_PARSE_ERR,
 	DLADM_STATUS_PROP_PARSE_ERR,
@@ -265,6 +267,14 @@ extern dladm_status_t	dladm_usage_dates(int (*)(dladm_usage_t *, void *),
 			    int, char *, char *, void *);
 extern dladm_status_t	dladm_zone_boot(dladm_handle_t, zoneid_t);
 extern dladm_status_t	dladm_zone_halt(dladm_handle_t, zoneid_t);
+
+extern dladm_status_t	dladm_strs2range(char **, uint_t, mac_propval_type_t,
+			    mac_propval_range_t **);
+extern dladm_status_t	dladm_range2list(mac_propval_range_t *, void*,
+			    uint_t *);
+extern int		dladm_range2strs(mac_propval_range_t *, char **);
+extern dladm_status_t	dladm_list2range(void *, uint_t, mac_propval_type_t,
+			    mac_propval_range_t **);
 
 #ifdef	__cplusplus
 }

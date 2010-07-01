@@ -264,6 +264,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dladm_part_up;
 	dladm_ib_info;
 	dladm_free_ib_info;
+
+	dladm_range2strs;
+	dladm_strs2range;
+	dladm_range2list;
+	dladm_list2range;
     local:
 	*;
 };

@@ -38,6 +38,7 @@
 #include <libdladm_impl.h>
 #include <libintl.h>
 #include <libdlpi.h>
+#include <libdllink.h>
 
 static char	dladm_rootdir[MAXPATHLEN] = "/";
 
@@ -279,7 +280,7 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_INVALIDMACPREFIXLEN:
 		s = "Invalid MAC address prefix length";
 		break;
-	case DLADM_STATUS_CPUMAX:
+	case DLADM_STATUS_BADCPUID:
 		s = "non-existent processor ID";
 		break;
 	case DLADM_STATUS_CPUERR:
@@ -287,6 +288,12 @@ dladm_status2str(dladm_status_t status, char *buf)
 		break;
 	case DLADM_STATUS_CPUNOTONLINE:
 		s = "processor not online";
+		break;
+	case DLADM_STATUS_TOOMANYELEMENTS:
+		s = "too many elements specified";
+		break;
+	case DLADM_STATUS_BADRANGE:
+		s = "invalid range";
 		break;
 	case DLADM_STATUS_DB_NOTFOUND:
 		s = "database not found";
@@ -1053,4 +1060,208 @@ dladm_parse_args(char *str, dladm_arg_list_t **listp, boolean_t novalues)
 fail:
 	dladm_free_args(list);
 	return (DLADM_STATUS_FAILED);
+}
+
+/*
+ * mac_propval_range_t functions.  Currently implemented for only
+ * ranges of uint32_t elements, but can be expanded as required.
+ */
+/*
+ * Convert an array of strings (which can be ranges or individual
+ * elements) into a single mac_propval_range_t structure which
+ * allocated here but should be freed by the caller.
+ */
+dladm_status_t
+dladm_strs2range(char **prop_val, uint_t val_cnt,
+	mac_propval_type_t type, mac_propval_range_t **range)
+{
+	int			i;
+	char			*endp;
+	mac_propval_range_t	*rangep;
+	dladm_status_t		status = DLADM_STATUS_OK;
+
+	switch (type) {
+	case MAC_PROPVAL_UINT32: {
+		mac_propval_uint32_range_t	*ur;
+
+		/* Allocate range structure */
+		rangep = malloc(sizeof (mac_propval_range_t) +
+		    (val_cnt-1)*(sizeof (mac_propval_uint32_range_t)));
+		if (rangep == NULL)
+			return (DLADM_STATUS_NOMEM);
+
+		rangep->mpr_count = 0;
+		ur = &rangep->mpr_range_uint32[0];
+		for (i = 0; i < val_cnt; i++, ur++) {
+			errno = 0;
+			if (strchr(prop_val[i], '-') == NULL) {
+				/* single element */
+				ur->mpur_min = ur->mpur_max =
+				    strtol(prop_val[i], &endp, 10);
+				if ((endp != NULL) && (*endp != '\0')) {
+					return (DLADM_STATUS_BADRANGE);
+				}
+			} else {
+				/* range of elements */
+				ur->mpur_min = strtol(prop_val[i], &endp, 10);
+				if (*endp++ != '-')
+					return (DLADM_STATUS_BADRANGE);
+				ur->mpur_max = strtol(endp, &endp, 10);
+				if (endp != NULL && *endp != '\0' ||
+				    ur->mpur_max < ur->mpur_min)
+					return (DLADM_STATUS_BADRANGE);
+			}
+			rangep->mpr_count++;
+		}
+		break;
+	}
+	default:
+		return (DLADM_STATUS_BADVAL);
+	}
+
+	rangep->mpr_type = type;
+	*range = rangep;
+
+	return (status);
+}
+
+/*
+ * Convert a mac_propval_range_t structure into an array of elements.
+ */
+dladm_status_t
+dladm_range2list(mac_propval_range_t *rangep, void *elem, uint_t *nelem)
+{
+	int		i, j, k;
+	dladm_status_t	status = DLADM_STATUS_OK;
+
+	switch (rangep->mpr_type) {
+	case MAC_PROPVAL_UINT32: {
+		mac_propval_uint32_range_t	*ur;
+		uint32_t			*elem32 = elem;
+
+		k = 0;
+		ur = &rangep->mpr_range_uint32[0];
+		for (i = 0; i < rangep->mpr_count; i++, ur++) {
+			for (j = 0; j <= ur->mpur_max - ur->mpur_min; j++) {
+				elem32[k++] = ur->mpur_min + j;
+				if (k > *nelem) {
+					status = DLADM_STATUS_TOOMANYELEMENTS;
+					break;
+				}
+			}
+		}
+		*nelem = k;
+		break;
+	}
+	default:
+		status = DLADM_STATUS_BADVAL;
+		break;
+	}
+	return (status);
+}
+
+/*
+ * Convert a mac_propval_range_t structure into an array of strings
+ * of single elements or ranges.
+ */
+int
+dladm_range2strs(mac_propval_range_t *rangep, char **prop_val)
+{
+	int	i;
+
+	switch (rangep->mpr_type) {
+	case MAC_PROPVAL_UINT32: {
+		mac_propval_uint32_range_t	*ur;
+
+		/* Write ranges and individual elements */
+		ur = &rangep->mpr_range_uint32[0];
+		for (i = 0; i <= rangep->mpr_count; i++, ur++) {
+			if (ur->mpur_min == ur->mpur_max) {
+				/* single element */
+				(void) snprintf(prop_val[i], DLADM_PROP_VAL_MAX,
+				    "%u", ur->mpur_min);
+			} else {
+				/* range of elements */
+				(void) snprintf(prop_val[i], DLADM_PROP_VAL_MAX,
+				    "%u-%u", ur->mpur_min, ur->mpur_max);
+			}
+		}
+		return (0);
+	}
+	default:
+		break;
+	}
+	return (EINVAL);
+}
+
+static int
+uint32cmp(const void *a, const void *b)
+{
+	return (*(uint32_t *)a - *(uint32_t *)b);
+}
+
+/*
+ * Sort and convert an array of elements into a single
+ * mac_propval_range_t structure which is allocated here but
+ * should be freed by the caller.
+ */
+dladm_status_t
+dladm_list2range(void *elem, uint_t nelem, mac_propval_type_t type,
+    mac_propval_range_t **range)
+{
+	int			i;
+	uint_t			nr = 0;
+	mac_propval_range_t	*rangep;
+	dladm_status_t		status = DLADM_STATUS_OK;
+
+	switch (type) {
+	case MAC_PROPVAL_UINT32: {
+		mac_propval_uint32_range_t	*ur;
+		uint32_t			*elem32 = elem;
+		uint32_t			*sort32;
+
+		/* Allocate range structure */
+		rangep = malloc(sizeof (mac_propval_range_t) +
+		    (nelem-1)*(sizeof (mac_propval_uint32_range_t)));
+		if (rangep == NULL)
+			return (DLADM_STATUS_NOMEM);
+
+		/* Allocate array for sorting */
+		sort32 = malloc(nelem * sizeof (uint32_t));
+		if (sort32 == NULL) {
+			free(rangep);
+			return (DLADM_STATUS_NOMEM);
+		}
+
+		/* Copy and sort list */
+		for (i = 0; i < nelem; i++)
+			sort32[i] =  elem32[i];
+		if (nelem > 1)
+			qsort(sort32, nelem, sizeof (uint32_t), uint32cmp);
+
+		/* Convert list to ranges */
+		ur = &rangep->mpr_range_uint32[0];
+		ur->mpur_min = ur->mpur_max = sort32[0];
+		for (i = 1; i < nelem; i++) {
+			if (sort32[i]-sort32[i-1] == 1) {
+				/* part of current range */
+				ur->mpur_max = sort32[i];
+			} else {
+				/* start a new range */
+				nr++; ur++;
+				ur->mpur_min = ur->mpur_max = sort32[i];
+			}
+		}
+		free(sort32);
+		break;
+	}
+	default:
+		return (DLADM_STATUS_BADRANGE);
+	}
+
+	rangep->mpr_type = type;
+	rangep->mpr_count = nr + 1;
+	*range = rangep;
+
+	return (status);
 }

@@ -23,6 +23,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <errno.h>
 #include <ctype.h>
@@ -110,8 +111,8 @@ typedef dladm_status_t	pd_setf_t(dladm_handle_t, prop_desc_t *, datalink_id_t,
  * generated on the fly.
  */
 typedef dladm_status_t	pd_checkf_t(dladm_handle_t, prop_desc_t *pdp,
-			    datalink_id_t, char **propstrp, uint_t cnt,
-			    uint_t flags, val_desc_t *propval,
+			    datalink_id_t, char **propstrp, uint_t *cnt,
+			    uint_t flags, val_desc_t **propval,
 			    datalink_media_t);
 
 typedef struct link_attr_s {
@@ -783,10 +784,12 @@ static dladm_status_t	i_dladm_getset_defval(dladm_handle_t, prop_desc_t *,
 /* ARGSUSED */
 static dladm_status_t
 check_prop(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t val_cnt, uint_t flags, val_desc_t *vdp,
+    char **prop_val, uint_t *val_cntp, uint_t flags, val_desc_t **vdpp,
     datalink_media_t media)
 {
 	int		i, j;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	for (j = 0; j < val_cnt; j++) {
 		for (i = 0; i < pdp->pd_noptval; i++) {
@@ -836,10 +839,10 @@ i_dladm_set_single_prop(dladm_handle_t handle, datalink_id_t linkid,
 		if (pdp->pd_check != NULL) {
 			needfree = ((pdp->pd_flags & PD_CHECK_ALLOC) != 0);
 			status = pdp->pd_check(handle, pdp, linkid, prop_val,
-			    val_cnt, flags, vdp, media);
+			    &val_cnt, flags, &vdp, media);
 		} else if (pdp->pd_optval != NULL) {
 			status = check_prop(handle, pdp, linkid, prop_val,
-			    val_cnt, flags, vdp, media);
+			    &val_cnt, flags, &vdp, media);
 		} else {
 			status = DLADM_STATUS_BADARG;
 		}
@@ -865,7 +868,7 @@ i_dladm_set_single_prop(dladm_handle_t handle, datalink_id_t linkid,
 				    sizeof (val_desc_t));
 			} else if (pdp->pd_check != NULL) {
 				status = pdp->pd_check(handle, pdp, linkid,
-				    prop_val, cnt, flags, vdp, media);
+				    prop_val, &cnt, flags, &vdp, media);
 				if (status != DLADM_STATUS_OK)
 					goto done;
 			}
@@ -1268,7 +1271,7 @@ dladm_get_linkprop_values(dladm_handle_t handle, datalink_id_t linkid,
 				status = DLADM_STATUS_NOMEM;
 			else
 				status = pdp->pd_check(handle, pdp, linkid,
-				    prop_val, *val_cntp, 0, vdp, media);
+				    prop_val, val_cntp, 0, &vdp, media);
 			if (status == DLADM_STATUS_OK) {
 				for (valc = 0; valc < *val_cntp; valc++)
 					ret_val[valc] = vdp[valc].vd_val;
@@ -1531,13 +1534,15 @@ set_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 check_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t val_cnt, uint_t flags, val_desc_t *vdp,
+    char **prop_val, uint_t *val_cntp, uint_t flags, val_desc_t **vdpp,
     datalink_media_t media)
 {
 	char		*zone_name;
 	zoneid_t	zoneid;
 	dladm_status_t	status = DLADM_STATUS_OK;
 	dld_ioc_zid_t	*dzp;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
@@ -1606,11 +1611,13 @@ get_maxbw(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 check_maxbw(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t val_cnt, uint_t flags, val_desc_t *vdp,
+    char **prop_val, uint_t *val_cntp, uint_t flags, val_desc_t **vdpp,
     datalink_media_t media)
 {
 	uint64_t	*maxbw;
 	dladm_status_t	status = DLADM_STATUS_OK;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
@@ -1658,8 +1665,8 @@ get_cpus(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 {
 	dladm_status_t		status;
 	mac_resource_props_t	mrp;
-	int			i;
-	uint32_t		ncpus;
+	mac_propval_range_t	*pv_range;
+	int			err;
 
 	if (strcmp(pdp->pd_name, "cpus-effective") == 0) {
 		status = i_dladm_get_public_prop(handle, linkid,
@@ -1673,36 +1680,50 @@ get_cpus(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
-	ncpus = mrp.mrp_ncpus;
-	if (ncpus > *val_cnt)
+	if (mrp.mrp_ncpus > *val_cnt)
 		return (DLADM_STATUS_TOOSMALL);
 
-	if (ncpus == 0) {
+	if (mrp.mrp_ncpus == 0) {
 		*val_cnt = 0;
 		return (DLADM_STATUS_OK);
 	}
 
-	*val_cnt = ncpus;
-	for (i = 0; i < ncpus; i++) {
-		(void) snprintf(prop_val[i], DLADM_PROP_VAL_MAX,
-		    "%u", mrp.mrp_cpu[i]);
+	/* Sort CPU list and convert it to a mac_propval_range */
+	status = dladm_list2range(mrp.mrp_cpu, mrp.mrp_ncpus,
+	    MAC_PROPVAL_UINT32, &pv_range);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	/* Write CPU ranges and individual CPUs */
+	err = dladm_range2strs(pv_range, prop_val);
+	if (err != 0) {
+		free(pv_range);
+		return (dladm_errno2status(err));
 	}
+
+	*val_cnt = pv_range->mpr_count;
+	free(pv_range);
+
 	return (DLADM_STATUS_OK);
 }
 
 /* ARGSUSED */
 static dladm_status_t
 check_cpus(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t val_cnt, uint_t flags, val_desc_t *vdp,
+    char **prop_val, uint_t *val_cntp, uint_t flags, val_desc_t **vdpp,
     datalink_media_t media)
 {
-	uint32_t		cpuid;
 	int			i, j, rc;
-	char			*endp;
 	long			nproc = sysconf(_SC_NPROCESSORS_CONF);
 	mac_resource_props_t	mrp;
-	dladm_status_t		status;
+	mac_propval_range_t	*pv_range;
 	uint_t			perm_flags;
+	uint32_t		ncpus;
+	uint32_t		*cpus = mrp.mrp_cpu;
+	val_desc_t		*vdp = *vdpp;
+	val_desc_t		*newvdp;
+	uint_t			val_cnt = *val_cntp;
+	dladm_status_t		status = DLADM_STATUS_OK;
 
 	/* Get the current pool property */
 	status = i_dladm_get_public_prop(handle, linkid, "resource", 0,
@@ -1714,35 +1735,79 @@ check_cpus(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 			return (DLADM_STATUS_POOLCPU);
 	}
 
-	bzero(&mrp, sizeof (mac_resource_props_t));
+	/* Read ranges and convert to mac_propval_range */
+	status = dladm_strs2range(prop_val, val_cnt, MAC_PROPVAL_UINT32,
+	    &pv_range);
+	if (status != DLADM_STATUS_OK)
+		goto done1;
 
-	for (i = 0; i < val_cnt; i++) {
-		errno = 0;
-		cpuid = strtol(prop_val[i], &endp, 10);
-		if (errno != 0 || *endp != '\0')
-			return (DLADM_STATUS_BADVAL);
+	/* Convert mac_propval_range to a single CPU list */
+	ncpus = MRP_NCPUS;
+	status = dladm_range2list(pv_range, cpus, &ncpus);
+	if (status != DLADM_STATUS_OK)
+		goto done1;
 
-		if (cpuid >= nproc)
-			return (DLADM_STATUS_CPUMAX);
-
-		rc = p_online(cpuid, P_STATUS);
-		if (rc < 1)
-			return (DLADM_STATUS_CPUERR);
-
-		if (rc != P_ONLINE)
-			return (DLADM_STATUS_CPUNOTONLINE);
-
-		vdp[i].vd_val = (uintptr_t)cpuid;
+	/*
+	 * If a range of CPUs was entered, update value count and reallocate
+	 * the array of val_desc_t's.  The array allocated was sized for
+	 * indvidual elements, but needs to be reallocated to accomodate the
+	 * expanded list of CPUs.
+	 */
+	if (val_cnt < ncpus) {
+		newvdp = calloc(*val_cntp, sizeof (val_desc_t));
+		if (newvdp == NULL) {
+			status = DLADM_STATUS_NOMEM;
+			goto done1;
+		}
+		vdp = newvdp;
 	}
 
-	/* Check for duplicates */
-	for (i = 0; i < val_cnt; i++) {
-		for (j = 0; j < val_cnt; j++) {
-			if (i != j && vdp[i].vd_val == vdp[j].vd_val)
-				return (DLADM_STATUS_BADVAL);
+	/* Check if all CPUs in the list are online */
+	for (i = 0; i < ncpus; i++) {
+		if (cpus[i] >= nproc) {
+			status = DLADM_STATUS_BADCPUID;
+			goto done2;
+		}
+
+		rc = p_online(cpus[i], P_STATUS);
+		if (rc < 1) {
+			status = DLADM_STATUS_CPUERR;
+			goto done2;
+		}
+
+		if (rc != P_ONLINE) {
+			status = DLADM_STATUS_CPUNOTONLINE;
+			goto done2;
+		}
+
+		vdp[i].vd_val = (uintptr_t)cpus[i];
+	}
+
+	/* Check for duplicate CPUs */
+	for (i = 0; i < *val_cntp; i++) {
+		for (j = 0; j < *val_cntp; j++) {
+			if (i != j && vdp[i].vd_val == vdp[j].vd_val) {
+				status = DLADM_STATUS_BADVAL;
+				goto done2;
+			}
 		}
 	}
-	return (DLADM_STATUS_OK);
+
+	/* Update *val_cntp and *vdpp if everything was OK */
+	if (val_cnt < ncpus) {
+		*val_cntp = ncpus;
+		free(*vdpp);
+		*vdpp = newvdp;
+	}
+
+	status = DLADM_STATUS_OK;
+	goto done1;
+
+done2:
+	free(newvdp);
+done1:
+	free(pv_range);
+	return (status);
 }
 
 /* ARGSUSED */
@@ -1808,7 +1873,7 @@ get_pool(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 check_pool(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t val_cnt, uint_t flags, val_desc_t *vdp,
+    char **prop_val, uint_t *val_cntp, uint_t flags, val_desc_t **vdpp,
     datalink_media_t media)
 {
 	pool_conf_t		*poolconf;
@@ -1817,6 +1882,7 @@ check_pool(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	dladm_status_t		status;
 	uint_t			perm_flags;
 	char			*poolname;
+	val_desc_t		*vdp = *vdpp;
 
 	/* Get the current cpus property */
 	status = i_dladm_get_public_prop(handle, linkid, "resource", 0,
@@ -1951,9 +2017,12 @@ i_dladm_range_size(mac_propval_range_t *r, size_t *sz)
 /* ARGSUSED */
 static dladm_status_t
 check_rings(dladm_handle_t handle, prop_desc_t *pdp,
-    datalink_id_t linkid, char **prop_val, uint_t val_cnt, uint_t flags,
-    val_desc_t *v, datalink_media_t media)
+    datalink_id_t linkid, char **prop_val, uint_t *val_cntp, uint_t flags,
+    val_desc_t **vp, datalink_media_t media)
 {
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*v = *vp;
+
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVAL);
 	if (strncasecmp(prop_val[0], "hw", strlen("hw")) == 0) {
@@ -2353,12 +2422,14 @@ check_single_ip(char *buf, mac_ipaddr_t *addr)
 /* ARGSUSED */
 static dladm_status_t
 check_allowedips(dladm_handle_t handle, prop_desc_t *pdp,
-    datalink_id_t linkid, char **prop_val, uint_t val_cnt, uint_t flags,
-    val_desc_t *vdp, datalink_media_t media)
+    datalink_id_t linkid, char **prop_val, uint_t *val_cntp, uint_t flags,
+    val_desc_t **vdpp, datalink_media_t media)
 {
 	dladm_status_t	status;
 	mac_ipaddr_t	*addr;
 	int		i;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (val_cnt > MPT_MAXIPADDR)
 		return (DLADM_STATUS_BADVALCNT);
@@ -2689,12 +2760,14 @@ extract_allowedcids(val_desc_t *vdp, uint_t cnt, void *arg)
 /* ARGSUSED */
 static dladm_status_t
 check_allowedcids(dladm_handle_t handle, prop_desc_t *pdp,
-    datalink_id_t linkid, char **prop_val, uint_t val_cnt,
-    uint_t flags, val_desc_t *vdp, datalink_media_t media)
+    datalink_id_t linkid, char **prop_val, uint_t *val_cntp,
+    uint_t flags, val_desc_t **vdpp, datalink_media_t media)
 {
 	dladm_status_t	status;
 	mac_dhcpcid_t	*cid;
 	int		i;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (val_cnt > MPT_MAXCID)
 		return (DLADM_STATUS_BADVALCNT);
@@ -2802,7 +2875,7 @@ i_dladm_add_ap_module(const char *module, struct dlautopush *dlap)
 /* ARGSUSED */
 static dladm_status_t
 check_autopush(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t val_cnt, uint_t flags, val_desc_t *vdp,
+    char **prop_val, uint_t *val_cntp, uint_t flags, val_desc_t **vdpp,
     datalink_media_t media)
 {
 	char			*module;
@@ -2810,6 +2883,8 @@ check_autopush(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	dladm_status_t		status;
 	char			val[DLADM_PROP_VAL_MAX];
 	char			delimiters[4];
+	uint_t			val_cnt = *val_cntp;
+	val_desc_t		*vdp = *vdpp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
@@ -2973,7 +3048,7 @@ set_rate(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 check_rate(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t val_cnt, uint_t flags, val_desc_t *vdp,
+    char **prop_val, uint_t *val_cntp, uint_t flags, val_desc_t **vdpp,
     datalink_media_t media)
 {
 	int		i;
@@ -2981,6 +3056,8 @@ check_rate(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	char		*buf, **modval;
 	dladm_status_t	status;
 	uint_t 		perm_flags;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
@@ -3177,11 +3254,13 @@ set_radio(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 check_hoplimit(dladm_handle_t handle, prop_desc_t *pdp,
-    datalink_id_t linkid, char **prop_val, uint_t val_cnt, uint_t flags,
-    val_desc_t *vdp, datalink_media_t media)
+    datalink_id_t linkid, char **prop_val, uint_t *val_cntp, uint_t flags,
+    val_desc_t **vdpp, datalink_media_t media)
 {
-	int32_t	hlim;
-	char	*ep;
+	int32_t		hlim;
+	char		*ep;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
@@ -3198,11 +3277,13 @@ check_hoplimit(dladm_handle_t handle, prop_desc_t *pdp,
 /* ARGSUSED */
 static dladm_status_t
 check_encaplim(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t val_cnt, uint_t flags, val_desc_t *vdp,
+    char **prop_val, uint_t *val_cntp, uint_t flags, val_desc_t **vdpp,
     datalink_media_t media)
 {
-	int32_t	elim;
-	char	*ep;
+	int32_t		elim;
+	char		*ep;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (media != DL_IPV6)
 		return (DLADM_STATUS_BADARG);
@@ -3497,9 +3578,12 @@ i_dladm_get_public_prop(dladm_handle_t handle, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 check_uint32(dladm_handle_t handle, prop_desc_t *pdp,
-    datalink_id_t linkid, char **prop_val, uint_t val_cnt, uint_t flags,
-    val_desc_t *v, datalink_media_t media)
+    datalink_id_t linkid, char **prop_val, uint_t *val_cntp, uint_t flags,
+    val_desc_t **vp, datalink_media_t media)
 {
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*v = *vp;
+
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVAL);
 	v->vd_val = strtoul(prop_val[0], NULL, 0);
@@ -3997,11 +4081,13 @@ set_stp_prop(dladm_handle_t handle, prop_desc_t *pd, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 check_stp_prop(dladm_handle_t handle, struct prop_desc *pd,
-    datalink_id_t linkid, char **prop_val, uint_t val_cnt, uint_t flags,
-    val_desc_t *vdp, datalink_media_t media)
+    datalink_id_t linkid, char **prop_val, uint_t *val_cntp, uint_t flags,
+    val_desc_t **vdpp, datalink_media_t media)
 {
-	char *cp;
-	boolean_t iscost;
+	char		*cp;
+	boolean_t	iscost;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
@@ -4149,10 +4235,12 @@ set_bridge_pvid(dladm_handle_t handle, prop_desc_t *pd, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 check_bridge_pvid(dladm_handle_t handle, struct prop_desc *pd,
-    datalink_id_t linkid, char **prop_val, uint_t val_cnt, uint_t flags,
-    val_desc_t *vdp, datalink_media_t media)
+    datalink_id_t linkid, char **prop_val, uint_t *val_cntp, uint_t flags,
+    val_desc_t **vdpp, datalink_media_t media)
 {
-	char *cp;
+	char		*cp;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
@@ -4308,7 +4396,7 @@ i_dladm_link_proplist_extract_one(dladm_handle_t handle,
 		/* Check property value */
 		if (pdp->pd_check != NULL) {
 			status = pdp->pd_check(handle, pdp, 0, aip->ai_val,
-			    aip->ai_count, flags, vdp, 0);
+			    &(aip->ai_count), flags, &vdp, 0);
 		} else {
 			status = DLADM_STATUS_BADARG;
 		}
