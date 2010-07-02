@@ -605,6 +605,9 @@
 @ MSG_CAP_MULDEFSYMS	"\t(file %s symbol '%s'; file %s symbol '%s');"
 @ MSG_CAP_REDUNDANT	"file %s: section [%u]%s: symbol capabilities \
 			 redundant, as object capabilities are more restrictive"
+@ MSG_CAP_NOSYMSFOUND	"no global symbols have been found that are associated \
+			 with capabilities identified relocatable objects: \
+			 -z symbolcap has no effect"
 
 @ MSG_CAPINFO_INVALSYM	"file %s: capabilities info section [%u]%s: index %d: \
 			 family member symbol '%s': invalid"

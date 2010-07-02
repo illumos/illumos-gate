@@ -1599,3 +1599,5 @@ Bugid   Risk Synopsis
 6964517 OSnet mapfiles should use version 2 link-editor syntax (2nd pass)
 6948720 SHT_INIT_ARRAY etc. section names don't follow ELF gABI (D)
 6962343 sgsmsg should use mkstemp() for temporary file creation
+6965723 libsoftcrypto symbol capabilities rely on compiler generated
+	capabilities - gcc failure (link-editor components only)

@@ -1583,12 +1583,24 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 		strtbl = ofl->ofl_dynstrtab;
 
 	/*
+	 * If symbol capabilities have been requested, but none have been
+	 * created, warn the user.  This scenario can occur if none of the
+	 * input relocatable objects defined any object capabilities.
+	 */
+	if ((ofl->ofl_flags & FLG_OF_OTOSCAP) && (ofl->ofl_capsymcnt == 0)) {
+		eprintf(ofl->ofl_lml, ERR_WARNING,
+		    MSG_INTL(MSG_CAP_NOSYMSFOUND));
+	}
+
+	/*
 	 * If symbol capabilities have been collected, but no symbols are left
 	 * referencing these capabilities, promote the capability groups back
 	 * to an object capability definition.
 	 */
 	if ((ofl->ofl_flags & FLG_OF_OTOSCAP) && ofl->ofl_capsymcnt &&
 	    (ofl->ofl_capfamilies == NULL)) {
+		eprintf(ofl->ofl_lml, ERR_WARNING,
+		    MSG_INTL(MSG_CAP_NOSYMSFOUND));
 		ld_cap_move_symtoobj(ofl);
 		ofl->ofl_capsymcnt = 0;
 		ofl->ofl_capgroups = NULL;

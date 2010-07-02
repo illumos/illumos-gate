@@ -27,10 +27,17 @@
 # of pics/bignumimpl.o.  Only the last object exports any interfaces, hence
 # we compile, and combine all three.  The resulting object is identified as a
 # whole with the bignum_i386_asm.o capabilities flags.
+#
+# Note, the Studio assembler identifies bignum_i386_asm.o with its capability
+# requirements - SSE2 and MMX.  Gnu's assembler does not.  These capability
+# flags are defined here to ensure either assembler can be used, and a valid
+# capabilities object is built for translating to a symbol capabilities object.
 
 $mapfile_version 2
 
-CAPABILITY i386_hwcap1;
+CAPABILITY i386_hwcap1 {
+	HW += SSE2 MMX;
+};
 
 SYMBOL_SCOPE {
 	global:
