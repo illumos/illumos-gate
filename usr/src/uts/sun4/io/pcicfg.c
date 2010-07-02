@@ -2117,12 +2117,11 @@ pcicfg_device_assign(dev_info_t *dip)
 
 	bzero((caddr_t)&request, sizeof (ndi_ra_request_t));
 
-	request.ra_flags |= NDI_RA_ALIGN_SIZE;
+	request.ra_flags = NDI_RA_ALIGN_SIZE;
 	request.ra_boundbase = 0;
 	request.ra_boundlen = PCICFG_4GIG_LIMIT;
 
 	rcount = length / sizeof (pci_regspec_t);
-	offset = PCI_CONF_BASE0;
 	for (i = 0; i < rcount; i++) {
 		if ((reg[i].pci_size_low != 0)||
 		    (reg[i].pci_size_hi != 0)) {
@@ -2132,7 +2131,7 @@ pcicfg_device_assign(dev_info_t *dip)
 
 			switch (PCI_REG_ADDR_G(reg[i].pci_phys_hi)) {
 			case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
-				request.ra_flags ^= NDI_RA_ALLOC_BOUNDED;
+				request.ra_flags &= ~NDI_RA_ALLOC_BOUNDED;
 				/* allocate memory space from the allocator */
 				if (ndi_ra_alloc(ddi_get_parent(dip),
 				    &request, &answer, &alen,
@@ -2151,20 +2150,17 @@ pcicfg_device_assign(dev_info_t *dip)
 				pci_config_put32(handle,
 				    offset, PCICFG_LOADDR(answer));
 
-				/* program the high word with value zero */
+				/* program the high word */
 				pci_config_put32(handle, offset + 4,
 				    PCICFG_HIADDR(answer));
 
 				reg[i].pci_phys_low = PCICFG_LOADDR(answer);
 				reg[i].pci_phys_mid = PCICFG_HIADDR(answer);
-				/*
-				 * currently support 32b address space
-				 * assignments only.
-				 */
-				reg[i].pci_phys_hi ^= PCI_ADDR_MEM64 ^
-				    PCI_ADDR_MEM32;
 
-				offset += 8;
+				/* adjust to 32b address space when possible */
+				if ((answer + alen) <= PCICFG_4GIG_LIMIT)
+					reg[i].pci_phys_hi ^=
+					    PCI_ADDR_MEM64 ^ PCI_ADDR_MEM32;
 				break;
 
 			case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
@@ -2188,9 +2184,8 @@ pcicfg_device_assign(dev_info_t *dip)
 				    offset, PCICFG_LOADDR(answer));
 
 				reg[i].pci_phys_low = PCICFG_LOADDR(answer);
-
-				offset += 4;
 				break;
+
 			case PCI_REG_ADDR_G(PCI_ADDR_IO):
 				/* allocate I/O space from the allocator */
 				request.ra_flags |= NDI_RA_ALLOC_BOUNDED;
@@ -2211,9 +2206,8 @@ pcicfg_device_assign(dev_info_t *dip)
 				    offset, PCICFG_LOADDR(answer));
 
 				reg[i].pci_phys_low = PCICFG_LOADDR(answer);
-
-				offset += 4;
 				break;
+
 			default:
 				DEBUG0("Unknown register type\n");
 				kmem_free(reg, length);
@@ -6104,8 +6098,7 @@ pcicfg_fcode_assign_bars(ddi_acc_handle_t h, dev_info_t *dip, uint_t bus,
 	req.ra_boundbase = 0;
 	req.ra_boundlen = PCICFG_4GIG_LIMIT;
 	req.ra_len = size;
-	req.ra_flags |= NDI_RA_ALIGN_SIZE;
-	req.ra_flags ^= NDI_RA_ALLOC_BOUNDED;
+	req.ra_flags = (NDI_RA_ALIGN_SIZE | NDI_RA_ALLOC_BOUNDED);
 
 	if (ndi_ra_alloc(ddi_get_parent(dip),
 	    &req, &mem_answer, &mem_alen,
@@ -6408,7 +6401,7 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 		return (1);
 	}
 
-	request.ra_flags |= NDI_RA_ALIGN_SIZE;
+	request.ra_flags = NDI_RA_ALIGN_SIZE;
 	request.ra_boundbase = 0;
 	request.ra_boundlen = PCICFG_4GIG_LIMIT;
 	/*
@@ -6422,7 +6415,7 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 
 	if (PCI_REG_REG_G(phys_spec.pci_phys_hi) == PCI_CONF_ROM) {
 
-		request.ra_flags ^= NDI_RA_ALLOC_BOUNDED;
+		request.ra_flags |= NDI_RA_ALLOC_BOUNDED;
 
 		/* allocate memory space from the allocator */
 
@@ -6449,7 +6442,7 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 
 		switch (PCI_REG_ADDR_G(phys_spec.pci_phys_hi)) {
 		case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
-			request.ra_flags ^= NDI_RA_ALLOC_BOUNDED;
+			request.ra_flags &= ~NDI_RA_ALLOC_BOUNDED;
 			/* allocate memory space from the allocator */
 			if (ndi_ra_alloc(ddi_get_parent(dip),
 			    &request, &answer, &alen,
@@ -6613,32 +6606,21 @@ pcicfg_free_resource(dev_info_t *dip, pci_regspec_t phys_spec,
 	} else {
 
 		switch (PCI_REG_ADDR_G(phys_spec.pci_phys_hi)) {
+
 		case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
+		case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
 			/* free memory back to the allocator */
 			if (ndi_ra_free(ddi_get_parent(dip),
 			    PCICFG_LADDR(phys_spec.pci_phys_low,
 			    phys_spec.pci_phys_mid),
 			    l, NDI_RA_TYPE_MEM,
 			    NDI_RA_PASS) != NDI_SUCCESS) {
-				DEBUG0("Can not free 64b mem");
+				DEBUG0("Cannot free mem");
 				pcicfg_unmap_phys(&h, &config);
 				return (1);
 			}
-
 			break;
 
-		case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
-			/* free memory back to the allocator */
-			if (ndi_ra_free(ddi_get_parent(dip),
-			    phys_spec.pci_phys_low,
-			    l, NDI_RA_TYPE_MEM,
-			    NDI_RA_PASS) != NDI_SUCCESS) {
-				DEBUG0("Can not free 32b mem");
-				pcicfg_unmap_phys(&h, &config);
-				return (1);
-			}
-
-			break;
 		case PCI_REG_ADDR_G(PCI_ADDR_IO):
 			/* free I/O space back to the allocator */
 			if (ndi_ra_free(ddi_get_parent(dip),
@@ -6649,8 +6631,8 @@ pcicfg_free_resource(dev_info_t *dip, pci_regspec_t phys_spec,
 				pcicfg_unmap_phys(&h, &config);
 				return (1);
 			}
-
 			break;
+
 		default:
 			DEBUG0("Unknown register type\n");
 			pcicfg_unmap_phys(&h, &config);
