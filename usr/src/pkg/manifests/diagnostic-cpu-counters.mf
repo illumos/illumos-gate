@@ -105,6 +105,8 @@ $(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.44 \
     target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.46 \
     target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.47 \
+    target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.23 \
     target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.26 \
@@ -122,6 +124,8 @@ $(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.37 \
 $(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.44 \
     target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.46 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.47 \
     target=pcbe.GenuineIntel.6.15
 link path=usr/lib/$(ARCH64)/libcpc.so target=./libcpc.so.1
 link path=usr/lib/$(ARCH64)/libpctx.so target=./libpctx.so.1

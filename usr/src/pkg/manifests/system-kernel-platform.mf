@@ -821,6 +821,9 @@ $(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel \
 $(i386_ONLY)file \
     path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.46 \
     group=sys mode=0755
+$(i386_ONLY)hardlink \
+    path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.47 \
+    target=cpu_ms.GenuineIntel.6.46
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu.generic group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD group=sys \
@@ -831,6 +834,9 @@ $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.46 \
     group=sys mode=0755
+$(i386_ONLY)hardlink \
+    path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.47 \
+    target=cpu_ms.GenuineIntel.6.46
 $(i386_ONLY)file path=platform/i86pc/kernel/dacf/$(ARCH64)/consconfig_dacf \
     group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/dacf/consconfig_dacf group=sys \

@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # This Makefile builds
@@ -44,7 +43,8 @@ SOFTLINKS	= pcbe.GenuineIntel.6.23 \
 			pcbe.GenuineIntel.6.31 \
 			pcbe.GenuineIntel.6.37 \
 			pcbe.GenuineIntel.6.44 \
-			pcbe.GenuineIntel.6.46
+			pcbe.GenuineIntel.6.46 \
+			pcbe.GenuineIntel.6.47
 ROOTSOFTLINKS	= $(SOFTLINKS:%=$(USR_PCBE_DIR)/%)
 
 #

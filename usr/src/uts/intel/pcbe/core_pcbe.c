@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1329,6 +1328,7 @@ core_pcbe_init(void)
 			case 44:
 			/* Nehalem-EX */
 			case 46:
+			case 47:
 				events_table = events_fam6_nhm;
 				break;
 			case 28:
