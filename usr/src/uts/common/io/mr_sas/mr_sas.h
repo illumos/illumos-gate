@@ -663,13 +663,7 @@ struct mrsas_ctrl_prop {
 	uint8_t		coercion_mode;
 	uint8_t		alarm_enable;
 	uint8_t		reserved_1[13];
-/* Add properties that can be controlled by a bit in the following structure */
-	struct {
-	    uint32_t	reserved_2				    : 10;
-	    uint32_t    disable_online_ctrl_reset   : 1;
-	    uint32_t    reserved_3				    : 21;
-	} on_off_properties;
-
+	uint32_t	on_off_properties;
 	uint8_t		reserved_4[28];
 };
 
@@ -975,6 +969,11 @@ struct mrsas_ctrl_info {
 /* DCMD Message Frame MAILBOX0-11 */
 #define	DCMD_MBOX_SZ		12
 
+/*
+ * on_off_property of mrsas_ctrl_prop
+ * bit0-9, 11-31 are reserved
+ */
+#define	DISABLE_OCR_PROP_FLAG	0x00000400 /* bit 10 */
 
 struct mrsas_register_set {
 	uint32_t	reserved_0[4];

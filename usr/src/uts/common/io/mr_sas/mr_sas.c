@@ -87,7 +87,7 @@ static volatile int 	msi_enable = 1;
 static volatile int 	ctio_enable = 1;
 
 /* Default Timeout value to issue online controller reset */
-static volatile int  debug_timeout_g  = 0x12C;
+static volatile int  debug_timeout_g  = 0xB4;
 /* Simulate consecutive firmware fault */
 static volatile int  debug_fw_faults_after_ocr_g  = 0;
 
@@ -1687,18 +1687,6 @@ mrsas_isr(struct mrsas_instance *instance)
 	}
 #endif
 
-	if (mrsas_initiate_ocr_if_fw_is_faulty(instance) ==  1) {
-		con_log(CL_ANN1, (CE_NOTE, "Fw Fault State Detected "));
-		if (instance->timeout_id == (timeout_id_t)-1) {
-			con_log(CL_ANN1, (CE_NOTE,
-			    "Trigger timeout in NON IO Case"));
-			instance->timeout_id =
-			    timeout(io_timeout_checker, (void *)instance,
-			    drv_usectohz(MRSAS_1_SECOND));
-		}
-		return (DDI_INTR_CLAIMED);
-	}
-
 	mutex_enter(&instance->completed_pool_mtx);
 	mutex_enter(&instance->cmd_pend_mtx);
 
@@ -1713,8 +1701,8 @@ mrsas_isr(struct mrsas_instance *instance)
 		con_log(CL_ANN1, (CE_WARN, "producer =  consumer case"));
 		DTRACE_PROBE2(isr_pc_err, uint32_t, producer,
 		    uint32_t, consumer);
-		mutex_exit(&instance->completed_pool_mtx);
 		mutex_exit(&instance->cmd_pend_mtx);
+		mutex_exit(&instance->completed_pool_mtx);
 		return (DDI_INTR_CLAIMED);
 	}
 
@@ -1839,8 +1827,8 @@ return_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 {
 	mutex_enter(&instance->cmd_pool_mtx);
 	ASSERT(mutex_owned(&instance->cmd_pool_mtx));
-
-	mlist_add(&cmd->list, &instance->cmd_pool_list);
+	/* use mlist_add_tail for debug assistance */
+	mlist_add_tail(&cmd->list, &instance->cmd_pool_list);
 
 	mutex_exit(&instance->cmd_pool_mtx);
 }
@@ -1875,11 +1863,14 @@ push_pending_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 			    (void *)cmd, cmd->index,
 			    gethrtime()));
 			/* Wait for specified interval  */
-			hdr->timeout = (unsigned int)debug_timeout_g;
+			cmd->drv_pkt_time = ddi_get16(
+			    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
+			if (cmd->drv_pkt_time < debug_timeout_g)
+				cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
 			con_log(CL_ANN1, (CE_CONT,
 			    "push_pending_pkt(): "
 			    "Called IO Timeout Value %x\n",
-			    hdr->timeout));
+			    cmd->drv_pkt_time));
 		}
 		if (hdr && instance->timeout_id == (timeout_id_t)-1) {
 			instance->timeout_id = timeout(io_timeout_checker,
@@ -1931,8 +1922,6 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 				if (cmd->sync_cmd == MRSAS_TRUE) {
 				hdr = (struct mrsas_header *)&cmd->frame->hdr;
 					if (hdr) {
-					hdr->timeout =
-					    (unsigned int)debug_timeout_g;
 					con_log(CL_ANN1, (CE_CONT,
 					    "print: cmd %p index %x hdr %p",
 					    (void *)cmd, cmd->index,
@@ -1941,8 +1930,6 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 				} else {
 					pkt = cmd->pkt;
 					if (pkt) {
-					cmd->drv_pkt_time =
-					    (uint16_t)debug_timeout_g;
 					con_log(CL_ANN1, (CE_CONT,
 					    "print: cmd %p index %x "
 					    "pkt %p", (void *)cmd, cmd->index,
@@ -1975,7 +1962,7 @@ mrsas_complete_pending_cmds(struct mrsas_instance *instance)
 		cmd = mlist_entry(pos, struct mrsas_cmd, list);
 		if (cmd) {
 			pkt = cmd->pkt;
-			if (pkt) { // for IO
+			if (pkt) { /* for IO */
 				if (((pkt->pkt_flags & FLAG_NOINTR)
 				    == 0) && pkt->pkt_comp) {
 					pkt->pkt_reason
@@ -2448,10 +2435,10 @@ get_ctrl_info(struct mrsas_instance *instance,
 	ctrl_info->ld_present_count = ddi_get16(
 	    cmd->frame_dma_obj.acc_handle, &ci->ld_present_count);
 
-/*
- *	ctrl_info->properties.on_off_properties.disable_online_ctrl_reset =
- *	    ci->properties.on_off_properties.disable_online_ctrl_reset;
- */
+	ctrl_info->properties.on_off_properties =
+	    ddi_get32(cmd->frame_dma_obj.acc_handle,
+	    &ci->properties.on_off_properties);
+
 	ddi_rep_get8(cmd->frame_dma_obj.acc_handle,
 	    (uint8_t *)(ctrl_info->product_name),
 	    (uint8_t *)(ci->product_name), 80 * sizeof (char),
@@ -2664,10 +2651,10 @@ init_mfi(struct mrsas_instance *instance)
 		instance->max_sectors_per_req = instance->max_num_sge *
 		    PAGESIZE / 512;
 	}
-/*
- *	instance->disable_online_ctrl_reset =
- *	    ctrl_info.properties.on_off_properties.disable_online_ctrl_reset;
- */
+
+	if (ctrl_info.properties.on_off_properties & DISABLE_OCR_PROP_FLAG)
+		instance->disable_online_ctrl_reset = 1;
+
 	return (DDI_SUCCESS);
 
 fail_fw_init:
@@ -3070,6 +3057,12 @@ flush_cache(struct mrsas_instance *instance)
 		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return;
 	}
+	cmd->retry_count_for_ocr = 0;
+	/* Clear the frame buffer and assign back the context id */
+	(void) memset((char *)&cmd->frame[0], 0, sizeof (union mrsas_frame));
+	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
+	    cmd->index);
+
 	dcmd = &cmd->frame->dcmd;
 
 	(void) memset(dcmd->mbox.b, 0, DCMD_MBOX_SZ);
@@ -5301,7 +5294,6 @@ io_timeout_checker(void *arg)
 	struct mlist_head	*pos, *next;
 	mlist_t			process_list;
 
-	instance->timeout_id = (timeout_id_t)-1;
 	if (instance->adapterresetinprogress == 1) {
 		con_log(CL_ANN1, (CE_NOTE, "io_timeout_checker"
 		    " reset in progress"));
@@ -5326,18 +5318,18 @@ io_timeout_checker(void *arg)
 
 	mutex_enter(&instance->cmd_pend_mtx);
 	mlist_for_each_safe(pos, next, &instance->cmd_pend_list) {
-	cmd = mlist_entry(pos, struct mrsas_cmd, list);
+		cmd = mlist_entry(pos, struct mrsas_cmd, list);
 
-	if (cmd == NULL) {
-		continue;
-	}
-
-	if (cmd->sync_cmd == MRSAS_TRUE) {
-		hdr = (struct mrsas_header *)&cmd->frame->hdr;
-		if (hdr == NULL) {
+		if (cmd == NULL) {
 			continue;
 		}
-		time = --hdr->timeout;
+
+		if (cmd->sync_cmd == MRSAS_TRUE) {
+			hdr = (struct mrsas_header *)&cmd->frame->hdr;
+			if (hdr == NULL) {
+				continue;
+			}
+			time = --cmd->drv_pkt_time;
 		} else {
 			pkt = cmd->pkt;
 			if (pkt == NULL) {
@@ -5369,6 +5361,7 @@ io_timeout_checker(void *arg)
 			    "Failing all the queued packets \n"));
 
 			(void) mrsas_kill_adapter(instance);
+			return;
 		} else {
 			if (cmd->retry_count_for_ocr <=  IO_RETRY_COUNT) {
 				if (instance->adapterresetinprogress == 0) {
@@ -5391,17 +5384,12 @@ io_timeout_checker(void *arg)
 	}
 
 
-	if (!mlist_empty(&instance->cmd_pend_list)) {
-		con_log(CL_ANN1, (CE_NOTE, "mrsas: "
-		    "schedule next timeout check: "
-		    "do timeout \n"));
-		if (instance->timeout_id == (timeout_id_t)-1) {
-			instance->timeout_id =
-			    timeout(io_timeout_checker, (void *)instance,
-			    drv_usectohz(MRSAS_1_SECOND));
-		}
-	}
-
+	con_log(CL_ANN1, (CE_NOTE, "mrsas: "
+	    "schedule next timeout check: "
+	    "do timeout \n"));
+	instance->timeout_id =
+	    timeout(io_timeout_checker, (void *)instance,
+	    drv_usectohz(MRSAS_1_SECOND));
 }
 static int
 read_fw_status_reg_ppc(struct mrsas_instance *instance)
@@ -5426,17 +5414,9 @@ issue_cmd_ppc(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
 			con_log(CL_ANN1, (CE_NOTE, "Reset the scsi_pkt timer"));
 		} else {
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
 			push_pending_mfi_pkt(instance, cmd);
 		}
 
-		if (pkt) {
-			con_log(CL_ANN1, (CE_NOTE,
-			    "TO ISSUE: cmd %p index %x "
-			    "pkt %p time %llx",
-			    (void *)cmd, cmd->index, (void *)pkt,
-			    gethrtime()));
-		}
 	} else {
 		con_log(CL_ANN1, (CE_CONT, "%llx : issue_cmd_ppc:"
 		    "ISSUED CMD TO FW : called : cmd : %p, instance: %p"
@@ -5456,10 +5436,15 @@ struct mrsas_cmd *cmd)
 {
 	int	i;
 	uint32_t	msecs = MFI_POLL_TIMEOUT_SECS * (10 * MILLISEC);
+	struct mrsas_header *hdr = &cmd->frame->hdr;
 
 	con_log(CL_ANN1, (CE_NOTE, "issue_cmd_in_sync_mode_ppc: called"));
 
 	if (instance->adapterresetinprogress) {
+		cmd->drv_pkt_time = ddi_get16(
+		    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
+		if (cmd->drv_pkt_time < debug_timeout_g)
+			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
 		con_log(CL_ANN1, (CE_NOTE, "sync_mode_ppc: "
 		    "issue and return in reset case\n"));
 		WR_IB_QPORT((cmd->frame_phys_addr) |
@@ -5712,7 +5697,7 @@ retry_reset:
 		    "FW state = 0x%x", fw_state));
 
 		if (fw_state == MFI_STATE_FAULT) {
-			// increment the count
+			/* increment the count */
 			instance->fw_fault_count_after_ocr++;
 			if (instance->fw_fault_count_after_ocr
 			    < MAX_FW_RESET_COUNT) {
@@ -5730,7 +5715,7 @@ retry_reset:
 			}
 		}
 	}
-	// reset the counter as FW is up after OCR
+	/* reset the counter as FW is up after OCR */
 	instance->fw_fault_count_after_ocr = 0;
 
 
