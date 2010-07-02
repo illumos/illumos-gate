@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -820,6 +819,9 @@ find_date(dumpdates_t *ddp, char *path, int level, time_t t)
 
 /*
  * Get the dumpdate of the last level backup done on the path.
+ * The last level normally is (level - 1) in case of NetBackup
+ * but some DMAs allow that previous level could be anything
+ * between 0 and the current level.
  *
  * Returns:
  *   0 on success
@@ -833,8 +835,8 @@ ndmpd_get_dumptime(char *path, int *level, time_t *ddate)
 	char vol[ZFS_MAXNAMELEN];
 	nvlist_t *userprops;
 	zfs_handle_t *zhp;
-	nvlist_t *propval;
-	char *strval;
+	nvlist_t *propval = NULL;
+	char *strval = NULL;
 
 	if (!path || !level || !ddate)
 		return (-1);
@@ -852,16 +854,22 @@ ndmpd_get_dumptime(char *path, int *level, time_t *ddate)
 	if ((zlibh != NULL) &&
 	    (get_zfsvolname(vol, sizeof (vol), path) == 0) &&
 	    ((zhp = zfs_open(zlibh, vol, ZFS_TYPE_DATASET)) != NULL)) {
-		if ((userprops = zfs_get_user_props(zhp)) == NULL ||
-		    (nvlist_lookup_nvlist(userprops,
-		    zfs_dumpdate_props[*level - 1], &propval) != 0)) {
+		if ((userprops = zfs_get_user_props(zhp)) == NULL) {
 			*level = 0;
 			*ddate = (time_t)0;
 			zfs_close(zhp);
 			(void) mutex_unlock(&zlib_mtx);
 			return (0);
 		}
-		if (nvlist_lookup_string(propval, ZPROP_VALUE,
+		for (i = *level - 1; i >= 0; i--) {
+			if (nvlist_lookup_nvlist(userprops,
+			    zfs_dumpdate_props[i], &propval) == 0) {
+				*level = i;
+				break;
+			}
+		}
+		if (propval == NULL ||
+		    nvlist_lookup_string(propval, ZPROP_VALUE,
 		    &strval) != 0) {
 			*level = 0;
 			*ddate = (time_t)0;
@@ -869,7 +877,7 @@ ndmpd_get_dumptime(char *path, int *level, time_t *ddate)
 			(void) mutex_unlock(&zlib_mtx);
 			return (0);
 		}
-		if (propval == NULL || unctime(strval, ddate) < 0) {
+		if (unctime(strval, ddate) < 0) {
 			zfs_close(zhp);
 			(void) mutex_unlock(&zlib_mtx);
 			return (-1);

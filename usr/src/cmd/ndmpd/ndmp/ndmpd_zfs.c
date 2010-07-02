@@ -504,8 +504,6 @@ ndmpd_zfs_send_fhist(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	    (ndmpd_zfs_params->mp_daemon_cookie);
 	struct stat64 st;
 	char *envp;
-	zfs_handle_t *zhp;
-	char mountpoint[PATH_MAX];
 
 	envp = MOD_GETENV(ndmpd_zfs_params, "HIST");
 	if (!envp)
@@ -518,14 +516,13 @@ ndmpd_zfs_send_fhist(ndmpd_zfs_args_t *ndmpd_zfs_args)
 		return (0);
 	}
 
-	if ((zhp = zfs_open(ndmpd_zfs_args->nz_zlibh,
-	    ndmpd_zfs_args->nz_dataset, ndmpd_zfs_args->nz_type)) == NULL ||
-	    zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint, PATH_MAX, NULL,
-	    NULL, 0, B_FALSE) != 0 ||
-	    stat64(mountpoint, &st) != 0)
-		(void) memset(&st, 0, sizeof (struct stat64));
-	if (zhp)
-		zfs_close(zhp);
+	/* Build up a sample root dir stat */
+	(void) memset(&st, 0, sizeof (struct stat64));
+	st.st_mode = S_IFDIR | 0777;
+	st.st_mtime = st.st_atime = st.st_ctime = time(NULL);
+	st.st_uid = st.st_gid = 0;
+	st.st_size = 1;
+	st.st_nlink = 1;
 
 	if (ndmpd_api_file_history_dir_v3(session, ".", ROOT_INODE,
 	    ROOT_INODE) != 0)
