@@ -40,42 +40,28 @@
 # If this script gets setup with a mode that makes it suid, then things won't
 # work because the script will be running with the incorrect name.
 #
+# The code in s10_native() which which cleans up the initial arguments for
+# a wrapped command relies on a well formatted argument list.  It assumes that
+# the -e options immediately follow the native ld.so.1 command and that these
+# options are contiguous with no extra spaces.  If additional non -e ld.so.1
+# options are added here, that code must also be updated.
+#
+n=/.SUNWnative
+
 bname=`/usr/bin/basename $0`
 dname=`/usr/bin/dirname $0`
 echo $dname | /usr/bin/grep "^/" >/dev/null || dname=`/bin/pwd`/$dname
 dname=`(cd $dname 2>/dev/null && /bin/pwd 2>/dev/null)`
 arch64=/
-LC_ALL=C /usr/bin/file /.SUNWnative/$dname/$bname | /usr/bin/grep "64-bit" \
+LC_ALL=C /usr/bin/file $n/$dname/$bname | /usr/bin/grep "64-bit" \
     >/dev/null && arch64=/64/
-n=/.SUNWnative
 
-unset LD_AUDIT
-unset LD_AUDIT_32
-unset LD_AUDIT_64
-unset LD_CONFIG
-unset LD_CONFIG_32
-unset LD_CONFIG_64
-unset LD_FLAGS
-unset LD_FLAGS_32
-unset LD_FLAGS_64
-unset LD_LOADFLTR
-unset LD_LOADFLTR_32
-unset LD_LOADFLTR_64
-unset LD_ORIGIN
-unset LD_ORIGIN_32
-unset LD_ORIGIN_64
-unset LD_SIGNAL
-unset LD_SIGNAL_32
-unset LD_SIGNAL_64
-unset LD_PRELOAD
-unset LD_LIBRARY_PATH
-
-LD_NOCONFIG=1
-LD_LIBRARY_PATH_32=$n/lib:$n/usr/lib:$n/usr/lib/mps
-LD_LIBRARY_PATH_64=$n/lib/64:$n/usr/lib/64:$n/usr/lib/mps/64
-LD_PRELOAD_32=s10_npreload.so.1
-LD_PRELOAD_64=s10_npreload.so.1
-export LD_NOCONFIG
-export LD_LIBRARY_PATH_32 LD_LIBRARY_PATH_64 LD_PRELOAD_32 LD_PRELOAD_64
-exec /.SUNWnative/usr/lib/brand/solaris10/s10_native \
-    /.SUNWnative/lib${arch64}ld.so.1 /.SUNWnative$dname/$bname "$@"
+exec $n/usr/lib/brand/solaris10/s10_native \
+    $n/lib${arch64}ld.so.1 \
+    -e LD_NOENVIRON=1 \
+    -e LD_NOCONFIG=1 \
+    -e LD_PRELOAD_32=s10_npreload.so.1 \
+    -e LD_PRELOAD_64=s10_npreload.so.1 \
+    -e LD_LIBRARY_PATH_32="$n/lib:$n/usr/lib:$n/usr/lib/mps" \
+    -e LD_LIBRARY_PATH_64="$n/lib/64:$n/usr/lib/64:$n/usr/lib/mps/64" \
+    $n$dname/$bname "$@"

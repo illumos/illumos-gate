@@ -35,19 +35,24 @@
 # bit linker and /.SUNWnative/lib/64/ld.so.1 as our 64-bit linker.
 # For convience we define "n" to be the native path prefix.
 #
+# The code in s10_native() which which cleans up the initial arguments for
+# a wrapped command relies on a well formatted argument list.  It assumes that
+# the -e options immediately follow the native ld.so.1 command and that these
+# options are contiguous with no extra spaces.  If additional non -e ld.so.1
+# options are added here, that code must also be updated.
+#
 pyname=$0
 n=/.SUNWnative
-
-LD_NOCONFIG=1
-LD_LIBRARY_PATH_32=$n/lib:$n/usr/lib:$n/usr/lib/mps
-LD_LIBRARY_PATH_64=$n/lib/64:$n/usr/lib/64:$n/usr/lib/mps/64
-LD_PRELOAD_32=s10_npreload.so.1
-LD_PRELOAD_64=s10_npreload.so.1
-export LD_NOCONFIG
-export LD_LIBRARY_PATH_32 LD_LIBRARY_PATH_64 LD_PRELOAD_32 LD_PRELOAD_64
 
 PYTHONPATH=/.SUNWnative/usr/lib/python2.4/vendor-packages
 export PYTHONPATH
 
-exec /.SUNWnative/usr/lib/brand/solaris10/s10_native \
-    /.SUNWnative/usr/bin/python2.4 /.SUNWnative$pyname "$@"
+exec $n/usr/lib/brand/solaris10/s10_native \
+    $n/lib/ld.so.1 \
+    -e LD_NOENVIRON=1 \
+    -e LD_NOCONFIG=1 \
+    -e LD_PRELOAD_32=s10_npreload.so.1 \
+    -e LD_PRELOAD_64=s10_npreload.so.1 \
+    -e LD_LIBRARY_PATH_32="$n/lib:$n/usr/lib:$n/usr/lib/mps" \
+    -e LD_LIBRARY_PATH_64="$n/lib/64:$n/usr/lib/64:$n/usr/lib/mps/64" \
+    $n/usr/bin/python2.4 $n$pyname "$@"

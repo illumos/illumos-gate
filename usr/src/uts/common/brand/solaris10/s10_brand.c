@@ -201,6 +201,29 @@ s10_amd64_correct_fsreg(klwp_t *l)
 }
 #endif	/* __amd64 */
 
+/*
+ * The native ld.so.1 is invoked with a set of -e options which we also want to
+ * strip off.  This function assumes the set of -e options immediately follows
+ * the native ld.so.1 command and is contiguous. This is OK, since we control
+ * the code in s10_isaexec_wrapper.  We do it this way so we don't accidently
+ * strip a -e option from the native command itself.  The format of an ld.so.1
+ * -e option looks like:
+ *	-e LD_NOENVIRON=1
+ */
+char *
+rm_e_options(char *args)
+{
+	char *p;
+
+	while (strncmp(args, "-e ", 3) == 0) {
+		args += 3;
+		if ((p = strchr(args, ' ')) != NULL)
+			args = p + 1;
+	}
+
+	return (args);
+}
+
 int
 s10_native()
 {
@@ -208,7 +231,11 @@ s10_native()
 	char		*args_new, *comm_new, *p;
 	int		len;
 
-	len = sizeof (BRAND_NATIVE_LINKER32 " ") - 1;
+	/*
+	 * len has an extra value for the trailing '\0' so this covers the
+	 * appended " " in the following strcmps.
+	 */
+	len = sizeof (BRAND_NATIVE_LINKER32);
 
 	/*
 	 * Make sure that the process' interpreter is the native dynamic linker.
@@ -221,13 +248,12 @@ s10_native()
 	 */
 	if (strcmp(up->u_comm, S10_LINKER_NAME) != 0)
 		return (0);
-	if (strncmp(up->u_psargs, BRAND_NATIVE_LINKER64 " /", len + 4) == 0)
+	if (strncmp(up->u_psargs, BRAND_NATIVE_LINKER64 " ", len + 3) == 0)
 		len += 3;		/* to account for "/64" in the path */
-	else if (strncmp(up->u_psargs, BRAND_NATIVE_LINKER32 " /", len + 1)
-	    != 0)
+	else if (strncmp(up->u_psargs, BRAND_NATIVE_LINKER32 " ", len) != 0)
 		return (0);
 
-	args_new = strdup(&up->u_psargs[len]);
+	args_new = strdup(rm_e_options(&up->u_psargs[len]));
 	if ((p = strchr(args_new, ' ')) != NULL)
 		*p = '\0';
 	if ((comm_new = strrchr(args_new, '/')) != NULL)
