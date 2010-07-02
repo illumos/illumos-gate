@@ -712,6 +712,7 @@ apix_cleanup_vector(apix_vector_t *vecp)
 	vecp->v_type = 0;
 	vecp->v_flags = 0;
 	vecp->v_busy = 0;
+	vecp->v_intrmap_private = NULL;
 }
 
 static void
