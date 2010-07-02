@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -982,8 +981,30 @@ lgrp_lineage_add(lgrp_t *newleaf, lgrp_t *oldleaf, klgrpset_t *changed)
 			lgrp_rsets_copy(child->lgrp_set, rset);
 			lgrp_rsets_add(newleaf->lgrp_set, rset);
 			if (nlevels >= lgrp_topo_levels) {
-				if (parent == lgrp_root)
+
+#ifdef	DEBUG
+				if (lgrp_topo_debug > 0) {
+					prom_printf("lgrp_lineage_add: nlevels "
+					    "%d > lgrp_topo_levels %d\n",
+					    nlevels, lgrp_topo_levels);
+					lgrp_rsets_print("rset ", rset);
+				}
+#endif	/* DEBUG */
+
+				if (parent == lgrp_root) {
+					/*
+					 * Don't proprogate new leaf resources
+					 * to parent, if it already contains
+					 * these resources
+					 */
+					if (lgrp_rsets_member_all(
+					    parent->lgrp_set, newleaf->lgrp_id))
+						break;
+
+					total += lgrp_proprogate(newleaf, child,
+					    latency, &changes);
 					break;
+				}
 
 #ifdef	DEBUG
 				if (lgrp_topo_debug > 0) {
@@ -1010,6 +1031,16 @@ lgrp_lineage_add(lgrp_t *newleaf, lgrp_t *oldleaf, klgrpset_t *changed)
 				total++;
 				proprogate++;
 			} else {
+
+#ifdef	DEBUG
+				if (lgrp_topo_debug > 0) {
+					prom_printf("lgrp_lineage_add: "
+					    "lgrp_new_parent(0x%p,%d)\n",
+					    (void *)child, latency);
+					lgrp_rsets_print("rset ", rset);
+				}
+#endif	/* DEBUG */
+
 				total += lgrp_new_parent(child, latency, rset,
 				    &changes);
 				intermed = child->lgrp_parent;
