@@ -918,7 +918,7 @@ usage(boolean_t verbose, uint_t flags)
 	FILE *fp = verbose ? stdout : stderr;
 	FILE *newfp;
 	boolean_t need_to_close = B_FALSE;
-	char *pager;
+	char *pager, *space;
 	int i;
 	struct stat statbuf;
 
@@ -927,7 +927,12 @@ usage(boolean_t verbose, uint_t flags)
 		if ((pager = getenv("PAGER")) == NULL)
 			pager = PAGER;
 
+		space = strchr(pager, ' ');
+		if (space)
+			*space = '\0';
 		if (stat(pager, &statbuf) == 0) {
+			if (space)
+				*space = ' ';
 			if ((newfp = popen(pager, "w")) != NULL) {
 				need_to_close = B_TRUE;
 				fp = newfp;
@@ -5337,7 +5342,7 @@ info_func(cmd_t *cmd)
 {
 	FILE *fp = stdout;
 	boolean_t need_to_close = B_FALSE;
-	char *pager;
+	char *pager, *space;
 	int type;
 	int res1, res2;
 	uint64_t swap_limit;
@@ -5353,8 +5358,12 @@ info_func(cmd_t *cmd)
 	if (interactive_mode) {
 		if ((pager = getenv("PAGER")) == NULL)
 			pager = PAGER;
-
+		space = strchr(pager, ' ');
+		if (space)
+			*space = '\0';
 		if (stat(pager, &statbuf) == 0) {
+			if (space)
+				*space = ' ';
 			if ((fp = popen(pager, "w")) != NULL)
 				need_to_close = B_TRUE;
 			else
