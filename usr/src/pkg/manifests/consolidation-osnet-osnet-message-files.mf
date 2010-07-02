@@ -304,6 +304,7 @@ file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.po
 file path=usr/lib/locale/C/LC_MESSAGES/SCA500.po
 file path=usr/lib/locale/C/LC_MESSAGES/SCF.po
 file path=usr/lib/locale/C/LC_MESSAGES/SENSOR.po
+file path=usr/lib/locale/C/LC_MESSAGES/STORAGE.po
 file path=usr/lib/locale/C/LC_MESSAGES/SUN4.po
 file path=usr/lib/locale/C/LC_MESSAGES/SUN4U.po
 file path=usr/lib/locale/C/LC_MESSAGES/SUN4V.po

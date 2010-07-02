@@ -249,6 +249,7 @@ file path=usr/lib/fm/dict/PCI.dict mode=0444
 file path=usr/lib/fm/dict/PCIEX.dict mode=0444
 $(sparc_ONLY)file path=usr/lib/fm/dict/SCF.dict mode=0444
 file path=usr/lib/fm/dict/SENSOR.dict mode=0444
+file path=usr/lib/fm/dict/STORAGE.dict mode=0444
 $(sparc_ONLY)file path=usr/lib/fm/dict/SUN4.dict mode=0444
 $(sparc_ONLY)file path=usr/lib/fm/dict/SUN4U.dict mode=0444
 $(sparc_ONLY)file path=usr/lib/fm/dict/SUN4V.dict mode=0444
@@ -261,6 +262,7 @@ file path=usr/lib/fm/eft/pci.eft mode=0444
 file path=usr/lib/fm/eft/pciex.eft mode=0444
 file path=usr/lib/fm/eft/pciexrc.eft mode=0444
 file path=usr/lib/fm/eft/sensor.eft mode=0444
+file path=usr/lib/fm/eft/storage.eft mode=0444
 file path=usr/lib/fm/fmd/fmd mode=0555
 file path=usr/lib/fm/fmd/fminject mode=0555
 file path=usr/lib/fm/fmd/fmsim mode=0555
@@ -365,6 +367,7 @@ file path=usr/lib/locale/C/LC_MESSAGES/PCI.mo mode=0444
 file path=usr/lib/locale/C/LC_MESSAGES/PCIEX.mo mode=0444
 $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SCF.mo mode=0444
 file path=usr/lib/locale/C/LC_MESSAGES/SENSOR.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/STORAGE.mo mode=0444
 $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4.mo mode=0444
 $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4U.mo mode=0444
 $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4V.mo mode=0444
