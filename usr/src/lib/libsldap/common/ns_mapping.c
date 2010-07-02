@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <strings.h>
@@ -350,7 +346,7 @@ __s_api_parseASearchDesc(const char *service,
 		return (NS_LDAP_INVALID_PARAM);
 
 	ptr = (ns_ldap_search_desc_t *)
-			calloc(1, sizeof (ns_ldap_search_desc_t));
+	    calloc(1, sizeof (ns_ldap_search_desc_t));
 	if (ptr == NULL)
 		return (NS_LDAP_MEMORY);
 
@@ -358,7 +354,7 @@ __s_api_parseASearchDesc(const char *service,
 
 	/* Get the default scope */
 	if ((rc = __ns_ldap_getParam(NS_LDAP_SEARCH_SCOPE_P,
-		&paramVal, errorp)) != NS_LDAP_SUCCESS) {
+	    &paramVal, errorp)) != NS_LDAP_SUCCESS) {
 		(void) __ns_ldap_freeError(errorp);
 		__ns_ldap_freeASearchDesc(ptr);
 		ptr = NULL;
@@ -629,14 +625,14 @@ __ns_ldap_saveSearchDesc(ns_ldap_search_desc_t ***sdlist,
 		*cnt = 0;
 		*max = NS_SDESC_MAX;
 		*sdlist = (ns_ldap_search_desc_t **)
-				calloc(*max, sizeof (ns_ldap_search_desc_t *));
+		    calloc(*max, sizeof (ns_ldap_search_desc_t *));
 		if (*sdlist == NULL)
 			return (-1);
 	} else if (*cnt+1 >= *max) {
 		*max += NS_SDESC_MAX;
 		tmplist = (ns_ldap_search_desc_t **)
-				realloc((void *)(*sdlist),
-			*max * sizeof (ns_ldap_search_desc_t *));
+		    realloc((void *)(*sdlist),
+		    *max * sizeof (ns_ldap_search_desc_t *));
 		if (tmplist == NULL)
 			return (-1);
 		else
@@ -677,7 +673,7 @@ int __ns_ldap_getSearchDescriptors(
 	*errorp = NULL;
 
 	rc = __ns_ldap_getParam(NS_LDAP_SERVICE_SEARCH_DESC_P,
-				(void ***)&param, errorp);
+	    (void ***)&param, errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		return (rc);
 	}
@@ -692,7 +688,7 @@ int __ns_ldap_getSearchDescriptors(
 		(void) snprintf(errstr, sizeof (errstr),
 		    gettext("No configuration information available."));
 		MKERROR(LOG_ERR, *errorp, NS_CONFIG_NOTLOADED, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_LDAP_CONFIG);
 	}
 
@@ -709,7 +705,7 @@ int __ns_ldap_getSearchDescriptors(
 		/* Convert a SEARCH_DN to a search descriptor */
 		for (; *sdl; sdl++) {
 			ret = (ns_ldap_search_desc_t *)
-				calloc(1, sizeof (ns_ldap_search_desc_t));
+			    calloc(1, sizeof (ns_ldap_search_desc_t));
 			if (ret == NULL) {
 				(void) __ns_ldap_freeSearchDescriptors(&sdlist);
 				__s_api_free2dArray(sdl_save);
@@ -726,7 +722,7 @@ int __ns_ldap_getSearchDescriptors(
 
 			/* default scope */
 			if ((rc = __ns_ldap_getParam(NS_LDAP_SEARCH_SCOPE_P,
-				&paramVal, errorp)) != NS_LDAP_SUCCESS) {
+			    &paramVal, errorp)) != NS_LDAP_SUCCESS) {
 				(void) __ns_ldap_freeASearchDesc(ret);
 				(void) __ns_ldap_freeSearchDescriptors(&sdlist);
 				__s_api_free2dArray(sdl_save);
@@ -775,17 +771,17 @@ int __ns_ldap_getSearchDescriptors(
 			if (rc != NS_LDAP_SUCCESS) {
 				(void) __ns_ldap_freeSearchDescriptors(&sdlist);
 				(void) snprintf(errstr, (2 * MAXERROR), gettext(
-					"Invalid serviceSearchDescriptor (%s). "
-					"Illegal configuration"), *sdl);
+				    "Invalid serviceSearchDescriptor (%s). "
+				    "Illegal configuration"), *sdl);
 				(void) __ns_ldap_freeParam(&param);
 				param = NULL;
 				MKERROR(LOG_ERR, *errorp, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+				    strdup(errstr), NULL);
 				return (rc);
 			}
 			if (ret != NULL) {
 				rc = __ns_ldap_saveSearchDesc(
-					&sdlist, &cnt, &max, ret);
+				    &sdlist, &cnt, &max, ret);
 			}
 			if (rc < 0) {
 				(void) __ns_ldap_freeSearchDescriptors(&sdlist);
@@ -1027,4 +1023,25 @@ char **__ns_ldap_mapAttributeList(
 		}
 	}
 	return (cpp);
+}
+
+char *
+__ns_ldap_mapAttribute(
+	const char *service,
+	const char *origAttr)
+{
+	char **npp;
+	char *mappedAttr;
+
+	if (origAttr == NULL)
+		return (NULL);
+
+	npp = __ns_ldap_getMappedAttributes(service, origAttr);
+	if (npp && npp[0]) {
+		mappedAttr = strdup(npp[0]);
+		__s_api_free2dArray(npp);
+	} else {
+		mappedAttr = strdup(origAttr);
+	}
+	return (mappedAttr);
 }

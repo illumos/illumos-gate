@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -39,6 +38,40 @@ extern void _printResult(ns_ldap_result_t *);
 extern void printMapping();
 
 int listflag = 0;
+
+
+
+static struct database_t {
+	const char *database;
+	const char *sortattr;
+}databaselist[] = {
+	{ NS_LDAP_TYPE_HOSTS, "cn" },
+	{ NS_LDAP_TYPE_IPNODES, "cn" },
+	{ NS_LDAP_TYPE_RPC, "cn" },
+	{ NS_LDAP_TYPE_PROTOCOLS, "cn" },
+	{ NS_LDAP_TYPE_NETWORKS, "ipnetworknumber" },
+	{ NS_LDAP_TYPE_SERVICES, "cn" },
+	{ NS_LDAP_TYPE_GROUP, "gidnumber" },
+	{ NS_LDAP_TYPE_NETMASKS, "ipnetworknumber"},
+	{ NS_LDAP_TYPE_ETHERS, "cn" },
+	{ NS_LDAP_TYPE_NETGROUP, "cn" },
+	{ NS_LDAP_TYPE_BOOTPARAMS, "cn" },
+	{ NS_LDAP_TYPE_PUBLICKEY, "cn" },
+	{ NS_LDAP_TYPE_PASSWD, "uid" },
+	{ NS_LDAP_TYPE_SHADOW, "uid" },
+	{ NS_LDAP_TYPE_ALIASES, "cn" },
+	{ NS_LDAP_TYPE_AUTOMOUNT, "automountKey" },
+	{ NS_LDAP_TYPE_USERATTR, "uid" },
+	{ NS_LDAP_TYPE_PROFILE, "cn" },
+	{ NS_LDAP_TYPE_EXECATTR, "cn" },
+	{ NS_LDAP_TYPE_AUTHATTR, "cn" },
+	{ NS_LDAP_TYPE_AUUSER, "uid" },
+	{ NS_LDAP_TYPE_TNRHDB, "ipTnetNumber" },
+	{ NS_LDAP_TYPE_TNRHTP, "ipTnetTemplateName" },
+	{ NS_LDAP_TYPE_PROJECT, "SolarisProjectName" },
+	{ 0, 0 }
+};
+
 
 void
 usage(char *msg) {
@@ -146,11 +179,29 @@ char **err, char *userdata)
 	ns_ldap_error_t	*errorp;
 	int		rc;
 	char		buf[500];
+	const char 	*sort = NULL;
+	int		i;
+
+	if (database) {
+		for (i = 0; databaselist[i].database; i++) {
+			if (strcmp(databaselist[i].database, database) == 0) {
+				sort = databaselist[i].sortattr;
+				break;
+			}
+			if (strcmp(databaselist[i].database,
+			    NS_LDAP_TYPE_AUTOMOUNT) == 0 &&
+			    strncmp(database, NS_LDAP_TYPE_AUTOMOUNT,
+			    sizeof (NS_LDAP_TYPE_AUTOMOUNT) - 1) == 0) {
+				sort = databaselist[i].sortattr;
+				break;
+			}
+		}
+	}
 
 	*err = NULL;
 	buf[0] = '\0';
-	rc = __ns_ldap_list(database, (const char *)ldapfilter,
-	    merge_SSD_filter, (const char **)ldapattribute, NULL,
+	rc = __ns_ldap_list_sort(database, (const char *)ldapfilter,
+	    sort, merge_SSD_filter, (const char **)ldapattribute, NULL,
 	    listflag, &result, &errorp, NULL, userdata);
 	if (rc != NS_LDAP_SUCCESS) {
 		char *p;

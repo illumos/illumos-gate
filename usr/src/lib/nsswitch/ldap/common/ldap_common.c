@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ldap_common.h"
 #include <malloc.h>
@@ -60,29 +57,42 @@
 				"(SolarisAttrKeyValue=*))"
 #define	_F_GETENT_SSD		"(%s)"
 
+/* getent sort attributes */
+#define	_A_UID			"uid"
+#define	_A_GIDNUMBER		"gidnumber"
+#define	_A_CN			"cn"
+#define	_A_IPNETWORKNUM		"ipnetworknumber"
+#define	_A_PROJECTNAM		"SolarisProjectName"
+#define	_A_IPTNETNUM		"ipTnetNumber"
+#define	_A_IPTNETTMPLNAM	"ipTnetTemplateName"
+
 static struct gettablefilter {
 	char *tablename;
 	char *tablefilter;
+	char *sortattr;
 } gettablefilterent[] = {
-	{(char *)_PASSWD,	(char *)_F_GETPWENT},
-	{(char *)_SHADOW,	(char *)_F_GETSPENT},
-	{(char *)_GROUP,	(char *)_F_GETGRENT},
-	{(char *)_HOSTS,	(char *)_F_GETHOSTENT},
-	{(char *)_NETWORKS,	(char *)_F_GETNETENT},
-	{(char *)_PROTOCOLS,	(char *)_F_GETPROTOENT},
-	{(char *)_RPC,		(char *)_F_GETRPCENT},
-	{(char *)_ALIASES,	(char *)_F_GETALIASENT},
-	{(char *)_SERVICES,	(char *)_F_GETSERVENT},
-	{(char *)_AUUSER,	(char *)_F_GETAUUSERNAME},
-	{(char *)_AUTHATTR,	(char *)_F_GETAUTHNAME},
-	{(char *)_EXECATTR,	(char *)_F_GETEXECNAME},
-	{(char *)_PROFATTR,	(char *)_F_GETPROFNAME},
-	{(char *)_USERATTR,	(char *)_F_GETUSERNAME},
-	{(char *)_PROJECT,	(char *)_F_GETPROJENT},
-	{(char *)_PRINTERS,	(char *)_F_GETPRINTERENT},
-	{(char *)_TNRHDB,	(char *)_F_GETTNRHDB},
-	{(char *)_TNRHTP,	(char *)_F_GETTNRHTP},
-	{(char *)NULL,		(char *)NULL}
+	{(char *)_PASSWD,	(char *)_F_GETPWENT,	(char *)_A_UID},
+	{(char *)_SHADOW,	(char *)_F_GETSPENT,	(char *)_A_UID},
+	{(char *)_GROUP,	(char *)_F_GETGRENT,	(char *)_A_GIDNUMBER},
+	{(char *)_HOSTS,	(char *)_F_GETHOSTENT,	(char *)_A_CN},
+	{(char *)_NETWORKS,	(char *)_F_GETNETENT,
+						(char *)_A_IPNETWORKNUM},
+	{(char *)_PROTOCOLS,	(char *)_F_GETPROTOENT,	(char *)_A_CN},
+	{(char *)_RPC,		(char *)_F_GETRPCENT,	(char *)_A_CN},
+	{(char *)_ALIASES,	(char *)_F_GETALIASENT,	(char *)_A_CN},
+	{(char *)_SERVICES,	(char *)_F_GETSERVENT,	(char *)_A_CN},
+	{(char *)_AUUSER,	(char *)_F_GETAUUSERNAME,
+							(char *)_A_UID},
+	{(char *)_AUTHATTR,	(char *)_F_GETAUTHNAME,	(char *)_A_CN},
+	{(char *)_EXECATTR,	(char *)_F_GETEXECNAME,	(char *)_A_CN},
+	{(char *)_PROFATTR,	(char *)_F_GETPROFNAME,	(char *)_A_CN},
+	{(char *)_USERATTR,	(char *)_F_GETUSERNAME,	(char *)_A_UID},
+	{(char *)_PROJECT,	(char *)_F_GETPROJENT,	(char *)_A_PROJECTNAM},
+	{(char *)_PRINTERS,	(char *)_F_GETPRINTERENT, (char *)_A_CN},
+	{(char *)_TNRHDB,	(char *)_F_GETTNRHDB,	(char *)_A_IPTNETNUM},
+	{(char *)_TNRHTP,	(char *)_F_GETTNRHTP,
+						(char *)_A_IPTNETTMPLNAM},
+	{(char *)NULL,		(char *)NULL,		(char *)NULL}
 };
 
 
@@ -339,10 +349,12 @@ _nss_ldap_setent(ldap_backend_ptr be, void *a)
 	if (be->setcalled == 1)
 		(void) _nss_ldap_endent(be, a);
 	be->filter = NULL;
+	be->sortattr = NULL;
 	for (gtf = gettablefilterent; gtf->tablename != (char *)NULL; gtf++) {
 		if (strcmp(gtf->tablename, be->tablename))
 			continue;
 		be->filter = (char *)gtf->tablefilter;
+		be->sortattr = (char *)gtf->sortattr;
 		break;
 	}
 
@@ -372,6 +384,7 @@ _nss_ldap_endent(ldap_backend_ptr be, void *a)
 
 	be->setcalled = 0;
 	be->filter = NULL;
+	be->sortattr = NULL;
 	if (be->enumcookie != NULL) {
 		(void) __ns_ldap_endEntry(&be->enumcookie, &error);
 		(void) __ns_ldap_freeError(&error);
@@ -413,8 +426,8 @@ _nss_ldap_getent(ldap_backend_ptr be, void *a)
 next_entry:
 	if (be->enumcookie == NULL) {
 		retcode = __ns_ldap_firstEntry(be->tablename,
-		    be->filter, _merge_SSD_filter, be->attrs, NULL,
-		    0, &be->enumcookie,
+		    be->filter, be->sortattr, _merge_SSD_filter, be->attrs,
+		    NULL, 0, &be->enumcookie,
 		    &be->result, &error, _F_GETENT_SSD);
 	} else {
 		if (be->services_cookie == NULL) {
@@ -427,73 +440,86 @@ next_entry:
 		(void) __ns_ldap_freeError(&error);
 		(void) _nss_ldap_endent(be, a);
 		return (retcode);
-	} else {
-		/* ns_ldap_entry_t -> file format */
-		if ((parsestat = be->ldapobj2str(be, argp))
-		    == NSS_STR_PARSE_SUCCESS) {
-			if (argp->buf.result != NULL) {
-				/* file format -> struct */
-				if (argp->str2ent == NULL) {
-					parsestat = NSS_STR_PARSE_PARSE;
-					goto error_out;
-				}
-				parsestat = (*argp->str2ent)(be->buffer,
-				    be->buflen,
-				    argp->buf.result,
-				    argp->buf.buffer,
-				    argp->buf.buflen);
-				if (parsestat == NSS_STR_PARSE_SUCCESS) {
-					if (be->buffer != NULL) {
-						free(be->buffer);
-						be->buffer = NULL;
-						be->buflen = 0;
-					}
-					be->result = NULL;
-					argp->returnval = argp->buf.result;
-					argp->returnlen = 1; /* irrevelant */
-					return ((nss_status_t)NSS_SUCCESS);
-				}
-			} else {
-				/*
-				 * nscd is not caching the enumerated
-				 * entries. This code path would be dormant.
-				 * Keep this path for the future references.
-				 */
-				argp->returnval = argp->buf.buffer;
-				argp->returnlen =
-				    strlen(argp->buf.buffer) + 1;
-			}
-		}
-error_out:
-		if (be->buffer != NULL) {
-			free(be->buffer);
-			be->buffer = NULL;
-			be->buflen = 0;
-		}
-		be->result = NULL;
-		if (parsestat == NSS_STR_PARSE_PARSE) {
-			argp->returnval = 0;
-			(void) _nss_ldap_endent(be, a);
-			return ((nss_status_t)NSS_NOTFOUND);
-		}
-
-		if (parsestat == NSS_STR_PARSE_ERANGE) {
-			argp->erange = 1;
-			(void) _nss_ldap_endent(be, a);
-			return ((nss_status_t)NSS_NOTFOUND);
-		}
-		if (parsestat == NSS_STR_PARSE_NO_ADDR)
-			/*
-			 * No IPV4 address is found in the current entry.
-			 * It indicates that the entry contains IPV6 addresses
-			 * only. Instead of calling _nss_ldap_endent to
-			 * terminate, get next entry to continue enumeration.
-			 * If it returned NSS_NOTFOUND here,
-			 * gethostent() would return NULL
-			 * and the enumeration would stop prematurely.
-			 */
-			goto next_entry;
 	}
+
+	if (be->result == NULL) {
+		parsestat = NSS_STR_PARSE_NO_RESULT;
+		goto error_out;
+	}
+	/* ns_ldap_entry_t -> file format */
+	if ((parsestat = be->ldapobj2str(be, argp))
+	    == NSS_STR_PARSE_SUCCESS) {
+		if (argp->buf.result != NULL) {
+			/* file format -> struct */
+			if (argp->str2ent == NULL) {
+				parsestat = NSS_STR_PARSE_NO_RESULT;
+				goto error_out;
+			}
+			parsestat = (*argp->str2ent)(be->buffer,
+			    be->buflen,
+			    argp->buf.result,
+			    argp->buf.buffer,
+			    argp->buf.buflen);
+			if (parsestat == NSS_STR_PARSE_SUCCESS) {
+				if (be->buffer != NULL) {
+					free(be->buffer);
+					be->buffer = NULL;
+					be->buflen = 0;
+				}
+				be->result = NULL;
+				argp->returnval = argp->buf.result;
+				argp->returnlen = 1; /* irrevelant */
+				return ((nss_status_t)NSS_SUCCESS);
+			}
+		} else {
+			/*
+			 * nscd is not caching the enumerated
+			 * entries. This code path would be dormant.
+			 * Keep this path for the future references.
+			 */
+			argp->returnval = argp->buf.buffer;
+			argp->returnlen =
+			    strlen(argp->buf.buffer) + 1;
+		}
+	}
+error_out:
+	if (be->buffer != NULL) {
+		free(be->buffer);
+		be->buffer = NULL;
+		be->buflen = 0;
+	}
+	be->result = NULL;
+	if (parsestat == NSS_STR_PARSE_NO_RESULT) {
+		argp->returnval = 0;
+		(void) _nss_ldap_endent(be, a);
+		return ((nss_status_t)NSS_NOTFOUND);
+	}
+
+	if (parsestat == NSS_STR_PARSE_ERANGE) {
+		argp->erange = 1;
+		(void) _nss_ldap_endent(be, a);
+		return ((nss_status_t)NSS_NOTFOUND);
+	}
+	if (parsestat == NSS_STR_PARSE_NO_ADDR)
+		/*
+		 * No IPV4 address is found in the current entry.
+		 * It indicates that the entry contains IPV6 addresses
+		 * only. Instead of calling _nss_ldap_endent to
+		 * terminate, get next entry to continue enumeration.
+		 * If it returned NSS_NOTFOUND here,
+		 * gethostent() would return NULL
+		 * and the enumeration would stop prematurely.
+		 */
+		goto next_entry;
+
+	if (parsestat == NSS_STR_PARSE_PARSE)
+		/*
+		 * There has been a parse error. Most likely some
+		 * mandatory attributes are missing. Ignore the error
+		 * and get the next entry. If we returned an error the
+		 * enumeration would stop prematurely.
+		 */
+		goto next_entry;
 
 	return ((nss_status_t)NSS_SUCCESS);
 }

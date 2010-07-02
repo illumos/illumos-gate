@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -74,7 +73,6 @@ extern "C" {
 
 #define	LISTPAGESIZE		1000
 #define	ENUMPAGESIZE		100
-#define	SORTKEYLIST		"cn uid"
 
 #define	DEFMAX			8
 #define	TOKENSEPARATOR		'='
@@ -553,6 +551,19 @@ typedef enum {
 typedef int ConnectionID;
 
 /*
+ * Server side sort type. Orginally the server side sort
+ * was set to "cn uid". This did not work with AD and
+ * hence single sort attribute was odopted. We dont
+ * know which server side sort will work with the
+ * Directory and hence we discover which method works.
+ */
+typedef enum {
+	SSS_UNKNOWN		= 0,
+	SSS_SINGLE_ATTR		= 1,
+	SSS_CN_UID_ATTRS	= 2
+} ns_srvsidesort_t;
+
+/*
  * This structure is used by ns_connect to create and manage
  * one or more ldap connections within the library.
  */
@@ -628,6 +639,7 @@ typedef struct ns_ldap_cookie {
 	char			*service;
 	char			*i_filter;
 	const char * const	*i_attr;
+	const char		*i_sortattr;
 	const ns_cred_t		*i_auth;
 	int 			i_flags;
 
@@ -651,6 +663,8 @@ typedef struct ns_ldap_cookie {
 	int			listType;
 	unsigned long		index;
 	LDAPControl		**p_serverctrls;
+	ns_srvsidesort_t	sortTypeTry;
+	int			entryCount;
 
 	int			scope;
 	char			*basedn;
@@ -825,6 +839,8 @@ int		__s_api_parse_map(char *cp, char **sid,
 				char **origA, char ***mapA);
 char		**__ns_ldap_mapAttributeList(const char *service,
 				const char * const *origAttrList);
+char		*__ns_ldap_mapAttribute(const char *service,
+				const char *origAttr);
 
 /* internal configuration APIs */
 void		__ns_ldap_setServer(int set);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LDAP_COMMON_H
@@ -69,6 +68,7 @@ extern "C" {
 #define	_TNRHTP			"tnrhtp"
 
 #define	NSS_STR_PARSE_NO_ADDR	(NSS_STR_PARSE_ERANGE + 100)
+#define	NSS_STR_PARSE_NO_RESULT	(NSS_STR_PARSE_ERANGE + 101)
 
 #define	DOTTEDSUBDOMAIN(string) \
 	((string != NULL) && (strchr(string, '.') != NULL))
@@ -118,6 +118,7 @@ struct ldap_backend {
 	char			*tablename;
 	void			*enumcookie;
 	char			*filter;
+	char			*sortattr;
 	int			setcalled;
 	const char		**attrs;
 	ns_ldap_result_t	*result;

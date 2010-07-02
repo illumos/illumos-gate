@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1746,6 +1745,87 @@ paging_supported(ns_ldap_cookie_t *cookie)
 	return (0);
 }
 
+typedef struct servicesorttype {
+	char *service;
+	ns_srvsidesort_t type;
+} servicesorttype_t;
+
+static servicesorttype_t *sort_type = NULL;
+static int sort_type_size = 0;
+static int sort_type_hwm = 0;
+static mutex_t sort_type_mutex = DEFAULTMUTEX;
+
+
+static ns_srvsidesort_t
+get_srvsidesort_type(char *service)
+{
+	int i;
+	ns_srvsidesort_t type = SSS_UNKNOWN;
+
+	if (service == NULL)
+		return (type);
+
+	(void) mutex_lock(&sort_type_mutex);
+	if (sort_type != NULL) {
+		for (i = 0; i < sort_type_hwm; i++) {
+			if (strcmp(sort_type[i].service, service) == 0) {
+				type = sort_type[i].type;
+				break;
+			}
+		}
+	}
+	(void) mutex_unlock(&sort_type_mutex);
+	return (type);
+}
+
+static void
+update_srvsidesort_type(char *service, ns_srvsidesort_t type)
+{
+	int i, size;
+	servicesorttype_t *tmp;
+
+	if (service == NULL)
+		return;
+
+	(void) mutex_lock(&sort_type_mutex);
+
+	for (i = 0; i < sort_type_hwm; i++) {
+		if (strcmp(sort_type[i].service, service) == 0) {
+			sort_type[i].type = type;
+			(void) mutex_unlock(&sort_type_mutex);
+			return;
+		}
+	}
+	if (sort_type == NULL) {
+		size = 10;
+		tmp = malloc(size * sizeof (servicesorttype_t));
+		if (tmp == NULL) {
+			(void) mutex_unlock(&sort_type_mutex);
+			return;
+		}
+		sort_type = tmp;
+		sort_type_size = size;
+	} else if (sort_type_hwm >= sort_type_size) {
+		size = sort_type_size + 10;
+		tmp = realloc(sort_type, size * sizeof (servicesorttype_t));
+		if (tmp == NULL) {
+			(void) mutex_unlock(&sort_type_mutex);
+			return;
+		}
+		sort_type = tmp;
+		sort_type_size = size;
+	}
+	sort_type[sort_type_hwm].service = strdup(service);
+	if (sort_type[sort_type_hwm].service == NULL) {
+		(void) mutex_unlock(&sort_type_mutex);
+		return;
+	}
+	sort_type[sort_type_hwm].type = type;
+	sort_type_hwm++;
+
+	(void) mutex_unlock(&sort_type_mutex);
+}
+
 static int
 setup_vlv_params(ns_ldap_cookie_t *cookie)
 {
@@ -1754,11 +1834,35 @@ setup_vlv_params(ns_ldap_cookie_t *cookie)
 	LDAPControl	*sortctrl = NULL;
 	LDAPControl	*vlvctrl = NULL;
 	LDAPVirtualList	vlist;
+	char		*sortattr;
 	int		rc;
+	int		free_sort = FALSE;
 
 	_freeControlList(&cookie->p_serverctrls);
 
-	rc = ldap_create_sort_keylist(&sortkeylist, SORTKEYLIST);
+	if (cookie->sortTypeTry == SSS_UNKNOWN)
+		cookie->sortTypeTry = get_srvsidesort_type(cookie->service);
+	if (cookie->sortTypeTry == SSS_UNKNOWN)
+		cookie->sortTypeTry = SSS_SINGLE_ATTR;
+
+	if (cookie->sortTypeTry == SSS_SINGLE_ATTR) {
+		if ((cookie->i_flags & NS_LDAP_NOMAP) == 0 &&
+		    cookie->i_sortattr) {
+			sortattr =  __ns_ldap_mapAttribute(cookie->service,
+			    cookie->i_sortattr);
+			free_sort = TRUE;
+		} else if (cookie->i_sortattr) {
+			sortattr = (char *)cookie->i_sortattr;
+		} else {
+			sortattr = "cn";
+		}
+	} else {
+		sortattr = "cn uid";
+	}
+
+	rc = ldap_create_sort_keylist(&sortkeylist, sortattr);
+	if (free_sort)
+		free(sortattr);
 	if (rc != LDAP_SUCCESS) {
 		(void) ldap_get_option(cookie->conn->ld,
 		    LDAP_OPT_ERROR_NUMBER, &rc);
@@ -1982,9 +2086,21 @@ multi_result(ns_ldap_cookie_t *cookie)
 			    cookie->conn->ld, retCtrls,
 			    &target_posp, &list_size, &errCode);
 			if (rc == LDAP_SUCCESS) {
-				cookie->index = target_posp + LISTPAGESIZE;
-				if (cookie->index > list_size) {
-					finished = 1;
+				/*
+				 * AD does not return valid target_posp
+				 * and list_size
+				 */
+				if (target_posp != 0 && list_size != 0) {
+					cookie->index =
+					    target_posp + LISTPAGESIZE;
+					if (cookie->index > list_size)
+						finished = 1;
+				} else {
+					if (cookie->entryCount < LISTPAGESIZE)
+						finished = 1;
+					else
+						cookie->index +=
+						    cookie->entryCount;
 				}
 			}
 			ldap_controls_free(retCtrls);
@@ -2095,8 +2211,11 @@ clear_results(ns_ldap_cookie_t *cookie)
 		rc = ldap_result(cookie->conn->ld, cookie->msgId, LDAP_MSG_ALL,
 		    (struct timeval *)&cookie->search_timeout,
 		    &cookie->resultMsg);
-		if (rc != -1 && rc != 0 && cookie->resultMsg != NULL)
+		if (rc != -1 && rc != 0 && cookie->resultMsg != NULL) {
 			(void) ldap_msgfree(cookie->resultMsg);
+			cookie->resultMsg = NULL;
+		}
+
 		/*
 		 * If there was timeout then we will send  ABANDON request to
 		 * LDAP server to decrease load.
@@ -2315,6 +2434,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			cookie->new_state = DO_SEARCH;
 			break;
 		case DO_SEARCH:
+			cookie->entryCount = 0;
 			rc = ldap_search_ext(cookie->conn->ld,
 			    cookie->basedn,
 			    cookie->scope,
@@ -2566,10 +2686,21 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			if (rc == LDAP_RES_SEARCH_RESULT) {
 				rc = ldap_result2error(cookie->conn->ld,
 				    cookie->resultMsg, 0);
+				if (rc == LDAP_ADMINLIMIT_EXCEEDED &&
+				    cookie->listType == VLVCTRLFLAG &&
+				    cookie->sortTypeTry == SSS_SINGLE_ATTR) {
+					/* Try old "cn uid" server side sort */
+					cookie->sortTypeTry = SSS_CN_UID_ATTRS;
+					cookie->new_state = NEXT_VLV;
+					(void) ldap_msgfree(cookie->resultMsg);
+					cookie->resultMsg = NULL;
+					break;
+				}
 				if (rc != LDAP_SUCCESS) {
 					cookie->err_rc = rc;
 					cookie->new_state = LDAP_ERROR;
 					(void) ldap_msgfree(cookie->resultMsg);
+					cookie->resultMsg = NULL;
 					break;
 				}
 				cookie->new_state = multi_result(cookie);
@@ -2634,6 +2765,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						    NEXT_SESSION;
 					break;
 				}
+
 				if ((rc == LDAP_CONNECT_ERROR ||
 				    rc == LDAP_SERVER_DOWN) &&
 				    cookie->reinit_on_retriable_err) {
@@ -2657,6 +2789,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				break;
 			}
 			/* else LDAP_RES_SEARCH_ENTRY */
+			cookie->entryCount++;
 			rc = __s_api_getEntry(cookie);
 			(void) ldap_msgfree(cookie->resultMsg);
 			cookie->resultMsg = NULL;
@@ -2664,6 +2797,14 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				cookie->new_state = LDAP_ERROR;
 				break;
 			}
+			/*
+			 * If VLV search was successfull save the server
+			 * side sort type tried.
+			 */
+			if (cookie->listType == VLVCTRLFLAG)
+				update_srvsidesort_type(cookie->service,
+				    cookie->sortTypeTry);
+
 			cookie->new_state = PROCESS_RESULT;
 			cookie->next_state = MULTI_RESULT;
 			break;
@@ -2910,6 +3051,7 @@ ldap_list(
 	ns_ldap_list_batch_t *batch,
 	const char *service,
 	const char *filter,
+	const char *sortattr,
 	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
 	char **realfilter, const void *userdata),
 	const char * const *attribute,
@@ -3065,6 +3207,7 @@ ldap_list(
 	cookie->i_filter = strdup(filter);
 	cookie->i_attr = attribute;
 	cookie->i_auth = auth;
+	cookie->i_sortattr = sortattr;
 
 	if (batch != NULL) {
 		cookie->batch = batch;
@@ -3128,11 +3271,44 @@ ldap_list(
  * mapping as appropriate. The operation may be retried a
  * couple of times in error situations.
  */
-
 int
 __ns_ldap_list(
 	const char *service,
 	const char *filter,
+	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+	char **realfilter, const void *userdata),
+	const char * const *attribute,
+	const ns_cred_t *auth,
+	const int flags,
+	ns_ldap_result_t **rResult, /* return result entries */
+	ns_ldap_error_t **errorp,
+	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
+	const void *userdata)
+{
+	int mod_flags;
+	/*
+	 * Strip the NS_LDAP_PAGE_CTRL option as this interface does not
+	 * support this. If you want to use this option call the API
+	 * __ns_ldap_list_sort() with has the sort attribute.
+	 */
+	mod_flags = flags & (~NS_LDAP_PAGE_CTRL);
+
+	return (__ns_ldap_list_sort(service, filter, NULL, init_filter_cb,
+	    attribute, auth, mod_flags, rResult, errorp,
+	    callback, userdata));
+}
+
+/*
+ * __ns_ldap_list_sort performs one or more LDAP searches to a given
+ * directory server using service search descriptors and schema
+ * mapping as appropriate. The operation may be retried a
+ * couple of times in error situations.
+ */
+int
+__ns_ldap_list_sort(
+	const char *service,
+	const char *filter,
+	const char *sortattr,
 	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
 	char **realfilter, const void *userdata),
 	const char * const *attribute,
@@ -3151,8 +3327,9 @@ __ns_ldap_list(
 		if (__s_api_setup_retry_search(&cu, NS_CONN_USER_SEARCH,
 		    &try_cnt, &rc, errorp) == 0)
 			break;
-		rc = ldap_list(NULL, service, filter, init_filter_cb, attribute,
-		    auth, flags, rResult, errorp, &trc, callback, userdata, cu);
+		rc = ldap_list(NULL, service, filter, sortattr, init_filter_cb,
+		    attribute, auth, flags, rResult, errorp, &trc, callback,
+		    userdata, cu);
 	}
 
 	return (rc);
@@ -3192,6 +3369,7 @@ __ns_ldap_list_batch_add(
 {
 	ns_conn_user_t	*cu;
 	int		rc;
+	int		mod_flags;
 
 	cu =  __s_api_conn_user_init(NS_CONN_USER_SEARCH, NULL, 0);
 	if (cu == NULL) {
@@ -3200,8 +3378,14 @@ __ns_ldap_list_batch_add(
 		return (NS_LDAP_MEMORY);
 	}
 
-	rc = ldap_list(batch, service, filter, init_filter_cb, attribute, auth,
-	    flags, rResult, errorp, rcp, callback, userdata, cu);
+	/*
+	 * Strip the NS_LDAP_PAGE_CTRL option as the batch interface does not
+	 * support this.
+	 */
+	mod_flags = flags & (~NS_LDAP_PAGE_CTRL);
+
+	rc = ldap_list(batch, service, filter, NULL, init_filter_cb, attribute,
+	    auth, mod_flags, rResult, errorp, rcp, callback, userdata, cu);
 
 	/*
 	 * Free the conn_user if the cookie was not batched. If the cookie
@@ -3531,6 +3715,7 @@ static int
 firstEntry(
     const char *service,
     const char *filter,
+    const char *sortattr,
     int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
     char **realfilter, const void *userdata),
     const char * const *attribute,
@@ -3683,6 +3868,7 @@ firstEntry(
 
 	cookie->i_filter = strdup(filter);
 	cookie->i_attr = attribute;
+	cookie->i_sortattr = sortattr;
 	cookie->i_auth = auth;
 
 	state = INIT;
@@ -3732,6 +3918,7 @@ int
 __ns_ldap_firstEntry(
     const char *service,
     const char *filter,
+    const char *vlv_sort,
     int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
     char **realfilter, const void *userdata),
     const char * const *attribute,
@@ -3750,8 +3937,9 @@ __ns_ldap_firstEntry(
 		if (__s_api_setup_retry_search(&cu, NS_CONN_USER_GETENT,
 		    &try_cnt, &rc, errorp) == 0)
 			break;
-		rc = firstEntry(service, filter, init_filter_cb, attribute,
-		    auth, flags, vcookie, result, errorp, userdata, cu);
+		rc = firstEntry(service, filter, vlv_sort, init_filter_cb,
+		    attribute, auth, flags, vcookie, result, errorp, userdata,
+		    cu);
 	}
 	return (rc);
 }

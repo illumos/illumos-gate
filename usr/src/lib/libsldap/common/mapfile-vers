@@ -55,6 +55,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__ns_ldap_initAuth;
 	__ns_ldap_initStandalone;
 	__ns_ldap_is_shadow_update_enabled;
+	__ns_ldap_list_sort;
 	__ns_ldap_pingOfflineServers;
 	__ns_ldap_self_gssapi_config;
 	__ns_ldap_self_gssapi_only_set;

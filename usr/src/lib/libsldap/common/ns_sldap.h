@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -693,6 +692,21 @@ int __ns_ldap_list(
 	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
 	const void *userdata);
 
+
+int __ns_ldap_list_sort(
+	const char *service,
+	const char *filter,
+	const char *sortattr,
+	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+			char **realfilter, const void *userdata),
+	const char * const *attribute,
+	const ns_cred_t *cred,
+	const int flags,
+	ns_ldap_result_t ** result,
+	ns_ldap_error_t ** errorp,
+	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
+	const void *userdata);
+
 int __ns_ldap_list_batch_start(
 	ns_ldap_list_batch_t **batch);
 
@@ -768,6 +782,7 @@ int __ns_ldap_delEntry(
 int __ns_ldap_firstEntry(
 	const char *service,
 	const char *filter,
+	const char *sortattr,
 	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
 			char **realfilter, const void *userdata),
 	const char * const *attribute,

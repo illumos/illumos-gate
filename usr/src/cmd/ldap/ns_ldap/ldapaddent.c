@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -68,6 +67,7 @@ static struct ttypelist_t {
 				/* routine to print ldap containers */
 	int (*filedbmline)();	/* routine to turn file line into dbm line */
 	char *objclass;		/* Objectclass for the servicetype */
+	char *sortattr;		/* Sort attr for enumeration */
 } *tt;
 
 char	parse_err_msg [PARSE_ERR_MSG_LEN];
@@ -4033,54 +4033,54 @@ filedbmline_plus(struct line_buf *line, FILE *etcf, int *lineno,
 
 static struct ttypelist_t ttypelist[] = {
 	{ NS_LDAP_TYPE_HOSTS, genent_hosts, dump_hosts,
-		filedbmline_comment, "iphost" },
+		filedbmline_comment, "iphost", "cn" },
 	{ NS_LDAP_TYPE_IPNODES, genent_hosts, dump_hosts,
-		filedbmline_comment, "iphost" },
+		filedbmline_comment, "iphost", "cn" },
 	{ NS_LDAP_TYPE_RPC, genent_rpc, dump_rpc,
-		filedbmline_comment, "oncrpc" },
+		filedbmline_comment, "oncrpc", "cn" },
 	{ NS_LDAP_TYPE_PROTOCOLS, genent_protocols, dump_protocols,
-		filedbmline_comment, "ipprotocol" },
+		filedbmline_comment, "ipprotocol", "cn" },
 	{ NS_LDAP_TYPE_NETWORKS, genent_networks, dump_networks,
-		filedbmline_comment, "ipnetwork"  },
+		filedbmline_comment, "ipnetwork", "ipnetworknumber" },
 	{ NS_LDAP_TYPE_SERVICES, genent_services, dump_services,
-		filedbmline_comment, "ipservice" },
+		filedbmline_comment, "ipservice", "cn" },
 	{ NS_LDAP_TYPE_GROUP, genent_group, dump_group,
-		filedbmline_plus, "posixgroup" },
+		filedbmline_plus, "posixgroup", "gidnumber" },
 	{ NS_LDAP_TYPE_NETMASKS, genent_netmasks, dump_netmasks,
-		filedbmline_comment, "ipnetwork" },
+		filedbmline_comment, "ipnetwork", "ipnetworknumber"},
 	{ NS_LDAP_TYPE_ETHERS, genent_ethers, dump_ethers,
-		filedbmline_comment, "ieee802Device" },
+		filedbmline_comment, "ieee802Device", "cn" },
 	{ NS_LDAP_TYPE_NETGROUP, genent_netgroup, dump_netgroup,
-		filedbmline_comment, "nisnetgroup" },
+		filedbmline_comment, "nisnetgroup", "cn" },
 	{ NS_LDAP_TYPE_BOOTPARAMS, genent_bootparams, dump_bootparams,
-		filedbmline_comment, "bootableDevice" },
+		filedbmline_comment, "bootableDevice", "cn" },
 	{ NS_LDAP_TYPE_PUBLICKEY, genent_publickey, NULL /* dump_publickey */,
-		filedbmline_comment, "niskeyobject" },
+		filedbmline_comment, "niskeyobject", "cn" },
 	{ NS_LDAP_TYPE_PASSWD, genent_passwd, dump_passwd,
-		filedbmline_plus, "posixaccount" },
+		filedbmline_plus, "posixaccount", "uid" },
 	{ NS_LDAP_TYPE_SHADOW, genent_shadow, dump_shadow,
-		filedbmline_plus, "shadowaccount" },
+		filedbmline_plus, "shadowaccount", "uid" },
 	{ NS_LDAP_TYPE_ALIASES, genent_aliases, dump_aliases,
-		filedbmline_plus, "mailGroup" },
+		filedbmline_plus, "mailGroup", "cn" },
 	{ NS_LDAP_TYPE_AUTOMOUNT, genent_automount, dump_automount,
-		filedbmline_comment, "automount" },
+		filedbmline_comment, "automount", "automountKey" },
 	{ NS_LDAP_TYPE_USERATTR, genent_user_attr, dump_user_attr,
-		filedbmline_comment, "SolarisUserAttr" },
+		filedbmline_comment, "SolarisUserAttr", "uid" },
 	{ NS_LDAP_TYPE_PROFILE, genent_prof_attr, dump_prof_attr,
-		filedbmline_comment, "SolarisProfAttr" },
+		filedbmline_comment, "SolarisProfAttr", "cn" },
 	{ NS_LDAP_TYPE_EXECATTR, genent_exec_attr, dump_exec_attr,
-		filedbmline_comment, "SolarisExecAttr" },
+		filedbmline_comment, "SolarisExecAttr", "cn" },
 	{ NS_LDAP_TYPE_AUTHATTR, genent_auth_attr, dump_auth_attr,
-		filedbmline_comment, "SolarisAuthAttr" },
+		filedbmline_comment, "SolarisAuthAttr", "cn" },
 	{ NS_LDAP_TYPE_AUUSER, genent_audit_user, dump_audit_user,
-		filedbmline_comment, "SolarisAuditUser" },
+		filedbmline_comment, "SolarisAuditUser", "uid" },
 	{ NS_LDAP_TYPE_TNRHDB, genent_tnrhdb, dump_tnrhdb,
-		filedbmline_comment, "ipTnetHost" },
+		filedbmline_comment, "ipTnetHost", "ipTnetNumber" },
 	{ NS_LDAP_TYPE_TNRHTP, genent_tnrhtp, dump_tnrhtp,
-		filedbmline_comment, "ipTnetTemplate" },
+		filedbmline_comment, "ipTnetTemplate", "ipTnetTemplateName" },
 	{ NS_LDAP_TYPE_PROJECT, genent_project, dump_project,
-		filedbmline_comment, "SolarisProject" },
-	{ 0, 0, 0, 0, 0 }
+		filedbmline_comment, "SolarisProject", "SolarisProjectName" },
+	{ 0, 0, 0, 0, 0, 0 }
 };
 
 
@@ -4167,11 +4167,11 @@ dumptable(char *service)
 	/* Pass cred only if supplied. Cred is not always needed for dump */
 	if (authority.cred.unix_cred.userID == NULL ||
 	    authority.cred.unix_cred.passwd == NULL)
-		rc = __ns_ldap_firstEntry(service, filter, NULL, NULL,
-		    NULL, NS_LDAP_HARD, &cookie, &eres, &err, NULL);
+		rc = __ns_ldap_firstEntry(service, filter, tt->sortattr, NULL,
+		    NULL, NULL, NS_LDAP_HARD, &cookie, &eres, &err, NULL);
 	else
-		rc = __ns_ldap_firstEntry(service, filter, NULL, NULL,
-		    &authority, NS_LDAP_HARD, &cookie, &eres, &err, NULL);
+		rc = __ns_ldap_firstEntry(service, filter, tt->sortattr, NULL,
+		    NULL, &authority, NS_LDAP_HARD, &cookie, &eres, &err, NULL);
 
 	switch (rc) {
 	case NS_LDAP_SUCCESS:
