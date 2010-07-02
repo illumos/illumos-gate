@@ -66,7 +66,7 @@ static int ibcma_query_local_ip(struct rdma_cm_id *, sol_cma_chan_t *,
 static int ibcma_get_paths(struct rdma_cm_id *, sol_cma_chan_t *,
     ibcma_chan_t *);
 static void ibcma_get_devlist(sol_cma_chan_t *, ib_guid_t *, int,
-    genlist_t *);
+    genlist_t *, boolean_t);
 static int ibcma_any_addr(ibt_ip_addr_t *);
 static int ibcma_get_first_ib_ipaddr(struct rdma_cm_id *);
 
@@ -164,7 +164,7 @@ rdma_ib_bind_addr(struct rdma_cm_id *idp, struct sockaddr *addr)
 	if (sol_cma_any_addr(addr)) {
 		ibchanp->chan_port = port;
 		ibchanp->chan_addr_flag |= IBCMA_LOCAL_ADDR_IFADDRANY;
-		return (ibcma_get_first_ib_ipaddr(idp));
+		return (0);
 	}
 
 	ret = ibcma_query_local_ip(idp, chanp, ibchanp);
@@ -331,8 +331,7 @@ rdma_ib_init_qp_attr(struct rdma_cm_id *idp, struct ib_qp_attr *qpattr,
 		    IB_QP_MAX_DEST_RD_ATOMIC | IB_QP_MIN_RNR_TIMER;
 		/*
 		 * Fill in valid values for address vector & Remote QPN.
-		 * Fill in MTU as MTU_256 & PSN as 0. This QP will be
-		 * reset anyway.
+		 * Fill in MTU from REQ data.
 		 */
 		ibt_addsvect2ah(&ibchanp->chan_rcreq_addr, &qpattr->ah_attr);
 		qpattr->path_mtu = (uint32_t)
@@ -436,7 +435,7 @@ ibcma_append_listen_list(struct rdma_cm_id  *root_idp)
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "Search IP @");
 	num_hcas = ibt_get_hca_list(&hca_guidp);
 	ibcma_get_devlist(root_chanp, hca_guidp, num_hcas,
-	    &dev_genlist);
+	    &dev_genlist, B_FALSE);
 	entry = remove_genlist_head(&dev_genlist);
 	while (entry) {
 		devp = (ibcma_dev_t *)(entry->data);
@@ -446,6 +445,7 @@ ibcma_append_listen_list(struct rdma_cm_id  *root_idp)
 		ASSERT(ep_idp);
 
 		ep_chanp = (sol_cma_chan_t *)ep_idp;
+		ep_chanp->chan_xport_type = SOL_CMA_XPORT_IB;
 		ipaddr2sockaddr(&devp->dev_ipaddr,
 		    &(ep_idp->route.addr.src_addr), NULL);
 		listenp = kmem_zalloc(sizeof (sol_cma_listen_info_t),
@@ -453,7 +453,7 @@ ibcma_append_listen_list(struct rdma_cm_id  *root_idp)
 		ep_chanp->chan_listenp = listenp;
 
 		ep_ibchanp = &ep_chanp->chan_ib;
-		kmem_free(ep_ibchanp->chan_devp, sizeof (ibcma_dev_t));
+		ASSERT(ep_ibchanp->chan_devp == NULL);
 		ep_ibchanp->chan_devp = devp;
 		ep_ibchanp->chan_port = root_ibchanp->chan_port;
 
@@ -1425,6 +1425,10 @@ ibcma_ud_hdlr(void *inp, ibt_cm_ud_event_t *eventp,
 		    sizeof (ibt_ip_addr_t));
 		ipaddr2sockaddr(&info.src_addr,
 		    &(event_idp->route.addr.dst_addr), &info.src_port);
+		bcopy(&info.dst_addr, &event_ibchanp->chan_local_addr,
+		    sizeof (ibt_ip_addr_t));
+		ipaddr2sockaddr(&info.dst_addr,
+		    &(event_idp->route.addr.src_addr), &info.src_port);
 
 		/*
 		 * Increment number of Reqs for listening CMID,
@@ -1656,6 +1660,14 @@ ibcma_handle_req(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 	    sizeof (ibt_ofuvcm_req_data_t));
 	event_ibchanp->chan_rcreq_qpn = reqp->req_remote_qpn;
 	event_ibchanp->chan_rcreq_ra_in = reqp->req_rdma_ra_in;
+	bcopy(&info.src_addr, &event_ibchanp->chan_remote_addr,
+	    sizeof (ibt_ip_addr_t));
+	ipaddr2sockaddr(&info.src_addr,
+	    &(event_idp->route.addr.dst_addr), &info.src_port);
+	bcopy(&info.dst_addr, &event_ibchanp->chan_local_addr,
+	    sizeof (ibt_ip_addr_t));
+	ipaddr2sockaddr(&info.dst_addr,
+	    &(event_idp->route.addr.src_addr), &info.src_port);
 
 	/*
 	 * Increment number of Reqs for listening CMID, so that
@@ -2156,7 +2168,7 @@ ibcma_get_first_ib_ipaddr(struct rdma_cm_id *idp)
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "get_first_ib_ipaddr(%p)", idp);
 
 	num_hcas = ibt_get_hca_list(&hca_guidp);
-	ibcma_get_devlist(chanp, hca_guidp, num_hcas, &devlist);
+	ibcma_get_devlist(chanp, hca_guidp, num_hcas, &devlist, B_TRUE);
 	entry = remove_genlist_head(&devlist);
 	while (entry) {
 		devp = (ibcma_dev_t *)entry->data;
@@ -2442,7 +2454,7 @@ ibcma_create_new_id(struct rdma_cm_id *idp)
 
 static void
 ibcma_get_devlist(sol_cma_chan_t *root_chanp, ib_guid_t *hca_guidp,
-    int num_hcas, genlist_t *ret_devlist)
+    int num_hcas, genlist_t *ret_devlist, boolean_t with_ipaddr_only)
 {
 	int			i;
 	ibt_status_t		status;
@@ -2452,8 +2464,9 @@ ibcma_get_devlist(sol_cma_chan_t *root_chanp, ib_guid_t *hca_guidp,
 	ibt_hca_portinfo_t	*port_info, *tmp;
 	ibt_ip_addr_t		hca_ipaddr;
 
-	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "get_devlist(%p, %p, %x, %p)",
-	    root_chanp, hca_guidp, num_hcas, ret_devlist);
+	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
+	    "get_devlist(%p, %p, %x, %p, %x)", root_chanp, hca_guidp,
+	    num_hcas, ret_devlist, with_ipaddr_only);
 
 	init_genlist(ret_devlist);
 	for (i = 0; i < num_hcas; i++) {
@@ -2484,12 +2497,14 @@ ibcma_get_devlist(sol_cma_chan_t *root_chanp, ib_guid_t *hca_guidp,
 					/* Skip holes in pkey table */
 					if (tmp->p_pkey_tbl[pk] == 0)
 						continue;
-					status = ibt_get_src_ip(
-					    tmp->p_sgid_tbl[s],
-					    tmp->p_pkey_tbl[pk],
-					    &hca_ipaddr);
-					if (status != IBT_SUCCESS)
-						continue;
+					if (with_ipaddr_only == B_TRUE) {
+						status = ibt_get_src_ip(
+						    tmp->p_sgid_tbl[s],
+						    tmp->p_pkey_tbl[pk],
+						    &hca_ipaddr);
+						if (status != IBT_SUCCESS)
+							continue;
+					}
 
 					/* allocate devinfo & fill in info */
 					devp = kmem_zalloc(
@@ -2499,8 +2514,10 @@ ibcma_get_devlist(sol_cma_chan_t *root_chanp, ib_guid_t *hca_guidp,
 					devp->dev_pkey_ix = pk;
 					devp->dev_pkey = tmp->p_pkey_tbl[pk];
 					devp->dev_sgid = tmp->p_sgid_tbl[s];
-					bcopy(&hca_ipaddr, &devp->dev_ipaddr,
-					    sizeof (ibt_ip_addr_t));
+					if (with_ipaddr_only == B_TRUE)
+						bcopy(&hca_ipaddr,
+						    &devp->dev_ipaddr,
+						    sizeof (ibt_ip_addr_t));
 
 					SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
 					    "get_devlist: add2devlist "
