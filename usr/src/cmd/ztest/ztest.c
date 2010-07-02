@@ -5246,6 +5246,13 @@ ztest_run(ztest_shared_t *zs)
 	}
 
 	kernel_fini();
+
+	list_destroy(&zcl.zcl_callbacks);
+
+	(void) _mutex_destroy(&zcl.zcl_callbacks_lock);
+
+	(void) rwlock_destroy(&zs->zs_name_lock);
+	(void) _mutex_destroy(&zs->zs_vdev_lock);
 }
 
 static void
@@ -5315,13 +5322,6 @@ ztest_freeze(ztest_shared_t *zs)
 	ztest_dataset_close(zs, 0);
 	spa_close(spa, FTAG);
 	kernel_fini();
-
-	list_destroy(&zcl.zcl_callbacks);
-
-	(void) _mutex_destroy(&zcl.zcl_callbacks_lock);
-
-	(void) rwlock_destroy(&zs->zs_name_lock);
-	(void) _mutex_destroy(&zs->zs_vdev_lock);
 }
 
 void
@@ -5405,6 +5405,9 @@ ztest_init(ztest_shared_t *zs)
 	ztest_freeze(zs);
 
 	ztest_run_zdb(zs->zs_pool);
+
+	(void) rwlock_destroy(&zs->zs_name_lock);
+	(void) _mutex_destroy(&zs->zs_vdev_lock);
 }
 
 int
