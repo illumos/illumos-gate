@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -541,6 +540,34 @@ fmd_xprt_send_case(fmd_case_t *cp, void *arg)
 	fmd_dispq_dispatch_gid(fmd.d_disp, e, class, xip->xi_queue->eq_sgid);
 }
 
+/*
+ * Similar to the above function, but for use with readonly transport. Puts
+ * the event on the module's queue such that it's fmdo_recv function can pick
+ * it up and send it if appropriate.
+ */
+static void
+fmd_xprt_send_case_ro(fmd_case_t *cp, void *arg)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_module_t *mp = arg;
+
+	fmd_event_t *e;
+	nvlist_t *nvl;
+	char *class;
+
+	if (cip->ci_state == FMD_CASE_UNSOLVED)
+		return;
+
+	nvl = fmd_case_mkevent(cp, FM_LIST_SUSPECT_CLASS);
+	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
+	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
+
+	fmd_dprintf(FMD_DBG_XPRT, "re-send %s for %s to rdonly transport %s\n",
+	    FM_LIST_SUSPECT_CLASS, cip->ci_uuid, mp->mod_name);
+
+	fmd_dispq_dispatch_gid(fmd.d_disp, e, class, mp->mod_queue->eq_sgid);
+}
+
 void
 fmd_xprt_event_run(fmd_xprt_impl_t *xip, nvlist_t *nvl)
 {
@@ -821,9 +848,15 @@ fmd_xprt_create(fmd_module_t *mp, uint_t flags, nvlist_t *auth, void *data)
 	 * read-only, go directly to RUN.  If we're accepting a new connection,
 	 * wait for a SYN.  Otherwise send a SYN and wait for an ACK.
 	 */
-	if ((flags & FMD_XPRT_RDWR) == FMD_XPRT_RDONLY)
+	if ((flags & FMD_XPRT_RDWR) == FMD_XPRT_RDONLY) {
+		/*
+		 * Send the list.suspects across here for readonly transports.
+		 * For read-write transport they will be sent on transition to
+		 * RUN state in fmd_xprt_event_run().
+		 */
+		fmd_case_hash_apply(fmd.d_cases, fmd_xprt_send_case_ro, mp);
 		fmd_xprt_transition(xip, _fmd_xprt_state_run, "RUN");
-	else if (flags & FMD_XPRT_ACCEPT)
+	} else if (flags & FMD_XPRT_ACCEPT)
 		fmd_xprt_transition(xip, _fmd_xprt_state_syn, "SYN");
 	else
 		fmd_xprt_transition(xip, _fmd_xprt_state_ack, "ACK");
