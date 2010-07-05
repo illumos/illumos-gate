@@ -18,37 +18,18 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+#Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-include ../Makefile.lib
+   	
+MODULE = ses-log-transport
+CLASS = common
+SRCS = ses_log_transport.c
 
-common_SUBDIRS = \
-	libfmd_agent \
-	libdiagcode \
-	libdiskstatus \
-	libseslog \
-	libfmd_adm \
-	libfmd_log \
-	libfmd_msg \
-	libfmd_snmp \
-	libfmevent \
-	topo
+include ../../Makefile.plugin
 
-sparc_SUBDIRS = \
-	libmdesc \
-	libldom
-
-i386_SUBDIRS =
-
-SUBDIRS = $(common_SUBDIRS) $($(MACH)_SUBDIRS)
-
-libldom: libmdesc libfmd_agent
-
-libfmd_snmp: libfmd_adm topo
-
-topo: $($(MACH)_SUBDIRS) libfmd_agent libdiskstatus
-
-include ./Makefile.subdirs
+CFLAGS += $(INCS)
+LINTFLAGS += $(INCS)
+LDLIBS += -L$(ROOTLIB)/fm -ltopo -lseslog
+LDFLAGS += -R/usr/lib/fm

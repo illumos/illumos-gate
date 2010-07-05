@@ -212,6 +212,7 @@ file path=usr/include/fm/fmd_msg.h
 file path=usr/include/fm/fmd_snmp.h
 file path=usr/include/fm/libdiskstatus.h
 file path=usr/include/fm/libfmevent.h
+file path=usr/include/fm/libseslog.h
 file path=usr/include/fm/libtopo.h
 file path=usr/include/fm/topo_hc.h
 file path=usr/include/fm/topo_list.h
@@ -227,6 +228,7 @@ file path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so.1
 file path=usr/lib/fm/$(ARCH64)/libfmevent.so.1
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/libldom.so.1
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/libmdesc.so.1
+file path=usr/lib/fm/$(ARCH64)/libseslog.so.1
 file path=usr/lib/fm/$(ARCH64)/libtopo.so.1
 file path=usr/lib/fm/$(ARCH64)/llib-ldiagcode.ln
 file path=usr/lib/fm/$(ARCH64)/llib-ldiskstatus.ln
@@ -238,6 +240,7 @@ file path=usr/lib/fm/$(ARCH64)/llib-lfmd_snmp.ln
 file path=usr/lib/fm/$(ARCH64)/llib-lfmevent.ln
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/llib-lldom.ln
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/llib-lmdesc.ln
+file path=usr/lib/fm/$(ARCH64)/llib-lseslog.ln
 file path=usr/lib/fm/$(ARCH64)/llib-ltopo.ln
 $(i386_ONLY)file path=usr/lib/fm/dict/AMD.dict mode=0444
 file path=usr/lib/fm/dict/DISK.dict mode=0444
@@ -288,6 +291,8 @@ file path=usr/lib/fm/fmd/plugins/ip-transport.conf
 file path=usr/lib/fm/fmd/plugins/ip-transport.so mode=0555
 file path=usr/lib/fm/fmd/plugins/sensor-transport.conf
 file path=usr/lib/fm/fmd/plugins/sensor-transport.so mode=0555
+file path=usr/lib/fm/fmd/plugins/ses-log-transport.conf
+file path=usr/lib/fm/fmd/plugins/ses-log-transport.so mode=0555
 file path=usr/lib/fm/fmd/plugins/snmp-trapgen.conf
 file path=usr/lib/fm/fmd/plugins/snmp-trapgen.so mode=0555
 file path=usr/lib/fm/fmd/plugins/sp-monitor.conf
@@ -328,6 +333,7 @@ file path=usr/lib/fm/libfmd_snmp.so.1
 file path=usr/lib/fm/libfmevent.so.1
 $(sparc_ONLY)file path=usr/lib/fm/libldom.so.1
 $(sparc_ONLY)file path=usr/lib/fm/libmdesc.so.1
+file path=usr/lib/fm/libseslog.so.1
 file path=usr/lib/fm/libtopo.so.1
 file path=usr/lib/fm/llib-ldiagcode
 file path=usr/lib/fm/llib-ldiagcode.ln
@@ -625,6 +631,7 @@ link path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so target=./libfmd_snmp.so.1
 link path=usr/lib/fm/$(ARCH64)/libfmevent.so target=./libfmevent.so.1
 $(sparc_ONLY)link path=usr/lib/fm/$(ARCH64)/libldom.so target=libldom.so.1
 $(sparc_ONLY)link path=usr/lib/fm/$(ARCH64)/libmdesc.so target=libmdesc.so.1
+link path=usr/lib/fm/$(ARCH64)/libseslog.so target=./libseslog.so.1
 link path=usr/lib/fm/$(ARCH64)/libtopo.so target=libtopo.so.1
 link path=usr/lib/fm/libdiagcode.so target=libdiagcode.so.1
 link path=usr/lib/fm/libdiskstatus.so target=libdiskstatus.so.1
@@ -636,6 +643,7 @@ link path=usr/lib/fm/libfmd_snmp.so target=libfmd_snmp.so.1
 link path=usr/lib/fm/libfmevent.so target=libfmevent.so.1
 $(sparc_ONLY)link path=usr/lib/fm/libldom.so target=libldom.so.1
 $(sparc_ONLY)link path=usr/lib/fm/libmdesc.so target=libmdesc.so.1
+link path=usr/lib/fm/libseslog.so target=libseslog.so.1
 link path=usr/lib/fm/libtopo.so target=libtopo.so.1
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins/etm.so \

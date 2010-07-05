@@ -18,37 +18,34 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-include ../Makefile.lib
 
-common_SUBDIRS = \
-	libfmd_agent \
-	libdiagcode \
-	libdiskstatus \
-	libseslog \
-	libfmd_adm \
-	libfmd_log \
-	libfmd_msg \
-	libfmd_snmp \
-	libfmevent \
-	topo
+LIBRARY=	libseslog.a
+VERS=		.1
 
-sparc_SUBDIRS = \
-	libmdesc \
-	libldom
+OBJECTS=	libseslog.o 
 
-i386_SUBDIRS =
+include ../../../Makefile.lib
+include ../../Makefile.lib
 
-SUBDIRS = $(common_SUBDIRS) $($(MACH)_SUBDIRS)
+LIBS=		$(DYNLIB) $(LINTLIB)
 
-libldom: libmdesc libfmd_agent
+SRCDIR=		../common
 
-libfmd_snmp: libfmd_adm topo
+INCS +=		-I$(SRCDIR)
+LDLIBS +=	-lc -lnvpair
+CPPFLAGS +=	$(INCS)
 
-topo: $($(MACH)_SUBDIRS) libfmd_agent libdiskstatus
+$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
-include ./Makefile.subdirs
+.KEEP_STATE:
+
+all: $(LIBS)
+
+lint: lintcheck
+
+include ../../../Makefile.targ
+include ../../Makefile.targ
