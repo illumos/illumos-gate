@@ -294,16 +294,20 @@ fix_smf()
 
 	if [[ $i -eq 9 && ! -r $ZONEROOT/etc/svc/volatile/repository_door ]];
 	then
+		#
+		# The zone never booted, something is wrong.
+		#
 		error "$e_nosmf"
+		error "$e_bootfail"
 		/usr/bin/rm -f $SMFTMPFILE
-		return
+		return 1
 	fi
 
 	insttmpfile=$(mktemp -t instsmf.XXXXXX)
 	if [[ $? == 1 || -z "$insttmpfile" ]]; then
 		error "$e_tmpfile"
 		/usr/bin/rm -f $SMFTMPFILE
-		return
+		return 1
 	fi
 
 	vlog "$v_rmhollowsvcs"
@@ -392,6 +396,8 @@ fix_smf()
 	done
 
 	/usr/bin/rm -f $insttmpfile
+
+	return 0
 }
 
 #
@@ -517,6 +523,7 @@ v_nonetfix=$(gettext "Cannot update /etc/hostname.{net} file")
 v_adjust=$(gettext "Updating the image to run within a zone")
 v_stacktype=$(gettext "Stack type '%s'")
 v_booting=$(gettext "Booting zone to single user mode")
+e_bootfail=$(gettext "Failed to boot zone to single user mode.")
 e_nosmf=$(gettext "SMF repository unavailable.")
 v_svcsinzone=$(gettext "The following SMF services are installed:")
 v_rmhollowsvcs=$(gettext "Deleting SMF services from hollow packages")
@@ -678,10 +685,10 @@ done
 rm -f $hollow_pkgs $hollow_file_list $hollow_dir_list
 
 # cleanup SMF services
-fix_smf
+fix_smf || failed=1
 
 # remove invalid pkgs
-rm_pkgs
+[[ -z $failed ]] && rm_pkgs
 
 if [[ -z $failed && -n $OPT_U ]]; then
 	vlog "$v_unconfig"
