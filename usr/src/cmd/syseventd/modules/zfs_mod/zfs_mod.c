@@ -92,6 +92,8 @@ typedef void (*zfs_process_func_t)(zpool_handle_t *, nvlist_t *, boolean_t);
 libzfs_handle_t *g_zfshdl;
 list_t g_pool_list;
 tpool_t *g_tpool;
+boolean_t g_enumeration_done;
+thread_t g_zfs_tid;
 
 typedef struct unavailpool {
 	zpool_handle_t	*uap_zhp;
@@ -342,16 +344,19 @@ zfs_iter_pool(zpool_handle_t *zhp, void *data)
 			zfs_iter_vdev(zhp, nvl, data);
 		}
 	}
-	for (pool = list_head(&g_pool_list); pool != NULL;
-	    pool = list_next(&g_pool_list, pool)) {
+	if (g_enumeration_done)  {
+		for (pool = list_head(&g_pool_list); pool != NULL;
+		    pool = list_next(&g_pool_list, pool)) {
 
-		if (strcmp(zpool_get_name(zhp),
-		    zpool_get_name(pool->uap_zhp)))
-			continue;
-		if (zfs_toplevel_state(zhp) >= VDEV_STATE_DEGRADED) {
-			list_remove(&g_pool_list, pool);
-			(void) tpool_dispatch(g_tpool, zfs_enable_ds, pool);
-			break;
+			if (strcmp(zpool_get_name(zhp),
+			    zpool_get_name(pool->uap_zhp)))
+				continue;
+			if (zfs_toplevel_state(zhp) >= VDEV_STATE_DEGRADED) {
+				list_remove(&g_pool_list, pool);
+				(void) tpool_dispatch(g_tpool, zfs_enable_ds,
+				    pool);
+				break;
+			}
 		}
 	}
 
@@ -646,6 +651,18 @@ zfs_deliver_event(sysevent_t *ev, int unused)
 	return (ret);
 }
 
+/*ARGSUSED*/
+void *
+zfs_enum_pools(void *arg)
+{
+	(void) zpool_iter(g_zfshdl, zfs_unavail_pool, (void *)&g_pool_list);
+	if (!list_is_empty(&g_pool_list))
+		g_tpool = tpool_create(1, sysconf(_SC_NPROCESSORS_ONLN),
+		    0, NULL);
+	g_enumeration_done = B_TRUE;
+	return (NULL);
+}
+
 static struct slm_mod_ops zfs_mod_ops = {
 	SE_MAJOR_VERSION, SE_MINOR_VERSION, 10, zfs_deliver_event
 };
@@ -655,13 +672,14 @@ slm_init()
 {
 	if ((g_zfshdl = libzfs_init()) == NULL)
 		return (NULL);
-	/* collect a list of unavailable pools */
+	/*
+	 * collect a list of unavailable pools (asynchronously,
+	 * since this can take a while)
+	 */
 	list_create(&g_pool_list, sizeof (struct unavailpool),
 	    offsetof(struct unavailpool, uap_node));
-	(void) zpool_iter(g_zfshdl, zfs_unavail_pool, (void *)&g_pool_list);
-	if (!list_is_empty(&g_pool_list))
-		g_tpool = tpool_create(1, sysconf(_SC_NPROCESSORS_ONLN),
-		    0, NULL);
+	if (thr_create(NULL, 0, zfs_enum_pools, NULL, 0, &g_zfs_tid) != 0)
+		return (NULL);
 	return (&zfs_mod_ops);
 }
 
@@ -670,7 +688,7 @@ slm_fini()
 {
 	unavailpool_t *pool;
 
-	if (g_tpool) {
+	if (g_tpool != NULL) {
 		tpool_wait(g_tpool);
 		tpool_destroy(g_tpool);
 	}
@@ -679,6 +697,7 @@ slm_fini()
 		zpool_close(pool->uap_zhp);
 		free(pool);
 	}
+	(void) thr_join(g_zfs_tid, NULL, NULL);
 	list_destroy(&g_pool_list);
 	libzfs_fini(g_zfshdl);
 }
