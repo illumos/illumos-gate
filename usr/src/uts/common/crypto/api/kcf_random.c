@@ -676,6 +676,7 @@ punt:
 			    "block random bytes are same as the previous "
 			    "one.\n");
 			/* discard random bytes and return error */
+			mutex_exit(&rmp->rm_mag.rm_lock);
 			return (EIO);
 		}
 
