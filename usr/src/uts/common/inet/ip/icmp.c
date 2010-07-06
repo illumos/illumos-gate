@@ -771,9 +771,6 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	if (ixa == NULL)
 		return (ENOMEM);
 
-	ASSERT(ixa->ixa_refcnt >= 2);
-	ASSERT(ixa == connp->conn_ixa);
-
 	mutex_enter(&connp->conn_lock);
 	/*
 	 * This icmp_t must have bound already before doing a connect.

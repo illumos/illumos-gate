@@ -718,8 +718,6 @@ iptun_bind(iptun_t *iptun)
 	ixa = conn_get_ixa(connp, B_FALSE);
 	if (ixa == NULL)
 		return (ENOMEM);
-	ASSERT(ixa->ixa_refcnt >= 2);
-	ASSERT(ixa == connp->conn_ixa);
 
 	/* We create PMTU state including for 6to4 */
 	ixa->ixa_flags |= IXAF_PMTU_DISCOVERY;

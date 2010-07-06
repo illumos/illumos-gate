@@ -5984,9 +5984,6 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	if (ixa == NULL)
 		return (ENOMEM);
 
-	ASSERT(ixa->ixa_refcnt >= 2);
-	ASSERT(ixa == connp->conn_ixa);
-
 	mutex_enter(&connp->conn_lock);
 	/*
 	 * This udp_t must have bound to a port already before doing a connect.
