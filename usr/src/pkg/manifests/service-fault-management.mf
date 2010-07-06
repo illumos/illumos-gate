@@ -355,6 +355,8 @@ $(sparc_ONLY)file path=usr/lib/fm/llib-lldom
 $(sparc_ONLY)file path=usr/lib/fm/llib-lldom.ln
 $(sparc_ONLY)file path=usr/lib/fm/llib-lmdesc
 $(sparc_ONLY)file path=usr/lib/fm/llib-lmdesc.ln
+file path=usr/lib/fm/llib-lseslog
+file path=usr/lib/fm/llib-lseslog.ln
 file path=usr/lib/fm/llib-ltopo
 file path=usr/lib/fm/llib-ltopo.ln
 file path=usr/lib/fm/topo/maps/xfp-hc-topology.xml mode=0444
