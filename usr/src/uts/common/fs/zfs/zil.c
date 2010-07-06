@@ -78,7 +78,7 @@ boolean_t zfs_nocacheflush = B_FALSE;
 
 static kmem_cache_t *zil_lwb_cache;
 
-static boolean_t zil_empty(zilog_t *zilog);
+static void zil_async_to_sync(zilog_t *zilog, uint64_t foid);
 
 #define	LWB_EMPTY(lwb) ((BP_GET_LSIZE(&lwb->lwb_blk) - \
     sizeof (zil_chain_t)) == (lwb->lwb_sz - lwb->lwb_nused))
@@ -712,7 +712,7 @@ zil_add_block(zilog_t *zilog, const blkptr_t *bp)
 	mutex_exit(&zilog->zl_vdev_lock);
 }
 
-void
+static void
 zil_flush_vdevs(zilog_t *zilog)
 {
 	spa_t *spa = zilog->zl_spa;
@@ -1119,7 +1119,7 @@ zil_aitx_compare(const void *x1, const void *x2)
 /*
  * Remove all async itx with the given oid.
  */
-void
+static void
 zil_remove_async(zilog_t *zilog, uint64_t oid)
 {
 	uint64_t otxg, txg;
@@ -1171,7 +1171,7 @@ zil_itx_assign(zilog_t *zilog, itx_t *itx, dmu_tx_t *tx)
 	itxs_t *itxs, *clean = NULL;
 
 	/*
-	 * Object ids can be re-instantiated in the same or next txg so
+	 * Object ids can be re-instantiated in the next txg so
 	 * remove any async transactions to avoid future leaks.
 	 * This can happen if a fsync occurs on the re-instantiated
 	 * object for a WR_INDIRECT or WR_NEED_COPY write, which gets
@@ -1179,6 +1179,12 @@ zil_itx_assign(zilog_t *zilog, itx_t *itx, dmu_tx_t *tx)
 	 */
 	if ((itx->itx_lr.lrc_txtype & ~TX_CI) == TX_REMOVE)
 		zil_remove_async(zilog, itx->itx_oid);
+
+	/*
+	 * Ensure the data of a renamed file is committed before the rename.
+	 */
+	if ((itx->itx_lr.lrc_txtype & ~TX_CI) == TX_RENAME)
+		zil_async_to_sync(zilog, itx->itx_oid);
 
 	if (spa_freeze_txg(zilog->zl_spa) !=  UINT64_MAX)
 		txg = ZILTEST_TXG;
@@ -1276,7 +1282,7 @@ zil_clean(zilog_t *zilog, uint64_t synced_txg)
 /*
  * Get the list of itxs to commit into zl_itx_commit_list.
  */
-void
+static void
 zil_get_commit_list(zilog_t *zilog)
 {
 	uint64_t otxg, txg;
@@ -1309,7 +1315,7 @@ zil_get_commit_list(zilog_t *zilog)
 /*
  * Move the async itxs for a specified object to commit into sync lists.
  */
-void
+static void
 zil_async_to_sync(zilog_t *zilog, uint64_t foid)
 {
 	uint64_t otxg, txg;

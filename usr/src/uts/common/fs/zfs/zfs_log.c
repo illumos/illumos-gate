@@ -418,7 +418,7 @@ zfs_log_symlink(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
  */
 void
 zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
-	znode_t *sdzp, char *sname, znode_t *tdzp, char *dname)
+	znode_t *sdzp, char *sname, znode_t *tdzp, char *dname, znode_t *szp)
 {
 	itx_t *itx;
 	lr_rename_t *lr;
@@ -434,6 +434,7 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
 	lr->lr_tdoid = tdzp->z_id;
 	bcopy(sname, (char *)(lr + 1), snamesize);
 	bcopy(dname, (char *)(lr + 1) + snamesize, dnamesize);
+	itx->itx_oid = szp->z_id;
 
 	zil_itx_assign(zilog, itx, tx);
 }

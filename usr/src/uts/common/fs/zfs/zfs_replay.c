@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -695,10 +694,8 @@ zfs_replay_write2(zfsvfs_t *zfsvfs, lr_write_t *lr, boolean_t byteswap)
 		return (error);
 
 	end = lr->lr_offset + lr->lr_length;
-	if (end > zp->z_size) {
-		ASSERT3U(end - zp->z_size, <, zp->z_blksz);
+	if (end > zp->z_size)
 		zp->z_size = end;
-	}
 
 	VN_RELE(ZTOV(zp));
 
