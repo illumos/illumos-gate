@@ -893,6 +893,14 @@ again:
 			    uio->uio_loffset);
 			ASSERT(error == 0);
 		}
+		/*
+		 * If we are replaying and eof is non zero then force
+		 * the file size to the specified eof. Note, there's no
+		 * concurrency during replay.
+		 */
+		if (zfsvfs->z_replay && zfsvfs->z_replay_eof != 0)
+			zp->z_size = zfsvfs->z_replay_eof;
+
 		error = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
 
 		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes, ioflag);
