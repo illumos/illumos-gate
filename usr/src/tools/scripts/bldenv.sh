@@ -306,7 +306,6 @@ fi
 [[ "${flags.O}" ]] && export MULTI_PROTO="yes"
 
 # update build-type variables
-CPIODIR="${CPIODIR}${SUFFIX}"
 PKGARCHIVE="${PKGARCHIVE}${SUFFIX}"
 
 # Append source version

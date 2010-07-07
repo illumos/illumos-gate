@@ -117,12 +117,6 @@ ELF_DATA_BASELINE_DIR="/ws/onnv-gate/usr/src/ELF-data-baseline.$MACH";	export EL
 #
 REF_PROTO_LIST=$PARENT_WS/usr/src/proto_list_${MACH}; export REF_PROTO_LIST
 
-# where cpio archives of the OS are placed. Usually this should be left
-# alone too. Here they don't go in the build workspace, but in the parent.
-# Since this is done as root, the build machine needs root acces to
-# the parent over NFS.
-CPIODIR="${PARENT_WS}/archives/${MACH}/nightly";	export CPIODIR
-
 #
 #	build environment variables, including version info for mcs, motd,
 # motd, uname and boot messages. Mostly you shouldn't change this except
