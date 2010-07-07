@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -80,6 +79,7 @@
 #include "nfs_subr.h"
 #include "webnfs.h"
 #include <rpcsvc/nfs4_prot.h>
+#include <limits.h>
 
 #include <nfs/nfssys.h>
 extern int _nfssys(enum nfssys_op, void *);
@@ -949,12 +949,27 @@ static char *optlist[] = {
 	NULL
 };
 
-#define	bad(val) (val == NULL || !isdigit(*val))
+static int
+convert_int(int *val, char *str)
+{
+	long lval;
+
+	if (str == NULL || !isdigit(*str))
+		return (-1);
+
+	lval = strtol(str, &str, 10);
+	if (*str != '\0' || lval > INT_MAX)
+		return (-2);
+
+	*val = (int)lval;
+	return (0);
+}
 
 static int
 set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 {
 	char *saveopt, *optstr, *opts, *newopts, *val;
+	int num;
 	int largefiles = 0;
 	int invalid = 0;
 	int attrpref = 0;
@@ -1030,9 +1045,9 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			args->flags |= NFSMNT_NOAC;
 			break;
 		case OPT_PORT:
-			if (bad(val))
+			if (convert_int(&num, val) != 0)
 				goto badopt;
-			nfs_port = htons((ushort_t)atoi(val));
+			nfs_port = htons((ushort_t)num);
 			break;
 
 		case OPT_SECURE:
@@ -1049,62 +1064,54 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			break;
 
 		case OPT_RSIZE:
-			args->flags |= NFSMNT_RSIZE;
-			if (bad(val))
+			if (convert_int(&args->rsize, val) != 0)
 				goto badopt;
-			args->rsize = atoi(val);
+			args->flags |= NFSMNT_RSIZE;
 			break;
 		case OPT_WSIZE:
-			args->flags |= NFSMNT_WSIZE;
-			if (bad(val))
+			if (convert_int(&args->wsize, val) != 0)
 				goto badopt;
-			args->wsize = atoi(val);
+			args->flags |= NFSMNT_WSIZE;
 			break;
 		case OPT_TIMEO:
-			args->flags |= NFSMNT_TIMEO;
-			if (bad(val))
+			if (convert_int(&args->timeo, val) != 0)
 				goto badopt;
-			args->timeo = atoi(val);
+			args->flags |= NFSMNT_TIMEO;
 			break;
 		case OPT_RETRANS:
-			args->flags |= NFSMNT_RETRANS;
-			if (bad(val))
+			if (convert_int(&args->retrans, val) != 0)
 				goto badopt;
-			args->retrans = atoi(val);
+			args->flags |= NFSMNT_RETRANS;
 			break;
 		case OPT_ACTIMEO:
-			args->flags |= NFSMNT_ACDIRMAX;
-			args->flags |= NFSMNT_ACREGMAX;
-			args->flags |= NFSMNT_ACDIRMIN;
-			args->flags |= NFSMNT_ACREGMIN;
-			if (bad(val))
+			if (convert_int(&args->acregmax, val) != 0)
 				goto badopt;
 			args->acdirmin = args->acregmin = args->acdirmax
-			    = args->acregmax = atoi(val);
+			    = args->acregmax;
+			args->flags |= NFSMNT_ACDIRMAX;
+			args->flags |= NFSMNT_ACREGMAX;
+			args->flags |= NFSMNT_ACDIRMIN;
+			args->flags |= NFSMNT_ACREGMIN;
 			break;
 		case OPT_ACREGMIN:
-			args->flags |= NFSMNT_ACREGMIN;
-			if (bad(val))
+			if (convert_int(&args->acregmin, val) != 0)
 				goto badopt;
-			args->acregmin = atoi(val);
+			args->flags |= NFSMNT_ACREGMIN;
 			break;
 		case OPT_ACREGMAX:
-			args->flags |= NFSMNT_ACREGMAX;
-			if (bad(val))
+			if (convert_int(&args->acregmax, val) != 0)
 				goto badopt;
-			args->acregmax = atoi(val);
+			args->flags |= NFSMNT_ACREGMAX;
 			break;
 		case OPT_ACDIRMIN:
-			args->flags |= NFSMNT_ACDIRMIN;
-			if (bad(val))
+			if (convert_int(&args->acdirmin, val) != 0)
 				goto badopt;
-			args->acdirmin = atoi(val);
+			args->flags |= NFSMNT_ACDIRMIN;
 			break;
 		case OPT_ACDIRMAX:
-			args->flags |= NFSMNT_ACDIRMAX;
-			if (bad(val))
+			if (convert_int(&args->acdirmax, val) != 0)
 				goto badopt;
-			args->acdirmax = atoi(val);
+			args->flags |= NFSMNT_ACDIRMAX;
 			break;
 		case OPT_BG:
 			bg++;
@@ -1113,9 +1120,8 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			bg = 0;
 			break;
 		case OPT_RETRY:
-			if (bad(val))
+			if (convert_int(&retries, val) != 0)
 				goto badopt;
-			retries = atoi(val);
 			break;
 		case OPT_LLOCK:
 			args->flags |= NFSMNT_LLOCK;
@@ -1124,9 +1130,9 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			posix = 1;
 			break;
 		case OPT_VERS:
-			if (bad(val))
+			if (convert_int(&num, val) != 0)
 				goto badopt;
-			nfsvers = (rpcvers_t)atoi(val);
+			nfsvers = (rpcvers_t)num;
 			break;
 		case OPT_PROTO:
 			if (val == NULL)
