@@ -282,9 +282,8 @@ zfs_secpolicy_read(zfs_cmd_t *zc, cred_t *cr)
 }
 
 static int
-zfs_dozonecheck(const char *dataset, cred_t *cr)
+zfs_dozonecheck_impl(const char *dataset, uint64_t zoned, cred_t *cr)
 {
-	uint64_t zoned;
 	int writable = 1;
 
 	/*
@@ -293,9 +292,6 @@ zfs_dozonecheck(const char *dataset, cred_t *cr)
 	 */
 	if (!INGLOBALZONE(curproc) &&
 	    !zone_dataset_visible(dataset, &writable))
-		return (ENOENT);
-
-	if (dsl_prop_get_integer(dataset, "zoned", &zoned, NULL))
 		return (ENOENT);
 
 	if (INGLOBALZONE(curproc)) {
@@ -319,6 +315,32 @@ zfs_dozonecheck(const char *dataset, cred_t *cr)
 	return (0);
 }
 
+static int
+zfs_dozonecheck(const char *dataset, cred_t *cr)
+{
+	uint64_t zoned;
+
+	if (dsl_prop_get_integer(dataset, "zoned", &zoned, NULL))
+		return (ENOENT);
+
+	return (zfs_dozonecheck_impl(dataset, zoned, cr));
+}
+
+static int
+zfs_dozonecheck_ds(const char *dataset, dsl_dataset_t *ds, cred_t *cr)
+{
+	uint64_t zoned;
+
+	rw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER);
+	if (dsl_prop_get_ds(ds, "zoned", 8, 1, &zoned, NULL)) {
+		rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
+		return (ENOENT);
+	}
+	rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
+
+	return (zfs_dozonecheck_impl(dataset, zoned, cr));
+}
+
 int
 zfs_secpolicy_write_perms(const char *name, const char *perm, cred_t *cr)
 {
@@ -329,6 +351,21 @@ zfs_secpolicy_write_perms(const char *name, const char *perm, cred_t *cr)
 		error = secpolicy_zfs(cr);
 		if (error)
 			error = dsl_deleg_access(name, perm, cr);
+	}
+	return (error);
+}
+
+int
+zfs_secpolicy_write_perms_ds(const char *name, dsl_dataset_t *ds,
+    const char *perm, cred_t *cr)
+{
+	int error;
+
+	error = zfs_dozonecheck_ds(name, ds, cr);
+	if (error == 0) {
+		error = secpolicy_zfs(cr);
+		if (error)
+			error = dsl_deleg_access_impl(ds, perm, cr);
 	}
 	return (error);
 }
@@ -508,8 +545,38 @@ zfs_secpolicy_rollback(zfs_cmd_t *zc, cred_t *cr)
 int
 zfs_secpolicy_send(zfs_cmd_t *zc, cred_t *cr)
 {
-	return (zfs_secpolicy_write_perms(zc->zc_name,
-	    ZFS_DELEG_PERM_SEND, cr));
+	spa_t *spa;
+	dsl_pool_t *dp;
+	dsl_dataset_t *ds;
+	char *cp;
+	int error;
+
+	/*
+	 * Generate the current snapshot name from the given objsetid, then
+	 * use that name for the secpolicy/zone checks.
+	 */
+	cp = strchr(zc->zc_name, '@');
+	if (cp == NULL)
+		return (EINVAL);
+	error = spa_open(zc->zc_name, &spa, FTAG);
+	if (error)
+		return (error);
+
+	dp = spa_get_dsl(spa);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	error = dsl_dataset_hold_obj(dp, zc->zc_sendobj, FTAG, &ds);
+	rw_exit(&dp->dp_config_rwlock);
+	spa_close(spa, FTAG);
+	if (error)
+		return (error);
+
+	dsl_dataset_name(ds, zc->zc_name);
+
+	error = zfs_secpolicy_write_perms_ds(zc->zc_name, ds,
+	    ZFS_DELEG_PERM_SEND, cr);
+	dsl_dataset_rele(ds, FTAG);
+
+	return (error);
 }
 
 static int
@@ -1579,25 +1646,11 @@ zfs_ioc_vdev_setfru(zfs_cmd_t *zc)
 	return (error);
 }
 
-/*
- * inputs:
- * zc_name		name of filesystem
- * zc_nvlist_dst_size	size of buffer for property nvlist
- *
- * outputs:
- * zc_objset_stats	stats
- * zc_nvlist_dst	property nvlist
- * zc_nvlist_dst_size	size of property nvlist
- */
 static int
-zfs_ioc_objset_stats(zfs_cmd_t *zc)
+zfs_ioc_objset_stats_impl(zfs_cmd_t *zc, objset_t *os)
 {
-	objset_t *os = NULL;
-	int error;
+	int error = 0;
 	nvlist_t *nv;
-
-	if (error = dmu_objset_hold(zc->zc_name, FTAG, &os))
-		return (error);
 
 	dmu_objset_fast_stat(os, &zc->zc_objset_stats);
 
@@ -1619,7 +1672,32 @@ zfs_ioc_objset_stats(zfs_cmd_t *zc)
 		nvlist_free(nv);
 	}
 
+	return (error);
+}
+
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_nvlist_dst_size	size of buffer for property nvlist
+ *
+ * outputs:
+ * zc_objset_stats	stats
+ * zc_nvlist_dst	property nvlist
+ * zc_nvlist_dst_size	size of property nvlist
+ */
+static int
+zfs_ioc_objset_stats(zfs_cmd_t *zc)
+{
+	objset_t *os = NULL;
+	int error;
+
+	if (error = dmu_objset_hold(zc->zc_name, FTAG, &os))
+		return (error);
+
+	error = zfs_ioc_objset_stats_impl(zc, os);
+
 	dmu_objset_rele(os, FTAG);
+
 	return (error);
 }
 
@@ -1852,19 +1930,43 @@ top:
 
 	error = dmu_snapshot_list_next(os,
 	    sizeof (zc->zc_name) - strlen(zc->zc_name),
-	    zc->zc_name + strlen(zc->zc_name), NULL, &zc->zc_cookie, NULL);
-	dmu_objset_rele(os, FTAG);
+	    zc->zc_name + strlen(zc->zc_name), &zc->zc_obj, &zc->zc_cookie,
+	    NULL);
+
 	if (error == 0) {
-		error = zfs_ioc_objset_stats(zc); /* fill in the stats */
-		if (error == ENOENT)  {
-			/* We lost a race with destroy, get the next one. */
-			*strchr(zc->zc_name, '@') = '\0';
-			goto top;
+		dsl_dataset_t *ds;
+		dsl_pool_t *dp = os->os_dsl_dataset->ds_dir->dd_pool;
+
+		/*
+		 * Since we probably don't have a hold on this snapshot,
+		 * it's possible that the objsetid could have been destroyed
+		 * and reused for a new objset. It's OK if this happens during
+		 * a zfs send operation, since the new createtxg will be
+		 * beyond the range we're interested in.
+		 */
+		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		error = dsl_dataset_hold_obj(dp, zc->zc_obj, FTAG, &ds);
+		rw_exit(&dp->dp_config_rwlock);
+		if (error) {
+			if (error == ENOENT) {
+				/* Racing with destroy, get the next one. */
+				*strchr(zc->zc_name, '@') = '\0';
+				dmu_objset_rele(os, FTAG);
+				goto top;
+			}
+		} else {
+			objset_t *ossnap;
+
+			error = dmu_objset_from_ds(ds, &ossnap);
+			if (error == 0)
+				error = zfs_ioc_objset_stats_impl(zc, ossnap);
+			dsl_dataset_rele(ds, FTAG);
 		}
 	} else if (error == ENOENT) {
 		error = ESRCH;
 	}
 
+	dmu_objset_rele(os, FTAG);
 	/* if we failed, undo the @ that we tacked on to zc_name */
 	if (error)
 		*strchr(zc->zc_name, '@') = '\0';
@@ -3573,9 +3675,10 @@ out:
 /*
  * inputs:
  * zc_name	name of snapshot to send
- * zc_value	short name of incremental fromsnap (may be empty)
  * zc_cookie	file descriptor to send stream to
- * zc_obj	fromorigin flag (mutually exclusive with zc_value)
+ * zc_obj	fromorigin flag (mutually exclusive with zc_fromobj)
+ * zc_sendobj	objsetid of snapshot to send
+ * zc_fromobj	objsetid of incremental fromsnap (may be zero)
  *
  * outputs: none
  */
@@ -3587,34 +3690,55 @@ zfs_ioc_send(zfs_cmd_t *zc)
 	file_t *fp;
 	int error;
 	offset_t off;
+	dsl_dataset_t *ds;
+	dsl_dataset_t *dsfrom = NULL;
+	spa_t *spa;
+	dsl_pool_t *dp;
 
-	error = dmu_objset_hold(zc->zc_name, FTAG, &tosnap);
+	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error)
 		return (error);
 
-	if (zc->zc_value[0] != '\0') {
-		char *buf;
-		char *cp;
+	dp = spa_get_dsl(spa);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	error = dsl_dataset_hold_obj(dp, zc->zc_sendobj, FTAG, &ds);
+	rw_exit(&dp->dp_config_rwlock);
+	if (error) {
+		spa_close(spa, FTAG);
+		return (error);
+	}
 
-		buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		(void) strncpy(buf, zc->zc_name, MAXPATHLEN);
-		cp = strchr(buf, '@');
-		if (cp)
-			*(cp+1) = 0;
-		(void) strncat(buf, zc->zc_value, MAXPATHLEN);
-		error = dmu_objset_hold(buf, FTAG, &fromsnap);
-		kmem_free(buf, MAXPATHLEN);
+	error = dmu_objset_from_ds(ds, &tosnap);
+	if (error) {
+		dsl_dataset_rele(ds, FTAG);
+		spa_close(spa, FTAG);
+		return (error);
+	}
+
+	if (zc->zc_fromobj != 0) {
+		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		error = dsl_dataset_hold_obj(dp, zc->zc_fromobj, FTAG, &dsfrom);
+		rw_exit(&dp->dp_config_rwlock);
+		spa_close(spa, FTAG);
 		if (error) {
-			dmu_objset_rele(tosnap, FTAG);
+			dsl_dataset_rele(ds, FTAG);
 			return (error);
 		}
+		error = dmu_objset_from_ds(dsfrom, &fromsnap);
+		if (error) {
+			dsl_dataset_rele(dsfrom, FTAG);
+			dsl_dataset_rele(ds, FTAG);
+			return (error);
+		}
+	} else {
+		spa_close(spa, FTAG);
 	}
 
 	fp = getf(zc->zc_cookie);
 	if (fp == NULL) {
-		dmu_objset_rele(tosnap, FTAG);
-		if (fromsnap)
-			dmu_objset_rele(fromsnap, FTAG);
+		dsl_dataset_rele(ds, FTAG);
+		if (dsfrom)
+			dsl_dataset_rele(dsfrom, FTAG);
 		return (EBADF);
 	}
 
@@ -3624,9 +3748,9 @@ zfs_ioc_send(zfs_cmd_t *zc)
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 		fp->f_offset = off;
 	releasef(zc->zc_cookie);
-	if (fromsnap)
-		dmu_objset_rele(fromsnap, FTAG);
-	dmu_objset_rele(tosnap, FTAG);
+	if (dsfrom)
+		dsl_dataset_rele(dsfrom, FTAG);
+	dsl_dataset_rele(ds, FTAG);
 	return (error);
 }
 
@@ -4194,6 +4318,8 @@ zfs_ioc_smb_acl(zfs_cmd_t *zc)
  * zc_cookie		recursive flag
  * zc_temphold		set if hold is temporary
  * zc_cleanup_fd	cleanup-on-exit file descriptor for calling process
+ * zc_sendobj		if non-zero, the objid for zc_name@zc_value
+ * zc_createtxg		if zc_sendobj is non-zero, snap must have zc_createtxg
  *
  * outputs:		none
  */
@@ -4201,12 +4327,66 @@ static int
 zfs_ioc_hold(zfs_cmd_t *zc)
 {
 	boolean_t recursive = zc->zc_cookie;
+	spa_t *spa;
+	dsl_pool_t *dp;
+	dsl_dataset_t *ds;
+	int error;
+	minor_t minor = 0;
 
 	if (snapshot_namecheck(zc->zc_value, NULL, NULL) != 0)
 		return (EINVAL);
 
-	return (dsl_dataset_user_hold(zc->zc_name, zc->zc_value,
-	    zc->zc_string, recursive, zc->zc_temphold, zc->zc_cleanup_fd));
+	if (zc->zc_sendobj == 0) {
+		return (dsl_dataset_user_hold(zc->zc_name, zc->zc_value,
+		    zc->zc_string, recursive, zc->zc_temphold,
+		    zc->zc_cleanup_fd));
+	}
+
+	if (recursive)
+		return (EINVAL);
+
+	error = spa_open(zc->zc_name, &spa, FTAG);
+	if (error)
+		return (error);
+
+	dp = spa_get_dsl(spa);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	error = dsl_dataset_hold_obj(dp, zc->zc_sendobj, FTAG, &ds);
+	rw_exit(&dp->dp_config_rwlock);
+	spa_close(spa, FTAG);
+	if (error)
+		return (error);
+
+	/*
+	 * Until we have a hold on this snapshot, it's possible that
+	 * zc_sendobj could've been destroyed and reused as part
+	 * of a later txg.  Make sure we're looking at the right object.
+	 */
+	if (zc->zc_createtxg != ds->ds_phys->ds_creation_txg) {
+		dsl_dataset_rele(ds, FTAG);
+		return (ENOENT);
+	}
+
+	if (zc->zc_cleanup_fd != -1 && zc->zc_temphold) {
+		error = zfs_onexit_fd_hold(zc->zc_cleanup_fd, &minor);
+		if (error) {
+			dsl_dataset_rele(ds, FTAG);
+			return (error);
+		}
+	}
+
+	error = dsl_dataset_user_hold_for_send(ds, zc->zc_string,
+	    zc->zc_temphold);
+	if (minor != 0) {
+		if (error == 0) {
+			dsl_register_onexit_hold_cleanup(ds, zc->zc_string,
+			    minor);
+		}
+		zfs_onexit_fd_rele(zc->zc_cleanup_fd);
+	}
+	dsl_dataset_rele(ds, FTAG);
+
+	return (error);
 }
 
 /*

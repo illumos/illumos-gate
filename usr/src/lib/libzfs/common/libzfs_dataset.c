@@ -3927,10 +3927,12 @@ zfs_userspace(zfs_handle_t *zhp, zfs_userquota_prop_t type,
 int
 zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
     boolean_t recursive, boolean_t temphold, boolean_t enoent_ok,
-    int cleanup_fd)
+    int cleanup_fd, uint64_t dsobj, uint64_t createtxg)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
+
+	ASSERT(!recursive || dsobj == 0);
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
@@ -3940,6 +3942,8 @@ zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
 	zc.zc_cookie = recursive;
 	zc.zc_temphold = temphold;
 	zc.zc_cleanup_fd = cleanup_fd;
+	zc.zc_sendobj = dsobj;
+	zc.zc_createtxg = createtxg;
 
 	if (zfs_ioctl(hdl, ZFS_IOC_HOLD, &zc) != 0) {
 		char errbuf[ZFS_MAXNAMELEN+32];
@@ -3969,7 +3973,7 @@ zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
 			return (zfs_error(hdl, EZFS_REFTAG_HOLD, errbuf));
 		case ENOENT:
 			if (enoent_ok)
-				return (0);
+				return (ENOENT);
 			/* FALLTHROUGH */
 		default:
 			return (zfs_standard_error_fmt(hdl, errno, errbuf));
@@ -3977,107 +3981,6 @@ zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
 	}
 
 	return (0);
-}
-
-struct hold_range_arg {
-	zfs_handle_t	*origin;
-	const char	*fromsnap;
-	const char	*tosnap;
-	char		lastsnapheld[ZFS_MAXNAMELEN];
-	const char	*tag;
-	boolean_t	temphold;
-	boolean_t	seento;
-	boolean_t	seenfrom;
-	boolean_t	holding;
-	boolean_t	recursive;
-	snapfilter_cb_t	*filter_cb;
-	void		*filter_cb_arg;
-	int		cleanup_fd;
-};
-
-static int
-zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
-{
-	struct hold_range_arg *hra = arg;
-	const char *thissnap;
-	int error;
-
-	thissnap = strchr(zfs_get_name(zhp), '@') + 1;
-
-	if (hra->fromsnap && !hra->seenfrom &&
-	    strcmp(hra->fromsnap, thissnap) == 0)
-		hra->seenfrom = B_TRUE;
-
-	/* snap is older or newer than the desired range, ignore it */
-	if (hra->seento || !hra->seenfrom) {
-		zfs_close(zhp);
-		return (0);
-	}
-
-	if (!hra->seento && strcmp(hra->tosnap, thissnap) == 0)
-		hra->seento = B_TRUE;
-
-	if (hra->filter_cb != NULL &&
-	    hra->filter_cb(zhp, hra->filter_cb_arg) == B_FALSE) {
-		zfs_close(zhp);
-		return (0);
-	}
-
-	if (hra->holding) {
-		/* We could be racing with destroy, so ignore ENOENT. */
-		error = zfs_hold(hra->origin, thissnap, hra->tag,
-		    hra->recursive, hra->temphold, B_TRUE, hra->cleanup_fd);
-		if (error == 0) {
-			(void) strlcpy(hra->lastsnapheld, zfs_get_name(zhp),
-			    sizeof (hra->lastsnapheld));
-		}
-	} else {
-		error = zfs_release(hra->origin, thissnap, hra->tag,
-		    hra->recursive);
-	}
-
-	zfs_close(zhp);
-	return (error);
-}
-
-/*
- * Add a user hold on the set of snapshots starting with fromsnap up to
- * and including tosnap. If we're unable to to acquire a particular hold,
- * undo any holds up to that point.
- */
-int
-zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
-    const char *tag, boolean_t recursive, boolean_t temphold,
-    snapfilter_cb_t filter_cb, void *cbarg, int cleanup_fd)
-{
-	struct hold_range_arg arg = { 0 };
-	int error;
-
-	arg.origin = zhp;
-	arg.fromsnap = fromsnap;
-	arg.tosnap = tosnap;
-	arg.tag = tag;
-	arg.temphold = temphold;
-	arg.holding = B_TRUE;
-	arg.recursive = recursive;
-	arg.seenfrom = (fromsnap == NULL);
-	arg.filter_cb = filter_cb;
-	arg.filter_cb_arg = cbarg;
-	arg.cleanup_fd = cleanup_fd;
-
-	error = zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg);
-
-	/*
-	 * Make sure we either hold the entire range or none. If we're
-	 * using cleanup-on-exit, we'll let the closing of the cleanup_fd
-	 * do the work for us.
-	 */
-	if (error && arg.lastsnapheld[0] != '\0' &&
-	    (cleanup_fd == -1 || !temphold)) {
-		(void) zfs_release_range(zhp, fromsnap,
-		    (const char *)arg.lastsnapheld, tag, recursive);
-	}
-	return (error);
 }
 
 int
@@ -4119,27 +4022,6 @@ zfs_release(zfs_handle_t *zhp, const char *snapname, const char *tag,
 	}
 
 	return (0);
-}
-
-/*
- * Release a user hold from the set of snapshots starting with fromsnap
- * up to and including tosnap.
- */
-int
-zfs_release_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
-    const char *tag, boolean_t recursive)
-{
-	struct hold_range_arg arg = { 0 };
-
-	arg.origin = zhp;
-	arg.fromsnap = fromsnap;
-	arg.tosnap = tosnap;
-	arg.tag = tag;
-	arg.recursive = recursive;
-	arg.seenfrom = (fromsnap == NULL);
-	arg.cleanup_fd = -1;
-
-	return (zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg));
 }
 
 uint64_t

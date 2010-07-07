@@ -182,6 +182,8 @@ void dsl_dataset_drop_ref(dsl_dataset_t *ds, void *tag);
 boolean_t dsl_dataset_tryown(dsl_dataset_t *ds, boolean_t inconsistentok,
     void *tag);
 void dsl_dataset_make_exclusive(dsl_dataset_t *ds, void *tag);
+void dsl_register_onexit_hold_cleanup(dsl_dataset_t *ds, const char *htag,
+    minor_t minor);
 uint64_t dsl_dataset_create_sync(dsl_dir_t *pds, const char *lastname,
     dsl_dataset_t *origin, uint64_t flags, cred_t *, dmu_tx_t *);
 uint64_t dsl_dataset_create_sync_dd(dsl_dir_t *dd, dsl_dataset_t *origin,
@@ -198,10 +200,12 @@ int dsl_dataset_clone_swap(dsl_dataset_t *clone, dsl_dataset_t *origin_head,
     boolean_t force);
 int dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
     boolean_t recursive, boolean_t temphold, int cleanup_fd);
+int dsl_dataset_user_hold_for_send(dsl_dataset_t *ds, char *htag,
+    boolean_t temphold);
 int dsl_dataset_user_release(char *dsname, char *snapname, char *htag,
     boolean_t recursive);
 int dsl_dataset_user_release_tmp(struct dsl_pool *dp, uint64_t dsobj,
-    char *htag);
+    char *htag, boolean_t retry);
 int dsl_dataset_get_holds(const char *dsname, nvlist_t **nvp);
 
 blkptr_t *dsl_dataset_get_blkptr(dsl_dataset_t *ds);

@@ -267,6 +267,9 @@ typedef struct zfs_cmd {
 	uint64_t	zc_action_handle;
 	int		zc_cleanup_fd;
 	uint8_t		zc_pad[4];
+	uint64_t	zc_sendobj;
+	uint64_t	zc_fromobj;
+	uint64_t	zc_createtxg;
 } zfs_cmd_t;
 
 typedef struct zfs_useracct {

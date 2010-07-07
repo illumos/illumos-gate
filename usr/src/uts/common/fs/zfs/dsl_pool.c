@@ -768,7 +768,7 @@ dsl_pool_clean_tmp_userrefs(dsl_pool_t *dp)
 		*htag = '\0';
 		++htag;
 		dsobj = strtonum(za.za_name, NULL);
-		(void) dsl_dataset_user_release_tmp(dp, dsobj, htag);
+		(void) dsl_dataset_user_release_tmp(dp, dsobj, htag, B_FALSE);
 	}
 	zap_cursor_fini(&zc);
 }

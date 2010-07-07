@@ -1351,10 +1351,18 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 
 	/* if this stream is dedup'ed, set up the avl tree for guid mapping */
 	if (featureflags & DMU_BACKUP_FEATURE_DEDUP) {
+		minor_t minor;
+
 		if (cleanup_fd == -1) {
 			ra.err = EBADF;
 			goto out;
 		}
+		ra.err = zfs_onexit_fd_hold(cleanup_fd, &minor);
+		if (ra.err) {
+			cleanup_fd = -1;
+			goto out;
+		}
+
 		if (*action_handlep == 0) {
 			ra.guid_to_ds_map =
 			    kmem_alloc(sizeof (avl_tree_t), KM_SLEEP);
@@ -1364,13 +1372,13 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 			(void) dmu_objset_find(drc->drc_top_ds, find_ds_by_guid,
 			    (void *)ra.guid_to_ds_map,
 			    DS_FIND_CHILDREN);
-			ra.err = zfs_onexit_add_cb(cleanup_fd,
+			ra.err = zfs_onexit_add_cb(minor,
 			    free_guid_map_onexit, ra.guid_to_ds_map,
 			    action_handlep);
 			if (ra.err)
 				goto out;
 		} else {
-			ra.err = zfs_onexit_cb_data(cleanup_fd, *action_handlep,
+			ra.err = zfs_onexit_cb_data(minor, *action_handlep,
 			    (void **)&ra.guid_to_ds_map);
 			if (ra.err)
 				goto out;
@@ -1456,6 +1464,9 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 	ASSERT(ra.err != 0);
 
 out:
+	if ((featureflags & DMU_BACKUP_FEATURE_DEDUP) && (cleanup_fd != -1))
+		zfs_onexit_fd_rele(cleanup_fd);
+
 	if (ra.err != 0) {
 		/*
 		 * destroy what we created, so we don't leave it in the

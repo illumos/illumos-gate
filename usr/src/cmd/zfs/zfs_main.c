@@ -2888,7 +2888,7 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 		}
 		if (holding) {
 			if (zfs_hold(zhp, delim+1, tag, recursive,
-			    temphold, B_FALSE, -1) != 0)
+			    temphold, B_FALSE, -1, 0, 0) != 0)
 				++errors;
 		} else {
 			if (zfs_release(zhp, delim+1, tag, recursive) != 0)

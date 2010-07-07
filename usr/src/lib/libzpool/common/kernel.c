@@ -946,7 +946,21 @@ kmem_asprintf(const char *fmt, ...)
 
 /* ARGSUSED */
 int
-zfs_onexit_add_cb(int fd, void (*func)(void *), void *data,
+zfs_onexit_fd_hold(int fd, minor_t *minorp)
+{
+	*minorp = 0;
+	return (0);
+}
+
+/* ARGSUSED */
+void
+zfs_onexit_fd_rele(int fd)
+{
+}
+
+/* ARGSUSED */
+int
+zfs_onexit_add_cb(minor_t minor, void (*func)(void *), void *data,
     uint64_t *action_handle)
 {
 	return (0);
@@ -954,14 +968,14 @@ zfs_onexit_add_cb(int fd, void (*func)(void *), void *data,
 
 /* ARGSUSED */
 int
-zfs_onexit_del_cb(int fd, uint64_t action_handle, boolean_t fire)
+zfs_onexit_del_cb(minor_t minor, uint64_t action_handle, boolean_t fire)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 int
-zfs_onexit_cb_data(int fd, uint64_t action_handle, void **data)
+zfs_onexit_cb_data(minor_t minor, uint64_t action_handle, void **data)
 {
 	return (0);
 }

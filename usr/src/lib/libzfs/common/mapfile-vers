@@ -75,7 +75,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_get_type;
 	zfs_history_event_names;
 	zfs_hold;
-	zfs_hold_range;
 	zfs_is_mounted;
 	zfs_is_shared;
 	zfs_is_shared_nfs;
@@ -121,7 +120,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_receive;
 	zfs_refresh_properties;
 	zfs_release;
-	zfs_release_range;
 	zfs_rename;
 	zfs_rollback;
 	zfs_send;
