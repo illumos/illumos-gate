@@ -35,9 +35,12 @@
 #include <priv.h>
 #include <errno.h>
 #include <ctype.h>
+#include <nss.h>
+#include <bsm/libbsm.h>
 #include <tsol/label.h>
 #include "funcs.h"
 #include "messages.h"
+#undef	GROUP
 #include "userdefs.h"
 
 typedef struct ua_key {
@@ -57,6 +60,8 @@ static const char lock[] = "lock_after_retries value";
 static const char label[] = "label";
 static const char idlecmd[] = "idlecmd value";
 static const char idletime[] = "idletime value";
+static const char auditflags[] = "audit mask";
+static char	  auditerr[256];
 
 
 static const char *check_auth(const char *);
@@ -69,6 +74,7 @@ static const char *check_lock_after_retries(const char *);
 static const char *check_label(const char *);
 static const char *check_idlecmd(const char *);
 static const char *check_idletime(const char *);
+static const char *check_auditflags(const char *);
 
 int nkeys;
 
@@ -86,6 +92,7 @@ static ua_key_t keys[] = {
 	{ USERATTR_MINLABEL,	check_label,	label },
 	{ USERATTR_IDLECMD_KW,	check_idlecmd,	idlecmd },
 	{ USERATTR_IDLETIME_KW,	check_idletime,	idletime },
+	{ USERATTR_AUDIT_FLAGS_KW, check_auditflags, auditflags },
 };
 
 #define	NKEYS	(sizeof (keys)/sizeof (ua_key_t))
@@ -461,6 +468,49 @@ check_idletime(const char *time)
 			return (time);
 		c = *++up;
 	}
+
+	return (NULL);
+}
+
+static const char *
+check_auditflags(const char *auditflags)
+{
+	au_mask_t mask;
+	char	*flags;
+	char	*last = NULL;
+	char	*err = "NULL";
+
+	/* if deleting audit_flags */
+	if (*auditflags == '\0') {
+		return (NULL);
+	}
+
+	if ((flags = _strdup_null((char *)auditflags)) == NULL) {
+		errmsg(M_NOSPACE);
+		exit(EX_FAILURE);
+	}
+
+	if (!__chkflags(_strtok_escape(flags, KV_AUDIT_DELIMIT, &last), &mask,
+	    B_FALSE, &err)) {
+		(void) snprintf(auditerr, sizeof (auditerr),
+		    "always mask \"%s\"", err);
+		free(flags);
+		return (auditerr);
+	}
+	if (!__chkflags(_strtok_escape(NULL, KV_AUDIT_DELIMIT, &last), &mask,
+	    B_FALSE, &err)) {
+		(void) snprintf(auditerr, sizeof (auditerr),
+		    "never mask \"%s\"", err);
+		free(flags);
+		return (auditerr);
+	}
+	if (last != NULL) {
+		(void) snprintf(auditerr, sizeof (auditerr), "\"%s\"",
+		    auditflags);
+		free(flags);
+		return (auditerr);
+	}
+	free(flags);
 
 	return (NULL);
 }

@@ -67,8 +67,6 @@ SYMBOL_VERSION SUNW_0.8 {
 	getauevent_r;
 	getauevnam_r;
 	getauevnum_r;
-	getauuserent_r;
-	getauusernam_r;
 } SUNW_0.7;
 
 SYMBOL_VERSION SUNW_0.7 {
@@ -99,7 +97,6 @@ SYMBOL_VERSION SUNW_0.7 {
 	endac;
 	endauclass;
 	endauevent;
-	endauuser;
 	getacdir;
 	getacflg;
 	getacmin;
@@ -114,15 +111,12 @@ SYMBOL_VERSION SUNW_0.7 {
 	getauevnonam;
 	getauevnum;
 	getauid;
-	getauuserent;
-	getauusernam;
 	getfauditflags;
 	setac;
 	setauclass;
 	setaudit;
 	setauevent;
 	setauid;
-	setauuser;
 };
 
 SYMBOL_VERSION SUNWprivate_1.1 {

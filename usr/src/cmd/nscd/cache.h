@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _NSCD_H
@@ -303,7 +302,7 @@ typedef struct nsc_lookup_args {
 	size_t		bufsize;
 } nsc_lookup_args_t;
 
-#define	CACHE_CTX_COUNT	20
+#define	CACHE_CTX_COUNT	19
 
 /* Context initialization */
 extern void passwd_init_ctx(nsc_ctx_t *);
@@ -318,7 +317,6 @@ extern void rpc_init_ctx(nsc_ctx_t *);
 extern void proto_init_ctx(nsc_ctx_t *);
 extern void net_init_ctx(nsc_ctx_t *);
 extern void bootp_init_ctx(nsc_ctx_t *);
-extern void auuser_init_ctx(nsc_ctx_t *);
 extern void auth_init_ctx(nsc_ctx_t *);
 extern void serv_init_ctx(nsc_ctx_t *);
 extern void netmask_init_ctx(nsc_ctx_t *);

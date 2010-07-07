@@ -20,83 +20,90 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#include <sys/types.h>
-#include <stdio.h>
-#include <bsm/audit.h>
+#include <errno.h>
+#include <nss.h>
+#include <secdb.h>
+#include <stdlib.h>
+#include <string.h>
+#include <user_attr.h>
+#include <zone.h>
+
 #include <bsm/libbsm.h>
 
-#define	AUDITSTRING_LEN 512
+#include <adt_xlate.h>		/* adt_write_syslog */
+
+/* ARGSUSED */
+static int
+audit_flags(const char *name, kva_t *kva, void *ctxt, void *pres)
+{
+	char *val;
+
+	if ((val = kva_match(kva, USERATTR_AUDIT_FLAGS_KW)) != NULL) {
+		if ((*(char **)ctxt = strdup(val)) == NULL) {
+			adt_write_syslog("au_user_mask strdup failed", errno);
+		}
+		return (1);
+	}
+	return (0);
+}
 
 /*
- * Initialize audit preselection mask. This function should be used
- * by applications like login that set the process preselection mask
- * when a connection or a session is created.
+ * Build user's audit preselection mask.
  *
- * First, the system wide default audit flags are obtained
- *	from the audit_control(5) file.
+ * per-user audit flags are optional and may be missing.
+ * If global zone auditing is set, a local zone cannot reduce the default
+ * flags.
  *
- * Next, the "always audit" flags, obtained from the audit_user(5) database,
- *	are added.
- *
- * Finally, the "never audit" flags, also obtained from the audit_user(5)
- *	database, are subtracted.
- *
- * The mask returned can be expressed as:
- *
- * (default audit flags + alway audit flags) - never audit flags
- *
- * If the lookup to audit_control(5) fails, then this function returns
- * an error.  If the lookup to audit_user(5), the function silently
- * continues.
+ * success flags = (system default success flags + per-user always success) -
+ *			per-user never success flags
+ * failure flags = (system default failure flags + per-user always failure) -
+ *			per-user never failure flags
  */
-int
-au_user_mask(char *username, au_mask_t *p_mask)
-{
-	char auditstring[AUDITSTRING_LEN];
-	au_user_ent_t *p_user = NULL;
-	int retval = -1;
 
-	if (p_mask == NULL)
+int
+au_user_mask(char *user, au_mask_t *mask)
+{
+	char		*last = NULL;
+	char		deflt[360];	/* matches stuff in getac*.c */
+	char		*user_flags = NULL;
+
+	if (mask == NULL) {
 		return (-1);
+	}
 
 	/*
-	 * Get the system wide default audit flags out of the audit_control(5)
-	 * file.
+	 * Get the default audit flags.
 	 */
+
 	setac();
-	if (getacflg(auditstring, AUDITSTRING_LEN) == 0) {
-		if (getauditflagsbin(auditstring, p_mask) == 0) {
-			retval = 0;
-		}
+	if (getacflg(deflt, sizeof (deflt)) != 0) {
+		endac();
+		return (-1);
 	}
 	endac();
+	(void) getauditflagsbin(deflt, mask);
 
 	/*
-	 * If you can't get the system wide flags, return an error code
-	 * now and don't bother trying to get the user specific flags.
+	 * Get per-user audit flags.
 	 */
-	if (retval != 0) {
-		return (-1);
-	}
+	(void) _enum_attrs(user, audit_flags, &user_flags, NULL);
+	if (user_flags != NULL) {
+		au_user_ent_t  per_user;
 
-	/*
-	 * Get the always audit flags and the never audit flags from
-	 * the audit_user(5) database.
-	 */
-	setauuser();
-	if ((p_user = getauusernam(username)) != (au_user_ent_t *)NULL) {
-		/* Add always audit flags. */
-		p_mask->as_success |= p_user->au_always.as_success;
-		p_mask->as_failure |= p_user->au_always.as_failure;
-		/* Subtract never audit flags.  */
-		p_mask->as_success &= ~(p_user->au_never.as_success);
-		p_mask->as_failure &= ~(p_user->au_never.as_failure);
+		(void) getauditflagsbin(_strtok_escape(user_flags,
+		    KV_AUDIT_DELIMIT, &last), &(per_user.au_always));
+		(void) getauditflagsbin(_strtok_escape(NULL,
+		    KV_AUDIT_DELIMIT, &last), &(per_user.au_never));
+		/* merge default and per-user */
+		mask->as_success |= per_user.au_always.as_success;
+		mask->as_failure |= per_user.au_always.as_failure;
+		mask->as_success &= ~(per_user.au_never.as_success);
+		mask->as_failure &= ~(per_user.au_never.as_failure);
+		free(user_flags);
 	}
-	endauuser();
 
 	return (0);
 }

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -505,7 +504,7 @@ usage(char *s)
 	(void) fprintf(stderr,
 	    "\n	Supported caches:\n");
 	(void) fprintf(stderr,
-	    "	  audit_user, auth_attr, bootparams, ethers\n");
+	    "	  auth_attr, bootparams, ethers\n");
 	(void) fprintf(stderr,
 	    "	  exec_attr, group, hosts, ipnodes, netmasks\n");
 	(void) fprintf(stderr,

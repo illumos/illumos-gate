@@ -176,18 +176,6 @@ extern au_class_ent_t *getauclassnam(char *);
 extern au_class_ent_t *getauclassnam_r(au_class_ent_t *, char *);
 
 /*
- * Functions that manipulate audit attributes of users
- */
-
-void	setauuser(void);
-void	endauuser(void);
-
-au_user_ent_t *getauuserent(void);
-au_user_ent_t *getauuserent_r(au_user_ent_t *);
-au_user_ent_t *getauusernam(char *);
-au_user_ent_t *getauusernam_r(au_user_ent_t *, char *);
-
-/*
  * Functions that manipulate the audit control file
  */
 
@@ -238,8 +226,6 @@ extern int	getauid(au_id_t *);
 extern int	setaudit(auditinfo_t *);
 extern int	setaudit_addr(auditinfo_addr_t *, int);
 extern int	setauid(au_id_t *);
-
-#define	BSM_TEXTBUFSZ	256 /* size of string for generic text token */
 
 /*
  * Defines for au_preselect(3)

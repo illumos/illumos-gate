@@ -19,15 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -44,6 +40,7 @@
 #include <fcntl.h>
 #include <secdb.h>
 #include <user_attr.h>
+#include <nss.h>
 
 #define	CMT_SIZE	(128+1)	/* Argument sizes + 1 (for '\0') */
 #define	DIR_SIZE	(256+1)
@@ -98,6 +95,7 @@ kvopts_t ua_opts[] =  {
 { '\0', USERATTR_MINLABEL },
 { '\0', USERATTR_IDLECMD_KW },
 { '\0', USERATTR_IDLETIME_KW },
+{ '\0', USERATTR_AUDIT_FLAGS_KW },
 };
 
 #define	UA_KEYS		(sizeof (ua_opts)/sizeof (kvopts_t))
@@ -207,7 +205,7 @@ putuserattrent(userattr_t *user, FILE *f)
 
 	for (i = j = 0; i < user->attr->length; i++) {
 		key = kv_pair[i].key;
-		val = kv_pair[i].value;
+		val = _escape(kv_pair[i].value, KV_SPECIAL);
 		if ((key == NULL) || (val == NULL))
 			break;
 		if (strlen(val) == 0)
@@ -367,7 +365,7 @@ main(int argc, char **argv)
 	/* parse the command line */
 
 	while ((c = getopt(argc, argv,
-			    "ml:c:h:u:g:s:f:e:k:A:P:R:T:oadK:")) != -1) {
+	    "ml:c:h:u:g:s:f:e:k:A:P:R:T:oadK:")) != -1) {
 
 		switch (c) {
 		case 'm':
@@ -448,24 +446,24 @@ main(int argc, char **argv)
 			    strpbrk(optarg, ":\n"))
 				bad_arg("Invalid argument to option -c");
 
-			    optn_mask |= C_MASK;
-			    passwd_st.pw_comment = optarg;
-			    passwd_st.pw_gecos = optarg;
-			    break;
+				optn_mask |= C_MASK;
+				passwd_st.pw_comment = optarg;
+				passwd_st.pw_gecos = optarg;
+				break;
 
 		case 'h' :
-			    /* The home directory */
+			/* The home directory */
 
-			    if ((D_MASK|H_MASK) & optn_mask)
-				    bad_usage("Invalid combination of options");
+			if ((D_MASK|H_MASK) & optn_mask)
+				bad_usage("Invalid combination of options");
 
-			    if (strlen(optarg) > (size_t)DIR_SIZE ||
-				strpbrk(optarg, ":\n"))
-				    bad_arg("Invalid argument to option -h");
+			if (strlen(optarg) > (size_t)DIR_SIZE ||
+			    strpbrk(optarg, ":\n"))
+				bad_arg("Invalid argument to option -h");
 
-			    optn_mask |= H_MASK;
-			    passwd_st.pw_dir = optarg;
-			    break;
+			optn_mask |= H_MASK;
+			passwd_st.pw_dir = optarg;
+			break;
 
 		case 'u' :
 			/* The uid */
@@ -551,9 +549,10 @@ main(int argc, char **argv)
 
 			for (i = 0; i < UA_KEYS; i++) {
 				if (strcmp(optarg, ua_opts[i].key) == 0) {
-					ua_opts[i].newvalue = char_p;
+					ua_opts[i].newvalue =
+					    _escape(char_p, KV_SPECIAL);
 					assign_attr(&userattr_st, optarg,
-						char_p);
+					    char_p);
 					break;
 				}
 			}
@@ -570,21 +569,25 @@ main(int argc, char **argv)
 		default :
 			/* Extended User Attributes */
 			{
-			    int j;
+				int j;
 
-			    for (j = 0; j < UA_KEYS; j++) {
-				if (ua_opts[j].option == (char)c) {
-					if ((D_MASK) & optn_mask)
-						bad_usage("Invalid combination"
-							" of options");
-					optn_mask |= UATTR_MASK;
-					assign_attr(&userattr_st,
-					    ua_opts[j].key, optarg);
-					ua_opts[j].newvalue = optarg;
-					break;
+				for (j = 0; j < UA_KEYS; j++) {
+					if (ua_opts[j].option == (char)c) {
+						if ((D_MASK) & optn_mask)
+							bad_usage("Invalid "
+							"combination of "
+							" options");
+						optn_mask |= UATTR_MASK;
+						assign_attr(&userattr_st,
+						    ua_opts[j].key,
+						    _escape(optarg,
+						    KV_SPECIAL));
+						ua_opts[j].newvalue =
+						    _escape(optarg, KV_SPECIAL);
+						break;
+					}
 				}
-			    }
-			    break;
+				break;
 			}
 		}
 	}
@@ -601,8 +604,8 @@ main(int argc, char **argv)
 	    ((optn_mask & M_MASK) &&
 	    !(optn_mask &
 	    (L_MASK|C_MASK|H_MASK|U_MASK|G_MASK|S_MASK|F_MASK|
-		E_MASK|UATTR_MASK))))
-			bad_usage("Invalid command syntax");
+	    E_MASK|UATTR_MASK))))
+		bad_usage("Invalid command syntax");
 
 	/* null string argument or bad characters ? */
 	if ((strlen(argv[optind]) == 0) || strpbrk(argv[optind], ":\n"))
@@ -637,8 +640,8 @@ main(int argc, char **argv)
 	/* Check the number of password files we are touching */
 
 	if ((!((M_MASK & optn_mask) && !(L_MASK & optn_mask))) ||
-		((M_MASK & optn_mask) && ((E_MASK & optn_mask) ||
-			(F_MASK & optn_mask))))
+	    ((M_MASK & optn_mask) && ((E_MASK & optn_mask) ||
+	    (F_MASK & optn_mask))))
 		info_mask |= BOTH_FILES;
 
 	if ((D_MASK|L_MASK|UATTR_MASK) & optn_mask)
@@ -656,10 +659,10 @@ main(int argc, char **argv)
 			if (unlink(PASSTEMP)) {
 				msg = "%s: warning: cannot unlink %s\n";
 				(void) fprintf(stderr, gettext(msg), prognamp,
-						PASSTEMP);
+				    PASSTEMP);
 			}
 			fd_ptemp = open(PASSTEMP, O_CREAT|O_EXCL|O_WRONLY,
-					statbuf.st_mode);
+			    statbuf.st_mode);
 			if (fd_ptemp == -1) {
 				file_error();
 			}
@@ -678,7 +681,7 @@ main(int argc, char **argv)
 		if (unlink(PASSTEMP)) {
 			msg = "%s: warning: cannot unlink %s\n";
 			(void) fprintf(stderr, gettext(msg), prognamp,
-				PASSTEMP);
+			    PASSTEMP);
 		}
 		file_error();
 	}
@@ -695,11 +698,10 @@ main(int argc, char **argv)
 				if (unlink(SHADTEMP)) {
 					msg = "%s: warning: cannot unlink %s\n";
 					(void) fprintf(stderr, gettext(msg),
-						prognamp, SHADTEMP);
+					    prognamp, SHADTEMP);
 				}
 				fd_stemp = open(SHADTEMP,
-						O_CREAT|O_EXCL|O_WRONLY,
-						statbuf.st_mode);
+				    O_CREAT|O_EXCL|O_WRONLY, statbuf.st_mode);
 				if (fd_stemp == -1) {
 					rid_tmpf();
 					file_error();
@@ -736,11 +738,10 @@ main(int argc, char **argv)
 				if (unlink(USERATTR_TEMP)) {
 					msg = "%s: warning: cannot unlink %s\n";
 					(void) fprintf(stderr, gettext(msg),
-						prognamp, USERATTR_TEMP);
+					    prognamp, USERATTR_TEMP);
 				}
 				fd_uatemp = open(USERATTR_TEMP,
-					O_CREAT|O_EXCL|O_WRONLY,
-						statbuf.st_mode);
+				    O_CREAT|O_EXCL|O_WRONLY, statbuf.st_mode);
 				if (fd_uatemp == -1) {
 					rid_tmpf();
 					file_error();
@@ -913,10 +914,10 @@ main(int argc, char **argv)
 
 				if (optn_mask & C_MASK) {
 					pw_ptr1p->pw_comment =
-						passwd_st.pw_comment;
+					    passwd_st.pw_comment;
 
 					pw_ptr1p->pw_gecos =
-						passwd_st.pw_comment;
+					    passwd_st.pw_comment;
 				}
 
 				if (optn_mask & H_MASK)
@@ -999,7 +1000,7 @@ main(int argc, char **argv)
 			}
 			while ((n = fread(buf, sizeof (char), 1024, pwf)) > 0) {
 				if (fwrite(buf, sizeof (char), n, fp_ptemp)
-					!= n) {
+				    != n) {
 					rid_tmpf();
 					file_error();
 				}
@@ -1076,10 +1077,10 @@ main(int argc, char **argv)
 					sp_ptr1p->sp_namp = shadow_st.sp_namp;
 					if (F_MASK & optn_mask)
 						sp_ptr1p->sp_inact =
-							shadow_st.sp_inact;
+						    shadow_st.sp_inact;
 					if (E_MASK & optn_mask)
 						sp_ptr1p->sp_expire =
-							shadow_st.sp_expire;
+						    shadow_st.sp_expire;
 
 					ck_s_sz(sp_ptr1p);
 				}
@@ -1240,7 +1241,7 @@ main(int argc, char **argv)
 							continue;
 						value =
 						    kva_match(ua_ptr1p->attr,
-							(char *)ua_opts[j].key);
+						    (char *)ua_opts[j].key);
 						if (value == NULL)
 							continue;
 						assign_attr(&userattr_st,
@@ -1460,14 +1461,14 @@ add_uid(uid_t uid)
 					uid_p = uid_p->link;
 
 				else if (uid >= uid_p->low &&
-						uid <= uid_p->high) {
+				    uid <= uid_p->high) {
 					uid_p = NULL;
 				}
 
 				else if (uid == (uid_p->high+1)) {
 
 					if (++uid_p->high ==
-						(uid_p->link->low - 1)) {
+					    (uid_p->link->low - 1)) {
 						uid_bcom(uid_p);
 					}
 					uid_p = NULL;
@@ -1490,7 +1491,7 @@ add_uid(uid_t uid)
 					uid_p->high++;
 					uid_p = NULL;
 				} else if (uid >= uid_p->low &&
-					uid <= uid_p->high) {
+				    uid <= uid_p->high) {
 					uid_p = NULL;
 				} else {
 					add_ublk(uid, uid_p);
@@ -1611,11 +1612,11 @@ ck_p_sz(struct passwd *pwp)
 	/* fields will fit in a passwd entry. The 1 accounts for the */
 	/* newline and the 6 accounts for the colons (:'s) */
 	if (((int)strlen(pwp->pw_name) + 1 +
-		sprintf(ctp, "%d", pwp->pw_uid) +
-		sprintf(ctp, "%d", pwp->pw_gid) +
-		(int)strlen(pwp->pw_comment) +
-		(int)strlen(pwp->pw_dir)	+
-		(int)strlen(pwp->pw_shell) + 6) > (ENTRY_LENGTH-1)) {
+	    sprintf(ctp, "%d", pwp->pw_uid) +
+	    sprintf(ctp, "%d", pwp->pw_gid) +
+	    (int)strlen(pwp->pw_comment) +
+	    (int)strlen(pwp->pw_dir) +
+	    (int)strlen(pwp->pw_shell) + 6) > (ENTRY_LENGTH-1)) {
 		rid_tmpf();
 		bad_arg("New password entry too long");
 	}
@@ -1631,13 +1632,13 @@ ck_s_sz(struct spwd *ssp)
 	/* fields will fit in a shadow entry. The 1 accounts for the */
 	/* newline and the 7 accounts for the colons (:'s) */
 	if (((int)strlen(ssp->sp_namp) + 1 +
-		(int)strlen(ssp->sp_pwdp) +
-		sprintf(ctp, "%d", ssp->sp_lstchg) +
-		sprintf(ctp, "%d", ssp->sp_min) +
-		sprintf(ctp, "%d", ssp->sp_max) +
-		sprintf(ctp, "%d", ssp->sp_warn) +
-		sprintf(ctp, "%d", ssp->sp_inact) +
-		sprintf(ctp, "%d", ssp->sp_expire) + 7) > (ENTRY_LENGTH - 1)) {
+	    (int)strlen(ssp->sp_pwdp) +
+	    sprintf(ctp, "%d", ssp->sp_lstchg) +
+	    sprintf(ctp, "%d", ssp->sp_min) +
+	    sprintf(ctp, "%d", ssp->sp_max) +
+	    sprintf(ctp, "%d", ssp->sp_warn) +
+	    sprintf(ctp, "%d", ssp->sp_inact) +
+	    sprintf(ctp, "%d", ssp->sp_expire) + 7) > (ENTRY_LENGTH - 1)) {
 		rid_tmpf();
 		bad_arg("New password entry too long");
 	}
@@ -1660,7 +1661,7 @@ rid_tmpf(void)
 		if (unlink(SHADTEMP)) {
 			msg = "%s: warning: cannot unlink %s\n";
 			(void) fprintf(stderr, gettext(msg), prognamp,
-				SHADTEMP);
+			    SHADTEMP);
 		}
 	}
 
@@ -1670,7 +1671,7 @@ rid_tmpf(void)
 		if (unlink(USERATTR_TEMP)) {
 			msg = "%s: warning: cannot unlink %s\n";
 			(void) fprintf(stderr, gettext(msg), prognamp,
-				USERATTR_TEMP);
+			    USERATTR_TEMP);
 		}
 	}
 }

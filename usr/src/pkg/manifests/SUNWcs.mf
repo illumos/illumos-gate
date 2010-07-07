@@ -442,7 +442,6 @@ file path=etc/saf/zsmon/_pmtab group=sys preserve=true
 file path=etc/security/audit_class group=sys preserve=renamenew
 file path=etc/security/audit_control group=sys preserve=renamenew
 file path=etc/security/audit_event group=sys preserve=renamenew
-file path=etc/security/audit_user group=sys preserve=renamenew
 file path=etc/security/audit_warn group=sys mode=0740 preserve=renamenew
 file path=etc/security/auth_attr group=sys preserve=true \
     timestamp=19700101T000000Z
