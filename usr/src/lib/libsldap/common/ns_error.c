@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <libintl.h>
@@ -64,7 +61,7 @@ ns_ldaperror_init()
 		ns_ldap_errlist[i++].e_reason = gettext("Object not found");
 		ns_ldap_errlist[i++].e_reason = gettext("Memory failure");
 		ns_ldap_errlist[i++].e_reason =
-			gettext("LDAP configuration problem");
+		    gettext("LDAP configuration problem");
 		ns_ldap_errlist[i++].e_reason = gettext("Partial result");
 		ns_ldap_errlist[i++].e_reason = gettext("LDAP error");
 		ns_ldap_errlist[i++].e_reason = gettext("Invalid parameter");
@@ -84,7 +81,7 @@ __ns_ldap_err2str(int err, char **strmsg)
 		ns_ldaperror_init();
 
 	for (i = 0; (ns_ldap_errlist[i].e_code != err) &&
-			(ns_ldap_errlist[i].e_code != -1); i++) {
+	    (ns_ldap_errlist[i].e_code != -1); i++) {
 		/* empty for loop */
 	}
 	*strmsg = ns_ldap_errlist[i].e_reason;
@@ -95,12 +92,16 @@ __ns_ldap_err2str(int err, char **strmsg)
 int
 __ns_ldap_freeError(ns_ldap_error_t **errorp)
 {
-	ns_ldap_error_t *err = *errorp;
-	if (err) {
-		if (err->message)
-			free(err->message);
-		free(err);
-	}
+	ns_ldap_error_t *err;
+
+	if (errorp == NULL || *errorp == NULL)
+		return (NS_LDAP_SUCCESS);
+
+	err = *errorp;
+	if (err->message)
+		free(err->message);
+
+	free(err);
 	*errorp = NULL;
 	return (NS_LDAP_SUCCESS);
 }
