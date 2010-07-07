@@ -20,9 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* $Id: lpd-query.c 155 2006-04-26 02:34:54Z ktou $ */
@@ -404,11 +402,16 @@ cache_update(service_t *svc)
 {
 	int fd;
 
-	if (svc->cache != NULL)	/* this should be time based */
-		return;
-
 	if (svc == NULL)
 		return;
+
+	if (svc->cache != NULL)	{ /* this should be time based */
+		if (svc->cache->jobs == NULL) {
+			free(svc->cache);
+			svc->cache = NULL;
+		} else
+			return;
+	}
 
 	if ((fd = lpd_open(svc, 'q', NULL, 15)) < 0)
 		return;
@@ -451,6 +454,17 @@ lpd_find_jobs_info(service_t *svc, job_t ***jobs)
 		}
 	}
 
+	/*
+	 * cache jobs is free()-ed in
+	 * libpapi-dynamic/common/printer.c -
+	 * papiPrinterListJobs() cache printer is
+	 * free()-ed by the caller of
+	 * lpd_find_printer_info Invalidate the
+	 * cache by freeing the cache.
+	 */
+	free(svc->cache);
+	svc->cache = NULL;
+
 	return (result);
 }
 
@@ -460,7 +474,7 @@ lpd_find_job_info(service_t *svc, int job_id, job_t **job)
 	papi_status_t result = PAPI_BAD_ARGUMENT;
 	job_t **jobs;
 
-	if (lpd_find_jobs_info(svc, &jobs) != PAPI_OK) {
+	if ((lpd_find_jobs_info(svc, &jobs) == PAPI_OK) && (jobs != NULL)) {
 		int i;
 
 		*job = NULL;
