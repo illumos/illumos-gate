@@ -775,7 +775,6 @@ file path=usr/bin/fdformat mode=4555
 file path=usr/bin/fgrep mode=0555
 file path=usr/bin/file mode=0555
 file path=usr/bin/find mode=0555
-file path=usr/bin/fmli mode=0755
 file path=usr/bin/fmt mode=0555
 file path=usr/bin/fmtmsg mode=0555
 file path=usr/bin/fold mode=0555

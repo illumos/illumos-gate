@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T.	*/
@@ -217,7 +216,7 @@ static struct pathmap {
 	 * Restrict to section 1 so that whatis /usr/{,xpg4,xpg6}/bin/ls
 	 * does not confuse users with section 1 and 1b
 	 */
-	{"/usr/bin",		"/usr/share/man,1,1m,1s,1t,1c,1f", 	0, 0},
+	{"/usr/bin",		"/usr/share/man,1,1m,1s,1t,1c", 	0, 0},
 	{"/usr/xpg4/bin",	"/usr/share/man,1",			0, 0},
 	{"/usr/xpg6/bin",	"/usr/share/man,1",			0, 0},
 	{NULL,			NULL,					0, 0}
@@ -768,7 +767,7 @@ getsect(struct man_node *manp, char **pv)
 		manp->defsrch = 1;
 /*
  * TRANSLATION_NOTE - message for man -d or catman -p
- * ex. /usr/share/man: from man.cf, MANSECTS=1,1m,1c,1f
+ * ex. /usr/share/man: from man.cf, MANSECTS=1,1m,1c
  */
 		if (debug)
 			(void) fprintf(stdout, gettext(

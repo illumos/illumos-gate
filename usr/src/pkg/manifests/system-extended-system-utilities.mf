@@ -127,7 +127,6 @@ file path=usr/bin/unix2dos mode=0555
 file path=usr/bin/unpack mode=0555
 file path=usr/bin/uudecode group=uucp mode=0555
 file path=usr/bin/uuencode group=uucp mode=0555
-file path=usr/bin/vsig mode=0755
 file path=usr/bin/yes mode=0555
 file path=usr/lib/$(ARCH64)/madv.so.1
 file path=usr/lib/$(ARCH64)/mpss.so.1
