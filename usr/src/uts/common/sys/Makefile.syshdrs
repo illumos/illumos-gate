@@ -64,6 +64,9 @@ ib/clients/of/sol_ofs/%.check:		ib/clients/of/sol_ofs/%.h
 ib/clients/of/sol_uverbs/%.check:	ib/clients/of/sol_uverbs/%.h
 	$(DOT_H_CHECK)
 
+ib/clients/of/sol_umad/%.check:		ib/clients/of/sol_umad/%.h
+	$(DOT_H_CHECK)
+
 ib/clients/of/sol_ucma/%.check:		ib/clients/of/sol_ucma/%.h
 	$(DOT_H_CHECK)
 
@@ -207,6 +210,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/ib/clients/of/rdma	\
 	$(ROOTDIR)/ib/clients/of/sol_ofs	\
 	$(ROOTDIR)/ib/clients/of/sol_uverbs	\
+	$(ROOTDIR)/ib/clients/of/sol_umad	\
 	$(ROOTDIR)/ib/clients/of/sol_ucma	\
 	$(ROOTDIR)/idm		\
 	$(ROOTDIR)/iscsit	\
@@ -262,6 +266,7 @@ ROOTOFHDRS= $(OFHDRS:%=$(ROOTDIR)/ib/clients/of/%)
 ROOTRDMAHDRS= $(RDMAHDRS:%=$(ROOTDIR)/ib/clients/of/rdma/%)
 ROOTSOL_OFSHDRS= $(SOL_OFSHDRS:%=$(ROOTDIR)/ib/clients/of/sol_ofs/%)
 ROOTSOL_UVERBSHDRS= $(SOL_UVERBSHDRS:%=$(ROOTDIR)/ib/clients/of/sol_uverbs/%)
+ROOTSOL_UMADHDRS= $(SOL_UMADHDRS:%=$(ROOTDIR)/ib/clients/of/sol_umad/%)
 ROOTSOL_UCMAHDRS= $(SOL_UCMAHDRS:%=$(ROOTDIR)/ib/clients/of/sol_ucma/%)
 ROOTTAVORHDRS= $(TAVORHDRS:%=$(ROOTDIR)/ib/adapters/tavor/%)
 ROOTHERMONHDRS= $(HERMONHDRS:%=$(ROOTDIR)/ib/adapters/hermon/%)
@@ -389,6 +394,9 @@ $(ROOTDIR)/ib/clients/of/sol_ofs/%:	ib/clients/of/sol_ofs/%
 	$(INS.file)
 
 $(ROOTDIR)/ib/clients/of/sol_uverbs/%:	ib/clients/of/sol_uverbs/%
+	$(INS.file)
+
+$(ROOTDIR)/ib/clients/of/sol_umad/%:	ib/clients/of/sol_umad/%
 	$(INS.file)
 
 $(ROOTDIR)/ib/clients/of/sol_ucma/%:	ib/clients/of/sol_ucma/%

@@ -709,6 +709,8 @@ SOL_UCMA_OBJS +=	sol_ucma.o
 SOL_UVERBS_OBJS +=	sol_uverbs.o sol_uverbs_comp.o sol_uverbs_event.o \
 			sol_uverbs_hca.o sol_uverbs_qp.o
 
+SOL_UMAD_OBJS += sol_umad.o
+
 KSTAT_OBJS +=	kstat.o
 
 KSYMS_OBJS +=	ksyms.o

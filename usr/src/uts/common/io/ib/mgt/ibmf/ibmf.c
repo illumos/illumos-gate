@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -901,6 +901,7 @@ ibmf_msg_transport(ibmf_handle_t ibmf_handle, ibmf_qp_handle_t ibmf_qp_handle,
 	 */
 	if ((ibmf_qp_handle == IBMF_QP_HANDLE_DEFAULT) &&
 	    ((clientp->ic_client_info.client_class != SUBN_AGENT) &&
+	    (clientp->ic_client_info.client_class != SUBN_ADM_AGENT) &&
 	    (clientp->ic_client_info.client_class != SUBN_MANAGER))) {
 
 		if ((msgp->im_local_addr.ia_p_key != IBMF_P_KEY_DEF_FULL) &&

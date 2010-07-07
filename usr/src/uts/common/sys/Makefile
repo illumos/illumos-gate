@@ -738,8 +738,11 @@ OFHDRS=			\
 	ofed_kernel.h
 
 RDMAHDRS=		\
-	ib_verbs.h 	\
+	ib_addr.h	\
+	ib_user_mad.h	\
+	ib_user_sa.h	\
 	ib_user_verbs.h \
+	ib_verbs.h 	\
 	rdma_cm.h 	\
 	rdma_user_cm.h
 
@@ -750,6 +753,9 @@ SOL_UVERBSHDRS=		\
 	sol_uverbs_hca.h	\
 	sol_uverbs_qp.h		\
 	sol_uverbs_event.h
+
+SOL_UMADHDRS=		\
+	sol_umad.h
 
 SOL_UCMAHDRS=		\
 	sol_ucma.h	\
@@ -1242,6 +1248,7 @@ CHECKHDRS=						\
 	$(ROOTOFHDRS)		\
 	$(ROOTRDMAHDRS)		\
 	$(ROOTSOL_OFSHDRS)	\
+	$(ROOTSOL_UMADHDRS)	\
 	$(ROOTSOL_UVERBSHDRS)	\
 	$(ROOTSOL_UCMAHDRS)	\
 	$(ROOTTAVORHDRS)	\
@@ -1310,6 +1317,7 @@ install_h:			\
 	$(ROOTOFHDRS)		\
 	$(ROOTRDMAHDRS)		\
 	$(ROOTSOL_OFSHDRS)	\
+	$(ROOTSOL_UMADHDRS)	\
 	$(ROOTSOL_UVERBSHDRS)	\
 	$(ROOTSOL_UCMAHDRS)	\
 	$(ROOTTAVORHDRS)	\
