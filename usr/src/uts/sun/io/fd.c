@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -2582,9 +2581,6 @@ fdrawioctl(struct fdctlr *fdc, int unit, intptr_t arg, int mode)
 
 	ASSERT(fdc->c_un->un_unit_no == unit);
 
-	FDERRPRINT(FDEP_L1, FDEM_RAWI,
-	    (C, "fdrawioctl: cmd[0]=0x%x\n", fdr.fdr_cmd[0]));
-
 	flag = B_READ;
 	err = 0;
 	fa = NULL;
@@ -2618,6 +2614,9 @@ fdrawioctl(struct fdctlr *fdc, int unit, intptr_t arg, int mode)
 		}
 		break;
 	}
+
+	FDERRPRINT(FDEP_L1, FDEM_RAWI,
+	    (C, "fdrawioctl: cmd[0]=0x%x\n", fdr.fdr_cmd[0]));
 
 	mutex_enter(&fdc->c_lolock);
 
