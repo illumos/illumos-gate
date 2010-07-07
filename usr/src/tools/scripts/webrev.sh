@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -1767,7 +1766,6 @@ function flist_from_mercurial
 	typeset parent=$2
 
 	print " File list from: hg-active -p $parent ...\c"
-
 	if [[ ! -x $HG_ACTIVE ]]; then
 		print		# Blank line for the \c above
 		print -u2 "Error: hg-active tool not found.  Exiting"
@@ -2286,10 +2284,25 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	#
 	# Mercurial priorities:
 	# 1. hg root from CODEMGR_WS environment variable
+	# 1a. hg root from CODEMGR_WS/usr/closed if we're somewhere under
+	#    usr/closed when we run webrev
 	# 2. hg root from directory of invocation
 	#
-	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
-	    codemgr_ws=$(hg root -R $CODEMGR_WS 2>/dev/null)
+	if [[ ${PWD} =~ "usr/closed" ]]; then
+		testparent=${CODEMGR_WS}/usr/closed
+		# If we're in OpenSolaris mode, we enforce a minor policy:
+		# help to make sure the reviewer doesn't accidentally publish
+		# source which is under usr/closed
+		if [[ -n "$Oflag" ]]; then
+			print -u2 "OpenSolaris output not permitted with" \
+			    "usr/closed changes"
+			exit 1
+		fi
+	else
+	        testparent=${CODEMGR_WS}
+	fi
+	[[ -z $codemgr_ws && -n $testparent ]] && \
+	    codemgr_ws=$(hg root -R $testparent 2>/dev/null)
 	[[ -z $codemgr_ws ]] && codemgr_ws=$(hg root 2>/dev/null)
 	CWS=$codemgr_ws
 elif [[ $SCM_MODE == "subversion" ]]; then
@@ -2321,8 +2334,6 @@ fi
 if [[ -z ${CWS} ]]; then
 	CWS=${CODEMGR_WS:-.}
 fi
-
-
 
 #
 # If the command line options indicate no webrev generation, either
@@ -3014,21 +3025,6 @@ do
 
 	# Make the webrev mirror directory if necessary
 	mkdir -p $WDIR/$DIR
-
-	#
-	# If we're in OpenSolaris mode, we enforce a minor policy:
-	# help to make sure the reviewer doesn't accidentally publish
-	# source which is in usr/closed/* or deleted_files/usr/closed/*
-	#
-	if [[ -n "$Oflag" ]]; then
-		pclosed=${P##usr/closed/}
-		pdeleted=${P##deleted_files/usr/closed/}
-		if [[ "$pclosed" != "$P" || "$pdeleted" != "$P" ]]; then
-			print "*** Omitting closed source for OpenSolaris" \
-			    "mode review"
-			continue
-		fi
-	fi
 
 	#
 	# We stash old and new files into parallel directories in $WDIR

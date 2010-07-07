@@ -26,7 +26,6 @@ SHELL=/usr/bin/ksh93
 
 SHFILES= \
 	Install \
-	bfu \
 	bindrop \
 	bldenv \
 	build_cscope \
@@ -40,8 +39,6 @@ SHFILES= \
 	genoffsets \
 	hgsetup \
 	keywords \
-	makebfu \
-	mkbfu \
 	mkclosed \
 	nightly \
 	onu \

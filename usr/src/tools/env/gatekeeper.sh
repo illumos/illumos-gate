@@ -32,7 +32,6 @@
 # area are put into the parent for everyone to use). It is based off
 # the onnv release. It sets NIGHTLY_OPTIONS to make nightly do:
 #	DEBUG and non-DEBUG builds (-D)
-#	creates cpio archives for bfu (-a)
 #	creates packages for PIT/RE (-p)
 #	checks for new interfaces in libraries (-A)
 #	runs 'make check' (-C)
@@ -43,7 +42,7 @@
 #	checks for changes in ELF runpaths (-r)
 #	checks for changes in unreferenced files (-f)
 #
-NIGHTLY_OPTIONS="-aADClmpuUrf";		export NIGHTLY_OPTIONS
+NIGHTLY_OPTIONS="-ADClmpuUrf";		export NIGHTLY_OPTIONS
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself

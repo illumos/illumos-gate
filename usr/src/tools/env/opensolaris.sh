@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #	Configuration variables for the runtime environment of the nightly
@@ -30,7 +29,6 @@
 # off the onnv release. It sets NIGHTLY_OPTIONS to make nightly do:
 #	DEBUG build only (-D, -F)
 #	do not bringover from the parent (-n)
-#	creates cpio archives for bfu (-a)
 #	runs 'make check' (-C)
 #	runs lint in usr/src (-l plus the LINTDIRS variable)
 #	sends mail on completion (-m and the MAILTO variable)
@@ -38,7 +36,7 @@
 #	checks for changes in ELF runpaths (-r)
 #	build and use this workspace's tools in $SRC/tools (-t)
 #
-NIGHTLY_OPTIONS="-FnaCDlmprt";		export NIGHTLY_OPTIONS
+NIGHTLY_OPTIONS="-FnCDlmprt";		export NIGHTLY_OPTIONS
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself
@@ -66,12 +64,6 @@ DMAKE_MAX_JOBS=`maxjobs`;			export DMAKE_MAX_JOBS
 
 # path to onbld tool binaries
 ONBLD_BIN="/opt/onbld/bin"
-
-# used by bfu.
-FASTFS=$ONBLD_BIN/`uname -p`/fastfs;		export FASTFS
-BFULD=$ONBLD_BIN/`uname -p`/bfuld;		export BFULD
-GZIPBIN=/usr/bin/gzip;				export GZIPBIN
-ACR=$ONBLD_BIN/acr;				export ACR
 
 # PARENT_WS is used to determine the parent of this workspace. This is
 # for the options that deal with the parent workspace (such as where the

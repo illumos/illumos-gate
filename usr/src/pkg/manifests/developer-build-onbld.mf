@@ -60,10 +60,8 @@ dir path=opt/onbld/man
 dir path=opt/onbld/man/man1
 dir path=opt/onbld/man/sman1
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
-file path=opt/onbld/bin/$(ARCH)/bfuld mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
 file path=opt/onbld/bin/$(ARCH)/codereview mode=0555
-file path=opt/onbld/bin/$(ARCH)/cpiotranslate mode=0555
 file path=opt/onbld/bin/$(ARCH)/cscope-fast mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfconvert mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfdump mode=0555
@@ -71,7 +69,6 @@ file path=opt/onbld/bin/$(ARCH)/ctfmerge mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfstabs mode=0555
 file path=opt/onbld/bin/$(ARCH)/cw mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/elfextract mode=0555
-file path=opt/onbld/bin/$(ARCH)/fastfs mode=0555
 file path=opt/onbld/bin/$(ARCH)/findunref mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth_preload.so.1 mode=0555
@@ -87,7 +84,6 @@ $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/stabs mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize.exe mode=0555
 file path=opt/onbld/bin/Install mode=0555
-file path=opt/onbld/bin/bfu mode=0555
 file path=opt/onbld/bin/bindrop mode=0555
 file path=opt/onbld/bin/bldenv mode=0555
 file path=opt/onbld/bin/bringovercheck mode=0555
@@ -116,9 +112,7 @@ file path=opt/onbld/bin/interface_cmp mode=0555
 file path=opt/onbld/bin/jstyle mode=0555
 file path=opt/onbld/bin/keywords mode=0555
 file path=opt/onbld/bin/make_pkg_db mode=0555
-file path=opt/onbld/bin/makebfu mode=0555
 file path=opt/onbld/bin/mapfilechk mode=0555
-file path=opt/onbld/bin/mkbfu mode=0555
 file path=opt/onbld/bin/mkclosed mode=0555
 file path=opt/onbld/bin/mkreadme_osol mode=0555
 file path=opt/onbld/bin/mktpl mode=0555

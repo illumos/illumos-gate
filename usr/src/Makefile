@@ -19,8 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+#
 #
 # Makefile for system source
 #
@@ -166,9 +166,9 @@ sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
 # dependent on a number of constant mapfiles, the tools themselves are
 # required to build the generated mapfiles.
 #
-setup: bldtools mapfiles
+setup: closedbins bldtools sgs mapfiles
 
-bldtools: closedbins sgs
+bldtools:
 	@cd tools; pwd; $(MAKE) install
 
 # /var/mail/:saved is a special case because of the colon in the name.
@@ -187,7 +187,7 @@ $(ROOTDIRS) $(MSGDIRS):
 userheaders: FRC
 	@cd head; pwd; $(MAKE) install_h
 
-libheaders: FRC
+libheaders: bldtools
 	@cd lib; pwd; $(MAKE) install_h
 
 sysheaders: FRC

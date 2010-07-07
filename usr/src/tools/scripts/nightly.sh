@@ -175,7 +175,6 @@ function crypto_from_proto {
 function normal_build {
 
 	typeset orig_p_FLAG="$p_FLAG"
-	typeset orig_a_FLAG="$a_FLAG"
 	typeset crypto_in="$ON_CRYPTO_BINS"
 	typeset crypto_signer="$CODESIGN_USER"
 	typeset gencrypto=no
@@ -225,7 +224,6 @@ function normal_build {
 	# DEBUG build ends
 
 	p_FLAG="$orig_p_FLAG"
-	a_FLAG="$orig_a_FLAG"
 }
 
 #
@@ -579,36 +577,6 @@ function myheaders {
 }
 
 #
-# Wrapper over commands that generate BFU archives.  The entire
-# command output gets written to LOGFILE, and any unexpected messages
-# are written to the mail message.  Returns with the status of the
-# original command.
-#
-function makebfu_filt {
-	typeset tmplog
-	typeset errors
-	typeset cmd
-	integer cmd_stat
-
-	cmd="$1"
-	shift
-	tmplog="$TMPDIR/$cmd.out"
-	errors="$TMPDIR/$cmd-errors"
-	$cmd $* > "$tmplog" 2>&1
-	cmd_stat=$?
-	cat "$tmplog" >> "$LOGFILE"
-	grep -v "^Creating .* archive:" "$tmplog" | grep -v "^Making" | \
-	    grep -v "^$" | sort -u > "$errors"
-	if [[ -s "$errors" ]]; then
-		echo "\n==== cpio archives build errors ($LABEL) ====\n" \
-		    >> "$mail_msg_file"
-		cat "$errors" >> "$mail_msg_file"
-	fi
-	rm -f "$tmplog" "$errors"
-	return $cmd_stat
-}
-
-#
 # Unpack the crypto tarball into the proto area.  We first extract the
 # tarball into a temp directory so that we can handle the non-DEBUG
 # tarball correctly with MULTI_PROTO=no.
@@ -635,7 +603,7 @@ function unpack_crypto {
 }
 
 #
-# Function to do the build, including cpio archive and package generation.
+# Function to do the build, including package generation.
 # usage: build LABEL SUFFIX ND MULTIPROTO CRYPTO
 # - LABEL is used to tag build output.
 # - SUFFIX is used to distinguish files (e.g., DEBUG vs non-DEBUG,
@@ -653,7 +621,6 @@ function build {
 	CRYPTOPATH=$5
 	INSTALLOG=install${SUFFIX}-${MACH}
 	NOISE=noise${SUFFIX}-${MACH}
-	CPIODIR=${CPIODIR_ORIG}${SUFFIX}
 	PKGARCHIVE=${PKGARCHIVE_ORIG}${SUFFIX}
 
 	ORIGROOT=$ROOT
@@ -812,28 +779,6 @@ function build {
 			build_ok=n
 			this_build_ok=n
 		fi
-	fi
-
-	#
-	#	Create cpio archives for preintegration testing (PIT)
-	#
-	if [ "$a_FLAG" = "y" -a "$this_build_ok" = "y" ]; then
-		echo "\n==== Creating $LABEL cpio archives at `date` ====\n" \
-			>> $LOGFILE
-		makebfu_filt makebfu
-		# hack for test folks
-		if [ -z "`echo $PARENT_WS|egrep '^\/ws\/'`" ]; then
-			X=/net/`uname -n`${CPIODIR}
-		else
-			X=${CPIODIR}
-		fi
-		echo "Archive_directory: ${X}" >${TMPDIR}/f
-		cp ${TMPDIR}/f $(dirname $(dirname ${CPIODIR}))/.${MACH}_wgtrun
-		rm -f ${TMPDIR}/f
-
-	else
-		echo "\n==== Not creating $LABEL cpio archives ====\n" \
-			>> $LOGFILE
 	fi
 
 	#
@@ -1268,7 +1213,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-U	update proto area in the parent
 	-V VERS set the build version string to VERS
 	-X	copy x86 IHV proto area
-	-a	create cpio archives
 	-f	find unreferenced files
 	-i	do an incremental build (no "make clobber")
 	-l	do "make lint" in $LINTDIRS (default: $SRC y)
@@ -1300,7 +1244,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 
 # default values for low-level FLAGS; G I R are group FLAGS
 A_FLAG=n
-a_FLAG=n
 C_FLAG=n
 D_FLAG=n
 F_FLAG=n
@@ -1324,7 +1267,6 @@ V_FLAG=n
 W_FLAG=n
 w_FLAG=n
 X_FLAG=n
-z_FLAG=n
 SD_FLAG=n
 SE_FLAG=n
 SH_FLAG=n
@@ -1534,7 +1476,7 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts +AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
+while getopts +ABCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
@@ -1551,8 +1493,6 @@ do
 			exit 1;
 		fi
 		;;
-	  a )	a_FLAG=y
-		;;
 	  B )	D_FLAG=y
 		;; # old version of D
 	  C )	C_FLAG=y
@@ -1563,11 +1503,9 @@ do
 		;;
 	  f )	f_FLAG=y
 		;;
-	  G )   a_FLAG=y
-		u_FLAG=y
+	  G )   u_FLAG=y
 		;;
-	  I )	a_FLAG=y
-		m_FLAG=y
+	  I )	m_FLAG=y
 		p_FLAG=y
 		u_FLAG=y
 		;;
@@ -1628,8 +1566,6 @@ do
 		fi
 		;;
 	  x )	XMOD_OPT="-x"
-		;;
-	  z )	z_FLAG=y
 		;;
 	 \? )	echo "$USAGE"
 		exit 1
@@ -1950,7 +1886,6 @@ PARENT_ROOT=
 export ENVLDLIBS3 ENVCPPFLAGS1 ENVCPPFLAGS2 ENVCPPFLAGS3 ENVCPPFLAGS4 \
 	PARENT_ROOT
 
-CPIODIR_ORIG=$CPIODIR
 PKGARCHIVE_ORIG=$PKGARCHIVE
 IA32_IHV_PKGS_ORIG=$IA32_IHV_PKGS
 
@@ -2226,17 +2161,6 @@ EOF
 		fi
 		echo "" | tee -a $mail_msg_file >> $LOGFILE
 	fi
-fi
-
-if [ "$O_FLAG" = "y" -a "$a_FLAG" = "n" ]; then
-	echo "WARNING: OpenSolaris deliveries (-O) require archives;" \
-	    "enabling the -a flag." | tee -a $mail_msg_file >> $LOGFILE
-	a_FLAG=y
-fi
-
-if [ "$a_FLAG" = "y" -a "$D_FLAG" = "n" -a "$F_FLAG" = "y" ]; then
-	echo "WARNING: Neither DEBUG nor non-DEBUG build requested, but the" \
-	    "'a' option was set." | tee -a $mail_msg_file >> $LOGFILE
 fi
 
 if [ "$D_FLAG" = "n" -a "$l_FLAG" = "y" ]; then
@@ -2836,13 +2760,13 @@ echo | tee -a $build_environ_file >> $LOGFILE
 
 # nightly
 echo "$0 $@" | tee -a $build_environ_file >> $LOGFILE
-if [[ $nightly_path = "/opt/onbld/bin/nightly" ]] &&
-    #
-    # XXX This should work with ips legacy pkginfo for now, but will
-    # fall apart when we stop updating that.
-    #
-    pkginfo SUNWonbld > /dev/null 2>&1 ; then
-	pkginfo -l SUNWonbld | egrep "PKGINST:|VERSION:|PSTAMP:"
+if [[ $nightly_path = "/opt/onbld/bin/nightly" ]]; then
+	# We assume that if you have /opt/onbld/bin/nightly, then
+	# you have some form of the onbld package installed. If this
+	# is not true then your nightly is almost definitely out of
+	# date and should not be used.
+	/usr/bin/pkg info \*onbld\* | \
+	    egrep "Name:|Publisher:|Version:|Packaging:|FMRI:"
 else
 	echo "$nightly_ls"
 fi | tee -a $build_environ_file >> $LOGFILE

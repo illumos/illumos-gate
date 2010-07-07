@@ -18,7 +18,7 @@
 .\" "
 .\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "
-.TH nightly 1 "28 May 2010"
+.TH nightly 1 "6 July 2010"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -121,7 +121,7 @@ will take as it proceeds.
 The -i, -n, +t and -V options may also be used from the command
 line to control the actions without editing your environment file.
 The -i and -n options complete the build more quickly by bypassing
-some actions. If NIGHTLY_OPTIONS is not set, then "-aBmt" build
+some actions. If NIGHTLY_OPTIONS is not set, then "-Bmt" build
 options will be used.
 
 .B Basic action options
@@ -148,12 +148,6 @@ current source code
 .B \-o
 Do an "old style" (pre-S10) build using root privileges to set OWNER
 and GROUP from the Makefiles.
-.TP
-.B \-a
-Create BFU archives
-.TP
-.B \-z
-Compress cpio archives with gzip
 .TP
 .B \-p
 Create packages for regular install
@@ -227,10 +221,10 @@ proto area will be used for comparison (which might not be what you want).
 .B Groups of options
 .TP 10
 .B \-G
-Gate keeper default group of options (-au)
+Gate keeper default group of options (-u)
 .TP
 .B \-I
-Integration engineer default group of options (-ampu)
+Integration engineer default group of options (-mpu)
 .TP
 .B \-R
 Default group of options for building a release (-mp)
@@ -295,7 +289,7 @@ one being built.  This is particularly relevant for configurations
 with a main
 workspace and build workspaces underneath it; see the 
 \-u and \-U
-options, and the CPIODIR and PKGARCHIVE environment variables, for more
+options as well as the PKGARCHIVE environment variable, for more
 information.
 .RE
 .LP
@@ -416,14 +410,6 @@ the build (for the \-m option).
 .B REF_PROTO_LIST
 .RS 5
 Name of file used with protocmp to compare proto area contents.
-.RE
-.LP
-.B CPIODIR
-.RS 5
-The destination for cpio archives.  This may be relative to
-$CODEMGR_WS for private archives or relative to $PARENT_WS
-if you have different workspaces for different architectures
-but want one hierarchy of BFU archives.
 .RE
 .LP
 .B PARENT_ROOT

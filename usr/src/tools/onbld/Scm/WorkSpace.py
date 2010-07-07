@@ -14,8 +14,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -276,8 +275,8 @@ class ActiveList(object):
             #
             if entry.name not in self.parenttip.manifest():
                 entry.change = ActiveEntry.ADDED
-            elif entry.is_modified() and not entry.parentname:
-                if not self.filecmp(entry):
+            elif entry.is_modified():
+                if not self._changed_file(entry.name):
                     del self[entry.name]
                     continue
 
@@ -364,16 +363,23 @@ class ActiveList(object):
         nodes = set(node.hex(ctx.node()) for ctx in self.revs)
         return [t for t in data if t.split(' ', 1)[0] not in nodes]
 
-    def filecmp(self, entry):
-        '''Compare two revisions of two files
-
+    def _changed_file(self, path):
+        '''Compare the parent and local versions of a given file.
         Return True if file changed, False otherwise.
+
+        Note that this compares the given path in both versions, not the given
+        entry; renamed and copied files are compared by name, not history.
 
         The fast path compares file metadata, slow path is a
         real comparison of file content.'''
 
-        parentfile = self.parenttip.filectx(entry.parentname or entry.name)
-        localfile = self.localtip.filectx(entry.name)
+        # Note that we use localtip.manifest() here because of a bug in
+        # Mercurial 1.1.2's workingctx.__contains__
+        if ((path in self.parenttip) != (path in self.localtip.manifest())):
+            return True
+
+        parentfile = self.parenttip.filectx(path)
+        localfile = self.localtip.filectx(path)
 
         #
         # NB: Keep these ordered such as to make every attempt

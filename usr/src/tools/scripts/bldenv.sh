@@ -386,8 +386,8 @@ DEF_STRIPFLAG="-s"
 
 TMPDIR="/tmp"
 
-# "o_FLAG" is used by "nightly.sh" and "makebfu.sh" (it may be useful to
-# rename this variable using a more descriptive name later)
+# "o_FLAG" is used by "nightly.sh" (it may be useful to rename this
+# variable using a more descriptive name later)
 export o_FLAG="$(${flags.o} && print 'y' || print 'n')"
 
 export \

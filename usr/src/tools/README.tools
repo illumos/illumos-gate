@@ -75,19 +75,6 @@ Layout of /opt/onbld
 Tool Summary
 ------------
 
-bfu
-	bonwick/faulkner upgrade. Loads a set of cpio archives created
-	by 'mkbfu' onto a machine, either live or on alternate root
-	and /usr filesystems. Attempts to preserve important files,
-	but may require manual intervention before reboot to resolve
-	changes to preserved files.
-
-bfuld
-	Used by bfu to survive getting a new runtime linker when extracting
-	new cpio archives onto a live system. Patches binaries to use
-	a saved runtime linker in /tmp during the bfu process.
-	Not run by anything but bfu.
-
 bldenv
 	companion to 'nightly.' Takes the same environment file you
 	used with 'nightly,' and starts a shell with the environment
@@ -240,14 +227,6 @@ lintdump
 
 keywords
 	checks files for proper SCCS keywords.
-
-makebfu
-	simple wrapper around 'mkbfu' for use outside nightly (when in a build
-	shell from 'ws' or 'bldenv'). 
-
-mkbfu
-	makes cpio archives out of the proto area suitable for bfu'ing.
-	Used by 'nightly' and 'makebfu'.
 
 ndrgen
 	Network Data Language (NDL) RPC protocol compiler to support DCE

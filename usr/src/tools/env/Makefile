@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 ENVFILES= \
@@ -31,6 +30,8 @@ include ../Makefile.tools
 
 FILEMODE= 644
 
+CLOBBERFILES= $(ENVFILES)
+
 .KEEP_STATE:
 
 all:	$(ENVFILES)
@@ -38,7 +39,8 @@ all:	$(ENVFILES)
 install: all .WAIT $(ROOTONBLDENVFILES)
 
 clean:
-	$(RM) $(CLEANFILES)
+
+clobber:
 
 include ../Makefile.targ
 

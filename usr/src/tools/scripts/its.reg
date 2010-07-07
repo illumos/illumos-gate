@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 
@@ -99,7 +98,7 @@
 PREFIX=arc
 INFO=http://opensolaris.org/os/community/arc/
 EXTERNAL_URL=http://arc.opensolaris.org/caselog/\\1/\\2/\\3
-INTERNAL_URL_sun.com=http://sac.eng.sun.com/Archives/CaseLog/arc/\\1/\\2/\\3
+INTERNAL_URL_sun.com=http://sac.sfbay.sun.com/Archives/CaseLog/arc/\\1/\\2/\\3
 REGEX=\\([A-Z]\\{1\,2\\}ARC\\)[ \\/]\\([0-9]\\{4\\}\\)\\/\\([0-9]\\{3\\}\\)
 CONTACT=arc-discuss@opensolaris.org
 
