@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -658,13 +657,12 @@ fx_forkret(kthread_t *t, kthread_t *ct)
 	 * the process does not disappear before we set it running.
 	 */
 	mutex_enter(&cp->p_lock);
-	mutex_exit(&pidlock);
 	continuelwps(cp);
 	mutex_exit(&cp->p_lock);
 
 	mutex_enter(&pp->p_lock);
+	mutex_exit(&pidlock);
 	continuelwps(pp);
-	mutex_exit(&pp->p_lock);
 
 	thread_lock(t);
 	fxpp = (fxproc_t *)(t->t_cldata);
@@ -673,6 +671,11 @@ fx_forkret(kthread_t *t, kthread_t *ct)
 	THREAD_TRANSITION(t);
 	fx_setrun(t);
 	thread_unlock(t);
+	/*
+	 * Safe to drop p_lock now since it is safe to change
+	 * the scheduling class after this point.
+	 */
+	mutex_exit(&pp->p_lock);
 
 	swtch();
 }
