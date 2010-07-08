@@ -102,7 +102,7 @@ cstatat_getvp(int fd, char *name, int follow, vnode_t **vp, cred_t **cred)
 	}
 	*cred = cr;
 
-	if (AU_AUDITING() && (startvp != NULL))
+	if (AU_AUDITING() && startvp != NULL)
 		audit_setfsat_path(1);
 
 lookup:

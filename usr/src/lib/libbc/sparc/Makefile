@@ -125,7 +125,7 @@ sprintf.o   vfprintf.o  vprintf.o   vsprintf.o
 
 SYSCOM=\
 _access.o acct.o  adjtime.o close.o _creat.o dup.o dup2.o \
-fchdir.o fchmod.o fchroot.o \
+fchdir.o fchroot.o \
 fdlist.o flock.o  fpathconf.o fsync.o ftruncate.o getdents.o \
 getdtablesize.o getgid.o  getitimer.o getpid.o gettimeofday.o \
 getuid.o ioctl.o kill.o lseek.o mincore.o mprotect.o munmap.o\
@@ -182,7 +182,7 @@ YP= yp_bind.o
 
 YP= yp_bind.o
 PSEUDO_SRCS= adjtime.s fchdir.s \
-fchmod.s   fchroot.s      \
+fchroot.s      \
 fpathconf.s getitimer.s    getpid.s    \
 mincore.s   mprotect.s munmap.s    \
 profil.s    setitimer.s \

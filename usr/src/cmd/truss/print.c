@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -2619,15 +2620,45 @@ prt_fxf(private_t *pri, int raw, long val)
 }
 
 /*
- * Print utimensat() flag
+ * Print faccessat() flag
  */
 void
-prt_utf(private_t *pri, int raw, long val)
+prt_fat(private_t *pri, int raw, long val)
+{
+	if (val == 0)
+		outstring(pri, "0");
+	else if (!raw && val == AT_EACCESS)
+		outstring(pri, "AT_EACCESS");
+	else
+		prt_hex(pri, 0, val);
+}
+
+/*
+ * Print unlinkat() flag
+ */
+void
+prt_uat(private_t *pri, int raw, long val)
+{
+	if (val == 0)
+		outstring(pri, "0");
+	else if (!raw && val == AT_REMOVEDIR)
+		outstring(pri, "AT_REMOVEDIR");
+	else
+		prt_hex(pri, 0, val);
+}
+
+/*
+ * Print AT_SYMLINK_NOFOLLOW / AT_SYMLINK_FOLLOW flag
+ */
+void
+prt_snf(private_t *pri, int raw, long val)
 {
 	if (val == 0)
 		outstring(pri, "0");
 	else if (!raw && val == AT_SYMLINK_NOFOLLOW)
 		outstring(pri, "AT_SYMLINK_NOFOLLOW");
+	else if (!raw && val == AT_SYMLINK_FOLLOW)
+		outstring(pri, "AT_SYMLINK_FOLLOW");
 	else
 		prt_hex(pri, 0, val);
 }
@@ -2648,14 +2679,14 @@ void (* const Print[])() = {
 	prt_uts,	/* UTS -- print utssys code */
 	prt_opn,	/* OPN -- print open code */
 	prt_sig,	/* SIG -- print signal name plus flags */
-	prt_nov,	/* Was ACT, now available for reuse */
+	prt_uat,	/* UAT -- print unlinkat() flag */
 	prt_msc,	/* MSC -- print msgsys command */
 	prt_msf,	/* MSF -- print msgsys flags */
 	prt_smc,	/* SMC -- print semsys command */
 	prt_sef,	/* SEF -- print semsys flags */
 	prt_shc,	/* SHC -- print shmsys command */
 	prt_shf,	/* SHF -- print shmsys flags */
-	prt_nov,	/* Was PLK, now available for reuse */
+	prt_fat,	/* FAT -- print faccessat( flag */
 	prt_sfs,	/* SFS -- print sysfs code */
 	prt_rst,	/* RST -- print string returned by syscall */
 	prt_smf,	/* SMF -- print streams message flags */
@@ -2733,7 +2764,7 @@ void (* const Print[])() = {
 	prt_spf,	/* SPF -- print rctlsys_projset() flags */
 	prt_un1,	/* UN1 -- as prt_uns except for -1 */
 	prt_mob,	/* MOB -- print mmapobj() flags */
-	prt_utf,	/* UTF -- print utimensat() flag */
+	prt_snf,	/* SNF -- print AT_SYMLINK_[NO]FOLLOW flag */
 	prt_skc,	/* SKC -- print sockconfig() subcode */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

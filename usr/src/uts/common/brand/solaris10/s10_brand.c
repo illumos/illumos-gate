@@ -511,8 +511,11 @@ _init(void)
 	s10_emulation_table[S10_SYS_open] = 1;			/*   5 */
 	s10_emulation_table[S10_SYS_wait] = 1;			/*   7 */
 	s10_emulation_table[S10_SYS_creat] = 1;			/*   8 */
+	s10_emulation_table[S10_SYS_link] = 1;			/*   9 */
 	s10_emulation_table[S10_SYS_unlink] = 1;		/*  10 */
 	s10_emulation_table[S10_SYS_exec] = 1;			/*  11 */
+	s10_emulation_table[S10_SYS_mknod] = 1;			/*  14 */
+	s10_emulation_table[S10_SYS_chmod] = 1;			/*  15 */
 	s10_emulation_table[S10_SYS_chown] = 1;			/*  16 */
 	s10_emulation_table[S10_SYS_stat] = 1;			/*  18 */
 	s10_emulation_table[S10_SYS_umount] = 1;		/*  22 */
@@ -527,9 +530,13 @@ _init(void)
 	s10_emulation_table[S10_SYS_issetugid] = 1;		/*  75 */
 	s10_emulation_table[S10_SYS_fsat] = 1;			/*  76 */
 	s10_emulation_table[S10_SYS_rmdir] = 1;			/*  79 */
+	s10_emulation_table[S10_SYS_mkdir] = 1;			/*  80 */
 	s10_emulation_table[SYS_getdents] = 1;			/*  81 */
 	s10_emulation_table[S10_SYS_poll] = 1;			/*  87 */
 	s10_emulation_table[S10_SYS_lstat] = 1;			/*  88 */
+	s10_emulation_table[S10_SYS_symlink] = 1;		/*  89 */
+	s10_emulation_table[S10_SYS_readlink] = 1;		/*  90 */
+	s10_emulation_table[S10_SYS_fchmod] = 1;		/*  93 */
 	s10_emulation_table[S10_SYS_fchown] = 1;		/*  94 */
 	s10_emulation_table[SYS_sigprocmask] = 1;		/*  95 */
 	s10_emulation_table[SYS_sigsuspend] = 1;		/*  96 */

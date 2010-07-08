@@ -18,28 +18,43 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-	.file	"readlink.s"
+#include "lint.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/fcntl.h>
 
-/*
- * C library -- readlink
- * ssize_t readlink(const char *path, char *buf, size_t bufsize);
- */
+int
+fchmodat(int fd, const char *path, mode_t mode, int flag)
+{
+	return (syscall(SYS_fchmodat, fd, path, mode, flag));
+}
 
-#include <sys/asm_linkage.h>
+#pragma weak _chmod = chmod
+int
+chmod(const char *path, mode_t mode)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_chmod, path, mode));
+#else
+	return (fchmodat(AT_FDCWD, path, mode, 0));
+#endif
+}
 
-	ANSI_PRAGMA_WEAK(readlink,function)
-
-#include "SYS.h"
-
-	SYSCALL_RVAL1(readlink)
-	RET
-	SET_SIZE(readlink)
+#pragma weak _fchmod = fchmod
+int
+fchmod(int fd, mode_t mode)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_fchmod, fd, mode));
+#else
+	return (fchmodat(fd, NULL, mode, 0));
+#endif
+}

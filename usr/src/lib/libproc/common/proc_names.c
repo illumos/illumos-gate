@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -121,11 +120,11 @@ static const char *const systable[] = {
 	"write",		/*  4 */
 	"open",			/*  5 */
 	"close",		/*  6 */
-	NULL,			/*  7 */
+	"linkat",		/*  7 */
 	NULL,			/*  8 */
 	"link",			/*  9 */
 	"unlink",		/* 10 */
-	NULL,			/* 11 */
+	"symlinkat",		/* 11 */
 	"chdir",		/* 12 */
 	"time",			/* 13 */
 	"mknod",		/* 14 */
@@ -136,7 +135,7 @@ static const char *const systable[] = {
 	"lseek",		/* 19 */
 	"getpid",		/* 20 */
 	"mount",		/* 21 */
-	NULL,			/* 22 */
+	"readlinkat",		/* 22 */
 	"setuid",		/* 23 */
 	"getuid",		/* 24 */
 	"stime",		/* 25 */
@@ -162,7 +161,7 @@ static const char *const systable[] = {
 	"faccessat",		/* 45 */
 	"setgid",		/* 46 */
 	"getgid",		/* 47 */
-	"signal",		/* 48 */
+	"mknodat",		/* 48 */
 	"msgsys",		/* 49 */
 	"sysi86",		/* 50 */
 	"acct",			/* 51 */
@@ -215,8 +214,8 @@ static const char *const systable[] = {
 	"sigaction",		/* 98 */
 	"sigpending",		/* 99 */
 	"context",		/* 100 */
-	NULL,			/* 101 */
-	NULL,			/* 102 */
+	"fchmodat",		/* 101 */
+	"mkdirat",		/* 102 */
 	"statvfs",		/* 103 */
 	"fstatvfs",		/* 104 */
 	"getloadavg",		/* 105 */

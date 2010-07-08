@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -1026,20 +1027,26 @@ audit_setfsat_path(int argnum)
 
 	switch (tad->tad_scid) {
 	case SYS_faccessat:
+	case SYS_fchmodat:
 	case SYS_fchownat:
 	case SYS_fstatat:
 	case SYS_fstatat64:
+	case SYS_mkdirat:
+	case SYS_mknodat:
 	case SYS_openat:
 	case SYS_openat64:
+	case SYS_readlinkat:
 	case SYS_unlinkat:
 		fd = uap->arg1;
 		break;
+	case SYS_linkat:
 	case SYS_renameat:
 		if (argnum == 3)
 			fd = uap->arg3;
 		else
 			fd = uap->arg1;
 		break;
+	case SYS_symlinkat:
 	case SYS_utimesys:
 		fd = uap->arg2;
 		break;

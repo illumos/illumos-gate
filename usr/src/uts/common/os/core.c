@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -435,9 +434,6 @@ do_core(char *fp, int sig, enum core_types core_type, struct core_globals *cg)
 		int closerr;
 #if defined(__sparc)
 		(void) flush_user_windows_to_stack(NULL);
-#endif
-#ifdef SUN_SRC_COMPAT
-		PTOU(curproc)->u_acflag |= ACORE;
 #endif
 		if ((eswp = PTOU(curproc)->u_execsw) == NULL ||
 		    (eswp = findexec_by_magic(eswp->exec_magic)) == NULL) {

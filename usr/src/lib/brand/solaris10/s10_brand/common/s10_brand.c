@@ -1867,13 +1867,13 @@ brand_sysent_table_t brand_sysent_table[] = {
 	NOSYS,					/*   6 */
 	EMULATE(s10_wait, 0 | RV_32RVAL2),	/*   7 */
 	EMULATE(s10_creat, 2 | RV_DEFAULT),	/*   8 */
-	NOSYS,					/*   9 */
+	EMULATE(s10_link, 2 | RV_DEFAULT),	/*   9 */
 	EMULATE(s10_unlink, 1 | RV_DEFAULT),	/*  10 */
 	EMULATE(s10_exec, 2 | RV_DEFAULT),	/*  11 */
 	NOSYS,					/*  12 */
 	NOSYS,					/*  13 */
-	NOSYS,					/*  14 */
-	NOSYS,					/*  15 */
+	EMULATE(s10_mknod, 3 | RV_DEFAULT),	/*  14 */
+	EMULATE(s10_chmod, 2 | RV_DEFAULT),	/*  15 */
 	EMULATE(s10_chown, 3 | RV_DEFAULT),	/*  16 */
 	NOSYS,					/*  17 */
 	EMULATE(s10_stat, 2 | RV_DEFAULT),	/*  18 */
@@ -1938,7 +1938,7 @@ brand_sysent_table_t brand_sysent_table[] = {
 	NOSYS,					/*  77 */
 	NOSYS,					/*  78 */
 	EMULATE(s10_rmdir, 1 | RV_DEFAULT),	/*  79 */
-	NOSYS,					/*  80 */
+	EMULATE(s10_mkdir, 2 | RV_DEFAULT),	/*  80 */
 	EMULATE(s10_getdents, 3 | RV_DEFAULT),	/*  81 */
 	NOSYS,					/*  82 */
 	NOSYS,					/*  83 */
@@ -1947,11 +1947,11 @@ brand_sysent_table_t brand_sysent_table[] = {
 	NOSYS,					/*  86 */
 	EMULATE(s10_poll, 3 | RV_DEFAULT),	/*  87 */
 	EMULATE(s10_lstat, 2 | RV_DEFAULT),	/*  88 */
-	NOSYS,					/*  89 */
-	NOSYS,					/*  90 */
+	EMULATE(s10_symlink, 2 | RV_DEFAULT),	/*  89 */
+	EMULATE(s10_readlink, 3 | RV_DEFAULT),	/*  90 */
 	NOSYS,					/*  91 */
 	NOSYS,					/*  92 */
-	NOSYS,					/*  93 */
+	EMULATE(s10_fchmod, 2 | RV_DEFAULT),	/*  93 */
 	EMULATE(s10_fchown, 3 | RV_DEFAULT),	/*  94 */
 	EMULATE(s10_sigprocmask, 3 | RV_DEFAULT), /*  95 */
 	EMULATE(s10_sigsuspend, 1 | RV_DEFAULT), /*  96 */

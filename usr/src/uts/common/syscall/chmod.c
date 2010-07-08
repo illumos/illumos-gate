@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,20 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -51,31 +43,43 @@
 #include <sys/filio.h>
 #include <sys/debug.h>
 
-extern int	namesetattr(char *, enum symfollow, vattr_t *, int);
-extern int	fdsetattr(int, vattr_t *);
+/*
+ * Change mode of file.
+ */
+int
+fchmodat(int fd, char *path, int mode, int flag)
+{
+	struct vattr vattr;
+	int error;
+
+	if (flag & ~AT_SYMLINK_NOFOLLOW)
+		return (set_errno(EINVAL));
+
+	if (flag & AT_SYMLINK_NOFOLLOW)
+		return (set_errno(EOPNOTSUPP));
+
+	vattr.va_mode = mode & MODEMASK;
+	vattr.va_mask = AT_MODE;
+	error = fsetattrat(fd, path, flag, &vattr);
+	if (error)
+		return (set_errno(error));
+	return (0);
+}
 
 /*
  * Change mode of file given path name.
  */
 int
-chmod(char *fname, int fmode)
+chmod(char *path, int mode)
 {
-	struct vattr vattr;
-
-	vattr.va_mode = fmode & MODEMASK;
-	vattr.va_mask = AT_MODE;
-	return (namesetattr(fname, FOLLOW, &vattr, 0));
+	return (fchmodat(AT_FDCWD, path, mode, 0));
 }
 
 /*
  * Change mode of file given file descriptor.
  */
 int
-fchmod(int fd, int fmode)
+fchmod(int fd, int mode)
 {
-	struct vattr vattr;
-
-	vattr.va_mode = fmode & MODEMASK;
-	vattr.va_mask = AT_MODE;
-	return (fdsetattr(fd, &vattr));
+	return (fchmodat(fd, NULL, mode, 0));
 }

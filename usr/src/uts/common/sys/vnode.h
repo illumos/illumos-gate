@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -1159,7 +1160,7 @@ extern int	fop_retzcbuf(vnode_t *, xuio_t *, cred_t *, caller_context_t *);
 /*
  * Flags for VOP_LOOKUP
  *
- * Defined in file.h, but also possible, FIGNORECASE
+ * Defined in file.h, but also possible, FIGNORECASE and FSEARCH
  *
  */
 #define	LOOKUP_DIR		0x01	/* want parent dir vp */
@@ -1244,6 +1245,8 @@ void	vn_rele_async(struct vnode *vp, struct taskq *taskq);
 void	vn_rele_dnlc(struct vnode *vp);
 void	vn_rele_stream(struct vnode *vp);
 int	vn_link(char *from, char *to, enum uio_seg seg);
+int	vn_linkat(vnode_t *fstartvp, char *from, enum symfollow follow,
+		vnode_t *tstartvp, char *to, enum uio_seg seg);
 int	vn_rename(char *from, char *to, enum uio_seg seg);
 int	vn_renameat(vnode_t *fdvp, char *fname, vnode_t *tdvp, char *tname,
 		enum uio_seg seg);

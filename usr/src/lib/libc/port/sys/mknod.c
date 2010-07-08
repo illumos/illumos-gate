@@ -20,20 +20,27 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
+#include "lint.h"
+#include <sys/syscall.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
 
-	.file	"link.s"
+int
+mknodat(int fd, const char *path, mode_t mode, dev_t dev)
+{
+	return (syscall(SYS_mknodat, fd, path, mode, dev));
+}
 
-/* C library -- link						*/
-/* int link (const char *path1, const char *path2);		*/
-
-#include "SYS.h"
-
-	SYSCALL2_RVAL1(__link,link)
-	RETC
-	SET_SIZE(__link)
+#pragma weak _mknod = mknod
+int
+mknod(const char *path, mode_t mode, dev_t dev)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_mknod, path, mode, dev));
+#else
+	return (mknodat(AT_FDCWD, path, mode, dev));
+#endif
+}

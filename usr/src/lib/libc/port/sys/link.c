@@ -20,30 +20,26 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#pragma	weak _link = link
-
 #include "lint.h"
-#include <stdlib.h>
-#include <errno.h>
 #include <unistd.h>
-#include <limits.h>
+#include <fcntl.h>
+#include <sys/syscall.h>
 
 extern	int __xpg4; /* defined in port/gen/xpg4.c; 0 if not xpg4/xpg4v2 */
 
-extern int __link(const char *existing, const char *new);
-
 int
-link(const char *existing, const char *new)
+linkat(int fd1, const char *path1, int fd2, const char *path2, int flag)
 {
-	int 	sz;
-	char 	linkbuf[PATH_MAX + 1];
+	return (syscall(SYS_linkat, fd1, path1, fd2, path2, flag));
+}
 
+#pragma	weak _link = link
+int
+link(const char *path1, const char *path2)
+{
 	/*
 	 * XPG4v2 link() requires that the link count of a symbolic
 	 * link target be updated rather than the link itself.  This
@@ -56,11 +52,13 @@ link(const char *existing, const char *new)
 	 * non-XPG4 based environments. For a more detailed discussion,
 	 * see bug 1256170.
 	 */
-	if (__xpg4 != 0) {
-		if ((sz = resolvepath(existing, linkbuf, PATH_MAX)) == -1)
-			return (-1);
-		linkbuf[sz] = '\0';
-		existing = linkbuf;
-	}
-	return (__link(existing, new));
+	if (__xpg4 != 0)
+		return (linkat(AT_FDCWD, path1, AT_FDCWD, path2,
+		    AT_SYMLINK_FOLLOW));
+
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_link, path1, path2));
+#else
+	return (linkat(AT_FDCWD, path1, AT_FDCWD, path2, 0));
+#endif
 }

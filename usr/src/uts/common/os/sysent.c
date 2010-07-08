@@ -20,6 +20,7 @@
  */
 
 /* ONC_PLUS EXTRACT START */
+
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -58,6 +59,7 @@ int	cladm();
 int	close();
 int	exece();
 int	faccessat();
+int	fchmodat();
 int	fchownat();
 int	fcntl();
 int64_t	vfork();
@@ -80,11 +82,13 @@ int	ioctl();
 int	kill();
 int	labelsys();
 int	link();
+int	linkat();
 off32_t	lseek32();
 off_t	lseek64();
 int	lgrpsys();
 int	mmapobjsys();
 int	mknod();
+int	mknodat();
 int	mount();
 int	nice();
 int	nullsys();
@@ -139,6 +143,7 @@ ssize_t	writev();
 int	syslwp_park();
 int	rmdir();
 int	mkdir();
+int	mkdirat();
 int	getdents32();
 int	statfs32();
 int	fstatfs32();
@@ -149,7 +154,9 @@ int	putmsg();
 int	uadmin();
 int	lstat();
 int	symlink();
+int	symlinkat();
 ssize_t	readlink();
+ssize_t	readlinkat();
 int	resolvepath();
 int	setgroups();
 int	getgroups();
@@ -423,11 +430,11 @@ struct sysent sysent[NSYSCALL] =
 	/*  4 */ SYSENT_CL("write",		write,		3),
 	/*  5 */ SYSENT_CI("open",		open,		3),
 	/*  6 */ SYSENT_CI("close",		close,		1),
-	/*  7 */ SYSENT_LOADABLE(),			/* (was wait) */
+	/*  7 */ SYSENT_CI("linkat",		linkat,		5),
 	/*  8 */ SYSENT_LOADABLE(),			/* (was creat) */
 	/*  9 */ SYSENT_CI("link",		link,		2),
 	/* 10 */ SYSENT_CI("unlink",		unlink,		1),
-	/* 11 */ SYSENT_LOADABLE(),			/* (was exec) */
+	/* 11 */ SYSENT_CI("symlinkat",		symlinkat,	3),
 	/* 12 */ SYSENT_CI("chdir",		chdir,		1),
 	/* 13 */ SYSENT_CL("time",		gtime,		0),
 	/* 14 */ SYSENT_CI("mknod",		mknod,		3),
@@ -440,7 +447,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_CL("lseek",	lseek32,	3)),
 	/* 20 */ SYSENT_2CI("getpid",		getpid,		0),
 	/* 21 */ SYSENT_AP("mount",		mount,		8),
-	/* 22 */ SYSENT_LOADABLE(),			/* (was umount) */
+	/* 22 */ SYSENT_CL("readlinkat",	readlinkat,	4),
 	/* 23 */ SYSENT_CI("setuid",		setuid,		1),
 	/* 24 */ SYSENT_2CI("getuid",		getuid,		0),
 	/* 25 */ SYSENT_CI("stime",		stime,		1),
@@ -470,7 +477,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 45 */ SYSENT_CI("faccessat",		faccessat,	4),
 	/* 46 */ SYSENT_CI("setgid",		setgid,		1),
 	/* 47 */ SYSENT_2CI("getgid",		getgid,		0),
-	/* 48 */ SYSENT_LOADABLE(),			/* (was ssig) */
+	/* 48 */ SYSENT_CI("mknodat",		mknodat,	4),
 	/* 49 */ SYSENT_LOADABLE(),			/* msgsys */
 	/* 50 */ IF_x86(
 			SYSENT_CI("sysi86",	sysi86,		4),
@@ -533,8 +540,8 @@ struct sysent sysent[NSYSCALL] =
 	/* 98 */ SYSENT_CI("sigaction",		sigaction,	3),
 	/* 99 */ SYSENT_CI("sigpending",	sigpending,	2),
 	/* 100 */ SYSENT_CI("getsetcontext",	getsetcontext,	2),
-	/* 101 */ SYSENT_LOADABLE(),
-	/* 102 */ SYSENT_LOADABLE(),
+	/* 101 */ SYSENT_CI("fchmodat",		fchmodat,	4),
+	/* 102 */ SYSENT_CI("mkdirat",		mkdirat,	3),
 	/* 103 */ SYSENT_CI("statvfs",		statvfs,	2),
 	/* 104 */ SYSENT_CI("fstatvfs",		fstatvfs,	2),
 	/* 105 */ SYSENT_CI("getloadavg",	getloadavg,	2),
@@ -754,6 +761,7 @@ extern ssize_t pwrite32();
 extern ssize_t readv32();
 extern ssize_t writev32();
 extern ssize_t readlink32();
+extern ssize_t readlinkat32();
 extern int open32();
 extern int openat32();
 extern int stat32();
@@ -805,11 +813,11 @@ struct sysent sysent32[NSYSCALL] =
 	/*  4 */ SYSENT_CI("write",		write32,	3),
 	/*  5 */ SYSENT_CI("open",		open32,		3),
 	/*  6 */ SYSENT_CI("close",		close,		1),
-	/*  7 */ SYSENT_LOADABLE32(),			/* (was wait) */
+	/*  7 */ SYSENT_CI("linkat",		linkat,		5),
 	/*  8 */ SYSENT_LOADABLE32(),			/* (was creat32) */
 	/*  9 */ SYSENT_CI("link",		link,		2),
 	/* 10 */ SYSENT_CI("unlink",		unlink,		1),
-	/* 11 */ SYSENT_LOADABLE32(),			/* (was exec) */
+	/* 11 */ SYSENT_CI("symlinkat",		symlinkat,	3),
 	/* 12 */ SYSENT_CI("chdir",		chdir,		1),
 	/* 13 */ SYSENT_CI("time",		gtime,		0),
 	/* 14 */ SYSENT_CI("mknod",		mknod,		3),
@@ -820,7 +828,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 19 */ SYSENT_CI("lseek",		lseek32,	3),
 	/* 20 */ SYSENT_2CI("getpid",		getpid,		0),
 	/* 21 */ SYSENT_AP("mount",		mount,		8),
-	/* 22 */ SYSENT_LOADABLE32(),			/* (was umount) */
+	/* 22 */ SYSENT_CI("readlinkat",	readlinkat32,	4),
 	/* 23 */ SYSENT_CI("setuid",		setuid,		1),
 	/* 24 */ SYSENT_2CI("getuid",		getuid,		0),
 	/* 25 */ SYSENT_CI("stime",		stime32,	1),
@@ -846,7 +854,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 45 */ SYSENT_CI("faccessat",		faccessat,	4),
 	/* 46 */ SYSENT_CI("setgid",		setgid,		1),
 	/* 47 */ SYSENT_2CI("getgid",		getgid,		0),
-	/* 48 */ SYSENT_LOADABLE32(),			/* (was ssig) */
+	/* 48 */ SYSENT_CI("mknodat",		mknodat,	4),
 	/* 49 */ SYSENT_LOADABLE32(),			/* msgsys */
 	/* 50 */ IF_386_ABI(
 			SYSENT_CI("sysi86",	sysi86,		4),
@@ -901,8 +909,8 @@ struct sysent sysent32[NSYSCALL] =
 	/* 98 */ SYSENT_CI("sigaction",		sigaction32,	3),
 	/* 99 */ SYSENT_CI("sigpending",	sigpending,	2),
 	/* 100 */ SYSENT_CI("getsetcontext",	getsetcontext32, 2),
-	/* 101 */ SYSENT_LOADABLE32(),
-	/* 102 */ SYSENT_LOADABLE32(),
+	/* 101 */ SYSENT_CI("fchmodat",		fchmodat,	4),
+	/* 102 */ SYSENT_CI("mkdirat",		mkdirat,	3),
 	/* 103 */ SYSENT_CI("statvfs",		statvfs32,	2),
 	/* 104 */ SYSENT_CI("fstatvfs",		fstatvfs32,	2),
 	/* 105 */ SYSENT_CI("getloadavg",	getloadavg,	2),

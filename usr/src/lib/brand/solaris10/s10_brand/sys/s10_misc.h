@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -42,10 +43,17 @@ extern int s10_lstat64();
 extern int s10_fstat64();
 extern int s10_open();
 extern int s10_open64();
+extern int s10_chmod();
+extern int s10_fchmod();
 extern int s10_chown();
 extern int s10_lchown();
 extern int s10_fchown();
+extern int s10_mkdir();
+extern int s10_mknod();
+extern int s10_link();
 extern int s10_unlink();
+extern int s10_symlink();
+extern int s10_readlink();
 extern int s10_rmdir();
 extern int s10_rename();
 extern int s10_access();

@@ -18,26 +18,29 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-	.file	"mkdir.s"
+#include "lint.h"
+#include <sys/syscall.h>
+#include <sys/unistd.h>
+#include <sys/fcntl.h>
 
-/* C library -- mkdir						*/
-/* int mkdir (const char *path, mode_t mode);			*/
+int
+symlinkat(const char *path1, int fd, const char *path2)
+{
+	return (syscall(SYS_symlinkat, path1, fd, path2));
+}
 
-#include <sys/asm_linkage.h>
-
-	ANSI_PRAGMA_WEAK(mkdir,function)
-
-#include "SYS.h"
-
-	SYSCALL_RVAL1(mkdir)
-	RET
-	SET_SIZE(mkdir)
+#pragma weak _symlink = symlink
+int
+symlink(const char *path1, const char *path2)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_symlink, path1, path2));
+#else
+	return (symlinkat(path1, AT_FDCWD, path2));
+#endif
+}

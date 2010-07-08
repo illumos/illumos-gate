@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -505,9 +504,13 @@ extern int fstatat64(int, const char *, struct stat64 *, int);
 #endif /* defined (_ATFILE_SOURCE) */
 #endif
 
-#if defined(__EXTENSIONS__) || \
+#if defined(__EXTENSIONS__) || defined(_ATFILE_SOURCE) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
 	/* || defined(_XPG7) */
+extern int mkdirat(int, const char *, mode_t);
+extern int mkfifoat(int, const char *, mode_t);
+extern int mknodat(int, const char *, mode_t, dev_t);
+extern int fchmodat(int, const char *, mode_t, int);
 extern int futimens(int, const struct timespec[2]);
 extern int utimensat(int, const char *, const struct timespec[2], int);
 #endif	/* defined(__EXTENSIONS__) ... */
@@ -536,9 +539,13 @@ extern int fstatat64();
 #endif /* defined (_ATFILE_SOURCE) */
 #endif
 
-#if defined(__EXTENSIONS__) || \
+#if defined(__EXTENSIONS__) || defined(_ATFILE_SOURCE) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
 	/* || defined(_XPG7) */
+extern int mkdirat();
+extern int mkfifoat();
+extern int mknodat();
+extern int fchmodat();
 extern int futimens();
 extern int utimensat();
 #endif	/* defined(__EXTENSIONS__) ... */

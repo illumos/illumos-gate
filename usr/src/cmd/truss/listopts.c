@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -226,24 +225,40 @@ syslist(char *str,			/* string of syscall names */
 				sysx = SYS_renameat;
 				goto def;
 
-			case SYS_unlink:	/* set both */
-				sysx = SYS_unlinkat;
+			case SYS_link:		/* set both */
+				sysx = SYS_linkat;
 				goto def;
 
+			case SYS_unlink:	/* set both */
 			case SYS_rmdir:		/* set both */
 				sysx = SYS_unlinkat;
 				goto def;
 
+			case SYS_symlink:	/* set both */
+				sysx = SYS_symlinkat;
+				goto def;
+
+			case SYS_readlink:	/* set both */
+				sysx = SYS_readlinkat;
+				goto def;
+
+			case SYS_chmod:		/* set both */
+			case SYS_fchmod:	/* set both */
+				sysx = SYS_fchmodat;
+				goto def;
+
 			case SYS_chown:		/* set both */
-				sysx = SYS_fchownat;
-				goto def;
-
 			case SYS_lchown:	/* set both */
-				sysx = SYS_fchownat;
-				goto def;
-
 			case SYS_fchown:	/* set both */
 				sysx = SYS_fchownat;
+				goto def;
+
+			case SYS_mkdir:		/* set both */
+				sysx = SYS_mkdirat;
+				goto def;
+
+			case SYS_mknod:		/* set both */
+				sysx = SYS_mknodat;
 				goto def;
 
 			case SYS_access:	/* set both */

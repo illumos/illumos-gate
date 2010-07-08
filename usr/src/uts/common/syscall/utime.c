@@ -83,10 +83,9 @@ cfutimesat(int fd, char *fname, int nmflag, vattr_t *vap, int flags, int follow)
 		}
 	}
 
-	if (AU_AUDITING() && (startvp != NULL))
-		audit_setfsat_path(1);
-
 	if ((nmflag == 1) || ((nmflag == 2) && (fname != NULL))) {
+		if (AU_AUDITING() && startvp != NULL)
+			audit_setfsat_path(1);
 		if ((error = lookupnameat(fname, UIO_USERSPACE,
 		    follow, NULLVPP, &vp, startvp)) != 0) {
 			if (startvp != NULL)

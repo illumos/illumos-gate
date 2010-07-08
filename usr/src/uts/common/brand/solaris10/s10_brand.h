@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -106,8 +107,11 @@ enum s10_emulated_features {
 #define	S10_SYS_open		5
 #define	S10_SYS_wait		7
 #define	S10_SYS_creat		8
+#define	S10_SYS_link		9
 #define	S10_SYS_unlink		10
 #define	S10_SYS_exec		11
+#define	S10_SYS_mknod		14
+#define	S10_SYS_chmod		15
 #define	S10_SYS_chown		16
 #define	S10_SYS_stat		18
 #define	S10_SYS_umount		22
@@ -118,8 +122,12 @@ enum s10_emulated_features {
 #define	S10_SYS_issetugid	75
 #define	S10_SYS_fsat		76
 #define	S10_SYS_rmdir		79
+#define	S10_SYS_mkdir		80
 #define	S10_SYS_poll		87
 #define	S10_SYS_lstat		88
+#define	S10_SYS_symlink		89
+#define	S10_SYS_readlink	90
+#define	S10_SYS_fchmod		93
 #define	S10_SYS_fchown		94
 #define	S10_SYS_xstat		123
 #define	S10_SYS_lxstat		124

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -53,8 +52,10 @@ extern "C" {
 #define	SYS_write	4
 #define	SYS_open	5
 #define	SYS_close	6
+#define	SYS_linkat	7
 #define	SYS_link	9
 #define	SYS_unlink	10
+#define	SYS_symlinkat	11
 #define	SYS_chdir	12
 #define	SYS_time	13
 #define	SYS_mknod	14
@@ -65,6 +66,7 @@ extern "C" {
 #define	SYS_lseek	19
 #define	SYS_getpid	20
 #define	SYS_mount	21
+#define	SYS_readlinkat	22
 #define	SYS_setuid	23
 #define	SYS_getuid	24
 #define	SYS_stime	25
@@ -97,6 +99,7 @@ extern "C" {
 #define	SYS_faccessat	45
 #define	SYS_setgid	46
 #define	SYS_getgid	47
+#define	SYS_mknodat	48
 #define	SYS_msgsys	49
 	/*
 	 * subcodes:
@@ -260,6 +263,8 @@ extern "C" {
 	 *	getcontext(...) :: syscall(100, 0, ...)
 	 *	setcontext(...) :: syscall(100, 1, ...)
 	 */
+#define	SYS_fchmodat	101
+#define	SYS_mkdirat	102
 #define	SYS_statvfs	103
 #define	SYS_fstatvfs	104
 #define	SYS_getloadavg	105

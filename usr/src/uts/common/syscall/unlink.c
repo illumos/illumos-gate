@@ -50,44 +50,21 @@
 int
 unlinkat(int fd, char *name, int flags)
 {
-	file_t *dirfp;
-	vnode_t *dirvp;
+	vnode_t *startvp;
 	int error;
-	char startchar;
 
-	if (fd == AT_FDCWD && name == NULL)
+	if (name == NULL)
 		return (set_errno(EFAULT));
-
-	if (name != NULL) {
-		if (copyin(name, &startchar, sizeof (char)))
-			return (set_errno(EFAULT));
-	} else
-		startchar = '\0';
-
-	if (fd == AT_FDCWD) {
-		dirvp = NULL;
-	} else {
-		if (startchar != '/') {
-			if ((dirfp = getf(fd)) == NULL) {
-				return (set_errno(EBADF));
-			}
-			dirvp = dirfp->f_vnode;
-			VN_HOLD(dirvp);
-			releasef(fd);
-		} else {
-			dirvp = NULL;
-		}
-	}
-
-	if (AU_AUDITING() && (dirvp != NULL))
+	if ((error = fgetstartvp(fd, name, &startvp)) != 0)
+		return (set_errno(error));
+	if (AU_AUDITING() && startvp != NULL)
 		audit_setfsat_path(1);
 
-	error = vn_removeat(dirvp, name,
-	    UIO_USERSPACE, (flags == AT_REMOVEDIR) ? RMDIRECTORY : RMFILE);
-	if (dirvp != NULL)
-		VN_RELE(dirvp);
-
-	if (error != NULL)
+	error = vn_removeat(startvp, name, UIO_USERSPACE,
+	    (flags == AT_REMOVEDIR) ? RMDIRECTORY : RMFILE);
+	if (startvp != NULL)
+		VN_RELE(startvp);
+	if (error)
 		return (set_errno(error));
 	return (0);
 }

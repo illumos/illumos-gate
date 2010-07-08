@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -32,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/isa_defs.h>
 #include <sys/types.h>
@@ -41,18 +38,48 @@
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/vnode.h>
+#include <sys/file.h>
+#include <sys/fcntl.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
+#include <c2/audit.h>
 
 /*
  * Make a hard link.
  */
 int
-link(char *from, char *to)
+linkat(int ffd, char *from, int tfd, char *to, int flag)
 {
-	int	error;
+	vnode_t *fstartvp = NULL;
+	vnode_t *tstartvp = NULL;
+	enum symfollow follow;
+	int error;
 
-	if (error = vn_link(from, to, UIO_USERSPACE))
+	if (flag & ~AT_SYMLINK_FOLLOW)
+		return (set_errno(EINVAL));
+	follow = (flag & AT_SYMLINK_FOLLOW)? FOLLOW : NO_FOLLOW;
+
+	if (from == NULL || to == NULL)
+		return (set_errno(EFAULT));
+	if ((error = fgetstartvp(ffd, from, &fstartvp)) != 0)
+		goto out;
+	if ((error = fgetstartvp(tfd, to, &tstartvp)) != 0)
+		goto out;
+
+	error = vn_linkat(fstartvp, from, follow, tstartvp, to, UIO_USERSPACE);
+
+out:
+	if (fstartvp != NULL)
+		VN_RELE(fstartvp);
+	if (tstartvp != NULL)
+		VN_RELE(tstartvp);
+	if (error)
 		return (set_errno(error));
 	return (0);
+}
+
+int
+link(char *from, char *to)
+{
+	return (linkat(AT_FDCWD, from, AT_FDCWD, to, 0));
 }

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -50,11 +49,13 @@ extern "C" {
 
 /*
  * Flag values accessible to open(2) and fcntl(2)
- * (the first three can only be set by open(2)).
+ * The first five can only be set (exclusively) by open(2).
  */
 #define	O_RDONLY	0
 #define	O_WRONLY	1
 #define	O_RDWR		2
+#define	O_SEARCH	0x200000
+#define	O_EXEC		0x400000
 #if defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE)
 #define	O_NDELAY	0x04	/* non-blocking I/O */
 #endif /* defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE) */
@@ -67,9 +68,6 @@ extern "C" {
 				/* defines read/write file integrity */
 #endif /* defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE) ... */
 #define	O_NONBLOCK	0x80	/* non-blocking I/O (POSIX) */
-#ifdef	SUN_SRC_COMPAT
-#define	O_PRIV 		0x1000  /* Private access to file */
-#endif /* SUN_SRC_COMPAT */
 #ifdef	_LARGEFILE_SOURCE
 #define	O_LARGEFILE	0x2000
 #endif
@@ -300,7 +298,8 @@ typedef struct o_flock {
  * POSIX constants
  */
 
-#define	O_ACCMODE	3	/* Mask for file access modes */
+/* Mask for file access modes */
+#define	O_ACCMODE	(O_SEARCH | O_EXEC | 0x3)
 #define	FD_CLOEXEC	1	/* close on exec flag */
 
 /*
@@ -345,8 +344,10 @@ typedef struct fshare {
  */
 #if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
 	defined(__EXTENSIONS__)
+	/* || defined(_XPG7) */
 #define	AT_FDCWD			0xffd19553
 #define	AT_SYMLINK_NOFOLLOW		0x1000
+#define	AT_SYMLINK_FOLLOW		0x2000	/* only for linkat() */
 #define	AT_REMOVEDIR			0x1
 #define	_AT_TRIGGER			0x2
 #define	AT_EACCESS			0x4	/* use EUID/EGID for access */

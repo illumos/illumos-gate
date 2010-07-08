@@ -500,10 +500,6 @@ proc_exit(int why, int what)
 	 */
 	prbarrier(p);
 
-#ifdef	SUN_SRC_COMPAT
-	if (code == CLD_KILLED)
-		u.u_acflag |= AXSIG;
-#endif
 	sigfillset(&p->p_ignore);
 	sigemptyset(&p->p_siginfo);
 	sigemptyset(&p->p_sig);

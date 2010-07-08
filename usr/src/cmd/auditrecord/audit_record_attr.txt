@@ -1300,6 +1300,14 @@ label=AUE_OPENAT_WTC
   see=openat(2)
   format=path:[path_attr]:[attr]
 
+label=AUE_OPEN_S
+  format=path:[path_attr]:[attr]
+  see=open(2) - search
+
+label=AUE_OPEN_E
+  format=path:[path_attr]:[attr]
+  see=open(2) - exec
+
 label=AUE_OSETPGRP
   skip=Not used.
 

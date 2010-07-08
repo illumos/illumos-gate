@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -41,11 +40,14 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/vnode.h>
+#include <sys/file.h>
+#include <sys/fcntl.h>
 #include <sys/mode.h>
 #include <sys/uio.h>
 #include <sys/mkdev.h>
 #include <sys/policy.h>
 #include <sys/debug.h>
+#include <c2/audit.h>
 
 /*
  * Create a special file, a regular file, or a FIFO.
@@ -54,8 +56,9 @@
  * dev = device number - b/c specials only
  */
 int
-mknod(char *fname, mode_t fmode, dev_t dev)
+mknodat(int fd, char *fname, mode_t fmode, dev_t dev)
 {
+	vnode_t *startvp;
 	vnode_t *vp;
 	struct vattr vattr;
 	int error;
@@ -86,10 +89,27 @@ mknod(char *fname, mode_t fmode, dev_t dev)
 		vattr.va_rdev = dev;
 		vattr.va_mask |= AT_RDEV;
 	}
+
+	if (fname == NULL)
+		return (set_errno(EFAULT));
+	if ((error = fgetstartvp(fd, fname, &startvp)) != 0)
+		return (set_errno(error));
+	if (AU_AUDITING() && startvp != NULL)
+		audit_setfsat_path(1);
+
 	why = ((fmode & S_IFMT) == S_IFDIR) ? CRMKDIR : CRMKNOD;
-	if (error = vn_create(fname, UIO_USERSPACE, &vattr, EXCL, 0, &vp,
-	    why, 0,  PTOU(curproc)->u_cmask))
+	error = vn_createat(fname, UIO_USERSPACE, &vattr, EXCL, 0, &vp,
+	    why, 0,  PTOU(curproc)->u_cmask, startvp);
+	if (startvp != NULL)
+		VN_RELE(startvp);
+	if (error)
 		return (set_errno(error));
 	VN_RELE(vp);
 	return (0);
+}
+
+int
+mknod(char *fname, mode_t fmode, dev_t dev)
+{
+	return (mknodat(AT_FDCWD, fname, fmode, dev));
 }

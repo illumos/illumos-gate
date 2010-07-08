@@ -55,13 +55,10 @@
  * Change ownership of file.
  */
 int
-fchownat(int fd, char *name, uid_t uid, gid_t gid, int flags)
+fchownat(int fd, char *path, uid_t uid, gid_t gid, int flag)
 {
-	vnode_t		*startvp, *vp;
-	file_t 		*filefp;
 	struct vattr 	vattr;
-	int 		error = 0;
-	char 		startchar;
+	int 		error;
 	struct zone	*zone = crgetzone(CRED());
 
 	if (uid != (uid_t)-1 && !VALID_UID(uid, zone) ||
@@ -76,83 +73,22 @@ fchownat(int fd, char *name, uid_t uid, gid_t gid, int flags)
 	if (vattr.va_gid != -1)
 		vattr.va_mask |= AT_GID;
 
-
-	if (fd == AT_FDCWD && name == NULL)
-		return (set_errno(EFAULT));
-
-	if (name != NULL) {
-		if (copyin(name, &startchar, sizeof (char)))
-			return (set_errno(EFAULT));
-	} else {
-		startchar = '\0';
-	}
-
-
-	if (fd == AT_FDCWD)
-		startvp = NULL;
-	else {
-		/*
-		 * only get fd if not doing absolute lookup
-		 */
-		if (startchar != '/') {
-			if ((filefp = getf(fd)) == NULL)
-				return (set_errno(EBADF));
-			startvp = filefp->f_vnode;
-			VN_HOLD(startvp);
-			releasef(fd);
-		} else {
-			startvp = NULL;
-		}
-	}
-
-	if (AU_AUDITING() && (startvp != NULL))
-		audit_setfsat_path(1);
-
-	/*
-	 * Do lookup for fchownat when name not NULL
-	 */
-	if (name != NULL) {
-		if (error = lookupnameat(name, UIO_USERSPACE,
-		    (flags == AT_SYMLINK_NOFOLLOW) ?
-		    NO_FOLLOW : FOLLOW,
-		    NULLVPP, &vp, startvp)) {
-			if (startvp != NULL)
-				VN_RELE(startvp);
-			return (set_errno(error));
-		}
-	} else {
-		vp = startvp;
-		ASSERT(vp);
-		VN_HOLD(vp);
-	}
-
-	if (vn_is_readonly(vp)) {
-		error = EROFS;
-	} else {
-		error = VOP_SETATTR(vp, &vattr, 0, CRED(), NULL);
-	}
-
-	if (startvp != NULL)
-		VN_RELE(startvp);
-	if (vp != NULL)
-		VN_RELE(vp);
-
-	if (error != 0)
+	error = fsetattrat(fd, path, flag, &vattr);
+	if (error)
 		return (set_errno(error));
-	else
-		return (error);
+	return (0);
 }
 
 int
-chown(char *fname, uid_t uid, gid_t gid)
+chown(char *path, uid_t uid, gid_t gid)
 {
-	return (fchownat(AT_FDCWD, fname, uid, gid, 0));
+	return (fchownat(AT_FDCWD, path, uid, gid, 0));
 }
 
 int
-lchown(char *fname, uid_t uid, gid_t gid)
+lchown(char *path, uid_t uid, gid_t gid)
 {
-	return (fchownat(AT_FDCWD, fname, uid, gid, AT_SYMLINK_NOFOLLOW));
+	return (fchownat(AT_FDCWD, path, uid, gid, AT_SYMLINK_NOFOLLOW));
 }
 
 int

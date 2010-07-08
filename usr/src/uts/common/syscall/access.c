@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -68,7 +69,7 @@ caccess(char *fname, int fmode, vnode_t *startvp)
 	int estale_retry = 0;
 
 	if (fmode & ~(E_OK|R_OK|W_OK|X_OK))
-		return (set_errno(EINVAL));
+		return (EINVAL);
 
 	mode = ((fmode & (R_OK|W_OK|X_OK)) << 6);
 
@@ -95,7 +96,7 @@ lookup:
 			goto lookup;
 		if (!eok)
 			crfree(tmpcr);
-		return (set_errno(error));
+		return (error);
 	}
 
 	if (mode) {
@@ -106,7 +107,6 @@ lookup:
 				VN_RELE(vp);
 				goto lookup;
 			}
-			(void) set_errno(error);
 		}
 	}
 
@@ -119,39 +119,17 @@ lookup:
 int
 faccessat(int fd, char *fname, int fmode, int flag)
 {
-	file_t *dirfp;
-	vnode_t *dirvp;
+	vnode_t *startvp;
 	int error;
-	char startchar;
-
-	if (fd == AT_FDCWD && fname == NULL)
-		return (set_errno(EFAULT));
 
 	if ((flag & ~AT_EACCESS) != 0)
 		return (set_errno(EINVAL));
 
-	if (fname != NULL) {
-		if (copyin(fname, &startchar, sizeof (char)))
-			return (set_errno(EFAULT));
-	} else
-		startchar = '\0';
-
-	if (fd == AT_FDCWD) {
-		dirvp = NULL;
-	} else {
-		if (startchar != '/') {
-			if ((dirfp = getf(fd)) == NULL) {
-				return (set_errno(EBADF));
-			}
-			dirvp = dirfp->f_vnode;
-			VN_HOLD(dirvp);
-			releasef(fd);
-		} else {
-			dirvp = NULL;
-		}
-	}
-
-	if (AU_AUDITING() && (dirvp != NULL))
+	if (fname == NULL)
+		return (set_errno(EFAULT));
+	if ((error = fgetstartvp(fd, fname, &startvp)) != 0)
+		return (set_errno(error));
+	if (AU_AUDITING() && startvp != NULL)
 		audit_setfsat_path(1);
 
 	/* Do not allow E_OK unless AT_EACCESS flag is set */
@@ -159,11 +137,12 @@ faccessat(int fd, char *fname, int fmode, int flag)
 	if (flag & AT_EACCESS)
 		fmode |= E_OK;
 
-	error = caccess(fname, fmode, dirvp);
-	if (dirvp != NULL)
-		VN_RELE(dirvp);
-
-	return (error);
+	error = caccess(fname, fmode, startvp);
+	if (startvp != NULL)
+		VN_RELE(startvp);
+	if (error)
+		return (set_errno(error));
+	return (0);
 }
 
 int

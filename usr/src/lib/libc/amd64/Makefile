@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
@@ -173,7 +172,6 @@ COMSYSOBJS=			\
 	alarm.o			\
 	brk.o			\
 	chdir.o			\
-	chmod.o			\
 	chroot.o		\
 	cladm.o			\
 	close.o			\
@@ -181,7 +179,6 @@ COMSYSOBJS=			\
 	exit.o			\
 	facl.o			\
 	fchdir.o		\
-	fchmod.o		\
 	fchroot.o		\
 	fdsync.o		\
 	fpathconf.o		\
@@ -206,14 +203,11 @@ COMSYSOBJS=			\
 	ioctl.o			\
 	kaio.o			\
 	kill.o			\
-	link.o			\
 	llseek.o		\
 	lseek.o			\
 	mmapobjsys.o		\
 	memcntl.o		\
 	mincore.o		\
-	mkdir.o			\
-	mknod.o			\
 	mmap.o			\
 	modctl.o		\
 	mount.o			\
@@ -236,7 +230,6 @@ COMSYSOBJS=			\
 	putpmsg.o		\
 	pwrite.o		\
 	read.o			\
-	readlink.o		\
 	readv.o			\
 	resolvepath.o		\
 	seteguid.o		\
@@ -253,7 +246,6 @@ COMSYSOBJS=			\
 	statfs.o		\
 	statvfs.o		\
 	stty.o			\
-	symlink.o		\
 	sync.o			\
 	sysconfig.o		\
 	sysfs.o			\
@@ -770,6 +762,7 @@ PORTSYS=			\
 	access.o		\
 	acctctl.o		\
 	bsd_signal.o		\
+	chmod.o			\
 	chown.o			\
 	corectl.o		\
 	exacctsys.o		\
@@ -782,13 +775,15 @@ PORTSYS=			\
 	inst_sync.o		\
 	issetugid.o		\
 	label.o			\
-	libc_link.o		\
+	link.o			\
 	lockf.o			\
 	lwp.o			\
 	lwp_cond.o		\
 	lwp_rwlock.o		\
 	lwp_sigmask.o		\
 	meminfosys.o		\
+	mkdir.o			\
+	mknod.o			\
 	msgsys.o		\
 	nfssys.o		\
 	open.o			\
@@ -797,6 +792,7 @@ PORTSYS=			\
 	ppriv.o			\
 	psetsys.o		\
 	rctlsys.o		\
+	readlink.o		\
 	rename.o		\
 	sbrk.o			\
 	semsys.o		\
@@ -809,6 +805,7 @@ PORTSYS=			\
 	sigpending.o		\
 	sigstack.o		\
 	stat.o			\
+	symlink.o		\
 	tasksys.o		\
 	time.o			\
 	time_util.o		\

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -40,6 +40,8 @@
 #include <sys/pathname.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/file.h>
+#include <sys/fcntl.h>
 #include <sys/proc.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
@@ -51,8 +53,9 @@
  * name is passed as string argument, not converted to vnode reference.
  */
 int
-symlink(char *target, char *linkname)
+symlinkat(char *target, int dfd, char *linkname)
 {
+	vnode_t *startvp;
 	vnode_t *dvp;
 	struct vattr vattr;
 	struct pathname lpn;
@@ -60,15 +63,23 @@ symlink(char *target, char *linkname)
 	size_t tlen;
 	int error;
 	int estale_retry = 0;
+	int auditing = AU_AUDITING();
+
+	if (linkname == NULL)
+		return (set_errno(EFAULT));
+	if ((error = fgetstartvp(dfd, linkname, &startvp)) != 0)
+		return (set_errno(error));
 
 top:
 	if (error = pn_get(linkname, UIO_USERSPACE, &lpn))
-		return (set_errno(error));
-	if (error = lookuppn(&lpn, NULL, NO_FOLLOW, &dvp, NULLVPP)) {
+		goto out;
+	if (auditing && startvp != NULL)
+		audit_setfsat_path(2);
+	if (error = lookuppnat(&lpn, NULL, NO_FOLLOW, &dvp, NULLVPP, startvp)) {
 		pn_free(&lpn);
-		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
+		if (error == ESTALE && fs_need_estale_retry(estale_retry++))
 			goto top;
-		return (set_errno(error));
+		goto out;
 	}
 	if (vn_is_readonly(dvp))
 		error = EROFS;
@@ -82,7 +93,7 @@ top:
 			vattr.va_mask = AT_TYPE|AT_MODE;
 			error = VOP_SYMLINK(dvp, lpn.pn_path, &vattr,
 			    tbuf, CRED(), NULL, 0);
-			if (AU_AUDITING())
+			if (auditing)
 				audit_symlink_create(dvp, lpn.pn_path,
 				    tbuf, error);
 		}
@@ -90,10 +101,18 @@ top:
 	}
 	pn_free(&lpn);
 	VN_RELE(dvp);
-	if (error) {
-		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
-			goto top;
+	if (error == ESTALE && fs_need_estale_retry(estale_retry++))
+		goto top;
+out:
+	if (startvp != NULL)
+		VN_RELE(startvp);
+	if (error)
 		return (set_errno(error));
-	}
 	return (0);
+}
+
+int
+symlink(char *target, char *linkname)
+{
+	return (symlinkat(target, AT_FDCWD, linkname));
 }

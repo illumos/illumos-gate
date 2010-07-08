@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1894,9 +1895,12 @@ openarg(private_t *pri, int arg)
 {
 	char *str = pri->code_buf;
 
-	switch (arg & ~ALL_O_FLAGS) {
+	if ((arg & ~(O_ACCMODE | ALL_O_FLAGS)) != 0)
+		return (NULL);
+
+	switch (arg & O_ACCMODE) {
 	default:
-		return ((char *)NULL);
+		return (NULL);
 	case O_RDONLY:
 		(void) strcpy(str, "O_RDONLY");
 		break;
@@ -1905,6 +1909,12 @@ openarg(private_t *pri, int arg)
 		break;
 	case O_RDWR:
 		(void) strcpy(str, "O_RDWR");
+		break;
+	case O_SEARCH:
+		(void) strcpy(str, "O_SEARCH");
+		break;
+	case O_EXEC:
+		(void) strcpy(str, "O_EXEC");
 		break;
 	}
 

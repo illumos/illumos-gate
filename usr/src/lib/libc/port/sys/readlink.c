@@ -18,26 +18,41 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-	.file	"symlink.s"
+#include "lint.h"
+#include <sys/syscall.h>
+#include <sys/unistd.h>
+#include <sys/fcntl.h>
 
-/* C library -- symlink						*/
-/* int symlink(const char *name1, const char *name2)		*/
+ssize_t
+readlinkat(int fd, const char *path, char *buf, size_t bufsize)
+{
+	sysret_t rval;
+	int error;
 
-#include <sys/asm_linkage.h>
+	error = __systemcall(&rval, SYS_readlinkat, fd, path, buf, bufsize);
+	if (error)
+		(void) __set_errno(error);
+	return ((ssize_t)rval.sys_rval1);
+}
 
-	ANSI_PRAGMA_WEAK(symlink,function)
+#pragma weak _readlink = readlink
+ssize_t
+readlink(const char *path, char *buf, size_t bufsize)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	sysret_t rval;
+	int error;
 
-#include "SYS.h"
-
-	SYSCALL_RVAL1(symlink)
-	RETC
-	SET_SIZE(symlink)
+	error = __systemcall(&rval, SYS_readlink, path, buf, bufsize);
+	if (error)
+		(void) __set_errno(error);
+	return ((ssize_t)rval.sys_rval1);
+#else
+	return (readlinkat(AT_FDCWD, path, buf, bufsize));
+#endif
+}

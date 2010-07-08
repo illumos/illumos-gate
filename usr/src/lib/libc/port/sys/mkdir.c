@@ -18,26 +18,29 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-	.file	"mknod.s"
+#include "lint.h"
+#include <sys/syscall.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
 
-/* C library -- mknod						*/
-/* int mknod(const char *path, mode_t mode, dev_t dev);		*/
+int
+mkdirat(int fd, const char *path, mode_t mode)
+{
+	return (syscall(SYS_mkdirat, fd, path, mode));
+}
 
-#include <sys/asm_linkage.h>
-
-	ANSI_PRAGMA_WEAK(mknod,function)
-
-#include "SYS.h"
-
-	SYSCALL_RVAL1(mknod)
-	RETC
-	SET_SIZE(mknod)
+#pragma weak _mkdir = mkdir
+int
+mkdir(const char *path, mode_t mode)
+{
+#if defined(_RETAIN_OLD_SYSCALLS)
+	return (syscall(SYS_mkdir, path, mode));
+#else
+	return (mkdirat(AT_FDCWD, path, mode));
+#endif
+}
