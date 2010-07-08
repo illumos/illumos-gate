@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 . /usr/lib/brand/solaris10/common.ksh
@@ -58,7 +57,7 @@ trap_cleanup()
 # If the attach failed then clean up the ZFS datasets we created.
 trap_exit()
 {
-	if [[ $EXIT_CODE != $ZONE_SUBPROC_OK && "$install_media" != "-" ]]; then
+	if [[ $EXIT_CODE != $ZONE_SUBPROC_OK && $rm_ds == 1 ]]; then
 		/usr/lib/brand/solaris10/uninstall $ZONENAME $ZONEPATH -F
 	fi
 
@@ -67,6 +66,7 @@ trap_exit()
 
 EXIT_CODE=$ZONE_SUBPROC_USAGE
 install_media="-"
+rm_ds=0
 
 trap trap_cleanup INT
 trap trap_exit EXIT
@@ -105,6 +105,10 @@ while getopts "a:d:nr:" opt; do
 			fi
 		 	inst_type="directory"
 			install_media="$OPTARG"
+			# '-d -' means use the existing zonepath.
+			if [[ "$install_media" == "$ZONEPATH" ]]; then
+				install_media="-"
+			fi
 			;;
 		n)	noexecute=1 ;;
 		r)
@@ -157,6 +161,7 @@ elif [[ "$install_media" != "-" ]]; then
 		if (( $? == 0 )); then
 			vlog "$m_zfs"
 			DATASET="$zds/$pnm"
+			rm_ds=1
 		else
 			log "$f_zfs" "$zds/$pnm"
 		fi
