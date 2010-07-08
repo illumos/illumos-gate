@@ -19,44 +19,47 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG=		ar
 XPG4PROG=	ar
 
 include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/sgs/Makefile.com
 
-COMOBJS=	main.o		file.o		cmd.o		global.o \
-		message.o
+COMOBJ=		main.o		file.o		cmd.o
 
-POFILE=		../ar.po
+BLTOBJ =	msg.o
 
-OBJS=		$(COMOBJS:%=objs/%)
-XPG4OBJS=	$(COMOBJS:%=objs.xpg4/%)
+OBJS=		$(BLTOBJ:%=objs/%) $(COMOBJ:%=objs/%)
+XPG4OBJS=	$(BLTOBJ:%=objs.xpg4/%) $(COMOBJ:%=objs.xpg4/%)
 
 LLDFLAGS =	'-R$$ORIGIN/../../lib'
-CPPFLAGS=	-I../../include $(CPPFLAGS.master)
+LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
+CPPFLAGS=	-I. -I../../include $(CPPFLAGS.master) -I$(ELFCAP)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
 
-LDLIBS +=	-lelf
-LINTFLAGS=	-mx
-LINTFLAGS64=	-mx -m64
-
-SED=		sed
+LDLIBS +=	-lelf $(CONVLIBDIR) $(CONV_LIB) -lsendfile
+LINTFLAGS=	-x
+LINTFLAGS64=	-x
 
 $(XPG4) :=	CPPFLAGS += -DXPG4
 
-SRCS=		$(COMOBJS:%.o=../common/%.c)
-LINTSRCS=	$(SRCS)
+BLTDEFS =	msg.h
+BLTDATA =	msg.c
+BLTMESG =	$(SGSMSGDIR)/ar
 
-CLEANFILES +=	$(OBJS) $(XPG4OBJS) $(LINTOUT)
+BLTFILES =	$(BLTDEFS) $(BLTDATA) $(BLTMESG)
 
+SGSMSGCOM =	../common/ar.msg
+SGSMSGTARG =	$(SGSMSGCOM)
+SGSMSGALL =	$(SGSMSGCOM)
 
-# Building SUNWonld results in a call to the `package' target.  Requirements
-# needed to run this application on older releases are established:
-#	i18n support requires libintl.so.1 prior to 2.6
+SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n ar_msg
 
-package :=	LDLIBS += /usr/lib/libintl.so.1
+SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA:%.o=$(SGSTOOLS)/common/%.c)
+LINTSRCS=	$(SRCS) ../common/lintsup.c
+
+CLEANFILES +=	$(LINTOUTS) $(BLTFILES)

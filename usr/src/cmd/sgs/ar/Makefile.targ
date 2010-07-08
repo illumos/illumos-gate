@@ -19,30 +19,29 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 
 objs/%.o \
 objs.xpg4/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-all:		$(PROG) $(XPG4)
+objs/%.o \
+objs.xpg4/%.o:	%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
 
 clean:
-		$(RM) $(CLEANFILES)
+		$(RM) $(OBJS) $(XPG4OBJS) $(CLEANFILES)
 
 delete:
 		$(RM) $(PROG)
 
-install \
-package:	all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTCCSBINLINK)
+catalog:	$(BLTMESG)
 
-catalog:	$(POFILE)
+.PARALLEL:	$(LINTOUT32) $(LINTOUT64)
 
-lint:		$(LINTOUT)
+lint:		$(LINTOUT32) $(SGSLINTOUT)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) -o $@ $(LLDFLAGS) $(OBJS) $(LDLIBS)
@@ -52,14 +51,6 @@ $(XPG4):	$(XPG4OBJS)
 		$(LINK.c) -o $@ $(XPG4OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
-$(POFILE):
-		$(RM) $@
-		$(XGETTEXT) $(XGETFLAGS) ../common/main.c
-		$(SED) "/^domain/d" < messages.po > $@
-		$(XGETTEXT) -a $(XGETFLAGS) ../common/message.c
-		$(SED) "/^domain/d" < messages.po >> $@
-		$(RM) messages.po
-
 $(OBJS):	objs
 
 $(XPG4OBJS):	objs.xpg4
@@ -67,8 +58,17 @@ $(XPG4OBJS):	objs.xpg4
 objs objs.xpg4:
 		-@ mkdir -p $@
 
-$(LINTOUT):	$(SRCS)
-		perl ../../tools/lint_hdr.pl $(PROG)	> $(LINTOUT)
-		$(LINT.c) $(SRCS) $(LDLIBS)		2>&1 | tee -a $(LINTOUT)
-
 include		$(SRC)/cmd/Makefile.targ
+include		$(SRC)/cmd/sgs/Makefile.targ
+
+# Derived source and header files (messaging).
+
+catalog:	$(BLTMESG)
+
+chkmsg:		$(SRCS)
+		sh $(CHKMSG) $(CHKMSGFLAGS) $(SRCS)
+
+$(BLTDEFS) + \
+$(BLTDATA) + \
+$(BLTMESG):	$(SGSMSGALL)
+		$(SGSMSG) $(SGSMSGFLAGS) $(SGSMSGALL)

@@ -1601,3 +1601,5 @@ Bugid   Risk Synopsis
 6962343 sgsmsg should use mkstemp() for temporary file creation
 6965723 libsoftcrypto symbol capabilities rely on compiler generated
 	capabilities - gcc failure (link-editor components only)
+6952219 ld support for archives larger than 2 GB (D, P)
+	PSARC/2010/224 Support for archives larger than 2 GB

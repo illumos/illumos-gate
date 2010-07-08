@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		$(SRC)/cmd/Makefile.cmd
@@ -84,8 +83,7 @@ SUBDIRS=	$(SUBDIRS-common) $(SUBDIRS-$(MACH))
 
 # Messaging support
 #
-POSUBDIRS=	ar		m4		nm \
-		tsort		yacc
+POSUBDIRS=	m4		nm	tsort		yacc
 POFILE=		sgs.po
 POFILES=	$(POSUBDIRS:%=%/%.po)
 
@@ -93,7 +91,7 @@ MSGSUBDIRS=	ld		ldd		libld		liblddbg \
 		libldstab	librtld		rtld		libelf \
 		ldprof		libcrle		pvs		elfdump	\
 		elfedit		crle		moe 		lari \
-		librtld_db	elfwrap
+		librtld_db	elfwrap		ar
 
 MSGDIR=		messages
 

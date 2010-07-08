@@ -143,6 +143,7 @@ int		nlist(const char *, struct nlist *);
  */
 extern void		_elf_execfill(_elf_execfill_func_t *);
 extern off_t		_elf_getarhdrbase(Elf *);
+extern size_t		_elf_getarsymwordsize(Elf *);
 extern size_t		_elf_getnextoff(Elf *);
 Elf64_Off		_elf_getxoff(Elf_Data *);
 int			_elf_swap_wrimage(Elf *);

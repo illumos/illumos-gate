@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -50,6 +47,8 @@ f none $SGSDIR/lib/sparcv9/librtld.so.1=lib/sparcv9/librtld.so.1 755 root bin
 f none $SGSDIR/lib/sparcv9/librtld_db.so.1=lib/sparcv9/librtld_db.so.1 755 root bin
 s none $SGSDIR/lib/sparcv9/librtld_db.so=librtld_db.so.1
 d none $SGSDIR/usr/bin/sparcv9 755 root bin
+f none $SGSDIR/usr/bin/sparcv9/ar=usr/bin/sparcv9/ar 555 root bin
+s none $SGSDIR/usr/ccs/bin/sparcv9/ar=../../bin/sparcv9/ar
 f none $SGSDIR/usr/bin/sparcv9/crle=usr/bin/sparcv9/crle 555 root bin
 f none $SGSDIR/usr/bin/sparcv9/ldd=usr/bin/sparcv9/ldd 555 root bin
 f none $SGSDIR/usr/bin/sparcv9/moe=usr/bin/sparcv9/moe 555 root bin

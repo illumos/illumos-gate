@@ -44,6 +44,7 @@ typedef void _elf_execfill_func_t(void *, off_t, size_t);
 extern void		_elf_execfill(_elf_execfill_func_t *);
 extern size_t		_elf_getnextoff(Elf *);
 extern off_t		_elf_getarhdrbase(Elf *);
+extern size_t		_elf_getarsymwordsize(Elf *);
 extern Elf64_Off	_elf_getxoff(Elf_Data *);
 extern GElf_Xword	_gelf_getdyndtflags_1(Elf *);
 extern int		_elf_swap_wrimage(Elf *);

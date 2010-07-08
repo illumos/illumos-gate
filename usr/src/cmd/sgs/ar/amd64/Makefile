@@ -1,7 +1,4 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,24 +19,27 @@
 # CDDL HEADER END
 #
 
-# This admin file can be used to force the installation of the
-# SUNWonld package on a system that already has it installed, without
-# having to first uninstall the existing instance. This is a generally
-# undesirable thing to do, but can be handy if you forget to uninstall
-# SUNWonld before BFUing the system. In that state, removing the
-# package can break your system, and the only safe route forward is
-# to install on top of the existing package.
 #
-#	# pkgadd -a admin -d SUNWonld
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-mail=
-instance=overwrite
-partial=ask
-runlevel=nocheck
-idepend=nocheck
-rdepend=ask
-space=nocheck
-setuid=nocheck
-conflict=nocheck
-action=nocheck
+include		../Makefile.com
+
+.KEEP_STATE:
+
+LLDFLAGS =	$(LLDFLAGS64)
+CONVLIBDIR =	$(CONVLIBDIR64)
+ELFLIBDIR =	$(ELFLIBDIR64)
+LDDBGLIBDIR =	$(LDDBGLIBDIR64)
+LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
+
+ROOTPROG =	$(ROOTPROG64)
+
+all:		$(PROG)
+
+install \
+package:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
+
+
+include		../Makefile.targ
+include		../../Makefile.sub.64

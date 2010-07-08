@@ -23,15 +23,14 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<unistd.h>
 #include	<string.h>
-#include	<libelf.h>
+#include	<_libelf.h>
 #include	<limits.h>
 #include	"conv.h"
 #include	"dump.h"
@@ -47,7 +46,8 @@ void
 ar_sym_read(Elf *elf, char *filename)
 {
 	Elf_Arsym *	arsym;
-	size_t		cnt, ptr;
+	size_t		cnt, ptr, is64;
+	const char	*fmt;
 
 	if ((arsym = elf_getarsym(elf, &ptr)) == NULL) {
 		(void) fprintf(stderr, "%s: %s: no archive symbol table\n",
@@ -55,18 +55,23 @@ ar_sym_read(Elf *elf, char *filename)
 		return;
 	}
 
+	is64 = (_elf_getarsymwordsize(elf) == 8);
 	(void) printf("%s:\n", filename);
 
 	if (!p_flag) {
 		(void) printf("     **** ARCHIVE SYMBOL TABLE ****\n");
-		(void) printf("%-8s %s\n\n", "Offset", "Name");
+		if (is64) {
+			(void) printf("%-8s         %s\n\n", "Offset", "Name");
+			fmt = "%-16.16llx %s\n";
+		} else {
+			(void) printf("%-8s %s\n\n", "Offset", "Name");
+			fmt = "%-8.8llx %s\n";
+		}
 	}
 	for (cnt = 0; cnt < ptr; cnt++, arsym++) {
-		if (arsym->as_off) {
-			/* LINTED */
-			(void) printf("%-8.8x %s\n", (int)arsym->as_off,
+		if (arsym->as_off)
+			(void) printf(fmt, EC_XWORD(arsym->as_off),
 			    (arsym->as_name ? arsym->as_name : ""));
-		}
 	}
 }
 

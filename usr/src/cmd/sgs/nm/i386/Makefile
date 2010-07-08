@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/sgs/nm/i386/Makefile
 #
@@ -52,13 +51,6 @@ CLEANFILES +=	$(LINTOUTS)
 objs.xpg4/%.o := CPPFLAGS += -DXPG4
 
 $(DEMOBJS):=	DEFLIST = -DELF_OBJ
-
-# Building SUNWonld results in a call to the `package' target.  Requirements
-# needed to run this application on older releases are established:
-#	i18n support requires libintl.so.1 prior to 2.6
-
-package :=	LDLIBS += /usr/lib/libintl.so.1
-
 
 objs.xpg4/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ $<

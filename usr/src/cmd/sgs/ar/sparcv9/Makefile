@@ -19,17 +19,25 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
 
 include		../Makefile.com
 
 .KEEP_STATE:
 
-all:		$(PROG) $(XPG4)
+LLDFLAGS =	$(LLDFLAGS64)
+CONVLIBDIR =	$(CONVLIBDIR64)
+ELFLIBDIR =	$(ELFLIBDIR64)
+LDDBGLIBDIR =	$(LDDBGLIBDIR64)
+LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 
-install \
-package:	all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTCCSBINLINK)
+ROOTPROG =	$(ROOTPROG64)
 
+all:		$(PROG)
 
+package \
+install:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
 
 include		../Makefile.targ
+include		../../Makefile.sub.64

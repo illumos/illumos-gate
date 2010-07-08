@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/sgs/messages/Makefile.com
 
@@ -44,7 +43,8 @@ MSGFMT=		msgfmt
 POFILES=	ld		ldd		libld		liblddbg \
 		librtld		rtld		libelf		ldprof \
 		libcrle		crle		moe		pvs \
-		elfdump		elfedit		elfwrap		lari
+		elfdump		elfedit		elfwrap		lari \
+	        ar
 
 # These message files are generated as a side effect of generating the
 # elfedit messages. Otherwise they are the same thing as POFILES

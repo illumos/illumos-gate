@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -76,6 +75,7 @@ PKGDIRS=	../libcrle \
 		../elfedit \
 		../elfedit/modules \
 		../elfwrap \
+		../ar \
 		../crle \
 		../dump \
 		../lari \

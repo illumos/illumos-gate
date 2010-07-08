@@ -20,16 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ar.h>
 #include <stdlib.h>
@@ -214,6 +211,11 @@ _elf_armem(Elf *elf, char *file, size_t fsz)
 		m->m_name[1] = '\0';
 	else if (f->ar_name[1] == '/' && f->ar_name[2] == ' ')	/* "//" */
 		m->m_name[2] = '\0';
+	else if (f->ar_name[1] == 'S' && f->ar_name[2] == 'Y' &&
+	    f->ar_name[3] == 'M' && f->ar_name[4] == '6' &&
+	    f->ar_name[5] == '4' && f->ar_name[6] == '/' &&
+	    f->ar_name[7] == ' ')				/* "/SYM64/" */
+		m->m_name[7] = '\0';
 	else {							/* "/?" */
 		m->m_hdr.ar_name = 0;
 		/*LINTED*/ /* MSG_INTL(EFMT_ARUNKNM) */
@@ -241,8 +243,16 @@ _elf_armem(Elf *elf, char *file, size_t fsz)
 /*
  * Initial archive processing
  *	An archive may have two special members.
- *	A symbol table, named /, must be first if it is present.
- *	A string table, named //, must precede all "normal" members.
+ *
+ *	A symbol table, named / or /SYM64/, must be first if it is present.
+ *	Both forms use the same layout differing in the width of the
+ *	integer type used (32 or 64-bit respectively).
+ *
+ *	A long name string table, named //, must precede all "normal"
+ *	members. This string table is used to hold the names of archive
+ *	members with names that are longer than 15 characters. It should not
+ *	be confused with the string table found at the end of the symbol
+ *	table, which is used to hold symbol names.
  *
  *	This code "peeks" at headers but doesn't change them.
  *	Later processing wants original headers.
@@ -284,11 +294,12 @@ _elf_arinit(Elf * elf)
 		}
 
 		hdr = mem + sz;
-		if (a->ar_name[1] == ' ') {
+		if (a->ar_name[1] == ' ') {	/* 32-bit symbol table */
 			elf->ed_arsym = mem;
 			elf->ed_arsymsz = sz;
 			elf->ed_arsymoff = (char *)a - base;
 		} else if (a->ar_name[1] == '/' && a->ar_name[2] == ' ') {
+						/* Long name string table */
 			int	k;
 
 			if (_elf_vm(elf, (size_t)(mem - elf->ed_ident),
@@ -314,6 +325,15 @@ _elf_arinit(Elf * elf)
 				++mem;
 			}
 			*(mem - 1) = '\0';
+		} else if (a->ar_name[1] == 'S' && a->ar_name[2] == 'Y' &&
+		    a->ar_name[3] == 'M' && a->ar_name[4] == '6' &&
+		    a->ar_name[5] == '4' && a->ar_name[6] == '/' &&
+		    a->ar_name[7] == ' ') {
+						/* 64-bit symbol table */
+			elf->ed_arsym = mem;
+			elf->ed_arsymsz = sz;
+			elf->ed_arsymoff = (char *)a - base;
+			elf->ed_myflags |= EDF_ARSYM64;
 		} else {
 			return;
 		}
