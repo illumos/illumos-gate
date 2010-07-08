@@ -6749,7 +6749,6 @@ pmcs_check_iomb_status(pmcs_hw_t *pwp, uint32_t *iomb)
 	case PMCOUT_SATA_EVENT:
 	case PMCOUT_SSP_EVENT:
 	case PMCOUT_DEVICE_HANDLE_ARRIVED:
-	case PMCOUT_SMP_REQUEST_RECEIVED:
 	case PMCOUT_GPIO:
 	case PMCOUT_GPIO_EVENT:
 	case PMCOUT_GET_TIME_STAMP:

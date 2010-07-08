@@ -57,6 +57,7 @@ typedef enum {
 #define	PMCS_HW_MAX_LINK_RATE	SAS_LINK_RATE_6GBIT
 
 #define	PMCS_INVALID_DEVICE_ID		0xffffffff
+#define	PMCS_DEVICE_ID_MASK		0xffff
 #define	PMCS_PHY_INVALID_PORT_ID	0xf
 
 #define	PMCS_PM_MAX_NAMELEN	16
