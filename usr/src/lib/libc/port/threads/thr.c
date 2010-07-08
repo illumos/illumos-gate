@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "lint.h"
@@ -1653,6 +1652,22 @@ postfork1_child()
 	}
 
 	/*
+	 * Do post-fork1 processing for subsystems that need it.
+	 * We need to do this before unmapping all of the abandoned
+	 * threads' stacks, below(), because the post-fork1 actions
+	 * might require access to those stacks.
+	 */
+	postfork1_child_sigev_aio();
+	postfork1_child_sigev_mq();
+	postfork1_child_sigev_timer();
+	postfork1_child_aio();
+	/*
+	 * The above subsystems use thread pools, so this action
+	 * must be performed after those actions.
+	 */
+	postfork1_child_tpool();
+
+	/*
 	 * All lwps except ourself are gone.  Mark them so.
 	 * First mark all of the lwps that have already been freed.
 	 * Then mark and free all of the active lwps except ourself.
@@ -1698,15 +1713,6 @@ postfork1_child()
 		udp->nzombies = 0;
 	}
 	trim_stack_cache(0);
-
-	/*
-	 * Do post-fork1 processing for subsystems that need it.
-	 */
-	postfork1_child_tpool();
-	postfork1_child_sigev_aio();
-	postfork1_child_sigev_mq();
-	postfork1_child_sigev_timer();
-	postfork1_child_aio();
 }
 
 lwpid_t
