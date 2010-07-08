@@ -506,7 +506,19 @@ rdsv3_rdma_send_complete(struct rdsv3_message *rm, int status)
 	mutex_exit(&rm->m_rs_lock);
 
 	if (rs) {
+		struct rsock *sk = rdsv3_rs_to_sk(rs);
+		int error;
+
 		rdsv3_wake_sk_sleep(rs);
+
+		/* wake up anyone waiting in poll */
+		sk->sk_upcalls->su_recv(sk->sk_upper_handle, NULL,
+		    0, 0, &error, NULL);
+		if (error != 0) {
+			RDSV3_DPRINTF2("rdsv3_recv_incoming",
+			    "su_recv returned: %d", error);
+		}
+
 		rdsv3_sk_sock_put(rdsv3_rs_to_sk(rs));
 	}
 
@@ -916,6 +928,8 @@ rdsv3_cmsg_send(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	return (ret);
 }
 
+extern unsigned long rdsv3_max_bcopy_size;
+
 int
 rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
     size_t payload_len)
@@ -955,6 +969,13 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 	if (daddr == 0 || rs->rs_bound_addr == 0) {
 		ret = -ENOTCONN; /* XXX not a great errno */
 		RDSV3_DPRINTF2("rdsv3_sendmsg", "returning: %d", -ret);
+		goto out;
+	}
+
+	if (payload_len > rdsv3_max_bcopy_size) {
+		RDSV3_DPRINTF2("rdsv3_sendmsg", "Message too large: %d",
+		    payload_len);
+		ret = -EMSGSIZE;
 		goto out;
 	}
 
@@ -1095,7 +1116,7 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 	rdsv3_stats_inc(s_send_queued);
 
 	if (!test_bit(RDSV3_LL_SEND_FULL, &conn->c_flags))
-		(void) rdsv3_send_xmit(conn);
+		(void) rdsv3_send_worker(&conn->c_send_w.work);
 
 	rdsv3_message_put(rm);
 	RDSV3_DPRINTF4("rdsv3_sendmsg", "Return(rs: %p, len: %d)",

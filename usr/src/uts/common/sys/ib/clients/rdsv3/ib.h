@@ -18,8 +18,6 @@
 #define	RDSV3_FMR_SIZE			256
 #define	RDSV3_FMR_POOL_SIZE		(12 * 1024)
 
-#define	RDSV3_IB_SEND_WRS		64
-
 #define	RDSV3_IB_MAX_SGE		8
 #define	RDSV3_IB_RECV_SGE 		2
 

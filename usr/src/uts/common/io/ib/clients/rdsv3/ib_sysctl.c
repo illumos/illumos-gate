@@ -54,6 +54,8 @@ unsigned long rdsv3_ib_sysctl_max_unsig_wrs = 16;
 
 unsigned long rdsv3_ib_sysctl_max_unsig_bytes = (16 << 20);
 
+unsigned long rdsv3_max_bcopy_size;
+
 /*
  * This sysctl does nothing.
  *
@@ -87,5 +89,7 @@ rdsv3_ib_sysctl_init(void)
 	    rdsv3_ib_sysctl_max_unsig_wrs,
 	    rdsv3_ib_sysctl_max_unsig_bytes,
 	    rdsv3_ib_sysctl_flow_control);
+
+	rdsv3_max_bcopy_size = rdsv3_ib_sysctl_max_send_wr * RDSV3_FRAG_SIZE;
 	return (0);
 }

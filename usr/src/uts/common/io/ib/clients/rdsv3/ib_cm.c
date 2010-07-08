@@ -319,7 +319,7 @@ rdsv3_ib_snd_tasklet_fn(void *data)
 	 */
 	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_snd_cq), &wc, 1, &polled) ==
 	    IBT_SUCCESS) {
-		RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
+		RDSV3_DPRINTF4("rdsv3_ib_snd_tasklet_fn",
 		    "wc_id 0x%llx type %d status %u byte_len %u imm_data %u\n",
 		    (unsigned long long)wc.wc_id, wc.wc_type, wc.wc_status,
 		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
@@ -329,8 +329,13 @@ rdsv3_ib_snd_tasklet_fn(void *data)
 	}
 	(void) ibt_enable_cq_notify(RDSV3_CQ2CQHDL(ic->i_snd_cq),
 	    IBT_NEXT_COMPLETION);
-	if (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_snd_cq), &wc, 1, &polled) ==
+	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_snd_cq), &wc, 1, &polled) ==
 	    IBT_SUCCESS) {
+		RDSV3_DPRINTF4("rdsv3_ib_snd_tasklet_fn",
+		    "wc_id 0x%llx type %d status %u byte_len %u imm_data %u\n",
+		    (unsigned long long)wc.wc_id, wc.wc_type, wc.wc_status,
+		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
+
 		ASSERT(wc.wc_id & RDSV3_IB_SEND_OP);
 		rdsv3_ib_send_cqe_handler(ic, &wc);
 	}
@@ -564,7 +569,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	    sizeof (struct rdsv3_ib_send_work));
 
 	ic->i_send_wrs =
-	    kmem_alloc(RDSV3_IB_SEND_WRS * (sizeof (ibt_send_wr_t) +
+	    kmem_alloc(ic->i_send_ring.w_nr * (sizeof (ibt_send_wr_t) +
 	    RDSV3_IB_MAX_SGE * sizeof (ibt_wr_ds_t)), KM_NOSLEEP);
 	if (ic->i_send_wrs == NULL) {
 		ret = -ENOMEM;
@@ -573,8 +578,8 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 		goto out;
 	}
 	sgl = (ibt_wr_ds_t *)((uint8_t *)ic->i_send_wrs +
-	    (RDSV3_IB_SEND_WRS * sizeof (ibt_send_wr_t)));
-	for (i = 0; i < RDSV3_IB_SEND_WRS; i++) {
+	    (ic->i_send_ring.w_nr * sizeof (ibt_send_wr_t)));
+	for (i = 0; i < ic->i_send_ring.w_nr; i++) {
 		wrp = &ic->i_send_wrs[i];
 		wrp->wr_sgl = &sgl[i * RDSV3_IB_MAX_SGE];
 	}
@@ -1037,7 +1042,7 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 		ic->i_sends = NULL;
 	}
 	if (ic->i_send_wrs) {
-		kmem_free(ic->i_send_wrs, RDSV3_IB_SEND_WRS *
+		kmem_free(ic->i_send_wrs, ic->i_send_ring.w_nr *
 		    (sizeof (ibt_send_wr_t) +
 		    RDSV3_IB_MAX_SGE * sizeof (ibt_wr_ds_t)));
 		ic->i_send_wrs = NULL;
