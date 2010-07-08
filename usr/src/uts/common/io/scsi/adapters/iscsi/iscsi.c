@@ -2807,7 +2807,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 					 */
 					if (persistent_static_addr_set(
 					    (char *)name,
-					    &e) == B_FALSE) {
+					    &tmp_e) == B_FALSE) {
 						cmn_err(CE_WARN, "Failed to "
 						    "restore static target "
 						    "address after logout "
