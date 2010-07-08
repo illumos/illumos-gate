@@ -458,11 +458,11 @@ static int ibd_undo_start(ibd_state_t *, link_state_t);
 static void ibd_set_mac_progress(ibd_state_t *, uint_t);
 static void ibd_clr_mac_progress(ibd_state_t *, uint_t);
 static int ibd_part_attach(ibd_state_t *state, dev_info_t *dip);
-static int ibd_part_unattach(ibd_state_t *state);
+static void ibd_part_unattach(ibd_state_t *state);
 static int ibd_port_attach(dev_info_t *);
 static int ibd_port_unattach(ibd_state_t *state, dev_info_t *dip);
 static int ibd_get_port_state(ibd_state_t *, link_state_t *);
-
+static int ibd_part_busy(ibd_state_t *);
 
 /*
  * Miscellaneous helpers
@@ -1881,8 +1881,9 @@ ibd_async_acache(ibd_state_t *state, ipoib_mac_t *mac)
 	ibd_n2h_gid(&ce->ac_mac, &destgid);
 	path_attr.pa_dgids = &destgid;
 	path_attr.pa_sl = state->id_mcinfo->mc_adds_vect.av_srvl;
-	if (ibt_get_paths(state->id_ibt_hdl, IBT_PATH_NO_FLAGS,
-	    &path_attr, 1, &path_info, NULL) != IBT_SUCCESS) {
+	path_attr.pa_pkey = state->id_pkey;
+	if (ibt_get_paths(state->id_ibt_hdl, IBT_PATH_PKEY, &path_attr, 1,
+	    &path_info, NULL) != IBT_SUCCESS) {
 		DPRINT(10, "ibd_async_acache : failed in ibt_get_paths");
 		goto error;
 	}
@@ -2543,20 +2544,27 @@ ibd_record_capab(ibd_state_t *state)
 }
 
 static int
-ibd_part_unattach(ibd_state_t *state)
+ibd_part_busy(ibd_state_t *state)
 {
-	uint32_t progress = state->id_mac_state;
-	ibt_status_t ret;
-
 	if (atomic_add_32_nv(&state->id_rx_list.dl_bufs_outstanding, 0) != 0) {
-		cmn_err(CE_CONT, "ibd_detach: failed: rx bufs outstanding\n");
+		DPRINT(10, "ibd_part_busy: failed: rx bufs outstanding\n");
 		return (DDI_FAILURE);
 	}
 
 	if (state->rc_srq_rwqe_list.dl_bufs_outstanding != 0) {
-		cmn_err(CE_CONT, "ibd_detach: failed: srq bufs outstanding\n");
+		DPRINT(10, "ibd_part_busy: failed: srq bufs outstanding\n");
 		return (DDI_FAILURE);
 	}
+
+	return (DDI_SUCCESS);
+}
+
+
+static void
+ibd_part_unattach(ibd_state_t *state)
+{
+	uint32_t progress = state->id_mac_state;
+	ibt_status_t ret;
 
 	/* make sure rx resources are freed */
 	ibd_free_rx_rsrcs(state);
@@ -2664,8 +2672,6 @@ ibd_part_unattach(ibd_state_t *state)
 		ibd_state_fini(state);
 		state->id_mac_state &= (~IBD_DRV_STATE_INITIALIZED);
 	}
-
-	return (DDI_SUCCESS);
 }
 
 int
@@ -2679,7 +2685,7 @@ ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 	 * Initialize mutexes and condition variables
 	 */
 	if (ibd_state_init(state, dip) != DDI_SUCCESS) {
-		DPRINT(10, "ibd_attach: failed in ibd_state_init()");
+		DPRINT(10, "ibd_part_attach: failed in ibd_state_init()");
 		return (DDI_FAILURE);
 	}
 	state->id_mac_state |= IBD_DRV_STATE_INITIALIZED;
@@ -2690,7 +2696,7 @@ ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 	if (ibd_rx_softintr == 1) {
 		if ((rv = ddi_add_softintr(dip, DDI_SOFTINT_LOW, &state->id_rx,
 		    NULL, NULL, ibd_intr, (caddr_t)state)) != DDI_SUCCESS) {
-			DPRINT(10, "ibd_attach: failed in "
+			DPRINT(10, "ibd_part_attach: failed in "
 			    "ddi_add_softintr(id_rx),  ret=%d", rv);
 			return (DDI_FAILURE);
 		}
@@ -2700,7 +2706,7 @@ ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 		if ((rv = ddi_add_softintr(dip, DDI_SOFTINT_LOW, &state->id_tx,
 		    NULL, NULL, ibd_tx_recycle,
 		    (caddr_t)state)) != DDI_SUCCESS) {
-			DPRINT(10, "ibd_attach: failed in "
+			DPRINT(10, "ibd_part_attach: failed in "
 			    "ddi_add_softintr(id_tx), ret=%d", rv);
 			return (DDI_FAILURE);
 		}
@@ -2714,7 +2720,7 @@ ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 	if (ibd_gstate.ig_ibt_hdl == NULL) {
 		if ((ret = ibt_attach(&ibd_clnt_modinfo, dip, state,
 		    &ibd_gstate.ig_ibt_hdl)) != IBT_SUCCESS) {
-			DPRINT(10, "ibd_attach: global: failed in "
+			DPRINT(10, "ibd_part_attach: global: failed in "
 			    "ibt_attach(), ret=%d", ret);
 			mutex_exit(&ibd_gstate.ig_mutex);
 			return (DDI_FAILURE);
@@ -2722,7 +2728,8 @@ ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 	}
 	if ((ret = ibt_attach(&ibd_clnt_modinfo, dip, state,
 	    &state->id_ibt_hdl)) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: failed in ibt_attach(), ret=%d", ret);
+		DPRINT(10, "ibd_part_attach: failed in ibt_attach(), ret=%d",
+		    ret);
 		mutex_exit(&ibd_gstate.ig_mutex);
 		return (DDI_FAILURE);
 	}
@@ -2735,7 +2742,8 @@ ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 	 */
 	if ((ret = ibt_open_hca(state->id_ibt_hdl, state->id_hca_guid,
 	    &state->id_hca_hdl)) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: ibt_open_hca() failed, ret=%d", ret);
+		DPRINT(10, "ibd_part_attach: ibt_open_hca() failed, ret=%d",
+		    ret);
 		return (DDI_FAILURE);
 	}
 	state->id_mac_state |= IBD_DRV_HCA_OPENED;
@@ -2744,7 +2752,8 @@ ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 	/* Initialize Driver Counters for Reliable Connected Mode */
 	if (state->id_enable_rc) {
 		if (ibd_rc_init_stats(state) != DDI_SUCCESS) {
-			DPRINT(10, "ibd_attach: failed in ibd_rc_init_stats");
+			DPRINT(10, "ibd_part_attach: failed in "
+			    "ibd_rc_init_stats");
 			return (DDI_FAILURE);
 		}
 		state->id_mac_state |= IBD_DRV_RC_PRIVATE_STATE;
@@ -2761,7 +2770,8 @@ ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 	 */
 	if ((ret = ibt_alloc_pd(state->id_hca_hdl, IBT_PD_NO_FLAGS,
 	    &state->id_pd_hdl)) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: ibt_alloc_pd() failed, ret=%d", ret);
+		DPRINT(10, "ibd_part_attach: ibt_alloc_pd() failed, ret=%d",
+		    ret);
 		return (DDI_FAILURE);
 	}
 	state->id_mac_state |= IBD_DRV_PD_ALLOCD;
@@ -8250,7 +8260,7 @@ fail:
 	if (pinfop) {
 		ibt_free_portinfo(pinfop, pinfosz);
 	}
-	(void) ibd_part_unattach(state);
+	ibd_part_unattach(state);
 	kmem_free(state, sizeof (ibd_state_t));
 	return (rval);
 }
@@ -8290,26 +8300,28 @@ ibd_delete_partition(void *karg, intptr_t arg, int mode, cred_t *credp,
 		return (err);
 	}
 
-	if ((err = mac_disable(node->id_mh)) != 0) {
-		(void) dls_devnet_create(node->id_mh, cmd->ioc_partid,
-		    crgetzoneid(credp));
-		mutex_exit(&ibd_objlist_lock);
-		return (err);
-	}
-
 	/*
 	 * Call ibd_part_unattach() only after making sure that the instance has
 	 * not been started yet and is also not in late hca init mode.
 	 */
 	ibd_set_mac_progress(node, IBD_DRV_DELETE_IN_PROGRESS);
+
+	err = 0;
 	if ((node->id_mac_state & IBD_DRV_STARTED) ||
 	    (node->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) ||
-	    (ibd_part_unattach(node) != DDI_SUCCESS)) {
+	    (ibd_part_busy(node) != DDI_SUCCESS) ||
+	    ((err = mac_disable(node->id_mh)) != 0)) {
+		(void) dls_devnet_create(node->id_mh, cmd->ioc_partid,
+		    crgetzoneid(credp));
 		ibd_clr_mac_progress(node, IBD_DRV_DELETE_IN_PROGRESS);
 		mutex_exit(&ibd_objlist_lock);
-		return (EBUSY);
+		return (err != 0 ? err : EBUSY);
 	}
+
 	node->id_mac_state |= IBD_DRV_IN_DELETION;
+
+	ibd_part_unattach(node);
+
 	ibd_clr_mac_progress(node, IBD_DRV_DELETE_IN_PROGRESS);
 
 	/* Remove the partition state structure from the linked list */
@@ -8674,7 +8686,7 @@ ibd_port_attach(dev_info_t *dip)
 	 */
 	instance = ddi_get_instance(dip);
 	if (ddi_soft_state_zalloc(ibd_list, instance) == DDI_FAILURE) {
-		DPRINT(10, "ibd_attach: ddi_soft_state_zalloc() failed");
+		DPRINT(10, "ibd_port_attach: ddi_soft_state_zalloc() failed");
 		return (DDI_FAILURE);
 	}
 
@@ -8685,19 +8697,19 @@ ibd_port_attach(dev_info_t *dip)
 
 	if ((state->id_port = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "port-number", 0)) == 0) {
-		DPRINT(10, "ibd_attach: invalid port number (%d)",
+		DPRINT(10, "ibd_port_attach: invalid port number (%d)",
 		    state->id_port);
 		return (DDI_FAILURE);
 	}
 	if ((state->id_hca_guid = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
 	    "hca-guid", 0)) == 0) {
-		DPRINT(10, "ibd_attach: hca has invalid guid (0x%llx)",
+		DPRINT(10, "ibd_port_attach: hca has invalid guid (0x%llx)",
 		    state->id_hca_guid);
 		return (DDI_FAILURE);
 	}
 	if ((state->id_port_guid = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
 	    "port-guid", 0)) == 0) {
-		DPRINT(10, "ibd_attach: port has invalid guid (0x%llx)",
+		DPRINT(10, "ibd_port_attach: port has invalid guid (0x%llx)",
 		    state->id_port_guid);
 		return (DDI_FAILURE);
 	}
@@ -8707,7 +8719,8 @@ ibd_port_attach(dev_info_t *dip)
 	 */
 	if ((ret = ibt_attach(&ibdpd_clnt_modinfo, dip, state,
 	    &state->id_ibt_hdl)) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: failed in ibt_attach(), ret=%d", ret);
+		DPRINT(10, "ibd_port_attach: failed in ibt_attach(), ret=%d",
+		    ret);
 		goto done;
 	}
 
@@ -8715,7 +8728,8 @@ ibd_port_attach(dev_info_t *dip)
 
 	if ((ret = ibt_open_hca(state->id_ibt_hdl, state->id_hca_guid,
 	    &state->id_hca_hdl)) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: ibt_open_hca() failed, ret=%d", ret);
+		DPRINT(10, "ibd_port_attach: ibt_open_hca() failed, ret=%d",
+		    ret);
 		goto done;
 	}
 	state->id_mac_state |= IBD_DRV_HCA_OPENED;
@@ -8723,7 +8737,8 @@ ibd_port_attach(dev_info_t *dip)
 	/* Update link status */
 
 	if (ibd_get_port_state(state, &lstate) != 0) {
-		DPRINT(10, "ibd_attach: ibt_open_hca() failed, ret=%d", ret);
+		DPRINT(10, "ibd_port_attach: ibt_open_hca() failed, ret=%d",
+		    ret);
 		goto done;
 	}
 	state->id_link_state = lstate;
@@ -8731,7 +8746,7 @@ ibd_port_attach(dev_info_t *dip)
 	 * Register ibd interfaces with the Nemo framework
 	 */
 	if (ibd_register_mac(state, dip) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: failed in ibd_register_mac()");
+		DPRINT(10, "ibd_port_attach: failed in ibd_register_mac()");
 		goto done;
 	}
 	state->id_mac_state |= IBD_DRV_MAC_REGISTERED;
