@@ -14612,10 +14612,24 @@ ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	((dl_bind_req_t *)bind_mp->b_rptr)->dl_sap = ill->ill_sap;
 	((dl_bind_req_t *)bind_mp->b_rptr)->dl_service_mode = DL_CLDLS;
 
-	unbind_mp = ip_dlpi_alloc(sizeof (dl_unbind_req_t), DL_UNBIND_REQ);
-	if (unbind_mp == NULL)
-		goto bad;
-
+	/*
+	 * ill_unbind_mp would be non-null if the following sequence had
+	 * happened:
+	 * - send DL_BIND_REQ to driver, wait for response
+	 * - multiple ioctls that need to bring the ipif up are encountered,
+	 *   but they cannot enter the ipsq due to the outstanding DL_BIND_REQ.
+	 *   These ioctls will then be enqueued on the ipsq
+	 * - a DL_ERROR_ACK is returned for the DL_BIND_REQ
+	 * At this point, the pending ioctls in the ipsq will be drained, and
+	 * since ill->ill_dl_up was not set, ill_dl_up would be invoked with
+	 * a non-null ill->ill_unbind_mp
+	 */
+	if (ill->ill_unbind_mp == NULL) {
+		unbind_mp = ip_dlpi_alloc(sizeof (dl_unbind_req_t),
+		    DL_UNBIND_REQ);
+		if (unbind_mp == NULL)
+			goto bad;
+	}
 	/*
 	 * Record state needed to complete this operation when the
 	 * DL_BIND_ACK shows up.  Also remember the pre-allocated mblks.
@@ -14634,8 +14648,8 @@ ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	 * Save the unbind message for ill_dl_down(); it will be consumed when
 	 * the interface goes down.
 	 */
-	ASSERT(ill->ill_unbind_mp == NULL);
-	ill->ill_unbind_mp = unbind_mp;
+	if (ill->ill_unbind_mp == NULL)
+		ill->ill_unbind_mp = unbind_mp;
 
 	ill_dlpi_send(ill, bind_mp);
 	/* Send down link-layer capabilities probe if not already done. */

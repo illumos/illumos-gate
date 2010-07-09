@@ -8210,6 +8210,9 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			ill_dlpi_done(ill, DL_BIND_REQ);
 			if (ill->ill_ifname_pending)
 				break;
+			mutex_enter(&ill->ill_lock);
+			ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
+			mutex_exit(&ill->ill_lock);
 			/*
 			 * Something went wrong with the bind.  We presumably
 			 * have an IOCTL hanging out waiting for completion.
@@ -8320,11 +8323,17 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 * sent by ill_dl_phys, in which case just return
 		 */
 		ill_dlpi_done(ill, DL_BIND_REQ);
+
 		if (ill->ill_ifname_pending) {
 			DTRACE_PROBE2(ip__rput__dlpi__ifname__pending,
 			    ill_t *, ill, mblk_t *, mp);
 			break;
 		}
+		mutex_enter(&ill->ill_lock);
+		ill->ill_dl_up = 1;
+		ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
+		mutex_exit(&ill->ill_lock);
+
 		if (!ioctl_aborted)
 			mp1 = ipsq_pending_mp_get(ipsq, &connp);
 		if (mp1 == NULL) {
@@ -8343,12 +8352,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 */
 		ip1dbg(("ip_rput_dlpi: bind_ack %s\n", ill->ill_name));
 		DTRACE_PROBE1(ip__rput__dlpi__bind__ack, ill_t *, ill);
-
-		mutex_enter(&ill->ill_lock);
-		ill->ill_dl_up = 1;
-		ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
 		ill_nic_event_dispatch(ill, 0, NE_UP, NULL, 0);
-		mutex_exit(&ill->ill_lock);
 
 		/*
 		 * Now bring up the resolver; when that is complete, we'll
