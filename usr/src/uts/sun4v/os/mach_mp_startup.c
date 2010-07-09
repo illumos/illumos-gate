@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/machsystm.h>
@@ -74,7 +73,16 @@ init_cpu_info(struct cpu *cp)
 	 * StarFire requires the signature block stuff setup here
 	 */
 	CPU_SGN_MAPIN(cpuid);
-	if (cpuid == cpu0.cpu_id) {
+
+	/*
+	 * cpu0 is always initialized at boot time, but it can be initialized
+	 * again if it is dynamically removed and then re-added. We check if
+	 * we are booting by verifying cpu_list. During boot, cpu0 is already
+	 * in cpu_list when this function is called. When a cpu is dynamically
+	 * added (after the boot) then it is added to cpu_list after this
+	 * function is called.
+	 */
+	if (cpuid == cpu0.cpu_id && ncpus == 1 && cpu_list[0].cpu_id == cpuid) {
 		/*
 		 * cpu0 starts out running.  Other cpus are
 		 * still in OBP land and we will leave them
