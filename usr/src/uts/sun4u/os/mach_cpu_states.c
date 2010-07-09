@@ -163,19 +163,25 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 			} else {
 				dllen = prom_getproplen(onode, "diag-level");
 				if (dllen != -1) {
-					int newstrlen;
 					char *newstr = kmem_alloc(strlen(
-					    bootstr) + dllen + 5, KM_SLEEP);
-					(void) strcpy(newstr, bootstr);
-					(void) strcat(newstr, " -f ");
-					newstrlen = strlen(bootstr) + 4;
-					(void) prom_getprop(onode, "diag-level",
-					    (caddr_t)&(newstr[newstrlen]));
-					newstr[newstrlen + dllen] = '\0';
-					bootstr = newstr;
+					    bootstr) + dllen + 5, KM_NOSLEEP);
+					if (newstr != NULL) {
+						int newstrlen;
+						(void) strcpy(newstr, bootstr);
+						(void) strcat(newstr, " -f ");
+						newstrlen = strlen(bootstr) + 4;
+						(void) prom_getprop(onode,
+						    "diag-level",
+						    (caddr_t)
+						    &(newstr[newstrlen]));
+						newstr[newstrlen + dllen] =
+						    '\0';
+						bootstr = newstr;
+						(void) prom_setprop(onode,
+						    "diag-level",
+						    "off", 4);
+					}
 				}
-				(void) prom_setprop(onode, "diag-level",
-				    "off", 4);
 			}
 		}
 		reboot_machine(bootstr);
