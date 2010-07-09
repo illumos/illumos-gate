@@ -41,6 +41,10 @@
 #ifndef _SYS_IB_CLIENTS_OF_RDMA_IB_USER_SA_H
 #define	_SYS_IB_CLIENTS_OF_RDMA_IB_USER_SA_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct ib_user_path_rec {
 	uint8_t		dgid[16];
 	uint8_t		sgid[16];
@@ -62,5 +66,9 @@ struct ib_user_path_rec {
 	uint8_t		packet_life_time;
 	uint8_t		preference;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SYS_IB_CLIENTS_OF_RDMA_IB_USER_SA_H */
