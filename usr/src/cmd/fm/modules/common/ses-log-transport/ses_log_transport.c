@@ -53,12 +53,12 @@
  * be overridden by entries in a ses_log_transport.conf file.
  */
 static const fmd_prop_t fmd_props[] = {
-	{ "interval", FMD_TYPE_TIME, "60s"},
-	{ "severity", FMD_TYPE_UINT32, "3"},
-	{ "path", FMD_TYPE_STRING, "/var/fm/fmd/ses_logs/"},
-	{ "logcount", FMD_TYPE_UINT32, "5"},
+	{ "interval",	FMD_TYPE_TIME, "60s"},
+	{ "severity",	FMD_TYPE_UINT32, "3"},
+	{ "path",	FMD_TYPE_STRING, "/var/fm/fmd/ses_logs/"},
+	{ "logcount",	FMD_TYPE_UINT32, "5"},
 	{ "maxlogsize", FMD_TYPE_UINT32, "1000000"},
-	{ NULL, 0, NULL}
+	{ NULL, 0,	NULL}
 };
 
 /* Maintains statistics on dropped ereports. */
@@ -90,24 +90,24 @@ typedef struct ses_log_monitor
 /* Contains expander log data retrieved from a topology node */
 typedef struct expander
 {
-	char slt_label[MAXPATHLEN]; /* The expander name */
-	char slt_pid[MAXPATHLEN];   /* The system product id */
-	char slt_key[MAXPATHLEN];   /* The expander key (sas address) */
+	char slt_label[MAXNAMELEN]; /* The expander name */
+	char slt_pid[MAXNAMELEN];   /* The system product id */
+	char slt_key[MAXNAMELEN];   /* The expander key (sas address) */
 	char slt_path[MAXPATHLEN];  /* The ses path to the expander */
 	nvlist_t *fmri;		    /* The fmri for this target */
 } expander_t;
 
-#define	DATA_FIELD  "data"	/* Label for the expander details */
-#define	DEFAULT_DATA	"0"	/* Default value for expander details */
-#define	MIN_LOG_SIZE	100000	/* The minimum allowed log file size. */
-#define	MIN_LOG_COUNT	1	/* The min number of old log files to keep */
-#define	EXAMINE_FMRI_VALUE	0   /* Operation value for extractin fmri val */
-#define	INVERT_FMRI_INSTANCE	1   /* Op value for inverting an FMRI value */
-#define	FATAL_ERROR "fatal"	/* ereport class leaf val for fatal errors */
-#define	NON_FATAL_ERROR	"non-fatal" /* val for non fatal errors */
-#define	INVALID_OPERATION   0x01    /* Invalid access_fmri operation */
-#define	NULL_LOG_DATA	    0x02    /* Library returned NULL log reference */
-#define	DATE_STRING_SIZE    16	    /* Size of date string prefix. */
+#define	DATA_FIELD		"data" /* Label for the expander details */
+#define	DEFAULT_DATA		"0" /* Default value for expander details */
+#define	MIN_LOG_SIZE		100000 /* The minimum allowed log file size. */
+#define	MIN_LOG_COUNT		1 /* The min number of old log files to keep */
+#define	EXAMINE_FMRI_VALUE	0 /* Operation value for extractin fmri val */
+#define	INVERT_FMRI_INSTANCE	1 /* Op value for inverting an FMRI value */
+#define	FATAL_ERROR		"fatal" /* ereport class val for fatal errors */
+#define	NON_FATAL_ERROR		"non-fatal" /* val for non fatal errors */
+#define	INVALID_OPERATION	0x01 /* Invalid access_fmri operation */
+#define	NULL_LOG_DATA		0x02 /* Library returned NULL log reference */
+#define	DATE_STRING_SIZE	16 /* Size of date string prefix. */
 
 /* Prototype needed for use in declaring and populating tables */
 static int invert_fmri(ses_log_monitor_t *, nvlist_t *);
@@ -132,19 +132,19 @@ typedef struct platforms {
 } platforms_t;
 
 /* This is the genesis list of codes and functions. */
-code_operation_t genesis_codes[] = {
+static code_operation_t genesis_codes[] = {
 	{ 684002, invert_fmri }	    /* Alternate controller is down */
 };
 
 /* This is the list of all platforms and their associated code op pairs. */
-platform_t platform_list[] = {
+static platform_t platform_list[] = {
 	{ "SUN-GENESIS",
 	    sizeof (genesis_codes) / sizeof (code_operation_t),
 	    genesis_codes }
 };
 
 /* This structure holds a reference to the platform list. */
-platforms_t platforms = {
+static platforms_t platforms = {
 	sizeof (platform_list) / sizeof (platform_t),
 	platform_list
 };
@@ -162,6 +162,8 @@ slt_post_ereport(fmd_hdl_t *hdl, fmd_xprt_t *xprt, const char *ereport_class,
 
 	(void) snprintf(fullclass, sizeof (fullclass), "%s.io.sas.log.%s",
 	    FM_EREPORT_CLASS, ereport_class);
+
+	fmd_hdl_debug(hdl, "Generating an ereport: %s", fullclass);
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) == 0) {
 
@@ -400,6 +402,8 @@ access_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri, char *target,
  * expander: An expander_t struct containing path, pid etc info from the node.
  * slmp: A pointer to the transport data structure which contains the
  * configurable file parameters.
+ * byte_count: The number of bytes that will be added to the target file for
+ * this expander.
  */
 static int
 create_filename(char *fileName, expander_t *expander, ses_log_monitor_t *slmp,
@@ -419,11 +423,8 @@ create_filename(char *fileName, expander_t *expander, ses_log_monitor_t *slmp,
 
 	ses_node = strrchr(fileName, '/');
 
-	if (ses_node) {
-
-		if (strlen(ses_node) > 1) {
-			(void) strlcat(fileName, "/", MAXPATHLEN);
-		}
+	if (ses_node && (strlen(ses_node) > 1)) {
+		(void) strlcat(fileName, "/", MAXPATHLEN);
 	}
 
 	ses_node = strrchr(expander->slt_path, '/');
@@ -480,14 +481,17 @@ error_type(int severity)
 	char *rval;
 
 	switch (severity) {
-	case SES_LOG_LEVEL_FATAL : rval = FATAL_ERROR;
-	break;
+	case SES_LOG_LEVEL_FATAL :
+		rval = FATAL_ERROR;
+		break;
 
-	case SES_LOG_LEVEL_ERROR : rval = NON_FATAL_ERROR;
-	break;
+	case SES_LOG_LEVEL_ERROR :
+		rval = NON_FATAL_ERROR;
+		break;
 
-	default : rval = NULL;
-	break;
+	default :
+		rval = NULL;
+		break;
 
 	}
 
@@ -620,6 +624,26 @@ check_code(ses_log_monitor_t *slmp, nvlist_t *fmri, char *pid, int code)
 }
 
 /*
+ * Searches the platform lists for for a match on the supplied product id.
+ * Returns zero if supported, non zero otherwise.
+ */
+static int
+platform_supported(char *pid)
+{
+	int supported = 1;
+	int i;
+
+	for (i = 0; i < platforms.pcount; i++) {
+		if (strcmp(platforms.plist[i].pid, pid) == 0) {
+			supported = 0;
+			break;
+		}
+	}
+
+	return (supported);
+}
+
+/*
  * Inverts the controller instance in the specified FMRI
  */
 static int
@@ -682,7 +706,10 @@ handle_log_entry(ses_log_monitor_t *slmp, nvpair_t *entry,
 			if (nvlist_lookup_string(entry_data, ENTRY_CODE,
 			    &code) == 0) {
 
-				/* Log errors in function */
+				/*
+				 * Check this code for any actions specific
+				 * to this platform.
+				 */
 				(void) check_code(slmp, expander->fmri,
 				    expander->slt_pid, atoi(code));
 			}
@@ -694,10 +721,7 @@ handle_log_entry(ses_log_monitor_t *slmp, nvpair_t *entry,
 				return (rval);
 			}
 
-			/*
-			 * Create the ENA for this transport so that it can be
-			 * used for any ereports that we need to generate.
-			 */
+			/* Create the ENA for this ereport */
 			ena = fmd_event_ena_create(slmp->slt_hdl);
 
 			slt_post_ereport(slmp->slt_hdl, slmp->slt_xprt,
@@ -921,8 +945,7 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 	expander_t *expander;
 	struct ses_log_call_struct lib_param;
 
-	int err;
-	int status = 0;
+	int err = 0;
 	char *label = NULL;
 	char *target_path = NULL;
 	char *product_id = NULL;
@@ -933,62 +956,60 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 		return (TOPO_WALK_NEXT);
 	}
 
+	if (topo_prop_get_string(node, "authority", "product-id",
+	    &product_id, &err) != 0) {
+		fmd_hdl_debug(slmp->slt_hdl,
+		    "Error collecting product_id %d", err);
+		return (TOPO_WALK_NEXT);
+	}
+
+	/* The current system type is not supported. Skip processing the node */
+	if (platform_supported(product_id) != 0) {
+		topo_hdl_strfree(thp, product_id);
+		return (TOPO_WALK_NEXT);
+	}
+
 	/* Allocate space for the holder structure */
 	expander = (expander_t *)fmd_hdl_zalloc(slmp->slt_hdl,
 	    sizeof (expander_t), FMD_SLEEP);
 
-
-	if ((status  |= topo_prop_get_string(node, "protocol", "label", &label,
-	    &err)) == 0) {
-		fmd_hdl_debug(slmp->slt_hdl, "Label: %s", label);
-		(void) snprintf(expander->slt_label, MAXPATHLEN, "%s", label);
-
-	} else {
-		fmd_hdl_error(slmp->slt_hdl, "Error collecting label\n");
-	}
-	topo_hdl_strfree(thp, label);
-
-	if ((status |= topo_prop_get_string(node, "ses", "ses-devfs-path",
-	    &target_path, &err)) == 0) {
-		(void) snprintf(expander->slt_path, MAXPATHLEN, "%s",
-		    target_path);
-
-	} else {
-		fmd_hdl_error(slmp->slt_hdl,
-		    "Error collecting ses-devfs-path\n");
-	}
-	topo_hdl_strfree(thp, target_path);
-
-
-	if ((status |= topo_prop_get_string(node, "authority", "product-id",
-	    &product_id, &err)) == 0) {
-
-		(void) snprintf(expander->slt_pid, MAXPATHLEN, "%s",
-		    product_id);
-
-	} else {
-		fmd_hdl_error(slmp->slt_hdl, "Error collecting product_id\n");
-	}
+	(void) snprintf(expander->slt_pid, MAXNAMELEN, "%s", product_id);
 	topo_hdl_strfree(thp, product_id);
 
-
-	if ((status |= topo_prop_get_string(node, "storage", "sas-address",
-	    &sas_address, &err)) == 0) {
-
-		if (strlen(sas_address) != 16) {
-			fmd_hdl_error(slmp->slt_hdl,
-			    "sas-address length is not 16: (%s)", sas_address);
-			status |= 1;
-
-		} else {
-
-			(void) snprintf(expander->slt_key, MAXPATHLEN, "%s",
-			    sas_address);
-		}
-
-	} else {
-		fmd_hdl_error(slmp->slt_hdl, "Error collecting sas_address\n");
+	if (topo_prop_get_string(node, "protocol", "label", &label, &err)
+	    != 0) {
+		fmd_hdl_debug(slmp->slt_hdl, "Error collecting label %d", err);
+		free_expander(slmp, expander);
+		return (TOPO_WALK_NEXT);
 	}
+	(void) snprintf(expander->slt_label, MAXNAMELEN, "%s", label);
+	topo_hdl_strfree(thp, label);
+
+	if (topo_prop_get_string(node, TOPO_PGROUP_SES,
+	    TOPO_PROP_SES_DEV_PATH, &target_path, &err) != 0) {
+		fmd_hdl_debug(slmp->slt_hdl,
+		    "Error collecting ses-devfs-path %d", err);
+		free_expander(slmp, expander);
+		return (TOPO_WALK_NEXT);
+	}
+	(void) snprintf(expander->slt_path, MAXPATHLEN, "%s", target_path);
+	topo_hdl_strfree(thp, target_path);
+
+	if (topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
+	    TOPO_PROP_SAS_ADDR, &sas_address, &err) != 0) {
+		fmd_hdl_debug(slmp->slt_hdl,
+		    "Error collecting sas_address %d", err);
+		free_expander(slmp, expander);
+		return (TOPO_WALK_NEXT);
+	}
+	if (strlen(sas_address) != 16) {
+		fmd_hdl_error(slmp->slt_hdl,
+		    "sas-address length is not 16: (%s)", sas_address);
+		free_expander(slmp, expander);
+		topo_hdl_strfree(thp, sas_address);
+		return (TOPO_WALK_NEXT);
+	}
+	(void) snprintf(expander->slt_key, MAXNAMELEN, "%s", sas_address);
 	topo_hdl_strfree(thp, sas_address);
 
 	/* Obtain the fmri for this node and save a reference to it. */
@@ -1002,23 +1023,18 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 		expander->fmri = fmri;
 	}
 
-	if (status == 0) {
-		if ((err = get_log(slmp, expander, &lib_param)) != 0) {
+	if ((err = get_log(slmp, expander, &lib_param)) != 0) {
 
-			fmd_hdl_error(slmp->slt_hdl,
-			    "Error retrieving logs: %d\n", err);
-
-			free_expander(slmp, expander);
-			return (TOPO_WALK_NEXT);
-		}
-
-		if ((err = process_log(slmp, expander, &lib_param)) != 0) {
-			fmd_hdl_error(slmp->slt_hdl,
-			    "Error processing logs: %d\n", err);
-		}
+		fmd_hdl_error(slmp->slt_hdl, "Error retrieving logs %d\n", err);
+		free_expander(slmp, expander);
+		return (TOPO_WALK_NEXT);
 	}
 
-	/* Free the expander structure whether this is a success or failure. */
+	if ((err = process_log(slmp, expander, &lib_param)) != 0) {
+		fmd_hdl_error(slmp->slt_hdl, "Error processing logs %d\n", err);
+	}
+
+	/* Free the expander structure before exiting. */
 	free_expander(slmp, expander);
 
 	return (TOPO_WALK_NEXT);
