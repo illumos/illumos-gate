@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -54,7 +53,7 @@
 
 #define	MAXBUF (64 * 1024)
 #define	BIGBUF 4096
-#define	LILBUF 64
+#define	LILBUF (sizeof (dirent_t))
 
 #define	DIRENT_NAMELEN(reclen)	\
 	((reclen) - (offsetof(dirent_t, d_name[0])))
@@ -266,7 +265,7 @@ main(int argc, char **argv)
 	if (rddir_bufsize < LILBUF || rddir_bufsize > MAXBUF) {
 		(void) fprintf(stderr, "Sorry, buffer size "
 		    "must be >= %d and less than or equal to %d bytes.\n",
-		    LILBUF, MAXBUF);
+		    (int)LILBUF, MAXBUF);
 		exit(EINVAL);
 	}
 
