@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <netdb.h>
@@ -164,7 +163,8 @@ retry:
 		curr->ifa_addr = malloc(sizeof (struct sockaddr_storage));
 		if (curr->ifa_addr == NULL)
 			goto fail;
-		*curr->ifa_addr = lifrp->lifr_addr;
+		(void) memcpy(curr->ifa_addr, &lifrp->lifr_addr,
+		    sizeof (struct sockaddr_storage));
 
 		/* Get the netmask */
 		if (ioctl(s, SIOCGLIFNETMASK, (caddr_t)&lifrl) < 0)
@@ -172,7 +172,8 @@ retry:
 		curr->ifa_netmask = malloc(sizeof (struct sockaddr_storage));
 		if (curr->ifa_netmask == NULL)
 			goto fail;
-		*curr->ifa_netmask = lifrl.lifr_addr;
+		(void) memcpy(curr->ifa_netmask, &lifrl.lifr_addr,
+		    sizeof (struct sockaddr_storage));
 
 		/* Get the destination for a pt-pt interface */
 		if (curr->ifa_flags & IFF_POINTOPOINT) {
@@ -182,7 +183,8 @@ retry:
 			    sizeof (struct sockaddr_storage));
 			if (curr->ifa_dstaddr == NULL)
 				goto fail;
-			*curr->ifa_dstaddr = lifrl.lifr_addr;
+			(void) memcpy(curr->ifa_dstaddr, &lifrp->lifr_addr,
+			    sizeof (struct sockaddr_storage));
 		} else if (curr->ifa_flags & IFF_BROADCAST) {
 			if (ioctl(s, SIOCGLIFBRDADDR, (caddr_t)&lifrl) < 0)
 				goto fail;
@@ -190,7 +192,8 @@ retry:
 			    sizeof (struct sockaddr_storage));
 			if (curr->ifa_broadaddr == NULL)
 				goto fail;
-			*curr->ifa_broadaddr = lifrl.lifr_addr;
+			(void) memcpy(curr->ifa_broadaddr, &lifrp->lifr_addr,
+			    sizeof (struct sockaddr_storage));
 		}
 
 	}

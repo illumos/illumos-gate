@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _IFADDRS_H
 #define	_IFADDRS_H
@@ -40,10 +39,8 @@ struct ifaddrs {
 	struct ifaddrs	*ifa_next;	/* Pointer to the next structure. */
 	char		*ifa_name;	/* Name of this network interface. */
 	uint64_t	ifa_flags;	/* Flags as from SIOCGLIFFLAGS ioctl. */
-	struct sockaddr_storage	*ifa_addr;
-					/* Network address of this interface. */
-	struct sockaddr_storage	*ifa_netmask;
-					/* Netmask of this interface. */
+	struct sockaddr	*ifa_addr;	/* Network address of this interface. */
+	struct sockaddr	*ifa_netmask;	/* Netmask of this interface. */
 	union {
 		/*
 		 * At most one of the following two is valid.  If the
@@ -52,8 +49,8 @@ struct ifaddrs {
 		 * set, then `ifa_dstaddr' is valid. It is never the case that
 		 * both these bits are set at once.
 		 */
-		struct sockaddr_storage	*ifu_broadaddr;
-		struct sockaddr_storage	*ifu_dstaddr;
+		struct sockaddr	*ifu_broadaddr;
+		struct sockaddr	*ifu_dstaddr;
 	} ifa_ifu;
 	void		*ifa_data; /* Address-specific data (may be unused). */
 /*

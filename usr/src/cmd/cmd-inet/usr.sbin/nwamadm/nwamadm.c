@@ -1114,7 +1114,7 @@ eventhandler(nwam_event_t event)
 			struct sockaddr_in *v4addr;
 			struct sockaddr_in6 *v6addr;
 			char addrstr[NWAM_MAX_VALUE_LEN];
-			int plen = mask2plen(netmask);
+			int plen = mask2plen((struct sockaddr *)netmask);
 
 			switch (address->ss_family) {
 			case AF_INET:

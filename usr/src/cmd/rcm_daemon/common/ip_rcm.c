@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1117,7 +1116,7 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct ifaddrs *ifa)
 	    sizeof (pif.pi_grname));
 
 	/* Get the interface address for this interface */
-	ifaddr = *(ifa->ifa_addr);
+	(void) memcpy(&ifaddr, ifa->ifa_addr, sizeof (ifaddr));
 
 	rsrc = get_link_resource(pif.pi_ifname);
 	if (rsrc == NULL) {
@@ -1261,7 +1260,7 @@ update_ipifs(rcm_handle_t *hd, int af)
 	for (ptr = ainfo; ptr; ptr = IA_NEXT(ptr)) {
 		ifa = &ptr->ia_ifa;
 		if (ptr->ia_state != IFA_DISABLED &&
-		    af == ifa->ifa_addr->ss_family)
+		    af == ifa->ifa_addr->sa_family)
 			(void) update_pif(hd, af, sock, ifa);
 	}
 	(void) close(sock);

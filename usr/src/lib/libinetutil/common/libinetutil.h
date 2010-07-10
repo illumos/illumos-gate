@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LIBINETUTIL_H
@@ -54,10 +53,9 @@ extern boolean_t	ifparse_ifspec(const char *, ifspec_t *);
 extern void		get_netmask4(const struct in_addr *, struct in_addr *);
 extern boolean_t	sockaddrcmp(const struct sockaddr_storage *,
 			    const struct sockaddr_storage *);
-extern int		plen2mask(uint_t, sa_family_t,
-			    struct sockaddr_storage *);
-extern int		mask2plen(const struct sockaddr_storage *);
-extern boolean_t	sockaddrunspec(const struct sockaddr_storage *);
+extern int		plen2mask(uint_t, sa_family_t, struct sockaddr *);
+extern int		mask2plen(const struct sockaddr *);
+extern boolean_t	sockaddrunspec(const struct sockaddr *);
 
 /*
  * Extended version of the classic BSD ifaddrlist() interface:

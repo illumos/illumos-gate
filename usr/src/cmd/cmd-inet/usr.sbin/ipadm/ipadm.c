@@ -1718,7 +1718,7 @@ print_sa_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		flags2str(ainfo->ia_pflags, pflags_mask, _B_TRUE, buf, bufsize);
 		break;
 	case SA_ADDR:
-		af = ifa->ifa_addr->ss_family;
+		af = ifa->ifa_addr->sa_family;
 		/*
 		 * If the address is 0.0.0.0 or :: and the origin is DHCP,
 		 * print STR_UNKNOWN_VAL.

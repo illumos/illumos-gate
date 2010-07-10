@@ -1559,6 +1559,7 @@ vrrpd_walk_addr_info(int af)
 	ipadm_addr_info_t	*ainfo, *ainfop;
 	ipadm_status_t		ipstatus;
 	char			*lifname;
+	struct sockaddr_storage	stor;
 	vrrp_addr_t		*addr;
 	int			ifindex;
 	uint64_t		flags;
@@ -1574,12 +1575,13 @@ vrrpd_walk_addr_info(int af)
 	}
 
 	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
-		if (ainfop->ia_ifa.ifa_addr->ss_family != af)
+		if (ainfop->ia_ifa.ifa_addr->sa_family != af)
 			continue;
 
 		lifname = ainfop->ia_ifa.ifa_name;
 		flags = ainfop->ia_ifa.ifa_flags;
-		addr = (vrrp_addr_t *)ainfop->ia_ifa.ifa_addr;
+		(void) memcpy(&stor, ainfop->ia_ifa.ifa_addr, sizeof (stor));
+		addr = (vrrp_addr_t *)&stor;
 
 		vrrp_log(VRRP_DBG0, "vrrpd_walk_addr_info(%s): %s",
 		    af_str(af), lifname);

@@ -2552,7 +2552,7 @@ ipv4_prefixlen(struct sockaddr_in *sin)
 	m = SIN(&mask);
 	m->sin_family = AF_INET;
 	if (getnetmaskbyaddr(sin->sin_addr, &m->sin_addr) == 0) {
-		return (mask2plen(&mask));
+		return (mask2plen((struct sockaddr *)&mask));
 	} else if (IN_CLASSA(htonl(sin->sin_addr.s_addr))) {
 		return (8);
 	} else if (IN_CLASSB(ntohl(sin->sin_addr.s_addr))) {

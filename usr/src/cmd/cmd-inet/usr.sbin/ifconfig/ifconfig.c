@@ -552,7 +552,7 @@ foreachinterface(int argc, char *argv[], int af,
 			if ((~ifa->ifa_flags & offflags) != offflags)
 				continue;
 		}
-		s = (ifa->ifa_addr->ss_family == AF_INET ? s4 : s6);
+		s = (ifa->ifa_addr->sa_family == AF_INET ? s4 : s6);
 		(void) strncpy(name, ifa->ifa_name, sizeof (name));
 		(void) strncpy(origname, name, sizeof (origname));
 		ifconfig(argc, argv, af, ifa);
@@ -805,7 +805,7 @@ ifconfig(int argc, char *argv[], int af, struct ifaddrs *ifa)
 			 */
 			if ((p->c_af == AF_ANY)	||
 			    (ifa == NULL) ||
-			    (ifa->ifa_addr->ss_family == p->c_af)) {
+			    (ifa->ifa_addr->sa_family == p->c_af)) {
 				ret = (*p->c_func)(*argv, p->c_parameter);
 				/*
 				 *	If c_func failed and we should
@@ -1000,7 +1000,7 @@ setifaddr(char *addr, int64_t param)
 		 * lifr.lifr_addr, which is updated by set_mask_lifreq()
 		 * will contain the right mask to use.
 		 */
-		prefixlen = mask2plen(&lifr.lifr_addr);
+		prefixlen = mask2plen((struct sockaddr *)&lifr.lifr_addr);
 		(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
 		    addrstr, prefixlen);
 
@@ -1921,7 +1921,8 @@ addif(char *str, int64_t param)
 		 * lifr.lifr_addr, which is updated by set_mask_lifreq()
 		 * will contain the right mask to use.
 		 */
-		prefixlen = mask2plen(&lifr.lifr_addr);
+		prefixlen = mask2plen((struct sockaddr *)&lifr.lifr_addr);
+
 		(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
 		    addrstr, prefixlen);
 
@@ -2002,7 +2003,8 @@ removeif(char *str, int64_t param)
 		ipadmerr_exit(istatus, "removeif");
 
 	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop))
-		if (sockaddrcmp(ainfop->ia_ifa.ifa_addr, &laddr))
+		if (sockaddrcmp(
+		    (struct sockaddr_storage *)ainfop->ia_ifa.ifa_addr, &laddr))
 			break;
 
 	if (ainfop != NULL) {

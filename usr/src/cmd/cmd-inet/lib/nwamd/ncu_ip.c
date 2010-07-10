@@ -371,7 +371,7 @@ nwamd_static_addresses_configured(nwamd_ncu_t *ncu, sa_family_t family)
 boolean_t
 nwamd_dhcp_managing(int protocol, nwamd_ncu_t *ncu)
 {
-	struct sockaddr_storage *addr;
+	struct sockaddr_storage addr;
 	uint64_t flags;
 	boolean_t rv = B_FALSE;
 	ipadm_addr_info_t *addrinfo, *a;
@@ -386,9 +386,19 @@ nwamd_dhcp_managing(int protocol, nwamd_ncu_t *ncu)
 	}
 
 	for (a = addrinfo; a != NULL; a = IA_NEXT(a)) {
+		/*
+		 * WARNING: This memcpy() assumes knowledge of the
+		 * implementation of getifaddrs() and that it always
+		 * uses sockaddr_storage as the backing store for
+		 * address information, thus making it possible to
+		 * copy the entire structure rather than do it on
+		 * the size of the sockaddr according to family.
+		 * This assumption is made elsewhere in this file.
+		 */
+		(void) memcpy(&addr, a->ia_ifa.ifa_addr, sizeof (addr));
+
 		/* is this address an expected static one? */
-		addr = a->ia_ifa.ifa_addr;
-		if (find_static_address(addr, ncu) != NULL)
+		if (find_static_address(&addr, ncu) != NULL)
 			continue;
 
 		/*
@@ -400,11 +410,11 @@ nwamd_dhcp_managing(int protocol, nwamd_ncu_t *ncu)
 		 * as not being managed by DHCP and skip checking of flags.
 		 */
 		if ((protocol == AF_INET &&
-		    ((struct sockaddr_in *)addr)->sin_addr.s_addr ==
+		    ((struct sockaddr_in *)&addr)->sin_addr.s_addr ==
 		    INADDR_ANY) ||
 		    (protocol == AF_INET6 &&
 		    IN6_IS_ADDR_LINKLOCAL(
-		    &((struct sockaddr_in6 *)addr)->sin6_addr))) {
+		    &((struct sockaddr_in6 *)&addr)->sin6_addr))) {
 			continue;
 		}
 
@@ -561,7 +571,7 @@ stateless_running(const nwamd_ncu_t *ncu)
 	}
 
 	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
-		if (ainfop->ia_ifa.ifa_addr->ss_family != AF_INET6)
+		if (ainfop->ia_ifa.ifa_addr->sa_family != AF_INET6)
 			continue;
 		flags = ainfop->ia_ifa.ifa_flags;
 		if (flags & STATELESS_RUNNING) {
@@ -594,11 +604,14 @@ addrinfo_for_addr(const struct sockaddr_storage *caddr, const char *ifname,
 
 	*ainfo = NULL;
 	for (ainfop = addrinfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
+		struct sockaddr_storage addr;
+
+		(void) memcpy(&addr, ainfop->ia_ifa.ifa_addr, sizeof (addr));
 		/*
 		 * If addresses match, rearrange pointers so that addrinfo
 		 * does not contain a, and return a.
 		 */
-		if (sockaddrcmp(ainfop->ia_ifa.ifa_addr, caddr)) {
+		if (sockaddrcmp(&addr, caddr)) {
 			if (last != NULL)
 				last->ia_ifa.ifa_next = ainfop->ia_ifa.ifa_next;
 			else
@@ -840,7 +853,7 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 		boolean_t stateful_ai_found = B_FALSE;
 		struct nwamd_if_address *nifa = NULL;
 		nwamd_if_t *u_if;
-		struct sockaddr_storage *addr, *ai_addr = 0;
+		struct sockaddr_storage *addr, ai_addr, *aip = NULL;
 		ushort_t family;
 		uint64_t flags = 0;
 
@@ -874,7 +887,9 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			}
 			addrinfo = ai;
 			flags = addrinfo->ia_ifa.ifa_flags;
-			ai_addr = addrinfo->ia_ifa.ifa_addr;
+			(void) memcpy(&ai_addr, addrinfo->ia_ifa.ifa_addr,
+			    sizeof (ai_addr));
+			aip = &ai_addr;
 
 			if (addrinfo->ia_atype == IPADM_ADDR_IPV6_ADDRCONF ||
 			    addrinfo->ia_atype == IPADM_ADDR_DHCP)
@@ -936,16 +951,22 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			    &ai)) {
 				ipadm_addr_info_t *a;
 				for (a = ai; a != NULL; a = IA_NEXT(a)) {
+					struct sockaddr_storage stor;
+
+					(void) memcpy(&stor, a->ia_ifa.ifa_addr,
+					    sizeof (stor));
 					/*
 					 * Since multiple addrinfo can have
 					 * the same ipaddr, find the one for
 					 * the address that generated this
 					 * state event.
 					 */
-					if (sockaddrcmp(addr,
-					    a->ia_ifa.ifa_addr)) {
+					if (sockaddrcmp(addr, &stor)) {
 						flags = a->ia_ifa.ifa_flags;
-						ai_addr = a->ia_ifa.ifa_addr;
+						(void) memcpy(&ai_addr,
+						    a->ia_ifa.ifa_addr,
+						    sizeof (ai_addr));
+						aip = &ai_addr;
 						addrinfo = a;
 					}
 					/*
@@ -981,10 +1002,10 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			 * interfaces).
 			 */
 			if (((struct sockaddr_in *)addr)->sin_addr.s_addr
-			    == INADDR_ANY && ai_addr != 0) {
+			    == INADDR_ANY && aip != 0) {
 				struct sockaddr_in *a;
 				char astr[INET6_ADDRSTRLEN];
-				a = (struct sockaddr_in *)ai_addr;
+				a = (struct sockaddr_in *)aip;
 
 				if ((flags & IFF_UP) &&
 				    !(flags & IFF_RUNNING) &&
@@ -1026,7 +1047,7 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 		 * in that case.
 		 */
 		if (!addr_added && !(flags & IFF_DUPLICATE)) {
-			if (ai_addr != 0 && sockaddrcmp(addr, ai_addr)) {
+			if (aip != 0 && sockaddrcmp(addr, aip)) {
 				nlog(LOG_INFO,
 				    "nwamd_ncu_handle_if_state_event: "
 				    "address %s is not really gone from %s, "

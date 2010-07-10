@@ -441,17 +441,19 @@ static int
 check_ipaddr(sa_family_t family, struct ifaddrs *ifa, void *arg)
 {
 	struct nwamd_ipaddr_condition_walk_arg *wa = arg;
+	struct sockaddr_in6 addr6;
+	struct sockaddr_in addr;
 	boolean_t match = B_FALSE;
 	uchar_t *addr1, *addr2;
 
 	if (family == AF_INET) {
-		addr1 = (uchar_t *)&(((struct sockaddr_in *)
-		    ifa->ifa_addr)->sin_addr.s_addr);
+		(void) memcpy(&addr, ifa->ifa_addr, sizeof (addr));
+		addr1 = (uchar_t *)(&addr.sin_addr.s_addr);
 		addr2 = (uchar_t *)&(((struct sockaddr_in *)
 		    &(wa->sockaddr))->sin_addr.s_addr);
 	} else {
-		addr1 = (uchar_t *)&(((struct sockaddr_in6 *)
-		    ifa->ifa_addr)->sin6_addr.s6_addr);
+		(void) memcpy(&addr6, ifa->ifa_addr, sizeof (addr6));
+		addr1 = (uchar_t *)(&addr6.sin6_addr.s6_addr);
 		addr2 = (uchar_t *)&(((struct sockaddr_in6 *)
 		    &(wa->sockaddr))->sin6_addr.s6_addr);
 	}
@@ -535,7 +537,7 @@ test_condition_ip_address(nwam_condition_t condition,
 		return (wa.res);
 	}
 	for (ifap = ifa; ifap != NULL; ifap = ifap->ifa_next) {
-		if (ifap->ifa_addr->ss_family != family)
+		if (ifap->ifa_addr->sa_family != family)
 			continue;
 		if (check_ipaddr(family, ifap, &wa) == 1)
 			break;
