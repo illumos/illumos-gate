@@ -715,8 +715,8 @@ tcp_paws_check(tcp_t *tcp, tcpha_t *tcpha, tcp_opt_t *tcpoptp)
 		if ((flags & TH_RST) == 0 &&
 		    TSTMP_LT(tcpoptp->tcp_opt_ts_val,
 		    tcp->tcp_ts_recent)) {
-			if (TSTMP_LT(LBOLT_FASTPATH64,
-			    tcp->tcp_last_rcv_lbolt + PAWS_TIMEOUT)) {
+			if (LBOLT_FASTPATH64 <
+			    (tcp->tcp_last_rcv_lbolt + PAWS_TIMEOUT)) {
 				/* This segment is not acceptable. */
 				return (B_FALSE);
 			} else {

@@ -155,7 +155,7 @@ typedef struct tcp_s {
 	uint32_t tcp_ts_recent;		/* Timestamp of earliest unacked */
 					/*  data segment */
 	clock_t	tcp_rto;		/* Round trip timeout */
-	clock_t	tcp_last_rcv_lbolt;
+	int64_t	tcp_last_rcv_lbolt;
 				/* lbolt on last packet, used for PAWS */
 	uint32_t tcp_rto_initial;	/* Initial RTO */
 	uint32_t tcp_rto_min;		/* Minimum RTO */
