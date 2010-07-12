@@ -114,6 +114,7 @@ pmcs_complete_work(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb, size_t amt)
 	 */
 	if (pwrk->state != PMCS_WORK_STATE_TIMED_OUT) {
 		pwrk->state = PMCS_WORK_STATE_INTR;
+		pwrk->onwire = 0;
 	}
 
 	pmcs_complete_work_impl(pwp, pwrk, iomb, amt);
@@ -180,6 +181,7 @@ pmcs_process_io_completion(pmcs_hw_t *pwp, pmcs_iocomp_cb_t *ioccb, size_t amt)
 	 */
 	if (pwrk->state != PMCS_WORK_STATE_TIMED_OUT) {
 		pwrk->state = PMCS_WORK_STATE_INTR;
+		pwrk->onwire = 0;
 	}
 
 	/*
@@ -1189,7 +1191,7 @@ pmcs_process_sata_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		 * problem commands.
 		 */
 		mutex_exit(&pwrk->lock);
-	} else if (status == PMCOUT_STATUS_XFER_CMD_FRAME_ISSUED) {
+	} else {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, NULL,
 		    "%s: tag %x put onto the wire for %s",
 		    __func__, htag, path);

@@ -4802,6 +4802,7 @@ pmcs_pwork(pmcs_hw_t *pwp, pmcwork_t *p)
 	p->phy = NULL;
 	p->abt_htag = 0;
 	p->timer = 0;
+	p->onwire = 0;
 	mutex_exit(&p->lock);
 
 	if (mutex_tryenter(&pwp->wfree_lock) == 0) {
@@ -7585,6 +7586,7 @@ pmcs_clone_phy(pmcs_phy_t *orig_phy)
 	 */
 	local->sibling = NULL;
 	local->children = NULL;
+	local->target = NULL;
 	mutex_init(&local->phy_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(orig_phy->pwp->intr_pri));
 
