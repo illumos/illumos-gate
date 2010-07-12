@@ -202,40 +202,21 @@ s10_amd64_correct_fsreg(klwp_t *l)
 #endif	/* __amd64 */
 
 /*
- * The native ld.so.1 is invoked with a set of -e options which we also want to
- * strip off.  This function assumes the set of -e options immediately follows
- * the native ld.so.1 command and is contiguous. This is OK, since we control
- * the code in s10_isaexec_wrapper.  We do it this way so we don't accidently
- * strip a -e option from the native command itself.  The format of an ld.so.1
- * -e option looks like:
- *	-e LD_NOENVIRON=1
+ * Native processes are started with the native ld.so.1 as the command.  This
+ * brand op is invoked by s10_npreload to fix up the command and arguments
+ * so that apps like pgrep or ps see the expected command strings.
  */
-char *
-rm_e_options(char *args)
-{
-	char *p;
-
-	while (strncmp(args, "-e ", 3) == 0) {
-		args += 3;
-		if ((p = strchr(args, ' ')) != NULL)
-			args = p + 1;
-	}
-
-	return (args);
-}
-
 int
-s10_native()
+s10_native(void *cmd, void *args)
 {
 	struct user	*up = PTOU(curproc);
-	char		*args_new, *comm_new, *p;
-	int		len;
+	char		cmd_buf[MAXCOMLEN + 1];
+	char		arg_buf[PSARGSZ];
 
-	/*
-	 * len has an extra value for the trailing '\0' so this covers the
-	 * appended " " in the following strcmps.
-	 */
-	len = sizeof (BRAND_NATIVE_LINKER32);
+	if (copyin(cmd, &cmd_buf, sizeof (cmd_buf)) != 0)
+		return (EFAULT);
+	if (copyin(args, &arg_buf, sizeof (arg_buf)) != 0)
+		return (EFAULT);
 
 	/*
 	 * Make sure that the process' interpreter is the native dynamic linker.
@@ -248,30 +229,22 @@ s10_native()
 	 */
 	if (strcmp(up->u_comm, S10_LINKER_NAME) != 0)
 		return (0);
-	if (strncmp(up->u_psargs, BRAND_NATIVE_LINKER64 " ", len + 3) == 0)
-		len += 3;		/* to account for "/64" in the path */
-	else if (strncmp(up->u_psargs, BRAND_NATIVE_LINKER32 " ", len) != 0)
+
+	/*
+	 * The sizeof has an extra value for the trailing '\0' so this covers
+	 * the appended " " in the following strcmps.
+	 */
+	if (strncmp(up->u_psargs, BRAND_NATIVE_LINKER64 " ",
+	    sizeof (BRAND_NATIVE_LINKER64)) != 0 &&
+	    strncmp(up->u_psargs, BRAND_NATIVE_LINKER32 " ",
+	    sizeof (BRAND_NATIVE_LINKER32)) != 0)
 		return (0);
 
-	args_new = strdup(rm_e_options(&up->u_psargs[len]));
-	if ((p = strchr(args_new, ' ')) != NULL)
-		*p = '\0';
-	if ((comm_new = strrchr(args_new, '/')) != NULL)
-		comm_new = strdup(comm_new + 1);
-	else
-		comm_new = strdup(args_new);
-	if (p != NULL)
-		*p = ' ';
+	mutex_enter(&curproc->p_lock);
+	(void) strlcpy(up->u_comm, cmd_buf, sizeof (up->u_comm));
+	(void) strlcpy(up->u_psargs, arg_buf, sizeof (up->u_psargs));
+	mutex_exit(&curproc->p_lock);
 
-	if ((strlen(args_new) != 0) && (strlen(comm_new) != 0)) {
-		mutex_enter(&curproc->p_lock);
-		(void) strlcpy(up->u_comm, comm_new, MAXCOMLEN+1);
-		(void) strlcpy(up->u_psargs, args_new, PSARGSZ);
-		mutex_exit(&curproc->p_lock);
-	}
-
-	strfree(args_new);
-	strfree(comm_new);
 	return (0);
 }
 
@@ -286,7 +259,7 @@ s10_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	*rval = 0;
 
 	if (cmd == B_S10_NATIVE)
-		return (s10_native());
+		return (s10_native((void *)arg1, (void *)arg2));
 
 	res = brand_solaris_cmd(cmd, arg1, arg2, arg3, &s10_brand, S10_VERSION);
 	if (res >= 0)
