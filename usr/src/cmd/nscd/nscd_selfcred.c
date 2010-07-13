@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -406,6 +405,9 @@ selfcred_pulse(
 
 	ret = _nscd_doorcall_fd(fd, NSCD_PULSE |(_whoami & NSCD_WHOAMI),
 	    NULL, 0, NULL, 0, NULL);
+
+	/* Close door because the other side exited. */
+	(void) close(fd);
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 	(me, "door (%d) monitor exited (rc = %d)\n", fd, ret);
