@@ -1725,7 +1725,7 @@ str_notify_allowed_ips(dld_str_t *dsp)
 	mblk_t		*mp;
 	dl_notify_ind_t	*dlip;
 	size_t		mp_size;
-	mac_protect_t	mrp;
+	mac_protect_t	*mrp;
 
 	if (!(dsp->ds_notifications & DL_NOTE_ALLOWED_IPS))
 		return;
@@ -1734,7 +1734,7 @@ str_notify_allowed_ips(dld_str_t *dsp)
 	if ((mp = mexchange(dsp->ds_wq, NULL, mp_size, M_PROTO, 0)) == NULL)
 		return;
 
-	mac_protect_get(dsp->ds_mh, &mrp);
+	mrp = mac_protect_get(dsp->ds_mh);
 	bzero(mp->b_rptr, mp_size);
 	dlip = (dl_notify_ind_t *)mp->b_rptr;
 	dlip->dl_primitive = DL_NOTIFY_IND;
@@ -1742,7 +1742,7 @@ str_notify_allowed_ips(dld_str_t *dsp)
 	dlip->dl_data = 0;
 	dlip->dl_addr_offset = sizeof (dl_notify_ind_t);
 	dlip->dl_addr_length = sizeof (mac_protect_t);
-	bcopy(&mrp, mp->b_rptr + sizeof (dl_notify_ind_t),
+	bcopy(mrp, mp->b_rptr + sizeof (dl_notify_ind_t),
 	    sizeof (mac_protect_t));
 
 	qreply(dsp->ds_wq, mp);

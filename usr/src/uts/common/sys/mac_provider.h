@@ -455,7 +455,7 @@ typedef struct mac_register_s {
 /*
  * Driver interface functions.
  */
-extern void			mac_protect_get(mac_handle_t, mac_protect_t *);
+extern mac_protect_t		*mac_protect_get(mac_handle_t);
 extern void			mac_sdu_get(mac_handle_t, uint_t *, uint_t *);
 extern int			mac_maxsdu_update(mac_handle_t, uint_t);
 
