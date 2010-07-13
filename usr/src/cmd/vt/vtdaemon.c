@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -519,7 +518,7 @@ vt_getinput(int noecho)
 
 	while ((vt_poll()) == 1) {
 		if ((c = vt_getchar(daemonfd)) != '\n' && c != '\r' &&
-		    c != EOF && (i < PAM_MAX_RESP_SIZE))
+		    c != EOF && (i < PAM_MAX_RESP_SIZE - 1))
 			input[i++] = (char)c;
 		else
 			break;
@@ -816,9 +815,6 @@ vt_do_auth(int target_vt)
 	(void) mutex_unlock(&vt_mutex);
 
 	(void) pam_end(vt_pamh, err);
-
-	if (user_name != NULL)
-		free(user_name);
 
 	(void) mutex_lock(&vt_mutex);
 	vt_auth_doing = B_FALSE;
