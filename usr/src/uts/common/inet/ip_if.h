@@ -33,7 +33,6 @@ extern "C" {
 #endif
 
 #define	PREFIX_INFINITY	0xffffffffUL
-#define	IP_MAX_HW_LEN	40
 
 #define	IP_LOOPBACK_MTU	(8*1024)
 

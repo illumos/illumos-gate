@@ -580,6 +580,17 @@ ill_delete_tail(ill_t *ill)
 		ill->ill_grp = NULL;
 	}
 
+	if (ill->ill_mphysaddr_list != NULL) {
+		multiphysaddr_t *mpa, *tmpa;
+
+		mpa = ill->ill_mphysaddr_list;
+		ill->ill_mphysaddr_list = NULL;
+		while (mpa) {
+			tmpa = mpa->mpa_next;
+			kmem_free(mpa, sizeof (*mpa));
+			mpa = tmpa;
+		}
+	}
 	/*
 	 * Take us out of the list of ILLs. ill_glist_delete -> phyint_free
 	 * could free the phyint. No more reference to the phyint after this

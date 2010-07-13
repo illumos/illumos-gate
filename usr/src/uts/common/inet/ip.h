@@ -93,6 +93,7 @@ typedef uint32_t ipaddr_t;
 #define	IP_ABITS		32
 #define	IPV4_ABITS		IP_ABITS
 #define	IPV6_ABITS		128
+#define	IP_MAX_HW_LEN	40
 
 #define	IP_HOST_MASK		(ipaddr_t)0xffffffffU
 
@@ -1272,6 +1273,18 @@ typedef struct irb {
 	ip_stack_t	*irb_ipst;	/* Does not have a netstack_hold */
 } irb_t;
 
+/*
+ * This is the structure used to store the multicast physical addresses
+ * that an interface has joined.
+ * The refcnt keeps track of the number of multicast IP addresses mapping
+ * to a physical multicast address.
+ */
+typedef struct multiphysaddr_s {
+	struct	multiphysaddr_s  *mpa_next;
+	char	mpa_addr[IP_MAX_HW_LEN];
+	int	mpa_refcnt;
+} multiphysaddr_t;
+
 #define	IRB2RT(irb)	(rt_t *)((caddr_t)(irb) - offsetof(rt_t, rt_irb))
 
 /* Forward declarations */
@@ -1803,6 +1816,9 @@ typedef struct ill_s {
 	uint32_t	ill_mrouter_cnt; /* mrouter allmulti joins */
 	uint32_t	ill_allowed_ips_cnt;
 	in6_addr_t	*ill_allowed_ips;
+
+	/* list of multicast physical addresses joined on this ill */
+	multiphysaddr_t *ill_mphysaddr_list;
 } ill_t;
 
 /*
@@ -1943,6 +1959,7 @@ typedef struct ill_s {
  * ill_grp (for underlying ill)	ipsq + ill_g_lock	ipsq OR ill_g_lock
  * ill_grp_pending		ill_mcast_serializer	ill_mcast_serializer
  * ill_mrouter_cnt		atomics			atomics
+ * ill_mphysaddr_list	ill_lock		ill_lock
  *
  * NOTE: It's OK to make heuristic decisions on an underlying interface
  *	 by using IS_UNDER_IPMP() or comparing ill_grp's raw pointer value.
