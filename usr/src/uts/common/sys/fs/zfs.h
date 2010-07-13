@@ -465,6 +465,7 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_NPARITY		"nparity"
 #define	ZPOOL_CONFIG_HOSTID		"hostid"
 #define	ZPOOL_CONFIG_HOSTNAME		"hostname"
+#define	ZPOOL_CONFIG_LOADED_TIME	"initial_load_time"
 #define	ZPOOL_CONFIG_UNSPARE		"unspare"
 #define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
 #define	ZPOOL_CONFIG_IS_LOG		"is_log"

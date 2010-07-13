@@ -1635,13 +1635,21 @@ spa_load(spa_t *spa, spa_load_state_t state, spa_import_type_t type,
 			    KM_SLEEP) == 0);
 		}
 
+		gethrestime(&spa->spa_loaded_ts);
 		error = spa_load_impl(spa, pool_guid, config, state, type,
 		    mosconfig, &ereport);
 	}
 
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
-	if (error && error != EBADF)
-		zfs_ereport_post(ereport, spa, NULL, NULL, 0, 0);
+	if (error) {
+		if (error != EEXIST) {
+			spa->spa_loaded_ts.tv_sec = 0;
+			spa->spa_loaded_ts.tv_nsec = 0;
+		}
+		if (error != EBADF) {
+			zfs_ereport_post(ereport, spa, NULL, NULL, 0, 0);
+		}
+	}
 	spa->spa_load_state = error ? SPA_LOAD_ERROR : SPA_LOAD_NONE;
 	spa->spa_ena = 0;
 
@@ -2280,7 +2288,6 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
 
 	spa_open_ref(spa, tag);
 
-
 	if (config != NULL)
 		*config = spa_config_generate(spa, NULL, -1ULL, B_TRUE);
 
@@ -2459,6 +2466,13 @@ spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 		spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
 
 		if (*config != NULL) {
+			uint64_t loadtimes[2];
+
+			loadtimes[0] = spa->spa_loaded_ts.tv_sec;
+			loadtimes[1] = spa->spa_loaded_ts.tv_nsec;
+			VERIFY(nvlist_add_uint64_array(*config,
+			    ZPOOL_CONFIG_LOADED_TIME, loadtimes, 2) == 0);
+
 			VERIFY(nvlist_add_uint64(*config,
 			    ZPOOL_CONFIG_ERRCOUNT,
 			    spa_get_errlog_size(spa)) == 0);

@@ -130,6 +130,7 @@ struct spa {
 	uint64_t	spa_freeze_txg;		/* freeze pool at this txg */
 	uint64_t	spa_load_max_txg;	/* best initial ub_txg */
 	uint64_t	spa_claim_max_txg;	/* highest claimed birth txg */
+	timespec_t	spa_loaded_ts;		/* 1st successful open time */
 	objset_t	*spa_meta_objset;	/* copy of dp->dp_meta_objset */
 	txg_list_t	spa_vdev_txg_list;	/* per-txg dirty vdev list */
 	vdev_t		*spa_root_vdev;		/* top-level vdev container */
