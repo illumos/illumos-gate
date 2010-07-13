@@ -309,14 +309,22 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 		smbc->type = SUN_OEM_EXT_PORT;
 		x86pi_smb_strcnt(shp, smbc);
 
-		/* enumerate direct attached SATA disks */
-		rv = topo_node_range_create(mod, chassis_node, BAY, 0,
-		    smbc->count + 1);
-		if (rv != 0) {
+		/*
+		 * enumerate direct attached SATA disks if we found a
+		 * SUN_OEM_EXT_PORT record.
+		 */
+		if (smbc->count > 0) {
+			rv = topo_node_range_create(mod, chassis_node, BAY, 0,
+			    smbc->count + 1);
+			if (rv != 0) {
+				topo_mod_dprintf(mod,
+				    "%s: Failed to create %s range: %s\n",
+				    f, BAY, topo_mod_errmsg(mod));
+				continue;
+			}
+		} else {
 			topo_mod_dprintf(mod,
-			    "%s: Failed to create %s range: %s\n",
-			    f, BAY, topo_mod_errmsg(mod));
-			continue;
+			    "Skipping disk bay enumeration\n");
 		}
 
 		for (i = 0; i < smbc->count; i++) {
