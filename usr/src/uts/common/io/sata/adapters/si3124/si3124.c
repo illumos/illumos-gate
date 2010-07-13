@@ -268,6 +268,9 @@ static void si_set_sense_data(sata_pkt_t *, int);
 static uint_t si_intr(caddr_t, caddr_t);
 static int si_intr_command_complete(si_ctl_state_t *,
 					si_port_state_t *, int);
+static void si_schedule_intr_command_error(si_ctl_state_t *,
+					si_port_state_t *, int);
+static void si_do_intr_command_error(void *);
 static int si_intr_command_error(si_ctl_state_t *,
 					si_port_state_t *, int);
 static void si_error_recovery_DEVICEERROR(si_ctl_state_t *,
@@ -308,6 +311,9 @@ static 	void si_rem_intrs(si_ctl_state_t *);
 static	int si_reset_dport_wait_till_ready(si_ctl_state_t *,
 				si_port_state_t *, int, int);
 static int si_clear_port(si_ctl_state_t *, int);
+static void si_schedule_port_initialize(si_ctl_state_t *,
+				si_port_state_t *, int);
+static void si_do_initialize_port(void *);
 static	int si_initialize_port_wait_till_ready(si_ctl_state_t *, int);
 
 static void si_timeout_pkts(si_ctl_state_t *, si_port_state_t *, int, uint32_t);
@@ -1470,7 +1476,6 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		}
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		ASSERT(satapkt != NULL);
 		SIDBG1(SIDBG_ERRS, si_ctlp,
 		    "si_mop_commands sending "
 		    "spkt up with PKT_TIMEOUT: %x",
@@ -1515,7 +1520,6 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 			break;
 		}
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		ASSERT(satapkt != NULL);
 		SIDBG1(SIDBG_ERRS, si_ctlp,
 		    "si_mop_commands sending PKT_RESET for "
 		    "reset spkt: %x",
@@ -1528,22 +1532,21 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 
 	ASSERT(reset_tags == 0);
 
-	/* Send up the unfinished_tags with SATA_PKT_BUSY. */
+	/* Send up the unfinished_tags with SATA_PKT_RESET. */
 	while (unfinished_tags) {
 		tmpslot = ddi_ffs(unfinished_tags) - 1;
 		if (tmpslot == -1) {
 			break;
 		}
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		ASSERT(satapkt != NULL);
 		SIDBG1(SIDBG_ERRS, si_ctlp,
-		    "si_mop_commands sending PKT_BUSY for "
+		    "si_mop_commands sending SATA_PKT_RESET for "
 		    "retry spkt: %x",
 		    satapkt);
 
 		CLEAR_BIT(unfinished_tags, tmpslot);
 		CLEAR_BIT(si_portp->siport_pending_tags, tmpslot);
-		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_BUSY);
+		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_RESET);
 	}
 
 	ASSERT(unfinished_tags == 0);
@@ -1947,6 +1950,10 @@ si_alloc_port_state(si_ctl_state_t *si_ctlp, int port)
 		return (SI_FAILURE);
 	}
 
+	/* Allocate the argument for the timeout */
+	si_portp->siport_event_args =
+	    kmem_zalloc(sizeof (si_event_arg_t), KM_SLEEP);
+
 	si_portp->siport_active = PORT_ACTIVE;
 	mutex_exit(&si_portp->siport_mutex);
 
@@ -1964,6 +1971,7 @@ si_dealloc_port_state(si_ctl_state_t *si_ctlp, int port)
 	si_portp = si_ctlp->sictl_ports[port];
 
 	mutex_enter(&si_portp->siport_mutex);
+	kmem_free(si_portp->siport_event_args, sizeof (si_event_arg_t));
 	si_dealloc_sgbpool(si_ctlp, port);
 	si_dealloc_prbpool(si_ctlp, port);
 	mutex_exit(&si_portp->siport_mutex);
@@ -2525,6 +2533,7 @@ si_deliver_satapkt(
 		 */
 		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
 		fill_dev_sregisters(si_ctlp, port, &spkt->satapkt_device);
+		CLEAR_BIT(si_portp->siport_pending_tags, slot);
 
 		return (SI_FAILURE);
 	}
@@ -3636,14 +3645,12 @@ si_intr(caddr_t arg1, caddr_t arg2)
 			mutex_enter(&si_portp->siport_mutex);
 			if (si_check_ctl_handles(si_ctlp) != DDI_SUCCESS ||
 			    si_check_port_handles(si_portp) != DDI_SUCCESS) {
-				mutex_exit(&si_portp->siport_mutex);
 				ddi_fm_service_impact(si_ctlp->sictl_devinfop,
 				    DDI_SERVICE_UNAFFECTED);
-				(void) si_initialize_port_wait_till_ready(
-				    si_ctlp, port);
-			} else {
-				mutex_exit(&si_portp->siport_mutex);
+				si_schedule_port_initialize(si_ctlp, si_portp,
+				    port);
 			}
+			mutex_exit(&si_portp->siport_mutex);
 		} else {
 			/* Clear the interrupts */
 			ddi_put32(si_ctlp->sictl_port_acc_handle,
@@ -3658,7 +3665,7 @@ si_intr(caddr_t arg1, caddr_t arg2)
 		 */
 
 		if (port_intr_status & INTR_COMMAND_ERROR) {
-			(void) si_intr_command_error(si_ctlp, si_portp, port);
+			si_schedule_intr_command_error(si_ctlp, si_portp, port);
 		}
 
 		if (port_intr_status & INTR_PORT_READY) {
@@ -3789,6 +3796,60 @@ si_intr_command_complete(
 	mutex_exit(&si_portp->siport_mutex);
 
 	return (SI_SUCCESS);
+}
+
+/*
+ * Schedule a call to si_intr_command_error using a timeout to get it done
+ * off the interrupt thread.
+ */
+static void
+si_schedule_intr_command_error(
+	si_ctl_state_t *si_ctlp,
+	si_port_state_t *si_portp,
+	int port)
+{
+	si_event_arg_t *args;
+
+	mutex_enter(&si_portp->siport_mutex);
+
+	args = si_portp->siport_event_args;
+	if (args->siea_ctlp != NULL) {
+		cmn_err(CE_WARN, "si_schedule_intr_command_error: "
+		    "args->si_ctlp != NULL");
+		mutex_exit(&si_portp->siport_mutex);
+		return;
+	}
+
+	args->siea_ctlp = si_ctlp;
+	args->siea_portp = si_portp;
+	args->siea_port = port;
+
+	(void) timeout(si_do_intr_command_error, args, 1);
+
+	mutex_exit(&si_portp->siport_mutex);
+}
+
+/*
+ * Called from timeout()
+ * Unpack the arguments and call si_intr_command_error()
+ */
+static void
+si_do_intr_command_error(void *arg)
+{
+	si_event_arg_t *args;
+	si_ctl_state_t *si_ctlp;
+	si_port_state_t *si_portp;
+	int port;
+
+	args = arg;
+	si_ctlp = args->siea_ctlp;
+	si_portp = args->siea_portp;
+	port = args->siea_port;
+
+	mutex_enter(&si_portp->siport_mutex);
+	args->siea_ctlp = NULL;	/* mark siport_event_args as free */
+	mutex_exit(&si_portp->siport_mutex);
+	(void) si_intr_command_error(si_ctlp, si_portp, port);
 }
 
 /*
@@ -4303,7 +4364,6 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 	    si_check_port_handles(si_portp) != DDI_SUCCESS) {
 		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
 		    DDI_SERVICE_UNAFFECTED);
-		return (0);
 	}
 
 	error = GET_FIS_FEATURES(prb->prb_fis);
@@ -5312,6 +5372,61 @@ si_reset_dport_wait_till_ready(
 
 	return (SI_SUCCESS);
 }
+
+/*
+ * Schedule an initialization of the port using a timeout to get it done
+ * off an interrupt thread.
+ *
+ * WARNING, WARNING: The caller is expected to obtain the siport_mutex
+ * before calling us.
+ */
+static void
+si_schedule_port_initialize(
+	si_ctl_state_t *si_ctlp,
+	si_port_state_t *si_portp,
+	int port)
+{
+	si_event_arg_t *args;
+
+	ASSERT(mutex_owned(&si_portp->siport_mutex));
+
+	args = si_portp->siport_event_args;
+	if (args->siea_ctlp != NULL) {
+		cmn_err(CE_WARN, "si_schedule_port_initialize: "
+		    "args->si_ctlp != NULL");
+		return;
+	}
+
+	args->siea_ctlp = si_ctlp;
+	args->siea_portp = si_portp;
+	args->siea_port = port;
+
+	(void) timeout(si_do_initialize_port, args, 1);
+}
+
+/*
+ * Called from timeout()
+ * Unpack the arguments and call si_initialize_port_wait_till_ready()
+ */
+static void
+si_do_initialize_port(void *arg)
+{
+	si_event_arg_t *args;
+	si_ctl_state_t *si_ctlp;
+	si_port_state_t *si_portp;
+	int port;
+
+	args = arg;
+	si_portp = args->siea_portp;
+	si_ctlp = args->siea_ctlp;
+	port = args->siea_port;
+
+	mutex_enter(&si_portp->siport_mutex);
+	args->siea_ctlp = NULL;	/* mark siport_event_args as free */
+	(void) si_initialize_port_wait_till_ready(si_ctlp, port);
+	mutex_exit(&si_portp->siport_mutex);
+}
+
 
 /*
  * Initializes the port.

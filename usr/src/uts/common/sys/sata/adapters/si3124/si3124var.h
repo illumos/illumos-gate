@@ -63,6 +63,13 @@ typedef struct si_sgblock {
 #define	SGE_LENGTH(x)	(3*(x)+1)
 #define	SI_DEFAULT_SGL_LENGTH	SGE_LENGTH(SI_DEFAULT_SGT_TABLES_PER_PRB)
 
+/* Argument to be used for calls to timeout() */
+typedef struct si_event_arg {
+	void *siea_ctlp;
+	void *siea_portp;
+	int siea_port;
+} si_event_arg_t;
+
 typedef struct si_portmult_state {
 	int sipm_num_ports;
 	uint8_t sipm_port_type[15];
@@ -119,6 +126,9 @@ typedef struct si_port_state {
 	 * during such blockage.
 	 */
 	int siport_reset_in_progress;
+
+	/* Argument to be used for calls to timeout() */
+	si_event_arg_t *siport_event_args;
 
 	/*
 	 * We mop the commands for either abort, reset, timeout or
