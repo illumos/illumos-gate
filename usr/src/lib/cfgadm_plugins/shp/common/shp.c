@@ -618,6 +618,7 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
     struct cfga_msg *msgp, char **errstring, cfga_flags_t flags)
 {
 	int		rv, state, new_state;
+	uint_t		hpflags = 0;
 	hp_node_t	node;
 	hp_node_t	results = NULL;
 
@@ -634,6 +635,13 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 	rv = physpath2node(ap_id, errstring, &node);
 	if (rv != CFGA_OK)
 		return (rv);
+
+	/*
+	 * Check for the FORCE flag.  It is only used
+	 * for DISCONNECT or UNCONFIGURE state changes.
+	 */
+	if (flags & CFGA_FLAG_FORCE)
+		hpflags |= HPFORCE;
 
 	state = hp_state(node);
 
@@ -672,8 +680,8 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 			rv = CFGA_INVAL;
 		} else if (state > DDI_HP_CN_STATE_PRESENT) {
 			/* Disconnect the slot */
-			if ((rv = hp_set_state(node, 0, new_state, &results))
-			    != 0) {
+			rv = hp_set_state(node, hpflags, new_state, &results);
+			if (rv != 0) {
 				if (rv == EBUSY)
 					rv = CFGA_BUSY;
 				else
@@ -712,8 +720,8 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 			cfga_err(errstring, ERR_AP_ERR, 0);
 			rv = CFGA_INVAL;
 		} else if (state >= DDI_HP_CN_STATE_ENABLED) {
-			if ((rv = hp_set_state(node, 0, new_state, &results))
-			    != 0) {
+			rv = hp_set_state(node, hpflags, new_state, &results);
+			if (rv != 0) {
 				if (rv == EBUSY)
 					rv = CFGA_BUSY;
 				else
