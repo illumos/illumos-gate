@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -58,38 +58,6 @@ static mutex_t self_gssapi_only_lock = DEFAULTMUTEX;
 #define	CLIENT_FPRINTF if (mode_verbose && !mode_quiet) (void) fprintf
 
 /*
- * One time initializtion
- */
-int		sasl_gssapi_inited = 0;
-static mutex_t	sasl_gssapi_lock = DEFAULTMUTEX;
-int
-__s_api_sasl_gssapi_init(void) {
-	int rc = NS_LDAP_SUCCESS;
-	(void) mutex_lock(&sasl_gssapi_lock);
-	if (!sasl_gssapi_inited) {
-			if (getuid() == 0) {
-				if (system(
-					"/usr/sbin/cryptoadm disable metaslot")
-					== 0) {
-					syslog(LOG_WARNING,
-						"libsldap: Metaslot disabled "
-						"for self credential mode");
-					sasl_gssapi_inited = 1;
-				} else {
-					syslog(LOG_ERR,
-						"libsldap: Can't disable "
-						"Metaslot for self credential "
-						"mode");
-					rc = NS_LDAP_INTERNAL;
-				}
-			}
-	}
-	(void) mutex_unlock(&sasl_gssapi_lock);
-
-	return (rc);
-}
-
-/*
  * nscd calls this function to set self_gssapi_only flag so libsldap performs
  * sasl/GSSAPI bind only. Also see comments of __ns_ldap_self_gssapi_config.
  *
@@ -102,6 +70,7 @@ __ns_ldap_self_gssapi_only_set(int flag) {
 	self_gssapi_only = flag;
 	(void) mutex_unlock(&self_gssapi_only_lock);
 }
+
 /*
  * Get the flag value of self_gssapi_only
  */
@@ -113,6 +82,7 @@ __s_api_self_gssapi_only_get(void) {
 	(void) mutex_unlock(&self_gssapi_only_lock);
 	return (flag);
 }
+
 /*
  * nscd calls this function to detect the current native ldap configuration.
  * The output are

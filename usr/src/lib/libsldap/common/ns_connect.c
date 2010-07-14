@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -2548,19 +2547,6 @@ doSASLBind(const ns_cred_t *auth,
 		free(digest_md5_name);
 		break;
 	case NS_LDAP_SASL_GSSAPI:
-		if (sasl_gssapi_inited == 0) {
-			ret_code = __s_api_sasl_gssapi_init();
-			if (ret_code != NS_LDAP_SUCCESS) {
-				(void) snprintf(errstr, sizeof (errstr),
-				    gettext("openConnection: "
-				    "GSSAPI initialization "
-				    "failed"));
-				(void) ldap_unbind(ld);
-				MKERROR(LOG_WARNING, *errorp, ret_code,
-				    strdup(errstr), NS_LDAP_MEMORY);
-				return (ret_code);
-			}
-		}
 		(void) memset(&sasl_param, 0,
 		    sizeof (ns_sasl_cb_param_t));
 		sasl_param.authid = NULL;

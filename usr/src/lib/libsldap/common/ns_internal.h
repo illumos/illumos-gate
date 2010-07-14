@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -727,9 +728,6 @@ typedef struct ns_sasl_cb_param {
 	char	*realm;
 } ns_sasl_cb_param_t;
 
-/* self/sasl/gssapi variable */
-extern int sasl_gssapi_inited;
-
 /* Multiple threads per connection variable */
 extern int MTperConn;
 
@@ -941,7 +939,6 @@ int		__s_api_sasl_bind_callback(
 			void		*in);
 
 int		__s_api_self_gssapi_only_get(void);
-int		__s_api_sasl_gssapi_init(void);
 
 int		__print2buf(LineBuf *line, const char *toprint, char *sep);
 
