@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SMP_IMPLDEFS_H

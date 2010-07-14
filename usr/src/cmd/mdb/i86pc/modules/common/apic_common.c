@@ -24,6 +24,7 @@
 
 #include "intr_common.h"
 
+#ifdef _KMDB
 
 /* Macros for reading/writing the IOAPIC RDT entries */
 #define	APIC_READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic_ix, ipin) \
@@ -139,3 +140,5 @@ apic(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	return (DCMD_OK);
 }
+
+#endif /* _KMDB */
