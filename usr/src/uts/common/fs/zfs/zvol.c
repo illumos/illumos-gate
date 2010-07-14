@@ -451,7 +451,7 @@ zvol_create_minor(const char *name)
 	}
 
 	/* lie and say we're read-only */
-	error = dmu_objset_own(name, DMU_OST_ZVOL, B_TRUE, zvol_tag, &os);
+	error = dmu_objset_own(name, DMU_OST_ZVOL, B_TRUE, FTAG, &os);
 
 	if (error) {
 		mutex_exit(&zfsdev_state_lock);
@@ -459,13 +459,13 @@ zvol_create_minor(const char *name)
 	}
 
 	if ((minor = zfsdev_minor_alloc()) == 0) {
-		dmu_objset_disown(os, zvol_tag);
+		dmu_objset_disown(os, FTAG);
 		mutex_exit(&zfsdev_state_lock);
 		return (ENXIO);
 	}
 
 	if (ddi_soft_state_zalloc(zfsdev_state, minor) != DDI_SUCCESS) {
-		dmu_objset_disown(os, zvol_tag);
+		dmu_objset_disown(os, FTAG);
 		mutex_exit(&zfsdev_state_lock);
 		return (EAGAIN);
 	}
@@ -477,7 +477,7 @@ zvol_create_minor(const char *name)
 	if (ddi_create_minor_node(zfs_dip, chrbuf, S_IFCHR,
 	    minor, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_soft_state_free(zfsdev_state, minor);
-		dmu_objset_disown(os, zvol_tag);
+		dmu_objset_disown(os, FTAG);
 		mutex_exit(&zfsdev_state_lock);
 		return (EAGAIN);
 	}
@@ -488,7 +488,7 @@ zvol_create_minor(const char *name)
 	    minor, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(zfs_dip, chrbuf);
 		ddi_soft_state_free(zfsdev_state, minor);
-		dmu_objset_disown(os, zvol_tag);
+		dmu_objset_disown(os, FTAG);
 		mutex_exit(&zfsdev_state_lock);
 		return (EAGAIN);
 	}
@@ -516,7 +516,7 @@ zvol_create_minor(const char *name)
 		zil_destroy(dmu_objset_zil(os), B_FALSE);
 	else
 		zil_replay(os, zv, zvol_replay_vector);
-	dmu_objset_disown(os, zvol_tag);
+	dmu_objset_disown(os, FTAG);
 	zv->zv_objset = NULL;
 
 	zvol_minors++;

@@ -367,7 +367,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		os->os_secondary_cache = ZFS_CACHE_ALL;
 	}
 
-	os->os_zil_header = os->os_phys->os_zil_header;
+	if (ds == NULL || !dsl_dataset_is_snapshot(ds))
+		os->os_zil_header = os->os_phys->os_zil_header;
 	os->os_zil = zil_alloc(os, &os->os_zil_header);
 
 	for (i = 0; i < TXG_SIZE; i++) {
@@ -696,19 +697,19 @@ dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	dsl_dir_t *dd = arg1;
 	struct oscarg *oa = arg2;
 	uint64_t dsobj;
+	dsl_dataset_t *ds;
+	objset_t *os;
 
 	ASSERT(dmu_tx_is_syncing(tx));
 
 	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
 	    oa->clone_origin, oa->flags, oa->cr, tx);
 
-	if (oa->clone_origin == NULL) {
-		dsl_dataset_t *ds;
-		blkptr_t *bp;
-		objset_t *os;
+	VERIFY(0 == dsl_dataset_hold_obj(dd->dd_pool, dsobj, FTAG, &ds));
 
-		VERIFY(0 == dsl_dataset_hold_obj(dd->dd_pool, dsobj,
-		    FTAG, &ds));
+	if (oa->clone_origin == NULL) {
+		blkptr_t *bp;
+
 		bp = dsl_dataset_get_blkptr(ds);
 		ASSERT(BP_IS_HOLE(bp));
 
@@ -717,8 +718,12 @@ dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 
 		if (oa->userfunc)
 			oa->userfunc(os, oa->userarg, oa->cr, tx);
-		dsl_dataset_rele(ds, FTAG);
+	} else {
+		VERIFY3U(0, ==, dmu_objset_from_ds(ds, &os));
+		bzero(&os->os_zil_header, sizeof (os->os_zil_header));
+		dsl_dataset_dirty(ds, tx);
 	}
+	dsl_dataset_rele(ds, FTAG);
 
 	spa_history_log_internal(LOG_DS_CREATE, dd->dd_pool->dp_spa,
 	    tx, "dataset = %llu", dsobj);
@@ -813,6 +818,7 @@ struct snaparg {
 	char *snapname;
 	char failed[MAXPATHLEN];
 	boolean_t recursive;
+	boolean_t needsuspend;
 	nvlist_t *props;
 };
 
@@ -888,20 +894,17 @@ dmu_objset_snapshot_one(const char *name, void *arg)
 		return (sn->recursive ? 0 : EBUSY);
 	}
 
-	/*
-	 * NB: we need to wait for all in-flight changes to get to disk,
-	 * so that we snapshot those changes.  zil_suspend does this as
-	 * a side effect.
-	 */
-	err = zil_suspend(dmu_objset_zil(os));
-	if (err == 0) {
-		dsl_sync_task_create(sn->dstg, snapshot_check,
-		    snapshot_sync, os, sn, 3);
-	} else {
-		dmu_objset_rele(os, sn);
+	if (sn->needsuspend) {
+		err = zil_suspend(dmu_objset_zil(os));
+		if (err) {
+			dmu_objset_rele(os, sn);
+			return (err);
+		}
 	}
+	dsl_sync_task_create(sn->dstg, snapshot_check, snapshot_sync,
+	    os, sn, 3);
 
-	return (err);
+	return (0);
 }
 
 int
@@ -923,6 +926,7 @@ dmu_objset_snapshot(char *fsname, char *snapname,
 	sn.snapname = snapname;
 	sn.props = props;
 	sn.recursive = recursive;
+	sn.needsuspend = (spa_version(spa) < SPA_VERSION_FAST_SNAP);
 
 	if (recursive) {
 		err = dmu_objset_find(fsname,
@@ -940,7 +944,8 @@ dmu_objset_snapshot(char *fsname, char *snapname,
 		dsl_dataset_t *ds = os->os_dsl_dataset;
 		if (dst->dst_err)
 			dsl_dataset_name(ds, sn.failed);
-		zil_resume(dmu_objset_zil(os));
+		if (sn.needsuspend)
+			zil_resume(dmu_objset_zil(os));
 		dmu_objset_rele(os, &sn);
 	}
 

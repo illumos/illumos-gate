@@ -1622,11 +1622,6 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 	cv_broadcast(&ds->ds_exclusive_cv);
 	mutex_exit(&ds->ds_lock);
 
-	if (ds->ds_objset) {
-		dmu_objset_evict(ds->ds_objset);
-		ds->ds_objset = NULL;
-	}
-
 	/* Remove our reservation */
 	if (ds->ds_reserved != 0) {
 		dsl_prop_setarg_t psa;
@@ -1852,6 +1847,15 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 		}
 	}
 
+	/*
+	 * This must be done after the dsl_traverse(), because it will
+	 * re-open the objset.
+	 */
+	if (ds->ds_objset) {
+		dmu_objset_evict(ds->ds_objset);
+		ds->ds_objset = NULL;
+	}
+
 	if (ds->ds_dir->dd_phys->dd_head_dataset_obj == ds->ds_object) {
 		/* Erase the link in the dir */
 		dmu_buf_will_dirty(ds->ds_dir->dd_dbuf, tx);
@@ -1930,7 +1934,7 @@ dsl_dataset_snapshot_reserve_space(dsl_dataset_t *ds, dmu_tx_t *tx)
 	 */
 	ASSERT(ds->ds_reserved == 0 || DS_UNIQUE_IS_ACCURATE(ds));
 	asize = MIN(ds->ds_phys->ds_unique_bytes, ds->ds_reserved);
-	if (asize > dsl_dir_space_available(ds->ds_dir, NULL, 0, FALSE))
+	if (asize > dsl_dir_space_available(ds->ds_dir, NULL, 0, TRUE))
 		return (ENOSPC);
 
 	/*
@@ -2226,8 +2230,22 @@ dsl_dataset_modified_since_lastsnap(dsl_dataset_t *ds)
 	if (ds->ds_prev == NULL)
 		return (B_FALSE);
 	if (ds->ds_phys->ds_bp.blk_birth >
-	    ds->ds_prev->ds_phys->ds_creation_txg)
-		return (B_TRUE);
+	    ds->ds_prev->ds_phys->ds_creation_txg) {
+		objset_t *os, *os_prev;
+		int err;
+		/*
+		 * It may be that only the ZIL differs, because it was
+		 * reset in the head.  Don't count that as being
+		 * modified.
+		 */
+		if (dmu_objset_from_ds(ds, &os) != 0)
+			return (B_TRUE);
+		if (dmu_objset_from_ds(ds->ds_prev, &os_prev) != 0)
+			return (B_TRUE);
+		return (bcmp(&os->os_phys->os_meta_dnode,
+		    &os_prev->os_phys->os_meta_dnode,
+		    sizeof (os->os_phys->os_meta_dnode)) != 0);
+	}
 	return (B_FALSE);
 }
 
