@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -897,16 +896,6 @@ uhci_cpr_suspend(uhci_state_t	*uhcip)
 
 	/* Set host controller soft state to suspend */
 	uhcip->uhci_hc_soft_state = UHCI_CTLR_SUSPEND_STATE;
-
-	/* Reset the host controller. This can poweroff downstream ports */
-	Set_OpReg16(USBCMD, USBCMD_REG_GBL_RESET);
-
-	/* Wait 10ms for reset to complete */
-	mutex_exit(&uhcip->uhci_int_mutex);
-	delay(drv_usectohz(UHCI_RESET_DELAY));
-	mutex_enter(&uhcip->uhci_int_mutex);
-
-	Set_OpReg16(USBCMD, 0);
 
 	mutex_exit(&uhcip->uhci_int_mutex);
 

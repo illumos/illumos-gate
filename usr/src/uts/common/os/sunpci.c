@@ -18,10 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -31,6 +29,8 @@
 #include <sys/pcie.h>
 #include <sys/pci_impl.h>
 #include <sys/epm.h>
+
+int	pci_enable_wakeup = 1;
 
 int
 pci_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
@@ -1041,9 +1041,7 @@ pci_post_suspend(dev_info_t *dip)
 			} else {
 				ret = DDI_SUCCESS;
 			}
-			kmem_free(p, sizeof (*p));
-			pci_config_teardown(&hdl);
-			return (DDI_SUCCESS);
+			goto done;
 		}
 		/*
 		 * Upon suspend, set the power level to the lowest that can
@@ -1052,10 +1050,10 @@ pci_post_suspend(dev_info_t *dip)
 		 * XXX device has had wakeup disabled
 		 */
 		pmcap = pci_config_get16(hdl, p->ppc_cap_offset + PCI_PMCAP);
-		if ((pmcap & PCI_PMCAP_D3COLD_PME) != 0)
+		if ((pmcap & (PCI_PMCAP_D3COLD_PME | PCI_PMCAP_D3HOT_PME)) != 0)
 			p->ppc_suspend_level =
 			    (PCI_PMCSR_PME_EN | PCI_PMCSR_D3HOT);
-		else if ((pmcap & (PCI_PMCAP_D3HOT_PME | PCI_PMCAP_D2_PME)) !=
+		else if ((pmcap & PCI_PMCAP_D2_PME) !=
 		    0)
 			p->ppc_suspend_level = PCI_PMCSR_PME_EN | PCI_PMCSR_D2;
 		else if ((pmcap & PCI_PMCAP_D1_PME) != 0)
@@ -1072,43 +1070,13 @@ pci_post_suspend(dev_info_t *dip)
 	}
 	/* If we set this in kmem_zalloc'd memory, we already returned above */
 	if ((p->ppc_flags & PPCF_NOPMCAP) != 0) {
-		ddi_prop_free(p);
-		pci_config_teardown(&hdl);
-		return (DDI_SUCCESS);
+		goto done;
 	}
 
-
-	/*
-	 * Turn off (Bus) Master Enable, since acpica will be turning off
-	 * bus master aribitration
-	 */
-	pcicmd = pci_config_get16(hdl, PCI_CONF_COMM);
-	pcicmd &= ~PCI_COMM_ME;
-	pci_config_put16(hdl, PCI_CONF_COMM, pcicmd);
-
-	/*
-	 * set pm csr
-	 */
 	pmcsr = pci_config_get16(hdl, p->ppc_cap_offset + PCI_PMCSR);
 	p->ppc_pmcsr = pmcsr;
 	pmcsr &= (PCI_PMCSR_STATE_MASK);
 	pmcsr |= (PCI_PMCSR_PME_STAT | p->ppc_suspend_level);
-	pci_config_put16(hdl, p->ppc_cap_offset + PCI_PMCSR, pmcsr);
-
-#if defined(__x86)
-	/*
-	 * Arrange for platform wakeup enabling
-	 */
-	if ((p->ppc_suspend_level & PCI_PMCSR_PME_EN) != 0) {
-		int retval;
-
-		retval = acpi_ddi_setwake(dip, 3);	/* XXX 3 for now */
-		if (retval) {
-			PMD(PMD_SX, ("pci_post_suspend, setwake %s@%s rets "
-			    "%x\n", PM_NAME(dip), PM_ADDR(dip), retval));
-		}
-	}
-#endif
 
 	/*
 	 * Push out saved register values
@@ -1116,12 +1084,7 @@ pci_post_suspend(dev_info_t *dip)
 	ret = ndi_prop_update_byte_array(DDI_DEV_T_NONE, dip, SAVED_PM_CONTEXT,
 	    (uchar_t *)p, sizeof (pci_pm_context_t));
 	if (ret == DDI_PROP_SUCCESS) {
-		if (fromprop)
-			ddi_prop_free(p);
-		else
-			kmem_free(p, sizeof (*p));
-		pci_config_teardown(&hdl);
-		return (DDI_SUCCESS);
+		goto done;
 	}
 	/* Failed; put things back the way we found them */
 	(void) pci_restore_config_regs(dip);
@@ -1132,6 +1095,67 @@ pci_post_suspend(dev_info_t *dip)
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, SAVED_PM_CONTEXT);
 	pci_config_teardown(&hdl);
 	return (DDI_FAILURE);
+
+done:
+
+	/*
+	 * According to 8.2.2 of "PCI Bus Power Management Interface
+	 * Specification Revision 1.2":
+	 * "When placing a function into D3, the operating system software is
+	 * required to disable I/O and memory space as well as bus mastering via
+	 * the PCI Command register."
+	 */
+
+	pcicmd = pci_config_get16(hdl, PCI_CONF_COMM);
+	pcicmd &= ~(PCI_COMM_ME|PCI_COMM_MAE|PCI_COMM_IO);
+	pci_config_put16(hdl, PCI_CONF_COMM, pcicmd);
+
+
+#if defined(__x86)
+	if (pci_enable_wakeup) {
+
+			ret = acpi_ddi_setwake(dip, 3);
+
+		if (ret) {
+			PMD(PMD_SX, ("pci_post_suspend, setwake %s@%s rets "
+			    "%x\n", PM_NAME(dip), PM_ADDR(dip), ret));
+		}
+	}
+#endif
+
+	if (p) {
+
+		/*
+		 * Some BIOS (e.g. Toshiba M10) expects pci-ide to be in D0
+		 * state when we set SLP_EN, otherwise it takes 5 minutes for
+		 * the BIOS to put the system into S3.
+		 */
+		if (strcmp(ddi_node_name(dip), "pci-ide") == 0) {
+			pmcsr = 0;
+		}
+
+		/*
+		 * pmcsr is the last write-operation to the device's PCI
+		 * config space, because we found that there are
+		 * some faulty devices whose PCI config space may not
+		 * respond correctly once in D3 state.
+		 */
+		if ((p->ppc_flags & PPCF_NOPMCAP) == 0 && pci_enable_wakeup) {
+			pci_config_put16(hdl, p->ppc_cap_offset + PCI_PMCSR,
+			    PCI_PMCSR_PME_STAT);
+			pci_config_put16(hdl, p->ppc_cap_offset + PCI_PMCSR,
+			    pmcsr);
+		}
+
+		if (fromprop)
+			ddi_prop_free(p);
+		else
+			kmem_free(p, sizeof (*p));
+	}
+
+	pci_config_teardown(&hdl);
+
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -1150,7 +1174,7 @@ pci_pre_resume(dev_info_t *dip)
 	uint_t length;
 	clock_t drv_usectohz(clock_t microsecs);
 #if defined(__x86)
-	uint16_t	suspend_level;
+	int retval;
 #endif
 
 	PMD(PMD_SX, ("pci_pre_resume %s:%d\n", ddi_driver_name(dip),
@@ -1163,19 +1187,14 @@ pci_pre_resume(dev_info_t *dip)
 	flags = p->ppc_flags;
 	pmcap = p->ppc_cap_offset;
 	pmcsr = p->ppc_pmcsr;
-#if defined(__x86)
-	suspend_level = p->ppc_suspend_level;
-#endif
 	ddi_prop_free(p);
-	if ((flags & PPCF_NOPMCAP) != 0)
-		goto done;
+
 #if defined(__x86)
 	/*
 	 * Turn platform wake enable back off
 	 */
-	if ((suspend_level & PCI_PMCSR_PME_EN) != 0) {
-		int retval;
 
+	if (pci_enable_wakeup) {
 		retval = acpi_ddi_setwake(dip, 0);	/* 0 for now */
 		if (retval) {
 			PMD(PMD_SX, ("pci_pre_resume, setwake %s@%s rets "
@@ -1183,6 +1202,9 @@ pci_pre_resume(dev_info_t *dip)
 		}
 	}
 #endif
+	if ((flags & PPCF_NOPMCAP) != 0)
+		goto done;
+
 	if (pci_config_setup(dip, &hdl) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}

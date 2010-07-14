@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2009, Intel Corporation.
@@ -550,6 +549,8 @@ acpica_ddi_setwake(dev_info_t *dip, int level)
 	ACPI_HANDLE	devobj, gpeobj;
 	ACPI_OBJECT	*prw, *gpe;
 	ACPI_BUFFER	prw_buf;
+	ACPI_OBJECT_LIST	arglist;
+	ACPI_OBJECT		args[3];
 	int		gpebit, pwr_res_count, prw_level, rv;
 
 	/*
@@ -578,6 +579,48 @@ acpica_ddi_setwake(dev_info_t *dip, int level)
 	}
 
 	/*
+	 * ACPI3.0 7.2.1: only use the _PSW method if OSPM does not support
+	 * _DSW or if the _DSW method is not present.
+	 *
+	 * _DSW arguments:
+	 * args[0] - Enable/Disable
+	 * args[1] - Target system state
+	 * args[2] - Target device state
+	 */
+
+	arglist.Count = 3;
+	arglist.Pointer = args;
+	args[0].Type = ACPI_TYPE_INTEGER;
+	args[0].Integer.Value = level ? 1 : 0;
+	args[1].Type = ACPI_TYPE_INTEGER;
+	args[1].Integer.Value = level;
+	args[2].Type = ACPI_TYPE_INTEGER;
+	args[2].Integer.Value = level;
+	if (ACPI_FAILURE(status = AcpiEvaluateObject(devobj, "_DSW",
+	    &arglist, NULL))) {
+
+		if (status == AE_NOT_FOUND) {
+			arglist.Count = 1;
+			args[0].Type = ACPI_TYPE_INTEGER;
+			args[0].Integer.Value = level ? 1 : 0;
+
+			if (ACPI_FAILURE(status = AcpiEvaluateObject(devobj,
+			    "_PSW", &arglist, NULL))) {
+
+				if (status != AE_NOT_FOUND) {
+					cmn_err(CE_NOTE,
+					    "!_PSW failure %d for device %s",
+					    status, ddi_driver_name(dip));
+				}
+			}
+
+		} else {
+			cmn_err(CE_NOTE, "!_DSW failure %d for device %s",
+			    status, ddi_driver_name(dip));
+		}
+	}
+
+	/*
 	 * Attempt to evaluate _PRW object.
 	 * If no valid object is found, return quietly, since not all
 	 * devices have _PRW objects.
@@ -587,8 +630,6 @@ acpica_ddi_setwake(dev_info_t *dip, int level)
 	if (ACPI_FAILURE(status) || prw_buf.Length == 0 || prw == NULL ||
 	    prw->Type != ACPI_TYPE_PACKAGE || prw->Package.Count < 2 ||
 	    prw->Package.Elements[1].Type != ACPI_TYPE_INTEGER) {
-		cmn_err(CE_NOTE, "acpica_ddi_setwake: could not "
-		    " evaluate _PRW");
 		goto done;
 	}
 
@@ -620,7 +661,7 @@ acpica_ddi_setwake(dev_info_t *dip, int level)
 	if (level == 0) {
 		if (ACPI_FAILURE(AcpiDisableGpe(gpeobj, gpebit, ACPI_NOT_ISR)))
 			goto done;
-	} else if (prw_level <= level) {
+	} else if (prw_level >= level) {
 		if (ACPI_SUCCESS(
 		    AcpiSetGpeType(gpeobj, gpebit, ACPI_GPE_TYPE_WAKE)))
 			if (ACPI_FAILURE(

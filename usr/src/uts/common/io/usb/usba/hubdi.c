@@ -992,6 +992,11 @@ hubd_suspend_port(hubd_t *hubd, usb_port_t port)
 				retval = USB_SUCCESS;
 
 				break;
+			} else {
+				USB_DPRINTF_L0(DPRINT_MASK_PM,
+				    hubd->h_log_handle,
+				    "hubdi: port%d failed to be suspended!",
+				    port);
 			}
 		}
 
@@ -7034,7 +7039,6 @@ hubd_cpr_suspend(hubd_t *hubd)
 			}
 
 			/* quiesce ourselves now */
-			hubd->h_dev_state = USB_DEV_SUSPENDED;
 			hubd_stop_polling(hubd);
 
 			/* close all the open pipes of our children */
@@ -7043,14 +7047,18 @@ hubd_cpr_suspend(hubd_t *hubd)
 				if (usba_dev != NULL) {
 					mutex_exit(HUBD_MUTEX(hubd));
 					usba_persistent_pipe_close(usba_dev);
+					if (hubd_suspend_port(hubd, port)) {
+						USB_DPRINTF_L0(
+						    DPRINT_MASK_HOTPLUG,
+						    hubd->h_log_handle,
+						    "suspending port %d failed",
+						    port);
+					}
 					mutex_enter(HUBD_MUTEX(hubd));
 				}
+
 			}
-			/*
-			 * turn off power to all the ports so that we
-			 * don't see any spurious activity
-			 */
-			(void) hubd_disable_all_port_power(hubd);
+			hubd->h_dev_state = USB_DEV_SUSPENDED;
 
 			/*
 			 * if we are the root hub, we close our pipes

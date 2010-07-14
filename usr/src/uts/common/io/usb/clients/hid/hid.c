@@ -68,7 +68,7 @@ uint_t	hid_instance_debug = (uint_t)-1;
 
 /* tunables */
 int	hid_default_pipe_drain_timeout = HID_DEFAULT_PIPE_DRAIN_TIMEOUT;
-int	hid_pm_mouse = 0;
+int	hid_pm_mouse = 1; /* enable remote_wakeup for USB mouse/keyboard */
 
 /* soft state structures */
 #define	HID_INITIAL_SOFT_SPACE	4
