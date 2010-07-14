@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Fibre Channel SCSI ULP Mapping driver
  */
@@ -3721,7 +3720,7 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 	char			*ndi_addr;		/* NDI addr */
 	int			is_mpxio, circ;
 	int			devi_entered = 0;
-	time_t			end_time;
+	clock_t			end_time;
 
 	ASSERT(rval != NULL);
 
