@@ -3763,10 +3763,12 @@ static int
 zone_set_privset(zone_t *zone, const priv_set_t *zone_privs,
     size_t zone_privssz)
 {
-	priv_set_t *privs = kmem_alloc(sizeof (priv_set_t), KM_SLEEP);
+	priv_set_t *privs;
 
 	if (zone_privssz < sizeof (priv_set_t))
-		return (set_errno(ENOMEM));
+		return (ENOMEM);
+
+	privs = kmem_alloc(sizeof (priv_set_t), KM_SLEEP);
 
 	if (copyin(zone_privs, privs, sizeof (priv_set_t))) {
 		kmem_free(privs, sizeof (priv_set_t));
@@ -5012,7 +5014,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 {
 	zone_t *zone;
 	zone_status_t zone_status;
-	int err;
+	int err = -1;
 	zone_net_data_t *zbuf;
 
 	if (secpolicy_zone_config(CRED()) != 0)
@@ -5039,8 +5041,10 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	 * non-global zones.
 	 */
 	zone_status = zone_status_get(zone);
-	if (attr != ZONE_ATTR_PHYS_MCAP && zone_status > ZONE_IS_READY)
+	if (attr != ZONE_ATTR_PHYS_MCAP && zone_status > ZONE_IS_READY) {
+		err = EINVAL;
 		goto done;
+	}
 
 	switch (attr) {
 	case ZONE_ATTR_INITNAME:
@@ -5074,12 +5078,13 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	case ZONE_ATTR_NETWORK:
 		if (bufsize > (PIPE_BUF + sizeof (zone_net_data_t))) {
 			err = EINVAL;
-			goto done;
+			break;
 		}
 		zbuf = kmem_alloc(bufsize, KM_SLEEP);
 		if (copyin(buf, zbuf, bufsize) != 0) {
+			kmem_free(zbuf, bufsize);
 			err = EFAULT;
-			goto done;
+			break;
 		}
 		err = zone_set_network(zoneid, zbuf);
 		kmem_free(zbuf, bufsize);
@@ -5093,6 +5098,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 
 done:
 	zone_rele(zone);
+	ASSERT(err != -1);
 	return (err != 0 ? set_errno(err) : 0);
 }
 
