@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -118,7 +117,7 @@ kcpc_hw_init(cpu_t *cp)
 	struct cpuid_regs cpuid;
 
 	strands_perfmon_shared = 0;
-	if (x86_feature & X86_HTT) {
+	if (is_x86_feature(x86_featureset, X86FSET_HTT)) {
 		if (cpuid_getvendor(cpu[0]) == X86_VENDOR_Intel) {
 			/*
 			 * Intel processors that support Architectural

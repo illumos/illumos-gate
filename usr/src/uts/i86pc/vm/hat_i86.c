@@ -491,7 +491,7 @@ set_max_page_level()
 	if (!kbm_largepage_support) {
 		lvl = 0;
 	} else {
-		if (x86_feature & X86_1GPG) {
+		if (is_x86_feature(x86_featureset, X86FSET_1GPG)) {
 			lvl = 2;
 			if (chk_optimal_1gtlb &&
 			    cpuid_opteron_erratum(CPU, 6671130)) {
@@ -528,7 +528,8 @@ mmu_init(void)
 	 * If CPU enabled the page table global bit, use it for the kernel
 	 * This is bit 7 in CR4 (PGE - Page Global Enable).
 	 */
-	if ((x86_feature & X86_PGE) != 0 && (getcr4() & CR4_PGE) != 0)
+	if (is_x86_feature(x86_featureset, X86FSET_PGE) &&
+	    (getcr4() & CR4_PGE) != 0)
 		mmu.pt_global = PT_GLOBAL;
 
 	/*
@@ -576,10 +577,10 @@ mmu_init(void)
 		mmu.pte_size_shift = 2;
 	}
 
-	if (mmu.pae_hat && (x86_feature & X86_PAE) == 0)
+	if (mmu.pae_hat && !is_x86_feature(x86_featureset, X86FSET_PAE))
 		panic("Processor does not support PAE");
 
-	if ((x86_feature & X86_CX8) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_CX8))
 		panic("Processor does not support cmpxchg8b instruction");
 
 #if defined(__amd64)
@@ -1095,7 +1096,7 @@ hati_mkpte(pfn_t pfn, uint_t attr, level_t level, uint_t flags)
 		/* nothing to set */;
 	} else if (cache_attr & (HAT_MERGING_OK | HAT_LOADCACHING_OK)) {
 		PTE_SET(pte, PT_NOCACHE);
-		if (x86_feature & X86_PAT)
+		if (is_x86_feature(x86_featureset, X86FSET_PAT))
 			PTE_SET(pte, (level == 0) ? PT_PAT_4K : PT_PAT_LARGE);
 		else
 			PTE_SET(pte, PT_WRITETHRU);

@@ -42,7 +42,7 @@ pci_check_amd_ioecs(void)
 	struct cpuid_regs cp;
 	int family;
 
-	if ((x86_feature & X86_CPUID) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID))
 		return (B_FALSE);
 
 	/*

@@ -492,7 +492,7 @@ authamd_init(cmi_hdl_t hdl, void **datap)
 	    !authamd_supported(hdl))
 		return (ENOTSUP);
 
-	if (!(x86_feature & X86_MCA))
+	if (!is_x86_feature(x86_featureset, X86FSET_MCA))
 		return (ENOTSUP);
 
 	if (cmi_hdl_rdmsr(hdl, IA32_MSR_MCG_CAP, &cap) != CMI_SUCCESS)

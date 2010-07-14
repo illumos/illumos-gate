@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2009, Intel Corporation.
@@ -324,45 +323,39 @@ extern "C" {
 	((uint64_t)MTRR_TYPE_WC << 48) |	\
 	((uint64_t)MTRR_TYPE_UC << 56))
 
-#define	X86_LARGEPAGE	0x00000001
-#define	X86_TSC		0x00000002
-#define	X86_MSR		0x00000004
-#define	X86_MTRR	0x00000008
-#define	X86_PGE		0x00000010
-#define	X86_DE		0x00000020
-#define	X86_CMOV	0x00000040
-#define	X86_MMX 	0x00000080
-#define	X86_MCA		0x00000100
-#define	X86_PAE		0x00000200
-#define	X86_CX8		0x00000400
-#define	X86_PAT		0x00000800
-#define	X86_SEP		0x00001000
-#define	X86_SSE		0x00002000
-#define	X86_SSE2	0x00004000
-#define	X86_HTT		0x00008000
-#define	X86_ASYSC	0x00010000
-#define	X86_NX		0x00020000
-#define	X86_SSE3	0x00040000
-#define	X86_CX16	0x00080000
-#define	X86_CMP		0x00100000
-#define	X86_TSCP	0x00200000
-#define	X86_MWAIT	0x00400000
-#define	X86_SSE4A	0x00800000
-#define	X86_CPUID	0x01000000
-#define	X86_SSSE3	0x02000000
-#define	X86_SSE4_1	0x04000000
-#define	X86_SSE4_2	0x08000000
-#define	X86_1GPG	0x10000000
-#define	X86_CLFSH	0x20000000
-#define	X86_64		0x40000000
-#define	X86_AES		0x80000000
-
-#define	FMT_X86_FEATURE						\
-	"\20"							\
-	"\40aes\34sse4_2\33sse4_1\32ssse3\31cpuid"		\
-	"\30sse4a\27mwait\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"\
-	"\20htt\17sse2\16sse\15sep\14pat\13cx8\12pae\11mca"	\
-	"\10mmx\7cmov\6de\5pge\4mtrr\3msr\2tsc\1lgpg"
+#define	X86FSET_LARGEPAGE	0
+#define	X86FSET_TSC		1
+#define	X86FSET_MSR		2
+#define	X86FSET_MTRR		3
+#define	X86FSET_PGE		4
+#define	X86FSET_DE		5
+#define	X86FSET_CMOV		6
+#define	X86FSET_MMX 		7
+#define	X86FSET_MCA		8
+#define	X86FSET_PAE		9
+#define	X86FSET_CX8		10
+#define	X86FSET_PAT		11
+#define	X86FSET_SEP		12
+#define	X86FSET_SSE		13
+#define	X86FSET_SSE2		14
+#define	X86FSET_HTT		15
+#define	X86FSET_ASYSC		16
+#define	X86FSET_NX		17
+#define	X86FSET_SSE3		18
+#define	X86FSET_CX16		19
+#define	X86FSET_CMP		20
+#define	X86FSET_TSCP		21
+#define	X86FSET_MWAIT		22
+#define	X86FSET_SSE4A		23
+#define	X86FSET_CPUID		24
+#define	X86FSET_SSSE3		25
+#define	X86FSET_SSE4_1		26
+#define	X86FSET_SSE4_2		27
+#define	X86FSET_1GPG		28
+#define	X86FSET_CLFSH		29
+#define	X86FSET_64		30
+#define	X86FSET_AES		31
+#define	X86FSET_PCLMULQDQ	32
 
 /*
  * flags to patch tsc_read routine.
@@ -389,7 +382,7 @@ extern "C" {
 
 /*
  * x86_type is a legacy concept; this is supplanted
- * for most purposes by x86_feature; modern CPUs
+ * for most purposes by x86_featureset; modern CPUs
  * should be X86_TYPE_OTHER
  */
 #define	X86_TYPE_OTHER		0
@@ -567,7 +560,16 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-extern uint_t x86_feature;
+extern void *x86_featureset;
+
+extern void free_x86_featureset(void *featureset);
+extern boolean_t is_x86_feature(void *featureset, uint_t feature);
+extern void add_x86_feature(void *featureset, uint_t feature);
+extern void remove_x86_feature(void *featureset, uint_t feature);
+extern boolean_t compare_x86_featureset(void *setA, void *setB);
+extern void print_x86_featureset(void *featureset);
+
+
 extern uint_t x86_type;
 extern uint_t x86_vendor;
 extern uint_t x86_clflush_size;
@@ -653,7 +655,7 @@ struct cpuid_info;
 extern void setx86isalist(void);
 extern void cpuid_alloc_space(struct cpu *);
 extern void cpuid_free_space(struct cpu *);
-extern uint_t cpuid_pass1(struct cpu *);
+extern void *cpuid_pass1(struct cpu *);
 extern void cpuid_pass2(struct cpu *);
 extern void cpuid_pass3(struct cpu *);
 extern uint_t cpuid_pass4(struct cpu *);

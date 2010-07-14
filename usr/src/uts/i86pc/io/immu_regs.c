@@ -382,7 +382,7 @@ setup_regs(immu_t *immu)
 		immu->immu_dvma_coherent = B_TRUE;
 	} else {
 		immu->immu_dvma_coherent = B_FALSE;
-		if (!(x86_feature & X86_CLFSH)) {
+		if (!is_x86_feature(x86_featureset, X86FSET_CLFSH)) {
 			ddi_err(DER_WARN, NULL,
 			    "immu unit %s can't be enabled due to "
 			    "missing clflush functionality", immu->immu_name);

@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Floating point configuration.
@@ -142,7 +139,8 @@ fpu_probe(void)
 		 *
 		 * (Perhaps we should complain more about this case!)
 		 */
-		if ((x86_feature & X86_SSE|X86_SSE2) == (X86_SSE|X86_SSE2)) {
+		if (is_x86_feature(x86_featureset, X86FSET_SSE) &&
+		    is_x86_feature(x86_featureset, X86FSET_SSE2)) {
 			fp_kind = __FP_SSE;
 			ENABLE_SSE();
 		}
@@ -151,15 +149,15 @@ fpu_probe(void)
 		 * SSE and SSE2 are both optional, and we patch kernel
 		 * code to exploit it when present.
 		 */
-		if (x86_feature & X86_SSE) {
+		if (is_x86_feature(x86_featureset, X86FSET_SSE)) {
 			fp_kind = __FP_SSE;
 			fpsave_ctxt = fpxsave_ctxt;
 			patch_sse();
-			if (x86_feature & X86_SSE2)
+			if (is_x86_feature(x86_featureset, X86FSET_SSE2))
 				patch_sse2();
 			ENABLE_SSE();
 		} else {
-			x86_feature &= ~X86_SSE2;
+			remove_x86_feature(x86_featureset, X86FSET_SSE2);
 			/*
 			 * (Just in case the BIOS decided we wanted SSE
 			 * enabled when we didn't. See 4965674.)
@@ -167,7 +165,7 @@ fpu_probe(void)
 			DISABLE_SSE();
 		}
 #endif
-		if (x86_feature & X86_SSE2) {
+		if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
 			use_sse_pagecopy = use_sse_pagezero = use_sse_copy = 1;
 		}
 

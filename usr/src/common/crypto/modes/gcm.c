@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -43,7 +42,7 @@
 
 #ifdef _KERNEL
 #include <sys/cpuvar.h>		/* cpu_t, CPU */
-#include <sys/x86_archext.h>	/* x86_feature, X86_*, CPUID_* */
+#include <sys/x86_archext.h>	/* x86_featureset, X86FSET_*, CPUID_* */
 #include <sys/disp.h>		/* kpreempt_disable(), kpreempt_enable */
 /* Workaround for no XMM kernel thread save/restore */
 #define	KPREEMPT_DISABLE	kpreempt_disable()
@@ -731,7 +730,7 @@ gcm_set_kmflag(gcm_ctx_t *ctx, int kmflag)
  * Cache the result, as the CPU can't change.
  *
  * Note: the userland version uses getisax().  The kernel version uses
- * global variable x86_feature or the output of cpuid_insn().
+ * is_x86_featureset().
  */
 static int
 intel_pclmulqdq_instruction_present(void)
@@ -740,21 +739,8 @@ intel_pclmulqdq_instruction_present(void)
 
 	if (cached_result == -1) { /* first time */
 #ifdef _KERNEL
-#ifdef X86_PCLMULQDQ
-		cached_result = (x86_feature & X86_PCLMULQDQ) != 0;
-#else
-		if (cpuid_getvendor(CPU) == X86_VENDOR_Intel) {
-			struct cpuid_regs	cpr;
-			cpu_t			*cp = CPU;
-
-			cpr.cp_eax = 1; /* Function 1: get processor info */
-			(void) cpuid_insn(cp, &cpr);
-			cached_result = ((cpr.cp_ecx &
-			    CPUID_INTC_ECX_PCLMULQDQ) != 0);
-		} else {
-			cached_result = 0;
-		}
-#endif	/* X86_PCLMULQDQ */
+		cached_result =
+		    is_x86_feature(x86_featureset, X86FSET_PCLMULQDQ);
 #else
 		uint_t		ui = 0;
 

@@ -1161,7 +1161,7 @@ get_cpu_mstate(cpu_t *cpu, hrtime_t *times)
 int
 checked_rdmsr(uint_t msr, uint64_t *value)
 {
-	if ((x86_feature & X86_MSR) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_MSR))
 		return (ENOTSUP);
 	*value = rdmsr(msr);
 	return (0);
@@ -1174,7 +1174,7 @@ checked_rdmsr(uint_t msr, uint64_t *value)
 int
 checked_wrmsr(uint_t msr, uint64_t value)
 {
-	if ((x86_feature & X86_MSR) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_MSR))
 		return (ENOTSUP);
 	wrmsr(msr, value);
 	return (0);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -180,13 +179,13 @@ mlsetup(struct regs *rp)
 	 * was done in locore before mlsetup was called.  Do the next
 	 * pass in C code.
 	 *
-	 * The x86_feature bits are set here on the basis of the capabilities
+	 * The x86_featureset is initialized here based on the capabilities
 	 * of the boot CPU.  Note that if we choose to support CPUs that have
 	 * different feature sets (at which point we would almost certainly
 	 * want to set the feature bits to correspond to the feature
 	 * minimum) this value may be altered.
 	 */
-	x86_feature = cpuid_pass1(cpu[0]);
+	x86_featureset = cpuid_pass1(cpu[0]);
 
 #if !defined(__xpv)
 
@@ -212,13 +211,16 @@ mlsetup(struct regs *rp)
 	 * The Xen hypervisor does not correctly report whether rdtscp is
 	 * supported or not, so we must assume that it is not.
 	 */
-	if (get_hwenv() != HW_XEN_HVM && (x86_feature & X86_TSCP))
+	if (get_hwenv() != HW_XEN_HVM &&
+	    is_x86_feature(x86_featureset, X86FSET_TSCP))
 		patch_tsc_read(X86_HAVE_TSCP);
 	else if (cpuid_getvendor(CPU) == X86_VENDOR_AMD &&
-	    cpuid_getfamily(CPU) <= 0xf && (x86_feature & X86_SSE2) != 0)
+	    cpuid_getfamily(CPU) <= 0xf &&
+	    is_x86_feature(x86_featureset, X86FSET_SSE2))
 		patch_tsc_read(X86_TSC_MFENCE);
 	else if (cpuid_getvendor(CPU) == X86_VENDOR_Intel &&
-	    cpuid_getfamily(CPU) <= 6 && (x86_feature & X86_SSE2) != 0)
+	    cpuid_getfamily(CPU) <= 6 &&
+	    is_x86_feature(x86_featureset, X86FSET_SSE2))
 		patch_tsc_read(X86_TSC_LFENCE);
 
 #endif	/* !__xpv */
@@ -229,7 +231,7 @@ mlsetup(struct regs *rp)
 	 * or at least they do not implement it correctly. Patch them to
 	 * return 0.
 	 */
-	if ((x86_feature & X86_TSC) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_TSC))
 		patch_tsc_read(X86_NO_TSC);
 #endif	/* __i386 && !__xpv */
 
@@ -246,13 +248,13 @@ mlsetup(struct regs *rp)
 	 * (the cpuid) for the rdtscp instruction on appropriately
 	 * capable hardware.
 	 */
-	if (x86_feature & X86_TSC)
+	if (is_x86_feature(x86_featureset, X86FSET_TSC))
 		setcr4(getcr4() & ~CR4_TSD);
 
-	if (x86_feature & X86_TSCP)
+	if (is_x86_feature(x86_featureset, X86FSET_TSCP))
 		(void) wrmsr(MSR_AMD_TSCAUX, 0);
 
-	if (x86_feature & X86_DE)
+	if (is_x86_feature(x86_featureset, X86FSET_DE))
 		setcr4(getcr4() | CR4_DE);
 #endif /* __xpv */
 

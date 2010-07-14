@@ -1193,7 +1193,7 @@ core_pcbe_init(void)
 		return (-1);
 
 	/* Set HTT-specific names of architectural & FFC events */
-	if (x86_feature & X86_HTT) {
+	if (is_x86_feature(x86_featureset, X86FSET_HTT)) {
 		ffc_names = ffc_names_htt;
 		arch_events_table = arch_events_table_htt;
 		known_arch_events =

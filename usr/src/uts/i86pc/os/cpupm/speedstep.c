@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2009,  Intel Corporation.
@@ -444,8 +443,8 @@ speedstep_supported(uint_t family, uint_t model)
 	struct cpuid_regs cpu_regs;
 
 	/* Required features */
-	if (!(x86_feature & X86_CPUID) ||
-	    !(x86_feature & X86_MSR)) {
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
+	    !is_x86_feature(x86_featureset, X86FSET_MSR)) {
 		return (B_FALSE);
 	}
 
@@ -476,8 +475,8 @@ turbo_supported(void)
 	struct cpuid_regs cpu_regs;
 
 	/* Required features */
-	if (!(x86_feature & X86_CPUID) ||
-	    !(x86_feature & X86_MSR)) {
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
+	    !is_x86_feature(x86_featureset, X86FSET_MSR)) {
 		return (B_FALSE);
 	}
 

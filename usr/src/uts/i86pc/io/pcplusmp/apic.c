@@ -371,7 +371,7 @@ apic_init_intr(void)
 	if (nlvt >= 5) {
 		/* Enable performance counter overflow interrupt */
 
-		if ((x86_feature & X86_MSR) != X86_MSR)
+		if (!is_x86_feature(x86_featureset, X86FSET_MSR))
 			apic_enable_cpcovf_intr = 0;
 		if (apic_enable_cpcovf_intr) {
 			if (apic_cpcovf_vect == 0) {

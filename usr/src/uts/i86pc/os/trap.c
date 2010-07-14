@@ -256,17 +256,17 @@ instr_is_other_syscall(caddr_t pc, int which)
 {
 	uchar_t instr[FAST_SCALL_SIZE];
 
-	ASSERT(which == X86_SEP || which == X86_ASYSC || which == 0xCD);
+	ASSERT(which == X86FSET_SEP || which == X86FSET_ASYSC || which == 0xCD);
 
 	if (copyin_nowatch(pc, (caddr_t)instr, FAST_SCALL_SIZE) != 0)
 		return (0);
 
 	switch (which) {
-	case X86_SEP:
+	case X86FSET_SEP:
 		if (instr[0] == 0x0F && instr[1] == 0x34)
 			return (1);
 		break;
-	case X86_ASYSC:
+	case X86FSET_ASYSC:
 		if (instr[0] == 0x0F && instr[1] == 0x05)
 			return (1);
 		break;
@@ -283,9 +283,9 @@ static const char *
 syscall_insn_string(int syscall_insn)
 {
 	switch (syscall_insn) {
-	case X86_SEP:
+	case X86FSET_SEP:
 		return ("sysenter");
-	case X86_ASYSC:
+	case X86FSET_ASYSC:
 		return ("syscall");
 	case 0xCD:
 		return ("int");
@@ -916,7 +916,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * be to emulate that particular instruction.
 		 */
 		if (p->p_ldt != NULL &&
-		    ldt_rewrite_syscall(rp, p, X86_ASYSC))
+		    ldt_rewrite_syscall(rp, p, X86FSET_ASYSC))
 			goto out;
 
 #ifdef __amd64
@@ -1018,7 +1018,8 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	case T_SIMDFPE + USER:		/* SSE and SSE2 exceptions */
 		if (tudebug && tudebugsse)
 			showregs(type, rp, addr);
-		if ((x86_feature & (X86_SSE|X86_SSE2)) == 0) {
+		if (!is_x86_feature(x86_featureset, X86FSET_SSE) &&
+		    !is_x86_feature(x86_featureset, X86FSET_SSE2)) {
 			/*
 			 * There are rumours that some user instructions
 			 * on older CPUs can cause this trap to occur; in
@@ -1268,7 +1269,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * this will be to emulate that particular instruction.
 		 */
 		if (p->p_ldt != NULL &&
-		    ldt_rewrite_syscall(rp, p, X86_SEP))
+		    ldt_rewrite_syscall(rp, p, X86FSET_SEP))
 			goto out;
 
 		/*FALLTHROUGH*/

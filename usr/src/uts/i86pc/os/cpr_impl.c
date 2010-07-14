@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -876,8 +875,6 @@ init_real_mode_platter(int cpun, uint32_t offset, uint_t cr4, wc_desctbr_t gdt)
 	real_mode_platter->rm_gdt_lim = gdt.limit;
 
 #if defined(__amd64)
-	real_mode_platter->rm_x86feature = x86_feature;
-
 	if (getcr3() > 0xffffffffUL)
 		panic("Cannot initialize CPUs; kernel's 64-bit page tables\n"
 		    "located above 4G in physical memory (@ 0x%llx).",
@@ -943,7 +940,7 @@ i_cpr_start_cpu(void)
 	 * We need to Sync PAT with cpu0's PAT. We have to do
 	 * this with interrupts disabled.
 	 */
-	if (x86_feature & X86_PAT)
+	if (is_x86_feature(x86_featureset, X86FSET_PAT))
 		pat_sync();
 
 	/*
@@ -994,7 +991,7 @@ i_cpr_start_cpu(void)
 	 * cmi already been init'd (during boot), so do not need to do it again
 	 */
 #ifdef PM_REINITMCAONRESUME
-	if (x86_feature & X86_MCA)
+	if (is_x86_feature(x86_featureset, X86FSET_MCA))
 		cmi_mca_init();
 #endif
 

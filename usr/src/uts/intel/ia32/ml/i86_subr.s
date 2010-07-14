@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -3086,8 +3085,8 @@ getcregs(struct cregs *crp)
 	movl	%eax, CREG_CR2(%edx)	/* cr2 */
 	movl	%cr3, %eax
 	movl	%eax, CREG_CR3(%edx)	/* cr3 */
-	testl	$X86_LARGEPAGE, x86_feature
-	jz	.nocr4
+	bt	$X86FSET_LARGEPAGE, x86_featureset
+	jnc	.nocr4
 	movl	%cr4, %eax
 	movl	%eax, CREG_CR4(%edx)	/* cr4 */
 	jmp	.skip

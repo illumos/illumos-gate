@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -500,13 +499,13 @@ p4_pcbe_init(void)
 		p4_eventlist[i][size - 1] = '\0';
 	}
 
-	if (x86_feature & X86_MMX)
+	if (is_x86_feature(x86_featureset, X86FSET_MMX))
 		p4_rdpmc_avail = 1;
 	/*
 	 * The X86_HTT flag may disappear soon, so we'll isolate the impact of
 	 * its demise to the following if().
 	 */
-	if (x86_feature & X86_HTT)
+	if (is_x86_feature(x86_featureset, X86FSET_HTT))
 		p4_htt = 1;
 
 	return (0);

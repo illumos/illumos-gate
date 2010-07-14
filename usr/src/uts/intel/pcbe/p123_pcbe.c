@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -536,7 +535,7 @@ ptm_pcbe_init(void)
 	int				i;
 	size_t				size;
 
-	if (x86_feature & X86_MMX)
+	if (is_x86_feature(x86_featureset, X86FSET_MMX))
 		ptm_rdpmc_avail = 1;
 
 	/*
@@ -567,7 +566,7 @@ ptm_pcbe_init(void)
 		ptm_ver = PTM_VER_P6;
 		ptm_cpuref = P6_CPUREF;
 		ptm_pcbe_ops.pcbe_caps = CPC_CAP_OVERFLOW_INTERRUPT;
-		if (x86_feature & X86_MMX)
+		if (is_x86_feature(x86_featureset, X86FSET_MMX))
 			ptm_impl_name = "Pentium Pro with MMX, Pentium II";
 		else
 			ptm_impl_name = "Pentium Pro, Pentium II";

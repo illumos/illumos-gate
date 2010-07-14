@@ -1320,7 +1320,6 @@ static void
 startup_kmem(void)
 {
 	extern void page_set_colorequiv_arr(void);
-	const char *fmt = "?features: %b\n";
 
 	PRM_POINT("startup_kmem() starting...");
 
@@ -1429,7 +1428,7 @@ startup_kmem(void)
 	/*
 	 * print this out early so that we know what's going on
 	 */
-	cmn_err(CE_CONT, fmt, x86_feature, FMT_X86_FEATURE);
+	print_x86_featureset(x86_featureset);
 
 	/*
 	 * Initialize bp_mapin().
@@ -1651,7 +1650,7 @@ startup_modules(void)
 			if ((hdl = cmi_init(CMI_HDL_SOLARIS_xVM_MCA,
 			    xen_physcpu_chipid(cpi), xen_physcpu_coreid(cpi),
 			    xen_physcpu_strandid(cpi))) != NULL &&
-			    (x86_feature & X86_MCA))
+			    is_x86_feature(x86_featureset, X86FSET_MCA))
 				cmi_mca_init(hdl);
 		}
 	}
@@ -1663,7 +1662,7 @@ startup_modules(void)
 	if ((get_hwenv() != HW_XEN_HVM) &&
 	    (hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
 	    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL &&
-	    (x86_feature & X86_MCA)) {
+	    is_x86_feature(x86_featureset, X86FSET_MCA)) {
 			cmi_mca_init(hdl);
 			CPU->cpu_m.mcpu_cmi_hdl = hdl;
 	}
@@ -2670,7 +2669,7 @@ pat_sync(void)
 {
 	ulong_t	cr0, cr0_orig, cr4;
 
-	if (!(x86_feature & X86_PAT))
+	if (!is_x86_feature(x86_featureset, X86FSET_PAT))
 		return;
 	cr0_orig = cr0 = getcr0();
 	cr4 = getcr4();
@@ -2993,12 +2992,13 @@ setx86isalist(void)
 	case X86_VENDOR_Intel:
 	case X86_VENDOR_AMD:
 	case X86_VENDOR_TM:
-		if (x86_feature & X86_CMOV) {
+		if (is_x86_feature(x86_featureset, X86FSET_CMOV)) {
 			/*
 			 * Pentium Pro or later
 			 */
 			(void) strcat(tp, "pentium_pro");
-			(void) strcat(tp, x86_feature & X86_MMX ?
+			(void) strcat(tp,
+			    is_x86_feature(x86_featureset, X86FSET_MMX) ?
 			    "+mmx pentium_pro " : " ");
 		}
 		/*FALLTHROUGH*/
@@ -3007,9 +3007,10 @@ setx86isalist(void)
 		 * The Cyrix 6x86 does not have any Pentium features
 		 * accessible while not at privilege level 0.
 		 */
-		if (x86_feature & X86_CPUID) {
+		if (is_x86_feature(x86_featureset, X86FSET_CPUID)) {
 			(void) strcat(tp, "pentium");
-			(void) strcat(tp, x86_feature & X86_MMX ?
+			(void) strcat(tp,
+			    is_x86_feature(x86_featureset, X86FSET_MMX) ?
 			    "+mmx pentium " : " ");
 		}
 		break;
