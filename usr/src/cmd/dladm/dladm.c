@@ -9142,7 +9142,7 @@ print_part(show_part_state_t *state, datalink_id_t linkid)
 	 * we want up-part to always succeed even if the port is currently down
 	 * or P_Key is not yet available in the subnet.
 	 */
-	if ((status = dladm_read_conf(handle, linkid, &conf)) ==
+	if ((status = dladm_getsnap_conf(handle, linkid, &conf)) ==
 	    DLADM_STATUS_OK) {
 		(void) dladm_get_conf_field(handle, conf, FFORCE,
 		    &force_in_conf, sizeof (boolean_t));

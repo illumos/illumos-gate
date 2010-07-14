@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LIBDLLINK_H
@@ -180,7 +179,9 @@ extern dladm_status_t	dladm_walk_datalink_id(int (*)(dladm_handle_t,
 extern dladm_status_t	dladm_create_conf(dladm_handle_t, const char *,
 			    datalink_id_t, datalink_class_t, uint32_t,
 			    dladm_conf_t *);
-extern dladm_status_t	dladm_read_conf(dladm_handle_t, datalink_id_t,
+extern dladm_status_t	dladm_open_conf(dladm_handle_t, datalink_id_t,
+			    dladm_conf_t *);
+extern dladm_status_t	dladm_getsnap_conf(dladm_handle_t, datalink_id_t,
 			    dladm_conf_t *);
 extern dladm_status_t	dladm_write_conf(dladm_handle_t, dladm_conf_t);
 extern dladm_status_t	dladm_remove_conf(dladm_handle_t, datalink_id_t);

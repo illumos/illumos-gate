@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -624,7 +623,7 @@ static dladm_status_t
 dladm_bridge_persist_conf(dladm_handle_t handle, const char *link,
     datalink_id_t linkid)
 {
-	dladm_conf_t conf = DLADM_INVALID_CONF;
+	dladm_conf_t conf;
 	dladm_status_t status;
 
 	status = dladm_create_conf(handle, link, linkid, DATALINK_CLASS_BRIDGE,
@@ -1050,8 +1049,8 @@ dladm_bridge_setlink(dladm_handle_t handle, datalink_id_t linkid,
 	if (*bridge != '\0' && !dladm_valid_bridgename(bridge))
 		return (DLADM_STATUS_FAILED);
 
-	if ((status = dladm_read_conf(handle, linkid, &conf)) !=
-	    DLADM_STATUS_OK)
+	status = dladm_open_conf(handle, linkid, &conf);
+	if (status != DLADM_STATUS_OK)
 		return (status);
 
 	has_oldbridge = B_FALSE;
@@ -1105,7 +1104,7 @@ dladm_bridge_getlink(dladm_handle_t handle, datalink_id_t linkid, char *bridge,
 	dladm_status_t status;
 	dladm_conf_t conf;
 
-	if ((status = dladm_read_conf(handle, linkid, &conf)) !=
+	if ((status = dladm_getsnap_conf(handle, linkid, &conf)) !=
 	    DLADM_STATUS_OK)
 		return (status);
 
@@ -1143,9 +1142,9 @@ i_dladm_bridge_is_held(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	dladm_status_t status = DLADM_STATUS_FAILED;
 	dladm_conf_t conf;
 	char bridge[MAXLINKNAMELEN];
-	bridge_held_arg_t	*bha = arg;
+	bridge_held_arg_t *bha = arg;
 
-	if ((status = dladm_read_conf(handle, linkid, &conf)) !=
+	if ((status = dladm_getsnap_conf(handle, linkid, &conf)) !=
 	    DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 	status = dladm_get_conf_field(handle, conf, FBRIDGE, bridge,

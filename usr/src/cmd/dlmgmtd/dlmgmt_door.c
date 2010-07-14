@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -61,7 +60,8 @@
 #include <librcm.h>
 #include "dlmgmt_impl.h"
 
-typedef void dlmgmt_door_handler_t(void *, void *, zoneid_t, ucred_t *);
+typedef void dlmgmt_door_handler_t(void *, void *, size_t *, zoneid_t,
+    ucred_t *);
 
 typedef struct dlmgmt_door_info_s {
 	uint_t			di_cmd;
@@ -136,8 +136,10 @@ done:
 	nvlist_free(nvl);
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_upcall_create(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_upcall_create(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_upcall_arg_create_t *create = argp;
 	dlmgmt_create_retval_t	*retvalp = retp;
@@ -274,8 +276,10 @@ noupdate:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_upcall_update(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_upcall_update(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_upcall_arg_update_t	*update = argp;
 	dlmgmt_update_retval_t		*retvalp = retp;
@@ -348,8 +352,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_upcall_destroy(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_upcall_destroy(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_upcall_arg_destroy_t	*destroy = argp;
 	dlmgmt_destroy_retval_t		*retvalp = retp;
@@ -396,7 +402,8 @@ done:
 
 /* ARGSUSED */
 static void
-dlmgmt_getname(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_getname(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_getname_t	*getname = argp;
 	dlmgmt_getname_retval_t	*retvalp = retp;
@@ -424,7 +431,8 @@ dlmgmt_getname(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 
 /* ARGSUSED */
 static void
-dlmgmt_getlinkid(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_getlinkid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_getlinkid_t	*getlinkid = argp;
 	dlmgmt_getlinkid_retval_t *retvalp = retp;
@@ -456,7 +464,8 @@ done:
 
 /* ARGSUSED */
 static void
-dlmgmt_getnext(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_getnext(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_getnext_t	*getnext = argp;
 	dlmgmt_getnext_retval_t	*retvalp = retp;
@@ -498,7 +507,8 @@ dlmgmt_getnext(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 
 /* ARGSUSED */
 static void
-dlmgmt_upcall_getattr(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_upcall_getattr(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_upcall_arg_getattr_t	*getattr = argp;
 	dlmgmt_getattr_retval_t		*retvalp = retp;
@@ -517,8 +527,10 @@ dlmgmt_upcall_getattr(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 	dlmgmt_table_unlock();
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_createid(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_createid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_createid_t	*createid = argp;
 	dlmgmt_createid_retval_t *retvalp = retp;
@@ -566,8 +578,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_destroyid(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_destroyid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_destroyid_t	*destroyid = argp;
 	dlmgmt_destroyid_retval_t *retvalp = retp;
@@ -605,8 +619,10 @@ done:
  * (ld_linkid) to a non-existent link2 (ld_link): rename link1's name to
  * the given link name.
  */
+/* ARGSUSED */
 static void
-dlmgmt_remapid(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_remapid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_remapid_t	*remapid = argp;
 	dlmgmt_remapid_retval_t	*retvalp = retp;
@@ -671,8 +687,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_upid(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_upid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_upid_t	*upid = argp;
 	dlmgmt_upid_retval_t	*retvalp = retp;
@@ -705,8 +723,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_createconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_createconf(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_createconf_t *createconf = argp;
 	dlmgmt_createconf_retval_t *retvalp = retp;
@@ -726,15 +746,17 @@ dlmgmt_createconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 	if (err == 0) {
 		avl_add(&dlmgmt_dlconf_avl, dlconfp);
 		dlmgmt_advance_dlconfid(dlconfp);
-		retvalp->lr_conf = (dladm_conf_t)dlconfp->ld_id;
+		retvalp->lr_confid = dlconfp->ld_id;
 	}
 done:
 	dlmgmt_dlconf_table_unlock();
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_setattr(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_setattr(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_setattr_t	*setattr = argp;
 	dlmgmt_setattr_retval_t	*retvalp = retp;
@@ -746,7 +768,7 @@ dlmgmt_setattr(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 	 */
 	dlmgmt_dlconf_table_lock(B_TRUE);
 
-	dlconf.ld_id = (int)setattr->ld_conf;
+	dlconf.ld_id = setattr->ld_confid;
 	dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL);
 	if (dlconfp == NULL || zoneid != dlconfp->ld_zoneid) {
 		err = ENOENT;
@@ -764,8 +786,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_unsetconfattr(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_unsetconfattr(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_unsetattr_t	*unsetattr = argp;
 	dlmgmt_unsetattr_retval_t *retvalp = retp;
@@ -777,7 +801,7 @@ dlmgmt_unsetconfattr(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 	 */
 	dlmgmt_dlconf_table_lock(B_TRUE);
 
-	dlconf.ld_id = (int)unsetattr->ld_conf;
+	dlconf.ld_id = unsetattr->ld_confid;
 	dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL);
 	if (dlconfp == NULL || zoneid != dlconfp->ld_zoneid) {
 		err = ENOENT;
@@ -795,19 +819,21 @@ done:
 }
 
 /*
- * Note that dlmgmt_readconf() returns a conf ID of a conf AVL tree entry,
+ * Note that dlmgmt_openconf() returns a conf ID of a conf AVL tree entry,
  * which is managed by dlmgmtd.  The ID is used to find the conf entry when
  * dlmgmt_write_conf() is called.  The conf entry contains an ld_gen value
  * (which is the generation number - ll_gen) of the dlmgmt_link_t at the time
- * of dlmgmt_readconf(), and ll_gen changes every time the dlmgmt_link_t
+ * of dlmgmt_openconf(), and ll_gen changes every time the dlmgmt_link_t
  * changes its attributes.  Therefore, dlmgmt_write_conf() can compare ld_gen
  * in the conf entry against the latest dlmgmt_link_t ll_gen value to see if
- * anything has changed between the dlmgmt_read_conf() and dlmgmt_writeconf()
+ * anything has changed between the dlmgmt_openconf() and dlmgmt_writeconf()
  * calls.  If so, EAGAIN is returned.  This mechanism can ensures atomicity
  * across the pair of dladm_read_conf() and dladm_write_conf() calls.
  */
+/* ARGSUSED */
 static void
-dlmgmt_writeconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_writeconf(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_writeconf_t	*writeconf = argp;
 	dlmgmt_writeconf_retval_t *retvalp = retp;
@@ -817,11 +843,11 @@ dlmgmt_writeconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 	int			err = 0;
 
 	/*
-	 * Hold the read lock to access the dlconf table.
+	 * Hold the lock to access the dlconf table.
 	 */
 	dlmgmt_dlconf_table_lock(B_TRUE);
 
-	dlconf.ld_id = (int)writeconf->ld_conf;
+	dlconf.ld_id = writeconf->ld_confid;
 	dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL);
 	if (dlconfp == NULL || zoneid != dlconfp->ld_zoneid) {
 		err = ENOENT;
@@ -885,8 +911,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_removeconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_removeconf(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_removeconf_t 	*removeconf = argp;
 	dlmgmt_removeconf_retval_t	*retvalp = retp;
@@ -916,8 +944,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_destroyconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_destroyconf(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_destroyconf_t	*destroyconf = argp;
 	dlmgmt_destroyconf_retval_t	*retvalp = retp;
@@ -929,7 +959,7 @@ dlmgmt_destroyconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 	 */
 	dlmgmt_dlconf_table_lock(B_TRUE);
 
-	dlconf.ld_id = (int)destroyconf->ld_conf;
+	dlconf.ld_id = destroyconf->ld_confid;
 	dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL);
 	if (dlconfp == NULL || zoneid != dlconfp->ld_zoneid) {
 		err = ENOENT;
@@ -948,17 +978,23 @@ done:
 }
 
 /*
- * See the comments above dladm_write_conf() to see how ld_gen is used to
- * ensure atomicity across the {dlmgmt_readconf(), dlmgmt_writeconf()} pair.
+ * dlmgmt_openconf() returns a handle of the current configuration, which
+ * is then used to update the configuration by dlmgmt_writeconf(). Therefore,
+ * it requires privileges.
+ *
+ * Further, please see the comments above dladm_write_conf() to see how
+ * ld_gen is used to ensure atomicity across the {dlmgmt_openconf(),
+ * dlmgmt_writeconf()} pair.
  */
 /* ARGSUSED */
 static void
-dlmgmt_readconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_openconf(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
-	dlmgmt_door_readconf_t	*readconf = argp;
-	dlmgmt_readconf_retval_t *retvalp = retp;
+	dlmgmt_door_openconf_t	*openconf = argp;
+	dlmgmt_openconf_retval_t *retvalp = retp;
 	dlmgmt_link_t 		*linkp;
-	datalink_id_t		linkid = readconf->ld_linkid;
+	datalink_id_t		linkid = openconf->ld_linkid;
 	dlmgmt_dlconf_t		*dlconfp;
 	dlmgmt_linkattr_t	*attrp;
 	int			err = 0;
@@ -987,6 +1023,9 @@ dlmgmt_readconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 		goto done;
 	}
 
+	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
+		goto done;
+
 	if ((err = dlconf_create(linkp->ll_link, linkp->ll_linkid,
 	    linkp->ll_class, linkp->ll_media, zoneid, &dlconfp)) != 0)
 		goto done;
@@ -1002,7 +1041,7 @@ dlmgmt_readconf(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
 	avl_add(&dlmgmt_dlconf_avl, dlconfp);
 	dlmgmt_advance_dlconfid(dlconfp);
 
-	retvalp->lr_conf = (dladm_conf_t)dlconfp->ld_id;
+	retvalp->lr_confid = dlconfp->ld_id;
 done:
 	dlmgmt_table_unlock();
 	dlmgmt_dlconf_table_unlock();
@@ -1010,36 +1049,117 @@ done:
 }
 
 /*
- * Note: the caller must free *retvalpp in case of success.
+ * dlmgmt_getconfsnapshot() returns a read-only snapshot of all the
+ * configuration, and requires no privileges.
+ *
+ * If the given size cannot hold all the configuration, set the size
+ * that is needed, and return ENOSPC.
  */
 /* ARGSUSED */
 static void
-dlmgmt_getattr(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_getconfsnapshot(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
+{
+	dlmgmt_door_getconfsnapshot_t	*snapshot = argp;
+	dlmgmt_getconfsnapshot_retval_t	*retvalp = retp;
+	dlmgmt_link_t 			*linkp;
+	datalink_id_t			linkid = snapshot->ld_linkid;
+	dlmgmt_linkattr_t		*attrp;
+	char				*buf;
+	size_t				nvlsz;
+	nvlist_t			*nvl = NULL;
+	int				err = 0;
+
+	assert(*sz >= sizeof (dlmgmt_getconfsnapshot_retval_t));
+
+	/*
+	 * Hold the reader lock to access the link
+	 */
+	dlmgmt_table_lock(B_FALSE);
+	linkp = link_by_id(linkid, zoneid);
+	if ((linkp == NULL) || !(linkp->ll_flags & DLMGMT_PERSIST)) {
+		/* The persistent link configuration does not exist. */
+		err = ENOENT;
+		goto done;
+	}
+	if (linkp->ll_onloan && zoneid != GLOBAL_ZONEID) {
+		/*
+		 * The caller is in a non-global zone and the persistent
+		 * configuration belongs to the global zone.
+		 */
+		err = EACCES;
+		goto done;
+	}
+
+	err = nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, 0);
+	if (err != 0)
+		goto done;
+
+	for (attrp = linkp->ll_head; attrp != NULL; attrp = attrp->lp_next) {
+		if ((err = nvlist_add_byte_array(nvl, attrp->lp_name,
+		    attrp->lp_val, attrp->lp_sz)) != 0) {
+			goto done;
+		}
+	}
+
+	if ((err = nvlist_size(nvl, &nvlsz, NV_ENCODE_NATIVE)) != 0)
+		goto done;
+
+	if (nvlsz + sizeof (dlmgmt_getconfsnapshot_retval_t) > *sz) {
+		*sz = nvlsz + sizeof (dlmgmt_getconfsnapshot_retval_t);
+		err = ENOSPC;
+		goto done;
+	}
+
+	/*
+	 * pack the the nvlist into the return value.
+	 */
+	*sz = nvlsz + sizeof (dlmgmt_getconfsnapshot_retval_t);
+	retvalp->lr_nvlsz = nvlsz;
+	buf = (char *)retvalp + sizeof (dlmgmt_getconfsnapshot_retval_t);
+	err = nvlist_pack(nvl, &buf, &nvlsz, NV_ENCODE_NATIVE, 0);
+
+done:
+	dlmgmt_table_unlock();
+	nvlist_free(nvl);
+	retvalp->lr_err = err;
+}
+
+/* ARGSUSED */
+static void
+dlmgmt_getattr(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_getattr_t	*getattr = argp;
 	dlmgmt_getattr_retval_t	*retvalp = retp;
 	dlmgmt_dlconf_t		dlconf, *dlconfp;
+	int			err;
 
 	/*
 	 * Hold the read lock to access the dlconf table.
 	 */
 	dlmgmt_dlconf_table_lock(B_FALSE);
 
-	dlconf.ld_id = (int)getattr->ld_conf;
+	dlconf.ld_id = getattr->ld_confid;
 	if ((dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL)) == NULL ||
 	    zoneid != dlconfp->ld_zoneid) {
 		retvalp->lr_err = ENOENT;
 	} else {
-		retvalp->lr_err = dlmgmt_getattr_common(&dlconfp->ld_head,
-		    getattr->ld_attr, retvalp);
+		if ((err = dlmgmt_checkprivs(dlconfp->ld_class, cred)) != 0) {
+			retvalp->lr_err = err;
+		} else {
+			retvalp->lr_err = dlmgmt_getattr_common(
+			    &dlconfp->ld_head, getattr->ld_attr, retvalp);
+		}
 	}
 
 	dlmgmt_dlconf_table_unlock();
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_upcall_linkprop_init(void *argp, void *retp, zoneid_t zoneid,
-    ucred_t *cred)
+dlmgmt_upcall_linkprop_init(void *argp, void *retp, size_t *sz,
+    zoneid_t zoneid, ucred_t *cred)
 {
 	dlmgmt_door_linkprop_init_t	*lip = argp;
 	dlmgmt_linkprop_init_retval_t	*retvalp = retp;
@@ -1068,57 +1188,10 @@ dlmgmt_upcall_linkprop_init(void *argp, void *retp, zoneid_t zoneid,
 	retvalp->lr_err = err;
 }
 
-/*
- * Get the link property that follows ld_last_attr.
- * If ld_last_attr is empty, return the first property.
- */
 /* ARGSUSED */
 static void
-dlmgmt_linkprop_getnext(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
-{
-	dlmgmt_door_linkprop_getnext_t		*getnext = argp;
-	dlmgmt_linkprop_getnext_retval_t	*retvalp = retp;
-	dlmgmt_dlconf_t				dlconf, *dlconfp;
-	char					*attr;
-	void					*attrval;
-	size_t					attrsz;
-	dladm_datatype_t			attrtype;
-	int					err = 0;
-
-	/*
-	 * Hold the read lock to access the dlconf table.
-	 */
-	dlmgmt_dlconf_table_lock(B_FALSE);
-
-	dlconf.ld_id = (int)getnext->ld_conf;
-	dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL);
-	if (dlconfp == NULL) {
-		err = ENOENT;
-		goto done;
-	}
-
-	err = linkprop_getnext(&dlconfp->ld_head, getnext->ld_last_attr,
-	    &attr, &attrval, &attrsz, &attrtype);
-	if (err != 0)
-		goto done;
-
-	if (attrsz > MAXLINKATTRVALLEN) {
-		err = EINVAL;
-		goto done;
-	}
-
-	(void) strlcpy(retvalp->lr_attr, attr, MAXLINKATTRLEN);
-	retvalp->lr_type = attrtype;
-	retvalp->lr_attrsz = attrsz;
-	bcopy(attrval, retvalp->lr_attrval, attrsz);
-
-done:
-	dlmgmt_dlconf_table_unlock();
-	retvalp->lr_err = err;
-}
-
-static void
-dlmgmt_setzoneid(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	dlmgmt_door_setzoneid_t	*setzoneid = argp;
 	dlmgmt_setzoneid_retval_t *retvalp = retp;
@@ -1196,8 +1269,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_zoneboot(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_zoneboot(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	int			err;
 	dlmgmt_door_zoneboot_t	*zoneboot = argp;
@@ -1226,8 +1301,10 @@ done:
 	retvalp->lr_err = err;
 }
 
+/* ARGSUSED */
 static void
-dlmgmt_zonehalt(void *argp, void *retp, zoneid_t zoneid, ucred_t *cred)
+dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
+    ucred_t *cred)
 {
 	int			err = 0;
 	dlmgmt_door_zonehalt_t	*zonehalt = argp;
@@ -1270,8 +1347,8 @@ static dlmgmt_door_info_t i_dlmgmt_door_info_tbl[] = {
 	    sizeof (dlmgmt_remapid_retval_t), dlmgmt_remapid },
 	{ DLMGMT_CMD_CREATECONF, sizeof (dlmgmt_door_createconf_t),
 	    sizeof (dlmgmt_createconf_retval_t), dlmgmt_createconf },
-	{ DLMGMT_CMD_READCONF, sizeof (dlmgmt_door_readconf_t),
-	    sizeof (dlmgmt_readconf_retval_t), dlmgmt_readconf },
+	{ DLMGMT_CMD_OPENCONF, sizeof (dlmgmt_door_openconf_t),
+	    sizeof (dlmgmt_openconf_retval_t), dlmgmt_openconf },
 	{ DLMGMT_CMD_WRITECONF, sizeof (dlmgmt_door_writeconf_t),
 	    sizeof (dlmgmt_writeconf_retval_t), dlmgmt_writeconf },
 	{ DLMGMT_CMD_UP_LINKID, sizeof (dlmgmt_door_upid_t),
@@ -1286,12 +1363,11 @@ static dlmgmt_door_info_t i_dlmgmt_door_info_tbl[] = {
 	    sizeof (dlmgmt_destroyconf_retval_t), dlmgmt_destroyconf },
 	{ DLMGMT_CMD_GETATTR, sizeof (dlmgmt_door_getattr_t),
 	    sizeof (dlmgmt_getattr_retval_t), dlmgmt_getattr },
+	{ DLMGMT_CMD_GETCONFSNAPSHOT, sizeof (dlmgmt_door_getconfsnapshot_t),
+	    sizeof (dlmgmt_getconfsnapshot_retval_t), dlmgmt_getconfsnapshot },
 	{ DLMGMT_CMD_LINKPROP_INIT, sizeof (dlmgmt_door_linkprop_init_t),
 	    sizeof (dlmgmt_linkprop_init_retval_t),
 	    dlmgmt_upcall_linkprop_init },
-	{ DLMGMT_CMD_LINKPROP_GETNEXT, sizeof (dlmgmt_door_linkprop_getnext_t),
-	    sizeof (dlmgmt_linkprop_getnext_retval_t),
-	    dlmgmt_linkprop_getnext },
 	{ DLMGMT_CMD_SETZONEID, sizeof (dlmgmt_door_setzoneid_t),
 	    sizeof (dlmgmt_setzoneid_retval_t), dlmgmt_setzoneid },
 	{ DLMGMT_CMD_ZONEBOOT, sizeof (dlmgmt_door_zoneboot_t),
@@ -1324,7 +1400,8 @@ dlmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 	dlmgmt_retval_t		retval;
 	ucred_t			*cred = NULL;
 	zoneid_t		zoneid;
-	void			*retvalp;
+	void			*retvalp = NULL;
+	size_t			sz, acksz;
 	int			err = 0;
 
 	infop = dlmgmt_getcmdinfo(door_arg->ld_cmd);
@@ -1339,17 +1416,31 @@ dlmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 	}
 
 	/*
-	 * We cannot use malloc() here because door_return never returns, and
-	 * memory allocated by malloc() would get leaked. Use alloca() instead.
+	 * Note that malloc() cannot be used here because door_return
+	 * never returns, and memory allocated by malloc() would get leaked.
+	 * Use alloca() instead.
 	 */
-	retvalp = alloca(infop->di_acksz);
-	infop->di_handler(argp, retvalp, zoneid, cred);
+	acksz = infop->di_acksz;
+
+again:
+	retvalp = alloca(acksz);
+	sz = acksz;
+	infop->di_handler(argp, retvalp, &acksz, zoneid, cred);
+	if (acksz > sz) {
+		/*
+		 * If the specified buffer size is not big enough to hold the
+		 * return value, reallocate the buffer and try to get the
+		 * result one more time.
+		 */
+		assert(((dlmgmt_retval_t *)retvalp)->lr_err == ENOSPC);
+		goto again;
+	}
 
 done:
 	if (cred != NULL)
 		ucred_free(cred);
 	if (err == 0) {
-		(void) door_return(retvalp, infop->di_acksz, NULL, 0);
+		(void) door_return(retvalp, acksz, NULL, 0);
 	} else {
 		retval.lr_err = err;
 		(void) door_return((char *)&retval, sizeof (retval), NULL, 0);

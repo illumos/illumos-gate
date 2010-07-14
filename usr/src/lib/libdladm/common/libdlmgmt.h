@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -49,7 +48,7 @@ extern "C" {
 #define	DLMGMT_CMD_DESTROY_LINKID	(DLMGMT_CMD_BASE + 1)
 #define	DLMGMT_CMD_REMAP_LINKID		(DLMGMT_CMD_BASE + 2)
 #define	DLMGMT_CMD_CREATECONF		(DLMGMT_CMD_BASE + 3)
-#define	DLMGMT_CMD_READCONF		(DLMGMT_CMD_BASE + 4)
+#define	DLMGMT_CMD_OPENCONF		(DLMGMT_CMD_BASE + 4)
 #define	DLMGMT_CMD_WRITECONF		(DLMGMT_CMD_BASE + 5)
 #define	DLMGMT_CMD_UP_LINKID		(DLMGMT_CMD_BASE + 6)
 #define	DLMGMT_CMD_SETATTR		(DLMGMT_CMD_BASE + 7)
@@ -57,7 +56,7 @@ extern "C" {
 #define	DLMGMT_CMD_REMOVECONF		(DLMGMT_CMD_BASE + 9)
 #define	DLMGMT_CMD_DESTROYCONF		(DLMGMT_CMD_BASE + 10)
 #define	DLMGMT_CMD_GETATTR		(DLMGMT_CMD_BASE + 11)
-#define	DLMGMT_CMD_LINKPROP_GETNEXT	(DLMGMT_CMD_BASE + 12)
+#define	DLMGMT_CMD_GETCONFSNAPSHOT	(DLMGMT_CMD_BASE + 12)
 #define	DLMGMT_CMD_ZONEBOOT		(DLMGMT_CMD_BASE + 13)
 #define	DLMGMT_CMD_ZONEHALT		(DLMGMT_CMD_BASE + 14)
 
@@ -97,7 +96,7 @@ typedef struct dlmgmt_door_createconf_s {
 
 typedef struct dlmgmt_door_setattr_s {
 	int			ld_cmd;
-	dladm_conf_t		ld_conf;
+	int			ld_confid;
 	char			ld_attr[MAXLINKATTRLEN];
 	size_t			ld_attrsz;
 	dladm_datatype_t	ld_type;
@@ -106,13 +105,13 @@ typedef struct dlmgmt_door_setattr_s {
 
 typedef struct dlmgmt_door_unsetattr_s {
 	int		ld_cmd;
-	dladm_conf_t	ld_conf;
+	int		ld_confid;
 	char		ld_attr[MAXLINKATTRLEN];
 } dlmgmt_door_unsetattr_t;
 
 typedef struct dlmgmt_door_writeconf_s {
 	int		ld_cmd;
-	dladm_conf_t	ld_conf;
+	int		ld_confid;
 } dlmgmt_door_writeconf_t;
 
 typedef struct dlmgmt_door_removeconf_s {
@@ -122,38 +121,40 @@ typedef struct dlmgmt_door_removeconf_s {
 
 typedef struct dlmgmt_door_destroyconf_s {
 	int		ld_cmd;
-	dladm_conf_t	ld_conf;
+	int		ld_confid;
 } dlmgmt_door_destroyconf_t;
 
-typedef struct dlmgmt_door_readconf_s {
+typedef struct dlmgmt_door_openconf_s {
 	int		ld_cmd;
 	datalink_id_t	ld_linkid;
-} dlmgmt_door_readconf_t;
+} dlmgmt_door_openconf_t;
+
+typedef struct dlmgmt_door_getconfsnapshot_s {
+	int		ld_cmd;
+	datalink_id_t	ld_linkid;
+} dlmgmt_door_getconfsnapshot_t;
 
 typedef struct dlmgmt_door_getattr_s {
 	int		ld_cmd;
-	dladm_conf_t	ld_conf;
+	int		ld_confid;
 	char		ld_attr[MAXLINKATTRLEN];
 } dlmgmt_door_getattr_t;
 
-typedef struct dlmgmt_handle_retval_s {
+typedef struct dlmgmt_createconf_retval_s {
 	uint_t			lr_err;
-	dladm_conf_t		lr_conf;
-} dlmgmt_createconf_retval_t, dlmgmt_readconf_retval_t;
+	int			lr_confid;
+} dlmgmt_createconf_retval_t;
 
-typedef struct dlmgmt_door_linkprop_getnext_s {
-	int			ld_cmd;
-	dladm_conf_t		ld_conf;
-	char			ld_last_attr[MAXLINKATTRLEN];
-} dlmgmt_door_linkprop_getnext_t;
+typedef struct dlmgmt_openconf_retval_s {
+	uint_t		lr_err;
+	int		lr_confid;
+} dlmgmt_openconf_retval_t;
 
-typedef struct dlmgmt_linkprop_getnext_retval_s {
-	uint_t			lr_err;
-	char			lr_attr[MAXLINKATTRLEN];
-	uint_t			lr_type;
-	uint_t			lr_attrsz;
-	char			lr_attrval[MAXLINKATTRVALLEN];
-} dlmgmt_linkprop_getnext_retval_t;
+typedef struct dlmgmt_getconfsnapshot_retval_s {
+	uint_t		lr_err;
+	size_t		lr_nvlsz;
+	/* buffer for nvl */
+} dlmgmt_getconfsnapshot_retval_t;
 
 typedef struct dlmgmt_door_zone_s {
 	int			ld_cmd;

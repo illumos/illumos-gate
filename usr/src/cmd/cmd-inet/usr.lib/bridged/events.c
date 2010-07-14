@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -323,17 +322,9 @@ static int
 update_link(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	dladm_status_t status;
-	dladm_conf_t conf;
 	char bridge[MAXLINKNAMELEN], linkname[MAXLINKNAMELEN];
 	char pointless[DLADM_STRSIZE];
 	datalink_class_t class;
-
-	status = dladm_read_conf(handle, linkid, &conf);
-	if (status != DLADM_STATUS_OK) {
-		syslog(LOG_DEBUG, "can't get status on link ID %u: %s", linkid,
-		    dladm_status2str(status, pointless));
-		return (DLADM_WALK_CONTINUE);
-	}
 
 	status = dladm_bridge_getlink(handle, linkid, bridge, sizeof (bridge));
 	if (status == DLADM_STATUS_OK && strcmp(bridge, instance_name) == 0) {
@@ -354,7 +345,6 @@ update_link(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 			syslog(LOG_DEBUG, "link ID %u is on bridge %s, not %s",
 			    linkid, bridge, instance_name);
 	}
-	dladm_destroy_conf(handle, conf);
 	return (DLADM_WALK_CONTINUE);
 }
 

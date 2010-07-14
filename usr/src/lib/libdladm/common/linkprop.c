@@ -3309,7 +3309,7 @@ i_dladm_set_linkprop_db(dladm_handle_t handle, datalink_id_t linkid,
 	dladm_conf_t	conf;
 	dladm_status_t	status;
 
-	status = dladm_read_conf(handle, linkid, &conf);
+	status = dladm_open_conf(handle, linkid, &conf);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
@@ -3349,7 +3349,7 @@ i_dladm_get_linkprop_db(dladm_handle_t handle, datalink_id_t linkid,
 	dladm_conf_t	conf;
 	dladm_status_t	status;
 
-	status = dladm_read_conf(handle, linkid, &conf);
+	status = dladm_getsnap_conf(handle, linkid, &conf);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
@@ -3391,7 +3391,7 @@ i_dladm_walk_linkprop_priv_db(dladm_handle_t handle, datalink_id_t linkid,
 	if (linkid == DATALINK_INVALID_LINKID || func == NULL)
 		return (DLADM_STATUS_BADARG);
 
-	status = dladm_read_conf(handle, linkid, &conf);
+	status = dladm_getsnap_conf(handle, linkid, &conf);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 

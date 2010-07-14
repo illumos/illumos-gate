@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -199,7 +198,7 @@ i_dladm_vnic_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 	datalink_class_t class;
 
 	attrp->va_vnic_id = linkid;
-	if ((status = dladm_read_conf(handle, linkid, &conf)) !=
+	if ((status = dladm_getsnap_conf(handle, linkid, &conf)) !=
 	    DLADM_STATUS_OK)
 		return (status);
 
@@ -278,7 +277,6 @@ i_dladm_vnic_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 	status = dladm_get_conf_field(handle, conf, FVLANID, &u64,
 	    sizeof (u64));
 	attrp->va_vid = ((status == DLADM_STATUS_OK) ?  (uint16_t)u64 : 0);
-
 
 	status = DLADM_STATUS_OK;
 done:
@@ -663,7 +661,7 @@ static dladm_status_t
 dladm_vnic_persist_conf(dladm_handle_t handle, const char *name,
     dladm_vnic_attr_t *attrp, datalink_class_t class)
 {
-	dladm_conf_t conf = DLADM_INVALID_CONF;
+	dladm_conf_t conf;
 	dladm_status_t status;
 	char macstr[ETHERADDRL * 3];
 	char linkover[MAXLINKNAMELEN];

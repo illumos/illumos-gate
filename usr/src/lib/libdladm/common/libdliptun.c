@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -252,9 +251,10 @@ i_iptun_get_dbparams(dladm_handle_t handle, iptun_params_t *params)
 	if (class != DATALINK_CLASS_IPTUN)
 		return (DLADM_STATUS_LINKINVAL);
 
-	status = dladm_read_conf(handle, params->iptun_param_linkid, &conf);
-	if (status != DLADM_STATUS_OK)
+	if ((status = dladm_getsnap_conf(handle, params->iptun_param_linkid,
+	    &conf)) != DLADM_STATUS_OK) {
 		return (status);
+	}
 
 	params->iptun_param_flags = 0;
 
@@ -374,7 +374,7 @@ i_iptun_modify_db(dladm_handle_t handle, const iptun_params_t *params)
 	if (params->iptun_param_flags & ~(IPTUN_PARAM_LADDR|IPTUN_PARAM_RADDR))
 		return (DLADM_STATUS_BADARG);
 
-	status = dladm_read_conf(handle, params->iptun_param_linkid, &conf);
+	status = dladm_open_conf(handle, params->iptun_param_linkid, &conf);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
