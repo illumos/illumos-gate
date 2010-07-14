@@ -30,7 +30,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.15";
+static char igb_version[] = "igb 1.1.16";
 
 /*
  * Local function protoypes
@@ -1055,6 +1055,17 @@ igb_resume(dev_info_t *devinfo)
 
 	mutex_enter(&igb->gen_lock);
 
+	/*
+	 * Enable interrupts
+	 */
+	if (igb->attach_progress & ATTACH_PROGRESS_ENABLE_INTR) {
+		if (igb_enable_intrs(igb) != IGB_SUCCESS) {
+			igb_error(igb, "Failed to enable DDI interrupts");
+			mutex_exit(&igb->gen_lock);
+			return (DDI_FAILURE);
+		}
+	}
+
 	if (igb->igb_state & IGB_STARTED) {
 		if (igb_start(igb, B_FALSE) != IGB_SUCCESS) {
 			mutex_exit(&igb->gen_lock);
@@ -1086,6 +1097,13 @@ igb_suspend(dev_info_t *devinfo)
 	mutex_enter(&igb->gen_lock);
 
 	atomic_or_32(&igb->igb_state, IGB_SUSPENDED);
+
+	/*
+	 * Disable interrupts
+	 */
+	if (igb->attach_progress & ATTACH_PROGRESS_ENABLE_INTR) {
+		(void) igb_disable_intrs(igb);
+	}
 
 	if (!(igb->igb_state & IGB_STARTED)) {
 		mutex_exit(&igb->gen_lock);
