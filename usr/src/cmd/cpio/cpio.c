@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -7895,12 +7894,10 @@ g_init(int *devtype, int *fdes)
 	if (Hdr_type == BAR) {
 		if (is_tape(*fdes)) {
 			bufsize = BAR_TAPE_SIZE;
-			(void) fprintf(stderr, "Archiving to tape");
-			(void) fprintf(stderr, " blocking factor 126\n");
+			msg(EPOST, "Archiving to tape blocking factor 126");
 		} else if (is_floppy(*fdes)) {
 			bufsize = BAR_FLOPPY_SIZE;
-			(void) fprintf(stderr, "Archiving to floppy");
-			(void) fprintf(stderr, " blocking factor 18\n");
+			msg(EPOST, "Archiving to floppy blocking factor 18");
 		}
 	}
 
@@ -8043,14 +8040,14 @@ append_secattr(
 		attrtext = acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT |
 		    ACL_SID_FMT);
 		if (attrtext == NULL) {
-			(void) fprintf(stderr, "acltotext failed\n");
+			msg(EPOST, "acltotext failed");
 			return (-1);
 		}
 		/* header: type + size = 8 */
 		newattrsize = 8 + strlen(attrtext) + 1;
 		attr = e_zalloc(E_NORMAL, newattrsize);
 		if (attr == NULL) {
-			(void) fprintf(stderr, "can't allocate memory\n");
+			msg(EPOST, "can't allocate memory");
 			return (-1);
 		}
 		attr->attr_type = (acl_type(aclp) == ACLENT_T) ?
@@ -8064,7 +8061,7 @@ append_secattr(
 		/* SunFed's case goes here */
 
 	default:
-		(void) fprintf(stderr, "unrecognized attribute type\n");
+		msg(EPOST, "unrecognized attribute type");
 		return (-1);
 	}
 
@@ -8073,7 +8070,7 @@ append_secattr(
 	*secinfo_len += newattrsize;
 	new_secinfo = e_zalloc(E_NORMAL, (uint_t)*secinfo_len);
 	if (new_secinfo == NULL) {
-		(void) fprintf(stderr, "can't allocate memory\n");
+		msg(EPOST, "can't allocate memory");
 		*secinfo_len -= newattrsize;
 		return (-1);
 	}
