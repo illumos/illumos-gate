@@ -298,6 +298,7 @@ COMMON_SUBDIRS = \
 	cmd/tzreload \
 	cmd/uadmin \
 	cmd/ul \
+	cmd/userattr \
 	cmd/users \
 	cmd/utmp_update \
 	cmd/utmpd \

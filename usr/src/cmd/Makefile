@@ -416,6 +416,7 @@ COMMON_SUBDIRS=		\
 	units		\
 	unlink		\
 	unpack		\
+	userattr	\
 	users		\
 	utmp_update	\
 	utmpd		\
@@ -715,6 +716,7 @@ MSGSUBDIRS=		\
 	units		\
 	unlink		\
 	unpack		\
+	userattr	\
 	valtools	\
 	vgrind		\
 	vi		\
