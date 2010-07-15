@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _X86PI_IMPL_H
@@ -160,21 +159,21 @@ typedef struct x86pi_hcfmri_info_s x86pi_hcfmri_t;
 
 /* SMBIOS */
 smbios_hdl_t *x86pi_smb_open(topo_mod_t *);
-void x86pi_smb_strcnt(smbios_hdl_t *, smbs_cnt_t *);
-int x86pi_check_comp(topo_mod_t *, smbios_hdl_t *);
+void x86pi_smb_strcnt(topo_mod_t *, smbs_cnt_t *);
+int x86pi_check_comp(topo_mod_t *);
 
 /* Node generation */
-tnode_t *x86pi_gen_chassis(topo_mod_t *, tnode_t *, smbios_hdl_t *, int, int);
-tnode_t *x86pi_gen_bboard(topo_mod_t *, tnode_t *, smbios_hdl_t *, int, int,
+tnode_t *x86pi_gen_chassis(topo_mod_t *, tnode_t *, int, int);
+tnode_t *x86pi_gen_bboard(topo_mod_t *, tnode_t *, int, int,
     int);
 int x86pi_gen_cmp(topo_mod_t *, tnode_t *, smbios_hdl_t *, int, int, int);
 int x86pi_gen_core(topo_mod_t *, tnode_t *, int, int, int);
 int x86pi_gen_strand(topo_mod_t *, tnode_t *, int, int, int);
 int x86pi_gen_memarray(topo_mod_t *, tnode_t *, smbios_hdl_t *, int, int);
 void x86pi_gen_memdev(topo_mod_t *, tnode_t *, smbios_hdl_t *, int, int, int);
-int x86pi_gen_hbr(topo_mod_t *, tnode_t *, smbios_hdl_t *, int,
-    topo_instance_t, topo_instance_t *);
-int x86pi_gen_bay(topo_mod_t *, tnode_t *, smbios_hdl_t *, smbios_port_ext_t *,
+int x86pi_gen_hbr(topo_mod_t *, tnode_t *, int, topo_instance_t,
+    topo_instance_t *);
+int x86pi_gen_bay(topo_mod_t *, tnode_t *, smbios_port_ext_t *,
     int);
 
 /* support routines */
@@ -199,9 +198,9 @@ int x86pi_hbr_enum_init(topo_mod_t *);
 void x86pi_hbr_enum_fini(topo_mod_t *);
 
 /* base board */
-id_t x86pi_bb_topparent(smbios_hdl_t *, int, tnode_t **, id_t *);
-int x86pi_bb_contains(topo_mod_t *, smbios_hdl_t *);
-int x86pi_bb_getchips(topo_mod_t *, smbios_hdl_t *, int, int);
+id_t x86pi_bb_topparent(topo_mod_t *, int, tnode_t **, id_t *);
+int x86pi_bb_contains(topo_mod_t *);
+int x86pi_bb_getchips(topo_mod_t *, int, int);
 
 const char *x86pi_cleanup_smbios_str(topo_mod_t *, const char *, int);
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -55,8 +54,8 @@ static const struct x86pi_bb_name {
 };
 
 tnode_t *
-x86pi_gen_bboard(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp,
-    int smb_id, int instance, int psmb_id)
+x86pi_gen_bboard(topo_mod_t *mod, tnode_t *t_parent, int smb_id,
+    int instance, int psmb_id)
 {
 	int		rv;
 	smbios_info_t	ip;
@@ -71,8 +70,15 @@ x86pi_gen_bboard(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp,
 	static int	systemboard = 0;
 	static int	motherboard = 0;
 	char		*f = "x86pi_gen_bboard";
+	smbios_hdl_t    *shp;
 
 	topo_mod_dprintf(mod, "%s\n", f);
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL) {
+		topo_mod_dprintf(mod, "%s: failed to load SMBIOS\n", f);
+		return (NULL);
+	}
 
 	/* SMBIOS Base Board struct */
 	rv = smbios_info_bboard(shp, smb_id, &bb);
@@ -190,13 +196,18 @@ x86pi_gen_bboard(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp,
 
 
 int
-x86pi_bb_getchips(topo_mod_t *mod, smbios_hdl_t *shp, int index, int nboards)
+x86pi_bb_getchips(topo_mod_t *mod, int index, int nboards)
 {
 	id_t		*cid;
 	int		count;
 	int		ncmp = 0;
 	smbios_struct_t	sp;
 	smbs_cnt_t	*smbc = NULL;
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (ncmp);
 
 	cid = stypes[SMB_TYPE_BASEBOARD].ids[index].con_ids;
 	count = stypes[SMB_TYPE_BASEBOARD].ids[index].con_cnt;
@@ -216,7 +227,7 @@ x86pi_bb_getchips(topo_mod_t *mod, smbios_hdl_t *shp, int index, int nboards)
 	 */
 	smbc = &stypes[SMB_TYPE_PROCESSOR];
 	smbc->type = SMB_TYPE_PROCESSOR;
-	x86pi_smb_strcnt(shp, smbc);
+	x86pi_smb_strcnt(mod, smbc);
 
 	if (nboards == 1) {
 		if (ncmp != stypes[SMB_TYPE_PROCESSOR].count)
@@ -235,13 +246,18 @@ x86pi_bb_getchips(topo_mod_t *mod, smbios_hdl_t *shp, int index, int nboards)
 
 
 id_t
-x86pi_bb_topparent(smbios_hdl_t *shp, int index, tnode_t **pnode, id_t *psmbid)
+x86pi_bb_topparent(topo_mod_t *mod, int index, tnode_t **pnode, id_t *psmbid)
 {
 
 	id_t	top_bb_smbid = -1;
 	id_t	smb_id;
 	int	bb_count, ch_count;
 	smbios_struct_t	sp;
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (top_bb_smbid);
 
 	smb_id = stypes[SMB_TYPE_BASEBOARD].ids[index].con_by_id;
 	(void) smbios_lookup_id(shp, smb_id, &sp);
@@ -273,7 +289,7 @@ x86pi_bb_topparent(smbios_hdl_t *shp, int index, tnode_t **pnode, id_t *psmbid)
 					    id;
 					break;
 				}
-				top_bb_smbid = x86pi_bb_topparent(shp,
+				top_bb_smbid = x86pi_bb_topparent(mod,
 				    i, pnode, psmbid);
 				break;
 			}
@@ -285,10 +301,15 @@ x86pi_bb_topparent(smbios_hdl_t *shp, int index, tnode_t **pnode, id_t *psmbid)
 
 
 id_t
-x86pi_bb_chassis(smbios_hdl_t *shp, id_t bb_smbid)
+x86pi_bb_chassis(topo_mod_t *mod, id_t bb_smbid)
 {
 	smbios_bboard_t	bb;
 	int		rv;
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (-1);
 
 	rv = smbios_info_bboard(shp, bb_smbid, &bb);
 	if (rv != 0)
@@ -299,7 +320,7 @@ x86pi_bb_chassis(smbios_hdl_t *shp, id_t bb_smbid)
 
 
 int
-x86pi_bb_contains(topo_mod_t *mod, smbios_hdl_t *shp)
+x86pi_bb_contains(topo_mod_t *mod)
 {
 	int		rv;
 	id_t		smb_id;
@@ -307,6 +328,11 @@ x86pi_bb_contains(topo_mod_t *mod, smbios_hdl_t *shp)
 	int		bb_count = 0;
 	uint_t		cont_cnt = 0;
 	smbios_struct_t	sp;
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (-1);
 
 	bb_count = stypes[SMB_TYPE_BASEBOARD].count;
 	for (int i = 0; i < bb_count; i++) {
@@ -318,7 +344,7 @@ x86pi_bb_contains(topo_mod_t *mod, smbios_hdl_t *shp)
 		/* Set Baseboard - Chassis Relationship */
 		if (stypes[SMB_TYPE_BASEBOARD].ids[i].con_by_id == 0) {
 			stypes[SMB_TYPE_BASEBOARD].ids[i].con_by_id =
-			    rv = x86pi_bb_chassis(shp, smb_id);
+			    rv = x86pi_bb_chassis(mod, smb_id);
 			if (rv == -1) {
 				topo_mod_dprintf(mod, " failed to get"
 				    " the chassis handle\n");

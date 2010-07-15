@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -213,8 +212,8 @@ mc_add_dimms(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 			int channum;
 
 			channum = topo_node_instance(pnode);
-			smbid = memnode_to_smbiosid(chip_smbid, DIMM_NODE_NAME,
-			    i, &channum);
+			smbid = memnode_to_smbiosid(mod, chip_smbid,
+			    DIMM_NODE_NAME, i, &channum);
 			if (serial == NULL)
 				serial = (char *)chip_serial_smbios_get(mod,
 				    smbid);

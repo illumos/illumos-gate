@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -265,7 +264,7 @@ amd_generic_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *cnode,
 				(void) topo_pgroup_create(csnode,
 				    &cs_pgroup, &err);
 				inst = chan;
-				dimm_smbid = memnode_to_smbiosid(smbid,
+				dimm_smbid = memnode_to_smbiosid(mod, smbid,
 				    CS_NODE_NAME, cs, &inst);
 				serial = chip_serial_smbios_get(mod,
 				    dimm_smbid);
@@ -498,8 +497,8 @@ amd_dimm_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 			continue;
 		}
 		if (FM_AWARE_SMBIOS(mod)) {
-			smbid = memnode_to_smbiosid(chip_smbid, DIMM_NODE_NAME,
-			    i, NULL);
+			smbid = memnode_to_smbiosid(mod, chip_smbid,
+			    DIMM_NODE_NAME, i, NULL);
 			serial = chip_serial_smbios_get(mod, smbid);
 			part = chip_part_smbios_get(mod, smbid);
 			rev = chip_rev_smbios_get(mod, smbid);

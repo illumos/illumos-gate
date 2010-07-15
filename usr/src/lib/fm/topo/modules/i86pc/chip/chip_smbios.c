@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -73,7 +72,6 @@ static int ncpu_ids = 0;
 static int bb_count = 0;
 static int ndimm_ids, nmct_ids = 0;
 
-static smbios_hdl_t *shp = NULL;
 static int fill_chip_smbios = 0;
 typedef int smbios_rec_f(topo_mod_t *, const smbios_struct_t *);
 
@@ -95,12 +93,18 @@ smb_export(const smb_struct_t *stp, smbios_struct_t *sp)
 }
 
 static int
-extdimmslot_to_dimmslot(id_t chip_smbid, int channum, int csnum)
+extdimmslot_to_dimmslot(topo_mod_t *mod, id_t chip_smbid, int channum,
+    int csnum)
 {
 	smbios_memdevice_ext_t emd;
 	smbios_memdevice_t md;
 	int i, j, k;
 	int match = 0;
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (-1);
 
 	if (chip_smbid == IGNORE_ID && bb_count <= 1 && nmct_ids <= 1) {
 		for (i = 0; i < ndimm_ids; i++) {
@@ -143,8 +147,8 @@ extdimmslot_to_dimmslot(id_t chip_smbid, int channum, int csnum)
 }
 
 id_t
-memnode_to_smbiosid(uint16_t chip_smbid, const char *name, uint64_t nodeid,
-    void *data)
+memnode_to_smbiosid(topo_mod_t *mod, uint16_t chip_smbid, const char *name,
+    uint64_t nodeid, void *data)
 {
 
 	if (strcmp(name, CS_NODE_NAME) == 0) {
@@ -159,7 +163,8 @@ memnode_to_smbiosid(uint16_t chip_smbid, const char *name, uint64_t nodeid,
 		 * Set the DIMM Slot label to the Chip Select Node
 		 * Set the "data" to carry the DIMM instance
 		 */
-		dimmslot = extdimmslot_to_dimmslot(chip_smbid, channum, csnum);
+		dimmslot = extdimmslot_to_dimmslot(mod, chip_smbid, channum,
+		    csnum);
 		if (dimmslot != -1 && dimmsmb[0].dimm_id != 0)
 			*((id_t *)data) = dimmslot % (dimmsmb[0].dimm_id);
 		else
@@ -182,7 +187,7 @@ memnode_to_smbiosid(uint16_t chip_smbid, const char *name, uint64_t nodeid,
 			id_t dimmslot = -1;
 
 			channum = *(int *)data;
-			dimmslot = extdimmslot_to_dimmslot(chip_smbid,
+			dimmslot = extdimmslot_to_dimmslot(mod, chip_smbid,
 			    channum, SKIP_CS);
 
 			return (dimmslot);
@@ -204,6 +209,11 @@ chip_get_smbstruct(topo_mod_t *mod, const smbios_struct_t *sp)
 	smbios_memarray_ext_t extma;
 	smbios_memdevice_ext_t extmd;
 	int ext_match = 0;
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (-1);
 
 	switch (sp->smbstr_type) {
 	case SMB_TYPE_BASEBOARD:
@@ -323,10 +333,16 @@ chip_get_smbstruct(topo_mod_t *mod, const smbios_struct_t *sp)
 static int
 chip_smbios_iterate(topo_mod_t *mod, smbios_rec_f *func_iter)
 {
-	const smb_struct_t *sp = shp->sh_structs;
+	const smb_struct_t *sp;
 	smbios_struct_t s;
 	int i, rv = 0;
+	smbios_hdl_t *shp;
 
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (rv);
+
+	sp = shp->sh_structs;
 	for (i = 0; i < shp->sh_nstructs; i++, sp++) {
 		if (sp->smbst_hdr->smbh_type != SMB_TYPE_INACTIVE &&
 		    (rv = func_iter(mod, smb_export(sp, &s))) != 0)
@@ -338,14 +354,6 @@ chip_smbios_iterate(topo_mod_t *mod, smbios_rec_f *func_iter)
 int
 init_chip_smbios(topo_mod_t *mod)
 {
-	if (shp == NULL) {
-		if ((shp = topo_mod_smbios(mod)) == NULL) {
-			whinge(mod, NULL, "init_chip_smbios: smbios "
-			    "handle get failed\n");
-			return (-1);
-		}
-	}
-
 	if (!fill_chip_smbios) {
 		if (chip_smbios_iterate(mod, chip_get_smbstruct) == -1)
 			return (-1);
@@ -490,7 +498,9 @@ chip_label_smbios_get(topo_mod_t *mod, tnode_t *pnode, id_t smb_id,
 	const char *dimm_bank = NULL;
 	const char *clean_label = NULL;
 	int err;
+	smbios_hdl_t *shp;
 
+	shp = topo_mod_smbios(mod);
 	if (shp != NULL) {
 		/*
 		 * Get Parent FRU's label
@@ -575,7 +585,9 @@ chip_serial_smbios_get(topo_mod_t *mod, id_t smb_id)
 {
 	smbios_info_t c;
 	const char *clean_serial = NULL;
+	smbios_hdl_t *shp;
 
+	shp = topo_mod_smbios(mod);
 	if (shp != NULL && smb_id != -1)
 		if (smbios_info_common(shp, smb_id, &c) != SMB_ERR) {
 			clean_serial = chip_cleanup_smbios_str(mod,
@@ -593,7 +605,9 @@ chip_part_smbios_get(topo_mod_t *mod, id_t smb_id)
 {
 	smbios_info_t c;
 	const char *clean_part = NULL;
+	smbios_hdl_t *shp;
 
+	shp = topo_mod_smbios(mod);
 	if (shp != NULL && smb_id != -1)
 		if (smbios_info_common(shp, smb_id, &c) != SMB_ERR) {
 			clean_part = chip_cleanup_smbios_str(mod,
@@ -610,7 +624,9 @@ chip_rev_smbios_get(topo_mod_t *mod, id_t smb_id)
 {
 	smbios_info_t c;
 	const char *clean_rev = NULL;
+	smbios_hdl_t *shp;
 
+	shp = topo_mod_smbios(mod);
 	if (shp != NULL && smb_id != -1)
 		if (smbios_info_common(shp, smb_id, &c) != SMB_ERR) {
 			clean_rev = chip_cleanup_smbios_str(mod,
