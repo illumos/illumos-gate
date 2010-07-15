@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# cmd/fs.d/Makefile
 
 # The filesystem independent utilities clri, fsdb, dcopy, labelit, and mkfs
 # are all built from the source file switchout.c. They are all then links
@@ -77,9 +75,6 @@ SYMETC2SBIN	=	$(ETC2SBIN:%=$(ROOTETC)/%)
 SYMETC2USRSBIN	=	$(ETC2USRSBIN:%=$(ROOTETC)/%)
 SYMUSRBIN2USRSBIN=	$(USRBIN2USRSBIN:%=$(ROOTBIN)/%)
 SYMDEVNM=		$(ROOTUSRSBIN)/devnm
-
-# This flag is being added only for SCO (x86) compatibility
-df.o := CFLAGS += $(iBCS2FLAG)
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE
 %.xpg4.o := CPPFLAGS += -DXPG4

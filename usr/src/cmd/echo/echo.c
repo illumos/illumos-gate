@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -47,9 +43,6 @@ main(int argc, char *argv[])
 	int		b_len;
 	char		*ep;
 
-#ifdef	_iBCS2
-	int		no_nl = 0;
-#endif
 	(void) setlocale(LC_ALL, "");
 
 	if (--argc == 0) {
@@ -59,18 +52,9 @@ main(int argc, char *argv[])
 		return (0);
 	}
 
-#ifdef	_iBCS2
-	/* If SYSV3 is set, check for ISC/SCO style -n option parsing. */
-	if (getenv("SYSV3")) {
-		if (strcmp(argv[1], "-n") == 0)
-			no_nl ++;
-	}
-	for (i = 1 + no_nl; i <= argc; i++) {
-#else
 	for (i = 1; i <= argc; i++) {
-#endif	/*  _iBCS2 */
 		for (cp = argv[i], ep = cp + (int)strlen(cp);
-			cp < ep; cp += b_len) {
+		    cp < ep; cp += b_len) {
 		if ((b_len = mbtowc(&wc, cp, MB_CUR_MAX)) <= 0) {
 			(void) putchar(*cp);
 			b_len = 1;
@@ -124,7 +108,7 @@ main(int argc, char *argv[])
 				case '0':
 					j = wd = 0;
 					while ((*++cp >= '0' && *cp <= '7') &&
-						j++ < 3) {
+					    j++ < 3) {
 						wd <<= 3;
 						wd |= (*cp - '0');
 					}
@@ -137,12 +121,9 @@ main(int argc, char *argv[])
 					(void) putchar(*cp);
 			}
 		}
-#ifdef	_iBCS2
-		if (!(no_nl && i == argc))
-#endif	/* _iBCS2 */
-			(void) putchar(i == argc? '\n': ' ');
-			if (fflush(stdout) != 0)
-				return (1);
+		(void) putchar(i == argc? '\n': ' ');
+		if (fflush(stdout) != 0)
+			return (1);
 	}
 	return (0);
 }

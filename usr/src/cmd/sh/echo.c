@@ -47,19 +47,7 @@ echo(int argc, unsigned char **argv)
 	int	len;
 	wchar_t	wc;
 
-#ifdef	_iBCS2		/* SCO compatibility support */
-	struct namnod   *sysv3;
-	int	do_sysv3 = 0;
-
-	sysv3 = findnam("SYSV3");
-	if (sysv3 && (sysv3->namflg & (N_EXPORT | N_ENVNAM)))
-		do_sysv3 = 1;
-
-	/* Do the -n parsing if sysv3 is set or if ucb_builtsin is set */
-	if (ucb_builtins && !do_sysv3) {
-#else
 	if (ucb_builtins) {
-#endif /* _iBCS2 */
 
 		nflg = 0;
 		if (argc > 1 && argv[1][0] == '-' &&
@@ -88,17 +76,6 @@ echo(int argc, unsigned char **argv)
 			prc_buff('\n');
 			exit(0);
 		}
-#ifdef  _iBCS2
-		if (do_sysv3) {
-			if (argc > 1 && argv[1][0] == '-' &&
-			    argv[1][1] == 'n' && !argv[1][2]) {
-				nflg++;
-				/* Step past the -n */
-				argc--;
-				argv++;
-			}
-		}
-#endif /* _iBCS2 */
 
 		for (i = 1; i <= argc; i++) {
 			sigchk();
@@ -163,11 +140,7 @@ echo(int argc, unsigned char **argv)
 					continue;
 				}
 			}
-#ifdef	_iBCS2
-			/* Don't do if don't want newlines & out of args */
-			if (!(nflg && i == argc))
-#endif /* _iBCS2 */
-				prc_buff(i == argc? '\n': ' ');
+			prc_buff(i == argc? '\n': ' ');
 		}
 		exit(0);
 	}

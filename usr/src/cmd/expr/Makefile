@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG= expr
 XPG4PROG= expr
@@ -40,9 +38,6 @@ include ../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 $(XPG4) := CFLAGS += -DXPG4
 $(XPG6) := CFLAGS += -DXPG6
-
-# This flag is being added only for SCO (x86) compatibility
-CFLAGS += $(iBCS2FLAG)
 
 XGETFLAGS += -a -x expr.xcl
 

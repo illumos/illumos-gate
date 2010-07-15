@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,11 +23,8 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <regexpr.h>
@@ -58,11 +54,9 @@
 #define	REM 272
 #define	MCH 273
 #define	MATCH 274
-#ifdef  _iBCS2
-#define	SUBSTR 276
-#define	LENGTH 277
-#define	INDEX  278
-#endif  /* _iBCS2 */
+#define	SUBSTR 275
+#define	LENGTH 276
+#define	INDEX  277
 
 /* size of subexpression array */
 #define	MSIZE	LINE_MAX
@@ -88,9 +82,6 @@ static int	Ac;
 static int	Argi;
 static int noarg;
 static int paren;
-#ifdef  _iBCS2
-char    *sysv3_set;
-#endif  /* _iBCS2 */
 /*
  *	Array used to store subexpressions in regular expressions
  *	Only one subexpression allowed per regular expression currently
@@ -102,23 +93,17 @@ static char *operator[] = {
 	"|", "&", "+", "-", "*", "/", "%", ":",
 	"=", "==", "<", "<=", ">", ">=", "!=",
 	"match",
-#ifdef	_iBCS2
 	"substr", "length", "index",
-#endif	/* _iBCS2 */
 	"\0" };
 static	int op[] = {
 	OR, AND, ADD,  SUBT, MULT, DIV, REM, MCH,
 	EQ, EQ, LT, LEQ, GT, GEQ, NEQ,
-	MATCH
-#ifdef	_iBCS2
-, SUBSTR, LENGTH, INDEX
-#endif	/* _iBCS2 */
+	MATCH,
+	SUBSTR, LENGTH, INDEX
 	};
 static	int pri[] = {
-	1, 2, 3, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 6, 7
-#ifdef	_iBCS2
-, 7, 7, 7
-#endif	/* _iBCS2 */
+	1, 2, 3, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 6, 7,
+	7, 7, 7
 	};
 
 
@@ -339,7 +324,6 @@ static char
 	return (rv);
 }
 
-#ifdef	_iBCS2
 char *
 substr(char *v, char *s, char *w)
 {
@@ -387,7 +371,6 @@ length(char *s)
 	(void) strcpy(rv, ltoa(i));
 	return (rv);
 }
-#endif	/* _iBCS2 */
 
 static char *
 match(char *s, char *p)
@@ -612,11 +595,7 @@ lop:
 		return (r1);
 	}
 	ylex = yylex();
-#ifdef	_iBCS2
-	if (ylex > MCH && ((sysv3_set && ylex <= INDEX) || ylex <= MATCH)) {
-#else
-	if (ylex > MCH && ylex <= MATCH) {
-#endif	/* _iBCS2 */
+	if (ylex > MCH && ylex <= INDEX) {
 		if (Argi == temp) {
 			return (r1);
 		}
@@ -627,7 +606,6 @@ lop:
 			rb = expres(pri[op1-OR], 0);
 			ra = expres(pri[op1-OR], 0);
 			break;
-#ifdef	_iBCS2
 		case SUBSTR:
 			rc = expres(pri[op1-OR], 0);
 			rb = expres(pri[op1-OR], 0);
@@ -640,13 +618,11 @@ lop:
 			rb = expres(pri[op1-OR], 0);
 			ra = expres(pri[op1-OR], 0);
 			break;
-#endif	/* _iBCS2 */
 		}
 		switch (op1) {
 		case MATCH:
 			r1 = match(rb, ra);
 			break;
-#ifdef	_iBCS2
 		case SUBSTR:
 			r1 = substr(rc, rb, ra);
 			break;
@@ -656,7 +632,6 @@ lop:
 		case INDEX:
 			r1 = index(rb, ra);
 			break;
-#endif	/* _iBCS2 */
 		}
 		if (noarg == 1) {
 			return (r1);
@@ -711,9 +686,6 @@ main(int argc, char **argv)
 	noarg = 0;
 	paren = 0;
 	Av = argv;
-#ifdef	_iBCS2
-	sysv3_set = getenv("SYSV3");
-#endif	/* _iBCS2 */
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
