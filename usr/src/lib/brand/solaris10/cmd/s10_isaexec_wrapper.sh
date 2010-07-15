@@ -40,12 +40,6 @@
 # If this script gets setup with a mode that makes it suid, then things won't
 # work because the script will be running with the incorrect name.
 #
-# The code in s10_native() which which cleans up the initial arguments for
-# a wrapped command relies on a well formatted argument list.  It assumes that
-# the -e options immediately follow the native ld.so.1 command and that these
-# options are contiguous with no extra spaces.  If additional non -e ld.so.1
-# options are added here, that code must also be updated.
-#
 n=/.SUNWnative
 
 bname=`/usr/bin/basename $0`
@@ -55,6 +49,13 @@ dname=`(cd $dname 2>/dev/null && /bin/pwd 2>/dev/null)`
 arch64=/
 LC_ALL=C /usr/bin/file $n/$dname/$bname | /usr/bin/grep "64-bit" \
     >/dev/null && arch64=/64/
+
+# This wrapper is running in the S10 zone so there is no L10N for the
+# following error msg.
+if [ ! -f $n$dname/$bname ]; then
+	echo "Error: \"$dname/$bname\" is not installed in the global zone"
+	exit 1
+fi
 
 exec $n/usr/lib/brand/solaris10/s10_native \
     $n/lib${arch64}ld.so.1 \

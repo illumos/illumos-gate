@@ -33,6 +33,8 @@ ZONENAME=$1
 ZONEPATH=$2
 ZONEROOT=$ZONEPATH/root
 
+w_missing=$(gettext "Warning: \"%s\" is not installed in the global zone")
+
 arch=`uname -p`
 if [ "$arch" = "i386" ]; then
 	ARCH32=i86
@@ -74,6 +76,8 @@ EXIT_CODE=1
 #
 replace_with_native() {
 	path_dname=$ZONEROOT/`dirname $1`
+
+	[ ! -f $1 ] && printf "$w_missing" "$1"
 	if [ ! -h $path_dname -a -d $path_dname ]; then
 		safe_replace $ZONEROOT/$1 $BRANDDIR/s10_isaexec_wrapper $2 $3 \
 		    remove
@@ -82,6 +86,9 @@ replace_with_native() {
 
 replace_with_native_py() {
 	path_dname=$ZONEROOT/`dirname $1`
+
+	[ ! -f $1 ] && printf "$w_missing" "$1"
+
 	if [ ! -h $path_dname -a -d $path_dname ]; then
 		safe_replace $ZONEROOT/$1 $BRANDDIR/s10_python_wrapper $2 $3 \
 		    remove
@@ -89,6 +96,9 @@ replace_with_native_py() {
 }
 
 wrap_with_native() {
+
+	[ ! -f $1 ] && printf "$w_missing" "$1"
+
 	safe_wrap $ZONEROOT/$1 $BRANDDIR/s10_isaexec_wrapper $2 $3
 }
 
@@ -175,7 +185,6 @@ replace_with_native /sbin/zfs 0555 root:bin
 replace_with_native /sbin/zpool 0555 root:bin
 replace_with_native /usr/lib/fs/ufs/quota 0555 root:bin
 replace_with_native /usr/lib/fs/zfs/fstyp 0555 root:bin
-replace_with_native /usr/lib/fs/zfs/zfsdle 0555 root:bin
 replace_with_native /usr/lib/zfs/availdevs 0555 root:bin
 replace_with_native /usr/sbin/df 0555 root:bin
 replace_with_native /usr/sbin/zstreamdump 0555 root:bin

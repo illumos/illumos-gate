@@ -35,17 +35,18 @@
 # bit linker and /.SUNWnative/lib/64/ld.so.1 as our 64-bit linker.
 # For convience we define "n" to be the native path prefix.
 #
-# The code in s10_native() which which cleans up the initial arguments for
-# a wrapped command relies on a well formatted argument list.  It assumes that
-# the -e options immediately follow the native ld.so.1 command and that these
-# options are contiguous with no extra spaces.  If additional non -e ld.so.1
-# options are added here, that code must also be updated.
-#
 pyname=$0
 n=/.SUNWnative
 
 PYTHONPATH=/.SUNWnative/usr/lib/python2.4/vendor-packages
 export PYTHONPATH
+
+# This wrapper is running in the S10 zone so there is no L10N for the
+# following error msg.
+if [ ! -f $n$pyname ]; then
+	echo "Error: \"$pyname\" is not installed in the global zone"
+	exit 1
+fi
 
 exec $n/usr/lib/brand/solaris10/s10_native \
     $n/lib/ld.so.1 \
