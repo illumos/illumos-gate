@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ROOTNEX_H
@@ -55,16 +54,17 @@ extern "C" {
 #define	ROOTNEX_DPROF_DEC(addr)		atomic_add_64(addr, -1)
 #define	ROOTNEX_DPROBE1(name, type1, arg1) \
 	DTRACE_PROBE1(name, type1, arg1)
+#define	ROOTNEX_DPROBE2(name, type1, arg1, type2, arg2) \
+	DTRACE_PROBE2(name, type1, arg1, type2, arg2)
 #define	ROOTNEX_DPROBE3(name, type1, arg1, type2, arg2, type3, arg3) \
 	DTRACE_PROBE3(name, type1, arg1, type2, arg2, type3, arg3)
 #else
 #define	ROOTNEX_DPROF_INC(addr)
 #define	ROOTNEX_DPROF_DEC(addr)
 #define	ROOTNEX_DPROBE1(name, type1, arg1)
+#define	ROOTNEX_DPROBE2(name, type1, arg1, type2, arg2)
 #define	ROOTNEX_DPROBE3(name, type1, arg1, type2, arg2, type3, arg3)
 #endif
-#define	ROOTNEX_PROF_INC(addr)		atomic_inc_64(addr)
-#define	ROOTNEX_PROF_DEC(addr)		atomic_add_64(addr, -1)
 
 /* set in dmac_type to signify that this cookie uses the copy buffer */
 #define	ROOTNEX_USES_COPYBUF		0x80000000
