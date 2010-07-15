@@ -2232,7 +2232,6 @@ dsl_dataset_modified_since_lastsnap(dsl_dataset_t *ds)
 	if (ds->ds_phys->ds_bp.blk_birth >
 	    ds->ds_prev->ds_phys->ds_creation_txg) {
 		objset_t *os, *os_prev;
-		int err;
 		/*
 		 * It may be that only the ZIL differs, because it was
 		 * reset in the head.  Don't count that as being
