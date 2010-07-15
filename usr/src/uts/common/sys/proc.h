@@ -624,7 +624,7 @@ extern void sigdefault(proc_t *);
 extern void pid_setmin(void);
 extern pid_t pid_allocate(proc_t *, pid_t, int);
 extern int pid_rele(struct pid *);
-extern void pid_exit(proc_t *);
+extern void pid_exit(proc_t *, struct task *);
 extern void proc_entry_free(struct pid *);
 extern proc_t *prfind(pid_t);
 extern proc_t *prfind_zone(pid_t, zoneid_t);

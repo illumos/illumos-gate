@@ -276,7 +276,7 @@ cfork(int isvfork, int isfork1, int flags)
 			ASSERT(cp->p_pool->pool_ref > 0);
 			atomic_add_32(&cp->p_pool->pool_ref, -1);
 			mutex_exit(&cp->p_lock);
-			pid_exit(cp);
+			pid_exit(cp, tk);
 			mutex_exit(&pidlock);
 			task_rele(tk);
 
@@ -641,7 +641,7 @@ forklwperr:
 		cp->p_sibling->p_psibling = cp->p_psibling;
 	if (cp->p_psibling)
 		cp->p_psibling->p_sibling = cp->p_sibling;
-	pid_exit(cp);
+	pid_exit(cp, tk);
 	mutex_exit(&pidlock);
 
 	task_rele(tk);
@@ -875,7 +875,7 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct,
 			ASSERT(p->p_pool->pool_ref > 0);
 			atomic_add_32(&p->p_pool->pool_ref, -1);
 			mutex_exit(&p->p_lock);
-			pid_exit(p);
+			pid_exit(p, tk);
 			mutex_exit(&pidlock);
 			task_rele(tk);
 
