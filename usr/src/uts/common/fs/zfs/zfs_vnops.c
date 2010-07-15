@@ -670,7 +670,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	    (((xuio_t *)uio)->xu_type == UIOTYPE_ZEROCOPY))
 		xuio = (xuio_t *)uio;
 	else
-		uio_prefaultpages(n, uio);
+		uio_prefaultpages(MIN(n, max_blksz), uio);
 
 	/*
 	 * If in append mode, set the io offset pointer to eof.
@@ -910,6 +910,9 @@ again:
 			break;
 		ASSERT(tx_bytes == nbytes);
 		n -= nbytes;
+
+		if (!xuio && n > 0)
+			uio_prefaultpages(MIN(n, max_blksz), uio);
 	}
 
 	zfs_range_unlock(rl);
