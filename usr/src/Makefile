@@ -31,14 +31,14 @@ include Makefile.master
 # it defines TARGETDIRS and ROOTDIRS.
 include Targetdirs
 
-COMMON_SUBDIRS=	uts lib cmd ucblib ucbcmd
+COMMON_SUBDIRS=	uts lib cmd ucblib ucbcmd psm
+sparc_SUBDIRS= stand
+i386_SUBDIRS= grub
 
 #
-# sparc needs to build both stand and psm, in that order
-# x86 needs to build psm and GRUB
+# sparc needs to build stand before psm
 #
-sparc_SUBDIRS= stand psm
-i386_SUBDIRS= psm grub
+$(SPARC_BLD)psm: stand
 
 SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
@@ -76,56 +76,39 @@ MSGDIRS=        $(MSGROOT) $(MSGDDIRS) $(MSGROOT)/LC_TIME
 
 all all_xmod :=		TARGET= all
 install install_xmod :=	TARGET= install
+install1 :=		TARGET= install
+install2 :=		TARGET= install
 install_h :=		TARGET= install_h
 clean :=		TARGET= clean
 clobber :=		TARGET= clobber
 check :=		TARGET= check
-_msg :=			TARGET= _msg
-
 
 .KEEP_STATE:
 
 #
-# Note: install only builds the all target for the pkg
-#       directory.  We are not yet ready to have an install
-#	build create 'packages' also.  To build packages
+# Note: install does not cause a build in pkg.  To build packages,
 #	cd pkg and do a 'make install'
 #
-all: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg_all
-install: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg_all .WAIT _msg
+
+all: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg
+
+install: install1 install2 _msg
 	@cd msg; pwd; $(MAKE) _msg
 	@rm -rf "$(ROOT)/catalog"
+
+install1: mapfiles closedbins sgs
+
+install2: install1 $(SUBDIRS)
+
+_msg: _msgdirs rootdirs install2 FRC
+	@for m in $(MSGSUBDIRS); do \
+		cd $$m; pwd; $(MAKE) _msg; cd ..; \
+	done
 
 mapfiles: bldtools
 	@cd common/mapfiles; pwd; $(MAKE) install
 
 clean clobber: $(SUBDIRS) head pkg
-_msg: _msgdirs rootdirs $(MSGSUBDIRS)
-
-# for a complete build from scratch
-crankturn: sgs uts pkg_all
-	@cd lib; pwd; $(MAKE) install
-	@cd cmd; pwd; $(MAKE) all
-	@cd ucblib; pwd; $(MAKE) install
-	@cd ucbcmd; pwd; $(MAKE) all
-
-pkg_all:
-	@cd pkg; pwd; $(MAKE) all
-
-#
-# target for building a proto area for reference via the ROOT macro
-#
-protolibs: rootlibs ucblibs
-
-# build all ucb libraries
-#
-ucblibs:
-	@cd ucblib; pwd; $(MAKE) install
-
-# Base subset of rootproto, excluding ucb libraries
-#
-rootlibs: sgs
-	@cd lib; pwd; $(MAKE) install
 
 closedbins: FRC $(ROOTDIRS)
 	@CLOSED_ROOT="$$ON_CLOSED_BINS/root_$(MACH)$${RELEASE_BUILD+-nd}"; \
@@ -143,7 +126,7 @@ closedbins: FRC $(ROOTDIRS)
 	fi
 
 #
-# Declare what parts can be build in parallel
+# Declare what parts can be built in parallel
 # DUMMY at the end is used in case macro expansion produces an empty string to
 # prevent everything going in parallel
 #

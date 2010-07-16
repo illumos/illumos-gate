@@ -387,7 +387,9 @@ PKGLISTS= \
 # per the individual file chain described above: mf, mog, dep, res,
 # and pub files for each manifest.
 # 
-all: $(PROC_SYNTH_PKGS) proto_list_$(PKGMACH)
+ALL_TARGETS= $(PROC_SYNTH_PKGS) proto_list_$(PKGMACH)
+
+all: $(ALL_TARGETS)
 
 #
 # This will build the directory to contain the processed manifests
@@ -439,7 +441,7 @@ $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 	done
 	$(PKGDEBUG)$(TOUCH) $(@)
 
-install: repository-metadata
+install: $(ALL_TARGETS) repository-metadata
 
 repository-metadata: publish_pkgs
 	@print "Creating repository metadata"
