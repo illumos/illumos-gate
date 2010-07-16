@@ -43,6 +43,7 @@
 #include	<sys/policy.h>
 #include	<sys/priv_names.h>
 #include	<sys/zone.h>
+#include	<sys/sysmacros.h>
 
 static void	drv_init(void);
 static int	drv_fini(void);
@@ -741,11 +742,9 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 		}
 		break;
 	default: {
-		mac_propval_range_t range, *rangep = NULL;
+		mac_propval_range_t *rangep = NULL;
 		void *default_val = NULL;
 		uint_t default_size = 0;
-		void *val = kprop->pr_val;
-		uint_t val_size = kprop->pr_valsize;
 
 		/* set a property value */
 		if (set) {
@@ -763,27 +762,31 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 		kprop->pr_perm_flags = MAC_PROP_PERM_RW;
 
 		if (kprop->pr_flags & DLD_PROP_POSSIBLE) {
-			rangep = &range;
+			rangep = (mac_propval_range_t *)kprop->pr_val;
+
+			/*
+			 * fail if rangep is not aligned to first
+			 * member of mac_propval_range_t.
+			 */
+			ASSERT(IS_P2ALIGNED(rangep, sizeof (uint_t)));
 		} else if (kprop->pr_flags & DLD_PROP_DEFAULT) {
-			default_val = val;
-			default_size = val_size;
+			default_val = kprop->pr_val;
+			default_size = kprop->pr_valsize;
 		}
 
 		/*
 		 * Always return the permissions, and optionally return
 		 * the default value or possible values range.
 		 */
-		(void) mac_prop_info(dlp->dl_mh, kprop->pr_num, kprop->pr_name,
+		err = mac_prop_info(dlp->dl_mh, kprop->pr_num, kprop->pr_name,
 		    default_val, default_size, rangep, &kprop->pr_perm_flags);
-		err = 0;
+		if (err != 0)
+			goto done;
 
 		if (default_val == NULL && rangep == NULL) {
 			err = mac_get_prop(dlp->dl_mh, kprop->pr_num,
 			    kprop->pr_name, kprop->pr_val, kprop->pr_valsize);
 		}
-
-		if (rangep != NULL)
-			bcopy(rangep, val, sizeof (range));
 	}
 	}
 

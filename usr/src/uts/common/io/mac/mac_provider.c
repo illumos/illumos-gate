@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1359,7 +1358,7 @@ mac_prop_info_set_default_str(mac_prop_info_handle_t ph, const char *str)
 		return;
 
 	if (strlen(str) > pr->pr_default_size)
-		pr->pr_default_status = ENOBUFS;
+		pr->pr_errno = ENOBUFS;
 	else
 		(void) strlcpy(pr->pr_default, str, strlen(str));
 	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
@@ -1388,16 +1387,28 @@ mac_prop_info_set_range_uint32(mac_prop_info_handle_t ph, uint32_t min,
 {
 	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
 	mac_propval_range_t *range = pr->pr_range;
+	mac_propval_uint32_range_t *range32;
 
 	/* nothing to do if the caller doesn't want the range info */
 	if (range == NULL)
 		return;
 
-	range->mpr_count = 1;
-	range->mpr_type = MAC_PROPVAL_UINT32;
-	range->mpr_range_uint32[0].mpur_min = min;
-	range->mpr_range_uint32[0].mpur_max = max;
-	pr->pr_flags |= MAC_PROP_INFO_RANGE;
+	if (pr->pr_range_cur_count++ == 0) {
+		/* first range */
+		pr->pr_flags |= MAC_PROP_INFO_RANGE;
+		range->mpr_type = MAC_PROPVAL_UINT32;
+	} else {
+		/* all ranges of a property should be of the same type */
+		ASSERT(range->mpr_type == MAC_PROPVAL_UINT32);
+		if (pr->pr_range_cur_count > range->mpr_count) {
+			pr->pr_errno = ENOSPC;
+			return;
+		}
+	}
+
+	range32 = range->mpr_range_uint32;
+	range32[pr->pr_range_cur_count - 1].mpur_min = min;
+	range32[pr->pr_range_cur_count - 1].mpur_max = max;
 }
 
 void

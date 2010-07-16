@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2752,32 +2751,165 @@ aggr_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 
-int
-aggr_grp_possible_mtu_range(aggr_grp_t *grp, uint32_t *min, uint32_t *max)
+typedef struct rboundary {
+	uint32_t	bval;
+	int		btype;
+} rboundary_t;
+
+/*
+ * This function finds the intersection of mtu ranges stored in arrays -
+ * mrange[0] ... mrange[mcount -1]. It returns the intersection in rval.
+ * Individual arrays are assumed to contain non-overlapping ranges.
+ * Algorithm:
+ *   A range has two boundaries - min and max. We scan all arrays and store
+ * each boundary as a separate element in a temporary array. We also store
+ * the boundary types, min or max, as +1 or -1 respectively in the temporary
+ * array. Then we sort the temporary array in ascending order. We scan the
+ * sorted array from lower to higher values and keep a cumulative sum of
+ * boundary types. Element in the temporary array for which the sum reaches
+ * mcount is a min boundary of a range in the result and next element will be
+ * max boundary.
+ *
+ * Example for mcount = 3,
+ *
+ *  ----|_________|-------|_______|----|__|------ mrange[0]
+ *
+ *  -------|________|--|____________|-----|___|-- mrange[1]
+ *
+ *  --------|________________|-------|____|------ mrange[2]
+ *
+ *                                      3 2 1
+ *                                       \|/
+ *      1  23     2 1  2  3  2    1 01 2  V   0  <- the sum
+ *  ----|--||-----|-|--|--|--|----|-||-|--|---|-- sorted array
+ *
+ *                                 same min and max
+ *                                        V
+ *  --------|_____|-------|__|------------|------ intersecting ranges
+ */
+void
+aggr_mtu_range_intersection(mac_propval_range_t **mrange, int mcount,
+    mac_propval_uint32_range_t **prval, int *prmaxcnt, int *prcount)
 {
-	mac_propval_range_t		*vals;
-	mac_propval_uint32_range_t	*ur;
+	mac_propval_uint32_range_t	*rval, *ur;
+	int				rmaxcnt, rcount;
+	size_t				sz_range32;
+	rboundary_t			*ta; /* temporary array */
+	rboundary_t			temp;
+	boolean_t			range_started = B_FALSE;
+	int				i, j, m, sum;
+
+	sz_range32 = sizeof (mac_propval_uint32_range_t);
+
+	for (i = 0, rmaxcnt = 0; i < mcount; i++)
+		rmaxcnt += mrange[i]->mpr_count;
+
+	/* Allocate enough space to store the results */
+	rval = kmem_alloc(rmaxcnt * sz_range32, KM_SLEEP);
+
+	/* Number of boundaries are twice as many as ranges */
+	ta = kmem_alloc(2 * rmaxcnt * sizeof (rboundary_t), KM_SLEEP);
+
+	for (i = 0, m = 0; i < mcount; i++) {
+		ur = &(mrange[i]->mpr_range_uint32[0]);
+		for (j = 0; j < mrange[i]->mpr_count; j++) {
+			ta[m].bval = ur[j].mpur_min;
+			ta[m++].btype = 1;
+			ta[m].bval = ur[j].mpur_max;
+			ta[m++].btype = -1;
+		}
+	}
+
+	/*
+	 * Sort the temporary array in ascending order of bval;
+	 * if boundary values are same then sort on btype.
+	 */
+	for (i = 0; i < m-1; i++) {
+		for (j = i+1; j < m; j++) {
+			if ((ta[i].bval > ta[j].bval) ||
+			    ((ta[i].bval == ta[j].bval) &&
+			    (ta[i].btype < ta[j].btype))) {
+				temp = ta[i];
+				ta[i] = ta[j];
+				ta[j] = temp;
+			}
+		}
+	}
+
+	/* Walk through temporary array to find all ranges in the results */
+	for (i = 0, sum = 0, rcount = 0; i < m; i++) {
+		sum += ta[i].btype;
+		if (sum == mcount) {
+			rval[rcount].mpur_min = ta[i].bval;
+			range_started = B_TRUE;
+		} else if (sum < mcount && range_started) {
+			rval[rcount++].mpur_max = ta[i].bval;
+			range_started = B_FALSE;
+		}
+	}
+
+	*prval = rval;
+	*prmaxcnt = rmaxcnt;
+	*prcount = rcount;
+}
+
+/*
+ * Returns the mtu ranges which could be supported by aggr group.
+ * prmaxcnt returns the size of the buffer prval, prcount returns
+ * the number of valid entries in prval. Caller is responsible
+ * for freeing up prval.
+ */
+int
+aggr_grp_possible_mtu_range(aggr_grp_t *grp, mac_propval_uint32_range_t **prval,
+    int *prmaxcnt, int *prcount)
+{
+	mac_propval_range_t		**vals;
 	aggr_port_t			*port;
 	mac_perim_handle_t		mph;
-	uint_t 				i;
+	uint_t 				i, numr;
 	int 				err = 0;
+	size_t				sz_propval, sz_range32;
+	size_t				size;
+
+	sz_propval = sizeof (mac_propval_range_t);
+	sz_range32 = sizeof (mac_propval_uint32_range_t);
 
 	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
-	*min = 0;
-	*max = (uint32_t)-1;
-
-	vals = kmem_alloc(sizeof (mac_propval_range_t) * grp->lg_nports,
+	vals = kmem_zalloc(sizeof (mac_propval_range_t *) * grp->lg_nports,
 	    KM_SLEEP);
 
 	for (port = grp->lg_ports, i = 0; port != NULL;
 	    port = port->lp_next, i++) {
+
+		size = sz_propval;
+		vals[i] = kmem_alloc(size, KM_SLEEP);
+		vals[i]->mpr_count = 1;
+
 		mac_perim_enter_by_mh(port->lp_mh, &mph);
+
 		err = mac_prop_info(port->lp_mh, MAC_PROP_MTU, NULL,
-		    NULL, 0, vals + i, NULL);
+		    NULL, 0, vals[i], NULL);
+		if (err == ENOSPC) {
+			/*
+			 * Not enough space to hold all ranges.
+			 * Allocate extra space as indicated and retry.
+			 */
+			numr = vals[i]->mpr_count;
+			kmem_free(vals[i], sz_propval);
+			size = sz_propval + (numr - 1) * sz_range32;
+			vals[i] = kmem_alloc(size, KM_SLEEP);
+			vals[i]->mpr_count = numr;
+			err = mac_prop_info(port->lp_mh, MAC_PROP_MTU, NULL,
+			    NULL, 0, vals[i], NULL);
+			ASSERT(err != ENOSPC);
+		}
 		mac_perim_exit(mph);
-		if (err != 0)
+		if (err != 0) {
+			kmem_free(vals[i], size);
+			vals[i] = NULL;
 			break;
+		}
 	}
 
 	/*
@@ -2789,22 +2921,19 @@ aggr_grp_possible_mtu_range(aggr_grp_t *grp, uint32_t *min, uint32_t *max)
 		goto done;
 	}
 
-	for (i = 0; i < grp->lg_nports; i++) {
-		ur = &((vals + i)->mpr_range_uint32[0]);
-		/*
-		 * Take max of the min, for range_min; that is the minimum
-		 * MTU value for an aggregation is the maximum of the
-		 * minimum values of all the underlying ports
-		 */
-		if (ur->mpur_min > *min)
-			*min = ur->mpur_min;
-		/* Take min of the max, for range_max */
-		if (ur->mpur_max < *max)
-			*max = ur->mpur_max;
-	}
-done:
-	kmem_free(vals, sizeof (mac_propval_range_t) * grp->lg_nports);
+	aggr_mtu_range_intersection(vals, grp->lg_nports, prval, prmaxcnt,
+	    prcount);
 
+done:
+	for (i = 0; i < grp->lg_nports; i++) {
+		if (vals[i] != NULL) {
+			numr = vals[i]->mpr_count;
+			size = sz_propval + (numr - 1) * sz_range32;
+			kmem_free(vals[i], size);
+		}
+	}
+
+	kmem_free(vals, sizeof (mac_propval_range_t *) * grp->lg_nports);
 	return (err);
 }
 
@@ -2812,18 +2941,27 @@ static void
 aggr_m_propinfo(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
     mac_prop_info_handle_t prh)
 {
-	aggr_grp_t		*grp = m_driver;
+	aggr_grp_t			*grp = m_driver;
+	mac_propval_uint32_range_t	*rval = NULL;
+	int				i, rcount, rmaxcnt;
+	int				err = 0;
 
 	_NOTE(ARGUNUSED(pr_name));
 
 	switch (pr_num) {
-	case MAC_PROP_MTU: {
-		uint32_t min, max;
+	case MAC_PROP_MTU:
 
-		if (aggr_grp_possible_mtu_range(grp, &min, &max) != 0)
+		err = aggr_grp_possible_mtu_range(grp, &rval, &rmaxcnt,
+		    &rcount);
+		if (err != 0) {
+			ASSERT(rval == NULL);
 			return;
-		mac_prop_info_set_range_uint32(prh, min, max);
+		}
+		for (i = 0; i < rcount; i++) {
+			mac_prop_info_set_range_uint32(prh,
+			    rval[i].mpur_min, rval[i].mpur_max);
+		}
+		kmem_free(rval, sizeof (mac_propval_uint32_range_t) * rmaxcnt);
 		break;
-	}
 	}
 }

@@ -1995,11 +1995,12 @@ extract_priority(val_desc_t *vdp, uint_t cnt, void *arg)
  * for retrieving the property range values.
  */
 static int
-i_dladm_range_size(mac_propval_range_t *r, size_t *sz)
+i_dladm_range_size(mac_propval_range_t *r, size_t *sz, uint_t *rcount)
 {
 	uint_t count = r->mpr_count;
 
 	*sz = sizeof (mac_propval_range_t);
+	*rcount = count;
 	--count;
 
 	switch (r->mpr_type) {
@@ -2010,6 +2011,7 @@ i_dladm_range_size(mac_propval_range_t *r, size_t *sz)
 		break;
 	}
 	*sz = 0;
+	*rcount = 0;
 	return (EINVAL);
 }
 
@@ -3719,9 +3721,8 @@ get_range(dladm_handle_t handle, prop_desc_t *pdp,
 	dld_ioc_macprop_t *dip;
 	dladm_status_t status = DLADM_STATUS_OK;
 	size_t	sz;
+	uint_t	rcount;
 	mac_propval_range_t *rangep;
-
-	sz = sizeof (mac_propval_range_t);
 
 	/*
 	 * As caller we don't know number of value ranges, the driver
@@ -3729,18 +3730,23 @@ get_range(dladm_handle_t handle, prop_desc_t *pdp,
 	 * buffer size is insufficient, driver returns back with the
 	 * actual count of value ranges. See mac.h for more details.
 	 */
+	sz = sizeof (mac_propval_range_t);
+	rcount = 1;
 retry:
 	if ((dip = i_dladm_buf_alloc_by_name(sz, linkid, pdp->pd_name, flags,
 	    &status)) == NULL)
 		return (status);
+
+	rangep = (mac_propval_range_t *)(void *)&dip->pr_val;
+	rangep->mpr_count = rcount;
 
 	status = i_dladm_macprop(handle, dip, B_FALSE);
 	if (status != DLADM_STATUS_OK) {
 		if (status == DLADM_STATUS_TOOSMALL) {
 			int err;
 
-			rangep = (mac_propval_range_t *)(void *)&dip->pr_val;
-			if ((err = i_dladm_range_size(rangep, &sz)) == 0) {
+			if ((err = i_dladm_range_size(rangep, &sz, &rcount))
+			    == 0) {
 				free(dip);
 				goto retry;
 			} else {
@@ -3751,7 +3757,6 @@ retry:
 		return (status);
 	}
 
-	rangep = (mac_propval_range_t *)(void *)&dip->pr_val;
 	if (rangep->mpr_count == 0) {
 		*val_cnt = 1;
 		(void) snprintf(prop_val[0], DLADM_PROP_VAL_MAX, "--");

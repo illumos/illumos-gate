@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_MAC_IMPL_H
@@ -694,10 +693,11 @@ extern int mac_dbg;
 typedef struct mac_prop_info_state_s {
 	uint8_t			pr_flags;
 	uint8_t			pr_perm;
+	uint8_t			pr_errno;
 	void			*pr_default;
 	size_t			pr_default_size;
-	uint8_t			pr_default_status;
 	mac_propval_range_t	*pr_range;
+	uint_t			pr_range_cur_count;
 } mac_prop_info_state_t;
 
 #define	MAC_PROTECT_ENABLED(mcip, type) \

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -3337,18 +3336,44 @@ mac_prop_info(mac_handle_t mh, mac_prop_id_t id, char *name,
 	if (mip->mi_callbacks->mc_callbacks & MC_PROPINFO) {
 		state.pr_default = default_val;
 		state.pr_default_size = default_size;
+
+		/*
+		 * The caller specifies the maximum number of ranges
+		 * it can accomodate using mpr_count. We don't touch
+		 * this value until the driver returns from its
+		 * mc_propinfo() callback, and ensure we don't exceed
+		 * this number of range as the driver defines
+		 * supported range from its mc_propinfo().
+		 *
+		 * pr_range_cur_count keeps track of how many ranges
+		 * were defined by the driver from its mc_propinfo()
+		 * entry point.
+		 *
+		 * On exit, the user-specified range mpr_count returns
+		 * the number of ranges specified by the driver on
+		 * success, or the number of ranges it wanted to
+		 * define if that number of ranges could not be
+		 * accomodated by the specified range structure.  In
+		 * the latter case, the caller will be able to
+		 * allocate a larger range structure, and query the
+		 * property again.
+		 */
+		state.pr_range_cur_count = 0;
 		state.pr_range = range;
 
 		mip->mi_callbacks->mc_propinfo(mip->mi_driver, name, id,
 		    (mac_prop_info_handle_t)&state);
+
+		if (state.pr_flags & MAC_PROP_INFO_RANGE)
+			range->mpr_count = state.pr_range_cur_count;
 
 		/*
 		 * The operation could fail if the buffer supplied by
 		 * the user was too small for the range or default
 		 * value of the property.
 		 */
-		if (state.pr_default_status != 0)
-			return (state.pr_default_status);
+		if (state.pr_errno != 0)
+			return (state.pr_errno);
 
 		if (perm != NULL && state.pr_flags & MAC_PROP_INFO_PERM)
 			*perm = state.pr_perm;
