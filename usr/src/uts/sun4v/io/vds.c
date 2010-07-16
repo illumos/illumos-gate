@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -5894,7 +5893,11 @@ vd_setup_backend_vnode(vd_t *vd)
 
 	if ((status = vn_open(file_path, UIO_SYSSPACE, vd->open_flags | FOFFMAX,
 	    0, &vd->file_vnode, 0, 0)) != 0) {
-		PRN("vn_open(%s) = errno %d", file_path, status);
+		if ((status == ENXIO || status == ENODEV || status == ENOENT ||
+		    status == EROFS) && (!(vd->initialized & VD_SETUP_ERROR) &&
+		    !(DEVI_IS_ATTACHING(vd->vds->dip)))) {
+			PRN("vn_open(%s) = errno %d", file_path, status);
+		}
 		return (status);
 	}
 
@@ -6669,7 +6672,8 @@ done:
 		 */
 		if (status == ENXIO || status == ENODEV ||
 		    status == ENOENT || status == EROFS) {
-			if (!(vd->initialized & VD_SETUP_ERROR)) {
+			if (!(vd->initialized & VD_SETUP_ERROR) &&
+			    !(DEVI_IS_ATTACHING(vd->vds->dip))) {
 				PRN("%s is currently inaccessible (error %d)",
 				    path, status);
 			}
