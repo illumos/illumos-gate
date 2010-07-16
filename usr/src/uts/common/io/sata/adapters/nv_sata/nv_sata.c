@@ -4181,6 +4181,8 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 		nv_put8(cmdhdl, nvp->nvp_hcyl, satacmd->satacmd_lba_high_lsb);
 		nv_put8(cmdhdl, nvp->nvp_lcyl, satacmd->satacmd_lba_mid_lsb);
 		nv_put8(cmdhdl, nvp->nvp_sect, satacmd->satacmd_lba_low_lsb);
+		nv_put8(cmdhdl, nvp->nvp_feature,
+		    satacmd->satacmd_features_reg);
 
 		break;
 
@@ -4196,6 +4198,8 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 		nv_put8(cmdhdl, nvp->nvp_hcyl, satacmd->satacmd_lba_high_lsb);
 		nv_put8(cmdhdl, nvp->nvp_lcyl, satacmd->satacmd_lba_mid_lsb);
 		nv_put8(cmdhdl, nvp->nvp_sect, satacmd->satacmd_lba_low_lsb);
+		nv_put8(cmdhdl, nvp->nvp_feature,
+		    satacmd->satacmd_features_reg);
 
 		break;
 
@@ -4210,16 +4214,16 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 		 */
 		if (ncq == B_TRUE) {
 			nv_put8(cmdhdl, nvp->nvp_count, slot << 3);
-			nv_put8(cmdhdl, nvp->nvp_feature,
-			    satacmd->satacmd_features_reg_ext);
-			nv_put8(cmdhdl, nvp->nvp_feature,
-			    satacmd->satacmd_features_reg);
 		} else {
 			nv_put8(cmdhdl, nvp->nvp_count,
 			    satacmd->satacmd_sec_count_msb);
 			nv_put8(cmdhdl, nvp->nvp_count,
 			    satacmd->satacmd_sec_count_lsb);
 		}
+		nv_put8(cmdhdl, nvp->nvp_feature,
+		    satacmd->satacmd_features_reg_ext);
+		nv_put8(cmdhdl, nvp->nvp_feature,
+		    satacmd->satacmd_features_reg);
 
 		/*
 		 * send the high-order half first
