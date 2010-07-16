@@ -77,7 +77,70 @@ PREFIX_NET="network:"
 PREFIX_POOL="pool:"
 PREFIX_IF="if:"
 
+GLOBAL_CONFIG=""
+GLOBAL_POLICY=""
+
 SERVINFO=/usr/lib/servinfo
+
+#
+# Get value(s) for given property from either firewall_config_default or
+# firewall_config_override property groups.
+# 
+# global_get_prop_value pg_name propname
+#   pg_name - FW_CONFIG_DEF_PG or FW_CONFIG_OVR_PG 
+#   propname - property name
+#
+global_get_prop_value()
+{
+	target_pg=$1
+	prop=$2
+
+	[ "$1" != $FW_CONFIG_OVR_PG -a "$1" != $FW_CONFIG_DEF_PG ] && return
+
+	[ "$1" == $FW_CONFIG_DEF_PG ] && extra_pg=$FW_CONFIG_OVR_PG  || \
+		extra_pg=$FW_CONFIG_DEF_PG
+
+	value=`echo $GLOBAL_CONFIG | awk '{
+		found=0
+		for (i=1; i<=NF; i++) {
+			if (found == 1) {
+				if (index($i, target_pg) == 1 || index($i, extra_pg) == 1)
+					break;
+
+				print $i;
+			}
+
+			if (split($i, values, "/") < 2)
+				continue;
+
+			if (values[1] == target_pg && values[2] == prop)
+				found=1;
+		}
+	}' target_pg=$target_pg prop=$prop extra_pg=$extra_pg`
+
+	# Return
+	echo "$value"
+}
+
+#
+# Initialize and cache network/ipfilter configuration, global configuration.
+#
+# Since an SMF service configuration may get updated during the execution of the
+# service method, it's best to read all relevant configuration via one svcprop
+# invocation and cache it for later use.
+#
+# This function reads and store relevant configuration into GLOBAL_CONFIG and
+# initializes GLOBAL_POLICY variable. GLOBAL_CONFIG is a string containing pg/prop
+# and their corresponding values (i.e. svcprop -p pg fmri output). To get values
+# for a certain pg/prop, use global_get_prop_value().
+#
+global_init()
+{
+	GLOBAL_CONFIG=`svcprop -p ${FW_CONFIG_OVR_PG} -p ${FW_CONFIG_DEF_PG} \
+        $IPF_FMRI 2>/dev/null | awk '{$2=" "; print $0}'`
+
+	GLOBAL_POLICY=`global_get_prop_value $FW_CONFIG_DEF_PG $POLICY_PROP`
+}
 
 #
 # Given a service, gets its config pg name 
@@ -99,11 +162,6 @@ get_policy()
 {
 	config_pg=`get_config_pg $1`
 	svcprop -p $config_pg/${POLICY_PROP} $1 2>/dev/null
-}
-
-get_global_def_policy()
-{
-	svcprop -p ${FW_CONFIG_DEF_PG}/${POLICY_PROP} $IPF_FMRI 2>/dev/null
 }
 
 #
@@ -632,8 +690,7 @@ process_nonsvc_progs()
 {
 	out=$1
 	echo "# Non-service programs rules" >>${out}
-	progs=`svcprop -p ${FW_CONFIG_DEF_PG}/${OPEN_PORTS_PROP} \
-	    $SMF_FMRI 2>/dev/null`
+	progs=`global_get_prop_value $FW_CONFIG_DEF_PG $OPEN_PORTS_PROP`
 
 	for prog in $progs; do
 		[ -z "$prog" -o "$prog" = '""' ] && continue
@@ -673,10 +730,8 @@ process_nonsvc_progs()
 #
 create_global_rules()
 {
-	policy=`get_global_def_policy`
-
-	if [ "$policy" = "custom" ]; then
-		file=`svcprop -p ${FW_CONFIG_DEF_PG}/${CUSTOM_FILE_PROP} $SMF_FMRI`
+	if [ "$GLOBAL_POLICY" = "custom" ]; then
+		file=`global_get_prop_value $FW_CONFIG_DEF_PG $CUSTOM_FILE_PROP`
 
 		[ -n "$file" ] && custom_set_symlink $file
 		return 0
@@ -686,11 +741,11 @@ create_global_rules()
 	process_nonsvc_progs $TEMP
 
 	echo "# Global Default rules" >>${TEMP}
-	if [ "$policy" != "none" ]; then
+	if [ "$GLOBAL_POLICY" != "none" ]; then
 		echo "pass out log quick all keep state" >>${TEMP}
 	fi
 
-	case "$policy" in
+	case "$GLOBAL_POLICY" in
 	'none')
 		# No rules
 		replace_file ${IPFILCONF} ${TEMP}
@@ -711,7 +766,7 @@ create_global_rules()
 		;;
 	esac
 
-	for name in `get_exceptions $SMF_FMRI`; do
+	for name in `global_get_prop_value $FW_CONFIG_DEF_PG $EXCEPTIONS_PROP`; do
 		[ -z "$name" -o "$name" = '""' ] && continue
 
 		ifc=`get_interface $name`
@@ -727,7 +782,7 @@ create_global_rules()
 
 	done
 
-	for name in `get_apply2_list $SMF_FMRI`; do
+	for name in `global_get_prop_value $FW_CONFIG_DEF_PG $APPLY2_PROP`; do
 		[ -z "$name" -o "$name" = '""' ] && continue
 
 		ifc=`get_interface $name`
@@ -742,7 +797,7 @@ create_global_rules()
 		fi
 	done
 
-	if [ "$policy" = "allow" ]; then
+	if [ "$GLOBAL_POLICY" = "allow" ]; then
 		#
 		# Allow DHCP traffic if running as a DHCP client 
 		#
@@ -776,7 +831,7 @@ create_global_ovr_rules()
 	#
 	# Simply empty override file if global policy is 'custom'
 	#
-	if [ "`get_global_def_policy`" = "custom" ]; then 
+	if [ "$GLOBAL_POLICY" = "custom" ]; then 
 		echo "# 'custom' global policy" >$IPFILOVRCONF
 		return 0
 	fi
@@ -784,7 +839,7 @@ create_global_ovr_rules()
 	#
 	# Get and process override policy
 	#
-	ovr_policy=`svcprop -p ${FW_CONFIG_OVR_PG}/${POLICY_PROP} $IPF_FMRI`
+	ovr_policy=`global_get_prop_value $FW_CONFIG_OVR_PG $POLICY_PROP`
 	if [ "$ovr_policy" = "none" ]; then 
 		echo "# global override policy is 'none'" >$IPFILOVRCONF
 		return 0
@@ -794,7 +849,7 @@ create_global_ovr_rules()
 	[ "$ovr_policy" = "deny" ] && acmd="block in log quick"
 	[ "$ovr_policy" = "allow" ] && acmd="pass in log"
 
-	apply2_list=`svcprop -p $FW_CONFIG_OVR_PG/$APPLY2_PROP $IPF_FMRI`
+	apply2_list=`global_get_prop_value $FW_CONFIG_OVR_PG $APPLY2_PROP`
 	for name in $apply2_list; do
 		[ -z "$name" -o "$name" = '""' ] && continue
 
@@ -854,8 +909,7 @@ create_services_rules()
 	#
 	# Do nothing if global policy is 'custom'
 	#
-	global_policy=`get_global_def_policy`
-	[ "$global_policy" = "custom" ] && return 0
+	[ "$GLOBAL_POLICY" = "custom" ] && return 0
 
 	ipf_get_lock
 
@@ -987,8 +1041,8 @@ service_update()
 	# If ipfilter isn't online or global policy is 'custom',
 	# nothing should be done.
 	#
+	[ "$GLOBAL_POLICY" = "custom" ] && return 0
 	service_check_state $SMF_FMRI $SMF_ONLINE || return 0
-	[ "`get_global_def_policy`" = "custom" ] && return 0
 
 	ipf_get_lock
 	service_update_rules $svc || ret=1
@@ -996,3 +1050,9 @@ service_update()
 	ipf_remove_lock
 	return $ret
 }
+
+#
+# Initialize global configuration
+# 
+global_init
+
