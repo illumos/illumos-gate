@@ -51,10 +51,12 @@
 /*
  * This struct contains the default property values.  These may
  * be overridden by entries in a ses_log_transport.conf file.
+ * The severity is set to -1 here so that the _fmd_init routine will
+ * determine the default severity based on the constants in libseslog.h.
  */
 static const fmd_prop_t fmd_props[] = {
 	{ "interval",	FMD_TYPE_TIME, "60s"},
-	{ "severity",	FMD_TYPE_UINT32, "3"},
+	{ "severity",	FMD_TYPE_INT32, "-1"},
 	{ "path",	FMD_TYPE_STRING, "/var/fm/fmd/ses_logs/"},
 	{ "logcount",	FMD_TYPE_UINT32, "5"},
 	{ "maxlogsize", FMD_TYPE_UINT32, "1000000"},
@@ -144,7 +146,7 @@ static platform_t platform_list[] = {
 };
 
 /* This structure holds a reference to the platform list. */
-static platforms_t platforms = {
+static const platforms_t platforms = {
 	sizeof (platform_list) / sizeof (platform_t),
 	platform_list
 };
@@ -162,8 +164,6 @@ slt_post_ereport(fmd_hdl_t *hdl, fmd_xprt_t *xprt, const char *ereport_class,
 
 	(void) snprintf(fullclass, sizeof (fullclass), "%s.io.sas.log.%s",
 	    FM_EREPORT_CLASS, ereport_class);
-
-	fmd_hdl_debug(hdl, "Generating an ereport: %s", fullclass);
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) == 0) {
 
@@ -293,7 +293,7 @@ access_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri, char *target,
 	char *target_val = NULL;
 
 	if ((*err = nvlist_lookup_nvpair(fmri, "hc-list", &nvp)) != 0) {
-		fmd_hdl_error(slmp->slt_hdl, "No hc-list in the fmri");
+		fmd_hdl_debug(slmp->slt_hdl, "No hc-list in the fmri");
 		return (NULL);
 	}
 
@@ -328,7 +328,7 @@ access_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri, char *target,
 		if ((*err = nvlist_lookup_nvpair(nvl_array[i], "hc-id", &nvp2))
 		    != 0) {
 
-			fmd_hdl_error(slmp->slt_hdl,
+			fmd_hdl_debug(slmp->slt_hdl,
 			    "Could not find hc-id in the fmri for %s", target);
 			return (NULL);
 		}
@@ -338,7 +338,7 @@ access_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri, char *target,
 		 * exit out and log an error.
 		 */
 		if ((*err = nvpair_value_string(nvp2, &target_val)) != 0) {
-			fmd_hdl_error(slmp->slt_hdl,
+			fmd_hdl_debug(slmp->slt_hdl,
 			    "Target value not returned.");
 			return (NULL);
 		}
@@ -358,11 +358,11 @@ access_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri, char *target,
 				if ((*err = nvlist_add_string(nvl_array[i],
 				    "hc-id", ivs)) != 0) {
 
-					fmd_hdl_error(slmp->slt_hdl,
+					fmd_hdl_debug(slmp->slt_hdl,
 					    "Error setting ivalue.");
 				}
 			} else {
-				fmd_hdl_error(slmp->slt_hdl,
+				fmd_hdl_debug(slmp->slt_hdl,
 				    "Error removing original ivalue.");
 			}
 
@@ -423,7 +423,7 @@ create_filename(char *fileName, expander_t *expander, ses_log_monitor_t *slmp,
 
 	ses_node = strrchr(fileName, '/');
 
-	if (ses_node && (strlen(ses_node) > 1)) {
+	if ((ses_node != NULL) && (ses_node[0] != '\0')) {
 		(void) strlcat(fileName, "/", MAXPATHLEN);
 	}
 
@@ -512,7 +512,7 @@ add_expander_record(ses_log_monitor_t *slmp, char *key)
 
 
 	if ((status = nvlist_alloc(&expanderDetails, NV_UNIQUE_NAME, 0)) != 0) {
-		fmd_hdl_error(slmp->slt_hdl,
+		fmd_hdl_debug(slmp->slt_hdl,
 		    "Error allocating expander detail space (%d)", status);
 		return (status);
 	}
@@ -520,7 +520,7 @@ add_expander_record(ses_log_monitor_t *slmp, char *key)
 	if ((status = nvlist_add_string(expanderDetails, DATA_FIELD,
 	    DEFAULT_DATA)) != 0) {
 
-		fmd_hdl_error(slmp->slt_hdl,
+		fmd_hdl_debug(slmp->slt_hdl,
 		    "Error adding default data to expander details (%d)",
 		    status);
 	} else {
@@ -528,7 +528,7 @@ add_expander_record(ses_log_monitor_t *slmp, char *key)
 		if ((status = nvlist_add_nvlist(slmp->slt_expanders, key,
 		    expanderDetails)) != 0) {
 
-			fmd_hdl_error(slmp->slt_hdl,
+			fmd_hdl_debug(slmp->slt_hdl,
 			    "Error storing the default expander details (%d)",
 			    status);
 		}
@@ -625,17 +625,17 @@ check_code(ses_log_monitor_t *slmp, nvlist_t *fmri, char *pid, int code)
 
 /*
  * Searches the platform lists for for a match on the supplied product id.
- * Returns zero if supported, non zero otherwise.
+ * Returns non zero if supported, zero otherwise.
  */
 static int
 platform_supported(char *pid)
 {
-	int supported = 1;
+	int supported = 0;
 	int i;
 
 	for (i = 0; i < platforms.pcount; i++) {
 		if (strcmp(platforms.plist[i].pid, pid) == 0) {
-			supported = 0;
+			supported = 1;
 			break;
 		}
 	}
@@ -730,7 +730,7 @@ handle_log_entry(ses_log_monitor_t *slmp, nvpair_t *entry,
 		}
 	} else {
 
-		fmd_hdl_error(slmp->slt_hdl,
+		fmd_hdl_debug(slmp->slt_hdl,
 		    "Unable to pull severity from the entry.");
 		return (rval);
 	}
@@ -747,7 +747,7 @@ handle_log_entry(ses_log_monitor_t *slmp, nvpair_t *entry,
 			    log_entry);
 		} else {
 
-			fmd_hdl_error(slmp->slt_hdl,
+			fmd_hdl_debug(slmp->slt_hdl,
 			    "Unable to pull log from the entry.");
 		}
 	}
@@ -795,7 +795,7 @@ get_log(ses_log_monitor_t *slmp, expander_t *expander,
 	/* Retrieve the last entry for this expander for the lib call */
 	if ((err = get_last_entry(slmp, expander->slt_key, &expdata)) != 0) {
 
-		fmd_hdl_error(slmp->slt_hdl, "Error collecting expander entry");
+		fmd_hdl_debug(slmp->slt_hdl, "Error collecting expander entry");
 		return (err);
 	}
 	(void) strncpy(lib_param->target_path, expander->slt_path, MAXPATHLEN);
@@ -809,14 +809,14 @@ get_log(ses_log_monitor_t *slmp, expander_t *expander,
 	 * is NULL, return an error.  Otherwise continue processing.
 	 */
 	if ((err = access_ses_log(lib_param)) != 0) {
-
-		fmd_hdl_error(slmp->slt_hdl, "Library access error: %d\n", err);
+		fmd_hdl_debug(slmp->slt_hdl, "Library access error: %d", err);
 	}
 
 	/* Double check that log data actually exists. */
 	if (lib_param->log_data == NULL) {
-
-		fmd_hdl_error(slmp->slt_hdl, "Library returned NULL data", err);
+		if (err != 0) {
+			return (err);
+		}
 		return (NULL_LOG_DATA);
 	}
 
@@ -963,8 +963,8 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 		return (TOPO_WALK_NEXT);
 	}
 
-	/* The current system type is not supported. Skip processing the node */
-	if (platform_supported(product_id) != 0) {
+	/* If the current system type is unsupported stop processing the node */
+	if (platform_supported(product_id) == 0) {
 		topo_hdl_strfree(thp, product_id);
 		return (TOPO_WALK_NEXT);
 	}
@@ -988,7 +988,8 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 	if (topo_prop_get_string(node, TOPO_PGROUP_SES,
 	    TOPO_PROP_SES_DEV_PATH, &target_path, &err) != 0) {
 		fmd_hdl_debug(slmp->slt_hdl,
-		    "Error collecting ses-devfs-path %d", err);
+		    "Error collecting ses-devfs-path for %s: %d",
+		    expander->slt_label, err);
 		free_expander(slmp, expander);
 		return (TOPO_WALK_NEXT);
 	}
@@ -998,12 +999,13 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 	if (topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
 	    TOPO_PROP_SAS_ADDR, &sas_address, &err) != 0) {
 		fmd_hdl_debug(slmp->slt_hdl,
-		    "Error collecting sas_address %d", err);
+		    "Error collecting sas_address for %s: %d",
+		    expander->slt_label, err);
 		free_expander(slmp, expander);
 		return (TOPO_WALK_NEXT);
 	}
 	if (strlen(sas_address) != 16) {
-		fmd_hdl_error(slmp->slt_hdl,
+		fmd_hdl_debug(slmp->slt_hdl,
 		    "sas-address length is not 16: (%s)", sas_address);
 		free_expander(slmp, expander);
 		topo_hdl_strfree(thp, sas_address);
@@ -1014,8 +1016,8 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 
 	/* Obtain the fmri for this node and save a reference to it. */
 	if (topo_node_resource(node, &fmri, &err) != 0) {
-		fmd_hdl_error(slmp->slt_hdl, "failed to get fmri: %s\n",
-		    topo_strerror(err));
+		fmd_hdl_debug(slmp->slt_hdl, "failed to get fmri for %s: %s",
+		    expander->slt_label, topo_strerror(err));
 
 		free_expander(slmp, expander);
 		return (TOPO_WALK_NEXT);
@@ -1024,14 +1026,24 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 	}
 
 	if ((err = get_log(slmp, expander, &lib_param)) != 0) {
-
-		fmd_hdl_error(slmp->slt_hdl, "Error retrieving logs %d\n", err);
+		/*
+		 * NULL_LOG_DATA means that no data was returned from the
+		 * library.  (i.e. There were no log entries.) Just free memory
+		 * and return.
+		 */
+		if (err != NULL_LOG_DATA) {
+			fmd_hdl_debug(slmp->slt_hdl,
+			    "Error retrieving logs from %s: %d",
+			    expander->slt_label, err);
+		}
 		free_expander(slmp, expander);
 		return (TOPO_WALK_NEXT);
 	}
 
 	if ((err = process_log(slmp, expander, &lib_param)) != 0) {
-		fmd_hdl_error(slmp->slt_hdl, "Error processing logs %d\n", err);
+		fmd_hdl_debug(slmp->slt_hdl,
+		    "Error processing logs from %s: %d",
+		    expander->slt_label, err);
 	}
 
 	/* Free the expander structure before exiting. */
