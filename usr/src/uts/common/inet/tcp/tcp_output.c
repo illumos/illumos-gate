@@ -1471,7 +1471,21 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	switch (tcp->tcp_state) {
 	case TCPS_CLOSED:
 	case TCPS_IDLE:
+		break;
 	case TCPS_BOUND:
+		if (tcp->tcp_listener != NULL) {
+			ASSERT(IPCL_IS_NONSTR(connp));
+			/*
+			 * Unlink from the listener and drop the reference
+			 * put on it by the eager. tcp_closei_local will not
+			 * do it because tcp_tconnind_started is TRUE.
+			 */
+			mutex_enter(&tcp->tcp_saved_listener->tcp_eager_lock);
+			tcp_eager_unlink(tcp);
+			mutex_exit(&tcp->tcp_saved_listener->tcp_eager_lock);
+			CONN_DEC_REF(tcp->tcp_saved_listener->tcp_connp);
+		}
+		break;
 	case TCPS_LISTEN:
 		break;
 	case TCPS_SYN_SENT:
@@ -1525,15 +1539,6 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 			tcp_eager_unlink(tcp);
 			mutex_exit(&tcp->tcp_saved_listener->tcp_eager_lock);
 			CONN_DEC_REF(tcp->tcp_saved_listener->tcp_connp);
-
-			/*
-			 * If the conn has received a RST, the only thing
-			 * left to do is to drop the ref.
-			 */
-			if (tcp->tcp_state <= TCPS_BOUND) {
-				CONN_DEC_REF(tcp->tcp_connp);
-				return;
-			}
 			break;
 		}
 

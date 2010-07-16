@@ -1127,6 +1127,7 @@ so_newconn(sock_upper_handle_t parenthandle,
 		mutex_exit(&so->so_acceptq_lock);
 		ASSERT(nso->so_count == 1);
 		nso->so_count--;
+		nso->so_listener = NULL;
 		/* drop proto ref */
 		VN_RELE(SOTOV(nso));
 		socket_destroy(nso);

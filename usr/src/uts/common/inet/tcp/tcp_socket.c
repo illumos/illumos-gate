@@ -177,14 +177,6 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 	 */
 	ASSERT(econnp->conn_ref >= 2);
 
-	/*
-	 * An error is returned if this conn has been reset, which will
-	 * cause the socket to be closed immediately. The eager will be
-	 * unlinked from the listener during close.
-	 */
-	if (eager->tcp_state < TCPS_ESTABLISHED)
-		return (ECONNABORTED);
-
 	mutex_enter(&listener->tcp_eager_lock);
 	/*
 	 * Non-STREAMS listeners never defer the notification of new
@@ -195,7 +187,7 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 	mutex_exit(&listener->tcp_eager_lock);
 	CONN_DEC_REF(listener->tcp_connp);
 
-	return (0);
+	return ((eager->tcp_state < TCPS_ESTABLISHED) ? ECONNABORTED : 0);
 }
 
 static int
