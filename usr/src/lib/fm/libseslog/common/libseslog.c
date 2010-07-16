@@ -43,6 +43,7 @@
 #include <dirent.h>
 #include <sys/scsi/generic/commands.h>
 #include <sys/scsi/generic/status.h>
+#include <sys/scsi/impl/commands.h>
 
 /*
  * open the device with given device name
@@ -145,8 +146,6 @@ read_log(int sg_fd, unsigned char *resp, int mx_resp_len)
 	unsigned char sense_b[SENSE_BUFF_LEN];
 	struct uscsi_cmd uscsi;
 
-
-
 	if (mx_resp_len > 0xffff) {
 		return (-1);
 	}
@@ -213,7 +212,7 @@ read_log(int sg_fd, unsigned char *resp, int mx_resp_len)
  * |-----+--------------------------------------------------------------------|
  * | 2   | DU     |  DS    |  TSD    | ETC   |         TMC     |  LBIN  | LP  |
  * |-----+--------------------------------------------------------------------|
- * |3    |                          Paramter Length(n-3)                      |
+ * | 3   |                          Parameter Length(n-3)                     |
  * |-----+--------------------------------------------------------------------|
  * | 4   |                           Parameter Values                         |
  * | --  |                                                                    |
@@ -222,141 +221,148 @@ read_log(int sg_fd, unsigned char *resp, int mx_resp_len)
  */
 
 static int
-save_logs(unsigned char *resp, int len, nvlist_t *log_data,
-    char *last_log_entry, unsigned long *seq_num_ret, int *number_log_entries)
+save_logs(unsigned char *resp, ses_log_call_t *data)
 {
-	int k, i;
-	int paramCode; /* Parameter code */
-	int paramLen = 0; /* Paramter length */
-	int pcb; /* Paramter control Byte */
-	unsigned char *lpp; /* Log parameter pointer */
+	int k;
+	int param_code; 	/* Parameter code */
+	int param_len = 0; 	/* Paramter length */
+	unsigned char *log_param_ptr; 	/* Log parameter pointer */
 	unsigned char *log_str_ptr; /* ptr to ascii str returend by expander */
 
-	unsigned long seq_num_ul = 0;
-	char seq_num[10];
-	char log_event_type[10];
-	char log_code[10];
-	char log_level[10];
+	char log_event_type[ENTRY_MAX_SIZE];
+	char log_code[ENTRY_MAX_SIZE];
+	char log_level[ENTRY_MAX_SIZE];
 	nvlist_t *entry;
 	char entry_num[15];
 	int type;
 	int match_found = 0;
-	long current_seq_num;
-	long last_num;
-	char save_buffer[256];
+	char save_buffer[MAX_LOG_ENTRY_SZ];
 	char entry_added = 0;
-	char *s;
+	int all_log_data_len;
 
+	/*
+	 * Bytes 2 and 3 of response buffer contain the page length of
+	 * the log entries returned.
+	 */
+	all_log_data_len = SCSI_READ16(&resp[2]);
 
-	(void) memset(seq_num, 0, sizeof (seq_num));
+	/*
+	 * Initialize log parameter pointer to point to first log entry.
+	 * The resp includes 4 bytes of header info and then log entries
+	 */
+	log_param_ptr = &resp[0] + 4;
 
-	*number_log_entries = 0;
-	/* Initial log paramter pointer to point to first log entry */
-	/* The resp includes 4 bytes of header info and then log entries */
-	lpp = &resp[0] + 4;
-	k = len;
-	/* Find last sequence number from last log read */
-	if (last_log_entry != NULL &&
-	    (strlen(last_log_entry) == SES_LOG_VALID_LOG_SIZE)) {
-		(void) strncpy(seq_num, (const char *) last_log_entry +
-		    SES_LOG_SEQ_NUM_START, 8);
-		last_num = strtoul(seq_num, 0, 16);
-		/* save this in case there are no new entries */
-		seq_num_ul = last_num;
+	/*
+	 * If multiple heads are reading the logs, it is possible that we
+	 * could be re-reading some of the same log entries plus some
+	 * new additional entries. Check to see if any entries in this read
+	 * contain the same log entry as the last entry we read last time.
+	 */
+	if (data->last_log_entry != NULL &&
+	    (strlen(data->last_log_entry) == SES_LOG_VALID_LOG_SIZE)) {
+		/*
+		 * We have a valid log entry from a previous read log
+		 * operation.
+		 */
 
-		/* First find if there are duplicate entries */
-		lpp = &resp[0] + 4;
 
 		/*
-		 * Start walking each log entry in return buffer looking for
+		 * Start walking each log entry in response buffer looking for
 		 * a duplicate entry.
 		 */
-		for (; k > 0; k -= paramLen) {
-			if (k < 3) {
-				/*
-				 * Should always have at least 3 Bytes for
-				 * each entry
-				 * If not, it must be a bad record so stop
-				 * processing
-				 */
-				nvlist_free(log_data);
-				log_data = NULL;
-				return (SES_LOG_FAILED_SHORT_LOG_PARAM_INIT);
-			}
-			pcb = lpp[2];
-			paramLen = lpp[3] + 4;
+		for (k = 0; k < all_log_data_len; k += param_len) {
 			/*
-			 * initial log_str_ptr to point to string info returned
-			 * by expander
-			 * first 4 bytes of log
-			 * parameter are 2 param:
-			 * codes Control byte, Parameter length
+			 * Calculate log entry length
+			 * Log param ptr [3] contains the log length minus the
+			 * header info which is 4 bytes so add that in.
 			 */
-			log_str_ptr = lpp + 4;
+			param_len = log_param_ptr[3] + 4;
 
-			if (paramLen > 4) {
-				if ((pcb & 0x1) && !(pcb & 2)) {
-
-					(void) strncpy(seq_num,
-					    (const char *)log_str_ptr +
-					    SES_LOG_SEQ_NUM_START, 8);
-					current_seq_num = strtoul(seq_num, 0,
-					    16);
-
-					if (current_seq_num == last_num) {
-						/*
-						 * Check to see if this is the
-						 * same line
-						 */
-						if (strncmp(
-						    (char *)log_str_ptr,
-						    last_log_entry,
-						    SES_LOG_VALID_LOG_SIZE) ==
-						    0) {
-							/*
-							 * Found an exact
-							 * match
-							 */
-							lpp += paramLen;
-							k -= paramLen;
-							match_found = 1;
-							break;
-						}
-					}
-				}
+			if (param_len <= 4) {
+				/*
+				 * Only header information in this entry
+				 * process next log entry
+				 */
+				log_param_ptr += param_len;
+				continue;
 			}
-			lpp += paramLen;
+
+
+			/*
+			 * initialize log_str_ptr to point to string info
+			 * returned by expander
+			 * first 4 bytes of log parameter contains
+			 * 2 bytes of parameter code, 1 byte of Control data
+			 * and 1 byte for parameter length. Log string begins
+			 * after that so add 4 to log param ptr.
+			 */
+			log_str_ptr = log_param_ptr + 4;
+
+			/*
+			 * Check to see if this is the
+			 * same line
+			 */
+			if (strncmp((char *)log_str_ptr, data->last_log_entry,
+			    SES_LOG_VALID_LOG_SIZE) == 0) {
+				/* Found an exact match */
+				log_param_ptr += param_len;
+				k += param_len;
+				match_found = 1;
+				break;
+			}
+			log_param_ptr += param_len;
 		}
 	}
 	if (!match_found) {
-		lpp = &resp[0] + 4;
-		k = len;
+		log_param_ptr = &resp[0] + 4;
+		k = 0;
+	}
+	if (k == all_log_data_len) {
+		/*
+		 * Either there was no log data or we have
+		 * already read these log entries.
+		 * Just return.
+		 */
+		return (0);
 	}
 
-	(void) memset(log_event_type, 0, sizeof (log_event_type));
-	(void) memset(seq_num, 0, sizeof (seq_num));
-	(void) memset(log_code, 0, sizeof (log_code));
-	(void) memset(save_buffer, 0, sizeof (save_buffer));
-	(void) memset(log_level, 0, sizeof (log_level));
+	/* Grab memory to return logs with */
+	if (nvlist_alloc(&data->log_data, NV_UNIQUE_NAME, 0) != 0) {
+		/* Couldn't alloc memory for nvlist */
+		return (SES_LOG_FAILED_NVLIST_CREATE);
+	}
 
-	/* K will be initialized from above */
-	for (; k > 0; k -= paramLen) {
-		if (k < 3) {
-			/* Should always have at least 3 Bytes for each entry */
-			/* If not, it must be a bad record so stop processing */
-			nvlist_free(log_data);
-			log_data = NULL;
-			return (SES_LOG_FAILED_SHORT_LOG_PARAM);
-		}
-		paramCode = (lpp[0] << 8) + lpp[1];
-		pcb = lpp[2];
-		paramLen = lpp[3] + 4;
+	(void) memset(log_event_type,	0, sizeof (log_event_type));
+	(void) memset(log_code,		0, sizeof (log_code));
+	(void) memset(save_buffer,	0, sizeof (save_buffer));
+	(void) memset(log_level,	0, sizeof (log_level));
+
+	/*
+	 * Start saving new log entries
+	 * Walk the log data adding any new entries
+	 */
+
+	for (; k < all_log_data_len; k += param_len) {
 		/*
-		 * initial log_str_ptr to point to string info of the log entry
-		 * First 4 bytes of log entry contains param code, control
-		 * byte, length
+		 * Calculate log entry length
+		 * Log ptr [3] contains the log length minus the header info
+		 * which is 4 bytes so add that in
 		 */
-		log_str_ptr = lpp + 4;
+		param_len = log_param_ptr[3] + 4;
+
+		if (param_len <= 4) {
+			/* Only header information in this entry */
+			/* process next log entry */
+			log_param_ptr += param_len;
+			continue;
+		}
+
+		/*
+		 * initialize log_str_ptr to point to string info of the log
+		 * entry. First 4 bytes of log entry contains param code,
+		 * control byte, and length. Log string starts after that.
+		 */
+		log_str_ptr = log_param_ptr + 4;
 
 		/*
 		 * Format of log str is as follows
@@ -367,124 +373,86 @@ save_logs(unsigned char *resp, int len, nvlist_t *log_data,
 		 * following example has extra spaces removed to fit in 80 char
 		 * 40004 0 42d5f5fe 185b 630002 fd0800 50800207 e482813
 		 */
-		if (paramLen > 4) {
-			if ((pcb & 0x1) && !(pcb & 2)) {
 
-				(void) strncpy(save_buffer,
-				    (const char *)log_str_ptr,
-				    SES_LOG_VALID_LOG_SIZE);
-				for (i = 0; (i < 8) && (s = strtok(i ? 0 :
-				    (char *)log_str_ptr, " ")); i++) {
-					char *ulp;
-					switch (i) {
-					case 0:
-						/* event type */
-						ulp = (char *)
-						    &log_event_type;
-					break;
-					case 3:
-						/* sequence number */
-						ulp = (char *)
-						    &seq_num;
-					break;
-					case 4:
-						/* log code */
-						ulp = (char *)
-						    &log_code;
-					break;
-					default:
-						ulp = 0;
-					}
+		(void) strncpy(save_buffer,
+		    (const char *)log_str_ptr,
+		    SES_LOG_VALID_LOG_SIZE);
 
-					if (ulp) {
-						(void) strncpy(ulp, s, 8);
-					}
-				}
+		(void) strncpy(log_event_type, (const char *)log_str_ptr +
+		    SES_LOG_EVENT_TYPE_START, SES_LOG_SPECIFIC_ENTRY_SIZE);
 
+		(void) strncpy(log_code,
+		    (const char *)log_str_ptr+SES_LOG_CODE_START,
+		    SES_LOG_SPECIFIC_ENTRY_SIZE);
 
-				seq_num_ul = strtoul(seq_num, 0, 16);
+		(void) strncpy(log_level,
+		    (const char *) log_str_ptr +
+		    SES_LOG_LEVEL_START, 1);
 
-				(void) strncpy(log_level,
-				    (const char *) log_str_ptr +
-				    SES_LOG_LEVEL_START, 1);
+		/* event type is in log_event_type */
+		/* 4x004 = looking for x */
+		type = (strtoul(log_event_type, 0, 16) >> 12) & 0xf;
 
-				/* event type is in log_event_type */
-				/* 4x004 = looking for x */
-				type = (strtoul(log_event_type, 0, 16) >> 12) &
-				    0xf;
-
-				/*
-				 * Check type. If type is 1, level needs to be
-				 * changed to FATAL. If type is something other
-				 * than 0 or 1, they are info only.
-				 */
-				if (type == 1) {
-					(void) strcpy(log_level, "4");
-				} else if (type > 1) {
-					/* These are not application log */
-					/* entries */
-					/* make them info only */
-					(void) strcpy(log_level, "0");
-				}
-
-				/* Add this entry to the nvlist log data */
-				if (nvlist_alloc(&entry,
-				    NV_UNIQUE_NAME, 0) != 0) {
-					nvlist_free(log_data);
-					log_data = NULL;
-					return (SES_LOG_FAILED_NV_UNIQUE);
-				}
-
-
-				if (nvlist_add_string(entry, ENTRY_LOG,
-				    save_buffer) != 0) {
-					nvlist_free(entry);
-					nvlist_free(log_data);
-					log_data = NULL;
-					return (SES_LOG_FAILED_NV_LOG);
-				}
-
-				if (nvlist_add_string(entry, ENTRY_CODE,
-				    log_code) != 0) {
-					nvlist_free(entry);
-					nvlist_free(log_data);
-					log_data = NULL;
-					return (SES_LOG_FAILED_NV_CODE);
-				}
-				if (nvlist_add_string(entry, ENTRY_SEVERITY,
-				    log_level) != 0) {
-					nvlist_free(entry);
-					nvlist_free(log_data);
-					log_data = NULL;
-					return (SES_LOG_FAILED_NV_SEV);
-				}
-
-				(void) snprintf(entry_num, sizeof (entry_num),
-				    "%s%d", ENTRY_PREFIX, paramCode);
-
-				if (nvlist_add_nvlist(log_data, entry_num,
-				    entry) != 0) {
-					nvlist_free(entry);
-					nvlist_free(log_data);
-					log_data = NULL;
-					return (SES_LOG_FAILED_NV_ENTRY);
-				}
-				nvlist_free(entry);
-
-				entry_added = 1;
-				(*number_log_entries)++;
-
-			}
+		/*
+		 * Check type. If type is 1, level needs to be
+		 * changed to FATAL(4). If type is something other
+		 * than 0 or 1, they are info only(0).
+		 */
+		if (type == 1) {
+			(void) strcpy(log_level, "4");
+		} else if (type > 1) {
+			/* These are not application log */
+			/* entries */
+			/* make them info only */
+			(void) strcpy(log_level, "0");
 		}
-		lpp += paramLen;
+
+		/* Add this entry to the nvlist log data */
+		if (nvlist_alloc(&entry, NV_UNIQUE_NAME, 0) != 0) {
+			/* Couldn't alloc space, return error */
+			return (SES_LOG_FAILED_NV_UNIQUE);
+		}
+
+
+		if (nvlist_add_string(entry, ENTRY_LOG, save_buffer) != 0) {
+			/* Error adding string, return error */
+			nvlist_free(entry);
+			return (SES_LOG_FAILED_NV_LOG);
+		}
+
+		if (nvlist_add_string(entry, ENTRY_CODE, log_code) != 0) {
+			/* Error adding string, return error */
+			nvlist_free(entry);
+			return (SES_LOG_FAILED_NV_CODE);
+		}
+		if (nvlist_add_string(entry, ENTRY_SEVERITY, log_level) != 0) {
+			/* Error adding srtring, return error */
+			nvlist_free(entry);
+			return (SES_LOG_FAILED_NV_SEV);
+		}
+
+		param_code = SCSI_READ16(&log_param_ptr[0]);
+
+		(void) snprintf(entry_num, sizeof (entry_num),
+		    "%s%d", ENTRY_PREFIX, param_code);
+
+		if (nvlist_add_nvlist(data->log_data, entry_num, entry) != 0) {
+			/* Error adding nvlist, return error */
+			nvlist_free(entry);
+			return (SES_LOG_FAILED_NV_ENTRY);
+		}
+		nvlist_free(entry);
+
+		entry_added = 1;
+		(data->number_log_entries)++;
+
+		log_param_ptr += param_len;
 
 	}
 	if (entry_added) {
 		/* Update the last log entry string with last one read */
-		(void) strncpy(last_log_entry, save_buffer, MAXNAMELEN);
+		(void) strncpy(data->last_log_entry, save_buffer, MAXNAMELEN);
 	}
-	*seq_num_ret = seq_num_ul;
-
 	return (0);
 }
 
@@ -562,7 +530,7 @@ sg_ll_mode_select10(int sg_fd, void * paramp, int param_len)
 
 	modesCmdBlk[1] = 0;
 	/*
-	 * modesCmdBlk 2   equal  0   PC 0 return current page code 0 return
+	 * modesCmdBlk 2 equal 0 PC 0 return current page code 0 return
 	 * vendor specific
 	 */
 
@@ -622,8 +590,7 @@ sg_ll_mode_select10(int sg_fd, void * paramp, int param_len)
  *	2-N  Mode parameters
  */
 static int
-sg_mode_page_offset(const unsigned char *resp, int resp_len,
-    char *err_buff, int err_buff_len)
+sg_mode_page_offset(const unsigned char *resp, int resp_len)
 {
 	int bd_len;
 	int calc_len;
@@ -641,15 +608,10 @@ sg_mode_page_offset(const unsigned char *resp, int resp_len,
 	offset = bd_len + MODE10_RESP_HDR_LEN;
 
 	if ((offset + 2) > resp_len) {
-		(void) snprintf(err_buff, err_buff_len,
-		    "given response length "
-		    "too small, offset=%d given_len=%d bd_len=%d\n",
-		    offset, resp_len, bd_len);
+		/* Given response length to small */
 		offset = -1;
 	} else if ((offset + 2) > calc_len) {
-		(void) snprintf(err_buff, err_buff_len, "calculated response "
-		    "length too small, offset=%d calc_len=%d bd_len=%d\n",
-		    offset, calc_len, bd_len);
+		/* Calculated response length too small */
 		offset = -1;
 	}
 	return (offset);
@@ -659,17 +621,19 @@ sg_mode_page_offset(const unsigned char *resp, int resp_len,
  * Clear logs
  */
 static int
-clear_log(int sg_fd, unsigned long seq_num, long poll_time)
+clear_log(int sg_fd, ses_log_call_t *data)
 {
 
 	int res, alloc_len, off;
 	int md_len;
 	int read_in_len = 0;
-	unsigned char ref_md[MX_ALLOC_LEN];
-	char ebuff[EBUFF_SZ];
+	unsigned char ref_md[MAX_ALLOC_LEN];
 	struct log_clear_control_struct clear_data;
 	long myhostid;
 	int error = 0;
+	long poll_time;
+	char seq_num_str[10];
+	unsigned long seq_num = 0;
 
 	(void) memset(&clear_data, 0, sizeof (clear_data));
 
@@ -684,12 +648,30 @@ clear_log(int sg_fd, unsigned long seq_num, long poll_time)
 	clear_data.host_id[14] = (myhostid & 0xff00) >> 8;
 	clear_data.host_id[15] = myhostid & 0xff;
 
-	/* Timeout set to 32 seconds for now */
-	/* Add 5 minutes to poll time to allow for data retrievel time */
+	/*
+	 * convert nanosecond time to seconds
+	 */
+	poll_time = data->poll_time / 1000000000;
+	/* Add 5 minutes to poll time to allow for data retrieval time */
 	poll_time = poll_time + 300;
 	clear_data.timeout[0] = (poll_time & 0xff00) >> 8;
 	clear_data.timeout[1] = poll_time & 0xff;
 
+	/*
+	 * retrieve the last read sequence number from the last
+	 * log entry read.
+	 */
+	if (data->last_log_entry != NULL &&
+	    (strlen(data->last_log_entry) == SES_LOG_VALID_LOG_SIZE)) {
+		/*
+		 * We have a valid log entry from a previous read log
+		 * operation.
+		 */
+		(void) strncpy(seq_num_str,
+		    (const char *) data->last_log_entry +
+		    SES_LOG_SEQ_NUM_START, 8);
+		seq_num = strtoul(seq_num_str, 0, 16);
+	}
 	clear_data.seq_clear[0] = (seq_num & 0xff000000) >> 24;
 	clear_data.seq_clear[1] = (seq_num & 0xff0000) >> 16;
 	clear_data.seq_clear[2] = (seq_num & 0xff00) >> 8;
@@ -699,8 +681,8 @@ clear_log(int sg_fd, unsigned long seq_num, long poll_time)
 
 
 	/* do MODE SENSE to fetch current values */
-	(void) memset(ref_md, 0, MX_ALLOC_LEN);
-	alloc_len = MX_ALLOC_LEN;
+	(void) memset(ref_md, 0, MAX_ALLOC_LEN);
+	alloc_len = MAX_ALLOC_LEN;
 
 
 	res = sg_ll_mode_sense10(sg_fd, ref_md, alloc_len);
@@ -711,7 +693,7 @@ clear_log(int sg_fd, unsigned long seq_num, long poll_time)
 	}
 
 	/* Setup mode Select to clear logs */
-	off = sg_mode_page_offset(ref_md, alloc_len, ebuff, EBUFF_SZ);
+	off = sg_mode_page_offset(ref_md, alloc_len);
 	if (off < 0) {
 		/* Mode page offset error */
 		error =  SES_LOG_FAILED_MODE_SENSE_OFFSET;
@@ -738,11 +720,11 @@ clear_log(int sg_fd, unsigned long seq_num, long poll_time)
 		/* reference model doesn't have use subpage format bit set */
 		/* Even though it should have */
 		/* don't send the command */
-		error = SES_LOG_FAILED_FORMAT_PAGE_ERROR;
+		error = SES_LOG_FAILED_FORMAT_PAGE_ERR;
 		return (error);
 	}
 
-	(void) memcpy(ref_md + off, (const void *) & clear_data,
+	(void) memcpy(ref_md + off, (const void *) &clear_data,
 	    sizeof (clear_data));
 
 	res = sg_ll_mode_select10(sg_fd, ref_md, md_len);
@@ -752,29 +734,21 @@ clear_log(int sg_fd, unsigned long seq_num, long poll_time)
 	}
 
 	return (error);
-
-
 }
 /*
  * Gather data from given device.
  */
 static int
-gatherData(char *device_name, nvlist_t *log_data, char *last_log_entry,
-    long poll_time, int *number_log_entries)
+gather_data(char *device_name, ses_log_call_t *data)
 {
 	int sg_fd;
-	unsigned long seq_num;
-	int pg_len, resp_len, res;
-	unsigned char rsp_buff[MX_ALLOC_LEN];
+	int resp_len, res;
+	unsigned char rsp_buff[MAX_ALLOC_LEN];
 	int error;
-
-
 
 	/* Open device */
 	if ((sg_fd = open_device(device_name)) < 0) {
 		/* Failed to open device */
-		nvlist_free(log_data);
-		log_data = NULL;
 		return (SES_LOG_FAILED_TO_OPEN_DEVICE);
 	}
 
@@ -783,33 +757,24 @@ gatherData(char *device_name, nvlist_t *log_data, char *last_log_entry,
 	resp_len = 0x8000; /* Maximum size available to read */
 	res = read_log(sg_fd, rsp_buff, resp_len);
 
-	if (res == 0) {
-		pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
-		if ((pg_len + 4) > resp_len) {
-			/* Didn't get entire response */
-			/* Process what we did get */
-			pg_len = resp_len - 4;
-		}
-	} else {
+	if (res != 0) {
 		/* Some sort of Error during read of logs */
-		nvlist_free(log_data);
-		log_data = NULL;
+		(void) close(sg_fd);
 		return (SES_LOG_FAILED_TO_READ_DEVICE);
 	}
 
 	/* Save the logs */
-	error = save_logs(rsp_buff, pg_len, log_data, last_log_entry,
-	    &seq_num, number_log_entries);
+	error = save_logs(rsp_buff, data);
 	if (error != 0) {
+		(void) close(sg_fd);
 		return (error);
 	}
-	/* Clear logs */
-	error = clear_log(sg_fd, seq_num, poll_time);
+	/* Clear the logs */
+	error = clear_log(sg_fd, data);
 
 	(void) close(sg_fd);
 
 	return (error);
-
 }
 
 /*
@@ -817,20 +782,19 @@ gatherData(char *device_name, nvlist_t *log_data, char *last_log_entry,
  * and return them in a nvlist.
  */
 int
-access_ses_log(struct ses_log_call_struct *data)
+access_ses_log(ses_log_call_t *data)
 {
 	char real_path[MAXPATHLEN];
-	long poll_time;
 	struct stat buffer;
 	int error;
+
+	/* Initialize return data */
+	data->log_data = NULL;
+	data->number_log_entries = 0;
 
 	if (data->target_path == NULL) {
 		/* NULL Target path, return error */
 		return (SES_LOG_FAILED_NULL_TARGET_PATH);
-	}
-	if (strncmp("SUN-GENESIS", data->product_id, 11) != 0) {
-		/* Not a supported node, return error */
-		return (SES_LOG_UNSUPPORTED_HW_ERROR);
 	}
 
 	/* Try to find a valid path */
@@ -847,30 +811,7 @@ access_ses_log(struct ses_log_call_struct *data)
 		}
 	}
 
-
-	/*
-	 * convert nanosecond time to seconds
-	 */
-	poll_time = data->poll_time / 1000000000;
-
-	error = nvlist_alloc(&data->log_data, NV_UNIQUE_NAME, 0);
-	if (error != 0) {
-		/* Couldn't alloc memory for nvlist */
-		return (SES_LOG_FAILED_NVLIST_CREATE);
-	}
-
-
-	/* Record the protocol used for later when an ereport is generated. */
-	error = nvlist_add_string(data->log_data, PROTOCOL, PROTOCOL_TYPE);
-	if (error != 0) {
-		nvlist_free(data->log_data);
-		data->log_data = NULL;
-		/* Error adding entry */
-		return (SES_LOG_FAILED_NVLIST_PROTOCOL);
-	}
-
-	error = gatherData(real_path, data->log_data, data->last_log_entry,
-	    poll_time, &data->number_log_entries);
+	error = gather_data(real_path, data);
 
 	/* Update the size of log entries being returned */
 	data->size_of_log_entries =
