@@ -610,6 +610,7 @@ fetch_zents(void)
 	FILE *fp;
 	boolean_t inaltroot;
 	zone_entry_t *zentp;
+	const char *altroot;
 
 	if (nzents > 0)
 		return (Z_OK);
@@ -640,15 +641,18 @@ again:
 	zents = safe_calloc(nzents, sizeof (zone_entry_t));
 
 	inaltroot = zonecfg_in_alt_root();
-	if (inaltroot)
+	if (inaltroot) {
 		fp = zonecfg_open_scratch("", B_FALSE);
-	else
+		altroot = zonecfg_get_root();
+	} else {
 		fp = NULL;
+	}
 	zentp = zents;
 	retv = Z_OK;
 	for (i = 0; i < nzents; i++) {
 		char name[ZONENAME_MAX];
 		char altname[ZONENAME_MAX];
+		char rev_altroot[MAXPATHLEN];
 
 		if (getzonenamebyid(zids[i], name, sizeof (name)) < 0) {
 			/*
@@ -665,12 +669,16 @@ again:
 				continue;
 			if (fp == NULL ||
 			    zonecfg_reverse_scratch(fp, name, altname,
-			    sizeof (altname), NULL, 0) == -1) {
+			    sizeof (altname), rev_altroot,
+			    sizeof (rev_altroot)) == -1) {
 				zerror(gettext("could not resolve scratch "
 				    "zone %s"), name);
 				retv = Z_ERR;
 				continue;
 			}
+			/* Ignore zones in other alternate roots */
+			if (strcmp(rev_altroot, altroot) != 0)
+				continue;
 			(void) strcpy(name, altname);
 		} else {
 			/* Ignore non-scratch when in an alternate root */
