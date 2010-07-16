@@ -486,14 +486,17 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 			phyp->target = NULL;
 		}
 		target->phy = NULL;
+		if (phyp) {
+			mutex_exit(&phyp->phy_lock);
+		}
 		pmcs_destroy_target(target);
 	} else {
 		mutex_exit(&target->statlock);
+		if (phyp) {
+			mutex_exit(&phyp->phy_lock);
+		}
 	}
 
-	if (phyp) {
-		mutex_exit(&phyp->phy_lock);
-	}
 	mutex_exit(&pwp->lock);
 }
 
