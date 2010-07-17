@@ -3325,6 +3325,7 @@ ipadm_refresh_addr(ipadm_handle_t iph, const char *aobjname,
 	if (!ipadm_check_auth())
 		return (IPADM_EAUTH);
 
+	bzero(&ipaddr, sizeof (ipaddr));
 	/* validate input */
 	if (aobjname == NULL || strlcpy(ipaddr.ipadm_aobjname, aobjname,
 	    IPADM_AOBJSIZ) >= IPADM_AOBJSIZ) {
@@ -3350,6 +3351,9 @@ ipadm_refresh_addr(ipadm_handle_t iph, const char *aobjname,
 		if (status != IPADM_SUCCESS)
 			return (status);
 		if (inform) {
+			if (dhcp_start_agent(DHCP_IPC_MAX_WAIT) == -1)
+				return (IPADM_DHCP_START_ERROR);
+
 			ipaddr.ipadm_wait = IPADM_DHCP_WAIT_DEFAULT;
 			return (i_ipadm_op_dhcp(&ipaddr, DHCP_INFORM, NULL));
 		}
