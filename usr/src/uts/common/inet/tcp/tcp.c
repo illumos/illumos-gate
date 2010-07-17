@@ -853,13 +853,11 @@ tcp_clean_death(tcp_t *tcp, int err)
 			if (!tcp->tcp_tconnind_started) {
 				CONN_DEC_REF(connp);
 			} else {
-				int32_t oldstate = tcp->tcp_state;
-
 				tcp->tcp_state = TCPS_BOUND;
 				DTRACE_TCP6(state__change, void, NULL,
 				    ip_xmit_attr_t *, connp->conn_ixa,
 				    void, NULL, tcp_t *, tcp, void, NULL,
-				    int32_t, oldstate);
+				    int32_t, TCPS_CLOSED);
 			}
 		} else {
 			tcp_close_detached(tcp);
@@ -948,6 +946,9 @@ tcp_clean_death(tcp_t *tcp, int err)
 	if (tcp->tcp_listener != NULL && IPCL_IS_NONSTR(connp)) {
 		tcp_closei_local(tcp);
 		tcp->tcp_state = TCPS_BOUND;
+		DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+		    connp->conn_ixa, void, NULL, tcp_t *, tcp, void, NULL,
+		    int32_t, TCPS_CLOSED);
 		return (0);
 	}
 
