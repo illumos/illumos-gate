@@ -846,10 +846,7 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_pwork(pwp, pwrk);
-	pmcs_smp_release(iport);
-	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
-
 	if (result) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
 
@@ -862,8 +859,12 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 			    "%s: Issuing SMP ABORT for htag 0x%08x",
 			    __func__, htag);
 		}
+		pmcs_smp_release(iport);
+		pmcs_rele_iport(iport);
 		return (EIO);
 	}
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
 	status = LE_32(iomb[stsoff]);
 
 	if (status != PMCOUT_STATUS_OK) {
@@ -4218,10 +4219,23 @@ again:
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_lock_phy(pptr);
+	if (result) {
+		pmcs_timed_out(pwp, htag, __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+		    "%s: Issuing SMP ABORT for htag 0x%08x", __func__, htag);
+		if (pmcs_abort(pwp, pptr, htag, 0, 1)) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+			    "%s: SMP ABORT failed for cmd (htag 0x%08x)",
+			    __func__, htag);
+		}
+		pmcs_smp_release(iport);
+		pmcs_rele_iport(iport);
+		result = 0;
+		goto out;
+	}
 	pmcs_smp_release(iport);
 	pmcs_rele_iport(iport);
-	pmcs_lock_phy(pptr);
-
 
 	mutex_enter(&pwp->config_lock);
 	if (pwp->config_changed) {
@@ -4232,22 +4246,6 @@ again:
 	}
 	mutex_exit(&pwp->config_lock);
 
-	if (result) {
-		pmcs_timed_out(pwp, htag, __func__);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-		    "%s: Issuing SMP ABORT for htag 0x%08x", __func__, htag);
-		if (pmcs_abort(pwp, pptr, htag, 0, 0)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-			    "%s: Unable to issue SMP ABORT for htag 0x%08x",
-			    __func__, htag);
-		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-			    "%s: Issuing SMP ABORT for htag 0x%08x",
-			    __func__, htag);
-		}
-		result = 0;
-		goto out;
-	}
 	ptr = (void *)pwp->scratch;
 	status = LE_32(ptr[2]);
 	if (status == PMCOUT_STATUS_UNDERFLOW ||
@@ -4457,9 +4455,22 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	pmcs_unlock_phy(expander);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_lock_phy(expander);
+	if (result) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+		    "%s: Issuing SMP ABORT for htag 0x%08x", __func__, htag);
+		if (pmcs_abort(pwp, pptr, htag, 0, 1)) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+			    "%s: SMP ABORT failed for cmd (htag 0x%08x)",
+			    __func__, htag);
+		}
+		pmcs_smp_release(iport);
+		pmcs_rele_iport(iport);
+		result = -ETIMEDOUT;
+		goto out;
+	}
 	pmcs_smp_release(iport);
 	pmcs_rele_iport(iport);
-	pmcs_lock_phy(expander);
 
 	mutex_enter(&pwp->config_lock);
 	if (pwp->config_changed) {
@@ -4468,22 +4479,8 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 		result = 0;
 		goto out;
 	}
-	mutex_exit(&pwp->config_lock);
 
-	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
-		if (pmcs_abort(pwp, expander, htag, 0, 0)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-			    "%s: Unable to issue SMP ABORT for htag 0x%08x",
-			    __func__, htag);
-		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-			    "%s: Issuing SMP ABORT for htag 0x%08x",
-			    __func__, htag);
-		}
-		result = -ETIMEDOUT;
-		goto out;
-	}
+	mutex_exit(&pwp->config_lock);
 	ptr = (void *)pwp->scratch;
 	/*
 	 * Point roff to the DMA offset for returned data

@@ -1120,10 +1120,7 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, smp_pkt->smp_pkt_timeout * 1000, result);
 	pmcs_pwork(pwp, pwrk);
-	pmcs_smp_release(iport);
-	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
-
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);
 		if (pmcs_abort(pwp, pptr, htag, 0, 0)) {
@@ -1135,11 +1132,15 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 			    "%s: Issuing SMP ABORT for htag 0x%08x",
 			    __func__, htag);
 		}
+		pmcs_smp_release(iport);
+		pmcs_rele_iport(iport);
 		pmcs_unlock_phy(pptr);
 		pmcs_release_scratch(pwp);
 		smp_pkt->smp_pkt_reason = ETIMEDOUT;
 		return (DDI_FAILURE);
 	}
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
 	status = LE_32(msg[2]);
 	if (status == PMCOUT_STATUS_OVERFLOW) {
 		status = PMCOUT_STATUS_OK;

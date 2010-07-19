@@ -599,7 +599,7 @@ no_action:
  * it involves sending multiple commands to device and we should not do it
  * in the interrupt context.
  * If it is failure of a recovery command, let the recovery thread deal with it.
- * Called with pmcwork lock held.
+ * Called with the work lock held.
  */
 void
 pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
@@ -642,7 +642,10 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 		RESTART_DISCOVERY(pwp);
 		return;
 	} else {
+		/* We have a phy pointer, we'll need to lock it */
+		mutex_exit(&pwrk->lock);
 		pmcs_lock_phy(pptr);
+		mutex_enter(&pwrk->lock);
 		if (tgt != NULL) {
 			mutex_enter(&tgt->statlock);
 		}
@@ -659,8 +662,8 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 			if (tgt != NULL) {
 				mutex_exit(&tgt->statlock);
 			}
-			pmcs_unlock_phy(pptr);
 			mutex_exit(&pwrk->lock);
+			pmcs_unlock_phy(pptr);
 			SCHEDULE_WORK(pwp, PMCS_WORK_ABORT_HANDLE);
 			RESTART_DISCOVERY(pwp);
 			return;
@@ -681,8 +684,8 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 			if (tgt != NULL) {
 				mutex_exit(&tgt->statlock);
 			}
+			mutex_exit(&pwrk->lock);
 			pmcs_unlock_phy(pptr);
-			mutex_exit(&pwrk->lock); /* XXX: Is this right??? */
 			return;
 		}
 
@@ -691,6 +694,8 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 			    "%s: Not scheduling SSP event recovery for NULL tgt"
 			    " pwrk(%p) tag(0x%x)", __func__, (void *)pwrk,
 			    pwrk->htag);
+			mutex_exit(&pwrk->lock);
+			pmcs_unlock_phy(pptr);
 			return;
 		}
 
@@ -706,6 +711,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 			    __func__, pwrk->htag);
 
 			mutex_exit(&tgt->statlock);
+			/* Note: work remains locked for the callback */
 			pmcs_unlock_phy(pptr);
 			pwrk->ssp_event = event;
 			callback = (pmcs_cb_t)pwrk->ptr;
@@ -719,13 +725,13 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 		 */
 		tgt->event_recovery = 1;
 		mutex_exit(&tgt->statlock);
-		pmcs_unlock_phy(pptr);
 		pwrk->ssp_event = event;
+		mutex_exit(&pwrk->lock);
+		pmcs_unlock_phy(pptr);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
 		    "%s: Scheduling SSP event recovery for tgt(0x%p) "
 		    "pwrk(%p) tag(0x%x)", __func__, (void *)tgt, (void *)pwrk,
 		    pwrk->htag);
-		mutex_exit(&pwrk->lock);
 		SCHEDULE_WORK(pwp, PMCS_WORK_SSP_EVT_RECOVERY);
 	}
 
