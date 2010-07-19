@@ -57,7 +57,7 @@ static struct kmem_cache *rdsv3_conn_slab = NULL;
 
 #define	rdsv3_conn_info_set(var, test, suffix) do {               \
 	if (test)                                               \
-		var |= RDSV3_INFO_CONNECTION_FLAG_##suffix;     \
+		var |= RDS_INFO_CONNECTION_FLAG_##suffix;     \
 } while (0)
 
 
@@ -420,7 +420,7 @@ rdsv3_conn_message_info(struct rsock *sock, unsigned int len,
 
 	RDSV3_DPRINTF4("rdsv3_conn_message_info", "Enter");
 
-	len /= sizeof (struct rdsv3_info_message);
+	len /= sizeof (struct rds_info_message);
 
 	rw_enter(&rdsv3_conn_lock, RW_READER);
 
@@ -455,7 +455,7 @@ rdsv3_conn_message_info(struct rsock *sock, unsigned int len,
 	rw_exit(&rdsv3_conn_lock);
 
 	lens->nr = total;
-	lens->each = sizeof (struct rdsv3_info_message);
+	lens->each = sizeof (struct rds_info_message);
 
 	RDSV3_DPRINTF4("rdsv3_conn_message_info", "Return");
 }
@@ -531,7 +531,7 @@ rdsv3_for_each_conn_info(struct rsock *sock, unsigned int len,
 static int
 rdsv3_conn_info_visitor(struct rdsv3_connection *conn, void *buffer)
 {
-	struct rdsv3_info_connection *cinfo = buffer;
+	struct rds_info_connection *cinfo = buffer;
 
 	cinfo->next_tx_seq = conn->c_next_tx_seq;
 	cinfo->next_rx_seq = conn->c_next_rx_seq;
@@ -559,7 +559,7 @@ rdsv3_conn_info(struct rsock *sock, unsigned int len,
     struct rdsv3_info_iterator *iter, struct rdsv3_info_lengths *lens)
 {
 	rdsv3_for_each_conn_info(sock, len, iter, lens,
-	    rdsv3_conn_info_visitor, sizeof (struct rdsv3_info_connection));
+	    rdsv3_conn_info_visitor, sizeof (struct rds_info_connection));
 }
 
 int
@@ -584,10 +584,10 @@ rdsv3_conn_init()
 
 	rdsv3_loop_init();
 
-	rdsv3_info_register_func(RDSV3_INFO_CONNECTIONS, rdsv3_conn_info);
-	rdsv3_info_register_func(RDSV3_INFO_SEND_MESSAGES,
+	rdsv3_info_register_func(RDS_INFO_CONNECTIONS, rdsv3_conn_info);
+	rdsv3_info_register_func(RDS_INFO_SEND_MESSAGES,
 	    rdsv3_conn_message_info_send);
-	rdsv3_info_register_func(RDSV3_INFO_RETRANS_MESSAGES,
+	rdsv3_info_register_func(RDS_INFO_RETRANS_MESSAGES,
 	    rdsv3_conn_message_info_retrans);
 
 	RDSV3_DPRINTF4("rdsv3_conn_init", "Return");

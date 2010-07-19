@@ -400,7 +400,7 @@ rdsv3_cong_wait(struct rdsv3_cong_map *map, uint16_be_t port, int nonblock,
 			 */
 			mutex_enter(&rs->rs_lock);
 			rs->rs_cong_mask |=
-			    RDSV3_CONG_MONITOR_MASK(ntohs(port));
+			    RDS_CONG_MONITOR_MASK(ntohs(port));
 			mutex_exit(&rs->rs_lock);
 
 			/*

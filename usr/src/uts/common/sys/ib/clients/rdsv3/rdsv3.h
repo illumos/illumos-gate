@@ -241,7 +241,7 @@ struct rdsv3_incoming {
 	unsigned long		i_rx_jiffies;
 	uint32_be_t		i_saddr;
 
-	rdsv3_rdma_cookie_t	i_rdma_cookie;
+	rds_rdma_cookie_t	i_rdma_cookie;
 };
 
 /*
@@ -301,7 +301,7 @@ struct rdsv3_message {
 
 	struct rdsv3_sock	*m_rs;
 	struct rdsv3_rdma_op	*m_rdma_op;
-	rdsv3_rdma_cookie_t	m_rdma_cookie;
+	rds_rdma_cookie_t	m_rdma_cookie;
 	struct rdsv3_mr		*m_rdma_mr;
 	unsigned int		m_nents;
 	unsigned int		m_count;
@@ -390,7 +390,7 @@ struct rdsv3_transport {
 	unsigned int (*stats_info_copy)(struct rdsv3_info_iterator *iter,
 	    unsigned int avail);
 	void (*exit)(void);
-	void *(*get_mr)(struct rdsv3_iovec *sg, unsigned long nr_sg,
+	void *(*get_mr)(struct rds_iovec *sg, unsigned long nr_sg,
 	    struct rdsv3_sock *rs, uint32_t *key_ret);
 	void (*sync_mr)(void *trans_private, int direction);
 	void (*free_mr)(void *trans_private, int invalidate);

@@ -274,7 +274,7 @@ static int
 rds_ib_conn_info_visitor(struct rdsv3_connection *conn,
     void *buffer)
 {
-	struct rdsv3_info_rdma_connection *iinfo = buffer;
+	struct rds_info_rdma_connection *iinfo = buffer;
 	struct rdsv3_ib_connection *ic;
 
 	RDSV3_DPRINTF4("rds_ib_conn_info_visitor", "conn: %p buffer: %p",
@@ -321,7 +321,7 @@ rds_ib_ic_info(struct rsock *sock, unsigned int len,
 
 	rdsv3_for_each_conn_info(sock, len, iter, lens,
 	    rds_ib_conn_info_visitor,
-	    sizeof (struct rdsv3_info_rdma_connection));
+	    sizeof (struct rds_info_rdma_connection));
 }
 
 /*
@@ -379,7 +379,7 @@ rdsv3_ib_exit(void)
 {
 	RDSV3_DPRINTF4("rds_ib_exit", "Enter");
 
-	rdsv3_info_deregister_func(RDSV3_INFO_IB_CONNECTIONS, rds_ib_ic_info);
+	rdsv3_info_deregister_func(RDS_INFO_IB_CONNECTIONS, rds_ib_ic_info);
 	rdsv3_ib_destroy_nodev_conns();
 	ib_unregister_client(&rdsv3_ib_client);
 	rdsv3_ib_sysctl_exit();
@@ -452,7 +452,7 @@ rdsv3_ib_init(void)
 	if (ret)
 		goto out_recv;
 
-	rdsv3_info_register_func(RDSV3_INFO_IB_CONNECTIONS, rds_ib_ic_info);
+	rdsv3_info_register_func(RDS_INFO_IB_CONNECTIONS, rds_ib_ic_info);
 
 	RDSV3_DPRINTF4("rds_ib_init", "Return");
 

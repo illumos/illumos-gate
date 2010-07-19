@@ -369,7 +369,7 @@ restart:
 
 	/* Nuke any messages we decided not to retransmit. */
 	if (!list_is_empty(&to_be_dropped))
-		rdsv3_send_remove_from_sock(&to_be_dropped, RDSV3_RDMA_DROPPED);
+		rdsv3_send_remove_from_sock(&to_be_dropped, RDS_RDMA_DROPPED);
 
 	if (conn->c_trans->xmit_complete)
 		conn->c_trans->xmit_complete(conn);
@@ -711,7 +711,7 @@ XXX
 	mutex_exit(&conn->c_lock);
 
 	/* now remove the messages from the sock list as needed */
-	rdsv3_send_remove_from_sock(&list, RDSV3_RDMA_SUCCESS);
+	rdsv3_send_remove_from_sock(&list, RDS_RDMA_SUCCESS);
 
 	RDSV3_DPRINTF4("rdsv3_send_drop_acked", "Return(conn: %p)", conn);
 }
@@ -756,7 +756,7 @@ rdsv3_send_drop_to(struct rdsv3_sock *rs, struct sockaddr_in *dest)
 		 */
 		mutex_enter(&rm->m_rs_lock);
 		/* If this is a RDMA operation, notify the app. */
-		__rdsv3_rdma_send_complete(rs, rm, RDSV3_RDMA_CANCELED);
+		__rdsv3_rdma_send_complete(rs, rm, RDS_RDMA_CANCELED);
 		rm->m_rs = NULL;
 		mutex_exit(&rm->m_rs_lock);
 
@@ -901,15 +901,15 @@ rdsv3_cmsg_send(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 		 * rm->m_rdma_cookie and rm->m_rdma_mr.
 		 */
 		switch (cmsg->cmsg_type) {
-		case RDSV3_CMSG_RDMA_ARGS:
+		case RDS_CMSG_RDMA_ARGS:
 			ret = rdsv3_cmsg_rdma_args(rs, rm, cmsg);
 			break;
 
-		case RDSV3_CMSG_RDMA_DEST:
+		case RDS_CMSG_RDMA_DEST:
 			ret = rdsv3_cmsg_rdma_dest(rs, rm, cmsg);
 			break;
 
-		case RDSV3_CMSG_RDMA_MAP:
+		case RDS_CMSG_RDMA_MAP:
 			ret = rdsv3_cmsg_rdma_map(rs, rm, cmsg);
 			if (ret)
 				*allocated_mr = 1;

@@ -44,7 +44,7 @@ struct rdsv3_mr {
 
 struct rdsv3_rdma_sg {
 	ddi_umem_cookie_t umem_cookie;
-	struct rdsv3_iovec iovec;
+	struct rds_iovec iovec;
 	ibt_send_wr_t	swr;
 	ibt_mi_hdl_t	mihdl;
 	ibt_hca_hdl_t	hca_hdl;
@@ -66,20 +66,20 @@ struct rdsv3_rdma_op {
 	struct rdsv3_rdma_sg	r_rdma_sg[1];
 };
 
-static inline rdsv3_rdma_cookie_t
+static inline rds_rdma_cookie_t
 rdsv3_rdma_make_cookie(uint32_t r_key, uint32_t offset)
 {
 	return (r_key | (((uint64_t)offset) << 32));
 }
 
 static inline uint32_t
-rdsv3_rdma_cookie_key(rdsv3_rdma_cookie_t cookie)
+rdsv3_rdma_cookie_key(rds_rdma_cookie_t cookie)
 {
 	return ((uint32_t)cookie);
 }
 
 static inline uint32_t
-rdsv3_rdma_cookie_offset(rdsv3_rdma_cookie_t cookie)
+rdsv3_rdma_cookie_offset(rds_rdma_cookie_t cookie)
 {
 	return (cookie >> 32);
 }

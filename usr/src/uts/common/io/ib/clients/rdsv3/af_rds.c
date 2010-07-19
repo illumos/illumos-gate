@@ -444,8 +444,8 @@ rdsv3_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 		break;
 
 	default:
-		if ((cmd >= RDSV3_INFO_FIRST) &&
-		    (cmd <= RDSV3_INFO_LAST)) {
+		if ((cmd >= RDS_INFO_FIRST) &&
+		    (cmd <= RDS_INFO_LAST)) {
 			return (rdsv3_info_ioctl((struct rsock *)proto_handle,
 			    cmd, (char *)arg, rvalp));
 		}
@@ -527,23 +527,23 @@ rdsv3_setsockopt(sock_lower_handle_t proto_handle, int level,
 	    rs, level, optname);
 
 	switch (optname) {
-	case RDSV3_CANCEL_SENT_TO:
+	case RDS_CANCEL_SENT_TO:
 		ret = rdsv3_cancel_sent_to(rs, (char *)optval, optlen);
 		break;
-	case RDSV3_GET_MR:
+	case RDS_GET_MR:
 		ret = rdsv3_get_mr(rs, optval, optlen);
 		break;
-	case RDSV3_GET_MR_FOR_DEST:
+	case RDS_GET_MR_FOR_DEST:
 		ret = rdsv3_get_mr_for_dest(rs, optval, optlen);
 		break;
-	case RDSV3_FREE_MR:
+	case RDS_FREE_MR:
 		ret = rdsv3_free_mr(rs, optval, optlen);
 		break;
-	case RDSV3_RECVERR:
+	case RDS_RECVERR:
 		ret = rdsv3_set_bool_option(&rs->rs_recverr,
 		    (char *)optval, optlen);
 		break;
-	case RDSV3_CONG_MONITOR:
+	case RDS_CONG_MONITOR:
 		ret = rdsv3_cong_monitor(rs, (char *)optval, optlen);
 		break;
 	case SO_SNDBUF:
@@ -593,7 +593,7 @@ rdsv3_getsockopt(sock_lower_handle_t proto_handle, int level,
 			*optlen = sizeof (uint_t);
 		}
 		return (ret);
-	case RDSV3_RECVERR:
+	case RDS_RECVERR:
 		RDSV3_DPRINTF4("rdsv3_getsockopt", "RDSV3_RECVERR(%d)",
 		    rs->rs_recverr);
 		if (*optlen < sizeof (int))
@@ -881,7 +881,7 @@ rdsv3_sock_inc_info(struct rsock *sock, unsigned int len,
 	RDSV3_DPRINTF4("rdsv3_sock_inc_info", "Enter(rs: %p)",
 	    rdsv3_sk_to_rs(sock));
 
-	len /= sizeof (struct rdsv3_info_message);
+	len /= sizeof (struct rds_info_message);
 
 	mutex_enter(&rdsv3_sock_lock);
 
@@ -902,7 +902,7 @@ rdsv3_sock_inc_info(struct rsock *sock, unsigned int len,
 	mutex_exit(&rdsv3_sock_lock);
 
 	lens->nr = total;
-	lens->each = sizeof (struct rdsv3_info_message);
+	lens->each = sizeof (struct rds_info_message);
 
 	RDSV3_DPRINTF4("rdsv3_sock_inc_info", "return(rs: %p)",
 	    rdsv3_sk_to_rs(sock));
@@ -912,21 +912,21 @@ static void
 rdsv3_sock_info(struct rsock *sock, unsigned int len,
     struct rdsv3_info_iterator *iter, struct rdsv3_info_lengths *lens)
 {
-	struct rdsv3_info_socket sinfo;
+	struct rds_info_socket sinfo;
 	struct rdsv3_sock *rs;
 	unsigned long bytes;
 
 	RDSV3_DPRINTF4("rdsv3_sock_info", "Enter(rs: %p)",
 	    rdsv3_sk_to_rs(sock));
 
-	len /= sizeof (struct rdsv3_info_socket);
+	len /= sizeof (struct rds_info_socket);
 
 	mutex_enter(&rdsv3_sock_lock);
 
 	if ((len < rdsv3_sock_count) || (iter->addr == NULL))
 		goto out;
 
-	bytes = sizeof (struct rdsv3_info_socket);
+	bytes = sizeof (struct rds_info_socket);
 	RDSV3_FOR_EACH_LIST_NODE(rs, &rdsv3_sock_list, rs_item) {
 		sinfo.sndbuf = rdsv3_sk_sndbuf(rs);
 		sinfo.rcvbuf = rdsv3_sk_rcvbuf(rs);
@@ -943,7 +943,7 @@ rdsv3_sock_info(struct rsock *sock, unsigned int len,
 
 out:
 	lens->nr = rdsv3_sock_count;
-	lens->each = sizeof (struct rdsv3_info_socket);
+	lens->each = sizeof (struct rds_info_socket);
 
 	mutex_exit(&rdsv3_sock_lock);
 }
@@ -976,8 +976,8 @@ rdsv3_exit(void)
 	rdsv3_sysctl_exit();
 	rdsv3_threads_exit();
 	rdsv3_stats_exit();
-	rdsv3_info_deregister_func(RDSV3_INFO_SOCKETS, rdsv3_sock_info);
-	rdsv3_info_deregister_func(RDSV3_INFO_RECV_MESSAGES,
+	rdsv3_info_deregister_func(RDS_INFO_SOCKETS, rdsv3_sock_info);
+	rdsv3_info_deregister_func(RDS_INFO_RECV_MESSAGES,
 	    rdsv3_sock_inc_info);
 
 	if (rdsv3_rdma_dwp) {
@@ -1011,8 +1011,8 @@ rdsv3_init()
 	if (ret)
 		goto out_sysctl;
 
-	rdsv3_info_register_func(RDSV3_INFO_SOCKETS, rdsv3_sock_info);
-	rdsv3_info_register_func(RDSV3_INFO_RECV_MESSAGES, rdsv3_sock_inc_info);
+	rdsv3_info_register_func(RDS_INFO_SOCKETS, rdsv3_sock_info);
+	rdsv3_info_register_func(RDS_INFO_RECV_MESSAGES, rdsv3_sock_inc_info);
 
 	/* rdsv3_rdma_init need to be called with a little delay */
 	rdsv3_rdma_dwp = kmem_zalloc(sizeof (rdsv3_delayed_work_t), KM_SLEEP);

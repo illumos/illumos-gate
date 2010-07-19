@@ -344,7 +344,7 @@ int
 rdsv3_notify_queue_get(struct rdsv3_sock *rs, struct msghdr *msghdr)
 {
 	struct rdsv3_notifier *notifier;
-	struct rdsv3_rdma_notify cmsg;
+	struct rds_rdma_notify cmsg;
 	unsigned int count = 0, max_messages = ~0U;
 	list_t copy;
 	int err = 0;
@@ -392,7 +392,7 @@ rdsv3_notify_queue_get(struct rdsv3_sock *rs, struct msghdr *msghdr)
 			cmsg.status  = notifier->n_status;
 
 			err = rdsv3_put_cmsg(msghdr, SOL_RDS,
-			    RDSV3_CMSG_RDMA_STATUS, sizeof (cmsg), &cmsg);
+			    RDS_CMSG_RDMA_STATUS, sizeof (cmsg), &cmsg);
 			if (err)
 				break;
 		}
@@ -425,7 +425,7 @@ rdsv3_notify_cong(struct rdsv3_sock *rs, struct msghdr *msghdr)
 	uint64_t notify = rs->rs_cong_notify;
 	int err;
 
-	err = rdsv3_put_cmsg(msghdr, SOL_RDS, RDSV3_CMSG_CONG_UPDATE,
+	err = rdsv3_put_cmsg(msghdr, SOL_RDS, RDS_CMSG_CONG_UPDATE,
 	    sizeof (notify), &notify);
 	if (err)
 		return (err);
@@ -443,7 +443,7 @@ rdsv3_notify_cong(struct rdsv3_sock *rs, struct msghdr *msghdr)
 static int
 rdsv3_cmsg_recv(struct rdsv3_incoming *inc, struct msghdr *msg)
 {
-	return (rdsv3_put_cmsg(msg, SOL_RDS, RDSV3_CMSG_RDMA_DEST,
+	return (rdsv3_put_cmsg(msg, SOL_RDS, RDS_CMSG_RDMA_DEST,
 	    sizeof (inc->i_rdma_cookie), &inc->i_rdma_cookie));
 }
 
@@ -648,7 +648,7 @@ rdsv3_inc_info_copy(struct rdsv3_incoming *inc,
     struct rdsv3_info_iterator *iter,
     uint32_be_t saddr, uint32_be_t daddr, int flip)
 {
-	struct rdsv3_info_message minfo;
+	struct rds_info_message minfo;
 
 	minfo.seq = ntohll(inc->i_hdr.h_sequence);
 	minfo.len = ntohl(inc->i_hdr.h_len);

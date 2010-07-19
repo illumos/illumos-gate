@@ -303,8 +303,8 @@ static inline void rdsv3_ib_destroy_conns(struct rdsv3_ib_device *rds_ibdev)
 int rdsv3_ib_create_mr_pool(struct rdsv3_ib_device *);
 void rdsv3_ib_destroy_mr_pool(struct rdsv3_ib_device *);
 void rdsv3_ib_get_mr_info(struct rdsv3_ib_device *rds_ibdev,
-	struct rdsv3_info_rdma_connection *iinfo);
-void *rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
+	struct rds_info_rdma_connection *iinfo);
+void *rdsv3_ib_get_mr(struct rds_iovec *args, unsigned long nents,
 	struct rdsv3_sock *rs, uint32_t *key_ret);
 void rdsv3_ib_sync_mr(void *trans_private, int dir);
 void rdsv3_ib_free_mr(void *trans_private, int invalidate);

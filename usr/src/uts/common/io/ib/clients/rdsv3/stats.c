@@ -87,7 +87,7 @@ void
 rdsv3_stats_info_copy(struct rdsv3_info_iterator *iter,
     uint64_t *values, char **names, size_t nr)
 {
-	struct rdsv3_info_counter ctr;
+	struct rds_info_counter ctr;
 	size_t i;
 
 	for (i = 0; i < nr; i++) {
@@ -123,7 +123,7 @@ rdsv3_stats_info(struct rsock *sock, unsigned int len,
 	int cpu;
 	unsigned int avail;
 
-	avail = len / sizeof (struct rdsv3_info_counter);
+	avail = len / sizeof (struct rds_info_counter);
 
 	if (avail < ARRAY_SIZE(rdsv3_stat_names)) {
 		avail = 0;
@@ -146,7 +146,7 @@ rdsv3_stats_info(struct rsock *sock, unsigned int len,
 	avail -= ARRAY_SIZE(rdsv3_stat_names);
 
 trans:
-	lens->each = sizeof (struct rdsv3_info_counter);
+	lens->each = sizeof (struct rds_info_counter);
 	lens->nr = rdsv3_trans_stats_info_copy(iter, avail) +
 	    ARRAY_SIZE(rdsv3_stat_names);
 }
@@ -154,12 +154,12 @@ trans:
 void
 rdsv3_stats_exit(void)
 {
-	rdsv3_info_deregister_func(RDSV3_INFO_COUNTERS, rdsv3_stats_info);
+	rdsv3_info_deregister_func(RDS_INFO_COUNTERS, rdsv3_stats_info);
 }
 
 int
 rdsv3_stats_init(void)
 {
-	rdsv3_info_register_func(RDSV3_INFO_COUNTERS, rdsv3_stats_info);
+	rdsv3_info_register_func(RDS_INFO_COUNTERS, rdsv3_stats_info);
 	return (0);
 }
