@@ -854,3 +854,24 @@ nwam_get_loc_prop()
 	echo $value
 	return $rtn
 }
+
+#
+# nwam_get_loc_list_prop location property
+#
+# echoes a space-separated list of the property values for the given location
+# return:
+#	0 => property is set
+#	1 => property is not set
+#
+nwam_get_loc_list_prop()
+{
+	clist=`/usr/sbin/nwamcfg "select loc $1; get -V $2" 2>/dev/null`
+	rtn=$?
+	#
+	# nwamcfg gives us a comma-separated list;
+	# need to convert commas to spaces.
+	#
+	slist=`echo $clist | sed -e s/","/" "/g`
+	echo $slist
+	return $rtn
+}
