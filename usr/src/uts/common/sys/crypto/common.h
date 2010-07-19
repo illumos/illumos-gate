@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_CRYPTO_COMMON_H
@@ -571,6 +570,11 @@ typedef enum cmd_type {
 #define	CRYPTO_OLD_CTX_TEMPLATE			0x00000051
 #define	CRYPTO_WEAK_KEY				0x00000052
 #define	CRYPTO_FIPS140_ERROR			0x00000053
+/*
+ * Don't forget to update CRYPTO_LAST_ERROR and the error_number_table[]
+ * in kernelUtil.c when new error code is added.
+ */
+#define	CRYPTO_LAST_ERROR			0x00000053
 
 /*
  * Special values that can be used to indicate that information is unavailable
