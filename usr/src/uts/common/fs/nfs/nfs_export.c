@@ -1103,6 +1103,9 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 
 	/* Do not allow sharing another vnode for already shared path */
 	if (ex1 && !PSEUDO(ex1) && !VN_CMP(ex1->exi_vp, vp)) {
+		VN_RELE(vp);
+		if (dvp != NULL)
+			VN_RELE(dvp);
 		pn_free(&lookpn);
 		exi_rele(ex1);
 		return (EEXIST);
@@ -1145,6 +1148,9 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 		    strcmp(ex2->exi_export.ex_path, lookpn.pn_path) != 0) {
 			DTRACE_PROBE(nfss__i__exported_lock2_stop);
 			rw_exit(&exported_lock);
+			VN_RELE(vp);
+			if (dvp != NULL)
+				VN_RELE(dvp);
 			pn_free(&lookpn);
 			return (EEXIST);
 		}
