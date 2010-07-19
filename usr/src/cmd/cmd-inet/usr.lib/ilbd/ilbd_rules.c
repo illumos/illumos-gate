@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -45,6 +44,10 @@
 /* until we all use AF_* macros ... */
 #define	AF_2_IPPROTO(_af)	(_af == AF_INET)?IPPROTO_IP:IPPROTO_IPV6
 #define	IPPROTO_2_AF(_i)	(_i == IPPROTO_IP)?AF_INET:AF_INET6
+
+#define	PROTOCOL_LEN	16				/* protocol type */
+#define	ADDR_LEN	(2 * INET6_ADDRSTRLEN + 1)	/* prxy src range */
+#define	PORT_LEN	6			/* hcport:1-65535 or "ANY" */
 
 static ilb_status_t ilbd_disable_one_rule(ilbd_rule_t *, boolean_t);
 static uint32_t i_flags_d2k(int);
@@ -505,12 +508,12 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 	adt_event_data_t	*event;
 	au_event_t		flag;
 	int			scf_val_len = ILBD_MAX_VALUE_LEN;
-	char			aobuf[scf_val_len]; /* algo:topo */
-	char			pbuf[scf_val_len]; /* protocol */
-	char			pxbuf[scf_val_len]; /* prxy src range */
-	char			hcpbuf[scf_val_len]; /* hcport: num or "ANY" */
-	char			valstr1[scf_val_len];
-	char			valstr2[scf_val_len];
+	char			*aobuf = NULL; /* algo:topo */
+	char			*valstr1 = NULL;
+	char			*valstr2 = NULL;
+	char			pbuf[PROTOCOL_LEN]; /* protocol */
+	char			pxbuf[ADDR_LEN]; /* prxy src range */
+	char			hcpbuf[PORT_LEN]; /* hcport */
 	char			addrstr_buf[INET6_ADDRSTRLEN];
 	char			addrstr_buf1[INET6_ADDRSTRLEN];
 	int			audit_error;
@@ -564,11 +567,13 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 		event->adt_ilb_disable_rule.rule_name = (char *)audit_rule_name;
 		break;
 	case ILBD_CREATE_RULE:
-		aobuf[0] = '\0';
-		pbuf[0] = '\0';
-		valstr1[0] = '\0';
-		valstr2[0] = '\0';
-		hcpbuf[0] = '\0';
+		if (((aobuf = malloc(scf_val_len)) == NULL) ||
+		    ((valstr1 = malloc(scf_val_len)) == NULL) ||
+		    ((valstr2 = malloc(scf_val_len)) == NULL)) {
+			logerr("ilbd_audit_rule_event: could not"
+			    " allocate buffer");
+			exit(EXIT_FAILURE);
+		}
 
 		event->adt_ilb_create_rule.auth_used = NET_ILB_CONFIG_AUTH;
 
@@ -595,15 +600,15 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 		 * its TCP by default
 		 */
 		if (rlinfo->rl_proto == IPPROTO_UDP)
-			(void) snprintf(pbuf, sizeof (pbuf), "UDP");
+			(void) snprintf(pbuf, PROTOCOL_LEN, "UDP");
 		else
-			(void) snprintf(pbuf, sizeof (pbuf), "TCP");
+			(void) snprintf(pbuf, PROTOCOL_LEN, "TCP");
 		event->adt_ilb_create_rule.protocol = pbuf;
 
 		/* Fill in algorithm and operation type */
 		ilbd_algo_to_str(rlinfo->rl_algo, valstr1);
 		ilbd_topo_to_str(rlinfo->rl_topo, valstr2);
-		(void) snprintf(aobuf, sizeof (aobuf), "%s:%s",
+		(void) snprintf(aobuf, scf_val_len, "%s:%s",
 		    valstr1, valstr2);
 		event->adt_ilb_create_rule.algo_optype = aobuf;
 
@@ -613,13 +618,13 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 			    sizeof (addrstr_buf));
 			if (&rlinfo->rl_nat_src_end == 0) {
 				/* Single address */
-				(void) snprintf(pxbuf, sizeof (pxbuf),
+				(void) snprintf(pxbuf, ADDR_LEN,
 				    "%s", addrstr_buf);
 			} else {
 				/* address range */
 				ilbd_addr2str(&rlinfo->rl_nat_src_end,
 				    addrstr_buf1, sizeof (addrstr_buf1));
-				(void) snprintf(pxbuf, sizeof (pxbuf),
+				(void) snprintf(pxbuf, ADDR_LEN,
 				    "%s-%s", addrstr_buf, addrstr_buf1);
 			}
 			event->adt_ilb_create_rule.proxy_src = pxbuf;
@@ -641,15 +646,14 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 		/* Fill in hcport */
 		if (rlinfo->rl_hcpflag == ILB_HCI_PROBE_FIX) {
 			/* hcport is specified by user */
-			(void) snprintf(hcpbuf, sizeof (hcpbuf), "%d",
+			(void) snprintf(hcpbuf, PORT_LEN, "%d",
 			    rlinfo->rl_hcport);
 			event->adt_ilb_create_rule.hcport = hcpbuf;
 		} else if (rlinfo->rl_hcpflag == ILB_HCI_PROBE_ANY) {
 			/* user has specified "ANY" */
-			(void) snprintf(hcpbuf, sizeof (hcpbuf), "ANY");
+			(void) snprintf(hcpbuf, PORT_LEN, "ANY");
 			event->adt_ilb_create_rule.hcport = hcpbuf;
 		}
-
 		/*
 		 * Fill out the conndrain, nat_timeout and persist_timeout
 		 * If the user does not specify them, the default value
@@ -683,6 +687,9 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 		}
 	}
 	adt_free_event(event);
+	free(aobuf);
+	free(valstr1);
+	free(valstr2);
 	(void) adt_end_session(ah);
 }
 
