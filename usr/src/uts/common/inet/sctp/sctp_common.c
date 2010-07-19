@@ -746,13 +746,13 @@ sctp_rotate_faddr(sctp_t *sctp, sctp_faddr_t *ofp)
 	if (sctp->sctp_nfaddrs < 2)
 		return (ofp);
 
-	min_strikes = ofp->strikes;
-
 	/*
 	 * Find the next live peer address with zero strikes. In case
 	 * there is none, find the one with the lowest number of strikes.
 	 */
-	for (nfp = ofp->next; nfp != ofp; nfp = nfp->next) {
+	min_strikes = ofp->strikes;
+	nfp = ofp->next;
+	while (nfp != ofp) {
 		/* If reached end of list, continue scan from the head */
 		if (nfp == NULL) {
 			nfp = sctp->sctp_faddrs;
@@ -766,6 +766,7 @@ sctp_rotate_faddr(sctp_t *sctp, sctp_faddr_t *ofp)
 				saved_fp = nfp;
 			}
 		}
+		nfp = nfp->next;
 	}
 	/* If reached the old address, there is no zero strike path */
 	if (nfp == ofp)
