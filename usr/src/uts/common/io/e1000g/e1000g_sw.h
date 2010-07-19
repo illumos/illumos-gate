@@ -19,8 +19,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _E1000G_SW_H
@@ -145,6 +144,7 @@ extern "C" {
 #define	DEFAULT_JUMBO_NUM_RX_BUF	2048
 #define	DEFAULT_JUMBO_NUM_TX_BUF	1152
 #define	DEFAULT_RX_LIMIT_ON_INTR	128
+#define	RX_FREELIST_INCREASE_SIZE	512
 
 #ifdef __sparc
 #define	MAX_INTR_PER_SEC		7100
@@ -224,8 +224,7 @@ extern "C" {
  * Defined for IP header alignment. We also need to preserve space for
  * VLAN tag (4 bytes)
  */
-#define	E1000G_IPALIGNROOM		6
-#define	E1000G_IPALIGNPRESERVEROOM	64
+#define	E1000G_IPALIGNROOM		2
 
 /*
  * bit flags for 'attach_progress' which is a member variable in struct e1000g
@@ -833,6 +832,7 @@ typedef struct _e1000g_rx_ring {
 	uint32_t stat_allocb_fail;
 	uint32_t stat_exceed_pkt;
 	uint32_t stat_size_error;
+	uint32_t stat_crc_only_pkt;
 #ifdef E1000G_DEBUG
 	uint32_t stat_none;
 	uint32_t stat_multi_desc;
@@ -877,6 +877,7 @@ typedef struct e1000g {
 	uint32_t tx_freelist_num;
 	uint32_t rx_desc_num;
 	uint32_t rx_freelist_num;
+	uint32_t rx_freelist_limit;
 	uint32_t tx_buffer_size;
 	uint32_t rx_buffer_size;
 
@@ -1042,6 +1043,7 @@ void e1000g_release_dma_resources(struct e1000g *Adapter);
 void e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet, boolean_t full_release);
 void e1000g_tx_setup(struct e1000g *Adapter);
 void e1000g_rx_setup(struct e1000g *Adapter);
+int e1000g_increase_rx_packets(e1000g_rx_data_t *rx_data);
 
 int e1000g_recycle(e1000g_tx_ring_t *tx_ring);
 void e1000g_free_tx_swpkt(p_tx_sw_packet_t packet);

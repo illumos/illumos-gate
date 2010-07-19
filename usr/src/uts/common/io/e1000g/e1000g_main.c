@@ -19,8 +19,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -45,6 +44,8 @@
 #include "e1000g_debug.h"
 
 static char ident[] = "Intel PRO/1000 Ethernet";
+/* LINTED E_STATIC_UNUSED */
+static char e1000g_version[] = "Driver Ver. 5.3.24";
 
 /*
  * Proto types for DDI entry points
@@ -253,6 +254,7 @@ static mac_callbacks_t e1000g_m_callbacks = {
 /*
  * Global variables
  */
+uint32_t e1000g_jumbo_mtu = MAXIMUM_MTU_9K;
 uint32_t e1000g_mblks_pending = 0;
 /*
  * Workaround for Dynamic Reconfiguration support, for x86 platform only.
@@ -580,7 +582,6 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 
 	Adapter->e1000g_state = E1000G_INITIALIZED;
-
 	return (DDI_SUCCESS);
 
 attach_fail:
@@ -886,13 +887,17 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 	case e1000_82574:
 	case e1000_80003es2lan:
 	case e1000_ich10lan:
-		Adapter->max_mtu = MAXIMUM_MTU_9K;
+		if (e1000g_jumbo_mtu >= ETHERMTU &&
+		    e1000g_jumbo_mtu <= MAXIMUM_MTU_9K) {
+			Adapter->max_mtu = e1000g_jumbo_mtu;
+		} else {
+			Adapter->max_mtu = MAXIMUM_MTU_9K;
+		}
 		break;
 	/* default limit is 16K */
 	default:
 		Adapter->max_mtu = FRAME_SIZE_UPTO_16K -
-		    sizeof (struct ether_vlan_header) - ETHERFCSL -
-		    E1000G_IPALIGNPRESERVEROOM;
+		    sizeof (struct ether_vlan_header) - ETHERFCSL;
 		break;
 	}
 }
@@ -938,10 +943,9 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 	    ((mac->type == e1000_82545) ||
 	    (mac->type == e1000_82546) ||
 	    (mac->type == e1000_82546_rev_3))) {
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K +
-		    E1000G_IPALIGNROOM;
+		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
 	} else {
-		rx_size = Adapter->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
+		rx_size = Adapter->max_frame_size;
 		if ((rx_size > FRAME_SIZE_UPTO_2K) &&
 		    (rx_size <= FRAME_SIZE_UPTO_4K))
 			Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_4K;
@@ -954,6 +958,7 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 		else
 			Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
 	}
+	Adapter->rx_buffer_size += E1000G_IPALIGNROOM;
 
 	tx_size = Adapter->max_frame_size;
 	if ((tx_size > FRAME_SIZE_UPTO_2K) && (tx_size <= FRAME_SIZE_UPTO_4K))
@@ -1660,7 +1665,12 @@ e1000g_link_up(struct e1000g *Adapter)
 	case e1000_media_type_copper:
 		if (hw->mac.get_link_status) {
 			(void) e1000_check_for_link(hw);
-			link_up = !hw->mac.get_link_status;
+			if ((E1000_READ_REG(hw, E1000_STATUS) &
+			    E1000_STATUS_LU)) {
+				link_up = B_TRUE;
+			} else {
+				link_up = !hw->mac.get_link_status;
+			}
 		} else {
 			link_up = B_TRUE;
 		}
@@ -1993,7 +2003,7 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 		mutex_exit(&e1000g_rx_detach_lock);
 	}
 
-	if (Adapter->link_state == LINK_STATE_UP) {
+	if (Adapter->link_state != LINK_STATE_UNKNOWN) {
 		Adapter->link_state = LINK_STATE_UNKNOWN;
 		if (!Adapter->reset_flag)
 			mac_link_update(Adapter->mh, Adapter->link_state);
@@ -3234,9 +3244,7 @@ reset:
 				 * resource consumption
 				 */
 				if (Adapter->max_frame_size >=
-				    (FRAME_SIZE_UPTO_4K -
-				    E1000G_IPALIGNPRESERVEROOM)) {
-
+				    (FRAME_SIZE_UPTO_4K)) {
 					if (Adapter->tx_desc_num_flag == 0)
 						Adapter->tx_desc_num =
 						    DEFAULT_JUMBO_NUM_TX_DESC;
@@ -3250,7 +3258,7 @@ reset:
 						    DEFAULT_JUMBO_NUM_TX_BUF;
 
 					if (Adapter->rx_buf_num_flag == 0)
-						Adapter->rx_freelist_num =
+						Adapter->rx_freelist_limit =
 						    DEFAULT_JUMBO_NUM_RX_BUF;
 				} else {
 					if (Adapter->tx_desc_num_flag == 0)
@@ -3266,7 +3274,7 @@ reset:
 						    DEFAULT_NUM_TX_FREELIST;
 
 					if (Adapter->rx_buf_num_flag == 0)
-						Adapter->rx_freelist_num =
+						Adapter->rx_freelist_limit =
 						    DEFAULT_NUM_RX_FREELIST;
 				}
 			}
@@ -3827,9 +3835,7 @@ e1000g_get_conf(struct e1000g *Adapter)
 	 * decrease the number of descriptors and free packets
 	 * for jumbo frames to reduce tx/rx resource consumption
 	 */
-	if (Adapter->max_frame_size >=
-	    (FRAME_SIZE_UPTO_4K -
-	    E1000G_IPALIGNPRESERVEROOM)) {
+	if (Adapter->max_frame_size >= FRAME_SIZE_UPTO_4K) {
 		is_jumbo = B_TRUE;
 	}
 
@@ -3865,7 +3871,7 @@ e1000g_get_conf(struct e1000g *Adapter)
 	    MIN_NUM_RX_FREELIST, MAX_NUM_RX_FREELIST,
 	    is_jumbo ? DEFAULT_JUMBO_NUM_RX_BUF
 	    : DEFAULT_NUM_RX_FREELIST, &propval);
-	Adapter->rx_freelist_num = propval;
+	Adapter->rx_freelist_limit = propval;
 
 	/*
 	 * NumTxPacketList
@@ -4502,24 +4508,17 @@ e1000g_get_max_frame_size(struct e1000g *Adapter)
 	case 0:
 		Adapter->default_mtu = ETHERMTU;
 		break;
-	/*
-	 * To avoid excessive memory allocation for rx buffers,
-	 * the bytes of E1000G_IPALIGNPRESERVEROOM are reserved.
-	 */
 	case 1:
 		Adapter->default_mtu = FRAME_SIZE_UPTO_4K -
-		    sizeof (struct ether_vlan_header) - ETHERFCSL -
-		    E1000G_IPALIGNPRESERVEROOM;
+		    sizeof (struct ether_vlan_header) - ETHERFCSL;
 		break;
 	case 2:
 		Adapter->default_mtu = FRAME_SIZE_UPTO_8K -
-		    sizeof (struct ether_vlan_header) - ETHERFCSL -
-		    E1000G_IPALIGNPRESERVEROOM;
+		    sizeof (struct ether_vlan_header) - ETHERFCSL;
 		break;
 	case 3:
 		Adapter->default_mtu = FRAME_SIZE_UPTO_16K -
-		    sizeof (struct ether_vlan_header) - ETHERFCSL -
-		    E1000G_IPALIGNPRESERVEROOM;
+		    sizeof (struct ether_vlan_header) - ETHERFCSL;
 		break;
 	default:
 		Adapter->default_mtu = ETHERMTU;
