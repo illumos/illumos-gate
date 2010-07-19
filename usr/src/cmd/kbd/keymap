@@ -20,14 +20,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # This file loads keyboard mappings and initializes keyboard defaults
 
@@ -37,8 +34,9 @@ smf_is_globalzone || exit $SMF_EXIT_OK
 
 #
 # Systems with no hardware keyboard ID may provide an eeprom value,
-# or the value can be supplied in /etc/default/kbd. A value supplied
-# in /etc/default/kbd will override the value supplied in eeprom.
+# or the value can be supplied in svc:/system/keymap:default. A value
+# supplied in svc:/system/keymap:default will override the value
+# supplied in eeprom.
 #
 [ -x /usr/lib/set_keyboard_layout ] && /usr/lib/set_keyboard_layout
 

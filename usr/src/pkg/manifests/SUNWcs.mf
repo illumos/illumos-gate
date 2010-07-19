@@ -362,7 +362,6 @@ file path=etc/default/cron group=sys preserve=true
 file path=etc/default/devfsadm group=sys preserve=true
 file path=etc/default/fs group=sys preserve=true
 file path=etc/default/init group=sys preserve=true
-file path=etc/default/kbd group=sys preserve=true
 file path=etc/default/keyserv group=sys preserve=true
 file path=etc/default/login group=sys preserve=true
 file path=etc/default/nss group=sys preserve=true

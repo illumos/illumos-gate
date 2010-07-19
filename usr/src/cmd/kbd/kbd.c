@@ -18,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  *	Usage: kbd [-r] [-t] [-l] [-c on|off] [-a enable|disable|alternate]
@@ -63,21 +60,25 @@
 #include <locale.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <libscf.h>
 
 #define	KBD_DEVICE	"/dev/kbd"		/* default keyboard device */
-#define	DEF_FILE	"/etc/default/kbd"	/* kbd defaults file	*/
-#define	DEF_ABORT	"KEYBOARD_ABORT="
-#define	DEF_CLICK	"KEYCLICK="
-#define	DEF_RPTDELAY	"REPEAT_DELAY="
-#define	DEF_RPTRATE	"REPEAT_RATE="
-#define	DEF_LAYOUT	"LAYOUT="
-#define	DEF_KBDFREQ	"KBD_BEEPER_FREQ="
-#define	DEF_CONSFREQ	"CONSOLE_BEEPER_FREQ="
 
 #define	KBD_LAYOUT_FILE  "/usr/share/lib/keytables/type_6/kbd_layouts"
 #define	MAX_LAYOUT_NUM		128
 #define	MAX_LINE_SIZE		256
 #define	DEFAULT_KBD_LAYOUT	33
+
+#define	KBD_FMRI		"svc:/system/keymap:default"
+#define	KBD_PG			"keymap"
+#define	KBD_PROP_LAYOUT		"layout"
+#define	KBD_PROP_KEYCLICK	"keyclick"
+#define	KBD_PROP_KEYBOARD_ABORT	"keyboard_abort"
+#define	KBD_PROP_RPTDELAY	"repeat_delay"
+#define	KBD_PROP_RPTRATE	"repeat_rate"
+#define	KBD_PROP_FREQ		"kbd_beeper_freq"
+#define	KBD_PROP_CONSFREQ	"console_beeper_freq"
+#define	KBD_MAX_NAME_LEN	1024
 
 char *layout_names[MAX_LAYOUT_NUM];
 int layout_numbers[MAX_LAYOUT_NUM];
@@ -93,7 +94,9 @@ static void usage(void);
 static int click(char *, int);
 static int abort_enable(char *, int);
 static int set_repeat_delay(char *, int);
+static int set_rptdelay(int, int);
 static int set_repeat_rate(char *, int);
+static int set_rptrate(int, int);
 
 static int get_layout_number(char *);
 static int set_layout(int, int);
@@ -308,8 +311,8 @@ set_kbd_layout(int kbd, char *layout_name)
 	/* layout setting is possible only for USB type keyboards */
 	if (get_type(kbd) != KB_USB) {
 		(void) fprintf(stderr, "The -s option does not apply for this"
-			" keyboard type.\n"
-			"Only USB/PS2 type keyboards support this option.\n");
+		    " keyboard type.\n"
+		    "Only USB/PS2 type keyboards support this option.\n");
 		return (error);
 	}
 
@@ -320,8 +323,8 @@ set_kbd_layout(int kbd, char *layout_name)
 	if (layout_name != NULL) {
 		if ((layout_num = get_layout_number(layout_name)) == -1) {
 			(void) fprintf(stderr, "%s: unknown layout name\n"
-				    "Please refer to 'kbd -s' to get the "
-				    "supported layouts.\n", layout_name);
+			    "Please refer to 'kbd -s' to get the "
+			    "supported layouts.\n", layout_name);
 			return (error);
 		}
 	} else {
@@ -331,20 +334,20 @@ set_kbd_layout(int kbd, char *layout_name)
 			char input[8]; /* 8 chars is enough for numbers */
 
 			print_cnt = (layout_count % 2) ?
-				layout_count/2+1 : layout_count/2;
+			    layout_count/2+1 : layout_count/2;
 
 			for (i = 1; i <= print_cnt; i++) {
 				(void) printf("%2d. %-30s", i,
-					    layout_names[i-1]);
+				    layout_names[i-1]);
 				j = i + print_cnt;
 				if (j <= layout_count) {
 					(void) printf("%-2d. %-30s\n", j,
-						    layout_names[j-1]);
+					    layout_names[j-1]);
 				}
 			}
 			(void) printf(gettext("\nTo select the keyboard layout,"
-				    " enter a number [default %d]:"),
-				    default_layout_number+1);
+			    " enter a number [default %d]:"),
+			    default_layout_number+1);
 
 			for (;;) {
 				if (input_right == B_FALSE)
@@ -564,14 +567,9 @@ abort_enable(char *aopt, int kbd)
 	return (0);
 }
 
-/*
- * this routine set autorepeat delay
- */
 static int
-set_repeat_delay(char *delay_str, int kbd)
+set_rptdelay(int delay, int kbd)
 {
-	int delay = atoi(delay_str);
-
 	/*
 	 * The error message depends on the different inputs.
 	 * a. the input is a invalid integer(unit in ms)
@@ -592,13 +590,19 @@ set_repeat_delay(char *delay_str, int kbd)
 }
 
 /*
- * this routine set autorepeat rate
+ * this routine set autorepeat delay
  */
 static int
-set_repeat_rate(char *rate_str, int kbd)
+set_repeat_delay(char *delay_str, int kbd)
 {
-	int rate = atoi(rate_str);
+	int delay = atoi(delay_str);
 
+	return (set_rptdelay(delay, kbd));
+}
+
+static int
+set_rptrate(int rate, int kbd)
+{
 	/*
 	 * The input validation check has been covered by main function
 	 * and kbd_defaults function.Here just give an error message if
@@ -611,111 +615,188 @@ set_repeat_rate(char *rate_str, int kbd)
 	return (0);
 }
 
-#define	BAD_DEFAULT	"kbd: bad default value for %s: %s\n"
+/*
+ * this routine set autorepeat rate
+ */
+static int
+set_repeat_rate(char *rate_str, int kbd)
+{
+	int rate = atoi(rate_str);
+
+	return (set_rptrate(rate, kbd));
+}
+
+#define	BAD_DEFAULT_STR		"kbd: bad default value for %s: %s\n"
+#define	BAD_DEFAULT_INT		"kbd: bad default value for %s: %d\n"
+#define	BAD_DEFAULT_LLINT	"kbd: bad default value for %s: %lld\n"
 
 static void
 kbd_defaults(int kbd)
 {
-	char *p, *endptr;
-	int layout_num, freq;
+	scf_handle_t *h = NULL;
+	scf_snapshot_t *snap = NULL;
+	scf_instance_t *inst = NULL;
+	scf_propertygroup_t *pg = NULL;
+	scf_property_t *prop = NULL;
+	scf_value_t *val = NULL;
 
-	if (defopen(DEF_FILE) != 0) {
-		(void) fprintf(stderr, "Can't open default file: %s\n",
-		    DEF_FILE);
-		exit(1);
+	int layout_num;
+	char *val_layout = NULL, *val_abort = NULL;
+	uint8_t val_click;
+	int64_t val_delay, val_rate;
+	int64_t val_kbd_beeper, val_console_beeper;
+
+	if ((h = scf_handle_create(SCF_VERSION)) == NULL ||
+	    scf_handle_bind(h) != 0 ||
+	    (inst = scf_instance_create(h)) == NULL ||
+	    (snap = scf_snapshot_create(h)) == NULL ||
+	    (pg = scf_pg_create(h)) == NULL ||
+	    (prop = scf_property_create(h)) == NULL ||
+	    (val = scf_value_create(h)) == NULL) {
+		goto out;
 	}
 
-	p = defread(DEF_CLICK);
-	if (p != NULL) {
-		/*
-		 * KEYCLICK must equal "on" or "off"
-		 */
-		if ((strcmp(p, "on") == 0) || (strcmp(p, "off") == 0))
-			(void) click(p, kbd);
-		else
-			(void) fprintf(stderr, BAD_DEFAULT, DEF_CLICK, p);
+	if (scf_handle_decode_fmri(h, KBD_FMRI, NULL, NULL, inst,
+	    NULL, NULL, SCF_DECODE_FMRI_REQUIRE_INSTANCE) != 0) {
+		goto out;
 	}
 
-	p = defread(DEF_ABORT);
-	if (p != NULL) {
+	if (scf_instance_get_snapshot(inst, "running", snap) != 0) {
+		scf_snapshot_destroy(snap);
+		snap = NULL;
+	}
+
+	if (scf_instance_get_pg_composed(inst, snap, KBD_PG, pg) != 0) {
+		goto out;
+	}
+
+	if ((val_abort = malloc(KBD_MAX_NAME_LEN)) == NULL) {
+		(void) fprintf(stderr,
+		    "Can not alloc memory for keyboard properties\n");
+		goto out;
+	}
+
+	if ((val_layout = malloc(KBD_MAX_NAME_LEN)) == NULL) {
+		(void) fprintf(stderr,
+		    "Can not alloc memory for keyboard properties\n");
+		goto out;
+	}
+
+	if (scf_pg_get_property(pg, KBD_PROP_KEYCLICK, prop) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_boolean(val, &val_click) == -1) {
+		(void) fprintf(stderr, "Can not get KEYCLICK\n");
+	}
+
+	if (val_click == 1)
+		(void) click("on", kbd);
+	else if (val_click == 0)
+		(void) click("off", kbd);
+	else
+		(void) fprintf(stderr,
+		    BAD_DEFAULT_INT, KBD_PROP_KEYCLICK, val_click);
+
+	if (scf_pg_get_property(pg, KBD_PROP_KEYBOARD_ABORT, prop) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_astring(val, val_abort, KBD_MAX_NAME_LEN) == -1) {
+		(void) fprintf(stderr, "Can not get KEYBOARD_ABORT\n");
+	}
+
+	if (*val_abort != '\0') {
 		/*
 		 * ABORT must equal "enable", "disable" or "alternate"
 		 */
-		if ((strcmp(p, "enable") == 0) ||
-		    (strcmp(p, "alternate") == 0) ||
-		    (strcmp(p, "disable") == 0))
-			(void) abort_enable(p, kbd);
+		if ((strcmp(val_abort, "enable") == 0) ||
+		    (strcmp(val_abort, "alternate") == 0) ||
+		    (strcmp(val_abort, "disable") == 0))
+			(void) abort_enable(val_abort, kbd);
 		else
-			(void) fprintf(stderr, BAD_DEFAULT, DEF_ABORT, p);
+			(void) fprintf(stderr, BAD_DEFAULT_STR,
+			    KBD_PROP_KEYBOARD_ABORT, val_abort);
 	}
 
-	p = defread(DEF_RPTDELAY);
-	if (p != NULL) {
-		/*
-		 * REPEAT_DELAY unit in ms
-		 */
-		if (atoi(p) > 0)
-			(void) set_repeat_delay(p, kbd);
-		else
-			(void) fprintf(stderr, BAD_DEFAULT, DEF_RPTDELAY, p);
+	if (scf_pg_get_property(pg, KBD_PROP_RPTDELAY, prop) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_integer(val, &val_delay) == -1) {
+		(void) fprintf(stderr, "Can not get RPTDELAY\n");
 	}
 
-	p = defread(DEF_RPTRATE);
-	if (p != NULL) {
-		/*
-		 * REPEAT_RATE unit in ms
-		 */
-		if (atoi(p) > 0)
-			(void) set_repeat_rate(p, kbd);
-		else
-			(void) fprintf(stderr, BAD_DEFAULT, DEF_RPTRATE, p);
+	if (val_delay > 0)
+		(void) set_rptdelay(val_delay, kbd);
+	else
+		(void) fprintf(stderr,
+		    BAD_DEFAULT_LLINT, KBD_PROP_RPTDELAY, val_delay);
+
+	if (scf_pg_get_property(pg, KBD_PROP_RPTRATE, prop) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_integer(val, &val_rate) == -1) {
+		(void) fprintf(stderr, "Can not get RPTRATE\n");
 	}
 
-	p = defread(DEF_LAYOUT);
-	if (p != NULL) {
+	if (val_rate > 0)
+		(void) set_rptrate(val_rate, kbd);
+	else
+		(void) fprintf(stderr,
+		    BAD_DEFAULT_LLINT, KBD_PROP_RPTRATE, val_rate);
+
+	if (scf_pg_get_property(pg, KBD_PROP_LAYOUT, prop) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_astring(val, val_layout, KBD_MAX_NAME_LEN) == -1) {
+		(void) fprintf(stderr, "Can not get LAYOUT\n");
+	}
+
+	if (*val_layout != '\0') {
 		/*
 		 * LAYOUT must be one of the layouts supported in kbd_layouts
 		 */
 		if (get_layouts() != 0)
-			return;
+			goto out;
 
-		if ((layout_num = get_layout_number(p)) == -1) {
-			(void) fprintf(stderr, BAD_DEFAULT, DEF_LAYOUT, p);
-			return;
+		if ((layout_num = get_layout_number(val_layout)) == -1) {
+			(void) fprintf(stderr,
+			    BAD_DEFAULT_STR, KBD_PROP_LAYOUT, val_layout);
+			goto out;
 		}
 
 		(void) set_layout(kbd, layout_num);
 	}
 
-	p = defread(DEF_KBDFREQ);
-	if (p != NULL) {
-		/*
-		 * Keyboard beeper frequency unit in Hz
-		 */
-		endptr = NULL;
-		errno = 0;
-		freq = (int)strtol(p, &endptr, 10);
-		if (errno == 0 && endptr[0] == '\0' &&
-		    freq >= 0 && freq <= INT16_MAX)
-			(void) set_beep_freq(kbd, "keyboard", freq);
-		else
-			(void) fprintf(stderr, BAD_DEFAULT, DEF_KBDFREQ, p);
+	if (scf_pg_get_property(pg, KBD_PROP_FREQ, prop) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_integer(val, &val_kbd_beeper) == -1) {
+		(void) fprintf(stderr, "Can not get FREQ\n");
 	}
 
-	p = defread(DEF_CONSFREQ);
-	if (p != NULL) {
-		/*
-		 * Console beeper frequency unit in Hz
-		 */
-		endptr = NULL;
-		errno = 0;
-		freq = (int)strtol(p, &endptr, 10);
-		if (errno == 0 && endptr[0] == '\0' &&
-		    freq >= 0 && freq <= INT16_MAX)
-			(void) set_beep_freq(kbd, "console", freq);
-		else
-			(void) fprintf(stderr, BAD_DEFAULT, DEF_CONSFREQ, p);
+	if (val_kbd_beeper >= 0 && val_kbd_beeper <= INT16_MAX)
+		(void) set_beep_freq(kbd, "keyboard", val_kbd_beeper);
+	else
+		(void) fprintf(stderr,
+		    BAD_DEFAULT_LLINT, KBD_PROP_FREQ, val_kbd_beeper);
+
+	if (scf_pg_get_property(pg, KBD_PROP_CONSFREQ, prop) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_integer(val, &val_console_beeper) == -1) {
+		(void) fprintf(stderr, "Can not get CONSFREQ\n");
 	}
+
+	if (val_console_beeper >= 0 && val_console_beeper <= INT16_MAX)
+		(void) set_beep_freq(kbd, "console", val_console_beeper);
+	else
+		(void) fprintf(stderr,
+		    BAD_DEFAULT_LLINT, KBD_PROP_CONSFREQ, val_console_beeper);
+
+out:
+	if (val_layout != NULL)
+		free(val_layout);
+	if (val_abort != NULL)
+		free(val_abort);
+	if (snap != NULL)
+		scf_snapshot_destroy(snap);
+	scf_value_destroy(val);
+	scf_property_destroy(prop);
+	scf_pg_destroy(pg);
+	scf_instance_destroy(inst);
+	scf_handle_destroy(h);
 }
 
 static int

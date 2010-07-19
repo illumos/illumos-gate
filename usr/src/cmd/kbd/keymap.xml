@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -38,8 +37,6 @@
 	type='service'
 	version='1'>
 
-	<create_default_instance enabled='false' />
-
 	<single_instance />
 
 	<dependency
@@ -74,6 +71,18 @@
 			value='transient' />
 	</property_group>
 
+	<instance name='default' enabled='false'>
+		<property_group name='keymap' type='system'>
+			<propval name='keyboard_abort' type='astring' value='enable' />
+			<propval name='keyclick' type='boolean' value='false' />
+			<propval name='repeat_delay' type='integer' value='500' />
+			<propval name='repeat_rate' type='integer' value='40' />
+			<propval name='layout' type='astring' value='US-English' />
+			<propval name='kbd_beeper_freq' type='integer' value='2000' />
+			<propval name='console_beeper_freq' type='integer' value='900' />
+		</property_group>
+	</instance>
+
 	<stability value='Unstable' />
 
 	<template>
@@ -88,6 +97,76 @@
 				section='1M'
 				manpath='/usr/share/man' />
 		</documentation>
+
+		<pg_pattern name='keymap' type='system'>
+			<description>
+				<loctext xml:lang='C'>
+					Default keyboard configurations
+				</loctext>
+			</description>
+			<prop_pattern name='keyboard_abort' type='astring' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The behavior of keyboard abort sequence
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='keyclick' type='boolean' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The keyclick behavior
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='repeat_delay' type='integer' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The autorepeat delay	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='repeat_rate' type='integer' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The autorepeat rate	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='layout' type='astring' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						The keyboard layout	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+			</prop_pattern>
+			<prop_pattern name='kbd_beeper_freq' type='integer' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						Keyboard beeper frequency	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+				<constraints>
+					<range min="0" max="32767"/>
+				</constraints>
+			</prop_pattern>
+			<prop_pattern name='console_beeper_freq' type='integer' required='true'>
+				<description>
+					<loctext xml:lang='C'>
+						Console beeper frequency	
+					</loctext>
+				</description>
+				<cardinality min="1" max="1"/>
+				<constraints>
+					<range min="0" max="32767"/>
+				</constraints>
+			</prop_pattern>
+		</pg_pattern>
 	</template>
 </service>
 
