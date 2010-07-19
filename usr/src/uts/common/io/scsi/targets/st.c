@@ -11743,6 +11743,7 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 		case SCMD_READ_G4:
 			bp->b_resid = sp->pkt_resid;
 			new_lastop = ST_OP_READ;
+			un->un_lastop = ST_OP_READ;
 			if (geterror(bp) == EIO) {
 				break;
 			}
@@ -12119,6 +12120,24 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 			    "eot pending\n");
 			un->un_pos.fileno++;
 			un->un_pos.blkno = 0;
+		} else if (BP_UCMD(bp)) {
+			/*
+			 * Uscsi reads have no concept of Berkley ver System IV.
+			 * Counts here must match raw device.
+			 * A non-full resid implies fix block mode where an
+			 * attempt to read X blocks resulted in less then X.
+			 */
+			if (bp->b_resid != bp->b_bcount) {
+				un->un_pos.eof = ST_EOF;
+			} else {
+				/* Read over a file mark */
+				un->un_pos.fileno++;
+				/* logical block is counted up elsewhere */
+				/* we're before the first block in next file */
+				un->un_pos.blkno = 0;
+				/* EOF is no longer pending */
+				un->un_pos.eof = ST_NO_EOF;
+			}
 		} else if (BSD_BEHAVIOR) {
 			/*
 			 * If the read of the filemark was a side effect
