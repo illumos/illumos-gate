@@ -1890,7 +1890,10 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5705M:
 	case DEVICE_ID_5705C:
 	case DEVICE_ID_5705_2:
+	case DEVICE_ID_5717:
 	case DEVICE_ID_5718:
+	case DEVICE_ID_5724:
+	case DEVICE_ID_57780:
 	case DEVICE_ID_5780:
 	case DEVICE_ID_5782:
 	case DEVICE_ID_5785:
@@ -2017,8 +2020,15 @@ bge_chip_id_init(bge_t *bgep)
 	cidp->msi_enabled = B_FALSE;
 
 	switch (cidp->device) {
+	case DEVICE_ID_5717:
 	case DEVICE_ID_5718:
-		cidp->chip_label = 5718;
+	case DEVICE_ID_5724:
+		if (cidp->device == DEVICE_ID_5717)
+			cidp->chip_label = 5717;
+		else if (cidp->device == DEVICE_ID_5718)
+			cidp->chip_label = 5718;
+		else
+			cidp->chip_label = 5724;
 		cidp->msi_enabled = bge_enable_msi;
 #ifdef __sparc
 		cidp->mask_pci_int = LE_32(MHCR_MASK_PCI_INT_OUTPUT);
@@ -2206,6 +2216,7 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5723:
 	case DEVICE_ID_5761:
 	case DEVICE_ID_5761E:
+	case DEVICE_ID_57780:
 		cidp->msi_enabled = bge_enable_msi;
 		/*
 		 * We don't use MSI for BCM5764 and BCM5785, as the
@@ -2221,6 +2232,8 @@ bge_chip_id_init(bge_t *bgep)
 			cidp->chip_label = 5764;
 		else if (cidp->device == DEVICE_ID_5785)
 			cidp->chip_label = 5785;
+		else if (cidp->device == DEVICE_ID_57780)
+			cidp->chip_label = 57780;
 		else
 			cidp->chip_label = 5761;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
