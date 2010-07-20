@@ -20,27 +20,31 @@
 #
 
 #
-# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-SUBDIRS=	fstyp bootinstall
+FSTYPE=		zfs
+LIBPROG=	bootinstall
+SRCS=		bootinstall.sh
+SUBDIRS=	etc
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
+all :=		TARGET = all
+install :=	TARGET = install
+clean :=	TARGET = clean
+clobber :=	TARGET = clobber
+lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+include		../../Makefile.fstype
 
-all install clean clobber lint: $(SUBDIRS)
+all:		$(SUBDIRS) $(LIBPROG)
 
-catalog:
+install:	$(SUBDIRS)
 
-$(SUBDIRS):	FRC
+clean:
+	$(RM) $(LIBPROG)
+
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
 FRC:

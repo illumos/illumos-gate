@@ -44,12 +44,6 @@
 
 static int read_efi_label(nvlist_t *config, diskaddr_t *sb);
 
-#if defined(__i386) || defined(__amd64)
-#define	BOOTCMD	"installgrub(1M)"
-#else
-#define	BOOTCMD	"installboot(1M)"
-#endif
-
 #define	DISK_ROOT	"/dev/dsk"
 #define	RDISK_ROOT	"/dev/rdsk"
 #define	BACKUP_SLICE	"s2"
@@ -2378,15 +2372,6 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 
 	if (ret == 0) {
 		if (rootpool) {
-			/*
-			 * XXX - This should be removed once we can
-			 * automatically install the bootblocks on the
-			 * newly attached disk.
-			 */
-			(void) fprintf(stderr, dgettext(TEXT_DOMAIN, "Please "
-			    "be sure to invoke %s to make '%s' bootable.\n"),
-			    BOOTCMD, new_disk);
-
 			/*
 			 * XXX need a better way to prevent user from
 			 * booting up a half-baked vdev.

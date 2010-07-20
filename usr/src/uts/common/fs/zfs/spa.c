@@ -3837,6 +3837,9 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	spa_strfree(oldvdpath);
 	spa_strfree(newvdpath);
 
+	if (spa->spa_bootfs)
+		spa_event_notify(spa, newvd, ESC_ZFS_BOOTFS_VDEV_ATTACH);
+
 	return (0);
 }
 

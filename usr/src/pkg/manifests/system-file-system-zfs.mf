@@ -74,6 +74,8 @@ dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
 driver name=zfs perms="* 0600 root sys" perms="zfs 0666 root sys"
+file path=etc/sysevent/config/SUNW,EC_zfs,ESC_ZFS_bootfs_vdev_attach,sysevent.conf \
+    group=sys
 file path=kernel/drv/$(ARCH64)/zfs group=sys
 $(i386_ONLY)file path=kernel/drv/zfs group=sys
 file path=kernel/drv/zfs.conf group=sys
@@ -89,6 +91,7 @@ file path=sbin/zpool mode=0555
 file path=usr/lib/$(ARCH64)/libzfs_jni.so.1
 file path=usr/lib/$(ARCH64)/libzpool.so.1
 file path=usr/lib/devfsadm/linkmod/SUNW_zfs_link.so group=sys
+file path=usr/lib/fs/zfs/bootinstall mode=0555
 file path=usr/lib/fs/zfs/fstyp.so.1 mode=0555
 file path=usr/lib/libzfs_jni.so.1
 $(i386_ONLY)file path=usr/lib/libzpool.so.1

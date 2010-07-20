@@ -18,29 +18,27 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-SUBDIRS=	fstyp bootinstall
+.PARALLEL:
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
+include $(SRC)/cmd/Makefile.cmd
+
+CONF = SUNW,EC_zfs,ESC_ZFS_bootfs_vdev_attach,sysevent.conf
+CONFDIR = $(ROOTETC)/sysevent/config
+
+# utilize the predefined install target patterns in cmd/Makefile.targ by
+# overriding ROOTCMDDIR
+#
+ROOTCMDDIR = $(CONFDIR)
+FILEMODE = 0644
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+all clean clobber lint:
 
-all install clean clobber lint: $(SUBDIRS)
+install: $(CONF:%=$(CONFDIR)/%)
 
-catalog:
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+include $(SRC)/cmd/Makefile.targ
