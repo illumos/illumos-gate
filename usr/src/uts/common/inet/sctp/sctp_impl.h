@@ -31,6 +31,9 @@
 #include <sys/list.h>
 #include <sys/strsun.h>
 #include <sys/zone.h>
+#include <sys/cpuvar.h>
+#include <sys/clock_impl.h>
+
 #include <netinet/ip6.h>
 #include <inet/optcom.h>
 #include <inet/tunables.h>
@@ -347,6 +350,80 @@ typedef struct {
 #define	SCTP_CONN_HASH(sctps, ports)			\
 	((((ports) ^ ((ports) >> 16)) * 31) & 		\
 	    ((sctps)->sctps_conn_hash_size - 1))
+
+/*
+ * Linked list struct to store SCTP listener association limit configuration
+ * per IP stack.  The list is stored at sctps_listener_conf in sctp_stack_t.
+ *
+ * sl_port: the listener port of this limit configuration
+ * sl_ratio: the maximum amount of memory consumed by all concurrent SCTP
+ *           connections created by a listener does not exceed 1/tl_ratio
+ *           of the total system memory.  Note that this is only an
+ *           approximation.
+ * sl_link: linked list struct
+ */
+typedef struct sctp_listener_s {
+	in_port_t	sl_port;
+	uint32_t	sl_ratio;
+	list_node_t	sl_link;
+} sctp_listener_t;
+
+/*
+ * If there is a limit set on the number of association allowed per each
+ * listener, the following struct is used to store that counter.  It keeps
+ * the number of SCTP association created by a listener.  Note that this needs
+ * to be separated from the listener since the listener can go away before
+ * all the associations are gone.
+ *
+ * When the struct is allocated, slc_cnt is set to 1.  When a new association
+ * is created by the listener, slc_cnt is incremented by 1.  When an
+ * association created by the listener goes away, slc_count is decremented by
+ * 1.  When the listener itself goes away, slc_cnt is decremented  by one.
+ * The last association (or the listener) which decrements slc_cnt to zero
+ * frees the struct.
+ *
+ * slc_max is the maximum number of concurrent associations created from a
+ * listener.  It is calculated when the sctp_listen_cnt_t is allocated.
+ *
+ * slc_report_time stores the time when cmn_err() is called to report that the
+ * max has been exceeeded.  Report is done at most once every
+ * SCTP_SLC_REPORT_INTERVAL mins for a listener.
+ *
+ * slc_drop stores the number of connection attempt dropped because the
+ * limit has reached.
+ */
+typedef struct sctp_listen_cnt_s {
+	uint32_t	slc_max;
+	uint32_t	slc_cnt;
+	int64_t		slc_report_time;
+	uint32_t	slc_drop;
+} sctp_listen_cnt_t;
+
+#define	SCTP_SLC_REPORT_INTERVAL	(30 * MINUTES)
+
+#define	SCTP_DECR_LISTEN_CNT(sctp)					\
+{									\
+	ASSERT((sctp)->sctp_listen_cnt->slc_cnt > 0);			\
+	if (atomic_add_32_nv(&(sctp)->sctp_listen_cnt->slc_cnt, -1) == 0) \
+		kmem_free((sctp)->sctp_listen_cnt, sizeof (sctp_listen_cnt_t));\
+	(sctp)->sctp_listen_cnt = NULL;					\
+}
+
+/* Increment and decrement the number of associations in sctp_stack_t. */
+#define	SCTPS_ASSOC_INC(sctps)						\
+	atomic_inc_64(							\
+	    (uint64_t *)&(sctps)->sctps_sc[CPU->cpu_seqid]->sctp_sc_assoc_cnt)
+
+#define	SCTPS_ASSOC_DEC(sctps)						\
+	atomic_dec_64(							\
+	    (uint64_t *)&(sctps)->sctps_sc[CPU->cpu_seqid]->sctp_sc_assoc_cnt)
+
+#define	SCTP_ASSOC_EST(sctps, sctp)					\
+{									\
+	(sctp)->sctp_state = SCTPS_ESTABLISHED;				\
+	(sctp)->sctp_assoc_start_time = (uint32_t)LBOLT_FASTPATH64;	\
+	SCTPS_ASSOC_INC(sctps);						\
+}
 
 /*
  * Bind hash array size and hash function.  The size must be a power
@@ -873,6 +950,9 @@ typedef struct sctp_s {
 	 * user request for stats on this endpoint.
 	 */
 	int	sctp_prev_maxrto;
+
+	/* For association counting. */
+	sctp_listen_cnt_t	*sctp_listen_cnt;
 } sctp_t;
 
 #define	SCTP_TXQ_LEN(sctp)	((sctp)->sctp_unsent + (sctp)->sctp_unacked)
@@ -925,6 +1005,7 @@ extern void	sctp_conn_hash_remove(sctp_t *);
 extern void	sctp_conn_init(conn_t *);
 extern sctp_t	*sctp_conn_match(in6_addr_t **, uint32_t, in6_addr_t *,
 		    uint32_t, zoneid_t, iaflags_t, sctp_stack_t *);
+extern void	sctp_conn_reclaim(void *);
 extern sctp_t	*sctp_conn_request(sctp_t *, mblk_t *, uint_t, uint_t,
 		    sctp_init_chunk_t *, ip_recv_attr_t *);
 extern uint32_t	sctp_cumack(sctp_t *, uint32_t, mblk_t **);
@@ -943,6 +1024,7 @@ extern void	sctp_faddr_fini(void);
 extern void	sctp_faddr_init(void);
 extern void	sctp_fast_rexmit(sctp_t *);
 extern void	sctp_fill_sack(sctp_t *, unsigned char *, int);
+extern uint32_t sctp_find_listener_conf(sctp_stack_t *, in_port_t);
 extern void	sctp_free_faddr_timers(sctp_t *);
 extern void	sctp_free_ftsn_set(sctp_ftsn_set_t *);
 extern void	sctp_free_msg(mblk_t *);
@@ -978,17 +1060,18 @@ extern uint32_t	sctp_init2vtag(sctp_chunk_hdr_t *);
 extern void	sctp_intf_event(sctp_t *, in6_addr_t, int, int);
 extern void	sctp_input_data(sctp_t *, mblk_t *, ip_recv_attr_t *);
 extern void	sctp_instream_cleanup(sctp_t *, boolean_t);
-extern int	sctp_is_a_faddr_clean(sctp_t *);
+extern boolean_t sctp_is_a_faddr_clean(sctp_t *);
 
 extern void	*sctp_kstat_init(netstackid_t);
 extern void	sctp_kstat_fini(netstackid_t, kstat_t *);
-extern void	*sctp_kstat2_init(netstackid_t, sctp_kstat_t *);
+extern void	*sctp_kstat2_init(netstackid_t);
 extern void	sctp_kstat2_fini(netstackid_t, kstat_t *);
 
 extern ssize_t	sctp_link_abort(mblk_t *, uint16_t, char *, size_t, int,
 		    boolean_t);
 extern void	sctp_listen_hash_insert(sctp_tf_t *, sctp_t *);
 extern void	sctp_listen_hash_remove(sctp_t *);
+extern void	sctp_listener_conf_cleanup(sctp_stack_t *);
 extern sctp_t	*sctp_lookup(sctp_t *, in6_addr_t *, sctp_tf_t *, uint32_t *,
 		    int);
 extern sctp_faddr_t *sctp_lookup_faddr(sctp_t *, in6_addr_t *);
@@ -1058,6 +1141,7 @@ extern void	sctp_set_if_mtu(sctp_t *);
 extern void	sctp_set_iplen(sctp_t *, mblk_t *, ip_xmit_attr_t *);
 extern void	sctp_set_ulp_prop(sctp_t *);
 extern void	sctp_ss_rexmit(sctp_t *);
+extern void	sctp_stack_cpu_add(sctp_stack_t *, processorid_t);
 extern size_t	sctp_supaddr_param_len(sctp_t *);
 extern size_t	sctp_supaddr_param(sctp_t *, uchar_t *);
 

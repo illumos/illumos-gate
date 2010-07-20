@@ -759,7 +759,7 @@ sctp_find_fast_rexmit_mblks(sctp_t *sctp, int *total, sctp_faddr_t **fp)
 						return (start_mp);
 					}
 				}
-				BUMP_MIB(&sctps->sctps_mib, sctpOutFastRetrans);
+				SCTPS_BUMP_MIB(sctps, sctpOutFastRetrans);
 				BUMP_LOCAL(sctp->sctp_rxtchunks);
 				SCTP_CHUNK_CLEAR_REXMIT(mp);
 				if (start_mp == NULL) {
@@ -997,7 +997,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 	int32_t			pad = 0;
 	int32_t			pathmax;
 	int			extra;
-	int64_t			now = ddi_get_lbolt64();
+	int64_t			now = LBOLT_FASTPATH64;
 	sctp_faddr_t		*fp;
 	sctp_faddr_t		*lfp;
 	sctp_data_hdr_t		*sdc;
@@ -1772,7 +1772,7 @@ window_probe:
 		sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn - 1;
 		ASSERT(sctp->sctp_rxt_maxtsn >= sctp->sctp_rxt_nxttsn);
 		sctp->sctp_zero_win_probe = B_TRUE;
-		BUMP_MIB(&sctps->sctps_mib, sctpOutWinProbe);
+		SCTPS_BUMP_MIB(sctps, sctpOutWinProbe);
 	}
 	return;
 out:
@@ -1818,7 +1818,7 @@ out:
 		if (oldfp != fp && oldfp->suna != 0)
 			SCTP_FADDR_TIMER_RESTART(sctp, oldfp, fp->rto);
 		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
-		BUMP_MIB(&sctps->sctps_mib, sctpOutWinProbe);
+		SCTPS_BUMP_MIB(sctps, sctpOutWinProbe);
 		return;
 	}
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -749,7 +749,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 
 	/* timestamp */
 	now = (int64_t *)(cookieph + 1);
-	nowt = ddi_get_lbolt64();
+	nowt = LBOLT_FASTPATH64;
 	bcopy(&nowt, now, sizeof (*now));
 
 	/* cookie lifetime -- need configuration */
@@ -951,7 +951,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
 	cph = NULL;
 	if (validate_init_params(sctp, iackch, iack, iackmp, &cph, &errmp,
 	    &pad, &sctp_options, ira) == 0) { /* result in 'pad' ignored */
-		BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+		SCTPS_BUMP_MIB(sctps, sctpAborted);
 		sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0, NULL);
 		sctp_clean_death(sctp, ECONNABORTED);
 		return;
@@ -1292,7 +1292,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 	 * So it is lbolt64 - (ts + *lt).  If it is positive, it means
 	 * that the Cookie has expired.
 	 */
-	diff = ddi_get_lbolt64() - (ts + *lt);
+	diff = LBOLT_FASTPATH64 - (ts + *lt);
 	if (diff > 0 && (init->sic_inittag != sctp->sctp_fvtag ||
 	    iack->sic_inittag != sctp->sctp_lvtag)) {
 		uint32_t staleness;
@@ -1354,11 +1354,8 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 			sctp->sctp_frwnd = ntohl(init->sic_a_rwnd);
 			sctp->sctp_fcsn = sctp->sctp_lastacked;
 
-			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
-			}
+			if (sctp->sctp_state < SCTPS_ESTABLISHED)
+				SCTP_ASSOC_EST(sctps, sctp);
 
 			dprint(1, ("sctp peer %x:%x:%x:%x (%d) restarted\n",
 			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
@@ -1384,9 +1381,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
 				if (!sctp_initialize_params(sctp, init, iack))
 					return (-1);	/* Drop? */
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
+				SCTP_ASSOC_EST(sctps, sctp);
 			}
 
 			dprint(1, ("init collision with %x:%x:%x:%x (%d)\n",
@@ -1416,9 +1411,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
 				if (!sctp_initialize_params(sctp, init, iack))
 					return (-1);	/* Drop? */
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
+				SCTP_ASSOC_EST(sctps, sctp);
 			}
 			return (0);
 		} else {

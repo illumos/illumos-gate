@@ -250,7 +250,10 @@ uint_t tcp_free_list_max_cnt = 0;
 		((uint_t)(accid) & (TCP_ACCEPTOR_FANOUT_SIZE - 1))
 #endif	/* _ILP32 */
 
-/* Minimum number of connections per listener. */
+/*
+ * Minimum number of connections which can be created per listener.  Used
+ * when the listener connection count is in effect.
+ */
 static uint32_t tcp_min_conn_listener = 2;
 
 uint32_t tcp_early_abort = 30;
@@ -399,8 +402,6 @@ struct T_info_ack tcp_g_t_info_ack_v6 = {
  */
 extern mod_prop_info_t tcp_propinfo_tbl[];
 extern int tcp_propinfo_count;
-
-#define	MB	(1024 * 1024)
 
 #define	IS_VMLOANED_MBLK(mp) \
 	(((mp)->b_datap->db_struioflag & STRUIO_ZC) != 0)
@@ -3700,10 +3701,6 @@ tcp_ddi_g_init(void)
 	 * set of tcp_stack_t's.
 	 */
 	netstack_register(NS_TCP, tcp_stack_init, NULL, tcp_stack_fini);
-
-	mutex_enter(&cpu_lock);
-	register_cpu_setup_func(tcp_cpu_update, NULL);
-	mutex_exit(&cpu_lock);
 }
 
 
@@ -3804,7 +3801,9 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	 * are not freed until the stack is going away.  So there is no need
 	 * to grab a lock to access the per CPU tcps_sc[x] pointer.
 	 */
+	mutex_enter(&cpu_lock);
 	tcps->tcps_sc_cnt = MAX(ncpus, boot_ncpus);
+	mutex_exit(&cpu_lock);
 	tcps->tcps_sc = kmem_zalloc(max_ncpus  * sizeof (tcp_stats_cpu_t *),
 	    KM_SLEEP);
 	for (i = 0; i < tcps->tcps_sc_cnt; i++) {
@@ -3825,10 +3824,6 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 void
 tcp_ddi_g_destroy(void)
 {
-	mutex_enter(&cpu_lock);
-	unregister_cpu_setup_func(tcp_cpu_update, NULL);
-	mutex_exit(&cpu_lock);
-
 	tcp_g_kstat_fini(tcp_g_kstat);
 	tcp_g_kstat = NULL;
 	bzero(&tcp_g_statistics, sizeof (tcp_g_statistics));

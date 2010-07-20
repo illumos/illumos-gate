@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -44,8 +43,11 @@
 #include "sctp_impl.h"
 #include "sctp_addr.h"
 
-static int sctp_snmp_state(sctp_t *sctp);
-
+static void sctp_clr_kstats2(sctp_kstat_t *);
+static void sctp_add_kstats2(sctp_kstat_counter_t *, sctp_kstat_t *);
+static int sctp_snmp_state(sctp_t *);
+static void sctp_sum_mib(sctp_stack_t *, mib2_sctp_t *);
+static void sctp_add_mib(mib2_sctp_t *, mib2_sctp_t *);
 
 static int
 sctp_kstat_update(kstat_t *kp, int rw)
@@ -56,6 +58,7 @@ sctp_kstat_update(kstat_t *kp, int rw)
 	netstackid_t	stackid = (netstackid_t)(uintptr_t)kp->ks_private;
 	netstack_t	*ns;
 	sctp_stack_t	*sctps;
+	mib2_sctp_t	sctp_mib;
 
 	if (kp == NULL|| kp->ks_data == NULL)
 		return (EIO);
@@ -71,13 +74,21 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		netstack_rele(ns);
 		return (-1);
 	}
-	myzoneid = netstackid_to_zoneid(stackid);
+
+	/*
+	 * For all exclusive netstacks, the zone ID is always GLOBAL_ZONEID.
+	 */
+	if (stackid != GLOBAL_NETSTACKID)
+		myzoneid = GLOBAL_ZONEID;
+	else
+		myzoneid = curproc->p_zone->zone_id;
+
+	bzero(&sctp_mib, sizeof (sctp_mib));
 
 	/*
 	 * Get the number of current associations and gather their
 	 * individual set of statistics.
 	 */
-	SET_MIB(sctps->sctps_mib.sctpCurrEstab, 0);
 	sctp_prev = NULL;
 	mutex_enter(&sctps->sctps_g_lock);
 	sctp = list_head(&sctps->sctps_g_list);
@@ -98,17 +109,21 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		if (sctp->sctp_state == SCTPS_ESTABLISHED ||
 		    sctp->sctp_state == SCTPS_SHUTDOWN_PENDING ||
 		    sctp->sctp_state == SCTPS_SHUTDOWN_RECEIVED) {
-			BUMP_MIB(&sctps->sctps_mib, sctpCurrEstab);
+			/*
+			 * Just bump the local sctp_mib.  The number of
+			 * existing associations is not kept in kernel.
+			 */
+			BUMP_MIB(&sctp_mib, sctpCurrEstab);
 		}
 
 		if (sctp->sctp_opkts) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpOutSCTPPkts,
+			SCTPS_UPDATE_MIB(sctps, sctpOutSCTPPkts,
 			    sctp->sctp_opkts);
 			sctp->sctp_opkts = 0;
 		}
 
 		if (sctp->sctp_obchunks) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpOutCtrlChunks,
+			SCTPS_UPDATE_MIB(sctps, sctpOutCtrlChunks,
 			    sctp->sctp_obchunks);
 			UPDATE_LOCAL(sctp->sctp_cum_obchunks,
 			    sctp->sctp_obchunks);
@@ -116,7 +131,7 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		}
 
 		if (sctp->sctp_odchunks) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpOutOrderChunks,
+			SCTPS_UPDATE_MIB(sctps, sctpOutOrderChunks,
 			    sctp->sctp_odchunks);
 			UPDATE_LOCAL(sctp->sctp_cum_odchunks,
 			    sctp->sctp_odchunks);
@@ -124,7 +139,7 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		}
 
 		if (sctp->sctp_oudchunks) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpOutUnorderChunks,
+			SCTPS_UPDATE_MIB(sctps, sctpOutUnorderChunks,
 			    sctp->sctp_oudchunks);
 			UPDATE_LOCAL(sctp->sctp_cum_oudchunks,
 			    sctp->sctp_oudchunks);
@@ -132,7 +147,7 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		}
 
 		if (sctp->sctp_rxtchunks) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpRetransChunks,
+			SCTPS_UPDATE_MIB(sctps, sctpRetransChunks,
 			    sctp->sctp_rxtchunks);
 			UPDATE_LOCAL(sctp->sctp_cum_rxtchunks,
 			    sctp->sctp_rxtchunks);
@@ -140,13 +155,13 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		}
 
 		if (sctp->sctp_ipkts) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpInSCTPPkts,
+			SCTPS_UPDATE_MIB(sctps, sctpInSCTPPkts,
 			    sctp->sctp_ipkts);
 			sctp->sctp_ipkts = 0;
 		}
 
 		if (sctp->sctp_ibchunks) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpInCtrlChunks,
+			SCTPS_UPDATE_MIB(sctps, sctpInCtrlChunks,
 			    sctp->sctp_ibchunks);
 			UPDATE_LOCAL(sctp->sctp_cum_ibchunks,
 			    sctp->sctp_ibchunks);
@@ -154,7 +169,7 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		}
 
 		if (sctp->sctp_idchunks) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpInOrderChunks,
+			SCTPS_UPDATE_MIB(sctps, sctpInOrderChunks,
 			    sctp->sctp_idchunks);
 			UPDATE_LOCAL(sctp->sctp_cum_idchunks,
 			    sctp->sctp_idchunks);
@@ -162,7 +177,7 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		}
 
 		if (sctp->sctp_iudchunks) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpInUnorderChunks,
+			SCTPS_UPDATE_MIB(sctps, sctpInUnorderChunks,
 			    sctp->sctp_iudchunks);
 			UPDATE_LOCAL(sctp->sctp_cum_iudchunks,
 			    sctp->sctp_iudchunks);
@@ -170,13 +185,13 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		}
 
 		if (sctp->sctp_fragdmsgs) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpFragUsrMsgs,
+			SCTPS_UPDATE_MIB(sctps, sctpFragUsrMsgs,
 			    sctp->sctp_fragdmsgs);
 			sctp->sctp_fragdmsgs = 0;
 		}
 
 		if (sctp->sctp_reassmsgs) {
-			UPDATE_MIB(&sctps->sctps_mib, sctpReasmUsrMsgs,
+			SCTPS_UPDATE_MIB(sctps, sctpReasmUsrMsgs,
 			    sctp->sctp_reassmsgs);
 			sctp->sctp_reassmsgs = 0;
 		}
@@ -190,6 +205,8 @@ next_sctp:
 	if (sctp_prev != NULL)
 		SCTP_REFRELE(sctp_prev);
 
+	sctp_sum_mib(sctps, &sctp_mib);
+
 	/* Copy data from the SCTP MIB */
 	sctpkp = (sctp_named_kstat_t *)kp->ks_data;
 
@@ -200,52 +217,41 @@ next_sctp:
 	sctpkp->sctpValCookieLife.value.ui32 = sctps->sctps_cookie_life;
 	sctpkp->sctpMaxInitRetr.value.ui32 = sctps->sctps_max_init_retr;
 
-	sctpkp->sctpCurrEstab.value.i32 = sctps->sctps_mib.sctpCurrEstab;
-	sctpkp->sctpActiveEstab.value.i32 = sctps->sctps_mib.sctpActiveEstab;
-	sctpkp->sctpPassiveEstab.value.i32 = sctps->sctps_mib.sctpPassiveEstab;
-	sctpkp->sctpAborted.value.i32 = sctps->sctps_mib.sctpAborted;
-	sctpkp->sctpShutdowns.value.i32 = sctps->sctps_mib.sctpShutdowns;
-	sctpkp->sctpOutOfBlue.value.i32 = sctps->sctps_mib.sctpOutOfBlue;
-	sctpkp->sctpChecksumError.value.i32 =
-	    sctps->sctps_mib.sctpChecksumError;
-	sctpkp->sctpOutCtrlChunks.value.i64 =
-	    sctps->sctps_mib.sctpOutCtrlChunks;
-	sctpkp->sctpOutOrderChunks.value.i64 =
-	    sctps->sctps_mib.sctpOutOrderChunks;
-	sctpkp->sctpOutUnorderChunks.value.i64 =
-	    sctps->sctps_mib.sctpOutUnorderChunks;
-	sctpkp->sctpRetransChunks.value.i64 =
-	    sctps->sctps_mib.sctpRetransChunks;
-	sctpkp->sctpOutAck.value.i32 = sctps->sctps_mib.sctpOutAck;
-	sctpkp->sctpOutAckDelayed.value.i32 =
-	    sctps->sctps_mib.sctpOutAckDelayed;
-	sctpkp->sctpOutWinUpdate.value.i32 = sctps->sctps_mib.sctpOutWinUpdate;
-	sctpkp->sctpOutFastRetrans.value.i32 =
-	    sctps->sctps_mib.sctpOutFastRetrans;
-	sctpkp->sctpOutWinProbe.value.i32 = sctps->sctps_mib.sctpOutWinProbe;
-	sctpkp->sctpInCtrlChunks.value.i64 = sctps->sctps_mib.sctpInCtrlChunks;
-	sctpkp->sctpInOrderChunks.value.i64 =
-	    sctps->sctps_mib.sctpInOrderChunks;
-	sctpkp->sctpInUnorderChunks.value.i64 =
-	    sctps->sctps_mib.sctpInUnorderChunks;
-	sctpkp->sctpInAck.value.i32 = sctps->sctps_mib.sctpInAck;
-	sctpkp->sctpInDupAck.value.i32 = sctps->sctps_mib.sctpInDupAck;
-	sctpkp->sctpInAckUnsent.value.i32 = sctps->sctps_mib.sctpInAckUnsent;
-	sctpkp->sctpFragUsrMsgs.value.i64 = sctps->sctps_mib.sctpFragUsrMsgs;
-	sctpkp->sctpReasmUsrMsgs.value.i64 = sctps->sctps_mib.sctpReasmUsrMsgs;
-	sctpkp->sctpOutSCTPPkts.value.i64 = sctps->sctps_mib.sctpOutSCTPPkts;
-	sctpkp->sctpInSCTPPkts.value.i64 = sctps->sctps_mib.sctpInSCTPPkts;
-	sctpkp->sctpInInvalidCookie.value.i32 =
-	    sctps->sctps_mib.sctpInInvalidCookie;
-	sctpkp->sctpTimRetrans.value.i32 = sctps->sctps_mib.sctpTimRetrans;
-	sctpkp->sctpTimRetransDrop.value.i32 =
-	    sctps->sctps_mib.sctpTimRetransDrop;
+	/* Copy data from the local sctp_mib to the provided kstat. */
+	sctpkp->sctpCurrEstab.value.i32 = sctp_mib.sctpCurrEstab;
+	sctpkp->sctpActiveEstab.value.i32 = sctp_mib.sctpActiveEstab;
+	sctpkp->sctpPassiveEstab.value.i32 = sctp_mib.sctpPassiveEstab;
+	sctpkp->sctpAborted.value.i32 = sctp_mib.sctpAborted;
+	sctpkp->sctpShutdowns.value.i32 = sctp_mib.sctpShutdowns;
+	sctpkp->sctpOutOfBlue.value.i32 = sctp_mib.sctpOutOfBlue;
+	sctpkp->sctpChecksumError.value.i32 = sctp_mib.sctpChecksumError;
+	sctpkp->sctpOutCtrlChunks.value.i64 = sctp_mib.sctpOutCtrlChunks;
+	sctpkp->sctpOutOrderChunks.value.i64 = sctp_mib.sctpOutOrderChunks;
+	sctpkp->sctpOutUnorderChunks.value.i64 = sctp_mib.sctpOutUnorderChunks;
+	sctpkp->sctpRetransChunks.value.i64 = sctp_mib.sctpRetransChunks;
+	sctpkp->sctpOutAck.value.i32 = sctp_mib.sctpOutAck;
+	sctpkp->sctpOutAckDelayed.value.i32 = sctp_mib.sctpOutAckDelayed;
+	sctpkp->sctpOutWinUpdate.value.i32 = sctp_mib.sctpOutWinUpdate;
+	sctpkp->sctpOutFastRetrans.value.i32 = sctp_mib.sctpOutFastRetrans;
+	sctpkp->sctpOutWinProbe.value.i32 = sctp_mib.sctpOutWinProbe;
+	sctpkp->sctpInCtrlChunks.value.i64 = sctp_mib.sctpInCtrlChunks;
+	sctpkp->sctpInOrderChunks.value.i64 = sctp_mib.sctpInOrderChunks;
+	sctpkp->sctpInUnorderChunks.value.i64 = sctp_mib.sctpInUnorderChunks;
+	sctpkp->sctpInAck.value.i32 = sctp_mib.sctpInAck;
+	sctpkp->sctpInDupAck.value.i32 = sctp_mib.sctpInDupAck;
+	sctpkp->sctpInAckUnsent.value.i32 = sctp_mib.sctpInAckUnsent;
+	sctpkp->sctpFragUsrMsgs.value.i64 = sctp_mib.sctpFragUsrMsgs;
+	sctpkp->sctpReasmUsrMsgs.value.i64 = sctp_mib.sctpReasmUsrMsgs;
+	sctpkp->sctpOutSCTPPkts.value.i64 = sctp_mib.sctpOutSCTPPkts;
+	sctpkp->sctpInSCTPPkts.value.i64 = sctp_mib.sctpInSCTPPkts;
+	sctpkp->sctpInInvalidCookie.value.i32 = sctp_mib.sctpInInvalidCookie;
+	sctpkp->sctpTimRetrans.value.i32 = sctp_mib.sctpTimRetrans;
+	sctpkp->sctpTimRetransDrop.value.i32 = sctp_mib.sctpTimRetransDrop;
 	sctpkp->sctpTimHeartBeatProbe.value.i32 =
-	    sctps->sctps_mib.sctpTimHeartBeatProbe;
-	sctpkp->sctpTimHeartBeatDrop.value.i32 =
-	    sctps->sctps_mib.sctpTimHeartBeatDrop;
-	sctpkp->sctpListenDrop.value.i32 = sctps->sctps_mib.sctpListenDrop;
-	sctpkp->sctpInClosed.value.i32 = sctps->sctps_mib.sctpInClosed;
+	    sctp_mib.sctpTimHeartBeatProbe;
+	sctpkp->sctpTimHeartBeatDrop.value.i32 = sctp_mib.sctpTimHeartBeatDrop;
+	sctpkp->sctpListenDrop.value.i32 = sctp_mib.sctpListenDrop;
+	sctpkp->sctpInClosed.value.i32 = sctp_mib.sctpInClosed;
 
 	netstack_rele(ns);
 	return (0);
@@ -302,7 +308,7 @@ sctp_kstat_init(netstackid_t stackid)
 	ksp = kstat_create_netstack(SCTP_MOD_NAME, 0, "sctp", "mib2",
 	    KSTAT_TYPE_NAMED, NUM_OF_FIELDS(sctp_named_kstat_t), 0, stackid);
 
-	if (ksp == NULL || ksp->ks_data == NULL)
+	if (ksp == NULL)
 		return (NULL);
 
 	/* These won't change. */
@@ -318,6 +324,123 @@ sctp_kstat_init(netstackid_t stackid)
 }
 
 /*
+ * To set all sctp_stat_t counters to 0.
+ */
+static void
+sctp_clr_kstats2(sctp_kstat_t *stats)
+{
+	stats->sctp_add_faddr.value.ui64 = 0;
+	stats->sctp_add_timer.value.ui64 = 0;
+	stats->sctp_conn_create.value.ui64 = 0;
+	stats->sctp_find_next_tq.value.ui64 = 0;
+	stats->sctp_fr_add_hdr.value.ui64 = 0;
+	stats->sctp_fr_not_found.value.ui64 = 0;
+	stats->sctp_output_failed.value.ui64 = 0;
+	stats->sctp_rexmit_failed.value.ui64 = 0;
+	stats->sctp_send_init_failed.value.ui64 = 0;
+	stats->sctp_send_cookie_failed.value.ui64 = 0;
+	stats->sctp_send_cookie_ack_failed.value.ui64 = 0;
+	stats->sctp_send_err_failed.value.ui64 = 0;
+	stats->sctp_send_sack_failed.value.ui64 = 0;
+	stats->sctp_send_shutdown_failed.value.ui64 = 0;
+	stats->sctp_send_shutdown_ack_failed.value.ui64 = 0;
+	stats->sctp_send_shutdown_comp_failed.value.ui64 = 0;
+	stats->sctp_send_user_abort_failed.value.ui64 = 0;
+	stats->sctp_send_asconf_failed.value.ui64 = 0;
+	stats->sctp_send_asconf_ack_failed.value.ui64 = 0;
+	stats->sctp_send_ftsn_failed.value.ui64 = 0;
+	stats->sctp_send_hb_failed.value.ui64 = 0;
+	stats->sctp_return_hb_failed.value.ui64 = 0;
+	stats->sctp_ss_rexmit_failed.value.ui64 = 0;
+	stats->sctp_cl_connect.value.ui64 = 0;
+	stats->sctp_cl_assoc_change.value.ui64 = 0;
+	stats->sctp_cl_check_addrs.value.ui64 = 0;
+	stats->sctp_reclaim_cnt.value.ui64 = 0;
+	stats->sctp_listen_cnt_drop.value.ui64 = 0;
+}
+
+/*
+ * To add counters from the per CPU sctp_kstat_counter_t to the stack
+ * sctp_kstat_t.
+ */
+static void
+sctp_add_kstats2(sctp_kstat_counter_t *from, sctp_kstat_t *to)
+{
+	to->sctp_add_faddr.value.ui64 += from->sctp_add_faddr;
+	to->sctp_add_timer.value.ui64 += from->sctp_add_timer;
+	to->sctp_conn_create.value.ui64 += from->sctp_conn_create;
+	to->sctp_find_next_tq.value.ui64 += from->sctp_find_next_tq;
+	to->sctp_fr_add_hdr.value.ui64 += from->sctp_fr_add_hdr;
+	to->sctp_fr_not_found.value.ui64 += from->sctp_fr_not_found;
+	to->sctp_output_failed.value.ui64 += from->sctp_output_failed;
+	to->sctp_rexmit_failed.value.ui64 += from->sctp_rexmit_failed;
+	to->sctp_send_init_failed.value.ui64 += from->sctp_send_init_failed;
+	to->sctp_send_cookie_failed.value.ui64 += from->sctp_send_cookie_failed;
+	to->sctp_send_cookie_ack_failed.value.ui64 +=
+	    from->sctp_send_cookie_ack_failed;
+	to->sctp_send_err_failed.value.ui64 += from->sctp_send_err_failed;
+	to->sctp_send_sack_failed.value.ui64 += from->sctp_send_sack_failed;
+	to->sctp_send_shutdown_failed.value.ui64 +=
+	    from->sctp_send_shutdown_failed;
+	to->sctp_send_shutdown_ack_failed.value.ui64 +=
+	    from->sctp_send_shutdown_ack_failed;
+	to->sctp_send_shutdown_comp_failed.value.ui64 +=
+	    from->sctp_send_shutdown_comp_failed;
+	to->sctp_send_user_abort_failed.value.ui64 +=
+	    from->sctp_send_user_abort_failed;
+	to->sctp_send_asconf_failed.value.ui64 += from->sctp_send_asconf_failed;
+	to->sctp_send_asconf_ack_failed.value.ui64 +=
+	    from->sctp_send_asconf_ack_failed;
+	to->sctp_send_ftsn_failed.value.ui64 += from->sctp_send_ftsn_failed;
+	to->sctp_send_hb_failed.value.ui64 += from->sctp_send_hb_failed;
+	to->sctp_return_hb_failed.value.ui64 += from->sctp_return_hb_failed;
+	to->sctp_ss_rexmit_failed.value.ui64 += from->sctp_ss_rexmit_failed;
+	to->sctp_cl_connect.value.ui64 += from->sctp_cl_connect;
+	to->sctp_cl_assoc_change.value.ui64 += from->sctp_cl_assoc_change;
+	to->sctp_cl_check_addrs.value.ui64 += from->sctp_cl_check_addrs;
+}
+
+/*
+ * Sum up all per CPU tcp_stat_t kstat counters.
+ */
+static int
+sctp_kstat2_update(kstat_t *kp, int rw)
+{
+	netstackid_t	stackid = (netstackid_t)(uintptr_t)kp->ks_private;
+	netstack_t	*ns;
+	sctp_stack_t	*sctps;
+	sctp_kstat_t	*stats;
+	int		i;
+	int		cnt;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL)
+		return (-1);
+	sctps = ns->netstack_sctp;
+	if (sctps == NULL) {
+		netstack_rele(ns);
+		return (-1);
+	}
+
+	stats = (sctp_kstat_t *)kp->ks_data;
+	sctp_clr_kstats2(stats);
+
+	/*
+	 * sctps_sc_cnt may change in the middle of the loop.  It is better
+	 * to get its value first.
+	 */
+	cnt = sctps->sctps_sc_cnt;
+	for (i = 0; i < cnt; i++)
+		sctp_add_kstats2(&sctps->sctps_sc[i]->sctp_sc_stats, stats);
+
+	netstack_rele(ns);
+	return (0);
+}
+
+/*
  * The following kstats are for debugging purposes.  They keep
  * track of problems which should not happen normally.  But in
  * those cases which they do happen, these kstats would be handy
@@ -325,7 +448,7 @@ sctp_kstat_init(netstackid_t stackid)
  * to be consumed by customers.
  */
 void *
-sctp_kstat2_init(netstackid_t stackid, sctp_kstat_t *sctps_statisticsp)
+sctp_kstat2_init(netstackid_t stackid)
 {
 	kstat_t *ksp;
 
@@ -356,18 +479,19 @@ sctp_kstat2_init(netstackid_t stackid, sctp_kstat_t *sctps_statisticsp)
 		{ "sctp_cl_connect",			KSTAT_DATA_UINT64 },
 		{ "sctp_cl_assoc_change",		KSTAT_DATA_UINT64 },
 		{ "sctp_cl_check_addrs",		KSTAT_DATA_UINT64 },
+		{ "sctp_reclaim_drop",			KSTAT_DATA_UINT64 },
+		{ "sctp_listen_cnt_drop",		KSTAT_DATA_UINT64 },
 	};
 
 	ksp = kstat_create_netstack(SCTP_MOD_NAME, 0, "sctpstat", "net",
-	    KSTAT_TYPE_NAMED, NUM_OF_FIELDS(template), KSTAT_FLAG_VIRTUAL,
-	    stackid);
+	    KSTAT_TYPE_NAMED, NUM_OF_FIELDS(template), 0, stackid);
 
 	if (ksp == NULL)
 		return (NULL);
 
-	bcopy(&template, sctps_statisticsp, sizeof (template));
-	ksp->ks_data = (void *)sctps_statisticsp;
+	bcopy(&template, ksp->ks_data, sizeof (template));
 	ksp->ks_private = (void *)(uintptr_t)stackid;
+	ksp->ks_update = sctp_kstat2_update;
 
 	kstat_install(ksp);
 	return (ksp);
@@ -427,6 +551,7 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 	conn_t			*connp;
 	boolean_t		needattr;
 	int			idx;
+	mib2_sctp_t		sctp_mib;
 
 	/*
 	 * Make copies of the original message.
@@ -456,19 +581,13 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 	mp_rem_data = mp_rem_ctl->b_cont;
 	mp_attr_data = mp_attr_ctl->b_cont;
 
+	bzero(&sctp_mib, sizeof (sctp_mib));
+
 	/* hostname address parameters are not supported in Solaris */
 	sce.sctpAssocRemHostName.o_length = 0;
 	sce.sctpAssocRemHostName.o_bytes[0] = 0;
 
 	/* build table of connections -- need count in fixed part */
-	SET_MIB(sctps->sctps_mib.sctpRtoAlgorithm, MIB2_SCTP_RTOALGO_VANJ);
-	SET_MIB(sctps->sctps_mib.sctpRtoMin, sctps->sctps_rto_ming);
-	SET_MIB(sctps->sctps_mib.sctpRtoMax, sctps->sctps_rto_maxg);
-	SET_MIB(sctps->sctps_mib.sctpRtoInitial, sctps->sctps_rto_initialg);
-	SET_MIB(sctps->sctps_mib.sctpMaxAssocs, -1);
-	SET_MIB(sctps->sctps_mib.sctpValCookieLife, sctps->sctps_cookie_life);
-	SET_MIB(sctps->sctps_mib.sctpMaxInitRetr, sctps->sctps_max_init_retr);
-	SET_MIB(sctps->sctps_mib.sctpCurrEstab, 0);
 
 	idx = 0;
 	mutex_enter(&sctps->sctps_g_lock);
@@ -490,54 +609,51 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 		if (sctp->sctp_state == SCTPS_ESTABLISHED ||
 		    sctp->sctp_state == SCTPS_SHUTDOWN_PENDING ||
 		    sctp->sctp_state == SCTPS_SHUTDOWN_RECEIVED) {
-			BUMP_MIB(&sctps->sctps_mib, sctpCurrEstab);
+			/*
+			 * Just bump the local sctp_mib.  The number of
+			 * existing associations is not kept in kernel.
+			 */
+			BUMP_MIB(&sctp_mib, sctpCurrEstab);
 		}
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpOutSCTPPkts, sctp->sctp_opkts);
+		SCTPS_UPDATE_MIB(sctps, sctpOutSCTPPkts, sctp->sctp_opkts);
 		sctp->sctp_opkts = 0;
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpOutCtrlChunks, sctp->sctp_obchunks);
+		SCTPS_UPDATE_MIB(sctps, sctpOutCtrlChunks, sctp->sctp_obchunks);
 		UPDATE_LOCAL(sctp->sctp_cum_obchunks,
 		    sctp->sctp_obchunks);
 		sctp->sctp_obchunks = 0;
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpOutOrderChunks, sctp->sctp_odchunks);
+		SCTPS_UPDATE_MIB(sctps, sctpOutOrderChunks,
+		    sctp->sctp_odchunks);
 		UPDATE_LOCAL(sctp->sctp_cum_odchunks,
 		    sctp->sctp_odchunks);
 		sctp->sctp_odchunks = 0;
-		UPDATE_MIB(&sctps->sctps_mib, sctpOutUnorderChunks,
+		SCTPS_UPDATE_MIB(sctps, sctpOutUnorderChunks,
 		    sctp->sctp_oudchunks);
 		UPDATE_LOCAL(sctp->sctp_cum_oudchunks,
 		    sctp->sctp_oudchunks);
 		sctp->sctp_oudchunks = 0;
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpRetransChunks, sctp->sctp_rxtchunks);
+		SCTPS_UPDATE_MIB(sctps, sctpRetransChunks,
+		    sctp->sctp_rxtchunks);
 		UPDATE_LOCAL(sctp->sctp_cum_rxtchunks,
 		    sctp->sctp_rxtchunks);
 		sctp->sctp_rxtchunks = 0;
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpInSCTPPkts, sctp->sctp_ipkts);
+		SCTPS_UPDATE_MIB(sctps, sctpInSCTPPkts, sctp->sctp_ipkts);
 		sctp->sctp_ipkts = 0;
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpInCtrlChunks, sctp->sctp_ibchunks);
+		SCTPS_UPDATE_MIB(sctps, sctpInCtrlChunks, sctp->sctp_ibchunks);
 		UPDATE_LOCAL(sctp->sctp_cum_ibchunks,
 		    sctp->sctp_ibchunks);
 		sctp->sctp_ibchunks = 0;
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpInOrderChunks, sctp->sctp_idchunks);
+		SCTPS_UPDATE_MIB(sctps, sctpInOrderChunks, sctp->sctp_idchunks);
 		UPDATE_LOCAL(sctp->sctp_cum_idchunks,
 		    sctp->sctp_idchunks);
 		sctp->sctp_idchunks = 0;
-		UPDATE_MIB(&sctps->sctps_mib, sctpInUnorderChunks,
+		SCTPS_UPDATE_MIB(sctps, sctpInUnorderChunks,
 		    sctp->sctp_iudchunks);
 		UPDATE_LOCAL(sctp->sctp_cum_iudchunks,
 		    sctp->sctp_iudchunks);
 		sctp->sctp_iudchunks = 0;
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpFragUsrMsgs, sctp->sctp_fragdmsgs);
+		SCTPS_UPDATE_MIB(sctps, sctpFragUsrMsgs, sctp->sctp_fragdmsgs);
 		sctp->sctp_fragdmsgs = 0;
-		UPDATE_MIB(&sctps->sctps_mib,
-		    sctpReasmUsrMsgs, sctp->sctp_reassmsgs);
+		SCTPS_UPDATE_MIB(sctps, sctpReasmUsrMsgs, sctp->sctp_reassmsgs);
 		sctp->sctp_reassmsgs = 0;
 
 		sce.sctpAssocId = ntohl(sctp->sctp_lvtag);
@@ -700,15 +816,12 @@ next_sctp:
 	if (sctp_prev != NULL)
 		SCTP_REFRELE(sctp_prev);
 
-	/* fixed length structure for IPv4 and IPv6 counters */
-	SET_MIB(sctps->sctps_mib.sctpEntrySize, sizeof (sce));
-	SET_MIB(sctps->sctps_mib.sctpLocalEntrySize, sizeof (scle));
-	SET_MIB(sctps->sctps_mib.sctpRemoteEntrySize, sizeof (scre));
+	sctp_sum_mib(sctps, &sctp_mib);
+
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_SCTP;
 	optp->name = 0;
-	(void) snmp_append_data(mpdata, (char *)&sctps->sctps_mib,
-	    sizeof (sctps->sctps_mib));
+	(void) snmp_append_data(mpdata, (char *)&sctp_mib, sizeof (sctp_mib));
 	optp->len = msgdsize(mpdata);
 	qreply(q, mpctl);
 
@@ -780,4 +893,77 @@ sctp_snmp_state(sctp_t *sctp)
 	default:
 		return (0);
 	}
+}
+
+/*
+ * To sum up all MIB2 stats for a sctp_stack_t from all per CPU stats.  The
+ * caller should initialize the target mib2_sctp_t properly as this function
+ * just adds up all the per CPU stats.
+ */
+static void
+sctp_sum_mib(sctp_stack_t *sctps, mib2_sctp_t *sctp_mib)
+{
+	int i;
+	int cnt;
+
+	/* Static componets of mib2_sctp_t. */
+	SET_MIB(sctp_mib->sctpRtoAlgorithm, MIB2_SCTP_RTOALGO_VANJ);
+	SET_MIB(sctp_mib->sctpRtoMin, sctps->sctps_rto_ming);
+	SET_MIB(sctp_mib->sctpRtoMax, sctps->sctps_rto_maxg);
+	SET_MIB(sctp_mib->sctpRtoInitial, sctps->sctps_rto_initialg);
+	SET_MIB(sctp_mib->sctpMaxAssocs, -1);
+	SET_MIB(sctp_mib->sctpValCookieLife, sctps->sctps_cookie_life);
+	SET_MIB(sctp_mib->sctpMaxInitRetr, sctps->sctps_max_init_retr);
+
+	/* fixed length structure for IPv4 and IPv6 counters */
+	SET_MIB(sctp_mib->sctpEntrySize, sizeof (mib2_sctpConnEntry_t));
+	SET_MIB(sctp_mib->sctpLocalEntrySize,
+	    sizeof (mib2_sctpConnLocalEntry_t));
+	SET_MIB(sctp_mib->sctpRemoteEntrySize,
+	    sizeof (mib2_sctpConnRemoteEntry_t));
+
+	/*
+	 * sctps_sc_cnt may change in the middle of the loop.  It is better
+	 * to get its value first.
+	 */
+	cnt = sctps->sctps_sc_cnt;
+	for (i = 0; i < cnt; i++)
+		sctp_add_mib(&sctps->sctps_sc[i]->sctp_sc_mib, sctp_mib);
+}
+
+static void
+sctp_add_mib(mib2_sctp_t *from, mib2_sctp_t *to)
+{
+	to->sctpActiveEstab += from->sctpActiveEstab;
+	to->sctpPassiveEstab += from->sctpPassiveEstab;
+	to->sctpAborted += from->sctpAborted;
+	to->sctpShutdowns += from->sctpShutdowns;
+	to->sctpOutOfBlue += from->sctpOutOfBlue;
+	to->sctpChecksumError += from->sctpChecksumError;
+	to->sctpOutCtrlChunks += from->sctpOutCtrlChunks;
+	to->sctpOutOrderChunks += from->sctpOutOrderChunks;
+	to->sctpOutUnorderChunks += from->sctpOutUnorderChunks;
+	to->sctpRetransChunks += from->sctpRetransChunks;
+	to->sctpOutAck += from->sctpOutAck;
+	to->sctpOutAckDelayed += from->sctpOutAckDelayed;
+	to->sctpOutWinUpdate += from->sctpOutWinUpdate;
+	to->sctpOutFastRetrans += from->sctpOutFastRetrans;
+	to->sctpOutWinProbe += from->sctpOutWinProbe;
+	to->sctpInCtrlChunks += from->sctpInCtrlChunks;
+	to->sctpInOrderChunks += from->sctpInOrderChunks;
+	to->sctpInUnorderChunks += from->sctpInUnorderChunks;
+	to->sctpInAck += from->sctpInAck;
+	to->sctpInDupAck += from->sctpInDupAck;
+	to->sctpInAckUnsent += from->sctpInAckUnsent;
+	to->sctpFragUsrMsgs += from->sctpFragUsrMsgs;
+	to->sctpReasmUsrMsgs += from->sctpReasmUsrMsgs;
+	to->sctpOutSCTPPkts += from->sctpOutSCTPPkts;
+	to->sctpInSCTPPkts += from->sctpInSCTPPkts;
+	to->sctpInInvalidCookie += from->sctpInInvalidCookie;
+	to->sctpTimRetrans += from->sctpTimRetrans;
+	to->sctpTimRetransDrop += from->sctpTimRetransDrop;
+	to->sctpTimHeartBeatProbe += from->sctpTimHeartBeatProbe;
+	to->sctpTimHeartBeatDrop += from->sctpTimHeartBeatDrop;
+	to->sctpListenDrop += from->sctpListenDrop;
+	to->sctpInClosed += from->sctpInClosed;
 }

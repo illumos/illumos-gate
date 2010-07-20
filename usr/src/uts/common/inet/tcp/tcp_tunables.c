@@ -98,7 +98,7 @@ tcp_listener_conf_get(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 			break;
 		}
 	}
-ret:
+
 	mutex_exit(&tcps->tcps_listener_conf_lock);
 	return (err);
 }

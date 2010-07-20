@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_TCP_STACK_H
@@ -77,8 +76,8 @@ struct tcp_stack {
 	 * MIB-2 stuff for SNMP
 	 * Note: tcpInErrs {tcp 15} is accumulated in ip.c
 	 */
-	kstat_t		*tcps_mibkp;	/* kstat exporting tcp_mib data */
-	kstat_t		*tcps_kstat;
+	kstat_t		*tcps_mibkp;	/* kstat exporting mib2_tcp_t data */
+	kstat_t		*tcps_kstat;	/* kstat exporting tcp_stat_t data */
 
 	uint32_t	tcps_iss_incr_extra;
 				/* Incremented for each connection */

@@ -63,7 +63,7 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	uint_t			sctp_options;
 	conn_t			*aconnp;
 	conn_t			*lconnp;
-	sctp_stack_t	*sctps = listener->sctp_sctps;
+	sctp_stack_t		*sctps = listener->sctp_sctps;
 
 	sctph = (sctp_hdr_t *)(cr_pkt->b_rptr + ip_hdr_len);
 	ASSERT(OK_32PTR(sctph));
@@ -127,15 +127,8 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	sctp_bind_hash_insert(&sctps->sctps_bind_fanout[
 	    SCTP_BIND_HASH(ntohs(aconnp->conn_lport))], acceptor, 0);
 
-	/*
-	 * No need to check for multicast destination since ip will only pass
-	 * up multicasts to those that have expressed interest
-	 * TODO: what about rejecting broadcasts?
-	 * Also check that source is not a multicast or broadcast address.
-	 */
-	/* XXXSCTP */
-	acceptor->sctp_state = SCTPS_ESTABLISHED;
-	acceptor->sctp_assoc_start_time = (uint32_t)ddi_get_lbolt();
+	SCTP_ASSOC_EST(sctps, acceptor);
+
 	/*
 	 * listener->sctp_rwnd should be the default window size or a
 	 * window size changed via SO_RCVBUF option.
@@ -163,6 +156,8 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	pid_t		cpid;
 	in6_addr_t	faddr, laddr;
 	ip_xmit_attr_t	*ixa;
+	sctp_listen_cnt_t *slc = sctp->sctp_listen_cnt;
+	boolean_t	slc_set = B_FALSE;
 
 	/*
 	 * No need to check for duplicate as this is the listener
@@ -173,19 +168,48 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	 */
 	ASSERT(OK_32PTR(mp->b_rptr));
 
-	if ((eager = sctp_create_eager(sctp)) == NULL) {
-		return (NULL);
-	}
-
 	connp = sctp->sctp_connp;
 	sctps = sctp->sctp_sctps;
+
+	/*
+	 * Enforce the limit set on the number of connections per listener.
+	 * Note that tlc_cnt starts with 1.  So need to add 1 to tlc_max
+	 * for comparison.
+	 */
+	if (slc != NULL) {
+		int64_t now;
+
+		if (atomic_add_32_nv(&slc->slc_cnt, 1) > slc->slc_max + 1) {
+			now = ddi_get_lbolt64();
+			atomic_add_32(&slc->slc_cnt, -1);
+			SCTP_KSTAT(sctps, sctp_listen_cnt_drop);
+			slc->slc_drop++;
+			if (now - slc->slc_report_time >
+			    MSEC_TO_TICK(SCTP_SLC_REPORT_INTERVAL)) {
+				zcmn_err(connp->conn_zoneid, CE_WARN,
+				    "SCTP listener (port %d) association max "
+				    "(%u) reached: %u attempts dropped total\n",
+				    ntohs(connp->conn_lport),
+				    slc->slc_max, slc->slc_drop);
+				slc->slc_report_time = now;
+			}
+			return (NULL);
+		}
+		slc_set = B_TRUE;
+	}
+
+	if ((eager = sctp_create_eager(sctp)) == NULL) {
+		if (slc_set)
+			atomic_add_32(&slc->slc_cnt, -1);
+		return (NULL);
+	}
 	econnp = eager->sctp_connp;
 
 	if (connp->conn_policy != NULL) {
 		/* Inherit the policy from the listener; use actions from ira */
 		if (!ip_ipsec_policy_inherit(econnp, connp, ira)) {
 			sctp_close_eager(eager);
-			BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
+			SCTPS_BUMP_MIB(sctps, sctpListenDrop);
 			return (NULL);
 		}
 	}
@@ -217,7 +241,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	if (ipsec_conn_cache_policy(econnp,
 	    (ira->ira_flags & IRAF_IS_IPV4) != 0) != 0) {
 		sctp_close_eager(eager);
-		BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
+		SCTPS_BUMP_MIB(sctps, sctpListenDrop);
 		return (NULL);
 	}
 
@@ -261,7 +285,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	err = sctp_accept_comm(sctp, eager, mp, ip_hdr_len, iack);
 	if (err != 0) {
 		sctp_close_eager(eager);
-		BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
+		SCTPS_BUMP_MIB(sctps, sctpListenDrop);
 		return (NULL);
 	}
 
@@ -301,7 +325,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 			if (flist != NULL)
 				kmem_free(flist, fsize);
 			sctp_close_eager(eager);
-			BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
+			SCTPS_BUMP_MIB(sctps, sctpListenDrop);
 			SCTP_KSTAT(sctps, sctp_cl_connect);
 			return (NULL);
 		}
@@ -319,7 +343,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	    (sock_lower_handle_t)eager, NULL, cr, cpid,
 	    &eager->sctp_upcalls)) == NULL) {
 		sctp_close_eager(eager);
-		BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
+		SCTPS_BUMP_MIB(sctps, sctpListenDrop);
 		return (NULL);
 	}
 	ASSERT(SCTP_IS_DETACHED(eager));

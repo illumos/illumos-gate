@@ -86,8 +86,34 @@ typedef struct udp_stat {			/* Class "net" kstats */
 	kstat_named_t	udp_out_mapped;
 	kstat_named_t	udp_out_ipv4;
 #endif
-
 } udp_stat_t;
+
+/*
+ * This struct contains only the counter part of udp_stat_t.  It is used
+ * in udp_stats_cpu_t instead of udp_stat_t to save memory space.
+ */
+typedef struct {
+	uint64_t	udp_sock_fallback;
+	uint64_t	udp_out_opt;
+	uint64_t	udp_out_err_notconn;
+	uint64_t	udp_out_err_output;
+	uint64_t	udp_out_err_tudr;
+#ifdef DEBUG
+	uint64_t	udp_data_conn;
+	uint64_t	udp_data_notconn;
+	uint64_t	udp_out_lastdst;
+	uint64_t	udp_out_diffdst;
+	uint64_t	udp_out_ipv6;
+	uint64_t	udp_out_mapped;
+	uint64_t	udp_out_ipv4;
+#endif
+} udp_stat_counter_t;
+
+/* Per CPU stats: UDP MIB2 and UDP kstat. */
+typedef struct {
+	mib2_udp_t		udp_sc_mib;
+	udp_stat_counter_t	udp_sc_stats;
+} udp_stats_cpu_t;
 
 #define	UDP_NUM_EPRIV_PORTS	64
 
@@ -118,9 +144,6 @@ struct udp_stack {
 
 	kstat_t		*us_mibkp;	/* kstats exporting mib data */
 	kstat_t		*us_kstat;
-	udp_stat_t	us_statistics;
-
-	mib2_udp_t	us_udp_mib;	/* SNMP fixed size info */
 
 /*
  * The smallest anonymous port in the priviledged port range which UDP
@@ -129,6 +152,9 @@ struct udp_stack {
 	in_port_t	us_min_anonpriv_port;
 
 	ldi_ident_t	us_ldi_ident;
+
+	udp_stats_cpu_t	**us_sc;
+	int		us_sc_cnt;
 };
 
 typedef struct udp_stack udp_stack_t;
@@ -194,9 +220,12 @@ typedef	struct udpahdr_s {
 #define	us_pmtu_discovery		us_propinfo_tbl[11].prop_cur_bval
 #define	us_sendto_ignerr		us_propinfo_tbl[12].prop_cur_bval
 
-#define	UDP_STAT(us, x)		((us)->us_statistics.x.value.ui64++)
+#define	UDPS_BUMP_MIB(us, x)	\
+	BUMP_MIB(&(us)->us_sc[CPU->cpu_seqid]->udp_sc_mib, x)
+
+#define	UDP_STAT(us, x)		((us)->us_sc[CPU->cpu_seqid]->udp_sc_stats.x++)
 #define	UDP_STAT_UPDATE(us, x, n)	\
-			((us)->us_statistics.x.value.ui64 += (n))
+	((us)->us->sc[CPU->cpu_seqid]->udp_sc_stats.x.value.ui64 += (n))
 #ifdef DEBUG
 #define	UDP_DBGSTAT(us, x)	UDP_STAT(us, x)
 #else
@@ -214,6 +243,13 @@ extern void	udp_ddi_g_destroy(void);
 extern void	udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr,
 		    socklen_t addrlen);
 extern void	udp_wput(queue_t *, mblk_t *);
+
+extern void	*udp_kstat_init(netstackid_t stackid);
+extern void	udp_kstat_fini(netstackid_t stackid, kstat_t *ksp);
+extern void	*udp_kstat2_init(netstackid_t stackid);
+extern void	udp_kstat2_fini(netstackid_t, kstat_t *);
+
+extern void	udp_stack_cpu_add(udp_stack_t *, processorid_t);
 
 /*
  * Object to represent database of options to search passed to

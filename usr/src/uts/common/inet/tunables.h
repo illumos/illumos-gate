@@ -140,6 +140,8 @@ struct mod_prop_info_s {
 #define	HOURS		(60 * MINUTES)
 #define	DAYS		(24 * HOURS)
 
+#define	MB		(1024 * 1024)
+
 /* Largest TCP/UDP/SCTP port number */
 #define	ULP_MAX_PORT	(64 * 1024 - 1)
 

@@ -618,10 +618,19 @@ sctp_redo_faddr_srcs(sctp_t *sctp)
 void
 sctp_faddr_alive(sctp_t *sctp, sctp_faddr_t *fp)
 {
-	int64_t now = ddi_get_lbolt64();
+	int64_t now = LBOLT_FASTPATH64;
 
+	/*
+	 * If we are under memory pressure, we abort association waiting
+	 * in zero window probing state for too long.  We do this by not
+	 * resetting sctp_strikes.  So if sctp_zero_win_probe continues
+	 * while under memory pressure, this association will eventually
+	 * time out.
+	 */
+	if (!sctp->sctp_zero_win_probe || !sctp->sctp_sctps->sctps_reclaim) {
+		sctp->sctp_strikes = 0;
+	}
 	fp->strikes = 0;
-	sctp->sctp_strikes = 0;
 	fp->lastactive = now;
 	fp->hb_expiry = now + SET_HB_INTVL(fp);
 	fp->hb_pending = B_FALSE;
@@ -646,18 +655,22 @@ sctp_faddr_alive(sctp_t *sctp, sctp_faddr_t *fp)
 	}
 }
 
-int
+/*
+ * Return B_TRUE if there is still an active peer address with zero strikes;
+ * otherwise rturn B_FALSE.
+ */
+boolean_t
 sctp_is_a_faddr_clean(sctp_t *sctp)
 {
 	sctp_faddr_t *fp;
 
 	for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
 		if (fp->state == SCTP_FADDRS_ALIVE && fp->strikes == 0) {
-			return (1);
+			return (B_TRUE);
 		}
 	}
 
-	return (0);
+	return (B_FALSE);
 }
 
 /*
@@ -723,7 +736,7 @@ sctp_faddr_dead(sctp_t *sctp, sctp_faddr_t *fp, int newstate)
 
 	/* All faddrs are down; kill the association */
 	dprint(1, ("sctp_faddr_dead: all faddrs down, killing assoc\n"));
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 	sctp_assoc_event(sctp, sctp->sctp_state < SCTPS_ESTABLISHED ?
 	    SCTP_CANT_STR_ASSOC : SCTP_COMM_LOST, 0, NULL);
 	sctp_clean_death(sctp, sctp->sctp_client_errno ?

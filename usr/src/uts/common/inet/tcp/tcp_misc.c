@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -649,52 +648,22 @@ tcp_listener_conf_cleanup(tcp_stack_t *tcps)
 }
 
 /*
- * Call back function for CPU state change.
+ * When a CPU is added, we need to allocate the per CPU stats struct.
  */
-/* ARGSUSED */
-int
-tcp_cpu_update(cpu_setup_t what, int id, void *arg)
+void
+tcp_stack_cpu_add(tcp_stack_t *tcps, processorid_t cpu_seqid)
 {
-	cpu_t *cp;
-	netstack_handle_t nh;
-	netstack_t *ns;
-	tcp_stack_t *tcps;
 	int i;
 
-	ASSERT(MUTEX_HELD(&cpu_lock));
-	cp = cpu[id];
-
-	switch (what) {
-	case CPU_CONFIG:
-	case CPU_ON:
-	case CPU_INIT:
-	case CPU_CPUPART_IN:
-		netstack_next_init(&nh);
-		while ((ns = netstack_next(&nh)) != NULL) {
-			tcps = ns->netstack_tcp;
-			if (cp->cpu_seqid >= tcps->tcps_sc_cnt) {
-				for (i = tcps->tcps_sc_cnt; i <= cp->cpu_seqid;
-				    i++) {
-					ASSERT(tcps->tcps_sc[i] == NULL);
-					tcps->tcps_sc[i] = kmem_zalloc(
-					    sizeof (tcp_stats_cpu_t), KM_SLEEP);
-				}
-				membar_producer();
-				tcps->tcps_sc_cnt = cp->cpu_seqid + 1;
-			}
-			netstack_rele(ns);
-		}
-		netstack_next_fini(&nh);
-		break;
-	case CPU_UNCONFIG:
-	case CPU_OFF:
-	case CPU_CPUPART_OUT:
-		/* Nothing to do */
-		break;
-	default:
-		break;
+	if (cpu_seqid < tcps->tcps_sc_cnt)
+		return;
+	for (i = tcps->tcps_sc_cnt; i <= cpu_seqid; i++) {
+		ASSERT(tcps->tcps_sc[i] == NULL);
+		tcps->tcps_sc[i] = kmem_zalloc(sizeof (tcp_stats_cpu_t),
+		    KM_SLEEP);
 	}
-	return (0);
+	membar_producer();
+	tcps->tcps_sc_cnt = cpu_seqid + 1;
 }
 
 /*

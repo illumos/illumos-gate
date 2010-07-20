@@ -308,8 +308,8 @@ typedef struct tcp_listener_s {
  * connection (or the listener) which decrements tlc_cnt to zero frees the
  * struct.
  *
- * tlc_max is the threshold value tcps_conn_listen_port.  It is set when the
- * tcp_listen_cnt_t is allocated.
+ * tlc_max is the maximum number of concurrent TCP connections created from a
+ * listner.  It is calculated when the tcp_listen_cnt_t is allocated.
  *
  * tlc_report_time stores the time when cmn_err() is called to report that the
  * max has been exceeeded.  Report is done at most once every
@@ -694,10 +694,10 @@ extern void		tcp_time_wait_processing(tcp_t *, mblk_t *, uint32_t,
 /*
  * Misc functions in tcp_misc.c.
  */
-extern int	tcp_cpu_update(cpu_setup_t, int, void *);
-extern void	tcp_ioctl_abort_conn(queue_t *, mblk_t *);
 extern uint32_t	tcp_find_listener_conf(tcp_stack_t *, in_port_t);
+extern void	tcp_ioctl_abort_conn(queue_t *, mblk_t *);
 extern void	tcp_listener_conf_cleanup(tcp_stack_t *);
+extern void	tcp_stack_cpu_add(tcp_stack_t *, processorid_t);
 
 #endif	/* _KERNEL */
 

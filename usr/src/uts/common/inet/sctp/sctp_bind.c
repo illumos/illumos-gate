@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -48,6 +47,12 @@
 #include "sctp_impl.h"
 #include "sctp_asconf.h"
 #include "sctp_addr.h"
+
+/*
+ * Minimum number of associations which can be created per listener.  Used
+ * when the listener association count is in effect.
+ */
+static uint32_t sctp_min_assoc_listener = 2;
 
 /*
  * Returns 0 on success, EACCES on permission failure.
@@ -160,9 +165,54 @@ sctp_listen(sctp_t *sctp)
 	(void) random_get_pseudo_bytes(sctp->sctp_secret, SCTP_SECRET_LEN);
 	sctp->sctp_last_secret_update = ddi_get_lbolt64();
 	bzero(sctp->sctp_old_secret, SCTP_SECRET_LEN);
+
+	/*
+	 * If there is an association limit, allocate and initialize
+	 * the counter struct.  Note that since listen can be called
+	 * multiple times, the struct may have been allready allocated.
+	 */
+	if (!list_is_empty(&sctps->sctps_listener_conf) &&
+	    sctp->sctp_listen_cnt == NULL) {
+		sctp_listen_cnt_t *slc;
+		uint32_t ratio;
+
+		ratio = sctp_find_listener_conf(sctps,
+		    ntohs(connp->conn_lport));
+		if (ratio != 0) {
+			uint32_t mem_ratio, tot_buf;
+
+			slc = kmem_alloc(sizeof (sctp_listen_cnt_t), KM_SLEEP);
+			/*
+			 * Calculate the connection limit based on
+			 * the configured ratio and maxusers.  Maxusers
+			 * are calculated based on memory size,
+			 * ~ 1 user per MB.  Note that the conn_rcvbuf
+			 * and conn_sndbuf may change after a
+			 * connection is accepted.  So what we have
+			 * is only an approximation.
+			 */
+			if ((tot_buf = connp->conn_rcvbuf +
+			    connp->conn_sndbuf) < MB) {
+				mem_ratio = MB / tot_buf;
+				slc->slc_max = maxusers / ratio * mem_ratio;
+			} else {
+				mem_ratio = tot_buf / MB;
+				slc->slc_max = maxusers / ratio / mem_ratio;
+			}
+			/* At least we should allow some associations! */
+			if (slc->slc_max < sctp_min_assoc_listener)
+				slc->slc_max = sctp_min_assoc_listener;
+			slc->slc_cnt = 1;
+			slc->slc_drop = 0;
+			sctp->sctp_listen_cnt = slc;
+		}
+	}
+
+
 	tf = &sctps->sctps_listen_fanout[SCTP_LISTEN_HASH(
 	    ntohs(connp->conn_lport))];
 	sctp_listen_hash_insert(tf, sctp);
+
 	WAKE_SCTP(sctp);
 	return (0);
 }

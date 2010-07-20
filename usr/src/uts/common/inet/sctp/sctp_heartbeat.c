@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -190,7 +189,7 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	fp->hb_pending = B_TRUE;
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
-	BUMP_MIB(&sctps->sctps_mib, sctpTimHeartBeatProbe);
+	SCTPS_BUMP_MIB(sctps, sctpTimHeartBeatProbe);
 
 	sctp_set_iplen(sctp, hbmp, fp->ixa);
 	(void) conn_ip_output(hbmp, fp->ixa);

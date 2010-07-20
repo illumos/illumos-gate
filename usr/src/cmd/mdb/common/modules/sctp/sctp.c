@@ -1499,6 +1499,68 @@ sctp_stack_ipif_walk_step(mdb_walk_state_t *wsp)
 	    wsp->walk_cbdata));
 }
 
+/*
+ * Initialization function for the per CPU SCTP stats counter walker of a given
+ * SCTP stack.
+ */
+int
+sctps_sc_walk_init(mdb_walk_state_t *wsp)
+{
+	sctp_stack_t sctps;
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_ERR);
+
+	if (mdb_vread(&sctps, sizeof (sctps), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read sctp_stack_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	if (sctps.sctps_sc_cnt == 0)
+		return (WALK_DONE);
+
+	/*
+	 * Store the sctp_stack_t pointer in walk_data.  The stepping function
+	 * used it to calculate if the end of the counter has reached.
+	 */
+	wsp->walk_data = (void *)wsp->walk_addr;
+	wsp->walk_addr = (uintptr_t)sctps.sctps_sc;
+	return (WALK_NEXT);
+}
+
+/*
+ * Stepping function for the per CPU SCTP stats counterwalker.
+ */
+int
+sctps_sc_walk_step(mdb_walk_state_t *wsp)
+{
+	int status;
+	sctp_stack_t sctps;
+	sctp_stats_cpu_t *stats;
+	char *next, *end;
+
+	if (mdb_vread(&sctps, sizeof (sctps), (uintptr_t)wsp->walk_data) ==
+	    -1) {
+		mdb_warn("failed to read sctp_stack_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&stats, sizeof (stats), wsp->walk_addr) == -1) {
+		mdb_warn("failed ot read sctp_stats_cpu_t at %p",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback((uintptr_t)stats, &stats, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+
+	next = (char *)wsp->walk_addr + sizeof (sctp_stats_cpu_t *);
+	end = (char *)sctps.sctps_sc + sctps.sctps_sc_cnt *
+	    sizeof (sctp_stats_cpu_t *);
+	if (next >= end)
+		return (WALK_DONE);
+	wsp->walk_addr = (uintptr_t)next;
+	return (WALK_NEXT);
+}
+
 static void
 sctp_help(void)
 {
@@ -1522,6 +1584,7 @@ sctp_help(void)
 	mdb_printf("\t-d\t Local and Peer addresses\n");
 	mdb_printf("\t-P\t Peer addresses\n");
 }
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "sctp", ":[-afhoimrSFHpRCcedP]",
 	    "display sctp control structure", sctp, sctp_help },
@@ -1591,8 +1654,8 @@ static const mdb_walker_t walkers[] = {
 		sctp_stack_ill_walk_init, sctp_stack_ill_walk_step, NULL },
 	{ "sctp_stack_walk_ipif", "walk the sctp_g_ipif list for one stack",
 		sctp_stack_ipif_walk_init, sctp_stack_ipif_walk_step, NULL },
-	{ "sctp_stacks", "walk all the sctp_stack_t",
-		sctp_stacks_walk_init, sctp_stacks_walk_step, NULL },
+	{ "sctps_sc", "walk all the per CPU stats counters of a sctp_stack_t",
+		sctps_sc_walk_init, sctps_sc_walk_step, NULL },
 	{ NULL }
 };
 

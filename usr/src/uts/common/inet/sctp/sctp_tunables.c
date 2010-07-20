@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <inet/ip.h>
@@ -36,6 +36,132 @@
 					sizeof (sctp_hdr_t)))
 /* Max of the above */
 #define	SCTP_MSS_MAX	SCTP_MSS_MAX_IPV4
+
+/*
+ * returns the current list of listener limit configuration.
+ */
+/* ARGSUSED */
+static int
+sctp_listener_conf_get(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+    void *val, uint_t psize, uint_t flags)
+{
+	sctp_stack_t	*sctps = (sctp_stack_t *)cbarg;
+	sctp_listener_t	*sl;
+	char		*pval = val;
+	size_t		nbytes = 0, tbytes = 0;
+	uint_t		size;
+	int		err = 0;
+
+	bzero(pval, psize);
+	size = psize;
+
+	if (flags & (MOD_PROP_DEFAULT|MOD_PROP_PERM|MOD_PROP_POSSIBLE))
+		return (0);
+
+	mutex_enter(&sctps->sctps_listener_conf_lock);
+	for (sl = list_head(&sctps->sctps_listener_conf); sl != NULL;
+	    sl = list_next(&sctps->sctps_listener_conf, sl)) {
+		if (psize == size)
+			nbytes = snprintf(pval, size, "%d:%d",  sl->sl_port,
+			    sl->sl_ratio);
+		else
+			nbytes = snprintf(pval, size, ",%d:%d",  sl->sl_port,
+			    sl->sl_ratio);
+		size -= nbytes;
+		pval += nbytes;
+		tbytes += nbytes;
+		if (tbytes >= psize) {
+			/* Buffer overflow, stop copying information */
+			err = ENOBUFS;
+			break;
+		}
+	}
+
+	mutex_exit(&sctps->sctps_listener_conf_lock);
+	return (err);
+}
+
+/*
+ * add a new listener limit configuration.
+ */
+/* ARGSUSED */
+static int
+sctp_listener_conf_add(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void* pval, uint_t flags)
+{
+	sctp_listener_t	*new_sl;
+	sctp_listener_t	*sl;
+	long		lport;
+	long		ratio;
+	char		*colon;
+	sctp_stack_t	*sctps = (sctp_stack_t *)cbarg;
+
+	if (flags & MOD_PROP_DEFAULT)
+		return (ENOTSUP);
+
+	if (ddi_strtol(pval, &colon, 10, &lport) != 0 || lport <= 0 ||
+	    lport > USHRT_MAX || *colon != ':') {
+		return (EINVAL);
+	}
+	if (ddi_strtol(colon + 1, NULL, 10, &ratio) != 0 || ratio <= 0)
+		return (EINVAL);
+
+	mutex_enter(&sctps->sctps_listener_conf_lock);
+	for (sl = list_head(&sctps->sctps_listener_conf); sl != NULL;
+	    sl = list_next(&sctps->sctps_listener_conf, sl)) {
+		/* There is an existing entry, so update its ratio value. */
+		if (sl->sl_port == lport) {
+			sl->sl_ratio = ratio;
+			mutex_exit(&sctps->sctps_listener_conf_lock);
+			return (0);
+		}
+	}
+
+	if ((new_sl = kmem_alloc(sizeof (sctp_listener_t), KM_NOSLEEP)) ==
+	    NULL) {
+		mutex_exit(&sctps->sctps_listener_conf_lock);
+		return (ENOMEM);
+	}
+
+	new_sl->sl_port = lport;
+	new_sl->sl_ratio = ratio;
+	list_insert_tail(&sctps->sctps_listener_conf, new_sl);
+	mutex_exit(&sctps->sctps_listener_conf_lock);
+	return (0);
+}
+
+/*
+ * remove a listener limit configuration.
+ */
+/* ARGSUSED */
+static int
+sctp_listener_conf_del(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void* pval, uint_t flags)
+{
+	sctp_listener_t	*sl;
+	long		lport;
+	sctp_stack_t	*sctps = (sctp_stack_t *)cbarg;
+
+	if (flags & MOD_PROP_DEFAULT)
+		return (ENOTSUP);
+
+	if (ddi_strtol(pval, NULL, 10, &lport) != 0 || lport <= 0 ||
+	    lport > USHRT_MAX) {
+		return (EINVAL);
+	}
+	mutex_enter(&sctps->sctps_listener_conf_lock);
+	for (sl = list_head(&sctps->sctps_listener_conf); sl != NULL;
+	    sl = list_next(&sctps->sctps_listener_conf, sl)) {
+		if (sl->sl_port == lport) {
+			list_remove(&sctps->sctps_listener_conf, sl);
+			mutex_exit(&sctps->sctps_listener_conf_lock);
+			kmem_free(sl, sizeof (sctp_listener_t));
+			return (0);
+		}
+	}
+	mutex_exit(&sctps->sctps_listener_conf_lock);
+	return (ESRCH);
+}
 
 /*
  * All of these are alterable, within the min/max values given, at run time.
@@ -209,6 +335,15 @@ mod_prop_info_t sctp_propinfo_tbl[] = {
 	{ "extra_priv_ports", MOD_PROTO_SCTP,
 	    mod_set_extra_privports, mod_get_extra_privports,
 	    {1, ULP_MAX_PORT, 0}, {0} },
+
+	{ "sctp_listener_limit_conf", MOD_PROTO_SCTP,
+	    NULL, sctp_listener_conf_get, {0}, {0} },
+
+	{ "sctp_listener_limit_conf_add", MOD_PROTO_SCTP,
+	    sctp_listener_conf_add, NULL, {0}, {0} },
+
+	{ "sctp_listener_limit_conf_del", MOD_PROTO_SCTP,
+	    sctp_listener_conf_del, NULL, {0}, {0} },
 
 	{ "?", MOD_PROTO_SCTP, NULL, mod_get_allprop, {0}, {0} },
 

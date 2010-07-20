@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -150,7 +149,7 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
 		freemsg(mp);
 		return;
 	}
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_opkts);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
@@ -282,7 +281,7 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 		ixa->ixa_ip_hdr_length = sctp->sctp_ip_hdr6_len;
 	}
 
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
 	if (is_system_labeled() && ixa->ixa_tsl != NULL) {
@@ -435,7 +434,7 @@ sctp_ootb_send_abort(uint32_t vtag, uint16_t serror, char *details,
 	ixas.ixa_ipst = ipst;
 	ixas.ixa_ifindex = 0;
 
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 
 	if (is_system_labeled()) {
 		ASSERT(ira->ira_tsl != NULL);

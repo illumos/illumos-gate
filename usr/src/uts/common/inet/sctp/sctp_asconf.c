@@ -870,7 +870,7 @@ sctp_rc_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	/* Retransmission */
 	if (sctp->sctp_strikes >= sctp->sctp_pa_max_rxt) {
 		/* time to give up */
-		BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+		SCTPS_BUMP_MIB(sctps, sctpAborted);
 		sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
 		sctp_clean_death(sctp, ETIMEDOUT);
 		return;

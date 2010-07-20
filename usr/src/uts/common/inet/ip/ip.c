@@ -740,6 +740,8 @@ static void	ip_kstat2_fini(netstackid_t, kstat_t *);
 static void	ipobs_init(ip_stack_t *);
 static void	ipobs_fini(ip_stack_t *);
 
+static int	ip_tp_cpu_update(cpu_setup_t, int, void *);
+
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 
 static long ip_rput_pullups;
@@ -4274,6 +4276,11 @@ ip_conn_input_icmp(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 void
 ip_ddi_destroy(void)
 {
+	/* This needs to be called before destroying any transports. */
+	mutex_enter(&cpu_lock);
+	unregister_cpu_setup_func(ip_tp_cpu_update, NULL);
+	mutex_exit(&cpu_lock);
+
 	tnet_fini();
 
 	icmp_ddi_g_destroy();
@@ -4531,6 +4538,11 @@ ip_ddi_init(void)
 	rts_ddi_g_init();
 	icmp_ddi_g_init();
 	ilb_ddi_g_init();
+
+	/* This needs to be called after all transports are initialized. */
+	mutex_enter(&cpu_lock);
+	register_cpu_setup_func(ip_tp_cpu_update, NULL);
+	mutex_exit(&cpu_lock);
 }
 
 /*
@@ -14152,7 +14164,7 @@ ip_fanout_sctp_raw(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, uint32_t ports,
 		 * Drop the packet here if the sctp checksum failed.
 		 */
 		if (iraflags & IRAF_SCTP_CSUM_ERR) {
-			BUMP_MIB(&sctps->sctps_mib, sctpChecksumError);
+			SCTPS_BUMP_MIB(sctps, sctpChecksumError);
 			freemsg(mp);
 			return;
 		}
@@ -15087,4 +15099,46 @@ ipif_lookup_testaddr_v4(ill_t *ill, const in_addr_t *v4srcp, ipif_t **ipifp)
 	ip1dbg(("ipif_lookup_testaddr_v4: cannot find ipif for src %x\n",
 	    *v4srcp));
 	return (B_FALSE);
+}
+
+/*
+ * Transport protocol call back function for CPU state change.
+ */
+/* ARGSUSED */
+static int
+ip_tp_cpu_update(cpu_setup_t what, int id, void *arg)
+{
+	processorid_t cpu_seqid;
+	netstack_handle_t nh;
+	netstack_t *ns;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+	cpu_seqid = cpu[id]->cpu_seqid;
+
+	switch (what) {
+	case CPU_CONFIG:
+	case CPU_ON:
+	case CPU_INIT:
+	case CPU_CPUPART_IN:
+		netstack_next_init(&nh);
+		while ((ns = netstack_next(&nh)) != NULL) {
+			tcp_stack_cpu_add(ns->netstack_tcp, cpu_seqid);
+			sctp_stack_cpu_add(ns->netstack_sctp, cpu_seqid);
+			udp_stack_cpu_add(ns->netstack_udp, cpu_seqid);
+			netstack_rele(ns);
+		}
+		netstack_next_fini(&nh);
+		break;
+	case CPU_UNCONFIG:
+	case CPU_OFF:
+	case CPU_CPUPART_OUT:
+		/*
+		 * Nothing to do.  We don't remove the per CPU stats from
+		 * the IP stack even when the CPU goes offline.
+		 */
+		break;
+	default:
+		break;
+	}
+	return (0);
 }

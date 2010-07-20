@@ -1349,7 +1349,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 
 	/* We can no longer deliver anything up, but still need to handle it. */
 	if (SCTP_IS_DETACHED(sctp)) {
-		BUMP_MIB(&sctps->sctps_mib, sctpInClosed);
+		SCTPS_BUMP_MIB(sctps, sctpInClosed);
 		can_deliver = B_FALSE;
 	}
 
@@ -1937,9 +1937,9 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 	    (void *)sctp->sctp_lastdata,
 	    SCTP_PRINTADDR(sctp->sctp_lastdata->faddr)));
 
-	sctp->sctp_active = ddi_get_lbolt64();
+	sctp->sctp_active = LBOLT_FASTPATH64;
 
-	BUMP_MIB(&sctps->sctps_mib, sctpOutAck);
+	SCTPS_BUMP_MIB(sctps, sctpOutAck);
 
 	sctp_set_iplen(sctp, smp, sctp->sctp_lastdata->ixa);
 	(void) conn_ip_output(smp, sctp->sctp_lastdata->ixa);
@@ -2124,7 +2124,7 @@ sctp_cumack(sctp_t *sctp, uint32_t tsn, mblk_t **first_unacked)
 cum_ack_done:
 	*first_unacked = mp;
 	if (cumack_forward > 0) {
-		BUMP_MIB(&sctps->sctps_mib, sctpInAck);
+		SCTPS_BUMP_MIB(sctps, sctpInAck);
 		if (SEQ_GT(sctp->sctp_lastack_rxd, sctp->sctp_recovery_tsn)) {
 			sctp->sctp_recovery_tsn = sctp->sctp_lastack_rxd;
 		}
@@ -2143,7 +2143,7 @@ cum_ack_done:
 		sctp->sctp_xmit_unacked = mp;
 	} else {
 		/* dup ack */
-		BUMP_MIB(&sctps->sctps_mib, sctpInDupAck);
+		SCTPS_BUMP_MIB(sctps, sctpInDupAck);
 	}
 	sctp->sctp_lastack_rxd = tsn;
 	if (SEQ_LT(sctp->sctp_adv_pap, sctp->sctp_lastack_rxd))
@@ -2298,7 +2298,7 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 	remaining =  ntohs(ch->sch_len) - sizeof (*ch) - sizeof (*ftsn);
 
 	if (SCTP_IS_DETACHED(sctp)) {
-		BUMP_MIB(&sctps->sctps_mib, sctpInClosed);
+		SCTPS_BUMP_MIB(sctps, sctpInClosed);
 		can_deliver = B_FALSE;
 	}
 	/*
@@ -2543,7 +2543,7 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 		 */
 		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
 		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
-			BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
+			SCTPS_BUMP_MIB(sctps, sctpInAckUnsent);
 			*trysend = -1;
 			return (acked);
 		} else if (SEQ_LT(gapend, gapstart) ||
@@ -2742,7 +2742,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		return (0);
 
 	if (SEQ_GT(cumtsn, sctp->sctp_ltsn - 1)) {
-		BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
+		SCTPS_BUMP_MIB(sctps, sctpInAckUnsent);
 		/* Send an ABORT */
 		return (-1);
 	}
@@ -2768,7 +2768,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			mp = sctp->sctp_xmit_head->b_cont;
 		else
 			mp = NULL;
-		BUMP_MIB(&sctps->sctps_mib, sctpInDupAck);
+		SCTPS_BUMP_MIB(sctps, sctpInDupAck);
 		/*
 		 * If we were doing a zero win probe and the win
 		 * has now opened to at least MSS, re-transmit the
@@ -2880,8 +2880,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 				    sctp->sctp_xmit_head, mp1,
 				    &trysend, &fast_recovery, gapstart);
 				if (trysend < 0) {
-					BUMP_MIB(&sctps->sctps_mib,
-					    sctpInAckUnsent);
+					SCTPS_BUMP_MIB(sctps, sctpInAckUnsent);
 					return (-1);
 				}
 				break;
@@ -2898,7 +2897,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		 */
 		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
 		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
-			BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
+			SCTPS_BUMP_MIB(sctps, sctpInAckUnsent);
 			return (-1);
 		} else if (SEQ_LT(gapend, gapstart) ||
 		    SEQ_LEQ(gapstart, cumtsn)) {
@@ -3409,8 +3408,8 @@ sctp_ootb_input(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst)
 
 	sctps = ipst->ips_netstack->netstack_sctp;
 
-	BUMP_MIB(&sctps->sctps_mib, sctpOutOfBlue);
-	BUMP_MIB(&sctps->sctps_mib, sctpInSCTPPkts);
+	SCTPS_BUMP_MIB(sctps, sctpOutOfBlue);
+	SCTPS_BUMP_MIB(sctps, sctpInSCTPPkts);
 
 	if (mp->b_cont != NULL) {
 		/*
@@ -3578,7 +3577,7 @@ sctp_process_abort(sctp_t *sctp, sctp_chunk_hdr_t *ch, int err)
 {
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 
 	sctp_assoc_event(sctp, SCTP_COMM_LOST,
@@ -3753,7 +3752,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 	gotdata = 0;
 	trysend = 0;
 
-	now = ddi_get_lbolt64();
+	now = LBOLT_FASTPATH64;
 	/* Process the chunks */
 	do {
 		dprint(3, ("sctp_dispatch_rput: state=%d, chunk id=%d\n",
@@ -3861,8 +3860,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				if (sctp->sctp_state == SCTPS_SHUTDOWN_SENT) {
 					sctp_shutdown_complete(sctp);
-					BUMP_MIB(&sctps->sctps_mib,
-					    sctpShutdowns);
+					SCTPS_BUMP_MIB(sctps, sctpShutdowns);
 					sctp_assoc_event(sctp,
 					    SCTP_SHUTDOWN_COMP, 0, NULL);
 					sctp_clean_death(sctp, 0);
@@ -3897,7 +3895,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 						sctp_adaptation_event(sctp);
 					}
 				} else {
-					BUMP_MIB(&sctps->sctps_mib,
+					SCTPS_BUMP_MIB(sctps,
 					    sctpInInvalidCookie);
 				}
 				break;
@@ -3953,7 +3951,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaptation, &peer_src,
 				    ira) == -1) {
-					BUMP_MIB(&sctps->sctps_mib,
+					SCTPS_BUMP_MIB(sctps,
 					    sctpInInvalidCookie);
 					goto done;
 				}
@@ -3997,7 +3995,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				 * properly reprocessed on the
 				 * eager's queue.
 				 */
-				BUMP_MIB(&sctps->sctps_mib, sctpPassiveEstab);
+				SCTPS_BUMP_MIB(sctps, sctpPassiveEstab);
 				if (mlen > ntohs(ch->sch_len)) {
 					eager->sctp_cookie_mp = dupb(mp);
 					/*
@@ -4075,7 +4073,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaptation, NULL, ira) == -1) {
-					BUMP_MIB(&sctps->sctps_mib,
+					SCTPS_BUMP_MIB(sctps,
 					    sctpInInvalidCookie);
 					break;
 				}
@@ -4087,10 +4085,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 					sctp_set_ulp_prop(sctp);
 
 				}
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
-				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
+				SCTP_ASSOC_EST(sctps, sctp);
+				SCTPS_BUMP_MIB(sctps, sctpActiveEstab);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
 					sctp->sctp_cookie_mp = NULL;
@@ -4129,10 +4125,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				}
 				if (sctp->sctp_unacked == 0)
 					sctp_stop_faddr_timers(sctp);
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
-				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
+				SCTP_ASSOC_EST(sctps, sctp);
+				SCTPS_BUMP_MIB(sctps, sctpActiveEstab);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
@@ -4157,7 +4151,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaptation, NULL, ira) == -1) {
-					BUMP_MIB(&sctps->sctps_mib,
+					SCTPS_BUMP_MIB(sctps,
 					    sctpInInvalidCookie);
 					break;
 				}
@@ -4171,10 +4165,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				}
 				if (sctp->sctp_unacked == 0)
 					sctp_stop_faddr_timers(sctp);
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
-				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
+				SCTP_ASSOC_EST(sctps, sctp);
+				SCTPS_BUMP_MIB(sctps, sctpActiveEstab);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
 					sctp->sctp_cookie_mp = NULL;
@@ -4206,7 +4198,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 					p = (sctp_parm_hdr_t *)(ch + 1);
 					if (p->sph_type ==
 					    htons(SCTP_ERR_STALE_COOKIE)) {
-						BUMP_MIB(&sctps->sctps_mib,
+						SCTPS_BUMP_MIB(sctps,
 						    sctpAborted);
 						sctp_error_event(sctp,
 						    ch, B_FALSE);
@@ -4241,7 +4233,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				goto done;
 			case CHUNK_SHUTDOWN_COMPLETE:
 				BUMP_LOCAL(sctp->sctp_ibchunks);
-				BUMP_MIB(&sctps->sctps_mib, sctpShutdowns);
+				SCTPS_BUMP_MIB(sctps, sctpShutdowns);
 				sctp_assoc_event(sctp, SCTP_SHUTDOWN_COMP, 0,
 				    NULL);
 
@@ -4252,7 +4244,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 			case CHUNK_SHUTDOWN_ACK:
 				sctp_shutdown_complete(sctp);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
-				BUMP_MIB(&sctps->sctps_mib, sctpShutdowns);
+				SCTPS_BUMP_MIB(sctps, sctpShutdowns);
 				sctp_assoc_event(sctp, SCTP_SHUTDOWN_COMP, 0,
 				    NULL);
 				sctp_clean_death(sctp, 0);
@@ -4435,7 +4427,7 @@ sctp_recvd(sctp_t *sctp, int len)
 	if (sctp->sctp_state >= SCTPS_ESTABLISHED &&
 	    ((old <= new >> 1) || (old < sctp->sctp_mss))) {
 		sctp->sctp_force_sack = 1;
-		BUMP_MIB(&sctps->sctps_mib, sctpOutWinUpdate);
+		SCTPS_BUMP_MIB(sctps, sctpOutWinUpdate);
 		(void) sctp_sack(sctp, NULL);
 	}
 	WAKE_SCTP(sctp);
