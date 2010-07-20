@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include	"msg.h"
 #include	"_debug.h"
@@ -30,12 +29,13 @@
 void
 Dbg_libs_audit(Lm_list *lml, const char *opath, const char *npath)
 {
-	if (DBG_NOTCLASS(DBG_C_LIBS | DBG_C_AUDITING))
+	if (DBG_NOTCLASS(DBG_C_LIBS))
 		return;
 
 	if (npath == opath)
 		return;
-	else if (npath == 0)
+
+	if (npath == NULL)
 		dbg_print(lml, MSG_INTL(MSG_LIB_SKIP), opath);
 	else
 		dbg_print(lml, MSG_INTL(MSG_LIB_ALTER), npath);

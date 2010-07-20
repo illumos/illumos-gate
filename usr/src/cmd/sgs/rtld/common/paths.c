@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -163,7 +162,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 			}
 			if (rpl_libdirs && (rtld_flags & RT_FL_SECURE) &&
 			    (search || DBG_ENABLED))
-				remove_plist(&rpl_libdirs, 1);
+				remove_alist(&rpl_libdirs, 1);
 
 			if (rpl_libdirs == NULL) {
 				/*
@@ -204,7 +203,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 				    prm_libpath, config->c_name);
 			if (prm_libdirs && (rtld_flags & RT_FL_SECURE) &&
 			    (search || DBG_ENABLED))
-				remove_plist(&prm_libdirs, 1);
+				remove_alist(&prm_libdirs, 1);
 
 			if (prm_libdirs == NULL) {
 				/*
@@ -241,7 +240,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 				    RPATH(lmp), NAME(lmp));
 			if (RLIST(lmp) && (rtld_flags & RT_FL_SECURE) &&
 			    (search || DBG_ENABLED))
-				remove_plist(&RLIST(lmp), 1);
+				remove_alist(&RLIST(lmp), 1);
 
 			if (RLIST(lmp) == NULL) {
 				/*

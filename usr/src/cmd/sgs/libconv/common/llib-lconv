@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* LINTLIBRARY */
 /* PROTOLIB1 */
@@ -141,6 +140,10 @@ const char	*conv_ent_flags(ec_flags_t, Conv_ent_flags_buf_t *);
 const char	*conv_ent_filcmp(Word, Conv_fmt_flags_t, Conv_inv_buf_t *);
 const char	*conv_grphdl_flags(uint_t, Conv_grphdl_flags_buf_t *);
 const char	*conv_grpdesc_flags(uint_t, Conv_grpdesc_flags_buf_t *);
+const char	*conv_la_activity(uint_t, Conv_fmt_flags_t, Conv_inv_buf_t *);
+const char	*conv_la_bind(uint_t, Conv_la_bind_buf_t *);
+const char	*conv_la_search(uint_t, Conv_la_search_buf_t *);
+const char	*conv_la_symbind(uint_t, Conv_la_symbind_buf_t *);
 Isa_desc	*conv_isalist(void);
 const char	*conv_mapfile_version(Word, Conv_fmt_flags_t,
 		    Conv_inv_buf_t *);

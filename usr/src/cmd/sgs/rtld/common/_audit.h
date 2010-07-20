@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	__AUDIT_DOT_H
@@ -39,13 +38,28 @@ extern "C" {
 /*
  * Define all auditing structures.
  *
- * A shared object may be a client of an audit library, in which case the
- * identify of the shared object is passed to the auditor using a cookie.
+ * A shared object may be a client of one or more audit libraries.  Calls to an
+ * auditor are accompanied with cookies that identify an object being audited.
+ * These cookies are initialized to the link-map pointers of the object being
+ * audited, however the auditor is free to re-allocate these cookies, and thus
+ * associate their own data with each object being audited.
+ *
+ * With auditing version LAV_VERSION5, local auditors can provide la_preinit()
+ * and la_activity() routines, each of which should be passed a cookie that
+ * represents the link-map of the head of the associated link-map list.  These
+ * cookies are maintained on the associated link-map list, using the lm_cookies
+ * alist.  These cookies are created by _audit_add_head(), and dynamically
+ * retrieved by the _audit_preinit() and _audit_activity() routines.
+ *
+ * Having these cookies kept on the link-map list decouples these cookies from
+ * the Audit_client structure of the object being locally audited.  In addition,
+ * this model ensures that multiple objects, undergoing local auditing from the
+ * same auditor, receive the same head link-map cookie.
  */
 typedef struct {
 	Rt_map		*ac_lmp;	/* audit library identifier */
 	uintptr_t	ac_cookie;	/* cookie assigned to audit library */
-	Word		ac_flags;	/*	and its associated flags */
+	Word		ac_flags;	/*    and its associated flags */
 } Audit_client;
 
 #define	FLG_AC_BINDTO	0x00001
@@ -70,7 +84,8 @@ struct audit_desc {
 	char		*ad_name;	/* originating audit names */
 	APlist		*ad_list;	/* audit objs Audit Interface list */
 	uint_t		ad_cnt;		/* no. of audit objs in this desc. */
-	uint_t		ad_flags;	/* audit capabilities found */
+	uint_t		ad_flags;	/* audit capabilities found.  See */
+					/*    LML_TFLG_AUD_* flags */
 };
 
 /*

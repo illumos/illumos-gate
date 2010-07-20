@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -155,9 +154,9 @@ sort_scc(Sort *sort, int fndx, int flag)
 	 * each object a group identifier so that cyclic dependent callers can
 	 * be better traced (see trace_sort()), or analyzed for non-use.
 	 */
-	if (((init = (lmflags & LML_FLG_TRC_INIT)) == 0) &&
-	    ((unref = (lmflags & LML_FLG_TRC_UNREF)) == 0) &&
-	    (DBG_ENABLED == 0))
+	init = lmflags & LML_FLG_TRC_INIT;
+	unref = lmflags & LML_FLG_TRC_UNREF;
+	if ((init == 0) && (unref == 0) && (DBG_ENABLED == 0))
 		return (1);
 
 	if (init) {

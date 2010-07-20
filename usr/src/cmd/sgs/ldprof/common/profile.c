@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -405,7 +404,7 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 	 * Don't even try to profile an object that does not have
 	 * auditing enabled on it's link-map.  This catches 'ld.so.1'.
 	 */
-	if (LIST(LINKMAP_TO_RTMAP(lmp))->lm_flags & LML_FLG_NOAUDIT)
+	if (LIST(LINKMAP_TO_RTMAP(lmp))->lm_tflags & LML_TFLG_NOAUDIT)
 		return (LA_FLG_BINDFROM);
 
 	if (profile_open(pname, lmp) == 0)

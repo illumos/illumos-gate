@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -156,7 +155,7 @@ typedef struct {
  * sections).
  */
 Rt_map *
-elf_obj_file(Lm_list *lml, Aliste lmco, const char *name,
+elf_obj_file(Lm_list *lml, Aliste lmco, Rt_map *clmp, const char *name,
     mmapobj_result_t *hmpp, mmapobj_result_t *mpp, uint_t mnum)
 {
 	Rej_desc	rej;
@@ -179,7 +178,7 @@ elf_obj_file(Lm_list *lml, Aliste lmco, const char *name,
 	md.md_mnum = mnum;
 	if (alist_append(&mpalp, &md, sizeof (Mmap_desc),
 	    AL_CNT_MPOBJS) == NULL) {
-		remove_so(lml, olmp);
+		remove_so(lml, olmp, clmp);
 		return (NULL);
 	}
 
@@ -189,7 +188,7 @@ elf_obj_file(Lm_list *lml, Aliste lmco, const char *name,
 	 */
 	if (ld_process_mem(name, name, hmpp->mr_addr, hmpp->mr_msize,
 	    (Ofl_desc *)ELFPRV(olmp), &rej) == (Ifl_desc *)S_ERROR) {
-		remove_so(lml, olmp);
+		remove_so(lml, olmp, clmp);
 		return (NULL);
 	}
 
@@ -231,7 +230,7 @@ check_mach_names(Syscapset *scapset, Alist *caps, Rej_desc *rej)
  * the appropriate link-edit functionality (refer to sgs/ld/common/main.c).
  */
 Rt_map *
-elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
+elf_obj_fini(Lm_list *lml, Rt_map *lmp, Rt_map *clmp, int *in_nfavl)
 {
 	Ofl_desc		*ofl = (Ofl_desc *)ELFPRV(lmp);
 	Rt_map			*nlmp, *tlmp;
@@ -331,7 +330,7 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	 */
 	fd.fd_nname = ofl->ofl_name;
 	if ((nlmp = elf_new_lmp(lml, CNTL(olmp), &fd, (Addr)hmpp->mr_addr,
-	    ofl->ofl_size, 0, in_nfavl)) == NULL)
+	    ofl->ofl_size, NULL, clmp, in_nfavl)) == NULL)
 		return (NULL);
 
 	MMAPS(nlmp) = hmpp;
@@ -426,7 +425,7 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	 * opened.
 	 */
 	if ((lml->lm_tflags | AFLAGS(nlmp)) & LML_TFLG_AUD_MASK) {
-		if (audit_objopen(lmp, lmp) == 0)
+		if (audit_objopen(nlmp, nlmp) == 0)
 			return (NULL);
 	}
 	return (nlmp);

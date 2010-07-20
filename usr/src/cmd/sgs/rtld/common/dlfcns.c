@@ -456,6 +456,7 @@ int
 dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 {
 	int	error;
+	Rt_map	*lmp;
 
 	/*
 	 * If we're already at atexit() there's no point processing further,
@@ -486,6 +487,21 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 	 * has little overhead.
 	 */
 	if (ghp->gh_flags & GPH_ZERO)
+		return (0);
+
+	/*
+	 * If this handle is associated with an object that is not on the base
+	 * link-map control list, or it has not yet been relocated, then this
+	 * handle must have originated from an auditors interaction.  User code
+	 * can only execute and bind to relocated objects on the base link-map
+	 * control list.  A non-relocated object, or an object on a non-base
+	 * link-map control list, is in the process of being loaded, and
+	 * therefore we do not attempt to remove the handle, as we might
+	 * mistakenly delete the object thinking that its loading has failed.
+	 */
+	if (((lmp = ghp->gh_ownlmp) != NULL) &&
+	    ((CNTL(lmp) != ALIST_OFF_DATA) ||
+	    ((FLAGS(lmp) & FLG_RT_RELOCED) == 0)))
 		return (0);
 
 	/*
@@ -730,7 +746,7 @@ dlmopen_core(Lm_list *lml, Lm_list *olml, const char *path, int mode,
 		return (NULL);
 
 	if ((palp->al_arritems > 1) && ((mode & RTLD_FIRST) == 0)) {
-		remove_plist(&palp, 1);
+		remove_alist(&palp, 1);
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_5));
 		return (NULL);
 	}
@@ -740,7 +756,7 @@ dlmopen_core(Lm_list *lml, Lm_list *olml, const char *path, int mode,
 	 * associated object.
 	 */
 	if ((nlmco = create_cntl(lml, 1)) == NULL) {
-		remove_plist(&palp, 1);
+		remove_alist(&palp, 1);
 		return (NULL);
 	}
 	olmco = nlmco;
@@ -752,7 +768,7 @@ dlmopen_core(Lm_list *lml, Lm_list *olml, const char *path, int mode,
 	 * Remove any expanded pathname infrastructure, and if the dependency
 	 * couldn't be loaded, cleanup.
 	 */
-	remove_plist(&palp, 1);
+	remove_alist(&palp, 1);
 	if (nlmp == NULL) {
 		remove_cntl(lml, olmco);
 		return (NULL);
@@ -776,7 +792,7 @@ dlmopen_core(Lm_list *lml, Lm_list *olml, const char *path, int mode,
 	/*
 	 * Finish processing the objects associated with this request.
 	 */
-	if (((nlmp = analyze_lmc(lml, nlmco, nlmp, in_nfavl)) == NULL) ||
+	if (((nlmp = analyze_lmc(lml, nlmco, nlmp, clmp, in_nfavl)) == NULL) ||
 	    (relocate_lmc(lml, nlmco, clmp, nlmp, in_nfavl) == 0)) {
 		ghp = NULL;
 		nlmp = NULL;
@@ -864,9 +880,8 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 			 * audited.  Insure all audit dependencies are loaded.
 			 */
 			lml->lm_tflags &= ~LML_TFLG_AUD_MASK;
-			lml->lm_tflags |=
-			    (LML_TFLG_NOLAZYLD | LML_TFLG_LOADFLTR);
-			lml->lm_flags |= LML_FLG_NOAUDIT;
+			lml->lm_tflags |= (LML_TFLG_NOLAZYLD |
+			    LML_TFLG_LOADFLTR | LML_TFLG_NOAUDIT);
 		}
 
 		if (aplist_append(&dynlm_list, lml, AL_CNT_DYNLIST) == NULL) {

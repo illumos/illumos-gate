@@ -20,10 +20,8 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<dlfcn.h>
 #include	<stdio.h>
@@ -32,23 +30,29 @@
 #include	"libld.h"
 
 void
-Dbg_audit_version(Lm_list *lml, const char *lib, ulong_t version)
+Dbg_audit_lib(Rt_map *clmp, const char *lib, int type)
 {
+	Lm_list		*clml = LIST(clmp);
+	const char	*str;
+
 	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_AUD_VERSION), lib, (int)version);
-}
+	Dbg_util_nl(clml, DBG_NL_STD);
+	switch (type) {
+	case DBG_AUD_PRELOAD:
+		str = MSG_ORIG(MSG_AUD_PRELOAD);
+		break;
+	case DBG_AUD_GLOBAL:
+		str = MSG_ORIG(MSG_AUD_GLOBAL);
+		break;
+	case DBG_AUD_LOCAL:
+		/* FALLTHROUGH */
+	default:
+		str = MSG_ORIG(MSG_STR_EMPTY);
+	}
 
-void
-Dbg_audit_lib(Lm_list *lml, const char *lib)
-{
-	if (DBG_NOTCLASS(DBG_C_AUDITING))
-		return;
-
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_AUD_INIT), lib);
+	dbg_print(clml, MSG_INTL(MSG_AUD_LIB), lib, NAME(clmp), str);
 }
 
 void
@@ -57,38 +61,154 @@ Dbg_audit_interface(Lm_list *lml, const char *lib, const char *interface)
 	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 
-	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_AUD_INTERFACE), lib, interface);
 }
 
 void
-Dbg_audit_object(Lm_list *lml, const char *lib, const char *obj)
+Dbg_audit_version(Lm_list *lml, const char *lib, uint_t overs, uint_t nvers)
+{
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_AUD_VERSION), lib, overs, nvers);
+}
+
+void
+Dbg_audit_activity(Lm_list *lml, const char *lib, const char *obj, uint_t flags)
+{
+	Conv_inv_buf_t	inv_buf;
+
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_AUD_ACTIVITY), lib, obj,
+	    conv_la_activity(flags, CONV_FMT_ALT_DEFAULT, &inv_buf));
+}
+
+void
+Dbg_audit_preinit(Lm_list *lml, const char *lib, const char *obj)
 {
 	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_AUD_OBJECT), lib, obj);
+	dbg_print(lml, MSG_INTL(MSG_AUD_PREINIT), lib, obj);
 }
 
 void
-Dbg_audit_symval(Lm_list *lml, const char *lib, const char *func,
-    const char *sym, Addr pval, Addr nval)
+Dbg_audit_objsearch(Lm_list *lml, int call, const char *lib,
+    const char *oobj, uint_t flags, const char *nobj)
 {
-	char	mesg[100];
+	Conv_la_search_buf_t	la_search_buf;
 
 	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
-	if (DBG_NOTDETAIL())
+
+	if (call == DBG_AUD_CALL) {
+		Dbg_util_nl(lml, DBG_NL_STD);
+		dbg_print(lml, MSG_INTL(MSG_AUD_OBJSEARCH), lib, oobj,
+		    conv_la_search(flags, &la_search_buf));
+	} else {
+		if (nobj)
+			dbg_print(lml, MSG_INTL(MSG_AUD_OBJSEARCH_R), lib,
+			    oobj, nobj);
+		else
+			dbg_print(lml, MSG_INTL(MSG_AUD_OBJSEARCH_S), lib,
+			    oobj);
+	}
+}
+
+void
+Dbg_audit_objfilter(Lm_list *lml, int call, const char *lib,
+    const char *filter, const char *filtee, const char *ref)
+{
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 
-	if (pval == nval)
-		mesg[0] = '\0';
-	else
-		(void) sprintf(mesg, MSG_INTL(MSG_AUD_SYMNEW), EC_XWORD(nval));
+	if (call == DBG_AUD_CALL) {
+		Dbg_util_nl(lml, DBG_NL_STD);
+		dbg_print(lml, MSG_INTL(MSG_AUD_OBJFILTER), lib, filter,
+		    filtee, ref);
+	} else
+		dbg_print(lml, MSG_INTL(MSG_AUD_OBJFILTER_R), lib, filter);
+}
 
-	dbg_print(lml, MSG_INTL(MSG_AUD_SYM), lib, func, Dbg_demangle_name(sym),
-	    EC_XWORD(pval), mesg);
+void
+Dbg_audit_objopen(Lm_list *lml, int call, const char *lib, const char *obj,
+    uint_t flags, Boolean ignore)
+{
+	Conv_la_bind_buf_t	la_bind_buf;
+
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
+		return;
+
+	if (call == DBG_AUD_CALL) {
+		Dbg_util_nl(lml, DBG_NL_STD);
+		dbg_print(lml, MSG_INTL(MSG_AUD_OBJOPEN), lib, obj);
+	} else {
+		if (ignore)
+			dbg_print(lml, MSG_INTL(MSG_AUD_OBJOPEN_RI), lib, obj,
+			    conv_la_bind(flags, &la_bind_buf));
+		else
+			dbg_print(lml, MSG_INTL(MSG_AUD_OBJOPEN_R), lib, obj,
+			    conv_la_bind(flags, &la_bind_buf));
+	}
+}
+
+void
+Dbg_audit_objclose(Lm_list *lml, const char *lib, const char *obj)
+{
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_AUD_OBJCLOSE), lib, obj);
+}
+
+void
+Dbg_audit_symbind(Lm_list *lml, int call, const char *lib, const char *name,
+    Addr value, uint_t flags)
+{
+	Conv_la_symbind_buf_t	la_symbind_buf;
+
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
+		return;
+
+	if (call == DBG_AUD_CALL) {
+		Dbg_util_nl(lml, DBG_NL_STD);
+		dbg_print(lml, MSG_INTL(MSG_AUD_SYMBIND), lib, name,
+		    EC_XWORD(value), conv_la_symbind(flags, &la_symbind_buf));
+	} else {
+		dbg_print(lml, MSG_INTL(MSG_AUD_SYMBIND_R), lib, name,
+		    EC_XWORD(value), conv_la_symbind(flags, &la_symbind_buf));
+	}
+}
+
+void
+Dbg_audit_pltenter(Lm_list *lml, int call, const char *lib, const char *name,
+    Addr value)
+{
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
+		return;
+
+	if (call == DBG_AUD_CALL) {
+		Dbg_util_nl(lml, DBG_NL_STD);
+		dbg_print(lml, MSG_INTL(MSG_AUD_PLTENTER), lib, name,
+		    EC_XWORD(value));
+	} else {
+		dbg_print(lml, MSG_INTL(MSG_AUD_PLTENTER_R), lib, name,
+		    EC_XWORD(value));
+	}
+}
+
+void
+Dbg_audit_pltexit(Lm_list *lml, const char *lib, const char *name)
+{
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_AUD_PLTEXIT), lib, name);
 }
 
 void
@@ -103,7 +223,7 @@ Dbg_audit_skip(Lm_list *lml, const char *name, const char *lmid)
 void
 Dbg_audit_terminate(Lm_list *lml, const char *name)
 {
-	if (DBG_NOTCLASS(DBG_C_AUDITING | DBG_C_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_AUD_TERM), name);

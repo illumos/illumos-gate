@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -282,7 +281,7 @@ aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 
 		nlmp = load_one(lml, lmco, palp, clmp, MODE(clmp), 0, 0,
 		    in_nfavl);
-		remove_plist(&palp, 1);
+		remove_alist(&palp, 1);
 		if (((nlmp == 0) || (bind_one(clmp, nlmp, BND_NEEDED) == 0)) &&
 		    ((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0))
 			return (0);
@@ -503,7 +502,7 @@ aout_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 /* ARGSUSED6 */
 Rt_map *
 aout_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
-    void *odyn, int *in_nfavl)
+    void *odyn, Rt_map *clmp, int *in_nfavl)
 {
 	const char	*name = fdp->fd_nname;
 	Rt_map		*lmp;

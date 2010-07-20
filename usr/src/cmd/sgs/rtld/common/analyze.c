@@ -102,7 +102,8 @@ load_filtees(Rt_map *lmp, int *in_nfavl)
  * Return the initial link-map from which analysis starts for relocate_lmc().
  */
 Rt_map *
-analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
+analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, Rt_map *clmp,
+    int *in_nfavl)
 {
 	Rt_map	*lmp;
 	Lm_cntl	*nlmc;
@@ -148,7 +149,8 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 		if (FLAGS(lmp) & FLG_RT_OBJECT) {
 			Rt_map	*olmp;
 
-			if ((olmp = elf_obj_fini(lml, lmp, in_nfavl)) == NULL) {
+			if ((olmp = elf_obj_fini(lml, lmp, clmp,
+			    in_nfavl)) == NULL) {
 				if (lml->lm_flags & LML_FLG_TRC_ENABLE)
 					continue;
 				nlmp = NULL;
@@ -1759,7 +1761,7 @@ map_obj(Lm_list *lml, Fdesc *fdp, size_t fsize, const char *name, int fd,
  * process the various names by which it can be referenced.
  */
 Rt_map *
-load_file(Lm_list *lml, Aliste lmco, Fdesc *fdp, int *in_nfavl)
+load_file(Lm_list *lml, Aliste lmco, Rt_map *clmp, Fdesc *fdp, int *in_nfavl)
 {
 	mmapobj_result_t	*fpmpp = NULL, *fmpp = NULL, *lpmpp, *lmpp;
 	mmapobj_result_t	*hmpp, *mpp, *ompp = fdp->fd_mapp;
@@ -1809,7 +1811,7 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdp, int *in_nfavl)
 	 * processing is finished with elf_obj_fini().
 	 */
 	if (ehdr && (ehdr->e_type == ET_REL)) {
-		if ((nlmp = elf_obj_file(lml, lmco, nname, hmpp, ompp,
+		if ((nlmp = elf_obj_file(lml, lmco, clmp, nname, hmpp, ompp,
 		    omapnum)) == NULL)
 			return (nlmp);
 	} else {
@@ -1829,7 +1831,7 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdp, int *in_nfavl)
 		msize = lmpp->mr_addr + lmpp->mr_msize - fmpp->mr_addr;
 
 		if ((nlmp = ((fdp->fd_ftp)->fct_new_lmp)(lml, lmco, fdp, addr,
-		    msize, NULL, in_nfavl)) == NULL)
+		    msize, NULL, clmp, in_nfavl)) == NULL)
 			return (NULL);
 
 		/*
@@ -1864,12 +1866,12 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdp, int *in_nfavl)
 
 	if ((NAME(nlmp)[0] == '/') && (fpavl_insert(lml, nlmp, NAME(nlmp),
 	    fdp->fd_avlwhere) == 0)) {
-		remove_so(lml, nlmp);
+		remove_so(lml, nlmp, clmp);
 		return (NULL);
 	}
 	if (((NAME(nlmp)[0] != '/') || (NAME(nlmp) != PATHNAME(nlmp))) &&
 	    (fpavl_insert(lml, nlmp, PATHNAME(nlmp), 0) == 0)) {
-		remove_so(lml, nlmp);
+		remove_so(lml, nlmp, clmp);
 		return (NULL);
 	}
 
@@ -1916,7 +1918,7 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdp, int *in_nfavl)
 			olen = strlen(odir) + 1;
 		}
 		if ((ndir = stravl_insert(odir, 0, olen, 1)) == NULL) {
-			remove_so(lml, nlmp);
+			remove_so(lml, nlmp, clmp);
 			return (NULL);
 		}
 		ORIGNAME(nlmp) = ndir;
@@ -2016,8 +2018,6 @@ load_so(Lm_list *lml, Aliste lmco, Rt_map *clmp, uint_t flags,
 		Word		strhash = 0;
 		int		found = 0;
 
-		DBG_CALL(Dbg_libs_find(lml, oname));
-
 		/*
 		 * Traverse the search path lists, creating full pathnames and
 		 * attempt to load each path.
@@ -2098,7 +2098,7 @@ load_so(Lm_list *lml, Aliste lmco, Rt_map *clmp, uint_t flags,
 	/*
 	 * Finish mapping the file and return the link-map descriptor.
 	 */
-	return (load_file(lml, lmco, fdp, in_nfavl));
+	return (load_file(lml, lmco, clmp, fdp, in_nfavl));
 }
 
 /*
@@ -2108,6 +2108,8 @@ const char *
 load_trace(Lm_list *lml, Pdesc *pdp, Rt_map *clmp, Fdesc *fdp)
 {
 	const char	*name = pdp->pd_pname;
+
+	DBG_CALL(Dbg_libs_find(lml, name));
 
 	/*
 	 * First generate any ldd(1) diagnostics.
@@ -2123,11 +2125,11 @@ load_trace(Lm_list *lml, Pdesc *pdp, Rt_map *clmp, Fdesc *fdp)
 		fdp->fd_flags |= FLG_FD_SLASH;
 
 	/*
-	 * If we're being audited tell the audit library of the file we're
+	 * If we're being audited tell any audit libraries of the file we're
 	 * about to go search for.
 	 */
-	if (((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_ACTIVITY) &&
-	    (lml == LIST(clmp)))
+	if (aud_activity ||
+	    ((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_ACTIVITY))
 		audit_activity(clmp, LA_ACT_ADD);
 
 	if ((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_OBJSEARCH) {
@@ -2406,7 +2408,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 
 /*
  * The central routine for loading shared objects.  Insures ldd() diagnostics,
- * handles and any other related additions are all done in one place.
+ * handle creation, and any other related additions are all done in one place.
  */
 Rt_map *
 load_path(Lm_list *lml, Aliste lmco, Rt_map *clmp, int nmode, uint_t flags,
@@ -2457,7 +2459,7 @@ load_path(Lm_list *lml, Aliste lmco, Rt_map *clmp, int nmode, uint_t flags,
 			_rej.rej_str = MSG_INTL(MSG_GEN_NOOPEN);
 			DBG_CALL(Dbg_file_rejected(lml, &_rej, M_MACH));
 			rejection_inherit(rej, &_rej);
-			remove_so(lml, nlmp);
+			remove_so(lml, nlmp, clmp);
 			return (NULL);
 		}
 	} else {
@@ -2507,24 +2509,23 @@ load_path(Lm_list *lml, Aliste lmco, Rt_map *clmp, int nmode, uint_t flags,
 		 * torn down.
 		 */
 		if ((FLAGS(nlmp) & FLG_RT_ANALYZED) == 0)
-			remove_so(lml, nlmp);
+			remove_so(lml, nlmp, clmp);
 		return (NULL);
 	}
 
 	/*
 	 * If this object is new, and we're being audited, tell the audit
-	 * library of the file we've just opened.  Note, if the new link-map
+	 * libraries of the file we've just opened.  Note, if the new link-map
 	 * requires local auditing of its dependencies we also register its
 	 * opening.
 	 */
 	if (FLAGS(nlmp) & FLG_RT_NEWLOAD) {
 		FLAGS(nlmp) &= ~FLG_RT_NEWLOAD;
 
-		if (((lml->lm_tflags | AFLAGS(clmp) | AFLAGS(nlmp)) &
-		    LML_TFLG_AUD_MASK) && (((lml->lm_flags |
-		    LIST(clmp)->lm_flags) & LML_FLG_NOAUDIT) == 0)) {
+		if ((lml->lm_tflags | AFLAGS(clmp) | AFLAGS(nlmp)) &
+		    LML_TFLG_AUD_MASK) {
 			if (audit_objopen(clmp, nlmp) == 0) {
-				remove_so(lml, nlmp);
+				remove_so(lml, nlmp, clmp);
 				return (NULL);
 			}
 		}

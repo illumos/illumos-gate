@@ -422,6 +422,3 @@
 
 @ MSG_LMID_FMT		"%s%d"
 @ MSG_LMID_MAXED	"ALTMAXEDOUT"
-
-@ MSG_AUD_PLTENTER	"la_pltenter"
-@ MSG_AUD_SYMBIND	"la_symbind"

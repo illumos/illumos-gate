@@ -420,7 +420,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * Establish a link-map control list for this request.
 	 */
 	if ((lmco = create_cntl(lml, 0)) == NULL) {
-		remove_plist(&palp, 1);
+		remove_alist(&palp, 1);
 		return (NULL);
 	}
 
@@ -435,7 +435,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * dependency count of the caller, together with the link-map lists
 	 * count of objects that still have lazy dependencies pending.
 	 */
-	remove_plist(&palp, 1);
+	remove_alist(&palp, 1);
 	if (--LAZY(clmp) == 0)
 		LIST(clmp)->lm_lazy--;
 
@@ -444,7 +444,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * create an association between the caller and this dependency.
 	 */
 	if (nlmp && ((bind_one(clmp, nlmp, BND_NEEDED) == 0) ||
-	    ((nlmp = analyze_lmc(lml, lmco, nlmp, in_nfavl)) == NULL) ||
+	    ((nlmp = analyze_lmc(lml, lmco, nlmp, clmp, in_nfavl)) == NULL) ||
 	    (relocate_lmc(lml, lmco, clmp, nlmp, in_nfavl) == 0)))
 		dip->di_info = nlmp = NULL;
 
@@ -729,7 +729,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 		 * error suppression state, if it had been previously set in
 		 * this routine.
 		 */
-		remove_plist(&palp, 0);
+		remove_alist(&palp, 0);
 
 		if (silent)
 			rtld_flags &= ~RT_FL_SILENCERR;
@@ -743,7 +743,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 			    (LML_FLG_LOADAVAIL | LML_FLG_TRC_ENABLE)))
 				continue;
 			else {
-				remove_plist(&palp, 1);
+				remove_alist(&palp, 1);
 				return (0);
 			}
 		}
@@ -752,7 +752,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 	if (LAZY(clmp))
 		lml->lm_lazy++;
 
-	remove_plist(&palp, 1);
+	remove_alist(&palp, 1);
 	return (1);
 }
 
@@ -930,7 +930,7 @@ _elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
 			 */
 			DBG_CALL(Dbg_cap_filter(lml, dir, ilmp));
 			if (cap_filtees((Alist **)&dip->di_info, idx, dir,
-			    lmco, ilmp, filtees, mode,
+			    lmco, ilmp, clmp, filtees, mode,
 			    (FLG_RT_PUBHDL | FLG_RT_CAP), in_nfavl) == 0) {
 				if ((lml->lm_flags & LML_FLG_TRC_ENABLE) &&
 				    (dip->di_flags & FLG_DI_AUXFLTR) &&
@@ -1114,7 +1114,7 @@ _elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
 				 * this filtee if necessary.
 				 */
 				if (nlmp && ghp && (((nlmp = analyze_lmc(lml,
-				    lmco, nlmp, in_nfavl)) == NULL) ||
+				    lmco, nlmp, clmp, in_nfavl)) == NULL) ||
 				    (relocate_lmc(lml, lmco, ilmp, nlmp,
 				    in_nfavl) == 0)))
 					nlmp = NULL;
@@ -1244,7 +1244,7 @@ _elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
 	 * use the null symbol routine.
 	 */
 	if (any == 0) {
-		remove_plist((Alist **)&(dip->di_info), 1);
+		remove_alist((Alist **)&(dip->di_info), 1);
 		elf_disable_filtee(ilmp, dip);
 	}
 
@@ -1644,7 +1644,7 @@ elf_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
  */
 Rt_map *
 elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
-    void *odyn, int *in_nfavl)
+    void *odyn, Rt_map *clmp, int *in_nfavl)
 {
 	const char	*name = fdp->fd_nname;
 	Rt_map		*lmp;
@@ -2115,7 +2115,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				if ((rti = alist_append(&lml->lm_rti, NULL,
 				    sizeof (Rti_desc),
 				    AL_CNT_RTLDINFO)) == NULL) {
-					remove_so(0, lmp);
+					remove_so(0, lmp, clmp);
 					return (NULL);
 				}
 				rti->rti_lmp = lmp;
@@ -2262,13 +2262,13 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 			if (((AUDITORS(lmp) =
 			    calloc(1, sizeof (Audit_desc))) == NULL) ||
 			    ((AUDITORS(lmp)->ad_name = strdup(cp)) == NULL)) {
-				remove_so(0, lmp);
+				remove_so(0, lmp, clmp);
 				return (NULL);
 			}
 			if (lml_main.lm_head) {
 				if (audit_setup(lmp, AUDITORS(lmp), 0,
 				    in_nfavl) == 0) {
-					remove_so(0, lmp);
+					remove_so(0, lmp, clmp);
 					return (NULL);
 				}
 				AFLAGS(lmp) |= AUDITORS(lmp)->ad_flags;
@@ -2278,7 +2278,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 	}
 
 	if (tphdr && (tls_assign(lml, lmp, tphdr) == 0)) {
-		remove_so(0, lmp);
+		remove_so(0, lmp, clmp);
 		return (NULL);
 	}
 

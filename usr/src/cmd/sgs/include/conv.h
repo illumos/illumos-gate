@@ -126,6 +126,33 @@ typedef union {
 } Conv_reject_desc_buf_t;
 
 /*
+ * conv_la_bind()
+ */
+#define	CONV_LA_BIND_BUFSIZE		56
+typedef union {
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_LA_BIND_BUFSIZE];
+} Conv_la_bind_buf_t;
+
+/*
+ * conv_la_search()
+ */
+#define	CONV_LA_SEARCH_BUFSIZE		111
+typedef union {
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_LA_SEARCH_BUFSIZE];
+} Conv_la_search_buf_t;
+
+/*
+ * conv_la_symbind()
+ */
+#define	CONV_LA_SYMBIND_BUFSIZE		113
+typedef union {
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_LA_SYMBIND_BUFSIZE];
+} Conv_la_symbind_buf_t;
+
+/*
  * conv_cap_val_hw/sf()
  *
  * These sizes are based on the maximum number of capabilities that exist.
@@ -843,6 +870,11 @@ extern	const char	*conv_elfdata_type(Elf_Type, Conv_inv_buf_t *);
 extern	const char	*conv_ent_flags(ec_flags_t, Conv_ent_flags_buf_t *);
 extern	const char	*conv_ent_files_flags(Word,  Conv_fmt_flags_t fmt_flags,
 			    Conv_ent_files_flags_buf_t *);
+extern	const char	*conv_la_activity(uint_t, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_la_bind(uint_t, Conv_la_bind_buf_t *);
+extern	const char	*conv_la_search(uint_t, Conv_la_search_buf_t *);
+extern	const char	*conv_la_symbind(uint_t, Conv_la_symbind_buf_t *);
 extern	const char	*conv_grphdl_flags(uint_t, Conv_grphdl_flags_buf_t *);
 extern	const char	*conv_grpdesc_flags(uint_t, Conv_grpdesc_flags_buf_t *);
 extern	Isa_desc	*conv_isalist(void);

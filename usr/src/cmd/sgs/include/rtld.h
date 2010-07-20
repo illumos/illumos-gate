@@ -303,7 +303,7 @@ struct lm_list {
 	uint_t		lm_tls;		/* new obj that require TLS */
 	uint_t		lm_lmid;	/* unique link-map list identifier, */
 	char		*lm_lmidstr;	/* and associated diagnostic string */
-	APlist		*lm_actaudit;	/* list of pending audit activity */
+	Alist		*lm_aud_cookies; /* local auditor cookies */
 	Lc_desc		lm_lcs[CI_MAX];	/* external libc functions */
 };
 
@@ -330,7 +330,7 @@ struct lm_list32 {
 	uint_t		lm_tls;
 	uint_t		lm_lmid;
 	Elf32_Addr	lm_lmidstr;
-	Elf32_Addr	lm_actaudit;
+	Elf32_Addr	lm_aud_cookies;
 	Elf32_Addr	lm_lcs[CI_MAX];
 };
 #endif /* _SYSCALL32 */
@@ -346,28 +346,27 @@ struct lm_list32 {
 /*
  * END: Exposed to rtld_db - don't move, don't delete
  */
-#define	LML_FLG_NOAUDIT		0x00000004	/* symbol auditing disabled */
+#define	LML_FLG_ACTAUDIT	0x00000004	/* audit activity posted */
 #define	LML_FLG_PLTREL		0x00000008	/* deferred plt relocation */
-						/* 	initialization */
-						/*	(ld.so.1 only) */
+						/*    initialization (ld.so.1 */
+						/*    only) */
 #define	LML_FLG_HOLDLOCK	0x00000010	/* hold the rtld mutex lock */
 #define	LML_FLG_ENVIRON		0x00000020	/* environ var initialized */
 #define	LML_FLG_INTRPOSE	0x00000040	/* interposing objs on list */
 #define	LML_FLG_LOCAUDIT	0x00000080	/* local auditors exists for */
-						/*	this link-map list */
+						/*    this link-map list */
 #define	LML_FLG_LOADAVAIL	0x00000100	/* load anything available */
 #define	LML_FLG_IGNRELERR	0x00000200	/* ignore relocation errors - */
-						/*	internal for crle(1) */
-#define	LML_FLG_DBNOTIF		0x00000400	/* binding activity going on */
-#define	LML_FLG_STARTREL	0x00000800	/* relocation started */
-#define	LML_FLG_ATEXIT		0x00001000	/* atexit processing */
-#define	LML_FLG_OBJADDED	0x00002000	/* object(s) added */
-#define	LML_FLG_OBJDELETED	0x00004000	/* object(s) deleted */
-#define	LML_FLG_OBJREEVAL	0x00008000	/* existing object(s) needs */
-						/*	tsort reevaluation */
-#define	LML_FLG_INTRPOSETSORT	0x00020000	/* interpose tsorting done */
-#define	LML_FLG_AUDITNOTIFY	0x00040000	/* audit consistent required */
-#define	LML_FLG_GROUPSEXIST	0x00080000	/* local groups exist */
+						/*    internal for crle(1) */
+#define	LML_FLG_STARTREL	0x00000400	/* relocation started */
+#define	LML_FLG_ATEXIT		0x00000800	/* atexit processing */
+#define	LML_FLG_OBJADDED	0x00001000	/* object(s) added */
+#define	LML_FLG_OBJDELETED	0x00002000	/* object(s) deleted */
+#define	LML_FLG_OBJREEVAL	0x00004000	/* existing object(s) needs */
+						/*    tsort reevaluation */
+#define	LML_FLG_INTRPOSETSORT	0x00008000	/* interpose tsorting done */
+#define	LML_FLG_AUDITNOTIFY	0x00010000	/* audit consistent required */
+#define	LML_FLG_GROUPSEXIST	0x00020000	/* local groups exist */
 
 #define	LML_FLG_TRC_LDDSTUB	0x00100000	/* identify lddstub */
 #define	LML_FLG_TRC_ENABLE	0x00200000	/* tracing enabled (ldd) */
@@ -375,14 +374,14 @@ struct lm_list32 {
 #define	LML_FLG_TRC_VERBOSE	0x00800000	/* verbose (versioning) trace */
 #define	LML_FLG_TRC_SEARCH	0x01000000	/* trace search paths */
 #define	LML_FLG_TRC_UNREF	0x02000000	/* trace unreferenced */
-						/*	dependencies */
+						/*    dependencies */
 #define	LML_FLG_TRC_UNUSED	0x04000000	/* trace unused dependencies */
 #define	LML_FLG_TRC_INIT	0x08000000	/* print .init order */
 #define	LML_FLG_TRC_NOUNRESWEAK	0x10000000	/* unresolved weak references */
-						/*	are not allowed */
+						/*    are not allowed */
 #define	LML_FLG_TRC_NOPAREXT	0x20000000	/* unresolved PARENT/EXTERN */
-						/*	references are not */
-						/*	allowed */
+						/*    references are not */
+						/*    allowed */
 #define	LML_MSK_TRC		0xfff00000	/* tracing mask */
 
 /*
@@ -391,7 +390,7 @@ struct lm_list32 {
  */
 #define	LML_TFLG_NOLAZYLD	0x00000001	/* lazy loading disabled */
 #define	LML_TFLG_NODIRECT	0x00000002	/* direct bindings disabled */
-
+#define	LML_TFLG_NOAUDIT	0x00000004	/* auditing disabled */
 #define	LML_TFLG_LOADFLTR	0x00000008	/* trigger filtee loading */
 
 #define	LML_TFLG_AUD_PREINIT	0x00001000	/* preinit (audit) exists */
