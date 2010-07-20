@@ -1,9 +1,6 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1988 Regents of the University of California.
@@ -3993,9 +3990,9 @@ OTX:
 				print((long)ip->di_nlink, 8, -4, 0);
 				printf("       bs: ");
 				print(ip->di_blocks, 12, -8, 0);
-				printf("   sz : ");
 				printf("c_flags : ");
 				print(ip->di_cflags, 12, -8, 0);
+				printf("   sz : ");
 #ifdef _LARGEFILE64_SOURCE
 				printll(ip->di_size, 20, -16, 0);
 #else /* !_LARGEFILE64_SOURCE */
