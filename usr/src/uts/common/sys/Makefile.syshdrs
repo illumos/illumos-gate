@@ -91,6 +91,9 @@ ib/adapters/tavor/%.check:	ib/adapters/tavor/%.h
 ib/adapters/hermon/%.check:	ib/adapters/hermon/%.h
 	$(DOT_H_CHECK)
 
+ib/adapters/%.check:	ib/adapters/%.h
+	$(DOT_H_CHECK)
+
 idm/%.check:		idm/%.h
 	$(DOT_H_CHECK)
 
@@ -200,6 +203,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/ib		\
 	$(ROOTDIR)/ib/adapters/tavor	\
 	$(ROOTDIR)/ib/adapters/hermon	\
+	$(ROOTDIR)/ib/adapters	\
 	$(ROOTDIR)/ib/ibtl	\
 	$(ROOTDIR)/ib/ibtl/impl	\
 	$(ROOTDIR)/ib/mgt	\
@@ -270,6 +274,7 @@ ROOTSOL_UMADHDRS= $(SOL_UMADHDRS:%=$(ROOTDIR)/ib/clients/of/sol_umad/%)
 ROOTSOL_UCMAHDRS= $(SOL_UCMAHDRS:%=$(ROOTDIR)/ib/clients/of/sol_ucma/%)
 ROOTTAVORHDRS= $(TAVORHDRS:%=$(ROOTDIR)/ib/adapters/tavor/%)
 ROOTHERMONHDRS= $(HERMONHDRS:%=$(ROOTDIR)/ib/adapters/hermon/%)
+ROOTMLNXHDRS= $(MLNXHDRS:%=$(ROOTDIR)/ib/adapters/%)
 
 ROOTIDMHDRS= $(IDMHDRS:%=$(ROOTDIR)/idm/%)
 ROOTISCSITHDRS= $(ISCSITHDRS:%=$(ROOTDIR)/iscsit/%)
@@ -421,6 +426,9 @@ $(ROOTDIR)/ib/adapters/tavor/%:	ib/adapters/tavor/%
 	$(INS.file)
 
 $(ROOTDIR)/ib/adapters/hermon/%:	ib/adapters/hermon/%
+	$(INS.file)
+
+$(ROOTDIR)/ib/adapters/%:	ib/adapters/%
 	$(INS.file)
 
 $(ROOTDIR)/lvm/%: lvm/%

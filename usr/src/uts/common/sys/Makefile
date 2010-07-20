@@ -773,6 +773,9 @@ TAVORHDRS=		\
 HERMONHDRS=		\
 	hermon_ioctl.h
 
+MLNXHDRS=		\
+	mlnx_umap.h
+
 IDMHDRS=		\
 	idm.h		\
 	idm_impl.h	\
@@ -1176,6 +1179,7 @@ CHECKHDRS=						\
 	$(SOL_OFSHDRS:%.h=ib/clients/of/sol_ofs/%.check)	\
 	$(TAVORHDRS:%.h=ib/adapters/tavor/%.check)	\
 	$(HERMONHDRS:%.h=ib/adapters/hermon/%.check)	\
+	$(MLNXHDRS:%.h=ib/adapters/%.check)		\
 	$(IDMHDRS:%.h=idm/%.check)			\
 	$(ISCSIHDRS:%.h=iscsi/%.check)			\
 	$(ISCSITHDRS:%.h=iscsit/%.check)			\
@@ -1253,6 +1257,7 @@ CHECKHDRS=						\
 	$(ROOTSOL_UCMAHDRS)	\
 	$(ROOTTAVORHDRS)	\
 	$(ROOTHERMONHDRS)	\
+	$(ROOTMLNXHDRS)		\
 	$(ROOTLVMHDRS)		\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\
@@ -1322,6 +1327,7 @@ install_h:			\
 	$(ROOTSOL_UCMAHDRS)	\
 	$(ROOTTAVORHDRS)	\
 	$(ROOTHERMONHDRS)	\
+	$(ROOTMLNXHDRS)		\
 	$(ROOTLVMHDRS)		\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\

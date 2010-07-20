@@ -1077,6 +1077,7 @@ $(i386_ONLY)file path=usr/include/sys/i8272A.h
 file path=usr/include/sys/ia.h
 file path=usr/include/sys/iapriocntl.h
 file path=usr/include/sys/ib/adapters/hermon/hermon_ioctl.h
+file path=usr/include/sys/ib/adapters/mlnx_umap.h
 file path=usr/include/sys/ib/adapters/tavor/tavor_ioctl.h
 file path=usr/include/sys/ib/clients/ibd/ibd.h
 file path=usr/include/sys/ib/clients/of/ofa_solaris.h
