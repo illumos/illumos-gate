@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T			*/
@@ -36,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * chmod option mode files
@@ -354,19 +351,15 @@ chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, sec_args_t *secp,
 			return (1);
 		}
 		if (secp->sec_type == SEC_ACL) {
-			if (doacl(dir, &st, secp->sec_acls) != 0)
-				return (1);
+			(void) doacl(dir, &st, secp->sec_acls);
 		} else if (secp->sec_type == SEC_ATTR) {
-			if (set_attrs(dir, attrnames, secp->sec_attrs) != 0) {
-				return (1);
-			}
+			(void) set_attrs(dir, attrnames, secp->sec_attrs);
 		} else {
 			return (1);
 		}
 	} else if (chmod(dir, newmode_common(ms, mode, umsk, dir, path,
 	    &group_clear_bits, &group_set_bits)) < 0) {
 		errmsg(2, 0, gettext("can't change %s\n"), path);
-		return (1);
 	}
 
 	/*
