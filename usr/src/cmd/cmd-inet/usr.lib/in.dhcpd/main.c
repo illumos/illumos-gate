@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the argument parsing routines of the dhcpd daemon.
@@ -430,22 +427,23 @@ duplicate IP address detection!\n\n"));
 		(void) dup2(0, 1);
 		(void) dup2(0, 2);
 
-		/* set NOFILE to unlimited */
-		rl.rlim_cur = rl.rlim_max = RLIM_INFINITY;
-		if ((err = setrlimit(RLIMIT_NOFILE, &rl)) < 0) {
-			dhcpmsg(LOG_ERR, "Cannot set open file limit: %s\n",
-			    strerror(errno));
-			return (err);
-		}
-		(void) enable_extended_FILE_stdio(-1, -1);
-
 		/* Detach console */
 		(void) setsid();
 
 		(void) openlog(DHCPD, LOG_PID, LOG_DAEMON);
-		if (verbose)
-			dhcpmsg(LOG_INFO, "Daemon started.\n");
 	}
+
+	/* set NOFILE to unlimited */
+	rl.rlim_cur = rl.rlim_max = RLIM_INFINITY;
+	if ((err = setrlimit(RLIMIT_NOFILE, &rl)) < 0) {
+		dhcpmsg(LOG_ERR, "Cannot set open file limit: %s\n",
+		    strerror(errno));
+		return (err);
+	}
+	(void) enable_extended_FILE_stdio(-1, -1);
+
+	if (verbose)
+		dhcpmsg(LOG_INFO, "Daemon started.\n");
 
 	/*
 	 * Block all signals in main thread - threads created will also

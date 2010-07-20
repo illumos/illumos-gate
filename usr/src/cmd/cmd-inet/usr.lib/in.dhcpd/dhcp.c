@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -534,7 +533,7 @@ dhcp_offer(dsvc_clnt_t *pcd, PKT_LIST *plp)
 			newlease = htonl(newlease);
 		else
 			newlease = htonl(now + newlease);
-		(void) update_offer(pcd, dnlp, newlease, NULL, B_TRUE);
+		(void) update_offer(pcd, &dnlp, newlease, NULL, B_TRUE);
 		existing_offer = B_TRUE;
 	} else {
 		unreserve = B_TRUE;
@@ -1880,15 +1879,15 @@ check_offer(dsvc_dnet_t *pnd, struct in_addr *reservep)
  * the interface we received the last DISCOVER on.
  *
  * pcd - per client data struct.
- * dnlp - pointer to current container entry. Performance: caching reduces
- * datastore activity, structure copying.
+ * dnlp - pointer to pointer to current container entry. Performance: caching
+ * reduces datastore activity, structure copying.
  * nlease - new lease time.
  * reservep - new offer address (expected in network order).
  * purge_cache - Multithreading: avoid redundant cache purging in
  * select_offer().
  */
 boolean_t
-update_offer(dsvc_clnt_t *pcd, dn_rec_list_t *dnlp, lease_t nlease,
+update_offer(dsvc_clnt_t *pcd, dn_rec_list_t **dnlp, lease_t nlease,
 	struct in_addr *reservep, boolean_t purge_cache)
 {
 	char		ntoab[INET_ADDRSTRLEN];
@@ -1901,10 +1900,10 @@ update_offer(dsvc_clnt_t *pcd, dn_rec_list_t *dnlp, lease_t nlease,
 	struct in_addr	off_ip;
 
 	/* Save the original datastore record. */
-	if (dnlp != NULL) {
-		if (pcd->dnlp != NULL && pcd->dnlp != dnlp)
+	if (dnlp != NULL && *dnlp != NULL) {
+		if (pcd->dnlp != NULL && pcd->dnlp != *dnlp)
 			dhcp_free_dd_list(pnd->dh, pcd->dnlp);
-		pcd->dnlp = dnlp;
+		pcd->dnlp = *dnlp;
 	}
 	if (pcd->dnlp != NULL)
 		dnp = pcd->dnlp->dnl_rec;
@@ -1954,6 +1953,10 @@ update_offer(dsvc_clnt_t *pcd, dn_rec_list_t *dnlp, lease_t nlease,
 			}
 			pcd->off_ip.s_addr = htonl(INADDR_ANY);
 			dhcp_free_dd_list(pnd->dh, pcd->dnlp);
+			if (dnlp != NULL && *dnlp != NULL &&
+			    pcd->dnlp == *dnlp) {
+				*dnlp = NULL;
+			}
 			pcd->dnlp = NULL;
 			return (B_FALSE);
 		}
