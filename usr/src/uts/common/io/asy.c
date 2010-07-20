@@ -682,6 +682,12 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
 		asy->asy_flags |= ASY_DDI_SUSPENDED;
 
+		/*
+		 * Hardware interrupts are disabled we can drop our high level
+		 * lock and proceed.
+		 */
+		mutex_exit(&asy->asy_excl_hi);
+
 		/* Process remaining RX characters and RX errors, if any */
 		lsr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR);
 		async_rxint(asy, lsr);
@@ -699,7 +705,6 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			    "asy: transmitter wasn't drained before "
 			    "driver was suspended");
 
-		mutex_exit(&asy->asy_excl_hi);
 		mutex_exit(&asy->asy_excl);
 		mutex_exit(&asy->asy_soft_sr);
 		break;
@@ -2254,6 +2259,12 @@ asyintr(caddr_t argasy)
 	}
 
 	mutex_enter(&asy->asy_excl_hi);
+
+	if (asy->asy_flags & ASY_DDI_SUSPENDED) {
+		mutex_exit(&asy->asy_excl_hi);
+		return (DDI_INTR_CLAIMED);
+	}
+
 	/*
 	 * We will loop until the interrupt line is pulled low. asy
 	 * interrupt is edge triggered.
