@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -233,6 +232,7 @@ fcoei_unbind_port(void *fca_handle)
  * Comments:
  *	Link the exchange elements with proper objects
  */
+/* ARGSUSED */
 static int
 fcoei_init_pkt(void *fca_handle, fc_packet_t *fpkt, int sleep)
 {
@@ -260,6 +260,7 @@ fcoei_init_pkt(void *fca_handle, fc_packet_t *fpkt, int sleep)
  * Comments:
  *	Very simple, just return successfully
  */
+/* ARGSUSED */
 static int
 fcoei_un_init_pkt(void *fca_handle, fc_packet_t *fpkt)
 {
@@ -1556,6 +1557,7 @@ fcoei_fill_els_adisc_cmd(fc_packet_t *fpkt, fcoe_frame_t *frm)
  * Comments:
  *	N/A
  */
+/* ARGSUSED */
 static void
 fcoei_fill_els_linit_cmd(fc_packet_t *fpkt, fcoe_frame_t *frm)
 {
@@ -1911,6 +1913,7 @@ fcoei_fpkt_comp(fc_packet_t *fpkt)
  * Comments:
  *	N/A
  */
+/* ARGSUSED */
 static uint32_t
 fcoei_xch_abort(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 {

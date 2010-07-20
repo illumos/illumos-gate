@@ -228,7 +228,7 @@ fcoet_xfer_scsi_data(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		xch->xch_left_data_size =
 		    XCH2TASK(xch)->task_expected_xfer_length;
 
-	if (dbuf->db_flags == DB_DIRECTION_FROM_RPORT) {
+	if (dbuf->db_flags & DB_DIRECTION_FROM_RPORT) {
 		/*
 		 * If it's write type command, we need send xfer_rdy now
 		 * We may need to consider bidirectional command later

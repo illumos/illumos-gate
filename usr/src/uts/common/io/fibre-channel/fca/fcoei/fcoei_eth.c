@@ -55,8 +55,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -437,6 +436,7 @@ fcoei_process_unsol_els_req(fcoe_frame_t *frm)
  * Comments:
  *	N/A
  */
+/* ARGSUSED */
 static uint32_t
 fcoei_search_abort_xch(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 {
