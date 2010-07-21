@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -232,6 +231,7 @@ mount_nfs(
 	int err = -1;
 	int cached;
 	action_list *alp;
+	char *dir;
 
 
 	alp = *alpp;
@@ -272,12 +272,15 @@ mount_nfs(
 	}
 	if (err) {
 		cached = strcmp(me->map_mounter, MNTTYPE_CACHEFS) == 0;
+		dir = strdup(mfs->mfs_dir);
 		err = nfsmount(mfs, mntpnt, me->map_mntopts,
 		    cached, overlay, uid, alp);
 		if (err && trace > 1) {
-			trace_prt(1, "	Couldn't mount %s:%s, err=%d\n",
-			    mfs->mfs_host, mfs->mfs_dir, err);
+			trace_prt(1, "  Couldn't mount %s:%s, err=%d\n",
+			    mfs->mfs_host ? mfs->mfs_host : "",
+			    mfs->mfs_dir ? mfs->mfs_dir : dir, err);
 		}
+		free(dir);
 	}
 	free_mfs(mfs);
 	return (err);
