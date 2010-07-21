@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -223,6 +222,10 @@ dr_bypass_device(char *dname)
 {
 	int i;
 	char **lname;
+
+	if (dname == NULL)
+		return (0);
+
 	/* check the bypass list */
 	for (i = 0, lname = &dr_bypass_list[i]; **lname != '\0'; lname++) {
 		if (strcmp(dname, dr_bypass_list[i++]) == 0)
@@ -708,10 +711,6 @@ dr_signal_user(int sig)
 void
 dr_resume(dr_sr_handle_t *srh)
 {
-	dr_handle_t	*handle;
-
-	handle = srh->sr_dr_handlep;
-
 	if (srh->sr_suspend_state < DR_SRSTATE_FULL) {
 		/*
 		 * Update the signature block.
@@ -812,8 +811,6 @@ dr_resume(dr_sr_handle_t *srh)
 		break;
 	}
 
-	i_ndi_allow_device_tree_changes(handle->h_ndi);
-
 	/*
 	 * update the signature block
 	 */
@@ -840,8 +837,6 @@ dr_suspend(dr_sr_handle_t *srh)
 	 */
 	CPU_SIGNATURE(OS_SIG, SIGST_QUIESCE_INPROGRESS, SIGSUBST_NULL,
 	    CPU->cpu_id);
-
-	i_ndi_block_device_tree_changes(&handle->h_ndi);
 
 	prom_printf("\nDR: suspending user threads...\n");
 	srh->sr_suspend_state = DR_SRSTATE_USER;
