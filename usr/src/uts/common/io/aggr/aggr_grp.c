@@ -2431,9 +2431,9 @@ static int
 aggr_m_multicst(void *arg, boolean_t add, const uint8_t *addrp)
 {
 	aggr_grp_t *grp = arg;
-	aggr_port_t *port = NULL;
+	aggr_port_t *port = NULL, *errport = NULL;
 	mac_perim_handle_t mph;
-	int err = 0, cerr;
+	int err = 0;
 
 	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
@@ -2441,9 +2441,29 @@ aggr_m_multicst(void *arg, boolean_t add, const uint8_t *addrp)
 		    !port->lp_started) {
 			continue;
 		}
-		cerr = aggr_port_multicst(port, add, addrp);
-		if (cerr != 0 && err == 0)
-			err = cerr;
+		err = aggr_port_multicst(port, add, addrp);
+		if (err != 0) {
+			errport = port;
+			break;
+		}
+	}
+
+	/*
+	 * At least one port caused error return and this error is returned to
+	 * mac, eventually a NAK would be sent upwards.
+	 * Some ports have this multicast address listed now, and some don't.
+	 * Treat this error as a whole aggr failure not individual port failure.
+	 * Therefore remove this multicast address from other ports.
+	 */
+	if ((err != 0) && add) {
+		for (port = grp->lg_ports; port != errport;
+		    port = port->lp_next) {
+			if (port->lp_state != AGGR_PORT_STATE_ATTACHED ||
+			    !port->lp_started) {
+				continue;
+			}
+			(void) aggr_port_multicst(port, B_FALSE, addrp);
+		}
 	}
 	mac_perim_exit(mph);
 	return (err);
