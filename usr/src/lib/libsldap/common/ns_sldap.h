@@ -915,7 +915,7 @@ int __ns_ldap_getAcctMgmt(
 	const char *user,
 	AcctUsableResponse_t *acctResp);
 
-boolean_t __ns_ldap_is_shadow_update_enabled();
+boolean_t __ns_ldap_is_shadow_update_enabled(void);
 
 void
 __ns_ldap_self_gssapi_only_set(

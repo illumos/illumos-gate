@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1232,12 +1232,15 @@ get_admin_passwd(ns_cred_t *cred, ns_ldap_error_t **errorp)
 }
 
 boolean_t
-__ns_ldap_is_shadow_update_enabled() {
-
-	int **enable_shadow = NULL;
+__ns_ldap_is_shadow_update_enabled(void)
+{
+	int			**enable_shadow = NULL;
+	ns_ldap_error_t		*errorp = NULL;
 
 	if (__ns_ldap_getParam(NS_LDAP_ENABLE_SHADOW_UPDATE_P,
-	    (void ***)&enable_shadow, NULL) != NS_LDAP_SUCCESS) {
+	    (void ***)&enable_shadow, &errorp) != NS_LDAP_SUCCESS) {
+		if (errorp)
+			(void) __ns_ldap_freeError(&errorp);
 		return (B_FALSE);
 	}
 	if ((enable_shadow != NULL && *enable_shadow != NULL) &&
