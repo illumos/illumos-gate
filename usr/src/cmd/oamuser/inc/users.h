@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -59,7 +58,7 @@
 #define	WARN_BAD_PROJ_NAME	0x20
 #define	WARN_LOGGED_IN		0x40
 
-/* Exit codes from passmgmt(1) */
+/* Exit codes from passmgmt */
 #define	PEX_SUCCESS	0
 #define	PEX_NO_PERM	1
 #define	PEX_SYNTAX	2
@@ -85,5 +84,5 @@ extern void warningmsg(int, char *);
 extern void putgrent(struct group *, FILE *);
 
 /* passmgmt */
-#define	PASSMGMT	"/usr/bin/passmgmt";
+#define	PASSMGMT	"/usr/lib/passmgmt";
 #endif	/* _USERS_H */

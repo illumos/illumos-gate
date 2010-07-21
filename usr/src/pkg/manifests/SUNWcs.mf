@@ -1398,7 +1398,7 @@ file path=usr/sbin/nlsadmin group=adm mode=0755
 file path=usr/sbin/nscd mode=0555
 file path=usr/sbin/nwamadm mode=0555
 file path=usr/sbin/nwamcfg mode=0555
-file path=usr/sbin/passmgmt group=sys mode=0555
+file path=usr/lib/passmgmt group=sys mode=0555
 file path=usr/sbin/pmadm group=sys mode=0555
 file path=usr/sbin/praudit mode=0555
 $(i386_ONLY)file path=usr/sbin/prtdiag group=sys mode=2755
@@ -2642,7 +2642,6 @@ link path=usr/bin/cachefspack target=../lib/fs/cachefs/cachefspack
 link path=usr/bin/cachefsstat target=../lib/fs/cachefs/cachefsstat
 link path=usr/bin/df target=../sbin/df
 link path=usr/bin/jsh target=ksh93
-link path=usr/bin/passmgmt target=../sbin/passmgmt
 link path=usr/bin/pwconv target=../sbin/pwconv
 link path=usr/bin/rmail target=./mail
 link path=usr/bin/sh target=$(ARCH32)/ksh93
