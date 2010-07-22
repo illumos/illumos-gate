@@ -213,7 +213,7 @@ ident_find_ref_nolock(modid_t modid, dev_info_t *dip, dev_t dev, major_t major)
 static struct ldi_ident *
 ident_alloc(char *mod_name, dev_info_t *dip, dev_t dev, major_t major)
 {
-	struct ldi_ident	*lip, **lipp;
+	struct ldi_ident	*lip, **lipp, *retlip;
 	modid_t			modid;
 	uint_t			index;
 
@@ -235,9 +235,10 @@ ident_alloc(char *mod_name, dev_info_t *dip, dev_t dev, major_t major)
 		/* we found an ident in the hash */
 		ASSERT(strcmp((*lipp)->li_modname, mod_name) == 0);
 		(*lipp)->li_ref++;
+		retlip = *lipp;
 		mutex_exit(&ldi_ident_hash_lock[index]);
 		kmem_free(lip, sizeof (struct ldi_ident));
-		return (*lipp);
+		return (retlip);
 	}
 
 	/* initialize the new ident */
@@ -331,20 +332,20 @@ handle_find_ref_nolock(vnode_t *vp, struct ldi_ident *ident)
 static struct ldi_handle *
 handle_find(vnode_t *vp, struct ldi_ident *ident)
 {
-	struct ldi_handle	**lhpp;
+	struct ldi_handle	**lhpp, *retlhp;
 	int			index = LH_HASH(vp);
 
 	mutex_enter(&ldi_handle_hash_lock[index]);
 	lhpp = handle_find_ref_nolock(vp, ident);
+	retlhp = *lhpp;
 	mutex_exit(&ldi_handle_hash_lock[index]);
-	ASSERT(lhpp != NULL);
-	return (*lhpp);
+	return (retlhp);
 }
 
 static struct ldi_handle *
 handle_alloc(vnode_t *vp, struct ldi_ident *ident)
 {
-	struct ldi_handle	*lhp, **lhpp;
+	struct ldi_handle	*lhp, **lhpp, *retlhp;
 	uint_t			index;
 
 	ASSERT((vp != NULL) && (ident != NULL));
@@ -360,16 +361,17 @@ handle_alloc(vnode_t *vp, struct ldi_ident *ident)
 	if (*lhpp != NULL) {
 		/* we found a handle in the hash */
 		(*lhpp)->lh_ref++;
+		retlhp = *lhpp;
 		mutex_exit(&ldi_handle_hash_lock[index]);
 
 		LDI_ALLOCFREE((CE_WARN, "ldi handle alloc: dup "
 		    "lh=0x%p, ident=0x%p, vp=0x%p, drv=%s, minor=0x%x",
-		    (void *)*lhpp, (void *)ident, (void *)vp,
+		    (void *)retlhp, (void *)ident, (void *)vp,
 		    mod_major_to_name(getmajor(vp->v_rdev)),
 		    getminor(vp->v_rdev)));
 
 		kmem_free(lhp, sizeof (struct ldi_handle));
-		return (*lhpp);
+		return (retlhp);
 	}
 
 	/* initialize the new handle */
