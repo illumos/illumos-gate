@@ -4001,6 +4001,104 @@ ehci_wait_for_sof(ehci_state_t	*ehcip)
 	return (USB_SUCCESS);
 }
 
+/*
+ * Toggle the async/periodic schedule based on opened pipe count.
+ * During pipe cleanup(in pipe reset case), the pipe's QH is temporarily
+ * disabled. But the TW on the pipe is not freed. In this case, we need
+ * to disable async/periodic schedule for some non-compatible hardware.
+ * Otherwise, the hardware will overwrite software's configuration of
+ * the QH.
+ */
+void
+ehci_toggle_scheduler_on_pipe(ehci_state_t *ehcip)
+{
+	uint_t  temp_reg, cmd_reg;
+
+	cmd_reg = Get_OpReg(ehci_command);
+	temp_reg = cmd_reg;
+
+	/*
+	 * Enable/Disable asynchronous scheduler, and
+	 * turn on/off async list door bell
+	 */
+	if (ehcip->ehci_open_async_count) {
+		if ((ehcip->ehci_async_req_count > 0) &&
+		    ((cmd_reg & EHCI_CMD_ASYNC_SCHED_ENABLE) == 0)) {
+			/*
+			 * For some reason this address might get nulled out by
+			 * the ehci chip. Set it here just in case it is null.
+			 */
+			Set_OpReg(ehci_async_list_addr,
+			    ehci_qh_cpu_to_iommu(ehcip,
+			    ehcip->ehci_head_of_async_sched_list));
+
+			/*
+			 * For some reason this register might get nulled out by
+			 * the Uli M1575 Southbridge. To workaround the HW
+			 * problem, check the value after write and retry if the
+			 * last write fails.
+			 *
+			 * If the ASYNCLISTADDR remains "stuck" after
+			 * EHCI_MAX_RETRY retries, then the M1575 is broken
+			 * and is stuck in an inconsistent state and is about
+			 * to crash the machine with a trn_oor panic when it
+			 * does a DMA read from 0x0.  It is better to panic
+			 * now rather than wait for the trn_oor crash; this
+			 * way Customer Service will have a clean signature
+			 * that indicts the M1575 chip rather than a
+			 * mysterious and hard-to-diagnose trn_oor panic.
+			 */
+			if ((ehcip->ehci_vendor_id == PCI_VENDOR_ULi_M1575) &&
+			    (ehcip->ehci_device_id == PCI_DEVICE_ULi_M1575) &&
+			    (ehci_qh_cpu_to_iommu(ehcip,
+			    ehcip->ehci_head_of_async_sched_list) !=
+			    Get_OpReg(ehci_async_list_addr))) {
+				int retry = 0;
+
+				Set_OpRegRetry(ehci_async_list_addr,
+				    ehci_qh_cpu_to_iommu(ehcip,
+				    ehcip->ehci_head_of_async_sched_list),
+				    retry);
+				if (retry >= EHCI_MAX_RETRY)
+					cmn_err(CE_PANIC,
+					    "ehci_toggle_scheduler_on_pipe: "
+					    "ASYNCLISTADDR write failed.");
+
+				USB_DPRINTF_L2(PRINT_MASK_ATTA,
+				    ehcip->ehci_log_hdl,
+				    "ehci_toggle_scheduler_on_pipe:"
+				    " ASYNCLISTADDR write failed, retry=%d",
+				    retry);
+			}
+
+			cmd_reg |= EHCI_CMD_ASYNC_SCHED_ENABLE;
+		}
+	} else {
+		cmd_reg &= ~EHCI_CMD_ASYNC_SCHED_ENABLE;
+	}
+
+	if (ehcip->ehci_open_periodic_count) {
+		if ((ehcip->ehci_periodic_req_count > 0) &&
+		    ((cmd_reg & EHCI_CMD_PERIODIC_SCHED_ENABLE) == 0)) {
+			/*
+			 * For some reason this address get's nulled out by
+			 * the ehci chip. Set it here just in case it is null.
+			 */
+			Set_OpReg(ehci_periodic_list_base,
+			    (uint32_t)(ehcip->ehci_pflt_cookie.dmac_address &
+			    0xFFFFF000));
+			cmd_reg |= EHCI_CMD_PERIODIC_SCHED_ENABLE;
+		}
+	} else {
+		cmd_reg &= ~EHCI_CMD_PERIODIC_SCHED_ENABLE;
+	}
+
+	/* Just an optimization */
+	if (temp_reg != cmd_reg) {
+		Set_OpReg(ehci_command, cmd_reg);
+	}
+}
+
 
 /*
  * ehci_toggle_scheduler:
