@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <cryptoutil.h>
@@ -187,7 +186,7 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 	CK_RV	(*Tmp_C_GetFunctionList)(CK_FUNCTION_LIST_PTR_PTR);
 	CK_FUNCTION_LIST_PTR	prov_funcs; /* Provider's function list */
 	CK_SLOT_ID_PTR		prov_slots = NULL; /* Provider's slot list */
-	CK_MECHANISM_TYPE_PTR	pmech_list; /* mechanism list for a slot */
+	CK_MECHANISM_TYPE_PTR	pmech_list = NULL; /* mech list for a slot */
 	CK_SLOT_INFO	slotinfo;
 	CK_ULONG	slot_count;
 	CK_ULONG	mech_count;
@@ -423,7 +422,7 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 				cryptodebug(
 				    "failed to call C_GetMechanismList() "
 				    "from %s.", libname);
-				(void) free(pmech_list);
+				free(pmech_list);
 				rc = FAILURE;
 				break;
 			}
@@ -446,7 +445,20 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 		 */
 		for (j = 0; show_mechs && j < mech_count; j++) {
 			CK_MECHANISM_TYPE	mech = pmech_list[j];
+			CK_MECHANISM_INFO mech_info;
 
+			rv = prov_funcs->C_GetMechanismInfo(
+			    prov_slots[i], mech, &mech_info);
+			if (rv != CKR_OK) {
+				cryptodebug(
+				    "failed to call "
+				    "C_GetMechanismInfo() from %s.",
+				    libname);
+				free(pmech_list);
+				pmech_list = NULL;
+				rc = FAILURE;
+				break;
+			}
 			if (mech >= CKM_VENDOR_DEFINED) {
 				(void) printf("%#lx", mech);
 			} else {
@@ -455,23 +467,12 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 			}
 
 			if (verbose) {
-				CK_MECHANISM_INFO mech_info;
-				rv = prov_funcs->C_GetMechanismInfo(
-				    prov_slots[i], mech, &mech_info);
-				if (rv != CKR_OK) {
-					cryptodebug(
-					    "failed to call "
-					    "C_GetMechanismInfo() from %s.",
-					    libname);
-					(void) free(pmech_list);
-					rc = FAILURE;
-					break;
-				}
 				display_mech_info(&mech_info);
 			}
 			(void) printf("\n");
 		}
-		(void) free(pmech_list);
+		if (pmech_list)
+			free(pmech_list);
 		if (rc == FAILURE) {
 			break;
 		}
@@ -497,7 +498,7 @@ clean_exit:
 	}
 
 	if (prov_slots != NULL) {
-		(void) free(prov_slots);
+		free(prov_slots);
 	}
 
 	return (rc);
