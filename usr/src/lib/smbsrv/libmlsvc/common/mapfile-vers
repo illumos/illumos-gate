@@ -21,7 +21,6 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
 
 #
 # MAPFILE HEADER START
@@ -76,6 +75,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_shr_stop;
 	smb_token_destroy;
 	smb_token_log;
+	spoolss_copy_spool_file;
     local:
 	*;
 };

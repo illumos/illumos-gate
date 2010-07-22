@@ -240,6 +240,8 @@ smb_com_locking_andx(smb_request_t *sr)
 	DWORD		result;
 	int 		rc;
 	uint32_t	ltype;
+	smb_ofile_t	*ofile;
+	uint8_t		brk;
 
 	rc = smbsr_decode_vwv(sr, "4.wbblww", &sr->smb_fid, &lock_type,
 	    &oplock_level, &timeout, &unlock_num, &lock_num);
@@ -251,6 +253,7 @@ smb_com_locking_andx(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+	ofile = sr->fid_ofile;
 
 	if (lock_type & LOCKING_ANDX_SHARED_LOCK)
 		ltype = SMB_LOCK_TYPE_READONLY;
@@ -260,19 +263,11 @@ smb_com_locking_andx(smb_request_t *sr)
 	pid = sr->smb_pid;	/* Save the original pid */
 
 	if (lock_type & LOCKING_ANDX_OPLOCK_RELEASE) {
-		smb_oplock_release(sr->fid_ofile->f_node, sr->fid_ofile);
-		/*
-		 * According to the protocol:
-		 *
-		 * If the client sends an SMB_LOCKING_ANDX request with the
-		 * LOCKING_ANDX_OPLOCK_RELEASE flag set
-		 * and NumberOfLocks is zero,
-		 * the server does not send a response.
-		 *
-		 * I'm not sure if it's going to break anything if I change
-		 * it according to the protocol. So, I leave it unchanged
-		 * for now.
-		 */
+		if (oplock_level == 0)
+			brk = SMB_OPLOCK_BREAK_TO_NONE;
+		else
+			brk = SMB_OPLOCK_BREAK_TO_LEVEL_II;
+		smb_oplock_ack(ofile->f_node, ofile, brk);
 		if (unlock_num == 0 && lock_num == 0)
 			return (SDRC_NO_REPLY);
 	}

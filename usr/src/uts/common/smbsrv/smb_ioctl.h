@@ -52,6 +52,8 @@ extern "C" {
 #define	SMB_IOC_SESSION_CLOSE	_IOW(SMB_IOC_BASE, 13, int)
 #define	SMB_IOC_STOP		_IOW(SMB_IOC_BASE, 14, int)
 #define	SMB_IOC_EVENT		_IOW(SMB_IOC_BASE, 15, int)
+#define	SMB_IOC_SHAREINFO	_IOW(SMB_IOC_BASE, 16, int)
+#define	SMB_IOC_SPOOLDOC	_IOW(SMB_IOC_BASE, 17, int)
 
 typedef struct smb_ioc_header {
 	uint32_t	version;
@@ -59,6 +61,14 @@ typedef struct smb_ioc_header {
 	uint32_t	len;
 	int		cmd;
 } smb_ioc_header_t;
+
+typedef	struct smb_ioc_spooldoc {
+	smb_ioc_header_t hdr;
+	smb_inaddr_t	ipaddr;
+	uint32_t	spool_num;
+	char		username[MAXNAMELEN];
+	char		path[MAXPATHLEN];
+} smb_ioc_spooldoc_t;
 
 typedef	struct {
 	smb_ioc_header_t hdr;
@@ -70,6 +80,12 @@ typedef struct smb_ioc_share {
 	uint32_t	shrlen;
 	char		shr[1];
 } smb_ioc_share_t;
+
+typedef struct smb_ioc_shareinfo {
+	smb_ioc_header_t hdr;
+	char		shrname[MAXNAMELEN];
+	uint32_t	shortnames;
+} smb_ioc_shareinfo_t;
 
 typedef	struct smb_ioc_listen {
 	smb_ioc_header_t hdr;
@@ -150,6 +166,7 @@ typedef struct smb_ioc_cfg {
 	int32_t		sync_enable;
 	int32_t		secmode;
 	int32_t		ipv6_enable;
+	int32_t		print_enable;
 	uint32_t	exec_flags;
 	smb_version_t	version;
 	char		nbdomain[NETBIOS_NAME_SZ];
@@ -170,6 +187,8 @@ typedef union smb_ioc {
 	smb_ioc_session_t	ioc_session;
 	smb_ioc_fileid_t	ioc_fileid;
 	smb_ioc_share_t		ioc_share;
+	smb_ioc_shareinfo_t	ioc_shareinfo;
+	smb_ioc_spooldoc_t	ioc_spooldoc;
 } smb_ioc_t;
 
 uint32_t smb_crc_gen(uint8_t *, size_t);

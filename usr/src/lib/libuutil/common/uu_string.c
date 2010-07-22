@@ -20,32 +20,37 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#ifndef _MISCUTILS_H
-#define	_MISCUTILS_H
 
 /*
- * Miscellaneous functions and macros not directly related to the application.
+ * String helper functions
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <string.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <malloc.h>
+#include <ctype.h>
+#include "libuutil.h"
 
-#define	NELEM(a)	(sizeof (a) / sizeof ((a)[0]))
-
-boolean_t strcaseeq(const char *a, const char *b);
-boolean_t streq(const char *a, const char *b);
-char *strndup(const char *s, int n);
-boolean_t strbw(const char *a, const char *b);
-void *memdup(const void *buf, size_t sz);
-void dump(FILE *out, const char *prefix, const void *buf, size_t len);
-
-#ifdef __cplusplus
+/* Return true if strings are equal */
+boolean_t
+uu_streq(const char *a, const char *b)
+{
+	return (strcmp(a, b) == 0);
 }
-#endif
 
-#endif /* _MISCUTILS_H */
+/* Return true if strings are equal, case-insensitively */
+boolean_t
+uu_strcaseeq(const char *a, const char *b)
+{
+	return (strcasecmp(a, b) == 0);
+}
+
+/* Return true if string a Begins With string b */
+boolean_t
+uu_strbw(const char *a, const char *b)
+{
+	return (strncmp(a, b, strlen(b)) == 0);
+}

@@ -478,7 +478,8 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 	fqi = &sr->arg.dirop.fqi;
 	node = fqi->fq_fnode;
 
-	(void) smb_oplock_break(node, sr->session, B_FALSE);
+	(void) smb_oplock_break(sr, node,
+	    SMB_OPLOCK_BREAK_TO_LEVEL_II | SMB_OPLOCK_BREAK_BATCH);
 
 	smb_node_start_crit(node, RW_READER);
 

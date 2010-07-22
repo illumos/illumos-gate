@@ -54,8 +54,8 @@
 /*LINTED E_STATIC_UNUSED*/
 static DWORD samr_connect1(char *, char *, char *, DWORD, mlsvc_handle_t *);
 static DWORD samr_connect2(char *, char *, char *, DWORD, mlsvc_handle_t *);
-static DWORD samr_connect3(char *, char *, char *, DWORD, mlsvc_handle_t *);
 static DWORD samr_connect4(char *, char *, char *, DWORD, mlsvc_handle_t *);
+static DWORD samr_connect5(char *, char *, char *, DWORD, mlsvc_handle_t *);
 
 typedef DWORD (*samr_connop_t)(char *, char *, char *, DWORD,
     mlsvc_handle_t *);
@@ -109,8 +109,8 @@ samr_open(char *server, char *domain, char *username, DWORD access_mask,
  *
  *	Windows NT3.x:	SamrConnect
  *	Windows NT4.0:	SamrConnect2
- *	Windows 2000:	SamrConnect3
- *	Windows XP:	SamrConnect4
+ *	Windows 2000:	SamrConnect4
+ *	Windows XP:	SamrConnect5
  *
  * Try the calls from most recent to oldest until the server responds with
  * something other than an RPC protocol error.  We don't use the original
@@ -121,8 +121,8 @@ samr_connect(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
 	static samr_connop_t samr_connop[] = {
+		samr_connect5,
 		samr_connect4,
-		samr_connect3,
 		samr_connect2
 	};
 
@@ -137,16 +137,12 @@ samr_connect(char *server, char *domain, char *username, DWORD access_mask,
 		status = (*samr_connop[i])(server, domain, username,
 		    access_mask, samr_handle);
 
-		if (status != NT_STATUS_UNSUCCESSFUL)
-			break;
+		if (status == NT_STATUS_SUCCESS)
+			return (0);
 	}
 
-	if (status != NT_STATUS_SUCCESS) {
-		ndr_rpc_unbind(samr_handle);
-		return (-1);
-	}
-
-	return (0);
+	ndr_rpc_unbind(samr_handle);
+	return (-1);
 }
 
 /*
@@ -163,12 +159,12 @@ static DWORD
 samr_connect1(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
-	struct samr_ConnectAnon arg;
+	struct samr_Connect arg;
 	int opnum;
 	DWORD status;
 
-	bzero(&arg, sizeof (struct samr_ConnectAnon));
-	opnum = SAMR_OPNUM_ConnectAnon;
+	bzero(&arg, sizeof (struct samr_Connect));
+	opnum = SAMR_OPNUM_Connect;
 	status = NT_STATUS_SUCCESS;
 
 	arg.servername = ndr_rpc_malloc(samr_handle, sizeof (DWORD));
@@ -206,13 +202,13 @@ static DWORD
 samr_connect2(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
-	struct samr_Connect arg;
+	struct samr_Connect2 arg;
 	int opnum;
 	DWORD status;
 	int len;
 
-	bzero(&arg, sizeof (struct samr_Connect));
-	opnum = SAMR_OPNUM_Connect;
+	bzero(&arg, sizeof (struct samr_Connect2));
+	opnum = SAMR_OPNUM_Connect2;
 	status = NT_STATUS_SUCCESS;
 
 	len = strlen(server) + 4;
@@ -237,22 +233,22 @@ samr_connect2(char *server, char *domain, char *username, DWORD access_mask,
 }
 
 /*
- * samr_connect3
+ * samr_connect4
  *
  * Connect to the SAM on a Windows 2000 domain controller.
  */
 /*ARGSUSED*/
 static DWORD
-samr_connect3(char *server, char *domain, char *username, DWORD access_mask,
+samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
-	struct samr_Connect3 arg;
+	struct samr_Connect4 arg;
 	int opnum;
 	DWORD status;
 	int len;
 
-	bzero(&arg, sizeof (struct samr_Connect3));
-	opnum = SAMR_OPNUM_Connect3;
+	bzero(&arg, sizeof (struct samr_Connect4));
+	opnum = SAMR_OPNUM_Connect4;
 	status = NT_STATUS_SUCCESS;
 
 	len = strlen(server) + 4;
@@ -278,7 +274,7 @@ samr_connect3(char *server, char *domain, char *username, DWORD access_mask,
 }
 
 /*
- * samr_connect4
+ * samr_connect5
  *
  * Connect to the SAM on a Windows XP domain controller.  On Windows
  * XP, the server should be the fully qualified DNS domain name with
@@ -290,17 +286,17 @@ samr_connect3(char *server, char *domain, char *username, DWORD access_mask,
  */
 /*ARGSUSED*/
 static DWORD
-samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
+samr_connect5(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
-	struct samr_Connect4 arg;
+	struct samr_Connect5 arg;
 	int len;
 	int opnum;
 	DWORD status;
 	smb_domainex_t dinfo;
 
-	bzero(&arg, sizeof (struct samr_Connect4));
-	opnum = SAMR_OPNUM_Connect;
+	bzero(&arg, sizeof (struct samr_Connect5));
+	opnum = SAMR_OPNUM_Connect5;
 	status = NT_STATUS_SUCCESS;
 
 	if (!smb_domain_getinfo(&dinfo))

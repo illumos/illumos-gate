@@ -589,7 +589,7 @@ libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
 libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
-libidmap:	libadutils libldap5 libavl libsldap
+libidmap:	libadutils libldap5 libavl libsldap libuutil
 libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
 		libdladm libsecdb
 libiscsit:	libc libnvpair libstmf libuuid libnsl

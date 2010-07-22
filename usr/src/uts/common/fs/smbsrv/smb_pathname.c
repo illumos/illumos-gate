@@ -402,7 +402,8 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 		    &vp, rootvp, dnode->vp, &attr, cred);
 
 		if (err) {
-			if (!smb_maybe_mangled(component))
+			if (!SMB_TREE_SUPPORTS_SHORTNAMES(sr) ||
+			    !smb_maybe_mangled(component))
 				break;
 
 			if ((err = smb_unmangle(dnode, component,

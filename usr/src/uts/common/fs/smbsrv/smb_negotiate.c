@@ -285,6 +285,7 @@ smb_com_negotiate(smb_request_t *sr)
 {
 	smb_arg_negotiate_t	*negprot = sr->sr_negprot;
 	uint16_t		secmode;
+	uint16_t		rawmode = 0;
 	uint32_t		sesskey;
 	char			ipaddr_buf[INET6_ADDRSTRLEN];
 	char			*nbdomain;
@@ -320,13 +321,17 @@ smb_com_negotiate(smb_request_t *sr)
 	    | CAP_NT_SMBS
 	    | CAP_STATUS32
 	    | CAP_NT_FIND
-	    | CAP_RAW_MODE
 	    | CAP_LEVEL_II_OPLOCKS
 	    | CAP_LOCK_AND_READ
 	    | CAP_RPC_REMOTE_APIS
 	    | CAP_LARGE_READX
 	    | CAP_LARGE_WRITEX
 	    | CAP_DFS;
+
+	if (smb_raw_mode) {
+		negprot->ni_capabilities |= CAP_RAW_MODE;
+		rawmode = 3;
+	}
 
 	if (smb_cap_passthru)
 		negprot->ni_capabilities |= CAP_INFOLEVEL_PASSTHRU;
@@ -366,7 +371,7 @@ smb_com_negotiate(smb_request_t *sr)
 		    SMB_DOS_MAXBUF,		/* max buffer size */
 		    1,				/* max MPX */
 		    1,				/* max VCs */
-		    3,				/* raw mode (s/b 3) */
+		    rawmode,			/* read/write raw (s/b 3) */
 		    sesskey,			/* session key */
 		    negprot->ni_servertime.tv_sec, /* server date/time */
 		    negprot->ni_tzcorrection,
@@ -391,7 +396,7 @@ smb_com_negotiate(smb_request_t *sr)
 		    SMB_DOS_MAXBUF,		/* max buffer size */
 		    1,				/* max MPX */
 		    1,				/* max VCs */
-		    3,				/* raw mode (s/b 3) */
+		    rawmode,			/* read/write raw (s/b 3) */
 		    sesskey,			/* session key */
 		    negprot->ni_servertime.tv_sec, /* server date/time */
 		    negprot->ni_tzcorrection,

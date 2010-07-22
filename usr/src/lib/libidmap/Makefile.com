@@ -34,7 +34,6 @@ LINT_OBJECTS =	\
 	sized_array.o		\
 	idmap_api.o		\
 	idmap_cache.o		\
-	miscutils.o		\
 	utils.o
 
 OBJECTS = $(LINT_OBJECTS)	\
@@ -44,7 +43,7 @@ include ../../Makefile.lib
 C99MODE = $(C99_ENABLE)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lavl -lnsl -lnvpair
+LDLIBS +=	-lc -lavl -lnsl -lnvpair -luutil
 
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)

@@ -41,6 +41,7 @@
 #include <assert.h>
 #include <sys/u8_textprep.h>
 #include <alloca.h>
+#include <libuutil.h>
 #include <note.h>
 
 #include "idmapd.h"
@@ -50,7 +51,6 @@
 #include "schema.h"
 #include "nldaputils.h"
 #include "idmap_lsa.h"
-#include "miscutils.h"
 
 
 static idmap_retcode sql_compile_n_step_once(sqlite *, char *,
@@ -58,8 +58,6 @@ static idmap_retcode sql_compile_n_step_once(sqlite *, char *,
 static idmap_retcode lookup_localsid2pid(idmap_mapping *, idmap_id_res *);
 static idmap_retcode lookup_cache_name2sid(sqlite *, const char *,
 	    const char *, char **, char **, idmap_rid_t *, idmap_id_type *);
-
-#define	NELEM(a)	(sizeof (a) / sizeof ((a)[0]))
 
 #define	EMPTY_NAME(name)	(*name == 0 || strcmp(name, "\"\"") == 0)
 
@@ -2256,8 +2254,15 @@ out:
 		}
 
 		if (IS_ID_SID(req->id1)) {
-			if (res->retcode != IDMAP_SUCCESS)
+			if (res->retcode == IDMAP_ERR_NOTFOUND) {
+				TRACE(req, res, "Not found in AD");
 				continue;
+			}
+			if (res->retcode != IDMAP_SUCCESS) {
+				TRACE(req, res, "AD lookup error=%d",
+				    res->retcode);
+				continue;
+			}
 			/* Evaluate result type */
 			switch (type) {
 			case IDMAP_USID:
@@ -2302,6 +2307,7 @@ out:
 				res->retcode = IDMAP_ERR_SID;
 				break;
 			}
+			TRACE(req, res, "Found in AD");
 			if (res->retcode == IDMAP_SUCCESS &&
 			    req->id1name != NULL &&
 			    (req->id2name == NULL ||
@@ -2314,7 +2320,7 @@ out:
 			if (res->retcode != IDMAP_SUCCESS) {
 				if ((!(IDMAP_FATAL_ERROR(res->retcode))) &&
 				    res->id.idmap_id_u.sid.prefix == NULL &&
-				    req->id2name == NULL) /* no winname */
+				    req->id2name == NULL) {
 					/*
 					 * If AD lookup by unixname or pid
 					 * failed with non fatal error
@@ -2324,7 +2330,20 @@ out:
 					 * process other mapping
 					 * mechanisms for this request.
 					 */
-					res->retcode = IDMAP_SUCCESS;
+					if (res->retcode ==
+					    IDMAP_ERR_NOTFOUND) {
+						/* This is not an error */
+						res->retcode = IDMAP_SUCCESS;
+						TRACE(req, res,
+						    "Not found in AD");
+					} else {
+						TRACE(req, res,
+						"AD lookup error (ignored)");
+						res->retcode = IDMAP_SUCCESS;
+					}
+				} else {
+					TRACE(req, res, "AD lookup error");
+				}
 				continue;
 			}
 			/* Evaluate result type */
@@ -2339,6 +2358,7 @@ out:
 				res->retcode = IDMAP_ERR_SID;
 				break;
 			}
+			TRACE(req, res, "Found in AD");
 		}
 	}
 
@@ -2535,7 +2555,7 @@ sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
 			if (p != NULL) {
 				char *q;
 				q = req->id1name;
-				req->id1name = strndup(q, p - req->id1name);
+				req->id1name = uu_strndup(q, p - req->id1name);
 				req->id1domain = strdup(p+1);
 				free(q);
 				if (req->id1name == NULL ||
@@ -3126,6 +3146,7 @@ name_based_mapping_sid2pid(lookup_state_t *state,
 			}
 			goto out;
 		} else if (r == SQLITE_DONE) {
+			TRACE(req, res, "No matching rule");
 			retcode = IDMAP_ERR_NOTFOUND;
 			goto out;
 		} else {
@@ -3523,7 +3544,6 @@ sid2pid_second_pass(lookup_state_t *state,
 		TRACE(req, res, "Rule-based mapping error=%d", retcode);
 		goto out;
 	}
-	TRACE(req, res, "No matching rule");
 
 do_eph:
 	/* If not found, do ephemeral mapping */
@@ -4390,7 +4410,6 @@ name_based_mapping_pid2sid(lookup_state_t *state, const char *unixname,
 	int		ncol, r;
 	int		want_wuser;
 	const char	*me = "name_based_mapping_pid2sid";
-	int 		non_wild_match = FALSE;
 	idmap_namerule	*rule = &res->info.how.idmap_how_u.rule;
 	int direction;
 
@@ -4459,28 +4478,10 @@ name_based_mapping_pid2sid(lookup_state_t *state, const char *unixname,
 
 			if (values[0][0] == '*') {
 				winname = unixname;
-				if (non_wild_match) {
-					/*
-					 * There were non-wildcard rules
-					 * where the Windows identity doesn't
-					 * exist. Return no mapping.
-					 */
-					retcode = IDMAP_ERR_NOMAPPING;
-					goto out;
-				}
 			} else {
-				/* Save first non-wild match rule */
-				if (!non_wild_match) {
-					idmap_namerule_set(rule, values[1],
-					    values[0], values[4],
-					    is_user,
-					    strtol(values[3], &end, 10),
-					    strtol(values[5], &end, 10),
-					    direction);
-					non_wild_match = TRUE;
-				}
 				winname = values[0];
 			}
+
 			want_wuser = res->id.idtype == IDMAP_USID ? 1
 			    : res->id.idtype == IDMAP_GSID ? 0
 			    : -1;
@@ -4509,28 +4510,34 @@ name_based_mapping_pid2sid(lookup_state_t *state, const char *unixname,
 			if (retcode == IDMAP_SUCCESS) {
 				break;
 			} else if (retcode == IDMAP_ERR_NOTFOUND) {
-				TRACE(req, res,
-				    "%s@%s not found, continuing",
-				    winname, windomain);
-				continue;
+				if (values[0][0] == '*') {
+					TRACE(req, res,
+					    "%s@%s not found, continuing",
+					    winname, windomain);
+					continue;
+				} else {
+					TRACE(req, res,
+					    "%s@%s not found",
+					    winname, windomain);
+					retcode = IDMAP_ERR_NOMAPPING;
+				}
 			} else {
 				TRACE(req, res,
 				    "Looking up %s@%s error=%d",
 				    winname, windomain, retcode);
 			}
 
+			idmap_namerule_set(rule, values[1],
+			    values[0], values[4], is_user,
+			    strtol(values[3], &end, 10),
+			    strtol(values[5], &end, 10),
+			    direction);
+
 			goto out;
 
 		} else if (r == SQLITE_DONE) {
-			/*
-			 * If there were non-wildcard rules where
-			 * Windows identity doesn't exist
-			 * return no mapping.
-			 */
-			if (non_wild_match)
-				retcode = IDMAP_ERR_NOMAPPING;
-			else
-				retcode = IDMAP_ERR_NOTFOUND;
+			TRACE(req, res, "No matching rule");
+			retcode = IDMAP_ERR_NOTFOUND;
 			goto out;
 		} else {
 			(void) sqlite_finalize(vm, &errmsg);

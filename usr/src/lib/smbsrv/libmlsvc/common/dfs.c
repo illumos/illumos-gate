@@ -75,6 +75,14 @@ static smb_cache_t dfs_nscache;
 static char dfs_nbname[NETBIOS_NAME_SZ];
 
 /*
+ * The name of cached namespace. This will be the only
+ * exported namespace until hosting multiple namespaces
+ * is supported
+ */
+static char dfs_cached_ns[MAXNAMELEN];
+static mutex_t dfs_nsmtx;
+
+/*
  * Lock for accessing root information (extended attribute)
  */
 static rwlock_t dfs_root_rwl;
@@ -86,6 +94,7 @@ extern uint32_t srvsvc_shr_setdfsroot(smb_share_t *, boolean_t);
  */
 static boolean_t dfs_namespace_findlink(const char *, char *, char *, size_t);
 static void *dfs_namespace_cache(void *);
+static boolean_t dfs_namespace_iscached(const char *);
 
 /*
  * Root functions
@@ -124,6 +133,8 @@ static boolean_t dfs_target_isvalidstate(uint32_t);
 static uint32_t dfs_cache_add_byunc(const char *, const char *, uint32_t);
 static void dfs_cache_populate(const char *, const char *);
 static int dfs_cache_cmp(const void *, const void *);
+static void dfs_cache_flush(const char *);
+static uint32_t dfs_cache_nscount(void);
 
 /*
  * Utility functions
@@ -234,7 +245,7 @@ dfs_namespace_load(const char *name)
 void /*ARGSUSED*/
 dfs_namespace_unload(const char *name)
 {
-	smb_cache_flush(&dfs_nscache);
+	dfs_cache_flush(name);
 }
 
 /*
@@ -254,6 +265,9 @@ dfs_namespace_path(const char *name, char *path, size_t pathsz)
 	if ((si.shr_flags & SMB_SHRF_DFSROOT) == 0)
 		return (ERROR_NOT_FOUND);
 
+	if (!dfs_namespace_iscached(name))
+		return (ERROR_NOT_FOUND);
+
 	if (path != NULL)
 		(void) strlcpy(path, si.shr_path, pathsz);
 
@@ -267,8 +281,6 @@ dfs_namespace_path(const char *name, char *path, size_t pathsz)
 uint32_t
 dfs_namespace_count(void)
 {
-	smb_shriter_t shi;
-	smb_share_t *si;
 	uint32_t nroot = 0;
 	int rc;
 
@@ -285,11 +297,7 @@ dfs_namespace_count(void)
 		    "assuming one namespace exists", rc);
 	}
 
-	smb_shr_iterinit(&shi);
-	while ((si = smb_shr_iterate(&shi)) != NULL) {
-		if ((si->shr_flags & SMB_SHRF_DFSROOT) != 0)
-			nroot++;
-	}
+	nroot += dfs_cache_nscount();
 
 	return (nroot);
 }
@@ -317,9 +325,20 @@ dfs_namespace_add(const char *rootshr, const char *cmnt)
 	if (smb_shr_get((char *)rootshr, &si) != NERR_Success)
 		return (NERR_NetNameNotFound);
 
-	if (si.shr_flags & SMB_SHRF_DFSROOT) {
-		/* Share is already a DFS root */
+	(void) mutex_lock(&dfs_nsmtx);
+	if (smb_strcasecmp(dfs_cached_ns, rootshr, 0) == 0) {
+		/* This DFS root is already exported */
+		(void) mutex_unlock(&dfs_nsmtx);
 		return (ERROR_FILE_EXISTS);
+	}
+
+	if (*dfs_cached_ns != '\0') {
+		syslog(LOG_WARNING, "dfs: trying to add %s namespace."
+		    " Only one standalone namespace is supported."
+		    " A namespace is already exported for %s",
+		    rootshr, dfs_cached_ns);
+		(void) mutex_unlock(&dfs_nsmtx);
+		return (ERROR_NOT_SUPPORTED);
 	}
 
 	bzero(&info, sizeof (info));
@@ -337,12 +356,18 @@ dfs_namespace_add(const char *rootshr, const char *cmnt)
 	info.i_ntargets = 1;
 	info.i_targets = &t;
 
-	if ((status = dfs_root_add(si.shr_path, &info)) != ERROR_SUCCESS)
+	if ((status = dfs_root_add(si.shr_path, &info)) != ERROR_SUCCESS) {
+		(void) mutex_unlock(&dfs_nsmtx);
 		return (status);
+	}
 
 	status = srvsvc_shr_setdfsroot(&si, B_TRUE);
-	if (status == ERROR_SUCCESS)
+	if (status == ERROR_SUCCESS) {
 		(void) dfs_cache_add_byname(rootshr, NULL, DFS_OBJECT_ROOT);
+		(void) strlcpy(dfs_cached_ns, rootshr, sizeof (dfs_cached_ns));
+		(void) smb_config_setnum(SMB_CI_DFS_STDROOT_NUM, 1);
+	}
+	(void) mutex_unlock(&dfs_nsmtx);
 
 	return (status);
 }
@@ -372,6 +397,9 @@ dfs_namespace_remove(const char *name)
 		syslog(LOG_WARNING, "dfs: failed to disable root share %s (%d)",
 		    name, status);
 
+	if (!dfs_namespace_iscached(name))
+		return (ERROR_SUCCESS);
+
 	smb_cache_iterinit(&dfs_nscache, &cursor);
 
 	while (smb_cache_iterate(&dfs_nscache, &cursor, &nscnode)) {
@@ -383,10 +411,29 @@ dfs_namespace_remove(const char *name)
 			    nscnode.nsc_fspath, status);
 	}
 
-	smb_cache_flush(&dfs_nscache);
+	dfs_cache_flush(name);
 
 	/* TODO: remove empty dirs */
 	return (ERROR_SUCCESS);
+}
+
+/*
+ * Determines the DFS namespace flavor.
+ */
+uint32_t
+dfs_namespace_getflavor(const char *name)
+{
+	char rootdir[DFS_PATH_MAX];
+	dfs_info_t info;
+
+	if (dfs_namespace_path(name, rootdir, DFS_PATH_MAX) != ERROR_SUCCESS)
+		return (0);
+
+	/* get flavor info from state info (info level 2) */
+	if (dfs_root_getinfo(rootdir, &info, 2) != ERROR_SUCCESS)
+		return (0);
+
+	return (info.i_state & DFS_VOLUME_FLAVORS);
 }
 
 /*
@@ -1050,6 +1097,24 @@ dfs_namespace_cache(void *arg)
 		return (NULL);
 	}
 
+	/*
+	 * This check should be removed when multiple standalone
+	 * namespaces are supported.
+	 */
+	(void) mutex_lock(&dfs_nsmtx);
+	if (*dfs_cached_ns != '\0') {
+		syslog(LOG_WARNING, "dfs: trying to load %s namespace."
+		    " Only one standalone namespace is supported."
+		    " A namespace is already exported for %s",
+		    share, dfs_cached_ns);
+		(void) mutex_unlock(&dfs_nsmtx);
+		free(share);
+		return (NULL);
+	}
+	(void) strlcpy(dfs_cached_ns, share, sizeof (dfs_cached_ns));
+	(void) smb_config_setnum(SMB_CI_DFS_STDROOT_NUM, 1);
+	(void) mutex_unlock(&dfs_nsmtx);
+
 	(void) snprintf(uncpath, DFS_PATH_MAX, "\\\\%s\\%s", dfs_nbname, share);
 	(void) dfs_cache_add_byunc(uncpath, si.shr_path, DFS_OBJECT_ROOT);
 
@@ -1057,6 +1122,22 @@ dfs_namespace_cache(void *arg)
 
 	free(share);
 	return (NULL);
+}
+
+/*
+ * Checks whether the given name matches the name of
+ * the cached namespace.
+ */
+static boolean_t
+dfs_namespace_iscached(const char *name)
+{
+	boolean_t iscached;
+
+	(void) mutex_lock(&dfs_nsmtx);
+	iscached = (smb_strcasecmp(name, dfs_cached_ns, 0) == 0);
+	(void) mutex_unlock(&dfs_nsmtx);
+
+	return (iscached);
 }
 
 static int
@@ -1216,6 +1297,10 @@ dfs_root_encode(dfs_info_t *info, char **buf, size_t *bufsz)
 	rc |= nvlist_add_string(nvl, "t_server", t->t_server);
 	rc |= nvlist_add_string(nvl, "t_share", t->t_share);
 	rc |= nvlist_add_uint32(nvl, "t_state", t->t_state);
+	rc |= nvlist_add_uint32(nvl, "t_priority_class",
+	    t->t_priority.p_class);
+	rc |= nvlist_add_uint16(nvl, "t_priority_rank",
+	    t->t_priority.p_rank);
 
 	if (rc == 0)
 		rc = nvlist_pack(nvl, buf, bufsz, NV_ENCODE_NATIVE, 0);
@@ -1236,6 +1321,9 @@ dfs_root_decode(dfs_info_t *info, char *buf, size_t bufsz, uint32_t infolvl)
 	char *cmnt, *guid;
 	char *t_server, *t_share;
 	uint32_t t_state;
+	uint32_t t_priority_class;
+	uint16_t t_priority_rank;
+	boolean_t decode_priority = B_FALSE;
 	int rc;
 
 	if (nvlist_unpack(buf, bufsz, &nvl, 0) != 0)
@@ -1263,9 +1351,12 @@ dfs_root_decode(dfs_info_t *info, char *buf, size_t bufsz, uint32_t infolvl)
 	case DFS_INFO_ALL:
 	case 3:
 	case 4:
+		/* need target information */
+		break;
 	case 6:
 	case 9:
-		/* need target information */
+		/* need target and priority information */
+		decode_priority = B_TRUE;
 		break;
 	default:
 		nvlist_free(nvl);
@@ -1287,6 +1378,23 @@ dfs_root_decode(dfs_info_t *info, char *buf, size_t bufsz, uint32_t infolvl)
 		return (ERROR_INTERNAL_ERROR);
 	}
 	dfs_target_init(info->i_targets, t_server, t_share, t_state);
+
+	if (decode_priority) {
+		rc = nvlist_lookup_uint32(nvl, "t_priority_class",
+		    &t_priority_class);
+		if (rc == 0)
+			rc = nvlist_lookup_uint16(nvl, "t_priority_rank",
+			    &t_priority_rank);
+
+		if (rc != 0 && rc != ENOENT) {
+			nvlist_free(nvl);
+			free(info->i_targets);
+			return (ERROR_INTERNAL_ERROR);
+		} else if (rc == 0) {
+			info->i_targets->t_priority.p_class = t_priority_class;
+			info->i_targets->t_priority.p_rank = t_priority_rank;
+		}
+	}
 
 	nvlist_free(nvl);
 	return (ERROR_SUCCESS);
@@ -1625,6 +1733,41 @@ dfs_cache_populate(const char *unc_prefix, const char *dir)
 }
 
 /*
+ * If this namespace hasn't been cached then return
+ * without flushing the cache; otherwise clear the
+ * name and flush the cache.
+ */
+static void
+dfs_cache_flush(const char *name)
+{
+	(void) mutex_lock(&dfs_nsmtx);
+	if (smb_strcasecmp(name, dfs_cached_ns, 0) != 0) {
+		(void) mutex_unlock(&dfs_nsmtx);
+		return;
+	}
+	*dfs_cached_ns = '\0';
+	(void) smb_config_setnum(SMB_CI_DFS_STDROOT_NUM, 0);
+	(void) mutex_unlock(&dfs_nsmtx);
+
+	smb_cache_flush(&dfs_nscache);
+}
+
+/*
+ * Returns the number of cached namespaces
+ */
+static uint32_t
+dfs_cache_nscount(void)
+{
+	uint32_t nscount;
+
+	(void) mutex_lock(&dfs_nsmtx);
+	nscount = (*dfs_cached_ns == '\0') ? 0 : 1;
+	(void) mutex_unlock(&dfs_nsmtx);
+
+	return (nscount);
+}
+
+/*
  * Determines whether the given path is a directory.
  */
 static boolean_t
@@ -1639,33 +1782,100 @@ dfs_path_isdir(const char *path)
 }
 
 /*
- * Validates the given state based on the object type (root/link)
- * and whether it is the object's state or its target's state
+ * Validates the given state based on the object type (root/link), info
+ * level, and whether it is the object's state or its target's state
  */
 static uint32_t
-dfs_isvalidstate(uint32_t state, uint32_t type, boolean_t target)
+dfs_isvalidstate(uint32_t state, uint32_t type, boolean_t target,
+    uint32_t infolvl)
 {
 	uint32_t status = ERROR_SUCCESS;
 
-	if (type == DFS_OBJECT_ROOT) {
-		if (!target)
-			return (dfs_root_isvalidstate(state));
+	switch (infolvl) {
+	case 101:
+		if (type == DFS_OBJECT_ROOT) {
+			if (!target)
+				return (dfs_root_isvalidstate(state));
 
-		if (!dfs_target_isvalidstate(state))
-			status = ERROR_INVALID_PARAMETER;
-		else if (state == DFS_STORAGE_STATE_OFFLINE)
-			status = ERROR_NOT_SUPPORTED;
-	} else {
-		if (!target) {
-			if (!dfs_link_isvalidstate(state))
-				status = ERROR_INVALID_PARAMETER;
-		} else {
 			if (!dfs_target_isvalidstate(state))
 				status = ERROR_INVALID_PARAMETER;
+			else if (state == DFS_STORAGE_STATE_OFFLINE)
+				status = ERROR_NOT_SUPPORTED;
+		} else {
+			if (!target) {
+				if (!dfs_link_isvalidstate(state))
+					status = ERROR_INVALID_PARAMETER;
+			} else {
+				if (!dfs_target_isvalidstate(state))
+					status = ERROR_INVALID_PARAMETER;
+			}
 		}
+		break;
+
+	case 105:
+		if (state == 0)
+			return (ERROR_SUCCESS);
+
+		if (type == DFS_OBJECT_ROOT) {
+			switch (state) {
+			case DFS_VOLUME_STATE_OK:
+			case DFS_VOLUME_STATE_OFFLINE:
+			case DFS_VOLUME_STATE_ONLINE:
+			case DFS_VOLUME_STATE_RESYNCHRONIZE:
+			case DFS_VOLUME_STATE_STANDBY:
+				status = ERROR_NOT_SUPPORTED;
+				break;
+
+			default:
+				status = ERROR_INVALID_PARAMETER;
+			}
+		} else {
+			switch (state) {
+			case DFS_VOLUME_STATE_OK:
+			case DFS_VOLUME_STATE_OFFLINE:
+			case DFS_VOLUME_STATE_ONLINE:
+				break;
+
+			case DFS_VOLUME_STATE_RESYNCHRONIZE:
+			case DFS_VOLUME_STATE_STANDBY:
+				status = ERROR_NOT_SUPPORTED;
+				break;
+
+			default:
+				status = ERROR_INVALID_PARAMETER;
+			}
+		}
+		break;
+
+	default:
+		status = ERROR_INVALID_LEVEL;
 	}
 
 	return (status);
+}
+
+/*
+ * Validates the given property flag mask based on the object
+ * type (root/link) and namespace flavor.
+ */
+static uint32_t
+dfs_isvalidpropflagmask(uint32_t propflag_mask, uint32_t type,
+    uint32_t flavor)
+{
+	uint32_t flgs_not_supported;
+
+	flgs_not_supported = DFS_PROPERTY_FLAG_ROOT_SCALABILITY
+	    | DFS_PROPERTY_FLAG_CLUSTER_ENABLED
+	    | DFS_PROPERTY_FLAG_ABDE;
+
+	if (flavor == DFS_VOLUME_FLAVOR_STANDALONE) {
+		if (type == DFS_OBJECT_LINK)
+			flgs_not_supported |= DFS_PROPERTY_FLAG_SITE_COSTING;
+		if (propflag_mask & flgs_not_supported)
+			return (ERROR_NOT_SUPPORTED);
+	}
+
+	return (ERROR_SUCCESS);
 }
 
 /*
@@ -1699,7 +1909,7 @@ dfs_modinfo(uint32_t type, dfs_info_t *info, dfs_info_t *newinfo,
 	case 101:
 		state = (target_op)
 		    ? newinfo->i_targets->t_state : newinfo->i_state;
-		status = dfs_isvalidstate(state, type, target_op);
+		status = dfs_isvalidstate(state, type, target_op, 101);
 		if (status != ERROR_SUCCESS)
 			return (status);
 
@@ -1730,9 +1940,19 @@ dfs_modinfo(uint32_t type, dfs_info_t *info, dfs_info_t *newinfo,
 		break;
 
 	case 105:
+		status = dfs_isvalidstate(newinfo->i_state, type, B_FALSE, 105);
+		if (status != ERROR_SUCCESS)
+			return (status);
+
+		status = dfs_isvalidpropflagmask(newinfo->i_propflag_mask, type,
+		    newinfo->i_flavor);
+		if (status != ERROR_SUCCESS)
+			return (status);
+
 		(void) strlcpy(info->i_comment, newinfo->i_comment,
 		    sizeof (newinfo->i_comment));
-		info->i_state = newinfo->i_state;
+		if (newinfo->i_state != 0)
+			info->i_state = newinfo->i_state;
 		info->i_timeout = newinfo->i_timeout;
 		info->i_propflags = newinfo->i_propflags;
 		break;

@@ -173,6 +173,8 @@ extern "C" {
 #define	SMB_SHRF_PERM		0x20000000
 #define	SMB_SHRF_AUTOHOME	0x40000000
 
+#define	SMB_SHARE_PRINT		"print$"
+#define	SMB_SHARE_PRINT_LEN	6
 /*
  * refcnt is currently only used for autohome.  autohome needs a refcnt
  * because a user can map his autohome share from more than one client

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -85,6 +84,7 @@ void
 mlsvc_fini(void)
 {
 	smb_logon_fini();
+	spoolss_finalize();
 	svcctl_finalize();
 	logr_finalize();
 	netdfs_finalize();

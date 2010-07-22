@@ -27,10 +27,15 @@
  */
 
 #include <smbsrv/smb_kproto.h>
+#include <sys/unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/fcntl.h>
+#include <smbsrv/smb_share.h>
 
 /*
- * Create a new printer file, which should be deleted automatically once
- * it has been closed and printed.
+ * Starts the creation of a new printer file, which will be deleted
+ * automatically once it has been closed and printed.
  *
  * SetupLength is the number of bytes in the first part of the resulting
  * print spool file which contains printer-specific control strings.
@@ -49,7 +54,6 @@
 smb_sdrc_t
 smb_pre_open_print_file(smb_request_t *sr)
 {
-	static uint32_t		tmp_id = 10000;
 	struct open_param	*op = &sr->arg.open;
 	char			*path;
 	char			*identifier;
@@ -57,9 +61,9 @@ smb_pre_open_print_file(smb_request_t *sr)
 	uint16_t		setup;
 	uint16_t		mode;
 	int			rc;
+	static uint32_t		tmp_id = 10000;
 
 	bzero(op, sizeof (sr->arg.open));
-
 	rc = smbsr_decode_vwv(sr, "ww", &setup, &mode);
 	if (rc == 0)
 		rc = smbsr_decode_data(sr, "%S", sr, &identifier);
@@ -73,7 +77,6 @@ smb_pre_open_print_file(smb_request_t *sr)
 
 	op->create_disposition = FILE_OVERWRITE_IF;
 	op->create_options = FILE_NON_DIRECTORY_FILE;
-
 	DTRACE_SMB_2(op__OpenPrintFile__start, smb_request_t *, sr,
 	    struct open_param *, op);
 
@@ -86,21 +89,53 @@ smb_post_open_print_file(smb_request_t *sr)
 	DTRACE_SMB_1(op__OpenPrintFile__done, smb_request_t *, sr);
 }
 
+/*
+ * Creates a new spool file which will be later copied and
+ * deleted by cupsd.  After the file is created, information
+ * related to the file will be placed in a spooldoc list
+ * to be later used by cupsd
+ *
+ * Return values
+ * 	rc 0 SDRC_SUCCESS
+ *	rc non-zero SDRC_ERROR
+ */
+
 smb_sdrc_t
 smb_com_open_print_file(smb_request_t *sr)
 {
-	int rc;
+	int 		rc;
+	smb_kspooldoc_t *sp;
+	smb_kshare_t 	*si;
+	struct open_param *op = &sr->arg.open;
 
 	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
+		cmn_err(CE_WARN, "smb_com_open_print_file: bad device");
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		return (SDRC_ERROR);
 	}
-
-	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
+	if ((rc = smb_common_create(sr)) != NT_STATUS_SUCCESS) {
+		cmn_err(CE_WARN, "smb_com_open_print_file: error rc=%d", rc);
 		return (SDRC_ERROR);
-
-	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, sr->smb_fid, 0);
+	}
+	if ((rc = smbsr_encode_result(sr, 1, 0,
+	    "bww", 1, sr->smb_fid, 0)) == 0) {
+		if ((si = smb_kshare_lookup(SMB_SHARE_PRINT)) == NULL) {
+			cmn_err(CE_NOTE, "smb_com_open_print_file: SDRC_ERROR");
+			return (SDRC_ERROR);
+		}
+		sp = kmem_zalloc(sizeof (smb_kspooldoc_t), KM_SLEEP);
+		(void) snprintf(sp->sd_path, MAXPATHLEN, "%s/%s", si->shr_path,
+		    op->fqi.fq_path.pn_path);
+		sp->sd_spool_num = sr->sr_server->sp_info.sp_cnt;
+		sp->sd_ipaddr = sr->session->ipaddr;
+		(void) strlcpy(sp->sd_username, sr->uid_user->u_name,
+		    MAXNAMELEN);
+		sp->sd_fid = sr->smb_fid;
+		if (smb_spool_add_doc(sp))
+			kmem_free(sp, sizeof (smb_kspooldoc_t));
+		smb_kshare_release(si);
+	}
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
@@ -130,16 +165,34 @@ smb_post_close_print_file(smb_request_t *sr)
 	DTRACE_SMB_1(op__ClosePrintFile__done, smb_request_t *, sr);
 }
 
+/*
+ *
+ * Adds the print file fid to a list to be used as a search
+ * key in the spooldoc list.  It then wakes up the smbd
+ * spool monitor thread to copy the spool file.
+ *
+ * Return values
+ * rc - 0 success
+ *
+ */
+
 smb_sdrc_t
 smb_com_close_print_file(smb_request_t *sr)
 {
+	smb_sdrc_t rc;
+
 	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
+		cmn_err(CE_WARN, "smb_com_close_print_file: SDRC_ERROR");
 		return (SDRC_ERROR);
 	}
+	rc = smb_com_close(sr);
 
-	return (smb_com_close(sr));
+	(void) smb_spool_add_fid(sr->smb_fid);
+	cv_broadcast(&sr->sr_server->sp_info.sp_cv);
+
+	return (rc);
 }
 
 /*

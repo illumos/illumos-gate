@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -303,11 +302,6 @@ smb_set_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 			smbsr_errno(sr, rc);
 		}
 		return (-1);
-	}
-
-	/* Break any conflicting oplock for subsequent attribute setting */
-	if (smb_oplock_conflict(node, sr->session, NULL)) {
-		(void) smb_oplock_break(node, sr->session, B_FALSE);
 	}
 
 	sinfo.si_xa = xa;
@@ -599,6 +593,11 @@ smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 		return (-1);
 	}
 
+	/* If opened by path, break exclusive oplock */
+	if (sr->fid_ofile == NULL)
+		(void) smb_oplock_break(sr, node,
+		    SMB_OPLOCK_BREAK_EXCLUSIVE | SMB_OPLOCK_BREAK_TO_NONE);
+
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_SIZE;
 	attr.sa_vattr.va_size = (u_offset_t)eof;
@@ -608,6 +607,7 @@ smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 		return (-1);
 	}
 
+	smb_oplock_break_levelII(node);
 	return (0);
 }
 
@@ -631,6 +631,11 @@ smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 		return (-1);
 	}
 
+	/* If opened by path, break exclusive oplock */
+	if (sr->fid_ofile == NULL)
+		(void) smb_oplock_break(sr, node,
+		    SMB_OPLOCK_BREAK_EXCLUSIVE | SMB_OPLOCK_BREAK_TO_NONE);
+
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_ALLOCSZ;
 	attr.sa_allocsz = (u_offset_t)allocsz;
@@ -640,6 +645,7 @@ smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 		return (-1);
 	}
 
+	smb_oplock_break_levelII(node);
 	return (0);
 }
 
@@ -711,10 +717,14 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 /*
  * smb_set_rename_info
  *
- * Explicity specified parameter validation rules:
+ * Explicitly specified parameter validation rules:
  * - If rootdir is not NULL respond with NT_STATUS_INVALID_PARAMETER.
  * - If the filename contains a separator character respond with
  *   NT_STATUS_INVALID_PARAMETER.
+ *
+ * Oplock break:
+ * Some Windows servers break BATCH oplocks prior to the rename.
+ * W2K3 does not. We behave as W2K3; we do not send an oplock break.
  */
 static int
 smb_set_rename_info(smb_request_t *sr, smb_setinfo_t *sinfo)

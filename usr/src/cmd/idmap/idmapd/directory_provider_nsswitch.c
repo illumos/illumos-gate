@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -35,6 +34,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <netdb.h>
+#include <libuutil.h>
 #include <note.h>
 #include <errno.h>
 #include "idmapd.h"
@@ -42,7 +42,6 @@
 #include "directory_private.h"
 #include <rpcsvc/idmap_prot.h>
 #include "directory_server_impl.h"
-#include "miscutils.h"
 #include "sidutil.h"
 
 static directory_error_t machine_sid_dav(directory_values_rpc *lvals,
@@ -299,25 +298,25 @@ directory_provider_nsswitch_populate(
 			/*
 			 * Handle attributes for user entries.
 			 */
-			if (strcaseeq(a, "cn")) {
+			if (uu_strcaseeq(a, "cn")) {
 				const char *p = pwd->pw_name;
 				de = str_list_dav(val, &p, 1);
-			} else if (strcaseeq(a, "objectClass")) {
+			} else if (uu_strcaseeq(a, "objectClass")) {
 				static const char *objectClasses[] = {
 					"top",
 					"posixAccount",
 				};
 				de = str_list_dav(val, objectClasses,
-				    NELEM(objectClasses));
-			} else if (strcaseeq(a, "gidNumber")) {
+				    UU_NELEM(objectClasses));
+			} else if (uu_strcaseeq(a, "gidNumber")) {
 				de = uint_list_dav(val, &pwd->pw_gid, 1);
-			} else if (strcaseeq(a, "objectSid")) {
+			} else if (uu_strcaseeq(a, "objectSid")) {
 				de = machine_sid_dav(val,
 				    pwd->pw_uid + LOCALRID_UID_MIN);
-			} else if (strcaseeq(a, "displayName")) {
+			} else if (uu_strcaseeq(a, "displayName")) {
 				const char *p = pwd->pw_gecos;
 				de = str_list_dav(val, &p, 1);
-			} else if (strcaseeq(a, "distinguishedName")) {
+			} else if (uu_strcaseeq(a, "distinguishedName")) {
 				char *dn;
 				RDLOCK_CONFIG();
 				(void) asprintf(&dn,
@@ -329,21 +328,21 @@ directory_provider_nsswitch_populate(
 				const char *cdn = dn;
 				de = str_list_dav(val, &cdn, 1);
 				free(dn);
-			} else if (strcaseeq(a, "uid")) {
+			} else if (uu_strcaseeq(a, "uid")) {
 				const char *p = pwd->pw_name;
 				de = str_list_dav(val, &p, 1);
-			} else if (strcaseeq(a, "uidNumber")) {
+			} else if (uu_strcaseeq(a, "uidNumber")) {
 				de = uint_list_dav(val, &pwd->pw_uid, 1);
-			} else if (strcaseeq(a, "gecos")) {
+			} else if (uu_strcaseeq(a, "gecos")) {
 				const char *p = pwd->pw_gecos;
 				de = str_list_dav(val, &p, 1);
-			} else if (strcaseeq(a, "homeDirectory")) {
+			} else if (uu_strcaseeq(a, "homeDirectory")) {
 				const char *p = pwd->pw_dir;
 				de = str_list_dav(val, &p, 1);
-			} else if (strcaseeq(a, "loginShell")) {
+			} else if (uu_strcaseeq(a, "loginShell")) {
 				const char *p = pwd->pw_shell;
 				de = str_list_dav(val, &p, 1);
-			} else if (strcaseeq(a, "x-sun-canonicalName")) {
+			} else if (uu_strcaseeq(a, "x-sun-canonicalName")) {
 				char *canon;
 				RDLOCK_CONFIG();
 				(void) asprintf(&canon, "%s@%s",
@@ -354,7 +353,7 @@ directory_provider_nsswitch_populate(
 				const char *ccanon = canon;
 				de = str_list_dav(val, &ccanon, 1);
 				free(canon);
-			} else if (strcaseeq(a, "x-sun-provider")) {
+			} else if (uu_strcaseeq(a, "x-sun-provider")) {
 				const char *provider = "UNIX-passwd";
 				de = str_list_dav(val, &provider, 1);
 			}
@@ -362,25 +361,25 @@ directory_provider_nsswitch_populate(
 			/*
 			 * Handle attributes for group entries.
 			 */
-			if (strcaseeq(a, "cn")) {
+			if (uu_strcaseeq(a, "cn")) {
 				const char *p = grp->gr_name;
 				de = str_list_dav(val, &p, 1);
-			} else if (strcaseeq(a, "objectClass")) {
+			} else if (uu_strcaseeq(a, "objectClass")) {
 				static const char *objectClasses[] = {
 					"top",
 					"posixGroup",
 				};
 				de = str_list_dav(val, objectClasses,
-				    NELEM(objectClasses));
-			} else if (strcaseeq(a, "gidNumber")) {
+				    UU_NELEM(objectClasses));
+			} else if (uu_strcaseeq(a, "gidNumber")) {
 				de = uint_list_dav(val, &grp->gr_gid, 1);
-			} else if (strcaseeq(a, "objectSid")) {
+			} else if (uu_strcaseeq(a, "objectSid")) {
 				de = machine_sid_dav(val,
 				    grp->gr_gid + LOCALRID_GID_MIN);
-			} else if (strcaseeq(a, "displayName")) {
+			} else if (uu_strcaseeq(a, "displayName")) {
 				const char *p = grp->gr_name;
 				de = str_list_dav(val, &p, 1);
-			} else if (strcaseeq(a, "distinguishedName")) {
+			} else if (uu_strcaseeq(a, "distinguishedName")) {
 				char *dn;
 				RDLOCK_CONFIG();
 				(void) asprintf(&dn,
@@ -392,7 +391,7 @@ directory_provider_nsswitch_populate(
 				const char *cdn = dn;
 				de = str_list_dav(val, &cdn, 1);
 				free(dn);
-			} else if (strcaseeq(a, "memberUid")) {
+			} else if (uu_strcaseeq(a, "memberUid")) {
 				/*
 				 * NEEDSWORK:  There is probably a non-cast
 				 * way to do this, but I don't immediately
@@ -401,7 +400,7 @@ directory_provider_nsswitch_populate(
 				const char * const *members =
 				    (const char * const *)grp->gr_mem;
 				de = str_list_dav(val, members, 0);
-			} else if (strcaseeq(a, "x-sun-canonicalName")) {
+			} else if (uu_strcaseeq(a, "x-sun-canonicalName")) {
 				char *canon;
 				RDLOCK_CONFIG();
 				(void) asprintf(&canon, "%s@%s",
@@ -412,7 +411,7 @@ directory_provider_nsswitch_populate(
 				const char *ccanon = canon;
 				de = str_list_dav(val, &ccanon, 1);
 				free(canon);
-			} else if (strcaseeq(a, "x-sun-provider")) {
+			} else if (uu_strcaseeq(a, "x-sun-provider")) {
 				const char *provider = "UNIX-group";
 				de = str_list_dav(val, &provider, 1);
 			}

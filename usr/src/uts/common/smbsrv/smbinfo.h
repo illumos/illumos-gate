@@ -118,6 +118,7 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_sync_enable;
 	int32_t skc_secmode;
 	int32_t skc_ipv6_enable;
+	int32_t skc_print_enable;
 	uint32_t skc_execflags;
 	smb_version_t skc_version;
 	char skc_nbdomain[NETBIOS_NAME_SZ];

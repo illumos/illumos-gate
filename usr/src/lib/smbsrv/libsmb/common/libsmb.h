@@ -144,6 +144,7 @@ typedef enum {
 	SMB_CI_KPASSWD_SEQNUM,
 	SMB_CI_NETLOGON_SEQNUM,
 	SMB_CI_IPV6_ENABLE,
+	SMB_CI_PRINT_ENABLE,
 	SMB_CI_MAP,
 	SMB_CI_UNMAP,
 	SMB_CI_DISPOSITION,
@@ -225,6 +226,23 @@ boolean_t smb_find_ads_server(char *, char *, int);
 extern void smb_config_getdomaininfo(char *, char *, char *, char *, char *);
 extern void smb_config_setdomaininfo(char *, char *, char *, char *, char *);
 extern uint32_t smb_get_dcinfo(char *, uint32_t, smb_inaddr_t *);
+
+CONTEXT_HANDLE(rpc_handle) rpc_handle_t;
+
+typedef struct smb_spooldoc {
+	uint32_t	sd_magic;
+	list_node_t	sd_lnd;
+	smb_inaddr_t	sd_ipaddr;
+	int		sd_spool_num;
+	char		sd_username[MAXNAMELEN];
+	char		sd_path[MAXPATHLEN];
+	char		sd_doc_name[MAXNAMELEN];
+	char		sd_printer_name[MAXPATHLEN];
+	int32_t		sd_fd;
+	rpc_handle_t	sd_handle;
+} smb_spooldoc_t;
+
+int smb_kmod_get_spool_doc(uint32_t *, char *, char *, smb_inaddr_t *);
 
 /*
  * buffer context structure. This is used to keep track of the buffer
@@ -889,6 +907,7 @@ int smb_kmod_nbtreceive(void);
 void smb_kmod_unbind(void);
 int smb_kmod_share(nvlist_t *);
 int smb_kmod_unshare(nvlist_t *);
+int smb_kmod_shareinfo(char *, boolean_t *);
 int smb_kmod_get_open_num(smb_opennum_t *);
 int smb_kmod_enum(smb_netsvc_t *);
 smb_netsvc_t *smb_kmod_enum_init(smb_svcenum_t *);

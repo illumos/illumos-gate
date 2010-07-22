@@ -23,7 +23,7 @@
  */
 
 #include <smbsrv/smb_kproto.h>
-
+#include <smbsrv/smb_share.h>
 
 /*
  * SmbTreeConnect: Map a share to a tree and obtain a tree-id (TID).

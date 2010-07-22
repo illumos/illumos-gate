@@ -48,6 +48,7 @@
 #include <libgen.h>
 #include <pwd.h>
 #include <grp.h>
+#include <cups/cups.h>
 
 #include <smbsrv/smb_door.h>
 #include <smbsrv/smb_ioctl.h>
@@ -57,8 +58,10 @@
 #include <smbsrv/libmlsvc.h>
 #include "smbd.h"
 
+#define	SMB_CUPS_DOCNAME "generic_doc"
 #define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
 #define	SMB_DBDIR "/var/smb"
+#define	SMB_SPOOL_WAIT 2
 
 static void *smbd_nbt_listener(void *);
 static void *smbd_tcp_listener(void *);
@@ -87,6 +90,10 @@ static int smbd_localtime_init(void);
 static void *smbd_localtime_monitor(void *arg);
 
 static pthread_t localtime_thr;
+
+static int smbd_spool_init(void);
+static void *smbd_spool_monitor(void *arg);
+static pthread_t smbd_spool_thr;
 
 static int smbd_refresh_init(void);
 static void smbd_refresh_fini(void);
@@ -134,6 +141,8 @@ main(int argc, char *argv[])
 	uid_t			uid;
 	int			pfd = -1;
 	uint_t			sigval;
+	struct rlimit		rl;
+	int			orig_limit;
 
 	smbd.s_pname = basename(argv[0]);
 	openlog(smbd.s_pname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
@@ -158,6 +167,19 @@ main(int argc, char *argv[])
 
 	if (smbd_already_running())
 		return (SMF_EXIT_OK);
+
+	/*
+	 * Raise the file descriptor limit to accommodate simultaneous user
+	 * authentications/file access.
+	 */
+	if ((getrlimit(RLIMIT_NOFILE, &rl) == 0) &&
+	    (rl.rlim_cur < rl.rlim_max)) {
+		orig_limit = rl.rlim_cur;
+		rl.rlim_cur = rl.rlim_max;
+		if (setrlimit(RLIMIT_NOFILE, &rl) != 0)
+			smbd_report("Failed to raise file descriptor limit"
+			    " from %d to %d", orig_limit, rl.rlim_cur);
+	}
 
 	(void) sigfillset(&set);
 	(void) sigdelset(&set, SIGABRT);
@@ -545,6 +567,13 @@ smbd_service_init(void)
 		return (-1);
 	}
 
+	if (smbd_spool_init() != 0) {
+		smbd_report("failed to start print monitor: %s",
+		    strerror(errno));
+		(void) mutex_unlock(&smbd_service_mutex);
+		return (-1);
+	}
+
 	smbd.s_initialized = B_TRUE;
 	smbd_report("service initialized");
 	(void) cond_signal(&smbd_service_cv);
@@ -867,6 +896,63 @@ smbd_kernel_unbind(void)
 	smbd_stop_listeners();
 	smb_kmod_unbind();
 	smbd.s_kbound = B_FALSE;
+}
+
+/*
+ * Initialization of the spool thread.
+ * Returns 0 on success, an error number if thread creation fails.
+ */
+
+static int
+smbd_spool_init(void)
+{
+	pthread_attr_t tattr;
+	int rc;
+
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&smbd_spool_thr, &tattr, smbd_spool_monitor, 0);
+	(void) pthread_attr_destroy(&tattr);
+
+	return (rc);
+}
+
+/*
+ * This user thread blocks waiting for close print file
+ * in the kernel. It then uses the data returned from the ioctl
+ * to copy the spool file into the cups spooler.
+ * This function is really only used by Vista and Win7 clients,
+ * other versions of windows create only a zero size file and this
+ * be removed by spoolss_copy_spool_file function.
+ */
+
+/*ARGSUSED*/
+static void *
+smbd_spool_monitor(void *arg)
+{
+	uint32_t spool_num;
+	char username[MAXNAMELEN];
+	char path[MAXPATHLEN];
+	smb_inaddr_t ipaddr;
+	int error_retry_cnt = 5;
+
+	while (!smbd.s_shutting_down && (error_retry_cnt > 0)) {
+		errno = 0;
+
+		if (smb_kmod_get_spool_doc(&spool_num, username,
+		    path, &ipaddr) == 0) {
+			spoolss_copy_spool_file(&ipaddr,
+			    username, path, SMB_CUPS_DOCNAME);
+			error_retry_cnt = 5;
+		} else {
+			if (errno == ECANCELED)
+				break;
+
+			(void) sleep(SMB_SPOOL_WAIT);
+			error_retry_cnt--;
+		}
+	}
+	return (NULL);
 }
 
 /*

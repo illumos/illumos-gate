@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -405,6 +404,7 @@ ndr_pipe_grow(ndr_pipe_t *np, size_t desired)
 	}
 
 	np->np_buf = newbuf;
+	np->np_iov.iov_base = np->np_buf + np->np_uio.uio_offset;
 	np->np_uio.uio_resid += desired;
 	np->np_iov.iov_len += desired;
 	smb_tracef("ndr_pipe_grow: %d bytes", required);

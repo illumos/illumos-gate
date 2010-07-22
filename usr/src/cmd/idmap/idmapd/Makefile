@@ -34,7 +34,7 @@ SERVEROBJS =				\
 	idmap_config.o			\
 	idmapd.o			\
 	init.o				\
-	idmap_lsa.o				\
+	idmap_lsa.o			\
 	nldaputils.o			\
 	rpc_svc.o			\
 	server.o			\
@@ -89,6 +89,7 @@ LDLIBS += -lsecdb \
 	-ladutils \
 	-lumem \
 	-lnvpair \
+	-luutil \
 	-L $(ROOT)/usr/lib/smbsrv \
 	-lsmb
 

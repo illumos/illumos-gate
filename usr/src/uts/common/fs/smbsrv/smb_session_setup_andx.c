@@ -33,6 +33,8 @@
 
 static int smb_authenticate(smb_request_t *, smb_arg_sessionsetup_t *,
     smb_session_key_t **);
+static int smb_authenticate_core(smb_request_t *, smb_arg_sessionsetup_t *,
+    smb_session_key_t **);
 static cred_t *smb_cred_create(smb_token_t *);
 static void smb_cred_set_sid(smb_id_t *id, ksid_t *ksid);
 static ksidlist_t *smb_cred_set_sidlist(smb_ids_t *token_grps);
@@ -188,6 +190,9 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		sinfo->ssi_capabilities |= CAP_LARGE_FILES |
 		    CAP_LARGE_READX | CAP_LARGE_WRITEX;
 
+	if (!smb_oplock_levelII)
+		sr->session->capabilities &= ~CAP_LEVEL_II_OPLOCKS;
+
 	sr->session->capabilities = sinfo->ssi_capabilities;
 
 	if (!(sr->session->signing.flags & SMB_SIGNING_ENABLED) &&
@@ -223,6 +228,23 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
+static int
+smb_authenticate(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
+    smb_session_key_t **session_key)
+{
+	int		rc;
+	smb_server_t	*sv = sr->sr_server;
+
+	if (smb_threshold_enter(&sv->sv_ssetup_ct) != 0) {
+		smbsr_error(sr, RPC_NT_SERVER_TOO_BUSY, 0, 0);
+		return (-1);
+	}
+
+	rc = smb_authenticate_core(sr, sinfo, session_key);
+	smb_threshold_exit(&sv->sv_ssetup_ct, sv);
+	return (rc);
+}
+
 /*
  * Authenticate a user.  If the user has already been authenticated on
  * this session, we can simply dup the user and return.
@@ -232,7 +254,7 @@ smb_com_session_setup_andx(smb_request_t *sr)
  * generate a cred and new user based on the token.
  */
 static int
-smb_authenticate(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
+smb_authenticate_core(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
     smb_session_key_t **session_key)
 {
 	char		*hostname = sr->sr_cfg->skc_hostname;

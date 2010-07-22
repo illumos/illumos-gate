@@ -89,6 +89,7 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	kcfg->skc_signing_enable = smb_config_getbool(SMB_CI_SIGNING_ENABLE);
 	kcfg->skc_signing_required = smb_config_getbool(SMB_CI_SIGNING_REQD);
 	kcfg->skc_ipv6_enable = smb_config_getbool(SMB_CI_IPV6_ENABLE);
+	kcfg->skc_print_enable = smb_config_getbool(SMB_CI_PRINT_ENABLE);
 	kcfg->skc_oplock_enable = smb_config_getbool(SMB_CI_OPLOCK_ENABLE);
 	kcfg->skc_sync_enable = smb_config_getbool(SMB_CI_SYNC_ENABLE);
 	kcfg->skc_secmode = smb_config_get_secmode();

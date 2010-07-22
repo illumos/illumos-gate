@@ -386,6 +386,7 @@ typedef struct smb_llist {
 	kmutex_t	ll_mutex;
 	list_t		ll_deleteq;
 	uint32_t	ll_deleteq_count;
+	boolean_t	ll_flushing;
 } smb_llist_t;
 
 typedef struct smb_slist {
@@ -531,42 +532,66 @@ int MBC_SHADOW_CHAIN(struct mbuf_chain *SUBMBC, struct mbuf_chain *MBC,
 
 #define	MBC_ROOM_FOR(b, n) (((b)->chain_offset + (n)) <= (b)->max_bytes)
 
+#define	OPLOCK_MIN_TIMEOUT	(5 * 1000)
+#define	OPLOCK_STD_TIMEOUT	(30 * 1000)
+
 /*
- * ol_sess_id:
- *
- *	ID of the session holding the oplock (if an oplock was granted).
- *
- * ol_xthread:
- *
- *	Worker thread treating the command that was granted the oplock. Until
- *	that thread is done with that command and has submitted the response
- *	to the network stack, all the other threads will be suspended in
- *	smb_oplock_enter(). They will be awaken when the worker thread
- *	referenced in 'ol_xthread' calls smb_oplock_broadcast().
- *
- *	The purpose of this mechanism is to prevent another thread from
- *	triggering a oplock break before the response conveying the grant
- *	has been sent.
- *
- * ol_ofile
- *
- *	Open file that was granted the oplock.
- *
- * ol_waiters_count
- *
- *	Number of threads waiting for a call to smb_oplock_broadcast().
- *
- * ol_level
- *
- *	Level of the oplock granted.
+ * Oplock break flags:
+ * SMB_OPLOCK_BREAK_EXCLUSIVE - only break exclusive oplock
+ * (type SMB_OPLOCK_EXCLUSIVE or SMB_OPLOCK_BATCH)
+ * SMB_OPLOCK_BREAK_BATCH - only break exclusive BATCH oplock
+ * SMB_OPLOCK_BREAK_NOWAIT - do not wait for oplock break ack
  */
+#define	SMB_OPLOCK_NO_BREAK		0x00
+#define	SMB_OPLOCK_BREAK_TO_NONE	0x01
+#define	SMB_OPLOCK_BREAK_TO_LEVEL_II	0x02
+#define	SMB_OPLOCK_BREAK_EXCLUSIVE	0x04
+#define	SMB_OPLOCK_BREAK_BATCH		0x08
+#define	SMB_OPLOCK_BREAK_NOWAIT		0x10
+
+/*
+ * Oplocks levels are defined to match the levels in the SMB
+ * protocol (nt_create_andx / nt_transact_create) and should
+ * not be changed
+ */
+#define	SMB_OPLOCK_NONE		0
+#define	SMB_OPLOCK_EXCLUSIVE	1
+#define	SMB_OPLOCK_BATCH	2
+#define	SMB_OPLOCK_LEVEL_II	3
+
 typedef struct smb_oplock {
-	uint64_t		ol_sess_id;
+	kmutex_t		ol_mutex;
 	kcondvar_t		ol_cv;
 	kthread_t		*ol_xthread;
-	struct smb_ofile	*ol_ofile;
-	uint8_t			ol_level;
+	boolean_t		ol_fem;		/* fem monitor installed? */
+	uint8_t			ol_break;
+	uint32_t		ol_count;	/* number of grants */
+	list_t			ol_grants;	/* list of smb_oplock_grant_t */
 } smb_oplock_t;
+
+#define	SMB_OPLOCK_GRANT_MAGIC	0x4F4C4B47	/* OLKG */
+#define	SMB_OPLOCK_GRANT_VALID(p) \
+	ASSERT((p)->og_magic == SMB_OPLOCK_GRANT_MAGIC)
+typedef struct smb_oplock_grant {
+	uint32_t		og_magic;
+	list_node_t		og_lnd;
+	uint8_t			og_level;
+	uint16_t		og_fid;
+	uint16_t		og_tid;
+	uint16_t		og_uid;
+	struct smb_session	*og_session;
+	struct smb_ofile	*og_ofile;
+} smb_oplock_grant_t;
+
+#define	SMB_OPLOCK_BREAK_MAGIC	0x4F4C4B42	/* OLKB */
+#define	SMB_OPLOCK_BREAK_VALID(p) \
+	ASSERT((p)->ob_magic == SMB_OPLOCK_BREAK_MAGIC)
+typedef struct smb_oplock_break {
+	uint32_t	ob_magic;
+	list_node_t	ob_lnd;
+	struct smb_node	*ob_node;
+} smb_oplock_break_t;
+
 
 #define	SMB_VFS_MAGIC	0x534D4256	/* 'SMBV' */
 
@@ -587,7 +612,7 @@ typedef struct smb_vfs {
  * Timestamps remain cached while there are open ofiles for the node.
  * This includes open ofiles for named streams.  t_open_ofiles is a
  * count of open ofiles on the node, including named streams' ofiles,
- * n_open_ofiles cannot be used as it doesn't include ofiles opened
+ * n_open_count cannot be used as it doesn't include ofiles opened
  * for the node's named streams.
  */
 typedef struct smb_times {
@@ -604,8 +629,6 @@ typedef struct smb_times {
 
 typedef enum {
 	SMB_NODE_STATE_AVAILABLE = 0,
-	SMB_NODE_STATE_OPLOCK_GRANTED,
-	SMB_NODE_STATE_OPLOCK_BREAKING,
 	SMB_NODE_STATE_DESTROYING
 } smb_node_state_t;
 
@@ -627,6 +650,7 @@ typedef struct smb_node {
 	uint32_t		n_hashkey;
 	smb_llist_t		*n_hash_bucket;
 	uint32_t		n_open_count;
+	uint32_t		n_opening_count;
 	smb_llist_t		n_ofile_list;
 	smb_llist_t		n_lock_list;
 	struct smb_ofile	*readonly_creator;
@@ -1012,8 +1036,8 @@ typedef struct smb_user {
 #define	SMB_TREE_CASEINSENSITIVE	0x00000008
 #define	SMB_TREE_NO_CASESENSITIVE	0x00000010
 #define	SMB_TREE_NO_EXPORT		0x00000020
-#define	SMB_TREE_NO_OPLOCKS		0x00000040
-#define	SMB_TREE_NO_ATIME		0x00000080
+#define	SMB_TREE_OPLOCKS		0x00000040
+#define	SMB_TREE_SHORTNAMES		0x00000080
 #define	SMB_TREE_XVATTR			0x00000100
 #define	SMB_TREE_DIRENTFLAGS		0x00000200
 #define	SMB_TREE_ACLONCREATE		0x00000400
@@ -1092,6 +1116,10 @@ typedef struct smb_tree {
 #define	SMB_TREE_IS_DFSROOT(sr)            				\
 	(((sr) && (sr)->tid_tree) ?                                     \
 	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_DFSROOT) : 0)
+
+#define	SMB_TREE_SUPPORTS_SHORTNAMES(sr)				\
+	(((sr) && (sr)->tid_tree) ?					\
+	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_SHORTNAMES) : 0)
 
 /*
  * SMB_TREE_CONTAINS_NODE is used to check that a node is in the same
@@ -1225,8 +1253,6 @@ typedef struct smb_ofile {
 	int			f_mode;
 	cred_t			*f_cr;
 	pid_t			f_pid;
-	boolean_t		f_oplock_granted;
-	boolean_t		f_oplock_exit;
 	uint32_t		f_explicit_times;
 	char			f_quota_resume[SMB_SID_STRSZ];
 } smb_ofile_t;
@@ -1243,6 +1269,7 @@ typedef struct smb_ofile {
 #define	SMB_ODIR_FLAG_EDIRENT		0x0008
 #define	SMB_ODIR_FLAG_CATIA		0x0010
 #define	SMB_ODIR_FLAG_ABE		0x0020
+#define	SMB_ODIR_FLAG_SHORTNAMES	0x0040
 
 typedef enum {
 	SMB_ODIR_STATE_OPEN = 0,
@@ -1412,10 +1439,6 @@ typedef struct dirop {
 	uint16_t	flags;
 } smb_arg_dirop_t;
 
-#define	OPLOCK_MIN_TIMEOUT	(5 * 1000)
-#define	OPLOCK_STD_TIMEOUT	(15 * 1000)
-#define	OPLOCK_RETRIES		2
-
 typedef struct {
 	uint32_t status;
 	uint16_t errcls;
@@ -1445,13 +1468,9 @@ typedef struct open_param {
 	smb_ofile_t	*dir;
 	/* This is only set by NTTransactCreate */
 	struct smb_sd	*sd;
-	uint8_t		op_oplock_level;
+	uint8_t		op_oplock_level;	/* requested/granted level */
+	boolean_t	op_oplock_levelII;	/* TRUE if levelII supported */
 } smb_arg_open_t;
-
-#define	SMB_OPLOCK_NONE		0
-#define	SMB_OPLOCK_EXCLUSIVE	1
-#define	SMB_OPLOCK_BATCH	2
-#define	SMB_OPLOCK_LEVEL_II	3
 
 /*
  * SMB Request State Machine
@@ -1792,6 +1811,27 @@ typedef struct {
 	smb_session_list_t	ld_session_list;
 } smb_listener_daemon_t;
 
+#define	SMB_SSETUP_CMD			"authentication"
+#define	SMB_TCON_CMD			"share mapping"
+#define	SMB_OPIPE_CMD			"pipe open"
+#define	SMB_THRESHOLD_REPORT_THROTTLE	50
+typedef struct smb_cmd_threshold {
+	char			*ct_cmd;
+	kmutex_t		ct_mutex;
+	volatile uint32_t	ct_active_cnt;
+	volatile uint32_t	ct_blocked_cnt;
+	volatile uint32_t	ct_error_cnt;
+	uint32_t		ct_threshold;
+	struct smb_event	*ct_event;
+	uint32_t		ct_event_id;
+} smb_cmd_threshold_t;
+
+typedef struct {
+	kstat_named_t		ls_files;
+	kstat_named_t		ls_trees;
+	kstat_named_t		ls_users;
+} smb_server_legacy_kstat_t;
+
 typedef enum smb_server_state {
 	SMB_SERVER_STATE_CREATED = 0,
 	SMB_SERVER_STATE_CONFIGURED,
@@ -1800,6 +1840,14 @@ typedef enum smb_server_state {
 	SMB_SERVER_STATE_DELETING,
 	SMB_SERVER_STATE_SENTINEL
 } smb_server_state_t;
+
+typedef struct {
+	kcondvar_t		sp_cv;
+	kmutex_t		sp_mutex;
+	uint32_t 		sp_cnt;
+	smb_llist_t		sp_list;
+	smb_llist_t		sp_fidlist;
+} smb_spool_t;
 
 #define	SMB_SERVER_STATE_VALID(S)               \
     ASSERT(((S) == SMB_SERVER_STATE_CREATED) || \
@@ -1857,23 +1905,46 @@ typedef struct smb_server {
 	volatile uint64_t	sv_rxb;
 	volatile uint64_t	sv_nreq;
 	smb_srqueue_t		sv_srqueue;
+	smb_spool_t		sp_info;
+	smb_cmd_threshold_t	sv_ssetup_ct;
+	smb_cmd_threshold_t	sv_tcon_ct;
+	smb_cmd_threshold_t	sv_opipe_ct;
+	kstat_t			*sv_legacy_ksp;
+	kmutex_t		sv_legacy_ksmtx;
 } smb_server_t;
 
 #define	SMB_EVENT_MAGIC		0x45564E54	/* EVNT */
+#define	SMB_EVENT_TIMEOUT	45		/* seconds */
 #define	SMB_EVENT_VALID(e)	\
     ASSERT(((e) != NULL) && ((e)->se_magic == SMB_EVENT_MAGIC))
-
 typedef struct smb_event {
 	uint32_t		se_magic;
 	list_node_t		se_lnd;
 	kmutex_t		se_mutex;
 	kcondvar_t		se_cv;
-	struct smb_server	*se_server;
+	smb_server_t		*se_server;
 	uint32_t		se_txid;
 	boolean_t		se_notified;
 	int			se_waittime;
+	int			se_timeout;
 	int			se_errno;
 } smb_event_t;
+
+typedef struct smb_kspooldoc {
+	uint32_t	sd_magic;
+	list_node_t	sd_lnd;
+	smb_inaddr_t	sd_ipaddr;
+	uint32_t	sd_spool_num;
+	uint16_t	sd_fid;
+	char		sd_username[MAXNAMELEN];
+	char		sd_path[MAXPATHLEN];
+} smb_kspooldoc_t;
+
+typedef struct smb_spoolfid {
+	uint32_t	sf_magic;
+	list_node_t	sf_lnd;
+	uint16_t	sf_fid;
+} smb_spoolfid_t;
 
 #define	SMB_INFO_NETBIOS_SESSION_SVC_RUNNING	0x0001
 #define	SMB_INFO_NETBIOS_SESSION_SVC_FAILED	0x0002

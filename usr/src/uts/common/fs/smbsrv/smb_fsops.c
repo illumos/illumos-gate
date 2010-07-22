@@ -33,11 +33,6 @@
 
 extern caller_context_t smb_ct;
 
-extern int smb_fem_oplock_install(smb_node_t *);
-extern void smb_fem_oplock_uninstall(smb_node_t *);
-
-extern int smb_vop_other_opens(vnode_t *, int);
-
 static int smb_fsop_create_stream(smb_request_t *, cred_t *, smb_node_t *,
     char *, char *, int, smb_attr_t *, smb_node_t **);
 
@@ -118,31 +113,6 @@ void
 smb_fsop_close(smb_node_t *node, int mode, cred_t *cred)
 {
 	smb_vop_close(node->vp, mode, cred);
-}
-
-int
-smb_fsop_oplock_install(smb_node_t *node, int mode)
-{
-	int rc;
-
-	if (smb_vop_other_opens(node->vp, mode))
-		return (EMFILE);
-
-	if ((rc = smb_fem_oplock_install(node)))
-		return (rc);
-
-	if (smb_vop_other_opens(node->vp, mode)) {
-		(void) smb_fem_oplock_uninstall(node);
-		return (EMFILE);
-	}
-
-	return (0);
-}
-
-void
-smb_fsop_oplock_uninstall(smb_node_t *node)
-{
-	smb_fem_oplock_uninstall(node);
 }
 
 static int
@@ -354,7 +324,7 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
 
 	/* Not a named stream */
 
-	if (smb_maybe_mangled(name)) {
+	if (SMB_TREE_SUPPORTS_SHORTNAMES(sr) && smb_maybe_mangled(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 		rc = smb_unmangle(dnode, name, longname, MAXNAMELEN, flags);
 		kmem_free(longname, MAXNAMELEN);
@@ -584,7 +554,7 @@ smb_fsop_mkdir(
 	if (SMB_TREE_SUPPORTS_ABE(sr))
 		flags |= SMB_ABE;
 
-	if (smb_maybe_mangled(name)) {
+	if (SMB_TREE_SUPPORTS_SHORTNAMES(sr) && smb_maybe_mangled(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 		rc = smb_unmangle(dnode, name, longname, MAXNAMELEN, flags);
 		kmem_free(longname, MAXNAMELEN);
@@ -746,7 +716,8 @@ smb_fsop_remove(
 		rc = smb_vop_remove(dnode->vp, name, flags, cr);
 
 		if (rc == ENOENT) {
-			if (!smb_maybe_mangled(name)) {
+			if (!SMB_TREE_SUPPORTS_SHORTNAMES(sr) ||
+			    !smb_maybe_mangled(name)) {
 				kmem_free(fname, MAXNAMELEN);
 				kmem_free(sname, MAXNAMELEN);
 				return (rc);
@@ -889,8 +860,10 @@ smb_fsop_rmdir(
 	rc = smb_vop_rmdir(dnode->vp, name, flags, cr);
 
 	if (rc == ENOENT) {
-		if (!smb_maybe_mangled(name))
+		if (!SMB_TREE_SUPPORTS_SHORTNAMES(sr) ||
+		    !smb_maybe_mangled(name)) {
 			return (rc);
+		}
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
@@ -1031,7 +1004,7 @@ smb_fsop_link(smb_request_t *sr, cred_t *cr, smb_node_t *from_fnode,
 	if (SMB_TREE_SUPPORTS_ABE(sr))
 		flags |= SMB_ABE;
 
-	if (smb_maybe_mangled(to_name)) {
+	if (SMB_TREE_SUPPORTS_SHORTNAMES(sr) && smb_maybe_mangled(to_name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 		rc = smb_unmangle(to_dnode, to_name, longname,
 		    MAXNAMELEN, flags);
@@ -1492,8 +1465,9 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(snode->n_state != SMB_NODE_STATE_DESTROYING);
 
+	/* Requests for no access should be denied. */
 	if (faccess == 0)
-		return (NT_STATUS_SUCCESS);
+		return (NT_STATUS_ACCESS_DENIED);
 
 	if (SMB_TREE_IS_READONLY(sr)) {
 		if (faccess & (FILE_WRITE_DATA|FILE_APPEND_DATA|
@@ -1550,13 +1524,10 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	    smb_node_is_symlink(snode))
 		acl_check = B_FALSE;
 
-	/*
-	 * Use the most restrictive parts of both faccess and the
-	 * share access.  An AND of the two value masks gives us that
-	 * since we've already converted to a mask of what we "can"
-	 * do.
-	 */
-	faccess &= sr->tid_tree->t_access;
+	/* Deny access based on the share access mask */
+
+	if ((faccess & ~sr->tid_tree->t_access) != 0)
+		return (NT_STATUS_ACCESS_DENIED);
 
 	if (acl_check) {
 		dir_vp = (snode->n_dnode) ? snode->n_dnode->vp : NULL;
@@ -1779,7 +1750,8 @@ smb_fsop_lookup(
 	    &ret_flags, root_node ? root_node->vp : NULL, &attr, cr);
 
 	if (rc != 0) {
-		if (!smb_maybe_mangled(name)) {
+		if (!SMB_TREE_SUPPORTS_SHORTNAMES(sr) ||
+		    !smb_maybe_mangled(name)) {
 			kmem_free(od_name, MAXNAMELEN);
 			return (rc);
 		}

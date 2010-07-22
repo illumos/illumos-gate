@@ -33,11 +33,11 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <libuutil.h>
 #include <rpcsvc/idmap_prot.h>
 #include "directory.h"
 #include "directory_private.h"
 #include "directory_library_impl.h"
-#include "miscutils.h"
 #include "sidutil.h"
 
 /*
@@ -275,7 +275,7 @@ boolean_t
 is_in_list(char **list, char *val)
 {
 	for (; *list != NULL; list++) {
-		if (strcaseeq(*list, val))
+		if (uu_strcaseeq(*list, val))
 			return (B_TRUE);
 	}
 	return (B_FALSE);
@@ -287,12 +287,12 @@ class_bitmap(char **objectClass)
 	uint64_t ret = 0;
 
 	for (; *objectClass != NULL; objectClass++) {
-		if (strcaseeq(*objectClass, "user") ||
-		    strcaseeq(*objectClass, "posixAccount"))
+		if (uu_strcaseeq(*objectClass, "user") ||
+		    uu_strcaseeq(*objectClass, "posixAccount"))
 			ret |= DIRECTORY_CLASS_USER;
 
-		if (strcaseeq(*objectClass, "group") ||
-		    strcaseeq(*objectClass, "posixGroup"))
+		if (uu_strcaseeq(*objectClass, "group") ||
+		    uu_strcaseeq(*objectClass, "posixGroup"))
 			ret |= DIRECTORY_CLASS_GROUP;
 	}
 

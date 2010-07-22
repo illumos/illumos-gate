@@ -1330,6 +1330,7 @@ static uint32_t
 srvsvc_get_share_flags(smb_share_t *si)
 {
 	uint32_t flags = 0;
+	boolean_t shortnames = B_TRUE;
 
 	switch (si->shr_flags & SMB_SHRF_CSC_MASK) {
 	case SMB_SHRF_CSC_DISABLED:
@@ -1351,6 +1352,12 @@ srvsvc_get_share_flags(smb_share_t *si)
 
 	if (si->shr_flags & SMB_SHRF_ABE)
 		flags |= SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM;
+
+	/* if 'smb' zfs property: shortnames=disabled */
+	if ((smb_kmod_shareinfo(si->shr_name, &shortnames) == 0) &&
+	    (shortnames == B_FALSE)) {
+		flags |= SHI1005_FLAGS_ALLOW_NAMESPACE_CACHING;
+	}
 
 	return (flags);
 }

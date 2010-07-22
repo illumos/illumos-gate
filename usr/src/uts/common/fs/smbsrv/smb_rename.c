@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/synch.h>
@@ -446,7 +445,8 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 			return (EEXIST);
 		}
 
-		(void) smb_oplock_break(dst_fnode, sr->session, B_FALSE);
+		(void) smb_oplock_break(sr, dst_fnode,
+		    SMB_OPLOCK_BREAK_TO_NONE | SMB_OPLOCK_BREAK_BATCH);
 
 		for (count = 0; count <= 3; count++) {
 			if (count) {
@@ -628,7 +628,7 @@ smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
  * smb_rename_lookup_src
  *
  * Lookup the src node, checking for sharing violations and
- * breaking any existing oplock.
+ * breaking any existing BATCH oplock.
  * Populate sr->arg.dirop.fqi
  *
  * Upon success, the dnode and fnode will have holds and the
@@ -685,11 +685,12 @@ smb_rename_lookup_src(smb_request_t *sr)
 	}
 
 	/*
-	 * Break the oplock before access checks. If a client
+	 * Break BATCH oplock before access checks. If a client
 	 * has a file open, this will force a flush or close,
 	 * which may affect the outcome of any share checking.
 	 */
-	(void) smb_oplock_break(src_node, sr->session, B_FALSE);
+	(void) smb_oplock_break(sr, src_node,
+	    SMB_OPLOCK_BREAK_TO_LEVEL_II | SMB_OPLOCK_BREAK_BATCH);
 
 	for (count = 0; count <= 3; count++) {
 		if (count) {

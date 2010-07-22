@@ -1284,8 +1284,10 @@ smb_request_free(smb_request_t *sr)
 	ASSERT(sr->session);
 	ASSERT(sr->r_xa == NULL);
 
-	if (sr->fid_ofile != NULL)
+	if (sr->fid_ofile != NULL) {
+		smb_ofile_request_complete(sr->fid_ofile);
 		smb_ofile_release(sr->fid_ofile);
+	}
 
 	if (sr->tid_tree != NULL)
 		smb_tree_release(sr->tid_tree);
@@ -1334,17 +1336,22 @@ smb_session_oplocks_enable(smb_session_t *session)
 		return (B_TRUE);
 }
 
+boolean_t
+smb_session_levelII_oplocks(smb_session_t *session)
+{
+	SMB_SESSION_VALID(session);
+	return (session->capabilities & CAP_LEVEL_II_OPLOCKS);
+}
+
 /*
- * smb_session_breaking_oplock
+ * smb_session_oplock_break
  *
- * This MUST be a cross-session call, i.e. the caller must be in a different
- * context than the one passed. The mutex of the SMB node requiring an oplock
- * break MUST be dropped before calling this function. This last requirement is
- * due to a potential deadlock that can occur when trying to enter the lock of
- * the session passed in.
+ * The session lock must NOT be held by the caller of this thread;
+ * as this would cause a deadlock.
  */
 void
-smb_session_oplock_break(smb_session_t *session, smb_ofile_t *of)
+smb_session_oplock_break(smb_session_t *session,
+    uint16_t tid, uint16_t fid, uint8_t brk)
 {
 	mbuf_chain_t	*mbc;
 
@@ -1352,17 +1359,19 @@ smb_session_oplock_break(smb_session_t *session, smb_ofile_t *of)
 
 	mbc = smb_mbc_alloc(MLEN);
 
-	(void) smb_mbc_encodef(mbc, "Mb19.wwwwbb3.ww10.",
+	(void) smb_mbc_encodef(mbc, "Mb19.wwwwbb3.wbb10.",
 	    SMB_COM_LOCKING_ANDX,
-	    SMB_TREE_GET_TID(SMB_OFILE_GET_TREE(of)),
+	    tid,
 	    0xFFFF, 0, 0xFFFF, 8, 0xFF,
-	    SMB_OFILE_GET_FID(of),
-	    LOCKING_ANDX_OPLOCK_RELEASE);
+	    fid,
+	    LOCKING_ANDX_OPLOCK_RELEASE,
+	    (brk == SMB_OPLOCK_BREAK_TO_LEVEL_II) ? 1 : 0);
 
 	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
 	switch (session->s_state) {
 	case SMB_SESSION_STATE_NEGOTIATED:
 	case SMB_SESSION_STATE_OPLOCK_BREAKING:
+	case SMB_SESSION_STATE_WRITE_RAW_ACTIVE:
 		session->s_state = SMB_SESSION_STATE_OPLOCK_BREAKING;
 		(void) smb_session_send(session, 0, mbc);
 		smb_mbc_free(mbc);

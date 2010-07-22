@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libuutil.a
@@ -38,6 +35,7 @@ OBJECTS = \
 	uu_misc.o \
 	uu_open.o \
 	uu_pname.o \
+	uu_string.o \
 	uu_strtoint.o
 
 include ../../Makefile.lib

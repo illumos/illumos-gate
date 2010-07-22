@@ -128,6 +128,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_NETLOGON_SEQNUM, "netlogon_seqnum", SCF_TYPE_INTEGER,
 	    0},
 	{SMB_CI_IPV6_ENABLE, "ipv6_enable", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_PRINT_ENABLE, "print_enable", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_MAP, "map", SCF_TYPE_ASTRING, SMB_CF_EXEC},
 	{SMB_CI_UNMAP, "unmap", SCF_TYPE_ASTRING, SMB_CF_EXEC},
 	{SMB_CI_DISPOSITION, "disposition", SCF_TYPE_ASTRING, SMB_CF_EXEC},

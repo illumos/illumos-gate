@@ -364,12 +364,6 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 				    "AD lookup - domain not found (ignored)");
 				continue;
 			}
-			if (res->retcode == IDMAP_SUCCESS)
-				TRACE(req, res, "Found in AD");
-			else if (res->retcode == IDMAP_ERR_NOTFOUND)
-				TRACE(req, res, "Not found in AD");
-			else
-				TRACE(req, res, "AD lookup error");
 		}
 	}
 

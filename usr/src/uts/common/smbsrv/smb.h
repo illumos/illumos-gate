@@ -442,6 +442,7 @@ typedef uint32_t smb_utime_t;
 #define	SMB_CSC_CACHE_NONE		0x000C
 
 #define	SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM	0x0800
+#define	SHI1005_FLAGS_ALLOW_NAMESPACE_CACHING		0x0400
 
 /*
  * The subcommand codes, placed in SETUP[0], for named pipe operations are:

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_VOPS_H
@@ -147,6 +146,8 @@ int smb_vop_shrlock(vnode_t *, uint32_t, uint32_t, uint32_t, cred_t *);
 int smb_vop_unshrlock(vnode_t *, uint32_t, cred_t *);
 
 int smb_vop_frlock(vnode_t *, cred_t *, int, flock64_t *);
+
+int smb_vop_other_opens(vnode_t *, int);
 
 void smb_vop_catia_v4tov5(char *, char *, int);
 char *smb_vop_catia_v5tov4(char *, char *, int);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_DFS_H
@@ -61,6 +60,7 @@ uint32_t dfs_namespace_add(const char *, const char *);
 uint32_t dfs_namespace_remove(const char *);
 void dfs_namespace_load(const char *);
 void dfs_namespace_unload(const char *);
+uint32_t dfs_namespace_getflavor(const char *);
 
 uint32_t dfs_root_getinfo(const char *, dfs_info_t *, uint32_t);
 uint32_t dfs_root_setinfo(const char *, dfs_info_t *, uint32_t);

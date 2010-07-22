@@ -19,13 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMBSRV_MLSVC_H
 #define	_SMBSRV_MLSVC_H
 
+#include <cups/cups.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/ndl/netlogon.ndl>
 
@@ -50,6 +50,7 @@ void netdfs_initialize(void);
 
 void logr_finalize(void);
 void svcctl_finalize(void);
+void spoolss_finalize(void);
 void netdfs_finalize(void);
 
 int netr_open(char *, char *, mlsvc_handle_t *);
@@ -78,6 +79,26 @@ void smb_quota_init(void);
 void smb_quota_fini(void);
 void smb_quota_add_fs(const char *);
 void smb_quota_remove_fs(const char *);
+
+typedef struct smb_cups_ops {
+	void *cups_hdl;
+	cups_lang_t *(*cupsLangDefault)();
+	const char *(*cupsLangEncoding)(cups_lang_t *);
+	void (*cupsLangFree)(cups_lang_t *);
+	ipp_status_t (*cupsLastError)();
+	int (*cupsGetDests)(cups_dest_t **);
+	void (*cupsFreeDests)(int, cups_dest_t *);
+	ipp_t *(*cupsDoFileRequest)(http_t *, ipp_t *, const char *,
+	    const char *);
+	ipp_t *(*ippNew)();
+	void (*ippDelete)();
+	char *(*ippErrorString)();
+	ipp_attribute_t *(*ippAddString)();
+	void (*httpClose)(http_t *);
+	http_t *(*httpConnect)(const char *, int);
+} smb_cups_ops_t;
+
+smb_cups_ops_t *spoolss_cups_ops(void);
 
 #ifdef __cplusplus
 }

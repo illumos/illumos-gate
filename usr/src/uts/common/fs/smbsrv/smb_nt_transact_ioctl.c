@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -34,6 +33,10 @@ static uint32_t smb_nt_trans_ioctl_invalid_parm(smb_request_t *,
 /*
  * This table defines the list of FSCTL values for which we'll
  * call a funtion to perform specific processing.
+ *
+ * Note: If support is added for FSCTL_SET_ZERO_DATA, it must break
+ * any oplocks on the file to none:
+ *   smb_oplock_break(sr, node, SMB_OPLOCK_BREAK_TO_NONE);
  */
 static struct {
 	uint32_t fcode;

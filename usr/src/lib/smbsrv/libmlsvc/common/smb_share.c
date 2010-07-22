@@ -43,6 +43,7 @@
 #include <pwd.h>
 #include <signal.h>
 #include <dirent.h>
+#include <dlfcn.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
@@ -51,6 +52,7 @@
 #include <smbsrv/smb.h>
 #include <mlsvc.h>
 #include <dfs.h>
+#include <cups/cups.h>
 
 #define	SMB_SHR_ERROR_THRESHOLD		3
 #define	SMB_SHR_CSC_BUFSZ		64
@@ -142,6 +144,7 @@ static void smb_shr_sa_loadgrp(sa_group_t);
 static uint32_t smb_shr_sa_load(sa_share_t, sa_resource_t);
 static uint32_t smb_shr_sa_loadbyname(char *);
 static uint32_t smb_shr_sa_get(sa_share_t, sa_resource_t, smb_share_t *);
+static void smb_shr_load_cups_printers();
 
 /*
  * .ZFS management functions
@@ -448,6 +451,9 @@ smb_shr_add(smb_share_t *si)
 			/* If path is ZFS, add the .zfs/shares/<share> entry. */
 			smb_shr_zfs_add(si);
 
+			if ((si->shr_flags & SMB_SHRF_DFSROOT) != 0)
+				dfs_namespace_load(si->shr_name);
+
 			return (NERR_Success);
 		}
 	}
@@ -571,6 +577,7 @@ smb_shr_rename(char *from_name, char *to_name)
 
 	bcopy(from_si, &to_si, sizeof (smb_share_t));
 	(void) strlcpy(to_si.shr_name, to_name, sizeof (to_si.shr_name));
+
 
 	/* If path is ZFS, rename the .zfs/shares/<share> entry. */
 	smb_shr_zfs_rename(from_si, &to_si);
@@ -1394,8 +1401,10 @@ smb_shr_cache_addent(smb_share_t *si)
 
 	(void) smb_strlwr(si->shr_name);
 
-	if ((si->shr_type & STYPE_IPC) == 0)
+	if (((si->shr_type & STYPE_PRINTQ) == 0) &&
+	    (si->shr_type & STYPE_IPC) == 0)
 		si->shr_type = STYPE_DISKTREE;
+
 	si->shr_type |= smb_shr_is_special(cache_ent->shr_name);
 
 	if (smb_shr_is_admin(cache_ent->shr_name))
@@ -1456,9 +1465,12 @@ smb_shr_sa_loadall(void *args)
 	sa_group_t group, subgroup;
 	char *gstate;
 	boolean_t gdisabled;
+	boolean_t printing_enabled;
 
-	if ((handle = smb_shr_sa_enter()) == NULL)
+	if ((handle = smb_shr_sa_enter()) == NULL) {
+		syslog(LOG_ERR, "smb_shr_sa_loadall: ret NULL");
 		return (NULL);
+	}
 
 	for (group = sa_get_group(handle, NULL);
 	    group != NULL; group = sa_get_next_group(group)) {
@@ -1480,9 +1492,51 @@ smb_shr_sa_loadall(void *args)
 		}
 
 	}
-
 	smb_shr_sa_exit();
+	printing_enabled = smb_config_getbool(SMB_CI_PRINT_ENABLE);
+	if (printing_enabled)
+		smb_shr_load_cups_printers();
 	return (NULL);
+}
+
+/*
+ * Load print shares from cups
+ */
+static void
+smb_shr_load_cups_printers()
+{
+	uint32_t nerr;
+	int i;
+	cups_dest_t *dests;
+	int num_dests;
+	cups_dest_t *dest;
+	smb_share_t si;
+	smb_cups_ops_t	*cups;
+
+	if ((cups = spoolss_cups_ops()) == NULL)
+		return;
+
+	if (smb_shr_get(SMB_SHARE_PRINT, &si) != NERR_Success) {
+		syslog(LOG_DEBUG, "error getting print$");
+		return;
+	}
+
+	num_dests = cups->cupsGetDests(&dests);
+	for (i = num_dests, dest = dests; i > 0; i--, dest++) {
+		if (dest->instance == NULL) {
+			/*
+			 * Use the path from print$
+			 */
+			(void) strlcpy(si.shr_name, dest->name, MAXPATHLEN);
+			(void) strlcpy(si.shr_cmnt,
+			    SMB_SHARE_PRINT, SMB_SHARE_PRINT_LEN + 1);
+			si.shr_type = STYPE_PRINTQ;
+			nerr = smb_shr_add(&si);
+			if (nerr != NERR_Success)
+				break;
+		}
+	}
+	cups->cupsFreeDests(num_dests, dests);
 }
 
 /*
@@ -1561,9 +1615,6 @@ smb_shr_sa_load(sa_share_t share, sa_resource_t resource)
 		    si.shr_name, status);
 		return (status);
 	}
-
-	if ((si.shr_flags & SMB_SHRF_DFSROOT) != 0)
-		dfs_namespace_load(si.shr_name);
 
 	return (NERR_Success);
 }
@@ -2431,6 +2482,8 @@ smb_shr_encode(smb_share_t *si, nvlist_t **nvlist)
 
 	if ((csc = smb_shr_sa_csc_name(si)) != NULL)
 		rc |= nvlist_add_string(smb, SHOPT_CSC, csc);
+
+	rc |= nvlist_add_uint32(smb, "type", si->shr_type);
 
 	rc |= nvlist_add_nvlist(share, "smb", smb);
 	rc |= nvlist_add_nvlist(list, si->shr_name, share);

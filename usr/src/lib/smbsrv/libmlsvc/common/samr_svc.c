@@ -213,7 +213,7 @@ samr_hdlookup(ndr_xa_t *mxa, ndr_hdid_t *id, samr_key_t key)
 }
 
 /*
- * samr_s_ConnectAnon
+ * samr_s_Connect
  *
  * This is a request to connect to the local SAM database. We don't
  * support any form of update request and our database doesn't
@@ -223,9 +223,9 @@ samr_hdlookup(ndr_xa_t *mxa, ndr_hdid_t *id, samr_key_t key)
  * Return a handle for use with subsequent SAM requests.
  */
 static int
-samr_s_ConnectAnon(void *arg, ndr_xa_t *mxa)
+samr_s_Connect(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_ConnectAnon *param = arg;
+	struct samr_Connect *param = arg;
 	ndr_hdid_t *id;
 
 	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, SMB_DOMAIN_NULL, 0);
@@ -1082,7 +1082,7 @@ samr_s_ListAliasMembers(void *arg, ndr_xa_t *mxa)
 }
 
 /*
- * samr_s_Connect
+ * samr_s_Connect2
  *
  * This is a request to connect to the local SAM database.
  * We don't support any form of update request and our database doesn't
@@ -1092,9 +1092,9 @@ samr_s_ListAliasMembers(void *arg, ndr_xa_t *mxa)
  * Return a handle for use with subsequent SAM requests.
  */
 static int
-samr_s_Connect(void *arg, ndr_xa_t *mxa)
+samr_s_Connect2(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_Connect *param = arg;
+	struct samr_Connect2 *param = arg;
 	ndr_hdid_t *id;
 
 	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, SMB_DOMAIN_NULL, 0);
@@ -1807,12 +1807,12 @@ samr_s_EnumDomainAliases(void *arg, ndr_xa_t *mxa)
 }
 
 /*
- * samr_s_Connect3
+ * samr_s_Connect4
  */
 static int
-samr_s_Connect3(void *arg, ndr_xa_t *mxa)
+samr_s_Connect4(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_Connect3	*param = arg;
+	struct samr_Connect4	*param = arg;
 	ndr_hdid_t		*id;
 
 	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, SMB_DOMAIN_NULL, 0);
@@ -1828,23 +1828,23 @@ samr_s_Connect3(void *arg, ndr_xa_t *mxa)
 }
 
 /*
- * samr_s_Connect4
+ * samr_s_Connect5
  *
- * This is the connect4 form of the connect request used by Windows XP.
+ * This is the connect5 form of the connect request used by Windows XP.
  * Returns an RPC fault for now.
  */
 /*ARGSUSED*/
 static int
-samr_s_Connect4(void *arg, ndr_xa_t *mxa)
+samr_s_Connect5(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_Connect4 *param = arg;
+	struct samr_Connect5 *param = arg;
 
-	bzero(param, sizeof (struct samr_Connect4));
+	bzero(param, sizeof (struct samr_Connect5));
 	return (NDR_DRC_FAULT_REQUEST_OPNUM_INVALID);
 }
 
 static ndr_stub_table_t samr_stub_table[] = {
-	{ samr_s_ConnectAnon,		SAMR_OPNUM_ConnectAnon },
+	{ samr_s_Connect,		SAMR_OPNUM_Connect },
 	{ samr_s_CloseHandle,		SAMR_OPNUM_CloseHandle },
 	{ samr_s_LookupDomain,		SAMR_OPNUM_LookupDomain },
 	{ samr_s_EnumLocalDomains,	SAMR_OPNUM_EnumLocalDomains },
@@ -1857,14 +1857,14 @@ static ndr_stub_table_t samr_stub_table[] = {
 	{ samr_s_QueryUserInfo,		SAMR_OPNUM_QueryUserInfo },
 	{ samr_s_QueryUserGroups,	SAMR_OPNUM_QueryUserGroups },
 	{ samr_s_OpenGroup,		SAMR_OPNUM_OpenGroup },
-	{ samr_s_Connect,		SAMR_OPNUM_Connect },
+	{ samr_s_Connect2,		SAMR_OPNUM_Connect2 },
 	{ samr_s_GetUserPwInfo,		SAMR_OPNUM_GetUserPwInfo },
 	{ samr_s_CreateUser,		SAMR_OPNUM_CreateUser },
 	{ samr_s_ChangeUserPasswd,	SAMR_OPNUM_ChangeUserPasswd },
 	{ samr_s_GetDomainPwInfo,	SAMR_OPNUM_GetDomainPwInfo },
 	{ samr_s_SetUserInfo,		SAMR_OPNUM_SetUserInfo },
-	{ samr_s_Connect3,		SAMR_OPNUM_Connect3 },
 	{ samr_s_Connect4,		SAMR_OPNUM_Connect4 },
+	{ samr_s_Connect5,		SAMR_OPNUM_Connect5 },
 	{ samr_s_QueryDispInfo,		SAMR_OPNUM_QueryDispInfo },
 	{ samr_s_OpenAlias,		SAMR_OPNUM_OpenAlias },
 	{ samr_s_CreateDomainAlias,	SAMR_OPNUM_CreateDomainAlias },

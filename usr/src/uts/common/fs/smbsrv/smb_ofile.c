@@ -217,7 +217,6 @@ smb_ofile_open(
 	mutex_init(&of->f_mutex, NULL, MUTEX_DEFAULT, NULL);
 	of->f_state = SMB_OFILE_STATE_OPEN;
 
-
 	if (ftype == SMB_FTYPE_MESG_PIPE) {
 		of->f_pipe = smb_opipe_alloc(tree->t_server);
 		smb_server_inc_pipes(of->f_server);
@@ -338,15 +337,11 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 		ASSERT(of->f_refcnt);
 		ASSERT(of->f_state == SMB_OFILE_STATE_CLOSING);
 		of->f_state = SMB_OFILE_STATE_CLOSED;
-		mutex_exit(&of->f_mutex);
 		if (of->f_node != NULL) {
 			smb_node_dec_open_ofiles(of->f_node);
-			if (of->f_oplock_granted) {
-				smb_oplock_release(of->f_node, of);
-				of->f_oplock_granted = B_FALSE;
-			}
+			smb_oplock_release(of->f_node, of);
 		}
-		return;
+		break;
 	}
 	case SMB_OFILE_STATE_CLOSED:
 	case SMB_OFILE_STATE_CLOSING:
@@ -483,20 +478,11 @@ smb_ofile_hold(smb_ofile_t *of)
  * iteration may be in progress.
  */
 void
-smb_ofile_release(smb_ofile_t	*of)
+smb_ofile_release(smb_ofile_t *of)
 {
-	boolean_t	rb;
-
 	SMB_OFILE_VALID(of);
 
 	mutex_enter(&of->f_mutex);
-	if (of->f_oplock_exit) {
-		mutex_exit(&of->f_mutex);
-		rb = smb_oplock_broadcast(of->f_node);
-		mutex_enter(&of->f_mutex);
-		if (rb)
-			of->f_oplock_exit = B_FALSE;
-	}
 	ASSERT(of->f_refcnt);
 	of->f_refcnt--;
 	switch (of->f_state) {
@@ -514,6 +500,35 @@ smb_ofile_release(smb_ofile_t	*of)
 		break;
 	}
 	mutex_exit(&of->f_mutex);
+}
+
+/*
+ * smb_ofile_request_complete
+ *
+ * During oplock acquisition, all other oplock requests on the node
+ * are blocked until the acquire request completes and the response
+ * is on the wire.
+ * Call smb_oplock_broadcast to notify the node that the request
+ * has completed.
+ *
+ * THIS MECHANISM RELIES ON THE FACT THAT THE OFILE IS NOT REMOVED
+ * FROM THE SR UNTIL REQUEST COMPLETION (when the sr is destroyed)
+ */
+void
+smb_ofile_request_complete(smb_ofile_t *of)
+{
+	SMB_OFILE_VALID(of);
+
+	switch (of->f_ftype) {
+	case SMB_FTYPE_DISK:
+		ASSERT(of->f_node);
+		smb_oplock_broadcast(of->f_node);
+		break;
+	case SMB_FTYPE_MESG_PIPE:
+		break;
+	default:
+		break;
+	}
 }
 
 /*
@@ -733,17 +748,6 @@ smb_ofile_is_open(smb_ofile_t *of)
 	rc = smb_ofile_is_open_locked(of);
 	mutex_exit(&of->f_mutex);
 	return (rc);
-}
-
-void
-smb_ofile_set_oplock_granted(smb_ofile_t *of)
-{
-	SMB_OFILE_VALID(of);
-	mutex_enter(&of->f_mutex);
-	ASSERT(!of->f_oplock_granted);
-	of->f_oplock_granted = B_TRUE;
-	of->f_oplock_exit = B_TRUE;
-	mutex_exit(&of->f_mutex);
 }
 
 /*
@@ -994,6 +998,18 @@ smb_ofile_access(smb_ofile_t *of, cred_t *cr, uint32_t access)
 	return (NT_STATUS_SUCCESS);
 }
 
+/*
+ * smb_ofile_share_check
+ *
+ * Check if ofile was opened with share access NONE (0).
+ * Returns: B_TRUE  - share access non-zero
+ *          B_FALSE - share access NONE
+ */
+boolean_t
+smb_ofile_share_check(smb_ofile_t *of)
+{
+	return (!SMB_DENY_ALL(of->f_share_access));
+}
 
 /*
  * check file sharing rules for current open request

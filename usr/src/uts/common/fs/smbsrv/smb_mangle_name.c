@@ -55,39 +55,8 @@ static char *special_chars = "[];=,+";
 
 #define	isinvalid(c)	(strchr(invalid_dos_chars, c) || (c & 0x80))
 
-static boolean_t smb_is_reserved_dos_name(const char *name);
 static int smb_generate_mangle(uint64_t, char *, size_t);
 static char smb_mangle_char(char);
-
-/*
- * smb_match_name
- *
- * Don't match reserved dos filenames.
- * Check name to see if it matches pattern.
- * Generate the shortname (even if !smb_needs_mangled()) since names may
- * be mangled to address case conflicts) and check if shortname matches
- * pattern.
- *
- * Returns: B_TRUE  - if there is a match
- *          B_FALSE - otherwise
- */
-boolean_t
-smb_match_name(ino64_t fid, char *name, char *pattern)
-{
-	char shortname[SMB_SHORTNAMELEN];
-
-	if (smb_is_reserved_dos_name(name))
-		return (B_FALSE);
-
-	if (smb_match_ci(pattern, name))
-		return (B_TRUE);
-
-	smb_mangle(name, fid, shortname, SMB_SHORTNAMELEN);
-	if (smb_match_ci(pattern, shortname))
-		return (B_TRUE);
-
-	return (B_FALSE);
-}
 
 /*
  * Return true if name contains characters that are invalid in a file
@@ -117,7 +86,7 @@ smb_is_invalid_filename(const char *name)
  * The device name should not be followed immediately by an extension,
  * for example, NUL.txt.
  */
-static boolean_t
+boolean_t
 smb_is_reserved_dos_name(const char *name)
 {
 	static char *cnames[] = { "CLOCK$", "COM1", "COM2", "COM3", "COM4",
