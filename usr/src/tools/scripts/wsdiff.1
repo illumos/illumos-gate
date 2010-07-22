@@ -1,4 +1,3 @@
-.\" ident	"%Z%%M%	%I%	%E% SMI"
 .\" " CDDL HEADER START
 .\" "
 .\" " The contents of this file are subject to the terms of the
@@ -18,13 +17,13 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-.\" "Use is subject to license terms."
-.TH wsdiff 1 "07 Jul 2006"
+.\" " Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+.\" "
+.TH wsdiff 1 "15 Jul 2010"
 .I wsdiff
 \- report differences between proto area objects
 .SH SYNOPSIS
-\fBwsdiff [-vVt] [-r \fIresults\fP] [-i \fIfilelist\fP] \fIold\fP \fInew\fP
+\fBwsdiff [-dvVst] [-r \fIresults\fP] [-i \fIfilelist\fP] \fIold\fP \fInew\fP
 .LP
 .SH DESCRIPTION
 .IX "OS-Net build tools" "wsdiff" "" "\fBwsdiff\fP"
@@ -41,6 +40,9 @@ workspace, otherwise wsdiff will find object differences not associated
 with the source change.
 .SH OPTIONS
 .TP 10
+.B -d
+Print debug information. The debug lines are prefixed with ##.
+.TP 10
 .B -v
 Do not truncate the diffs logged to the results file. By default wsdiff
 will truncate the length of a sufficiently long set of object diffs to preserve
@@ -53,6 +55,11 @@ it will log the difference associated with that section only, and move on. -V fo
 wsdiff to log all ELF section differences found between two objects, rather than
 just the first. Because of the extra work involved, this may slow wsdiff down
 considerably.
+.TP 10
+.B -s
+Produce sorted lists. This is handy when comparing multiple wsdiff outputs
+because wsdiff runs in multithreaded mode so the list of differences is not
+sorted and can differ between multiple runs.
 .TP 10
 .B -t
 Look for the onbld tools in $SRC/tools rather than /opt/onbld/bin
@@ -170,6 +177,20 @@ pre-existing proto area (renaming it to $ROOT.prev under proto), and will
 invoke wsdiff at the end of the build. The list of changed objects will be reported
 in the nightly mail message, and a results file "wsdiff_results" will appear in the
 nightly log area.
+.PP
+\fBExample 5: Influencing the level of paralelism\fR
+.PP
+wsdiff spawns a number of threads by default after it determines the list
+of files for comparison. Default number of threads is based on the number of
+on-line CPUs present in the system. To set the number of threads for processing
+to some other value the DMAKE_MAX_JOBS environment variable can be used:
+.LP
+.nf
+$ DMAKE_MAX_JOBS=24 wsdiff proto_base proto_patch
+.fi
+.PP
+Note that this variable is also used for nightly(1) so when run from
+nightly(1), wsdiff will honor the setting.
 .LP
 .SH SEE ALSO
 .LP

@@ -1138,14 +1138,15 @@ function do_wsdiff {
 	oldproto=$2
 	newproto=$3
 
-	echo "\n==== Objects that differ since last build ($label) ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
 	wsdiff="wsdiff"
 	[ "$t_FLAG" = y ] && wsdiff="wsdiff -t"
 
-	$wsdiff -r ${TMPDIR}/wsdiff.results $oldproto $newproto 2>&1 | \
+	echo "\n==== Getting object changes since last build at `date`" \
+	    "($label) ====\n" | tee -a $LOGFILE >> $mail_msg_file
+	$wsdiff -s -r ${TMPDIR}/wsdiff.results $oldproto $newproto 2>&1 | \
 		    tee -a $LOGFILE >> $mail_msg_file
+	echo "\n==== Object changes determined at `date` ($label) ====\n" | \
+	    tee -a $LOGFILE >> $mail_msg_file
 }
 
 #
