@@ -161,16 +161,6 @@ typedef enum zfs_mnted {
 } zfs_mnted_t;
 
 /*
- * The following two defines are used to detect and create the correct
- * boot archive  when safemode patching is underway.  LOFS_PATCH_FILE is a
- * contracted private interface between bootadm and the install
- * consolidation.  It is set by pdo.c when a patch with SUNW_PATCH_SAFEMODE
- * is applied.
- */
-#define	LOFS_PATCH_FILE		"/var/run/.patch_loopback_mode"
-#define	LOFS_PATCH_MNT		"/var/run/.patch_root_loopbackmnt"
-
-/*
  * Default file attributes
  */
 #define	DEFAULT_DEV_MODE	0644	/* default permissions */
@@ -3906,49 +3896,10 @@ update_all(char *root, char *opt)
 	}
 
 	/*
-	 * Check to see if we are in the midst of safemode patching
-	 * If so skip building the archive for /. Instead build it
-	 * against the latest bits obtained by creating a fresh lofs
-	 * mount of root.
+	 * First update archive for current root
 	 */
-	if (stat(LOFS_PATCH_FILE, &sb) == 0)  {
-		if (mkdir(LOFS_PATCH_MNT, DIR_PERMS) == -1 &&
-		    errno != EEXIST) {
-			bam_error(MKDIR_FAILED, "%s", LOFS_PATCH_MNT,
-			    strerror(errno));
-			ret = BAM_ERROR;
-			goto out;
-		}
-		(void) snprintf(multibt, sizeof (multibt),
-		    "/sbin/mount -F lofs -o nosub /  %s", LOFS_PATCH_MNT);
-		if (exec_cmd(multibt, NULL) != 0) {
-			bam_error(MOUNT_FAILED, LOFS_PATCH_MNT, "lofs");
-			ret = BAM_ERROR;
-		}
-		if (ret != BAM_ERROR) {
-			(void) snprintf(rootbuf, sizeof (rootbuf), "%s/",
-			    LOFS_PATCH_MNT);
-			bam_rootlen = strlen(rootbuf);
-			if (update_archive(rootbuf, opt) != BAM_SUCCESS)
-				ret = BAM_ERROR;
-			/*
-			 * unmount the lofs mount since there could be
-			 * multiple invocations of bootadm -a update_all
-			 */
-			(void) snprintf(multibt, sizeof (multibt),
-			    "/sbin/umount %s", LOFS_PATCH_MNT);
-			if (exec_cmd(multibt, NULL) != 0) {
-				bam_error(UMOUNT_FAILED, LOFS_PATCH_MNT);
-				ret = BAM_ERROR;
-			}
-		}
-	} else {
-		/*
-		 * First update archive for current root
-		 */
-		if (update_archive(root, opt) != BAM_SUCCESS)
-			ret = BAM_ERROR;
-	}
+	if (update_archive(root, opt) != BAM_SUCCESS)
+		ret = BAM_ERROR;
 
 	if (ret == BAM_ERROR)
 		goto out;
