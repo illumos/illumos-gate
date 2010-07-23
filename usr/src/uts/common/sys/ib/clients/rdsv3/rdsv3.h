@@ -120,6 +120,7 @@ enum {
 
 struct rdsv3_connection {
 	struct avl_node		c_hash_node;
+	struct rdsv3_ip_bucket	*c_bucketp;
 	uint32_be_t		c_laddr;
 	uint32_be_t		c_faddr;
 	unsigned int		c_loopback:1;
@@ -551,7 +552,9 @@ void __rdsv3_wake_sk_sleep(struct rsock *sk);
 int rdsv3_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
     socklen_t len, cred_t *cr);
 void rdsv3_remove_bound(struct rdsv3_sock *rs);
-struct rdsv3_sock *rdsv3_find_bound(uint32_be_t addr, uint16_be_t port);
+struct rdsv3_sock *rdsv3_find_bound(struct rdsv3_connection *conn,
+    uint16_be_t port);
+struct rdsv3_ip_bucket *rdsv3_find_ip_bucket(ipaddr_t, zoneid_t);
 
 /* conn.c */
 int rdsv3_conn_init(void);

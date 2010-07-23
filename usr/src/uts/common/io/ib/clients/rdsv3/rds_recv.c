@@ -242,7 +242,7 @@ rdsv3_recv_incoming(struct rdsv3_connection *conn, uint32_be_t saddr,
 		goto out;
 	}
 
-	rs = rdsv3_find_bound(daddr, inc->i_hdr.h_dport);
+	rs = rdsv3_find_bound(conn, inc->i_hdr.h_dport);
 	if (!rs) {
 		rdsv3_stats_inc(s_recv_drop_no_sock);
 		goto out;

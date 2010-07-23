@@ -156,6 +156,14 @@ __rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
 	conn->c_laddr = laddr;
 	conn->c_faddr = faddr;
 
+	/*
+	 * We don't allow sockets to send messages without binding.
+	 * So, the IP address will already be there in the bind array.
+	 * Mostly, this is a readonly operation.
+	 * For now, passing GLOBAL_ZONEID.
+	 */
+	conn->c_bucketp = rdsv3_find_ip_bucket(ntohl(laddr), GLOBAL_ZONEID);
+
 	ret = rdsv3_cong_get_maps(conn);
 	if (ret) {
 		kmem_cache_free(rdsv3_conn_slab, conn);

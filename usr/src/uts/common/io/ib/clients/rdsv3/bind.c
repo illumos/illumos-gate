@@ -49,32 +49,89 @@
 #include <sys/ib/clients/rdsv3/rdsv3.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
-/*
- * XXX this probably still needs more work.. no INADDR_ANY, and rbtrees aren't
- * particularly zippy.
- *
- * This is now called for every incoming frame so we arguably care much more
- * about it than we used to.
- */
 kmutex_t	rdsv3_bind_lock;
 avl_tree_t	rdsv3_bind_tree;
 
-static struct rdsv3_sock *
-rdsv3_bind_tree_walk(uint32_be_t addr, uint16_be_t port,
-    struct rdsv3_sock *insert)
-{
-	struct rdsv3_sock *rs;
-	avl_index_t	where;
-	uint64_t	needle = ((uint64_t)addr << 32) | port;
+/*
+ * Each node in the rdsv3_bind_tree is of this type.
+ */
+struct rdsv3_ip_bucket {
+	ipaddr_t		ip;
+	zoneid_t		zone;
+	avl_node_t		ip_avl_node;
+	krwlock_t		rwlock;
+	uint_t			nsockets;
+	struct rdsv3_sock	*port[65536];
+};
 
-	rs = avl_find(&rdsv3_bind_tree, &needle, &where);
-	if ((rs == NULL) && (insert != NULL)) {
-		insert->rs_bound_addr = addr;
-		insert->rs_bound_port = port;
-		avl_insert(&rdsv3_bind_tree, insert, where);
+static int
+rdsv3_bind_node_compare(const void *a, const void *b)
+{
+	struct rdsv3_ip_bucket *bp = (struct rdsv3_ip_bucket *)b;
+
+	if (*(uint64_t *)a > (((uint64_t)bp->ip << 32) | bp->zone))
+		return (+1);
+	else if (*(uint64_t *)a < (((uint64_t)bp->ip << 32) | bp->zone))
+		return (-1);
+
+	return (0);
+}
+
+void
+rdsv3_bind_init()
+{
+	RDSV3_DPRINTF4("rdsv3_bind_tree_init", "Enter");
+
+	mutex_init(&rdsv3_bind_lock, NULL, MUTEX_DRIVER, NULL);
+	avl_create(&rdsv3_bind_tree, rdsv3_bind_node_compare,
+	    sizeof (struct rdsv3_ip_bucket),
+	    offsetof(struct rdsv3_ip_bucket, ip_avl_node));
+
+	RDSV3_DPRINTF4("rdsv3_bind_tree_init", "Return");
+}
+
+/* called on detach */
+void
+rdsv3_bind_exit()
+{
+	struct rdsv3_ip_bucket	*bucketp;
+	void			*cookie = NULL;
+
+	RDSV3_DPRINTF2("rdsv3_bind_tree_exit", "Enter");
+
+	while ((bucketp =
+	    avl_destroy_nodes(&rdsv3_bind_tree, &cookie)) != NULL) {
+		rw_destroy(&bucketp->rwlock);
+		kmem_free(bucketp, sizeof (struct rdsv3_ip_bucket));
 	}
 
-	return (rs);
+	avl_destroy(&rdsv3_bind_tree);
+	mutex_destroy(&rdsv3_bind_lock);
+
+	RDSV3_DPRINTF2("rdsv3_bind_tree_exit", "Return");
+}
+
+struct rdsv3_ip_bucket *
+rdsv3_find_ip_bucket(ipaddr_t ipaddr, zoneid_t zoneid)
+{
+	struct rdsv3_ip_bucket	*bucketp;
+	avl_index_t		where;
+	uint64_t		needle = ((uint64_t)ipaddr << 32) | zoneid;
+
+	mutex_enter(&rdsv3_bind_lock);
+	bucketp = avl_find(&rdsv3_bind_tree, &needle, &where);
+	if (bucketp == NULL) {
+		/* allocate a new bucket for this IP & zone */
+		bucketp =
+		    kmem_zalloc(sizeof (struct rdsv3_ip_bucket), KM_SLEEP);
+		rw_init(&bucketp->rwlock, NULL, RW_DRIVER, NULL);
+		bucketp->ip = ipaddr;
+		bucketp->zone = zoneid;
+		avl_insert(&rdsv3_bind_tree, bucketp, where);
+	}
+	mutex_exit(&rdsv3_bind_lock);
+
+	return (bucketp);
 }
 
 /*
@@ -84,22 +141,24 @@ rdsv3_bind_tree_walk(uint32_be_t addr, uint16_be_t port,
  * marked this socket and don't return a rs ref to the rx path.
  */
 struct rdsv3_sock *
-rdsv3_find_bound(uint32_be_t addr, uint16_be_t port)
+rdsv3_find_bound(struct rdsv3_connection *conn, uint16_be_t port)
 {
 	struct rdsv3_sock *rs;
 
-	RDSV3_DPRINTF4("rdsv3_find_bound", "Enter(port: %x)", port);
+	RDSV3_DPRINTF4("rdsv3_find_bound", "Enter(ip:port: %u.%u.%u.%u:%d)",
+	    NIPQUAD(conn->c_laddr), ntohs(port));
 
-	mutex_enter(&rdsv3_bind_lock);
-	rs = rdsv3_bind_tree_walk(addr, port, NULL);
+	rw_enter(&conn->c_bucketp->rwlock, RW_READER);
+	ASSERT(ntohl(conn->c_laddr) == conn->c_bucketp->ip);
+	rs = conn->c_bucketp->port[ntohs(port)];
 	if (rs && !rdsv3_sk_sock_flag(rdsv3_rs_to_sk(rs), SOCK_DEAD))
-		rdsv3_sock_addref(rs);
+		rdsv3_sk_sock_hold(rdsv3_rs_to_sk(rs));
 	else
 		rs = NULL;
-	mutex_exit(&rdsv3_bind_lock);
+	rw_exit(&conn->c_bucketp->rwlock);
 
-	RDSV3_DPRINTF5("rdsv3_find_bound", "returning rs %p for %u.%u.%u.%u:%x",
-	    rs, NIPQUAD(addr), port);
+	RDSV3_DPRINTF5("rdsv3_find_bound", "returning rs %p for %u.%u.%u.%u:%d",
+	    rs, NIPQUAD(conn->c_laddr), ntohs(port));
 
 	return (rs);
 }
@@ -110,8 +169,10 @@ rdsv3_add_bound(struct rdsv3_sock *rs, uint32_be_t addr, uint16_be_t *port)
 {
 	int ret = -EADDRINUSE;
 	uint16_t rover, last;
+	struct rdsv3_ip_bucket *bucketp;
 
-	RDSV3_DPRINTF4("rdsv3_add_bound", "Enter(port: %x)", *port);
+	RDSV3_DPRINTF4("rdsv3_add_bound", "Enter(addr:port: %x:%x)",
+	    ntohl(addr), ntohs(*port));
 
 	if (*port != 0) {
 		rover = ntohs(*port);
@@ -123,13 +184,16 @@ rdsv3_add_bound(struct rdsv3_sock *rs, uint32_be_t addr, uint16_be_t *port)
 		last = rover - 1;
 	}
 
-	mutex_enter(&rdsv3_bind_lock);
+	bucketp = rdsv3_find_ip_bucket(ntohl(addr), rs->rs_zoneid);
+
+	/* leave the bind lock and get the bucket lock */
+	rw_enter(&bucketp->rwlock, RW_WRITER);
 
 	do {
 		if (rover == 0)
 			rover++;
 
-		if (rdsv3_bind_tree_walk(addr, htons(rover), rs) == NULL) {
+		if (bucketp->port[rover] == NULL) {
 			*port = htons(rover);
 			ret = 0;
 			break;
@@ -139,16 +203,20 @@ rdsv3_add_bound(struct rdsv3_sock *rs, uint32_be_t addr, uint16_be_t *port)
 	if (ret == 0)  {
 		rs->rs_bound_addr = addr;
 		rs->rs_bound_port = *port;
+		bucketp->port[rover] = rs;
+		bucketp->nsockets++;
 		rdsv3_sock_addref(rs);
 
 		RDSV3_DPRINTF5("rdsv3_add_bound",
-		    "rs %p binding to %u.%u.%u.%u:%x",
-		    rs, NIPQUAD(addr), *port);
+		    "rs %p binding to %u.%u.%u.%u:%d",
+		    rs, NIPQUAD(addr), rover);
 	}
 
-	mutex_exit(&rdsv3_bind_lock);
+	rw_exit(&bucketp->rwlock);
 
-	RDSV3_DPRINTF4("rdsv3_add_bound", "Return(port: %x)", *port);
+	RDSV3_DPRINTF4("rdsv3_add_bound", "Return(ret: %d port: %d)",
+	    ret, rover);
+
 
 	return (ret);
 }
@@ -158,18 +226,24 @@ rdsv3_remove_bound(struct rdsv3_sock *rs)
 {
 	RDSV3_DPRINTF4("rdsv3_remove_bound", "Enter(rs: %p)", rs);
 
-	mutex_enter(&rdsv3_bind_lock);
-
 	if (rs->rs_bound_addr) {
+		struct rdsv3_ip_bucket *bucketp;
+
 		RDSV3_DPRINTF5("rdsv3_remove_bound",
 		    "rs %p unbinding from %u.%u.%u.%u:%x",
-		    rs, NIPQUAD(rs->rs_bound_addr), rs->rs_bound_port);
-		avl_remove(&rdsv3_bind_tree, rs);
-		rdsv3_sock_put(rs);
-		rs->rs_bound_addr = 0;
-	}
+		    rs, NIPQUAD(htonl(rs->rs_bound_addr)), rs->rs_bound_port);
 
-	mutex_exit(&rdsv3_bind_lock);
+		bucketp = rdsv3_find_ip_bucket(ntohl(rs->rs_bound_addr),
+		    rs->rs_zoneid);
+
+		rw_enter(&bucketp->rwlock, RW_WRITER);
+		bucketp->port[ntohs(rs->rs_bound_port)] = NULL;
+		bucketp->nsockets--;
+		rs->rs_bound_addr = 0;
+		rw_exit(&bucketp->rwlock);
+
+		rdsv3_sock_put(rs);
+	}
 
 	RDSV3_DPRINTF4("rdsv3_remove_bound", "Return(rs: %p)", rs);
 }

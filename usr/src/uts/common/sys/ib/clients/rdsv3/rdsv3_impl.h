@@ -376,9 +376,6 @@ int rdsv3_mr_compare(const void *mr1, const void *mr2);
 int rdsv3_put_cmsg(struct nmsghdr *msg, int level, int type, size_t size,
     void *payload);
 int rdsv3_verify_bind_address(ipaddr_t addr);
-int rdsv3_bind_node_compare(const void *a, const void *b);
-void rdsv3_bind_tree_init();
-void rdsv3_bind_tree_exit();
 uint16_t rdsv3_ip_fast_csum(void *buffer, size_t length);
 uint_t rdsv3_ib_dma_map_sg(struct ib_device *dev, struct rdsv3_scatterlist
 	*scat, uint_t num);
