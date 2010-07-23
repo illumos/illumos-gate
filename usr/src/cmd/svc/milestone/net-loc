@@ -273,10 +273,8 @@ do_nis () {
 			DEFAULT_DOMAIN=`get_dhcpinfo NISdmain | \
 			    $NAWK '{ print $1 }'`
 			NIS_SERVERS=`get_dhcpinfo NISservs`
-			if [ "$domainname_set" = "false" ]; then
-				$DOMAINNAME $DEFAULT_DOMAIN
-				$DOMAINNAME > $ETC_DEFAULT_DOMAIN
-			fi
+			$DOMAINNAME $DEFAULT_DOMAIN
+			$DOMAINNAME > $ETC_DEFAULT_DOMAIN
 			;;
 		'*')
 			echo "Unrecognized NIS configsrc ${configsrc}; ignoring"
