@@ -1616,3 +1616,4 @@ Bugid   Risk Synopsis
 	PSARC/2010/224 Support for archives larger than 2 GB
 6956152 dlclose() from an auditor can be fatal. Preinit/activity events should
 	be more flexible. (D)
+6971440 moe can core dump while processing libc.

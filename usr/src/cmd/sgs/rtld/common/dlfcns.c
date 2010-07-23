@@ -492,14 +492,16 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 	/*
 	 * If this handle is associated with an object that is not on the base
 	 * link-map control list, or it has not yet been relocated, then this
-	 * handle must have originated from an auditors interaction.  User code
+	 * handle must have originated from an auditors interaction, or some
+	 * permutation of RTLD_CONFGEN use (crle(1), moe(1), etc.).  User code
 	 * can only execute and bind to relocated objects on the base link-map
-	 * control list.  A non-relocated object, or an object on a non-base
-	 * link-map control list, is in the process of being loaded, and
-	 * therefore we do not attempt to remove the handle, as we might
-	 * mistakenly delete the object thinking that its loading has failed.
+	 * control list.  Outside of RTLD_CONFGEN use, a non-relocated object,
+	 * or an object on a non-base link-map control list, is in the process
+	 * of being loaded, and therefore we do not attempt to remove the
+	 * handle.
 	 */
 	if (((lmp = ghp->gh_ownlmp) != NULL) &&
+	    ((MODE(lmp) & RTLD_CONFGEN) == 0) &&
 	    ((CNTL(lmp) != ALIST_OFF_DATA) ||
 	    ((FLAGS(lmp) & FLG_RT_RELOCED) == 0)))
 		return (0);
