@@ -522,7 +522,7 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 		    "unspecified_%s", resource_nodetype);
 	}
 
-	vfs_setresource(vfsp, resource_name);
+	vfs_setresource(vfsp, resource_name, 0);
 
 	kmem_free(svfsp, sizeof (statvfs64_t));
 	kmem_free(resource_name, RESOURCE_NAME_SZ);

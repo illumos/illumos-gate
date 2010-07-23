@@ -259,7 +259,7 @@ tmp_mount(
 	/*
 	 * Having the resource be anything but "swap" doesn't make sense.
 	 */
-	vfs_setresource(vfsp, "swap");
+	vfs_setresource(vfsp, "swap", 0);
 
 	/*
 	 * now look for options we understand...

@@ -211,7 +211,7 @@ prmount(struct vfs *vfsp, struct vnode *mvp,
 	/*
 	 * Having the resource be anything but "proc" doesn't make sense
 	 */
-	vfs_setresource(vfsp, "proc");
+	vfs_setresource(vfsp, "proc", 0);
 
 	pnp = kmem_alloc(sizeof (*pnp), KM_SLEEP);
 	mutex_enter(&pr_mount_lock);

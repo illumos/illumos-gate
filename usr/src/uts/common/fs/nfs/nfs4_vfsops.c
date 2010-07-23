@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2616,7 +2615,7 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 		(void) strcat(resource, svp->sv_hostname);
 		(void) strcat(resource, ":");
 		(void) strcat(resource, svp->sv_path);
-		vfs_setresource(vfsp, resource);
+		vfs_setresource(vfsp, resource, 0);
 		kmem_free(resource, len);
 	}
 

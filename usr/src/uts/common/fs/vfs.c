@@ -670,8 +670,8 @@ vfs_mountdevices(void)
 	/*
 	 * Set appropriate members and add to vfs list for mnttab display
 	 */
-	vfs_setresource(&devices, "/devices");
-	vfs_setmntpoint(&devices, "/devices");
+	vfs_setresource(&devices, "/devices", 0);
+	vfs_setmntpoint(&devices, "/devices", 0);
 
 	/*
 	 * Hold the root of /devices so it won't go away
@@ -748,8 +748,8 @@ vfs_mountdev1(void)
 	/*
 	 * Set appropriate members and add to vfs list for mnttab display
 	 */
-	vfs_setresource(&dev, "/dev");
-	vfs_setmntpoint(&dev, "/dev");
+	vfs_setresource(&dev, "/dev", 0);
+	vfs_setmntpoint(&dev, "/dev", 0);
 
 	/*
 	 * Hold the root of /dev so it won't go away
@@ -832,7 +832,7 @@ vfs_mountroot(void)
 	 * to point to it.  These are used by lookuppn() so that it
 	 * knows where to start from ('/' or '.').
 	 */
-	vfs_setmntpoint(rootvfs, "/");
+	vfs_setmntpoint(rootvfs, "/", 0);
 	if (VFS_ROOT(rootvfs, &rootdir))
 		panic("vfs_mountroot: no root vnode");
 
@@ -872,7 +872,7 @@ vfs_mountroot(void)
 	/*
 	 * Set up mnttab information for root
 	 */
-	vfs_setresource(rootvfs, rootfs.bo_name);
+	vfs_setresource(rootvfs, rootfs.bo_name, 0);
 
 	/*
 	 * Notify cluster software that the root filesystem is available.
@@ -930,7 +930,7 @@ vfs_mountroot(void)
 		 * mnttab should reflect the new root device
 		 */
 		vfs_lock_wait(rootvfs);
-		vfs_setresource(rootvfs, rootfs.bo_name);
+		vfs_setresource(rootvfs, rootfs.bo_name, 0);
 		vfs_unlock(rootvfs);
 	}
 #endif /* __sparc */
@@ -959,39 +959,6 @@ vfs_mountroot(void)
 	}
 	kmem_free(path, plen + MAXPATHLEN);
 	vfs_mnttabvp_setup();
-}
-
-/*
- * If remount failed and we're in a zone we need to check for the zone
- * root path and strip it before the call to vfs_setpath().
- *
- * If strpath doesn't begin with the zone_rootpath the original
- * strpath is returned unchanged.
- */
-static const char *
-stripzonepath(const char *strpath)
-{
-	char *str1, *str2;
-	int i;
-	zone_t *zonep = curproc->p_zone;
-
-	if (zonep->zone_rootpath == NULL || strpath == NULL) {
-		return (NULL);
-	}
-
-	/*
-	 * we check for the end of the string at one past the
-	 * current position because the zone_rootpath always
-	 * ends with "/" but we don't want to strip that off.
-	 */
-	str1 = zonep->zone_rootpath;
-	str2 = (char *)strpath;
-	ASSERT(str1[0] != '\0');
-	for (i = 0; str1[i + 1] != '\0'; i++) {
-		if (str1[i] != str2[i])
-			return ((char *)strpath);
-	}
-	return (&str2[i]);
 }
 
 /*
@@ -1645,8 +1612,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		if ((oldmntpt = vfsp->vfs_mntpt) != NULL)
 			refstr_hold(oldmntpt);
 	}
-	vfs_setresource(vfsp, resource);
-	vfs_setmntpoint(vfsp, mountpt);
+	vfs_setresource(vfsp, resource, 0);
+	vfs_setmntpoint(vfsp, mountpt, 0);
 
 	/*
 	 * going to mount on this vnode, so notify.
@@ -1667,12 +1634,12 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		if (remount) {
 			/* put back pre-remount options */
 			vfs_swapopttbl(&mnt_mntopts, &vfsp->vfs_mntopts);
-			vfs_setmntpoint(vfsp, (stripzonepath(
-			    refstr_value(oldmntpt))));
+			vfs_setmntpoint(vfsp, refstr_value(oldmntpt),
+			    VFSSP_VERBATIM);
 			if (oldmntpt)
 				refstr_rele(oldmntpt);
-			vfs_setresource(vfsp, (stripzonepath(
-			    refstr_value(oldresource))));
+			vfs_setresource(vfsp, refstr_value(oldresource),
+			    VFSSP_VERBATIM);
 			if (oldresource)
 				refstr_rele(oldresource);
 			vfsp->vfs_flag = ovflags;
@@ -1842,7 +1809,11 @@ errout:
 }
 
 static void
-vfs_setpath(struct vfs *vfsp, refstr_t **refp, const char *newpath)
+vfs_setpath(
+    struct vfs *vfsp,		/* vfs being updated */
+    refstr_t **refp,		/* Ref-count string to contain the new path */
+    const char *newpath,	/* Path to add to refp (above) */
+    uint32_t flag)		/* flag */
 {
 	size_t len;
 	refstr_t *ref;
@@ -1871,9 +1842,16 @@ vfs_setpath(struct vfs *vfsp, refstr_t **refp, const char *newpath)
 	if (*refp != NULL)
 		refstr_rele(*refp);
 
-	/* Do we need to modify the path? */
-
-	if (zone == global_zone || *newpath != '/') {
+	/*
+	 * If we are in a non-global zone then we prefix the supplied path,
+	 * newpath, with the zone's root path, with two exceptions. The first
+	 * is where we have been explicitly directed to avoid doing so; this
+	 * will be the case following a failed remount, where the path supplied
+	 * will be a saved version which must now be restored. The second
+	 * exception is where newpath is not a pathname but a descriptive name,
+	 * e.g. "procfs".
+	 */
+	if (zone == global_zone || (flag & VFSSP_VERBATIM) || *newpath != '/') {
 		ref = refstr_alloc(newpath);
 		goto out;
 	}
@@ -1925,11 +1903,11 @@ out:
  * If vfsp is already mounted, caller must hold the vfs lock.
  */
 void
-vfs_setresource(struct vfs *vfsp, const char *resource)
+vfs_setresource(struct vfs *vfsp, const char *resource, uint32_t flag)
 {
 	if (resource == NULL || resource[0] == '\0')
 		resource = VFS_NORESOURCE;
-	vfs_setpath(vfsp, &vfsp->vfs_resource, resource);
+	vfs_setpath(vfsp, &vfsp->vfs_resource, resource, flag);
 }
 
 /*
@@ -1937,11 +1915,11 @@ vfs_setresource(struct vfs *vfsp, const char *resource)
  * If vfsp is already mounted, caller must hold the vfs lock.
  */
 void
-vfs_setmntpoint(struct vfs *vfsp, const char *mntpt)
+vfs_setmntpoint(struct vfs *vfsp, const char *mntpt, uint32_t flag)
 {
 	if (mntpt == NULL || mntpt[0] == '\0')
 		mntpt = VFS_NOMNTPT;
-	vfs_setpath(vfsp, &vfsp->vfs_mntpt, mntpt);
+	vfs_setpath(vfsp, &vfsp->vfs_mntpt, mntpt, flag);
 }
 
 /* Returns the vfs_resource. Caller must call refstr_rele() when finished. */

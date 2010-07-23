@@ -201,7 +201,7 @@ mntmount(struct vfs *vfsp, struct vnode *mvp,
 	/*
 	 * Having the resource be anything but "mnttab" doesn't make sense
 	 */
-	vfs_setresource(vfsp, "mnttab");
+	vfs_setresource(vfsp, "mnttab", 0);
 
 	mnt = kmem_zalloc(sizeof (*mnt), KM_SLEEP);
 	mutex_enter(&mvp->v_lock);

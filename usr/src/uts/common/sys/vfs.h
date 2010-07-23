@@ -442,6 +442,11 @@ enum {
 
 #define	VSW_INSTALLED	0x8000	/* this vsw is associated with a file system */
 
+/*
+ * A flag for vfs_setpath().
+ */
+#define	VFSSP_VERBATIM	0x1	/* do not prefix the supplied path */
+
 #if defined(_KERNEL)
 /*
  * Public operations.
@@ -502,8 +507,8 @@ void	vfs_mnttab_modtimeupd(void);
 
 void	vfs_clearmntopt(struct vfs *, const char *);
 void	vfs_setmntopt(struct vfs *, const char *, const char *, int);
-void	vfs_setresource(struct vfs *, const char *);
-void	vfs_setmntpoint(struct vfs *, const char *);
+void	vfs_setresource(struct vfs *, const char *, uint32_t);
+void	vfs_setmntpoint(struct vfs *, const char *, uint32_t);
 refstr_t *vfs_getresource(const struct vfs *);
 refstr_t *vfs_getmntpoint(const struct vfs *);
 int	vfs_optionisset(const struct vfs *, const char *, char **);
