@@ -48,7 +48,7 @@ static void	udp_add_mib(mib2_udp_t *, mib2_udp_t *);
  * information that can be changing beneath us.
  */
 mblk_t *
-udp_snmp_get(queue_t *q, mblk_t *mpctl)
+udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 {
 	mblk_t			*mpdata;
 	mblk_t			*mp_conn_ctl;
@@ -76,6 +76,8 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 	udp_stack_t		*us = connp->conn_netstack->netstack_udp;
 	mblk_t			*mp2ctl;
 	mib2_udp_t		udp_mib;
+	size_t			udp_mib_size, ude_size, ude6_size;
+
 
 	/*
 	 * make a copy of the original message
@@ -99,10 +101,20 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 
 	zoneid = connp->conn_zoneid;
 
+	if (legacy_req) {
+		udp_mib_size = LEGACY_MIB_SIZE(&udp_mib, mib2_udp_t);
+		ude_size = LEGACY_MIB_SIZE(&ude, mib2_udpEntry_t);
+		ude6_size = LEGACY_MIB_SIZE(&ude6, mib2_udp6Entry_t);
+	} else {
+		udp_mib_size = sizeof (mib2_udp_t);
+		ude_size = sizeof (mib2_udpEntry_t);
+		ude6_size = sizeof (mib2_udp6Entry_t);
+	}
+
 	bzero(&udp_mib, sizeof (udp_mib));
 	/* fixed length structure for IPv4 and IPv6 counters */
-	SET_MIB(udp_mib.udpEntrySize, sizeof (mib2_udpEntry_t));
-	SET_MIB(udp_mib.udp6EntrySize, sizeof (mib2_udp6Entry_t));
+	SET_MIB(udp_mib.udpEntrySize, ude_size);
+	SET_MIB(udp_mib.udp6EntrySize, ude6_size);
 
 	udp_sum_mib(us, &udp_mib);
 
@@ -118,7 +130,7 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_UDP;
 	optp->name = 0;
-	(void) snmp_append_data(mpdata, (char *)&udp_mib, sizeof (udp_mib));
+	(void) snmp_append_data(mpdata, (char *)&udp_mib, udp_mib_size);
 	optp->len = msgdsize(mpdata);
 	qreply(q, mpctl);
 
@@ -236,7 +248,7 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 				ude.udpCreationTime = connp->conn_open_time;
 
 				(void) snmp_append_data2(mp_conn_ctl->b_cont,
-				    &mp_conn_tail, (char *)&ude, sizeof (ude));
+				    &mp_conn_tail, (char *)&ude, ude_size);
 				mlp.tme_connidx = v4_conn_idx++;
 				if (needattr)
 					(void) snmp_append_data2(
@@ -279,8 +291,7 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 				ude6.udp6CreationTime = connp->conn_open_time;
 
 				(void) snmp_append_data2(mp6_conn_ctl->b_cont,
-				    &mp6_conn_tail, (char *)&ude6,
-				    sizeof (ude6));
+				    &mp6_conn_tail, (char *)&ude6, ude6_size);
 				mlp.tme_connidx = v6_conn_idx++;
 				if (needattr)
 					(void) snmp_append_data2(

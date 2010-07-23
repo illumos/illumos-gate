@@ -493,7 +493,7 @@ extern void 	tcp_free(tcp_t *tcp);
 extern void	tcp_ddi_g_init(void);
 extern void	tcp_ddi_g_destroy(void);
 extern void 	*tcp_get_conn(void *arg, tcp_stack_t *);
-extern mblk_t	*tcp_snmp_get(queue_t *, mblk_t *);
+extern mblk_t	*tcp_snmp_get(queue_t *, mblk_t *, boolean_t);
 extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
 
 /*

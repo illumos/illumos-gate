@@ -88,7 +88,7 @@ tcp_snmp_state(tcp_t *tcp)
  * Return SNMP stuff in buffer in mpdata.
  */
 mblk_t *
-tcp_snmp_get(queue_t *q, mblk_t *mpctl)
+tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 {
 	mblk_t			*mpdata;
 	mblk_t			*mp_conn_ctl = NULL;
@@ -114,6 +114,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	ip_stack_t		*ipst;
 	mblk_t			*mp2ctl;
 	mib2_tcp_t		tcp_mib;
+	size_t			tcp_mib_size, tce_size, tce6_size;
 
 	/*
 	 * make a copy of the original message
@@ -137,6 +138,16 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 
 	ipst = connp->conn_netstack->netstack_ip;
 	tcps = connp->conn_netstack->netstack_tcp;
+
+	if (legacy_req) {
+		tcp_mib_size = LEGACY_MIB_SIZE(&tcp_mib, mib2_tcp_t);
+		tce_size = LEGACY_MIB_SIZE(&tce, mib2_tcpConnEntry_t);
+		tce6_size = LEGACY_MIB_SIZE(&tce6, mib2_tcp6ConnEntry_t);
+	} else {
+		tcp_mib_size = sizeof (mib2_tcp_t);
+		tce_size = sizeof (mib2_tcpConnEntry_t);
+		tce6_size = sizeof (mib2_tcp6ConnEntry_t);
+	}
 
 	bzero(&tcp_mib, sizeof (tcp_mib));
 
@@ -266,7 +277,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			tce6.tcp6ConnCreationTime = connp->conn_open_time;
 
 			(void) snmp_append_data2(mp6_conn_ctl->b_cont,
-			    &mp6_conn_tail, (char *)&tce6, sizeof (tce6));
+			    &mp6_conn_tail, (char *)&tce6, tce6_size);
 
 			mlp.tme_connidx = v6_conn_idx++;
 			if (needattr)
@@ -333,7 +344,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				tce.tcpConnCreationTime = connp->conn_open_time;
 
 				(void) snmp_append_data2(mp_conn_ctl->b_cont,
-				    &mp_conn_tail, (char *)&tce, sizeof (tce));
+				    &mp_conn_tail, (char *)&tce, tce_size);
 
 				mlp.tme_connidx = v4_conn_idx++;
 				if (needattr)
@@ -347,6 +358,10 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 
 	tcp_sum_mib(tcps, &tcp_mib);
 
+	/* Fixed length structure for IPv4 and IPv6 counters */
+	SET_MIB(tcp_mib.tcpConnTableSize, tce_size);
+	SET_MIB(tcp_mib.tcp6ConnTableSize, tce6_size);
+
 	/*
 	 * Synchronize 32- and 64-bit counters.  Note that tcpInSegs and
 	 * tcpOutSegs are not updated anywhere in TCP.  The new 64 bits
@@ -359,7 +374,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_TCP;
 	optp->name = 0;
-	(void) snmp_append_data(mpdata, (char *)&tcp_mib, sizeof (tcp_mib));
+	(void) snmp_append_data(mpdata, (char *)&tcp_mib, tcp_mib_size);
 	optp->len = msgdsize(mpdata);
 	qreply(q, mpctl);
 
@@ -566,6 +581,10 @@ tcp_kstat_update(kstat_t *kp, int rw)
 	}
 	bzero(&tcp_mib, sizeof (tcp_mib));
 	tcp_sum_mib(tcps, &tcp_mib);
+
+	/* Fixed length structure for IPv4 and IPv6 counters */
+	SET_MIB(tcp_mib.tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
+	SET_MIB(tcp_mib.tcp6ConnTableSize, sizeof (mib2_tcp6ConnEntry_t));
 
 	tcpkp->activeOpens.value.ui32 = tcp_mib.tcpActiveOpens;
 	tcpkp->passiveOpens.value.ui32 = tcp_mib.tcpPassiveOpens;
@@ -855,10 +874,6 @@ tcp_sum_mib(tcp_stack_t *tcps, mib2_tcp_t *tcp_mib)
 	cnt = tcps->tcps_sc_cnt;
 	for (i = 0; i < cnt; i++)
 		tcp_add_mib(&tcps->tcps_sc[i]->tcp_sc_mib, tcp_mib);
-
-	/* Fixed length structure for IPv4 and IPv6 counters */
-	SET_MIB(tcp_mib->tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
-	SET_MIB(tcp_mib->tcp6ConnTableSize, sizeof (mib2_tcp6ConnEntry_t));
 }
 
 /*

@@ -333,6 +333,13 @@ fix_smf()
 	[[ -n $LOGFILE ]] && cat $insttmpfile >&2
 
 	#
+	# Import ip-interface-management service in S10C, network
+	# loopback service requires ipmgmtd in exclusive stack zones.
+	#
+	/usr/sbin/zlogin -S $ZONENAME /usr/sbin/svccfg import \
+	    $ZONEROOT/var/svc/manifest/network/network-ipmgmt.xml
+
+	#
 	# Fix network services if shared stack.
 	#
 	if [[ "$STACK_TYPE" == "shared" ]]; then

@@ -3442,7 +3442,7 @@ extern uint8_t	ipoptp_next(ipoptp_t *);
 extern uint8_t	ipoptp_first(ipoptp_t *, ipha_t *);
 extern int	ip_opt_get_user(conn_t *, uchar_t *);
 extern int	ipsec_req_from_conn(conn_t *, ipsec_req_t *, int);
-extern int	ip_snmp_get(queue_t *q, mblk_t *mctl, int level);
+extern int	ip_snmp_get(queue_t *q, mblk_t *mctl, int level, boolean_t);
 extern int	ip_snmp_set(queue_t *q, int, int, uchar_t *, int);
 extern void	ip_process_ioctl(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_quiesce_conn(conn_t *);

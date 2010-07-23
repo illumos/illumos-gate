@@ -100,7 +100,6 @@ s10_verify(char *xmlfile)
 {
 	zone_dochandle_t	handle;
 	struct zone_devtab	devtab;
-	zone_iptype_t		iptype;
 
 	if ((handle = zonecfg_init_handle()) == NULL)
 		s10_err(gettext("internal libzonecfg.so.1 error"), 0);
@@ -133,17 +132,6 @@ s10_verify(char *xmlfile)
 		}
 	}
 	(void) zonecfg_enddevent(handle);
-
-	/*
-	 * Check to see whether the zone has any experimental features
-	 * configured.
-	 */
-	if (zonecfg_get_iptype(handle, &iptype) == Z_OK &&
-	    iptype == ZS_EXCLUSIVE && !override) {
-		zonecfg_fini_handle(handle);
-		s10_err(gettext("solaris10 zones do not currently support "
-		    "exclusive ip-type stacks"));
-	}
 
 	zonecfg_fini_handle(handle);
 	return (0);

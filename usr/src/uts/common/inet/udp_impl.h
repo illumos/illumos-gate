@@ -236,7 +236,7 @@ extern int	udp_opt_default(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
 extern int	udp_tpi_opt_get(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
 extern int	udp_tpi_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
 		    uint_t *, uchar_t *, void *, cred_t *);
-extern mblk_t	*udp_snmp_get(queue_t *, mblk_t *);
+extern mblk_t	*udp_snmp_get(queue_t *, mblk_t *, boolean_t);
 extern int	udp_snmp_set(queue_t *, t_scalar_t, t_scalar_t, uchar_t *, int);
 extern void	udp_ddi_g_init(void);
 extern void	udp_ddi_g_destroy(void);
