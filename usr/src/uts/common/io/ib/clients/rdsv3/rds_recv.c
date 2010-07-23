@@ -443,8 +443,12 @@ rdsv3_notify_cong(struct rdsv3_sock *rs, struct msghdr *msghdr)
 static int
 rdsv3_cmsg_recv(struct rdsv3_incoming *inc, struct msghdr *msg)
 {
-	return (rdsv3_put_cmsg(msg, SOL_RDS, RDS_CMSG_RDMA_DEST,
-	    sizeof (inc->i_rdma_cookie), &inc->i_rdma_cookie));
+	int ret = 0;
+	if (inc->i_rdma_cookie) {
+		ret = rdsv3_put_cmsg(msg, SOL_RDS, RDS_CMSG_RDMA_DEST,
+		    sizeof (inc->i_rdma_cookie), &inc->i_rdma_cookie);
+	}
+	return (ret);
 }
 
 int
@@ -608,6 +612,9 @@ rdsv3_recvmsg(struct rdsv3_sock *rs, uio_t *uio,
 		rdsv3_inc_put(inc);
 
 out:
+	if (msg && msg->msg_control == NULL)
+		msg->msg_controllen = 0;
+
 	RDSV3_DPRINTF4("rdsv3_recvmsg", "Return(rs: %p, ret: %d)", rs, ret);
 
 	return (ret);

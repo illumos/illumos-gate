@@ -1105,7 +1105,7 @@ rdsv3_put_cmsg(struct nmsghdr *msg, int level, int type, size_t size,
 	    "Enter(msg: %p level: %d type: %d sz: %d)",
 	    msg, level, type, size);
 
-	if (msg == NULL || msg->msg_controllen == 0 || payload == NULL) {
+	if (msg == NULL || msg->msg_controllen == 0) {
 		return (0);
 	}
 	/* check for first cmsg or this is another cmsg to be appended */
