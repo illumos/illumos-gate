@@ -3538,34 +3538,51 @@ phyint_exists(uint_t index, ip_stack_t *ipst)
 	    &index, NULL) != NULL);
 }
 
-/* Pick a unique ifindex */
+/*
+ * Pick a unique ifindex.
+ * When the index counter passes IF_INDEX_MAX for the first time, the wrap
+ * flag is set so that next time time ip_assign_ifindex() is called, it
+ * falls through and resets the index counter back to 1, the minimum value
+ * for the interface index. The logic below assumes that ips_ill_index
+ * can hold a value of IF_INDEX_MAX+1 without there being any loss
+ * (i.e. reset back to 0.)
+ */
 boolean_t
 ip_assign_ifindex(uint_t *indexp, ip_stack_t *ipst)
 {
-	uint_t starting_index;
+	uint_t loops;
 
 	if (!ipst->ips_ill_index_wrap) {
 		*indexp = ipst->ips_ill_index++;
-		if (ipst->ips_ill_index == 0) {
-			/* Reached the uint_t limit Next time wrap  */
+		if (ipst->ips_ill_index > IF_INDEX_MAX) {
+			/*
+			 * Reached the maximum ifindex value, set the wrap
+			 * flag to indicate that it is no longer possible
+			 * to assume that a given index is unallocated.
+			 */
 			ipst->ips_ill_index_wrap = B_TRUE;
 		}
 		return (B_TRUE);
 	}
+
+	if (ipst->ips_ill_index > IF_INDEX_MAX)
+		ipst->ips_ill_index = 1;
 
 	/*
 	 * Start reusing unused indexes. Note that we hold the ill_g_lock
 	 * at this point and don't want to call any function that attempts
 	 * to get the lock again.
 	 */
-	starting_index = ipst->ips_ill_index++;
-	for (; ipst->ips_ill_index != starting_index; ipst->ips_ill_index++) {
-		if (ipst->ips_ill_index != 0 &&
-		    !phyint_exists(ipst->ips_ill_index, ipst)) {
+	for (loops = IF_INDEX_MAX; loops > 0; loops--) {
+		if (!phyint_exists(ipst->ips_ill_index, ipst)) {
 			/* found unused index - use it */
 			*indexp = ipst->ips_ill_index;
 			return (B_TRUE);
 		}
+
+		ipst->ips_ill_index++;
+		if (ipst->ips_ill_index > IF_INDEX_MAX)
+			ipst->ips_ill_index = 1;
 	}
 
 	/*
@@ -15957,7 +15974,7 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 */
 	ill = ipif->ipif_ill;
 	phyi = ill->ill_phyint;
-	if (ipif->ipif_id != 0 || index == 0) {
+	if (ipif->ipif_id != 0 || index == 0 || index > IF_INDEX_MAX) {
 		return (EINVAL);
 	}
 
