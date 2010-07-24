@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_module.h>
@@ -187,6 +185,12 @@ mdb_lookup_by_addr(uintptr_t addr, uint_t flags, char *buf,
 {
 	return (mdb_tgt_lookup_by_addr(mdb.m_target, addr, flags,
 	    buf, nbytes, sym, NULL));
+}
+
+int
+mdb_getareg(mdb_tid_t tid, const char *rname, mdb_reg_t *rp)
+{
+	return (mdb_tgt_getareg(mdb.m_target, tid, rname, rp));
 }
 
 u_longlong_t
@@ -741,6 +745,51 @@ ssize_t
 mdb_get_xdata(const char *name, void *buf, size_t nbytes)
 {
 	return (mdb_tgt_getxdata(mdb.m_target, name, buf, nbytes));
+}
+
+/*
+ * Private callback structure for implementing mdb_object_iter, below.
+ */
+typedef struct {
+	mdb_object_cb_t oi_cb;
+	void *oi_arg;
+	int oi_rval;
+} object_iter_arg_t;
+
+/*ARGSUSED*/
+static int
+mdb_object_cb(void *data, const mdb_map_t *map, const char *fullname)
+{
+	object_iter_arg_t *arg = data;
+	mdb_object_t obj;
+
+	if (arg->oi_rval != 0)
+		return (0);
+
+	bzero(&obj, sizeof (obj));
+	obj.obj_base = map->map_base;
+	obj.obj_name = strbasename(map->map_name);
+	obj.obj_size = map->map_size;
+	obj.obj_fullname = fullname;
+
+	arg->oi_rval = arg->oi_cb(&obj, arg->oi_arg);
+
+	return (0);
+}
+
+int
+mdb_object_iter(mdb_object_cb_t cb, void *data)
+{
+	object_iter_arg_t arg;
+
+	arg.oi_cb = cb;
+	arg.oi_arg = data;
+	arg.oi_rval = 0;
+
+	if (mdb_tgt_object_iter(mdb.m_target, mdb_object_cb, &arg) != 0)
+		return (-1);
+
+	return (arg.oi_rval);
 }
 
 /*

@@ -32,6 +32,7 @@
 #include <setjmp.h>
 #include <string.h>
 #include <thr_uberdata.h>
+#include "findstack.h"
 
 static const char *
 stack_flags(const stack_t *sp)
@@ -981,10 +982,76 @@ whatis_run_ulwps(mdb_whatis_t *w, void *arg)
  * ==================== threads ==========================
  */
 
+int
+stacks_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	int rval = stacks(addr, flags, argc, argv);
+
+	/*
+	 * For the user-level variant of ::stacks, we don't bother caching
+	 * state, as even a very large program is unlikely to compare to the
+	 * kernel in terms of number of threads.  (And if you find yourself
+	 * here in anger, frustrated about how long ::stacks is running on
+	 * your galactically complicated zillion-thread program, hopefully
+	 * you will find some solace in the irony.  Okay, probably not...)
+	 */
+	stacks_cleanup(B_TRUE);
+	return (rval);
+}
+
+typedef struct tid2ulwp_walk {
+	lwpid_t t2u_tid;
+	uintptr_t t2u_lwp;
+	boolean_t t2u_found;
+} tid2ulwp_walk_t;
+
+/*ARGSUSED*/
+static int
+tid2ulwp_walk(uintptr_t addr, ulwp_t *ulwp, tid2ulwp_walk_t *t2u)
+{
+	if (ulwp->ul_lwpid == t2u->t2u_tid) {
+		t2u->t2u_lwp = addr;
+		t2u->t2u_found = B_TRUE;
+		return (WALK_DONE);
+	}
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static int
+tid2ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	tid2ulwp_walk_t t2u;
+
+	if (argc != 0)
+		return (DCMD_USAGE);
+
+	bzero(&t2u, sizeof (t2u));
+	t2u.t2u_tid = (lwpid_t)addr;
+
+	if (mdb_walk("ulwp", (mdb_walk_cb_t)tid2ulwp_walk, &t2u) != 0) {
+		mdb_warn("can't walk 'ulwp'");
+		return (DCMD_ERR);
+	}
+
+	if (!t2u.t2u_found) {
+		mdb_warn("thread ID %d not found", t2u.t2u_tid);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%p\n", t2u.t2u_lwp);
+
+	return (DCMD_OK);
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "jmp_buf", ":", "print jmp_buf contents", d_jmp_buf, NULL },
 	{ "sigjmp_buf", ":", "print sigjmp_buf contents", d_sigjmp_buf, NULL },
 	{ "siginfo", ":", "print siginfo_t structure", d_siginfo, NULL },
+	{ "stacks", "?[-afiv] [-c func] [-C func] [-m module] [-M module] ",
+		"print unique thread stacks", stacks_dcmd, stacks_help },
+	{ "tid2ulwp", "?", "convert TID to ulwp_t address", tid2ulwp },
 	{ "ucontext", ":", "print ucontext_t structure", d_ucontext, NULL },
 	{ "ulwp", ":", "print ulwp_t structure", d_ulwp, NULL },
 	{ "uberdata", ":", "print uberdata_t structure", d_uberdata, NULL },
@@ -997,6 +1064,8 @@ static const mdb_walker_t walkers[] = {
 	{ "oldcontext", "walk per-lwp oldcontext pointers",
 		oldc_walk_init, oldc_walk_step, oldc_walk_fini, NULL },
 	{ "ulwps", "walk list of ulwp_t pointers",
+		ulwp_walk_init, ulwp_walk_step, NULL, NULL },
+	{ "ulwp", "walk list of ulwp_t pointers",
 		ulwp_walk_init, ulwp_walk_step, NULL, NULL },
 	{ NULL }
 };

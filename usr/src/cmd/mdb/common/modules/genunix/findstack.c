@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -31,130 +31,13 @@
 #include <sys/stack.h>
 #include <sys/thread.h>
 #include <sys/modctl.h>
+#include <assert.h>
 
 #include "findstack.h"
 #include "thread.h"
 #include "sobj.h"
 
-typedef struct findstack_info {
-	uintptr_t	*fsi_stack;	/* place to record frames */
-
-	uintptr_t	fsi_sp;		/* stack pointer */
-	uintptr_t	fsi_pc;		/* pc */
-	uintptr_t	fsi_sobj_ops;	/* sobj_ops */
-
-	uint_t		fsi_tstate;	/* t_state */
-
-	uchar_t		fsi_depth;	/* stack depth */
-	uchar_t		fsi_failed;	/* search failed */
-	uchar_t		fsi_overflow;	/* stack was deeper than max_depth */
-	uchar_t		fsi_panic;	/* thread called panic() */
-
-	uchar_t		fsi_max_depth;	/* stack frames available */
-} findstack_info_t;
-#define	FSI_FAIL_BADTHREAD	1
-#define	FSI_FAIL_NOTINMEMORY	2
-#define	FSI_FAIL_THREADCORRUPT	3
-#define	FSI_FAIL_STACKNOTFOUND	4
-
-#ifndef STACK_BIAS
-#define	STACK_BIAS	0
-#endif
-
-#define	fs_dprintf(x)					\
-	if (findstack_debug_on) {			\
-		mdb_printf("findstack debug: ");	\
-		/*CSTYLED*/				\
-		mdb_printf x ;				\
-	}
-
-static int findstack_debug_on = 0;
-
-#if defined(__i386) || defined(__amd64)
-struct rwindow {
-	uintptr_t rw_fp;
-	uintptr_t rw_rtn;
-};
-#endif
-
-#define	TOO_BIG_FOR_A_STACK (1024 * 1024)
-
-#define	KTOU(p) ((p) - kbase + ubase)
-#define	UTOK(p) ((p) - ubase + kbase)
-
-#define	CRAWL_FOUNDALL	(-1)
-
-/*
- * Given a stack pointer, try to crawl down it to the bottom.
- * "frame" is a VA in MDB's address space.
- *
- * Returns the number of frames successfully crawled down, or
- * CRAWL_FOUNDALL if it got to the bottom of the stack.
- */
-static int
-crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
-    int kill_fp, findstack_info_t *fsip)
-{
-	int levels = 0;
-
-	fsip->fsi_depth = 0;
-	fsip->fsi_overflow = 0;
-
-	fs_dprintf(("<0> frame = %p, kbase = %p, ktop = %p, ubase = %p\n",
-	    frame, kbase, ktop, ubase));
-	for (;;) {
-		uintptr_t fp;
-		long *fpp = (long *)&((struct rwindow *)frame)->rw_fp;
-
-		fs_dprintf(("<1> fpp = %p, frame = %p\n", fpp, frame));
-
-		if ((frame & (STACK_ALIGN - 1)) != 0)
-			break;
-
-		fp = ((struct rwindow *)frame)->rw_fp + STACK_BIAS;
-		if (fsip->fsi_depth < fsip->fsi_max_depth)
-			fsip->fsi_stack[fsip->fsi_depth++] =
-			    ((struct rwindow *)frame)->rw_rtn;
-		else
-			fsip->fsi_overflow = 1;
-
-		fs_dprintf(("<2> fp = %p\n", fp));
-
-		if (fp == ktop)
-			return (CRAWL_FOUNDALL);
-		fs_dprintf(("<3> not at base\n"));
-
-#if defined(__i386) || defined(__amd64)
-		if (ktop - fp == sizeof (struct rwindow)) {
-			fs_dprintf(("<4> found base\n"));
-			return (CRAWL_FOUNDALL);
-		}
-#endif
-
-		fs_dprintf(("<5> fp = %p, kbase = %p, ktop - size = %p\n",
-		    fp, kbase, ktop - sizeof (struct rwindow)));
-
-		if (fp < kbase || fp >= (ktop - sizeof (struct rwindow)))
-			break;
-
-		frame = KTOU(fp);
-		fs_dprintf(("<6> frame = %p\n", frame));
-
-		/*
-		 * NULL out the old %fp so we don't go down this stack
-		 * more than once.
-		 */
-		if (kill_fp) {
-			fs_dprintf(("<7> fpp = %p\n", fpp));
-			*fpp = NULL;
-		}
-
-		fs_dprintf(("<8> levels = %d\n", levels));
-		levels++;
-	}
-
-	return (levels);
-}
+int findstack_debug_on = 0;
 
 /*
  * "sp" is a kernel VA.
@@ -193,164 +76,6 @@ print_stack(uintptr_t sp, uintptr_t pc, uintptr_t addr,
 	return ((err == -1) ? DCMD_ABORT : DCMD_OK);
 }
 
-/*ARGSUSED*/
-static int
-do_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
-{
-	kthread_t thr;
-	size_t stksz;
-	uintptr_t ubase, utop;
-	uintptr_t kbase, ktop;
-	uintptr_t win, sp;
-
-	fsip->fsi_failed = 0;
-	fsip->fsi_pc = 0;
-	fsip->fsi_sp = 0;
-	fsip->fsi_depth = 0;
-	fsip->fsi_overflow = 0;
-
-	bzero(&thr, sizeof (thr));
-	if (mdb_ctf_vread(&thr, "kthread_t", addr,
-	    MDB_CTF_VREAD_IGNORE_ALL) == -1) {
-		if (print_warnings)
-			mdb_warn("couldn't read thread at %p\n", addr);
-		fsip->fsi_failed = FSI_FAIL_BADTHREAD;
-		return (DCMD_ERR);
-	}
-
-	fsip->fsi_sobj_ops = (uintptr_t)thr.t_sobj_ops;
-	fsip->fsi_tstate = thr.t_state;
-	fsip->fsi_panic = !!(thr.t_flag & T_PANIC);
-
-	if ((thr.t_schedflag & TS_LOAD) == 0) {
-		if (print_warnings)
-			mdb_warn("thread %p isn't in memory\n", addr);
-		fsip->fsi_failed = FSI_FAIL_NOTINMEMORY;
-		return (DCMD_ERR);
-	}
-
-	if (thr.t_stk < thr.t_stkbase) {
-		if (print_warnings)
-			mdb_warn(
-			    "stack base or stack top corrupt for thread %p\n",
-			    addr);
-		fsip->fsi_failed = FSI_FAIL_THREADCORRUPT;
-		return (DCMD_ERR);
-	}
-
-	kbase = (uintptr_t)thr.t_stkbase;
-	ktop = (uintptr_t)thr.t_stk;
-	stksz = ktop - kbase;
-
-#ifdef __amd64
-	/*
-	 * The stack on amd64 is intentionally misaligned, so ignore the top
-	 * half-frame.  See thread_stk_init().  When handling traps, the frame
-	 * is automatically aligned by the hardware, so we only alter ktop if
-	 * needed.
-	 */
-	if ((ktop & (STACK_ALIGN - 1)) != 0)
-		ktop -= STACK_ENTRY_ALIGN;
-#endif
-
-	/*
-	 * If the stack size is larger than a meg, assume that it's bogus.
-	 */
-	if (stksz > TOO_BIG_FOR_A_STACK) {
-		if (print_warnings)
-			mdb_warn("stack size for thread %p is too big to be "
-			    "reasonable\n", addr);
-		fsip->fsi_failed = FSI_FAIL_THREADCORRUPT;
-		return (DCMD_ERR);
-	}
-
-	/*
-	 * This could be (and was) a UM_GC allocation.  Unfortunately,
-	 * stksz tends to be very large.  As currently implemented, dcmds
-	 * invoked as part of pipelines don't have their UM_GC-allocated
-	 * memory freed until the pipeline completes.  With stksz in the
-	 * neighborhood of 20k, the popular ::walk thread |::findstack
-	 * pipeline can easily run memory-constrained debuggers (kmdb) out
-	 * of memory.  This can be changed back to a gc-able allocation when
-	 * the debugger is changed to free UM_GC memory more promptly.
-	 */
-	ubase = (uintptr_t)mdb_alloc(stksz, UM_SLEEP);
-	utop = ubase + stksz;
-	if (mdb_vread((caddr_t)ubase, stksz, kbase) != stksz) {
-		mdb_free((void *)ubase, stksz);
-		if (print_warnings)
-			mdb_warn("couldn't read entire stack for thread %p\n",
-			    addr);
-		fsip->fsi_failed = FSI_FAIL_THREADCORRUPT;
-		return (DCMD_ERR);
-	}
-
-	/*
-	 * Try the saved %sp first, if it looks reasonable.
-	 */
-	sp = KTOU((uintptr_t)thr.t_sp + STACK_BIAS);
-	if (sp >= ubase && sp <= utop) {
-		if (crawl(sp, kbase, ktop, ubase, 0, fsip) == CRAWL_FOUNDALL) {
-			fsip->fsi_sp = (uintptr_t)thr.t_sp;
-#if !defined(__i386)
-			fsip->fsi_pc = (uintptr_t)thr.t_pc;
-#endif
-			goto found;
-		}
-	}
-
-	/*
-	 * Now walk through the whole stack, starting at the base,
-	 * trying every possible "window".
-	 */
-	for (win = ubase;
-	    win + sizeof (struct rwindow) <= utop;
-	    win += sizeof (struct rwindow *)) {
-		if (crawl(win, kbase, ktop, ubase, 1, fsip) == CRAWL_FOUNDALL) {
-			fsip->fsi_sp = UTOK(win) - STACK_BIAS;
-			goto found;
-		}
-	}
-
-	/*
-	 * We didn't conclusively find the stack.  So we'll take another lap,
-	 * and print out anything that looks possible.
-	 */
-	if (print_warnings)
-		mdb_printf("Possible stack pointers for thread %p:\n", addr);
-	(void) mdb_vread((caddr_t)ubase, stksz, kbase);
-
-	for (win = ubase;
-	    win + sizeof (struct rwindow) <= utop;
-	    win += sizeof (struct rwindow *)) {
-		uintptr_t fp = ((struct rwindow *)win)->rw_fp;
-		int levels;
-
-		if ((levels = crawl(win, kbase, ktop, ubase, 1, fsip)) > 1) {
-			if (print_warnings)
-				mdb_printf("  %p (%d)\n", fp, levels);
-		} else if (levels == CRAWL_FOUNDALL) {
-			/*
-			 * If this is a live system, the stack could change
-			 * between the two mdb_vread(ubase, utop, kbase)'s,
-			 * and we could have a fully valid stack here.
-			 */
-			fsip->fsi_sp = UTOK(win) - STACK_BIAS;
-			goto found;
-		}
-	}
-
-	fsip->fsi_depth = 0;
-	fsip->fsi_overflow = 0;
-	fsip->fsi_failed = FSI_FAIL_STACKNOTFOUND;
-
-	mdb_free((void *)ubase, stksz);
-	return (DCMD_ERR);
-found:
-	mdb_free((void *)ubase, stksz);
-	return (DCMD_OK);
-}
-
 int
 findstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -362,7 +87,7 @@ findstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	bzero(&fsi, sizeof (fsi));
 
-	if ((retval = do_findstack(addr, &fsi, 1)) != DCMD_OK ||
+	if ((retval = stacks_findstack(addr, &fsi, 1)) != DCMD_OK ||
 	    fsi.fsi_failed)
 		return (retval);
 
@@ -399,6 +124,7 @@ sobj_to_text(uintptr_t addr, char *out, size_t out_sz)
 }
 
 #define	SOBJ_ALL	1
+
 static int
 text_to_sobj(const char *text, uintptr_t *out)
 {
@@ -406,6 +132,7 @@ text_to_sobj(const char *text, uintptr_t *out)
 		*out = SOBJ_ALL;
 		return (0);
 	}
+
 	return (sobj_text_to_ops(text, out));
 }
 
@@ -457,10 +184,8 @@ typedef struct stacks_info {
 	size_t		si_count;	/* total stacks_entry_ts (incl dups) */
 	size_t		si_entries;	/* # entries in hash table */
 	stacks_entry_t	**si_hash;	/* hash table */
-
 	findstack_info_t si_fsi;	/* transient callback state */
 } stacks_info_t;
-
 
 /* global state cached between invocations */
 #define	STACKS_STATE_CLEAN	0
@@ -631,6 +356,8 @@ stacks_cleanup(int force)
 		    stacks_array_size * sizeof (*stacks_array));
 	}
 
+	stacks_findstack_cleanup();
+
 	stacks_array_size = 0;
 	stacks_state = STACKS_STATE_CLEAN;
 }
@@ -646,7 +373,7 @@ stacks_thread_cb(uintptr_t addr, const void *ignored, void *cbarg)
 	int idx;
 	size_t depth;
 
-	if (do_findstack(addr, fsip, 0) != DCMD_OK &&
+	if (stacks_findstack(addr, fsip, 0) != DCMD_OK &&
 	    fsip->fsi_failed == FSI_FAIL_BADTHREAD) {
 		mdb_warn("couldn't read thread at %p\n", addr);
 		return (WALK_NEXT);
@@ -694,19 +421,14 @@ stacks_run_tlist(mdb_pipe_t *tlist, stacks_info_t *si)
 {
 	size_t idx;
 	size_t found = 0;
-	kthread_t kt;
 	int ret;
 
 	for (idx = 0; idx < tlist->pipe_len; idx++) {
 		uintptr_t addr = tlist->pipe_data[idx];
 
-		if (mdb_vread(&kt, sizeof (kt), addr) == -1) {
-			mdb_warn("unable to read kthread_t at %p", addr);
-			continue;
-		}
 		found++;
 
-		ret = stacks_thread_cb(addr, &kt, si);
+		ret = stacks_thread_cb(addr, NULL, si);
 		if (ret == WALK_DONE)
 			break;
 		if (ret != WALK_NEXT)
@@ -811,65 +533,35 @@ stacks_has_caller(stacks_entry_t *sep, uintptr_t addr)
 	return (0);
 }
 
-typedef struct find_module_struct {
-	struct modctl *mcp;
-	const char *name;
-} find_module_struct_t;
-
-/*ARGSUSED*/
-int
-find_module_cb(uintptr_t addr, const void *modctl_arg, void *cbarg)
-{
-	find_module_struct_t *sp = cbarg;
-	char mod_modname[MODMAXNAMELEN + 1];
-	const struct modctl *mp = modctl_arg;
-
-	if (!mp->mod_modname)
-		return (WALK_NEXT);
-
-	if (mdb_readstr(mod_modname, sizeof (mod_modname),
-	    (uintptr_t)mp->mod_modname) == -1) {
-		mdb_warn("failed to read mod_modname in \"modctl\" walk");
-		return (WALK_ERR);
-	}
-
-	if (strcmp(sp->name, mod_modname))
-		return (WALK_NEXT);
-
-	sp->mcp = mdb_alloc(sizeof (*sp->mcp), UM_SLEEP | UM_GC);
-	bcopy(mp, sp->mcp, sizeof (*sp->mcp));
-	return (WALK_DONE);
-}
-
-static struct modctl *
-find_module(const char *name)
-{
-	find_module_struct_t mptr;
-
-	mptr.name = name;
-	mptr.mcp = NULL;
-
-	if (mdb_walk("modctl", find_module_cb, &mptr) != 0)
-		mdb_warn("cannot walk \"modctl\"");
-	return (mptr.mcp);
-}
-
 static int
-stacks_has_module(stacks_entry_t *sep, struct modctl *mp)
+stacks_has_module(stacks_entry_t *sep, stacks_module_t *mp)
 {
 	int idx;
 
-	if (mp == NULL)
-		return (0);
-
-	for (idx = 0; idx < sep->se_depth; idx++)
-		if (sep->se_stack[idx] >= (uintptr_t)mp->mod_text &&
-		    sep->se_stack[idx] <
-		    ((uintptr_t)mp->mod_text + mp->mod_text_size))
+	for (idx = 0; idx < sep->se_depth; idx++) {
+		if (sep->se_stack[idx] >= mp->sm_text &&
+		    sep->se_stack[idx] < mp->sm_text + mp->sm_size)
 			return (1);
+	}
+
 	return (0);
 }
 
+static int
+stacks_module_find(const char *name, stacks_module_t *mp)
+{
+	(void) strncpy(mp->sm_name, name, sizeof (mp->sm_name));
+
+	if (stacks_module(mp) != 0)
+		return (-1);
+
+	if (mp->sm_size == 0) {
+		mdb_warn("stacks: module \"%s\" is unknown\n", name);
+		return (-1);
+	}
+
+	return (0);
+}
 
 static int
 uintptrcomp(const void *lp, const void *rp)
@@ -881,96 +573,6 @@ uintptrcomp(const void *lp, const void *rp)
 	if (lhs < rhs)
 		return (-1);
 	return (0);
-}
-
-/*ARGSUSED*/
-static void
-print_sobj_help(int type, const char *name, const char *ops_name, void *ign)
-{
-	mdb_printf(" %s", name);
-}
-
-/*ARGSUSED*/
-static void
-print_tstate_help(uint_t state, const char *name, void *ignored)
-{
-	mdb_printf(" %s", name);
-}
-
-void
-stacks_help(void)
-{
-	mdb_printf(
-"::stacks processes all of the thread stacks on the system, grouping\n"
-"together threads which have the same:\n"
-"\n"
-"  * Thread state,\n"
-"  * Sync object type, and\n"
-"  * PCs in their stack trace.\n"
-"\n"
-"The default output (no address or options) is just a dump of the thread\n"
-"groups in the system.  For a view of active threads, use \"::stacks -i\",\n"
-"which filters out FREE threads (interrupt threads which are currently\n"
-"inactive) and threads sleeping on a CV. (Note that those threads may still\n"
-"be noteworthy; this is just for a first glance.)  More general filtering\n"
-"options are described below, in the \"FILTERS\" section.\n"
-"\n"
-"::stacks can be used in a pipeline.  The input to ::stacks is one or more\n"
-"thread pointers.  For example, to get a summary of threads in a process,\n"
-"you can do:\n"
-"\n"
-"  %<b>procp%</b>::walk thread | ::stacks\n"
-"\n"
-"When output into a pipe, ::stacks prints all of the threads input,\n"
-"filtered by the given filtering options.  This means that multiple\n"
-"::stacks invocations can be piped together to achieve more complicated\n"
-"filters.  For example, to get threads which have both 'fop_read' and\n"
-"'cv_wait_sig_swap' in their stack trace, you could do:\n"
-"\n"
-"  ::stacks -c fop_read | ::stacks -c cv_wait_sig_swap_core\n"
-"\n"
-"To get the full list of threads in each group, use the '-a' flag:\n"
-"\n"
-"  ::stacks -a\n"
-"\n");
-	mdb_dec_indent(2);
-	mdb_printf("%<b>OPTIONS%</b>\n");
-	mdb_inc_indent(2);
-	mdb_printf("%s",
-"  -a    Print all of the grouped threads, instead of just a count.\n"
-"  -f    Force a re-run of the thread stack gathering.\n"
-"  -v    Be verbose about thread stack gathering.\n"
-"\n");
-	mdb_dec_indent(2);
-	mdb_printf("%<b>FILTERS%</b>\n");
-	mdb_inc_indent(2);
-	mdb_printf("%s",
-"  -i    Show active threads; equivalent to '-S CV -T FREE'.\n"
-"  -c func[+offset]\n"
-"        Only print threads whose stacks contain func/func+offset.\n"
-"  -C func[+offset]\n"
-"        Only print threads whose stacks do not contain func/func+offset.\n"
-"  -m module\n"
-"        Only print threads whose stacks contain functions from module.\n"
-"  -M module\n"
-"        Only print threads whose stacks do not contain functions from\n"
-"        module.\n"
-"  -s {type | ALL}\n"
-"        Only print threads which are on a 'type' synchronization object\n"
-"        (SOBJ).\n"
-"  -S {type | ALL}\n"
-"        Only print threads which are not on a 'type' SOBJ.\n"
-"  -t tstate\n"
-"        Only print threads which are in thread state 'tstate'.\n"
-"  -T tstate\n"
-"        Only print threads which are not in thread state 'tstate'.\n"
-"\n");
-	mdb_printf("   SOBJ types:");
-	sobj_type_walk(print_sobj_help, NULL);
-	mdb_printf("\n");
-	mdb_printf("Thread states:");
-	thread_walk_states(print_tstate_help, NULL);
-	mdb_printf(" panic\n");
 }
 
 /*ARGSUSED*/
@@ -986,7 +588,7 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uintptr_t caller = 0, excl_caller = 0;
 	const char *module_str = NULL;
 	const char *excl_module_str = NULL;
-	struct modctl *module = NULL, *excl_module = NULL;
+	stacks_module_t module, excl_module;
 	const char *sobj = NULL;
 	const char *excl_sobj = NULL;
 	uintptr_t sobj_ops = 0, excl_sobj_ops = 0;
@@ -1014,6 +616,9 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t only_matching = addrspec && (flags & DCMD_PIPE);
 
 	mdb_pipe_t p;
+
+	bzero(&module, sizeof (module));
+	bzero(&excl_module, sizeof (excl_module));
 
 	if (mdb_getopts(argc, argv,
 	    'a', MDB_OPT_SETBITS, TRUE, &all,
@@ -1063,24 +668,17 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 	mdb_set_dot(addr);
 
-	if (module_str != NULL &&
-	    (module = find_module(module_str)) == NULL) {
-		mdb_warn("stacks: module \"%s\" is unknown", module_str);
+	if (module_str != NULL && stacks_module_find(module_str, &module) != 0)
 		return (DCMD_ABORT);
-	}
 
 	if (excl_module_str != NULL &&
-	    (excl_module = find_module(excl_module_str)) == NULL) {
-		mdb_warn("stacks: module \"%s\" is unknown", excl_module_str);
+	    stacks_module_find(excl_module_str, &excl_module) != 0)
 		return (DCMD_ABORT);
-	}
 
-	if (sobj != NULL &&
-	    text_to_sobj(sobj, &sobj_ops) != 0)
+	if (sobj != NULL && text_to_sobj(sobj, &sobj_ops) != 0)
 		return (DCMD_USAGE);
 
-	if (excl_sobj != NULL &&
-	    text_to_sobj(excl_sobj, &excl_sobj_ops) != 0)
+	if (excl_sobj != NULL && text_to_sobj(excl_sobj, &excl_sobj_ops) != 0)
 		return (DCMD_USAGE);
 
 	if (sobj_ops != 0 && excl_sobj_ops != 0) {
@@ -1088,8 +686,7 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 	}
 
-	if (tstate_str != NULL &&
-	    text_to_tstate(tstate_str, &tstate) != 0)
+	if (tstate_str != NULL && text_to_tstate(tstate_str, &tstate) != 0)
 		return (DCMD_USAGE);
 
 	if (excl_tstate_str != NULL &&
@@ -1190,11 +787,15 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if (caller != 0 && !stacks_has_caller(sep, caller))
 			continue;
+
 		if (excl_caller != 0 && stacks_has_caller(sep, excl_caller))
 			continue;
-		if (module != 0 && !stacks_has_module(sep, module))
+
+		if (module.sm_size != 0 && !stacks_has_module(sep, &module))
 			continue;
-		if (excl_module != 0 && stacks_has_module(sep, excl_module))
+
+		if (excl_module.sm_size != 0 &&
+		    stacks_has_module(sep, &excl_module))
 			continue;
 
 		if (tstate != -1U) {
@@ -1256,10 +857,10 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    sobj, sizeof (sobj));
 
 			if (cur == sep)
-				mdb_printf("%?p %-8s %-?s %8d\n",
+				mdb_printf("%-?p %-8s %-?s %8d\n",
 				    cur->se_thread, state, sobj, count);
 			else
-				mdb_printf("%?p %-8s %-?s %8s\n",
+				mdb_printf("%-?p %-8s %-?s %8s\n",
 				    cur->se_thread, state, sobj, "-");
 
 			cur = only_matching ? cur->se_next : cur->se_dup;

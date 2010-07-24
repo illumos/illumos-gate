@@ -114,7 +114,7 @@ CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 YYCFLAGS =
-LDLIBS += -lgen -lproc -lrtld_db -lctf -lelf -lc
+LDLIBS += -lgen -lproc -lrtld_db -lnsl -lsocket -lctf -lelf -lc
 DRTILDLIBS = $(LDLIBS.lib) -lc
 
 yydebug := YYCFLAGS += -DYYDEBUG
