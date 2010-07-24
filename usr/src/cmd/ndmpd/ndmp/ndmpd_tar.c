@@ -1601,11 +1601,6 @@ check_backup_dir_validity(ndmpd_module_params_t *params, char *bkpath)
 	} else if (!S_ISDIR(st.st_mode)) {
 		MOD_LOG(params, "Error: %s is not a directory.\n", bkpath);
 		rv = NDMP_ILLEGAL_ARGS_ERR;
-	} else if (ndmp_is_chkpnt_root(bkpath)) {
-		/* It's a .chkpnt directory */
-		MOD_LOG(params, "Error: %s is a checkpoint root directory.\n",
-		    bkpath);
-		rv = NDMP_BAD_FILE_ERR;
 	} else if (fs_is_rdonly(bkpath) && !fs_is_chkpntvol(bkpath) &&
 	    fs_is_chkpnt_enabled(bkpath)) {
 		MOD_LOG(params, "Error: %s is not a checkpointed path.\n",
@@ -1882,7 +1877,7 @@ ndmpd_tar_backup_starter(void *arg)
 		NLP_SET(nlp, NLPF_CHKPNTED_PATH);
 	else {
 		NLP_UNSET(nlp, NLPF_CHKPNTED_PATH);
-		if (ndmp_start_check_point(nlp->nlp_backup_path,
+		if (ndmp_create_snapshot(nlp->nlp_backup_path,
 		    nlp->nlp_jstat->js_job_name) < 0) {
 			MOD_LOG(mod_params,
 			    "Error: creating checkpoint on %s\n",
@@ -1914,7 +1909,7 @@ ndmpd_tar_backup_starter(void *arg)
 	}
 
 	if (!NLP_ISCHKPNTED(nlp))
-		(void) ndmp_release_check_point(nlp->nlp_backup_path,
+		(void) ndmp_remove_snapshot(nlp->nlp_backup_path,
 		    nlp->nlp_jstat->js_job_name);
 
 	NDMP_LOG(LOG_DEBUG, "err %d, update %c",

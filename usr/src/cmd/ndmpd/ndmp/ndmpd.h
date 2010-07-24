@@ -995,15 +995,9 @@ extern int ndmp_get_max_tok_seq(void);
 extern boolean_t set_debug_level(boolean_t);
 extern boolean_t get_debug_level(void);
 
-typedef struct ndmp_chkpnt_vol {
-	char cv_vol_name[64];
-	unsigned int cv_count;
-	void *cv_next;
-} ndmp_chkpnt_vol_t;
-
 extern int get_zfsvolname(char *, int, char *);
-extern int ndmp_start_check_point(char *, char *);
-extern int ndmp_release_check_point(char *, char *);
+extern int ndmp_create_snapshot(char *, char *);
+extern int ndmp_remove_snapshot(char *, char *);
 extern int ndmpd_mark_inodes_v2(ndmpd_session_t *, ndmp_lbr_params_t *);
 extern void ndmpd_abort_marking_v2(ndmpd_session_t *);
 extern int ndmpd_mark_inodes_v3(ndmpd_session_t *, ndmp_lbr_params_t *);
@@ -1040,8 +1034,8 @@ extern int tcp_get_peer(int, unsigned int *, int *);
 extern char *gethostaddr(void);
 extern int tlm_init(void);
 
-extern int chkpnt_backup_successful(char *, char *, boolean_t, int *);
-extern int chkpnt_backup_prepare(char *, char *, boolean_t);
+extern int snapshot_create(char *, char *, boolean_t, boolean_t);
+extern int snapshot_destroy(char *, char *, boolean_t, boolean_t, int *);
 
 extern boolean_t fs_is_chkpntvol(char *);
 extern boolean_t fs_is_chkpnt_enabled(char *);
