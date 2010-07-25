@@ -55,11 +55,11 @@
  * determine the default severity based on the constants in libseslog.h.
  */
 static const fmd_prop_t fmd_props[] = {
-	{ "interval",	FMD_TYPE_TIME, "60s"},
-	{ "severity",	FMD_TYPE_INT32, "-1"},
-	{ "path",	FMD_TYPE_STRING, "/var/fm/fmd/ses_logs/"},
-	{ "logcount",	FMD_TYPE_UINT32, "5"},
-	{ "maxlogsize", FMD_TYPE_UINT32, "1000000"},
+	{ "interval",	FMD_TYPE_TIME,	    "60s"},
+	{ "severity",	FMD_TYPE_INT32,	    "-1"},
+	{ "path",	FMD_TYPE_STRING,    "/var/fm/fmd/ses_logs/"},
+	{ "logcount",	FMD_TYPE_UINT32,    "5"},
+	{ "maxlogsize", FMD_TYPE_UINT32,    "1000000"},
 	{ NULL, 0,	NULL}
 };
 
@@ -78,13 +78,13 @@ static struct slt_stat
  */
 typedef struct ses_log_monitor
 {
-	fmd_hdl_t *slt_hdl;	/* opaque handle for this transport */
-	fmd_xprt_t *slt_xprt;	/* ereport transport */
-	id_t slt_timer;		/* Timer for FMD polling use */
-	hrtime_t slt_interval;	/* Polling interval */
-	int32_t slt_severity;	/* Min severity for logging ereports */
-	char *slt_path;		/* Output path for log files */
-	int32_t slt_log_count;	/* Max rolled logs to keep  */
+	fmd_hdl_t *slt_hdl;	    /* opaque handle for this transport */
+	fmd_xprt_t *slt_xprt;	    /* ereport transport */
+	id_t slt_timer;		    /* Timer for FMD polling use */
+	hrtime_t slt_interval;	    /* Polling interval */
+	int32_t slt_severity;	    /* Min severity for logging ereports */
+	char *slt_path;		    /* Output path for log files */
+	int32_t slt_log_count;	    /* Max rolled logs to keep  */
 	int32_t slt_max_log_size;   /* Max log size before rolling */
 	nvlist_t *slt_expanders;    /* List of expander log entries */
 } ses_log_monitor_t;
@@ -99,17 +99,18 @@ typedef struct expander
 	nvlist_t *fmri;		    /* The fmri for this target */
 } expander_t;
 
-#define	DATA_FIELD		"data" /* Label for the expander details */
-#define	DEFAULT_DATA		"0" /* Default value for expander details */
-#define	MIN_LOG_SIZE		100000 /* The minimum allowed log file size. */
-#define	MIN_LOG_COUNT		1 /* The min number of old log files to keep */
-#define	EXAMINE_FMRI_VALUE	0 /* Operation value for extractin fmri val */
-#define	INVERT_FMRI_INSTANCE	1 /* Op value for inverting an FMRI value */
-#define	FATAL_ERROR		"fatal" /* ereport class val for fatal errors */
+#define	DATA_FIELD		"data"	    /* Label for the expander details */
+#define	DEFAULT_DATA		"0"	    /* Default expander details value */
+#define	MIN_LOG_SIZE		100000	    /* The minimum log file size. */
+#define	MIN_LOG_COUNT		1	    /* Num of rolled files to keep */
+#define	EXAMINE_FMRI_VALUE	0	    /* Extract fmri val */
+#define	INVERT_FMRI_INSTANCE	1	    /* Invert an FMRI instance value */
+#define	FATAL_ERROR		"fatal"	    /* ereport val for fatal errors */
 #define	NON_FATAL_ERROR		"non-fatal" /* val for non fatal errors */
-#define	INVALID_OPERATION	0x01 /* Invalid access_fmri operation */
-#define	NULL_LOG_DATA		0x02 /* Library returned NULL log reference */
-#define	DATE_STRING_SIZE	16 /* Size of date string prefix. */
+#define	INVALID_OPERATION	0x01	    /* Invalid access_fmri operation */
+#define	NULL_LOG_DATA		0x02	    /* Lib returned NULL log ref */
+#define	INVALID_SEVERITY	0x03	    /* Invalid severity value */
+#define	DATE_STRING_SIZE	16	    /* Size of date string prefix. */
 
 /* Prototype needed for use in declaring and populating tables */
 static int invert_fmri(ses_log_monitor_t *, nvlist_t *);
@@ -135,7 +136,8 @@ typedef struct platforms {
 
 /* This is the genesis list of codes and functions. */
 static code_operation_t genesis_codes[] = {
-	{ 684002, invert_fmri }	    /* Alternate controller is down */
+	{ 684002, invert_fmri },    /* Alternate expander is down */
+	{ 685002, invert_fmri }	    /* Alternate expander is down */
 };
 
 /* This is the list of all platforms and their associated code op pairs. */
@@ -345,7 +347,7 @@ access_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri, char *target,
 
 		switch (operation) {
 
-		case INVERT_FMRI_INSTANCE : {
+		case INVERT_FMRI_INSTANCE:
 
 			ival = atoi(target_val);
 			ival = (ival + 1) % 2;
@@ -367,23 +369,18 @@ access_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri, char *target,
 			}
 
 			break;
-		}
 
-
-		case EXAMINE_FMRI_VALUE : {
+		case EXAMINE_FMRI_VALUE:
 			/*
 			 * target_val is already set. Return without modifying
 			 * its value.
 			 */
 			break;
-		}
-
 
 		/* Can return target_val as is (NULL) */
-		default : {
+		default:
 			*err = INVALID_OPERATION;
 			break;
-		}
 
 		} /* End switch on operation */
 
@@ -481,18 +478,17 @@ error_type(int severity)
 	char *rval;
 
 	switch (severity) {
-	case SES_LOG_LEVEL_FATAL :
+	case SES_LOG_LEVEL_FATAL:
 		rval = FATAL_ERROR;
 		break;
 
-	case SES_LOG_LEVEL_ERROR :
+	case SES_LOG_LEVEL_ERROR:
 		rval = NON_FATAL_ERROR;
 		break;
 
-	default :
+	default:
 		rval = NULL;
 		break;
-
 	}
 
 	return (rval);
@@ -644,7 +640,8 @@ platform_supported(char *pid)
 }
 
 /*
- * Inverts the controller instance in the specified FMRI
+ * Inverts the controller instance and the expander instance in the
+ * specified FMRI.
  */
 static int
 invert_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri)
@@ -652,10 +649,16 @@ invert_fmri(ses_log_monitor_t *slmp, nvlist_t *fmri)
 	int err = 0;
 
 	(void) access_fmri(slmp, fmri, CONTROLLER, INVERT_FMRI_INSTANCE, &err);
-
 	if (err != 0) {
 		fmd_hdl_debug(slmp->slt_hdl,
-		    "invert_fmri encountered an error: %d", err);
+		    "error inverting the controller instance: %d", err);
+		return (err);
+	}
+
+	(void) access_fmri(slmp, fmri, SASEXPANDER, INVERT_FMRI_INSTANCE, &err);
+	if (err != 0) {
+		fmd_hdl_debug(slmp->slt_hdl,
+		    "error inverting sas-expander instance: %d", err);
 	}
 
 	return (err);
@@ -685,7 +688,6 @@ handle_log_entry(ses_log_monitor_t *slmp, nvpair_t *entry,
 	uint64_t ena;
 	int rval = 0;
 
-
 	if ((rval = nvpair_value_nvlist(entry, &entry_data)) != 0) {
 		fmd_hdl_debug(slmp->slt_hdl, "Unable to retrieve entry");
 		return (rval);
@@ -697,28 +699,31 @@ handle_log_entry(ses_log_monitor_t *slmp, nvpair_t *entry,
 		severityValue = atoi(severity);
 
 		if (severityValue >= slmp->slt_severity) {
-
 			/*
 			 * Pull the code and check to see if there are any
 			 * special operations to perform for it on the given
 			 * platform.
 			 */
-			if (nvlist_lookup_string(entry_data, ENTRY_CODE,
-			    &code) == 0) {
+			if ((rval = nvlist_lookup_string(entry_data, ENTRY_CODE,
+			    &code)) != 0) {
 
-				/*
-				 * Check this code for any actions specific
-				 * to this platform.
-				 */
-				(void) check_code(slmp, expander->fmri,
-				    expander->slt_pid, atoi(code));
+				fmd_hdl_debug(slmp->slt_hdl,
+				    "Error retrieving code: %d", rval);
+				return (rval);
 			}
+
+			/*
+			 * Check this code for any actions specific
+			 * to this platform.
+			 */
+			(void) check_code(slmp, expander->fmri,
+			    expander->slt_pid, atoi(code));
 
 			class_sev = error_type(severityValue);
 			if (class_sev == NULL) {
 				fmd_hdl_debug(slmp->slt_hdl,
 				    "log severity %d mapped to NULL", severity);
-				return (rval);
+				return (INVALID_SEVERITY);
 			}
 
 			/* Create the ENA for this ereport */
@@ -965,6 +970,8 @@ slt_process_ses_log(topo_hdl_t *thp, tnode_t *node, void *arg)
 
 	/* If the current system type is unsupported stop processing the node */
 	if (platform_supported(product_id) == 0) {
+		fmd_hdl_debug(slmp->slt_hdl, "Unsupported platform %d",
+		    product_id);
 		topo_hdl_strfree(thp, product_id);
 		return (TOPO_WALK_NEXT);
 	}
