@@ -229,12 +229,10 @@ save_logs(unsigned char *resp, ses_log_call_t *data)
 	unsigned char *log_param_ptr; 	/* Log parameter pointer */
 	unsigned char *log_str_ptr; /* ptr to ascii str returend by expander */
 
-	char log_event_type[ENTRY_MAX_SIZE];
 	char log_code[ENTRY_MAX_SIZE];
 	char log_level[ENTRY_MAX_SIZE];
 	nvlist_t *entry;
 	char entry_num[15];
-	int type;
 	int match_found = 0;
 	char save_buffer[MAX_LOG_ENTRY_SZ];
 	char entry_added = 0;
@@ -332,7 +330,6 @@ save_logs(unsigned char *resp, ses_log_call_t *data)
 		return (SES_LOG_FAILED_NVLIST_CREATE);
 	}
 
-	(void) memset(log_event_type,	0, sizeof (log_event_type));
 	(void) memset(log_code,		0, sizeof (log_code));
 	(void) memset(save_buffer,	0, sizeof (save_buffer));
 	(void) memset(log_level,	0, sizeof (log_level));
@@ -378,9 +375,6 @@ save_logs(unsigned char *resp, ses_log_call_t *data)
 		    (const char *)log_str_ptr,
 		    SES_LOG_VALID_LOG_SIZE);
 
-		(void) strncpy(log_event_type, (const char *)log_str_ptr +
-		    SES_LOG_EVENT_TYPE_START, SES_LOG_SPECIFIC_ENTRY_SIZE);
-
 		(void) strncpy(log_code,
 		    (const char *)log_str_ptr+SES_LOG_CODE_START,
 		    SES_LOG_SPECIFIC_ENTRY_SIZE);
@@ -389,23 +383,6 @@ save_logs(unsigned char *resp, ses_log_call_t *data)
 		    (const char *) log_str_ptr +
 		    SES_LOG_LEVEL_START, 1);
 
-		/* event type is in log_event_type */
-		/* 4x004 = looking for x */
-		type = (strtoul(log_event_type, 0, 16) >> 12) & 0xf;
-
-		/*
-		 * Check type. If type is 1, level needs to be
-		 * changed to FATAL(4). If type is something other
-		 * than 0 or 1, they are info only(0).
-		 */
-		if (type == 1) {
-			(void) strcpy(log_level, "4");
-		} else if (type > 1) {
-			/* These are not application log */
-			/* entries */
-			/* make them info only */
-			(void) strcpy(log_level, "0");
-		}
 
 		/* Add this entry to the nvlist log data */
 		if (nvlist_alloc(&entry, NV_UNIQUE_NAME, 0) != 0) {

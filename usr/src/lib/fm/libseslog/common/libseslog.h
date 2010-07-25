@@ -74,8 +74,6 @@ enum {
 /* The string log is made from 8 char entries */
 #define	SES_LOG_SPECIFIC_ENTRY_SIZE 8
 
-/* Index of where log event type starts */
-#define	SES_LOG_EVENT_TYPE_START 4
 /* Index of where sequence number starts in returned string */
 #define	SES_LOG_SEQ_NUM_START 27
 /* Index of where log code starts */
