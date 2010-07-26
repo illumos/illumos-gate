@@ -484,6 +484,8 @@ swapctl(int sc_cmd, void *sc_arg, int *rv)
 		ai.ani_max = (k_anoninfo.ani_max +
 		    k_anoninfo.ani_mem_resv) + avail;
 
+		/* Update ani_free */
+		set_anoninfo();
 		ai.ani_free = k_anoninfo.ani_free + avail;
 
 		ai.ani_resv = k_anoninfo.ani_phys_resv +
@@ -821,6 +823,8 @@ swapctl32(int sc_cmd, void *sc_arg, int *rv)
 			return (EOVERFLOW);
 		ai.ani_max = s;
 
+		/* Update ani_free */
+		set_anoninfo();
 		s = k_anoninfo.ani_free + avail;
 		if (s > UINT32_MAX)
 			return (EOVERFLOW);

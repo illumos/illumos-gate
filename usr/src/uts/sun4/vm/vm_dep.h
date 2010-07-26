@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -40,8 +39,8 @@ extern "C" {
 
 #define	GETTICK()	gettick()
 
-/* #define for keeping code architecturally neutral */
-#define	randtick()	gettick()
+/* tick value that should be used for random values */
+extern u_longlong_t randtick(void);
 
 /*
  * Per page size free lists. Allocated dynamically.

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -907,35 +906,9 @@ alloc_hmehash(caddr_t alloc_base)
  * Allocate hat structs from the nucleus data memory.
  */
 int
-ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages)
+ndata_alloc_hat(struct memlist *ndata)
 {
-	size_t	mml_alloc_sz;
 	size_t	cb_alloc_sz;
-
-	/*
-	 * For the page mapping list mutex array we allocate one mutex
-	 * for every 128 pages (1 MB) with a minimum of 64 entries and
-	 * a maximum of 8K entries. For the initial computation npages
-	 * is rounded up (ie. 1 << highbit(npages * 1.5 / 128))
-	 *
-	 * mml_shift is roughly log2(mml_table_sz) + 3 for MLIST_HASH
-	 */
-	mml_table_sz = 1 << highbit((npages * 3) / 256);
-	if (mml_table_sz < 64)
-		mml_table_sz = 64;
-	else if (mml_table_sz > 8192)
-		mml_table_sz = 8192;
-	mml_shift = highbit(mml_table_sz) + 3;
-
-	PRM_DEBUG(mml_table_sz);
-	PRM_DEBUG(mml_shift);
-
-	mml_alloc_sz = mml_table_sz * sizeof (kmutex_t);
-
-	mml_table = ndata_alloc(ndata, mml_alloc_sz, ecache_alignsize);
-	if (mml_table == NULL)
-		return (-1);
-	PRM_DEBUG(mml_table);
 
 	cb_alloc_sz = sfmmu_max_cb_id * sizeof (struct sfmmu_callback);
 	PRM_DEBUG(cb_alloc_sz);

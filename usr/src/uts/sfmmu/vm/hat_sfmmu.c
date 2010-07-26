@@ -736,36 +736,6 @@ static void	sfmmu_hat_unlock_all(void);
 static void	sfmmu_ismhat_enter(sfmmu_t *, int);
 static void	sfmmu_ismhat_exit(sfmmu_t *, int);
 
-/*
- * Array of mutexes protecting a page's mapping list and p_nrm field.
- *
- * The hash function looks complicated, but is made up so that:
- *
- * "pp" not shifted, so adjacent pp values will hash to different cache lines
- *  (8 byte alignment * 8 bytes/mutes == 64 byte coherency subblock)
- *
- * "pp" >> mml_shift, incorporates more source bits into the hash result
- *
- *  "& (mml_table_size - 1), should be faster than using remainder "%"
- *
- * Hopefully, mml_table, mml_table_size and mml_shift are all in the same
- * cacheline, since they get declared next to each other below. We'll trust
- * ld not to do something random.
- */
-#ifdef	DEBUG
-int mlist_hash_debug = 0;
-#define	MLIST_HASH(pp)	(mlist_hash_debug ? &mml_table[0] : \
-	&mml_table[((uintptr_t)(pp) + \
-	((uintptr_t)(pp) >> mml_shift)) & (mml_table_sz - 1)])
-#else	/* !DEBUG */
-#define	MLIST_HASH(pp)   &mml_table[ \
-	((uintptr_t)(pp) + ((uintptr_t)(pp) >> mml_shift)) & (mml_table_sz - 1)]
-#endif	/* !DEBUG */
-
-kmutex_t		*mml_table;
-uint_t			mml_table_sz;	/* must be a power of 2 */
-uint_t			mml_shift;	/* log2(mml_table_sz) + 3 for align */
-
 kpm_hlk_t	*kpmp_table;
 uint_t		kpmp_table_sz;	/* must be a power of 2 */
 uchar_t		kpmp_shift;
@@ -794,13 +764,19 @@ uint_t		kpmp_stable_sz;	/* must be a power of 2 */
 	((uintptr_t)(pp) >> (PP_SHIFT + SPL_SHIFT)) ^ \
 	((uintptr_t)(pp) >> (PP_SHIFT + SPL_SHIFT * 2)) ^ \
 	((uintptr_t)(pp) >> (PP_SHIFT + SPL_SHIFT * 3))) & \
-	(SPL_TABLE_SIZE - 1))
+	SPL_MASK)
 
 #define	SPL_HASH(pp)    \
-	(&sfmmu_page_lock[SPL_INDEX(pp) & SPL_MASK].pad_mutex)
+	(&sfmmu_page_lock[SPL_INDEX(pp)].pad_mutex)
 
 static	pad_mutex_t	sfmmu_page_lock[SPL_TABLE_SIZE];
 
+/* Array of mutexes protecting a page's mapping list and p_nrm field. */
+
+#define	MML_TABLE_SIZE	SPL_TABLE_SIZE
+#define	MLIST_HASH(pp)	(&mml_table[SPL_INDEX(pp)].pad_mutex)
+
+static pad_mutex_t	mml_table[MML_TABLE_SIZE];
 
 /*
  * hat_unload_callback() will group together callbacks in order
@@ -1458,8 +1434,8 @@ hat_lock_init()
 	 * initialize the array of mutexes protecting a page's mapping
 	 * list and p_nrm field.
 	 */
-	for (i = 0; i < mml_table_sz; i++)
-		mutex_init(&mml_table[i], NULL, MUTEX_DEFAULT, NULL);
+	for (i = 0; i < MML_TABLE_SIZE; i++)
+		mutex_init(&mml_table[i].pad_mutex, NULL, MUTEX_DEFAULT, NULL);
 
 	if (kpm_enable) {
 		for (i = 0; i < kpmp_table_sz; i++) {

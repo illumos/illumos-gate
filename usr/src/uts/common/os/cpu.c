@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -91,8 +90,8 @@ static int cpu_state_change_hooks(int, cpu_setup_t, cpu_setup_t);
 
 /*
  * cpu_lock protects ncpus, ncpus_online, cpu_flag, cpu_list, cpu_active,
- * and dispatch queue reallocations.  The lock ordering with respect to
- * related locks is:
+ * max_cpu_seqid_ever, and dispatch queue reallocations.  The lock ordering with
+ * respect to related locks is:
  *
  *	cpu_lock --> thread_free_lock  --->  p_lock  --->  thread_lock()
  *
@@ -132,6 +131,13 @@ int boot_ncpus = -1;
  * used to size arrays that are indexed by CPU id.
  */
 processorid_t max_cpuid = NCPU - 1;
+
+/*
+ * Maximum cpu_seqid was given. This number can only grow and never shrink. It
+ * can be used to optimize NCPU loops to avoid going through CPUs which were
+ * never on-line.
+ */
+processorid_t max_cpu_seqid_ever = 0;
 
 int ncpus = 1;
 int ncpus_online = 1;
@@ -1758,6 +1764,10 @@ cpu_add_unit(cpu_t *cp)
 		continue;
 	CPUSET_ADD(cpu_seqid_inuse, seqid);
 	cp->cpu_seqid = seqid;
+
+	if (seqid > max_cpu_seqid_ever)
+		max_cpu_seqid_ever = seqid;
+
 	ASSERT(ncpus < max_ncpus);
 	ncpus++;
 	cp->cpu_cache_offset = KMEM_CPU_CACHE_OFFSET(cp->cpu_seqid);

@@ -888,7 +888,7 @@ _tsc_lfence_end:
  * is called by callers who do not need to have a guarenteed
  * correct tick value.  The proper routine to use is tsc_read().
  */
-hrtime_t
+u_longlong_t
 randtick(void)
 {
 	return (0);

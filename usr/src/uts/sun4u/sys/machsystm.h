@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_MACHSYSTM_H
@@ -274,7 +273,7 @@ extern uint_t vac_colors_mask;
 extern int ndata_alloc_page_freelists(struct memlist *, int);
 extern int ndata_alloc_dmv(struct memlist *);
 extern int ndata_alloc_tsbs(struct memlist *, pgcnt_t);
-extern int ndata_alloc_hat(struct memlist *, pgcnt_t);
+extern int ndata_alloc_hat(struct memlist *);
 extern int ndata_alloc_kpm(struct memlist *, pgcnt_t);
 extern int ndata_alloc_page_mutexs(struct memlist *ndata);
 

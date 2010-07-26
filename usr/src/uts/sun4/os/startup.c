@@ -1063,7 +1063,7 @@ startup_memlist(void)
 		cmn_err(CE_PANIC,
 		    "no more nucleus memory after page free lists alloc");
 
-	if (ndata_alloc_hat(&ndata, npages) != 0)
+	if (ndata_alloc_hat(&ndata) != 0)
 		cmn_err(CE_PANIC, "no more nucleus memory after hat alloc");
 
 	if (ndata_alloc_memseg(&ndata, boot_physavail_len) != 0)

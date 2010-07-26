@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1987, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2364,9 +2363,6 @@ extern int		uhmehash_num;
 extern int		khmehash_num;
 extern struct hmehash_bucket *uhme_hash;
 extern struct hmehash_bucket *khme_hash;
-extern kmutex_t		*mml_table;
-extern uint_t		mml_table_sz;
-extern uint_t		mml_shift;
 extern uint_t		hblk_alloc_dynamic;
 extern struct tsbmiss	tsbmiss_area[NCPU];
 extern struct kpmtsbm	kpmtsbm_area[NCPU];
