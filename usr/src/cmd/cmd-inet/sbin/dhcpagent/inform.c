@@ -19,13 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * INFORM_SENT state of the client state machine.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <time.h>
@@ -98,7 +95,7 @@ dhcp_inform(dhcp_smach_t *dsmp)
 		(void) add_pkt_opt(dpkt, CD_END, NULL, 0);
 
 		IN6_V4MAPPED_TO_IPADDR(&dsmp->dsm_server, server);
-		if (!send_pkt(dsmp, dpkt, server, NULL)) {
+		if (!send_pkt(dsmp, dpkt, server, stop_informing)) {
 			dhcpmsg(MSG_ERROR, "dhcp_inform: send_pkt failed");
 			goto failed;
 		}

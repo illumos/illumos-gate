@@ -1346,63 +1346,64 @@ retry:
 		}
 		ipstatus = ipadm_refresh_addr(ipadm_handle, aobjname,
 		    IPADM_OPT_ACTIVE | IPADM_OPT_INFORM);
-
 		break;
 	}
 	case DHCP_START:
-	{
 		ipstatus = ipadm_create_addr(ipadm_handle, ipaddr,
 		    IPADM_OPT_ACTIVE);
+		break;
+	default:
+		nlog(LOG_ERR, "start_dhcp: invalid dhcp_ipc_type_t: %d", type);
+		goto done;
+	}
 
-		if (ipstatus == IPADM_DHCP_IPC_TIMEOUT) {
-			/*
-			 * DHCP timed out: change state for this NCU and enqueue
-			 * event to check NCU priority-groups.  Only care for
-			 * DHCP requests (not informs).
-			 */
+	if (ipstatus == IPADM_DHCP_IPC_TIMEOUT) {
+		/*
+		 * DHCP timed out: for DHCP_START requests, change state for
+		 * this NCU and euqueue event to check NCU priority-groups;
+		 * for DHCP_INFORM requests, nothing to do.
+		 */
+		if (type == DHCP_START) {
 			char *object_name;
 
-			nlog(LOG_INFO, "start_dhcp: DHCP timed out for %s",
-			    name);
+			nlog(LOG_INFO,
+			    "start_dhcp: DHCP_START timed out for %s", name);
 
 			if (nwam_ncu_name_to_typed_name(name,
 			    NWAM_NCU_TYPE_INTERFACE, &object_name)
 			    != NWAM_SUCCESS) {
 				nlog(LOG_ERR, "start_dhcp: "
-				    "nwam_ncu_name_to_typed_name failed "
-				    "for %s", name);
+				    "nwam_ncu_name_to_typed_name failed for %s",
+				    name);
 				goto done;
 			}
 			nwamd_object_set_state(NWAM_OBJECT_TYPE_NCU,
 			    object_name, NWAM_STATE_OFFLINE_TO_ONLINE,
 			    NWAM_AUX_STATE_IF_DHCP_TIMED_OUT);
 			nwamd_create_ncu_check_event(0);
-
 			free(object_name);
-			goto done;
-
-		} else if (ipstatus == IPADM_DHCP_IPC_ERROR &&
-		    retries++ < NWAMD_DHCP_RETRIES) {
-			/*
-			 * Retry DHCP request as we may have been unplumbing
-			 * as part of the configuration phase.
-			 */
-			nlog(LOG_ERR, "start_dhcp: will retry on %s in %d sec",
-			    name, NWAMD_DHCP_RETRY_WAIT_TIME);
-			(void) sleep(NWAMD_DHCP_RETRY_WAIT_TIME);
-			goto retry;
+		} else {
+			nlog(LOG_INFO,
+			    "start_dhcp: DHCP_INFORM timed out for %s", name);
 		}
-		break;
-	}
-	default:
-		nlog(LOG_ERR, "start_dhcp: invalid dhcp_ipc_type_t: %d", type);
-		goto done;
-	}
 
-	if (ipstatus != IPADM_SUCCESS) {
+	} else if ((ipstatus == IPADM_DHCP_IPC_ERROR ||
+	    ipstatus == IPADM_IPC_ERROR) && retries++ < NWAMD_DHCP_RETRIES) {
+		/*
+		 * Retry DHCP request as we may have been unplumbing as part
+		 * of the configuration phase.
+		 */
+		nlog(LOG_ERR, "start_dhcp: ipadm_%s_addr on %s returned: %s, "
+		    "retrying in %d sec",
+		    (type == DHCP_START ? "create" : "refresh"), name,
+		    ipadm_status2str(ipstatus), NWAMD_DHCP_RETRY_WAIT_TIME);
+		(void) sleep(NWAMD_DHCP_RETRY_WAIT_TIME);
+		goto retry;
+
+	} else if (ipstatus != IPADM_SUCCESS) {
 		nlog(LOG_ERR, "start_dhcp: ipadm_%s_addr failed for %s: %s",
-		    (type == DHCP_START ? "create" : "refresh"),
-		    name, ipadm_status2str(ipstatus));
+		    (type == DHCP_START ? "create" : "refresh"), name,
+		    ipadm_status2str(ipstatus));
 	}
 
 done:
