@@ -510,7 +510,7 @@ lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 	 * out of the door.
 	 */
 	if (!is_opened(lsp) && (lsp->ls_cleanup || lsp->ls_vp == NULL)) {
-		lofi_free_dev(dev);
+		lofi_free_dev(lsp->ls_dev);
 		lofi_destroy(lsp, credp);
 	}
 
@@ -2330,7 +2330,7 @@ err:
  * unmap a file.
  */
 static int
-lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
+lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
     struct cred *credp, int ioctl_flag)
 {
 	struct lofi_state *lsp;
@@ -2409,7 +2409,7 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 	}
 
 out:
-	lofi_free_dev(dev);
+	lofi_free_dev(lsp->ls_dev);
 	lofi_destroy(lsp, credp);
 
 	mutex_exit(&lofi_lock);
@@ -2533,11 +2533,11 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		case LOFI_UNMAP_FILE:
 			if ((flag & FWRITE) == 0)
 				return (EPERM);
-			return (lofi_unmap_file(dev, lip, 1, credp, flag));
+			return (lofi_unmap_file(lip, 1, credp, flag));
 		case LOFI_UNMAP_FILE_MINOR:
 			if ((flag & FWRITE) == 0)
 				return (EPERM);
-			return (lofi_unmap_file(dev, lip, 0, credp, flag));
+			return (lofi_unmap_file(lip, 0, credp, flag));
 		case LOFI_GET_FILENAME:
 			return (lofi_get_info(dev, lip, LOFI_GET_FILENAME,
 			    credp, flag));

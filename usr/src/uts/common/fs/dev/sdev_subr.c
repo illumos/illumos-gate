@@ -547,8 +547,22 @@ static struct sdev_vop_table vtab[] =
 	{ "ipnet", devipnet_vnodeops_tbl, NULL, &devipnet_vnodeops,
 	devipnet_validate, SDEV_DYNAMIC | SDEV_VTOR | SDEV_NO_NCACHE },
 
-	{ "lofi", NULL, NULL, NULL, NULL, SDEV_ZONED },
-	{ "rlofi", NULL, NULL, NULL, NULL, SDEV_ZONED },
+	/*
+	 * SDEV_DYNAMIC: prevent calling out to devfsadm, since only the
+	 * lofi driver controls child nodes.
+	 *
+	 * SDEV_PERSIST: ensure devfsadm knows to clean up any persisted
+	 * stale nodes (e.g. from devfsadm -R).
+	 *
+	 * In addition, devfsadm knows not to attempt a rmdir: a zone
+	 * may hold a reference, which would zombify the node,
+	 * preventing a mkdir.
+	 */
+
+	{ "lofi", NULL, NULL, NULL, NULL,
+	    SDEV_ZONED | SDEV_DYNAMIC | SDEV_PERSIST },
+	{ "rlofi", NULL, NULL, NULL, NULL,
+	    SDEV_ZONED | SDEV_DYNAMIC | SDEV_PERSIST },
 
 	{ NULL, NULL, NULL, NULL, NULL, 0}
 };
@@ -1531,6 +1545,13 @@ sdev_filldir_dynamic(struct sdev_node *ddv)
 	vap->va_mtime = vap->va_atime;
 	vap->va_ctime = vap->va_atime;
 	for (i = 0; vtab[i].vt_name != NULL; i++) {
+		/*
+		 * This early, we may be in a read-only /dev
+		 * environment: leave the creation of any nodes we'd
+		 * attempt to persist to devfsadm.
+		 */
+		if (vtab[i].vt_flags & SDEV_PERSIST)
+			continue;
 		nm = vtab[i].vt_name;
 		ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
 		dv = NULL;

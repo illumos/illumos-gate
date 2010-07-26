@@ -226,12 +226,12 @@ static item_t **nfp_hash;
 static mutex_t  nfp_mutex = DEFAULTMUTEX;
 
 /*
- * Packaged directories - not removed even when empty.
- * The dirs must be listed in canonical form
- * i.e. without leading "/dev/"
+ * Directories not removed even when empty.  They are packaged, or may
+ * be referred to from a non-global zone.  The dirs must be listed in
+ * canonical form i.e. without leading "/dev/"
  */
-static char *packaged_dirs[] =
-	{"dsk", "rdsk", "term", NULL};
+static char *sticky_dirs[] =
+	{"dsk", "rdsk", "term", "lofi", "rlofi", NULL};
 
 /* Devname globals */
 static int lookup_door_fd = -1;
@@ -3195,17 +3195,17 @@ s_rmdir(char *path)
 
 	/*
 	 * Certain directories are created at install time by packages.
-	 * Some of them (listed in packaged_dirs[]) are required by apps
+	 * Some of them (listed in sticky_dirs[]) are required by apps
 	 * and need to be present even when empty.
 	 */
-	vprint(REMOVE_MID, "%s: checking if %s is packaged\n", fcn, path);
+	vprint(REMOVE_MID, "%s: checking if %s is sticky\n", fcn, path);
 
 	rpath = path + strlen(dev_dir) + 1;
 
-	for (i = 0; (dir = packaged_dirs[i]) != NULL; i++) {
+	for (i = 0; (dir = sticky_dirs[i]) != NULL; i++) {
 		if (*rpath == *dir) {
 			if (strcmp(rpath, dir) == 0) {
-				vprint(REMOVE_MID, "%s: skipping packaged dir: "
+				vprint(REMOVE_MID, "%s: skipping sticky dir: "
 				    "%s\n", fcn, path);
 				errno = EEXIST;
 				return (-1);
