@@ -2201,14 +2201,11 @@ static int
 idmap_id_to_numeric_domain_rid(uid_t id, boolean_t isuser,
     char **domainp, idmap_rid_t *ridp)
 {
-	idmap_handle_t *idmap_hdl = NULL;
 	idmap_get_handle_t *get_hdl = NULL;
 	idmap_stat status;
 	int err = EINVAL;
 
-	if (idmap_init(&idmap_hdl) != IDMAP_SUCCESS)
-		goto out;
-	if (idmap_get_create(idmap_hdl, &get_hdl) != IDMAP_SUCCESS)
+	if (idmap_get_create(&get_hdl) != IDMAP_SUCCESS)
 		goto out;
 
 	if (isuser) {
@@ -2227,8 +2224,6 @@ idmap_id_to_numeric_domain_rid(uid_t id, boolean_t isuser,
 out:
 	if (get_hdl)
 		idmap_get_destroy(get_hdl);
-	if (idmap_hdl)
-		(void) idmap_fini(idmap_hdl);
 	return (err);
 }
 

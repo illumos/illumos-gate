@@ -943,6 +943,7 @@ smb_ofile_delete(void *arg)
 	SMB_OFILE_VALID(of);
 	ASSERT(of->f_refcnt == 0);
 	ASSERT(of->f_state == SMB_OFILE_STATE_CLOSED);
+	ASSERT(!SMB_OFILE_OPLOCK_GRANTED(of));
 
 	tree = of->f_tree;
 	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);

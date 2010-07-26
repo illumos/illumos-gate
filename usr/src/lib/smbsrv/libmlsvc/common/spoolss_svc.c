@@ -168,11 +168,17 @@ static ndr_service_t spoolss_service = {
 	spoolss_stub_table		/* stub_table */
 };
 
+/*
+ * Defer calling spoolss_cups_init() until something actually
+ * needs access to CUPS due to the libcups dependency on OpenSSL.
+ * OpenSSL is not MT-safe and initializing CUPS here can crash
+ * OpenSSL if it collides with other threads that are in other
+ * libraries that are attempting to use OpenSSL.
+ */
 void
 spoolss_initialize(void)
 {
 	(void) ndr_svc_register(&spoolss_service);
-	(void) spoolss_cups_init();
 }
 
 void

@@ -42,6 +42,7 @@ SYMBOL_VERSION SUNWprivate {
     global:
 	dfs_get_referrals;
 	dfs_info_free;
+	dssetup_check_service;
 	dssetup_clear_domain_info;
 	lsa_lookup_name;
 	lsa_lookup_sid;

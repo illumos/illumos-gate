@@ -43,25 +43,7 @@
 extern "C" {
 #endif
 
-#define	_IDMAP_HANDLE_RPC_DOORS		1
-
-#define	_IDMAP_GET_CLIENT_HANDLE(h, clnt) \
-		if (h == NULL) \
-			return (IDMAP_ERR_CLIENT_HANDLE);\
-		if (h->type != _IDMAP_HANDLE_RPC_DOORS) \
-			return (IDMAP_ERR_NOTSUPPORTED);\
-		clnt = (CLIENT *)h->privhandle;\
-		if (clnt == NULL)\
-			return (IDMAP_ERR_RPC_HANDLE);
-
-struct idmap_handle {
-	int	type;
-	void	*privhandle;
-	/* locks */
-};
-
 struct idmap_udt_handle {
-	struct idmap_handle	*ih;
 	idmap_update_batch	batch;
 	uint64_t		next;
 	int64_t			error_index;
@@ -90,7 +72,6 @@ typedef struct idmap_get_res {
 } idmap_get_res_t;
 
 struct idmap_get_handle {
-	struct idmap_handle	*ih;
 	idmap_mapping_batch	batch;
 	idmap_get_res_t		*retlist;
 	uint64_t		next;
@@ -104,7 +85,6 @@ struct idmap_get_handle {
 	gh->next = 0;
 
 struct idmap_iter {
-	struct idmap_handle	*ih;
 	int			type;
 	uint64_t		limit;
 	void			*arg;
@@ -122,11 +102,15 @@ typedef struct stat_table {
 
 typedef idmap_retcode	_idmap_stat;
 
+extern idmap_stat	_idmap_clnt_call(const rpcproc_t,
+				const xdrproc_t, const caddr_t,
+				const xdrproc_t, caddr_t out,
+				const struct timeval);
+
 extern idmap_retcode	_udt_extend_batch(idmap_udt_handle_t *);
 extern idmap_retcode	_get_ids_extend_batch(idmap_get_handle_t *);
 extern idmap_stat	_iter_get_next_list(int, idmap_iter_t *, void *,
 				uchar_t **, size_t, xdrproc_t, xdrproc_t);
-extern idmap_stat	_idmap_rpc2stat(CLIENT *);
 
 extern idmap_logger_t logger;
 

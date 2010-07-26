@@ -29,6 +29,7 @@
 
 #include <strings.h>
 #include <assert.h>
+#include <errno.h>
 #include <smbsrv/ntifs.h>
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/libsmb.h>
@@ -156,11 +157,18 @@ smb_sd_read_acl(char *path, smb_fssd_t *fs_sd)
 	ace_t *z_ace;
 
 	fs_sd->sd_gid = fs_sd->sd_uid = 0;
-	if (acl_trivial(path) != 1)
-		return (NT_STATUS_INTERNAL_ERROR);
 
-	if (acl_get(path, ACL_NO_TRIVIAL, &z_acl) != 0)
-		return (NT_STATUS_INTERNAL_ERROR);
+	errno = 0;
+	if (acl_get(path, 0, &z_acl) != 0) {
+		switch (errno) {
+		case EACCES:
+			return (NT_STATUS_ACCESS_DENIED);
+		case ENOENT:
+			return (NT_STATUS_OBJECT_PATH_NOT_FOUND);
+		default:
+			return (NT_STATUS_INTERNAL_ERROR);
+		}
+	}
 
 	if ((z_ace = (ace_t *)z_acl->acl_aclp) == NULL)
 		return (NT_STATUS_INVALID_ACL);

@@ -45,14 +45,14 @@ void smbd_share_stop(void);
 int smbd_nicmon_start(const char *);
 void smbd_nicmon_stop(void);
 int smbd_nicmon_refresh(void);
-boolean_t smbd_set_netlogon_cred(void);
-int smbd_locate_dc_start(void);
+int smbd_dc_monitor_init(void);
 smb_token_t *smbd_user_auth_logon(smb_logon_t *);
 void smbd_user_nonauth_logon(uint32_t);
 void smbd_user_auth_logoff(uint32_t);
 uint32_t smbd_join(smb_joininfo_t *);
 void smbd_set_secmode(int);
 boolean_t smbd_online(void);
+void smbd_online_wait(const char *);
 
 int smbd_vss_get_count(const char *, uint32_t *);
 void smbd_vss_get_snapshots(const char *, uint32_t, uint32_t *,
@@ -75,6 +75,10 @@ typedef struct smbd {
 	int		s_door_srv;
 	int		s_door_opipe;
 	int		s_secmode;	/* Current security mode */
+	pthread_t	s_refresh_tid;
+	pthread_t	s_localtime_tid;
+	pthread_t	s_spool_tid;
+	pthread_t	s_dc_monitor_tid;
 	boolean_t	s_nbt_listener_running;
 	boolean_t	s_tcp_listener_running;
 	pthread_t	s_nbt_listener_id;

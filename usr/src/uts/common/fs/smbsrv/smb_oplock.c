@@ -56,12 +56,12 @@ static void smb_oplock_wait(smb_node_t *);
 static void smb_oplock_wait_ack(smb_node_t *, uint32_t);
 static void smb_oplock_timedout(smb_node_t *);
 
-static smb_oplock_grant_t *smb_oplock_create_grant(smb_ofile_t *, uint8_t);
-void smb_oplock_delete_grant(smb_oplock_grant_t *);
+static smb_oplock_grant_t *smb_oplock_set_grant(smb_ofile_t *, uint8_t);
+void smb_oplock_clear_grant(smb_oplock_grant_t *);
 static int smb_oplock_insert_grant(smb_node_t *, smb_oplock_grant_t *);
 static void smb_oplock_remove_grant(smb_node_t *, smb_oplock_grant_t *);
 static smb_oplock_grant_t *smb_oplock_exclusive_grant(list_t *);
-static smb_oplock_grant_t *smb_oplock_find_grant(list_t *, smb_ofile_t *);
+static smb_oplock_grant_t *smb_oplock_get_grant(smb_oplock_t *, smb_ofile_t *);
 
 static smb_oplock_break_t *smb_oplock_create_break(smb_node_t *);
 static smb_oplock_break_t *smb_oplock_get_break(void);
@@ -73,7 +73,6 @@ static void smb_oplock_break_thread();
 /* levelII oplock break requests (smb_oplock_break_t) */
 static boolean_t	smb_oplock_initialized = B_FALSE;
 static kmem_cache_t	*smb_oplock_break_cache = NULL;
-static kmem_cache_t	*smb_oplock_grant_cache = NULL;
 static smb_llist_t	smb_oplock_breaks;
 static smb_thread_t	smb_oplock_thread;
 
@@ -95,9 +94,6 @@ smb_oplock_init(void)
 	smb_oplock_break_cache = kmem_cache_create("smb_oplock_break_cache",
 	    sizeof (smb_oplock_break_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 
-	smb_oplock_grant_cache = kmem_cache_create("smb_oplock_grant_cache",
-	    sizeof (smb_oplock_grant_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-
 	smb_llist_constructor(&smb_oplock_breaks, sizeof (smb_oplock_break_t),
 	    offsetof(smb_oplock_break_t, ob_lnd));
 
@@ -109,7 +105,6 @@ smb_oplock_init(void)
 		smb_thread_destroy(&smb_oplock_thread);
 		smb_llist_destructor(&smb_oplock_breaks);
 		kmem_cache_destroy(smb_oplock_break_cache);
-		kmem_cache_destroy(smb_oplock_grant_cache);
 		return (rc);
 	}
 
@@ -141,7 +136,6 @@ smb_oplock_fini(void)
 	smb_llist_destructor(&smb_oplock_breaks);
 
 	kmem_cache_destroy(smb_oplock_break_cache);
-	kmem_cache_destroy(smb_oplock_grant_cache);
 }
 
 /*
@@ -259,9 +253,9 @@ smb_oplock_acquire(smb_request_t *sr, smb_node_t *node, smb_ofile_t *ofile)
 
 	nbl_end_crit(node->vp);
 
-	og = smb_oplock_create_grant(ofile, op->op_oplock_level);
+	og = smb_oplock_set_grant(ofile, op->op_oplock_level);
 	if (smb_oplock_insert_grant(node, og) != 0) {
-		smb_oplock_delete_grant(og);
+		smb_oplock_clear_grant(og);
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 		mutex_exit(&ol->ol_mutex);
 		return;
@@ -471,7 +465,7 @@ smb_oplock_process_levelII_break(smb_node_t *node)
 		smb_session_oplock_break(og->og_session,
 		    og->og_tid, og->og_fid, SMB_OPLOCK_BREAK_TO_NONE);
 		smb_oplock_remove_grant(node, og);
-		smb_oplock_delete_grant(og);
+		smb_oplock_clear_grant(og);
 	}
 
 	mutex_exit(&ol->ol_mutex);
@@ -527,7 +521,7 @@ smb_oplock_timedout(smb_node_t *node)
 		case SMB_OPLOCK_BREAK_TO_NONE:
 			og->og_level = SMB_OPLOCK_NONE;
 			smb_oplock_remove_grant(node, og);
-			smb_oplock_delete_grant(og);
+			smb_oplock_clear_grant(og);
 			break;
 		case SMB_OPLOCK_BREAK_TO_LEVEL_II:
 			og->og_level = SMB_OPLOCK_LEVEL_II;
@@ -552,18 +546,15 @@ smb_oplock_release(smb_node_t *node, smb_ofile_t *of)
 {
 	smb_oplock_t		*ol;
 	smb_oplock_grant_t	*og;
-	list_t			*grants;
 
 	ol = &node->n_oplock;
-	grants = &ol->ol_grants;
-
 	mutex_enter(&ol->ol_mutex);
 	smb_oplock_wait(node);
 
-	og = smb_oplock_find_grant(grants, of);
+	og = smb_oplock_get_grant(ol, of);
 	if (og) {
 		smb_oplock_remove_grant(node, og);
-		smb_oplock_delete_grant(og);
+		smb_oplock_clear_grant(og);
 
 		if (ol->ol_break != SMB_OPLOCK_NO_BREAK) {
 			ol->ol_break = SMB_OPLOCK_NO_BREAK;
@@ -594,17 +585,14 @@ smb_oplock_ack(smb_node_t *node, smb_ofile_t *of, uint8_t brk)
 {
 	smb_oplock_t		*ol;
 	smb_oplock_grant_t	*og;
-	list_t			*grants;
 	boolean_t		brk_to_none = B_FALSE;
 
 	ol = &node->n_oplock;
-	grants = &ol->ol_grants;
-
 	mutex_enter(&ol->ol_mutex);
 	smb_oplock_wait(node);
 
 	if ((ol->ol_break == SMB_OPLOCK_NO_BREAK) ||
-	    ((og = smb_oplock_find_grant(grants, of)) == NULL)) {
+	    ((og = smb_oplock_get_grant(ol, of)) == NULL)) {
 		mutex_exit(&ol->ol_mutex);
 		return;
 	}
@@ -628,7 +616,7 @@ smb_oplock_ack(smb_node_t *node, smb_ofile_t *of, uint8_t brk)
 
 	if (og->og_level == SMB_OPLOCK_NONE) {
 		smb_oplock_remove_grant(node, og);
-		smb_oplock_delete_grant(og);
+		smb_oplock_clear_grant(og);
 	}
 
 	ol->ol_break = SMB_OPLOCK_NO_BREAK;
@@ -690,14 +678,15 @@ smb_oplock_wait(smb_node_t *node)
 }
 
 /*
- * smb_oplock_create_grant
+ * smb_oplock_set_grant
  */
 static smb_oplock_grant_t *
-smb_oplock_create_grant(smb_ofile_t *of, uint8_t level)
+smb_oplock_set_grant(smb_ofile_t *of, uint8_t level)
 {
 	smb_oplock_grant_t	*og;
 
-	og = kmem_cache_alloc(smb_oplock_grant_cache, KM_SLEEP);
+	og = &of->f_oplock_grant;
+
 	og->og_magic = SMB_OPLOCK_GRANT_MAGIC;
 	og->og_level = level;
 	og->og_ofile = of;
@@ -709,12 +698,12 @@ smb_oplock_create_grant(smb_ofile_t *of, uint8_t level)
 }
 
 /*
- * smb_oplock_delete_grant
+ * smb_oplock_clear_grant
  */
 void
-smb_oplock_delete_grant(smb_oplock_grant_t *og)
+smb_oplock_clear_grant(smb_oplock_grant_t *og)
 {
-	kmem_cache_free(smb_oplock_grant_cache, og);
+	bzero(og, sizeof (smb_oplock_grant_t));
 }
 
 /*
@@ -782,23 +771,19 @@ smb_oplock_exclusive_grant(list_t *grants)
 }
 
 /*
- * smb_oplock_find_grant
+ * smb_oplock_get_grant
  *
  * Find oplock grant corresponding to the specified ofile.
  */
 static smb_oplock_grant_t *
-smb_oplock_find_grant(list_t *grants, smb_ofile_t *ofile)
+smb_oplock_get_grant(smb_oplock_t *ol, smb_ofile_t *ofile)
 {
-	smb_oplock_grant_t	*og = NULL;
+	ASSERT(MUTEX_HELD(&ol->ol_mutex));
 
-	for (og = list_head(grants);
-	    og != NULL;
-	    og = list_next(grants, og)) {
-		SMB_OPLOCK_GRANT_VALID(og);
-		if (og->og_ofile == ofile)
-			break;
-	}
-	return (og);
+	if (SMB_OFILE_OPLOCK_GRANTED(ofile))
+		return (&ofile->f_oplock_grant);
+	else
+		return (NULL);
 }
 
 /*

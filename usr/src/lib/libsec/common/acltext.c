@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*LINTLIBRARY*/
@@ -120,7 +119,6 @@ prgname(gid_t gid, char *gidp, size_t buflen, int noresolve)
 static int
 getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 {
-	idmap_handle_t *idmap_hdl = NULL;
 	idmap_get_handle_t *get_hdl = NULL;
 	idmap_stat status;
 	idmap_rid_t rid;
@@ -144,8 +142,7 @@ getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 			    IDMAP_REQ_FLG_USE_CACHE, &name, &domain);
 	}
 	if (error != IDMAP_SUCCESS) {
-		if (idmap_init(&idmap_hdl) == IDMAP_SUCCESS &&
-		    idmap_get_create(idmap_hdl, &get_hdl) == IDMAP_SUCCESS) {
+		if (idmap_get_create(&get_hdl) == IDMAP_SUCCESS) {
 			if (user)
 				error = idmap_get_sidbyuid(get_hdl, who,
 				    IDMAP_REQ_FLG_USE_CACHE, &domain, &rid,
@@ -168,8 +165,6 @@ getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 		}
 		if (get_hdl)
 			idmap_get_destroy(get_hdl);
-		if (idmap_hdl)
-			(void) idmap_fini(idmap_hdl);
 	} else {
 		int len;
 

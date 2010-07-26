@@ -68,8 +68,7 @@ typedef struct idmap_iter idmap_iter_t;
  */
 
 /* Create handle for updates */
-extern idmap_stat idmap_udt_create(idmap_handle_t *,
-	idmap_udt_handle_t **);
+extern idmap_stat idmap_udt_create(idmap_udt_handle_t **);
 
 /* Commit */
 extern idmap_stat idmap_udt_commit(idmap_udt_handle_t *);
@@ -100,15 +99,14 @@ extern idmap_stat idmap_udt_rm_namerule(idmap_udt_handle_t *, boolean_t,
 extern idmap_stat idmap_udt_flush_namerules(idmap_udt_handle_t *);
 
 /* Flush caches */
-extern idmap_stat idmap_flush(idmap_handle_t *, idmap_flush_op);
+extern idmap_stat idmap_flush(idmap_flush_op);
 
 /*
  * Iterator API
  */
 
 /* Create a iterator to get SID to UID/GID mappings */
-extern idmap_stat idmap_iter_mappings(idmap_handle_t *,	idmap_iter_t **,
-	int flag);
+extern idmap_stat idmap_iter_mappings(idmap_iter_t **, int flag);
 
 /* Iterate through the SID to UID/GID mappings */
 extern idmap_stat idmap_iter_next_mapping(idmap_iter_t *, char **,
@@ -116,7 +114,7 @@ extern idmap_stat idmap_iter_next_mapping(idmap_iter_t *, char **,
 	boolean_t *, int *, idmap_info *);
 
 /* Create a iterator to get name-based mapping rules */
-extern idmap_stat idmap_iter_namerules(idmap_handle_t *, const char *,
+extern idmap_stat idmap_iter_namerules(const char *,
 	boolean_t, boolean_t, const char *, const char *, idmap_iter_t **);
 
 /* Iterate through the name-based mapping rules */
@@ -133,11 +131,11 @@ extern void idmap_iter_destroy(idmap_iter_t *);
 /*
  * Get mapping
  */
-extern idmap_stat idmap_get_w2u_mapping(idmap_handle_t *, const char *,
+extern idmap_stat idmap_get_w2u_mapping(const char *,
 	idmap_rid_t *, const char *, const char *, int, int *, int *,
 	uid_t *, char **, int *, idmap_info *);
 
-extern idmap_stat idmap_get_u2w_mapping(idmap_handle_t *, uid_t *,
+extern idmap_stat idmap_get_u2w_mapping(uid_t *,
 	const char *, int, int, int *, char **, idmap_rid_t *, char **,
 	char **, int *, idmap_info *);
 
@@ -188,10 +186,8 @@ extern idmap_stat idmap_getext_sidbygid(idmap_get_handle_t *, gid_t, int,
 	char **, idmap_rid_t *, idmap_info *, idmap_stat *);
 
 /* Properties */
-extern idmap_stat idmap_get_prop_ds(idmap_handle_t *, idmap_prop_type,
-    idmap_ad_disc_ds_t *);
-extern idmap_stat idmap_get_prop_str(idmap_handle_t *, idmap_prop_type,
-    char **);
+extern idmap_stat idmap_get_prop_ds(idmap_prop_type, idmap_ad_disc_ds_t *);
+extern idmap_stat idmap_get_prop_str(idmap_prop_type, char **);
 
 /*
  * Trace

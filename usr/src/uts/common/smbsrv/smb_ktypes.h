@@ -572,6 +572,8 @@ typedef struct smb_oplock {
 #define	SMB_OPLOCK_GRANT_MAGIC	0x4F4C4B47	/* OLKG */
 #define	SMB_OPLOCK_GRANT_VALID(p) \
 	ASSERT((p)->og_magic == SMB_OPLOCK_GRANT_MAGIC)
+#define	SMB_OFILE_OPLOCK_GRANTED(p) \
+	((p)->f_oplock_grant.og_magic == SMB_OPLOCK_GRANT_MAGIC)
 typedef struct smb_oplock_grant {
 	uint32_t		og_magic;
 	list_node_t		og_lnd;
@@ -1255,6 +1257,7 @@ typedef struct smb_ofile {
 	pid_t			f_pid;
 	uint32_t		f_explicit_times;
 	char			f_quota_resume[SMB_SID_STRSZ];
+	smb_oplock_grant_t	f_oplock_grant;
 } smb_ofile_t;
 
 #define	SMB_ODIR_MAGIC 		0x4F444952	/* 'ODIR' */

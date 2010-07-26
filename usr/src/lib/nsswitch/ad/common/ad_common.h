@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_AD_COMMON_H
@@ -82,7 +81,6 @@ struct ad_backend {
 	fnf			adobj2str;
 	char			*buffer;
 	int			buflen;
-	idmap_handle_t		*ih;
 	uid_t			uid;
 	adutils_result_t	*result;
 	nss_ad_db_type_t	db_type;

@@ -60,11 +60,11 @@ uint32_t lsa_lookup_sid(smb_sid_t *, smb_account_t *);
 
 extern boolean_t smb_locate_dc(char *, char *, smb_domainex_t *);
 
+extern int dssetup_check_service(void);
 extern void dssetup_clear_domain_info(void);
 extern void mlsvc_disconnect(const char *);
 extern int mlsvc_init(void);
 extern void mlsvc_fini(void);
-extern int mlsvc_ping(const char *);
 extern DWORD mlsvc_netlogon(char *, char *);
 extern DWORD mlsvc_join(smb_domainex_t *, char *, char *);
 

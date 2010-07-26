@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <grp.h>
@@ -72,7 +71,6 @@ getbynam(ad_backend_ptr be, void *a)
 	idmap_stat	idmaprc;
 	gid_t		gid;
 	int		is_user, is_wuser;
-	idmap_handle_t	*ih;
 
 	be->db_type = NSS_AD_DB_GROUP_BYNAME;
 
@@ -89,14 +87,10 @@ getbynam(ad_backend_ptr be, void *a)
 	/*
 	 * Map the name to gid using idmap service.
 	 */
-	idmaprc = idmap_init(&ih);
-	if (idmaprc != IDMAP_SUCCESS)
-		return ((nss_status_t)NSS_NOTFOUND);
 	is_wuser = -1;
 	is_user = 0; /* Map name to gid */
-	idmaprc = idmap_get_w2u_mapping(ih, NULL, NULL, name, dname,
+	idmaprc = idmap_get_w2u_mapping(NULL, NULL, name, dname,
 	    0, &is_user, &is_wuser, &gid, NULL, NULL, NULL);
-	(void) idmap_fini(ih);
 	if (idmaprc != IDMAP_SUCCESS) {
 		RESET_ERRNO();
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -134,9 +128,7 @@ getbygid(ad_backend_ptr be, void *a)
 		goto out;
 
 	/* Map the given GID to a SID using the idmap service */
-	if (idmap_init(&be->ih) != 0)
-		goto out;
-	if (idmap_get_u2w_mapping(be->ih, &argp->key.gid, NULL, 0,
+	if (idmap_get_u2w_mapping(&argp->key.gid, NULL, 0,
 	    0, NULL, NULL, NULL, &winname, &windomain,
 	    NULL, NULL) != 0) {
 		RESET_ERRNO();
@@ -161,8 +153,6 @@ getbygid(ad_backend_ptr be, void *a)
 out:
 	idmap_free(winname);
 	idmap_free(windomain);
-	(void) idmap_fini(be->ih);
-	be->ih = NULL;
 	return (stat);
 }
 

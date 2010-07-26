@@ -58,6 +58,7 @@
 #include <smbsrv/libmlsvc.h>
 #include "smbd.h"
 
+#define	SMBD_ONLINE_WAIT_INTERVAL	10
 #define	SMB_CUPS_DOCNAME "generic_doc"
 #define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
 #define	SMB_DBDIR "/var/smb"
@@ -89,16 +90,15 @@ static int32_t smbd_gmtoff(void);
 static int smbd_localtime_init(void);
 static void *smbd_localtime_monitor(void *arg);
 
-static pthread_t localtime_thr;
+static int smbd_spool_init(void);
+static void *smbd_spool_monitor(void *arg);
 
 static int smbd_spool_init(void);
 static void *smbd_spool_monitor(void *arg);
-static pthread_t smbd_spool_thr;
 
 static int smbd_refresh_init(void);
 static void smbd_refresh_fini(void);
 static void *smbd_refresh_monitor(void *);
-static void smbd_refresh_dc(void);
 
 static void *smbd_nbt_receiver(void *);
 static void *smbd_nbt_listener(void *);
@@ -112,7 +112,6 @@ static int smbd_kernel_start(void);
 
 static void smbd_fatal_error(const char *);
 
-static pthread_t refresh_thr;
 static pthread_cond_t refresh_cond;
 static pthread_mutex_t refresh_mutex;
 
@@ -516,16 +515,15 @@ smbd_service_init(void)
 		}
 	}
 
-	smb_ads_init();
+	if (smbd_dc_monitor_init() != 0)
+		smbd_report("DC monitor initialization failed %s",
+		    strerror(errno));
+
 	if (mlsvc_init() != 0) {
 		smbd_report("msrpc initialization failed");
 		(void) mutex_unlock(&smbd_service_mutex);
 		return (-1);
 	}
-
-	if (smbd.s_secmode == SMB_SECMODE_DOMAIN)
-		if (smbd_locate_dc_start() != 0)
-			smbd_report("dc discovery failed %s", strerror(errno));
 
 	smbd.s_door_srv = smbd_door_start();
 	smbd.s_door_opipe = smbd_opipe_start();
@@ -623,7 +621,6 @@ smbd_service_fini(void)
 	smb_pwd_fini();
 	smb_domain_fini();
 	mlsvc_fini();
-	smb_ads_fini();
 	smb_netbios_stop();
 
 	smbd.s_initialized = B_FALSE;
@@ -654,7 +651,8 @@ smbd_refresh_init()
 
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&refresh_thr, &tattr, smbd_refresh_monitor, 0);
+	rc = pthread_create(&smbd.s_refresh_tid, &tattr, smbd_refresh_monitor,
+	    NULL);
 	(void) pthread_attr_destroy(&tattr);
 
 	return (rc);
@@ -668,8 +666,8 @@ smbd_refresh_init()
 static void
 smbd_refresh_fini()
 {
-	if (pthread_self() != refresh_thr) {
-		(void) pthread_cancel(refresh_thr);
+	if (pthread_self() != smbd.s_refresh_tid) {
+		(void) pthread_cancel(smbd.s_refresh_tid);
 		(void) pthread_cond_destroy(&refresh_cond);
 		(void) pthread_mutex_destroy(&refresh_mutex);
 	}
@@ -722,27 +720,9 @@ smbd_refresh_monitor(void *arg)
 			smbd_report("NIC monitor refresh failed");
 		smb_netbios_name_reconfig();
 		smb_browser_reconfig();
-		smbd_refresh_dc();
 		dyndns_update_zones();
 
 		(void) mutex_unlock(&smbd_service_mutex);
-
-		if (smbd_set_netlogon_cred()) {
-			/*
-			 * Restart required because the domain changed
-			 * or the credential chain setup failed.
-			 */
-			if (smb_smf_restart_service() != 0) {
-				syslog(LOG_ERR,
-				    "unable to restart smb/server. "
-				    "Run 'svcs -xv smb/server' for more "
-				    "information.");
-				smbd_service_fini();
-				/*NOTREACHED*/
-			}
-
-			break;
-		}
 
 		if (!smbd.s_kbound) {
 			if ((error = smbd_kernel_bind()) == 0)
@@ -761,23 +741,6 @@ smbd_refresh_monitor(void *arg)
 	}
 
 	return (NULL);
-}
-
-/*
- * Update DC information on a refresh.
- */
-static void
-smbd_refresh_dc(void)
-{
-	char fqdomain[MAXHOSTNAMELEN];
-	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
-		return;
-
-	if (smb_getfqdomainname(fqdomain, MAXHOSTNAMELEN))
-		return;
-
-	if (!smb_locate_dc(fqdomain, "", NULL))
-		smbd_report("DC refresh failed");
 }
 
 void
@@ -805,6 +768,26 @@ boolean_t
 smbd_online(void)
 {
 	return (smbd.s_initialized && !smbd.s_shutting_down);
+}
+
+/*
+ * Wait until the service is online.  Provided for threads that
+ * should wait until the service has been fully initialized before
+ * they start performing operations.
+ */
+void
+smbd_online_wait(const char *text)
+{
+	while (!smbd_online()) {
+		if (text != NULL)
+			smb_log(smbd.s_loghd, LOG_DEBUG,
+			    "%s: waiting for online", text);
+
+		(void) sleep(SMBD_ONLINE_WAIT_INTERVAL);
+	}
+
+	if (text != NULL)
+		smb_log(smbd.s_loghd, LOG_DEBUG, "%s: online", text);
 }
 
 /*
@@ -911,7 +894,8 @@ smbd_spool_init(void)
 
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&smbd_spool_thr, &tattr, smbd_spool_monitor, 0);
+	rc = pthread_create(&smbd.s_spool_tid, &tattr, smbd_spool_monitor,
+	    NULL);
 	(void) pthread_attr_destroy(&tattr);
 
 	return (rc);
@@ -935,6 +919,8 @@ smbd_spool_monitor(void *arg)
 	char path[MAXPATHLEN];
 	smb_inaddr_t ipaddr;
 	int error_retry_cnt = 5;
+
+	smbd_online_wait("smbd_spool_monitor");
 
 	while (!smbd.s_shutting_down && (error_retry_cnt > 0)) {
 		errno = 0;
@@ -968,7 +954,8 @@ smbd_localtime_init(void)
 
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&localtime_thr, &tattr, smbd_localtime_monitor, 0);
+	rc = pthread_create(&smbd.s_localtime_tid, &tattr,
+	    smbd_localtime_monitor, NULL);
 	(void) pthread_attr_destroy(&tattr);
 	return (rc);
 }
@@ -991,6 +978,8 @@ smbd_localtime_monitor(void *arg)
 	int32_t gmtoff, last_gmtoff = -1;
 	int timeout;
 	int error;
+
+	smbd_online_wait("smbd_localtime_monitor");
 
 	for (;;) {
 		gmtoff = smbd_gmtoff();

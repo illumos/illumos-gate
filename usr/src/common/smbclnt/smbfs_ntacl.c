@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -902,9 +901,6 @@ smbfs_acl_sd2zfs(
 	gid_t own_gid = (gid_t)-1;
 	i_ntacl_t *ntacl;
 	i_ntace_t **ntacep;
-#ifndef	_KERNEL
-	idmap_handle_t *idmap_h = NULL;
-#endif /* _KERNEL */
 	idmap_get_handle_t *idmap_gh = NULL;
 	idmap_stat	idms;
 
@@ -961,12 +957,7 @@ smbfs_acl_sd2zfs(
 #ifdef	_KERNEL
 	idmap_gh = kidmap_get_create(curproc->p_zone);
 #else /* _KERNEL */
-	idms = idmap_init(&idmap_h);
-	if (idms != IDMAP_SUCCESS) {
-		error = ENOTACTIVE;
-		goto errout;
-	}
-	idms = idmap_get_create(idmap_h, &idmap_gh);
+	idms = idmap_get_create(&idmap_gh);
 	if (idms != IDMAP_SUCCESS) {
 		error = ENOTACTIVE;
 		goto errout;
@@ -1147,8 +1138,6 @@ errout:
 #else /* _KERNEL */
 	if (idmap_gh != NULL)
 		idmap_get_destroy(idmap_gh);
-	if (idmap_h != NULL)
-		(void) idmap_fini(idmap_h);
 #endif /* _KERNEL */
 
 	return (error);
@@ -1440,9 +1429,6 @@ smbfs_acl_zfs2sd(
 	i_ntsd_t *sd = NULL;
 	i_ntacl_t *acl = NULL;
 	i_ntace_t **acep = NULL;
-#ifndef	_KERNEL
-	idmap_handle_t *idmap_h = NULL;
-#endif /* _KERNEL */
 	idmap_get_handle_t *idmap_gh = NULL;
 	idmap_stat	idms;
 
@@ -1499,12 +1485,7 @@ smbfs_acl_zfs2sd(
 #ifdef	_KERNEL
 	idmap_gh = kidmap_get_create(curproc->p_zone);
 #else /* _KERNEL */
-	idms = idmap_init(&idmap_h);
-	if (idms != IDMAP_SUCCESS) {
-		error = ENOTACTIVE;
-		goto errout;
-	}
-	idms = idmap_get_create(idmap_h, &idmap_gh);
+	idms = idmap_get_create(&idmap_gh);
 	if (idms != IDMAP_SUCCESS) {
 		error = ENOTACTIVE;
 		goto errout;
@@ -1719,8 +1700,6 @@ errout:
 #else /* _KERNEL */
 	if (idmap_gh != NULL)
 		idmap_get_destroy(idmap_gh);
-	if (idmap_h != NULL)
-		(void) idmap_fini(idmap_h);
 #endif /* _KERNEL */
 
 	return (error);

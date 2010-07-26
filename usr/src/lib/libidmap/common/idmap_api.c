@@ -38,7 +38,6 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <libintl.h>
-#include <ucontext.h>
 #include <syslog.h>
 #include <assert.h>
 #include "idmap_impl.h"
@@ -49,11 +48,7 @@ static struct timeval TIMEOUT = { 25, 0 };
 static int idmap_stat2errno(idmap_stat);
 static idmap_stat	idmap_strdupnull(char **, const char *);
 
-#define	__ITER_CREATE(itera, argu, handl, ityp)\
-	if (handl == NULL) {\
-		errno = EINVAL;\
-		return (IDMAP_ERR_ARG);\
-	}\
+#define	__ITER_CREATE(itera, argu, ityp)\
 	itera = calloc(1, sizeof (*itera));\
 	if (itera == NULL) {\
 		errno = ENOMEM;\
@@ -65,7 +60,6 @@ static idmap_stat	idmap_strdupnull(char **, const char *);
 		errno = ENOMEM;\
 		return (IDMAP_ERR_MEMORY);\
 	}\
-	itera->ih = handl;\
 	itera->type = ityp;\
 	itera->retcode = IDMAP_NEXT;\
 	itera->limit = 1024;\
@@ -105,136 +99,30 @@ idmap_free(void *ptr)
 }
 
 
-#define	MIN_STACK_NEEDS	65536
-
-/*
- * Create and Initialize idmap client handle for rpc/doors
- *
- * Output:
- * handle - idmap handle
- */
-idmap_stat
-idmap_init(idmap_handle_t **handle)
-{
-	CLIENT			*clnt = NULL;
-	struct idmap_handle	*hptr;
-	uint_t			sendsz = 0;
-	stack_t			st;
-
-	*handle = NULL;
-	hptr = (struct idmap_handle *)calloc(1, sizeof (*hptr));
-	if (hptr == NULL)
-		return (IDMAP_ERR_MEMORY);
-
-	/*
-	 * clnt_door_call() alloca()s sendsz bytes (twice too, once for
-	 * the call args buffer and once for the call result buffer), so
-	 * we want to pick a sendsz that will be large enough, but not
-	 * too large.
-	 */
-	if (stack_getbounds(&st) == 0) {
-		/*
-		 * Estimate how much stack space is left;
-		 * st.ss_sp is the top of stack.
-		 */
-		if ((char *)&sendsz < (char *)st.ss_sp)
-			/* stack grows up */
-			sendsz = ((char *)st.ss_sp - (char *)&sendsz);
-		else
-			/* stack grows down */
-			sendsz = ((char *)&sendsz - (char *)st.ss_sp);
-
-		if (sendsz <= MIN_STACK_NEEDS) {
-			sendsz = 0;	/* RPC call may fail */
-		} else {
-			/* Leave 64Kb (just a guess) for our needs */
-			sendsz -= MIN_STACK_NEEDS;
-
-			/* Divide the stack space left by two */
-			sendsz = RNDUP(sendsz / 2);
-
-			/* Limit sendsz to 256KB */
-			if (sendsz > IDMAP_MAX_DOOR_RPC)
-				sendsz = IDMAP_MAX_DOOR_RPC;
-		}
-	}
-
-	clnt = clnt_door_create(IDMAP_PROG, IDMAP_V1, sendsz);
-	if (clnt == NULL) {
-		free(hptr);
-		return (IDMAP_ERR_RPC);
-	}
-	hptr->type = _IDMAP_HANDLE_RPC_DOORS;
-	hptr->privhandle = clnt;
-	*handle = hptr;
-	return (IDMAP_SUCCESS);
-}
-
-
-/*
- * Finalize idmap handle
- *
- * Input:
- * handle - idmap handle
- */
-idmap_stat
-idmap_fini(idmap_handle_t *handle)
-{
-	CLIENT			*clnt;
-	struct idmap_handle	*hptr;
-
-	if (handle == NULL)
-		return (IDMAP_SUCCESS);
-
-	hptr = (struct idmap_handle *)handle;
-
-	switch (hptr->type) {
-	case _IDMAP_HANDLE_RPC_DOORS:
-		clnt = (CLIENT *)hptr->privhandle;
-		if (clnt) {
-			if (clnt->cl_auth)
-				auth_destroy(clnt->cl_auth);
-			clnt_destroy(clnt);
-		}
-		break;
-	default:
-		break;
-	}
-	free(hptr);
-	return (IDMAP_SUCCESS);
-}
-
-
 static idmap_stat
-idmap_get_prop(idmap_handle_t *handle, idmap_prop_type pr, idmap_prop_res *res)
+idmap_get_prop(idmap_prop_type pr, idmap_prop_res *res)
 {
-	CLIENT			*clnt;
-	enum clnt_stat		clntstat;
-
+	idmap_stat retcode;
 
 	(void) memset(res, 0, sizeof (*res));
-	_IDMAP_GET_CLIENT_HANDLE(handle, clnt);
 
-	clntstat = clnt_call(clnt, IDMAP_GET_PROP,
+	retcode = _idmap_clnt_call(IDMAP_GET_PROP,
 	    (xdrproc_t)xdr_idmap_prop_type, (caddr_t)&pr,
 	    (xdrproc_t)xdr_idmap_prop_res, (caddr_t)res, TIMEOUT);
-
-	if (clntstat != RPC_SUCCESS) {
-		return (_idmap_rpc2stat(clnt));
-	}
+	if (retcode != IDMAP_SUCCESS)
+		return (retcode);
 
 	return (res->retcode); /* This might not be IDMAP_SUCCESS! */
 }
 
 
 idmap_stat
-idmap_get_prop_ds(idmap_handle_t *handle, idmap_prop_type pr,
-    idmap_ad_disc_ds_t *dc)
+idmap_get_prop_ds(idmap_prop_type pr, idmap_ad_disc_ds_t *dc)
 {
 	idmap_prop_res res;
 	idmap_stat rc = IDMAP_SUCCESS;
 
-	rc = idmap_get_prop(handle, pr, &res);
+	rc = idmap_get_prop(pr, &res);
 	if (rc < 0)
 		return (rc);
 
@@ -254,12 +142,12 @@ idmap_get_prop_ds(idmap_handle_t *handle, idmap_prop_type pr,
  * otherwise IDMAP_SUCCESS is returned.
  */
 idmap_stat
-idmap_get_prop_str(idmap_handle_t *handle, idmap_prop_type pr, char **str)
+idmap_get_prop_str(idmap_prop_type pr, char **str)
 {
 	idmap_prop_res res;
 	idmap_stat rc = IDMAP_SUCCESS;
 
-	rc = idmap_get_prop(handle, pr, &res);
+	rc = idmap_get_prop(pr, &res);
 	if (rc < 0)
 		return (rc);
 
@@ -274,11 +162,11 @@ idmap_get_prop_str(idmap_handle_t *handle, idmap_prop_type pr, char **str)
  * udthandle - update handle
  */
 idmap_stat
-idmap_udt_create(idmap_handle_t *handle, idmap_udt_handle_t **udthandle)
+idmap_udt_create(idmap_udt_handle_t **udthandle)
 {
 	idmap_udt_handle_t	*tmp;
 
-	if (handle == NULL || udthandle == NULL) {
+	if (udthandle == NULL) {
 		errno = EINVAL;
 		return (IDMAP_ERR_ARG);
 	}
@@ -287,7 +175,6 @@ idmap_udt_create(idmap_handle_t *handle, idmap_udt_handle_t **udthandle)
 		return (IDMAP_ERR_MEMORY);
 	}
 
-	tmp->ih = handle;
 	*udthandle = tmp;
 	return (IDMAP_SUCCESS);
 }
@@ -306,8 +193,6 @@ idmap_udt_create(idmap_handle_t *handle, idmap_udt_handle_t **udthandle)
 idmap_stat
 idmap_udt_commit(idmap_udt_handle_t *udthandle)
 {
-	CLIENT			*clnt;
-	enum clnt_stat		clntstat;
 	idmap_update_res	res;
 	idmap_stat		retcode;
 
@@ -318,16 +203,12 @@ idmap_udt_commit(idmap_udt_handle_t *udthandle)
 
 	(void) memset(&res, 0, sizeof (res));
 
-	_IDMAP_GET_CLIENT_HANDLE(udthandle->ih, clnt);
-	clntstat = clnt_call(clnt, IDMAP_UPDATE,
+	retcode = _idmap_clnt_call(IDMAP_UPDATE,
 	    (xdrproc_t)xdr_idmap_update_batch, (caddr_t)&udthandle->batch,
 	    (xdrproc_t)xdr_idmap_update_res, (caddr_t)&res,
 	    TIMEOUT);
-
-	if (clntstat != RPC_SUCCESS) {
-		retcode = _idmap_rpc2stat(clnt);
+	if (retcode != IDMAP_SUCCESS)
 		goto out;
-	}
 
 	retcode = udthandle->commit_stat = res.retcode;
 	udthandle->error_index = res.error_index;
@@ -692,7 +573,7 @@ idmap_iter_set_limit(idmap_iter_t *iter, uint64_t limit)
  * iter - iterator
  */
 idmap_stat
-idmap_iter_namerules(idmap_handle_t *handle, const char *windomain,
+idmap_iter_namerules(const char *windomain,
 		boolean_t is_user, boolean_t is_wuser, const char *winname,
 		const char *unixname, idmap_iter_t **iter)
 {
@@ -702,7 +583,7 @@ idmap_iter_namerules(idmap_handle_t *handle, const char *windomain,
 	idmap_namerule			*rule;
 	idmap_retcode			retcode;
 
-	__ITER_CREATE(tmpiter, arg, handle, IDMAP_LIST_NAMERULES);
+	__ITER_CREATE(tmpiter, arg, IDMAP_LIST_NAMERULES);
 
 	rule = &arg->rule;
 	rule->is_user = is_user;
@@ -847,12 +728,12 @@ errout:
  * iter - iterator
  */
 idmap_stat
-idmap_iter_mappings(idmap_handle_t *handle, idmap_iter_t **iter, int flag)
+idmap_iter_mappings(idmap_iter_t **iter, int flag)
 {
 	idmap_iter_t			*tmpiter;
 	idmap_list_mappings_1_argument	*arg = NULL;
 
-	__ITER_CREATE(tmpiter, arg, handle, IDMAP_LIST_MAPPINGS);
+	__ITER_CREATE(tmpiter, arg, IDMAP_LIST_MAPPINGS);
 
 	arg->flag = flag;
 	*iter = tmpiter;
@@ -1055,15 +936,9 @@ idmap_iter_destroy(idmap_iter_t *iter)
  * gh - "get mapping" handle
  */
 idmap_stat
-idmap_get_create(idmap_handle_t *handle, idmap_get_handle_t **gh)
+idmap_get_create(idmap_get_handle_t **gh)
 {
 	idmap_get_handle_t	*tmp;
-
-	/* sanity checks */
-	if (handle == NULL || gh == NULL) {
-		errno = EINVAL;
-		return (IDMAP_ERR_ARG);
-	}
 
 	/* allocate the handle */
 	if ((tmp = calloc(1, sizeof (*tmp))) == NULL) {
@@ -1071,7 +946,6 @@ idmap_get_create(idmap_handle_t *handle, idmap_get_handle_t **gh)
 		return (IDMAP_ERR_MEMORY);
 	}
 
-	tmp->ih = handle;
 	*gh = tmp;
 	return (IDMAP_SUCCESS);
 }
@@ -1557,8 +1431,6 @@ errout:
 idmap_stat
 idmap_get_mappings(idmap_get_handle_t *gh)
 {
-	CLIENT		*clnt;
-	enum clnt_stat	clntstat;
 	idmap_retcode	retcode;
 	idmap_ids_res	res;
 	idmap_id	*res_id;
@@ -1570,17 +1442,15 @@ idmap_get_mappings(idmap_get_handle_t *gh)
 		errno = EINVAL;
 		return (IDMAP_ERR_ARG);
 	}
-	_IDMAP_GET_CLIENT_HANDLE(gh->ih, clnt);
 
 	(void) memset(&res, 0, sizeof (idmap_ids_res));
-	clntstat = clnt_call(clnt, IDMAP_GET_MAPPED_IDS,
+	retcode = _idmap_clnt_call(IDMAP_GET_MAPPED_IDS,
 	    (xdrproc_t)xdr_idmap_mapping_batch,
 	    (caddr_t)&gh->batch,
 	    (xdrproc_t)xdr_idmap_ids_res,
 	    (caddr_t)&res,
 	    TIMEOUT);
-	if (clntstat != RPC_SUCCESS) {
-		retcode = _idmap_rpc2stat(clnt);
+	if (retcode != IDMAP_SUCCESS) {
 		goto out;
 	}
 	if (res.retcode != IDMAP_SUCCESS) {
@@ -1726,24 +1596,15 @@ idmap_get_destroy(idmap_get_handle_t *gh)
  * Get windows to unix mapping
  */
 idmap_stat
-idmap_get_w2u_mapping(idmap_handle_t *handle,
+idmap_get_w2u_mapping(
 		const char *sidprefix, idmap_rid_t *rid,
 		const char *winname, const char *windomain,
 		int flag, int *is_user, int *is_wuser,
 		uid_t *pid, char **unixname, int *direction, idmap_info *info)
 {
-	CLIENT			*clnt;
-	enum clnt_stat		clntstat;
 	idmap_mapping		request, *mapping;
 	idmap_mappings_res	result;
 	idmap_retcode		retcode, rc;
-
-	if (handle == NULL) {
-		errno = EINVAL;
-		return (IDMAP_ERR_ARG);
-	}
-
-	_IDMAP_GET_CLIENT_HANDLE(handle, clnt);
 
 	(void) memset(&request, 0, sizeof (request));
 	(void) memset(&result, 0, sizeof (result));
@@ -1789,13 +1650,13 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 	else
 		request.id1.idtype = IDMAP_SID;
 
-	clntstat = clnt_call(clnt, IDMAP_GET_MAPPED_ID_BY_NAME,
+	retcode = _idmap_clnt_call(IDMAP_GET_MAPPED_ID_BY_NAME,
 	    (xdrproc_t)xdr_idmap_mapping, (caddr_t)&request,
 	    (xdrproc_t)xdr_idmap_mappings_res, (caddr_t)&result,
 	    TIMEOUT);
 
-	if (clntstat != RPC_SUCCESS)
-		return (_idmap_rpc2stat(clnt));
+	if (retcode != IDMAP_SUCCESS)
+		return (retcode);
 
 	retcode = result.retcode;
 
@@ -1849,25 +1710,16 @@ out:
  * Get unix to windows mapping
  */
 idmap_stat
-idmap_get_u2w_mapping(idmap_handle_t *handle,
+idmap_get_u2w_mapping(
 		uid_t *pid, const char *unixname,
 		int flag, int is_user, int *is_wuser,
 		char **sidprefix, idmap_rid_t *rid,
 		char **winname, char **windomain,
 		int *direction, idmap_info *info)
 {
-	CLIENT			*clnt;
-	enum clnt_stat		clntstat;
 	idmap_mapping		request, *mapping;
 	idmap_mappings_res	result;
 	idmap_retcode		retcode, rc;
-
-	if (handle == NULL) {
-		errno = EINVAL;
-		return (IDMAP_ERR_ARG);
-	}
-
-	_IDMAP_GET_CLIENT_HANDLE(handle, clnt);
 
 	if (sidprefix)
 		*sidprefix = NULL;
@@ -1905,13 +1757,13 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 	else if (*is_wuser == 1)
 		request.id2.idtype = IDMAP_USID;
 
-	clntstat = clnt_call(clnt, IDMAP_GET_MAPPED_ID_BY_NAME,
+	retcode = _idmap_clnt_call(IDMAP_GET_MAPPED_ID_BY_NAME,
 	    (xdrproc_t)xdr_idmap_mapping, (caddr_t)&request,
 	    (xdrproc_t)xdr_idmap_mappings_res, (caddr_t)&result,
 	    TIMEOUT);
 
-	if (clntstat != RPC_SUCCESS)
-		return (_idmap_rpc2stat(clnt));
+	if (retcode != IDMAP_SUCCESS)
+		return (retcode);
 
 	retcode = result.retcode;
 
@@ -2060,9 +1912,8 @@ static stat_table_t stattable[] = {
  * Return Value:
  * human-readable localized description of idmap_stat
  */
-/* ARGSUSED */
 const char *
-idmap_stat2string(idmap_handle_t *handle, idmap_stat status)
+idmap_stat2string(idmap_stat status)
 {
 	int i;
 
@@ -2258,7 +2109,6 @@ idmap_stat
 idmap_getuidbywinname(const char *name, const char *domain, int flag,
 	uid_t *uid)
 {
-	idmap_handle_t	*ih;
 	idmap_retcode	rc;
 	int		is_user = 1;
 	int		is_wuser = -1;
@@ -2273,11 +2123,8 @@ idmap_getuidbywinname(const char *name, const char *domain, int flag,
 			return (rc);
 	}
 	/* Get mapping */
-	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
-		return (rc);
-	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, flag,
+	rc = idmap_get_w2u_mapping(NULL, NULL, name, domain, flag,
 	    &is_user, &is_wuser, uid, NULL, &direction, NULL);
-	(void) idmap_fini(ih);
 
 	if (rc == IDMAP_SUCCESS && (flag & IDMAP_REQ_FLG_USE_CACHE)) {
 		/* If we have not got the domain don't store UID to winname */
@@ -2297,7 +2144,6 @@ idmap_stat
 idmap_getgidbywinname(const char *name, const char *domain, int flag,
 	gid_t *gid)
 {
-	idmap_handle_t	*ih;
 	idmap_retcode	rc;
 	int		is_user = 0;
 	int		is_wuser = -1;
@@ -2313,11 +2159,8 @@ idmap_getgidbywinname(const char *name, const char *domain, int flag,
 	}
 
 	/* Get mapping */
-	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
-		return (rc);
-	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, flag,
+	rc = idmap_get_w2u_mapping(NULL, NULL, name, domain, flag,
 	    &is_user, &is_wuser, gid, NULL, &direction, NULL);
-	(void) idmap_fini(ih);
 
 	if (rc == IDMAP_SUCCESS && (flag & IDMAP_REQ_FLG_USE_CACHE)) {
 		/* If we have not got the domain don't store GID to winname */
@@ -2337,7 +2180,6 @@ static idmap_retcode
 idmap_getwinnamebypid(uid_t pid, int is_user, int flag, char **name,
 	char **domain)
 {
-	idmap_handle_t	*ih;
 	idmap_retcode	rc;
 	int		len;
 	char		*winname, *windomain;
@@ -2360,11 +2202,8 @@ idmap_getwinnamebypid(uid_t pid, int is_user, int flag, char **name,
 	}
 
 	/* Get mapping */
-	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
-		return (rc);
-	rc = idmap_get_u2w_mapping(ih, &pid, NULL, flag, is_user, NULL,
+	rc = idmap_get_u2w_mapping(&pid, NULL, flag, is_user, NULL,
 	    NULL, NULL, &winname, &windomain, &direction, NULL);
-	(void) idmap_fini(ih);
 
 	/* Return on error */
 	if (rc != IDMAP_SUCCESS)
@@ -2429,23 +2268,17 @@ idmap_getwinnamebygid(gid_t gid, int flag, char **name, char **domain)
 }
 
 idmap_stat
-idmap_flush(idmap_handle_t *handle, idmap_flush_op op)
+idmap_flush(idmap_flush_op op)
 {
-	CLIENT			*clnt;
-	enum clnt_stat		clntstat;
-	idmap_retcode		res;
+	idmap_retcode		rc1, rc2;
 
-	res = IDMAP_SUCCESS;
-	_IDMAP_GET_CLIENT_HANDLE(handle, clnt);
-
-	clntstat = clnt_call(clnt, IDMAP_FLUSH,
+	rc1 = _idmap_clnt_call(IDMAP_FLUSH,
 	    (xdrproc_t)xdr_idmap_flush_op, (caddr_t)&op,
-	    (xdrproc_t)xdr_idmap_retcode, (caddr_t)&res, TIMEOUT);
+	    (xdrproc_t)xdr_idmap_retcode, (caddr_t)&rc2, TIMEOUT);
 
-	if (clntstat != RPC_SUCCESS) {
-		return (_idmap_rpc2stat(clnt));
-	}
-	return (res);
+	if (rc1 != IDMAP_SUCCESS)
+		return (rc1);
+	return (rc2);
 }
 
 
