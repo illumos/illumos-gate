@@ -1648,6 +1648,7 @@ zil_free(zilog_t *zilog)
 	if (head_lwb) {
 		ASSERT(head_lwb == list_tail(&zilog->zl_lwb_list));
 		list_remove(&zilog->zl_lwb_list, head_lwb);
+		zio_buf_free(head_lwb->lwb_buf, head_lwb->lwb_sz);
 		kmem_cache_free(zil_lwb_cache, head_lwb);
 	}
 	list_destroy(&zilog->zl_lwb_list);
