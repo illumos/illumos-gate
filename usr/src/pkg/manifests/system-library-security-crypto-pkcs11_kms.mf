@@ -34,7 +34,6 @@ dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/security
 dir path=usr/lib/security/$(ARCH64)
 dir path=usr/bin
-dir path=usr/share
 file path=usr/lib/$(ARCH64)/libkmsagent.so.1
 file path=usr/lib/security/$(ARCH64)/pkcs11_kms.so.1
 file path=usr/lib/libkmsagent.so.1
