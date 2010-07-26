@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -938,7 +937,7 @@ print_inq_data(char *arg_path, char *path, L_inquiry inq, uchar_t *serial,
 	if (inq.inq_ansi < MAX_ANSI_VERSION) {
 		(void) fprintf(stdout, "%s", ansi_version[inq.inq_ansi]);
 	} else
-		(void) fprintf(stdout, MSGSTR(71, " (Reserved)"));
+		(void) fprintf(stdout, " (%s)", MSGSTR(71, "Reserved"));
 
 	(void) fprintf(stdout, "\n");
 
