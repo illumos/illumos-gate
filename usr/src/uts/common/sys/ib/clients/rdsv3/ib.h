@@ -362,8 +362,9 @@ int rdsv3_ib_send_grab_credits(struct rdsv3_ib_connection *ic, uint32_t wanted,
     uint32_t *adv_credits, int need_posted);
 
 /* ib_stats.c */
-RDSV3_DECLARE_PER_CPU(struct rdsv3_ib_statistics, rdsv3_ib_stats);
-#define	rdsv3_ib_stats_inc(member) rdsv3_stats_inc_which(rdsv3_ib_stats, member)
+extern struct rdsv3_ib_statistics	*rdsv3_ib_stats;
+#define	rdsv3_ib_stats_inc(member) \
+	rdsv3_stats_add_which(rdsv3_ib_stats, member, 1)
 unsigned int rdsv3_ib_stats_info_copy(struct rdsv3_info_iterator *iter,
     unsigned int avail);
 

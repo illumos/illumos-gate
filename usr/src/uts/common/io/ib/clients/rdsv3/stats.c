@@ -45,7 +45,8 @@
 
 #include <sys/ib/clients/rdsv3/rdsv3.h>
 
-RDSV3_DEFINE_PER_CPU(struct rdsv3_statistics, rdsv3_stats);
+struct rdsv3_statistics *rdsv3_stats = NULL;
+uint_t	nr_cpus;
 
 static char *rdsv3_stat_names[] = {
 	"conn_reset",
@@ -132,7 +133,7 @@ rdsv3_stats_info(struct rsock *sock, unsigned int len,
 
 	bzero(&stats, sizeof (struct rdsv3_statistics));
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
 		src = (uint64_t *)&(rdsv3_per_cpu(rdsv3_stats, cpu));
 		sum = (uint64_t *)&stats;
 		for (i = 0;
@@ -155,11 +156,24 @@ void
 rdsv3_stats_exit(void)
 {
 	rdsv3_info_deregister_func(RDS_INFO_COUNTERS, rdsv3_stats_info);
+
+	ASSERT(rdsv3_stats);
+	kmem_free(rdsv3_stats,
+	    nr_cpus * sizeof (struct rdsv3_statistics));
+	rdsv3_stats = NULL;
 }
 
 int
 rdsv3_stats_init(void)
 {
+	/*
+	 * Note the max number of cpus that ths system can have at most.
+	 */
+	nr_cpus = max_ncpus;
+	ASSERT(rdsv3_stats == NULL);
+	rdsv3_stats = kmem_zalloc(nr_cpus *
+	    sizeof (struct rdsv3_statistics), KM_SLEEP);
+
 	rdsv3_info_register_func(RDS_INFO_COUNTERS, rdsv3_stats_info);
 	return (0);
 }

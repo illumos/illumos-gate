@@ -385,6 +385,8 @@ rdsv3_ib_exit(void)
 	rdsv3_ib_sysctl_exit();
 	rdsv3_ib_recv_exit();
 	rdsv3_trans_unregister(&rdsv3_ib_transport);
+	kmem_free(rdsv3_ib_stats,
+	    nr_cpus * sizeof (struct rdsv3_ib_statistics));
 	mutex_destroy(&ib_nodev_conns_lock);
 	list_destroy(&ib_nodev_conns);
 	list_destroy(&rdsv3_ib_devices);
@@ -435,6 +437,11 @@ rdsv3_ib_init(void)
 	    offsetof(struct rdsv3_ib_connection, ib_node));
 	mutex_init(&ib_nodev_conns_lock, NULL, MUTEX_DRIVER, NULL);
 
+	/* allocate space for ib statistics */
+	ASSERT(rdsv3_ib_stats == NULL);
+	rdsv3_ib_stats = kmem_zalloc(nr_cpus *
+	    sizeof (struct rdsv3_ib_statistics), KM_SLEEP);
+
 	rdsv3_ib_client.dip = rdsv3_dev_info;
 	ret = ib_register_client(&rdsv3_ib_client);
 	if (ret)
@@ -465,6 +472,8 @@ out_sysctl:
 out_ibreg:
 	ib_unregister_client(&rdsv3_ib_client);
 out:
+	kmem_free(rdsv3_ib_stats,
+	    nr_cpus * sizeof (struct rdsv3_ib_statistics));
 	mutex_destroy(&ib_nodev_conns_lock);
 	list_destroy(&ib_nodev_conns);
 	list_destroy(&rdsv3_ib_devices);

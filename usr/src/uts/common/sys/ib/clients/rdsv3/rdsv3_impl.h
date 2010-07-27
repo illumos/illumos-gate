@@ -136,11 +136,6 @@ uint_t	rdsv3_one_sec_in_hz;
 #define	IS_ERR(ptr)	(((uintptr_t)ptr) >= (uintptr_t)-MAX_ERRNO)
 #define	PTR_ERR(ptr)	(int)(uintptr_t)ptr
 
-/* cpu */
-#define	NR_CPUS		1
-#define	put_cpu()
-#define	get_cpu()	0
-
 #define	MAX_SCHEDULE_TIMEOUT	(~0UL>>1)
 
 #define	RDMA_CM_EVENT_ADDR_CHANGE	14
