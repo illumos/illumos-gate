@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "statcommon.h"
@@ -702,8 +701,8 @@ get_lti(char *s,
 
 /* get the lun, target, and initiator name and instance */
 static void
-get_path_info(struct iodev_snapshot *io, char *mod, int *type, int *inst,
-    char *name, size_t size)
+get_path_info(struct iodev_snapshot *io, char *mod, size_t modlen, int *type,
+    int *inst, char *name, size_t size)
 {
 
 	/*
@@ -732,11 +731,11 @@ get_path_info(struct iodev_snapshot *io, char *mod, int *type, int *inst,
 			/* set to disk so we sort with disks */
 			*type = IODEV_DISK;
 		}
-		(void) strcpy(mod, lname);
+		(void) strlcpy(mod, lname, modlen);
 		*inst = l1;
 	} else {
-		(void) strcpy(mod, io->is_module);
-		(void) strcpy(name, io->is_name);
+		(void) strlcpy(mod, io->is_module, modlen);
+		(void) strlcpy(name, io->is_name, size);
 		*type = io->is_type;
 		*inst = io->is_instance;
 	}
@@ -750,8 +749,10 @@ iodev_cmp(struct iodev_snapshot *io1, struct iodev_snapshot *io2)
 	char	name1[KSTAT_STRLEN], name2[KSTAT_STRLEN];
 	char	mod1[KSTAT_STRLEN], mod2[KSTAT_STRLEN];
 
-	get_path_info(io1, mod1, &type1, &inst1, name1, sizeof (name1));
-	get_path_info(io2, mod2, &type2, &inst2, name2, sizeof (name2));
+	get_path_info(io1, mod1, sizeof (mod1), &type1, &inst1, name1,
+	    sizeof (name1));
+	get_path_info(io2, mod2, sizeof (mod2), &type2, &inst2, name2,
+	    sizeof (name2));
 	if ((!disk_or_partition(type1)) ||
 	    (!disk_or_partition(type2))) {
 		/* neutral sort order between disk and part */
