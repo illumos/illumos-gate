@@ -798,7 +798,7 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 	ncu_obj = nwamd_object_find(NWAM_OBJECT_TYPE_NCU,
 	    event->event_object);
 	if (ncu_obj == NULL) {
-		nlog(LOG_ERR, "nwamd_ncu_handle_if_state_event: no object %s",
+		nlog(LOG_INFO, "nwamd_ncu_handle_if_state_event: no object %s",
 		    event->event_object);
 		nwamd_event_do_not_send(event);
 		return;

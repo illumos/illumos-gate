@@ -60,7 +60,7 @@ enm_create_init_fini_event(nwam_enm_handle_t enmh, void *data)
 	nwamd_event_t enm_event;
 
 	if (nwam_enm_get_name(enmh, &name) != NWAM_SUCCESS) {
-		nlog(LOG_ERR, "enm_init_fini: could not get ENM name");
+		nlog(LOG_ERR, "enm_init_fini: could not get enm name");
 		return (0);
 	}
 
@@ -157,7 +157,7 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 	object = nwamd_object_find(NWAM_OBJECT_TYPE_ENM, object_name);
 	if (object == NULL) {
 		nlog(LOG_ERR, "nwamd_enm_activate_deactivate_thread: "
-		    "could not find ENM %s", object_name);
+		    "could not find enm %s", object_name);
 		goto done;
 	}
 	enmh = object->nwamd_object_handle;
@@ -191,7 +191,7 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 		struct timeval now;
 
 		nlog(LOG_DEBUG, "nwamd_enm_activate_deactivate_thread: "
-		    "running script %s for ENM %s", script, object_name);
+		    "running script %s for enm %s", script, object_name);
 
 		/*
 		 * The script may take a number of arguments. We need to
@@ -239,7 +239,7 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 		object = nwamd_object_find(NWAM_OBJECT_TYPE_ENM, object_name);
 		if (object == NULL) {
 			nlog(LOG_ERR, "nwamd_enm_activate_deactivate_thread: "
-			    "could not find ENM %s after running script",
+			    "could not find enm %s after running script",
 			    object_name);
 			goto done;
 		}
@@ -247,7 +247,7 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 		if (object->nwamd_script_time.tv_sec != now.tv_sec ||
 		    object->nwamd_script_time.tv_usec != now.tv_usec) {
 			nlog(LOG_INFO, "nwamd_enm_activate_deactivate_thread: "
-			    "ENM %s has been refreshed, nothing to do",
+			    "enm %s has been refreshed, nothing to do",
 			    object_name);
 			nwamd_object_release(object);
 			goto done;
@@ -261,7 +261,7 @@ err:
 		 */
 		if (ret != 0) {
 			nlog(LOG_ERR, "nwamd_enm_activate_deactivate_thread: "
-			    "execution of '%s' failed for ENM %s",
+			    "execution of '%s' failed for enm %s",
 			    script, object_name);
 			if (object->nwamd_object_aux_state !=
 			    NWAM_AUX_STATE_UNINITIALIZED) {
@@ -380,7 +380,7 @@ nwamd_enm_activate(const char *object_name)
 
 	object = nwamd_object_find(NWAM_OBJECT_TYPE_ENM, object_name);
 	if (object == NULL) {
-		nlog(LOG_ERR, "nwamd_enm_activate: could not find ENM %s",
+		nlog(LOG_ERR, "nwamd_enm_activate: could not find enm %s",
 		    object_name);
 		return;
 	}
@@ -388,7 +388,7 @@ nwamd_enm_activate(const char *object_name)
 	aux_state = object->nwamd_object_aux_state;
 	enmh = object->nwamd_object_handle;
 
-	nlog(LOG_DEBUG, "nwamd_enm_activate: activating ENM %s",
+	nlog(LOG_DEBUG, "nwamd_enm_activate: activating enm %s",
 	    object->nwamd_object_name);
 
 	err = nwam_enm_get_prop_value(enmh, NWAM_ENM_PROP_FMRI, &fmrival);
@@ -397,7 +397,7 @@ nwamd_enm_activate(const char *object_name)
 
 		if (nwam_value_get_string(fmrival, &fmri) != NWAM_SUCCESS) {
 			nlog(LOG_ERR, "nwamd_enm_activate: could not retrieve "
-			    "FMRI string for ENM %s",
+			    "fmri string for enm %s",
 			    object->nwamd_object_name);
 			nwam_value_free(fmrival);
 			state = NWAM_STATE_MAINTENANCE;
@@ -406,15 +406,15 @@ nwamd_enm_activate(const char *object_name)
 		}
 
 		if ((smf_state = smf_get_state(fmri)) == NULL) {
-			nlog(LOG_ERR, "nwamd_enm_activate: invalid FMRI %s "
-			    "for ENM %s", fmri, object->nwamd_object_name);
+			nlog(LOG_ERR, "nwamd_enm_activate: invalid fmri %s "
+			    "for enm %s", fmri, object->nwamd_object_name);
 			nwam_value_free(fmrival);
 			state = NWAM_STATE_MAINTENANCE;
 			aux_state = NWAM_AUX_STATE_INVALID_CONFIG;
 			break;
 		}
 
-		nlog(LOG_DEBUG, "nwamd_enm_activate: activating %s for ENM %s",
+		nlog(LOG_DEBUG, "nwamd_enm_activate: activating %s for enm %s",
 		    fmri, object->nwamd_object_name);
 
 		if (strcmp(smf_state, SCF_STATE_STRING_ONLINE) == 0)
@@ -431,7 +431,7 @@ nwamd_enm_activate(const char *object_name)
 			aux_state = NWAM_AUX_STATE_ACTIVE;
 		} else {
 			nlog(LOG_ERR, "nwamd_enm_activate: failed to enable "
-			    "FMRI %s for ENM %s", fmri,
+			    "fmri %s for enm %s", fmri,
 			    object->nwamd_object_name);
 			state = NWAM_STATE_MAINTENANCE;
 			aux_state = NWAM_AUX_STATE_METHOD_FAILED;
@@ -486,7 +486,7 @@ nwamd_enm_deactivate(const char *object_name)
 
 	object = nwamd_object_find(NWAM_OBJECT_TYPE_ENM, object_name);
 	if (object == NULL) {
-		nlog(LOG_ERR, "nwamd_enm_deactivate: could not find ENM %s",
+		nlog(LOG_ERR, "nwamd_enm_deactivate: could not find enm %s",
 		    object_name);
 		return;
 	}
@@ -521,9 +521,8 @@ nwamd_enm_deactivate(const char *object_name)
 		}
 	} else {
 		if (nwam_value_get_string(fmrival, &fmri) != NWAM_SUCCESS) {
-			nlog(LOG_ERR,
-			    "nwamd_enm_deactivate: could not retrieve "
-			    "FMRI string for ENM %s",
+			nlog(LOG_ERR, "nwamd_enm_deactivate: could not "
+			    "retrieve fmri string for enm %s",
 			    object->nwamd_object_name);
 			if (!destroying) {
 				state = NWAM_STATE_MAINTENANCE;
@@ -532,7 +531,7 @@ nwamd_enm_deactivate(const char *object_name)
 		} else {
 			if ((smf_state = smf_get_state(fmri)) == NULL) {
 				nlog(LOG_ERR, "nwamd_enm_deactivate: invalid "
-				    "FMRI %s for ENM %s", fmri,
+				    "fmri %s for enm %s", fmri,
 				    object->nwamd_object_name);
 				nwam_value_free(fmrival);
 				if (!destroying) {
@@ -545,14 +544,14 @@ nwamd_enm_deactivate(const char *object_name)
 			free(smf_state);
 
 			nlog(LOG_DEBUG, "nwamd_enm_deactivate: deactivating %s "
-			    "for ENM %s", fmri, object->nwamd_object_name);
+			    "for enm %s", fmri, object->nwamd_object_name);
 
 			ret = smf_disable_instance(fmri, SMF_TEMPORARY);
 
 			if (ret != 0) {
 				nlog(LOG_ERR, "nwamd_enm_deactivate: "
 				    "smf_disable_instance(%s) failed for "
-				    "ENM %s: %s", fmri,
+				    "enm %s: %s", fmri,
 				    object->nwamd_object_name,
 				    scf_strerror(scf_error()));
 				if (!destroying) {
@@ -643,9 +642,8 @@ nwamd_enm_check(nwamd_object_t object, void *data)
 			default:
 				if (nwamd_enm_action(object->nwamd_object_name,
 				    NWAM_ACTION_ENABLE) != 0) {
-					nlog(LOG_ERR,
-					    "nwamd_enm_check: enable failed "
-					    "for enm %s",
+					nlog(LOG_ERR, "nwamd_enm_check: "
+					    "enable failed for enm %s",
 					    object->nwamd_object_name);
 				}
 				break;
@@ -891,8 +889,8 @@ nwamd_enm_handle_state_event(nwamd_event_t event)
 
 	if ((object = nwamd_object_find(NWAM_OBJECT_TYPE_ENM,
 	    event->event_object)) == NULL) {
-		nlog(LOG_ERR, "nwamd_enm_handle_state_event: "
-		    "state event for nonexistent ENM %s", event->event_object);
+		nlog(LOG_INFO, "nwamd_enm_handle_state_event: "
+		    "state event for nonexistent enm %s", event->event_object);
 		nwamd_event_do_not_send(event);
 		return;
 	}
@@ -903,7 +901,7 @@ nwamd_enm_handle_state_event(nwamd_event_t event)
 	if (new_state == object->nwamd_object_state &&
 	    new_aux_state == object->nwamd_object_aux_state) {
 		nlog(LOG_DEBUG, "nwamd_enm_handle_state_event: "
-		    "ENM %s already in state (%s , %s)",
+		    "enm %s already in state (%s , %s)",
 		    object->nwamd_object_name, nwam_state_to_string(new_state),
 		    nwam_aux_state_to_string(new_aux_state));
 		nwamd_object_release(object);
@@ -913,7 +911,7 @@ nwamd_enm_handle_state_event(nwamd_event_t event)
 	object->nwamd_object_state = new_state;
 	object->nwamd_object_aux_state = new_aux_state;
 
-	nlog(LOG_DEBUG, "nwamd_enm_handle_state_event: changing state for ENM "
+	nlog(LOG_DEBUG, "nwamd_enm_handle_state_event: changing state for enm "
 	    "%s to (%s , %s)", object->nwamd_object_name,
 	    nwam_state_to_string(object->nwamd_object_state),
 	    nwam_aux_state_to_string(object->nwamd_object_aux_state));
