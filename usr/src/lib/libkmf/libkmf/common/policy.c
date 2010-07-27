@@ -1279,7 +1279,6 @@ out:
 	return (ret);
 }
 
-
 KMF_RETURN
 kmf_verify_policy(KMF_POLICY_RECORD *policy)
 {
@@ -1290,7 +1289,10 @@ kmf_verify_policy(KMF_POLICY_RECORD *policy)
 		return (KMF_ERR_POLICY_NAME);
 
 	/* Check the TA related policy */
-	if (policy->ta_name != NULL && policy->ta_serial != NULL) {
+	if (policy->ta_name != NULL &&
+	    strcasecmp(policy->ta_name, "search") == 0) {
+		has_ta = B_TRUE;
+	} else if (policy->ta_name != NULL && policy->ta_serial != NULL) {
 		has_ta = B_TRUE;
 	} else if (policy->ta_name == NULL && policy->ta_serial == NULL) {
 		has_ta = B_FALSE;

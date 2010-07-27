@@ -57,6 +57,9 @@ show_policy(KMF_POLICY_RECORD *plc)
 
 	if (plc->ta_name == NULL && plc->ta_serial == NULL) {
 		(void) printf(gettext("Trust Anchor Certificate: <null>\n"));
+	} else if (strcasecmp(plc->ta_name, "search") == 0) {
+		(void) printf(gettext("Trust Anchor Certificate: "
+		    "Search by Issuer\n"));
 	} else {
 		(void) printf(gettext("Trust Anchor Certificate:\n"));
 		(void) printf(gettext("\tName: %s\n"),
