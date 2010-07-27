@@ -59,7 +59,7 @@ asctime.o atof.o atoi.o atol.o bcmp.o bsearch.o\
 clock.o closedir.o crypt.o ctime.o ctype_.o\
 drand48.o dysize.o errlst.o execvp.o exit.o exportent.o ecvt.o\
 fabs.o fmod.o frexp.o\
-fstab.o ftok.o ftw.o getacinfo.o getauid.o getauditflags.o \
+fstab.o ftok.o ftw.o getauid.o getauditflags.o \
 getcwd.o getenv.o getgraent.o getlogin.o \
 getopt.o getsubopt.o getpwaent.o  getttyent.o\
 getttynam.o getusershell.o grpauth.o hsearch.o\

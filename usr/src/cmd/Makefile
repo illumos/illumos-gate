@@ -515,8 +515,10 @@ MSGSUBDIRS=		\
 	asa		\
 	audio		\
 	audit		\
+	auditconfig	\
 	auditd		\
 	auditrecord	\
+	auditset	\
 	auths		\
 	autopush	\
 	avs		\
@@ -799,6 +801,7 @@ AUDITSUBDIRS=		\
 	auditd		\
 	auditrecord	\
 	auditreduce	\
+	auditset	\
 	auditstat	\
 	praudit		\
 	bsmconv		\

@@ -50,12 +50,11 @@ OBJECTS=	adr.o \
 		audit_rexd.o \
 		audit_rexecd.o \
 		audit_rshd.o \
+		audit_scf.o \
 		audit_settid.o \
 		audit_shutdown.o \
 		bsm.o \
 		generic.o \
-		getacinfo.o \
-		getacval.o \
 		getauditflags.o \
 		getdaent.o \
 		getdevicerange.o \
@@ -84,11 +83,12 @@ ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
 CLEANFILES +=	$(LINTOUT) $(LINTLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
-LDLIBS +=	-lsocket -lnsl -lmd -lc -lsecdb -ltsol -linetutil
+LDLIBS +=	-lsocket -lnsl -lmd -lc -lsecdb -ltsol -linetutil -lscf
 
 COMDIR=		../common
+AUDITD=		$(SRC)/cmd/auditd
 
-CPPFLAGS += -I$(COMDIR)
+CPPFLAGS += -I$(COMDIR) -I$(AUDITD)
 CPPFLAGS += -D_REENTRANT
 
 #

@@ -28,9 +28,7 @@
 include ../../../../Makefile.master
 
 HTMLENTS = \
-	AuditConfig.html \
 	AuditHeader.html \
-	AuditRead.html \
 	DevAllocHeader.html \
 	DevAllocate.html \
 	DevConfig.html \
@@ -79,6 +77,7 @@ HTMLENTS = \
 	SmfInetdStates.html \
 	SmfIPsecStates.html \
 	SmfLocationStates.html \
+	SmfManageAudit.html \
 	SmfManageHeader.html \
 	SmfManageHotplug.html \
 	SmfMDNSStates.html \
@@ -97,6 +96,7 @@ HTMLENTS = \
 	SmfSendmailStates.html \
 	SmfSshStates.html \
 	SmfSyslogStates.html \
+	SmfValueAudit.html \
 	SmfValueCoreadm.html \
 	SmfValueExAcctFlow.html \
 	SmfValueExAcctProcess.html \

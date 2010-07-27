@@ -26,6 +26,7 @@ include ../../../../Makefile.master
 HTMLENTS = \
 	RtAcctadm.html \
 	RtAll.html \
+	RtAuditCfg.html \
 	RtAuditCtrl.html \
 	RtAuditReview.html \
 	RtContractObserver.html \

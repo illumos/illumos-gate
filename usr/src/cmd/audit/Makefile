@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG = audit
@@ -32,13 +31,13 @@ POFILE=$(PROG).po
 
 LDLIBS += -lbsm -lsecdb -lscf 
 
-AUDITD = ../auditd
+LIBBSM = $(SRC)/lib/libbsm/common
 
 OBJS = audit.o
 SRCS = $(OBJS:.o=.c)
 MSGFILES = $(SRCS)
 
-CPPFLAGS += -I$(AUDITD)
+CPPFLAGS += -I$(LIBBSM)
 
 .KEEP_STATE:
 

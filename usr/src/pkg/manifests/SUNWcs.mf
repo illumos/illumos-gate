@@ -439,7 +439,6 @@ file path=etc/saf/_sactab group=sys preserve=true
 file path=etc/saf/_sysconfig group=sys preserve=true
 file path=etc/saf/zsmon/_pmtab group=sys preserve=true
 file path=etc/security/audit_class group=sys preserve=renamenew
-file path=etc/security/audit_control group=sys preserve=renamenew
 file path=etc/security/audit_event group=sys preserve=renamenew
 file path=etc/security/audit_warn group=sys mode=0740 preserve=renamenew
 file path=etc/security/auth_attr group=sys preserve=true \
@@ -553,6 +552,7 @@ file path=lib/svc/manifest/network/shares/reparsed.xml group=sys mode=0444
 file path=lib/svc/manifest/network/socket-filter-kssl.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ssl/kssl-proxy.xml group=sys mode=0444
 file path=lib/svc/manifest/system/auditd.xml group=sys mode=0444
+file path=lib/svc/manifest/system/auditset.xml group=sys mode=0444
 file path=lib/svc/manifest/system/boot-archive-update.xml group=sys mode=0444
 file path=lib/svc/manifest/system/boot-archive.xml group=sys mode=0444
 file path=lib/svc/manifest/system/boot-config.xml group=sys mode=0444
@@ -618,6 +618,7 @@ file path=lib/svc/method/net-svc mode=0555
 file path=lib/svc/method/rmtmpfiles mode=0555
 file path=lib/svc/method/rpc-bind mode=0555
 file path=lib/svc/method/svc-auditd mode=0555
+file path=lib/svc/method/svc-auditset mode=0555
 file path=lib/svc/method/svc-boot-config mode=0555
 file path=lib/svc/method/svc-consadm mode=0555
 file path=lib/svc/method/svc-cron mode=0555
@@ -1022,9 +1023,7 @@ file path=usr/lib/fs/ufs/ufsrestore mode=4555
 file path=usr/lib/fs/ufs/volcopy mode=0555
 file path=usr/lib/getoptcvt mode=0555
 file path=usr/lib/help/auths/locale/C/AllSolAuthsHeader.html
-file path=usr/lib/help/auths/locale/C/AuditConfig.html
 file path=usr/lib/help/auths/locale/C/AuditHeader.html
-file path=usr/lib/help/auths/locale/C/AuditRead.html
 file path=usr/lib/help/auths/locale/C/AuthJobsAdmin.html
 file path=usr/lib/help/auths/locale/C/AuthJobsUser.html
 file path=usr/lib/help/auths/locale/C/AuthProfmgrAssign.html
@@ -1080,6 +1079,7 @@ file path=usr/lib/help/auths/locale/C/SmfIdmapStates.html
 file path=usr/lib/help/auths/locale/C/SmfInetdStates.html
 file path=usr/lib/help/auths/locale/C/SmfLocationStates.html
 file path=usr/lib/help/auths/locale/C/SmfMDNSStates.html
+file path=usr/lib/help/auths/locale/C/SmfManageAudit.html
 file path=usr/lib/help/auths/locale/C/SmfManageHeader.html
 file path=usr/lib/help/auths/locale/C/SmfManageHotplug.html
 file path=usr/lib/help/auths/locale/C/SmfManageZFSSnap.html
@@ -1101,6 +1101,7 @@ file path=usr/lib/help/auths/locale/C/SmfSendmailStates.html
 file path=usr/lib/help/auths/locale/C/SmfSshStates.html
 file path=usr/lib/help/auths/locale/C/SmfSyslogStates.html
 file path=usr/lib/help/auths/locale/C/SmfVRRPStates.html
+file path=usr/lib/help/auths/locale/C/SmfValueAudit.html
 file path=usr/lib/help/auths/locale/C/SmfValueCoreadm.html
 file path=usr/lib/help/auths/locale/C/SmfValueExAcctFlow.html
 file path=usr/lib/help/auths/locale/C/SmfValueExAcctNet.html
@@ -1142,6 +1143,7 @@ file path=usr/lib/help/auths/locale/C/ZoneLogin.html
 file path=usr/lib/help/auths/locale/C/ZoneManage.html
 file path=usr/lib/help/profiles/locale/C/RtAcctadm.html
 file path=usr/lib/help/profiles/locale/C/RtAll.html
+file path=usr/lib/help/profiles/locale/C/RtAuditCfg.html
 file path=usr/lib/help/profiles/locale/C/RtAuditCtrl.html
 file path=usr/lib/help/profiles/locale/C/RtAuditReview.html
 file path=usr/lib/help/profiles/locale/C/RtCPUPowerManagement.html

@@ -160,62 +160,59 @@ adt_audit_enabled(void)
  *	See adt_audit_enabled() for state discussions.
  *	The state parameter is a hedge until all the uses become clear.
  *	Likely if adt_audit_enabled is brought internal to this file,
- *	it can take a parameter discussing the state.
+ *	it could be modified to take one or more parameters to describe the
+ *	state.
  */
 
 boolean_t
-adt_audit_state(int state)
+adt_audit_state(int states)
 {
 
 	(void) auditon(A_GETCOND, (caddr_t)&auditstate, sizeof (auditstate));
 
-	return (auditstate & state);
+	return ((auditstate & states) ? B_TRUE : B_FALSE);
 }
 
 /*
- * The man page for getpwuid_r says the buffer must be big enough
- * or ERANGE will be returned, but offers no guidance for how big
- * the buffer should be or a way to calculate it.  If you get
- * ERANGE, double pwd_buff's size.
- *
- * This may be called even when auditing is off.
+ * Get user_specific/non-attributable audit mask. This may be called even when
+ * auditing is off.
  */
-
-#define	NAFLAG_LEN 512
 
 static int
 adt_get_mask_from_user(uid_t uid, au_mask_t *mask)
 {
 	struct passwd	pwd;
-	char		pwd_buff[NSS_BUFSIZ];
-	char		naflag_buf[NAFLAG_LEN];
+	long		buff_sz;
+	char		*pwd_buff;
+
 
 	if (auditstate & AUC_DISABLED) {
 		/* c2audit excluded */
 		mask->am_success = 0;
 		mask->am_failure = 0;
 	} else if (uid <= MAXUID) {
-		if (getpwuid_r(uid, &pwd, pwd_buff, NSS_BUFSIZ) == NULL) {
-			/*
-			 * getpwuid_r returns NULL without setting
-			 * errno if the user does not exist; only
-			 * if the input is the wrong length does it
-			 * set errno.
-			 */
-			if (errno != ERANGE)
-				errno = EINVAL;
+		if ((buff_sz = sysconf(_SC_GETPW_R_SIZE_MAX)) == -1) {
+			adt_write_syslog("couldn't determine maximum size of "
+			    "password buffer", errno);
 			return (-1);
 		}
+		if ((pwd_buff = calloc(1, (size_t)++buff_sz)) == NULL) {
+			return (-1);
+		}
+		if (getpwuid_r(uid, &pwd, pwd_buff, (int)buff_sz) == NULL) {
+			errno = EINVAL;	/* user doesn't exist */
+			free(pwd_buff);
+			return (-1);
+		}
+		free(pwd_buff);
 		if (au_user_mask(pwd.pw_name, mask)) {
 			errno = EFAULT; /* undetermined failure */
 			return (-1);
 		}
-	} else if (getacna(naflag_buf, NAFLAG_LEN - 1) == 0) {
-		if (getauditflagsbin(naflag_buf, mask))
+	} else if (auditon(A_GETKMASK, (caddr_t)mask, sizeof (*mask)) == -1) {
 			return (-1);
-	} else {
-		return (-1);
 	}
+
 	return (0);
 }
 

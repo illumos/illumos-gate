@@ -254,6 +254,10 @@ label=AUE_AUDITON
 label=AUE_AUDITON_GESTATE
   skip=Not used
 
+label=AUE_AUDITON_GETAMASK
+  format=kernel
+  syscall=auditon: GETAMASK
+
 label=AUE_AUDITON_GETCAR
   format=kernel
   syscall=auditon: GETCAR
@@ -325,6 +329,12 @@ label=AUE_AUDITON_GTERMID
 label=AUE_AUDITON_SESTATE
   skip=Not used.
 
+label=AUE_AUDITON_SETAMASK
+  format=[arg]1:[arg]2
+    comment=2, "setamask as_success", user default audit preselection mask:
+    comment=2, "setamask as_failure", user default audit preselection mask
+  syscall=auditon: SETAMASK
+
 label=AUE_AUDITON_SETCLASS
   format=[arg]1:[arg]2
     comment=2, "setclass&colon;ec_event", event number:
@@ -344,8 +354,8 @@ label=AUE_AUDITON_SETCOND
 
 label=AUE_AUDITON_SETKMASK
   format=[arg]1:[arg]2
-    comment=2, "setkmask as_success", kernel mask:
-    comment=2, "setkmask as_failure", kernel mask
+    comment=2, "setkmask as_success", kernel non-attributable mask:
+    comment=2, "setkmask as_failure", kernel non-attributable mask
   syscall=auditon: SETKMASK
 #	header,124,2,auditon(2) - set kernel mask,,Mon May 15 09:17:06 2000, + 300000807 msec
 #	argument,2,0x0,setkmask:as_success

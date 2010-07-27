@@ -27,15 +27,11 @@
 #
 #
 All:suser:cmd:::*:
-Audit Control:suser:cmd:::/etc/security/bsmconv:uid=0
-Audit Control:suser:cmd:::/etc/security/bsmunconv:uid=0
-Audit Control:solaris:cmd:::/usr/sbin/audit:privs=sys_audit,file_dac_read,proc_owner
-Audit Control:suser:cmd:::/usr/sbin/audit:euid=0
-Audit Control:suser:cmd:::/usr/sbin/auditconfig:euid=0
-Audit Control:suser:cmd:::/usr/sbin/auditd:uid=0
-Audit Review:suser:cmd:::/usr/sbin/auditreduce:euid=0
-Audit Review:suser:cmd:::/usr/sbin/auditstat:euid=0
-Audit Review:suser:cmd:::/usr/sbin/praudit:euid=0
+Audit Control:solaris:cmd:::/usr/sbin/audit:privs=proc_owner,sys_audit
+Audit Configuration:solaris:::/usr/sbin/auditconfig:privs=sys_audit
+Audit Review:solaris:cmd:::/usr/sbin/auditreduce:euid=0
+Audit Review:solaris:cmd:::/usr/sbin/auditstat:privs=proc_audit
+Audit Review:solaris:cmd:::/usr/sbin/praudit:privs=file_dac_read
 Contract Observer:solaris:cmd:::/usr/bin/ctwatch:\
 	privs=contract_event,contract_observer
 Cron Management:suser:cmd:::/usr/bin/crontab:euid=0

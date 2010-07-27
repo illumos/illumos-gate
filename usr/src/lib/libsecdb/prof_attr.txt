@@ -27,8 +27,9 @@
 # profiles attributes. see prof_attr(4)
 #
 All:::Execute any command as the user or role:help=RtAll.html
-Audit Control:::Configure Solaris Auditing:auths=solaris.audit.config,solaris.jobs.admin;help=RtAuditCtrl.html
-Audit Review:::Review Solaris Auditing logs:auths=solaris.audit.read;help=RtAuditReview.html
+Audit Configuration:::Configure Solaris Audit:auths=solaris.smf.value.audit;help=RtAuditCfg.html
+Audit Control:::Control Solaris Audit:auths=solaris.smf.manage.audit;help=RtAuditCtrl.html
+Audit Review:::Review Solaris Auditing logs:help=RtAuditReview.html
 Console User:::Manage System as the Console User:profiles=Suspend To RAM,Suspend To Disk,Brightness,CPU Power Management,Network Autoconf User;auths=solaris.system.shutdown;help=RtConsUser.html
 Contract Observer:::Reliably observe any/all contract events:help=RtContractObserver.html
 Device Management:::Control Access to Removable Media:auths=solaris.device.*;help=RtDeviceMngmnt.html

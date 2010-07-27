@@ -67,7 +67,6 @@ int
 au_user_mask(char *user, au_mask_t *mask)
 {
 	char		*last = NULL;
-	char		deflt[360];	/* matches stuff in getac*.c */
 	char		*user_flags = NULL;
 
 	if (mask == NULL) {
@@ -75,16 +74,13 @@ au_user_mask(char *user, au_mask_t *mask)
 	}
 
 	/*
-	 * Get the default audit flags.
+	 * Get the system wide default audit flags. If you can't get the
+	 * system wide flags, return an error code now and don't bother
+	 * trying to get the user specific flags.
 	 */
-
-	setac();
-	if (getacflg(deflt, sizeof (deflt)) != 0) {
-		endac();
+	if (auditon(A_GETAMASK, (caddr_t)mask, sizeof (*mask)) == -1) {
 		return (-1);
 	}
-	endac();
-	(void) getauditflagsbin(deflt, mask);
 
 	/*
 	 * Get per-user audit flags.

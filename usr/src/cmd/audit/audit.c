@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
@@ -38,8 +39,8 @@
 #include <bsm/audit.h>
 #include <bsm/libbsm.h>
 #include <locale.h>
-#include <audit_sig_infc.h>
 #include <zone.h>
+#include <audit_scf.h>
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN "SUNW_OST_OSCMD"
@@ -49,14 +50,16 @@
 
 /* GLOBALS */
 static char	*progname = "audit";
-static char	*usage = "audit [-n] | [-s] | [-t] | [-v filepath]";
+static char	*usage = "audit [-n] | [-s] | [-t] | [-v]";
 static int	silent = 0;
 
 static void	display_smf_error();
 
-static boolean_t is_audit_control_ok(char *);	/* file validation  */
+static boolean_t is_audit_config_ok();		/* config validation  */
 static boolean_t is_valid_zone(boolean_t);	/* operation ok in this zone? */
-static int	start_auditd();			/* start audit daemon */
+static boolean_t contains_valid_dirs(char *);	/* p_dir contents validation */
+static boolean_t validate_path(char *);		/* is it path to dir? */
+static void	start_auditd();			/* start audit daemon */
 static int	sig_auditd(int);		/* send signal to auditd */
 
 /*
@@ -65,18 +68,18 @@ static int	sig_auditd(int);		/* send signal to auditd */
  *
  * input:
  *	audit -s
- *		- signal audit daemon to read audit_control file and
+ *		- signal audit daemon to read audit configuration and
  *		  start auditd if needed.
  *	audit -n
- *		- signal audit daemon to use next audit_control audit directory.
+ *		- signal audit daemon to use next audit_binfile directory.
  *	audit -t
  *		- signal audit daemon to disable auditing.
  *	audit -T
  *		- signal audit daemon to temporarily disable auditing reporting
  *		  no errors.
- *	audit -v filepath
- *		- validate audit_control parameters but use filepath for
- *		  the name.  Emit errors or "syntax ok"
+ *	audit -v
+ *		- validate audit configuration parameters;
+ *		  Print errors or "configuration ok".
  *
  *
  * output:
@@ -88,67 +91,67 @@ static int	sig_auditd(int);		/* send signal to auditd */
 int
 main(int argc, char *argv[])
 {
-	char	c;
-	char	*first_option;
+	int	c;
 
 	/* Internationalization */
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	/* first option required */
-	if ((c = getopt(argc, argv, "nstTv:")) == -1) {
-		(void) fprintf(stderr, gettext("usage: %s\n"), usage);
-		exit(3);
-	}
-	first_option = optarg;
 	/* second or more options not allowed; please pick one */
-	if (getopt(argc, argv, "nstTv:") != -1) {
+	if (argc > 2) {
 		(void) fprintf(stderr, gettext("usage: %s\n"), usage);
-		exit(5);
+		exit(1);
 	}
+
+	/* first option required */
+	if ((c = getopt(argc, argv, "nstTv")) == -1) {
+		(void) fprintf(stderr, gettext("usage: %s\n"), usage);
+		exit(1);
+	}
+
 	switch (c) {
 	case 'n':
 		if (!is_valid_zone(1))	/* 1 == display error if any */
-			exit(10);
+			exit(1);
 
-		if (sig_auditd(AU_SIG_NEXT_DIR) != 0)
+		if (sig_auditd(SIGUSR1) != 0)
 			exit(1);
 		break;
 	case 's':
 		if (!is_valid_zone(1))	/* 1 == display error if any */
-			exit(10);
-		else if (!is_audit_control_ok(NULL))
-			exit(7);
+			exit(1);
+		else if (!is_audit_config_ok())
+			exit(1);
 
-		return (start_auditd());
+		start_auditd();
+		return (0);
 	case 't':
 		if (!is_valid_zone(0))	/* 0 == no error message display */
-			exit(10);
+			exit(1);
 		if (smf_disable_instance(AUDITD_FMRI, 0) != 0) {
 			display_smf_error();
-			exit(11);
+			exit(1);
 		}
 		break;
 	case 'T':
 		silent = 1;
 		if (!is_valid_zone(0))	/* 0 == no error message display */
-			exit(10);
-
+			exit(1);
 		if (smf_disable_instance(AUDITD_FMRI, SMF_TEMPORARY) != 0) {
-			exit(11);
+			exit(1);
 		}
 		break;
 	case 'v':
-		if (is_audit_control_ok(first_option)) {
-			(void) fprintf(stderr, gettext("syntax ok\n"));
+		if (is_audit_config_ok()) {
+			(void) fprintf(stderr, gettext("configuration ok\n"));
 			exit(0);
 		} else {
-			exit(8);
+			exit(1);
 		}
 		break;
 	default:
 		(void) fprintf(stderr, gettext("usage: %s\n"), usage);
-		exit(6);
+		exit(1);
 	}
 
 	return (0);
@@ -190,112 +193,79 @@ sig_auditd(int sig)
 }
 
 /*
- * perform reasonableness check on audit_control or its standin; goal
- * is that "audit -s" (1) not crash the system and (2) c2audit/auditd
- * actually generates data.
- *
- * A NULL input is ok -- it is used to tell _openac() to use the
- * real audit_control file, not a substitute.
+ * perform reasonableness check on audit configuration
  */
-#define	TRADITIONAL_MAX	1024
 
 static boolean_t
-is_audit_control_ok(char *filename) {
-	char		buf[TRADITIONAL_MAX];
-	int		outputs = 0;
-	int		state = 1;	/* 1 is ok, 0 is not */
-	int		rc;
-	int		min;
-	kva_t		*kvlist;
-	char		*plugin_name;
-	char		*plugin_dir;
-	au_acinfo_t	*ach;
+is_audit_config_ok() {
+	int			state = B_TRUE;	/* B_TRUE/B_FALSE = ok/not_ok */
+	char			*cval_str;
+	int			cval_int;
+	kva_t			*kvlist;
+	scf_plugin_kva_node_t   *plugin_kva_ll;
+	scf_plugin_kva_node_t   *plugin_kva_ll_head;
+	boolean_t		one_plugin_enabled = B_FALSE;
 
-	ach = _openac(filename);	/* open audit_control */
-	if (ach == NULL) {
-		perror(progname);
-		exit(9);
-	}
 	/*
-	 * There must be at least one directory or one plugin
-	 * defined.
+	 * There must be at least one active plugin configured; if the
+	 * configured plugin is audit_binfile(5), then the p_dir must not be
+	 * empty.
 	 */
-	if ((rc = _getacdir(ach, buf, TRADITIONAL_MAX)) == 0) {
-		outputs++;
-	} else if (rc < -1) {	/* -1 is not found, others are errors */
+	if (!do_getpluginconfig_scf(NULL, &plugin_kva_ll)) {
 		(void) fprintf(stderr,
-			gettext("%s: audit_control \"dir:\" spec invalid\n"),
-				progname);
-		state = 0;	/* is_not_ok */
+		    gettext("Could not get plugin configuration.\n"));
+		exit(1);
 	}
 
-	/*
-	 * _getacplug -- all that is of interest is the return code.
-	 */
-	_rewindac(ach);	/* rewind audit_control */
-	while ((rc = _getacplug(ach, &kvlist)) == 0) {
-		plugin_name = kva_match(kvlist, "name");
-		if (plugin_name == NULL) {
-			(void) fprintf(stderr, gettext("%s: audit_control "
-			    "\"plugin:\" missing name\n"), progname);
-			state = 0;	/* is_not_ok */
-		} else {
-			if (strcmp(plugin_name, "audit_binfile.so") == 0) {
-				plugin_dir = kva_match(kvlist, "p_dir");
-				if ((plugin_dir == NULL) && (outputs == 0)) {
-					(void) fprintf(stderr,
-					    gettext("%s: audit_control "
-					    "\"plugin:\" missing p_dir\n"),
-					    progname);
-					state = 0;	/* is_not_ok */
-				} else {
-					outputs++;
-				}
+	plugin_kva_ll_head = plugin_kva_ll;
+
+	while (plugin_kva_ll != NULL) {
+		kvlist = plugin_kva_ll->plugin_kva;
+
+		if (!one_plugin_enabled) {
+			cval_str = kva_match(kvlist, "active");
+			if (atoi(cval_str) == 1) {
+				one_plugin_enabled = B_TRUE;
 			}
 		}
-		_kva_free(kvlist);
+
+		if (strcmp((char *)&(*plugin_kva_ll).plugin_name,
+		    "audit_binfile") == 0) {
+			cval_str = kva_match(kvlist, "p_dir");
+			if (*cval_str == '\0' || cval_str == NULL) {
+				(void) fprintf(stderr,
+				    gettext("%s: audit_binfile(5) \"p_dir:\" "
+				    "attribute empty\n"), progname);
+				state = B_FALSE;
+			} else if (!contains_valid_dirs(cval_str)) {
+				(void) fprintf(stderr,
+				    gettext("%s: audit_binfile(5) \"p_dir:\" "
+				    "attribute invalid\n"), progname);
+				state = B_FALSE;
+			}
+
+			cval_str = kva_match(kvlist, "p_minfree");
+			cval_int = atoi(cval_str);
+			if (cval_int < 0 || cval_int > 100) {
+				(void) fprintf(stderr,
+				    gettext("%s: audit_binfile(5) "
+				    "\"p_minfree:\" attribute invalid\n"),
+				    progname);
+				state = B_FALSE;
+			}
+		}
+
+		plugin_kva_ll = plugin_kva_ll->next;
 	}
-	if (rc < -1) {
-		(void) fprintf(stderr,
-			gettext("%s: audit_control \"plugin:\" spec invalid\n"),
-				progname);
-		state = 0;	/* is_not_ok */
+
+	plugin_kva_ll_free(plugin_kva_ll_head);
+
+	if (!one_plugin_enabled) {
+		(void) fprintf(stderr, gettext("%s: no active plugin found\n"),
+		    progname);
+		state = B_FALSE;
 	}
-	if (outputs == 0) {
-		(void) fprintf(stderr,
-			gettext("%s: audit_control must have either a "
-				"valid \"dir:\" entry or a valid \"plugin:\" "
-				"entry with \"p_dir:\" specified.\n"),
-				progname);
-		state = 0;	/* is_not_ok */
-	}
-	/* minfree is not required */
-	_rewindac(ach);
-	if ((rc = _getacmin(ach, &min)) < -1) {
-		(void) fprintf(stderr,
-			gettext(
-			    "%s: audit_control \"minfree:\" spec invalid\n"),
-			    progname);
-		state = 0;	/* is_not_ok */
-	}
-	/* flags is not required */
-	_rewindac(ach);
-	if ((rc = _getacflg(ach, buf, TRADITIONAL_MAX)) < -1) {
-		(void) fprintf(stderr,
-			gettext("%s: audit_control \"flags:\" spec invalid\n"),
-				progname);
-		state = 0;	/* is_not_ok */
-	}
-	/* naflags is not required */
-	_rewindac(ach);
-	if ((rc = _getacna(ach, buf, TRADITIONAL_MAX)) < -1) {
-		(void) fprintf(stderr,
-			gettext(
-			    "%s: audit_control \"naflags:\" spec invalid\n"),
-			    progname);
-		state = 0;	/* is_not_ok */
-	}
-	_endac(ach);
+
 	return (state);
 }
 
@@ -337,11 +307,79 @@ is_valid_zone(boolean_t show_err)
 }
 
 /*
+ * Verify, whether the dirs_str contains at least one currently valid path to
+ * the directory. All invalid paths are reported. In case no valid directory
+ * path is found function returns B_FALSE, otherwise B_TRUE.
+ */
+
+static boolean_t
+contains_valid_dirs(char *dirs_str)
+{
+	boolean_t	rc = B_FALSE;
+	boolean_t	rc_validate_path = B_TRUE;
+	char		*tok_ptr;
+	char		*tok_lasts;
+
+	if (dirs_str == NULL) {
+		return (rc);
+	}
+
+	if ((tok_ptr = strtok_r(dirs_str, ",", &tok_lasts)) != NULL) {
+		if (validate_path(tok_ptr)) {
+			rc = B_TRUE;
+		} else {
+			rc_validate_path = B_FALSE;
+		}
+		while ((tok_ptr = strtok_r(NULL, ",", &tok_lasts)) != NULL) {
+			if (validate_path(tok_ptr)) {
+				rc = B_TRUE;
+			} else {
+				rc_validate_path = B_FALSE;
+			}
+		}
+	}
+
+	if (rc && !rc_validate_path) {
+		(void) fprintf(stderr, gettext("%s: at least one valid "
+		    "directory path found\n"), progname);
+	}
+
+	return (rc);
+}
+
+/*
+ * Verify, that the dir_path is path to a directory.
+ */
+
+static boolean_t
+validate_path(char *dir_path)
+{
+	boolean_t	rc = B_FALSE;
+	struct stat	statbuf;
+
+	if (dir_path == NULL) {
+		return (rc);
+	}
+
+	if (stat(dir_path, &statbuf) == -1) {
+		(void) fprintf(stderr, gettext("%s: %s error: %s\n"), progname,
+		    dir_path, strerror(errno));
+	} else if (statbuf.st_mode & S_IFDIR) {
+			rc = B_TRUE;
+	} else {
+		(void) fprintf(stderr, gettext("%s: %s is not a directory\n"),
+		    progname, dir_path);
+	}
+
+	return (rc);
+}
+
+/*
  * if auditd isn't running, start it.  Otherwise refresh.
  * First check to see if c2audit is loaded via the auditon()
  * system call, then check SMF state.
  */
-static int
+static void
 start_auditd()
 {
 	int	audit_state;
@@ -349,27 +387,26 @@ start_auditd()
 
 	if (auditon(A_GETCOND, (caddr_t)&audit_state,
 	    sizeof (audit_state)) != 0)
-		return (12);
+		exit(1);
 
 	if ((state = smf_get_state(AUDITD_FMRI)) == NULL) {
 		display_smf_error();
-		return (13);
+		exit(1);
 	}
 	if (strcmp(SCF_STATE_STRING_ONLINE, state) != 0) {
 		if (smf_enable_instance(AUDITD_FMRI, 0) != 0) {
 			display_smf_error();
 			free(state);
-			return (14);
+			exit(1);
 		}
 	} else {
 		if (smf_refresh_instance(AUDITD_FMRI) != 0) {
 			display_smf_error();
 			free(state);
-			return (15);
+			exit(1);
 		}
 	}
 	free(state);
-	return (0);
 }
 
 static void

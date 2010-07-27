@@ -18,55 +18,53 @@
 #
 # CDDL HEADER END
 #
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Makefile for auditset
 
-PROG = auditd
+PROG = svc-auditset
+SVCMETHOD = $(PROG)
 
-MANIFEST = auditd.xml
-SVCMETHOD = svc-auditd
+MANIFEST = auditset.xml
 
 include $(SRC)/cmd/Makefile.cmd
 
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 LIBBSM = $(SRC)/lib/libbsm/common
-AUDITD = $(SRC)/cmd/auditd
 
-CPPFLAGS += -D_REENTRANT
-CPPFLAGS += -I$(LIBBSM) -I$(AUDITD)
+LDLIBS += -lbsm
 
-LDLIBS += -lbsm -lsecdb
-
-OBJS = auditd.o doorway.o queue.o
+OBJS = svc-auditset.o 
 SRCS = $(OBJS:%.o=%.c)
 
-POFILE =	$(PROG).po
-MSGFILES =	$(SRCS)
+POFILE = $(PROG).po
+MSGFILES = $(SRCS)
+
+CPPFLAGS += -I$(LIBBSM)
 
 .KEEP_STATE:
 
-all:		$(PROG)
+all: $(PROG)
 
-install:	all $(ROOTUSRSBINPROG) \
-		$(ROOTMANIFEST) $(ROOTSVCMETHOD)
+install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
-$(PROG):	$(SRCS) $(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
-
-lint:		lint_SRCS
+$(PROG): $(SRCS) $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
 $(POFILE): $(MSGFILES)
-		$(BUILDPO.msgfiles)
+	$(BUILDPO.msgfiles)
 
 _msg: $(MSGDOMAINPOFILE)
 
 clean:
-		$(RM) $(OBJS)
+	$(RM) $(OBJS)
 
-check:		$(CHKMANIFEST)
+lint:	lint_SRCS
+
+check:          $(CHKMANIFEST)
 
 include $(SRC)/cmd/Makefile.targ
 include $(SRC)/Makefile.msg.targ

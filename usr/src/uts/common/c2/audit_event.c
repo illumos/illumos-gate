@@ -2990,6 +2990,12 @@ aui_auditsys(au_event_t e)
 		case A_SETPOLICY:
 			e = AUE_AUDITON_SPOLICY;
 			break;
+		case A_GETAMASK:
+			e = AUE_AUDITON_GETAMASK;
+			break;
+		case A_SETAMASK:
+			e = AUE_AUDITON_SETAMASK;
+			break;
 		case A_GETKMASK:
 			e = AUE_AUDITON_GETKMASK;
 			break;
@@ -3138,6 +3144,14 @@ aus_auditsys(struct t_audit_data *tad)
 		au_uwrite(au_to_arg32((char)1, "asid",
 		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_asid)));
 		break;
+	case AUE_AUDITON_SETAMASK:
+		if (copyin((caddr_t)a2, &mask, sizeof (au_mask_t)))
+				return;
+		au_uwrite(au_to_arg32(
+		    2, "setamask:as_success", (uint32_t)mask.as_success));
+		au_uwrite(au_to_arg32(
+		    2, "setamask:as_failure", (uint32_t)mask.as_failure));
+		break;
 	case AUE_AUDITON_SETKMASK:
 		if (copyin((caddr_t)a2, &mask, sizeof (au_mask_t)))
 				return;
@@ -3229,6 +3243,7 @@ aus_auditsys(struct t_audit_data *tad)
 	case AUE_AUDIT:
 	case AUE_AUDITON_GPOLICY:
 	case AUE_AUDITON_GQCTRL:
+	case AUE_AUDITON_GETAMASK:
 	case AUE_AUDITON_GETKMASK:
 	case AUE_AUDITON_GETCWD:
 	case AUE_AUDITON_GETCAR:

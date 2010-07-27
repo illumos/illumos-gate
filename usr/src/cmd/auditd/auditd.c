@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Audit daemon server */
@@ -30,14 +29,12 @@
  * audit records (usually one or more per buffer, potentially less than
  * one) and passes them to one or more plugins for processing.
  *
- * The major interrupts are AU_SIG_READ_CONTROL (start over),
- * AU_SIG_DISABLE (start shutting down), SIGALRM (quit), and
- * AU_SIG_NEXT_DIR (start a new audit log file). SIGTERM (the implementation
- * value of AU_SIG_DISABLE) is also used for the child to tell the parent
- * that audit is ready.
+ * The major interrupts are SIGHUP (start over), SIGTERM (start shutting down),
+ * SIGALRM (quit), and SIGUSR1 (start a new audit log file). SIGTERM is also
+ * used for the child to tell the parent that audit is ready.
  *
- * Configuration data comes from /etc/security/audit_control and the auditon
- * system call.
+ * Configuration data comes from audit service configuration
+ * (AUDITD_FMRI/smf(5)) and the auditon system call.
  *
  * The major errors are EBUSY (auditing is already in use) and EINTR
  * (one of the above signals was received).  File space errors are
@@ -76,7 +73,6 @@
 #include <termios.h>
 #include <unistd.h>
 #include "plugin.h"
-#include "audit_sig_infc.h"
 #include <audit_plugin.h>
 #include <audit_scf.h>
 
@@ -84,10 +80,10 @@
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
 #endif
 /*
- * After we get a AU_SIG_DISABLE, we want to set a timer for 2 seconds
+ * After we get a SIGTERM, we want to set a timer for 2 seconds
  * and let c2audit write as many records as it can until the timer
- * goes off(at which point it returns to auditd with SIGALRM).  If any
- * other signals are received during that time, we call
+ * goes off (at which point it returns to auditd with SIGALRM).
+ * If any other signals are received during that time, we call
  * __audit_dowarn() to indicate that the queue may not have been fully
  * flushed.
  */
@@ -109,11 +105,11 @@ static thr_data_t	main_thr;	/* auditd thread (0) */
 pthread_mutex_t		plugin_mutex;	/* for plugin_t list */
 
 static int	caught_alrm = 0;	/* number of SIGALRMs pending */
-static int	caught_readc = 0;	/* number of AU_SIG_READ_CONTROLs */
-static int	caught_term = 0;	/* number of AU_SIG_DISABLEs pending */
-static int	caught_nextd = 0;	/* number of AU_SIG_NEXT_DIRs pending */
+static int	caught_readc = 0;	/* number of SIGHUPs pending */
+static int	caught_term = 0;	/* number of SIGTERMs pending */
+static int	caught_nextd = 0;	/* number of SIGUSR1s pending */
 
-static int	reset_list = 1;	/* 1 to re-read audit_control */
+static int	reset_list = 1;	/* 1 to re-read audit configuration */
 static int	reset_file = 1; /* 1 to close/open binary log */
 
 static int	auditing_set = 0;	/* 1 if auditon(A_SETCOND, on... */
@@ -125,7 +121,6 @@ static void	block_signals();
 static int	do_sethost();
 
 static void	conf_to_kernel();
-static void	aconf_to_kernel();
 static void	scf_to_kernel_qctrl();
 static void	scf_to_kernel_policy();
 
@@ -164,7 +159,7 @@ auditd_exit(int status)
 
 	if (auditing_set)
 		(void) auditon(A_SETCOND, (caddr_t)&turn_audit_off,
-		    (int)sizeof (int));
+		    sizeof (int));
 
 #if DEBUG
 	(void) fclose(dbfp);
@@ -220,7 +215,7 @@ main(int argc, char *argv[])
 	/*
 	 * Set the audit state flag to AUDITING.
 	 */
-	if (auditon(A_SETCOND, (caddr_t)&turn_audit_on, (int)sizeof (int)) !=
+	if (auditon(A_SETCOND, (caddr_t)&turn_audit_on, sizeof (int)) !=
 	    0) {
 		DPRINT((dbfp, "auditon(A_SETCOND...) failed (exit)\n"));
 		__audit_dowarn("nostart", "", 0);
@@ -237,9 +232,9 @@ main(int argc, char *argv[])
 		int		signal_caught = 0;
 
 		(void) sigemptyset(&set);
-		(void) sigaddset(&set, AU_SIG_DISABLE);
+		(void) sigaddset(&set, SIGTERM);
 
-		while (signal_caught != AU_SIG_DISABLE)
+		while (signal_caught != SIGTERM)
 			signal_caught = sigwait(&set);
 
 		DPRINT((dbfp, "init complete:  parent can now exit\n"));
@@ -279,18 +274,19 @@ main(int argc, char *argv[])
 	 */
 	(void) umask(007);
 
-	if (__logpost("")) {	/* Cannot unlink pointer to audit.log file. */
+	if (__logpost("")) {	/* Cannot unlink pointer to audit.log(4) file */
 		DPRINT((dbfp, "logpost failed\n"));
 		auditd_exit(1);
 	}
 	/*
-	 * Here is the main body of the audit daemon.  running == 0 means that
-	 * after flushing out the audit queue, it is time to exit in response to
-	 * AU_SIG_DISABLE
+	 * Here is the main body of the audit daemon. running == 0 means that
+	 * after flushing out the audit queue, it is time to exit in response
+	 * to SIGTERM.
 	 */
 	while (running) {
 		/*
-		 * Read audit_control and create plugin lists.
+		 * Read auditd / auditd plugins related configuration from
+		 * smf(5) repository and create plugin lists.
 		 *
 		 * loadauditlist() and auditd_thread_init() are called
 		 * while under the plugin_mutex lock to avoid a race
@@ -299,7 +295,6 @@ main(int argc, char *argv[])
 		if (reset_list || reset_file) {
 			if (reset_list) {
 				conf_to_kernel();
-				aconf_to_kernel();
 				scf_to_kernel_qctrl();
 				scf_to_kernel_policy();
 				(void) pthread_mutex_lock(&plugin_mutex);
@@ -313,13 +308,15 @@ main(int argc, char *argv[])
 				/* continue; wait for audit -s */
 			}
 			(void) pthread_mutex_unlock(&plugin_mutex);
-			reset_list = 0;
 
 			if (reset_list && reset_file) {
 				(void) printf(gettext("auditd started\n"));
 			} else {
 				(void) printf(gettext("auditd refreshed\n"));
 			}
+
+			reset_list = 0;
+			reset_file = 0;
 		}
 		/*
 		 * tell parent I'm running whether or not the initialization
@@ -327,14 +324,14 @@ main(int argc, char *argv[])
 		 * audit -n or audit -s to fix the problem.
 		 */
 		if (pid != 0) {
-			(void) kill(pid, AU_SIG_DISABLE);
+			(void) kill(pid, SIGTERM);
 			pid = 0;
 		}
 		/*
 		 * thread_signal() signals main (this thread) when
 		 * it has received a signal.
 		 */
-		DPRINT((dbfp, "main thread is waiting\n"));
+		DPRINT((dbfp, "main thread is waiting for signal\n"));
 		(void) pthread_mutex_lock(&(main_thr.thd_mutex));
 
 		if (!(caught_readc || caught_term || caught_alrm ||
@@ -400,19 +397,20 @@ main(int argc, char *argv[])
 			 * if both hup and usr1 are caught, the logic in
 			 * loadauditlist() results in hup winning.  The
 			 * result will be that the audit file is not rolled
-			 * over unless audit_control actually changed.
+			 * over unless audit configuration actually changed.
 			 *
-			 * They want to reread the audit_control file.
-			 * Set reset_list which will return us to the
-			 * main while loop in the main routine.
+			 * They want to reread the audit configuration from
+			 * smf(5) repository (AUDITD_FMRI). Set reset_list
+			 * which will return us to the main while loop in the
+			 * main routine.
 			 */
 			caught_readc = 0;
 			reset_list = 1;
 		} else if (caught_nextd) {
 			/*
-			 * This is a special case for the binfile
-			 * plugin. (audit -n)  NULL out kvlist
-			 * so binfile won't re-read audit_control
+			 * This is a special case for the binfile plugin.
+			 * (audit -n)  NULL out kvlist so binfile won't
+			 * re-read audit configuration.
 			 */
 			caught_nextd = 0;
 			reset_file = 1;
@@ -450,14 +448,14 @@ my_sleep()
 	(void) pthread_mutex_unlock(&(main_thr.thd_mutex));
 
 	if (caught_term) {
-		DPRINT((dbfp, "normal AU_SIG_DISABLE exit\n"));
+		DPRINT((dbfp, "normal SIGTERM exit\n"));
 		/*
 		 * Exit, as requested.
 		 */
 		auditd_thread_close();
 	}
 	if (caught_readc)
-		reset_list = 1;		/* Reread the audit_control file */
+		reset_list = 1;		/* Reread the audit configuration */
 
 	caught_readc = 0;
 	caught_nextd = 0;
@@ -487,11 +485,11 @@ isa_ified(char *path, char **newpath)
 }
 
 /*
- * init_plugin first searches the existing plugin list to see
- * if the plugin already has been defined; if not, it creates it
- * and links it into the list.  It returns a pointer to the found
- * or created struct.  A change of path in audit_control for a
- * given plugin will cause a miss.
+ * init_plugin first searches the existing plugin list to see if the plugin
+ * already has been defined; if not, it creates it and links it into the list.
+ * It returns a pointer to the found or created struct. Note, that
+ * (manual/unsupported) change of path property in audit service configuration
+ * for given plugin will cause a miss.
  */
 /*
  * for 64 bits, the path name can grow 3 bytes (minus 5 for the
@@ -530,7 +528,10 @@ init_plugin(char *name, kva_t *list, int cnt_flag)
 				p->plg_cnt = cnt_flag;
 
 				_kva_free(p->plg_kvlist);
-				p->plg_kvlist = list;
+				p->plg_kvlist = _kva_dup(list);
+				if (list != NULL && p->plg_kvlist == NULL) {
+					err_exit(NULL);
+				}
 				p->plg_reopen = 1;
 				DPRINT((dbfp, "reusing %s\n", p->plg_path));
 				return (p);
@@ -564,48 +565,37 @@ init_plugin(char *name, kva_t *list, int cnt_flag)
 	p->plg_sequence = 1;
 	p->plg_last_seq_out = 0;
 	p->plg_path = strdup(path);
-	p->plg_kvlist = list;
+	p->plg_kvlist = _kva_dup(list);
 	p->plg_cnt = cnt_flag;
 	p->plg_retry_time = SLEEP_TIME;
 	p->plg_qmax = 0;
 	p->plg_save_q_copy = NULL;
+
+	if (list != NULL && p->plg_kvlist == NULL || p->plg_path == NULL) {
+		err_exit(NULL);
+	}
 
 	DPRINT((dbfp, "created plugin:  %s\n", path));
 	return (p);
 }
 
 /*
- * loadauditlist - read the directory list from the audit_control file.
- *		   to determine if a binary file is to be written.
- *		 - read the plugin entries from the audit_control file
- *
- * globals -
- *
- *	plugin queues
- *
- * success is when at least one plug in is defined.
- *
- * set cnt policy here based on auditconfig setting.  future could
- * have a policy = {+|-}cnt entry per plugin with auditconfig providing the
- * default.
+ * loadauditlist() - read the auditd plugin configuration from smf(5) and
+ * prepare appropriate plugin related structures (plugin_t). Set cnt policy here
+ * based on currently active policy settings. (future could have a policy =
+ * {+|-}cnt entry per plugin with auditconfig providing the default)
  */
-
 static void
 loadauditlist()
 {
-	char		buf[MAXPATHLEN];
-	char		*value;
-	plugin_t	*p;
-	int		acresult;
-	int		wait_count = 0;
-	kva_t		*kvlist;
-	uint32_t	policy;
-	int		cnt_flag;
-	struct au_qctrl	kqmax;
-	au_acinfo_t	*ach = NULL;
-	int		got_dir = 0;
-	int		have_plugin = 0;
-	char		*endptr;
+	char			*value;
+	char			*endptr;
+	plugin_t		*p;
+	uint32_t		policy;
+	int			cnt_flag;
+	struct au_qctrl		kqmax;
+	scf_plugin_kva_node_t	*plugin_kva_ll;
+	scf_plugin_kva_node_t	*plugin_kva_ll_head;
 
 	if (auditon(A_GETPOLICY, (char *)&policy, 0) == -1) {
 		DPRINT((dbfp, "auditon(A_GETPOLICY...) failed (exit)\n"));
@@ -614,14 +604,17 @@ loadauditlist()
 		auditd_exit(1);
 	}
 	cnt_flag = ((policy & AUDIT_CNT) != 0) ? 1 : 0;
-	DPRINT((dbfp, "loadauditlist:  policy is to %s\n", (cnt_flag == 1) ?
+	DPRINT((dbfp, "loadauditlist: policy is to %s\n", (cnt_flag == 1) ?
 	    "continue" : "block"));
 
 #if DEBUG
-	if (auditon(A_GETCOND, (caddr_t)&acresult, (int)sizeof (int)) != 0)
-		DPRINT((dbfp, "auditon(A_GETCOND...) failed (exit)\n"));
-
-	DPRINT((dbfp, "audit cond = %d (1 is on)\n", acresult));
+	{
+		int	acresult;
+		if (auditon(A_GETCOND, (caddr_t)&acresult, sizeof (int)) != 0) {
+			DPRINT((dbfp, "auditon(A_GETCOND...) failed (exit)\n"));
+		}
+		DPRINT((dbfp, "audit cond = %d (1 is on)\n", acresult));
+	}
 #endif
 
 
@@ -633,7 +626,7 @@ loadauditlist()
 		auditd_exit(1);
 	}
 	kqmax.aq_hiwater *= 5;		/* RAM is cheaper in userspace */
-	DPRINT((dbfp, "auditd: reading audit_control\n"));
+	DPRINT((dbfp, "auditd: reading audit configuration\n"));
 
 	p = plugin_head;
 	/*
@@ -642,107 +635,61 @@ loadauditlist()
 	 * active.
 	 */
 	while (p != NULL) {
-		DPRINT((dbfp, "loadauditlist:  %p, %s previously created\n",
+		DPRINT((dbfp, "loadauditlist: %p, %s previously created\n",
 		    (void *)p, p->plg_path));
 		p->plg_to_be_removed = 1;	/* tentative removal */
 		p = p->plg_next;
 	}
-	/*
-	 * have_plugin may over count by one if both a "dir" entry
-	 * and a "plugin" entry for binfile are found.  All that
-	 * matters is that it be zero if no plugin or dir entries
-	 * are found.
-	 */
-	have_plugin = 0;
-	for (;;) {
-		/* NULL == use standard path for audit_control */
-		ach = _openac(NULL);
-		/*
-		 * loop until a directory entry is found (0) or eof (-1)
-		 */
-		while (((acresult = _getacdir(ach, buf, sizeof (buf))) != 0) &&
-		    acresult != -1) {
+
+	if (!do_getpluginconfig_scf(NULL, &plugin_kva_ll)) {
+		DPRINT((dbfp, "Could not get plugin configuration.\n"));
+		auditd_thread_close();
+		auditd_exit(1);
+	}
+	plugin_kva_ll_head = plugin_kva_ll;
+
+	while (plugin_kva_ll != NULL) {
+		DPRINT((dbfp, "loadauditlist: starting with %s",
+		    plugin_kva_ll->plugin_name));
+
+		/* skip inactive plugins */
+		value = kva_match(plugin_kva_ll->plugin_kva, PLUGIN_ACTIVE);
+		if (strcmp(value, "1") != 0) {
+			DPRINT((dbfp, " (inactive:%s) skipping..\n", value));
+			plugin_kva_ll = plugin_kva_ll->next;
+			continue;
 		}
-		if (acresult == 0) {
-			DPRINT((dbfp,
-			    "loadauditlist: "
-			    "got binfile via old config syntax\n"));
-			/*
-			 * A directory entry was found.
-			 */
-			got_dir = 1;
-			kvlist = _str2kva("name=audit_binfile.so.1",
-			    "=", ";");
+		DPRINT((dbfp, " (active)\n"));
 
-			p = init_plugin("audit_binfile.so.1", kvlist, cnt_flag);
+		value = kva_match(plugin_kva_ll->plugin_kva, PLUGIN_PATH);
+		DPRINT((dbfp, "loadauditlist: have an entry for %s (%s)\n",
+		    plugin_kva_ll->plugin_name, value));
 
-			if (p != NULL) {
-				binfile = p;
-				p->plg_qmax = kqmax.aq_hiwater;
-				have_plugin++;
+		p = init_plugin(value, plugin_kva_ll->plugin_kva, cnt_flag);
+		if (p == NULL) {
+			DPRINT((dbfp, "Unsuccessful plugin_t "
+			    "initialization.\n"));
+			my_sleep();
+			continue;
+		}
+
+		if (strcmp(plugin_kva_ll->plugin_name, "audit_binfile") == 0) {
+			binfile = p;
+		}
+
+		p->plg_qmax = kqmax.aq_hiwater; /* default */
+		value = kva_match(plugin_kva_ll->plugin_kva, PLUGIN_QSIZE);
+		if (value != NULL) {
+			long	tmp;
+			tmp = strtol(value, &endptr, 10);
+			if (*endptr == '\0' && tmp != 0) {
+				p->plg_qmax = tmp;
 			}
 		}
-		/*
-		 * collect plugin entries.  If there is an entry for
-		 * binfile.so.1, the parameters from the plugin line
-		 * override those set above.  For binfile, p_dir is
-		 * required only if dir wasn't specified elsewhere in
-		 * audit_control
-		 */
-		_rewindac(ach);
-		while ((acresult = _getacplug(ach, &kvlist)) == 0) {
-			value = kva_match(kvlist, "name");
-			if (value == NULL)
-				break;
-			DPRINT((dbfp, "loadauditlist: have an entry for %s\n",
-			    value));
-			p = init_plugin(value, kvlist, cnt_flag);
-			if (p == NULL)
-				continue;
+		DPRINT((dbfp, "%s queue max = %d\n", p->plg_path, p->plg_qmax));
 
-			if (strstr(value, "/audit_binfile.so") != NULL) {
-				binfile = p;
-				if (!got_dir &&
-				    (kva_match(kvlist, "p_dir") ==
-				    NULL)) {
-					__audit_dowarn("getacdir", "",
-					    wait_count);
-				}
-			}
-			p->plg_qmax = kqmax.aq_hiwater; /* default */
-			value = kva_match(kvlist, "qsize");
-			if (value != NULL) {
-				long	tmp;
-
-				tmp = strtol(value, &endptr, 10);
-				if (*endptr == '\0')
-					p->plg_qmax = tmp;
-			}
-			DPRINT((dbfp, "%s queue max = %d\n", p->plg_path,
-			    p->plg_qmax));
-
-			have_plugin++;
-		}
-		_endac(ach);
-		if (have_plugin != 0)
-			break;
-		/*
-		 * there was a problem getting the directory
-		 * list or remote host info from the audit_control file
-		 */
-		wait_count++;
-#if DEBUG
-		if (wait_count < 2)
-			DPRINT((dbfp,
-			    "auditd: problem getting directory "
-			    "/ or plugin list from audit_control.\n"));
-#endif	/* DEBUG */
-		__audit_dowarn("getacdir", "", wait_count);
-		/*
-		 * sleep for SLEEP_TIME seconds.
-		 */
-		my_sleep();
-	}    /* end for(;;) */
+		plugin_kva_ll = plugin_kva_ll->next;
+	}
 
 	p = plugin_head;
 	while (p != NULL) {
@@ -751,6 +698,8 @@ loadauditlist()
 		p->plg_removed = p->plg_to_be_removed;
 		p = p->plg_next;
 	}
+
+	plugin_kva_ll_free(plugin_kva_ll_head);
 }
 
 /*
@@ -787,9 +736,9 @@ signal_thread()
 
 	(void) sigemptyset(&set);
 	(void) sigaddset(&set, SIGALRM);
-	(void) sigaddset(&set, AU_SIG_DISABLE);
-	(void) sigaddset(&set, AU_SIG_READ_CONTROL);
-	(void) sigaddset(&set, AU_SIG_NEXT_DIR);
+	(void) sigaddset(&set, SIGTERM);
+	(void) sigaddset(&set, SIGHUP);
+	(void) sigaddset(&set, SIGUSR1);
 
 	for (;;) {
 		signal_caught = sigwait(&set);
@@ -798,17 +747,17 @@ signal_thread()
 			caught_alrm++;
 			DPRINT((dbfp, "caught SIGALRM\n"));
 			break;
-		case AU_SIG_DISABLE:
+		case SIGTERM:
 			caught_term++;
-			DPRINT((dbfp, "caught AU_SIG_DISABLE\n"));
+			DPRINT((dbfp, "caught SIGTERM\n"));
 			break;
-		case AU_SIG_READ_CONTROL:
+		case SIGHUP:
 			caught_readc++;
-			DPRINT((dbfp, "caught AU_SIG_READ_CONTROL\n"));
+			DPRINT((dbfp, "caught SIGHUP\n"));
 			break;
-		case AU_SIG_NEXT_DIR:
+		case SIGUSR1:
 			caught_nextd++;
-			DPRINT((dbfp, "caught AU_SIG_NEXT_DIR\n"));
+			DPRINT((dbfp, "caught SIGUSR1\n"));
 			break;
 		default:
 			DPRINT((dbfp, "caught unexpected signal:  %d\n",
@@ -891,7 +840,7 @@ conf_to_kernel(void)
 			ec.ec_class = evp->ae_class;
 
 			if (auditon(A_SETCLASS, (caddr_t)&ec,
-			    (int)sizeof (ec)) != 0) {
+			    sizeof (ec)) != 0) {
 				(void) asprintf(&msg,
 				    gettext("Could not configure kernel audit "
 				    "event to class mappings."));
@@ -902,38 +851,6 @@ conf_to_kernel(void)
 	endauevent();
 
 	DPRINT((dbfp, "configured %d kernel events.\n", i));
-}
-
-/*
- * aconf_to_kernel() - set the non-attributable audit mask from the
- * audit_control(4); see also auditconfig(1M) -aconf option.
- */
-static void
-aconf_to_kernel(void)
-{
-	char		*msg;
-	char		buf[2048];
-	au_mask_t	pmask;
-
-	if (getacna(buf, sizeof (buf)) < 0) {
-		(void) asprintf(&msg,
-		    gettext("bad non-attributable flags in audit_control(4)"));
-		err_exit(msg);
-	}
-
-	if (getauditflagsbin(buf, &pmask) < 0) {
-		(void) asprintf(&msg,
-		    gettext("bad audit flag value encountered"));
-		err_exit(msg);
-	}
-
-	if (auditon(A_SETKMASK, (caddr_t)&pmask, (int)sizeof (pmask)) != 0) {
-		(void) asprintf(&msg,
-		    gettext("Could not configure non-attributable events."));
-		err_exit(msg);
-	}
-
-	DPRINT((dbfp, "configured non-attributable events.\n"));
 }
 
 /*

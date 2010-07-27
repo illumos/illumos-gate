@@ -18,68 +18,48 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
 #include <bsm/audit.h>
-
-#define	MAXSTRLEN 360
-
-/*	getfaudflgs.c */
+#include <bsm/libbsm.h>
 
 /*
  * getfauditflags() - combines system event flag mask with user event
  *	flag masks.
  *
  * input: usremasks->as_success - always audit on success
- *	usremasks->as_failure - always audit on failure
- *	usrdmasks->as_success - never audit on success
- *	usrdmasks->as_failure - never audit on failure
+ *	  usremasks->as_failure - always audit on failure
+ *	  usrdmasks->as_success - never audit on success
+ *	  usrdmasks->as_failure - never audit on failure
  *
  * output: lastmasks->as_success - audit on success
- *	lastmasks->as_failure - audit on failure
+ *	   lastmasks->as_failure - audit on failure
  *
- * returns:	0 - ok
- * 		-1 - error
+ * returns:	 0 - ok
+ * 		-1 - error (cannot get attributable mask)
  */
-
-extern int getauditflagsbin();
-extern int getacflg();
-
 int
-getfauditflags(usremasks, usrdmasks, lastmasks)
-au_mask_t *usremasks;
-au_mask_t *usrdmasks;
-au_mask_t *lastmasks;
+getfauditflags(au_mask_t *usremasks, au_mask_t *usrdmasks, au_mask_t *lastmasks)
 {
-	int	len = MAXSTRLEN, retstat = 0;
-	char	s_auditstring[MAXSTRLEN];
-	audit_state_t masks;
+	au_mask_t masks;
 
-	masks.as_success = 0;
-	masks.as_failure = 0;
 	/* get system audit mask and convert to bit mask */
-	if ((getacflg(s_auditstring, len)) >= 0)  {
-		if ((getauditflagsbin(s_auditstring, &masks)) != 0)
-			retstat = -1;
-	} else
-		retstat = -1;
+	if (auditon(A_GETAMASK, (caddr_t)&masks, sizeof (masks)) == -1) {
+		return (-1);
+	}
 
 	/* combine system and user event masks */
-	if (retstat == 0) {
-		lastmasks->as_success = masks.as_success;
-		lastmasks->as_failure = masks.as_failure;
+	lastmasks->as_success = masks.as_success;
+	lastmasks->as_failure = masks.as_failure;
 
-		lastmasks->as_success |= usremasks->as_success;
-		lastmasks->as_failure |= usremasks->as_failure;
+	lastmasks->as_success |= usremasks->as_success;
+	lastmasks->as_failure |= usremasks->as_failure;
 
-		lastmasks->as_success &= ~(usrdmasks->as_success);
-		lastmasks->as_failure &= ~(usrdmasks->as_failure);
-	}
-	return (retstat);
+	lastmasks->as_success &= ~(usrdmasks->as_success);
+	lastmasks->as_failure &= ~(usrdmasks->as_failure);
+
+	return (0);
 }

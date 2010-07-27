@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -57,27 +56,26 @@ char	*user;
 au_event_t	event;
 int	sf;
 {
-	int	rc, sorf;
-	char	naflags[512];
-	struct au_mask mask;
+	int		sorf;
+	struct au_mask	mask;
 
 	mask.am_success = mask.am_failure = 0;
 	if (uid > MAXEPHUID) {
-		rc = getacna(naflags, 256); /* get non-attrib flags */
-		if (rc == 0)
-			(void) getauditflagsbin(naflags, &mask);
+		/* get non-attrib flags */
+		(void) auditon(A_GETKMASK, (caddr_t)&mask, sizeof (mask));
 	} else {
-		rc = au_user_mask(user, &mask);
+		(void) au_user_mask(user, &mask);
 	}
 
-	if (sf == 0)
+	if (sf == 0) {
 		sorf = AU_PRS_SUCCESS;
-	else if (sf == -1)
+	} else if (sf == -1) {
 		sorf = AU_PRS_FAILURE;
-	else
+	} else {
 		sorf = AU_PRS_BOTH;
-	rc = au_preselect(event, &mask, sorf, AU_PRS_REREAD);
-	return (rc);
+	}
+
+	return (au_preselect(event, &mask, sorf, AU_PRS_REREAD));
 }
 
 void

@@ -45,7 +45,7 @@ COMMONDIR = common
 # Macros for libbsm header files. These define user-level only interfaces.
 #
 GENHDRS = audit_uevents.h
-HDRS = libbsm.h devices.h devalloc.h adt.h adt_event.h audit_private.h
+HDRS = libbsm.h devices.h devalloc.h adt.h adt_event.h audit_private.h 
 GENSRCS =	$(COMMONDIR)/adt_xlate.c $(COMMONDIR)/adt_event.h
 COMMONHDRS =	$(HDRS:%=$(COMMONDIR)/%)
 ROOTHDRDIR = 	$(ROOT)/usr/include/bsm
@@ -70,7 +70,7 @@ clean clobber delete: $(SUBDIRS)
 ROOTETCSECURITY = 	$(ROOT)/etc/security
 $(ROOTETCSECURITY) := 	DIRMODE = 0755
 
-ESFILES =		audit_class audit_control audit_event
+ESFILES =		audit_class audit_event
 ESSRC =			$(ESFILES:%=%.txt)
 ETCSECURITYFILES =	$(ESFILES:%=$(ROOTETCSECURITY)/%)
 $(ETCSECURITYFILES) :=	FILEMODE = 0644

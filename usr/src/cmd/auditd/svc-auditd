@@ -19,14 +19,14 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 
+#
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+#
 
 . /lib/svc/share/smf_include.sh
 
+AUDIT=/usr/sbin/audit
 AUDITCONFIG=/usr/sbin/auditconfig
 AUDITD=/usr/sbin/auditd
 AWK=/usr/bin/awk
@@ -40,7 +40,6 @@ SVCS=/usr/bin/svcs
 
 AUDIT_STARTUP=/etc/security/audit_startup
 AUDITD_FMRI="system/auditd:default"
-
 
 #
 # main - the execution starts there.
@@ -68,7 +67,6 @@ main()
 	esac
 }
 	
-
 #
 # do_common - executes all the code common to all supported service methods.
 do_common()
@@ -93,13 +91,21 @@ do_common()
 		$AUDITCONFIG -t -getpolicy | \
 		    $EGREP "perzone|all" 1>/dev/null 2>&1
 		if [ $? -eq 1 ]; then
-			echo "$0:  auditd is not configured to run in a local"
-			echo "   zone, perzone policy not set" \
+			echo "$0: auditd(1M) is not configured to run in"
+			echo "   a local zone, perzone policy not set" \
 			    "(see auditconfig(1M))."
 			$SVCADM disable $AUDITD_FMRI
 			$SLEEP 5 &
 			exit $SMF_EXIT_OK
 		fi
+	fi
+	#
+	# Validate the audit service configuration
+	val_err="`$AUDIT -v 2>&1`"
+	if [ $? -ne 0 ]; then
+		echo "$0: audit service misconfiguration detected (${val_err})"
+		$SVCADM mark maintenance $AUDITD_FMRI
+		exit $SMF_EXIT_MON_OFFLINE
 	fi
 }
 
@@ -182,7 +188,6 @@ do_refresh()
 		exit $SMF_EXIT_ERR_CONFIG
 	fi
 }
-
 
 #
 # Call main() to start the own script execution.

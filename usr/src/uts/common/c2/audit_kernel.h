@@ -305,7 +305,7 @@ struct au_kcontext {
 
 	au_stat_t		auk_statistics;
 
-	struct auditinfo_addr	auk_info;
+	k_auditinfo_addr_t	auk_info;
 	kmutex_t		auk_eagain_mutex; /* door call retry */
 	kcondvar_t		auk_eagain_cv;
 

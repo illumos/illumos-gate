@@ -230,12 +230,12 @@ typedef au_id_t auid_t;
 #define	BSM_AUDITDOOR		37
 
 /*
- * Auditctl(2) commands
+ * auditon(2) commands
  */
 #define	A_GETPOLICY	2	/* get audit policy */
 #define	A_SETPOLICY	3	/* set audit policy */
-#define	A_GETKMASK	4	/* get kernel event preselection mask */
-#define	A_SETKMASK	5	/* set kernel event preselection mask */
+#define	A_GETKMASK	4	/* get non-attributable event audit mask */
+#define	A_SETKMASK	5	/* set non-attributable event audit mask */
 #define	A_GETQCTRL	6	/* get kernel audit queue ctrl parameters */
 #define	A_SETQCTRL	7	/* set kernel audit queue ctrl parameters */
 #define	A_GETCWD	8	/* get process current working directory */
@@ -253,6 +253,8 @@ typedef au_id_t auid_t;
 #define	A_GETPINFO_ADDR	28	/* get audit info for an arbitrary pid */
 #define	A_GETKAUDIT	29	/* get kernel audit characteristics */
 #define	A_SETKAUDIT	30	/* set kernel audit characteristics */
+#define	A_GETAMASK	31	/* set user default audit event mask */
+#define	A_SETAMASK	32	/* get user default audit event mask */
 
 /*
  * Audit Policy parameters (32 bits)
@@ -336,6 +338,15 @@ typedef struct auditinfo32 auditinfo32_t;
 #endif
 
 typedef struct auditinfo auditinfo_t;
+
+struct k_auditinfo_addr {
+	au_id_t		ai_auid;
+	au_mask_t	ai_amask;	/* user default preselection mask */
+	au_mask_t	ai_namask;	/* non-attributable mask */
+	au_tid_addr_t	ai_termid;
+	au_asid_t	ai_asid;
+};
+typedef struct k_auditinfo_addr k_auditinfo_addr_t;
 
 struct auditinfo_addr {
 	au_id_t		ai_auid;

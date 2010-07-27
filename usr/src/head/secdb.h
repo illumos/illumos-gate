@@ -86,6 +86,7 @@ extern int _insert2kva(kva_t *, char *, char *);
 extern int _kva2str(kva_t *, char *, int, char *, char *);
 extern kva_t *_kva_dup(kva_t *);
 extern void _kva_free(kva_t *);
+extern void _kva_free_value(kva_t *, char *);
 extern kva_t *_new_kva(int size);
 extern kva_t *_str2kva(char *, char *, char *);
 extern int _enum_auths(const char *, int (*)(const char *, void *, void *),

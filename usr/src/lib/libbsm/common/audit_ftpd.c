@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -55,7 +52,7 @@
 #define	NO_ANONYMOUS	(4)
 #define	MISC_FAILURE	(5)
 
-static char		luser[16];
+static char		luser[LOGNAME_MAX + 1];
 
 static void generate_record(char *, int, char *);
 static int selected(uid_t, char *, au_event_t, int);
@@ -66,10 +63,8 @@ audit_ftpd_bad_pw(char *uname)
 	if (cannot_audit(0)) {
 		return;
 	}
-	(void) strncpy(luser, uname, 8);
-	luser[8] = '\0';
-	generate_record(luser, BAD_PASSWD, dgettext(bsm_dom,
-		"bad password"));
+	(void) strncpy(luser, uname, LOGNAME_MAX);
+	generate_record(luser, BAD_PASSWD, dgettext(bsm_dom, "bad password"));
 }
 
 
@@ -79,10 +74,8 @@ audit_ftpd_unknown(char	*uname)
 	if (cannot_audit(0)) {
 		return;
 	}
-	(void) strncpy(luser, uname, 8);
-	luser[8] = '\0';
-	generate_record(luser, UNKNOWN_USER, dgettext(bsm_dom,
-		"unknown user"));
+	(void) strncpy(luser, uname, LOGNAME_MAX);
+	generate_record(luser, UNKNOWN_USER, dgettext(bsm_dom, "unknown user"));
 }
 
 
@@ -92,10 +85,9 @@ audit_ftpd_excluded(char *uname)
 	if (cannot_audit(0)) {
 		return;
 	}
-	(void) strncpy(luser, uname, 8);
-	luser[8] = '\0';
+	(void) strncpy(luser, uname, LOGNAME_MAX);
 	generate_record(luser, EXCLUDED_USER, dgettext(bsm_dom,
-		"excluded user"));
+	    "excluded user"));
 }
 
 
@@ -105,8 +97,7 @@ audit_ftpd_no_anon(void)
 	if (cannot_audit(0)) {
 		return;
 	}
-	generate_record("", NO_ANONYMOUS, dgettext(bsm_dom,
-		"no anonymous"));
+	generate_record("", NO_ANONYMOUS, dgettext(bsm_dom, "no anonymous"));
 }
 
 void
@@ -115,8 +106,7 @@ audit_ftpd_failure(char *uname)
 	if (cannot_audit(0)) {
 		return;
 	}
-	generate_record(uname, MISC_FAILURE, dgettext(bsm_dom,
-		"misc failure"));
+	generate_record(uname, MISC_FAILURE, dgettext(bsm_dom, "misc failure"));
 }
 
 void
@@ -125,8 +115,7 @@ audit_ftpd_success(char	*uname)
 	if (cannot_audit(0)) {
 		return;
 	}
-	(void) strncpy(luser, uname, 8);
-	luser[8] = '\0';
+	(void) strncpy(luser, uname, LOGNAME_MAX);
 	generate_record(luser, 0, "");
 }
 
@@ -186,7 +175,7 @@ generate_record(
 
 	/* add subject token */
 	(void) au_write(rd, au_to_subject_ex(uid, uid, gid,
-		ruid, rgid, pid, pid, &info.ai_termid));
+	    ruid, rgid, pid, pid, &info.ai_termid));
 
 	if (is_system_labeled())
 		(void) au_write(rd, au_to_mylabel());
@@ -229,27 +218,26 @@ selected(
 	au_event_t	event,
 	int	err)
 {
-	int	rc, sorf;
-	char	naflags[512];
-	struct au_mask mask;
+	int		sorf;
+	struct au_mask	mask;
 
 	mask.am_success = mask.am_failure = 0;
 	if (uid > MAXEPHUID) {
-		rc = getacna(naflags, 256); /* get non-attrib flags */
-		if (rc == 0)
-			(void) getauditflagsbin(naflags, &mask);
+		/* get non-attrib flags */
+		(void) auditon(A_GETKMASK, (caddr_t)&mask, sizeof (mask));
 	} else {
-		rc = au_user_mask(locuser, &mask);
+		(void) au_user_mask(locuser, &mask);
 	}
 
-	if (err == 0)
+	if (err == 0) {
 		sorf = AU_PRS_SUCCESS;
-	else if (err >= 1)
+	} else if (err >= 1) {
 		sorf = AU_PRS_FAILURE;
-	else
+	} else {
 		sorf = AU_PRS_BOTH;
-	rc = au_preselect(event, &mask, sorf, AU_PRS_REREAD);
-	return (rc);
+	}
+
+	return (au_preselect(event, &mask, sorf, AU_PRS_REREAD));
 }
 
 
@@ -277,7 +265,7 @@ audit_ftpd_logout(void)
 
 	/* determine if we're preselected */
 	if (au_preselect(AUE_ftpd_logout, &info.ai_mask, AU_PRS_SUCCESS,
-		AU_PRS_USECACHE) == 0) {
+	    AU_PRS_USECACHE) == 0) {
 		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_AUDIT,
 		    NULL);
 		return;
@@ -293,7 +281,7 @@ audit_ftpd_logout(void)
 
 	/* add subject token */
 	(void) au_write(rd, au_to_subject_ex(info.ai_auid, euid,
-		egid, uid, gid, pid, pid, &info.ai_termid));
+	    egid, uid, gid, pid, pid, &info.ai_termid));
 
 	if (is_system_labeled())
 		(void) au_write(rd, au_to_mylabel());

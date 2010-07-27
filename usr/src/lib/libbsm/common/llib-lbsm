@@ -22,8 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <bsm/devices.h>
@@ -36,3 +35,4 @@
 #include <bsm/adt_event.h>
 #include <bsm/audit_private.h>
 #include <audit_plugin.h>
+#include <audit_scf.h>

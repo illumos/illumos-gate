@@ -19,12 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#ifndef	_AUDITCONFIG_IMPL_H
-#define	_AUDITCONFIG_IMPL_H
+#ifndef	_AUDIT_POLICY_H
+#define	_AUDIT_POLICY_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,4 +83,4 @@ static policy_entry_t policy_table[] = {
 }
 #endif
 
-#endif	/* _AUDITCONFIG_IMPL_H */
+#endif	/* _AUDIT_POLICY_H */

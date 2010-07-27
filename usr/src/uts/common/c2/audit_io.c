@@ -808,9 +808,9 @@ audit_async_start(label_t *jb, au_event_t event, int sorf)
 	estate = kctx->auk_ets[event];
 
 	if (sorf & AUM_SUCC)
-		success = kctx->auk_info.ai_mask.as_success & estate;
+		success = kctx->auk_info.ai_namask.as_success & estate;
 	if (sorf & AUM_FAIL)
-		failure = kctx->auk_info.ai_mask.as_failure & estate;
+		failure = kctx->auk_info.ai_namask.as_failure & estate;
 
 	if ((success | failure) == NULL)
 		return (1);

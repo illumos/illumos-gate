@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * private interfaces for auditd plugins and auditd.
  */
@@ -116,15 +115,14 @@ __audit_dowarn(char *option, char *text, int count)
 		(void) waitpid(pid, &st, 0);
 		return;
 	}
-	(void) sprintf(countstr, "%d", count);
+	(void) snprintf(countstr, 5, "%d", count);
 	if (text == NULL)
 		text = empty;
 
 	if (strcmp(option, "soft") == 0 || strcmp(option, "hard") == 0)
 		(void) execl(auditwarn, auditwarn, option, text, 0);
 
-	else if (strcmp(option, "allhard") == 0 ||
-	    strcmp(option, "getacdir") == 0)
+	else if (strcmp(option, "allhard") == 0)
 		(void) execl(auditwarn, auditwarn, option, countstr, 0);
 	else if (strcmp(option, "plugin") == 0)
 		(void) execl(auditwarn, auditwarn, option, text, countstr, 0);
@@ -134,22 +132,16 @@ __audit_dowarn(char *option, char *text, int count)
 	 * (execl failed)
 	 */
 	if (strcmp(option, "soft") == 0)
-		(void) sprintf(warnstring,
+		(void) snprintf(warnstring, 80,
 		    gettext("soft limit in %s.\n"), text);
 	else if (strcmp(option, "hard") == 0)
-		(void) sprintf(warnstring,
+		(void) snprintf(warnstring, 80,
 		    gettext("hard limit in %s.\n"), text);
 	else if (strcmp(option, "allhard") == 0)
 		(void) sprintf(warnstring,
 		    gettext("All audit filesystems are full.\n"));
-	else if (strcmp(option, "getacmin") == 0)
-		(void) sprintf(warnstring,
-		    gettext("audit_control minfree error.\n"));
-	else if (strcmp(option, "getacdir") == 0)
-		(void) sprintf(warnstring,
-		    gettext("audit_control directory error.\n"));
 	else
-		(void) sprintf(warnstring,
+		(void) snprintf(warnstring, 80,
 		    gettext("error %s.\n"), option);
 
 	__audit_syslog("auditd", LOG_PID | LOG_ODELAY | LOG_CONS, LOG_AUTH,
@@ -190,7 +182,7 @@ __audit_dowarn2(char *option, char *name, char *error, char *text, int count)
 		(void) waitpid(pid, &st, 0);
 		return;
 	}
-	(void) sprintf(countstr, "%d", count);
+	(void) snprintf(countstr, 5, "%d", count);
 	if ((text == NULL) || (*text == '\0'))
 		text = empty;
 	if ((name == NULL) || (*name == '\0'))
@@ -202,8 +194,8 @@ __audit_dowarn2(char *option, char *name, char *error, char *text, int count)
 	/*
 	 * (execl failed)
 	 */
-	(void) sprintf(warnstring,
-	    gettext("audit_control plugin error: %s\n"), text);
+	(void) snprintf(warnstring, 80,
+	    gettext("%s plugin error: %s\n"), name, text);
 
 	__audit_syslog("auditd", LOG_PID | LOG_ODELAY | LOG_CONS, LOG_AUTH,
 	    LOG_ALERT, (const char *)warnstring);
