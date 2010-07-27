@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -1735,6 +1734,7 @@ bfe_mac_propinfo(void *arg, const char *name, mac_prop_id_t num,
 	case MAC_PROP_ADV_10FDX_CAP:
 	case MAC_PROP_ADV_10HDX_CAP:
 	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		break;
 
@@ -1756,10 +1756,6 @@ bfe_mac_propinfo(void *arg, const char *name, mac_prop_id_t num,
 
 	case MAC_PROP_EN_10HDX_CAP:
 		mac_prop_info_set_default_uint8(prh, bfe->bfe_cap_10hdx);
-		break;
-
-	case MAC_PROP_EN_100T4_CAP:
-		mac_prop_info_set_default_uint8(prh, bfe->bfe_cap_100T4);
 		break;
 	}
 }
@@ -1794,11 +1790,6 @@ bfe_mac_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
 	case MAC_PROP_EN_10HDX_CAP:
 		advp = &bfe->bfe_adv_10hdx;
 		capp = &bfe->bfe_cap_10hdx;
-		break;
-
-	case MAC_PROP_EN_100T4_CAP:
-		advp = &bfe->bfe_adv_100T4;
-		capp = &bfe->bfe_cap_100T4;
 		break;
 
 	case MAC_PROP_AUTONEG:
