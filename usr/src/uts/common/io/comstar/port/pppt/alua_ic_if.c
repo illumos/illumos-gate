@@ -664,11 +664,14 @@ stmf_ic_scsi_cmd_msg_alloc(
 	    sizeof (icsc->icsc_task_lun_no));
 
 	icsc->icsc_task_expected_xfer_length = task->task_expected_xfer_length;
-	icsc->icsc_task_cdb_length = task->task_cdb_length;
-
-	icsc->icsc_task_cdb = (uint8_t *)kmem_zalloc(task->task_cdb_length,
-	    KM_SLEEP);
-	bcopy(task->task_cdb, icsc->icsc_task_cdb, task->task_cdb_length);
+	if (task->task_cdb_length) {
+		ASSERT(task->task_mgmt_function == TM_NONE);
+		icsc->icsc_task_cdb_length = task->task_cdb_length;
+		icsc->icsc_task_cdb =
+		    (uint8_t *)kmem_zalloc(task->task_cdb_length, KM_SLEEP);
+		bcopy(task->task_cdb, icsc->icsc_task_cdb,
+		    task->task_cdb_length);
+	}
 
 	icsc->icsc_task_flags = task->task_flags;
 	icsc->icsc_task_priority = task->task_priority;
@@ -1019,7 +1022,7 @@ stmf_ic_scsi_cmd_msg_free(stmf_ic_scsi_cmd_msg_t *m,
 	scsi_devid_desc_free(m->icsc_ini_devid);
 	scsi_devid_desc_free(m->icsc_tgt_devid);
 	stmf_remote_port_free(m->icsc_rport);
-	if (cmethod == STMF_CONSTRUCTOR) {
+	if ((cmethod == STMF_CONSTRUCTOR) && m->icsc_task_cdb) {
 		kmem_free(m->icsc_task_cdb, m->icsc_task_cdb_length);
 	}
 
@@ -1256,6 +1259,10 @@ stmf_ic_scsi_cmd_msg_marshal(nvlist_t *nvl, void *msg)
 	NVLIST_ADD_ARRAY_LEN(uint8, m, icsc_task_lun_no, 8);
 	NVLIST_ADD_FIELD(uint32, m, icsc_task_expected_xfer_length);
 	NVLIST_ADD_FIELD(uint16, m, icsc_task_cdb_length);
+	/*
+	 * icsc_task_cdb_length may be zero in the case of a task
+	 * management function.
+	 */
 	NVLIST_ADD_ARRAY_LEN(uint8, m, icsc_task_cdb, m->icsc_task_cdb_length);
 	NVLIST_ADD_FIELD(uint8, m, icsc_task_flags);
 	NVLIST_ADD_FIELD(uint8, m, icsc_task_priority);
@@ -1741,12 +1748,14 @@ stmf_ic_scsi_cmd_msg_unmarshal(nvlist_t *nvl)
 	}
 
 	/* icsc_task_cdb */
-	m->icsc_task_cdb = stmf_ic_uint8_array_unmarshal(nvl, "icsc_task_cdb",
-	    m->icsc_task_cdb_length, NULL);
-	if (!m->icsc_task_cdb) {
-		stmf_ic_nvlookup_warn(__func__, "icsc_task_cdb");
-		rc = ENOMEM;
-		goto done;
+	if (m->icsc_task_cdb_length) {
+		m->icsc_task_cdb = stmf_ic_uint8_array_unmarshal(nvl,
+		    "icsc_task_cdb", m->icsc_task_cdb_length, NULL);
+		if (!m->icsc_task_cdb) {
+			stmf_ic_nvlookup_warn(__func__, "icsc_task_cdb");
+			rc = ENOMEM;
+			goto done;
+		}
 	}
 
 	/* immediate data, if there is any */
