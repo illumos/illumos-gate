@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/task.h>
 #include <sys/types.h>
@@ -65,7 +63,7 @@ remove_spaces(char *s)
 
 	while (*next != '\0') {
 		while (isspace(*next))
-		    next++;
+			next++;
 		*current++ = *next++;
 	}
 	*current = '\0';
@@ -178,6 +176,15 @@ build_rctlblk(rctlblk_t *blk, int comp_num, char *component)
 #define	CLOSEBEFOREOPEN	4
 #define	BADSPEC		5
 
+static void
+reinit_blk(rctlblk_t *blk, int local_action)
+{
+	rctlblk_set_privilege(blk, RCPRIV_PRIVILEGED);
+	rctlblk_set_value(blk, 0);
+	rctlblk_set_local_flags(blk, 0);
+	rctlblk_set_local_action(blk, local_action, 0);
+}
+
 static int
 rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 {
@@ -191,7 +198,12 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 	int project_entity = 0;
 	int count = 0;
 	char *tmp;
-	int local_action;
+	int local_act;
+	rctlblk_t *rlast;
+	rctlblk_t *rnext;
+	rctlblk_t *rtmp;
+	int teardown_basic = 0;
+	int teardown_priv = 0;
 
 	/* We cannot modify a zone resource control */
 	if (strncmp(ctl_name, "zone.", strlen("zone.")) == 0) {
@@ -200,56 +212,35 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 
 	remove_spaces(val);
 
-	/*
-	 * As we are operating in a new task, both process and task
-	 * rctls are referenced by this process alone.  Tear down
-	 * matching process and task rctls only.
-	 *
-	 * blk will be the RCPRIV_SYSTEM for this resource control,
-	 * populated by the last pr_setrctl().
-	 */
-	if ((strncmp(ctl_name, "process.", strlen("process.")) == 0) ||
-	    (strncmp(ctl_name, "task.", strlen("task.")) == 0)) {
-
-		if ((blk = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
-			return (SETFAILED);
-		}
-
-
-		while (pr_getrctl(Pr, ctl_name, NULL, blk, RCTL_FIRST) != -1 &&
-		    rctlblk_get_privilege(blk) != RCPRIV_SYSTEM) {
-			(void) pr_setrctl(Pr, ctl_name, NULL, blk, RCTL_DELETE);
-		}
-
-	} else if (strncmp(ctl_name, "project.", strlen("project.")) == 0) {
+	if (strncmp(ctl_name, "project.", strlen("project.")) == 0) {
 		project_entity = 1;
-
-		/* Determine how many attributes we'll be setting */
-		for (tmp = val; *tmp != '\0'; tmp++) {
-			if (*tmp == '(')
-				count++;
-		}
-
-		/* Allocate sufficient memory for rctl blocks */
-		if ((count == 0) || ((ablk =
-		    (rctlblk_t *)malloc(rctlblk_size() * count)) == NULL)) {
-			return (SETFAILED);
-		}
-		blk = ablk;
-
-		/*
-		 * In order to set the new rctl's local_action, we'll need the
-		 * current value of global_flags.  We obtain global_flags by
-		 * performing a pr_getrctl().
-		 *
-		 * The ctl_name has been verified as valid, so we have no reason
-		 * to suspect that pr_getrctl() will return an error.
-		 */
-		(void) pr_getrctl(Pr, ctl_name, NULL, blk, RCTL_FIRST);
-
-	} else {
+	} else if ((strncmp(ctl_name, "process.", strlen("process.")) != 0) &&
+	    (strncmp(ctl_name, "task.", strlen("task.")) != 0)) {
 		return (SETFAILED);
 	}
+
+	/* Determine how many attributes we'll be setting */
+	for (tmp = val; *tmp != '\0'; tmp++) {
+		if (*tmp == '(')
+			count++;
+	}
+	/* Allocate sufficient memory for rctl blocks */
+	if ((count == 0) || ((ablk =
+	    (rctlblk_t *)malloc(rctlblk_size() * count)) == NULL)) {
+		return (SETFAILED);
+	}
+	blk = ablk;
+
+	/*
+	 * In order to set the new rctl's local_action, we'll need the
+	 * current value of global_flags.  We obtain global_flags by
+	 * performing a pr_getrctl().
+	 *
+	 * The ctl_name has been verified as valid, so we have no reason
+	 * to suspect that pr_getrctl() will return an error.
+	 */
+	(void) pr_getrctl(Pr, ctl_name, NULL, blk, RCTL_FIRST);
+
 
 	/*
 	 * Set initial local action based on global deny properties.
@@ -259,13 +250,14 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 	rctlblk_set_local_flags(blk, 0);
 
 	if (rctlblk_get_global_flags(blk) & RCTL_GLOBAL_DENY_ALWAYS)
-		local_action = RCTL_LOCAL_DENY;
+		local_act = RCTL_LOCAL_DENY;
 	else
-		local_action = RCTL_LOCAL_NOACTION;
+		local_act = RCTL_LOCAL_NOACTION;
 
-	rctlblk_set_local_action(blk, local_action, 0);
+	rctlblk_set_local_action(blk, local_act, 0);
 
 	for (; ; val++) {
+
 		switch (*val) {
 			case '(':
 				if (state & INPAREN) {
@@ -297,30 +289,29 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 					    (rctlblk_get_privilege(blk) ==
 					    RCPRIV_BASIC)) {
 						error = SETFAILED;
-					} else if (project_entity) {
-						if (valuecount > count)
-							return (SETFAILED);
-
-						if (valuecount != count)
-							blk = RCTLBLK_INC(ablk,
-								valuecount);
 					} else {
-						if (pr_setrctl(Pr, ctl_name,
-						    NULL, blk, RCTL_INSERT) ==
-						    -1)
-							error = SETFAILED;
+						if (rctlblk_get_privilege(blk)
+						    == RCPRIV_BASIC)
+							teardown_basic = 1;
+
+						if (rctlblk_get_privilege(blk)
+						    == RCPRIV_PRIVILEGED)
+							teardown_priv = 1;
+
+						if (valuecount > count) {
+							free(ablk);
+							return (SETFAILED);
+						}
+
+						if (valuecount != count) {
+							blk = RCTLBLK_INC(ablk,
+							    valuecount);
+							/* re-initialize blk */
+							reinit_blk(blk,
+							    local_act);
+						}
 					}
 
-					/* re-initialize block */
-					if (!project_entity ||
-					    (valuecount != count)) {
-						rctlblk_set_privilege(blk,
-						    RCPRIV_PRIVILEGED);
-						rctlblk_set_value(blk, 0);
-						rctlblk_set_local_flags(blk, 0);
-						rctlblk_set_local_action(blk,
-						    local_action, 0);
-					}
 				} else {
 					error = CLOSEBEFOREOPEN;
 				}
@@ -354,17 +345,82 @@ rctl_set(char *ctl_name, char *val, struct ps_prochandle *Pr, int flags)
 		if (error)
 			break;
 	}
-
-	if (project_entity) {
-		blk = ablk;
-		if (pr_setprojrctl(Pr, ctl_name, blk, count, flags) == -1)
-			error = SETFAILED;
-	}
-
-	free(blk);
+	/* ablk points to array of rctlblk_t */
 
 	if (valuecount == 0)
 		error = BADSPEC;
+
+	if (error != COMPLETE) {
+		free(ablk);
+		return (error);
+	}
+
+	/* teardown rctls if required */
+	if (!project_entity) {
+
+		if ((rlast = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
+			free(ablk);
+			return (SETFAILED);
+		}
+		if ((rnext = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
+			free(ablk);
+			free(rlast);
+			return (SETFAILED);
+		}
+
+		if (pr_getrctl(Pr, ctl_name, NULL, rnext, RCTL_FIRST) == 0) {
+
+			while (1) {
+				if ((rctlblk_get_privilege(rnext) ==
+				    RCPRIV_PRIVILEGED) &&
+				    (teardown_priv == 1)) {
+					(void) pr_setrctl(Pr, ctl_name, NULL,
+					    rnext, RCTL_DELETE);
+				}
+				if ((rctlblk_get_privilege(rnext) ==
+				    RCPRIV_BASIC) && (teardown_basic == 1)) {
+					(void) pr_setrctl(Pr, ctl_name, NULL,
+					    rnext, RCTL_DELETE);
+				}
+
+				rtmp = rnext;
+				rnext = rlast;
+				rlast = rtmp;
+				if (pr_getrctl(Pr, ctl_name, rlast, rnext,
+				    RCTL_NEXT) == -1)
+					break;
+			}
+
+		}
+
+		free(rnext);
+		free(rlast);
+
+	}
+
+	/* set rctls */
+
+	blk = ablk;
+
+	if (project_entity) {
+		if (pr_setprojrctl(Pr, ctl_name, blk, count, flags) == -1)
+			error = SETFAILED;
+	} else {
+		valuecount = 0;
+		while (valuecount < count) {
+			if (pr_setrctl(Pr, ctl_name,
+			    NULL, blk, RCTL_INSERT) == -1) {
+				error = SETFAILED;
+				break;
+				}
+			valuecount++;
+			blk = RCTLBLK_INC(ablk, valuecount);
+		}
+	}
+
+
+
+	free(ablk);
 
 	if (error != COMPLETE)
 		return (error);
