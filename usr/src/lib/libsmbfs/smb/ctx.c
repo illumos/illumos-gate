@@ -1101,7 +1101,8 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 	if (error) {
 		const char *ais = gai_strerror(error);
 		smb_error(dgettext(TEXT_DOMAIN,
-		    "can't get server address, %s"), 0, ais);
+		    "can't resolve name\"%s\", %s"),
+		    0, ctx->ct_fullserver, ais);
 		return (ENODATA);
 	}
 	assert(ctx->ct_addrinfo != NULL);

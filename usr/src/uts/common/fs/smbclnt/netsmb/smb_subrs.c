@@ -191,6 +191,19 @@ m_dumpm(mblk_t *m)
 #define	ETIME ETIMEDOUT
 #endif
 
+/*
+ * Log any un-handled NT or DOS errors we encounter.
+ * Make these log NOTICE in a debug build to ensure
+ * they get noticed during tests.  In the field these
+ * are unimportant, so just fire a Dtrace probe.
+ */
+static int unknown_err_logpri =
+#ifdef	DEBUG
+	CE_NOTE;
+#else
+	CE_CONT;
+#endif
+
 typedef struct nt2errno {
 	unsigned int nterr;
 	int errno;
@@ -219,6 +232,7 @@ static const nt2errno_t nt2errno[] = {
 	{NT_STATUS_DIRECTORY_NOT_EMPTY,		ENOTEMPTY},
 	{NT_STATUS_DISK_FULL,			ENOSPC},
 	{NT_STATUS_DLL_NOT_FOUND,		ELIBACC},
+	{NT_STATUS_DUPLICATE_NAME,		EINVAL},
 	{NT_STATUS_END_OF_FILE,			ENODATA},
 	{NT_STATUS_FILE_IS_A_DIRECTORY,		EISDIR},
 	{NT_STATUS_FILE_LOCK_CONFLICT,		EAGAIN},
@@ -255,9 +269,9 @@ static const nt2errno_t nt2errno[] = {
 	{NT_STATUS_NONEXISTENT_SECTOR,		ESPIPE},
 	{NT_STATUS_NONE_MAPPED,			EINVAL},
 	{NT_STATUS_NOT_A_DIRECTORY,		ENOTDIR},
-	{NT_STATUS_NOT_IMPLEMENTED,		ENOSYS},
+	{NT_STATUS_NOT_IMPLEMENTED,		ENOTSUP},
 	{NT_STATUS_NOT_MAPPED_VIEW,		EINVAL},
-	{NT_STATUS_NOT_SUPPORTED,		ENOSYS},
+	{NT_STATUS_NOT_SUPPORTED,		ENOTSUP},
 	{NT_STATUS_NO_MEDIA,			ENOMEDIUM},
 	{NT_STATUS_NO_MEDIA_IN_DEVICE,		ENOMEDIUM},
 	{NT_STATUS_NO_MEMORY,			ENOMEM},
@@ -277,7 +291,7 @@ static const nt2errno_t nt2errno[] = {
 	{NT_STATUS_PIPE_BUSY,			EPIPE},
 	{NT_STATUS_PIPE_CONNECTED,		EISCONN},
 	{NT_STATUS_PIPE_DISCONNECTED,		EPIPE},
-	{NT_STATUS_PIPE_NOT_AVAILABLE,		ENOSYS},
+	{NT_STATUS_PIPE_NOT_AVAILABLE,		EBUSY},
 	{NT_STATUS_PORT_CONNECTION_REFUSED,	ECONNREFUSED},
 	{NT_STATUS_PORT_MESSAGE_TOO_LONG,	EMSGSIZE},
 	{NT_STATUS_PORT_UNREACHABLE,		EHOSTUNREACH},
@@ -844,7 +858,8 @@ smb_maperr32(uint32_t nterr)
 	for (nt2e = nt2errno; nt2e->errno; nt2e++)
 		if (nt2e->nterr == nterr)
 			return (nt2e->errno);
-	SMBERROR("no direct map for 32 bit server error (0x%x)\n", nterr);
+	smb_errmsg(unknown_err_logpri, "smb_maperr32",
+	    "No direct map for 32 bit server error (0x%x)\n", nterr);
 
 	/* ok, then try mapping to dos to unix */
 	for (nt2d = nt2doserr; nt2d->nterr; nt2d++)
@@ -973,13 +988,12 @@ smb_maperror(int eclass, int eno)
 		case ERRdata:
 		case ERRgeneral:
 			return (EIO);
-		default:
-			SMBERROR("Unmapped DOS error %d:%d\n", eclass, eno);
-			return (EIO);
 		}
 	}
-	SMBERROR("Unmapped DOS error %d:%d\n", eclass, eno);
-	return (EBADRPC);
+
+	smb_errmsg(unknown_err_logpri, "smb_maperror",
+	    "Unknown DOS error %d/%d\n", eclass, eno);
+	return (EIO);
 }
 
 #if defined(NOICONVSUPPORT) || defined(lint)

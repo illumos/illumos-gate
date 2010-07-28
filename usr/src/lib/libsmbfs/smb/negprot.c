@@ -31,8 +31,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -111,13 +110,17 @@ smb_negprot(struct smb_ctx *ctx, struct mbdata *oblob)
 	/*
 	 * Initialize: vc_hflags and vc_hflags2.
 	 * Note: ctx->ct_hflags* are copied into the
-	 * (per request) rqp->rq_hflags* by smb_rq_init,
-	 * so changing them after that call will not
-	 * affect THIS request.
+	 * (per request) rqp->rq_hflags* by smb_rq_init.
+	 *
+	 * Like Windows, set FLAGS2_UNICODE in our first request,
+	 * even though technically we don't yet know whether the
+	 * server supports Unicode.  Will clear this flag below
+	 * if we find out it doesn't.  Need to do this because
+	 * some servers reject all non-Unicode requests.
 	 */
 	ctx->ct_hflags = SMB_FLAGS_CASELESS;
-	ctx->ct_hflags2 = (SMB_FLAGS2_ERR_STATUS |
-	    SMB_FLAGS2_KNOWS_LONG_NAMES);
+	ctx->ct_hflags2 = SMB_FLAGS2_KNOWS_LONG_NAMES |
+	    SMB_FLAGS2_ERR_STATUS | SMB_FLAGS2_UNICODE;
 
 	/*
 	 * Sould we offer extended security?
@@ -276,11 +279,12 @@ smb_negprot(struct smb_ctx *ctx, struct mbdata *oblob)
 	}
 	DPRINT("Security signatures: %d", will_sign);
 
-	if (sv->sv_caps & SMB_CAP_UNICODE) {
+	/* See comment above re. FLAGS2_UNICODE */
+	if (sv->sv_caps & SMB_CAP_UNICODE)
 		ctx->ct_vcflags |= SMBV_UNICODE;
-		ctx->ct_hflags2 |= SMB_FLAGS2_UNICODE;
+	else
+		ctx->ct_hflags2 &= ~SMB_FLAGS2_UNICODE;
 
-	}
 	if ((sv->sv_caps & SMB_CAP_STATUS32) == 0) {
 		/*
 		 * They don't do NT error codes.

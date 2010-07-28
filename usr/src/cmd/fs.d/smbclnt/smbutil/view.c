@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -131,12 +130,11 @@ again:
 
 	/*
 	 * Have IPC$ tcon, now list shares.
+	 * This prints its own errors.
 	 */
 	error = enum_shares(ctx);
-	if (error) {
-		smb_error("cannot list shares", error);
+	if (error)
 		return (error);
-	}
 
 	smb_ctx_free(ctx);
 	return (0);
@@ -172,7 +170,8 @@ enum_shares(smb_ctx_t *ctx)
 	 */
 	error = smb_netshareenum(ctx, &entries, &total, &share_info);
 	if (error) {
-		smb_error(gettext("unable to list resources"), error);
+		smb_error(gettext("//%s failed to list shares"),
+		    error, ctx->ct_fullserver);
 		return (error);
 	}
 	print_shares(entries, total, share_info);
