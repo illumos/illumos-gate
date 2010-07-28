@@ -523,6 +523,7 @@ file path=lib/svc/manifest/milestone/single-user.xml group=sys mode=0444
 file path=lib/svc/manifest/milestone/sysconfig.xml group=sys mode=0444
 file path=lib/svc/manifest/network/dlmgmt.xml group=sys mode=0444
 file path=lib/svc/manifest/network/dns/client.xml group=sys mode=0444
+file path=lib/svc/manifest/network/dns/install.xml group=sys mode=0444
 file path=lib/svc/manifest/network/forwarding.xml group=sys mode=0444
 file path=lib/svc/manifest/network/inetd-upgrade.xml group=sys mode=0444
 file path=lib/svc/manifest/network/inetd.xml group=sys mode=0444
@@ -532,6 +533,7 @@ file path=lib/svc/manifest/network/ipsec/manual-key.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ipsec/policy.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ldap/client.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-initial.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-install.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-ipmgmt.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-ipqos.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-iptun.xml group=sys mode=0444
@@ -593,6 +595,7 @@ file path=lib/svc/method/boot-archive-update mode=0555
 file path=lib/svc/method/console-login mode=0555
 file path=lib/svc/method/devices-audio mode=0555
 file path=lib/svc/method/devices-local mode=0555
+file path=lib/svc/method/dns-install mode=0555
 file path=lib/svc/method/fs-local mode=0555
 file path=lib/svc/method/fs-minimal mode=0555
 file path=lib/svc/method/fs-root mode=0555
@@ -605,6 +608,7 @@ file path=lib/svc/method/ldap-client mode=0555
 file path=lib/svc/method/manifest-import mode=0555
 file path=lib/svc/method/mpxio-upgrade mode=0555
 file path=lib/svc/method/net-init mode=0555
+file path=lib/svc/method/net-install mode=0555
 file path=lib/svc/method/net-ipmgmt mode=0555
 file path=lib/svc/method/net-ipqos mode=0555
 file path=lib/svc/method/net-iptun mode=0555

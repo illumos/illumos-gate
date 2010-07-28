@@ -50,7 +50,6 @@ extern "C" {
 /* Permanent data store for ipadm */
 #define	IPADM_DB_FILE		"/etc/ipadm/ipadm.conf"
 #define	IPADM_FILE_MODE		(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
-#define	IPADM_TMPFS_DIR		"/etc/svc/volatile/ipadm"
 
 /*
  * For more information on these definitions please refer to the top of

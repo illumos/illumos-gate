@@ -69,6 +69,9 @@
 
 extern pthread_rwlock_t ipmgmt_dbconf_lock;
 
+/* signifies whether volatile copy of data store is in use */
+static boolean_t ipmgmt_rdonly_root = B_FALSE;
+
 /*
  * Checks if the database nvl, `db_nvl' contains and matches ALL of the passed
  * in private nvpairs `proto', `ifname' & `aobjname'.
@@ -358,8 +361,49 @@ ipmgmt_db_getaddr(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 }
 
 /*
+ * This function only gets called if a volatile filesystem version
+ * of the configuration file has been created. This only happens in the
+ * extremely rare case that a request has been made to update the configuration
+ * file at boottime while the root filesystem was read-only. This is
+ * really a rare occurrence now that we don't support UFS root filesystems
+ * any longer. This function will periodically attempt to write the
+ * configuration back to its location on the root filesystem. Success
+ * will indicate that the filesystem is no longer read-only.
+ */
+/* ARGSUSED */
+static void *
+ipmgmt_db_restore_thread(void *arg)
+{
+	int err;
+
+	for (;;) {
+		(void) sleep(5);
+		(void) pthread_rwlock_wrlock(&ipmgmt_dbconf_lock);
+		if (!ipmgmt_rdonly_root)
+			break;
+		err = ipmgmt_cpfile(IPADM_VOL_DB_FILE, IPADM_DB_FILE, B_FALSE);
+		if (err == 0) {
+			ipmgmt_rdonly_root = B_FALSE;
+			break;
+		}
+		(void) pthread_rwlock_unlock(&ipmgmt_dbconf_lock);
+	}
+	(void) pthread_rwlock_unlock(&ipmgmt_dbconf_lock);
+	return (NULL);
+}
+
+/*
  * This function takes the appropriate lock, read or write, based on the
- * `db_op' and then calls DB walker ipadm_rw_db().
+ * `db_op' and then calls DB walker ipadm_rw_db(). The code is complicated
+ * by the fact that we are not always guaranteed to have a writable root
+ * filesystem since it is possible that we are reading or writing during
+ * bootime while the root filesystem is still read-only. This is, by far,
+ * the exception case. Normally, this function will be called when the
+ * root filesystem is writable. In the unusual case where this is not
+ * true, the configuration file is copied to the volatile file system
+ * and is updated there until the root filesystem becomes writable. At
+ * that time the file will be moved back to its proper location by
+ * ipmgmt_db_restore_thread().
  */
 extern int
 ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
@@ -367,9 +411,9 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 	int		err;
 	boolean_t	writeop;
 	mode_t		mode;
+	pthread_t	tid;
 
 	writeop = (db_op != IPADM_DB_READ);
-
 	if (writeop) {
 		(void) pthread_rwlock_wrlock(&ipmgmt_dbconf_lock);
 		mode = IPADM_FILE_MODE;
@@ -378,7 +422,42 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 		mode = 0;
 	}
 
-	err = ipadm_rw_db(db_walk_func, db_warg, IPADM_DB_FILE, mode, db_op);
+	/*
+	 * Did a previous write attempt fail? If so, don't even try to
+	 * read/write to IPADM_DB_FILE.
+	 */
+	if (!ipmgmt_rdonly_root) {
+		err = ipadm_rw_db(db_walk_func, db_warg, IPADM_DB_FILE,
+		    mode, db_op);
+		if (err != EROFS)
+			goto done;
+	}
+
+	/*
+	 * If we haven't already copied the file to the volatile
+	 * file system, do so. This should only happen on a failed
+	 * writeop(i.e., we have acquired the write lock above).
+	 */
+	if (access(IPADM_VOL_DB_FILE, F_OK) != 0) {
+		assert(writeop);
+		err = ipmgmt_cpfile(IPADM_DB_FILE, IPADM_VOL_DB_FILE, B_TRUE);
+		if (err != 0)
+			goto done;
+		err = pthread_create(&tid, NULL, ipmgmt_db_restore_thread,
+		    NULL);
+		if (err != 0) {
+			(void) unlink(IPADM_VOL_DB_FILE);
+			goto done;
+		}
+		ipmgmt_rdonly_root = B_TRUE;
+	}
+
+	/*
+	 * Read/write from the volatile copy.
+	 */
+	err = ipadm_rw_db(db_walk_func, db_warg, IPADM_VOL_DB_FILE,
+	    mode, db_op);
+done:
 	(void) pthread_rwlock_unlock(&ipmgmt_dbconf_lock);
 	return (err);
 }

@@ -45,6 +45,7 @@ extern void	ipmgmt_handler(void *, char *, size_t, door_desc_t *, uint_t);
 
 /* ipmgmt_util.c */
 extern void	ipmgmt_log(int, const char *, ...);
+extern int	ipmgmt_cpfile(const char *, const char *, boolean_t);
 
 /* ipmgmt_persist.c */
 
@@ -137,7 +138,15 @@ extern ipmgmt_aobjmap_list_t aobjmap;
  * in-memory copy of list `aobjmap' on disk. This is done to recover from
  * daemon reboot (using svcadm) or crashes.
  */
+#define	IPADM_TMPFS_DIR		"/etc/svc/volatile/ipadm"
 #define	ADDROBJ_MAPPING_DB_FILE	IPADM_TMPFS_DIR"/aobjmap.conf"
+
+/*
+ * A temporary copy of the ipadm configuration file might need
+ * to be created if write requests are encountered during boottime
+ * and the root filesystem is mounted read-only.
+ */
+#define	IPADM_VOL_DB_FILE	IPADM_TMPFS_DIR"/ipadm.conf"
 
 extern int		ipmgmt_db_walk(db_wfunc_t *, void *, ipadm_db_op_t);
 extern int		ipmgmt_aobjmap_op(ipmgmt_aobjmap_t *, uint32_t);

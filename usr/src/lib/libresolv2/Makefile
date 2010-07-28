@@ -19,20 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 
 include		../../Makefile.master
 include		../Makefile.lib
 
-MANIFEST=	client.xml
+MANIFEST=	client.xml install.xml
 MANIFESTDIR=	$(ROOT)/lib/svc/manifest/network/dns
 ROOTMANIFEST=	$(MANIFEST:%=$(MANIFESTDIR)/%)
 
 $(ROOTMANIFEST) :=	FILEMODE = 444
+
+SVCMETHOD=	dns-install
+SVCMETHODDIR=	$(ROOT)/lib/svc/method
+ROOTSVCMETHOD=	$(SVCMETHOD:%=$(SVCMETHODDIR)/%)
+
+$(ROOTSVCMETHOD) :=	FILEMODE = 0555
 
 CHKMANIFEST=	$(MANIFEST:%.xml=%.xmlchk)
 
@@ -59,7 +63,7 @@ GREP=	grep
 
 all clean clobber lint: $(SUBDIRS)
 
-install: $(SUBDIRS) $(ROOTMANIFEST)
+install: $(SUBDIRS) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 $(ROOTMANIFEST): $(MANIFESTDIR)
 
@@ -68,6 +72,13 @@ $(MANIFESTDIR):
 
 $(MANIFESTDIR)/%: %
 	$(INS.file)                                                             
+$(ROOTSVCMETHOD): $(SVCMETHODDIR)
+
+$(SVCMETHODDIR):
+	$(INS.dir) 
+
+$(SVCMETHODDIR)/%: %
+	$(INS.file)
 
 # install rule for install_h target
 $(ROOTHDRDIR)/%: %
