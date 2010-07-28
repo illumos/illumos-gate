@@ -254,7 +254,6 @@ sof_setsockopt_impl(struct sonode *so, int option_name,
 			    (sof_handle_t)inst, so->so_family, so->so_type,
 			    so->so_protocol, cr, &inst->sofi_cookie);
 			if (rval != SOF_RVAL_CONTINUE) {
-				sof_instance_destroy(inst);
 				switch (rval) {
 				case SOF_RVAL_DETACH:
 					/*
@@ -272,6 +271,7 @@ sof_setsockopt_impl(struct sonode *so, int option_name,
 					error = sof_rval2errno(rval);
 					break;
 				}
+				sof_instance_destroy(inst);
 				return (error);
 			}
 		}

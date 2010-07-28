@@ -773,7 +773,6 @@ sockparams_filter_cleanup_impl(sof_entry_t *ent, list_t *list)
 	    sp = list_next(list, sp)) {
 		flist = (ent->sofe_flags & SOFEF_AUTO) ?
 		    &sp->sp_auto_filters : &sp->sp_prog_filters;
-		fil = list_head(flist);
 		for (fil = list_head(flist); fil != NULL;
 		    fil = list_next(flist, fil)) {
 			if (fil->spf_filter == ent) {
