@@ -872,8 +872,9 @@ print_node_name(char *drv_name, char *strdevfspath)
 		if (devfspath == NULL)
 			continue;
 
-		if (strncmp(strdevfspath, devfspath,
-		    strlen(strdevfspath)) == 0) {
+		if ((strlen(strdevfspath) == strlen(devfspath)) &&
+		    (strncmp(strdevfspath, devfspath,
+		    strlen(devfspath)) == 0)) {
 			node_name = find_link(curnode);
 			if (node_name == NULL) {
 				(void) printf("NOT MAPPED\n");
@@ -1366,46 +1367,44 @@ vhci_to_phci(char *devpath, char *slice, int d_flag)
 
 	pi = (sv_path_info_t *)ioc.ret_buf;
 	while (npaths--) {
-		if (pi->ret_state == MDI_PATHINFO_STATE_ONLINE) {
+		bzero(nodename, MAXPATHLEN);
+		bzero(phci_driver, 10);
 
-			bzero(nodename, MAXPATHLEN);
-			bzero(phci_driver, 10);
-
-			get_phci_driver_name(pi->device.ret_phci,
-			    &phci_driver);
-			logmsg(MSG_INFO, "phci driver name: %s\n", phci_driver);
-			/*
-			 * A hack, but nicer than a platform-specific ifdef
-			 * fp on SPARC using "ssd" as nodename
-			 * mpt use "sd" when mpxio disabled, use "disk" when
-			 * mpxio is enabled
-			 * for alll other cases, "disk" should be used as the
-			 * nodename
-			 */
-			if (strstr(devpath, "ssd") != NULL) {
-				(void) snprintf(nodename, 5, "ssd");
-			} else if (strncmp(phci_driver, "mpt", 10) == 0) {
-				(void) snprintf(nodename, 5, "sd");
+		get_phci_driver_name(pi->device.ret_phci,
+		    &phci_driver);
+		logmsg(MSG_INFO, "phci driver name: %s\n", phci_driver);
+		/*
+		 * A hack, but nicer than a platform-specific ifdef
+		 * fp on SPARC using "ssd" as nodename
+		 * mpt use "sd" when mpxio disabled, use "disk" when
+		 * mpxio is enabled
+		 * for alll other cases, "disk" should be used as the
+		 * nodename
+		 */
+		if (strstr(devpath, "ssd") != NULL) {
+			(void) snprintf(nodename, 5, "ssd");
+		} else if (strncmp(phci_driver, "mpt", 10) == 0) {
+			(void) snprintf(nodename, 5, "sd");
+		} else {
+			(void) snprintf(nodename, 5, "disk");
+		}
+		if ((d_flag == DISPLAY_ONE_PATH) &&
+		    (pi->ret_state == MDI_PATHINFO_STATE_ONLINE)) {
+			(void) printf("%s/%s@%s", pi->device.ret_phci,
+			    nodename, pi->ret_addr);
+			if ((slice != NULL) && (strlen(slice) <= 3)) {
+				(void) printf("%s\n", slice);
 			} else {
-				(void) snprintf(nodename, 5, "disk");
+				(void) printf("\n");
 			}
-			if (d_flag == DISPLAY_ONE_PATH) {
-				(void) printf("%s/%s@%s", pi->device.ret_phci,
-				    nodename, pi->ret_addr);
-				if ((slice != NULL) && (strlen(slice) <= 3)) {
-					(void) printf("%s\n", slice);
-				} else {
-					(void) printf("\n");
-				}
-				break;
-			} else if (d_flag == DISPLAY_ALL_PATH) {
-				(void) printf("%s/%s@%s", pi->device.ret_phci,
-				    nodename, pi->ret_addr);
-				if ((slice != NULL) && (strlen(slice) <= 3)) {
-					(void) printf("%s\n", slice);
-				} else {
-					(void) printf("\n");
-				}
+			break;
+		} else if (d_flag == DISPLAY_ALL_PATH) {
+			(void) printf("%s/%s@%s", pi->device.ret_phci,
+			    nodename, pi->ret_addr);
+			if ((slice != NULL) && (strlen(slice) <= 3)) {
+				(void) printf("%s\n", slice);
+			} else {
+				(void) printf("\n");
 			}
 		}
 		pi++;
