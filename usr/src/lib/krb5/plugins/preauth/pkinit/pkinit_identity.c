@@ -624,13 +624,13 @@ pkinit_identity_initialize(krb5_context context,
 	goto errout;
 
     retval = crypto_load_certs(context, plg_cryptoctx, req_cryptoctx,
-			       idopts, id_cryptoctx, princ);
+			       idopts, id_cryptoctx, princ, do_matching);
     if (retval)
 	goto errout;
 
     if (do_matching) {
 	retval = pkinit_cert_matching(context, plg_cryptoctx, req_cryptoctx,
-				      id_cryptoctx, princ);
+				      id_cryptoctx, princ, TRUE);
 	if (retval) {
 	    pkiDebug("%s: No matching certificate found\n", __FUNCTION__);
 	    (void) crypto_free_cert_info(context, plg_cryptoctx, req_cryptoctx,

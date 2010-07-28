@@ -28,6 +28,10 @@
  * SUCH DAMAGES.
  */
 
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
@@ -745,7 +749,8 @@ pkinit_cert_matching(krb5_context context,
 		     pkinit_plg_crypto_context plg_cryptoctx,
 		     pkinit_req_crypto_context req_cryptoctx,
 		     pkinit_identity_crypto_context id_cryptoctx,
-		     krb5_principal princ)
+		     krb5_principal princ,
+                     krb5_boolean do_select)
 {
 
     krb5_error_code retval = KRB5KDC_ERR_PREAUTH_FAILED;
@@ -761,8 +766,11 @@ pkinit_cert_matching(krb5_context context,
 			      "pkinit_cert_match", &rules);
     if (rules == NULL) {
 	pkiDebug("%s: no matching rules found in config file\n", __FUNCTION__);
-	retval = crypto_cert_select_default(context, plg_cryptoctx,
-					    req_cryptoctx, id_cryptoctx);
+        if (do_select == TRUE) {
+            retval = crypto_cert_select_default(context, plg_cryptoctx,
+                                                req_cryptoctx, id_cryptoctx);
+        } else
+            retval = 0;
 	goto cleanup;
     }
 
@@ -818,13 +826,15 @@ pkinit_cert_matching(krb5_context context,
     }
 
     if (match_found && the_matching_cert != NULL) {
-	pkiDebug("%s: Selecting the matching cert!\n", __FUNCTION__);
-	retval = crypto_cert_select(context, the_matching_cert);
-	if (retval) {
-	    pkiDebug("%s: crypto_cert_select error %d, %s\n",
-		     __FUNCTION__, retval, error_message(retval));
-	    goto cleanup;
-	}
+        if (do_select == TRUE) {
+            pkiDebug("%s: Selecting the matching cert!\n", __FUNCTION__);
+            retval = crypto_cert_select(context, the_matching_cert);
+            if (retval) {
+                pkiDebug("%s: crypto_cert_select error %d, %s\n",
+                         __FUNCTION__, retval, error_message(retval));
+                goto cleanup;
+            }
+        }
     } else {
 	retval = ENOENT;    /* XXX */
 	goto cleanup;

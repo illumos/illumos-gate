@@ -290,7 +290,8 @@ krb5_error_code pkinit_cert_matching
 	pkinit_plg_crypto_context plg_cryptoctx,
 	pkinit_req_crypto_context req_cryptoctx,
 	pkinit_identity_crypto_context id_cryptoctx,
-	krb5_principal princ);
+	krb5_principal princ,
+	krb5_boolean do_select);
 
 /*
  * initialization and free functions

@@ -43,6 +43,9 @@
 
 /* Solaris Kerberos */
 #include <libintl.h>
+#include <assert.h>
+#include <security/pam_appl.h>
+#include <ctype.h>
 #include "k5-int.h"
 #include <ctype.h>
 
@@ -776,6 +779,7 @@ pkinit_init_pkcs11(pkinit_identity_crypto_context ctx)
     ctx->p11flags = 0; /* Solaris Kerberos */
 #endif
     ctx->pkcs11_method = 0;
+    (void) memset(ctx->creds, 0, sizeof(ctx->creds));
 
     return 0;
 }
@@ -788,7 +792,7 @@ pkinit_fini_pkcs11(pkinit_identity_crypto_context ctx)
 	return;
 
     if (ctx->p11 != NULL) {
-	if (ctx->session) {
+	if (ctx->session != CK_INVALID_HANDLE) {
 	    ctx->p11->C_CloseSession(ctx->session);
 	    ctx->session = CK_INVALID_HANDLE;
 	}
@@ -3370,6 +3374,69 @@ pkinit_C_UnloadModule(void *handle)
 }
 
 /*
+ * Solaris Kerberos: this is a new function that does not exist yet in the MIT
+ * code.
+ *
+ * labelstr will be C string containing token label with trailing white space
+ * removed.
+ */
+static void
+trim_token_label(CK_TOKEN_INFO *tinfo, char *labelstr, unsigned int labelstr_len)
+{
+    int i;
+
+    assert(labelstr_len > sizeof (tinfo->label));
+    /*
+     * \0 terminate labelstr in case the last char in the token label is
+     * non-whitespace
+     */
+    labelstr[sizeof (tinfo->label)] = '\0';
+    (void) memcpy(labelstr, (char *) tinfo->label, sizeof (tinfo->label));
+
+    /* init i so terminating \0 is skipped */
+    for (i = sizeof (tinfo->label) - 1; i >= 0; i--) {
+	if (labelstr[i] == ' ')
+	    labelstr[i] = '\0';
+	else
+	    break;
+    }
+}
+
+/*
+ * Solaris Kerberos: this is a new function that does not exist yet in the MIT
+ * code.
+ */
+static krb5_error_code
+pkinit_prompt_user(krb5_context context,
+		   pkinit_identity_crypto_context cctx,
+		   krb5_data *reply,
+		   char *prompt,
+		   int hidden)
+{
+    krb5_error_code r;
+    krb5_prompt kprompt;
+    krb5_prompt_type prompt_type;
+
+    if (cctx->prompter == NULL)
+	return (EINVAL);
+
+    kprompt.prompt = prompt;
+    kprompt.hidden = hidden;
+    kprompt.reply = reply;
+    /*
+     * Note, assuming this type for now, may need to be passed in in the future.
+     */
+    prompt_type = KRB5_PROMPT_TYPE_PREAUTH;
+
+    /* PROMPTER_INVOCATION */
+    k5int_set_prompt_types(context, &prompt_type);
+    r = (*cctx->prompter)(context, cctx->prompter_data,
+			  NULL, NULL, 1, &kprompt);
+    k5int_set_prompt_types(context, NULL);
+    return (r);
+}
+
+/*
  * Solaris Kerberos: this function was changed to support a PIN being passed
  * in.  If that is the case the user will not be prompted for their PIN.
  */
@@ -3381,8 +3448,6 @@ pkinit_login(krb5_context context,
     krb5_data rdat;
     char *prompt;
     int prompt_len;
-    krb5_prompt kprompt;
-    krb5_prompt_type prompt_type;
     int r = 0;
 
     if (tip->flags & CKF_PROTECTED_AUTHENTICATION_PATH) {
@@ -3398,14 +3463,14 @@ pkinit_login(krb5_context context,
 	 */
 	rdat.length = strlen(id_cryptoctx->PIN);
     } else {
-        unsigned char *lastnonwspc, *iterp; /* Solaris Kerberos - trim token label */
-        int count;
+        /* Solaris Kerberos - trim token label */
+	char tmplabel[sizeof (tip->label) + 1];
 
 	if (!id_cryptoctx->prompter) {
 	    pkiDebug("pkinit_login: id_cryptoctx->prompter is NULL\n");
 	    /* Solaris Kerberos: Improved error messages */
 	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
-		gettext("failed to log into token: prompter function is NULL"));
+		gettext("Failed to log into token: prompter function is NULL"));
 	    return (KRB5KDC_ERR_PREAUTH_FAILED);
 	}
 	/* Solaris Kerberos - Changes for gettext() */
@@ -3414,13 +3479,9 @@ pkinit_login(krb5_context context,
 	    return ENOMEM;
 
 	/* Solaris Kerberos - trim token label which can be padded with space */
-        for (count = 0, iterp = tip->label; count < sizeof (tip->label);
-             count++, iterp++) {
-            if ((char) *iterp != ' ')
-                lastnonwspc = iterp;
-        }
-	(void) snprintf(prompt, prompt_len, gettext("%.*s PIN"),
-                        (int) (lastnonwspc - tip->label) + 1, tip->label);
+	trim_token_label(tip, tmplabel, sizeof (tmplabel));
+	(void) snprintf(prompt, prompt_len, gettext("%s PIN"), tmplabel);
+
 	/* Solaris Kerberos */
 	if (tip->flags & CKF_USER_PIN_LOCKED)
 	    (void) strlcat(prompt, gettext(" (Warning: PIN locked)"), prompt_len);
@@ -3434,17 +3495,8 @@ pkinit_login(krb5_context context,
 	 * Note that the prompter function will set rdat.length such that the
 	 * NULL terminator is not included
 	 */
-
-	kprompt.prompt = prompt;
-	kprompt.hidden = 1;
-	kprompt.reply = &rdat;
-	prompt_type = KRB5_PROMPT_TYPE_PREAUTH;
-
 	/* PROMPTER_INVOCATION */
-	k5int_set_prompt_types(context, &prompt_type);
-	r = (*id_cryptoctx->prompter)(context, id_cryptoctx->prompter_data,
-		NULL, NULL, 1, &kprompt);
-	k5int_set_prompt_types(context, NULL);
+	r = pkinit_prompt_user(context, id_cryptoctx, &rdat, prompt, 1);
 	free(prompt);
     }
 
@@ -3456,7 +3508,7 @@ pkinit_login(krb5_context context,
 	    pkiDebug("C_Login: %s\n", pkinit_pkcs11_code_to_text(r));
 	    /* Solaris Kerberos: Improved error messages */
 	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
-		gettext("failed to log into token: %s"),
+		gettext("Failed to log into token: %s"),
 		pkinit_pkcs11_code_to_text(r));
 	    r = KRB5KDC_ERR_PREAUTH_FAILED;
 	} else {
@@ -3469,34 +3521,443 @@ pkinit_login(krb5_context context,
 	free(rdat.data);
     }
 
-    return r;
+    return (r);
 }
 
+/*
+ * Solaris Kerberos: added these structs in support of prompting user for
+ * missing token.
+ */
+struct _token_entry {
+    CK_SLOT_ID slotID;
+    CK_SESSION_HANDLE session;
+    CK_TOKEN_INFO token_info;
+};
+struct _token_choices {
+    unsigned int numtokens;
+    struct _token_entry *token_array;
+};
+
+
+/*
+ * Solaris Kerberos: this is a new function that does not exist yet in the MIT
+ * code.
+ */
+static krb5_error_code
+pkinit_prompt_token(krb5_context context,
+		    pkinit_identity_crypto_context cctx)
+{
+    char tmpbuf[4];
+    krb5_data reply;
+    char *token_prompt = gettext("If you have a smartcard insert it now. "
+				 "Press enter to continue");
+
+    reply.data = tmpbuf;
+    reply.length = sizeof(tmpbuf);
+
+    /* note, don't care about the reply */
+    return (pkinit_prompt_user(context, cctx, &reply, token_prompt, 0));
+}
+
+/*
+ * Solaris Kerberos: new defines for prompting support.
+ */
+#define CHOOSE_THIS_TOKEN 0
+#define CHOOSE_RESCAN 1
+#define CHOOSE_SKIP 2
+#define CHOOSE_SEE_NEXT 3
+
+#define RESCAN_TOKENS -1
+#define SKIP_TOKENS -2
+
+/*
+ * Solaris Kerberos: this is a new function that does not exist yet in the MIT
+ * code.
+ *
+ * This prompts to user for various choices regarding a token to use.  Note
+ * that if there is no error, choice will be set to one of:
+ * - the token_choices->token_array entry
+ * - RESCAN_TOKENS
+ * - SKIP_TOKENS
+ */
+static int
+pkinit_choose_tokens(krb5_context context,
+		     pkinit_identity_crypto_context cctx,
+		     struct _token_choices *token_choices,
+		     int *choice)
+{
+    krb5_error_code r;
+    /*
+     * Assuming that PAM_MAX_MSG_SIZE is a reasonable restriction. Note that -
+     * 2 is to account for the fact that a krb prompter to PAM conv bridge will
+     * add ": ".
+     */
+    char prompt[PAM_MAX_MSG_SIZE - 2];
+    char tmpbuf[4];
+    char tmplabel[sizeof (token_choices->token_array->token_info.label) + 1];
+    krb5_data reply;
+    int i, num_used, tmpchoice;
+
+    assert(token_choices != NULL);
+    assert(choice != NULL);
+
+    /* Create the menu prompt */
+
+    /* only need to do this once before the for loop */
+    reply.data = tmpbuf;
+
+    for (i = 0; i < token_choices->numtokens; i++) {
+
+	trim_token_label(&token_choices->token_array[i].token_info, tmplabel,
+			 sizeof (tmplabel));
+
+	if (i == (token_choices->numtokens - 1)) {
+	    /* no more smartcards/tokens */
+	    if ((num_used = snprintf(prompt, sizeof (prompt),
+				     "%s\n%d: %s \"%s\" %s %d\n%d: %s\n%d: %s\n",
+				     /*
+				      * TRANSLATION_NOTE: Translations of the
+				      * following 5 strings must not exceed 450
+				      * bytes total.
+				      */
+				     gettext("Select one of the following and press enter:"),
+				     CHOOSE_THIS_TOKEN, gettext("Use smartcard"), tmplabel,
+                                     gettext("in slot"), token_choices->token_array[i].slotID,
+				     CHOOSE_RESCAN, gettext("Rescan for newly inserted smartcard"),
+				     CHOOSE_SKIP, gettext("Skip smartcard authentication")))
+		>= sizeof (prompt)) {
+		pkiDebug("pkinit_choose_tokens: buffer overflow num_used: %d,"
+			 " sizeof prompt: %d\n", num_used, sizeof (prompt));
+		krb5_set_error_message(context, EINVAL,
+                               gettext("In pkinit_choose_tokens: prompt size"
+				      " %d exceeds prompt buffer size %d"),
+			       num_used, sizeof(prompt));
+		(void) snprintf(prompt, sizeof (prompt), "%s",
+			        gettext("Error: PKINIT prompt message is too large for buffer, "
+					"please alert the system administrator. Press enter to "
+					"continue"));
+		reply.length = sizeof(tmpbuf);
+		if ((r = pkinit_prompt_user(context, cctx, &reply, prompt, 0)) != 0 )
+		    return (r);
+		return (EINVAL);
+	    }
+	} else {
+	    if ((num_used = snprintf(prompt, sizeof (prompt),
+				     "%s\n%d: %s \"%s\" %s %d\n%d: %s\n%d: %s\n%d: %s\n",
+				     /*
+				      * TRANSLATION_NOTE: Translations of the
+				      * following 6 strings must not exceed 445
+				      * bytes total.
+				      */
+				     gettext("Select one of the following and press enter:"),
+				     CHOOSE_THIS_TOKEN, gettext("Use smartcard"), tmplabel,
+                                     gettext("in slot"), token_choices->token_array[i].slotID,
+				     CHOOSE_RESCAN, gettext("Rescan for newly inserted smartcard"),
+				     CHOOSE_SKIP, gettext("Skip smartcard authentication"),
+				     CHOOSE_SEE_NEXT, gettext("See next smartcard")))
+		>= sizeof (prompt)) {
+
+		pkiDebug("pkinit_choose_tokens: buffer overflow num_used: %d,"
+			 " sizeof prompt: %d\n", num_used, sizeof (prompt));
+		krb5_set_error_message(context, EINVAL,
+				       gettext("In pkinit_choose_tokens: prompt size"
+					       " %d exceeds prompt buffer size %d"),
+				       num_used, sizeof(prompt));
+		(void) snprintf(prompt, sizeof (prompt), "%s",
+				gettext("Error: PKINIT prompt message is too large for buffer, "
+					"please alert the system administrator. Press enter to "
+					"continue"));
+		reply.length = sizeof(tmpbuf);
+		if ((r = pkinit_prompt_user(context, cctx, &reply, prompt, 0)) != 0 )
+		    return (r);
+		return (EINVAL);
+	    }
+	}
+
+        /*
+	 * reply.length needs to be reset to length of tmpbuf before calling
+	 * prompter
+         */
+        reply.length = sizeof(tmpbuf);
+	if ((r = pkinit_prompt_user(context, cctx, &reply, prompt, 0)) != 0 )
+	    return (r);
+
+	if (reply.length == 0) {
+	    return (EINVAL);
+	} else {
+            char *cp = reply.data;
+            /* reply better be digits */
+            while (*cp != NULL) {
+                if (!isdigit(*cp++))
+                    return (EINVAL);
+            }
+	    errno = 0;
+	    tmpchoice = (int) strtol(reply.data, (char **)NULL, 10);
+	    if (errno != 0)
+		return (errno);
+	}
+
+	switch (tmpchoice) {
+	case CHOOSE_THIS_TOKEN:
+	    *choice = i; /* chosen entry of token_choices->token_array */
+	    return (0);
+	case CHOOSE_RESCAN:
+	    *choice = RESCAN_TOKENS; /* rescan for new smartcard */
+	    return (0);
+	case CHOOSE_SKIP:
+	    *choice = SKIP_TOKENS; /* skip smartcard auth */
+	    return (0);
+	case CHOOSE_SEE_NEXT: /* see next smartcard */
+	    continue;
+	default:
+	    return (EINVAL);
+	}
+    }
+
+    return (0);
+}
+
+/*
+ * Solaris Kerberos: this is a new function that does not exist yet in the MIT
+ * code.
+ *
+ * Note, this isn't the best solution to providing a function to check the
+ * certs in a token however I wanted to avoid rewriting a bunch of code so I
+ * settled for some duplication of processing.
+ */
+static krb5_error_code
+check_load_certs(krb5_context context,
+            CK_SESSION_HANDLE session,
+	    pkinit_plg_crypto_context plg_cryptoctx,
+	    pkinit_req_crypto_context req_cryptoctx,
+            pkinit_identity_crypto_context id_cryptoctx,
+            krb5_principal princ,
+            int do_matching,
+            int load_cert)
+{
+    CK_OBJECT_CLASS cls;
+    CK_OBJECT_HANDLE obj;
+    CK_ATTRIBUTE attrs[4];
+    CK_ULONG count;
+    CK_CERTIFICATE_TYPE certtype;
+    CK_BYTE_PTR cert = NULL, cert_id = NULL;
+    const unsigned char *cp;
+    int i, r;
+    unsigned int nattrs;
+    X509 *x = NULL;
+
+    cls = CKO_CERTIFICATE;
+    attrs[0].type = CKA_CLASS;
+    attrs[0].pValue = &cls;
+    attrs[0].ulValueLen = sizeof cls;
+
+    certtype = CKC_X_509;
+    attrs[1].type = CKA_CERTIFICATE_TYPE;
+    attrs[1].pValue = &certtype;
+    attrs[1].ulValueLen = sizeof certtype;
+
+    nattrs = 2;
+
+    /* If a cert id and/or label were given, use them too */
+    if (id_cryptoctx->cert_id_len > 0) {
+	attrs[nattrs].type = CKA_ID;
+	attrs[nattrs].pValue = id_cryptoctx->cert_id;
+	attrs[nattrs].ulValueLen = id_cryptoctx->cert_id_len;
+	nattrs++;
+    }
+    if (id_cryptoctx->cert_label != NULL) {
+	attrs[nattrs].type = CKA_LABEL;
+	attrs[nattrs].pValue = id_cryptoctx->cert_label;
+	attrs[nattrs].ulValueLen = strlen(id_cryptoctx->cert_label);
+	nattrs++;
+    }
+
+    r = id_cryptoctx->p11->C_FindObjectsInit(session, attrs, nattrs);
+    if (r != CKR_OK) {
+        pkiDebug("C_FindObjectsInit: %s\n", pkinit_pkcs11_code_to_text(r));
+        krb5_set_error_message(context, EINVAL,
+                               gettext("PKCS11 error from C_FindObjectsInit: %s"),
+                               pkinit_pkcs11_code_to_text(r));
+        r = EINVAL;
+        goto out;
+    }
+
+    for (i = 0; ; i++) {
+	if (i >= MAX_CREDS_ALLOWED) {
+            r = EINVAL;
+            goto out;
+        }
+
+	/* Look for x.509 cert */
+	/* Solaris Kerberos */
+	if ((r = id_cryptoctx->p11->C_FindObjects(session, &obj, 1, &count))
+            != CKR_OK || count == 0) {
+	    id_cryptoctx->creds[i] = NULL;
+	    break;
+	}
+
+	/* Get cert and id len */
+	attrs[0].type = CKA_VALUE;
+	attrs[0].pValue = NULL;
+	attrs[0].ulValueLen = 0;
+
+	attrs[1].type = CKA_ID;
+	attrs[1].pValue = NULL;
+	attrs[1].ulValueLen = 0;
+
+	if ((r = id_cryptoctx->p11->C_GetAttributeValue(session,
+                                                        obj,
+                                                        attrs,
+                                                        2)) != CKR_OK &&
+            r != CKR_BUFFER_TOO_SMALL) {
+            pkiDebug("C_GetAttributeValue: %s\n", pkinit_pkcs11_code_to_text(r));
+	    krb5_set_error_message(context, EINVAL,
+				   gettext("Error from PKCS11 C_GetAttributeValue: %s"),
+				   pkinit_pkcs11_code_to_text(r));
+            r = EINVAL;
+            goto out;
+        }
+	cert = malloc((size_t) attrs[0].ulValueLen + 1);
+	if (cert == NULL) {
+	    r = ENOMEM;
+            goto out;
+        }
+	cert_id = malloc((size_t) attrs[1].ulValueLen + 1);
+	if (cert_id == NULL) {
+	    r = ENOMEM;
+            goto out;
+        }
+
+	/* Read the cert and id off the card */
+
+	attrs[0].type = CKA_VALUE;
+	attrs[0].pValue = cert;
+
+	attrs[1].type = CKA_ID;
+	attrs[1].pValue = cert_id;
+
+	if ((r = id_cryptoctx->p11->C_GetAttributeValue(session,
+		obj, attrs, 2)) != CKR_OK) {
+	    pkiDebug("C_GetAttributeValue: %s\n", pkinit_pkcs11_code_to_text(r));
+	    krb5_set_error_message(context, EINVAL,
+				   gettext("Error from PKCS11 C_GetAttributeValue: %s"),
+				   pkinit_pkcs11_code_to_text(r));
+	    r = EINVAL;
+            goto out;
+	}
+
+	pkiDebug("cert %d size %d id %d idlen %d\n", i,
+	    (int) attrs[0].ulValueLen, (int) cert_id[0],
+	    (int) attrs[1].ulValueLen);
+
+	cp = (unsigned char *) cert;
+	x = d2i_X509(NULL, &cp, (int) attrs[0].ulValueLen);
+	if (x == NULL) {
+	    r = EINVAL;
+            goto out;
+        }
+
+	id_cryptoctx->creds[i] = malloc(sizeof(struct _pkinit_cred_info));
+	if (id_cryptoctx->creds[i] == NULL) {
+	    r = ENOMEM;
+            goto out;
+        }
+	id_cryptoctx->creds[i]->cert = x;
+	id_cryptoctx->creds[i]->key = NULL;
+	id_cryptoctx->creds[i]->cert_id = cert_id;
+        cert_id = NULL;
+	id_cryptoctx->creds[i]->cert_id_len = attrs[1].ulValueLen;
+	free(cert);
+        cert = NULL;
+    }
+    id_cryptoctx->p11->C_FindObjectsFinal(session);
+
+    if (id_cryptoctx->creds[0] == NULL || id_cryptoctx->creds[0]->cert == NULL) {
+	r = ENOENT;
+    } else if (do_matching){
+        /*
+         * Do not let pkinit_cert_matching set the primary cert in id_cryptoctx
+         * as this will be done later.
+         */
+        r = pkinit_cert_matching(context, plg_cryptoctx, req_cryptoctx,
+                                 id_cryptoctx, princ, FALSE);
+    }
+
+out:
+    if ((r != 0 || !load_cert) &&
+        id_cryptoctx->creds[0] != NULL &&
+        id_cryptoctx->creds[0]->cert != NULL) {
+        /*
+         * If there's an error or load_cert isn't 1 free all the certs loaded
+         * onto id_cryptoctx.
+         */
+        (void) crypto_free_cert_info(context, plg_cryptoctx, req_cryptoctx,
+                                     id_cryptoctx);
+    }
+
+    if (cert)
+        free(cert);
+
+    if (cert_id)
+        free(cert_id);
+    
+    return (r);
+}
+
+/*
+ * Solaris Kerberos: this function has been significantly modified to prompt
+ * the user in certain cases so defer to this version when resyncing MIT code.
+ *
+ * pkinit_open_session now does several things including prompting the user if
+ * do_matching is set which indicates the code is executing in a client
+ * context.  This function fills out a pkinit_identity_crypto_context with a
+ * set of certs and a open session if a token can be found that matches all
+ * supplied criteria.  If no token is found then the user is prompted one time
+ * to insert their token.  If there is more than one token that matches all
+ * client criteria the user is prompted to make a choice if in client context.
+ * If do_matching is false (KDC context) then the first token matching all
+ * server criteria is chosen.
+ */
 static krb5_error_code
 pkinit_open_session(krb5_context context,
-		    pkinit_identity_crypto_context cctx)
+                    pkinit_plg_crypto_context plg_cryptoctx,
+                    pkinit_req_crypto_context req_cryptoctx,
+                    pkinit_identity_crypto_context cctx,
+                    krb5_principal princ,
+                    int do_matching)
 {
     int i, r;
     CK_ULONG count = 0;
-    CK_SLOT_ID_PTR slotlist = NULL;
+    CK_SLOT_ID_PTR slotlist = NULL, tmpslotlist = NULL;
     CK_TOKEN_INFO tinfo;
+    krb5_boolean tokenmatch = FALSE;
+    CK_SESSION_HANDLE tmpsession = NULL;
+    struct _token_choices token_choices;
+    int choice = 0;
 
-    if (cctx->p11_module != NULL)
+    if (cctx->session != CK_INVALID_HANDLE)
 	return 0; /* session already open */
 
     /* Load module */
-    cctx->p11_module =
-	pkinit_C_LoadModule(cctx->p11_module_name, &cctx->p11);
-    if (cctx->p11_module == NULL)
-	return KRB5KDC_ERR_PREAUTH_FAILED;
+    if (cctx->p11_module == NULL) {
+        cctx->p11_module =
+            pkinit_C_LoadModule(cctx->p11_module_name, &cctx->p11);
+        if (cctx->p11_module == NULL)
+            return KRB5KDC_ERR_PREAUTH_FAILED;
+    }
 
     /* Init */
     /* Solaris Kerberos: Don't fail if cryptoki is already initialized */
     r = cctx->p11->C_Initialize(NULL);
     if (r != CKR_OK && r != CKR_CRYPTOKI_ALREADY_INITIALIZED) {
 	pkiDebug("C_Initialize: %s\n", pkinit_pkcs11_code_to_text(r));
+	krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+			       gettext("Error from PKCS11 C_Initialize: %s"),
+			       pkinit_pkcs11_code_to_text(r));
 	return KRB5KDC_ERR_PREAUTH_FAILED;
     }
+
+    (void) memset(&token_choices, 0, sizeof(token_choices));
 
     /*
      * Solaris Kerberos:
@@ -3507,25 +3968,103 @@ pkinit_open_session(krb5_context context,
      */
      cctx->finalize_pkcs11 =
 	(r == CKR_CRYPTOKI_ALREADY_INITIALIZED ? FALSE : TRUE);
+    /*
+     * First make sure that is an applicable slot otherwise fail.
+     *
+     * Start by getting a count of all slots with or without tokens.
+     */
 
-    /* get number of slots that have tokens */
-     if ((r = cctx->p11->C_GetSlotList(TRUE, NULL, &count)) != CKR_OK) {
-	 pkiDebug("C_GetSlotList: %s\n", pkinit_pkcs11_code_to_text(r));
-	 krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
-				gettext("Error trying to get PKCS11 slot list: %s"),
-				pkinit_pkcs11_code_to_text(r));
-	 r = KRB5KDC_ERR_PREAUTH_FAILED;
-	 goto out;
-     }
-
-    if (count == 0) {
+    if ((r = cctx->p11->C_GetSlotList(FALSE, NULL, &count)) != CKR_OK) {
+	pkiDebug("C_GetSlotList: %s\n", pkinit_pkcs11_code_to_text(r));
+	krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+	    gettext("Error trying to get PKCS11 slot list: %s"),
+	    pkinit_pkcs11_code_to_text(r));
 	r = KRB5KDC_ERR_PREAUTH_FAILED;
-	krb5_set_error_message(context, r,
-			       gettext("No smart card tokens found"));
-	pkiDebug("pkinit_open_session: no token\n");
 	goto out;
     }
 
+    if (count == 0) {
+	/* There are no slots so bail */
+	r = KRB5KDC_ERR_PREAUTH_FAILED;
+	krb5_set_error_message(context, r,
+			       gettext("No PKCS11 slots found"));
+	pkiDebug("pkinit_open_session: no slots, count: %d\n", count);
+	goto out;
+    } else if (cctx->slotid != PK_NOSLOT) {
+	/* See if any of the slots match the specified slotID */
+	tmpslotlist = malloc(count * sizeof (CK_SLOT_ID));
+	if (tmpslotlist == NULL) {
+	    krb5_set_error_message(context, ENOMEM,
+				   gettext("Memory allocation error:"));
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    goto out;
+	}
+	if ((r = cctx->p11->C_GetSlotList(FALSE, tmpslotlist, &count)) != CKR_OK) {
+	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+				   gettext("Error trying to get PKCS11 slot list: %s"),
+				   pkinit_pkcs11_code_to_text(r));
+	    pkiDebug("C_GetSlotList: %s\n", pkinit_pkcs11_code_to_text(r));
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    goto out;
+	}
+
+	for (i = 0; i < count && cctx->slotid != tmpslotlist[i]; i++)
+	    continue;
+
+	if (i >= count) {
+	    /* no slots match */
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    krb5_set_error_message(context, r,
+				   gettext("Requested PKCS11 slot ID %d not found"),
+				   cctx->slotid);
+	    pkiDebug("open_session: no matching slot found for slotID %d\n",
+		     cctx->slotid);
+	    goto out;
+	}
+    }
+    
+tryagain:
+    /* get count of slots that have tokens */
+    if ((r = cctx->p11->C_GetSlotList(TRUE, NULL, &count)) != CKR_OK) {
+	pkiDebug("C_GetSlotList: %s\n", pkinit_pkcs11_code_to_text(r));
+	krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+			       gettext("Error trying to get PKCS11 slot list: %s"),
+			       pkinit_pkcs11_code_to_text(r));
+	r = KRB5KDC_ERR_PREAUTH_FAILED;
+	goto out;
+    }
+
+    if (count == 0) {
+	/*
+	 * Note, never prompt if !do_matching as this implies KDC side
+	 * processing
+	 */
+	if (!(cctx->p11flags & C_PROMPTED_USER) && do_matching) {
+	    /* found slot(s) but no token so prompt and try again */
+	    if ((r = pkinit_prompt_token(context, cctx)) == 0) {
+		cctx->p11flags |= C_PROMPTED_USER;
+		goto tryagain;
+	    } else {
+		pkiDebug("open_session: prompt for token/smart card failed\n");
+		krb5_set_error_message(context, r,
+				       gettext("Prompt for token/smart card failed"));
+		r = KRB5KDC_ERR_PREAUTH_FAILED;
+		goto out;
+	    }
+
+	} else {
+	    /* already prompted once so bailing */
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    krb5_set_error_message(context, r,
+				   gettext("No smart card tokens found"));
+	    pkiDebug("pkinit_open_session: no token, already prompted\n");
+	    goto out;
+	}
+    }
+
+    if (slotlist != NULL)
+	free(slotlist);
+ 
     slotlist = malloc(count * sizeof (CK_SLOT_ID));
     if (slotlist == NULL) {
 	krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
@@ -3540,11 +4079,21 @@ pkinit_open_session(krb5_context context,
 	krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
 			       gettext("Error trying to get PKCS11 slot list: %s"),
 			       pkinit_pkcs11_code_to_text(r));
+	pkiDebug("C_GetSlotList: %s\n", pkinit_pkcs11_code_to_text(r));
 	r = KRB5KDC_ERR_PREAUTH_FAILED;
 	goto out;
     }
 
-    /* Look for the given token label, or if none given take the first one */
+    token_choices.numtokens = 0;
+    token_choices.token_array = malloc(count * sizeof (*token_choices.token_array));
+    if (token_choices.token_array == NULL) {
+	r = KRB5KDC_ERR_PREAUTH_FAILED;
+	krb5_set_error_message(context, r,
+			       gettext("Memory allocation error"));
+	goto out;
+    }
+
+    /* examine all the tokens */
     for (i = 0; i < count; i++) {
 	/*
 	 * Solaris Kerberos: if a slotid was specified skip slots that don't
@@ -3552,14 +4101,14 @@ pkinit_open_session(krb5_context context,
 	 */
 	if (cctx->slotid != PK_NOSLOT && cctx->slotid != slotlist[i])
 	    continue;
-	cctx->session = NULL;
+
 	/* Open session */
 	if ((r = cctx->p11->C_OpenSession(slotlist[i], CKF_SERIAL_SESSION,
-					  NULL, NULL, &cctx->session)) != CKR_OK) {
+					  NULL, NULL, &tmpsession)) != CKR_OK) {
 	    pkiDebug("C_OpenSession: %s\n", pkinit_pkcs11_code_to_text(r));
 	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
-		gettext("Error trying to open PKCS11 session: %s"),
-		pkinit_pkcs11_code_to_text(r));
+				   gettext("Error trying to open PKCS11 session: %s"),
+				   pkinit_pkcs11_code_to_text(r));
 	    r = KRB5KDC_ERR_PREAUTH_FAILED;
 	    goto out;
 	}
@@ -3568,76 +4117,227 @@ pkinit_open_session(krb5_context context,
 	if ((r = cctx->p11->C_GetTokenInfo(slotlist[i], &tinfo)) != CKR_OK) {
 	    pkiDebug("C_GetTokenInfo: %s\n", pkinit_pkcs11_code_to_text(r));
 	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
-		gettext("Error trying to read token: %s"),
-		pkinit_pkcs11_code_to_text(r));
+				   gettext("Error trying to read PKCS11 token: %s"),
+				   pkinit_pkcs11_code_to_text(r));
 	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    cctx->p11->C_CloseSession(tmpsession);
 	    goto out;
 	}
 
 	if (cctx->token_label == NULL) {
-	    /* nothing to compare to assume this is the right token */
-	    break;
+	    /*
+             * If the token doesn't require login to examine the certs then
+             * let's check the certs out to see if any match the criteria if
+             * any.
+             */
+	    if (!(tinfo.flags & CKF_LOGIN_REQUIRED)) {
+		/*
+		 * It's okay to check the certs if we don't have to login but
+		 * don't load the certs onto cctx at this point, this will be
+		 * done later in this function for the chosen token.
+		 */
+		if ((r = check_load_certs(context, tmpsession, plg_cryptoctx,
+					  req_cryptoctx, cctx, princ,
+					  do_matching, 0)) == 0) {
+		    tokenmatch = TRUE;
+		} else if (r != ENOENT){
+		    r = KRB5KDC_ERR_PREAUTH_FAILED;
+		    cctx->p11->C_CloseSession(tmpsession);
+		    goto out;
+		} else {
+		    /* ignore ENOENT here */
+		    r = 0;
+		}
+	    } else {
+                tokenmatch = TRUE;
+            }
 	} else {
 	    /* + 1 so tokenlabelstr can be \0 terminated */
 	    char tokenlabelstr[sizeof (tinfo.label) + 1];
-	    int j;
 
 	    /*
-	     * Convert token label into C string with trailing white space trimmed.
-	     * Note, a token label is not a \0 terminated string.
+	     * Convert token label into C string with trailing white space
+	     * trimmed.
 	     */
-	    /*
-	     * \0 terminate tokenlabelstr in case the last char in the token
-	     * label is non-whitespace
-	     */ 
-	    tokenlabelstr[sizeof (tokenlabelstr) - 1] = '\0';
-	    (void) memcpy(tokenlabelstr, (char *) tinfo.label, sizeof (tinfo.label));
-	    /* init j so it skips the \0 terminator */
-	    for (j = sizeof (tinfo.label) - 1; j >= 0; j--) {
-		if (isblank(tokenlabelstr[j]))
-		    tokenlabelstr[j] = '\0';
-		else
-		    break;
-	    }
+	    trim_token_label(&tinfo, tokenlabelstr, sizeof (tokenlabelstr));
 
 	    pkiDebug("open_session: slotid %d token found: \"%s\", "
 		     "cctx->token_label: \"%s\"\n",
 		     slotlist[i], tokenlabelstr, (char *) cctx->token_label);
+
 	    if (!strcmp(cctx->token_label, tokenlabelstr)) {
-		break;
+		if (!(tinfo.flags & CKF_LOGIN_REQUIRED)) {
+		    /*
+		     * It's okay to check the certs if we don't have to login but
+		     * don't load the certs onto cctx at this point, this will be
+		     * done later in this function for the chosen token.
+		     */
+		    if ((r = check_load_certs(context, tmpsession, plg_cryptoctx,
+					      req_cryptoctx, cctx, princ,
+					      do_matching, 0)) == 0) {
+			tokenmatch = TRUE;
+		    } else if (r != ENOENT){
+			r = KRB5KDC_ERR_PREAUTH_FAILED;
+			cctx->p11->C_CloseSession(tmpsession);
+			goto out;
+		    } else {
+			/* ignore ENOENT here */
+			r = 0;
+		    }
+		} else {
+		    tokenmatch = TRUE;
+		}
 	    }
 	}
-	cctx->p11->C_CloseSession(cctx->session);
-	cctx->session = NULL;
+
+	if (tokenmatch == TRUE) {
+	    /* add the token to token_choices.token_array */
+	    token_choices.token_array[token_choices.numtokens].slotID = slotlist[i];
+	    token_choices.token_array[token_choices.numtokens].session = tmpsession;
+	    token_choices.token_array[token_choices.numtokens].token_info = tinfo;
+	    token_choices.numtokens++;
+            /* !do_matching implies we take the first matching token */
+            if (!do_matching)
+                break;
+            else
+                tokenmatch = FALSE;
+	} else {
+	    cctx->p11->C_CloseSession(tmpsession);
+	}
     }
 
-    if (i >= count) {
-	pkiDebug("open_session: no matching token found\n");
-	r = KRB5KDC_ERR_PREAUTH_FAILED;
-	goto out;
+    if (token_choices.numtokens == 0) {
+	/*
+	 * Solaris Kerberos: prompt for token one time if there was no token
+         * and do_matching is 1 (see earlier comment about do_matching).
+	 */
+	if (!(cctx->p11flags & C_PROMPTED_USER) && do_matching) {
+	    if ((r = pkinit_prompt_token(context, cctx)) == 0) {
+                cctx->p11flags |= C_PROMPTED_USER;
+		goto tryagain;
+	    } else {
+		pkiDebug("open_session: prompt for token/smart card failed\n");
+		krb5_set_error_message(context, r,
+				       gettext("Prompt for token/smart card failed"));
+		r = KRB5KDC_ERR_PREAUTH_FAILED;
+		goto out;
+	    }
+	} else {
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    krb5_set_error_message(context, r,
+				   gettext("No smart card tokens found"));
+	    pkiDebug("open_session: no matching token found\n");
+	    goto out;
+	}
+    } else if (token_choices.numtokens == 1) {
+        if ((token_choices.token_array[0].token_info.flags & CKF_LOGIN_REQUIRED) &&
+            !(cctx->p11flags & C_PROMPTED_USER) &&
+            do_matching) {
+            if ((r = pkinit_choose_tokens(context, cctx, &token_choices, &choice)) != 0) {
+                pkiDebug("pkinit_open_session: pkinit_choose_tokens failed: %d\n", r);
+                r = KRB5KDC_ERR_PREAUTH_FAILED;
+                krb5_set_error_message(context, r,
+                                       gettext("Prompt for token/smart card failed"));
+                goto out;
+            }
+            if (choice == RESCAN_TOKENS) {
+                /* rescan for new smartcard/token */
+                for (i = 0; i < token_choices.numtokens; i++) {
+                    /* close all sessions */
+                    cctx->p11->C_CloseSession(token_choices.token_array[i].session);
+                }
+                free(token_choices.token_array);
+                token_choices.token_array = NULL;
+                token_choices.numtokens = 0;
+                goto tryagain;
+            } else if (choice == SKIP_TOKENS) {
+                /* do not use smartcard/token for auth */
+                cctx->p11flags |= (C_PROMPTED_USER|C_SKIP_PKCS11_AUTH);
+                r = KRB5KDC_ERR_PREAUTH_FAILED;
+                goto out;
+            } else {
+                cctx->p11flags |= C_PROMPTED_USER;
+            }
+        } else {
+            choice = 0; /* really the only choice is the first token_array entry */
+        }
+    } else if (!(cctx->p11flags & C_PROMPTED_USER) && do_matching) {
+	/* > 1 token so present menu of token choices, let the user decide. */
+	if ((r = pkinit_choose_tokens(context, cctx, &token_choices, &choice)) != 0) {
+	    pkiDebug("pkinit_open_session: pkinit_choose_tokens failed: %d\n", r);
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    krb5_set_error_message(context, r,
+				   gettext("Prompt for token/smart card failed"));
+	    goto out;
+	}
+	if (choice == RESCAN_TOKENS) {
+	    /* rescan for new smartcard/token */
+	    for (i = 0; i < token_choices.numtokens; i++) {
+		/* close all sessions */
+		cctx->p11->C_CloseSession(token_choices.token_array[i].session);
+	    }
+	    free(token_choices.token_array);
+	    token_choices.token_array = NULL;
+	    token_choices.numtokens = 0;
+	    goto tryagain;
+	} else if (choice == SKIP_TOKENS) {
+	    /* do not use smartcard/token for auth */
+            cctx->p11flags |= (C_PROMPTED_USER|C_SKIP_PKCS11_AUTH);
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    goto out;
+	} else {
+            cctx->p11flags |= C_PROMPTED_USER;
+        }
+    } else {
+        r = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto out;
     }
 
-    if (cctx->slotid == PK_NOSLOT)
-	cctx->slotid = slotlist[i];
+    cctx->slotid = token_choices.token_array[choice].slotID;
+    cctx->session = token_choices.token_array[choice].session;
 
     pkiDebug("open_session: slotid %d (%d of %d)\n", (int) cctx->slotid,
 	     i + 1, (int) count);
 
     /* Login if needed */
     /* Solaris Kerberos: added cctx->p11flags check */
-    if (tinfo.flags & CKF_LOGIN_REQUIRED && ! (cctx->p11flags & C_LOGIN_DONE))
-	r = pkinit_login(context, cctx, &tinfo);
+    if ((token_choices.token_array[choice].token_info.flags & CKF_LOGIN_REQUIRED) &&
+        !(cctx->p11flags & C_LOGIN_DONE)) {
+        r = pkinit_login(context, cctx, &token_choices.token_array[choice].token_info);
+    }
+
+    if (r == 0) {
+	/* Doing this again to load the certs into cctx. */
+	r = check_load_certs(context, cctx->session, plg_cryptoctx,
+			     req_cryptoctx, cctx, princ, do_matching, 1);
+    }
 
 out:
     if (slotlist != NULL)
 	free(slotlist);
 
-    if (r != 0 && cctx->session != NULL) {
-	cctx->p11->C_CloseSession(cctx->session);
-	cctx->session = NULL;
+    if (tmpslotlist != NULL)
+	free(tmpslotlist);
+
+    if (token_choices.token_array != NULL) {
+	if (r != 0) {
+	    /* close all sessions if there's an error */
+	    for (i = 0; i < token_choices.numtokens; i++) {
+		cctx->p11->C_CloseSession(token_choices.token_array[i].session);
+	    }
+	    cctx->session = CK_INVALID_HANDLE;
+	} else {
+	    /* close sessions not chosen */
+	    for (i = 0; i < token_choices.numtokens; i++) {
+		if (i != choice) {
+		    cctx->p11->C_CloseSession(token_choices.token_array[i].session);
+		}
+	    }
+	}
+	free(token_choices.token_array);
     }
 
-    return r;
+    return (r);
 }
 
 /*
@@ -3848,10 +4548,11 @@ pkinit_decode_data_pkcs11(krb5_context context,
     unsigned char *cp;
     int r;
 
-    if (pkinit_open_session(context, id_cryptoctx)) {
-	pkiDebug("can't open pkcs11 session\n");
-	return KRB5KDC_ERR_PREAUTH_FAILED;
-    }
+    /*
+     * Solaris Kerberos: assume session is open and libpkcs11 funcs have been
+     * loaded.
+     */
+    assert(id_cryptoctx->p11 != NULL);
 
     /* Solaris Kerberos: Login, if needed, to access private object */
     if (!(id_cryptoctx->p11flags & C_LOGIN_DONE)) {
@@ -3961,10 +4662,11 @@ pkinit_sign_data_pkcs11(krb5_context context,
     unsigned char *cp;
     int r;
 
-    if (pkinit_open_session(context, id_cryptoctx)) {
-	pkiDebug("can't open pkcs11 session\n");
-	return KRB5KDC_ERR_PREAUTH_FAILED;
-    }
+    /*
+     * Solaris Kerberos: assume session is open and libpkcs11 funcs have been
+     * loaded.
+     */
+    assert(id_cryptoctx->p11 != NULL);
 
     /* Solaris Kerberos: Login, if needed, to access private object */
     if (!(id_cryptoctx->p11flags & C_LOGIN_DONE)) {
@@ -4152,7 +4854,7 @@ pkinit_get_certs_pkcs12(krb5_context context,
     if (idopts->cert_filename == NULL) {
 	/* Solaris Kerberos: Improved error messages */
 	krb5_set_error_message(context, retval,
-	    gettext("failed to get certificate location"));
+	    gettext("Failed to get certificate location"));
 	pkiDebug("%s: failed to get user's cert location\n", __FUNCTION__);
 	goto cleanup;
     }
@@ -4160,7 +4862,7 @@ pkinit_get_certs_pkcs12(krb5_context context,
     if (idopts->key_filename == NULL) {
 	/* Solaris Kerberos: Improved error messages */
 	krb5_set_error_message(context, retval,
-	    gettext("failed to get private key location"));
+	    gettext("Failed to get private key location"));
 	pkiDebug("%s: failed to get user's private key location\n", __FUNCTION__);
 	goto cleanup;
     }
@@ -4169,7 +4871,7 @@ pkinit_get_certs_pkcs12(krb5_context context,
     if (fp == NULL) {
 	/* Solaris Kerberos: Improved error messages */
 	krb5_set_error_message(context, retval,
-	    gettext("failed to open PKCS12 file '%s': %s"),
+	    gettext("Failed to open PKCS12 file '%s': %s"),
 	    idopts->cert_filename, error_message(errno));
 	pkiDebug("Failed to open PKCS12 file '%s', error %d\n",
 		 idopts->cert_filename, errno);
@@ -4180,7 +4882,7 @@ pkinit_get_certs_pkcs12(krb5_context context,
     (void) fclose(fp);
     if (p12 == NULL) {
 	krb5_set_error_message(context, retval,
-	    gettext("failed to decode PKCS12 file '%s' contents"),
+	    gettext("Failed to decode PKCS12 file '%s' contents"),
 	    idopts->cert_filename);
 	pkiDebug("Failed to decode PKCS12 file '%s' contents\n",
 		 idopts->cert_filename);
@@ -4235,7 +4937,7 @@ pkinit_get_certs_pkcs12(krb5_context context,
 	if (ret == 0) {
 	    /* Solaris Kerberos: Improved error messages */
 	    krb5_set_error_message(context, retval,
-	        gettext("failed to parse PKCS12 file '%s' with password"),
+	        gettext("Failed to parse PKCS12 file '%s' with password"),
 	        idopts->cert_filename);
 	    pkiDebug("Seconde PKCS12_parse with password failed\n");
 	    goto cleanup;
@@ -4282,7 +4984,7 @@ pkinit_load_fs_cert_and_key(krb5_context context,
     if (retval != 0 || x == NULL) {
 	/* Solaris Kerberos: Improved error messages */
 	krb5_set_error_message(context, retval,
-	    gettext("failed to load user's certificate from %s: %s"),
+	    gettext("Failed to load user's certificate from %s: %s"),
 	        certname, error_message(retval));
 	pkiDebug("failed to load user's certificate from '%s'\n", certname);
 	goto cleanup;
@@ -4291,7 +4993,7 @@ pkinit_load_fs_cert_and_key(krb5_context context,
     if (retval != 0 || y == NULL) {
 	/* Solaris Kerberos: Improved error messages */
 	krb5_set_error_message(context, retval,
-	    gettext("failed to load user's private key from %s: %s"),
+	    gettext("Failed to load user's private key from %s: %s"),
 	        keyname, error_message(retval));
 	pkiDebug("failed to load user's private key from '%s'\n", keyname);
 	goto cleanup;
@@ -4384,7 +5086,7 @@ pkinit_get_certs_dir(krb5_context context,
     if (d == NULL) {
 	/* Solaris Kerberos: Improved error messages */
 	krb5_set_error_message(context, errno,
-	    gettext("failed to open directory \"%s\": %s"),
+	    gettext("Failed to open directory \"%s\": %s"),
 	    dirname, error_message(errno));
 	return errno;
     }
@@ -4460,22 +5162,16 @@ pkinit_get_certs_pkcs11(krb5_context context,
 			pkinit_req_crypto_context req_cryptoctx,
 			pkinit_identity_opts *idopts,
 			pkinit_identity_crypto_context id_cryptoctx,
-			krb5_principal princ)
+			krb5_principal princ,
+			int do_matching)
 {
 #ifdef PKINIT_USE_MECH_LIST
-    CK_MECHANISM_TYPE_PTR mechp;
+    CK_MECHANISM_TYPE_PTR mechp = NULL;
     CK_MECHANISM_INFO info;
 #endif
-    CK_OBJECT_CLASS cls;
-    CK_OBJECT_HANDLE obj;
-    CK_ATTRIBUTE attrs[4];
-    CK_ULONG count;
-    CK_CERTIFICATE_TYPE certtype;
-    CK_BYTE_PTR cert = NULL, cert_id;
-    const unsigned char *cp;
-    int i, r;
-    unsigned int nattrs;
-    X509 *x = NULL;
+
+    if (id_cryptoctx->p11flags & C_SKIP_PKCS11_AUTH)
+	return KRB5KDC_ERR_PREAUTH_FAILED;
 
     /* Copy stuff from idopts -> id_cryptoctx */
     if (idopts->p11_module_name != NULL) {
@@ -4522,13 +5218,6 @@ pkinit_get_certs_pkcs11(krb5_context context,
     id_cryptoctx->slotid = idopts->slotid;
     id_cryptoctx->pkcs11_method = 1;
 
-
-
-    if (pkinit_open_session(context, id_cryptoctx)) {
-	pkiDebug("can't open pkcs11 session\n");
-	return KRB5KDC_ERR_PREAUTH_FAILED;
-    }
-
 #ifndef PKINIT_USE_MECH_LIST
     /*
      * We'd like to use CKM_SHA1_RSA_PKCS for signing if it's available, but
@@ -4548,12 +5237,16 @@ pkinit_get_certs_pkcs11(krb5_context context,
     if (mechp == NULL)
 	return ENOMEM;
     if ((r = id_cryptoctx->p11->C_GetMechanismList(id_cryptoctx->slotid,
-	    mechp, &count)) != CKR_OK)
+	    mechp, &count)) != CKR_OK) {
+	free(mechp);
 	return KRB5KDC_ERR_PREAUTH_FAILED;
+    }
     for (i = 0; i < count; i++) {
 	if ((r = id_cryptoctx->p11->C_GetMechanismInfo(id_cryptoctx->slotid,
-		mechp[i], &info)) != CKR_OK)
+		mechp[i], &info)) != CKR_OK) {
+	    free(mechp);
 	    return KRB5KDC_ERR_PREAUTH_FAILED;
+	}
 #ifdef DEBUG_MECHINFO
 	pkiDebug("mech %x flags %x\n", (int) mechp[i], (int) info.flags);
 	if ((info.flags & (CKF_SIGN|CKF_DECRYPT)) == (CKF_SIGN|CKF_DECRYPT))
@@ -4570,126 +5263,8 @@ pkinit_get_certs_pkcs11(krb5_context context,
     pkiDebug("got %d mechs from card\n", (int) count);
 #endif
 
-    cls = CKO_CERTIFICATE;
-    attrs[0].type = CKA_CLASS;
-    attrs[0].pValue = &cls;
-    attrs[0].ulValueLen = sizeof cls;
-
-    certtype = CKC_X_509;
-    attrs[1].type = CKA_CERTIFICATE_TYPE;
-    attrs[1].pValue = &certtype;
-    attrs[1].ulValueLen = sizeof certtype;
-
-    nattrs = 2;
-
-    /* If a cert id and/or label were given, use them too */
-    if (id_cryptoctx->cert_id_len > 0) {
-	attrs[nattrs].type = CKA_ID;
-	attrs[nattrs].pValue = id_cryptoctx->cert_id;
-	attrs[nattrs].ulValueLen = id_cryptoctx->cert_id_len;
-	nattrs++;
-    }
-    if (id_cryptoctx->cert_label != NULL) {
-	attrs[nattrs].type = CKA_LABEL;
-	attrs[nattrs].pValue = id_cryptoctx->cert_label;
-	attrs[nattrs].ulValueLen = strlen(id_cryptoctx->cert_label);
-	nattrs++;
-    }
-
-    r = id_cryptoctx->p11->C_FindObjectsInit(id_cryptoctx->session, attrs, nattrs);
-    if (r != CKR_OK) {
-	pkiDebug("C_FindObjectsInit: %s\n", pkinit_pkcs11_code_to_text(r));
-	return KRB5KDC_ERR_PREAUTH_FAILED;
-    }
-
-    for (i = 0; ; i++) {
-	if (i >= MAX_CREDS_ALLOWED) 
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
-
-	/* Look for x.509 cert */
-	/* Solaris Kerberos */
-	if ((r = id_cryptoctx->p11->C_FindObjects(id_cryptoctx->session,
-		&obj, 1, &count)) != CKR_OK || count == 0) {
-	    id_cryptoctx->creds[i] = NULL;
-	    break;
-	}
-
-	/* Get cert and id len */
-	attrs[0].type = CKA_VALUE;
-	attrs[0].pValue = NULL;
-	attrs[0].ulValueLen = 0;
-
-	attrs[1].type = CKA_ID;
-	attrs[1].pValue = NULL;
-	attrs[1].ulValueLen = 0;
-
-	if ((r = id_cryptoctx->p11->C_GetAttributeValue(id_cryptoctx->session,
-		obj, attrs, 2)) != CKR_OK && r != CKR_BUFFER_TOO_SMALL) {
-	    pkiDebug("C_GetAttributeValue: %s\n", pkinit_pkcs11_code_to_text(r));
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
-	}
-	cert = (CK_BYTE_PTR) malloc((size_t) attrs[0].ulValueLen + 1);
-	cert_id = (CK_BYTE_PTR) malloc((size_t) attrs[1].ulValueLen + 1);
-	if (cert == NULL || cert_id == NULL)
-	    return ENOMEM;
-
-	/* Read the cert and id off the card */
-
-	attrs[0].type = CKA_VALUE;
-	attrs[0].pValue = cert;
-
-	attrs[1].type = CKA_ID;
-	attrs[1].pValue = cert_id;
-
-	if ((r = id_cryptoctx->p11->C_GetAttributeValue(id_cryptoctx->session,
-		obj, attrs, 2)) != CKR_OK) {
-	    pkiDebug("C_GetAttributeValue: %s\n", pkinit_pkcs11_code_to_text(r));
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
-	}
-
-	pkiDebug("cert %d size %d id %d idlen %d\n", i,
-	    (int) attrs[0].ulValueLen, (int) cert_id[0],
-	    (int) attrs[1].ulValueLen);
-
-	cp = (unsigned char *) cert;
-	x = d2i_X509(NULL, &cp, (int) attrs[0].ulValueLen);
-	if (x == NULL)
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
-	id_cryptoctx->creds[i] = malloc(sizeof(struct _pkinit_cred_info));
-	if (id_cryptoctx->creds[i] == NULL)
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
-	id_cryptoctx->creds[i]->cert = x;
-	id_cryptoctx->creds[i]->key = NULL;
-	id_cryptoctx->creds[i]->cert_id = cert_id;
-	id_cryptoctx->creds[i]->cert_id_len = attrs[1].ulValueLen;
-	free(cert);
-    }
-    id_cryptoctx->p11->C_FindObjectsFinal(id_cryptoctx->session);
-    /* Solaris Kerberos: Improved error messages */
-    if (cert == NULL) {
-	if (r != CKR_OK) {
-	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
-		gettext("pkcs11 error while searching for certificates: %s"),
-		pkinit_pkcs11_code_to_text(r));
-	} else {
-	    BIGNUM *cid = BN_bin2bn(id_cryptoctx->cert_id,
-		id_cryptoctx->cert_id_len, NULL);
-	    char *cidstr = BN_bn2hex(cid);
-	    char *printstr = id_cryptoctx->cert_id_len ? cidstr : "<none>"; 
-
-	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
-		gettext("failed to find any suitable certificates "
-		"(certlabel: %s, certid: %s)"),
-		id_cryptoctx->cert_label ? id_cryptoctx->cert_label : "<none>",
-		cidstr ? printstr : "<unknown>");
-
-	    if (cidstr != NULL)
-		OPENSSL_free(cidstr);
-	    BN_free(cid);
-	}
-	return KRB5KDC_ERR_PREAUTH_FAILED;
-    }
-    return 0;
+    return (pkinit_open_session(context, plg_cryptoctx, req_cryptoctx,
+                                id_cryptoctx, princ, do_matching));
 }
 #endif
 
@@ -4739,7 +5314,8 @@ crypto_load_certs(krb5_context context,
 		  pkinit_req_crypto_context req_cryptoctx,
 		  pkinit_identity_opts *idopts,
 		  pkinit_identity_crypto_context id_cryptoctx,
-		  krb5_principal princ)
+		  krb5_principal princ,
+		  int do_matching)
 {
     krb5_error_code retval;
 
@@ -4758,7 +5334,7 @@ crypto_load_certs(krb5_context context,
 	case IDTYPE_PKCS11:
 	    retval = pkinit_get_certs_pkcs11(context, plg_cryptoctx,
 					     req_cryptoctx, idopts,
-					     id_cryptoctx, princ);
+					     id_cryptoctx, princ, do_matching);
 	    break;
 #endif
 	case IDTYPE_PKCS12:
@@ -5193,7 +5769,7 @@ crypto_cert_select_default(krb5_context context,
 	/* Solaris Kerberos: Improved error messages */
 	retval = EINVAL;
 	krb5_set_error_message(context, retval,
-	    gettext("failed to select default certificate: "
+	    gettext("Failed to select default certificate: "
 	        "found %d certs to choose from but there must be exactly one"),
 	    cert_count);
 	pkiDebug("%s: ERROR: There are %d certs to choose from, "

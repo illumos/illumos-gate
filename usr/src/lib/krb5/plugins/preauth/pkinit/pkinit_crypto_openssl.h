@@ -103,6 +103,8 @@ struct _pkinit_identity_crypto_context {
 
 /* Solaris Kerberos: need to know if login was done */
 #define	C_LOGIN_DONE 0x1 /* The session is logged in. */
+#define	C_PROMPTED_USER 0x2 /* The user was prompted for token. */
+#define	C_SKIP_PKCS11_AUTH 0x4 /* User does not want to do PKCS11 auth */
 
 struct _pkinit_plg_crypto_context {
     DH *dh_1024;
@@ -220,8 +222,6 @@ static krb5_error_code pkinit_find_private_key
 static krb5_error_code pkinit_login
 	(krb5_context context, pkinit_identity_crypto_context id_cryptoctx,
 		CK_TOKEN_INFO *tip);
-static krb5_error_code pkinit_open_session
-	(krb5_context context, pkinit_identity_crypto_context id_cryptoctx);
 static void * pkinit_C_LoadModule(const char *modname, CK_FUNCTION_LIST_PTR_PTR p11p);
 static CK_RV pkinit_C_UnloadModule(void *handle);
 #ifdef SILLYDECRYPT
