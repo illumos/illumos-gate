@@ -34,7 +34,7 @@
 #include <sys/zil.h>
 #include <sys/zil_impl.h>
 #include <sys/dsl_dataset.h>
-#include <sys/vdev.h>
+#include <sys/vdev_impl.h>
 #include <sys/dmu_tx.h>
 #include <sys/dsl_pool.h>
 
@@ -640,6 +640,7 @@ zil_check_log_chain(const char *osname, void *tx)
 {
 	zilog_t *zilog;
 	objset_t *os;
+	blkptr_t *bp;
 	int error;
 
 	ASSERT(tx == NULL);
@@ -651,6 +652,29 @@ zil_check_log_chain(const char *osname, void *tx)
 	}
 
 	zilog = dmu_objset_zil(os);
+	bp = (blkptr_t *)&zilog->zl_header->zh_log;
+
+	/*
+	 * Check the first block and determine if it's on a log device
+	 * which may have been removed or faulted prior to loading this
+	 * pool.  If so, there's no point in checking the rest of the log
+	 * as its content should have already been synced to the pool.
+	 */
+	if (!BP_IS_HOLE(bp)) {
+		vdev_t *vd;
+		boolean_t valid = B_TRUE;
+
+		spa_config_enter(os->os_spa, SCL_STATE, FTAG, RW_READER);
+		vd = vdev_lookup_top(os->os_spa, DVA_GET_VDEV(&bp->blk_dva[0]));
+		if (vd->vdev_islog && vdev_is_dead(vd))
+			valid = vdev_log_state_valid(vd);
+		spa_config_exit(os->os_spa, SCL_STATE, FTAG);
+
+		if (!valid) {
+			dmu_objset_rele(os, FTAG);
+			return (0);
+		}
+	}
 
 	/*
 	 * Because tx == NULL, zil_claim_log_block() will not actually claim

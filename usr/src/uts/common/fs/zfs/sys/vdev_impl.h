@@ -283,6 +283,7 @@ extern void vdev_remove_parent(vdev_t *cvd);
  * vdev sync load and sync
  */
 extern void vdev_load_log_state(vdev_t *nvd, vdev_t *ovd);
+extern boolean_t vdev_log_state_valid(vdev_t *vd);
 extern void vdev_load(vdev_t *vd);
 extern void vdev_sync(vdev_t *vd, uint64_t txg);
 extern void vdev_sync_done(vdev_t *vd, uint64_t txg);

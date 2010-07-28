@@ -4847,19 +4847,19 @@ ztest_spa_import_export(char *oldname, char *newname)
 	/*
 	 * Import it under the new name.
 	 */
-	VERIFY3U(0, ==, spa_import(newname, config, NULL));
+	VERIFY3U(0, ==, spa_import(newname, config, NULL, 0));
 
 	ztest_walk_pool_directory("pools after import");
 
 	/*
 	 * Try to import it again -- should fail with EEXIST.
 	 */
-	VERIFY3U(EEXIST, ==, spa_import(newname, config, NULL));
+	VERIFY3U(EEXIST, ==, spa_import(newname, config, NULL, 0));
 
 	/*
 	 * Try to import it under a different name -- should fail with EEXIST.
 	 */
-	VERIFY3U(EEXIST, ==, spa_import(oldname, config, NULL));
+	VERIFY3U(EEXIST, ==, spa_import(oldname, config, NULL, 0));
 
 	/*
 	 * Verify that the pool is no longer visible under the old name.

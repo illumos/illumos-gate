@@ -486,6 +486,8 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_SUSPENDED		"suspended"	/* not stored on disk */
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
 #define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
+#define	ZPOOL_CONFIG_MISSING_DEVICES	"missing_vdevs"	/* not stored on disk */
+#define	ZPOOL_CONFIG_LOAD_INFO		"load_info"	/* not stored on disk */
 /*
  * The persistent vdev state is stored as separate values rather than a single
  * 'vdev_state' entry.  This is because a device can be in multiple states, such
@@ -809,6 +811,14 @@ typedef enum {
 #define	ZFS_ONLINE_FORCEFAULT	0x4
 #define	ZFS_ONLINE_EXPAND	0x8
 #define	ZFS_OFFLINE_TEMPORARY	0x1
+
+/*
+ * Flags for ZFS_IOC_POOL_IMPORT
+ */
+#define	ZFS_IMPORT_NORMAL	0x0
+#define	ZFS_IMPORT_VERBATIM	0x1
+#define	ZFS_IMPORT_ANY_HOST	0x2
+#define	ZFS_IMPORT_MISSING_LOG	0x4
 
 /*
  * Sysevent payload members.  ZFS will generate the following sysevents with the

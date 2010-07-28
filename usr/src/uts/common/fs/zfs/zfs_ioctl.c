@@ -1206,13 +1206,15 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) != 0 ||
 	    guid != zc->zc_guid)
 		error = EINVAL;
-	else if (zc->zc_cookie)
-		error = spa_import_verbatim(zc->zc_name, config, props);
 	else
-		error = spa_import(zc->zc_name, config, props);
+		error = spa_import(zc->zc_name, config, props, zc->zc_cookie);
 
-	if (zc->zc_nvlist_dst != 0)
-		(void) put_nvlist(zc, config);
+	if (zc->zc_nvlist_dst != 0) {
+		int err;
+
+		if ((err = put_nvlist(zc, config)) != 0)
+			error = err;
+	}
 
 	nvlist_free(config);
 
@@ -3847,7 +3849,10 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 			error = spa_open_rewind(zc->zc_name, &spa, FTAG,
 			    policy, &config);
 			if (config != NULL) {
-				(void) put_nvlist(zc, config);
+				int err;
+
+				if ((err = put_nvlist(zc, config)) != 0)
+					error = err;
 				nvlist_free(config);
 			}
 			nvlist_free(policy);

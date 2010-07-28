@@ -1499,7 +1499,7 @@ show_import(nvlist_t *config)
  */
 static int
 do_import(nvlist_t *config, const char *newname, const char *mntopts,
-    int force, nvlist_t *props, boolean_t do_verbatim)
+    nvlist_t *props, int flags)
 {
 	zpool_handle_t *zhp;
 	char *name;
@@ -1517,7 +1517,8 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 		(void) fprintf(stderr, gettext("cannot import '%s': pool "
 		    "is formatted using a newer ZFS version\n"), name);
 		return (1);
-	} else if (state != POOL_STATE_EXPORTED && !force) {
+	} else if (state != POOL_STATE_EXPORTED &&
+	    !(flags & ZFS_IMPORT_ANY_HOST)) {
 		uint64_t hostid;
 
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_HOSTID,
@@ -1551,7 +1552,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 		}
 	}
 
-	if (zpool_import_props(g_zfs, config, newname, props, do_verbatim) != 0)
+	if (zpool_import_props(g_zfs, config, newname, props, flags) != 0)
 		return (1);
 
 	if (newname != NULL)
@@ -1620,7 +1621,6 @@ zpool_do_import(int argc, char **argv)
 	boolean_t do_all = B_FALSE;
 	boolean_t do_destroyed = B_FALSE;
 	char *mntopts = NULL;
-	boolean_t do_force = B_FALSE;
 	nvpair_t *elem;
 	nvlist_t *config;
 	uint64_t searchguid = 0;
@@ -1630,7 +1630,7 @@ zpool_do_import(int argc, char **argv)
 	nvlist_t *policy = NULL;
 	nvlist_t *props = NULL;
 	boolean_t first;
-	boolean_t do_verbatim = B_FALSE;
+	int flags = ZFS_IMPORT_NORMAL;
 	uint32_t rewind_policy = ZPOOL_NO_REWIND;
 	boolean_t dryrun = B_FALSE;
 	boolean_t do_rewind = B_FALSE;
@@ -1640,7 +1640,7 @@ zpool_do_import(int argc, char **argv)
 	importargs_t idata = { 0 };
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":aCc:d:DEfFno:rR:VX")) != -1) {
+	while ((c = getopt(argc, argv, ":aCc:d:DEfFmno:rR:VX")) != -1) {
 		switch (c) {
 		case 'a':
 			do_all = B_TRUE;
@@ -1665,10 +1665,13 @@ zpool_do_import(int argc, char **argv)
 			do_destroyed = B_TRUE;
 			break;
 		case 'f':
-			do_force = B_TRUE;
+			flags |= ZFS_IMPORT_ANY_HOST;
 			break;
 		case 'F':
 			do_rewind = B_TRUE;
+			break;
+		case 'm':
+			flags |= ZFS_IMPORT_MISSING_LOG;
 			break;
 		case 'n':
 			dryrun = B_TRUE;
@@ -1697,7 +1700,7 @@ zpool_do_import(int argc, char **argv)
 				goto error;
 			break;
 		case 'V':
-			do_verbatim = B_TRUE;
+			flags |= ZFS_IMPORT_VERBATIM;
 			break;
 		case 'X':
 			xtreme_rewind = B_TRUE;
@@ -1869,7 +1872,7 @@ zpool_do_import(int argc, char **argv)
 
 			if (do_all) {
 				err |= do_import(config, NULL, mntopts,
-				    do_force, props, do_verbatim);
+				    props, flags);
 			} else {
 				show_import(config);
 			}
@@ -1918,7 +1921,7 @@ zpool_do_import(int argc, char **argv)
 			err = B_TRUE;
 		} else {
 			err |= do_import(found_config, argc == 1 ? NULL :
-			    argv[1], mntopts, do_force, props, do_verbatim);
+			    argv[1], mntopts, props, flags);
 		}
 	}
 

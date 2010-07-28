@@ -1369,10 +1369,10 @@ vdev_validate(vdev_t *vd)
 		nvlist_free(label);
 
 		/*
-		 * If spa->spa_load_verbatim is true, no need to check the
+		 * If this is a verbatim import, no need to check the
 		 * state of the pool.
 		 */
-		if (!spa->spa_load_verbatim &&
+		if (!(spa->spa_import_flags & ZFS_IMPORT_VERBATIM) &&
 		    spa_load_state(spa) == SPA_LOAD_OPEN &&
 		    state != POOL_STATE_ACTIVE)
 			return (EBADF);
@@ -2064,7 +2064,7 @@ vdev_psize_to_asize(vdev_t *vd, uint64_t psize)
 int
 vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 {
-	vdev_t *vd;
+	vdev_t *vd, *tvd;
 
 	spa_vdev_state_enter(spa, SCL_NONE);
 
@@ -2073,6 +2073,8 @@ vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
+
+	tvd = vd->vdev_top;
 
 	/*
 	 * We don't directly use the aux state here, but if we do a
@@ -2093,7 +2095,7 @@ vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 	 * If this device has the only valid copy of the data, then
 	 * back off and simply mark the vdev as degraded instead.
 	 */
-	if (!vd->vdev_islog && vd->vdev_aux == NULL && vdev_dtl_required(vd)) {
+	if (!tvd->vdev_islog && vd->vdev_aux == NULL && vdev_dtl_required(vd)) {
 		vd->vdev_degraded = 1ULL;
 		vd->vdev_faulted = 0ULL;
 
@@ -2101,7 +2103,7 @@ vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 		 * If we reopen the device and it's not dead, only then do we
 		 * mark it degraded.
 		 */
-		vdev_reopen(vd);
+		vdev_reopen(tvd);
 
 		if (vdev_readable(vd))
 			vdev_set_state(vd, B_FALSE, VDEV_STATE_DEGRADED, aux);
@@ -2343,7 +2345,7 @@ vdev_clear(spa_t *spa, vdev_t *vd)
 		 */
 		vd->vdev_forcefault = B_TRUE;
 
-		vd->vdev_faulted = vd->vdev_degraded = 0;
+		vd->vdev_faulted = vd->vdev_degraded = 0ULL;
 		vd->vdev_cant_read = B_FALSE;
 		vd->vdev_cant_write = B_FALSE;
 
@@ -3036,29 +3038,49 @@ vdev_is_bootable(vdev_t *vd)
 /*
  * Load the state from the original vdev tree (ovd) which
  * we've retrieved from the MOS config object. If the original
- * vdev was offline then we transfer that state to the device
- * in the current vdev tree (nvd).
+ * vdev was offline or faulted then we transfer that state to the
+ * device in the current vdev tree (nvd).
  */
 void
 vdev_load_log_state(vdev_t *nvd, vdev_t *ovd)
 {
 	spa_t *spa = nvd->vdev_spa;
 
+	ASSERT(nvd->vdev_top->vdev_islog);
 	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
 	ASSERT3U(nvd->vdev_guid, ==, ovd->vdev_guid);
 
 	for (int c = 0; c < nvd->vdev_children; c++)
 		vdev_load_log_state(nvd->vdev_child[c], ovd->vdev_child[c]);
 
-	if (nvd->vdev_ops->vdev_op_leaf && ovd->vdev_offline) {
+	if (nvd->vdev_ops->vdev_op_leaf) {
 		/*
-		 * It would be nice to call vdev_offline()
-		 * directly but the pool isn't fully loaded and
-		 * the txg threads have not been started yet.
+		 * Restore the persistent vdev state
 		 */
 		nvd->vdev_offline = ovd->vdev_offline;
-		vdev_reopen(nvd->vdev_top);
+		nvd->vdev_faulted = ovd->vdev_faulted;
+		nvd->vdev_degraded = ovd->vdev_degraded;
+		nvd->vdev_removed = ovd->vdev_removed;
 	}
+}
+
+/*
+ * Determine if a log device has valid content.  If the vdev was
+ * removed or faulted in the MOS config then we know that
+ * the content on the log device has already been written to the pool.
+ */
+boolean_t
+vdev_log_state_valid(vdev_t *vd)
+{
+	if (vd->vdev_ops->vdev_op_leaf && !vd->vdev_faulted &&
+	    !vd->vdev_removed)
+		return (B_TRUE);
+
+	for (int c = 0; c < vd->vdev_children; c++)
+		if (vdev_log_state_valid(vd->vdev_child[c]))
+			return (B_TRUE);
+
+	return (B_FALSE);
 }
 
 /*

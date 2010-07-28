@@ -1202,19 +1202,23 @@ zpool_export_force(zpool_handle_t *zhp)
 
 static void
 zpool_rewind_exclaim(libzfs_handle_t *hdl, const char *name, boolean_t dryrun,
-    nvlist_t *rbi)
+    nvlist_t *config)
 {
+	nvlist_t *nv = NULL;
 	uint64_t rewindto;
 	int64_t loss = -1;
 	struct tm t;
 	char timestr[128];
 
-	if (!hdl->libzfs_printerr || rbi == NULL)
+	if (!hdl->libzfs_printerr || config == NULL)
 		return;
 
-	if (nvlist_lookup_uint64(rbi, ZPOOL_CONFIG_LOAD_TIME, &rewindto) != 0)
+	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_LOAD_INFO, &nv) != 0)
 		return;
-	(void) nvlist_lookup_int64(rbi, ZPOOL_CONFIG_REWIND_TIME, &loss);
+
+	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_LOAD_TIME, &rewindto) != 0)
+		return;
+	(void) nvlist_lookup_int64(nv, ZPOOL_CONFIG_REWIND_TIME, &loss);
 
 	if (localtime_r((time_t *)&rewindto, &t) != NULL &&
 	    strftime(timestr, 128, 0, &t) != 0) {
@@ -1249,6 +1253,7 @@ void
 zpool_explain_recover(libzfs_handle_t *hdl, const char *name, int reason,
     nvlist_t *config)
 {
+	nvlist_t *nv = NULL;
 	int64_t loss = -1;
 	uint64_t edata = UINT64_MAX;
 	uint64_t rewindto;
@@ -1264,12 +1269,12 @@ zpool_explain_recover(libzfs_handle_t *hdl, const char *name, int reason,
 		(void) printf(dgettext(TEXT_DOMAIN, "\t"));
 
 	/* All attempted rewinds failed if ZPOOL_CONFIG_LOAD_TIME missing */
-	if (nvlist_lookup_uint64(config,
-	    ZPOOL_CONFIG_LOAD_TIME, &rewindto) != 0)
+	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_LOAD_INFO, &nv) != 0 ||
+	    nvlist_lookup_uint64(nv, ZPOOL_CONFIG_LOAD_TIME, &rewindto) != 0)
 		goto no_info;
 
-	(void) nvlist_lookup_int64(config, ZPOOL_CONFIG_REWIND_TIME, &loss);
-	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_LOAD_DATA_ERRORS,
+	(void) nvlist_lookup_int64(nv, ZPOOL_CONFIG_REWIND_TIME, &loss);
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_LOAD_DATA_ERRORS,
 	    &edata);
 
 	(void) printf(dgettext(TEXT_DOMAIN,
@@ -1353,10 +1358,38 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		}
 	}
 
-	ret = zpool_import_props(hdl, config, newname, props, B_FALSE);
+	ret = zpool_import_props(hdl, config, newname, props,
+	    ZFS_IMPORT_NORMAL);
 	if (props)
 		nvlist_free(props);
 	return (ret);
+}
+
+static void
+print_vdev_tree(libzfs_handle_t *hdl, const char *name, nvlist_t *nv,
+    int indent)
+{
+	nvlist_t **child;
+	uint_t c, children;
+	char *vname;
+	uint64_t is_log = 0;
+
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_LOG,
+	    &is_log);
+
+	if (name != NULL)
+		(void) printf("\t%*s%s%s\n", indent, "", name,
+		    is_log ? " [log]" : "");
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) != 0)
+		return;
+
+	for (c = 0; c < children; c++) {
+		vname = zpool_vdev_name(hdl, NULL, child[c], B_TRUE);
+		print_vdev_tree(hdl, vname, child[c], indent + 2);
+		free(vname);
+	}
 }
 
 /*
@@ -1367,15 +1400,17 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
  */
 int
 zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
-    nvlist_t *props, boolean_t importfaulted)
+    nvlist_t *props, int flags)
 {
 	zfs_cmd_t zc = { 0 };
 	zpool_rewind_policy_t policy;
-	nvlist_t *nvi = NULL;
+	nvlist_t *nv = NULL;
+	nvlist_t *nvinfo = NULL;
+	nvlist_t *missing = NULL;
 	char *thename;
 	char *origname;
-	uint64_t returned_size;
 	int ret;
+	int error = 0;
 	char errbuf[1024];
 
 	verify(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
@@ -1418,27 +1453,36 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		nvlist_free(props);
 		return (-1);
 	}
-	returned_size =  zc.zc_nvlist_conf_size + 512;
-	if (zcmd_alloc_dst_nvlist(hdl, &zc, returned_size) != 0) {
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0) {
 		nvlist_free(props);
 		return (-1);
 	}
 
-	zc.zc_cookie = (uint64_t)importfaulted;
-	ret = 0;
-	if (zfs_ioctl(hdl, ZFS_IOC_POOL_IMPORT, &zc) != 0) {
+	zc.zc_cookie = flags;
+	while ((ret = zfs_ioctl(hdl, ZFS_IOC_POOL_IMPORT, &zc)) != 0 &&
+	    errno == ENOMEM) {
+		if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
+			zcmd_free_nvlists(&zc);
+			return (-1);
+		}
+	}
+	if (ret != 0)
+		error = errno;
+
+	(void) zcmd_read_dst_nvlist(hdl, &zc, &nv);
+	zpool_get_rewind_policy(config, &policy);
+
+	if (error) {
 		char desc[1024];
 
-		(void) zcmd_read_dst_nvlist(hdl, &zc, &nvi);
-		zpool_get_rewind_policy(config, &policy);
 		/*
 		 * Dry-run failed, but we print out what success
 		 * looks like if we found a best txg
 		 */
-		if ((policy.zrp_request & ZPOOL_TRY_REWIND) && nvi) {
+		if (policy.zrp_request & ZPOOL_TRY_REWIND) {
 			zpool_rewind_exclaim(hdl, newname ? origname : thename,
-			    B_TRUE, nvi);
-			nvlist_free(nvi);
+			    B_TRUE, nv);
+			nvlist_free(nv);
 			return (-1);
 		}
 
@@ -1451,7 +1495,7 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 			    dgettext(TEXT_DOMAIN, "cannot import '%s' as '%s'"),
 			    origname, thename);
 
-		switch (errno) {
+		switch (error) {
 		case ENOTSUP:
 			/*
 			 * Unsupported version.
@@ -1469,15 +1513,32 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 			(void) zfs_error(hdl, EZFS_BADDEV, desc);
 			break;
 
+		case ENXIO:
+			if (nv && nvlist_lookup_nvlist(nv,
+			    ZPOOL_CONFIG_LOAD_INFO, &nvinfo) == 0 &&
+			    nvlist_lookup_nvlist(nvinfo,
+			    ZPOOL_CONFIG_MISSING_DEVICES, &missing) == 0) {
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "The devices below are missing, use "
+				    "'-m' to import the pool anyway:\n"));
+				print_vdev_tree(hdl, NULL, missing, 2);
+				(void) printf("\n");
+			}
+			(void) zpool_standard_error(hdl, error, desc);
+			break;
+
+		case EEXIST:
+			(void) zpool_standard_error(hdl, error, desc);
+			break;
+
 		default:
-			(void) zcmd_read_dst_nvlist(hdl, &zc, &nvi);
-			(void) zpool_standard_error(hdl, errno, desc);
+			(void) zpool_standard_error(hdl, error, desc);
 			zpool_explain_recover(hdl,
-			    newname ? origname : thename, -errno, nvi);
-			nvlist_free(nvi);
+			    newname ? origname : thename, -error, nv);
 			break;
 		}
 
+		nvlist_free(nv);
 		ret = -1;
 	} else {
 		zpool_handle_t *zhp;
@@ -1489,15 +1550,12 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 			ret = -1;
 		else if (zhp != NULL)
 			zpool_close(zhp);
-		(void) zcmd_read_dst_nvlist(hdl, &zc, &nvi);
-		zpool_get_rewind_policy(config, &policy);
 		if (policy.zrp_request &
 		    (ZPOOL_DO_REWIND | ZPOOL_TRY_REWIND)) {
 			zpool_rewind_exclaim(hdl, newname ? origname : thename,
-			    ((policy.zrp_request & ZPOOL_TRY_REWIND) != 0),
-			    nvi);
+			    ((policy.zrp_request & ZPOOL_TRY_REWIND) != 0), nv);
 		}
-		nvlist_free(nvi);
+		nvlist_free(nv);
 		return (0);
 	}
 
@@ -2816,6 +2874,7 @@ zpool_clear(zpool_handle_t *zhp, const char *path, nvlist_t *rewindnvl)
 	boolean_t avail_spare, l2cache;
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 	nvlist_t *nvi = NULL;
+	int error;
 
 	if (path)
 		(void) snprintf(msg, sizeof (msg),
@@ -2846,14 +2905,21 @@ zpool_clear(zpool_handle_t *zhp, const char *path, nvlist_t *rewindnvl)
 	zpool_get_rewind_policy(rewindnvl, &policy);
 	zc.zc_cookie = policy.zrp_request;
 
-	if (zcmd_alloc_dst_nvlist(hdl, &zc, 8192) != 0)
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0)
 		return (-1);
 
 	if (zcmd_write_src_nvlist(zhp->zpool_hdl, &zc, rewindnvl) != 0)
 		return (-1);
 
-	if (zfs_ioctl(hdl, ZFS_IOC_CLEAR, &zc) == 0 ||
-	    ((policy.zrp_request & ZPOOL_TRY_REWIND) &&
+	while ((error = zfs_ioctl(hdl, ZFS_IOC_CLEAR, &zc)) != 0 &&
+	    errno == ENOMEM) {
+		if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
+			zcmd_free_nvlists(&zc);
+			return (-1);
+		}
+	}
+
+	if (!error || ((policy.zrp_request & ZPOOL_TRY_REWIND) &&
 	    errno != EPERM && errno != EACCES)) {
 		if (policy.zrp_request &
 		    (ZPOOL_DO_REWIND | ZPOOL_TRY_REWIND)) {
