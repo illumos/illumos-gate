@@ -1981,6 +1981,7 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 	case SATAC_WRITE_DMA_QUEUED_EXT:
 	case SATAC_READ_FPDMA_QUEUED:
 	case SATAC_WRITE_FPDMA_QUEUED:
+	case SATAC_DSM:
 		dma_cmd = B_TRUE;
 		break;
 	default:
