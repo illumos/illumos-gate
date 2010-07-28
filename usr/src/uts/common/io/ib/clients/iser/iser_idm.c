@@ -701,9 +701,9 @@ iser_handle_boolean(nvpair_t *nvp, boolean_t value, const idm_kv_xlate_t *ikvx,
     boolean_t iser_value, nvlist_t *request_nvl, nvlist_t *response_nvl,
     nvlist_t *negotiated_nvl)
 {
-	kv_status_t		kvrc;
+	kv_status_t		kvrc = KV_UNHANDLED;
 	int			nvrc;
-	boolean_t		respond;
+	boolean_t		respond = B_FALSE;
 
 	if (value != iser_value) {
 		/*
@@ -711,9 +711,12 @@ iser_handle_boolean(nvpair_t *nvp, boolean_t value, const idm_kv_xlate_t *ikvx,
 		 * set the return value to unset the transit bit.
 		 */
 		value = iser_value;
-		kvrc = KV_HANDLED_NO_TRANSIT;
-		nvrc = 0;
-		respond = B_TRUE;
+		nvrc = nvlist_add_boolean_value(negotiated_nvl,
+		    ikvx->ik_key_name, value);
+		if (nvrc == 0) {
+			kvrc = KV_HANDLED_NO_TRANSIT;
+			respond = B_TRUE;
+		}
 
 	} else {
 		/* Add this to our negotiated values */
@@ -747,9 +750,9 @@ iser_handle_numerical(nvpair_t *nvp, uint64_t value, const idm_kv_xlate_t *ikvx,
     uint64_t min_value, uint64_t max_value, uint64_t iser_max_value,
     nvlist_t *request_nvl, nvlist_t *response_nvl, nvlist_t *negotiated_nvl)
 {
-	kv_status_t		kvrc;
+	kv_status_t		kvrc = KV_UNHANDLED;
 	int			nvrc;
-	boolean_t		respond;
+	boolean_t		respond = B_FALSE;
 
 	/* Validate against standard */
 	if ((value < min_value) || (value > max_value)) {
@@ -761,9 +764,12 @@ iser_handle_numerical(nvpair_t *nvp, uint64_t value, const idm_kv_xlate_t *ikvx,
 			 * set the return value to unset the transit bit.
 			 */
 			value = iser_max_value;
-			kvrc = KV_HANDLED_NO_TRANSIT;
-			nvrc = 0;
-			respond = B_TRUE;
+			nvrc = nvlist_add_uint64(negotiated_nvl,
+			    ikvx->ik_key_name, value);
+			if (nvrc == 0) {
+				kvrc = KV_HANDLED_NO_TRANSIT;
+				respond = B_TRUE;
+			}
 		} else {
 			/* Add this to our negotiated values */
 			nvrc = nvlist_add_nvpair(negotiated_nvl, nvp);
