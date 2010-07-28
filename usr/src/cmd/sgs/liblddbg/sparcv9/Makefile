@@ -20,16 +20,13 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		../Makefile.com
 
 ROOTFS_LIBDIR64 = \
-		$(VAR_LIBLDDBG_V9_ROOTFS_LIBDIR)
+		$(VAR_LIBLDDBG_64_ROOTFS_LIBDIR)
 ROOTFS_DYNLIB64 = \
 		$(DYNLIB:%=$(ROOTFS_LIBDIR64)/%)
 

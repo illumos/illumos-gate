@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY=	rtld.a
@@ -58,7 +57,6 @@ FILEMODE=	555
 DYNLIB=		ld.so
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-$(VAR_POUND_2)LIBS += $(LIBRARY)
 
 # definitions for lint
 

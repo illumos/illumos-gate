@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -34,7 +33,6 @@
  * This program demonstrates that libelf is MT-Safe and the usage
  * of elf_begin(ELF_C_READ).
  */
-
 
 #include <stdio.h>
 #include <libelf.h>
@@ -68,24 +66,24 @@ static mutex_t	printlock = DEFAULTMUTEX;	/* printlock used to */
 static void
 print_comment(Elf *elf, const char *file)
 {
-	Elf_Scn *	scn = 0;
+	Elf_Scn		*scn = NULL;
 	GElf_Shdr	shdr;
-	Elf_Data *	data;
+	Elf_Data	*data;
 	size_t		shstrndx;
-
 
 	if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
 		(void) fprintf(stderr, "%s: elf_getshdrstrndx() failed: %s\n",
 		    file, elf_errmsg(0));
 		return;
 	}
-	while ((scn = elf_nextscn(elf, scn)) != 0) {
+
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
 		/*
 		 * Do a string compare to examine each section header
 		 * to see if it is a ".comment" section.  If it is then
 		 * this is the section we want to process.
 		 */
-		if (gelf_getshdr(scn, &shdr) == 0) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
@@ -96,18 +94,18 @@ print_comment(Elf *elf, const char *file)
 			int	i;
 			char	*ptr;
 
-			mutex_lock(&printlock);
+			(void) mutex_lock(&printlock);
 			(void) printf("%s .comment:\n", file);
 
 			/*
 			 * Get the data associated with the .comment
 			 * section.
 			 */
-			if ((data = elf_getdata(scn, 0)) == 0) {
+			if ((data = elf_getdata(scn, NULL)) == NULL) {
 				(void) fprintf(stderr,
 				    "%s: elf_getdata() failed: %s\n",
 				    file, elf_errmsg(0));
-				mutex_unlock(&printlock);
+				(void) mutex_unlock(&printlock);
 				return;
 			}
 			/*
@@ -122,18 +120,17 @@ print_comment(Elf *elf, const char *file)
 					i += strlen(&ptr[i]);
 				}
 			(void) putchar('\n');
-			mutex_unlock(&printlock);
+			(void) mutex_unlock(&printlock);
 		}
 	}
 
 }
 
-
 static void
-process_elf(pe_args * pep)
+process_elf(pe_args *pep)
 {
 	Elf_Cmd	cmd;
-	Elf *	_elf;
+	Elf	*_elf;
 
 	switch (elf_kind(pep->pe_elf)) {
 	case ELF_K_ELF:
@@ -142,12 +139,12 @@ process_elf(pe_args * pep)
 	case ELF_K_AR:
 		cmd = ELF_C_READ;
 		while ((_elf = elf_begin(pep->pe_fd, cmd,
-		    pep->pe_elf)) != 0) {
-			Elf_Arhdr *	arhdr;
-			pe_args *	_pep;
+		    pep->pe_elf)) != NULL) {
+			Elf_Arhdr	*arhdr;
+			pe_args		*_pep;
 			int		rc;
 
-			if ((arhdr = elf_getarhdr(_elf)) == 0) {
+			if ((arhdr = elf_getarhdr(_elf)) == NULL) {
 				(void) fprintf(stderr,
 				    "%s: elf_getarhdr() failed: %s\n",
 				    pep->pe_file, elf_errmsg(0));
@@ -161,6 +158,7 @@ process_elf(pe_args * pep)
 			    "%s(%s)", pep->pe_file, arhdr->ar_name);
 			_pep->pe_fd = pep->pe_fd;
 			_pep->pe_member = 1;
+
 			if ((rc = thr_create(NULL, 0,
 			    (void *(*)(void *))process_elf,
 			    (void *)_pep, THR_DETACHED, 0)) != 0) {
@@ -171,11 +169,11 @@ process_elf(pe_args * pep)
 		break;
 	default:
 		if (!pep->pe_member) {
-			mutex_lock(&printlock);
+			(void) mutex_lock(&printlock);
 			(void) fprintf(stderr,
 			    "%s: unexpected elf_kind(): 0x%x\n",
 			    pep->pe_file, elf_kind(pep->pe_elf));
-			mutex_unlock(&printlock);
+			(void) mutex_unlock(&printlock);
 		}
 	}
 
@@ -190,7 +188,6 @@ int
 main(int argc, char ** argv)
 {
 	int	i;
-
 
 	if (argc < 2) {
 		(void) printf("usage: %s elf_file ...\n", argv[0]);
@@ -235,10 +232,10 @@ main(int argc, char ** argv)
 		 * for each file.
 		 */
 		if ((elf = elf_begin(fd, ELF_C_READ, 0)) == NULL) {
-			mutex_lock(&printlock);
+			(void) mutex_lock(&printlock);
 			(void) fprintf(stderr, "elf_begin() failed: %s\n",
 			    elf_errmsg(0));
-			mutex_unlock(&printlock);
+			(void) mutex_unlock(&printlock);
 			(void) close(fd);
 			continue;
 		}
@@ -249,10 +246,10 @@ main(int argc, char ** argv)
 		pep->pe_member = 0;
 		if ((rc = thr_create(NULL, 0, (void *(*)(void *))process_elf,
 		    (void *)pep, THR_DETACHED, 0)) != 0) {
-			mutex_lock(&printlock);
+			(void) mutex_lock(&printlock);
 			(void) fprintf(stderr,
 			    "thr_create() failed with code: %d\n", rc);
-			mutex_unlock(&printlock);
+			(void) mutex_unlock(&printlock);
 			return (1);
 		}
 	}

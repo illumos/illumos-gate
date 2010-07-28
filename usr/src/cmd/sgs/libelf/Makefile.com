@@ -50,7 +50,7 @@ OBJECTS=	$(BLTOBJS)  $(MACHOBJS)  $(COMOBJS)  $(CLASSOBJS) $(MISCOBJS)
 
 include $(SRC)/lib/Makefile.lib
 
-DEMOFILES=	Makefile	README		acom.c		dcom.c \
+DEMOFILES=	Makefile	00README	acom.c		dcom.c \
 		pcom.c		tpcom.c		dispsyms.c
 DEMOFILESRCDIR=	../demo
 ROOTDEMODIRBASE=$(ROOT)/usr/demo/ELF
@@ -65,7 +65,7 @@ MAPFILES =	../common/mapfile-vers
 CLOBBERFILES +=
 
 DYNFLAGS +=	$(VERSREF)
-LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(VAR_LIBELF_LDLIBS) -lc
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
 LINTFLAGS +=	-u -erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-u -erroff=E_CAST_INT_TO_SMALL_INT

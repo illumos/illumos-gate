@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # The link-editor related source files and Makefile files have at times been
@@ -50,15 +49,11 @@
 #
 # Common Macro definitions
 #
-VAR_CPPFLAGS=
 VAR_LINTFLAGS64=	-m64
 
 VAR_PLAT_sparc=		sparc
 VAR_PLAT_i386=		intel/ia32
 VAR_PLAT_amd64=		intel/amd64
-
-VAR_POUND_1=
-VAR_POUND_2=		$(POUND_SIGN)
 
 #
 # VAR_AVLDIR - directory to find avl.c in.
@@ -105,7 +100,6 @@ VAR_SGSCCSLINK64=	$(ROOTCCSBINLINK64)
 #
 # ld
 #
-VAR_LD_NATIVE_LLDLIBS=
 VAR_LD_LLDFLAGS=	'-R$$ORIGIN/../../lib'
 VAR_LD_LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
 
@@ -127,21 +121,9 @@ VAR_ELFEDIT_LLDFLAGS64 ='-R$$ORIGIN/../../../lib/$(MACH64)'
 VAR_LDDSTUB_INTERP=	-I'$$ORIGIN/ld.so.1'
 
 #
-# libconv
-#
-VAR_LIBCONV_CPPFLAGS=
-
-#
-# libelf
-#
-VAR_LIBELF_LDLIBS=
-VAR_LIBELF_ROOTDEMODIR_DIRMODE=	755
-
-#
 # libld
 #
-VAR_LIBLD_CPPFLAGS=		$(VAR_COM_CPPFLAGS) \
-				$(VAR_AVLINCDIR)
+VAR_LIBLD_CPPFLAGS=		$(VAR_AVLINCDIR)
 VAR_LIBLD_64_ROOTFS_LIBDIR=	$(ROOT)/lib/$(MACH64)
 
 #
@@ -152,23 +134,10 @@ VAR_TOOLS_CPPFLAGS=		$(VAR_AVLINCDIR)
 #
 # liblddbg
 #
-VAR_LIBLDDBG_V9_ROOTFS_LIBDIR=	$(ROOT)/lib/$(MACH64)
-VAR_LIBLDDBG_CPPFLAGS=-DDEMANGLE
-
-#
-# librtld_db
-#
-VAR_LIBRTLD_DB_RDB_DEMO_LINTFLAGS64=	$(VAR_LINTFLAGS64)
+VAR_LIBLDDBG_64_ROOTFS_LIBDIR=	$(ROOT)/lib/$(MACH64)
 
 #
 # rtld
 #
 VAR_RTLD_CPICLIB=	-L ../../../../lib/libc/$(MACH)
 VAR_RTLD_CPICLIB64=	-L ../../../../lib/libc/$(MACH64)
-VAR_RTLD_SONAME=	/lib/ld.so.1
-VAR_RTLD_V9_SONAME=	/lib/sparcv9/ld.so.1
-
-VAR_RTLD_ETCDYNLIB=
-VAR_RTLD_CPPFEATUREMACROS=
-VAR_RTLD_CPPFLAGS=	$(VAR_AVLINCDIR)
-VAR_RTLD_EXTRASUBDIRS=	mdbmod

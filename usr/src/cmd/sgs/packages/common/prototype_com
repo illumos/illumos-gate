@@ -137,7 +137,7 @@ f none $SGSDIR/usr/xpg4/bin/nm=usr/xpg4/bin/nm 0555 root bin
 d none $SGSDIR/usr/demo 755 root bin
 d none $SGSDIR/usr/demo/ELF 755 root bin
 f none $SGSDIR/usr/demo/ELF/Makefile=usr/demo/ELF/Makefile 644 root bin
-f none $SGSDIR/usr/demo/ELF/README=usr/demo/ELF/README 644 root bin
+f none $SGSDIR/usr/demo/ELF/00README=usr/demo/ELF/00README 644 root bin
 f none $SGSDIR/usr/demo/ELF/acom.c=usr/demo/ELF/acom.c 644 root bin
 f none $SGSDIR/usr/demo/ELF/dcom.c=usr/demo/ELF/dcom.c 644 root bin
 f none $SGSDIR/usr/demo/ELF/dispsyms.c=usr/demo/ELF/dispsyms.c 644 root bin

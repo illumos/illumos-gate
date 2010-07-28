@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1996 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,14 +34,12 @@ static int    hash_string(const char *, long);
 hash *
 make_hash(size_t size)
 {
-	hash *ptr;
+	hash	*ptr;
 
-	ptr = (hash *) malloc(sizeof (*ptr));
+	ptr = malloc(sizeof (*ptr));
 	ptr->size = size;
-	ptr->table = (hash_entry **)
-	    malloc((size_t) (sizeof (hash_entry *) * size));
-	(void) memset((char *) ptr->table, (char) 0,
-	    sizeof (hash_entry *)*size);
+	ptr->table = malloc((size_t)(sizeof (hash_entry *) * size));
+	(void) memset((char *)ptr->table, 0, sizeof (hash_entry *) * size);
 	ptr->start = NULL;
 	ptr->hash_type = String_Key;
 	return (ptr);
@@ -54,25 +48,22 @@ make_hash(size_t size)
 hash *
 make_ihash(size_t size)
 {
-	hash * ptr;
+	hash	*ptr;
 
-	ptr = (hash *) malloc(sizeof (*ptr));
+	ptr = malloc(sizeof (*ptr));
 	ptr->size = size;
-	ptr->table = (hash_entry **) malloc(sizeof (hash_entry *) * size);
-	(void) memset((char *) ptr->table, (char) 0,
-	    sizeof (hash_entry *) * size);
+	ptr->table = malloc(sizeof (hash_entry *) * size);
+	(void) memset((char *)ptr->table, 0, sizeof (hash_entry *) * size);
 	ptr->start = NULL;
 	ptr->hash_type = Integer_Key;
 	return (ptr);
 }
 
-
 char **
 get_hash(hash *tbl, char *key)
 {
-	long bucket;
-	hash_entry *tmp;
-	hash_entry *new;
+	long		bucket;
+	hash_entry	*tmp, *new;
 
 	if (tbl->hash_type == String_Key) {
 		tmp = tbl->table[bucket = hash_string(key, tbl->size)];
@@ -100,21 +91,22 @@ get_hash(hash *tbl, char *key)
 	 * not found....
 	 * insert new entry into bucket...
 	 */
-
-	new = (hash_entry *) malloc(sizeof (*new));
+	new = malloc(sizeof (*new));
 	new->key = ((tbl->hash_type == String_Key)?strdup(key):key);
+
 	/*
 	 * hook into chain from tbl...
 	 */
 	new->right_entry = NULL;
 	new->left_entry = tbl->start;
 	tbl->start = new;
+
 	/*
 	 * hook into bucket chain
 	 */
 	new->next_entry = tbl->table[bucket];
 	tbl->table[bucket] = new;
-	new->data = NULL;   /* so we know that it is new */
+	new->data = NULL;		/* so we know that it is new */
 	return (&new->data);
 }
 
@@ -138,7 +130,6 @@ find_hash(hash *tbl, const char *key)
 			}
 		}
 	}
-
 	return (NULL);
 }
 
@@ -178,9 +169,10 @@ del_hash(hash *tbl, const char *key)
 			return (NULL); /* not found */
 		}
 	}
+
 	/*
 	 * tmp now points to entry marked for deletion, prev to
-	 * item preceeding in bucket chain or NULL if tmp is first.
+	 * item preceding in bucket chain or NULL if tmp is first.
 	 * remove from bucket chain first....
 	 */
 	if (tbl->hash_type == String_Key) {
@@ -191,6 +183,7 @@ del_hash(hash *tbl, const char *key)
 	} else {
 		tbl->table[bucket] = tmp->next_entry;
 	}
+
 	/*
 	 * now remove from tbl chain....
 	 */
@@ -207,8 +200,8 @@ del_hash(hash *tbl, const char *key)
 size_t
 operate_hash(hash *tbl, void (*ptr)(), const char *usr_arg)
 {
-	hash_entry * tmp = tbl->start;
-	size_t c = 0;
+	hash_entry	*tmp = tbl->start;
+	size_t		c = 0;
 
 	while (tmp) {
 		(*ptr)(tmp->data, usr_arg, tmp->key);
@@ -221,8 +214,8 @@ operate_hash(hash *tbl, void (*ptr)(), const char *usr_arg)
 size_t
 operate_hash_addr(hash *tbl, void (*ptr)(), const char *usr_arg)
 {
-	hash_entry * tmp = tbl->start;
-	size_t c = 0;
+	hash_entry	*tmp = tbl->start;
+	size_t		c = 0;
 
 	while (tmp) {
 		(*ptr)(&(tmp->data), usr_arg, tmp->key);
@@ -256,10 +249,10 @@ destroy_hash(hash *tbl, int (*ptr)(), const char *usr_arg)
 static int
 hash_string(const char *s, long modulo)
 {
-	unsigned result = 0;
-	int i = 1;
+	unsigned int	result = 0;
+	int		i = 1;
 
-	while (*s != 0) {
+	while (*s != NULL) {
 		result += (*s++ << i++);
 	}
 

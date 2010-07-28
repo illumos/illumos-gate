@@ -19,11 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-
-$(VAR_POUND_2)LIBS +=	$(LIBRARY)
 
 objs/%.o \
 pics/%.o:	%.c
@@ -52,12 +49,10 @@ install:	all .WAIT $(ROOTFS_LIBS) $(ROOTFS_LINKS) \
 		.WAIT $(ROOTDEMODIRS) .WAIT $(ROOTDEMOFILES) \
 		$(ROOTFS_LIBDIR)/$(LINTLIBSRC)
 
-$(VAR_POUND_1)$(ROOTFS_LIBDIR)/$(LINTLIBSRC): ../common/$(LINTLIBSRC)
-$(VAR_POUND_1)	$(INS.file) ../common/$(LINTLIBSRC)
+$(ROOTFS_LIBDIR)/$(LINTLIBSRC): ../common/$(LINTLIBSRC)
+		$(VAR_POUND_1)  $(INS.file) ../common/$(LINTLIBSRC)
 
 lint:		$(LINTLIB) $(LINTOUT32) $(LINTOUT64) $(SGSLINTOUT)
-
-$(VAR_POUND_2)lint :=		LIBTHREADFLAG=-lthread
 
 .PARALLEL:	$(LINTOUT32) $(LINTOUT64)
 

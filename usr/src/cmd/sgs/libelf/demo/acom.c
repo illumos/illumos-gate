@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -46,7 +45,7 @@ static const char	*CommentStr =	".comment";
 static void
 update_comment(Elf *elf, const char *file, const char *comment)
 {
-	Elf_Scn		*scn = 0;
+	Elf_Scn		*scn = NULL;
 	GElf_Shdr	shdr;
 	Elf_Data	*data;
 	size_t		shstrndx;
@@ -57,13 +56,13 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		return;
 	}
 
-	while ((scn = elf_nextscn(elf, scn)) != 0) {
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
 		/*
 		 * Do a string compare to examine each section header
 		 * to see if it is a ".comment" section.  If it is then
 		 * this is the section we want to process.
 		 */
-		if (gelf_getshdr(scn, &shdr) == 0) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
@@ -73,7 +72,7 @@ update_comment(Elf *elf, const char *file, const char *comment)
 			break;
 	}
 
-	if (scn == 0) {
+	if (scn == NULL) {
 		int	ndx;
 
 		(void) printf("%s has no .comment section.  "
@@ -81,18 +80,18 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		/*
 		 * First add the ".comment" string to the string table
 		 */
-		if ((scn = elf_getscn(elf, shstrndx)) == 0) {
+		if ((scn = elf_getscn(elf, shstrndx)) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getscn() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
 		}
-		if ((data = elf_getdata(scn, 0)) == 0) {
+		if ((data = elf_getdata(scn, NULL)) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getdata() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
 		}
 		ndx = data->d_off + data->d_size;
-		if ((data = elf_newdata(scn)) == 0) {
+		if ((data = elf_newdata(scn)) == NULL) {
 			(void) fprintf(stderr, "%s: elf_newdata() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
@@ -106,12 +105,12 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		 * Initialize the fields in the Section Header that
 		 * libelf will not fill in.
 		 */
-		if ((scn = elf_newscn(elf)) == 0) {
+		if ((scn = elf_newscn(elf)) == NULL) {
 			(void) fprintf(stderr, "%s: elf_newscn() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
 		}
-		if (gelf_getshdr(scn, &shdr) == 0) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
@@ -127,7 +126,7 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		 * Flush the changes to the underlying elf32 or elf64
 		 * section header.
 		 */
-		gelf_update_shdr(scn, &shdr);
+		(void) gelf_update_shdr(scn, &shdr);
 	}
 
 	if (shdr.sh_addr != 0) {
@@ -136,7 +135,7 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		return;
 	}
 
-	if ((data = elf_newdata(scn)) == 0) {
+	if ((data = elf_newdata(scn)) == NULL) {
 		(void) fprintf(stderr, "%s: elf_getdata() failed: %s\n",
 		    file, elf_errmsg(0));
 		return;
@@ -149,7 +148,6 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		(void) fprintf(stderr, "%s: elf_update() failed: %s\n", file,
 		    elf_errmsg(0));
 }
-
 
 int
 main(int argc, char **argv)

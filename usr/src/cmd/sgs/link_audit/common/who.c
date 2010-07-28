@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <fcntl.h>
 #include <link.h>
@@ -42,22 +38,21 @@
 #include "who.h"
 
 
-static int		detail_syms = 0; /* display detail symbol information */
-static Objinfo *	objhead = 0;	/* head of object list */
-static Elist *		funclist = 0;
-static sigset_t		iset;
-
+static int	detail_syms = 0;	/* display detail symbol information */
+static Objinfo	*objhead = NULL;	/* head of object list */
+static Elist	*funclist = NULL;
+static sigset_t	iset;
 
 static void
-add_object(Objinfo ** objlist, Link_map * lmp)
+add_object(Objinfo **objlist, Link_map *lmp)
 {
-	Objinfo *	op, * cur, * prev;
-	Elf_Ehdr *	ehdr;
-	Elf_Phdr *	phdr;
+	Objinfo		*op, *cur, *prev;
+	Elf_Ehdr	*ehdr;
+	Elf_Phdr	*phdr;
 	caddr_t		lpc, hpc;
 	int		i;
 
-	if ((op = calloc(1, sizeof (Objinfo))) == 0) {
+	if ((op = calloc(1, sizeof (Objinfo))) == NULL) {
 		(void) fprintf(stderr, "who.so.1: calloc failed\n");
 		exit(1);
 	}
@@ -78,11 +73,10 @@ add_object(Objinfo ** objlist, Link_map * lmp)
 	op->o_hpc = hpc;
 	op->o_lmp = lmp;
 
-
 	if (ehdr->e_type == ET_EXEC)
 		op->o_flags |= FLG_OB_FIXED;
 
-	if (*objlist == 0) {
+	if (*objlist == NULL) {
 		*objlist = op;
 		return;
 	}
@@ -96,11 +90,11 @@ add_object(Objinfo ** objlist, Link_map * lmp)
 		return;
 	}
 
-	for (prev = 0, cur = *objlist; cur; prev = cur, cur = cur->o_next) {
+	for (prev = NULL, cur = *objlist; cur; prev = cur, cur = cur->o_next) {
 		if (lpc < cur->o_lpc)
 			break;
 	}
-	if (prev == 0) {
+	if (prev == NULL) {
 		op->o_next = *objlist;
 		*objlist = op;
 		return;
@@ -110,14 +104,15 @@ add_object(Objinfo ** objlist, Link_map * lmp)
 }
 
 static void
-remove_object(Objinfo ** objlist, Link_map * lmp)
+remove_object(Objinfo **objlist, Link_map *lmp)
 {
-	Objinfo *	cur, * prev;
+	Objinfo	*cur, *prev;
 
-	for (prev = 0, cur = *objlist; cur; prev = cur, cur = cur->o_next) {
+	for (prev = NULL, cur = *objlist; cur; prev = cur, cur = cur->o_next) {
 		if (cur->o_lmp == lmp)
 			break;
 	}
+
 	/*
 	 * Did we find it?
 	 */
@@ -137,27 +132,27 @@ remove_object(Objinfo ** objlist, Link_map * lmp)
 }
 
 static void
-print_simple_address(void * pc)
+print_simple_address(void *pc)
 {
 	Dl_info		info;
 
 	if (dladdr(pc, &info) == 0) {
 		(void) fprintf(stderr,
-			"\t<unknown>: 0x%lx\n", (unsigned long)pc);
+		    "\t<unknown>: 0x%lx\n", (unsigned long)pc);
 		return;
 	}
 
-	(void) fprintf(stderr, "\t%s:%s+0x%lx\n",
-		info.dli_fname, info.dli_sname,
-		(ulong_t)((uintptr_t)pc - (uintptr_t)info.dli_saddr));
+	(void) fprintf(stderr, "\t%s:%s+0x%lx\n", info.dli_fname,
+	    info.dli_sname,
+	    (ulong_t)((uintptr_t)pc - (uintptr_t)info.dli_saddr));
 }
 
 static void
-load_syms(Objinfo * op)
+load_syms(Objinfo *op)
 {
-	int		fd;
-	Elf *		elf;
-	Elf_Scn *	scn;
+	int	fd;
+	Elf	*elf;
+	Elf_Scn	*scn;
 
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		op->o_flags |= FLG_OB_NOSYMS;
@@ -169,15 +164,16 @@ load_syms(Objinfo * op)
 		return;
 	}
 
-	if ((elf = elf_begin(fd, ELF_C_READ, 0)) == 0) {
+	if ((elf = elf_begin(fd, ELF_C_READ, 0)) == NULL) {
 		op->o_flags |= FLG_OB_NOSYMS;
 		(void) close(fd);
 		return;
 	}
-	scn = 0;
-	while ((scn = elf_nextscn(elf, scn)) != 0) {
-		Elf_Shdr *	shdr;
-		Elf_Data *	data;
+	scn = NULL;
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		Elf_Shdr	*shdr;
+		Elf_Data	*data;
+
 		shdr = elf_getshdr(scn);
 		if (shdr->sh_type != SHT_SYMTAB)
 			continue;
@@ -200,9 +196,9 @@ load_syms(Objinfo * op)
 static void
 print_address(caddr_t pc)
 {
-	Elf_Sym *	sym, * _sym;
-	Objinfo *	op;
-	int		i;
+	Elf_Sym	*sym, *_sym;
+	Objinfo	*op;
+	int	i;
 
 	if (!detail_syms) {
 		print_simple_address(pc);
@@ -212,7 +208,7 @@ print_address(caddr_t pc)
 		if ((pc >= op->o_lpc) && (pc <= op->o_hpc))
 			break;
 	}
-	if (op && (op->o_syms == 0))
+	if (op && (op->o_syms == NULL))
 		load_syms(op);
 
 	if (!op || (op->o_flags & FLG_OB_NOSYMS)) {
@@ -228,9 +224,9 @@ print_address(caddr_t pc)
 		    (_sym->st_value > sym->st_value))
 			sym = _sym;
 	}
-	(void) fprintf(stderr, "\t%s:%s+0x%lx\n",
-		op->o_lmp->l_name, sym->st_name + op->o_strs,
-		(ulong_t)((uintptr_t)pc - (uintptr_t)sym->st_value));
+	(void) fprintf(stderr, "\t%s:%s+0x%lx\n", op->o_lmp->l_name,
+	    sym->st_name + op->o_strs,
+	    (ulong_t)((uintptr_t)pc - (uintptr_t)sym->st_value));
 }
 
 static void
@@ -249,7 +245,7 @@ la_version(uint_t version)
 {
 	if (version > LAV_CURRENT)
 		(void) fprintf(stderr, "who.so: unexpected version: %d\n",
-			version);
+		    version);
 
 	if (checkenv((const char *)"WHO_DETAIL"))
 		detail_syms++;
@@ -273,14 +269,12 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 	return (LA_FLG_BINDTO | LA_FLG_BINDFROM);
 }
 
-
 uint_t
 la_objclose(uintptr_t *cookie)
 {
 	remove_object(&objhead, (Link_map *)(*cookie));
 	return (1);
 }
-
 
 /* ARGSUSED1 */
 #if	defined(__sparcv9)
@@ -313,8 +307,8 @@ la_i86_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcooke,
 		struct frame	*frame_p;
 
 		(void) fprintf(stderr, "%s(0x%lx, 0x%lx, 0x%lx)\n", sym_name,
-			(long)GETARG0(regset), (long)GETARG1(regset),
-			(long)GETARG2(regset));
+		    (long)GETARG0(regset), (long)GETARG1(regset),
+		    (long)GETARG2(regset));
 
 		print_address((caddr_t)GETPREVPC(regset));
 

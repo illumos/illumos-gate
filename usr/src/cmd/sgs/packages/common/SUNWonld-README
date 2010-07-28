@@ -57,7 +57,7 @@ SUNWonld - link-editors development package.
 
     If the patch has been made official, you'll find it in:
 
-	http://sunsolve.Ebay.Sun.COM/cgi/show.pl?target=patches/os-patches
+	http://sunsolve.east/cgi/show.pl?target=patches/os-patches
 
     If it hasn't been released, the patch will be in:
 
@@ -1617,3 +1617,4 @@ Bugid   Risk Synopsis
 6956152 dlclose() from an auditor can be fatal. Preinit/activity events should
 	be more flexible. (D)
 6971440 moe can core dump while processing libc.
+6972234 sgs demo's could use some cleanup

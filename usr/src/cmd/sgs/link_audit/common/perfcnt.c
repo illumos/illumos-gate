@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,8 +50,8 @@ typedef struct list {
 } List;
 
 
-static Elist	    *bindto_list = 0;
-static Elist	    *bindfrom_list = 0;
+static Elist	    *bindto_list = NULL;
+static Elist	    *bindfrom_list = NULL;
 
 static int  initialized;
 extern long long gethrvtime();
@@ -66,7 +62,7 @@ static long long accounted[1000];		/* time accounted for */
 static int  counter = 0;
 
 static float	total_time = 0.0;
-static List	*list_head = 0;
+static List	*list_head = NULL;
 
 static hash	*tbl;
 
@@ -79,26 +75,26 @@ list_insert(d_entry *dep)
 	List *cur;
 	List *prev;
 
-	if ((new_list = malloc(sizeof (List))) == 0) {
+	if ((new_list = malloc(sizeof (List))) == NULL) {
 		(void) printf("libperfcnt.so: malloc failed - "
-			"can't print summary\n");
+		    "can't print summary\n");
 		exit(1);
 	}
 	new_list->l_dep = dep;
 
-	if (list_head == 0) {
+	if (list_head == NULL) {
 		list_head = new_list;
-		new_list->l_next = 0;
+		new_list->l_next = NULL;
 		return;
 	}
-	for (cur = list_head, prev = 0;
+	for (cur = list_head, prev = NULL;
 	    (cur && (cur->l_dep->d_time < dep->d_time));
 	    prev = cur, cur = cur->l_next)
 		;
 	/*
 	 * insert at head of list
 	 */
-	if (prev == 0) {
+	if (prev == NULL) {
 		new_list->l_next = list_head;
 		list_head = new_list;
 		return;
@@ -115,7 +111,7 @@ la_version(uint_t version)
 
 	if (version > LAV_CURRENT)
 		(void) fprintf(stderr, "perfcnt.so.1: unexpected version: %d\n",
-			version);
+		    version);
 
 	(void) sprintf(buffer, "/proc/%d", (int)getpid());
 	if ((fd = open(buffer, O_RDWR)) >= 0) {
@@ -153,13 +149,13 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 		first = 0;
 	}
 
-	if (bindto_list == 0)
+	if (bindto_list == NULL)
 		flags = LA_FLG_BINDTO;
 	else {
 		if (check_list(bindto_list, lmp->l_name))
 			flags = LA_FLG_BINDTO;
 	}
-	if (bindfrom_list == 0)
+	if (bindfrom_list == NULL)
 		flags |= LA_FLG_BINDFROM;
 	else {
 		if (check_list(bindfrom_list, lmp->l_name))
@@ -259,19 +255,19 @@ cleanup()
 	(void) operate_hash(tbl, scanlist, NULL);
 	(void) printf("\n\nPerf Counts for: %s\n\n", progname);
 	(void) printf("%20s\tc_count\t    tim\t\tavg. tim\ttot. %%\n",
-		"SYMBOL");
+	    "SYMBOL");
 	(void) printf("--------------------------------------------------"
-		"-------------------\n");
+	    "-------------------\n");
 	for (cur = list_head; cur; cur = cur->l_next) {
 		d_entry		*dep = cur->l_dep;
 		float		tim = dep->d_time * 1000000;
 
 		(void) printf("%20s\t%d\t%8.2f\t%8.2f\t%2.2f%%\n",
-			dep->d_symname, dep->d_count, tim, tim / dep->d_count,
-			((dep->d_time / total_time) * 100.0));
+		    dep->d_symname, dep->d_count, tim, tim / dep->d_count,
+		    ((dep->d_time / total_time) * 100.0));
 	}
 	(void) printf("--------------------------------------------------"
-		"-------------------\n");
+	    "-------------------\n");
 	(void) printf("\t\t\t\t\t\tTotal Time: %8.2f\n",
-		total_time * 1000000);
+	    total_time * 1000000);
 }

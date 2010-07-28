@@ -20,13 +20,8 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include	<link.h>
 #include	<stdlib.h>
 #include	<unistd.h>
@@ -46,8 +41,8 @@
 #include	"bindings.h"
 #include	"env.h"
 
-static Elist		*bindto_list = 0;
-static Elist		*bindfrom_list = 0;
+static Elist		*bindto_list = NULL;
+static Elist		*bindfrom_list = NULL;
 
 static bindhead		*bhp = NULL;
 static unsigned int	current_map_len = 0;
@@ -61,8 +56,8 @@ static lwp_mutex_t	sharedmutex = SHAREDMUTEX;
 static unsigned long
 ehash(const char *name)
 {
-	register unsigned int		g, h = 0;
-	register const unsigned char	*nm = (unsigned char *)name;
+	unsigned int		g, h = 0;
+	const unsigned char	*nm = (unsigned char *)name;
 
 	while (*nm != '\0') {
 		h = (h << 4) + *nm++;
@@ -145,8 +140,7 @@ grow_buffer(void)
 	int	fd;
 	if ((fd = open(buffer_name, O_RDWR)) == -1) {
 		(void) fprintf(stderr,
-			"bidings: grow_buffer: open failed: %s\n",
-			buffer_name);
+		    "bidings: grow_buffer: open failed: %s\n", buffer_name);
 		perror("open");
 		bt_unlock(&bhp->bh_lock);
 		exit(1);
@@ -236,8 +230,8 @@ la_version(uint_t version)
 
 	if (version < LAV_CURRENT) {
 		(void) fprintf(stderr,
-			"bindings.so: unexpected link_audit version: %d\n",
-			version);
+		    "bindings.so: unexpected link_audit version: %d\n",
+		    version);
 		return (0);
 	}
 
@@ -250,6 +244,7 @@ la_version(uint_t version)
 	(void) sigprocmask(SIG_BLOCK, &iset, &omask);
 	if ((fd = open(buffer_name, O_RDWR | O_CREAT | O_EXCL, 0666)) != -1) {
 		int	init_size = sizeof (bindhead) + BLKSIZE;
+
 		if (ftruncate(fd, init_size) == -1) {
 			perror("ftruncate");
 			return (0);
@@ -296,7 +291,7 @@ la_version(uint_t version)
 			    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) ==
 			    MAP_FAILED) {
 				(void) fprintf(stderr,
-					"bindings: mmap failed\n");
+				    "bindings: mmap failed\n");
 				perror("mmap");
 				return (0);
 			}
@@ -306,7 +301,7 @@ la_version(uint_t version)
 		}
 		if (bhp == NULL) {
 			(void) fprintf(stderr,
-				"bindings: buffer mapping timed out\n");
+			    "bindings: buffer mapping timed out\n");
 			return (0);
 		}
 		for (i = 0; i < 4; i++) {
@@ -317,7 +312,7 @@ la_version(uint_t version)
 		}
 		if (bhp->bh_vers == 0) {
 			(void) fprintf(stderr,
-				"bindings: %s not initialized\n", buffer_name);
+			    "bindings: %s not initialized\n", buffer_name);
 			return (0);
 		}
 
@@ -328,7 +323,7 @@ la_version(uint_t version)
 		(void) close(fd);
 	} else {
 		(void) fprintf(stderr, "bindings: unable to open %s\n",
-			buffer_name);
+		    buffer_name);
 		perror("open");
 		return (0);
 	}
@@ -345,13 +340,13 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 {
 	uint_t	flags;
 
-	if ((bindto_list == 0) ||
+	if ((bindto_list == NULL) ||
 	    (check_list(bindto_list, lmp->l_name)))
 		flags = LA_FLG_BINDTO;
 	else
 		flags = 0;
 
-	if ((bindfrom_list == 0) ||
+	if ((bindfrom_list == NULL) ||
 	    (check_list(bindfrom_list, lmp->l_name)))
 		flags |= LA_FLG_BINDFROM;
 
@@ -392,7 +387,7 @@ la_i86_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcooke,
 	lib_name = dlmp->l_name;
 
 	(void) sigprocmask(SIG_BLOCK, &iset, &omask);
-	if (sym_name == 0) {
+	if (sym_name == NULL) {
 		output_err_message("null symname\n");
 		return (symp->st_value);
 	}
@@ -440,9 +435,9 @@ la_i86_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcooke,
 	} else {
 		int		strcmp_res;
 		unsigned int	prev_off = 0;
-		binding_entry *	prev_bep = NULL;
+		binding_entry	*prev_bep = NULL;
 		unsigned int	cur_off;
-		binding_entry *	cur_bep;
+		binding_entry	*cur_bep;
 		unsigned int	lib_off = 0;
 
 		/*

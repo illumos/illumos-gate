@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -42,8 +41,6 @@
  * fields required.  This program is *only* an example of how
  * to do this and not a complete program in itself.
  */
-
-
 #include <stdio.h>
 #include <libelf.h>
 #include <gelf.h>
@@ -84,28 +81,19 @@ mkname(const char *bname)
 	return (tempnam(buffer, 0));
 }
 
-
-
 static void
 delete_comment(Elf *elf, int fd, const char *file)
 {
-	GElf_Ehdr	ehdr;
-	Elf_Scn		*scn = 0;
+	Elf_Scn		*scn = NULL;
 	char		*tfile;
 	Elf		*telf;
-	int		tfd;
-	GElf_Ehdr	tehdr;
-	GElf_Phdr	phdr;
-	GElf_Phdr	tphdr;
-	size_t		shstrndx;
-	size_t		shnum;
-	size_t		phnum;
-	int		*shndx;
-	int		ndx = 1;
-	int		off = 0;
+	GElf_Ehdr	ehdr, tehdr;
+	GElf_Phdr	phdr, tphdr;
+	size_t		shstrndx, shnum, phnum;
+	int		tfd, *shndx, ndx = 1, off = 0;
 	struct stat	sbuf;
 
-	if (gelf_getehdr(elf, &ehdr) == 0) {
+	if (gelf_getehdr(elf, &ehdr) == NULL) {
 		(void) fprintf(stderr, "%s: elf_getehdr() failed: %s\n",
 		    file, elf_errmsg(0));
 		return;
@@ -135,7 +123,7 @@ delete_comment(Elf *elf, int fd, const char *file)
 	 */
 	shndx = calloc(shnum, sizeof (int));
 
-	while ((scn = elf_nextscn(elf, scn)) != 0) {
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
 		GElf_Shdr	shdr;
 
 		/*
@@ -143,7 +131,7 @@ delete_comment(Elf *elf, int fd, const char *file)
 		 * to see if it is a ".comment" section.  If it is then
 		 * this is the section we want to process.
 		 */
-		if (gelf_getshdr(scn, &shdr) == 0) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			free(shndx);
@@ -184,33 +172,31 @@ delete_comment(Elf *elf, int fd, const char *file)
 	/*
 	 * Create a new ELF to duplicate the ELF file into.
 	 */
-	if ((telf = elf_begin(tfd, ELF_C_WRITE, 0)) == 0) {
+	if ((telf = elf_begin(tfd, ELF_C_WRITE, 0)) == NULL) {
 		(void) fprintf(stderr, "elf_begin(ELF_C_WRITE) failed: %s\n",
 		    elf_errmsg(0));
 		return;
 	}
 
-	if (gelf_newehdr(telf, gelf_getclass(elf)) == 0) {
+	if (gelf_newehdr(telf, gelf_getclass(elf)) == NULL) {
 		(void) fprintf(stderr, "%s: elf_newehdr() failed: %s\n",
 		    file, elf_errmsg(0));
 		free(shndx);
 		return;
 	}
-	if (gelf_getehdr(telf, &tehdr) == 0) {
+	if (gelf_getehdr(telf, &tehdr) == NULL) {
 		(void) fprintf(stderr, "%s: elf_getehdr() failed: %s\n",
 		    file, elf_errmsg(0));
 		free(shndx);
 		return;
 	}
 
-	scn = 0;
+	scn = NULL;
 	ndx = 1;
-	while ((scn = elf_nextscn(elf, scn)) != 0) {
-		Elf_Scn *	tscn;
-		Elf_Data *	data;
-		Elf_Data *	tdata;
-		GElf_Shdr	shdr;
-		GElf_Shdr	tshdr;
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		Elf_Scn		*tscn;
+		Elf_Data	*data, *tdata;
+		GElf_Shdr	shdr, tshdr;
 
 		if (shndx[ndx] == -1) {
 			ndx++;
@@ -221,19 +207,19 @@ delete_comment(Elf *elf, int fd, const char *file)
 		 * Duplicate all but the .comment section in the
 		 * new file.
 		 */
-		if (gelf_getshdr(scn, &shdr) == 0) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
-		if ((tscn = elf_newscn(telf)) == 0) {
+		if ((tscn = elf_newscn(telf)) == NULL) {
 			(void) fprintf(stderr, "%s: elf_newscn() failed: %s\n",
 			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
-		if (gelf_getshdr(tscn, &tshdr) == 0) {
+		if (gelf_getshdr(tscn, &tshdr) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			free(shndx);
@@ -259,15 +245,15 @@ delete_comment(Elf *elf, int fd, const char *file)
 		 * Flush the changes to the underlying elf32 or elf64
 		 * section header.
 		 */
-		gelf_update_shdr(tscn, &tshdr);
+		(void) gelf_update_shdr(tscn, &tshdr);
 
-		if ((data = elf_getdata(scn, 0)) == 0) {
+		if ((data = elf_getdata(scn, 0)) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getdata() failed: %s\n",
 			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
-		if ((tdata = elf_newdata(tscn)) == 0) {
+		if ((tdata = elf_newdata(tscn)) == NULL) {
 			(void) fprintf(stderr, "%s: elf_newdata() failed: %s\n",
 			    file, elf_errmsg(0));
 			free(shndx);
@@ -283,17 +269,18 @@ delete_comment(Elf *elf, int fd, const char *file)
 	else {
 		Elf_Scn		*_scn;
 		GElf_Shdr	shdr0;
+
 		/*
 		 * 'ELF Extended Sections' are enabled - we must
 		 * store the shstrndx in Shdr[0].sh_link
 		 */
-		if ((_scn = elf_getscn(telf, 0)) == 0) {
+		if ((_scn = elf_getscn(telf, 0)) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getscn() failed: %s\n",
 			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
-		if (gelf_getshdr(_scn, &shdr0) == 0) {
+		if (gelf_getshdr(_scn, &shdr0) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			free(shndx);
@@ -301,9 +288,9 @@ delete_comment(Elf *elf, int fd, const char *file)
 		}
 		tehdr.e_shstrndx = SHN_XINDEX;
 		shdr0.sh_link = shndx[shstrndx];
-		gelf_update_shdr(_scn, &shdr0);
+		(void) gelf_update_shdr(_scn, &shdr0);
 	}
-	gelf_update_ehdr(telf, &tehdr);
+	(void) gelf_update_ehdr(telf, &tehdr);
 
 	free(shndx);
 
@@ -311,21 +298,21 @@ delete_comment(Elf *elf, int fd, const char *file)
 	 * Duplicate all program headers contained in the ELF file.
 	 */
 	if (phnum != 0) {
-		if (gelf_newphdr(telf, phnum) == 0) {
+		if (gelf_newphdr(telf, phnum) == NULL) {
 			(void) fprintf(stderr, "%s: elf_newphdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
 		}
 		for (ndx = 0; ndx < (int)phnum; ndx++) {
-			if (gelf_getphdr(elf, ndx, &phdr) == 0 ||
-			    gelf_getphdr(telf, ndx, &tphdr) == 0) {
+			if (gelf_getphdr(elf, ndx, &phdr) == NULL ||
+			    gelf_getphdr(telf, ndx, &tphdr) == NULL) {
 				(void) fprintf(stderr,
 				    "%s: elf_getphdr() failed: %s\n",
 				    file, elf_errmsg(0));
 				return;
 			}
 			tphdr = phdr;
-			gelf_update_phdr(telf, ndx, &tphdr);
+			(void) gelf_update_phdr(telf, ndx, &tphdr);
 		}
 	}
 
@@ -358,7 +345,6 @@ delete_comment(Elf *elf, int fd, const char *file)
 	 */
 	(void) rename(tfile, file);
 }
-
 
 int
 main(int argc, char ** argv)

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 .KEEP_STATE:
@@ -59,7 +58,7 @@ ELFCAP=		$(SRC)/common/elfcap
 # Reassign CPPFLAGS so that local search paths are used before any parent
 # $ROOT paths.
 CPPFLAGS =	-I. -I../common -I../../include -I../../include/$(MACH) \
-		$(VAR_CPPFLAGS) $(CPPFLAGS.master) -I$(ELFCAP)
+		$(CPPFLAGS.master) -I$(ELFCAP)
 
 # PICS64 is unique to our environment
 $(PICS64) :=	sparc_CFLAGS += -xregs=no%appl -K pic

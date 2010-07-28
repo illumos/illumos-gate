@@ -66,7 +66,7 @@ include		$(SRC)/cmd/sgs/rtld/Makefile.com
 ADBGENCFLAGS +=	-erroff=%all
 ADBGENFLAGS +=	-milp32
 ADBSUB=		$(ADBSUB32)
-SONAME=		$(VAR_RTLD_SONAME)
+SONAME=		/lib/ld.so.1
 
 SGSMSGTARG +=	$(SGSMSGINTEL) $(SGSMSGINTEL32) $(SGSMSG32)
 
@@ -74,7 +74,7 @@ SGSMSGTARG +=	$(SGSMSGINTEL) $(SGSMSGINTEL32) $(SGSMSG32)
 
 all:		$(RTLD)
 
-install:	all $(ROOTDYNLIB) $(VAR_RTLD_ETCDYNLIB)
+install:	all $(ROOTDYNLIB)
 
 lint:		$(LINTOUT32)
 

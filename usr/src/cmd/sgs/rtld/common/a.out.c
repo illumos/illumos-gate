@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -248,7 +248,7 @@ aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 
 				for (pdp = get_next_dir(&sd, clmp, 0); pdp;
 				    pdp = get_next_dir(&sd, clmp, 0)) {
-					if (pdp->pd_pname == 0)
+					if (pdp->pd_pname == NULL)
 						continue;
 
 					if (path = aout_get_so(pdp->pd_pname,
@@ -282,7 +282,8 @@ aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 		nlmp = load_one(lml, lmco, palp, clmp, MODE(clmp), 0, 0,
 		    in_nfavl);
 		remove_alist(&palp, 1);
-		if (((nlmp == 0) || (bind_one(clmp, nlmp, BND_NEEDED) == 0)) &&
+		if (((nlmp == NULL) ||
+		    (bind_one(clmp, nlmp, BND_NEEDED) == 0)) &&
 		    ((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0))
 			return (0);
 	}
@@ -322,7 +323,7 @@ aout_symconvert(struct nlist *sp)
 static struct nlist *
 aout_find_com(struct nlist *sp, const char *name)
 {
-	static struct rtc_symb	*rtcp = 0;
+	static struct rtc_symb	*rtcp = NULL;
 	struct rtc_symb		*rs, *trs;
 	const char		*sl;
 	char			*cp;
@@ -419,11 +420,11 @@ aout_findsb(const char *aname, Rt_map *lmp, int flag)
 				if (*name++ == '\0')
 					return (sp);	/* found */
 			}
-			if (p->next == 0)
+			if (p->next == NULL)
 				return (NULL);		/* not found */
 			else
 				continue;
-		} while ((p = &LM2LP(lmp)->lp_hash[p->next]) != 0);
+		} while ((p = &LM2LP(lmp)->lp_hash[p->next]) != NULL);
 	}
 	return (NULL);
 }
@@ -483,7 +484,7 @@ aout_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 			 * is it a common?
 			 */
 			if (sp->n_type == (N_EXT + N_UNDF)) {
-				if ((sp = aout_find_com(sp, name)) == 0)
+				if ((sp = aout_find_com(sp, name)) == NULL)
 					return (0);
 			}
 			srp->sr_dmap = ilmp;
@@ -542,7 +543,7 @@ aout_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 	/*
 	 * Specific settings for a.out format.
 	 */
-	if (lml->lm_head == 0) {
+	if (lml->lm_head == NULL) {
 		base = (caddr_t)MAIN_BASE;
 		FLAGS(lmp) |= FLG_RT_FIXED;
 	} else
@@ -569,7 +570,7 @@ aout_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 	AOUTDYN(lmp) = ld;
 
 	if ((RPATH(lmp) = (char *)&base[ld->v2->ld_rules]) == base)
-		RPATH(lmp) = 0;
+		RPATH(lmp) = NULL;
 	LM2LP(lmp)->lp_symbol_base = caddr;
 	/* LINTED */
 	LM2LP(lmp)->lp_plt = (struct jbind *)(&caddr[JMPOFF(ld)]);
@@ -630,7 +631,7 @@ aout_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info,
 	else
 		base = ADDR(lmp);
 
-	for (_sym = 0, _value = 0, ndx = 0; ndx < cnt; ndx++, sym++) {
+	for (_sym = NULL, _value = 0, ndx = 0; ndx < cnt; ndx++, sym++) {
 		ulong_t	value;
 
 		if (sym->n_type == (N_EXT + N_UNDF))
@@ -661,7 +662,7 @@ aout_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info,
 		 * a symbol entry for AOUT's.
 		 */
 		if (_flags == RTLD_DL_SYMENT)
-			*info = 0;
+			*info = NULL;
 		else if (_flags == RTLD_DL_LINKMAP)
 			*info = (void *)lmp;
 
@@ -718,14 +719,17 @@ aout_dlsym_handle(Grp_hdl *ghp, Slookup *slp, Sresult *srp, uint_t *binfo,
  * we don't care, as this can't be relocated, and we're never going to try
  * unmapping the a.out.
  */
+#define	PROCSIZE	20
+
 int
 aout_get_mmap(Lm_list *lml, mmapobj_result_t *mpp)
 {
 	prmap_t	*maps;
-	char	proc[16];
+	char	proc[PROCSIZE];
 	int	num, err, fd;
 
-	(void) snprintf(proc, 16, MSG_ORIG(MSG_FMT_PROC), (int)getpid());
+	(void) snprintf(proc, PROCSIZE, MSG_ORIG(MSG_FMT_PROC),
+	    EC_SWORD(getpid()));
 	if ((fd = open(proc, O_RDONLY)) == -1) {
 		err = errno;
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), proc,

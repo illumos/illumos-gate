@@ -24,5 +24,7 @@
 #
 
 include		$(SRC)/cmd/sgs/Makefile.com
-EXTRASUBDIRS=	$(VAR_RTLD_EXTRASUBDIRS)
+
+EXTRASUBDIRS =	mdbmod
+
 include		$(SRC)/cmd/sgs/Makefile.sub

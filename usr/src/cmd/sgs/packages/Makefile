@@ -35,9 +35,8 @@ MACHS:sh=	if [ "$MACH" = "sparc" ]; \
 		else echo "unknown"; \
 		fi
 
-RDBDIRS=	$(MACHS:%=../librtld_db/rdb_demo/%)
+RDBDIRS=	$(MACHS:%=../librtld_db/demo/%)
 LDMAKEDIRS=	$(MACHS:%=../libldmake/%)
-
 
 SUBDIRS1=	../libconv \
 		.WAIT \
@@ -61,7 +60,6 @@ SUBDIRS2 =	../rtld \
 		../0@0 \
 		../tools \
 		$(RDBDIRS)
-
 
 #
 # Package dirs are directories which specifically

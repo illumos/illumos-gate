@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,8 +36,6 @@
  *	  decode a corresponding SHT_SYMTAB_SHNDX
  *	  section if required.
  */
-
-
 #include <stdio.h>
 #include <libelf.h>
 #include <gelf.h>
@@ -72,13 +69,13 @@ static const char *symtype[STT_NUM] = {
 static void
 print_symtab(Elf *elf, const char *file)
 {
-	Elf_Scn		*scn;
+	Elf_Scn		*scn = NULL;
 	GElf_Shdr	shdr;
 	GElf_Ehdr	ehdr;
 	size_t		shstrndx;
 
 
-	if (gelf_getehdr(elf, &ehdr) == 0) {
+	if (gelf_getehdr(elf, &ehdr) == NULL) {
 		(void) fprintf(stderr, "%s: elf_getehdr() failed: %s\n",
 		    file, elf_errmsg(0));
 		return;
@@ -90,15 +87,11 @@ print_symtab(Elf *elf, const char *file)
 		return;
 	}
 
-	scn = 0;
-	while ((scn = elf_nextscn(elf, scn)) != 0) {
-		uint_t		symcnt;
-		uint_t		ndx;
-		uint_t		nosymshndx;
-		Elf_Data	*symdata;
-		Elf_Data	*shndxdata;
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		uint_t		symcnt, ndx, nosymshndx;
+		Elf_Data	*symdata, *shndxdata;
 
-		if (gelf_getshdr(scn, &shdr) == 0) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
 			(void) fprintf(stderr,
 			    "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
@@ -113,7 +106,7 @@ print_symtab(Elf *elf, const char *file)
 		 * Get the data associated with the Symbol
 		 * section.
 		 */
-		if ((symdata = elf_getdata(scn, 0)) == 0) {
+		if ((symdata = elf_getdata(scn, NULL)) == NULL) {
 			(void) fprintf(stderr,
 			    "%s: elf_getdata() failed: %s\n",
 			    file, elf_errmsg(0));
@@ -138,15 +131,11 @@ print_symtab(Elf *elf, const char *file)
 		for (ndx = 0; ndx < symcnt; ndx++) {
 			GElf_Sym	sym;
 			Elf32_Word	shndx;
-			uint_t		type;
-			uint_t		bind;
-			uint_t		specshndx;
+			uint_t		type, bind, specshndx;
 			char		bindbuf[INTSTRLEN];
 			char		typebuf[INTSTRLEN];
 			char		shndxbuf[INTSTRLEN];
-			const char	*bindstr;
-			const char	*typestr;
-			const char	*shndxstr;
+			const char	*bindstr, *typestr, *shndxstr;
 
 			/*
 			 * Get a symbol entry
@@ -159,26 +148,26 @@ print_symtab(Elf *elf, const char *file)
 				return;
 			}
 			/*
-			 * Check to see if this symbol's st_shndx
-			 * is using the 'Extended SHNDX table' for
-			 * a SYMTAB.
+			 * Check to see if this symbol's st_shndx is using
+			 * the 'Extended SHNDX table' for a SYMTAB.
 			 *
-			 * If it is - and we havn't searched before,
-			 * go find the associated SHT_SYMTAB_SHNDX
-			 * section.
+			 * If it is - and we haven't searched before, go
+			 * find the associated SHT_SYMTAB_SHNDX section.
 			 */
 			if ((sym.st_shndx == SHN_XINDEX) &&
 			    (shndxdata == 0) && (nosymshndx == 0)) {
-				Elf_Scn		*_scn;
+				Elf_Scn		*_scn = NULL;
 				GElf_Shdr	_shdr;
 				GElf_Word	symscnndx;
-				_scn = 0;
+
 				specshndx = 0;
 				symscnndx = elf_ndxscn(scn);
 
-				while ((_scn = elf_nextscn(elf, _scn)) != 0) {
-					if (gelf_getshdr(_scn, &_shdr) == 0)
+				while ((_scn =
+				    elf_nextscn(elf, _scn)) != NULL) {
+					if (gelf_getshdr(_scn, &_shdr) == NULL)
 						break;
+
 					/*
 					 * We've found the Symtab SHNDX table
 					 * if it's of type SHT_SYMTAB_SHNDX
@@ -188,11 +177,10 @@ print_symtab(Elf *elf, const char *file)
 					 */
 					if ((_shdr.sh_type ==
 					    SHT_SYMTAB_SHNDX) &&
-					    (_shdr.sh_link == symscnndx)) {
-						if ((shndxdata =
-						    elf_getdata(_scn, 0)) != 0)
-							break;
-					}
+					    (_shdr.sh_link == symscnndx) &&
+					    ((shndxdata = elf_getdata(_scn,
+					    NULL)) != NULL))
+						break;
 				}
 				/*
 				 * Get a symbol entry
@@ -304,10 +292,10 @@ process_elf(Elf *elf, char *file, int fd, int member)
 		 * in turn be examined with libelf.
 		 *
 		 * The below loop will iterate over each member of the
-		 * archive and recursivly call process_elf() for processing.
+		 * archive and recursively call process_elf().
 		 */
 		cmd = ELF_C_READ;
-		while ((_elf = elf_begin(fd, cmd, elf)) != 0) {
+		while ((_elf = elf_begin(fd, cmd, elf)) != NULL) {
 			Elf_Arhdr	*arhdr;
 			char		buffer[1024];
 
@@ -321,7 +309,7 @@ process_elf(Elf *elf, char *file, int fd, int member)
 			    file, arhdr->ar_name);
 
 			/*
-			 * recursivly process the ELF members.
+			 * Recursively process the ELF members.
 			 */
 			process_elf(_elf, buffer, fd, 1);
 			cmd = elf_next(_elf);
@@ -337,12 +325,10 @@ process_elf(Elf *elf, char *file, int fd, int member)
 	}
 }
 
-
 int
 main(int argc, char **argv)
 {
 	int	i;
-
 
 	if (argc < 2) {
 		(void) printf("usage: %s elf_file ...\n", argv[0]);

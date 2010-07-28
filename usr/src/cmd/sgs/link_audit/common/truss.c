@@ -18,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <link.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -37,8 +34,8 @@
 #include "env.h"
 #include "mach.h"
 
-static Elist		*bindto_list = 0;
-static Elist		*bindfrom_list = 0;
+static Elist		*bindto_list = NULL;
+static Elist		*bindfrom_list = NULL;
 
 static uint_t		pidout = 0;
 static pid_t		pid;
@@ -48,7 +45,6 @@ static uint_t		indent_level = 1;
 static uint_t		trussall = 0;
 static uint_t		noexit = 0;
 static sigset_t		iset;
-
 
 /*
  * It's not possible to gather the return code on routines
@@ -89,14 +85,14 @@ static char	*spec_sym[] = {
 	(char *)0
 };
 
-
 uint_t
 la_version(uint_t version)
 {
 	char	*str;
+
 	if (version > LAV_CURRENT)
 		(void) fprintf(stderr, "truss.so: unexpected version: %d\n",
-			version);
+		    version);
 
 	build_env_list(&bindto_list, (const char *)"TRUSS_BINDTO");
 	build_env_list(&bindfrom_list, (const char *)"TRUSS_BINDFROM");
@@ -151,7 +147,6 @@ la_version(uint_t version)
 	return (LAV_CURRENT);
 }
 
-
 /* ARGSUSED1 */
 uint_t
 la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
@@ -160,21 +155,21 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 	char	*basename;
 	static int	first = 1;
 
-	if ((bindto_list == 0) || (trussall))
+	if ((bindto_list == NULL) || (trussall))
 		flags = LA_FLG_BINDTO;
 	else if (check_list(bindto_list, lmp->l_name))
 		flags = LA_FLG_BINDTO;
 	else
 		flags = 0;
 
-	if (((bindfrom_list == 0) && first) || trussall ||
+	if (((bindfrom_list == NULL) && first) || trussall ||
 	    (check_list(bindfrom_list, lmp->l_name)))
 		flags |= LA_FLG_BINDFROM;
 
 	first = 0;
 
 	if (flags) {
-		if ((basename = strrchr(lmp->l_name, '/')) != 0)
+		if ((basename = strrchr(lmp->l_name, '/')) != NULL)
 			basename++;
 		else
 			basename = lmp->l_name;
@@ -224,8 +219,6 @@ la_symbind32(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcook,
 	}
 	return (symp->st_value);
 }
-
-
 
 /* ARGSUSED1 */
 #if	defined(__sparcv9)
@@ -277,7 +270,6 @@ la_i86_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcookie,
 	(void) sigprocmask(SIG_SETMASK, &oset, NULL);
 	return (symp->st_value);
 }
-
 
 /* ARGSUSED1 */
 #if	defined(_LP64)
