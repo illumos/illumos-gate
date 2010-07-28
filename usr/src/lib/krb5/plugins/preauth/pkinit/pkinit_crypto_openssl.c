@@ -3478,7 +3478,7 @@ pkinit_open_session(krb5_context context,
 {
     int i, r;
     CK_ULONG count = 0;
-    CK_SLOT_ID_PTR slotlist;
+    CK_SLOT_ID_PTR slotlist = NULL;
     CK_TOKEN_INFO tinfo;
 
     if (cctx->p11_module != NULL)
@@ -3508,35 +3508,70 @@ pkinit_open_session(krb5_context context,
      cctx->finalize_pkcs11 =
 	(r == CKR_CRYPTOKI_ALREADY_INITIALIZED ? FALSE : TRUE);
 
-    /* Get the list of available slots */
-    if (cctx->slotid != PK_NOSLOT) {
-	/* A slot was specified, so that's the only one in the list */
-	count = 1;
-	slotlist = (CK_SLOT_ID_PTR) malloc(sizeof (CK_SLOT_ID));
-	slotlist[0] = cctx->slotid;
-    } else {
-	if (cctx->p11->C_GetSlotList(TRUE, NULL, &count) != CKR_OK)
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
-	if (count == 0)
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
-	slotlist = (CK_SLOT_ID_PTR) malloc(count * sizeof (CK_SLOT_ID));
-	if (cctx->p11->C_GetSlotList(TRUE, slotlist, &count) != CKR_OK)
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
+    /* get number of slots that have tokens */
+     if ((r = cctx->p11->C_GetSlotList(TRUE, NULL, &count)) != CKR_OK) {
+	 pkiDebug("C_GetSlotList: %s\n", pkinit_pkcs11_code_to_text(r));
+	 krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+				gettext("Error trying to get PKCS11 slot list: %s"),
+				pkinit_pkcs11_code_to_text(r));
+	 r = KRB5KDC_ERR_PREAUTH_FAILED;
+	 goto out;
+     }
+
+    if (count == 0) {
+	r = KRB5KDC_ERR_PREAUTH_FAILED;
+	krb5_set_error_message(context, r,
+			       gettext("No smart card tokens found"));
+	pkiDebug("pkinit_open_session: no token\n");
+	goto out;
+    }
+
+    slotlist = malloc(count * sizeof (CK_SLOT_ID));
+    if (slotlist == NULL) {
+	krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+			       gettext("Memory allocation error"));
+	r = KRB5KDC_ERR_PREAUTH_FAILED;
+	goto out;
+    }
+    /*
+     * Solaris Kerberos: get list of PKCS11 slotid's that have tokens.
+     */
+    if (cctx->p11->C_GetSlotList(TRUE, slotlist, &count) != CKR_OK) {
+	krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+			       gettext("Error trying to get PKCS11 slot list: %s"),
+			       pkinit_pkcs11_code_to_text(r));
+	r = KRB5KDC_ERR_PREAUTH_FAILED;
+	goto out;
     }
 
     /* Look for the given token label, or if none given take the first one */
     for (i = 0; i < count; i++) {
+	/*
+	 * Solaris Kerberos: if a slotid was specified skip slots that don't
+	 * match.
+	 */
+	if (cctx->slotid != PK_NOSLOT && cctx->slotid != slotlist[i])
+	    continue;
+	cctx->session = NULL;
 	/* Open session */
 	if ((r = cctx->p11->C_OpenSession(slotlist[i], CKF_SERIAL_SESSION,
 					  NULL, NULL, &cctx->session)) != CKR_OK) {
 	    pkiDebug("C_OpenSession: %s\n", pkinit_pkcs11_code_to_text(r));
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
+	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+		gettext("Error trying to open PKCS11 session: %s"),
+		pkinit_pkcs11_code_to_text(r));
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    goto out;
 	}
 
 	/* Get token info */
 	if ((r = cctx->p11->C_GetTokenInfo(slotlist[i], &tinfo)) != CKR_OK) {
 	    pkiDebug("C_GetTokenInfo: %s\n", pkinit_pkcs11_code_to_text(r));
-	    return KRB5KDC_ERR_PREAUTH_FAILED;
+	    krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
+		gettext("Error trying to read token: %s"),
+		pkinit_pkcs11_code_to_text(r));
+	    r = KRB5KDC_ERR_PREAUTH_FAILED;
+	    goto out;
 	}
 
 	if (cctx->token_label == NULL) {
@@ -3573,14 +3608,18 @@ pkinit_open_session(krb5_context context,
 	    }
 	}
 	cctx->p11->C_CloseSession(cctx->session);
+	cctx->session = NULL;
     }
+
     if (i >= count) {
-	free(slotlist);
 	pkiDebug("open_session: no matching token found\n");
-	return KRB5KDC_ERR_PREAUTH_FAILED;
+	r = KRB5KDC_ERR_PREAUTH_FAILED;
+	goto out;
     }
-    cctx->slotid = slotlist[i];
-    free(slotlist);
+
+    if (cctx->slotid == PK_NOSLOT)
+	cctx->slotid = slotlist[i];
+
     pkiDebug("open_session: slotid %d (%d of %d)\n", (int) cctx->slotid,
 	     i + 1, (int) count);
 
@@ -3588,6 +3627,15 @@ pkinit_open_session(krb5_context context,
     /* Solaris Kerberos: added cctx->p11flags check */
     if (tinfo.flags & CKF_LOGIN_REQUIRED && ! (cctx->p11flags & C_LOGIN_DONE))
 	r = pkinit_login(context, cctx, &tinfo);
+
+out:
+    if (slotlist != NULL)
+	free(slotlist);
+
+    if (r != 0 && cctx->session != NULL) {
+	cctx->p11->C_CloseSession(cctx->session);
+	cctx->session = NULL;
+    }
 
     return r;
 }
