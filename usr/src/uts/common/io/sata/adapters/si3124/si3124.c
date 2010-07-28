@@ -1305,7 +1305,11 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 	if (spkt->satapkt_op_mode & (SATA_OPMODE_POLLING|SATA_OPMODE_SYNCH)) {
 		/* we need to poll now */
 		si_poll_cmd(si_ctlp, si_portp, cport, slot, spkt);
-
+		/*
+		 * The command has completed, and spkt will be freed by the
+		 * sata module, so don't keep a pointer to it lying around.
+		 */
+		si_portp->siport_slot_pkts[slot] = NULL;
 	}
 
 	mutex_exit(&si_portp->siport_mutex);
@@ -1401,9 +1405,9 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		}
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		ASSERT(satapkt != NULL);
 
-		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs) {
+		if (satapkt != NULL &&
+		    satapkt->satapkt_cmd.satacmd_flags.sata_special_regs) {
 			si_copy_out_regs(&satapkt->satapkt_cmd, si_ctlp,
 			    port, tmpslot);
 		}
@@ -1429,36 +1433,41 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		    "handling failed slot: 0x%x", tmpslot);
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		ASSERT(satapkt != NULL);
-		if (satapkt->satapkt_device.satadev_type ==
-		    SATA_DTYPE_ATAPICD) {
-			si_set_sense_data(satapkt, SATA_PKT_DEV_ERROR);
-		}
+
+		if (satapkt != NULL) {
+
+			if (satapkt->satapkt_device.satadev_type ==
+			    SATA_DTYPE_ATAPICD) {
+				si_set_sense_data(satapkt, SATA_PKT_DEV_ERROR);
+			}
 
 
-		flagsp = &satapkt->satapkt_cmd.satacmd_flags;
+			flagsp = &satapkt->satapkt_cmd.satacmd_flags;
 
-		flagsp->sata_copy_out_lba_low_msb = B_TRUE;
-		flagsp->sata_copy_out_lba_mid_msb = B_TRUE;
-		flagsp->sata_copy_out_lba_high_msb = B_TRUE;
-		flagsp->sata_copy_out_lba_low_lsb = B_TRUE;
-		flagsp->sata_copy_out_lba_mid_lsb = B_TRUE;
-		flagsp->sata_copy_out_lba_high_lsb = B_TRUE;
-		flagsp->sata_copy_out_error_reg = B_TRUE;
-		flagsp->sata_copy_out_sec_count_msb = B_TRUE;
-		flagsp->sata_copy_out_sec_count_lsb = B_TRUE;
-		flagsp->sata_copy_out_device_reg = B_TRUE;
+			flagsp->sata_copy_out_lba_low_msb = B_TRUE;
+			flagsp->sata_copy_out_lba_mid_msb = B_TRUE;
+			flagsp->sata_copy_out_lba_high_msb = B_TRUE;
+			flagsp->sata_copy_out_lba_low_lsb = B_TRUE;
+			flagsp->sata_copy_out_lba_mid_lsb = B_TRUE;
+			flagsp->sata_copy_out_lba_high_lsb = B_TRUE;
+			flagsp->sata_copy_out_error_reg = B_TRUE;
+			flagsp->sata_copy_out_sec_count_msb = B_TRUE;
+			flagsp->sata_copy_out_sec_count_lsb = B_TRUE;
+			flagsp->sata_copy_out_device_reg = B_TRUE;
 
-		si_copy_out_regs(&satapkt->satapkt_cmd, si_ctlp, port, tmpslot);
+			si_copy_out_regs(&satapkt->satapkt_cmd, si_ctlp,
+			    port, tmpslot);
 
-		/*
-		 * In the case of NCQ command failures, the error is
-		 * overwritten by the one obtained from issuing of a
-		 * READ LOG EXTENDED command.
-		 */
-		if (si_portp->siport_err_tags_SDBERROR & (1 << tmpslot)) {
-			satapkt->satapkt_cmd.satacmd_error_reg =
-			    si_read_log_ext(si_ctlp, si_portp, port);
+			/*
+			 * In the case of NCQ command failures, the error is
+			 * overwritten by the one obtained from issuing of a
+			 * READ LOG EXTENDED command.
+			 */
+			if (si_portp->siport_err_tags_SDBERROR &
+			    (1 << tmpslot)) {
+				satapkt->satapkt_cmd.satacmd_error_reg =
+				    si_read_log_ext(si_ctlp, si_portp, port);
+			}
 		}
 
 		CLEAR_BIT(failed_tags, tmpslot);
@@ -1496,11 +1505,10 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		}
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		ASSERT(satapkt != NULL);
 		SIDBG1(SIDBG_ERRS, si_ctlp,
 		    "si_mop_commands aborting spkt: %x",
 		    satapkt);
-		if (satapkt->satapkt_device.satadev_type ==
+		if (satapkt != NULL && satapkt->satapkt_device.satadev_type ==
 		    SATA_DTYPE_ATAPICD) {
 			si_set_sense_data(satapkt, SATA_PKT_ABORTED);
 		}
