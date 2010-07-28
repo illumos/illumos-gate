@@ -28,6 +28,10 @@
  * SUCH DAMAGES.
  */
 
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
@@ -136,6 +140,7 @@ pkinit_init_identity_opts(pkinit_identity_opts **idopts)
     opts->token_label = NULL;
     opts->cert_id_string = NULL;
     opts->cert_label = NULL;
+    opts->PIN = NULL;
 #endif
 
     *idopts = opts;
@@ -219,6 +224,11 @@ pkinit_dup_identity_opts(pkinit_identity_opts *src_opts,
 	if (newopts->cert_label == NULL)
 	    goto cleanup;
     }
+    if (src_opts->PIN != NULL) {
+	newopts->PIN = strdup(src_opts->PIN);
+	if (newopts->PIN == NULL)
+	    goto cleanup;
+    }
 #endif
 
 
@@ -255,6 +265,10 @@ pkinit_fini_identity_opts(pkinit_identity_opts *idopts)
 	free(idopts->cert_id_string);
     if (idopts->cert_label != NULL)
 	free(idopts->cert_label);
+    if (idopts->PIN != NULL) {
+	(void) memset(idopts->PIN, 0, strlen(idopts->PIN));
+	free(idopts->PIN);
+    }
 #endif
     free(idopts);
 }

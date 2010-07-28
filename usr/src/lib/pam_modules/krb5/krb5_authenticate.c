@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <security/pam_appl.h>
@@ -499,7 +498,7 @@ attempt_krb5_auth(
 		KRB5_TGS_NAME_SIZE,
 		KRB5_TGS_NAME
 	};
-	krb5_get_init_creds_opt opts;
+	krb5_get_init_creds_opt *opts = NULL;
 	krb5_kdc_rep *as_reply = NULL;
 	/*
 	 * "result" should not be assigned PAM_SUCCESS unless
@@ -514,8 +513,6 @@ attempt_krb5_auth(
 		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (auth): attempt_krb5_auth: start: user='%s'",
 		    user ? user : "<null>");
-
-	krb5_get_init_creds_opt_init(&opts);
 
 	/* need to free context with krb5_free_context */
 	if (code = krb5_init_secure_context(&kmd->kcontext)) {
@@ -632,35 +629,44 @@ attempt_krb5_auth(
 	} else
 		my_creds->times.renew_till = 0;
 
-	krb5_get_init_creds_opt_set_tkt_life(&opts, lifetime);
+	code = krb5_get_init_creds_opt_alloc(kmd->kcontext, &opts);
+	if (code != 0) {
+		__pam_log(LOG_AUTH | LOG_ERR,
+		    "Error allocating gic opts: %s",
+		    error_message(code));
+		result = PAM_SYSTEM_ERR;
+		goto out;
+	}
+
+	krb5_get_init_creds_opt_set_tkt_life(opts, lifetime);
 
 	if (proxiable_flag) { 		/* Set in config file */
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (auth): Proxiable tickets "
 			    "requested");
-		krb5_get_init_creds_opt_set_proxiable(&opts, TRUE);
+		krb5_get_init_creds_opt_set_proxiable(opts, TRUE);
 	}
 	if (forwardable_flag) {
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (auth): Forwardable tickets "
 			    "requested");
-		krb5_get_init_creds_opt_set_forwardable(&opts, TRUE);
+		krb5_get_init_creds_opt_set_forwardable(opts, TRUE);
 	}
 	if (renewable_flag) {
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (auth): Renewable tickets "
 			    "requested");
-		krb5_get_init_creds_opt_set_renew_life(&opts, rlife);
+		krb5_get_init_creds_opt_set_renew_life(opts, rlife);
 	}
 	if (no_address_flag) {
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (auth): Addressless tickets "
 			    "requested");
-		krb5_get_init_creds_opt_set_address_list(&opts, NULL);
+		krb5_get_init_creds_opt_set_address_list(opts, NULL);
 	}
 
 	/*
@@ -686,28 +692,30 @@ attempt_krb5_auth(
 			KRB5_PADATA_PK_AS_REQ,
 			KRB5_PADATA_PK_AS_REQ_OLD
 		};
-		krb5_get_init_creds_opt_set_preauth_list(&opts, pk_pa_list, 2);
+		krb5_get_init_creds_opt_set_preauth_list(opts, pk_pa_list, 2);
 
-		if (*krb5_pass == NULL) {
-			/* let preauth plugin prompt for PIN */
-			code = __krb5_get_init_creds_password(kmd->kcontext,
-			    my_creds,
-			    me,
-			    NULL, /* clear text passwd */
-			    pam_krb5_prompter, /* prompter */
-			    pamh, /* prompter data */
-			    0, /* start time */
-			    NULL, /* defaults to krbtgt@REALM */
-			    &opts,
-			    &as_reply);
+		if (*krb5_pass == NULL || strlen(*krb5_pass) != 0) {
+			if (*krb5_pass != NULL) {
+				/* treat the krb5_pass as a PIN */
+				code = krb5_get_init_creds_opt_set_pa(
+				    kmd->kcontext, opts, "PIN", *krb5_pass);
+			}
+
+			if (!code) {
+				code = __krb5_get_init_creds_password(
+				    kmd->kcontext,
+				    my_creds,
+				    me,
+				    NULL, /* clear text passwd */
+				    pam_krb5_prompter, /* prompter */
+				    pamh, /* prompter data */
+				    0, /* start time */
+				    NULL, /* defaults to krbtgt@REALM */
+				    opts,
+				    &as_reply);
+			}
 		} else {
-			/*
-			 * krb pkinit does not support setting the PIN so we
-			 * punt on trying to use krb5_pass as the PIN for now.
-			 * Note that once this is supported by pkinit the code
-			 * should make sure krb5_pass isn't empty and if it is
-			 * then that's an error.
-			 */
+			/* invalid PIN */
 			code = KRB5KRB_AP_ERR_BAD_INTEGRITY;
 		}
 	} else {
@@ -725,7 +733,7 @@ attempt_krb5_auth(
 				KRB5_PADATA_ENC_TIMESTAMP
 			};
 
-			krb5_get_init_creds_opt_set_preauth_list(&opts,
+			krb5_get_init_creds_opt_set_preauth_list(opts,
 			    pk_pa_list, 1);
 
 			/*
@@ -743,7 +751,7 @@ attempt_krb5_auth(
 			    NULL,	/* data */
 			    0,		/* start time */
 			    NULL,	/* defaults to krbtgt@REALM */
-			    &opts,
+			    opts,
 			    &as_reply);
 		}
 	}
@@ -951,6 +959,8 @@ out:
 		krb5_free_context(kmd->kcontext);
 		kmd->kcontext = NULL;
 	}
+	if (opts)
+		krb5_get_init_creds_opt_free(kmd->kcontext, opts);
 
 	if (kmd->debug)
 		__pam_log(LOG_AUTH | LOG_DEBUG,

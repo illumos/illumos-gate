@@ -304,14 +304,11 @@ usr/src/lib/krb5/plugins/kdb/ldap/libkdb_ldap/ldap_tkt_policy.c
 usr/src/lib/krb5/plugins/kdb/ldap/libkdb_ldap/ldap_tkt_policy.h
 usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_accessor.c
 usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_accessor.h
-usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_clnt.c
 usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_crypto.h
-usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_identity.c
 usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_lib.c
 usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_matching.c
 usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_profile.c
 usr/src/lib/krb5/plugins/preauth/pkinit/pkinit_srv.c
-usr/src/lib/krb5/plugins/preauth/pkinit/pkinit.h
 usr/src/lib/krb5/ss/copyright.h
 usr/src/lib/krb5/ss/mit-sipb-copyright.h
 usr/src/lib/krb5/ss/options.c

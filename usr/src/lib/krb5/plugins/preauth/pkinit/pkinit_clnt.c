@@ -28,6 +28,10 @@
  * SUCH DAMAGES.
  */
 
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -1472,6 +1476,11 @@ handle_gic_opt(krb5_context context,
 	    pkiDebug("Setting flag to use RSA_PROTOCOL\n");
 	    plgctx->opts->dh_or_rsa = RSA_PROTOCOL;
 	}
+    } else if (strcmp(attr, "PIN") == 0) {
+	/* Solaris Kerberos: handle our PIN attr */
+	plgctx->idopts->PIN = strdup(value);
+	if (plgctx->idopts->PIN == NULL)
+	    return ENOMEM;
     }
     return 0;
 }

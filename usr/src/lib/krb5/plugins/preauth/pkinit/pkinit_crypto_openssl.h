@@ -80,6 +80,7 @@ struct _pkinit_identity_crypto_context {
     CK_SLOT_ID slotid;
     char *token_label;
     char *cert_label;
+    char *PIN; /* Solaris Kerberos: */
     /* These are crypto-specific */
     void *p11_module;
     CK_SESSION_HANDLE session;

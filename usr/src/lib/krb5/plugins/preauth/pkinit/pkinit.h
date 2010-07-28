@@ -28,6 +28,10 @@
  * SUCH DAMAGES.
  */
 
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 #ifndef _PKINIT_H
 #define _PKINIT_H
 
@@ -196,6 +200,7 @@ typedef struct _pkinit_identity_opts {
     char *token_label;
     char *cert_id_string;
     char *cert_label;
+    char *PIN; /* Solaris Kerberos */
 #endif
 } pkinit_identity_opts;
 

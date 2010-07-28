@@ -769,6 +769,7 @@ pkinit_init_pkcs11(pkinit_identity_crypto_context ctx)
     ctx->slotid = PK_NOSLOT;
     ctx->token_label = NULL;
     ctx->cert_label = NULL;
+    ctx->PIN = NULL;
     ctx->session = CK_INVALID_HANDLE;
     ctx->p11 = NULL;
     ctx->p11flags = 0; /* Solaris Kerberos */
@@ -811,6 +812,10 @@ pkinit_fini_pkcs11(pkinit_identity_crypto_context ctx)
 	free(ctx->cert_id);
     if (ctx->cert_label != NULL)
 	free(ctx->cert_label);
+    if (ctx->PIN != NULL) {
+	(void) memset(ctx->PIN, 0, strlen(ctx->PIN));
+	free(ctx->PIN);
+    }
 #endif
 }
 
@@ -3363,6 +3368,10 @@ pkinit_C_UnloadModule(void *handle)
     return CKR_OK;
 }
 
+/*
+ * Solaris Kerberos: this function was changed to support a PIN being passed
+ * in.  If that is the case the user will not be prompted for their PIN.
+ */
 static krb5_error_code
 pkinit_login(krb5_context context,
 	     pkinit_identity_crypto_context id_cryptoctx,
@@ -3378,6 +3387,15 @@ pkinit_login(krb5_context context,
     if (tip->flags & CKF_PROTECTED_AUTHENTICATION_PATH) {
 	rdat.data = NULL;
 	rdat.length = 0;
+    } else if (id_cryptoctx->PIN != NULL) {
+	if ((rdat.data = strdup(id_cryptoctx->PIN)) == NULL)
+	    return (ENOMEM);
+	/*
+	 * Don't include NULL string terminator in length calculation as this
+	 * PIN is passed to the C_Login function and only the text chars should
+	 * be considered to be the PIN.
+	 */
+	rdat.length = strlen(id_cryptoctx->PIN);
     } else {
         unsigned char *lastnonwspc, *iterp; /* Solaris Kerberos - trim token label */
         int count;
@@ -3409,8 +3427,12 @@ pkinit_login(krb5_context context,
 	    (void) strlcat(prompt, gettext(" (Warning: PIN final try)"), prompt_len);
 	else if (tip->flags & CKF_USER_PIN_COUNT_LOW)
 	    (void) strlcat(prompt, gettext(" (Warning: PIN count low)"), prompt_len);
-	rdat.data = (char *)malloc(tip->ulMaxPinLen + 2);
+	rdat.data = malloc(tip->ulMaxPinLen + 2);
 	rdat.length = tip->ulMaxPinLen + 1;
+	/*
+	 * Note that the prompter function will set rdat.length such that the
+	 * NULL terminator is not included
+	 */
 
 	kprompt.prompt = prompt;
 	kprompt.hidden = 1;
@@ -3421,7 +3443,7 @@ pkinit_login(krb5_context context,
 	k5int_set_prompt_types(context, &prompt_type);
 	r = (*id_cryptoctx->prompter)(context, id_cryptoctx->prompter_data,
 		NULL, NULL, 1, &kprompt);
-	k5int_set_prompt_types(context, 0);
+	k5int_set_prompt_types(context, NULL);
 	free(prompt);
     }
 
@@ -3441,8 +3463,10 @@ pkinit_login(krb5_context context,
             id_cryptoctx->p11flags |= C_LOGIN_DONE;
         }
     }
-    if (rdat.data)
+    if (rdat.data) {
+	(void) memset(rdat.data, 0, rdat.length);
 	free(rdat.data);
+    }
 
     return r;
 }
@@ -4105,27 +4129,33 @@ pkinit_get_certs_pkcs12(krb5_context context,
 
 	pkiDebug("Initial PKCS12_parse with no password failed\n");
 
-	(void) memset(prompt_reply, '\0', sizeof(prompt_reply));
-	rdat.data = prompt_reply;
-	rdat.length = sizeof(prompt_reply);
+	if (id_cryptoctx->PIN != NULL) {
+		/* Solaris Kerberos: use PIN if set */
+		rdat.data = id_cryptoctx->PIN;
+		/* note rdat.length isn't needed in this case */
+	} else {
+		(void) memset(prompt_reply, '\0', sizeof(prompt_reply));
+		rdat.data = prompt_reply;
+		rdat.length = sizeof(prompt_reply);
 
-	r = snprintf(prompt_string, sizeof(prompt_string), "%s %s",
-		     prompt_prefix, idopts->cert_filename);
-	if (r >= sizeof(prompt_string)) {
-	    pkiDebug("Prompt string, '%s %s', is too long!\n",
-		     prompt_prefix, idopts->cert_filename);
-	    goto cleanup;
+		r = snprintf(prompt_string, sizeof(prompt_string), "%s %s",
+			     prompt_prefix, idopts->cert_filename);
+		if (r >= sizeof(prompt_string)) {
+		    pkiDebug("Prompt string, '%s %s', is too long!\n",
+			     prompt_prefix, idopts->cert_filename);
+		    goto cleanup;
+		}
+		kprompt.prompt = prompt_string;
+		kprompt.hidden = 1;
+		kprompt.reply = &rdat;
+		prompt_type = KRB5_PROMPT_TYPE_PREAUTH;
+
+		/* PROMPTER_INVOCATION */
+		k5int_set_prompt_types(context, &prompt_type);
+		r = (*id_cryptoctx->prompter)(context, id_cryptoctx->prompter_data,
+					      NULL, NULL, 1, &kprompt);
+		k5int_set_prompt_types(context, NULL);
 	}
-	kprompt.prompt = prompt_string;
-	kprompt.hidden = 1;
-	kprompt.reply = &rdat;
-	prompt_type = KRB5_PROMPT_TYPE_PREAUTH;
-
-	/* PROMPTER_INVOCATION */
-	k5int_set_prompt_types(context, &prompt_type);
-	r = (*id_cryptoctx->prompter)(context, id_cryptoctx->prompter_data,
-				      NULL, NULL, 1, &kprompt);
-	k5int_set_prompt_types(context, 0);
 
 	ret = PKCS12_parse(p12, rdat.data, &y, &x, NULL);
 	if (ret == 0) {
@@ -4387,6 +4417,11 @@ pkinit_get_certs_pkcs11(krb5_context context,
     if (idopts->cert_label != NULL) {
 	id_cryptoctx->cert_label = strdup(idopts->cert_label);
 	if (id_cryptoctx->cert_label == NULL)
+	    return ENOMEM;
+    }
+    if (idopts->PIN != NULL) {
+	id_cryptoctx->PIN = strdup(idopts->PIN);
+	if (id_cryptoctx->PIN == NULL)
 	    return ENOMEM;
     }
     /* Convert the ascii cert_id string into a binary blob */
