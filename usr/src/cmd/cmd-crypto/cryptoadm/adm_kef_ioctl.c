@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <fcntl.h>
@@ -31,6 +30,7 @@
 #include <locale.h>
 #include <libgen.h>
 #include <sys/types.h>
+#include <sys/varargs.h>
 #include <zone.h>
 #include <sys/crypto/ioctladmin.h>
 #include "cryptoadm.h"
@@ -38,7 +38,43 @@
 #define	DEFAULT_DEV_NUM 5
 #define	DEFAULT_SOFT_NUM 10
 
+#define	NUM_FIPS_SW_PROV	\
+	(sizeof (fips_sw_providers) / sizeof (char *))
+
+static char *fips_sw_providers[] = {
+	"des",
+	"aes",
+	"ecc",
+	"sha1",
+	"sha2",
+	"rsa",
+	"swrand"
+};
+
 static crypto_get_soft_info_t *setup_get_soft_info(char *, int);
+
+static void
+fips_sw_printf(const char *format, ...)
+{
+	va_list	ap;
+	char	message[1024];
+	int	i;
+
+	va_start(ap, format);
+	(void) snprintf(message, sizeof (message), format, ap);
+	va_end(ap);
+
+	(void) printf(gettext("\nUser-level providers:\n"));
+	(void) printf(gettext("=====================\n"));
+	(void) printf(gettext("/usr/lib/security/$ISA/pkcs11_softtoken: %s\n"),
+	    message);
+	(void) printf(gettext("\nKernel software providers:\n"));
+	(void) printf(gettext("==========================\n"));
+	for (i = 0; i < NUM_FIPS_SW_PROV; i++) {
+		(void) printf(gettext("%s: %s\n"),
+		    fips_sw_providers[i], message);
+	}
+}
 
 /*
  * Prepare the argument for the LOAD_SOFT_CONFIG ioctl call for the
@@ -623,11 +659,9 @@ do_fips_actions(int action, int caller)
 
 	if (action == FIPS140_STATUS) {
 		if (pkcs11_fips_mode == CRYPTO_FIPS_MODE_ENABLED)
-			(void) printf(gettext(
-			    "\tFIPS-140 mode is enabled.\n"));
+			fips_sw_printf(gettext("FIPS-140 mode is enabled."));
 		else
-			(void) printf(gettext(
-			    "\tFIPS-140 mode is disabled.\n"));
+			fips_sw_printf(gettext("FIPS-140 mode is disabled."));
 		return (SUCCESS);
 	}
 
@@ -635,17 +669,15 @@ do_fips_actions(int action, int caller)
 		/* Is it a duplicate operation? */
 		if ((action == FIPS140_ENABLE) &&
 		    (pkcs11_fips_mode == CRYPTO_FIPS_MODE_ENABLED)) {
-			cryptoerror(LOG_STDERR,
-			    gettext("FIPS-140 mode has already "
-			    "been enabled.\n"));
+			fips_sw_printf(gettext("FIPS-140 mode has already "
+			    "been enabled."));
 			return (FAILURE);
 		}
 
 		if ((action == FIPS140_DISABLE) &&
 		    (pkcs11_fips_mode == CRYPTO_FIPS_MODE_DISABLED)) {
-			cryptoerror(LOG_STDERR,
-			    gettext("FIPS-140 mode has already "
-			    "been disabled.\n"));
+			fips_sw_printf(gettext("FIPS-140 mode has already "
+			    "been disabled."));
 			return (FAILURE);
 		}
 
@@ -657,17 +689,13 @@ do_fips_actions(int action, int caller)
 
 		/* No need to inform kernel */
 		if (action == FIPS140_ENABLE) {
-			(void) printf(gettext(
-			    "FIPS-140 mode was enabled successfully.\n"));
+			fips_sw_printf(gettext("FIPS-140 mode was enabled "
+			    "successfully."));
 		} else {
-			(void) printf(gettext(
-			    "FIPS-140 mode was disabled successfully.\n"));
+			fips_sw_printf(gettext("FIPS-140 mode was disabled "
+			    "successfully."));
 		}
 
-		(void) printf(gettext(
-		    "The FIPS-140 mode has changed.\n"));
-		(void) printf(gettext(
-		    "The system will require a reboot.\n\n"));
 		return (SUCCESS);
 
 	}

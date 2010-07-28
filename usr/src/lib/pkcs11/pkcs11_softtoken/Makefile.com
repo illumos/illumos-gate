@@ -79,7 +79,8 @@ RNG_COBJECTS = fips_random.o
 FIPS_COBJECTS = fips_aes_util.o fips_des_util.o \
 		fips_sha1_util.o fips_sha2_util.o \
 		fips_dsa_util.o fips_rsa_util.o \
-		fips_ecc_util.o fips_random_util.o
+		fips_ecc_util.o fips_random_util.o \
+		fips_test_vectors.o
 
 ECC_OBJECTS = $(ECC_COBJECTS) $(ECC_PSR_OBJECTS)
 MPI_OBJECTS = $(MPI_COBJECTS) $(MPI_PSR_OBJECTS)

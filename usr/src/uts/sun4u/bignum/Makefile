@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the misc/bignum module.
 #
@@ -31,6 +29,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
+CRYPTODIR = $(COMMONBASE)/crypto
 COM1_DIR = $(COMMONBASE)/bignum
 
 #
@@ -56,14 +55,14 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy
+LDFLAGS += -dy -Nmisc/kcf
 
 #
 # lint pass one enforcement
 #
-CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR)
+CFLAGS		+= $(CCVERBOSE) -I$(CRYPTODIR) -I$(COM1_DIR)
 CFLAGS		+= -DUMUL64 -DUSE_FLOATING_POINT
-LINTFLAGS	+= -I$(COM1_DIR)
+LINTFLAGS	+= -I$(CRYPTODIR) -I$(COM1_DIR)
 
 #
 #	Default build targets.

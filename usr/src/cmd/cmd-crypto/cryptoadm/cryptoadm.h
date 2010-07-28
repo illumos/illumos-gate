@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_CRYPTOADM_H
@@ -39,6 +38,10 @@ extern "C" {
 #define	TMPFILE_TEMPLATE	"/etc/crypto/admXXXXXX"
 
 #define	ERROR_USAGE	2
+
+#define	HW_PROVIDER_NCP		1
+#define	HW_PROVIDER_N2CP	2
+#define	HW_PROVIDER_N2RNG	3
 
 /*
  * Common keywords and delimiters for pkcs11.conf and kcf.conf files are
@@ -177,6 +180,9 @@ extern int list_metaslot_policy();
 extern int disable_metaslot(mechlist_t *, boolean_t, boolean_t);
 extern int enable_metaslot(char *, char *, boolean_t, mechlist_t *, boolean_t,
     boolean_t);
+
+/* adm_hw */
+extern int do_fips_hw_actions(int, int);
 
 #ifdef __cplusplus
 }

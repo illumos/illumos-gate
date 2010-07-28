@@ -19,56 +19,52 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#ifndef _SYS_CRYPTO_FIPS_H
+#define	_SYS_CRYPTO_FIPS_H
 
-#include <sys/types.h>
-#include <sys/systm.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef  _KERNEL
+#include <sys/elf.h>
 #include <sys/modctl.h>
-#include <sys/cmn_err.h>
+#include <sys/kobj.h>
+#include <sys/kmem.h>
+#include <sys/sha1.h>
 #include <sys/ddi.h>
-#include <fips/fips_checksum.h>
+#else
+#include <ctype.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <libelf.h>
+#include <gelf.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sha1.h>
+#include <sys/elf_SPARC.h>
+#endif
 
-extern struct mod_ops mod_cryptoops;
 
-/*
- * Module linkage information for the kernel.
- */
-static struct modlmisc modlmisc = {
-	&mod_miscops, "bignum utility module"
-};
+#define	FAILURE -1
+#define	SUCCESS 0
 
-static struct modlinkage modlinkage = {
-	MODREV_1, (void *)&modlmisc, NULL
-};
+#ifdef  _KERNEL
+extern int	fips_calc_checksum(struct _buf *, Elf64_Ehdr *, char *);
+extern int	fips_check_module(char *modname, void *_initaddr);
+#else
+extern int	fips_read_file(int, char *, int, int);
+extern int	fips_calc_checksum(int, Elf64_Ehdr *, char *);
+#endif
 
 
-int
-_init(void)
-{
-	return (mod_install(&modlinkage));
+#ifdef __cplusplus
 }
+#endif
 
-int
-_fini(void)
-{
-	return (mod_remove(&modlinkage));
-}
-
-int
-_info(struct modinfo *modinfop)
-{
-	return (mod_info(&modlinkage, modinfop));
-}
-
-int
-bignum_fips_check()
-{
-	if (fips_check_module("misc/bignum", (void *)_init) != 0) {
-		cmn_err(CE_WARN, "bignum: FIPS-140 Software Integrity Test "
-		    "failed");
-		return (EINVAL);
-	}
-	return (0);
-}
+#endif /* _SYS_CRYPTO_FIPS_H */

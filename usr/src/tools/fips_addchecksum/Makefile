@@ -18,31 +18,26 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
 #
 
-PROG = cryptoadm
+CRYPTODIR = $(SRC)/common/crypto
 
-OBJS =  cryptoadm.o \
-	adm_uef.o \
-	adm_kef.o \
-	adm_kef_ioctl.o \
-	adm_kef_util.o \
-	adm_fips_hw.o \
-	adm_util.o \
-	start_stop.o \
-	adm_metaslot.o
+PROG = fips_addchecksum
+OBJS = fips_addchecksum.o fips_checksum.o
+SRCS = $(OBJS:.o=.c) 
+LINTFILES = $(OBJS:.o=.ln)
 
-SRCS = $(OBJS:.o=.c)
+include ../Makefile.tools
 
-include ../../Makefile.cmd 
+INCS += -I $(CRYPTODIR)
 
-POFILES = $(OBJS:%.o=%.po)
-POFILE = $(PROG)_all.po
+CFLAGS += $(CCVERBOSE)	$(INCS)
+LINTFLAGS += $(INCS)
 
-CFLAGS += $(CCVERBOSE)
-
-LDLIBS += -lcryptoutil
+LDLIBS += -lmd -lelf
 
 .KEEP_STATE:
 
@@ -52,16 +47,19 @@ $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(DYNFLAGS)
 	$(POST_PROCESS)
 
-$(POFILE): $(POFILES)
-	$(RM) $@; cat $(POFILES) > $@
+%.o:	$(CRYPTODIR)/fips/%.c
+	$(COMPILE.c) $(CFLAGS) -o $@ -c $<
 
-install: all $(ROOTSBINPROG)
-	$(RM) $(ROOTUSRSBINPROG)
-	-$(SYMLINK) ../../sbin/$(PROG) $(ROOTUSRSBINPROG)
+
+install: all $(ROOTPROG)
 
 clean:
-	$(RM) -f $(OBJS) $(PROG)
+	$(RM) -f $(OBJS) $(PROG) $(LINTFILES)
 
-lint:   lint_SRCS
+%.ln:	$(CRYPTODIR)/fips/%.c
+	$(LINT.c) -c $<
 
-include ../../Makefile.targ
+lint:	$(LINTFILES)
+	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
+
+include $(SRC)/cmd/Makefile.targ

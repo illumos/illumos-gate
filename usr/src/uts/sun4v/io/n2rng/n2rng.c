@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -48,6 +47,7 @@
 #include <sys/machsystm.h>
 #include <sys/hypervisor_api.h>
 #include <sys/n2rng.h>
+#include <fips/fips_checksum.h>
 
 static int	n2rng_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	n2rng_detach(dev_info_t *, ddi_detach_cmd_t);
@@ -298,6 +298,17 @@ n2rng_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    (void *)n2rng, DDI_SLEEP) != DDI_SUCCESS) {
 		n2rng_diperror(dip, "ddi_taskq_dispatch() failed");
 		goto errorexit;
+	}
+
+	if (n2rng->n_is_fips == B_TRUE) {
+		/*
+		 * FIPs Post test: Feed the known seed and make sure it
+		 * produces the known random number.
+		 */
+		if (n2rng_fips_rng_post() != CRYPTO_SUCCESS) {
+			n2rng_diperror(dip, "n2rng: FIPs POST test failed\n");
+			goto errorexit;
+		}
 	}
 
 	return (DDI_SUCCESS);
@@ -1065,6 +1076,11 @@ n2rng_init_ctl(n2rng_t *n2rng)
 	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "hc_seconds",
 	    RNG_DEFAULT_HC_SECS);
 
+	/* get fips configuration : FALSE by default */
+	n2rng->n_is_fips = ddi_getprop(DDI_DEV_T_ANY, n2rng->n_dip,
+	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS,
+	    N2RNG_FIPS_STRING, B_FALSE);
+
 	/* API versions prior to 2.0 do not support health checks */
 	if ((n2rng->n_hvapi_major_version < 2) &&
 	    (n2rng->n_ctl_data->n_hc_secs > 0)) {
@@ -1073,6 +1089,16 @@ n2rng_init_ctl(n2rng_t *n2rng)
 		    n2rng->n_hvapi_major_version,
 		    n2rng->n_hvapi_minor_version);
 		n2rng->n_ctl_data->n_hc_secs = 0;
+	}
+
+
+	if (n2rng->n_is_fips == B_TRUE) {
+		/* When in FIPs mode, run the module integrity test */
+		if (fips_check_module("drv/n2rng", (void *)_init) != 0) {
+			cmn_err(CE_WARN, "n2rng: FIPs Software Integrity Test "
+			    "failed\n");
+			return (DDI_FAILURE);
+		}
 	}
 
 	/* Calculate watchdog timeout value */
