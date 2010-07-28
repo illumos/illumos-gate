@@ -44,6 +44,7 @@
 /* Solaris Kerberos */
 #include <libintl.h>
 #include "k5-int.h"
+#include <ctype.h>
 
 /*
  * Q: What is this SILLYDECRYPT stuff about?
@@ -3476,7 +3477,6 @@ pkinit_open_session(krb5_context context,
 		    pkinit_identity_crypto_context cctx)
 {
     int i, r;
-    unsigned char *cp;
     CK_ULONG count = 0;
     CK_SLOT_ID_PTR slotlist;
     CK_TOKEN_INFO tinfo;
@@ -3538,14 +3538,40 @@ pkinit_open_session(krb5_context context,
 	    pkiDebug("C_GetTokenInfo: %s\n", pkinit_pkcs11_code_to_text(r));
 	    return KRB5KDC_ERR_PREAUTH_FAILED;
 	}
-	for (cp = tinfo.label + sizeof (tinfo.label) - 1;
-	     *cp == '\0' || *cp == ' '; cp--)
-	    *cp = '\0';
-	pkiDebug("open_session: slotid %d token \"%s\"\n",
-		 (int) slotlist[i], tinfo.label);
-	if (cctx->token_label == NULL ||
-	    !strcmp((char *) cctx->token_label, (char *) tinfo.label))
+
+	if (cctx->token_label == NULL) {
+	    /* nothing to compare to assume this is the right token */
 	    break;
+	} else {
+	    /* + 1 so tokenlabelstr can be \0 terminated */
+	    char tokenlabelstr[sizeof (tinfo.label) + 1];
+	    int j;
+
+	    /*
+	     * Convert token label into C string with trailing white space trimmed.
+	     * Note, a token label is not a \0 terminated string.
+	     */
+	    /*
+	     * \0 terminate tokenlabelstr in case the last char in the token
+	     * label is non-whitespace
+	     */ 
+	    tokenlabelstr[sizeof (tokenlabelstr) - 1] = '\0';
+	    (void) memcpy(tokenlabelstr, (char *) tinfo.label, sizeof (tinfo.label));
+	    /* init j so it skips the \0 terminator */
+	    for (j = sizeof (tinfo.label) - 1; j >= 0; j--) {
+		if (isblank(tokenlabelstr[j]))
+		    tokenlabelstr[j] = '\0';
+		else
+		    break;
+	    }
+
+	    pkiDebug("open_session: slotid %d token found: \"%s\", "
+		     "cctx->token_label: \"%s\"\n",
+		     slotlist[i], tokenlabelstr, (char *) cctx->token_label);
+	    if (!strcmp(cctx->token_label, tokenlabelstr)) {
+		break;
+	    }
+	}
 	cctx->p11->C_CloseSession(cctx->session);
     }
     if (i >= count) {
