@@ -18,30 +18,12 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # psm/stand/bootblks/ufs/sparc/Makefile
 #
 
 BASEDIR = ../..
-
-include $(BASEDIR)/Makefile.com
-
-#
-# This program is used to install the boot block
-#
-INSTALLBOOT		= installboot
-
-USR			= $(ROOT)/usr
-USR_SBIN		= $(USR)/sbin
-USR_SBIN_INSTALLBOOT	= $(USR_SBIN)/$(INSTALLBOOT)
-
-#
-# Overrides for installing installboot.
-#
-INS.file.555		= $(RM) $@; $(INS) -s -m 555 -f $(@D) $<
-
 
 SUBDIRS	= sun4u sun4v
 
@@ -53,30 +35,9 @@ lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-all: $(INSTALLBOOT) $(SUBDIRS)
-
-install: $(USR_SBIN_INSTALLBOOT) $(SUBDIRS)
-
-lint clean: $(SUBDIRS)
-
-clobber: $(SUBDIRS)
-	-$(RM) $(INSTALLBOOT)
+all install lint clean clobber: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-#
-# install rules
-#
-$(USR_SBIN)/%:	% $(USR_SBIN)
-	$(INS.file.555)
-
-#
-# Pattern matching rules for source in this directory
-#
-%: %.sh
-	$(RM) $@
-	cat $< > $@
-	chmod +x $@

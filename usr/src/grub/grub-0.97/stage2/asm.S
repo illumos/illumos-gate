@@ -108,17 +108,16 @@ VARIABLE(config_file)
 	 *  Leave some breathing room for the config file name.
 	 */
 
-	. = EXT_C(main) + 0x5f
-VARIABLE(ext_info)
-	.byte 0xEE
-VARIABLE(md5hash)
-	.quad	0xAAAAAAAACCCCCCCC, 0xBBBBBBBBBBBBBBBB
-VARIABLE(pkg_version)
-	.byte 0
+	. = EXT_C(main) + 0x60
+VARIABLE(fake_mboot)
+	.long	0x1BADB002
+	.long   0x00010003 
+	.long	-0x1BAEB005	
 	/* 
-	 * installgrub will place the pkg_version here
+	 * installgrub will place the rest of the fake 
+	 * multiboot header here.
 	 */
-	.= EXT_C(main) + 0x110
+	.= EXT_C(main) + 0x140
 /* the real mode code continues... */
 codestart:
 	cli		/* we're not safe here! */

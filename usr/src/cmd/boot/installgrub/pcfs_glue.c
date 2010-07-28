@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -37,7 +36,7 @@
 /*
  * This file is glue layer to pcfs module in usr/src/common/fs/pcfs.c.
  * It's main functionality is to get the stage file blocklist. It's
- * used for installing grub on floppy and Solaris boot partition.
+ * used for installing grub on a Solaris boot partition.
  */
 extern struct boot_fs_ops bpcfs_ops;
 struct boot_fs_ops *bfs_ops;
@@ -141,25 +140,25 @@ unmountroot()
 }
 
 static int
-floppy_open(const char *filename, int flags)
+pcfs_glue_open(const char *filename, int flags)
 {
 	return (BRD_OPEN(bfs_ops, (char *)filename, flags));
 }
 
 static int
-floppy_close(int fd)
+pcfs_glue_close(int fd)
 {
 	return (BRD_CLOSE(bfs_ops, fd));
 }
 
 static ssize_t
-floppy_read(int fd, void *buf, size_t size)
+pcfs_glue_read(int fd, void *buf, size_t size)
 {
 	return (BRD_READ(bfs_ops, fd, buf, size));
 }
 
 static off_t
-floppy_lseek(int fd, off_t addr, int whence)
+pcfs_glue_lseek(int fd, off_t addr, int whence)
 {
 	return (BRD_SEEK(bfs_ops, fd, addr, whence));
 }
@@ -180,7 +179,7 @@ read_stage2_blocklist(int device_fd, unsigned int *blkbuf)
 		return (-1);
 	}
 
-	if ((fd = floppy_open("/boot/grub/stage2", 0)) == -1) {
+	if ((fd = pcfs_glue_open("/boot/grub/stage2", 0)) == -1) {
 		fprintf(stderr, OPEN_FAIL_PCFS);
 		return (-1);
 	}
@@ -191,13 +190,13 @@ read_stage2_blocklist(int device_fd, unsigned int *blkbuf)
 	blocklist = blkbuf;
 	fileread_callback = add_stage2_block;
 	for (;;) {
-		size = floppy_read(fd, buf, DEV_BSIZE);
+		size = pcfs_glue_read(fd, buf, DEV_BSIZE);
 		if (size != DEV_BSIZE)
 			break;
 		stage2_block++;
 	}
 	fileread_callback = NULL;
-	(void) floppy_close(fd);
+	(void) pcfs_glue_close(fd);
 
 	if (bootrd_debug) {
 		(void) printf("last block size = %d\n", size);

@@ -18,41 +18,28 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # 
 
-PROG= installgrub
+PROG= installboot
 
-PCFS_SRC= $(SRC)/common/fs/pcfs.c
 EINFO_SRC= ./../common/bblk_einfo.c
 UTILS_SRC =./../common/boot_utils.c
 EXTRA_SRC =./../common/mboot_extra.c
 
-OBJS= installgrub.o pcfs_glue.o pcfs.o bblk_einfo.o boot_utils.o mboot_extra.o
-SRCS= installgrub.c pcfs_glue.c $(PCFS_SRC) $(UTILS_SRC) $(EINFO_SRC) \
-	$(EXTRA_SRC)
-SBINLINKS= $(PROG)
+OBJS= installboot.o bblk_einfo.o  boot_utils.o mboot_extra.o
+SRCS= installboot.c $(UTILS_SRC) $(EINFO_SRC) $(EXTRA_SRC)
 
 include ../Makefile.com
 
-CPPFLAGS += -I$(SRC)/uts/i86pc -I$(SRC)/uts/intel -I$(SRC)/uts/common
+CPPFLAGS += -I$(SRC)/uts/common
 
 LDLIBS += -lmd5
 
-i386_CFLAGS += -D_LARGEFILE64_SOURCE
-i386_CFLAGS += -D_FILE_OFFSET_BITS=64
-
-LDLIBS += -lfdisk
-
-LINTFLAGS += \
-	-erroff=E_BAD_PTR_CAST_ALIGN \
-	-erroff=E_STATIC_UNUSED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED2 \
-	-xerroff=E_NAME_DEF_NOT_USED2
-
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
+
+LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 
@@ -61,11 +48,6 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
-
-
-# pick pcfs from usr/src/common/fs
-pcfs.o:	$(PCFS_SRC)
-	$(COMPILE.c) -o $@ $(PCFS_SRC)
 
 boot_utils.o:	$(UTILS_SRC)
 		$(COMPILE.c) -o $@ $(UTILS_SRC)
@@ -76,7 +58,7 @@ mboot_extra.o:	$(EXTRA_SRC)
 bblk_einfo.o:	$(EINFO_SRC)
 		$(COMPILE.c) -o $@ $(EINFO_SRC)
 
-install: all $(ROOTSBINPROG) .WAIT $(ROOTUSRSBINLINKS)
+install: all $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) $(OBJS)

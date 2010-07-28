@@ -17,10 +17,6 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 /*
  *  Generic defines to use anywhere
@@ -534,7 +530,6 @@ struct vbe_mode
   unsigned char reserved3[189];
 } __attribute__ ((packed));
 
-
 #undef NULL
 #define NULL         ((void *) 0)
 
@@ -607,8 +602,6 @@ extern char version_string[];
 extern char config_file[];
 extern char *bootfile;
 extern configfile_origin_t configfile_origin;
-extern unsigned char md5hash[];
-extern char pkg_version[];
 extern unsigned long linux_text_len;
 extern char *linux_data_tmp_addr;
 extern char *linux_data_real_addr;
