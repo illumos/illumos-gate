@@ -479,10 +479,8 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		    target->target_num);
 		pwp->targets[target->target_num] = NULL;
 		target->target_num = PMCS_INVALID_TARGET_NUM;
-		/*
-		 * If the target still has a PHY pointer, break the linkage
-		 */
-		if (phyp) {
+		/* If the PHY has a pointer to this target, clear it */
+		if (phyp && (phyp->target == target)) {
 			phyp->target = NULL;
 		}
 		target->phy = NULL;
@@ -1427,7 +1425,8 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		    (void *)tgt, tgt->target_num);
 		pwp->targets[tgt->target_num] = NULL;
 		tgt->target_num = PMCS_INVALID_TARGET_NUM;
-		if (phyp) {
+		/* If the PHY has a pointer to this target, clear it */
+		if (phyp && (phyp->target == tgt)) {
 			phyp->target = NULL;
 		}
 		tgt->phy = NULL;
@@ -3195,6 +3194,14 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port, boolean_t alloc_tgt)
 			}
 		}
 
+		/*
+		 * Set this target pointer back up, since it's been
+		 * through pmcs_clear_xp().
+		 */
+		tgt->dev_gone = 0;
+		tgt->assigned = 1;
+		tgt->dtype = phyp->dtype;
+		tgt->dev_state = PMCS_DEVICE_STATE_OPERATIONAL;
 		tgt->phy = phyp;
 		phyp->target = tgt;
 

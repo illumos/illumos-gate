@@ -6820,14 +6820,6 @@ pmcs_clear_xp(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp, "%s: Device 0x%p is gone.",
 	    __func__, (void *)xp);
 
-	/*
-	 * Clear the dip now.  This keeps pmcs_remove_device from attempting
-	 * to call us on the same device while we're still flushing queues.
-	 * The only side effect is we can no longer update SM-HBA properties,
-	 * but this device is going away anyway, so no matter.
-	 */
-	xp->dip = NULL;
-	xp->smpd = NULL;
 	xp->special_running = 0;
 	xp->recovering = 0;
 	xp->recover_wait = 0;
