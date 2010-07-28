@@ -2754,6 +2754,7 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 		{
 			mpapi_lu_data_t	*lu;
 			scsi_vhci_lun_t	*svl = res;
+			client_lb_t	lb_policy;
 			/*
 			 * We cant use ddi_get_instance(svl->svl_dip) at this
 			 * point because the dip is not yet in DS_READY state.
@@ -2788,14 +2789,19 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			    ((VHCI_CONF_FLAGS_AUTO_FAILBACK & vhci->
 			    vhci_conf_flags) ? 1 : 0);
 
-			if (svl->svl_lb_policy_save == LOAD_BALANCE_NONE) {
+			/*
+			 * Retrieve current load balance policy from mdi client.
+			 * Both client and client's dip should already exist
+			 * here and the client should be initialized.
+			 */
+			lb_policy = mdi_get_lb_policy(svl->svl_dip);
+			if (lb_policy == LOAD_BALANCE_NONE) {
 				lu->prop.currentLoadBalanceType =
 				    MP_DRVR_LOAD_BALANCE_TYPE_NONE;
-			} else if (svl->svl_lb_policy_save == LOAD_BALANCE_RR) {
+			} else if (lb_policy == LOAD_BALANCE_RR) {
 				lu->prop.currentLoadBalanceType =
 				    MP_DRVR_LOAD_BALANCE_TYPE_ROUNDROBIN;
-			} else if (svl->svl_lb_policy_save ==
-			    LOAD_BALANCE_LBA) {
+			} else if (lb_policy == LOAD_BALANCE_LBA) {
 				lu->prop.currentLoadBalanceType =
 				    MP_DRVR_LOAD_BALANCE_TYPE_LBA_REGION;
 			} else {

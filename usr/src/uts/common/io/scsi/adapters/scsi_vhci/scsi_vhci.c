@@ -1117,13 +1117,16 @@ vhci_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	struct scsi_vhci_lun	*vlun = ADDR2VLUN(ap);
 	struct vhci_pkt		*vpkt = TGTPKT2VHCIPKT(pkt);
 	int			flags = 0;
-	scsi_vhci_priv_t	*svp;
+	scsi_vhci_priv_t	*svp, *svp_resrv;
 	dev_info_t 		*cdip;
 	client_lb_t		lbp;
 	int			restore_lbp = 0;
 	/* set if pkt is SCSI-II RESERVE cmd */
 	int			pkt_reserve_cmd = 0;
 	int			reserve_failed = 0;
+	int			resrv_instance = 0;
+	mdi_pathinfo_t		*pip;
+	struct scsi_pkt		*rel_pkt;
 
 	ASSERT(vhci != NULL);
 	ASSERT(vpkt != NULL);
@@ -1204,15 +1207,27 @@ vhci_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			}
 			restore_lbp = 1;
 		}
+
+		VHCI_DEBUG(2, (CE_NOTE, vhci->vhci_dip,
+		    "!vhci_scsi_start: sending SCSI-2 RESERVE, vlun 0x%p, "
+		    "svl_resrv_pip 0x%p, svl_flags: %x, lb_policy %x",
+		    (void *)vlun, (void *)vlun->svl_resrv_pip, vlun->svl_flags,
+		    mdi_get_lb_policy(cdip)));
+
 		/*
 		 * See comments for VLUN_RESERVE_ACTIVE_FLG in scsi_vhci.h
 		 * To narrow this window where a reserve command may be sent
 		 * down an inactive path the path states first need to be
-		 * updated. Before calling vhci_update_pathstates reset
+		 * updated.  Before calling vhci_update_pathstates reset
 		 * VLUN_RESERVE_ACTIVE_FLG, just in case it was already set
 		 * for this lun.  This shall prevent an unnecessary reset
-		 * from being sent out.
+		 * from being sent out.  Also remember currently reserved path
+		 * just for a case the new reservation will go to another path.
 		 */
+		if (vlun->svl_flags & VLUN_RESERVE_ACTIVE_FLG) {
+			resrv_instance = mdi_pi_get_path_instance(
+			    vlun->svl_resrv_pip);
+		}
 		vlun->svl_flags &= ~VLUN_RESERVE_ACTIVE_FLG;
 		vhci_update_pathstates((void *)vlun);
 	}
@@ -1300,6 +1315,81 @@ pkt_cleanup:
 			sema_v(&vlun->svl_pgr_sema);
 		}
 		return (TRAN_BUSY);
+	}
+
+	if ((resrv_instance != 0) && (resrv_instance !=
+	    mdi_pi_get_path_instance(vpkt->vpkt_path))) {
+		/*
+		 * This is an attempt to reserve vpkt->vpkt_path.  But the
+		 * previously reserved path referred by resrv_instance might
+		 * still be reserved.  Hence we will send a release command
+		 * there in order to avoid a reservation conflict.
+		 */
+		VHCI_DEBUG(1, (CE_NOTE, vhci->vhci_dip, "!vhci_scsi_start: "
+		    "conflicting reservation on another path, vlun 0x%p, "
+		    "reserved instance %d, new instance: %d, pip: 0x%p",
+		    (void *)vlun, resrv_instance,
+		    mdi_pi_get_path_instance(vpkt->vpkt_path),
+		    (void *)vpkt->vpkt_path));
+
+		/*
+		 * In rare cases, the path referred by resrv_instance could
+		 * disappear in the meantime. Calling mdi_select_path() below
+		 * is an attempt to find out if the path still exists. It also
+		 * ensures that the path will be held when the release is sent.
+		 */
+		rval = mdi_select_path(cdip, NULL, MDI_SELECT_PATH_INSTANCE,
+		    (void *)(intptr_t)resrv_instance, &pip);
+
+		if ((rval == MDI_SUCCESS) && (pip != NULL)) {
+			svp_resrv = (scsi_vhci_priv_t *)
+			    mdi_pi_get_vhci_private(pip);
+			rel_pkt = scsi_init_pkt(&svp_resrv->svp_psd->sd_address,
+			    NULL, NULL, CDB_GROUP0,
+			    sizeof (struct scsi_arq_status), 0, 0, SLEEP_FUNC,
+			    NULL);
+
+			if (rel_pkt == NULL) {
+				char	*p_path;
+
+				/*
+				 * This is very unlikely.
+				 * scsi_init_pkt(SLEEP_FUNC) does not fail
+				 * because of resources. But in theory it could
+				 * fail for some other reason. There is not an
+				 * easy way how to recover though. Log a warning
+				 * and return.
+				 */
+				p_path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+				vhci_log(CE_WARN, vhci->vhci_dip, "!Sending "
+				    "RELEASE(6) to %s failed, a potential "
+				    "reservation conflict ahead.",
+				    ddi_pathname(mdi_pi_get_phci(pip), p_path));
+				kmem_free(p_path, MAXPATHLEN);
+
+				if (restore_lbp)
+					(void) mdi_set_lb_policy(cdip, lbp);
+
+				/* no need to check pkt_reserve_cmd here */
+				vlun->svl_flags &= ~VLUN_QUIESCED_FLG;
+				return (TRAN_FATAL_ERROR);
+			}
+
+			rel_pkt->pkt_cdbp[0] = SCMD_RELEASE;
+			rel_pkt->pkt_time = 60;
+
+			/*
+			 * Ignore the return value.  If it will fail
+			 * then most likely it is no longer reserved
+			 * anyway.
+			 */
+			(void) vhci_do_scsi_cmd(rel_pkt);
+			VHCI_DEBUG(1, (CE_NOTE, NULL,
+			    "!vhci_scsi_start: path 0x%p, issued SCSI-2"
+			    " RELEASE\n", (void *)pip));
+			scsi_destroy_pkt(rel_pkt);
+			mdi_rele_path(pip);
+		}
 	}
 
 	VHCI_INCR_PATH_CMDCOUNT(svp);
@@ -3707,7 +3797,7 @@ vhci_update_pathstates(void *arg)
 	struct scsi_vhci		*vhci;
 	struct scsi_pkt			*pkt;
 	struct buf			*bp;
-	int				reserve_conflict = 0;
+	struct scsi_vhci_priv		*svp_conflict = NULL;
 
 	ASSERT(VHCI_LUN_IS_HELD(vlun));
 	dip  = vlun->svl_dip;
@@ -3798,40 +3888,6 @@ vhci_update_pathstates(void *arg)
 					vlun->svl_waiting_for_activepath = 0;
 				}
 				mutex_exit(&vlun->svl_mutex);
-				/* Check for Reservation Conflict */
-				bp = scsi_alloc_consistent_buf(
-				    &svp->svp_psd->sd_address,
-				    (struct buf *)NULL, DEV_BSIZE, B_READ,
-				    NULL, NULL);
-				if (!bp) {
-					VHCI_DEBUG(1, (CE_NOTE, NULL,
-					    "vhci_update_pathstates: "
-					    "!No resources (buf)\n"));
-					mdi_rele_path(pip);
-					goto done;
-				}
-				pkt = scsi_init_pkt(&svp->svp_psd->sd_address,
-				    NULL, bp, CDB_GROUP1,
-				    sizeof (struct scsi_arq_status), 0,
-				    PKT_CONSISTENT, NULL, NULL);
-				if (pkt) {
-					(void) scsi_setup_cdb((union scsi_cdb *)
-					    (uintptr_t)pkt->pkt_cdbp,
-					    SCMD_READ, 1, 1, 0);
-					pkt->pkt_time = 3*30;
-					pkt->pkt_flags = FLAG_NOINTR;
-					pkt->pkt_path_instance =
-					    mdi_pi_get_path_instance(pip);
-
-					if ((scsi_transport(pkt) ==
-					    TRAN_ACCEPT) && (pkt->pkt_reason
-					    == CMD_CMPLT) && (SCBP_C(pkt) ==
-					    STATUS_RESERVATION_CONFLICT)) {
-						reserve_conflict = 1;
-					}
-					scsi_destroy_pkt(pkt);
-				}
-				scsi_free_consistent_buf(bp);
 			} else if (MDI_PI_IS_ONLINE(pip)) {
 				if (strcmp(pclass, opinfo.opinfo_path_attr)
 				    != 0) {
@@ -3873,6 +3929,43 @@ vhci_update_pathstates(void *arg)
 					}
 				}
 			}
+
+			/* Check for Reservation Conflict */
+			bp = scsi_alloc_consistent_buf(
+			    &svp->svp_psd->sd_address, (struct buf *)NULL,
+			    DEV_BSIZE, B_READ, NULL, NULL);
+			if (!bp) {
+				VHCI_DEBUG(1, (CE_NOTE, NULL,
+				    "!vhci_update_pathstates: No resources "
+				    "(buf)\n"));
+				mdi_rele_path(pip);
+				goto done;
+			}
+			pkt = scsi_init_pkt(&svp->svp_psd->sd_address, NULL, bp,
+			    CDB_GROUP1, sizeof (struct scsi_arq_status), 0,
+			    PKT_CONSISTENT, NULL, NULL);
+			if (pkt) {
+				(void) scsi_setup_cdb((union scsi_cdb *)
+				    (uintptr_t)pkt->pkt_cdbp, SCMD_READ, 1, 1,
+				    0);
+				pkt->pkt_time = 3*30;
+				pkt->pkt_flags = FLAG_NOINTR;
+				pkt->pkt_path_instance =
+				    mdi_pi_get_path_instance(pip);
+
+				if ((scsi_transport(pkt) == TRAN_ACCEPT) &&
+				    (pkt->pkt_reason == CMD_CMPLT) &&
+				    (SCBP_C(pkt) ==
+				    STATUS_RESERVATION_CONFLICT)) {
+					VHCI_DEBUG(1, (CE_NOTE, NULL,
+					    "!vhci_update_pathstates: reserv. "
+					    "conflict to be resolved on 0x%p\n",
+					    (void *)pip));
+					svp_conflict = svp;
+				}
+				scsi_destroy_pkt(pkt);
+			}
+			scsi_free_consistent_buf(bp);
 		} else if ((opinfo.opinfo_path_state == SCSI_PATH_INACTIVE) &&
 		    !(MDI_PI_IS_STANDBY(pip))) {
 			VHCI_DEBUG(1, (CE_NOTE, NULL,
@@ -3916,14 +4009,22 @@ vhci_update_pathstates(void *arg)
 	/*
 	 * Check to see if this vlun has an active SCSI-II RESERVE.  If so
 	 * clear the reservation by sending a reset, so the host doesn't
-	 * receive a reservation conflict.
-	 * Reset VLUN_RESERVE_ACTIVE_FLG for this vlun. Also notify ssd
+	 * receive a reservation conflict.  The reset has to be sent via a
+	 * working path.  Let's use a path referred to by svp_conflict as it
+	 * should be working.
+	 * Reset VLUN_RESERVE_ACTIVE_FLG for this vlun.  Also notify ssd
 	 * of the reset, explicitly.
 	 */
 	if (vlun->svl_flags & VLUN_RESERVE_ACTIVE_FLG) {
-		if (reserve_conflict && (vlun->svl_xlf_capable == 0)) {
+		if (svp_conflict && (vlun->svl_xlf_capable == 0)) {
+			VHCI_DEBUG(1, (CE_NOTE, NULL, "!vhci_update_pathstates:"
+			    " sending recovery reset on 0x%p, path_state: %x",
+			    svp_conflict->svp_psd->sd_private,
+			    mdi_pi_get_state((mdi_pathinfo_t *)
+			    svp_conflict->svp_psd->sd_private)));
+
 			(void) vhci_recovery_reset(vlun,
-			    &svp->svp_psd->sd_address, FALSE,
+			    &svp_conflict->svp_psd->sd_address, FALSE,
 			    VHCI_DEPTH_TARGET);
 		}
 		vlun->svl_flags &= ~VLUN_RESERVE_ACTIVE_FLG;
@@ -3993,7 +4094,15 @@ vhci_pathinfo_init(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	svp = kmem_zalloc(sizeof (*svp), KM_SLEEP);
 	svp->svp_svl = vlun;
 
-	vlun->svl_lb_policy_save = mdi_get_lb_policy(tgt_dip);
+	/*
+	 * Initialize svl_lb_policy_save only for newly allocated vlun. Writing
+	 * to svl_lb_policy_save later could accidentally overwrite saved lb
+	 * policy.
+	 */
+	if (vlun_alloced) {
+		vlun->svl_lb_policy_save = mdi_get_lb_policy(tgt_dip);
+	}
+
 	mutex_init(&svp->svp_mutex, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&svp->svp_cv, NULL, CV_DRIVER, NULL);
 
@@ -4617,6 +4726,9 @@ vhci_update_pathinfo(struct scsi_device *psd,  mdi_pathinfo_t *pip,
 {
 	struct scsi_path_opinfo		opinfo;
 	char				*pclass, *best_pclass;
+	char				*resrv_pclass = NULL;
+	int				force_rereserve = 0;
+	int				update_pathinfo_done = 0;
 
 	if (fo->sfo_path_get_opinfo(psd, &opinfo, vlun->svl_fops_ctpriv) != 0) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "!vhci_update_pathinfo: "
@@ -4688,6 +4800,46 @@ vhci_update_pathinfo(struct scsi_device *psd,  mdi_pathinfo_t *pip,
 				vlun->svl_fo_support = opinfo.opinfo_mode;
 				mdi_pi_set_preferred(pip,
 				    opinfo.opinfo_preferred);
+				update_pathinfo_done = 1;
+			}
+
+			/*
+			 * Find out a class of currently reserved path if there
+			 * is any.
+			 */
+			if ((vlun->svl_flags & VLUN_RESERVE_ACTIVE_FLG) &&
+			    mdi_prop_lookup_string(vlun->svl_resrv_pip,
+			    "path-class", &resrv_pclass) != MDI_SUCCESS) {
+				VHCI_DEBUG(1, (CE_NOTE, NULL,
+				    "!vhci_update_pathinfo: prop lookup "
+				    "failed for path 0x%p\n",
+				    (void *)vlun->svl_resrv_pip));
+				/*
+				 * Something is wrong with the reserved path.
+				 * We can't do much with that right here. Just
+				 * force re-reservation to another path.
+				 */
+				force_rereserve = 1;
+			}
+
+			(void) fo->sfo_pathclass_next(NULL, &best_pclass,
+			    vlun->svl_fops_ctpriv);
+			if ((force_rereserve == 1) || ((resrv_pclass != NULL) &&
+			    (strcmp(pclass, best_pclass) == 0) &&
+			    (strcmp(resrv_pclass, best_pclass) != 0))) {
+				/*
+				 * Inform target driver that a reservation
+				 * should be reinstated because the reserved
+				 * path is not the most preferred one.
+				 */
+				mutex_enter(&vhci->vhci_mutex);
+				scsi_hba_reset_notify_callback(
+				    &vhci->vhci_mutex,
+				    &vhci->vhci_reset_notify_listf);
+				mutex_exit(&vhci->vhci_mutex);
+			}
+
+			if (update_pathinfo_done == 1) {
 				return (MDI_SUCCESS);
 			}
 		} else {
@@ -5020,12 +5172,6 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	tgt_dip = psd->sd_dev;
 	ASSERT(tgt_dip != NULL);
 	vhci_get_device_type_mpxio_options(vdip, tgt_dip, psd);
-
-	/*
-	 * The device probe or options in conf file may have set/changed the
-	 * lb policy, save the current value.
-	 */
-	vlun->svl_lb_policy_save = mdi_get_lb_policy(tgt_dip);
 
 	/*
 	 * if PGR is active, revalidate key and register on this path also,
