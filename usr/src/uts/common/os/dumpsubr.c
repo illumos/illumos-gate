@@ -130,6 +130,10 @@ int		dump_check_used;	/* enable check for used pages */
 uint_t dump_ncpu_low = 4;	/* minimum config for parallel lzjb */
 uint_t dump_bzip2_level = 1;	/* bzip2 level (1-9) */
 
+/* Use dump_plat_mincpu_default unless this variable is set by /etc/system */
+#define	MINCPU_NOT_SET	((uint_t)-1)
+uint_t dump_plat_mincpu = MINCPU_NOT_SET;
+
 /* tunables for pre-reserved heap */
 uint_t dump_kmem_permap = 1024;
 uint_t dump_kmem_pages = 8;
@@ -401,6 +405,7 @@ typedef struct dumpcfg {
 	char	*maxvm;		/* reserved VM for spare pages */
 	lock_t	helper_lock;	/* protect helper state */
 	char	helpers_wanted;	/* flag to enable parallelism */
+	char	helper_present;	/* at least one helper showed up */
 } dumpcfg_t;
 
 static dumpcfg_t dumpcfg;	/* config vars */
@@ -582,6 +587,10 @@ dump_update_clevel()
 
 	if (new->nhelper > DUMP_MAX_NHELPER)
 		new->nhelper = DUMP_MAX_NHELPER;
+
+	/* use platform default, unless /etc/system overrides */
+	if (dump_plat_mincpu == MINCPU_NOT_SET)
+		dump_plat_mincpu = dump_plat_mincpu_default;
 
 	/* increase threshold for faster disks */
 	new->threshold = dump_plat_mincpu;
@@ -866,6 +875,25 @@ dumpsys_get_maxmem()
 	dumpmlw_t mlw;
 	int k;
 
+	/*
+	 * Fall back to doing a serial dump if no helpers showed
+	 * up. It is possible for other CPUs to be stuck in PROM, or
+	 * DRd out. panic("sync initiated") in sync_handler() is one
+	 * case. A parallel dump will hang (dump time out) unless
+	 * there is at least one helper CPU. At this point dumpsys()
+	 * has done some I/O, which means there has been plenty of
+	 * time for helpers to arrive.
+	 */
+	if (!cfg->helper_present) {
+		cfg->clevel = 0;
+		return;
+	}
+
+	/*
+	 * There may be no point in looking for spare memory. If
+	 * dumping all memory, then none is spare. If doing a serial
+	 * dump, then already have buffers.
+	 */
 	if (cfg->maxsize == 0 || cfg->clevel < DUMP_CLEVEL_LZJB ||
 	    (dump_conflags & DUMP_ALL) != 0) {
 		if (cfg->clevel > DUMP_CLEVEL_LZJB)
@@ -2109,6 +2137,8 @@ dumpsys_lzjbcompress(helper_t *hp)
 void
 dumpsys_helper()
 {
+	if (!dumpcfg.helper_present)
+		dumpcfg.helper_present = 1;
 	dumpsys_spinlock(&dumpcfg.helper_lock);
 	if (dumpcfg.helpers_wanted) {
 		helper_t *hp, *hpend = &dumpcfg.helper[dumpcfg.nhelper];
@@ -2147,6 +2177,8 @@ dumpsys_helper()
 void
 dumpsys_helper_nw()
 {
+	if (!dumpcfg.helper_present)
+		dumpcfg.helper_present = 1;
 	if (dumpcfg.helpers_wanted)
 		dumpsys_helper();
 }

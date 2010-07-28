@@ -193,17 +193,22 @@ extern int dump_plat_data(void *);
 
 /*
  * Define a CPU count threshold that determines when to employ
- * bzip2. The values are defined per-platform in dump_plat_mincpu, and
- * may be changed with /etc/system. The value 0 disables parallelism,
- * and the old format dump is produced.
+ * bzip2. This value is defined per-platform.
  */
-extern uint_t dump_plat_mincpu;
+extern uint_t dump_plat_mincpu_default;
 
 #define	DUMP_PLAT_SUN4U_MINCPU		51
 #define	DUMP_PLAT_SUN4U_OPL_MINCPU	8
 #define	DUMP_PLAT_SUN4V_MINCPU		128
 #define	DUMP_PLAT_X86_64_MINCPU		11
 #define	DUMP_PLAT_X86_32_MINCPU		0
+
+/*
+ * Override the per-platform default by setting this variable with
+ * /etc/system.  The value 0 disables parallelism, and the old format
+ * dump is produced.
+ */
+extern uint_t dump_plat_mincpu;
 
 /*
  * Pages may be stolen at dump time. Prevent the pages from ever being

@@ -1497,8 +1497,7 @@ startup_modules(void)
 	size_t hme8blk_sz, hme1blk_sz;
 
 	/*
-	 * Let the platforms have a chance to change default
-	 * values before reading system file.
+	 * The system file /etc/system was read already under startup_memlist.
 	 */
 	if (&set_platform_defaults)
 		set_platform_defaults();

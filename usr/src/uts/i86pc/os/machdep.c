@@ -1226,9 +1226,9 @@ num_phys_pages()
 
 /* cpu threshold for compressed dumps */
 #ifdef _LP64
-uint_t dump_plat_mincpu = DUMP_PLAT_X86_64_MINCPU;
+uint_t dump_plat_mincpu_default = DUMP_PLAT_X86_64_MINCPU;
 #else
-uint_t dump_plat_mincpu = DUMP_PLAT_X86_32_MINCPU;
+uint_t dump_plat_mincpu_default = DUMP_PLAT_X86_32_MINCPU;
 #endif
 
 int
