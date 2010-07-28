@@ -167,8 +167,16 @@ main(int ac, char *av[])
 
 			i = 100 - (i * 2.5);
 			if ((i < 1) || (i > 100)) {
-				fprintf(stderr, gettext(
-				    "priority must be between 0 and 39.\n"));
+				fprintf(stderr, gettext("UX:lp: "));
+				fprintf(stderr, gettext("ERROR: "));
+				fprintf(stderr, gettext("Bad priority"
+				    " value \"%s\"."), optarg);
+				fprintf(stderr, gettext("\n      "));
+				fprintf(stderr, gettext("TO FIX"));
+				fprintf(stderr, gettext(": "));
+				fprintf(stderr, gettext("Use an integer value"
+				    " from 0 to 39."));
+				fprintf(stderr, gettext("\n"));
 				exit(1);
 			}
 			papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
