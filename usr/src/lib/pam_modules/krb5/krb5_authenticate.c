@@ -380,15 +380,18 @@ pam_krb5_prompter(
 	int num_prompts,
 	krb5_prompt prompts[])
 {
-	krb5_error_code rc;
+	krb5_error_code rc = KRB5_LIBOS_CANTREADPWD;
 	pam_handle_t *pamh = (pam_handle_t *)data;
 	struct pam_conv	*pam_convp;
-	struct pam_message *msgs;
-	struct pam_response *ret_respp;
+	struct pam_message *msgs = NULL;
+	struct pam_response *ret_respp = NULL;
 	int i;
 	krb5_prompt_type *prompt_type = krb5_get_prompt_types(ctx);
 	char tmpbuf[PAM_MAX_MSG_SIZE];
 
+	if (prompts) {
+		assert(num_prompts > 0);
+	}
 	/*
 	 * Because this function should never be used for password prompts,
 	 * disallow password prompts.
@@ -398,31 +401,21 @@ pam_krb5_prompter(
 		case KRB5_PROMPT_TYPE_PASSWORD:
 		case KRB5_PROMPT_TYPE_NEW_PASSWORD:
 		case KRB5_PROMPT_TYPE_NEW_PASSWORD_AGAIN:
-			return (KRB5_LIBOS_CANTREADPWD);
+			return (rc);
 		}
 	}
 
-	if (num_prompts == 0) {
-		if (prompts) {
-			/* This shouldn't happen */
-			return (PAM_SYSTEM_ERR);
-		} else {
-			/* no prompts so return */
-			return (0);
-		}
-	}
-	if ((rc = pam_get_item(pamh, PAM_CONV, (void **)&pam_convp))
-	    != PAM_SUCCESS) {
+	if (pam_get_item(pamh, PAM_CONV, (void **)&pam_convp) != PAM_SUCCESS) {
 		return (rc);
 	}
 	if (pam_convp == NULL) {
-		return (PAM_SYSTEM_ERR);
+		return (rc);
 	}
 
 	msgs = (struct pam_message *)calloc(num_prompts,
 	    sizeof (struct pam_message));
 	if (msgs == NULL) {
-		return (PAM_BUF_ERR);
+		return (rc);
 	}
 	(void) memset(msgs, 0, sizeof (struct pam_message) * num_prompts);
 
@@ -439,12 +432,10 @@ pam_krb5_prompter(
 		 */
 		if (snprintf(tmpbuf, sizeof (tmpbuf), "%s: ",
 		    prompts[i].prompt) < 0) {
-			rc = PAM_BUF_ERR;
 			goto cleanup;
 		}
 		msgs[i].msg = strdup(tmpbuf);
 		if (msgs[i].msg == NULL) {
-			rc = PAM_BUF_ERR;
 			goto cleanup;
 		}
 	}
@@ -452,21 +443,40 @@ pam_krb5_prompter(
 	/*
 	 * Call PAM conv function to display the prompt.
 	 */
-	rc = (pam_convp->conv)(num_prompts, &msgs, &ret_respp,
-	    pam_convp->appdata_ptr);
 
-	if (rc == PAM_SUCCESS) {
+	if ((pam_convp->conv)(num_prompts, &msgs, &ret_respp,
+	    pam_convp->appdata_ptr) == PAM_SUCCESS) {
 		for (i = 0; i < num_prompts; i++) {
 			/* convert PAM response to krb prompt reply format */
-			prompts[i].reply->length = strlen(ret_respp[i].resp) +
-			    1; /* adding 1 for NULL terminator */
-			prompts[i].reply->data = ret_respp[i].resp;
+			assert(prompts[i].reply->data != NULL);
+			assert(ret_respp[i].resp != NULL);
+
+			if (strlcpy(prompts[i].reply->data,
+			    ret_respp[i].resp, prompts[i].reply->length) >=
+			    prompts[i].reply->length) {
+				char errmsg[1][PAM_MAX_MSG_SIZE];
+
+				(void) snprintf(errmsg[0], PAM_MAX_MSG_SIZE,
+				    "%s", dgettext(TEXT_DOMAIN,
+				    "Reply too long: "));
+				(void) __pam_display_msg(pamh, PAM_ERROR_MSG,
+				    1, errmsg, NULL);
+				goto cleanup;
+			} else {
+				char *retp;
+
+				/*
+				 * newline must be replaced with \0 terminator
+				 */
+				retp = strchr(prompts[i].reply->data, '\n');
+				if (retp != NULL)
+					*retp = '\0';
+				/* NULL terminator should not be counted */
+				prompts[i].reply->length =
+				    strlen(prompts[i].reply->data);
+			}
 		}
-		/*
-		 * Note, just free ret_respp, not the resp data since that is
-		 * being referenced by the krb prompt reply data pointer.
-		 */
-		free(ret_respp);
+		rc = 0;
 	}
 
 cleanup:
@@ -474,8 +484,15 @@ cleanup:
 		if (msgs[i].msg) {
 			free(msgs[i].msg);
 		}
+		if (ret_respp[i].resp) {
+			/* 0 out sensitive data before free() */
+			(void) memset(ret_respp[i].resp, 0,
+			    strlen(ret_respp[i].resp));
+			free(ret_respp[i].resp);
+		}
 	}
 	free(msgs);
+	free(ret_respp);
 	return (rc);
 }
 
