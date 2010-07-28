@@ -394,8 +394,12 @@ pam_krb5_prompter(
 	 * disallow password prompts.
 	 */
 	for (i = 0; i < num_prompts; i++) {
-		if (prompt_type[i] == KRB5_PROMPT_TYPE_PASSWORD)
+		switch (prompt_type[i]) {
+		case KRB5_PROMPT_TYPE_PASSWORD:
+		case KRB5_PROMPT_TYPE_NEW_PASSWORD:
+		case KRB5_PROMPT_TYPE_NEW_PASSWORD_AGAIN:
 			return (KRB5_LIBOS_CANTREADPWD);
+		}
 	}
 
 	if (num_prompts == 0) {
