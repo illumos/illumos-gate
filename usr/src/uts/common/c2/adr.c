@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Adr memory based encoding
@@ -97,7 +93,7 @@ adr_int32(adr_t *adr, int32_t *lp, int count)
 	for (; count-- > 0; lp++) {
 		for (i = 0, l = *lp; i < 4; i++) {
 			*adr->adr_now++ = (char)((l & (int32_t)0xff000000) >>
-				(int)24);
+			    (int)24);
 			l <<= (int)8;
 		}
 	}
@@ -114,8 +110,9 @@ adr_int64(adr_t *adr, int64_t *lp, int count)
 
 	for (; count-- > 0; lp++) {
 		for (i = 0, l = *lp; i < 8; i++) {
-		    *adr->adr_now++ =
-			(char)((l & (int64_t)0xff00000000000000) >> (int)56);
+			*adr->adr_now++ =
+			    (char)((l & (int64_t)0xff00000000000000) >>
+			    (int)56);
 			l <<= (int)8;
 		}
 	}
