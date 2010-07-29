@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -74,6 +73,7 @@ static pi_enum_functions_t pi_enum_fns_builtin[] = {
 	{pi_enum_hostbridge,	HOSTBRIDGE},
 	{pi_enum_pciexrc,	PCIEX_ROOT},
 	{pi_enum_niu,		NIU},
+	{pi_enum_bay,		BAY},
 	{NULL, NULL}
 };
 static nvlist_t *pi_enum_fns;
@@ -590,6 +590,14 @@ pi_walker_node_range(topo_mod_t *mod, md_t *mdp, tnode_t *t_parent,
 			(void) nvlist_add_uint32(hc_range, PI_STR_MAX, max);
 
 		} else {
+			if (hc_name == NULL) {
+				topo_mod_dprintf(mod, "node_0x%llx has no "
+				    "topo_hc_name.", (uint64_t)arcp[arcidx]);
+				(void) topo_mod_seterrno(mod,
+				    EMOD_PARTIAL_ENUM);
+				return (MDE_WALK_ERROR);
+			}
+
 			topo_mod_dprintf(mod, "node_0x%llx type %s has no id. "
 			    "Excluding from range", (uint64_t)arcp[arcidx],
 			    hc_name);

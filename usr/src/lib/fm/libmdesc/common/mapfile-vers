@@ -44,6 +44,7 @@ SYMBOL_VERSION SUNWprivate {
 	md_find_node_prop;
 	md_fini;
 	md_get_prop_arcs;
+	md_get_prop_data;
 	md_get_prop_str;
 	md_get_prop_val;
 	md_init_intern;
