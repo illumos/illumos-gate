@@ -814,6 +814,12 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 		curr = buf + i + 1;
 	}
 
+	/* Correct any erroneous IPTUN datalink class constant in the file */
+	if (linkp->ll_class == 0x60) {
+		linkp->ll_class = DATALINK_CLASS_IPTUN;
+		rewrite_needed = B_TRUE;
+	}
+
 	return (0);
 
 parse_fail:
@@ -1119,8 +1125,8 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 		}
 
 		link_in_file.ll_zoneid = req->ls_zoneid;
-		link_in_db = avl_find(&dlmgmt_name_avl, &link_in_file,
-		    &name_where);
+		link_in_db = link_by_name(link_in_file.ll_link,
+		    link_in_file.ll_zoneid);
 		if (link_in_db != NULL) {
 			/*
 			 * If the link in the database already has the flag
@@ -1166,9 +1172,13 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 				newlink->ll_linkid = dlmgmt_nextlinkid;
 			if (avl_find(&dlmgmt_id_avl, newlink, &id_where) !=
 			    NULL) {
+				dlmgmt_log(LOG_WARNING, "Link ID %d is already"
+				    " in use, destroying link %s",
+				    newlink->ll_linkid, newlink->ll_link);
 				link_destroy(newlink);
 				continue;
 			}
+
 			if ((req->ls_flags & DLMGMT_ACTIVE) &&
 			    link_activate(newlink) != 0) {
 				dlmgmt_log(LOG_WARNING, "Unable to activate %s",
@@ -1176,8 +1186,18 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 				link_destroy(newlink);
 				continue;
 			}
-			avl_insert(&dlmgmt_name_avl, newlink, name_where);
+
 			avl_insert(&dlmgmt_id_avl, newlink, id_where);
+			/*
+			 * link_activate call above can insert newlink in
+			 * dlmgmt_name_avl tree when activating a link that is
+			 * assigned to a NGZ.
+			 */
+			if (avl_find(&dlmgmt_name_avl, newlink,
+			    &name_where) == NULL)
+				avl_insert(&dlmgmt_name_avl, newlink,
+				    name_where);
+
 			dlmgmt_advance(newlink);
 			newlink->ll_flags |= req->ls_flags;
 		}

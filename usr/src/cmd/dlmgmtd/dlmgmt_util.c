@@ -367,7 +367,7 @@ int
 link_activate(dlmgmt_link_t *linkp)
 {
 	int		err = 0;
-	zoneid_t	zoneid;
+	zoneid_t	zoneid = ALL_ZONES;
 
 	if (zone_check_datalink(&zoneid, linkp->ll_linkid) == 0) {
 		/*
@@ -379,7 +379,10 @@ link_activate(dlmgmt_link_t *linkp)
 				err = EEXIST;
 				goto done;
 			}
-			avl_remove(&dlmgmt_name_avl, linkp);
+
+			if (avl_find(&dlmgmt_name_avl, linkp, NULL) != NULL)
+				avl_remove(&dlmgmt_name_avl, linkp);
+
 			linkp->ll_zoneid = zoneid;
 			avl_add(&dlmgmt_name_avl, linkp);
 			avl_add(&dlmgmt_loan_avl, linkp);

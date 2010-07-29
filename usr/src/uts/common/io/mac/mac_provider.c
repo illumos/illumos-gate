@@ -1357,10 +1357,10 @@ mac_prop_info_set_default_str(mac_prop_info_handle_t ph, const char *str)
 	if (pr->pr_default == NULL)
 		return;
 
-	if (strlen(str) > pr->pr_default_size)
+	if (strlen(str) >= pr->pr_default_size)
 		pr->pr_errno = ENOBUFS;
 	else
-		(void) strlcpy(pr->pr_default, str, strlen(str));
+		(void) strlcpy(pr->pr_default, str, pr->pr_default_size);
 	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
 }
 

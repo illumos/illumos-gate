@@ -56,7 +56,8 @@ dladm_door_call(dladm_handle_t handle, void *arg, size_t asize, void *rbuf,
 {
 	door_arg_t	darg;
 	int		door_fd;
-	dladm_status_t	status = DLADM_STATUS_OK;
+	dladm_status_t	status;
+	boolean_t	reopen = B_FALSE;
 
 	darg.data_ptr	= arg;
 	darg.data_size	= asize;
@@ -65,11 +66,23 @@ dladm_door_call(dladm_handle_t handle, void *arg, size_t asize, void *rbuf,
 	darg.rbuf	= rbuf;
 	darg.rsize	= *rsizep;
 
+reopen:
 	/* The door descriptor is opened if it isn't already */
 	if ((status = dladm_door_fd(handle, &door_fd)) != DLADM_STATUS_OK)
 		return (status);
-	if (door_call(door_fd, &darg) == -1)
+	if (door_call(door_fd, &darg) == -1) {
+		/*
+		 * Stale door descriptor is possible if dlmgmtd was re-started
+		 * since last door_fd open so try re-opening door file.
+		 */
+		if (!reopen && errno == EBADF) {
+			(void) close(handle->door_fd);
+			handle->door_fd = -1;
+			reopen = B_TRUE;
+			goto reopen;
+		}
 		status = dladm_errno2status(errno);
+	}
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
