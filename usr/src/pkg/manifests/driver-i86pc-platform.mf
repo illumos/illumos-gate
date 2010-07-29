@@ -49,15 +49,6 @@ driver name=cmdk perms="* 0640 root sys"
 driver name=ecpp alias=lp perms="* 0666 root sys"
 driver name=fd perms="* 0666 root sys"
 driver name=fdc
-driver name=ncrs class=scsi \
-    alias=pci1000,1 \
-    alias=pci1000,2 \
-    alias=pci1000,3 \
-    alias=pci1000,4 \
-    alias=pci1000,6 \
-    alias=pci1000,8f \
-    alias=pci1000,c \
-    alias=pci1000,f
 file path=kernel/drv/$(ARCH64)/asy group=sys
 file path=kernel/drv/$(ARCH64)/cmdk group=sys
 file path=kernel/drv/$(ARCH64)/ecpp group=sys
@@ -73,8 +64,6 @@ file path=kernel/drv/fd group=sys
 file path=kernel/drv/fd.conf group=sys
 file path=kernel/drv/fdc group=sys
 file path=kernel/drv/fdc.conf group=sys
-file path=kernel/drv/ncrs group=sys
-file path=kernel/drv/ncrs.conf group=sys
 file path=kernel/misc/$(ARCH64)/dadk group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/gda group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/strategy group=sys mode=0755
@@ -98,5 +87,3 @@ legacy pkg=SUNWpsdcr arch=$(ARCH) category=system \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license lic_OSBL license=lic_OSBL
-license lic_OSBL_preamble license=lic_OSBL_preamble
