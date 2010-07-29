@@ -331,9 +331,7 @@ static int si_check_ctl_handles(si_ctl_state_t *);
 static int si_check_port_handles(si_port_state_t *);
 static void si_fm_ereport(si_ctl_state_t *, char *, char *);
 
-#if SI_DEBUG
-static	void si_log(si_ctl_state_t *, uint_t, char *, ...);
-#endif	/* SI_DEBUG */
+static	void si_log(si_ctl_state_t *, si_port_state_t *, char *, ...);
 
 static void si_copy_out_regs(sata_cmd_t *, si_ctl_state_t *, uint8_t, uint8_t);
 
@@ -425,10 +423,10 @@ static  struct modlinkage modlinkage = {
 
 /* The following are needed for si_log() */
 static kmutex_t si_log_mutex;
-#if SI_DEBUG
-static char si_log_buf[512];
-#endif	/* SI_DEBUG */
-uint32_t si_debug_flags = 0x0;
+static char si_log_buf[SI_LOGBUF_LEN];
+uint32_t si_debug_flags =
+    SIDBG_ERRS|SIDBG_INIT|SIDBG_EVENT|SIDBG_TIMEOUT|SIDBG_RESET;
+
 static int is_msi_supported = 0;
 
 /*
@@ -526,7 +524,7 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int intr_types;
 	sata_device_t sdevice;
 
-	SIDBG0(SIDBG_INIT|SIDBG_ENTRY, NULL, "si_attach enter");
+	SIDBG(SIDBG_ENTRY, "si_attach enter", NULL);
 	instance = ddi_get_instance(dip);
 	attach_state = ATTACH_PROGRESS_NONE;
 
@@ -610,17 +608,18 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/* Get supported interrupt types. */
 		if (ddi_intr_get_supported_types(dip, &intr_types)
 		    != DDI_SUCCESS) {
-			SIDBG0(SIDBG_INIT, NULL,
-			    "ddi_intr_get_supported_types failed");
+			SIDBG_C(SIDBG_INIT, si_ctlp,
+			    "ddi_intr_get_supported_types failed", NULL);
 			goto err_out;
 		}
 
-		SIDBG1(SIDBG_INIT, NULL,
+		SIDBG_C(SIDBG_INIT, si_ctlp,
 		    "ddi_intr_get_supported_types() returned: 0x%x",
 		    intr_types);
 
 		if (is_msi_supported && (intr_types & DDI_INTR_TYPE_MSI)) {
-			SIDBG0(SIDBG_INIT, NULL, "Using MSI interrupt type");
+			SIDBG_C(SIDBG_INIT, si_ctlp,
+			    "Using MSI interrupt type", NULL);
 
 			/*
 			 * Try MSI first, but fall back to legacy if MSI
@@ -629,16 +628,13 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			if (si_add_msi_intrs(si_ctlp) == DDI_SUCCESS) {
 				si_ctlp->sictl_intr_type = DDI_INTR_TYPE_MSI;
 				attach_state |= ATTACH_PROGRESS_INTR_ADDED;
-				SIDBG0(SIDBG_INIT, NULL,
-				    "MSI interrupt setup done");
-			}
-#if SI_DEBUG
-			else {
-				SIDBG0(SIDBG_INIT, NULL,
+				SIDBG_C(SIDBG_INIT, si_ctlp,
+				    "MSI interrupt setup done", NULL);
+			} else {
+				SIDBG_C(SIDBG_INIT, si_ctlp,
 				    "MSI registration failed "
-				    "will try Legacy interrupts");
+				    "will try Legacy interrupts", NULL);
 			}
-#endif	/* SI_DEBUG */
 		}
 
 		if (!(attach_state & ATTACH_PROGRESS_INTR_ADDED) &&
@@ -647,23 +643,24 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * Either the MSI interrupt setup has failed or only
 			 * fixed interrupts are available on the system.
 			 */
-			SIDBG0(SIDBG_INIT, NULL, "Using Legacy interrupt type");
+			SIDBG_C(SIDBG_INIT, si_ctlp,
+			    "Using Legacy interrupt type", NULL);
 
 			if (si_add_legacy_intrs(si_ctlp) == DDI_SUCCESS) {
 				si_ctlp->sictl_intr_type = DDI_INTR_TYPE_FIXED;
 				attach_state |= ATTACH_PROGRESS_INTR_ADDED;
-				SIDBG0(SIDBG_INIT, NULL,
-				    "Legacy interrupt setup done");
+				SIDBG_C(SIDBG_INIT, si_ctlp,
+				    "Legacy interrupt setup done", NULL);
 			} else {
-				SIDBG0(SIDBG_INIT, NULL,
-				    "legacy interrupt setup failed");
+				SIDBG_C(SIDBG_INIT, si_ctlp,
+				    "legacy interrupt setup failed", NULL);
 				goto err_out;
 			}
 		}
 
 		if (!(attach_state & ATTACH_PROGRESS_INTR_ADDED)) {
-			SIDBG0(SIDBG_INIT, NULL,
-			    "si3124: No interrupts registered");
+			SIDBG_C(SIDBG_INIT, si_ctlp,
+			    "si3124: No interrupts registered", NULL);
 			goto err_out;
 		}
 
@@ -687,8 +684,8 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		attach_state |= ATTACH_PROGRESS_HW_INIT;
 
 		if (si_register_sata_hba_tran(si_ctlp)) {
-			SIDBG0(SIDBG_INIT, NULL,
-			    "si3124: setting sata hba tran failed");
+			SIDBG_C(SIDBG_INIT, si_ctlp,
+			    "si3124: setting sata hba tran failed", NULL);
 			goto err_out;
 		}
 
@@ -728,8 +725,8 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		bzero((void *)&sdevice, sizeof (sata_device_t));
 		sata_hba_event_notify(dip, &sdevice,
 		    SATA_EVNT_PWR_LEVEL_CHANGED);
-		SIDBG0(SIDBG_INIT|SIDBG_EVENT, si_ctlp,
-		    "sending event up: SATA_EVNT_PWR_LEVEL_CHANGED");
+		SIDBG_C(SIDBG_INIT|SIDBG_EVENT, si_ctlp,
+		    "sending event up: SATA_EVNT_PWR_LEVEL_CHANGED", NULL);
 
 		(void) pm_idle_component(si_ctlp->sictl_devinfop, 0);
 
@@ -793,7 +790,7 @@ si_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	si_ctl_state_t *si_ctlp;
 	int instance;
 
-	SIDBG0(SIDBG_INIT|SIDBG_ENTRY, NULL, "si_detach enter");
+	SIDBG(SIDBG_ENTRY, "si_detach enter", NULL);
 	instance = ddi_get_instance(dip);
 	si_ctlp = ddi_get_soft_state(si_statep, instance);
 
@@ -878,7 +875,8 @@ si_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		(void) untimeout(si_ctlp->sictl_timeout_id);
 		si_ctlp->sictl_flags &= ~SI_NO_TIMEOUTS;
 
-		SIDBG1(SIDBG_POWER, NULL, "si3124%d: DDI_SUSPEND", instance);
+		SIDBG_C(SIDBG_POWER, si_ctlp, "si3124%d: DDI_SUSPEND",
+		    instance);
 
 		mutex_exit(&si_ctlp->sictl_mutex);
 
@@ -901,9 +899,7 @@ si_power(dev_info_t *dip, int component, int level)
 	si_ctl_state_t *si_ctlp;
 	int instance = ddi_get_instance(dip);
 	int rval = DDI_SUCCESS;
-#if SI_DEBUG
 	int old_level;
-#endif	/* SI_DEBUG */
 	sata_device_t sdevice;
 
 	si_ctlp = ddi_get_soft_state(si_statep, instance);
@@ -912,12 +908,10 @@ si_power(dev_info_t *dip, int component, int level)
 		return (DDI_FAILURE);
 	}
 
-	SIDBG0(SIDBG_ENTRY, NULL, "si_power enter");
+	SIDBG_C(SIDBG_ENTRY, si_ctlp, "si_power enter", NULL);
 
 	mutex_enter(&si_ctlp->sictl_mutex);
-#if SI_DEBUG
 	old_level = si_ctlp->sictl_power_level;
-#endif	/* SI_DEBUG */
 
 	switch (level) {
 	case PM_LEVEL_D0: /* fully on */
@@ -929,7 +923,7 @@ si_power(dev_info_t *dip, int component, int level)
 		si_ctlp->sictl_power_level = PM_LEVEL_D0;
 		(void) pci_restore_config_regs(si_ctlp->sictl_devinfop);
 
-		SIDBG2(SIDBG_POWER, si_ctlp,
+		SIDBG_C(SIDBG_POWER, si_ctlp,
 		    "si3124%d: turning power ON. old level %d",
 		    instance, old_level);
 		/*
@@ -953,8 +947,8 @@ si_power(dev_info_t *dip, int component, int level)
 		sata_hba_event_notify(
 		    si_ctlp->sictl_sata_hba_tran->sata_tran_hba_dip,
 		    &sdevice, SATA_EVNT_PWR_LEVEL_CHANGED);
-		SIDBG0(SIDBG_EVENT|SIDBG_POWER, si_ctlp,
-		    "sending event up: PWR_LEVEL_CHANGED");
+		SIDBG_C(SIDBG_EVENT|SIDBG_POWER, si_ctlp,
+		    "sending event up: PWR_LEVEL_CHANGED", NULL);
 
 		break;
 
@@ -974,13 +968,13 @@ si_power(dev_info_t *dip, int component, int level)
 		pci_config_put16(si_ctlp->sictl_pci_conf_handle,
 		    PM_CSR(si_ctlp->sictl_devid), PCI_PMCSR_D3HOT);
 
-		SIDBG2(SIDBG_POWER, NULL, "si3124%d: turning power OFF. "
+		SIDBG_C(SIDBG_POWER, si_ctlp, "si3124%d: turning power OFF. "
 		    "old level %d", instance, old_level);
 
 		break;
 
 	default:
-		SIDBG2(SIDBG_POWER, NULL, "si3124%d: turning power OFF. "
+		SIDBG_C(SIDBG_POWER, si_ctlp, "si3124%d: turning power OFF. "
 		    "old level %d", instance, old_level);
 		rval = DDI_FAILURE;
 		break;
@@ -1040,8 +1034,8 @@ si_register_sata_hba_tran(si_ctl_state_t *si_ctlp)
 {
 	struct 	sata_hba_tran	*sata_hba_tran;
 
-	SIDBG0(SIDBG_INIT|SIDBG_ENTRY, si_ctlp,
-	    "si_register_sata_hba_tran entry");
+	SIDBG_C(SIDBG_ENTRY, si_ctlp,
+	    "si_register_sata_hba_tran entry", NULL);
 
 	mutex_enter(&si_ctlp->sictl_mutex);
 
@@ -1135,7 +1129,7 @@ si_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 
 	si_ctlp = ddi_get_soft_state(si_statep, ddi_get_instance(dip));
 
-	SIDBG3(SIDBG_ENTRY, si_ctlp,
+	SIDBG_C(SIDBG_ENTRY, si_ctlp,
 	    "si_tran_probe_port: cport: 0x%x, pmport: 0x%x, qual: 0x%x",
 	    cport, pmport, qual);
 
@@ -1246,8 +1240,8 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 	si_portp = si_ctlp->sictl_ports[cport];
 	mutex_exit(&si_ctlp->sictl_mutex);
 
-	SIDBG1(SIDBG_ENTRY, si_ctlp,
-	    "si_tran_start entry: port: 0x%x", cport);
+	SIDBG_P(SIDBG_ENTRY, si_portp,
+	    "si_tran_start entry", NULL);
 
 	mutex_enter(&si_portp->siport_mutex);
 
@@ -1266,9 +1260,9 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 
 	if (spkt->satapkt_cmd.satacmd_flags.sata_clear_dev_reset) {
 		si_portp->siport_reset_in_progress = 0;
-		SIDBG1(SIDBG_ENTRY, si_ctlp,
+		SIDBG_P(SIDBG_RESET, si_portp,
 		    "si_tran_start clearing the "
-		    "reset_in_progress for port: 0x%x", cport);
+		    "reset_in_progress for port", NULL);
 	}
 
 	if (si_portp->siport_reset_in_progress &&
@@ -1276,18 +1270,18 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 	    ! ddi_in_panic()) {
 
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		SIDBG1(SIDBG_ERRS, si_ctlp,
+		SIDBG_P(SIDBG_RESET, si_portp,
 		    "si_tran_start returning BUSY while "
-		    "reset in progress: port: 0x%x", cport);
+		    "reset in progress for port", NULL);
 		mutex_exit(&si_portp->siport_mutex);
 		return (SATA_TRAN_BUSY);
 	}
 
 	if (si_portp->mopping_in_progress > 0) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		SIDBG1(SIDBG_ERRS, si_ctlp,
+		SIDBG_P(SIDBG_RESET, si_portp,
 		    "si_tran_start returning BUSY while "
-		    "mopping in progress: port: 0x%x", cport);
+		    "mopping in progress for port", NULL);
 		mutex_exit(&si_portp->siport_mutex);
 		return (SATA_TRAN_BUSY);
 	}
@@ -1295,9 +1289,9 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 	if ((slot = si_deliver_satapkt(si_ctlp, si_portp, cport, spkt))
 	    == SI_FAILURE) {
 		spkt->satapkt_reason = SATA_PKT_QUEUE_FULL;
-		SIDBG1(SIDBG_ERRS, si_ctlp,
-		    "si_tran_start returning QUEUE_FULL: port: 0x%x",
-		    cport);
+		SIDBG_P(SIDBG_ERRS, si_portp,
+		    "si_tran_start returning QUEUE_FULL",
+		    NULL);
 		mutex_exit(&si_portp->siport_mutex);
 		return (SATA_TRAN_QUEUE_FULL);
 	}
@@ -1370,11 +1364,11 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 	sata_pkt_t *satapkt;
 	struct sata_cmd_flags *flagsp;
 
-	SIDBG1(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si_mop_commands entered: slot_status: 0x%x",
 	    slot_status);
 
-	SIDBG4(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si_mop_commands: failed_tags: 0x%x, timedout_tags: 0x%x"
 	    "aborting_tags: 0x%x, reset_tags: 0x%x",
 	    failed_tags,
@@ -1412,7 +1406,7 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 			    port, tmpslot);
 		}
 
-		SIDBG1(SIDBG_ERRS, si_ctlp,
+		SIDBG_P(SIDBG_ERRS, si_portp,
 		    "si_mop_commands sending up completed satapkt: %x",
 		    satapkt);
 
@@ -1429,7 +1423,7 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		if (tmpslot == -1) {
 			break;
 		}
-		SIDBG1(SIDBG_ERRS, si_ctlp, "si3124: si_mop_commands: "
+		SIDBG_P(SIDBG_ERRS, si_portp, "si3124: si_mop_commands: "
 		    "handling failed slot: 0x%x", tmpslot);
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
@@ -1485,7 +1479,7 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		}
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		SIDBG1(SIDBG_ERRS, si_ctlp,
+		SIDBG_P(SIDBG_ERRS, si_portp,
 		    "si_mop_commands sending "
 		    "spkt up with PKT_TIMEOUT: %x",
 		    satapkt);
@@ -1505,7 +1499,7 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		}
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		SIDBG1(SIDBG_ERRS, si_ctlp,
+		SIDBG_P(SIDBG_ERRS, si_portp,
 		    "si_mop_commands aborting spkt: %x",
 		    satapkt);
 		if (satapkt != NULL && satapkt->satapkt_device.satadev_type ==
@@ -1528,7 +1522,7 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 			break;
 		}
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		SIDBG1(SIDBG_ERRS, si_ctlp,
+		SIDBG_P(SIDBG_ERRS, si_portp,
 		    "si_mop_commands sending PKT_RESET for "
 		    "reset spkt: %x",
 		    satapkt);
@@ -1547,7 +1541,7 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 			break;
 		}
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
-		SIDBG1(SIDBG_ERRS, si_ctlp,
+		SIDBG_P(SIDBG_ERRS, si_portp,
 		    "si_mop_commands sending SATA_PKT_RESET for "
 		    "retry spkt: %x",
 		    satapkt);
@@ -1585,7 +1579,7 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	si_portp = si_ctlp->sictl_ports[port];
 	mutex_exit(&si_ctlp->sictl_mutex);
 
-	SIDBG1(SIDBG_ENTRY, si_ctlp, "si_tran_abort on port: %x", port);
+	SIDBG_P(SIDBG_ERRS, si_portp, "si_tran_abort on port: %x", port);
 
 	mutex_enter(&si_portp->siport_mutex);
 
@@ -1593,7 +1587,7 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	 * If already mopping, then no need to abort anything.
 	 */
 	if (si_portp->mopping_in_progress > 0) {
-		SIDBG1(SIDBG_INFO, si_ctlp,
+		SIDBG_P(SIDBG_ERRS, si_portp,
 		    "si_tran_abort: port %d mopping "
 		    "in progress, so just return", port);
 		mutex_exit(&si_portp->siport_mutex);
@@ -1688,7 +1682,7 @@ si_reject_all_reset_pkts(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_RESET, si_portp,
 	    "si_reject_all_reset_pkts on port: %x",
 	    port);
 
@@ -1725,7 +1719,7 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 	int retval = SI_SUCCESS;
 
 	si_ctlp = ddi_get_soft_state(si_statep, ddi_get_instance(dip));
-	SIDBG1(SIDBG_ENTRY, si_ctlp,
+	SIDBG_C(SIDBG_RESET, si_ctlp,
 	    "si_tran_reset_port entry: port: 0x%x",
 	    port);
 
@@ -1741,7 +1735,7 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 		 * If already mopping, then no need to reset or mop again.
 		 */
 		if (si_portp->mopping_in_progress > 0) {
-			SIDBG1(SIDBG_INFO, si_ctlp,
+			SIDBG_P(SIDBG_RESET, si_portp,
 			    "si_tran_reset_dport: CPORT port %d mopping "
 			    "in progress, so just return", port);
 			mutex_exit(&si_portp->siport_mutex);
@@ -1774,7 +1768,7 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 		 * If already mopping, then no need to reset or mop again.
 		 */
 		if (si_portp->mopping_in_progress > 0) {
-			SIDBG1(SIDBG_INFO, si_ctlp,
+			SIDBG_P(SIDBG_RESET, si_portp,
 			    "si_tran_reset_dport: DCPORT port %d mopping "
 			    "in progress, so just return", port);
 			mutex_exit(&si_portp->siport_mutex);
@@ -1802,7 +1796,7 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 			 * mopped, therefore there is nothing else to do.
 			 */
 			if (si_portp->mopping_in_progress > 0) {
-				SIDBG1(SIDBG_INFO, si_ctlp,
+				SIDBG_P(SIDBG_RESET, si_portp,
 				    "si_tran_reset_dport: CNTRL port %d mopping"
 				    " in progress, so just return", i);
 				mutex_exit(&si_portp->siport_mutex);
@@ -1823,8 +1817,8 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 
 	case SATA_ADDR_PMPORT:
 	case SATA_ADDR_DPMPORT:
-		SIDBG0(SIDBG_VERBOSE, si_ctlp,
-		    "port mult reset not implemented yet");
+		SIDBG_P(SIDBG_RESET, si_portp,
+		    "port mult reset not implemented yet", NULL);
 		/* FALLSTHROUGH */
 
 	default:
@@ -1854,7 +1848,8 @@ si_tran_hotplug_port_activate(dev_info_t *dip, sata_device_t *satadev)
 	si_portp = si_ctlp->sictl_ports[port];
 	mutex_exit(&si_ctlp->sictl_mutex);
 
-	SIDBG0(SIDBG_ENTRY, si_ctlp, "si_tran_hotplug_port_activate entry");
+	SIDBG_P(SIDBG_EVENT, si_portp, "si_tran_hotplug_port_activate entry",
+	    NULL);
 
 	mutex_enter(&si_portp->siport_mutex);
 	si_enable_port_interrupts(si_ctlp, port);
@@ -1895,7 +1890,7 @@ si_tran_hotplug_port_deactivate(dev_info_t *dip, sata_device_t *satadev)
 	si_portp = si_ctlp->sictl_ports[port];
 	mutex_exit(&si_ctlp->sictl_mutex);
 
-	SIDBG0(SIDBG_ENTRY, NULL, "si_tran_hotplug_port_deactivate entry");
+	SIDBG(SIDBG_EVENT, "si_tran_hotplug_port_deactivate entry", NULL);
 
 	mutex_enter(&si_portp->siport_mutex);
 	if (si_portp->siport_pending_tags & SI_SLOT_MASK) {
@@ -2167,7 +2162,7 @@ si_find_dev_signature(
 	uint32_t slot_status, signature;
 	int slot, loop_count;
 
-	SIDBG2(SIDBG_ENTRY|SIDBG_INIT, si_ctlp,
+	SIDBG_P(SIDBG_INIT, si_portp,
 	    "si_find_dev_signature enter: port: %x, pmp: %x",
 	    port, pmp);
 
@@ -2232,7 +2227,7 @@ si_find_dev_signature(
 
 	} while (slot_status & SI_SLOT_MASK & (0x1 << slot));
 
-	SIDBG2(SIDBG_POLL_LOOP, si_ctlp,
+	SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 	    "si_find_dev_signature: loop count: %d, slot_status: 0x%x",
 	    loop_count, slot_status);
 
@@ -2246,11 +2241,11 @@ si_find_dev_signature(
 	    (uint32_t *)(PORT_SIGNATURE_LSB(si_ctlp,
 	    port, slot))));
 
-	SIDBG1(SIDBG_INIT, si_ctlp, "Device signature: 0x%x", signature);
+	SIDBG_P(SIDBG_INIT, si_portp, "Device signature: 0x%x", signature);
 
 	if (signature == SI_SIGNATURE_PORT_MULTIPLIER) {
 
-		SIDBG2(SIDBG_INIT, si_ctlp,
+		SIDBG_P(SIDBG_INIT, si_portp,
 		    "Found multiplier at cport: 0x%d, pmport: 0x%x",
 		    port, pmp);
 
@@ -2279,7 +2274,7 @@ si_find_dev_signature(
 			si_portp->siport_port_type = PORT_TYPE_ATAPI;
 			si_init_port(si_ctlp, port);
 		}
-		SIDBG2(SIDBG_INIT, si_ctlp,
+		SIDBG_P(SIDBG_INIT, si_portp,
 		    "Found atapi at : cport: %x, pmport: %x",
 		    port, pmp);
 
@@ -2293,7 +2288,7 @@ si_find_dev_signature(
 			si_portp->siport_port_type = PORT_TYPE_DISK;
 			si_init_port(si_ctlp, port);
 		}
-		SIDBG2(SIDBG_INIT, si_ctlp,
+		SIDBG_P(SIDBG_INIT, si_portp,
 		    "found disk at : cport: %x, pmport: %x",
 		    port, pmp);
 
@@ -2305,7 +2300,7 @@ si_find_dev_signature(
 		} else {
 			si_portp->siport_port_type = PORT_TYPE_UNKNOWN;
 		}
-		SIDBG3(SIDBG_INIT, si_ctlp,
+		SIDBG_P(SIDBG_INIT, si_portp,
 		    "Found unknown signature 0x%x at: port: %x, pmp: %x",
 		    signature, port, pmp);
 	}
@@ -2331,7 +2326,7 @@ si_poll_cmd(
 	uint32_t port_intr_status;
 	int in_panic = ddi_in_panic();
 
-	SIDBG1(SIDBG_ENTRY, si_ctlp, "si_poll_cmd entered: port: 0x%x", port);
+	SIDBG_P(SIDBG_ENTRY, si_portp, "si_poll_cmd entered: port: 0x%x", port);
 
 	pkt_timeout_ticks = drv_usectohz((clock_t)satapkt->satapkt_time *
 	    1000000);
@@ -2384,7 +2379,7 @@ si_poll_cmd(
 		port_intr_status = ddi_get32(si_ctlp->sictl_global_acc_handle,
 		    (uint32_t *)PORT_INTERRUPT_STATUS(si_ctlp, port));
 
-		SIDBG2(SIDBG_VERBOSE, si_ctlp,
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
 		    "si_poll_cmd: port_intr_status: 0x%x, port: %x",
 		    port_intr_status, port);
 
@@ -2475,20 +2470,20 @@ si_claim_free_slot(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ENTRY, si_portp,
 	    "si_claim_free_slot entry: siport_pending_tags: %x",
 	    si_portp->siport_pending_tags);
 
 	free_slots = (~si_portp->siport_pending_tags) & SI_SLOT_MASK;
 	slot = ddi_ffs(free_slots) - 1;
 	if (slot == -1) {
-		SIDBG0(SIDBG_VERBOSE, si_ctlp,
-		    "si_claim_free_slot: no empty slots");
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "si_claim_free_slot: no empty slots", NULL);
 		return (SI_FAILURE);
 	}
 
 	si_portp->siport_pending_tags |= (0x1 << slot);
-	SIDBG1(SIDBG_VERBOSE, si_ctlp, "si_claim_free_slot: found slot: 0x%x",
+	SIDBG_P(SIDBG_VERBOSE, si_portp, "si_claim_free_slot: found slot: 0x%x",
 	    slot);
 	return (slot);
 }
@@ -2552,7 +2547,7 @@ si_deliver_satapkt(
 
 	cmd = &spkt->satapkt_cmd;
 
-	SIDBG4(SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ENTRY, si_portp,
 	    "si_deliver_satpkt entry: cmd_reg: 0x%x, slot: 0x%x, \
 		port: %x, satapkt: %x",
 	    cmd->satacmd_cmd_reg, slot, port, (uint32_t)(intptr_t)spkt);
@@ -2697,14 +2692,15 @@ si_deliver_satapkt(
 	ncookies = spkt->satapkt_cmd.satacmd_num_dma_cookies;
 	ASSERT(ncookies <= (SGE_LENGTH(si_dma_sg_number)));
 
-	SIDBG1(SIDBG_COOKIES, si_ctlp, "total ncookies: %d", ncookies);
+	SIDBG_P(SIDBG_COOKIES, si_portp, "total ncookies: %d", ncookies);
 	if (ncookies == 0) {
 		sgbp = &si_portp->siport_sgbpool[slot * si_dma_sg_number];
 		sgtp = &sgbp->sgb_sgt[0];
 		sgep = &sgtp->sgt_sge[0];
 
 		/* No cookies. Terminate the chain. */
-		SIDBG0(SIDBG_COOKIES, si_ctlp, "empty cookies: terminating.");
+		SIDBG_P(SIDBG_COOKIES, si_portp, "empty cookies: terminating.",
+		    NULL);
 
 		sgep->sge_addr_low = 0;
 		sgep->sge_addr_high = 0;
@@ -2725,7 +2721,7 @@ si_deliver_satapkt(
 		    ((j < 3) && (cookie_index < ncookies-1));
 		    j++, cookie_index++, sgep++)  {
 			ASSERT(cookie_index < ncookies);
-			SIDBG2(SIDBG_COOKIES, si_ctlp,
+			SIDBG_P(SIDBG_COOKIES, si_portp,
 			    "inner loop: cookie_index: %d, ncookies: %d",
 			    cookie_index,
 			    ncookies);
@@ -2744,7 +2740,7 @@ si_deliver_satapkt(
 
 		if (cookie_index == ncookies-1) {
 			/* This is the last cookie. Terminate the chain. */
-			SIDBG2(SIDBG_COOKIES, si_ctlp,
+			SIDBG_P(SIDBG_COOKIES, si_portp,
 			    "filling the last: cookie_index: %d, "
 			    "ncookies: %d",
 			    cookie_index,
@@ -2761,7 +2757,7 @@ si_deliver_satapkt(
 
 		} else {
 			/* This is not the last one. So link it. */
-			SIDBG2(SIDBG_COOKIES, si_ctlp,
+			SIDBG_P(SIDBG_COOKIES, si_portp,
 			    "linking SGT: cookie_index: %d, ncookies: %d",
 			    cookie_index,
 			    ncookies);
@@ -2798,7 +2794,7 @@ sgl_fill_done:
 		 */
 		ASSERT((cmd->satacmd_acdb_len == 12) ||
 		    (cmd->satacmd_acdb_len == 16));
-		SIDBG1(SIDBG_VERBOSE, si_ctlp, "deliver: acdb_len: %d",
+		SIDBG_P(SIDBG_VERBOSE, si_portp, "deliver: acdb_len: %d",
 		    cmd->satacmd_acdb_len);
 
 		if (cmd->satacmd_acdb_len == 16) {
@@ -2883,12 +2879,12 @@ si_initialize_controller(si_ctl_state_t *si_ctlp)
 	uint32_t port_status;
 	uint32_t SStatus;
 	uint32_t SControl;
-	int port;
+	uint8_t port;
 	int loop_count = 0;
 	si_port_state_t *si_portp;
 
-	SIDBG0(SIDBG_INIT|SIDBG_ENTRY, si_ctlp,
-	    "si3124: si_initialize_controller entered");
+	SIDBG_C(SIDBG_INIT, si_ctlp,
+	    "si3124: si_initialize_controller entered", NULL);
 
 	mutex_enter(&si_ctlp->sictl_mutex);
 
@@ -2913,6 +2909,8 @@ si_initialize_controller(si_ctl_state_t *si_ctlp)
 
 		si_portp = si_ctlp->sictl_ports[port];
 		mutex_enter(&si_portp->siport_mutex);
+		si_portp->siport_ctlp = si_ctlp;
+		si_portp->siport_port_num = port;
 
 		/* Clear Port Reset. */
 		ddi_put32(si_ctlp->sictl_port_acc_handle,
@@ -3016,7 +3014,7 @@ si_initialize_controller(si_ctl_state_t *si_ctlp)
 		} while (SSTATUS_GET_DET(SStatus) !=
 		    SSTATUS_DET_DEVPRESENT_PHYONLINE);
 
-		SIDBG2(SIDBG_POLL_LOOP|SIDBG_INIT, si_ctlp,
+		SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 		    "si_initialize_controller: 1st loop count: %d, "
 		    "SStatus: 0x%x",
 		    loop_count,
@@ -3056,7 +3054,7 @@ si_initialize_controller(si_ctl_state_t *si_ctlp)
 
 		} while (!(port_status & PORT_STATUS_BITS_PORT_READY));
 
-		SIDBG1(SIDBG_POLL_LOOP|SIDBG_INIT, si_ctlp,
+		SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 		    "si_initialize_controller: 2nd loop count: %d",
 		    loop_count);
 
@@ -3105,8 +3103,8 @@ si_deinitialize_controller(si_ctl_state_t *si_ctlp)
 
 	_NOTE(ASSUMING_PROTECTED(si_ctlp))
 
-	SIDBG0(SIDBG_INIT|SIDBG_ENTRY, si_ctlp,
-	    "si3124: si_deinitialize_controller entered");
+	SIDBG_C(SIDBG_INIT, si_ctlp,
+	    "si3124: si_deinitialize_controller entered", NULL);
 
 	/* disable all the interrupts. */
 	si_disable_all_interrupts(si_ctlp);
@@ -3132,7 +3130,7 @@ static void
 si_init_port(si_ctl_state_t *si_ctlp, int port)
 {
 
-	SIDBG1(SIDBG_ENTRY|SIDBG_INIT, si_ctlp,
+	SIDBG_C(SIDBG_INIT, si_ctlp,
 	    "si_init_port entered: port: 0x%x",
 	    port);
 
@@ -3179,7 +3177,7 @@ si_enumerate_port_multiplier(
 	uint32_t SError = 0;
 	int loop_count = 0;
 
-	SIDBG1(SIDBG_ENTRY|SIDBG_INIT, si_ctlp,
+	SIDBG_P(SIDBG_INIT, si_portp,
 	    "si_enumerate_port_multiplier entered: port: %d",
 	    port);
 
@@ -3201,7 +3199,7 @@ si_enumerate_port_multiplier(
 	}
 	si_portp->siport_portmult_state.sipm_num_ports = num_dev_ports;
 
-	SIDBG1(SIDBG_INIT, si_ctlp,
+	SIDBG_P(SIDBG_INIT, si_portp,
 	    "si_enumerate_port_multiplier: ports found: %d",
 	    num_dev_ports);
 
@@ -3239,7 +3237,7 @@ si_enumerate_port_multiplier(
 			    pmport, PSCR_REG0, &SStatus)) {
 				break;
 			}
-			SIDBG1(SIDBG_POLL_LOOP, si_ctlp,
+			SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 			    "looping for PHYRDY: SStatus: %x",
 			    SStatus);
 
@@ -3269,7 +3267,7 @@ si_enumerate_port_multiplier(
 		} while (SSTATUS_GET_DET(SStatus) !=
 		    SSTATUS_DET_DEVPRESENT_PHYONLINE);
 
-		SIDBG2(SIDBG_POLL_LOOP, si_ctlp,
+		SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 		    "si_enumerate_port_multiplier: "
 		    "loop count: %d, SStatus: 0x%x",
 		    loop_count,
@@ -3280,7 +3278,7 @@ si_enumerate_port_multiplier(
 		    (SSTATUS_GET_DET(SStatus) ==
 		    SSTATUS_DET_DEVPRESENT_PHYONLINE)) {
 			/* The interface is active and the device is present */
-			SIDBG1(SIDBG_INIT, si_ctlp,
+			SIDBG_P(SIDBG_INIT, si_portp,
 			    "Status: %x, device exists",
 			    SStatus);
 			/*
@@ -3291,7 +3289,7 @@ si_enumerate_port_multiplier(
 			    pmport, PSCR_REG1, &SError)) {
 				continue;
 			}
-			SIDBG1(SIDBG_INIT, si_ctlp,
+			SIDBG_P(SIDBG_INIT, si_portp,
 			    "SError bits are: %x", SError);
 			if (si_write_portmult_reg(si_ctlp, si_portp, port,
 			    pmport, PSCR_REG1, SError)) {
@@ -3335,7 +3333,7 @@ si_read_portmult_reg(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG3(SIDBG_ENTRY, si_ctlp, "si_read_portmult_reg: port: %x,"
+	SIDBG_P(SIDBG_ENTRY, si_portp, "si_read_portmult_reg: port: %x,"
 	    "pmport: %x, regnum: %x",
 	    port, pmport, regnum);
 
@@ -3381,7 +3379,7 @@ si_read_portmult_reg(
 		slot_status = ddi_get32(si_ctlp->sictl_port_acc_handle,
 		    (uint32_t *)(PORT_SLOT_STATUS(si_ctlp, port)));
 
-		SIDBG1(SIDBG_POLL_LOOP, si_ctlp,
+		SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 		    "looping read_pm slot_status: 0x%x",
 		    slot_status);
 
@@ -3397,7 +3395,7 @@ si_read_portmult_reg(
 
 	} while (slot_status & SI_SLOT_MASK & (0x1 << slot));
 
-	SIDBG1(SIDBG_POLL_LOOP, si_ctlp,
+	SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 	    "read_portmult_reg: loop count: %d",
 	    loop_count);
 
@@ -3456,7 +3454,7 @@ si_write_portmult_reg(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG4(SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ENTRY, si_portp,
 	    "si_write_portmult_reg: port: %x, pmport: %x,"
 	    "regnum: %x, regval: %x",
 	    port, pmport, regnum, regval);
@@ -3508,7 +3506,7 @@ si_write_portmult_reg(
 		slot_status = ddi_get32(si_ctlp->sictl_port_acc_handle,
 		    (uint32_t *)(PORT_SLOT_STATUS(si_ctlp, port)));
 
-		SIDBG1(SIDBG_POLL_LOOP, si_ctlp,
+		SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 		    "looping write_pmp slot_status: 0x%x",
 		    slot_status);
 
@@ -3524,7 +3522,7 @@ si_write_portmult_reg(
 
 	} while (slot_status & SI_SLOT_MASK & (0x1 << slot));
 
-	SIDBG1(SIDBG_POLL_LOOP, si_ctlp,
+	SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 	    "write_portmult_reg: loop count: %d",
 	    loop_count);
 
@@ -3610,7 +3608,7 @@ si_intr(caddr_t arg1, caddr_t arg2)
 	global_intr_status = ddi_get32(si_ctlp->sictl_global_acc_handle,
 	    (uint32_t *)GLOBAL_INTERRUPT_STATUS(si_ctlp));
 
-	SIDBG1(SIDBG_INTR|SIDBG_ENTRY, si_ctlp,
+	SIDBG_C(SIDBG_INTR, si_ctlp,
 	    "si_intr: global_int_status: 0x%x",
 	    global_intr_status);
 
@@ -3641,7 +3639,7 @@ si_intr(caddr_t arg1, caddr_t arg2)
 		port_intr_status = ddi_get32(si_ctlp->sictl_global_acc_handle,
 		    (uint32_t *)PORT_INTERRUPT_STATUS(si_ctlp, port));
 
-		SIDBG2(SIDBG_VERBOSE, si_ctlp,
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
 		    "s_intr: port_intr_status: 0x%x, port: %x",
 		    port_intr_status,
 		    port);
@@ -3747,8 +3745,8 @@ si_intr_command_complete(
 	int finished_slot;
 	sata_pkt_t *satapkt;
 
-	SIDBG0(SIDBG_ENTRY|SIDBG_INTR, si_ctlp,
-	    "si_intr_command_complete enter");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_command_complete enter", NULL);
 
 	mutex_enter(&si_portp->siport_mutex);
 
@@ -3764,7 +3762,7 @@ si_intr_command_complete(
 		return (SI_SUCCESS);
 	}
 
-	SIDBG2(SIDBG_VERBOSE, si_ctlp, "si3124: si_intr_command_complete: "
+	SIDBG_P(SIDBG_VERBOSE, si_portp, "si3124: si_intr_command_complete: "
 	    "pending_tags: %x, slot_status: %x",
 	    si_portp->siport_pending_tags,
 	    slot_status);
@@ -3790,7 +3788,7 @@ si_intr_command_complete(
 		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_COMPLETED);
 	}
 
-	SIDBG2(SIDBG_PKTCOMP, si_ctlp,
+	SIDBG_P(SIDBG_PKTCOMP, si_portp,
 	    "command_complete done: pend_tags: 0x%x, slot_status: 0x%x",
 	    si_portp->siport_pending_tags,
 	    slot_status);
@@ -3882,7 +3880,7 @@ si_intr_command_error(
 	command_error = ddi_get32(si_ctlp->sictl_port_acc_handle,
 	    (uint32_t *)(PORT_COMMAND_ERROR(si_ctlp, port)));
 
-	SIDBG1(SIDBG_INTR|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si_intr_command_error: command_error: 0x%x",
 	    command_error);
 
@@ -3946,7 +3944,7 @@ si_intr_command_error(
 	    (si_portp->siport_err_tags_SDBERROR |
 	    si_portp->siport_err_tags_nonSDBERROR);
 
-	SIDBG3(SIDBG_ERRS|SIDBG_INTR, si_ctlp, "si_intr_command_error: "
+	SIDBG_P(SIDBG_ERRS, si_portp, "si_intr_command_error: "
 	    "err_tags_SDBERROR: 0x%x, "
 	    "err_tags_nonSDBERRROR: 0x%x, "
 	    "failed_tags: 0x%x",
@@ -3954,7 +3952,8 @@ si_intr_command_error(
 	    si_portp->siport_err_tags_nonSDBERROR,
 	    failed_tags);
 
-	SIDBG2(SIDBG_ERRS|SIDBG_INTR, si_ctlp, "si3124: si_intr_command_error: "
+	SIDBG_P(SIDBG_ERRS, si_portp,
+	    "si3124: si_intr_command_error: "
 	    "slot_status:0x%x, pending_tags: 0x%x",
 	    slot_status,
 	    si_portp->siport_pending_tags);
@@ -4004,7 +4003,7 @@ si_recover_portmult_errors(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si_recover_portmult_errors: port: 0x%x",
 	    port);
 
@@ -4108,7 +4107,7 @@ si_error_recovery_DEVICEERROR(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si_error_recovery_DEVICEERROR: port: 0x%x",
 	    port);
 
@@ -4144,7 +4143,7 @@ si_error_recovery_SDBERROR(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si3124: si_error_recovery_SDBERROR: port: 0x%x",
 	    port);
 
@@ -4179,7 +4178,7 @@ si_error_recovery_DATAFISERROR(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si3124: si_error_recovery_DATAFISERROR: port: 0x%x",
 	    port);
 
@@ -4219,7 +4218,7 @@ si_error_recovery_SENDFISERROR(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si3124: si_error_recovery_SENDFISERROR: port: 0x%x",
 	    port);
 
@@ -4252,7 +4251,7 @@ si_error_recovery_default(
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si3124: si_error_recovery_default: port: 0x%x",
 	    port);
 
@@ -4284,7 +4283,7 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
-	SIDBG1(SIDBG_ENTRY|SIDBG_ERRS, si_ctlp,
+	SIDBG_P(SIDBG_ERRS, si_portp,
 	    "si_read_log_ext: port: %x", port);
 
 	slot = si_claim_free_slot(si_ctlp, si_portp, port);
@@ -4327,7 +4326,7 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 		slot_status = ddi_get32(si_ctlp->sictl_port_acc_handle,
 		    (uint32_t *)(PORT_SLOT_STATUS(si_ctlp, port)));
 
-		SIDBG1(SIDBG_POLL_LOOP, si_ctlp,
+		SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 		    "looping read_log_ext slot_status: 0x%x",
 		    slot_status);
 
@@ -4354,7 +4353,7 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 		(void) si_initialize_port_wait_till_ready(si_ctlp, port);
 	}
 
-	SIDBG1(SIDBG_POLL_LOOP, si_ctlp,
+	SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 	    "read_portmult_reg: loop count: %d",
 	    loop_count);
 
@@ -4391,10 +4390,11 @@ si_log_error_message(si_ctl_state_t *si_ctlp, int port, uint32_t command_error)
 #if SI_DEBUG
 #ifndef __lock_lint
 	_NOTE(ARGUNUSED(si_ctlp))
-	_NOTE(ARGUNUSED(port))
+        _NOTE(ARGUNUSED(port))
 #endif  /* __lock_lint */
 
 	char *errstr;
+	si_port_state_t *si_portp = si_ctlp->sictl_ports[port];
 
 	switch (command_error) {
 
@@ -4494,15 +4494,14 @@ si_log_error_message(si_ctl_state_t *si_ctlp, int port, uint32_t command_error)
 
 	}
 
-	SIDBG2(SIDBG_ERRS, si_ctlp,
-	    "command error: port: 0x%x, error: %s",
-	    port,
+	SIDBG_P(SIDBG_ERRS, si_portp,
+	    "command error: error: %s",
 	    errstr);
 #else
 #ifndef __lock_lint
-	_NOTE(ARGUNUSED(si_ctlp))
-	_NOTE(ARGUNUSED(port))
-	_NOTE(ARGUNUSED(command_error))
+        _NOTE(ARGUNUSED(si_ctlp))
+        _NOTE(ARGUNUSED(port))
+        _NOTE(ARGUNUSED(command_error))
 #endif  /* __lock_lint */
 
 #endif	/* SI_DEBUG */
@@ -4522,7 +4521,7 @@ si_intr_port_ready(
 	si_port_state_t *si_portp,
 	int port)
 {
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_ready");
+	SIDBG_P(SIDBG_INTR, si_portp, "si_intr_ready", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4539,7 +4538,7 @@ si_intr_pwr_change(
 	si_port_state_t *si_portp,
 	int port)
 {
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_pwr_change");
+	SIDBG_P(SIDBG_INTR, si_portp, "si_intr_pwr_change", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4558,7 +4557,8 @@ si_intr_phy_ready_change(
 	int dev_exists_now = 0;
 	int dev_existed_previously = 0;
 
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_phy_rdy_change");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_phy_rdy_change", NULL);
 
 	mutex_enter(&si_ctlp->sictl_mutex);
 	if ((si_ctlp->sictl_sata_hba_tran == NULL) || (si_portp == NULL)) {
@@ -4599,12 +4599,12 @@ si_intr_phy_ready_change(
 		if (dev_existed_previously) {
 
 			/* Things are fine now. The loss was temporary. */
-			SIDBG0(SIDBG_INTR, NULL,
-			    "phyrdy: doing BOTH EVENTS TOGETHER");
+			SIDBG_P(SIDBG_INTR, si_portp,
+			    "phyrdy: doing BOTH EVENTS TOGETHER", NULL);
 			if (si_portp->siport_active) {
-				SIDBG0(SIDBG_EVENT, si_ctlp,
+				SIDBG_P(SIDBG_EVENT, si_portp,
 				    "sending event: LINK_LOST & "
-				    "LINK_ESTABLISHED");
+				    "LINK_ESTABLISHED", NULL);
 
 				sata_hba_event_notify(
 				    si_ctlp->sictl_sata_hba_tran->\
@@ -4621,10 +4621,11 @@ si_intr_phy_ready_change(
 			si_find_dev_signature(si_ctlp, si_portp, port,
 			    PORTMULT_CONTROL_PORT);
 			mutex_enter(&si_portp->siport_mutex);
-			SIDBG0(SIDBG_INTR, NULL, "phyrdy: doing ATTACH event");
+			SIDBG_P(SIDBG_INTR, si_portp,
+			    "phyrdy: doing ATTACH event", NULL);
 			if (si_portp->siport_active) {
-				SIDBG0(SIDBG_EVENT, si_ctlp,
-				    "sending event up: LINK_ESTABLISHED");
+				SIDBG_P(SIDBG_EVENT, si_portp,
+				    "sending event up: LINK_ESTABLISHED", NULL);
 
 				sata_hba_event_notify(
 				    si_ctlp->sictl_sata_hba_tran->\
@@ -4640,8 +4641,8 @@ si_intr_phy_ready_change(
 
 			/* An existing device is lost. */
 			if (si_portp->siport_active) {
-				SIDBG0(SIDBG_EVENT, si_ctlp,
-				    "sending event up: LINK_LOST");
+				SIDBG_P(SIDBG_EVENT, si_portp,
+				    "sending event up: LINK_LOST", NULL);
 
 				sata_hba_event_notify(
 				    si_ctlp->sictl_sata_hba_tran->
@@ -4651,15 +4652,12 @@ si_intr_phy_ready_change(
 			}
 			si_portp->siport_port_type = PORT_TYPE_NODEV;
 
-		}
-#if SI_DEBUG
-		else {
+		} else {
 
 			/* spurious interrupt */
-			SIDBG0(SIDBG_INTR, NULL,
-			    "spurious phy ready interrupt");
+			SIDBG_P(SIDBG_INTR, si_portp,
+			    "spurious phy ready interrupt", NULL);
 		}
-#endif	/* SI_DEBUG */
 	}
 
 	mutex_exit(&si_portp->siport_mutex);
@@ -4680,7 +4678,8 @@ si_intr_comwake_rcvd(
 	si_port_state_t *si_portp,
 	int port)
 {
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_commwake_rcvd");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_commwake_rcvd", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4697,7 +4696,8 @@ si_intr_unrecognised_fis(
 	si_port_state_t *si_portp,
 	int port)
 {
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_unrecognised_fis");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_unrecognised_fis", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4715,7 +4715,8 @@ si_intr_dev_xchanged(
 	int port)
 {
 
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_dev_xchanged");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_dev_xchanged", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4732,7 +4733,8 @@ si_intr_decode_err_threshold(
 	si_port_state_t *si_portp,
 	int port)
 {
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_err_threshold");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_err_threshold", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4749,7 +4751,8 @@ si_intr_crc_err_threshold(
 	si_port_state_t *si_portp,
 	int port)
 {
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_crc_threshold");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_crc_threshold", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4766,8 +4769,8 @@ si_intr_handshake_err_threshold(
 	si_port_state_t *si_portp,
 	int port)
 {
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp,
-	    "si_intr_handshake_err_threshold");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_handshake_err_threshold", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4784,7 +4787,8 @@ si_intr_set_devbits_notify(
 	si_port_state_t *si_portp,
 	int port)
 {
-	SIDBG0(SIDBG_INTR|SIDBG_ENTRY, si_ctlp, "si_intr_set_devbits_notify");
+	SIDBG_P(SIDBG_INTR, si_portp,
+	    "si_intr_set_devbits_notify", NULL);
 	return (SI_SUCCESS);
 }
 
@@ -4799,12 +4803,13 @@ static void
 si_enable_port_interrupts(si_ctl_state_t *si_ctlp, int port)
 {
 	uint32_t mask;
+	si_port_state_t *si_portp = si_ctlp->sictl_ports[port];
 
 	/* get the current settings first. */
 	mask = ddi_get32(si_ctlp->sictl_global_acc_handle,
 	    (uint32_t *)GLOBAL_CONTROL_REG(si_ctlp));
 
-	SIDBG1(SIDBG_INIT|SIDBG_ENTRY, si_ctlp,
+	SIDBG_P(SIDBG_INIT, si_portp,
 	    "si_enable_port_interrupts: current mask: 0x%x",
 	    mask);
 
@@ -4897,12 +4902,12 @@ si_add_legacy_intrs(si_ctl_state_t *si_ctlp)
 	int		actual, count = 0;
 	int		x, y, rc, inum = 0;
 
-	SIDBG0(SIDBG_ENTRY, si_ctlp, "si_add_legacy_intrs");
+	SIDBG_C(SIDBG_INIT, si_ctlp, "si_add_legacy_intrs", NULL);
 
 	/* get number of interrupts. */
 	rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_FIXED, &count);
 	if ((rc != DDI_SUCCESS) || (count == 0)) {
-		SIDBG2(SIDBG_INTR|SIDBG_INIT, si_ctlp,
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
 		    "ddi_intr_get_nintrs() failed, "
 		    "rc %d count %d\n", rc, count);
 		return (DDI_FAILURE);
@@ -4917,14 +4922,14 @@ si_add_legacy_intrs(si_ctl_state_t *si_ctlp)
 	    inum, count, &actual, DDI_INTR_ALLOC_STRICT);
 
 	if ((rc != DDI_SUCCESS) || (actual == 0)) {
-		SIDBG1(SIDBG_INTR|SIDBG_INIT, si_ctlp,
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
 		    "ddi_intr_alloc() failed, rc %d\n", rc);
 		kmem_free(si_ctlp->sictl_htable, si_ctlp->sictl_intr_size);
 		return (DDI_FAILURE);
 	}
 
 	if (actual < count) {
-		SIDBG2(SIDBG_INTR|SIDBG_INIT, si_ctlp,
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
 		    "Requested: %d, Received: %d", count, actual);
 
 		for (x = 0; x < actual; x++) {
@@ -4940,8 +4945,8 @@ si_add_legacy_intrs(si_ctl_state_t *si_ctlp)
 	/* Get intr priority. */
 	if (ddi_intr_get_pri(si_ctlp->sictl_htable[0],
 	    &si_ctlp->sictl_intr_pri) != DDI_SUCCESS) {
-		SIDBG0(SIDBG_INTR|SIDBG_INIT, si_ctlp,
-		    "ddi_intr_get_pri() failed");
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
+		    "ddi_intr_get_pri() failed", NULL);
 
 		for (x = 0; x < actual; x++) {
 			(void) ddi_intr_free(si_ctlp->sictl_htable[x]);
@@ -4953,8 +4958,8 @@ si_add_legacy_intrs(si_ctl_state_t *si_ctlp)
 
 	/* Test for high level mutex. */
 	if (si_ctlp->sictl_intr_pri >= ddi_intr_get_hilevel_pri()) {
-		SIDBG0(SIDBG_INTR|SIDBG_INIT, si_ctlp,
-		    "si_add_legacy_intrs: Hi level intr not supported");
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
+		    "si_add_legacy_intrs: Hi level intr not supported", NULL);
 
 		for (x = 0; x < actual; x++) {
 			(void) ddi_intr_free(si_ctlp->sictl_htable[x]);
@@ -4969,8 +4974,8 @@ si_add_legacy_intrs(si_ctl_state_t *si_ctlp)
 	for (x = 0; x < actual; x++) {
 		if (ddi_intr_add_handler(si_ctlp->sictl_htable[x], si_intr,
 		    (caddr_t)si_ctlp, NULL) != DDI_SUCCESS) {
-			SIDBG0(SIDBG_INTR|SIDBG_INIT, si_ctlp,
-			    "ddi_intr_add_handler() failed");
+			SIDBG_C(SIDBG_ERRS, si_ctlp,
+			    "ddi_intr_add_handler() failed", NULL);
 
 			for (y = 0; y < actual; y++) {
 				(void) ddi_intr_free(si_ctlp->sictl_htable[y]);
@@ -5000,12 +5005,12 @@ si_add_msi_intrs(si_ctl_state_t *si_ctlp)
 	int		count, avail, actual;
 	int		x, y, rc, inum = 0;
 
-	SIDBG0(SIDBG_ENTRY|SIDBG_INIT, si_ctlp, "si_add_msi_intrs");
+	SIDBG_C(SIDBG_INIT, si_ctlp, "si_add_msi_intrs", NULL);
 
 	/* get number of interrupts. */
 	rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_MSI, &count);
 	if ((rc != DDI_SUCCESS) || (count == 0)) {
-		SIDBG2(SIDBG_INIT, si_ctlp,
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
 		    "ddi_intr_get_nintrs() failed, "
 		    "rc %d count %d\n", rc, count);
 		return (DDI_FAILURE);
@@ -5014,19 +5019,17 @@ si_add_msi_intrs(si_ctl_state_t *si_ctlp)
 	/* get number of available interrupts. */
 	rc = ddi_intr_get_navail(devinfo, DDI_INTR_TYPE_MSI, &avail);
 	if ((rc != DDI_SUCCESS) || (avail == 0)) {
-		SIDBG2(SIDBG_INIT, si_ctlp,
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
 		    "ddi_intr_get_navail() failed, "
 		    "rc %d avail %d\n", rc, avail);
 		return (DDI_FAILURE);
 	}
 
-#if SI_DEBUG
 	if (avail < count) {
-		SIDBG2(SIDBG_INIT, si_ctlp,
+		SIDBG_C(SIDBG_INIT, si_ctlp,
 		    "ddi_intr_get_nvail returned %d, navail() returned %d",
 		    count, avail);
 	}
-#endif	/* SI_DEBUG */
 
 	/* Allocate an array of interrupt handles. */
 	si_ctlp->sictl_intr_size = count * sizeof (ddi_intr_handle_t);
@@ -5037,19 +5040,17 @@ si_add_msi_intrs(si_ctl_state_t *si_ctlp)
 	    inum, count, &actual, DDI_INTR_ALLOC_NORMAL);
 
 	if ((rc != DDI_SUCCESS) || (actual == 0)) {
-		SIDBG1(SIDBG_INIT, si_ctlp,
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
 		    "ddi_intr_alloc() failed, rc %d\n", rc);
 		kmem_free(si_ctlp->sictl_htable, si_ctlp->sictl_intr_size);
 		return (DDI_FAILURE);
 	}
 
-#if SI_DEBUG
 	/* use interrupt count returned */
 	if (actual < count) {
-		SIDBG2(SIDBG_INIT, si_ctlp,
+		SIDBG_C(SIDBG_INIT, si_ctlp,
 		    "Requested: %d, Received: %d", count, actual);
 	}
-#endif	/* SI_DEBUG */
 
 	si_ctlp->sictl_intr_cnt = actual;
 
@@ -5058,7 +5059,7 @@ si_add_msi_intrs(si_ctl_state_t *si_ctlp)
 	 */
 	if (ddi_intr_get_pri(si_ctlp->sictl_htable[0],
 	    &si_ctlp->sictl_intr_pri) != DDI_SUCCESS) {
-		SIDBG0(SIDBG_INIT, si_ctlp, "ddi_intr_get_pri() failed");
+		SIDBG_C(SIDBG_ERRS, si_ctlp, "ddi_intr_get_pri() failed", NULL);
 
 		/* Free already allocated intr. */
 		for (y = 0; y < actual; y++) {
@@ -5071,8 +5072,8 @@ si_add_msi_intrs(si_ctl_state_t *si_ctlp)
 
 	/* Test for high level mutex. */
 	if (si_ctlp->sictl_intr_pri >= ddi_intr_get_hilevel_pri()) {
-		SIDBG0(SIDBG_INIT, si_ctlp,
-		    "si_add_msi_intrs: Hi level intr not supported");
+		SIDBG_C(SIDBG_ERRS, si_ctlp,
+		    "si_add_msi_intrs: Hi level intr not supported", NULL);
 
 		/* Free already allocated intr. */
 		for (y = 0; y < actual; y++) {
@@ -5088,8 +5089,8 @@ si_add_msi_intrs(si_ctl_state_t *si_ctlp)
 	for (x = 0; x < actual; x++) {
 		if (ddi_intr_add_handler(si_ctlp->sictl_htable[x], si_intr,
 		    (caddr_t)si_ctlp, NULL) != DDI_SUCCESS) {
-			SIDBG0(SIDBG_INIT, si_ctlp,
-			    "ddi_intr_add_handler() failed");
+			SIDBG_C(SIDBG_ERRS, si_ctlp,
+			    "ddi_intr_add_handler() failed", NULL);
 
 			/* Free already allocated intr. */
 			for (y = 0; y < actual; y++) {
@@ -5128,7 +5129,7 @@ si_rem_intrs(si_ctl_state_t *si_ctlp)
 {
 	int x;
 
-	SIDBG0(SIDBG_ENTRY, si_ctlp, "si_rem_intrs entered");
+	SIDBG_C(SIDBG_INIT, si_ctlp, "si_rem_intrs entered", NULL);
 
 	/* Disable all interrupts. */
 	if ((si_ctlp->sictl_intr_type == DDI_INTR_TYPE_MSI) &&
@@ -5269,7 +5270,7 @@ si_reset_dport_wait_till_ready(
 
 	} while (SSTATUS_GET_DET(SStatus) != SSTATUS_DET_DEVPRESENT_PHYONLINE);
 
-	SIDBG2(SIDBG_POLL_LOOP, si_ctlp,
+	SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 	    "si_reset_dport_wait_till_ready: loop count: %d, \
 		SStatus: 0x%x",
 	    loop_count,
@@ -5293,7 +5294,7 @@ si_reset_dport_wait_till_ready(
 
 	} while (!(port_status & PORT_STATUS_BITS_PORT_READY));
 
-	SIDBG3(SIDBG_POLL_LOOP, si_ctlp,
+	SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 	    "si_reset_dport_wait_till_ready: loop count: %d, \
 		port_status: 0x%x, SStatus: 0x%x",
 	    loop_count,
@@ -5322,8 +5323,8 @@ si_reset_dport_wait_till_ready(
 			    SATA_EVNT_DEVICE_RESET);
 		}
 
-		SIDBG0(SIDBG_EVENT, si_ctlp,
-		    "sending event up: SATA_EVNT_RESET");
+		SIDBG_P(SIDBG_EVENT, si_portp,
+		    "sending event up: SATA_EVNT_RESET", NULL);
 	}
 
 	if ((SSTATUS_GET_IPM(SStatus) == SSTATUS_IPM_INTERFACE_ACTIVE) &&
@@ -5332,8 +5333,8 @@ si_reset_dport_wait_till_ready(
 		/* The interface is active and the device is present */
 		if (!(port_status & PORT_STATUS_BITS_PORT_READY)) {
 			/* But the port is is not ready for some reason */
-			SIDBG0(SIDBG_POLL_LOOP, si_ctlp,
-			    "si_reset_dport_wait_till_ready failed");
+			SIDBG_P(SIDBG_POLL_LOOP, si_portp,
+			    "si_reset_dport_wait_till_ready failed", NULL);
 			return (SI_FAILURE);
 		}
 	}
@@ -5344,7 +5345,7 @@ si_reset_dport_wait_till_ready(
 	 * any reset condition. So restore them back now.
 	 */
 
-	SIDBG1(SIDBG_INIT, si_ctlp,
+	SIDBG_P(SIDBG_INIT, si_portp,
 	    "current interrupt enable set: 0x%x",
 	    ddi_get32(si_ctlp->sictl_port_acc_handle,
 	    (uint32_t *)PORT_INTERRUPT_ENABLE_SET(si_ctlp, port)));
@@ -5375,8 +5376,8 @@ si_reset_dport_wait_till_ready(
 	    port_intr_status & INTR_MASK);
 
 
-	SIDBG0(SIDBG_POLL_LOOP, si_ctlp,
-	    "si_reset_dport_wait_till_ready returning success");
+	SIDBG_P(SIDBG_POLL_LOOP, si_portp,
+	    "si_reset_dport_wait_till_ready returning success", NULL);
 
 	return (SI_SUCCESS);
 }
@@ -5454,6 +5455,7 @@ si_initialize_port_wait_till_ready(si_ctl_state_t *si_ctlp, int port)
 	uint32_t port_status;
 	int loop_count = 0;
 	uint32_t SStatus;
+	si_port_state_t *si_portp = si_ctlp->sictl_ports[port];
 
 	/* Initialize the port. */
 	ddi_put32(si_ctlp->sictl_port_acc_handle,
@@ -5467,7 +5469,7 @@ si_initialize_port_wait_till_ready(si_ctl_state_t *si_ctlp, int port)
 		    (uint32_t *)PORT_STATUS(si_ctlp, port));
 
 		if (loop_count++ > SI_POLLRATE_PORTREADY) {
-			SIDBG1(SIDBG_INTR, si_ctlp,
+			SIDBG_P(SIDBG_INTR, si_portp,
 			    "si_initialize_port_wait is timing out: "
 			    "port_status: %x",
 			    port_status);
@@ -5482,7 +5484,7 @@ si_initialize_port_wait_till_ready(si_ctl_state_t *si_ctlp, int port)
 
 	} while (!(port_status & PORT_STATUS_BITS_PORT_READY));
 
-	SIDBG1(SIDBG_POLL_LOOP, si_ctlp,
+	SIDBG_P(SIDBG_POLL_LOOP, si_portp,
 	    "si_initialize_port_wait_till_ready: loop count: %d",
 	    loop_count);
 
@@ -5518,7 +5520,8 @@ si_timeout_pkts(
 	uint32_t slot_status;
 	uint32_t finished_tags;
 
-	SIDBG0(SIDBG_TIMEOUT|SIDBG_ENTRY, si_ctlp, "si_timeout_pkts entry");
+	SIDBG_P(SIDBG_TIMEOUT, si_portp,
+	    "si_timeout_pkts entry", NULL);
 
 	mutex_enter(&si_portp->siport_mutex);
 	slot_status = ddi_get32(si_ctlp->sictl_port_acc_handle,
@@ -5541,7 +5544,7 @@ si_timeout_pkts(
 	    ~slot_status & SI_SLOT_MASK;
 	timedout_tags &= ~finished_tags;
 
-	SIDBG2(SIDBG_TIMEOUT, si_ctlp,
+	SIDBG_P(SIDBG_TIMEOUT, si_portp,
 	    "si_timeout_pkts: finished: %x, timeout: %x",
 	    finished_tags,
 	    timedout_tags);
@@ -5581,8 +5584,8 @@ si_watchdog_handler(si_ctl_state_t *si_ctlp)
 	int watched_cycles;
 
 	mutex_enter(&si_ctlp->sictl_mutex);
-	SIDBG0(SIDBG_TIMEOUT|SIDBG_ENTRY, si_ctlp,
-	    "si_watchdog_handler entered");
+	SIDBG_C(SIDBG_ENTRY, si_ctlp,
+	    "si_watchdog_handler entered", NULL);
 
 	for (port = 0; port < si_ctlp->sictl_num_ports; port++) {
 
@@ -5600,7 +5603,7 @@ si_watchdog_handler(si_ctl_state_t *si_ctlp)
 
 		/* Skip the check for those ports in error recovery */
 		if (si_portp->mopping_in_progress > 0) {
-			SIDBG1(SIDBG_INFO, si_ctlp,
+			SIDBG_P(SIDBG_INFO, si_portp,
 			    "si_watchdog_handler: port %d mopping "
 			    "in progress, so just return", port);
 			mutex_exit(&si_portp->siport_mutex);
@@ -5634,8 +5637,8 @@ si_watchdog_handler(si_ctl_state_t *si_ctlp)
 				    si_watchdog_timeout;
 				if (watched_cycles > max_life_cycles) {
 					timedout_tags |= (0x1 << tmpslot);
-					SIDBG1(SIDBG_TIMEOUT|SIDBG_VERBOSE,
-					    si_ctlp,
+					SIDBG_P(SIDBG_TIMEOUT,
+					    si_portp,
 					    "watchdog: timedout_tags: 0x%x",
 					    timedout_tags);
 				}
@@ -5842,34 +5845,54 @@ si_fm_ereport(si_ctl_state_t *si_ctlp, char *detail, char *payload)
 	}
 }
 
-#if SI_DEBUG
 /*
  * Logs the message.
  */
 static void
-si_log(si_ctl_state_t *si_ctlp, uint_t level, char *fmt, ...)
+si_log(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, char *fmt, ...)
 {
 	va_list ap;
 
 	mutex_enter(&si_log_mutex);
 
 	va_start(ap, fmt);
-	if (si_ctlp) {
-		(void) sprintf(si_log_buf, "%s-[%d]:",
-		    ddi_get_name(si_ctlp->sictl_devinfop),
-		    ddi_get_instance(si_ctlp->sictl_devinfop));
-	} else {
-		(void) sprintf(si_log_buf, "si3124:");
-	}
-	(void) vsprintf(si_log_buf, fmt, ap);
-	va_end(ap);
 
-	cmn_err(level, "%s", si_log_buf);
+	if (si_portp == NULL && si_ctlp == NULL) {
+		sata_vtrace_debug(NULL, fmt, ap);
+		va_end(ap);
+		mutex_exit(&si_log_mutex);
+		return;
+	}
+
+	if (si_portp == NULL && si_ctlp != NULL) {
+		sata_vtrace_debug(si_ctlp->sictl_devinfop, fmt, ap);
+		va_end(ap);
+		mutex_exit(&si_log_mutex);
+		return;
+	}
+
+	/*
+	 * si_portp is not NULL, but si_ctlp might be.
+	 * Reference si_portp for both port and dip.
+	 */
+	(void) snprintf(si_log_buf, SI_LOGBUF_LEN, "port%d: %s",
+	    si_portp->siport_port_num, fmt);
+
+	if (si_portp->siport_ctlp == NULL) {
+		sata_vtrace_debug(NULL, si_log_buf, ap);
+		va_end(ap);
+		mutex_exit(&si_log_mutex);
+		return;
+	}
+
+	sata_vtrace_debug(si_portp->siport_ctlp->sictl_devinfop,
+	    si_log_buf, ap);
+
+	va_end(ap);
 
 	mutex_exit(&si_log_mutex);
 
 }
-#endif	/* SI_DEBUG */
 
 static void
 si_copy_out_regs(sata_cmd_t *scmd, si_ctl_state_t *si_ctlp, uint8_t port,
@@ -5878,6 +5901,7 @@ si_copy_out_regs(sata_cmd_t *scmd, si_ctl_state_t *si_ctlp, uint8_t port,
 	uint32_t *fis_word_ptr;
 	si_prb_t *prb;
 	int i;
+	si_port_state_t *si_portp = si_ctlp->sictl_ports[port];
 
 	/*
 	 * The LRAM contains the the modified FIS after command completion, so
@@ -5905,64 +5929,72 @@ si_copy_out_regs(sata_cmd_t *scmd, si_ctl_state_t *si_ctlp, uint8_t port,
 	if (scmd->satacmd_flags.sata_copy_out_sec_count_msb) {
 		scmd->satacmd_sec_count_msb =
 		    GET_FIS_SECTOR_COUNT_EXP(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL,
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
 		    "copyout satacmd_sec_count_msb %x\n",
 		    scmd->satacmd_sec_count_msb);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_lba_low_msb) {
 		scmd->satacmd_lba_low_msb = GET_FIS_SECTOR_EXP(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_low_msb %x\n",
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "copyout satacmd_lba_low_msb %x\n",
 		    scmd->satacmd_lba_low_msb);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_lba_mid_msb) {
 		scmd->satacmd_lba_mid_msb = GET_FIS_CYL_LOW_EXP(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_mid_msb %x\n",
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "copyout satacmd_lba_mid_msb %x\n",
 		    scmd->satacmd_lba_mid_msb);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_lba_high_msb) {
 		scmd->satacmd_lba_high_msb = GET_FIS_CYL_HI_EXP(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_high_msb %x\n",
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "copyout satacmd_lba_high_msb %x\n",
 		    scmd->satacmd_lba_high_msb);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_sec_count_lsb) {
 		scmd->satacmd_sec_count_lsb =
 		    GET_FIS_SECTOR_COUNT(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL,
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
 		    "copyout satacmd_sec_count_lsb %x\n",
 		    scmd->satacmd_sec_count_lsb);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_lba_low_lsb) {
 		scmd->satacmd_lba_low_lsb = GET_FIS_SECTOR(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_low_lsb %x\n",
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "copyout satacmd_lba_low_lsb %x\n",
 		    scmd->satacmd_lba_low_lsb);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_lba_mid_lsb) {
 		scmd->satacmd_lba_mid_lsb = GET_FIS_CYL_LOW(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_mid_lsb %x\n",
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "copyout satacmd_lba_mid_lsb %x\n",
 		    scmd->satacmd_lba_mid_lsb);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_lba_high_lsb) {
 		scmd->satacmd_lba_high_lsb = GET_FIS_CYL_HI(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_high_lsb %x\n",
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "copyout satacmd_lba_high_lsb %x\n",
 		    scmd->satacmd_lba_high_lsb);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_device_reg) {
 		scmd->satacmd_device_reg = GET_FIS_DEV_HEAD(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_device_reg %x\n",
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "copyout satacmd_device_reg %x\n",
 		    scmd->satacmd_device_reg);
 	}
 
 	if (scmd->satacmd_flags.sata_copy_out_error_reg) {
 		scmd->satacmd_error_reg = GET_FIS_FEATURES(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_error_reg %x\n",
+		SIDBG_P(SIDBG_VERBOSE, si_portp,
+		    "copyout satacmd_error_reg %x\n",
 		    scmd->satacmd_error_reg);
 	}
 }
@@ -6009,12 +6041,12 @@ si_quiesce(dev_info_t *dip)
 	int instance;
 	int port;
 
-	SIDBG0(SIDBG_INIT|SIDBG_ENTRY, NULL, "si_quiesce enter");
 	instance = ddi_get_instance(dip);
 	si_ctlp = ddi_get_soft_state(si_statep, instance);
 	if (si_ctlp == NULL)
 		return (DDI_FAILURE);
 
+	SIDBG_C(SIDBG_ENTRY, si_ctlp, "si_quiesce enter", NULL);
 	/*
 	 * Disable all the interrupts before quiesce
 	 */

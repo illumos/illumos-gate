@@ -34,6 +34,8 @@ extern "C" {
 #define	SI3132_MAX_PORTS		2
 #define	SI_MAX_PORTS			SI3124_MAX_PORTS
 
+#define	SI_LOGBUF_LEN			512
+
 #define	SI_SUCCESS			(0)	/* successful return */
 #define	SI_TIMEOUT			(1)	/* timed out */
 #define	SI_FAILURE			(-1)	/* unsuccessful return */
@@ -97,10 +99,14 @@ typedef struct si_portmult_state {
 #define	PORT_ACTIVE		0x1
 
 typedef struct si_port_state {
+	struct si_ctl_state *siport_ctlp;	/* back pointer to controller */
+
 	uint8_t siport_port_type;
 	/* one of PORT_TYPE_[NODEV | MULTIPLIER | ATAPI | DISK | UNKNOWN] */
 
 	uint8_t siport_active;		/* one of ACTIVE or INACTIVE */
+
+	uint8_t siport_port_num;	/* port number */
 
 	si_portmult_state_t siport_portmult_state;
 
@@ -148,6 +154,8 @@ typedef struct si_port_state {
 _NOTE(MUTEX_PROTECTS_DATA(si_port_state_t::siport_mutex, si_port_state_t))
 _NOTE(READ_ONLY_DATA(si_port_state_t::siport_prbpool_dma_handle))
 _NOTE(READ_ONLY_DATA(si_port_state_t::siport_sgbpool_dma_handle))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(si_port_state_t::siport_ctlp))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(si_port_state_t::siport_port_num))
 
 
 typedef struct si_ctl_state {
@@ -196,6 +204,7 @@ _NOTE(MUTEX_PROTECTS_DATA(si_ctl_state_t::sictl_mutex,
 					si_ctl_state_t::sictl_flags))
 _NOTE(MUTEX_PROTECTS_DATA(si_ctl_state_t::sictl_mutex,
 					si_ctl_state_t::sictl_timeout_id))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(si_ctl_state_t::sictl_ports))
 /*
  * flags for si_flags
  */
@@ -235,6 +244,9 @@ _NOTE(MUTEX_PROTECTS_DATA(si_ctl_state_t::sictl_mutex,
 
 #define	SI_DEBUG	1
 
+#endif /* DEBUG */
+
+/* si_debug_flags */
 #define	SIDBG_TEST	0x0001
 #define	SIDBG_INIT	0x0002
 #define	SIDBG_ENTRY	0x0004
@@ -249,42 +261,25 @@ _NOTE(MUTEX_PROTECTS_DATA(si_ctl_state_t::sictl_mutex,
 #define	SIDBG_ERRS	0x0800
 #define	SIDBG_COOKIES	0x1000
 #define	SIDBG_POWER	0x2000
+#define	SIDBG_RESET	0x4000
 
 extern uint32_t si_debug_flags;
 
-#define	SIDBG0(flag, softp, format) \
+#define	SIDBG(flag, format, args ...) \
 	if (si_debug_flags & (flag)) { \
-		si_log(softp, CE_WARN, format); \
+		si_log(NULL, NULL, format, ## args); \
 	}
 
-#define	SIDBG1(flag, softp, format, arg1) \
+#define	SIDBG_P(flag, si_portp, format, args ...) \
 	if (si_debug_flags & (flag)) { \
-		si_log(softp, CE_WARN, format, arg1); \
+		si_log(NULL, si_portp, format, ## args); \
 	}
 
-#define	SIDBG2(flag, softp, format, arg1, arg2) \
+#define	SIDBG_C(flag, si_ctlp, format, args ...) \
 	if (si_debug_flags & (flag)) { \
-		si_log(softp, CE_WARN, format, arg1, arg2); \
+		si_log(si_ctlp, NULL, format, ## args); \
 	}
 
-#define	SIDBG3(flag, softp, format, arg1, arg2, arg3) \
-	if (si_debug_flags & (flag)) { \
-		si_log(softp, CE_WARN, format, arg1, arg2, arg3); \
-	}
-
-#define	SIDBG4(flag, softp, format, arg1, arg2, arg3, arg4) \
-	if (si_debug_flags & (flag)) { \
-		si_log(softp, CE_WARN, format, arg1, arg2, arg3, arg4); \
-	}
-#else
-
-#define	SIDBG0(flag, dip, frmt)
-#define	SIDBG1(flag, dip, frmt, arg1)
-#define	SIDBG2(flag, dip, frmt, arg1, arg2)
-#define	SIDBG3(flag, dip, frmt, arg1, arg2, arg3)
-#define	SIDBG4(flag, dip, frmt, arg1, arg2, arg3, arg4)
-
-#endif /* DEBUG */
 
 /* Flags controlling the reset behavior */
 #define	SI_PORT_RESET		0x1	/* Reset the port */
