@@ -1,0 +1,46 @@
+Illumos Gate README - July 29, 2010.
+
+This is the Illumos gate.  It contains the following subdirectories:
+
+        - usr/src -- this is a clone (with changes) of the Oracle ONNV gate.
+          We should avoid making too many disruptive changes here.  It
+          will be periodically synced with ONNV.
+
+        - usr/illumos -- this is the set of bits that we deliver, which are not
+          yet integrated into the onnv tree.  This may include various
+          testing bits, etc.  These bits (for whatever reason), are things
+          that we think are inappropriate for inclusion in the upstream and
+	  really are specific to illumos.
+
+Integration Rules:
+
+        All changes must have been reviewed, and (for the interim only!)
+        approved by the gatekeeper (below).  A code review may be performed
+        by someone other than the gatekeeper, but the final integration should
+        still be approved by the gatekeeper.  (Think CRT advocate for now.)
+        The gatekeeper will want to see your webrev and hg outgoing -v.
+
+        All changes must adhere to typical ON style and quality rules.
+        For example, pass full cstyle, applicable lint rules, etc.
+
+        All commits must include either a CDDL or BSD/MIT license, unless
+        approved otherwise by the gatekeeper.  CDDL licensed changes must
+        be backed by a Sun Contributor Agreement, so that the changes can
+        be contributed to the upstream OpenSolaris consolidation.
+
+        Hg commits should have comments of the following form:
+
+        1234 This is a sample bug report synopsis
+        4567 If you have a second bug synopsis...
+        Reviewed by: codereviewer@somewhere.net
+        Approved by: gatekeeper@somewhere.else.com
+
+Branches:
+
+        Please talk to the gatekeeper about personal branches.  In general,
+        they will be allowed as long as we don't go *too* wild on them.
+
+Gatekeeper:     garrett@nexenta.com  (Interim)
+IRC channel:    #illumos on irc.freenode.net
+Mailing list:   developer@lists.illumos.org
+
