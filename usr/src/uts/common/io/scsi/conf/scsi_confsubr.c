@@ -1023,7 +1023,7 @@ scsi_test(struct scsi_pkt *pkt, enum scsi_test_ctxt ctxt)
 int
 scsi_probe(struct scsi_device *sd, int (*callback)())
 {
-	int			ret;
+	int			ret, retry = 0;
 	scsi_hba_tran_t		*tran = sd->sd_address.a_hba_tran;
 
 	if (scsi_check_ss2_LUN_limit(sd) != 0) {
@@ -1033,11 +1033,19 @@ scsi_probe(struct scsi_device *sd, int (*callback)())
 		 */
 		return (SCSIPROBE_NORESP);	/* skip probing this one */
 	}
-
+again:
 	if (tran->tran_tgt_probe != NULL) {
 		ret = (*tran->tran_tgt_probe)(sd, callback);
 	} else {
 		ret = scsi_hba_probe(sd, callback);
+	}
+
+	if ((ret != SCSIPROBE_EXISTS) && (retry == 0)) {
+		if (scsi_reset(&sd->sd_address, RESET_LUN) != 1) {
+			cmn_err(CE_WARN, "scsi_probe: scsi_reset failed");
+		}
+		retry = 1;
+		goto again;
 	}
 
 	if (ret == SCSIPROBE_EXISTS) {
