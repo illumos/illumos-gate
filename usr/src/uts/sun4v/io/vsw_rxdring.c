@@ -456,7 +456,7 @@ vsw_map_tx_dring(vsw_ldc_t *ldcp, void *pkt)
 	/* RxDringData mode specific initializations */
 	mutex_init(&dp->txlock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&dp->restart_lock, NULL, MUTEX_DRIVER, NULL);
-	dp->next_txi = 0;
+	dp->next_txi = dp->restart_peer_txi = 0;
 	dp->restart_reqd = B_TRUE;
 	ldcp->dringdata_msgid = 0;
 	ldcp->lane_in.dringp = dp;
@@ -857,7 +857,6 @@ vsw_dringsend_shm(vsw_ldc_t *ldcp, mblk_t *mp)
 	uint32_t			next_txi;
 	uint32_t			txi;
 	vnet_rx_dringdata_desc_t	*txdp;
-	vnet_rx_dringdata_desc_t	*ntxdp;
 	struct ether_header		*ehp;
 	size_t				mblksz;
 	caddr_t				dst;
@@ -951,20 +950,19 @@ vsw_dringsend_shm(vsw_ldc_t *ldcp, mblk_t *mp)
 	mutex_enter(&dp->txlock);
 	txi = next_txi = dp->next_txi;
 	INCR_TXI(dp, next_txi);
-	ntxdp = &(pub_addr[next_txi]);
-	if (ntxdp->dstate != VIO_DESC_DONE) { /* out of descriptors */
+	txdp = &(pub_addr[txi]);
+	if (txdp->dstate != VIO_DESC_DONE) { /* out of descriptors */
 		statsp->tx_no_desc++;
 		mutex_exit(&dp->txlock);
 		(void) LDC_NO_TRAP();
 		return (LDC_TX_NORESOURCES);
+	} else {
+		txdp->dstate = VIO_DESC_INITIALIZING;
 	}
 
 	/* Update descriptor ring index */
 	dp->next_txi = next_txi;
 	mutex_exit(&dp->txlock);
-
-	/* Access the descriptor */
-	txdp = &(pub_addr[txi]);
 
 	/* Ensure load ordering of dstate (above) and data_buf_offset. */
 	MEMBAR_CONSUMER();
@@ -993,11 +991,13 @@ vsw_dringsend_shm(vsw_ldc_t *ldcp, mblk_t *mp)
 
 	mutex_enter(&dp->restart_lock);
 
+	ASSERT(txdp->dstate == VIO_DESC_INITIALIZING);
+
 	/* Mark the descriptor ready */
 	txdp->dstate = VIO_DESC_READY;
 
 	/* Check if peer needs wake up (handled below) */
-	if (dp->restart_reqd == B_TRUE) {
+	if (dp->restart_reqd == B_TRUE && dp->restart_peer_txi == txi) {
 		dp->restart_reqd = B_FALSE;
 		resched_peer = B_TRUE;
 	}
@@ -1208,6 +1208,7 @@ vsw_process_dringdata_ack_shm(vsw_ldc_t *ldcp, vio_dring_msg_t *msg)
 		 * the peer when tx descriptors are ready in transmit routine.
 		 */
 		dp->restart_reqd = B_TRUE;
+		dp->restart_peer_txi = txi;
 		mutex_exit(&dp->restart_lock);
 		return;
 	}

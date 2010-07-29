@@ -402,7 +402,7 @@ vgen_map_tx_dring(vgen_ldc_t *ldcp, void *pkt)
 	ldcp->num_txds = num_desc;
 
 	/* Initialize tx dring indexes and seqnum */
-	ldcp->next_txi = ldcp->cur_txi = 0;
+	ldcp->next_txi = ldcp->cur_txi = ldcp->resched_peer_txi = 0;
 	ldcp->next_txseq = VNET_ISS - 1;
 	ldcp->resched_peer = B_TRUE;
 	ldcp->dring_mtype = minfo.mtype;
@@ -493,7 +493,7 @@ vgen_unmap_tx_dring(vgen_ldc_t *ldcp)
 	/* clobber tx ring members */
 	bzero(&ldcp->tx_dring_cookie, sizeof (ldcp->tx_dring_cookie));
 	ldcp->mtxdp = NULL;
-	ldcp->next_txi = ldcp->cur_txi = 0;
+	ldcp->next_txi = ldcp->cur_txi = ldcp->resched_peer_txi = 0;
 	ldcp->num_txds = 0;
 	ldcp->next_txseq = VNET_ISS - 1;
 	ldcp->resched_peer = B_TRUE;
@@ -567,7 +567,6 @@ vgen_dringsend_shm(void *arg, mblk_t *mp)
 	uint32_t			next_txi;
 	uint32_t			txi;
 	vnet_rx_dringdata_desc_t	*txdp;
-	vnet_rx_dringdata_desc_t	*ntxdp;
 	struct ether_header		*ehp;
 	size_t				mblksz;
 	caddr_t				dst;
@@ -644,8 +643,8 @@ vgen_dringsend_shm(void *arg, mblk_t *mp)
 	mutex_enter(&ldcp->txlock);
 	txi = next_txi = ldcp->next_txi;
 	INCR_TXI(next_txi, ldcp);
-	ntxdp = &(ldcp->mtxdp[next_txi]);
-	if (ntxdp->dstate != VIO_DESC_DONE) { /* out of descriptors */
+	txdp = &(ldcp->mtxdp[txi]);
+	if (txdp->dstate != VIO_DESC_DONE) { /* out of descriptors */
 		if (ldcp->tx_blocked == B_FALSE) {
 			ldcp->tx_blocked_lbolt = ddi_get_lbolt();
 			ldcp->tx_blocked = B_TRUE;
@@ -654,6 +653,8 @@ vgen_dringsend_shm(void *arg, mblk_t *mp)
 		mutex_exit(&ldcp->txlock);
 		(void) LDC_NO_TRAP();
 		return (VGEN_TX_NORESOURCES);
+	} else {
+		txdp->dstate = VIO_DESC_INITIALIZING;
 	}
 
 	if (ldcp->tx_blocked == B_TRUE) {
@@ -671,9 +672,6 @@ vgen_dringsend_shm(void *arg, mblk_t *mp)
 
 		vtx_update(ldcp->portp->vhp);
 	}
-
-	/* Access the descriptor */
-	txdp = &(ldcp->mtxdp[txi]);
 
 	/* Ensure load ordering of dstate (above) and data_buf_offset. */
 	MEMBAR_CONSUMER();
@@ -702,13 +700,15 @@ vgen_dringsend_shm(void *arg, mblk_t *mp)
 
 	mutex_enter(&ldcp->wrlock);
 
+	ASSERT(txdp->dstate == VIO_DESC_INITIALIZING);
+
 	/* Mark the descriptor ready */
 	txdp->dstate = VIO_DESC_READY;
 
 	/* Check if peer needs wake up (handled below) */
-	if (ldcp->resched_peer == B_TRUE) {
-		ldcp->resched_peer = B_FALSE;
+	if (ldcp->resched_peer == B_TRUE && ldcp->resched_peer_txi == txi) {
 		resched_peer = B_TRUE;
+		ldcp->resched_peer = B_FALSE;
 	}
 
 	/* Update tx stats */
@@ -1270,6 +1270,7 @@ vgen_handle_dringdata_ack_shm(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		 * the peer when tx descriptors are ready in transmit routine.
 		 */
 		ldcp->resched_peer = B_TRUE;
+		ldcp->resched_peer_txi = txi;
 		mutex_exit(&ldcp->wrlock);
 		return (rv);
 	}
