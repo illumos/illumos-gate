@@ -303,7 +303,7 @@ static void freev(char **);
 static void fullpaths(struct man_node **);
 static void lower(char *);
 static int cmp(const void *, const void *);
-static void manual(struct man_node *, char *);
+static int manual(struct man_node *, char *);
 static void mandir(char **, char *, char *);
 static void sortdir(DIR *, char ***);
 static int searchdir(char *, char *, char *);
@@ -355,6 +355,7 @@ main(int argc, char *argv[])
 	char *manpath = NULL;
 	static struct man_node	*manpage = NULL;
 	int bmp_flags = 0;
+	int err = 0;
 
 	if (access(SROFF_CMD, F_OK | X_OK) != 0)
 		no_sroff = 1;
@@ -584,7 +585,7 @@ doargs:
 			} else if (printmp != 0) {
 				print_manpath(mp, argv[optind]);
 			} else {
-				manual(mp, argv[optind]);
+				err += manual(mp, argv[optind]);
 			}
 
 			if (mp != NULL && mp != manpage) {
@@ -593,7 +594,7 @@ doargs:
 			}
 		}
 	}
-	return (0);
+	return (err == 0 ? 0 : 1);
 	/*NOTREACHED*/
 }
 
@@ -1590,7 +1591,7 @@ cmp(const void *arg1, const void *arg2)
  *   and if it doesn't exist, do the hard way.
  */
 
-static void
+static int
 manual(struct man_node *manp, char *name)
 {
 	struct man_node *p;
@@ -1662,19 +1663,21 @@ manual(struct man_node *manp, char *name)
 		more(pages, nomore);
 	} else {
 		if (sargs) {
-			(void) printf(gettext("No entry for %s in section(s) "
-			    "%s of the manual.\n"), fullname, mansec);
+			(void) fprintf(stderr, gettext("No entry for %s in "
+			    "section(s) %s of the manual.\n"),
+			    fullname, mansec);
 		} else {
-			(void) printf(gettext(
+			(void) fprintf(stderr, gettext(
 			    "No manual entry for %s.\n"), fullname, mansec);
 		}
 
 		if (sman_no_man_no_sroff)
-			(void) printf(gettext("(An SGML manpage was found "
-			    "for '%s' but it cannot be displayed.)\n"),
+			(void) fprintf(stderr, gettext("(An SGML manpage was "
+			    "found for '%s' but it cannot be displayed.)\n"),
 			    fullname, mansec);
 	}
 	sman_no_man_no_sroff = 0;
+	return (!found);
 }
 
 
