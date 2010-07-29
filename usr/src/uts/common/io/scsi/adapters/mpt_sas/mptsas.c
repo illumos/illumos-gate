@@ -452,6 +452,7 @@ static int mptsas_init_pm(mptsas_t *mpt);
  * By default MSI is enabled on all supported platforms.
  */
 boolean_t mptsas_enable_msi = B_TRUE;
+boolean_t mptsas_physical_bind_failed_page_83 = B_FALSE;
 
 static int mptsas_register_intrs(mptsas_t *);
 static void mptsas_unregister_intrs(mptsas_t *);
@@ -14381,6 +14382,8 @@ mptsas_create_lun(dev_info_t *pdip, struct scsi_inquiry *sd_inq,
 		if (rval != 0) {
 			mptsas_log(mpt, CE_WARN, "!mptsas request inquiry page "
 			    "0x83 for target:%x, lun:%x failed!", target, lun);
+			if (mptsas_physical_bind_failed_page_83 != B_FALSE)
+				goto create_lun;
 			goto out;
 		}
 		/*
