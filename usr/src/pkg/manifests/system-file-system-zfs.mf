@@ -64,9 +64,9 @@ dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/lib/mdb/proc group=sys
 $(sparc_ONLY)dir path=usr/lib/mdb/proc/$(ARCH64) group=sys
 $(i386_ONLY)dir path=usr/lib/mdb/proc/$(ARCH64)
-dir path=usr/lib/python2.4
-dir path=usr/lib/python2.4/vendor-packages
-dir path=usr/lib/python2.4/vendor-packages/zfs
+dir path=usr/lib/python2.6
+dir path=usr/lib/python2.6/vendor-packages
+dir path=usr/lib/python2.6/vendor-packages/zfs
 dir path=usr/lib/sysevent
 dir path=usr/lib/sysevent/modules
 dir path=usr/lib/zfs
@@ -99,25 +99,25 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/zfs.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/zfs.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libzpool.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libzpool.so group=sys mode=0555
-file path=usr/lib/python2.4/vendor-packages/zfs/__init__.py
-file path=usr/lib/python2.4/vendor-packages/zfs/__init__.pyc
-file path=usr/lib/python2.4/vendor-packages/zfs/allow.py
-file path=usr/lib/python2.4/vendor-packages/zfs/allow.pyc
-file path=usr/lib/python2.4/vendor-packages/zfs/dataset.py
-file path=usr/lib/python2.4/vendor-packages/zfs/dataset.pyc
-file path=usr/lib/python2.4/vendor-packages/zfs/groupspace.py
-file path=usr/lib/python2.4/vendor-packages/zfs/groupspace.pyc
-file path=usr/lib/python2.4/vendor-packages/zfs/holds.py
-file path=usr/lib/python2.4/vendor-packages/zfs/holds.pyc
-file path=usr/lib/python2.4/vendor-packages/zfs/ioctl.so
-file path=usr/lib/python2.4/vendor-packages/zfs/table.py
-file path=usr/lib/python2.4/vendor-packages/zfs/table.pyc
-file path=usr/lib/python2.4/vendor-packages/zfs/unallow.py
-file path=usr/lib/python2.4/vendor-packages/zfs/unallow.pyc
-file path=usr/lib/python2.4/vendor-packages/zfs/userspace.py
-file path=usr/lib/python2.4/vendor-packages/zfs/userspace.pyc
-file path=usr/lib/python2.4/vendor-packages/zfs/util.py
-file path=usr/lib/python2.4/vendor-packages/zfs/util.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/__init__.py
+file path=usr/lib/python2.6/vendor-packages/zfs/__init__.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/allow.py
+file path=usr/lib/python2.6/vendor-packages/zfs/allow.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/dataset.py
+file path=usr/lib/python2.6/vendor-packages/zfs/dataset.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/groupspace.py
+file path=usr/lib/python2.6/vendor-packages/zfs/groupspace.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/holds.py
+file path=usr/lib/python2.6/vendor-packages/zfs/holds.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/ioctl.so
+file path=usr/lib/python2.6/vendor-packages/zfs/table.py
+file path=usr/lib/python2.6/vendor-packages/zfs/table.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/unallow.py
+file path=usr/lib/python2.6/vendor-packages/zfs/unallow.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/userspace.py
+file path=usr/lib/python2.6/vendor-packages/zfs/userspace.pyc
+file path=usr/lib/python2.6/vendor-packages/zfs/util.py
+file path=usr/lib/python2.6/vendor-packages/zfs/util.pyc
 file path=usr/lib/sysevent/modules/zfs_mod.so group=sys
 file path=usr/lib/zfs/availdevs mode=0555
 file path=usr/lib/zfs/pyzfs.py mode=0555
@@ -165,3 +165,4 @@ link path=usr/lib/llib-lzfs target=../../lib/llib-lzfs
 link path=usr/lib/llib-lzfs.ln target=../../lib/llib-lzfs.ln
 link path=usr/sbin/zfs target=../../sbin/zfs
 link path=usr/sbin/zpool target=../../sbin/zpool
+depend fmri=runtime/python-26 type=require

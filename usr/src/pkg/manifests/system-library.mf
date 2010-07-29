@@ -54,9 +54,9 @@ dir path=usr/lib/iconv/$(ARCH64)
 $(i386_ONLY)dir path=usr/lib/libc
 dir path=usr/lib/lwp
 dir path=usr/lib/lwp/$(ARCH64)
-dir path=usr/lib/python2.4
-dir path=usr/lib/python2.4/vendor-packages
-dir path=usr/lib/python2.4/vendor-packages/solaris
+dir path=usr/lib/python2.6
+dir path=usr/lib/python2.6/vendor-packages
+dir path=usr/lib/python2.6/vendor-packages/solaris
 dir path=usr/lib/raidcfg
 dir path=usr/lib/raidcfg/$(ARCH64)
 dir path=usr/lib/scsi
@@ -365,9 +365,9 @@ file path=usr/lib/libzoneinfo.so.1
 file path=usr/lib/nss_ad.so.1
 file path=usr/lib/nss_ldap.so.1
 file path=usr/lib/passwdutil.so.1
-file path=usr/lib/python2.4/vendor-packages/solaris/__init__.py
-file path=usr/lib/python2.4/vendor-packages/solaris/__init__.pyc
-file path=usr/lib/python2.4/vendor-packages/solaris/misc.so
+file path=usr/lib/python2.6/vendor-packages/solaris/__init__.py
+file path=usr/lib/python2.6/vendor-packages/solaris/__init__.pyc
+file path=usr/lib/python2.6/vendor-packages/solaris/misc.so
 file path=usr/lib/raidcfg/$(ARCH64)/mpt.so.1
 file path=usr/lib/raidcfg/mpt.so.1
 file path=usr/lib/scsi/$(ARCH64)/libscsi.so.1
@@ -1204,3 +1204,4 @@ $(USE_INTERNAL_CRYPTO)depend fmri=driver/crypto/dprov type=require
 # a dependency which cannot be automatically derived
 #
 depend fmri=system/library/storage/scsi-plugins type=require
+depend fmri=runtime/python-26 type=require

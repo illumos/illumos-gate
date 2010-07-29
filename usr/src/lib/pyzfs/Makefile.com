@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	ioctl.a
@@ -36,7 +35,8 @@ include ../../Makefile.lib
 
 LIBLINKS = 
 SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python2.4/vendor-packages/zfs
+ROOTLIBDIR=	$(ROOT)/usr/lib/python2.6/vendor-packages/zfs
+PYTHON=		$(PYTHON_26)
 PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYZFSFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
@@ -45,9 +45,9 @@ C99MODE=        -xc99=%all
 C99LMODE=       -Xc99=%all
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lnvpair -lpython2.4 -lzfs
+LDLIBS +=	-lc -lnvpair -lpython2.6 -lzfs
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I/usr/include/python2.4
+CPPFLAGS +=	-I/usr/include/python2.6
 CPPFLAGS +=	-I../../../uts/common/fs/zfs
 CPPFLAGS +=	-I../../../common/zfs
 
