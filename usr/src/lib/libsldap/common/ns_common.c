@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -1495,8 +1494,23 @@ __s_api_addRefInfo(ns_referral_info_t **head, char *url,
 		return (NS_LDAP_MEMORY);
 	}
 
-	if (scope)
+	/*
+	 * If the scope is specified in the URL use it.
+	 * Note if the scope is missing in the URL, ldap_url_parse_nodn()
+	 * returns the scope BASE. We need to check that the scope of BASE
+	 * is actually present in the URL.
+	 * If the scope is missing in the URL then use the passed-in
+	 * scope.
+	 * If there is no passed-in scope, then use the scope SUBTREE.
+	 */
+	if (ludp->lud_dn && ludp->lud_scope != LDAP_SCOPE_BASE)
+		ref->refScope = ludp->lud_scope;
+	else if (ludp->lud_dn && strstr(url, "?base"))
+		ref->refScope = LDAP_SCOPE_BASE;
+	else if (scope)
 		ref->refScope = *scope;
+	else
+		ref->refScope = LDAP_SCOPE_SUBTREE;
 
 	ref->next = NULL;
 
