@@ -7084,15 +7084,17 @@ get_title(char *rootdir)
 		goto out;
 	}
 
-	while (s_fgets(title, sizeof (title), fp) != NULL) {
-		cp = strstr(title, "Solaris");
-		if (cp)
-			break;
+	/* grab first line of /etc/release */
+	cp = s_fgets(title, sizeof (title), fp);
+	if (cp) {
+		while (isspace(*cp))    /* remove leading spaces */
+			cp++;
 	}
+
 	(void) fclose(fp);
 
 out:
-	cp = cp ? cp : "Solaris";
+	cp = cp ? cp : "Oracle Solaris";
 
 	BAM_DPRINTF((D_GET_TITLE, fcn, cp));
 
