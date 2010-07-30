@@ -863,7 +863,7 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 		}
 
 		mutex_exit(&anoninfo_lock);
-		(void) page_reclaim_mem(mswap_pages, floor_pages, 0);
+		(void) page_reclaim_mem(mswap_pages, floor_pages, 0, 60);
 		mutex_enter(&anoninfo_lock);
 	}
 
@@ -3450,12 +3450,20 @@ anon_pages(struct anon_hdr *ahp, ulong_t anon_index, pgcnt_t nslots)
 }
 
 /*
- * Move reserved phys swap into memory swap (unreserve phys swap
- * and reserve mem swap by the same amount).
- * Used by segspt when it needs to lock reserved swap npages in memory
+ * When memory is locked the corresponding swap is unreserved.
+ * Swap for locked memory is "locked" which means that it can
+ * not be unreserved until its memory is unlocked.
+ * If there is enough of mem swap reserved, nothing is done
+ * because availrmem was already decremented (when mem swap
+ * was reserved).
+ * If there is not enough of mem swap reserved, move reserved disk
+ * swap into memory swap (unreserve phys swap and reserve mem swap
+ * by the same amount) and decrement availrmem. The availrmem needs
+ * to be decremented because pages are locked!.
+ * Used by segspt and mlock when memory is locked.
  */
 int
-anon_swap_adjust(pgcnt_t npages)
+anon_swap_adjust(pgcnt_t npages, pgcnt_t limit, int cnt)
 {
 	pgcnt_t unlocked_mem_swap;
 
@@ -3473,7 +3481,7 @@ anon_swap_adjust(pgcnt_t npages)
 		 * if there is not enough unlocked mem swap we take missing
 		 * amount from phys swap and give it to mem swap
 		 */
-		if (!page_reclaim_mem(adjusted_swap, segspt_minfree, 1)) {
+		if (!page_reclaim_mem(adjusted_swap, limit, 1, cnt)) {
 			mutex_exit(&anoninfo_lock);
 			return (ENOMEM);
 		}
@@ -3495,8 +3503,9 @@ anon_swap_adjust(pgcnt_t npages)
 }
 
 /*
- * 'unlocked' reserved mem swap so when it is unreserved it
- * can be moved back phys (disk) swap
+ * When memory is unlocked make its "locked" swap freeable.
+ * The unlocked mem swap is unreserved (and availrmem is decremented)
+ * in anon_unresvmem().
  */
 void
 anon_swap_restore(pgcnt_t npages)

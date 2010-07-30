@@ -426,7 +426,7 @@ extern void	anon_swap_free(struct anon *, struct page *);
 extern void	anon_decref(struct anon *);
 extern int	non_anon(struct anon_hdr *, ulong_t, u_offset_t *, size_t *);
 extern pgcnt_t	anon_pages(struct anon_hdr *, ulong_t, pgcnt_t);
-extern int	anon_swap_adjust(pgcnt_t);
+extern int	anon_swap_adjust(pgcnt_t, pgcnt_t, int);
 extern void	anon_swap_restore(pgcnt_t);
 extern struct	anon_hdr *anon_create(pgcnt_t, int);
 extern void	anon_release(struct anon_hdr *, pgcnt_t);
