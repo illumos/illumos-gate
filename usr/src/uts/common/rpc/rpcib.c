@@ -729,6 +729,7 @@ rib_create_cq(rib_hca_t *hca, uint32_t cq_size, ibt_cq_handler_t cq_handler,
 
 	cq = kmem_zalloc(sizeof (rib_cq_t), KM_SLEEP);
 	cq->rib_hca = hca;
+	bzero(&cq_attr, sizeof (cq_attr));
 	cq_attr.cq_size = cq_size;
 	cq_attr.cq_flags = IBT_CQ_NO_FLAGS;
 	status = ibt_alloc_cq(hca->hca_hdl, &cq_attr, &cq->rib_cq_hdl,

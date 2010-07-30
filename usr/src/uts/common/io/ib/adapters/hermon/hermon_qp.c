@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -63,9 +62,11 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
     uint_t sleepflag)
 {
 	hermon_rsrc_t			*qpc, *rsrc;
+	hermon_rsrc_type_t		rsrc_type;
 	hermon_umap_db_entry_t		*umapdb;
 	hermon_qphdl_t			qp;
 	ibt_qp_alloc_attr_t		*attr_p;
+	ibt_qp_alloc_flags_t		alloc_flags;
 	ibt_qp_type_t			type;
 	hermon_qp_wq_type_t		swq_type;
 	ibtl_qp_hdl_t			ibt_qphdl;
@@ -101,6 +102,49 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	queuesz_p = qpinfo->qpi_queueszp;
 	qpn	  = qpinfo->qpi_qpn;
 	qphdl	  = &qpinfo->qpi_qphdl;
+	alloc_flags = attr_p->qp_alloc_flags;
+
+	/*
+	 * Verify correctness of alloc_flags.
+	 *
+	 * 1. FEXCH and RSS are only allocated via qp_range.
+	 */
+	if (alloc_flags & (IBT_QP_USES_FEXCH | IBT_QP_USES_RSS)) {
+		return (IBT_INVALID_PARAM);
+	}
+	rsrc_type = HERMON_QPC;
+	qp_is_umap = 0;
+
+	/* 2. Make sure only one of these flags is set. */
+	switch (alloc_flags &
+	    (IBT_QP_USER_MAP | IBT_QP_USES_RFCI | IBT_QP_USES_FCMD)) {
+	case IBT_QP_USER_MAP:
+		qp_is_umap = 1;
+		break;
+	case IBT_QP_USES_RFCI:
+		if (type != IBT_UD_RQP)
+			return (IBT_INVALID_PARAM);
+
+		switch (attr_p->qp_fc.fc_hca_port) {
+		case 1:
+			rsrc_type = HERMON_QPC_RFCI_PORT1;
+			break;
+		case 2:
+			rsrc_type = HERMON_QPC_RFCI_PORT2;
+			break;
+		default:
+			return (IBT_INVALID_PARAM);
+		}
+		break;
+	case IBT_QP_USES_FCMD:
+		if (type != IBT_UD_RQP)
+			return (IBT_INVALID_PARAM);
+		break;
+	case 0:
+		break;
+	default:
+		return (IBT_INVALID_PARAM);	/* conflicting flags set */
+	}
 
 	/*
 	 * Determine whether QP is being allocated for userland access or
@@ -110,15 +154,11 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	 * (e.g. if the process has not previously open()'d the Hermon driver),
 	 * then an error is returned.
 	 */
-
-
-	qp_is_umap = (attr_p->qp_alloc_flags & IBT_QP_USER_MAP) ? 1 : 0;
 	if (qp_is_umap) {
 		status = hermon_umap_db_find(state->hs_instance, ddi_get_pid(),
 		    MLNX_UMAP_UARPG_RSRC, &value, 0, NULL);
 		if (status != DDI_SUCCESS) {
-			status = IBT_INVALID_PARAM;
-			goto qpalloc_fail;
+			return (IBT_INVALID_PARAM);
 		}
 		uarpg = ((hermon_rsrc_t *)(uintptr_t)value)->hr_indx;
 	} else {
@@ -128,7 +168,7 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	/*
 	 * Determine whether QP is being associated with an SRQ
 	 */
-	qp_srq_en = (attr_p->qp_alloc_flags & IBT_QP_USES_SRQ) ? 1 : 0;
+	qp_srq_en = (alloc_flags & IBT_QP_USES_SRQ) ? 1 : 0;
 	if (qp_srq_en) {
 		/*
 		 * Check for valid SRQ handle pointers
@@ -172,14 +212,22 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 
 	/*
 	 * Check for valid CQ handle pointers
+	 *
+	 * FCMD QPs do not require a receive cq handle.
 	 */
-	if ((attr_p->qp_ibc_scq_hdl == NULL) ||
-	    (attr_p->qp_ibc_rcq_hdl == NULL)) {
+	if (attr_p->qp_ibc_scq_hdl == NULL) {
 		status = IBT_CQ_HDL_INVALID;
 		goto qpalloc_fail1;
 	}
 	sq_cq = (hermon_cqhdl_t)attr_p->qp_ibc_scq_hdl;
-	rq_cq = (hermon_cqhdl_t)attr_p->qp_ibc_rcq_hdl;
+	if ((attr_p->qp_ibc_rcq_hdl == NULL)) {
+		if ((alloc_flags & IBT_QP_USES_FCMD) == 0) {
+			status = IBT_CQ_HDL_INVALID;
+			goto qpalloc_fail1;
+		}
+		rq_cq = sq_cq;	/* just use the send cq */
+	} else
+		rq_cq = (hermon_cqhdl_t)attr_p->qp_ibc_rcq_hdl;
 
 	/*
 	 * Increment the reference count on the CQs.  One or both of these
@@ -206,7 +254,7 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	 * passing the QP to hardware.  If we fail here, we must undo all
 	 * the reference count (CQ and PD).
 	 */
-	status = hermon_rsrc_alloc(state, HERMON_QPC, 1, sleepflag, &qpc);
+	status = hermon_rsrc_alloc(state, rsrc_type, 1, sleepflag, &qpc);
 	if (status != DDI_SUCCESS) {
 		status = IBT_INSUFF_RESOURCE;
 		goto qpalloc_fail3;
@@ -226,15 +274,23 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	bzero(qp, sizeof (struct hermon_sw_qp_s));
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*qp))
 
+	qp->qp_alloc_flags = alloc_flags;
+
 	/*
 	 * Calculate the QP number from QPC index.  This routine handles
 	 * all of the operations necessary to keep track of used, unused,
 	 * and released QP numbers.
 	 */
-	status = hermon_qp_create_qpn(state, qp, qpc);
-	if (status != DDI_SUCCESS) {
-		status = IBT_INSUFF_RESOURCE;
-		goto qpalloc_fail5;
+	if (type == IBT_UD_RQP) {
+		qp->qp_qpnum = qpc->hr_indx;
+		qp->qp_ring = qp->qp_qpnum << 8;
+		qp->qp_qpn_hdl = NULL;
+	} else {
+		status = hermon_qp_create_qpn(state, qp, qpc);
+		if (status != DDI_SUCCESS) {
+			status = IBT_INSUFF_RESOURCE;
+			goto qpalloc_fail5;
+		}
 	}
 
 	/*
@@ -548,12 +604,12 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	qp->qp_qpcrsrcp		= qpc;
 	qp->qp_rsrcp		= rsrc;
 	qp->qp_state		= HERMON_QP_RESET;
+	HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 	qp->qp_pdhdl		= pd;
 	qp->qp_mrhdl		= mr;
 	qp->qp_sq_sigtype	= (attr_p->qp_flags & IBT_WR_SIGNALED) ?
 	    HERMON_QP_SQ_WR_SIGNALED : HERMON_QP_SQ_ALL_SIGNALED;
 	qp->qp_is_special	= 0;
-	qp->qp_is_umap		= qp_is_umap;
 	qp->qp_uarpg		= uarpg;
 	qp->qp_umap_dhp		= (devmap_cookie_t)NULL;
 	qp->qp_sq_cqhdl		= sq_cq;
@@ -585,18 +641,22 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	 */
 	if (qp_srq_en) {
 		qp->qp_srqhdl = srq;
-		qp->qp_srq_en = HERMON_QP_SRQ_ENABLED;
 		hermon_srq_refcnt_inc(qp->qp_srqhdl);
 	} else {
 		qp->qp_srqhdl = NULL;
-		qp->qp_srq_en = HERMON_QP_SRQ_DISABLED;
 	}
 
 	/* Determine the QP service type */
+	qp->qp_type = type;
 	if (type == IBT_RC_RQP) {
 		qp->qp_serv_type = HERMON_QP_RC;
 	} else if (type == IBT_UD_RQP) {
-		qp->qp_serv_type = HERMON_QP_UD;
+		if (alloc_flags & IBT_QP_USES_RFCI)
+			qp->qp_serv_type = HERMON_QP_RFCI;
+		else if (alloc_flags & IBT_QP_USES_FCMD)
+			qp->qp_serv_type = HERMON_QP_FCMND;
+		else
+			qp->qp_serv_type = HERMON_QP_UD;
 	} else {
 		qp->qp_serv_type = HERMON_QP_UC;
 	}
@@ -634,8 +694,7 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	 * Put QP handle in Hermon QPNum-to-QPHdl list.  Then fill in the
 	 * "qphdl" and return success
 	 */
-	ASSERT(state->hs_qphdl[qpc->hr_indx] == NULL);
-	state->hs_qphdl[qpc->hr_indx] = qp;
+	hermon_icm_set_num_to_hdl(state, HERMON_QPC, qpc->hr_indx, qp);
 
 	/*
 	 * If this is a user-mappable QP, then we need to insert the previously
@@ -646,8 +705,6 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 		hermon_umap_db_add(umapdb);
 	}
 	mutex_init(&qp->qp_sq_lock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(state->hs_intrmsi_pri));
-	mutex_init(&qp->qp_rq_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(state->hs_intrmsi_pri));
 
 	*qphdl = qp;
@@ -677,7 +734,12 @@ qpalloc_fail6:
 	 * Releasing the QPN will also free up the QPC context.  Update
 	 * the QPC context pointer to indicate this.
 	 */
-	hermon_qp_release_qpn(state, qp->qp_qpn_hdl, HERMON_QPN_RELEASE);
+	if (qp->qp_qpn_hdl) {
+		hermon_qp_release_qpn(state, qp->qp_qpn_hdl,
+		    HERMON_QPN_RELEASE);
+	} else {
+		hermon_rsrc_free(state, &qpc);
+	}
 	qpc = NULL;
 qpalloc_fail5:
 	hermon_rsrc_free(state, &rsrc);
@@ -826,6 +888,7 @@ hermon_special_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	bzero(qp, sizeof (struct hermon_sw_qp_s));
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*qp))
+	qp->qp_alloc_flags = attr_p->qp_alloc_flags;
 
 	/*
 	 * Actual QP number is a combination of the index of the QPC and
@@ -1053,13 +1116,13 @@ hermon_special_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	qp->qp_qpcrsrcp		= qpc;
 	qp->qp_rsrcp		= rsrc;
 	qp->qp_state		= HERMON_QP_RESET;
+	HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 	qp->qp_pdhdl		= pd;
 	qp->qp_mrhdl		= mr;
 	qp->qp_sq_sigtype	= (attr_p->qp_flags & IBT_WR_SIGNALED) ?
 	    HERMON_QP_SQ_WR_SIGNALED : HERMON_QP_SQ_ALL_SIGNALED;
 	qp->qp_is_special	= (type == IBT_SMI_SQP) ?
 	    HERMON_QP_SMI : HERMON_QP_GSI;
-	qp->qp_is_umap		= 0;
 	qp->qp_uarpg		= uarpg;
 	qp->qp_umap_dhp		= (devmap_cookie_t)NULL;
 	qp->qp_sq_cqhdl		= sq_cq;
@@ -1077,10 +1140,10 @@ hermon_special_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	qp->qp_sqd_still_draining = 0;
 	qp->qp_hdlrarg		= (void *)ibt_qphdl;
 	qp->qp_mcg_refcnt	= 0;
-	qp->qp_srq_en		= 0;
 	qp->qp_srqhdl		= NULL;
 
 	/* All special QPs are UD QP service type */
+	qp->qp_type = IBT_UD_RQP;
 	qp->qp_serv_type = HERMON_QP_UD;
 
 	/*
@@ -1116,8 +1179,10 @@ hermon_special_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	 * Put QP handle in Hermon QPNum-to-QPHdl list.  Then fill in the
 	 * "qphdl" and return success
 	 */
-	ASSERT(state->hs_qphdl[qpc->hr_indx + port] == NULL);
-	state->hs_qphdl[qpc->hr_indx + port] = qp;
+	hermon_icm_set_num_to_hdl(state, HERMON_QPC, qpc->hr_indx + port, qp);
+
+	mutex_init(&qp->qp_sq_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(state->hs_intrmsi_pri));
 
 	*qphdl = qp;
 
@@ -1147,6 +1212,638 @@ spec_qpalloc_fail2:
 spec_qpalloc_fail1:
 	hermon_pd_refcnt_dec(pd);
 spec_qpalloc_fail:
+	return (status);
+}
+
+
+/*
+ * hermon_qp_alloc_range()
+ *    Context: Can be called only from user or kernel context.
+ */
+int
+hermon_qp_alloc_range(hermon_state_t *state, uint_t log2,
+    hermon_qp_info_t *qpinfo, ibtl_qp_hdl_t *ibt_qphdl,
+    ibc_cq_hdl_t *send_cq, ibc_cq_hdl_t *recv_cq,
+    hermon_qphdl_t *qphdl, uint_t sleepflag)
+{
+	hermon_rsrc_t			*qpc, *rsrc;
+	hermon_rsrc_type_t		rsrc_type;
+	hermon_qphdl_t			qp;
+	hermon_qp_range_t		*qp_range_p;
+	ibt_qp_alloc_attr_t		*attr_p;
+	ibt_qp_type_t			type;
+	hermon_qp_wq_type_t		swq_type;
+	ibt_chan_sizes_t		*queuesz_p;
+	ibt_mr_attr_t			mr_attr;
+	hermon_mr_options_t		mr_op;
+	hermon_srqhdl_t			srq;
+	hermon_pdhdl_t			pd;
+	hermon_cqhdl_t			sq_cq, rq_cq;
+	hermon_mrhdl_t			mr;
+	uint64_t			qp_desc_off;
+	uint64_t			*thewqe, thewqesz;
+	uint32_t			*sq_buf, *rq_buf;
+	uint32_t			log_qp_sq_size, log_qp_rq_size;
+	uint32_t			sq_size, rq_size;
+	uint32_t			sq_depth, rq_depth;
+	uint32_t			sq_wqe_size, rq_wqe_size, wqesz_shift;
+	uint32_t			max_sgl, max_recv_sgl, uarpg;
+	uint_t				qp_srq_en, i, j;
+	int				ii;	/* loop counter for range */
+	int				status, flag;
+	uint_t				serv_type;
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attr_p, *queuesz_p))
+
+	/*
+	 * Extract the necessary info from the hermon_qp_info_t structure
+	 */
+	attr_p	  = qpinfo->qpi_attrp;
+	type	  = qpinfo->qpi_type;
+	queuesz_p = qpinfo->qpi_queueszp;
+
+	if (attr_p->qp_alloc_flags & IBT_QP_USES_RSS) {
+		if (log2 > state->hs_ibtfinfo.hca_attr->hca_rss_max_log2_table)
+			return (IBT_INSUFF_RESOURCE);
+		rsrc_type = HERMON_QPC;
+		serv_type = HERMON_QP_UD;
+	} else if (attr_p->qp_alloc_flags & IBT_QP_USES_FEXCH) {
+		if (log2 > state->hs_ibtfinfo.hca_attr->hca_fexch_max_log2_qp)
+			return (IBT_INSUFF_RESOURCE);
+		switch (attr_p->qp_fc.fc_hca_port) {
+		case 1:
+			rsrc_type = HERMON_QPC_FEXCH_PORT1;
+			break;
+		case 2:
+			rsrc_type = HERMON_QPC_FEXCH_PORT2;
+			break;
+		default:
+			return (IBT_INVALID_PARAM);
+		}
+		serv_type = HERMON_QP_FEXCH;
+	} else
+		return (IBT_INVALID_PARAM);
+
+	/*
+	 * Determine whether QP is being allocated for userland access or
+	 * whether it is being allocated for kernel access.  If the QP is
+	 * being allocated for userland access, fail (too complex for now).
+	 */
+	if (attr_p->qp_alloc_flags & IBT_QP_USER_MAP) {
+		return (IBT_NOT_SUPPORTED);
+	} else {
+		uarpg = state->hs_kernel_uar_index;
+	}
+
+	/*
+	 * Determine whether QP is being associated with an SRQ
+	 */
+	qp_srq_en = (attr_p->qp_alloc_flags & IBT_QP_USES_SRQ) ? 1 : 0;
+	if (qp_srq_en) {
+		/*
+		 * Check for valid SRQ handle pointers
+		 */
+		if (attr_p->qp_ibc_srq_hdl == NULL) {
+			return (IBT_SRQ_HDL_INVALID);
+		}
+		srq = (hermon_srqhdl_t)attr_p->qp_ibc_srq_hdl;
+	}
+
+	/*
+	 * Check for valid QP service type (only UD supported)
+	 */
+	if (type != IBT_UD_RQP) {
+		return (IBT_QP_SRV_TYPE_INVALID);
+	}
+
+	/*
+	 * Check for valid PD handle pointer
+	 */
+	if (attr_p->qp_pd_hdl == NULL) {
+		return (IBT_PD_HDL_INVALID);
+	}
+	pd = (hermon_pdhdl_t)attr_p->qp_pd_hdl;
+
+	/*
+	 * If on an SRQ, check to make sure the PD is the same
+	 */
+	if (qp_srq_en && (pd->pd_pdnum != srq->srq_pdhdl->pd_pdnum)) {
+		return (IBT_PD_HDL_INVALID);
+	}
+
+	/* set loop variable here, for freeing resources on error */
+	ii = 0;
+
+	/*
+	 * Allocate 2^log2 contiguous/aligned QP context entries.  This will
+	 * be filled in with all the necessary parameters to define the
+	 * Queue Pairs.  Unlike other Hermon hardware resources, ownership
+	 * is not immediately given to hardware in the final step here.
+	 * Instead, we must wait until the QP is later transitioned to the
+	 * "Init" state before passing the QP to hardware.  If we fail here,
+	 * we must undo all the reference count (CQ and PD).
+	 */
+	status = hermon_rsrc_alloc(state, rsrc_type, 1 << log2, sleepflag,
+	    &qpc);
+	if (status != DDI_SUCCESS) {
+		return (IBT_INSUFF_RESOURCE);
+	}
+
+	if (attr_p->qp_alloc_flags & IBT_QP_USES_FEXCH)
+		/*
+		 * Need to init the MKEYs for the FEXCH QPs.
+		 *
+		 * For FEXCH QP subranges, we return the QPN base as
+		 * "relative" to the full FEXCH QP range for the port.
+		 */
+		*(qpinfo->qpi_qpn) = hermon_fcoib_fexch_relative_qpn(state,
+		    attr_p->qp_fc.fc_hca_port, qpc->hr_indx);
+	else
+		*(qpinfo->qpi_qpn) = (ib_qpn_t)qpc->hr_indx;
+
+	qp_range_p = kmem_alloc(sizeof (*qp_range_p),
+	    (sleepflag == HERMON_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
+	if (qp_range_p == NULL) {
+		status = IBT_INSUFF_RESOURCE;
+		goto qpalloc_fail0;
+	}
+	mutex_init(&qp_range_p->hqpr_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(state->hs_intrmsi_pri));
+	mutex_enter(&qp_range_p->hqpr_lock);
+	qp_range_p->hqpr_refcnt = 1 << log2;
+	qp_range_p->hqpr_qpcrsrc = qpc;
+	mutex_exit(&qp_range_p->hqpr_lock);
+
+for_each_qp:
+
+	/* Increment the reference count on the protection domain (PD) */
+	hermon_pd_refcnt_inc(pd);
+
+	rq_cq = (hermon_cqhdl_t)recv_cq[ii];
+	sq_cq = (hermon_cqhdl_t)send_cq[ii];
+	if (sq_cq == NULL) {
+		if (attr_p->qp_alloc_flags & IBT_QP_USES_FEXCH) {
+			/* if no send completions, just use rq_cq */
+			sq_cq = rq_cq;
+		} else {
+			status = IBT_CQ_HDL_INVALID;
+			goto qpalloc_fail1;
+		}
+	}
+
+	/*
+	 * Increment the reference count on the CQs.  One or both of these
+	 * could return error if we determine that the given CQ is already
+	 * being used with a special (SMI/GSI) QP.
+	 */
+	status = hermon_cq_refcnt_inc(sq_cq, HERMON_CQ_IS_NORMAL);
+	if (status != DDI_SUCCESS) {
+		status = IBT_CQ_HDL_INVALID;
+		goto qpalloc_fail1;
+	}
+	status = hermon_cq_refcnt_inc(rq_cq, HERMON_CQ_IS_NORMAL);
+	if (status != DDI_SUCCESS) {
+		status = IBT_CQ_HDL_INVALID;
+		goto qpalloc_fail2;
+	}
+
+	/*
+	 * Allocate the software structure for tracking the queue pair
+	 * (i.e. the Hermon Queue Pair handle).  If we fail here, we must
+	 * undo the reference counts and the previous resource allocation.
+	 */
+	status = hermon_rsrc_alloc(state, HERMON_QPHDL, 1, sleepflag, &rsrc);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto qpalloc_fail4;
+	}
+	qp = (hermon_qphdl_t)rsrc->hr_addr;
+	bzero(qp, sizeof (struct hermon_sw_qp_s));
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*qp))
+	qp->qp_alloc_flags = attr_p->qp_alloc_flags;
+
+	/*
+	 * Calculate the QP number from QPC index.  This routine handles
+	 * all of the operations necessary to keep track of used, unused,
+	 * and released QP numbers.
+	 */
+	qp->qp_qpnum = qpc->hr_indx + ii;
+	qp->qp_ring = qp->qp_qpnum << 8;
+	qp->qp_qpn_hdl = NULL;
+
+	/*
+	 * Allocate the doorbell record.  Hermon just needs one for the RQ,
+	 * if the QP is not associated with an SRQ, and use uarpg (above) as
+	 * the uar index
+	 */
+
+	if (!qp_srq_en) {
+		status = hermon_dbr_alloc(state, uarpg, &qp->qp_rq_dbr_acchdl,
+		    &qp->qp_rq_vdbr, &qp->qp_rq_pdbr, &qp->qp_rdbr_mapoffset);
+		if (status != DDI_SUCCESS) {
+			status = IBT_INSUFF_RESOURCE;
+			goto qpalloc_fail6;
+		}
+	}
+
+	qp->qp_uses_lso = (attr_p->qp_flags & IBT_USES_LSO);
+
+	/*
+	 * We verify that the requested number of SGL is valid (i.e.
+	 * consistent with the device limits and/or software-configured
+	 * limits).  If not, then obviously the same cleanup needs to be done.
+	 */
+	max_sgl = state->hs_ibtfinfo.hca_attr->hca_ud_send_sgl_sz;
+	swq_type = HERMON_QP_WQ_TYPE_SENDQ_UD;
+	max_recv_sgl = state->hs_ibtfinfo.hca_attr->hca_recv_sgl_sz;
+	if ((attr_p->qp_sizes.cs_sq_sgl > max_sgl) ||
+	    (!qp_srq_en && (attr_p->qp_sizes.cs_rq_sgl > max_recv_sgl))) {
+		status = IBT_HCA_SGL_EXCEEDED;
+		goto qpalloc_fail7;
+	}
+
+	/*
+	 * Determine this QP's WQE stride (for both the Send and Recv WQEs).
+	 * This will depend on the requested number of SGLs.  Note: this
+	 * has the side-effect of also calculating the real number of SGLs
+	 * (for the calculated WQE size).
+	 *
+	 * For QP's on an SRQ, we set these to 0.
+	 */
+	if (qp_srq_en) {
+		qp->qp_rq_log_wqesz = 0;
+		qp->qp_rq_sgl = 0;
+	} else {
+		hermon_qp_sgl_to_logwqesz(state, attr_p->qp_sizes.cs_rq_sgl,
+		    max_recv_sgl, HERMON_QP_WQ_TYPE_RECVQ,
+		    &qp->qp_rq_log_wqesz, &qp->qp_rq_sgl);
+	}
+	hermon_qp_sgl_to_logwqesz(state, attr_p->qp_sizes.cs_sq_sgl,
+	    max_sgl, swq_type, &qp->qp_sq_log_wqesz, &qp->qp_sq_sgl);
+
+	sq_wqe_size = 1 << qp->qp_sq_log_wqesz;
+
+	/* NOTE: currently policy in driver, later maybe IBTF interface */
+	qp->qp_no_prefetch = 0;
+
+	/*
+	 * for prefetching, we need to add the number of wqes in
+	 * the 2k area plus one to the number requested, but
+	 * ONLY for send queue.  If no_prefetch == 1 (prefetch off)
+	 * it's exactly TWO wqes for the headroom
+	 */
+	if (qp->qp_no_prefetch)
+		qp->qp_sq_headroom = 2 * sq_wqe_size;
+	else
+		qp->qp_sq_headroom = sq_wqe_size + HERMON_QP_OH_SIZE;
+	/*
+	 * hdrm wqes must be integral since both sq_wqe_size &
+	 * HERMON_QP_OH_SIZE are power of 2
+	 */
+	qp->qp_sq_hdrmwqes = (qp->qp_sq_headroom / sq_wqe_size);
+
+
+	/*
+	 * Calculate the appropriate size for the work queues.
+	 * For send queue, add in the headroom wqes to the calculation.
+	 * Note:  All Hermon QP work queues must be a power-of-2 in size.  Also
+	 * they may not be any smaller than HERMON_QP_MIN_SIZE.  This step is
+	 * to round the requested size up to the next highest power-of-2
+	 */
+	/* first, adjust to a minimum and tell the caller the change */
+	attr_p->qp_sizes.cs_sq = max(attr_p->qp_sizes.cs_sq,
+	    HERMON_QP_MIN_SIZE);
+	attr_p->qp_sizes.cs_rq = max(attr_p->qp_sizes.cs_rq,
+	    HERMON_QP_MIN_SIZE);
+	/*
+	 * now, calculate the alloc size, taking into account
+	 * the headroom for the sq
+	 */
+	log_qp_sq_size = highbit(attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes);
+	/* if the total is a power of two, reduce it */
+	if (((attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes)  &
+	    (attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes - 1)) == 0)	{
+		log_qp_sq_size = log_qp_sq_size - 1;
+	}
+
+	log_qp_rq_size = highbit(attr_p->qp_sizes.cs_rq);
+	if ((attr_p->qp_sizes.cs_rq & (attr_p->qp_sizes.cs_rq - 1)) == 0) {
+		log_qp_rq_size = log_qp_rq_size - 1;
+	}
+
+	/*
+	 * Next we verify that the rounded-up size is valid (i.e. consistent
+	 * with the device limits and/or software-configured limits).  If not,
+	 * then obviously we have a lot of cleanup to do before returning.
+	 *
+	 * NOTE: the first condition deals with the (test) case of cs_sq
+	 * being just less than 2^32.  In this case, the headroom addition
+	 * to the requested cs_sq will pass the test when it should not.
+	 * This test no longer lets that case slip through the check.
+	 */
+	if ((attr_p->qp_sizes.cs_sq >
+	    (1 << state->hs_cfg_profile->cp_log_max_qp_sz)) ||
+	    (log_qp_sq_size > state->hs_cfg_profile->cp_log_max_qp_sz) ||
+	    (!qp_srq_en && (log_qp_rq_size >
+	    state->hs_cfg_profile->cp_log_max_qp_sz))) {
+		status = IBT_HCA_WR_EXCEEDED;
+		goto qpalloc_fail7;
+	}
+
+	/*
+	 * Allocate the memory for QP work queues. Since Hermon work queues
+	 * are not allowed to cross a 32-bit (4GB) boundary, the alignment of
+	 * the work queue memory is very important.  We used to allocate
+	 * work queues (the combined receive and send queues) so that they
+	 * would be aligned on their combined size.  That alignment guaranteed
+	 * that they would never cross the 4GB boundary (Hermon work queues
+	 * are on the order of MBs at maximum).  Now we are able to relax
+	 * this alignment constraint by ensuring that the IB address assigned
+	 * to the queue memory (as a result of the hermon_mr_register() call)
+	 * is offset from zero.
+	 * Previously, we had wanted to use the ddi_dma_mem_alloc() routine to
+	 * guarantee the alignment, but when attempting to use IOMMU bypass
+	 * mode we found that we were not allowed to specify any alignment
+	 * that was more restrictive than the system page size.
+	 * So we avoided this constraint by passing two alignment values,
+	 * one for the memory allocation itself and the other for the DMA
+	 * handle (for later bind).  This used to cause more memory than
+	 * necessary to be allocated (in order to guarantee the more
+	 * restrictive alignment contraint).  But by guaranteeing the
+	 * zero-based IB virtual address for the queue, we are able to
+	 * conserve this memory.
+	 */
+	sq_wqe_size = 1 << qp->qp_sq_log_wqesz;
+	sq_depth    = 1 << log_qp_sq_size;
+	sq_size	    = sq_depth * sq_wqe_size;
+
+	/* QP on SRQ sets these to 0 */
+	if (qp_srq_en) {
+		rq_wqe_size = 0;
+		rq_size	    = 0;
+	} else {
+		rq_wqe_size = 1 << qp->qp_rq_log_wqesz;
+		rq_depth    = 1 << log_qp_rq_size;
+		rq_size	    = rq_depth * rq_wqe_size;
+	}
+
+	qp->qp_wqinfo.qa_size = sq_size + rq_size;
+	qp->qp_wqinfo.qa_alloc_align = PAGESIZE;
+	qp->qp_wqinfo.qa_bind_align  = PAGESIZE;
+	qp->qp_wqinfo.qa_location = HERMON_QUEUE_LOCATION_NORMAL;
+	status = hermon_queue_alloc(state, &qp->qp_wqinfo, sleepflag);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto qpalloc_fail7;
+	}
+
+	/*
+	 * Sort WQs in memory according to stride (*q_wqe_size), largest first
+	 * If they are equal, still put the SQ first
+	 */
+	qp->qp_sq_baseaddr = 0;
+	qp->qp_rq_baseaddr = 0;
+	if ((sq_wqe_size > rq_wqe_size) || (sq_wqe_size == rq_wqe_size)) {
+		sq_buf = qp->qp_wqinfo.qa_buf_aligned;
+
+		/* if this QP is on an SRQ, set the rq_buf to NULL */
+		if (qp_srq_en) {
+			rq_buf = NULL;
+		} else {
+			rq_buf = (uint32_t *)((uintptr_t)sq_buf + sq_size);
+			qp->qp_rq_baseaddr = sq_size;
+		}
+	} else {
+		rq_buf = qp->qp_wqinfo.qa_buf_aligned;
+		sq_buf = (uint32_t *)((uintptr_t)rq_buf + rq_size);
+		qp->qp_sq_baseaddr = rq_size;
+	}
+
+	qp->qp_sq_wqhdr = hermon_wrid_wqhdr_create(sq_depth);
+	if (qp->qp_sq_wqhdr == NULL) {
+		status = IBT_INSUFF_RESOURCE;
+		goto qpalloc_fail8;
+	}
+	if (qp_srq_en) {
+		qp->qp_rq_wqavl.wqa_wq = srq->srq_wq_wqhdr;
+		qp->qp_rq_wqavl.wqa_srq_en = 1;
+		qp->qp_rq_wqavl.wqa_srq = srq;
+	} else {
+		qp->qp_rq_wqhdr = hermon_wrid_wqhdr_create(rq_depth);
+		if (qp->qp_rq_wqhdr == NULL) {
+			status = IBT_INSUFF_RESOURCE;
+			goto qpalloc_fail8;
+		}
+		qp->qp_rq_wqavl.wqa_wq = qp->qp_rq_wqhdr;
+	}
+	qp->qp_sq_wqavl.wqa_qpn = qp->qp_qpnum;
+	qp->qp_sq_wqavl.wqa_type = HERMON_WR_SEND;
+	qp->qp_sq_wqavl.wqa_wq = qp->qp_sq_wqhdr;
+	qp->qp_rq_wqavl.wqa_qpn = qp->qp_qpnum;
+	qp->qp_rq_wqavl.wqa_type = HERMON_WR_RECV;
+
+	/*
+	 * Register the memory for the QP work queues.  The memory for the
+	 * QP must be registered in the Hermon cMPT tables.  This gives us the
+	 * LKey to specify in the QP context later.  Note: The memory for
+	 * Hermon work queues (both Send and Recv) must be contiguous and
+	 * registered as a single memory region.  Note: If the QP memory is
+	 * user-mappable, force DDI_DMA_CONSISTENT mapping. Also, in order to
+	 * meet the alignment restriction, we pass the "mro_bind_override_addr"
+	 * flag in the call to hermon_mr_register(). This guarantees that the
+	 * resulting IB vaddr will be zero-based (modulo the offset into the
+	 * first page). If we fail here, we still have the bunch of resource
+	 * and reference count cleanup to do.
+	 */
+	flag = (sleepflag == HERMON_SLEEP) ? IBT_MR_SLEEP :
+	    IBT_MR_NOSLEEP;
+	mr_attr.mr_vaddr    = (uint64_t)(uintptr_t)qp->qp_wqinfo.qa_buf_aligned;
+	mr_attr.mr_len	    = qp->qp_wqinfo.qa_size;
+	mr_attr.mr_as	    = NULL;
+	mr_attr.mr_flags    = flag;
+	/* HERMON_QUEUE_LOCATION_NORMAL */
+	mr_op.mro_bind_type =
+	    state->hs_cfg_profile->cp_iommu_bypass;
+	mr_op.mro_bind_dmahdl = qp->qp_wqinfo.qa_dmahdl;
+	mr_op.mro_bind_override_addr = 1;
+	status = hermon_mr_register(state, pd, &mr_attr, &mr,
+	    &mr_op, HERMON_QP_CMPT);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto qpalloc_fail9;
+	}
+
+	/*
+	 * Calculate the offset between the kernel virtual address space
+	 * and the IB virtual address space.  This will be used when
+	 * posting work requests to properly initialize each WQE.
+	 */
+	qp_desc_off = (uint64_t)(uintptr_t)qp->qp_wqinfo.qa_buf_aligned -
+	    (uint64_t)mr->mr_bindinfo.bi_addr;
+
+	/*
+	 * Fill in all the return arguments (if necessary).  This includes
+	 * real work queue sizes (in wqes), real SGLs, and QP number
+	 */
+	if (queuesz_p != NULL) {
+		queuesz_p->cs_sq 	=
+		    (1 << log_qp_sq_size) - qp->qp_sq_hdrmwqes;
+		queuesz_p->cs_sq_sgl	= qp->qp_sq_sgl;
+
+		/* if this QP is on an SRQ, set these to 0 */
+		if (qp_srq_en) {
+			queuesz_p->cs_rq	= 0;
+			queuesz_p->cs_rq_sgl	= 0;
+		} else {
+			queuesz_p->cs_rq	= (1 << log_qp_rq_size);
+			queuesz_p->cs_rq_sgl	= qp->qp_rq_sgl;
+		}
+	}
+
+	/*
+	 * Fill in the rest of the Hermon Queue Pair handle.
+	 */
+	qp->qp_qpcrsrcp		= NULL;
+	qp->qp_rsrcp		= rsrc;
+	qp->qp_state		= HERMON_QP_RESET;
+	HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
+	qp->qp_pdhdl		= pd;
+	qp->qp_mrhdl		= mr;
+	qp->qp_sq_sigtype	= (attr_p->qp_flags & IBT_WR_SIGNALED) ?
+	    HERMON_QP_SQ_WR_SIGNALED : HERMON_QP_SQ_ALL_SIGNALED;
+	qp->qp_is_special	= 0;
+	qp->qp_uarpg		= uarpg;
+	qp->qp_umap_dhp		= (devmap_cookie_t)NULL;
+	qp->qp_sq_cqhdl		= sq_cq;
+	qp->qp_sq_bufsz		= (1 << log_qp_sq_size);
+	qp->qp_sq_logqsz	= log_qp_sq_size;
+	qp->qp_sq_buf		= sq_buf;
+	qp->qp_desc_off		= qp_desc_off;
+	qp->qp_rq_cqhdl		= rq_cq;
+	qp->qp_rq_buf		= rq_buf;
+	qp->qp_rlky		= (attr_p->qp_flags & IBT_FAST_REG_RES_LKEY) !=
+	    0;
+
+	/* if this QP is on an SRQ, set rq_bufsz to 0 */
+	if (qp_srq_en) {
+		qp->qp_rq_bufsz		= 0;
+		qp->qp_rq_logqsz	= 0;
+	} else {
+		qp->qp_rq_bufsz		= (1 << log_qp_rq_size);
+		qp->qp_rq_logqsz	= log_qp_rq_size;
+	}
+
+	qp->qp_forward_sqd_event  = 0;
+	qp->qp_sqd_still_draining = 0;
+	qp->qp_hdlrarg		= (void *)ibt_qphdl[ii];
+	qp->qp_mcg_refcnt	= 0;
+
+	/*
+	 * If this QP is to be associated with an SRQ, set the SRQ handle
+	 */
+	if (qp_srq_en) {
+		qp->qp_srqhdl = srq;
+		hermon_srq_refcnt_inc(qp->qp_srqhdl);
+	} else {
+		qp->qp_srqhdl = NULL;
+	}
+
+	qp->qp_type = IBT_UD_RQP;
+	qp->qp_serv_type = serv_type;
+
+	/*
+	 * Initialize the RQ WQEs - unlike Arbel, no Rcv init is needed
+	 */
+
+	/*
+	 * Initialize the SQ WQEs - all that needs to be done is every 64 bytes
+	 * set the quadword to all F's - high-order bit is owner (init to one)
+	 * and the rest for the headroom definition of prefetching.
+	 */
+	if ((attr_p->qp_alloc_flags & IBT_QP_USES_FEXCH) == 0) {
+		wqesz_shift = qp->qp_sq_log_wqesz;
+		thewqesz    = 1 << wqesz_shift;
+		thewqe = (uint64_t *)(void *)(qp->qp_sq_buf);
+		for (i = 0; i < sq_depth; i++) {
+			/*
+			 * for each stride, go through and every 64 bytes
+			 * write the init value - having set the address
+			 * once, just keep incrementing it
+			 */
+			for (j = 0; j < thewqesz; j += 64, thewqe += 8) {
+				*(uint32_t *)thewqe = 0xFFFFFFFF;
+			}
+		}
+	}
+
+	/* Zero out the QP context */
+	bzero(&qp->qpc, sizeof (hermon_hw_qpc_t));
+
+	/*
+	 * Put QP handle in Hermon QPNum-to-QPHdl list.  Then fill in the
+	 * "qphdl" and return success
+	 */
+	hermon_icm_set_num_to_hdl(state, HERMON_QPC, qpc->hr_indx + ii, qp);
+
+	mutex_init(&qp->qp_sq_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(state->hs_intrmsi_pri));
+
+	qp->qp_rangep = qp_range_p;
+
+	qphdl[ii] = qp;
+
+	if (++ii < (1 << log2))
+		goto for_each_qp;
+
+	return (DDI_SUCCESS);
+
+/*
+ * The following is cleanup for all possible failure cases in this routine
+ */
+qpalloc_fail9:
+	hermon_queue_free(&qp->qp_wqinfo);
+qpalloc_fail8:
+	if (qp->qp_sq_wqhdr)
+		hermon_wrid_wqhdr_destroy(qp->qp_sq_wqhdr);
+	if (qp->qp_rq_wqhdr)
+		hermon_wrid_wqhdr_destroy(qp->qp_rq_wqhdr);
+qpalloc_fail7:
+	if (!qp_srq_en) {
+		hermon_dbr_free(state, uarpg, qp->qp_rq_vdbr);
+	}
+
+qpalloc_fail6:
+	hermon_rsrc_free(state, &rsrc);
+qpalloc_fail4:
+	hermon_cq_refcnt_dec(rq_cq);
+qpalloc_fail2:
+	hermon_cq_refcnt_dec(sq_cq);
+qpalloc_fail1:
+	hermon_pd_refcnt_dec(pd);
+qpalloc_fail0:
+	if (ii == 0) {
+		if (qp_range_p)
+			kmem_free(qp_range_p, sizeof (*qp_range_p));
+		hermon_rsrc_free(state, &qpc);
+	} else {
+		/* qp_range_p and qpc rsrc will be freed in hermon_qp_free */
+
+		mutex_enter(&qp->qp_rangep->hqpr_lock);
+		qp_range_p->hqpr_refcnt = ii;
+		mutex_exit(&qp->qp_rangep->hqpr_lock);
+		while (--ii >= 0) {
+			ibc_qpn_hdl_t qpn_hdl;
+			int free_status;
+
+			free_status = hermon_qp_free(state, &qphdl[ii],
+			    IBC_FREE_QP_AND_QPN, &qpn_hdl, sleepflag);
+			if (free_status != DDI_SUCCESS)
+				cmn_err(CE_CONT, "!qp_range: status 0x%x: "
+				    "error status %x during free",
+				    status, free_status);
+		}
+	}
+
 	return (status);
 }
 
@@ -1186,7 +1883,7 @@ hermon_qp_free(hermon_state_t *state, hermon_qphdl_t *qphdl,
 	 */
 	qp	= *qphdl;
 	mutex_enter(&qp->qp_lock);
-	qpc	= qp->qp_qpcrsrcp;
+	qpc	= qp->qp_qpcrsrcp;	/* NULL if part of a "range" */
 	rsrc	= qp->qp_rsrcp;
 	pd	= qp->qp_pdhdl;
 	srq	= qp->qp_srqhdl;
@@ -1194,7 +1891,7 @@ hermon_qp_free(hermon_state_t *state, hermon_qphdl_t *qphdl,
 	rq_cq	= qp->qp_rq_cqhdl;
 	sq_cq	= qp->qp_sq_cqhdl;
 	port	= qp->qp_portnum;
-	qp_srq_en = qp->qp_srq_en;
+	qp_srq_en = qp->qp_alloc_flags & IBT_QP_USES_SRQ;
 
 	/*
 	 * If the QP is part of an MCG, then we fail the qp_free
@@ -1221,6 +1918,7 @@ hermon_qp_free(hermon_state_t *state, hermon_qphdl_t *qphdl,
 			goto qpfree_fail;
 		}
 		qp->qp_state = HERMON_QP_RESET;
+		HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 
 		/*
 		 * Do any additional handling necessary for the transition
@@ -1242,7 +1940,7 @@ hermon_qp_free(hermon_state_t *state, hermon_qphdl_t *qphdl,
 	 * We also need to invalidate the QP tracking information for the
 	 * user mapping.
 	 */
-	if (qp->qp_is_umap) {
+	if (qp->qp_alloc_flags & IBT_QP_USER_MAP) {
 		status = hermon_umap_db_find(state->hs_instance, qp->qp_qpnum,
 		    MLNX_UMAP_QPMEM_RSRC, &value, HERMON_UMAP_DB_REMOVE,
 		    &umapdb);
@@ -1274,10 +1972,15 @@ hermon_qp_free(hermon_state_t *state, hermon_qphdl_t *qphdl,
 	 * number has been freed.  Note: it does depend in whether we are
 	 * freeing a special QP or not.
 	 */
-	if (qp->qp_is_special) {
-		state->hs_qphdl[qpc->hr_indx + port] = NULL;
+	if (qpc == NULL) {
+		hermon_icm_set_num_to_hdl(state, HERMON_QPC,
+		    qp->qp_qpnum, NULL);
+	} else if (qp->qp_is_special) {
+		hermon_icm_set_num_to_hdl(state, HERMON_QPC,
+		    qpc->hr_indx + port, NULL);
 	} else {
-		state->hs_qphdl[qpc->hr_indx] = NULL;
+		hermon_icm_set_num_to_hdl(state, HERMON_QPC,
+		    qpc->hr_indx, NULL);
 	}
 
 	/*
@@ -1342,9 +2045,20 @@ hermon_qp_free(hermon_state_t *state, hermon_qphdl_t *qphdl,
 			goto qpfree_fail;
 		}
 
+	} else if (qp->qp_rangep) {
+		int refcnt;
+		mutex_enter(&qp->qp_rangep->hqpr_lock);
+		refcnt = --qp->qp_rangep->hqpr_refcnt;
+		mutex_exit(&qp->qp_rangep->hqpr_lock);
+		if (refcnt == 0) {
+			mutex_destroy(&qp->qp_rangep->hqpr_lock);
+			hermon_rsrc_free(state, &qp->qp_rangep->hqpr_qpcrsrc);
+			kmem_free(qp->qp_rangep, sizeof (*qp->qp_rangep));
+		}
+		qp->qp_rangep = NULL;
+	} else if (qp->qp_qpn_hdl == NULL) {
+		hermon_rsrc_free(state, &qpc);
 	} else {
-		type = qp->qp_serv_type;
-
 		/*
 		 * Check the flags and determine whether to release the
 		 * QPN or not, based on their value.
@@ -1359,8 +2073,8 @@ hermon_qp_free(hermon_state_t *state, hermon_qphdl_t *qphdl,
 			    HERMON_QPN_RELEASE);
 		}
 	}
+
 	mutex_destroy(&qp->qp_sq_lock);
-	mutex_destroy(&qp->qp_rq_lock);
 
 	/* Free the Hermon Queue Pair handle */
 	hermon_rsrc_free(state, &rsrc);
@@ -1450,8 +2164,10 @@ hermon_qp_query(hermon_state_t *state, hermon_qphdl_t qp,
 	 * the current QP state.  Note: Some special handling is necessary
 	 * for calculating the QP number on special QP (QP0 and QP1).
 	 */
-	attr_p->qp_sq_cq    = qp->qp_sq_cqhdl->cq_hdlrarg;
-	attr_p->qp_rq_cq    = qp->qp_rq_cqhdl->cq_hdlrarg;
+	attr_p->qp_sq_cq    =
+	    (qp->qp_sq_cqhdl == NULL) ? NULL : qp->qp_sq_cqhdl->cq_hdlrarg;
+	attr_p->qp_rq_cq    =
+	    (qp->qp_rq_cqhdl == NULL) ? NULL : qp->qp_rq_cqhdl->cq_hdlrarg;
 	if (qp->qp_is_special) {
 		attr_p->qp_qpn = (qp->qp_is_special == HERMON_QP_SMI) ? 0 : 1;
 	} else {
@@ -1498,7 +2214,7 @@ hermon_qp_query(hermon_state_t *state, hermon_qphdl_t qp,
 	/*
 	 * Fill in the additional QP info based on the QP's transport type.
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 
 		/* Fill in the UD-specific info */
 		ud = &attr_p->qp_info.qp_transport.ud;
@@ -1510,6 +2226,38 @@ hermon_qp_query(hermon_state_t *state, hermon_qphdl_t qp,
 		    (uint8_t)(((qpc->pri_addr_path.sched_q >> 6) & 0x01) + 1);
 
 		attr_p->qp_info.qp_trans = IBT_UD_SRV;
+
+		if (qp->qp_serv_type == HERMON_QP_FEXCH) {
+			ibt_pmr_desc_t *pmr;
+			uint64_t heart_beat;
+
+			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*pmr))
+			pmr = &attr_p->qp_query_fexch.fq_uni_mem_desc;
+			pmr->pmd_iova = 0;
+			pmr->pmd_lkey = pmr->pmd_rkey =
+			    hermon_fcoib_qpn_to_mkey(state, qp->qp_qpnum);
+			pmr->pmd_phys_buf_list_sz =
+			    state->hs_fcoib.hfc_mtts_per_mpt;
+			pmr->pmd_sync_required = 0;
+
+			pmr = &attr_p->qp_query_fexch.fq_bi_mem_desc;
+			pmr->pmd_iova = 0;
+			pmr->pmd_lkey = 0;
+			pmr->pmd_rkey = 0;
+			pmr->pmd_phys_buf_list_sz = 0;
+			pmr->pmd_sync_required = 0;
+
+			attr_p->qp_query_fexch.fq_flags =
+			    ((hermon_get_heart_beat_rq_cmd_post(state,
+			    qp->qp_qpnum, &heart_beat) == HERMON_CMD_SUCCESS) &&
+			    (heart_beat == 0)) ? IBT_FEXCH_HEART_BEAT_OK :
+			    IBT_FEXCH_NO_FLAGS;
+
+			ud->ud_fc = qp->qp_fc_attr;
+		} else if (qp->qp_serv_type == HERMON_QP_FCMND ||
+		    qp->qp_serv_type == HERMON_QP_RFCI) {
+			ud->ud_fc = qp->qp_fc_attr;
+		}
 
 	} else if (qp->qp_serv_type == HERMON_QP_RC) {
 
@@ -1637,10 +2385,12 @@ hermon_qp_query(hermon_state_t *state, hermon_qphdl_t qp,
 	if (qpc->state == HERMON_QP_SQERR) {
 		attr_p->qp_info.qp_state = IBT_STATE_SQE;
 		qp->qp_state = HERMON_QP_SQERR;
+		HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_SQERR);
 	}
 	if (qpc->state == HERMON_QP_ERR) {
 		attr_p->qp_info.qp_state = IBT_STATE_ERROR;
 		qp->qp_state = HERMON_QP_ERR;
+		HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_ERR);
 	}
 	mutex_exit(&qp->qp_lock);
 
@@ -1889,7 +2639,7 @@ hermon_qphdl_from_qpnum(hermon_state_t *state, uint_t qpnum)
 	/* Calculate the QP table index from the qpnum */
 	qpmask = (1 << state->hs_cfg_profile->cp_log_num_qp) - 1;
 	qpindx = qpnum & qpmask;
-	return (state->hs_qphdl[qpindx]);
+	return (hermon_icm_num_to_hdl(state, HERMON_QPC, qpindx));
 }
 
 

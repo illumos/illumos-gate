@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTL_TYPES_H
@@ -386,7 +385,9 @@ typedef enum ibt_hca_flags2_e {
 	IBT_HCA2_RSS_XOR_ALG	= 1 << 7,	/* RSS: XOR algorithm */
 	IBT_HCA2_XRC		= 1 << 8,	/* Extended RC (XRC) */
 	IBT_HCA2_XRC_SRQ_RESIZE	= 1 << 9,	/* resize XRC SRQ */
-	IBT_HCA2_MEM_MGT_EXT	= 1 << 10 /* FMR-WR, send-inv, local-inv */
+	IBT_HCA2_MEM_MGT_EXT	= 1 << 10, /* FMR-WR, send-inv, local-inv */
+	IBT_HCA2_DMA_MR		= 1 << 11,	/* DMA MR */
+	IBT_HCA2_FC		= 1 << 12	/* FCoIB or FCoE offload */
 } ibt_hca_flags2_t;
 
 /*
@@ -535,7 +536,16 @@ typedef struct ibt_hca_attr_s {
 	uint_t		hca_recv_sgl_sz;	/* detailed SGL sizes */
 	uint_t		hca_ud_send_sgl_sz;
 	uint_t		hca_conn_send_sgl_sz;
+	uint_t		hca_conn_rdma_read_sgl_sz;
+	uint_t		hca_conn_rdma_write_sgl_sz;
 	uint_t		hca_conn_rdma_sgl_overhead;
+
+	/* FC Support */
+	uint8_t		hca_rfci_max_log2_qp;	/* max log2 RFCI QPs */
+	uint8_t		hca_fexch_max_log2_qp;	/* max log2 FEXCH QPs */
+	uint8_t		hca_fexch_max_log2_mem;	/* max log2 mem per FEXCH */
+
+	dev_info_t	*hca_dip;	/* HCA dev_info */
 } ibt_hca_attr_t;
 
 /*
@@ -745,6 +755,9 @@ typedef uint8_t ibt_tran_srv_t;
 #define	IBT_UD_SRV		3
 #define	IBT_RAWIP_SRV		4
 #define	IBT_RAWETHER_SRV	5
+#define	IBT_RFCI_SRV		6
+#define	IBT_FCMD_SRV		7
+#define	IBT_FEXCH_SRV		8
 
 /*
  * Channel (QP/EEC) state definitions.
@@ -818,7 +831,8 @@ typedef enum ibt_cep_modify_flags_e {
 	IBT_CEP_SET_OPAQUE6		= (1 << 21),
 	IBT_CEP_SET_OPAQUE7		= (1 << 22),
 	IBT_CEP_SET_OPAQUE8		= (1 << 23),
-	IBT_CEP_SET_RSS			= (1 << 24)
+	IBT_CEP_SET_RSS			= (1 << 24),
+	IBT_CEP_SET_FEXCH_RANGE		= (1 << 25)
 } ibt_cep_modify_flags_t;
 
 /*
@@ -837,20 +851,33 @@ typedef enum ibt_cq_flags_e {
 	IBT_CQ_HANDLER_IN_THREAD	= 1 << 0,	/* A thread calls the */
 							/* CQ handler */
 	IBT_CQ_USER_MAP			= 1 << 1,
-	IBT_CQ_DEFER_ALLOC		= 1 << 2
+	IBT_CQ_DEFER_ALLOC		= 1 << 2,
+	IBT_CQ_HID			= 1 << 3
 } ibt_cq_flags_t;
 
-/*
- * CQ types shared across TI and CI.
- */
 typedef enum ibt_cq_sched_flags_e {
 	IBT_CQS_NO_FLAGS	= 0,
 	IBT_CQS_WARM_CACHE	= 1 << 0, /* run on same CPU */
-	IBT_CQS_AFFINITY	= 1 << 1,
+	IBT_CQS_EXACT_SCHED_GROUP = 1 << 1,
 	IBT_CQS_SCHED_GROUP	= 1 << 2,
 	IBT_CQS_USER_MAP	= 1 << 3,
 	IBT_CQS_DEFER_ALLOC	= 1 << 4
 } ibt_cq_sched_flags_t;
+
+/*
+ * Attributes when creating a Completion Queue Scheduling Handle.
+ */
+typedef struct ibt_cq_sched_attr_s {
+	ibt_cq_sched_flags_t	cqs_flags;
+	char			*cqs_pool_name;
+} ibt_cq_sched_attr_t;
+
+typedef	void *ibt_intr_handle_t;
+
+typedef struct ibt_cq_handler_attr_s {
+	dev_info_t		*cha_dip;
+	ibt_intr_handle_t	cha_ih;
+} ibt_cq_handler_attr_t;
 
 /*
  * Attributes when creating a Completion Queue.
@@ -863,6 +890,7 @@ typedef struct ibt_cq_attr_s {
 	ibt_sched_hdl_t		cq_sched;	/* 0 = no hint, */
 						/* other = cq_sched value */
 	ibt_cq_flags_t		cq_flags;
+	ibt_cq_handler_id_t	cq_hid;
 } ibt_cq_attr_t;
 
 /*
@@ -894,7 +922,8 @@ typedef enum ibt_mr_flags_e {
 	/* Additional physical registration flags */
 	IBT_MR_CONSUMER_KEY		= (1 << 13),	/* Consumer owns key */
 							/* portion of keys */
-	IBT_MR_DISABLE_RO		= (1 << 14)
+	IBT_MR_DISABLE_RO		= (1 << 14),
+	IBT_MR_USER_BUF			= (1 << 15)  /* ibt_(re)register_buf */
 } ibt_mr_flags_t;
 
 
@@ -995,6 +1024,13 @@ typedef struct ibt_pmr_attr_s {
 	uint8_t		pmr_key;	/* Key to use on new Lkey & Rkey */
 } ibt_pmr_attr_t;
 
+/* DMA Memory Region */
+typedef struct ibt_dmr_attr_s {
+	uint64_t	dmr_paddr;	/* starting physical addr */
+	ib_memlen_t	dmr_len;	/* length in bytes */
+	ibt_mr_flags_t	dmr_flags;	/* no sleep, memory permissions */
+} ibt_dmr_attr_t;
+
 /* addr/length pair */
 typedef struct ibt_iov_s {
 	caddr_t	iov_addr;	/* Beginning address */
@@ -1006,7 +1042,9 @@ typedef enum ibt_iov_flags_e {
 	IBT_IOV_SLEEP		= 0,
 	IBT_IOV_NOSLEEP		= (1 << 0),
 	IBT_IOV_BUF		= (1 << 1),
-	IBT_IOV_RECV		= (1 << 2)
+	IBT_IOV_RECV		= (1 << 2),
+	IBT_IOV_USER_BUF	= (1 << 3),
+	IBT_IOV_ALT_LKEY	= (1 << 4)
 } ibt_iov_flags_t;
 
 typedef struct ibt_iov_attr_s {
@@ -1016,6 +1054,7 @@ typedef struct ibt_iov_attr_s {
 	uint32_t		iov_list_len;
 	uint32_t		iov_wr_nds;
 	ib_msglen_t		iov_lso_hdr_sz;
+	ibt_lkey_t		iov_alt_lkey;
 	ibt_iov_flags_t		iov_flags;
 } ibt_iov_attr_t;
 
@@ -1090,7 +1129,8 @@ typedef enum ibt_va_flags_e {
 	IBT_VA_FMR		= (1 << 2),
 	IBT_VA_BLOCK_MODE	= (1 << 3),
 	IBT_VA_BUF		= (1 << 4),
-	IBT_VA_REG_FN		= (1 << 5)
+	IBT_VA_REG_FN		= (1 << 5),
+	IBT_VA_USER_BUF		= (1 << 6)
 } ibt_va_flags_t;
 
 
@@ -1127,6 +1167,29 @@ typedef struct ibt_fmr_pool_attr_s {
 	void			*fmr_func_arg;
 } ibt_fmr_pool_attr_t;
 
+/*
+ * Define types for Fibre Channel over IB (fcoib)
+ */
+typedef enum ibt_fexch_query_flags_e {
+	IBT_FEXCH_NO_FLAGS =		0,
+	IBT_FEXCH_HEART_BEAT_OK =	(1 << 0)	/* FEXCH only */
+} ibt_fexch_query_flags_t;
+
+typedef struct ibt_fexch_query_attr_s {
+	ibt_pmr_desc_t	fq_uni_mem_desc; /* FEXCH: uni-directional MR attrs */
+	ibt_pmr_desc_t	fq_bi_mem_desc;	/* FEXCH: bi-directional MR attrs */
+	ibt_fexch_query_flags_t fq_flags;
+} ibt_fexch_query_attr_t;
+
+typedef struct ibt_fc_attr_s {
+	uint32_t	fc_src_id;	/* S_ID assigned to the RFCI QP */
+			/* FCMD, FEXCH: matching RFCI QP = RFCI base + idx */
+	ib_qpn_t	fc_rfci_qpn;
+	uint16_t	fc_exch_base_off; /* FCMD: FEXCH usable base */
+	uint8_t		fc_exch_log2_sz; /* FCMD: FEXCH log2 size */
+	uint8_t		fc_hca_port;	/* RFCI, FEXCH: HCA port number */
+} ibt_fc_attr_t;
+
 
 /*
  * WORK REQUEST AND WORK REQUEST COMPLETION DEFINITIONS.
@@ -1156,6 +1219,8 @@ typedef uint8_t ibt_wrc_opcode_t;
 #define	IBT_WRC_FAST_REG_PMR	9	/* Fast Register Physical mem region */
 #define	IBT_WRC_LOCAL_INVALIDATE 10
 #define	IBT_WRC_SEND_LSO	11
+#define	IBT_WRC_INIT_SEND_FCMD	12	/* Init & Send for FCMD initiator */
+#define	IBT_WRC_INIT_FEXCH	13	/* Init for FEXCH target */
 
 
 /*
@@ -1169,6 +1234,8 @@ typedef uint8_t ibt_wc_flags_t;
 #define	IBT_WC_IMMED_DATA_PRESENT	(1 << 1)
 #define	IBT_WC_RKEY_INVALIDATED		(1 << 2)
 #define	IBT_WC_CKSUM_OK			(1 << 3)
+#define	IBT_WC_FEXCH_FMT		(1 << 4)
+#define	IBT_WC_DIF_ERROR		(1 << 5)
 
 /* IPoIB flags for wc_detail field */
 #define	IBT_WC_DETAIL_ALL_FLAGS_MASK	(0x0FC00000)
@@ -1184,6 +1251,12 @@ typedef uint8_t ibt_wc_flags_t;
 #define	IBT_WC_DETAIL_RSS_IPV6		(1 << 19)
 #define	IBT_WC_DETAIL_RSS_TCP_IPV4	(1 << 20)
 #define	IBT_WC_DETAIL_RSS_IPV4		(1 << 21)
+
+/* FEXCH flags for wc_detail field */
+#define	IBT_WC_DETAIL_FC_MATCH_MASK	(0xE000000)
+#define	IBT_WC_DETAIL_FEXCH_INIT_XFER	(1 << 25)
+#define	IBT_WC_DETAIL_FEXCH_LAST	(1 << 26)
+#define	IBT_WC_DETAIL_RFCI_CRC_OK	(1 << 27)
 
 /*
  * Work Request Completion - This structure encapsulates the information
@@ -1211,6 +1284,13 @@ typedef struct ibt_wc_s {
 	ib_path_bits_t		wc_opaque4;
 } ibt_wc_t;
 
+/* FC format alternative field names */
+#define	wc_fexch_seq_cnt	wc_cksum
+#define	wc_fexch_tx_bytes_xfer	wc_immed_data
+#define	wc_fexch_rx_bytes_xfer	wc_res_hash
+#define	wc_fexch_seq_id		wc_opaque2
+
+
 /*
  * WR Flags. Common for both RC and UD
  *
@@ -1225,6 +1305,7 @@ typedef uint8_t ibt_wr_flags_t;
 #define	IBT_WR_SEND_SOLICIT	(1 << 3)	/* Solicited Event Indicator */
 #define	IBT_WR_SEND_REMOTE_INVAL	(1 << 4) /* Remote Invalidate */
 #define	IBT_WR_SEND_CKSUM	(1 << 5)	/* Checksum offload Indicator */
+#define	IBT_WR_SEND_FC_CRC	IBT_WR_SEND_CKSUM	/* RFCI: FC CRC */
 #define	IBT_WR_SEND_INLINE	(1 << 6)	/* INLINE required (no lkey) */
 
 /*
@@ -1433,11 +1514,75 @@ typedef struct ibt_wr_lso_s {
 	ib_msglen_t		lso_mss;
 } ibt_wr_lso_t;
 
+/* FC  WR definitions */
+typedef enum ibt_fctl_flags_e {			/* F_CTL flags */
+	IBT_FCTL_NO_FLAGS =	0,
+	IBT_FCTL_SIT =		(1 << 16),	/* seq initiative transfer */
+	IBT_FCTL_PRIO =		(1 << 17),	/* InitAndSend WR: priority */
+	IBT_FCTL_LAST_SEQ =	(1 << 20),
+	/* InitAndSend WR: Exchange Originator, set = initiator, off = tgt */
+	IBT_FCTL_ORIG_INIT =	(1 << 23)
+} ibt_fctl_flags_t;
+#define	IBT_FCTL_SET_ABORT_FIELD(VAL) (((VAL) & 0x3) << 4) /* InitAndSend WR */
+#define	IBT_FCTL_GET_ABORT_FIELD(FCTL)	(((FCTL) & 0x30) >> 4)
+
+/* FC information category value, low 4 bits of routing control */
+#define	IBT_FC_INFO_SOL_DATA	1	/* solicited data */
+#define	IBT_FC_INFO_DATA_DESC	5	/* data descriptor */
+#define	IBT_FC_INFO_UNSOL_CMD	6	/* unsolicited command */
+#define	IBT_FC_INFO_CMD_STAT	7	/* command status */
+
+typedef struct ibt_fc_ctl_s {
+	ibt_ud_dest_hdl_t	fc_dest;
+	ibt_fctl_flags_t	fc_frame_ctrl;
+	uint32_t		fc_parameter;
+	uint8_t			fc_seq_id;
+				/* FC R_CTL containing information category */
+	uint8_t			fc_routing_ctrl;
+} ibt_fc_ctl_t;
+
+/* RFCI version of send */
+typedef struct ibt_wr_rfci_send_s {
+	ibt_ud_dest_hdl_t	rfci_dest;
+	uint8_t			rfci_eof;	/* RFCI: when FC CRC set */
+} ibt_wr_rfci_send_t;
+
+typedef uint8_t ibt_init_send_op_t;
+#define	IBT_IS_OP_TARGET	0x0	/* target mode or no IO initiator op */
+#define	IBT_IS_OP_NO_IO		IBT_IS_OP_TARGET
+#define	IBT_IS_OP_IO_READ	0x1	/* IO read */
+#define	IBT_IS_OP_IO_WRITE	0x2	/* IO write */
+#define	IBT_IS_OP_BIDIR		0x3	/* bidirectional command */
+
+/* Init and Send for FCMD initiator and also Init for FEXCH target */
+typedef struct ibt_wr_init_send_s {
+	ibt_fc_ctl_t	is_ctl;
+	uint32_t	is_dest_id;	/* FC hdr: D_ID, low 24 bits */
+	uint16_t	is_fc_mtu;	/* packet MTU (4B), low 10 bits */
+	uint16_t	is_rem_exch;	/* target: remote exchange */
+	uint16_t	is_exch_qp_idx; /* FEXCH index for ULP */
+	uint8_t		is_cs_priority;	/* FC hdr: CS_CTL/Priority */
+	uint8_t		is_tx_seq_id;	/* initiator: FCP_DATA seq_id */
+	ibt_init_send_op_t is_op;
+} ibt_wr_init_send_t;
+
+typedef union ibt_wr_fc_u {
+	ibt_wr_rfci_send_t	rfci_send;	/* RFCI send */
+	ibt_wr_init_send_t	*fc_is;		/* FCMD, FEXCH */
+	ibt_wr_reg_pmr_t	*reg_pmr;	/* FCMD */
+} ibt_wr_fc_t;
+
+
 /*
  * Send Work Request (WR) attributes structure.
  *
  * Operation type in ibt_wrc_opcode_t.
  * Immediate Data indicator in ibt_wr_flags_t.
+ *
+ * RFCI initiator QP: send (FCP_CONF)
+ * FCMD initiator QP: init & send (FCP_CMND), FRWR
+ * FEXCH target QP: init, FRWR, RDMA-R (FCP_XFER_RDY), RDMA-W (FCP_DATA),
+ *	Send (FCP_RSP)
  */
 typedef struct ibt_send_wr_s {
 	ibt_wrid_t		wr_id;		/* WR ID */
@@ -1456,11 +1601,17 @@ typedef struct ibt_send_wr_s {
 		ibt_wr_reth_t	reth;	/* Reserved For Future Use */
 		ibt_wr_ripv6_t	ripv6;	/* Reserved For Future Use */
 		ibt_wr_lso_t	ud_lso;
+		ibt_wr_fc_t	fc;	/* RFCI, FCMD, FEXCH */
 	} wr;				/* operation specific */
 } ibt_send_wr_t;
 
 /*
  * Receive Work Request (WR) attributes structure.
+ *
+ * also used by these FC QP types:
+ * RFCI initiator QP
+ * FEXCH initiator QP (FCP_RSP)
+ * RFCI target QP (FCP_CMND)
  */
 typedef struct ibt_recv_wr_s {
 	ibt_wrid_t		wr_id;		/* WR ID */
@@ -1514,7 +1665,8 @@ typedef enum ibt_async_code_e {
 	IBT_ERROR_CATASTROPHIC_SRQ		= 0x080000,
 
 	IBT_PORT_CHANGE_EVENT			= 0x100000,
-	IBT_CLNT_REREG_EVENT			= 0x200000
+	IBT_CLNT_REREG_EVENT			= 0x200000,
+	IBT_FEXCH_ERROR				= 0x400000
 } ibt_async_code_t;
 
 #define	IBT_PORT_EVENTS (IBT_EVENT_PORT_UP|IBT_PORT_CHANGE_EVENT|\
@@ -1529,6 +1681,10 @@ typedef enum ibt_port_change_e {
 	IBT_PORT_CHANGE_SM_FLAG		= 0x000020, /* IsSMDisabled bit */
 	IBT_PORT_CHANGE_REREG		= 0x000040  /* IsClientReregSupport */
 } ibt_port_change_t;
+
+typedef uint8_t ibt_fc_syndrome_t;
+#define	IBT_FC_BAD_IU		0x0
+#define	IBT_FC_BROKEN_SEQ	0x1
 
 /*
  * ibt_ci_data_in() and ibt_ci_data_out() flags.

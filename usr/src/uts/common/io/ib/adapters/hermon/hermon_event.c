@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -73,7 +72,7 @@ static int hermon_catastrophic_handler(hermon_state_t *state,
     hermon_eqhdl_t eq, hermon_hw_eqe_t *eqe);
 static int hermon_srq_last_wqe_reached_handler(hermon_state_t *state,
     hermon_eqhdl_t eq, hermon_hw_eqe_t *eqe);
-static int hermon_ecc_detection_handler(hermon_state_t *state,
+static int hermon_fexch_error_handler(hermon_state_t *state,
     hermon_eqhdl_t eq, hermon_hw_eqe_t *eqe);
 static int hermon_no_eqhandler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe);
@@ -91,7 +90,7 @@ hermon_eq_init_all(hermon_state_t *state)
 	uint_t		num_eq, num_eq_init, num_eq_unmap, num_eq_rsvd;
 	uint32_t	event_mask;	/* used for multiple event types */
 	int		status, i, num_extra;
-	uint64_t	offset;
+	struct hermon_sw_eq_s **eq;
 	ddi_acc_handle_t uarhdl = hermon_get_uarhdl(state);
 
 	/* initialize the FMA retry loop */
@@ -118,7 +117,8 @@ hermon_eq_init_all(hermon_state_t *state)
 	 * (see below for more details).
 	 */
 	num_eq = HERMON_NUM_EQ_USED;
-	num_eq_rsvd = state->hs_devlim.num_rsvd_eq;
+	num_eq_rsvd = state->hs_rsvd_eqs;
+	eq = &state->hs_eqhdl[num_eq_rsvd];
 
 	/*
 	 * If MSI is to be used, then set intr_num to the MSI number.
@@ -131,20 +131,17 @@ hermon_eq_init_all(hermon_state_t *state)
 	} else {
 		/* If we have more than one MSI-X vector, init them. */
 		for (i = 0; i + 1 < state->hs_intrmsi_allocd; i++) {
-			status = hermon_eq_alloc(state, log_eq_size, i,
-			    &state->hs_eqhdl[i + num_eq_rsvd]);
+			status = hermon_eq_alloc(state, log_eq_size, i, &eq[i]);
 			if (status != DDI_SUCCESS) {
 				while (--i >= 0) {
 					(void) hermon_eq_handler_fini(state,
-					    state->hs_eqhdl[i + num_eq_rsvd]);
-					(void) hermon_eq_free(state,
-					    &state->hs_eqhdl[i + num_eq_rsvd]);
+					    eq[i]);
+					(void) hermon_eq_free(state, &eq[i]);
 				}
 				return (DDI_FAILURE);
 			}
 
-			(void) hermon_eq_handler_init(state,
-			    state->hs_eqhdl[i + num_eq_rsvd],
+			(void) hermon_eq_handler_init(state, eq[i],
 			    HERMON_EVT_NO_MASK, hermon_cq_handler);
 		}
 		intr_num = i;
@@ -158,7 +155,7 @@ hermon_eq_init_all(hermon_state_t *state)
 	 */
 	for (i = 0; i < num_eq; i++) {
 		status = hermon_eq_alloc(state, log_eq_size, intr_num,
-		    &state->hs_eqhdl[num_eq_rsvd + num_extra + i]);
+		    &eq[num_extra + i]);
 		if (status != DDI_SUCCESS) {
 			num_eq_init = i;
 			goto all_eq_init_fail;
@@ -171,15 +168,14 @@ hermon_eq_init_all(hermon_state_t *state)
 	 * possible event class unmapping.
 	 */
 	num_eq_unmap = 0;
+
 	/*
 	 * Setup EQ0 (first avail) for use with Completion Queues.  Note: We can
 	 * cast the return value to void here because, when we use the
 	 * HERMON_EVT_NO_MASK flag, it is not possible for
 	 * hermon_eq_handler_init() to return an error.
 	 */
-
-	(void) hermon_eq_handler_init(state,
-	    state->hs_eqhdl[num_eq_unmap + num_extra + num_eq_rsvd],
+	(void) hermon_eq_handler_init(state, eq[num_eq_unmap + num_extra],
 	    HERMON_EVT_NO_MASK, hermon_cq_handler);
 
 	num_eq_unmap++;
@@ -193,14 +189,13 @@ hermon_eq_init_all(hermon_state_t *state)
 	 * everything that has been successfully initialized, and return an
 	 * error.
 	 */
-	status = hermon_eq_handler_init(state,
-	    state->hs_eqhdl[num_eq_unmap + num_extra + num_eq_rsvd],
+	status = hermon_eq_handler_init(state, eq[num_eq_unmap + num_extra],
 	    HERMON_EVT_MSK_CQ_ERRORS, hermon_cq_err_handler);
 	if (status != DDI_SUCCESS) {
 		goto all_eq_init_fail;
 	}
+	state->hs_cq_erreqnum = num_eq_unmap + num_extra + num_eq_rsvd;
 	num_eq_unmap++;
-
 
 	/*
 	 * Setup EQ2 for handling most other things including:
@@ -239,12 +234,13 @@ hermon_eq_init_all(hermon_state_t *state)
 	 *   These events correspond to the IB affiliated asynchronous events
 	 *   that are used to indicate that path migration was not successful.
 	 *
+	 * Fibre Channel Error Event
+	 *   This event is affiliated with an Fexch QP.
+	 *
 	 * NOTE: When an event fires on this EQ, it will demux the type and
 	 * 	send it to the right specific handler routine
 	 *
 	 */
-
-
 	event_mask =
 	    HERMON_EVT_MSK_PORT_STATE_CHANGE |
 	    HERMON_EVT_MSK_COMM_ESTABLISHED |
@@ -257,10 +253,9 @@ hermon_eq_init_all(hermon_state_t *state)
 	    HERMON_EVT_MSK_PATH_MIGRATE_FAILED |
 	    HERMON_EVT_MSK_SRQ_CATASTROPHIC_ERROR |
 	    HERMON_EVT_MSK_SRQ_LAST_WQE_REACHED |
-	    HERMON_EVT_MSK_ECC_DETECTION;
+	    HERMON_EVT_MSK_FEXCH_ERROR;
 
-	status = hermon_eq_handler_init(state,
-	    state->hs_eqhdl[num_eq_unmap + num_extra + num_eq_rsvd],
+	status = hermon_eq_handler_init(state, eq[num_eq_unmap + num_extra],
 	    event_mask, hermon_eq_demux);
 	if (status != DDI_SUCCESS) {
 		goto all_eq_init_fail;
@@ -276,8 +271,7 @@ hermon_eq_init_all(hermon_state_t *state)
 	 * since the Arbel firmware does not currently support any such
 	 * handling), we allow these events to go to the catch-all handler.
 	 */
-	status = hermon_eq_handler_init(state,
-	    state->hs_eqhdl[num_eq_unmap + num_extra + num_eq_rsvd],
+	status = hermon_eq_handler_init(state, eq[num_eq_unmap + num_extra],
 	    HERMON_EVT_CATCHALL_MASK, hermon_no_eqhandler);
 	if (status != DDI_SUCCESS) {
 		goto all_eq_init_fail;
@@ -292,10 +286,7 @@ hermon_eq_init_all(hermon_state_t *state)
 	 * Run through and initialize the Consumer Index for each EQC.
 	 */
 	for (i = 0; i < num_eq + num_extra; i++) {
-		offset = ARM_EQ_INDEX(i + num_eq_rsvd);
-		ddi_put32(uarhdl,
-		    (uint32_t *)((uintptr_t)state->hs_reg_uar_baseaddr +
-		    (uint32_t)offset), 0x0);
+		ddi_put32(uarhdl, eq[i]->eq_doorbell, 0x0);
 	}
 
 	/* the FMA retry loop ends. */
@@ -308,13 +299,12 @@ all_eq_init_fail:
 
 	/* Unmap any of the partially mapped EQs from above */
 	for (i = 0; i < num_eq_unmap + num_extra; i++) {
-		(void) hermon_eq_handler_fini(state,
-		    state->hs_eqhdl[i + num_eq_rsvd]);
+		(void) hermon_eq_handler_fini(state, eq[i]);
 	}
 
 	/* Free up any of the partially allocated EQs from above */
 	for (i = 0; i < num_eq_init + num_extra; i++) {
-		(void) hermon_eq_free(state, &state->hs_eqhdl[i]);
+		(void) hermon_eq_free(state, &eq[i]);
 	}
 
 	/* If a HW error happen during ddi_pio, return DDI_FAILURE */
@@ -336,6 +326,7 @@ hermon_eq_fini_all(hermon_state_t *state)
 {
 	uint_t		num_eq, num_eq_rsvd;
 	int		status, i;
+	struct hermon_sw_eq_s **eq;
 
 	/*
 	 * Grab the total number of supported EQs again.  This is the same
@@ -343,15 +334,15 @@ hermon_eq_fini_all(hermon_state_t *state)
 	 * initialization.)
 	 */
 	num_eq = HERMON_NUM_EQ_USED + state->hs_intrmsi_allocd - 1;
-	num_eq_rsvd = state->hs_devlim.num_rsvd_eq;
+	num_eq_rsvd = state->hs_rsvd_eqs;
+	eq = &state->hs_eqhdl[num_eq_rsvd];
 
 	/*
 	 * For each of the event queues that we initialized and mapped
 	 * earlier, attempt to unmap the events from the EQ.
 	 */
 	for (i = 0; i < num_eq; i++) {
-		status = hermon_eq_handler_fini(state,
-		    state->hs_eqhdl[i + num_eq_rsvd]);
+		status = hermon_eq_handler_fini(state, eq[i]);
 		if (status != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
@@ -362,8 +353,7 @@ hermon_eq_fini_all(hermon_state_t *state)
 	 * earlier.
 	 */
 	for (i = 0; i < num_eq; i++) {
-		status = hermon_eq_free(state,
-		    &state->hs_eqhdl[i + num_eq_rsvd]);
+		status = hermon_eq_free(state, &eq[i]);
 		if (status != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
@@ -372,50 +362,31 @@ hermon_eq_fini_all(hermon_state_t *state)
 	return (DDI_SUCCESS);
 }
 
+
 /*
- * hermon_eq_arm()
- *	Context:  called from interrupt
- *
- * Arms a single eq - eqn is the __logical__ eq number 0-based
+ * hermon_eq_reset_uar_baseaddr
+ *    Context: Only called from attach()
  */
 void
-hermon_eq_arm(hermon_state_t *state, int eqn)
+hermon_eq_reset_uar_baseaddr(hermon_state_t *state)
 {
-	uint64_t	offset;
-	hermon_eqhdl_t	eq;
-	uint32_t	eq_ci;
-	ddi_acc_handle_t uarhdl = hermon_get_uarhdl(state);
+	int i, num_eq;
+	hermon_eqhdl_t eq, *eqh;
 
-	/* initialize the FMA retry loop */
-	hermon_pio_init(fm_loop_cnt, fm_status, fm_test);
-
-	offset = ARM_EQ_INDEX(eqn + state->hs_devlim.num_rsvd_eq);
-	eq = state->hs_eqhdl[eqn + state->hs_devlim.num_rsvd_eq];
-	eq_ci = (eq->eq_consindx & HERMON_EQ_CI_MASK) | EQ_ARM_BIT;
-
-	/* the FMA retry loop starts. */
-	hermon_pio_start(state, uarhdl, pio_error, fm_loop_cnt, fm_status,
-	    fm_test);
-
-	ddi_put32(uarhdl,
-	    (uint32_t *)((uintptr_t)state->hs_reg_uar_baseaddr +
-	    (uint32_t)offset), eq_ci);
-
-	/* the FMA retry loop ends. */
-	hermon_pio_end(state, uarhdl, pio_error, fm_loop_cnt, fm_status,
-	    fm_test);
-
-	return;
-
-pio_error:
-	hermon_fm_ereport(state, HCA_SYS_ERR, HCA_ERR_FATAL);
+	num_eq = HERMON_NUM_EQ_USED + state->hs_intrmsi_allocd - 1;
+	eqh = &state->hs_eqhdl[state->hs_rsvd_eqs];
+	for (i = 0; i < num_eq; i++) {
+		eq = eqh[i];
+		eq->eq_doorbell = (uint32_t *)
+		    ((uintptr_t)state->hs_reg_uar_baseaddr +
+		    (uint32_t)ARM_EQ_INDEX(eq->eq_eqnum));
+	}
 }
 
 
 /*
  * hermon_eq_arm_all
  *    Context: Only called from attach() and/or detach() path contexts
- *    Arbel calls in interrupt, currently (initial impl) in Hermon as well
  */
 int
 hermon_eq_arm_all(hermon_state_t *state)
@@ -430,8 +401,8 @@ hermon_eq_arm_all(hermon_state_t *state)
 	/* initialize the FMA retry loop */
 	hermon_pio_init(fm_loop_cnt, fm_status, fm_test);
 
-	num_eq = HERMON_NUM_EQ_USED;
-	num_eq_rsvd = state->hs_devlim.num_rsvd_eq;
+	num_eq = HERMON_NUM_EQ_USED + state->hs_intrmsi_allocd - 1;
+	num_eq_rsvd = state->hs_rsvd_eqs;
 
 	/* the FMA retry loop starts. */
 	hermon_pio_start(state, uarhdl, pio_error, fm_loop_cnt, fm_status,
@@ -511,7 +482,7 @@ hermon_isr(caddr_t arg1, caddr_t arg2)
 	 * events, whereas the "if" case deals with the required interrupt
 	 * vector that is used for all classes of events.
 	 */
-	r = state->hs_devlim.num_rsvd_eq;
+	r = state->hs_rsvd_eqs;
 
 	if (intr + 1 == state->hs_intrmsi_allocd) {	/* last intr */
 		r += state->hs_intrmsi_allocd - 1;
@@ -538,9 +509,8 @@ static void
 hermon_eq_poll(hermon_state_t *state, hermon_eqhdl_t eq)
 {
 	hermon_hw_eqe_t	*eqe;
-	uint64_t	offset;
 	int		polled_some;
-	uint32_t	cons_indx, wrap_around_mask;
+	uint32_t	cons_indx, wrap_around_mask, shift;
 	int (*eqfunction)(hermon_state_t *state, hermon_eqhdl_t eq,
 	    hermon_hw_eqe_t *eqe);
 	ddi_acc_handle_t uarhdl = hermon_get_uarhdl(state);
@@ -552,6 +522,7 @@ hermon_eq_poll(hermon_state_t *state, hermon_eqhdl_t eq)
 
 	/* Get the consumer pointer index */
 	cons_indx = eq->eq_consindx;
+	shift = eq->eq_log_eqsz - HERMON_EQE_OWNER_SHIFT;
 
 	/*
 	 * Calculate the wrap around mask.  Note: This operation only works
@@ -573,7 +544,7 @@ hermon_eq_poll(hermon_state_t *state, hermon_eqhdl_t eq)
 
 	for (;;) {
 		polled_some = 0;
-		while (HERMON_EQE_OWNER_IS_SW(eq, eqe)) {
+		while (HERMON_EQE_OWNER_IS_SW(eq, eqe, cons_indx, shift)) {
 
 			/*
 			 * Call the EQ handler function.  But only call if we
@@ -598,8 +569,6 @@ hermon_eq_poll(hermon_state_t *state, hermon_eqhdl_t eq)
 
 			/* Reset to hardware ownership is implicit */
 
-			eq->eq_nexteqe++;	/* for next time through */
-
 			/* Increment the consumer index */
 			cons_indx++;
 
@@ -616,16 +585,12 @@ hermon_eq_poll(hermon_state_t *state, hermon_eqhdl_t eq)
 
 		eq->eq_consindx = cons_indx;
 
-		offset = ARM_EQ_INDEX(eq->eq_eqnum);
-
 		/* the FMA retry loop starts. */
 		hermon_pio_start(state, uarhdl, pio_error, fm_loop_cnt,
 		    fm_status, fm_test);
 
-		ddi_put32(uarhdl,
-		    (uint32_t *)((uintptr_t)state->hs_reg_uar_baseaddr +
-		    (uint32_t)offset), (cons_indx & HERMON_EQ_CI_MASK) |
-		    EQ_ARM_BIT);
+		ddi_put32(uarhdl, eq->eq_doorbell,
+		    (cons_indx & HERMON_EQ_CI_MASK) | EQ_ARM_BIT);
 
 		/* the FMA retry loop starts. */
 		hermon_pio_end(state, uarhdl, pio_error, fm_loop_cnt,
@@ -807,8 +772,7 @@ hermon_eq_alloc(hermon_state_t *state, uint32_t log_eq_size, uint_t intr,
 	 * Allocate the memory for Event Queue.
 	 */
 	eq->eq_eqinfo.qa_size = (1 << log_eq_size) * sizeof (hermon_hw_eqe_t);
-	eq->eq_eqinfo.qa_alloc_align = PAGESIZE;
-	eq->eq_eqinfo.qa_bind_align  = PAGESIZE;
+	eq->eq_eqinfo.qa_alloc_align = eq->eq_eqinfo.qa_bind_align = PAGESIZE;
 
 	eq->eq_eqinfo.qa_location = HERMON_QUEUE_LOCATION_NORMAL;
 	status = hermon_queue_alloc(state, &eq->eq_eqinfo, HERMON_SLEEP);
@@ -847,12 +811,6 @@ hermon_eq_alloc(hermon_state_t *state, uint32_t log_eq_size, uint_t intr,
 		goto eqalloc_fail4;
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
-
-	/* Sync entire EQ for use by the hardware */
-	eq->eq_sync = 1;
-
-	(void) ddi_dma_sync(mr->mr_bindinfo.bi_dmahdl, 0,
-	    eq->eq_eqinfo.qa_size, DDI_DMA_SYNC_FORDEV);
 
 	/*
 	 * Fill in the EQC entry.  This is the final step before passing
@@ -904,8 +862,9 @@ hermon_eq_alloc(hermon_state_t *state, uint32_t log_eq_size, uint_t intr,
 	eq->eq_buf	 = buf;
 	eq->eq_bufsz	 = (1 << log_eq_size);
 	eq->eq_log_eqsz	 = log_eq_size;
-	eq->eq_nexteqe	 = 0;
 	eq->eq_mrhdl	 = mr;
+	eq->eq_doorbell	 = (uint32_t *)((uintptr_t)state->hs_reg_uar_baseaddr +
+	    (uint32_t)ARM_EQ_INDEX(eq->eq_eqnum));
 	*eqhdl		 = eq;
 
 	return (DDI_SUCCESS);
@@ -1112,17 +1071,17 @@ hermon_eq_demux(hermon_state_t *state, hermon_eqhdl_t eq,
 		break;
 
 	case HERMON_EVT_LOCAL_WQ_CAT_ERROR:
-		HERMON_FMANOTE(state, HERMON_FMA_LOCCAT);
+		HERMON_WARNING(state, HERMON_FMA_LOCCAT);
 		status = hermon_local_wq_cat_err_handler(state, eq, eqe);
 		break;
 
 	case HERMON_EVT_INV_REQ_LOCAL_WQ_ERROR:
-		HERMON_FMANOTE(state, HERMON_FMA_LOCINV);
+		HERMON_WARNING(state, HERMON_FMA_LOCINV);
 		status = hermon_invreq_local_wq_err_handler(state, eq, eqe);
 		break;
 
 	case HERMON_EVT_LOCAL_ACC_VIO_WQ_ERROR:
-		HERMON_FMANOTE(state, HERMON_FMA_LOCACEQ);
+		HERMON_WARNING(state, HERMON_FMA_LOCACEQ);
 		IBTF_DPRINTF_L2("async", HERMON_FMA_LOCACEQ);
 		status = hermon_local_acc_vio_wq_err_handler(state, eq, eqe);
 		break;
@@ -1135,12 +1094,12 @@ hermon_eq_demux(hermon_state_t *state, hermon_eqhdl_t eq,
 		break;
 
 	case HERMON_EVT_PATH_MIGRATE_FAILED:
-		HERMON_FMANOTE(state, HERMON_FMA_PATHMIG);
+		HERMON_WARNING(state, HERMON_FMA_PATHMIG);
 		status = hermon_path_mig_err_handler(state, eq, eqe);
 		break;
 
 	case HERMON_EVT_SRQ_CATASTROPHIC_ERROR:
-		HERMON_FMANOTE(state, HERMON_FMA_SRQCAT);
+		HERMON_WARNING(state, HERMON_FMA_SRQCAT);
 		status = hermon_catastrophic_handler(state, eq, eqe);
 		break;
 
@@ -1148,8 +1107,8 @@ hermon_eq_demux(hermon_state_t *state, hermon_eqhdl_t eq,
 		status = hermon_srq_last_wqe_reached_handler(state, eq, eqe);
 		break;
 
-	case HERMON_EVT_ECC_DETECTION:
-		status = hermon_ecc_detection_handler(state, eq, eqe);
+	case HERMON_EVT_FEXCH_ERROR:
+		status = hermon_fexch_error_handler(state, eq, eqe);
 		break;
 
 	default:
@@ -1162,6 +1121,7 @@ hermon_eq_demux(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_port_state_change_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_port_state_change_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1170,18 +1130,7 @@ hermon_port_state_change_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	ibt_async_code_t	type;
 	uint_t			subtype;
 	uint8_t			port;
-	uint_t			eqe_evttype;
 	char			link_msg[24];
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_PORT_STATE_CHANGE ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/*
 	 * Depending on the type of Port State Change event, pass the
@@ -1238,6 +1187,7 @@ hermon_port_state_change_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_comm_estbl_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_comm_estbl_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1246,17 +1196,6 @@ hermon_comm_estbl_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			qpnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_COMM_ESTABLISHED ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the QP handle from QP number in event descriptor */
 	qpnum = HERMON_EQE_QPNUM_GET(eq, eqe);
@@ -1298,6 +1237,7 @@ hermon_comm_estbl_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_local_wq_cat_err_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_local_wq_cat_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1306,17 +1246,6 @@ hermon_local_wq_cat_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			qpnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_LOCAL_WQ_CAT_ERROR ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the QP handle from QP number in event descriptor */
 	qpnum = HERMON_EQE_QPNUM_GET(eq, eqe);
@@ -1358,6 +1287,7 @@ hermon_local_wq_cat_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_invreq_local_wq_err_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_invreq_local_wq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1366,17 +1296,6 @@ hermon_invreq_local_wq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			qpnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_INV_REQ_LOCAL_WQ_ERROR ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the QP handle from QP number in event descriptor */
 	qpnum = HERMON_EQE_QPNUM_GET(eq, eqe);
@@ -1418,6 +1337,7 @@ hermon_invreq_local_wq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_local_acc_vio_wq_err_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_local_acc_vio_wq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1426,17 +1346,6 @@ hermon_local_acc_vio_wq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			qpnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_LOCAL_ACC_VIO_WQ_ERROR ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the QP handle from QP number in event descriptor */
 	qpnum = HERMON_EQE_QPNUM_GET(eq, eqe);
@@ -1478,6 +1387,7 @@ hermon_local_acc_vio_wq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_sendq_drained_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_sendq_drained_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1487,17 +1397,6 @@ hermon_sendq_drained_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	ibc_async_event_t	event;
 	uint_t			forward_sqd_event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_SEND_QUEUE_DRAINED ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the QP handle from QP number in event descriptor */
 	qpnum = HERMON_EQE_QPNUM_GET(eq, eqe);
@@ -1554,6 +1453,7 @@ hermon_sendq_drained_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_path_mig_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_path_mig_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1562,17 +1462,6 @@ hermon_path_mig_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			qpnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_PATH_MIGRATED ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the QP handle from QP number in event descriptor */
 	qpnum = HERMON_EQE_QPNUM_GET(eq, eqe);
@@ -1614,6 +1503,7 @@ hermon_path_mig_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_path_mig_err_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_path_mig_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1622,17 +1512,6 @@ hermon_path_mig_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			qpnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_PATH_MIGRATE_FAILED ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the QP handle from QP number in event descriptor */
 	qpnum = HERMON_EQE_QPNUM_GET(eq, eqe);
@@ -1674,6 +1553,7 @@ hermon_path_mig_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_catastrophic_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_catastrophic_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1682,22 +1562,11 @@ hermon_catastrophic_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			qpnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
 
 	if (eq->eq_evttypemask == HERMON_EVT_MSK_LOCAL_CAT_ERROR) {
 		HERMON_FMANOTE(state, HERMON_FMA_INTERNAL);
 		hermon_eq_catastrophic(state);
 		return (DDI_SUCCESS);
-	}
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_SRQ_CATASTROPHIC_ERROR ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
 	}
 
 	/* Get the QP handle from QP number in event descriptor */
@@ -1744,6 +1613,7 @@ hermon_catastrophic_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_srq_last_wqe_reached_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 static int
 hermon_srq_last_wqe_reached_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1752,17 +1622,6 @@ hermon_srq_last_wqe_reached_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			qpnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_SRQ_LAST_WQE_REACHED ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the QP handle from QP number in event descriptor */
 	qpnum = HERMON_EQE_QPNUM_GET(eq, eqe);
@@ -1800,69 +1659,52 @@ hermon_srq_last_wqe_reached_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 }
 
 
-/*
- * hermon_ecc_detection_handler()
- *    Context: Only called from interrupt context
- */
-static int
-hermon_ecc_detection_handler(hermon_state_t *state, hermon_eqhdl_t eq,
-    hermon_hw_eqe_t *eqe)
+/* ARGSUSED */
+static int hermon_fexch_error_handler(hermon_state_t *state,
+    hermon_eqhdl_t eq, hermon_hw_eqe_t *eqe)
 {
-	uint_t			eqe_evttype;
-	uint_t			data;
-	int			i;
+	hermon_qphdl_t		qp;
+	uint_t			qpnum;
+	ibc_async_event_t	event;
+	ibt_async_code_t	type;
 
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
+	/* Get the QP handle from QP number in event descriptor */
+	event.ev_port = HERMON_EQE_FEXCH_PORTNUM_GET(eq, eqe);
+	qpnum = hermon_fcoib_qpnum_from_fexch(state,
+	    event.ev_port, HERMON_EQE_FEXCH_FEXCH_GET(eq, eqe));
+	qp = hermon_qphdl_from_qpnum(state, qpnum);
 
-	ASSERT(eqe_evttype == HERMON_EVT_ECC_DETECTION ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
+	event.ev_fc = HERMON_EQE_FEXCH_SYNDROME_GET(eq, eqe);
 
 	/*
-	 * The "ECC Detection Event" indicates that a correctable single-bit
-	 * has occurred with the attached DDR.  The EQE provides some
-	 * additional information about the errored EQ.  So we print a warning
-	 * message here along with that additional information.
+	 * If the QP handle is NULL, this is probably an indication
+	 * that the QP has been freed already.  In which case, we
+	 * should not deliver this event.
+	 *
+	 * We also check that the QP number in the handle is the
+	 * same as the QP number in the event queue entry.  This
+	 * extra check allows us to handle the case where a QP was
+	 * freed and then allocated again in the time it took to
+	 * handle the event queue processing.  By constantly incrementing
+	 * the non-constrained portion of the QP number every time
+	 * a new QP is allocated, we mitigate (somewhat) the chance
+	 * that a stale event could be passed to the client's QP
+	 * handler.
+	 *
+	 * Lastly, we check if "hs_ibtfpriv" is NULL.  If it is then it
+	 * means that we've have either received this event before we
+	 * finished attaching to the IBTF or we've received it while we
+	 * are in the process of detaching.
 	 */
-	HERMON_WARNING(state, "ECC Correctable Error Event Detected");
-	for (i = 0; i < sizeof (hermon_hw_eqe_t) >> 2; i++) {
-		data = ((uint_t *)eqe)[i];
-		cmn_err(CE_CONT, "!  EQE[%02x]: %08x\n", i, data);
+	if ((qp != NULL) && (qp->qp_qpnum == qpnum) &&
+	    (state->hs_ibtfpriv != NULL)) {
+		event.ev_qp_hdl = (ibtl_qp_hdl_t)qp->qp_hdlrarg;
+		type		= IBT_FEXCH_ERROR;
+
+		HERMON_DO_IBTF_ASYNC_CALLB(state, type, &event);
 	}
 
 	return (DDI_SUCCESS);
-}
-
-
-/*
- * hermon_eq_overflow_handler()
- *    Context: Only called from interrupt context
- */
-/* ARGSUSED */
-void
-hermon_eq_overflow_handler(hermon_state_t *state, hermon_eqhdl_t eq,
-    hermon_hw_eqe_t *eqe)
-{
-	uint_t		error_type, data;
-
-	ASSERT(HERMON_EQE_EVTTYPE_GET(eq, eqe) == HERMON_EVT_EQ_OVERFLOW);
-
-	/*
-	 * The "Event Queue Overflow Event" indicates that something has
-	 * probably gone seriously wrong with some hardware (or, perhaps,
-	 * with the software... though it's unlikely in this case).  The EQE
-	 * provides some additional information about the errored EQ.  So we
-	 * print a warning message here along with that additional information.
-	 */
-	error_type = HERMON_EQE_OPERRTYPE_GET(eq, eqe);
-	data	   = HERMON_EQE_OPERRDATA_GET(eq, eqe);
-
-	HERMON_WARNING(state, "Event Queue overflow");
-	cmn_err(CE_CONT, "  Error type: %02x, data: %08x\n", error_type, data);
 }
 
 

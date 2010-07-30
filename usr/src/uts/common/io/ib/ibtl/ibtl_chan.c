@@ -404,15 +404,48 @@ ibt_alloc_ud_channel(ibt_hca_hdl_t hca_hdl, ibt_chan_alloc_flags_t flags,
 	ibt_qp_alloc_attr_t	qp_attr;
 	ibt_qp_info_t		qp_modify_attr;
 	ibt_channel_hdl_t	chanp;
+	ibt_chan_alloc_flags_t	variant_flags;
 
 	IBTF_DPRINTF_L3(ibtl_chan, "ibt_alloc_ud_channel(%p, %x, %p, %p)",
 	    hca_hdl, flags, args, sizes);
 
-	bzero(&qp_modify_attr, sizeof (ibt_qp_info_t));
+	if (flags & IBT_ACHAN_USES_FEXCH) {
+		IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel: "
+		    "FEXCH QPs are allocated by ibt_alloc_ud_channel_range()");
+		return (IBT_CHAN_SRV_TYPE_INVALID);
+	}
 
+	bzero(&qp_modify_attr, sizeof (ibt_qp_info_t));
+	bzero(&qp_attr, sizeof (ibt_qp_alloc_attr_t));
 	qp_attr.qp_alloc_flags = IBT_QP_NO_FLAGS;
-	if (flags & IBT_ACHAN_USER_MAP)
+
+	/* allow at most one of these flags */
+	variant_flags = flags & (IBT_ACHAN_USER_MAP | IBT_ACHAN_USES_RSS |
+	    IBT_ACHAN_USES_RFCI | IBT_ACHAN_USES_FCMD | IBT_ACHAN_CLONE);
+	switch (variant_flags) {
+	case IBT_ACHAN_USER_MAP:
 		qp_attr.qp_alloc_flags |= IBT_QP_USER_MAP;
+		break;
+	case IBT_ACHAN_USES_RSS:
+		qp_attr.qp_alloc_flags |= IBT_QP_USES_RSS;
+		qp_modify_attr.qp_transport.ud.ud_rss = args->ud_rss;
+		break;
+	case IBT_ACHAN_USES_RFCI:
+		qp_attr.qp_alloc_flags |= IBT_QP_USES_RFCI;
+		qp_modify_attr.qp_transport.ud.ud_fc = qp_attr.qp_fc =
+		    args->ud_fc;
+		break;
+	case IBT_ACHAN_USES_FCMD:
+		qp_attr.qp_alloc_flags |= IBT_QP_USES_FCMD;
+		qp_modify_attr.qp_transport.ud.ud_fc = qp_attr.qp_fc =
+		    args->ud_fc;
+		break;
+	case IBT_ACHAN_CLONE:
+	case 0:
+		break;
+	default:
+		return (IBT_INVALID_PARAM);
+	}
 
 	if (flags & IBT_ACHAN_DEFER_ALLOC)
 		qp_attr.qp_alloc_flags |= IBT_QP_DEFER_ALLOC;
@@ -421,6 +454,11 @@ ibt_alloc_ud_channel(ibt_hca_hdl_t hca_hdl, ibt_chan_alloc_flags_t flags,
 		if (args->ud_srq == NULL) {
 			IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel: "
 			    "NULL SRQ Handle specified.");
+			return (IBT_INVALID_PARAM);
+		}
+		if (flags & IBT_ACHAN_USES_RSS) {
+			IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel: "
+			    "SRQ not allowed with RSS.");
 			return (IBT_INVALID_PARAM);
 		}
 		qp_attr.qp_alloc_flags |= IBT_QP_USES_SRQ;
@@ -534,6 +572,191 @@ ibt_alloc_ud_channel(ibt_hca_hdl_t hca_hdl, ibt_chan_alloc_flags_t flags,
 
 /*
  * Function:
+ *	ibt_alloc_ud_channel_range
+ * Input:
+ *	hca_hdl		HCA Handle.
+ *	log2		Log (base 2) of the number of QPs to allocate.
+ *	flags		Channel allocate flags.
+ *	args		A pointer to an ibt_ud_chan_alloc_args_t struct that
+ *			specifies required channel attributes.
+ *	send_cq		A pointer to an array of CQ handles.
+ *	recv_cq		A pointer to an array of CQ handles.
+ * Output:
+ *	base_qpn_p	The returned QP number of the base QP.
+ *	ud_chan_p	The returned UD Channel handle.
+ *	sizes		NULL or a pointer to ibt_chan_sizes_s struct where
+ *			new SendQ/RecvQ, and WR SGL sizes are returned.
+ * Returns:
+ *	IBT_SUCCESS
+ *	IBT_INVALID_PARAM
+ * Description:
+ *	Allocate UD channels that satisfy the specified channel attributes.
+ */
+ibt_status_t
+ibt_alloc_ud_channel_range(ibt_hca_hdl_t hca_hdl, uint_t log2,
+    ibt_chan_alloc_flags_t flags, ibt_ud_chan_alloc_args_t *args,
+    ibt_cq_hdl_t *send_cq, ibt_cq_hdl_t *recv_cq, ib_qpn_t *base_qpn_p,
+    ibt_channel_hdl_t *ud_chan_p, ibt_chan_sizes_t *sizes)
+{
+	ibt_status_t		retval;
+	ibt_qp_alloc_attr_t	qp_attr;
+	ibt_qp_info_t		qp_modify_attr;
+	ibtl_channel_t		*chanp;
+	ibt_cq_hdl_t		ibt_cq_hdl;
+	ibc_cq_hdl_t		*ibc_send_cq, *ibc_recv_cq;
+	ibc_qp_hdl_t		*ibc_qp_hdl_p;
+	int			i, n = 1 << log2;
+	ib_pkey_t		tmp_pkey;
+
+
+	IBTF_DPRINTF_L3(ibtl_chan, "ibt_alloc_ud_channel_range(%p, %x, %p, %p)",
+	    hca_hdl, flags, args, sizes);
+
+	bzero(&qp_modify_attr, sizeof (ibt_qp_info_t));
+
+	qp_attr.qp_alloc_flags = IBT_QP_NO_FLAGS;
+
+	if (flags & IBT_ACHAN_CLONE)
+		return (IBT_INVALID_PARAM);
+
+	if (flags & IBT_ACHAN_USER_MAP)
+		qp_attr.qp_alloc_flags |= IBT_QP_USER_MAP;
+
+	if (flags & IBT_ACHAN_DEFER_ALLOC)
+		qp_attr.qp_alloc_flags |= IBT_QP_DEFER_ALLOC;
+
+	if (flags & IBT_ACHAN_USES_SRQ) {
+		if (args->ud_srq == NULL) {
+			IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel: "
+			    "NULL SRQ Handle specified.");
+			return (IBT_INVALID_PARAM);
+		}
+		qp_attr.qp_alloc_flags |= IBT_QP_USES_SRQ;
+	}
+
+	if (flags & IBT_ACHAN_USES_FEXCH) {
+		qp_attr.qp_alloc_flags |= IBT_QP_USES_FEXCH;
+		qp_attr.qp_fc = args->ud_fc;
+		qp_modify_attr.qp_transport.ud.ud_fc = qp_attr.qp_fc =
+		    args->ud_fc;
+	}
+	if (flags & IBT_ACHAN_USES_RSS) {
+		if (log2 >
+		    hca_hdl->ha_hca_devp->hd_hca_attr->hca_rss_max_log2_table)
+			return (IBT_INSUFF_RESOURCE);
+		qp_attr.qp_alloc_flags |= IBT_QP_USES_RSS;
+	}
+
+	ibc_send_cq = kmem_alloc(sizeof (ibc_cq_hdl_t) << log2, KM_SLEEP);
+	ibc_recv_cq = kmem_alloc(sizeof (ibc_cq_hdl_t) << log2, KM_SLEEP);
+	ibc_qp_hdl_p = kmem_alloc(sizeof (ibc_qp_hdl_t) << log2, KM_SLEEP);
+
+	for (i = 0; i < 1 << log2; i++) {
+		ud_chan_p[i] = kmem_zalloc(sizeof (ibtl_channel_t), KM_SLEEP);
+		ibt_cq_hdl = send_cq[i];
+		ibc_send_cq[i] = ibt_cq_hdl ? ibt_cq_hdl->cq_ibc_cq_hdl : NULL;
+		ibt_cq_hdl = recv_cq[i];
+		ibc_recv_cq[i] = ibt_cq_hdl ? ibt_cq_hdl->cq_ibc_cq_hdl : NULL;
+	}
+
+	/* Setup QP alloc attributes. */
+	qp_attr.qp_pd_hdl = args->ud_pd;
+	qp_attr.qp_flags = args->ud_flags;
+	qp_attr.qp_srq_hdl = args->ud_srq;
+
+	bcopy(&args->ud_sizes, &qp_attr.qp_sizes,
+	    sizeof (ibt_chan_sizes_t));
+
+	qp_modify_attr.qp_transport.ud.ud_port = args->ud_hca_port_num;
+	qp_modify_attr.qp_transport.ud.ud_qkey = args->ud_qkey;
+
+	/* Validate input hca_port_num and pkey_ix values. */
+	if ((retval = ibt_index2pkey(hca_hdl, args->ud_hca_port_num,
+	    args->ud_pkey_ix, &tmp_pkey)) != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel_range:"
+		    " ibt_index2pkey failed, status: %d", retval);
+		goto fail;
+	}
+	qp_modify_attr.qp_transport.ud.ud_pkey_ix = args->ud_pkey_ix;
+
+	/* Allocate Channel and Initialize the channel. */
+	retval = (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_alloc_qp_range)(
+	    IBTL_HCA2CIHCA(hca_hdl), log2, (ibtl_qp_hdl_t *)ud_chan_p,
+	    IBT_UD_RQP, &qp_attr, sizes, ibc_send_cq, ibc_recv_cq,
+	    base_qpn_p, ibc_qp_hdl_p);
+	if (retval != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel_range: "
+		    "Failed to allocate QPs: %d", retval);
+		goto fail;
+	}
+
+	/* Initialize UD Channel by transitioning it to RTS State. */
+	qp_modify_attr.qp_trans = IBT_UD_SRV;
+	qp_modify_attr.qp_flags = IBT_CEP_NO_FLAGS;
+	qp_modify_attr.qp_transport.ud.ud_sq_psn = 0;
+
+	for (i = 0; i < n; i++) {
+		/* Initialize the internal QP struct. */
+		chanp = ud_chan_p[i];
+		chanp->ch_qp.qp_type = IBT_UD_SRV;
+		chanp->ch_qp.qp_hca = hca_hdl;
+		chanp->ch_qp.qp_ibc_qp_hdl = ibc_qp_hdl_p[i];
+		chanp->ch_qp.qp_send_cq = send_cq[i];
+		chanp->ch_qp.qp_recv_cq = recv_cq[i];
+		chanp->ch_current_state = IBT_STATE_RESET;
+		mutex_init(&chanp->ch_cm_mutex, NULL, MUTEX_DEFAULT, NULL);
+		cv_init(&chanp->ch_cm_cv, NULL, CV_DEFAULT, NULL);
+
+		retval = ibt_initialize_qp(chanp, &qp_modify_attr);
+		if (retval != IBT_SUCCESS) {
+			int j;
+
+			IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel_range:"
+			    " Failed to Initialize QP: %d", retval);
+
+			/* Free the QP as we failed to initialize it. */
+			(void) ibt_free_qp(chanp);
+			for (j = 0; j < i; j++) {
+				chanp = ud_chan_p[j];
+				(void) ibt_free_qp(chanp);
+			}
+			goto fail;
+		}
+
+		/*
+		 * The IBTA spec does not include the signal type or PD on a QP
+		 * query operation. In order to implement the "CLONE" feature
+		 * we need to cache these values.
+		 */
+		chanp->ch_qp.qp_flags = qp_attr.qp_flags;
+		chanp->ch_qp.qp_pd_hdl = qp_attr.qp_pd_hdl;
+	}
+
+
+	IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel_range(%p): SUCCESS");
+
+	atomic_add_32(&hca_hdl->ha_qp_cnt, n);
+
+	retval = IBT_SUCCESS;
+
+fail:
+	kmem_free(ibc_send_cq, sizeof (ibc_cq_hdl_t) << log2);
+	kmem_free(ibc_recv_cq, sizeof (ibc_cq_hdl_t) << log2);
+	kmem_free(ibc_qp_hdl_p, sizeof (ibc_qp_hdl_t) << log2);
+	if (retval != IBT_SUCCESS) {
+		for (i = 0; i < 1 << log2; i++) {
+			kmem_free(ud_chan_p[i], sizeof (ibtl_channel_t));
+			ud_chan_p[i] = NULL;
+		}
+		IBTF_DPRINTF_L2(ibtl_chan, "ibt_alloc_ud_channel_range(%p): "
+		    "failed: %d", retval);
+	}
+	return (retval);
+}
+
+
+/*
+ * Function:
  *	ibt_query_ud_channel
  * Input:
  *	ud_chan		A previously allocated UD channel handle.
@@ -591,6 +814,8 @@ ibt_query_ud_channel(ibt_channel_hdl_t ud_chan,
 	ud_chan_attrs->ud_srq = qp_attr.qp_srq;
 
 	ud_chan_attrs->ud_flags = ud_chan->ch_qp.qp_flags;
+
+	ud_chan_attrs->ud_query_fc = qp_attr.qp_query_fexch;
 
 	return (retval);
 }

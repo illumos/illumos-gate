@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_CQ_H
@@ -57,18 +56,10 @@ extern "C" {
  * The following defines the default number of Completion Queues. This
  * is controllable via the "hermon_log_num_cq" configuration variable.
  * We also have a define for the minimum size of a CQ.  CQs allocated
- * with size 0, 1, 2, or 3 will always get back a CQ of size 4.
+ * with size "less than a page" will always get back a page.
  */
-#define	HERMON_NUM_CQ_SHIFT		0x10
-/*
- *	#define	HERMON_CQ_MIN_SIZE	0x3
- */
+#define	HERMON_NUM_CQ_SHIFT		0x12
 
-/*
- *	#define	HERMON_CQ_MIN_SIZE	0xFF	 testing, try min 1 page
- */
-
-/* page div 32 (cqe size) minus 1, for min size */
 #define	HERMON_CQ_MIN_SIZE	((PAGESIZE / 32) - 1)
 
 /*
@@ -97,7 +88,7 @@ extern "C" {
  * the associated QP.
  */
 #define	HERMON_CQE_SND_NOP		0x0
-#define	HERMON_CQE_SND_SND_INV		0x1
+#define	HERMON_CQE_SND_SEND_INV		0x1
 #define	HERMON_CQE_SND_RDMAWR		0x8
 #define	HERMON_CQE_SND_RDMAWR_IMM	0x9
 #define	HERMON_CQE_SND_SEND		0xA
@@ -116,7 +107,7 @@ extern "C" {
 #define	HERMON_CQE_RCV_RDMAWR_IMM	0x00
 #define	HERMON_CQE_RCV_SEND		0x01
 #define	HERMON_CQE_RCV_SEND_IMM		0x02
-#define	HERMON_CQE_RCV_SND_INV		0x03
+#define	HERMON_CQE_RCV_SEND_INV		0x03
 #define	HERMON_CQE_RCV_ERROR_CODE	0x1E
 #define	HERMON_CQE_RCV_RESIZE_CODE	0x16
 
@@ -124,25 +115,56 @@ extern "C" {
 /* Define for maximum CQ number mask (CQ number is 24 bits) */
 #define	HERMON_CQ_MAXNUMBER_MSK		0xFFFFFF
 
+/*
+ * CQ Sched Management
+ *
+ *	Each hermon_cq_sched struct defines a range of cq handler_id's
+ *	assigned to the cq_sched instance.  Also, the "next_alloc"
+ *	member is used to allocate handler_id's in a round robin fashion.
+ *
+ *	Valid cq handler_id's are in the range of 1 to hs_intrmsi_allocd.
+ *	They are indexes into the hs_intrmsi_hdl array.
+ */
+#define	HERMON_CQH_MAX	32
+typedef struct hermon_cq_sched_s {
+	char	cqs_name[HERMON_CQH_MAX];
+	uint_t	cqs_start_hid;
+	uint_t	cqs_len;
+	uint_t	cqs_next_alloc;
+	uint_t	cqs_desired;
+	uint_t	cqs_minimum;
+	uint_t	cqs_refcnt;	/* could be alloc'ed more than once */
+} hermon_cq_sched_t;
 
 /*
  * new EQ mgmt - per domain (when it gets there).
- * The first N are for CQ Completions.  Following that are:
+ * The first hs_rsvd_eqs are reserved by the firmware.
+ * The next hs_intrmsi_allocd are for CQ Completions.
+ * Each of these "completion" EQs has a unique interrupt vector.
+ * The EQs following that are:
  *
  *	1 for CQ Errors
  *	1 for Asyncs and Command Completions, and finally
  *	1 for All Other events.
  *
- * hs_intrmsi_allocd is the N in the above.
+ * share the last of the interrupt vectors.
  */
+#define	HERMON_CQSCHED_NEXT_HID(cq_schedp)				\
+	((atomic_inc_uint_nv(&(cq_schedp)->cqs_next_alloc) %		\
+	    (cq_schedp)->cqs_len) + (cq_schedp)->cqs_start_hid)
 
-#define	HERMON_CQ_EQNUM_GET(state)					\
-	(state->hs_devlim.num_rsvd_eq +					\
-	    (atomic_inc_uint_nv(&state->hs_eq_dist) %			\
-	    state->hs_intrmsi_allocd))
+#define	HERMON_HID_TO_EQNUM(state, hid)					\
+	((state)->hs_rsvd_eqs + (hid) - 1)
+
+#define	HERMON_HID_VALID(state, hid)					\
+	((uint_t)((hid) - 1) < (state)->hs_intrmsi_allocd)
+
+#define	HERMON_EQNUM_TO_HID(state, eqnum)				\
+	((eqnum) - (state)->hs_rsvd_eqs + 1)
 
 #define	HERMON_CQ_ERREQNUM_GET(state)					\
-	(state->hs_devlim.num_rsvd_eq + state->hs_intrmsi_allocd)
+	(state)->hs_cq_erreqnum
+
 /*
  * The following defines are used for Hermon CQ error handling.  Note: For
  * CQEs which correspond to error events, the Hermon device requires some
@@ -151,8 +173,6 @@ extern "C" {
  * code (above), doorbell count, and whether a error completion is for a
  * send or receive work request.
  */
-
-
 #define	HERMON_CQE_ERR_STATUS_SHIFT	0
 #define	HERMON_CQE_ERR_STATUS_MASK	0xFF
 #define	HERMON_CQE_ERR_DBDCNT_MASK	0xFFFF
@@ -223,7 +243,6 @@ struct hermon_sw_cq_s {
 	struct hermon_qalloc_info_s cq_cqinfo;
 };
 _NOTE(READ_ONLY_DATA(hermon_sw_cq_s::cq_cqnum
-    hermon_sw_cq_s::cq_eqnum
     hermon_sw_cq_s::cq_erreqnum
     hermon_sw_cq_s::cq_cqcrsrcp
     hermon_sw_cq_s::cq_rsrcp
@@ -235,6 +254,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hermon_sw_cq_s::cq_bufsz
     hermon_sw_cq_s::cq_cqinfo))
 _NOTE(MUTEX_PROTECTS_DATA(hermon_sw_cq_s::cq_lock,
     hermon_sw_cq_s::cq_buf
+    hermon_sw_cq_s::cq_eqnum
     hermon_sw_cq_s::cq_mrhdl
     hermon_sw_cq_s::cq_refcnt
     hermon_sw_cq_s::cq_is_special
@@ -257,6 +277,9 @@ int hermon_cq_notify(hermon_state_t *state, hermon_cqhdl_t cqhdl,
     ibt_cq_notify_flags_t flags);
 int hermon_cq_poll(hermon_state_t *state, hermon_cqhdl_t cqhdl, ibt_wc_t *wc_p,
     uint_t num_wc, uint_t *num_polled);
+int hermon_cq_sched_alloc(hermon_state_t *state, ibt_cq_sched_attr_t *attr,
+    hermon_cq_sched_t **cq_sched_pp);
+int hermon_cq_sched_free(hermon_state_t *state, hermon_cq_sched_t *cq_schedp);
 int hermon_cq_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe);
 int hermon_cq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
@@ -266,6 +289,8 @@ void hermon_cq_refcnt_dec(hermon_cqhdl_t cq);
 hermon_cqhdl_t hermon_cqhdl_from_cqnum(hermon_state_t *state, uint_t cqnum);
 void hermon_cq_entries_flush(hermon_state_t *state, hermon_qphdl_t qp);
 void hermon_cq_resize_helper(hermon_state_t *state, hermon_cqhdl_t cq);
+int hermon_cq_sched_init(hermon_state_t *state);
+void hermon_cq_sched_fini(hermon_state_t *state);
 
 #ifdef __cplusplus
 }

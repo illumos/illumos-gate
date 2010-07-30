@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -204,6 +203,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_INIT;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_INIT);
 
 		} else if ((flags & IBT_CEP_SET_STATE) &&
 		    (mod_state == IBT_STATE_RESET)) {
@@ -232,6 +232,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_ERR;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_ERR);
 
 		} else {
 			/* Invalid transition - return error */
@@ -255,6 +256,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				HERMON_WARNING(state, "failed to reset QP");
 			}
 			qp->qp_state = HERMON_QP_RESET;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 
 			mutex_exit(&qp->qp_lock);
 			goto qpmod_fail;
@@ -303,6 +305,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RTR;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RTR);
 
 		} else if ((flags & IBT_CEP_SET_STATE) &&
 		    (mod_state == IBT_STATE_INIT)) {
@@ -315,6 +318,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_INIT;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_INIT);
 
 		} else if ((flags & IBT_CEP_SET_STATE) &&
 		    (mod_state == IBT_STATE_RESET)) {
@@ -327,6 +331,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RESET;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 
 			/*
 			 * Do any additional handling necessary for the
@@ -350,6 +355,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_ERR;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_ERR);
 
 		} else {
 			/* Invalid transition - return error */
@@ -402,6 +408,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RTS;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RTS);
 
 		} else if ((flags & IBT_CEP_SET_STATE) &&
 		    (mod_state == IBT_STATE_RESET)) {
@@ -414,6 +421,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RESET;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 
 			/*
 			 * Do any additional handling necessary for the
@@ -437,6 +445,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_ERR;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_ERR);
 
 		} else {
 			/* Invalid transition - return error */
@@ -478,6 +487,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RTS;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RTS);
 
 		} else if ((flags & IBT_CEP_SET_STATE) &&
 		    (mod_state == IBT_STATE_SQD)) {
@@ -491,6 +501,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_SQD;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_SQD);
 #else
 			/* hack because of the lack of fw support for SQD */
 			mutex_exit(&qp->qp_lock);
@@ -509,6 +520,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RESET;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 
 			/*
 			 * Do any additional handling necessary for the
@@ -532,6 +544,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_ERR;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_ERR);
 
 		} else {
 			/* Invalid transition - return error */
@@ -571,6 +584,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RTS;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RTS);
 
 		} else if ((flags & IBT_CEP_SET_STATE) &&
 		    (mod_state == IBT_STATE_RESET)) {
@@ -583,6 +597,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RESET;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 
 			/*
 			 * Do any additional handling necessary for the
@@ -606,6 +621,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_ERR;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_ERR);
 
 		} else {
 			/* Invalid transition - return error */
@@ -651,6 +667,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_SQD;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_SQD);
 
 		} else if ((flags & IBT_CEP_SET_STATE) &&
 		    (mod_state == IBT_STATE_RTS)) {
@@ -678,6 +695,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_SQD;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_SQD);
 
 			/*
 			 * The, attempt to transition from "SQD" to "RTS", but
@@ -691,6 +709,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RTS;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RTS);
 
 		} else if ((flags & IBT_CEP_SET_STATE) &&
 		    (mod_state == IBT_STATE_RESET)) {
@@ -703,6 +722,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RESET;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 
 			/*
 			 * Do any additional handling necessary for the
@@ -726,6 +746,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_ERR;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_ERR);
 
 		} else {
 			/* Invalid transition - return error */
@@ -751,6 +772,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 				goto qpmod_fail;
 			}
 			qp->qp_state = HERMON_QP_RESET;
+			HERMON_SET_QP_POST_SEND_STATE(qp, HERMON_QP_RESET);
 
 			/*
 			 * Do any additional handling necessary for the
@@ -818,6 +840,7 @@ hermon_qp_reset2init(hermon_state_t *state, hermon_qphdl_t qp,
 	uint_t			portnum, pkeyindx;
 	int			status;
 	uint32_t		cqnmask;
+	int			qp_srq_en;
 
 	ASSERT(MUTEX_HELD(&qp->qp_lock));
 
@@ -847,16 +870,12 @@ hermon_qp_reset2init(hermon_state_t *state, hermon_qphdl_t qp,
 
 	qpc->usr_page		= qp->qp_uarpg;
 
-	/* HERMON: sched_q is now in the address vector(s) */
-	qpc->pri_addr_path.sched_q = HERMON_QP_SCHEDQ_GET(qp->qp_portnum,
-	    0, qp->qp_is_special);
-	qpc->alt_addr_path.sched_q = HERMON_QP_SCHEDQ_GET(qp->qp_portnum,
-	    0, qp->qp_is_special);
-
 	cqnmask = (1 << state->hs_cfg_profile->cp_log_num_cq) - 1;
-	qpc->cqn_snd		= qp->qp_sq_cqhdl->cq_cqnum & cqnmask;
+	qpc->cqn_snd		=
+	    (qp->qp_sq_cqhdl == NULL) ? 0 : qp->qp_sq_cqhdl->cq_cqnum & cqnmask;
 	qpc->page_offs		= qp->qp_wqinfo.qa_pgoffs >> 6;
-	qpc->cqn_rcv		= qp->qp_rq_cqhdl->cq_cqnum & cqnmask;
+	qpc->cqn_rcv		=
+	    (qp->qp_rq_cqhdl == NULL) ? 0 : qp->qp_rq_cqhdl->cq_cqnum & cqnmask;
 
 	/* dbr is now an address, not an index */
 	qpc->dbr_addrh		= ((uint64_t)qp->qp_rq_pdbr >> 32);
@@ -875,25 +894,33 @@ hermon_qp_reset2init(hermon_state_t *state, hermon_qphdl_t qp,
 	qpc->mtt_base_addrl	= (qp->qp_mrhdl->mr_mttaddr) >> 3;
 	qpc->mtt_base_addrh	= (uint32_t)((qp->qp_mrhdl->mr_mttaddr >> 32) &
 	    0xFF);
-	qpc->srq_en		= qp->qp_srq_en;
+	qp_srq_en		= (qp->qp_alloc_flags & IBT_QP_USES_SRQ) != 0;
+	qpc->srq_en		= qp_srq_en;
 
-	if (qp->qp_srq_en == HERMON_QP_SRQ_ENABLED) {
+	if (qp_srq_en) {
 		qpc->srq_number	= qp->qp_srqhdl->srq_srqnum;
 	} else {
 		qpc->srq_number = 0;
 	}
 
-	/* 1.2 verbs extensions disabled for now */
-	qpc->fre		= 0; /* default disable fast registration WR */
+	/*
+	 * Fast Registration Work Requests and Reserved Lkey are enabled
+	 * with the single IBT bit stored in qp_rlky.
+	 */
+	qpc->fre		= qp->qp_rlky;
 	qpc->rlky		= qp->qp_rlky;
-	qpc->header_sep		= 0; /* disble header separation for now */
-	qpc->rss		= 0; /* default disable RSS for now */
+
+	/* 1.2 verbs extensions disabled for now */
+	qpc->header_sep		= 0; /* disable header separation for now */
+	qpc->rss		= qp->qp_alloc_flags & IBT_QP_USES_RSS ? 1 : 0;
 	qpc->inline_scatter	= 0; /* disable inline scatter for now */
 
 	/*
 	 * Now fill in the QPC fields which are specific to transport type
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
+		int my_fc_id_idx, exch_base;
+
 		ud = &info_p->qp_transport.ud;
 
 		/* Set the QKey */
@@ -907,6 +934,8 @@ hermon_qp_reset2init(hermon_state_t *state, hermon_qphdl_t qp,
 		qpc->mtu = HERMON_MAX_MTU;
 		if (qp->qp_uses_lso)
 			qpc->msg_max = state->hs_devlim.log_max_gso_sz;
+		else if (qp->qp_is_special)
+			qpc->msg_max = HERMON_MAX_MTU + 6;
 		else
 			qpc->msg_max = HERMON_QP_LOG_MAX_MSGSZ;
 
@@ -929,6 +958,60 @@ hermon_qp_reset2init(hermon_state_t *state, hermon_qphdl_t qp,
 			qp->qp_pkeyindx = pkeyindx;
 		} else {
 			return (IBT_PKEY_IX_ILLEGAL);
+		}
+
+		/* fill in the RSS fields */
+		if (qpc->rss) {
+			struct hermon_hw_rss_s *rssp;
+			ibt_rss_flags_t flags = ud->ud_rss.rss_flags;
+
+			rssp = (struct hermon_hw_rss_s *)&qpc->pri_addr_path;
+			rssp->log2_tbl_sz = ud->ud_rss.rss_log2_table;
+			rssp->base_qpn = ud->ud_rss.rss_base_qpn;
+			rssp->default_qpn = ud->ud_rss.rss_def_qpn;
+			if (flags & IBT_RSS_ALG_XOR)
+				rssp->hash_fn = 0;	/* XOR Hash Function */
+			else if (flags & IBT_RSS_ALG_TPL)
+				rssp->hash_fn = 1;	/* Toeplitz Hash Fn */
+			else
+				return (IBT_INVALID_PARAM);
+			rssp->ipv4 = (flags & IBT_RSS_HASH_IPV4) != 0;
+			rssp->tcp_ipv4 = (flags & IBT_RSS_HASH_TCP_IPV4) != 0;
+			rssp->ipv6 = (flags & IBT_RSS_HASH_IPV6) != 0;
+			rssp->tcp_ipv4 = (flags & IBT_RSS_HASH_TCP_IPV6) != 0;
+			bcopy(ud->ud_rss.rss_toe_key, rssp->rss_key, 40);
+		} else if (qp->qp_serv_type == HERMON_QP_RFCI) {
+			status = hermon_fcoib_set_id(state, portnum,
+			    qp->qp_qpnum, ud->ud_fc.fc_src_id);
+			if (status != DDI_SUCCESS)
+				return (status);
+			qp->qp_fc_attr = ud->ud_fc;
+		} else if (qp->qp_serv_type == HERMON_QP_FEXCH) {
+			my_fc_id_idx = hermon_fcoib_get_id_idx(state,
+			    portnum, &ud->ud_fc);
+			if (my_fc_id_idx == -1)
+				return (IBT_INVALID_PARAM);
+			qpc->my_fc_id_idx = my_fc_id_idx;
+
+			status = hermon_fcoib_fexch_mkey_init(state,
+			    qp->qp_pdhdl, ud->ud_fc.fc_hca_port,
+			    qp->qp_qpnum, HERMON_CMD_NOSLEEP_SPIN);
+			if (status != DDI_SUCCESS)
+				return (status);
+			qp->qp_fc_attr = ud->ud_fc;
+		} else if (qp->qp_serv_type == HERMON_QP_FCMND) {
+			my_fc_id_idx = hermon_fcoib_get_id_idx(state,
+			    portnum, &ud->ud_fc);
+			if (my_fc_id_idx == -1)
+				return (IBT_INVALID_PARAM);
+			qpc->my_fc_id_idx = my_fc_id_idx;
+			exch_base = hermon_fcoib_check_exch_base_off(state,
+			    portnum, &ud->ud_fc);
+			if (exch_base == -1)
+				return (IBT_INVALID_PARAM);
+			qpc->exch_base = exch_base;
+			qpc->exch_size = ud->ud_fc.fc_exch_log2_sz;
+			qp->qp_fc_attr = ud->ud_fc;
 		}
 
 	} else if (qp->qp_serv_type == HERMON_QP_RC) {
@@ -1046,7 +1129,7 @@ hermon_qp_init2init(hermon_state_t *state, hermon_qphdl_t qp,
 	 * Since there are no common fields to be filled in for this command,
 	 * we begin with the QPC fields which are specific to transport type.
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 		ud = &info_p->qp_transport.ud;
 
 		/*
@@ -1255,7 +1338,7 @@ hermon_qp_init2rtr(hermon_state_t *state, hermon_qphdl_t qp,
 	 * Since there are few common fields to be filled in for this command,
 	 * we just do the QPC fields that are specific to transport type.
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 		ud = &info_p->qp_transport.ud;
 
 		/*
@@ -1627,7 +1710,7 @@ hermon_qp_rtr2rts(hermon_state_t *state, hermon_qphdl_t qp,
 	/*
 	 * Now fill in the QPC fields which are specific to transport type
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 		ud = &info_p->qp_transport.ud;
 
 		/* Set the send PSN */
@@ -1898,7 +1981,7 @@ hermon_qp_rts2rts(hermon_state_t *state, hermon_qphdl_t qp,
 	 * Since there are no common fields to be filled in for this command,
 	 * we begin with the QPC fields which are specific to transport type.
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 		ud = &info_p->qp_transport.ud;
 
 		/*
@@ -2190,7 +2273,7 @@ hermon_qp_sqd2rts(hermon_state_t *state, hermon_qphdl_t qp,
 	/*
 	 * Now fill in the QPC fields which are specific to transport type
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 		ud = &info_p->qp_transport.ud;
 
 		/*
@@ -2491,7 +2574,7 @@ hermon_qp_sqd2sqd(hermon_state_t *state, hermon_qphdl_t qp,
 	/*
 	 * Now fill in the QPC fields which are specific to transport type
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 		ud = &info_p->qp_transport.ud;
 
 		/*
@@ -2933,7 +3016,7 @@ hermon_qp_sqerr2rts(hermon_state_t *state, hermon_qphdl_t qp,
 	 * Since there are no common fields to be filled in for this command,
 	 * we begin with the QPC fields which are specific to transport type.
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 		ud = &info_p->qp_transport.ud;
 
 		/*
@@ -3065,7 +3148,13 @@ hermon_qp_to_reset(hermon_state_t *state, hermon_qphdl_t qp)
 		}
 		return (ibc_get_ci_failure(0));
 	}
-
+	if (qp->qp_serv_type == HERMON_QP_FEXCH) {
+		status = hermon_fcoib_fexch_mkey_fini(state, qp->qp_pdhdl,
+		    qp->qp_qpnum, HERMON_CMD_NOSLEEP_SPIN);
+		if (status != DDI_SUCCESS)
+			cmn_err(CE_NOTE, "hermon%d: fexch_mkey_fini failed "
+			    "%08x\n", state->hs_instance, status);
+	}
 	return (DDI_SUCCESS);
 }
 
@@ -3125,9 +3214,11 @@ hermon_qp_reset2err(hermon_state_t *state, hermon_qphdl_t qp)
 	qpc->mtt_base_addrh	= (qp->qp_mrhdl->mr_mttaddr) >> 32 & 0xFF;
 	qpc->mtt_base_addrl	= (qp->qp_mrhdl->mr_mttaddr) >> 3 & 0xFFFFFFFF;
 	cqnmask = (1 << state->hs_cfg_profile->cp_log_num_cq) - 1;
-	qpc->cqn_snd		= qp->qp_sq_cqhdl->cq_cqnum & cqnmask;
+	qpc->cqn_snd		=
+	    (qp->qp_sq_cqhdl == NULL) ? 0 : qp->qp_sq_cqhdl->cq_cqnum & cqnmask;
 	qpc->page_offs		= qp->qp_wqinfo.qa_pgoffs >> 6;
-	qpc->cqn_rcv		= qp->qp_rq_cqhdl->cq_cqnum & cqnmask;
+	qpc->cqn_rcv		=
+	    (qp->qp_rq_cqhdl == NULL) ? 0 : qp->qp_rq_cqhdl->cq_cqnum & cqnmask;
 
 	qpc->sq_wqe_counter	= 0;
 	qpc->rq_wqe_counter	= 0;
@@ -3135,10 +3226,10 @@ hermon_qp_reset2err(hermon_state_t *state, hermon_qphdl_t qp)
 	qpc->log_rq_stride	= qp->qp_rq_log_wqesz - 4;
 	qpc->log_sq_size	= highbit(qp->qp_sq_bufsz) - 1;
 	qpc->log_rq_size	= highbit(qp->qp_rq_bufsz) - 1;
-	qpc->srq_en		= qp->qp_srq_en;
+	qpc->srq_en		= (qp->qp_alloc_flags & IBT_QP_USES_SRQ) != 0;
 	qpc->sq_no_prefetch	= qp->qp_no_prefetch;
 
-	if (qp->qp_srq_en == HERMON_QP_SRQ_ENABLED) {
+	if (qp->qp_alloc_flags & IBT_QP_USES_SRQ) {
 		qpc->srq_number	= qp->qp_srqhdl->srq_srqnum;
 	} else {
 		qpc->srq_number = 0;
@@ -3150,7 +3241,7 @@ hermon_qp_reset2err(hermon_state_t *state, hermon_qphdl_t qp)
 	/*
 	 * Now fill in the QPC fields which are specific to transport type
 	 */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
+	if (qp->qp_type == IBT_UD_RQP) {
 		/* Set the UD parameters to an invalid default */
 		qpc->qkey = 0;
 		qpc->pri_addr_path.sched_q =

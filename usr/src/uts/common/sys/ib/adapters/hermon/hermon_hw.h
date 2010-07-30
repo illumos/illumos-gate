@@ -127,7 +127,7 @@ struct hermon_hw_hcr_s {
 #define	HERMON_HCR_CMD_OPMOD_SHFT	12
 
 /*
- * Arbel "QUERY_DEV_LIM" command - Hermon, "QUERY_DEV_CAP" - Same hex code
+ * Arbel/tavor "QUERY_DEV_LIM" == Hermon "QUERY_DEV_CAP" - Same hex code
  *    same function as tavor/arbel QUERY_DEV_LIM, just renamed (whatever).
  *    The QUERY_DEV_LIM command returns the device limits and capabilities
  *    supported by the Hermon device.  This command must be run before
@@ -175,8 +175,8 @@ struct hermon_hw_querydevlim_s {
 	uint32_t			:2;
 	uint32_t	log_rsvd_dmpt	:4;
 	uint32_t			:4;
-	uint32_t	log_max_mrw_sz	:8;
-	uint32_t			:4;
+	uint32_t	log_max_mrw_sz	:7;
+	uint32_t			:5;
 	uint32_t	log_rsvd_mtt	:4;
 
 	uint32_t	log_max_ra_glob	:6;
@@ -196,22 +196,25 @@ struct hermon_hw_querydevlim_s {
 	uint32_t	num_ports	:4;
 	uint32_t			:12;
 	uint32_t	ca_ack_delay	:5;
-	uint32_t			:11;
+	uint32_t	cqmep		:3;	/* cq moderation policies */
+	uint32_t			:4;
+	uint32_t			:1;
+	uint32_t			:3;
 
-	uint32_t	mod_wr_srq	:1;
+	uint32_t	mod_wr_srq	:1;	/* resize SRQ supported */
 	uint32_t			:31;
 
-	uint32_t			:4;
-	uint32_t			:12;
+	uint32_t			:16;
 	uint32_t	stat_rate_sup	:16;
 
+	uint32_t			:8;
 	uint32_t			:4;
-	uint32_t			:12;
+	uint32_t			:4;
 	uint32_t			:8;
 	uint32_t	log_max_msg	:5;
 	uint32_t			:3;
 
-	uint32_t	rc		:1;
+	uint32_t	rc		:1;	/* 0x44 */
 	uint32_t	uc		:1;
 	uint32_t	ud		:1;
 	uint32_t	xrc		:1;
@@ -222,21 +225,39 @@ struct hermon_hw_querydevlim_s {
 	uint32_t	pkey_v		:1;
 	uint32_t	qkey_v		:1;
 	uint32_t	vmm		:1;
-	uint32_t			:5;
+	uint32_t	fcoe		:1;
+	uint32_t	dpdp		:1;	/* dual port diff protocol */
+	uint32_t	raw_etype	:1;
+	uint32_t	raw_ipv4	:1;
+	uint32_t	blh		:1;	/* big LSO header, bit in WQE */
 	uint32_t	mem_win		:1;
 	uint32_t	apm		:1;
 	uint32_t	atomic		:1;
 	uint32_t	raw_multi	:1;
 	uint32_t	avp		:1;
 	uint32_t	ud_multi	:1;
-	uint32_t			:2;
+	uint32_t	udm_ipv4	:1;
+	uint32_t	dif		:1;	/* DIF supported */
 	uint32_t	pg_on_demand	:1;
 	uint32_t	router		:1;
-	uint32_t			:6;
+	uint32_t	l2mc		:1;	/* lev 2 enet multicast */
+	uint32_t			:1;
+	uint32_t	ud_swp		:1;	/* sw parse for UD xport */
+	uint32_t	ipv6_ex		:1;	/* offload w/ IPV6 ext hdrs */
+	uint32_t	lle		:1;	/* low latency enet */
+	uint32_t	fcoe_t11	:1;	/* fcoenet T11 frame support */
 
-	uint32_t			:32;
+						/* 0x40 */
+	uint32_t	eth_uc_lb	:1;	/* enet unicast loopback */
+	uint32_t			:3;
+	uint32_t	hdr_split	:1;
+	uint32_t	hdr_lookahead	:1;
+	uint32_t			:2;
+	uint32_t	rss_udp		:1;
+	uint32_t			:7;
+	uint32_t			:16;
 
-	uint32_t	log_max_bf_page	:6;
+	uint32_t	log_max_bf_page	:6;	/* 0x4c */
 	uint32_t			:2;
 	uint32_t	log_max_bf_req_ppg :6;
 	uint32_t			:2;
@@ -244,30 +265,37 @@ struct hermon_hw_querydevlim_s {
 	uint32_t			:10;
 	uint32_t	blu_flm		:1;
 
-	uint32_t	log_pg_sz	:8;
+	uint32_t	log_pg_sz	:8;	/* 0x48 */
 	uint32_t			:8;
 	uint32_t	log_max_uar_sz	:6;
 	uint32_t			:6;
 	uint32_t	num_rsvd_uar	:4;
 
-	uint32_t	max_desc_sz_rq	:16;
+	uint32_t	max_desc_sz_rq	:16;	/* 0x54 */
 	uint32_t	max_sg_rq	:8;
 	uint32_t			:8;
 
-	uint32_t	max_desc_sz_sq	:16;
+	uint32_t	max_desc_sz_sq	:16;	/* 0x50 */
 	uint32_t	max_sg_sq	:8;
 	uint32_t			:8;
 
-	uint32_t	rsvd_fcoib[2];
 
-	uint32_t	log_max_srcd	:4;
-	uint32_t			:8;
-	uint32_t	num_rsvd_srcds	:4;
+	uint32_t	rsvd_fcoib;		/* 0x5C */
+
+	uint32_t			:1;	/* 0x58 */
+	uint32_t	fexch_base_mpt	:7;	/* FC exch base mpt num */
+	uint32_t	fcp_ud_base_qp	:16;	/* RC UD base qp num */
+	uint32_t	fexch_base_qp	:8;	/* FC exch base qp num */
+
+
+	uint32_t	log_max_xrcd	:5;	/* 0x64 */
+	uint32_t			:7;
+	uint32_t	num_rsvd_xrcds	:4;
 	uint32_t	log_max_pd	:5;
 	uint32_t			:7;
 	uint32_t	num_rsvd_pd	:4;
 
-	uint32_t	log_max_mcg	:8;
+	uint32_t	log_max_mcg	:8;	/* 0x60 */
 	uint32_t	num_rsvd_mcg	:4;
 	uint32_t			:4;
 	uint32_t	log_max_qp_mcg	:8;
@@ -275,19 +303,19 @@ struct hermon_hw_querydevlim_s {
 
 	uint32_t	rsrv2[6];
 
-	uint32_t	altc_entry_sz	:16;
+	uint32_t	altc_entry_sz	:16;	/* 0x84 */
 	uint32_t	aux_entry_sz	:16;
 
-	uint32_t	qpc_entry_sz	:16;
+	uint32_t	qpc_entry_sz	:16;	/* 0x80 */
 	uint32_t	rdmardc_entry_sz :16;
 
-	uint32_t	cmpt_entry_sz	:16;
+	uint32_t	cmpt_entry_sz	:16;	/* 0x8C */
 	uint32_t	srq_entry_sz	:16;
 
-	uint32_t	cqc_entry_sz	:16;
+	uint32_t	cqc_entry_sz	:16;	/* 0x88 */
 	uint32_t	eqc_entry_sz	:16;
 
-	uint32_t	bmme		:1;
+	uint32_t	bmme		:1;	/* 0x94 */
 	uint32_t	win_type	:1;
 	uint32_t	mps		:1;
 	uint32_t	bl		:1;
@@ -301,13 +329,13 @@ struct hermon_hw_querydevlim_s {
 	uint32_t	fast_reg_wr	:1;
 	uint32_t			:20;
 
-	uint32_t	dmpt_entry_sz	:16;
+	uint32_t	dmpt_entry_sz	:16;	/* 0x90 */
 	uint32_t	mtt_entry_sz	:16;
 
 	uint32_t			:32;
 
 	uint32_t	rsv_lkey;
-
+						/* 0xA0 */
 	uint64_t	max_icm_size;
 
 	uint32_t	rsrv3[22];
@@ -349,8 +377,8 @@ struct hermon_hw_querydevlim_s {
 	uint32_t	log_max_eq	:4;
 
 	uint32_t	log_rsvd_mtt	:4;
-	uint32_t			:4;
-	uint32_t	log_max_mrw_sz	:8;
+	uint32_t			:5;
+	uint32_t	log_max_mrw_sz	:7;
 	uint32_t			:4;
 	uint32_t	log_rsvd_dmpt	:4;
 	uint32_t			:2;
@@ -373,37 +401,56 @@ struct hermon_hw_querydevlim_s {
 	uint32_t	log_max_ra_glob	:6;
 
 	uint32_t			:31;
-	uint32_t	mod_wr_srq	:1;
+	uint32_t	mod_wr_srq	:1;	/* resize SRQ supported */
 
-	uint32_t			:11;
+	uint32_t			:3;
+	uint32_t			:1;
+	uint32_t			:4;
+	uint32_t	cqmep		:3;	/* cq moderation policies */
 	uint32_t	ca_ack_delay	:5;
-	/* PRM 0.35, stuff moved to per port info */
 	uint32_t			:12;
 	uint32_t	num_ports	:4;
 
 	uint32_t			:3;
 	uint32_t	log_max_msg	:5;
 	uint32_t			:8;
-	uint32_t			:12;
 	uint32_t			:4;
+	uint32_t			:4;
+	uint32_t			:8;
 
 	uint32_t	stat_rate_sup	:16;
-	uint32_t			:12;
-	uint32_t			:4;
+	uint32_t			:16;
 
-	uint32_t			:32;
-
-	uint32_t			:6;
+	uint32_t			:16;	/* 0x40 */
+	uint32_t			:7;
+	uint32_t	rss_udp		:1;
+	uint32_t			:2;
+	uint32_t	hdr_lookahead	:1;
+	uint32_t	hdr_split	:1;
+	uint32_t			:3;
+	uint32_t	eth_uc_lb	:1;	/* enet unicast loopback */
+						/* 0x44 */
+	uint32_t	fcoe_t11	:1;	/* fcoenet T11 frame support */
+	uint32_t	lle		:1;	/* low latency enet */
+	uint32_t	ipv6_ex		:1;	/* offload w/ IPV6 ext hdrs */
+	uint32_t	ud_swp		:1;	/* sw parse for UD xport */
+	uint32_t			:1;
+	uint32_t	l2mc		:1;	/* lev 2 enet multicast */
 	uint32_t	router		:1;
 	uint32_t	pg_on_demand	:1;
-	uint32_t			:2;
+	uint32_t	dif		:1;	/* DIF supported */
+	uint32_t	udm_ipv4	:1;
 	uint32_t	ud_multi	:1;
 	uint32_t	avp		:1;
 	uint32_t	raw_multi	:1;
 	uint32_t	atomic		:1;
 	uint32_t	apm		:1;
 	uint32_t	mem_win		:1;
-	uint32_t			:5;
+	uint32_t	blh		:1;	/* big LSO header, bit in WQE */
+	uint32_t	raw_ipv4	:1;
+	uint32_t	raw_etype	:1;
+	uint32_t	dpdp		:1;	/* dual port diff protocol */
+	uint32_t	fcoe		:1;
 	uint32_t	vmm		:1;
 	uint32_t	qkey_v		:1;
 	uint32_t	pkey_v		:1;
@@ -416,13 +463,13 @@ struct hermon_hw_querydevlim_s {
 	uint32_t	uc		:1;
 	uint32_t	rc		:1;
 
-	uint32_t	num_rsvd_uar	:4;
+	uint32_t	num_rsvd_uar	:4;	/* 0x48 */
 	uint32_t			:6;
 	uint32_t	log_max_uar_sz	:6;
 	uint32_t			:8;
 	uint32_t	log_pg_sz	:8;
 
-	uint32_t	blu_flm		:1;
+	uint32_t	blu_flm		:1;	/* 0x4c */
 	uint32_t			:10;
 	uint32_t	log_bf_reg_sz	:5;
 	uint32_t			:2;
@@ -430,47 +477,53 @@ struct hermon_hw_querydevlim_s {
 	uint32_t			:2;
 	uint32_t	log_max_bf_page	:6;
 
-	uint32_t			:8;
+	uint32_t			:8;	/* 0x50 */
 	uint32_t	max_sg_sq	:8;
 	uint32_t	max_desc_sz_sq	:16;
 
-	uint32_t			:8;
+	uint32_t			:8;	/* 0x54 */
 	uint32_t	max_sg_rq	:8;
 	uint32_t	max_desc_sz_rq	:16;
 
-	uint32_t	rsvd_fcoib[2];
+						/* 0x58 */
+	uint32_t	fexch_base_qp	:8;	/* FC exch base qp num */
+	uint32_t	fcp_ud_base_qp	:16;	/* RC UD base qp num */
+	uint32_t	fexch_base_mpt	:7;	/* FC exch base mpt num */
+	uint32_t			:1;
 
-	uint32_t			:8;
+	uint32_t	rsvd_fcoib;		/* 0x5C */
+
+	uint32_t			:8;	/* 0x60 */
 	uint32_t	log_max_qp_mcg	:8;
 	uint32_t			:4;
 	uint32_t	num_rsvd_mcg	:4;
 	uint32_t	log_max_mcg	:8;
 
-	uint32_t	num_rsvd_pd	:4;
+	uint32_t	num_rsvd_pd	:4;	/* 0x64 */
 	uint32_t			:7;
 	uint32_t	log_max_pd	:5;
-	uint32_t	num_rsvd_srcds	:4;
-	uint32_t			:8;
-	uint32_t	log_max_srcd	:4;
+	uint32_t	num_rsvd_xrcds	:4;
+	uint32_t			:7;
+	uint32_t	log_max_xrcd	:5;
 
 	uint32_t	rsrv2[6];
 
-	uint32_t	rdmardc_entry_sz :16;
+	uint32_t	rdmardc_entry_sz :16;	/* 0x80 */
 	uint32_t	qpc_entry_sz	:16;
 
-	uint32_t	aux_entry_sz	:16;
+	uint32_t	aux_entry_sz	:16;	/* 0x84 */
 	uint32_t	altc_entry_sz	:16;
 
-	uint32_t	eqc_entry_sz	:16;
+	uint32_t	eqc_entry_sz	:16;	/* 0x88 */
 	uint32_t	cqc_entry_sz	:16;
 
-	uint32_t	srq_entry_sz	:16;
+	uint32_t	srq_entry_sz	:16;	/* 0x8C */
 	uint32_t	cmpt_entry_sz	:16;
 
-	uint32_t	mtt_entry_sz	:16;
+	uint32_t	mtt_entry_sz	:16;	/* 0x90 */
 	uint32_t	dmpt_entry_sz	:16;
 
-	uint32_t			:20;
+	uint32_t			:20;	/* 0x94 */
 	uint32_t	fast_reg_wr	:1;
 	uint32_t	reserved_lkey	:1;
 	uint32_t	win_type2	:1;
@@ -489,7 +542,7 @@ struct hermon_hw_querydevlim_s {
 	uint32_t			:32;
 
 	uint64_t	max_icm_size;
-
+						/* 0xA0 */
 	uint32_t	rsrv3[22];
 };
 #endif
@@ -520,16 +573,16 @@ struct hermon_hw_queryfw_s {
 	uint32_t	cmd_intf_rev	:16;
 	uint32_t			:16;
 
-	uint32_t	fw_day	:8;
+	uint32_t	fw_day		:8;
 	uint32_t	fw_month	:8;
-	uint32_t	fw_year	:16;
+	uint32_t	fw_year		:16;
 
 	uint32_t			:1;
-	uint32_t	ccq		:1;
+	uint32_t	ccq		:1;	/* currently not def'd */
 	uint32_t			:6;
-	uint32_t	fw_sec	:8;
-	uint32_t	fw_min	:8;
-	uint32_t	fw_hour	:8;
+	uint32_t	fw_sec		:8;
+	uint32_t	fw_min		:8;
+	uint32_t	fw_hour		:8;
 
 	uint32_t	rsrv0[2];
 
@@ -547,9 +600,16 @@ struct hermon_hw_queryfw_s {
 
 	uint32_t	error_buf_sz;
 
-	uint32_t	rsrv2[48];
+	uint64_t	vf_com_ch_addr;
+
+	uint32_t			:32;
+
+	uint32_t			:30;
+	uint32_t	vf_com_ch_bar	:2;
+
+	uint32_t	rsrv2[44];
 };
-#else
+#else	/* BIG ENDIAN */
 struct hermon_hw_queryfw_s {
 	uint32_t	fw_pages	:16;
 	uint32_t	fw_rev_major	:16;
@@ -564,16 +624,16 @@ struct hermon_hw_queryfw_s {
 	uint32_t			:23;
 	uint32_t	log_max_cmd	:8;
 
-	uint32_t	fw_hour	:8;
-	uint32_t	fw_min	:8;
-	uint32_t	fw_sec	:8;
+	uint32_t	fw_hour		:8;
+	uint32_t	fw_min		:8;
+	uint32_t	fw_sec		:8;
 	uint32_t			:6;
-	uint32_t	ccq		:1;
+	uint32_t	ccq		:1;	/* currently not def'd */
 	uint32_t			:1;
 
-	uint32_t	fw_year	:16;
+	uint32_t	fw_year		:16;
 	uint32_t	fw_month	:8;
-	uint32_t	fw_day	:8;
+	uint32_t	fw_day		:8;
 
 	uint32_t	rsrv1[2];
 
@@ -591,7 +651,14 @@ struct hermon_hw_queryfw_s {
 	uint32_t	err_buf_bar	:2;
 	uint32_t			:30;
 
-	uint32_t	rsrv2[48];
+	uint64_t	vf_com_ch_addr;
+
+	uint32_t	vf_com_ch_bar	:2;
+	uint32_t			:30;
+
+	uint32_t			:32;
+
+	uint32_t	rsrv2[44];
 };
 #endif
 
@@ -662,23 +729,27 @@ struct hermon_hw_queryadapter_s {
 struct hermon_hw_vpm_s {
 	uint32_t			:12;
 	uint32_t	vaddr_l		:20;
+
 	uint32_t	vaddr_h;
 
-	uint32_t	log2sz	:5;
+	uint32_t	log2sz		:5;	/* in 4KB pages */
 	uint32_t			:7;
 	uint32_t	paddr_l		:20;
+
 	uint32_t	paddr_h;
 };
 #else
 struct hermon_hw_vpm_s {
 	uint32_t	vaddr_h;
+
 	uint32_t	vaddr_l		:20;
 	uint32_t			:12;
 
 	uint32_t	paddr_h;
+
 	uint32_t	paddr_l		:20;
 	uint32_t			:7;
-	uint32_t	log2sz	:5;
+	uint32_t	log2sz		:5;	/* in 4KB pages */
 };
 #endif
 
@@ -751,7 +822,7 @@ typedef struct hermon_hw_qp_ee_cq_eq_rdb_s {
 
 	uint32_t	rsrv6[2];
 } hermon_hw_qp_ee_cq_eq_rdb_t;
-#else
+#else	/* BIG ENDIAN */
 typedef struct hermon_hw_qp_ee_cq_eq_rdb_s {
 	uint32_t	rsrv0[4];
 
@@ -816,7 +887,7 @@ typedef struct hermon_multicast_param_s {
 	uint32_t	mc_hash_fn	:3;
 	uint32_t			:5;
 } hermon_multicast_param_t;
-#else
+#else	/* BIG ENDIAN */
 typedef struct hermon_multicast_param_s {
 	uint64_t	mc_baseaddr;
 
@@ -844,6 +915,7 @@ typedef struct hermon_tpt_param_s {
 	uint64_t	dmpt_baseaddr;
 
 	uint32_t			:32;
+
 	uint32_t	log_dmpt_sz	:6;
 	uint32_t			:2;
 	uint32_t	pgfault_rnr_to	:5;
@@ -853,7 +925,7 @@ typedef struct hermon_tpt_param_s {
 
 	uint64_t	cmpt_baseaddr;
 } hermon_tpt_param_t;
-#else
+#else	/* BIG ENDIAN */
 typedef struct hermon_tpt_param_s {
 	uint64_t	dmpt_baseaddr;
 
@@ -861,6 +933,7 @@ typedef struct hermon_tpt_param_s {
 	uint32_t	pgfault_rnr_to	:5;
 	uint32_t			:2;
 	uint32_t	log_dmpt_sz	:6;
+
 	uint32_t			:32;
 
 	uint64_t	mtt_baseaddr;
@@ -899,6 +972,10 @@ typedef struct hermon_uar_param_s {
 /*
  * NEW for Hermon
  *   QP Allocation Params
+ *	NOTE:  	as of PRM v0.50 no longer needed (ccq not supported
+ *		leave structure here, just in case ccq comes back )
+ *		but adjust the overall structure
+ *		not to use it
  *
  */
 
@@ -926,12 +1003,13 @@ typedef struct hermon_qp_alloc_param_s {
 } hermon_qp_alloc_param_t;
 #endif
 
+
 #ifdef	_LITTLE_ENDIAN
 struct hermon_hw_initqueryhca_s {
 	uint32_t			:32;
 
 	uint32_t			:24;
-	uint32_t	version	:8;
+	uint32_t	version		:8;
 
 	uint32_t			:13;
 	uint32_t	log2_cacheline  :3;
@@ -941,9 +1019,11 @@ struct hermon_hw_initqueryhca_s {
 
 	uint32_t	udav_port_chk	:1;
 	uint32_t	big_endian	:1;
-	uint32_t			:1;
+	uint32_t	qos		:1;
 	uint32_t	chsum_en	:1;
-	uint32_t			:28;
+	uint32_t			:12;
+	uint32_t	cqpm_short_pkt_lim :14; /* short pkt limit for qpm */
+	uint32_t	cqmp		:2;	/* cq moderation policy */
 
 	uint32_t	router_qp	:24;
 	uint32_t			:5;
@@ -957,7 +1037,7 @@ struct hermon_hw_initqueryhca_s {
 
 	uint32_t	rsrv2[8];
 
-	hermon_multicast_param_t		multi;
+	hermon_multicast_param_t	multi;
 
 	uint32_t	rsrv3[4];
 
@@ -967,15 +1047,22 @@ struct hermon_hw_initqueryhca_s {
 
 	hermon_uar_param_t		uar;
 
-	uint32_t	rsrv5[4];
+	uint32_t	rsrv5[36];
 
-	hermon_qp_alloc_param_t		qp_alloc;
+	hermon_multicast_param_t	enet_multi;
 
-	uint32_t	rsrv6[100];	/* from 0x16c to 0x2fc offsets */
+	uint32_t	rsrv6[24];		/* to 0x24C */
+
+	uint32_t			:32;
+
+	uint32_t	fcoe_t11	:1;	/* fcoe t11 frame enable */
+	uint32_t			:31;
+
+	uint32_t	rsrv7[42];		/* 0x254 - 0x2FC */
 };
 #else	/* BIG ENDIAN */
 struct hermon_hw_initqueryhca_s {
-	uint32_t	version	:8;
+	uint32_t	version		:8;
 	uint32_t			:24;
 
 	uint32_t			:32;
@@ -992,9 +1079,11 @@ struct hermon_hw_initqueryhca_s {
 	uint32_t			:5;
 	uint32_t	router_qp	:24;
 
-	uint32_t			:28;
+	uint32_t	cqmp		:2;	/* cq moderation policy */
+	uint32_t	cqpm_short_pkt_lim :14; /* short pkt limit for qpm */
+	uint32_t			:12;
 	uint32_t	chsum_en	:1;
-	uint32_t			:1;
+	uint32_t	qos		:1;
 	uint32_t	big_endian	:1;
 	uint32_t	udav_port_chk	:1;
 
@@ -1004,7 +1093,7 @@ struct hermon_hw_initqueryhca_s {
 
 	uint32_t	rsrv2[8];
 
-	hermon_multicast_param_t		multi;
+	hermon_multicast_param_t	multi;
 
 	uint32_t	rsrv3[4];
 
@@ -1014,11 +1103,18 @@ struct hermon_hw_initqueryhca_s {
 
 	hermon_uar_param_t		uar;
 
-	uint32_t	rsrv5[4];
+	uint32_t	rsrv5[36];
 
-	hermon_qp_alloc_param_t		qp_alloc;
+	hermon_multicast_param_t	enet_multi;
 
-	uint32_t	rsrv6[100];	/* from 0x16c to 0x2fc offsets */
+	uint32_t	rsrv6[24];		/* to 0x24C */
+
+	uint32_t			:31;
+	uint32_t	fcoe_t11	:1;	/* fcoe t11 frame enable */
+
+	uint32_t			:32;
+
+	uint32_t	rsrv7[42];		/* 0x254 - 0x2FC */
 };
 #endif
 #define	HERMON_UDAV_PROTECT_DISABLED	0x0
@@ -1057,81 +1153,130 @@ struct hermon_hw_initqueryhca_s {
  *	directly as was done for the previous HCAs).
  */
 
+/*
+ * 	PRM 0.4X and 0.50 changed the query_port to integrate the ethernet
+ *	stuff as well, so this is a signficant change to the structure
+ */
+
 #ifdef _LITTLE_ENDIAN
 struct hermon_hw_query_port_s {
+						/* 0x04 */
 	uint32_t	log_max_pkey 	:4;	/* pkey table size */
 	uint32_t	log_max_gid	:4;	/* max gids / port */
-	/* was max_port_width arbel: long list of values */
-	uint32_t	ib_port_wid	:4;
-	uint32_t			:4;
-	uint32_t			:4;	/* other types possibly */
+	uint32_t	ib_port_wid	:8;
+	/*
+	 * Enet link speed - 0x0 10Gb XAUI, 0x01 10Gb XFI,
+	 *	0x02 1Gb, 0xF other
+	 */
+	uint32_t	eth_link_spd	:4;
 	uint32_t			:4;
 	/*
-	 * 0x1=2.5G, 0x3=2.5 or 5.0G, 0x5=2.5 or 10G
-	 *	0x7=2.5, 5.0, or 10G, others rsvd
+	 * IB Link speed - bit 0 SDR, bit1 DDR, Bit 2 QDR
 	 */
-	uint32_t	ib_link_spd	:4;
+	uint32_t	ib_link_spd	:8;
 
-	uint32_t			:4;
-
-	uint32_t			:16;	/* used for other types (?) */
+						/* 0x00 */
+	uint32_t	eth_mtu		:16;	/* in bytes */
+	/*
+	 * IB MTU - 0x0 rsvd, 0x1=256, 0x2=512, 0x3=1024, 0x4=2048, 0x5=4096
+	 */
 	uint32_t	ib_mtu		:4;
+	uint32_t			:4;
 	/*
-	 * 0x0 rsvd, 0x1=256, 0x2=512, 0x3=1024, 0x5=2048
-	 * 0x5=4096, others rsvd
+	 * for next two if link down
+	 * -> what port supports, if up
+	 * -> what port is running
 	 */
-	uint32_t			:4;
-	uint32_t	port_type	:8;	/* 0x00, 0x01 IB, others TBD */
 
-	uint32_t			:32;
+	uint32_t	ib_link		:1;
+	uint32_t	eth_link	:1;
+	uint32_t			:1;
+	uint32_t	vpi		:1;
+	uint32_t			:3;
+	uint32_t	link_up		:1;
+
+
+	uint32_t			:32;	/* 0x0C */
+
 	/* max vl's supported (not incl vl_15) */
-	uint32_t	max_vl		:4;
+	uint32_t	max_vl		:4;	/* 0x08 */
 	uint32_t			:4;
-	uint32_t			:8;	/* but others possibly */
+	uint32_t	log_max_mac	:4;
+	uint32_t	log_max_vlan	:4;
 	uint32_t			:16;
 
-	uint32_t	rsvd0[2];		/* but for other types */
-	uint32_t	rsvd1[504];
+	uint32_t	mac_lo;
+
+	uint32_t	mac_hi		:16;
+	uint32_t			:16;
+
+	uint32_t	rsvd1[2];
 };
+
 #else /* BIG ENDIAN */
 struct hermon_hw_query_port_s {
-	uint32_t	port_type	:8;	/* 0x00, 0x01 IB, others TBD */
+						/* 0x00 */
+	uint32_t	link_up		:1;
+	uint32_t			:3;
+	uint32_t	vpi		:1;
+	uint32_t			:1;
+	/*
+	 * for next two if link down
+	 * -> what port supports, if up
+	 * -> what port is running
+	 */
+	uint32_t	eth_link	:1;
+	uint32_t	ib_link		:1;
 	uint32_t			:4;
 	/*
-	 * 0x0 rsvd, 0x1=256, 0x2=512, 0x3=1024, 0x5=2048
-	 * 0x1=256, 0x2=512, 0x3=1024, 0x5=2048
+	 * IB MTU - 0x0 rsvd, 0x1=256, 0x2=512, 0x3=1024, 0x4=2048, 0x5=4096
 	 */
 	uint32_t	ib_mtu		:4;
-						/*	0x5=4096, others rsvd */
-	uint32_t			:16;	/* used for other types (?) */
+	uint32_t	eth_mtu		:16;	/* in bytes */
 
-	uint32_t			:4;
-	uint32_t	ib_link_spd	:4;
+						/* 0x04 */
 	/*
-	 * 0x1=2.5G, 0x3=2.5 or 5.0G, 0x5=2.5 or 10G
-	 *	0x7=2.5, 5.0, or 10G, others rsvd
+	 * IB Link speed - bit 0 SDR, bit1 DDR, Bit 2 QDR
 	 */
+	uint32_t	ib_link_spd	:8;
 	uint32_t			:4;
-	uint32_t			:4;	/* other types possibly */
-	uint32_t			:4;
-	/* was max_port_width arbel: long list of values */
-	uint32_t	ib_port_wid	:4;
+	/*
+	 * Enet link speed - 0x0 10Gb XAUI, 0x01 10Gb XFI,
+	 *	0x02 1Gb, 0xF other
+	 */
+	uint32_t	eth_link_spd	:4;
+	uint32_t	ib_port_wid	:8;
 	uint32_t	log_max_gid	:4;	/* max gids / port */
 	uint32_t	log_max_pkey 	:4;	/* pkey table size */
 
-	uint32_t			:16;
-	uint32_t			:8;	/* but others possibly */
+	uint32_t			:16;	/* 0x08 */
+	uint32_t	log_max_vlan	:4;
+	uint32_t	log_max_mac	:4;
 	uint32_t			:4;
 	/* max vl's supported (not incl vl_15) */
 	uint32_t	max_vl		:4;
 
-	uint32_t			:32;
+	uint32_t			:32;	/* 0x0C */
 
-	uint32_t	rsvd0[2];		/* but for other types */
-	uint32_t	rsvd1[504];
+	uint32_t			:16;
+	uint32_t	mac_hi		:16;
+
+	uint32_t	mac_lo;
+
+	uint32_t	rsvd1[2];
 
 };
 #endif
+
+/*
+ * the following structure is used for IB set port
+ *	others following are for ethernet set port
+ */
+
+#define	HERMON_HW_OPMOD_SETPORT_IB	0x0
+#define	HERMON_HW_OPMOD_SETPORT_EN	0x1
+#define	HERMON_HW_OPMOD_SETPORT_EXT	0x2
+
 
 #ifdef _LITTLE_ENDIAN
 struct hermon_hw_set_port_s {
@@ -1158,20 +1303,17 @@ struct hermon_hw_set_port_s {
 
 	uint64_t	node_guid;
 
-	uint32_t	sniff_qpn_base  :24;
-	uint32_t	ge		:1;	/* glob egress sniff enabled */
-	uint32_t	gi		:1;	/* glob ingress sniff enabled */
-	uint32_t	qe		:1;	/* qp-egress sniff enable */
-	uint32_t	qi		:1;	/* qp-ingress sniff enabled */
-	uint32_t			:4;
+	uint32_t	ingress_sniff_qpn  :24;
+	uint32_t	ingress_sniff_mode :1;
+	uint32_t			   :7;
 
-	uint32_t	router_qpn_base :24;
-	uint32_t	routermode	:1;
-	uint32_t			:7;
+	uint32_t	egress_sniff_qpn  :24;
+	uint32_t	egress_sniff_mode :1;
+	uint32_t			  :7;
 
 	uint32_t			:32;
 
-	uint32_t	max_guid	:16;	/* valid if noted above */
+	uint32_t	max_gid		:16;	/* valid if noted above */
 	uint32_t	max_pkey	:16;	/* valid if noted above */
 
 	uint32_t	rsrd0[500];
@@ -1201,23 +1343,307 @@ struct hermon_hw_set_port_s {
 
 	uint64_t	node_guid;
 
-	uint32_t			:7;
-	uint32_t	routermode	:1;
-	uint32_t	router_qpn_base :24;
+	uint32_t			  :7;
+	uint32_t	egress_sniff_mode :1;
+	uint32_t	egress_sniff_qpn   :24;
 
-	uint32_t			:4;
-	uint32_t	qi		:1;	/* qp-ingress sniff enabled */
-	uint32_t	qe		:1;	/* qp-egress sniff enable */
-	uint32_t	gi		:1;	/* glob ingress sniff enabled */
-	uint32_t	ge		:1;	/* glob egress sniff enabled */
-	uint32_t	sniff_qpn_base  :24;
+	uint32_t			   :7;
+	uint32_t	ingress_sniff_mode :1;
+	uint32_t	ingress_sniff_qpn  :24;
+
 
 	uint32_t	max_pkey	:16;	/* valid if noted above */
-	uint32_t	max_guid	:16;	/* valid if noted above */
+	uint32_t	max_gid		:16;	/* valid if noted above */
 
 	uint32_t			:32;
 
 	uint32_t	rsrd0[500];
+};
+#endif
+
+/*
+ * structures  for ethernet setport
+ * Which structure is used depends on low-16 of opmod
+ * Low 8 == port number, 15:8 == selector
+ * Or the following with port number
+ */
+
+#define	HERMON_HW_ENET_OPMOD_SELECT_GEN	0x0000		/* general params */
+#define	HERMON_HW_ENET_OPMOD_SELECT_RQN 0x0100		/* rcv qpn calc */
+#define	HERMON_HW_ENET_OPMOD_SELECT_MAC 0x0200		/* MAC table conf */
+#define	HERMON_HW_ENET_OPMOD_SELECT_VLAN 0x0300		/* VLAN table conf */
+#define	HERMON_HW_ENET_OPMOD_SELECT_PRIO 0x0400		/* Priority table */
+#define	HERMON_HW_ENET_OPMOD_SELECT_GID	 0x0500		/* GID Table */
+
+/*
+ * set port for enthernet, general parameters
+ * Which structure
+ */
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_set_port_en_s {
+	uint32_t	mtu		:16;
+	uint32_t			:16;
+
+	uint32_t	v_mtu		:1;
+	uint32_t	v_pprx		:1;
+	uint32_t	v_pptx		:1;
+	uint32_t			:29;
+
+	uint32_t			:16;
+	uint32_t	pfcrx		:8;
+	uint32_t			:7;
+	uint32_t	pprx		:1;
+
+	uint32_t			:16;
+	uint32_t	pfctx		:8;
+	uint32_t			:7;
+	uint32_t	pptx		:1;
+
+	uint32_t	rsvd0[4];
+};
+
+#else /* BIG ENDIAN */
+struct hermon_hw_set_port_en_s {
+	uint32_t			:29;
+	uint32_t	v_pptx		:1;
+	uint32_t	v_pprx		:1;
+	uint32_t	v_mtu		:1;
+
+	uint32_t			:16;
+	uint32_t	mtu		:16;
+
+	uint32_t	pptx		:1;
+	uint32_t			:7;
+	uint32_t	pfctx		:8;
+	uint32_t			:16;
+
+	uint32_t	pprx		:1;
+	uint32_t			:7;
+	uint32_t	pfcrx		:8;
+	uint32_t			:16;
+
+	uint32_t	rsvd0[4];
+
+};
+#endif
+
+/* set_port for enet, RX QPM calculations Parameters */
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_set_port_en_rqpn_s {
+	uint32_t	n_p		:2;
+	uint32_t			:6;
+	uint32_t	n_v		:3;
+	uint32_t			:5;
+	uint32_t	n_m		:4;
+	uint32_t			:12;
+
+	uint32_t	base_qpn	:24;
+	uint32_t			:8;
+
+	uint32_t	vlan_miss_idx	:7;
+	uint32_t			:8;
+	uint32_t	intra_vlan_miss	:1;
+	uint32_t	no_vlan_idx	:7;
+	uint32_t			:8;
+	uint32_t	intra_no_vlan	:1;
+
+	uint32_t	mac_miss_idx	:8;
+	uint32_t			:24;
+
+	uint32_t	promisc_qpn	:24;
+	uint32_t			:7;
+	uint32_t	en_uc_promisc	:1;
+
+	uint32_t	no_vlan_prio	:3;
+	uint32_t			:29;
+
+	uint32_t			:32;
+
+	uint32_t	def_mcast_qpn	:24;
+	uint32_t			:5;
+	uint32_t	mc_by_vlan	:1;
+	uint32_t	mc_promisc_mode :2;
+
+	uint32_t	rsvd0[4];
+};
+
+#else /* BIG ENDIAN */
+struct hermon_hw_set_port_en_rqpn_s {
+	uint32_t			:8;
+	uint32_t	base_qpn	:24;
+
+	uint32_t			:12;
+	uint32_t	n_m		:4;
+	uint32_t			:5;
+	uint32_t	n_v		:3;
+	uint32_t			:6;
+	uint32_t	n_p		:2;
+
+	uint32_t			:24;
+	uint32_t	mac_miss_idx	:8;
+
+	uint32_t	intra_no_vlan	:1;
+	uint32_t			:8;
+	uint32_t	no_vlan_idx	:7;
+	uint32_t	intra_vlan_miss	:1;
+	uint32_t			:8;
+	uint32_t	vlan_miss_idx	:7;
+
+	uint32_t			:29;
+	uint32_t	no_vlan_prio	:3;
+
+	uint32_t	en_uc_promisc	:1;
+	uint32_t			:7;
+	uint32_t	promisc_qpn	:24;
+
+	uint32_t	mc_promisc_mode :2;
+	uint32_t	mc_by_vlan	:1;
+	uint32_t			:5;
+	uint32_t	def_mcast_qpn	:24;
+
+	uint32_t			:32;
+
+	uint32_t	rsvd0[4];
+};
+#endif
+
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_set_port_mact_entry_s {
+	uint32_t	mac_lo		:32;
+
+	uint32_t	mac_hi		:16;
+	uint32_t			:7;
+	uint32_t	mac_valid	:1;
+};
+#else /* BIG ENDIAN */
+struct hermon_hw_set_port_mact_entry_s {
+	uint32_t	mac_valid	:1;
+	uint32_t			:7;
+	uint32_t	mac_hi		:16;
+
+	uint32_t	mac_lo		:32;
+
+};
+#endif
+
+
+/* set_port for enet, MAC Table Configuration */
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_set_port_en_mact_s {
+	struct hermon_hw_set_port_mact_entry_s mtable[128];
+};
+#else /* BIG ENDIAN */
+struct hermon_hw_set_port_en_mact_s {
+	struct hermon_hw_set_port_mact_entry_s mtable[128];
+};
+#endif
+
+
+/* set_port for enet, VLAN Table Configuration */
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_set_port_vlant_entry_s {
+	uint32_t	vlan_id		:12;
+	uint32_t			:18;
+	uint32_t	intra		:1;
+	uint32_t	valid		:1;
+};
+#else /* BIG ENDIAN */
+struct hermon_hw_set_port_vlant_entry_s {
+	uint32_t	valid		:1;
+	uint32_t	intra		:1;
+	uint32_t			:18;
+	uint32_t	vlan_id		:12;
+};
+#endif
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_set_port_en_vlant_s {
+	uint32_t	rsvd[2];
+	struct hermon_hw_set_port_vlant_entry_s table[126];
+};
+#else /* BIG ENDIAN */
+struct hermon_hw_set_port_en_vlant_s {
+	uint32_t	rsvd[2];
+	struct hermon_hw_set_port_vlant_entry_s table[126];
+};
+#endif
+
+/* set_port for enet, Priority table Parameters */
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_set_port_en_priot_s {
+	uint32_t			:32;
+
+	uint32_t	prio0		:3;
+	uint32_t			:1;
+	uint32_t	prio1		:3;
+	uint32_t			:1;
+	uint32_t	prio2		:3;
+	uint32_t			:1;
+	uint32_t	prio3		:3;
+	uint32_t			:1;
+	uint32_t	prio4		:3;
+	uint32_t			:1;
+	uint32_t	prio5		:3;
+	uint32_t			:1;
+	uint32_t	prio6		:3;
+	uint32_t			:1;
+	uint32_t	prio7		:3;
+	uint32_t			:1;
+
+	uint32_t	rsvd[2];
+};
+#else /* BIG ENDIAN */
+struct hermon_hw_set_port_en_priot_s {
+	uint32_t			:1;
+	uint32_t	prio7		:3;
+	uint32_t			:1;
+	uint32_t	prio6		:3;
+	uint32_t			:1;
+	uint32_t	prio5		:3;
+	uint32_t			:1;
+	uint32_t	prio4		:3;
+	uint32_t			:1;
+	uint32_t	prio3		:3;
+	uint32_t			:1;
+	uint32_t	prio2		:3;
+	uint32_t			:1;
+	uint32_t	prio1		:3;
+	uint32_t			:1;
+	uint32_t	prio0		:3;
+
+	uint32_t			:32;
+
+	uint32_t	rsvd[2];
+
+};
+#endif
+
+
+/* note:  GID table is same BIG or LITTLE ENDIAN */
+
+struct hermon_hw_set_port_gidtable_s {
+	uint64_t	gid[128];
+};
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_conf_int_mod_s {
+	uint32_t			:32;
+
+	uint32_t	int_vect	:16;
+	uint32_t	min_delay	:16;
+};
+#else /* BIG ENDIAN */
+struct hermon_hw_conf_int_mod_s {
+	uint32_t	min_delay	:16;
+	uint32_t	int_vect	:16;
+
+	uint32_t			:32;
 };
 #endif
 
@@ -1286,6 +1712,7 @@ struct hermon_hw_dmpt_s {
 	uint32_t			:1; 	/* dw 2, byte 0xc-f */
 
 	uint32_t	mem_key;
+
 	uint64_t	start_addr;		/* dw 4-5, byte 0x10-17 */
 
 	uint64_t	reg_win_len;		/* dw 6-7, byte 0x18-1f */
@@ -1315,15 +1742,16 @@ struct hermon_hw_dmpt_s {
 
 	uint32_t	entity_sz	:21;
 	uint32_t			:11;	/* dw 14, byte 0x38-3b */
-#ifdef HERMON_NOTIMPL
+
 	uint32_t	dif_m_atag	:16;
 	uint32_t			:16;	/* dw 17, 0x44-47 */
 
 	uint32_t	dif_a_msk	:16;
 	uint32_t	dif_v_msk	:2;
 	uint32_t	dif_rep		:2;
-	uint32_t			:9;
-	uint32_t	dif_err		:3; 	/* dw 16, 0x40-43 */
+	uint32_t			:4;
+	uint32_t	dif_err		:3;
+	uint32_t			:5;	/* dw 16, 0x40-43 */
 
 	uint32_t	dif_w_atag	:16;
 	uint32_t			:16;	/* dw 19, 0x4c-4f */
@@ -1333,7 +1761,9 @@ struct hermon_hw_dmpt_s {
 	uint32_t			:32;
 
 	uint32_t	dif_w_rtagb;		/* dw 20, 0x50-53 */
-#endif /* HERMON_NOTIMPL */
+
+	uint32_t	rsvd[10];
+
 };
 
 #else /* BIG ENDIAN */
@@ -1399,10 +1829,10 @@ struct hermon_hw_dmpt_s {
 
 	uint32_t			:11;
 	uint32_t	mtt_fbo		:21;	/* dw 15, byte 0x3c-3f */
-#ifdef HERMON_NOTIMPL
 
+	uint32_t			:5;
 	uint32_t	dif_err		:3;
-	uint32_t			:9;
+	uint32_t			:4;
 	uint32_t	dif_rep		:2;
 	uint32_t	dif_v_msk	:2;
 	uint32_t	dif_a_msk	:16;	/* dw 16, 0x40-43 */
@@ -1418,7 +1848,9 @@ struct hermon_hw_dmpt_s {
 	uint32_t	dif_w_rtagb;		/* dw 20, 0x50-53 */
 
 	uint32_t			:32;
-#endif  /* HERMON_NOTIMPL */
+
+	uint32_t	rsvd[10];
+
 };
 #endif
 
@@ -1469,7 +1901,7 @@ struct hermon_hw_cmpt_s {
 
 	uint64_t	reg_win_len;		/* dw 6-7, byte 0x18-1f */
 
-	uint32_t	win_cnt	:24;
+	uint32_t	win_cnt		:24;
 	uint32_t			:8; 	/* dw 9, byte 0x24-27 */
 
 	uint32_t	lkey;			/* dw 8, byte 0x20-23 */
@@ -1480,8 +1912,8 @@ struct hermon_hw_cmpt_s {
 	uint32_t	mtt_rep		:4;
 	uint32_t			:17;
 	uint32_t	blk_mode	:1;
-	uint32_t	len_b64	:1;	/* bit 64 of length */
-	uint32_t	fbo_en	:1;
+	uint32_t	len_b64		:1;	/* bit 64 of length */
+	uint32_t	fbo_en		:1;
 	uint32_t			:8; 	/* dw 10, byte 0x28-2b */
 
 	uint32_t	mtt_size;		/* dw 13, byte 0x34-37 */
@@ -1489,7 +1921,7 @@ struct hermon_hw_cmpt_s {
 	uint32_t			:3;
 	uint32_t	mtt_addr_l	:29; 	/* dw 12, byte 0x30-33 */
 
-	uint32_t	mtt_fbo	:21;
+	uint32_t	mtt_fbo		:21;
 	uint32_t			:11; 	/* dw 15, byte 0x3c-3f */
 
 	uint32_t	entity_sz	:21;
@@ -1500,24 +1932,24 @@ struct hermon_hw_cmpt_s {
 
 #else /* BIG ENDIAN */
 struct hermon_hw_cmpt_s {
-	uint32_t	status	:4;
+	uint32_t	status		:4;
 	uint32_t			:8;
 	uint32_t	no_snoop	:1;
 	uint32_t			:1;
 	uint32_t	atc_xlat	:1;
-	uint32_t	atc_req	:1;
-	uint32_t	en_bind	:1;
-	uint32_t	atomic	:1;
+	uint32_t	atc_req		:1;
+	uint32_t	en_bind		:1;
+	uint32_t	atomic		:1;
 	uint32_t	rw		:1;
 	uint32_t	rr		:1;
 	uint32_t	lw		:1;
 	uint32_t	lr		:1;
 	uint32_t	phys_addr	:1;
-	uint32_t	reg_win	:1;
+	uint32_t	reg_win		:1;
 	uint32_t			:8;	/* dw 0, byte 0x0-3 */
 
 	uint32_t	qpn		:24;
-	uint32_t	bnd_qp	:1;
+	uint32_t	bnd_qp		:1;
 	uint32_t			:7;	/* dw 1, byte 0x4-7 */
 
 	uint32_t	mem_key;		/* dw 2, byte 0x8-b */
@@ -1539,14 +1971,14 @@ struct hermon_hw_cmpt_s {
 	uint32_t	lkey;			/* dw 8, bytd 0x20-23 */
 
 	uint32_t			:8;
-	uint32_t	win_cnt	:24;	/* dw 9, byte 0x24-27 */
+	uint32_t	win_cnt		:24;	/* dw 9, byte 0x24-27 */
 
 	uint32_t			:8;
-	uint32_t	fbo_en	:1;
-	uint32_t	len_b64	:1;	/* bit 64 of length */
+	uint32_t	fbo_en		:1;
+	uint32_t	len_b64		:1;	/* bit 64 of length */
 	uint32_t	blk_mode	:1;
 	uint32_t			:17;
-	uint32_t	mtt_rep	:4;	/* dw 10, byte 0x28-2b */
+	uint32_t	mtt_rep		:4;	/* dw 10, byte 0x28-2b */
 
 	uint32_t			:24;
 	uint32_t	mtt_addr_h	:8;	/* dw 11, byte 0x2c-2f */
@@ -1558,6 +1990,9 @@ struct hermon_hw_cmpt_s {
 
 	uint32_t			:11;
 	uint32_t	entity_sz	:21;	/* dw 14, byte 0x38-3b */
+
+	uint32_t			:11; 	/* dw 15, byte 0x3c-3f */
+	uint32_t	mtt_fbo		:21;
 };
 #endif
 
@@ -1862,6 +2297,22 @@ typedef struct hermon_hw_eqe_operr_s {
 #define	HERMON_ERREVT_INTERNAL_PARITY	0x5
 
 
+typedef struct hermon_hw_eqe_fcerr_s {
+	uint32_t			:14;
+	uint32_t	port		:2;
+	uint32_t	fexch		:16;	/* fexch number */
+
+	uint32_t			:32;
+
+	uint32_t			:24;
+	uint32_t	fcsyndrome	:8;
+
+	uint32_t	rsvd[3];
+} hermon_hw_eqe_fcerr_t;
+
+#define	HERMON_ERR_FC_BADIU		0x0
+#define	HERMON_ERR_FC_SEQUENCE		0x01
+
 typedef struct hermon_hw_eqe_pgflt_s {
 	uint32_t	rsrv0[2];
 	uint32_t			:24;
@@ -1901,6 +2352,7 @@ struct hermon_hw_eqe_s {
 		hermon_hw_eqe_cmdcmpl_t		eqe_cmdcmpl;
 		hermon_hw_eqe_operr_t		eqe_operr;
 		hermon_hw_eqe_pgflt_t		eqe_pgflt;
+		hermon_hw_eqe_fcerr_t		eqe_fcerr;
 	} event_data;
 	uint32_t			:24;
 	uint32_t	owner		:1;
@@ -1914,6 +2366,7 @@ struct hermon_hw_eqe_s {
 #define	eqe_cmdcmpl			event_data.eqe_cmdcmpl
 #define	eqe_operr			event_data.eqe_operr
 #define	eqe_pgflt			event_data.eqe_pgflt
+#define	eqe_fcerr			event_data.eqe_fcerr
 
 /*
  * The following macros are used for extracting (and in some cases filling in)
@@ -1953,6 +2406,13 @@ struct hermon_hw_eqe_s {
 	(((uint8_t *)(eqe))[0xf])
 #define	HERMON_EQE_OPERRDATA_GET(eq, eqe)				\
 	htonl(((uint32_t *)(eqe))[4])
+#define	HERMON_EQE_FEXCH_PORTNUM_GET(eq, eqe)				\
+	(((uint8_t *)(eqe))[5] & 0x3)
+#define	HERMON_EQE_FEXCH_FEXCH_GET(eq, eqe)				\
+	htons(((uint16_t *)(eqe))[3])
+#define	HERMON_EQE_FEXCH_SYNDROME_GET(eq, eqe)				\
+	(((uint8_t *)(eqe))[15])
+
 /*
  * Hermon does ownership of CQ and EQ differently from Arbel & Tavor.
  * Now, you keep track of the TOTAL number of CQE's or EQE's that have been
@@ -1964,10 +2424,9 @@ struct hermon_hw_eqe_s {
  * does not consume it.
  */
 
-#define	HERMON_EQE_OWNER_IS_SW(eq, eqe)					\
+#define	HERMON_EQE_OWNER_IS_SW(eq, eqe, consindx, shift)		\
 	((((uint8_t *)(eqe))[0x1f] & HERMON_EQE_OWNER_MASK) ==		\
-	    (((eq->eq_nexteqe) & eq->eq_bufsz) >>			\
-	    (eq->eq_log_eqsz - HERMON_EQE_OWNER_SHIFT)))
+	    (((consindx) & eq->eq_bufsz) >> (shift)))
 
 /*
  * Hermon Completion Queue Context Table (CQC) entries
@@ -2049,7 +2508,7 @@ struct hermon_hw_cqc_s {
 };
 #else
 struct hermon_hw_cqc_s {
-	uint32_t	status	:4;
+	uint32_t	status		:4;
 	uint32_t			:9;
 	uint32_t	cqe_coalesc	:1;
 	uint32_t	overrun_ignore	:1;
@@ -2125,9 +2584,9 @@ struct hermon_hw_cqc_s {
 
 struct hermon_hw_cqe_s {
 	uint32_t	dife		:1;
-	uint32_t			:2;
+	uint32_t	vlan		:2;
 	uint32_t	fl		:1;
-	uint32_t	fccrc_sd	:1;
+	uint32_t	fcrc_sd		:1;
 	uint32_t	d2s		:1;
 	uint32_t			:2;
 	uint32_t	my_qpn		:24;
@@ -2139,10 +2598,10 @@ struct hermon_hw_cqe_s {
 	uint32_t	srq_rqpn	:24;
 
 	uint32_t	sl		:4;
-	uint32_t			:12;
-	uint32_t	slid		:16;
+	uint32_t	vid		:12;
+	uint32_t	slid		:16;	/* SMAC 47:32 or SLID */
 
-	uint32_t	ipoib_status;
+	uint32_t	ipoib_status; /* SMAC 31:0 or enet/ipoib/EoIB status */
 
 	uint32_t	byte_cnt;
 
@@ -2235,6 +2694,9 @@ struct hermon_hw_cqe_s {
 #define	HERMON_CQE_ERROR_SYNDROME_GET(cq, cqe)				\
 	(((uint8_t *)(cqe))[27])
 
+#define	HERMON_CQE_ERROR_VENDOR_SYNDROME_GET(cq, cqe)			\
+	(((uint8_t *)(cqe))[26])
+
 #define	HERMON_CQE_OPCODE_GET(cq, cqe)					\
 	((((uint8_t *)(cqe))[31]) & HERMON_CQE_OPCODE_MASK)
 
@@ -2242,12 +2704,30 @@ struct hermon_hw_cqe_s {
 	(((((uint8_t *)(cqe))[31]) & HERMON_CQE_SENDRECV_MASK) >>	\
 	    HERMON_CQE_SENDRECV_SHIFT)
 
+#define	HERMON_CQE_FEXCH_SEQ_CNT(cq, cqe)				\
+	HERMON_CQE_CKSUM(cq, cqe)
+
+#define	HERMON_CQE_FEXCH_TX_BYTES(cq, cqe)				\
+	htonl(((uint32_t *)(cqe))[3])
+
+#define	HERMON_CQE_FEXCH_RX_BYTES(cq, cqe)				\
+	htonl(((uint32_t *)(cqe))[4])
+
+#define	HERMON_CQE_FEXCH_SEQ_ID(cq, cqe)				\
+	(((uint8_t *)(cqe))[8])
+
+#define	HERMON_CQE_FEXCH_DETAIL(cq, cqe)				\
+	htonl(((uint32_t *)(cqe))[0])
+
+#define	HERMON_CQE_FEXCH_DIFE(cq, cqe)					\
+	((((uint8_t *)(cqe))[0]) & 0x80)
+
 /* See Comment above for EQE - ownership of CQE is handled the same */
 
-#define	HERMON_CQE_OWNER_IS_SW(cq, cqe, considx)			\
+#define	HERMON_CQE_OWNER_IS_SW(cq, cqe, considx, shift, mask)		\
 	(((((uint8_t *)(cqe))[31] & HERMON_CQE_OWNER_MASK) >>		\
 	    HERMON_CQE_OWNER_SHIFT) == 					\
-	    (((considx) & cq->cq_bufsz) >> cq->cq_log_cqsz))
+	    (((considx) & (mask)) >> (shift)))
 
 /*
  * Hermon Shared Receive Queue (SRQ) Context Entry Format
@@ -2297,7 +2777,7 @@ struct hermon_hw_srqc_s {
 	uint32_t	rsrc0[80];	/* to match DEV_CAP size of 0x80 */
 
 };
-#else
+#else  /* BIG ENDIAN */
 struct hermon_hw_srqc_s {
 	uint32_t	state			:4;
 	uint32_t	log_srq_size		:4;
@@ -2349,9 +2829,17 @@ struct hermon_hw_srqc_s {
 
 #ifdef _LITTLE_ENDIAN
 struct hermon_hw_mod_stat_cfg_s {
-	uint32_t	rsvd0;
+	uint32_t				:16;
+	uint32_t	qdr_rx_op		:4;
+	uint32_t				:3;
+	uint32_t	qdr_rx_opt_m		:1;
+	uint32_t	qdr_tx_op		:4;
+	uint32_t				:3;
+	uint32_t	qdr_tx_opt_m		:1;
 
-	uint32_t				:14;
+	uint32_t	log_pg_sz		:8;
+	uint32_t	log_pg_sz_m		:1;
+	uint32_t				:5;
 	uint32_t	dife			:1;
 	uint32_t	dife_m			:1;
 	uint32_t	rx_options		:4;
@@ -2368,7 +2856,7 @@ struct hermon_hw_mod_stat_cfg_s {
 	uint32_t	port_en_m		:1;
 	uint32_t				:10;
 
-	uint32_t	rsvd1;
+	uint32_t				:32;
 
 	uint32_t	guid_hi;
 
@@ -2376,8 +2864,8 @@ struct hermon_hw_mod_stat_cfg_s {
 	uint32_t	guid_hi_m		:1;
 
 	uint32_t	guid_lo;
-	uint32_t				:31;
 
+	uint32_t				:31;
 	uint32_t	guid_lo_m		:1;
 
 	uint32_t	rsvd[4];
@@ -2405,7 +2893,13 @@ struct hermon_hw_mod_stat_cfg_s {
 	uint32_t				:2;
 	uint32_t	serdes_m		:1;
 
-	uint32_t	reserved[50];
+	uint32_t	reserved[22];
+
+	uint32_t	mac_lo			:32;
+
+	uint32_t	mac_hi			:16;
+	uint32_t				:15;
+	uint32_t	mac_m			:1;
 };
 #else /* BIG ENDIAN */
 struct hermon_hw_mod_stat_cfg_s {
@@ -2417,11 +2911,19 @@ struct hermon_hw_mod_stat_cfg_s {
 	uint32_t	rx_options		:4;
 	uint32_t	dife_m			:1;
 	uint32_t	dife			:1;
-	uint32_t				:14;
+	uint32_t				:5;
+	uint32_t	log_pg_sz_m		:1;
+	uint32_t	log_pg_sz		:8;
 
-	uint32_t	rsvd0;
+	uint32_t	qdr_tx_opt_m		:1;
+	uint32_t				:3;
+	uint32_t	qdr_tx_op		:4;
+	uint32_t	qdr_rx_opt_m		:1;
+	uint32_t				:3;
+	uint32_t	qdr_rx_op		:4;
+	uint32_t				:16;
 
-	uint32_t	rsvd1;
+	uint32_t				:32;
 
 	uint32_t				:10;
 	uint32_t	port_en_m		:1;
@@ -2465,13 +2967,20 @@ struct hermon_hw_mod_stat_cfg_s {
 	uint32_t				:1;
 	uint32_t	inbuf_ind_en		:3;
 
-	uint32_t	reserved[50];
+	uint32_t	reserved[22];		/* get to new enet stuff */
+
+	uint32_t	mac_m			:1;
+	uint32_t				:15;
+	uint32_t	mac_hi			:16;
+
+	uint32_t	mac_lo			:32;
 };
 #endif
 
-
 /*
  * Hermon MOD_STAT_CFG input modifier structure
+ * NOTE:  this might end up defined ONLY one way,
+ * if usage is access via macros
  */
 struct hermon_hw_msg_in_mod_s {
 #ifdef _LITTLE_ENDIAN
@@ -2506,14 +3015,14 @@ struct hermon_hw_msg_in_mod_s {
 #ifdef	_LITTLE_ENDIAN
 struct hermon_hw_udav_s {
 	uint32_t	rlid		:16;
-	uint32_t	ml_path		:7;
+	uint32_t	ml_path		:7;	/* mlid or SMAC idx */
 	uint32_t	grh		:1;
 	uint32_t			:8;
 
 	uint32_t	pd		:24;
 	uint32_t	portnum		:2;
 	uint32_t			:5;
-	uint32_t	force_lp	:1;
+	uint32_t	force_lb	:1;
 
 	uint32_t	flow_label	:20;
 	uint32_t	tclass		:8;
@@ -2537,7 +3046,7 @@ struct hermon_hw_udav_s {
 
 	uint32_t			:8;
 	uint32_t	grh		:1;
-	uint32_t	ml_path		:7;
+	uint32_t	ml_path		:7;	/* mlid or SMAC idx */
 	uint32_t	rlid		:16;
 
 	uint32_t			:9;
@@ -2557,6 +3066,75 @@ struct hermon_hw_udav_s {
 #define	HERMON_UDAV_MODIFY_MASK0		0xFCFFFFFFFF000000ULL
 #define	HERMON_UDAV_MODIFY_MASK1		0xFF80F00000000000ULL
 
+/* UDAV for enthernet */
+
+#ifdef	_LITTLE_ENDIAN
+struct hermon_hw_udav_enet_s {
+	uint32_t			:16;
+	uint32_t	smac_idx	:7;
+	uint32_t			:9;
+
+	uint32_t	pd		:24;
+	uint32_t	portnum		:2;
+	uint32_t			:3;
+	uint32_t	cv		:1;
+	uint32_t			:1;
+	uint32_t	force_lb	:1;
+
+	uint32_t	flow_label	:20;
+	uint32_t	tclass		:8;
+	uint32_t	sl		:4;
+
+	uint32_t	hop_limit	:8;
+	uint32_t	max_stat_rate	:4;
+	uint32_t			:4;
+	uint32_t	mgid_index	:7;
+	uint32_t			:9;
+
+	uint64_t	rgid_h;
+	uint64_t	rgid_l;
+
+	uint32_t	rsrv[2];
+
+	uint32_t	dmac_lo;
+
+	uint32_t	dmac_hi		:16;
+	uint32_t	vlan		:16;
+};
+#else
+struct hermon_hw_udav_enet_s {
+	uint32_t	force_lb	:1;
+	uint32_t			:1;
+	uint32_t	cv		:1;
+	uint32_t			:3;
+	uint32_t	portnum		:2;
+	uint32_t	pd		:24;
+
+	uint32_t			:9;
+	uint32_t	smac_idx	:7;
+	uint32_t			:16;
+
+	uint32_t			:9;
+	uint32_t	mgid_index	:7;
+	uint32_t			:4;
+	uint32_t	max_stat_rate	:4;
+	uint32_t	hop_limit	:8;
+
+	uint32_t	sl		:4;
+	uint32_t	tclass		:8;
+	uint32_t	flow_label	:20;
+
+	uint64_t	rgid_h;
+	uint64_t	rgid_l;
+
+	uint32_t	rsrv[2];
+
+	uint32_t	vlan		:16;
+	uint32_t	dmac_hi		:16;
+
+	uint32_t	dmac_low;
+};
+#endif
 
 /*
  * Hermon Queue Pair Context Table (QPC) entries
@@ -2588,45 +3166,165 @@ struct hermon_hw_udav_s {
 #ifdef	_LITTLE_ENDIAN
 struct hermon_hw_addr_path_s {
 	uint32_t	rlid		:16;
+	uint32_t	mlid		:7;	/* mlid or SMAC idx */
+	uint32_t	grh		:1;
+	uint32_t	cntr_idx	:8;
+
+	uint32_t	pkey_indx	:7;
+	uint32_t			:22;
+	uint32_t			:1;	/* but may be used for enet */
+	uint32_t	cv		:1;
+	uint32_t	force_lb	:1;
+
+	uint32_t	flow_label	:20;
+	uint32_t	tclass		:8;
+	uint32_t	sniff_s_in	:1;
+	uint32_t	sniff_s_out	:1;
+	uint32_t	sniff_r_in	:1;
+	uint32_t	sniff_r_out 	:1; 	/* sniff-rcv-egress */
+
+	uint32_t	hop_limit	:8;
+	uint32_t	max_stat_rate	:4;
+	uint32_t			:4;
+	uint32_t	mgid_index	:7;
+	uint32_t			:1;
+	uint32_t	link_type	:3;
+	uint32_t	ack_timeout	:5;
+
+	uint64_t	rgid_h;
+	uint64_t	rgid_l;
+
+	uint32_t	dmac_hi		:16;
+	uint32_t			:16;
+
+	uint32_t			:8;	/* but may be used for enet */
+	uint32_t	sp		:1;
+	uint32_t			:2;
+	uint32_t	fvl		:1;
+	uint32_t	fsip		:1;
+	uint32_t	fsm		:1;
+	uint32_t			:2;
+	uint32_t	vlan_idx	:7;
+	uint32_t			:1;
+	uint32_t	sched_q		:8;
+
+	uint32_t	dmac_lo		:32;
+};
+#else
+struct hermon_hw_addr_path_s {
+	uint32_t	force_lb	:1;
+	uint32_t	cv		:1;
+	uint32_t			:1;	/* but may be used for enet */
+	uint32_t			:22;
+	uint32_t	pkey_indx	:7;
+
+	uint32_t	cntr_idx	:8;
+	uint32_t	grh		:1;
+	uint32_t	mlid		:7;	/* mlid or SMAC idx */
+	uint32_t	rlid		:16;
+
+	uint32_t	ack_timeout	:5;
+	uint32_t	link_type	:3;
+	uint32_t			:1;
+	uint32_t	mgid_index	:7;
+	uint32_t			:4;
+	uint32_t	max_stat_rate	:4;
+	uint32_t	hop_limit	:8;
+
+	uint32_t	sniff_r_out	:1;	/* sniff-rcv-egress */
+	uint32_t	sniff_r_in	:1;
+	uint32_t	sniff_s_out	:1;
+	uint32_t	sniff_s_in	:1;
+	uint32_t	tclass		:8;
+	uint32_t	flow_label	:20;
+
+	uint64_t	rgid_h;
+	uint64_t	rgid_l;
+
+	uint32_t	sched_q		:8;
+	uint32_t			:1;
+	uint32_t	vlan_idx	:7;
+	uint32_t			:2;
+	uint32_t	fsm		:1;
+	uint32_t	fsip		:1;
+	uint32_t	fvl		:1;
+	uint32_t			:2;
+	uint32_t	sp		:1;
+	uint32_t			:8;	/* but may be used for enet */
+
+	uint32_t			:16;
+	uint32_t	dmac_hi		:16;
+
+	uint32_t	dmac_lo		:32;
+};
+#endif	/* LITTLE ENDIAN */
+
+/* The addr path includes RSS fields for RSS QPs */
+#ifdef	_LITTLE_ENDIAN
+struct hermon_hw_rss_s {
+	uint32_t	rlid		:16;
 	uint32_t	mlid		:7;
 	uint32_t	grh		:1;
 	uint32_t	cntr_idx	:8;
 
 	uint32_t	pkey_indx	:7;
 	uint32_t			:22;
-	uint32_t			:2;	/* but may be used for enet */
+	uint32_t			:1;	/* but may be used for enet */
+	uint32_t	cv		:1;
 	uint32_t	force_lb	:1;
 
 	uint32_t	flow_label	:20;
 	uint32_t	tclass		:8;
-	uint32_t			:4;
+	uint32_t	sniff_s_in	:1;
+	uint32_t	sniff_s_out	:1;
+	uint32_t	sniff_r_in	:1;
+	uint32_t	sniff_r_out 	:1; 	/* sniff-rcv-egress */
 
 	uint32_t	hop_limit	:8;
 	uint32_t	max_stat_rate	:4;
 	uint32_t			:4;
 	uint32_t	mgid_index	:7;
-	uint32_t			:4;
+	uint32_t			:1;
+	uint32_t	link_type	:3;
 	uint32_t	ack_timeout	:5;
 
 	uint64_t	rgid_h;
 	uint64_t	rgid_l;
 
-	uint32_t			:32;	/* but may be used for enet */
+	uint32_t	base_qpn	:24;
+	uint32_t	log2_tbl_sz	:4;
+	uint32_t			:4;
 
-	uint32_t			:12;	/* but may be used for enet */
+	uint32_t			:8;	/* but may be used for enet */
+	uint32_t	sp		:1;
+	uint32_t			:2;
+	uint32_t	fvl		:1;
 	uint32_t	fsip		:1;
-	uint32_t			:3;
-	uint32_t			:7;
+	uint32_t	fsm		:1;
+	uint32_t			:2;
+	uint32_t	vlan_idx	:7;
 	uint32_t			:1;
 	uint32_t	sched_q		:8;
 
+	uint32_t			:2;
+	uint32_t	tcp_ipv6	:1;
+	uint32_t	ipv6		:1;
+	uint32_t	tcp_ipv4	:1;
+	uint32_t	ipv4		:1;
+	uint32_t			:2;
+	uint32_t	hash_fn		:2;
+	uint32_t			:22;
 
-	uint32_t			:32;
+	uint32_t	default_qpn	:24;
+	uint32_t			:8;
+
+	uint8_t		rss_key[40];
 };
-#else
-struct hermon_hw_addr_path_s {
+#else  /* BIG ENDIAN */
+struct hermon_hw_rss_s {
 	uint32_t	force_lb	:1;
-	uint32_t			:2;	/* but may be used for enet */
+	uint32_t	cv		:1;
+	uint32_t			:1;	/* but may be used for enet */
 	uint32_t			:22;
 	uint32_t	pkey_indx	:7;
 
@@ -2636,13 +3334,17 @@ struct hermon_hw_addr_path_s {
 	uint32_t	rlid		:16;
 
 	uint32_t	ack_timeout	:5;
-	uint32_t			:4;
+	uint32_t	link_type	:3;
+	uint32_t			:1;
 	uint32_t	mgid_index	:7;
 	uint32_t			:4;
 	uint32_t	max_stat_rate	:4;
 	uint32_t	hop_limit	:8;
 
-	uint32_t			:4;
+	uint32_t	sniff_r_out	:1;	/* sniff-rcv-egress */
+	uint32_t	sniff_r_in	:1;
+	uint32_t	sniff_s_out	:1;
+	uint32_t	sniff_s_in	:1;
 	uint32_t	tclass		:8;
 	uint32_t	flow_label	:20;
 
@@ -2651,14 +3353,32 @@ struct hermon_hw_addr_path_s {
 
 	uint32_t	sched_q		:8;
 	uint32_t			:1;
-	uint32_t			:7;
-	uint32_t			:3;
+	uint32_t	vlan_idx	:7;
+	uint32_t			:2;
+	uint32_t	fsm		:1;
 	uint32_t	fsip		:1;
-	uint32_t			:12;	/* but may be used for enet */
+	uint32_t	fvl		:1;
+	uint32_t			:2;
+	uint32_t	sp		:1;
+	uint32_t			:8;	/* but may be used for enet */
 
-	uint32_t			:32;	/* but may be used for enet */
+	uint32_t			:4;
+	uint32_t	log2_tbl_sz	:4;
+	uint32_t	base_qpn	:24;
 
-	uint32_t			:32;
+	uint32_t			:8;
+	uint32_t	default_qpn	:24;
+
+	uint32_t			:22;
+	uint32_t	hash_fn		:2;
+	uint32_t			:2;
+	uint32_t	ipv4		:1;
+	uint32_t	tcp_ipv4	:1;
+	uint32_t	ipv6		:1;
+	uint32_t	tcp_ipv6	:1;
+	uint32_t			:2;
+
+	uint8_t		rss_key[40];
 };
 #endif	/* LITTLE ENDIAN */
 
@@ -2756,7 +3476,7 @@ struct hermon_hw_qpc_s {
 	uint32_t	cqn_rcv		:24;
 	uint32_t			:8;
 
-	uint32_t	srcd		:16;
+	uint32_t	xrcd		:16;
 	uint32_t			:16;
 
 	uint32_t			:2;
@@ -2785,7 +3505,7 @@ struct hermon_hw_qpc_s {
 
 	uint32_t	rmc_parent_qpn	:24;
 	uint32_t	header_sep	:1;
-	uint32_t	inline_scatter :1; /* m/b 0 for srq */
+	uint32_t	inline_scatter  :1; 	/* m/b 0 for srq */
 	uint32_t			:1;
 	uint32_t	rmc_enable	:2;
 	uint32_t			:2;	/* may use one bit for enet */
@@ -2799,7 +3519,22 @@ struct hermon_hw_qpc_s {
 	uint32_t	log2_pgsz	:6;
 	uint32_t			:2;
 
-	uint32_t	rsvd[12];		/* may/will be used for FCoIB */
+	uint32_t	exch_base	:16;
+	uint32_t	exch_size	:4;
+	uint32_t			:12;
+
+	uint32_t	vft_vf_id	:12;
+	uint32_t	vft_prior	:3;
+	uint32_t			:16;
+	uint32_t	ve		:1;
+
+	uint32_t			:32;
+
+	uint32_t			:16;
+	uint32_t	my_fc_id_idx	:8;
+	uint32_t	vft_hop_cnt	:8;
+
+	uint32_t	rsvd[8];
 };
 #else /* BIG ENDIAN */
 struct hermon_hw_qpc_s {
@@ -2886,7 +3621,7 @@ struct hermon_hw_qpc_s {
 	uint32_t	next_rcv_psn	:24;
 
 	uint32_t			:16;
-	uint32_t	srcd		:16;
+	uint32_t	xrcd		:16;
 
 	uint32_t			:8;
 	uint32_t	cqn_rcv		:24;
@@ -2916,7 +3651,7 @@ struct hermon_hw_qpc_s {
 	uint32_t			:2;	/* may use one bit for enet */
 	uint32_t	rmc_enable	:2;
 	uint32_t			:1;
-	uint32_t	inline_scatter :1; /* m/b 0 for srq */
+	uint32_t	inline_scatter  :1; 	/* m/b 0 for srq */
 	uint32_t	header_sep	:1;
 	uint32_t	rmc_parent_qpn	:24;
 
@@ -2931,7 +3666,22 @@ struct hermon_hw_qpc_s {
 	uint32_t	mtt_base_addrl	:29;
 	uint32_t			:3;
 
-	uint32_t	rsvd[12];		/* may/will be used for FCoIB */
+	uint32_t	ve		:1;
+	uint32_t			:16;
+	uint32_t	vft_prior	:3;
+	uint32_t	vft_vf_id	:12;
+
+	uint32_t			:12;
+	uint32_t	exch_size	:4;
+	uint32_t	exch_base	:16;
+
+	uint32_t	vft_hop_cnt	:8;
+	uint32_t	my_fc_id_idx	:8;
+	uint32_t			:16;
+
+	uint32_t			:32;
+
+	uint32_t	rsvd[8];
 };
 #endif	/* LITTLE ENDIAN */
 
@@ -2951,7 +3701,11 @@ struct hermon_hw_qpc_s {
 #define	HERMON_QP_RC			0x0
 #define	HERMON_QP_UC			0x1
 #define	HERMON_QP_UD			0x3
+#define	HERMON_QP_FCMND			0x4
+#define	HERMON_QP_FEXCH			0x5
+#define	HERMON_QP_XRC			0x6
 #define	HERMON_QP_MLX			0x7
+#define	HERMON_QP_RFCI			0x9
 
 #define	HERMON_QP_PMSTATE_MIGRATED	0x3
 #define	HERMON_QP_PMSTATE_ARMED		0x0
@@ -2999,7 +3753,8 @@ struct hermon_hw_qpc_s {
 #ifdef	_LITTLE_ENDIAN
 struct hermon_hw_mcg_s {
 	uint32_t	member_cnt	:24;
-	uint32_t			:8;
+	uint32_t			:6;
+	uint32_t	protocol	:2;
 
 	uint32_t			:6;
 	uint32_t	next_gid_indx	:26;
@@ -3015,7 +3770,8 @@ struct hermon_hw_mcg_s {
 	uint32_t	next_gid_indx	:26;
 	uint32_t			:6;
 
-	uint32_t			:8;
+	uint32_t	protocol	:2;
+	uint32_t			:6;
 	uint32_t	member_cnt	:24;
 
 	uint32_t			:32;
@@ -3023,6 +3779,58 @@ struct hermon_hw_mcg_s {
 
 	uint64_t	mgid_h;
 	uint64_t	mgid_l;
+};
+#endif
+
+#ifdef	_LITTLE_ENDIAN
+struct hermon_hw_mcg_en_s {
+	uint32_t	member_cnt	:24;
+	uint32_t			:6;
+	uint32_t	protocol	:2;
+
+	uint32_t			:6;
+	uint32_t	next_gid_indx	:26;
+
+	uint32_t			:32;
+	uint32_t			:32;
+
+	uint32_t	vlan_present	:1;
+	uint32_t			:31;
+
+	uint32_t			:32;
+
+	uint32_t	mac_lo		:32;
+
+	uint32_t	mac_hi		:16;
+	uint32_t	vlan_id		:12;
+	uint32_t	vlan_cfi	:1;
+	uint32_t	vlan_prior	:3;
+
+};
+#else
+struct hermon_hw_mcg_en_s {
+	uint32_t	next_gid_indx	:26;
+	uint32_t			:6;
+
+	uint32_t	protocol	:2;
+	uint32_t			:6;
+	uint32_t	member_cnt	:24;
+
+	uint32_t			:32;
+	uint32_t			:32;
+
+	uint32_t			:32;
+
+	uint32_t			:31;
+	uint32_t	vlan_present	:1;
+
+	uint32_t	vlan_prior	:3;
+	uint32_t	vlan_cfi	:1;
+	uint32_t	vlan_id		:12;
+	uint32_t	mac_hi		:16;
+
+	uint32_t	mac_lo		:32;
+
 };
 #endif
 
@@ -3045,6 +3853,152 @@ struct hermon_hw_mcg_qp_list_s {
 #endif
 
 #define	HERMON_MCG_QPN_BLOCK_LB		0x40000000
+
+/*
+ * ETHERNET ONLY Commands
+ * The follow are new commands, used only for an Ethernet Port
+ */
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_set_mcast_fltr_s {
+	uint32_t	mac_lo;
+
+	uint32_t	mac_hi		:16;
+	uint32_t			:15;
+	uint32_t	sfs		:1;
+};
+#else	/* BIG ENDIAN */
+struct hermon_hw_set_mcast_fltr_s {
+	uint32_t	sfs		:1;
+	uint32_t			:15;
+	uint32_t	mac_hi		:16;
+
+	uint32_t	mac_lo;
+};
+#endif
+
+/* opmod for set_mcast_fltr */
+#define	HERMON_SET_MCAST_FLTR_CONF	0x0
+#define	HERMON_SET_MCAST_FLTR_DIS	0x1
+#define	HERMON_SET_MCAST_FLTR_EN	0x2
+
+
+/*
+ * FC Command structures
+ */
+
+
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_config_fc_basic_s {
+	uint32_t	n_p		:2;
+	uint32_t			:6;
+	uint32_t	n_v		:3;
+	uint32_t			:5;
+	uint32_t	n_m		:4;
+	uint32_t			:12;
+
+	uint32_t			:16;
+	uint32_t	fexch_base_hi	:8;
+	uint32_t			:8;
+
+	uint32_t	rfci_base	:24;
+	uint32_t	log2_num_rfci	:3;
+	uint32_t			:5;
+
+	uint32_t	fx_base_mpt_lo	:8;
+	uint32_t			:17;
+	uint32_t	fx_base_mpt_hi	:7;
+
+	uint32_t	fcoe_prom_qpn	:24;
+	uint32_t	uint32_t	:8;
+
+	uint32_t			:32;
+
+	uint32_t	rsrv[58];
+};
+#else
+struct hermon_hw_config_fc_basic_s {
+	uint32_t			:8;
+	uint32_t	fexch_base_hi	:8;
+	uint32_t			:16;
+
+	uint32_t			:12;
+	uint32_t	n_m		:4;
+	uint32_t			:5;
+	uint32_t	n_v		:3;
+	uint32_t			:6;
+	uint32_t	n_p		:2;
+
+	uint32_t	fx_base_mpt_hi	:7;
+	uint32_t			:17;
+	uint32_t	fx_base_mpt_lo	:8;
+
+	uint32_t			:5;
+	uint32_t	log2_num_rfci	:3;
+	uint32_t	rfci_base	:24;
+
+	uint32_t			:32;
+
+	uint32_t	uint32_t	:8;
+	uint32_t	fcoe_prom_qpn	:24;
+
+	uint32_t	rsrv[58];
+};
+#endif
+
+#define	HERMON_HW_FC_PORT_ENABLE	0x0
+#define	HERMON_HW_FC_PORT_DISABLE	0x1
+#define	HERMON_HW_FC_CONF_BASIC		0x0000
+#define	HERMON_HW_FC_CONF_NPORT		0x0100
+
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_query_fc_s {
+	uint32_t			:32;
+
+	uint32_t	log2_max_rfci	:3;
+	uint32_t			:5;
+	uint32_t	log2_max_fexch	:5;
+	uint32_t			:3;
+	uint32_t	log2_max_nports	:3;
+	uint32_t			:13;
+
+	uint32_t	rsrv[62];
+};
+#else
+struct hermon_hw_query_fc_s {
+	uint32_t			:13;
+	uint32_t	log2_max_nports	:3;
+	uint32_t			:3;
+	uint32_t	log2_max_fexch	:5;
+	uint32_t			:5;
+	uint32_t	log2_max_rfci	:3;
+
+	uint32_t			:32;
+
+	uint32_t	rsrv[62];
+};
+#endif
+
+
+
+
+/* ARM_RQ - limit water mark for srq & rq */
+#ifdef _LITTLE_ENDIAN
+struct hermon_hw_arm_req_s {
+	uint32_t	lwm		:16;
+	uint32_t			:16;
+
+	uint32_t			:32;
+};
+#else
+struct hermon_hw_arm_req_s {
+	uint32_t			:32;
+
+	uint32_t			:16;
+	uint32_t	lwm		:16;
+};
+#endif
 
 /*
  * Structure for getting the peformance counters from the HCA
@@ -3380,25 +4334,39 @@ typedef struct hermon_hw_cq_arm_db_s {
 
 struct hermon_hw_snd_wqe_ctrl_s {
 	uint32_t	owner		:1;
-	/* NOTE: some/many may be used by enet */
-	uint32_t			:26;
+	uint32_t			:1;
+	uint32_t	nec		:1;
+	uint32_t			:5;
+	uint32_t	fceof		:8;
+	uint32_t			:9;
+	uint32_t	rr		:1;
+	uint32_t			:1;
 	uint32_t	opcode		:5;
-	/* NOTE: some will be used by enet */
-	uint32_t			:25;
+
+	uint32_t	vlan		:16;
+	uint32_t			:1;
+	uint32_t	cv		:1;
+	uint32_t			:7;
 	uint32_t	fence		:1;
-	/* WQE size in octowords */
-	uint32_t	ds		:6;
-	/* SRC remote buffer if impl */
-	uint32_t	src_rem_buf	:24;
+	uint32_t	ds		:6;	/* WQE size in octowords */
+
+	/*
+	 * XRC remote buffer if impl
+	 * XRC 23:0, or DMAC 47:32& 8 bits of pad
+	 */
+	uint32_t	xrc_rem_buf	:24;
 	uint32_t	so		:1;
-	uint32_t			:1;	/* FCoIB only */
+	uint32_t	fcrc		:1;	/* fc crc calc */
 	uint32_t	tcp_udp		:1;	/* Checksumming */
 	uint32_t	ip		:1;	/* Checksumming */
 	uint32_t	cq_gen		:2;	/* 00=no cqe, 11= gen cqe */
-	/* set means solicit bit in last packet */
+	/* s-bit set means solicit bit in last packet */
 	uint32_t	s		:1;
 	uint32_t	force_lb	:1;
 
+	/*
+	 * immediate OR invalidation key OR DMAC 31:0 depending
+	 */
 	uint32_t	immediate	:32;
 };
 
@@ -3410,6 +4378,96 @@ struct hermon_hw_srq_wqe_next_s {
 };
 
 
+struct hermonw_hw_fcp3_ctrl_s {
+	uint32_t	owner		:1;
+	uint32_t			:1;
+	uint32_t	nec		:1;
+	uint32_t			:24;
+	uint32_t	opcode		:5;
+
+	uint32_t			:24;
+	uint32_t	sit		:1;
+	uint32_t			:1;
+	uint32_t	ds		:6;
+
+	uint32_t	seq_id		:8;
+	uint32_t	info		:4;
+	uint32_t			:3;
+	uint32_t	ls		:1;
+	uint32_t			:8;
+	uint32_t	so		:1;
+	uint32_t			:3;
+	uint32_t	cq_gen		:2;
+	uint32_t			:2;
+
+	uint32_t	param		:32;
+};
+
+struct hermon_hw_fcp3_init_s {
+	uint32_t			:8;
+	uint32_t	pe		:1;
+	uint32_t			:23;
+
+	uint32_t	csctl_prior	:8;
+	uint32_t	seqid_tx	:8;
+	uint32_t			:6;
+	uint32_t	mtu		:10;
+
+	uint32_t	rem_id		:24;
+	uint32_t	abort		:2;
+	uint32_t			:1;
+	uint32_t	op		:2;
+	uint32_t			:1;
+	uint32_t	org		:1;
+	uint32_t			:1;
+
+	uint32_t	rem_exch	:16;
+	uint32_t	loc_exch_idx	:16;
+};
+
+struct hermon_hw_fcmd_o_enet_s {
+	uint32_t			:4;
+	uint32_t	stat_rate	:4;
+	uint32_t			:24;
+
+	uint32_t			:32;
+
+	uint32_t			:16;
+	uint32_t	dmac_hi		:16;
+
+	uint32_t	dmac_lo		:32;
+};
+
+struct hermon_hw_fcmd_o_ib_s {
+	uint32_t			:32;
+
+	uint32_t			:8;
+	uint32_t	grh		:1;
+	uint32_t			:7;
+	uint32_t	rlid		:16;
+
+	uint32_t			:20;
+	uint32_t	stat_rate	:4;
+	uint32_t	hop_limit	:8;
+
+	uint32_t	sl		:4;
+	uint32_t	tclass		:8;
+	uint32_t	flow_label	:20;
+
+	uint64_t	rgid_hi;
+
+	uint64_t	rgid_lo;
+
+	uint32_t			:8;
+	uint32_t	rqp		:24;
+
+	uint32_t	rsrv[3];
+};
+
+
+
+
+
 #define	HERMON_WQE_SEND_FENCE_MASK	0x40
 
 #define	HERMON_WQE_SEND_NOPCODE_NOP	0x00
@@ -3418,6 +4476,7 @@ struct hermon_hw_srq_wqe_next_s {
 #define	HERMON_WQE_SEND_NOPCODE_RDMAWI	0x9
 #define	HERMON_WQE_SEND_NOPCODE_SEND	0xA
 #define	HERMON_WQE_SEND_NOPCODE_SENDI	0xB
+#define	HERMON_WQE_SEND_NOPCODE_INIT_AND_SEND 0xD
 #define	HERMON_WQE_SEND_NOPCODE_LSO	0xE
 #define	HERMON_WQE_SEND_NOPCODE_RDMAR	0x10
 #define	HERMON_WQE_SEND_NOPCODE_ATMCS	0x11
@@ -3429,6 +4488,9 @@ struct hermon_hw_srq_wqe_next_s {
 #define	HERMON_WQE_SEND_NOPCODE_LCL_INV 0x1B
 #define	HERMON_WQE_SEND_NOPCODE_CONFIG 0x1F		/* for ccq only */
 
+#define	HERMON_WQE_FCP_OPCODE_INIT_AND_SEND 0xD
+#define	HERMON_WQE_FCP_OPCODE_INIT_FEXCH  0xC
+
 #define	HERMON_WQE_SEND_SIGNALED_MASK	0x0000000C00000000ull
 #define	HERMON_WQE_SEND_SOLICIT_MASK	0x0000000200000000ull
 #define	HERMON_WQE_SEND_IMMEDIATE_MASK	0x0000000100000000ull
@@ -3438,9 +4500,13 @@ struct hermon_hw_snd_wqe_ud_s {
 
 	uint32_t			:8;
 	uint32_t	dest_qp		:24;
+
 	uint32_t	qkey		:32;
-	uint32_t			:32;
-	uint32_t			:32;
+
+	uint32_t	vlan		:16;
+	uint32_t	dmac_hi		:16;
+
+	uint32_t	dmac_lo		:32;
 };
 #define	HERMON_WQE_SENDHDR_UD_AV_MASK	0xFFFFFFFFFFFFFFE0ull
 #define	HERMON_WQE_SENDHDR_UD_DQPN_MASK	0xFFFFFF
@@ -3466,6 +4532,12 @@ struct hermon_hw_snd_wqe_bind_s {
 #define	HERMON_WQE_SENDHDR_BIND_WR	0x4000000000000000ull
 #define	HERMON_WQE_SENDHDR_BIND_RD	0x2000000000000000ull
 
+struct hermon_hw_snd_wqe_lso_s {
+	uint32_t	mss		:16;
+	uint32_t			:6;
+	uint32_t	hdr_size	:10;
+};
+
 struct hermon_hw_snd_wqe_remaddr_s {
 	uint64_t	vaddr;
 	uint32_t	rkey;
@@ -3484,8 +4556,6 @@ struct hermon_hw_snd_wqe_atomic_ext_s {
 	uint64_t	cmpmask;
 };
 
-
-
 struct hermon_hw_snd_wqe_local_inv_s {
 	uint32_t			:6;
 	uint32_t	atc_shoot	:1;
@@ -3495,15 +4565,24 @@ struct hermon_hw_snd_wqe_local_inv_s {
 
 	uint32_t	mkey;
 
+	uint32_t	rsrv0;
+
+	uint32_t	rsrv1;
 	uint32_t			:25;
 	uint32_t	guest_id	:7;	/* for atc shootdown */
-
-	uint32_t	rsrv0[6];
 
 	uint32_t	p_addrh;
 	uint32_t	p_addrl		:23;
 	uint32_t			:9;
 };
+
+struct hermon_hw_snd_rem_addr_s {
+	uint64_t	rem_vaddr;
+
+	uint32_t	rkey;
+	uint32_t	rsrv;
+};
+
 
 struct hermon_hw_snd_wqe_frwr_s {
 	uint32_t	rem_atomic	:1;
@@ -3513,7 +4592,8 @@ struct hermon_hw_snd_wqe_frwr_s {
 	uint32_t	loc_read	:1;
 	uint32_t	fbo_en		:1;
 	uint32_t	len_64		:1;
-	uint32_t			:3;	/* but some for FCoIB */
+	uint32_t			:2;
+	uint32_t	dif		:1;	/* FCoIB */
 	uint32_t	bind_en		:1;
 	uint32_t	blk_pg_mode	:1;
 	uint32_t	mtt_rep		:4;
@@ -3521,10 +4601,7 @@ struct hermon_hw_snd_wqe_frwr_s {
 
 	uint32_t	mkey;		/* swapped w/ addrh relative to arbel */
 
-	uint32_t	pbl_addrh;
-
-	uint32_t	pbl_addrl	:26;
-	uint32_t			:6;
+	uint64_t	pbl_addr;
 
 	uint64_t	start_addr;
 
@@ -3539,15 +4616,25 @@ struct hermon_hw_snd_wqe_frwr_s {
 	uint32_t	rsrv0[2];
 };
 
-/*
- * NOTE:  Some hermon-PRM defined Send WQE segments are not defined here
- *	because they will not be used initially:  they should be added and
- *	used later on:
- * 		FCP-3 init
- *		FCP-3 Control
- *		Large Send Offload
- *
- */
+struct hermon_hw_snd_wqe_frwr_ext_s {
+	uint32_t	dif_in_mem	:1;
+	uint32_t	dif_on_wire	:1;
+	uint32_t	valid_ref	:1;
+	uint32_t	valid_crc	:1;
+	uint32_t	repl_ref_tag	:1;
+	uint32_t	repl_app_tag	:1;
+	uint32_t			:10;
+	uint32_t	app_mask	:16;
+
+	uint32_t	wire_app_tag	:16;
+	uint32_t	mem_app_tag	:16;
+
+	uint32_t	wire_ref_tag_base;
+
+	uint32_t	mem_ref_tag_base;
+};
+
+
 
 /*
  * Hermon "MLX transport" Work Queue Element (WQE)
@@ -3704,7 +4791,7 @@ struct hermon_hw_wqe_sgl_s {
 	tmp[1] = htonll((uint64_t)(wr_rdma)->rdma_rkey << 32);		\
 }
 
-#define	HERMON_WQE_BUILD_RC_ATOMIC_REMADDR(qp, rc, wr)	\
+#define	HERMON_WQE_BUILD_RC_ATOMIC_REMADDR(qp, rc, wr)			\
 {									\
 	uint64_t		*tmp;					\
 									\
@@ -3713,7 +4800,7 @@ struct hermon_hw_wqe_sgl_s {
 	tmp[1] = htonll((uint64_t)(wr)->wr.rc.rcwr.atomic->atom_rkey << 32); \
 }
 
-#define	HERMON_WQE_BUILD_ATOMIC(qp, at, wr_atom)		\
+#define	HERMON_WQE_BUILD_ATOMIC(qp, at, wr_atom)			\
 {									\
 	uint64_t		*tmp;					\
 									\
@@ -3722,7 +4809,7 @@ struct hermon_hw_wqe_sgl_s {
 	tmp[1] = htonll((wr_atom)->atom_arg1);				\
 }
 
-#define	HERMON_WQE_BUILD_BIND(qp, bn, wr_bind)			\
+#define	HERMON_WQE_BUILD_BIND(qp, bn, wr_bind)				\
 {									\
 	uint64_t		*tmp;					\
 	uint64_t		bn0_tmp;				\
@@ -3743,16 +4830,67 @@ struct hermon_hw_wqe_sgl_s {
 	tmp[3] = htonll((wr_bind)->bind_len);				\
 }
 
-#define	HERMON_WQE_BUILD_DATA_SEG_RECV(ds, sgl)		\
+#define	HERMON_WQE_BUILD_FRWR(qp, frwr_arg, pmr_arg)			\
+{									\
+	ibt_mr_flags_t		flags;					\
+	ibt_lkey_t		lkey;					\
+	ibt_wr_reg_pmr_t	*pmr = (pmr_arg);			\
+	uint64_t		*frwr64 = (uint64_t *)(frwr_arg);	\
+									\
+	flags = pmr->pmr_flags;						\
+	((uint32_t *)frwr64)[0] = htonl(0x08000000 |			\
+	    ((flags & IBT_MR_ENABLE_REMOTE_ATOMIC) ? 0x80000000 : 0) |	\
+	    ((flags & IBT_MR_ENABLE_REMOTE_WRITE) ? 0x40000000 : 0) |	\
+	    ((flags & IBT_MR_ENABLE_REMOTE_READ) ? 0x20000000 : 0) |	\
+	    ((flags & IBT_MR_ENABLE_LOCAL_WRITE) ? 0x10000000 : 0) |	\
+	    ((flags & IBT_MR_ENABLE_WINDOW_BIND) ? 0x00200000 : 0));	\
+	lkey = (pmr->pmr_lkey & ~0xff) | pmr->pmr_key;			\
+	pmr->pmr_rkey = pmr->pmr_lkey = lkey;				\
+	((uint32_t *)frwr64)[1] = htonl(lkey);				\
+	frwr64[1] = htonll(pmr->pmr_addr_list->p_laddr);		\
+	frwr64[2] = htonll(pmr->pmr_iova);				\
+	frwr64[3] = htonll(pmr->pmr_len);				\
+	((uint32_t *)frwr64)[8] = htonl(pmr->pmr_offset);		\
+	((uint32_t *)frwr64)[9] = htonl(pmr->pmr_buf_sz);		\
+	frwr64[5] = 0;							\
+}
+
+#define	HERMON_WQE_BUILD_LI(qp, li_arg, wr_li)				\
+{									\
+	uint64_t		*li64 = (uint64_t *)(void *)(li_arg);	\
+									\
+	li64[0] = 0;							\
+	((uint32_t *)li64)[2] = htonl((wr_li)->li_rkey);		\
+	((uint32_t *)li64)[3] = 0;					\
+	li64[2] = 0;							\
+	li64[3] = 0;							\
+}
+
+#define	HERMON_WQE_BUILD_FCP3_INIT(ds, fctl, cs_pri, seq_id, mtu,	\
+		dest_id, op, rem_exch, local_exch_idx)			\
+{									\
+	uint32_t		*fc_init;				\
+									\
+	fc_init = (uint32_t *)ds;					\
+	fc_init[1] = htonl((cs_pri) << 24 | (seq_id) << 16 | (mtu));	\
+	fc_init[2] = htonl((dest_id) << 8 |				\
+	    IBT_FCTL_GET_ABORT_FIELD(fctl) << 6 | (op) << 3 | 0x2);	\
+	fc_init[3] = htonl((rem_exch) << 16 | (local_exch_idx));	\
+	membar_producer(); /* fc_init[0] is where the stamping is */	\
+	fc_init[0] = htonl(((fctl) & IBT_FCTL_PRIO) << 6);		\
+}
+
+#define	HERMON_WQE_BUILD_DATA_SEG_RECV(ds, sgl)				\
 {									\
 	uint64_t		*tmp;					\
 									\
 	tmp	= (uint64_t *)(ds);					\
-	tmp[0] = htonll((((uint64_t)((sgl)->ds_len & \
+	tmp[0] = htonll((((uint64_t)((sgl)->ds_len &			\
 	    HERMON_WQE_SGL_BYTE_CNT_MASK) << 32) | (sgl)->ds_key));	\
-	tmp[1] = htonll((sgl)->ds_va); \
+	tmp[1] = htonll((sgl)->ds_va);					\
 }
-#define	HERMON_WQE_BUILD_DATA_SEG_SEND(ds, sgl)		\
+
+#define	HERMON_WQE_BUILD_DATA_SEG_SEND(ds, sgl)				\
 {									\
 	((uint64_t *)(ds))[1] = htonll((sgl)->ds_va);			\
 	((uint32_t *)(ds))[1] = htonl((sgl)->ds_key);			\
@@ -3764,17 +4902,18 @@ struct hermon_hw_wqe_sgl_s {
 #define	HERMON_WQE_BUILD_INLINE(qp, ds, sz)				\
 	*(uint32_t *)(ds) = htonl(HERMON_WQE_SGL_INLINE_MASK | (sz))
 
-#define	HERMON_WQE_BUILD_INLINE_ICRC(qp, ds, sz, icrc)	\
+#define	HERMON_WQE_BUILD_INLINE_ICRC(qp, ds, sz, icrc)			\
 {									\
 	uint32_t		*tmp;					\
 									\
 	tmp = (uint32_t *)(ds);						\
-	tmp[0] = htonl(HERMON_WQE_SGL_INLINE_MASK | (sz));		\
 	tmp[1] = htonl(icrc);						\
+	membar_producer();						\
+	tmp[0] = htonl(HERMON_WQE_SGL_INLINE_MASK | (sz));		\
 }
 
 #define	HERMON_WQE_SET_CTRL_SEGMENT(desc, desc_sz, fence,	 	\
-		imm, sol, sig, ip_cksum, qp)				\
+		imm, sol, sig, cksum, qp, strong, fccrc)		\
 {									\
 	uint32_t		*tmp;					\
 	uint32_t		cntr_tmp;				\
@@ -3783,11 +4922,7 @@ struct hermon_hw_wqe_sgl_s {
 	tmp = (uint32_t *)desc;						\
 	cntr_tmp = (fence << 6) | desc_sz;				\
 	tmp[1] = ntohl(cntr_tmp); 					\
-	cntr_tmp = 0;							\
-	if ((sol) != 0) cntr_tmp |= 0x02;				\
-	if ((sig) != 0) cntr_tmp |= 0x0C;				\
-	/*LINTED*/							\
-	if (ip_cksum) cntr_tmp |= 0x30;					\
+	cntr_tmp = strong | fccrc | sol | sig | cksum;			\
 	tmp[2] = ntohl(cntr_tmp); 					\
 	tmp[3] = ntohl(imm);						\
 }
@@ -3804,13 +4939,11 @@ struct hermon_hw_wqe_sgl_s {
 	cntr_tmp |= HERMON_WQE_SEND_NOPCODE_SEND;			\
 	tmp[0] = ntohl(cntr_tmp);					\
 	tmp[1] = ntohl(desc_sz);					\
-	cntr_tmp = ((maxstat << 4) | (sl & 0xff)) << 8;			\
+	cntr_tmp = (((maxstat << 4) | (sl & 0xff)) << 8) | sig;		\
 	if (qp->qp_is_special == HERMON_QP_SMI)				\
 		cntr_tmp |= (0x02 << 16);				\
 	if (lid == IB_LID_PERMISSIVE)					\
 		cntr_tmp |= (0x01 << 16);				\
-	if ((sig) != 0)							\
-		cntr_tmp |= 0xC;					\
 	tmp[2] = ntohl(cntr_tmp);					\
 	tmp[3] = ntohl((lid) << 16);					\
 }
@@ -3851,7 +4984,7 @@ struct hermon_hw_wqe_sgl_s {
  * Also note: Filling in the GIDs in the way we do below is helpful because
  * it avoids potential alignment restrictions and/or conflicts.
  */
-#define	HERMON_WQE_BUILD_MLX_GRH(state, grh, qp, udav, pktlen)	\
+#define	HERMON_WQE_BUILD_MLX_GRH(state, grh, qp, udav, pktlen)		\
 {									\
 	uint32_t		*tmp;					\
 	uint32_t		grh_tmp;				\
@@ -3877,7 +5010,7 @@ struct hermon_hw_wqe_sgl_s {
 	bcopy(&(udav)->rgid_h, &tmp[6], sizeof (ib_gid_t));		\
 }
 
-#define	HERMON_WQE_BUILD_MLX_BTH(state, bth, qp, wr)		\
+#define	HERMON_WQE_BUILD_MLX_BTH(state, bth, qp, wr)			\
 {									\
 	uint32_t		*tmp;					\
 	uint32_t		bth_tmp;				\
@@ -3900,7 +5033,7 @@ struct hermon_hw_wqe_sgl_s {
 	tmp[2] = 0x0;							\
 }
 
-#define	HERMON_WQE_BUILD_MLX_DETH(deth, qp)			\
+#define	HERMON_WQE_BUILD_MLX_DETH(deth, qp)				\
 {									\
 	uint32_t		*tmp;					\
 									\
@@ -3914,10 +5047,6 @@ struct hermon_hw_wqe_sgl_s {
 		tmp[1] = htonl(0x1);					\
 	}								\
 }
-
-
-
-
 
 
 /*

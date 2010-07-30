@@ -5927,6 +5927,163 @@ ibcm_get_node_rec(ibmf_saa_handle_t saa_handle, sa_node_record_t *nr_req,
 
 /*
  * Function:
+ *	ibt_lid_to_node_info()
+ * Input:
+ *	lid		Identifies the IB Node and port for which to obtain
+ *			Node information.
+ * Output:
+ *	node_info_p	A pointer to an ibt_node_info_t structure (allocated
+ *			by the caller) in which to return the node information.
+ * Returns:
+ *	IBT_SUCCESS
+ *	IBT_INVALID_PARAM
+ *	IBT_NODE_RECORDS_NOT_FOUND
+ *	IBT_NO_HCAS_AVAILABLE
+ * Description:
+ *	Retrieve Node Information for the specified LID.
+ */
+ibt_status_t
+ibt_lid_to_node_info(ib_lid_t lid, ibt_node_info_t *node_info_p)
+{
+	ibt_status_t	retval;
+	ibcm_hca_info_t	*hcap;
+	uint8_t		i, j;
+	ib_guid_t	*guid_array = NULL;
+	uint_t		num_hcas = 0;
+
+
+	IBTF_DPRINTF_L4(cmlog, "ibt_lid_to_node_info(0x%lX, %p)",
+	    lid, node_info_p);
+
+	if ((lid == 0) || (node_info_p == NULL)) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_lid_to_node_info: "
+		    "Lid is zero, or node_info_p is NULL.");
+		return (IBT_INVALID_PARAM);
+	}
+
+	/* Get the number of HCAs and their GUIDs */
+	num_hcas = ibt_get_hca_list(&guid_array);
+	IBTF_DPRINTF_L4(cmlog, "ibt_lid_to_node_info: ibt_get_hca_list "
+	    "returned %d hcas", num_hcas);
+
+	if (num_hcas == 0) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_lid_to_node_info: "
+		    "NO HCA's Found on this system");
+		return (IBT_NO_HCAS_AVAILABLE);
+	}
+
+	for (i = 0; i < num_hcas; i++) {
+		hcap = ibcm_find_hca_entry(guid_array[i]);
+		if (hcap == NULL) {
+			IBTF_DPRINTF_L3(cmlog, "ibt_lid_to_node_info: "
+			    "HCA(%llX) info not found", guid_array[i]);
+			retval = IBT_NO_HCAS_AVAILABLE;
+			continue;
+		}
+
+		for (j = 0; j < hcap->hca_num_ports; j++) {
+			uint8_t			port;
+			ibmf_saa_handle_t	saa_handle;
+			uint_t			num_rec;
+			size_t			len;
+			void			*res_p;
+			sa_node_record_t	nr_req, *nr_resp;
+
+			port = j + 1;
+
+			/* Get SA Access Handle. */
+			saa_handle = ibcm_get_saa_handle(hcap, port);
+			if (saa_handle == NULL) {
+				IBTF_DPRINTF_L3(cmlog, "ibt_lid_to_node_info: "
+				    "Port %d of HCA (%llX) is NOT ACTIVE",
+				    port, guid_array[i]);
+				retval = IBT_NODE_RECORDS_NOT_FOUND;
+				continue;
+			}
+
+			/* Retrieve Node Records from SA Access. */
+			bzero(&nr_req, sizeof (sa_node_record_t));
+
+			nr_req.LID = lid;	/* LID */
+
+			retval = ibcm_get_node_rec(saa_handle, &nr_req,
+			    SA_NODEINFO_COMPMASK_NODELID, &res_p, &len);
+			if (retval == IBT_NODE_RECORDS_NOT_FOUND) {
+				IBTF_DPRINTF_L2(cmlog, "ibt_lid_to_node_info: "
+				    "failed (%d) to get Node records", retval);
+				continue;
+			} else if (retval != IBT_SUCCESS) {
+				IBTF_DPRINTF_L2(cmlog, "ibt_lid_to_node_info: "
+				    "failed (%d) to get Node records", retval);
+				ibcm_dec_hca_acc_cnt(hcap);
+				goto lid_to_ni_exit;
+			}
+
+			num_rec = len/sizeof (sa_node_record_t);
+			nr_resp = (sa_node_record_t *)(uchar_t *)res_p;
+
+			/* Validate the returned number of records. */
+			if ((nr_resp != NULL) && (num_rec > 0)) {
+
+				IBCM_DUMP_NODE_REC(nr_resp);
+
+				_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(
+				    *node_info_p))
+
+				node_info_p->n_sys_img_guid =
+				    nr_resp->NodeInfo.SystemImageGUID;
+				node_info_p->n_node_guid =
+				    nr_resp->NodeInfo.NodeGUID;
+				node_info_p->n_port_guid =
+				    nr_resp->NodeInfo.PortGUID;
+				node_info_p->n_dev_id =
+				    nr_resp->NodeInfo.DeviceID;
+				node_info_p->n_revision =
+				    nr_resp->NodeInfo.Revision;
+				node_info_p->n_vendor_id =
+				    nr_resp->NodeInfo.VendorID;
+				node_info_p->n_num_ports =
+				    nr_resp->NodeInfo.NumPorts;
+				node_info_p->n_port_num =
+				    nr_resp->NodeInfo.LocalPortNum;
+				node_info_p->n_node_type =
+				    nr_resp->NodeInfo.NodeType;
+				(void) strncpy(node_info_p->n_description,
+				    (char *)&nr_resp->NodeDescription, 64);
+
+				_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(
+				    *node_info_p))
+
+				/*
+				 * Deallocate the memory allocated by SA for
+				 * 'nr_resp'.
+				 */
+				ibcm_dec_hca_acc_cnt(hcap);
+				kmem_free(nr_resp, len);
+				retval = IBT_SUCCESS;
+
+				goto lid_to_ni_exit;
+			} else {
+				retval = IBT_NODE_RECORDS_NOT_FOUND;
+				IBTF_DPRINTF_L3(cmlog, "ibt_lid_to_node_info: "
+				    "Node Records NOT found - LID 0x%lX",
+				    lid);
+			}
+		}
+		ibcm_dec_hca_acc_cnt(hcap);
+	}
+
+lid_to_ni_exit:
+	if (guid_array)
+		ibt_free_hca_list(guid_array, num_hcas);
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_lid_to_node_info: done. Status %d", retval);
+
+	return (retval);
+}
+
+/*
+ * Function:
  *	ibt_get_companion_port_gids()
  * Description:
  *	Get list of GID's available on a companion port(s) of the specified
@@ -6336,70 +6493,133 @@ get_comp_pgid_exit:
 
 /* RDMA IP CM Support routines */
 ibt_status_t
-ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey, ibt_ip_addr_t *src_ip)
+ibt_get_src_ip(ibt_srcip_attr_t *sattr, ibt_srcip_info_t **src_info_p,
+    uint_t *entries_p)
 {
+	ibt_srcip_info_t	*s_ip;
 	ibcm_arp_ip_t		*ipp;
 	ibcm_arp_ibd_insts_t	ibds;
-	int			i;
-	boolean_t		found = B_FALSE;
+	uint8_t			i, j;
+	uint_t			count;
 	ibt_status_t		retval = IBT_SUCCESS;
 
-	IBTF_DPRINTF_L4(cmlog, "ibt_get_src_ip(%llX:%llX, %X, %p)",
-	    gid.gid_prefix, gid.gid_guid, pkey, src_ip);
+	IBTF_DPRINTF_L4(cmlog, "ibt_get_src_ip(%p, %p, %p)",
+	    sattr, src_info_p, entries_p);
 
-	if (gid.gid_prefix == 0 || gid.gid_guid == 0) {
+	if (sattr == NULL || entries_p == NULL) {
+		IBTF_DPRINTF_L3(cmlog, "ibt_get_src_ip: Invalid I/P Args.");
+		return (IBT_INVALID_PARAM);
+	}
+
+	if (sattr->sip_gid.gid_prefix == 0 || sattr->sip_gid.gid_guid == 0) {
 		IBTF_DPRINTF_L3(cmlog, "ibt_get_src_ip: Invalid GID.");
 		return (IBT_INVALID_PARAM);
 	}
 
-	if (src_ip == NULL) {
-		IBTF_DPRINTF_L3(cmlog, "ibt_get_src_ip: ERROR: src_ip NULL");
-		return (IBT_INVALID_PARAM);
-	}
-
-	retval = ibcm_arp_get_ibds(&ibds, AF_UNSPEC);
+	/* TBD: Zoneid */
+	retval = ibcm_arp_get_ibds(&ibds, sattr->sip_family);
 	if (retval != IBT_SUCCESS) {
 		IBTF_DPRINTF_L2(cmlog, "ibt_get_src_ip: ibcm_arp_get_ibds "
 		    "failed to get IBD Instances: ret 0x%x", retval);
 		goto get_src_ip_end;
 	}
 
+	count = 0;
 	for (i = 0, ipp = ibds.ibcm_arp_ip; i < ibds.ibcm_arp_ibd_cnt;
 	    i++, ipp++) {
 		if (ipp->ip_inet_family == AF_UNSPEC)
 			continue;
-		if (ipp->ip_port_gid.gid_prefix == gid.gid_prefix &&
-		    ipp->ip_port_gid.gid_guid == gid.gid_guid) {
-			if (pkey) {
-				if (ipp->ip_pkey == pkey) {
-					found = B_TRUE;
-					break;
-				} else
-					continue;
-			}
-			found = B_TRUE;
+		if (ipp->ip_port_gid.gid_prefix == sattr->sip_gid.gid_prefix &&
+		    ipp->ip_port_gid.gid_guid == sattr->sip_gid.gid_guid) {
+			if ((sattr->sip_pkey) &&
+			    (ipp->ip_pkey != sattr->sip_pkey))
+				continue;
+
+			if ((sattr->sip_zoneid != ALL_ZONES) &&
+			    (sattr->sip_zoneid != ipp->ip_zoneid))
+				continue;
+
+			count++;
 			break;
 		}
 	}
 
-	if (found == B_FALSE) {
-		retval = IBT_SRC_IP_NOT_FOUND;
-	} else {
-		src_ip->family = ipp->ip_inet_family;
-		if (src_ip->family == AF_INET) {
-			bcopy(&ipp->ip_cm_sin.sin_addr, &src_ip->un.ip4addr,
-			    sizeof (in_addr_t));
-		} else if (src_ip->family == AF_INET6) {
-			bcopy(&ipp->ip_cm_sin6.sin6_addr, &src_ip->un.ip6addr,
-			    sizeof (in6_addr_t));
+	if (count) {
+		/*
+		 * Allocate memory for return buffer, to be freed by
+		 * ibt_free_srcip_info().
+		 */
+		s_ip = kmem_alloc((count * sizeof (ibt_srcip_info_t)),
+		    KM_SLEEP);
+
+		*src_info_p = s_ip;
+		*entries_p = count;
+
+		j = 0;
+		for (i = 0, ipp = ibds.ibcm_arp_ip; i < ibds.ibcm_arp_ibd_cnt;
+		    i++, ipp++) {
+			if (ipp->ip_inet_family == AF_UNSPEC)
+				continue;
+			if ((ipp->ip_port_gid.gid_prefix ==
+			    sattr->sip_gid.gid_prefix) &&
+			    (ipp->ip_port_gid.gid_guid ==
+			    sattr->sip_gid.gid_guid)) {
+				if ((sattr->sip_pkey) &&
+				    (ipp->ip_pkey != sattr->sip_pkey))
+					continue;
+
+				if ((sattr->sip_zoneid != ALL_ZONES) &&
+				    (sattr->sip_zoneid != ipp->ip_zoneid))
+					continue;
+
+				_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*s_ip))
+				s_ip[j].ip_addr.family = ipp->ip_inet_family;
+				_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*s_ip))
+				if (s_ip[j].ip_addr.family == AF_INET) {
+					bcopy(&ipp->ip_cm_sin.sin_addr,
+					    &s_ip[j].ip_addr.un.ip4addr,
+					    sizeof (in_addr_t));
+				} else if (s_ip[j].ip_addr.family == AF_INET6) {
+					bcopy(&ipp->ip_cm_sin6.sin6_addr,
+					    &s_ip[j].ip_addr.un.ip6addr,
+					    sizeof (in6_addr_t));
+					/* TBD: scope_id */
+				}
+				IBCM_PRINT_IP("ibt_get_src_ip",
+				    &s_ip[j].ip_addr);
+				j++;
+			}
 		}
-		IBCM_PRINT_IP("ibt_get_src_ip", src_ip);
+	} else {
+		retval = IBT_SRC_IP_NOT_FOUND;
 	}
 
 get_src_ip_end:
 	ibcm_arp_free_ibds(&ibds);
 	return (retval);
 }
+
+/*
+ * ibt_free_srcip_info()
+ *	Free the memory allocated by successful ibt_get_src_ip()
+ *
+ *	src_info	Pointer returned by ibt_get_src_ip().
+ *
+ *	entries		The number of ibt_ip_addr_t entries to free.
+ */
+void
+ibt_free_srcip_info(ibt_srcip_info_t *src_info, uint_t entries)
+{
+	IBTF_DPRINTF_L3(cmlog, "ibt_free_srcip_info: "
+	    "Free <%d> entries from 0x%p", entries, src_info);
+
+	if ((src_info != NULL) && (entries > 0))
+		kmem_free(src_info, entries * sizeof (ibt_srcip_info_t));
+	else
+		IBTF_DPRINTF_L2(cmlog, "ibt_free_srcip_info: "
+		    "ERROR: NULL buf pointer or ZERO length specified.");
+}
+
 
 ib_svc_id_t
 ibt_get_ip_sid(uint8_t protocol_num, in_port_t dst_port)

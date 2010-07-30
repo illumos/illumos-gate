@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1656,7 +1655,7 @@ hermon_umap_qp_data_out(hermon_qphdl_t qp, mlnx_umap_qp_data_out_t *data,
 	 * then return invalid RecvQ parameters.  Otherwise, return
 	 * the proper parameter values.
 	 */
-	if (qp->qp_srq_en == HERMON_QP_SRQ_ENABLED) {
+	if (qp->qp_alloc_flags & IBT_QP_USES_SRQ) {
 		data->mqp_rq_off	= (uint32_t)qp->qp_wqinfo.qa_size;
 		data->mqp_rq_desc_addr	= (uint32_t)qp->qp_wqinfo.qa_size;
 		data->mqp_rq_numwqe	= 0;

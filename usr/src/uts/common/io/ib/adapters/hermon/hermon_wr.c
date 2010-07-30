@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -53,8 +52,6 @@ static int hermon_wqe_recv_build(hermon_state_t *state, hermon_qphdl_t qp,
     ibt_recv_wr_t *wr, uint64_t *desc);
 static int hermon_wqe_srq_build(hermon_state_t *state, hermon_srqhdl_t srq,
     ibt_recv_wr_t *wr, uint64_t *desc);
-static void hermon_wqe_sync(void *hdl, uint_t sync_from,
-    uint_t sync_to, uint_t sync_type, uint_t flag);
 static hermon_workq_avl_t *hermon_wrid_wqavl_find(hermon_cqhdl_t cq, uint_t qpn,
     uint_t send_or_recv);
 static void hermon_cq_workq_add(hermon_cqhdl_t cq, hermon_workq_avl_t *wqavl);
@@ -79,6 +76,8 @@ hermon_post_send_ud(hermon_state_t *state, hermon_qphdl_t qp,
 	hermon_hw_snd_wqe_ud_t		*ud;
 	hermon_workq_hdr_t		*wq;
 	hermon_ahhdl_t			ah;
+	ibt_wr_rfci_send_t		*rfci;
+	ibt_wr_init_send_t		*is;
 	ibt_ud_dest_t			*dest;
 	uint64_t			*desc;
 	uint32_t			desc_sz;
@@ -88,11 +87,13 @@ hermon_post_send_ud(hermon_state_t *state, hermon_qphdl_t qp,
 	uint32_t			nopcode, fence, immed_data = 0;
 	hermon_hw_wqe_sgl_t		*ds, *old_ds;
 	ibt_wr_ds_t			*sgl;
-	uint32_t			nds, dnds;
+	int				nds;
 	int				i, j, last_ds, num_ds, status;
 	uint32_t			*wqe_start;
 	int				sectperwqe;
 	uint_t				posted_cnt = 0;
+	int				total_len, strong_order, fc_bits, cksum;
+
 
 	/* initialize the FMA retry loop */
 	hermon_pio_init(fm_loop_cnt, fm_status, fm_test_num);
@@ -132,27 +133,25 @@ post_next:
 
 	desc = HERMON_QP_SQ_ENTRY(qp, tail);
 
-	ud = (hermon_hw_snd_wqe_ud_t *)((uintptr_t)desc +
-	    sizeof (hermon_hw_snd_wqe_ctrl_t));
-	ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)ud +
-	    sizeof (hermon_hw_snd_wqe_ud_t));
 	nds = wr->wr_nds;
 	sgl = wr->wr_sgl;
 	num_ds = 0;
-
-	/* need to know the count of destination nds for backward loop */
-	for (dnds = 0, i = 0; i < nds; i++) {
-		if (sgl[i].ds_len != 0)
-			dnds++;
-	}
+	strong_order = 0;
+	fc_bits = 0;
+	cksum = 0;
 
 	/*
 	 * Build a Send or Send_LSO WQE
 	 */
-	if (wr->wr_opcode == IBT_WRC_SEND_LSO) {
-		int total_len;
-
+	switch (wr->wr_opcode) {
+	case IBT_WRC_SEND_LSO:
+		if (wr->wr_trans != IBT_UD_SRV) {
+			status = IBT_QP_SRV_TYPE_INVALID;
+			goto done;
+		}
 		nopcode = HERMON_WQE_SEND_NOPCODE_LSO;
+		if (wr->wr_flags & IBT_WR_SEND_CKSUM)
+			cksum = 0x30;
 		if (wr->wr.ud_lso.lso_hdr_sz > 60) {
 			nopcode |= (1 << 6);	/* ReRead bit must be set */
 		}
@@ -162,6 +161,10 @@ post_next:
 			status = IBT_AH_HDL_INVALID;
 			goto done;
 		}
+		ud = (hermon_hw_snd_wqe_ud_t *)((uintptr_t)desc +
+		    sizeof (hermon_hw_snd_wqe_ctrl_t));
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)ud +
+		    sizeof (hermon_hw_snd_wqe_ud_t));
 		HERMON_WQE_BUILD_UD(qp, ud, ah, dest);
 
 		total_len = (4 + 0xf + wr->wr.ud_lso.lso_hdr_sz) & ~0xf;
@@ -175,22 +178,128 @@ post_next:
 		    wr->wr.ud_lso.lso_hdr_sz);
 		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)ds + total_len);
 		i = 0;
-	} else if (wr->wr_opcode == IBT_WRC_SEND) {
-		if (wr->wr_flags & IBT_WR_SEND_IMMED) {
-			nopcode = HERMON_WQE_SEND_NOPCODE_SENDI;
-			immed_data = wr->wr.ud.udwr_immed;
+		break;
+
+	case IBT_WRC_SEND:
+		nopcode = HERMON_WQE_SEND_NOPCODE_SEND;
+		if (qp->qp_serv_type == HERMON_QP_UD) {
+			if (wr->wr_trans != IBT_UD_SRV) {
+				status = IBT_QP_SRV_TYPE_INVALID;
+				goto done;
+			}
+			if (wr->wr_flags & IBT_WR_SEND_CKSUM)
+				cksum = 0x30;
+			dest = wr->wr.ud.udwr_dest;
+		} else if (qp->qp_serv_type == HERMON_QP_RFCI) {
+			if (wr->wr_trans != IBT_RFCI_SRV) {
+				status = IBT_QP_SRV_TYPE_INVALID;
+				goto done;
+			}
+			rfci = &wr->wr.fc.rfci_send;
+			if ((wr->wr_flags & IBT_WR_SEND_FC_CRC) != 0) {
+				nopcode |= (rfci->rfci_eof << 16);
+				fc_bits = 0x40;	/* set FCRC */
+			}
+			dest = rfci->rfci_dest;
 		} else {
-			nopcode = HERMON_WQE_SEND_NOPCODE_SEND;
+			status = IBT_QP_OP_TYPE_INVALID;
+			goto done;
 		}
-		dest = wr->wr.ud.udwr_dest;
+		if (wr->wr_flags & IBT_WR_SEND_IMMED) {
+			/* "|=" changes 0xa to 0xb without touching FCEOF */
+			nopcode |= HERMON_WQE_SEND_NOPCODE_SENDI;
+			immed_data = wr->wr.ud.udwr_immed;
+		}
 		ah = (hermon_ahhdl_t)dest->ud_ah;
 		if (ah == NULL) {
 			status = IBT_AH_HDL_INVALID;
 			goto done;
 		}
+		ud = (hermon_hw_snd_wqe_ud_t *)((uintptr_t)desc +
+		    sizeof (hermon_hw_snd_wqe_ctrl_t));
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)ud +
+		    sizeof (hermon_hw_snd_wqe_ud_t));
 		HERMON_WQE_BUILD_UD(qp, ud, ah, dest);
 		i = 0;
-	} else {
+		break;
+
+	case IBT_WRC_INIT_SEND_FCMD:
+		if (qp->qp_serv_type != HERMON_QP_FCMND) {
+			status = IBT_QP_OP_TYPE_INVALID;
+			goto done;
+		}
+		if (wr->wr_trans != IBT_FCMD_SRV) {
+			status = IBT_QP_SRV_TYPE_INVALID;
+			goto done;
+		}
+		nopcode = HERMON_WQE_FCP_OPCODE_INIT_AND_SEND;
+		is = wr->wr.fc.fc_is;
+		dest = is->is_ctl.fc_dest;
+		ah = (hermon_ahhdl_t)dest->ud_ah;
+		if (ah == NULL) {
+			status = IBT_AH_HDL_INVALID;
+			goto done;
+		}
+		ud = (hermon_hw_snd_wqe_ud_t *)((uintptr_t)desc +
+		    sizeof (hermon_hw_snd_wqe_ctrl_t));
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)ud +
+		    sizeof (hermon_hw_snd_wqe_ud_t));
+		HERMON_WQE_BUILD_UD(qp, ud, ah, dest);
+		old_ds = ds;
+		/* move ds beyond the FCP-3 Init Segment */
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)ds + 0x10);
+		i = 0;
+		break;
+
+	case IBT_WRC_FAST_REG_PMR:
+	{
+		hermon_hw_snd_wqe_frwr_t	*frwr;
+
+		if (qp->qp_serv_type != HERMON_QP_FCMND) {
+			status = IBT_QP_OP_TYPE_INVALID;
+			goto done;
+		}
+		if (wr->wr_trans != IBT_FCMD_SRV) {
+			status = IBT_QP_SRV_TYPE_INVALID;
+			goto done;
+		}
+		nopcode = HERMON_WQE_SEND_NOPCODE_FRWR;
+		frwr = (hermon_hw_snd_wqe_frwr_t *)((uintptr_t)desc +
+		    sizeof (hermon_hw_snd_wqe_ctrl_t));
+		HERMON_WQE_BUILD_FRWR(qp, frwr, wr->wr.fc.reg_pmr);
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)frwr +
+		    sizeof (hermon_hw_snd_wqe_frwr_t));
+		nds = 0;
+		strong_order = 0x80;
+		break;
+	}
+
+#if 0
+	/* firmware does not support this */
+	case IBT_WRC_LOCAL_INVALIDATE:
+	{
+		hermon_hw_snd_wqe_local_inv_t	*li;
+
+		if (qp->qp_serv_type != HERMON_QP_FCMND) {
+			status = IBT_QP_OP_TYPE_INVALID;
+			goto done;
+		}
+		if (wr->wr_trans != IBT_FCMD_SRV) {
+			status = IBT_QP_SRV_TYPE_INVALID;
+			goto done;
+		}
+		nopcode = HERMON_WQE_SEND_NOPCODE_LCL_INV;
+		li = (hermon_hw_snd_wqe_local_inv_t *)((uintptr_t)desc +
+		    sizeof (hermon_hw_snd_wqe_ctrl_t));
+		HERMON_WQE_BUILD_LI(qp, li, wr->wr.fc.li);
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)li +
+		    sizeof (hermon_hw_snd_wqe_local_inv_t));
+		nds = 0;
+		strong_order = 0x80;
+		break;
+	}
+#endif
+	default:
 		status = IBT_QP_OP_TYPE_INVALID;
 		goto done;
 	}
@@ -223,17 +332,33 @@ post_next:
 	if (wr->wr_opcode == IBT_WRC_SEND_LSO) {
 		HERMON_WQE_BUILD_LSO(qp, old_ds, wr->wr.ud_lso.lso_mss,
 		    wr->wr.ud_lso.lso_hdr_sz);
+	} else if (wr->wr_opcode == IBT_WRC_INIT_SEND_FCMD) {
+		/* This sits in the STAMP, so must be set after setting SGL */
+		HERMON_WQE_BUILD_FCP3_INIT(old_ds, is->is_ctl.fc_frame_ctrl,
+		    is->is_cs_priority, is->is_tx_seq_id, is->is_fc_mtu,
+		    is->is_dest_id, is->is_op, is->is_rem_exch,
+		    is->is_exch_qp_idx);
+
+		/* The following will be used in HERMON_WQE_SET_CTRL_SEGMENT */
+		/* SIT bit in FCP-3 ctrl segment */
+		desc_sz |= (is->is_ctl.fc_frame_ctrl & IBT_FCTL_SIT) ? 0x80 : 0;
+		/* LS bit in FCP-3 ctrl segment */
+		fc_bits |= (is->is_ctl.fc_frame_ctrl & IBT_FCTL_LAST_SEQ) ?
+		    0x10000 : 0;
+		fc_bits |= ((is->is_ctl.fc_routing_ctrl & 0xF) << 20) |
+		    (is->is_ctl.fc_seq_id << 24);
+		immed_data = is->is_ctl.fc_parameter;
 	}
 
 	fence = (wr->wr_flags & IBT_WR_SEND_FENCE) ? 1 : 0;
 
 	signaled_dbd = ((qp->qp_sq_sigtype == HERMON_QP_SQ_ALL_SIGNALED) ||
-	    (wr->wr_flags & IBT_WR_SEND_SIGNAL)) ? 1 : 0;
+	    (wr->wr_flags & IBT_WR_SEND_SIGNAL)) ? 0xC : 0;
 
-	solicited = (wr->wr_flags & IBT_WR_SEND_SOLICIT) ? 1 : 0;
+	solicited = (wr->wr_flags & IBT_WR_SEND_SOLICIT) ? 0x2 : 0;
 
 	HERMON_WQE_SET_CTRL_SEGMENT(desc, desc_sz, fence, immed_data,
-	    solicited, signaled_dbd, wr->wr_flags & IBT_WR_SEND_CKSUM, qp);
+	    solicited, signaled_dbd, cksum, qp, strong_order, fc_bits);
 
 	wq->wq_wrid[tail] = wr->wr_id;
 
@@ -312,13 +437,16 @@ hermon_post_send_rc(hermon_state_t *state, hermon_qphdl_t qp,
 	hermon_hw_snd_wqe_remaddr_t	*rc;
 	hermon_hw_snd_wqe_atomic_t	*at;
 	hermon_hw_snd_wqe_bind_t	*bn;
+	hermon_hw_snd_wqe_frwr_t	*frwr;
+	hermon_hw_snd_wqe_local_inv_t	*li;
 	hermon_hw_wqe_sgl_t		*ds;
 	ibt_wr_ds_t			*sgl;
-	uint32_t			nds;
+	int				nds;
 	int				i, last_ds, num_ds;
 	uint32_t			*wqe_start;
 	int				sectperwqe;
 	uint_t				posted_cnt = 0;
+	int				strong_order;
 	int				print_rdma;
 	int				rlen;
 	uint32_t			rkey;
@@ -343,6 +471,7 @@ hermon_post_send_rc(hermon_state_t *state, hermon_qphdl_t qp,
 post_next:
 	print_rdma = 0;
 	rlen = 0;
+	strong_order = 0;
 
 	/*
 	 * Check for "queue full" condition.  If the queue
@@ -366,6 +495,10 @@ post_next:
 	nds = wr->wr_nds;
 	sgl = wr->wr_sgl;
 	num_ds = 0;
+	if (wr->wr_trans != IBT_RC_SRV) {
+		status = IBT_QP_SRV_TYPE_INVALID;
+		goto done;
+	}
 
 	/*
 	 * Validate the operation type.  For RC requests, we allow
@@ -378,7 +511,10 @@ post_next:
 		goto done;
 
 	case IBT_WRC_SEND:
-		if (wr->wr_flags & IBT_WR_SEND_IMMED) {
+		if (wr->wr_flags & IBT_WR_SEND_REMOTE_INVAL) {
+			nopcode = HERMON_WQE_SEND_NOPCODE_SND_INV;
+			immed_data = wr->wr.rc.rcwr.send_inval;
+		} else if (wr->wr_flags & IBT_WR_SEND_IMMED) {
 			nopcode = HERMON_WQE_SEND_NOPCODE_SENDI;
 			immed_data = wr->wr.rc.rcwr.send_immed;
 		} else {
@@ -488,6 +624,29 @@ post_next:
 		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)bn +
 		    sizeof (hermon_hw_snd_wqe_bind_t));
 		nds = 0;
+		break;
+
+	case IBT_WRC_FAST_REG_PMR:
+		nopcode = HERMON_WQE_SEND_NOPCODE_FRWR;
+		frwr = (hermon_hw_snd_wqe_frwr_t *)((uintptr_t)desc +
+		    sizeof (hermon_hw_snd_wqe_ctrl_t));
+		HERMON_WQE_BUILD_FRWR(qp, frwr, wr->wr.rc.rcwr.reg_pmr);
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)frwr +
+		    sizeof (hermon_hw_snd_wqe_frwr_t));
+		nds = 0;
+		strong_order = 0x80;
+		break;
+
+	case IBT_WRC_LOCAL_INVALIDATE:
+		nopcode = HERMON_WQE_SEND_NOPCODE_LCL_INV;
+		li = (hermon_hw_snd_wqe_local_inv_t *)((uintptr_t)desc +
+		    sizeof (hermon_hw_snd_wqe_ctrl_t));
+		HERMON_WQE_BUILD_LI(qp, li, wr->wr.rc.rcwr.li);
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)li +
+		    sizeof (hermon_hw_snd_wqe_local_inv_t));
+		nds = 0;
+		strong_order = 0x80;
+		break;
 	}
 
 	/*
@@ -522,6 +681,12 @@ post_next:
 		last_ds--;
 		HERMON_WQE_BUILD_DATA_SEG_SEND(&ds[last_ds], &sgl[i]);
 	}
+	/* ensure RDMA READ does not exceed HCA limit */
+	if ((wr->wr_opcode == IBT_WRC_RDMAR) && (desc_sz >
+	    state->hs_ibtfinfo.hca_attr->hca_conn_rdma_read_sgl_sz + 2)) {
+		status = IBT_QP_SGL_LEN_INVALID;
+		goto done;
+	}
 
 	if (print_rdma & 0x1) {
 		IBTF_DPRINTF_L2("rdma", "post: indx %x  rkey %x  raddr %llx  "
@@ -531,12 +696,12 @@ post_next:
 	fence = (wr->wr_flags & IBT_WR_SEND_FENCE) ? 1 : 0;
 
 	signaled_dbd = ((qp->qp_sq_sigtype == HERMON_QP_SQ_ALL_SIGNALED) ||
-	    (wr->wr_flags & IBT_WR_SEND_SIGNAL)) ? 1 : 0;
+	    (wr->wr_flags & IBT_WR_SEND_SIGNAL)) ? 0xC : 0;
 
-	solicited = (wr->wr_flags & IBT_WR_SEND_SOLICIT) ? 1 : 0;
+	solicited = (wr->wr_flags & IBT_WR_SEND_SOLICIT) ? 0x2 : 0;
 
 	HERMON_WQE_SET_CTRL_SEGMENT(desc, desc_sz, fence, immed_data, solicited,
-	    signaled_dbd, wr->wr_flags & IBT_WR_SEND_CKSUM, qp);
+	    signaled_dbd, 0, qp, strong_order, 0);
 
 	wq->wq_wrid[tail] = wr->wr_id;
 
@@ -621,7 +786,6 @@ hermon_post_send(hermon_state_t *state, hermon_qphdl_t qp,
 	uint32_t			desc_sz;
 	uint32_t			signaled_dbd, solicited;
 	uint32_t			head, tail, next_tail, qsize_msk;
-	uint32_t			sync_from, sync_to;
 	uint32_t			hdrmwqes;
 	uint_t				currindx, wrindx, numremain;
 	uint_t				chainlen;
@@ -630,6 +794,7 @@ hermon_post_send(hermon_state_t *state, hermon_qphdl_t qp,
 	int				status;
 	uint32_t			nopcode, fence, immed_data = 0;
 	uint32_t			prev_nopcode;
+	uint_t				qp_state;
 
 	/* initialize the FMA retry loop */
 	hermon_pio_init(fm_loop_cnt, fm_status, fm_test);
@@ -639,42 +804,33 @@ hermon_post_send(hermon_state_t *state, hermon_qphdl_t qp,
 	 * clients to post to QP memory that is accessible directly by the
 	 * user.  If the QP memory is user accessible, then return an error.
 	 */
-	if (qp->qp_is_umap) {
+	if (qp->qp_alloc_flags & IBT_QP_USER_MAP) {
 		return (IBT_QP_HDL_INVALID);
 	}
 
-	mutex_enter(&qp->qp_lock);
+	mutex_enter(&qp->qp_sq_lock);
 
 	/*
 	 * Check QP state.  Can not post Send requests from the "Reset",
 	 * "Init", or "RTR" states
 	 */
-	if ((qp->qp_state == HERMON_QP_RESET) ||
-	    (qp->qp_state == HERMON_QP_INIT) ||
-	    (qp->qp_state == HERMON_QP_RTR)) {
-		mutex_exit(&qp->qp_lock);
+	qp_state = qp->qp_state_for_post_send;
+	if ((qp_state == HERMON_QP_RESET) ||
+	    (qp_state == HERMON_QP_INIT) ||
+	    (qp_state == HERMON_QP_RTR)) {
+		mutex_exit(&qp->qp_sq_lock);
 		return (IBT_QP_STATE_INVALID);
 	}
-	mutex_exit(&qp->qp_lock);
-	mutex_enter(&qp->qp_sq_lock);
 
 	if (qp->qp_is_special)
 		goto post_many;
 
 	/* Use these optimized functions most of the time */
-	if (qp->qp_serv_type == HERMON_QP_UD) {
-		if (wr->wr_trans != IBT_UD_SRV) {
-			mutex_exit(&qp->qp_sq_lock);
-			return (IBT_QP_SRV_TYPE_INVALID);
-		}
+	if (qp->qp_type == IBT_UD_RQP) {
 		return (hermon_post_send_ud(state, qp, wr, num_wr, num_posted));
 	}
 
 	if (qp->qp_serv_type == HERMON_QP_RC) {
-		if (wr->wr_trans != IBT_RC_SRV) {
-			mutex_exit(&qp->qp_sq_lock);
-			return (IBT_QP_SRV_TYPE_INVALID);
-		}
 		return (hermon_post_send_rc(state, qp, wr, num_wr, num_posted));
 	}
 
@@ -727,18 +883,6 @@ post_many:
 		 * to the current descriptor.
 		 */
 		prev = HERMON_QP_SQ_ENTRY(qp, tail);
-
-	/*
-	 * unlike Tavor & Arbel, tail will maintain the number of the
-	 * next (this) WQE to be posted.  Since there is no backward linking
-	 * in Hermon, we can always just look ahead
-	 */
-		/*
-		 * Before we begin, save the current "tail index" for later
-		 * DMA sync
-		 */
-		/* NOTE: don't need to go back one like arbel/tavor */
-		sync_from = tail;
 
 		/*
 		 * Break the request up into lists that are less than or
@@ -850,12 +994,12 @@ post_many:
 
 			if ((qp->qp_sq_sigtype == HERMON_QP_SQ_ALL_SIGNALED) ||
 			    (curr_wr->wr_flags & IBT_WR_SEND_SIGNAL)) {
-				signaled_dbd = 1;
+				signaled_dbd = 0xC;
 			} else {
 				signaled_dbd = 0;
 			}
 			if (curr_wr->wr_flags & IBT_WR_SEND_SOLICIT)
-				solicited = 1;
+				solicited = 0x2;
 			else
 				solicited = 0;
 
@@ -873,8 +1017,7 @@ post_many:
 			} else {
 				HERMON_WQE_SET_CTRL_SEGMENT(desc, desc_sz,
 				    fence, immed_data, solicited,
-				    signaled_dbd, curr_wr->wr_flags &
-				    IBT_WR_SEND_CKSUM, qp);
+				    signaled_dbd, 0, qp, 0, 0);
 			}
 			wq->wq_wrid[tail] = curr_wr->wr_id;
 
@@ -912,19 +1055,9 @@ post_many:
 		if (posted_cnt != 0) {
 			ddi_acc_handle_t uarhdl = hermon_get_uarhdl(state);
 
-			/*
-			 * Save away updated "tail index" for the DMA sync
-			 * including the headroom that will be needed
-			 */
-			sync_to = (tail + hdrmwqes) & qsize_msk;
-
 			/* do the invalidate of the headroom */
 
 			hermon_wqe_headroom(tail, qp);
-
-			/* Do a DMA sync for current send WQE(s) */
-			hermon_wqe_sync(qp, sync_from, sync_to, HERMON_WR_SEND,
-			    DDI_DMA_SYNC_FORDEV);
 
 			/* Update some of the state in the QP */
 			wq->wq_tail = tail;
@@ -982,7 +1115,6 @@ hermon_post_recv(hermon_state_t *state, hermon_qphdl_t qp,
 	uint64_t			*desc;
 	hermon_workq_hdr_t		*wq;
 	uint32_t			head, tail, next_tail, qsize_msk;
-	uint32_t			sync_from, sync_to;
 	uint_t				wrindx;
 	uint_t				posted_cnt;
 	int				status;
@@ -992,7 +1124,7 @@ hermon_post_recv(hermon_state_t *state, hermon_qphdl_t qp,
 	 * clients to post to QP memory that is accessible directly by the
 	 * user.  If the QP memory is user accessible, then return an error.
 	 */
-	if (qp->qp_is_umap) {
+	if (qp->qp_alloc_flags & IBT_QP_USER_MAP) {
 		return (IBT_QP_HDL_INVALID);
 	}
 
@@ -1004,7 +1136,7 @@ hermon_post_recv(hermon_state_t *state, hermon_qphdl_t qp,
 	/*
 	 * Check if QP is associated with an SRQ
 	 */
-	if (qp->qp_srq_en == HERMON_QP_SRQ_ENABLED) {
+	if (qp->qp_alloc_flags & IBT_QP_USES_SRQ) {
 		mutex_exit(&qp->qp_lock);
 		return (IBT_SRQ_IN_USE);
 	}
@@ -1018,15 +1150,12 @@ hermon_post_recv(hermon_state_t *state, hermon_qphdl_t qp,
 	}
 
 	/* Check that work request transport type is valid */
-	if ((qp->qp_serv_type != HERMON_QP_UD) &&
+	if ((qp->qp_type != IBT_UD_RQP) &&
 	    (qp->qp_serv_type != HERMON_QP_RC) &&
 	    (qp->qp_serv_type != HERMON_QP_UC)) {
 		mutex_exit(&qp->qp_lock);
 		return (IBT_QP_SRV_TYPE_INVALID);
 	}
-
-	mutex_exit(&qp->qp_lock);
-	mutex_enter(&qp->qp_rq_lock);
 
 	/*
 	 * Grab the lock for the WRID list, i.e., membar_consumer().
@@ -1042,11 +1171,6 @@ hermon_post_recv(hermon_state_t *state, hermon_qphdl_t qp,
 
 	wrindx = 0;
 	status	  = DDI_SUCCESS;
-	/*
-	 * Before we begin, save the current "tail index" for later
-	 * DMA sync
-	 */
-	sync_from = tail;
 
 	for (wrindx = 0; wrindx < num_wr; wrindx++) {
 		if (wq->wq_full != 0) {
@@ -1071,11 +1195,6 @@ hermon_post_recv(hermon_state_t *state, hermon_qphdl_t qp,
 	}
 
 	if (posted_cnt != 0) {
-		/* Save away updated "tail index" for the DMA sync */
-		sync_to = tail;
-
-		hermon_wqe_sync(qp, sync_from, sync_to, HERMON_WR_RECV,
-		    DDI_DMA_SYNC_FORDEV);
 
 		wq->wq_tail = tail;
 
@@ -1091,7 +1210,7 @@ hermon_post_recv(hermon_state_t *state, hermon_qphdl_t qp,
 	}
 
 
-	mutex_exit(&qp->qp_rq_lock);
+	mutex_exit(&qp->qp_lock);
 	return (status);
 }
 
@@ -1149,8 +1268,6 @@ hermon_post_srq(hermon_state_t *state, hermon_srqhdl_t srq,
 			break;
 		}
 
-		hermon_wqe_sync(srq, indx, indx + 1,
-		    HERMON_WR_SRQ, DDI_DMA_SYNC_FORDEV);
 		posted_cnt++;
 		indx = htons(((uint16_t *)desc)[1]);
 		wq->wq_head = indx;
@@ -1795,7 +1912,7 @@ hermon_wqe_recv_build(hermon_state_t *state, hermon_qphdl_t qp,
 	hermon_hw_wqe_sgl_t	*ds;
 	int			i, num_ds;
 
-	ASSERT(MUTEX_HELD(&qp->qp_rq_lock));
+	ASSERT(MUTEX_HELD(&qp->qp_lock));
 
 	/*
 	 * Fill in the Data Segments (SGL) for the Recv WQE  - don't
@@ -1984,118 +2101,6 @@ hermon_wqe_headroom(uint_t from, hermon_qphdl_t qp)
 }
 
 /*
- * hermon_wqe_sync()
- *    Context: Can be called from interrupt or base context.
- */
-static void
-hermon_wqe_sync(void *hdl, uint_t sync_from, uint_t sync_to,
-    uint_t sync_type, uint_t flag)
-{
-	hermon_qphdl_t		qp;
-	hermon_srqhdl_t		srq;
-	uint64_t		*wqe_from, *wqe_to;
-	uint64_t		*wq_base, *wq_top, *qp_base;
-	ddi_dma_handle_t	dmahdl;
-	off_t			offset;
-	size_t			length;
-	uint32_t		qsize;
-	int			status;
-
-	if (sync_type == HERMON_WR_SRQ) {
-		srq = (hermon_srqhdl_t)hdl;
-		/* Get the DMA handle from SRQ context */
-		dmahdl = srq->srq_mrhdl->mr_bindinfo.bi_dmahdl;
-		/* get base addr of the buffer */
-		qp_base = (uint64_t *)(void *)srq->srq_wq_buf;
-	} else {
-		qp = (hermon_qphdl_t)hdl;
-		/* Get the DMA handle from QP context */
-		dmahdl = qp->qp_mrhdl->mr_bindinfo.bi_dmahdl;
-		/* Determine the base address of the QP buffer */
-		if (qp->qp_sq_baseaddr == 0) {
-			qp_base = (uint64_t *)(void *)(qp->qp_sq_buf);
-		} else {
-			qp_base = (uint64_t *)(void *)(qp->qp_rq_buf);
-		}
-	}
-
-	/*
-	 * Depending on the type of the work queue, we grab information
-	 * about the address ranges we need to DMA sync.
-	 */
-
-	if (sync_type == HERMON_WR_SEND) {
-		wqe_from = HERMON_QP_SQ_ENTRY(qp, sync_from);
-		wqe_to   = HERMON_QP_SQ_ENTRY(qp, sync_to);
-		qsize	 = qp->qp_sq_bufsz;
-
-		wq_base = HERMON_QP_SQ_ENTRY(qp, 0);
-		wq_top	 = HERMON_QP_SQ_ENTRY(qp, qsize);
-	} else if (sync_type == HERMON_WR_RECV) {
-		wqe_from = HERMON_QP_RQ_ENTRY(qp, sync_from);
-		wqe_to   = HERMON_QP_RQ_ENTRY(qp, sync_to);
-		qsize	 = qp->qp_rq_bufsz;
-
-		wq_base = HERMON_QP_RQ_ENTRY(qp, 0);
-		wq_top	 = HERMON_QP_RQ_ENTRY(qp, qsize);
-	} else {
-		wqe_from = HERMON_SRQ_WQ_ENTRY(srq, sync_from);
-		wqe_to   = HERMON_SRQ_WQ_ENTRY(srq, sync_to);
-		qsize	 = srq->srq_wq_bufsz;
-
-		wq_base = HERMON_SRQ_WQ_ENTRY(srq, 0);
-		wq_top	 = HERMON_SRQ_WQ_ENTRY(srq, qsize);
-	}
-
-	/*
-	 * There are two possible cases for the beginning and end of the WQE
-	 * chain we are trying to sync.  Either this is the simple case, where
-	 * the end of the chain is below the beginning of the chain, or it is
-	 * the "wrap-around" case, where the end of the chain has wrapped over
-	 * the end of the queue.  In the former case, we simply need to
-	 * calculate the span from beginning to end and sync it.  In the latter
-	 * case, however, we need to calculate the span from the top of the
-	 * work queue to the end of the chain and sync that, and then we need
-	 * to find the other portion (from beginning of chain to end of queue)
-	 * and sync that as well.  Note: if the "top to end" span is actually
-	 * zero length, then we don't do a DMA sync because a zero length DMA
-	 * sync unnecessarily syncs the entire work queue.
-	 */
-	if (wqe_to > wqe_from) {
-		/* "From Beginning to End" */
-
-		offset = (off_t)((uintptr_t)wqe_from - (uintptr_t)qp_base);
-		length = (size_t)((uintptr_t)wqe_to - (uintptr_t)wqe_from);
-
-		status = ddi_dma_sync(dmahdl, offset, length, flag);
-		if (status != DDI_SUCCESS) {
-			return;
-		}
-	} else {
-		/* "From Top to End" */
-
-		offset = (off_t)((uintptr_t)wq_base - (uintptr_t)qp_base);
-		length = (size_t)((uintptr_t)wqe_to - (uintptr_t)wq_base);
-		if (length) {
-			status = ddi_dma_sync(dmahdl, offset, length, flag);
-			if (status != DDI_SUCCESS) {
-				return;
-			}
-		}
-
-		/* "From Beginning to Bottom" */
-
-		offset = (off_t)((uintptr_t)wqe_from - (uintptr_t)qp_base);
-		length = (size_t)((uintptr_t)wq_top - (uintptr_t)wqe_from);
-		status = ddi_dma_sync(dmahdl, offset, length, flag);
-		if (status != DDI_SUCCESS) {
-			return;
-		}
-	}
-}
-
-
-/*
  * hermon_wr_bind_check()
  *    Context: Can be called from interrupt or base context.
  */
@@ -2211,22 +2216,25 @@ int
 hermon_wrid_from_reset_handling(hermon_state_t *state, hermon_qphdl_t qp)
 {
 	hermon_workq_hdr_t	*swq, *rwq;
-	uint_t			qp_srq_en;
 
-	if (qp->qp_is_umap)
+	if (qp->qp_alloc_flags & IBT_QP_USER_MAP)
 		return (DDI_SUCCESS);
 
-	/* grab the cq lock(s) to modify the wqavl tree */
-	mutex_enter(&qp->qp_rq_cqhdl->cq_lock);
 #ifdef __lock_lint
+	mutex_enter(&qp->qp_rq_cqhdl->cq_lock);
 	mutex_enter(&qp->qp_sq_cqhdl->cq_lock);
 #else
-	if (qp->qp_rq_cqhdl != qp->qp_sq_cqhdl)
+	/* grab the cq lock(s) to modify the wqavl tree */
+	if (qp->qp_rq_cqhdl)
+		mutex_enter(&qp->qp_rq_cqhdl->cq_lock);
+	if (qp->qp_rq_cqhdl != qp->qp_sq_cqhdl &&
+	    qp->qp_sq_cqhdl != NULL)
 		mutex_enter(&qp->qp_sq_cqhdl->cq_lock);
 #endif
 
 	/* Chain the newly allocated work queue header to the CQ's list */
-	hermon_cq_workq_add(qp->qp_sq_cqhdl, &qp->qp_sq_wqavl);
+	if (qp->qp_sq_cqhdl)
+		hermon_cq_workq_add(qp->qp_sq_cqhdl, &qp->qp_sq_wqavl);
 
 	swq = qp->qp_sq_wqhdr;
 	swq->wq_head = 0;
@@ -2239,12 +2247,11 @@ hermon_wrid_from_reset_handling(hermon_state_t *state, hermon_qphdl_t qp)
 	 *
 	 * Note: We still use the 'qp_rq_cqhdl' even in the SRQ case.
 	 */
-	qp_srq_en = qp->qp_srq_en;
 
 #ifdef __lock_lint
 	mutex_enter(&qp->qp_srqhdl->srq_lock);
 #else
-	if (qp_srq_en == HERMON_QP_SRQ_ENABLED) {
+	if (qp->qp_alloc_flags & IBT_QP_USES_SRQ) {
 		mutex_enter(&qp->qp_srqhdl->srq_lock);
 	} else {
 		rwq = qp->qp_rq_wqhdr;
@@ -2259,18 +2266,21 @@ hermon_wrid_from_reset_handling(hermon_state_t *state, hermon_qphdl_t qp)
 #ifdef __lock_lint
 	mutex_exit(&qp->qp_srqhdl->srq_lock);
 #else
-	if (qp_srq_en == HERMON_QP_SRQ_ENABLED) {
+	if (qp->qp_alloc_flags & IBT_QP_USES_SRQ) {
 		mutex_exit(&qp->qp_srqhdl->srq_lock);
 	}
 #endif
 
 #ifdef __lock_lint
 	mutex_exit(&qp->qp_sq_cqhdl->cq_lock);
-#else
-	if (qp->qp_rq_cqhdl != qp->qp_sq_cqhdl)
-		mutex_exit(&qp->qp_sq_cqhdl->cq_lock);
-#endif
 	mutex_exit(&qp->qp_rq_cqhdl->cq_lock);
+#else
+	if (qp->qp_rq_cqhdl != qp->qp_sq_cqhdl &&
+	    qp->qp_sq_cqhdl != NULL)
+		mutex_exit(&qp->qp_sq_cqhdl->cq_lock);
+	if (qp->qp_rq_cqhdl)
+		mutex_exit(&qp->qp_rq_cqhdl->cq_lock);
+#endif
 	return (DDI_SUCCESS);
 }
 
@@ -2282,9 +2292,7 @@ hermon_wrid_from_reset_handling(hermon_state_t *state, hermon_qphdl_t qp)
 int
 hermon_wrid_to_reset_handling(hermon_state_t *state, hermon_qphdl_t qp)
 {
-	uint_t			qp_srq_en;
-
-	if (qp->qp_is_umap)
+	if (qp->qp_alloc_flags & IBT_QP_USER_MAP)
 		return (DDI_SUCCESS);
 
 	/*
@@ -2292,19 +2300,22 @@ hermon_wrid_to_reset_handling(hermon_state_t *state, hermon_qphdl_t qp)
 	 * polled/flushed.
 	 * Grab the CQ lock(s) before manipulating the lists.
 	 */
-	mutex_enter(&qp->qp_rq_cqhdl->cq_lock);
 #ifdef __lock_lint
+	mutex_enter(&qp->qp_rq_cqhdl->cq_lock);
 	mutex_enter(&qp->qp_sq_cqhdl->cq_lock);
 #else
-	if (qp->qp_rq_cqhdl != qp->qp_sq_cqhdl)
+	/* grab the cq lock(s) to modify the wqavl tree */
+	if (qp->qp_rq_cqhdl)
+		mutex_enter(&qp->qp_rq_cqhdl->cq_lock);
+	if (qp->qp_rq_cqhdl != qp->qp_sq_cqhdl &&
+	    qp->qp_sq_cqhdl != NULL)
 		mutex_enter(&qp->qp_sq_cqhdl->cq_lock);
 #endif
 
-	qp_srq_en = qp->qp_srq_en;
 #ifdef __lock_lint
 	mutex_enter(&qp->qp_srqhdl->srq_lock);
 #else
-	if (qp_srq_en == HERMON_QP_SRQ_ENABLED) {
+	if (qp->qp_alloc_flags & IBT_QP_USES_SRQ) {
 		mutex_enter(&qp->qp_srqhdl->srq_lock);
 	}
 #endif
@@ -2316,21 +2327,25 @@ hermon_wrid_to_reset_handling(hermon_state_t *state, hermon_qphdl_t qp)
 #ifdef __lock_lint
 	mutex_exit(&qp->qp_srqhdl->srq_lock);
 #else
-	if (qp_srq_en == HERMON_QP_SRQ_ENABLED) {
+	if (qp->qp_alloc_flags & IBT_QP_USES_SRQ) {
 		mutex_exit(&qp->qp_srqhdl->srq_lock);
 	}
 #endif
 
 	hermon_cq_workq_remove(qp->qp_rq_cqhdl, &qp->qp_rq_wqavl);
-	hermon_cq_workq_remove(qp->qp_sq_cqhdl, &qp->qp_sq_wqavl);
+	if (qp->qp_sq_cqhdl != NULL)
+		hermon_cq_workq_remove(qp->qp_sq_cqhdl, &qp->qp_sq_wqavl);
 
 #ifdef __lock_lint
 	mutex_exit(&qp->qp_sq_cqhdl->cq_lock);
-#else
-	if (qp->qp_rq_cqhdl != qp->qp_sq_cqhdl)
-		mutex_exit(&qp->qp_sq_cqhdl->cq_lock);
-#endif
 	mutex_exit(&qp->qp_rq_cqhdl->cq_lock);
+#else
+	if (qp->qp_rq_cqhdl != qp->qp_sq_cqhdl &&
+	    qp->qp_sq_cqhdl != NULL)
+		mutex_exit(&qp->qp_sq_cqhdl->cq_lock);
+	if (qp->qp_rq_cqhdl)
+		mutex_exit(&qp->qp_rq_cqhdl->cq_lock);
+#endif
 
 	return (IBT_SUCCESS);
 }

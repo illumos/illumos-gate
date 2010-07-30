@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # ibcm api entry points
@@ -62,12 +61,11 @@ root	ibt_get_ip_protocol_num
 root	ibt_get_ip_sid
 root	ibt_release_ip_sid 
 root	ibt_get_src_ip
+root	ibt_free_srcip_info
+root	ibt_lid_to_node_info
 
 root	ibt_ofuvcm_get_req_data
 root	ibt_ofuvcm_proceed
-
-root	ibcm_arp_get_srcip_plist
-root	ibcm_arp_get_ibd_insts_cb
 
 # callback entry points from ibmf
 root	ibcm_recv_cb

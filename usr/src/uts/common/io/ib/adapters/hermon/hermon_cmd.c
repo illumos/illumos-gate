@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -399,22 +398,12 @@ hermon_mbox_free(hermon_state_t *state, hermon_mbox_info_t *mbox_info)
  * hermon_cmd_complete_handler()
  *    Context: Called only from interrupt context.
  */
+/* ARGSUSED */
 int
 hermon_cmd_complete_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
 {
 	hermon_cmd_t		*cmdp;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_COMMAND_INTF_COMP ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/*
 	 * Find the outstanding command pointer based on value returned
@@ -1596,7 +1585,7 @@ hermon_mod_stat_cfg_cmd_post(hermon_state_t *state)
 
 /*
  * hermon_map_cmd_post()
- *    Context: Can be called only from attach() path
+ *    Context: Can be called only from user or kernel context
  *
  * Generic routine to map FW, ICMA, and ICM.
  */
@@ -2954,6 +2943,7 @@ hermon_cmn_qp_cmd_post(hermon_state_t *state, uint_t opcode,
  * Note: This common function should be used only with the following
  *    opcodes: QUERY_DEV_LIM, QUERY_FW, QUERY_DDR, QUERY_ADAPTER, QUERY_PORT
  *     QUERY_HCA, QUERY_MPT, QUERY_EQ, QUERY_CQ, and QUERY_QP.
+ *	With support of FCoIB, this also supports QUERY_FC.
  */
 int
 hermon_cmn_query_cmd_post(hermon_state_t *state, uint_t opcode, uint_t opmod,
@@ -3180,6 +3170,36 @@ hermon_conf_special_qp_cmd_post(hermon_state_t *state, uint_t qpindx,
 	cmd.cp_flags	= sleepflag;
 	status = hermon_cmd_post(state, &cmd);
 
+	return (status);
+}
+
+
+/*
+ * hermon_get_heart_beat_rq_cmd_post()
+ *    Context: Can be called only from kernel or interrupt context
+ */
+int
+hermon_get_heart_beat_rq_cmd_post(hermon_state_t *state, uint_t qpindx,
+    uint64_t *outparm)
+{
+	hermon_cmd_post_t	cmd;
+	int			status;
+
+	bzero((void *)&cmd, sizeof (hermon_cmd_post_t));
+
+	/* Setup and post the Hermon "HEART_BEAT_RQ" command */
+	cmd.cp_inparm	= 0;
+	cmd.cp_outparm	= 0;
+	cmd.cp_inmod	= qpindx;
+	cmd.cp_opcode	= HEART_BEAT_RQ;
+	cmd.cp_opmod	= 0;
+	cmd.cp_flags	= HERMON_CMD_NOSLEEP_SPIN;
+	status = hermon_cmd_post(state, &cmd);
+
+	/*
+	 * Return immediate out param through argument pointer.
+	 */
+	*outparm = cmd.cp_outparm;
 	return (status);
 }
 
@@ -3455,6 +3475,135 @@ hermon_modify_mpt_cmd_post(hermon_state_t *state, hermon_hw_dmpt_t *mpt,
 }
 
 
+/*
+ * hermon_config_fc_cmd_post()
+ *    	Context: Can be called from user or kernel context.
+ *	This can do either a basic config passing in
+ * 	*hermon_hw_config_fc_basic_s, or config the N_Port table.
+ *	passing in pointer to an array of 32-bit id's
+ *	Note that either one needs to be cast to void *
+ */
+int
+hermon_config_fc_cmd_post(hermon_state_t *state, void *cfginfo, int enable,
+    int selector, int n_ports, int portnum, uint_t sleepflag)
+{
+	hermon_mbox_info_t	mbox_info;
+	hermon_cmd_post_t	cmd;
+	uint64_t		data;
+	uint32_t		portid;
+	uint_t			size;
+	int			status, i;
+
+	bzero((void *)&cmd, sizeof (hermon_cmd_post_t));
+
+	/* Get an "In" mailbox for the command */
+	mbox_info.mbi_alloc_flags = HERMON_ALLOC_INMBOX;
+	status = hermon_mbox_alloc(state, &mbox_info, sleepflag);
+	if (status != HERMON_CMD_SUCCESS) {
+		return (status);
+	}
+
+	/* Copy the appropriate info into mailbox */
+	if (selector == HERMON_HW_FC_CONF_BASIC) {	/* basic info */
+		size = sizeof (hermon_hw_config_fc_basic_t);
+		for (i = 0; i < (size >> 3); i++) {
+			data = ((uint64_t *)cfginfo)[i];
+			ddi_put64(mbox_info.mbi_in->mb_acchdl,
+			    ((uint64_t *)mbox_info.mbi_in->mb_addr + i), data);
+		}
+	} else {					/* NPort config */
+		ASSERT(selector == HERMON_HW_FC_CONF_NPORT);
+		size = n_ports * sizeof (uint32_t);
+		/*
+		 * n_ports must == number queried from card
+		 *
+		 * passed in is an array but for little endian needs to
+		 * be rearranged in the mbox
+		 */
+		for (i = 0; i < (size >> 3); i++) {
+			portid = ((uint32_t *)cfginfo)[i * 2];
+			data = (uint64_t)portid << 32;
+			if (i * 2 < n_ports) {
+				portid = ((uint32_t *)cfginfo)[i * 2 + 1];
+				data |= portid;
+			}
+			ddi_put64(mbox_info.mbi_in->mb_acchdl,
+			    ((uint64_t *)mbox_info.mbi_in->mb_addr + i), data);
+		}
+	}
+
+	/* Sync the mailbox for the device to read */
+	hermon_mbox_sync(mbox_info.mbi_in, 0, size, DDI_DMA_SYNC_FORDEV);
+
+	/* Setup and post Hermon "CONFIG_FC" command */
+	cmd.cp_inparm	= mbox_info.mbi_in->mb_mapaddr;
+	cmd.cp_outparm	= 0;
+	cmd.cp_inmod	= (uint32_t)(selector | portnum);
+	cmd.cp_opcode	= CONFIG_FC;
+	cmd.cp_opmod	= (uint16_t)enable;
+	cmd.cp_flags	= sleepflag;
+	status = hermon_cmd_post(state, &cmd);
+
+	/* Free the mailbox */
+	hermon_mbox_free(state, &mbox_info);
+	return (status);
+}
+
+/*
+ * hermon_sense_port_post() - used to send protocol running on a port
+ *	Context: Can be called from interrupt or base context
+ */
+
+int
+hermon_sense_port_post(hermon_state_t *state, uint_t portnum,
+    uint32_t *protocol)
+{
+	hermon_cmd_post_t	cmd;
+	int			status;
+
+	bzero((void *)&cmd, sizeof (hermon_cmd_post_t));
+
+	/* Setup and post Hermon "CMD_NOP" command */
+	cmd.cp_inparm	= 0;
+	cmd.cp_outparm	= 0;
+	cmd.cp_inmod	= (uint32_t)portnum;
+	cmd.cp_opcode	= SENSE_PORT;
+	cmd.cp_opmod	= 0;
+	cmd.cp_flags	= HERMON_CMD_NOSLEEP_SPIN;
+	status = hermon_cmd_post(state, &cmd);
+	if (status == HERMON_CMD_SUCCESS) *protocol = (uint32_t)cmd.cp_outparm;
+	return (status);
+}
+
+
+/*
+ * CONFIG_INT_MOD - used to configure INTERRUPT moderation
+ *	if command fails, *health is invalid/undefined
+ */
+int
+hermon_config_int_mod(hermon_state_t *state, uint_t min_delay, uint_t vector)
+{
+	hermon_cmd_post_t	cmd;
+	int			status;
+	uint64_t		inparm = 0;
+
+	bzero((void *)&cmd, sizeof (hermon_cmd_post_t));
+
+	/* Setup and post Hermon "CONFIG_INT_MOD" command */
+	inparm = (((uint64_t)min_delay & 0xFFFF) << 48) ||
+	    (((uint64_t)vector & 0xFFFF) << 32);
+
+	cmd.cp_inparm	= inparm;
+	cmd.cp_outparm	= 0;
+	cmd.cp_inmod	= 0;
+	cmd.cp_opcode	= CONFIG_INT_MOD;
+	cmd.cp_opmod	= 0;
+	cmd.cp_flags	= HERMON_CMD_NOSLEEP_SPIN;
+	status = hermon_cmd_post(state, &cmd);
+	return (status);
+}
+
+
 int
 hermon_nop_post(hermon_state_t *state, uint_t interval, uint_t sleep)
 {
@@ -3472,6 +3621,26 @@ hermon_nop_post(hermon_state_t *state, uint_t interval, uint_t sleep)
 	cmd.cp_flags	= HERMON_CMD_SLEEP_NOSPIN;
 	if (sleep) cmd.cp_flags	= HERMON_CMD_NOSLEEP_SPIN;
 	status = hermon_cmd_post(state, &cmd);
+	return (status);
+}
+
+int
+hermon_hw_health_check(hermon_state_t *state, int *health)
+{
+	hermon_cmd_post_t	cmd;
+	int			status;
+
+	bzero((void *)&cmd, sizeof (hermon_cmd_post_t));
+
+	/* Setup and post Hermon "CMD_NOP" command */
+	cmd.cp_inparm	= 0;
+	cmd.cp_outparm	= 0;
+	cmd.cp_inmod	= 0;
+	cmd.cp_opcode	= HW_HEALTH_CHECK;
+	cmd.cp_opmod	= 0;
+	cmd.cp_flags	= HERMON_CMD_NOSLEEP_SPIN;
+	status = hermon_cmd_post(state, &cmd);
+	*health = (int)cmd.cp_outparm;
 	return (status);
 }
 

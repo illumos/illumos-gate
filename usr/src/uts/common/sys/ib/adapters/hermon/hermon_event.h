@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_EVENT_H
@@ -116,7 +115,7 @@ extern "C" {
 #define	HERMON_EVT_PATH_MIGRATED		0x01
 #define	HERMON_EVT_COMM_ESTABLISHED		0x02
 #define	HERMON_EVT_SEND_QUEUE_DRAINED		0x03
-#define	HERMON_EVT_SRQ_LAST_WQE_REACHED	0x13
+#define	HERMON_EVT_SRQ_LAST_WQE_REACHED		0x13
 #define	HERMON_EVT_SRQ_LIMIT			0x14
 /* QP Affiliated Asynch Event */
 #define	HERMON_EVT_CQ_ERRORS			0x04 /* overrun, protection */
@@ -127,6 +126,9 @@ extern "C" {
 #define	HERMON_EVT_LOCAL_ACC_VIO_WQ_ERROR	0x11
 #define	HERMON_EVT_SRQ_CATASTROPHIC_ERROR	0x12
 #define	HERMON_EVT_SPOOF_FAIL			0x16	/* enet only */
+/* FEXCH Errors (QP Affiliated) */
+#define	HERMON_EVT_FEXCH_ERROR			0x0B
+
 /* Unaffiliated Asynch Events/Errors */
 #define	HERMON_EVT_PORT_STATE_CHANGE		0x09
 #define	HERMON_EVT_GPIO				0x15
@@ -134,11 +136,6 @@ extern "C" {
 #define	HERMON_EVT_COMMAND_INTF_COMP		0x0A
 /* Miscellaneous */
 #define	HERMON_EVT_LOCAL_CAT_ERROR		0x08
-/* LEGACY - no longer supported */
-#define	HERMON_EVT_WQE_PG_FAULT			0x0B
-#define	HERMON_EVT_UNSUPPORTED_PG_FAULT		0x0C
-#define	HERMON_EVT_ECC_DETECTION		0x0E
-#define	HERMON_EVT_EQ_OVERFLOW			0x0F
 
 
 #define	HERMON_EVT_MSK_COMPLETION		\
@@ -152,10 +149,10 @@ extern "C" {
 	(1 << HERMON_EVT_SEND_QUEUE_DRAINED)
 #define	HERMON_EVT_MSK_SRQ_LAST_WQE_REACHED	\
 	(1 << HERMON_EVT_SRQ_LAST_WQE_REACHED)
-#define	HERMON_EVT_MSK_SRQ_LIMIT	\
+#define	HERMON_EVT_MSK_SRQ_LIMIT		\
 	(1 << HERMON_EVT_SRQ_LIMIT)
 
-#define	HERMON_EVT_MSK_CQ_ERRORS			\
+#define	HERMON_EVT_MSK_CQ_ERRORS		\
 	(1 << HERMON_EVT_CQ_ERRORS)
 #define	HERMON_EVT_MSK_LOCAL_WQ_CAT_ERROR	\
 	(1 << HERMON_EVT_LOCAL_WQ_CAT_ERROR)
@@ -169,37 +166,29 @@ extern "C" {
 	(1 << HERMON_EVT_LOCAL_ACC_VIO_WQ_ERROR)
 #define	HERMON_EVT_MSK_SRQ_CATASTROPHIC_ERROR	\
 	(1 << HERMON_EVT_SRQ_CATASTROPHIC_ERROR)
-#define	HERMON_EVT_MSK_SPOOF_FAIL	\
+#define	HERMON_EVT_MSK_SPOOF_FAIL		\
 	(1 << HERMON_EVT_SPOOF_FAIL)
 
-#define	HERMON_EVT_MSK_PORT_STATE_CHANGE		\
+#define	HERMON_EVT_MSK_FEXCH_ERROR		\
+	(1 << HERMON_EVT_FEXCH_ERROR)
+
+#define	HERMON_EVT_MSK_PORT_STATE_CHANGE	\
 	(1 << HERMON_EVT_PORT_STATE_CHANGE)
-#define	HERMON_EVT_MSK_GPIO		\
+#define	HERMON_EVT_MSK_GPIO			\
 	(1 << HERMON_EVT_GPIO)
 
-#define	HERMON_EVT_MSK_COMMAND_INTF_COMP		\
+#define	HERMON_EVT_MSK_COMMAND_INTF_COMP	\
 	(1 << HERMON_EVT_COMMAND_INTF_COMP)
 
 #define	HERMON_EVT_MSK_LOCAL_CAT_ERROR		\
 	(1 << HERMON_EVT_LOCAL_CAT_ERROR)
 
-#define	HERMON_EVT_MSK_WQE_PG_FAULT		\
-	(1 << HERMON_EVT_WQE_PG_FAULT)
-#define	HERMON_EVT_MSK_UNSUPPORTED_PG_FAULT	\
-	(1 << HERMON_EVT_UNSUPPORTED_PG_FAULT)
-#define	HERMON_EVT_MSK_ECC_DETECTION		\
-	(1 << HERMON_EVT_ECC_DETECTION)
-
 
 #define	HERMON_EVT_NO_MASK			0
-/*
- *  WAS in Tavor & Arbel, but now two bits - 0x1000 and 0x0800 (0x0B & 0x00C)
- *  are no longer supported, so the catchall will be just 0x0040 (0x06)
- *  Loc QPC cat
- *	#define	HERMON_EVT_CATCHALL_MASK		0x1840
- */
 
+/* For now, "catchall" is just HERMON_EVT_LOCAL_QPC_CAT_ERROR. */
 #define	HERMON_EVT_CATCHALL_MASK		0x0040
+
 /*
  * The last defines are used by hermon_eqe_sync() to indicate whether or not
  * to force a DMA sync.  The case for forcing a DMA sync on a EQE comes from
@@ -270,9 +259,8 @@ extern "C" {
  * Specifically, it has a consumer index and a lock to ensure single threaded
  * access to it.  It has pointers to the various resources allocated for the
  * event queue, i.e. an EQC resource and the memory for the event queue
- * itself.  It has flags to indicate whether the EQ requires ddi_dma_sync()
- * ("eq_sync") or to indicate which type of event class(es) the EQ has been
- * mapped to (eq_evttypemask).
+ * itself.  It has flags to indicate which type of event class(es) the EQ
+ * has been mapped to (eq_evttypemask).
  *
  * It also has a pointer to the associated MR handle (for the mapped queue
  * memory) and a function pointer that points to the handler that should
@@ -288,11 +276,10 @@ struct hermon_sw_eq_s {
 	uint32_t		eq_consindx;
 	uint32_t		eq_eqnum;
 	hermon_hw_eqe_t		*eq_buf;
+	uint32_t		*eq_doorbell;
 	hermon_mrhdl_t		eq_mrhdl;
 	uint32_t		eq_bufsz;
 	uint32_t		eq_log_eqsz;
-	uint32_t		eq_nexteqe;
-	uint_t			eq_sync;
 	uint_t			eq_evttypemask;
 	hermon_rsrc_t		*eq_eqcrsrcp;
 	hermon_rsrc_t		*eq_rsrcp;
@@ -310,6 +297,7 @@ void hermon_eq_doorbell(hermon_state_t *state, uint32_t eq_cmd, uint32_t eqn,
     uint32_t eq_param);
 void hermon_eq_overflow_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe);
+void hermon_eq_reset_uar_baseaddr(hermon_state_t *state);
 
 #ifdef __cplusplus
 }

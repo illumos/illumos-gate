@@ -51,28 +51,11 @@ ibt_status_t
 ibt_alloc_cq_sched(ibt_hca_hdl_t hca_hdl, ibt_cq_sched_attr_t *attr,
     ibt_sched_hdl_t *sched_hdl_p)
 {
-	ibc_cq_handler_attr_t	handler_attrs;
-	ibt_cq_priority_t	priority;
-
 	IBTF_DPRINTF_L3(ibtf_cq, "ibt_alloc_cq_sched(%p, %p, %p)",
 	    hca_hdl, attr, sched_hdl_p);
 
-	/* Validate and Convert the IBT CQ priority */
-	priority = attr->cqs_priority;
-
-	if ((priority < IBT_CQ_DEFAULT) || (priority > IBT_CQ_PRI_16)) {
-		return (IBT_CQ_INVALID_PRIORITY);
-	}
-
-
-	/*
-	 * Do we need to check for valid range for load ? What's the valid
-	 * range?
-	 */
-	*sched_hdl_p = NULL;	/* Function not implemented fully yet */
-
 	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_alloc_cq_sched(
-	    IBTL_HCA2CIHCA(hca_hdl), attr->cqs_flags, &handler_attrs));
+	    IBTL_HCA2CIHCA(hca_hdl), attr, sched_hdl_p));
 }
 
 
@@ -84,20 +67,13 @@ ibt_alloc_cq_sched(ibt_hca_hdl_t hca_hdl, ibt_cq_sched_attr_t *attr,
  *	load	  - CQ load being removed.
  */
 ibt_status_t
-ibt_free_cq_sched(ibt_hca_hdl_t hca_hdl, ibt_sched_hdl_t sched_hdl,
-    uint_t load)
+ibt_free_cq_sched(ibt_hca_hdl_t hca_hdl, ibt_sched_hdl_t sched_hdl)
 {
-	ibt_cq_handler_id_t	handler_id = 0;
+	IBTF_DPRINTF_L3(ibtf_cq, "ibt_free_cq_sched(%p, %p)",
+	    hca_hdl, sched_hdl);
 
-	IBTF_DPRINTF_L3(ibtf_cq, "ibt_free_cq_sched(%p, %d, %p)",
-	    hca_hdl, sched_hdl, load);
-
-	/*
-	 * Function not fully implemented should get handler ID from
-	 * sched_hdl.
-	 */
 	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_free_cq_sched(
-	    IBTL_HCA2CIHCA(hca_hdl), handler_id));
+	    IBTL_HCA2CIHCA(hca_hdl), sched_hdl));
 }
 
 
@@ -281,4 +257,18 @@ void *
 ibt_get_cq_private(ibt_cq_hdl_t ibt_cq)
 {
 	return (ibt_cq->cq_clnt_private);
+}
+
+/*
+ * ibt_query_cq_handler_id - Retrieves the attributes of a cq_handler_id.
+ */
+ibt_status_t
+ibt_query_cq_handler_id(ibt_hca_hdl_t hca_hdl,
+    ibt_cq_handler_id_t hid, ibt_cq_handler_attr_t *attrs)
+{
+	IBTF_DPRINTF_L3(ibtf_cq, "ibt_query_cq_handler(%p, %d, %p)",
+	    hca_hdl, hid, attrs);
+
+	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_query_cq_handler_id(
+	    IBTL_HCA2CIHCA(hca_hdl), hid, attrs));
 }

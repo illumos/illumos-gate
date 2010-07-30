@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTL_CI_TYPES_H
@@ -228,7 +227,12 @@ typedef enum ibt_qp_alloc_flags_e {
 	IBT_QP_USER_MAP		= (1 << 0),
 	IBT_QP_DEFER_ALLOC	= (1 << 1),
 	IBT_QP_USES_SRQ		= (1 << 2),
-	IBT_QP_USES_RSS		= (1 << 3)
+	IBT_QP_USES_RSS		= (1 << 3),
+
+	/* FC variants of UD */
+	IBT_QP_USES_RFCI	= (1 << 4),
+	IBT_QP_USES_FCMD	= (1 << 5),
+	IBT_QP_USES_FEXCH	= (1 << 6)
 } ibt_qp_alloc_flags_t;
 
 /*
@@ -248,6 +252,7 @@ typedef struct ibt_qp_alloc_attr_s {
 	ibt_opaque1_t		qp_opaque2;
 	ibt_srq_hdl_t		qp_srq_hdl;	/* SRQ ibt hdl */
 	ibt_opaque2_t		qp_opaque3;
+	ibt_fc_attr_t		qp_fc;
 } ibt_qp_alloc_attr_t;
 
 
@@ -305,6 +310,7 @@ typedef struct ibt_qp_ud_attr_s {
 	uint16_t	ud_pkey_ix;	/* P_Key Index */
 	uint8_t		ud_port;	/* port */
 	ibt_rss_attr_t	ud_rss;		/* RSS stuff */
+	ibt_fc_attr_t	ud_fc;
 } ibt_qp_ud_attr_t;
 
 /*
@@ -326,7 +332,6 @@ typedef struct ibt_qp_info_s {
 	} qp_transport;
 } ibt_qp_info_t;
 
-
 /*
  * QP Query Attributes definition.
  */
@@ -340,6 +345,7 @@ typedef struct ibt_qp_query_attr_s {
 	ibt_qp_info_t		qp_info;	/* Modifiable attributes */
 	ibt_srq_hdl_t		qp_srq;		/* SRQ hdl or NULL */
 	ibt_attr_flags_t	qp_flags;
+	ibt_fexch_query_attr_t	qp_query_fexch;	/* FEXCH query only set */
 } ibt_qp_query_attr_t;
 
 

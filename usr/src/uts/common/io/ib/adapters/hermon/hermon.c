@@ -47,6 +47,9 @@
 
 #include <sys/ib/adapters/hermon/hermon.h>
 
+/* /etc/system can tune this down, if that is desirable. */
+int hermon_msix_max = HERMON_MSIX_MAX;
+
 /* The following works around a problem in pre-2_7_000 firmware. */
 #define	HERMON_FW_WORKAROUND
 
@@ -972,6 +975,10 @@ hermon_dma_free(hermon_dma_info_t *info)
  *    Context: Can be called from base context.
  *
  * Only one thread can be here for a given hermon_rsrc_type_t "type".
+ *
+ * "num_to_hdl" is set if there is a need for lookups from resource
+ * number/index to resource handle.  This is needed for QPs/CQs/SRQs
+ * for the various affiliated events/errors.
  */
 int
 hermon_icm_alloc(hermon_state_t *state, hermon_rsrc_type_t type,
@@ -981,6 +988,7 @@ hermon_icm_alloc(hermon_state_t *state, hermon_rsrc_type_t type,
 	hermon_dma_info_t	*dma_info;
 	uint8_t			*bitmap;
 	int			status;
+	int			num_to_hdl = 0;
 
 	if (hermon_verbose) {
 		IBTF_DPRINTF_L2("hermon", "hermon_icm_alloc: rsrc_type (0x%x) "
@@ -1013,18 +1021,21 @@ hermon_icm_alloc(hermon_state_t *state, hermon_rsrc_type_t type,
 			HERMON_ICM_FREE(HERMON_CMPT_QPC);
 			return (status);
 		}
+		num_to_hdl = 1;
 		break;
 	case HERMON_SRQC:
 		status = HERMON_ICM_ALLOC(HERMON_CMPT_SRQC);
 		if (status != DDI_SUCCESS) {
 			return (status);
 		}
+		num_to_hdl = 1;
 		break;
 	case HERMON_CQC:
 		status = HERMON_ICM_ALLOC(HERMON_CMPT_CQC);
 		if (status != DDI_SUCCESS) {
 			return (status);
 		}
+		num_to_hdl = 1;
 		break;
 	case HERMON_EQC:
 		status = HERMON_ICM_ALLOC(HERMON_CMPT_EQC);
@@ -1035,15 +1046,20 @@ hermon_icm_alloc(hermon_state_t *state, hermon_rsrc_type_t type,
 	}
 
 	/* ensure existence of bitmap and dmainfo, sets "dma_info" */
-	hermon_bitmap(bitmap, dma_info, icm, index1);
+	hermon_bitmap(bitmap, dma_info, icm, index1, num_to_hdl);
 
 	/* Set up the DMA handle for allocation and mapping */
-	dma_info = icm->icm_dma[index1] + index2;
+	dma_info += index2;
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*dma_info))
 	dma_info->length  = icm->span << icm->log_object_size;
 	dma_info->icmaddr = icm->icm_baseaddr +
 	    (((index1 << icm->split_shift) +
 	    (index2 << icm->span_shift)) << icm->log_object_size);
+
+	/* Allocate memory for the num_to_qp/cq/srq pointers */
+	if (num_to_hdl)
+		icm->num_to_hdl[index1][index2] =
+		    kmem_zalloc(HERMON_ICM_SPAN * sizeof (void *), KM_SLEEP);
 
 	if (hermon_verbose) {
 		IBTF_DPRINTF_L2("hermon", "alloc DMA: "
@@ -1149,6 +1165,66 @@ hermon_icm_free(hermon_state_t *state, hermon_rsrc_type_t type,
 	}
 }
 
+
+/*
+ * hermon_icm_num_to_hdl()
+ *    Context: Can be called from base or interrupt context.
+ *
+ * Given an index of a resource, index through the sparsely allocated
+ * arrays to find the pointer to its software handle.  Return NULL if
+ * any of the arrays of pointers has been freed (should never happen).
+ */
+void *
+hermon_icm_num_to_hdl(hermon_state_t *state, hermon_rsrc_type_t type,
+    uint32_t idx)
+{
+	hermon_icm_table_t	*icm;
+	uint32_t		span_offset;
+	uint32_t		index1, index2;
+	void			***p1, **p2;
+
+	icm = &state->hs_icm[type];
+	hermon_index(index1, index2, idx, icm, span_offset);
+	p1 = icm->num_to_hdl[index1];
+	if (p1 == NULL) {
+		IBTF_DPRINTF_L2("hermon", "icm_num_to_hdl failed at level 1"
+		    ": rsrc_type %d, index 0x%x", type, idx);
+		return (NULL);
+	}
+	p2 = p1[index2];
+	if (p2 == NULL) {
+		IBTF_DPRINTF_L2("hermon", "icm_num_to_hdl failed at level 2"
+		    ": rsrc_type %d, index 0x%x", type, idx);
+		return (NULL);
+	}
+	return (p2[span_offset]);
+}
+
+/*
+ * hermon_icm_set_num_to_hdl()
+ *    Context: Can be called from base or interrupt context.
+ *
+ * Given an index of a resource, we index through the sparsely allocated
+ * arrays to store the software handle, used by hermon_icm_num_to_hdl().
+ * This function is used to both set and reset (set to NULL) the handle.
+ * This table is allocated during ICM allocation for the given resource,
+ * so its existence is a given, and the store location does not conflict
+ * with any other stores to the table (no locking needed).
+ */
+void
+hermon_icm_set_num_to_hdl(hermon_state_t *state, hermon_rsrc_type_t type,
+    uint32_t idx, void *hdl)
+{
+	hermon_icm_table_t	*icm;
+	uint32_t		span_offset;
+	uint32_t		index1, index2;
+
+	icm = &state->hs_icm[type];
+	hermon_index(index1, index2, idx, icm, span_offset);
+	ASSERT((hdl == NULL) ^
+	    (icm->num_to_hdl[index1][index2][span_offset] == NULL));
+	icm->num_to_hdl[index1][index2][span_offset] = hdl;
+}
 
 /*
  * hermon_device_mode()
@@ -1764,8 +1840,8 @@ hermon_hw_init(hermon_state_t *state)
 		return (DDI_FAILURE);
 	}
 
-	state->hs_devlim.num_rsvd_eq = max(state->hs_devlim.num_rsvd_eq,
-	    (4 * state->hs_devlim.num_rsvd_uar));	/* lesser of resvd's */
+	state->hs_rsvd_eqs = max(state->hs_devlim.num_rsvd_eq,
+	    (4 * state->hs_devlim.num_rsvd_uar));
 
 	/* now we have enough info to map in the UAR BAR */
 	/*
@@ -2326,14 +2402,14 @@ hermon_soft_state_init(hermon_state_t *state)
 	 * either configuration variables or successful queries of the Hermon
 	 * hardware abilities
 	 */
-	state->hs_ibtfinfo.hca_ci_vers	= IBCI_V3;
-	state->hs_ibtfinfo.hca_dip	= state->hs_dip;
+	state->hs_ibtfinfo.hca_ci_vers	= IBCI_V4;
 	state->hs_ibtfinfo.hca_handle	= (ibc_hca_hdl_t)state;
 	state->hs_ibtfinfo.hca_ops	= &hermon_ibc_ops;
 
 	hca_attr = kmem_zalloc(sizeof (ibt_hca_attr_t), KM_SLEEP);
 	state->hs_ibtfinfo.hca_attr = hca_attr;
 
+	hca_attr->hca_dip = state->hs_dip;
 	hca_attr->hca_fw_major_version = state->hs_fw.fw_rev_major;
 	hca_attr->hca_fw_minor_version = state->hs_fw.fw_rev_minor;
 	hca_attr->hca_fw_micro_version = state->hs_fw.fw_rev_subminor;
@@ -2341,9 +2417,8 @@ hermon_soft_state_init(hermon_state_t *state)
 	/* CQ interrupt moderation maximums - each limited to 16 bits */
 	hca_attr->hca_max_cq_mod_count = 0xFFFF;
 	hca_attr->hca_max_cq_mod_usec = 0xFFFF;
+	hca_attr->hca_max_cq_handlers = state->hs_intrmsi_allocd;
 
-	/* CQ relocation to other EQs - change when multiple MSI-Xs are used */
-	hca_attr->hca_max_cq_handlers = 1;
 
 	/*
 	 * Determine HCA capabilities:
@@ -2387,15 +2462,19 @@ hermon_soft_state_init(hermon_state_t *state)
 		hca_attr->hca_reserved_lkey = state->hs_devlim.rsv_lkey;
 	}
 	if (state->hs_devlim.local_inv && state->hs_devlim.remote_inv &&
-	    state->hs_devlim.fast_reg_wr) {	/* fw needs to be >= 2.6.636 */
-		if (state->hs_fw.fw_rev_major > 2)
+	    state->hs_devlim.fast_reg_wr) {	/* fw needs to be >= 2.7.000 */
+		if ((state->hs_fw.fw_rev_major > 2) ||
+		    ((state->hs_fw.fw_rev_major == 2) &&
+		    (state->hs_fw.fw_rev_minor >= 7)))
 			caps2 |= IBT_HCA2_MEM_MGT_EXT;
-		else if (state->hs_fw.fw_rev_major == 2)
-			if (state->hs_fw.fw_rev_minor > 6)
-				caps2 |= IBT_HCA2_MEM_MGT_EXT;
-			else if (state->hs_fw.fw_rev_minor == 6)
-				if (state->hs_fw.fw_rev_subminor >= 636)
-					caps2 |= IBT_HCA2_MEM_MGT_EXT;
+	}
+	if (state->hs_devlim.log_max_rss_tbl_sz) {
+		hca_attr->hca_rss_max_log2_table =
+		    state->hs_devlim.log_max_rss_tbl_sz;
+		if (state->hs_devlim.rss_xor)
+			caps2 |= IBT_HCA2_RSS_XOR_ALG;
+		if (state->hs_devlim.rss_toep)
+			caps2 |= IBT_HCA2_RSS_TPL_ALG;
 	}
 	if (state->hs_devlim.mps) {
 		caps |= IBT_HCA_ZERO_BASED_VA;
@@ -2406,6 +2485,7 @@ hermon_soft_state_init(hermon_state_t *state)
 	caps |= (IBT_HCA_AH_PORT_CHECK | IBT_HCA_SQD_SQD_PORT |
 	    IBT_HCA_SI_GUID | IBT_HCA_RNR_NAK | IBT_HCA_CURRENT_QP_STATE |
 	    IBT_HCA_PORT_UP | IBT_HCA_RC_SRQ | IBT_HCA_UD_SRQ | IBT_HCA_FMR);
+	caps2 |= IBT_HCA2_DMA_MR;
 
 	if (state->hs_devlim.log_max_gso_sz) {
 		hca_attr->hca_max_lso_size =
@@ -2421,6 +2501,8 @@ hermon_soft_state_init(hermon_state_t *state)
 	hca_attr->hca_ud_send_sgl_sz = (max_send_wqe_bytes / 16) - 4;
 	hca_attr->hca_conn_send_sgl_sz = (max_send_wqe_bytes / 16) - 1;
 	hca_attr->hca_conn_rdma_sgl_overhead = 1;
+	hca_attr->hca_conn_rdma_write_sgl_sz = (max_send_wqe_bytes / 16) - 2;
+	hca_attr->hca_conn_rdma_read_sgl_sz = (512 / 16) - 2; /* see PRM */
 	hca_attr->hca_recv_sgl_sz = max_recv_wqe_bytes / 16;
 
 	/* We choose not to support "inline" unless it improves performance */
@@ -2428,6 +2510,13 @@ hermon_soft_state_init(hermon_state_t *state)
 	hca_attr->hca_ud_send_inline_sz = 0;
 	hca_attr->hca_conn_send_inline_sz = 0;
 	hca_attr->hca_conn_rdmaw_inline_overhead = 4;
+
+	if (state->hs_devlim.fcoib && (caps2 & IBT_HCA2_MEM_MGT_EXT)) {
+		caps2 |= IBT_HCA2_FC;
+		hca_attr->hca_rfci_max_log2_qp = 7;	/* 128 per port */
+		hca_attr->hca_fexch_max_log2_qp = 16;	/* 64K per port */
+		hca_attr->hca_fexch_max_log2_mem = 20;	/* 1MB per MPT - XXX */
+	}
 
 	hca_attr->hca_flags = caps;
 	hca_attr->hca_flags2 = caps2;
@@ -2669,9 +2758,38 @@ hermon_soft_state_init(hermon_state_t *state)
 	/* Initialize the AVL tree for QP number support */
 	hermon_qpn_avl_init(state);
 
+	/* Initialize the cq_sched info structure */
+	status = hermon_cq_sched_init(state);
+	if (status != DDI_SUCCESS) {
+		hermon_qpn_avl_fini(state);
+		mutex_destroy(&state->hs_info_lock);
+		mutex_destroy(&state->hs_fw_flashlock);
+		mutex_destroy(&state->hs_uar_lock);
+		kmem_free(hca_attr, sizeof (ibt_hca_attr_t));
+		HERMON_ATTACH_MSG(state->hs_attach_buf,
+		    "soft_state_init_cqsched_init_fail");
+		return (DDI_FAILURE);
+	}
+
+	/* Initialize the fcoib info structure */
+	status = hermon_fcoib_init(state);
+	if (status != DDI_SUCCESS) {
+		hermon_cq_sched_fini(state);
+		hermon_qpn_avl_fini(state);
+		mutex_destroy(&state->hs_info_lock);
+		mutex_destroy(&state->hs_fw_flashlock);
+		mutex_destroy(&state->hs_uar_lock);
+		kmem_free(hca_attr, sizeof (ibt_hca_attr_t));
+		HERMON_ATTACH_MSG(state->hs_attach_buf,
+		    "soft_state_init_fcoibinit_fail");
+		return (DDI_FAILURE);
+	}
+
 	/* Initialize the kstat info structure */
 	status = hermon_kstat_init(state);
 	if (status != DDI_SUCCESS) {
+		hermon_fcoib_fini(state);
+		hermon_cq_sched_fini(state);
 		hermon_qpn_avl_fini(state);
 		mutex_destroy(&state->hs_info_lock);
 		mutex_destroy(&state->hs_fw_flashlock);
@@ -2696,6 +2814,12 @@ hermon_soft_state_fini(hermon_state_t *state)
 
 	/* Teardown the kstat info */
 	hermon_kstat_fini(state);
+
+	/* Teardown the fcoib info */
+	hermon_fcoib_fini(state);
+
+	/* Teardown the cq_sched info */
+	hermon_cq_sched_fini(state);
 
 	/* Teardown the AVL tree for QP number support */
 	hermon_qpn_avl_fini(state);
@@ -3435,7 +3559,7 @@ hermon_hca_port_init(hermon_state_t *state)
 		if (val > maxval) {
 			goto init_ports_fail;
 		}
-		initport->max_guid = (uint16_t)val;
+		initport->max_gid = (uint16_t)val;
 		initport->mg = 1;
 
 		/* Validate max PKey table size */
@@ -4193,7 +4317,6 @@ hermon_intr_or_msi_init(hermon_state_t *state)
 {
 	int	status;
 
-
 	/* Query for the list of supported interrupt event types */
 	status = ddi_intr_get_supported_types(state->hs_dip,
 	    &state->hs_intr_types_avail);
@@ -4253,6 +4376,19 @@ hermon_intr_or_msi_init(hermon_state_t *state)
 	return (DDI_FAILURE);
 }
 
+/* ARGSUSED */
+static int
+hermon_intr_cb_handler(dev_info_t *dip, ddi_cb_action_t action, void *cbarg,
+    void *arg1, void *arg2)
+{
+	hermon_state_t *state = (hermon_state_t *)arg1;
+
+	IBTF_DPRINTF_L2("hermon", "interrupt callback: instance %d, "
+	    "action %d, cbarg %d\n", state->hs_instance, action,
+	    (uint32_t)(uintptr_t)cbarg);
+	return (DDI_SUCCESS);
+}
+
 /*
  * hermon_add_intrs()
  *    Context: Only called from attach() patch context
@@ -4262,11 +4398,24 @@ hermon_add_intrs(hermon_state_t *state, int intr_type)
 {
 	int	status;
 
+	if (state->hs_intr_cb_hdl == NULL) {
+		status = ddi_cb_register(state->hs_dip, DDI_CB_FLAG_INTR,
+		    hermon_intr_cb_handler, state, NULL,
+		    &state->hs_intr_cb_hdl);
+		if (status != DDI_SUCCESS) {
+			cmn_err(CE_CONT, "ddi_cb_register failed: 0x%x\n",
+			    status);
+			state->hs_intr_cb_hdl = NULL;
+			return (DDI_FAILURE);
+		}
+	}
 
 	/* Get number of interrupts/MSI supported */
 	status = ddi_intr_get_nintrs(state->hs_dip, intr_type,
 	    &state->hs_intrmsi_count);
 	if (status != DDI_SUCCESS) {
+		(void) ddi_cb_unregister(state->hs_intr_cb_hdl);
+		state->hs_intr_cb_hdl = NULL;
 		return (DDI_FAILURE);
 	}
 
@@ -4274,27 +4423,41 @@ hermon_add_intrs(hermon_state_t *state, int intr_type)
 	status = ddi_intr_get_navail(state->hs_dip, intr_type,
 	    &state->hs_intrmsi_avail);
 	if (status != DDI_SUCCESS) {
+		(void) ddi_cb_unregister(state->hs_intr_cb_hdl);
+		state->hs_intr_cb_hdl = NULL;
 		return (DDI_FAILURE);
 	}
 
 	/* Ensure that we have at least one (1) usable MSI or interrupt */
 	if ((state->hs_intrmsi_avail < 1) || (state->hs_intrmsi_count < 1)) {
+		(void) ddi_cb_unregister(state->hs_intr_cb_hdl);
+		state->hs_intr_cb_hdl = NULL;
 		return (DDI_FAILURE);
 	}
 
-	/* Attempt to allocate the maximum #interrupt/MSI handles */
+	/*
+	 * Allocate the #interrupt/MSI handles.
+	 * The number we request is the minimum of these three values:
+	 *	HERMON_MSIX_MAX			driver maximum (array size)
+	 *	hermon_msix_max			/etc/system override to...
+	 *						HERMON_MSIX_MAX
+	 *	state->hs_intrmsi_avail		Maximum the ddi provides.
+	 */
 	status = ddi_intr_alloc(state->hs_dip, &state->hs_intrmsi_hdl[0],
-	    intr_type, 0, min(HERMON_MSIX_MAX, state->hs_intrmsi_avail),
-	    &state->hs_intrmsi_allocd, DDI_INTR_ALLOC_NORMAL);
+	    intr_type, 0, min(min(HERMON_MSIX_MAX, state->hs_intrmsi_avail),
+	    hermon_msix_max), &state->hs_intrmsi_allocd, DDI_INTR_ALLOC_NORMAL);
 	if (status != DDI_SUCCESS) {
+		(void) ddi_cb_unregister(state->hs_intr_cb_hdl);
+		state->hs_intr_cb_hdl = NULL;
 		return (DDI_FAILURE);
 	}
 
 	/* Ensure that we have allocated at least one (1) MSI or interrupt */
 	if (state->hs_intrmsi_allocd < 1) {
+		(void) ddi_cb_unregister(state->hs_intr_cb_hdl);
+		state->hs_intr_cb_hdl = NULL;
 		return (DDI_FAILURE);
 	}
-	state->hs_eq_dist = state->hs_intrmsi_allocd - 1; /* start at 0 */
 
 	/*
 	 * Extract the priority for the allocated interrupt/MSI.  This
@@ -4306,6 +4469,8 @@ hermon_add_intrs(hermon_state_t *state, int intr_type)
 		/* Free the allocated interrupt/MSI handle */
 		(void) ddi_intr_free(state->hs_intrmsi_hdl[0]);
 
+		(void) ddi_cb_unregister(state->hs_intr_cb_hdl);
+		state->hs_intr_cb_hdl = NULL;
 		return (DDI_FAILURE);
 	}
 
@@ -4348,6 +4513,10 @@ hermon_intr_or_msi_fini(hermon_state_t *state)
 		if (status != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
+	}
+	if (state->hs_intr_cb_hdl) {
+		(void) ddi_cb_unregister(state->hs_intr_cb_hdl);
+		state->hs_intr_cb_hdl = NULL;
 	}
 	return (DDI_SUCCESS);
 }

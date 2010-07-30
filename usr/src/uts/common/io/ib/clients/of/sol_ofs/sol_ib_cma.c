@@ -1212,6 +1212,7 @@ ibcma_query_local_ip(struct rdma_cm_id *idp, sol_cma_chan_t *chanp,
 	bcopy(local_addrp, &path_attr.ipa_src_ip, sizeof (ibt_ip_addr_t));
 	path_attr.ipa_ndst = 1;
 	path_attr.ipa_max_paths = 1;
+	path_attr.ipa_zoneid = 0;
 
 	if ((status = ibt_get_ip_paths(chanp->chan_ib_client_hdl,
 	    IBT_PATH_NO_FLAGS, &path_attr, &local_path, NULL, NULL)) !=
@@ -1316,6 +1317,7 @@ ibcma_get_paths(struct rdma_cm_id *idp, sol_cma_chan_t *chanp,
 	    sizeof (ibt_ip_addr_t));
 	path_attr.ipa_ndst = 1;
 	path_attr.ipa_max_paths = 2;
+	path_attr.ipa_zoneid = 0;
 	if (ibcma_any_addr(&path_attr.ipa_src_ip))
 		path_attr.ipa_src_ip.family = AF_UNSPEC;
 
@@ -2462,7 +2464,9 @@ ibcma_get_devlist(sol_cma_chan_t *root_chanp, ib_guid_t *hca_guidp,
 	uint_t			num_ports, p;
 	uint_t			port_size;
 	ibt_hca_portinfo_t	*port_info, *tmp;
-	ibt_ip_addr_t		hca_ipaddr;
+	ibt_srcip_info_t	*src_info;
+	ibt_srcip_attr_t	attr;
+	uint_t			entries;
 
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
 	    "get_devlist(%p, %p, %x, %p, %x)", root_chanp, hca_guidp,
@@ -2498,10 +2502,16 @@ ibcma_get_devlist(sol_cma_chan_t *root_chanp, ib_guid_t *hca_guidp,
 					if (tmp->p_pkey_tbl[pk] == 0)
 						continue;
 					if (with_ipaddr_only == B_TRUE) {
-						status = ibt_get_src_ip(
-						    tmp->p_sgid_tbl[s],
-						    tmp->p_pkey_tbl[pk],
-						    &hca_ipaddr);
+						bcopy(&tmp->p_sgid_tbl[s],
+						    &attr.sip_gid,
+						    sizeof (ib_gid_t));
+						attr.sip_pkey =
+						    tmp->p_pkey_tbl[pk];
+						attr.sip_family = AF_INET;
+						attr.sip_zoneid = 0;
+
+						status = ibt_get_src_ip(&attr,
+						    &src_info, &entries);
 						if (status != IBT_SUCCESS)
 							continue;
 					}
@@ -2514,10 +2524,13 @@ ibcma_get_devlist(sol_cma_chan_t *root_chanp, ib_guid_t *hca_guidp,
 					devp->dev_pkey_ix = pk;
 					devp->dev_pkey = tmp->p_pkey_tbl[pk];
 					devp->dev_sgid = tmp->p_sgid_tbl[s];
-					if (with_ipaddr_only == B_TRUE)
-						bcopy(&hca_ipaddr,
+					if (with_ipaddr_only == B_TRUE) {
+						bcopy(&src_info[0].ip_addr,
 						    &devp->dev_ipaddr,
 						    sizeof (ibt_ip_addr_t));
+						ibt_free_srcip_info(src_info,
+						    entries);
+					}
 
 					SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
 					    "get_devlist: add2devlist "

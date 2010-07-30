@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_IBTL_IBVTI_H
@@ -89,26 +88,6 @@ extern "C" {
  */
 #define	ibt_qp_hdl_t		ibt_channel_hdl_t
 
-/*
- * ibt_cq_priority_t
- * VTI clients have full control over CQ priorities.
- */
-#define	IBT_CQ_PRI_1	IBT_CQ_OPAQUE_1		/* Lowest priority */
-#define	IBT_CQ_PRI_2	IBT_CQ_OPAQUE_2
-#define	IBT_CQ_PRI_3	IBT_CQ_OPAQUE_3
-#define	IBT_CQ_PRI_4	IBT_CQ_OPAQUE_4
-#define	IBT_CQ_PRI_5	IBT_CQ_OPAQUE_5
-#define	IBT_CQ_PRI_6	IBT_CQ_OPAQUE_6
-#define	IBT_CQ_PRI_7	IBT_CQ_OPAQUE_7
-#define	IBT_CQ_PRI_8	IBT_CQ_OPAQUE_8
-#define	IBT_CQ_PRI_9	IBT_CQ_OPAQUE_9
-#define	IBT_CQ_PRI_10	IBT_CQ_OPAQUE_10
-#define	IBT_CQ_PRI_11	IBT_CQ_OPAQUE_11
-#define	IBT_CQ_PRI_12	IBT_CQ_OPAQUE_12
-#define	IBT_CQ_PRI_13	IBT_CQ_OPAQUE_13
-#define	IBT_CQ_PRI_14	IBT_CQ_OPAQUE_14
-#define	IBT_CQ_PRI_15	IBT_CQ_OPAQUE_15
-#define	IBT_CQ_PRI_16	IBT_CQ_OPAQUE_16	/* Highest priority */
 
 /*
  * FUNCTION PROTOTYPES.

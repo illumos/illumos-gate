@@ -138,14 +138,12 @@ ibt_alloc_qp(ibt_hca_hdl_t hca_hdl, ibt_qp_type_t type,
 	}
 
 	/* Get CI CQ handles */
-	if ((qp_attrp->qp_scq_hdl == NULL) || (qp_attrp->qp_rcq_hdl == NULL)) {
-		IBTF_DPRINTF_L2(ibtf_qp, "ibt_alloc_qp: Invalid CQ Handle");
-		*ibt_qp_p = NULL;
-		return (IBT_CQ_HDL_INVALID);
-	}
-	qp_attrp->qp_ibc_scq_hdl = qp_attrp->qp_scq_hdl->cq_ibc_cq_hdl;
-	qp_attrp->qp_ibc_rcq_hdl = qp_attrp->qp_rcq_hdl->cq_ibc_cq_hdl;
+	qp_attrp->qp_ibc_scq_hdl = (qp_attrp->qp_scq_hdl == NULL) ? NULL :
+	    qp_attrp->qp_scq_hdl->cq_ibc_cq_hdl;
+	qp_attrp->qp_ibc_rcq_hdl = (qp_attrp->qp_rcq_hdl == NULL) ? NULL :
+	    qp_attrp->qp_rcq_hdl->cq_ibc_cq_hdl;
 
+	/* Get CI SRQ handle */
 	if ((qp_attrp->qp_alloc_flags & IBT_QP_USES_SRQ) &&
 	    (qp_attrp->qp_srq_hdl != NULL))
 		qp_attrp->qp_ibc_srq_hdl =

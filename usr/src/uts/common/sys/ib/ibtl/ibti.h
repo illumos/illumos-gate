@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTI_H
@@ -47,7 +46,12 @@ typedef enum ibt_chan_alloc_flags_e {
 	IBT_ACHAN_USER_MAP		= (1 << 1),
 	IBT_ACHAN_DEFER_ALLOC		= (1 << 2),
 	IBT_ACHAN_USES_SRQ		= (1 << 3),
-	IBT_ACHAN_USES_RSS		= (1 << 4)
+	IBT_ACHAN_USES_RSS		= (1 << 4),
+
+	/* UD variants for FC support */
+	IBT_ACHAN_USES_RFCI		= (1 << 5),	/* from RFCI pool */
+	IBT_ACHAN_USES_FCMD		= (1 << 6),
+	IBT_ACHAN_USES_FEXCH		= (1 << 7)	/* from FEXCH pool */
 } ibt_chan_alloc_flags_t;
 
 
@@ -151,6 +155,7 @@ typedef struct ibt_ud_chan_alloc_args_s {
 	ibt_channel_hdl_t	ud_clone_chan;	/* Optional clone handle */
 	ibt_srq_hdl_t		ud_srq;		/* Optional Shared Rcv Queue */
 	ibt_rss_attr_t		ud_rss;
+	ibt_fc_attr_t		ud_fc;
 } ibt_ud_chan_alloc_args_t;
 
 /*
@@ -170,6 +175,8 @@ typedef struct ibt_ud_chan_query_attr_s {
 	ibt_attr_flags_t	ud_flags;		/* Signaling Type etc */
 	ibt_srq_hdl_t		ud_srq;		/* Optional Shared Rcv Queue */
 	ibt_rss_attr_t		ud_rss;
+	ibt_fc_attr_t		ud_fc;
+	ibt_fexch_query_attr_t	ud_query_fc;	/* query only set */
 } ibt_ud_chan_query_attr_t;
 
 /*
@@ -187,6 +194,7 @@ typedef struct ibt_ud_chan_modify_attr_s {
 	uint_t			ud_rq_sz;	/* Set RQ Max outstanding WRs */
 	ib_qkey_t		ud_qkey;	/* Set Q_Key */
 	ibt_rss_attr_t		ud_rss;		/* Set RSS stuff */
+	ibt_fc_attr_t		ud_fc;
 } ibt_ud_chan_modify_attr_t;
 
 

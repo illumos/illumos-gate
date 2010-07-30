@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -352,8 +351,16 @@ hermon_cfg_profile_init_phase2(hermon_state_t *state)
 	cp->cp_max_mtu		= port->ib_mtu;	/* XXX now from query_port */
 	cp->cp_max_port_width	= port->ib_port_wid;  /* now from query_port */
 	cp->cp_max_vlcap	= port->max_vl;
-	cp->cp_num_ports	= devlim->num_ports;
 	cp->cp_log_num_ah	= hermon_log_num_ah;
+
+	/* Paranoia, ensure no arrays indexed by port_num are out of bounds */
+	cp->cp_num_ports	= devlim->num_ports;
+	if (cp->cp_num_ports > HERMON_MAX_PORTS) {
+		cmn_err(CE_CONT, "device has more ports (%d) than are "
+		    "supported; Using %d ports\n",
+		    cp->cp_num_ports, HERMON_MAX_PORTS);
+		cp->cp_num_ports = HERMON_MAX_PORTS;
+	};
 
 	/* allocate variable sized arrays */
 	for (i = 0; i < HERMON_MAX_PORTS; i++) {

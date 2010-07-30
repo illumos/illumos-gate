@@ -497,7 +497,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	ic->i_cq = ib_create_cq(dev, rdsv3_ib_cq_comp_handler,
 	    rdsv3_ib_cq_event_handler, conn,
 	    ic->i_recv_ring.w_nr + ic->i_send_ring.w_nr + 1,
-	    (intptr_t)rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
+	    rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
 	if (IS_ERR(ic->i_cq)) {
 		ret = PTR_ERR(ic->i_cq);
 		ic->i_cq = NULL;
@@ -508,7 +508,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	if (rdsv3_enable_snd_cq) {
 		ic->i_snd_cq = ib_create_cq(dev, rdsv3_ib_snd_cq_comp_handler,
 		    rdsv3_ib_cq_event_handler, conn, ic->i_send_ring.w_nr + 1,
-		    (intptr_t)rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
+		    rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
 		if (IS_ERR(ic->i_snd_cq)) {
 			ret = PTR_ERR(ic->i_snd_cq);
 			(void) ib_destroy_cq(ic->i_cq);

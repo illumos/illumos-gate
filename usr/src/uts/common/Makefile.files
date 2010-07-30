@@ -697,7 +697,7 @@ HERMON_OBJS +=	hermon.o hermon_agents.o hermon_cfg.o hermon_ci.o hermon_cmd.o \
 		hermon_cq.o hermon_event.o hermon_ioctl.o hermon_misc.o \
 		hermon_mr.o hermon_qp.o hermon_qpmod.o hermon_rsrc.o \
 		hermon_srq.o hermon_stats.o hermon_umap.o hermon_wr.o \
-		hermon_fm.o
+		hermon_fcoib.o hermon_fm.o
 
 DAPLT_OBJS +=	daplt.o
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_MR_H
@@ -61,7 +60,7 @@ extern "C" {
  * MTTs per MPT. We also define a log MTT size, since it's not likely
  * to change.
  */
-#define	HERMON_NUM_MTT_SHIFT		0x1a
+#define	HERMON_NUM_MTT_SHIFT		0x1d
 #define	HERMON_MTT_SIZE_SHIFT		0x3
 
 /*
@@ -172,6 +171,7 @@ typedef struct hermon_bind_info_s {
 #define	HERMON_BINDHDL_VADDR		1
 #define	HERMON_BINDHDL_BUF		2
 #define	HERMON_BINDHDL_UBUF		3
+#define	HERMON_BINDHDL_LKEY		4
 
 /*
  * The hermon_sw_mr_s structure is also referred to using the "hermon_mrhdl_t"
@@ -288,6 +288,8 @@ _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
     ibc_mem_alloc_s::ibc_dma_hdl
     ibc_mem_alloc_s::ibc_acc_hdl))
 
+int hermon_dma_mr_register(hermon_state_t *state, hermon_pdhdl_t pdhdl,
+    ibt_dmr_attr_t *attr_p, hermon_mrhdl_t *mrhdl);
 int hermon_mr_register(hermon_state_t *state, hermon_pdhdl_t pdhdl,
     ibt_mr_attr_t *attr_p, hermon_mrhdl_t *mrhdl, hermon_mr_options_t *op,
     hermon_mpt_rsrc_type_t mpt_type);
@@ -324,8 +326,12 @@ int hermon_mr_alloc_fmr(hermon_state_t *state, hermon_pdhdl_t pd,
 int hermon_mr_dealloc_fmr(hermon_state_t *state, hermon_mrhdl_t *mrhdl);
 int hermon_mr_register_physical_fmr(hermon_state_t *state,
     ibt_pmr_attr_t *mem_pattr_p, hermon_mrhdl_t mr, ibt_pmr_desc_t *mem_desc_p);
-int hermon_mr_invalidate_fmr(hermon_state_t *state, hermon_mrhdl_t mr);
-int hermon_mr_deregister_fmr(hermon_state_t *state, hermon_mrhdl_t mr);
+int hermon_mr_alloc_lkey(hermon_state_t *state, hermon_pdhdl_t pd,
+    ibt_lkey_flags_t flags, uint_t sz, hermon_mrhdl_t *mr);
+int hermon_mr_fexch_mpt_init(hermon_state_t *state, hermon_pdhdl_t pd,
+    uint32_t mpt_indx, uint_t nummtt, uint64_t mtt_addr, uint_t sleep);
+int hermon_mr_fexch_mpt_fini(hermon_state_t *state, hermon_pdhdl_t pd,
+    uint32_t mpt_indx, uint_t sleep);
 
 
 #ifdef __cplusplus

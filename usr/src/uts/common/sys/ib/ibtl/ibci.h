@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_IBTL_IBCI_H
@@ -64,6 +63,7 @@ typedef struct ibc_cq_s		*ibc_cq_hdl_t;	/* Completion Queue Handle */
 typedef struct ibc_eec_s	*ibc_eec_hdl_t; /* End-to-End Context Handle */
 typedef struct ibc_mem_alloc_s	*ibc_mem_alloc_hdl_t; /* Memory Handle */
 
+#define	ibc_sched_hdl_t		ibt_sched_hdl_t	/* CQ Sched Handle */
 #define	ibc_fmr_pool_hdl_t	ibt_fmr_pool_hdl_t /* FMR Pool Handle */
 #define	ibc_mr_hdl_t	ibt_mr_hdl_t	/* Memory Region Handle */
 #define	ibc_mw_hdl_t	ibt_mw_hdl_t	/* Memory Window Handle */
@@ -142,11 +142,11 @@ typedef struct ibtl_hca_devinfo_s *ibc_clnt_hdl_t;	/* ibc_attach() */
 
 
 /* Channel Interface version */
-typedef enum ibc_version_e {
-	IBCI_V1		= 1,
-	IBCI_V2		= 2,		/* FMR Support */
-	IBCI_V3		= 3
-} ibc_version_t;
+typedef int ibc_version_t;
+#define	IBCI_V1	1
+#define	IBCI_V2	2
+#define	IBCI_V3	3
+#define	IBCI_V4	4
 
 
 typedef enum ibc_free_qp_flags_e {
@@ -176,24 +176,6 @@ typedef enum ibc_eec_flags_e {
 	IBT_EEC_DEFER_ALLOC	= (1 << 1)
 } ibc_eec_flags_t;
 
-
-/*
- * Completion Queues
- *
- */
-
-/*
- * CQ handler attribute structure.
- */
-typedef struct ibc_cq_handler_attr_s {
-	ibt_cq_handler_id_t	h_id;		/* Valid ID != NULL */
-	int			h_flags;	/* Flags of ddi_intr_get_cap */
-	int			h_pri;		/* priority from */
-						/* ddi_intr_get_pri */
-	void			*h_bind;	/* unknown intrd stuff */
-} ibc_cq_handler_attr_t;
-
-
 /*
  * Event data for asynchronous events and errors. The QP/EEC/CQ/SRQ handle,
  * or port number associated with the Event/Error is passed as an argument
@@ -207,6 +189,7 @@ typedef struct ibc_async_event_s {
 	ibt_srq_hdl_t	ev_srq_hdl;	/* SRQ handle */
 	ibt_port_change_t ev_port_flags; /* Port Change flags */
 	uint8_t		ev_port;	/* For PORT UP/DOWN/CHANGE events */
+	ibt_fc_syndrome_t ev_fc;	/* FEXCH syndrome */
 } ibc_async_event_t;
 
 
@@ -272,9 +255,11 @@ typedef struct ibc_operations_s {
 	ibt_status_t (*ibc_modify_cq)(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq,
 	    uint_t count, uint_t usec, ibt_cq_handler_id_t hid);
 	ibt_status_t (*ibc_alloc_cq_sched)(ibc_hca_hdl_t hca,
-	    ibt_cq_sched_flags_t flags, ibc_cq_handler_attr_t *handler_attrs_p);
+	    ibt_cq_sched_attr_t *attr, ibc_sched_hdl_t *sched_hdl_p);
 	ibt_status_t (*ibc_free_cq_sched)(ibc_hca_hdl_t hca,
-	    ibt_cq_handler_id_t id);
+	    ibc_sched_hdl_t sched_hdl);
+	ibt_status_t (*ibc_query_cq_handler_id)(ibc_hca_hdl_t hca,
+	    ibt_cq_handler_id_t hid, ibt_cq_handler_attr_t *attrs);
 
 	/* EE Context */
 	ibt_status_t (*ibc_alloc_eec)(ibc_hca_hdl_t hca, ibc_eec_flags_t flags,
@@ -409,6 +394,17 @@ typedef struct ibc_operations_s {
 	ibt_status_t (*ibc_free_xrc_tgt_qp)();
 	ibt_status_t (*ibc_query_xrc_tgt_qp)();
 	ibt_status_t (*ibc_modify_xrc_tgt_qp)();
+
+	/* DMA memory region */
+	ibt_status_t (*ibc_register_dma_mr)(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
+	    ibt_dmr_attr_t *attr_p, void *ibtl_reserved, ibc_mr_hdl_t *mr_p,
+	    ibt_mr_desc_t *mem_desc);
+
+	/* OPS extensions for next round of enhancements */
+	ibt_status_t (*ibc_enhancement1)();
+	ibt_status_t (*ibc_enhancement2)();
+	ibt_status_t (*ibc_enhancement3)();
+	ibt_status_t (*ibc_enhancement4)();
 } ibc_operations_t;
 
 
@@ -421,12 +417,10 @@ typedef struct ibc_operations_s {
  */
 typedef struct ibc_hca_info_s {
 	ibc_version_t		hca_ci_vers;	/* CI Version */
-	dev_info_t		*hca_dip;	/* HCA dev_info */
 	ibc_hca_hdl_t		hca_handle;	/* used for call through */
 						/* "hca_ops" */
 	ibc_operations_t	*hca_ops;
 	ibt_hca_attr_t		*hca_attr;
-	ibc_cq_handler_attr_t	hca_def_cq_handler_attr;
 } ibc_hca_info_t;
 
 

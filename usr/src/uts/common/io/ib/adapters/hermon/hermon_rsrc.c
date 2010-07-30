@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -107,19 +106,19 @@ static void hermon_rsrc_pd_handles_fini(hermon_state_t *state,
  */
 static int hermon_rsrc_mbox_alloc(hermon_rsrc_pool_info_t *pool_info,
     uint_t num, hermon_rsrc_t *hdl);
-static void hermon_rsrc_mbox_free(hermon_rsrc_pool_info_t *pool_info,
-    hermon_rsrc_t *hdl);
+static void hermon_rsrc_mbox_free(hermon_rsrc_t *hdl);
 
 static int hermon_rsrc_hw_entry_alloc(hermon_rsrc_pool_info_t *pool_info,
-    uint_t num, uint_t num_align, ddi_acc_handle_t acc_handle,
-    uint_t sleepflag, hermon_rsrc_t *hdl);
+    uint_t num, uint_t num_align, uint_t sleepflag, hermon_rsrc_t *hdl);
 static void hermon_rsrc_hw_entry_free(hermon_rsrc_pool_info_t *pool_info,
     hermon_rsrc_t *hdl);
+static int hermon_rsrc_hw_entry_reserve(hermon_rsrc_pool_info_t *pool_info,
+    uint_t num, uint_t num_align, uint_t sleepflag, hermon_rsrc_t *hdl);
 
 static int hermon_rsrc_hw_entry_icm_confirm(hermon_rsrc_pool_info_t *pool_info,
-    uint_t num, hermon_rsrc_t *hdl);
+    uint_t num, hermon_rsrc_t *hdl, int num_to_hdl);
 static int hermon_rsrc_hw_entry_icm_free(hermon_rsrc_pool_info_t *pool_info,
-    hermon_rsrc_t *hdl);
+    hermon_rsrc_t *hdl, int num_to_hdl);
 
 static int hermon_rsrc_swhdl_alloc(hermon_rsrc_pool_info_t *pool_info,
     uint_t sleepflag, hermon_rsrc_t *hdl);
@@ -130,6 +129,13 @@ static int hermon_rsrc_pdhdl_alloc(hermon_rsrc_pool_info_t *pool_info,
     uint_t sleepflag, hermon_rsrc_t *hdl);
 static void hermon_rsrc_pdhdl_free(hermon_rsrc_pool_info_t *pool_info,
     hermon_rsrc_t *hdl);
+
+static int hermon_rsrc_fexch_alloc(hermon_state_t *state,
+    hermon_rsrc_type_t rsrc, uint_t num, uint_t sleepflag, hermon_rsrc_t *hdl);
+static void hermon_rsrc_fexch_free(hermon_state_t *state, hermon_rsrc_t *hdl);
+static int hermon_rsrc_rfci_alloc(hermon_state_t *state,
+    hermon_rsrc_type_t rsrc, uint_t num, uint_t sleepflag, hermon_rsrc_t *hdl);
+static void hermon_rsrc_rfci_free(hermon_state_t *state, hermon_rsrc_t *hdl);
 
 /*
  * The following routines are the constructors and destructors for several
@@ -187,8 +193,7 @@ hermon_rsrc_alloc(hermon_state_t *state, hermon_rsrc_type_t rsrc, uint_t num,
 	 * Allocate space for the object used to track the resource handle
 	 */
 	flag = (sleepflag == HERMON_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
-	tmp_rsrc_hdl = (hermon_rsrc_t *)kmem_cache_alloc(state->hs_rsrc_cache,
-	    flag);
+	tmp_rsrc_hdl = kmem_cache_alloc(state->hs_rsrc_cache, flag);
 	if (tmp_rsrc_hdl == NULL) {
 		return (DDI_FAILURE);
 	}
@@ -203,7 +208,7 @@ hermon_rsrc_alloc(hermon_state_t *state, hermon_rsrc_type_t rsrc, uint_t num,
 	/*
 	 * Depending on resource type, call the appropriate alloc routine
 	 */
-	switch (rsrc_pool->rsrc_type) {
+	switch (rsrc) {
 	case HERMON_IN_MBOX:
 	case HERMON_OUT_MBOX:
 	case HERMON_INTR_IN_MBOX:
@@ -211,64 +216,37 @@ hermon_rsrc_alloc(hermon_state_t *state, hermon_rsrc_type_t rsrc, uint_t num,
 		status = hermon_rsrc_mbox_alloc(rsrc_pool, num, tmp_rsrc_hdl);
 		break;
 
+	case HERMON_DMPT:
+		/* Allocate "num" (contiguous/aligned for FEXCH) DMPTs */
 	case HERMON_QPC:
-		/* Allocate "num" contiguous/aligned QPCs for RSS */
+		/* Allocate "num" (contiguous/aligned for RSS) QPCs */
 		status = hermon_rsrc_hw_entry_alloc(rsrc_pool, num, num,
-		    0, sleepflag, tmp_rsrc_hdl);
-		break;
-
-	case HERMON_CQC:
-	case HERMON_SRQC:
-	case HERMON_EQC:
-		/*
-		 * Because these objects are NOT accessed by Hermon driver
-		 * software, we set the acc_handle parameter to zero.
-		 */
-		status = hermon_rsrc_hw_entry_alloc(rsrc_pool, num, 1, 0,
 		    sleepflag, tmp_rsrc_hdl);
 		break;
 
-	case HERMON_DMPT:
-		/*
-		 * Because these objects are sometimes accessed by Hermon
-		 * driver software (FMR for MPTs), we need the acc_handle
-		 * to be set.  The ICM-aware code will set it for all
-		 * ICM backed resources.
-		 * But if they are allocated in multiples, we specify here that
-		 * they must be aligned on a more restrictive boundary.
-		 */
-		status = hermon_rsrc_hw_entry_alloc(rsrc_pool, num, num,
-		    0, sleepflag, tmp_rsrc_hdl);
+	case HERMON_QPC_FEXCH_PORT1:
+	case HERMON_QPC_FEXCH_PORT2:
+		/* Allocate "num" contiguous/aligned QPCs for FEXCH */
+		status = hermon_rsrc_fexch_alloc(state, rsrc, num,
+		    sleepflag, tmp_rsrc_hdl);
 		break;
 
-	case HERMON_MCG:
-		/*
-		 * Hermon MCG entries are also NOT accessed by Hermon driver
-		 * software, but because MCG entries do not have the same
-		 * alignnment restrictions we loosen the constraint here.
-		 */
-		status = hermon_rsrc_hw_entry_alloc(rsrc_pool, num, 1, 0,
+	case HERMON_QPC_RFCI_PORT1:
+	case HERMON_QPC_RFCI_PORT2:
+		/* Allocate "num" contiguous/aligned QPCs for RFCI */
+		status = hermon_rsrc_rfci_alloc(state, rsrc, num,
 		    sleepflag, tmp_rsrc_hdl);
 		break;
 
 	case HERMON_MTT:
-		/*
-		 * Because MTT objects are among the few HW resources that
-		 * may be allocated in odd numbers, we specify a less
-		 * restrictive alignment than for the above resources.
-		 */
-		status = hermon_rsrc_hw_entry_alloc(rsrc_pool, num, 1,
-		    0, sleepflag, tmp_rsrc_hdl);
-		break;
-
+	case HERMON_CQC:
+	case HERMON_SRQC:
+	case HERMON_EQC:
+	case HERMON_MCG:
 	case HERMON_UARPG:
-		/*
-		 * Because UAR pages are written by Hermon driver software (for
-		 * doorbells), we set the acc_handle parameter to point to
-		 * the ddi_acc_handle_t for the Hermon UAR memory.
-		 */
+		/* Allocate "num" unaligned resources */
 		status = hermon_rsrc_hw_entry_alloc(rsrc_pool, num, 1,
-		    hermon_rsrc_alloc_uarhdl(state), sleepflag, tmp_rsrc_hdl);
+		    sleepflag, tmp_rsrc_hdl);
 		break;
 
 	case HERMON_MRHDL:
@@ -307,12 +285,248 @@ hermon_rsrc_alloc(hermon_state_t *state, hermon_rsrc_type_t rsrc, uint_t num,
 	 */
 	if (status != DDI_SUCCESS) {
 		kmem_cache_free(state->hs_rsrc_cache, tmp_rsrc_hdl);
-		tmp_rsrc_hdl = NULL;
 		return (DDI_FAILURE);
 	} else {
 		*hdl = tmp_rsrc_hdl;
 		return (DDI_SUCCESS);
 	}
+}
+
+
+/*
+ * hermon_rsrc_reserve()
+ *
+ *    Context: Can only be called from attach.
+ *    The "sleepflag" parameter is used by all object allocators to
+ *    determine whether to SLEEP for resources or not.
+ */
+int
+hermon_rsrc_reserve(hermon_state_t *state, hermon_rsrc_type_t rsrc, uint_t num,
+    uint_t sleepflag, hermon_rsrc_t **hdl)
+{
+	hermon_rsrc_pool_info_t	*rsrc_pool;
+	hermon_rsrc_t		*tmp_rsrc_hdl;
+	int			flag, status = DDI_FAILURE;
+
+	ASSERT(state != NULL);
+	ASSERT(hdl != NULL);
+
+	rsrc_pool = &state->hs_rsrc_hdl[rsrc];
+	ASSERT(rsrc_pool != NULL);
+
+	/*
+	 * Allocate space for the object used to track the resource handle
+	 */
+	flag = (sleepflag == HERMON_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
+	tmp_rsrc_hdl = kmem_cache_alloc(state->hs_rsrc_cache, flag);
+	if (tmp_rsrc_hdl == NULL) {
+		return (DDI_FAILURE);
+	}
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*tmp_rsrc_hdl))
+
+	/*
+	 * Set rsrc_hdl type.  This is later used by the hermon_rsrc_free call
+	 * to know what type of resource is being freed.
+	 */
+	tmp_rsrc_hdl->rsrc_type = rsrc;
+
+	switch (rsrc) {
+	case HERMON_QPC:
+	case HERMON_DMPT:
+	case HERMON_MTT:
+		/*
+		 * Reserve num resources, naturally aligned (N * num).
+		 */
+		status = hermon_rsrc_hw_entry_reserve(rsrc_pool, num, num,
+		    sleepflag, tmp_rsrc_hdl);
+		break;
+
+	default:
+		HERMON_WARNING(state, "unexpected resource type in reserve ");
+		cmn_err(CE_WARN, "Resource type %x \n", rsrc);
+		break;
+	}
+
+	/*
+	 * If the resource allocation failed, then free the special resource
+	 * tracking structure and return failure.  Otherwise return the
+	 * handle for the resource tracking structure.
+	 */
+	if (status != DDI_SUCCESS) {
+		kmem_cache_free(state->hs_rsrc_cache, tmp_rsrc_hdl);
+		return (DDI_FAILURE);
+	} else {
+		*hdl = tmp_rsrc_hdl;
+		return (DDI_SUCCESS);
+	}
+}
+
+
+/*
+ * hermon_rsrc_fexch_alloc()
+ *
+ *    Context: Can only be called from base context.
+ *    The "sleepflag" parameter is used by all object allocators to
+ *    determine whether to SLEEP for resources or not.
+ */
+static int
+hermon_rsrc_fexch_alloc(hermon_state_t *state, hermon_rsrc_type_t rsrc,
+    uint_t num, uint_t sleepflag, hermon_rsrc_t *hdl)
+{
+	hermon_fcoib_t		*fcoib;
+	void			*addr;
+	uint32_t		fexch_qpn_base;
+	hermon_rsrc_pool_info_t	*qpc_pool, *mpt_pool, *mtt_pool;
+	int			flag, status;
+	hermon_rsrc_t		mpt_hdl; /* temporary, just for icm_confirm */
+	hermon_rsrc_t		mtt_hdl; /* temporary, just for icm_confirm */
+	uint_t			portm1;	/* hca_port_number - 1 */
+	uint_t			nummtt;
+	vmem_t			*vmp;
+
+	ASSERT(state != NULL);
+	ASSERT(hdl != NULL);
+
+	if ((state->hs_ibtfinfo.hca_attr->hca_flags2 & IBT_HCA2_FC) == 0)
+		return (DDI_FAILURE);
+
+	portm1 = rsrc - HERMON_QPC_FEXCH_PORT1;
+	fcoib = &state->hs_fcoib;
+	flag = (sleepflag == HERMON_SLEEP) ? VM_SLEEP : VM_NOSLEEP;
+
+	/* Allocate from the FEXCH QP range */
+	vmp = fcoib->hfc_fexch_vmemp[portm1];
+	addr = vmem_xalloc(vmp, num, num, 0, 0, NULL, NULL, flag | VM_FIRSTFIT);
+	if (addr == NULL) {
+		return (DDI_FAILURE);
+	}
+	fexch_qpn_base = (uint32_t)((uintptr_t)addr -
+	    fcoib->hfc_vmemstart + fcoib->hfc_fexch_base[portm1]);
+
+	/* ICM confirm for the FEXCH QP range */
+	qpc_pool = &state->hs_rsrc_hdl[HERMON_QPC];
+	hdl->hr_len = num << qpc_pool->rsrc_shift;
+	hdl->hr_addr = addr;	/* used only for vmem_xfree */
+	hdl->hr_indx = fexch_qpn_base;
+
+	status = hermon_rsrc_hw_entry_icm_confirm(qpc_pool, num, hdl, 1);
+	if (status != DDI_SUCCESS) {
+		vmem_xfree(vmp, addr, num);
+		return (DDI_FAILURE);
+	}
+
+	/* ICM confirm for the Primary MKEYs (client side only) */
+	mpt_pool = &state->hs_rsrc_hdl[HERMON_DMPT];
+	mpt_hdl.hr_len = num << mpt_pool->rsrc_shift;
+	mpt_hdl.hr_addr = NULL;
+	mpt_hdl.hr_indx = fcoib->hfc_mpt_base[portm1] +
+	    (fexch_qpn_base - fcoib->hfc_fexch_base[portm1]);
+
+	status = hermon_rsrc_hw_entry_icm_confirm(mpt_pool, num, &mpt_hdl, 0);
+	if (status != DDI_SUCCESS) {
+		status = hermon_rsrc_hw_entry_icm_free(qpc_pool, hdl, 1);
+		vmem_xfree(vmp, addr, num);
+		return (DDI_FAILURE);
+	}
+
+	/* ICM confirm for the MTTs of the Primary MKEYs (client side only) */
+	nummtt = fcoib->hfc_mtts_per_mpt;
+	num *= nummtt;
+	mtt_pool = &state->hs_rsrc_hdl[HERMON_MTT];
+	mtt_hdl.hr_len = num << mtt_pool->rsrc_shift;
+	mtt_hdl.hr_addr = NULL;
+	mtt_hdl.hr_indx = fcoib->hfc_mtt_base[portm1] +
+	    (fexch_qpn_base - fcoib->hfc_fexch_base[portm1]) *
+	    nummtt;
+
+	status = hermon_rsrc_hw_entry_icm_confirm(mtt_pool, num, &mtt_hdl, 0);
+	if (status != DDI_SUCCESS) {
+		vmem_xfree(vmp, addr, num);
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+static void
+hermon_rsrc_fexch_free(hermon_state_t *state, hermon_rsrc_t *hdl)
+{
+	hermon_fcoib_t		*fcoib;
+	uint_t			portm1; /* hca_port_number - 1 */
+
+	ASSERT(state != NULL);
+	ASSERT(hdl != NULL);
+
+	portm1 = hdl->rsrc_type - HERMON_QPC_FEXCH_PORT1;
+	fcoib = &state->hs_fcoib;
+	vmem_xfree(fcoib->hfc_fexch_vmemp[portm1], hdl->hr_addr,
+	    hdl->hr_len >> state->hs_rsrc_hdl[HERMON_QPC].rsrc_shift);
+}
+
+/*
+ * hermon_rsrc_rfci_alloc()
+ *
+ *    Context: Can only be called from base context.
+ *    The "sleepflag" parameter is used by all object allocators to
+ *    determine whether to SLEEP for resources or not.
+ */
+static int
+hermon_rsrc_rfci_alloc(hermon_state_t *state, hermon_rsrc_type_t rsrc,
+    uint_t num, uint_t sleepflag, hermon_rsrc_t *hdl)
+{
+	hermon_fcoib_t		*fcoib;
+	void			*addr;
+	uint32_t		rfci_qpn_base;
+	hermon_rsrc_pool_info_t	*qpc_pool;
+	int			flag, status;
+	uint_t			portm1;	/* hca_port_number - 1 */
+	vmem_t			*vmp;
+
+	ASSERT(state != NULL);
+	ASSERT(hdl != NULL);
+
+	if ((state->hs_ibtfinfo.hca_attr->hca_flags2 & IBT_HCA2_FC) == 0)
+		return (DDI_FAILURE);
+
+	portm1 = rsrc - HERMON_QPC_RFCI_PORT1;
+	fcoib = &state->hs_fcoib;
+	flag = (sleepflag == HERMON_SLEEP) ? VM_SLEEP : VM_NOSLEEP;
+
+	/* Allocate from the RFCI QP range */
+	vmp = fcoib->hfc_rfci_vmemp[portm1];
+	addr = vmem_xalloc(vmp, num, num, 0, 0, NULL, NULL, flag | VM_FIRSTFIT);
+	if (addr == NULL) {
+		return (DDI_FAILURE);
+	}
+	rfci_qpn_base = (uint32_t)((uintptr_t)addr -
+	    fcoib->hfc_vmemstart + fcoib->hfc_rfci_base[portm1]);
+
+	/* ICM confirm for the RFCI QP */
+	qpc_pool = &state->hs_rsrc_hdl[HERMON_QPC];
+	hdl->hr_len = num << qpc_pool->rsrc_shift;
+	hdl->hr_addr = addr;	/* used only for vmem_xfree */
+	hdl->hr_indx = rfci_qpn_base;
+
+	status = hermon_rsrc_hw_entry_icm_confirm(qpc_pool, num, hdl, 1);
+	if (status != DDI_SUCCESS) {
+		vmem_xfree(vmp, addr, num);
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+static void
+hermon_rsrc_rfci_free(hermon_state_t *state, hermon_rsrc_t *hdl)
+{
+	hermon_fcoib_t		*fcoib;
+	uint_t			portm1; /* hca_port_number - 1 */
+
+	ASSERT(state != NULL);
+	ASSERT(hdl != NULL);
+
+	portm1 = hdl->rsrc_type - HERMON_QPC_RFCI_PORT1;
+	fcoib = &state->hs_fcoib;
+	vmem_xfree(fcoib->hfc_rfci_vmemp[portm1], hdl->hr_addr,
+	    hdl->hr_len >> state->hs_rsrc_hdl[HERMON_QPC].rsrc_shift);
 }
 
 
@@ -339,7 +553,17 @@ hermon_rsrc_free(hermon_state_t *state, hermon_rsrc_t **hdl)
 	case HERMON_OUT_MBOX:
 	case HERMON_INTR_IN_MBOX:
 	case HERMON_INTR_OUT_MBOX:
-		hermon_rsrc_mbox_free(rsrc_pool, *hdl);
+		hermon_rsrc_mbox_free(*hdl);
+		break;
+
+	case HERMON_QPC_FEXCH_PORT1:
+	case HERMON_QPC_FEXCH_PORT2:
+		hermon_rsrc_fexch_free(state, *hdl);
+		break;
+
+	case HERMON_QPC_RFCI_PORT1:
+	case HERMON_QPC_RFCI_PORT2:
+		hermon_rsrc_rfci_free(state, *hdl);
 		break;
 
 	case HERMON_QPC:
@@ -375,7 +599,7 @@ hermon_rsrc_free(hermon_state_t *state, hermon_rsrc_t **hdl)
 	case HERMON_CMPT_CQC:
 	case HERMON_CMPT_EQC:
 	default:
-		HERMON_WARNING(state, "unexpected resource type in free");
+		cmn_err(CE_CONT, "!rsrc_type = 0x%x\n", rsrc_pool->rsrc_type);
 		break;
 	}
 
@@ -422,7 +646,7 @@ hermon_rsrc_init_phase1(hermon_state_t *state)
 	cleanup = HERMON_RSRC_CLEANUP_LEVEL0;
 
 	/* Build kmem cache name from Hermon instance */
-	rsrc_name = (char *)kmem_zalloc(HERMON_RSRC_NAME_MAXLEN, KM_SLEEP);
+	rsrc_name = kmem_zalloc(HERMON_RSRC_NAME_MAXLEN, KM_SLEEP);
 	HERMON_RSRC_NAME(rsrc_name, HERMON_RSRC_CACHE);
 
 	/*
@@ -446,7 +670,6 @@ hermon_rsrc_init_phase1(hermon_state_t *state)
 	num  =  ((uint64_t)1 << cfgprof->cp_log_num_outmbox);
 	size =  ((uint64_t)1 << cfgprof->cp_log_outmbox_size);
 	rsrc_pool = &state->hs_rsrc_hdl[HERMON_OUT_MBOX];
-	rsrc_pool->rsrc_type	  = HERMON_OUT_MBOX;
 	rsrc_pool->rsrc_loc	  = HERMON_IN_SYSMEM;
 	rsrc_pool->rsrc_pool_size = (size * num);
 	rsrc_pool->rsrc_shift	  = cfgprof->cp_log_outmbox_size;
@@ -477,7 +700,6 @@ hermon_rsrc_init_phase1(hermon_state_t *state)
 	num  =  ((uint64_t)1 << cfgprof->cp_log_num_intr_outmbox);
 	size =  ((uint64_t)1 << cfgprof->cp_log_outmbox_size);
 	rsrc_pool = &state->hs_rsrc_hdl[HERMON_INTR_OUT_MBOX];
-	rsrc_pool->rsrc_type	  = HERMON_INTR_OUT_MBOX;
 	rsrc_pool->rsrc_loc	  = HERMON_IN_SYSMEM;
 	rsrc_pool->rsrc_pool_size = (size * num);
 	rsrc_pool->rsrc_shift	  = cfgprof->cp_log_outmbox_size;
@@ -508,7 +730,6 @@ hermon_rsrc_init_phase1(hermon_state_t *state)
 	num  =  ((uint64_t)1 << cfgprof->cp_log_num_inmbox);
 	size =  ((uint64_t)1 << cfgprof->cp_log_inmbox_size);
 	rsrc_pool = &state->hs_rsrc_hdl[HERMON_IN_MBOX];
-	rsrc_pool->rsrc_type	  = HERMON_IN_MBOX;
 	rsrc_pool->rsrc_loc	  = HERMON_IN_SYSMEM;
 	rsrc_pool->rsrc_pool_size = (size * num);
 	rsrc_pool->rsrc_shift	  = cfgprof->cp_log_inmbox_size;
@@ -539,7 +760,6 @@ hermon_rsrc_init_phase1(hermon_state_t *state)
 	num  =  ((uint64_t)1 << cfgprof->cp_log_num_intr_inmbox);
 	size =  ((uint64_t)1 << cfgprof->cp_log_inmbox_size);
 	rsrc_pool = &state->hs_rsrc_hdl[HERMON_INTR_IN_MBOX];
-	rsrc_pool->rsrc_type	  = HERMON_INTR_IN_MBOX;
 	rsrc_pool->rsrc_loc	  = HERMON_IN_SYSMEM;
 	rsrc_pool->rsrc_pool_size = (size * num);
 	rsrc_pool->rsrc_shift	  = cfgprof->cp_log_inmbox_size;
@@ -600,7 +820,7 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 	/* Allocate the ICM resource name space */
 
 	/* Build the ICM vmem arena names from Hermon instance */
-	rsrc_name = (char *)kmem_zalloc(HERMON_RSRC_NAME_MAXLEN, KM_SLEEP);
+	rsrc_name = kmem_zalloc(HERMON_RSRC_NAME_MAXLEN, KM_SLEEP);
 
 	/*
 	 * Initialize the resource pools for all objects that exist in
@@ -628,6 +848,7 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 
 		rsrc_pool = &state->hs_rsrc_hdl[i];
 		rsrc_pool->rsrc_type = i;
+		rsrc_pool->rsrc_state = state;
 
 		/* Set the resource-specific attributes */
 		switch (i) {
@@ -668,7 +889,7 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 
 		case HERMON_EQC:
 			max = ((uint64_t)1 << devlim->log_max_eq);
-			num_prealloc = devlim->num_rsvd_eq;
+			num_prealloc = state->hs_rsvd_eqs;
 			HERMON_RSRC_NAME(rsrc_name, HERMON_EQC_VMEM);
 			ncleanup = HERMON_RSRC_CLEANUP_LEVEL18;
 			break;
@@ -732,7 +953,6 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 	max			  = ((uint64_t)1 << devlim->log_max_mcg);
 	num_prealloc	  = ((uint64_t)1 << cfgprof->cp_log_num_mcg_hash);
 	rsrc_pool		  = &state->hs_rsrc_hdl[HERMON_MCG];
-	rsrc_pool->rsrc_type	  = HERMON_MCG;
 	rsrc_pool->rsrc_loc	  = HERMON_IN_ICM;
 	rsrc_pool->rsrc_pool_size = (mcg_size * num);
 	rsrc_pool->rsrc_shift	  = mcg_size_shift;
@@ -773,7 +993,6 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 
 	/* Initialize the resource pool and vmem arena for the PD handles */
 	rsrc_pool		 = &state->hs_rsrc_hdl[HERMON_PDHDL];
-	rsrc_pool->rsrc_type	 = HERMON_PDHDL;
 	rsrc_pool->rsrc_loc	 = HERMON_IN_SYSMEM;
 	rsrc_pool->rsrc_quantum	 = sizeof (struct hermon_sw_pd_s);
 	rsrc_pool->rsrc_state	 = state;
@@ -801,11 +1020,11 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 	 */
 	for (i = HERMON_NUM_ICM_RESOURCES; i < HERMON_NUM_RESOURCES; i++) {
 		rsrc_pool = &state->hs_rsrc_hdl[i];
+		rsrc_pool->rsrc_type = i;
 
 		/* Set the resource-specific attributes */
 		switch (i) {
 		case HERMON_MRHDL:
-			rsrc_pool->rsrc_type    = HERMON_MRHDL;
 			rsrc_pool->rsrc_quantum =
 			    sizeof (struct hermon_sw_mr_s);
 			HERMON_RSRC_NAME(rsrc_name, HERMON_MRHDL_CACHE);
@@ -823,7 +1042,6 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 			break;
 
 		case HERMON_EQHDL:
-			rsrc_pool->rsrc_type    = HERMON_EQHDL;
 			rsrc_pool->rsrc_quantum =
 			    sizeof (struct hermon_sw_eq_s);
 			HERMON_RSRC_NAME(rsrc_name, HERMON_EQHDL_CACHE);
@@ -836,7 +1054,6 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 			break;
 
 		case HERMON_CQHDL:
-			rsrc_pool->rsrc_type    = HERMON_CQHDL;
 			rsrc_pool->rsrc_quantum =
 			    sizeof (struct hermon_sw_cq_s);
 			HERMON_RSRC_NAME(rsrc_name, HERMON_CQHDL_CACHE);
@@ -846,14 +1063,12 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 			hdl_info.swi_constructor =
 			    hermon_rsrc_cqhdl_constructor;
 			hdl_info.swi_destructor	 = hermon_rsrc_cqhdl_destructor;
-			hdl_info.swi_flags = (HERMON_SWHDL_KMEMCACHE_INIT |
-			    HERMON_SWHDL_TABLE_INIT);
+			hdl_info.swi_flags	 = HERMON_SWHDL_KMEMCACHE_INIT;
 			hdl_info.swi_prealloc_sz = sizeof (hermon_cqhdl_t);
 			ncleanup = HERMON_RSRC_CLEANUP_LEVEL24;
 			break;
 
 		case HERMON_SRQHDL:
-			rsrc_pool->rsrc_type    = HERMON_SRQHDL;
 			rsrc_pool->rsrc_quantum =
 			    sizeof (struct hermon_sw_srq_s);
 			HERMON_RSRC_NAME(rsrc_name, HERMON_SRQHDL_CACHE);
@@ -863,14 +1078,12 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 			hdl_info.swi_constructor =
 			    hermon_rsrc_srqhdl_constructor;
 			hdl_info.swi_destructor = hermon_rsrc_srqhdl_destructor;
-			hdl_info.swi_flags = (HERMON_SWHDL_KMEMCACHE_INIT |
-			    HERMON_SWHDL_TABLE_INIT);
+			hdl_info.swi_flags	 = HERMON_SWHDL_KMEMCACHE_INIT;
 			hdl_info.swi_prealloc_sz = sizeof (hermon_srqhdl_t);
 			ncleanup = HERMON_RSRC_CLEANUP_LEVEL25;
 			break;
 
 		case HERMON_AHHDL:
-			rsrc_pool->rsrc_type	= HERMON_AHHDL;
 			rsrc_pool->rsrc_quantum	=
 			    sizeof (struct hermon_sw_ah_s);
 			HERMON_RSRC_NAME(rsrc_name, HERMON_AHHDL_CACHE);
@@ -885,7 +1098,6 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 			break;
 
 		case HERMON_QPHDL:
-			rsrc_pool->rsrc_type    = HERMON_QPHDL;
 			rsrc_pool->rsrc_quantum =
 			    sizeof (struct hermon_sw_qp_s);
 			HERMON_RSRC_NAME(rsrc_name, HERMON_QPHDL_CACHE);
@@ -895,14 +1107,12 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 			hdl_info.swi_constructor =
 			    hermon_rsrc_qphdl_constructor;
 			hdl_info.swi_destructor	= hermon_rsrc_qphdl_destructor;
-			hdl_info.swi_flags = (HERMON_SWHDL_KMEMCACHE_INIT |
-			    HERMON_SWHDL_TABLE_INIT);
+			hdl_info.swi_flags	 = HERMON_SWHDL_KMEMCACHE_INIT;
 			hdl_info.swi_prealloc_sz = sizeof (hermon_qphdl_t);
 			ncleanup = HERMON_RSRC_CLEANUP_LEVEL27;
 			break;
 
 		case HERMON_REFCNT:
-			rsrc_pool->rsrc_type	 = HERMON_REFCNT;
 			rsrc_pool->rsrc_quantum	 = sizeof (hermon_sw_refcnt_t);
 			HERMON_RSRC_NAME(rsrc_name, HERMON_REFCNT_CACHE);
 			hdl_info.swi_num =
@@ -931,25 +1141,6 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 			goto rsrcinitp2_fail;
 		}
 		cleanup = ncleanup;
-
-		/*
-		 * For table entries, save away a pointer to the central list
-		 * of handle pointers. These are used to enable fast lookup
-		 * of the resources during event processing.
-		 */
-		switch (i) {
-		case HERMON_CQHDL:
-			state->hs_cqhdl = hdl_info.swi_table_ptr;
-			break;
-		case HERMON_QPHDL:
-			state->hs_qphdl = hdl_info.swi_table_ptr;
-			break;
-		case HERMON_SRQHDL:
-			state->hs_srqhdl = hdl_info.swi_table_ptr;
-			break;
-		default:
-			break;
-		}
 	}
 
 	/*
@@ -985,7 +1176,6 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 	max			  = num;
 	num_prealloc		  = max(devlim->num_rsvd_uar, 128);
 	rsrc_pool		  = &state->hs_rsrc_hdl[HERMON_UARPG];
-	rsrc_pool->rsrc_type	  = HERMON_UARPG;
 	rsrc_pool->rsrc_loc	  = HERMON_IN_UAR;
 	rsrc_pool->rsrc_pool_size = (num << PAGESHIFT);
 	rsrc_pool->rsrc_shift	  = PAGESHIFT;
@@ -1079,7 +1269,7 @@ hermon_rsrc_fini(hermon_state_t *state, hermon_rsrc_cleanup_level_t clean)
 	case HERMON_RSRC_CLEANUP_LEVEL28:
 		/* Cleanup the QP handle resource pool */
 		hdl_info.swi_rsrcpool  = &state->hs_rsrc_hdl[HERMON_QPHDL];
-		hdl_info.swi_table_ptr = state->hs_qphdl;
+		hdl_info.swi_table_ptr = NULL;
 		hdl_info.swi_num = ((uint64_t)1 << cfgprof->cp_log_num_qp);
 		hdl_info.swi_prealloc_sz = sizeof (hermon_qphdl_t);
 		hermon_rsrc_sw_handles_fini(state, &hdl_info);
@@ -1094,7 +1284,7 @@ hermon_rsrc_fini(hermon_state_t *state, hermon_rsrc_cleanup_level_t clean)
 	case HERMON_RSRC_CLEANUP_LEVEL26:
 		/* Cleanup the SRQ handle resource pool. */
 		hdl_info.swi_rsrcpool  = &state->hs_rsrc_hdl[HERMON_SRQHDL];
-		hdl_info.swi_table_ptr = state->hs_srqhdl;
+		hdl_info.swi_table_ptr = NULL;
 		hdl_info.swi_num = ((uint64_t)1 << cfgprof->cp_log_num_srq);
 		hdl_info.swi_prealloc_sz = sizeof (hermon_srqhdl_t);
 		hermon_rsrc_sw_handles_fini(state, &hdl_info);
@@ -1103,7 +1293,7 @@ hermon_rsrc_fini(hermon_state_t *state, hermon_rsrc_cleanup_level_t clean)
 	case HERMON_RSRC_CLEANUP_LEVEL25:
 		/* Cleanup the CQ handle resource pool */
 		hdl_info.swi_rsrcpool  = &state->hs_rsrc_hdl[HERMON_CQHDL];
-		hdl_info.swi_table_ptr = state->hs_cqhdl;
+		hdl_info.swi_table_ptr = NULL;
 		hdl_info.swi_num = ((uint64_t)1 << cfgprof->cp_log_num_cq);
 		hdl_info.swi_prealloc_sz = sizeof (hermon_cqhdl_t);
 		hermon_rsrc_sw_handles_fini(state, &hdl_info);
@@ -1662,7 +1852,7 @@ hermon_rsrc_mbox_alloc(hermon_rsrc_pool_info_t *pool_info, uint_t num,
 	}
 
 	/* Allocate memory for the mailbox */
-	temp_len = (num * pool_info->rsrc_quantum);
+	temp_len = (num << pool_info->rsrc_shift);
 	status = ddi_dma_mem_alloc(hdl->hr_dmahdl, temp_len,
 	    &priv->pmb_devaccattr, priv->pmb_xfer_mode, DDI_DMA_SLEEP,
 	    NULL, &kaddr, &real_len, &hdl->hr_acchdl);
@@ -1684,9 +1874,8 @@ hermon_rsrc_mbox_alloc(hermon_rsrc_pool_info_t *pool_info, uint_t num,
  *    Context: Can be called from interrupt or base context.
  */
 static void
-hermon_rsrc_mbox_free(hermon_rsrc_pool_info_t *pool_info, hermon_rsrc_t *hdl)
+hermon_rsrc_mbox_free(hermon_rsrc_t *hdl)
 {
-	ASSERT(pool_info != NULL);
 	ASSERT(hdl != NULL);
 
 	/* Use ddi_dma_mem_free() to free up sys memory for mailbox */
@@ -1703,8 +1892,7 @@ hermon_rsrc_mbox_free(hermon_rsrc_pool_info_t *pool_info, hermon_rsrc_t *hdl)
  */
 static int
 hermon_rsrc_hw_entry_alloc(hermon_rsrc_pool_info_t *pool_info, uint_t num,
-    uint_t num_align, ddi_acc_handle_t acc_handle, uint_t sleepflag,
-    hermon_rsrc_t *hdl)
+    uint_t num_align, uint_t sleepflag, hermon_rsrc_t *hdl)
 {
 	void			*addr;
 	uint64_t		offset;
@@ -1716,21 +1904,14 @@ hermon_rsrc_hw_entry_alloc(hermon_rsrc_pool_info_t *pool_info, uint_t num,
 	ASSERT(hdl != NULL);
 
 	/*
-	 * Hermon hardware entries (QPC, CQC, EQC, MPT, etc.) do not
-	 * generally use the acc_handle (because the entries are not
-	 * directly accessed by software).  The exception to this rule
-	 * are the MTT entries.
-	 */
-
-	/*
 	 * Use vmem_xalloc() to get a properly aligned pointer (based on
 	 * the number requested) to the HW entry(ies).  This handles the
 	 * cases (for special QPCs and for RDB entries) where we need more
 	 * than one and need to ensure that they are properly aligned.
 	 */
 	flag = (sleepflag == HERMON_SLEEP) ? VM_SLEEP : VM_NOSLEEP;
-	hdl->hr_len = (num * pool_info->rsrc_quantum);
-	align = (num_align * pool_info->rsrc_quantum);
+	hdl->hr_len = (num << pool_info->rsrc_shift);
+	align = (num_align << pool_info->rsrc_shift);
 
 	addr = vmem_xalloc(pool_info->rsrc_vmp, hdl->hr_len,
 	    align, 0, 0, NULL, NULL, flag | VM_FIRSTFIT);
@@ -1740,25 +1921,79 @@ hermon_rsrc_hw_entry_alloc(hermon_rsrc_pool_info_t *pool_info, uint_t num,
 		return (DDI_FAILURE);
 	}
 
-	hdl->hr_acchdl = acc_handle;
+	hdl->hr_acchdl = NULL;	/* only used for mbox resources */
 
 	/* Calculate vaddr and HW table index */
 	offset = (uintptr_t)addr - (uintptr_t)pool_info->rsrc_start;
-	hdl->hr_addr = addr;
+	hdl->hr_addr = addr;	/* only used for mbox and uarpg resources */
 	hdl->hr_indx = offset >> pool_info->rsrc_shift;
 
 	if (pool_info->rsrc_loc == HERMON_IN_ICM) {
+		int num_to_hdl;
+		hermon_rsrc_type_t rsrc_type = pool_info->rsrc_type;
+
+		num_to_hdl = (rsrc_type == HERMON_QPC ||
+		    rsrc_type == HERMON_CQC || rsrc_type == HERMON_SRQC);
+
 		/* confirm ICM is mapped, and allocate if necessary */
-		status = hermon_rsrc_hw_entry_icm_confirm(pool_info, num, hdl);
+		status = hermon_rsrc_hw_entry_icm_confirm(pool_info, num, hdl,
+		    num_to_hdl);
 		if (status != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
-		hdl->hr_addr = NULL;
+		hdl->hr_addr = NULL;	/* not used for ICM resources */
 	}
 
 	return (DDI_SUCCESS);
 }
 
+
+/*
+ * hermon_rsrc_hw_entry_reserve()
+ *    Context: Can be called from interrupt or base context.
+ */
+int
+hermon_rsrc_hw_entry_reserve(hermon_rsrc_pool_info_t *pool_info, uint_t num,
+    uint_t num_align, uint_t sleepflag, hermon_rsrc_t *hdl)
+{
+	void			*addr;
+	uint64_t		offset;
+	uint32_t		align;
+	int			flag;
+
+	ASSERT(pool_info != NULL);
+	ASSERT(hdl != NULL);
+	ASSERT(pool_info->rsrc_loc == HERMON_IN_ICM);
+
+	/*
+	 * Use vmem_xalloc() to get a properly aligned pointer (based on
+	 * the number requested) to the HW entry(ies).  This handles the
+	 * cases (for special QPCs and for RDB entries) where we need more
+	 * than one and need to ensure that they are properly aligned.
+	 */
+	flag = (sleepflag == HERMON_SLEEP) ? VM_SLEEP : VM_NOSLEEP;
+	hdl->hr_len = (num << pool_info->rsrc_shift);
+	align = (num_align << pool_info->rsrc_shift);
+
+	addr = vmem_xalloc(pool_info->rsrc_vmp, hdl->hr_len,
+	    align, 0, 0, NULL, NULL, flag | VM_FIRSTFIT);
+
+	if (addr == NULL) {
+		/* No more HW entries available */
+		return (DDI_FAILURE);
+	}
+
+	hdl->hr_acchdl = NULL;	/* only used for mbox resources */
+
+	/* Calculate vaddr and HW table index */
+	offset = (uintptr_t)addr - (uintptr_t)pool_info->rsrc_start;
+	hdl->hr_addr = NULL;
+	hdl->hr_indx = offset >> pool_info->rsrc_shift;
+
+	/* ICM will be allocated and mapped if and when it gets used */
+
+	return (DDI_SUCCESS);
+}
 
 
 /*
@@ -1784,8 +2019,15 @@ hermon_rsrc_hw_entry_free(hermon_rsrc_pool_info_t *pool_info,
 	vmem_xfree(pool_info->rsrc_vmp, addr, hdl->hr_len);
 
 	if (pool_info->rsrc_loc == HERMON_IN_ICM) {
+		int num_to_hdl;
+		hermon_rsrc_type_t rsrc_type = pool_info->rsrc_type;
+
+		num_to_hdl = (rsrc_type == HERMON_QPC ||
+		    rsrc_type == HERMON_CQC || rsrc_type == HERMON_SRQC);
+
 		/* free ICM references, and free ICM if required */
-		status = hermon_rsrc_hw_entry_icm_free(pool_info, hdl);
+		status = hermon_rsrc_hw_entry_icm_free(pool_info, hdl,
+		    num_to_hdl);
 		if (status != DDI_SUCCESS)
 			HERMON_WARNING(pool_info->rsrc_state,
 			    "failure in hw_entry_free");
@@ -1798,7 +2040,7 @@ hermon_rsrc_hw_entry_free(hermon_rsrc_pool_info_t *pool_info,
  */
 static int
 hermon_rsrc_hw_entry_icm_confirm(hermon_rsrc_pool_info_t *pool_info, uint_t num,
-    hermon_rsrc_t *hdl)
+    hermon_rsrc_t *hdl, int num_to_hdl)
 {
 	hermon_state_t		*state;
 	hermon_icm_table_t	*icm_table;
@@ -1838,7 +2080,7 @@ hermon_rsrc_hw_entry_icm_confirm(hermon_rsrc_pool_info_t *pool_info, uint_t num,
 	}
 
 	mutex_enter(&icm_table->icm_table_lock);
-	hermon_bitmap(bitmap, dma_info, icm_table, index1);
+	hermon_bitmap(bitmap, dma_info, icm_table, index1, num_to_hdl);
 	while (num) {
 #ifndef __lock_lint
 		while (icm_table->icm_busy) {
@@ -1864,13 +2106,6 @@ hermon_rsrc_hw_entry_icm_confirm(hermon_rsrc_pool_info_t *pool_info, uint_t num,
 				    type, index1, index2);
 			}
 		}
-
-		/*
-		 * Mellanox FMR accesses the MPT directly.  We set the
-		 * access handle here only for this case
-		 */
-		if (type == HERMON_DMPT)
-			hdl->hr_acchdl = dma_info[index2].acc_hdl;
 
 		/*
 		 * We need to increment the refcnt of this span by the
@@ -1911,7 +2146,7 @@ hermon_rsrc_hw_entry_icm_confirm(hermon_rsrc_pool_info_t *pool_info, uint_t num,
 			break;
 
 		hermon_index(index1, index2, rindx, icm_table, span_offset);
-		hermon_bitmap(bitmap, dma_info, icm_table, index1);
+		hermon_bitmap(bitmap, dma_info, icm_table, index1, num_to_hdl);
 	}
 	mutex_exit(&icm_table->icm_table_lock);
 
@@ -1960,7 +2195,7 @@ fail_alloc:
  */
 static int
 hermon_rsrc_hw_entry_icm_free(hermon_rsrc_pool_info_t *pool_info,
-    hermon_rsrc_t *hdl)
+    hermon_rsrc_t *hdl, int num_to_hdl)
 {
 	hermon_state_t		*state;
 	hermon_icm_table_t	*icm_table;
@@ -1989,7 +2224,7 @@ hermon_rsrc_hw_entry_icm_free(hermon_rsrc_pool_info_t *pool_info,
 
 	rindx = hdl->hr_indx;
 	hermon_index(index1, index2, rindx, icm_table, span_offset);
-	hermon_bitmap(bitmap, dma_info, icm_table, index1);
+	hermon_bitmap(bitmap, dma_info, icm_table, index1, num_to_hdl);
 
 	/* determine the number of ICM objects in this allocation */
 	num = hdl->hr_len >> pool_info->rsrc_shift;
@@ -2051,7 +2286,7 @@ hermon_rsrc_hw_entry_icm_free(hermon_rsrc_pool_info_t *pool_info,
 			break;
 
 		hermon_index(index1, index2, rindx, icm_table, span_offset);
-		hermon_bitmap(bitmap, dma_info, icm_table, index1);
+		hermon_bitmap(bitmap, dma_info, icm_table, index1, num_to_hdl);
 	}
 	mutex_exit(&icm_table->icm_table_lock);
 

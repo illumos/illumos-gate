@@ -1,6 +1,5 @@
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 one tavor_state_s
@@ -73,6 +72,8 @@ root	tavor_ci_map_mem_iov
 root	tavor_ci_unmap_mem_iov
 root	tavor_ci_alloc_io_mem
 root	tavor_ci_free_io_mem
+root	tavor_ci_register_dma_mr
+root	tavor_ci_not_supported
 
 ### Tavor Firmware commands (currently unused)
 root	tavor_sync_tpt_cmd_post

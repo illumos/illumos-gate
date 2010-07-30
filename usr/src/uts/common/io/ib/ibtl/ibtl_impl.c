@@ -156,10 +156,6 @@ _init(void)
 }
 
 
-/*
- * The IBTF Module is never unloaded. Actually there is no need of this
- * routine, but provided just in case.
- */
 int
 _fini(void)
 {
@@ -536,7 +532,7 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 	IBTF_DPRINTF_L2(ibtf, "ibc_attach(%p, %p)", ibc_hdl_p, info_p);
 
 	/* Validate the Transport API version */
-	if (info_p->hca_ci_vers != IBCI_V3) {
+	if (info_p->hca_ci_vers != IBCI_V4) {
 		IBTF_DPRINTF_L1(ibtf, "ibc_attach: Invalid IB CI Version '%d'",
 		    info_p->hca_ci_vers);
 		return (IBC_FAILURE);
@@ -595,7 +591,7 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 	hca_devp->hd_ibc_hca_hdl = info_p->hca_handle;
 	hca_devp->hd_ibc_ops	= info_p->hca_ops;
 	hca_devp->hd_hca_attr	= info_p->hca_attr;
-	hca_devp->hd_hca_dip	= info_p->hca_dip;
+	hca_devp->hd_hca_dip	= info_p->hca_attr->hca_dip;
 
 	status = ibtl_init_hca_portinfo(hca_devp);
 	if (status != IBT_SUCCESS) {
@@ -608,7 +604,7 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 	}
 
 	/* Register the with MPxIO as PHCI */
-	if (ibtl_ibnex_phci_register(info_p->hca_dip) != IBT_SUCCESS) {
+	if (ibtl_ibnex_phci_register(hca_devp->hd_hca_dip) != IBT_SUCCESS) {
 		mutex_exit(&ibtl_clnt_list_mutex);
 		IBTF_DPRINTF_L1(ibtf, "ibc_attach: MPxIO register failed");
 		kmem_free(hca_devp, sizeof (ibtl_hca_devinfo_t) +

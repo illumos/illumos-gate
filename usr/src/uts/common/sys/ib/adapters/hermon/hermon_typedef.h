@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_TYPEDEF_H
@@ -57,6 +56,17 @@ typedef struct hermon_hw_hcr_s		hermon_hw_hcr_t;
 typedef struct hermon_hw_querydevlim_s	hermon_hw_querydevlim_t;
 typedef struct hermon_hw_query_port_s	hermon_hw_query_port_t;
 typedef struct hermon_hw_set_port_s	hermon_hw_set_port_t;
+typedef struct hermon_hw_set_port_en_s	hermon_hw_set_port_en_t;
+typedef struct hermon_hw_set_port_en_rqpn_s  hermon_hw_set_port_en_rqpn_t;
+typedef struct hermon_hw_set_port_en_mact_s  hermon_hw_set_port_en_mact_t;
+typedef struct hermon_hw_set_port_en_vlant_s hermon_hw_set_port_en_vlant_t;
+typedef struct hermon_hw_set_port_en_priot_s hermon_hw_set_port_en_priot_t;
+typedef struct hermon_fw_set_port_gidtable_s hermon_fw_set_port_gidtable_t;
+typedef struct hermon_hw_set_mcast_fltr_s hermon_hw_set_mcast_fltr_t;
+typedef struct hermon_hw_arm_req_s	hermon_hw_arm_req_t;
+typedef struct hermon_hw_config_fc_basic_s hermon_hw_config_fc_basic_t;
+typedef struct hermon_hw_query_fc_s	hermon_hw_query_fc_t;
+
 typedef struct hermon_hw_queryfw_s	hermon_hw_queryfw_t;
 typedef struct hermon_hw_queryadapter_s	hermon_hw_queryadapter_t;
 typedef struct hermon_hw_initqueryhca_s	hermon_hw_initqueryhca_t;
@@ -73,20 +83,32 @@ typedef struct hermon_hw_addr_path_s	hermon_hw_addr_path_t;
 typedef	struct hermon_hw_mod_stat_cfg_s  hermon_hw_mod_stat_cfg_t;
 typedef	struct hermon_hw_msg_in_mod_s	hermon_hw_msg_in_mod_t;
 typedef struct hermon_hw_udav_s		hermon_hw_udav_t;
+typedef struct hermon_hw_udav_enet_s	hermon_hw_udav_enet_t;
 typedef struct hermon_hw_qpc_s		hermon_hw_qpc_t;
 typedef struct hermon_hw_mcg_s		hermon_hw_mcg_t;
+typedef struct hermon_hw_mcg_en_s	hermon_hw_mcg_en_t;
 typedef struct hermon_hw_mcg_qp_list_s	hermon_hw_mcg_qp_list_t;
 typedef struct hermon_hw_sm_perfcntr_s	hermon_hw_sm_perfcntr_t;
 typedef struct hermon_hw_sm_extperfcntr_s hermon_hw_sm_extperfcntr_t;
-typedef struct hermon_hw_snd_wqe_ctrl_s hermon_hw_snd_wqe_ctrl_t;
-typedef struct hermon_hw_srq_wqe_next_s hermon_hw_srq_wqe_next_t;
-typedef struct hermon_hw_snd_wqe_ud_s	   hermon_hw_snd_wqe_ud_t;
-typedef struct hermon_hw_snd_wqe_bind_s	   hermon_hw_snd_wqe_bind_t;
+
+typedef struct hermon_hw_snd_wqe_ud_s	hermon_hw_snd_wqe_ud_t;
+typedef struct hermon_hw_snd_wqe_bind_s	hermon_hw_snd_wqe_bind_t;
 typedef struct hermon_hw_snd_wqe_remaddr_s  hermon_hw_snd_wqe_remaddr_t;
 typedef struct hermon_hw_snd_wqe_atomic_s   hermon_hw_snd_wqe_atomic_t;
+typedef struct hermon_hw_snd_wqe_frwr_s	hermon_hw_snd_wqe_frwr_t;
+typedef struct hermon_hw_snd_wqe_frwr_ext_s  hermon_hw_snd_wqe_frwr_ext_t;
+typedef struct hermon_hw_snd_wqe_local_inv_s hermon_hw_snd_wqe_local_inv_t;
+typedef struct hermon_hw_snd_rem_addr_s	hermon_hw_snd_rem_addr_t;
+typedef struct hermon_sw_send_wqe_lso_s hermon_sw_send_wqe_lso_t;
 typedef struct hermon_hw_mlx_wqe_nextctrl_s hermon_hw_mlx_wqe_nextctrl_t;
 typedef struct hermon_hw_rcv_wqe_nextctrl_s hermon_hw_rcv_wqe_nextctrl_t;
 typedef struct hermon_hw_wqe_sgl_s	hermon_hw_wqe_sgl_t;
+typedef struct hermon_hw_snd_wqe_ctrl_s hermon_hw_snd_wqe_ctrl_t;
+typedef struct hermon_hw_srq_wqe_next_s hermon_hw_srq_wqe_next_t;
+typedef struct hermonw_hw_fcp3_ctrl_s 	hermonw_hw_fcp3_ctrl_t;
+typedef struct hermon_hw_fcp3_init_s 	hermon_hw_fcp3_init_t;
+typedef struct hermon_hw_fcmd_o_enet_s	hermon_hw_fcmd_o_enet_t;
+typedef struct hermon_hw_fcmd_o_ib_s	hermon_hw_fcmd_o_ib_t;
 
 typedef struct hermon_sw_mr_s		*hermon_mrhdl_t;
 typedef struct hermon_sw_mr_s		*hermon_mwhdl_t;

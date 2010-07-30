@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_CMD_H
@@ -149,10 +148,13 @@ extern "C" {
 #define	SW2HW_SRQ			0x35
 #define	HW2SW_SRQ			0x36
 #define	QUERY_SRQ			0x37
-/* new in hermon, replaces part of modifyMPT */
+/* new in hermon, replaces part of modify MPT */
 #define	RESIZE_SRQ			0X44
 /* new in hermon, set limit water mark */
 #define	ARM_RQ				0X40
+/* new in hermon (PRM 0.36) configure interrupt moderation */
+#define	CONFIG_INT_MOD			0X45
+#define	HW_HEALTH_CHECK			0X50
 
 /* Multicast Group Commands */
 #define	READ_MGM			0x25
@@ -167,6 +169,14 @@ extern "C" {
 #define	DIAG_RPRT			0x30
 #define	CMD_NOP				0x31
 
+#define	SET_VLAN_FLTR			0x47
+#define	SET_MCAST_FLTR			0x48
+
+#define	CONFIG_FC			0x4A
+#define	QUERY_FC			0x4B
+#define	HEART_BEAT_RQ			0x4C
+
+#define	SENSE_PORT			0x4D
 
 /* ICM and related commands - w/out LAM commands from Arbel */
 #define	RUN_FW				0xFF6
@@ -182,7 +192,6 @@ extern "C" {
  * Commands mentioned but not defined in PRM v35
  *	REL_ICM_AUX
  *	INIT_VM
- * 	HEART_BEAT_RQ
  */
 
 /*
@@ -731,6 +740,7 @@ int hermon_cmn_qp_cmd_post(hermon_state_t *state, uint_t opcode,
  * commands:
  * QUERY_DEV_LIM/CAP, QUERY_FW, QUERY_ADAPTER, QUERY_HCA, QUERY_MPT,
  * QUERY_EQ, QUERY_CQ, and QUERY_QP.
+ * New with FCoIB, QUERY_FC
  */
 int hermon_cmn_query_cmd_post(hermon_state_t *state, uint_t opcode,
     uint_t opmod, uint_t queryindx, void *query, uint_t size, uint_t sleepflag);
@@ -800,6 +810,12 @@ int hermon_conf_special_qp_cmd_post(hermon_state_t *state, uint_t qpindx,
     uint_t qptype, uint_t sleepflag, uint_t opmod);
 
 /*
+ * Get FEXCH HEART BEAT
+ */
+int hermon_get_heart_beat_rq_cmd_post(hermon_state_t *state, uint_t qpindx,
+    uint64_t *outparm);
+
+/*
  * MGID_HASH, READ_MGM, and WRITE_MGM - used for manipulation of the
  * hardware resource tables for multicast groups.
  *	NOTE: for intial implementation these functions retain their original
@@ -833,7 +849,6 @@ int hermon_modify_mpt_cmd_post(hermon_state_t *state, hermon_hw_dmpt_t *mpt,
  * to resize the SRQ, by passing the new information in the same format as
  * the original srqc, which the HCA will update appropriately
  */
-
 int hermon_resize_srq_cmd_post(hermon_state_t *state, hermon_hw_srqc_t *srq,
     uint_t srqnum, uint_t sleepflag);
 
@@ -842,11 +857,39 @@ int hermon_resize_srq_cmd_post(hermon_state_t *state, hermon_hw_srqc_t *srq,
  */
 int hermon_nop_post(hermon_state_t *state, uint_t interval, uint_t sleep);
 int hermon_setdebug_post(hermon_state_t *state);
+
 /*
  * READ_MTT - used to read an mtt entry at address.
  */
 int hermon_read_mtt_cmd_post(hermon_state_t *state, uint64_t mtt_addr,
     hermon_hw_mtt_t *mtt);
+
+/*
+ * SENSE_PORT - used to send protocol running on a port
+ */
+int hermon_sense_port_post(hermon_state_t *state, uint_t portnum,
+    uint32_t *protocol);
+
+/*
+ * CONFIG_FC - used to do either a basic config passing in
+ * 	*hermon_hw_config_fc_basic_s, or config the N_Port table.
+ *	passing in pointer to an array of 32-bit id's
+ *	Note that either one needs to be cast to void *
+ */
+int hermon_config_fc_cmd_post(hermon_state_t *state, void *cfginfo, int enable,
+    int selector, int n_ports, int portnum, uint_t sleepflag);
+
+/*
+ * CONFIG_INT_MOD - used to configure INTERRUPT moderation
+ */
+int hermon_config_int_mod(hermon_state_t *state, uint_t min_delay,
+    uint_t vector);
+
+/*
+ * HW_HEALTH_CHECK - tests state of the HCA
+ *	if command fails, *health is invalid/undefined
+ */
+int hermon_hw_health_check(hermon_state_t *state, int *health);
 
 #ifdef __cplusplus
 }

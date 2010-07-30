@@ -937,7 +937,7 @@ ofs_cq_handler(ibt_cq_hdl_t ibt_cq, void *arg)
 struct ib_cq *
 ib_create_cq(struct ib_device *device, ib_comp_handler comp_handler,
     void (*event_handler)(struct ib_event *, void *), void *cq_context,
-    int cqe, int comp_vector)
+    int cqe, void *comp_vector)
 {
 	ofs_client_t	*ofs_client = (ofs_client_t *)device->clnt_hdl;
 	ibt_cq_attr_t	cq_attr;
@@ -949,7 +949,7 @@ ib_create_cq(struct ib_device *device, ib_comp_handler comp_handler,
 		SOL_OFS_DPRINTF_L2(sol_kverbs_dbg_str,
 		    "ib_create_cq: device: 0x%p, comp_handler: 0x%p, "
 		    "event_handler: 0x%p, cq_context: 0x%p, cqe: 0x%x, "
-		    "comp_vector: %d => no sufficient memory", device,
+		    "comp_vector: %p => no sufficient memory", device,
 		    comp_handler, event_handler, cq_context, cqe, comp_vector);
 		return ((struct ib_cq *)-ENOMEM);
 	}
@@ -960,7 +960,7 @@ ib_create_cq(struct ib_device *device, ib_comp_handler comp_handler,
 		SOL_OFS_DPRINTF_L2(sol_kverbs_dbg_str,
 		    "ib_create_cq: device: 0x%p, comp_handler: 0x%p, "
 		    "event_handler: 0x%p, cq_context: 0x%p, cqe: 0x%x, "
-		    "comp_vector: %d => invalid device state (%d)", device,
+		    "comp_vector: %p => invalid device state (%d)", device,
 		    comp_handler, event_handler, cq_context, cqe, comp_vector,
 		    device->reg_state);
 		return ((struct ib_cq *)-ENXIO);
@@ -973,7 +973,7 @@ ib_create_cq(struct ib_device *device, ib_comp_handler comp_handler,
 	    cq_context, cqe, comp_vector);
 
 	cq_attr.cq_size = cqe;
-	cq_attr.cq_sched = 0; /* no hint */
+	cq_attr.cq_sched = comp_vector;
 	cq_attr.cq_flags = IBT_CQ_NO_FLAGS;
 	rtn = ibt_alloc_cq(device->hca_hdl, &cq_attr, &cq->ibt_cq, &real_size);
 	ofs_lock_exit(&ofs_client->lock);

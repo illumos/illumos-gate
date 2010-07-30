@@ -224,6 +224,9 @@ typedef enum ibt_status_e {
 	IBT_CQ_EMPTY			= 503,	/* Completion Queue Empty */
 	IBT_CQ_NOTIFY_TYPE_INVALID	= 504,	/* Invalid notification type */
 	IBT_CQ_INVALID_PRIORITY		= 505,	/* Invalid CQ Priority */
+	IBT_CQ_SCHED_INVALID		= 550,	/* Invalid CQ Sched Handle */
+	IBT_CQ_NO_SCHED_GROUP		= 551,	/* Schedule group not found */
+	IBT_CQ_HID_INVALID		= 552,	/* CQ Handler ID invalid */
 
 	/*
 	 * Reserved for future use.
@@ -315,8 +318,8 @@ typedef uint8_t ibt_wc_status_t;
 						/* for posted WR */
 #define	IBT_WC_WR_FLUSHED_ERR		14	/* WR was in process when the */
 						/* chan went to error state */
-#define	IBT_WC_MEM_WIN_BIND_ERR		15	/* Consumer had insufficient */
-						/* access rights */
+#define	IBT_WC_MEM_MGT_OP_ERR		15	/* bind plus 1.2 mem ext */
+#define	IBT_WC_MEM_WIN_BIND_ERR		IBT_WC_MEM_MGT_OP_ERR
 
 	/*
 	 * Errors that are only reported for Reliable Queue Pairs.

@@ -99,8 +99,10 @@ static ibt_status_t hermon_ci_resize_cq(ibc_hca_hdl_t, ibc_cq_hdl_t,
 static ibt_status_t hermon_ci_modify_cq(ibc_hca_hdl_t, ibc_cq_hdl_t,
     uint_t, uint_t, ibt_cq_handler_id_t);
 static ibt_status_t hermon_ci_alloc_cq_sched(ibc_hca_hdl_t,
-    ibt_cq_sched_flags_t, ibc_cq_handler_attr_t *);
-static ibt_status_t hermon_ci_free_cq_sched(ibc_hca_hdl_t, ibt_cq_handler_id_t);
+    ibt_cq_sched_attr_t *, ibc_sched_hdl_t *);
+static ibt_status_t hermon_ci_free_cq_sched(ibc_hca_hdl_t, ibc_sched_hdl_t);
+static ibt_status_t hermon_ci_query_cq_handler_id(ibc_hca_hdl_t,
+    ibt_cq_handler_id_t, ibt_cq_handler_attr_t *);
 
 /* EE Contexts */
 static ibt_status_t hermon_ci_alloc_eec(ibc_hca_hdl_t, ibc_eec_flags_t,
@@ -129,6 +131,8 @@ static ibt_status_t hermon_ci_reregister_buf(ibc_hca_hdl_t, ibc_mr_hdl_t,
     ibc_pd_hdl_t, ibt_smr_attr_t *, struct buf *, void *, ibc_mr_hdl_t *,
     ibt_mr_desc_t *);
 static ibt_status_t hermon_ci_sync_mr(ibc_hca_hdl_t, ibt_mr_sync_t *, size_t);
+static ibt_status_t hermon_ci_register_dma_mr(ibc_hca_hdl_t, ibc_pd_hdl_t,
+    ibt_dmr_attr_t *, void *, ibc_mr_hdl_t *, ibt_mr_desc_t *);
 
 /* Memory Windows */
 static ibt_status_t hermon_ci_alloc_mw(ibc_hca_hdl_t, ibc_pd_hdl_t,
@@ -212,6 +216,7 @@ static ibt_status_t hermon_ci_alloc_io_mem(ibc_hca_hdl_t hca, size_t size,
     ibc_mem_alloc_hdl_t *mem_alloc_hdl_p);
 static ibt_status_t hermon_ci_free_io_mem(ibc_hca_hdl_t hca,
     ibc_mem_alloc_hdl_t mem_alloc_hdl);
+static ibt_status_t hermon_ci_not_supported();
 
 /*
  * This ibc_operations_t structure includes pointers to all the entry points
@@ -255,6 +260,7 @@ ibc_operations_t hermon_ibc_ops = {
 	hermon_ci_modify_cq,
 	hermon_ci_alloc_cq_sched,
 	hermon_ci_free_cq_sched,
+	hermon_ci_query_cq_handler_id,
 
 	/* EE Contexts */
 	hermon_ci_alloc_eec,
@@ -321,7 +327,38 @@ ibc_operations_t hermon_ibc_ops = {
 	/* Memory allocation */
 	hermon_ci_alloc_io_mem,
 	hermon_ci_free_io_mem,
+
+	/* XRC not yet supported */
+	hermon_ci_not_supported,	/* ibc_alloc_xrc_domain */
+	hermon_ci_not_supported,	/* ibc_free_xrc_domain */
+	hermon_ci_not_supported,	/* ibc_alloc_xrc_srq */
+	hermon_ci_not_supported,	/* ibc_free_xrc_srq */
+	hermon_ci_not_supported,	/* ibc_query_xrc_srq */
+	hermon_ci_not_supported,	/* ibc_modify_xrc_srq */
+	hermon_ci_not_supported,	/* ibc_alloc_xrc_tgt_qp */
+	hermon_ci_not_supported,	/* ibc_free_xrc_tgt_qp */
+	hermon_ci_not_supported,	/* ibc_query_xrc_tgt_qp */
+	hermon_ci_not_supported,	/* ibc_modify_xrc_tgt_qp */
+
+	/* Memory Region (physical) */
+	hermon_ci_register_dma_mr,
+
+	/* Next enhancements */
+	hermon_ci_not_supported,	/* ibc_enhancement1 */
+	hermon_ci_not_supported,	/* ibc_enhancement2 */
+	hermon_ci_not_supported,	/* ibc_enhancement3 */
+	hermon_ci_not_supported,	/* ibc_enhancement4 */
 };
+
+/*
+ * Not yet implemented OPS
+ */
+/* ARGSUSED */
+static ibt_status_t
+hermon_ci_not_supported()
+{
+	return (IBT_NOT_SUPPORTED);
+}
 
 
 /*
@@ -336,11 +373,6 @@ hermon_ci_query_hca_ports(ibc_hca_hdl_t hca, uint8_t query_port,
 	hermon_state_t	*state;
 	uint_t		start, end, port;
 	int		status, indx;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
@@ -380,11 +412,6 @@ hermon_ci_modify_ports(ibc_hca_hdl_t hca, uint8_t port,
 {
 	hermon_state_t	*state;
 	int		status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
@@ -427,11 +454,6 @@ hermon_ci_alloc_pd(ibc_hca_hdl_t hca, ibt_pd_flags_t flags, ibc_pd_hdl_t *pd_p)
 
 	ASSERT(pd_p != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
 
@@ -459,16 +481,6 @@ hermon_ci_free_pd(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd)
 	hermon_state_t		*state;
 	hermon_pdhdl_t		pdhdl;
 	int			status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid PD handle pointer */
-	if (pd == NULL) {
-		return (IBT_PD_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and PD handle */
 	state = (hermon_state_t *)hca;
@@ -532,16 +544,6 @@ hermon_ci_alloc_ah(ibc_hca_hdl_t hca, ibt_ah_flags_t flags, ibc_pd_hdl_t pd,
 	hermon_pdhdl_t	pdhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid PD handle pointer */
-	if (pd == NULL) {
-		return (IBT_PD_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and PD handle */
 	state = (hermon_state_t *)hca;
 	pdhdl = (hermon_pdhdl_t)pd;
@@ -571,16 +573,6 @@ hermon_ci_free_ah(ibc_hca_hdl_t hca, ibc_ah_hdl_t ah)
 	hermon_ahhdl_t	ahhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid address handle pointer */
-	if (ah == NULL) {
-		return (IBT_AH_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and AH handle */
 	state = (hermon_state_t *)hca;
 	ahhdl = (hermon_ahhdl_t)ah;
@@ -605,16 +597,6 @@ hermon_ci_query_ah(ibc_hca_hdl_t hca, ibc_ah_hdl_t ah, ibc_pd_hdl_t *pd_p,
 	hermon_ahhdl_t	ahhdl;
 	hermon_pdhdl_t	pdhdl;
 	int		status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid address handle pointer */
-	if (ah == NULL) {
-		return (IBT_AH_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and AH handle */
 	state = (hermon_state_t *)hca;
@@ -645,16 +627,6 @@ hermon_ci_modify_ah(ibc_hca_hdl_t hca, ibc_ah_hdl_t ah, ibt_adds_vect_t *attr_p)
 	hermon_ahhdl_t	ahhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid address handle pointer */
-	if (ah == NULL) {
-		return (IBT_AH_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and AH handle */
 	state = (hermon_state_t *)hca;
 	ahhdl = (hermon_ahhdl_t)ah;
@@ -677,16 +649,11 @@ hermon_ci_alloc_qp(ibc_hca_hdl_t hca, ibtl_qp_hdl_t ibt_qphdl,
     ibt_chan_sizes_t *queue_sizes_p, ib_qpn_t *qpn, ibc_qp_hdl_t *qp_p)
 {
 	hermon_state_t		*state;
-	hermon_qp_info_t		qpinfo;
+	hermon_qp_info_t	qpinfo;
 	int			status;
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attr_p))
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*queue_sizes_p))
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
@@ -721,16 +688,11 @@ hermon_ci_alloc_special_qp(ibc_hca_hdl_t hca, uint8_t port,
     ibc_qp_hdl_t *qp_p)
 {
 	hermon_state_t		*state;
-	hermon_qp_info_t		qpinfo;
+	hermon_qp_info_t	qpinfo;
 	int			status;
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attr_p))
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*queue_sizes_p))
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
@@ -751,15 +713,37 @@ hermon_ci_alloc_special_qp(ibc_hca_hdl_t hca, uint8_t port,
 	return (IBT_SUCCESS);
 }
 
+/*
+ * hermon_ci_alloc_qp_range()
+ *    Free a Queue Pair
+ *    Context: Can be called only from user or kernel context.
+ */
 /* ARGSUSED */
 static ibt_status_t
 hermon_ci_alloc_qp_range(ibc_hca_hdl_t hca, uint_t log2,
-    ibtl_qp_hdl_t *ibtl_qp_p, ibt_qp_type_t type,
+    ibtl_qp_hdl_t *ibtl_qp, ibt_qp_type_t type,
     ibt_qp_alloc_attr_t *attr_p, ibt_chan_sizes_t *queue_sizes_p,
-    ibc_cq_hdl_t *send_cq_p, ibc_cq_hdl_t *recv_cq_p,
-    ib_qpn_t *qpn_p, ibc_qp_hdl_t *qp_p)
+    ibc_cq_hdl_t *send_cq, ibc_cq_hdl_t *recv_cq,
+    ib_qpn_t *qpn, ibc_qp_hdl_t *qp_p)
 {
-	return (IBT_NOT_SUPPORTED);
+	hermon_state_t		*state;
+	hermon_qp_info_t	qpinfo;
+	int			status;
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attr_p))
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*queue_sizes_p))
+
+	/* Grab the Hermon softstate pointer */
+	state = (hermon_state_t *)hca;
+
+	/* Allocate the QP */
+	qpinfo.qpi_attrp	= attr_p;
+	qpinfo.qpi_type		= type;
+	qpinfo.qpi_queueszp	= queue_sizes_p;
+	qpinfo.qpi_qpn		= qpn;
+	status = hermon_qp_alloc_range(state, log2, &qpinfo, ibtl_qp,
+	    send_cq, recv_cq, (hermon_qphdl_t *)qp_p, HERMON_NOSLEEP);
+	return (status);
 }
 
 /*
@@ -774,16 +758,6 @@ hermon_ci_free_qp(ibc_hca_hdl_t hca, ibc_qp_hdl_t qp,
 	hermon_state_t	*state;
 	hermon_qphdl_t	qphdl;
 	int		status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid QP handle pointer */
-	if (qp == NULL) {
-		return (IBT_QP_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and QP handle */
 	state = (hermon_state_t *)hca;
@@ -807,16 +781,6 @@ hermon_ci_release_qpn(ibc_hca_hdl_t hca, ibc_qpn_hdl_t qpnh)
 {
 	hermon_state_t		*state;
 	hermon_qpn_entry_t	*entry;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid QP handle pointer */
-	if (qpnh == NULL) {
-		return (IBT_QP_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and QP handle */
 	state = (hermon_state_t *)hca;
@@ -842,16 +806,6 @@ hermon_ci_query_qp(ibc_hca_hdl_t hca, ibc_qp_hdl_t qp,
 	hermon_qphdl_t	qphdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid QP handle */
-	if (qp == NULL) {
-		return (IBT_QP_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and QP handle */
 	state = (hermon_state_t *)hca;
 	qphdl = (hermon_qphdl_t)qp;
@@ -875,16 +829,6 @@ hermon_ci_modify_qp(ibc_hca_hdl_t hca, ibc_qp_hdl_t qp,
 	hermon_state_t	*state;
 	hermon_qphdl_t	qphdl;
 	int		status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid QP handle */
-	if (qp == NULL) {
-		return (IBT_QP_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and QP handle */
 	state = (hermon_state_t *)hca;
@@ -910,13 +854,7 @@ hermon_ci_alloc_cq(ibc_hca_hdl_t hca, ibt_cq_hdl_t ibt_cqhdl,
 	hermon_cqhdl_t	cqhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
-
 
 	/* Allocate the CQ */
 	status = hermon_cq_alloc(state, ibt_cqhdl, attr_p, actual_size,
@@ -944,16 +882,6 @@ hermon_ci_free_cq(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq)
 	hermon_cqhdl_t	cqhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid CQ handle pointer */
-	if (cq == NULL) {
-		return (IBT_CQ_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and CQ handle */
 	state = (hermon_state_t *)hca;
 	cqhdl = (hermon_cqhdl_t)cq;
@@ -974,26 +902,19 @@ static ibt_status_t
 hermon_ci_query_cq(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq, uint_t *entries_p,
     uint_t *count_p, uint_t *usec_p, ibt_cq_handler_id_t *hid_p)
 {
+	hermon_state_t	*state;
 	hermon_cqhdl_t	cqhdl;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid CQ handle pointer */
-	if (cq == NULL) {
-		return (IBT_CQ_HDL_INVALID);
-	}
-
 	/* Grab the CQ handle */
+	state = (hermon_state_t *)hca;
 	cqhdl = (hermon_cqhdl_t)cq;
 
 	/* Query the current CQ size */
 	*entries_p = cqhdl->cq_bufsz;
 	*count_p = cqhdl->cq_intmod_count;
 	*usec_p = cqhdl->cq_intmod_usec;
-	*hid_p = 0;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*cqhdl))
+	*hid_p = HERMON_EQNUM_TO_HID(state, cqhdl->cq_eqnum);
 
 	return (IBT_SUCCESS);
 }
@@ -1011,16 +932,6 @@ hermon_ci_resize_cq(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq, uint_t size,
 	hermon_state_t		*state;
 	hermon_cqhdl_t		cqhdl;
 	int			status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid CQ handle pointer */
-	if (cq == NULL) {
-		return (IBT_CQ_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and CQ handle */
 	state = (hermon_state_t *)hca;
@@ -1048,16 +959,6 @@ hermon_ci_modify_cq(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq, uint_t count,
 	hermon_cqhdl_t		cqhdl;
 	int			status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid CQ handle pointer */
-	if (cq == NULL) {
-		return (IBT_CQ_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and CQ handle */
 	state = (hermon_state_t *)hca;
 	cqhdl = (hermon_cqhdl_t)cq;
@@ -1076,24 +977,14 @@ hermon_ci_modify_cq(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq, uint_t count,
  */
 /* ARGSUSED */
 static ibt_status_t
-hermon_ci_alloc_cq_sched(ibc_hca_hdl_t hca, ibt_cq_sched_flags_t flags,
-    ibc_cq_handler_attr_t *handler_attr_p)
+hermon_ci_alloc_cq_sched(ibc_hca_hdl_t hca, ibt_cq_sched_attr_t *attr,
+    ibc_sched_hdl_t *sched_hdl_p)
 {
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
+	int	status;
 
-	/*
-	 * This is an unsupported interface for the Hermon driver.  Hermon
-	 * does not support CQ scheduling classes.
-	 */
-
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*handler_attr_p))
-	handler_attr_p->h_id = NULL;
-	handler_attr_p->h_pri = 0;
-	handler_attr_p->h_bind = NULL;
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*handler_attr_p))
-	return (IBT_SUCCESS);
+	status = hermon_cq_sched_alloc((hermon_state_t *)hca, attr,
+	    (hermon_cq_sched_t **)sched_hdl_p);
+	return (status);
 }
 
 
@@ -1102,26 +993,33 @@ hermon_ci_alloc_cq_sched(ibc_hca_hdl_t hca, ibt_cq_sched_flags_t flags,
  *    Free a CQ scheduling class resource
  *    Context: Can be called only from user or kernel context.
  */
+/* ARGSUSED */
 static ibt_status_t
-hermon_ci_free_cq_sched(ibc_hca_hdl_t hca, ibt_cq_handler_id_t handler_id)
+hermon_ci_free_cq_sched(ibc_hca_hdl_t hca, ibc_sched_hdl_t sched_hdl)
 {
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
+	int	status;
 
-	/*
-	 * This is an unsupported interface for the Hermon driver.  Hermon
-	 * does not support CQ scheduling classes.  Returning a NULL
-	 * hint is the way to treat this as unsupported.  We check for
-	 * the expected NULL, but do not fail in any case.
-	 */
-	if (handler_id != NULL) {
-		cmn_err(CE_NOTE, "hermon_ci_free_cq_sched: unexpected "
-		    "non-NULL handler_id\n");
-	}
-	return (IBT_SUCCESS);
+	status = hermon_cq_sched_free((hermon_state_t *)hca,
+	    (hermon_cq_sched_t *)sched_hdl);
+	return (status);
 }
 
+static ibt_status_t
+hermon_ci_query_cq_handler_id(ibc_hca_hdl_t hca,
+    ibt_cq_handler_id_t hid, ibt_cq_handler_attr_t *attrs)
+{
+	hermon_state_t		*state;
+
+	state = (hermon_state_t *)hca;
+	if (!HERMON_HID_VALID(state, hid))
+		return (IBT_CQ_HID_INVALID);
+	if (attrs == NULL)
+		return (IBT_INVALID_PARAM);
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attrs))
+	attrs->cha_ih = state->hs_intrmsi_hdl[hid - 1];
+	attrs->cha_dip = state->hs_dip;
+	return (IBT_SUCCESS);
+}
 
 /*
  * hermon_ci_alloc_eec()
@@ -1221,16 +1119,6 @@ hermon_ci_register_mr(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
 	ASSERT(mr_p != NULL);
 	ASSERT(mr_desc != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid PD handle pointer */
-	if (pd == NULL) {
-		return (IBT_PD_HDL_INVALID);
-	}
-
 	/*
 	 * Validate the access flags.  Both Remote Write and Remote Atomic
 	 * require the Local Write flag to be set
@@ -1303,16 +1191,6 @@ hermon_ci_register_buf(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
 	ASSERT(mr_p != NULL);
 	ASSERT(mr_desc != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid PD handle pointer */
-	if (pd == NULL) {
-		return (IBT_PD_HDL_INVALID);
-	}
-
 	/*
 	 * Validate the access flags.  Both Remote Write and Remote Atomic
 	 * require the Local Write flag to be set
@@ -1374,16 +1252,6 @@ hermon_ci_deregister_mr(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr)
 	hermon_mrhdl_t		mrhdl;
 	int			status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid memory region handle */
-	if (mr == NULL) {
-		return (IBT_MR_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
 	mrhdl = (hermon_mrhdl_t)mr;
@@ -1411,16 +1279,6 @@ hermon_ci_query_mr(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr,
 	int			status;
 
 	ASSERT(mr_attr != NULL);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for MemRegion handle */
-	if (mr == NULL) {
-		return (IBT_MR_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and MR handle */
 	state = (hermon_state_t *)hca;
@@ -1454,20 +1312,6 @@ hermon_ci_register_shared_mr(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr,
 	ASSERT(mr_p != NULL);
 	ASSERT(mr_desc != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid PD handle pointer */
-	if (pd == NULL) {
-		return (IBT_PD_HDL_INVALID);
-	}
-
-	/* Check for valid memory region handle */
-	if (mr == NULL) {
-		return (IBT_MR_HDL_INVALID);
-	}
 	/*
 	 * Validate the access flags.  Both Remote Write and Remote Atomic
 	 * require the Local Write flag to be set
@@ -1538,16 +1382,6 @@ hermon_ci_reregister_mr(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr, ibc_pd_hdl_t pd,
 	ASSERT(mr_new != NULL);
 	ASSERT(mr_desc != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid memory region handle */
-	if (mr == NULL) {
-		return (IBT_MR_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer, mrhdl, and pdhdl */
 	state = (hermon_state_t *)hca;
 	mrhdl = (hermon_mrhdl_t)mr;
@@ -1609,16 +1443,6 @@ hermon_ci_reregister_buf(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr, ibc_pd_hdl_t pd,
 	ASSERT(mr_new != NULL);
 	ASSERT(mr_desc != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid memory region handle */
-	if (mr == NULL) {
-		return (IBT_MR_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer, mrhdl, and pdhdl */
 	state = (hermon_state_t *)hca;
 	mrhdl = (hermon_mrhdl_t)mr;
@@ -1669,11 +1493,6 @@ hermon_ci_sync_mr(ibc_hca_hdl_t hca, ibt_mr_sync_t *mr_segs, size_t num_segs)
 
 	ASSERT(mr_segs != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
 
@@ -1699,16 +1518,6 @@ hermon_ci_alloc_mw(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd, ibt_mw_flags_t flags,
 
 	ASSERT(mw_p != NULL);
 	ASSERT(rkey_p != NULL);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid PD handle pointer */
-	if (pd == NULL) {
-		return (IBT_PD_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and PD handle */
 	state = (hermon_state_t *)hca;
@@ -1741,16 +1550,6 @@ hermon_ci_free_mw(ibc_hca_hdl_t hca, ibc_mw_hdl_t mw)
 	hermon_mwhdl_t		mwhdl;
 	int			status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid MW handle */
-	if (mw == NULL) {
-		return (IBT_MW_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and MW handle */
 	state = (hermon_state_t *)hca;
 	mwhdl = (hermon_mwhdl_t)mw;
@@ -1766,6 +1565,7 @@ hermon_ci_free_mw(ibc_hca_hdl_t hca, ibc_mw_hdl_t mw)
  *    Return the attributes of the specified Memory Window
  *    Context: Can be called from interrupt or base context.
  */
+/* ARGSUSED */
 static ibt_status_t
 hermon_ci_query_mw(ibc_hca_hdl_t hca, ibc_mw_hdl_t mw,
     ibt_mw_query_attr_t *mw_attr_p)
@@ -1774,22 +1574,77 @@ hermon_ci_query_mw(ibc_hca_hdl_t hca, ibc_mw_hdl_t mw,
 
 	ASSERT(mw_attr_p != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid MemWin handle */
-	if (mw == NULL) {
-		return (IBT_MW_HDL_INVALID);
-	}
-
 	/* Query the memory window pointer and fill in the return values */
 	mwhdl = (hermon_mwhdl_t)mw;
 	mutex_enter(&mwhdl->mr_lock);
 	mw_attr_p->mw_pd   = (ibc_pd_hdl_t)mwhdl->mr_pdhdl;
 	mw_attr_p->mw_rkey = mwhdl->mr_rkey;
 	mutex_exit(&mwhdl->mr_lock);
+
+	return (IBT_SUCCESS);
+}
+
+
+/*
+ * hermon_ci_register_dma_mr()
+ *    Allocate a memory region that maps physical addresses.
+ *    Context: Can be called only from user or kernel context.
+ */
+/* ARGSUSED */
+static ibt_status_t
+hermon_ci_register_dma_mr(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
+    ibt_dmr_attr_t *mr_attr, void *ibtl_reserved, ibc_mr_hdl_t *mr_p,
+    ibt_mr_desc_t *mr_desc)
+{
+	hermon_state_t		*state;
+	hermon_pdhdl_t		pdhdl;
+	hermon_mrhdl_t		mrhdl;
+	int			status;
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr_desc))
+
+	ASSERT(mr_attr != NULL);
+	ASSERT(mr_p != NULL);
+	ASSERT(mr_desc != NULL);
+
+	/*
+	 * Validate the access flags.  Both Remote Write and Remote Atomic
+	 * require the Local Write flag to be set
+	 */
+	if (((mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_WRITE) ||
+	    (mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_ATOMIC)) &&
+	    !(mr_attr->dmr_flags & IBT_MR_ENABLE_LOCAL_WRITE)) {
+		return (IBT_MR_ACCESS_REQ_INVALID);
+	}
+
+	/* Grab the Hermon softstate pointer and PD handle */
+	state = (hermon_state_t *)hca;
+	pdhdl = (hermon_pdhdl_t)pd;
+
+	status = hermon_dma_mr_register(state, pdhdl, mr_attr, &mrhdl);
+	if (status != DDI_SUCCESS) {
+		return (status);
+	}
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mrhdl))
+
+	/* Fill in the mr_desc structure */
+	mr_desc->md_vaddr = mr_attr->dmr_paddr;
+	mr_desc->md_lkey  = mrhdl->mr_lkey;
+	/* Only set RKey if remote access was requested */
+	if ((mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_ATOMIC) ||
+	    (mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_WRITE) ||
+	    (mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_READ)) {
+		mr_desc->md_rkey = mrhdl->mr_rkey;
+	}
+
+	/*
+	 * If region is mapped for streaming (i.e. noncoherent), then set
+	 * sync is required
+	 */
+	mr_desc->md_sync_required = B_FALSE;
+
+	/* Return the Hermon MR handle */
+	*mr_p = (ibc_mr_hdl_t)mrhdl;
 
 	return (IBT_SUCCESS);
 }
@@ -1807,16 +1662,6 @@ hermon_ci_attach_mcg(ibc_hca_hdl_t hca, ibc_qp_hdl_t qp, ib_gid_t gid,
 	hermon_state_t		*state;
 	hermon_qphdl_t		qphdl;
 	int			status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid QP handle pointer */
-	if (qp == NULL) {
-		return (IBT_QP_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and QP handles */
 	state = (hermon_state_t *)hca;
@@ -1840,16 +1685,6 @@ hermon_ci_detach_mcg(ibc_hca_hdl_t hca, ibc_qp_hdl_t qp, ib_gid_t gid,
 	hermon_state_t		*state;
 	hermon_qphdl_t		qphdl;
 	int			status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid QP handle pointer */
-	if (qp == NULL) {
-		return (IBT_QP_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and QP handle */
 	state = (hermon_state_t *)hca;
@@ -1876,16 +1711,6 @@ hermon_ci_post_send(ibc_hca_hdl_t hca, ibc_qp_hdl_t qp, ibt_send_wr_t *wr_p,
 
 	ASSERT(wr_p != NULL);
 	ASSERT(num_wr != 0);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid QP handle pointer */
-	if (qp == NULL) {
-		return (IBT_QP_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer and QP handle */
 	state = (hermon_state_t *)hca;
@@ -1916,15 +1741,6 @@ hermon_ci_post_recv(ibc_hca_hdl_t hca, ibc_qp_hdl_t qp, ibt_recv_wr_t *wr_p,
 	state = (hermon_state_t *)hca;
 	qphdl = (hermon_qphdl_t)qp;
 
-	if (state == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid QP handle pointer */
-	if (qphdl == NULL) {
-		return (IBT_QP_HDL_INVALID);
-	}
-
 	/* Post the receive WQEs */
 	status = hermon_post_recv(state, qphdl, wr_p, num_wr, num_posted_p);
 	return (status);
@@ -1945,16 +1761,6 @@ hermon_ci_poll_cq(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq, ibt_wc_t *wc_p,
 	int			status;
 
 	ASSERT(wc_p != NULL);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid CQ handle pointer */
-	if (cq == NULL) {
-		return (IBT_CQ_HDL_INVALID);
-	}
 
 	/* Check for valid num_wc field */
 	if (num_wc == 0) {
@@ -1984,16 +1790,6 @@ hermon_ci_notify_cq(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq_hdl,
 	hermon_cqhdl_t		cqhdl;
 	int			status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid CQ handle pointer */
-	if (cq_hdl == NULL) {
-		return (IBT_CQ_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and CQ handle */
 	state = (hermon_state_t *)hca;
 	cqhdl = (hermon_cqhdl_t)cq_hdl;
@@ -2016,11 +1812,6 @@ hermon_ci_ci_data_in(ibc_hca_hdl_t hca, ibt_ci_data_flags_t flags,
 	hermon_state_t		*state;
 	int			status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
 
@@ -2042,11 +1833,6 @@ hermon_ci_ci_data_out(ibc_hca_hdl_t hca, ibt_ci_data_flags_t flags,
 {
 	hermon_state_t		*state;
 	int			status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
@@ -2074,18 +1860,7 @@ hermon_ci_alloc_srq(ibc_hca_hdl_t hca, ibt_srq_flags_t flags,
 	hermon_srq_info_t	srqinfo;
 	int			status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	state = (hermon_state_t *)hca;
-
-	/* Check for valid PD handle pointer */
-	if (pd == NULL) {
-		return (IBT_PD_HDL_INVALID);
-	}
-
 	pdhdl = (hermon_pdhdl_t)pd;
 
 	srqinfo.srqi_ibt_srqhdl = ibt_srq;
@@ -2117,11 +1892,6 @@ hermon_ci_free_srq(ibc_hca_hdl_t hca, ibc_srq_hdl_t srq)
 	hermon_srqhdl_t	srqhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	state = (hermon_state_t *)hca;
 
 	/* Check for valid SRQ handle pointer */
@@ -2141,21 +1911,12 @@ hermon_ci_free_srq(ibc_hca_hdl_t hca, ibc_srq_hdl_t srq)
  *    Query properties of a Shared Receive Queue (SRQ)
  *    Context: Can be called from interrupt or base context.
  */
+/* ARGSUSED */
 static ibt_status_t
 hermon_ci_query_srq(ibc_hca_hdl_t hca, ibc_srq_hdl_t srq, ibc_pd_hdl_t *pd_p,
     ibt_srq_sizes_t *sizes_p, uint_t *limit_p)
 {
 	hermon_srqhdl_t	srqhdl;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid SRQ handle pointer */
-	if (srq == NULL) {
-		return (IBT_SRQ_HDL_INVALID);
-	}
 
 	srqhdl = (hermon_srqhdl_t)srq;
 
@@ -2189,18 +1950,7 @@ hermon_ci_modify_srq(ibc_hca_hdl_t hca, ibc_srq_hdl_t srq,
 	uint_t		resize_supported, cur_srq_size;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	state = (hermon_state_t *)hca;
-
-	/* Check for valid SRQ handle pointer */
-	if (srq == NULL) {
-		return (IBT_SRQ_HDL_INVALID);
-	}
-
 	srqhdl = (hermon_srqhdl_t)srq;
 
 	/*
@@ -2282,18 +2032,7 @@ hermon_ci_post_srq(ibc_hca_hdl_t hca, ibc_srq_hdl_t srq,
 	hermon_srqhdl_t	srqhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	state = (hermon_state_t *)hca;
-
-	/* Check for valid SRQ handle pointer */
-	if (srq == NULL) {
-		return (IBT_SRQ_HDL_INVALID);
-	}
-
 	srqhdl = (hermon_srqhdl_t)srq;
 
 	status = hermon_post_srq(state, srqhdl, wr, num_wr, num_posted_p);
@@ -2436,7 +2175,7 @@ marea_fail3:
 
 /*
  * hermon_ci_map_mem_area()
- *    Context: Can be called from interrupt or base context.
+ *    Context: Can be called from user or base context.
  *
  *	Creates the memory mapping suitable for a subsequent posting of an
  *	FRWR work request.  All the info about the memory area for the
@@ -2476,6 +2215,8 @@ hermon_ci_map_mem_area(ibc_hca_hdl_t hca, ibt_va_attr_t *va_attrs,
 	/* FRWR */
 
 	state = (hermon_state_t *)hca;
+	if (!(state->hs_ibtfinfo.hca_attr->hca_flags2 & IBT_HCA2_MEM_MGT_EXT))
+		return (IBT_NOT_SUPPORTED);
 	hermon_dma_attr_init(state, &dma_attr);
 #ifdef	__sparc
 	if (state->hs_cfg_profile->cp_iommu_bypass == HERMON_BINDMEM_BYPASS)
@@ -2561,7 +2302,8 @@ hermon_ci_map_mem_area(ibc_hca_hdl_t hca, ibt_va_attr_t *va_attrs,
 	len = 0;
 	pagesize = PAGESIZE;
 	kaddr = (uint64_t *)(void *)ma_hdl->h_ma_kaddr;
-	kcookie_paddr = kcookie.dmac_laddress + HERMON_PAGEMASK;
+	kcookie.dmac_size += kcookie.dmac_laddress & HERMON_PAGEOFFSET;
+	kcookie_paddr = kcookie.dmac_laddress & HERMON_PAGEMASK;
 	khdl = ma_hdl->h_ma_list_hdl;
 	while (cookie_cnt-- > 0) {
 		addr	= dmacookie.dmac_laddress;
@@ -2704,13 +2446,6 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*wr))
 
-	if (mi_hdl_p == NULL)
-		return (IBT_MI_HDL_INVALID);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL)
-		return (IBT_HCA_HDL_INVALID);
-
 	state = (hermon_state_t *)hca;
 	hermon_dma_attr_init(state, &dma_attr);
 #ifdef	__sparc
@@ -2726,7 +2461,8 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 	if (iov_attr->iov_lso_hdr_sz)
 		max_nds -= (iov_attr->iov_lso_hdr_sz + sizeof (uint32_t) +
 		    0xf) >> 4;	/* 0xf is for rounding up to a multiple of 16 */
-	rsvd_lkey = state->hs_devlim.rsv_lkey;
+	rsvd_lkey = (iov_attr->iov_flags & IBT_IOV_ALT_LKEY) ?
+	    iov_attr->iov_alt_lkey : state->hs_devlim.rsv_lkey;
 	if ((iov_attr->iov_flags & IBT_IOV_NOSLEEP) == 0) {
 		kmflag = KM_SLEEP;
 		callback = DDI_DMA_SLEEP;
@@ -2875,9 +2611,10 @@ hermon_ci_unmap_mem_iov(ibc_hca_hdl_t hca, ibc_mi_hdl_t mi_hdl)
 	return (IBT_SUCCESS);
 }
 
-/* Allocate L_Key */
 /*
  * hermon_ci_alloc_lkey()
+ * Allocate an empty memory region for use with FRWR.
+ *    Context: Can be called from user or base context.
  */
 /* ARGSUSED */
 static ibt_status_t
@@ -2885,7 +2622,41 @@ hermon_ci_alloc_lkey(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
     ibt_lkey_flags_t flags, uint_t list_sz, ibc_mr_hdl_t *mr_p,
     ibt_pmr_desc_t *mem_desc_p)
 {
-	return (IBT_NOT_SUPPORTED);
+	hermon_state_t		*state;
+	hermon_pdhdl_t		pdhdl;
+	hermon_mrhdl_t		mrhdl;
+	int			status;
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mem_desc_p))
+
+	ASSERT(mr_p != NULL);
+	ASSERT(mem_desc_p != NULL);
+
+	state = (hermon_state_t *)hca;
+	pdhdl = (hermon_pdhdl_t)pd;
+
+	if (!(state->hs_ibtfinfo.hca_attr->hca_flags2 & IBT_HCA2_MEM_MGT_EXT))
+		return (IBT_NOT_SUPPORTED);
+
+	status = hermon_mr_alloc_lkey(state, pdhdl, flags, list_sz, &mrhdl);
+	if (status != DDI_SUCCESS) {
+		return (status);
+	}
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mrhdl))
+
+	/* Fill in the mem_desc_p structure */
+	mem_desc_p->pmd_iova = 0;
+	mem_desc_p->pmd_phys_buf_list_sz = list_sz;
+	mem_desc_p->pmd_lkey = mrhdl->mr_lkey;
+	/* Only set RKey if remote access was requested */
+	if (flags & IBT_KEY_REMOTE) {
+		mem_desc_p->pmd_rkey = mrhdl->mr_rkey;
+	}
+	mem_desc_p->pmd_sync_required = B_FALSE;
+
+	/* Return the Hermon MR handle */
+	*mr_p = (ibc_mr_hdl_t)mrhdl;
+	return (IBT_SUCCESS);
 }
 
 /* Physical Register Memory Region */
@@ -2927,11 +2698,6 @@ hermon_ci_create_fmr_pool(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
 	hermon_pdhdl_t	pdhdl;
 	hermon_fmrhdl_t	fmrpoolhdl;
 	int		status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
 
 	state = (hermon_state_t *)hca;
 
@@ -2975,18 +2741,7 @@ hermon_ci_destroy_fmr_pool(ibc_hca_hdl_t hca, ibc_fmr_pool_hdl_t fmr_pool)
 	hermon_fmrhdl_t	fmrpoolhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	state = (hermon_state_t *)hca;
-
-	/* Check for valid FMR Pool handle */
-	if (fmr_pool == NULL) {
-		return (IBT_FMR_POOL_HDL_INVALID);
-	}
-
 	fmrpoolhdl = (hermon_fmrhdl_t)fmr_pool;
 
 	status = hermon_destroy_fmr_pool(state, fmrpoolhdl);
@@ -3005,20 +2760,9 @@ hermon_ci_flush_fmr_pool(ibc_hca_hdl_t hca, ibc_fmr_pool_hdl_t fmr_pool)
 	hermon_fmrhdl_t	fmrpoolhdl;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	state = (hermon_state_t *)hca;
 
-	/* Check for valid FMR Pool handle */
-	if (fmr_pool == NULL) {
-		return (IBT_FMR_POOL_HDL_INVALID);
-	}
-
 	fmrpoolhdl = (hermon_fmrhdl_t)fmr_pool;
-
 	status = hermon_flush_fmr_pool(state, fmrpoolhdl);
 	return (status);
 }
@@ -3044,18 +2788,8 @@ hermon_ci_register_physical_fmr(ibc_hca_hdl_t hca,
 	ASSERT(mr_p != NULL);
 	ASSERT(mem_desc_p != NULL);
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
-
-	/* Check for valid FMR Pool handle */
-	if (fmr_pool == NULL) {
-		return (IBT_FMR_POOL_HDL_INVALID);
-	}
 
 	fmrpoolhdl = (hermon_fmrhdl_t)fmr_pool;
 
@@ -3096,16 +2830,6 @@ hermon_ci_deregister_fmr(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr)
 	hermon_state_t		*state;
 	hermon_mrhdl_t		mrhdl;
 	int			status;
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid memory region handle */
-	if (mr == NULL) {
-		return (IBT_MR_HDL_INVALID);
-	}
 
 	/* Grab the Hermon softstate pointer */
 	state = (hermon_state_t *)hca;
@@ -3179,16 +2903,6 @@ hermon_ci_alloc_io_mem(ibc_hca_hdl_t hca, size_t size, ibt_mr_flags_t mr_flag,
 	hermon_state_t	*state;
 	int		status;
 
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid mem_alloc_hdl_p handle pointer */
-	if (mem_alloc_hdl_p == NULL) {
-		return (IBT_MEM_ALLOC_HDL_INVALID);
-	}
-
 	/* Grab the Hermon softstate pointer and mem handle */
 	state = (hermon_state_t *)hca;
 
@@ -3210,19 +2924,10 @@ hermon_ci_alloc_io_mem(ibc_hca_hdl_t hca, size_t size, ibt_mr_flags_t mr_flag,
  * hermon_ci_free_io_mem()
  * Unbind handl and free the memory
  */
+/* ARGSUSED */
 static ibt_status_t
 hermon_ci_free_io_mem(ibc_hca_hdl_t hca, ibc_mem_alloc_hdl_t mem_alloc_hdl)
 {
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid mem_alloc_hdl handle pointer */
-	if (mem_alloc_hdl == NULL) {
-		return (IBT_MEM_ALLOC_HDL_INVALID);
-	}
-
 	/* Unbind the handles and free the memory */
 	(void) ddi_dma_unbind_handle(mem_alloc_hdl->ibc_dma_hdl);
 	ddi_dma_mem_free(&mem_alloc_hdl->ibc_acc_hdl);

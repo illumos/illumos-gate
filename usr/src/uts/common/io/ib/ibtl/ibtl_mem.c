@@ -892,3 +892,23 @@ ibt_deregister_fmr(ibt_hca_hdl_t hca, ibt_mr_hdl_t mr_hdl)
 	return (IBTL_HCA2CIHCAOPS_P(hca)->ibc_deregister_fmr(
 	    IBTL_HCA2CIHCA(hca), mr_hdl));
 }
+
+/*
+ * ibt_register_dma_mr
+ */
+ibt_status_t
+ibt_register_dma_mr(ibt_hca_hdl_t hca, ibt_pd_hdl_t pd,
+    ibt_dmr_attr_t *mem_attr, ibt_mr_hdl_t *mr_hdl_p, ibt_mr_desc_t *mem_desc)
+{
+	ibt_status_t 	status;
+
+	IBTF_DPRINTF_L3(ibtl_mem, "ibt_register_dma_mr(%p, %p, %p)",
+	    hca, pd, mem_attr);
+
+	status = IBTL_HCA2CIHCAOPS_P(hca)->ibc_register_dma_mr(
+	    IBTL_HCA2CIHCA(hca), pd, mem_attr, NULL, mr_hdl_p, mem_desc);
+	if (status == IBT_SUCCESS) {
+		atomic_inc_32(&hca->ha_mr_cnt);
+	}
+	return (status);
+}
