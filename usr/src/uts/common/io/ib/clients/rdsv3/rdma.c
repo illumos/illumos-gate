@@ -47,6 +47,7 @@
 
 #include <sys/ib/clients/rdsv3/ib.h>
 #include <sys/ib/clients/rdsv3/rdma.h>
+#include <sys/ib/clients/rdsv3/rdsv3.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
 #define	DMA_TO_DEVICE 0
@@ -582,17 +583,19 @@ rdsv3_cmsg_rdma_args(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	struct cmsghdr *cmsg)
 {
 	struct rdsv3_rdma_op *op;
-	struct rds_rdma_args *ap;
+	/* uint64_t alignment on the buffer */
+	uint64_t buf[ceil(CMSG_LEN(sizeof (struct rds_rdma_args)),
+	    sizeof (uint64_t))];
 
-	if (cmsg->cmsg_len < CMSG_LEN(sizeof (struct rds_rdma_args)) ||
+	if (cmsg->cmsg_len != CMSG_LEN(sizeof (struct rds_rdma_args)) ||
 	    rm->m_rdma_op != NULL)
 		return (-EINVAL);
 
-	/* uint64_t alignment on struct rds_get_mr_args */
-	ap = (struct rds_rdma_args *)kmem_alloc(cmsg->cmsg_len, KM_SLEEP);
-	bcopy(CMSG_DATA(cmsg), ap, cmsg->cmsg_len);
-	op = rdsv3_rdma_prepare(rs, ap);
-	kmem_free(ap, cmsg->cmsg_len);
+	ASSERT(sizeof (buf) >= cmsg->cmsg_len && ((uintptr_t)buf & 0x7) == 0);
+
+	bcopy(CMSG_DATA(cmsg), (char *)buf, cmsg->cmsg_len);
+	op = rdsv3_rdma_prepare(rs, (struct rds_rdma_args *)buf);
+
 	if (IS_ERR(op))
 		return (PTR_ERR(op));
 	rdsv3_stats_inc(s_send_rdma);
@@ -612,7 +615,7 @@ rdsv3_cmsg_rdma_dest(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	uint32_t r_key;
 	int err = 0;
 
-	if (cmsg->cmsg_len < CMSG_LEN(sizeof (rds_rdma_cookie_t)) ||
+	if (cmsg->cmsg_len != CMSG_LEN(sizeof (rds_rdma_cookie_t)) ||
 	    rm->m_rdma_cookie != 0)
 		return (-EINVAL);
 
@@ -652,17 +655,20 @@ int
 rdsv3_cmsg_rdma_map(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	struct cmsghdr *cmsg)
 {
-	struct rds_get_mr_args *mrp;
+	/* uint64_t alignment on the buffer */
+	uint64_t buf[ceil(CMSG_LEN(sizeof (struct rds_get_mr_args)),
+	    sizeof (uint64_t))];
 	int status;
 
-	if (cmsg->cmsg_len < CMSG_LEN(sizeof (struct rds_get_mr_args)) ||
+	if (cmsg->cmsg_len != CMSG_LEN(sizeof (struct rds_get_mr_args)) ||
 	    rm->m_rdma_cookie != 0)
 		return (-EINVAL);
 
-	/* uint64_t alignment on struct rds_get_mr_args */
-	mrp = (struct rds_get_mr_args *)kmem_alloc(cmsg->cmsg_len, KM_SLEEP);
-	bcopy(CMSG_DATA(cmsg), mrp, cmsg->cmsg_len);
-	status = __rdsv3_rdma_map(rs, mrp, &rm->m_rdma_cookie, &rm->m_rdma_mr);
-	kmem_free(mrp, cmsg->cmsg_len);
+	ASSERT(sizeof (buf) >= cmsg->cmsg_len && ((uintptr_t)buf & 0x7) == 0);
+
+	bcopy(CMSG_DATA(cmsg), (char *)buf, cmsg->cmsg_len);
+	status = __rdsv3_rdma_map(rs, (struct rds_get_mr_args *)buf,
+	    &rm->m_rdma_cookie, &rm->m_rdma_mr);
+
 	return (status);
 }
