@@ -437,13 +437,7 @@ initialize() {
 		cp /etc/nsswitch.conf $ZONE_ETC_DIR/nsswitch.ldap
 	else
 		print "name_service=NONE" > ${SYSIDCFG}
-		if [ $NSCD_PER_LABEL = 0 ] ; then
-			sharePasswd
-		else
-			unsharePasswd
 		fi
-	fi
-
 	print "security_policy=NONE" >> ${SYSIDCFG}
 	locale=$(locale|grep LANG | cut -d "=" -f2)
 	if [[ -z $locale ]] ; then
@@ -454,6 +448,12 @@ initialize() {
 	print "timezone=$timezone" >> ${SYSIDCFG}
 	print "terminal=vt100" >> ${SYSIDCFG}
 	rootpwd=$(grep "^root:" /etc/shadow|cut -d : -f2)
+ 
+#	There are two problems with setting the root password:
+#		The zone's shadow file may be read-only
+#		The password contains unparsable characters
+#	so the following line is commented out until this is resolved.
+
 	#print "root_password=$rootpwd" >> ${SYSIDCFG}
 	print "nfs4_domain=dynamic" >> ${SYSIDCFG}
 	print "network_interface=PRIMARY {" >> ${SYSIDCFG}
@@ -537,13 +537,12 @@ snapshot of one of the following halted zones:")
 		removeZoneBEs
 		zoneadm -z $zonename clone $image
 
-		if [ ! -f /var/ldap/ldap_client_file ] ; then
-			if [ $NSCD_PER_LABEL = 0 ] ; then
-				sharePasswd
-			else
-				unsharePasswd
-			fi
+		if [ $NSCD_PER_LABEL = 0 ] ; then
+			sharePasswd $zonename
+		else
+			unsharePasswd $zonename
 		fi
+
 		ipType=$(zonecfg -z $zonename info ip-type|cut -d" " -f2)
 		if [ $ipType = exclusive ] ; then
 			zoneadm -z $zonename ready
@@ -582,6 +581,12 @@ install() {
 	if [ $zonestate != ready ] ; then
 		gettext "error making zone $zonename ready.\n"
 		return 1
+	fi
+
+	if [ $NSCD_PER_LABEL = 0 ] ; then
+		sharePasswd $zonename
+	else
+		unsharePasswd $zonename
 	fi
 
 	initialize
@@ -653,12 +658,13 @@ validateIPaddr () {
 					octet_cnt+=1
 					continue
 				fi
-			fi
+			else
 			x=$(zenity --error \
 			    --title="$title" \
 			    --text="$ipaddr $msg_badip")
 			ipaddr=
 			return
+			fi
 		done
 	else
 		x=$(zenity --error \
@@ -878,6 +884,16 @@ shareInterface() {
 	mv $TXTMP/txnetmgr.$$ $if_file
 }
 
+unshareInterface() {
+	#
+	# TODO: better integration with nwam
+	#
+	ifconfig $nic -zone;\
+	if_file=/etc/hostname.$nic
+	sed q | sed -e "s/all-zones/ /" < $if_file >$TXTMP/txnetmgr.$$
+	mv $TXTMP/txnetmgr.$$ $if_file
+}
+
 addTnrhdb() {
 	ipaddr=$(zenity --entry \
 	    --title="$title" \
@@ -996,20 +1012,67 @@ setMLPs() {
 	rm $TXTMP/syntax_error.$$
 }
 
-unsharePasswd() {
-	for i in $(zoneadm list -i | grep -v global) ; do
-		zonecfg -z $i remove fs dir=/etc/passwd 2>&1 | grep -v such
-		zonecfg -z $i remove fs dir=/etc/shadow 2>&1 | grep -v such
+enableAuthentication() {
+	integer file_cnt=0
+
+	zonepath=$(zoneadm -z $1 list -p|cut -d : -f4)
+	ZONE_ETC_DIR=$zonepath/root/etc
+
+	# If the zone's shadow file was previously read-only
+	# there may be no root password entry for this zone.
+	# If so, replace the root password entry with the global zone's.
+
+	entry=$(grep ^root:: $ZONE_ETC_DIR/shadow)
+	if [ $? -eq 0 ] ; then
+		grep ^root: /etc/shadow > $TXTMP/shadow.$$
+		sed -e "/^root::/d" $ZONE_ETC_DIR/shadow >> \
+		    $TXTMP/shadow.$$ 2>/dev/null
+		mv $TXTMP/shadow.$$ $ZONE_ETC_DIR/shadow
+		chmod 400 $ZONE_ETC_DIR/shadow
+	fi
+
+	if [ $LOGNAME = "root" ]; then
+		return
+	fi
+
+	file[0]="passwd"
+	file[1]="shadow"
+	file[2]="user_attr"
+	#
+	# Add the user who assumed the root role to each installed zone
+	#
+	while (( file_cnt < ${#file[*]} )); do
+		exists=$(grep "^${LOGNAME}:" \
+		    $ZONE_ETC_DIR/${file[file_cnt]} >/dev/null)
+		if [ $? -ne 0 ] ; then
+			entry=$(grep "^${LOGNAME}:" \
+			    /etc/${file[file_cnt]})
+			if [ $? -eq 0 ] ; then
+				print "$entry" >> \
+				    $ZONE_ETC_DIR/${file[file_cnt]}
+			fi
+		fi
+		file_cnt+=1
 	done
+	chmod 400 $ZONE_ETC_DIR/shadow
+}
+
+unsharePasswd() {
+	zonecfg -z $1 remove fs dir=/etc/passwd >/dev/null 2>&1 | grep -v such
+	zonecfg -z $1 remove fs dir=/etc/shadow >/dev/null 2>&1 | grep -v such
+	zoneadm -z $1 ready >/dev/null 2>&1
+	if [ $? -eq 0 ] ; then
+		enableAuthentication $1
+		zoneadm -z $1 halt >/dev/null 2>&1
+	else
+		echo Skipping $1
+	fi
 }
 
 sharePasswd() {
-	if [ $NSCD_PER_LABEL -ne 0 ] ; then
-		return
-	fi
-	passwd=$(zonecfg -z $zonename info|grep /etc/passwd)
+	passwd=$(zonecfg -z $1 info|grep /etc/passwd)
 	if [ $? -eq 1 ] ; then
-		zonecfg -z $zonename "add fs; \
+		zonecfg -z $1 "add fs; \
 		    set special=/etc/passwd; \
 		    set dir=/etc/passwd; \
 		    set type=lofs; \
@@ -1021,6 +1084,12 @@ sharePasswd() {
 		    set type=lofs; \
 		    add options ro; \
 		    end"
+	fi
+	zoneadm -z $1 ready >/dev/null 2>&1
+	if [ $? -eq 0 ] ; then
+		zoneadm -z $1 halt >/dev/null 2>&1
+	else
+		echo Skipping $1
 	fi
 }
 
@@ -1036,16 +1105,18 @@ manageNscd() {
 		touch $NSCD_INDICATOR
 		NSCD_OPT="Unconfigure per-zone name service"
 		NSCD_PER_LABEL=1
-		unsharePasswd
+		for i in $(zoneadm list -i | grep -v global) ; do
+			zoneadm -z $i halt >/dev/null 2>&1
+			unsharePasswd $i
+		done
 	else
 		rm -f $NSCD_INDICATOR
 		NSCD_OPT="Configure per-zone name service"
 		NSCD_PER_LABEL=0
 		for i in $(zoneadm list -i | grep -v global) ; do
-			zonename=$i
-			sharePasswd
+			zoneadm -z $i halt >/dev/null 2>&1
+			sharePasswd $i
 		done
-		zonename=global
 	fi
 }
 
@@ -1146,6 +1217,8 @@ manageInterface () {
 			setipaddr="Set IP address...\n"
 		elif [ $zone != all-zones ] ; then
 			share="Share with Shared-IP Zones\n"
+		else 
+			share="Remove from Shared-IP Zones\n"
 		fi
 
 		command=$(print ""\
@@ -1172,6 +1245,8 @@ manageInterface () {
 			addHost;;
 		    " Share with Shared-IP Zones")
 			shareInterface;;
+		    " Remove from Shared-IP Zones")
+			unshareInterface;;
 		    " Remove Logical Interface")
 			ifconfig $nic unplumb
 			rm -f /etc/hostname.$nic
