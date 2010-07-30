@@ -23,8 +23,10 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "lint.h"
 #include "file64.h"
@@ -65,11 +67,8 @@ vwprintf(const wchar_t *format, va_list ap)
 
 	FLOCKFILE(lk, stdout);
 
-	if (_set_orientation_wide(stdout, NULL, NULL, 0) == -1) {
-		errno = EBADF;
-		FUNLOCKFILE(lk);
-		return (EOF);
-	}
+	if (GET_NO_MODE(stdout))
+		_setorientation(stdout, _WC_MODE);
 	if (!(stdout->_flag & _IOWRT)) {
 		/* if no write flag */
 		if (stdout->_flag & _IORW) {
@@ -114,11 +113,8 @@ vfwprintf(FILE *iop, const wchar_t *format, va_list ap)
 
 	FLOCKFILE(lk, iop);
 
-	if (_set_orientation_wide(iop, NULL, NULL, 0) == -1) {
-		errno = EBADF;
-		FUNLOCKFILE(lk);
-		return (EOF);
-	}
+	if (GET_NO_MODE(iop))
+		_setorientation(iop, _WC_MODE);
 
 	if (!(iop->_flag & _IOWRT)) {
 		/* if no write flag */

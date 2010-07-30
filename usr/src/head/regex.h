@@ -28,11 +28,13 @@
  * Copyright 1989, 1994 by Mortice Kern Systems Inc.
  * All rights reserved.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef	_REGEX_H
 #define	_REGEX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -69,17 +71,23 @@ typedef long    wchar_t;
 typedef ssize_t regoff_t;
 
 /* regcomp flags */
+#define	REG_BASIC	0x00
 #define	REG_EXTENDED	0x01		/* Use Extended Regular Expressions */
 #define	REG_NEWLINE	0x08		/* Treat \n as regular character */
 #define	REG_ICASE	0x04		/* Ignore case in match */
 #define	REG_NOSUB	0x02		/* Don't set subexpression */
 #define	REG_EGREP	0x1000		/* running as egrep(1) */
 
-/* non-standard flags */
+/* non-standard flags - note that most of these are not supported */
 #define	REG_DELIM	0x10		/* string[0] is delimiter */
 #define	REG_DEBUG	0x20		/* Debug recomp and regexec */
 #define	REG_ANCHOR	0x40		/* Implicit ^ and $ */
 #define	REG_WORDS	0x80		/* \< and \> match word boundries */
+
+/* FreeBSD additions */
+#define	REG_DUMP	0x2000
+#define	REG_PEND	0x4000
+#define	REG_NOSPEC	0x8000
 
 /* internal flags */
 #define	REG_MUST	0x100		/* check for regmust substring */
@@ -119,11 +127,14 @@ typedef struct {		/* regcomp() data saved for regexec() */
 	size_t  re_nsub;	/* # of subexpressions in RE pattern */
 
 	/*
-	 * Internal use only
+	 * Internal use only.  Note that any changes to this structure
+	 * have to preserve sizing, as it is baked into applications.
 	 */
-	void	*re_comp;	/* compiled RE; freed by regfree() */
-	int	re_cflags;	/* saved cflags for regexec() */
-	size_t	re_erroff;	/* RE pattern error offset */
+	struct re_guts *re_g;
+	int re_magic;
+	const char *re_endp;
+
+	/* here for compat */
 	size_t	re_len;		/* # wchar_t chars in compiled pattern */
 	struct _regex_ext_t *re_sc;	/* for binary compatibility */
 } regex_t;

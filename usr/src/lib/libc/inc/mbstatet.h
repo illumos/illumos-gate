@@ -24,17 +24,22 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #ifndef	_MBSTATET_H
 #define	_MBSTATET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * This structure is totally opaque. The value mirrors wchar_impl.h.
+ */
 typedef struct __mbstate_t {
-	void	*__lc_locale;	/* pointer to _LC_locale_t */
-	void	*__state;		/* currently unused state flag */
-	char	__consumed[8];	/* 8 bytes */
-	char	__nconsumed;
-	char	__fill[7];
+#if defined(_LP64)
+        long    __filler[4];
+#else
+        int     __filler[6];
+#endif
 } __mbstate_t;
 
 #endif	/* _MBSTATET_H */

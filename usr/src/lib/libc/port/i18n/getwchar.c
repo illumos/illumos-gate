@@ -23,8 +23,10 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -48,7 +50,7 @@
 wint_t
 getwchar(void)
 {
-	return (_getwc(stdin));
+	return (getwc(stdin));
 }
 
 wint_t

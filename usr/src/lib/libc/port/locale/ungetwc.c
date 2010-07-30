@@ -24,75 +24,90 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	This module is created for NLS on Sep.03.86		*/
 
 /*
- * Fputwc transforms the wide character c into the multibyte character,
- * and writes it onto the output stream "iop".
+ * Ungetwc saves the process code c into the one character buffer
+ * associated with an input stream "iop". That character, c,
+ * will be returned by the next getwc call on that stream.
  */
 
 #include "lint.h"
 #include "file64.h"
 #include "mse_int.h"
-#include "mtlib.h"
-#include <stdlib.h>
 #include <stdio.h>
-#include <wchar.h>
+#include <stdlib.h>
+#include <widec.h>
 #include <limits.h>
 #include <errno.h>
+#include "libc.h"
 #include "stdiom.h"
 #include "mse.h"
 
-wint_t
-__fputwc_xpg5(wint_t wc, FILE *iop)
+static wint_t
+__ungetwc_impl(wint_t wc, FILE *iop, int orient)
 {
-	char	mbs[MB_LEN_MAX];
+	char		mbs[MB_LEN_MAX];
 	unsigned char	*p;
-	int	n;
-	void	*lc;
-	int	(*fp_wctomb)(void *, char *, wchar_t);
+	int		n;
 	rmutex_t	*lk;
 
 	FLOCKFILE(lk, iop);
 
-	if (_set_orientation_wide(iop, &lc,
-	    (void (*(*))(void))&fp_wctomb, FP_WCTOMB) == -1) {
-		errno = EBADF;
+	if (orient && GET_NO_MODE(iop)) {
+		_setorientation(iop, _WC_MODE);
+	}
+	if ((wc == WEOF) || ((iop->_flag & _IOREAD) == 0)) {
 		FUNLOCKFILE(lk);
 		return (WEOF);
 	}
 
-	if (wc == WEOF) {
-		FUNLOCKFILE(lk);
-		return (WEOF);
-	}
-	n = fp_wctomb(lc, mbs, (wchar_t)wc);
+	n = wctomb(mbs, (wchar_t)wc);
 	if (n <= 0) {
 		FUNLOCKFILE(lk);
 		return (WEOF);
 	}
-	p = (unsigned char *)mbs;
-	while (n--) {
-		/* Can wide I/O functions call byte I/O functions */
-		/* because a steam bound to WIDE should not be used */
-		/* by byte I/O functions ? */
-		/* Anyway, I assume PUTC() macro has appropriate */
-		/* definition here. */
-		if (PUTC((*p++), iop) == EOF) {
+
+	if (iop->_ptr <= iop->_base) {
+		if (iop->_base == NULL) {
+			FUNLOCKFILE(lk);
+			return (WEOF);
+		}
+		if (iop->_ptr == iop->_base && iop->_cnt == 0) {
+			++iop->_ptr;
+		} else if ((iop->_ptr - n) < (iop->_base - PUSHBACK)) {
 			FUNLOCKFILE(lk);
 			return (WEOF);
 		}
 	}
+
+	p = (unsigned char *)(mbs + n - 1);
+	while (n--) {
+		*--(iop)->_ptr = (*p--);
+		++(iop)->_cnt;
+	}
+	iop->_flag &= ~_IOEOF;
 	FUNLOCKFILE(lk);
 	return (wc);
 }
 
+
 wint_t
-__putwc_xpg5(wint_t wc, FILE *iop)
+__ungetwc_xpg5(wint_t wc, FILE *iop)
 {
-	return (__fputwc_xpg5(wc, iop));
+	return (__ungetwc_impl(wc, iop, 1));
+}
+
+wint_t
+ungetwc(wint_t wc, FILE *iop)
+{
+	return (__ungetwc_impl(wc, iop, 0));
 }

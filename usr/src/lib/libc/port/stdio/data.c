@@ -27,7 +27,10 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma weak __iob = _iob
 
@@ -53,7 +56,7 @@ Uchar _smbuf[_NFILE + 1][_SMBFSZ] = {0};  /* shared library compatibility */
 
 
 #define	DEFAULTMBSTATE \
-	{ NULL, NULL, {0, 0, 0, 0, 0, 0, 0, 0}, 0, {0, 0}}
+	{ 0 }
 
 #ifdef	_LP64
 

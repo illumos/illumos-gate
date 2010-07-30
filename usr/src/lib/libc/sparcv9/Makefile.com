@@ -22,6 +22,9 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 
 LIBCDIR=	$(SRC)/lib/libc
 LIB_PIC=	libc_pic.a
@@ -668,11 +671,6 @@ PORTSTDIO=			\
 	wscanf.o
 
 PORTI18N=			\
-	__fgetwc_xpg5.o		\
-	__fgetws_xpg5.o		\
-	__fputwc_xpg5.o		\
-	__fputws_xpg5.o		\
-	__ungetwc_xpg5.o	\
 	getwchar.o		\
 	putwchar.o		\
 	putws.o			\
@@ -717,11 +715,78 @@ PORTI18N=			\
 	wdresolve.o		\
 	_ctype.o		\
 	isascii.o		\
+	isdigit.o		\
 	toascii.o
 
 PORTI18N_COND=			\
 	wcstol_longlong.o	\
 	wcstoul_longlong.o
+
+PORTLOCALE=			\
+	ascii.o			\
+	big5.o			\
+	btowc.o			\
+	collate.o		\
+	collcmp.o		\
+	euc.o			\
+	fnmatch.o		\
+	fgetwc.o		\
+	fgetws.o		\
+	fputwc.o		\
+	fputws.o		\
+	fwide.o			\
+	gb18030.o		\
+	gb2312.o		\
+	gbk.o			\
+	getdate.o		\
+	iswctype.o		\
+	ldpart.o		\
+	lmessages.o		\
+	lnumeric.o		\
+	lmonetary.o		\
+	localeconv.o		\
+	mbftowc.o		\
+	mblen.o			\
+	mbrlen.o		\
+	mbrtowc.o		\
+	mbsinit.o		\
+	mbsrtowcs.o		\
+	mbstowcs.o		\
+	mbtowc.o		\
+	mskanji.o		\
+	none.o			\
+	regcomp.o		\
+	regfree.o		\
+	regerror.o		\
+	regexec.o		\
+	rune.o			\
+	runetype.o		\
+	setlocale.o		\
+	setrunelocale.o		\
+	strcoll.o		\
+	strfmon.o		\
+	strftime.o		\
+	strptime.o		\
+	strxfrm.o		\
+	table.o			\
+	timelocal.o		\
+	tolower.o		\
+	towlower.o		\
+	ungetwc.o		\
+	utf8.o			\
+	wcrtomb.o		\
+	wcscoll.o		\
+	wcsftime.o		\
+	wcsrtombs.o		\
+	wcswidth.o		\
+	wcstombs.o		\
+	wcsxfrm.o		\
+	wctob.o			\
+	wctomb.o		\
+	wctrans.o		\
+	wctype.o		\
+	wcwidth.o		\
+	wscol.o
 
 AIOOBJS=			\
 	aio.o			\
@@ -861,6 +926,7 @@ MOSTOBJS=			\
 	$(PORTGEN64)		\
 	$(PORTI18N)		\
 	$(PORTI18N_COND)	\
+	$(PORTLOCALE)		\
 	$(PORTPRINT)		\
 	$(PORTPRINT_W)		\
 	$(PORTREGEX)		\
@@ -989,6 +1055,7 @@ SRCS=							\
 	$(PORTFP:%.o=$(LIBCDIR)/port/fp/%.c)			\
 	$(PORTGEN:%.o=$(LIBCDIR)/port/gen/%.c)			\
 	$(PORTI18N:%.o=$(LIBCDIR)/port/i18n/%.c)		\
+	$(PORTLOCALE:%.o=$(LIBCDIR)/port/locale/%.c)		\
 	$(PORTPRINT:%.o=$(LIBCDIR)/port/print/%.c)		\
 	$(PORTREGEX:%.o=$(LIBCDIR)/port/regex/%.c)		\
 	$(PORTSTDIO:%.o=$(LIBCDIR)/port/stdio/%.c)		\

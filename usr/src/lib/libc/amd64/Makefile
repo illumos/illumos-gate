@@ -22,6 +22,9 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 
 LIBCBASE=	.
 LIBCDIR=	$(SRC)/lib/libc
@@ -645,11 +648,6 @@ PORTSTDIO=			\
 	wscanf.o
 
 PORTI18N=			\
-	__fgetwc_xpg5.o		\
-	__fgetws_xpg5.o		\
-	__fputwc_xpg5.o		\
-	__fputws_xpg5.o		\
-	__ungetwc_xpg5.o	\
 	getwchar.o		\
 	putwchar.o		\
 	putws.o			\
@@ -690,6 +688,7 @@ PORTI18N=			\
 	gettext_gnu.o		\
 	gettext_real.o		\
 	gettext_util.o		\
+	isdigit.o		\
 	plural_parser.o		\
 	wdresolve.o		\
 	_ctype.o		\
@@ -699,6 +698,76 @@ PORTI18N=			\
 PORTI18N_COND=			\
 	wcstol_longlong.o	\
 	wcstoul_longlong.o
+
+PORTLOCALE=			\
+	ascii.o			\
+	big5.o			\
+	btowc.o			\
+	collate.o		\
+	collcmp.o		\
+	euc.o			\
+	fnmatch.o		\
+	fgetwc.o		\
+	fgetws.o		\
+	fix_grouping.o		\
+	fputwc.o		\
+	fputws.o		\
+	fwide.o			\
+	gb18030.o		\
+	gb2312.o		\
+	gbk.o			\
+	getdate.o		\
+	iswctype.o		\
+	ldpart.o		\
+	lmessages.o		\
+	lnumeric.o		\
+	lmonetary.o		\
+	localeconv.o		\
+	mbftowc.o		\
+	mblen.o			\
+	mbrlen.o		\
+	mbrtowc.o		\
+	mbsinit.o		\
+	mbsnrtowcs.o		\
+	mbsrtowcs.o		\
+	mbstowcs.o		\
+	mbtowc.o		\
+	mskanji.o		\
+	nl_langinfo.o		\
+	none.o			\
+	regcomp.o		\
+	regfree.o		\
+	regerror.o		\
+	regexec.o		\
+	rune.o			\
+	runetype.o		\
+	setlocale.o		\
+	setrunelocale.o		\
+	strcoll.o		\
+	strfmon.o		\
+	strftime.o		\
+	strptime.o		\
+	strxfrm.o		\
+	table.o			\
+	timelocal.o		\
+	tolower.o		\
+	towlower.o		\
+	ungetwc.o		\
+	utf8.o			\
+	wcrtomb.o		\
+	wcscoll.o		\
+	wcsftime.o		\
+	wcsnrtombs.o		\
+	wcsrtombs.o		\
+	wcswidth.o		\
+	wcstombs.o		\
+	wcsxfrm.o		\
+	wctob.o			\
+	wctomb.o		\
+	wctrans.o		\
+	wctype.o		\
+	wcwidth.o		\
+	wscol.o
 
 AIOOBJS=			\
 	aio.o			\
@@ -843,6 +912,7 @@ MOSTOBJS=			\
 	$(PORTGEN64)		\
 	$(PORTI18N)		\
 	$(PORTI18N_COND)	\
+	$(PORTLOCALE)		\
 	$(PORTPRINT)		\
 	$(PORTPRINT_W)		\
 	$(PORTREGEX)		\
@@ -885,12 +955,6 @@ CRTSRCS= ../../common/amd64
 include ../../Makefile.lib
 include ../../Makefile.lib.64
 
-# NOTE: libc_i18n.a will be part of libc.so.1.  Therefore, the compilation
-# conditions such as the settings of CFLAGS and CPPFLAGS for the libc_i18n stuff
-# need to be compatible with the ones for the libc stuff.  Whenever the changes
-# that affect the compilation conditions of libc happened, those for libc_i18n
-# also need to be updated.
-
 CFLAGS64 += $(CTF_FLAGS)
 
 # This is necessary to avoid problems with calling _ex_unwind().
@@ -908,7 +972,6 @@ CFLAGS64 += $(XSTRCONST)
 
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
-$(DYNLIB) := PICS += $(ROOTFS_LIBDIR64)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(EXTPICS)
 
 MAPFILES =	$(LIBCDIR)/port/mapfile-vers
@@ -967,6 +1030,7 @@ SRCS=							\
 	$(PORTFP:%.o=$(LIBCDIR)/port/fp/%.c)			\
 	$(PORTGEN:%.o=$(LIBCDIR)/port/gen/%.c)			\
 	$(PORTI18N:%.o=$(LIBCDIR)/port/i18n/%.c)		\
+	$(PORTLOCALE:%.o=$(LIBCDIR)/port/locale/%.c)		\
 	$(PORTPRINT:%.o=$(LIBCDIR)/port/print/%.c)		\
 	$(PORTREGEX:%.o=$(LIBCDIR)/port/regex/%.c)		\
 	$(PORTSTDIO:%.o=$(LIBCDIR)/port/stdio/%.c)		\

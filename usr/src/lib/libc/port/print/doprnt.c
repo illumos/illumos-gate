@@ -89,7 +89,7 @@ static const wchar_t widenullstr[] = L"(null)";
 #define	PUT(p, n) \
 	{ \
 		int	retp; \
-		retp = put_wide(iop, &bufptr, bufferend, p, n, sflag, lc, fp); \
+		retp = put_wide(iop, &bufptr, bufferend, p, n, sflag); \
 		if (retp == EOF) { \
 			return ((ssize_t)EOF); \
 		} \
@@ -299,7 +299,7 @@ _dowrite(const char *p, ssize_t n, FILE *iop, unsigned char **ptrptr)
 static int
 put_wide(FILE *iop, unsigned char **bufptr,
 	unsigned char *bufferend, wchar_t *p, size_t n,
-	int sflag, void *lc, int (*fp_wctomb)(void *, char *, wchar_t))
+	int sflag)
 {
 	unsigned char	*newbufptr;
 	wchar_t	*q;
@@ -330,7 +330,7 @@ put_wide(FILE *iop, unsigned char **bufptr,
 		q = p;
 		tmpq = tmpp;
 		for (len = 0, i = 0; i < n; i++) {
-			r = fp_wctomb(lc, tmpq, *q++);
+			r = wctomb(tmpq, *q++);
 			if (r == -1) {
 				lfree(tmpp, tsize);
 				errno = EILSEQ;
@@ -423,9 +423,6 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 #ifdef	_WIDE
 	int	sflag = 0;
 	size_t	maxcount;
-	mbstate_t	*mbst;
-	void	*lc;
-	int	(*fp)(void *, char *, wchar_t);
 #else
 	int	snflag = 0;
 #endif /* _WIDE */
@@ -592,13 +589,6 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 		sflag = 1;
 
 	if (!sflag) {
-		mbst = _getmbstate(iop);
-		if (mbst == NULL) {
-			errno = EBADF;
-			return (EOF);
-		}
-		lc = __mbst_get_lc_and_fp((const mbstate_t *)mbst,
-		    (void (*(*))(void))&fp, FP_WCTOMB);
 #endif /* _WIDE */
 	/* if first I/O to the stream get a buffer */
 	/* Note that iop->_base should not equal 0 for sprintf and vsprintf */

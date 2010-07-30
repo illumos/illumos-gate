@@ -54,11 +54,8 @@ vwscanf(const wchar_t *fmt, va_list ap)
 
 	FLOCKFILE(lk, stdin);
 
-	if (_set_orientation_wide(stdin, NULL, NULL, 0) == -1) {
-		errno = EBADF;
-		FUNLOCKFILE(lk);
-		return (EOF);
-	}
+	if (GET_NO_MODE(stdin))
+		_setorientation(stdin, _WC_MODE);
 
 #ifdef _C89_INTMAX32
 	ret = __wdoscan_u(stdin, fmt, ap, _F_INTMAX32);
@@ -81,11 +78,8 @@ vfwscanf(FILE *iop, const wchar_t *fmt, va_list ap)
 
 	FLOCKFILE(lk, iop);
 
-	if (_set_orientation_wide(iop, NULL, NULL, 0) == -1) {
-		errno = EBADF;
-		FUNLOCKFILE(lk);
-		return (EOF);
-	}
+	if (GET_NO_MODE(iop))
+		_setorientation(iop, _WC_MODE);
 
 
 #ifdef _C89_INTMAX32

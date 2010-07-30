@@ -21,6 +21,9 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 
 #
 # MAPFILE HEADER START
@@ -2493,14 +2496,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__inf_written;
 	__i_size;
 	_isnanf			{ TYPE = FUNCTION; FILTER = libm.so.2 };
-	__lc_charmap;
-	__lc_collate;
-	__lc_ctype;
-	__lc_locale;
-	__lc_messages;
-	__lc_monetary;
-	__lc_numeric;
-	__lc_time;
 	__libc_threaded;
 	_lib_version		{ FLAGS = NODIRECT };
 	_logb			{ TYPE = FUNCTION; FILTER = libm.so.2 };
@@ -2597,14 +2592,9 @@ $endif
 	attr_to_option;
 	attr_to_xattr_view;	
 	_autofssys;
-	__btowc_dense;
-	__btowc_euc;
-	__btowc_sb;
 	_bufsync;
-	__charmap_init;
 	_cladm;
 	__class_quadruple;
-	__collate_init;
 	core_get_default_content;
 	core_get_default_path;
 	core_get_global_content;
@@ -2619,7 +2609,6 @@ $endif
 	core_set_options;
 	core_set_process_content;
 	core_set_process_path;
-	__ctype_init;
 	dbm_close_status;
 	dbm_do_nextkey;
 	dbm_setdefwrite;
@@ -2640,24 +2629,17 @@ $endif
 	_doscan;
 	_errfp;
 	_errxfp;
-	__eucpctowc_gen;
 	exportfs;
 	_F_cplx_div;
 	_F_cplx_div_ix;
 	_F_cplx_div_rx;
 	_F_cplx_mul;
-	__fgetwc_dense;
-	__fgetwc_euc;
-	__fgetwc_sb;
 	__fgetwc_xpg5;
 	__fgetws_xpg5;
 	_findbuf;
 	_findiop;
 	__fini_daemon_priv;
 	_finite;
-	__fnmatch_C;
-	__fnmatch_sb;
-	__fnmatch_std;
 	_fork1			{ FLAGS = NODYNSORT };
 	_forkall		{ FLAGS = NODYNSORT };
 	_fpclass;
@@ -2670,12 +2652,10 @@ $endif
 	_fpsetsticky;
 	__fputwc_xpg5;
 	__fputws_xpg5;
-	__fseterror_u;
 	_ftw;
 	_gcvt;
 	_getarg;
 	__getcontext;
-	__getdate_std;
 	_getdents;
 	_get_exit_frame_monitor;
 	_getfp;
@@ -2694,12 +2674,7 @@ $endif
 	__init_suid_priv;
 	_insert;
 	inst_sync;
-	_is_euc_fc;
-	_is_euc_pc;
 	_iswctype;
-	__iswctype_bc;
-	__iswctype_sb;
-	__iswctype_std;
 	klpd_create;
 	klpd_getpath;
 	klpd_getport;
@@ -2711,8 +2686,6 @@ $endif
 	_lgrp_home_fast		{ FLAGS = NODYNSORT };
 	_lgrpsys;
 	_lltostr;
-	__localeconv_std;
-	__locale_init;
 	_lock_clear;
 	_lock_try;
 	_ltzset;
@@ -2720,38 +2693,10 @@ $endif
 	makeut;
 	makeutx;
 	_mbftowc;
-	__mbftowc_dense;
-	__mbftowc_euc;
-	__mbftowc_sb;
-	__mblen_gen;
-	__mblen_sb;
-	__mbrlen_gen;
-	__mbrlen_sb;
-	__mbrtowc_dense;
-	__mbrtowc_euc;
-	__mbrtowc_sb;
-	__mbsinit_gen;
-	__mbsrtowcs_dense;
-	__mbsrtowcs_euc;
-	__mbsrtowcs_sb;
-	__mbst_get_consumed_array;
-	__mbst_get_locale;
-	__mbst_get_nconsumed;
-	__mbstowcs_dense;
-	__mbstowcs_euc;
-	__mbstowcs_sb;
-	__mbst_set_consumed_array;
-	__mbst_set_locale;
-	__mbst_set_nconsumed;
-	__mbtowc_dense;
-	__mbtowc_euc;
-	__mbtowc_sb;
 	mcfiller;
-	__messages_init;
 	mntopt;
 	modctl;
 	modutx;
-	__monetary_init;
 	msgctl64;
 	__multi_innetgr;
 	_mutex_destroy		{ FLAGS = NODYNSORT };
@@ -2763,7 +2708,6 @@ $endif
 	nfssvc;
 	_nfssys;
 	__nis_get_environment;
-	__nl_langinfo_std;
 	_nss_db_state_destr;
 	nss_default_key2str;
 	nss_delete;
@@ -2784,7 +2728,6 @@ $endif
 	__nsw_freeconfig_v1;
 	__nsw_getconfig_v1;
 	__nthreads;
-	__numeric_init;
 	__openattrdirat;
 	option_to_attr;
 	__priv_bracket;
@@ -2798,12 +2741,6 @@ $endif
 	rctlctl;
 	rctllist;
 	_realbufend;
-	__regcomp_C;
-	__regcomp_std;
-	__regerror_std;
-	__regexec_C;
-	__regexec_std;
-	__regfree_std;
 	_resume;
 	_resume_ret;
 	_rpcsys;
@@ -2812,7 +2749,6 @@ $endif
 	semctl64;
 	_semctl64;
 	set_setcontext_enforcement;
-	set_l10n_alternate_root;
 	_setbufend;
 	__set_errno;
 	setprojrctl;
@@ -2846,16 +2782,7 @@ $endif
 	str2group;
 	str2passwd;
 	str2spwd;
-	__strcoll_C;
-	__strcoll_sb;
-	__strcoll_std;
-	__strfmon_std;
-	__strftime_std;
 	__strptime_dontzero;
-	__strptime_std;
-	__strxfrm_C;
-	__strxfrm_sb;
-	__strxfrm_std;
 	stty;
 	syscall;
 	_sysconfig;
@@ -2883,14 +2810,7 @@ $endif
 	_thr_suspend_mutator;
 	thr_wait_mutator;
 	_thr_wait_mutator;
-	__time_init;
 	__tls_get_addr;
-	__towctrans_bc;
-	__towctrans_std;
-	__towlower_bc;
-	__towlower_std;
-	__towupper_bc;
-	__towupper_std;
 	tpool_create;
 	tpool_dispatch;
 	tpool_destroy;
@@ -2899,8 +2819,6 @@ $endif
 	tpool_suspended;
 	tpool_resume;
 	tpool_member;
-	_trwctype;
-	__trwctype_std;
 	_ttyname_dev;
 	_ucred_alloc;
 	ucred_getamask;
@@ -2925,43 +2843,8 @@ $endif
 	_vwarnxfp;
 	_warnfp;
 	_warnxfp;
-	__wcrtomb_dense;
-	__wcrtomb_euc;
-	__wcrtomb_sb;
-	__wcscoll_bc;
-	__wcscoll_C;
-	__wcscoll_std;
-	__wcsftime_std;
 	__wcsftime_xpg5;
-	__wcsrtombs_dense;
-	__wcsrtombs_euc;
-	__wcsrtombs_sb;
 	__wcstok_xpg5;
-	__wcstombs_dense;
-	__wcstombs_euc;
-	__wcstombs_sb;
-	__wcswidth_bc;
-	__wcswidth_dense;
-	__wcswidth_euc;
-	__wcswidth_sb;
-	__wcswidth_std;
-	__wcsxfrm_bc;
-	__wcsxfrm_C;
-	__wcsxfrm_std;
-	__wctob_dense;
-	__wctob_euc;
-	__wctob_sb;
-	__wctoeucpc_gen;
-	__wctomb_dense;
-	__wctomb_euc;
-	__wctomb_sb;
-	__wctrans_std;
-	__wctype_std;
-	__wcwidth_bc;
-	__wcwidth_dense;
-	__wcwidth_euc;
-	__wcwidth_sb;
-	__wcwidth_std;
 	wdbindf;
 	wdchkind;
 	wddelim;

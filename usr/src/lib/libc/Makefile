@@ -21,6 +21,8 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 LIBBASENAME=	libc
@@ -125,28 +127,11 @@ $(ROOTVARIANTDIR64)/$(VAR1_DYNLIB64)	:= FILEMODE= 755
 
 .KEEP_STATE:
 
-all:	check_i18n .WAIT lib32 $(BUILD64) .WAIT lib64 .WAIT etc
-
-check_i18n:
-	@if [ ! -f $(ROOTFS_LIBDIR)/libc_i18n.a -o \
-	    ! -f $(ROOTFS_LIBDIR64)/libc_i18n.a ]; then \
-		if [ "$$CLOSED_IS_PRESENT" = no ]; then \
-			$(ECHO) "Warning: closed binaries not" \
-			    "properly unpacked." >&2;\
-			$(ECHO) "Missing libc_i18n.a" >&2; \
-			exit 1; \
-		else \
-			$(ECHO) "Warning: libc_i18n.a must be built" \
-			    "before libc can be built." >&2; \
-			exit 1; \
-		fi \
-	fi
+all:	lib32 $(BUILD64) .WAIT lib64 .WAIT etc
 
 etc:	$($(MACH)_ETC)
 
 lib32:	$(MACH_COMP) $(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
-	mkdir -p $(MACH)/i18n_pics
-	cd $(MACH)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR)/libc_i18n.a
 	@if $(ELFDUMP) -r $(MACH)/$(DYNLIB) | $(GREP) -w environ ; then \
 		$(ECHO) "Error: Invalid reference to environ" ; \
 		$(ECHO) "Error: See comments in port/gen/env_data.c" ; \
@@ -154,8 +139,6 @@ lib32:	$(MACH_COMP) $(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 	fi
 
 lib64:	$(MACH_COMP) $(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS64)
-	mkdir -p $(MACH64)/i18n_pics
-	cd $(MACH64)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR64)/libc_i18n.a
 	@if $(ELFDUMP) -r $(MACH64)/$(DYNLIB) | $(GREP) -w environ ; then \
 		$(ECHO) "Error: Invalid reference to environ" ; \
 		$(ECHO) "Error: See comments in port/gen/env_data.c" ; \
@@ -246,8 +229,6 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; VERSION='$(VERSION)' $(MAKE) $(TARGET)
 
 clean clobber: $(SUBDIRS)
-	$(RM) -r $(MACH)/i18n_pics
-	$(BUILD64)$(RM) -r $(MACH64)/i18n_pics
 
 lint: $(SUBDIRS)
 

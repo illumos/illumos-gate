@@ -23,12 +23,15 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef	_MSE_H
 #define	_MSE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include "lint.h"
 #include <stdio.h>
 #include <wchar.h>
 #include <string.h>
@@ -89,38 +92,10 @@ extern void	_setorientation(FILE *, _IOP_orientation_t);
  * otherwise alter the orientation of a stream.
  */
 
-/*
- * libc_i18n provides the following functions:
- */
-extern int	_set_orientation_wide(FILE *, void **, void (*(*))(void), int);
-extern void	*__mbst_get_lc_and_fp(const mbstate_t *,
-    void (*(*))(void), int);
-/*
- * Above two functions take either FP_WCTOMB or FP_FGETWC for the integer
- * argument.
- */
-#define	FP_WCTOMB	0
-#define	FP_FGETWC	1
-
 #define	_SET_ORIENTATION_BYTE(iop) \
 { \
 	if (GET_NO_MODE(iop)) \
 		_setorientation(iop, _BYTE_MODE); \
 }
-
-/* The following is specified in the argument of _get_internal_mbstate() */
-#define	_MBRLEN		0
-#define	_MBRTOWC	1
-#define	_WCRTOMB	2
-#define	_MBSRTOWCS	3
-#define	_WCSRTOMBS	4
-#define	_MAX_MB_FUNC	_WCSRTOMBS
-
-extern void	_clear_internal_mbstate(void);
-extern mbstate_t	*_get_internal_mbstate(int);
-
-#define	MBSTATE_INITIAL(ps)	MBSTATE_RESTART(ps)
-#define	MBSTATE_RESTART(ps) \
-	(void) memset((void *)ps, 0, sizeof (mbstate_t))
 
 #endif	/* _MSE_H */
