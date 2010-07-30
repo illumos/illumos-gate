@@ -574,6 +574,14 @@ recv_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	if (!rbsa->force && dsl_dataset_modified_since_lastsnap(ds))
 		return (ETXTBSY);
 
+	/* new snapshot name must not exist */
+	err = zap_lookup(ds->ds_dir->dd_pool->dp_meta_objset,
+	    ds->ds_phys->ds_snapnames_zapobj, rbsa->tosnap, 8, 1, &val);
+	if (err == 0)
+		return (EEXIST);
+	if (err != ENOENT)
+		return (err);
+
 	if (rbsa->fromguid) {
 		/* if incremental, most recent snapshot must match fromguid */
 		if (ds->ds_prev == NULL)
@@ -621,13 +629,6 @@ recv_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	if (err != ENOENT)
 		return (err);
 
-	/* new snapshot name must not exist */
-	err = zap_lookup(ds->ds_dir->dd_pool->dp_meta_objset,
-	    ds->ds_phys->ds_snapnames_zapobj, rbsa->tosnap, 8, 1, &val);
-	if (err == 0)
-		return (EEXIST);
-	if (err != ENOENT)
-		return (err);
 	return (0);
 }
 

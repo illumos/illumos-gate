@@ -422,7 +422,7 @@ dmu_objset_from_ds(dsl_dataset_t *ds, objset_t **osp)
 	*osp = ds->ds_objset;
 	if (*osp == NULL) {
 		err = dmu_objset_open_impl(dsl_dataset_get_spa(ds),
-		    ds, &ds->ds_phys->ds_bp, osp);
+		    ds, dsl_dataset_get_blkptr(ds), osp);
 	}
 	mutex_exit(&ds->ds_opening_lock);
 	return (err);
@@ -602,11 +602,11 @@ dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	dnode_t *mdn;
 
 	ASSERT(dmu_tx_is_syncing(tx));
-	if (ds)
-		mutex_enter(&ds->ds_opening_lock);
-	VERIFY(0 == dmu_objset_open_impl(spa, ds, bp, &os));
-	if (ds)
-		mutex_exit(&ds->ds_opening_lock);
+	if (ds != NULL)
+		VERIFY(0 == dmu_objset_from_ds(ds, &os));
+	else
+		VERIFY(0 == dmu_objset_open_impl(spa, NULL, bp, &os));
+
 	mdn = DMU_META_DNODE(os);
 
 	dnode_allocate(mdn, DMU_OT_DNODE, 1 << DNODE_BLOCK_SHIFT,
@@ -695,38 +695,33 @@ static void
 dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
+	spa_t *spa = dd->dd_pool->dp_spa;
 	struct oscarg *oa = arg2;
-	uint64_t dsobj;
-	dsl_dataset_t *ds;
-	objset_t *os;
+	uint64_t obj;
 
 	ASSERT(dmu_tx_is_syncing(tx));
 
-	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
+	obj = dsl_dataset_create_sync(dd, oa->lastname,
 	    oa->clone_origin, oa->flags, oa->cr, tx);
 
-	VERIFY(0 == dsl_dataset_hold_obj(dd->dd_pool, dsobj, FTAG, &ds));
-
 	if (oa->clone_origin == NULL) {
+		dsl_pool_t *dp = dd->dd_pool;
+		dsl_dataset_t *ds;
 		blkptr_t *bp;
+		objset_t *os;
 
+		VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, obj, FTAG, &ds));
 		bp = dsl_dataset_get_blkptr(ds);
 		ASSERT(BP_IS_HOLE(bp));
 
-		os = dmu_objset_create_impl(dsl_dataset_get_spa(ds),
-		    ds, bp, oa->type, tx);
+		os = dmu_objset_create_impl(spa, ds, bp, oa->type, tx);
 
 		if (oa->userfunc)
 			oa->userfunc(os, oa->userarg, oa->cr, tx);
-	} else {
-		VERIFY3U(0, ==, dmu_objset_from_ds(ds, &os));
-		bzero(&os->os_zil_header, sizeof (os->os_zil_header));
-		dsl_dataset_dirty(ds, tx);
+		dsl_dataset_rele(ds, FTAG);
 	}
-	dsl_dataset_rele(ds, FTAG);
 
-	spa_history_log_internal(LOG_DS_CREATE, dd->dd_pool->dp_spa,
-	    tx, "dataset = %llu", dsobj);
+	spa_history_log_internal(LOG_DS_CREATE, spa, tx, "dataset = %llu", obj);
 }
 
 int
@@ -794,18 +789,8 @@ dmu_objset_destroy(const char *name, boolean_t defer)
 	dsl_dataset_t *ds;
 	int error;
 
-	/*
-	 * dsl_dataset_destroy() can free any claimed-but-unplayed
-	 * intent log, but if there is an active log, it has blocks that
-	 * are allocated, but may not yet be reflected in the on-disk
-	 * structure.  Only the ZIL knows how to free them, so we have
-	 * to call into it here.
-	 */
 	error = dsl_dataset_own(name, B_TRUE, FTAG, &ds);
 	if (error == 0) {
-		objset_t *os;
-		if (dmu_objset_from_ds(ds, &os) == 0)
-			zil_destroy(dmu_objset_zil(os), B_FALSE);
 		error = dsl_dataset_destroy(ds, FTAG, defer);
 		/* dsl_dataset_destroy() closes the ds. */
 	}

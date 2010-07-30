@@ -883,6 +883,21 @@ dsl_dataset_create_sync(dsl_dir_t *pdd, const char *lastname,
 
 	dsl_dir_close(dd, FTAG);
 
+	/*
+	 * If we are creating a clone, make sure we zero out any stale
+	 * data from the origin snapshots zil header.
+	 */
+	if (origin != NULL) {
+		dsl_dataset_t *ds;
+		objset_t *os;
+
+		VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
+		VERIFY3U(0, ==, dmu_objset_from_ds(ds, &os));
+		bzero(&os->os_zil_header, sizeof (os->os_zil_header));
+		dsl_dataset_dirty(ds, tx);
+		dsl_dataset_rele(ds, FTAG);
+	}
+
 	return (dsobj);
 }
 
@@ -1083,11 +1098,16 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 		 */
 		(void) dmu_free_object(os, obj);
 	}
+	if (err != ESRCH)
+		goto out;
 
 	/*
-	 * We need to sync out all in-flight IO before we try to evict
-	 * (the dataset evict func is trying to clear the cached entries
-	 * for this dataset in the ARC).
+	 * Only the ZIL knows how to free log blocks.
+	 */
+	zil_destroy(dmu_objset_zil(os), B_FALSE);
+
+	/*
+	 * Sync out all in-flight IO.
 	 */
 	txg_wait_synced(dd->dd_pool, 0);
 
@@ -1104,9 +1124,6 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 		ASSERT(zap_count(os, DMU_GROUPUSED_OBJECT, &count) != 0 ||
 		    count == 0);
 	}
-
-	if (err != ESRCH)
-		goto out;
 
 	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 	err = dsl_dir_open_obj(dd->dd_pool, dd->dd_object, NULL, FTAG, &dd);
