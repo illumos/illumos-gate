@@ -102,6 +102,7 @@ IP Filter Management:::IP Filter Administration:help=RtIPFilterMngmnt.html
 Project Management:::Add/Modify/Remove projects:help=RtProjManagement.html
 VSCAN Management:::Manage the VSCAN service:auths=solaris.smf.manage.vscan,solaris.smf.value.vscan,solaris.smf.modify.application;help=RtVscanMngmnt.html
 WUSB Management:::Manage Wireless USB:auths=solaris.admin.wusb.*,solaris.smf.manage.wusb;help=WUSBmgmt.html
+Event Notification Agent Management:::Manage Event Notification Agents:auths=solaris.smf.manage.smtp-notify,solaris.smf.manage.snmp-notify,solaris.smf.value.smtp-notify,solaris.smf.value.snmp-notify
 #
 # Trusted Extensions profiles:
 #

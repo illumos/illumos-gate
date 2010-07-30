@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SYSEVENT_IMPL_H
@@ -76,7 +76,7 @@ typedef struct sysevent_attr_impl {
 
 /*
  * sysevent event header information -
- * 	contained in every event generated.  The header and the event
+ *	contained in every event generated.  The header and the event
  *	must remain 64-bit aligned.  The header, up to the attribute
  *	offset, can be contained in a single cache line.
  */
@@ -98,7 +98,7 @@ typedef struct sys_event_impl {
 	se_data_t	se_class_name;	/* class string in contig memory */
 	se_data_t	se_subclass_name; /* subclass string in contig memory */
 	se_data_t	se_pub;		/* publisher string in contig mem */
-	se_data_t 	se_attr_buf;	/* contiguous attribute memory	*/
+	se_data_t	se_attr_buf;	/* contiguous attribute memory	*/
 } sysevent_impl_t;
 
 /* Helpful defines */
@@ -237,14 +237,14 @@ typedef struct sysevent_channel_descriptor {
 /*
  * log_sysevent private interfaces
  */
-void log_event_init(void);
-void log_sysevent_flushq(int cmd, uint_t flag);
-int log_sysevent_filename(char *file);
-int log_usr_sysevent(sysevent_t *ev, int ev_size, sysevent_id_t *eid);
-int log_sysevent_copyout_data(sysevent_id_t *eid, size_t ubuflen, caddr_t ubuf);
-int log_sysevent_free_data(sysevent_id_t *eid);
-int log_sysevent_register(char *channel_name, char *data, se_pubsub_t *udata);
-uint64_t log_sysevent_new_id();
+extern void log_event_init(void);
+extern void log_sysevent_flushq(int, uint_t);
+extern int log_sysevent_filename(char *);
+extern int log_usr_sysevent(sysevent_t *, int, sysevent_id_t *);
+extern int log_sysevent_copyout_data(sysevent_id_t *, size_t, caddr_t);
+extern int log_sysevent_free_data(sysevent_id_t *);
+extern int log_sysevent_register(char *, char *, se_pubsub_t *);
+extern uint64_t log_sysevent_new_id(void);
 
 /*
  * Structures and definitions for general purpose event channels
@@ -281,8 +281,8 @@ typedef struct evch_qelem {
 typedef struct {
 	evch_qelem_t	*sq_head;
 	evch_qelem_t	*sq_tail;
-	uint32_t 	sq_count;
-	uint32_t 	sq_highwm;
+	uint32_t	sq_count;
+	uint32_t	sq_highwm;
 } evch_squeue_t;
 
 /*
@@ -394,6 +394,8 @@ typedef struct {
 	int		ch_maxsubscr;	/* Maximum number of subscriptions */
 	int		ch_holdpend;	/* Hold pending events mode if != 0 */
 	time_t		ch_ctime;	/* Channel creation time */
+	nvlist_t	*ch_propnvl;	/* Channel properties nvlist */
+	int64_t		ch_propnvlgen;	/* Properties generation number */
 } evch_chan_t;
 
 /*
@@ -413,26 +415,28 @@ typedef struct {
 	sysevent_impl_t	*sn_nxtev;	/* Pointer to find next event */
 } evchanq_t;
 
-/* Project privat interfaces */
-evchan_t *evch_usrchanopen(const char *name, uint32_t flags, int *err);
-void evch_usrchanclose(evchan_t *cbp);
-sysevent_impl_t *evch_usrallocev(size_t evsize, uint32_t flags);
-void evch_usrfreeev(sysevent_impl_t *ev);
-int evch_usrpostevent(evchan_t *bp, sysevent_impl_t *ev, uint32_t flags);
-int evch_usrsubscribe(evchan_t *bp, const char *sid, const char *class,
+/* Project private interfaces */
+extern evchan_t *evch_usrchanopen(const char *name, uint32_t flags, int *err);
+extern void evch_usrchanclose(evchan_t *cbp);
+extern sysevent_impl_t *evch_usrallocev(size_t evsize, uint32_t flags);
+extern void evch_usrfreeev(sysevent_impl_t *ev);
+extern int evch_usrpostevent(evchan_t *bp, sysevent_impl_t *ev, uint32_t flags);
+extern int evch_usrsubscribe(evchan_t *bp, const char *sid, const char *class,
     int d, uint32_t flags);
-int evch_usrcontrol_set(evchan_t *bp, int cmd, uint32_t value);
-int evch_usrcontrol_get(evchan_t *bp, int cmd, uint32_t *value);
-void evch_usrunsubscribe(evchan_t *bp, const char *subid, uint32_t flag);
-int evch_usrgetchnames(char *buf, size_t size);
-int evch_usrgetchdata(char *chname, void *buf, size_t size);
+extern int evch_usrcontrol_set(evchan_t *bp, int cmd, uint32_t value);
+extern int evch_usrcontrol_get(evchan_t *bp, int cmd, uint32_t *value);
+extern void evch_usrunsubscribe(evchan_t *bp, const char *subid, uint32_t flag);
+extern int evch_usrgetchnames(char *buf, size_t size);
+extern int evch_usrgetchdata(char *chname, void *buf, size_t size);
+extern void evch_usrsetpropnvl(evchan_t *bp, nvlist_t *nvl);
+extern int evch_usrgetpropnvl(evchan_t *bp, nvlist_t **nvlp, int64_t *genp);
 
-void sysevent_evc_init();
-void sysevent_evc_thrinit();
-evchanq_t *sysevent_evc_walk_init(evchan_t *, char *);
-sysevent_t *sysevent_evc_walk_step(evchanq_t *);
-void sysevent_evc_walk_fini(evchanq_t *);
-char *sysevent_evc_event_attr(sysevent_t *, size_t *);
+extern void sysevent_evc_init();
+extern void sysevent_evc_thrinit();
+extern evchanq_t *sysevent_evc_walk_init(evchan_t *, char *);
+extern sysevent_t *sysevent_evc_walk_step(evchanq_t *);
+extern void sysevent_evc_walk_fini(evchanq_t *);
+extern char *sysevent_evc_event_attr(sysevent_t *, size_t *);
 
 #endif /* _KERNEL */
 
@@ -508,6 +512,8 @@ typedef struct {
 #define	SEV_UNSUBSCRIBE		SEV_BASE | 0x05
 #define	SEV_CHANNAMES		SEV_BASE | 0x06
 #define	SEV_CHANDATA		SEV_BASE | 0x07
+#define	SEV_SETPROPNVL		SEV_BASE | 0x08
+#define	SEV_GETPROPNVL		SEV_BASE | 0x09
 
 #define	DEVSYSEVENT	"/dev/sysevent"
 #define	DEVICESYSEVENT	"/devices/pseudo/sysevent@0:sysevent"
@@ -559,6 +565,11 @@ typedef struct chandata {
 	sev_box_t in_data;
 	sev_box_t out_data;
 } sev_chandata_args_t;
+
+typedef struct propnvl_args {
+	sev_box_t packednvl;	/* input and output */
+	int64_t generation;	/* output on get operation */
+} sev_propnvl_args_t;
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -68,6 +67,8 @@ static struct sysev_stats {
 	    "events dropped due to invalid nvlist" },
 	{ "eagain", FMD_TYPE_UINT64, "events retried due to low memory" },
 };
+
+static sysevent_subattr_t *subattr;
 
 /*
  * event_transfer(sysevent_t *ev, void *arg)
@@ -122,6 +123,8 @@ _fmd_fini(fmd_hdl_t *handle)
 	if (h_event != NULL) {
 		(void) sysevent_evc_unsubscribe(h_event, SUBSCRIBE_ID);
 		(void) sysevent_evc_unbind(h_event);
+		if (subattr != NULL)
+			sysevent_subattr_free(subattr);
 	}
 
 	if (h_fmd != NULL && h_xprt != NULL)
@@ -154,8 +157,15 @@ _fmd_init(fmd_hdl_t *hdl)
 		fmd_hdl_unregister(hdl);
 	}
 
-	ret = sysevent_evc_subscribe(h_event, SUBSCRIBE_ID,
-	    SUBSCRIBE_FLAGS, event_transfer, NULL, 0);
+	if ((subattr = sysevent_subattr_alloc()) == NULL)
+		fmd_hdl_abort(hdl, "failed to allocate subscription "
+		    "attributes: %s");
+
+	sysevent_subattr_thrcreate(subattr, fmd_doorthr_create, NULL);
+	sysevent_subattr_thrsetup(subattr, fmd_doorthr_setup, NULL);
+
+	ret = sysevent_evc_xsubscribe(h_event, SUBSCRIBE_ID,
+	    SUBSCRIBE_FLAGS, event_transfer, NULL, 0, subattr);
 	if (ret != 0) {
 		if (ret == EEXIST) {
 			fmd_hdl_unregister(hdl);

@@ -773,7 +773,6 @@ $(i386_ONLY)file path=kernel/sys/pset group=sys mode=0755
 $(i386_ONLY)file path=kernel/sys/semsys group=sys mode=0755
 $(i386_ONLY)file path=kernel/sys/shmsys group=sys mode=0755
 file path=lib/svc/manifest/system/dumpadm.xml group=sys mode=0444
-file path=lib/svc/manifest/system/fmd.xml group=sys mode=0444
 file path=lib/svc/manifest/system/intrd.xml group=sys mode=0444
 file path=lib/svc/manifest/system/scheduler.xml group=sys mode=0444
 file path=lib/svc/method/svc-dumpadm mode=0555

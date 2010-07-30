@@ -2779,14 +2779,14 @@ publish_suspects(struct fme *fmep, struct rsl *srl)
 			ipath_print(O_DEBUG|O_NONL,
 			    rp->suspect->enode->u.event.ename->u.name.s,
 			    rp->suspect->ipp);
-			out(O_DEBUG, " has no FITrate (using 1)");
+			out(O_VERB, " has no FITrate (using 1)");
 			fr = 1;
 		} else if (fr == 0) {
 			out(O_DEBUG|O_NONL, "event ");
 			ipath_print(O_DEBUG|O_NONL,
 			    rp->suspect->enode->u.event.ename->u.name.s,
 			    rp->suspect->ipp);
-			out(O_DEBUG, " has zero FITrate (using 1)");
+			out(O_VERB, " has zero FITrate (using 1)");
 			fr = 1;
 		}
 

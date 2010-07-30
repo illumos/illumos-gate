@@ -35,33 +35,66 @@ set name=pkg.summary value="Fault Management Daemon and Utilities"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/fm group=sys
-dir path=etc/fm/fmd group=sys
-dir path=etc/net-snmp
-dir path=etc/net-snmp/snmp
-dir path=etc/net-snmp/snmp/mibs
+#
+# Start by describing our directory structure.
+#
+# The snmp mibs are common to global and non-global zones
+#
+dir path=etc group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=etc/fm group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=etc/fm/fmd group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=etc/net-snmp variant.opensolaris.zone=__NODEFAULT
+dir path=etc/net-snmp/snmp variant.opensolaris.zone=__NODEFAULT
+dir path=etc/net-snmp/snmp/mibs variant.opensolaris.zone=__NODEFAULT
+#
+# Our kernel driver is global zone only
+#
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
-dir path=usr group=sys
+#
+# Our service manifests are common to global and non-global zones
+#
+dir path=lib/svc/manifest/system group=sys \
+    variant.opensolaris.zone=__NODEFAULT
+dir path=lib/svc/manifest/system/fm group=sys \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# Our additional /etc/logadm.conf entries are common to global and local zones
+#
+dir path=etc/logadm.d group=sys variant.opensolaris.zone=__NODEFAULT
+#
+# usr dirs:
+#	- most are common to both global and non-global zones
+#	- those mentioning 'include' will automatically apply to both
+#	- dictionaries are delivered to both contexts, even if they
+#	  are hardware dictionaries
+#	- eversholt rules (eft) are global zone only
+#	- some plugins and all schemes apply to both contexts
+#	- we don't deliver any topo maps to non-global zones, but we
+#	  create the directory nonetheless; similarly for topo plugins
+#	- paths mentioning mdb will automatically apply to both
+#	- usr/platform is global zone only
+#
+dir path=usr group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=usr/include
 dir path=usr/include/fm
-dir path=usr/lib
-dir path=usr/lib/fm
-dir path=usr/lib/fm/$(ARCH64)
-dir path=usr/lib/fm/dict
+dir path=usr/lib variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/$(ARCH64) variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/dict variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm/eft
-dir path=usr/lib/fm/fmd
-dir path=usr/lib/fm/fmd/plugins
-dir path=usr/lib/fm/fmd/schemes
-dir path=usr/lib/fm/fmd/schemes/$(ARCH64)
-dir path=usr/lib/fm/topo
-dir path=usr/lib/fm/topo/maps
-dir path=usr/lib/fm/topo/plugins
-dir path=usr/lib/locale
-dir path=usr/lib/locale/C
-dir path=usr/lib/locale/C/LC_MESSAGES
+dir path=usr/lib/fm/fmd variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/fmd/plugins variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/fmd/schemes variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/fmd/schemes/$(ARCH64) variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/notify variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/topo variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/topo/maps variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/topo/plugins variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/locale variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/locale/C variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/locale/C/LC_MESSAGES variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/proc group=sys
 dir path=usr/platform group=sys
@@ -186,22 +219,56 @@ $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/fmd/plugins
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/topo
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/topo/maps
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/topo/plugins
-dir path=usr/sbin
-dir path=usr/share group=sys
-dir path=usr/share/lib group=sys
-dir path=usr/share/lib/xml group=sys
-dir path=usr/share/lib/xml/dtd group=sys
-dir path=var/fm group=sys
-dir path=var/fm/fmd group=sys
-dir path=var/fm/fmd/ckpt group=sys
-dir path=var/fm/fmd/rsrc group=sys
-dir path=var/fm/fmd/xprt group=sys
+#
+# Some directories common to both global and non-global zones:
+#
+dir path=usr/sbin variant.opensolaris.zone=__NODEFAULT
+dir path=usr/share group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=usr/share/lib group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=usr/share/lib/xml group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=usr/share/lib/xml/dtd group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=var/fm group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=var/fm/fmd group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=var/fm/fmd/ckpt group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=var/fm/fmd/rsrc group=sys variant.opensolaris.zone=__NODEFAULT
+dir path=var/fm/fmd/xprt group=sys variant.opensolaris.zone=__NODEFAULT
+#
+# driver is global-zone only
+#
 driver name=fm perms="* 0644 root sys"
-file path=etc/net-snmp/snmp/fmd-trapgen.conf mode=0600
-file path=etc/net-snmp/snmp/mibs/SUN-FM-MIB.mib
+#
+# Now for our file and link payloads
+#
+# snmp MIBs are common to both global and non-global zones
+#
+file path=etc/net-snmp/snmp/mibs/SUN-FM-MIB.mib \
+    variant.opensolaris.zone=__NODEFAULT
+file path=etc/net-snmp/snmp/mibs/SUN-IREPORT-MIB.mib \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# driver is global-zone only
+#
 file path=kernel/drv/$(ARCH64)/fm group=sys
 $(i386_ONLY)file path=kernel/drv/fm group=sys
 file path=kernel/drv/fm.conf group=sys
+#
+# Service manifests are common to both global and non-global zones
+#
+file path=lib/svc/manifest/system/fm/notify-params.xml group=sys mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=lib/svc/manifest/system/fmd.xml group=sys mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# Our additional /etc/logadm.conf entries are common to global and local zones
+#
+file path=etc/logadm.d/fmd.logadm.conf group=sys mode=0444 \
+    refresh_fmri='svc:/system/logadm-upgrade:default' \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# Headers are automatically included in both contexts.
+# While some of these are from global-zone-only components
+# there's no harm in including them in both contexts.
+#
 file path=usr/include/fm/diagcode.h
 file path=usr/include/fm/fmd_adm.h
 file path=usr/include/fm/fmd_agent.h
@@ -212,53 +279,110 @@ file path=usr/include/fm/fmd_msg.h
 file path=usr/include/fm/fmd_snmp.h
 file path=usr/include/fm/libdiskstatus.h
 file path=usr/include/fm/libfmevent.h
+file path=usr/include/fm/libfmevent_ruleset.h
 file path=usr/include/fm/libseslog.h
 file path=usr/include/fm/libtopo.h
 file path=usr/include/fm/topo_hc.h
 file path=usr/include/fm/topo_list.h
 file path=usr/include/fm/topo_method.h
 file path=usr/include/fm/topo_mod.h
-file path=usr/lib/fm/$(ARCH64)/libdiagcode.so.1
-file path=usr/lib/fm/$(ARCH64)/libdiskstatus.so.1
-file path=usr/lib/fm/$(ARCH64)/libfmd_adm.so.1
-file path=usr/lib/fm/$(ARCH64)/libfmd_agent.so.1
-file path=usr/lib/fm/$(ARCH64)/libfmd_log.so.1
-file path=usr/lib/fm/$(ARCH64)/libfmd_msg.so.1
-file path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so.1
-file path=usr/lib/fm/$(ARCH64)/libfmevent.so.1
+#
+#	64-bit .so.1
+#
+file path=usr/lib/fm/$(ARCH64)/libdiagcode.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/libdiskstatus.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/libfmd_adm.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/libfmd_agent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/libfmd_log.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/libfmd_msg.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/libfmnotify.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/libldom.so.1
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/libmdesc.so.1
 file path=usr/lib/fm/$(ARCH64)/libseslog.so.1
-file path=usr/lib/fm/$(ARCH64)/libtopo.so.1
-file path=usr/lib/fm/$(ARCH64)/llib-ldiagcode.ln
-file path=usr/lib/fm/$(ARCH64)/llib-ldiskstatus.ln
-file path=usr/lib/fm/$(ARCH64)/llib-lfmd_adm.ln
-file path=usr/lib/fm/$(ARCH64)/llib-lfmd_agent.ln
-file path=usr/lib/fm/$(ARCH64)/llib-lfmd_log.ln
-file path=usr/lib/fm/$(ARCH64)/llib-lfmd_msg.ln
-file path=usr/lib/fm/$(ARCH64)/llib-lfmd_snmp.ln
-file path=usr/lib/fm/$(ARCH64)/llib-lfmevent.ln
+file path=usr/lib/fm/$(ARCH64)/libtopo.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+#	64-bit lint libraries
+#
+file path=usr/lib/fm/$(ARCH64)/llib-ldiagcode.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/llib-ldiskstatus.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_adm.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_agent.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_log.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_msg.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_snmp.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/llib-lfmevent.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/$(ARCH64)/llib-lfmnotify.ln \
+    variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/llib-lldom.ln
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/llib-lmdesc.ln
 file path=usr/lib/fm/$(ARCH64)/llib-lseslog.ln
-file path=usr/lib/fm/$(ARCH64)/llib-ltopo.ln
-$(i386_ONLY)file path=usr/lib/fm/dict/AMD.dict mode=0444
-file path=usr/lib/fm/dict/DISK.dict mode=0444
-file path=usr/lib/fm/dict/FMD.dict mode=0444
-$(i386_ONLY)file path=usr/lib/fm/dict/GMCA.dict mode=0444
-$(i386_ONLY)file path=usr/lib/fm/dict/INTEL.dict mode=0444
-file path=usr/lib/fm/dict/NXGE.dict mode=0444
-file path=usr/lib/fm/dict/PCI.dict mode=0444
-file path=usr/lib/fm/dict/PCIEX.dict mode=0444
-$(sparc_ONLY)file path=usr/lib/fm/dict/SCF.dict mode=0444
-file path=usr/lib/fm/dict/SENSOR.dict mode=0444
-file path=usr/lib/fm/dict/STORAGE.dict mode=0444
-$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4.dict mode=0444
-$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4U.dict mode=0444
-$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4V.dict mode=0444
-file path=usr/lib/fm/dict/SUNOS.dict mode=0444
-file path=usr/lib/fm/dict/ZFS.dict mode=0444
-file path=usr/lib/fm/eft/disk.eft mode=0444
+file path=usr/lib/fm/$(ARCH64)/llib-ltopo.ln \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# Dictionaries, whether they are hardware-specific or not, are
+# common to both global and non-global zones.
+#
+$(i386_ONLY)file path=usr/lib/fm/dict/AMD.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/DISK.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/FMD.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/FMNOTIFY.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(i386_ONLY)file path=usr/lib/fm/dict/GMCA.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(i386_ONLY)file path=usr/lib/fm/dict/INTEL.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/NXGE.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/PCI.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/PCIEX.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(sparc_ONLY)file path=usr/lib/fm/dict/SCF.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/SENSOR.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/STORAGE.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/SMF.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4U.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4V.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/SUNOS.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/ZFS.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# Eversholt rules are global zone only
+#
+file path=usr/lib/fm/eft/disk.eft mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/eft/neptune_xaui.eft mode=0444
 file path=usr/lib/fm/eft/neptune_xfp.eft mode=0444
 file path=usr/lib/fm/eft/pci.eft mode=0444
@@ -266,11 +390,24 @@ file path=usr/lib/fm/eft/pciex.eft mode=0444
 file path=usr/lib/fm/eft/pciexrc.eft mode=0444
 file path=usr/lib/fm/eft/sensor.eft mode=0444
 file path=usr/lib/fm/eft/storage.eft mode=0444
-file path=usr/lib/fm/fmd/fmd mode=0555
-file path=usr/lib/fm/fmd/fminject mode=0555
-file path=usr/lib/fm/fmd/fmsim mode=0555
-file path=usr/lib/fm/fmd/fmtopo mode=0555
+#
+# usr/lib/fm/fmd executables:
+#	- fmd is common, as are fminject, fmsim and fmtopo
+#	- ipmitopo is global zone only
+#
+file path=usr/lib/fm/fmd/fmd mode=0555 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/fminject mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/fmsim mode=0555 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/fmtopo mode=0555 variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/ipmitopo mode=0555
+#
+# fmd plugins:
+#	- most are hardware-specific and so global zone only
+#	- ext-event-transport, ip-transport, syslog-msgs,
+#	  software-diagnosis and software-response
+#	  are common to both contexts
+#
 file path=usr/lib/fm/fmd/plugins/cpumem-retire.conf
 file path=usr/lib/fm/fmd/plugins/cpumem-retire.so mode=0555
 file path=usr/lib/fm/fmd/plugins/disk-monitor.conf
@@ -279,110 +416,197 @@ file path=usr/lib/fm/fmd/plugins/disk-transport.conf
 file path=usr/lib/fm/fmd/plugins/disk-transport.so mode=0555
 file path=usr/lib/fm/fmd/plugins/eft.conf
 file path=usr/lib/fm/fmd/plugins/eft.so mode=0555
-file path=usr/lib/fm/fmd/plugins/ext-event-transport.conf
-file path=usr/lib/fm/fmd/plugins/ext-event-transport.so mode=0555
+file path=usr/lib/fm/fmd/plugins/ext-event-transport.conf \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/plugins/ext-event-transport.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/plugins/fabric-xlate.conf
 file path=usr/lib/fm/fmd/plugins/fabric-xlate.so mode=0555
 file path=usr/lib/fm/fmd/plugins/fdd-msg.conf
 file path=usr/lib/fm/fmd/plugins/fdd-msg.so mode=0555
 file path=usr/lib/fm/fmd/plugins/io-retire.conf
 file path=usr/lib/fm/fmd/plugins/io-retire.so mode=0555
-file path=usr/lib/fm/fmd/plugins/ip-transport.conf
-file path=usr/lib/fm/fmd/plugins/ip-transport.so mode=0555
+file path=usr/lib/fm/fmd/plugins/ip-transport.conf \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/plugins/ip-transport.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/plugins/sensor-transport.conf
 file path=usr/lib/fm/fmd/plugins/sensor-transport.so mode=0555
 file path=usr/lib/fm/fmd/plugins/ses-log-transport.conf
 file path=usr/lib/fm/fmd/plugins/ses-log-transport.so mode=0555
-file path=usr/lib/fm/fmd/plugins/snmp-trapgen.conf
-file path=usr/lib/fm/fmd/plugins/snmp-trapgen.so mode=0555
+file path=usr/lib/fm/fmd/plugins/software-diagnosis.conf \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/plugins/software-diagnosis.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/plugins/software-response.conf \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/plugins/software-response.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/plugins/sp-monitor.conf
 file path=usr/lib/fm/fmd/plugins/sp-monitor.so mode=0555
-file path=usr/lib/fm/fmd/plugins/syslog-msgs.conf
-file path=usr/lib/fm/fmd/plugins/syslog-msgs.so mode=0555
+file path=usr/lib/fm/fmd/plugins/syslog-msgs.conf \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/plugins/syslog-msgs.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/plugins/zfs-diagnosis.conf
 file path=usr/lib/fm/fmd/plugins/zfs-diagnosis.so mode=0555
 file path=usr/lib/fm/fmd/plugins/zfs-retire.conf
 file path=usr/lib/fm/fmd/plugins/zfs-retire.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/cpu.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/dev.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/fmd.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/hc.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/legacy-hc.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mem.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mod.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/pkg.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/svc.so mode=0555
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/zfs.so mode=0555
-file path=usr/lib/fm/fmd/schemes/cpu.so mode=0555
-file path=usr/lib/fm/fmd/schemes/dev.so mode=0555
-file path=usr/lib/fm/fmd/schemes/fmd.so mode=0555
-file path=usr/lib/fm/fmd/schemes/hc.so mode=0555
-file path=usr/lib/fm/fmd/schemes/legacy-hc.so mode=0555
-file path=usr/lib/fm/fmd/schemes/mem.so mode=0555
-file path=usr/lib/fm/fmd/schemes/mod.so mode=0555
-file path=usr/lib/fm/fmd/schemes/pkg.so mode=0555
-file path=usr/lib/fm/fmd/schemes/svc.so mode=0555
-file path=usr/lib/fm/fmd/schemes/zfs.so mode=0555
-file path=usr/lib/fm/libdiagcode.so.1
-file path=usr/lib/fm/libdiskstatus.so.1
-file path=usr/lib/fm/libfmd_adm.so.1
-file path=usr/lib/fm/libfmd_agent.so.1
-file path=usr/lib/fm/libfmd_log.so.1
-file path=usr/lib/fm/libfmd_msg.so.1
-file path=usr/lib/fm/libfmd_snmp.so.1
-file path=usr/lib/fm/libfmevent.so.1
+#
+# fmri scheme support: all are common to both global and non-global zones
+#
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/cpu.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/dev.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/fmd.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/hc.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/legacy-hc.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mem.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mod.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/pkg.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/svc.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/sw.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/zfs.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/cpu.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/dev.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/fmd.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/hc.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/legacy-hc.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/mem.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/mod.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/pkg.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/svc.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/sw.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/zfs.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# Libraries for usr/lib/fm; we include these in both global and non-global
+# contexts except for the ldom and seslog libraries.
+#
+#
+#	32-bit .so.1
+#
+file path=usr/lib/fm/libdiagcode.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/libdiskstatus.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/libfmd_adm.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/libfmd_agent.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/libfmd_log.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/libfmd_msg.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/libfmd_snmp.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/libfmevent.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/libfmnotify.so.1 variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/fm/libldom.so.1
 $(sparc_ONLY)file path=usr/lib/fm/libmdesc.so.1
 file path=usr/lib/fm/libseslog.so.1
-file path=usr/lib/fm/libtopo.so.1
-file path=usr/lib/fm/llib-ldiagcode
-file path=usr/lib/fm/llib-ldiagcode.ln
-file path=usr/lib/fm/llib-ldiskstatus
-file path=usr/lib/fm/llib-ldiskstatus.ln
-file path=usr/lib/fm/llib-lfmd_adm
-file path=usr/lib/fm/llib-lfmd_adm.ln
-file path=usr/lib/fm/llib-lfmd_agent
-file path=usr/lib/fm/llib-lfmd_agent.ln
-file path=usr/lib/fm/llib-lfmd_log
-file path=usr/lib/fm/llib-lfmd_log.ln
-file path=usr/lib/fm/llib-lfmd_msg
-file path=usr/lib/fm/llib-lfmd_msg.ln
-file path=usr/lib/fm/llib-lfmd_snmp
-file path=usr/lib/fm/llib-lfmd_snmp.ln
-file path=usr/lib/fm/llib-lfmevent
-file path=usr/lib/fm/llib-lfmevent.ln
+file path=usr/lib/fm/libtopo.so.1 variant.opensolaris.zone=__NODEFAULT
+#
+#	32-bit lint libraries
+#
+file path=usr/lib/fm/llib-ldiagcode variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-ldiagcode.ln variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-ldiskstatus variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-ldiskstatus.ln variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_adm variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_adm.ln variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_agent variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_agent.ln variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_log variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_log.ln variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_msg variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_msg.ln variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_snmp variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmd_snmp.ln variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmevent variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmevent.ln variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmnotify variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-lfmnotify.ln variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/fm/llib-lldom
 $(sparc_ONLY)file path=usr/lib/fm/llib-lldom.ln
 $(sparc_ONLY)file path=usr/lib/fm/llib-lmdesc
 $(sparc_ONLY)file path=usr/lib/fm/llib-lmdesc.ln
 file path=usr/lib/fm/llib-lseslog
 file path=usr/lib/fm/llib-lseslog.ln
-file path=usr/lib/fm/llib-ltopo
-file path=usr/lib/fm/llib-ltopo.ln
+file path=usr/lib/fm/llib-ltopo variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/llib-ltopo.ln variant.opensolaris.zone=__NODEFAULT
+#
+# Topo xml maps are all global-zone only
+#
 file path=usr/lib/fm/topo/maps/xfp-hc-topology.xml mode=0444
 file path=usr/lib/fm/topo/plugins/disk.so mode=0555
 file path=usr/lib/fm/topo/plugins/fac_prov_ipmi.so mode=0555
 file path=usr/lib/fm/topo/plugins/ipmi.so mode=0555
 file path=usr/lib/fm/topo/plugins/ses.so mode=0555
 file path=usr/lib/fm/topo/plugins/xfp.so mode=0555
-$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/AMD.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/DISK.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/FMD.mo mode=0444
-$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/GMCA.mo mode=0444
-$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/INTEL.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/NXGE.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/PCI.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/PCIEX.mo mode=0444
-$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SCF.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/SENSOR.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/STORAGE.mo mode=0444
-$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4.mo mode=0444
-$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4U.mo mode=0444
-$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4V.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/SUNOS.mo mode=0444
-file path=usr/lib/locale/C/LC_MESSAGES/ZFS.mo mode=0444
+#
+# Dictionaries, whether they are hardware-specific or not, are
+# common to both global and non-global zones.
+#
+$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/AMD.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/DISK.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/FMD.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/FMNOTIFY.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/GMCA.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/INTEL.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/NXGE.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/PCI.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/PCIEX.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SCF.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/SENSOR.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/STORAGE.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/SMF.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4U.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4V.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/SUNOS.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/ZFS.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# mdb support will automatically be included in both contexts;
+# we allow eft.so to be included despite not delivering
+# the eft plugin in non-global zones
+#
 file path=usr/lib/mdb/proc/eft.so group=sys mode=0555
 file path=usr/lib/mdb/proc/fmd.so group=sys mode=0555
+#
+# Platform-specific fmd plugins are global zone only
+#
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins/etm.conf
 $(sparc_ONLY)file \
@@ -607,10 +831,20 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/xaui.so \
     mode=0555
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/zambezi.so \
     mode=0555
-file path=usr/sbin/fmadm mode=0555
-file path=usr/sbin/fmdump mode=0555
-file path=usr/sbin/fmstat mode=0555
-file path=usr/share/lib/xml/dtd/topology.dtd.1
+#
+# Administrative utilities are common to both contexts
+#
+file path=usr/sbin/fmadm mode=0555 variant.opensolaris.zone=__NODEFAULT
+file path=usr/sbin/fmdump mode=0555 variant.opensolaris.zone=__NODEFAULT
+file path=usr/sbin/fmstat mode=0555 variant.opensolaris.zone=__NODEFAULT
+#
+# Topo DTD is also common
+#
+file path=usr/share/lib/xml/dtd/topology.dtd.1 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# legacy packaging and license
+#
 legacy pkg=SUNWfmd arch=$(ARCH) category=system \
     desc="Fault Management Daemon and Utilities" \
     hotline="Please contact your local service provider" \
@@ -623,30 +857,61 @@ legacy pkg=SUNWfmdr arch=$(ARCH) category=system \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/fm/$(ARCH64)/libdiagcode.so target=./libdiagcode.so.1
-link path=usr/lib/fm/$(ARCH64)/libdiskstatus.so target=./libdiskstatus.so.1
-link path=usr/lib/fm/$(ARCH64)/libfmd_adm.so target=./libfmd_adm.so.1
-link path=usr/lib/fm/$(ARCH64)/libfmd_agent.so target=./libfmd_agent.so.1
-link path=usr/lib/fm/$(ARCH64)/libfmd_log.so target=./libfmd_log.so.1
-link path=usr/lib/fm/$(ARCH64)/libfmd_msg.so target=./libfmd_msg.so.1
-link path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so target=./libfmd_snmp.so.1
-link path=usr/lib/fm/$(ARCH64)/libfmevent.so target=./libfmevent.so.1
+#
+#	64-bit .so symlinks
+#
+link path=usr/lib/fm/$(ARCH64)/libdiagcode.so target=./libdiagcode.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libdiskstatus.so target=./libdiskstatus.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libfmd_adm.so target=./libfmd_adm.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libfmd_agent.so target=./libfmd_agent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libfmd_log.so target=./libfmd_log.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libfmd_msg.so target=./libfmd_msg.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so target=./libfmd_snmp.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libfmevent.so target=./libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libfmnotify.so target=./libfmnotify.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)link path=usr/lib/fm/$(ARCH64)/libldom.so target=libldom.so.1
 $(sparc_ONLY)link path=usr/lib/fm/$(ARCH64)/libmdesc.so target=libmdesc.so.1
 link path=usr/lib/fm/$(ARCH64)/libseslog.so target=./libseslog.so.1
-link path=usr/lib/fm/$(ARCH64)/libtopo.so target=libtopo.so.1
-link path=usr/lib/fm/libdiagcode.so target=libdiagcode.so.1
-link path=usr/lib/fm/libdiskstatus.so target=libdiskstatus.so.1
-link path=usr/lib/fm/libfmd_adm.so target=libfmd_adm.so.1
-link path=usr/lib/fm/libfmd_agent.so target=libfmd_agent.so.1
-link path=usr/lib/fm/libfmd_log.so target=libfmd_log.so.1
-link path=usr/lib/fm/libfmd_msg.so target=libfmd_msg.so.1
-link path=usr/lib/fm/libfmd_snmp.so target=libfmd_snmp.so.1
-link path=usr/lib/fm/libfmevent.so target=libfmevent.so.1
+link path=usr/lib/fm/$(ARCH64)/libtopo.so target=libtopo.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+#	32-bit .so symlinks
+#
+link path=usr/lib/fm/libdiagcode.so target=libdiagcode.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libdiskstatus.so target=libdiskstatus.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libfmd_adm.so target=libfmd_adm.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libfmd_agent.so target=libfmd_agent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libfmd_log.so target=libfmd_log.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libfmd_msg.so target=libfmd_msg.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libfmd_snmp.so target=libfmd_snmp.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libfmevent.so target=libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libfmnotify.so target=libfmnotify.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)link path=usr/lib/fm/libldom.so target=libldom.so.1
 $(sparc_ONLY)link path=usr/lib/fm/libmdesc.so target=libmdesc.so.1
 link path=usr/lib/fm/libseslog.so target=libseslog.so.1
-link path=usr/lib/fm/libtopo.so target=libtopo.so.1
+link path=usr/lib/fm/libtopo.so target=libtopo.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+# symlinks for fmd plugins for particular platforms
+#
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins/etm.so \
     target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so

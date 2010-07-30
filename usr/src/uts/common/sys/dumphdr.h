@@ -43,7 +43,7 @@ extern "C" {
  * overwritten by swap activity.  See dumpadm(1M) for dump configuration.
  */
 #define	DUMP_MAGIC	0xdefec8edU		/* dump magic number */
-#define	DUMP_VERSION	9			/* version of this dumphdr */
+#define	DUMP_VERSION	10			/* version of this dumphdr */
 #define	DUMP_WORDSIZE	(sizeof (long) * NBBY)	/* word size (32 or 64) */
 #define	DUMP_PANICSIZE	200			/* Max panic string copied */
 #define	DUMP_COMPRESS_RATIO	2		/* conservative; usually 2.5+ */
@@ -54,6 +54,10 @@ extern "C" {
 	(ERPT_EVCH_MAX +		\
 	ERPT_MAX_ERRS * ERPT_HIWAT),	\
 	DUMP_OFFSET))				/* ereport save area */
+#define	DUMP_SUMMARYSIZE (P2ROUNDUP(    \
+	(STACK_BUF_SIZE +	       \
+	sizeof (summary_dump_t) + 1024), \
+	DUMP_OFFSET))				/* summary save area */
 
 typedef struct dumphdr {
 	uint32_t dump_magic;		/* magic number */
@@ -76,6 +80,8 @@ typedef struct dumphdr {
 	pgcnt_t	dump_npages;		/* number of data pages */
 	size_t	dump_ksyms_size;	/* kernel symbol table size */
 	size_t	dump_ksyms_csize;	/* compressed symbol table size */
+	uint32_t dump_fm_panic;		/* initiated from fm subsystems */
+	char	dump_uuid[36 + 1];	/* os image uuid */
 } dumphdr_t;
 
 /*
@@ -190,6 +196,8 @@ extern int dumpvp_resize(void);
 extern int dump_plat_addr(void);
 extern void dump_plat_pfn(void);
 extern int dump_plat_data(void *);
+extern int dump_set_uuid(const char *);
+extern const char *dump_get_uuid(void);
 
 /*
  * Define a CPU count threshold that determines when to employ

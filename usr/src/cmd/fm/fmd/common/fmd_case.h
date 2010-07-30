@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FMD_CASE_H
@@ -121,7 +120,7 @@ extern fmd_case_t *fmd_case_hash_lookup(fmd_case_hash_t *, const char *);
 extern void fmd_case_hash_apply(fmd_case_hash_t *,
     void (*)(fmd_case_t *, void *), void *);
 
-extern fmd_case_t *fmd_case_create(struct fmd_module *, void *);
+extern fmd_case_t *fmd_case_create(struct fmd_module *, const char *, void *);
 extern fmd_case_t *fmd_case_recreate(struct fmd_module *,
     struct fmd_xprt *, uint_t, const char *, const char *);
 extern void fmd_case_destroy(fmd_case_t *, int);

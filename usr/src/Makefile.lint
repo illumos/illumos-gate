@@ -263,6 +263,7 @@ COMMON_SUBDIRS = \
 	cmd/rpcgen \
 	cmd/rpcsvc/rpc.bootparamd \
 	cmd/runat \
+	cmd/savecore \
 	cmd/sbdadm \
 	cmd/sdpadm \
 	cmd/setpgrp \
@@ -425,6 +426,7 @@ COMMON_SUBDIRS = \
 	lib/libsrpt \
 	lib/libstmf \
 	lib/libsun_ima \
+	lib/libsysevent \
 	lib/libthread \
 	lib/libtsnet \
 	lib/libtsol \

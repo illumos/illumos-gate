@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _TOPO_MOD_H
@@ -93,6 +92,10 @@ extern nvlist_t *topo_mod_memfmri(topo_mod_t *, int, uint64_t, uint64_t,
     const char *, int);
 extern nvlist_t *topo_mod_modfmri(topo_mod_t *, int, const char *);
 extern nvlist_t *topo_mod_pkgfmri(topo_mod_t *, int, const char *);
+extern nvlist_t *topo_mod_swfmri(topo_mod_t *, int,
+    char *, char *, nvlist_t *,
+    char *, char *, char *, char *, int64_t,
+    char *, char *, int64_t, char *, int64_t, char **, uint_t);
 extern int topo_mod_nvl2str(topo_mod_t *, nvlist_t *, char **);
 extern int topo_mod_str2nvl(topo_mod_t *, const char *,  nvlist_t **);
 extern int topo_prop_setmutable(tnode_t *node, const char *pgname,

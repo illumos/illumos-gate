@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FMD_API_H
@@ -30,6 +29,7 @@
 #include <sys/types.h>
 #include <libnvpair.h>
 #include <stdarg.h>
+#include <door.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -49,8 +49,9 @@ extern "C" {
 #define	FMD_API_VERSION_2	2
 #define	FMD_API_VERSION_3	3
 #define	FMD_API_VERSION_4	4
+#define	FMD_API_VERSION_5	5
 
-#define	FMD_API_VERSION		FMD_API_VERSION_4
+#define	FMD_API_VERSION		FMD_API_VERSION_5
 
 typedef struct fmd_hdl fmd_hdl_t;
 typedef struct fmd_event fmd_event_t;
@@ -168,6 +169,7 @@ extern void fmd_stat_destroy(fmd_hdl_t *, uint_t, fmd_stat_t *);
 extern void fmd_stat_setstr(fmd_hdl_t *, fmd_stat_t *, const char *);
 
 extern fmd_case_t *fmd_case_open(fmd_hdl_t *, void *);
+extern fmd_case_t *fmd_case_open_uuid(fmd_hdl_t *, const char *, void *);
 extern void fmd_case_reset(fmd_hdl_t *, fmd_case_t *);
 extern void fmd_case_solve(fmd_hdl_t *, fmd_case_t *);
 extern void fmd_case_close(fmd_hdl_t *, fmd_case_t *);
@@ -176,6 +178,7 @@ extern const char *fmd_case_uuid(fmd_hdl_t *, fmd_case_t *);
 extern fmd_case_t *fmd_case_uulookup(fmd_hdl_t *, const char *);
 extern void fmd_case_uuclose(fmd_hdl_t *, const char *);
 extern int fmd_case_uuclosed(fmd_hdl_t *, const char *);
+extern int fmd_case_uuisresolved(fmd_hdl_t *, const char *);
 extern void fmd_case_uuresolved(fmd_hdl_t *, const char *);
 
 extern int fmd_case_solved(fmd_hdl_t *, fmd_case_t *);
@@ -215,11 +218,19 @@ extern void fmd_thr_destroy(fmd_hdl_t *, pthread_t);
 extern void fmd_thr_signal(fmd_hdl_t *, pthread_t);
 extern void fmd_thr_checkpoint(fmd_hdl_t *);
 
+extern door_xcreate_server_func_t fmd_doorthr_create;
+extern door_xcreate_thrsetup_func_t fmd_doorthr_setup;
+
 extern id_t fmd_timer_install(fmd_hdl_t *, void *, fmd_event_t *, hrtime_t);
 extern void fmd_timer_remove(fmd_hdl_t *, id_t);
 
+extern nvlist_t *fmd_nvl_create_defect(fmd_hdl_t *,
+    const char *, uint8_t, nvlist_t *, nvlist_t *, nvlist_t *);
 extern nvlist_t *fmd_nvl_create_fault(fmd_hdl_t *,
     const char *, uint8_t, nvlist_t *, nvlist_t *, nvlist_t *);
+
+extern const nvlist_t *fmd_hdl_fmauth(fmd_hdl_t *);
+extern const nvlist_t *fmd_hdl_modauth(fmd_hdl_t *);
 
 extern int fmd_nvl_class_match(fmd_hdl_t *, nvlist_t *, const char *);
 extern int fmd_nvl_fmri_expand(fmd_hdl_t *, nvlist_t *);

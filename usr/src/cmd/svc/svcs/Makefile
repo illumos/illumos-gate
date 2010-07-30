@@ -19,29 +19,34 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG =		svcs
 OBJS =		svcs.o explain.o
-SRCS =		$(OBJS:%.o=%.c)
+MYOBJS =	notify_params.o
+SRCS =		$(OBJS:%.o=%.c) $(MYOBJS:%.o=../common/%.c)
 POFILES = 	$(OBJS:.o=.po)
 
 include ../../Makefile.cmd
 include ../../Makefile.ctf
 
 POFILE =	$(PROG)_all.po
-LDLIBS +=	-lcontract -lscf -luutil -lumem
+LDLIBS +=	-lcontract -lscf -luutil -lumem -lnvpair
+CPPFLAGS += -I ../common
 
-lint := LINTFLAGS = -ux
+lint := LINTFLAGS = -mux
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+%.o: ../common/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
+$(PROG): $(OBJS) $(MYOBJS)
+	$(LINK.c) -o $@ $(OBJS) $(MYOBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 $(POFILE): $(POFILES)
@@ -50,7 +55,7 @@ $(POFILE): $(POFILES)
 install: all $(ROOTPROG)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(MYOBJS)
 
 lint: lint_SRCS
 

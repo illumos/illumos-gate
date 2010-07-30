@@ -28,7 +28,6 @@
 #include <assert.h>
 #include <libuutil.h>
 #include <stdio.h>
-#include <strings.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/param.h>
@@ -50,25 +49,6 @@
 
 /* Path to speedy files area must end with a slash */
 #define	SMF_SPEEDY_FILES_PATH		"/etc/svc/volatile/"
-
-/*
- * Internal private function that creates and binds a handle.
- */
-static scf_handle_t *
-handle_create(void)
-{
-	scf_handle_t *h;
-
-	h = scf_handle_create(SCF_VERSION);
-	if (h == NULL)
-		return (NULL);
-
-	if (scf_handle_bind(h) == -1) {
-		scf_handle_destroy(h);
-		return (NULL);
-	}
-	return (h);
-}
 
 void
 scf_simple_handle_destroy(scf_simple_handle_t *simple_h)
@@ -939,7 +919,7 @@ set_inst_action(const char *fmri, const char *action)
 	scf_instance_t *inst;
 	int ret = -1;
 
-	h = handle_create();
+	h = _scf_handle_create_and_bind(SCF_VERSION);
 	if (h == NULL)
 		return (-1);
 
@@ -1082,7 +1062,7 @@ set_inst_enabled_flags(const char *fmri, int flags, uint8_t desired)
 		return (ret);
 	}
 
-	if ((h = handle_create()) == NULL)
+	if ((h = _scf_handle_create_and_bind(SCF_VERSION)) == NULL)
 		return (ret);
 
 	if ((inst = scf_instance_create(h)) == NULL) {
@@ -1181,6 +1161,35 @@ int
 _smf_refresh_instance_i(scf_instance_t *inst)
 {
 	return (set_inst_action_inst(inst, SCF_PROPERTY_REFRESH));
+}
+
+int
+_smf_refresh_all_instances(scf_service_t *s)
+{
+	scf_handle_t	*h = scf_service_handle(s);
+	scf_instance_t	*i = scf_instance_create(h);
+	scf_iter_t	*it = scf_iter_create(h);
+	int err, r = -1;
+
+	if (h == NULL || i == NULL || it == NULL)
+		goto error;
+
+	if (scf_iter_service_instances(it, s) != 0)
+		goto error;
+
+	while ((err = scf_iter_next_instance(it, i)) == 1)
+		if (_smf_refresh_instance_i(i) != 0)
+			goto error;
+
+	if (err == -1)
+		goto error;
+
+	r = 0;
+error:
+	scf_instance_destroy(i);
+	scf_iter_destroy(it);
+
+	return (r);
 }
 
 int
@@ -1320,7 +1329,7 @@ scf_general_pg_setup(const char *fmri, const char *pg_name)
 		return (NULL);
 	} else {
 
-		ret->h = handle_create();
+		ret->h = _scf_handle_create_and_bind(SCF_VERSION);
 		ret->inst = scf_instance_create(ret->h);
 		ret->snap = scf_snapshot_create(ret->h);
 		ret->running_pg = scf_pg_create(ret->h);
@@ -1564,7 +1573,7 @@ scf_simple_walk_instances(uint_t state_flags, void *private,
 	int			svc_iter_ret, inst_iter_ret;
 	int			inst_state;
 
-	if ((h = handle_create()) == NULL)
+	if ((h = _scf_handle_create_and_bind(SCF_VERSION)) == NULL)
 		return (ret);
 
 	if (((scope = scf_scope_create(h)) == NULL) ||
@@ -1654,7 +1663,7 @@ scf_simple_prop_get(scf_handle_t *hin, const char *instance, const char *pgname,
 		local_h = B_FALSE;
 	}
 
-	if (local_h && ((h = handle_create()) == NULL))
+	if (local_h && ((h = _scf_handle_create_and_bind(SCF_VERSION)) == NULL))
 		return (NULL);
 
 	if ((fmri_buf = assemble_fmri(h, instance, pgname, propname)) == NULL) {
@@ -1795,7 +1804,7 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 		local_h = B_FALSE;
 	}
 
-	if (local_h && ((h = handle_create()) == NULL))
+	if (local_h && ((h = _scf_handle_create_and_bind(SCF_VERSION)) == NULL))
 		return (NULL);
 
 	if (inst_fmri == NULL) {
@@ -2495,7 +2504,7 @@ gen_filenms_from_fmri(const char *fmri, const char *name, char *filename,
 	return (0);
 }
 
-static scf_type_t
+scf_type_t
 scf_true_base_type(scf_type_t type)
 {
 	scf_type_t base = type;
@@ -2576,7 +2585,7 @@ int
 scf_read_propvec(const char *fmri, const char *pgname, boolean_t running,
     scf_propvec_t *properties, scf_propvec_t **badprop)
 {
-	scf_handle_t *h = handle_create();
+	scf_handle_t *h = _scf_handle_create_and_bind(SCF_VERSION);
 	scf_service_t *s = scf_service_create(h);
 	scf_instance_t *i = scf_instance_create(h);
 	scf_snapshot_t *snap = running ? scf_snapshot_create(h) : NULL;
@@ -2742,7 +2751,7 @@ int
 scf_write_propvec(const char *fmri, const char *pgname,
     scf_propvec_t *properties, scf_propvec_t **badprop)
 {
-	scf_handle_t *h = handle_create();
+	scf_handle_t *h = _scf_handle_create_and_bind(SCF_VERSION);
 	scf_service_t *s = scf_service_create(h);
 	scf_instance_t *inst = scf_instance_create(h);
 	scf_snapshot_t *snap = scf_snapshot_create(h);
@@ -3050,5 +3059,88 @@ _check_services(char **svcs)
 				    SMF_TEMPORARY);
 			free(s);
 		}
+	}
+}
+
+/*ARGSUSED*/
+static int
+str_compare(const char *s1, const char *s2, size_t n)
+{
+	return (strcmp(s1, s2));
+}
+
+static int
+str_n_compare(const char *s1, const char *s2, size_t n)
+{
+	return (strncmp(s1, s2, n));
+}
+
+int32_t
+state_from_string(const char *state, size_t l)
+{
+	int (*str_cmp)(const char *, const char *, size_t);
+
+	if (l == 0)
+		str_cmp = str_compare;
+	else
+		str_cmp = str_n_compare;
+
+	if (str_cmp(SCF_STATE_STRING_UNINIT, state, l) == 0)
+		return (SCF_STATE_UNINIT);
+	else if (str_cmp(SCF_STATE_STRING_MAINT, state, l) == 0)
+		return (SCF_STATE_MAINT);
+	else if (str_cmp(SCF_STATE_STRING_OFFLINE, state, l) == 0)
+		return (SCF_STATE_OFFLINE);
+	else if (str_cmp(SCF_STATE_STRING_DISABLED, state, l) == 0)
+		return (SCF_STATE_DISABLED);
+	else if (str_cmp(SCF_STATE_STRING_ONLINE, state, l) == 0)
+		return (SCF_STATE_ONLINE);
+	else if (str_cmp(SCF_STATE_STRING_DEGRADED, state, l) == 0)
+		return (SCF_STATE_DEGRADED);
+	else if (str_cmp("all", state, l) == 0)
+		return (SCF_STATE_ALL);
+	else
+		return (-1);
+}
+
+/*
+ * int32_t smf_state_from_string()
+ * return the value of the macro SCF_STATE_* for the corresponding state
+ * it returns SCF_STATE_ALL if "all" is passed. -1 if the string passed doesn't
+ * correspond to any valid state.
+ */
+int32_t
+smf_state_from_string(const char *state)
+{
+	return (state_from_string(state, 0));
+}
+
+/*
+ * smf_state_to_string()
+ * Takes an int32_t representing an SMF state and returns
+ * the corresponding string. The string is read only and need not to be
+ * freed.
+ * returns NULL on invalid input.
+ */
+const char *
+smf_state_to_string(int32_t s)
+{
+	switch (s) {
+	case SCF_STATE_UNINIT:
+		return (SCF_STATE_STRING_UNINIT);
+	case SCF_STATE_MAINT:
+		return (SCF_STATE_STRING_MAINT);
+	case SCF_STATE_OFFLINE:
+		return (SCF_STATE_STRING_OFFLINE);
+	case SCF_STATE_DISABLED:
+		return (SCF_STATE_STRING_DISABLED);
+	case SCF_STATE_ONLINE:
+		return (SCF_STATE_STRING_ONLINE);
+	case SCF_STATE_DEGRADED:
+		return (SCF_STATE_STRING_DEGRADED);
+	case SCF_STATE_ALL:
+		return ("all");
+	default:
+		return (NULL);
 	}
 }

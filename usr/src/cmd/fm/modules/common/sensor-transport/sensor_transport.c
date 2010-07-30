@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <fm/fmd_api.h>
@@ -71,6 +70,9 @@ st_stats_t st_stats = {
 	{ "repairs", FMD_TYPE_UINT64, "auto repairs" }
 };
 
+static int st_check_component_complaints;
+static int have_complained;
+
 static int
 st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
@@ -117,9 +119,12 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 	if (topo_method_invoke(node, TOPO_METH_SENSOR_FAILURE,
 	    TOPO_METH_SENSOR_FAILURE_VERSION, NULL, &nvl, &err) != 0) {
 		if (err == ETOPO_METHOD_NOTSUP) {
-			fmd_hdl_debug(hdl, "Method %s not supported on %s=%d",
-			    TOPO_METH_SENSOR_FAILURE, name,
-			    topo_node_instance(node));
+			st_check_component_complaints++;
+			if (!have_complained) {
+				fmd_hdl_debug(hdl, "Method %s not supported "
+				    "on %s=%d", TOPO_METH_SENSOR_FAILURE, name,
+				    topo_node_instance(node));
+			}
 			nvlist_free(rsrc);
 			return (0);
 		}
@@ -271,6 +276,8 @@ out:
 	return (0);
 }
 
+int st_timeout_verbose = 0;
+
 /*ARGSUSED*/
 static void
 st_timeout(fmd_hdl_t *hdl, id_t id, void *data)
@@ -281,7 +288,8 @@ st_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 	topo_walk_t *twp;
 	int err;
 
-	fmd_hdl_debug(hdl, "timeout: checking topology");
+	if (st_timeout_verbose)
+		fmd_hdl_debug(hdl, "timeout: checking topology");
 
 	stp = fmd_hdl_getspecific(hdl);
 	thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
@@ -294,6 +302,9 @@ st_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 		st_stats.st_topo_errs.fmds_value.ui64++;
 		return;
 	}
+
+	if (st_check_component_complaints)
+		have_complained++;
 
 	/*
 	 * Initialize values in our internal FRU list for this iteration of

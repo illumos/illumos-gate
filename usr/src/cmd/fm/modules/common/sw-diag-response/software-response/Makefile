@@ -18,16 +18,24 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-# Supplemental configuration for the snmp-trapgen FMA module.  Normal
-# configuration of this module should be made via trap sink directives
-# in /etc/net-snmp/snmp/snmpd.conf, not in this file.  See snmpd(4) and
-# snmp_config(4).
-#
+MODULE = software-response
+CLASS = common
+
+include ../Makefile.com
+
+SWRP_SRCS = swrp_main.c
+
+SUBRP_SRCS = $(SMF_RP_SRCS)
+
+SRCS = $(SWRP_SRCS) $(CMN_SRCS:%=../%) $(SUBRP_SRCS:%=../%)
+
+include ../../../Makefile.plugin
+
+CFLAGS += $(INCS)
+LINTFLAGS += $(INCS)
+LDLIBS += -L$(ROOTLIB)/fm -ltopo -lscf
+LDFLAGS += -R/usr/lib/fm

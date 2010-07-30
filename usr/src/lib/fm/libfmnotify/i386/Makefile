@@ -18,33 +18,15 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-MODULE = snmp-trapgen
-CLASS = common
-SRCS = snmp.c
-NETSNMPCONFS = fmd-trapgen.conf
+include ../Makefile.com
 
-ROOTNETSNMPDIR = $(ROOT)/etc/net-snmp/snmp
-ROOTNETSNMPCONFS = $(NETSNMPCONFS:%=$(ROOTNETSNMPDIR)/%)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
 
-include ../../Makefile.plugin
+MACH_LDLIBS = -L$(ROOT)/usr/lib/fm
 
-SNMPLIBS = -lnetsnmp -lnetsnmpagent -lfmd_msg
-lint := SNMPLIBS =
+DYNFLAGS += -R/usr/lib/fm
 
-LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
-LINTFLAGS += -L$(ROOT)/usr/lib/fm
-LDLIBS += $(SNMPLIBS) -lfmd_msg
-
-$(ROOTNETSNMPCONFS) := FILEMODE = 0600
-
-$(ROOTNETSNMPDIR)/%: %
-	$(INS.file)
-
-install: $(ROOTNETSNMPCONFS)

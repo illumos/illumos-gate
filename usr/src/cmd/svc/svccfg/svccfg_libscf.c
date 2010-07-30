@@ -33,6 +33,7 @@
 #include <fnmatch.h>
 #include <inttypes.h>
 #include <libintl.h>
+#include <libnvpair.h>
 #include <libscf.h>
 #include <libscf_priv.h>
 #include <libtecla.h>
@@ -54,6 +55,7 @@
 #include <sys/mman.h>
 
 #include "svccfg.h"
+#include "notify_params.h"
 #include "manifest_hash.h"
 #include "manifest_find.h"
 
@@ -105,6 +107,7 @@ struct entity_elts {
 	xmlNodePtr	dependents;
 	xmlNodePtr	method_context;
 	xmlNodePtr	exec_methods;
+	xmlNodePtr	notify_params;
 	xmlNodePtr	property_groups;
 	xmlNodePtr	instances;
 	xmlNodePtr	stability;
@@ -127,6 +130,14 @@ struct template_elts {
 	xmlNodePtr	common_name;
 	xmlNodePtr	description;
 	xmlNodePtr	documentation;
+};
+
+/*
+ * Likewise for type (for notification parameters) elements.
+ */
+struct params_elts {
+	xmlNodePtr	paramval;
+	xmlNodePtr	parameter;
 };
 
 /*
@@ -208,6 +219,7 @@ static const char *emsg_entity_not_selected;
 static const char *emsg_permission_denied;
 static const char *emsg_create_xml;
 static const char *emsg_cant_modify_snapshots;
+static const char *emsg_invalid_for_snapshot;
 static const char *emsg_read_only;
 static const char *emsg_deleted;
 static const char *emsg_invalid_pg_name;
@@ -285,15 +297,42 @@ static char *start_method_names[] = {
 	NULL
 };
 
-static void
-safe_printf(const char *fmt, ...)
-{
-	va_list va;
+static struct uri_scheme {
+	const char *scheme;
+	const char *protocol;
+} uri_scheme[] = {
+	{ "mailto", "smtp" },
+	{ "snmp", "snmp" },
+	{ "syslog", "syslog" },
+	{ NULL, NULL }
+};
+#define	URI_SCHEME_NUM ((sizeof (uri_scheme) / \
+    sizeof (struct uri_scheme)) - 1)
 
-	va_start(va, fmt);
-	if (vprintf(fmt, va) < 0)
-		uu_die(gettext("Error writing to stdout"));
-	va_end(va);
+static int
+check_uri_scheme(const char *scheme)
+{
+	int i;
+
+	for (i = 0; uri_scheme[i].scheme != NULL; ++i) {
+		if (strcmp(scheme, uri_scheme[i].scheme) == 0)
+			return (i);
+	}
+
+	return (-1);
+}
+
+static int
+check_uri_protocol(const char *p)
+{
+	int i;
+
+	for (i = 0; uri_scheme[i].protocol != NULL; ++i) {
+		if (strcmp(p, uri_scheme[i].protocol) == 0)
+			return (i);
+	}
+
+	return (-1);
 }
 
 /*
@@ -931,6 +970,8 @@ lscf_init()
 	emsg_permission_denied = gettext("Permission denied.\n");
 	emsg_create_xml = gettext("Could not create XML node.\n");
 	emsg_cant_modify_snapshots = gettext("Cannot modify snapshots.\n");
+	emsg_invalid_for_snapshot =
+	    gettext("Invalid operation on a snapshot.\n");
 	emsg_read_only = gettext("Backend read-only.\n");
 	emsg_deleted = gettext("Current selection has been deleted.\n");
 	emsg_invalid_pg_name =
@@ -9995,6 +10036,176 @@ export_template(scf_propertygroup_t *pg, struct entity_elts *elts,
 }
 
 /*
+ * Process parameter and paramval elements
+ */
+static void
+export_parameter(scf_property_t *prop, const char *name,
+    struct params_elts *elts)
+{
+	xmlNodePtr param;
+	scf_error_t err = 0;
+	int ret;
+
+	if (scf_property_get_value(prop, exp_val) == SCF_SUCCESS) {
+		if ((param = xmlNewNode(NULL, (xmlChar *)"paramval")) == NULL)
+			uu_die(emsg_create_xml);
+
+		safe_setprop(param, name_attr, name);
+
+		if (scf_value_get_as_string(exp_val, exp_str, exp_str_sz) < 0)
+			scfdie();
+		safe_setprop(param, value_attr, exp_str);
+
+		if (elts->paramval == NULL)
+			elts->paramval = param;
+		else
+			(void) xmlAddSibling(elts->paramval, param);
+
+		return;
+	}
+
+	err = scf_error();
+
+	if (err != SCF_ERROR_CONSTRAINT_VIOLATED &&
+	    err != SCF_ERROR_NOT_FOUND)
+		scfdie();
+
+	if ((param = xmlNewNode(NULL, (xmlChar *)"parameter")) == NULL)
+		uu_die(emsg_create_xml);
+
+	safe_setprop(param, name_attr, name);
+
+	if (err == SCF_ERROR_CONSTRAINT_VIOLATED) {
+		if (scf_iter_property_values(exp_val_iter, prop) != SCF_SUCCESS)
+			scfdie();
+
+		while ((ret = scf_iter_next_value(exp_val_iter, exp_val)) ==
+		    1) {
+			xmlNodePtr vn;
+
+			if ((vn = xmlNewChild(param, NULL,
+			    (xmlChar *)"value_node", NULL)) == NULL)
+				uu_die(emsg_create_xml);
+
+			if (scf_value_get_as_string(exp_val, exp_str,
+			    exp_str_sz) < 0)
+				scfdie();
+
+			safe_setprop(vn, value_attr, exp_str);
+		}
+		if (ret != 0)
+			scfdie();
+	}
+
+	if (elts->parameter == NULL)
+		elts->parameter = param;
+	else
+		(void) xmlAddSibling(elts->parameter, param);
+}
+
+/*
+ * Process notification parameters for a service or instance
+ */
+static void
+export_notify_params(scf_propertygroup_t *pg, struct entity_elts *elts)
+{
+	xmlNodePtr n, event, *type;
+	struct params_elts *eelts;
+	int ret, err, i;
+
+	n = xmlNewNode(NULL, (xmlChar *)"notification_parameters");
+	event = xmlNewNode(NULL, (xmlChar *)"event");
+	if (n == NULL || event == NULL)
+		uu_die(emsg_create_xml);
+
+	/* event value */
+	if (scf_pg_get_name(pg, exp_str, max_scf_name_len + 1) < 0)
+		scfdie();
+	safe_setprop(event, value_attr, exp_str);
+
+	(void) xmlAddChild(n, event);
+
+	if ((type = calloc(URI_SCHEME_NUM, sizeof (xmlNodePtr))) == NULL ||
+	    (eelts = calloc(URI_SCHEME_NUM,
+	    sizeof (struct params_elts))) == NULL)
+		uu_die(gettext("Out of memory.\n"));
+
+	err = 0;
+
+	if (scf_iter_pg_properties(exp_prop_iter, pg) != SCF_SUCCESS)
+		scfdie();
+
+	while ((ret = scf_iter_next_property(exp_prop_iter, exp_prop)) == 1) {
+		char *t, *p;
+
+		if (scf_property_get_name(exp_prop, exp_str, exp_str_sz) < 0)
+			scfdie();
+
+		if ((t = strtok_r(exp_str, ",", &p)) == NULL || p == NULL) {
+			/*
+			 * this is not a well formed notification parameters
+			 * element, we should export as regular pg
+			 */
+			err = 1;
+			break;
+		}
+
+		if ((i = check_uri_protocol(t)) < 0) {
+			err = 1;
+			break;
+		}
+
+		if (type[i] == NULL) {
+			if ((type[i] = xmlNewNode(NULL, (xmlChar *)"type")) ==
+			    NULL)
+				uu_die(emsg_create_xml);
+
+			safe_setprop(type[i], name_attr, t);
+		}
+		if (strcmp(p, active_attr) == 0) {
+			if (set_attr_from_prop(exp_prop, type[i],
+			    active_attr) != 0) {
+				err = 1;
+				break;
+			}
+			continue;
+		}
+		/*
+		 * We export the parameter
+		 */
+		export_parameter(exp_prop, p, &eelts[i]);
+	}
+
+	if (ret == -1)
+		scfdie();
+
+	if (err == 1) {
+		for (i = 0; i < URI_SCHEME_NUM; ++i)
+			xmlFree(type[i]);
+		free(type);
+
+		export_pg(pg, elts, 0);
+
+		return;
+	} else {
+		for (i = 0; i < URI_SCHEME_NUM; ++i)
+			if (type[i] != NULL) {
+				(void) xmlAddChildList(type[i],
+				    eelts[i].paramval);
+				(void) xmlAddChildList(type[i],
+				    eelts[i].parameter);
+				(void) xmlAddSibling(event, type[i]);
+			}
+	}
+	free(type);
+
+	if (elts->notify_params == NULL)
+		elts->notify_params = n;
+	else
+		(void) xmlAddSibling(elts->notify_params, n);
+}
+
+/*
  * Process the general property group for an instance.
  */
 static void
@@ -10153,6 +10364,9 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts, int flags)
 		} else if (strcmp(exp_str, SCF_GROUP_TEMPLATE) == 0) {
 			export_template(exp_pg, &elts, &template_elts);
 			continue;
+		} else if (strcmp(exp_str, SCF_NOTIFY_PARAMS_PG_TYPE) == 0) {
+			export_notify_params(exp_pg, &elts);
+			continue;
 		}
 
 		/* Ordinary pg. */
@@ -10173,8 +10387,8 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts, int flags)
 
 	if (isdefault && elts.restarter == NULL &&
 	    elts.dependencies == NULL && elts.method_context == NULL &&
-	    elts.exec_methods == NULL && elts.property_groups == NULL &&
-	    elts.template == NULL) {
+	    elts.exec_methods == NULL && elts.notify_params == NULL &&
+	    elts.property_groups == NULL && elts.template == NULL) {
 		xmlChar *eval;
 
 		/* This is a default instance */
@@ -10197,6 +10411,7 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts, int flags)
 		(void) xmlAddChildList(n, elts.dependents);
 		(void) xmlAddChild(n, elts.method_context);
 		(void) xmlAddChildList(n, elts.exec_methods);
+		(void) xmlAddChildList(n, elts.notify_params);
 		(void) xmlAddChildList(n, elts.property_groups);
 		(void) xmlAddChild(n, elts.template);
 
@@ -10276,6 +10491,9 @@ export_service(scf_service_t *svc, int flags)
 		} else if (strcmp(exp_str, SCF_GROUP_TEMPLATE) == 0) {
 			export_template(exp_pg, &elts, &template_elts);
 			continue;
+		} else if (strcmp(exp_str, SCF_NOTIFY_PARAMS_PG_TYPE) == 0) {
+			export_notify_params(exp_pg, &elts);
+			continue;
 		}
 
 		export_pg(exp_pg, &elts, flags);
@@ -10310,6 +10528,7 @@ export_service(scf_service_t *svc, int flags)
 	(void) xmlAddChildList(snode, elts.dependents);
 	(void) xmlAddChild(snode, elts.method_context);
 	(void) xmlAddChildList(snode, elts.exec_methods);
+	(void) xmlAddChildList(snode, elts.notify_params);
 	(void) xmlAddChildList(snode, elts.property_groups);
 	(void) xmlAddChildList(snode, elts.instances);
 	(void) xmlAddChild(snode, elts.stability);
@@ -15178,6 +15397,534 @@ out:
 	if (argv != NULL)
 		free(argv);
 	return (ret);
+usage:
+	ret = -2;
+	goto out;
+}
+
+#define	PARAM_ACTIVE	((const char *) "active")
+#define	PARAM_INACTIVE	((const char *) "inactive")
+#define	PARAM_SMTP_TO	((const char *) "to")
+
+/*
+ * tokenize()
+ * Breaks down the string according to the tokens passed.
+ * Caller is responsible for freeing array of pointers returned.
+ * Returns NULL on failure
+ */
+char **
+tokenize(char *str, const char *sep)
+{
+	char *token, *lasts;
+	char **buf;
+	int n = 0;	/* number of elements */
+	int size = 8;	/* size of the array (initial) */
+
+	buf = safe_malloc(size * sizeof (char *));
+
+	for (token = strtok_r(str, sep, &lasts); token != NULL;
+	    token = strtok_r(NULL, sep, &lasts), ++n) {
+		if (n + 1 >= size) {
+			size *= 2;
+			if ((buf = realloc(buf, size * sizeof (char *))) ==
+			    NULL) {
+				uu_die(gettext("Out of memory"));
+			}
+		}
+		buf[n] = token;
+	}
+	/* NULL terminate the pointer array */
+	buf[n] = NULL;
+
+	return (buf);
+}
+
+int32_t
+check_tokens(char **p)
+{
+	int32_t smf = 0;
+	int32_t fma = 0;
+
+	while (*p) {
+		int32_t t = string_to_tset(*p);
+
+		if (t == 0) {
+			if (is_fma_token(*p) == 0)
+				return (INVALID_TOKENS);
+			fma = 1; /* this token is an fma event */
+		} else {
+			smf |= t;
+		}
+
+		if (smf != 0 && fma == 1)
+			return (MIXED_TOKENS);
+		++p;
+	}
+
+	if (smf > 0)
+		return (smf);
+	else if (fma == 1)
+		return (FMA_TOKENS);
+
+	return (INVALID_TOKENS);
+}
+
+static int
+get_selection_str(char *fmri, size_t sz)
+{
+	if (g_hndl == NULL) {
+		semerr(emsg_entity_not_selected);
+		return (-1);
+	} else if (cur_level != NULL) {
+		semerr(emsg_invalid_for_snapshot);
+		return (-1);
+	} else {
+		lscf_get_selection_str(fmri, sz);
+	}
+
+	return (0);
+}
+
+void
+lscf_delnotify(const char *set, int global)
+{
+	char *str = strdup(set);
+	char **pgs;
+	char **p;
+	int32_t tset;
+	char *fmri = NULL;
+
+	if (str == NULL)
+		uu_die(gettext("Out of memory.\n"));
+
+	pgs = tokenize(str, ",");
+
+	if ((tset = check_tokens(pgs)) > 0) {
+		size_t sz = max_scf_fmri_len + 1;
+
+		fmri = safe_malloc(sz);
+		if (global) {
+			(void) strlcpy(fmri, SCF_INSTANCE_GLOBAL, sz);
+		} else if (get_selection_str(fmri, sz) != 0) {
+			goto out;
+		}
+
+		if (smf_notify_del_params(SCF_SVC_TRANSITION_CLASS, fmri,
+		    tset) != SCF_SUCCESS) {
+			uu_warn(gettext("Failed smf_notify_del_params: %s\n"),
+			    scf_strerror(scf_error()));
+		}
+	} else if (tset == FMA_TOKENS) {
+		if (global) {
+			semerr(gettext("Can't use option '-g' with FMA event "
+			    "definitions\n"));
+			goto out;
+		}
+
+		for (p = pgs; *p; ++p) {
+			if (smf_notify_del_params(de_tag(*p), NULL, NULL) !=
+			    SCF_SUCCESS) {
+				uu_warn(gettext("Failed for \"%s\": %s\n"), *p,
+				    scf_strerror(scf_error()));
+				goto out;
+			}
+		}
+	} else if (tset == MIXED_TOKENS) {
+		semerr(gettext("Can't mix SMF and FMA event definitions\n"));
+		goto out;
+	} else {
+		uu_die(gettext("Invalid input.\n"));
+	}
+
+out:
+	free(fmri);
+	free(pgs);
+	free(str);
+}
+
+void
+lscf_listnotify(const char *set, int global)
+{
+	char *str = safe_strdup(set);
+	char **pgs;
+	char **p;
+	int32_t tset;
+	nvlist_t *nvl;
+	char *fmri = NULL;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		uu_die(gettext("Out of memory.\n"));
+
+	pgs = tokenize(str, ",");
+
+	if ((tset = check_tokens(pgs)) > 0) {
+		size_t sz = max_scf_fmri_len + 1;
+
+		fmri = safe_malloc(sz);
+		if (global) {
+			(void) strlcpy(fmri, SCF_INSTANCE_GLOBAL, sz);
+		} else if (get_selection_str(fmri, sz) != 0) {
+			goto out;
+		}
+
+		if (_scf_get_svc_notify_params(fmri, nvl, tset, 1, 1) !=
+		    SCF_SUCCESS) {
+			if (scf_error() != SCF_ERROR_NOT_FOUND &&
+			    scf_error() != SCF_ERROR_DELETED)
+				uu_warn(gettext(
+				    "Failed listnotify: %s\n"),
+				    scf_strerror(scf_error()));
+			goto out;
+		}
+
+		listnotify_print(nvl, NULL);
+	} else if (tset == FMA_TOKENS) {
+		if (global) {
+			semerr(gettext("Can't use option '-g' with FMA event "
+			    "definitions\n"));
+			goto out;
+		}
+
+		for (p = pgs; *p; ++p) {
+			if (_scf_get_fma_notify_params(de_tag(*p), nvl, 1) !=
+			    SCF_SUCCESS) {
+				/*
+				 * if the preferences have just been deleted
+				 * or does not exist, just skip.
+				 */
+				if (scf_error() == SCF_ERROR_NOT_FOUND ||
+				    scf_error() == SCF_ERROR_DELETED)
+					continue;
+				uu_warn(gettext(
+				    "Failed listnotify: %s\n"),
+				    scf_strerror(scf_error()));
+				goto out;
+			}
+			listnotify_print(nvl, re_tag(*p));
+		}
+	} else if (tset == MIXED_TOKENS) {
+		semerr(gettext("Can't mix SMF and FMA event definitions\n"));
+		goto out;
+	} else {
+		semerr(gettext("Invalid input.\n"));
+	}
+
+out:
+	nvlist_free(nvl);
+	free(fmri);
+	free(pgs);
+	free(str);
+}
+
+static char *
+strip_quotes_and_blanks(char *s)
+{
+	char *start = s;
+	char *end = strrchr(s, '\"');
+
+	if (s[0] == '\"' && end != NULL && *(end + 1) == '\0') {
+		start = s + 1;
+		while (isblank(*start))
+			start++;
+		while (isblank(*(end - 1)) && end > start) {
+			end--;
+		}
+		*end = '\0';
+	}
+
+	return (start);
+}
+
+static int
+set_active(nvlist_t *mech, const char *hier_part)
+{
+	boolean_t b;
+
+	if (*hier_part == '\0' || strcmp(hier_part, PARAM_ACTIVE) == 0) {
+		b = B_TRUE;
+	} else if (strcmp(hier_part, PARAM_INACTIVE) == 0) {
+		b = B_FALSE;
+	} else {
+		return (-1);
+	}
+
+	if (nvlist_add_boolean_value(mech, PARAM_ACTIVE, b) != 0)
+		uu_die(gettext("Out of memory.\n"));
+
+	return (0);
+}
+
+static int
+add_snmp_params(nvlist_t *mech, char *hier_part)
+{
+	return (set_active(mech, hier_part));
+}
+
+static int
+add_syslog_params(nvlist_t *mech, char *hier_part)
+{
+	return (set_active(mech, hier_part));
+}
+
+/*
+ * add_mailto_paramas()
+ * parse the hier_part of mailto URI
+ * mailto:<addr>[?<header1>=<value1>[&<header2>=<value2>]]
+ * or mailto:{[active]|inactive}
+ */
+static int
+add_mailto_params(nvlist_t *mech, char *hier_part)
+{
+	const char *tok = "?&";
+	char *p;
+	char *lasts;
+	char *param;
+	char *val;
+
+	/*
+	 * If the notification parametes are in the form of
+	 *
+	 *   malito:{[active]|inactive}
+	 *
+	 * we set the property accordingly and return.
+	 * Otherwise, we make the notification type active and
+	 * process the hier_part.
+	 */
+	if (set_active(mech, hier_part) == 0)
+		return (0);
+	else if (set_active(mech, PARAM_ACTIVE) != 0)
+		return (-1);
+
+	if ((p = strtok_r(hier_part, tok, &lasts)) == NULL) {
+		/*
+		 * sanity check: we only get here if hier_part = "", but
+		 * that's handled by set_active
+		 */
+		uu_die("strtok_r");
+	}
+
+	if (nvlist_add_string(mech, PARAM_SMTP_TO, p) != 0)
+		uu_die(gettext("Out of memory.\n"));
+
+	while ((p = strtok_r(NULL, tok, &lasts)) != NULL)
+		if ((param = strtok_r(p, "=", &val)) != NULL)
+			if (nvlist_add_string(mech, param, val) != 0)
+				uu_die(gettext("Out of memory.\n"));
+
+	return (0);
+}
+
+static int
+uri_split(char *uri, char **scheme, char **hier_part)
+{
+	int r = -1;
+
+	if ((*scheme = strtok_r(uri, ":", hier_part)) == NULL ||
+	    *hier_part == NULL) {
+		semerr(gettext("'%s' is not an URI\n"), uri);
+		return (r);
+	}
+
+	if ((r = check_uri_scheme(*scheme)) < 0) {
+		semerr(gettext("Unkown URI scheme: %s\n"), *scheme);
+		return (r);
+	}
+
+	return (r);
+}
+
+static int
+process_uri(nvlist_t *params, char *uri)
+{
+	char *scheme;
+	char *hier_part;
+	nvlist_t *mech;
+	int index;
+	int r;
+
+	if ((index = uri_split(uri, &scheme, &hier_part)) < 0)
+		return (-1);
+
+	if (nvlist_alloc(&mech, NV_UNIQUE_NAME, 0) != 0)
+		uu_die(gettext("Out of memory.\n"));
+
+	switch (index) {
+	case 0:
+		/* error messages displayed by called function */
+		r = add_mailto_params(mech, hier_part);
+		break;
+
+	case 1:
+		if ((r = add_snmp_params(mech, hier_part)) != 0)
+			semerr(gettext("Not valid parameters: '%s'\n"),
+			    hier_part);
+		break;
+
+	case 2:
+		if ((r = add_syslog_params(mech, hier_part)) != 0)
+			semerr(gettext("Not valid parameters: '%s'\n"),
+			    hier_part);
+		break;
+
+	default:
+		r = -1;
+	}
+
+	if (r == 0 && nvlist_add_nvlist(params, uri_scheme[index].protocol,
+	    mech) != 0)
+		uu_die(gettext("Out of memory.\n"));
+
+	nvlist_free(mech);
+	return (r);
+}
+
+static int
+set_params(nvlist_t *params, char **p)
+{
+	char *uri;
+
+	if (p == NULL)
+		/* sanity check */
+		uu_die("set_params");
+
+	while (*p) {
+		uri = strip_quotes_and_blanks(*p);
+		if (process_uri(params, uri) != 0)
+			return (-1);
+
+		++p;
+	}
+
+	return (0);
+}
+
+static int
+setnotify(const char *e, char **p, int global)
+{
+	char *str = safe_strdup(e);
+	char **events;
+	int32_t tset;
+	int r = -1;
+	nvlist_t *nvl, *params;
+	char *fmri = NULL;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_alloc(&params, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_uint32(nvl, SCF_NOTIFY_NAME_VERSION,
+	    SCF_NOTIFY_PARAMS_VERSION) != 0)
+		uu_die(gettext("Out of memory.\n"));
+
+	events = tokenize(str, ",");
+
+	if ((tset = check_tokens(events)) > 0) {
+		/* SMF state transitions parameters */
+		size_t sz = max_scf_fmri_len + 1;
+
+		fmri = safe_malloc(sz);
+		if (global) {
+			(void) strlcpy(fmri, SCF_INSTANCE_GLOBAL, sz);
+		} else if (get_selection_str(fmri, sz) != 0) {
+			goto out;
+		}
+
+		if (nvlist_add_string(nvl, SCF_NOTIFY_NAME_FMRI, fmri) != 0 ||
+		    nvlist_add_int32(nvl, SCF_NOTIFY_NAME_TSET, tset) != 0)
+			uu_die(gettext("Out of memory.\n"));
+
+		if ((r = set_params(params, p)) == 0) {
+			if (nvlist_add_nvlist(nvl, SCF_NOTIFY_PARAMS,
+			    params) != 0)
+				uu_die(gettext("Out of memory.\n"));
+
+			if (smf_notify_set_params(SCF_SVC_TRANSITION_CLASS,
+			    nvl) != SCF_SUCCESS) {
+				r = -1;
+				uu_warn(gettext(
+				    "Failed smf_notify_set_params(3SCF): %s\n"),
+				    scf_strerror(scf_error()));
+			}
+		}
+	} else if (tset == FMA_TOKENS) {
+		/* FMA event parameters */
+		if (global) {
+			semerr(gettext("Can't use option '-g' with FMA event "
+			    "definitions\n"));
+			goto out;
+		}
+
+		if ((r = set_params(params, p)) != 0)
+			goto out;
+
+		if (nvlist_add_nvlist(nvl, SCF_NOTIFY_PARAMS, params) != 0)
+			uu_die(gettext("Out of memory.\n"));
+
+		while (*events) {
+			if (smf_notify_set_params(de_tag(*events), nvl) !=
+			    SCF_SUCCESS)
+				uu_warn(gettext(
+				    "Failed smf_notify_set_params(3SCF) for "
+				    "event %s: %s\n"), *events,
+				    scf_strerror(scf_error()));
+			events++;
+		}
+	} else if (tset == MIXED_TOKENS) {
+		semerr(gettext("Can't mix SMF and FMA event definitions\n"));
+	} else {
+		/* Sanity check */
+		uu_die(gettext("Invalid input.\n"));
+	}
+
+out:
+	nvlist_free(nvl);
+	nvlist_free(params);
+	free(fmri);
+	free(str);
+
+	return (r);
+}
+
+int
+lscf_setnotify(uu_list_t *args)
+{
+	int argc;
+	char **argv = NULL;
+	string_list_t *slp;
+	int global;
+	char *events;
+	char **p;
+	int i;
+	int ret;
+
+	if ((argc = uu_list_numnodes(args)) < 2)
+		goto usage;
+
+	argv = calloc(argc + 1, sizeof (char *));
+	if (argv == NULL)
+		uu_die(gettext("Out of memory.\n"));
+
+	for (slp = uu_list_first(args), i = 0;
+	    slp != NULL;
+	    slp = uu_list_next(args, slp), ++i)
+		argv[i] = slp->str;
+
+	argv[i] = NULL;
+
+	if (strcmp(argv[0], "-g") == 0) {
+		global = 1;
+		events = argv[1];
+		p = argv + 2;
+	} else {
+		global = 0;
+		events = argv[0];
+		p = argv + 1;
+	}
+
+	ret = setnotify(events, p, global);
+
+out:
+	free(argv);
+	return (ret);
+
 usage:
 	ret = -2;
 	goto out;

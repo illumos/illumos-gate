@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1165,6 +1164,8 @@ evch_chunbind(evch_bind_t *bp)
 		mutex_exit(&chp->ch_mutex);
 		evch_dl_del(&eg->evch_list, &chp->ch_link);
 		evch_evq_destroy(chp->ch_queue);
+		if (chp->ch_propnvl)
+			nvlist_free(chp->ch_propnvl);
 		mutex_destroy(&chp->ch_mutex);
 		mutex_destroy(&chp->ch_pubmx);
 		cv_destroy(&chp->ch_pubcv);
@@ -1564,6 +1565,47 @@ evch_chgetchdata(char *chname, void *buf, size_t size)
 	return (chdlen + buflen);
 }
 
+static void
+evch_chsetpropnvl(evch_bind_t *bp, nvlist_t *nvl)
+{
+	evch_chan_t *chp = bp->bd_channel;
+
+	mutex_enter(&chp->ch_mutex);
+
+	if (chp->ch_propnvl)
+		nvlist_free(chp->ch_propnvl);
+
+	chp->ch_propnvl = nvl;
+	chp->ch_propnvlgen++;
+
+	mutex_exit(&chp->ch_mutex);
+}
+
+static int
+evch_chgetpropnvl(evch_bind_t *bp, nvlist_t **nvlp, int64_t *genp)
+{
+	evch_chan_t *chp = bp->bd_channel;
+	int rc = 0;
+
+	mutex_enter(&chp->ch_mutex);
+
+	if (chp->ch_propnvl != NULL)
+		rc = (nvlist_dup(chp->ch_propnvl, nvlp, 0) == 0) ? 0 : ENOMEM;
+	else
+		*nvlp = NULL;	/* rc still 0 */
+
+	if (genp)
+		*genp = chp->ch_propnvlgen;
+
+	mutex_exit(&chp->ch_mutex);
+
+	if (rc != 0)
+		*nvlp = NULL;
+
+	return (rc);
+
+}
+
 /*
  * Init iteration of all events of a channel. This function creates a new
  * event queue and puts all events from the channel into that queue.
@@ -1718,6 +1760,8 @@ evch_chgetnextev(evchanq_t *snp)
  * sysevent_evc_unsubscribe - Unsubscribe from an event class
  * sysevent_evc_publish	    - Publish an event to an event channel
  * sysevent_evc_control	    - Various control operation on event channel
+ * sysevent_evc_setpropnvl  - Set channel property nvlist
+ * sysevent_evc_getpropnvl  - Get channel property nvlist
  *
  * The function below are for evaluating a sysevent:
  *
@@ -1971,6 +2015,25 @@ sysevent_evc_control(evchan_t *scp, int cmd, ...)
 	return (rc);
 }
 
+int
+sysevent_evc_setpropnvl(evchan_t *scp, nvlist_t *nvl)
+{
+	nvlist_t *nvlcp = nvl;
+
+	if (nvl != NULL && nvlist_dup(nvl, &nvlcp, 0) != 0)
+		return (ENOMEM);
+
+	evch_chsetpropnvl((evch_bind_t *)scp, nvlcp);
+
+	return (0);
+}
+
+int
+sysevent_evc_getpropnvl(evchan_t *scp, nvlist_t **nvlp)
+{
+	return (evch_chgetpropnvl((evch_bind_t *)scp, nvlp, NULL));
+}
+
 /*
  * Project private interface to take a snapshot of all events of the
  * specified event channel. Argument subscr may be a subscriber id, the empty
@@ -2130,6 +2193,8 @@ sysevent_get_attr_list(sysevent_t *ev, nvlist_t **nvlist)
  * evch_usrcontrol_get	- Get channel properties
  * evch_usrgetchnames	- Get list of channel names
  * evch_usrgetchdata	- Get data of an event channel
+ * evch_usrsetpropnvl	- Set channel properties nvlist
+ * evch_usrgetpropnvl	- Get channel properties nvlist
  */
 evchan_t *
 evch_usrchanopen(const char *name, uint32_t flags, int *err)
@@ -2266,4 +2331,16 @@ int
 evch_usrgetchdata(char *chname, void *buf, size_t size)
 {
 	return (evch_chgetchdata(chname, buf, size));
+}
+
+void
+evch_usrsetpropnvl(evchan_t *bp, nvlist_t *nvl)
+{
+	evch_chsetpropnvl((evch_bind_t *)bp, nvl);
+}
+
+int
+evch_usrgetpropnvl(evchan_t *bp, nvlist_t **nvlp, int64_t *genp)
+{
+	return (evch_chgetpropnvl((evch_bind_t *)bp, nvlp, genp));
 }

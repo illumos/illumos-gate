@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,8 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fmd_module.h>
 #include <fmd_subr.h>
@@ -33,11 +29,13 @@
 #include <fmd_string.h>
 #include <fmd_event.h>
 #include <fmd_builtin.h>
+#include <zone.h>
 
 static const struct fmd_builtin _fmd_builtins[] = {
-	{ "fmd-self-diagnosis", self_init, self_fini },
-	{ "sysevent-transport", sysev_init, sysev_fini },
-	{ NULL, NULL, NULL }
+	{ "fmd-self-diagnosis", self_init, self_fini, FMD_BUILTIN_ALLCTXT },
+	{ "sysevent-transport", sysev_init, sysev_fini,
+		FMD_BUILTIN_CTXT_GLOBALZONE },
+	{ NULL, NULL, NULL, 0 }
 };
 
 static int
@@ -106,9 +104,16 @@ int
 fmd_builtin_loadall(fmd_modhash_t *mhp)
 {
 	const fmd_builtin_t *bp;
+	uint32_t ctxt = 0;
 	int err = 0;
 
+	ctxt |= (getzoneid() == GLOBAL_ZONEID) ? FMD_BUILTIN_CTXT_GLOBALZONE :
+	    FMD_BUILTIN_CTXT_NONGLOBALZONE;
+
 	for (bp = _fmd_builtins; bp->bltin_name != NULL; bp++) {
+		if (!(ctxt & bp->bltin_ctxts))
+			continue;
+
 		if (fmd_modhash_load(mhp, bp->bltin_name,
 		    &fmd_bltin_ops) == NULL)
 			err = -1;

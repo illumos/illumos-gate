@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -95,6 +94,8 @@ dump_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	uint64_t dumpsize_in_pages;
 	int error = 0;
 	char *pathbuf = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	char uuidbuf[36 + 1];
+	size_t len;
 	vnode_t *vp;
 
 	switch (cmd) {
@@ -188,6 +189,23 @@ dump_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		else
 			dumpsys();
 		mutex_exit(&dump_lock);
+		break;
+
+	case DIOCSETUUID:
+		if ((error = copyinstr((char *)arg, uuidbuf, sizeof (uuidbuf),
+		    &len)) != 0)
+			break;
+
+		if (len != 37) {
+			error = EINVAL;
+			break;
+		}
+
+		error = dump_set_uuid(uuidbuf);
+		break;
+
+	case DIOCGETUUID:
+		error = copyoutstr(dump_get_uuid(), (void *)arg, 37, NULL);
 		break;
 
 	default:

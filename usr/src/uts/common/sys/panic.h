@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_PANIC_H
 #define	_SYS_PANIC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(_ASM)
 #include <sys/types.h>
@@ -45,9 +42,12 @@ extern "C" {
 #endif
 
 #define	PANICBUFSIZE	8192
-#define	PANICBUFVERS	1
+#define	PANICBUFVERS	2
 
 #define	PANICNVNAMELEN	16
+
+#define	STACK_BUF_SIZE	2048
+#define	SUMMARY_MAGIC	0xdead0d8a
 
 /*
  * Panicbuf Format:
@@ -80,8 +80,18 @@ typedef struct panic_nv {
 typedef struct panic_data {
 	uint32_t pd_version;		/* Version number of panic_data_t */
 	uint32_t pd_msgoff;		/* Message byte offset in panicbuf */
+	char pd_uuid[36 + 1];		/* image uuid */
 	panic_nv_t pd_nvdata[1];	/* Array of named data */
 } panic_data_t;
+
+typedef struct summary_dump {
+	uint32_t sd_magic;		/* magic number */
+	uint32_t sd_ssum;		/* checsksum32(stack buffer) */
+	/*
+	 * stack buffer and other summary data follow here -- see
+	 * dump_summary()
+	 */
+} summary_dump_t;
 
 #if defined(_KERNEL)
 

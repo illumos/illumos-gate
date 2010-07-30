@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -471,6 +470,116 @@ sysevent_chandata(dev_t dev, int *rvalp, void *arg, int flag, cred_t *cr)
 	return (rc);
 }
 
+/* ARGSUSED */
+static int
+sysevent_setpropnvl(dev_t dev, int *rvalp, void *arg, int flag, cred_t *cr)
+{
+	sev_propnvl_args_t uargs;
+	nvlist_t *nvl = NULL;
+	evchan_ctl_t *ctl;
+	size_t bufsz;
+	char *buf;
+
+	ctl = ddi_get_soft_state(evchan_ctlp, getminor(dev));
+	if (ctl == NULL || ctl->chp == NULL)
+		return (ENXIO);
+
+	if (copyin(arg, &uargs, sizeof (uargs)) != 0)
+		return (EFAULT);
+
+	if (uargs.packednvl.name != 0) {
+		bufsz = uargs.packednvl.len;
+
+		if (bufsz == 0)
+			return (EINVAL);
+
+		if (bufsz > EVCH_MAX_DATA_SIZE)
+			return (EOVERFLOW);
+
+		buf = kmem_alloc(bufsz, KM_SLEEP);
+
+		if (copyin((void *)(uintptr_t)uargs.packednvl.name, buf,
+		    bufsz) != 0 ||
+		    nvlist_unpack(buf, bufsz, &nvl, KM_SLEEP) != 0) {
+			kmem_free(buf, bufsz);
+			return (EFAULT);
+		}
+
+		kmem_free(buf, bufsz);
+
+		if (nvl == NULL)
+			return (EINVAL);
+	}
+
+	evch_usrsetpropnvl(ctl->chp, nvl);
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+sysevent_getpropnvl(dev_t dev, int *rvalp, void *arg, int flag, cred_t *cr)
+{
+	sev_propnvl_args_t uargs;
+	size_t reqsz, avlsz;
+	evchan_ctl_t *ctl;
+	nvlist_t *nvl;
+	int64_t gen;
+	int rc;
+
+	ctl = ddi_get_soft_state(evchan_ctlp, getminor(dev));
+
+	if (ctl == NULL || ctl->chp == NULL)
+		return (ENXIO);
+
+	if (copyin(arg, &uargs, sizeof (uargs)) != 0)
+		return (EFAULT);
+
+	if ((rc = evch_usrgetpropnvl(ctl->chp, &nvl, &gen)) != 0)
+		return (rc);
+
+	if (nvl != NULL) {
+		avlsz = uargs.packednvl.len;
+
+		if (nvlist_size(nvl, &reqsz, NV_ENCODE_NATIVE) != 0) {
+			nvlist_free(nvl);
+			return (EINVAL);
+		}
+
+		if (reqsz > EVCH_MAX_DATA_SIZE) {
+			nvlist_free(nvl);
+			return (E2BIG);
+		}
+
+		if (reqsz <= avlsz) {
+			char *buf = kmem_alloc(reqsz, KM_SLEEP);
+
+			if (nvlist_pack(nvl, &buf, &reqsz,
+			    NV_ENCODE_NATIVE, 0) != 0 || copyout(buf,
+			    (void *)(uintptr_t)uargs.packednvl.name,
+			    reqsz) != 0) {
+				kmem_free(buf, reqsz);
+				nvlist_free(nvl);
+				return (EFAULT);
+			}
+			kmem_free(buf, reqsz);
+			rc = 0;
+		} else {
+			rc = EOVERFLOW;
+		}
+		uargs.packednvl.len = (uint32_t)reqsz;
+		nvlist_free(nvl);
+	} else {
+		uargs.packednvl.len = 0;
+		rc = 0;
+	}
+
+	uargs.generation = gen;
+	if (copyout((void *)&uargs, arg, sizeof (uargs)) != 0)
+		rc = EFAULT;
+
+	return (rc);
+}
+
 /*ARGSUSED*/
 static int
 sysevent_ioctl(dev_t dev, int cmd, intptr_t arg,
@@ -499,6 +608,12 @@ sysevent_ioctl(dev_t dev, int cmd, intptr_t arg,
 		break;
 	case SEV_CHANDATA:
 		rc = sysevent_chandata(dev, rvalp, (void *)arg, flag, cr);
+		break;
+	case SEV_SETPROPNVL:
+		rc = sysevent_setpropnvl(dev, rvalp, (void *)arg, flag, cr);
+		break;
+	case SEV_GETPROPNVL:
+		rc = sysevent_getpropnvl(dev, rvalp, (void *)arg, flag, cr);
 		break;
 	default:
 		rc = EINVAL;

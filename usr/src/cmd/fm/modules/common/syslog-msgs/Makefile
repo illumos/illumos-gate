@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = syslog-msgs
 CLASS = common
@@ -32,4 +30,4 @@ include ../../Makefile.plugin
 
 LDFLAGS += -L $(ROOT)/usr/lib/fm  -R/usr/lib/fm
 LINTFLAGS += -L$(ROOT)/usr/lib/fm
-LDLIBS += -lfmd_msg
+LDLIBS += -lfmd_msg -lscf

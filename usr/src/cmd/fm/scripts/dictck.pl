@@ -19,10 +19,7 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # dictck -- Sanity check a .dict file and optionally the corresponding .po file
@@ -54,6 +51,11 @@ $SIG{HUP} = $SIG{INT} = $SIG{TERM} = $SIG{__DIE__} = sub {
 	# commonly-used "nightly" script flags this as lint on the .dict file
 	die "$Myname: WARNING: @_";
 };
+
+#
+# Category 1 event classes
+#
+my @cat1ev = qw(fault defect upset ereport list ireport);
 
 #
 # usage -- print a usage message and exit
@@ -182,10 +184,11 @@ sub dodict {
 
 		# check for duplicate or unexpected keys
 		my %keys;
+		my $cat1pat = join('|', @cat1ev);
 		foreach my $e (split(/\s/, $lhs)) {
 			die "$name:$line: unknown event type \"$e\"\n"
 			    unless $e =~
-			    /^(fault|defect|upset|ereport|list)\..*[^.]$/;
+			    /^($cat1pat)\..*[^.]$/;
 			die "$name:$line: key repeated: \"$e\"\n"
 			    if defined($keys{$e});
 			$keys{$e} = 1;

@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -33,7 +32,7 @@ HDRDIR = common
 SUBDIRS = $(MACH) 
 $(BUILD64)SUBDIRS += $(MACH64)
 
-MIBFILES = SUN-FM-MIB.mib
+MIBFILES = SUN-FM-MIB.mib SUN-IREPORT-MIB.mib
 
 ROOTNETSNMPMIBDIR = $(ROOT)/etc/net-snmp/snmp/mibs
 ROOTMIBS = $(MIBFILES:%=$(ROOTNETSNMPMIBDIR)/%)

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <kmdb/kmdb_kvm.h>
@@ -546,6 +545,7 @@ kmt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	kmt_data_t *kmt = mdb.m_target->t_data;
 	struct utsname uts;
+	char uuid[37];
 	kreg_t tt;
 
 	if (mdb_tgt_readsym(mdb.m_target, MDB_TGT_AS_VIRT, &uts, sizeof (uts),
@@ -560,6 +560,17 @@ kmt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    (*uts.nodename == '\0' ? "(not set)" : uts.nodename));
 	mdb_printf("operating system: %s %s (%s)\n",
 	    uts.release, uts.version, uts.machine);
+
+	if (mdb_tgt_readsym(mdb.m_target, MDB_TGT_AS_VIRT, uuid, sizeof (uuid),
+	    "genunix", "dump_osimage_uuid") != sizeof (uuid)) {
+		warn("failed to read 'dump_osimage_uuid' string from kernel\n");
+		(void) strcpy(uuid, "(error)");
+	} else if (*uuid == '\0') {
+		(void) strcpy(uuid, "(not set)");
+	} else if (uuid[36] != '\0') {
+		(void) strcpy(uuid, "(invalid)");
+	}
+	mdb_printf("image uuid: %s\n", uuid);
 
 	if (kmt->kmt_cpu != NULL) {
 		mdb_printf("CPU-specific support: %s\n",

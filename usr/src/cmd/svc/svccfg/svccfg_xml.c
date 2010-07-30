@@ -54,6 +54,7 @@
 #include "manifest_hash.h"
 
 #include "svccfg.h"
+#include "notify_params.h"
 
 /*
  * snprintf(3C) format strings for constructing property names that include
@@ -92,6 +93,7 @@ const char * const uri_attr = "uri";
 const char * const value_attr = "value";
 const char * const version_attr = "version";
 const char * const xml_lang_attr = "xml:lang";
+const char * const active_attr = "active";
 
 /* Attribute values */
 const char * const all_value = "all";
@@ -118,6 +120,7 @@ static const char *lxml_elements[] = {
 	"doc_link",			/* SC_DOC_LINK */
 	"documentation",		/* SC_DOCUMENTATION */
 	"enabled",			/* SC_ENABLED */
+	"event",			/* SC_EVENT */
 	"exec_method",			/* SC_EXEC_METHOD */
 	"fmri_list",			/* SC_FMRI */
 	"host_list",			/* SC_HOST */
@@ -136,7 +139,10 @@ static const char *lxml_elements[] = {
 	"net_address_list",		/* SC_NET_ADDR */
 	"net_address_v4_list",		/* SC_NET_ADDR_V4 */
 	"net_address_v6_list",		/* SC_NET_ADDR_V6 */
+	"notification_parameters",	/* SC_NOTIFICATION_PARAMETERS */
 	"opaque_list",			/* SC_OPAQUE */
+	"parameter",			/* SC_PARAMETER */
+	"paramval",			/* SC_PARAMVAL */
 	"pg_pattern",			/* SC_PG_PATTERN */
 	"prop_pattern",			/* SC_PROP_PATTERN */
 	"property",			/* SC_PROPERTY */
@@ -151,6 +157,7 @@ static const char *lxml_elements[] = {
 	"stability",			/* SC_STABILITY */
 	"template",			/* SC_TEMPLATE */
 	"time_list",			/* SC_TIME */
+	"type",				/* SC_TYPE */
 	"units",			/* SC_UNITS */
 	"uri_list",			/* SC_URI */
 	"ustring_list",			/* SC_USTRING */
@@ -181,6 +188,7 @@ static const char *lxml_prop_types[] = {
 	"",				/* SC_DOC_LINK */
 	"",				/* SC_DOCUMENTATION */
 	"",				/* SC_ENABLED */
+	"",				/* SC_EVENT */
 	"",				/* SC_EXEC_METHOD */
 	"fmri",				/* SC_FMRI */
 	"host",				/* SC_HOST */
@@ -199,7 +207,10 @@ static const char *lxml_prop_types[] = {
 	"net_address",			/* SC_NET_ADDR */
 	"net_address_v4",		/* SC_NET_ADDR_V4 */
 	"net_address_v6",		/* SC_NET_ADDR_V6 */
+	"",				/* SC_NOTIFICATION_PARAMETERS */
 	"opaque",			/* SC_OPAQUE */
+	"",				/* SC_PARAMETER */
+	"",				/* SC_PARAMVAL */
 	"",				/* SC_PG_PATTERN */
 	"",				/* SC_PROP_PATTERN */
 	"",				/* SC_PROPERTY */
@@ -214,6 +225,7 @@ static const char *lxml_prop_types[] = {
 	"",				/* SC_STABILITY */
 	"",				/* SC_TEMPLATE */
 	"time",				/* SC_TIME */
+	"",				/* SC_TYPE */
 	"",				/* SC_UNITS */
 	"uri",				/* SC_URI */
 	"ustring",			/* SC_USTRING */
@@ -1417,6 +1429,223 @@ lxml_get_restarter(entity_t *entity, xmlNodePtr rstr)
 	}
 
 	return (0);
+}
+
+static void
+lxml_get_paramval(pgroup_t *pgrp, const char *propname, xmlNodePtr pval)
+{
+	property_t *p;
+	char *value;
+	char *prop;
+
+	if ((prop = strdup(propname)) == NULL)
+		uu_die(gettext("Out of memory.\n"));
+
+	value = (char *)xmlGetProp(pval, (xmlChar *)value_attr);
+	if (value == NULL || *value == '\0')
+		uu_die(gettext("property value missing for property '%s/%s'\n"),
+		    pgrp->sc_pgroup_name, propname);
+	p = internal_property_create(prop, SCF_TYPE_ASTRING, 1, value);
+
+	(void) internal_attach_property(pgrp, p);
+}
+
+static void
+lxml_get_parameter(pgroup_t *pgrp, const char *propname, xmlNodePtr param)
+{
+	property_t *p = internal_property_new();
+
+	if ((p->sc_property_name = strdup(propname)) == NULL)
+		uu_die(gettext("Out of memory.\n"));
+	p->sc_value_type = SCF_TYPE_ASTRING;
+
+	(void) lxml_get_value(p, SC_ASTRING, param);
+
+	(void) internal_attach_property(pgrp, p);
+}
+
+static void
+lxml_get_type(pgroup_t *pgrp, xmlNodePtr type)
+{
+	property_t *p;
+	xmlChar *name;
+	xmlChar *active;
+	xmlNodePtr cursor;
+	uint64_t active_val;
+	size_t sz = max_scf_name_len + 1;
+	char *propname = safe_malloc(sz);
+
+	if (pgrp->sc_parent->sc_op == SVCCFG_OP_APPLY)
+		lxml_validate_element(type);
+
+	name = xmlGetProp(type, (xmlChar *)name_attr);
+	if (name == NULL || *name == '\0')
+		uu_die(gettext("attribute name missing in element 'type'\n"));
+
+	for (cursor = type->xmlChildrenNode; cursor != NULL;
+	    cursor = cursor->next) {
+		xmlChar *pname;
+
+		if (lxml_ignorable_block(cursor))
+			continue;
+
+		pname = xmlGetProp(cursor, (xmlChar *)name_attr);
+		if (pname == NULL || *pname == '\0')
+			uu_die(gettext(
+			    "attribute name missing in sub-element of type\n"));
+
+		if (snprintf(propname, sz, "%s,%s", (char *)name,
+		    (char *)pname) >= sz)
+			uu_die(gettext("name '%s,%s' is too long\n"),
+			    (char *)name, (char *)pname);
+		xmlFree(pname);
+
+		switch (lxml_xlate_element(cursor->name)) {
+		case SC_PARAMETER:
+			lxml_get_parameter(pgrp, propname, cursor);
+			break;
+
+		case SC_PARAMVAL:
+			lxml_get_paramval(pgrp, propname, cursor);
+			break;
+
+		default:
+			uu_die(gettext("unknown element %s\n"), cursor->name);
+		}
+	}
+
+	active = xmlGetProp(type, (xmlChar *)active_attr);
+	if (active == NULL || strcmp(true, (const char *)active) == 0)
+		active_val = 1;
+	else
+		active_val = 0;
+	xmlFree(active);
+
+	if (snprintf(propname, sz, "%s,%s", (char *)name,
+	    SCF_PROPERTY_ACTIVE_POSTFIX) >= sz)
+		uu_die(gettext("name '%s,%s' is too long\n"),
+		    (char *)name, SCF_PROPERTY_ACTIVE_POSTFIX);
+
+	p = internal_property_create(propname, SCF_TYPE_BOOLEAN, 1, active_val);
+
+	(void) internal_attach_property(pgrp, p);
+
+	xmlFree(name);
+}
+
+static void
+lxml_get_event(entity_t *entity, const char *pgname, xmlNodePtr np)
+{
+	xmlNodePtr cursor;
+	pgroup_t *pgrp;
+
+	pgrp = internal_pgroup_find_or_create(entity, pgname,
+	    SCF_NOTIFY_PARAMS_PG_TYPE);
+	for (cursor = np->xmlChildrenNode; cursor != NULL;
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+
+		switch (lxml_xlate_element(cursor->name)) {
+		case SC_EVENT:
+			continue;
+
+		case SC_TYPE:
+			lxml_get_type(pgrp, cursor);
+			break;
+
+		default:
+			uu_warn(gettext("illegal element '%s' on "
+			    "notification parameters\n"), cursor->name);
+		}
+	}
+}
+
+static int
+lxml_get_notification_parameters(entity_t *entity, xmlNodePtr np)
+{
+	char *event = NULL;
+	char **pgs = NULL;
+	char **p;
+	char *pgname = NULL;
+	xmlNodePtr cursor;
+	int32_t tset, t;
+	size_t sz = max_scf_name_len + 1;
+	int count;
+	int r = -1;
+
+	for (count = 0, cursor = np->xmlChildrenNode; cursor != NULL;
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+
+		if (lxml_xlate_element(cursor->name) == SC_EVENT) {
+			xmlChar *s;
+
+			count++;
+			if (count > 1)
+				uu_die(gettext("Can't have more than 1 element "
+				    "event in a notification parameter\n"));
+			s = xmlGetProp(cursor, (xmlChar *)value_attr);
+			if (s == NULL || (event = strdup((char *)s)) == NULL)
+				uu_die(gettext("couldn't allocate memory"));
+			xmlFree(s);
+		}
+	}
+
+	pgs = tokenize(event, ",");
+
+	switch (tset = check_tokens(pgs)) {
+	case INVALID_TOKENS:
+		uu_die(gettext("Invalid input.\n"));
+		/*NOTREACHED*/
+	case MIXED_TOKENS:
+		semerr(gettext("Can't mix SMF and FMA event definitions\n"));
+		goto out;
+	case FMA_TOKENS:
+		/* make sure this is SCF_NOTIFY_PARAMS_INST */
+		if (entity->sc_etype != SVCCFG_INSTANCE_OBJECT ||
+		    strcmp(entity->sc_fmri, SCF_NOTIFY_PARAMS_INST) != 0) {
+			semerr(gettext(
+			    "Non-SMF transition evenst must go to %s\n"),
+			    SCF_NOTIFY_PARAMS_INST);
+			goto out;
+		}
+		pgname = safe_malloc(sz);
+		for (p = pgs; *p; ++p) {
+			if (snprintf(pgname, sz, "%s,%s", de_tag(*p),
+			    SCF_NOTIFY_PG_POSTFIX) >= sz)
+				uu_die(gettext("event name too long: %s\n"),
+				    *p);
+
+			lxml_get_event(entity, pgname, np);
+		}
+
+	default:	/* smf state transition tokens */
+		if (entity->sc_etype == SVCCFG_SERVICE_OBJECT &&
+		    strcmp(entity->sc_fmri, SCF_SERVICE_GLOBAL) == 0) {
+			semerr(gettext(
+			    "Can't set events for global service\n"));
+			goto out;
+		}
+		for (t = 0x1; t < SCF_STATE_ALL; t <<= 1) {
+			if (t & tset) {
+				lxml_get_event(entity, tset_to_string(t), np);
+			}
+			if ((t << 16) & tset) {
+				lxml_get_event(entity, tset_to_string(t << 16),
+				    np);
+			}
+		}
+	}
+
+	r = 0;
+out:
+	free(pgname);
+	free(pgs);
+	free(event);
+
+	return (r);
 }
 
 /*
@@ -3042,6 +3271,10 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, bundle_type_t bt,
 			if (lxml_get_template(i, cursor) != 0)
 				return (-1);
 			break;
+		case SC_NOTIFICATION_PARAMETERS:
+			if (lxml_get_notification_parameters(i, cursor) != 0)
+				return (-1);
+			break;
 		default:
 			uu_die(gettext(
 			    "illegal element \"%s\" on instance \"%s\"\n"),
@@ -3242,6 +3475,10 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 			}
 
 			if (lxml_get_template(s, cursor) != 0)
+				return (-1);
+			break;
+		case SC_NOTIFICATION_PARAMETERS:
+			if (lxml_get_notification_parameters(s, cursor) != 0)
 				return (-1);
 			break;
 		case SC_STABILITY:

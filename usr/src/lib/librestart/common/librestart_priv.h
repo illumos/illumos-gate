@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBRESTART_PRIV_H
 #define	_LIBRESTART_PRIV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libscf.h>
 #include <librestart.h>
@@ -42,6 +38,7 @@ extern "C" {
 #define	RESTARTER_NAME_NEXT_STATE	SCF_PROPERTY_NEXT_STATE
 #define	RESTARTER_NAME_AUX_STATE	SCF_PROPERTY_AUX_STATE
 #define	RESTARTER_NAME_ERROR		"error"
+#define	RESTARTER_NAME_REASON		"reason"
 
 #define	RESTARTER_CHANNEL_MASTER	0
 #define	RESTARTER_CHANNEL_DELEGATE	1

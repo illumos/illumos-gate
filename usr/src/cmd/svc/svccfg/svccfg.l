@@ -21,8 +21,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -71,6 +70,12 @@ extern int yyerror(const char *);
  */
 %Start	WORD
 
+/*
+ * The default value of lex for transitions is 2000 and it seems we reached it.
+ * So we are bumping it up!
+ */
+%a 3000
+
 %%
 
 #.*$			;	/* comments */
@@ -115,6 +120,10 @@ extern int yyerror(const char *);
 <INITIAL>selectsnap	{ BEGIN WORD; return (SCC_SELECTSNAP); }
 <INITIAL>revert		{ BEGIN WORD; return (SCC_REVERT); }
 <INITIAL>refresh	{ BEGIN WORD; return (SCC_REFRESH); }
+
+<INITIAL>delnotify	{ BEGIN WORD; return (SCC_DELNOTIFY); }
+<INITIAL>listnotify	{ BEGIN WORD; return (SCC_LISTNOTIFY); }
+<INITIAL>setnotify	{ BEGIN WORD; return (SCC_SETNOTIFY); }
 
 [^ \t\n">=()]+		{
 				if ((yylval.str = strdup(yytext)) == NULL) {

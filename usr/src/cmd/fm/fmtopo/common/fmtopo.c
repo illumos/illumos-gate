@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -34,6 +33,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <umem.h>
+#include <zone.h>
 #include <sys/param.h>
 
 #define	FMTOPO_EXIT_SUCCESS	0
@@ -960,6 +960,11 @@ walk_topo(topo_hdl_t *thp, char *uuid)
 	topo_walk_t *twp;
 	int flag;
 
+	if (getzoneid() != GLOBAL_ZONEID &&
+	    strcmp(opt_s, FM_FMRI_SCHEME_HC) == 0) {
+		return (0);
+	}
+
 	if ((twp = topo_walk_init(thp, opt_s, walk_node, NULL, &err))
 	    == NULL) {
 		(void) fprintf(stderr, "%s: failed to walk %s topology:"
@@ -1268,8 +1273,11 @@ main(int argc, char *argv[])
 		    g_pname, topo_strerror(err));
 		return (fmtopo_exit(thp, uuid, FMTOPO_EXIT_ERROR));
 	} else if (err != 0) {
-		(void) fprintf(stderr, "%s: topology snapshot incomplete\n",
-		    g_pname);
+		(void) fprintf(stderr, "%s: topology snapshot incomplete%s\n",
+		    g_pname, getzoneid() != GLOBAL_ZONEID &&
+		    strcmp(opt_s, FM_FMRI_SCHEME_HC) == 0 ?
+		    " (" FM_FMRI_SCHEME_HC " scheme does not enumerate "
+		    "in a non-global zone)": "");
 	}
 
 	if (opt_x) {

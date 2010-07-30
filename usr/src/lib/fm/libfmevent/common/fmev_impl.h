@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _FMEV_IMPL_H
@@ -44,6 +43,9 @@ extern "C" {
 #include <libuutil.h>
 #include <libsysevent.h>
 #include <fm/libfmevent.h>
+#include <fm/libtopo.h>
+
+#include "fmev_channels.h"
 
 #ifdef DEBUG
 #define	ASSERT(x) (assert(x))
@@ -59,7 +61,13 @@ struct fmev_hdl_cmn {
 	void (*hc_free)(void *, size_t);
 };
 
+#define	_FMEV_SHMAGIC	0x5368446c	/* ShDl */
+
 struct fmev_hdl_cmn *fmev_shdl_cmn(fmev_shdl_t);
+
+extern void *dflt_alloc(size_t);
+extern void *dflt_zalloc(size_t);
+extern void dflt_free(void *, size_t);
 
 extern int fmev_api_init(struct fmev_hdl_cmn *);
 extern int fmev_api_enter(struct fmev_hdl_cmn *, uint32_t);
@@ -68,6 +76,7 @@ extern fmev_err_t fmev_seterr(fmev_err_t);
 extern int fmev_shdl_valid(fmev_shdl_t);
 extern fmev_t fmev_sysev2fmev(fmev_shdl_t, sysevent_t *sep, char **,
     nvlist_t **);
+extern topo_hdl_t *fmev_topohdl(fmev_shdl_t);
 
 #ifdef __cplusplus
 }

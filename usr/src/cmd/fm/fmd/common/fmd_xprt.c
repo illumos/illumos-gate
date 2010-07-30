@@ -1099,7 +1099,7 @@ fmd_xprt_list_suspect_local(fmd_xprt_t *xp, nvlist_t *nvl)
 	boolean_t injected;
 
 	fmd_module_lock(xip->xi_queue->eq_mod);
-	cp = fmd_case_create(xip->xi_queue->eq_mod, NULL);
+	cp = fmd_case_create(xip->xi_queue->eq_mod, NULL, NULL);
 	if (cp == NULL) {
 		fmd_module_unlock(xip->xi_queue->eq_mod);
 		return;
@@ -1457,7 +1457,7 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt, boolean_t logonly)
 
 	fmd_event_t *e;
 	char *class, *uuid;
-	boolean_t isproto, isereport;
+	boolean_t isproto, isereport, isireport, ishvireport, issysevent;
 
 	uint64_t *tod;
 	uint8_t ttl;
@@ -1505,13 +1505,30 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt, boolean_t logonly)
 	fmd_dprintf(FMD_DBG_XPRT, "xprt %u %s %s\n", xip->xi_id,
 	    ((logonly == FMD_B_TRUE) ? "logging" : "posting"), class);
 
-	isereport = (strncmp(class, FM_EREPORT_CLASS,
-	    sizeof (FM_EREPORT_CLASS - 1)) == 0) ? FMD_B_TRUE : FMD_B_FALSE;
+	isereport = (strncmp(class, FM_EREPORT_CLASS ".",
+	    sizeof (FM_EREPORT_CLASS)) == 0) ? FMD_B_TRUE : FMD_B_FALSE;
+
+	isireport = (strncmp(class, FM_IREPORT_CLASS ".",
+	    sizeof (FM_IREPORT_CLASS)) == 0) ?  FMD_B_TRUE : FMD_B_FALSE;
+
+	issysevent = (strncmp(class, SYSEVENT_RSRC_CLASS,
+	    sizeof (SYSEVENT_RSRC_CLASS) - 1)) == 0 ? FMD_B_TRUE : FMD_B_FALSE;
+
+	if (isireport) {
+		char *pri;
+
+		if (nvlist_lookup_string(nvl, FM_IREPORT_PRIORITY, &pri) == 0 &&
+		    strncmp(pri, "high", 5) == 0) {
+			ishvireport = 1;
+		} else {
+			ishvireport = 0;
+		}
+	}
 
 	/*
 	 * The logonly flag should only be set for ereports.
 	 */
-	if ((logonly == FMD_B_TRUE) && (isereport == FMD_B_FALSE)) {
+	if (logonly == FMD_B_TRUE && isereport == FMD_B_FALSE) {
 		fmd_error(EFMD_XPRT_INVAL, "discarding nvlist %p: "
 		    "logonly flag is not valid for class %s",
 		    (void *)nvl, class);
@@ -1605,13 +1622,30 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt, boolean_t logonly)
 	}
 
 	/*
-	 * Record the event in the errlog if it is an ereport.  This code will
+	 * Record ereports and ireports in the log.  This code will
 	 * be replaced later with a per-transport intent log instead.
 	 */
-	if (isereport == FMD_B_TRUE) {
-		(void) pthread_rwlock_rdlock(&dp->d_log_lock);
-		fmd_log_append(dp->d_errlog, e, NULL);
-		(void) pthread_rwlock_unlock(&dp->d_log_lock);
+	if (isereport == FMD_B_TRUE || isireport == FMD_B_TRUE ||
+	    issysevent == B_TRUE) {
+		pthread_rwlock_t *lockp;
+		fmd_log_t *lp;
+
+		if (isereport == FMD_B_TRUE) {
+			lp = fmd.d_errlog;
+			lockp = &fmd.d_log_lock;
+		} else {
+			if (ishvireport || issysevent) {
+				lp = fmd.d_hvilog;
+				lockp = &fmd.d_hvilog_lock;
+			} else {
+				lp = fmd.d_ilog;
+				lockp = &fmd.d_ilog_lock;
+			}
+		}
+
+		(void) pthread_rwlock_rdlock(lockp);
+		fmd_log_append(lp, e, NULL);
+		(void) pthread_rwlock_unlock(lockp);
 	}
 
 	/*

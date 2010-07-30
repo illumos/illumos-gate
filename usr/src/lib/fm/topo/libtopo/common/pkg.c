@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <limits.h>
@@ -74,7 +73,7 @@ pkg_init(topo_mod_t *mod, topo_version_t version)
 {
 	if (getenv("TOPOPKGDEBUG"))
 		topo_mod_setdebug(mod);
-	topo_mod_dprintf(mod, "initializing mod builtin\n");
+	topo_mod_dprintf(mod, "initializing pkg builtin\n");
 
 	if (version != PKG_VERSION)
 		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
@@ -99,6 +98,11 @@ static int
 pkg_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
+	/*
+	 * Methods are registered, but there is no enumeration.  Should
+	 * enumeration be added be sure to cater for global vs non-global
+	 * zones.
+	 */
 	(void) topo_method_register(mod, pnode, pkg_methods);
 	return (0);
 }

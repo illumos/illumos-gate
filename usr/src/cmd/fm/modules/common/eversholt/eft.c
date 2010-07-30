@@ -20,10 +20,10 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <fm/fmd_api.h>
@@ -213,7 +213,7 @@ dodiscardprint(struct node *lhs, struct node *rhs, void *arg)
 {
 	char *ename = (char *)lhs;
 
-	out(O_DEBUG, "allow silent discard_if_config_unknown: \"%s\"", ename);
+	out(O_VERB, "allow silent discard_if_config_unknown: \"%s\"", ename);
 }
 
 extern struct stats *Filecount;
@@ -248,7 +248,7 @@ call_finis(void)
 static void
 doopendict(const char *lhs, void *rhs, void *arg)
 {
-	out(O_DEBUG, "opendict: \"%s\"", lhs);
+	out(O_VERB, "opendict: \"%s\"", lhs);
 	fmd_hdl_opendict(Hdl, lhs);
 }
 
@@ -340,7 +340,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	fme_istat_load(hdl);
 	fme_serd_load(hdl);
 
-	out(O_DEBUG, "reconstituting any existing fmes");
+	out(O_VERB, "reconstituting any existing fmes");
 	while ((casep = fmd_case_next(hdl, casep)) != NULL) {
 		fme_restart(hdl, casep);
 	}

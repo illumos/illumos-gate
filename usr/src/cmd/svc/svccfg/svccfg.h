@@ -99,6 +99,7 @@ typedef enum element {
 	SC_DOC_LINK,
 	SC_DOCUMENTATION,
 	SC_ENABLED,
+	SC_EVENT,
 	SC_EXEC_METHOD,
 	SC_FMRI,
 	SC_HOST,
@@ -117,7 +118,10 @@ typedef enum element {
 	SC_NET_ADDR,
 	SC_NET_ADDR_V4,
 	SC_NET_ADDR_V6,
+	SC_NOTIFICATION_PARAMETERS,
 	SC_OPAQUE,
+	SC_PARAMETER,
+	SC_PARAMVAL,
 	SC_PG_PATTERN,
 	SC_PROP_PATTERN,
 	SC_PROPERTY,
@@ -132,6 +136,7 @@ typedef enum element {
 	SC_STABILITY,
 	SC_TEMPLATE,
 	SC_TIME,
+	SC_TYPE,
 	SC_UNITS,
 	SC_URI,
 	SC_USTRING,
@@ -380,6 +385,7 @@ extern const char * const name_attr;
 extern const char * const type_attr;
 extern const char * const value_attr;
 extern const char * const enabled_attr;
+extern const char * const active_attr;
 extern const char * const scf_pg_general;
 extern const char * const scf_group_framework;
 extern const char * const true;
@@ -467,6 +473,10 @@ int lscf_retrieve_hash(const char *, unsigned char *);
 int lscf_store_hash(const char *, unsigned char *);
 int lscf_service_cleanup(void *, scf_walkinfo_t *);
 int lscf_hash_cleanup();
+void lscf_delnotify(const char *, int);
+void lscf_listnotify(const char *, int);
+int lscf_setnotify(uu_list_t *);
+
 CPL_MATCH_FN(complete_select);
 CPL_MATCH_FN(complete_command);
 
@@ -494,6 +504,15 @@ void tmpl_init(void);
 void tmpl_property_fini(property_t *);
 void tmpl_property_init(property_t *);
 tmpl_validate_status_t tmpl_validate_bundle(bundle_t *, tmpl_errors_t **);
+
+#define	FMA_TOKENS	0
+#define	MIXED_TOKENS	-1
+#define	INVALID_TOKENS	-2
+
+char **tokenize(char *, const char *);
+int32_t check_tokens(char **);
+const char *de_tag(const char *);
+const char *tset_to_string(int32_t);
 
 #ifdef	__cplusplus
 }

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sysevent/eventdefs.h>
@@ -41,6 +40,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <zone.h>
 
 #undef MUTEX_HELD
 #undef RW_READ_HELD
@@ -87,6 +87,8 @@ static pthread_mutex_t sysev_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int sysev_replay_wait = 1;
 static int sysev_exiting;
 
+static sysevent_subattr_t *subattr;
+
 /*
  * Entry point for legacy sysevents.  This function is responsible for two
  * things: passing off interesting events to the DR handler, and converting
@@ -100,7 +102,6 @@ sysev_legacy(sysevent_t *sep)
 	char *fullclass;
 	size_t len;
 	nvlist_t *attr, *nvl;
-	fmd_event_t *e;
 	hrtime_t hrt;
 
 	/* notify the DR subsystem of the event */
@@ -128,15 +129,12 @@ sysev_legacy(sysevent_t *sep)
 	(void) nvlist_add_uint8(nvl, FM_VERSION, FM_RSRC_VERSION);
 
 	/*
-	 * Dispatch the event.  Ideally, we'd like to use the same transport
-	 * interface as sysev_recv(), but because the legacy sysevent mechanism
-	 * puts in a thread outside fmd's control, using the module APIs is
-	 * impossible.
+	 * Dispatch the event.  Because we have used sysevent_bind_xhandle
+	 * the delivery thread is blessed as a proper fmd thread so
+	 * we may use regular fmd api calls.
 	 */
 	sysevent_get_time(sep, &hrt);
-	(void) nvlist_lookup_string(nvl, FM_CLASS, &fullclass);
-	e = fmd_event_create(FMD_EVT_PROTOCOL, hrt, nvl, fullclass);
-	fmd_dispq_dispatch(fmd.d_disp, e, fullclass);
+	fmd_xprt_post(sysev_hdl, sysev_xprt, nvl, hrt);
 }
 
 /*
@@ -444,6 +442,10 @@ sysev_init(fmd_hdl_t *hdl)
 	uint_t flags;
 	const char *subclasses[] = { EC_SUB_ALL };
 
+	/* This builtin is for the global zone only */
+	if (getzoneid() != GLOBAL_ZONEID)
+		return;
+
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &sysev_info) != 0)
 		return; /* invalid property settings */
 
@@ -482,15 +484,22 @@ sysev_init(fmd_hdl_t *hdl)
 	else
 		flags = EVCH_SUB_DUMP;
 
-	errno = sysevent_evc_subscribe(sysev_evc,
-	    sysev_sid, sysev_class, sysev_recv, sysev_xprt, flags);
+	if ((subattr = sysevent_subattr_alloc()) == NULL)
+		fmd_hdl_abort(hdl, "failed to allocate subscription "
+		    "attributes");
+
+	sysevent_subattr_thrcreate(subattr, fmd_doorthr_create, NULL);
+	sysevent_subattr_thrsetup(subattr, fmd_doorthr_setup, NULL);
+
+	errno = sysevent_evc_xsubscribe(sysev_evc,
+	    sysev_sid, sysev_class, sysev_recv, sysev_xprt, flags, subattr);
 
 	if (errno != 0) {
 		if (errno == EEXIST) {
 			fmd_hdl_abort(hdl, "another fault management daemon is "
 			    "active on transport channel %s\n", sysev_channel);
 		} else {
-			fmd_hdl_abort(hdl, "failed to subscribe to %s on "
+			fmd_hdl_abort(hdl, "failed to xsubscribe to %s on "
 			    "transport channel %s", sysev_class, sysev_channel);
 		}
 	}
@@ -512,7 +521,7 @@ sysev_init(fmd_hdl_t *hdl)
 		return;
 
 	if ((fmd.d_sysev_hdl =
-	    sysevent_bind_handle(sysev_legacy)) == NULL)
+	    sysevent_bind_xhandle(sysev_legacy, subattr)) == NULL)
 		fmd_hdl_abort(hdl, "failed to bind to legacy sysevent channel");
 
 	if (sysevent_subscribe_event(fmd.d_sysev_hdl, EC_ALL,
@@ -539,6 +548,11 @@ sysev_fini(fmd_hdl_t *hdl)
 
 	if (fmd.d_sysev_hdl != NULL)
 		sysevent_unbind_handle(fmd.d_sysev_hdl);
+
+	if (subattr != NULL) {
+		sysevent_subattr_free(subattr);
+		subattr = NULL;
+	}
 
 	if (sysev_xprt != NULL) {
 		/*

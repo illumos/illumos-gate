@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -485,9 +484,18 @@ kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (kt->k_dumphdr) {
 		dumphdr_t *dh = kt->k_dumphdr;
 
+		mdb_printf("image uuid: %s\n", dh->dump_uuid[0] != '\0' ?
+		    dh->dump_uuid : "(not set)");
 		mdb_printf("panic message: %s\n", dh->dump_panicstring);
 
 		kt->k_dump_print_content(dh, kt->k_dumpcontent);
+	} else {
+		char uuid[37];
+
+		if (mdb_readsym(uuid, 37, "dump_osimage_uuid") == 37 &&
+		    uuid[36] == '\0') {
+			mdb_printf("image uuid: %s\n", uuid);
+		}
 	}
 
 	return (DCMD_OK);

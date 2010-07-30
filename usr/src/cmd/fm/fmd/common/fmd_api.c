@@ -20,13 +20,13 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
 #include <fm/topo_hc.h>
+#include <uuid/uuid.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -34,6 +34,7 @@
 #include <syslog.h>
 #include <alloca.h>
 #include <stddef.h>
+#include <door.h>
 
 #include <fmd_module.h>
 #include <fmd_api.h>
@@ -237,10 +238,17 @@ fmd_api_module(fmd_hdl_t *hdl)
 	}
 
 	/*
-	 * If our TSD refers to the root module and is a door server thread,
-	 * then it was created asynchronously at the request of a module but
-	 * is using now the module API as an auxiliary module thread.  We reset
-	 * tp->thr_mod to the module handle so it can act as a module thread.
+	 * If our TSD refers to the root module and is a non-private
+	 * door server thread,  then it was created asynchronously at the
+	 * request of a module but is using now the module API as an
+	 * auxiliary module thread.  We reset tp->thr_mod to the module
+	 * handle so it can act as a module thread.
+	 *
+	 * If more than one module uses non-private doors then the
+	 * "client handle is not valid" check below can fail since
+	 * door server threads for such doors can service *any*
+	 * non-private door.  We use non-private door for legacy sysevent
+	 * alone.
 	 */
 	if (tp->thr_mod == fmd.d_rmod && tp->thr_func == &fmd_door_server)
 		tp->thr_mod = (fmd_module_t *)hdl;
@@ -368,7 +376,7 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	 * the module thread to which we assigned this client handle.  The info
 	 * provided for the handle must be valid and have the minimal settings.
 	 */
-	if (version > FMD_API_VERSION_4)
+	if (version > FMD_API_VERSION_5)
 		return (fmd_hdl_register_error(mp, EFMD_VER_NEW));
 
 	if (version < FMD_API_VERSION_1)
@@ -535,6 +543,25 @@ static void
 fmd_module_thrcancel(fmd_idspace_t *ids, id_t id, fmd_module_t *mp)
 {
 	fmd_thread_t *tp = fmd_idspace_getspecific(ids, id);
+
+	/*
+	 * Door service threads are not cancellable (worse - if they're
+	 * waiting in door_return then that is interrupted, but they then spin
+	 * endlessly!).  Non-private door service threads are not tracked
+	 * in the module thread idspace so it's only private server threads
+	 * created via fmd_doorthr_create that we'll encounter.  In most
+	 * cases the module _fini should have tidied up (e.g., calling
+	 * sysevent_evc_unbind which will cleanup door threads if
+	 * sysevent_evc_xsubscribe was used).  One case that does not
+	 * clean up is sysev_fini which explicitly does not unbind the
+	 * channel, so we must skip any remaining door threads here.
+	 */
+	if (tp->thr_isdoor) {
+		fmd_dprintf(FMD_DBG_MOD, "not cancelling %s private door "
+		    "thread %u\n", mp->mod_name, tp->thr_tid);
+		fmd_thread_destroy(tp, FMD_THREAD_NOJOIN);
+		return;
+	}
 
 	fmd_dprintf(FMD_DBG_MOD, "cancelling %s auxiliary thread %u\n",
 	    mp->mod_name, tp->thr_tid);
@@ -1031,9 +1058,42 @@ fmd_case_t *
 fmd_case_open(fmd_hdl_t *hdl, void *data)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
-	fmd_case_t *cp = fmd_case_create(mp, data);
+	fmd_case_t *cp = fmd_case_create(mp, NULL, data);
 	fmd_module_unlock(mp);
 	return (cp);
+}
+
+fmd_case_t *
+fmd_case_open_uuid(fmd_hdl_t *hdl, const char *uuidstr, void *data)
+{
+	fmd_module_t *mp;
+	fmd_case_t *cp;
+	uint_t uuidlen;
+	uuid_t uuid;
+
+	mp = fmd_api_module_lock(hdl);
+
+	(void) fmd_conf_getprop(fmd.d_conf, "uuidlen", &uuidlen);
+
+	if (uuidstr == NULL) {
+		fmd_api_error(mp, EFMD_CASE_INVAL, "NULL uuid string\n");
+	} else if (strnlen(uuidstr, uuidlen + 1) != uuidlen) {
+		fmd_api_error(mp, EFMD_CASE_INVAL, "invalid uuid string: '%s' "
+		    "(expected length %d)\n", uuidstr, uuidlen);
+	} else if (uuid_parse((char *)uuidstr, uuid) == -1) {
+		fmd_api_error(mp, EFMD_CASE_INVAL, "cannot parse uuid string: "
+		    "'%s'\n", uuidstr);
+	}
+
+	if ((cp = fmd_case_hash_lookup(fmd.d_cases, uuidstr)) == NULL) {
+		cp = fmd_case_create(mp, uuidstr, data);
+	} else {
+		fmd_case_rele(cp);
+		cp = NULL;
+	}
+
+	fmd_module_unlock(mp);
+	return (cp);	/* May be NULL iff case already exists */
 }
 
 void
@@ -1155,6 +1215,23 @@ fmd_case_uuresolved(fmd_hdl_t *hdl, const char *uuid)
 	}
 
 	fmd_module_unlock(mp);
+}
+
+int
+fmd_case_uuisresolved(fmd_hdl_t *hdl, const char *uuid)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	fmd_case_t *cp = fmd_case_hash_lookup(fmd.d_cases, uuid);
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	int rv = FMD_B_FALSE;
+
+	if (cip != NULL) {
+		rv = (cip->ci_state >= FMD_CASE_RESOLVED);
+		fmd_case_rele(cp);
+	}
+
+	fmd_module_unlock(mp);
+	return (rv);
 }
 
 static int
@@ -1760,6 +1837,65 @@ fmd_thr_checkpoint(fmd_hdl_t *hdl)
 	fmd_module_unlock(mp);
 }
 
+/*ARGSUSED3*/
+int
+fmd_doorthr_create(door_info_t *dip, void *(*crf)(void *), void *crarg,
+    void *cookie)
+{
+	fmd_thread_t *old_tp, *new_tp;
+	fmd_module_t *mp;
+	pthread_t tid;
+
+	/*
+	 * We're called either during initial door_xcreate or during
+	 * a depletion callback.  In both cases the current thread
+	 * is already setup so we can retrieve the fmd_thread_t.
+	 * If not then we panic.  The new thread will be associated with
+	 * the same module as the old.
+	 *
+	 * If dip == NULL we're being called as part of the
+	 * sysevent_bind_subscriber hack - see comments there.
+	 */
+	if ((old_tp = pthread_getspecific(fmd.d_key)) == NULL)
+		fmd_panic("fmd_doorthr_create from unrecognized thread\n");
+
+	mp = old_tp->thr_mod;
+	(void) fmd_api_module_lock((fmd_hdl_t *)mp);
+
+	if (dip && mp->mod_stats->ms_doorthrtotal.fmds_value.ui32 >=
+	    mp->mod_stats->ms_doorthrlimit.fmds_value.ui32) {
+		fmd_module_unlock(mp);
+		(void) fmd_dprintf(FMD_DBG_XPRT, "door server %s for %p "
+		    "not attemped - at max\n",
+		    dip->di_attributes & DOOR_DEPLETION_CB ?
+		    "depletion callback" : "startup", (void *)dip);
+		return (0);
+	}
+
+	if ((new_tp = fmd_doorthread_create(mp, (fmd_thread_f *)crf,
+	    crarg)) != NULL) {
+		tid = new_tp->thr_tid;
+		mp->mod_stats->ms_doorthrtotal.fmds_value.ui32++;
+		(void) fmd_idspace_xalloc(mp->mod_threads, tid, new_tp);
+	}
+
+	fmd_module_unlock(mp);
+
+	if (dip) {
+		fmd_dprintf(FMD_DBG_XPRT, "door server startup for %p %s\n",
+		    (void *)dip, new_tp ? "successful" : "failed");
+	}
+
+	return (new_tp ? 1 : -1);
+}
+
+/*ARGSUSED*/
+void
+fmd_doorthr_setup(void *cookie)
+{
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+}
+
 id_t
 fmd_timer_install(fmd_hdl_t *hdl, void *arg, fmd_event_t *ep, hrtime_t delta)
 {
@@ -1816,16 +1952,19 @@ fmd_timer_remove(fmd_hdl_t *hdl, id_t id)
 	fmd_eventq_cancel(mp->mod_queue, FMD_EVT_TIMEOUT, (void *)id);
 }
 
-nvlist_t *
-fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
-    uint8_t certainty, nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc)
+static nvlist_t *
+fmd_nvl_create_suspect(fmd_hdl_t *hdl, const char *class,
+    uint8_t certainty, nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc,
+    const char *pfx, boolean_t chkpfx)
 {
 	fmd_module_t *mp;
 	nvlist_t *nvl;
 
 	mp = fmd_api_module_lock(hdl);
-	if (class == NULL || class[0] == '\0')
-		fmd_api_error(mp, EFMD_NVL_INVAL, "invalid fault class\n");
+	if (class == NULL || class[0] == '\0' ||
+	    chkpfx == B_TRUE && strncmp(class, pfx, strlen(pfx)) != 0)
+		fmd_api_error(mp, EFMD_NVL_INVAL, "invalid %s class: '%s'\n",
+		    pfx, class ? class : "(empty)");
 
 	nvl = fmd_protocol_fault(class, certainty, asru, fru, rsrc, NULL);
 
@@ -1833,6 +1972,57 @@ fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
 
 	return (nvl);
 }
+
+nvlist_t *
+fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
+    uint8_t certainty, nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc)
+{
+	/*
+	 * We can't enforce that callers only specifiy classes matching
+	 * fault.* since there are already a number of modules that
+	 * use fmd_nvl_create_fault to create a defect event.  Since
+	 * fmd_nvl_create_{fault,defect} are equivalent, for now anyway,
+	 * no harm is done.  So call fmd_nvl_create_suspect with last
+	 * argument B_FALSE.
+	 */
+	return (fmd_nvl_create_suspect(hdl, class, certainty, asru,
+	    fru, rsrc, FM_FAULT_CLASS ".", B_FALSE));
+}
+
+nvlist_t *
+fmd_nvl_create_defect(fmd_hdl_t *hdl, const char *class,
+    uint8_t certainty, nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc)
+{
+	return (fmd_nvl_create_suspect(hdl, class, certainty, asru,
+	    fru, rsrc, FM_DEFECT_CLASS ".", B_TRUE));
+}
+
+const nvlist_t *
+fmd_hdl_fmauth(fmd_hdl_t *hdl)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	const nvlist_t *auth;
+
+	auth = (const nvlist_t *)fmd.d_rmod->mod_fmri;
+
+	fmd_module_unlock(mp);
+
+	return (auth);
+}
+
+const nvlist_t *
+fmd_hdl_modauth(fmd_hdl_t *hdl)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	const nvlist_t *auth;
+
+	auth = (const nvlist_t *)mp->mod_fmri;
+
+	fmd_module_unlock(mp);
+
+	return (auth);
+}
+
 
 int
 fmd_nvl_class_match(fmd_hdl_t *hdl, nvlist_t *nvl, const char *pattern)

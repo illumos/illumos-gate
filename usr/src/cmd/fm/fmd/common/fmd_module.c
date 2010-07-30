@@ -79,6 +79,8 @@ static const fmd_modstat_t _fmd_modstat_tmpl = {
 { "fmd.buflimit", FMD_TYPE_SIZE, "limit on total buffer space" },
 { "fmd.thrtotal", FMD_TYPE_UINT32, "total number of auxiliary threads" },
 { "fmd.thrlimit", FMD_TYPE_UINT32, "limit on number of auxiliary threads" },
+{ "fmd.doorthrtotal", FMD_TYPE_UINT32, "total number of door server threads" },
+{ "fmd.doorthrlimit", FMD_TYPE_UINT32, "limit on door server threads" },
 { "fmd.caseopen", FMD_TYPE_UINT64, "cases currently open by module" },
 { "fmd.casesolved", FMD_TYPE_UINT64, "total cases solved by module" },
 { "fmd.caseclosed", FMD_TYPE_UINT64, "total cases closed by module" },
@@ -246,6 +248,9 @@ fmd_module_create(const char *path, const fmd_modops_t *ops)
 
 	(void) fmd_conf_getprop(fmd.d_conf, "client.thrlim",
 	    &mp->mod_stats->ms_thrlimit.fmds_value.ui32);
+
+	(void) fmd_conf_getprop(fmd.d_conf, "client.doorthrlim",
+	    &mp->mod_stats->ms_doorthrlimit.fmds_value.ui32);
 
 	(void) fmd_conf_getprop(fmd.d_conf, "client.xprtlim",
 	    &mp->mod_stats->ms_xprtlimit.fmds_value.ui32);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _FMEV_CHANNELS_H
@@ -39,7 +38,22 @@
 extern "C" {
 #endif
 
+/*
+ * Channel that fmd forwards protocol events on, feeding the subscription
+ * aspect of libfmevent.
+ */
 #define	FMD_SNOOP_CHANNEL	"com.sun:fm:protocol_snoop"
+
+/*
+ * Channels on which published events are dispatched towards fmd for
+ * processing into full protocol events.
+ */
+#define	FMEV_CHAN_USER_PRIV_HV		"com.sun:fm:user_priv_highval"
+#define	FMEV_CHAN_USER_PRIV_LV		"com.sun:fm:user_priv_lowval"
+#define	FMEV_CHAN_USER_NOPRIV_HV	"com.sun:fm:user_nopriv_highval"
+#define	FMEV_CHAN_USER_NOPRIV_LV	"com.sun:fm:user_nopriv_lowval"
+#define	FMEV_CHAN_KERNEL_HV		"com.sun:fm:kernel_highval"
+#define	FMEV_CHAN_KERNEL_LV		"com.sun:fm:kernel_lowval"
 
 #ifdef __cplusplus
 }

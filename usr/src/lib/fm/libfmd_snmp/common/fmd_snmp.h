@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#ifndef _SUNFM_H
-#define	_SUNFM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef _FMD_SNMP_H
+#define	_FMD_SNMP_H
 
 #ifdef	__cplusplus
 extern "C" {
@@ -35,7 +32,7 @@ extern "C" {
 
 /*
  * These values are derived from, and must remain consistent with, the
- * MIB definitions.
+ * MIB definitions in SUN-FM-MIB.
  */
 #define	MODNAME_STR	"sunFM"
 #define	SUNFM_OID	1, 3, 6, 1, 4, 1, 42, 2, 195, 1
@@ -114,10 +111,30 @@ extern "C" {
 
 #define	SNMP_URL_MSG	"snmp-url"
 
+/*
+ * Definitions from SUN-IREPORT-MIB
+ */
+#define	SUNIREPORT_OID	1, 3, 6, 1, 4, 1, 42, 2, 197, 1
+
+#define	SUNIREPORTNOTIFICATIONENTRY	SUNIREPORT_OID, 1
+
+#define	SUNIREPORTHOSTNAME_OID		SUNIREPORTNOTIFICATIONENTRY, 1
+#define	SUNIREPORTMSGID_OID		SUNIREPORTNOTIFICATIONENTRY, 2
+#define	SUNIREPORTDESCRIPTION_OID	SUNIREPORTNOTIFICATIONENTRY, 3
+#define	SUNIREPORTTIME_OID		SUNIREPORTNOTIFICATIONENTRY, 4
+#define	SUNIREPORTSMFFMRI_OID		SUNIREPORTNOTIFICATIONENTRY, 5
+#define	SUNIREPORTSMFFROMSTATE_OID	SUNIREPORTNOTIFICATIONENTRY, 6
+#define	SUNIREPORTSMFTOSTATE_OID	SUNIREPORTNOTIFICATIONENTRY, 7
+#define	SUNIREPORTTRANSITIONREASON_OID	SUNIREPORTNOTIFICATIONENTRY, 8
+
+#define	SUNIREPORTTRAPS_OID		SUNIREPORT_OID, 2, 0
+#define	SUNIREPORTTRAP_OID		SUNIREPORTTRAPS_OID, 1
+
+
 extern int	init_sunFM(void);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SUNFM_H */
+#endif	/* _FMD_SNMP_H */

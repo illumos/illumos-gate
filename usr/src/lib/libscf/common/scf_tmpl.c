@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -152,8 +151,8 @@ static const scf_error_t errors_server[] = {
  * Returns 1 if the supplied error is a member of the error array, 0
  * if it is not.
  */
-static scf_error_t
-ismember(const int error, const scf_error_t error_array[])
+int
+ismember(const scf_error_t error, const scf_error_t error_array[])
 {
 	int i;
 
@@ -505,7 +504,7 @@ _read_single_boolean_from_pg(scf_propertygroup_t *pg, const char *prop_name,
 }
 
 /*
- * char **_append_astrings_values()
+ * static char ** _append_astrings_values()
  *
  * This function reads the values from the property prop_name in pg and
  * appends to an existing scf_values_t *vals.  vals may be empty, but
@@ -4093,10 +4092,12 @@ scf_values_destroy(scf_values_t *vals)
 {
 	int i;
 	char **items = NULL;
-	char **str = vals->values_as_strings;
+	char **str = NULL;
 
 	if (vals == NULL)
 		return;
+
+	str = vals->values_as_strings;
 
 	/* free values */
 	switch (vals->value_type) {

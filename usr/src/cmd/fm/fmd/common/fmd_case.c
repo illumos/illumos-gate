@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1247,7 +1246,7 @@ fmd_case_hash_delete(fmd_case_hash_t *chp, fmd_case_impl_t *cip)
 }
 
 fmd_case_t *
-fmd_case_create(fmd_module_t *mp, void *data)
+fmd_case_create(fmd_module_t *mp, const char *uuidstr, void *data)
 {
 	fmd_case_impl_t *cip = fmd_zalloc(sizeof (fmd_case_impl_t), FMD_SLEEP);
 	fmd_case_impl_t *eip = NULL;
@@ -1272,17 +1271,35 @@ fmd_case_create(fmd_module_t *mp, void *data)
 	(void) fmd_conf_getprop(fmd.d_conf, "uuidlen", &cip->ci_uuidlen);
 	cip->ci_uuid = fmd_zalloc(cip->ci_uuidlen + 1, FMD_SLEEP);
 
-	/*
-	 * We expect this loop to execute only once, but code it defensively
-	 * against the possibility of libuuid bugs.  Keep generating uuids and
-	 * attempting to do a hash insert until we get a unique one.
-	 */
-	do {
-		if (eip != NULL)
-			fmd_case_rele((fmd_case_t *)eip);
-		uuid_generate(uuid);
-		uuid_unparse(uuid, cip->ci_uuid);
-	} while ((eip = fmd_case_hash_insert(fmd.d_cases, cip)) != cip);
+	if (uuidstr == NULL) {
+		/*
+		 * We expect this loop to execute only once, but code it
+		 * defensively against the possibility of libuuid bugs.
+		 * Keep generating uuids and attempting to do a hash insert
+		 * until we get a unique one.
+		 */
+		do {
+			if (eip != NULL)
+				fmd_case_rele((fmd_case_t *)eip);
+			uuid_generate(uuid);
+			uuid_unparse(uuid, cip->ci_uuid);
+		} while ((eip = fmd_case_hash_insert(fmd.d_cases, cip)) != cip);
+	} else {
+		/*
+		 * If a uuid was specified we must succeed with that uuid,
+		 * or return NULL indicating a case with that uuid already
+		 * exists.
+		 */
+		(void) strncpy(cip->ci_uuid, uuidstr, cip->ci_uuidlen + 1);
+		if (fmd_case_hash_insert(fmd.d_cases, cip) != cip) {
+			fmd_free(cip->ci_uuid, cip->ci_uuidlen + 1);
+			(void) fmd_buf_hash_destroy(&cip->ci_bufs);
+			fmd_module_rele(mp);
+			pthread_mutex_destroy(&cip->ci_lock);
+			fmd_free(cip, sizeof (*cip));
+			return (NULL);
+		}
+	}
 
 	ASSERT(fmd_module_locked(mp));
 	fmd_list_append(&mp->mod_cases, cip);

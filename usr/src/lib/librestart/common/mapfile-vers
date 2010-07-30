@@ -63,12 +63,15 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	restarter_state_to_string;
 	restarter_store_contract;
 	restarter_string_to_state;
+	restarter_str_version;
 	restarter_inst_validate_ractions_aux_fmri;
 	restarter_inst_ractions_from_tty;
 	restarter_inst_reset_ractions_aux_fmri;
 	restarter_inst_reset_aux_fmri;
 	restarter_inst_set_aux_fmri;
 	restarter_mc_error_destroy;
+	restarter_get_str_short;
+	restarter_get_str_long;
     local:
 	*;
 };

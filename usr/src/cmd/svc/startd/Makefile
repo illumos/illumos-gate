@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG = svc.startd
@@ -88,7 +87,8 @@ LDLIBS += \
 	-luutil
 
 LDLIBS_i386 +=	-lgrubmgmt
-LDLIBS +=	$(LDLIBS_$(MACH))
+LDLIBS +=	$(LDLIBS_$(MACH)) -L $(ROOT)/usr/lib/fm -lfmevent
+LDFLAGS +=	-R /usr/lib/fm
 
 FILEMODE = 0555
 
@@ -105,7 +105,7 @@ lint_SRCS := CPPFLAGS += \
 all: $(PROG)
 
 $(PROG): $(ALLOBJS)
-	$(LINK.c) -o $@ $(ALLOBJS) $(LDLIBS)
+	$(LINK.c) -o $@ $(ALLOBJS) $(LDLIBS) $(LDFLAGS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
 $(POFILE): $(POFILES)

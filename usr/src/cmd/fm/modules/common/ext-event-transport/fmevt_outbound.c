@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -38,7 +37,7 @@ static evchan_t *fmevt_outbound_chan;
 static struct fmevt_outbound_stats {
 	fmd_stat_t recv_calls;
 	fmd_stat_t recv_list;
-	fmd_stat_t recv_swevent;
+	fmd_stat_t recv_ireport;
 	fmd_stat_t recv_other;
 	fmd_stat_t fwd_success;
 	fmd_stat_t fwd_failure;
@@ -47,8 +46,8 @@ static struct fmevt_outbound_stats {
 	    "total events received for forwarding" },
 	{ "outbound_cat1class_list", FMD_TYPE_UINT64,
 	    "events received matching list.*" },
-	{ "outbound_cat1class_swevent", FMD_TYPE_UINT64,
-	    "events received matching swevent.*" },
+	{ "outbound_cat1class_ireport", FMD_TYPE_UINT64,
+	    "events received matching ireport.*" },
 	{ "outbound_cat1class_other", FMD_TYPE_UINT64,
 	    "events of other classes" },
 	{ "outbound_fwd_success", FMD_TYPE_UINT64,
@@ -60,7 +59,7 @@ static struct fmevt_outbound_stats {
 #define	BUMPSTAT(stat)	outbound_stats.stat.fmds_value.ui64++
 
 /*
- * In the .conf file we subscribe to list.* and swevent.* event classes.
+ * In the .conf file we subscribe to list.* and ireport.* event classes.
  * Any additions to that set could cause some unexpected behaviour.
  * For example adding fault.foo won't work (since we don't publish
  * faults directly but only within a list.suspect) but we will get
@@ -74,8 +73,8 @@ fmevt_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 
 	if (strncmp(class, "list.", 5) == 0)
 		BUMPSTAT(recv_list);
-	else if (strncmp(class, "swevent.", 8) == 0)
-		BUMPSTAT(recv_swevent);
+	else if (strncmp(class, "ireport.", 8) == 0)
+		BUMPSTAT(recv_ireport);
 	else
 		BUMPSTAT(recv_other);
 
@@ -93,6 +92,7 @@ fmevt_init_outbound(fmd_hdl_t *hdl)
 {
 	int32_t channel_depth;
 	char *channel_name;
+	nvlist_t *nvl;
 
 	if (fmd_prop_get_int32(hdl, "protocol_forward_disable") == B_TRUE) {
 		fmd_hdl_debug(hdl, "protocol forwarding disabled "
@@ -122,8 +122,14 @@ fmevt_init_outbound(fmd_hdl_t *hdl)
 		fmd_hdl_abort(hdl, "Unable to set depth of channel %s to %d",
 		    channel_name, channel_depth);
 	}
-
 	fmd_prop_free_string(hdl, channel_name);
+
+	nvl = fmd_nvl_alloc(hdl, FMD_SLEEP);
+	(void) nvlist_add_nvlist(nvl, "fmdauth",
+	    (nvlist_t *)fmd_hdl_fmauth(hdl));
+	(void) sysevent_evc_setpropnvl(fmevt_outbound_chan, nvl);
+	nvlist_free(nvl);
+
 }
 
 /*ARGSUSED*/

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,14 +20,11 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FMD_BUILTIN_H
 #define	_FMD_BUILTIN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -50,7 +46,14 @@ typedef struct fmd_builtin {
 	const char *bltin_name;
 	void (*bltin_init)(fmd_hdl_t *);
 	void (*bltin_fini)(fmd_hdl_t *);
+	int bltin_ctxts;
 } fmd_builtin_t;
+
+#define	FMD_BUILTIN_CTXT_GLOBALZONE	0x1
+#define	FMD_BUILTIN_CTXT_NONGLOBALZONE	0x2
+
+#define	FMD_BUILTIN_ALLCTXT \
+	(FMD_BUILTIN_CTXT_GLOBALZONE | FMD_BUILTIN_CTXT_NONGLOBALZONE)
 
 extern int fmd_builtin_loadall(fmd_modhash_t *);
 

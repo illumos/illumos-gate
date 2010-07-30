@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <fmdump.h>
@@ -56,16 +55,44 @@ err_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 
 /*ARGSUSED*/
 static int
-err_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+err_verb23_cmn(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp,
+    nvlist_prtctl_t pctl)
 {
 	char buf[32];
 
 	fmdump_printf(fp, "%-20s.%9.9llu %s\n",
 	    fmdump_year(buf, sizeof (buf), rp), rp->rec_nsec, rp->rec_class);
 
-	nvlist_print(fp, rp->rec_nvl);
+	if (pctl)
+		nvlist_prt(rp->rec_nvl, pctl);
+	else
+		nvlist_print(fp, rp->rec_nvl);
+
 	fmdump_printf(fp, "\n");
 	return (0);
+}
+
+static int
+err_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+{
+	return (err_verb23_cmn(lp, rp, fp, NULL));
+}
+
+static int
+err_pretty(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+{
+	nvlist_prtctl_t pctl;
+	int rc;
+
+	if ((pctl = nvlist_prtctl_alloc()) != NULL) {
+		nvlist_prtctl_setdest(pctl, fp);
+		nvlist_prtctlop_nvlist(pctl, fmdump_render_nvlist, NULL);
+	}
+
+	rc = err_verb23_cmn(lp, rp, fp, pctl);
+
+	nvlist_prtctl_free(pctl);
+	return (rc);
 }
 
 const fmdump_ops_t fmdump_err_ops = {
@@ -79,6 +106,9 @@ const fmdump_ops_t fmdump_err_ops = {
 }, {
 "TIME                           CLASS",
 (fmd_log_rec_f *)err_verb2
+}, {
+"TIME                           CLASS",
+(fmd_log_rec_f *)err_pretty
 }, {
 NULL, NULL
 } }

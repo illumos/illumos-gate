@@ -92,6 +92,11 @@ SYMBOL_VERSION SUNW_1.2 {
 	scf_tmpl_visibility_to_string;
 	scf_type_to_string;
 	scf_values_destroy;
+	smf_notify_del_params;
+	smf_notify_get_params;
+	smf_notify_set_params;
+	smf_state_from_string;
+	smf_state_to_string;
 } SUNW_1.1;
 
 SYMBOL_VERSION SUNW_1.1 {
@@ -275,16 +280,20 @@ SYMBOL_VERSION SUNW_1.1 {
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	gen_filenms_from_fmri;
+	ismember;
 	scf_canonify_fmri;
 	scf_cmp_pattern;
 	_scf_create_errors;
         scf_decode32;
 	scf_encode32;
 	scf_general_pg_setup;
+	_scf_get_fma_notify_params;
+	_scf_get_svc_notify_params;
 	_scf_handle_decorations;
 	scf_is_compatible_type;
 	_scf_notify_add_pgname;
 	_scf_notify_add_pgtype;
+	_scf_notify_get_params;
 	_scf_notify_wait;
 	scf_parse_file_fmri;
 	scf_parse_fmri;
@@ -320,6 +329,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	scf_is_fastboot_default;
 	scf_fastreboot_default_set_transient;
 	_check_services;
+	_scf_handle_create_and_bind;
+	_smf_refresh_all_instances;
     local:
 	*;
 };

@@ -256,6 +256,9 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 		pdp->pd_version = PANICBUFVERS;
 		pdp->pd_msgoff = sizeof (panic_data_t) - sizeof (panic_nv_t);
 
+		(void) strncpy(pdp->pd_uuid, dump_get_uuid(),
+		    sizeof (pdp->pd_uuid));
+
 		if (t->t_panic_trap != NULL)
 			panic_savetrap(pdp, t->t_panic_trap);
 		else

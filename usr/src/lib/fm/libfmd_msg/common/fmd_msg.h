@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FMD_MSG_H
@@ -73,7 +72,9 @@ extern const char *fmd_msg_url_get(fmd_msg_hdl_t *);
 
 extern char *fmd_msg_gettext_nv(fmd_msg_hdl_t *, const char *, nvlist_t *);
 extern char *fmd_msg_gettext_id(fmd_msg_hdl_t *, const char *, const char *);
-
+extern char *fmd_msg_gettext_key(fmd_msg_hdl_t *, const char *, const char *,
+    const char *);
+extern char *fmd_msg_decode_tokens(nvlist_t *, const char *, const char *);
 extern char *fmd_msg_getitem_nv(fmd_msg_hdl_t *,
     const char *, nvlist_t *, fmd_msg_item_t);
 

@@ -1,0 +1,138 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+. /lib/svc/share/smf_include.sh
+
+LOGADM=/etc/logadm.conf
+LOGADM_D=${LOGADM%conf}d
+LS=/usr/bin/ls
+AWK=/usr/bin/awk
+GREP=/usr/bin/grep
+
+#
+# This is a temporary service to allow addition (only) to /etc/logadm.conf
+# It is temporary in the sense that logadm(1M) should have its configuration
+# migrated to SMF in the future.
+#
+
+#
+# Display error message and exits with error code
+#
+msg_exit()
+{
+	exit_code=$1
+	msg=$2
+
+	echo "${msg}"
+	exit ${exit_code}
+}
+
+#
+# If there is no /etc/logadm.d we can bail
+#
+if [ ! -d ${LOGADM_D} ]; then
+	exit ${SMF_EXIT_OK}
+fi
+
+#
+# Cache files
+#
+files=$(${LS} -t  ${LOGADM} ${LOGADM_D}/*)
+
+#
+# If there is no /etc/logadm.conf create it and make sure it has the
+# right ownership and permissions.
+# Make sure this is done AFTER $files is set. Otherwise /etc/logadm.conf will be
+# newer than all files is /etc/logadm.d and they will be skipped.
+#
+if [ ! -f ${LOGADM} ]; then
+	touch ${LOGADM}
+	chmod 644 ${LOGADM}
+	chown root:sys ${LOGADM}
+fi
+
+for f in ${files}
+do
+	#
+	# If it is not a file, we skip it.
+	#
+	if [ ! -f ${f} ]; then
+		continue
+	fi
+
+	#
+	# We stop when files at /etc/logadm.d are older than /etc/logadm.conf
+	#
+	if [ ${f} = ${LOGADM} ]; then
+		break
+	fi
+
+	#
+	# We ignore files that are not owned by root, group sys
+	# and have permissions different than 444
+	#
+	perm=$(${LS} -l ${f} | ${AWK} '{printf("%s %s:%s", $1, $3, $4)}')
+	if [ $? != 0 ]; then
+		msg_exit ${SMF_EXIT_ERR_FATAL} "${perm}"
+	fi
+	if [ "${perm}" != "-r--r--r-- root:sys" ]; then
+		echo "Unexpected permission/ownership for ${f}"
+		echo "    expected -r--r--r-- root:sys but got ${perm}"
+		echo "    skipping ${f}"
+		continue
+	fi
+
+	#
+	# Discard comments (lines starting with #)
+	#
+	${GREP} -v '^#' ${f} | while read entry
+	do
+		sig=$(echo ${entry} | ${AWK} '{printf("%s\>", $1);}' 2>&1)
+		if [ $? != 0 ]; then # only happens if awk(1) fails
+			msg_exit ${SMF_EXIT_ERR_FATAL} "${sig}"
+		fi
+
+		#
+		# if ${sig} is null but the previous command succeeded, we skip
+		#
+		if [ ! ${sig} ]; then
+			continue;
+		fi
+
+		err_msg=$(${GREP} ^${sig} ${LOGADM} 2>&1)
+		case $? in
+		'1')
+			echo "${entry}" >> ${LOGADM}
+			;;
+		'0')
+			;;
+		*)
+			msg_exit ${SMF_EXIT_ERR_FATAL} "${err_msg}"
+		esac
+	done
+done
+
+exit ${SMF_EXIT_OK}
+

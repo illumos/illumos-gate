@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PROTOCOL_H
 #define	_PROTOCOL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <startd.h>
 
@@ -45,6 +41,7 @@ typedef struct protocol_states {
 	restarter_instance_state_t	ps_state;
 	restarter_instance_state_t	ps_state_next;
 	restarter_error_t		ps_err;
+	restarter_str_t			ps_reason;
 } protocol_states_t;
 
 
@@ -71,6 +68,7 @@ typedef struct graph_update {
 typedef struct restarter_protocol_event {
 	char			*rpe_inst;
 	restarter_event_type_t	rpe_type;
+	int32_t			rpe_reason;
 
 	uu_list_node_t		rpe_link;
 } restarter_protocol_event_t;
@@ -94,7 +92,7 @@ void graph_event_release(graph_protocol_event_t *);
 void restarter_protocol_init();
 evchan_t *restarter_protocol_init_delegate(char *);
 void restarter_protocol_send_event(const char *, evchan_t *,
-    restarter_event_type_t);
+    restarter_event_type_t, int32_t);
 restarter_protocol_event_t *restarter_event_dequeue();
 void restarter_event_requeue(restarter_protocol_event_t *);
 void restarter_event_release(restarter_protocol_event_t *);

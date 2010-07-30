@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -38,6 +37,8 @@
 #include "startd.h"
 
 #define	SMF_SNAPSHOT_RUNNING	"running"
+
+#define	INFO_EVENTS_ALL "info_events_all"
 
 char *
 inst_fmri_to_svc_fmri(const char *fmri)
@@ -417,6 +418,90 @@ read_single_astring_fail:
 	return (r);
 }
 
+/*
+ * libscf_get_stn_tset
+ */
+int32_t
+libscf_get_stn_tset(scf_instance_t *inst)
+{
+	scf_handle_t		*h = scf_instance_handle(inst);
+	scf_propertygroup_t	*pg = scf_pg_create(h);
+	char			*pgname = NULL;
+	int32_t			t, f, tset;
+
+	assert(inst != NULL);
+
+	pgname =  startd_alloc(max_scf_fmri_size);
+	if (h == NULL || pg == NULL) {
+		tset = -1;
+		goto cleanup;
+	}
+
+	for (tset = 0, t = 1; t < SCF_STATE_ALL; t <<= 1) {
+		f = t << 16;
+
+		(void) strcpy(pgname, SCF_STN_PREFIX_TO);
+		(void) strlcat(pgname, smf_state_to_string(t),
+		    max_scf_fmri_size);
+
+		if (scf_instance_get_pg_composed(inst, NULL, pgname, pg) ==
+		    SCF_SUCCESS) {
+			tset |= t;
+		} else if (scf_error() != SCF_ERROR_NOT_FOUND && scf_error() !=
+		    SCF_ERROR_DELETED) {
+			tset = -1;
+			goto cleanup;
+		}
+
+		(void) strcpy(pgname, SCF_STN_PREFIX_FROM);
+		(void) strlcat(pgname, smf_state_to_string(t),
+		    max_scf_fmri_size);
+
+		if (scf_instance_get_pg_composed(inst, NULL, pgname, pg) ==
+		    SCF_SUCCESS) {
+			tset |= f;
+		} else if (scf_error() != SCF_ERROR_NOT_FOUND && scf_error() !=
+		    SCF_ERROR_DELETED) {
+			tset = -1;
+			goto cleanup;
+		}
+	}
+
+cleanup:
+	scf_pg_destroy(pg);
+	startd_free(pgname, max_scf_fmri_size);
+
+	return (tset);
+}
+
+static int32_t
+libscf_get_global_stn_tset(scf_handle_t *h)
+{
+	scf_instance_t	*inst = scf_instance_create(h);
+	int32_t		tset = -1;
+
+	if (inst == NULL) {
+		goto cleanup;
+	}
+
+	if (scf_handle_decode_fmri(h, SCF_INSTANCE_GLOBAL, NULL, NULL, inst,
+	    NULL, NULL, SCF_DECODE_FMRI_REQUIRE_INSTANCE) != 0) {
+		goto cleanup;
+	}
+
+	tset = libscf_get_stn_tset(inst);
+
+cleanup:
+	scf_instance_destroy(inst);
+
+	if (tset == -1)
+		log_framework(LOG_WARNING,
+		    "Failed to get system wide notification parameters: %s\n",
+		    scf_strerror(scf_error()));
+
+	return (tset);
+}
+
 static int
 libscf_read_state(const scf_propertygroup_t *pg, const char *prop_name,
     restarter_instance_state_t *state)
@@ -721,6 +806,26 @@ out:
 	scf_value_destroy(val);
 	scf_property_destroy(prop);
 	return (ret);
+}
+
+/*
+ * get info event property from restarter:default
+ */
+int
+libscf_get_info_events_all(scf_propertygroup_t *pg)
+{
+	uint8_t	v;
+	int r = 0;
+
+	if (get_boolean(pg, INFO_EVENTS_ALL, &v) == 0) {
+		r = v;
+	} else if (scf_error() != SCF_ERROR_NOT_FOUND) {
+		uu_warn("Failed get_boolean %s/%s: %s\n",
+		    SCF_PG_OPTIONS, INFO_EVENTS_ALL,
+		    scf_strerror(scf_error()));
+	}
+
+	return (r);
 }
 
 /*
@@ -1125,7 +1230,6 @@ enabled:
 
 	return (0);
 }
-
 
 /*
  * Sets pg to the name property group of s_inst.  If it doesn't exist, it is
@@ -2677,6 +2781,7 @@ out:
 	return (ret);
 }
 
+extern int32_t stn_global;
 /*
  * Call dgraph_add_instance() for each instance in the repository.
  */
@@ -2688,7 +2793,6 @@ libscf_populate_graph(scf_handle_t *h)
 	scf_instance_t *inst;
 	scf_iter_t *svc_iter;
 	scf_iter_t *inst_iter;
-	int ret;
 
 	scope = safe_scf_scope_create(h);
 	svc = safe_scf_service_create(h);
@@ -2698,9 +2802,12 @@ libscf_populate_graph(scf_handle_t *h)
 
 	deathrow_init();
 
-	if ((ret = scf_handle_get_local_scope(h, scope)) !=
+	stn_global = libscf_get_global_stn_tset(h);
+
+	if (scf_handle_get_local_scope(h, scope) !=
 	    SCF_SUCCESS)
-		uu_die("retrieving local scope failed: %d\n", ret);
+		uu_die("retrieving local scope failed: %s\n",
+		    scf_strerror(scf_error()));
 
 	if (scf_iter_scope_services(svc_iter, scope) == -1)
 		uu_die("walking local scope's services failed\n");
@@ -3602,8 +3709,9 @@ add_inst:
 	idata.i_state = RESTARTER_STATE_NONE;
 	idata.i_next_state = RESTARTER_STATE_NONE;
 set_state:
-	switch (r = _restarter_commit_states(h, &idata, RESTARTER_STATE_ONLINE,
-	    RESTARTER_STATE_NONE, NULL)) {
+	switch (r = _restarter_commit_states(h, &idata,
+	    RESTARTER_STATE_ONLINE, RESTARTER_STATE_NONE,
+	    restarter_get_str_short(restarter_str_insert_in_graph))) {
 	case 0:
 		break;
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -38,9 +37,8 @@
 
 #include "fmev_impl.h"
 
-#define	API_ENTERV1(iep) \
-	((void) fmev_api_enter(fmev_shdl_cmn(((iep)->ei_hdl)), \
-	LIBFMEVENT_VERSION_1))
+#define	FMEV_API_ENTER(iep, v) \
+	fmev_api_enter(fmev_shdl_cmn(((iep)->ei_hdl)), LIBFMEVENT_VERSION_##v)
 
 typedef struct {
 	uint32_t ei_magic;		/* _FMEVMAGIC */
@@ -137,7 +135,7 @@ fmev_hold(fmev_t ev)
 
 	ASSERT(EVENT_VALID(iep));
 
-	API_ENTERV1(iep);
+	(void) FMEV_API_ENTER(iep, 1);
 
 	atomic_inc_32(&iep->ei_refcnt);
 }
@@ -149,7 +147,7 @@ fmev_rele(fmev_t ev)
 
 	ASSERT(EVENT_VALID(iep));
 
-	API_ENTERV1(iep);
+	(void) FMEV_API_ENTER(iep, 1);
 
 	if (atomic_dec_32_nv(&iep->ei_refcnt) == 0)
 		fmev_free(iep);
@@ -163,7 +161,8 @@ fmev_dup(fmev_t ev)
 
 	ASSERT(EVENT_VALID(iep));
 
-	API_ENTERV1(iep);
+	if (!FMEV_API_ENTER(iep, 1))
+		return (NULL);	/* fmev_errno set */
 
 	if (ev == NULL) {
 		(void) fmev_seterr(FMEVERR_API);
@@ -194,7 +193,8 @@ fmev_attr_list(fmev_t ev)
 
 	ASSERT(EVENT_VALID(iep));
 
-	API_ENTERV1(iep);
+	if (!FMEV_API_ENTER(iep, 1))
+		return (NULL);	/* fmev_errno set */
 
 	if (ev == NULL) {
 		(void) fmev_seterr(FMEVERR_API);
@@ -215,7 +215,8 @@ fmev_class(fmev_t ev)
 
 	ASSERT(EVENT_VALID(iep));
 
-	API_ENTERV1(iep);
+	if (!FMEV_API_ENTER(iep, 1))
+		return (NULL);	/* fmev_errno set */
 
 	if (ev == NULL) {
 		(void) fmev_seterr(FMEVERR_API);
@@ -238,7 +239,8 @@ fmev_timespec(fmev_t ev, struct timespec *tp)
 	uint64_t timetlimit;
 
 	ASSERT(EVENT_VALID(iep));
-	API_ENTERV1(iep);
+	if (!FMEV_API_ENTER(iep, 1))
+		return (fmev_errno);
 
 #ifdef	_LP64
 	timetlimit = INT64_MAX;
@@ -274,4 +276,15 @@ fmev_localtime(fmev_t ev, struct tm *tm)
 
 	seconds = (time_t)fmev_time_sec(ev);
 	return (localtime_r(&seconds, tm));
+}
+
+fmev_shdl_t
+fmev_ev2shdl(fmev_t ev)
+{
+	fmev_impl_t *iep = FMEV2IMPL(ev);
+
+	if (!FMEV_API_ENTER(iep, 2))
+		return (NULL);
+
+	return (iep->ei_hdl);
 }

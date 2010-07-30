@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -548,6 +547,70 @@ topo_mod_modfmri(topo_mod_t *mod, int version, const char *driver)
 
 	if ((fmri = topo_fmri_create(mod->tm_hdl, FM_FMRI_SCHEME_MOD,
 	    FM_FMRI_SCHEME_MOD, 0, args, &err)) == NULL) {
+		nvlist_free(args);
+		return (set_fmri_err(mod, err));
+	}
+
+	nvlist_free(args);
+
+	(void) topo_mod_nvdup(mod, fmri, &nfp);
+	nvlist_free(fmri);
+
+	return (nfp);
+}
+
+#define	_SWFMRI_ADD_STRING(nvl, name, val) \
+	((val) ? (nvlist_add_string(nvl, name, val) != 0) : 0)
+
+nvlist_t *
+topo_mod_swfmri(topo_mod_t *mod, int version,
+    char *obj_path, char *obj_root, nvlist_t *obj_pkg,
+    char *site_token, char *site_module, char *site_file, char *site_func,
+    int64_t site_line, char *ctxt_origin, char *ctxt_execname,
+    int64_t ctxt_pid, char *ctxt_zone, int64_t ctxt_ctid,
+    char **ctxt_stack, uint_t ctxt_stackdepth)
+{
+	nvlist_t *fmri, *args;
+	nvlist_t *nfp = NULL;
+	int err;
+
+	if (version != FM_SW_SCHEME_VERSION)
+		return (set_fmri_err(mod, EMOD_FMRI_VERSION));
+
+	if (topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) != 0)
+		return (set_fmri_err(mod, EMOD_FMRI_NVL));
+
+	err = 0;
+	err |= _SWFMRI_ADD_STRING(args, "obj_path", obj_path);
+	err |= _SWFMRI_ADD_STRING(args, "obj_root", obj_root);
+	if (obj_pkg)
+		err |= nvlist_add_nvlist(args, "obj_pkg", obj_pkg);
+
+	err |= _SWFMRI_ADD_STRING(args, "site_token", site_token);
+	err |= _SWFMRI_ADD_STRING(args, "site_module", site_module);
+	err |= _SWFMRI_ADD_STRING(args, "site_file", site_file);
+	err |= _SWFMRI_ADD_STRING(args, "site_func", site_func);
+	if (site_line != -1)
+		err |= nvlist_add_int64(args, "site_line", site_line);
+
+	err |= _SWFMRI_ADD_STRING(args, "ctxt_origin", ctxt_origin);
+	err |= _SWFMRI_ADD_STRING(args, "ctxt_execname", ctxt_execname);
+	if (ctxt_pid != -1)
+		err |= nvlist_add_int64(args, "ctxt_pid", ctxt_pid);
+	err |= _SWFMRI_ADD_STRING(args, "ctxt_zone", ctxt_zone);
+	if (ctxt_ctid != -1)
+		err |= nvlist_add_int64(args, "ctxt_ctid", ctxt_ctid);
+	if (ctxt_stack != NULL && ctxt_stackdepth != 0)
+		err |= nvlist_add_string_array(args, "stack", ctxt_stack,
+		    ctxt_stackdepth);
+
+	if (err) {
+		nvlist_free(args);
+		return (set_fmri_err(mod, EMOD_FMRI_NVL));
+	}
+
+	if ((fmri = topo_fmri_create(mod->tm_hdl, FM_FMRI_SCHEME_SW,
+	    FM_FMRI_SCHEME_SW, 0, args, &err)) == NULL) {
 		nvlist_free(args);
 		return (set_fmri_err(mod, err));
 	}

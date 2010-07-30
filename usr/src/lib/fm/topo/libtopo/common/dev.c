@@ -114,6 +114,11 @@ static int
 dev_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
+	/*
+	 * Methods are registered, but there is no enumeration.  Should
+	 * enumeration be added be sure to cater for global vs non-global
+	 * zones.
+	 */
 	(void) topo_method_register(mod, pnode, dev_methods);
 	return (0);
 }

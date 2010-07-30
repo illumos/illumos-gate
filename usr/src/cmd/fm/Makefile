@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 SUBDIRS = \
 	fmd \
@@ -36,7 +35,8 @@ SUBDIRS = \
 	scripts \
 	modules \
 	dicts \
-	eversholt
+	eversholt \
+	notify
 
 include ./Makefile.subdirs
 

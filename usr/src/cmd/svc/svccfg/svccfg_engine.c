@@ -1074,7 +1074,9 @@ help(int com)
 		    "Property group commands: listpg addpg delpg\n"
 		    "Property commands:	 listprop setprop delprop editprop\n"
 		    "Property value commands: addpropvalue delpropvalue "
-		    "setenv unsetenv\n"));
+		    "setenv unsetenv\n"
+		    "Notification parameters: "
+		    "listnotify setnotify delnotify\n"));
 		return;
 	}
 

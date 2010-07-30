@@ -19,9 +19,9 @@
 # CDDL HEADER END
 #
 #
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-#
+
 SUBDIRS = cpumem-retire \
 	disk-monitor	\
 	disk-transport	\
@@ -33,7 +33,7 @@ SUBDIRS = cpumem-retire \
 	ip-transport	\
 	sensor-transport \
 	ses-log-transport \
-	snmp-trapgen	\
+	sw-diag-response \
 	sp-monitor	\
 	syslog-msgs	\
 	zfs-diagnosis	\

@@ -20,12 +20,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/fs_include.sh
 
 #
 # mksavedir
@@ -47,9 +46,33 @@ savedev=none
 # an alternate dump device, then the dump is in the primary swap partition,
 # which was configured as the dump device by the first swapadd early in boot.
 # Thus before we run dumpadm to configure the dump device, we first run
-# savecore to check the swap partition for a dump.
+# savecore to check the swap partition for a dump;  this is run in the
+# foreground to reduce the chances of overwriting the dump.
 #
-if [ -x /usr/bin/savecore ]; then
+# This does not apply for zfs root systems that use a zvol for dump;
+# for such systems the dedicated dump device is appointed during startup
+# of the filesystem/usr:default instance before any swap is added.
+# Therefore we must check that the dump device is a swap device here -
+# if not then we'll run savecore here in the foreground and prevent
+# our dependent services coming online until we're done.
+#
+
+rootiszfs=0
+alreadydedicated=0
+
+readmnttab / </etc/mnttab
+if [ "$fstype" = zfs ] ; then
+	rootiszfs=1
+	if [ -x /usr/sbin/dumpadm ]; then
+		if /usr/sbin/dumpadm 2>/dev/null | grep "Dump device:" | \
+		    grep '(dedicated)' > /dev/null 2>&1; then
+			alreadydedicated=1
+		fi
+	fi
+fi
+
+if [ -x /usr/bin/savecore -a \
+    \( ! $rootiszfs -eq 1 -o $alreadydedicated -eq 0 \) ]; then
 	[ -r /etc/dumpadm.conf ] && . /etc/dumpadm.conf
 
 	if [ "x$DUMPADM_ENABLE" != xno ] && mksavedir; then
@@ -57,8 +80,17 @@ if [ -x /usr/bin/savecore ]; then
 		shift $#
 		set -- `/usr/sbin/dumpadm 2>/dev/null | /usr/bin/grep 'device:'`
 		savedev=${3:-none}
+	else
+		#
+		# dumpadm -n is in effect, but we can still run savecore
+		# to raise an event with initial panic detail extracted
+		# from the dump header.
+		#
+		/usr/bin/savecore -c
 	fi
-else
+fi
+
+if [ ! -x /usr/bin/savecore ]; then
 	echo "WARNING: /usr/bin/savecore is missing or not executable" >& 2
 fi
 
@@ -82,20 +114,38 @@ else
 fi
 
 #
+# If the savecore executable is absent then we're done
+#
+if [ ! -x /usr/bin/savecore ]; then
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+#
 # Now that dumpadm has reconfigured /dev/dump, we need to run savecore again
 # because the dump device may have changed.  If the earlier savecore had
 # saved the dump, savecore will just exit immediately.
 #
-if [ "x$DUMPADM_ENABLE" != xno ]; then
-	if /usr/sbin/swap -l 2>/dev/null | grep "^${DUMPADM_DEVICE} " \
+
+isswap=0
+swapchanged=0
+if /usr/sbin/swap -l 2>/dev/null | grep "^${DUMPADM_DEVICE} " \
 	    >/dev/null 2>&1; then
+	isswap=1
+	if [ "x$savedev" != "x$DUMPADM_DEVICE" ]; then
+		swapchanged=1
+	fi
+fi
+
+if [ "x$DUMPADM_ENABLE" != xno ]; then
+	if [ $isswap -eq 1 ]; then
 		#
 		# If the dump device is part of swap, we only need to run
 		# savecore a second time if the device is different from the
 		# swap device on which we initially ran savecore.
 		#
-		[ "x$savedev" != "x$DUMPADM_DEVICE" ] && \
+		if [ $swapchanged -eq 1 ]; then
 		    mksavedir && /usr/bin/savecore $DUMPADM_SAVDIR &
+		fi
 	else
 		#
 		# The dump device couldn't have been dedicated before we
@@ -103,6 +153,16 @@ if [ "x$DUMPADM_ENABLE" != xno ]; then
 		#
 		mksavedir && /usr/bin/savecore $DUMPADM_SAVDIR &
 	fi
+else
+		#
+		# savecore not enabled.  Check whether a valid dump is
+		# present on the device and raise an event to signal that,
+		# but avoid sending a duplicate event from the savecore -c
+		# earlier.
+		#
+		if [ $isswap -eq 0 -o $swapchanged -eq 1 ]; then
+			/usr/bin/savecore -c
+		fi
 fi
 
 exit $SMF_EXIT_OK

@@ -32,6 +32,7 @@
 #include <alloca.h>
 #include <assert.h>
 #include <limits.h>
+#include <zone.h>
 #include <fm/topo_mod.h>
 #include <fm/topo_hc.h>
 #include <fm/fmd_fmri.h>
@@ -311,6 +312,7 @@ int
 hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
     topo_instance_t max, void *notused1, void *notused2)
 {
+	int isglobal = (getzoneid() == GLOBAL_ZONEID);
 	nvlist_t *pfmri = NULL;
 	nvlist_t *nvl;
 	nvlist_t *auth;
@@ -330,6 +332,9 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 		    HC, min, max);
 		return (topo_mod_seterrno(mod, EINVAL));
 	}
+
+	if (!isglobal)
+		return (0);
 
 	(void) topo_node_resource(pnode, &pfmri, &err);
 	auth = topo_mod_auth(mod, pnode);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1025,7 +1024,7 @@ method_thread(void *arg)
 	scf_instance_t	*s_inst = NULL;
 	int r, exit_code;
 	boolean_t retryable;
-	const char *aux;
+	restarter_str_t reason;
 
 	assert(0 <= info->sf_method_type && info->sf_method_type <= 2);
 
@@ -1063,7 +1062,7 @@ rebind_retry:
 		 */
 		(void) restarter_instance_update_states(local_handle, inst,
 		    inst->ri_i.i_state, RESTARTER_STATE_NONE, RERR_NONE,
-		    NULL);
+		    restarter_str_none);
 		goto out;
 
 	case EINVAL:
@@ -1105,7 +1104,7 @@ retry:
 		 */
 		(void) restarter_instance_update_states(local_handle, inst,
 		    inst->ri_i.i_next_state, RESTARTER_STATE_NONE,
-		    info->sf_event_type, NULL);
+		    info->sf_event_type, info->sf_reason);
 
 		(void) update_fault_count(inst, FAULT_COUNT_RESET);
 
@@ -1145,16 +1144,17 @@ retry:
 	else
 		log_transition(inst, START_FAILED_OTHER);
 
-	if (r == ELOOP)
-		aux = "restarting_too_quickly";
-	else if (retryable)
-		aux = "fault_threshold_reached";
-	else
-		aux = "method_failed";
+	if (r == ELOOP) {
+		reason = restarter_str_restarting_too_quickly;
+	} else if (retryable) {
+		reason = restarter_str_fault_threshold_reached;
+	} else {
+		reason = restarter_str_method_failed;
+	}
 
 	(void) restarter_instance_update_states(local_handle, inst,
 	    RESTARTER_STATE_MAINT, RESTARTER_STATE_NONE, RERR_FAULT,
-	    (char *)aux);
+	    reason);
 
 	if (!method_is_transient(inst, info->sf_method_type) &&
 	    inst->ri_i.i_primary_ctid != 0)

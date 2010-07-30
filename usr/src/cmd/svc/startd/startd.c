@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -325,6 +324,7 @@ startd_thread_create(void *(*func)(void *), void *ptr)
 	return (tid);
 }
 
+extern int info_events_all;
 
 static int
 read_startd_config(void)
@@ -393,7 +393,8 @@ read_startd_config(void)
 	idata.i_next_state = RESTARTER_STATE_NONE;
 timestamp:
 	switch (r = _restarter_commit_states(hndl, &idata,
-	    RESTARTER_STATE_ONLINE, RESTARTER_STATE_NONE, NULL)) {
+	    RESTARTER_STATE_ONLINE, RESTARTER_STATE_NONE,
+	    restarter_get_str_short(restarter_str_insert_in_graph))) {
 	case 0:
 		break;
 
@@ -470,6 +471,9 @@ timestamp:
 	 */
 	if (scf_pg_get_name(pg, NULL, 0) < 0)
 		goto scfout;
+
+	/* get info_events_all */
+	info_events_all = libscf_get_info_events_all(pg);
 
 	/* Iterate through. */
 	iter = safe_scf_iter_create(hndl);

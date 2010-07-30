@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -78,6 +77,7 @@
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
 #include <uuid/uuid.h>
+#include <zone.h>
 
 #include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
@@ -379,7 +379,7 @@ topo_snap_hold(topo_hdl_t *thp, const char *uuid, int *errp)
 		/*
 		 * Now walk the tree and invoke any facility enumeration methods
 		 */
-		if (ret != NULL) {
+		if (ret != NULL && getzoneid() == 0) {
 			if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC,
 			    fac_walker, (void *)0, errp)) == NULL) {
 				return (ret);

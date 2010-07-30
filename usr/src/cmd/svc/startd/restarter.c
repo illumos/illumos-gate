@@ -324,6 +324,7 @@ restarter_insert_inst(scf_handle_t *h, const char *name)
 	restarter_instance_state_t state, next_state;
 	protocol_states_t *ps;
 	pid_t start_pid;
+	restarter_str_t reason = restarter_str_insert_in_graph;
 
 	MUTEX_LOCK(&instance_list.ril_lock);
 
@@ -475,6 +476,14 @@ rep_retry:
 				do_commit_states = B_TRUE;
 			} else {
 				/*
+				 * The reason for transition will depend on
+				 * state.
+				 */
+				if (st->st_initial == 0)
+					reason = restarter_str_startd_restart;
+				else if (state == RESTARTER_STATE_MAINT)
+					reason = restarter_str_bad_repo_state;
+				/*
 				 * Inform the restarter of our state without
 				 * changing the STIME in the repository.
 				 */
@@ -482,6 +491,7 @@ rep_retry:
 				inst->ri_i.i_state = ps->ps_state = state;
 				inst->ri_i.i_next_state = ps->ps_state_next =
 				    next_state;
+				ps->ps_reason = reason;
 
 				graph_protocol_send_event(inst->ri_i.i_fmri,
 				    GRAPH_UPDATE_STATE_CHANGE, ps);
@@ -635,7 +645,7 @@ rep_retry:
 
 	if (do_commit_states)
 		(void) restarter_instance_update_states(h, inst, state,
-		    next_state, RERR_NONE, NULL);
+		    next_state, RERR_NONE, reason);
 
 	log_framework(LOG_DEBUG, "%s is a %s-style service\n", name,
 	    service_style(inst->ri_flags));
@@ -803,7 +813,8 @@ instance_started(restarter_inst_t *inst)
 int
 restarter_instance_update_states(scf_handle_t *h, restarter_inst_t *ri,
     restarter_instance_state_t new_state,
-    restarter_instance_state_t new_state_next, restarter_error_t err, char *aux)
+    restarter_instance_state_t new_state_next, restarter_error_t err,
+    restarter_str_t reason)
 {
 	protocol_states_t *states;
 	int e;
@@ -818,7 +829,7 @@ restarter_instance_update_states(scf_handle_t *h, restarter_inst_t *ri,
 
 retry:
 	e = _restarter_commit_states(h, &ri->ri_i, new_state, new_state_next,
-	    aux);
+	    restarter_get_str_short(reason));
 	switch (e) {
 	case 0:
 		break;
@@ -861,6 +872,7 @@ retry:
 	states->ps_state = new_state;
 	states->ps_state_next = new_state_next;
 	states->ps_err = err;
+	states->ps_reason = reason;
 	graph_protocol_send_event(ri->ri_i.i_fmri, GRAPH_UPDATE_STATE_CHANGE,
 	    (void *)states);
 
@@ -999,6 +1011,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 	const char *cp;
 	int err;
 	restarter_error_t re;
+	restarter_str_t	reason;
 
 	assert(MUTEX_HELD(&inst->ri_lock));
 	assert(inst->ri_method_thread == 0);
@@ -1006,30 +1019,37 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 	switch (cause) {
 	case RSTOP_EXIT:
 		re = RERR_RESTART;
+		reason = restarter_str_ct_ev_exit;
 		cp = "all processes in service exited";
 		break;
 	case RSTOP_CORE:
 		re = RERR_FAULT;
+		reason = restarter_str_ct_ev_core;
 		cp = "process dumped core";
 		break;
 	case RSTOP_SIGNAL:
 		re = RERR_FAULT;
+		reason = restarter_str_ct_ev_signal;
 		cp = "process received fatal signal from outside the service";
 		break;
 	case RSTOP_HWERR:
 		re = RERR_FAULT;
+		reason = restarter_str_ct_ev_hwerr;
 		cp = "process killed due to uncorrectable hardware error";
 		break;
 	case RSTOP_DEPENDENCY:
 		re = RERR_RESTART;
+		reason = restarter_str_dependency_activity;
 		cp = "dependency activity requires stop";
 		break;
 	case RSTOP_DISABLE:
 		re = RERR_RESTART;
+		reason = restarter_str_disable_request;
 		cp = "service disabled";
 		break;
 	case RSTOP_RESTART:
 		re = RERR_RESTART;
+		reason = restarter_str_restart_request;
 		cp = "service restarting";
 		break;
 	default:
@@ -1076,7 +1096,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 		 */
 		switch (err = restarter_instance_update_states(local_handle,
 		    inst, inst->ri_i.i_state, RESTARTER_STATE_OFFLINE, re,
-		    NULL)) {
+		    reason)) {
 		case 0:
 		case ECONNRESET:
 			break;
@@ -1102,7 +1122,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 
 		switch (err = restarter_instance_update_states(local_handle,
 		    inst, inst->ri_i.i_next_state, RESTARTER_STATE_NONE, re,
-		    NULL)) {
+		    reason)) {
 		case 0:
 		case ECONNRESET:
 			break;
@@ -1125,7 +1145,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 
 	switch (err = restarter_instance_update_states(local_handle, inst,
 	    inst->ri_i.i_state, inst->ri_i.i_enabled ? RESTARTER_STATE_OFFLINE :
-	    RESTARTER_STATE_DISABLED, RERR_NONE, NULL)) {
+	    RESTARTER_STATE_DISABLED, RERR_NONE, reason)) {
 	case 0:
 	case ECONNRESET:
 		break;
@@ -1139,6 +1159,7 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 	info->sf_id = inst->ri_id;
 	info->sf_method_type = METHOD_STOP;
 	info->sf_event_type = re;
+	info->sf_reason = reason;
 	inst->ri_method_thread = startd_thread_create(method_thread, info);
 
 	return (0);
@@ -1177,6 +1198,7 @@ unmaintain_instance(scf_handle_t *h, restarter_inst_t *rip,
 	int r;
 	uint_t tries = 0, msecs = ALLOC_DELAY;
 	const char *cp;
+	restarter_str_t	reason;
 
 	assert(MUTEX_HELD(&rip->ri_lock));
 
@@ -1190,9 +1212,11 @@ unmaintain_instance(scf_handle_t *h, restarter_inst_t *rip,
 	switch (cause) {
 	case RUNMAINT_CLEAR:
 		cp = "clear requested";
+		reason = restarter_str_clear_request;
 		break;
 	case RUNMAINT_DISABLE:
 		cp = "disable requested";
+		reason = restarter_str_disable_request;
 		break;
 	default:
 #ifndef NDEBUG
@@ -1208,7 +1232,7 @@ unmaintain_instance(scf_handle_t *h, restarter_inst_t *rip,
 	    "%s.\n", rip->ri_i.i_fmri, cp);
 
 	(void) restarter_instance_update_states(h, rip, RESTARTER_STATE_UNINIT,
-	    RESTARTER_STATE_NONE, RERR_RESTART, "none");
+	    RESTARTER_STATE_NONE, RERR_RESTART, reason);
 
 	/*
 	 * If we did ADMIN_MAINT_ON_IMMEDIATE, then there might still be
@@ -1294,9 +1318,12 @@ again:
  *     ECONNRESET - h was rebound
  */
 static int
-enable_inst(scf_handle_t *h, restarter_inst_t *inst, restarter_event_type_t e)
+enable_inst(scf_handle_t *h, restarter_inst_t *inst,
+    restarter_instance_qentry_t *riq)
 {
 	restarter_instance_state_t state;
+	restarter_event_type_t e = riq->riq_type;
+	restarter_str_t reason = restarter_str_per_configuration;
 	int r;
 
 	assert(MUTEX_HELD(&inst->ri_lock));
@@ -1320,9 +1347,19 @@ enable_inst(scf_handle_t *h, restarter_inst_t *inst, restarter_event_type_t e)
 			log_instance(inst, B_FALSE, "Enabled.");
 			log_framework(LOG_DEBUG, "%s: Instance enabled.\n",
 			    inst->ri_i.i_fmri);
+
+			/*
+			 * If we are coming from DISABLED, it was obviously an
+			 * enable request. If we are coming from UNINIT, it may
+			 * have been a sevice in MAINT that was cleared.
+			 */
+			if (riq->riq_reason == restarter_str_clear_request)
+				reason = restarter_str_clear_request;
+			else if (state == RESTARTER_STATE_DISABLED)
+				reason = restarter_str_enable_request;
 			(void) restarter_instance_update_states(h, inst,
 			    RESTARTER_STATE_OFFLINE, RESTARTER_STATE_NONE,
-			    RERR_NONE, NULL);
+			    RERR_NONE, reason);
 		} else {
 			log_framework(LOG_DEBUG, "Restarter: "
 			    "Not changing state of %s for enable command.\n",
@@ -1352,9 +1389,19 @@ enable_inst(scf_handle_t *h, restarter_inst_t *inst, restarter_event_type_t e)
 			log_instance(inst, B_FALSE, "Disabled.");
 			log_framework(LOG_DEBUG, "%s: Instance disabled.\n",
 			    inst->ri_i.i_fmri);
+
+			/*
+			 * If we are coming from OFFLINE, it was obviously a
+			 * disable request. But if we are coming from
+			 * UNINIT, it may have been a disable request for a
+			 * service in MAINT.
+			 */
+			if (riq->riq_reason == restarter_str_disable_request ||
+			    state == RESTARTER_STATE_OFFLINE)
+				reason = restarter_str_disable_request;
 			(void) restarter_instance_update_states(h, inst,
 			    RESTARTER_STATE_DISABLED, RESTARTER_STATE_NONE,
-			    RERR_RESTART, NULL);
+			    RERR_RESTART, reason);
 			return (0);
 
 		case RESTARTER_STATE_DISABLED:
@@ -1386,9 +1433,11 @@ enable_inst(scf_handle_t *h, restarter_inst_t *inst, restarter_event_type_t e)
 }
 
 static void
-start_instance(scf_handle_t *local_handle, restarter_inst_t *inst)
+start_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
+    int32_t reason)
 {
 	fork_info_t *info;
+	restarter_str_t	new_reason;
 
 	assert(MUTEX_HELD(&inst->ri_lock));
 	assert(instance_in_transition(inst) == 0);
@@ -1396,6 +1445,18 @@ start_instance(scf_handle_t *local_handle, restarter_inst_t *inst)
 
 	log_framework(LOG_DEBUG, "%s: trying to start instance\n",
 	    inst->ri_i.i_fmri);
+
+	/*
+	 * We want to keep the original reason for restarts and clear actions
+	 */
+	switch (reason) {
+	case restarter_str_restart_request:
+	case restarter_str_clear_request:
+		new_reason = reason;
+		break;
+	default:
+		new_reason = restarter_str_dependencies_satisfied;
+	}
 
 	/* Services in the disabled and maintenance state are ignored */
 	if (inst->ri_i.i_state == RESTARTER_STATE_MAINT ||
@@ -1418,13 +1479,14 @@ start_instance(scf_handle_t *local_handle, restarter_inst_t *inst)
 	log_framework(LOG_DEBUG, "%s: starting instance.\n", inst->ri_i.i_fmri);
 
 	(void) restarter_instance_update_states(local_handle, inst,
-	    inst->ri_i.i_state, RESTARTER_STATE_ONLINE, RERR_NONE, "none");
+	    inst->ri_i.i_state, RESTARTER_STATE_ONLINE, RERR_NONE, new_reason);
 
 	info = startd_zalloc(sizeof (fork_info_t));
 
 	info->sf_id = inst->ri_id;
 	info->sf_method_type = METHOD_START;
 	info->sf_event_type = RERR_NONE;
+	info->sf_reason = new_reason;
 	inst->ri_method_thread = startd_thread_create(method_thread, info);
 }
 
@@ -1445,18 +1507,19 @@ event_from_tty(scf_handle_t *h, restarter_inst_t *rip)
 
 static void
 maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
-    const char *aux)
+    restarter_str_t reason)
 {
 	fork_info_t *info;
 	scf_instance_t *scf_inst = NULL;
 
 	assert(MUTEX_HELD(&rip->ri_lock));
-	assert(aux != NULL);
+	assert(reason != restarter_str_none);
 	assert(rip->ri_method_thread == 0);
 
-	log_instance(rip, B_TRUE, "Stopping for maintenance due to %s.", aux);
+	log_instance(rip, B_TRUE, "Stopping for maintenance due to %s.",
+	    restarter_get_str_short(reason));
 	log_framework(LOG_DEBUG, "%s: stopping for maintenance due to %s.\n",
-	    rip->ri_i.i_fmri, aux);
+	    rip->ri_i.i_fmri, restarter_get_str_short(reason));
 
 	/* Services in the maintenance state are ignored */
 	if (rip->ri_i.i_state == RESTARTER_STATE_MAINT) {
@@ -1467,12 +1530,12 @@ maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
 	}
 
 	/*
-	 * If aux state is "service_request" and
+	 * If reason state is restarter_str_service_request and
 	 * restarter_actions/auxiliary_fmri property is set with a valid fmri,
 	 * copy the fmri to restarter/auxiliary_fmri so svcs -x can use.
 	 */
-	if (strcmp(aux, "service_request") == 0 && libscf_fmri_get_instance(h,
-	    rip->ri_i.i_fmri, &scf_inst) == 0) {
+	if (reason == restarter_str_service_request &&
+	    libscf_fmri_get_instance(h, rip->ri_i.i_fmri, &scf_inst) == 0) {
 		if (restarter_inst_validate_ractions_aux_fmri(scf_inst) == 0) {
 			if (restarter_inst_set_aux_fmri(scf_inst))
 				log_framework(LOG_DEBUG, "%s: "
@@ -1504,12 +1567,12 @@ maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
 
 		(void) restarter_instance_update_states(h, rip,
 		    RESTARTER_STATE_MAINT, RESTARTER_STATE_NONE, RERR_RESTART,
-		    (char *)aux);
+		    reason);
 		return;
 	}
 
 	(void) restarter_instance_update_states(h, rip, rip->ri_i.i_state,
-	    RESTARTER_STATE_MAINT, RERR_NONE, (char *)aux);
+	    RESTARTER_STATE_MAINT, RERR_NONE, reason);
 
 	log_transition(rip, MAINT_REQUESTED);
 
@@ -1517,6 +1580,7 @@ maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
 	info->sf_id = rip->ri_id;
 	info->sf_method_type = METHOD_STOP;
 	info->sf_event_type = RERR_RESTART;
+	info->sf_reason = reason;
 	rip->ri_method_thread = startd_thread_create(method_thread, info);
 }
 
@@ -1582,12 +1646,14 @@ rep_retry:
 	if (instance_started(rip)) {
 		/* Refresh does not change the state. */
 		(void) restarter_instance_update_states(h, rip,
-		    rip->ri_i.i_state, rip->ri_i.i_state, RERR_NONE, NULL);
+		    rip->ri_i.i_state, rip->ri_i.i_state, RERR_NONE,
+		    restarter_str_refresh);
 
 		info = startd_zalloc(sizeof (*info));
 		info->sf_id = rip->ri_id;
 		info->sf_method_type = METHOD_REFRESH;
 		info->sf_event_type = RERR_REFRESH;
+		info->sf_reason = NULL;
 
 		assert(rip->ri_method_thread == 0);
 		rip->ri_method_thread =
@@ -1655,11 +1721,11 @@ again:
 		switch (event->riq_type) {
 		case RESTARTER_EVENT_TYPE_ENABLE:
 		case RESTARTER_EVENT_TYPE_DISABLE:
-			(void) enable_inst(h, inst, event->riq_type);
+			(void) enable_inst(h, inst, event);
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_DISABLE:
-			if (enable_inst(h, inst, event->riq_type) == 0)
+			if (enable_inst(h, inst, event) == 0)
 				reset_start_times(inst);
 			break;
 
@@ -1676,33 +1742,35 @@ again:
 			break;
 
 		case RESTARTER_EVENT_TYPE_START:
-			start_instance(h, inst);
+			start_instance(h, inst, event->riq_reason);
 			break;
 
 		case RESTARTER_EVENT_TYPE_DEPENDENCY_CYCLE:
-			maintain_instance(h, inst, 0, "dependency_cycle");
+			maintain_instance(h, inst, 0,
+			    restarter_str_dependency_cycle);
 			break;
 
 		case RESTARTER_EVENT_TYPE_INVALID_DEPENDENCY:
-			maintain_instance(h, inst, 0, "invalid_dependency");
+			maintain_instance(h, inst, 0,
+			    restarter_str_invalid_dependency);
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON:
 			if (event_from_tty(h, inst) == 0)
 				maintain_instance(h, inst, 0,
-				    "service_request");
+				    restarter_str_service_request);
 			else
 				maintain_instance(h, inst, 0,
-				    "administrative_request");
+				    restarter_str_administrative_request);
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON_IMMEDIATE:
 			if (event_from_tty(h, inst) == 0)
 				maintain_instance(h, inst, 1,
-				    "service_request");
+				    restarter_str_service_request);
 			else
 				maintain_instance(h, inst, 1,
-				    "administrative_request");
+				    restarter_str_administrative_request);
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_MAINT_OFF:
@@ -1807,6 +1875,7 @@ restarter_queue_event(restarter_inst_t *ri, restarter_protocol_event_t *e)
 
 	qe = startd_zalloc(sizeof (restarter_instance_qentry_t));
 	qe->riq_type = e->rpe_type;
+	qe->riq_reason = e->rpe_reason;
 
 	uu_list_node_init(qe, &qe->riq_link, restarter_queue_pool);
 	r = uu_list_insert_before(ri->ri_queue, NULL, qe);

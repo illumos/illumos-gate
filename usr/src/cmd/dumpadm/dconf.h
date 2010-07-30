@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_DCONF_H
@@ -71,6 +70,7 @@ extern int dconf_close(dumpconf_t *);
 extern int dconf_write(dumpconf_t *);
 extern int dconf_update(dumpconf_t *, int);
 extern void dconf_print(dumpconf_t *, FILE *);
+extern int dconf_write_uuid(dumpconf_t *);
 
 extern int dconf_str2device(dumpconf_t *, char *);
 extern int dconf_str2savdir(dumpconf_t *, char *);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/fm/protocol.h>
@@ -157,6 +156,10 @@ self_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 
 	if (self_case_lookup(hdl, SC_CLASS, class) != NULL)
 		return; /* case is already open against this class */
+
+	if (strncmp(class, FM_IREPORT_CLASS ".",
+	    sizeof (FM_IREPORT_CLASS)) == 0)
+		return; /* no subscriber required for ireport.* */
 
 	cp = fmd_case_open(hdl, self_case_create(hdl, SC_CLASS, class));
 	fmd_case_add_ereport(hdl, cp, ep);

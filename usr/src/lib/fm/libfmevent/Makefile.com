@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY = libfmevent.a
@@ -29,7 +28,8 @@ VERS = .1
 LIBSRCS = fmev_subscribe.c \
 	fmev_evaccess.c \
 	fmev_errstring.c \
-	fmev_util.c
+	fmev_util.c \
+	fmev_publish.c
 
 OBJECTS = $(LIBSRCS:%.c=%.o)
 
@@ -41,12 +41,15 @@ LIBS = $(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
+C99MODE = $(C99_ENABLE)
+
 CPPFLAGS += -I../common -I.
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
-LDLIBS += -lumem -lnvpair -luutil -lsysevent -lc
+$(DYNLIB) := LDLIBS += -lumem -lnvpair -luutil -lsysevent -L$(ROOTLIBDIR) \
+	-ltopo -lc
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -m64

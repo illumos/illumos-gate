@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSCF_IMPL_H
 #define	_LIBSCF_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libscf.h>
 #include <libscf_priv.h>
@@ -58,7 +55,10 @@ typedef enum {
 	SCF_MSG_PATTERN_LEGACY
 } scf_msg_t;
 
+scf_type_t scf_true_base_type(scf_type_t);
 const char *scf_get_msg(scf_msg_t);
+int ismember(const scf_error_t, const scf_error_t[]);
+int32_t state_from_string(const char *, size_t);
 
 #ifdef	__cplusplus
 }

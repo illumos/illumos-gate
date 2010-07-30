@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -35,6 +34,7 @@
 #include <strings.h>
 #include <synch.h>
 #include <pthread.h>
+#include <signal.h>
 #include <thread.h>
 #include <libnvpair.h>
 #include <assert.h>
@@ -763,6 +763,10 @@ subscriber_event_handler(sysevent_handle_t *shp)
 	sysevent_queue_t *evqp;
 
 	sub_info = (subscriber_priv_t *)SH_PRIV_DATA(shp);
+
+	/* See hack alert in sysevent_bind_subscriber_cmn */
+	if (sub_info->sp_handler_tid == NULL)
+		sub_info->sp_handler_tid = thr_self();
 
 	(void) mutex_lock(&sub_info->sp_qlock);
 	for (;;) {
@@ -2038,18 +2042,72 @@ fail:
 	return (-1);
 }
 
-/*
- * sysevent_bind_subscriber - Bind an event receiver to an event channel
- */
-int
-sysevent_bind_subscriber(sysevent_handle_t *shp,
-	void (*event_handler)(sysevent_t *ev))
+static pthread_once_t xdoor_thrattr_once = PTHREAD_ONCE_INIT;
+static pthread_attr_t xdoor_thrattr;
+
+static void
+xdoor_thrattr_init(void)
+{
+	(void) pthread_attr_init(&xdoor_thrattr);
+	(void) pthread_attr_setdetachstate(&xdoor_thrattr,
+	    PTHREAD_CREATE_DETACHED);
+	(void) pthread_attr_setscope(&xdoor_thrattr, PTHREAD_SCOPE_SYSTEM);
+}
+
+static int
+xdoor_server_create(door_info_t *dip, void *(*startf)(void *),
+    void *startfarg, void *cookie)
+{
+	struct sysevent_subattr_impl *xsa = cookie;
+	pthread_attr_t *thrattr;
+	sigset_t oset;
+	int err;
+
+	if (xsa->xs_thrcreate) {
+		return (xsa->xs_thrcreate(dip, startf, startfarg,
+		    xsa->xs_thrcreate_cookie));
+	}
+
+	if (xsa->xs_thrattr == NULL) {
+		(void) pthread_once(&xdoor_thrattr_once, xdoor_thrattr_init);
+		thrattr = &xdoor_thrattr;
+	} else {
+		thrattr = xsa->xs_thrattr;
+	}
+
+	(void) pthread_sigmask(SIG_SETMASK, &xsa->xs_sigmask, &oset);
+	err = pthread_create(NULL, thrattr, startf, startfarg);
+	(void) pthread_sigmask(SIG_SETMASK, &oset, NULL);
+
+	return (err == 0 ? 1 : -1);
+}
+
+static void
+xdoor_server_setup(void *cookie)
+{
+	struct sysevent_subattr_impl *xsa = cookie;
+
+	if (xsa->xs_thrsetup) {
+		xsa->xs_thrsetup(xsa->xs_thrsetup_cookie);
+	} else {
+		(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+		(void) pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+	}
+}
+
+static int
+sysevent_bind_subscriber_cmn(sysevent_handle_t *shp,
+	void (*event_handler)(sysevent_t *ev),
+	sysevent_subattr_t *subattr)
 {
 	int fd = -1;
 	int error = 0;
 	uint32_t sub_id = 0;
 	char door_name[MAXPATHLEN];
 	subscriber_priv_t *sub_info;
+	int created;
+	struct sysevent_subattr_impl *xsa =
+	    (struct sysevent_subattr_impl *)subattr;
 
 	if (shp == NULL || event_handler == NULL) {
 		errno = EINVAL;
@@ -2124,8 +2182,18 @@ sysevent_bind_subscriber(sysevent_handle_t *shp,
 	 * syseventd will use this door service to propagate
 	 * events to the client.
 	 */
-	if ((SH_DOOR_DESC(shp) = door_create(event_deliver_service,
-	    (void *)shp, DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
+	if (subattr == NULL) {
+		SH_DOOR_DESC(shp) = door_create(event_deliver_service,
+		    (void *)shp, DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
+	} else {
+		SH_DOOR_DESC(shp) = door_xcreate(event_deliver_service,
+		    (void *)shp,
+		    DOOR_REFUSE_DESC | DOOR_NO_CANCEL | DOOR_NO_DEPLETION_CB,
+		    xdoor_server_create, xdoor_server_setup,
+		    (void *)subattr, 1);
+	}
+
+	if (SH_DOOR_DESC(shp) == -1) {
 		dprint("sysevent_bind_subscriber: door create failed: "
 		    "%s\n", strerror(errno));
 		error = EFAULT;
@@ -2151,10 +2219,33 @@ sysevent_bind_subscriber(sysevent_handle_t *shp,
 	SH_TYPE(shp) = SUBSCRIBER;
 	SH_PRIV_DATA(shp) = (void *)sub_info;
 
-
 	/* Create an event handler thread */
-	if (thr_create(NULL, NULL, (void *(*)(void *))subscriber_event_handler,
-	    shp, THR_BOUND, &sub_info->sp_handler_tid) != 0) {
+	if (xsa == NULL || xsa->xs_thrcreate == NULL) {
+		created = thr_create(NULL, NULL,
+		    (void *(*)(void *))subscriber_event_handler,
+		    shp, THR_BOUND, &sub_info->sp_handler_tid) == 0;
+	} else {
+		/*
+		 * A terrible hack.  We will use the extended private
+		 * door thread creation function the caller passed in to
+		 * create the event handler thread.  That function will
+		 * be called with our chosen thread start function and arg
+		 * instead of the usual libc-provided ones, but that's ok
+		 * as it is required to use them verbatim anyway.  We will
+		 * pass a NULL door_info_t pointer to the function - so
+		 * callers depending on this hack had better be prepared
+		 * for that.  All this allow the caller to rubberstamp
+		 * the created thread as it wishes.  But we don't get
+		 * the created threadid with this, so we modify the
+		 * thread start function to stash it.
+		 */
+
+		created = xsa->xs_thrcreate(NULL,
+		    (void *(*)(void *))subscriber_event_handler,
+		    shp, xsa->xs_thrcreate_cookie) == 1;
+	}
+
+	if (!created) {
 		error = EFAULT;
 		goto fail;
 	}
@@ -2187,6 +2278,27 @@ fail:
 	errno = error;
 
 	return (-1);
+}
+
+/*
+ * sysevent_bind_subscriber - Bind an event receiver to an event channel
+ */
+int
+sysevent_bind_subscriber(sysevent_handle_t *shp,
+	void (*event_handler)(sysevent_t *ev))
+{
+	return (sysevent_bind_subscriber_cmn(shp, event_handler, NULL));
+}
+
+/*
+ * sysevent_bind_xsubscriber - Bind a subscriber using door_xcreate with
+ * attributes specified.
+ */
+int
+sysevent_bind_xsubscriber(sysevent_handle_t *shp,
+	void (*event_handler)(sysevent_t *ev), sysevent_subattr_t *subattr)
+{
+	return (sysevent_bind_subscriber_cmn(shp, event_handler, subattr));
 }
 
 /*
@@ -2389,7 +2501,6 @@ sysevent_unbind_subscriber(sysevent_handle_t *shp)
 	(void) door_revoke(SH_DOOR_DESC(shp));
 	(void) fdetach(SH_DOOR_NAME(shp));
 
-
 	/*
 	 * Release resources and wait for pending event delivery to
 	 * complete.
@@ -2399,7 +2510,8 @@ sysevent_unbind_subscriber(sysevent_handle_t *shp)
 	/* Signal event handler and drain the subscriber's event queue */
 	(void) cond_signal(&sub_info->sp_cv);
 	(void) mutex_unlock(&sub_info->sp_qlock);
-	(void) thr_join(sub_info->sp_handler_tid, NULL, NULL);
+	if (sub_info->sp_handler_tid != NULL)
+		(void) thr_join(sub_info->sp_handler_tid, NULL, NULL);
 
 	(void) cond_destroy(&sub_info->sp_cv);
 	(void) mutex_destroy(&sub_info->sp_qlock);
@@ -2447,12 +2559,9 @@ sysevent_unbind_publisher(sysevent_handle_t *shp)
  * Evolving APIs to subscribe to syseventd(1M) system events.
  */
 
-/*
- * sysevent_bind_handle - Bind application event handler for syseventd
- *		subscription.
- */
-sysevent_handle_t *
-sysevent_bind_handle(void (*event_handler)(sysevent_t *ev))
+static sysevent_handle_t *
+sysevent_bind_handle_cmn(void (*event_handler)(sysevent_t *ev),
+    sysevent_subattr_t *subattr)
 {
 	sysevent_handle_t *shp;
 
@@ -2470,8 +2579,7 @@ sysevent_bind_handle(void (*event_handler)(sysevent_t *ev))
 		return (NULL);
 	}
 
-	if (sysevent_bind_subscriber(shp, event_handler) != 0) {
-
+	if (sysevent_bind_xsubscriber(shp, event_handler, subattr) != 0) {
 		/*
 		 * Ask syseventd to clean-up any stale subcribers and try to
 		 * to bind again
@@ -2496,7 +2604,8 @@ sysevent_bind_handle(void (*event_handler)(sysevent_t *ev))
 			(void) close(pub_fd);
 
 			/* Try to bind again */
-			if (sysevent_bind_subscriber(shp, event_handler) != 0) {
+			if (sysevent_bind_xsubscriber(shp, event_handler,
+			    subattr) != 0) {
 				sysevent_close_channel(shp);
 				return (NULL);
 			}
@@ -2507,6 +2616,27 @@ sysevent_bind_handle(void (*event_handler)(sysevent_t *ev))
 	}
 
 	return (shp);
+}
+
+/*
+ * sysevent_bind_handle - Bind application event handler for syseventd
+ *		subscription.
+ */
+sysevent_handle_t *
+sysevent_bind_handle(void (*event_handler)(sysevent_t *ev))
+{
+	return (sysevent_bind_handle_cmn(event_handler, NULL));
+}
+
+/*
+ * sysevent_bind_xhandle - Bind application event handler for syseventd
+ *		subscription, using door_xcreate and attributes as specified.
+ */
+sysevent_handle_t *
+sysevent_bind_xhandle(void (*event_handler)(sysevent_t *ev),
+    sysevent_subattr_t *subattr)
+{
+	return (sysevent_bind_handle_cmn(event_handler, subattr));
 }
 
 /*

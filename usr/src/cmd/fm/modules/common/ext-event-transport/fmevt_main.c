@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -32,6 +31,12 @@ const fmd_prop_t fmevt_props[] = {
 	{ "protocol_forward_disable", FMD_TYPE_BOOL, "false" },
 	{ "outbound_channel", FMD_TYPE_STRING, FMD_SNOOP_CHANNEL },
 	{ "outbound_channel_depth", FMD_TYPE_INT32, "256" },
+	{ "user_priv_highval_channel", FMD_TYPE_STRING,
+	    FMEV_CHAN_USER_PRIV_HV },
+	{ "user_priv_lowval_channel", FMD_TYPE_STRING,
+	    FMEV_CHAN_USER_PRIV_LV },
+	{ "sidprefix", FMD_TYPE_STRING, "fmd" },
+	{ "inbound_postprocess_smf", FMD_TYPE_BOOL, "true" },
 	{ NULL, 0, NULL },
 };
 
@@ -46,8 +51,10 @@ static const fmd_hdl_ops_t fmd_ops = {
 };
 
 static const fmd_hdl_info_t fmd_info = {
-	"External FM event transport", "0.1", &fmd_ops, fmevt_props
+	"External FM event transport", "0.2", &fmd_ops, fmevt_props
 };
+
+fmd_hdl_t *fmevt_hdl;
 
 void
 _fmd_init(fmd_hdl_t *hdl)
@@ -60,11 +67,15 @@ _fmd_init(fmd_hdl_t *hdl)
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return;
 
+	fmevt_hdl = hdl;
+
 	fmevt_init_outbound(hdl);
+	fmevt_init_inbound(hdl);
 }
 
 void
 _fmd_fini(fmd_hdl_t *hdl)
 {
 	fmevt_fini_outbound(hdl);
+	fmevt_fini_inbound(hdl);
 }

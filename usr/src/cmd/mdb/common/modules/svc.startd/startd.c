@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 
@@ -59,6 +56,14 @@ startd_status(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	u_longlong_t lookups;
 	u_longlong_t dep_inserts, dep_cycle_ns, dep_insert_ns;
 	size_t graph_num, restarter_num;
+	uint64_t ct_maint;
+	uint64_t ct_hwerr;
+	uint64_t ct_service;
+	uint64_t ct_global;
+	uint64_t ct_noprefs;
+	uint64_t ct_from_uninit;
+	uint64_t ct_bad_state;
+	uint64_t ct_ovr_prefs;
 
 	if (mdb_readvar(&lookups, "dictionary_lookups") == -1) {
 		mdb_warn("failed to read 'dictionary_lookups' value\n");
@@ -109,18 +114,71 @@ startd_status(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if (mdb_readvar(&ct_maint, "stev_ct_maint") == -1) {
+		mdb_warn("failed to read 'stev_ct_maint'\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&ct_hwerr, "stev_ct_hwerr") == -1) {
+		mdb_warn("failed to read 'stev_ct_hwerr'\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&ct_service, "stev_ct_service") == -1) {
+		mdb_warn("failed to read 'stev_ct_service'\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&ct_global, "stev_ct_global") == -1) {
+		mdb_warn("failed to read 'stev_ct_global'\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&ct_noprefs, "stev_ct_noprefs") == -1) {
+		mdb_warn("failed to read 'stev_ct_noprefs'\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&ct_from_uninit, "stev_ct_from_uninit") == -1) {
+		mdb_warn("failed to read 'stev_ct_from_uninit'\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&ct_bad_state, "stev_ct_bad_state") == -1) {
+		mdb_warn("failed to read 'stev_ct_bad_state'\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&ct_ovr_prefs, "stev_ct_ovr_prefs") == -1) {
+		mdb_warn("failed to read 'stev_ct_ovr_prefs'\n");
+		return (DCMD_ERR);
+	}
+
 	mdb_printf(
-	    "         dictionary lookups: %llu\n"
-	    "        average lookup time: %llu us\n"
-	    "graph dependency insertions: %llu\n"
-	    "   average cycle-check time: %llu us\n"
-	    " avg dependency insert time: %llu us\n"
-	    "number of nodes in dgraph: %llu\n"
-	    "number of nodes in instance_list: %llu\n", lookups,
+	    "General stats\n"
+	    "              dictionary lookups: %llu\n"
+	    "             average lookup time: %llu us\n"
+	    "     graph dependency insertions: %llu\n"
+	    "        average cycle-check time: %llu us\n"
+	    "      avg dependency insert time: %llu us\n"
+	    "       number of nodes in dgraph: %llu\n"
+	    "number of nodes in instance_list: %llu\n"
+	    "\nState Transition Events\n"
+	    "                     maintenance: %llu\n"
+	    "                  hardware error: %llu\n"
+	    "           service specific pref: %llu\n"
+	    "                system wide pref: %llu\n"
+	    "            no prefs, not raised: %llu\n"
+	    "          from unint, not raised: %llu\n"
+	    "           bad state, not raised: %llu\n"
+	    "           override pref, raised: %llu\n", lookups,
 	    lookups ? ns_total / (1000 * lookups) : 0, dep_inserts,
 	    dep_inserts ? dep_cycle_ns / (1000 * dep_inserts) : 0,
 	    dep_inserts ? dep_insert_ns / (1000 * dep_inserts) : 0,
-	    (u_longlong_t)graph_num, (u_longlong_t)restarter_num);
+	    (u_longlong_t)graph_num, (u_longlong_t)restarter_num,
+	    ct_maint, ct_hwerr, ct_service, ct_global, ct_noprefs,
+	    ct_from_uninit, ct_bad_state, ct_ovr_prefs);
+
 
 	return (DCMD_OK);
 }

@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG= logadm
@@ -40,6 +39,18 @@ $(ROOTETC)/$(CONFIGFILE):= FILEMODE= 644
 
 CLOBBERFILES += $(TESTS)
 
+LOGADMDIR = $(ROOT)/etc/logadm.d
+
+MFSTFILES =	logadm-upgrade.xml
+MANIFESTDIR =	$(ROOT)/lib/svc/manifest/system
+MANIFEST =	$(MFSTFILES:%=$(MANIFESTDIR)/%)
+$(MANIFEST) :=	FILEMODE = 0444
+
+METHODFILES =	logadm-upgrade
+METHODDIR =	$(ROOT)/lib/svc/method
+METHOD =	$(METHODFILES:%=$(METHODDIR)/%)
+$(METHOD) :=	FILEMODE = 0555
+
 .KEEP_STATE:
 
 all: $(PROG)
@@ -51,7 +62,23 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTUSRSBINPROG) $(ROOTETC)/$(CONFIGFILE)
+install: all $(ROOTUSRSBINPROG) $(ROOTETC)/$(CONFIGFILE) $(LOGADMDIR) \
+             $(MANIFESTDIR) $(MANIFEST) $(METHODDIR) $(METHOD)
+
+$(LOGADMDIR):
+	$(INS.dir)
+
+$(MANIFESTDIR):
+	$(INS.dir)
+
+$(MANIFESTDIR)/% : %
+	$(INS.file)
+
+$(METHODDIR):
+	$(INS.dir)
+
+$(METHODDIR)/% : %
+	$(INS.file)
 
 $(POFILE): $(POFILES)
 	$(RM) $@
