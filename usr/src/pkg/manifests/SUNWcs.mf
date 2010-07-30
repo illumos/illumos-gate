@@ -406,7 +406,7 @@ file path=etc/init.d/ufs_quota group=sys mode=0744 preserve=true
 file path=etc/inittab group=sys preserve=true
 file path=etc/ioctl.syscon group=sys preserve=true
 file path=etc/ksh.kshrc group=sys preserve=renameold
-file path=etc/logadm.conf group=sys preserve=true
+file path=etc/logadm.conf group=sys preserve=true timestamp=19700101T000000Z
 file path=etc/logindevperm group=sys preserve=true
 file path=etc/magic mode=0444
 file path=etc/mail/mailx.rc preserve=true
