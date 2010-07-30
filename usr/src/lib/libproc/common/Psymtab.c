@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -636,7 +635,7 @@ Paddr_to_text_map(struct ps_prochandle *P, uintptr_t addr)
 		 */
 		if (fptr != NULL && fptr->file_lo != NULL &&
 		    (fptr->file_lo->rl_data_base == NULL ||
-		    pmp->pr_vaddr + pmp->pr_size <
+		    pmp->pr_vaddr + pmp->pr_size <=
 		    fptr->file_lo->rl_data_base))
 			return (pmp);
 	}
