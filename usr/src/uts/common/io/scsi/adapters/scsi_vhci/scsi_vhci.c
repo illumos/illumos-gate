@@ -5097,6 +5097,8 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	psd = svp->svp_psd;
 	ASSERT(psd != NULL);
 
+	ap = &psd->sd_address;
+
 	/*
 	 * Get inquiry data into pathinfo related scsi_device structure.
 	 * Free sq_inq when pathinfo related scsi_device structure is destroyed
@@ -5207,7 +5209,6 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 			 * IBM Shark storage does not clear RESERVE upon
 			 * host reboot.
 			 */
-			ap = &psd->sd_address;
 			pkt = scsi_init_pkt(ap, NULL, NULL, CDB_GROUP0,
 			    sizeof (struct scsi_arq_status), 0, 0,
 			    SLEEP_FUNC, NULL);
