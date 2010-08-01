@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * SCSI (SCSA) midlayer interface for PMC drier.
@@ -67,9 +66,10 @@ struct pmcs_cmd {
 #define	SCSA_STSLEN(sp)		sp->cmd_pkt->pkt_scblen
 #define	SCSA_TGTLEN(sp)		sp->cmd_pkt->pkt_tgtlen
 
-#define	PMCS_WQ_RUN_SUCCESS	0
-#define	PMCS_WQ_RUN_FAIL_RES	1 /* Failed to alloc rsrcs (e.g. DMA chunks) */
-#define	PMCS_WQ_RUN_FAIL_OTHER	2 /* Any other failure */
+#define	PMCS_WQ_RUN_SUCCESS		0
+#define	PMCS_WQ_RUN_FAIL_RES		1 /* Failed to alloc rsrcs */
+#define	PMCS_WQ_RUN_FAIL_RES_CMP	2 /* Failed rsrcs, but put on the CQ */
+#define	PMCS_WQ_RUN_FAIL_OTHER		3 /* Any other failure */
 
 int pmcs_scsa_init(pmcs_hw_t *, const ddi_dma_attr_t *);
 

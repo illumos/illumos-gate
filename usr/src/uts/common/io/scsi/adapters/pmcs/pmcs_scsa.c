@@ -1644,7 +1644,9 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 		if (xp->dtype == SAS) {
 			pwrk->ptr = (void *) pmcs_SAS_done;
 			if ((rval = pmcs_SAS_run(sp, pwrk)) != 0) {
-				sp->cmd_tag = NULL;
+				if (rval != PMCS_WQ_RUN_FAIL_RES_CMP) {
+					sp->cmd_tag = NULL;
+				}
 				pmcs_dec_phy_ref_count(phyp);
 				pmcs_pwork(pwp, pwrk);
 				SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
@@ -1900,6 +1902,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 			if (STAILQ_EMPTY(&xp->wq)) {
 				STAILQ_INSERT_HEAD(&xp->wq, sp, cmd_next);
 				mutex_exit(&xp->wqlock);
+				return (PMCS_WQ_RUN_FAIL_RES);
 			} else {
 				mutex_exit(&xp->wqlock);
 				CMD2PKT(sp)->pkt_scbp[0] = STATUS_QFULL;
@@ -1907,6 +1910,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 				CMD2PKT(sp)->pkt_state |= STATE_GOT_BUS |
 				    STATE_GOT_TARGET | STATE_SENT_CMD |
 				    STATE_GOT_STATUS;
+				sp->cmd_tag = NULL;
 				mutex_enter(&pwp->cq_lock);
 				STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 				PMCS_CQ_RUN_LOCKED(pwp);
@@ -1914,8 +1918,8 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 				    "%s: Failed to dma_load for tgt %d (QF)",
 				    __func__, xp->target_num);
+				return (PMCS_WQ_RUN_FAIL_RES_CMP);
 			}
-			return (PMCS_WQ_RUN_FAIL_RES);
 		}
 	} else {
 		ptr[4] = LE_32(PMCIN_DATADIR_NONE);
