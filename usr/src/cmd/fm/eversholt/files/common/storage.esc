@@ -30,6 +30,7 @@
  */
 
 event fault.config.fan-fail@ses-enclosure;
+event fault.config.fantray-fail@ses-enclosure;
 event fault.config.psu-fail@ses-enclosure;
 event fault.device.controller.fail@controller;
 event fault.device.ethernet.fail@controller;
@@ -45,11 +46,6 @@ event fault.io.i2c.fail@fanboard;
 event fault.io.i2c.fail@fanmodule;
 event fault.io.i2c.fail@powerboard;
 event fault.io.i2c.fail@psu;
-event fault.io.i2c.poweron-fail@controller;
-event fault.io.i2c.poweron-fail@fanboard;
-event fault.io.i2c.poweron-fail@fanmodule;
-event fault.io.i2c.poweron-fail@powerboard;
-event fault.io.i2c.poweron-fail@psu;
 event fault.io.sas.log.fatal@sas-expander;
 event fault.io.sas.log.non-fatal@sas-expander;
 event fault.power.ext-fail@ses-enclosure;
@@ -76,6 +72,7 @@ event fault.temp.fail@psu;
  */
 
 event ereport.chassis.config.missing-fan@ses-enclosure;
+event ereport.chassis.config.missing-fantray@ses-enclosure;
 event ereport.chassis.config.missing-psu@ses-enclosure;
 event ereport.chassis.device.ecb.shutoff@controller;
 event ereport.chassis.device.ethernet.link-down@controller;
@@ -93,11 +90,6 @@ event ereport.chassis.io.i2c.fail@fanboard;
 event ereport.chassis.io.i2c.fail@fanmodule;
 event ereport.chassis.io.i2c.fail@powerboard;
 event ereport.chassis.io.i2c.fail@psu;
-event ereport.chassis.io.i2c.poweron-fail@controller;
-event ereport.chassis.io.i2c.poweron-fail@fanboard;
-event ereport.chassis.io.i2c.poweron-fail@fanmodule;
-event ereport.chassis.io.i2c.poweron-fail@powerboard;
-event ereport.chassis.io.i2c.poweron-fail@psu;
 event ereport.chassis.post.device.fail@controller;
 event ereport.chassis.post.device.fail@fan;
 event ereport.chassis.post.device.fail@fanmodule;
@@ -172,25 +164,6 @@ prop fault.io.i2c.fail@psu ->
     ereport.chassis.io.i2c.fail@psu;
 
 /*
- * I2C transaction failure during power-on
- */
-
-prop fault.io.i2c.poweron-fail@controller ->
-    ereport.chassis.io.i2c.poweron-fail@controller;
-  
-prop fault.io.i2c.poweron-fail@fanboard ->
-    ereport.chassis.io.i2c.poweron-fail@fanboard;
-
-prop fault.io.i2c.poweron-fail@fanmodule ->
-    ereport.chassis.io.i2c.poweron-fail@fanmodule;
-
-prop fault.io.i2c.poweron-fail@powerboard ->
-    ereport.chassis.io.i2c.poweron-fail@powerboard;
-
-prop fault.io.i2c.poweron-fail@psu ->
-    ereport.chassis.io.i2c.poweron-fail@psu;
-
-/*
  * Chassis ID unusable failure
  */
 
@@ -202,10 +175,19 @@ prop fault.device.unusable-chassis-id@fanboard ->
  */
 
 prop fault.config.psu-fail@ses-enclosure ->
-    ereport.chassis.config.missing-psu@ses-enclosure;
+    ereport.chassis.config.missing-psu@ses-enclosure{
+    setpayloadprop("min-required", payloadprop("min-required")) &&
+    setpayloadprop("devices", payloadprop("devices"))};
 
 prop fault.config.fan-fail@ses-enclosure ->
-    ereport.chassis.config.missing-fan@ses-enclosure;
+    ereport.chassis.config.missing-fan@ses-enclosure{
+    setpayloadprop("min-required", payloadprop("min-required")) &&
+    setpayloadprop("devices", payloadprop("devices"))};
+
+prop fault.config.fantray-fail@ses-enclosure ->
+    ereport.chassis.config.missing-fantray@ses-enclosure{
+    setpayloadprop("min-required", payloadprop("min-required")) &&
+    setpayloadprop("devices", payloadprop("devices"))};
 
 /*
  * Fan failure
@@ -318,7 +300,8 @@ prop fault.sp.unavailable@controller ->
  */
 
 prop fault.sp.svc-fail@controller ->
-    ereport.chassis.sp.svc-restart@controller;
+    ereport.chassis.sp.svc-restart@controller{
+    setpayloadprop("service", payloadprop("service"))};
 
 /*
  * SAS Expander Log failure
