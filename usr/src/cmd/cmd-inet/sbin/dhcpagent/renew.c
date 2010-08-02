@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <time.h>
@@ -34,6 +31,7 @@
 #include <netinet/udp_var.h>
 #include <libinetutil.h>
 #include <dhcpmsg.h>
+#include <dhcp_hostconf.h>
 #include <string.h>
 
 #include "packet.h"
@@ -274,6 +272,8 @@ dhcp_finish_expire(dhcp_smach_t *dsmp, void *arg)
 		    dsmp->dsm_name);
 		return (1);
 	}
+
+	(void) remove_hostconf(dsmp->dsm_name, dsmp->dsm_isv6);
 
 	dhcpmsg(MSG_INFO, "last lease expired on %s -- restarting DHCP",
 	    dsmp->dsm_name);

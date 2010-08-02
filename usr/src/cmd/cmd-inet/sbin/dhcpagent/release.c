@@ -19,13 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * DECLINE/RELEASE configuration functionality for the DHCP client.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -156,6 +153,8 @@ dhcp_release(dhcp_smach_t *dsmp, void *arg)
 	    dsmp->dsm_name);
 	(void) set_smach_state(dsmp, RELEASING);
 
+	(void) remove_hostconf(dsmp->dsm_name, dsmp->dsm_isv6);
+
 	if (dsmp->dsm_isv6) {
 		dpkt = init_pkt(dsmp, DHCPV6_MSG_RELEASE);
 		(void) add_pkt_opt(dpkt, DHCPV6_OPT_SERVERID,
@@ -237,24 +236,7 @@ dhcp_drop(dhcp_smach_t *dsmp, void *arg)
 			    "used bootp; not writing lease file for %s",
 			    dsmp->dsm_name);
 		} else {
-			PKT_LIST *plp[2];
-			const char *hcfile;
-
-			hcfile = ifname_to_hostconf(dsmp->dsm_name,
-			    dsmp->dsm_isv6);
-			plp[0] = dsmp->dsm_ack;
-			plp[1] = dsmp->dsm_orig_ack;
-			if (write_hostconf(dsmp->dsm_name, plp, 2,
-			    monosec_to_time(dsmp->dsm_curstart_monosec),
-			    dsmp->dsm_isv6) != -1) {
-				dhcpmsg(MSG_DEBUG, "wrote lease to %s", hcfile);
-			} else if (errno == EROFS) {
-				dhcpmsg(MSG_DEBUG, "%s is on a read-only file "
-				    "system; not saving lease", hcfile);
-			} else {
-				dhcpmsg(MSG_ERR, "cannot write %s (reboot will "
-				    "not use cached configuration)", hcfile);
-			}
+			write_lease_to_hostconf(dsmp);
 		}
 	} else {
 		dhcpmsg(MSG_DEBUG, "%s in state %s; not saving lease",
