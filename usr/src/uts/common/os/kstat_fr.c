@@ -807,6 +807,7 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 	time_t zone_boot_time;
 	clock_t zone_lbolt;
 	hrtime_t zone_hrtime;
+	size_t zone_nproc;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
@@ -832,9 +833,10 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 		mutex_exit(&cpu_lock);
 	}
 
-	if (curproc->p_zone->zone_id == 0) {
+	if (INGLOBALZONE(curproc)) {
 		zone_boot_time = boot_time;
 		zone_lbolt = ddi_get_lbolt();
+		zone_nproc = nproc;
 	} else {
 		struct timeval tvp;
 		hrt2tv(curproc->p_zone->zone_zsched->p_mstart, &tvp);
@@ -843,6 +845,9 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 		zone_hrtime = gethrtime();
 		zone_lbolt = (clock_t)(NSEC_TO_TICK(zone_hrtime) -
 		    NSEC_TO_TICK(curproc->p_zone->zone_zsched->p_mstart));
+		mutex_enter(&curproc->p_zone->zone_nlwps_lock);
+		zone_nproc = curproc->p_zone->zone_nprocs;
+		mutex_exit(&curproc->p_zone->zone_nlwps_lock);
 	}
 
 	system_misc_kstat.ncpus.value.ui32		= (uint32_t)myncpus;
@@ -850,7 +855,7 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 	system_misc_kstat.deficit.value.ui32		= (uint32_t)deficit;
 	system_misc_kstat.clk_intr.value.ui32		= (uint32_t)zone_lbolt;
 	system_misc_kstat.vac.value.ui32		= (uint32_t)vac;
-	system_misc_kstat.nproc.value.ui32		= (uint32_t)nproc;
+	system_misc_kstat.nproc.value.ui32		= (uint32_t)zone_nproc;
 	system_misc_kstat.avenrun_1min.value.ui32	= (uint32_t)loadavgp[0];
 	system_misc_kstat.avenrun_5min.value.ui32	= (uint32_t)loadavgp[1];
 	system_misc_kstat.avenrun_15min.value.ui32	= (uint32_t)loadavgp[2];
