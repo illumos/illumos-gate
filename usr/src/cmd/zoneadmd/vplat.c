@@ -3107,17 +3107,25 @@ remove_datalink_protect(zlog_t *zlogp, zoneid_t zoneid)
 	}
 
 	for (i = 0, dllink = dllinks; i < dlnum; i++, dllink++) {
+		char dlerr[DLADM_STRSIZE];
+
 		dlstatus = dladm_set_linkprop(dld_handle, *dllink,
 		    "protection", NULL, 0, DLADM_OPT_ACTIVE);
+		if (dlstatus == DLADM_STATUS_NOTFOUND) {
+			/* datalink does not belong to the GZ */
+			continue;
+		}
 		if (dlstatus != DLADM_STATUS_OK) {
-			zerror(zlogp, B_TRUE, "could not reset protection\n");
+			zerror(zlogp, B_FALSE,
+			    dladm_status2str(dlstatus, dlerr));
 			free(dllinks);
 			return (-1);
 		}
 		dlstatus = dladm_set_linkprop(dld_handle, *dllink,
 		    "allowed-ips", NULL, 0, DLADM_OPT_ACTIVE);
 		if (dlstatus != DLADM_STATUS_OK) {
-			zerror(zlogp, B_TRUE, "could not reset allowed-ips\n");
+			zerror(zlogp, B_FALSE,
+			    dladm_status2str(dlstatus, dlerr));
 			free(dllinks);
 			return (-1);
 		}

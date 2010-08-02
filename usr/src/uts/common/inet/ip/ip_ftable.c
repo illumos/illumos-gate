@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1446,6 +1445,15 @@ ire_route_recursive_impl_v4(ire_t *ire,
 			goto error;
 
 		ASSERT(!(ire->ire_type & IRE_MULTICAST)); /* Not in ftable */
+		/*
+		 * Verify that the IRE_IF_CLONE has a consistent generation
+		 * number.
+		 */
+		if ((ire->ire_type & IRE_IF_CLONE) && !ire_clone_verify(ire)) {
+			ire_refrele(ire);
+			ire = NULL;
+			continue;
+		}
 
 		/*
 		 * Don't allow anything unusual past the first iteration.
@@ -1713,28 +1721,29 @@ ire_route_recursive_dstonly_v4(ipaddr_t nexthop, uint_t irr_flags,
 	ire = ire_ftable_lookup_simple_v4(nexthop, xmit_hint, ipst,
 	    &generation);
 	ASSERT(ire != NULL);
-
-	/*
-	 * If this type should have an ire_nce_cache (even if it
-	 * doesn't yet have one) then we are done. Includes
-	 * IRE_INTERFACE with a full 32 bit mask.
-	 */
-	if (ire->ire_nce_capable)
-		return (ire);
-
 	/*
 	 * If the IRE has a current cached parent we know that the whole
 	 * parent chain is current, hence we don't need to discover and
 	 * build any dependencies by doing a recursive lookup.
 	 */
 	mutex_enter(&ire->ire_lock);
-	if (ire->ire_dep_parent != NULL &&
-	    ire->ire_dep_parent->ire_generation ==
-	    ire->ire_dep_parent_generation) {
+	if (ire->ire_dep_parent != NULL) {
+		if (ire->ire_dep_parent->ire_generation ==
+		    ire->ire_dep_parent_generation) {
+			mutex_exit(&ire->ire_lock);
+			return (ire);
+		}
 		mutex_exit(&ire->ire_lock);
-		return (ire);
+	} else {
+		mutex_exit(&ire->ire_lock);
+		/*
+		 * If this type should have an ire_nce_cache (even if it
+		 * doesn't yet have one) then we are done. Includes
+		 * IRE_INTERFACE with a full 32 bit mask.
+		 */
+		if (ire->ire_nce_capable)
+			return (ire);
 	}
-	mutex_exit(&ire->ire_lock);
 
 	/*
 	 * Fallback to loop in the normal code starting with the ire
@@ -1745,4 +1754,25 @@ ire_route_recursive_dstonly_v4(ipaddr_t nexthop, uint_t irr_flags,
 	    &generation);
 	ire_refrele(ire);
 	return (ire1);
+}
+
+/*
+ * Verify that the generation numbers in the chain leading to an IRE_IF_CLONE
+ * are consistent. Return FALSE (and delete the IRE_IF_CLONE) if they
+ * are not consistent, and TRUE otherwise.
+ */
+boolean_t
+ire_clone_verify(ire_t *ire)
+{
+	ASSERT((ire->ire_type & IRE_IF_CLONE) != 0);
+	mutex_enter(&ire->ire_lock);
+	if (ire->ire_dep_parent != NULL &&
+	    ire->ire_dep_parent->ire_generation !=
+	    ire->ire_dep_parent_generation) {
+		mutex_exit(&ire->ire_lock);
+		ire_delete(ire);
+		return (B_FALSE);
+	}
+	mutex_exit(&ire->ire_lock);
+	return (B_TRUE);
 }

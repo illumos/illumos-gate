@@ -9378,7 +9378,7 @@ ip_input_options(ipha_t *ipha, ipaddr_t dst, mblk_t *mp,
 			 */
 			if (optval == IPOPT_SSRR) {
 				ire = ire_ftable_lookup_v4(dst, 0, 0,
-				    IRE_IF_ALL, NULL, ALL_ZONES,
+				    IRE_INTERFACE, NULL, ALL_ZONES,
 				    ira->ira_tsl,
 				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, 0, ipst,
 				    NULL);
@@ -12915,7 +12915,8 @@ ip_output_options(mblk_t *mp, ipha_t *ipha, ip_xmit_attr_t *ixa, ill_t *ill)
 			 */
 			if (optval == IPOPT_SSRR) {
 				ire = ire_ftable_lookup_v4(dst, 0, 0,
-				    IRE_IF_ALL, NULL, ALL_ZONES, ixa->ixa_tsl,
+				    IRE_INTERFACE, NULL, ALL_ZONES,
+				    ixa->ixa_tsl,
 				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, 0, ipst,
 				    NULL);
 				if (ire == NULL) {

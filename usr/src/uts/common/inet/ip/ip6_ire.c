@@ -1218,6 +1218,15 @@ ire_route_recursive_impl_v6(ire_t *ire,
 			goto error;
 
 		ASSERT(!(ire->ire_type & IRE_MULTICAST)); /* Not in ftable */
+		/*
+		 * Verify that the IRE_IF_CLONE has a consistent generation
+		 * number.
+		 */
+		if ((ire->ire_type & IRE_IF_CLONE) && !ire_clone_verify(ire)) {
+			ire_refrele(ire);
+			ire = NULL;
+			continue;
+		}
 
 		/*
 		 * Don't allow anything unusual past the first iteration.
@@ -1477,26 +1486,28 @@ ire_route_recursive_dstonly_v6(const in6_addr_t *nexthop, uint_t irr_flags,
 	ASSERT(ire != NULL);
 
 	/*
-	 * If this type should have an ire_nce_cache (even if it
-	 * doesn't yet have one) then we are done. Includes
-	 * IRE_INTERFACE with a full 128 bit mask.
-	 */
-	if (ire->ire_nce_capable)
-		return (ire);
-
-	/*
 	 * If the IRE has a current cached parent we know that the whole
 	 * parent chain is current, hence we don't need to discover and
 	 * build any dependencies by doing a recursive lookup.
 	 */
 	mutex_enter(&ire->ire_lock);
-	if (ire->ire_dep_parent != NULL &&
-	    ire->ire_dep_parent->ire_generation ==
-	    ire->ire_dep_parent_generation) {
+	if (ire->ire_dep_parent != NULL) {
+		if (ire->ire_dep_parent->ire_generation ==
+		    ire->ire_dep_parent_generation) {
+			mutex_exit(&ire->ire_lock);
+			return (ire);
+		}
 		mutex_exit(&ire->ire_lock);
-		return (ire);
+	} else {
+		mutex_exit(&ire->ire_lock);
+		/*
+		 * If this type should have an ire_nce_cache (even if it
+		 * doesn't yet have one) then we are done. Includes
+		 * IRE_INTERFACE with a full 128 bit mask.
+		 */
+		if (ire->ire_nce_capable)
+			return (ire);
 	}
-	mutex_exit(&ire->ire_lock);
 
 	/*
 	 * Fallback to loop in the normal code starting with the ire
