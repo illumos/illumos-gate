@@ -807,8 +807,8 @@ dmar_table_destroy(dmar_table_t *tbl)
 	}
 
 	/* free strings */
-	kmem_free(tbl->tbl_oem_tblid, TBL_OEM_ID_SZ + 1);
-	kmem_free(tbl->tbl_oem_id, TBL_OEM_TBLID_SZ + 1);
+	kmem_free(tbl->tbl_oem_tblid, TBL_OEM_TBLID_SZ + 1);
+	kmem_free(tbl->tbl_oem_id, TBL_OEM_ID_SZ + 1);
 	tbl->tbl_raw = NULL; /* raw ACPI table doesn't have to be freed */
 	mutex_destroy(&(tbl->tbl_lock));
 	kmem_free(tbl, sizeof (dmar_table_t));

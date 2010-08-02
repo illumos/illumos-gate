@@ -1306,7 +1306,14 @@ create_unity_domain(immu_t *immu)
 	ASSERT(domain->dom_pgtable_root);
 	pgtable_zero(immu, domain->dom_pgtable_root);
 
-	map_unity_domain(domain);
+	/*
+	 * Only map all physical memory in to the unity domain
+	 * if passthrough is not supported. If it is supported,
+	 * passthrough is set in the context entry instead.
+	 */
+	if (!IMMU_ECAP_GET_PT(immu->immu_regs_excap))
+		map_unity_domain(domain);
+
 
 	/*
 	 * put it on the system-wide UNITY domain list
@@ -1506,7 +1513,6 @@ again:
 			ASSERT(CONT_GET_P(hw_cent));
 			ASSERT(CONT_GET_DID(hw_cent) == domain->dom_did);
 			ASSERT(CONT_GET_AW(hw_cent) == immu->immu_dvma_agaw);
-			ASSERT(CONT_GET_TTYPE(hw_cent) == TTYPE_XLATE_ONLY);
 			ASSERT(CONT_GET_ASR(hw_cent) ==
 			    pgtable_root->hwpg_paddr);
 			rw_exit(&(immu->immu_ctx_rwlock));
@@ -1542,7 +1548,6 @@ again:
 		ASSERT(CONT_GET_DID(hw_cent) ==
 		    immu->immu_unity_domain->dom_did);
 		ASSERT(CONT_GET_AW(hw_cent) == immu->immu_dvma_agaw);
-		ASSERT(CONT_GET_TTYPE(hw_cent) == TTYPE_XLATE_ONLY);
 		ASSERT(CONT_GET_ASR(hw_cent) ==
 		    unity_pgtable_root->hwpg_paddr);
 
@@ -1562,8 +1567,12 @@ again:
 		CONT_SET_DID(hw_cent, domain->dom_did);
 		CONT_SET_AW(hw_cent, immu->immu_dvma_agaw);
 		CONT_SET_ASR(hw_cent, pgtable_root->hwpg_paddr);
-		/*LINTED*/
-		CONT_SET_TTYPE(hw_cent, TTYPE_XLATE_ONLY);
+		if (domain->dom_did == IMMU_UNITY_DID &&
+		    IMMU_ECAP_GET_PT(immu->immu_regs_excap))
+			CONT_SET_TTYPE(hw_cent, TTYPE_PASSTHRU);
+		else
+			/*LINTED*/
+			CONT_SET_TTYPE(hw_cent, TTYPE_XLATE_ONLY);
 		CONT_SET_P(hw_cent);
 		immu_regs_cpu_flush(immu, (caddr_t)hw_cent, sizeof (hw_rce_t));
 	}
@@ -1608,8 +1617,11 @@ context_create(immu_t *immu)
 			    immu->immu_unity_domain->dom_did);
 			CONT_SET_AW(hw_cent, immu->immu_dvma_agaw);
 			CONT_SET_ASR(hw_cent, pgtable_root->hwpg_paddr);
-			/*LINTED*/
-			CONT_SET_TTYPE(hw_cent, TTYPE_XLATE_ONLY);
+			if (IMMU_ECAP_GET_PT(immu->immu_regs_excap))
+				CONT_SET_TTYPE(hw_cent, TTYPE_PASSTHRU);
+			else
+				/*LINTED*/
+				CONT_SET_TTYPE(hw_cent, TTYPE_XLATE_ONLY);
 			CONT_SET_AVAIL(hw_cent, IMMU_CONT_UNINITED);
 			CONT_SET_P(hw_cent);
 		}
@@ -3057,6 +3069,11 @@ immu_dvma_physmem_update(uint64_t addr, uint64_t size)
 	mutex_enter(&immu_domain_lock);
 	domain = list_head(&immu_unity_domain_list);
 	for (; domain; domain = list_next(&immu_unity_domain_list, domain)) {
+		/*
+		 * Nothing to do if the IOMMU supports passthrough.
+		 */
+		if (IMMU_ECAP_GET_PT(domain->dom_immu->immu_regs_excap))
+			continue;
 
 		/* There is no vmem_arena for unity domains. Just map it */
 		ddi_err(DER_LOG, NULL, "IMMU: unity-domain: Adding map "
