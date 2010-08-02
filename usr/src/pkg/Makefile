@@ -378,14 +378,6 @@ PKGLISTS= \
 #					| pkgdepend
 #					|
 #				processed manifests
-#
-# Due to limitations in pkgdepend, we cannot simply treat synthetic
-# and real manifests identically.  But we don't really want to
-# maintain a separate chain for synthetic manifests, so for the left
-# side of this diagram, we actually do faux dependency generation and
-# resolution, so we end up with the expected set of files in $(PDIR),
-# per the individual file chain described above: mf, mog, dep, res,
-# and pub files for each manifest.
 # 
 ALL_TARGETS= $(PROC_SYNTH_PKGS) proto_list_$(PKGMACH)
 
@@ -401,16 +393,10 @@ $(PDIR):
 
 #
 # This rule resolves dependencies across all published manifests.
-# We should be able to do this with
 #
-#    pkgdepend resolve -m $(PUB_PKGS:%.pub=%.dep)
-#
-# but until 14113 is fixed, the incorporations confuse pkgdepend, so we
-# just create the .res file for DEP_SYNTH_PKGS directly.
-#
-# We also shouldn't have to ignore the error from pkgdepend, but
-# until at least 14110 is resolved, pkgdepend will always exit with
-# an error.
+# We shouldn't have to ignore the error from pkgdepend, but until
+# 16012 and its dependencies are resolved, pkgdepend will always exit
+# with an error.
 #
 $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 	-$(PKGDEBUG)if [ "$(SUPPRESSPKGDEP)" = "true" ]; then \
@@ -420,7 +406,7 @@ $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 		done; \
 	else \
 		print "Resolving dependencies"; \
-		pkgdepend resolve -m $(DEP_PKGS); \
+		pkgdepend resolve -m $(DEP_SYNTH_PKGS) $(DEP_PKGS); \
 		for p in $(DEP_PKGS:%.dep=%); do \
 			if [ "$$(print $$p.metadata.*)" = \
 			     "$$(print $$p.metadata.noincorp.*)" ]; \
@@ -435,10 +421,6 @@ $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 			fi; \
 		done; \
 	fi
-	$(PKGDEBUG)for p in $(DEP_SYNTH_PKGS:%.dep=%); \
-	do \
-		$(CP) $$p.dep $$p.res; \
-	done
 	$(PKGDEBUG)$(TOUCH) $(@)
 
 install: $(ALL_TARGETS) repository-metadata
@@ -448,7 +430,6 @@ repository-metadata: publish_pkgs
 	$(PKGDEBUG)for r in $(REPOS); do \
 		/usr/lib/pkg.depotd -d $(PKGDEST)/repo.$$r \
 			--add-content --exit-ready; \
-		chmod a+r $(PKGDEST)/repo.$$r/cfg_cache; \
 	done
 
 #
