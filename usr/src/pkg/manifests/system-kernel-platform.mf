@@ -821,9 +821,6 @@ $(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel \
 $(i386_ONLY)file \
     path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.46 \
     group=sys mode=0755
-$(i386_ONLY)hardlink \
-    path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.47 \
-    target=cpu_ms.GenuineIntel.6.46
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu.generic group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD group=sys \
@@ -834,9 +831,6 @@ $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.46 \
     group=sys mode=0755
-$(i386_ONLY)hardlink \
-    path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.47 \
-    target=cpu_ms.GenuineIntel.6.46
 $(i386_ONLY)file path=platform/i86pc/kernel/dacf/$(ARCH64)/consconfig_dacf \
     group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/dacf/consconfig_dacf group=sys \
@@ -866,15 +860,15 @@ $(i386_ONLY)file path=platform/i86pc/kernel/drv/ppm group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/ppm.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex.conf group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/pcplusmp group=sys \
-    mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/apix group=sys \
+    mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/pcplusmp group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/uppc group=sys \
     mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/mach/apix group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/pcplusmp group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/uppc group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/mach/apix group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/acpidev group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/gfx_private \
@@ -1162,6 +1156,11 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/platmod group=sys \
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/vis group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4v/wanboot group=sys reboot-needed=true
+$(i386_ONLY)hardlink \
+    path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.47 \
+    target=cpu_ms.GenuineIntel.6.46
+$(i386_ONLY)hardlink path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.47 \
+    target=cpu_ms.GenuineIntel.6.46
 $(sparc_ONLY)hardlink path=platform/sun4u/kernel/misc/$(ARCH64)/md5 \
     target=../../../kernel/crypto/$(ARCH64)/md5
 $(sparc_ONLY)hardlink path=platform/sun4u/kernel/misc/$(ARCH64)/sha1 \

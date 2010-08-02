@@ -161,18 +161,18 @@ $(i386_ONLY)file path=kernel/kmdb/sppp group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/ufs group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/uhci group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/usba group=sys mode=0555
-$(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/pcplusmp group=sys \
-    mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/apix group=sys \
+    mode=0555
+$(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/pcplusmp group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/uppc group=sys \
     mode=0555
+$(i386_ONLY)file path=platform/i86pc/kernel/kmdb/apix group=sys mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/pcplusmp group=sys mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/unix group=sys mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/uppc group=sys mode=0555
-$(i386_ONLY)file path=platform/i86pc/kernel/kmdb/apix group=sys mode=0555
 $(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/xpv_psm group=sys \
@@ -308,21 +308,21 @@ file path=usr/lib/mdb/proc/libuutil.so group=sys mode=0555
 file path=usr/lib/mdb/proc/mdb_ds.so group=sys mode=0555
 file path=usr/lib/mdb/proc/svc.configd.so group=sys mode=0555
 file path=usr/lib/mdb/proc/svc.startd.so group=sys mode=0555
-$(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/pcplusmp.so \
-    group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/apix.so \
+    group=sys mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/pcplusmp.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/uppc.so \
     group=sys mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/apix.so group=sys \
+    mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/pcplusmp.so group=sys \
     mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/unix.so group=sys \
     mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/uppc.so group=sys \
-    mode=0555
-$(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/apix.so group=sys \
     mode=0555
 $(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555

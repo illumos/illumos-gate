@@ -538,6 +538,7 @@ $(REPOS:%=$(PKGDEST)/repo.%):
 
 $(PDIR)/%.mog: manifests/%.mf
 	@print "Processing manifest $(<F)"
+	@pkgfmt -c $<
 	$(PKGDEBUG)$(RM) $(@) $(@:%.mog=%) $(@:%.mog=%.nodepend) \
 		$(PDIR)/$(@F:%.mog=%).metadata.* $(@).vars
 	$(PKGDEBUG)$(PKGMOGRIFY) $(PKGMOG_VERBOSE) $(PM_INC:%= -I %) \

@@ -74,7 +74,8 @@ dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
 driver name=zfs perms="* 0600 root sys" perms="zfs 0666 root sys"
-file path=etc/sysevent/config/SUNW,EC_zfs,ESC_ZFS_bootfs_vdev_attach,sysevent.conf \
+file \
+    path=etc/sysevent/config/SUNW,EC_zfs,ESC_ZFS_bootfs_vdev_attach,sysevent.conf \
     group=sys
 file path=kernel/drv/$(ARCH64)/zfs group=sys
 $(i386_ONLY)file path=kernel/drv/zfs group=sys

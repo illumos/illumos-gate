@@ -482,16 +482,14 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire/lib/fs \
     target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire/sbin \
-    target=../sun4u/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire/sbin target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/fs \
     target=../../sun4v/lib/fs
 $(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,T5140/sbin \
-    target=../sun4v/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,T5140/sbin target=../sun4v/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,T5240 target=SUNW,T5140
 $(sparc_ONLY)link path=usr/platform/SUNW,T5440 target=SUNW,T5140
 $(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/lib/fs \
@@ -500,8 +498,7 @@ $(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/lib/libpcp.so \
     target=../../sun4v/lib/libpcp.so
 $(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/lib/libpcp.so.1 \
     target=../../sun4v/lib/libpcp.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/sbin \
-    target=../sun4v/sbin
+$(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/sbin target=../sun4v/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-2/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-2/lib/fs \

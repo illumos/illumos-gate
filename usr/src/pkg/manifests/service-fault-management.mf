@@ -43,6 +43,10 @@ set name=variant.arch value=$(ARCH)
 dir path=etc group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=etc/fm group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=etc/fm/fmd group=sys variant.opensolaris.zone=__NODEFAULT
+#
+# Our additional /etc/logadm.conf entries are common to global and local zones
+#
+dir path=etc/logadm.d group=sys variant.opensolaris.zone=__NODEFAULT
 dir path=etc/net-snmp variant.opensolaris.zone=__NODEFAULT
 dir path=etc/net-snmp/snmp variant.opensolaris.zone=__NODEFAULT
 dir path=etc/net-snmp/snmp/mibs variant.opensolaris.zone=__NODEFAULT
@@ -59,10 +63,6 @@ dir path=lib/svc/manifest/system group=sys \
     variant.opensolaris.zone=__NODEFAULT
 dir path=lib/svc/manifest/system/fm group=sys \
     variant.opensolaris.zone=__NODEFAULT
-#
-# Our additional /etc/logadm.conf entries are common to global and local zones
-#
-dir path=etc/logadm.d group=sys variant.opensolaris.zone=__NODEFAULT
 #
 # usr dirs:
 #	- most are common to both global and non-global zones
@@ -237,6 +237,12 @@ dir path=var/fm/fmd/xprt group=sys variant.opensolaris.zone=__NODEFAULT
 #
 driver name=fm perms="* 0644 root sys"
 #
+# Our additional /etc/logadm.conf entries are common to global and local zones
+#
+file path=etc/logadm.d/fmd.logadm.conf group=sys mode=0444 \
+    refresh_fmri=svc:/system/logadm-upgrade:default \
+    variant.opensolaris.zone=__NODEFAULT
+#
 # Now for our file and link payloads
 #
 # snmp MIBs are common to both global and non-global zones
@@ -257,12 +263,6 @@ file path=kernel/drv/fm.conf group=sys
 file path=lib/svc/manifest/system/fm/notify-params.xml group=sys mode=0444 \
     variant.opensolaris.zone=__NODEFAULT
 file path=lib/svc/manifest/system/fmd.xml group=sys mode=0444 \
-    variant.opensolaris.zone=__NODEFAULT
-#
-# Our additional /etc/logadm.conf entries are common to global and local zones
-#
-file path=etc/logadm.d/fmd.logadm.conf group=sys mode=0444 \
-    refresh_fmri='svc:/system/logadm-upgrade:default' \
     variant.opensolaris.zone=__NODEFAULT
 #
 # Headers are automatically included in both contexts.
@@ -364,9 +364,9 @@ $(sparc_ONLY)file path=usr/lib/fm/dict/SCF.dict mode=0444 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/dict/SENSOR.dict mode=0444 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/dict/STORAGE.dict mode=0444 \
-    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/dict/SMF.dict mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/dict/STORAGE.dict mode=0444 \
     variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/fm/dict/SUN4.dict mode=0444 \
     variant.opensolaris.zone=__NODEFAULT
@@ -583,9 +583,9 @@ $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SCF.mo mode=0444 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/locale/C/LC_MESSAGES/SENSOR.mo mode=0444 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/locale/C/LC_MESSAGES/STORAGE.mo mode=0444 \
-    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/locale/C/LC_MESSAGES/SMF.mo mode=0444 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/locale/C/LC_MESSAGES/STORAGE.mo mode=0444 \
     variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4.mo mode=0444 \
     variant.opensolaris.zone=__NODEFAULT

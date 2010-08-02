@@ -1258,6 +1258,7 @@ file path=usr/lib/localedef/extensions/single_byte.x mode=0444
 file path=usr/lib/makekey mode=0555
 file path=usr/lib/more.help
 file path=usr/lib/newsyslog group=sys mode=0555
+file path=usr/lib/passmgmt group=sys mode=0555
 file path=usr/lib/pci/pcidr mode=0555
 file path=usr/lib/pci/pcidr_plugin.so
 file path=usr/lib/pfexecd mode=0555
@@ -1408,7 +1409,6 @@ file path=usr/sbin/nlsadmin group=adm mode=0755
 file path=usr/sbin/nscd mode=0555
 file path=usr/sbin/nwamadm mode=0555
 file path=usr/sbin/nwamcfg mode=0555
-file path=usr/lib/passmgmt group=sys mode=0555
 file path=usr/sbin/pmadm group=sys mode=0555
 file path=usr/sbin/praudit mode=0555
 $(i386_ONLY)file path=usr/sbin/prtdiag group=sys mode=2755
@@ -1443,8 +1443,8 @@ file path=usr/sbin/syncstat mode=0555
 file path=usr/sbin/syseventadm group=sys mode=0555
 file path=usr/sbin/syslogd group=sys mode=0555
 file path=usr/sbin/tar mode=0555
-file path=usr/sbin/trapstat mode=0555
 file path=usr/sbin/traceroute mode=4555
+file path=usr/sbin/trapstat mode=0555
 file path=usr/sbin/ttyadm group=sys mode=0755
 $(i386_ONLY)file path=usr/sbin/ucodeadm mode=0555
 file path=usr/sbin/umountall group=sys mode=0555
