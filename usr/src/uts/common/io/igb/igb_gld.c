@@ -20,12 +20,11 @@
  */
 
 /*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "igb_sw.h"
@@ -1435,7 +1434,8 @@ igb_set_priv_prop(igb_t *igb, const char *pr_name,
 		}
 		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
 		if (result < MIN_TX_RESCHED_THRESHOLD ||
-		    result > MAX_TX_RESCHED_THRESHOLD)
+		    result > MAX_TX_RESCHED_THRESHOLD ||
+		    result > igb->tx_ring_size)
 			err = EINVAL;
 		else {
 			igb->tx_resched_thresh = (uint32_t)result;

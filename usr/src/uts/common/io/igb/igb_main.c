@@ -30,7 +30,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.16";
+static char igb_version[] = "igb 1.1.17";
 
 /*
  * Local function protoypes
@@ -2841,8 +2841,10 @@ igb_get_conf(igb_t *igb)
 	    MIN_TX_OVERLOAD_THRESHOLD, MAX_TX_OVERLOAD_THRESHOLD,
 	    DEFAULT_TX_OVERLOAD_THRESHOLD);
 	igb->tx_resched_thresh = igb_get_prop(igb, PROP_TX_RESCHED_THRESHOLD,
-	    MIN_TX_RESCHED_THRESHOLD, MAX_TX_RESCHED_THRESHOLD,
-	    DEFAULT_TX_RESCHED_THRESHOLD);
+	    MIN_TX_RESCHED_THRESHOLD,
+	    MIN(igb->tx_ring_size, MAX_TX_RESCHED_THRESHOLD),
+	    igb->tx_ring_size > DEFAULT_TX_RESCHED_THRESHOLD ?
+	    DEFAULT_TX_RESCHED_THRESHOLD : DEFAULT_TX_RESCHED_THRESHOLD_LOW);
 
 	igb->rx_copy_thresh = igb_get_prop(igb, PROP_RX_COPY_THRESHOLD,
 	    MIN_RX_COPY_THRESHOLD, MAX_RX_COPY_THRESHOLD,
@@ -3732,14 +3734,17 @@ static void
 igb_set_external_loopback(igb_t *igb)
 {
 	struct e1000_hw *hw;
+	uint32_t ctrl_ext;
 
 	hw = &igb->hw;
 
-	/* Set phy to known state */
-	(void) e1000_phy_hw_reset(hw);
+	/* Set link mode to PHY (00b) in the Extended Control register */
+	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
+	ctrl_ext &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
+	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
 
 	(void) e1000_write_phy_reg(hw, 0x0, 0x0140);
-	(void) e1000_write_phy_reg(hw, 0x9, 0x1b00);
+	(void) e1000_write_phy_reg(hw, 0x9, 0x1a00);
 	(void) e1000_write_phy_reg(hw, 0x12, 0x1610);
 	(void) e1000_write_phy_reg(hw, 0x1f37, 0x3f1c);
 }

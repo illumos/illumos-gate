@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,8 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "igb_sw.h"
@@ -392,8 +394,10 @@ adjust_threshold:
 	 * Before fill the tx descriptor ring with the data, we need to
 	 * ensure there are adequate free descriptors for transmit
 	 * (including one context descriptor).
+	 * Do not use up all the tx descriptors.
+	 * Otherwise tx recycle will fail and cause false hang.
 	 */
-	if (tx_ring->tbd_free < (desc_total + 1)) {
+	if (tx_ring->tbd_free <= (desc_total + 1)) {
 		tx_ring->tx_recycle(tx_ring);
 	}
 
@@ -407,7 +411,7 @@ adjust_threshold:
 	 * ensure the correctness when multiple threads access it in
 	 * parallel.
 	 */
-	if (tx_ring->tbd_free < (desc_total + 1)) {
+	if (tx_ring->tbd_free <= (desc_total + 1)) {
 		IGB_DEBUG_STAT(tx_ring->stat_fail_no_tbd);
 		mutex_exit(&tx_ring->tx_lock);
 		goto tx_failure;
@@ -882,8 +886,6 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 		 */
 		load_context = igb_check_tx_context(tx_ring, ctx);
 		if (load_context) {
-			first_tcb = (tx_control_block_t *)
-			    LIST_GET_HEAD(pending_list);
 			tbd = &tx_ring->tbd_ring[index];
 
 			/*
@@ -920,6 +922,7 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	 * control block.
 	 */
 	tcb = (tx_control_block_t *)LIST_POP_HEAD(pending_list);
+	first_tcb = tcb;
 	while (tcb != NULL) {
 
 		for (i = 0; i < tcb->desc_num; i++) {
@@ -938,15 +941,6 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 			desc_num++;
 		}
 
-		if (first_tcb != NULL) {
-			/*
-			 * Count the checksum context descriptor for
-			 * the first tx control block.
-			 */
-			first_tcb->desc_num++;
-			first_tcb = NULL;
-		}
-
 		/*
 		 * Add the tx control block to the work list
 		 */
@@ -956,6 +950,15 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 		tcb_index = index;
 		tcb = (tx_control_block_t *)LIST_POP_HEAD(pending_list);
 	}
+
+	if (load_context) {
+		/*
+		 * Count the checksum context descriptor for
+		 * the first tx control block.
+		 */
+		first_tcb->desc_num++;
+	}
+	first_tcb->last_index = PREV_INDEX(index, 1, tx_ring->ring_size);
 
 	/*
 	 * The Insert Ethernet CRC (IFCS) bit and the checksum fields are only
@@ -1064,7 +1067,7 @@ igb_save_desc(tx_control_block_t *tcb, uint64_t address, size_t length)
 uint32_t
 igb_tx_recycle_legacy(igb_tx_ring_t *tx_ring)
 {
-	uint32_t index, last_index;
+	uint32_t index, last_index, next_index;
 	int desc_num;
 	boolean_t desc_done;
 	tx_control_block_t *tcb;
@@ -1107,18 +1110,26 @@ igb_tx_recycle_legacy(igb_tx_ring_t *tx_ring)
 	tcb = tx_ring->work_list[index];
 	ASSERT(tcb != NULL);
 
-	desc_done = B_TRUE;
-	while (desc_done && (tcb != NULL)) {
+	while (tcb != NULL) {
 
 		/*
-		 * Get the last tx descriptor of the tx control block.
-		 * If the last tx descriptor is done, it is done with
-		 * all the tx descriptors of the tx control block.
-		 * Then the tx control block and all the corresponding
-		 * tx descriptors can be recycled.
+		 * Get the last tx descriptor of this packet.
+		 * If the last tx descriptor is done, then
+		 * we can recycle all descriptors of a packet
+		 * which usually includes several tx control blocks.
+		 * For some chips, LSO descriptors can not be recycled
+		 * unless the whole packet's transmission is done.
+		 * That's why packet level recycling is used here.
 		 */
-		last_index = NEXT_INDEX(index, tcb->desc_num - 1,
-		    tx_ring->ring_size);
+		last_index = tcb->last_index;
+		/*
+		 * MAX_TX_RING_SIZE is used to judge whether
+		 * the index is a valid value or not.
+		 */
+		if (last_index == MAX_TX_RING_SIZE)
+			break;
+
+		next_index = NEXT_INDEX(last_index, 1, tx_ring->ring_size);
 
 		/*
 		 * Check if the Descriptor Done bit is set
@@ -1126,24 +1137,32 @@ igb_tx_recycle_legacy(igb_tx_ring_t *tx_ring)
 		desc_done = tx_ring->tbd_ring[last_index].wb.status &
 		    E1000_TXD_STAT_DD;
 		if (desc_done) {
-			/*
-			 * Strip off the tx control block from the work list,
-			 * and add it to the pending list.
-			 */
-			tx_ring->work_list[index] = NULL;
-			LIST_PUSH_TAIL(&pending_list, &tcb->link);
+			while (tcb != NULL) {
+				/*
+				 * Strip off the tx control block from the work
+				 * list, and add it to the pending list.
+				 */
+				tx_ring->work_list[index] = NULL;
+				LIST_PUSH_TAIL(&pending_list, &tcb->link);
 
-			/*
-			 * Count the total number of the tx descriptors recycled
-			 */
-			desc_num += tcb->desc_num;
+				/*
+				 * Count the total number of the tx descriptors
+				 * recycled.
+				 */
+				desc_num += tcb->desc_num;
 
-			/*
-			 * Advance the index of the tx descriptor ring
-			 */
-			index = NEXT_INDEX(last_index, 1, tx_ring->ring_size);
+				/*
+				 * Advance the index of the tx descriptor ring
+				 */
+				index = NEXT_INDEX(index, tcb->desc_num,
+				    tx_ring->ring_size);
 
-			tcb = tx_ring->work_list[index];
+				tcb = tx_ring->work_list[index];
+				if (index == next_index)
+					break;
+			}
+		} else {
+			break;
 		}
 	}
 
@@ -1372,6 +1391,7 @@ igb_free_tcb(tx_control_block_t *tcb)
 	}
 
 	tcb->tx_type = USE_NONE;
+	tcb->last_index = MAX_TX_RING_SIZE;
 	tcb->frag_num = 0;
 	tcb->desc_num = 0;
 }
