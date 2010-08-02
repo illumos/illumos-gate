@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * logadm/main.c -- main routines for logadm
  *
@@ -66,6 +65,8 @@ static void docopytruncate(struct opts *opts, const char *file,
 
 /* our configuration file, unless otherwise specified by -f */
 static char *Default_conffile = "/etc/logadm.conf";
+/* our timestamps file, unless otherwise specified by -F */
+static char *Default_timestamps = "/var/logadm/timestamps";
 
 /* default pathnames to the commands we invoke */
 static char *Sh = "/bin/sh";
@@ -92,40 +93,8 @@ static struct lut *Donenames;
 /* A list of names of files to be gzipped */
 static struct lut *Gzipnames = NULL;
 
-/* table that drives argument parsing */
-static struct optinfo Opttable[] = {
-	{ "e", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "f", OPTTYPE_STRING,	NULL,			OPTF_CLI },
-	{ "h", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
-	{ "l", OPTTYPE_BOOLEAN, NULL,			OPTF_CLI|OPTF_CONF },
-	{ "N", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "n", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
-	{ "r", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
-	{ "V", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
-	{ "v", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
-	{ "w", OPTTYPE_STRING,	NULL,			OPTF_CLI },
-	{ "p", OPTTYPE_INT,	opts_parse_seconds,	OPTF_CLI|OPTF_CONF },
-	{ "P", OPTTYPE_INT,	opts_parse_ctime,	OPTF_CLI|OPTF_CONF },
-	{ "s", OPTTYPE_INT,	opts_parse_bytes,	OPTF_CLI|OPTF_CONF },
-	{ "a", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "b", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "c", OPTTYPE_BOOLEAN, NULL,			OPTF_CLI|OPTF_CONF },
-	{ "g", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "m", OPTTYPE_INT,	opts_parse_atopi,	OPTF_CLI|OPTF_CONF },
-	{ "M", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "o", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "R", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "t", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "z", OPTTYPE_INT,	opts_parse_atopi,	OPTF_CLI|OPTF_CONF },
-	{ "A", OPTTYPE_INT,	opts_parse_seconds,	OPTF_CLI|OPTF_CONF },
-	{ "C", OPTTYPE_INT,	opts_parse_atopi,	OPTF_CLI|OPTF_CONF },
-	{ "E", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-	{ "S", OPTTYPE_INT,	opts_parse_bytes,	OPTF_CLI|OPTF_CONF },
-	{ "T", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
-};
-
 /*
- * only the "fhnVv" options are allowed in the first form of this command,
+ * only the "FfhnVv" options are allowed in the first form of this command,
  * so this defines the list of options that are an error in they appear
  * in the first form.  In other words, it is not allowed to run logadm
  * with any of these options unless at least one logname is also provided.
@@ -141,6 +110,7 @@ static struct optinfo Opttable[] = {
 "\n"\
 "General options:\n"\
 "        -e mailaddr     mail errors to given address\n"\
+"        -F timestamps   use timestamps instead of /var/logadm/timestamps\n"\
 "        -f conffile     use conffile instead of /etc/logadm.conf\n"\
 "        -h              display help\n"\
 "        -N              not an error if log file nonexistent\n"\
@@ -188,10 +158,12 @@ main(int argc, char *argv[])
 {
 	struct opts *clopts;		/* from parsing command line */
 	const char *conffile;		/* our configuration file */
+	const char *timestamps;		/* our timestamps file */
 	struct fn_list *lognames;	/* list of lognames we're processing */
 	struct fn *fnp;
 	char *val;
 	char *buf;
+	int status;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -201,7 +173,7 @@ main(int argc, char *argv[])
 
 	(void) textdomain(TEXT_DOMAIN);
 
-	/* we only print times into the conffile, so make them uniform */
+	/* we only print times into the timestamps file, so make them uniform */
 	(void) setlocale(LC_TIME, "C");
 
 	/* give our name to error routines & skip it for arg parsing */
@@ -221,6 +193,8 @@ main(int argc, char *argv[])
 	/* check for (undocumented) debugging environment variables */
 	if (val = getenv("_LOGADM_DEFAULT_CONFFILE"))
 		Default_conffile = val;
+	if (val = getenv("_LOGADM_DEFAULT_TIMESTAMPS"))
+		Default_timestamps = val;
 	if (val = getenv("_LOGADM_DEBUG"))
 		Debug = atoi(val);
 	if (val = getenv("_LOGADM_SH"))
@@ -240,13 +214,13 @@ main(int argc, char *argv[])
 	if (val = getenv("_LOGADM_MKDIR"))
 		Mkdir = val;
 
-	opts_init(Opttable, sizeof (Opttable) / sizeof (struct optinfo));
+	opts_init(Opttable, Opttable_cnt);
 
 	/* parse command line arguments */
 	if (SETJMP)
 		usage("bailing out due to command line errors");
 	else
-		clopts = opts_parse(argv, OPTF_CLI);
+		clopts = opts_parse(NULL, argv, OPTF_CLI);
 
 	if (Debug) {
 		(void) fprintf(stderr, "command line opts:");
@@ -327,12 +301,16 @@ main(int argc, char *argv[])
 	if (opts_count(clopts, "e"))
 		err_mailto(opts_optarg(clopts, "e"));
 
-	/* this implements the default conffile */
+	/* this implements the default conffile and timestamps */
 	if ((conffile = opts_optarg(clopts, "f")) == NULL)
 		conffile = Default_conffile;
+	if ((timestamps = opts_optarg(clopts, "F")) == NULL)
+		timestamps = Default_timestamps;
 	if (opts_count(clopts, "v"))
 		(void) out("# loading %s\n", conffile);
-	conf_open(conffile, opts_count(clopts, "Vn") == 0);
+	status = conf_open(conffile, timestamps, clopts);
+	if (!status && opts_count(clopts, "V"))
+		err_done(0);
 
 	/* handle conffile write option */
 	if (opts_count(clopts, "w")) {

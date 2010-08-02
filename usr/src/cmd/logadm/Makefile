@@ -56,7 +56,7 @@ $(METHOD) :=	FILEMODE = 0555
 all: $(PROG)
 
 test: $(TESTS) $(PROG)
-	./tester `pwd`
+	$(PERL) -w ./tester `pwd`
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

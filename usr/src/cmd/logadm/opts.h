@@ -19,16 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * logadm/opts.h -- public definitions for opts module
  */
 
 #ifndef	_LOGADM_OPTS_H
 #define	_LOGADM_OPTS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -57,7 +54,7 @@ struct optinfo {
 #define	OPTF_CONF	2
 
 void opts_init(struct optinfo *table, int numentries);
-struct opts *opts_parse(char **args, int flags);
+struct opts *opts_parse(struct opts *, char **args, int flags);
 void opts_free(struct opts *opts);
 void opts_set(struct opts *opts, const char *o, const char *optarg);
 int opts_count(struct opts *opts, const char *options);
@@ -69,13 +66,11 @@ struct opts *opts_merge(struct opts *back, struct opts *front);
 #define	OPTP_NOW (-1)
 #define	OPTP_NEVER (-2)
 
-off_t opts_parse_ctime(const char *o, const char *optarg);
-off_t opts_parse_bytes(const char *o, const char *optarg);
-off_t opts_parse_atopi(const char *o, const char *optarg);
-off_t opts_parse_seconds(const char *o, const char *optarg);
-
 void opts_print(struct opts *opts, FILE *stream, char *exclude);
 void opts_printword(const char *word, FILE *stream);
+
+extern struct optinfo Opttable[];
+extern int Opttable_cnt;
 
 #ifdef	__cplusplus
 }

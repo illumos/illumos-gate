@@ -362,6 +362,7 @@ DIRS= \
 	/var/ld \
 	/var/log \
 	/var/log/pool \
+	/var/logadm \
 	/var/mail \
 	/var/news \
 	/var/opt \

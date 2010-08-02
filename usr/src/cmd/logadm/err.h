@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,16 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * logadm/err.h -- public definitions for error module
  */
 
 #ifndef	_LOGADM_ERR_H
 #define	_LOGADM_ERR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <setjmp.h>
 
@@ -55,8 +51,12 @@ void err_mailto(const char *recipient);
 #define	EF_RAW	0x10	/* don't prepend/append anything to message */
 
 jmp_buf Err_env;
+extern jmp_buf *Err_env_ptr;
 
-#define	SETJMP	setjmp(Err_env)
+#define	SETJMP	setjmp(*(Err_env_ptr = &Err_env))
+#define	LOCAL_ERR_BEGIN	{ jmp_buf Err_env, *Save_err_env_ptr = Err_env_ptr; {
+#define	LOCAL_ERR_END	} Err_env_break: Err_env_ptr = Save_err_env_ptr; }
+#define	LOCAL_ERR_BREAK	goto Err_env_break
 
 #define	MALLOC(nbytes) err_malloc(nbytes, __FILE__, __LINE__)
 void *err_malloc(int nbytes, const char *fname, int line);
