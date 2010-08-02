@@ -1633,11 +1633,8 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 
 		pwrk->xp = xp;
 		pwrk->arg = sp;
+		pwrk->timer = 0;
 		sp->cmd_tag = pwrk->htag;
-		pwrk->timer = US2WT(CMD2PKT(sp)->pkt_time * 1000000);
-		if (pwrk->timer == 0) {
-			pwrk->timer = US2WT(1000000);
-		}
 
 		pwrk->dtype = xp->dtype;
 
@@ -1975,6 +1972,12 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	STAILQ_INSERT_TAIL(&xp->aq, sp, cmd_next);
 	mutex_exit(&xp->aqlock);
 	INC_IQ_ENTRY(pwp, iq);
+	mutex_enter(&pwrk->lock);
+	pwrk->timer = US2WT(CMD2PKT(sp)->pkt_time * 1000000);
+	if (pwrk->timer == 0) {
+		pwrk->timer = US2WT(1000000);
+	}
+	mutex_exit(&pwrk->lock);
 
 	/*
 	 * If we just submitted the last command queued from device state
@@ -2587,6 +2590,12 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	pmcs_print_entry(pwp, PMCS_PRT_DEBUG3, "SATA INI Message", ptr);
 #endif
 	INC_IQ_ENTRY(pwp, iq);
+	mutex_enter(&pwrk->lock);
+	pwrk->timer = US2WT(CMD2PKT(sp)->pkt_time * 1000000);
+	if (pwrk->timer == 0) {
+		pwrk->timer = US2WT(1000000);
+	}
+	mutex_exit(&pwrk->lock);
 
 	return (PMCS_WQ_RUN_SUCCESS);
 }
