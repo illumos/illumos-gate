@@ -206,7 +206,7 @@ static struct scsi_pkt *vhci_create_retry_pkt(struct vhci_pkt *);
 static struct vhci_pkt *vhci_sync_retry_pkt(struct vhci_pkt *);
 static struct scsi_vhci_lun *vhci_lun_lookup(dev_info_t *);
 static struct scsi_vhci_lun *vhci_lun_lookup_alloc(dev_info_t *, char *, int *);
-static void vhci_lun_free(dev_info_t *);
+static void vhci_lun_free(struct scsi_vhci_lun *dvlp, struct scsi_device *sd);
 static int vhci_recovery_reset(scsi_vhci_lun_t *, struct scsi_address *,
     uint8_t, uint8_t);
 void vhci_update_pathstates(void *);
@@ -1059,6 +1059,12 @@ static void
 vhci_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
+	struct scsi_vhci_lun *dvlp;
+	ASSERT(mdi_client_get_path_count(tgt_dip) <= 0);
+	dvlp = (struct scsi_vhci_lun *)scsi_device_hba_private_get(sd);
+	ASSERT(dvlp != NULL);
+
+	vhci_lun_free(dvlp, sd);
 }
 
 /*
@@ -4197,7 +4203,7 @@ failure:
 		kmem_free(hba, sizeof (scsi_hba_tran_t));
 
 	if (vlun_alloced)
-		vhci_lun_free(tgt_dip);
+		vhci_lun_free(vlun, NULL);
 
 	return (rval);
 }
@@ -4267,14 +4273,6 @@ vhci_pathinfo_uninit(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	mutex_destroy(&svp->svp_mutex);
 	cv_destroy(&svp->svp_cv);
 	kmem_free((caddr_t)svp, sizeof (*svp));
-
-	/*
-	 * If this is the last path to the client,
-	 * then free up the vlun as well.
-	 */
-	if (mdi_client_get_path_count(cdip) == 1) {
-		vhci_lun_free(cdip);
-	}
 
 	VHCI_DEBUG(4, (CE_NOTE, NULL, "!vhci_pathinfo_uninit: path=0x%p\n",
 	    (void *)pip));
@@ -7316,23 +7314,9 @@ vhci_lun_lookup_alloc(dev_info_t *tgt_dip, char *guid, int *didalloc)
 }
 
 static void
-vhci_lun_free(dev_info_t *tgt_dip)
+vhci_lun_free(struct scsi_vhci_lun *dvlp, struct scsi_device *sd)
 {
-	struct scsi_vhci_lun *dvlp;
 	char *guid;
-	struct scsi_device *sd;
-
-	/*
-	 * The scsi_device was set to driver private during child node
-	 * initialization in the scsi_hba_bus_ctl().
-	 */
-	sd = (struct scsi_device *)ddi_get_driver_private(tgt_dip);
-
-	dvlp = (struct scsi_vhci_lun *)
-	    mdi_client_get_vhci_private(tgt_dip);
-	ASSERT(dvlp != NULL);
-
-	mdi_client_set_vhci_private(tgt_dip, NULL);
 
 	guid = dvlp->svl_lun_wwn;
 	ASSERT(guid != NULL);
