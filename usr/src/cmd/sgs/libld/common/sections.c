@@ -523,11 +523,12 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 
 	case SHT_DYNAMIC:
 		/*
-		 * A dynamic section may or may not be allocable, depending
-		 * on context, so we leave that flag unset and leave it to
-		 * the caller to add it if necessary.
+		 * A dynamic section may or may not be allocable, and may or
+		 * may not be writable, depending on context, so we leave the
+		 * flags unset and leave it to the caller to add them if
+		 * necessary.
 		 */
-		SET_SEC_INFO_WORD_ALIGN(ELF_T_DYN, SHF_WRITE, sizeof (Dyn))
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_DYN, 0, sizeof (Dyn))
 		break;
 
 	case SHT_NOBITS:
@@ -958,9 +959,21 @@ make_dynamic(Ofl_desc *ofl)
 	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
-	/* new_section() does not set SHF_ALLOC. Add it if needed */
+	/*
+	 * new_section() does not set SHF_ALLOC.  If we're building anything
+	 * besides a relocatable object, then the .dynamic section should
+	 * reside in allocatable memory.
+	 */
 	if (not_relobj)
 		shdr->sh_flags |= SHF_ALLOC;
+
+	/*
+	 * new_section() does not set SHF_WRITE.  If we're building an object
+	 * that specifies an interpretor, then a DT_DEBUG entry is created,
+	 * which is initialized to the applications link-map list at runtime.
+	 */
+	if (ofl->ofl_osinterp)
+		shdr->sh_flags |= SHF_WRITE;
 
 	osp = ofl->ofl_osdynamic =
 	    ld_place_section(ofl, isec, NULL, ld_targ.t_id.id_dynamic, NULL);
@@ -1084,6 +1097,7 @@ make_dynamic(Ofl_desc *ofl)
 
 	if (not_relobj) {
 		Aliste	idx;
+		Sg_desc	*sgp;
 
 		if (ofl->ofl_config) {
 			cnt++;
@@ -1111,8 +1125,8 @@ make_dynamic(Ofl_desc *ofl)
 		}
 
 		/*
-		 * Reserve entries for the HASH, STRTAB, STRSZ, SYMTAB, SYMENT,
-		 * and CHECKSUM.
+		 * Reserve entries for the DT_HASH, DT_STRTAB, DT_STRSZ,
+		 * DT_SYMTAB, DT_SYMENT, and DT_CHECKSUM.
 		 */
 		cnt += 6;
 
@@ -1143,49 +1157,50 @@ make_dynamic(Ofl_desc *ofl)
 			cnt += 2;		/* DT_VERNEED & DT_VERNEEDNUM */
 
 		if ((flags & FLG_OF_COMREL) && ofl->ofl_relocrelcnt)
-			cnt++;			/* RELACOUNT */
+			cnt++;			/* DT_RELACOUNT */
 
-		if (flags & FLG_OF_TEXTREL)	/* TEXTREL */
+		if (flags & FLG_OF_TEXTREL)	/* DT_TEXTREL */
 			cnt++;
 
-		if (ofl->ofl_osfiniarray)	/* FINI_ARRAY & FINI_ARRAYSZ */
-			cnt += 2;
+		if (ofl->ofl_osfiniarray)	/* DT_FINI_ARRAY */
+			cnt += 2;		/*    DT_FINI_ARRAYSZ */
 
-		if (ofl->ofl_osinitarray)	/* INIT_ARRAY & INIT_ARRAYSZ */
-			cnt += 2;
+		if (ofl->ofl_osinitarray)	/* DT_INIT_ARRAY */
+			cnt += 2;		/*    DT_INIT_ARRAYSZ */
 
-		if (ofl->ofl_ospreinitarray)	/* PREINIT_ARRAY & */
-			cnt += 2;		/*	PREINIT_ARRAYSZ */
+		if (ofl->ofl_ospreinitarray)	/* DT_PREINIT_ARRAY & */
+			cnt += 2;		/*    DT_PREINIT_ARRAYSZ */
 
 		/*
-		 * If we have plt's reserve a PLT, PLTSZ, PLTREL and JMPREL.
+		 * If we have plt's reserve a DT_PLTRELSZ, DT_PLTREL and
+		 * DT_JMPREL.
 		 */
 		if (ofl->ofl_pltcnt)
 			cnt += 3;
 
 		/*
-		 * If pltpadding is needed (Sparcv9)
+		 * If plt padding is needed (Sparcv9).
 		 */
 		if (ofl->ofl_pltpad)
 			cnt += 2;		/* DT_PLTPAD & DT_PLTPADSZ */
 
 		/*
-		 * If we have any relocations reserve a REL, RELSZ and
-		 * RELENT entry.
+		 * If we have any relocations reserve a DT_REL, DT_RELSZ and
+		 * DT_RELENT entry.
 		 */
 		if (ofl->ofl_relocsz)
 			cnt += 3;
 
 		/*
-		 * If a syminfo section is required create SYMINFO, SYMINSZ,
-		 * and SYMINENT entries.
+		 * If a syminfo section is required create DT_SYMINFO,
+		 * DT_SYMINSZ, and DT_SYMINENT entries.
 		 */
 		if (flags & FLG_OF_SYMINFO)
 			cnt += 3;
 
 		/*
 		 * If there are any partially initialized sections allocate
-		 * MOVEENT, MOVESZ and MOVETAB.
+		 * DT_MOVETAB, DT_MOVESZ and DT_MOVEENT.
 		 */
 		if (ofl->ofl_osmove)
 			cnt += 3;
@@ -1203,42 +1218,37 @@ make_dynamic(Ofl_desc *ofl)
 			cnt++;
 
 		/*
-		 * These two entries should only be placed in a segment
-		 * which is writable.  If it's a read-only segment
-		 * (due to mapfile magic, e.g. libdl.so.1) then don't allocate
-		 * these entries.
+		 * The following entry should only be placed in a segment that
+		 * is writable.
 		 */
-		if ((osp->os_sgdesc) &&
-		    (osp->os_sgdesc->sg_phdr.p_flags & PF_W)) {
-			cnt++;			/* FEATURE_1 */
-
-			if (ofl->ofl_osinterp)
-				cnt++;		/* DEBUG */
-		}
+		if (((sgp = osp->os_sgdesc) != NULL) &&
+		    (sgp->sg_phdr.p_flags & PF_W) && ofl->ofl_osinterp)
+			cnt++;		/* DT_DEBUG */
 
 		/*
 		 * Capabilities require a .dynamic entry for the .SUNW_cap
 		 * section.
 		 */
 		if (ofl->ofl_oscap)
-			cnt++;			/* SUNW_CAP */
+			cnt++;			/* DT_SUNW_CAP */
 
 		/*
 		 * Symbol capabilities require a .dynamic entry for the
 		 * .SUNW_capinfo section.
 		 */
 		if (ofl->ofl_oscapinfo)
-			cnt++;			/* SUNW_CAPINFO */
+			cnt++;			/* DT_SUNW_CAPINFO */
 
 		/*
 		 * Capabilities chain information requires a .SUNW_capchain
-		 * entry, an entry size, and total size.
+		 * entry (DT_SUNW_CAPCHAIN), entry size (DT_SUNW_CAPCHAINENT),
+		 * and total size (DT_SUNW_CAPCHAINSZ).
 		 */
 		if (ofl->ofl_oscapchain)
-			cnt += 3;		/* SUNW_CAPCHAIN/ENT/SZ */
+			cnt += 3;
 
 		if (flags & FLG_OF_SYMBOLIC)
-			cnt++;			/* SYMBOLIC */
+			cnt++;			/* DT_SYMBOLIC */
 	}
 
 	/*
@@ -1334,18 +1344,20 @@ make_interp(Ofl_desc *ofl)
 		return (1);
 
 	/*
-	 * We always build an .interp section for dynamic executables.  However
-	 * if the user has specifically specified an interpreter we'll build
-	 * this section for any output (presumably the user knows what they are
-	 * doing. refer ABI section 5-4, and ld.1 man page use of -I).
+	 * An .interp section is always created for a dynamic executable.
+	 * A user can define the interpreter to use.  This definition overrides
+	 * the default that would be recorded in an executable, and triggers
+	 * the creation of an .interp section in any other object.  Presumably
+	 * the user knows what they are doing.  Refer to the generic ELF ABI
+	 * section 5-4, and the ld(1) -I option.
 	 */
 	if (((ofl->ofl_flags & (FLG_OF_DYNAMIC | FLG_OF_EXEC |
 	    FLG_OF_RELOBJ)) != (FLG_OF_DYNAMIC | FLG_OF_EXEC)) && !iname)
 		return (1);
 
 	/*
-	 * In the case of a dynamic executable supply a default interpreter
-	 * if a specific interpreter has not been specified.
+	 * In the case of a dynamic executable, supply a default interpreter
+	 * if the user has not specified their own.
 	 */
 	if (iname == NULL)
 		iname = ofl->ofl_interp = ld_targ.t_m.m_def_interp;

@@ -1824,7 +1824,6 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				SYMENT(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_FEATURE_1:
-				dyn->d_un.d_val |= DTF_1_PARINIT;
 				if (dyn->d_un.d_val & DTF_1_CONFEXP)
 					crle = 1;
 				break;

@@ -2200,6 +2200,7 @@ update_odynamic(Ofl_desc *ofl)
 
 	if (not_relobj) {
 		Aliste	idx;
+		Sg_desc	*sgp;
 
 		if (ofl->ofl_config) {
 			dyn->d_tag = DT_CONFIG;
@@ -2502,19 +2503,10 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 
-		if (ofl->ofl_osdynamic->os_sgdesc &&
-		    (ofl->ofl_osdynamic->os_sgdesc->sg_phdr.p_flags & PF_W)) {
-			if (ofl->ofl_osinterp) {
-				dyn->d_tag = DT_DEBUG;
-				dyn->d_un.d_ptr = 0;
-				dyn++;
-			}
-
-			dyn->d_tag = DT_FEATURE_1;
-			if (ofl->ofl_osmove)
-				dyn->d_un.d_val = 0;
-			else
-				dyn->d_un.d_val = DTF_1_PARINIT;
+		if (((sgp = ofl->ofl_osdynamic->os_sgdesc) != NULL) &&
+		    (sgp->sg_phdr.p_flags & PF_W) && ofl->ofl_osinterp) {
+			dyn->d_tag = DT_DEBUG;
+			dyn->d_un.d_ptr = 0;
 			dyn++;
 		}
 
