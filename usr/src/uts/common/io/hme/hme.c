@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -2342,7 +2341,9 @@ hmestart(struct hme *hmep, mblk_t *mp)
 	}
 	mcopymsg(mp, tbuf->kaddr);
 
-	if ((csflags != 0) && (len < 64)) {
+	if ((csflags != 0) && ((len < 64) ||
+	    (start_offset > HMETMD_CSSTART_MAX) ||
+	    (stuff_offset > HMETMD_CSSTUFF_MAX))) {
 		uint16_t sum;
 		sum = hme_cksum(tbuf->kaddr + start_offset,
 		    len - start_offset);

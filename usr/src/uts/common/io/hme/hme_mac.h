@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	HME_MAC_H
@@ -60,6 +59,8 @@ struct hme_tmd {
 					/* 0 - owned by software */
 					/* 1 - owned by hardware */
 
+#define	HMETMD_CSSTART_MAX	0x3f	/* Maximum checksum start offset */
+#define	HMETMD_CSSTUFF_MAX	0xff	/* Maximum checksum stuff offset */
 #define	HMETMD_CSSTART_SHIFT 14	/* checksum start bit position */
 #define	HMETMD_CSSTUFF_SHIFT 20	/* checksum stuff bit position */
 
