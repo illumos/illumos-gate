@@ -47,7 +47,6 @@
 
 #include <sys/ib/clients/rdsv3/ib.h>
 #include <sys/ib/clients/rdsv3/rdma.h>
-#include <sys/ib/clients/rdsv3/rdsv3.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
 #define	DMA_TO_DEVICE 0
@@ -399,6 +398,8 @@ rdsv3_rdma_unuse(struct rdsv3_sock *rs, uint32_t r_key, int force)
 		avl_remove(&rs->rs_rdma_keys, &mr->r_rb_node);
 		RB_CLEAR_NODE(&mr->r_rb_node);
 		zot_me = 1;
+	} else {
+		atomic_add_32(&mr->r_refcount, 1);
 	}
 	mutex_exit(&rs->rs_rdma_lock);
 
@@ -574,6 +575,8 @@ out:
 	return (op);
 }
 
+#define	CEIL(x, y)	(((x) + (y) - 1) / (y))
+
 /*
  * The application asks for a RDMA transfer.
  * Extract all arguments and set up the rdma_op
@@ -584,7 +587,7 @@ rdsv3_cmsg_rdma_args(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 {
 	struct rdsv3_rdma_op *op;
 	/* uint64_t alignment on the buffer */
-	uint64_t buf[ceil(CMSG_LEN(sizeof (struct rds_rdma_args)),
+	uint64_t buf[CEIL(CMSG_LEN(sizeof (struct rds_rdma_args)),
 	    sizeof (uint64_t))];
 
 	if (cmsg->cmsg_len != CMSG_LEN(sizeof (struct rds_rdma_args)) ||
@@ -656,7 +659,7 @@ rdsv3_cmsg_rdma_map(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	struct cmsghdr *cmsg)
 {
 	/* uint64_t alignment on the buffer */
-	uint64_t buf[ceil(CMSG_LEN(sizeof (struct rds_get_mr_args)),
+	uint64_t buf[CEIL(CMSG_LEN(sizeof (struct rds_get_mr_args)),
 	    sizeof (uint64_t))];
 	int status;
 
