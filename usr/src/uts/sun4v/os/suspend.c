@@ -385,13 +385,16 @@ update_cpu_mappings(void)
 	 * so while CPUs are paused, call pg_cpu_inactive and swap in the
 	 * bootstrap PG structure saving the original PG structure to be
 	 * fini'd afterwards. This prevents the dispatcher from encountering
-	 * PGs in which all CPUs are inactive.
+	 * PGs in which all CPUs are inactive. Offline CPUs are already
+	 * inactive in their PGs and shouldn't be reactivated, so we must
+	 * not call pg_cpu_inactive or pg_cpu_active for those CPUs.
 	 */
 	pause_cpus(NULL);
 	for (id = 0; id < NCPU; id++) {
 		if ((cp = cpu_get(id)) == NULL)
 			continue;
-		pg_cpu_inactive(cp);
+		if ((cp->cpu_flags & CPU_OFFLINE) == 0)
+			pg_cpu_inactive(cp);
 		pgps[id] = cp->cpu_pg;
 		pg_cpu_bootstrap(cp);
 	}
@@ -432,7 +435,8 @@ update_cpu_mappings(void)
 		if ((cp = cpu_get(id)) == NULL)
 			continue;
 		cp->cpu_pg = pgps[id];
-		pg_cpu_active(cp);
+		if ((cp->cpu_flags & CPU_OFFLINE) == 0)
+			pg_cpu_active(cp);
 	}
 	start_cpus();
 
