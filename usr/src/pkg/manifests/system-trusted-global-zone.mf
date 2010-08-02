@@ -89,3 +89,5 @@ license lic_CDDL license=lic_CDDL
 link path=etc/security/lib/audio_clean.windowing target=./audio_clean
 link path=etc/security/lib/disk_clean.windowing target=./disk_clean
 link path=etc/security/lib/st_clean.windowing target=./st_clean
+# etc/security/lib/wdwmsg runs usr/bin/zenity
+depend fmri=gnome/zenity type=require
