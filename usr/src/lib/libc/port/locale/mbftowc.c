@@ -51,7 +51,7 @@ _mbftowc(char *s, wchar_t *wc, int (*peek)(void), int *errorc)
 	int		c;
 	mbstate_t	mbs;
 	char		*start = s;
-	int		cons = 0;
+	size_t		cons = 0;
 
 	for (;;) {
 		c = peek();
@@ -65,11 +65,11 @@ _mbftowc(char *s, wchar_t *wc, int (*peek)(void), int *errorc)
 
 		(void) memset(&mbs, 0, sizeof (mbs));
 		cons = mbrtowc(wc, start, s - start, &mbs);
-		if (cons >= 0) {
+		if ((int)cons >= 0) {
 			/* fully translated character */
 			return (cons);
 		}
-		if (cons == -2) {
+		if (cons == (size_t)-2) {
 			/* incomplete, recycle */
 			continue;
 		}

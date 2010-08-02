@@ -57,9 +57,9 @@
  */
 
 static int
-__istype(wint_t c, unsigned long f)
+__istype(wint_t c, unsigned int f)
 {
-	unsigned long rt;
+	unsigned int rt;
 
 	/* Fast path for single byte locales */
 	if (c < 0 || c >= _CACHED_RUNES)
@@ -70,9 +70,9 @@ __istype(wint_t c, unsigned long f)
 }
 
 static int
-__isctype(wint_t c, unsigned long f)
+__isctype(wint_t c, unsigned int f)
 {
-	unsigned long rt;
+	unsigned int rt;
 
 	/* Fast path for single byte locales */
 	if (c < 0 || c >= _CACHED_RUNES)
@@ -86,14 +86,14 @@ __isctype(wint_t c, unsigned long f)
 int
 iswctype(wint_t wc, wctype_t class)
 {
-	return (__istype(wc, (unsigned long)class));
+	return (__istype(wc, class));
 }
 
 #undef _iswctype
 unsigned
 _iswctype(wchar_t wc, int class)
 {
-	return (__istype((wint_t)wc, (unsigned long)class));
+	return (__istype((wint_t)wc, (unsigned int)class));
 }
 
 #undef iswalnum

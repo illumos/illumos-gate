@@ -377,7 +377,7 @@ strfmon(char *_RESTRICT_KYWD s, size_t maxsize,
 					PRINT(' ');
 			} else {
 				pad_size = dst-tmpptr;
-				memmove(tmpptr + width-pad_size, tmpptr,
+				(void) memmove(tmpptr + width-pad_size, tmpptr,
 				    pad_size);
 				(void) memset(tmpptr, ' ', width-pad_size);
 				dst += width-pad_size;
@@ -620,7 +620,7 @@ __format_grouped_double(double value, int *flags,
 	}
 
 	bufsize = bufsize - (bufend - rslt) + 1;
-	memmove(rslt, bufend, bufsize);
+	(void) memmove(rslt, bufend, bufsize);
 	free(avalue);
 	return (rslt);
 }

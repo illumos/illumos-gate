@@ -1282,7 +1282,7 @@ doinsert(struct parse *p, sop op, size_t opnd, sopno pos)
 		}
 	}
 
-	memmove((char *)&p->strip[pos+1], (char *)&p->strip[pos],
+	(void) memmove((char *)&p->strip[pos+1], (char *)&p->strip[pos],
 	    (HERE()-pos-1)*sizeof (sop));
 	p->strip[pos] = s;
 }

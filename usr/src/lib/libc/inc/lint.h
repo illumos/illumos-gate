@@ -31,6 +31,9 @@
 extern "C" {
 #endif
 
+/* we need the following to pick up _LP64 */
+#include <sys/feature_tests.h>
+
 /*
  * We must include "lint.h" as the first #include in all libc source files
  * for the purpose of running lint over libc, else lint errors occur due to

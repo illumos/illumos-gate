@@ -83,6 +83,6 @@
 #define	_CTYPE_SWM	0xe0000000U		/* Mask for screen width data */
 #define	_CTYPE_SWS	30			/* Bits to shift to get width */
 
-unsigned long	___runetype(int);
+unsigned int	___runetype(int);
 
 #endif /* !__CTYPE_H_ */

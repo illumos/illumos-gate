@@ -104,7 +104,7 @@ typedef struct {
 	__rune_t	__min;		/* First rune of the range */
 	__rune_t	__max;		/* Last rune (inclusive) of the range */
 	__rune_t	__map;		/* What first maps to in maps */
-	unsigned long	*__types;	/* Array of types in range */
+	unsigned	*__types;	/* Array of types in range */
 } _RuneEntry;
 
 typedef struct {

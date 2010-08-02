@@ -32,6 +32,7 @@
 #define	_MSE_H
 
 #include "lint.h"
+#include "file64.h"
 #include <stdio.h>
 #include <wchar.h>
 #include <string.h>

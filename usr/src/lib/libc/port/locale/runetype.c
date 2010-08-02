@@ -40,7 +40,7 @@
 #include <stdio.h>
 #include "runetype.h"
 
-unsigned long
+unsigned int
 ___runetype(__ct_rune_t c)
 {
 	size_t lim;
