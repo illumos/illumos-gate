@@ -294,5 +294,5 @@ legacy pkg=SUNWgrubS arch=$(ARCH) category=system desc="Source for GNU GRUB" \
     name="Source for GNU GRUB - GNU GRand Unified Bootloader" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license grubcredits license=grubcredits
-license lic_GPLv2 license=lic_GPLv2
+license usr/src/grub/grub-0.97/AUTHORS license=usr/src/grub/grub-0.97/AUTHORS
+license usr/src/grub/grub-0.97/COPYING license=usr/src/grub/grub-0.97/COPYING

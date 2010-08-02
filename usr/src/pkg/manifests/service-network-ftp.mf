@@ -67,6 +67,6 @@ legacy pkg=SUNWftpu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="FTP Server, (Usr)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license ../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
-    license=../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
 license cr_Sun license=cr_Sun
+license usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE

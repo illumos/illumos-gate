@@ -37,10 +37,10 @@ legacy pkg=SUNWscplp arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Solaris Print - Source Compatibility, (Usr)" \
     vendor="Sun Microsystems, Inc." version=13.1,REV=2009.11.11
-license cmd/lp/cmd/lptest/THIRDPARTYLICENSE \
-    license=cmd/lp/cmd/lptest/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/lp/cmd/lptest/THIRDPARTYLICENSE \
+    license=usr/src/cmd/lp/cmd/lptest/THIRDPARTYLICENSE
 link path=usr/ucb/lpc target=../bin/lpc
 link path=usr/ucb/lpq target=../bin/lpq
 link path=usr/ucb/lpr target=../bin/lpr

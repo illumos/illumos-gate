@@ -78,10 +78,10 @@ legacy pkg=SUNWrcmds arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Remote Network Server Commands (Usr)" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.comsat \
-    license=cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.comsat
-license cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind \
-    license=cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.comsat \
+    license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.comsat
+license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind \
+    license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind
 link path=etc/rmt target=../usr/sbin/rmt

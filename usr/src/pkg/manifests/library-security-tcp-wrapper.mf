@@ -57,4 +57,5 @@ legacy pkg=SUNWtcpd arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="tcpd - access control facility for internet services" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/tcpd/THIRDPARTYLICENSE license=cmd/tcpd/THIRDPARTYLICENSE
+license usr/src/cmd/tcpd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tcpd/THIRDPARTYLICENSE

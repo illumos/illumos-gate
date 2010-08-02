@@ -2552,33 +2552,45 @@ legacy pkg=SUNWftpr arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="FTP Server, (Root)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license ../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
-    license=../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
-license cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE
-license cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE
-license cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp \
-    license=cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp
-license cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route \
-    license=cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route
-license cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE
-license cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE
-license cmd/csh/THIRDPARTYLICENSE license=cmd/csh/THIRDPARTYLICENSE
-license cmd/eeprom/THIRDPARTYLICENSE license=cmd/eeprom/THIRDPARTYLICENSE
-license cmd/fs.d/ufs/THIRDPARTYLICENSE license=cmd/fs.d/ufs/THIRDPARTYLICENSE
-license cmd/mt/THIRDPARTYLICENSE license=cmd/mt/THIRDPARTYLICENSE
-license cmd/script/THIRDPARTYLICENSE license=cmd/script/THIRDPARTYLICENSE
-license cmd/stat/vmstat/THIRDPARTYLICENSE \
-    license=cmd/stat/vmstat/THIRDPARTYLICENSE
-license cmd/tip/THIRDPARTYLICENSE license=cmd/tip/THIRDPARTYLICENSE
-license cmd/vi/THIRDPARTYLICENSE license=cmd/vi/THIRDPARTYLICENSE
-license cmd/which/THIRDPARTYLICENSE license=cmd/which/THIRDPARTYLICENSE
-license cmd/xstr/THIRDPARTYLICENSE license=cmd/xstr/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp \
+    license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp
+license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route \
+    license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route
+license usr/src/cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
+license usr/src/cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE
+license usr/src/cmd/cron/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cron/THIRDPARTYLICENSE
+license usr/src/cmd/csh/THIRDPARTYLICENSE \
+    license=usr/src/cmd/csh/THIRDPARTYLICENSE
+license usr/src/cmd/eeprom/THIRDPARTYLICENSE \
+    license=usr/src/cmd/eeprom/THIRDPARTYLICENSE
+license usr/src/cmd/fs.d/ufs/THIRDPARTYLICENSE \
+    license=usr/src/cmd/fs.d/ufs/THIRDPARTYLICENSE
+license usr/src/cmd/mt/THIRDPARTYLICENSE \
+    license=usr/src/cmd/mt/THIRDPARTYLICENSE
+license usr/src/cmd/script/THIRDPARTYLICENSE \
+    license=usr/src/cmd/script/THIRDPARTYLICENSE
+license usr/src/cmd/stat/vmstat/THIRDPARTYLICENSE \
+    license=usr/src/cmd/stat/vmstat/THIRDPARTYLICENSE
+license usr/src/cmd/tip/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tip/THIRDPARTYLICENSE
+license usr/src/cmd/vi/THIRDPARTYLICENSE \
+    license=usr/src/cmd/vi/THIRDPARTYLICENSE
+license usr/src/cmd/which/THIRDPARTYLICENSE \
+    license=usr/src/cmd/which/THIRDPARTYLICENSE
+license usr/src/cmd/xstr/THIRDPARTYLICENSE \
+    license=usr/src/cmd/xstr/THIRDPARTYLICENSE
+license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
 link path=bin target=./usr/bin
 link path=etc/TIMEZONE target=./default/init
 link path=etc/autopush target=../sbin/autopush

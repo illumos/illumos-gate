@@ -54,7 +54,7 @@ legacy pkg=SUNWmwl arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Marvell 88W8363 IEEE802.11b/g Wireless Network Device Driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license uts/common/io/mwl/THIRDPARTYLICENSE \
-    license=uts/common/io/mwl/THIRDPARTYLICENSE
-license uts/common/io/mwl/mwl_fw/LICENSE \
-    license=uts/common/io/mwl/mwl_fw/LICENSE
+license usr/src/uts/common/io/mwl/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/mwl/THIRDPARTYLICENSE
+license usr/src/uts/common/io/mwl/mwl_fw/LICENSE \
+    license=usr/src/uts/common/io/mwl/mwl_fw/LICENSE

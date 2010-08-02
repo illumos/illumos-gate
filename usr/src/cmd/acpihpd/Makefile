@@ -18,12 +18,16 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
 #
 # Copyright (c) 2010, Intel Corporation.
 # All rights reserved.
+#
+
 #
 # cmd/acpihpd/Makefile
 #
@@ -46,9 +50,16 @@ lint	:=	TARGET = lint
 
 .KEEP_STATE:
 
+CLOBBERFILES += THIRDPARTYLICENSE
+
 all:	$(SUBDIRS)
 
 install:	$(SUBDIRS) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+all install: THIRDPARTYLICENSE
+
+THIRDPARTYLICENSE: acpihpd.c
+	$(SED) -e '/sys\/param.h/,$$ d' acpihpd.c > $@
 
 clean clobber lint:	$(SUBDIRS)
 

@@ -53,5 +53,5 @@ legacy pkg=SUNWamr arch=$(ARCH) category=system \
     name="LSI MegaRAID SCSI HBA Driver" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license uts/intel/io/amr/THIRDPARTYLICENSE \
-    license=uts/intel/io/amr/THIRDPARTYLICENSE
+license usr/src/uts/intel/io/amr/THIRDPARTYLICENSE \
+    license=usr/src/uts/intel/io/amr/THIRDPARTYLICENSE

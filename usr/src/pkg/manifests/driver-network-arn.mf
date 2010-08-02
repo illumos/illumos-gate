@@ -49,4 +49,5 @@ legacy pkg=SUNWarn arch=$(ARCH) category=system \
     name="Atheros IEEE 802.11 Wireless NIC Driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license uts/common/io/arn/LICENSE license=uts/common/io/arn/LICENSE
+license usr/src/uts/common/io/arn/LICENSE \
+    license=usr/src/uts/common/io/arn/LICENSE

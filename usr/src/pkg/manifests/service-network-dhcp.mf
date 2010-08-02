@@ -76,6 +76,8 @@ legacy pkg=SUNWdhcsu arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/usr.lib/in.dhcpd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.lib/in.dhcpd/THIRDPARTYLICENSE
 link path=usr/lib/inet/dhcp/svc/ds_SUNWfiles.so target=./ds_SUNWfiles.so.1
 depend fmri=network/dhcp/dhcpmgr type=require
 depend fmri=network/ftp type=require

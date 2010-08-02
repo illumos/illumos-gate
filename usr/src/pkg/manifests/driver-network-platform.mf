@@ -190,5 +190,7 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
+license usr/closed/uts/intel/io/iprb/THIRDPARTYLICENSE \
+    license=usr/closed/uts/intel/io/iprb/THIRDPARTYLICENSE
 # elxl moved out of this package, so create a dependency for upgraded systems
 depend fmri=driver/network/elxl type=require

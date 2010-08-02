@@ -24,6 +24,9 @@
 
 include ../../Makefile.cmd
 
+i386_DFILES = \
+	iprb.d
+
 DFILES = \
 	applicat.d \
 	badopen.d \
@@ -53,7 +56,6 @@ DFILES = \
 	ipio.d \
 	ipproto.d \
 	tcprst.d \
-	iprb.d \
 	kstat.d \
 	ksyms.d \
 	libc.d \
@@ -121,7 +123,8 @@ DFILES = \
 	writetimeq.d \
 	xioctl.d \
 	xterm.d \
-	xwork.d
+	xwork.d \
+	$($(MACH)_DFILES)
 
 HTMLFILES = index.html
 

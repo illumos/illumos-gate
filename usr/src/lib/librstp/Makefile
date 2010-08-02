@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include $(SRC)/lib/Makefile.lib
@@ -39,14 +39,6 @@ lint :=		TARGET = lint
 
 all clean clobber install lint: $(SUBDIRS)
 
-install: THIRDPARTYLICENSE
-
-THIRDPARTYLICENSE: common/COPYING
-	$(RM) $@
-	$(CP) $? $@
-
-CLOBBERFILES +=	THIRDPARTYLICENSE
-
 install_h:	$(ROOTHDRS)
 
 check:
@@ -56,5 +48,4 @@ $(SUBDIRS): FRC
 
 FRC:
 
-include $(SRC)/Makefile.msg.targ
 include $(SRC)/lib/Makefile.targ

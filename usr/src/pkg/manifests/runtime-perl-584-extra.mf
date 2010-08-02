@@ -1513,6 +1513,7 @@ legacy pkg=SUNWperl584usr arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Perl 5.8.4 (non-core)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/perl/THIRDPARTYLICENSE license=cmd/perl/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
+license usr/src/cmd/perl/THIRDPARTYLICENSE \
+    license=usr/src/cmd/perl/THIRDPARTYLICENSE
 link path=usr/perl5/pod target=./5.8.4/lib/pod

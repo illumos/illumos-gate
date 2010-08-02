@@ -85,8 +85,10 @@ legacy pkg=SUNWcpcu arch=$(ARCH) category=system \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/intel/pcbe/THIRDPARTYLICENSE \
-    license=uts/intel/pcbe/THIRDPARTYLICENSE
+$(i386_ONLY)license usr/src/uts/intel/pcbe/THIRDPARTYLICENSE \
+    license=usr/src/uts/intel/pcbe/THIRDPARTYLICENSE
+$(sparc_ONLY)license usr/src/uts/sun4u/pcbe/THIRDPARTYLICENSE \
+    license=usr/src/uts/sun4u/pcbe/THIRDPARTYLICENSE
 $(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.23 \
     target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.26 \

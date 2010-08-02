@@ -44,4 +44,3 @@ legacy pkg=SUNWqlcu arch=$(ARCH) category=system \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license lic_Qlogic license=lic_Qlogic

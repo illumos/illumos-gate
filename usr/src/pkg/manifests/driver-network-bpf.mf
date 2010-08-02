@@ -58,6 +58,8 @@ legacy pkg=SUNWpacketu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Solaris Kernel Packet (Usr)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/ipf/tools/IPFILTER.LICENCE license=cmd/ipf/tools/IPFILTER.LICENCE
 license cr_Sun license=cr_Sun
-license uts/common/io/bpf/BPF.LICENCE license=uts/common/io/bpf/BPF.LICENCE
+license usr/src/cmd/ipf/tools/IPFILTER.LICENCE \
+    license=usr/src/cmd/ipf/tools/IPFILTER.LICENCE
+license usr/src/uts/common/io/bpf/BPF.LICENCE \
+    license=usr/src/uts/common/io/bpf/BPF.LICENCE

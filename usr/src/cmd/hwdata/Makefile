@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.cmd
@@ -31,7 +31,14 @@ ROOTHWDATA =	$(HWDATA:%=$(HWDATADIR)/%)
 
 $(ROOTHWDATA) :=	FILEMODE = 444
 
-all:
+CLOBBERFILES += THIRDPARTYLICENSE.pciids
+
+all install: THIRDPARTYLICENSE.pciids
+
+THIRDPARTYLICENSE.pciids: pci.ids THIRDPARTYLICENSE.pciids.tmpl
+	$(RM) $@
+	$(SED) -e '/^$$/,$$ d' < pci.ids > $@
+	$(CAT) THIRDPARTYLICENSE.pciids.tmpl >> $@
 
 install: $(ROOTHWDATA)
 
@@ -42,3 +49,4 @@ lint check clean clobber:
 
 FRC:
 
+include ../Makefile.targ

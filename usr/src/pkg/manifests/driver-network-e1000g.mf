@@ -192,6 +192,5 @@ legacy pkg=SUNWintgige arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Intel(R) PRO/1000 Server Adapter Driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cr_Intel.SUNWintgige license=cr_Intel
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/io/e1000g/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/e1000g/THIRDPARTYLICENSE

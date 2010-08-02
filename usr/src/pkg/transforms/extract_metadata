@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -29,6 +28,13 @@
 # osnet build.
 #
 <transform set name=org.opensolaris.redist value=nonredist|internal -> print REPO=extra>
+
+#
+# Pull out the license paths for staging in the proto area.  Ignore
+# those with no path separators, as that indicates a file kept in
+# $SRC/pkg/license_files, rather than alongside the associated source.
+#
+<transform license license=.*/.+ -> print LICS="${LICS} %(license)">
 
 #
 # Ordering is important here, and the last line wins.

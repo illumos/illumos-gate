@@ -68,9 +68,9 @@ legacy pkg=SUNWndmpu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Network Data Management Protocol Service (User)" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/ndmpd/LICENSE license=cmd/ndmpd/LICENSE
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
+license usr/src/cmd/ndmpd/LICENSE license=usr/src/cmd/ndmpd/LICENSE
 link path=usr/lib/$(ARCH64)/libndmp.so target=libndmp.so.1
 link path=usr/lib/libndmp.so target=libndmp.so.1

@@ -47,6 +47,7 @@ legacy pkg=SUNWtecla arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Tecla command-line editing library" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license lib/libtecla/THIRDPARTYLICENSE license=lib/libtecla/THIRDPARTYLICENSE
+license usr/src/lib/libtecla/THIRDPARTYLICENSE \
+    license=usr/src/lib/libtecla/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libtecla.so target=libtecla.so.1
 link path=usr/lib/libtecla.so target=libtecla.so.1

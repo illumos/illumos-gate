@@ -50,6 +50,7 @@ legacy pkg=SUNWlibsasl arch=$(ARCH) category=system \
     name="Simple Authentication and Security Layer (SASL) v2 shared library and plugins" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lib/libsasl/THIRDPARTYLICENSE license=lib/libsasl/THIRDPARTYLICENSE
+license usr/src/lib/libsasl/THIRDPARTYLICENSE \
+    license=usr/src/lib/libsasl/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libsasl.so target=libsasl.so.1
 link path=usr/lib/libsasl.so target=libsasl.so.1

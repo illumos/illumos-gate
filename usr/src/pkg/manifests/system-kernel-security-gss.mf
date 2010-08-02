@@ -50,5 +50,5 @@ legacy pkg=SUNWgssk arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="kernel GSSAPI V2" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE \
-    license=uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE
+license usr/src/uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE

@@ -61,7 +61,7 @@ legacy pkg=SUNWwpi arch=$(ARCH) category=system \
     name="Intel(R) PRO/Wireless 3945ABG driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license uts/common/io/wpi/THIRDPARTYLICENSE \
-    license=uts/common/io/wpi/THIRDPARTYLICENSE
-license uts/common/io/wpi/fw-wpi/LICENSE \
-    license=uts/common/io/wpi/fw-wpi/LICENSE
+license usr/src/uts/common/io/wpi/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/wpi/THIRDPARTYLICENSE
+license usr/src/uts/common/io/wpi/fw-wpi/LICENSE \
+    license=usr/src/uts/common/io/wpi/fw-wpi/LICENSE

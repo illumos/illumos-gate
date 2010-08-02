@@ -52,6 +52,6 @@ legacy pkg=SUNWwbsup arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="WAN boot support" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license common/openssl/LICENSE license=common/openssl/LICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/common/openssl/LICENSE license=usr/src/common/openssl/LICENSE

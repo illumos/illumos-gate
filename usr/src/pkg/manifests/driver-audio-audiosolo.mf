@@ -46,5 +46,5 @@ legacy pkg=SUNWaudiosolo arch=$(ARCH) category=system \
     name="ESS Solo-1 Audio Driver" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE \
-    license=uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE
+license usr/src/uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE

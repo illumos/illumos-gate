@@ -144,12 +144,12 @@ legacy pkg=SUNWdsdu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Multicast DNS and Service Discovery (Usr)" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
-license lib/libdns_sd/THIRDPARTYLICENSE \
-    license=lib/libdns_sd/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE
+license usr/src/lib/libdns_sd/THIRDPARTYLICENSE \
+    license=usr/src/lib/libdns_sd/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libdns_sd.so target=libdns_sd.so.1
 link path=usr/lib/$(ARCH64)/libjdns_sd.so target=libjdns_sd.so.1
 link path=usr/lib/libdns_sd.so target=libdns_sd.so.1

@@ -934,3 +934,10 @@ opt/onbld/bin/sparc/elfsign	sparc
 # Private socket filter API
 #
 usr/include/sys/sockfilter.h
+#
+# We don't actually validate license action payloads, and the license
+# staging area is provided as a separate basedir for package
+# publication.  The net result is that everything therein should be
+# ignored for packaging validation.
+#
+licenses

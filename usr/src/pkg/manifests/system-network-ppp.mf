@@ -95,9 +95,9 @@ legacy pkg=SUNWpppdu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Solaris PPP daemon and utilities" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/common/io/ppp/THIRDPARTYLICENSE \
-    license=uts/common/io/ppp/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE
+license usr/src/uts/common/io/ppp/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/ppp/THIRDPARTYLICENSE

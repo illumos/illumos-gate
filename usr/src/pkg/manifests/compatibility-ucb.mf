@@ -99,28 +99,36 @@ legacy pkg=SUNWscpu arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license ucbcmd/basename/THIRDPARTYLICENSE \
-    license=ucbcmd/basename/THIRDPARTYLICENSE
-license ucbcmd/echo/THIRDPARTYLICENSE license=ucbcmd/echo/THIRDPARTYLICENSE
-license ucbcmd/from/THIRDPARTYLICENSE license=ucbcmd/from/THIRDPARTYLICENSE
-license ucbcmd/groups/THIRDPARTYLICENSE \
-    license=ucbcmd/groups/THIRDPARTYLICENSE
-license ucbcmd/ln/THIRDPARTYLICENSE license=ucbcmd/ln/THIRDPARTYLICENSE
-license ucbcmd/ls/THIRDPARTYLICENSE license=ucbcmd/ls/THIRDPARTYLICENSE
-license ucbcmd/sum/THIRDPARTYLICENSE license=ucbcmd/sum/THIRDPARTYLICENSE
-license ucbcmd/test/THIRDPARTYLICENSE license=ucbcmd/test/THIRDPARTYLICENSE
-license ucbcmd/tset/THIRDPARTYLICENSE license=ucbcmd/tset/THIRDPARTYLICENSE
-license ucbcmd/users/THIRDPARTYLICENSE license=ucbcmd/users/THIRDPARTYLICENSE
-license ucbcmd/whereis/THIRDPARTYLICENSE \
-    license=ucbcmd/whereis/THIRDPARTYLICENSE
-license ucbcmd/whoami/THIRDPARTYLICENSE \
-    license=ucbcmd/whoami/THIRDPARTYLICENSE
-license ucblib/libcurses/THIRDPARTYLICENSE \
-    license=ucblib/libcurses/THIRDPARTYLICENSE
-license ucblib/libtermcap/THIRDPARTYLICENSE \
-    license=ucblib/libtermcap/THIRDPARTYLICENSE
-license ucblib/libucb/THIRDPARTYLICENSE \
-    license=ucblib/libucb/THIRDPARTYLICENSE
+license usr/src/ucbcmd/basename/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/basename/THIRDPARTYLICENSE
+license usr/src/ucbcmd/echo/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/echo/THIRDPARTYLICENSE
+license usr/src/ucbcmd/from/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/from/THIRDPARTYLICENSE
+license usr/src/ucbcmd/groups/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/groups/THIRDPARTYLICENSE
+license usr/src/ucbcmd/ln/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/ln/THIRDPARTYLICENSE
+license usr/src/ucbcmd/ls/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/ls/THIRDPARTYLICENSE
+license usr/src/ucbcmd/sum/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/sum/THIRDPARTYLICENSE
+license usr/src/ucbcmd/test/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/test/THIRDPARTYLICENSE
+license usr/src/ucbcmd/tset/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/tset/THIRDPARTYLICENSE
+license usr/src/ucbcmd/users/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/users/THIRDPARTYLICENSE
+license usr/src/ucbcmd/whereis/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/whereis/THIRDPARTYLICENSE
+license usr/src/ucbcmd/whoami/THIRDPARTYLICENSE \
+    license=usr/src/ucbcmd/whoami/THIRDPARTYLICENSE
+license usr/src/ucblib/libcurses/THIRDPARTYLICENSE \
+    license=usr/src/ucblib/libcurses/THIRDPARTYLICENSE
+license usr/src/ucblib/libtermcap/THIRDPARTYLICENSE \
+    license=usr/src/ucblib/libtermcap/THIRDPARTYLICENSE
+license usr/src/ucblib/libucb/THIRDPARTYLICENSE \
+    license=usr/src/ucblib/libucb/THIRDPARTYLICENSE
 link path=etc/chroot target=../usr/sbin/chroot
 link path=etc/fuser target=../usr/sbin/fuser
 link path=etc/link target=../usr/sbin/link

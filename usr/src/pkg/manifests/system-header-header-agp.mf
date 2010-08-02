@@ -46,5 +46,5 @@ legacy pkg=SUNWagph arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/common/sys/THIRDPARTYLICENSE.agpgart \
-    license=uts/common/sys/THIRDPARTYLICENSE.agpgart
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.agpgart \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.agpgart

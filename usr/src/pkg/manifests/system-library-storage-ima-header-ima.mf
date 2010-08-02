@@ -51,8 +51,9 @@ legacy pkg=SUNWimacr arch=$(ARCH) category=system \
     name="Solaris IMA Common Library (Root)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lib/libima/THIRDPARTYLICENSE license=lib/libima/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/libima/THIRDPARTYLICENSE \
+    license=usr/src/lib/libima/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libima.so target=libima.so.1
 link path=usr/lib/libima.so target=libima.so.1
 depend fmri=system/library/storage/ima type=require

@@ -134,3 +134,5 @@ legacy pkg=SUNWusb arch=$(ARCH) category=system \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers
+license usr/src/uts/common/io/usb/clients/hwa1480_fw/i1480/LICENSE \
+    license=usr/src/uts/common/io/usb/clients/hwa1480_fw/i1480/LICENSE

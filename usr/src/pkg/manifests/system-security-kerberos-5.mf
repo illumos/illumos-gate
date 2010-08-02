@@ -102,8 +102,9 @@ legacy pkg=SUNWkdcu arch=$(ARCH) category=system \
     name="Kerberos V5 Master KDC (user)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lib/krb5/THIRDPARTYLICENSE license=lib/krb5/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/krb5/THIRDPARTYLICENSE \
+    license=usr/src/lib/krb5/THIRDPARTYLICENSE
 link path=usr/lib/krb5/db2.so target=db2.so.1
 link path=usr/lib/krb5/kldap.so target=kldap.so.1
 link path=usr/lib/krb5/libdb2.so target=libdb2.so.1

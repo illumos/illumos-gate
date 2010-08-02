@@ -49,5 +49,5 @@ legacy pkg=SUNWrwd arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Ralink RT2561/RT2561S/RT2661 IEEE802.11b/g Wireless Network Device" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license uts/common/io/rwd/THIRDPARTYLICENSE \
-    license=uts/common/io/rwd/THIRDPARTYLICENSE
+license usr/src/uts/common/io/rwd/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/rwd/THIRDPARTYLICENSE

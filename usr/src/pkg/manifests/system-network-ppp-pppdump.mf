@@ -46,10 +46,10 @@ legacy pkg=SUNWpppg arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="GNU utilities for PPP" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect \
-    license=cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect
-license cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.passwd \
-    license=cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.passwd
-license cmd/cmd-inet/usr.bin/pppdump/LICENSE.top \
-    license=cmd/cmd-inet/usr.bin/pppdump/LICENSE.top
 license cr_Sun license=cr_Sun
+license usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect \
+    license=usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect
+license usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.passwd \
+    license=usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.passwd
+license usr/src/cmd/cmd-inet/usr.bin/pppdump/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.bin/pppdump/THIRDPARTYLICENSE

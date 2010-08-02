@@ -49,7 +49,7 @@ legacy pkg=SUNWrwn arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Ralink RT2700/2800 IEEE802.11 a/b/g/n Wireless Network Device" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license uts/common/io/rwn/THIRDPARTYLICENSE \
-    license=uts/common/io/rwn/THIRDPARTYLICENSE
-license uts/common/io/rwn/fw-rt2860/LICENSE \
-    license=uts/common/io/rwn/fw-rt2860/LICENSE
+license usr/src/uts/common/io/rwn/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/rwn/THIRDPARTYLICENSE
+license usr/src/uts/common/io/rwn/fw-rt2860/LICENSE \
+    license=usr/src/uts/common/io/rwn/fw-rt2860/LICENSE

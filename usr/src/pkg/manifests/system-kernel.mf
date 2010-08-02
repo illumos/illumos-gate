@@ -837,31 +837,35 @@ legacy pkg=SUNWckr arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Core Solaris Kernel (Root)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license common/crypto/THIRDPARTYLICENSE.cryptogams \
-    license=common/crypto/THIRDPARTYLICENSE.cryptogams
-license common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
-    license=common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman
-license common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \
-    license=common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl
-license common/crypto/ecc/THIRDPARTYLICENSE \
-    license=common/crypto/ecc/THIRDPARTYLICENSE
-license common/crypto/md5/amd64/THIRDPARTYLICENSE \
-    license=common/crypto/md5/amd64/THIRDPARTYLICENSE
-license common/mpi/THIRDPARTYLICENSE license=common/mpi/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/common/inet/ip/THIRDPARTYLICENSE.rts \
-    license=uts/common/inet/ip/THIRDPARTYLICENSE.rts
-license uts/common/inet/tcp/THIRDPARTYLICENSE \
-    license=uts/common/inet/tcp/THIRDPARTYLICENSE
-license uts/common/io/THIRDPARTYLICENSE.etheraddr \
-    license=uts/common/io/THIRDPARTYLICENSE.etheraddr
-license uts/common/sys/THIRDPARTYLICENSE.icu \
-    license=uts/common/sys/THIRDPARTYLICENSE.icu
-license uts/common/sys/THIRDPARTYLICENSE.unicode \
-    license=uts/common/sys/THIRDPARTYLICENSE.unicode
-license uts/intel/io/acpica/THIRDPARTYLICENSE \
-    license=uts/intel/io/acpica/THIRDPARTYLICENSE
+license usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE \
+    license=usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE
+license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
+license usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams \
+    license=usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams
+$(i386_ONLY)license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
+    license=usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman
+$(i386_ONLY)license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \
+    license=usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl
+license usr/src/common/crypto/ecc/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/ecc/THIRDPARTYLICENSE
+$(i386_ONLY)license usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
+license usr/src/common/mpi/THIRDPARTYLICENSE \
+    license=usr/src/common/mpi/THIRDPARTYLICENSE
+license usr/src/uts/common/inet/ip/THIRDPARTYLICENSE.rts \
+    license=usr/src/uts/common/inet/ip/THIRDPARTYLICENSE.rts
+license usr/src/uts/common/inet/tcp/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/inet/tcp/THIRDPARTYLICENSE
+license usr/src/uts/common/io/THIRDPARTYLICENSE.etheraddr \
+    license=usr/src/uts/common/io/THIRDPARTYLICENSE.etheraddr
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.icu \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.icu
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
+$(i386_ONLY)license usr/src/uts/intel/io/acpica/THIRDPARTYLICENSE \
+    license=usr/src/uts/intel/io/acpica/THIRDPARTYLICENSE
 $(i386_ONLY)link path=boot/solaris/bin/root_archive \
     target=../../../usr/sbin/root_archive
 link path=dev/dld target=../devices/pseudo/dld@0:ctl

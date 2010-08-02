@@ -72,5 +72,5 @@ legacy pkg=SUNWpmcsu arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/common/io/scsi/adapters/pmcs/LICENSE \
-    license=uts/common/io/scsi/adapters/pmcs/LICENSE
+license usr/src/uts/common/io/scsi/adapters/pmcs/LICENSE \
+    license=usr/src/uts/common/io/scsi/adapters/pmcs/LICENSE

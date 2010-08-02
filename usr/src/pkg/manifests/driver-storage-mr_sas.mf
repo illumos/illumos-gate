@@ -55,4 +55,5 @@ legacy pkg=SUNWmrsas arch=$(ARCH) category=system \
     name="LSI MegaRAID SAS2.0 HBA Driver" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE

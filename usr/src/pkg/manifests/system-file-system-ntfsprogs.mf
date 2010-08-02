@@ -54,4 +54,8 @@ legacy pkg=SUNWntfsprogs arch=$(ARCH) category=system \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/ntfsprogs/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ntfsprogs/THIRDPARTYLICENSE
+license usr/src/lib/libntfs/THIRDPARTYLICENSE \
+    license=usr/src/lib/libntfs/THIRDPARTYLICENSE
 link path=usr/lib/libntfs.so target=./libntfs.so.10

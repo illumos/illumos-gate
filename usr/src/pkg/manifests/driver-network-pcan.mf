@@ -50,5 +50,5 @@ legacy pkg=SUNWpcan arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Cisco-Aironet 802.11b driver" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license uts/common/io/pcan/THIRDPARTYLICENSE \
-    license=uts/common/io/pcan/THIRDPARTYLICENSE
+license usr/src/uts/common/io/pcan/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/pcan/THIRDPARTYLICENSE

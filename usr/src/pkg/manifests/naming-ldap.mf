@@ -42,5 +42,6 @@ legacy pkg=SUNWlldap arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="LDAP Libraries" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/ldap/THIRDPARTYLICENSE license=cmd/ldap/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
+license usr/src/cmd/ldap/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ldap/THIRDPARTYLICENSE

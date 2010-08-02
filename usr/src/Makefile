@@ -92,9 +92,24 @@ check :=		TARGET= check
 
 all: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg
 
-install: install1 install2 _msg
+#
+# The _msg build is a two-step process.  First, the _msg dependency
+# causes recursive makes in $(MSGSUBDIRS), which stages raw message
+# files in $(ROOT)/catalog.  Second, the action from the install
+# target rule causes those messages to be post-processed from where
+# they were staged in $(ROOT)/catalog, and the results placed into the
+# proto area.
+#
+# The stage-licenses target causes the license files needed for
+# packaging to be pulled from $(SRC) and $(CLOSED) and staged in
+# $(ROOT)/licenses.
+#
+install: install1 install2 _msg stage-licenses
 	@cd msg; pwd; $(MAKE) _msg
 	@rm -rf "$(ROOT)/catalog"
+
+stage-licenses: install2
+	@cd pkg; pwd; $(MAKE) stage-licenses
 
 install1: mapfiles closedbins sgs
 

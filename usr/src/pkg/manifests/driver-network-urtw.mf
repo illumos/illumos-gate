@@ -60,5 +60,5 @@ legacy pkg=SUNWurtw arch=$(ARCH) category=system \
     name="RealTek RTL8187L/B USB 802.11b/g Wireless Driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license uts/common/io/urtw/THIRDPARTYLICENSE \
-    license=uts/common/io/urtw/THIRDPARTYLICENSE
+license usr/src/uts/common/io/urtw/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/urtw/THIRDPARTYLICENSE

@@ -61,7 +61,5 @@ legacy pkg=SUNWelxl arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="3Com Etherlink XL Ethernet Driver" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-license uts/common/io/elxl/THIRDPARTYLICENSE \
-    license=uts/common/io/elxl/THIRDPARTYLICENSE
+license usr/src/uts/common/io/elxl/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/elxl/THIRDPARTYLICENSE

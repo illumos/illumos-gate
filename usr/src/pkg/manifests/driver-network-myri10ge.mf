@@ -53,5 +53,5 @@ legacy pkg=SUNWmyri10ge arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/common/io/myri10ge/THIRDPARTYLICENSE \
-    license=uts/common/io/myri10ge/THIRDPARTYLICENSE
+license usr/src/uts/common/io/myri10ge/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/myri10ge/THIRDPARTYLICENSE

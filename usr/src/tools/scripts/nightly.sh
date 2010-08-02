@@ -139,12 +139,18 @@ function crypto_from_proto {
 	# both DEBUG and non-DEBUG, but it's a cheap operation and not
 	# worth the complexity to only do once.
 	#
-	mktpl -c usr/src/tools/opensolaris/license-list >> "$LOGFILE" 2>&1
-	if (( $? != 0 )) ; then
-		echo "Couldn't create crypto THIRDPARTYLICENSE file." |
+	if [ -d $ROOT/licenses/usr ]; then
+		( cd $ROOT/licenses ; \
+		    mktpl -c $SRC/pkg/license-list ) >> "$LOGFILE" 2>&1
+		if (( $? != 0 )) ; then
+			echo "Couldn't create crypto THIRDPARTYLICENSE files" |
+			    tee -a "$mail_msg_file" >> "$LOGFILE"
+			build_ok=n
+			return
+		fi
+	else
+		echo "No licenses found under $ROOT/licenses" |
 		    tee -a "$mail_msg_file" >> "$LOGFILE"
-		build_ok=n
-		return
 	fi
 
 	to=$(cryptodest "$suffix")
@@ -2871,9 +2877,15 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	echo "\n==== Generating THIRDPARTYLICENSE files ====\n" |
 	    tee -a "$mail_msg_file" >> "$LOGFILE"
 
-	mktpl usr/src/tools/opensolaris/license-list >> "$LOGFILE" 2>&1
-	if (( $? != 0 )) ; then
-		echo "Couldn't create THIRDPARTYLICENSE files" |
+	if [ -d $ROOT/licenses/usr ]; then
+		( cd $ROOT/licenses ; \
+		    mktpl $SRC/pkg/license-list ) >> "$LOGFILE" 2>&1
+		if (( $? != 0 )) ; then
+			echo "Couldn't create THIRDPARTYLICENSE files" |
+			    tee -a "$mail_msg_file" >> "$LOGFILE"
+		fi
+	else
+		echo "No licenses found under $ROOT/licenses" |
 		    tee -a "$mail_msg_file" >> "$LOGFILE"
 	fi
 fi

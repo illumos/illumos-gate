@@ -51,5 +51,6 @@ legacy pkg=SUNWbridgeu arch=$(ARCH) category=system \
     name="IEEE 802 Bridging Support (Usr)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lib/librstp/THIRDPARTYLICENSE license=lib/librstp/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/librstp/common/COPYING \
+    license=usr/src/lib/librstp/common/COPYING

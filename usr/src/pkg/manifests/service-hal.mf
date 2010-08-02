@@ -175,9 +175,9 @@ legacy pkg=SUNWhalr arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Hardware Abstraction Layer (Root)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/hal/LICENSE license=cmd/hal/LICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/hal/LICENSE license=usr/src/cmd/hal/LICENSE
 link path=usr/lib/$(ARCH64)/libhal-storage.so target=./libhal-storage.so.1.0.0
 link path=usr/lib/$(ARCH64)/libhal-storage.so.1 \
     target=./libhal-storage.so.1.0.0

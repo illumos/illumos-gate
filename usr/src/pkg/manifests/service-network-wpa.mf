@@ -49,7 +49,7 @@ legacy pkg=SUNWwpau arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Wireless WPA Supplicant, (Usr)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.lib/wpad/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.lib/wpad/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/usr.lib/wpad/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.lib/wpad/THIRDPARTYLICENSE

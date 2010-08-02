@@ -94,7 +94,7 @@ file path=usr/demo/dtrace/iothrough.d
 file path=usr/demo/dtrace/iotime.d
 file path=usr/demo/dtrace/ipio.d
 file path=usr/demo/dtrace/ipproto.d
-file path=usr/demo/dtrace/iprb.d
+$(i386_ONLY)file path=usr/demo/dtrace/iprb.d
 file path=usr/demo/dtrace/kstat.d
 file path=usr/demo/dtrace/ksyms.d
 file path=usr/demo/dtrace/libc.d
@@ -638,7 +638,6 @@ legacy pkg=SUNWdtrc arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license lic_iprb license=lic_iprb
 link path=usr/lib/$(ARCH64)/libdtrace.so target=libdtrace.so.1
 link path=usr/lib/$(ARCH64)/libdtrace_jni.so target=libdtrace_jni.so.1
 link path=usr/lib/libdtrace.so target=libdtrace.so.1

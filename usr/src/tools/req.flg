@@ -21,15 +21,12 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-
 
 echo_file usr/src/lib/Makefile.lib
 echo_file usr/src/lib/Makefile.targ
 echo_file usr/src/lib/libctf/common/libctf.h
-echo_file usr/src/pkg/license_files/lic_GPLv2
 echo_file usr/src/tools/Makefile
 echo_file usr/src/tools/Makefile.targ
 echo_file usr/src/tools/Makefile.tools

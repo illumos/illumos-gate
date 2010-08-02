@@ -279,7 +279,8 @@ legacy pkg=SUNWonbld arch=$(ARCH) category=system \
     version=11.11,REV=2009.10.22
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license tools/ctf/dwarf/THIRDPARTYLICENSE \
-    license=tools/ctf/dwarf/THIRDPARTYLICENSE
-license tools/onbld/THIRDPARTYLICENSE license=tools/onbld/THIRDPARTYLICENSE
+license usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE \
+    license=usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE
+license usr/src/tools/onbld/THIRDPARTYLICENSE \
+    license=usr/src/tools/onbld/THIRDPARTYLICENSE
 link path=opt/onbld/lib/python target=python2.4

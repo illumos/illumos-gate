@@ -192,9 +192,10 @@ legacy pkg=SUNWsndmu arch=$(ARCH) category=system desc="Sendmail Utilities" \
     hotline="Please contact your local service provider" \
     name="Sendmail (/usr)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/sendmail/THIRDPARTYLICENSE license=cmd/sendmail/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/sendmail/THIRDPARTYLICENSE \
+    license=usr/src/cmd/sendmail/THIRDPARTYLICENSE
 link path=etc/aliases target=./mail/aliases
 link path=etc/mail/cf/cf/main.cf target=sendmail.cf
 link path=etc/mail/cf/cf/main.mc target=sendmail.mc

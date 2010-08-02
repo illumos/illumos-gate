@@ -73,5 +73,4 @@ legacy pkg=CPQary3 arch=$(ARCH) category=system \
     name="HP Smart Array HBA Driver 2.2.0.1" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lic_HP license=lic_HP
 license lic_OSBL license=lic_OSBL

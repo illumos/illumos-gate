@@ -54,9 +54,9 @@ legacy pkg=SUNWmpapir arch=$(ARCH) category=system \
     name="SNIA Multipath Management API Common Library (Root)" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lib/mpapi/libmpapi/THIRDPARTYLICENSE \
-    license=lib/mpapi/libmpapi/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/mpapi/libmpapi/THIRDPARTYLICENSE \
+    license=usr/src/lib/mpapi/libmpapi/THIRDPARTYLICENSE
 link path=lib/$(ARCH64)/libMPAPI.so target=libMPAPI.so.1 \
     variant.opensolaris.zone=global
 link path=lib/libMPAPI.so target=libMPAPI.so.1 variant.opensolaris.zone=global

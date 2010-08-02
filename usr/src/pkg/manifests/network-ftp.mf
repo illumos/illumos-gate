@@ -48,8 +48,8 @@ legacy pkg=SUNWbipr arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Basic IP commands (Root)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.bin/ftp/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.bin/ftp/THIRDPARTYLICENSE
 license cr_ATT license=cr_ATT
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/usr.bin/ftp/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.bin/ftp/THIRDPARTYLICENSE

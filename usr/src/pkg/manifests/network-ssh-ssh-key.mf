@@ -41,4 +41,5 @@ legacy pkg=SUNWsshcu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="SSH Common, (Usr)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/ssh/THIRDPARTYLICENSE license=cmd/ssh/THIRDPARTYLICENSE
+license usr/src/cmd/ssh/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ssh/THIRDPARTYLICENSE

@@ -134,7 +134,8 @@ file \
     path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Utils/Utils.so
 file path=usr/perl5/5.10.0/lib/Sun/Solaris/BSM/_BSMparse.pm
 file path=usr/perl5/5.10.0/lib/Sun/Solaris/PerlGcc/Config.pm
-license cmd/perl/THIRDPARTYLICENSE license=cmd/perl/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
+license usr/src/cmd/perl/THIRDPARTYLICENSE \
+    license=usr/src/cmd/perl/THIRDPARTYLICENSE
 depend fmri=runtime/perl-510 type=require
 depend fmri=runtime/perl-510/extra type=require

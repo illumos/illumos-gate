@@ -1856,6 +1856,8 @@ legacy pkg=SUNWhea arch=$(ARCH) category=system \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers
+license usr/src/lib/pkcs11/include/THIRDPARTYLICENSE \
+    license=usr/src/lib/pkcs11/include/THIRDPARTYLICENSE
 link path=usr/include/iso/assert_iso.h target=../assert.h
 link path=usr/include/iso/errno_iso.h target=../errno.h
 link path=usr/include/iso/float_iso.h target=../float.h

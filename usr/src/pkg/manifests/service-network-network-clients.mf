@@ -52,15 +52,15 @@ legacy pkg=SUNWrcmdc arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Remote Network Client Commands" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/cmd-inet/THIRDPARTYLICENSE.kcmd \
-    license=cmd/cmd-inet/THIRDPARTYLICENSE.kcmd
-license cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rcp \
-    license=cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rcp
-license cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rsh \
-    license=cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rsh
-license cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/THIRDPARTYLICENSE.kcmd \
+    license=usr/src/cmd/cmd-inet/THIRDPARTYLICENSE.kcmd
+license usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rcp \
+    license=usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rcp
+license usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rsh \
+    license=usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.rsh
+license usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE
 link path=usr/bin/remsh target=./rsh
 link path=usr/lib/sunw,rcp target=../bin/rcp

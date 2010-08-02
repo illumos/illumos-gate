@@ -91,4 +91,6 @@ legacy pkg=SUNWemlxu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Emulex-Sun LightPulse Fibre Channel Adapter Utilties (usr)" \
     vendor="Emulex Corporation" version=11.11,REV=2009.11.11
-license lic_Emulex license=lic_Emulex
+license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/io/fibre-channel/fca/emlxs/FIRMWARELICENSE \
+    license=usr/src/uts/common/io/fibre-channel/fca/emlxs/FIRMWARELICENSE

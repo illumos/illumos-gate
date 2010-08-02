@@ -47,10 +47,10 @@ legacy pkg=SUNWsasnm arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Solstice Enterprise Agents 1.0.3 Simple Network Management Protocol" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/agents/snmp/THIRDPARTYLICENSE \
-    license=cmd/agents/snmp/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/agents/snmp/THIRDPARTYLICENSE \
+    license=usr/src/cmd/agents/snmp/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libssagent.so target=./libssagent.so.1
 link path=usr/lib/$(ARCH64)/libssasnmp.so target=./libssasnmp.so.1
 link path=usr/lib/libssagent.so target=./libssagent.so.1

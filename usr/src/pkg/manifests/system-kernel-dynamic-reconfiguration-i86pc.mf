@@ -66,9 +66,10 @@ file path=platform/i86pc/kernel/misc/$(ARCH64)/drmach_acpi group=sys mode=0755
 file path=usr/platform/i86pc/lib/acpihpd group=sys mode=0755
 file path=usr/platform/i86pc/lib/cfgadm/$(ARCH64)/sbd.so.1
 file path=usr/platform/i86pc/lib/cfgadm/sbd.so.1
-license cr_Intel.hotplug license=cr_Intel
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/acpihpd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/acpihpd/THIRDPARTYLICENSE
 link path=usr/platform/i86pc/lib/cfgadm/$(ARCH64)/sbd.so target=./sbd.so.1
 link path=usr/platform/i86pc/lib/cfgadm/sbd.so target=./sbd.so.1
 depend fmri=pkg:/system/kernel/power type=require

@@ -256,11 +256,3 @@
 #
 ./usr/src/cmd/dfs.cmds/sharemgr/amd64/Makefile
 ./usr/src/cmd/dfs.cmds/sharemgr/sparcv9/Makefile
-
-#
-# Ignore the license description file for Open Fabrics Alliance
-# license file (lic_of). This exception is needed because the
-# name of the license file does not have a prefix of :
-# 	THIRDPARTYLICENSE
-#
-./usr/src/uts/common/io/ib/clients/of/lic_of.descrip

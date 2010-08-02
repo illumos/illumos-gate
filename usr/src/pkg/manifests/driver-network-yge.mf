@@ -55,4 +55,5 @@ legacy pkg=SUNWyge arch=$(ARCH) category=system \
     name="Marvell Yukon 2 Gigabit Ethernet Driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/io/yge/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/yge/THIRDPARTYLICENSE

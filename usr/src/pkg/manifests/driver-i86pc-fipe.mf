@@ -52,6 +52,5 @@ legacy pkg=SUNWfipe arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Intel 5000/7300 memory power management driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cr_Intel.SUNWfipe license=cr_Intel
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
+license usr/src/uts/i86pc/io/fipe/THIRDPARTYLICENSE \
+    license=usr/src/uts/i86pc/io/fipe/THIRDPARTYLICENSE

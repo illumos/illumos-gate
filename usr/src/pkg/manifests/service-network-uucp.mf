@@ -119,9 +119,10 @@ legacy pkg=SUNWbnuu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Networking UUCP Utilities, (Usr)" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/bnu/THIRDPARTYLICENSE license=cmd/bnu/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/bnu/THIRDPARTYLICENSE \
+    license=usr/src/cmd/bnu/THIRDPARTYLICENSE
 link path=etc/uucp/remote.unknown target=../../usr/lib/uucp/remote.unknown
 link path=var/spool/uucp/.Admin target=../../uucp/.Admin
 link path=var/spool/uucp/.Log target=../../uucp/.Log

@@ -59,5 +59,9 @@ legacy pkg=SUNWparted arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/parted/THIRDPARTYLICENSE \
+    license=usr/src/cmd/parted/THIRDPARTYLICENSE
+license usr/src/lib/libparted/THIRDPARTYLICENSE \
+    license=usr/src/lib/libparted/THIRDPARTYLICENSE
 link path=usr/lib/libparted.so target=./libparted.so.8
 depend fmri=system/file-system/ntfsprogs type=require

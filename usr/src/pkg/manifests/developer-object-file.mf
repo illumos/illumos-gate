@@ -105,10 +105,10 @@ legacy pkg=SUNWbtool arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="CCS tools bundled with SunOS" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/backup/dump/THIRDPARTYLICENSE \
-    license=cmd/backup/dump/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/backup/dump/THIRDPARTYLICENSE \
+    license=usr/src/cmd/backup/dump/THIRDPARTYLICENSE
 link path=usr/ccs/bin/$(ARCH64)/ar target=../../../bin/$(ARCH64)/ar
 link path=usr/ccs/bin/$(ARCH64)/dump target=../../../bin/$(ARCH64)/dump
 link path=usr/ccs/bin/$(ARCH64)/elfdump target=../../../bin/$(ARCH64)/elfdump

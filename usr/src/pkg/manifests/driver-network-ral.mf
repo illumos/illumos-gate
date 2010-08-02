@@ -47,5 +47,5 @@ legacy pkg=SUNWralink arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Ralink RT2500 802.11b/g Wireless Driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license uts/common/io/ral/THIRDPARTYLICENSE \
-    license=uts/common/io/ral/THIRDPARTYLICENSE
+license usr/src/uts/common/io/ral/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/ral/THIRDPARTYLICENSE

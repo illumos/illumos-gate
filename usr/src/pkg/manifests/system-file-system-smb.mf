@@ -98,15 +98,15 @@ legacy pkg=SUNWsmbfsu arch=$(ARCH) category=system \
     name="SMB/CIFS File System client support (Usr)" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lib/libsmbfs/smb/THIRDPARTYLICENSE.apple \
-    license=lib/libsmbfs/smb/THIRDPARTYLICENSE.apple
-license lib/libsmbfs/smb/THIRDPARTYLICENSE.boris_popov \
-    license=lib/libsmbfs/smb/THIRDPARTYLICENSE.boris_popov
-license lib/libsmbfs/smb/THIRDPARTYLICENSE.bsd4 \
-    license=lib/libsmbfs/smb/THIRDPARTYLICENSE.bsd4
-license lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft \
-    license=lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.apple \
+    license=usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.apple
+license usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.boris_popov \
+    license=usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.boris_popov
+license usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.bsd4 \
+    license=usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.bsd4
+license usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft \
+    license=usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft
 link path=usr/lib/security/$(ARCH64)/pam_smbfs_login.so \
     target=pam_smbfs_login.so.1
 link path=usr/lib/security/pam_smbfs_login.so target=pam_smbfs_login.so.1

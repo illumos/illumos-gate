@@ -185,12 +185,16 @@ legacy pkg=SUNWesu arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Extended System Utilities" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/compress/THIRDPARTYLICENSE license=cmd/compress/THIRDPARTYLICENSE
-license cmd/lastcomm/THIRDPARTYLICENSE license=cmd/lastcomm/THIRDPARTYLICENSE
-license cmd/look/THIRDPARTYLICENSE license=cmd/look/THIRDPARTYLICENSE
-license cmd/units/THIRDPARTYLICENSE license=cmd/units/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/compress/THIRDPARTYLICENSE \
+    license=usr/src/cmd/compress/THIRDPARTYLICENSE
+license usr/src/cmd/lastcomm/THIRDPARTYLICENSE \
+    license=usr/src/cmd/lastcomm/THIRDPARTYLICENSE
+license usr/src/cmd/look/THIRDPARTYLICENSE \
+    license=usr/src/cmd/look/THIRDPARTYLICENSE
+license usr/src/cmd/units/THIRDPARTYLICENSE \
+    license=usr/src/cmd/units/THIRDPARTYLICENSE
 link path=usr/bin/dmesg target=../sbin/dmesg
 link path=usr/bin/pcat target=./unpack
 link path=usr/bin/strace target=../sbin/strace

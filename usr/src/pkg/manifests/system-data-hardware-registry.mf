@@ -40,4 +40,5 @@ legacy pkg=SUNWhwdata arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Hardware data files" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license lic_SUNWhwdata license=lic_SUNWhwdata
+license usr/src/cmd/hwdata/THIRDPARTYLICENSE.pciids \
+    license=usr/src/cmd/hwdata/THIRDPARTYLICENSE.pciids

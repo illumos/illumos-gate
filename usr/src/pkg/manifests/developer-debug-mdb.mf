@@ -373,6 +373,11 @@ legacy pkg=SUNWmdbr arch=$(ARCH) category=system \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
+license usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE
+license usr/src/uts/common/zmod/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/zmod/THIRDPARTYLICENSE
 $(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/niumx target=intr
 $(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/pcipsy target=intr
 $(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/pcisch target=intr

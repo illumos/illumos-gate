@@ -39,4 +39,5 @@ hardlink path=usr/bin/powertop target=../../usr/lib/isaexec
 legacy pkg=SUNWpowertop arch=$(ARCH) category=system desc="PowerTOP tool" \
     hotline="Please contact your local service provider" name="PowerTOP tool" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license lic_GPLv2 license=lic_GPLv2
+license usr/src/cmd/powertop/common/COPYING \
+    license=usr/src/cmd/powertop/common/COPYING

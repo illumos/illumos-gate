@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -76,16 +73,25 @@
 */tools
 
 #
-# Ignore license files. This should be temporary, and these lines
-# should be removed once we start generating the opensolaris.org
-# deliverables from the nightly gate builds.
-#
-*/COPYING*
-*/LICENSE*
-*/THIRDPARTYLICENSE*
-*/OPENSOLARIS.LICENSE
-
-#
 # Ignore file list generators
 #
 *.flg
+
+#
+# Legitimately unreferenced license/copying files.  Please include
+# explanatory comments when adding items here.
+#
+# Though "COPYING" is usually used as a filename for GPL, the license
+# information for openssh is actually found in usr/src/cmd/ssh/doc/LICENSE.
+# The COPYING.Ylonen file is merely additional information.
+#
+usr/src/cmd/ssh/doc/COPYING.Ylonen
+#
+# The GPL terms for libntfs are included in the corresponding
+# THIRDPARTYLICENSE file.
+#
+usr/src/lib/libntfs/COPYING
+#
+# This covers header files that are not delivered.
+#
+usr/src/uts/common/xen/public/COPYING

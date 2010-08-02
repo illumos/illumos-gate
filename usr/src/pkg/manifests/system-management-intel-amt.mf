@@ -72,3 +72,7 @@ legacy pkg=SUNWamt-lms arch=$(ARCH) category=system \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/lms/THIRDPARTYLICENSE \
+    license=usr/src/cmd/lms/THIRDPARTYLICENSE
+license usr/src/uts/intel/io/heci/THIRDPARTYLICENSE \
+    license=usr/src/uts/intel/io/heci/THIRDPARTYLICENSE

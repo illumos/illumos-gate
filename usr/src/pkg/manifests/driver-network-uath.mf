@@ -56,7 +56,7 @@ legacy pkg=SUNWuath arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Atheros AR5523 USB IEEE802.11b/g Wireless Network Driver" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license uts/common/io/uath/THIRDPARTYLICENSE \
-    license=uts/common/io/uath/THIRDPARTYLICENSE
-license uts/common/io/uath/uath_fw/LICENSE \
-    license=uts/common/io/uath/uath_fw/LICENSE
+license usr/src/uts/common/io/uath/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/uath/THIRDPARTYLICENSE
+license usr/src/uts/common/io/uath/uath_fw/LICENSE \
+    license=usr/src/uts/common/io/uath/uath_fw/LICENSE

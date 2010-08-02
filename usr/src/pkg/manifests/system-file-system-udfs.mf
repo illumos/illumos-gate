@@ -54,7 +54,7 @@ legacy pkg=SUNWudfr arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Universal Disk Format 1.50" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/fs.d/udfs/fsck/THIRDPARTYLICENSE \
-    license=cmd/fs.d/udfs/fsck/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/fs.d/udfs/fsck/THIRDPARTYLICENSE \
+    license=usr/src/cmd/fs.d/udfs/fsck/THIRDPARTYLICENSE

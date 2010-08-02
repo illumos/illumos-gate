@@ -61,10 +61,11 @@ legacy pkg=SUNWroutr arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="Network Routing daemons/commands (Root)" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.sbin/in.rdisc/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.sbin/in.rdisc/THIRDPARTYLICENSE
-license cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license lic_SUNWroute license=lic_SUNWroute
+license usr/src/cmd/cmd-inet/usr.sbin/in.rdisc/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/in.rdisc/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE.bsd \
+    license=usr/src/cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE.bsd
+license usr/src/cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE.freebsd \
+    license=usr/src/cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE.freebsd

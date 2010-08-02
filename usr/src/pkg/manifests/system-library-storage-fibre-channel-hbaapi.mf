@@ -51,8 +51,9 @@ legacy pkg=SUNWcfclr arch=$(ARCH) category=system \
     name="Common Fibre Channel HBA API Library (Root)" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lib/hbaapi/THIRDPARTYLICENSE license=lib/hbaapi/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/hbaapi/THIRDPARTYLICENSE \
+    license=usr/src/lib/hbaapi/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libHBAAPI.so target=libHBAAPI.so.1
 link path=usr/lib/libHBAAPI.so target=libHBAAPI.so.1
 depend fmri=system/library/storage/fibre-channel/libsun_fc type=require

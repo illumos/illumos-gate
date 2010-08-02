@@ -36,5 +36,5 @@ legacy pkg=SUNWnetcat arch=$(ARCH) category=system desc="Netcat Command" \
     hotline="Please contact your local service provider" \
     name="Netcat Command" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.bin/nc/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.bin/nc/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.bin/nc/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.bin/nc/THIRDPARTYLICENSE

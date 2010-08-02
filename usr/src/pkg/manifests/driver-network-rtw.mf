@@ -47,5 +47,5 @@ legacy pkg=SUNWrtw arch=$(ARCH) category=system \
     hotline="Please contact your local service provider" \
     name="realtek 8180L 802.11b driver" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
-license uts/common/io/rtw/THIRDPARTYLICENSE \
-    license=uts/common/io/rtw/THIRDPARTYLICENSE
+license usr/src/uts/common/io/rtw/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/rtw/THIRDPARTYLICENSE

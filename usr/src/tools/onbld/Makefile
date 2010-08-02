@@ -43,23 +43,17 @@ install := TARGET = install
 clean	:= TARGET = clean
 clobber := TARGET = clobber
 
-CLOBBERFILES += THIRDPARTYLICENSE
-
 include ../Makefile.python
 
 .KEEP_STATE:
 
-all: $(PYVERSOBJS) $(SUBDIRS) THIRDPARTYLICENSE
+all: $(PYVERSOBJS) $(SUBDIRS)
 
 install: all $(ROOTPYFILES) $(SUBDIRS)
 
 clean: $(SUBDIRS)
 
 clobber: clean pyclobber $(SUBDIRS)
-
-THIRDPARTYLICENSE: $(SRC)/pkg/license_files/lic_GPLv2
-	$(RM) $@
-	$(CAT) $? > $@
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

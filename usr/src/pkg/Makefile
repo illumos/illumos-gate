@@ -66,20 +66,15 @@ PKGDEBUG= @
 #      is unable to find the required binaries.
 #   2. You need the desired tools proto area, which you can get in the
 #      same ways as the normal proto area.  If you don't do this, you
-#      will get packaging failures building SUNWonbld, because pkgsend is
+#      will get packaging failures building onbld, because pkgsend is
 #      unable to find the tools binaries.
-#   3. You need to have built the appropriate third party license
-#      files in $SRC, which generally means you should override SRC in
-#      your build environment.  If you don't do this, you will get
-#      packaging failures because pkgsend is unable to find various
-#      THIRDPARTYLICENSE files.
-#   4. The remainder of this Makefile should never refer directly to
+#   3. The remainder of this Makefile should never refer directly to
 #      $(MACH).  Instead, $(PKGMACH) should be used whenever an
 #      architecture-specific path or token is needed.  If this is done
 #      incorrectly, then packaging will fail, and you will see the
 #      value of $(uname -p) instead of the value of $(PKGMACH) in the
 #      commands that fail.
-#   5. Each time a rule in this Makefile invokes $(MAKE), it should
+#   4. Each time a rule in this Makefile invokes $(MAKE), it should
 #      pass PKGMACH=$(PKGMACH) explicitly on the command line.  If
 #      this is done incorrectly, then packaging will fail, and you
 #      will see the value of $(uname -p) instead of the value of
@@ -212,7 +207,6 @@ PKGMOG_DEFINES= \
 	PKGVERS_BUILTON=$(PKGVERS_BUILTON) \
 	PKGVERS_BRANCH=$(PKGVERS_BRANCH) \
 	PKGVERS=$(PKGVERS) \
-	SRC=$(SRC) \
 	CLOSED_BUILD=$(CLOSED_BUILD) \
 	OPEN_BUILD=$(OPEN_ONLY_BUILD) \
 	USE_INTERNAL_CRYPTO=$(USE_INTERNAL_CRYPTO) \
@@ -379,6 +373,7 @@ PKGLISTS= \
 #					|
 #				processed manifests
 # 
+
 ALL_TARGETS= $(PROC_SYNTH_PKGS) proto_list_$(PKGMACH)
 
 all: $(ALL_TARGETS)
@@ -443,7 +438,12 @@ repository-metadata: publish_pkgs
 #
 publish_pkgs: $(REPOS:%=$(PKGDEST)/repo.%) $(PDIR)/gendeps .WAIT $(PUB_PKGS)
 
-$(PUB_PKGS): FRC
+#
+# Before publishing, we want to pull the license files from $CODEMGR_WS
+# into the proto area.  This allows us to NOT pass $SRC (or
+# $CODEMGR_WS) as a basedir for publication.
+#
+$(PUB_PKGS): stage-licenses
 
 #
 # Initialize the empty on-disk repositories
@@ -521,7 +521,7 @@ $(PDIR)/%.mog: manifests/%.mf
 	@print "Processing manifest $(<F)"
 	@pkgfmt -c $<
 	$(PKGDEBUG)$(RM) $(@) $(@:%.mog=%) $(@:%.mog=%.nodepend) \
-		$(PDIR)/$(@F:%.mog=%).metadata.* $(@).vars
+		$(@:%.mog=%.lics) $(PDIR)/$(@F:%.mog=%).metadata.* $(@).vars
 	$(PKGDEBUG)$(PKGMOGRIFY) $(PKGMOG_VERBOSE) $(PM_INC:%= -I %) \
 		$(PKGMOG_DEFINES:%=-D %) -P $(@).vars -O $(@) \
 		$(<) $(PM_TRANSFORMS)
@@ -537,8 +537,9 @@ $(PDIR)/%.mog: manifests/%.mf
 		     \( "$$PKGSTAT" = "renamed" \) ]; \
 			then print $(PKGDEP_INCORP) >> $(@); \
 		fi; \
+		print $$LICS > $(@:%.mog=%.lics); \
 	else \
-		$(TOUCH) $(@); \
+		$(TOUCH) $(@) $(@:%.mog=%.lics); \
 	fi
 	$(PKGDEBUG)$(RM) $(@).vars
 
@@ -564,8 +565,9 @@ $(PDIR)/%.pub: $(PDIR)/%.res
 	if [ -s $(<) ]; then \
 		print "Publishing $(@F:%.pub=%) to $$r repository"; \
 		pkgsend -s file://$(PKGDEST)/repo.$$r publish \
-		    -d $(PKGROOT) -d $(TOOLSROOT) -d $(SRC)/pkg/license_files \
-		    -d $(SRC) --fmri-in-manifest --no-index --no-catalog $(<) \
+		    -d $(PKGROOT) -d $(TOOLSROOT) \
+		    -d license_files -d $(PKGROOT)/licenses \
+		    --fmri-in-manifest --no-index --no-catalog $(<) \
 		    > /dev/null; \
 	fi; \
 	$(TOUCH) $(@);
@@ -670,6 +672,30 @@ $(PKGLISTS): $(PROC_PKGS)
 makesilent:
 	@$(MAKE) -e $(PROC_PKGS) PKGMACH=$(PKGMACH) \
 		SUPPRESSPKGDEP=$(SUPPRESSPKGDEP) > /dev/null
+
+#
+# The .lics files were created during pkgmogrification, and list the
+# set of licenses to pull from $SRC for each package.  Because
+# licenses may be duplicated between packages, we uniquify them as
+# well as aggregating them here.
+#
+license-list: makesilent
+	$(PKGDEBUG)( for l in `cat $(PROC_PKGS:%.mog=%.lics)`; \
+		do print $$l; done ) | sort -u > $@
+
+#
+# Staging the license and description files in the proto area allows
+# us to do proper unreferenced file checking of both license and
+# description files without blanket exceptions, and to pull license
+# content without reference to $CODEMGR_WS during publication.
+#
+stage-licenses: license-list FRC
+	$(PKGDEBUG)$(MAKE) -e -f Makefile.lic \
+		PKGDEBUG=$(PKGDEBUG) LICROOT=$(PKGROOT)/licenses \
+		`$(NAWK) '{ \
+			print "$(PKGROOT)/licenses/" $$0; \
+			print "$(PKGROOT)/licenses/" $$0 ".descrip"; \
+		}' license-list` > /dev/null;
 
 protocmp: makesilent
 	@validate_pkg -a $(PKGMACH) -v \
