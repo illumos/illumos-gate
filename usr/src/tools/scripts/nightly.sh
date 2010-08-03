@@ -139,8 +139,8 @@ function crypto_from_proto {
 	# both DEBUG and non-DEBUG, but it's a cheap operation and not
 	# worth the complexity to only do once.
 	#
-	if [ -d $ROOT/licenses/usr ]; then
-		( cd $ROOT/licenses ; \
+	if [ -d ${ROOT}${suffix}/licenses/usr ]; then
+		( cd ${ROOT}${suffix}/licenses ; \
 		    mktpl -c $SRC/pkg/license-list ) >> "$LOGFILE" 2>&1
 		if (( $? != 0 )) ; then
 			echo "Couldn't create crypto THIRDPARTYLICENSE files" |
@@ -149,7 +149,7 @@ function crypto_from_proto {
 			return
 		fi
 	else
-		echo "No licenses found under $ROOT/licenses" |
+		echo "No licenses found under ${ROOT}${suffix}/licenses" |
 		    tee -a "$mail_msg_file" >> "$LOGFILE"
 	fi
 
