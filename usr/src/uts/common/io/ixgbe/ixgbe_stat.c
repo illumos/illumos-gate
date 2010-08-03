@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,8 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -103,14 +105,22 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 		ixgbe_ks->qbrc[i].value.ui64 +=
 		    IXGBE_READ_REG(hw, IXGBE_QBRC(i));
 		ixgbe_ks->tor.value.ui64 += ixgbe_ks->qbrc[i].value.ui64;
-		if (hw->mac.type >= ixgbe_mac_82599EB) {
-			ixgbe_ks->qbtc[i].value.ui64 +=
-			    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
-			ixgbe_ks->qbtc[i].value.ui64 += ((uint64_t)
-			    (IXGBE_READ_REG(hw, IXGBE_QBTC_H(i))) << 32);
-		} else {
+		switch (hw->mac.type) {
+		case ixgbe_mac_82598EB:
 			ixgbe_ks->qbtc[i].value.ui64 +=
 			    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+			break;
+
+		case ixgbe_mac_82599EB:
+			ixgbe_ks->qbtc[i].value.ui64 +=
+			    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
+			ixgbe_ks->qbtc[i].value.ui64 +=
+			    ((uint64_t)((IXGBE_READ_REG(hw,
+			    IXGBE_QBTC_H(i))) & 0xF) << 32);
+			break;
+
+		default:
+			break;
 		}
 		ixgbe_ks->tot.value.ui64 += ixgbe_ks->qbtc[i].value.ui64;
 	}
@@ -148,20 +158,34 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 	ixgbe_ks->mrfc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_MRFC);
 	ixgbe_ks->rlec.value.ui64 += IXGBE_READ_REG(hw, IXGBE_RLEC);
 	ixgbe_ks->lxontxc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_LXONTXC);
-	if (hw->mac.type == ixgbe_mac_82598EB) {
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
 		ixgbe_ks->lxonrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXONRXC);
-	} else {
+		break;
+
+	case ixgbe_mac_82599EB:
 		ixgbe_ks->lxonrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXONRXCNT);
+		break;
+
+	default:
+		break;
 	}
 	ixgbe_ks->lxofftxc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_LXOFFTXC);
-	if (hw->mac.type == ixgbe_mac_82598EB) {
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
 		ixgbe_ks->lxoffrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXOFFRXC);
-	} else {
+		break;
+
+	case ixgbe_mac_82599EB:
 		ixgbe_ks->lxoffrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXOFFRXCNT);
+		break;
+
+	default:
+		break;
 	}
 	ixgbe_ks->ruc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_RUC);
 	ixgbe_ks->rfc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_RFC);
@@ -525,14 +549,22 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_OBYTES:
 		ixgbe_ks->tot.value.ui64 = 0;
 		for (i = 0; i < 16; i++) {
-			if (hw->mac.type >= ixgbe_mac_82599EB) {
-				ixgbe_ks->qbtc[i].value.ui64 +=
-				    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
-				ixgbe_ks->qbtc[i].value.ui64 += ((uint64_t)
-				    IXGBE_READ_REG(hw, IXGBE_QBTC_H(i))) << 32;
-			} else {
+			switch (hw->mac.type) {
+			case ixgbe_mac_82598EB:
 				ixgbe_ks->qbtc[i].value.ui64 +=
 				    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+				break;
+
+			case ixgbe_mac_82599EB:
+				ixgbe_ks->qbtc[i].value.ui64 +=
+				    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
+				ixgbe_ks->qbtc[i].value.ui64 +=
+				    ((uint64_t)((IXGBE_READ_REG(hw,
+				    IXGBE_QBTC_H(i))) & 0xF) << 32);
+				break;
+
+			default:
+				break;
 			}
 			ixgbe_ks->tot.value.ui64 +=
 			    ixgbe_ks->qbtc[i].value.ui64;

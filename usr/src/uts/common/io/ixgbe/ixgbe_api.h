@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +21,14 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.78 sol_ixgbe_shared_339b */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.82 scm_061610_003709 */
 
 #ifndef _IXGBE_API_H
 #define	_IXGBE_API_H
@@ -61,6 +63,9 @@ s32 ixgbe_check_phy_link(struct ixgbe_hw *hw,
     ixgbe_link_speed *speed, bool *link_up);
 s32 ixgbe_setup_phy_link_speed(struct ixgbe_hw *hw, ixgbe_link_speed speed,
     bool autoneg, bool autoneg_wait_to_complete);
+void ixgbe_disable_tx_laser(struct ixgbe_hw *hw);
+void ixgbe_enable_tx_laser(struct ixgbe_hw *hw);
+void ixgbe_flap_tx_laser(struct ixgbe_hw *hw);
 s32 ixgbe_setup_link(struct ixgbe_hw *hw, ixgbe_link_speed speed,
     bool autoneg, bool autoneg_wait_to_complete);
 s32 ixgbe_check_link(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
@@ -113,7 +118,8 @@ s32 ixgbe_init_fdir_perfect_82599(struct ixgbe_hw *hw, u32 pballoc);
 s32 ixgbe_fdir_add_signature_filter_82599(struct ixgbe_hw *hw,
     struct ixgbe_atr_input *input, u8 queue);
 s32 ixgbe_fdir_add_perfect_filter_82599(struct ixgbe_hw *hw,
-    struct ixgbe_atr_input *input, u16 soft_id, u8 queue);
+    struct ixgbe_atr_input *input, struct ixgbe_atr_input_masks *masks,
+    u16 soft_id, u8 queue);
 u16 ixgbe_atr_compute_hash_82599(struct ixgbe_atr_input *input, u32 key);
 s32 ixgbe_atr_set_vlan_id_82599(struct ixgbe_atr_input *input, u16 vlan_id);
 s32 ixgbe_atr_set_src_ipv4_82599(struct ixgbe_atr_input *input, u32 src_addr);
@@ -152,5 +158,6 @@ s32 ixgbe_acquire_swfw_semaphore(struct ixgbe_hw *hw, u16 mask);
 void ixgbe_release_swfw_semaphore(struct ixgbe_hw *hw, u16 mask);
 s32 ixgbe_get_wwn_prefix(struct ixgbe_hw *hw, u16 *wwnn_prefix,
     u16 *wwpn_prefix);
+s32 ixgbe_get_fcoe_boot_status(struct ixgbe_hw *hw, u16 *bs);
 
 #endif /* _IXGBE_API_H */

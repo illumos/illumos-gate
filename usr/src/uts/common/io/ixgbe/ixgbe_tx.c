@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,8 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -101,6 +103,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 
 	if ((ixgbe->ixgbe_state & IXGBE_SUSPENDED) ||
 	    (ixgbe->ixgbe_state & IXGBE_ERROR) ||
+	    (ixgbe->ixgbe_state & IXGBE_OVERTEMP) ||
 	    !(ixgbe->ixgbe_state & IXGBE_STARTED)) {
 		return (mp);
 	}
@@ -476,8 +479,10 @@ adjust_threshold:
 	 * Before fill the tx descriptor ring with the data, we need to
 	 * ensure there are adequate free descriptors for transmit
 	 * (including one context descriptor).
+	 * Do not use up all the tx descriptors.
+	 * Otherwise tx recycle will fail and cause false hang.
 	 */
-	if (tx_ring->tbd_free < (desc_total + 1)) {
+	if (tx_ring->tbd_free <= (desc_total + 1)) {
 		tx_ring->tx_recycle(tx_ring);
 	}
 
@@ -490,7 +495,7 @@ adjust_threshold:
 	 * ensure the correctness when multiple threads access it in
 	 * parallel.
 	 */
-	if (tx_ring->tbd_free < (desc_total + 1)) {
+	if (tx_ring->tbd_free <= (desc_total + 1)) {
 		IXGBE_DEBUG_STAT(tx_ring->stat_fail_no_tbd);
 		mutex_exit(&tx_ring->tx_lock);
 		goto tx_failure;
@@ -1080,6 +1085,15 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS;
 
 	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		if (ctx != NULL && ctx->lso_flag) {
+			first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
+			first_tbd->read.olinfo_status |=
+			    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
+			    - ctx->l4_hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT;
+		}
+		break;
+
 	case ixgbe_mac_82599EB:
 		if (ctx != NULL && ctx->lso_flag) {
 			first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
@@ -1091,14 +1105,7 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 			    (mbsize << IXGBE_ADVTXD_PAYLEN_SHIFT);
 		}
 		break;
-	case ixgbe_mac_82598EB:
-		if (ctx != NULL && ctx->lso_flag) {
-			first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
-			first_tbd->read.olinfo_status |=
-			    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
-			    - ctx->l4_hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT;
-		}
-		break;
+
 	default:
 		break;
 	}

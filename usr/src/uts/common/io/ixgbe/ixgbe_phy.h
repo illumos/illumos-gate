@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +21,14 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.37 sol_ixgbe_shared_339b */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.43 scm_061610_003709 */
 
 #ifndef _IXGBE_PHY_H
 #define	_IXGBE_PHY_H
@@ -44,11 +46,15 @@
 #define	IXGBE_SFF_1GBE_COMP_CODES	0x6
 #define	IXGBE_SFF_10GBE_COMP_CODES	0x3
 #define	IXGBE_SFF_CABLE_TECHNOLOGY	0x8
+#define	IXGBE_SFF_CABLE_SPEC_COMP	0x3C
 
 /* Bitmasks */
 #define	IXGBE_SFF_DA_PASSIVE_CABLE	0x4
+#define	IXGBE_SFF_DA_ACTIVE_CABLE	0x8
+#define	IXGBE_SFF_DA_SPEC_ACTIVE_LIMITING	0x4
 #define	IXGBE_SFF_1GBASESX_CAPABLE	0x1
 #define	IXGBE_SFF_1GBASELX_CAPABLE	0x2
+#define	IXGBE_SFF_1GBASET_CAPABLE	0x8
 #define	IXGBE_SFF_10GBASESR_CAPABLE	0x10
 #define	IXGBE_SFF_10GBASELR_CAPABLE	0x20
 #define	IXGBE_I2C_EEPROM_READ_MASK	0x100
@@ -57,6 +63,10 @@
 #define	IXGBE_I2C_EEPROM_STATUS_PASS	0x1
 #define	IXGBE_I2C_EEPROM_STATUS_FAIL	0x2
 #define	IXGBE_I2C_EEPROM_STATUS_IN_PROGRESS	0x3
+
+/* Flow control defines */
+#define	IXGBE_TAF_SYM_PAUSE	0x400
+#define	IXGBE_TAF_ASM_PAUSE	0x800
 
 /* Bit-shift macros */
 #define	IXGBE_SFF_VENDOR_OUI_BYTE0_SHIFT	24
@@ -80,6 +90,9 @@
 #define	IXGBE_I2C_T_FALL	1
 #define	IXGBE_I2C_T_SU_STO	4
 #define	IXGBE_I2C_T_BUF		5
+
+#define	IXGBE_TN_LASI_STATUS_REG	0x9005
+#define	IXGBE_TN_LASI_STATUS_TEMP_ALARM	0x0008
 
 s32 ixgbe_init_phy_ops_generic(struct ixgbe_hw *hw);
 bool ixgbe_validate_phy_addr(struct ixgbe_hw *hw, u32 phy_addr);
@@ -110,6 +123,7 @@ s32 ixgbe_reset_phy_nl(struct ixgbe_hw *hw);
 s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw);
 s32 ixgbe_get_sfp_init_sequence_offsets(struct ixgbe_hw *hw,
     u16 *list_offset, u16 *data_offset);
+s32 ixgbe_tn_check_overtemp(struct ixgbe_hw *hw);
 s32 ixgbe_read_i2c_byte_generic(struct ixgbe_hw *hw, u8 byte_offset,
     u8 dev_addr, u8 *data);
 s32 ixgbe_write_i2c_byte_generic(struct ixgbe_hw *hw, u8 byte_offset,

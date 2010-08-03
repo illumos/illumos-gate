@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,8 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -517,10 +519,14 @@ ixgbe_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	switch (pr_num) {
 	case MAC_PROP_DUPLEX:
 	case MAC_PROP_SPEED:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
 	case MAC_PROP_ADV_100FDX_CAP:
 	case MAC_PROP_ADV_1000FDX_CAP:
 	case MAC_PROP_ADV_10GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh, 1);
 		break;
 
 	case MAC_PROP_AUTONEG:
@@ -529,9 +535,8 @@ ixgbe_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	case MAC_PROP_EN_100FDX_CAP:
 		perm = (ixgbe->hw.phy.media_type == ixgbe_media_type_copper) ?
 		    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
-		if (perm == MAC_PROP_PERM_RW)
-			mac_prop_info_set_default_uint8(prh, 1);
 		mac_prop_info_set_perm(prh, perm);
+		mac_prop_info_set_default_uint8(prh, 1);
 		break;
 
 	case MAC_PROP_FLOWCTRL:

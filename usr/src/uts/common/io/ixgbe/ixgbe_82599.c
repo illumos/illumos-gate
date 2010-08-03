@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +21,14 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.202 sol_ixgbe_shared_339b */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.217 scm_061610_003709 */
 
 #include "ixgbe_type.h"
 #include "ixgbe_api.h"
@@ -37,6 +39,9 @@ s32 ixgbe_init_ops_82599(struct ixgbe_hw *hw);
 s32 ixgbe_get_link_capabilities_82599(struct ixgbe_hw *hw,
     ixgbe_link_speed *speed, bool *autoneg);
 enum ixgbe_media_type ixgbe_get_media_type_82599(struct ixgbe_hw *hw);
+void ixgbe_disable_tx_laser_multispeed_fiber(struct ixgbe_hw *hw);
+void ixgbe_enable_tx_laser_multispeed_fiber(struct ixgbe_hw *hw);
+void ixgbe_flap_tx_laser_multispeed_fiber(struct ixgbe_hw *hw);
 s32 ixgbe_setup_mac_link_multispeed_fiber(struct ixgbe_hw *hw,
     ixgbe_link_speed speed, bool autoneg, bool autoneg_wait_to_complete);
 s32 ixgbe_setup_mac_link_smartspeed(struct ixgbe_hw *hw,
@@ -73,7 +78,15 @@ ixgbe_init_mac_link_ops_82599(struct ixgbe_hw *hw)
 	if (hw->phy.multispeed_fiber) {
 		/* Set up dual speed SFP+ support */
 		mac->ops.setup_link = &ixgbe_setup_mac_link_multispeed_fiber;
+		mac->ops.disable_tx_laser =
+		    &ixgbe_disable_tx_laser_multispeed_fiber;
+		mac->ops.enable_tx_laser =
+		    &ixgbe_enable_tx_laser_multispeed_fiber;
+		mac->ops.flap_tx_laser = &ixgbe_flap_tx_laser_multispeed_fiber;
 	} else {
+		mac->ops.disable_tx_laser = NULL;
+		mac->ops.enable_tx_laser = NULL;
+		mac->ops.flap_tx_laser = NULL;
 		if ((ixgbe_get_media_type(hw) == ixgbe_media_type_backplane) &&
 		    (hw->phy.smart_speed == ixgbe_smart_speed_auto ||
 		    hw->phy.smart_speed == ixgbe_smart_speed_on))
@@ -210,6 +223,7 @@ ixgbe_init_ops_82599(struct ixgbe_hw *hw)
 
 	/* MAC */
 	mac->ops.reset_hw = &ixgbe_reset_hw_82599;
+	mac->ops.enable_relaxed_ordering = &ixgbe_enable_relaxed_ordering_82599;
 	mac->ops.get_media_type = &ixgbe_get_media_type_82599;
 	mac->ops.get_supported_physical_layer =
 	    &ixgbe_get_supported_physical_layer_82599;
@@ -222,6 +236,7 @@ ixgbe_init_ops_82599(struct ixgbe_hw *hw)
 	mac->ops.set_san_mac_addr = &ixgbe_set_san_mac_addr_generic;
 	mac->ops.get_device_caps = &ixgbe_get_device_caps_82599;
 	mac->ops.get_wwn_prefix = &ixgbe_get_wwn_prefix_generic;
+	mac->ops.get_fcoe_boot_status = &ixgbe_get_fcoe_boot_status_generic;
 
 	/* RAR, Multicast, VLAN */
 	mac->ops.set_vmdq = &ixgbe_set_vmdq_generic;
@@ -264,6 +279,14 @@ ixgbe_get_link_capabilities_82599(struct ixgbe_hw *hw,
 	u32 autoc = 0;
 
 	DEBUGFUNC("ixgbe_get_link_capabilities_82599");
+
+	/* Check if 1G SFP module. */
+	if (hw->phy.sfp_type == ixgbe_sfp_type_1g_cu_core0 ||
+	    hw->phy.sfp_type == ixgbe_sfp_type_1g_cu_core1) {
+		*speed = IXGBE_LINK_SPEED_1GB_FULL;
+		*negotiation = true;
+		goto out;
+	}
 
 	/*
 	 * Determine link capabilities based on the stored value of AUTOC,
@@ -376,7 +399,7 @@ ixgbe_get_media_type_82599(struct ixgbe_hw *hw)
 	case IXGBE_DEV_ID_82599_CX4:
 		media_type = ixgbe_media_type_cx4;
 		break;
-	case IXGBE_DEV_ID_82599_T:
+	case IXGBE_DEV_ID_82599_T3_LOM:
 		media_type = ixgbe_media_type_copper;
 		break;
 	default:
@@ -438,6 +461,74 @@ ixgbe_start_mac_link_82599(struct ixgbe_hw *hw, bool autoneg_wait_to_complete)
 }
 
 /*
+ * ixgbe_disable_tx_laser_multispeed_fiber - Disable Tx laser
+ * @hw: pointer to hardware structure
+ *
+ * The base drivers may require better control over SFP+ module
+ * PHY states.  This includes selectively shutting down the Tx
+ * laser on the PHY, effectively halting physical link.
+ */
+void
+ixgbe_disable_tx_laser_multispeed_fiber(struct ixgbe_hw *hw)
+{
+	u32 esdp_reg = IXGBE_READ_REG(hw, IXGBE_ESDP);
+
+	/*
+	 * Disable tx laser; allow 100us to go dark per spec
+	 */
+	esdp_reg |= IXGBE_ESDP_SDP3;
+	IXGBE_WRITE_REG(hw, IXGBE_ESDP, esdp_reg);
+	IXGBE_WRITE_FLUSH(hw);
+	usec_delay(100);
+}
+
+/*
+ * ixgbe_enable_tx_laser_multispeed_fiber - Enable Tx laser
+ * @hw: pointer to hardware structure
+ *
+ * The base drivers may require better control over SFP+ module
+ * PHY states.  This includes selectively turning on the Tx
+ * laser on the PHY, effectively starting physical link.
+ */
+void
+ixgbe_enable_tx_laser_multispeed_fiber(struct ixgbe_hw *hw)
+{
+	u32 esdp_reg = IXGBE_READ_REG(hw, IXGBE_ESDP);
+
+	/*
+	 * Enable tx laser; allow 100ms to light up
+	 */
+	esdp_reg &= ~IXGBE_ESDP_SDP3;
+	IXGBE_WRITE_REG(hw, IXGBE_ESDP, esdp_reg);
+	IXGBE_WRITE_FLUSH(hw);
+	msec_delay(100);
+}
+
+/*
+ * ixgbe_flap_tx_laser_multispeed_fiber - Flap Tx laser
+ * @hw: pointer to hardware structure
+ *
+ * When the driver changes the link speeds that it can support,
+ * it sets autotry_restart to true to indicate that we need to
+ * initiate a new autotry session with the link partner.  To do
+ * so, we set the speed then disable and re-enable the tx laser, to
+ * alert the link partner that it also needs to restart autotry on its
+ * end.  This is consistent with true clause 37 autoneg, which also
+ * involves a loss of signal.
+ */
+void
+ixgbe_flap_tx_laser_multispeed_fiber(struct ixgbe_hw *hw)
+{
+	DEBUGFUNC("ixgbe_flap_tx_laser_multispeed_fiber");
+
+	if (hw->mac.autotry_restart) {
+		ixgbe_disable_tx_laser_multispeed_fiber(hw);
+		ixgbe_enable_tx_laser_multispeed_fiber(hw);
+		hw->mac.autotry_restart = false;
+	}
+}
+
+/*
  * ixgbe_setup_mac_link_multispeed_fiber - Set MAC link speed
  * @hw: pointer to hardware structure
  * @speed: new link speed
@@ -469,16 +560,6 @@ ixgbe_setup_mac_link_multispeed_fiber(struct ixgbe_hw *hw,
 	speed &= link_speed;
 
 	/*
-	 * When the driver changes the link speeds that it can support,
-	 * it sets autotry_restart to true to indicate that we need to
-	 * initiate a new autotry session with the link partner.  To do
-	 * so, we set the speed then disable and re-enable the tx laser, to
-	 * alert the link partner that it also needs to restart autotry on its
-	 * end.  This is consistent with true clause 37 autoneg, which also
-	 * involves a loss of signal.
-	 */
-
-	/*
 	 * Try each speed one by one, highest priority first.  We do this in
 	 * software because 10gb fiber doesn't support speed autonegotiation.
 	 */
@@ -497,6 +578,7 @@ ixgbe_setup_mac_link_multispeed_fiber(struct ixgbe_hw *hw,
 		/* Set the module link speed */
 		esdp_reg |= (IXGBE_ESDP_SDP5_DIR | IXGBE_ESDP_SDP5);
 		IXGBE_WRITE_REG(hw, IXGBE_ESDP, esdp_reg);
+		IXGBE_WRITE_FLUSH(hw);
 
 		/* Allow module to change analog characteristics (1G->10G) */
 		msec_delay(40);
@@ -508,19 +590,7 @@ ixgbe_setup_mac_link_multispeed_fiber(struct ixgbe_hw *hw,
 			return (status);
 
 		/* Flap the tx laser if it has not already been done */
-		if (hw->mac.autotry_restart) {
-			/* Disable tx laser; allow 100us to go dark per spec */
-			esdp_reg |= IXGBE_ESDP_SDP3;
-			IXGBE_WRITE_REG(hw, IXGBE_ESDP, esdp_reg);
-			usec_delay(100);
-
-			/* Enable tx laser; allow 2ms to light up per spec */
-			esdp_reg &= ~IXGBE_ESDP_SDP3;
-			IXGBE_WRITE_REG(hw, IXGBE_ESDP, esdp_reg);
-			msec_delay(2);
-
-			hw->mac.autotry_restart = false;
-		}
+		ixgbe_flap_tx_laser(hw);
 
 		/*
 		 * Wait for the controller to acquire link.  Per IEEE 802.3ap,
@@ -559,6 +629,7 @@ ixgbe_setup_mac_link_multispeed_fiber(struct ixgbe_hw *hw,
 		esdp_reg &= ~IXGBE_ESDP_SDP5;
 		esdp_reg |= IXGBE_ESDP_SDP5_DIR;
 		IXGBE_WRITE_REG(hw, IXGBE_ESDP, esdp_reg);
+		IXGBE_WRITE_FLUSH(hw);
 
 		/* Allow module to change analog characteristics (10G->1G) */
 		msec_delay(40);
@@ -570,19 +641,7 @@ ixgbe_setup_mac_link_multispeed_fiber(struct ixgbe_hw *hw,
 			return (status);
 
 		/* Flap the tx laser if it has not already been done */
-		if (hw->mac.autotry_restart) {
-			/* Disable tx laser; allow 100us to go dark per spec */
-			esdp_reg |= IXGBE_ESDP_SDP3;
-			IXGBE_WRITE_REG(hw, IXGBE_ESDP, esdp_reg);
-			usec_delay(100);
-
-			/* Enable tx laser; allow 2ms to light up per spec */
-			esdp_reg &= ~IXGBE_ESDP_SDP3;
-			IXGBE_WRITE_REG(hw, IXGBE_ESDP, esdp_reg);
-			msec_delay(2);
-
-			hw->mac.autotry_restart = false;
-		}
+		ixgbe_flap_tx_laser(hw);
 
 		/* Wait for the link partner to also set speed */
 		msec_delay(100);
@@ -632,7 +691,7 @@ ixgbe_setup_mac_link_smartspeed(struct ixgbe_hw *hw,
     ixgbe_link_speed speed, bool autoneg, bool autoneg_wait_to_complete)
 {
 	s32 status = IXGBE_SUCCESS;
-	ixgbe_link_speed link_speed;
+	ixgbe_link_speed link_speed = IXGBE_LINK_SPEED_UNKNOWN;
 	s32 i, j;
 	bool link_up = false;
 	u32 autoc_reg = IXGBE_READ_REG(hw, IXGBE_AUTOC);
@@ -725,6 +784,9 @@ ixgbe_setup_mac_link_smartspeed(struct ixgbe_hw *hw,
 	    autoneg_wait_to_complete);
 
 out:
+	if (link_up && (link_speed == IXGBE_LINK_SPEED_1GB_FULL))
+		DEBUGOUT("Smartspeed has downgraded the link speed "
+		"from the maximum advertised\n");
 	return (status);
 }
 
@@ -881,7 +943,7 @@ s32
 ixgbe_reset_hw_82599(struct ixgbe_hw *hw)
 {
 	s32 status = IXGBE_SUCCESS;
-	u32 ctrl, ctrl_ext;
+	u32 ctrl;
 	u32 i;
 	u32 autoc;
 	u32 autoc2;
@@ -939,11 +1001,6 @@ mac_reset_top:
 		status = IXGBE_ERR_RESET_FAILED;
 		DEBUGOUT("Reset polling failed to complete.\n");
 	}
-
-	/* Clear PF Reset Done bit so PF/VF Mail Ops can work */
-	ctrl_ext = IXGBE_READ_REG(hw, IXGBE_CTRL_EXT);
-	ctrl_ext |= IXGBE_CTRL_EXT_PFRSTD;
-	IXGBE_WRITE_REG(hw, IXGBE_CTRL_EXT, ctrl_ext);
 
 	/*
 	 * Double resets are required for recovery from certain error
@@ -1224,6 +1281,9 @@ ixgbe_init_fdir_perfect_82599(struct ixgbe_hw *hw, u32 pballoc)
 
 	/* Send interrupt when 64 filters are left */
 	fdirctrl |= 4 << IXGBE_FDIRCTRL_FULL_THRESH_SHIFT;
+
+	/* Initialize the drop queue to Rx queue 127 */
+	fdirctrl |= (127 << IXGBE_FDIRCTRL_DROP_Q_SHIFT);
 
 	switch (pballoc) {
 	case IXGBE_FDIR_PBALLOC_64K:
@@ -1921,6 +1981,8 @@ ixgbe_fdir_add_signature_filter_82599(struct ixgbe_hw *hw,
  * ixgbe_fdir_add_perfect_filter_82599 - Adds a perfect filter
  * @hw: pointer to hardware structure
  * @input: input bitstream
+ * @input_masks: masks for the input bitstream
+ * @soft_id: software index for the filters
  * @queue: queue index to direct traffic to
  *
  * Note that the caller to this function must lock before calling, since the
@@ -1928,15 +1990,17 @@ ixgbe_fdir_add_signature_filter_82599(struct ixgbe_hw *hw,
  */
 s32
 ixgbe_fdir_add_perfect_filter_82599(struct ixgbe_hw *hw,
-    struct ixgbe_atr_input *input, u16 soft_id, u8 queue)
+    struct ixgbe_atr_input *input, struct ixgbe_atr_input_masks *input_masks,
+    u16 soft_id, u8 queue)
 {
 	u32 fdircmd = 0;
 	u32 fdirhash;
-	u32 src_ipv4, dst_ipv4;
+	u32 src_ipv4 = 0, dst_ipv4 = 0;
 	u32 src_ipv6_1, src_ipv6_2, src_ipv6_3, src_ipv6_4;
 	u16 src_port, dst_port, vlan_id, flex_bytes;
 	u16 bucket_hash;
 	u8  l4type;
+	u8  fdirm = 0;
 
 	DEBUGFUNC("ixgbe_fdir_add_perfect_filter_82599");
 
@@ -2003,6 +2067,77 @@ ixgbe_fdir_add_perfect_filter_82599(struct ixgbe_hw *hw,
 	    (flex_bytes << IXGBE_FDIRVLAN_FLEX_SHIFT)));
 	IXGBE_WRITE_REG(hw, IXGBE_FDIRPORT, (src_port |
 	    (dst_port << IXGBE_FDIRPORT_DESTINATION_SHIFT)));
+
+	/*
+	 * Program the relevant mask registers.  If src/dst_port or src/dst_addr
+	 * are zero, then assume a full mask for that field.  Also assume that
+	 * a VLAN of 0 is unspecified, so mask that out as well.  L4type
+	 * cannot be masked out in this implementation.
+	 *
+	 * This also assumes IPv4 only.  IPv6 masking isn't supported at this
+	 * point in time.
+	 */
+	if (src_ipv4 == 0)
+		IXGBE_WRITE_REG(hw, IXGBE_FDIRSIP4M, 0xffffffff);
+	else
+		IXGBE_WRITE_REG(hw, IXGBE_FDIRSIP4M, input_masks->src_ip_mask);
+
+	if (dst_ipv4 == 0)
+		IXGBE_WRITE_REG(hw, IXGBE_FDIRDIP4M, 0xffffffff);
+	else
+		IXGBE_WRITE_REG(hw, IXGBE_FDIRDIP4M, input_masks->dst_ip_mask);
+
+	switch (l4type & IXGBE_ATR_L4TYPE_MASK) {
+	case IXGBE_ATR_L4TYPE_TCP:
+		if (src_port == 0)
+			IXGBE_WRITE_REG(hw, IXGBE_FDIRTCPM, 0xffff);
+		else
+			IXGBE_WRITE_REG(hw, IXGBE_FDIRTCPM,
+			    input_masks->src_port_mask);
+
+		if (dst_port == 0)
+			IXGBE_WRITE_REG(hw, IXGBE_FDIRTCPM,
+			    (IXGBE_READ_REG(hw, IXGBE_FDIRTCPM) |
+			    0xffff0000));
+		else
+			IXGBE_WRITE_REG(hw, IXGBE_FDIRTCPM,
+			    (IXGBE_READ_REG(hw, IXGBE_FDIRTCPM) |
+			    (input_masks->dst_port_mask << 16)));
+		break;
+	case IXGBE_ATR_L4TYPE_UDP:
+		if (src_port == 0)
+			IXGBE_WRITE_REG(hw, IXGBE_FDIRUDPM, 0xffff);
+		else
+			IXGBE_WRITE_REG(hw, IXGBE_FDIRUDPM,
+			    input_masks->src_port_mask);
+
+		if (dst_port == 0)
+			IXGBE_WRITE_REG(hw, IXGBE_FDIRUDPM,
+			    (IXGBE_READ_REG(hw, IXGBE_FDIRUDPM) |
+			    0xffff0000));
+		else
+			IXGBE_WRITE_REG(hw, IXGBE_FDIRUDPM,
+			    (IXGBE_READ_REG(hw, IXGBE_FDIRUDPM) |
+			    (input_masks->src_port_mask << 16)));
+		break;
+	default:
+		/* this already would have failed above */
+		break;
+	}
+
+	/* Program the last mask register, FDIRM */
+	if (input_masks->vlan_id_mask || !vlan_id)
+		/* Mask both VLAN and VLANP - bits 0 and 1 */
+		fdirm |= (IXGBE_FDIRM_VLANID | IXGBE_FDIRM_VLANP);
+
+	if (input_masks->data_mask || !flex_bytes)
+		/* Flex bytes need masking, so mask the whole thing - bit 4 */
+		fdirm |= IXGBE_FDIRM_FLEX;
+
+	/* Now mask VM pool and destination IPv6 - bits 5 and 2 */
+	fdirm |= (IXGBE_FDIRM_POOL | IXGBE_FDIRM_DIPv6);
+
+	IXGBE_WRITE_REG(hw, IXGBE_FDIRM, fdirm);
 
 	fdircmd |= IXGBE_FDIRCMD_CMD_ADD_FLOW;
 	fdircmd |= IXGBE_FDIRCMD_FILTER_UPDATE;
@@ -2162,6 +2297,7 @@ ixgbe_get_supported_physical_layer_82599(struct ixgbe_hw *hw)
 	u32 pma_pmd_1g = autoc & IXGBE_AUTOC_1G_PMA_PMD_MASK;
 	u16 ext_ability = 0;
 	u8 comp_codes_10g = 0;
+	u8 comp_codes_1g = 0;
 
 	DEBUGFUNC("ixgbe_get_support_physical_layer_82599");
 
@@ -2231,20 +2367,28 @@ sfp_check:
 		goto out;
 
 	switch (hw->phy.type) {
-	case ixgbe_phy_tw_tyco:
-	case ixgbe_phy_tw_unknown:
+	case ixgbe_phy_sfp_passive_tyco:
+	case ixgbe_phy_sfp_passive_unknown:
 		physical_layer = IXGBE_PHYSICAL_LAYER_SFP_PLUS_CU;
+		break;
+	case ixgbe_phy_sfp_ftl_active:
+	case ixgbe_phy_sfp_active_unknown:
+		physical_layer = IXGBE_PHYSICAL_LAYER_SFP_ACTIVE_DA;
 		break;
 	case ixgbe_phy_sfp_avago:
 	case ixgbe_phy_sfp_ftl:
 	case ixgbe_phy_sfp_intel:
 	case ixgbe_phy_sfp_unknown:
 		hw->phy.ops.read_i2c_eeprom(hw,
+		    IXGBE_SFF_1GBE_COMP_CODES, &comp_codes_1g);
+		hw->phy.ops.read_i2c_eeprom(hw,
 		    IXGBE_SFF_10GBE_COMP_CODES, &comp_codes_10g);
 		if (comp_codes_10g & IXGBE_SFF_10GBASESR_CAPABLE)
 			physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_SR;
 		else if (comp_codes_10g & IXGBE_SFF_10GBASELR_CAPABLE)
 			physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_LR;
+		else if (comp_codes_1g & IXGBE_SFF_1GBASET_CAPABLE)
+			physical_layer = IXGBE_PHYSICAL_LAYER_1000BASE_T;
 		break;
 	default:
 		break;

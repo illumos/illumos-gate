@@ -30,7 +30,7 @@
 #include "ixgbe_sw.h"
 
 static char ixgbe_ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "ixgbe 1.1.6";
+static char ixgbe_version[] = "ixgbe 1.1.7";
 
 /*
  * Local function protoypes
@@ -71,6 +71,7 @@ static void ixgbe_init_params(ixgbe_t *);
 static int ixgbe_get_prop(ixgbe_t *, char *, int, int, int);
 static void ixgbe_driver_link_check(ixgbe_t *);
 static void ixgbe_sfp_check(void *);
+static void ixgbe_overtemp_check(void *);
 static void ixgbe_link_timer(void *);
 static void ixgbe_local_timer(void *);
 static void ixgbe_arm_watchdog_timer(ixgbe_t *);
@@ -253,6 +254,7 @@ static adapter_info_t ixgbe_82598eb_cap = {
 	16,		/* maximum number of ring vectors */
 	2,		/* maximum number of other vectors */
 	IXGBE_EICR_LSC,	/* "other" interrupt types handled */
+	0,		/* "other" interrupt types enable mask */
 	(IXGBE_FLAG_DCA_CAPABLE	/* capability flags */
 	| IXGBE_FLAG_RSS_CAPABLE
 	| IXGBE_FLAG_VMDQ_CAPABLE)
@@ -275,11 +277,18 @@ static adapter_info_t ixgbe_82599eb_cap = {
 	64,		/* maximum total msix vectors */
 	16,		/* maximum number of ring vectors */
 	2,		/* maximum number of other vectors */
-	IXGBE_EICR_LSC,	/* "other" interrupt types handled */
-	(IXGBE_FLAG_DCA_CAPABLE	/* capability flags */
+	(IXGBE_EICR_LSC
+	| IXGBE_EICR_GPI_SDP1
+	| IXGBE_EICR_GPI_SDP2), /* "other" interrupt types handled */
+
+	(IXGBE_SDP1_GPIEN
+	| IXGBE_SDP2_GPIEN), /* "other" interrupt types enable mask */
+
+	(IXGBE_FLAG_DCA_CAPABLE
 	| IXGBE_FLAG_RSS_CAPABLE
 	| IXGBE_FLAG_VMDQ_CAPABLE
-	| IXGBE_FLAG_RSC_CAPABLE)
+	| IXGBE_FLAG_RSC_CAPABLE
+	| IXGBE_FLAG_SFP_PLUG_CAPABLE) /* capability flags */
 };
 
 /*
@@ -471,13 +480,24 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Create a taskq for sfp-change
 	 */
-	(void) sprintf(taskqname, "ixgbe%d_taskq", instance);
+	(void) sprintf(taskqname, "ixgbe%d_sfp_taskq", instance);
 	if ((ixgbe->sfp_taskq = ddi_taskq_create(devinfo, taskqname,
 	    1, TASKQ_DEFAULTPRI, 0)) == NULL) {
-		ixgbe_error(ixgbe, "taskq_create failed");
+		ixgbe_error(ixgbe, "sfp_taskq create failed");
 		goto attach_fail;
 	}
 	ixgbe->attach_progress |= ATTACH_PROGRESS_SFP_TASKQ;
+
+	/*
+	 * Create a taskq for over-temp
+	 */
+	(void) sprintf(taskqname, "ixgbe%d_overtemp_taskq", instance);
+	if ((ixgbe->overtemp_taskq = ddi_taskq_create(devinfo, taskqname,
+	    1, TASKQ_DEFAULTPRI, 0)) == NULL) {
+		ixgbe_error(ixgbe, "overtemp_taskq create failed");
+		goto attach_fail;
+	}
+	ixgbe->attach_progress |= ATTACH_PROGRESS_OVERTEMP_TASKQ;
 
 	/*
 	 * Initialize driver parameters
@@ -680,6 +700,13 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	}
 
 	/*
+	 * Remove taskq for over-temp
+	 */
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_OVERTEMP_TASKQ) {
+		ddi_taskq_destroy(ixgbe->overtemp_taskq);
+	}
+
+	/*
 	 * Remove interrupts
 	 */
 	if (ixgbe->attach_progress & ATTACH_PROGRESS_ALLOC_INTR) {
@@ -825,18 +852,21 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 		if (ixgbe_get_media_type(hw) == ixgbe_media_type_copper) {
 			ixgbe->capab->flags |= IXGBE_FLAG_FAN_FAIL_CAPABLE;
 			ixgbe->capab->other_intr |= IXGBE_EICR_GPI_SDP1;
+			ixgbe->capab->other_gpie |= IXGBE_SDP1_GPIEN;
 		}
-		ixgbe->capab->other_intr |= IXGBE_EICR_LSC;
-
 		break;
+
 	case ixgbe_mac_82599EB:
 		IXGBE_DEBUGLOG_0(ixgbe, "identify 82599 adapter\n");
 		ixgbe->capab = &ixgbe_82599eb_cap;
 
-		ixgbe->capab->other_intr = (IXGBE_EICR_GPI_SDP1 |
-		    IXGBE_EICR_GPI_SDP2 | IXGBE_EICR_LSC);
-
+		if (hw->device_id == IXGBE_DEV_ID_82599_T3_LOM) {
+			ixgbe->capab->flags |= IXGBE_FLAG_TEMP_SENSOR_CAPABLE;
+			ixgbe->capab->other_intr |= IXGBE_EICR_GPI_SDP0;
+			ixgbe->capab->other_gpie |= IXGBE_SDP0_GPIEN;
+		}
 		break;
+
 	default:
 		IXGBE_DEBUGLOG_1(ixgbe,
 		    "adapter not supported in ixgbe_identify_hardware(): %d\n",
@@ -1255,7 +1285,8 @@ ixgbe_chip_start(ixgbe_t *ixgbe)
 	 * Re-enable relaxed ordering for performance.  It is disabled
 	 * by default in the hardware init.
 	 */
-	ixgbe_enable_relaxed_ordering(hw);
+	if (ixgbe->relax_order_enable == B_TRUE)
+		ixgbe_enable_relaxed_ordering(hw);
 
 	/*
 	 * Setup adapter interrupt vectors
@@ -1563,10 +1594,11 @@ ixgbe_start(ixgbe_t *ixgbe, boolean_t alloc_buffer)
 
 	/*
 	 * ixgbe_start() will be called when resetting, however if reset
-	 * happens, we need to clear the ERROR and STALL flags before
-	 * enabling the interrupts.
+	 * happens, we need to clear the ERROR, STALL and OVERTEMP flags
+	 * before enabling the interrupts.
 	 */
-	atomic_and_32(&ixgbe->ixgbe_state, ~(IXGBE_ERROR | IXGBE_STALL));
+	atomic_and_32(&ixgbe->ixgbe_state, ~(IXGBE_ERROR
+	    | IXGBE_STALL| IXGBE_OVERTEMP));
 
 	/*
 	 * Enable adapter interrupts
@@ -2347,22 +2379,38 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
 		ring_mapping |= (i & 0xF) << (8 * (i & 0x3));
 		if ((i & 0x3) == 0x3) {
-			if (hw->mac.type >= ixgbe_mac_82599EB) {
-				IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2),
-				    ring_mapping);
-			} else {
+			switch (hw->mac.type) {
+			case ixgbe_mac_82598EB:
 				IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2),
 				    ring_mapping);
+				break;
+
+			case ixgbe_mac_82599EB:
+				IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2),
+				    ring_mapping);
+				break;
+
+			default:
+				break;
 			}
+
 			ring_mapping = 0;
 		}
 	}
-	if ((i & 0x3) != 0x3)
-		if (hw->mac.type >= ixgbe_mac_82599EB) {
-			IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2), ring_mapping);
-		} else {
+	if (i & 0x3) {
+		switch (hw->mac.type) {
+		case ixgbe_mac_82598EB:
 			IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2), ring_mapping);
+			break;
+
+		case ixgbe_mac_82599EB:
+			IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2), ring_mapping);
+			break;
+
+		default:
+			break;
 		}
+	}
 
 	/*
 	 * Enable CRC appending and TX padding (for short tx frames)
@@ -2500,7 +2548,6 @@ ixgbe_setup_vmdq(ixgbe_t *ixgbe)
 		 */
 		IXGBE_WRITE_REG(hw, IXGBE_VFRE(0), IXGBE_VFRE_ENABLE_ALL);
 		IXGBE_WRITE_REG(hw, IXGBE_VFRE(1), IXGBE_VFRE_ENABLE_ALL);
-
 		break;
 
 	default:
@@ -2847,7 +2894,6 @@ ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe)
 			ixgbe->num_rx_rings = ixgbe->num_rx_groups *
 			    min(2, ring_per_group);
 		}
-
 		break;
 
 	default:
@@ -2996,6 +3042,8 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	    0, 1, DEFAULT_LRO_ENABLE);
 	ixgbe->tx_head_wb_enable = ixgbe_get_prop(ixgbe, PROP_TX_HEAD_WB_ENABLE,
 	    0, 1, DEFAULT_TX_HEAD_WB_ENABLE);
+	ixgbe->relax_order_enable = ixgbe_get_prop(ixgbe,
+	    PROP_RELAX_ORDER_ENABLE, 0, 1, DEFAULT_RELAX_ORDER_ENABLE);
 
 	/* Head Write Back not recommended for 82599 */
 	if (hw->mac.type >= ixgbe_mac_82599EB) {
@@ -3220,12 +3268,6 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * this is only reached after a link-status-change interrupt
-	 * so always get new phy state
-	 */
-	ixgbe_get_hw_state(ixgbe);
-
-	/*
 	 * If we are in an interrupt context, need to re-enable the
 	 * interrupt, which was automasked
 	 */
@@ -3258,6 +3300,7 @@ ixgbe_sfp_check(void *arg)
 		(void) ixgbe_setup_link(hw, IXGBE_LINK_SPEED_82599_AUTONEG,
 		    B_TRUE, B_TRUE);
 		ixgbe_driver_link_check(ixgbe);
+		ixgbe_get_hw_state(ixgbe);
 	} else if (eicr & IXGBE_EICR_GPI_SDP2) {
 		/* clear the interrupt */
 		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP2);
@@ -3269,7 +3312,69 @@ ixgbe_sfp_check(void *arg)
 		(void) ixgbe_setup_link(hw, IXGBE_LINK_SPEED_82599_AUTONEG,
 		    B_TRUE, B_TRUE);
 		ixgbe_driver_link_check(ixgbe);
+		ixgbe_get_hw_state(ixgbe);
 	}
+	mutex_exit(&ixgbe->gen_lock);
+
+	/*
+	 * We need to fully re-check the link later.
+	 */
+	ixgbe->link_check_complete = B_FALSE;
+	ixgbe->link_check_hrtime = gethrtime() +
+	    (IXGBE_LINK_UP_TIME * 100000000ULL);
+}
+
+/*
+ * ixgbe_overtemp_check - overtemp module processing done in taskq
+ *
+ * This routine will only be called on adapters with temperature sensor.
+ * The indication of over-temperature can be either SDP0 interrupt or the link
+ * status change interrupt.
+ */
+static void
+ixgbe_overtemp_check(void *arg)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)arg;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t eicr = ixgbe->eicr;
+	ixgbe_link_speed speed;
+	boolean_t link_up;
+
+	mutex_enter(&ixgbe->gen_lock);
+
+	/* make sure we know current state of link */
+	(void) ixgbe_check_link(hw, &speed, &link_up, false);
+
+	/* check over-temp condition */
+	if (((eicr & IXGBE_EICR_GPI_SDP0) && (!link_up)) ||
+	    (eicr & IXGBE_EICR_LSC)) {
+		if (hw->phy.ops.check_overtemp(hw) == IXGBE_ERR_OVERTEMP) {
+			atomic_or_32(&ixgbe->ixgbe_state, IXGBE_OVERTEMP);
+
+			/*
+			 * Disable the adapter interrupts
+			 */
+			ixgbe_disable_adapter_interrupts(ixgbe);
+
+			/*
+			 * Disable Rx/Tx units
+			 */
+			(void) ixgbe_stop_adapter(hw);
+
+			ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
+			ixgbe_error(ixgbe,
+			    "Problem: Network adapter has been stopped "
+			    "because it has overheated");
+			ixgbe_error(ixgbe,
+			    "Action: Restart the computer. "
+			    "If the problem persists, power off the system "
+			    "and replace the adapter");
+		}
+	}
+
+	/* write to clear the interrupt */
+	IXGBE_WRITE_REG(hw, IXGBE_EICR, eicr);
+
 	mutex_exit(&ixgbe->gen_lock);
 }
 
@@ -3296,12 +3401,14 @@ ixgbe_local_timer(void *arg)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)arg;
 
+	if (ixgbe->ixgbe_state & IXGBE_OVERTEMP)
+		goto out;
+
 	if (ixgbe->ixgbe_state & IXGBE_ERROR) {
 		ixgbe->reset_count++;
 		if (ixgbe_reset(ixgbe) == IXGBE_SUCCESS)
 			ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_RESTORED);
-		ixgbe_restart_watchdog_timer(ixgbe);
-		return;
+		goto out;
 	}
 
 	if (ixgbe_stall_check(ixgbe)) {
@@ -3313,6 +3420,7 @@ ixgbe_local_timer(void *arg)
 			ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_RESTORED);
 	}
 
+out:
 	ixgbe_restart_watchdog_timer(ixgbe);
 }
 
@@ -3632,15 +3740,26 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 			gpie |= IXGBE_GPIE_EIAME;
 		}
 	}
-	/* Enable specific interrupts for 82599  */
-	if (hw->mac.type == ixgbe_mac_82599EB) {
-		gpie |= IXGBE_SDP2_GPIEN; /* pluggable optics intr */
-		gpie |= IXGBE_SDP1_GPIEN; /* LSC interrupt */
+
+	/* Enable specific "other" interrupt types */
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		gpie |= ixgbe->capab->other_gpie;
+		break;
+
+	case ixgbe_mac_82599EB:
+		gpie |= ixgbe->capab->other_gpie;
+
+		/* Enable RSC Delay 8us when LRO enabled  */
+		if (ixgbe->lro_enable) {
+			gpie |= (1 << IXGBE_GPIE_RSC_DELAY_SHIFT);
+		}
+		break;
+
+	default:
+		break;
 	}
-	/* Enable RSC Dealy 8us for 82599  */
-	if (ixgbe->lro_enable) {
-		gpie |= (1 << IXGBE_GPIE_RSC_DELAY_SHIFT);
-	}
+
 	/* write to interrupt control registers */
 	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
 	IXGBE_WRITE_REG(hw, IXGBE_EIAC, eiac);
@@ -3794,7 +3913,8 @@ ixgbe_set_internal_mac_loopback(ixgbe_t *ixgbe)
 	/*
 	 * Disable Atlas Tx lanes to keep packets in loopback and not on wire
 	 */
-	if (hw->mac.type == ixgbe_mac_82598EB) {
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
 		(void) ixgbe_read_analog_reg8(&ixgbe->hw, IXGBE_ATLAS_PDN_LPBK,
 		    &atlas);
 		atlas |= IXGBE_ATLAS_PDN_TX_REG_EN;
@@ -3818,7 +3938,9 @@ ixgbe_set_internal_mac_loopback(ixgbe_t *ixgbe)
 		atlas |= IXGBE_ATLAS_PDN_TX_AN_QL_ALL;
 		(void) ixgbe_write_analog_reg8(&ixgbe->hw, IXGBE_ATLAS_PDN_AN,
 		    atlas);
-	} else if (hw->mac.type == ixgbe_mac_82599EB) {
+		break;
+
+	case ixgbe_mac_82599EB:
 		reg = IXGBE_READ_REG(&ixgbe->hw, IXGBE_AUTOC);
 		reg |= (IXGBE_AUTOC_FLU |
 		    IXGBE_AUTOC_10G_KX4);
@@ -3826,6 +3948,10 @@ ixgbe_set_internal_mac_loopback(ixgbe_t *ixgbe)
 
 		(void) ixgbe_setup_link(&ixgbe->hw, IXGBE_LINK_SPEED_10GB_FULL,
 		    B_FALSE, B_TRUE);
+		break;
+
+	default:
+		break;
 	}
 }
 
@@ -3881,8 +4007,6 @@ ixgbe_intr_tx_work(ixgbe_tx_ring_t *tx_ring)
 static void
 ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 {
-	struct ixgbe_hw *hw = &ixgbe->hw;
-
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
 
 	/*
@@ -3890,6 +4014,7 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 	 */
 	if (eicr & IXGBE_EICR_LSC) {
 		ixgbe_driver_link_check(ixgbe);
+		ixgbe_get_hw_state(ixgbe);
 	}
 
 	/*
@@ -3897,32 +4022,55 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 	 */
 	if ((ixgbe->capab->flags & IXGBE_FLAG_FAN_FAIL_CAPABLE) &&
 	    (eicr & IXGBE_EICR_GPI_SDP1)) {
-		if (hw->mac.type < ixgbe_mac_82599EB) {
-			ixgbe_log(ixgbe,
-			    "Fan has stopped, replace the adapter\n");
+		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_OVERTEMP);
 
-			/* re-enable the interrupt, which was automasked */
-			ixgbe->eims |= IXGBE_EICR_GPI_SDP1;
-		}
+		/*
+		 * Disable the adapter interrupts
+		 */
+		ixgbe_disable_adapter_interrupts(ixgbe);
+
+		/*
+		 * Disable Rx/Tx units
+		 */
+		(void) ixgbe_stop_adapter(&ixgbe->hw);
+
+		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
+		ixgbe_error(ixgbe,
+		    "Problem: Network adapter has been stopped "
+		    "because the fan has stopped.\n");
+		ixgbe_error(ixgbe,
+		    "Action: Replace the adapter.\n");
+
+		/* re-enable the interrupt, which was automasked */
+		ixgbe->eims |= IXGBE_EICR_GPI_SDP1;
 	}
 
 	/*
-	 * Do SFP check for 82599
+	 * Do SFP check for adapters with hot-plug capability
 	 */
-	if (hw->mac.type == ixgbe_mac_82599EB) {
+	if ((ixgbe->capab->flags & IXGBE_FLAG_SFP_PLUG_CAPABLE) &&
+	    ((eicr & IXGBE_EICR_GPI_SDP1) || (eicr & IXGBE_EICR_GPI_SDP2))) {
+		ixgbe->eicr = eicr;
 		if ((ddi_taskq_dispatch(ixgbe->sfp_taskq,
 		    ixgbe_sfp_check, (void *)ixgbe,
 		    DDI_NOSLEEP)) != DDI_SUCCESS) {
 			ixgbe_log(ixgbe, "No memory available to dispatch "
 			    "taskq for SFP check");
 		}
+	}
 
-		/*
-		 * We need to fully re-check the link later.
-		 */
-		ixgbe->link_check_complete = B_FALSE;
-		ixgbe->link_check_hrtime = gethrtime() +
-		    (IXGBE_LINK_UP_TIME * 100000000ULL);
+	/*
+	 * Do over-temperature check for adapters with temp sensor
+	 */
+	if ((ixgbe->capab->flags & IXGBE_FLAG_TEMP_SENSOR_CAPABLE) &&
+	    ((eicr & IXGBE_EICR_GPI_SDP0) || (eicr & IXGBE_EICR_LSC))) {
+		ixgbe->eicr = eicr;
+		if ((ddi_taskq_dispatch(ixgbe->overtemp_taskq,
+		    ixgbe_overtemp_check, (void *)ixgbe,
+		    DDI_NOSLEEP)) != DDI_SUCCESS) {
+			ixgbe_log(ixgbe, "No memory available to dispatch "
+			    "taskq for overtemp check");
+		}
 	}
 }
 
@@ -4005,12 +4153,18 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 
 		/* any interrupt type other than tx/rx */
 		if (eicr & ixgbe->capab->other_intr) {
-			if (hw->mac.type < ixgbe_mac_82599EB) {
+			switch (hw->mac.type) {
+			case ixgbe_mac_82598EB:
 				ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
-			}
-			if (hw->mac.type == ixgbe_mac_82599EB) {
+				break;
+
+			case ixgbe_mac_82599EB:
 				ixgbe->eimc = IXGBE_82599_OTHER_INTR;
 				IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
+				break;
+
+			default:
+				break;
 			}
 			ixgbe_intr_other_work(ixgbe, eicr);
 			ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
@@ -4092,12 +4246,18 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 	/* any interrupt type other than tx/rx */
 	if (eicr & ixgbe->capab->other_intr) {
 		mutex_enter(&ixgbe->gen_lock);
-		if (hw->mac.type < ixgbe_mac_82599EB) {
+		switch (hw->mac.type) {
+		case ixgbe_mac_82598EB:
 			ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
-		}
-		if (hw->mac.type == ixgbe_mac_82599EB) {
+			break;
+
+		case ixgbe_mac_82599EB:
 			ixgbe->eimc = IXGBE_82599_OTHER_INTR;
 			IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
+			break;
+
+		default:
+			break;
 		}
 		ixgbe_intr_other_work(ixgbe, eicr);
 		ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
@@ -4160,24 +4320,25 @@ ixgbe_intr_msix(void *arg1, void *arg2)
 		}
 
 		/*
-		 * Need check cause bits and only other causes will
-		 * be processed
+		 * Check "other" cause bits: any interrupt type other than tx/rx
 		 */
-		/* any interrupt type other than tx/rx */
 		if (eicr & ixgbe->capab->other_intr) {
-			if (hw->mac.type < ixgbe_mac_82599EB) {
-				mutex_enter(&ixgbe->gen_lock);
+			mutex_enter(&ixgbe->gen_lock);
+			switch (hw->mac.type) {
+			case ixgbe_mac_82598EB:
 				ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
 				ixgbe_intr_other_work(ixgbe, eicr);
-				mutex_exit(&ixgbe->gen_lock);
-			} else {
-				if (hw->mac.type == ixgbe_mac_82599EB) {
-					mutex_enter(&ixgbe->gen_lock);
-					ixgbe->eims |= IXGBE_EICR_RTX_QUEUE;
-					ixgbe_intr_other_work(ixgbe, eicr);
-					mutex_exit(&ixgbe->gen_lock);
-				}
+				break;
+
+			case ixgbe_mac_82599EB:
+				ixgbe->eims |= IXGBE_EICR_RTX_QUEUE;
+				ixgbe_intr_other_work(ixgbe, eicr);
+				break;
+
+			default:
+				break;
 			}
+			mutex_exit(&ixgbe->gen_lock);
 		}
 
 		/* re-enable the interrupts which were automasked */
@@ -4373,9 +4534,8 @@ ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 	 */
 	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
 	ASSERT((ixgbe->num_rx_rings % ixgbe->num_rx_groups) == 0);
-	if (min(actual, ixgbe->num_rx_rings) < ring_per_group) {
-		ixgbe->num_rx_rings = ixgbe->num_rx_groups *
-		    min(actual, ixgbe->num_rx_rings);
+	if (actual < ring_per_group) {
+		ixgbe->num_rx_rings = ixgbe->num_rx_groups * actual;
 		ixgbe_setup_vmdq_rss_conf(ixgbe);
 	}
 
@@ -4569,6 +4729,7 @@ ixgbe_setup_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, uint8_t msix_vector,
 		ivar |= (msix_vector << (8 * (intr_alloc_entry & 0x3)));
 		IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
 		break;
+
 	case ixgbe_mac_82599EB:
 		if (cause == -1) {
 			/* other causes */
@@ -4590,6 +4751,7 @@ ixgbe_setup_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, uint8_t msix_vector,
 			    ivar);
 		}
 		break;
+
 	default:
 		break;
 	}
@@ -4620,6 +4782,7 @@ ixgbe_enable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 		    (intr_alloc_entry & 0x3)));
 		IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
 		break;
+
 	case ixgbe_mac_82599EB:
 		if (cause == -1) {
 			/* other causes */
@@ -4637,6 +4800,7 @@ ixgbe_enable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 			    ivar);
 		}
 		break;
+
 	default:
 		break;
 	}
@@ -4667,6 +4831,7 @@ ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 		    (intr_alloc_entry & 0x3)));
 		IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
 		break;
+
 	case ixgbe_mac_82599EB:
 		if (cause == -1) {
 			/* other causes */
@@ -4684,6 +4849,7 @@ ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 			    ivar);
 		}
 		break;
+
 	default:
 		break;
 	}
@@ -4704,19 +4870,26 @@ ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
 	    ixgbe->classify_mode == IXGBE_CLASSIFY_NONE) {
 		return (sw_rx_index);
 	} else if (ixgbe->classify_mode == IXGBE_CLASSIFY_VMDQ) {
-		if (hw->mac.type == ixgbe_mac_82598EB) {
+		switch (hw->mac.type) {
+		case ixgbe_mac_82598EB:
 			return (sw_rx_index);
-		} else if (hw->mac.type == ixgbe_mac_82599EB) {
+
+		case ixgbe_mac_82599EB:
 			return (sw_rx_index * 2);
+
+		default:
+			break;
 		}
 	} else if (ixgbe->classify_mode == IXGBE_CLASSIFY_VMDQ_RSS) {
 		rx_ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
 
-		if (hw->mac.type == ixgbe_mac_82598EB) {
+		switch (hw->mac.type) {
+		case ixgbe_mac_82598EB:
 			hw_rx_index = (sw_rx_index / rx_ring_per_group) *
 			    16 + (sw_rx_index % rx_ring_per_group);
 			return (hw_rx_index);
-		} else if (hw->mac.type == ixgbe_mac_82599EB) {
+
+		case ixgbe_mac_82599EB:
 			if (ixgbe->num_rx_groups > 32) {
 				hw_rx_index = (sw_rx_index /
 				    rx_ring_per_group) * 2 +
@@ -4727,6 +4900,9 @@ ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
 				    (sw_rx_index % rx_ring_per_group);
 			}
 			return (hw_rx_index);
+
+		default:
+			break;
 		}
 	}
 
@@ -4815,14 +4991,14 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 	case ixgbe_mac_82598EB:
 		for (v_idx = 0; v_idx < 25; v_idx++)
 			IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
-
 		break;
+
 	case ixgbe_mac_82599EB:
 		for (v_idx = 0; v_idx < 64; v_idx++)
 			IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
 		IXGBE_WRITE_REG(hw, IXGBE_IVAR_MISC, 0);
-
 		break;
+
 	default:
 		break;
 	}
@@ -4997,6 +5173,7 @@ ixgbe_get_hw_state(ixgbe_t *ixgbe)
 	boolean_t link_up = B_FALSE;
 	uint32_t pcs1g_anlp = 0;
 	uint32_t pcs1g_ana = 0;
+	boolean_t autoneg = B_FALSE;
 
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
 	ixgbe->param_lp_1000fdx_cap = 0;
@@ -5004,9 +5181,10 @@ ixgbe_get_hw_state(ixgbe_t *ixgbe)
 
 	/* check for link, don't wait */
 	(void) ixgbe_check_link(hw, &speed, &link_up, false);
+	pcs1g_ana = IXGBE_READ_REG(hw, IXGBE_PCS1GANA);
+
 	if (link_up) {
 		pcs1g_anlp = IXGBE_READ_REG(hw, IXGBE_PCS1GANLP);
-		pcs1g_ana = IXGBE_READ_REG(hw, IXGBE_PCS1GANA);
 
 		ixgbe->param_lp_1000fdx_cap =
 		    (pcs1g_anlp & IXGBE_PCS1GANLP_LPFD) ? 1 : 0;
@@ -5014,9 +5192,12 @@ ixgbe_get_hw_state(ixgbe_t *ixgbe)
 		    (pcs1g_anlp & IXGBE_PCS1GANLP_LPFD) ? 1 : 0;
 	}
 
-	ixgbe->param_adv_1000fdx_cap =
-	    (pcs1g_ana & IXGBE_PCS1GANA_FDC)  ? 1 : 0;
-	ixgbe->param_adv_100fdx_cap = (pcs1g_ana & IXGBE_PCS1GANA_FDC)  ? 1 : 0;
+	(void) ixgbe_get_link_capabilities(hw, &speed, &autoneg);
+
+	ixgbe->param_adv_1000fdx_cap = ((pcs1g_ana & IXGBE_PCS1GANA_FDC) &&
+	    (speed & IXGBE_LINK_SPEED_1GB_FULL)) ? 1 : 0;
+	ixgbe->param_adv_100fdx_cap = ((pcs1g_ana & IXGBE_PCS1GANA_FDC) &&
+	    (speed & IXGBE_LINK_SPEED_100_FULL)) ? 1 : 0;
 }
 
 /*

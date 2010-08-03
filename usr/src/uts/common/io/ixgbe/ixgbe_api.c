@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +21,14 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.134 sol_ixgbe_shared_339b */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.140 scm_061610_003709 */
 
 #include "ixgbe_api.h"
 #include "ixgbe_common.h"
@@ -111,7 +113,7 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 		case IXGBE_DEV_ID_82599_SFP:
 		case IXGBE_DEV_ID_82599_SFP_EM:
 		case IXGBE_DEV_ID_82599_CX4:
-		case IXGBE_DEV_ID_82599_T:
+		case IXGBE_DEV_ID_82599_T3_LOM:
 			hw->mac.type = ixgbe_mac_82599EB;
 			break;
 		default:
@@ -288,6 +290,20 @@ ixgbe_get_wwn_prefix(struct ixgbe_hw *hw, u16 *wwnn_prefix, u16 *wwpn_prefix)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.get_wwn_prefix,
 	    (hw, wwnn_prefix, wwpn_prefix), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_get_fcoe_boot_status -  Get FCOE boot status from EEPROM
+ * @hw: pointer to hardware structure
+ * @bs: the fcoe boot status
+ *
+ * This function will read the FCOE boot status from the iSCSI FCOE block
+ */
+s32
+ixgbe_get_fcoe_boot_status(struct ixgbe_hw *hw, u16 *bs)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.get_fcoe_boot_status,
+	    (hw, bs), IXGBE_NOT_IMPLEMENTED);
 }
 
 /*
@@ -508,6 +524,47 @@ ixgbe_check_link(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
 {
 	return ixgbe_call_func(hw, hw->mac.ops.check_link, (hw, speed,
 	    link_up, link_up_wait_to_complete), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_disable_tx_laser - Disable Tx laser
+ * @hw: pointer to hardware structure
+ *
+ * If the driver needs to disable the laser on SFI optics.
+ */
+void
+ixgbe_disable_tx_laser(struct ixgbe_hw *hw)
+{
+	if (hw->mac.ops.disable_tx_laser)
+		hw->mac.ops.disable_tx_laser(hw);
+}
+
+/*
+ * ixgbe_enable_tx_laser - Enable Tx laser
+ * @hw: pointer to hardware structure
+ *
+ * If the driver needs to enable the laser on SFI optics.
+ */
+void
+ixgbe_enable_tx_laser(struct ixgbe_hw *hw)
+{
+	if (hw->mac.ops.enable_tx_laser)
+		hw->mac.ops.enable_tx_laser(hw);
+}
+
+/*
+ * ixgbe_flap_tx_laser - flap Tx laser to start autotry process
+ * @hw: pointer to hardware structure
+ *
+ * When the driver changes the link speeds that it can support then
+ * flap the tx laser to alert the link partner to start autotry
+ * process on its end.
+ */
+void
+ixgbe_flap_tx_laser(struct ixgbe_hw *hw)
+{
+	if (hw->mac.ops.flap_tx_laser)
+		hw->mac.ops.flap_tx_laser(hw);
 }
 
 /*
