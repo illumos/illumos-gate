@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG=		parted
@@ -50,6 +49,14 @@ ROOTPROG=	$(PROG:%=$(ROOTUSRSBIN)/%)
 
 .KEEP_STATE:
 all: $(PROG)
+
+all install: THIRDPARTYLICENSE
+
+CLOBBERFILES += THIRDPARTYLICENSE
+
+THIRDPARTYLICENSE: $(SRC)/common/GPLDISCLAIMER COPYING
+	$(RM) $@
+	$(CAT) $(SRC)/common/GPLDISCLAIMER COPYING > $@
 
 $(PROG):	$(OBJS)
 	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)

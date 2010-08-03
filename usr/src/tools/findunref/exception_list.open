@@ -256,3 +256,25 @@
 #
 ./usr/src/cmd/dfs.cmds/sharemgr/amd64/Makefile
 ./usr/src/cmd/dfs.cmds/sharemgr/sparcv9/Makefile
+
+#
+# Legitimately unreferenced license/copying files.  Please include
+# explanatory comments when adding items here.
+#
+
+#
+# OPENSOLARIS.LICENSE needs to remain in usr/src as long as it is
+# referenced in the CDDL headers.
+#
+./usr/src/OPENSOLARIS.LICENSE
+
+# Though "COPYING" is usually used as a filename for GPL, the license
+# information for openssh is actually found in usr/src/cmd/ssh/doc/LICENSE.
+# The COPYING.Ylonen file is merely additional information.
+#
+./usr/src/cmd/ssh/doc/COPYING.Ylonen
+
+#
+# This covers header files that are not delivered.
+#
+./usr/src/uts/common/xen/public/COPYING

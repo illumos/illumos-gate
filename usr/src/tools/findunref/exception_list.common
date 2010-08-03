@@ -76,22 +76,3 @@
 # Ignore file list generators
 #
 *.flg
-
-#
-# Legitimately unreferenced license/copying files.  Please include
-# explanatory comments when adding items here.
-#
-# Though "COPYING" is usually used as a filename for GPL, the license
-# information for openssh is actually found in usr/src/cmd/ssh/doc/LICENSE.
-# The COPYING.Ylonen file is merely additional information.
-#
-usr/src/cmd/ssh/doc/COPYING.Ylonen
-#
-# The GPL terms for libntfs are included in the corresponding
-# THIRDPARTYLICENSE file.
-#
-usr/src/lib/libntfs/COPYING
-#
-# This covers header files that are not delivered.
-#
-usr/src/uts/common/xen/public/COPYING
