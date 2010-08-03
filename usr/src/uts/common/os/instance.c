@@ -1618,6 +1618,18 @@ e_ddi_borrow_instance(dev_info_t *cdip, in_node_t *cnp)
 	}
 
 	if (alias && (anp = e_ddi_path_to_instance(alias)) != NULL) {
+		/*
+		 * Since pcieb nodes can split and merge, it is dangerous
+		 * to borrow and instance for them. However since they do
+		 * not expose their instance numbers it is safe to never
+		 * borrow one.
+		 */
+		if (anp->in_drivers->ind_driver_name &&
+		    (strcmp(anp->in_drivers->ind_driver_name, "pcieb") == 0)) {
+			DDI_MP_DBG((CE_NOTE, "not borrowing pcieb: "
+			    "%s alias: %s", curr, alias));
+			goto out;
+		}
 		DDI_MP_DBG((CE_NOTE, "borrowing current: %s alias: %s",
 		    curr, alias));
 		cnp->in_drivers = anp->in_drivers;
