@@ -710,7 +710,7 @@ xdrrdma_control(XDR *xdrs, int request, void *info)
 	rdma_wlist_conn_info_t *rwcip = NULL;
 	rdma_chunkinfo_lengths_t *rcilp = NULL;
 	struct uio *uiop;
-	struct clist	*rwl = NULL;
+	struct clist	*rwl = NULL, *first = NULL;
 	struct clist	*prev = NULL;
 
 	switch (request) {
@@ -789,6 +789,8 @@ xdrrdma_control(XDR *xdrs, int request, void *info)
 
 			for (i = 0; i < uiop->uio_iovcnt; i++) {
 				rwl = clist_alloc();
+				if (first == NULL)
+					first = rwl;
 				rwl->c_len = uiop->uio_iov[i].iov_len;
 				rwl->u.c_daddr =
 				    (uint64)(uintptr_t)
@@ -811,8 +813,8 @@ xdrrdma_control(XDR *xdrs, int request, void *info)
 			}
 
 			rwl->c_next = NULL;
-			xdrp->xp_wcl = rwl;
-			*(rcip->rci_clpp) = rwl;
+			xdrp->xp_wcl = first;
+			*(rcip->rci_clpp) = first;
 
 			break;
 

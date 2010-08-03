@@ -3182,8 +3182,13 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (args->wlist)
+	if (args->wlist) {
+		if (args->count > clist_len(args->wlist)) {
+			*cs->statusp = resp->status = NFS4ERR_INVAL;
+			goto out;
+		}
 		rdma_used = 1;
+	}
 
 	/* use loaned buffers for TCP */
 	loaned_buffers = (nfs_loaned_buffers && !rdma_used) ? 1 : 0;
