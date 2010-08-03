@@ -4761,6 +4761,7 @@ pmcs_gwork(pmcs_hw_t *pwp, uint32_t tag_type, pmcs_phy_t *phyp)
 	p->state = PMCS_WORK_STATE_READY;
 	p->ssp_event = 0;
 	p->dead = 0;
+	p->timer = 0;
 
 	if (phyp) {
 		p->phy = phyp;

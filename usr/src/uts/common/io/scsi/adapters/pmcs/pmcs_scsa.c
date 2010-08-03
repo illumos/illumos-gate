@@ -1846,8 +1846,9 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	pmcs_hw_t *pwp = CMD2PMC(sp);
 	struct scsi_pkt *pkt = CMD2PKT(sp);
 	pmcs_xscsi_t *xp = pwrk->xp;
-	uint32_t iq, *ptr;
+	uint32_t iq, lhtag, *ptr;
 	sas_ssp_cmd_iu_t sc;
+	int sp_pkt_time = 0;
 
 	ASSERT(xp != NULL);
 	mutex_enter(&xp->statlock);
@@ -1961,6 +1962,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	    min(SCSA_CDBLEN(sp), sizeof (sc.cdb)));
 	(void) memcpy(&ptr[5], &sc, sizeof (sas_ssp_cmd_iu_t));
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
+	lhtag = pwrk->htag;
 	mutex_exit(&pwrk->lock);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL,
 	    "%s: giving pkt %p (tag %x) to the hardware", __func__,
@@ -1971,11 +1973,14 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	mutex_enter(&xp->aqlock);
 	STAILQ_INSERT_TAIL(&xp->aq, sp, cmd_next);
 	mutex_exit(&xp->aqlock);
+	sp_pkt_time = CMD2PKT(sp)->pkt_time;
 	INC_IQ_ENTRY(pwp, iq);
 	mutex_enter(&pwrk->lock);
-	pwrk->timer = US2WT(CMD2PKT(sp)->pkt_time * 1000000);
-	if (pwrk->timer == 0) {
-		pwrk->timer = US2WT(1000000);
+	if (lhtag == pwrk->htag) {
+		pwrk->timer = US2WT(sp_pkt_time * 1000000);
+		if (pwrk->timer == 0) {
+			pwrk->timer = US2WT(1000000);
+		}
 	}
 	mutex_exit(&pwrk->lock);
 
@@ -2357,10 +2362,11 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	struct scsi_pkt *pkt = CMD2PKT(sp);
 	pmcs_xscsi_t *xp;
 	uint8_t cdb_base, asc, tag;
-	uint32_t *ptr, iq, nblk, i, mtype;
+	uint32_t *ptr, lhtag, iq, nblk, i, mtype;
 	fis_t fis;
 	size_t amt;
 	uint64_t lba;
+	int sp_pkt_time = 0;
 
 	xp = pwrk->xp;
 	ASSERT(xp != NULL);
@@ -2572,6 +2578,7 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	}
 
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
+	lhtag = pwrk->htag;
 	mutex_exit(&pwrk->lock);
 	xp->tagmap |= (1 << tag);
 	xp->actv_cnt++;
@@ -2589,11 +2596,14 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 #ifdef DEBUG
 	pmcs_print_entry(pwp, PMCS_PRT_DEBUG3, "SATA INI Message", ptr);
 #endif
+	sp_pkt_time = CMD2PKT(sp)->pkt_time;
 	INC_IQ_ENTRY(pwp, iq);
 	mutex_enter(&pwrk->lock);
-	pwrk->timer = US2WT(CMD2PKT(sp)->pkt_time * 1000000);
-	if (pwrk->timer == 0) {
-		pwrk->timer = US2WT(1000000);
+	if (lhtag == pwrk->htag) {
+		pwrk->timer = US2WT(sp_pkt_time * 1000000);
+		if (pwrk->timer == 0) {
+			pwrk->timer = US2WT(1000000);
+		}
 	}
 	mutex_exit(&pwrk->lock);
 
