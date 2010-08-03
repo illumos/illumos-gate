@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/file.h>
@@ -590,7 +589,8 @@ mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 			 * equal to the zone's root path. Since the zone's root
 			 * path isn't a mount point, we copy the vfs_t of the
 			 * zone's root vnode, and provide it with a fake mount
-			 * point and resource.
+			 * and resource. However, if the zone's root is a
+			 * zfs dataset, use the dataset name as the resource.
 			 *
 			 * Note that by cloning another vfs_t we also acquire
 			 * its high-resolution ctime. This might appear to
@@ -607,7 +607,9 @@ mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 			 */
 			dummyvfs = *zonep->zone_rootvp->v_vfsp;
 			dummyvfs.vfs_mntpt = refstr_alloc(zonep->zone_rootpath);
-			dummyvfs.vfs_resource = dummyvfs.vfs_mntpt;
+			if (strcmp(vfssw[dummyvfs.vfs_fstype].vsw_name, "zfs")
+			    != 0)
+				dummyvfs.vfs_resource = dummyvfs.vfs_mntpt;
 			dummyvfsp = &dummyvfs;
 			if (firstvfsp == NULL) {
 				lastvfsp = dummyvfsp;
