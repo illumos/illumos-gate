@@ -144,16 +144,16 @@ typedef struct sctpt_s {
 #define	SCTP_FADDR_TIMER_RESTART(sctp, fp, intvl)			\
 {									\
 	dprint(3, ("faddr_timer_restart: fp=%p %x:%x:%x:%x %d\n",	\
-	    (void *)(fp), SCTP_PRINTADDR((fp)->faddr), (int)(intvl)));	\
-	sctp_timer((sctp), (fp)->timer_mp, (intvl));			\
-	(fp)->timer_running = 1;					\
+	    (void *)(fp), SCTP_PRINTADDR((fp)->sf_faddr), (int)(intvl))); \
+	sctp_timer((sctp), (fp)->sf_timer_mp, (intvl));			\
+	(fp)->sf_timer_running = 1;					\
 }
 
 #define	SCTP_FADDR_TIMER_STOP(fp)			\
-	ASSERT((fp)->timer_mp != NULL);			\
-	if ((fp)->timer_running) {			\
-		sctp_timer_stop((fp)->timer_mp);	\
-		(fp)->timer_running = 0;		\
+	ASSERT((fp)->sf_timer_mp != NULL);		\
+	if ((fp)->sf_timer_running) {			\
+		sctp_timer_stop((fp)->sf_timer_mp);	\
+		(fp)->sf_timer_running = 0;		\
 	}
 
 /* For per endpoint association statistics */
@@ -164,15 +164,15 @@ typedef struct sctpt_s {
 	 * at the end of each stats request.		\
 	 */						\
 	(sctp)->sctp_maxrto =				\
-	    MAX((sctp)->sctp_maxrto, (fp)->rto);	\
+	    MAX((sctp)->sctp_maxrto, (fp)->sf_rto);	\
 	DTRACE_PROBE2(sctp__maxrto, sctp_t *,		\
 	    sctp, struct sctp_faddr_s, fp);		\
 }
 
 #define	SCTP_CALC_RXT(sctp, fp, max)	\
 {					\
-	if (((fp)->rto <<= 1) > (max))	\
-		(fp)->rto = (max);	\
+	if (((fp)->sf_rto <<= 1) > (max))	\
+		(fp)->sf_rto = (max);	\
 	SCTP_MAX_RTO(sctp, fp);		\
 }
 
@@ -272,9 +272,9 @@ typedef struct {
 		if (SCTP_CHUNK_ISACKED(mp)) {				\
 			(sctp)->sctp_unacked += (chunkdata);		\
 		} else {						\
-			ASSERT(SCTP_CHUNK_DEST(mp)->suna >= ((chunkdata) + \
+			ASSERT(SCTP_CHUNK_DEST(mp)->sf_suna >= ((chunkdata) + \
 							sizeof (*sdc))); \
-			SCTP_CHUNK_DEST(mp)->suna -= ((chunkdata) + 	\
+			SCTP_CHUNK_DEST(mp)->sf_suna -= ((chunkdata) + 	\
 					sizeof (*sdc));			\
 		}							\
 		DTRACE_PROBE3(sctp__chunk__sent2, sctp_t *, sctp,	\
@@ -284,10 +284,10 @@ typedef struct {
 		SCTP_CHUNK_SET_SACKCNT(mp, 0);				\
 		BUMP_LOCAL(sctp->sctp_rxtchunks);			\
 		BUMP_LOCAL((sctp)->sctp_T3expire);			\
-		BUMP_LOCAL((fp)->T3expire);				\
+		BUMP_LOCAL((fp)->sf_T3expire);				\
 	}								\
 	SCTP_SET_CHUNK_DEST(mp, fp);					\
-	(fp)->suna += ((chunkdata) + sizeof (*sdc));			\
+	(fp)->sf_suna += ((chunkdata) + sizeof (*sdc));			\
 }
 
 #define	SCTP_CHUNK_ISSENT(mp)	((mp)->b_flag & SCTP_CHUNK_FLAG_SENT)
@@ -480,17 +480,17 @@ typedef struct sctp_instr_s {
 
 /* Reassembly data structure (per-stream) */
 typedef struct sctp_reass_s {
-	uint16_t	ssn;
-	uint16_t	needed;
-	uint16_t	got;
-	uint16_t	msglen;		/* len of consecutive fragments */
+	uint16_t	sr_ssn;
+	uint16_t	sr_needed;
+	uint16_t	sr_got;
+	uint16_t	sr_msglen;	/* len of consecutive fragments */
 					/* from the begining (B-bit) */
-	mblk_t		*tail;
-	boolean_t	hasBchunk;	/* If the fragment list begins with */
+	mblk_t		*sr_tail;
+	boolean_t	sr_hasBchunk;	/* If the fragment list begins with */
 					/* a B-bit set chunk */
-	uint32_t	nexttsn;	/* TSN of the next fragment we */
+	uint32_t	sr_nexttsn;	/* TSN of the next fragment we */
 					/* are expecting */
-	boolean_t	partial_delivered;
+	boolean_t	sr_partial_delivered;
 } sctp_reass_t;
 
 /* debugging */
@@ -541,45 +541,45 @@ typedef enum {
 } faddr_state_t;
 
 typedef struct sctp_faddr_s {
-	struct sctp_faddr_s *next;
-	faddr_state_t	state;
+	struct sctp_faddr_s *sf_next;
+	faddr_state_t	sf_state;
 
-	in6_addr_t	faddr;
-	in6_addr_t	saddr;
+	in6_addr_t	sf_faddr;
+	in6_addr_t	sf_saddr;
 
-	int64_t		hb_expiry;	/* time to retransmit heartbeat */
-	uint32_t	hb_interval;	/* the heartbeat interval */
+	int64_t		sf_hb_expiry;	/* time to retransmit heartbeat */
+	uint32_t	sf_hb_interval;	/* the heartbeat interval */
 
-	int		rto;		/* RTO in tick */
-	int		srtt;		/* Smoothed RTT in tick */
-	int		rttvar;		/* RTT variance in tick */
-	uint32_t	rtt_updates;
-	int		strikes;
-	int		max_retr;
-	uint32_t	sfa_pmss;
-	uint32_t	cwnd;
-	uint32_t	ssthresh;
-	uint32_t	suna;		/* sent - unack'ed */
-	uint32_t	pba;		/* partial bytes acked */
-	uint32_t	acked;
-	int64_t		lastactive;
-	mblk_t		*timer_mp;	/* retransmission timer control */
+	int		sf_rto;		/* RTO in tick */
+	int		sf_srtt;	/* Smoothed RTT in tick */
+	int		sf_rttvar;	/* RTT variance in tick */
+	uint32_t	sf_rtt_updates;
+	int		sf_strikes;
+	int		sf_max_retr;
+	uint32_t	sf_pmss;
+	uint32_t	sf_cwnd;
+	uint32_t	sf_ssthresh;
+	uint32_t	sf_suna;	/* sent - unack'ed */
+	uint32_t	sf_pba;		/* partial bytes acked */
+	uint32_t	sf_acked;
+	int64_t		sf_lastactive;
+	mblk_t		*sf_timer_mp;	/* retransmission timer control */
 	uint32_t
-			hb_pending : 1,
-			timer_running : 1,
-			df : 1,
-			pmtu_discovered : 1,
+			sf_hb_pending : 1,
+			sf_timer_running : 1,
+			sf_df : 1,
+			sf_pmtu_discovered : 1,
 
-			rc_timer_running : 1,
-			isv4 : 1,
-			hb_enabled : 1;
+			sf_rc_timer_running : 1,
+			sf_isv4 : 1,
+			sf_hb_enabled : 1;
 
-	mblk_t		*rc_timer_mp;	/* reliable control chunk timer */
-	ip_xmit_attr_t	*ixa;		/* Transmit attributes */
-	uint32_t	T3expire;	/* # of times T3 timer expired */
+	mblk_t		*sf_rc_timer_mp; /* reliable control chunk timer */
+	ip_xmit_attr_t	*sf_ixa;	/* Transmit attributes */
+	uint32_t	sf_T3expire;	/* # of times T3 timer expired */
 
-	uint64_t	hb_secret;	/* per addr "secret" in heartbeat */
-	uint32_t	rxt_unacked;	/* # unack'ed retransmitted bytes */
+	uint64_t	sf_hb_secret;	/* per addr "secret" in heartbeat */
+	uint32_t	sf_rxt_unacked;	/* # unack'ed retransmitted bytes */
 } sctp_faddr_t;
 
 /* Flags to indicate supported address type in the PARM_SUP_ADDRS. */
@@ -592,8 +592,8 @@ typedef struct sctp_faddr_s {
  * as the jitter does not really need to be "very" random.
  */
 #define	SET_HB_INTVL(fp)					\
-	((fp)->hb_interval + (fp)->rto + ((fp)->rto >> 1) -	\
-	(uint_t)gethrtime() % (fp)->rto)
+	((fp)->sf_hb_interval + (fp)->sf_rto + ((fp)->sf_rto >> 1) -	\
+	(uint_t)gethrtime() % (fp)->sf_rto)
 
 #define	SCTP_IPIF_HASH	16
 
@@ -611,7 +611,7 @@ typedef	struct	sctp_ipif_hash_s {
  */
 #define	SET_CWND(fp, mss, def_max_init_cwnd)				\
 {									\
-	(fp)->cwnd = MIN(def_max_init_cwnd * (mss),			\
+	(fp)->sf_cwnd = MIN(def_max_init_cwnd * (mss),			\
 	    MIN(4 * (mss), MAX(2 * (mss), 4380 / (mss) * (mss))));	\
 }
 

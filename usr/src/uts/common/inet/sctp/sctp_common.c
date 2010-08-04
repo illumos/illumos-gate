@@ -62,10 +62,10 @@ static void sctp_init_faddr(sctp_t *, sctp_faddr_t *, in6_addr_t *, mblk_t *);
 void
 sctp_set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
 {
-	boolean_t v6 = !fp->isv4;
+	boolean_t v6 = !fp->sf_isv4;
 	boolean_t addr_set;
 
-	fp->saddr = sctp_get_valid_addr(sctp, v6, &addr_set);
+	fp->sf_saddr = sctp_get_valid_addr(sctp, v6, &addr_set);
 	/*
 	 * If there is no source address avaialble, mark this peer address
 	 * as unreachable for now.  When the heartbeat timer fires, it will
@@ -73,7 +73,7 @@ sctp_set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
 	 * available.
 	 */
 	if (!addr_set)
-		fp->state = SCTP_FADDRS_UNREACH;
+		fp->sf_state = SCTP_FADDRS_UNREACH;
 }
 
 /*
@@ -101,33 +101,33 @@ sctp_get_dest(sctp_t *sctp, sctp_faddr_t *fp)
 	 * Tell sctp_make_mp it needs to call us again should we not
 	 * complete and set the saddr.
 	 */
-	fp->saddr = ipv6_all_zeros;
+	fp->sf_saddr = ipv6_all_zeros;
 
 	/*
 	 * If this addr is not reachable, mark it as unconfirmed for now, the
 	 * state will be changed back to unreachable later in this function
 	 * if it is still the case.
 	 */
-	if (fp->state == SCTP_FADDRS_UNREACH) {
-		fp->state = SCTP_FADDRS_UNCONFIRMED;
+	if (fp->sf_state == SCTP_FADDRS_UNREACH) {
+		fp->sf_state = SCTP_FADDRS_UNCONFIRMED;
 	}
 
 	/*
 	 * Socket is connected - enable PMTU discovery.
 	 */
 	if (!sctps->sctps_ignore_path_mtu)
-		fp->ixa->ixa_flags |= IXAF_PMTU_DISCOVERY;
+		fp->sf_ixa->ixa_flags |= IXAF_PMTU_DISCOVERY;
 
-	ip_attr_nexthop(&connp->conn_xmit_ipp, fp->ixa, &fp->faddr,
+	ip_attr_nexthop(&connp->conn_xmit_ipp, fp->sf_ixa, &fp->sf_faddr,
 	    &nexthop);
 
-	laddr = fp->saddr;
-	error = ip_attr_connect(connp, fp->ixa, &laddr, &fp->faddr, &nexthop,
-	    connp->conn_fport, &laddr, &uinfo, flags);
+	laddr = fp->sf_saddr;
+	error = ip_attr_connect(connp, fp->sf_ixa, &laddr, &fp->sf_faddr,
+	    &nexthop, connp->conn_fport, &laddr, &uinfo, flags);
 
 	if (error != 0) {
 		dprint(3, ("sctp_get_dest: no ire for %x:%x:%x:%x\n",
-		    SCTP_PRINTADDR(fp->faddr)));
+		    SCTP_PRINTADDR(fp->sf_faddr)));
 		/*
 		 * It is tempting to just leave the src addr
 		 * unspecified and let IP figure it out, but we
@@ -146,12 +146,12 @@ sctp_get_dest(sctp_t *sctp, sctp_faddr_t *fp)
 		 * it won't be used to send data.
 		 */
 		sctp_set_saddr(sctp, fp);
-		if (fp->state == SCTP_FADDRS_UNREACH)
+		if (fp->sf_state == SCTP_FADDRS_UNREACH)
 			return;
 		goto check_current;
 	}
-	ASSERT(fp->ixa->ixa_ire != NULL);
-	ASSERT(!(fp->ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)));
+	ASSERT(fp->sf_ixa->ixa_ire != NULL);
+	ASSERT(!(fp->sf_ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)));
 
 	if (!sctp->sctp_loopback)
 		sctp->sctp_loopback = uinfo.iulp_loopback;
@@ -162,7 +162,7 @@ sctp_get_dest(sctp_t *sctp, sctp_faddr_t *fp)
 		if (sp->saddr_ipif_unconfirmed == 1)
 			sp->saddr_ipif_unconfirmed = 0;
 		/* We did IPsec policy lookup for laddr already */
-		fp->saddr = laddr;
+		fp->sf_saddr = laddr;
 	} else {
 		dprint(2, ("sctp_get_dest: src addr is not part of assoc "
 		    "%x:%x:%x:%x\n", SCTP_PRINTADDR(laddr)));
@@ -175,7 +175,7 @@ sctp_get_dest(sctp_t *sctp, sctp_faddr_t *fp)
 		 * not the preferred source address to send to the peer.
 		 */
 		sctp_set_saddr(sctp, fp);
-		if (fp->state == SCTP_FADDRS_UNREACH) {
+		if (fp->sf_state == SCTP_FADDRS_UNREACH) {
 			return;
 		}
 	}
@@ -184,18 +184,18 @@ sctp_get_dest(sctp_t *sctp, sctp_faddr_t *fp)
 	 * Pull out RTO information for this faddr and use it if we don't
 	 * have any yet.
 	 */
-	if (fp->srtt == -1 && uinfo.iulp_rtt != 0) {
+	if (fp->sf_srtt == -1 && uinfo.iulp_rtt != 0) {
 		/* The cached value is in ms. */
-		fp->srtt = MSEC_TO_TICK(uinfo.iulp_rtt);
-		fp->rttvar = MSEC_TO_TICK(uinfo.iulp_rtt_sd);
-		fp->rto = 3 * fp->srtt;
+		fp->sf_srtt = MSEC_TO_TICK(uinfo.iulp_rtt);
+		fp->sf_rttvar = MSEC_TO_TICK(uinfo.iulp_rtt_sd);
+		fp->sf_rto = 3 * fp->sf_srtt;
 
 		/* Bound the RTO by configured min and max values */
-		if (fp->rto < sctp->sctp_rto_min) {
-			fp->rto = sctp->sctp_rto_min;
+		if (fp->sf_rto < sctp->sctp_rto_min) {
+			fp->sf_rto = sctp->sctp_rto_min;
 		}
-		if (fp->rto > sctp->sctp_rto_max) {
-			fp->rto = sctp->sctp_rto_max;
+		if (fp->sf_rto > sctp->sctp_rto_max) {
+			fp->sf_rto = sctp->sctp_rto_max;
 		}
 		SCTP_MAX_RTO(sctp, fp);
 	}
@@ -205,16 +205,16 @@ sctp_get_dest(sctp_t *sctp, sctp_faddr_t *fp)
 	 * Record the MTU for this faddr. If the MTU for this faddr has
 	 * changed, check if the assc MTU will also change.
 	 */
-	if (fp->isv4) {
+	if (fp->sf_isv4) {
 		hdrlen = sctp->sctp_hdr_len;
 	} else {
 		hdrlen = sctp->sctp_hdr6_len;
 	}
-	if ((fp->sfa_pmss + hdrlen) != pmtu) {
-		/* Make sure that sfa_pmss is a multiple of SCTP_ALIGN. */
-		fp->sfa_pmss = (pmtu - hdrlen) & ~(SCTP_ALIGN - 1);
-		if (fp->cwnd < (fp->sfa_pmss * 2)) {
-			SET_CWND(fp, fp->sfa_pmss,
+	if ((fp->sf_pmss + hdrlen) != pmtu) {
+		/* Make sure that sf_pmss is a multiple of SCTP_ALIGN. */
+		fp->sf_pmss = (pmtu - hdrlen) & ~(SCTP_ALIGN - 1);
+		if (fp->sf_cwnd < (fp->sf_pmss * 2)) {
+			SET_CWND(fp, fp->sf_pmss,
 			    sctps->sctps_slow_start_initial);
 		}
 	}
@@ -233,47 +233,47 @@ sctp_update_dce(sctp_t *sctp)
 	ip_stack_t	*ipst = sctps->sctps_netstack->netstack_ip;
 	uint_t		ifindex;
 
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
 		bzero(&uinfo, sizeof (uinfo));
 		/*
 		 * Only record the PMTU for this faddr if we actually have
 		 * done discovery. This prevents initialized default from
 		 * clobbering any real info that IP may have.
 		 */
-		if (fp->pmtu_discovered) {
-			if (fp->isv4) {
-				uinfo.iulp_mtu = fp->sfa_pmss +
+		if (fp->sf_pmtu_discovered) {
+			if (fp->sf_isv4) {
+				uinfo.iulp_mtu = fp->sf_pmss +
 				    sctp->sctp_hdr_len;
 			} else {
-				uinfo.iulp_mtu = fp->sfa_pmss +
+				uinfo.iulp_mtu = fp->sf_pmss +
 				    sctp->sctp_hdr6_len;
 			}
 		}
 		if (sctps->sctps_rtt_updates != 0 &&
-		    fp->rtt_updates >= sctps->sctps_rtt_updates) {
+		    fp->sf_rtt_updates >= sctps->sctps_rtt_updates) {
 			/*
 			 * dce_update_uinfo() merges these values with the
 			 * old values.
 			 */
-			uinfo.iulp_rtt = TICK_TO_MSEC(fp->srtt);
-			uinfo.iulp_rtt_sd = TICK_TO_MSEC(fp->rttvar);
-			fp->rtt_updates = 0;
+			uinfo.iulp_rtt = TICK_TO_MSEC(fp->sf_srtt);
+			uinfo.iulp_rtt_sd = TICK_TO_MSEC(fp->sf_rttvar);
+			fp->sf_rtt_updates = 0;
 		}
 		ifindex = 0;
-		if (IN6_IS_ADDR_LINKSCOPE(&fp->faddr)) {
+		if (IN6_IS_ADDR_LINKSCOPE(&fp->sf_faddr)) {
 			/*
 			 * If we are going to create a DCE we'd better have
 			 * an ifindex
 			 */
-			if (fp->ixa->ixa_nce != NULL) {
-				ifindex = fp->ixa->ixa_nce->nce_common->
+			if (fp->sf_ixa->ixa_nce != NULL) {
+				ifindex = fp->sf_ixa->ixa_nce->nce_common->
 				    ncec_ill->ill_phyint->phyint_ifindex;
 			} else {
 				continue;
 			}
 		}
 
-		(void) dce_update_uinfo(&fp->faddr, ifindex, &uinfo, ipst);
+		(void) dce_update_uinfo(&fp->sf_faddr, ifindex, &uinfo, ipst);
 	}
 }
 
@@ -290,10 +290,10 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *fp, int trailer)
 	boolean_t src_changed = B_FALSE;
 
 	ASSERT(fp != NULL);
-	isv4 = fp->isv4;
+	isv4 = fp->sf_isv4;
 
-	if (SCTP_IS_ADDR_UNSPEC(isv4, fp->saddr) ||
-	    (fp->ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
+	if (SCTP_IS_ADDR_UNSPEC(isv4, fp->sf_saddr) ||
+	    (fp->sf_ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
 		/* Need to pick a source */
 		sctp_get_dest(sctp, fp);
 		/*
@@ -305,11 +305,11 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *fp, int trailer)
 	}
 
 	/* There is no suitable source address to use, return. */
-	if (fp->state == SCTP_FADDRS_UNREACH)
+	if (fp->sf_state == SCTP_FADDRS_UNREACH)
 		return (NULL);
 
-	ASSERT(fp->ixa->ixa_ire != NULL);
-	ASSERT(!SCTP_IS_ADDR_UNSPEC(isv4, fp->saddr));
+	ASSERT(fp->sf_ixa->ixa_ire != NULL);
+	ASSERT(!SCTP_IS_ADDR_UNSPEC(isv4, fp->sf_saddr));
 
 	if (isv4) {
 		ipsctplen = sctp->sctp_hdr_len;
@@ -333,11 +333,11 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *fp, int trailer)
 		bcopy(sctp->sctp_iphc, mp->b_rptr, ipsctplen);
 		if (fp != sctp->sctp_current || src_changed) {
 			/* Fix the source and destination addresses. */
-			IN6_V4MAPPED_TO_IPADDR(&fp->faddr, iph->ipha_dst);
-			IN6_V4MAPPED_TO_IPADDR(&fp->saddr, iph->ipha_src);
+			IN6_V4MAPPED_TO_IPADDR(&fp->sf_faddr, iph->ipha_dst);
+			IN6_V4MAPPED_TO_IPADDR(&fp->sf_saddr, iph->ipha_src);
 		}
 		/* set or clear the don't fragment bit */
-		if (fp->df) {
+		if (fp->sf_df) {
 			iph->ipha_fragment_offset_and_flags = htons(IPH_DF);
 		} else {
 			iph->ipha_fragment_offset_and_flags = 0;
@@ -346,8 +346,8 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *fp, int trailer)
 		bcopy(sctp->sctp_iphc6, mp->b_rptr, ipsctplen);
 		if (fp != sctp->sctp_current || src_changed) {
 			/* Fix the source and destination addresses. */
-			((ip6_t *)(mp->b_rptr))->ip6_dst = fp->faddr;
-			((ip6_t *)(mp->b_rptr))->ip6_src = fp->saddr;
+			((ip6_t *)(mp->b_rptr))->ip6_dst = fp->sf_faddr;
+			((ip6_t *)(mp->b_rptr))->ip6_src = fp->sf_saddr;
 		}
 	}
 	ASSERT(sctp->sctp_connp != NULL);
@@ -365,7 +365,7 @@ sctp_set_ulp_prop(sctp_t *sctp)
 
 	sctp_stack_t *sctps = sctp->sctp_sctps;
 
-	if (sctp->sctp_current->isv4) {
+	if (sctp->sctp_current->sf_isv4) {
 		hdrlen = sctp->sctp_hdr_len;
 	} else {
 		hdrlen = sctp->sctp_hdr6_len;
@@ -375,7 +375,7 @@ sctp_set_ulp_prop(sctp_t *sctp)
 	sctp->sctp_connp->conn_wroff = sctps->sctps_wroff_xtra + hdrlen +
 	    sizeof (sctp_data_hdr_t);
 
-	ASSERT(sctp->sctp_current->sfa_pmss == sctp->sctp_mss);
+	ASSERT(sctp->sctp_current->sf_pmss == sctp->sctp_mss);
 	bzero(&sopp, sizeof (sopp));
 	sopp.sopp_flags = SOCKOPT_MAXBLK|SOCKOPT_WROFF;
 	sopp.sopp_wroff = sctp->sctp_connp->conn_wroff;
@@ -420,10 +420,11 @@ sctp_compare_faddrsets(sctp_faddr_t *a1, sctp_faddr_t *a2)
 	int onematch;
 	sctp_faddr_t *fp1, *fp2;
 
-	for (fp1 = a1; fp1; fp1 = fp1->next) {
+	for (fp1 = a1; fp1; fp1 = fp1->sf_next) {
 		onematch = 0;
-		for (fp2 = a2; fp2; fp2 = fp2->next) {
-			if (IN6_ARE_ADDR_EQUAL(&fp1->faddr, &fp2->faddr)) {
+		for (fp2 = a2; fp2; fp2 = fp2->sf_next) {
+			if (IN6_ARE_ADDR_EQUAL(&fp1->sf_faddr,
+			    &fp2->sf_faddr)) {
 				overlap++;
 				onematch = 1;
 				break;
@@ -518,19 +519,19 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 	((sctpt_t *)(timer_mp->b_rptr))->sctpt_faddr = faddr;
 
 	/* Start with any options set on the conn */
-	faddr->ixa = conn_get_ixa_exclusive(connp);
-	if (faddr->ixa == NULL) {
+	faddr->sf_ixa = conn_get_ixa_exclusive(connp);
+	if (faddr->sf_ixa == NULL) {
 		freemsg(timer_mp);
 		kmem_cache_free(sctp_kmem_faddr_cache, faddr);
 		return (ENOMEM);
 	}
-	faddr->ixa->ixa_notify_cookie = connp->conn_sctp;
+	faddr->sf_ixa->ixa_notify_cookie = connp->conn_sctp;
 
 	sctp_init_faddr(sctp, faddr, addr, timer_mp);
-	ASSERT(faddr->ixa->ixa_cred != NULL);
+	ASSERT(faddr->sf_ixa->ixa_cred != NULL);
 
 	/* ip_attr_connect didn't allow broadcats/multicast dest */
-	ASSERT(faddr->next == NULL);
+	ASSERT(faddr->sf_next == NULL);
 
 	if (sctp->sctp_faddrs == NULL) {
 		ASSERT(sctp->sctp_lastfaddr == NULL);
@@ -538,10 +539,10 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 		sctp->sctp_faddrs = sctp->sctp_lastfaddr = faddr;
 	} else if (first) {
 		ASSERT(sctp->sctp_lastfaddr != NULL);
-		faddr->next = sctp->sctp_faddrs;
+		faddr->sf_next = sctp->sctp_faddrs;
 		sctp->sctp_faddrs = faddr;
 	} else {
-		sctp->sctp_lastfaddr->next = faddr;
+		sctp->sctp_lastfaddr->sf_next = faddr;
 		sctp->sctp_lastfaddr = faddr;
 	}
 	sctp->sctp_nfaddrs++;
@@ -554,8 +555,8 @@ sctp_lookup_faddr(sctp_t *sctp, in6_addr_t *addr)
 {
 	sctp_faddr_t *fp;
 
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-		if (IN6_ARE_ADDR_EQUAL(&fp->faddr, addr))
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+		if (IN6_ARE_ADDR_EQUAL(&fp->sf_faddr, addr))
 			break;
 	}
 
@@ -565,8 +566,8 @@ sctp_lookup_faddr(sctp_t *sctp, in6_addr_t *addr)
 sctp_faddr_t *
 sctp_lookup_faddr_nosctp(sctp_faddr_t *fp, in6_addr_t *addr)
 {
-	for (; fp; fp = fp->next) {
-		if (IN6_ARE_ADDR_EQUAL(&fp->faddr, addr)) {
+	for (; fp; fp = fp->sf_next) {
+		if (IN6_ARE_ADDR_EQUAL(&fp->sf_faddr, addr)) {
 			break;
 		}
 	}
@@ -581,24 +582,25 @@ void
 sctp_set_faddr_current(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	/* Now setup the composite header. */
-	if (fp->isv4) {
-		IN6_V4MAPPED_TO_IPADDR(&fp->faddr,
+	if (fp->sf_isv4) {
+		IN6_V4MAPPED_TO_IPADDR(&fp->sf_faddr,
 		    sctp->sctp_ipha->ipha_dst);
-		IN6_V4MAPPED_TO_IPADDR(&fp->saddr, sctp->sctp_ipha->ipha_src);
+		IN6_V4MAPPED_TO_IPADDR(&fp->sf_saddr,
+		    sctp->sctp_ipha->ipha_src);
 		/* update don't fragment bit */
-		if (fp->df) {
+		if (fp->sf_df) {
 			sctp->sctp_ipha->ipha_fragment_offset_and_flags =
 			    htons(IPH_DF);
 		} else {
 			sctp->sctp_ipha->ipha_fragment_offset_and_flags = 0;
 		}
 	} else {
-		sctp->sctp_ip6h->ip6_dst = fp->faddr;
-		sctp->sctp_ip6h->ip6_src = fp->saddr;
+		sctp->sctp_ip6h->ip6_dst = fp->sf_faddr;
+		sctp->sctp_ip6h->ip6_src = fp->sf_saddr;
 	}
 
 	sctp->sctp_current = fp;
-	sctp->sctp_mss = fp->sfa_pmss;
+	sctp->sctp_mss = fp->sf_pmss;
 
 	/* Update the uppper layer for the change. */
 	if (!SCTP_IS_DETACHED(sctp))
@@ -610,7 +612,7 @@ sctp_redo_faddr_srcs(sctp_t *sctp)
 {
 	sctp_faddr_t *fp;
 
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
 		sctp_get_dest(sctp, fp);
 	}
 }
@@ -630,13 +632,13 @@ sctp_faddr_alive(sctp_t *sctp, sctp_faddr_t *fp)
 	if (!sctp->sctp_zero_win_probe || !sctp->sctp_sctps->sctps_reclaim) {
 		sctp->sctp_strikes = 0;
 	}
-	fp->strikes = 0;
-	fp->lastactive = now;
-	fp->hb_expiry = now + SET_HB_INTVL(fp);
-	fp->hb_pending = B_FALSE;
-	if (fp->state != SCTP_FADDRS_ALIVE) {
-		fp->state = SCTP_FADDRS_ALIVE;
-		sctp_intf_event(sctp, fp->faddr, SCTP_ADDR_AVAILABLE, 0);
+	fp->sf_strikes = 0;
+	fp->sf_lastactive = now;
+	fp->sf_hb_expiry = now + SET_HB_INTVL(fp);
+	fp->sf_hb_pending = B_FALSE;
+	if (fp->sf_state != SCTP_FADDRS_ALIVE) {
+		fp->sf_state = SCTP_FADDRS_ALIVE;
+		sctp_intf_event(sctp, fp->sf_faddr, SCTP_ADDR_AVAILABLE, 0);
 		/* Should have a full IRE now */
 		sctp_get_dest(sctp, fp);
 
@@ -648,7 +650,7 @@ sctp_faddr_alive(sctp_t *sctp, sctp_faddr_t *fp)
 		 * then we'd be unreachable at this point in time.
 		 */
 		if (fp == sctp->sctp_primary &&
-		    fp->state != SCTP_FADDRS_UNREACH) {
+		    fp->sf_state != SCTP_FADDRS_UNREACH) {
 			sctp_set_faddr_current(sctp, fp);
 			return;
 		}
@@ -664,8 +666,8 @@ sctp_is_a_faddr_clean(sctp_t *sctp)
 {
 	sctp_faddr_t *fp;
 
-	for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
-		if (fp->state == SCTP_FADDRS_ALIVE && fp->strikes == 0) {
+	for (fp = sctp->sctp_faddrs; fp; fp = fp->sf_next) {
+		if (fp->sf_state == SCTP_FADDRS_ALIVE && fp->sf_strikes == 0) {
 			return (B_TRUE);
 		}
 	}
@@ -686,13 +688,13 @@ sctp_faddr_dead(sctp_t *sctp, sctp_faddr_t *fp, int newstate)
 	sctp_faddr_t *ofp;
 	sctp_stack_t *sctps = sctp->sctp_sctps;
 
-	if (fp->state == SCTP_FADDRS_ALIVE) {
-		sctp_intf_event(sctp, fp->faddr, SCTP_ADDR_UNREACHABLE, 0);
+	if (fp->sf_state == SCTP_FADDRS_ALIVE) {
+		sctp_intf_event(sctp, fp->sf_faddr, SCTP_ADDR_UNREACHABLE, 0);
 	}
-	fp->state = newstate;
+	fp->sf_state = newstate;
 
 	dprint(1, ("sctp_faddr_dead: %x:%x:%x:%x down (state=%d)\n",
-	    SCTP_PRINTADDR(fp->faddr), newstate));
+	    SCTP_PRINTADDR(fp->sf_faddr), newstate));
 
 	if (fp == sctp->sctp_current) {
 		/* Current faddr down; need to switch it */
@@ -701,16 +703,16 @@ sctp_faddr_dead(sctp_t *sctp, sctp_faddr_t *fp, int newstate)
 
 	/* Find next alive faddr */
 	ofp = fp;
-	for (fp = fp->next; fp != NULL; fp = fp->next) {
-		if (fp->state == SCTP_FADDRS_ALIVE) {
+	for (fp = fp->sf_next; fp != NULL; fp = fp->sf_next) {
+		if (fp->sf_state == SCTP_FADDRS_ALIVE) {
 			break;
 		}
 	}
 
 	if (fp == NULL) {
 		/* Continue from beginning of list */
-		for (fp = sctp->sctp_faddrs; fp != ofp; fp = fp->next) {
-			if (fp->state == SCTP_FADDRS_ALIVE) {
+		for (fp = sctp->sctp_faddrs; fp != ofp; fp = fp->sf_next) {
+			if (fp->sf_state == SCTP_FADDRS_ALIVE) {
 				break;
 			}
 		}
@@ -723,7 +725,7 @@ sctp_faddr_dead(sctp_t *sctp, sctp_faddr_t *fp, int newstate)
 	if (fp != ofp) {
 		if (sctp->sctp_current == NULL) {
 			dprint(1, ("sctp_faddr_dead: failover->%x:%x:%x:%x\n",
-			    SCTP_PRINTADDR(fp->faddr)));
+			    SCTP_PRINTADDR(fp->sf_faddr)));
 			/*
 			 * Note that we don't need to reset the source addr
 			 * of the new fp.
@@ -763,23 +765,23 @@ sctp_rotate_faddr(sctp_t *sctp, sctp_faddr_t *ofp)
 	 * Find the next live peer address with zero strikes. In case
 	 * there is none, find the one with the lowest number of strikes.
 	 */
-	min_strikes = ofp->strikes;
-	nfp = ofp->next;
+	min_strikes = ofp->sf_strikes;
+	nfp = ofp->sf_next;
 	while (nfp != ofp) {
 		/* If reached end of list, continue scan from the head */
 		if (nfp == NULL) {
 			nfp = sctp->sctp_faddrs;
 			continue;
 		}
-		if (nfp->state == SCTP_FADDRS_ALIVE) {
-			if (nfp->strikes == 0)
+		if (nfp->sf_state == SCTP_FADDRS_ALIVE) {
+			if (nfp->sf_strikes == 0)
 				break;
-			if (nfp->strikes < min_strikes) {
-				min_strikes = nfp->strikes;
+			if (nfp->sf_strikes < min_strikes) {
+				min_strikes = nfp->sf_strikes;
 				saved_fp = nfp;
 			}
 		}
-		nfp = nfp->next;
+		nfp = nfp->sf_next;
 	}
 	/* If reached the old address, there is no zero strike path */
 	if (nfp == ofp)
@@ -806,35 +808,35 @@ sctp_unlink_faddr(sctp_t *sctp, sctp_faddr_t *fp)
 		return;
 	}
 
-	if (fp->timer_mp != NULL) {
-		sctp_timer_free(fp->timer_mp);
-		fp->timer_mp = NULL;
-		fp->timer_running = 0;
+	if (fp->sf_timer_mp != NULL) {
+		sctp_timer_free(fp->sf_timer_mp);
+		fp->sf_timer_mp = NULL;
+		fp->sf_timer_running = 0;
 	}
-	if (fp->rc_timer_mp != NULL) {
-		sctp_timer_free(fp->rc_timer_mp);
-		fp->rc_timer_mp = NULL;
-		fp->rc_timer_running = 0;
+	if (fp->sf_rc_timer_mp != NULL) {
+		sctp_timer_free(fp->sf_rc_timer_mp);
+		fp->sf_rc_timer_mp = NULL;
+		fp->sf_rc_timer_running = 0;
 	}
-	if (fp->ixa != NULL) {
-		ixa_refrele(fp->ixa);
-		fp->ixa = NULL;
+	if (fp->sf_ixa != NULL) {
+		ixa_refrele(fp->sf_ixa);
+		fp->sf_ixa = NULL;
 	}
 
 	if (fp == sctp->sctp_faddrs) {
 		goto gotit;
 	}
 
-	for (fpp = sctp->sctp_faddrs; fpp->next != fp; fpp = fpp->next)
+	for (fpp = sctp->sctp_faddrs; fpp->sf_next != fp; fpp = fpp->sf_next)
 		;
 
 gotit:
 	ASSERT(sctp->sctp_conn_tfp != NULL);
 	mutex_enter(&sctp->sctp_conn_tfp->tf_lock);
 	if (fp == sctp->sctp_faddrs) {
-		sctp->sctp_faddrs = fp->next;
+		sctp->sctp_faddrs = fp->sf_next;
 	} else {
-		fpp->next = fp->next;
+		fpp->sf_next = fp->sf_next;
 	}
 	mutex_exit(&sctp->sctp_conn_tfp->tf_lock);
 	kmem_cache_free(sctp_kmem_faddr_cache, fp);
@@ -864,10 +866,10 @@ sctp_zap_faddrs(sctp_t *sctp, int caller_holds_lock)
 	}
 
 	for (fp = sctp->sctp_faddrs; fp; fp = fpn) {
-		fpn = fp->next;
-		if (fp->ixa != NULL) {
-			ixa_refrele(fp->ixa);
-			fp->ixa = NULL;
+		fpn = fp->sf_next;
+		if (fp->sf_ixa != NULL) {
+			ixa_refrele(fp->sf_ixa);
+			fp->sf_ixa = NULL;
 		}
 		kmem_cache_free(sctp_kmem_faddr_cache, fp);
 		sctp->sctp_nfaddrs--;
@@ -1038,8 +1040,8 @@ sctp_v4_label(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	conn_t *connp = sctp->sctp_connp;
 
-	ASSERT(fp->ixa->ixa_flags & IXAF_IS_IPV4);
-	return (conn_update_label(connp, fp->ixa, &fp->faddr,
+	ASSERT(fp->sf_ixa->ixa_flags & IXAF_IS_IPV4);
+	return (conn_update_label(connp, fp->sf_ixa, &fp->sf_faddr,
 	    &connp->conn_xmit_ipp));
 }
 
@@ -1048,8 +1050,8 @@ sctp_v6_label(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	conn_t *connp = sctp->sctp_connp;
 
-	ASSERT(!(fp->ixa->ixa_flags & IXAF_IS_IPV4));
-	return (conn_update_label(connp, fp->ixa, &fp->faddr,
+	ASSERT(!(fp->sf_ixa->ixa_flags & IXAF_IS_IPV4));
+	return (conn_update_label(connp, fp->sf_ixa, &fp->sf_faddr,
 	    &connp->conn_xmit_ipp));
 }
 
@@ -1073,11 +1075,11 @@ sctp_set_hdraddrs(sctp_t *sctp)
 	ASSERT(sctp->sctp_nsaddrs > 0);
 
 	/* Set up using the primary first */
-	connp->conn_faddr_v6 = sctp->sctp_primary->faddr;
+	connp->conn_faddr_v6 = sctp->sctp_primary->sf_faddr;
 	/* saddr may be unspec; make_mp() will handle this */
-	connp->conn_saddr_v6 = sctp->sctp_primary->saddr;
+	connp->conn_saddr_v6 = sctp->sctp_primary->sf_saddr;
 	connp->conn_laddr_v6 = connp->conn_saddr_v6;
-	if (IN6_IS_ADDR_V4MAPPED(&sctp->sctp_primary->faddr)) {
+	if (IN6_IS_ADDR_V4MAPPED(&sctp->sctp_primary->sf_faddr)) {
 		if (!is_system_labeled() ||
 		    sctp_v4_label(sctp, sctp->sctp_primary) == 0) {
 			gotv4 = 1;
@@ -1092,8 +1094,8 @@ sctp_set_hdraddrs(sctp_t *sctp)
 		}
 	}
 
-	for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
-		if (!gotv4 && IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
+	for (fp = sctp->sctp_faddrs; fp; fp = fp->sf_next) {
+		if (!gotv4 && IN6_IS_ADDR_V4MAPPED(&fp->sf_faddr)) {
 			if (!is_system_labeled() ||
 			    sctp_v4_label(sctp, fp) == 0) {
 				gotv4 = 1;
@@ -1101,7 +1103,7 @@ sctp_set_hdraddrs(sctp_t *sctp)
 					break;
 				}
 			}
-		} else if (!gotv6 && !IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
+		} else if (!gotv6 && !IN6_IS_ADDR_V4MAPPED(&fp->sf_faddr)) {
 			if (!is_system_labeled() ||
 			    sctp_v6_label(sctp, fp) == 0) {
 				gotv6 = 1;
@@ -1320,11 +1322,11 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 	/* make the header addr the primary */
 
 	if (cl_sctp_assoc_change != NULL && psctp == NULL)
-		curaddr = sctp->sctp_current->faddr;
+		curaddr = sctp->sctp_current->sf_faddr;
 
 	sctp->sctp_primary = fp;
 	sctp->sctp_current = fp;
-	sctp->sctp_mss = fp->sfa_pmss;
+	sctp->sctp_mss = fp->sf_pmss;
 
 	/* For loopback connections & linklocal get address from the header */
 	if (sctp->sctp_loopback || sctp->sctp_linklocal) {
@@ -1555,8 +1557,8 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 					goto done;
 				}
 				bzero(fpa, sizeof (*fpa));
-				fpa->faddr = addr;
-				fpa->next = NULL;
+				fpa->sf_faddr = addr;
+				fpa->sf_next = NULL;
 			}
 		} else if (ph->sph_type == htons(PARM_ADDR6)) {
 			if (remaining >= PARM_ADDR6_LEN) {
@@ -1566,9 +1568,9 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 					goto done;
 				}
 				bzero(fpa, sizeof (*fpa));
-				bcopy(ph + 1, &fpa->faddr,
-				    sizeof (fpa->faddr));
-				fpa->next = NULL;
+				bcopy(ph + 1, &fpa->sf_faddr,
+				    sizeof (fpa->sf_faddr));
+				fpa->sf_next = NULL;
 			}
 		}
 		/* link in the new addr, if it was an addr param */
@@ -1576,7 +1578,7 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 			if (fphead == NULL) {
 				fphead = fpa;
 			} else {
-				fpa->next = fphead;
+				fpa->sf_next = fphead;
 				fphead = fpa;
 			}
 		}
@@ -1601,8 +1603,8 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 			goto done;
 		}
 		bzero(fp, sizeof (*fp));
-		fp->faddr = *hdraddr;
-		fp->next = fphead;
+		fp->sf_faddr = *hdraddr;
+		fp->sf_next = fphead;
 		fphead = fp;
 	}
 
@@ -1641,11 +1643,11 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 			 * here, setting it to 0 if the address was
 			 * not added, 1 if it was added.
 			 */
-			for (fp = fphead; fp; fp = fp->next) {
-				if (sctp_lookup_faddr(sctp, &fp->faddr)) {
-					fp->rto = 0;
+			for (fp = fphead; fp; fp = fp->sf_next) {
+				if (sctp_lookup_faddr(sctp, &fp->sf_faddr)) {
+					fp->sf_rto = 0;
 				} else {
-					fp->rto = 1;
+					fp->sf_rto = 1;
 					nadded++;
 				}
 			}
@@ -1671,16 +1673,16 @@ done:
 
 		ph = dtail;
 		dlen = 0;
-		for (fp = fphead; fp; fp = fp->next) {
-			if (fp->rto == 0) {
+		for (fp = fphead; fp; fp = fp->sf_next) {
+			if (fp->sf_rto == 0) {
 				continue;
 			}
-			if (IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
+			if (IN6_IS_ADDR_V4MAPPED(&fp->sf_faddr)) {
 				ipaddr_t addr4;
 
 				ph->sph_type = htons(PARM_ADDR4);
 				ph->sph_len = htons(PARM_ADDR4_LEN);
-				IN6_V4MAPPED_TO_IPADDR(&fp->faddr, addr4);
+				IN6_V4MAPPED_TO_IPADDR(&fp->sf_faddr, addr4);
 				ph++;
 				bcopy(&addr4, ph, sizeof (addr4));
 				ph = (sctp_parm_hdr_t *)
@@ -1690,9 +1692,9 @@ done:
 				ph->sph_type = htons(PARM_ADDR6);
 				ph->sph_len = htons(PARM_ADDR6_LEN);
 				ph++;
-				bcopy(&fp->faddr, ph, sizeof (fp->faddr));
+				bcopy(&fp->sf_faddr, ph, sizeof (fp->sf_faddr));
 				ph = (sctp_parm_hdr_t *)
-				    ((char *)ph + sizeof (fp->faddr));
+				    ((char *)ph + sizeof (fp->sf_faddr));
 				dlen += PARM_ADDR6_LEN;
 			}
 		}
@@ -1710,10 +1712,10 @@ cleanup:
 	if (fphead) {
 		sctp_faddr_t *fpn;
 		for (fp = fphead; fp; fp = fpn) {
-			fpn = fp->next;
-			if (fp->ixa != NULL) {
-				ixa_refrele(fp->ixa);
-				fp->ixa = NULL;
+			fpn = fp->sf_next;
+			if (fp->sf_ixa != NULL) {
+				ixa_refrele(fp->sf_ixa);
+				fp->sf_ixa = NULL;
 			}
 			kmem_cache_free(sctp_kmem_faddr_cache, fp);
 		}
@@ -1732,11 +1734,11 @@ sctp_congest_reset(sctp_t *sctp)
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 	mblk_t		*mp;
 
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-		fp->ssthresh = sctps->sctps_initial_mtu;
-		SET_CWND(fp, fp->sfa_pmss, sctps->sctps_slow_start_initial);
-		fp->suna = 0;
-		fp->pba = 0;
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+		fp->sf_ssthresh = sctps->sctps_initial_mtu;
+		SET_CWND(fp, fp->sf_pmss, sctps->sctps_slow_start_initial);
+		fp->sf_suna = 0;
+		fp->sf_pba = 0;
 	}
 	/*
 	 * Clean up the transmit list as well since we have reset accounting
@@ -1778,48 +1780,48 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 {
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
-	ASSERT(fp->ixa != NULL);
+	ASSERT(fp->sf_ixa != NULL);
 
-	bcopy(addr, &fp->faddr, sizeof (*addr));
+	bcopy(addr, &fp->sf_faddr, sizeof (*addr));
 	if (IN6_IS_ADDR_V4MAPPED(addr)) {
-		fp->isv4 = 1;
-		/* Make sure that sfa_pmss is a multiple of SCTP_ALIGN. */
-		fp->sfa_pmss =
+		fp->sf_isv4 = 1;
+		/* Make sure that sf_pmss is a multiple of SCTP_ALIGN. */
+		fp->sf_pmss =
 		    (sctps->sctps_initial_mtu - sctp->sctp_hdr_len) &
 		    ~(SCTP_ALIGN - 1);
-		fp->ixa->ixa_flags |= IXAF_IS_IPV4;
+		fp->sf_ixa->ixa_flags |= IXAF_IS_IPV4;
 	} else {
-		fp->isv4 = 0;
-		fp->sfa_pmss =
+		fp->sf_isv4 = 0;
+		fp->sf_pmss =
 		    (sctps->sctps_initial_mtu - sctp->sctp_hdr6_len) &
 		    ~(SCTP_ALIGN - 1);
-		fp->ixa->ixa_flags &= ~IXAF_IS_IPV4;
+		fp->sf_ixa->ixa_flags &= ~IXAF_IS_IPV4;
 	}
-	fp->cwnd = sctps->sctps_slow_start_initial * fp->sfa_pmss;
-	fp->rto = MIN(sctp->sctp_rto_initial, sctp->sctp_rto_max_init);
+	fp->sf_cwnd = sctps->sctps_slow_start_initial * fp->sf_pmss;
+	fp->sf_rto = MIN(sctp->sctp_rto_initial, sctp->sctp_rto_max_init);
 	SCTP_MAX_RTO(sctp, fp);
-	fp->srtt = -1;
-	fp->rtt_updates = 0;
-	fp->strikes = 0;
-	fp->max_retr = sctp->sctp_pp_max_rxt;
+	fp->sf_srtt = -1;
+	fp->sf_rtt_updates = 0;
+	fp->sf_strikes = 0;
+	fp->sf_max_retr = sctp->sctp_pp_max_rxt;
 	/* Mark it as not confirmed. */
-	fp->state = SCTP_FADDRS_UNCONFIRMED;
-	fp->hb_interval = sctp->sctp_hb_interval;
-	fp->ssthresh = sctps->sctps_initial_ssthresh;
-	fp->suna = 0;
-	fp->pba = 0;
-	fp->acked = 0;
-	fp->lastactive = fp->hb_expiry = ddi_get_lbolt64();
-	fp->timer_mp = timer_mp;
-	fp->hb_pending = B_FALSE;
-	fp->hb_enabled = B_TRUE;
-	fp->df = 1;
-	fp->pmtu_discovered = 0;
-	fp->next = NULL;
-	fp->T3expire = 0;
-	(void) random_get_pseudo_bytes((uint8_t *)&fp->hb_secret,
-	    sizeof (fp->hb_secret));
-	fp->rxt_unacked = 0;
+	fp->sf_state = SCTP_FADDRS_UNCONFIRMED;
+	fp->sf_hb_interval = sctp->sctp_hb_interval;
+	fp->sf_ssthresh = sctps->sctps_initial_ssthresh;
+	fp->sf_suna = 0;
+	fp->sf_pba = 0;
+	fp->sf_acked = 0;
+	fp->sf_lastactive = fp->sf_hb_expiry = ddi_get_lbolt64();
+	fp->sf_timer_mp = timer_mp;
+	fp->sf_hb_pending = B_FALSE;
+	fp->sf_hb_enabled = B_TRUE;
+	fp->sf_df = 1;
+	fp->sf_pmtu_discovered = 0;
+	fp->sf_next = NULL;
+	fp->sf_T3expire = 0;
+	(void) random_get_pseudo_bytes((uint8_t *)&fp->sf_hb_secret,
+	    sizeof (fp->sf_hb_secret));
+	fp->sf_rxt_unacked = 0;
 
 	sctp_get_dest(sctp, fp);
 }
@@ -1830,11 +1832,11 @@ faddr_constructor(void *buf, void *arg, int flags)
 {
 	sctp_faddr_t *fp = buf;
 
-	fp->timer_mp = NULL;
-	fp->timer_running = 0;
+	fp->sf_timer_mp = NULL;
+	fp->sf_timer_running = 0;
 
-	fp->rc_timer_mp = NULL;
-	fp->rc_timer_running = 0;
+	fp->sf_rc_timer_mp = NULL;
+	fp->sf_rc_timer_running = 0;
 
 	return (0);
 }
@@ -1845,11 +1847,11 @@ faddr_destructor(void *buf, void *arg)
 {
 	sctp_faddr_t *fp = buf;
 
-	ASSERT(fp->timer_mp == NULL);
-	ASSERT(fp->timer_running == 0);
+	ASSERT(fp->sf_timer_mp == NULL);
+	ASSERT(fp->sf_timer_running == 0);
 
-	ASSERT(fp->rc_timer_mp == NULL);
-	ASSERT(fp->rc_timer_running == 0);
+	ASSERT(fp->sf_rc_timer_mp == NULL);
+	ASSERT(fp->sf_rc_timer_running == 0);
 }
 
 void

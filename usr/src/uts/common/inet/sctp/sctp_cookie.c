@@ -898,8 +898,8 @@ sctp_send_cookie_ack(sctp_t *sctp)
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	sctp_set_iplen(sctp, camp, sctp->sctp_current->ixa);
-	(void) conn_ip_output(camp, sctp->sctp_current->ixa);
+	sctp_set_iplen(sctp, camp, sctp->sctp_current->sf_ixa);
+	(void) conn_ip_output(camp, sctp->sctp_current->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
@@ -974,7 +974,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
 	    BPRI_MED);
 	if (cemp == NULL) {
 		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
-		    sctp->sctp_current->rto);
+		    sctp->sctp_current->sf_rto);
 		if (errmp != NULL)
 			freeb(errmp);
 		return;
@@ -995,7 +995,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
 	 * Need to set the df bit in the current fp as it has been cleared
 	 * in sctp_connect().
 	 */
-	sctp->sctp_current->df = B_TRUE;
+	sctp->sctp_current->sf_df = B_TRUE;
 	sctp->sctp_ipha->ipha_fragment_offset_and_flags |= IPH_DF_HTONS;
 
 	/*
@@ -1011,7 +1011,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
 		mutex_exit(&tf->tf_lock);
 		freeb(cemp);
 		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
-		    sctp->sctp_current->rto);
+		    sctp->sctp_current->sf_rto);
 		if (errmp != NULL)
 			freeb(errmp);
 		return;
@@ -1043,7 +1043,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
 	}
 	if (sctp->sctp_ostrcntrs == NULL) {
 		freeb(cemp);
-		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 		if (errmp != NULL)
 			freeb(errmp);
 		return;
@@ -1073,7 +1073,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
 		kmem_free(sctp->sctp_ostrcntrs,
 		    sizeof (uint16_t) * sctp->sctp_num_ostr);
 		freeb(cemp);
-		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 		if (errmp != NULL)
 			freeb(errmp);
 		return;
@@ -1157,7 +1157,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
 	sctp->sctp_xmit_tail = meta;
 	sdc = (sctp_data_hdr_t *)mp->b_rptr;
 	seglen = ntohs(sdc->sdh_len);
-	if ((ceclen + seglen) > fp->sfa_pmss ||
+	if ((ceclen + seglen) > fp->sf_pmss ||
 	    (seglen - sizeof (*sdc)) > cansend) {
 		goto sendcookie;
 	}
@@ -1167,7 +1167,7 @@ sendcookie:
 	head = sctp_add_proto_hdr(sctp, fp, cemp, 0, NULL);
 	if (head == NULL) {
 		freemsg(cemp);
-		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 		if (errmp != NULL)
 			freeb(errmp);
 		SCTP_KSTAT(sctps, sctp_send_cookie_failed);
@@ -1177,7 +1177,7 @@ sendcookie:
 	 * Even if cookie-echo exceeds MTU for one of the hops, it'll
 	 * have a chance of getting there.
 	 */
-	if (fp->isv4) {
+	if (fp->sf_isv4) {
 		ipha_t *iph = (ipha_t *)head->b_rptr;
 		iph->ipha_fragment_offset_and_flags = 0;
 	}
@@ -1203,10 +1203,10 @@ sendcookie:
 		linkb(head, errmp);
 	}
 	sctp->sctp_state = SCTPS_COOKIE_ECHOED;
-	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 
-	sctp_set_iplen(sctp, head, fp->ixa);
-	(void) conn_ip_output(head, fp->ixa);
+	sctp_set_iplen(sctp, head, fp->sf_ixa);
+	(void) conn_ip_output(head, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
@@ -1331,7 +1331,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 		    *fttag == 0 && *lttag == 0) {
 
 			dprint(1, ("duplicate cookie from %x:%x:%x:%x (%d)\n",
-			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    SCTP_PRINTADDR(sctp->sctp_current->sf_faddr),
 			    (int)(connp->conn_fport)));
 			return (-1);
 		}
@@ -1358,7 +1358,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 				SCTP_ASSOC_EST(sctps, sctp);
 
 			dprint(1, ("sctp peer %x:%x:%x:%x (%d) restarted\n",
-			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    SCTP_PRINTADDR(sctp->sctp_current->sf_faddr),
 			    (int)(connp->conn_fport)));
 			/* reset parameters */
 			sctp_congest_reset(sctp);
@@ -1385,7 +1385,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 			}
 
 			dprint(1, ("init collision with %x:%x:%x:%x (%d)\n",
-			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    SCTP_PRINTADDR(sctp->sctp_current->sf_faddr),
 			    (int)(connp->conn_fport)));
 
 			return (0);
@@ -1395,7 +1395,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 
 			/* Section 5.2.4 case C: late COOKIE */
 			dprint(1, ("late cookie from %x:%x:%x:%x (%d)\n",
-			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    SCTP_PRINTADDR(sctp->sctp_current->sf_faddr),
 			    (int)(connp->conn_fport)));
 			return (-1);
 		} else if (init->sic_inittag == sctp->sctp_fvtag &&
@@ -1406,7 +1406,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 			 * Don't check cookie lifetime
 			 */
 			dprint(1, ("cookie tags match from %x:%x:%x:%x (%d)\n",
-			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    SCTP_PRINTADDR(sctp->sctp_current->sf_faddr),
 			    (int)(connp->conn_fport)));
 			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
 				if (!sctp_initialize_params(sctp, init, iack))

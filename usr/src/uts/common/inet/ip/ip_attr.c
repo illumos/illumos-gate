@@ -1253,8 +1253,8 @@ conn_ixa_cleanup(conn_t *connp, void *arg)
 		sctp = CONN2SCTP(connp);
 		RUN_SCTP(sctp);
 		ixa_cleanup_stale(connp->conn_ixa);
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next)
-			ixa_cleanup_stale(fp->ixa);
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next)
+			ixa_cleanup_stale(fp->sf_ixa);
 		WAKE_SCTP(sctp);
 	} else {
 		ip_xmit_attr_t	*ixa;

@@ -289,9 +289,9 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 		return (NULL);
 	}
 
-	ASSERT(eager->sctp_current->ixa != NULL);
+	ASSERT(eager->sctp_current->sf_ixa != NULL);
 
-	ixa = eager->sctp_current->ixa;
+	ixa = eager->sctp_current->sf_ixa;
 	if (!(ira->ira_flags & IXAF_IS_IPV4)) {
 		ASSERT(!(ixa->ixa_flags & IXAF_IS_IPV4));
 
@@ -556,10 +556,10 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen,
 			return (err);
 		}
 		cur_fp = sctp->sctp_faddrs;
-		ASSERT(cur_fp->ixa != NULL);
+		ASSERT(cur_fp->sf_ixa != NULL);
 
 		/* No valid src addr, return. */
-		if (cur_fp->state == SCTP_FADDRS_UNREACH) {
+		if (cur_fp->sf_state == SCTP_FADDRS_UNREACH) {
 			mutex_exit(&tbf->tf_lock);
 			WAKE_SCTP(sctp);
 			return (EADDRNOTAVAIL);
@@ -567,11 +567,11 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen,
 
 		sctp->sctp_primary = cur_fp;
 		sctp->sctp_current = cur_fp;
-		sctp->sctp_mss = cur_fp->sfa_pmss;
+		sctp->sctp_mss = cur_fp->sf_pmss;
 		sctp_conn_hash_insert(tbf, sctp, 1);
 		mutex_exit(&tbf->tf_lock);
 
-		ixa = cur_fp->ixa;
+		ixa = cur_fp->sf_ixa;
 		ASSERT(ixa->ixa_cred != NULL);
 
 		if (scope_id != 0) {
@@ -604,13 +604,13 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen,
 		 * (but the cookie echo will still be sent with the df bit
 		 * off).
 		 */
-		cur_fp->df = B_FALSE;
+		cur_fp->sf_df = B_FALSE;
 
 		/* Mark this address as alive */
-		cur_fp->state = SCTP_FADDRS_ALIVE;
+		cur_fp->sf_state = SCTP_FADDRS_ALIVE;
 
 		/* Send the INIT to the peer */
-		SCTP_FADDR_TIMER_RESTART(sctp, cur_fp, cur_fp->rto);
+		SCTP_FADDR_TIMER_RESTART(sctp, cur_fp, cur_fp->sf_rto);
 		sctp->sctp_state = SCTPS_COOKIE_WAIT;
 		/*
 		 * sctp_init_mp() could result in modifying the source

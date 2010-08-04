@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -723,7 +722,7 @@ sctp_getpeeraddr(sctp_t *sctp, struct sockaddr *addr)
 		mdb_warn("failed to read sctp primary faddr");
 		return (-1);
 	}
-	faddr = sctp_primary.faddr;
+	faddr = sctp_primary.sf_faddr;
 
 	switch (connp->conn_family) {
 	case AF_INET:

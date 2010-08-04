@@ -277,7 +277,7 @@ sctp_asconf_send(sctp_t *sctp, sctp_asconf_t *asc, sctp_faddr_t *fp,
 
 	ASSERT(asc != NULL && asc->head != NULL);
 
-	isv4 = (fp != NULL) ? fp->isv4 : sctp->sctp_current->isv4;
+	isv4 = (fp != NULL) ? fp->sf_isv4 : sctp->sctp_current->sf_isv4;
 
 	/* SCTP chunk header + Serial Number + Address Param TLV */
 	msgsize = sizeof (*ch) + sizeof (uint32_t) +
@@ -582,13 +582,13 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	}
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	if (fp->isv4)
+	if (fp->sf_isv4)
 		ach->sch_len = htons(msgdsize(hmp) - sctp->sctp_hdr_len);
 	else
 		ach->sch_len = htons(msgdsize(hmp) - sctp->sctp_hdr6_len);
 
-	sctp_set_iplen(sctp, hmp, fp->ixa);
-	(void) conn_ip_output(hmp, fp->ixa);
+	sctp_set_iplen(sctp, hmp, fp->sf_ixa);
+	(void) conn_ip_output(hmp, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 	sctp_validate_peer(sctp);
 }
@@ -796,8 +796,8 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	mp->b_cont = NULL;
 
 	fp = SCTP_CHUNK_DEST(mp);
-	ASSERT(fp != NULL && fp->suna >= MBLKL(mp));
-	fp->suna -= MBLKL(mp);
+	ASSERT(fp != NULL && fp->sf_suna >= MBLKL(mp));
+	fp->sf_suna -= MBLKL(mp);
 
 	/*
 	 * Update clustering's state for this assoc. Note acount/dcount
@@ -849,7 +849,7 @@ sctp_rc_timer(sctp_t *sctp, sctp_faddr_t *fp)
 
 	ASSERT(fp != NULL);
 
-	fp->rc_timer_running = 0;
+	fp->sf_rc_timer_running = 0;
 
 	if (sctp->sctp_state != SCTPS_ESTABLISHED ||
 	    sctp->sctp_cxmit_list == NULL) {
@@ -875,12 +875,12 @@ sctp_rc_timer(sctp_t *sctp, sctp_faddr_t *fp)
 		sctp_clean_death(sctp, ETIMEDOUT);
 		return;
 	}
-	if (fp->strikes >= fp->max_retr) {
+	if (fp->sf_strikes >= fp->sf_max_retr) {
 		if (sctp_faddr_dead(sctp, fp, SCTP_FADDRS_DOWN) == -1)
 			return;
 	}
 
-	fp->strikes++;
+	fp->sf_strikes++;
 	sctp->sctp_strikes++;
 	SCTP_CALC_RXT(sctp, fp, sctp->sctp_rto_max);
 
@@ -889,17 +889,17 @@ sctp_rc_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	ofp = SCTP_CHUNK_DEST(sctp->sctp_cxmit_list);
 	SCTP_SET_CHUNK_DEST(sctp->sctp_cxmit_list, NULL);
 	ASSERT(ofp != NULL && ofp == fp);
-	ASSERT(ofp->suna >= MBLKL(sctp->sctp_cxmit_list));
+	ASSERT(ofp->sf_suna >= MBLKL(sctp->sctp_cxmit_list));
 	/*
 	 * Enter slow start for this destination.
 	 * XXX anything in the data path that needs to be considered?
 	 */
-	ofp->ssthresh = ofp->cwnd / 2;
-	if (ofp->ssthresh < 2 * ofp->sfa_pmss)
-		ofp->ssthresh = 2 * ofp->sfa_pmss;
-	ofp->cwnd = ofp->sfa_pmss;
-	ofp->pba = 0;
-	ofp->suna -= MBLKL(sctp->sctp_cxmit_list);
+	ofp->sf_ssthresh = ofp->sf_cwnd / 2;
+	if (ofp->sf_ssthresh < 2 * ofp->sf_pmss)
+		ofp->sf_ssthresh = 2 * ofp->sf_pmss;
+	ofp->sf_cwnd = ofp->sf_pmss;
+	ofp->sf_pba = 0;
+	ofp->sf_suna -= MBLKL(sctp->sctp_cxmit_list);
 	/*
 	 * The rexmit flags is used to determine if a serial number needs to
 	 * be assigned or not, so once set we leave it there.
@@ -939,13 +939,13 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 	/* OK to send */
 	ipmp = sctp_make_mp(sctp, fp, 0);
 	if (ipmp == NULL) {
-		SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
+		SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->sf_rto);
 		SCTP_KSTAT(sctps, sctp_send_asconf_failed);
 		return;
 	}
 	mp = sctp->sctp_cxmit_list;
 	/* Fill in the mandatory  Address Parameter TLV */
-	isv4 = (fp != NULL) ? fp->isv4 : sctp->sctp_current->isv4;
+	isv4 = (fp != NULL) ? fp->sf_isv4 : sctp->sctp_current->sf_isv4;
 	ph = (sctp_parm_hdr_t *)(mp->b_rptr + sizeof (sctp_chunk_hdr_t) +
 	    sizeof (uint32_t));
 	if (isv4) {
@@ -964,7 +964,8 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 			 * Maybe we might have better luck next time.
 			 */
 			if (!saddr_set) {
-				SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
+				SCTP_FADDR_RC_TIMER_RESTART(sctp, fp,
+				    fp->sf_rto);
 				freeb(ipmp);
 				return;
 			}
@@ -986,7 +987,8 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 			 * Maybe we might have better luck next time.
 			 */
 			if (!saddr_set) {
-				SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
+				SCTP_FADDR_RC_TIMER_RESTART(sctp, fp,
+				    fp->sf_rto);
 				freeb(ipmp);
 				return;
 			}
@@ -995,9 +997,9 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 	}
 
 	/* Don't exceed CWND */
-	if ((MBLKL(mp) > (fp->cwnd - fp->suna)) ||
+	if ((MBLKL(mp) > (fp->sf_cwnd - fp->sf_suna)) ||
 	    ((mp = dupb(sctp->sctp_cxmit_list)) == NULL)) {
-		SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
+		SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->sf_rto);
 		freeb(ipmp);
 		return;
 	}
@@ -1008,17 +1010,17 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 		*snp = htonl(sctp->sctp_lcsn++);
 	}
 	SCTP_CHUNK_CLEAR_FLAGS(mp);
-	fp->suna += MBLKL(mp);
+	fp->sf_suna += MBLKL(mp);
 	/* Attach the header and send the chunk */
 	ipmp->b_cont = mp;
 	sctp->sctp_cchunk_pend = 1;
 
 	SCTP_SET_SENT_FLAG(sctp->sctp_cxmit_list);
 	SCTP_SET_CHUNK_DEST(sctp->sctp_cxmit_list, fp);
-	sctp_set_iplen(sctp, ipmp, fp->ixa);
-	(void) conn_ip_output(ipmp, fp->ixa);
+	sctp_set_iplen(sctp, ipmp, fp->sf_ixa);
+	(void) conn_ip_output(ipmp, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
-	SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
+	SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->sf_rto);
 #undef	SCTP_SET_SENT_FLAG
 }
 
@@ -1215,7 +1217,7 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 			err = SCTP_ERR_BAD_MANDPARM;
 			goto error_handler;
 		}
-		if (sctp->sctp_faddrs == nfp && nfp->next == NULL) {
+		if (sctp->sctp_faddrs == nfp && nfp->sf_next == NULL) {
 			/* Peer is trying to delete last address */
 			dprint(1, ("delip: del last addr: %x:%x:%x:%x\n",
 			    SCTP_PRINTADDR(addr)));
@@ -1248,7 +1250,8 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 			sctp->sctp_shutdown_faddr = nfp;
 		}
 		if (sctp->sctp_lastfaddr == nfp) {
-			for (fp = sctp->sctp_faddrs; fp->next; fp = fp->next)
+			for (fp = sctp->sctp_faddrs; fp->sf_next;
+			    fp = fp->sf_next)
 				;
 			sctp->sctp_lastfaddr = fp;
 		}
@@ -1392,7 +1395,7 @@ sctp_setprim_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 
 	sctp_intf_event(sctp, addr, SCTP_ADDR_MADE_PRIM, 0);
 	sctp->sctp_primary = nfp;
-	if (nfp->state != SCTP_FADDRS_ALIVE || nfp == sctp->sctp_current) {
+	if (nfp->sf_state != SCTP_FADDRS_ALIVE || nfp == sctp->sctp_current) {
 		return (NULL);
 	}
 	sctp_set_faddr_current(sctp, nfp);

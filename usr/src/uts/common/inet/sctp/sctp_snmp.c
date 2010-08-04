@@ -664,17 +664,17 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 		if (sctp->sctp_primary != NULL) {
 			fp = sctp->sctp_primary;
 
-			if (IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
+			if (IN6_IS_ADDR_V4MAPPED(&fp->sf_faddr)) {
 				sce.sctpAssocRemPrimAddrType =
 				    MIB2_SCTP_ADDR_V4;
 			} else {
 				sce.sctpAssocRemPrimAddrType =
 				    MIB2_SCTP_ADDR_V6;
 			}
-			sce.sctpAssocRemPrimAddr = fp->faddr;
-			sce.sctpAssocLocPrimAddr = fp->saddr;
+			sce.sctpAssocRemPrimAddr = fp->sf_faddr;
+			sce.sctpAssocLocPrimAddr = fp->sf_saddr;
 			sce.sctpAssocHeartBeatInterval = TICK_TO_MSEC(
-			    fp->hb_interval);
+			    fp->sf_hb_interval);
 		} else {
 			sce.sctpAssocRemPrimAddrType = MIB2_SCTP_ADDR_V4;
 			bzero(&sce.sctpAssocRemPrimAddr,
@@ -724,15 +724,15 @@ done:
 		/*
 		 * Table for remote addresses
 		 */
-		for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
+		for (fp = sctp->sctp_faddrs; fp; fp = fp->sf_next) {
 			scre.sctpAssocId = ntohl(sctp->sctp_lvtag);
-			if (IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
+			if (IN6_IS_ADDR_V4MAPPED(&fp->sf_faddr)) {
 				scre.sctpAssocRemAddrType = MIB2_SCTP_ADDR_V4;
 			} else {
 				scre.sctpAssocRemAddrType = MIB2_SCTP_ADDR_V6;
 			}
-			scre.sctpAssocRemAddr = fp->faddr;
-			if (fp->state == SCTP_FADDRS_ALIVE) {
+			scre.sctpAssocRemAddr = fp->sf_faddr;
+			if (fp->sf_state == SCTP_FADDRS_ALIVE) {
 				scre.sctpAssocRemAddrActive =
 				    scre.sctpAssocRemAddrHBActive =
 				    MIB2_SCTP_ACTIVE;
@@ -741,9 +741,9 @@ done:
 				    scre.sctpAssocRemAddrHBActive =
 				    MIB2_SCTP_INACTIVE;
 			}
-			scre.sctpAssocRemAddrRTO = TICK_TO_MSEC(fp->rto);
-			scre.sctpAssocRemAddrMaxPathRtx = fp->max_retr;
-			scre.sctpAssocRemAddrRtx = fp->T3expire;
+			scre.sctpAssocRemAddrRTO = TICK_TO_MSEC(fp->sf_rto);
+			scre.sctpAssocRemAddrMaxPathRtx = fp->sf_max_retr;
+			scre.sctpAssocRemAddrRtx = fp->sf_T3expire;
 			(void) snmp_append_data2(mp_rem_data, &mp_rem_tail,
 			    (char *)&scre, sizeof (scre));
 		}

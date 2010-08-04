@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -514,10 +513,10 @@ sctp_fix_saddr(sctp_t *sctp, in6_addr_t *saddr)
 {
 	sctp_faddr_t	*fp;
 
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-		if (!IN6_ARE_ADDR_EQUAL(&fp->saddr, saddr))
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+		if (!IN6_ARE_ADDR_EQUAL(&fp->sf_saddr, saddr))
 			continue;
-		V6_SET_ZERO(fp->saddr);
+		V6_SET_ZERO(fp->sf_saddr);
 	}
 }
 
@@ -1975,12 +1974,12 @@ sctp_get_faddr_list(sctp_t *sctp, uchar_t *p, size_t psize)
 {
 	sctp_faddr_t	*fp;
 
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-		if (psize < sizeof (fp->faddr))
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+		if (psize < sizeof (fp->sf_faddr))
 			return;
-		bcopy(&fp->faddr, p, sizeof (fp->faddr));
-		p += sizeof (fp->faddr);
-		psize -= sizeof (fp->faddr);
+		bcopy(&fp->sf_faddr, p, sizeof (fp->sf_faddr));
+		p += sizeof (fp->sf_faddr);
+		psize -= sizeof (fp->sf_faddr);
 	}
 }
 

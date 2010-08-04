@@ -82,25 +82,25 @@ sctp_get_status(sctp_t *sctp, void *ptr)
 	}
 	fp = sctp->sctp_primary;
 
-	if (fp->isv4) {
+	if (fp->sf_isv4) {
 		sin = (struct sockaddr_in *)&sp->spinfo_address;
 		sin->sin_family = AF_INET;
 		sin->sin_port = connp->conn_fport;
-		IN6_V4MAPPED_TO_INADDR(&fp->faddr, &sin->sin_addr);
+		IN6_V4MAPPED_TO_INADDR(&fp->sf_faddr, &sin->sin_addr);
 		sp->spinfo_mtu = sctp->sctp_hdr_len;
 	} else {
 		sin6 = (struct sockaddr_in6 *)&sp->spinfo_address;
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_port = connp->conn_fport;
-		sin6->sin6_addr = fp->faddr;
+		sin6->sin6_addr = fp->sf_faddr;
 		sp->spinfo_mtu = sctp->sctp_hdr6_len;
 	}
-	sp->spinfo_state = fp->state == SCTP_FADDRS_ALIVE ? SCTP_ACTIVE :
+	sp->spinfo_state = fp->sf_state == SCTP_FADDRS_ALIVE ? SCTP_ACTIVE :
 	    SCTP_INACTIVE;
-	sp->spinfo_cwnd = fp->cwnd;
-	sp->spinfo_srtt = fp->srtt;
-	sp->spinfo_rto = fp->rto;
-	sp->spinfo_mtu += fp->sfa_pmss;
+	sp->spinfo_cwnd = fp->sf_cwnd;
+	sp->spinfo_srtt = fp->sf_srtt;
+	sp->spinfo_rto = fp->sf_rto;
+	sp->spinfo_mtu += fp->sf_pmss;
 
 noprim:
 	sstat->sstat_unackdata = 0;
@@ -173,12 +173,12 @@ sctp_get_paddrinfo(sctp_t *sctp, void *ptr, socklen_t *optlen)
 	if ((fp = sctp_lookup_faddr(sctp, &faddr)) == NULL)
 		return (EINVAL);
 
-	infop->spinfo_state = (fp->state == SCTP_FADDRS_ALIVE) ? SCTP_ACTIVE :
-	    SCTP_INACTIVE;
-	infop->spinfo_cwnd = fp->cwnd;
-	infop->spinfo_srtt = TICK_TO_MSEC(fp->srtt);
-	infop->spinfo_rto = TICK_TO_MSEC(fp->rto);
-	infop->spinfo_mtu = fp->sfa_pmss;
+	infop->spinfo_state = (fp->sf_state == SCTP_FADDRS_ALIVE) ?
+	    SCTP_ACTIVE : SCTP_INACTIVE;
+	infop->spinfo_cwnd = fp->sf_cwnd;
+	infop->spinfo_srtt = TICK_TO_MSEC(fp->sf_srtt);
+	infop->spinfo_rto = TICK_TO_MSEC(fp->sf_rto);
+	infop->spinfo_mtu = fp->sf_pmss;
 
 	*optlen = sizeof (struct sctp_paddrinfo);
 	return (0);
@@ -268,7 +268,7 @@ sctp_get_assocparams(sctp_t *sctp, void *ptr)
 	/*
 	 * Count the number of peer addresses
 	 */
-	for (i = 0, fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+	for (i = 0, fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
 		i++;
 	}
 	sap->sasoc_number_peer_destinations = i;
@@ -293,8 +293,8 @@ sctp_set_assocparams(sctp_t *sctp, const void *invalp)
 			 * Bounds check: as per rfc2960, assoc max retr cannot
 			 * exceed the sum of all individual path max retr's.
 			 */
-			for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
-				sum += fp->max_retr;
+			for (fp = sctp->sctp_faddrs; fp; fp = fp->sf_next) {
+				sum += fp->sf_max_retr;
 			}
 			if (sap->sasoc_asocmaxrxt > sum) {
 				return (EINVAL);
@@ -439,8 +439,8 @@ sctp_get_peer_addr_params(sctp_t *sctp, void *ptr)
 		return (retval);
 	}
 	if (fp) {
-		spp->spp_hbinterval = TICK_TO_MSEC(fp->hb_interval);
-		spp->spp_pathmaxrxt = fp->max_retr;
+		spp->spp_hbinterval = TICK_TO_MSEC(fp->sf_hb_interval);
+		spp->spp_pathmaxrxt = fp->sf_max_retr;
 	} else {
 		spp->spp_hbinterval = TICK_TO_MSEC(sctp->sctp_hb_interval);
 		spp->spp_pathmaxrxt = sctp->sctp_pp_max_rxt;
@@ -474,11 +474,11 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp)
 		return (EINVAL);
 	}
 	if (spp->spp_pathmaxrxt && sctp->sctp_faddrs) {
-		for (fp2 = sctp->sctp_faddrs; fp2; fp2 = fp2->next) {
+		for (fp2 = sctp->sctp_faddrs; fp2; fp2 = fp2->sf_next) {
 			if (!fp || fp2 == fp) {
 				sum += spp->spp_pathmaxrxt;
 			} else {
-				sum += fp2->max_retr;
+				sum += fp2->sf_max_retr;
 			}
 		}
 		if (sctp->sctp_pa_max_rxt > sum) {
@@ -495,8 +495,8 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp)
 			 */
 			sctp_send_heartbeat(sctp, fp);
 		} else {
-			fp->hb_interval = MSEC_TO_TICK(spp->spp_hbinterval);
-			fp->hb_expiry = now + SET_HB_INTVL(fp);
+			fp->sf_hb_interval = MSEC_TO_TICK(spp->spp_hbinterval);
+			fp->sf_hb_expiry = now + SET_HB_INTVL(fp);
 			/*
 			 * Restart the heartbeat timer using the new intrvl.
 			 * We need to call sctp_heartbeat_timer() to set
@@ -505,10 +505,10 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp)
 			sctp_heartbeat_timer(sctp);
 		}
 		if (spp->spp_pathmaxrxt) {
-			fp->max_retr = spp->spp_pathmaxrxt;
+			fp->sf_max_retr = spp->spp_pathmaxrxt;
 		}
 	} else {
-		for (fp2 = sctp->sctp_faddrs; fp2 != NULL; fp2 = fp2->next) {
+		for (fp2 = sctp->sctp_faddrs; fp2 != NULL; fp2 = fp2->sf_next) {
 			if (spp->spp_hbinterval == UINT32_MAX) {
 				/*
 				 * Send heartbeat immediatelly, don't modify
@@ -516,12 +516,12 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp)
 				 */
 				sctp_send_heartbeat(sctp, fp2);
 			} else {
-				fp2->hb_interval = MSEC_TO_TICK(
+				fp2->sf_hb_interval = MSEC_TO_TICK(
 				    spp->spp_hbinterval);
-				fp2->hb_expiry = now + SET_HB_INTVL(fp2);
+				fp2->sf_hb_expiry = now + SET_HB_INTVL(fp2);
 			}
 			if (spp->spp_pathmaxrxt) {
-				fp2->max_retr = spp->spp_pathmaxrxt;
+				fp2->sf_max_retr = spp->spp_pathmaxrxt;
 			}
 		}
 		if (spp->spp_hbinterval != UINT32_MAX) {
@@ -594,7 +594,7 @@ sctp_set_prim(sctp_t *sctp, const void *invalp)
 	sctp->sctp_primary = fp;
 
 	/* Only switch current if fp is alive */
-	if (fp->state != SCTP_FADDRS_ALIVE || fp == sctp->sctp_current) {
+	if (fp->sf_state != SCTP_FADDRS_ALIVE || fp == sctp->sctp_current) {
 		return (0);
 	}
 	sctp_set_faddr_current(sctp, fp);
@@ -901,7 +901,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			sctp_faddr_t *fp;
 
 			for (i = 0, fp = sctp->sctp_faddrs; fp != NULL;
-			    i++, fp = fp->next)
+			    i++, fp = fp->sf_next)
 				;
 			*(int32_t *)ptr = i;
 			break;
@@ -1331,7 +1331,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 		 * We recache the information which might pick a different
 		 * source and redo IPsec as a result.
 		 */
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next)
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next)
 			sctp_get_dest(sctp, fp);
 	}
 	if (coas.coa_changed & COA_HEADER_CHANGED) {
@@ -1477,7 +1477,7 @@ sctp_getpeeraddrs(sctp_t *sctp, void *paddrs, int *addrcnt)
 
 	/* If we want only one, give the primary */
 	if (max == 1) {
-		addr = sctp->sctp_primary->faddr;
+		addr = sctp->sctp_primary->sf_faddr;
 		switch (family) {
 		case AF_INET:
 			sin4 = paddrs;
@@ -1494,10 +1494,10 @@ sctp_getpeeraddrs(sctp_t *sctp, void *paddrs, int *addrcnt)
 			sin6->sin6_flowinfo = connp->conn_flowinfo;
 			if (IN6_IS_ADDR_LINKSCOPE(&addr) &&
 			    sctp->sctp_primary != NULL &&
-			    (sctp->sctp_primary->ixa->ixa_flags &
+			    (sctp->sctp_primary->sf_ixa->ixa_flags &
 			    IXAF_SCOPEID_SET)) {
 				sin6->sin6_scope_id =
-				    sctp->sctp_primary->ixa->ixa_scopeid;
+				    sctp->sctp_primary->sf_ixa->ixa_scopeid;
 			} else {
 				sin6->sin6_scope_id = 0;
 			}
@@ -1507,8 +1507,8 @@ sctp_getpeeraddrs(sctp_t *sctp, void *paddrs, int *addrcnt)
 		return (0);
 	}
 
-	for (cnt = 0; cnt < max && fp != NULL; cnt++, fp = fp->next) {
-		addr = fp->faddr;
+	for (cnt = 0; cnt < max && fp != NULL; cnt++, fp = fp->sf_next) {
+		addr = fp->sf_faddr;
 		switch (family) {
 		case AF_INET:
 			ASSERT(IN6_IS_ADDR_V4MAPPED(&addr));
@@ -1524,8 +1524,8 @@ sctp_getpeeraddrs(sctp_t *sctp, void *paddrs, int *addrcnt)
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_flowinfo = connp->conn_flowinfo;
 			if (IN6_IS_ADDR_LINKSCOPE(&addr) &&
-			    (fp->ixa->ixa_flags & IXAF_SCOPEID_SET))
-				sin6->sin6_scope_id = fp->ixa->ixa_scopeid;
+			    (fp->sf_ixa->ixa_flags & IXAF_SCOPEID_SET))
+				sin6->sin6_scope_id = fp->sf_ixa->ixa_scopeid;
 			else
 				sin6->sin6_scope_id = 0;
 			sin6->__sin6_src_id = 0;

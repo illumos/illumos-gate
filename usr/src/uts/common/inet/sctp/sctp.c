@@ -965,7 +965,7 @@ sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
 {
 	uint32_t	pmtu;
 	int32_t		mss;
-	ip_xmit_attr_t	*ixa = fp->ixa;
+	ip_xmit_attr_t	*ixa = fp->sf_ixa;
 
 	if (sctp->sctp_state < SCTPS_ESTABLISHED)
 		return;
@@ -990,20 +990,20 @@ sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
 	/*
 	 * Nothing to change, so just return.
 	 */
-	if (mss == fp->sfa_pmss)
+	if (mss == fp->sf_pmss)
 		return;
 
 	/*
 	 * Currently, for ICMP errors, only PMTU decrease is handled.
 	 */
-	if (mss > fp->sfa_pmss && decrease_only)
+	if (mss > fp->sf_pmss && decrease_only)
 		return;
 
 #ifdef DEBUG
 	(void) printf("sctp_update_pmtu mss from %d to %d\n",
-	    fp->sfa_pmss, mss);
+	    fp->sf_pmss, mss);
 #endif
-	DTRACE_PROBE2(sctp_update_pmtu, int32_t, fp->sfa_pmss, uint32_t, mss);
+	DTRACE_PROBE2(sctp_update_pmtu, int32_t, fp->sf_pmss, uint32_t, mss);
 
 	/*
 	 * Update ixa_fragsize and ixa_pmtu.
@@ -1014,8 +1014,8 @@ sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
 	 * Make sure that sfa_pmss is a multiple of
 	 * SCTP_ALIGN.
 	 */
-	fp->sfa_pmss = mss & ~(SCTP_ALIGN - 1);
-	fp->pmtu_discovered = 1;
+	fp->sf_pmss = mss & ~(SCTP_ALIGN - 1);
+	fp->sf_pmtu_discovered = 1;
 
 #ifdef notyet
 	if (mss < sctp->sctp_sctps->sctps_mss_min)
@@ -1031,7 +1031,7 @@ sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
 	 */
 	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		if (!(ixa->ixa_flags & IXAF_PMTU_IPV4_DF)) {
-			fp->df = B_FALSE;
+			fp->sf_df = B_FALSE;
 			if (fp == sctp->sctp_current) {
 				sctp->sctp_ipha->
 				    ipha_fragment_offset_and_flags = 0;
@@ -1056,8 +1056,8 @@ sctp_notify(void *arg, ip_xmit_attr_t *ixa, ixa_notify_type_t ntype,
 	switch (ntype) {
 	case IXAN_PMTU:
 		/* Find the faddr based on the ip_xmit_attr_t pointer */
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-			if (fp->ixa == ixa)
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+			if (fp->sf_ixa == ixa)
 				break;
 		}
 		if (fp != NULL)

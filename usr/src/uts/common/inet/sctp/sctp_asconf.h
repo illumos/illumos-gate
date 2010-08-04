@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _INET_SCTP_SCTP_ASCONF_H
@@ -31,23 +30,23 @@ extern "C" {
 #endif
 
 #define	SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, intvl)			\
-	if ((fp)->rc_timer_mp == NULL) {				\
-		(fp)->rc_timer_mp = sctp_timer_alloc((sctp), 		\
+	if ((fp)->sf_rc_timer_mp == NULL) {				\
+		(fp)->sf_rc_timer_mp = sctp_timer_alloc((sctp), 	\
 		    sctp_rc_timer, KM_NOSLEEP);				\
 	}								\
-	if ((fp)->rc_timer_mp != NULL) {				\
-		((sctpt_t *)((fp)->rc_timer_mp->b_rptr))->sctpt_faddr = fp;  \
+	if ((fp)->sf_rc_timer_mp != NULL) {				\
+		((sctpt_t *)((fp)->sf_rc_timer_mp->b_rptr))->sctpt_faddr = fp;\
 		dprint(3, ("faddr_rc_timer_restart: fp=%p %x:%x:%x:%x %d\n", \
-		    (void *)(fp), SCTP_PRINTADDR((fp)->faddr),		\
+		    (void *)(fp), SCTP_PRINTADDR((fp)->sf_faddr),	\
 		    (int)(intvl)));					\
-		sctp_timer((sctp), (fp)->rc_timer_mp, (intvl));		\
-		(fp)->rc_timer_running = 1;				\
+		sctp_timer((sctp), (fp)->sf_rc_timer_mp, (intvl));	\
+		(fp)->sf_rc_timer_running = 1;				\
 	}
 
 #define	SCTP_FADDR_RC_TIMER_STOP(fp)					\
-	if ((fp)->rc_timer_running && (fp)->rc_timer_mp != NULL) {	\
-		sctp_timer_stop((fp)->rc_timer_mp);			\
-		(fp)->rc_timer_running = 0;				\
+	if ((fp)->sf_rc_timer_running && (fp)->sf_rc_timer_mp != NULL) { \
+		sctp_timer_stop((fp)->sf_rc_timer_mp);			\
+		(fp)->sf_rc_timer_running = 0;				\
 	}
 
 extern int sctp_add_ip(sctp_t *, const void *, uint32_t);
