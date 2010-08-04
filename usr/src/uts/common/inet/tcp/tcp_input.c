@@ -137,11 +137,22 @@
 static uint32_t tcp_drop_ack_unsent_cnt = 10;
 
 /*
- * The shift factor applied to tcp_mss to decide if the peer sends us a
- * valid initial receive window.  By default, if the peer receive window
- * is smaller than 1 MSS (shift factor is 0), it is considered as invalid.
+ * To protect TCP against attacker using a small window and requesting
+ * large amount of data (DoS attack by conuming memory), TCP checks the
+ * window advertised in the last ACK of the 3-way handshake.  TCP uses
+ * the tcp_mss (the size of one packet) value for comparion.  The window
+ * should be larger than tcp_mss.  But while a sane TCP should advertise
+ * a receive window larger than or equal to 4*MSS to avoid stop and go
+ * tarrfic, not all TCP stacks do that.  This is especially true when
+ * tcp_mss is a big value.
+ *
+ * To work around this issue, an additional fixed value for comparison
+ * is also used.  If the advertised window is smaller than both tcp_mss
+ * and tcp_init_wnd_chk, the ACK is considered as invalid.  So for large
+ * tcp_mss value (say, 8K), a window larger than tcp_init_wnd_chk but
+ * smaller than 8K is considered to be OK.
  */
-static uint32_t tcp_init_wnd_shft = 0;
+static uint32_t tcp_init_wnd_chk = 4096;
 
 /* Process ICMP source quench message or not. */
 static boolean_t tcp_icmp_source_quench = B_FALSE;
@@ -2665,6 +2676,8 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		return;
 	case TCPS_SYN_RCVD:
 		if (flags & TH_ACK) {
+			uint32_t pinit_wnd;
+
 			/*
 			 * In this state, a SYN|ACK packet is either bogus
 			 * because the other side must be ACKing our SYN which
@@ -2697,8 +2710,9 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			 * ACK.  We also shorten the abort timeout in case
 			 * this is an attack.
 			 */
-			if ((ntohs(tcpha->tha_win) << tcp->tcp_snd_ws) <
-			    (tcp->tcp_mss >> tcp_init_wnd_shft)) {
+			pinit_wnd = ntohs(tcpha->tha_win) << tcp->tcp_snd_ws;
+			if (pinit_wnd < tcp->tcp_mss &&
+			    pinit_wnd < tcp_init_wnd_chk) {
 				freemsg(mp);
 				TCP_STAT(tcps, tcp_zwin_ack_syn);
 				tcp->tcp_second_ctimer_threshold =
