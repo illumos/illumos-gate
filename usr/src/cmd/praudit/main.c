@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <dirent.h>
 #include <locale.h>
@@ -83,8 +80,9 @@ main(int argc, char **argv)
 			if (input_mode == FILEMODE) {
 				if (freopen(names[i], "r", stdin) == NULL) {
 					(void) fprintf(stderr,
-					    gettext("praudit: Can't assign %s "
-					    "to stdin.\n"), names[i]);
+					    gettext("praudit: Cannot associate "
+					    "stdin with %s: %s\n"),
+					    names[i], strerror(errno));
 					exit(1);
 				}
 			}
