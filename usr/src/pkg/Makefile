@@ -402,7 +402,7 @@ $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 	else \
 		print "Resolving dependencies"; \
 		pkgdepend resolve -m $(DEP_SYNTH_PKGS) $(DEP_PKGS); \
-		for p in $(DEP_PKGS:%.dep=%); do \
+		for p in $(DEP_SYNTH_PKGS:%.dep=%) $(DEP_PKGS:%.dep=%); do \
 			if [ "$$(print $$p.metadata.*)" = \
 			     "$$(print $$p.metadata.noincorp.*)" ]; \
 			then \
