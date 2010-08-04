@@ -238,6 +238,8 @@ SUBDIRS += \
 	udapl		\
 	libzpool	\
 	libzfs		\
+	libbe 		\
+	pylibbe 	\
 	libzfs_jni	\
 	pyzfs		\
 	pysolaris	\
@@ -569,6 +571,7 @@ $(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
 libast: 	libsocket
 libadutils: 	libldap5 libresolv libsocket libnsl
 nsswitch:	libadutils libidmap
+libbe: 		libzfs
 libbsm:		libtsol
 libcmd: 	libsum libast libsocket libnsl
 libcmdutils:	libavl
@@ -659,6 +662,7 @@ sun_fc:		libdevinfo libsysevent libnvpair
 libsun_ima:	libdevinfo libsysevent libnsl
 sun_sas:	libdevinfo libsysevent libnvpair libkstat libdevid
 libgrubmgmt:	libdevinfo libzfs libfstyp
+pylibbe: 	libbe libzfs
 pyzfs:		libnvpair libzfs
 pysolaris:	libsec libidmap
 libreparse:	libnvpair

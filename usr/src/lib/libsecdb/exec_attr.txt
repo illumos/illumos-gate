@@ -269,6 +269,7 @@ Process Management:solaris:cmd:::/usr/sbin/rcapadm:uid=0
 Project Management:solaris:cmd:::/usr/sbin/projadd:euid=0
 Project Management:solaris:cmd:::/usr/sbin/projmod:euid=0
 Project Management:solaris:cmd:::/usr/sbin/projdel:euid=0
+Software Installation:suser:cmd:::/sbin/beadm:uid=0;gid=bin
 Software Installation:suser:cmd:::/usr/bin/ln:euid=0
 Software Installation:suser:cmd:::/usr/bin/pkginfo:uid=0
 Software Installation:suser:cmd:::/usr/bin/pkgmk:uid=0

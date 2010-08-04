@@ -941,3 +941,6 @@ usr/include/sys/sockfilter.h
 # ignored for packaging validation.
 #
 licenses
+# Libbe is private
+#
+usr/include/libbe_priv.h

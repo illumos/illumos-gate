@@ -290,6 +290,7 @@ DIRS= \
 	/usr/lib/python2.6/vendor-packages \
 	/usr/lib/python2.6/vendor-packages/solaris \
 	/usr/lib/python2.6/vendor-packages/zfs \
+	/usr/lib/python2.6/vendor-packages/beadm \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
 	/usr/lib/sa  \

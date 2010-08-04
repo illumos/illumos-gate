@@ -79,7 +79,7 @@ Rights Delegation:::Delegate ability to assign rights to users and roles:auths=s
 Rmvolmgr Management:::Manage Removable Volume Manager SMF service:auths=solaris.smf.manage.rmvolmgr;help=RtRmvolmgrMngmnt.html
 Service Management:::Manage services:auths=solaris.smf.manage,solaris.smf.modify
 Service Operator:::Administer services:auths=solaris.smf.manage,solaris.smf.modify.framework
-Software Installation:::Add application software to the system:help=RtSoftwareInstall.html
+Software Installation:::Add application software to the system:profiles=ZFS File System Management;help=RtSoftwareInstall.html
 Stop:::Last Profile evaluated, default profiles are not considered:help=RtReservedProfile.html
 System Administrator:::Can perform most non-security administrative tasks:profiles=Audit Review,Printer Management,Cron Management,Device Management,File System Management,Mail Management,Maintenance and Repair,Media Backup,Media Restore,Name Service Management,Network Management,Object Access Management,Process Management,Software Installation,User Management,Project Management,All;help=RtSysAdmin.html
 System Event Management:::Manage system events and system event channels:help=RtSysEvMngmnt.html

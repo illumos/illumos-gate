@@ -69,6 +69,7 @@ COMMON_SUBDIRS=		\
 	basename	\
 	bc		\
 	bdiff		\
+	beadm 		\
 	bfs		\
 	bnu		\
 	boot		\
@@ -528,6 +529,7 @@ MSGSUBDIRS=		\
 	banner		\
 	bart		\
 	basename	\
+	beadm 		\
 	bnu		\
 	bsmconv		\
 	bsmunconv	\
