@@ -51,6 +51,13 @@ static int x86pi_enum_gentopo(topo_mod_t *, tnode_t *);
 static topo_enum_f x86pi_enum;	/* libtopo enumeration entry point */
 
 /*
+ * Top level chassis node in a multiple chassis system; or the chassis
+ * node in a single chassis system.
+ */
+static tnode_t *motherchassis_node = NULL;
+
+
+/*
  * Declare the operations vector and information structure used during
  * module registration
  */
@@ -208,11 +215,11 @@ x86pi_enum_start(topo_mod_t *mod, x86pi_enum_t *x86pi)
 	x86pi->mod = mod;
 
 	if (fac_done == 0) {
-		(void) topo_mod_enummap(mod, x86pi->t_parent, "chassis",
+		(void) topo_mod_enummap(mod, motherchassis_node, "chassis",
 		    FM_FMRI_SCHEME_HC);
-		(void) topo_mod_enummap(mod, x86pi->t_parent, "fan",
+		(void) topo_mod_enummap(mod, motherchassis_node, "fan",
 		    FM_FMRI_SCHEME_HC);
-		(void) topo_mod_enummap(mod, x86pi->t_parent, "psu",
+		(void) topo_mod_enummap(mod, motherchassis_node, "psu",
 		    FM_FMRI_SCHEME_HC);
 	}
 
@@ -246,7 +253,6 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent)
 	tnode_t		*chassis_node = NULL;
 	tnode_t		*basebd_node = NULL;
 	smbs_cnt_t	*smbc;
-	tnode_t		*motherchassis_node = NULL;
 	tnode_t		*pnode = NULL;
 	id_t		psmbid;
 	int		notvisited;
