@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -40,6 +39,8 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <ctype.h>
+#include <sys/byteorder.h>
 #include <sys/scsi/impl/uscsi.h>
 #include <sys/scsi/scsi.h>
 #include <tlm.h>
@@ -153,38 +154,31 @@ read_serial_num_page(scsi_link_t *slink, char *snum, int size)
  * Read the Device Name Page.
  */
 static int
-read_dev_name_page(scsi_link_t *slink, device_name_page_t *devp)
+read_dev_name_page(scsi_link_t *slink, device_ident_header_t *devp, int len)
 {
-	(void) memset(devp, 0, sizeof (device_name_page_t));
+	(void) memset(devp, 0, len);
 
 	if (read_data_page(slink, SCSI_DEVICE_IDENT_PAGE, (caddr_t)devp,
-	    sizeof (device_name_page_t)) == -1)
+	    len) == -1)
 		return (-1);
 
-	if (devp->np_header.di_page_code == SCSI_DEVICE_IDENT_PAGE &&
-	    devp->np_node.ni_code_set == 1 &&
-	    devp->np_node.ni_ident_type == 3 &&
-	    devp->np_node.ni_ident_length == 8)
-		return (0);
+	if (devp->di_page_code != SCSI_DEVICE_IDENT_PAGE)
+		return (-1);
 
-	if (devp->np_header.di_page_code == SCSI_DEVICE_IDENT_PAGE)
-		return (0);
-
-	return (-1);
+	return (0);
 }
 
 /*
  * Formatted print of WWN
  */
-char *
+static void
 snprintf_wwn(char *buf, int size, uint8_t *wwn)
 {
 	if (wwn == NULL || buf == NULL)
-		return (0);
+		return;
 
 	(void) snprintf(buf, size, "0x%2.2X%2.2X%2.2X%2.2X%2.2X%2.2X%2.2X%2.2X",
 	    wwn[0], wwn[1], wwn[2], wwn[3], wwn[4], wwn[5], wwn[6], wwn[7]);
-	return (buf);
 }
 
 
@@ -194,34 +188,77 @@ snprintf_wwn(char *buf, int size, uint8_t *wwn)
 int
 read_device_wwn(scsi_link_t *slink, char *wwnp, int wsize)
 {
-	device_name_page_t dinfo;
+	device_ident_header_t *header;
+	name_ident_t *ident;
+	uint16_t page_len = sizeof (device_ident_header_t);
+	uint16_t act_len;
+	int accessed;
+	uint8_t *designator_data;
 
 	(void) memset(wwnp, 0, wsize);
-	if (read_dev_name_page(slink, &dinfo) == -1)
+resize:
+	header = malloc(page_len);
+	if (header == NULL)
 		return (-1);
 
-	if (dinfo.np_port.ni_code_set == 1 &&
-	    dinfo.np_port.ni_ident_type == 3) {
-		(void) snprintf_wwn(wwnp, wsize, dinfo.np_port_info.d_name);
-		return (0);
+	if (read_dev_name_page(slink, header, page_len) == -1) {
+		free(header);
+		return (-1);
 	}
-	if (dinfo.np_node.ni_code_set == 1 &&
-	    dinfo.np_node.ni_ident_type == 3) {
-		(void) snprintf_wwn(wwnp, wsize, dinfo.np_node_info.d_name);
-		return (0);
+
+	act_len = BE_16(header->di_page_length);
+	if (act_len > page_len) {
+		free(header);
+		page_len = act_len;
+		goto resize;
 	}
-	if (dinfo.np_port.ni_code_set == 2 &&
-	    dinfo.np_port.ni_ident_type == 1) {
-		(void) snprintf(wwnp, wsize, "%.*s",
-		    dinfo.np_port.ni_ident_length, dinfo.np_port_info.d_name);
-		return (0);
+
+	ident = (name_ident_t *)&header[1];
+	accessed = sizeof (device_ident_header_t);
+
+	while (accessed < act_len) {
+
+		accessed += sizeof (name_ident_t);
+		accessed += ident->ni_ident_length;
+		designator_data = (uint8_t *)&ident[1];
+		/*
+		 * Looking for code set 1 (Binary) ident type NAA 64 bit
+		 * address that is associated with the node (0).
+		 */
+		if ((ident->ni_code_set == 1) &&
+		    (ident->ni_ident_type == 3)) {
+			snprintf_wwn(wwnp, wsize, designator_data);
+			/*
+			 * If assc is zero (Node) this is the one we want.
+			 * If we find that we're done.
+			 */
+			if (ident->ni_asso == 0)
+				break;
+		}
+		/*
+		 * If we find a EUI-64 we can use that also.
+		 */
+		if ((ident->ni_code_set == 2) &&
+		    (ident->ni_ident_type == 1) &&
+		    (ident->ni_asso == 0) &&
+		    (isprint(wwnp[0] == 0))) { /* Don't overwrite */
+			/*
+			 * This isn't our first choice but we'll print it
+			 * in case there is nothing else to use.
+			 */
+			(void) snprintf(wwnp, wsize, "%.*s",
+			    ident->ni_ident_length, designator_data);
+		}
+		ident =
+		    (name_ident_t *)&designator_data[ident->ni_ident_length];
 	}
-	if (dinfo.np_node.ni_code_set == 2 &&
-	    dinfo.np_node.ni_ident_type == 1) {
-		(void) snprintf(wwnp, wsize, "%.*s",
-		    dinfo.np_node.ni_ident_length, dinfo.np_node_info.d_name);
+	free(header);
+	/*
+	 * See if we found something.
+	 * Memset above would leave wwnp not printable.
+	 */
+	if (isprint(wwnp[0]))
 		return (0);
-	}
 	return (-1);
 }
 

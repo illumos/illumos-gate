@@ -723,6 +723,11 @@ ndmpd_config_get_tape_info_v3(ndmp_connection_t *connection, void *body)
 			continue;
 		if (sl->sl_type != DTYPE_SEQUENTIAL)
 			continue;
+		/*
+		 * Don't report dead links.
+		 */
+		if ((access(sd->sd_name, F_OK) == -1) && (errno == ENOENT))
+			continue;
 
 		NDMP_LOG(LOG_DEBUG,
 		    "model \"%s\" dev \"%s\"", sd->sd_id, sd->sd_name);
@@ -819,6 +824,11 @@ ndmpd_config_get_scsi_info_v3(ndmp_connection_t *connection, void *body)
 		if (!(sl = sasd_dev_slink(i)) || !(sd = sasd_drive(i)))
 			continue;
 		if (sl->sl_type != DTYPE_CHANGER)
+			continue;
+		/*
+		 * Don't report dead links.
+		 */
+		if ((access(sd->sd_name, F_OK) == -1) && (errno == ENOENT))
 			continue;
 
 		NDMP_LOG(LOG_DEBUG,
