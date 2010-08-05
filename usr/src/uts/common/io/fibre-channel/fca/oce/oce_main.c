@@ -40,6 +40,7 @@
 #define	ATTACH_HW_INIT		0x10
 #define	ATTACH_SETUP_TXRX 	0x20
 #define	ATTACH_SETUP_ADAP	0x40
+#define	ATTACH_SETUP_INTR	0x80
 #define	ATTACH_STAT_INIT	0x100
 #define	ATTACH_MAC_REG		0x200
 
@@ -47,16 +48,21 @@
 const char oce_ident_string[] = OCE_IDENT_STRING;
 const char oce_mod_name[] = OCE_MOD_NAME;
 
-char oce_version[] = OCE_REVISION;
-
 /* driver properties */
-static const char mtu_prop_name[] = "oce_default_mtu";
-static const char tx_ring_size_name[] = "oce_tx_ring_size";
-static const char tx_bcopy_limit_name[] = "oce_tx_bcopy_limit";
-static const char rx_bcopy_limit_name[] = "oce_rx_bcopy_limit";
-static const char fm_cap_name[] = "oce_fm_capability";
-static const char log_level_name[] = "oce_log_level";
-static const char lso_capable_name[] = "oce_lso_capable";
+static const char flow_control[]	 = "flow_control";
+static const char mtu_prop_name[]	 = "oce_default_mtu";
+static const char tx_ring_size_name[]	 = "tx_ring_size";
+static const char tx_bcopy_limit_name[]	 = "tx_bcopy_limit";
+static const char rx_bcopy_limit_name[]	 = "rx_bcopy_limit";
+static const char rx_frag_size_name[]	 = "rx_frag_size";
+static const char rx_max_bufs_name[]	 = "rx_max_bufs";
+static const char fm_cap_name[]		 = "oce_fm_capability";
+static const char log_level_name[]	 = "oce_log_level";
+static const char lso_capable_name[]	 = "lso_capable";
+static const char rx_pkt_per_intr_name[] = "rx_pkts_per_intr";
+static const char tx_reclaim_threshold_name[] = "tx_reclaim_threshold";
+static const char rx_rings_name[]	 = "max_rx_rings";
+static const char tx_rings_name[]	 = "max_tx_rings";
 
 /* --[ static function prototypes here ]------------------------------- */
 static int oce_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd);
@@ -68,6 +74,8 @@ static void oce_unconfigure(struct oce_dev *dev);
 static void oce_init_locks(struct oce_dev *dev);
 static void oce_destroy_locks(struct oce_dev *dev);
 static void oce_get_params(struct oce_dev *dev);
+static int oce_get_prop(struct oce_dev *dev, char *propname, int minval,
+    int maxval, int defval, uint32_t *values);
 
 static struct cb_ops oce_cb_ops = {
 	nulldev,		/* cb_open */
@@ -196,10 +204,7 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/* allocate dev */
-	dev = kmem_zalloc(sizeof (struct oce_dev), KM_NOSLEEP);
-	if (dev == NULL) {
-		return (DDI_FAILURE);
-	}
+	dev = kmem_zalloc(sizeof (struct oce_dev), KM_SLEEP);
 
 	/* populate the dev structure */
 	dev->dip = dip;
@@ -219,17 +224,6 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	oce_fm_init(dev);
 	dev->attach_state |= ATTACH_FM_INIT;
-	ret = oce_setup_intr(dev);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Interrupt setup failed with %d", ret);
-		goto attach_fail;
-
-	}
-
-	/* initialize locks */
-	oce_init_locks(dev);
-	dev->attach_state |= ATTACH_LOCK_INIT;
 
 	/* setup PCI bars */
 	ret = oce_pci_init(dev);
@@ -239,6 +233,20 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto attach_fail;
 	}
 	dev->attach_state |= ATTACH_PCI_INIT;
+
+	ret = oce_setup_intr(dev);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "Interrupt setup failed with %d", ret);
+		goto attach_fail;
+
+	}
+	dev->attach_state |= ATTACH_SETUP_INTR;
+
+	/* initialize locks */
+	oce_init_locks(dev);
+	dev->attach_state |= ATTACH_LOCK_INIT;
+
 
 	/* HW init */
 	ret = oce_hw_init(dev);
@@ -312,7 +320,8 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/* correct link status only after start */
-	mac_link_update(dev->mac_handle, LINK_STATE_UNKNOWN);
+	dev->link_status = LINK_STATE_UNKNOWN;
+	mac_link_update(dev->mac_handle, dev->link_status);
 
 	dev->attach_state |= ATTACH_MAC_REG;
 	dev->state |= STATE_INIT;
@@ -332,6 +341,7 @@ oce_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	struct oce_dev *dev;
 	int pcnt = 0;
+	int qid;
 
 	dev = ddi_get_driver_private(dip);
 	if (dev == NULL) {
@@ -353,7 +363,6 @@ oce_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (mac_unregister(dev->mac_handle) != 0) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
 		    "Failed to unregister MAC ");
-		return (DDI_FAILURE);
 	}
 	dev->attach_state &= ~ATTACH_MAC_REG;
 
@@ -369,10 +378,13 @@ oce_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/*
 	 * Wait for Packets sent up to be freed
 	 */
-	if ((pcnt = oce_rx_pending(dev)) != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "%d Pending Buffers Detach failed", pcnt);
-		return (DDI_FAILURE);
+	for (qid = 0; qid < dev->rx_rings; qid++) {
+		pcnt = oce_rx_pending(dev, dev->rq[qid], DEFAULT_DRAIN_TIME);
+		if (pcnt != 0) {
+			oce_log(dev, CE_WARN, MOD_CONFIG,
+			    "%d Pending Buffers Detach failed", pcnt);
+			return (DDI_FAILURE);
+		}
 	}
 	oce_unconfigure(dev);
 
@@ -430,7 +442,7 @@ oce_resume(dev_info_t *dip)
 		mutex_exit(&dev->dev_lock);
 		return (DDI_SUCCESS);
 	}
-	if (dev->state & STATE_MAC_STARTED) {
+	if (!(dev->state & STATE_MAC_STARTED)) {
 		ret = oce_setup_adapter(dev);
 		if (ret != DDI_SUCCESS) {
 			mutex_exit(&dev->dev_lock);
@@ -487,11 +499,15 @@ oce_unconfigure(struct oce_dev *dev)
 	if (state & ATTACH_HW_INIT) {
 		oce_hw_fini(dev);
 	}
-	if (state & ATTACH_PCI_INIT) {
-		oce_pci_fini(dev);
-	}
 	if (state & ATTACH_LOCK_INIT) {
 		oce_destroy_locks(dev);
+	}
+
+	if (state & ATTACH_SETUP_INTR) {
+		(void) oce_teardown_intr(dev);
+	}
+	if (state & ATTACH_PCI_INIT) {
+		oce_pci_fini(dev);
 	}
 	if (state & ATTACH_FM_INIT) {
 		oce_fm_fini(dev);
@@ -508,39 +524,77 @@ oce_get_params(struct oce_dev *dev)
 	uint32_t log_level;
 	uint16_t mod_mask;
 	uint16_t severity;
+	/*
+	 * Allowed values for the driver parameters. If all values in a range
+	 * is allowed, the the array has only one value.
+	 */
+	uint32_t fc_values[] = {OCE_FC_NONE, OCE_FC_TX, OCE_FC_RX,
+	    OCE_DEFAULT_FLOW_CONTROL, END};
+	uint32_t mtu_values[] = {OCE_MIN_MTU, OCE_MAX_MTU, END};
+	uint32_t tx_rs_values[] = {SIZE_256, SIZE_512, SIZE_1K, SIZE_2K, END};
+	uint32_t tx_bcl_values[] = {SIZE_128, SIZE_256, SIZE_512, SIZE_1K,
+	    SIZE_2K, END};
+	uint32_t rx_bcl_values[] = {SIZE_128, SIZE_256, SIZE_512, SIZE_1K,
+	    SIZE_2K, END};
+	uint32_t rq_fs_values[] = {SIZE_2K, SIZE_4K, SIZE_8K, END};
+	uint32_t rq_mb_values[] = {SIZE_2K, SIZE_4K, SIZE_8K, END};
+	uint32_t lso_capable_values[] = {0, 1, END};
+	uint32_t fm_caps_values[] = {DDI_FM_NOT_CAPABLE, OCE_FM_CAPABILITY,
+	    END};
+	uint32_t tx_rt_values[] = {END};
+	uint32_t rx_ppi_values[] = {END};
+	uint32_t rx_rings_values[] = {END};
+	uint32_t tx_rings_values[] = {END};
+	uint32_t log_level_values[] = {END};
 
 	/* non tunables  */
 	dev->rx_ring_size = OCE_DEFAULT_RX_RING_SIZE;
-	dev->flow_control = OCE_DEFAULT_FLOW_CONTROL;
 
 	/* configurable parameters */
+	dev->flow_control = oce_get_prop(dev, (char *)flow_control, OCE_FC_NONE,
+	    OCE_DEFAULT_FLOW_CONTROL, OCE_DEFAULT_FLOW_CONTROL, fc_values);
 
-	/* restrict MTU to 1500 and 9000 only */
-	dev->mtu = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)mtu_prop_name, OCE_MIN_MTU);
-	if (dev->mtu != OCE_MIN_MTU && dev->mtu != OCE_MAX_MTU)
-		dev->mtu = OCE_MIN_MTU;
+	dev->mtu = oce_get_prop(dev, (char *)mtu_prop_name, OCE_MIN_MTU,
+	    OCE_MAX_MTU, OCE_MIN_MTU, mtu_values);
 
-	dev->tx_ring_size = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)tx_ring_size_name,
-	    OCE_DEFAULT_TX_RING_SIZE);
+	dev->tx_ring_size = oce_get_prop(dev, (char *)tx_ring_size_name,
+	    SIZE_256, SIZE_2K, OCE_DEFAULT_TX_RING_SIZE, tx_rs_values);
 
-	dev->tx_bcopy_limit = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)tx_bcopy_limit_name,
-	    OCE_DEFAULT_TX_BCOPY_LIMIT);
-	dev->rx_bcopy_limit = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)rx_bcopy_limit_name,
-	    OCE_DEFAULT_RX_BCOPY_LIMIT);
+	dev->tx_bcopy_limit = oce_get_prop(dev, (char *)tx_bcopy_limit_name,
+	    SIZE_128, SIZE_2K, OCE_DEFAULT_TX_BCOPY_LIMIT, tx_bcl_values);
 
-	dev->lso_capable = (boolean_t)ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)lso_capable_name, 1);
+	dev->rx_bcopy_limit = oce_get_prop(dev, (char *)rx_bcopy_limit_name,
+	    SIZE_128, SIZE_2K, OCE_DEFAULT_RX_BCOPY_LIMIT, rx_bcl_values);
 
-	dev->fm_caps = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)fm_cap_name, OCE_FM_CAPABILITY);
+	dev->rq_frag_size = oce_get_prop(dev, (char *)rx_frag_size_name,
+	    SIZE_2K, SIZE_8K, OCE_RQ_BUF_SIZE, rq_fs_values);
 
-	log_level = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, (char *)log_level_name,
-	    OCE_DEFAULT_LOG_SETTINGS);
+	dev->rq_max_bufs = oce_get_prop(dev, (char *)rx_max_bufs_name, SIZE_2K,
+	    SIZE_8K, OCE_RQ_NUM_BUFFERS, rq_mb_values);
+
+	dev->lso_capable = oce_get_prop(dev, (char *)lso_capable_name, 0,
+	    1, 1, lso_capable_values);
+
+	dev->fm_caps = oce_get_prop(dev, (char *)fm_cap_name,
+	    DDI_FM_NOT_CAPABLE, OCE_FM_CAPABILITY, OCE_FM_CAPABILITY,
+	    fm_caps_values);
+
+	dev->tx_reclaim_threshold = oce_get_prop(dev,
+	    (char *)tx_reclaim_threshold_name, 0, dev->tx_ring_size/2,
+	    OCE_DEFAULT_TX_RECLAIM_THRESHOLD, tx_rt_values);
+
+	dev->rx_pkt_per_intr = oce_get_prop(dev, (char *)rx_pkt_per_intr_name,
+	    0, dev->rx_ring_size/2, OCE_DEFAULT_RX_PKT_PER_INTR, rx_ppi_values);
+
+	dev->rx_rings = oce_get_prop(dev, (char *)rx_rings_name,
+	    OCE_DEFAULT_RQS, OCE_MAX_RQS, OCE_DEFAULT_RQS, rx_rings_values);
+
+	dev->tx_rings = oce_get_prop(dev, (char *)tx_rings_name,
+	    OCE_DEFAULT_WQS, OCE_DEFAULT_WQS, OCE_DEFAULT_WQS, tx_rings_values);
+
+	log_level = oce_get_prop(dev, (char *)log_level_name, 0,
+	    OCE_MAX_LOG_SETTINGS, OCE_DEFAULT_LOG_SETTINGS, log_level_values);
+
 	severity = (uint16_t)(log_level & 0xffff);
 	mod_mask = (uint16_t)(log_level >> 16);
 	if (mod_mask > MOD_ISR) {
@@ -553,3 +607,33 @@ oce_get_params(struct oce_dev *dev)
 	dev->mod_mask = mod_mask;
 	dev->severity = severity;
 } /* oce_get_params */
+
+static int
+oce_get_prop(struct oce_dev *dev, char *propname, int minval, int maxval,
+    int defval, uint32_t *values)
+{
+	int value = 0;
+	int i = 0;
+
+	value = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
+	    DDI_PROP_DONTPASS, propname, defval);
+
+	if (value > maxval)
+		value = maxval;
+
+	if (value < minval)
+		value = minval;
+
+	while (values[i] != 0xdeadface) {
+		if (values[i] == value) {
+			break;
+		}
+		i++;
+	}
+
+	if ((i != 0) && (values[i] == 0xdeadface)) {
+		value = defval;
+	}
+
+	return (value);
+}

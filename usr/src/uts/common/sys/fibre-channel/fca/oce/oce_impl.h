@@ -63,12 +63,29 @@ extern "C" {
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
 #include <sys/note.h>
+#include <sys/pci.h>
+#include <sys/random.h>
 #include <oce_hw.h>
 #include <oce_hw_eth.h>
 #include <oce_io.h>
 #include <oce_buf.h>
 #include <oce_utils.h>
 #include <oce_version.h>
+
+#define	SIZE_128	128
+#define	SIZE_256	256
+#define	SIZE_512	512
+#define	SIZE_1K		1024
+#define	SIZE_2K		(2 * 1024)
+#define	SIZE_4K		(4 * 1024)
+#define	SIZE_8K		(8 * 1024)
+
+#define	END		0xdeadface
+
+#define	OCE_MAX_ETH_FRAME_SIZE	1500
+#define	OCE_MAX_JUMBO_FRAME_SIZE 9018
+#define	OCE_MIN_ETH_FRAME_SIZE	64
+#define	OCE_LLC_SNAP_HDR_LEN	8
 
 #define	OCE_MIN_MTU	1500
 #define	OCE_MAX_MTU	9000
@@ -78,46 +95,50 @@ extern "C" {
 #define	OCE_MAX_EQ	8
 #define	OCE_MAX_CQ	1024
 #define	OCE_MAX_WQ	8
-#define	OCE_WQ_NUM_BUFFERS	2048
-#define	OCE_WQ_BUF_SIZE	2048
-#define	OCE_LSO_MAX_SIZE (32 * 1024)
-#define	OCE_DEFAULT_TX_BCOPY_LIMIT	1024
+#define	OCE_MAX_RQ	5
+
+#define	OCE_WQ_NUM_BUFFERS		2048
+#define	OCE_WQ_BUF_SIZE			2048
+#define	OCE_LSO_MAX_SIZE		(64 * 1024)
+#define	OCE_DEFAULT_TX_BCOPY_LIMIT	512
 #define	OCE_DEFAULT_RX_BCOPY_LIMIT	128
-#define	OCE_DEFAULT_WQ_EQD	16
+#define	OCE_DEFAULT_WQ_EQD		16
 
-#define	OCE_MAX_RQ		8
-#define	OCE_MAX_RQ_POSTS	255
-#define	OCE_RQ_NUM_BUFFERS	2048
-#define	OCE_RQ_BUF_SIZE		2048
+#define	OCE_DEFAULT_TX_RING_SIZE	2048
+#define	OCE_DEFAULT_RX_RING_SIZE	1024
+#define	OCE_DEFAULT_WQS			1
+#define	OCE_DEFAULT_RQS			1
+#define	OCE_MAX_RQS			5
+
+#define	OCE_DEFAULT_RX_PKT_PER_INTR (OCE_DEFAULT_RX_RING_SIZE / 2)
+#define	OCE_DEFAULT_TX_RECLAIM_THRESHOLD 1024
+#define	OCE_MAX_RQ_POSTS		255
+#define	OCE_RQ_NUM_BUFFERS		2048
+#define	OCE_RQ_BUF_SIZE			8192
 #define	OCE_DEFAULT_RECHARGE_THRESHOLD	OCE_MAX_RQ_POSTS
-#define	OCE_NUM_USED_VECTORS    2
-#define	OCE_DMA_ALIGNMENT   0x1000ull
+#define	OCE_NUM_USED_VECTORS		2
+#define	OCE_ITBL_SIZE			64
+#define	OCE_HKEY_SIZE			40
+#define	OCE_DMA_ALIGNMENT		0x1000ull
 
-#define	OCE_DEFAULT_TX_RING_SIZE    2048
-#define	OCE_DEFAULT_RX_RING_SIZE    1024
+#define	OCE_MIN_VECTORS			1
 
-#define	OCE_INVAL_IF_ID			-1
-
-#define	OCE_DEFAULT_IF_CAP	(MBX_RX_IFACE_FLAGS_PROMISCUOUS	| \
-			MBX_RX_IFACE_FLAGS_BROADCAST		| \
+#define	OCE_CAPAB_FLAGS	(MBX_RX_IFACE_FLAGS_BROADCAST		| \
+			MBX_RX_IFACE_FLAGS_PROMISCUOUS		| \
 			MBX_RX_IFACE_FLAGS_UNTAGGED		| \
 			MBX_RX_IFACE_FLAGS_MCAST_PROMISCUOUS	| \
 			MBX_RX_IFACE_FLAGS_PASS_L3L4)
 
-#define	OCE_DEFAULT_IF_CAP_EN	(MBX_RX_IFACE_FLAGS_BROADCAST	| \
+#define	OCE_CAPAB_ENABLE	(MBX_RX_IFACE_FLAGS_BROADCAST	| \
 				MBX_RX_IFACE_FLAGS_UNTAGGED	| \
-				MBX_RX_IFACE_FLAGS_MCAST_PROMISCUOUS	| \
 				MBX_RX_IFACE_FLAGS_PASS_L3L4)
-
-#define	OCE_RX_FILTER_GLOBAL_FLAGS	(NTWK_RX_FILTER_IP_CKSUM | \
-					NTWK_RX_FILTER_TCP_CKSUM | \
-					NTWK_RX_FILTER_UDP_CKSUM | \
-					NTWK_RX_FILTER_STRIP_CRC)
-
 
 #define	OCE_FM_CAPABILITY		(DDI_FM_EREPORT_CAPABLE	|	\
 					DDI_FM_ACCCHK_CAPABLE	|	\
 					DDI_FM_DMACHK_CAPABLE)
+
+
+#define	OCE_DEFAULT_RSS_TYPE	(RSS_ENABLE_IPV4|RSS_ENABLE_TCP_IPV4)
 
 /* flow control definitions */
 #define	OCE_FC_NONE	0x00000000
@@ -181,42 +202,41 @@ enum oce_driver_state {
 };
 
 struct oce_dev {
-	uint32_t dev_id;		/* device ID or instance number */
-	int32_t if_id; 			/* IF ID */
-	uint8_t fn; 			/* function number */
-	uint8_t fw_version[32]; 	/* fw version string */
-	enum oce_driver_state state; 	/* state */
-	struct oce_mq *mq;		/* MQ ring */
-	oce_dma_buf_t *bmbx;		/* Bootstrap MailBox	*/
-	kmutex_t bmbx_lock;		/* Bootstrap Lock	*/
-	uint16_t mod_mask;		/* Log Mask 	*/
-	int16_t severity;		/* Log level	*/
+	kmutex_t bmbx_lock;		/* Bootstrap Lock */
+	kmutex_t dev_lock;		/* lock for device */
+
+	/* Queues relarted */
 	struct oce_wq *wq[OCE_MAX_WQ];	/* TXQ Array */
 	struct oce_rq *rq[OCE_MAX_RQ];	/* RXQ Array */
 	struct oce_cq *cq[OCE_MAX_CQ];	/* Completion Queues */
 	struct oce_eq *eq[OCE_MAX_EQ];	/* Event Queues	*/
+	struct oce_mq *mq;		/* MQ ring */
+
+	/* driver state  machine */
+	enum oce_driver_state state;	/* state */
+	boolean_t suspended;		/* CPR */
+	uint32_t attach_state;		/* attach progress */
+
+	oce_dma_buf_t *bmbx;		/* Bootstrap MailBox */
+
 	uint32_t tx_bcopy_limit;	/* TX BCOPY Limit */
 	uint32_t rx_bcopy_limit;	/* RX BCOPY Limit */
+	uint32_t tx_reclaim_threshold;	/* Tx reclaim */
+	uint32_t rx_pkt_per_intr;	/* Rx pkts processed per intr */
 
-	uint32_t cookie;
-
-	clock_t stat_ticks;
-	uint32_t in_stats;
-
-	/* Add implementation specific stuff here */
-	ddi_acc_handle_t pci_cfg_handle; /* Config space handle */
+	/* BARS */
 	int num_bars;
+	ddi_acc_handle_t pci_cfg_handle; /* Config space handle */
 	ddi_acc_handle_t cfg_handle;	/* MMIO PCI Config Space Regs */
-	caddr_t csr_addr;
 	ddi_acc_handle_t csr_handle;	/* MMIO Control Status Regs */
+	caddr_t csr_addr;
 	caddr_t db_addr;
-	ddi_acc_handle_t db_handle;	/* MMIO DoorBell Area */
 	caddr_t dev_cfg_addr;
-	ddi_acc_handle_t dev_cfg_handle;	/* MMIO CONFIG SPACE */
+	ddi_acc_handle_t db_handle;	/* MMIO DoorBell Area */
+	ddi_acc_handle_t dev_cfg_handle; /* MMIO CONFIG SPACE */
 	mac_handle_t mac_handle;	/* MAC HANDLE	*/
 
-	/* device info structure for device tree node */
-	dev_info_t *dip;
+	/* device stats */
 	kstat_t *oce_kstats;		/* NIC STATS */
 	oce_dma_buf_t *stats_dbuf;	/* STATS BUFFER */
 	struct mbx_get_nic_stats *hw_stats;
@@ -225,53 +245,61 @@ struct oce_dev {
 	uint32_t tx_noxmtbuf;
 
 	/* link status */
-	struct link_status link;
+	link_state_t link_status;
+	int32_t link_speed;		/* Link speed in Mbps */
 
-	/* flow control settings */
-	uint32_t flow_control;
+	/* OS */
+	uint32_t dev_id;	/* device ID or instance number */
+	dev_info_t *dip;	/* device info structure for device tree node */
 
-	/* the type of interrupts supported */
-	int intr_types;
-	/* number of vectors used */
-	int num_vectors;
-	/* interrupt priority */
-	uint_t intr_pri;
+	/* Interrupt related */
+	int intr_type;		/* INTR TYPE USED */
+	int num_vectors;	/* number of vectors used */
+	uint_t intr_pri;	/* interrupt priority */
 	int intr_cap;
-	/* intr handler table */
-	ddi_intr_handle_t *htable;
-
-	/* lock for device */
-	kmutex_t dev_lock;
-
-	/* hardware mac address */
-	uint8_t mac_addr[ETHERADDRL];
-
-	/* Current Multicast address table that we have set to h/w */
-	uint16_t num_mca;
-	struct ether_addr multi_cast[OCE_MAX_MCA];
+	ddi_intr_handle_t *htable;	/* intr handler table */
+	int32_t hsize;
 
 	/* device configuration */
-	uint32_t pmac_id; /* used to add or remove mac */
-	uint8_t unicast_addr[ETHERADDRL];
-	uint32_t mtu;
+	uint32_t rq_max_bufs;		/* maximum prealloced buffers */
+	uint32_t rq_frag_size;		/* Rxq fragment size */
 	enum oce_ring_size tx_ring_size;
 	enum oce_ring_size rx_ring_size;
-	boolean_t lso_capable;
-	boolean_t promisc;
-	uint32_t if_cap_flags;
-	int32_t  fm_caps;
-	uint32_t  attach_state;
-	boolean_t suspended;
-	uint32_t  neqs;	/* No of event queues */
-	uint32_t  nwqs;	/* No of Work Queues */
-	uint32_t  nrqs;	/* No of Receive Queues */
-	uint32_t  nifs; /* No of interfaces created */
+	uint32_t neqs;			/* No of event queues */
+	uint32_t nwqs;			/* No of Work Queues */
+	uint32_t nrqs;			/* No of Receive Queues */
+	uint32_t nifs;			/* No of interfaces created */
+	uint32_t tx_rings;
+	uint32_t rx_rings;
+	uint32_t pmac_id;		/* used to add or remove mac */
+	uint8_t unicast_addr[ETHERADDRL];
+	uint32_t mtu;
+	int32_t fm_caps;
+	boolean_t rss_enable;		/* RSS support */
+	boolean_t lso_capable;		/* LSO */
+	boolean_t promisc;		/* PROMISC MODE */
+	uint32_t if_cap_flags;		/* IF CAPAB */
+	uint32_t flow_control;		/* flow control settings */
+	uint8_t mac_addr[ETHERADDRL];	/* hardware mac address */
+	uint16_t num_mca;		/* MCA supported */
+	struct ether_addr multi_cast[OCE_MAX_MCA];	/* MC TABLE */
+	uint32_t cookie;		/* used during fw download */
 
 	/* fw config: only relevant fields */
-	uint32_t    config_number;
-	uint32_t    asic_revision;
-	uint32_t    port_id;
-	uint32_t    function_mode;
+	uint32_t config_number;
+	uint32_t asic_revision;
+	uint32_t port_id;
+	uint32_t function_mode;
+	uint32_t function_caps;
+	uint32_t max_tx_rings;		/* Max Rx rings available */
+	uint32_t max_rx_rings;		/* Max rx rings available */
+	int32_t if_id;			/* IF ID */
+	uint8_t fn;			/* function number */
+	uint8_t fw_version[32];		/* fw version string */
+
+	/* Logging related */
+	uint16_t mod_mask;		/* Log Mask */
+	int16_t severity;		/* Log level */
 };
 
 /* GLD handler functions */
@@ -310,7 +338,6 @@ int  oce_fm_check_dma_handle(struct oce_dev *dev,
 
 /* Interrupt handling */
 int oce_setup_intr(struct oce_dev *dev);
-int oce_alloc_intr(struct oce_dev *dev);
 int oce_teardown_intr(struct oce_dev *dev);
 int oce_setup_handlers(struct oce_dev *dev);
 void oce_remove_handler(struct oce_dev *dev);

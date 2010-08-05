@@ -158,6 +158,7 @@ oce_pci_init(struct oce_dev *dev)
 	ret = oce_map_regs(dev);
 
 	if (ret != DDI_SUCCESS) {
+		pci_config_teardown(&dev->pci_cfg_handle);
 		return (DDI_FAILURE);
 	}
 	dev->fn =  OCE_PCI_FUNC(dev);
@@ -335,9 +336,16 @@ int
 oce_create_nw_interface(struct oce_dev *dev)
 {
 	int ret;
+	uint32_t capab_flags = OCE_CAPAB_FLAGS;
+	uint32_t capab_en_flags = OCE_CAPAB_ENABLE;
+
+	if (dev->rss_enable) {
+		capab_flags |= MBX_RX_IFACE_FLAGS_RSS;
+		capab_en_flags |= MBX_RX_IFACE_FLAGS_RSS;
+	}
 
 	/* create an interface for the device with out mac */
-	ret = oce_if_create(dev, OCE_DEFAULT_IF_CAP, OCE_DEFAULT_IF_CAP_EN,
+	ret = oce_if_create(dev, capab_flags, capab_en_flags,
 	    0, &dev->mac_addr[0], (uint32_t *)&dev->if_id);
 	if (ret != 0) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
@@ -346,7 +354,7 @@ oce_create_nw_interface(struct oce_dev *dev)
 	}
 	atomic_inc_32(&dev->nifs);
 
-	dev->if_cap_flags = OCE_DEFAULT_IF_CAP_EN;
+	dev->if_cap_flags = capab_en_flags;
 
 	/* Enable VLAN Promisc on HW */
 	ret = oce_config_vlan(dev, (uint8_t)dev->if_id, NULL, 0,
@@ -371,17 +379,6 @@ oce_create_nw_interface(struct oce_dev *dev)
 		oce_log(dev, CE_NOTE, MOD_CONFIG,
 		    "Set Promisc failed: %d", ret);
 	}
-#if 0
-	/* this could happen if the  driver is resuming after suspend */
-	if (dev->num_mca > 0) {
-		ret = oce_set_multicast_table(dev, dev->multi_cast,
-		    dev->num_mca);
-		if (ret != 0) {
-			oce_log(dev, CE_NOTE, MOD_CONFIG,
-			    "Set Multicast failed: %d", ret);
-		}
-	}
-#endif
 
 	return (0);
 }
@@ -396,11 +393,28 @@ oce_delete_nw_interface(struct oce_dev *dev) {
 	}
 }
 
+static void
+oce_create_itbl(struct oce_dev *dev, char *itbl)
+{
+	int i;
+	struct oce_rq **rss_queuep = &dev->rq[1];
+	int nrss  = dev->nrqs - 1;
+	/* fill the indirection table rq 0 is default queue */
+	for (i = 0; i < OCE_ITBL_SIZE; i++) {
+		itbl[i] = rss_queuep[i % nrss]->rss_cpuid;
+	}
+}
 
 int
 oce_setup_adapter(struct oce_dev *dev)
 {
 	int ret;
+	char itbl[OCE_ITBL_SIZE];
+	char hkey[OCE_HKEY_SIZE];
+
+	/* disable the interrupts here and enable in start */
+	oce_chip_di(dev);
+
 	ret = oce_create_nw_interface(dev);
 	if (ret != DDI_SUCCESS) {
 		return (DDI_FAILURE);
@@ -410,12 +424,47 @@ oce_setup_adapter(struct oce_dev *dev)
 		oce_delete_nw_interface(dev);
 		return (DDI_FAILURE);
 	}
+	if (dev->rss_enable) {
+		(void) oce_create_itbl(dev, itbl);
+		(void) oce_gen_hkey(hkey, OCE_HKEY_SIZE);
+		ret = oce_config_rss(dev, dev->if_id, hkey, itbl, OCE_ITBL_SIZE,
+		    OCE_DEFAULT_RSS_TYPE, B_TRUE);
+		if (ret != DDI_SUCCESS) {
+			oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
+			    "Failed to Configure RSS");
+			oce_delete_queues(dev);
+			oce_delete_nw_interface(dev);
+			return (ret);
+		}
+	}
+	ret = oce_setup_handlers(dev);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
+		    "Failed to Setup handlers");
+		oce_delete_queues(dev);
+		oce_delete_nw_interface(dev);
+		return (ret);
+	}
 	return (DDI_SUCCESS);
 }
 
 void
 oce_unsetup_adapter(struct oce_dev *dev)
 {
+	oce_remove_handler(dev);
+	if (dev->rss_enable) {
+		char itbl[OCE_ITBL_SIZE] = {0};
+		char hkey[OCE_HKEY_SIZE] = {0};
+		int ret = 0;
+
+		ret = oce_config_rss(dev, dev->if_id, hkey, itbl, OCE_ITBL_SIZE,
+		    RSS_ENABLE_NONE, B_TRUE);
+
+		if (ret != DDI_SUCCESS) {
+			oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
+			    "Failed to Disable RSS");
+		}
+	}
 	oce_delete_queues(dev);
 	oce_delete_nw_interface(dev);
 }
@@ -435,7 +484,7 @@ oce_hw_init(struct oce_dev *dev)
 	}
 	/* create bootstrap mailbox */
 	dev->bmbx = oce_alloc_dma_buffer(dev,
-	    sizeof (struct oce_bmbx), DDI_DMA_CONSISTENT);
+	    sizeof (struct oce_bmbx), NULL, DDI_DMA_CONSISTENT);
 	if (dev->bmbx == NULL) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
 		    "Failed to allocate bmbx: size = %u",

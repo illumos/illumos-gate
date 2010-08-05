@@ -79,6 +79,7 @@ mbx_common_req_hdr_init(struct mbx_hdr *hdr,
 
 	hdr->u0.req.timeout = timeout;
 	hdr->u0.req.request_length = pyld_len - sizeof (struct mbx_hdr);
+	hdr->u0.req.rsvd0 = 0;
 } /* mbx_common_req_hdr_init */
 
 /*
@@ -615,7 +616,10 @@ oce_get_link_status(struct oce_dev *dev, struct link_status *link)
 	}
 
 	/* interpret response */
-	bcopy(&fwcmd->params.rsp, link, 8);
+	bcopy(&fwcmd->params.rsp, link, sizeof (struct link_status));
+	link->logical_link_status = LE_32(link->logical_link_status);
+	link->qos_link_speed = LE_16(link->qos_link_speed);
+
 	return (0);
 } /* oce_get_link_status */
 
@@ -750,6 +754,15 @@ oce_get_fw_config(struct oce_dev *dev)
 	dev->port_id = fwcmd->params.rsp.port_id;
 	dev->function_mode = fwcmd->params.rsp.function_mode;
 
+	/* get the max rings alloted for this function */
+	if (fwcmd->params.rsp.ulp[0].mode & ULP_NIC_MODE) {
+		dev->max_tx_rings = fwcmd->params.rsp.ulp[0].wq_count;
+		dev->max_rx_rings = fwcmd->params.rsp.ulp[0].rq_count;
+	} else {
+		dev->max_tx_rings = fwcmd->params.rsp.ulp[1].wq_count;
+		dev->max_rx_rings = fwcmd->params.rsp.ulp[1].rq_count;
+	}
+	dev->function_caps = fwcmd->params.rsp.function_caps;
 	return (0);
 } /* oce_get_fw_config */
 
@@ -1162,6 +1175,50 @@ oce_config_link(struct oce_dev *dev, boolean_t enable)
 	return (ret);
 } /* oce_config_link */
 
+int
+oce_config_rss(struct oce_dev *dev, uint16_t if_id, char *hkey, char *itbl,
+    int  tbl_sz, uint16_t rss_type, uint8_t flush)
+{
+	struct oce_mbx mbx;
+	struct mbx_config_nic_rss *fwcmd;
+	int i;
+	int ret = 0;
+
+	bzero(&mbx, sizeof (struct oce_mbx));
+	fwcmd = (struct mbx_config_nic_rss *)&mbx.payload;
+
+	/* initialize the ioctl header */
+	mbx_common_req_hdr_init(&fwcmd->hdr, 0, 0,
+	    MBX_SUBSYSTEM_NIC,
+	    OPCODE_CONFIG_NIC_RSS,
+	    MBX_TIMEOUT_SEC,
+	    sizeof (struct mbx_config_nic_rss));
+	fwcmd->params.req.enable_rss = LE_16(rss_type);
+	fwcmd->params.req.flush = flush;
+	fwcmd->params.req.if_id = LE_32(if_id);
+
+	if (hkey != NULL) {
+		bcopy(hkey, fwcmd->params.req.hash, OCE_HKEY_SIZE);
+	}
+
+
+	/* Fill the indirection table */
+	for (i = 0; i < tbl_sz; i++) {
+		fwcmd->params.req.cputable[i] = itbl[i];
+	}
+
+	fwcmd->params.req.cpu_tbl_sz_log2 = LE_16(OCE_LOG2(tbl_sz));
+
+	/* fill rest of mbx */
+	mbx.u0.s.embedded = B_TRUE;
+	mbx.payload_length = sizeof (struct mbx_config_nic_rss);
+	DW_SWAP(u32ptr(&mbx), (OCE_BMBX_RHDR_SZ + OCE_MBX_RRHDR_SZ));
+
+	/* post the command */
+	ret = oce_mbox_post(dev, &mbx, NULL);
+
+	return (ret);
+}
 
 /*
  * function called from the gld ioctl entry point to send a mbx to fw

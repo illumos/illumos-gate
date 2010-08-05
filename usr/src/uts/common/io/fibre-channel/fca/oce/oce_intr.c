@@ -31,16 +31,7 @@
 
 #include <oce_impl.h>
 
-static int oce_setup_msix(struct oce_dev *dev);
-static int oce_teardown_msix(struct oce_dev *dev);
-static int oce_add_msix_handlers(struct oce_dev *dev);
-static void oce_del_msix_handlers(struct oce_dev *dev);
 static uint_t oce_isr(caddr_t arg1, caddr_t arg2);
-
-static int oce_setup_intx(struct oce_dev *dev);
-static int oce_teardown_intx(struct oce_dev *dev);
-static int oce_add_intx_handlers(struct oce_dev *dev);
-static void oce_del_intx_handlers(struct oce_dev *dev);
 
 /*
  * top level function to setup interrupts
@@ -54,6 +45,11 @@ oce_setup_intr(struct oce_dev *dev)
 {
 	int ret;
 	int intr_types = 0;
+	int navail = 0;
+	int nsupported = 0;
+	int min = 0;
+	int nreqd = 0;
+	int nallocd = 0;
 
 	/* get supported intr types */
 	ret = ddi_intr_get_supported_types(dev->dip, &intr_types);
@@ -63,30 +59,94 @@ oce_setup_intr(struct oce_dev *dev)
 		return (DDI_FAILURE);
 	}
 
+retry_intr:
 	if (intr_types & DDI_INTR_TYPE_MSIX) {
-		dev->intr_types = DDI_INTR_TYPE_MSIX;
-		dev->num_vectors = 2;
-		return (DDI_SUCCESS);
+		dev->intr_type = DDI_INTR_TYPE_MSIX;
+		/* one vector is shared by MCC and Tx */
+		nreqd = dev->rx_rings + 1;
+		min = OCE_MIN_VECTORS;
+	} else if (intr_types & DDI_INTR_TYPE_FIXED) {
+		dev->intr_type = DDI_INTR_TYPE_FIXED;
+		nreqd = OCE_MIN_VECTORS;
+		min = OCE_MIN_VECTORS;
 	}
 
-	if (intr_types & DDI_INTR_TYPE_FIXED) {
-		dev->intr_types = DDI_INTR_TYPE_FIXED;
-		dev->num_vectors = 1;
-		return (DDI_SUCCESS);
-	}
-	return (DDI_FAILURE);
-}
-
-int
-oce_alloc_intr(struct oce_dev *dev)
-{
-	if (dev->intr_types == DDI_INTR_TYPE_MSIX) {
-		return (oce_setup_msix(dev));
-	}
-	if (dev->intr_types == DDI_INTR_TYPE_FIXED) {
-		return (oce_setup_intx(dev));
+	ret = ddi_intr_get_nintrs(dev->dip, dev->intr_type, &nsupported);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "Could not get nintrs:0x%d", ret);
+		return (DDI_FAILURE);
 	}
 
+	/* get the number of vectors available */
+	ret = ddi_intr_get_navail(dev->dip, dev->intr_type, &navail);
+	if (ret != DDI_SUCCESS || navail < min) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "Could not get msix vectors:0x%x",
+		    navail);
+		return (DDI_FAILURE);
+	}
+
+	if (navail < min) {
+		return (DDI_FAILURE);
+	}
+
+	/* if the requested number is more than available reset reqd */
+	if (navail < nreqd) {
+		nreqd = navail;
+	}
+
+	/* allocate htable */
+	dev->hsize  = nreqd *  sizeof (ddi_intr_handle_t);
+	dev->htable = kmem_zalloc(dev->hsize,  KM_NOSLEEP);
+
+	if (dev->htable == NULL)
+		return (DDI_FAILURE);
+
+	nallocd = 0;
+	/* allocate interrupt handlers */
+	ret = ddi_intr_alloc(dev->dip, dev->htable, dev->intr_type,
+	    0, nreqd, &nallocd, DDI_INTR_ALLOC_NORMAL);
+
+	if (ret != DDI_SUCCESS) {
+		goto fail_intr;
+	}
+
+	dev->num_vectors = nallocd;
+	if (nallocd < min) {
+		goto fail_intr;
+	}
+
+	/*
+	 * get the interrupt priority. Assumption is that all handlers have
+	 * equal priority
+	 */
+
+	ret = ddi_intr_get_pri(dev->htable[0], &dev->intr_pri);
+
+	if (ret != DDI_SUCCESS) {
+		goto fail_intr;
+	}
+
+	(void) ddi_intr_get_cap(dev->htable[0], &dev->intr_cap);
+
+	if ((intr_types & DDI_INTR_TYPE_MSIX) && (nallocd > 1)) {
+		dev->rx_rings = nallocd - 1;
+	} else {
+		dev->rx_rings = 1;
+	}
+
+	return (DDI_SUCCESS);
+
+fail_intr:
+	(void) oce_teardown_intr(dev);
+	if ((dev->intr_type == DDI_INTR_TYPE_MSIX) &&
+	    (intr_types & DDI_INTR_TYPE_FIXED)) {
+		intr_types &= ~DDI_INTR_TYPE_MSIX;
+		oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
+		    "Could not get MSIX vectors, trying for FIXED vectors");
+		goto retry_intr;
+	}
 	return (DDI_FAILURE);
 }
 
@@ -100,15 +160,18 @@ oce_alloc_intr(struct oce_dev *dev)
 int
 oce_teardown_intr(struct oce_dev *dev)
 {
-	if (dev->intr_types ==  DDI_INTR_TYPE_MSIX) {
-		return (oce_teardown_msix(dev));
+	int i;
+
+	/* release handlers */
+	for (i = 0; i < dev->num_vectors; i++) {
+		(void) ddi_intr_free(dev->htable[i]);
 	}
 
-	if (dev->intr_types == DDI_INTR_TYPE_FIXED) {
-		return (oce_teardown_intx(dev));
-	}
+	/* release htable */
+	kmem_free(dev->htable, dev->hsize);
+	dev->htable = NULL;
 
-	return (DDI_FAILURE);
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -121,15 +184,21 @@ oce_teardown_intr(struct oce_dev *dev)
 int
 oce_setup_handlers(struct oce_dev *dev)
 {
-	if (dev->intr_types == DDI_INTR_TYPE_MSIX) {
-		return (oce_add_msix_handlers(dev));
+	int i = 0;
+	int ret;
+	for (i = 0; i < dev->num_vectors; i++) {
+		ret = ddi_intr_add_handler(dev->htable[i], oce_isr,
+		    (caddr_t)dev->eq[i], NULL);
+		if (ret != DDI_SUCCESS) {
+			oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+			    "Failed to add interrupt handlers");
+			for (i--; i >= 0; i--) {
+				(void) ddi_intr_remove_handler(dev->htable[i]);
+			}
+			return (DDI_FAILURE);
+		}
 	}
-
-	if (dev->intr_types == DDI_INTR_TYPE_FIXED) {
-		return (oce_add_intx_handlers(dev));
-	}
-
-	return (DDI_FAILURE);
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -142,12 +211,9 @@ oce_setup_handlers(struct oce_dev *dev)
 void
 oce_remove_handler(struct oce_dev *dev)
 {
-	if (dev->intr_types == DDI_INTR_TYPE_MSIX) {
-		oce_del_msix_handlers(dev);
-	}
-
-	if (dev->intr_types == DDI_INTR_TYPE_FIXED) {
-		oce_del_intx_handlers(dev);
+	int nvec;
+	for (nvec = 0; nvec < dev->num_vectors; nvec++) {
+		(void) ddi_intr_remove_handler(dev->htable[nvec]);
 	}
 }
 
@@ -225,6 +291,7 @@ oce_di(struct oce_dev *dev)
 	int i;
 	int ret;
 
+	oce_chip_di(dev);
 	if (dev->intr_cap & DDI_INTR_FLAG_BLOCK) {
 		(void) ddi_intr_block_disable(dev->htable, dev->num_vectors);
 	} else {
@@ -236,158 +303,7 @@ oce_di(struct oce_dev *dev)
 			}
 		}
 	}
-	oce_chip_di(dev);
 } /* oce_di */
-
-/*
- * function to setup the MSIX vectors
- *
- * dev - software handle to the device
- *
- * return 0=>success, failure otherwise
- */
-static int
-oce_setup_msix(struct oce_dev *dev)
-{
-	int navail = 0;
-	int ret = 0;
-
-	ret = ddi_intr_get_nintrs(dev->dip, DDI_INTR_TYPE_MSIX, &navail);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Could not get nintrs:0x%x %d",
-		    navail, ret);
-		return (DDI_FAILURE);
-	}
-
-	/* get the number of vectors available */
-	ret = ddi_intr_get_navail(dev->dip, DDI_INTR_TYPE_MSIX, &navail);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Could not get msix vectors:0x%x",
-		    navail);
-		return (DDI_FAILURE);
-	}
-
-	if (navail < dev->num_vectors)
-		return (DDI_FAILURE);
-
-	/* allocate htable */
-	dev->htable = kmem_zalloc(dev->num_vectors *
-	    sizeof (ddi_intr_handle_t), KM_NOSLEEP);
-
-	if (dev->htable == NULL)
-		return (DDI_FAILURE);
-
-	/* allocate interrupt handlers */
-	ret = ddi_intr_alloc(dev->dip, dev->htable, DDI_INTR_TYPE_MSIX,
-	    0, dev->num_vectors, &navail, DDI_INTR_ALLOC_NORMAL);
-
-	if (ret != DDI_SUCCESS || navail < dev->num_vectors) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Alloc intr failed: %d %d",
-		    navail, ret);
-		kmem_free(dev->htable,
-		    dev->num_vectors * sizeof (ddi_intr_handle_t));
-		return (DDI_FAILURE);
-	}
-
-	/* update the actual number of interrupts allocated */
-	dev->num_vectors = navail;
-
-	/*
-	 * get the interrupt priority. Assumption is that all handlers have
-	 * equal priority
-	 */
-
-	ret = ddi_intr_get_pri(dev->htable[0], &dev->intr_pri);
-
-	if (ret != DDI_SUCCESS) {
-		int i;
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Unable to get intr priority: 0x%x",
-		    dev->intr_pri);
-		for (i = 0; i < dev->num_vectors; i++) {
-			(void) ddi_intr_free(dev->htable[i]);
-		}
-		kmem_free(dev->htable,
-		    dev->num_vectors * sizeof (ddi_intr_handle_t));
-		return (DDI_FAILURE);
-	}
-
-	(void) ddi_intr_get_cap(dev->htable[0], &dev->intr_cap);
-	return (DDI_SUCCESS);
-} /* oce_setup_msix */
-
-/*
- * helper function to teardown MSIX interrupts
- *
- * dev - software handle to the device
- *
- * return 0 => success, failure otherwise
- */
-static int
-oce_teardown_msix(struct oce_dev *dev)
-{
-	int i;
-
-	/* release handlers */
-	for (i = 0; i < dev->num_vectors; i++) {
-		(void) ddi_intr_free(dev->htable[i]);
-	}
-
-	/* release htable */
-	kmem_free(dev->htable,
-	    dev->num_vectors * sizeof (ddi_intr_handle_t));
-
-	return (DDI_SUCCESS);
-} /* oce_teardown_msix */
-
-/*
- * function to add MSIX handlers to vectors
- *
- * dev - software handle to the device
- *
- * return DDI_SUCCESS => success, failure otherwise
- */
-static int
-oce_add_msix_handlers(struct oce_dev *dev)
-{
-	int ret;
-	int i;
-
-	for (i = 0; i < dev->neqs; i++) {
-		ret = ddi_intr_add_handler(dev->htable[i], oce_isr,
-		    (caddr_t)dev->eq[i], NULL);
-		if (ret != DDI_SUCCESS) {
-			oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
-			    "Failed to add interrupt handlers");
-			for (i--; i >= 0; i--) {
-				(void) ddi_intr_remove_handler(dev->htable[i]);
-			}
-			return (DDI_FAILURE);
-		}
-	}
-
-	return (DDI_SUCCESS);
-} /* oce_add_msix_handlers */
-
-/*
- * function to disassociate msix handlers added in oce_add_msix_handlers
- *
- * dev - software handle to the device
- *
- * return DDI_SUCCESS => success, failure otherwise
- */
-static void
-oce_del_msix_handlers(struct oce_dev *dev)
-{
-	int nvec;
-
-	for (nvec = 0; nvec < dev->num_vectors; nvec++) {
-		(void) ddi_intr_remove_handler(dev->htable[nvec]);
-	}
-} /* oce_del_msix_handlers */
 
 /*
  * command interrupt handler routine added to all vectors
@@ -411,21 +327,7 @@ oce_isr(caddr_t arg1, caddr_t arg2)
 
 	eq = (struct oce_eq *)(void *)(arg1);
 
-	if (eq == NULL) {
-		return (DDI_INTR_UNCLAIMED);
-	}
 	dev = eq->parent;
-
-	/* If device is getting suspended or closing, then return */
-	if ((dev == NULL) ||
-	    (dev->state & STATE_MAC_STOPPING) ||
-	    !(dev->state & STATE_MAC_STARTED) ||
-	    dev->suspended) {
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	(void) ddi_dma_sync(eq->ring->dbuf->dma_handle, 0, 0,
-	    DDI_DMA_SYNC_FORKERNEL);
 
 	eqe = RING_GET_CONSUMER_ITEM_VA(eq->ring, struct oce_eqe);
 
@@ -441,7 +343,7 @@ oce_isr(caddr_t arg1, caddr_t arg2)
 		}
 
 		/* get the cq from the eqe */
-		cq_id = eqe->u0.s.resource_id;
+		cq_id = eqe->u0.s.resource_id % OCE_MAX_CQ;
 		cq = dev->cq[cq_id];
 
 		/* Call the completion handler */
@@ -455,119 +357,10 @@ oce_isr(caddr_t arg1, caddr_t arg2)
 	} /* for all EQEs */
 
 	/* ring the eq doorbell, signify that it's done processing  */
+	oce_arm_eq(dev, eq->eq_id, num_eqe, B_TRUE, B_TRUE);
 	if (num_eqe > 0) {
-		oce_arm_eq(dev, eq->eq_id, num_eqe, B_TRUE, B_TRUE);
 		return (DDI_INTR_CLAIMED);
 	} else {
 		return (DDI_INTR_UNCLAIMED);
 	}
 } /* oce_msix_handler */
-
-static int
-oce_setup_intx(struct oce_dev *dev)
-{
-	int navail = 0;
-	int nintr = 0;
-	int ret = 0;
-
-	ret = ddi_intr_get_nintrs(dev->dip, DDI_INTR_TYPE_FIXED, &nintr);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "could not get nintrs:0x%x %d",
-		    navail, ret);
-		return (DDI_FAILURE);
-	}
-
-	/* get the number of vectors available */
-	ret = ddi_intr_get_navail(dev->dip, DDI_INTR_TYPE_FIXED, &navail);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "could not get intx vectors:0x%x",
-		    navail);
-		return (DDI_FAILURE);
-	}
-
-	/* always 1 */
-	if (navail != nintr)
-		return (DDI_FAILURE);
-
-	dev->num_vectors = navail;
-
-	/* allocate htable */
-	dev->htable = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_NOSLEEP);
-	if (dev->htable == NULL) {
-		return (DDI_FAILURE);
-	}
-
-	/* allocate interrupt handlers */
-	ret = ddi_intr_alloc(dev->dip, dev->htable, DDI_INTR_TYPE_FIXED,
-	    0, dev->num_vectors, &navail, DDI_INTR_ALLOC_NORMAL);
-
-	if (ret != DDI_SUCCESS || navail != 1) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "alloc intr failed: %d %d",
-		    navail, ret);
-		kmem_free(dev->htable, sizeof (ddi_intr_handle_t));
-		return (DDI_FAILURE);
-	}
-
-	/* update the actual number of interrupts allocated */
-	dev->num_vectors = navail;
-
-	/*
-	 * get the interrupt priority. Assumption is that all handlers have
-	 * equal priority
-	 */
-
-	ret = ddi_intr_get_pri(dev->htable[0], &dev->intr_pri);
-
-	if (ret != DDI_SUCCESS) {
-		int i;
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Unable to get intr priority: 0x%x",
-		    dev->intr_pri);
-		for (i = 0; i < dev->num_vectors; i++) {
-			(void) ddi_intr_free(dev->htable[i]);
-		}
-		kmem_free(dev->htable, sizeof (ddi_intr_handle_t));
-		return (DDI_FAILURE);
-	}
-
-	(void) ddi_intr_get_cap(dev->htable[0], &dev->intr_cap);
-	return (DDI_SUCCESS);
-} /* oce_setup_intx */
-
-static int
-oce_teardown_intx(struct oce_dev *dev)
-{
-	/* release handlers */
-	(void) ddi_intr_free(dev->htable[0]);
-
-	/* release htable */
-	kmem_free(dev->htable, sizeof (ddi_intr_handle_t));
-
-	return (DDI_FAILURE);
-} /* oce_teardown_intx */
-
-static int
-oce_add_intx_handlers(struct oce_dev *dev)
-{
-	int ret;
-
-	ret = ddi_intr_add_handler(dev->htable[0], oce_isr,
-	    (caddr_t)dev->eq[0], NULL);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
-		    "failed to add intr handlers");
-		(void) ddi_intr_remove_handler(dev->htable[0]);
-		return (DDI_FAILURE);
-	}
-
-	return (DDI_SUCCESS);
-} /* oce_add_intx_handlers */
-
-static void
-oce_del_intx_handlers(struct oce_dev *dev)
-{
-	(void) ddi_intr_remove_handler(dev->htable[0]);
-} /* oce_del_intx_handlers */
