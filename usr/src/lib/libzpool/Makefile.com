@@ -37,7 +37,6 @@ include ../../Makefile.lib
 ZFS_COMMON_SRCS=	$(ZFS_COMMON_OBJS:%.o=../../../uts/common/fs/zfs/%.c)
 ZFS_SHARED_SRCS=	$(ZFS_SHARED_OBJS:%.o=../../../common/zfs/%.c)
 KERNEL_SRCS=		$(KERNEL_OBJS:%.o=../common/%.c)
-LIST_SRCS=		$(LIST_OBJS:%.o=../../../uts/common/os/%.c)
 
 SRCS=$(ZFS_COMMON_SRCS) $(ZFS_SHARED_SRCS) $(KERNEL_SRCS)
 SRCDIR=		../common

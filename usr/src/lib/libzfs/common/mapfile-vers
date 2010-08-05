@@ -46,6 +46,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	fletcher_4_byteswap;
 	fletcher_4_incremental_native;
 	fletcher_4_incremental_byteswap;
+	libzfs_add_handle;
+	libzfs_dataset_cmp;
 	libzfs_errno;
 	libzfs_error_action;
 	libzfs_error_description;
