@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1108,8 +1107,8 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				DEVI_ATTACHED_CHILDREN,	DEVI_ATTACHED_CHILDREN},
 	    { "BRANCH_HELD",	DEVI_BRANCH_HELD,	DEVI_BRANCH_HELD },
 	    { "NO_BIND",	DEVI_NO_BIND,		DEVI_NO_BIND },
-	    { "DEVI_REGISTERED_DEVID",
-				DEVI_REGISTERED_DEVID,	DEVI_REGISTERED_DEVID },
+	    { "DEVI_CACHED_DEVID",
+				DEVI_CACHED_DEVID,	DEVI_CACHED_DEVID },
 	    { "PHCI_SIGNALS_VHCI",
 				DEVI_PHCI_SIGNALS_VHCI,
 				DEVI_PHCI_SIGNALS_VHCI },
