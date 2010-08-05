@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -351,16 +351,14 @@ if_nameindex(void)
 void
 if_freenameindex(struct if_nameindex *ptr)
 {
+	struct if_nameindex *p;
 
 	if (ptr == NULL)
 		return;
 
-
 	/* First free the if_name member in each array element */
-	while (ptr->if_name != NULL) {
-		free(ptr->if_name);
-		ptr++;
-	}
+	for (p = ptr; p->if_name != NULL; p++)
+		free(p->if_name);
 
 	/* Now free up the array space */
 	free(ptr);
