@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Netract Platform specific functions.
  *
  * 	called when :
  *	machine_type == MTYPE_MONTECARLO
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* includes */
 #include <assert.h>
@@ -374,9 +371,9 @@ display(Sys_tree *tree,
 		(void) uname(&uts_buf);
 
 		log_printf(dgettext(TEXT_DOMAIN,
-			"System Configuration:  Sun Microsystems"
-			"  %s %s\n"), uts_buf.machine,
-			get_prop_val(find_prop(root, "banner-name")), 0);
+		    "System Configuration:  Oracle Corporation"
+		    "  %s %s\n"), uts_buf.machine,
+		    get_prop_val(find_prop(root, "banner-name")), 0);
 
 		/* display system clock frequency */
 		value = get_prop_val(find_prop(root, "clock-frequency"));
@@ -422,12 +419,12 @@ check_platform()
 	}
 
 	if ((strncmp(si_platform, MONTECARLO_PLATFORM,
-				strlen(MONTECARLO_PLATFORM))) == 0) {
+	    strlen(MONTECARLO_PLATFORM))) == 0) {
 		scsb_node = mc_scsb_node;
 		ps_node = mc_ps_node;
 		temp_node = mc_temp_node;
 	} else if ((strncmp(si_platform, MAKAHA_PLATFORM,
-				strlen(MAKAHA_PLATFORM))) == 0) {
+	    strlen(MAKAHA_PLATFORM))) == 0) {
 		scsb_node = ot_scsb_node;
 		ps_node = ot_ps_node;
 		temp_node = NULL;
@@ -470,7 +467,7 @@ force_load_drivers()
 	if (temp_node) {
 		if (open(temp_node, O_RDONLY) < 0)
 			log_printf(dgettext(TEXT_DOMAIN,
-						"\ncputemp open FAILED!"), 0);
+			    "\ncputemp open FAILED!"), 0);
 	}
 }
 
@@ -536,7 +533,7 @@ config_calloc_check(
 {
 	void *p;
 	static char alloc_fail[] =
-		"%s: memory allocation failed (%d*%d bytes)\n";
+	    "%s: memory allocation failed (%d*%d bytes)\n";
 
 	p = calloc(nelem, elsize);
 	if (p == NULL) {
@@ -685,10 +682,10 @@ do_scsb_kstat()
 	log_printf("Midplane version:	%d\n",
 	    pks_topo->mid_plane.fru_version, 0);
 	log_printf("\ttype %d unit %d; id 0x%x; VER 0x%x\n",
-		pks_topo->mct_scb[0].fru_type,
-		pks_topo->mct_scb[0].fru_unit,
-		pks_topo->mct_scb[0].fru_id,
-		pks_topo->mct_scb[0].fru_version, 0);
+	    pks_topo->mct_scb[0].fru_type,
+	    pks_topo->mct_scb[0].fru_unit,
+	    pks_topo->mct_scb[0].fru_id,
+	    pks_topo->mct_scb[0].fru_version, 0);
 	/*
 	 * Slots
 	 */
@@ -894,7 +891,7 @@ do_pcf8574_kstat()
 			strncat(kstat_name, "2", 1);
 		}
 		if ((ksp_ps = kstat_lookup(kc, I2C_PCF8574_NAME, 0, kstat_name))
-			== NULL) {
+		    == NULL) {
 #ifdef	DEBUG_TEMP
 			log_printf("\nks lookup for pwrsupply%d failed",
 			    i+1, 0);
@@ -1082,7 +1079,7 @@ scsi_disk_status(int disk_number)
 
 	if (disk_number == RMM_NUMBER) { /* RMM */
 		if (config_list_ext(1, ap_ids, &list_array, &nlist,
-			NULL, NULL, NULL, CFGA_FLAG_LIST_ALL) != CFGA_OK) {
+		    NULL, NULL, NULL, CFGA_FLAG_LIST_ALL) != CFGA_OK) {
 			kstat_close(kc);
 			return (-1);
 		}
@@ -1090,27 +1087,27 @@ scsi_disk_status(int disk_number)
 			if (strstr(list_array[i].ap_phys_id, "rmt/0") != NULL) {
 				/* Tape drive */
 				if (list_array[i].ap_o_state ==
-					CFGA_STAT_UNCONFIGURED) {
+				    CFGA_STAT_UNCONFIGURED) {
 					kstat_close(kc);
 					return (-1);
 				}
 				if ((ksp_disk = kstat_lookup(kc, STERR,
-						st_instance, NULL)) == NULL) {
+				    st_instance, NULL)) == NULL) {
 					kstat_close(kc);
 					return (-1);
 				}
 				break;
 			} else if (strstr(list_array[i].ap_phys_id,
-						"dsk/c0t6d0") != NULL) {
+			    "dsk/c0t6d0") != NULL) {
 				/* CD_ROM */
 				if (list_array[i].ap_o_state ==
-						CFGA_STAT_UNCONFIGURED) {
+				    CFGA_STAT_UNCONFIGURED) {
 					kstat_close(kc);
 					return (-1);
 				}
 				if ((ksp_disk = kstat_lookup(kc, SDERR,
-					sd_instances[disk_number-1], NULL)) ==
-									NULL) {
+				    sd_instances[disk_number-1], NULL)) ==
+				    NULL) {
 					kstat_close(kc);
 					return (-1);
 				}
@@ -1119,7 +1116,7 @@ scsi_disk_status(int disk_number)
 		}
 	} else { /* Hard disk */
 		if ((ksp_disk = kstat_lookup(kc, SDERR,
-			sd_instances[disk_number-1], NULL)) == NULL) {
+		    sd_instances[disk_number-1], NULL)) == NULL) {
 			kstat_close(kc);
 			return (-1);
 		}
@@ -1789,7 +1786,7 @@ display_mc_prtdiag_info()
 					    PCI_ROOT_AP, 0);
 			for (nd = 0;
 			    nd < mc_slots_data.mc_slot_info[i1].number_devs;
-				    nd++) {
+			    nd++) {
 			log_printf(dgettext(TEXT_DOMAIN, "%52s%s\n"), BLANK,
 			    mc_slots_data.mc_slot_info[i1].devs_info[nd],
 			    0);
@@ -1805,7 +1802,7 @@ display_mc_prtdiag_info()
 			/* use solaris lot table */
 			if (fail_syssoft_prop == 1) {
 				if (scsb_ks_topo.mct_slots[i].fru_unit ==
-				hotswap_slot_table[s_index].pslotnum) {
+				    hotswap_slot_table[s_index].pslotnum) {
 					/*
 					 * search for the addr/pci
 					 * num in all slot info structs

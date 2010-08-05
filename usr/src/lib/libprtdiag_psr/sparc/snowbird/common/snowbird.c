@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -152,7 +148,7 @@ picldiag_get_uint_propval(picl_nodehdl_t modh, char *prop_name, int *ret)
 	 * If it is not an int or uint prop, return failure
 	 */
 	if ((pinfo.type != PICL_PTYPE_INT) &&
-		(pinfo.type != PICL_PTYPE_UNSIGNED_INT)) {
+	    (pinfo.type != PICL_PTYPE_UNSIGNED_INT)) {
 		*ret = PICL_FAILURE;
 		return (0);
 	}
@@ -219,7 +215,7 @@ display_system_clock(picl_nodehdl_t plafh)
 		return (err);
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System clock frequency: %d MHZ\n"), system_clk);
+	    "System clock frequency: %d MHZ\n"), system_clk);
 
 	return (PICL_SUCCESS);
 }
@@ -245,7 +241,7 @@ picldiag_get_string_propval(picl_nodehdl_t modh, char *prop_name, char **outbuf)
 	 * If it is not a string prop, return NULL
 	 */
 	if (pinfo.type != PICL_PTYPE_CHARSTRING)
-	    return (PICL_FAILURE);
+		return (PICL_FAILURE);
 
 	prop_value = malloc(pinfo.size);
 	if (prop_value == NULL)
@@ -277,7 +273,7 @@ display_platform_banner(picl_nodehdl_t plafh)
 	 * get PICL_PROP_MACHINE and PICL_PROP_BANNER_NAME
 	 */
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System Configuration: Sun Microsystems "), 0);
+	    "System Configuration: Oracle Corporation "), 0);
 	err = picldiag_get_string_propval(plafh, PICL_PROP_MACHINE,
 	    &platform);
 	if (err != PICL_SUCCESS)
@@ -319,7 +315,7 @@ picldiag_get_node_by_name(picl_nodehdl_t rooth, char *name,
 		    nodename, (strlen(name) + 1));
 		if (err != PICL_SUCCESS) {
 			err = picl_get_propval_by_name(childh, PICL_PROP_PEER,
-				&childh, sizeof (picl_nodehdl_t));
+			    &childh, sizeof (picl_nodehdl_t));
 			continue;
 		}
 
@@ -442,11 +438,11 @@ pd_prt_snowbird_diag()
 	if (pd_print_option) {
 
 		log_printf(
-			"\n %11s Other Miscellaneous Information \n",
-			PD_BLANK, 0);
+		    "\n %11s Other Miscellaneous Information \n",
+		    PD_BLANK, 0);
 		log_printf(
-			"%12s ------------------------------- \n",
-			PD_BLANK, 0);
+		    "%12s ------------------------------- \n",
+		    PD_BLANK, 0);
 
 		if ((status = pd_get_role_information()) != PD_SUCCESS) {
 			return (status);
@@ -454,10 +450,10 @@ pd_prt_snowbird_diag()
 
 		if (pd_smc_glbl_enabl_rsp[1] & 0x10) {
 			log_printf(
-				"IPMI Response Notification\t\tEnabled\n", 0);
+			    "IPMI Response Notification\t\tEnabled\n", 0);
 		} else {
 			log_printf(
-				"IPMI Response Notification\t\tDisabled\n", 0);
+			    "IPMI Response Notification\t\tDisabled\n", 0);
 		}
 		if ((status = pd_query_SMC_firmware_version()) != PD_SUCCESS) {
 			return (status);
@@ -520,7 +516,7 @@ pd_query_SMC_firmware_version()
 
 
 	smc_init_smc_msg(&req_pkt, SMC_QUERY_FIRMWARE_VERSION,
-		DEFAULT_SEQN, 0);
+	    DEFAULT_SEQN, 0);
 	smc_send_msg(-1, &req_pkt, &rsp_pkt, POLL_TIMEOUT);
 	ver = (rsp_pkt.data[0] & 0xf0) >> 4;
 	rev = rsp_pkt.data[0] & 0x0f;
@@ -549,7 +545,7 @@ pd_check_cpu_health()
 	uint8_t mem_test = 0x20;
 
 	smc_init_smc_msg(&req_pkt, SMC_GET_SMC_SELF_TEST_RESULT,
-		DEFAULT_SEQN, 0);
+	    DEFAULT_SEQN, 0);
 	smc_send_msg(-1, &req_pkt, &rsp_pkt, POLL_TIMEOUT);
 
 	dev_id = rsp_pkt.data[0] & dev_id;
@@ -655,7 +651,7 @@ pd_check_slots()
 
 
 	if (picl_walk_tree_by_class(nodeh, PICL_CLASS_LOCATION,
-		    (void *)c_args, pd_prt_slot_info) != PICL_SUCCESS) {
+	    (void *)c_args, pd_prt_slot_info) != PICL_SUCCESS) {
 		return (PD_INTERNAL_FAILURE);
 	}
 
@@ -684,7 +680,7 @@ pd_prt_slot_info(picl_nodehdl_t nodeh, void *c_args)
 
 	/* get the label on the location */
 	if (picl_get_prop_by_name(nodeh, PICL_PROP_LABEL,
-		    &proph) != PICL_SUCCESS)
+	    &proph) != PICL_SUCCESS)
 		return (PD_INTERNAL_FAILURE);
 
 	if (picl_get_propinfo(proph, &propinfo) != PICL_SUCCESS)
@@ -695,7 +691,7 @@ pd_prt_slot_info(picl_nodehdl_t nodeh, void *c_args)
 		return (PD_INTERNAL_FAILURE);
 
 	if (picl_get_propval(proph, (void *)valbuf, propinfo.size)
-		    != PICL_SUCCESS) {
+	    != PICL_SUCCESS) {
 		free(valbuf);
 		return (PD_INTERNAL_FAILURE);
 	}
@@ -715,7 +711,7 @@ pd_prt_slot_info(picl_nodehdl_t nodeh, void *c_args)
 
 	/* get the slot type for the location */
 	if (picl_get_prop_by_name(nodeh, PICL_PROP_SLOT_TYPE,
-		    &proph) != PICL_SUCCESS)
+	    &proph) != PICL_SUCCESS)
 		return (PD_INTERNAL_FAILURE);
 
 	if (picl_get_propinfo(proph, & propinfo) != PICL_SUCCESS)
@@ -726,7 +722,7 @@ pd_prt_slot_info(picl_nodehdl_t nodeh, void *c_args)
 		return (PD_INTERNAL_FAILURE);
 
 	if (picl_get_propval(proph, (void *)valbuf,
-		    propinfo.size) != PICL_SUCCESS) {
+	    propinfo.size) != PICL_SUCCESS) {
 		free(valbuf);
 		return (PD_INTERNAL_FAILURE);
 	}
@@ -741,7 +737,7 @@ pd_prt_slot_info(picl_nodehdl_t nodeh, void *c_args)
 		log_printf(" %d       Yes      cPSB IO Slot\n", unit_no, 0);
 
 		if (picl_get_propval_by_name(nodeh, PICL_PROP_CHILD,
-			    &childh, sizeof (childh)) == PICL_SUCCESS) {
+		    &childh, sizeof (childh)) == PICL_SUCCESS) {
 			pd_prt_cpci_condition(childh);
 		}
 		/* For Snowbird auto configuration is always enabled */
@@ -762,16 +758,16 @@ pd_print_fruinfo_hdr()
 {
 
 	log_printf(
-		"\n %19s FRU Information \n",
-		PD_BLANK, 0);
+	    "\n %19s FRU Information \n",
+	    PD_BLANK, 0);
 	log_printf(
-		"%11s ------------------------------------------------\n",
-		PD_BLANK, 0);
+	    "%11s ------------------------------------------------\n",
+	    PD_BLANK, 0);
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"FRU         FRU    FRU      Miscellaneous\n"), 0);
+	    "FRU         FRU    FRU      Miscellaneous\n"), 0);
 	log_printf(dgettext(TEXT_DOMAIN,
-		"Type        Unit#  Present  Information\n"), 0);
+	    "Type        Unit#  Present  Information\n"), 0);
 	log_printf("----        -----  -------", 0);
 	log_printf("  --------------------------------\n", 0);
 	return (PD_SUCCESS);
@@ -786,7 +782,7 @@ pd_check_location_parent(picl_nodehdl_t nodeh)
 	char *prop_name;
 
 	if (picl_get_propval_by_name(nodeh, PICL_PROP_PARENT,
-		    &parenth, sizeof (parenth)) != PICL_SUCCESS) {
+	    &parenth, sizeof (parenth)) != PICL_SUCCESS) {
 		return (PD_FAILURE);
 	}
 
@@ -796,7 +792,7 @@ pd_check_location_parent(picl_nodehdl_t nodeh)
 	}
 
 	if (picl_get_propval_by_name(parenth, PICL_PROP_NAME, (void *)prop_name,
-		    PICL_PROPNAMELEN_MAX) != PICL_SUCCESS) {
+	    PICL_PROPNAMELEN_MAX) != PICL_SUCCESS) {
 		free(prop_name);
 		return (PD_FAILURE);
 	}
@@ -825,7 +821,7 @@ pd_query_watchdog_state()
 	}
 
 	if (picl_walk_tree_by_class(nodehandle, PICL_CLASS_WATCHDOG_TIMER,
-		    (void *)c_args, pd_check_wd_state) != PICL_SUCCESS)
+	    (void *)c_args, pd_check_wd_state) != PICL_SUCCESS)
 		return (PD_INTERNAL_FAILURE);
 
 	return (PD_SUCCESS);
@@ -847,13 +843,13 @@ pd_check_wd_state(picl_nodehdl_t nodeh, void *c_args)
 	}
 
 	if (picl_get_propval_by_name(nodeh, PICL_PROP_NAME,
-		(void *)prop_name, PICL_PROPNAMELEN_MAX) != PICL_SUCCESS) {
+	    (void *)prop_name, PICL_PROPNAMELEN_MAX) != PICL_SUCCESS) {
 		free(prop_name);
 		return (PICL_WALK_TERMINATE);
 	}
 
 	if ((picl_get_prop_by_name(nodeh, PICL_PROP_STATE,
-		&proph)) != PICL_SUCCESS) {
+	    &proph)) != PICL_SUCCESS) {
 		free(prop_name);
 		return (PICL_WALK_TERMINATE);
 	}
@@ -870,7 +866,7 @@ pd_check_wd_state(picl_nodehdl_t nodeh, void *c_args)
 	}
 
 	if ((picl_get_propval(proph, (void *)valbuf,
-		propinfo.size)) != PICL_SUCCESS) {
+	    propinfo.size)) != PICL_SUCCESS) {
 		free(valbuf);
 		free(prop_name);
 		return (PICL_WALK_TERMINATE);
@@ -903,20 +899,20 @@ pd_get_role_information()
 	uint8_t usparc_role;
 
 	smc_init_smc_msg(&req_pkt, SMC_GET_ROLE_INFO,
-		DEFAULT_SEQN, 0);
+	    DEFAULT_SEQN, 0);
 	smc_send_msg(-1, &req_pkt, &rsp_pkt, POLL_TIMEOUT);
 	usparc_role = rsp_pkt.data[1];
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"UltraSPARC Host Role\t\t\t"), 0);
+	    "UltraSPARC Host Role\t\t\t"), 0);
 	if (usparc_role & 0x80) {
 		log_printf(
-			dgettext(TEXT_DOMAIN,
-			"System Board Computer (SBC)\n"), 0);
+		    dgettext(TEXT_DOMAIN,
+		    "System Board Computer (SBC)\n"), 0);
 	}
 	if (usparc_role & 0x40) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"Standby System Board Computer (Standby SBC)\n"), 0);
+		    "Standby System Board Computer (Standby SBC)\n"), 0);
 	}
 	if (usparc_role & 0x20) {
 		log_printf(dgettext(TEXT_DOMAIN,
@@ -924,7 +920,7 @@ pd_get_role_information()
 	}
 	if (usparc_role & 0x10) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"Satellite Board Computer (SAT)\n"), 0);
+		    "Satellite Board Computer (SAT)\n"), 0);
 	}
 	return (PD_SUCCESS);
 
@@ -939,7 +935,7 @@ pd_get_message_flags()
 	sc_rspmsg_t rsp_pkt;
 
 	smc_init_smc_msg(&req_pkt, SMC_GET_MESSAGE_FLAGS,
-		DEFAULT_SEQN, 0);
+	    DEFAULT_SEQN, 0);
 	smc_send_msg(-1, &req_pkt, &rsp_pkt, POLL_TIMEOUT);
 
 	if (rsp_pkt.data[0] & 0x01) {
@@ -964,7 +960,7 @@ pd_get_reset_mode()
 
 
 	smc_init_smc_msg(&req_pkt, SMC_GET_CONFIG_BLOCK,
-		DEFAULT_SEQN,  0);
+	    DEFAULT_SEQN,  0);
 	smc_send_msg(-1, &req_pkt, &rsp_pkt, POLL_TIMEOUT);
 
 	log_printf("Reset Mode\t\t\t\t%x \n", rsp_pkt.data[2], 0);
@@ -985,7 +981,7 @@ pd_get_sensor_reading()
 	req_pkt.data[0] = 0x0e;
 
 	smc_init_smc_msg(&req_pkt, SMC_SENSOR_READING_GET,
-		DEFAULT_SEQN, 1);
+	    DEFAULT_SEQN, 1);
 	smc_send_msg(-1, &req_pkt, &rsp_pkt, POLL_TIMEOUT);
 	log_printf("\nCPU Node Temperature Information\n", PD_BLANK, 0);
 	log_printf("--------------------------------\n", PD_BLANK, 0);
@@ -1007,7 +1003,7 @@ pd_get_sensor_threshold()
 	req_pkt.data[0] = 0x0e;
 
 	smc_init_smc_msg(&req_pkt, SMC_SENSOR_THRESHOLD_GET,
-		DEFAULT_SEQN,  1);
+	    DEFAULT_SEQN,  1);
 	smc_send_msg(-1, &req_pkt, &rsp_pkt, POLL_TIMEOUT);
 	log_printf("Critical Threshold Information\n", 0);
 	log_printf("------------------------------\n", 0);
@@ -1018,7 +1014,7 @@ pd_get_sensor_threshold()
 		log_printf("High Power-Off Threshold %9s", PD_BLANK, 0);
 		if (rsp_pkt.data[6] & 0x80) {
 			log_printf("-%d\n",
-				(int)((uint8_t)~rsp_pkt.data[6] + 1), 0);
+			    (int)((uint8_t)~rsp_pkt.data[6] + 1), 0);
 		} else {
 			log_printf(" %d\n", rsp_pkt.data[6], 0);
 		}
@@ -1028,7 +1024,7 @@ pd_get_sensor_threshold()
 		log_printf("High Shutdown Threshold %10s", PD_BLANK, 0);
 		if (rsp_pkt.data[5] & 0x80) {
 			log_printf("-%d\n",
-				(int)((uint8_t)~rsp_pkt.data[5] + 1), 0);
+			    (int)((uint8_t)~rsp_pkt.data[5] + 1), 0);
 		} else {
 			log_printf(" %d\n", rsp_pkt.data[5], 0);
 		}
@@ -1039,7 +1035,7 @@ pd_get_sensor_threshold()
 		log_printf("High Warning Threshold %11s", PD_BLANK, 0);
 		if (rsp_pkt.data[4] & 0x80) {
 			log_printf("-%d\n",
-				(int)((uint8_t)~rsp_pkt.data[4] + 1), 0);
+			    (int)((uint8_t)~rsp_pkt.data[4] + 1), 0);
 		} else {
 			log_printf(" %d\n", rsp_pkt.data[4], 0);
 		}
@@ -1049,7 +1045,7 @@ pd_get_sensor_threshold()
 		log_printf("Low Power Off Threshold %10s", PD_BLANK, 0);
 		if (rsp_pkt.data[3] & 0x80) {
 			log_printf("-%d\n",
-				(int)((uint8_t)~rsp_pkt.data[3] + 1), 0);
+			    (int)((uint8_t)~rsp_pkt.data[3] + 1), 0);
 		} else {
 			log_printf(" %d\n", rsp_pkt.data[3], 0);
 		}
@@ -1059,7 +1055,7 @@ pd_get_sensor_threshold()
 		log_printf("Low Shutdown Threshold %11s", PD_BLANK, 0);
 		if (rsp_pkt.data[2] & 0x80) {
 			log_printf("-%d\n",
-				(int)((uint8_t)~rsp_pkt.data[2] + 1), 0);
+			    (int)((uint8_t)~rsp_pkt.data[2] + 1), 0);
 		} else {
 			log_printf(" %d\n", rsp_pkt.data[2], 0);
 		}
@@ -1069,7 +1065,7 @@ pd_get_sensor_threshold()
 		log_printf("Low Warning Threshold %12s", PD_BLANK, 0);
 		if (rsp_pkt.data[1] & 0x80) {
 			log_printf("-%d\n",
-				(int)((uint8_t)~rsp_pkt.data[1] + 1), 0);
+			    (int)((uint8_t)~rsp_pkt.data[1] + 1), 0);
 		} else {
 			log_printf(" %d\n", rsp_pkt.data[1], 0);
 		}
@@ -1091,7 +1087,7 @@ pd_prt_cpci_condition(picl_nodehdl_t nodeh)
 
 
 	if (picl_get_prop_by_name(nodeh, PICL_PROP_CONDITION,
-		    &proph) != PICL_SUCCESS) {
+	    &proph) != PICL_SUCCESS) {
 		return (PD_FAILURE);
 	}
 
@@ -1105,7 +1101,7 @@ pd_prt_cpci_condition(picl_nodehdl_t nodeh)
 	}
 
 	if (picl_get_propval(proph, (void *)valbuf,
-		    propinfo.size) != PICL_SUCCESS) {
+	    propinfo.size) != PICL_SUCCESS) {
 		free(valbuf);
 		return (PD_FAILURE);
 	}

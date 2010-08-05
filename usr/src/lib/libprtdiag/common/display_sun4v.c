@@ -143,7 +143,7 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int log,
 		(void) uname(&uts_buf);
 
 		log_printf(dgettext(TEXT_DOMAIN, "System Configuration:  "
-		    "Sun Microsystems  %s %s\n"), uts_buf.machine,
+		    "Oracle Corporation  %s %s\n"), uts_buf.machine,
 		    get_prop_val(find_prop(root, "banner-name")), 0);
 
 		/* display system clock frequency */
