@@ -1032,6 +1032,7 @@ extern int tcp_accept(int, unsigned int *);
 extern int tcp_get_peer(int, unsigned int *, int *);
 
 extern char *gethostaddr(void);
+extern char *get_default_nic_addr(void);
 extern int tlm_init(void);
 
 extern int snapshot_create(char *, char *, boolean_t, boolean_t);

@@ -49,6 +49,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <libinetutil.h>
 #include "ndmpd.h"
 #include "ndmpd_common.h"
 
@@ -1502,6 +1503,32 @@ gethostaddr(void)
 	(void) memcpy(&in.s_addr, p, sizeof (in.s_addr));
 	return (inet_ntoa(in));
 }
+
+
+/*
+ * get_default_nic_addr
+ *
+ * Get the IP address of the default NIC
+ */
+char *
+get_default_nic_addr(void)
+{
+	struct ifaddrlist *al = NULL;
+	char errmsg[ERRBUFSIZE];
+	struct in_addr addr;
+	int nifs;
+
+	nifs = ifaddrlist(&al, AF_INET, LIFC_EXTERNAL_SOURCE, errmsg);
+	if (nifs <= 0)
+		return (NULL);
+
+	/* pick the first interface's address */
+	addr = al[0].addr.addr;
+	free(al);
+
+	return (inet_ntoa(IN_ADDR(addr.s_addr)));
+}
+
 
 /*
  * ndmpd_audit_backup

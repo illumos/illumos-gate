@@ -1254,9 +1254,9 @@ restore_file(int *fp,
 			write_size = min(size, actual_size);
 			if (want_this_file) {
 				write_size = write(*fp, rec, write_size);
+				NS_ADD(wdisk, write_size);
+				NS_INC(wfile);
 			}
-			NS_ADD(wdisk, write_size);
-			NS_INC(wfile);
 			size -= write_size;
 		}
 	}

@@ -288,6 +288,7 @@ snapshot_destroy(char *volname, char *jname, boolean_t recursive,
 	char snapname[ZFS_MAXNAMELEN];
 	zfs_handle_t *zhp;
 	zfs_type_t ztype;
+	char *namep;
 	int err;
 
 	if (zfs_err)
@@ -298,25 +299,27 @@ snapshot_destroy(char *volname, char *jname, boolean_t recursive,
 
 	if (recursive) {
 		ztype = ZFS_TYPE_VOLUME | ZFS_TYPE_FILESYSTEM;
+		namep = volname;
 	} else {
 		(void) snprintf(snapname, ZFS_MAXNAMELEN, "%s@%s", volname,
 		    jname);
+		namep = snapname;
 		ztype = ZFS_TYPE_SNAPSHOT;
 	}
 
 	(void) mutex_lock(&zlib_mtx);
 	if (hold &&
-	    snapshot_release(volname, snapname, jname, recursive) != 0) {
+	    snapshot_release(volname, namep, jname, recursive) != 0) {
 		NDMP_LOG(LOG_DEBUG,
 		    "snapshot_destroy: %s release failed (err=%d): %s",
-		    snapname, errno, libzfs_error_description(zlibh));
+		    namep, errno, libzfs_error_description(zlibh));
 		(void) mutex_unlock(&zlib_mtx);
 		return (-1);
 	}
 
-	if ((zhp = zfs_open(zlibh, snapname, ztype)) == NULL) {
+	if ((zhp = zfs_open(zlibh, namep, ztype)) == NULL) {
 		NDMP_LOG(LOG_DEBUG, "snapshot_destroy: open %s failed",
-		    snapname);
+		    namep);
 		(void) mutex_unlock(&zlib_mtx);
 		return (-1);
 	}
@@ -329,7 +332,7 @@ snapshot_destroy(char *volname, char *jname, boolean_t recursive,
 
 	if (err) {
 		NDMP_LOG(LOG_ERR, "%s (recursive destroy: %d): %d; %s; %s",
-		    snapname,
+		    namep,
 		    recursive,
 		    libzfs_errno(zlibh),
 		    libzfs_error_action(zlibh),
