@@ -214,39 +214,6 @@ uint_t ibd_log_sz = 0x20000;
 #define	IBD_OP_ROUTERED			4
 
 /*
- * State of IBD driver initialization during attach/m_start
- */
-#define	IBD_DRV_STATE_INITIALIZED	0x000001
-#define	IBD_DRV_RXINTR_ADDED		0x000002
-#define	IBD_DRV_TXINTR_ADDED		0x000004
-#define	IBD_DRV_IBTL_ATTACH_DONE	0x000008
-#define	IBD_DRV_HCA_OPENED		0x000010
-#define	IBD_DRV_PD_ALLOCD		0x000020
-#define	IBD_DRV_MAC_REGISTERED		0x000040
-#define	IBD_DRV_PORT_DETAILS_OBTAINED	0x000080
-#define	IBD_DRV_BCAST_GROUP_FOUND	0x000100
-#define	IBD_DRV_ACACHE_INITIALIZED	0x000200
-#define	IBD_DRV_CQS_ALLOCD		0x000400
-#define	IBD_DRV_UD_CHANNEL_SETUP	0x000800
-#define	IBD_DRV_TXLIST_ALLOCD		0x001000
-#define	IBD_DRV_SCQ_NOTIFY_ENABLED	0x002000
-#define	IBD_DRV_RXLIST_ALLOCD		0x004000
-#define	IBD_DRV_BCAST_GROUP_JOINED	0x008000
-#define	IBD_DRV_ASYNC_THR_CREATED	0x010000
-#define	IBD_DRV_RCQ_NOTIFY_ENABLED	0x020000
-#define	IBD_DRV_SM_NOTICES_REGISTERED	0x040000
-#define	IBD_DRV_STARTED			0x080000
-#define	IBD_DRV_RC_SRQ_ALLOCD		0x100000
-#define	IBD_DRV_RC_LARGEBUF_ALLOCD	0x200000
-#define	IBD_DRV_RC_LISTEN		0x400000
-#ifdef DEBUG
-#define	IBD_DRV_RC_PRIVATE_STATE	0x800000
-#endif
-#define	IBD_DRV_IN_DELETION		0x1000000
-#define	IBD_DRV_IN_LATE_HCA_INIT 	0x2000000
-#define	IBD_DRV_REQ_LIST_INITED 	0x4000000
-
-/*
  * Start/stop in-progress flags; note that restart must always remain
  * the OR of start and stop flag values.
  */
@@ -292,6 +259,8 @@ ibd_global_state_t ibd_gstate;
  */
 ibd_state_t	*ibd_objlist_head = NULL;
 kmutex_t	ibd_objlist_lock;
+
+int ibd_rc_conn_timeout = 60 * 10;	/* 10 minutes */
 
 /*
  * Logging
@@ -769,6 +738,14 @@ _NOTE(SCHEME_PROTECTS_DATA("atomic or dl mutex or single thr",
 _NOTE(SCHEME_PROTECTS_DATA("atomic or dl mutex or single thr",
     ibd_state_t::id_rx_list.dl_cnt))
 
+/*
+ * rc_timeout_lock
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::rc_timeout_lock,
+    ibd_state_t::rc_timeout_start))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::rc_timeout_lock,
+    ibd_state_t::rc_timeout))
+
 
 /*
  * Items protected by atomic updates
@@ -793,7 +770,8 @@ _NOTE(SCHEME_PROTECTS_DATA("atomic update only",
     ibd_state_s::rc_xmt_small_pkt
     ibd_state_s::rc_xmt_fragmented_pkt
     ibd_state_s::rc_xmt_map_fail_pkt
-    ibd_state_s::rc_xmt_map_succ_pkt))
+    ibd_state_s::rc_xmt_map_succ_pkt
+    ibd_rc_chan_s::rcq_invoking))
 
 /*
  * Non-mutex protection schemes for data elements. Almost all of
@@ -865,8 +843,6 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared or single-threaded",
     ibd_rc_chan_s::rcq_size
     ibd_rc_chan_s::scq_hdl
     ibd_rc_chan_s::scq_size
-    ibd_rc_chan_s::requester_gid
-    ibd_rc_chan_s::requester_pkey
     ibd_rc_chan_s::rx_bufs
     ibd_rc_chan_s::rx_mr_hdl
     ibd_rc_chan_s::rx_rwqes
@@ -874,7 +850,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared or single-threaded",
     ibd_rc_chan_s::tx_mr_bufs
     ibd_rc_chan_s::tx_mr_hdl
     ibd_rc_chan_s::tx_rel_list.dl_cnt
-    ibd_rc_chan_s::tx_trans_error_cnt
+    ibd_rc_chan_s::is_used
     ibd_rc_tx_largebuf_s::lb_buf
     ibd_rc_msg_hello_s
     ibt_cm_return_args_s))
@@ -933,7 +909,6 @@ _NOTE(SCHEME_PROTECTS_DATA("atomic or dl mutex or single thr",
  */
 _NOTE(SCHEME_PROTECTS_DATA("counters for problem diagnosis",
     ibd_state_s::rc_rcv_alloc_fail
-    ibd_state_s::rc_rcq_invoke
     ibd_state_s::rc_rcq_err
     ibd_state_s::rc_ace_not_found
     ibd_state_s::rc_xmt_drop_too_long_pkt
@@ -945,7 +920,6 @@ _NOTE(SCHEME_PROTECTS_DATA("counters for problem diagnosis",
     ibd_state_s::rc_xmt_buf_mac_update
     ibd_state_s::rc_scq_no_swqe
     ibd_state_s::rc_scq_no_largebuf
-    ibd_state_s::rc_scq_invoke
     ibd_state_s::rc_conn_succ
     ibd_state_s::rc_conn_fail
     ibd_state_s::rc_null_conn
@@ -954,7 +928,12 @@ _NOTE(SCHEME_PROTECTS_DATA("counters for problem diagnosis",
     ibd_state_s::rc_pas_close
     ibd_state_s::rc_delay_ace_recycle
     ibd_state_s::rc_act_close_simultaneous
-    ibd_state_s::rc_reset_cnt))
+    ibd_state_s::rc_act_close_not_clean
+    ibd_state_s::rc_pas_close_rcq_invoking
+    ibd_state_s::rc_reset_cnt
+    ibd_state_s::rc_timeout_act
+    ibd_state_s::rc_timeout_pas
+    ibd_state_s::rc_stop_connect))
 
 #ifdef DEBUG
 /*
@@ -968,9 +947,7 @@ _NOTE(SCHEME_PROTECTS_DATA("counters for problem diagnosis",
     ibd_rc_stat_s::rc_rcv_copy_byte
     ibd_rc_stat_s::rc_rcv_copy_pkt
     ibd_rc_stat_s::rc_rcv_alloc_fail
-    ibd_rc_stat_s::rc_rcq_invoke
     ibd_rc_stat_s::rc_rcq_err 
-    ibd_rc_stat_s::rc_scq_invoke
     ibd_rc_stat_s::rc_rwqe_short
     ibd_rc_stat_s::rc_xmt_bytes
     ibd_rc_stat_s::rc_xmt_small_pkt
@@ -992,7 +969,9 @@ _NOTE(SCHEME_PROTECTS_DATA("counters for problem diagnosis",
     ibd_rc_stat_s::rc_pas_close
     ibd_rc_stat_s::rc_delay_ace_recycle
     ibd_rc_stat_s::rc_act_close_simultaneous
-    ibd_rc_stat_s::rc_reset_cnt))
+    ibd_rc_stat_s::rc_reset_cnt
+    ibd_rc_stat_s::rc_timeout_act
+    ibd_rc_stat_s::rc_timeout_pas))
 #endif
 
 int
@@ -1296,6 +1275,10 @@ ibd_async_work(ibd_state_t *state)
 				case IBD_ASYNC_RC_RECYCLE_ACE:
 					ibd_async_rc_recycle_ace(state, ptr);
 					break;
+				case IBD_ASYNC_RC_CLOSE_PAS_CHAN:
+					(void) ibd_rc_pas_close(ptr->rq_ptr,
+					    B_TRUE, B_TRUE);
+					break;
 			}
 free_req_and_continue:
 			if (ptr != NULL)
@@ -1546,8 +1529,8 @@ ibd_acache_lookup(ibd_state_t *state, ipoib_mac_t *mac, int *err, int numwqe)
 			 * for it.
 			 */
 			bcopy(mac, &(req->rq_mac), IPOIB_ADDRL);
-			ibd_queue_work_slot(state, req, IBD_ASYNC_GETAH);
 			state->id_ah_op = IBD_OP_ONGOING;
+			ibd_queue_work_slot(state, req, IBD_ASYNC_GETAH);
 			bcopy(mac, &state->id_ah_addr, IPOIB_ADDRL);
 		}
 	} else if ((state->id_ah_op != IBD_OP_ONGOING) &&
@@ -2556,6 +2539,15 @@ ibd_part_busy(ibd_state_t *state)
 		return (DDI_FAILURE);
 	}
 
+	/*
+	 * "state->id_ah_op == IBD_OP_ONGOING" means this IPoIB port is
+	 * connecting to a remote IPoIB port. We can't remove this port.
+	 */
+	if (state->id_ah_op == IBD_OP_ONGOING) {
+		DPRINT(10, "ibd_part_busy: failed: connecting\n");
+		return (DDI_FAILURE);
+	}
+
 	return (DDI_SUCCESS);
 }
 
@@ -2890,6 +2882,7 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	mutex_init(&state->rc_srq_free_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&state->rc_pass_chan_list.chan_list_mutex, NULL,
 	    MUTEX_DRIVER, NULL);
+	mutex_init(&state->rc_timeout_lock, NULL, MUTEX_DRIVER, NULL);
 
 	/*
 	 * Make the default link mode as RC. If this fails during connection
@@ -2954,6 +2947,7 @@ ibd_state_fini(ibd_state_t *state)
 	mutex_destroy(&state->id_link_mutex);
 
 	/* For Reliable Connected Mode */
+	mutex_destroy(&state->rc_timeout_lock);
 	mutex_destroy(&state->rc_srq_free_list.dl_mutex);
 	mutex_destroy(&state->rc_srq_rwqe_list.dl_mutex);
 	mutex_destroy(&state->rc_pass_chan_list.chan_list_mutex);
@@ -5514,6 +5508,7 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 	ib_gid_t mgid;
 	ibd_mce_t *mce;
 	uint8_t jstate;
+	timeout_id_t tid;
 
 	if (atomic_dec_32_nv(&state->id_running) != 0)
 		cmn_err(CE_WARN, "ibd_undo_start: id_running was not 1\n");
@@ -5554,7 +5549,37 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 		state->id_mac_state &= (~IBD_DRV_RC_LISTEN);
 	}
 
+	/* Stop timeout routine */
+	if (progress & IBD_DRV_RC_TIMEOUT) {
+		ASSERT(state->id_enable_rc);
+		mutex_enter(&state->rc_timeout_lock);
+		state->rc_timeout_start = B_FALSE;
+		tid = state->rc_timeout;
+		state->rc_timeout = 0;
+		mutex_exit(&state->rc_timeout_lock);
+		if (tid != 0)
+			(void) untimeout(tid);
+		state->id_mac_state &= (~IBD_DRV_RC_TIMEOUT);
+	}
+
 	if ((state->id_enable_rc) && (progress & IBD_DRV_ACACHE_INITIALIZED)) {
+		attempts = 100;
+		while (state->id_ah_op == IBD_OP_ONGOING) {
+			/*
+			 * "state->id_ah_op == IBD_OP_ONGOING" means this IPoIB
+			 * port is connecting to a remote IPoIB port. Wait for
+			 * the end of this connecting operation.
+			 */
+			delay(drv_usectohz(100000));
+			if (--attempts == 0) {
+				state->rc_stop_connect++;
+				DPRINT(40, "ibd_undo_start: connecting");
+				break;
+			}
+		}
+		mutex_enter(&state->id_sched_lock);
+		state->id_sched_needed = 0;
+		mutex_exit(&state->id_sched_lock);
 		(void) ibd_rc_close_all_chan(state);
 	}
 
@@ -5594,11 +5619,29 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 	if (progress & IBD_DRV_RC_SRQ_ALLOCD) {
 		ASSERT(state->id_enable_rc);
 		if (state->rc_srq_rwqe_list.dl_bufs_outstanding == 0) {
-			ibd_rc_fini_srq_list(state);
-			state->id_mac_state &= (~IBD_DRV_RC_SRQ_ALLOCD);
+			if (state->id_ah_op == IBD_OP_ONGOING) {
+				delay(drv_usectohz(10000));
+				if (state->id_ah_op == IBD_OP_ONGOING) {
+					/*
+					 * "state->id_ah_op == IBD_OP_ONGOING"
+					 * means this IPoIB port is connecting
+					 * to a remote IPoIB port. We can't
+					 * delete SRQ here.
+					 */
+					state->rc_stop_connect++;
+					DPRINT(40, "ibd_undo_start: "
+					    "connecting");
+				} else {
+					ibd_rc_fini_srq_list(state);
+					state->id_mac_state &=
+					    (~IBD_DRV_RC_SRQ_ALLOCD);
+				}
+			} else {
+				ibd_rc_fini_srq_list(state);
+				state->id_mac_state &= (~IBD_DRV_RC_SRQ_ALLOCD);
+			}
 		} else {
-			cmn_err(CE_CONT, "ibd_undo_start: srq bufs "
-			    "outstanding\n");
+			DPRINT(40, "ibd_undo_start: srq bufs outstanding\n");
 		}
 	}
 
@@ -5632,9 +5675,9 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 		 * Give some time for the TX CQ handler to process the
 		 * completions.
 		 */
+		attempts = 10;
 		mutex_enter(&state->id_tx_list.dl_mutex);
 		mutex_enter(&state->id_tx_rel_list.dl_mutex);
-		attempts = 10;
 		while (state->id_tx_list.dl_cnt + state->id_tx_rel_list.dl_cnt
 		    != state->id_ud_num_swqe) {
 			if (--attempts == 0)
@@ -6070,6 +6113,16 @@ late_hca_init_return:
 	mac_link_update(state->id_mh, state->id_link_state);
 	state->id_mac_state &= ~IBD_DRV_IN_LATE_HCA_INIT;
 	state->id_mac_state |= IBD_DRV_STARTED;
+
+	/* Start timer after everything is ready */
+	if (state->id_enable_rc) {
+		mutex_enter(&state->rc_timeout_lock);
+		state->rc_timeout_start = B_TRUE;
+		state->rc_timeout = timeout(ibd_rc_conn_timeout_call, state,
+		    SEC_TO_TICK(ibd_rc_conn_timeout));
+		mutex_exit(&state->rc_timeout_lock);
+		state->id_mac_state |= IBD_DRV_RC_TIMEOUT;
+	}
 
 	return (DDI_SUCCESS);
 
@@ -6917,6 +6970,7 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 			if (ace->ac_chan->chan_state ==
 			    IBD_RC_STATE_ACT_ESTAB) {
 				rc_chan = ace->ac_chan;
+				rc_chan->is_used = B_TRUE;
 				mutex_enter(&rc_chan->tx_wqe_list.dl_mutex);
 				node = WQE_TO_SWQE(
 				    rc_chan->tx_wqe_list.dl_head);
