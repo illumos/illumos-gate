@@ -6450,6 +6450,10 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		}
 
 		mutex_enter(&mpt->m_mutex);
+		if (mptsas_set_led_status(mpt, ptgt, 0) != DDI_SUCCESS) {
+			NDBG14(("mptsas: clear LED for tgt %x failed",
+			    ptgt->m_slot_num));
+		}
 		if (rval == DDI_SUCCESS) {
 			mptsas_tgt_free(&mpt->m_active->m_tgttbl,
 			    ptgt->m_sas_wwn, ptgt->m_phymask);
@@ -16078,6 +16082,12 @@ static int mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
 
 	bzero(&req, sizeof (req));
 	bzero(&rep, sizeof (rep));
+
+	/* Do nothing for RAID volumes */
+	if (ptgt->m_phymask == 0) {
+		NDBG14(("mptsas_send_sep: Skip RAID volumes"));
+		return (DDI_FAILURE);
+	}
 
 	req.Function = MPI2_FUNCTION_SCSI_ENCLOSURE_PROCESSOR;
 	req.Action = act;
