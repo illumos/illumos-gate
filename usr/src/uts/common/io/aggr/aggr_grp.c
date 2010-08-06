@@ -2871,6 +2871,8 @@ aggr_mtu_range_intersection(mac_propval_range_t **mrange, int mcount,
 	*prval = rval;
 	*prmaxcnt = rmaxcnt;
 	*prcount = rcount;
+
+	kmem_free(ta, 2 * rmaxcnt * sizeof (rboundary_t));
 }
 
 /*
