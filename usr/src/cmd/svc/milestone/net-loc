@@ -667,10 +667,11 @@ if [ $? -eq 1 -a -f "$SCRIPT_PATH/create_loc_legacy" ]; then
 	# may not have a writable filesystem in net-nwam.  So here we move the
 	# components and rewrite the script to point at the writable filesystem.
 	#
-	$CP -r $SCRIPT_PATH/Legacy $LEGACY_LOC_PATH
+	$CP -r $SCRIPT_PATH/Legacy /etc/nwam/loc
 	$MV $SCRIPT_PATH/create_loc_legacy $SCRIPT_PATH/vcreate_loc_legacy
-	$SED -e's,/etc/svc/volatile/nwam/Legacy,/etc/nwam/loc/Legacy,' \
+	$SED -e's,$SCRIPT_PATH/Legacy,$LEGACY_LOC_PATH,' \
 	    $SCRIPT_PATH/vcreate_loc_legacy >$SCRIPT_PATH/create_loc_legacy
+	$RM -f $SCRIPT_PATH/vcreate_loc_legacy
 	$NWAMCFG -f $SCRIPT_PATH/create_loc_legacy
 	loc_ver=`$SVCPROP -c -p location_upgrade/version $LOCATION_FMRI \
 	    2>/dev/null`

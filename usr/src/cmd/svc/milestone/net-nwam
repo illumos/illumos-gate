@@ -65,30 +65,33 @@ SVCPROP=/usr/bin/svcprop
 # Path to directories
 # We don't have a writable file system so we write to /etc/svc/volatile and
 # then later copy anything interesting to /etc/nwam.
-LEGACY_PATH=/etc/svc/volatile/nwam/Legacy
+VOL_NWAM_PATH=/etc/svc/volatile/nwam
+VOL_LEGACY_PATH=$VOL_NWAM_PATH/Legacy
+PERM_LEGACY_PATH=/etc/nwam/loc/Legacy
 NIS_BIND_PATH=/var/yp/binding
 
 #
 # copy_to_legacy_loc <file>
 #
 # Copies the file to the Legacy location directory
+# (in /etc/svc/volatile/nwam/Legacy)
 #
 copy_to_legacy_loc() {
-	$MKDIR -p $LEGACY_PATH
+	$MKDIR -p $VOL_LEGACY_PATH
 	if [ -f "$1" ]; then
-		$CP -p $1 $LEGACY_PATH
+		$CP -p $1 $VOL_LEGACY_PATH
 	fi
 }
 
 #
 # copy_from_legacy_loc <destination file>
 #
-# Copies file with the same name from Legacy location to the given
-# destination file
+# Copies file with the same name from Legacy location
+# (in /etc/nwam/loc/Legacy) to the given destination file
 #
 copy_from_legacy_loc () {
 	DEST_DIR=`/usr/bin/dirname $1`
-	SRC_FILE="$LEGACY_PATH/`$BASENAME $1`"
+	SRC_FILE="$PERM_LEGACY_PATH/`$BASENAME $1`"
 
 	# Make destination directory if needed
 	if [ ! -d "$DEST_DIR" ]; then
@@ -133,7 +136,7 @@ get_smf_prop () {
 # Creates Legacy location from the current configuration
 #
 create_legacy_loc () {
-	CREATE_LOC_LEGACY_FILE=/etc/svc/volatile/nwam/create_loc_legacy
+	CREATE_LOC_LEGACY_FILE=$VOL_NWAM_PATH/create_loc_legacy
 
 	#
 	# Write nwamcfg commands to create Legacy location to
@@ -159,7 +162,7 @@ create_legacy_loc () {
 
 	# Copy /etc/nsswitch.conf file
 	copy_to_legacy_loc /etc/nsswitch.conf
-	NAMESERVICES_CONFIG_FILE="$LEGACY_PATH/nsswitch.conf"
+	NAMESERVICES_CONFIG_FILE="$VOL_LEGACY_PATH/nsswitch.conf"
 	
 	# Gather DNS info from resolv.conf if present.
 	if [ -f /etc/resolv.conf ]; then
@@ -341,7 +344,7 @@ revert_to_legacy_loc () {
 	copy_from_legacy_loc /etc/nsswitch.conf
 
 	# DNS - copy resolv.conf to /etc/resolv.conf
-	if [ -f "$LEGACY_PATH/resolv.conf" ]; then
+	if [ -f "$PERM_LEGACY_PATH/resolv.conf" ]; then
 		copy_from_legacy_loc /etc/resolv.conf
 	        $SVCADM enable dns/client
 	fi
@@ -369,7 +372,7 @@ revert_to_legacy_loc () {
 	fi
 
 	# LDAP - copy ldap_client_file to /var/ldap/ldap_client_file
-	if [ -f "$LEGACY_PATH/ldap_client_file" ]; then
+	if [ -f "$PERM_LEGACY_PATH/ldap_client_file" ]; then
 		copy_from_legacy_loc /var/ldap/ldap_client_file
 		$SVCADM enable ldap/client
 	fi
@@ -457,8 +460,10 @@ revert_to_legacy_loc () {
 		$SVCADM disable $IPFILTER_FMRI
 	fi
 
-	# Remove the Legacy directory and location
-	$RM -rf $LEGACY_PATH
+	# Remove the Legacy directories, script and location
+	$RM -rf $VOL_LEGACY_PATH
+	$RM -rf $PERM_LEGACY_PATH
+	$RM -f $VOL_NWAM_PATH/create_loc_legacy
 	$NWAMCFG destroy loc Legacy
 }
 
@@ -472,8 +477,8 @@ revert_to_legacy_loc () {
 #
 # Create nwam directory in /etc/svc/volatile
 #
-if [ ! -d /etc/svc/volatile/nwam ]; then
-	$MKDIR -m 0755 /etc/svc/volatile/nwam
+if [ ! -d $VOL_NWAM_PATH ]; then
+	$MKDIR -m 0755 $VOL_NWAM_PATH
 fi
 
 case "$1" in
@@ -493,9 +498,9 @@ case "$1" in
 	# create a dummy background process to preserve contract lifetime.
 	smf_configure_ip
 	if [ $? = "1" ] ; then 
-		$RM -f /etc/svc/volatile/nwam/nwam_blocked
-		$MKFIFO /etc/svc/volatile/nwam/nwam_blocked
-		($CAT </etc/svc/volatile/nwam/nwam_blocked >/dev/null) &
+		$RM -f $VOL_NWAM_PATH/nwam_blocked
+		$MKFIFO $VOL_NWAM_PATH/nwam_blocked
+		($CAT <$VOL_NWAM_PATH/nwam_blocked >/dev/null) &
 		exit $SMF_EXIT_OK
 	fi
 
@@ -575,7 +580,7 @@ case "$1" in
 	# We need to make the dummy process we created above stop.
 	smf_configure_ip
 	if [ $? = "1" ] ; then 
-		echo "stop" > /etc/svc/volatile/nwam/nwam_blocked
+		echo "stop" > $VOL_NWAM_PATH/nwam_blocked
 		exit $SMF_EXIT_OK
 	fi
 
