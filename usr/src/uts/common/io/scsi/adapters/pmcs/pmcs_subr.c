@@ -3977,6 +3977,8 @@ pmcs_check_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 				ctmp->atdt = local->atdt;
 				ctmp->link_rate = local->link_rate;
 				ctmp->pend_dtype = local->dtype;
+				ctmp->att_port_pm_tmp = local->att_port_pm_tmp;
+				ctmp->tgt_port_pm_tmp = local->tgt_port_pm_tmp;
 			}
 		}
 

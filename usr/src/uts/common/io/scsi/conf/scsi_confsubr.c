@@ -1024,6 +1024,7 @@ int
 scsi_probe(struct scsi_device *sd, int (*callback)())
 {
 	int			ret, retry = 0;
+	int			lr_cap, sr_ret;
 	scsi_hba_tran_t		*tran = sd->sd_address.a_hba_tran;
 
 	if (scsi_check_ss2_LUN_limit(sd) != 0) {
@@ -1034,6 +1035,7 @@ scsi_probe(struct scsi_device *sd, int (*callback)())
 		return (SCSIPROBE_NORESP);	/* skip probing this one */
 	}
 again:
+	ret = lr_cap = sr_ret = -1;
 	if (tran->tran_tgt_probe != NULL) {
 		ret = (*tran->tran_tgt_probe)(sd, callback);
 	} else {
@@ -1041,8 +1043,11 @@ again:
 	}
 
 	if ((ret != SCSIPROBE_EXISTS) && (retry == 0)) {
-		if (scsi_reset(&sd->sd_address, RESET_LUN) != 1) {
-			cmn_err(CE_WARN, "scsi_probe: scsi_reset failed");
+		lr_cap = (*tran->tran_getcap)(&sd->sd_address, "lun-reset", 1);
+		sr_ret = scsi_reset(&sd->sd_address, RESET_LUN);
+		if ((sr_ret != 1) && (lr_cap == 1)) {
+			cmn_err(CE_WARN, "scsi_probe(%d): scsi_reset failed(%d)"
+			    " lun-reset cap(%d)", ret, sr_ret, lr_cap);
 		}
 		retry = 1;
 		goto again;
