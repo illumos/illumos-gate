@@ -111,9 +111,6 @@ extern int	apic_panic_on_apic_error;
 
 extern int	apic_verbose;
 
-/* minimum number of timer ticks to program to */
-extern int apic_min_timer_ticks;
-
 #ifdef DEBUG
 extern int	apic_debug;
 extern int	apic_restrict_vector;
@@ -180,9 +177,7 @@ extern void	apic_unset_idlecpu(processorid_t cpun);
 extern void	apic_shutdown(int cmd, int fcn);
 extern void	apic_preshutdown(int cmd, int fcn);
 extern processorid_t	apic_get_next_processorid(processorid_t cpun);
-extern void	apic_timer_reprogram(hrtime_t time);
-extern void	apic_timer_enable(void);
-extern void	apic_timer_disable(void);
+extern uint_t	apic_calibrate(volatile uint32_t *, uint16_t *);
 
 extern int apic_error_intr();
 extern void apic_cpcovf_mask_clear(void);

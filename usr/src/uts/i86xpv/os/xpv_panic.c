@@ -18,10 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -37,6 +35,7 @@
 #include <sys/frame.h>
 #include <sys/kobj.h>
 #include <sys/apic.h>
+#include <sys/apic_timer.h>
 #include <sys/dumphdr.h>
 #include <sys/mem.h>
 #include <sys/x86_archext.h>
@@ -584,7 +583,7 @@ xpv_apic_clkinit()
 	 * one timeout interval.  Program the timer to send us an interrupt
 	 * every time that interval expires.
 	 */
-	xpv_apicadr[APIC_LOCAL_TIMER] = T_XPV_TIMER | AV_TIME;
+	xpv_apicadr[APIC_LOCAL_TIMER] = T_XPV_TIMER | AV_PERIODIC;
 	xpv_apicadr[APIC_INIT_COUNT] = apic_ticks;
 	xpv_apicadr[APIC_EOI_REG] = 0;
 }

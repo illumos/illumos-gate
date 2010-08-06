@@ -22,6 +22,11 @@
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
+
 #ifndef _SYS_APIC_APIC_H
 #define	_SYS_APIC_APIC_H
 
@@ -73,9 +78,6 @@ extern "C" {
 /* Interrupt Command registers */
 #define	APIC_INT_CMD1		0xc0
 #define	APIC_INT_CMD2		0xc4
-
-/* Timer Vector Table register */
-#define	APIC_LOCAL_TIMER	0xc8
 
 /* Local Interrupt Vector registers */
 #define	APIC_CMCI_VECT		0xbc
@@ -343,9 +345,6 @@ struct apic_io_intr {
 #define	AV_SH_ALL_EXCSELF	0xc0000 /* All excluding self */
 /* spurious interrupt vector register					*/
 #define	AV_UNIT_ENABLE	0x100
-
-/* timer vector table							*/
-#define	AV_TIME		0x20000	/* Set timer mode to periodic */
 
 #define	APIC_MAXVAL	0xffffffffUL
 #define	APIC_TIME_MIN	0x5000
@@ -665,19 +664,6 @@ typedef struct {
 #define	PSMGI_INTRBY_DEFAULT	0x4000	/* PSM specific default value */
 #define	PSMGI_INTRBY_FLAGS	0xc000	/* Mask for this flag */
 
-/*
- * Use scaled-fixed-point arithmetic to calculate apic ticks.
- * Round when dividing (by adding half of divisor to dividend)
- * for one extra bit of precision.
- */
-
-#define	SF	(1ULL<<20)		/* Scaling Factor: scale by 2^20 */
-#define	APIC_TICKS_TO_NSECS(ticks)	((((int64_t)(ticks) * SF) + \
-					apic_ticks_per_SFnsecs / 2) / \
-					apic_ticks_per_SFnsecs);
-#define	APIC_NSECS_TO_TICKS(nsecs)	(((int64_t)(nsecs) * \
-					apic_ticks_per_SFnsecs + (SF/2)) / SF)
-
 extern int	apic_verbose;
 
 /* Flag definitions for apic_verbose */
@@ -839,6 +825,7 @@ extern int apic_local_mode();
 extern void apic_change_eoi();
 extern void apic_send_EOI(uint32_t);
 extern void apic_send_directed_EOI(uint32_t);
+extern uint_t apic_calibrate(volatile uint32_t *, uint16_t *);
 
 extern volatile uint32_t *apicadr;	/* virtual addr of local APIC   */
 extern int apic_forceload;

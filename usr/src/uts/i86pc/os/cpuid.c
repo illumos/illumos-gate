@@ -22,7 +22,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
 /*
@@ -4332,6 +4332,38 @@ cpuid_iepb_supported(struct cpu *cp)
 	regs.cp_eax = 0x6;
 	(void) cpuid_insn(NULL, &regs);
 	return (regs.cp_ecx & CPUID_EPB_SUPPORT);
+}
+
+/*
+ * Check support for TSC deadline timer
+ *
+ * TSC deadline timer provides a superior software programming
+ * model over local APIC timer that eliminates "time drifts".
+ * Instead of specifying a relative time, software specifies an
+ * absolute time as the target at which the processor should
+ * generate a timer event.
+ */
+int
+cpuid_deadline_tsc_supported(void)
+{
+	struct cpuid_info *cpi = CPU->cpu_m.mcpu_cpi;
+	struct cpuid_regs regs;
+
+	ASSERT(cpuid_checkpass(CPU, 1));
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
+
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
+		if (cpi->cpi_maxeax >= 1) {
+			regs.cp_eax = 1;
+			(void) cpuid_insn(NULL, &regs);
+			return (regs.cp_ecx & CPUID_DEADLINE_TSC);
+		} else {
+			return (0);
+		}
+	default:
+		return (0);
+	}
 }
 
 #if defined(__amd64) && !defined(__xpv)

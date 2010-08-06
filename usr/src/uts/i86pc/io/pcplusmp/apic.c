@@ -75,6 +75,7 @@
 #include <sys/reboot.h>
 #include <sys/hpet.h>
 #include <sys/apic_common.h>
+#include <sys/apic_timer.h>
 
 /*
  *	Local Function Prototypes
@@ -86,8 +87,6 @@ static void apic_init_intr(void);
  */
 static int	apic_probe(void);
 static int	apic_getclkirq(int ipl);
-static uint_t	apic_calibrate(volatile uint32_t *addr,
-    uint16_t *pit_ticks_adj);
 static void	apic_init(void);
 static void	apic_picinit(void);
 static int	apic_post_cpu_start(void);

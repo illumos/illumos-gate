@@ -23,6 +23,7 @@
  */
 
 #include "intr_common.h"
+#include <sys/apic_timer.h>
 
 /*
  * Globals

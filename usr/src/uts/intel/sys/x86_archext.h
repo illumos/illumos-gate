@@ -22,7 +22,7 @@
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -381,6 +381,11 @@ extern "C" {
 #define	CPUID_EPB_SUPPORT	(1 << 3)
 
 /*
+ * Intel TSC deadline timer
+ */
+#define	CPUID_DEADLINE_TSC	(1 << 24)
+
+/*
  * x86_type is a legacy concept; this is supplanted
  * for most purposes by x86_featureset; modern CPUs
  * should be X86_TYPE_OTHER
@@ -671,6 +676,7 @@ extern void cpuid_mwait_free(struct cpu *);
 extern int cpuid_deep_cstates_supported(void);
 extern int cpuid_arat_supported(void);
 extern int cpuid_iepb_supported(struct cpu *);
+extern int cpuid_deadline_tsc_supported(void);
 extern int vmware_platform(void);
 #endif
 
