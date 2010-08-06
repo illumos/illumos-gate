@@ -353,6 +353,9 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		if (vd->vdev_offline && !vd->vdev_tmpoffline)
 			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_OFFLINE,
 			    B_TRUE) == 0);
+		if (vd->vdev_resilvering)
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_RESILVERING,
+			    B_TRUE) == 0);
 		if (vd->vdev_faulted)
 			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_FAULTED,
 			    B_TRUE) == 0);

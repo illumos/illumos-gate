@@ -116,6 +116,7 @@ static boolean_t spa_has_active_shared_spare(spa_t *spa);
 static int spa_load_impl(spa_t *spa, uint64_t, nvlist_t *config,
     spa_load_state_t state, spa_import_type_t type, boolean_t mosconfig,
     char **ereport);
+static void spa_vdev_resilver_done(spa_t *spa);
 
 uint_t		zio_taskq_batch_pct = 100;	/* 1 thread per cpu in pset */
 id_t		zio_taskq_psrset_bind = PS_NONE;
@@ -3226,7 +3227,8 @@ spa_import_rootpool(char *devpath, char *devid)
 	    !bvd->vdev_isspare) {
 		cmn_err(CE_NOTE, "The boot device is currently spared. Please "
 		    "try booting from '%s'",
-		    bvd->vdev_parent->vdev_child[1]->vdev_path);
+		    bvd->vdev_parent->
+		    vdev_child[bvd->vdev_parent->vdev_children - 1]->vdev_path);
 		error = EINVAL;
 		goto out;
 	}
@@ -3834,7 +3836,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 		 * spares.
 		 */
 		if (pvd->vdev_ops == &vdev_spare_ops &&
-		    pvd->vdev_child[1] == oldvd &&
+		    oldvd->vdev_isspare &&
 		    !spa_has_spare(spa, newvd->vdev_guid))
 			return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
 
@@ -3846,13 +3848,15 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 		 * the same (spare replaces spare, non-spare replaces
 		 * non-spare).
 		 */
-		if (pvd->vdev_ops == &vdev_replacing_ops)
+		if (pvd->vdev_ops == &vdev_replacing_ops &&
+		    spa_version(spa) < SPA_VERSION_MULTI_REPLACE) {
 			return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
-		else if (pvd->vdev_ops == &vdev_spare_ops &&
-		    newvd->vdev_isspare != oldvd->vdev_isspare)
+		} else if (pvd->vdev_ops == &vdev_spare_ops &&
+		    newvd->vdev_isspare != oldvd->vdev_isspare) {
 			return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
-		else if (pvd->vdev_ops != &vdev_spare_ops &&
-		    newvd->vdev_isspare)
+		}
+
+		if (newvd->vdev_isspare)
 			pvops = &vdev_spare_ops;
 		else
 			pvops = &vdev_replacing_ops;
@@ -3886,6 +3890,9 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 			oldvd->vdev_devid = NULL;
 		}
 	}
+
+	/* mark the device being resilvered */
+	newvd->vdev_resilvering = B_TRUE;
 
 	/*
 	 * If the parent is not a mirror, or if we're replacing, insert the new
@@ -3975,7 +3982,6 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 	vdev_t *vd, *pvd, *cvd, *tvd;
 	boolean_t unspare = B_FALSE;
 	uint64_t unspare_guid;
-	size_t len;
 	char *vdpath;
 
 	txg = spa_vdev_enter(spa);
@@ -4007,18 +4013,11 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 		return (spa_vdev_exit(spa, NULL, txg, EBUSY));
 
 	/*
-	 * If replace_done is specified, only remove this device if it's
-	 * the first child of a replacing vdev.  For the 'spare' vdev, either
-	 * disk can be removed.
+	 * Only 'replacing' or 'spare' vdevs can be replaced.
 	 */
-	if (replace_done) {
-		if (pvd->vdev_ops == &vdev_replacing_ops) {
-			if (vd->vdev_id != 0)
-				return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
-		} else if (pvd->vdev_ops != &vdev_spare_ops) {
-			return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
-		}
-	}
+	if (replace_done && pvd->vdev_ops != &vdev_replacing_ops &&
+	    pvd->vdev_ops != &vdev_spare_ops)
+		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
 
 	ASSERT(pvd->vdev_ops != &vdev_spare_ops ||
 	    spa_version(spa) >= SPA_VERSION_SPARES);
@@ -4045,16 +4044,22 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 	 * check to see if we changed the original vdev's path to have "/old"
 	 * at the end in spa_vdev_attach().  If so, undo that change now.
 	 */
-	if (pvd->vdev_ops == &vdev_replacing_ops && vd->vdev_id == 1 &&
-	    pvd->vdev_child[0]->vdev_path != NULL &&
-	    pvd->vdev_child[1]->vdev_path != NULL) {
-		ASSERT(pvd->vdev_child[1] == vd);
-		cvd = pvd->vdev_child[0];
-		len = strlen(vd->vdev_path);
-		if (strncmp(cvd->vdev_path, vd->vdev_path, len) == 0 &&
-		    strcmp(cvd->vdev_path + len, "/old") == 0) {
-			spa_strfree(cvd->vdev_path);
-			cvd->vdev_path = spa_strdup(vd->vdev_path);
+	if (pvd->vdev_ops == &vdev_replacing_ops && vd->vdev_id > 0 &&
+	    vd->vdev_path != NULL) {
+		size_t len = strlen(vd->vdev_path);
+
+		for (int c = 0; c < pvd->vdev_children; c++) {
+			cvd = pvd->vdev_child[c];
+
+			if (cvd == vd || cvd->vdev_path == NULL)
+				continue;
+
+			if (strncmp(cvd->vdev_path, vd->vdev_path, len) == 0 &&
+			    strcmp(cvd->vdev_path + len, "/old") == 0) {
+				spa_strfree(cvd->vdev_path);
+				cvd->vdev_path = spa_strdup(vd->vdev_path);
+				break;
+			}
 		}
 	}
 
@@ -4064,7 +4069,8 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 	 * active spare list for the pool.
 	 */
 	if (pvd->vdev_ops == &vdev_spare_ops &&
-	    vd->vdev_id == 0 && pvd->vdev_child[1]->vdev_isspare)
+	    vd->vdev_id == 0 &&
+	    pvd->vdev_child[pvd->vdev_children - 1]->vdev_isspare)
 		unspare = B_TRUE;
 
 	/*
@@ -4086,7 +4092,7 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 	/*
 	 * Remember one of the remaining children so we can get tvd below.
 	 */
-	cvd = pvd->vdev_child[0];
+	cvd = pvd->vdev_child[pvd->vdev_children - 1];
 
 	/*
 	 * If we need to remove the remaining child from the list of hot spares,
@@ -4102,14 +4108,20 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 		spa_spare_remove(cvd);
 		unspare_guid = cvd->vdev_guid;
 		(void) spa_vdev_remove(spa, unspare_guid, B_TRUE);
+		cvd->vdev_unspare = B_TRUE;
 	}
 
 	/*
 	 * If the parent mirror/replacing vdev only has one child,
 	 * the parent is no longer needed.  Remove it from the tree.
 	 */
-	if (pvd->vdev_children == 1)
+	if (pvd->vdev_children == 1) {
+		if (pvd->vdev_ops == &vdev_spare_ops)
+			cvd->vdev_unspare = B_FALSE;
 		vdev_remove_parent(cvd);
+		cvd->vdev_resilvering = B_FALSE;
+	}
+
 
 	/*
 	 * We don't set tvd until now because the parent we just removed
@@ -4151,6 +4163,9 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 
 	spa_event_notify(spa, vd, ESC_ZFS_VDEV_REMOVE);
 
+	/* hang on to the spa before we release the lock */
+	spa_open_ref(spa, FTAG);
+
 	error = spa_vdev_exit(spa, vd, txg, 0);
 
 	spa_history_log_internal(LOG_POOL_VDEV_DETACH, spa, NULL,
@@ -4163,23 +4178,30 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 	 * list of every other pool.
 	 */
 	if (unspare) {
-		spa_t *myspa = spa;
-		spa = NULL;
+		spa_t *altspa = NULL;
+
 		mutex_enter(&spa_namespace_lock);
-		while ((spa = spa_next(spa)) != NULL) {
-			if (spa->spa_state != POOL_STATE_ACTIVE)
+		while ((altspa = spa_next(altspa)) != NULL) {
+			if (altspa->spa_state != POOL_STATE_ACTIVE ||
+			    altspa == spa)
 				continue;
-			if (spa == myspa)
-				continue;
-			spa_open_ref(spa, FTAG);
+
+			spa_open_ref(altspa, FTAG);
 			mutex_exit(&spa_namespace_lock);
-			(void) spa_vdev_remove(spa, unspare_guid,
-			    B_TRUE);
+			(void) spa_vdev_remove(altspa, unspare_guid, B_TRUE);
 			mutex_enter(&spa_namespace_lock);
-			spa_close(spa, FTAG);
+			spa_close(altspa, FTAG);
 		}
 		mutex_exit(&spa_namespace_lock);
+
+		/* search the rest of the vdevs for spares to remove */
+		spa_vdev_resilver_done(spa);
 	}
+
+	/* all done with the spa; OK to release */
+	mutex_enter(&spa_namespace_lock);
+	spa_close(spa, FTAG);
+	mutex_exit(&spa_namespace_lock);
 
 	return (error);
 }
@@ -4728,11 +4750,18 @@ spa_vdev_resilver_done_hunt(vdev_t *vd)
 	}
 
 	/*
-	 * Check for a completed replacement.
+	 * Check for a completed replacement.  We always consider the first
+	 * vdev in the list to be the oldest vdev, and the last one to be
+	 * the newest (see spa_vdev_attach() for how that works).  In
+	 * the case where the newest vdev is faulted, we will not automatically
+	 * remove it after a resilver completes.  This is OK as it will require
+	 * user intervention to determine which disk the admin wishes to keep.
 	 */
-	if (vd->vdev_ops == &vdev_replacing_ops && vd->vdev_children == 2) {
+	if (vd->vdev_ops == &vdev_replacing_ops) {
+		ASSERT(vd->vdev_children > 1);
+
+		newvd = vd->vdev_child[vd->vdev_children - 1];
 		oldvd = vd->vdev_child[0];
-		newvd = vd->vdev_child[1];
 
 		if (vdev_dtl_empty(newvd, DTL_MISSING) &&
 		    vdev_dtl_empty(newvd, DTL_OUTAGE) &&
@@ -4743,16 +4772,41 @@ spa_vdev_resilver_done_hunt(vdev_t *vd)
 	/*
 	 * Check for a completed resilver with the 'unspare' flag set.
 	 */
-	if (vd->vdev_ops == &vdev_spare_ops && vd->vdev_children == 2) {
-		newvd = vd->vdev_child[0];
-		oldvd = vd->vdev_child[1];
+	if (vd->vdev_ops == &vdev_spare_ops) {
+		vdev_t *first = vd->vdev_child[0];
+		vdev_t *last = vd->vdev_child[vd->vdev_children - 1];
 
-		if (newvd->vdev_unspare &&
+		if (last->vdev_unspare) {
+			oldvd = first;
+			newvd = last;
+		} else if (first->vdev_unspare) {
+			oldvd = last;
+			newvd = first;
+		} else {
+			oldvd = NULL;
+		}
+
+		if (oldvd != NULL &&
 		    vdev_dtl_empty(newvd, DTL_MISSING) &&
 		    vdev_dtl_empty(newvd, DTL_OUTAGE) &&
-		    !vdev_dtl_required(oldvd)) {
-			newvd->vdev_unspare = 0;
+		    !vdev_dtl_required(oldvd))
 			return (oldvd);
+
+		/*
+		 * If there are more than two spares attached to a disk,
+		 * and those spares are not required, then we want to
+		 * attempt to free them up now so that they can be used
+		 * by other pools.  Once we're back down to a single
+		 * disk+spare, we stop removing them.
+		 */
+		if (vd->vdev_children > 2) {
+			newvd = vd->vdev_child[1];
+
+			if (newvd->vdev_isspare && last->vdev_isspare &&
+			    vdev_dtl_empty(last, DTL_MISSING) &&
+			    vdev_dtl_empty(last, DTL_OUTAGE) &&
+			    !vdev_dtl_required(newvd))
+				return (newvd);
 		}
 	}
 
@@ -4779,9 +4833,9 @@ spa_vdev_resilver_done(spa_t *spa)
 		 * we need to detach the parent's first child (the original hot
 		 * spare) as well.
 		 */
-		if (ppvd->vdev_ops == &vdev_spare_ops && pvd->vdev_id == 0) {
+		if (ppvd->vdev_ops == &vdev_spare_ops && pvd->vdev_id == 0 &&
+		    ppvd->vdev_children == 2) {
 			ASSERT(pvd->vdev_ops == &vdev_replacing_ops);
-			ASSERT(ppvd->vdev_children == 2);
 			sguid = ppvd->vdev_child[1]->vdev_guid;
 		}
 		spa_config_exit(spa, SCL_ALL, FTAG);

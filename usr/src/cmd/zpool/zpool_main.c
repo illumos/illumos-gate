@@ -4014,6 +4014,7 @@ zpool_do_upgrade(int argc, char **argv)
 		    "performance\n"));
 		(void) printf(gettext(" 27  Improved snapshot creation "
 		    "performance\n"));
+		(void) printf(gettext(" 28  Multiple vdev replacements\n"));
 		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases,\n"));
 		(void) printf(gettext("see the ZFS Administration Guide.\n\n"));

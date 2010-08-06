@@ -518,6 +518,9 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE,
 		    &vd->vdev_offline);
 
+		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_RESILVERING,
+		    &vd->vdev_resilvering);
+
 		/*
 		 * When importing a pool, we want to ignore the persistent fault
 		 * state, as the diagnosis made on another system may not be
@@ -1849,6 +1852,9 @@ vdev_dtl_required(vdev_t *vd)
 	vd->vdev_cant_read = cant_read;
 	vdev_dtl_reassess(tvd, 0, 0, B_FALSE);
 
+	if (!required && zio_injection_enabled)
+		required = !!zio_handle_device_injection(vd, NULL, ECHILD);
+
 	return (required);
 }
 
@@ -2940,12 +2946,13 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		vd->vdev_removed = B_TRUE;
 	} else if (state == VDEV_STATE_CANT_OPEN) {
 		/*
-		 * If we fail to open a vdev during an import, we mark it as
-		 * "not available", which signifies that it was never there to
-		 * begin with.  Failure to open such a device is not considered
-		 * an error.
+		 * If we fail to open a vdev during an import or recovery, we
+		 * mark it as "not available", which signifies that it was
+		 * never there to begin with.  Failure to open such a device
+		 * is not considered an error.
 		 */
-		if (spa_load_state(spa) == SPA_LOAD_IMPORT &&
+		if ((spa_load_state(spa) == SPA_LOAD_IMPORT ||
+		    spa_load_state(spa) == SPA_LOAD_RECOVER) &&
 		    vd->vdev_ops->vdev_op_leaf)
 			vd->vdev_not_present = 1;
 

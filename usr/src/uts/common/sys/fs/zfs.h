@@ -336,14 +336,16 @@ typedef enum {
 #define	SPA_VERSION_25			25ULL
 #define	SPA_VERSION_26			26ULL
 #define	SPA_VERSION_27			27ULL
+#define	SPA_VERSION_28			28ULL
+
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_27
-#define	SPA_VERSION_STRING		"27"
+#define	SPA_VERSION			SPA_VERSION_28
+#define	SPA_VERSION_STRING		"28"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -393,6 +395,7 @@ typedef enum {
 #define	SPA_VERSION_DIR_CLONES		SPA_VERSION_26
 #define	SPA_VERSION_DEADLISTS		SPA_VERSION_26
 #define	SPA_VERSION_FAST_SNAP		SPA_VERSION_27
+#define	SPA_VERSION_MULTI_REPLACE	SPA_VERSION_28
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -483,6 +486,7 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_SPLIT_GUID		"split_guid"
 #define	ZPOOL_CONFIG_SPLIT_LIST		"guid_list"
 #define	ZPOOL_CONFIG_REMOVING		"removing"
+#define	ZPOOL_CONFIG_RESILVERING	"resilvering"
 #define	ZPOOL_CONFIG_SUSPENDED		"suspended"	/* not stored on disk */
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
 #define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
