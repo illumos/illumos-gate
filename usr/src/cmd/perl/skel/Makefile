@@ -84,7 +84,7 @@ install: all
 # copy_contrib copies the clearfiles from ../contrib to here.
 #
 copy_contrib:
-	@ $(SH) ../contrib/copy_contrib.sh ../contrib . $(PERL_EXT)
+	@ $(KSH93) ../contrib/copy_contrib.sh ../contrib . $(PERL_EXT)
 
 clean:
 	for ext in $(PERL_EXT); do \
