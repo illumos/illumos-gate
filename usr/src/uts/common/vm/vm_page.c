@@ -109,13 +109,12 @@ pgcnt_t availrmem_initial;
  * pages_useclaim,pages_claimed : These two variables track the
  * claim adjustments because of the protection changes on a segvn segment.
  *
- * The pages_locked is protected by pages_locked_lock lock.
- * All other globals are protected by the same lock which protects availrmem.
+ * All these globals are protected by the same lock which protects availrmem.
  */
 pgcnt_t pages_locked = 0;
 pgcnt_t pages_useclaim = 0;
 pgcnt_t pages_claimed = 0;
-kmutex_t pages_locked_lock;
+
 
 /*
  * new_freemem_lock protects freemem, freemem_wait & freemem_cv.
@@ -3098,27 +3097,18 @@ page_destroy(page_t *pp, int dontfree)
 		 * We are doing a modified version of page_pp_unlock here.
 		 */
 		if ((pp->p_lckcnt != 0) || (pp->p_cowcnt != 0)) {
+			mutex_enter(&freemem_lock);
 			if (pp->p_lckcnt != 0) {
-				/*
-				 * Page has not been unlocked via
-				 * page_pp_unlock(). Therefore
-				 * anon_swap_restore() is called to unlock
-				 * swap for this page so its swap can be
-				 * unreserved.
-				 */
-				anon_swap_restore(1);
-				mutex_enter(&pages_locked_lock);
+				availrmem++;
 				pages_locked--;
-				mutex_exit(&pages_locked_lock);
 				pp->p_lckcnt = 0;
 			}
 			if (pp->p_cowcnt != 0) {
-				anon_swap_restore(pp->p_cowcnt);
-				mutex_enter(&pages_locked_lock);
+				availrmem += pp->p_cowcnt;
 				pages_locked -= pp->p_cowcnt;
-				mutex_exit(&pages_locked_lock);
 				pp->p_cowcnt = 0;
 			}
+			mutex_exit(&freemem_lock);
 		}
 		/*
 		 * Put the page on the "free" list.
@@ -3836,20 +3826,20 @@ page_pp_lock(
 	 * Acquire the "freemem_lock" for availrmem.
 	 */
 	if (cow) {
-		if (pp->p_cowcnt < (ushort_t)PAGE_LOCK_MAXIMUM) {
-			if (!anon_swap_adjust(1, pages_pp_maximum, 0)) {
-				mutex_enter(&pages_locked_lock);
-				pages_locked++;
-				mutex_exit(&pages_locked_lock);
-				r = 1;
-				if (++pp->p_cowcnt ==
-				    (ushort_t)PAGE_LOCK_MAXIMUM) {
-					cmn_err(CE_WARN,
-					    "COW lock limit on pfn 0x%lx",
-					page_pptonum(pp));
-				}
+		mutex_enter(&freemem_lock);
+		if ((availrmem > pages_pp_maximum) &&
+		    (pp->p_cowcnt < (ushort_t)PAGE_LOCK_MAXIMUM)) {
+			availrmem--;
+			pages_locked++;
+			mutex_exit(&freemem_lock);
+			r = 1;
+			if (++pp->p_cowcnt == (ushort_t)PAGE_LOCK_MAXIMUM) {
+				cmn_err(CE_WARN,
+				    "COW lock limit reached on pfn 0x%lx",
+				    page_pptonum(pp));
 			}
-		}
+		} else
+			mutex_exit(&freemem_lock);
 	} else {
 		if (pp->p_lckcnt) {
 			if (pp->p_lckcnt < (ushort_t)PAGE_LOCK_MAXIMUM) {
@@ -3867,13 +3857,14 @@ page_pp_lock(
 				++pp->p_lckcnt;
 				r = 1;
 			} else {
-				if (!anon_swap_adjust(1, pages_pp_maximum, 0)) {
-					mutex_enter(&pages_locked_lock);
+				mutex_enter(&freemem_lock);
+				if (availrmem > pages_pp_maximum) {
+					availrmem--;
 					pages_locked++;
-					mutex_exit(&pages_locked_lock);
 					++pp->p_lckcnt;
 					r = 1;
 				}
+				mutex_exit(&freemem_lock);
 			}
 		}
 	}
@@ -3904,19 +3895,19 @@ page_pp_unlock(
 	 */
 	if (cow) {
 		if (pp->p_cowcnt) {
-			anon_swap_restore(1);
+			mutex_enter(&freemem_lock);
 			pp->p_cowcnt--;
-			mutex_enter(&pages_locked_lock);
+			availrmem++;
 			pages_locked--;
-			mutex_exit(&pages_locked_lock);
+			mutex_exit(&freemem_lock);
 		}
 	} else {
 		if (pp->p_lckcnt && --pp->p_lckcnt == 0) {
 			if (!kernel) {
-				anon_swap_restore(1);
-				mutex_enter(&pages_locked_lock);
+				mutex_enter(&freemem_lock);
+				availrmem++;
 				pages_locked--;
-				mutex_exit(&pages_locked_lock);
+				mutex_exit(&freemem_lock);
 			}
 		}
 	}
@@ -5777,11 +5768,12 @@ page_mem_avail(pgcnt_t npages)
 	return (1);
 }
 
+#define	MAX_CNT	60	/* max num of iterations */
 /*
  * Reclaim/reserve availrmem for npages.
  * If there is not enough memory start reaping seg, kmem caches.
  * Start pageout scanner (via page_needfree()).
- * Exit after max_cnt tries regardless of how much memory has been released.
+ * Exit after ~ MAX_CNT s regardless of how much memory has been released.
  * Note: There is no guarantee that any availrmem will be freed as
  * this memory typically is locked (kernel heap) or reserved for swap.
  * Also due to memory fragmentation kmem allocator may not be able
@@ -5789,7 +5781,7 @@ page_mem_avail(pgcnt_t npages)
  * freeing slab or a page).
  */
 int
-page_reclaim_mem(pgcnt_t npages, pgcnt_t epages, int adjust, int max_cnt)
+page_reclaim_mem(pgcnt_t npages, pgcnt_t epages, int adjust)
 {
 	int	i = 0;
 	int	ret = 0;
@@ -5799,7 +5791,7 @@ page_reclaim_mem(pgcnt_t npages, pgcnt_t epages, int adjust, int max_cnt)
 	mutex_enter(&freemem_lock);
 	old_availrmem = availrmem - 1;
 	while ((availrmem < tune.t_minarmem + npages + epages) &&
-	    (old_availrmem < availrmem) && (i++ < max_cnt)) {
+	    (old_availrmem < availrmem) && (i++ < MAX_CNT)) {
 		old_availrmem = availrmem;
 		deficit = tune.t_minarmem + npages + epages - availrmem;
 		mutex_exit(&freemem_lock);

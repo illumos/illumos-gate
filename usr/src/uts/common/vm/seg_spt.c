@@ -399,7 +399,7 @@ segspt_create(struct seg *seg, caddr_t argsp)
 	    tnf_opaque, addr, addr, tnf_ulong, len, seg->s_size);
 #endif
 	if ((sptcargs->flags & SHM_PAGEABLE) == 0) {
-		if (err = anon_swap_adjust(npages, segspt_minfree, 60))
+		if (err = anon_swap_adjust(npages))
 			return (err);
 	}
 	err = ENOMEM;
