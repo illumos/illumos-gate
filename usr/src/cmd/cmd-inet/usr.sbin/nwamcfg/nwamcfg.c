@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1770,11 +1769,12 @@ help_func(cmd_t *cmd)
 void
 revert_func(cmd_t *cmd)
 {
-	nwam_error_t	ret;
-	char		*name = NULL;
-	nwam_ncu_type_t ncu_type;
+	nwam_error_t		ret;
+	char			*name = NULL;
+	nwam_ncu_type_t		ncu_type;
+	nwam_object_type_t	object_type = active_object_type();
 
-	switch (active_object_type()) {
+	switch (object_type) {
 	case NWAM_OBJECT_TYPE_NCU:
 		/* retrieve name and type to use later */
 		if ((ret = nwam_ncu_get_ncu_type(ncu_h, &ncu_type))
@@ -1813,12 +1813,18 @@ revert_func(cmd_t *cmd)
 	}
 
 	/* Exit this scope because handle already freed (call do_cancel()) */
-	free(name);
 	need_to_commit = B_FALSE;
+
 	if (ret != NWAM_SUCCESS) {
-		nwamerr(ret, "Revert error");
+		if (ret == NWAM_ENTITY_NOT_FOUND) {
+			nerr("%s '%s' does not exist to revert to, removing it",
+			    nwam_object_type_to_string(object_type), name);
+		} else {
+			nwamerr(ret, "Revert error");
+		}
 		do_cancel();
 	}
+	free(name);
 	return;
 
 name_error:
