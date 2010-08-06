@@ -731,11 +731,7 @@ platform_config_snapshot(void)
 	lastgen = curgen;
 	/* we're getting a new config, so clean up the last one */
 	if (Lastcfg != NULL) {
-		if (--Lastcfg->raw_refcnt == 0) {
-			if (Lastcfg->begin != NULL)
-				FREE(Lastcfg->begin);
-			FREE(Lastcfg);
-		}
+		config_free(Lastcfg);
 	}
 
 	Lastcfg = MALLOC(sizeof (struct cfgdata));

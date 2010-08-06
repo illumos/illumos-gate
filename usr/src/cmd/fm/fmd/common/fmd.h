@@ -67,6 +67,7 @@ typedef struct fmd {
 	pthread_key_t d_key;		/* key for fmd's thread-specific data */
 	volatile int d_signal;		/* signal indicating we should quit */
 	volatile int d_running;		/* flag set when fmd_run() succeeds */
+	volatile int d_loaded;		/* flag set when all modules loaded */
 	volatile int d_booted;		/* flag set when fmd_run() completes */
 
 	uint_t d_fmd_debug;		/* mask of fmd active debugging modes */

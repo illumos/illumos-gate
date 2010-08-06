@@ -1001,6 +1001,8 @@ fmd_run(fmd_t *dp, int pfd)
 	(void) fmd_conf_getprop(dp->d_conf, "agent.path", &pap);
 	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_proc_ops, NULL);
 
+	dp->d_loaded = 1; /* modules are now loaded */
+
 	/*
 	 * With all modules loaded, replay fault events from the ASRU cache for
 	 * any ASRUs that must be retired, replay error events from the errlog
