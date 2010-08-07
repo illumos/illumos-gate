@@ -66,13 +66,13 @@ wcwidth(wchar_t wc)
 #pragma weak _scrwidth = scrwidth
 
 /*
- * This is a Solaris extension.  I don't really understand why a different
- * function was needed.  Anecdotally, it appears that perhaps some versions
- * of the Sun wcwidth didn't handle illegal encodings well, and scrwidth
- * seems to have been better.  Its not an issue for our implementation.
+ * This is a Solaris extension.  It never returns a negative width, even for
+ * non-printable characters.  It is used internally by the printf
+ * implementation for %ws.
  */
 int
 scrwidth(wchar_t wc)
 {
-	return (wcwidth(wc));
+	int	v = wcwidth(wc);
+	return (v > 0 ? v : 0);
 }

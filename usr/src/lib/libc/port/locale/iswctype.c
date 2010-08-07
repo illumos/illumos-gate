@@ -66,7 +66,7 @@ __istype(wint_t c, unsigned int f)
 		rt =  ___runetype(c);
 	else
 		rt = _CurrentRuneLocale->__runetype[c];
-	return (!!(rt & f));
+	return (rt & f);
 }
 
 static int
@@ -79,7 +79,7 @@ __isctype(wint_t c, unsigned int f)
 		return (0);
 	else
 		rt = _CurrentRuneLocale->__runetype[c];
-	return (!!(rt & f));
+	return (rt & f);
 }
 
 #undef iswctype
