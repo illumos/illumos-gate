@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Author:  Jeff Bonwick
 #
@@ -240,24 +239,24 @@ function fixglom {
 	    -v glomname=$2 \
 	    -v karch=$KARCH ' 
 	$1 == "MOD" || $1 == "SYMLINK" {
-		sub(/^platform.*kernel/, "platform/" karch "/" glomname, $3)
-		sub(/^kernel/, "platform/" karch "/" glomname, $3)
-		sub(/^usr.kernel/, "platform/" karch "/" glomname, $3)
-		print
-	}
-	$1 == "LINK" {
-		sub(/^platform.*kernel/, "platform/" karch "/" glomname, $2)
-		sub(/^kernel/, "platform/" karch "/" glomname, $2)
-		sub(/^usr.kernel/, "platform/" karch "/" glomname, $2)
 		sub(/^platform.*kernel/, "platform/" karch "/" glomname, $4)
 		sub(/^kernel/, "platform/" karch "/" glomname, $4)
 		sub(/^usr.kernel/, "platform/" karch "/" glomname, $4)
 		print
 	}
+	$1 == "LINK" {
+		sub(/^platform.*kernel/, "platform/" karch "/" glomname, $3)
+		sub(/^kernel/, "platform/" karch "/" glomname, $3)
+		sub(/^usr.kernel/, "platform/" karch "/" glomname, $3)
+		sub(/^platform.*kernel/, "platform/" karch "/" glomname, $5)
+		sub(/^kernel/, "platform/" karch "/" glomname, $5)
+		sub(/^usr.kernel/, "platform/" karch "/" glomname, $5)
+		print
+	}
 	$1 == "CONF" {
-		sub(/^platform.*kernel/, "platform/" karch "/" glomname, $2)
-		sub(/^kernel/, "platform/" karch "/" glomname, $2)
-		sub(/^usr.kernel/, "platform/" karch "/" glomname, $2)
+		sub(/^platform.*kernel/, "platform/" karch "/" glomname, $3)
+		sub(/^kernel/, "platform/" karch "/" glomname, $3)
+		sub(/^usr.kernel/, "platform/" karch "/" glomname, $3)
 		print
 	}
 	' $1 > $1.new
@@ -265,7 +264,8 @@ function fixglom {
 }
 
 #
-# Remove entries from 
+# Filter out implementation-specific modules, unless that
+# implementation was requested by the user.
 # usage: filtimpl listfile implname
 #
 
@@ -273,15 +273,15 @@ function filtimpl {
 	nawk \
 	    -v impl=$2 '
 	$1 == "MOD" || $1 == "SYMLINK" {
-		if ($5 == "all" || $5 == impl)
+		if ($6 == "all" || $6 == impl)
 			print
 	}
 	$1 == "CONF" {
-		if ($4 == "all" || $4 == impl)
+		if ($5 == "all" || $5 == impl)
 			print
 	}
 	$1 == "LINK" {
-		if ($6 == "all" || $6 == impl)
+		if ($7 == "all" || $7 == impl)
 			print
 	}
 	' $1 > $1.new
@@ -316,19 +316,19 @@ function filtmod {
 			reqmods[tmpmods[i]] = 1
 	}
 	$1 == "MOD" {
-		if (modmatch($2))
+		if (modmatch($3))
 			print
 	}
 	$1 == "CONF" {
-		if (modmatch($5))
-			print
-	}
-	$1 == "SYMLINK" {
 		if (modmatch($6))
 			print
 	}
+	$1 == "SYMLINK" {
+		if (modmatch($7))
+			print
+	}
 	$1 == "LINK" {
-		if (modmatch($3))
+		if (modmatch($4))
 			print
 	}
 	' $1 > $1.new
@@ -386,7 +386,7 @@ function fixcrypto {
 	[ "$OBJD" = obj ] && root=root_$MACH-nd
 
 	grep -v ^MOD $listfile > $listfile.no-mod
-	grep ^MOD $listfile | while read tag module targdir size impl srcdir; do
+	grep ^MOD $listfile | while read tag srcdir module targdir size impl; do
 		#
 		# We don't just grep for ${OBJD}$size/$module because
 		# there can be generic and platform-dependent versions
@@ -410,47 +410,69 @@ function fixcrypto {
 
 #
 # Copy a module, or create a link, as needed.
-# See $SRC/uts/Makefile.targ ($(MODLIST_DEPS) target) for the format
-# of the different input lines.
 #
 
 function copymod {
 	case $1 in
 	MOD)
-		targdir=$INSTALL_FILES/$3
+		targdir=$INSTALL_FILES/$4
 		tstmkdir $targdir
-		target=$targdir/$2
-		verbose "$INSTALL_CP $6/${OBJD}$4/$2 $target"
-		$INSTALL_CP $6/${OBJD}$4/$2 $target || \
+		target=$targdir/$3
+		verbose "$INSTALL_CP $2/${OBJD}$5/$3 $target"
+		$INSTALL_CP $2/${OBJD}$5/$3 $target || \
 		    fail "can't create $target"
 		;;
 	SYMLINK)
-		targdir=$INSTALL_FILES/$3
-		tstmkdir $targdir
-		target=$targdir/$4
-		rm -f $target
-		verbose "ln -s $2 $target"
-		ln -s $2 $target || fail "can't create $target"
-		;;
-	LINK)
 		targdir=$INSTALL_FILES/$4
 		tstmkdir $targdir
 		target=$targdir/$5
 		rm -f $target
-		verbose "ln $INSTALL_FILES/$2/$3 $target"
-		ln $INSTALL_FILES/$2/$3 $target || fail "can't create $target"
+		verbose "ln -s $3 $target"
+		ln -s $3 $target || fail "can't create $target"
+		;;
+	LINK)
+		targdir=$INSTALL_FILES/$5
+		tstmkdir $targdir
+		target=$targdir/$6
+		rm -f $target
+		verbose "ln $INSTALL_FILES/$3/$4 $target"
+		ln $INSTALL_FILES/$3/$4 $target || fail "can't create $target"
 		;;
 	CONF)
-		target=$INSTALL_FILES/$2
+		target=$INSTALL_FILES/$3
 		tstmkdir `dirname $target`
-		conffile=`basename $2`
-		verbose "$INSTALL_CP $3/$conffile $target"
-		$INSTALL_CP $3/$conffile $target
+		conffile=`basename $3`
+		verbose "$INSTALL_CP $4/$conffile $target"
+		$INSTALL_CP $4/$conffile $target
 		;;
 	*)
 		fail "unrecognized modlist entry: $*"
 		;;
 	esac
+}
+
+# Sanity-check the given module list.
+function check_modlist {
+	nawk '
+	BEGIN {
+		nfields["MOD"] = 6
+		nfields["CONF"] = 6
+		nfields["LINK"] = 7
+		nfields["SYMLINK"] = 7
+	}
+	{
+		# This also catches unknown tags.
+		if (nfields[$1] != NF) {
+			print "error: invalid modlist record:"
+			print $0
+			print "expected", nfields[$1], "fields, found", NF
+			status=1
+		}
+	}
+	END {
+		exit status
+	}
+	' $1 || fail "Errors in kernel module list"
 }
 
 #
@@ -519,6 +541,7 @@ function copy_kernel {
 	(cd $KARCH; MAKEFLAGS=e $make -K $MODSTATE modlist.karch) | \
 	    egrep "^MOD|^CONF|^LINK|^SYMLINK" > $modlist
 	[ "$VERBOSE" = "V" ] && cat $modlist
+	check_modlist $modlist
 	if [ -n "$ON_CRYPTO_BINS" ]; then
 		cryptotar="$ON_CRYPTO_BINS"
 		if [ "$OBJD" = obj ]; then
