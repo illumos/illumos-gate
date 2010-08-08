@@ -1862,7 +1862,8 @@ zpool_find_vdev_by_physpath(zpool_handle_t *zhp, const char *ppath,
 
 	*avail_spare = B_FALSE;
 	*l2cache = B_FALSE;
-	*log = B_FALSE;
+	if (log != NULL)
+		*log = B_FALSE;
 	ret = vdev_to_nvlist_iter(nvroot, search, avail_spare, l2cache, log);
 	nvlist_free(search);
 
