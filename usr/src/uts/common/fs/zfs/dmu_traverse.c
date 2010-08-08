@@ -162,6 +162,8 @@ traverse_visitbp(traverse_data_t *td, const dnode_phys_t *dnp,
 	if (td->td_flags & TRAVERSE_PRE) {
 		err = td->td_func(td->td_spa, NULL, bp, pbuf, zb, dnp,
 		    td->td_arg);
+		if (err == TRAVERSE_VISIT_NO_CHILDREN)
+			return (0);
 		if (err)
 			return (err);
 	}

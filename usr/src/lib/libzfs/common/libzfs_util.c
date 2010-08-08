@@ -219,6 +219,10 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		    "use 'zpool scrub -s' to cancel current scrub"));
 	case EZFS_NO_SCRUB:
 		return (dgettext(TEXT_DOMAIN, "there is no active scrub"));
+	case EZFS_DIFF:
+		return (dgettext(TEXT_DOMAIN, "unable to generate diffs"));
+	case EZFS_DIFFDATA:
+		return (dgettext(TEXT_DOMAIN, "invalid diff data"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -494,6 +498,29 @@ zfs_alloc(libzfs_handle_t *hdl, size_t size)
 }
 
 /*
+ * A safe form of asprintf() which will die if the allocation fails.
+ */
+/*PRINTFLIKE2*/
+char *
+zfs_asprintf(libzfs_handle_t *hdl, const char *fmt, ...)
+{
+	va_list ap;
+	char *ret;
+	int err;
+
+	va_start(ap, fmt);
+
+	err = vasprintf(&ret, fmt, ap);
+
+	va_end(ap);
+
+	if (err < 0)
+		(void) no_memory(hdl);
+
+	return (ret);
+}
+
+/*
  * A safe form of realloc(), which also zeroes newly allocated space.
  */
 void *
@@ -579,7 +606,7 @@ libzfs_init(void)
 {
 	libzfs_handle_t *hdl;
 
-	if ((hdl = calloc(sizeof (libzfs_handle_t), 1)) == NULL) {
+	if ((hdl = calloc(1, sizeof (libzfs_handle_t))) == NULL) {
 		return (NULL);
 	}
 

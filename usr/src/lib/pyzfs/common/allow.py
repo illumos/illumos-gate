@@ -218,6 +218,7 @@ perms_subcmd = dict(
     send="",
     hold=_("Allows adding a user hold to a snapshot"),
     release=_("Allows releasing a user hold which\n\t\t\t\tmight destroy the snapshot"),
+    diff=_("Allows lookup of paths within a dataset,\n\t\t\t\tgiven an object number. Ordinary users need this\n\t\t\t\tin order to use zfs diff"),
 )
 
 perms_other = dict(

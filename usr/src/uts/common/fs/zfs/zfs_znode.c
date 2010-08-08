@@ -63,6 +63,7 @@
 #include <sys/zfs_znode.h>
 #include <sys/sa.h>
 #include <sys/zfs_sa.h>
+#include <sys/zfs_stat.h>
 
 #include "zfs_prop.h"
 #include "zfs_comutil.h"
@@ -1879,80 +1880,121 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 
 #endif /* _KERNEL */
 
+static int
+zfs_sa_setup(objset_t *osp, sa_attr_type_t **sa_table)
+{
+	uint64_t sa_obj = 0;
+	int error;
+
+	error = zap_lookup(osp, MASTER_NODE_OBJ, ZFS_SA_ATTRS, 8, 1, &sa_obj);
+	if (error != 0 && error != ENOENT)
+		return (error);
+
+	error = sa_setup(osp, sa_obj, zfs_attr_table, ZPL_END, sa_table);
+	return (error);
+}
+
+static int
+zfs_grab_sa_handle(objset_t *osp, uint64_t obj, sa_handle_t **hdlp,
+    dmu_buf_t **db)
+{
+	dmu_object_info_t doi;
+	int error;
+
+	if ((error = sa_buf_hold(osp, obj, FTAG, db)) != 0)
+		return (error);
+
+	dmu_object_info_from_db(*db, &doi);
+	if ((doi.doi_bonus_type != DMU_OT_SA &&
+	    doi.doi_bonus_type != DMU_OT_ZNODE) ||
+	    doi.doi_bonus_type == DMU_OT_ZNODE &&
+	    doi.doi_bonus_size < sizeof (znode_phys_t)) {
+		sa_buf_rele(*db, FTAG);
+		return (ENOTSUP);
+	}
+
+	error = sa_handle_get(osp, obj, NULL, SA_HDL_PRIVATE, hdlp);
+	if (error != 0) {
+		sa_buf_rele(*db, FTAG);
+		return (error);
+	}
+
+	return (0);
+}
+
+void
+zfs_release_sa_handle(sa_handle_t *hdl, dmu_buf_t *db)
+{
+	sa_handle_destroy(hdl);
+	sa_buf_rele(db, FTAG);
+}
+
 /*
  * Given an object number, return its parent object number and whether
  * or not the object is an extended attribute directory.
  */
 static int
-zfs_obj_to_pobj(objset_t *osp, uint64_t obj, uint64_t *pobjp, int *is_xattrdir,
-    sa_attr_type_t *sa_table)
+zfs_obj_to_pobj(sa_handle_t *hdl, sa_attr_type_t *sa_table, uint64_t *pobjp,
+    int *is_xattrdir)
 {
-	dmu_buf_t *db;
-	dmu_object_info_t doi;
-	int error;
 	uint64_t parent;
 	uint64_t pflags;
 	uint64_t mode;
 	sa_bulk_attr_t bulk[3];
-	sa_handle_t *hdl;
 	int count = 0;
+	int error;
 
-	if ((error = sa_buf_hold(osp, obj, FTAG, &db)) != 0)
-		return (error);
-
-	dmu_object_info_from_db(db, &doi);
-	if ((doi.doi_bonus_type != DMU_OT_SA &&
-	    doi.doi_bonus_type != DMU_OT_ZNODE) ||
-	    doi.doi_bonus_type == DMU_OT_ZNODE &&
-	    doi.doi_bonus_size < sizeof (znode_phys_t)) {
-		sa_buf_rele(db, FTAG);
-		return (EINVAL);
-	}
-
-	if ((error = sa_handle_get(osp, obj, NULL, SA_HDL_PRIVATE,
-	    &hdl)) != 0) {
-		sa_buf_rele(db, FTAG);
-		return (error);
-	}
-
-	SA_ADD_BULK_ATTR(bulk, count, sa_table[ZPL_PARENT],
-	    NULL, &parent, 8);
+	SA_ADD_BULK_ATTR(bulk, count, sa_table[ZPL_PARENT], NULL,
+	    &parent, sizeof (parent));
 	SA_ADD_BULK_ATTR(bulk, count, sa_table[ZPL_FLAGS], NULL,
-	    &pflags, 8);
+	    &pflags, sizeof (pflags));
 	SA_ADD_BULK_ATTR(bulk, count, sa_table[ZPL_MODE], NULL,
-	    &mode, 8);
+	    &mode, sizeof (mode));
 
-	if ((error = sa_bulk_lookup(hdl, bulk, count)) != 0) {
-		sa_buf_rele(db, FTAG);
-		sa_handle_destroy(hdl);
+	if ((error = sa_bulk_lookup(hdl, bulk, count)) != 0)
 		return (error);
-	}
+
 	*pobjp = parent;
 	*is_xattrdir = ((pflags & ZFS_XATTR) != 0) && S_ISDIR(mode);
-	sa_handle_destroy(hdl);
-	sa_buf_rele(db, FTAG);
 
 	return (0);
 }
 
-int
-zfs_obj_to_path(objset_t *osp, uint64_t obj, char *buf, int len)
+/*
+ * Given an object number, return some zpl level statistics
+ */
+static int
+zfs_obj_to_stats_impl(sa_handle_t *hdl, sa_attr_type_t *sa_table,
+    zfs_stat_t *sb)
 {
+	sa_bulk_attr_t bulk[4];
+	int count = 0;
+
+	SA_ADD_BULK_ATTR(bulk, count, sa_table[ZPL_MODE], NULL,
+	    &sb->zs_mode, sizeof (sb->zs_mode));
+	SA_ADD_BULK_ATTR(bulk, count, sa_table[ZPL_GEN], NULL,
+	    &sb->zs_gen, sizeof (sb->zs_gen));
+	SA_ADD_BULK_ATTR(bulk, count, sa_table[ZPL_LINKS], NULL,
+	    &sb->zs_links, sizeof (sb->zs_links));
+	SA_ADD_BULK_ATTR(bulk, count, sa_table[ZPL_CTIME], NULL,
+	    &sb->zs_ctime, sizeof (sb->zs_ctime));
+
+	return (sa_bulk_lookup(hdl, bulk, count));
+}
+
+static int
+zfs_obj_to_path_impl(objset_t *osp, uint64_t obj, sa_handle_t *hdl,
+    sa_attr_type_t *sa_table, char *buf, int len)
+{
+	sa_handle_t *sa_hdl;
+	sa_handle_t *prevhdl = NULL;
+	dmu_buf_t *prevdb = NULL;
+	dmu_buf_t *sa_db = NULL;
 	char *path = buf + len - 1;
-	sa_attr_type_t *sa_table;
 	int error;
-	uint64_t sa_obj = 0;
 
 	*path = '\0';
-
-	error = zap_lookup(osp, MASTER_NODE_OBJ, ZFS_SA_ATTRS, 8, 1, &sa_obj);
-
-	if (error != 0 && error != ENOENT)
-		return (error);
-
-	if ((error = sa_setup(osp, sa_obj, zfs_attr_table,
-	    ZPL_END, &sa_table)) != 0)
-		return (error);
+	sa_hdl = hdl;
 
 	for (;;) {
 		uint64_t pobj;
@@ -1960,8 +2002,11 @@ zfs_obj_to_path(objset_t *osp, uint64_t obj, char *buf, int len)
 		size_t complen;
 		int is_xattrdir;
 
-		if ((error = zfs_obj_to_pobj(osp, obj, &pobj,
-		    &is_xattrdir, sa_table)) != 0)
+		if (prevdb)
+			zfs_release_sa_handle(prevhdl, prevdb);
+
+		if ((error = zfs_obj_to_pobj(sa_hdl, sa_table, &pobj,
+		    &is_xattrdir)) != 0)
 			break;
 
 		if (pobj == obj) {
@@ -1985,10 +2030,80 @@ zfs_obj_to_path(objset_t *osp, uint64_t obj, char *buf, int len)
 		ASSERT(path >= buf);
 		bcopy(component, path, complen);
 		obj = pobj;
+
+		if (sa_hdl != hdl) {
+			prevhdl = sa_hdl;
+			prevdb = sa_db;
+		}
+		error = zfs_grab_sa_handle(osp, obj, &sa_hdl, &sa_db);
+		if (error != 0) {
+			sa_hdl = prevhdl;
+			sa_db = prevdb;
+			break;
+		}
+	}
+
+	if (sa_hdl != NULL && sa_hdl != hdl) {
+		ASSERT(sa_db != NULL);
+		zfs_release_sa_handle(sa_hdl, sa_db);
 	}
 
 	if (error == 0)
 		(void) memmove(buf, path, buf + len - path);
 
+	return (error);
+}
+
+int
+zfs_obj_to_path(objset_t *osp, uint64_t obj, char *buf, int len)
+{
+	sa_attr_type_t *sa_table;
+	sa_handle_t *hdl;
+	dmu_buf_t *db;
+	int error;
+
+	error = zfs_sa_setup(osp, &sa_table);
+	if (error != 0)
+		return (error);
+
+	error = zfs_grab_sa_handle(osp, obj, &hdl, &db);
+	if (error != 0)
+		return (error);
+
+	error = zfs_obj_to_path_impl(osp, obj, hdl, sa_table, buf, len);
+
+	zfs_release_sa_handle(hdl, db);
+	return (error);
+}
+
+int
+zfs_obj_to_stats(objset_t *osp, uint64_t obj, zfs_stat_t *sb,
+    char *buf, int len)
+{
+	char *path = buf + len - 1;
+	sa_attr_type_t *sa_table;
+	sa_handle_t *hdl;
+	dmu_buf_t *db;
+	int error;
+
+	*path = '\0';
+
+	error = zfs_sa_setup(osp, &sa_table);
+	if (error != 0)
+		return (error);
+
+	error = zfs_grab_sa_handle(osp, obj, &hdl, &db);
+	if (error != 0)
+		return (error);
+
+	error = zfs_obj_to_stats_impl(hdl, sa_table, sb);
+	if (error != 0) {
+		zfs_release_sa_handle(hdl, db);
+		return (error);
+	}
+
+	error = zfs_obj_to_path_impl(osp, obj, hdl, sa_table, buf, len);
+
+	zfs_release_sa_handle(hdl, db);
 	return (error);
 }

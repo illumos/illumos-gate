@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/attr.h>
@@ -63,6 +62,7 @@ static xattr_entry_t xattrs[F_ATTR_ALL] = {
 	{ A_FSID, O_NONE, XATTR_VIEW_READONLY, DATA_TYPE_UINT64 },
 	{ A_REPARSE_POINT, O_REPARSE_POINT, XATTR_VIEW_READONLY,
 	    DATA_TYPE_BOOLEAN_VALUE },
+	{ A_GEN, O_NONE, XATTR_VIEW_READONLY, DATA_TYPE_UINT64 },
 };
 
 const char *

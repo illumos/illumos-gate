@@ -162,6 +162,22 @@ struct dsl_ds_destroyarg {
 	boolean_t need_prep;		/* do we need to retry due to EBUSY? */
 };
 
+/*
+ * The max length of a temporary tag prefix is the number of hex digits
+ * required to express UINT64_MAX plus one for the hyphen.
+ */
+#define	MAX_TAG_PREFIX_LEN	17
+
+struct dsl_ds_holdarg {
+	dsl_sync_task_group_t *dstg;
+	char *htag;
+	char *snapname;
+	boolean_t recursive;
+	boolean_t gotone;
+	boolean_t temphold;
+	char failed[MAXPATHLEN];
+};
+
 #define	dsl_dataset_is_snapshot(ds) \
 	((ds)->ds_phys->ds_num_children != 0)
 
@@ -194,6 +210,7 @@ dsl_checkfunc_t dsl_dataset_destroy_check;
 dsl_syncfunc_t dsl_dataset_destroy_sync;
 dsl_checkfunc_t dsl_dataset_snapshot_check;
 dsl_syncfunc_t dsl_dataset_snapshot_sync;
+dsl_syncfunc_t dsl_dataset_user_hold_sync;
 int dsl_dataset_rename(char *name, const char *newname, boolean_t recursive);
 int dsl_dataset_promote(const char *name, char *conflsnap);
 int dsl_dataset_clone_swap(dsl_dataset_t *clone, dsl_dataset_t *origin_head,

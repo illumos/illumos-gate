@@ -225,6 +225,9 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 		case F_REPARSE:
 			XVA_SET_REQ(&xvattr, XAT_REPARSE);
 			break;
+		case F_GEN:
+			XVA_SET_REQ(&xvattr, XAT_GEN);
+			break;
 		default:
 			break;
 		}
@@ -311,6 +314,11 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 			VERIFY(nvlist_add_boolean_value(nvlp,
 			    attr_to_name(F_REPARSE),
 			    xoap->xoa_reparse) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_GEN)) {
+			VERIFY(nvlist_add_uint64(nvlp,
+			    attr_to_name(F_GEN),
+			    xoap->xoa_generation) == 0);
 		}
 	}
 	/*

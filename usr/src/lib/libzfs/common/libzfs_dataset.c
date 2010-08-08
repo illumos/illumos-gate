@@ -125,7 +125,7 @@ path_to_str(const char *path, int types)
  * provide a more meaningful error message.  We call zfs_error_aux() to
  * explain exactly why the name was not valid.
  */
-static int
+int
 zfs_validate_name(libzfs_handle_t *hdl, const char *path, int type,
     boolean_t modifying)
 {

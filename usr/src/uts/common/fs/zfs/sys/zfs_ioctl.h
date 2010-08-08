@@ -30,6 +30,7 @@
 #include <sys/zio.h>
 #include <sys/dsl_deleg.h>
 #include <sys/spa.h>
+#include <sys/zfs_stat.h>
 
 #ifdef _KERNEL
 #include <sys/nvpair.h>
@@ -198,6 +199,22 @@ typedef struct dmu_replay_record {
 	} drr_u;
 } dmu_replay_record_t;
 
+/* diff record range types */
+typedef enum diff_type {
+	DDR_NONE = 0x1,
+	DDR_INUSE = 0x2,
+	DDR_FREE = 0x4
+} diff_type_t;
+
+/*
+ * The diff reports back ranges of free or in-use objects.
+ */
+typedef struct dmu_diff_record {
+	uint64_t ddr_type;
+	uint64_t ddr_first;
+	uint64_t ddr_last;
+} dmu_diff_record_t;
+
 typedef struct zinject_record {
 	uint64_t	zi_objset;
 	uint64_t	zi_object;
@@ -266,10 +283,11 @@ typedef struct zfs_cmd {
 	boolean_t	zc_temphold;
 	uint64_t	zc_action_handle;
 	int		zc_cleanup_fd;
-	uint8_t		zc_pad[4];
+	uint8_t		zc_pad[4];		/* alignment */
 	uint64_t	zc_sendobj;
 	uint64_t	zc_fromobj;
 	uint64_t	zc_createtxg;
+	zfs_stat_t	zc_stat;
 } zfs_cmd_t;
 
 typedef struct zfs_useracct {

@@ -2536,6 +2536,10 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			xoap->xoa_reparse = ((zp->z_pflags & ZFS_REPARSE) != 0);
 			XVA_SET_RTN(xvap, XAT_REPARSE);
 		}
+		if (XVA_ISSET_REQ(xvap, XAT_GEN)) {
+			xoap->xoa_generation = zp->z_gen;
+			XVA_SET_RTN(xvap, XAT_GEN);
+		}
 	}
 
 	ZFS_TIME_DECODE(&vap->va_atime, zp->z_atime);

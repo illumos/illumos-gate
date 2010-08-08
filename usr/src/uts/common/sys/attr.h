@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_ATTR_H
@@ -55,6 +54,7 @@ extern "C" {
 #define	A_OWNERSID		"ownersid"
 #define	A_GROUPSID		"groupsid"
 #define	A_REPARSE_POINT		"reparse"
+#define	A_GEN			"generation"
 
 /* Attribute option for utilities */
 #define	O_HIDDEN	 "H"
@@ -93,6 +93,7 @@ typedef enum {
 	F_GROUPSID,
 	F_FSID,
 	F_REPARSE,
+	F_GEN,
 	F_ATTR_ALL
 } f_attr_t;
 

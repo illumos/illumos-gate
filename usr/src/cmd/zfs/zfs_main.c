@@ -40,6 +40,7 @@
 #include <zone.h>
 #include <grp.h>
 #include <pwd.h>
+#include <signal.h>
 #include <sys/mkdev.h>
 #include <sys/mntent.h>
 #include <sys/mnttab.h>
@@ -84,6 +85,7 @@ static int zfs_do_userspace(int argc, char **argv);
 static int zfs_do_python(int argc, char **argv);
 static int zfs_do_hold(int argc, char **argv);
 static int zfs_do_release(int argc, char **argv);
+static int zfs_do_diff(int argc, char **argv);
 
 /*
  * Enable a reasonable set of defaults for libumem debugging on DEBUG builds.
@@ -128,7 +130,8 @@ typedef enum {
 	HELP_GROUPSPACE,
 	HELP_HOLD,
 	HELP_HOLDS,
-	HELP_RELEASE
+	HELP_RELEASE,
+	HELP_DIFF
 } zfs_help_t;
 
 typedef struct zfs_command {
@@ -180,6 +183,7 @@ static zfs_command_t command_table[] = {
 	{ "hold",	zfs_do_hold,		HELP_HOLD		},
 	{ "holds",	zfs_do_python,		HELP_HOLDS		},
 	{ "release",	zfs_do_release,		HELP_RELEASE		},
+	{ "diff",	zfs_do_diff,		HELP_DIFF		},
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
@@ -283,6 +287,9 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tholds [-r] <snapshot> ...\n"));
 	case HELP_RELEASE:
 		return (gettext("\trelease [-r] <tag> <snapshot> ...\n"));
+	case HELP_DIFF:
+		return (gettext("\tdiff [-FHt] <snapshot> "
+		    "[snapshot|filesystem]\n"));
 	}
 
 	abort();
@@ -3972,6 +3979,81 @@ find_command_idx(char *command, int *idx)
 		}
 	}
 	return (1);
+}
+
+static int
+zfs_do_diff(int argc, char **argv)
+{
+	zfs_handle_t *zhp;
+	int flags = 0;
+	char *tosnap = NULL;
+	char *fromsnap = NULL;
+	char *atp, *copy;
+	int err;
+	int c;
+
+	while ((c = getopt(argc, argv, "FHt")) != -1) {
+		switch (c) {
+		case 'F':
+			flags |= ZFS_DIFF_CLASSIFY;
+			break;
+		case 'H':
+			flags |= ZFS_DIFF_PARSEABLE;
+			break;
+		case 't':
+			flags |= ZFS_DIFF_TIMESTAMP;
+			break;
+		default:
+			(void) fprintf(stderr,
+			    gettext("invalid option '%c'\n"), optopt);
+			usage(B_FALSE);
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc < 1) {
+		(void) fprintf(stderr,
+		gettext("must provide at least one snapshot name\n"));
+		usage(B_FALSE);
+	}
+
+	if (argc > 2) {
+		(void) fprintf(stderr, gettext("too many arguments\n"));
+		usage(B_FALSE);
+	}
+
+	fromsnap = argv[0];
+	tosnap = (argc == 2) ? argv[1] : NULL;
+
+	copy = NULL;
+	if (*fromsnap != '@')
+		copy = strdup(fromsnap);
+	else if (tosnap)
+		copy = strdup(tosnap);
+	if (copy == NULL)
+		usage(B_FALSE);
+
+	if (atp = strchr(copy, '@'))
+		*atp = '\0';
+
+	if ((zhp = zfs_open(g_zfs, copy, ZFS_TYPE_FILESYSTEM)) == NULL)
+		return (1);
+
+	free(copy);
+
+	/*
+	 * Ignore SIGPIPE so that the library can give us
+	 * information on any failure
+	 */
+	(void) sigignore(SIGPIPE);
+
+	err = zfs_show_diffs(zhp, STDOUT_FILENO, fromsnap, tosnap, flags);
+
+	zfs_close(zhp);
+
+	return (err != 0);
 }
 
 int

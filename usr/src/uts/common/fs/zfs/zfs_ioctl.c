@@ -854,6 +854,22 @@ zfs_secpolicy_config(zfs_cmd_t *zc, cred_t *cr)
 }
 
 /*
+ * Policy for object to name lookups.
+ */
+/* ARGSUSED */
+static int
+zfs_secpolicy_diff(zfs_cmd_t *zc, cred_t *cr)
+{
+	int error;
+
+	if ((error = secpolicy_sys_config(cr, B_FALSE)) == 0)
+		return (0);
+
+	error = zfs_secpolicy_write_perms(zc->zc_name, ZFS_DELEG_PERM_DIFF, cr);
+	return (error);
+}
+
+/*
  * Policy for fault injection.  Requires all privileges.
  */
 /* ARGSUSED */
@@ -941,6 +957,33 @@ zfs_secpolicy_release(zfs_cmd_t *zc, cred_t *cr)
 {
 	return (zfs_secpolicy_write_perms(zc->zc_name,
 	    ZFS_DELEG_PERM_RELEASE, cr));
+}
+
+/*
+ * Policy for allowing temporary snapshots to be taken or released
+ */
+static int
+zfs_secpolicy_tmp_snapshot(zfs_cmd_t *zc, cred_t *cr)
+{
+	/*
+	 * A temporary snapshot is the same as a snapshot,
+	 * hold, destroy and release all rolled into one.
+	 * Delegated diff alone is sufficient that we allow this.
+	 */
+	int error;
+
+	if ((error = zfs_secpolicy_write_perms(zc->zc_name,
+	    ZFS_DELEG_PERM_DIFF, cr)) == 0)
+		return (0);
+
+	error = zfs_secpolicy_snapshot(zc, cr);
+	if (!error)
+		error = zfs_secpolicy_hold(zc, cr);
+	if (!error)
+		error = zfs_secpolicy_release(zc, cr);
+	if (!error)
+		error = zfs_secpolicy_destroy(zc, cr);
+	return (error);
 }
 
 /*
@@ -1431,6 +1474,35 @@ zfs_ioc_obj_to_path(zfs_cmd_t *zc)
 		return (EINVAL);
 	}
 	error = zfs_obj_to_path(os, zc->zc_obj, zc->zc_value,
+	    sizeof (zc->zc_value));
+	dmu_objset_rele(os, FTAG);
+
+	return (error);
+}
+
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_obj		object to find
+ *
+ * outputs:
+ * zc_stat		stats on object
+ * zc_value		path to object
+ */
+static int
+zfs_ioc_obj_to_stats(zfs_cmd_t *zc)
+{
+	objset_t *os;
+	int error;
+
+	/* XXX reading from objset not owned */
+	if ((error = dmu_objset_hold(zc->zc_name, FTAG, &os)) != 0)
+		return (error);
+	if (dmu_objset_type(os) != DMU_OST_ZFS) {
+		dmu_objset_rele(os, FTAG);
+		return (EINVAL);
+	}
+	error = zfs_obj_to_stats(os, zc->zc_obj, &zc->zc_stat, zc->zc_value,
 	    sizeof (zc->zc_value));
 	dmu_objset_rele(os, FTAG);
 
@@ -2978,8 +3050,8 @@ zfs_ioc_snapshot(zfs_cmd_t *zc)
 		goto out;
 	}
 
-	error = dmu_objset_snapshot(zc->zc_name, zc->zc_value,
-	    nvprops, recursive);
+	error = dmu_objset_snapshot(zc->zc_name, zc->zc_value, NULL,
+	    nvprops, recursive, B_FALSE, -1);
 
 out:
 	nvlist_free(nvprops);
@@ -4167,6 +4239,113 @@ ace_t full_access[] = {
 };
 
 /*
+ * inputs:
+ * zc_name		name of containing filesystem
+ * zc_obj		object # beyond which we want next in-use object #
+ *
+ * outputs:
+ * zc_obj		next in-use object #
+ */
+static int
+zfs_ioc_next_obj(zfs_cmd_t *zc)
+{
+	objset_t *os = NULL;
+	int error;
+
+	error = dmu_objset_hold(zc->zc_name, FTAG, &os);
+	if (error)
+		return (error);
+
+	error = dmu_object_next(os, &zc->zc_obj, B_FALSE,
+	    os->os_dsl_dataset->ds_phys->ds_prev_snap_txg);
+
+	dmu_objset_rele(os, FTAG);
+	return (error);
+}
+
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_value		prefix name for snapshot
+ * zc_cleanup_fd	cleanup-on-exit file descriptor for calling process
+ *
+ * outputs:
+ */
+static int
+zfs_ioc_tmp_snapshot(zfs_cmd_t *zc)
+{
+	char *snap_name;
+	int error;
+
+	snap_name = kmem_asprintf("%s-%016llx", zc->zc_value,
+	    (u_longlong_t)ddi_get_lbolt64());
+
+	if (strlen(snap_name) >= MAXNAMELEN) {
+		strfree(snap_name);
+		return (E2BIG);
+	}
+
+	error = dmu_objset_snapshot(zc->zc_name, snap_name, snap_name,
+	    NULL, B_FALSE, B_TRUE, zc->zc_cleanup_fd);
+	if (error != 0) {
+		strfree(snap_name);
+		return (error);
+	}
+
+	(void) strcpy(zc->zc_value, snap_name);
+	strfree(snap_name);
+	return (0);
+}
+
+/*
+ * inputs:
+ * zc_name		name of "to" snapshot
+ * zc_value		name of "from" snapshot
+ * zc_cookie		file descriptor to write diff data on
+ *
+ * outputs:
+ * dmu_diff_record_t's to the file descriptor
+ */
+static int
+zfs_ioc_diff(zfs_cmd_t *zc)
+{
+	objset_t *fromsnap;
+	objset_t *tosnap;
+	file_t *fp;
+	offset_t off;
+	int error;
+
+	error = dmu_objset_hold(zc->zc_name, FTAG, &tosnap);
+	if (error)
+		return (error);
+
+	error = dmu_objset_hold(zc->zc_value, FTAG, &fromsnap);
+	if (error) {
+		dmu_objset_rele(tosnap, FTAG);
+		return (error);
+	}
+
+	fp = getf(zc->zc_cookie);
+	if (fp == NULL) {
+		dmu_objset_rele(fromsnap, FTAG);
+		dmu_objset_rele(tosnap, FTAG);
+		return (EBADF);
+	}
+
+	off = fp->f_offset;
+
+	error = dmu_diff(tosnap, fromsnap, fp->f_vnode, &off);
+
+	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
+		fp->f_offset = off;
+	releasef(zc->zc_cookie);
+
+	dmu_objset_rele(fromsnap, FTAG);
+	dmu_objset_rele(tosnap, FTAG);
+	return (error);
+}
+
+/*
  * Remove all ACL files in shares dir
  */
 static int
@@ -4510,9 +4689,9 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	    B_TRUE, B_TRUE },
 	{ zfs_ioc_snapshot, zfs_secpolicy_snapshot, DATASET_NAME, B_TRUE,
 	    B_TRUE },
-	{ zfs_ioc_dsobj_to_dsname, zfs_secpolicy_config, POOL_NAME, B_FALSE,
+	{ zfs_ioc_dsobj_to_dsname, zfs_secpolicy_diff, POOL_NAME, B_FALSE,
 	    B_FALSE },
-	{ zfs_ioc_obj_to_path, zfs_secpolicy_config, DATASET_NAME, B_FALSE,
+	{ zfs_ioc_obj_to_path, zfs_secpolicy_diff, DATASET_NAME, B_FALSE,
 	    B_TRUE },
 	{ zfs_ioc_pool_set_props, zfs_secpolicy_config,	POOL_NAME, B_TRUE,
 	    B_TRUE },
@@ -4541,6 +4720,13 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_objset_recvd_props, zfs_secpolicy_read, DATASET_NAME, B_FALSE,
 	    B_FALSE },
 	{ zfs_ioc_vdev_split, zfs_secpolicy_config, POOL_NAME, B_TRUE,
+	    B_TRUE },
+	{ zfs_ioc_next_obj, zfs_secpolicy_read, DATASET_NAME, B_FALSE,
+	    B_FALSE },
+	{ zfs_ioc_diff, zfs_secpolicy_diff, DATASET_NAME, B_FALSE, B_FALSE },
+	{ zfs_ioc_tmp_snapshot, zfs_secpolicy_tmp_snapshot, DATASET_NAME,
+	    B_FALSE, B_FALSE },
+	{ zfs_ioc_obj_to_stats, zfs_secpolicy_diff, DATASET_NAME, B_FALSE,
 	    B_TRUE }
 };
 

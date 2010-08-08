@@ -1375,6 +1375,11 @@ dsl_dataset_origin_check(struct dsl_ds_destroyarg *dsda, void *tag,
 	return (0);
 }
 
+/*
+ * If you add new checks here, you may need to add
+ * additional checks to the "temporary" case in
+ * snapshot_check() in dmu_objset.c.
+ */
 /* ARGSUSED */
 int
 dsl_dataset_destroy_check(void *arg1, void *arg2, dmu_tx_t *tx)
@@ -1616,21 +1621,23 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 	objset_t *mos = dp->dp_meta_objset;
 	dsl_dataset_t *ds_prev = NULL;
+	boolean_t wont_destroy;
 	uint64_t obj;
 
-	ASSERT(ds->ds_owner);
+	wont_destroy = (dsda->defer &&
+	    (ds->ds_userrefs > 0 || ds->ds_phys->ds_num_children > 1));
+
+	ASSERT(ds->ds_owner || wont_destroy);
 	ASSERT(dsda->defer || ds->ds_phys->ds_num_children <= 1);
 	ASSERT(ds->ds_prev == NULL ||
 	    ds->ds_prev->ds_phys->ds_next_snap_obj != ds->ds_object);
 	ASSERT3U(ds->ds_phys->ds_bp.blk_birth, <=, tx->tx_txg);
 
-	if (dsda->defer) {
+	if (wont_destroy) {
 		ASSERT(spa_version(dp->dp_spa) >= SPA_VERSION_USERREFS);
-		if (ds->ds_userrefs > 0 || ds->ds_phys->ds_num_children > 1) {
-			dmu_buf_will_dirty(ds->ds_dbuf, tx);
-			ds->ds_phys->ds_flags |= DS_FLAG_DEFER_DESTROY;
-			return;
-		}
+		dmu_buf_will_dirty(ds->ds_dbuf, tx);
+		ds->ds_phys->ds_flags |= DS_FLAG_DEFER_DESTROY;
+		return;
 	}
 
 	/* signal any waiters that this dataset is going away */
@@ -3452,16 +3459,6 @@ dsl_dataset_set_reservation(const char *dsname, zprop_source_t source,
 	return (err);
 }
 
-struct dsl_ds_holdarg {
-	dsl_sync_task_group_t *dstg;
-	char *htag;
-	char *snapname;
-	boolean_t recursive;
-	boolean_t gotone;
-	boolean_t temphold;
-	char failed[MAXPATHLEN];
-};
-
 typedef struct zfs_hold_cleanup_arg {
 	dsl_pool_t *dp;
 	uint64_t dsobj;
@@ -3493,11 +3490,10 @@ dsl_register_onexit_hold_cleanup(dsl_dataset_t *ds, const char *htag,
 }
 
 /*
- * The max length of a temporary tag prefix is the number of hex digits
- * required to express UINT64_MAX plus one for the hyphen.
+ * If you add new checks here, you may need to add
+ * additional checks to the "temporary" case in
+ * snapshot_check() in dmu_objset.c.
  */
-#define	MAX_TAG_PREFIX_LEN	17
-
 static int
 dsl_dataset_user_hold_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
@@ -3532,7 +3528,7 @@ dsl_dataset_user_hold_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	return (error);
 }
 
-static void
+void
 dsl_dataset_user_hold_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;

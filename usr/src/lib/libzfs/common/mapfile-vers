@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-
 #
 # MAPFILE HEADER START
 #
@@ -61,6 +58,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	libzfs_mnttab_cache;
 	libzfs_print_on_error;
 	zfs_allocatable_devs;
+	zfs_asprintf;
 	zfs_clone;
 	zfs_close;
 	zfs_create;
@@ -129,6 +127,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_shareall;
 	zfs_share_nfs;
 	zfs_share_smb;
+	zfs_show_diffs;
 	zfs_smb_acl_add;
 	zfs_smb_acl_purge;
 	zfs_smb_acl_remove;
