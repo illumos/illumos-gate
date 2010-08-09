@@ -231,7 +231,12 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 		(void) strlcpy(libpath, libname, sizeof (libpath));
 	}
 
-	/* Open the provider */
+	/*
+	 * Open the provider. Use RTLD_NOW here, as a way to
+	 * catch any providers with incomplete symbols that
+	 * might otherwise cause problems during libpkcs11's
+	 * execution.
+	 */
 	dldesc = dlopen(libpath, RTLD_NOW);
 	if (dldesc == NULL) {
 		dl_error = dlerror();
