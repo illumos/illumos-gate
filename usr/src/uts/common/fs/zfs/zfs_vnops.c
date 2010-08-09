@@ -2949,7 +2949,7 @@ top:
 			 * Are we upgrading ACL from old V0 format
 			 * to V1 format?
 			 */
-			if (zfsvfs->z_version <= ZPL_VERSION_FUID &&
+			if (zfsvfs->z_version >= ZPL_VERSION_FUID &&
 			    zfs_znode_acl_version(zp) ==
 			    ZFS_ACL_VERSION_INITIAL) {
 				dmu_tx_hold_free(tx, acl_obj, 0,

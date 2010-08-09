@@ -2065,10 +2065,12 @@ top:
 	 */
 
 	if ((acl_obj = zfs_external_acl(zp)) != 0) {
-		if (zfsvfs->z_version <= ZPL_VERSION_SA &&
+		if (zfsvfs->z_version >= ZPL_VERSION_FUID &&
 		    zfs_znode_acl_version(zp) <= ZFS_ACL_VERSION_INITIAL) {
 			dmu_tx_hold_free(tx, acl_obj, 0,
 			    DMU_OBJECT_END);
+			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
+			    aclp->z_acl_bytes);
 		} else {
 			dmu_tx_hold_write(tx, acl_obj, 0, aclp->z_acl_bytes);
 		}
