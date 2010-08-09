@@ -686,6 +686,9 @@ fork_fail(proc_t *cp)
 		VN_RELE(cp->p_execdir);
 	if (PTOU(curproc)->u_cwd)
 		refstr_rele(PTOU(curproc)->u_cwd);
+	if (PROC_IS_BRANDED(cp)) {
+		brand_clearbrand(cp, B_TRUE);
+	}
 }
 
 /*
@@ -700,6 +703,10 @@ forklwp_fail(proc_t *p)
 {
 	kthread_t *t;
 	task_t *tk;
+	int branded = 0;
+
+	if (PROC_IS_BRANDED(p))
+		branded = 1;
 
 	while ((t = p->p_tlist) != NULL) {
 		/*
@@ -721,6 +728,9 @@ forklwp_fail(proc_t *p)
 		mutex_exit(&p->p_zone->zone_nlwps_lock);
 
 		ASSERT(t->t_schedctl == NULL);
+
+		if (branded)
+			BROP(p)->b_freelwp(ttolwp(t));
 
 		if (t->t_door != NULL) {
 			kmem_free(t->t_door, sizeof (door_data_t));

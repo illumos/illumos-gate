@@ -375,7 +375,7 @@ proc_exit(int why, int what)
 	 */
 	if (PROC_IS_BRANDED(p)) {
 		lwp_detach_brand_hdlrs(lwp);
-		brand_clearbrand(p);
+		brand_clearbrand(p, B_FALSE);
 	}
 
 	/*

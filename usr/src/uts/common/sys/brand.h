@@ -33,6 +33,7 @@ extern "C" {
 #include <sys/proc.h>
 #include <sys/exec.h>
 #include <sys/modctl.h>
+#include <sys/types.h>
 
 /*
  * All Brands supported by this kernel must use BRAND_VER_1.
@@ -165,7 +166,7 @@ extern brand_t	*brand_find_name(char *);
 extern void	brand_unregister_zone(brand_t *);
 extern int	brand_zone_count(brand_t *);
 extern void	brand_setbrand(proc_t *);
-extern void	brand_clearbrand(proc_t *);
+extern void	brand_clearbrand(proc_t *, boolean_t);
 
 /*
  * The following functions can be shared among kernel brand modules which

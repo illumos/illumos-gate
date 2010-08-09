@@ -330,19 +330,25 @@ brand_setbrand(proc_t *p)
 }
 
 void
-brand_clearbrand(proc_t *p)
+brand_clearbrand(proc_t *p, boolean_t no_lwps)
 {
 	brand_t *bp = p->p_zone->zone_brand;
+	klwp_t *lwp = NULL;
 	ASSERT(bp != NULL);
+	ASSERT(!no_lwps || (p->p_tlist == NULL));
 
 	/*
-	 * We should only be called from exec_common() or proc_exit(),
-	 * when we know the process is single-threaded.
+	 * If called from exec_common() or proc_exit(),
+	 * we know the process is single-threaded.
+	 * If called from fork_fail, p_tlist is NULL.
 	 */
-	ASSERT(p->p_tlist == p->p_tlist->t_forw);
+	if (!no_lwps) {
+		ASSERT(p->p_tlist == p->p_tlist->t_forw);
+		lwp = p->p_tlist->t_lwp;
+	}
 
 	ASSERT(PROC_IS_BRANDED(p));
-	BROP(p)->b_proc_exit(p, p->p_tlist->t_lwp);
+	BROP(p)->b_proc_exit(p, lwp);
 	p->p_brand = &native_brand;
 }
 
@@ -1111,13 +1117,15 @@ brand_solaris_proc_exit(struct proc *p, klwp_t *l, struct brand *pbrand)
 	ASSERT(p->p_brand_data != NULL);
 
 	/*
-	 * We should only be called from proc_exit(), when we know that
-	 * process is single-threaded.
+	 * When called from proc_exit(), we know that process is
+	 * single-threaded and free our lwp brand data.
+	 * otherwise just free p_brand_data and return.
 	 */
-	ASSERT(p->p_tlist == p->p_tlist->t_forw);
-
-	/* upon exit, free our lwp brand data */
-	(void) brand_solaris_freelwp(ttolwp(curthread), pbrand);
+	if (l != NULL) {
+		ASSERT(p->p_tlist == p->p_tlist->t_forw);
+		ASSERT(p->p_tlist->t_lwp == l);
+		(void) brand_solaris_freelwp(l, pbrand);
+	}
 
 	/* upon exit, free our proc brand data */
 	kmem_free(p->p_brand_data, sizeof (brand_proc_data_t));

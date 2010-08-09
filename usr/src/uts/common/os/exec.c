@@ -299,7 +299,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,
 	    exec_file, p->p_cred, brand_action)) != 0) {
 		if (brandme)
-			brand_clearbrand(p);
+			brand_clearbrand(p, B_FALSE);
 		VN_RELE(vp);
 		if (dir != NULL)
 			VN_RELE(dir);
@@ -415,7 +415,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 
 	/* Unbrand ourself if necessary. */
 	if (PROC_IS_BRANDED(p) && (brand_action == EBA_NATIVE))
-		brand_clearbrand(p);
+		brand_clearbrand(p, B_FALSE);
 
 	setregs(&args);
 
