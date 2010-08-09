@@ -32,6 +32,7 @@
 #include <sys/archsystm.h>
 #include <vm/hat_i86.h>
 #include <sys/types.h>
+#include <sys/cpu.h>
 #include <sys/sysmacros.h>
 #include <sys/immu.h>
 
@@ -44,10 +45,6 @@
 /* status data size of invalidation wait descriptor */
 #define	QINV_SYNC_DATA_SIZE	0x4
 
-/* status data value of invalidation wait descriptor */
-#define	QINV_SYNC_DATA_FENCE	1
-#define	QINV_SYNC_DATA_UNFENCE	2
-
 /* invalidation queue head and tail */
 #define	QINV_IQA_HEAD(QH)	BITX((QH), 18, 4)
 #define	QINV_IQA_TAIL_SHIFT	4
@@ -57,38 +54,6 @@ typedef struct qinv_inv_dsc {
 	uint64_t	lo;
 	uint64_t	hi;
 } qinv_dsc_t;
-
-/*
- * struct iotlb_cache_node
- *   the pending data for iotlb flush
- */
-typedef struct iotlb_pend_node {
-	dvcookie_t	*icn_dvcookies;  /* ptr to dvma cookie array */
-	uint_t		icn_count;  /* valid cookie count */
-	uint_t		icn_array_size;  /* array size */
-	list_node_t	node;
-} qinv_iotlb_pend_node_t;
-
-/*
- * struct iotlb_cache_head
- *   the pending head for the iotlb flush
- */
-typedef struct iotlb_pend_head {
-	/* the pending node cache list */
-	kmutex_t	ich_mem_lock;
-	list_t		ich_mem_list;
-} qinv_iotlb_pend_head_t;
-
-/*
- * qinv_iotlb_t
- *   pending data for qiueued invalidation iotlb flush
- */
-typedef struct qinv_iotlb {
-	dvcookie_t	*qinv_iotlb_dvcookies;
-	uint_t		qinv_iotlb_count;
-	uint_t		qinv_iotlb_size;
-	list_node_t	qinv_iotlb_node;
-} qinv_iotlb_t;
 
 /* physical contigous pages for invalidation queue */
 typedef struct qinv_mem {
@@ -111,14 +76,13 @@ typedef struct qinv_mem {
  *
  * qinv_table		- invalidation queue table
  * qinv_sync		- sync status memory for invalidation wait descriptor
- * qinv_iotlb_pend_node	- pending iotlb node
  */
 typedef struct qinv {
 	qinv_mem_t		qinv_table;
 	qinv_mem_t		qinv_sync;
-	qinv_iotlb_pend_head_t qinv_pend_head;
-	qinv_iotlb_pend_node_t  **qinv_iotlb_pend_node;
 } qinv_t;
+
+static void immu_qinv_inv_wait(immu_inv_wait_t *iwp);
 
 static struct immu_flushops immu_qinv_flushops = {
 	immu_qinv_context_fsi,
@@ -126,7 +90,8 @@ static struct immu_flushops immu_qinv_flushops = {
 	immu_qinv_context_gbl,
 	immu_qinv_iotlb_psi,
 	immu_qinv_iotlb_dsi,
-	immu_qinv_iotlb_gbl
+	immu_qinv_iotlb_gbl,
+	immu_qinv_inv_wait
 };
 
 /* helper macro for making queue invalidation descriptor */
@@ -200,13 +165,8 @@ static void qinv_iotlb_common(immu_t *immu, uint_t domain_id,
     uint64_t addr, uint_t am, uint_t hint, tlb_inv_g_t type);
 static void qinv_iec_common(immu_t *immu, uint_t iidx,
     uint_t im, uint_t g);
-static uint_t qinv_alloc_sync_mem_entry(immu_t *immu);
-static void qinv_wait_async_unfence(immu_t *immu,
-    qinv_iotlb_pend_node_t *node);
-static void qinv_wait_sync(immu_t *immu);
-static int qinv_wait_async_finish(immu_t *immu, int *count);
-/*LINTED*/
-static void qinv_wait_async_fence(immu_t *immu);
+static void immu_qinv_inv_wait(immu_inv_wait_t *iwp);
+static void qinv_wait_sync(immu_t *immu, immu_inv_wait_t *iwp);
 /*LINTED*/
 static void qinv_dev_iotlb_common(immu_t *immu, uint16_t sid,
     uint64_t addr, uint_t size, uint_t max_invs_pd);
@@ -219,6 +179,9 @@ qinv_submit_inv_dsc(immu_t *immu, qinv_dsc_t *dsc)
 	qinv_t *qinv;
 	qinv_mem_t *qinv_table;
 	uint_t tail;
+#ifdef DEBUG
+	uint_t count = 0;
+#endif
 
 	qinv = (qinv_t *)immu->immu_qinv;
 	qinv_table = &(qinv->qinv_table);
@@ -231,6 +194,9 @@ qinv_submit_inv_dsc(immu_t *immu, qinv_dsc_t *dsc)
 		qinv_table->qinv_mem_tail = 0;
 
 	while (qinv_table->qinv_mem_head == qinv_table->qinv_mem_tail) {
+#ifdef DEBUG
+		count++;
+#endif
 		/*
 		 * inv queue table exhausted, wait hardware to fetch
 		 * next descriptor
@@ -238,6 +204,9 @@ qinv_submit_inv_dsc(immu_t *immu, qinv_dsc_t *dsc)
 		qinv_table->qinv_mem_head = QINV_IQA_HEAD(
 		    immu_regs_get64(immu, IMMU_REG_INVAL_QH));
 	}
+
+	IMMU_DPROBE3(immu__qinv__sub, uint64_t, dsc->lo, uint64_t, dsc->hi,
+	    uint_t, count);
 
 	bcopy(dsc, qinv_table->qinv_mem_vaddr + tail * QINV_ENTRY_SIZE,
 	    QINV_ENTRY_SIZE);
@@ -331,162 +300,71 @@ qinv_iec_common(immu_t *immu, uint_t iidx, uint_t im, uint_t g)
 }
 
 /*
- * alloc free entry from sync status table
- */
-static uint_t
-qinv_alloc_sync_mem_entry(immu_t *immu)
-{
-	qinv_mem_t *sync_mem;
-	uint_t tail;
-	qinv_t *qinv;
-
-	qinv = (qinv_t *)immu->immu_qinv;
-	sync_mem = &qinv->qinv_sync;
-
-sync_mem_exhausted:
-	mutex_enter(&sync_mem->qinv_mem_lock);
-	tail = sync_mem->qinv_mem_tail;
-	sync_mem->qinv_mem_tail++;
-	if (sync_mem->qinv_mem_tail == sync_mem->qinv_mem_size)
-		sync_mem->qinv_mem_tail = 0;
-
-	if (sync_mem->qinv_mem_head == sync_mem->qinv_mem_tail) {
-		/* should never happen */
-		ddi_err(DER_WARN, NULL, "sync mem exhausted");
-		sync_mem->qinv_mem_tail = tail;
-		mutex_exit(&sync_mem->qinv_mem_lock);
-		delay(IMMU_ALLOC_RESOURCE_DELAY);
-		goto sync_mem_exhausted;
-	}
-	mutex_exit(&sync_mem->qinv_mem_lock);
-
-	return (tail);
-}
-
-/*
- * queued invalidation interface -- invalidation wait descriptor
- *   fence flag not set, need status data to indicate the invalidation
- *   wait descriptor completion
- */
-static void
-qinv_wait_async_unfence(immu_t *immu, qinv_iotlb_pend_node_t *node)
-{
-	qinv_dsc_t dsc;
-	qinv_mem_t *sync_mem;
-	uint64_t saddr;
-	uint_t tail;
-	qinv_t *qinv;
-
-	qinv = (qinv_t *)immu->immu_qinv;
-	sync_mem = &qinv->qinv_sync;
-	tail = qinv_alloc_sync_mem_entry(immu);
-
-	/* plant an iotlb pending node */
-	qinv->qinv_iotlb_pend_node[tail] = node;
-
-	saddr = sync_mem->qinv_mem_paddr + tail * QINV_SYNC_DATA_SIZE;
-
-	/*
-	 * sdata = QINV_SYNC_DATA_UNFENCE, fence = 0, sw = 1, if = 0
-	 * indicate the invalidation wait descriptor completion by
-	 * performing a coherent DWORD write to the status address,
-	 * not by generating an invalidation completion event
-	 */
-	dsc.lo = INV_WAIT_DSC_LOW(QINV_SYNC_DATA_UNFENCE, 0, 1, 0);
-	dsc.hi = INV_WAIT_DSC_HIGH(saddr);
-
-	qinv_submit_inv_dsc(immu, &dsc);
-}
-
-/*
- * queued invalidation interface -- invalidation wait descriptor
- *   fence flag set, indicate descriptors following the invalidation
- *   wait descriptor must be processed by hardware only after the
- *   invalidation wait descriptor completes.
- */
-static void
-qinv_wait_async_fence(immu_t *immu)
-{
-	qinv_dsc_t dsc;
-
-	/* sw = 0, fence = 1, iflag = 0 */
-	dsc.lo = INV_WAIT_DSC_LOW(0, 1, 0, 0);
-	dsc.hi = 0;
-	qinv_submit_inv_dsc(immu, &dsc);
-}
-
-/*
  * queued invalidation interface -- invalidation wait descriptor
  *   wait until the invalidation request finished
  */
 static void
-qinv_wait_sync(immu_t *immu)
+qinv_wait_sync(immu_t *immu, immu_inv_wait_t *iwp)
 {
 	qinv_dsc_t dsc;
-	qinv_mem_t *sync_mem;
-	uint64_t saddr;
-	uint_t tail;
-	qinv_t *qinv;
 	volatile uint32_t *status;
+	uint64_t paddr;
+#ifdef DEBUG
+	uint_t count;
+#endif
 
-	qinv = (qinv_t *)immu->immu_qinv;
-	sync_mem = &qinv->qinv_sync;
-	tail = qinv_alloc_sync_mem_entry(immu);
-	saddr = sync_mem->qinv_mem_paddr + tail * QINV_SYNC_DATA_SIZE;
-	status = (uint32_t *)(sync_mem->qinv_mem_vaddr + tail *
-	    QINV_SYNC_DATA_SIZE);
+	status = &iwp->iwp_vstatus;
+	paddr = iwp->iwp_pstatus;
+
+	*status = IMMU_INV_DATA_PENDING;
+	membar_producer();
 
 	/*
-	 * sdata = QINV_SYNC_DATA_FENCE, fence = 1, sw = 1, if = 0
+	 * sdata = IMMU_INV_DATA_DONE, fence = 1, sw = 1, if = 0
 	 * indicate the invalidation wait descriptor completion by
 	 * performing a coherent DWORD write to the status address,
 	 * not by generating an invalidation completion event
 	 */
-	dsc.lo = INV_WAIT_DSC_LOW(QINV_SYNC_DATA_FENCE, 1, 1, 0);
-	dsc.hi = INV_WAIT_DSC_HIGH(saddr);
+	dsc.lo = INV_WAIT_DSC_LOW(IMMU_INV_DATA_DONE, 1, 1, 0);
+	dsc.hi = INV_WAIT_DSC_HIGH(paddr);
 
 	qinv_submit_inv_dsc(immu, &dsc);
 
-	while ((*status) != QINV_SYNC_DATA_FENCE)
-		iommu_cpu_nop();
-	*status = QINV_SYNC_DATA_UNFENCE;
+	if (iwp->iwp_sync) {
+#ifdef DEBUG
+		count = 0;
+		while (*status != IMMU_INV_DATA_DONE) {
+			count++;
+			ht_pause();
+		}
+		DTRACE_PROBE2(immu__wait__sync, const char *, iwp->iwp_name,
+		    uint_t, count);
+#else
+		while (*status != IMMU_INV_DATA_DONE)
+			ht_pause();
+#endif
+	}
 }
 
-/* get already completed invalidation wait requests */
-static int
-qinv_wait_async_finish(immu_t *immu, int *cnt)
+static void
+immu_qinv_inv_wait(immu_inv_wait_t *iwp)
 {
-	qinv_mem_t *sync_mem;
-	int index;
-	qinv_t *qinv;
-	volatile uint32_t *value;
+	volatile uint32_t *status = &iwp->iwp_vstatus;
+#ifdef DEBUG
+	uint_t count;
 
-	ASSERT((*cnt) == 0);
-
-	qinv = (qinv_t *)immu->immu_qinv;
-	sync_mem = &qinv->qinv_sync;
-
-	mutex_enter(&sync_mem->qinv_mem_lock);
-	index = sync_mem->qinv_mem_head;
-	value = (uint32_t *)(sync_mem->qinv_mem_vaddr + index
-	    * QINV_SYNC_DATA_SIZE);
-	while (*value == QINV_SYNC_DATA_UNFENCE) {
-		*value = 0;
-		(*cnt)++;
-		sync_mem->qinv_mem_head++;
-		if (sync_mem->qinv_mem_head == sync_mem->qinv_mem_size) {
-			sync_mem->qinv_mem_head = 0;
-			value = (uint32_t *)(sync_mem->qinv_mem_vaddr);
-		} else
-			value = (uint32_t *)((char *)value +
-			    QINV_SYNC_DATA_SIZE);
+	count = 0;
+	while (*status != IMMU_INV_DATA_DONE) {
+		count++;
+		ht_pause();
 	}
+	DTRACE_PROBE2(immu__wait__async, const char *, iwp->iwp_name,
+	    uint_t, count);
+#else
 
-	mutex_exit(&sync_mem->qinv_mem_lock);
-	if ((*cnt) > 0)
-		return (index);
-	else
-		return (-1);
+	while (*status != IMMU_INV_DATA_DONE)
+		ht_pause();
+#endif
 }
 
 /*
@@ -608,15 +486,6 @@ qinv_setup(immu_t *immu)
 	mutex_init(&(qinv->qinv_table.qinv_mem_lock), NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&(qinv->qinv_sync.qinv_mem_lock), NULL, MUTEX_DRIVER, NULL);
 
-	/*
-	 * init iotlb pend node for submitting invalidation iotlb
-	 * queue request
-	 */
-	qinv->qinv_iotlb_pend_node = (qinv_iotlb_pend_node_t **)
-	    kmem_zalloc(qinv->qinv_sync.qinv_mem_size
-	    * sizeof (qinv_iotlb_pend_node_t *), KM_SLEEP);
-
-	/* set invalidation queue structure */
 	immu->immu_qinv = qinv;
 
 	mutex_exit(&(immu->immu_qinv_lock));
@@ -698,11 +567,11 @@ immu_qinv_startup(immu_t *immu)
  */
 void
 immu_qinv_context_fsi(immu_t *immu, uint8_t function_mask,
-    uint16_t source_id, uint_t domain_id)
+    uint16_t source_id, uint_t domain_id, immu_inv_wait_t *iwp)
 {
 	qinv_context_common(immu, function_mask, source_id,
 	    domain_id, CTT_INV_G_DEVICE);
-	qinv_wait_sync(immu);
+	qinv_wait_sync(immu, iwp);
 }
 
 /*
@@ -710,10 +579,10 @@ immu_qinv_context_fsi(immu_t *immu, uint8_t function_mask,
  *   domain based context cache invalidation
  */
 void
-immu_qinv_context_dsi(immu_t *immu, uint_t domain_id)
+immu_qinv_context_dsi(immu_t *immu, uint_t domain_id, immu_inv_wait_t *iwp)
 {
 	qinv_context_common(immu, 0, 0, domain_id, CTT_INV_G_DOMAIN);
-	qinv_wait_sync(immu);
+	qinv_wait_sync(immu, iwp);
 }
 
 /*
@@ -721,10 +590,10 @@ immu_qinv_context_dsi(immu_t *immu, uint_t domain_id)
  *   invalidation global context cache
  */
 void
-immu_qinv_context_gbl(immu_t *immu)
+immu_qinv_context_gbl(immu_t *immu, immu_inv_wait_t *iwp)
 {
 	qinv_context_common(immu, 0, 0, 0, CTT_INV_G_GLOBAL);
-	qinv_wait_sync(immu);
+	qinv_wait_sync(immu, iwp);
 }
 
 /*
@@ -733,7 +602,7 @@ immu_qinv_context_gbl(immu_t *immu)
  */
 void
 immu_qinv_iotlb_psi(immu_t *immu, uint_t domain_id,
-	uint64_t dvma, uint_t count, uint_t hint)
+	uint64_t dvma, uint_t count, uint_t hint, immu_inv_wait_t *iwp)
 {
 	uint_t am = 0;
 	uint_t max_am;
@@ -761,6 +630,8 @@ immu_qinv_iotlb_psi(immu_t *immu, uint_t domain_id,
 		qinv_iotlb_common(immu, domain_id, dvma,
 		    0, hint, TLB_INV_G_DOMAIN);
 	}
+
+	qinv_wait_sync(immu, iwp);
 }
 
 /*
@@ -768,10 +639,10 @@ immu_qinv_iotlb_psi(immu_t *immu, uint_t domain_id,
  *   domain based iotlb invalidation
  */
 void
-immu_qinv_iotlb_dsi(immu_t *immu, uint_t domain_id)
+immu_qinv_iotlb_dsi(immu_t *immu, uint_t domain_id, immu_inv_wait_t *iwp)
 {
 	qinv_iotlb_common(immu, domain_id, 0, 0, 0, TLB_INV_G_DOMAIN);
-	qinv_wait_sync(immu);
+	qinv_wait_sync(immu, iwp);
 }
 
 /*
@@ -779,97 +650,32 @@ immu_qinv_iotlb_dsi(immu_t *immu, uint_t domain_id)
  *    global iotlb invalidation
  */
 void
-immu_qinv_iotlb_gbl(immu_t *immu)
+immu_qinv_iotlb_gbl(immu_t *immu, immu_inv_wait_t *iwp)
 {
 	qinv_iotlb_common(immu, 0, 0, 0, 0, TLB_INV_G_GLOBAL);
-	qinv_wait_sync(immu);
+	qinv_wait_sync(immu, iwp);
 }
-
-
-
-/*
- * the plant wait operation for queued invalidation interface
- */
-void
-immu_qinv_plant(immu_t *immu, dvcookie_t *dvcookies,
-	uint_t count, uint_t array_size)
-{
-	qinv_t *qinv;
-	qinv_iotlb_pend_node_t *node = NULL;
-	qinv_iotlb_pend_head_t *head;
-
-	qinv = (qinv_t *)immu->immu_qinv;
-
-	head = &(qinv->qinv_pend_head);
-	mutex_enter(&(head->ich_mem_lock));
-	node = list_head(&(head->ich_mem_list));
-	if (node) {
-		list_remove(&(head->ich_mem_list), node);
-	}
-	mutex_exit(&(head->ich_mem_lock));
-
-	/* no cache, alloc one */
-	if (node == NULL) {
-		node = kmem_zalloc(sizeof (qinv_iotlb_pend_node_t), KM_SLEEP);
-	}
-	node->icn_dvcookies = dvcookies;
-	node->icn_count = count;
-	node->icn_array_size = array_size;
-
-	/* plant an invalidation wait descriptor, not wait its completion */
-	qinv_wait_async_unfence(immu, node);
-}
-
-/*
- * the reap wait operation for queued invalidation interface
- */
-void
-immu_qinv_reap(immu_t *immu)
-{
-	int index, cnt = 0;
-	qinv_iotlb_pend_node_t *node;
-	qinv_iotlb_pend_head_t *head;
-	qinv_t *qinv;
-
-	qinv = (qinv_t *)immu->immu_qinv;
-	head = &(qinv->qinv_pend_head);
-
-	index = qinv_wait_async_finish(immu, &cnt);
-
-	while (cnt--) {
-		node = qinv->qinv_iotlb_pend_node[index];
-		if (node == NULL)
-			continue;
-		mutex_enter(&(head->ich_mem_lock));
-		list_insert_head(&(head->ich_mem_list), node);
-		mutex_exit(&(head->ich_mem_lock));
-		qinv->qinv_iotlb_pend_node[index] = NULL;
-		index++;
-		if (index == qinv->qinv_sync.qinv_mem_size)
-			index = 0;
-	}
-}
-
 
 /* queued invalidation interface -- global invalidate interrupt entry cache */
 void
-immu_qinv_intr_global(immu_t *immu)
+immu_qinv_intr_global(immu_t *immu, immu_inv_wait_t *iwp)
 {
 	qinv_iec_common(immu, 0, 0, IEC_INV_GLOBAL);
-	qinv_wait_sync(immu);
+	qinv_wait_sync(immu, iwp);
 }
 
 /* queued invalidation interface -- invalidate single interrupt entry cache */
 void
-immu_qinv_intr_one_cache(immu_t *immu, uint_t iidx)
+immu_qinv_intr_one_cache(immu_t *immu, uint_t iidx, immu_inv_wait_t *iwp)
 {
 	qinv_iec_common(immu, iidx, 0, IEC_INV_INDEX);
-	qinv_wait_sync(immu);
+	qinv_wait_sync(immu, iwp);
 }
 
 /* queued invalidation interface -- invalidate interrupt entry caches */
 void
-immu_qinv_intr_caches(immu_t *immu, uint_t iidx, uint_t cnt)
+immu_qinv_intr_caches(immu_t *immu, uint_t iidx, uint_t cnt,
+    immu_inv_wait_t *iwp)
 {
 	uint_t	i, mask = 0;
 
@@ -880,7 +686,7 @@ immu_qinv_intr_caches(immu_t *immu, uint_t iidx, uint_t cnt)
 		for (i = 0; i < cnt; i++) {
 			qinv_iec_common(immu, iidx + cnt, 0, IEC_INV_INDEX);
 		}
-		qinv_wait_sync(immu);
+		qinv_wait_sync(immu, iwp);
 		return;
 	}
 
@@ -892,13 +698,13 @@ immu_qinv_intr_caches(immu_t *immu, uint_t iidx, uint_t cnt)
 		for (i = 0; i < cnt; i++) {
 			qinv_iec_common(immu, iidx + cnt, 0, IEC_INV_INDEX);
 		}
-		qinv_wait_sync(immu);
+		qinv_wait_sync(immu, iwp);
 		return;
 	}
 
 	qinv_iec_common(immu, iidx, mask, IEC_INV_INDEX);
 
-	qinv_wait_sync(immu);
+	qinv_wait_sync(immu, iwp);
 }
 
 void

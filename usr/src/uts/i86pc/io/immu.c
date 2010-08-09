@@ -53,7 +53,6 @@
 #include <sys/spl.h>
 #include <sys/archsystm.h>
 #include <sys/x86_archext.h>
-#include <sys/rootnex.h>
 #include <sys/avl.h>
 #include <sys/bootconf.h>
 #include <sys/bootinfo.h>
@@ -72,7 +71,7 @@ boolean_t immu_dvma_enable = B_TRUE;
 /* accessed in other files so not static */
 boolean_t immu_gfxdvma_enable = B_TRUE;
 boolean_t immu_intrmap_enable = B_FALSE;
-boolean_t immu_qinv_enable = B_FALSE;
+boolean_t immu_qinv_enable = B_TRUE;
 
 /* various quirks that need working around */
 
@@ -98,7 +97,6 @@ immu_flags_t immu_global_dvma_flags;
 dev_info_t *root_devinfo;
 kmutex_t immu_lock;
 list_t immu_list;
-void *immu_pgtable_cache;
 boolean_t immu_setup;
 boolean_t immu_running;
 boolean_t immu_quiesced;
@@ -112,6 +110,11 @@ static char **unity_driver_array;
 static uint_t nunity;
 static char **xlate_driver_array;
 static uint_t nxlate;
+
+static char **premap_driver_array;
+static uint_t npremap;
+static char **nopremap_driver_array;
+static uint_t nnopremap;
 /* ###################### Utility routines ############################# */
 
 /*
@@ -124,8 +127,6 @@ check_mobile4(dev_info_t *dip, void *arg)
 	int vendor, device;
 	int *ip = (int *)arg;
 
-	ASSERT(arg);
-
 	vendor = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "vendor-id", -1);
 	device = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
@@ -133,7 +134,7 @@ check_mobile4(dev_info_t *dip, void *arg)
 
 	if (vendor == 0x8086 && device == 0x2a40) {
 		*ip = B_TRUE;
-		ddi_err(DER_NOTE, dip, "IMMU: Mobile 4 chipset detected. "
+		ddi_err(DER_NOTE, dip, "iommu: Mobile 4 chipset detected. "
 		    "Force setting IOMMU write buffer");
 		return (DDI_WALK_TERMINATE);
 	} else {
@@ -145,7 +146,12 @@ static void
 map_bios_rsvd_mem(dev_info_t *dip)
 {
 	struct memlist *mp;
-	int e;
+
+	/*
+	 * Make sure the domain for the device is set up before
+	 * mapping anything.
+	 */
+	(void) immu_dvma_device_setup(dip, 0);
 
 	memlist_read_lock();
 
@@ -153,15 +159,14 @@ map_bios_rsvd_mem(dev_info_t *dip)
 	while (mp != NULL) {
 		memrng_t mrng = {0};
 
-		ddi_err(DER_LOG, dip, "IMMU: Mapping BIOS rsvd range "
+		ddi_err(DER_LOG, dip, "iommu: Mapping BIOS rsvd range "
 		    "[0x%" PRIx64 " - 0x%"PRIx64 "]\n", mp->ml_address,
 		    mp->ml_address + mp->ml_size);
 
 		mrng.mrng_start = IMMU_ROUNDOWN(mp->ml_address);
 		mrng.mrng_npages = IMMU_ROUNDUP(mp->ml_size) / IMMU_PAGESIZE;
 
-		e = immu_dvma_map(NULL, NULL, &mrng, 0, dip, IMMU_FLAGS_MEMRNG);
-		ASSERT(e == DDI_DMA_MAPPED || e == DDI_DMA_USE_PHYSICAL);
+		(void) immu_map_memrange(dip, &mrng);
 
 		mp = mp->ml_next;
 	}
@@ -180,7 +185,8 @@ check_conf(dev_info_t *dip, void *arg)
 	immu_devi_t *immu_devi;
 	const char *dname;
 	uint_t i;
-	int hasprop = 0;
+	int hasmapprop = 0, haspreprop = 0;
+	boolean_t old_premap;
 
 	/*
 	 * Only PCI devices can use an IOMMU. Legacy ISA devices
@@ -196,25 +202,45 @@ check_conf(dev_info_t *dip, void *arg)
 
 	for (i = 0; i < nunity; i++) {
 		if (strcmp(unity_driver_array[i], dname) == 0) {
-			hasprop = 1;
+			hasmapprop = 1;
 			immu_devi->imd_dvma_flags |= IMMU_FLAGS_UNITY;
 		}
 	}
 
 	for (i = 0; i < nxlate; i++) {
 		if (strcmp(xlate_driver_array[i], dname) == 0) {
-			hasprop = 1;
+			hasmapprop = 1;
 			immu_devi->imd_dvma_flags &= ~IMMU_FLAGS_UNITY;
+		}
+	}
+
+	old_premap = immu_devi->imd_use_premap;
+
+	for (i = 0; i < nnopremap; i++) {
+		if (strcmp(nopremap_driver_array[i], dname) == 0) {
+			haspreprop = 1;
+			immu_devi->imd_use_premap = B_FALSE;
+		}
+	}
+
+	for (i = 0; i < npremap; i++) {
+		if (strcmp(premap_driver_array[i], dname) == 0) {
+			haspreprop = 1;
+			immu_devi->imd_use_premap = B_TRUE;
 		}
 	}
 
 	/*
 	 * Report if we changed the value from the default.
 	 */
-	if (hasprop && (immu_devi->imd_dvma_flags ^ immu_global_dvma_flags))
+	if (hasmapprop && (immu_devi->imd_dvma_flags ^ immu_global_dvma_flags))
 		ddi_err(DER_LOG, dip, "using %s DVMA mapping",
 		    immu_devi->imd_dvma_flags & IMMU_FLAGS_UNITY ?
 		    DDI_DVMA_MAPTYPE_UNITY : DDI_DVMA_MAPTYPE_XLATE);
+
+	if (haspreprop && (immu_devi->imd_use_premap != old_premap))
+		ddi_err(DER_LOG, dip, "%susing premapped DVMA space",
+		    immu_devi->imd_use_premap ? "" : "not ");
 }
 
 /*
@@ -263,11 +289,10 @@ check_lpc(dev_info_t *dip, void *arg)
 	immu_devi_t *immu_devi;
 
 	immu_devi = immu_devi_get(dip);
-	ASSERT(immu_devi);
 	if (immu_devi->imd_lpc == B_TRUE) {
-		ddi_err(DER_LOG, dip, "IMMU: Found LPC device");
+		ddi_err(DER_LOG, dip, "iommu: Found LPC device");
 		/* This will put the immu_devi on the LPC "specials" list */
-		(void) immu_dvma_get_immu(dip, IMMU_FLAGS_SLEEP);
+		(void) immu_dvma_device_setup(dip, IMMU_FLAGS_SLEEP);
 	}
 }
 
@@ -281,10 +306,9 @@ check_gfx(dev_info_t *dip, void *arg)
 	immu_devi_t *immu_devi;
 
 	immu_devi = immu_devi_get(dip);
-	ASSERT(immu_devi);
 	if (immu_devi->imd_display == B_TRUE) {
 		immu_devi->imd_dvma_flags |= IMMU_FLAGS_UNITY;
-		ddi_err(DER_LOG, dip, "IMMU: Found GFX device");
+		ddi_err(DER_LOG, dip, "iommu: Found GFX device");
 		/* This will put the immu_devi on the GFX "specials" list */
 		(void) immu_dvma_get_immu(dip, IMMU_FLAGS_SLEEP);
 	}
@@ -365,9 +389,6 @@ static void
 get_conf_opt(char *bopt, boolean_t *kvar)
 {
 	char *val = NULL;
-
-	ASSERT(bopt);
-	ASSERT(kvar);
 
 	/*
 	 * Check the rootnex.conf property
@@ -577,6 +598,24 @@ mapping_list_setup(void)
 		xlate_driver_array = string_array;
 		nxlate = nstrings;
 	}
+
+	if (ddi_prop_lookup_string_array(
+	    makedevice(ddi_name_to_major("rootnex"), 0), root_devinfo,
+	    DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
+	    "immu-dvma-premap-drivers",
+	    &string_array, &nstrings) == DDI_PROP_SUCCESS) {
+		premap_driver_array = string_array;
+		npremap = nstrings;
+	}
+
+	if (ddi_prop_lookup_string_array(
+	    makedevice(ddi_name_to_major("rootnex"), 0), root_devinfo,
+	    DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
+	    "immu-dvma-nopremap-drivers",
+	    &string_array, &nstrings) == DDI_PROP_SUCCESS) {
+		nopremap_driver_array = string_array;
+		nnopremap = nstrings;
+	}
 }
 
 /*
@@ -589,8 +628,6 @@ blacklisted_driver(void)
 	char **strptr;
 	int i;
 	major_t maj;
-
-	ASSERT((black_array == NULL) ^ (nblacks != 0));
 
 	/* need at least 2 strings */
 	if (nblacks < 2) {
@@ -624,8 +661,6 @@ blacklisted_smbios(void)
 	char *mfg, *product, *version;
 	char **strptr;
 	int i;
-
-	ASSERT((black_array == NULL) ^ (nblacks != 0));
 
 	/* need at least 4 strings for this setting */
 	if (nblacks < 4) {
@@ -668,7 +703,6 @@ blacklisted_smbios(void)
 static boolean_t
 blacklisted_acpi(void)
 {
-	ASSERT((black_array == NULL) ^ (nblacks != 0));
 	if (nblacks == 0) {
 		return (B_FALSE);
 	}
@@ -734,9 +768,20 @@ blacklist_destroy(void)
 		black_array = NULL;
 		nblacks = 0;
 	}
+}
 
-	ASSERT(black_array == NULL);
-	ASSERT(nblacks == 0);
+static char *
+immu_alloc_name(const char *str, int instance)
+{
+	size_t slen;
+	char *s;
+
+	slen = strlen(str) + IMMU_ISTRLEN + 1;
+	s = kmem_zalloc(slen, VM_SLEEP);
+	if (s != NULL)
+		(void) snprintf(s, slen, "%s%d", str, instance);
+
+	return (s);
 }
 
 
@@ -749,6 +794,8 @@ static void *
 immu_state_alloc(int seg, void *dmar_unit)
 {
 	immu_t *immu;
+	char *nodename, *hcachename, *pcachename;
+	int instance;
 
 	dmar_unit = immu_dmar_walk_units(seg, dmar_unit);
 	if (dmar_unit == NULL) {
@@ -763,9 +810,14 @@ immu_state_alloc(int seg, void *dmar_unit)
 	mutex_enter(&(immu->immu_lock));
 
 	immu->immu_dmar_unit = dmar_unit;
-	immu->immu_name = ddi_strdup(immu_dmar_unit_name(dmar_unit),
-	    KM_SLEEP);
 	immu->immu_dip = immu_dmar_unit_dip(dmar_unit);
+
+	nodename = ddi_node_name(immu->immu_dip);
+	instance = ddi_get_instance(immu->immu_dip);
+
+	immu->immu_name = immu_alloc_name(nodename, instance);
+	if (immu->immu_name == NULL)
+		return (NULL);
 
 	/*
 	 * the immu_intr_lock mutex is grabbed by the IOMMU
@@ -808,9 +860,24 @@ immu_state_alloc(int seg, void *dmar_unit)
 	 */
 	list_insert_tail(&immu_list, immu);
 
+	pcachename = immu_alloc_name("immu_pgtable_cache", instance);
+	if (pcachename == NULL)
+		return (NULL);
+
+	hcachename = immu_alloc_name("immu_hdl_cache", instance);
+	if (hcachename == NULL)
+		return (NULL);
+
+	immu->immu_pgtable_cache = kmem_cache_create(pcachename,
+	    sizeof (pgtable_t), 0, pgtable_ctor, pgtable_dtor, NULL, immu,
+	    NULL, 0);
+	immu->immu_hdl_cache = kmem_cache_create(hcachename,
+	    sizeof (immu_hdl_priv_t), 64, immu_hdl_priv_ctor,
+	    NULL, NULL, immu, NULL, 0);
+
 	mutex_exit(&(immu->immu_lock));
 
-	ddi_err(DER_LOG, immu->immu_dip, "IMMU: unit setup");
+	ddi_err(DER_LOG, immu->immu_dip, "unit setup");
 
 	immu_dmar_set_immu(dmar_unit, immu);
 
@@ -824,21 +891,12 @@ immu_subsystems_setup(void)
 	void *unit_hdl;
 
 	ddi_err(DER_VERB, NULL,
-	    "Creating state structures for Intel IOMMU units\n");
-
-	ASSERT(immu_setup == B_FALSE);
-	ASSERT(immu_running == B_FALSE);
+	    "Creating state structures for Intel IOMMU units");
 
 	mutex_init(&immu_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&immu_list, sizeof (immu_t), offsetof(immu_t, immu_node));
 
 	mutex_enter(&immu_lock);
-
-	ASSERT(immu_pgtable_cache == NULL);
-
-	immu_pgtable_cache = kmem_cache_create("immu_pgtable_cache",
-	    sizeof (pgtable_t), 0,
-	    pgtable_ctor, pgtable_dtor, NULL, NULL, NULL, 0);
 
 	unit_hdl = NULL;
 	for (seg = 0; seg < IMMU_MAXSEG; seg++) {
@@ -865,11 +923,9 @@ static void
 immu_subsystems_startup(void)
 {
 	immu_t *immu;
+	iommulib_ops_t *iommulib_ops;
 
 	mutex_enter(&immu_lock);
-
-	ASSERT(immu_setup == B_TRUE);
-	ASSERT(immu_running == B_FALSE);
 
 	immu_dmar_startup();
 
@@ -893,6 +949,12 @@ immu_subsystems_startup(void)
 		immu_regs_startup(immu);
 
 		mutex_exit(&(immu->immu_lock));
+
+		iommulib_ops = kmem_alloc(sizeof (iommulib_ops_t), KM_SLEEP);
+		*iommulib_ops = immulib_ops;
+		iommulib_ops->ilops_data = (void *)immu;
+		(void) iommulib_iommu_register(immu->immu_dip, iommulib_ops,
+		    &immu->immu_iommulib_handle);
 	}
 
 	mutex_exit(&immu_lock);
@@ -921,11 +983,6 @@ immu_walk_ancestor(
 	dev_info_t *pdip;
 	int level;
 	int error = DDI_SUCCESS;
-
-	ASSERT(root_devinfo);
-	ASSERT(rdip);
-	ASSERT(rdip != root_devinfo);
-	ASSERT(func);
 
 	/* ddip and immu can be NULL */
 
@@ -969,7 +1026,6 @@ immu_init(void)
 	char *phony_reg = "A thing of beauty is a joy forever";
 
 	/* Set some global shorthands that are needed by all of IOMMU code */
-	ASSERT(root_devinfo == NULL);
 	root_devinfo = ddi_root_node();
 
 	/*
@@ -1107,7 +1163,7 @@ immu_startup(void)
 
 	if (immu_setup == B_FALSE) {
 		ddi_err(DER_WARN, NULL, "Intel IOMMU not setup, "
-		    "skipping IOMU startup");
+		    "skipping IOMMU startup");
 		return;
 	}
 
@@ -1119,38 +1175,6 @@ immu_startup(void)
 	immu_subsystems_startup();
 
 	immu_running = B_TRUE;
-}
-
-/*
- * immu_map_sgl()
- * 	called from rootnex_coredma_bindhdl() when Intel
- *	IOMMU is enabled to build DVMA cookies and map them.
- */
-int
-immu_map_sgl(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
-    int prealloc_count, dev_info_t *rdip)
-{
-	if (immu_running == B_FALSE) {
-		return (DDI_DMA_USE_PHYSICAL);
-	}
-
-	return (immu_dvma_map(hp, dmareq, NULL, prealloc_count, rdip,
-	    IMMU_FLAGS_DMAHDL));
-}
-
-/*
- * immu_unmap_sgl()
- * 	called from rootnex_coredma_unbindhdl(), to unmap DVMA
- * 	cookies and free them
- */
-int
-immu_unmap_sgl(ddi_dma_impl_t *hp, dev_info_t *rdip)
-{
-	if (immu_running == B_FALSE) {
-		return (DDI_DMA_USE_PHYSICAL);
-	}
-
-	return (immu_dvma_unmap(hp, rdip));
 }
 
 /*
@@ -1194,8 +1218,6 @@ immu_quiesce(void)
 	if (immu_running == B_FALSE)
 		return (DDI_SUCCESS);
 
-	ASSERT(immu_setup == B_TRUE);
-
 	immu = list_head(&immu_list);
 	for (; immu; immu = list_next(&immu_list, immu)) {
 
@@ -1205,9 +1227,9 @@ immu_quiesce(void)
 
 		/* flush caches */
 		rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
-		immu_flush_context_gbl(immu);
+		immu_flush_context_gbl(immu, &immu->immu_ctx_inv_wait);
+		immu_flush_iotlb_gbl(immu, &immu->immu_ctx_inv_wait);
 		rw_exit(&(immu->immu_ctx_rwlock));
-		immu_flush_iotlb_gbl(immu);
 		immu_regs_wbf_flush(immu);
 
 		mutex_enter(&(immu->immu_lock));
@@ -1252,9 +1274,6 @@ immu_unquiesce(void)
 	if (immu_quiesced == B_FALSE)
 		return (DDI_SUCCESS);
 
-	ASSERT(immu_setup == B_TRUE);
-	ASSERT(immu_running == B_FALSE);
-
 	immu = list_head(&immu_list);
 	for (; immu; immu = list_next(&immu_list, immu)) {
 
@@ -1274,9 +1293,9 @@ immu_unquiesce(void)
 
 		/* flush caches before unquiesce */
 		rw_enter(&(immu->immu_ctx_rwlock), RW_WRITER);
-		immu_flush_context_gbl(immu);
+		immu_flush_context_gbl(immu, &immu->immu_ctx_inv_wait);
+		immu_flush_iotlb_gbl(immu, &immu->immu_ctx_inv_wait);
 		rw_exit(&(immu->immu_ctx_rwlock));
-		immu_flush_iotlb_gbl(immu);
 
 		/*
 		 * Set IOMMU unit's regs to do
@@ -1301,6 +1320,22 @@ immu_unquiesce(void)
 	mutex_exit(&immu_lock);
 
 	return (ret);
+}
+
+void
+immu_init_inv_wait(immu_inv_wait_t *iwp, const char *name, boolean_t sync)
+{
+	caddr_t vaddr;
+	uint64_t paddr;
+
+	iwp->iwp_sync = sync;
+
+	vaddr = (caddr_t)&iwp->iwp_vstatus;
+	paddr = pfn_to_pa(hat_getpfnum(kas.a_hat, vaddr));
+	paddr += ((uintptr_t)vaddr) & MMU_PAGEOFFSET;
+
+	iwp->iwp_pstatus = paddr;
+	iwp->iwp_name = name;
 }
 
 /* ##############  END Intel IOMMU entry points ################## */

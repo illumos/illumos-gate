@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DDIDMAREQ_H
@@ -66,6 +65,20 @@ struct phy_address {
 };
 
 /*
+ * Structure to describe an array DVMA addresses.
+ * Under normal circumstances, dv_nseg will be 1.
+ * dvs_start is always page aligned.
+ */
+struct dvma_address {
+	size_t dv_off;
+	size_t dv_nseg;
+	struct dvmaseg {
+		uint64_t dvs_start;
+		size_t dvs_len;
+	} *dv_seg;
+};
+
+/*
  * A union of all of the above structures.
  *
  * This union describes the relationship between
@@ -75,6 +88,7 @@ typedef union {
 	struct v_address virt_obj;	/* Some virtual address		*/
 	struct pp_address pp_obj;	/* Some page-based address	*/
 	struct phy_address phys_obj;	/* Some physical address	*/
+	struct dvma_address dvma_obj;
 } ddi_dma_aobj_t;
 
 /*
@@ -85,7 +99,8 @@ typedef enum {
 	DMA_OTYP_VADDR = 0,	/* enforce starting value of zero */
 	DMA_OTYP_PAGES,
 	DMA_OTYP_PADDR,
-	DMA_OTYP_BUFVADDR
+	DMA_OTYP_BUFVADDR,
+	DMA_OTYP_DVADDR
 } ddi_dma_atyp_t;
 
 /*

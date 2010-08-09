@@ -1401,7 +1401,8 @@ detach_node(dev_info_t *dip, uint_t flag)
 	/*
 	 * Close any iommulib mediated linkage to an IOMMU
 	 */
-	iommulib_nex_close(dip);
+	if (IOMMU_USED(dip))
+		iommulib_nex_close(dip);
 #endif
 
 	/* destroy the taskq */

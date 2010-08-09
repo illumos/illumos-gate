@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_ARCHSYSTM_H
@@ -48,7 +47,6 @@ extern void setcr0(ulong_t);
 extern ulong_t getcr8(void);
 extern void setcr8(ulong_t);
 extern ulong_t getcr2(void);
-extern void iommu_cpu_nop(void);
 extern void clflush_insn(caddr_t addr);
 extern void mfence_insn(void);
 

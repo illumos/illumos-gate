@@ -4246,22 +4246,6 @@ ftrace_interrupt_enable(ftrace_icookie_t cookie)
 
 /*ARGSUSED*/
 void
-iommu_cpu_nop(void)
-{}
-
-#else /* __lint */
-
-	ENTRY(iommu_cpu_nop)
-	rep;	nop
-	ret
-	SET_SIZE(iommu_cpu_nop)
-
-#endif /* __lint */
-
-#if defined (__lint)
-
-/*ARGSUSED*/
-void
 clflush_insn(caddr_t addr)
 {}
 

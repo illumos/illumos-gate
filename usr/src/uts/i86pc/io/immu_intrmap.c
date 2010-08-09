@@ -38,6 +38,7 @@
 
 typedef struct intrmap_private {
 	immu_t		*ir_immu;
+	immu_inv_wait_t	ir_inv_wait;
 	uint16_t	ir_idx;
 	uint32_t	ir_sid_svt_sq;
 } intrmap_private_t;
@@ -573,6 +574,7 @@ immu_intr_handler(immu_t *immu)
 			    (sid >> 8) & 0xff, (sid >> 3) & 0x1f, sid & 0x7,
 			    immu_dvma_faults[MIN(fault_reason,
 			    DVMA_MAX_FAULTS)]);
+			immu_print_fault_info(sid, pg_addr);
 		} else if (fault_reason < 0x27) {
 			/* intr-remapping fault */
 			ddi_err(DER_WARN, idip,
@@ -666,6 +668,7 @@ immu_intrmap_alloc(void **intrmap_private_tbl, dev_info_t *dip,
 {
 	immu_t	*immu;
 	intrmap_t *intrmap;
+	immu_inv_wait_t *iwp;
 	uint32_t		idx, i;
 	uint32_t		sid_svt_sq;
 	intrmap_private_t	*intrmap_private;
@@ -702,10 +705,12 @@ immu_intrmap_alloc(void **intrmap_private_tbl, dev_info_t *dip,
 
 	sid_svt_sq = intrmap_private->ir_sid_svt_sq =
 	    get_sid(dip, type, ioapic_index);
+	iwp = &intrmap_private->ir_inv_wait;
+	immu_init_inv_wait(iwp, "intrmaplocal", B_TRUE);
 
 	if (count == 1) {
 		if (IMMU_CAP_GET_CM(immu->immu_regs_cap)) {
-			immu_qinv_intr_one_cache(immu, idx);
+			immu_qinv_intr_one_cache(immu, idx, iwp);
 		} else {
 			immu_regs_wbf_flush(immu);
 		}
@@ -723,7 +728,7 @@ immu_intrmap_alloc(void **intrmap_private_tbl, dev_info_t *dip,
 	}
 
 	if (IMMU_CAP_GET_CM(immu->immu_regs_cap)) {
-		immu_qinv_intr_caches(immu, idx, count);
+		immu_qinv_intr_caches(immu, idx, count, iwp);
 	} else {
 		immu_regs_wbf_flush(immu);
 	}
@@ -742,6 +747,7 @@ immu_intrmap_map(void *intrmap_private, void *intrmap_data, uint16_t type,
     int count)
 {
 	immu_t	*immu;
+	immu_inv_wait_t	*iwp;
 	intrmap_t	*intrmap;
 	ioapic_rdt_t	*irdt = (ioapic_rdt_t *)intrmap_data;
 	msi_regs_t	*mregs = (msi_regs_t *)intrmap_data;
@@ -755,6 +761,7 @@ immu_intrmap_map(void *intrmap_private, void *intrmap_data, uint16_t type,
 
 	idx = INTRMAP_PRIVATE(intrmap_private)->ir_idx;
 	immu = INTRMAP_PRIVATE(intrmap_private)->ir_immu;
+	iwp = &INTRMAP_PRIVATE(intrmap_private)->ir_inv_wait;
 	intrmap = immu->immu_intrmap;
 	sid_svt_sq = INTRMAP_PRIVATE(intrmap_private)->ir_sid_svt_sq;
 
@@ -795,7 +802,7 @@ immu_intrmap_map(void *intrmap_private, void *intrmap_data, uint16_t type,
 		    idx * INTRMAP_RTE_SIZE,
 		    INTRMAP_RTE_SIZE);
 
-		immu_qinv_intr_one_cache(immu, idx);
+		immu_qinv_intr_one_cache(immu, idx, iwp);
 
 	} else {
 		for (i = 0; i < count; i++) {
@@ -810,7 +817,7 @@ immu_intrmap_map(void *intrmap_private, void *intrmap_data, uint16_t type,
 			idx++;
 		}
 
-		immu_qinv_intr_caches(immu, idx, count);
+		immu_qinv_intr_caches(immu, idx, count, iwp);
 	}
 }
 
@@ -819,6 +826,7 @@ static void
 immu_intrmap_free(void **intrmap_privatep)
 {
 	immu_t *immu;
+	immu_inv_wait_t *iwp;
 	intrmap_t *intrmap;
 	uint32_t idx;
 
@@ -828,13 +836,14 @@ immu_intrmap_free(void **intrmap_privatep)
 	}
 
 	immu = INTRMAP_PRIVATE(*intrmap_privatep)->ir_immu;
+	iwp = &INTRMAP_PRIVATE(*intrmap_privatep)->ir_inv_wait;
 	intrmap = immu->immu_intrmap;
 	idx = INTRMAP_PRIVATE(*intrmap_privatep)->ir_idx;
 
 	bzero(intrmap->intrmap_vaddr + idx * INTRMAP_RTE_SIZE,
 	    INTRMAP_RTE_SIZE);
 
-	immu_qinv_intr_one_cache(immu, idx);
+	immu_qinv_intr_one_cache(immu, idx, iwp);
 
 	mutex_enter(&intrmap->intrmap_lock);
 	bitset_del(&intrmap->intrmap_map, idx);
@@ -928,6 +937,8 @@ immu_intrmap_setup(list_t *listp)
 		mutex_init(&(immu->immu_intrmap_lock), NULL,
 		    MUTEX_DEFAULT, NULL);
 		mutex_enter(&(immu->immu_intrmap_lock));
+		immu_init_inv_wait(&immu->immu_intrmap_inv_wait,
+		    "intrmapglobal", B_TRUE);
 		immu->immu_intrmap_setup = B_TRUE;
 		mutex_exit(&(immu->immu_intrmap_lock));
 	}

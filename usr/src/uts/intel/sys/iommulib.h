@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IOMMULIB_H
@@ -45,10 +44,11 @@ typedef enum {
 
 typedef enum {
 	IOMMU_OPS_VERSION_INVALID = 0,
-	IOMMU_OPS_VERSION_1 = 1
+	IOMMU_OPS_VERSION_1 = 1,
+	IOMMU_OPS_VERSION_2 = 2
 } iommulib_opsversion_t;
 
-#define	IOMMU_OPS_VERSION IOMMU_OPS_VERSION_1
+#define	IOMMU_OPS_VERSION IOMMU_OPS_VERSION_2
 
 typedef struct iommulib_ops {
 	iommulib_opsversion_t	ilops_vers;
@@ -82,6 +82,13 @@ typedef struct iommulib_ops {
 	    off_t *offp, size_t *lenp, ddi_dma_cookie_t *cookiep,
 	    uint_t *ccountp);
 
+	int	(*ilops_dma_mapobject)(iommulib_handle_t handle,
+	    dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t dma_handle,
+	    struct ddi_dma_req *dmareq, ddi_dma_obj_t *dmao);
+
+	int	(*ilops_dma_unmapobject)(iommulib_handle_t handle,
+	    dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t dma_handle,
+	    ddi_dma_obj_t *dmao);
 
 	/* Obsolete DMA routines */
 
@@ -96,18 +103,37 @@ typedef struct iommulib_ops {
 
 } iommulib_ops_t;
 
+/*
+ * Fake pointer value to indicate that a device will not use an IOMMU
+ * for DMA (it's either set up for passthrough or uses a unity mapping).
+ */
+#define	IOMMU_HANDLE_UNUSED	(void *)-1
 
 /*
- * IOMMU_USED() checks if there is an IOMMU controlling the dip's DMA
+ * IOMMU_UNITIALIZED() is true if it has not been determined whether
+ * a device uses an IOMMU for DMA or not. After it has been determined,
+ * the USED and UNUSED macros may be used to see if an IOMMU is being
+ * used or not.
+ *
+ * IOMMU_USED() is true if a device uses an IOMMU for DMA
+ *
+ * IOMMU_UNUSED() is true if a device does not use an IOMMU for DMA
  */
-#define	IOMMU_USED(dip)  (DEVI(dip)->devi_iommulib_handle)
+#define	IOMMU_USED(dip) \
+	(DEVI(dip)->devi_iommulib_handle != NULL && \
+	DEVI(dip)->devi_iommulib_handle != IOMMU_HANDLE_UNUSED)
+#define	IOMMU_UNUSED(dip) \
+	(DEVI(dip)->devi_iommulib_handle == IOMMU_HANDLE_UNUSED)
+#define	IOMMU_UNITIALIZED(dip) \
+	(DEVI(dip)->devi_iommulib_handle == NULL)
 
 typedef enum {
 	IOMMU_NEXOPS_VERSION_INVALID = 0,
-	IOMMU_NEXOPS_VERSION_1 = 1
+	IOMMU_NEXOPS_VERSION_1 = 1,
+	IOMMU_NEXOPS_VERSION_2 = 2
 } iommulib_nexops_version_t;
 
-#define	IOMMU_NEXOPS_VERSION IOMMU_NEXOPS_VERSION_1
+#define	IOMMU_NEXOPS_VERSION IOMMU_NEXOPS_VERSION_2
 
 typedef struct iommulib_nexops {
 	iommulib_nexops_version_t	nops_vers;
@@ -154,10 +180,13 @@ typedef struct iommulib_nexops {
 	int (*nops_dma_mctl)(dev_info_t *dip, dev_info_t *rdip,
 	    ddi_dma_handle_t handle, enum ddi_dma_ctlops request, off_t *offp,
 	    size_t *lenp, caddr_t *objpp, uint_t cache_flags);
-} iommulib_nexops_t;
 
-struct iommulib_nex;
-typedef struct iommulib_nex *iommulib_nexhandle_t;
+	int (*nops_dmahdl_setprivate)(dev_info_t *dip, dev_info_t *rdip,
+	    ddi_dma_handle_t handle, void *priv);
+
+	void * (*nops_dmahdl_getprivate)(dev_info_t *dip, dev_info_t *rdip,
+	    ddi_dma_handle_t handle);
+} iommulib_nexops_t;
 
 /*
  * struct iommu_dip_private
@@ -201,7 +230,7 @@ int iommulib_nexus_register(dev_info_t *dip, iommulib_nexops_t *nexops,
 
 int iommulib_nexus_unregister(iommulib_nexhandle_t handle);
 
-int iommulib_nex_open(dev_info_t *rdip, uint_t *errorp);
+int iommulib_nex_open(dev_info_t *dip, dev_info_t *rdip);
 void iommulib_nex_close(dev_info_t *rdip);
 
 int iommulib_nexdma_allochdl(dev_info_t *dip, dev_info_t *rdip,
@@ -232,6 +261,12 @@ int iommulib_nexdma_map(dev_info_t *dip, dev_info_t *rdip,
 int iommulib_nexdma_mctl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t dma_handle, enum ddi_dma_ctlops request,
     off_t *offp, size_t *lenp, caddr_t *objpp, uint_t cache_flags);
+
+int iommulib_nexdma_mapobject(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t dma_handle, struct ddi_dma_req *dmareq,
+    ddi_dma_obj_t *dmao);
+int iommulib_nexdma_unmapobject(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t dma_handle, ddi_dma_obj_t *dmao);
 
 /*
  * Interfaces for IOMMU drivers provided by IOMMULIB
@@ -293,6 +328,13 @@ int iommulib_iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
 int iommulib_iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, enum ddi_dma_ctlops request, off_t *offp,
     size_t *lenp, caddr_t *objpp, uint_t cache_flags);
+
+int iommulib_iommu_dmahdl_setprivate(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle, void *priv);
+
+void *iommulib_iommu_dmahdl_getprivate(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle);
+
 
 /*
  * For SMBIOS access from IOMMU drivers

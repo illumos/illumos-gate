@@ -117,8 +117,13 @@ typedef struct devi_bus_priv {
 	devi_port_t port_down;
 } devi_bus_priv_t;
 
+#if defined(__x86)
 struct iommulib_unit;
 typedef struct iommulib_unit *iommulib_handle_t;
+struct iommulib_nex;
+typedef struct iommulib_nex *iommulib_nexhandle_t;
+#endif
+
 typedef uint8_t	ndi_flavor_t;
 struct ddi_hp_cn_handle;
 
@@ -258,11 +263,12 @@ struct dev_info  {
 	struct i_ddi_prop_dyn	*devi_prop_dyn_driver;	/* prop_op */
 	struct i_ddi_prop_dyn	*devi_prop_dyn_parent;	/* bus_prop_op */
 
+#if defined(__x86)
 	/* For x86 (Intel and AMD) IOMMU support */
 	void		*devi_iommu;
-
-	/* IOMMU handle */
 	iommulib_handle_t	devi_iommulib_handle;
+	iommulib_nexhandle_t	devi_iommulib_nex_handle;
+#endif
 
 	/* Generic callback mechanism */
 	ddi_cb_t	*devi_cb_p;

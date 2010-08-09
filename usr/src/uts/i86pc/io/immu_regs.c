@@ -33,6 +33,7 @@
 #include <sys/spl.h>
 #include <sys/sysmacros.h>
 #include <sys/immu.h>
+#include <sys/cpu.h>
 
 #define	get_reg32(immu, offset)	ddi_get32((immu)->immu_regs_handle, \
 		(uint32_t *)(immu->immu_regs_addr + (offset)))
@@ -45,13 +46,16 @@
 		((immu)->immu_regs_handle, \
 		(uint64_t *)(immu->immu_regs_addr + (offset)), val)
 
+static void immu_regs_inv_wait(immu_inv_wait_t *iwp);
+
 struct immu_flushops immu_regs_flushops = {
 	immu_regs_context_fsi,
 	immu_regs_context_dsi,
 	immu_regs_context_gbl,
 	immu_regs_iotlb_psi,
 	immu_regs_iotlb_dsi,
-	immu_regs_iotlb_gbl
+	immu_regs_iotlb_gbl,
+	immu_regs_inv_wait
 };
 
 /*
@@ -74,7 +78,7 @@ struct immu_flushops immu_regs_flushops = {
 			    "immu wait completion time out");		\
 			/*NOTREACHED*/   \
 		} else { \
-			iommu_cpu_nop();\
+			ht_pause();\
 		}\
 	}\
 }
@@ -118,9 +122,6 @@ iotlb_flush(immu_t *immu, uint_t domain_id,
 	 */
 	switch (type) {
 	case IOTLB_PSI:
-		ASSERT(IMMU_CAP_GET_PSI(immu->immu_regs_cap));
-		ASSERT(am <= IMMU_CAP_GET_MAMV(immu->immu_regs_cap));
-		ASSERT(!(addr & IMMU_PAGEOFFSET));
 		command |= TLB_INV_PAGE | TLB_INV_IVT |
 		    TLB_INV_DID(domain_id);
 		iva = addr | am | TLB_IVA_HINT(hint);
@@ -149,9 +150,10 @@ iotlb_flush(immu_t *immu, uint_t domain_id,
  * immu_regs_iotlb_psi()
  *   iotlb page specific invalidation
  */
+/*ARGSUSED*/
 void
 immu_regs_iotlb_psi(immu_t *immu, uint_t did, uint64_t dvma, uint_t snpages,
-    uint_t hint)
+    uint_t hint, immu_inv_wait_t *iwp)
 {
 	int dvma_am;
 	int npg_am;
@@ -163,11 +165,9 @@ immu_regs_iotlb_psi(immu_t *immu, uint_t did, uint64_t dvma, uint_t snpages,
 	int i;
 
 	if (!IMMU_CAP_GET_PSI(immu->immu_regs_cap)) {
-		immu_regs_iotlb_dsi(immu, did);
+		immu_regs_iotlb_dsi(immu, did, iwp);
 		return;
 	}
-
-	ASSERT(dvma % IMMU_PAGESIZE == 0);
 
 	max_am = IMMU_CAP_GET_MAMV(immu->immu_regs_cap);
 
@@ -210,8 +210,9 @@ immu_regs_iotlb_psi(immu_t *immu, uint_t did, uint64_t dvma, uint_t snpages,
  * immu_regs_iotlb_dsi()
  *	domain specific invalidation
  */
+/*ARGSUSED*/
 void
-immu_regs_iotlb_dsi(immu_t *immu, uint_t domain_id)
+immu_regs_iotlb_dsi(immu_t *immu, uint_t domain_id, immu_inv_wait_t *iwp)
 {
 	mutex_enter(&(immu->immu_regs_lock));
 	iotlb_flush(immu, domain_id, 0, 0, 0, IOTLB_DSI);
@@ -222,8 +223,9 @@ immu_regs_iotlb_dsi(immu_t *immu, uint_t domain_id)
  * immu_regs_iotlb_gbl()
  *     global iotlb invalidation
  */
+/*ARGSUSED*/
 void
-immu_regs_iotlb_gbl(immu_t *immu)
+immu_regs_iotlb_gbl(immu_t *immu, immu_inv_wait_t *iwp)
 {
 	mutex_enter(&(immu->immu_regs_lock));
 	iotlb_flush(immu, 0, 0, 0, 0, IOTLB_GLOBAL);
@@ -345,9 +347,6 @@ setup_regs(immu_t *immu)
 {
 	int error;
 
-	ASSERT(immu);
-	ASSERT(immu->immu_name);
-
 	/*
 	 * This lock may be acquired by the IOMMU interrupt handler
 	 */
@@ -396,6 +395,11 @@ setup_regs(immu_t *immu)
 	immu->immu_SNP_reserved = immu_regs_is_SNP_reserved(immu);
 	immu->immu_TM_reserved = immu_regs_is_TM_reserved(immu);
 
+	if (IMMU_ECAP_GET_CH(immu->immu_regs_excap) && immu_use_tm)
+		immu->immu_ptemask = PDTE_MASK_TM;
+	else
+		immu->immu_ptemask = 0;
+
 	/*
 	 * Check for Mobile 4 series chipset
 	 */
@@ -405,7 +409,6 @@ setup_regs(immu_t *immu)
 		    "IMMU: Mobile 4 chipset quirk detected. "
 		    "Force-setting RWBF");
 		IMMU_CAP_SET_RWBF(immu->immu_regs_cap);
-		ASSERT(IMMU_CAP_GET_RWBF(immu->immu_regs_cap));
 	}
 
 	/*
@@ -514,10 +517,6 @@ immu_regs_startup(immu_t *immu)
 		return;
 	}
 
-	ASSERT(immu->immu_regs_running == B_FALSE);
-
-	ASSERT(MUTEX_HELD(&(immu->immu_lock)));
-
 	mutex_enter(&(immu->immu_regs_lock));
 	put_reg32(immu, IMMU_REG_GLOBAL_CMD,
 	    immu->immu_regs_cmdval | IMMU_GCMD_TE);
@@ -527,7 +526,7 @@ immu_regs_startup(immu_t *immu)
 	immu->immu_regs_running = B_TRUE;
 	mutex_exit(&(immu->immu_regs_lock));
 
-	ddi_err(DER_NOTE, NULL, "IMMU %s running", immu->immu_name);
+	ddi_err(DER_NOTE, NULL, "%s running", immu->immu_name);
 }
 
 /*
@@ -542,10 +541,6 @@ immu_regs_shutdown(immu_t *immu)
 	if (immu->immu_regs_running == B_FALSE) {
 		return;
 	}
-
-	ASSERT(immu->immu_regs_setup == B_TRUE);
-
-	ASSERT(MUTEX_HELD(&(immu->immu_lock)));
 
 	mutex_enter(&(immu->immu_regs_lock));
 	immu->immu_regs_cmdval &= ~IMMU_GCMD_TE;
@@ -649,15 +644,17 @@ immu_regs_wbf_flush(immu_t *immu)
 void
 immu_regs_cpu_flush(immu_t *immu, caddr_t addr, uint_t size)
 {
-	uint64_t i;
-
-	ASSERT(immu);
+	uintptr_t startline, endline;
 
 	if (immu->immu_dvma_coherent == B_TRUE)
 		return;
 
-	for (i = 0; i < size; i += x86_clflush_size, addr += x86_clflush_size) {
-		clflush_insn(addr);
+	startline = (uintptr_t)addr  & ~(uintptr_t)(x86_clflush_size - 1);
+	endline = ((uintptr_t)addr + size - 1) &
+	    ~(uintptr_t)(x86_clflush_size - 1);
+	while (startline <= endline) {
+		clflush_insn((caddr_t)startline);
+		startline += x86_clflush_size;
 	}
 
 	mfence_insn();
@@ -674,9 +671,6 @@ context_flush(immu_t *immu, uint8_t function_mask,
 	uint64_t command = 0;
 	uint64_t status;
 
-	ASSERT(immu);
-	ASSERT(rw_write_held(&(immu->immu_ctx_rwlock)));
-
 	/*
 	 * define the command
 	 */
@@ -687,15 +681,10 @@ context_flush(immu_t *immu, uint8_t function_mask,
 		    | CCMD_INV_SID(sid) | CCMD_INV_FM(function_mask);
 		break;
 	case CONTEXT_DSI:
-		ASSERT(function_mask == 0);
-		ASSERT(sid == 0);
 		command |= CCMD_INV_ICC | CCMD_INV_DOMAIN
 		    | CCMD_INV_DID(did);
 		break;
 	case CONTEXT_GLOBAL:
-		ASSERT(function_mask == 0);
-		ASSERT(sid == 0);
-		ASSERT(did == 0);
 		command |= CCMD_INV_ICC | CCMD_INV_GLOBAL;
 		break;
 	default:
@@ -706,30 +695,41 @@ context_flush(immu_t *immu, uint8_t function_mask,
 	}
 
 	mutex_enter(&(immu->immu_regs_lock));
-	ASSERT(!(get_reg64(immu, IMMU_REG_CONTEXT_CMD) & CCMD_INV_ICC));
 	put_reg64(immu, IMMU_REG_CONTEXT_CMD, command);
 	wait_completion(immu, IMMU_REG_CONTEXT_CMD, get_reg64,
 	    (!(status & CCMD_INV_ICC)), status);
 	mutex_exit(&(immu->immu_regs_lock));
 }
 
+/*ARGSUSED*/
 void
 immu_regs_context_fsi(immu_t *immu, uint8_t function_mask,
-    uint16_t source_id, uint_t domain_id)
+    uint16_t source_id, uint_t domain_id, immu_inv_wait_t *iwp)
 {
 	context_flush(immu, function_mask, source_id, domain_id, CONTEXT_FSI);
 }
 
+/*ARGSUSED*/
 void
-immu_regs_context_dsi(immu_t *immu, uint_t domain_id)
+immu_regs_context_dsi(immu_t *immu, uint_t domain_id, immu_inv_wait_t *iwp)
 {
 	context_flush(immu, 0, 0, domain_id, CONTEXT_DSI);
 }
 
+/*ARGSUSED*/
 void
-immu_regs_context_gbl(immu_t *immu)
+immu_regs_context_gbl(immu_t *immu, immu_inv_wait_t *iwp)
 {
 	context_flush(immu, 0, 0, 0, CONTEXT_GLOBAL);
+}
+
+/*
+ * Nothing to do, all register operations are synchronous.
+ */
+/*ARGSUSED*/
+static void
+immu_regs_inv_wait(immu_inv_wait_t *iwp)
+{
 }
 
 void
@@ -797,8 +797,7 @@ immu_regs_intrmap_enable(immu_t *immu, uint64_t irta_reg)
 	mutex_exit(&(immu->immu_regs_lock));
 
 	/* global flush intr entry cache */
-	if (immu_qinv_enable == B_TRUE)
-		immu_qinv_intr_global(immu);
+	immu_qinv_intr_global(immu, &immu->immu_intrmap_inv_wait);
 
 	/* enable interrupt remapping */
 	mutex_enter(&(immu->immu_regs_lock));
