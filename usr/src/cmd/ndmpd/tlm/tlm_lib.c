@@ -45,6 +45,7 @@
 #include <pthread.h>
 #include "tlm.h"
 #include "tlm_proto.h"
+#include <ndmpd_prop.h>
 #include <sys/mtio.h>
 #include <sys/mnttab.h>
 #include <sys/mntent.h>
@@ -1015,6 +1016,7 @@ probe_scsi(void)
 	char *p;
 	int lun = 0;
 	int sid = 0;
+	char *drive_type;
 
 	/* Initialize the scsi adapter link */
 	sa->sa_link_head.sl_next = &sa->sa_link_head;
@@ -1050,18 +1052,35 @@ probe_scsi(void)
 		NDMP_LOG(LOG_DEBUG,
 		    "Tape directory read error %s", SCSI_TAPE_DIR);
 	} else {
+		drive_type = ndmpd_get_prop(NDMP_DRIVE_TYPE);
+
+		if ((strcasecmp(drive_type, "sysv") != 0) &&
+		    (strcasecmp(drive_type, "bsd") != 0)) {
+			NDMP_LOG(LOG_ERR, "Invalid ndmpd/drive-type value. "
+			    "Valid values are 'sysv' and 'bsd'.");
+			return (-1);
+		}
+
 		while ((dp = readdir(dirp)) != NULL) {
 			if ((strcmp(dp->d_name, ".") == 0) ||
 			    (strcmp(dp->d_name, "..") == 0))
 				continue;
 
 			/* Skip special modes */
-			if (strpbrk(dp->d_name, "bchlmu") != 0)
+			if (strpbrk(dp->d_name, "chlmu") != NULL)
 				continue;
 
 			/* Pick the non-rewind device */
 			if (strchr(dp->d_name, 'n') == NULL)
 				continue;
+
+			if (strcasecmp(drive_type, "sysv") == 0) {
+				if (strchr(dp->d_name, 'b') != NULL)
+					continue;
+			} else if (strcasecmp(drive_type, "bsd") == 0) {
+				if (strchr(dp->d_name, 'b') == NULL)
+					continue;
+			}
 
 			sid = atoi(dp->d_name);
 

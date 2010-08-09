@@ -137,6 +137,7 @@ POSSIBILITY OF SUCH DAMAGE.
 		<propval name='restore-wildcard-enable' type='boolean' value='false' />
 		<propval name='tcp-port' type='integer' value='10000' />
 		<propval name='zfs-force-override' type='astring' value='off' />
+		<propval name='drive-type' type='astring' value='sysv' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.ndmp' />
 	</property_group>

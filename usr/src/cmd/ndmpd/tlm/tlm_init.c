@@ -545,7 +545,8 @@ tlm_init(void)
 	 * but later on this needs to be removed as the
 	 * probe will happen somewhere else.
 	 */
-	(void) probe_scsi();
+	if (probe_scsi() < 0)
+		return (-1);
 
 	nsa = scsi_get_adapter_count();
 	for (i = 0; i < nsa; i++)

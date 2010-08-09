@@ -1034,6 +1034,7 @@ ndmpd_zfs_pre_backup(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	nctxp->nc_plversion = ndmp_pl->np_plversion;
 	nctxp->nc_plname = ndmpd_get_prop(NDMP_PLUGIN_PATH);
 	nctxp->nc_ddata = (void *) session;
+	nctxp->nc_params = ndmpd_zfs_params;
 
 	err = ndmp_pl->np_pre_backup(ndmp_pl, nctxp,
 	    ndmpd_zfs_args->nz_dataset);
@@ -1091,6 +1092,7 @@ ndmpd_zfs_pre_restore(ndmpd_zfs_args_t *ndmpd_zfs_args)
 
 	(void) memset(nctxp, 0, sizeof (ndmp_context_t));
 	nctxp->nc_ddata = (void *) session;
+	nctxp->nc_params = ndmpd_zfs_params;
 
 	err = ndmp_pl->np_pre_restore(ndmp_pl, nctxp, bkpath,
 	    ndmpd_zfs_args->nz_dataset);

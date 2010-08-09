@@ -301,7 +301,10 @@ main(int argc, char *argv[])
 		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
-	(void) tlm_init();
+	if (tlm_init() == -1) {
+		syslog(LOG_ERR, "Failed to initialize tape manager.");
+		exit(SMF_EXIT_ERR_CONFIG);
+	}
 
 	/*
 	 * Prior to this point, we are single-threaded. We will be
