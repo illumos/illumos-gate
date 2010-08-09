@@ -1541,6 +1541,7 @@ vdev_dirty(vdev_t *vd, int flags, void *arg, uint64_t txg)
 	ASSERT(vd == vd->vdev_top);
 	ASSERT(!vd->vdev_ishole);
 	ASSERT(ISP2(flags));
+	ASSERT(spa_writeable(vd->vdev_spa));
 
 	if (flags & VDD_METASLAB)
 		(void) txg_list_add(&vd->vdev_ms_list, arg, txg);
@@ -1596,6 +1597,7 @@ vdev_dtl_dirty(vdev_t *vd, vdev_dtl_type_t t, uint64_t txg, uint64_t size)
 
 	ASSERT(t < DTL_TYPES);
 	ASSERT(vd != vd->vdev_spa->spa_root_vdev);
+	ASSERT(spa_writeable(vd->vdev_spa));
 
 	mutex_enter(sm->sm_lock);
 	if (!space_map_contains(sm, txg, size))
@@ -2355,11 +2357,11 @@ vdev_clear(spa_t *spa, vdev_t *vd)
 		vd->vdev_cant_read = B_FALSE;
 		vd->vdev_cant_write = B_FALSE;
 
-		vdev_reopen(vd);
+		vdev_reopen(vd == rvd ? rvd : vd->vdev_top);
 
 		vd->vdev_forcefault = B_FALSE;
 
-		if (vd != rvd)
+		if (vd != rvd && vdev_writeable(vd->vdev_top))
 			vdev_state_dirty(vd->vdev_top);
 
 		if (vd->vdev_aux == NULL && !vdev_is_dead(vd))
@@ -2701,6 +2703,8 @@ vdev_config_dirty(vdev_t *vd)
 	vdev_t *rvd = spa->spa_root_vdev;
 	int c;
 
+	ASSERT(spa_writeable(spa));
+
 	/*
 	 * If this is an aux vdev (as with l2cache and spare devices), then we
 	 * update the vdev config manually and set the sync flag.
@@ -2789,6 +2793,7 @@ vdev_state_dirty(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
 
+	ASSERT(spa_writeable(spa));
 	ASSERT(vd == vd->vdev_top);
 
 	/*

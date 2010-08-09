@@ -202,12 +202,14 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\thistory [-il] [<pool>] ...\n"));
 	case HELP_IMPORT:
 		return (gettext("\timport [-d dir] [-D]\n"
-		    "\timport [-d dir | -c cachefile] [-n] -F <pool | id>\n"
+		    "\timport [-d dir | -c cachefile] [-F [-n]] <pool | id>\n"
 		    "\timport [-o mntopts] [-o property=value] ... \n"
-		    "\t    [-d dir | -c cachefile] [-D] [-f] [-R root] -a\n"
+		    "\t    [-d dir | -c cachefile] [-D] [-f] [-m] [-N] "
+		    "[-R root] [-F [-n]] -a\n"
 		    "\timport [-o mntopts] [-o property=value] ... \n"
-		    "\t    [-d dir | -c cachefile] [-D] [-f] [-R root] "
-		    "<pool | id> [newpool]\n"));
+		    "\t    [-d dir | -c cachefile] [-D] [-f] [-m] [-N] "
+		    "[-R root] [-F [-n]]\n"
+		    "\t    <pool | id> [newpool]\n"));
 	case HELP_IOSTAT:
 		return (gettext("\tiostat [-v] [-T d|u] [pool] ... [interval "
 		    "[count]]\n"));
@@ -1562,6 +1564,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 		return (1);
 
 	if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL &&
+	    !(flags & ZFS_IMPORT_ONLY) &&
 	    zpool_enable_datasets(zhp, mntopts, 0) != 0) {
 		zpool_close(zhp);
 		return (1);
@@ -1603,6 +1606,11 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
  *
  *       -n     See if rewind would work, but don't actually rewind.
  *
+ *       -N     Import the pool but don't mount datasets.
+ *
+ *       -T     Specify a starting txg to use for import. This option is
+ *       	intentionally undocumented option for testing purposes.
+ *
  *       -a	Import all pools found.
  *
  *       -o	Set property=value and/or temporary mount options (without '=').
@@ -1635,12 +1643,13 @@ zpool_do_import(int argc, char **argv)
 	boolean_t dryrun = B_FALSE;
 	boolean_t do_rewind = B_FALSE;
 	boolean_t xtreme_rewind = B_FALSE;
-	uint64_t pool_state;
+	uint64_t pool_state, txg = -1ULL;
 	char *cachefile = NULL;
 	importargs_t idata = { 0 };
+	char *endptr;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":aCc:d:DEfFmno:rR:VX")) != -1) {
+	while ((c = getopt(argc, argv, ":aCc:d:DEfFmnNo:rR:T:VX")) != -1) {
 		switch (c) {
 		case 'a':
 			do_all = B_TRUE;
@@ -1676,6 +1685,9 @@ zpool_do_import(int argc, char **argv)
 		case 'n':
 			dryrun = B_TRUE;
 			break;
+		case 'N':
+			flags |= ZFS_IMPORT_ONLY;
+			break;
 		case 'o':
 			if ((propval = strchr(optarg, '=')) != NULL) {
 				*propval = '\0';
@@ -1698,6 +1710,16 @@ zpool_do_import(int argc, char **argv)
 			if (add_prop_list(zpool_prop_to_name(
 			    ZPOOL_PROP_CACHEFILE), "none", &props, B_TRUE))
 				goto error;
+			break;
+		case 'T':
+			errno = 0;
+			txg = strtoull(optarg, &endptr, 10);
+			if (errno != 0 || *endptr != '\0') {
+				(void) fprintf(stderr,
+				    gettext("invalid txg value\n"));
+				usage(B_FALSE);
+			}
+			rewind_policy = ZPOOL_DO_REWIND | ZPOOL_EXTREME_REWIND;
 			break;
 		case 'V':
 			flags |= ZFS_IMPORT_VERBATIM;
@@ -1739,6 +1761,7 @@ zpool_do_import(int argc, char **argv)
 
 	/* In the future, we can capture further policy and include it here */
 	if (nvlist_alloc(&policy, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_uint64(policy, ZPOOL_REWIND_REQUEST_TXG, txg) != 0 ||
 	    nvlist_add_uint32(policy, ZPOOL_REWIND_REQUEST, rewind_policy) != 0)
 		goto error;
 

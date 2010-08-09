@@ -69,7 +69,7 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_BADPROP:
 		return (dgettext(TEXT_DOMAIN, "invalid property value"));
 	case EZFS_PROPREADONLY:
-		return (dgettext(TEXT_DOMAIN, "read only property"));
+		return (dgettext(TEXT_DOMAIN, "read-only property"));
 	case EZFS_PROPTYPE:
 		return (dgettext(TEXT_DOMAIN, "property doesn't apply to "
 		    "datasets of this type"));
@@ -89,7 +89,7 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_BADSTREAM:
 		return (dgettext(TEXT_DOMAIN, "invalid backup stream"));
 	case EZFS_DSREADONLY:
-		return (dgettext(TEXT_DOMAIN, "dataset is read only"));
+		return (dgettext(TEXT_DOMAIN, "dataset is read-only"));
 	case EZFS_VOLTOOBIG:
 		return (dgettext(TEXT_DOMAIN, "volume size exceeds limit for "
 		    "this system"));
@@ -181,9 +181,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_NODELEGATION:
 		return (dgettext(TEXT_DOMAIN, "delegated administration is "
 		    "disabled on pool"));
-	case EZFS_PERMRDONLY:
-		return (dgettext(TEXT_DOMAIN, "snapshot permissions cannot be"
-		    " modified"));
 	case EZFS_BADCACHE:
 		return (dgettext(TEXT_DOMAIN, "invalid or missing cache file"));
 	case EZFS_ISL2CACHE:
@@ -223,6 +220,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "unable to generate diffs"));
 	case EZFS_DIFFDATA:
 		return (dgettext(TEXT_DOMAIN, "invalid diff data"));
+	case EZFS_POOLREADONLY:
+		return (dgettext(TEXT_DOMAIN, "pool is read-only"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -371,9 +370,7 @@ zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 		zfs_verror(hdl, EZFS_BUSY, fmt, ap);
 		break;
 	case EROFS:
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "snapshot permissions cannot be modified"));
-		zfs_verror(hdl, EZFS_PERMRDONLY, fmt, ap);
+		zfs_verror(hdl, EZFS_POOLREADONLY, fmt, ap);
 		break;
 	case ENAMETOOLONG:
 		zfs_verror(hdl, EZFS_NAMETOOLONG, fmt, ap);
@@ -459,10 +456,15 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 	case EDQUOT:
 		zfs_verror(hdl, EZFS_NOSPC, fmt, ap);
 		return (-1);
+
 	case EAGAIN:
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "pool I/O is currently suspended"));
 		zfs_verror(hdl, EZFS_POOLUNAVAIL, fmt, ap);
+		break;
+
+	case EROFS:
+		zfs_verror(hdl, EZFS_POOLREADONLY, fmt, ap);
 		break;
 
 	default:

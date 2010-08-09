@@ -602,6 +602,7 @@ extern objset_t *spa_meta_objset(spa_t *spa);
 
 /* Miscellaneous support routines */
 extern int spa_rename(const char *oldname, const char *newname);
+extern spa_t *spa_by_guid(uint64_t pool_guid, uint64_t device_guid);
 extern boolean_t spa_guid_exists(uint64_t pool_guid, uint64_t device_guid);
 extern char *spa_strdup(const char *);
 extern void spa_strfree(char *);

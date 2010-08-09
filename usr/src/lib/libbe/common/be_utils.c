@@ -2553,7 +2553,7 @@ zfs_err_to_be_err(libzfs_handle_t *zfsh)
 		return (BE_ERR_BE_EXISTS);
 	case EZFS_BUSY:
 		return (BE_ERR_DEV_BUSY);
-	case EZFS_PERMRDONLY:
+	case EZFS_POOLREADONLY:
 		return (BE_ERR_ROFS);
 	case EZFS_NAMETOOLONG:
 		return (BE_ERR_NAMETOOLONG);

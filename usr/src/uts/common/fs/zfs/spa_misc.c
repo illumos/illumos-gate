@@ -1078,12 +1078,12 @@ spa_rename(const char *name, const char *newname)
 }
 
 /*
- * Determine whether a pool with given pool_guid exists.  If device_guid is
- * non-zero, determine whether the pool exists *and* contains a device with the
- * specified device_guid.
+ * Return the spa_t associated with given pool_guid, if it exists.  If
+ * device_guid is non-zero, determine whether the pool exists *and* contains
+ * a device with the specified device_guid.
  */
-boolean_t
-spa_guid_exists(uint64_t pool_guid, uint64_t device_guid)
+spa_t *
+spa_by_guid(uint64_t pool_guid, uint64_t device_guid)
 {
 	spa_t *spa;
 	avl_tree_t *t = &spa_namespace_avl;
@@ -1114,7 +1114,16 @@ spa_guid_exists(uint64_t pool_guid, uint64_t device_guid)
 		}
 	}
 
-	return (spa != NULL);
+	return (spa);
+}
+
+/*
+ * Determine whether a pool with the given pool_guid exists.
+ */
+boolean_t
+spa_guid_exists(uint64_t pool_guid, uint64_t device_guid)
+{
+	return (spa_by_guid(pool_guid, device_guid) != NULL);
 }
 
 char *

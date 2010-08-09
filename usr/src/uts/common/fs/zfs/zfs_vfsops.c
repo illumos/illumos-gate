@@ -417,7 +417,8 @@ zfs_register_callbacks(vfs_t *vfsp)
 	 * of mount options, we stash away the current values and
 	 * restore them after we register the callbacks.
 	 */
-	if (vfs_optionisset(vfsp, MNTOPT_RO, NULL)) {
+	if (vfs_optionisset(vfsp, MNTOPT_RO, NULL) ||
+	    !spa_writeable(dmu_objset_spa(os))) {
 		readonly = B_TRUE;
 		do_readonly = B_TRUE;
 	} else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL)) {
@@ -1046,12 +1047,15 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 		 * allocated and in the unlinked set, and there is an
 		 * intent log record saying to allocate it.
 		 */
-		if (zil_replay_disable) {
-			zil_destroy(zfsvfs->z_log, B_FALSE);
-		} else {
-			zfsvfs->z_replay = B_TRUE;
-			zil_replay(zfsvfs->z_os, zfsvfs, zfs_replay_vector);
-			zfsvfs->z_replay = B_FALSE;
+		if (spa_writeable(dmu_objset_spa(zfsvfs->z_os))) {
+			if (zil_replay_disable) {
+				zil_destroy(zfsvfs->z_log, B_FALSE);
+			} else {
+				zfsvfs->z_replay = B_TRUE;
+				zil_replay(zfsvfs->z_os, zfsvfs,
+				    zfs_replay_vector);
+				zfsvfs->z_replay = B_FALSE;
+			}
 		}
 		zfsvfs->z_vfs->vfs_flag |= readonly; /* restore readonly bit */
 	}
@@ -1813,7 +1817,8 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 	 * Evict cached data
 	 */
 	if (dmu_objset_is_dirty_anywhere(zfsvfs->z_os))
-		txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
+		if (!(zfsvfs->z_vfs->vfs_flag & VFS_RDONLY))
+			txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
 	(void) dmu_objset_evict_dbufs(zfsvfs->z_os);
 
 	return (0);

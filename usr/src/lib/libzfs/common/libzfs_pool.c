@@ -48,6 +48,11 @@ static int read_efi_label(nvlist_t *config, diskaddr_t *sb);
 #define	RDISK_ROOT	"/dev/rdsk"
 #define	BACKUP_SLICE	"s2"
 
+typedef struct prop_flags {
+	int create:1;	/* Validate property on creation */
+	int import:1;	/* Validate property on import */
+} prop_flags_t;
+
 /*
  * ====================================================================
  *   zpool property functions
@@ -370,7 +375,7 @@ pool_is_bootable(zpool_handle_t *zhp)
  */
 static nvlist_t *
 zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
-    nvlist_t *props, uint64_t version, boolean_t create_or_import, char *errbuf)
+    nvlist_t *props, uint64_t version, prop_flags_t flags, char *errbuf)
 {
 	nvpair_t *elem;
 	nvlist_t *retprops;
@@ -427,7 +432,7 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 			break;
 
 		case ZPOOL_PROP_BOOTFS:
-			if (create_or_import) {
+			if (flags.create || flags.import) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "property '%s' cannot be set at creation "
 				    "or import time"), propname);
@@ -480,7 +485,7 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 			break;
 
 		case ZPOOL_PROP_ALTROOT:
-			if (!create_or_import) {
+			if (!flags.create && !flags.import) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "property '%s' can only be set during pool "
 				    "creation or import"), propname);
@@ -535,6 +540,16 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 
 			*slash = '/';
 			break;
+
+		case ZPOOL_PROP_READONLY:
+			if (!flags.import) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "property '%s' can only be set at "
+				    "import time"), propname);
+				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+				goto error;
+			}
+			break;
 		}
 	}
 
@@ -556,6 +571,7 @@ zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
 	nvlist_t *nvl = NULL;
 	nvlist_t *realprops;
 	uint64_t version;
+	prop_flags_t flags = { 0 };
 
 	(void) snprintf(errbuf, sizeof (errbuf),
 	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
@@ -571,7 +587,7 @@ zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
 
 	version = zpool_get_prop_int(zhp, ZPOOL_PROP_VERSION, NULL);
 	if ((realprops = zpool_valid_proplist(zhp->zpool_hdl,
-	    zhp->zpool_name, nvl, version, B_FALSE, errbuf)) == NULL) {
+	    zhp->zpool_name, nvl, version, flags, errbuf)) == NULL) {
 		nvlist_free(nvl);
 		return (-1);
 	}
@@ -878,8 +894,10 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 		return (-1);
 
 	if (props) {
+		prop_flags_t flags = { .create = B_TRUE, .import = B_FALSE };
+
 		if ((zc_props = zpool_valid_proplist(hdl, pool, props,
-		    SPA_VERSION_1, B_TRUE, msg)) == NULL) {
+		    SPA_VERSION_1, flags, msg)) == NULL) {
 			goto create_failed;
 		}
 	}
@@ -1430,12 +1448,13 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 
 	if (props) {
 		uint64_t version;
+		prop_flags_t flags = { .create = B_FALSE, .import = B_TRUE };
 
 		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
 		    &version) == 0);
 
 		if ((props = zpool_valid_proplist(hdl, origname,
-		    props, version, B_TRUE, errbuf)) == NULL) {
+		    props, version, flags, errbuf)) == NULL) {
 			return (-1);
 		} else if (zcmd_write_src_nvlist(hdl, &zc, props) != 0) {
 			nvlist_free(props);
@@ -2624,8 +2643,9 @@ zpool_vdev_split(zpool_handle_t *zhp, char *newname, nvlist_t **newroot,
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION, &vers) == 0);
 
 	if (props) {
+		prop_flags_t flags = { .create = B_FALSE, .import = B_TRUE };
 		if ((zc_props = zpool_valid_proplist(hdl, zhp->zpool_name,
-		    props, vers, B_TRUE, msg)) == NULL)
+		    props, vers, flags, msg)) == NULL)
 			return (-1);
 	}
 

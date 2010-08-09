@@ -181,6 +181,8 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		spa_prop_add_list(*nvp, ZPOOL_PROP_ALLOCATED, NULL, alloc, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_FREE, NULL,
 		    size - alloc, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_READONLY, NULL,
+		    (spa_mode(spa) == FREAD), src);
 
 		cap = (size == 0) ? 0 : (alloc * 100 / size);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_CAPACITY, NULL, cap, src);
@@ -530,7 +532,9 @@ spa_prop_set(spa_t *spa, nvlist_t *nvp)
 		    nvpair_name(elem))) == ZPROP_INVAL)
 			return (EINVAL);
 
-		if (prop == ZPOOL_PROP_CACHEFILE || prop == ZPOOL_PROP_ALTROOT)
+		if (prop == ZPOOL_PROP_CACHEFILE ||
+		    prop == ZPOOL_PROP_ALTROOT ||
+		    prop == ZPOOL_PROP_READONLY)
 			continue;
 
 		need_sync = B_TRUE;
@@ -2241,12 +2245,14 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 static int
 spa_load_retry(spa_t *spa, spa_load_state_t state, int mosconfig)
 {
+	int mode = spa->spa_mode;
+
 	spa_unload(spa);
 	spa_deactivate(spa);
 
 	spa->spa_load_max_txg--;
 
-	spa_activate(spa, spa_mode_global);
+	spa_activate(spa, mode);
 	spa_async_suspend(spa);
 
 	return (spa_load(spa, state, SPA_IMPORT_EXISTING, mosconfig));
@@ -3257,6 +3263,8 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	char *altroot = NULL;
 	spa_load_state_t state = SPA_LOAD_IMPORT;
 	zpool_rewind_policy_t policy;
+	uint64_t mode = spa_mode_global;
+	uint64_t readonly = B_FALSE;
 	int error;
 	nvlist_t *nvroot;
 	nvlist_t **spares, **l2cache;
@@ -3276,6 +3284,10 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	 */
 	(void) nvlist_lookup_string(props,
 	    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), &altroot);
+	(void) nvlist_lookup_uint64(props,
+	    zpool_prop_to_name(ZPOOL_PROP_READONLY), &readonly);
+	if (readonly)
+		mode = FREAD;
 	spa = spa_add(pool, config, altroot);
 	spa->spa_import_flags = flags;
 
@@ -3295,7 +3307,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 		return (0);
 	}
 
-	spa_activate(spa, spa_mode_global);
+	spa_activate(spa, mode);
 
 	/*
 	 * Don't start async tasks until we know everything is healthy.
@@ -3676,6 +3688,8 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	nvlist_t **spares, **l2cache;
 	uint_t nspares, nl2cache;
 
+	ASSERT(spa_writeable(spa));
+
 	txg = spa_vdev_enter(spa);
 
 	if ((error = spa_config_parse(spa, &vd, nvroot, NULL, 0,
@@ -3786,6 +3800,8 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	char *oldvdpath, *newvdpath;
 	int newvd_isspare;
 	int error;
+
+	ASSERT(spa_writeable(spa));
 
 	txg = spa_vdev_enter(spa);
 
@@ -3983,6 +3999,8 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 	boolean_t unspare = B_FALSE;
 	uint64_t unspare_guid;
 	char *vdpath;
+
+	ASSERT(spa_writeable(spa));
 
 	txg = spa_vdev_enter(spa);
 
@@ -4223,8 +4241,7 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 	vdev_t *rvd, **vml = NULL;			/* vdev modify list */
 	boolean_t activate_slog;
 
-	if (!spa_writeable(spa))
-		return (EROFS);
+	ASSERT(spa_writeable(spa));
 
 	txg = spa_vdev_enter(spa);
 
@@ -4641,6 +4658,8 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 	int error = 0;
 	boolean_t locked = MUTEX_HELD(&spa_namespace_lock);
 
+	ASSERT(spa_writeable(spa));
+
 	if (!locked)
 		txg = spa_vdev_enter(spa);
 
@@ -4858,6 +4877,8 @@ spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
 {
 	vdev_t *vd;
 	boolean_t sync = B_FALSE;
+
+	ASSERT(spa_writeable(spa));
 
 	spa_vdev_state_enter(spa, SCL_ALL);
 
@@ -5304,9 +5325,11 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			ASSERT(spa->spa_root != NULL);
 			break;
 
+		case ZPOOL_PROP_READONLY:
 		case ZPOOL_PROP_CACHEFILE:
 			/*
-			 * 'cachefile' is also a non-persisitent property.
+			 * 'readonly' and 'cachefile' are also non-persisitent
+			 * properties.
 			 */
 			break;
 		default:
@@ -5437,6 +5460,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 	vdev_t *vd;
 	dmu_tx_t *tx;
 	int error;
+
+	VERIFY(spa_writeable(spa));
 
 	/*
 	 * Lock out configuration changes.
@@ -5656,7 +5681,8 @@ spa_sync_allpools(void)
 	spa_t *spa = NULL;
 	mutex_enter(&spa_namespace_lock);
 	while ((spa = spa_next(spa)) != NULL) {
-		if (spa_state(spa) != POOL_STATE_ACTIVE || spa_suspended(spa))
+		if (spa_state(spa) != POOL_STATE_ACTIVE ||
+		    !spa_writeable(spa) || spa_suspended(spa))
 			continue;
 		spa_open_ref(spa, FTAG);
 		mutex_exit(&spa_namespace_lock);
@@ -5736,6 +5762,8 @@ spa_lookup_by_guid(spa_t *spa, uint64_t guid, boolean_t aux)
 void
 spa_upgrade(spa_t *spa, uint64_t version)
 {
+	ASSERT(spa_writeable(spa));
+
 	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
 
 	/*

@@ -160,6 +160,7 @@ typedef enum {
 	ZPOOL_PROP_DEDUPRATIO,
 	ZPOOL_PROP_FREE,
 	ZPOOL_PROP_ALLOCATED,
+	ZPOOL_PROP_READONLY,
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
 
@@ -827,6 +828,7 @@ typedef enum {
 #define	ZFS_IMPORT_VERBATIM	0x1
 #define	ZFS_IMPORT_ANY_HOST	0x2
 #define	ZFS_IMPORT_MISSING_LOG	0x4
+#define	ZFS_IMPORT_ONLY		0x8
 
 /*
  * Sysevent payload members.  ZFS will generate the following sysevents with the

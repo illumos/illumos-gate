@@ -103,7 +103,6 @@ enum {
 	EZFS_BADPERM,		/* invalid permission */
 	EZFS_BADPERMSET,	/* invalid permission set name */
 	EZFS_NODELEGATION,	/* delegated administration is disabled */
-	EZFS_PERMRDONLY,	/* pemissions are readonly */
 	EZFS_UNSHARESMBFAILED,	/* failed to unshare over smb */
 	EZFS_SHARESMBFAILED,	/* failed to share over smb */
 	EZFS_BADCACHE,		/* bad cache file */
@@ -122,6 +121,7 @@ enum {
 	EZFS_NO_SCRUB,		/* no active scrub */
 	EZFS_DIFF,		/* general failure of zfs diff */
 	EZFS_DIFFDATA,		/* bad zfs diff data */
+	EZFS_POOLREADONLY,	/* pool is in read-only mode */
 	EZFS_UNKNOWN
 };
 

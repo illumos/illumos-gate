@@ -270,6 +270,12 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 	else
 		(void) strlcpy(mntopts, options, sizeof (mntopts));
 
+	/*
+	 * If the pool is imported read-only then all mounts must be read-only
+	 */
+	if (zpool_get_prop_int(zhp->zpool_hdl, ZPOOL_PROP_READONLY, NULL))
+		flags |= MS_RDONLY;
+
 	if (!zfs_is_mountable(zhp, mountpoint, sizeof (mountpoint), NULL))
 		return (0);
 

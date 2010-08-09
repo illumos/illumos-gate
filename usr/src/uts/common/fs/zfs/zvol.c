@@ -500,7 +500,7 @@ zvol_create_minor(const char *name)
 	zv->zv_min_bs = DEV_BSHIFT;
 	zv->zv_minor = minor;
 	zv->zv_objset = os;
-	if (dmu_objset_is_snapshot(os))
+	if (dmu_objset_is_snapshot(os) || !spa_writeable(dmu_objset_spa(os)))
 		zv->zv_flags |= ZVOL_RDONLY;
 	mutex_init(&zv->zv_znode.z_range_lock, NULL, MUTEX_DEFAULT, NULL);
 	avl_create(&zv->zv_znode.z_range_avl, zfs_range_compare,
@@ -512,10 +512,12 @@ zvol_create_minor(const char *name)
 	ASSERT(error == 0);
 	zv->zv_volblocksize = doi.doi_data_block_size;
 
-	if (zil_replay_disable)
-		zil_destroy(dmu_objset_zil(os), B_FALSE);
-	else
-		zil_replay(os, zv, zvol_replay_vector);
+	if (spa_writeable(dmu_objset_spa(os))) {
+		if (zil_replay_disable)
+			zil_destroy(dmu_objset_zil(os), B_FALSE);
+		else
+			zil_replay(os, zv, zvol_replay_vector);
+	}
 	dmu_objset_disown(os, FTAG);
 	zv->zv_objset = NULL;
 
@@ -605,7 +607,8 @@ zvol_first_open(zvol_state_t *zv)
 
 	VERIFY(dsl_prop_get_integer(zv->zv_name, "readonly", &readonly,
 	    NULL) == 0);
-	if (readonly || dmu_objset_is_snapshot(os))
+	if (readonly || dmu_objset_is_snapshot(os) ||
+	    !spa_writeable(dmu_objset_spa(os)))
 		zv->zv_flags |= ZVOL_RDONLY;
 	else
 		zv->zv_flags &= ~ZVOL_RDONLY;
