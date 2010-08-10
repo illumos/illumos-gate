@@ -728,7 +728,8 @@ cmd_gen_datapath_fault(fmd_hdl_t *hdl, cmd_dimm_t *d1, cmd_dimm_t *d2,
 	char *frustr;
 	nvlist_t *rsrc, *fltlist;
 	char *s;
-	uint_t len;
+	char const *str1, *str2;
+	uint_t len, i;
 
 	s = strstr(d1->dimm_unum, "CMP");
 	if (s == NULL)
@@ -736,6 +737,14 @@ cmd_gen_datapath_fault(fmd_hdl_t *hdl, cmd_dimm_t *d1, cmd_dimm_t *d2,
 
 	frustr = fmd_hdl_zalloc(hdl, strlen(d1->dimm_unum), FMD_SLEEP);
 	len = strlen(d1->dimm_unum) -  strlen(s);
+
+	if (strncmp(d1->dimm_unum, d2->dimm_unum, len) != 0) {
+		for (i = 0, str1 = d1->dimm_unum, str2 = d2->dimm_unum;
+		    *str1 == *str2 && i <= len;
+		    str1++, str2++, i++)
+			;
+		len = i;
+	}
 
 	(void) strncpy(frustr, d1->dimm_unum, len);
 

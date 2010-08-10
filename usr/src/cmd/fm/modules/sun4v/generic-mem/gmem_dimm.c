@@ -49,6 +49,8 @@ typedef struct dimmid {
 	int type;
 } dimmid_t;
 
+static int gmem_find_dimm_chip(nvlist_t *, uint32_t *);
+
 nvlist_t *
 gmem_dimm_fru(gmem_dimm_t *dimm)
 {
@@ -126,11 +128,12 @@ dimm_lookup_by_serial(const char *serial)
 }
 
 gmem_dimm_t *
-gmem_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
+gmem_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru, nvlist_t *det)
 {
 	gmem_dimm_t *dimm;
 	nvlist_t *fmri;
 	char *serial;
+	uint32_t chip_id;
 
 	if (nvlist_lookup_string(asru, FM_FMRI_HC_SERIAL_ID, &serial) != 0) {
 		fmd_hdl_debug(hdl, "Unable to get dimm serial\n");
@@ -142,6 +145,8 @@ gmem_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 		return (NULL);
 	}
 
+	(void) gmem_find_dimm_chip(det, &chip_id);
+
 	fmd_hdl_debug(hdl, "dimm_create: creating new DIMM serial=%s\n",
 	    serial);
 	GMEM_STAT_BUMP(dimm_creat);
@@ -152,6 +157,7 @@ gmem_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 	dimm->dimm_phys_addr_low = ULLONG_MAX;
 	dimm->dimm_phys_addr_hi = 0;
 	dimm->dimm_syl_error = USHRT_MAX;
+	dimm->dimm_chipid = chip_id;
 
 	gmem_bufname(dimm->dimm_bufname, sizeof (dimm->dimm_bufname), "dimm_%s",
 	    serial);
@@ -490,6 +496,7 @@ gmem_find_dimm_chip(nvlist_t *nvl, uint32_t *chip)
 	uint_t n;
 	int i;
 	int rc = 0;
+	*chip = ULONG_MAX;
 
 	if (nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcl, &n) < 0)
 		return (0);
@@ -506,29 +513,17 @@ gmem_find_dimm_chip(nvlist_t *nvl, uint32_t *chip)
 	return (rc);
 }
 
+/*ARGSUSED*/
 int
 gmem_same_datapath_dimms(fmd_hdl_t *hdl, gmem_dimm_t *d1, gmem_dimm_t *d2)
 {
-	nvlist_t *rsrc1, *rsrc2;
-	uint32_t chip1, chip2;
 
-	rsrc1 = gmem_find_dimm_rsc(hdl, d1->dimm_serial);
-	rsrc2 = gmem_find_dimm_rsc(hdl, d2->dimm_serial);
-
-	if (rsrc1 == NULL || rsrc2 == NULL)
+	if (d1->dimm_chipid == ULONG_MAX || d2->dimm_chipid == ULONG_MAX)
 		return (0);
 
-	if (gmem_find_dimm_chip(rsrc1, &chip1) &&
-	    gmem_find_dimm_chip(rsrc2, &chip2)) {
-		if (chip1 == chip2) {
-			nvlist_free(rsrc1);
-			nvlist_free(rsrc2);
-			return (1);
-		}
-	}
+	if (d1->dimm_chipid == d2->dimm_chipid)
+		return (1);
 
-	nvlist_free(rsrc1);
-	nvlist_free(rsrc2);
 	return (0);
 }
 

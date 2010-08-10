@@ -778,7 +778,7 @@ gmem_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	}
 
 	if ((dimm = gmem_dimm_lookup(hdl, fru)) == NULL &&
-	    (dimm = gmem_dimm_create(hdl, fru)) == NULL) {
+	    (dimm = gmem_dimm_create(hdl, fru, det)) == NULL) {
 		nvlist_free(fru);
 		return (GMEM_EVD_UNUSED);
 	}

@@ -113,6 +113,7 @@ struct gmem_dimm {
 	gmem_case_t dimm_case;		/* Open CE case against this DIMM */
 	fmd_stat_t dimm_retstat;	/* retirement statistics, this DIMM */
 	uint16_t dimm_syl_error;	/* bad rw symbol-in-error */
+	uint32_t dimm_chipid;		/* detector */
 	gmem_list_t
 	    mq_root[GMEM_MAX_CKWDS];	/* per-checkword CEs to correlate */
 };
@@ -139,7 +140,7 @@ struct gmem_dimm {
 #define	dimm_phys_addr_low	dimm_pers.dimmp_phys_addr_low
 
 extern gmem_dimm_t *gmem_dimm_lookup(fmd_hdl_t *, nvlist_t *);
-extern gmem_dimm_t *gmem_dimm_create(fmd_hdl_t *, nvlist_t *);
+extern gmem_dimm_t *gmem_dimm_create(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 extern nvlist_t *gmem_dimm_fru(gmem_dimm_t *);
 extern int gmem_dimm_thresh_reached(fmd_hdl_t *, gmem_dimm_t *, uint64_t,
     uint16_t);
