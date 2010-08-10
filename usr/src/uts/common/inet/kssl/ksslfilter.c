@@ -288,16 +288,15 @@ kssl_data_out_cb(sof_handle_t handle, void *cookie, mblk_t *mp,
     struct nmsghdr *msg, cred_t *cr, sof_rval_t *rv)
 {
 	ksslf_t *kssl = (ksslf_t *)cookie;
-	kssl_ctx_t kssl_ctx = kssl->ksslf_ctx;
 	mblk_t *recmp;
 
 	_NOTE(ARGUNUSED(handle, msg, cr));
 
 	*rv = SOF_RVAL_CONTINUE;
-	if (kssl_ctx == NULL)
+	if (kssl == NULL || kssl->ksslf_ctx == NULL)
 		return (mp);
 
-	if ((recmp = kssl_build_record(kssl_ctx, mp)) == NULL) {
+	if ((recmp = kssl_build_record(kssl->ksslf_ctx, mp)) == NULL) {
 		freemsg(mp);
 		*rv = SOF_RVAL_EINVAL;
 		return (NULL);
@@ -313,15 +312,14 @@ sof_rval_t
 kssl_shutdown_cb(sof_handle_t handle, void *cookie, int *howp, cred_t *cr)
 {
 	ksslf_t *kssl = (ksslf_t *)cookie;
-	kssl_ctx_t kssl_ctx = kssl->ksslf_ctx;
 	mblk_t *outmp;
 	boolean_t flowctrld;
 	struct nmsghdr msg;
 
 	_NOTE(ARGUNUSED(cr));
 
-	if (kssl_ctx == NULL)
-		return (SOF_RVAL_EINVAL);
+	if (kssl == NULL || kssl->ksslf_ctx == NULL)
+		return (SOF_RVAL_CONTINUE);
 
 	/*
 	 * We only want to send close_notify when doing SHUT_WR/SHUT_RDWR
@@ -331,7 +329,7 @@ kssl_shutdown_cb(sof_handle_t handle, void *cookie, int *howp, cred_t *cr)
 		return (SOF_RVAL_CONTINUE);
 
 	/* Go on if we fail to build the record. */
-	if ((outmp = kssl_build_record(kssl_ctx, NULL)) == NULL)
+	if ((outmp = kssl_build_record(kssl->ksslf_ctx, NULL)) == NULL)
 		return (SOF_RVAL_CONTINUE);
 
 	bzero(&msg, sizeof (msg));
@@ -466,15 +464,17 @@ kssl_data_in_proc_cb(sof_handle_t handle, void *cookie, mblk_t *mp,
     cred_t *cr, size_t *lenp)
 {
 	ksslf_t *kssl = (ksslf_t *)cookie;
-	kssl_ctx_t kssl_ctx = kssl->ksslf_ctx;
 	kssl_cmd_t kssl_cmd;
 	mblk_t *out;
 
 	_NOTE(ARGUNUSED(cr));
 
+	if (kssl == NULL || kssl->ksslf_ctx)
+		return (mp);
+
 	*lenp = 0;
 
-	kssl_cmd = kssl_handle_mblk(kssl_ctx, &mp, &out);
+	kssl_cmd = kssl_handle_mblk(kssl->ksslf_ctx, &mp, &out);
 
 	switch (kssl_cmd) {
 	case KSSL_CMD_NONE:

@@ -3618,9 +3618,20 @@ process_ack:
 			CONN_INC_REF(connp);
 
 			if (!tcp_newconn_notify(tcp, ira)) {
+				/*
+				 * The state-change probe for SYN_RCVD ->
+				 * ESTABLISHED has not fired yet. We reset
+				 * the state to SYN_RCVD so that future
+				 * state-change probes report correct state
+				 * transistions.
+				 */
+				tcp->tcp_state = TCPS_SYN_RCVD;
 				freemsg(mp);
 				/* notification did not go up, so drop ref */
 				CONN_DEC_REF(connp);
+				/* ... and close the eager */
+				ASSERT(TCP_IS_DETACHED(tcp));
+				(void) tcp_close_detached(tcp);
 				return;
 			}
 			/*

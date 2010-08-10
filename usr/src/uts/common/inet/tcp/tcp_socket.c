@@ -1055,12 +1055,11 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
  * Notifies a non-STREAMS based listener about a new connection. This
  * function is executed on the *eager*'s squeue once the 3 way handshake
  * has completed. Note that the behavior differs from STREAMS, where the
- * T_CONN_IND is sent up by tcp_send_conn_ind while on the *listener*'s
+ * T_CONN_IND is sent up by tcp_send_conn_ind() while on the *listener*'s
  * squeue.
  *
- * Returns B_TRUE if the notification succeeded, in which case `tcp' will
- * be moved over to the ESTABLISHED list (q) of the listener. Othwerise,
- * B_FALSE is returned and `tcp' is killed.
+ * Returns B_TRUE if the notification succeeded and an upper handle was
+ * obtained. `tcp' should be closed on failure.
  */
 boolean_t
 tcp_newconn_notify(tcp_t *tcp, ip_recv_attr_t *ira)
@@ -1072,7 +1071,6 @@ tcp_newconn_notify(tcp_t *tcp, ip_recv_attr_t *ira)
 	ipaddr_t *addr_cache;
 	sock_upper_handle_t upper;
 	struct sock_proto_props sopp;
-	mblk_t *mp;
 
 	mutex_enter(&listener->tcp_eager_lock);
 	/*
@@ -1150,22 +1148,6 @@ tcp_newconn_notify(tcp_t *tcp, ip_recv_attr_t *ira)
 	    (lconnp->conn_upper_handle, (sock_lower_handle_t)econnp,
 	    &sock_tcp_downcalls, ira->ira_cred, ira->ira_cpid,
 	    &econnp->conn_upcalls)) == NULL) {
-		/*
-		 * Normally this should not happen, but the listener might
-		 * have done a fallback to TPI followed by a close(), in
-		 * which case tcp_closemp for this conn might have been
-		 * used by tcp_eager_cleanup().
-		 */
-		mutex_enter(&listener->tcp_eager_lock);
-		if (tcp->tcp_closemp_used) {
-			mutex_exit(&listener->tcp_eager_lock);
-			return (B_FALSE);
-		}
-		tcp->tcp_closemp_used = B_TRUE;
-		TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
-		mp = &tcp->tcp_closemp;
-		mutex_exit(&listener->tcp_eager_lock);
-		tcp_eager_kill(econnp, mp, NULL, NULL);
 		return (B_FALSE);
 	}
 	econnp->conn_upper_handle = upper;
