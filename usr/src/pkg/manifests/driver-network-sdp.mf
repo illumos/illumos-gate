@@ -37,6 +37,7 @@ set name=info.classification \
     value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
+dir path=etc/sock2path.d group=sys
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -45,6 +46,7 @@ dir path=kernel/socketmod/$(ARCH64) group=sys
 driver name=sdp perms="* 0644 root sys" perms="sdp 0666 root sys"
 file path=etc/sdp.conf group=sys original_name=SUNWibsdp:etc/sdp.conf \
     preserve=true
+file path=etc/sock2path.d/driver%2Fnetwork%2Fsdp group=sys
 file path=kernel/drv/$(ARCH64)/sdp group=sys
 $(i386_ONLY)file path=kernel/drv/sdp group=sys
 file path=kernel/drv/sdp.conf group=sys

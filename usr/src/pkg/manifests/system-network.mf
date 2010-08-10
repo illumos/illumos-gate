@@ -67,8 +67,6 @@ file path=etc/inet/ipsecinit.sample group=sys mode=0444
 file path=etc/inet/secret/ike.preshared group=sys mode=0600 \
     original_name=SUNWcnetr:etc/inet/secret/ike.preshared preserve=true
 file path=etc/inet/secret/ipseckeys.sample group=sys mode=0600
-file path=etc/inet/sock2path group=sys \
-    original_name=SUNWcnetr:etc/inet/sock2path preserve=renameold
 file path=etc/ipadm/ipadm.conf group=netadm owner=netadm preserve=true
 file path=etc/nwam/loc/NoNet/ipf.conf.dfl group=netadm owner=netadm \
     preserve=true
@@ -90,7 +88,6 @@ legacy pkg=SUNWcnetr arch=$(ARCH) category=system \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=etc/sock2path target=./inet/sock2path
 user username=dladm ftpuser=false gcos-field="Datalink Admin" group=netadm \
     uid=15
 user username=netadm ftpuser=false gcos-field="Network Admin" group=netadm \

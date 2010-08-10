@@ -43,7 +43,7 @@ if [ $? -eq 0 ]; then
 	# Rerun soconfig to configure any sockets that use /dev
 	# entries that were just created by devfsadm.
 	#
-	/sbin/soconfig -f /etc/sock2path >/dev/null 2>&1
+	/sbin/soconfig -d /etc/sock2path.d >/dev/null 2>&1
 
 	#
 	# Update kernel driver.conf cache.

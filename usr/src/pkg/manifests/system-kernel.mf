@@ -42,6 +42,7 @@ dir path=boot/solaris group=sys
 dir path=boot/solaris/bin group=sys
 dir path=etc group=sys
 dir path=etc/crypto group=sys
+dir path=etc/sock2path.d group=sys
 dir path=kernel group=sys
 $(i386_ONLY)dir path=kernel/$(ARCH64) group=sys
 dir path=kernel/crypto group=sys
@@ -265,6 +266,7 @@ file path=etc/crypto/kcf.conf group=sys \
     original_name=SUNWckr:etc/crypto/kcf.conf preserve=true
 file path=etc/name_to_sysnum group=sys \
     original_name=SUNWckr:etc/name_to_sysnum preserve=renameold
+file path=etc/sock2path.d/system%2Fkernel group=sys
 file path=etc/system group=sys original_name=SUNWckr:etc/system preserve=true
 $(i386_ONLY)file path=kernel/$(ARCH64)/genunix group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/aes group=sys mode=0755

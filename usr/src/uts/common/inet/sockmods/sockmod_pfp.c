@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -242,7 +241,7 @@ sockpfp_fini(void)
  * being used for reading packets from.
  *
  * This create function enforces this module only being used with PF_PACKET
- * sockets and the policy that we support via the sock2path.conf file:
+ * sockets and the policy that we support via the config file in sock2path.d:
  * PF_PACKET sockets must be either SOCK_DGRAM or SOCK_RAW.
  */
 /* ARGSUSED */

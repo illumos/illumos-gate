@@ -42,6 +42,7 @@ dir path=etc/rc0.d group=sys
 dir path=etc/rc1.d group=sys
 dir path=etc/rc2.d group=sys
 dir path=etc/rcS.d group=sys
+dir path=etc/sock2path.d group=sys
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -65,6 +66,8 @@ file path=etc/nca/ncalogd.conf group=sys \
     original_name=SUNWnca:etc/nca/ncalogd.conf preserve=true
 file path=etc/nca/ncaport.conf group=sys \
     original_name=SUNWnca:etc/nca/ncaport.conf preserve=true
+file path=etc/sock2path.d/system%2Fnetwork%2Fhttp%2Fcache%2Faccelerator \
+    group=sys
 file path=kernel/drv/$(ARCH64)/nca group=sys
 $(i386_ONLY)file path=kernel/drv/nca group=sys
 file path=kernel/drv/nca.conf group=sys

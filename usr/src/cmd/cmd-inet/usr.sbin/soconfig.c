@@ -22,22 +22,26 @@
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#include <stdio.h>
-#include <sys/stat.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
 #include <ctype.h>
+#include <dirent.h>
+#include <errno.h>
 #include <locale.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #define	MAXLINELEN	4096
 
 /*
  * Usage:
- *	sonconfig -f <file>
+ *	soconfig -d <dir>
+ *		Reads input from files in dir.
+ *
+ *	soconfig -f <file>
  *		Reads input from file. The file is structured as
  *			 <fam> <type> <protocol> <path|module>
  *			 <fam> <type> <protocol>
@@ -60,12 +64,14 @@
  *		unconfigures filter
  */
 
+static int	parse_files_in_dir(const char *dir);
+
 static int	parse_file(char *filename);
 
 static int	split_line(char *line, char *argvec[], int maxargvec);
 
 static int	parse_params(char *famstr, char *typestr, char *protostr,
-				char *path, int line);
+				char *path, const char *file, int line);
 
 static int	parse_int(char *str);
 
@@ -93,16 +99,21 @@ main(argc, argv)
 		ret = parse_filter_params(argc, argv);
 		exit(ret);
 	}
+	if (argc == 2 && strcmp(argv[0], "-d") == 0) {
+		ret = parse_files_in_dir(argv[1]);
+		exit(ret);
+	}
 	if (argc == 2 && strcmp(argv[0], "-f") == 0) {
 		ret = parse_file(argv[1]);
 		exit(ret);
 	}
 	if (argc == 3) {
-		ret = parse_params(argv[0], argv[1], argv[2], NULL, -1);
+		ret = parse_params(argv[0], argv[1], argv[2], NULL, NULL, -1);
 		exit(ret);
 	}
 	if (argc == 4) {
-		ret = parse_params(argv[0], argv[1], argv[2], argv[3], -1);
+		ret = parse_params(argv[0], argv[1], argv[2], argv[3],
+		    NULL, -1);
 		exit(ret);
 	}
 	usage();
@@ -114,9 +125,55 @@ static void
 usage(void)
 {
 	fprintf(stderr, gettext(
-	    "Usage:	soconfig -f <file>\n"
+	    "Usage:	soconfig -d <dir>\n"
+	    "\tsoconfig -f <file>\n"
 	    "\tsoconfig <fam> <type> <protocol> <path|module>\n"
 	    "\tsoconfig <fam> <type> <protocol>\n"));
+}
+
+/*
+ * Parse all files in the given directory.
+ */
+static int
+parse_files_in_dir(const char *dirname)
+{
+	DIR		*dp;
+	struct dirent 	*dirp;
+	struct stat	stats;
+	char		buf[MAXPATHLEN];
+
+	if ((dp = opendir(dirname)) == NULL) {
+		fprintf(stderr, gettext("failed to open directory '%s': %s\n"),
+		    dirname, strerror(errno));
+		return (1);
+	}
+
+	while ((dirp = readdir(dp)) != NULL) {
+		if (dirp->d_name[0] == '.')
+			continue;
+
+		if (snprintf(buf, sizeof (buf), "%s/%s", dirname,
+		    dirp->d_name) >= sizeof (buf)) {
+			fprintf(stderr,
+			    gettext("path name is too long: %s/%s\n"),
+			    dirname, dirp->d_name);
+			continue;
+		}
+		if (stat(buf, &stats) == -1) {
+			fprintf(stderr,
+			    gettext("failed to stat '%s': %s\n"), buf,
+			    strerror(errno));
+			continue;
+		}
+		if (!S_ISREG(stats.st_mode))
+			continue;
+
+		(void) parse_file(buf);
+	}
+
+	closedir(dp);
+
+	return (0);
 }
 
 /*
@@ -162,18 +219,19 @@ parse_file(char *filename)
 			break;
 		case 3:
 			numerror += parse_params(argvec[0], argvec[1],
-			    argvec[2], NULL, linecount);
+			    argvec[2], NULL, filename, linecount);
 			break;
 		case 4:
 			numerror += parse_params(argvec[0], argvec[1],
-			    argvec[2], argvec[3], linecount);
+			    argvec[2], argvec[3], filename, linecount);
 			break;
 		default:
 			numerror++;
 			fprintf(stderr,
 			    gettext("Malformed line: <%s>\n"), line);
 			fprintf(stderr,
-			    gettext("\ton line %d\n"), linecount);
+			    gettext("\ton line %d in %s\n"), linecount,
+			    filename);
 			break;
 		}
 	}
@@ -229,7 +287,8 @@ split_line(char *line, char *argvec[], int maxargvec)
  * If line is not -1 it is assumed to be the line number in the file.
  */
 static int
-parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
+parse_params(char *famstr, char *typestr, char *protostr, char *path,
+    const char *file, int line)
 {
 	int cmd, fam, type, protocol;
 
@@ -238,7 +297,7 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 		fprintf(stderr, gettext("Bad family number: %s\n"), famstr);
 		if (line != -1)
 			fprintf(stderr,
-			    gettext("\ton line %d\n"), line);
+			    gettext("\ton line %d in %s\n"), line, file);
 		else {
 			fprintf(stderr, "\n");
 			usage();
@@ -252,7 +311,7 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 		    gettext("Bad socket type number: %s\n"), typestr);
 		if (line != -1)
 			fprintf(stderr,
-			    gettext("\ton line %d\n"), line);
+			    gettext("\ton line %d in %s\n"), line, file);
 		else {
 			fprintf(stderr, "\n");
 			usage();
@@ -266,7 +325,7 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 		    gettext("Bad protocol number: %s\n"), protostr);
 		if (line != -1)
 			fprintf(stderr,
-			    gettext("\ton line %d\n"), line);
+			    gettext("\ton line %d in %s\n"), line, file);
 		else {
 			fprintf(stderr, "\n");
 			usage();
@@ -283,7 +342,8 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 			perror(path);
 			if (line != -1)
 				fprintf(stderr,
-				    gettext("\ton line %d\n"), line);
+				    gettext("\ton line %d in %s\n"), line,
+				    file);
 			else {
 				fprintf(stderr, "\n");
 				usage();
@@ -301,7 +361,25 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 	    cmd, fam, type, protocol, path == NULL ? "(null)" : path);
 #else
 	if (_sockconfig(cmd, fam, type, protocol, path) == -1) {
-		perror("sockconfig");
+		char *s;
+
+		switch (errno) {
+		case EEXIST:
+			s = gettext("Mapping exists");
+			break;
+		default:
+			s = strerror(errno);
+			break;
+		}
+
+		fprintf(stderr,
+		    gettext("warning: socket configuration failed "
+		    "for family %d type %d protocol %d: %s\n"),
+		    fam, type, protocol, s);
+		if (line != -1) {
+			fprintf(stderr,
+			    gettext("\ton line %d in %s\n"), line, file);
+		}
 		return (1);
 	}
 #endif
