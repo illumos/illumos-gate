@@ -866,43 +866,43 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 			return (S_ERROR);
 
 		/*
-		 * Now we initialize the GOT table entry.
+		 * Initialize the GOT table entry.
 		 *
-		 * Pseudo code to describe the the decisions below:
+		 * For global symbols, we clear the GOT table entry and create
+		 * a GLOB_DAT relocation against the symbol.
 		 *
-		 * If (local)
-		 * then
-		 *	enter symbol value in GOT table entry
-		 *	if (Shared Object)
-		 *	then
-		 *		create Relative relocation against symbol
-		 *	fi
-		 * else
-		 *	clear GOT table entry
-		 *	create a GLOB_DAT relocation against symbol
-		 * fi
+		 * For local symbols, we enter the symbol value into a GOT
+		 * table entry and create a relative relocation if all of
+		 * the following hold:
+		 *
+		 * -	Output is a shared object
+		 * -	Symbol is not ABS
+		 * -	Relocation is not against one of the special sections
+		 *	(COMMON, ...)
+		 * -	This is not one of the generated symbols we have
+		 *	to update after the output object has been fully
+		 *	laid out (_START_, _END_, ...)
+		 *
+		 * Local symbols that don't meet the above requirements
+		 * are processed as is.
 		 */
 		if (local == TRUE) {
-			if (flags & FLG_OF_SHAROBJ) {
+			if ((flags & FLG_OF_SHAROBJ) &&
+			    (((sdp->sd_flags & FLG_SY_SPECSEC) == 0) ||
+			    ((sdp->sd_sym->st_shndx != SHN_ABS)) ||
+			    (sdp->sd_aux && sdp->sd_aux->sa_symspec))) {
 				if (ld_add_actrel((FLG_REL_GOT | FLG_REL_GOTCL),
 				    rsp, ofl) == S_ERROR)
 					return (S_ERROR);
 
-				/*
-				 * Add a RELATIVE relocation if this is
-				 * anything but a ABS symbol.
-				 */
-				if ((((sdp->sd_flags & FLG_SY_SPECSEC) == 0) ||
-				    (sdp->sd_sym->st_shndx != SHN_ABS)) ||
-				    (sdp->sd_aux && sdp->sd_aux->sa_symspec)) {
-					rsp->rel_rtype =
-					    ld_targ.t_m.m_r_relative;
-					if ((*ld_targ.t_mr.mr_add_outrel)
-					    ((FLG_REL_GOT | FLG_REL_ADVAL), rsp,
-					    ofl) == S_ERROR)
-						return (S_ERROR);
-					rsp->rel_rtype = rtype;
-				}
+				rsp->rel_rtype = ld_targ.t_m.m_r_relative;
+
+				if ((*ld_targ.t_mr.mr_add_outrel)
+				    ((FLG_REL_GOT | FLG_REL_ADVAL),
+				    rsp, ofl) == S_ERROR)
+					return (S_ERROR);
+
+				rsp->rel_rtype = rtype;
 			} else {
 				if (ld_add_actrel(FLG_REL_GOT, rsp,
 				    ofl) == S_ERROR)

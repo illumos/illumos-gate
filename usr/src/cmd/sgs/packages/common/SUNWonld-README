@@ -1619,3 +1619,4 @@ Bugid   Risk Synopsis
 6971440 moe can core dump while processing libc.
 6972234 sgs demo's could use some cleanup
 6935867 .dynamic could be readonly in sharable objects
+6975290 ld mishandles GOT relocation against local ABS symbol
