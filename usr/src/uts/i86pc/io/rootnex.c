@@ -251,10 +251,12 @@ static int rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, uint_t win, off_t *offp, size_t *lenp,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp);
 
+#if defined(__amd64) && !defined(__xpv)
 static int rootnex_coredma_hdl_setprivate(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, void *v);
 static void *rootnex_coredma_hdl_getprivate(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle);
+#endif
 
 
 static struct bus_ops rootnex_bus_ops = {
@@ -1969,8 +1971,10 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 {
 	rootnex_sglinfo_t *sinfo;
 	ddi_dma_obj_t *dmao;
+#if defined(__amd64) && !defined(__xpv)
 	struct dvmaseg *dvs;
 	ddi_dma_cookie_t *cookie;
+#endif
 	ddi_dma_attr_t *attr;
 	ddi_dma_impl_t *hp;
 	rootnex_dma_t *dma;
@@ -1980,6 +1984,7 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 
 	hp = (ddi_dma_impl_t *)handle;
 	dma = (rootnex_dma_t *)hp->dmai_private;
+	dmao = &dma->dp_dma;
 	sinfo = &dma->dp_sglinfo;
 	attr = &hp->dmai_attr;
 
@@ -2064,7 +2069,6 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 			return (e);
 		}
 	}
-
 #endif
 
 	/*
@@ -2094,8 +2098,6 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 		ncookies += (dmao->dmao_obj.dvma_obj.dv_nseg - 1);
 
 		sinfo->si_max_pages = MIN(sinfo->si_max_pages, ncookies);
-	} else {
-		dmao = &dma->dp_dma;
 	}
 
 	/*
@@ -4960,6 +4962,7 @@ rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	    cookiep, ccountp));
 }
 
+#if defined(__amd64) && !defined(__xpv)
 /*ARGSUSED*/
 static int
 rootnex_coredma_hdl_setprivate(dev_info_t *dip, dev_info_t *rdip,
@@ -4988,6 +4991,7 @@ rootnex_coredma_hdl_getprivate(dev_info_t *dip, dev_info_t *rdip,
 
 	return (dma->dp_iommu_private);
 }
+#endif
 
 /*
  * ************************

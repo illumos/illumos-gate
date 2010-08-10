@@ -360,7 +360,6 @@ iommulib_iommu_register(dev_info_t *dip, iommulib_ops_t *ops,
 	iommulib_unit_t *unitp;
 	int instance = ddi_get_instance(dip);
 	const char *driver = ddi_driver_name(dip);
-	dev_info_t *pdip = ddi_get_parent(dip);
 	const char *f = "iommulib_register";
 
 	ASSERT(ops);
