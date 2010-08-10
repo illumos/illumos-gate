@@ -465,8 +465,8 @@ ibd_rc_init_stats(ibd_state_t *state)
 	 * Create and init kstat
 	 */
 	inst = ddi_get_instance(state->id_dip);
-	(void) snprintf(stat_name, KSTAT_STRLEN, "statistics%d_%x", inst,
-	    state->id_pkey);
+	(void) snprintf(stat_name, KSTAT_STRLEN, "statistics%d_%x_%u", inst,
+	    state->id_pkey, state->id_plinkid);
 	ksp = kstat_create("ibd", 0, stat_name, "net", KSTAT_TYPE_NAMED,
 	    sizeof (ibd_rc_stat_t) / sizeof (kstat_named_t), 0);
 

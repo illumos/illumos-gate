@@ -598,16 +598,20 @@ void
 ibd_print_warn(ibd_state_t *state, char *fmt, ...)
 {
 	ib_guid_t hca_guid;
-	char ibd_print_buf[256];
+	char ibd_print_buf[MAXNAMELEN + 256];
 	int len;
 	va_list ap;
+	char part_name[MAXNAMELEN];
+	datalink_id_t linkid = state->id_plinkid;
 
 	hca_guid = ddi_prop_get_int64(DDI_DEV_T_ANY, state->id_dip,
 	    0, "hca-guid", 0);
+	(void) dls_mgmt_get_linkinfo(linkid, part_name, NULL, NULL, NULL);
 	len = snprintf(ibd_print_buf, sizeof (ibd_print_buf),
-	    "%s%d: HCA GUID %016llx port %d PKEY %02x ",
+	    "%s%d: HCA GUID %016llx port %d PKEY %02x link %s ",
 	    ddi_driver_name(state->id_dip), ddi_get_instance(state->id_dip),
-	    (u_longlong_t)hca_guid, state->id_port, state->id_pkey);
+	    (u_longlong_t)hca_guid, state->id_port, state->id_pkey,
+	    part_name);
 	va_start(ap, fmt);
 	(void) vsnprintf(ibd_print_buf + len, sizeof (ibd_print_buf) - len,
 	    fmt, ap);
@@ -2870,8 +2874,8 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	state->id_rx_list.dl_cnt = 0;
 	mutex_init(&state->id_rx_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&state->id_rx_free_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
-	(void) sprintf(buf, "ibd_req%d_%x", ddi_get_instance(dip),
-	    state->id_pkey);
+	(void) sprintf(buf, "ibd_req%d_%x_%u", ddi_get_instance(dip),
+	    state->id_pkey, state->id_plinkid);
 	state->id_req_kmc = kmem_cache_create(buf, sizeof (ibd_req_t),
 	    0, NULL, NULL, NULL, NULL, NULL, 0);
 
@@ -8222,7 +8226,8 @@ ibd_create_partition(void *karg, intptr_t arg, int mode, cred_t *credp,
 	mutex_enter(&ibd_objlist_lock);
 	for (p = ibd_objlist_head; p; p = p->id_next) {
 		if ((p->id_port_inst == cmd->ibdioc.ioc_port_inst) &&
-		    (p->id_pkey == cmd->ioc_pkey)) {
+		    (p->id_pkey == cmd->ioc_pkey) &&
+		    (p->id_plinkid == cmd->ioc_partid)) {
 			mutex_exit(&ibd_objlist_lock);
 			rval = EEXIST;
 			cmd->ibdioc.ioc_status = IBD_PARTITION_EXISTS;
@@ -8334,7 +8339,7 @@ ibd_delete_partition(void *karg, intptr_t arg, int mode, cred_t *credp,
 	mutex_enter(&ibd_objlist_lock);
 	node = ibd_objlist_head;
 
-	/* Find the ibd state structure corresponding the partion */
+	/* Find the ibd state structure corresponding to the partition */
 	while (node != NULL) {
 		if (node->id_plinkid == cmd->ioc_partid)
 			break;
