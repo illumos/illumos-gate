@@ -87,16 +87,12 @@ file path=usr/ucblib/libucb.so.1
 $(i386_ONLY)hardlink path=usr/ucb/$(ARCH32)/ps target=../../bin/$(ARCH32)/ps
 hardlink path=usr/ucb/$(ARCH64)/ps target=../../bin/$(ARCH64)/ps
 hardlink path=usr/ucb/ps target=../../usr/lib/isaexec
-legacy pkg=SUNWscpr arch=$(ARCH) category=system \
+legacy pkg=SUNWscpr \
     desc="utilities for user interface and source build compatibility with SunOS 4.x" \
-    hotline="Please contact your local service provider" \
-    name="Source Compatibility, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWscpu arch=$(ARCH) category=system \
+    name="Source Compatibility, (Root)"
+legacy pkg=SUNWscpu \
     desc="utilities for user interface and source build compatibility with SunOS 4.x" \
-    hotline="Please contact your local service provider" \
-    name="Source Compatibility, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Source Compatibility, (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/ucbcmd/basename/THIRDPARTYLICENSE \

@@ -55,11 +55,8 @@ driver name=wpi clone_perms="wpi 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,4227.8086.1014
 file path=kernel/drv/$(ARCH64)/wpi group=sys
 file path=kernel/drv/wpi group=sys
-legacy pkg=SUNWwpi arch=$(ARCH) category=system \
-    desc="Intel(R) PRO/Wireless 3945ABG driver" \
-    hotline="Please contact your local service provider" \
-    name="Intel(R) PRO/Wireless 3945ABG driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWwpi desc="Intel(R) PRO/Wireless 3945ABG driver" \
+    name="Intel(R) PRO/Wireless 3945ABG driver"
 license cr_Sun license=cr_Sun
 license usr/src/uts/common/io/wpi/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/wpi/THIRDPARTYLICENSE

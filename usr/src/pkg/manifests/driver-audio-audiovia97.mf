@@ -38,10 +38,7 @@ dir path=kernel group=sys
 dir path=kernel/drv group=sys
 driver name=audiovia97 alias=pci1106,3058
 file path=kernel/drv/audiovia97 group=sys
-legacy pkg=SUNWaudiovia97 arch=$(ARCH) category=system \
-    desc="SunOS audio device driver for Via 82C686" \
-    hotline="Please contact your local service provider" \
-    name="Via 82C686 Audio Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWaudiovia97 desc="SunOS audio device driver for Via 82C686" \
+    name="Via 82C686 Audio Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -45,15 +45,9 @@ $(i386_ONLY)file path=boot/solaris/bootenv.rc group=sys \
 $(i386_ONLY)file path=boot/solaris/devicedb/master group=sys \
     original_name=SUNWrmod:boot/solaris/devicedb/master preserve=true
 $(i386_ONLY)file path=usr/lib/fs/ufs/mboot mode=0444
-$(i386_ONLY)legacy pkg=SUNWrmodr arch=$(ARCH) category=system \
-    desc="Realmode Modules, (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Realmode Modules, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-$(i386_ONLY)legacy pkg=SUNWrmodu arch=$(ARCH) category=system \
-    desc="Realmode Modules, (Usr)" \
-    hotline="Please contact your local service provider" \
-    name="Realmode Modules, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+$(i386_ONLY)legacy pkg=SUNWrmodr desc="Realmode Modules, (Root)" \
+    name="Realmode Modules, (Root)"
+$(i386_ONLY)legacy pkg=SUNWrmodu desc="Realmode Modules, (Usr)" \
+    name="Realmode Modules, (Usr)"
 $(i386_ONLY)license cr_Sun license=cr_Sun
 $(i386_ONLY)license lic_CDDL license=lic_CDDL

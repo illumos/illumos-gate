@@ -44,10 +44,8 @@ driver name=audioixp \
     alias=pci1002,4370
 file path=kernel/drv/$(ARCH64)/audioixp group=sys
 file path=kernel/drv/audioixp group=sys
-legacy pkg=SUNWadixp arch=$(ARCH) category=system \
+legacy pkg=SUNWadixp \
     desc="SunOS audio device driver for ATI IXP integrated audio hardware" \
-    hotline="Please contact your local service provider" \
-    name="SUNW Audio Driver for ATI IXP" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="SUNW Audio Driver for ATI IXP"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

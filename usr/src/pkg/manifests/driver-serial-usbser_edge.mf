@@ -73,11 +73,8 @@ file path=kernel/drv/$(ARCH64)/usbser_edge group=sys
 $(i386_ONLY)file path=kernel/drv/usbser_edge group=sys
 file path=kernel/drv/usbser_edge.conf group=sys \
     original_name=SUNWuedg:kernel/drv/usbser_edge.conf preserve=true
-legacy pkg=SUNWuedg arch=$(ARCH) category=system \
-    desc="USB Digi Edgeport serial driver" \
-    hotline="Please contact your local service provider" \
-    name="USB Digi Edgeport serial driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWuedg desc="USB Digi Edgeport serial driver" \
+    name="USB Digi Edgeport serial driver"
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble

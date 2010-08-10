@@ -42,16 +42,12 @@ file path=usr/lib/llib-lima
 file path=usr/lib/llib-lima.ln
 file path=usr/lib/llib-lsun_ima
 file path=usr/lib/llib-lsun_ima.ln
-legacy pkg=SUNWima arch=$(ARCH) category=system \
+legacy pkg=SUNWima \
     desc="SNIA iSCSI Managment API plugin library for iSCSI adapters" \
-    hotline="Please contact your local service provider" \
-    name="Solaris IMA Software Initiator Plugin" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWimar arch=$(ARCH) category=system \
+    name="Solaris IMA Software Initiator Plugin"
+legacy pkg=SUNWimar \
     desc="SNIA iSCSI Managment API plugin library for iSCSI adapters (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Solaris IMA Software Initiator Plugin (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Solaris IMA Software Initiator Plugin (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libima/THIRDPARTYLICENSE \

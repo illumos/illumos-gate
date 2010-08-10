@@ -647,16 +647,11 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libpriplugin.so.1 \
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so.1 \
     group=sys
 file path=usr/sbin/prtpicl mode=0755
-legacy pkg=SUNWpiclr arch=$(ARCH) category=system \
-    desc="PICL Framework init scripts" \
-    hotline="Please contact your local service provider" \
-    name="PICL Framework (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWpiclu arch=$(ARCH) category=system \
+legacy pkg=SUNWpiclr desc="PICL Framework init scripts" \
+    name="PICL Framework (Root)"
+legacy pkg=SUNWpiclu \
     desc="PICL Daemon, Libraries, prtpicl client and plug-in modules" \
-    hotline="Please contact your local service provider" \
-    name="PICL Libraries, and Plugin Modules (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="PICL Libraries, and Plugin Modules (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libpicl.so target=./libpicl.so.1

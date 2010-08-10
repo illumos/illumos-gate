@@ -45,10 +45,7 @@ driver name=usbvc perms="* 0666 root sys" \
     alias=usbia46d,8c5.config1.0
 file path=kernel/drv/$(ARCH64)/usbvc group=sys
 $(i386_ONLY)file path=kernel/drv/usbvc group=sys
-legacy pkg=SUNWusbvc arch=$(ARCH) category=system \
-    desc="usbvc (USB Video Class Driver)" \
-    hotline="Please contact your local service provider" \
-    name="USB Video Class Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWusbvc desc="usbvc (USB Video Class Driver)" \
+    name="USB Video Class Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

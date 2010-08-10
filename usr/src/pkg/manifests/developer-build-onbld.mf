@@ -272,11 +272,8 @@ file path=opt/onbld/man/man1/xref.1
 file path=opt/onbld/man/sman1/get_depend_info.1
 file path=opt/onbld/man/sman1/make_pkg_db.1
 hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
-legacy pkg=SUNWonbld arch=$(ARCH) category=system \
-    desc="tools used to build the OS-Net consolidation" \
-    hotline="Please contact your local service provider" \
-    name="OS-Net Build Tools" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.10.22
+legacy pkg=SUNWonbld desc="tools used to build the OS-Net consolidation" \
+    name="OS-Net Build Tools" version=11.11,REV=2009.10.22
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE \

@@ -81,16 +81,12 @@ file path=var/sadm/install/admin/default group=sys mode=0444
 hardlink path=usr/sadm/install/scripts/i.CONFIG.prsv target=./i.preserve
 hardlink path=usr/sbin/pkgask target=../../usr/sbin/pkgadd
 hardlink path=usr/sbin/removef target=../../usr/sbin/installf
-legacy pkg=SUNWpkgcmdsr arch=$(ARCH) category=system \
+legacy pkg=SUNWpkgcmdsr \
     desc="Solaris System V release 4 Package Commands (root)" \
-    hotline="Please contact your local service provider" \
-    name="SVr4 package commands (root)" vendor="Sun Microsystems, Inc." \
-    version=11.11.1,REV=2009.11.11
-legacy pkg=SUNWpkgcmdsu arch=$(ARCH) category=system \
+    name="SVr4 package commands (root)" version=11.11.1,REV=2009.11.11
+legacy pkg=SUNWpkgcmdsu \
     desc="Solaris System V Release 4 Packaging Commands (usr)" \
-    hotline="Please contact your local service provider" \
-    name="SVr4 packaging commands (usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11.1,REV=2009.11.11
+    name="SVr4 packaging commands (usr)" version=11.11.1,REV=2009.11.11
 license cr_ATT license=cr_ATT
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

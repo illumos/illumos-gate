@@ -70,14 +70,9 @@ $(i386_ONLY)file path=boot/grub/zfs_stage1_5 group=sys
 file path=lib/libgrubmgmt.so.1
 file path=lib/llib-lgrubmgmt
 file path=lib/llib-lgrubmgmt.ln
-$(i386_ONLY)legacy pkg=SUNWgrub arch=$(ARCH) category=system \
-    desc="Multiboot Boot Loader" \
-    hotline="Please contact your local service provider" \
-    name="GNU GRUB - GNU GRand Unified Bootloader" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWgrubr arch=$(ARCH) category=system desc="GRUB libraries" \
-    hotline="Please contact your local service provider" name="GRUB (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+$(i386_ONLY)legacy pkg=SUNWgrub desc="Multiboot Boot Loader" \
+    name="GNU GRUB - GNU GRand Unified Bootloader"
+legacy pkg=SUNWgrubr desc="GRUB libraries" name="GRUB (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/grub/grub-0.97/AUTHORS license=usr/src/grub/grub-0.97/AUTHORS

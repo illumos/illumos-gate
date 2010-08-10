@@ -40,10 +40,8 @@ dir path=usr/sbin
 $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/a5k_g_fc_i18n_cat
 $(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/ibfirmware
 file path=usr/sbin/luxadm mode=0555
-legacy pkg=SUNWluxop arch=$(ARCH) category=system \
+legacy pkg=SUNWluxop \
     desc="Sun Enterprise Network Array firmware and utilities" \
-    hotline="Please contact your local service provider" \
-    name="Sun Enterprise Network Array firmware and utilities" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Sun Enterprise Network Array firmware and utilities"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

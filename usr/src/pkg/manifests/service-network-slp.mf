@@ -59,14 +59,12 @@ file path=usr/lib/llib-lslp
 file path=usr/lib/llib-lslp.ln
 file path=usr/share/lib/slp/slp.jar group=sys
 file path=usr/share/lib/slp/slpd.jar group=sys mode=0600
-legacy pkg=SUNWslpr arch=$(ARCH) category=system \
+legacy pkg=SUNWslpr \
     desc="Root filesystem portion of the Service Location Protocol (SLP) framework. Includes the SLP configuration file and start scripts for the SLP daemon." \
-    hotline="Please contact your local service provider" name="SLP, (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWslpu arch=$(ARCH) category=system \
+    name="SLP, (Root)"
+legacy pkg=SUNWslpu \
     desc="Usr filesystem portion of the Service Location Protocol (SLP) framework. Included are C and Java developer libraries and a daemon which can act as a directory agent (DA)." \
-    hotline="Please contact your local service provider" name="SLP, (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="SLP, (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libslp.so target=libslp.so.1

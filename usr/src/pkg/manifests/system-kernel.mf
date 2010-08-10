@@ -834,11 +834,9 @@ hardlink path=kernel/sys/$(ARCH64)/rpcmod \
     target=../../../kernel/strmod/$(ARCH64)/rpcmod
 $(i386_ONLY)hardlink path=kernel/sys/autofs target=../../kernel/fs/autofs
 $(i386_ONLY)hardlink path=kernel/sys/rpcmod target=../../kernel/strmod/rpcmod
-legacy pkg=SUNWckr arch=$(ARCH) category=system \
+legacy pkg=SUNWckr \
     desc="core kernel software for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris Kernel (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Core Solaris Kernel (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE \

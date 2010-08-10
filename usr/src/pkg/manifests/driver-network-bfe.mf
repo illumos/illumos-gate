@@ -44,10 +44,7 @@ driver name=bfe \
     alias=pci14e4,4402
 file path=kernel/drv/$(ARCH64)/bfe group=sys
 file path=kernel/drv/bfe group=sys
-legacy pkg=SUNWbfe arch=$(ARCH) category=system \
-    desc="Broadcom BCM4401 Fast Ethernet Driver" \
-    hotline="Please contact your local service provider" \
-    name="Broadcom BCM4401 Fast Ethernet Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWbfe desc="Broadcom BCM4401 Fast Ethernet Driver" \
+    name="Broadcom BCM4401 Fast Ethernet Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -38,10 +38,7 @@ file path=usr/include/sys/scsi/adapters/fascmd.h
 file path=usr/include/sys/scsi/adapters/fasdma.h
 file path=usr/include/sys/scsi/adapters/fasreg.h
 file path=usr/include/sys/scsi/adapters/fasvar.h
-legacy pkg=SUNWhmdu arch=$(ARCH) category=system \
-    desc="SunSwift Adapter Headers" \
-    hotline="Please contact your local service provider" \
-    name="SunSwift Adapter Headers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWhmdu desc="SunSwift Adapter Headers" \
+    name="SunSwift Adapter Headers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

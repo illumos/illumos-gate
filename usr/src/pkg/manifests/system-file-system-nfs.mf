@@ -94,21 +94,13 @@ file path=usr/lib/nfs/statd mode=0555
 group groupname=unknown gid=96
 hardlink path=kernel/sys/$(ARCH64)/nfs target=../../../kernel/fs/$(ARCH64)/nfs
 $(i386_ONLY)hardlink path=kernel/sys/nfs target=../../kernel/fs/nfs
-legacy pkg=SUNWnfsckr arch=$(ARCH) category=system \
+legacy pkg=SUNWnfsckr \
     desc="Network File System (NFS) client kernel support (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Network File System (NFS) client kernel support (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWnfscr arch=$(ARCH) category=system \
-    desc="Network File System (NFS) client support (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Network File System (NFS) client support (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWnfscu arch=$(ARCH) category=system \
-    desc="Network File System (NFS) client support (Usr)" \
-    hotline="Please contact your local service provider" \
-    name="Network File System (NFS) client support (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Network File System (NFS) client kernel support (Root)"
+legacy pkg=SUNWnfscr desc="Network File System (NFS) client support (Root)" \
+    name="Network File System (NFS) client support (Root)"
+legacy pkg=SUNWnfscu desc="Network File System (NFS) client support (Usr)" \
+    name="Network File System (NFS) client support (Usr)"
 license cr_ATT license=cr_ATT
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -1848,11 +1848,9 @@ $(sparc_ONLY)file path=usr/platform/sun4v/include/vm/mach_sfmmu.h
 file path=usr/xpg4/include/curses.h
 file path=usr/xpg4/include/term.h
 file path=usr/xpg4/include/unctrl.h
-legacy pkg=SUNWhea arch=$(ARCH) category=system \
+legacy pkg=SUNWhea \
     desc="SunOS C/C++ header files for general development of software" \
-    hotline="Please contact your local service provider" \
-    name="SunOS Header Files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="SunOS Header Files"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers

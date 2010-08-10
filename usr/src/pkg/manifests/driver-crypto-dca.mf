@@ -59,16 +59,10 @@ file path=usr/lib/fm/eft/sca1000.eft mode=0444
 file path=usr/lib/fm/eft/sca500.eft mode=0444
 file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.mo mode=0444
 file path=usr/lib/locale/C/LC_MESSAGES/SCA500.mo mode=0444
-legacy pkg=SUNWdcaf arch=$(ARCH) category=system \
-    desc="DCA Crypto Accelerator Supplemental Files (usr)" \
-    hotline="Please contact your local service provider" \
-    name="DCA Crypto Accelerator (usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWdcar arch=$(ARCH) category=system \
-    desc="DCA Crypto Accelerator driver" \
-    hotline="Please contact your local service provider" \
-    name="DCA Crypto Accelerator (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWdcaf desc="DCA Crypto Accelerator Supplemental Files (usr)" \
+    name="DCA Crypto Accelerator (usr)"
+legacy pkg=SUNWdcar desc="DCA Crypto Accelerator driver" \
+    name="DCA Crypto Accelerator (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 $(USE_INTERNAL_CRYPTO)depend fmri=driver/crypto/dprov type=require

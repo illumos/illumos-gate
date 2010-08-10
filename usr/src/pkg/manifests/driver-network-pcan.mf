@@ -45,10 +45,7 @@ driver name=pcan clone_perms="pcan 0666 root sys" perms="* 0666 root sys" \
     alias=pci14b9,a504
 file path=kernel/drv/$(ARCH64)/pcan group=sys
 $(i386_ONLY)file path=kernel/drv/pcan group=sys
-legacy pkg=SUNWpcan arch=$(ARCH) category=system \
-    desc="Cisco-Aironet 802.11b driver" \
-    hotline="Please contact your local service provider" \
-    name="Cisco-Aironet 802.11b driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWpcan desc="Cisco-Aironet 802.11b driver" \
+    name="Cisco-Aironet 802.11b driver"
 license usr/src/uts/common/io/pcan/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/pcan/THIRDPARTYLICENSE

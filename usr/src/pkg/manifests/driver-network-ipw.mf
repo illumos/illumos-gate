@@ -42,11 +42,8 @@ driver name=ipw alias=pci8086,1043 clone_perms="ipw 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/ipw group=sys
 file path=kernel/drv/ipw group=sys
-legacy pkg=SUNWipw arch=$(ARCH) category=system \
-    desc="Intel Pro. Wirless 802.11b IPW2100B Driver" \
-    hotline="Please contact your local service provider" \
-    name="Intel Pro. Wireless 802.11b IPW2100B Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWipw desc="Intel Pro. Wirless 802.11b IPW2100B Driver" \
+    name="Intel Pro. Wireless 802.11b IPW2100B Driver"
 license cr_Sun license=cr_Sun
 license usr/src/uts/common/io/ipw/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/ipw/THIRDPARTYLICENSE

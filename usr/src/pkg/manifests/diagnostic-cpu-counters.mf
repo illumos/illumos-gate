@@ -78,11 +78,8 @@ $(i386_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.5 \
     target=pcbe.GenuineIntel.6
 $(i386_ONLY)hardlink path=usr/kernel/pcbe/pcbe.GenuineIntel.5 \
     target=pcbe.GenuineIntel.6
-legacy pkg=SUNWcpcu arch=$(ARCH) category=system \
-    desc="CPU Performance Counter libraries and utilities" \
-    hotline="Please contact your local service provider" \
-    name="CPU Performance Counter libraries and utilities" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWcpcu desc="CPU Performance Counter libraries and utilities" \
+    name="CPU Performance Counter libraries and utilities"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 $(i386_ONLY)license usr/src/uts/intel/pcbe/THIRDPARTYLICENSE \

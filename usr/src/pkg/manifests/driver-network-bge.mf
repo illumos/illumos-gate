@@ -123,11 +123,9 @@ $(sparc_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
 file path=kernel/drv/$(ARCH64)/bge group=sys
 $(i386_ONLY)file path=kernel/drv/bge group=sys
 file path=kernel/drv/bge.conf group=sys
-legacy pkg=SUNWbge arch=$(ARCH) category=system \
+legacy pkg=SUNWbge \
     desc="Broadcom 57xx Gigabit Ethernet Network Adapter Driver" \
-    hotline="Please contact your local service provider" \
-    name="Broadcom 57xx GE NIC Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Broadcom 57xx GE NIC Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/bge/THIRDPARTYLICENSE \

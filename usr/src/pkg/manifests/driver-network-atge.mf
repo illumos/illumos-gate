@@ -44,10 +44,7 @@ driver name=atge \
     alias=pciex1969,1048
 file path=kernel/drv/$(ARCH64)/atge group=sys
 file path=kernel/drv/atge group=sys
-legacy pkg=SUNWatge arch=$(ARCH) category=system \
-    desc="Atheros/Attansic L1E Gigabit Ethernet" \
-    hotline="Please contact your local service provider" \
-    name="Atheros/Attansic L1E Gigabit Ethernet 10/100/1000 Base (AR8121/AR8113)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWatge desc="Atheros/Attansic L1E Gigabit Ethernet" \
+    name="Atheros/Attansic L1E Gigabit Ethernet 10/100/1000 Base (AR8121/AR8113)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

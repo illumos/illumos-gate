@@ -50,11 +50,8 @@ driver name=ntxn \
 file path=kernel/drv/$(ARCH64)/ntxn group=sys
 file path=kernel/drv/ntxn group=sys
 file path=kernel/drv/ntxn.conf group=sys
-legacy pkg=SUNWntxn arch=$(ARCH) category=system \
-    desc="NetXen 1Gb/10Gb Ethernet Adapter Driver" \
-    hotline="Please contact your local service provider" \
-    name="NetXen 1Gb/10Gb NIC Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWntxn desc="NetXen 1Gb/10Gb Ethernet Adapter Driver" \
+    name="NetXen 1Gb/10Gb NIC Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/ntxn/THIRDPARTYLICENSE \

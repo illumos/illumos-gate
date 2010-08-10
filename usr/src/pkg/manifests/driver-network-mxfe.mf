@@ -45,11 +45,8 @@ driver name=mxfe clone_perms="mxfe 0666 root sys" perms="* 0666 root sys" \
     alias=pci11fc,9881
 file path=kernel/drv/$(ARCH64)/mxfe group=sys
 $(i386_ONLY)file path=kernel/drv/mxfe group=sys
-legacy pkg=SUNWmxfe arch=$(ARCH) category=system \
-    desc="Macronix Fast Ethernet Network Adapter Driver" \
-    hotline="Please contact your local service provider" \
-    name="Macronix Fast Ethernet Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWmxfe desc="Macronix Fast Ethernet Network Adapter Driver" \
+    name="Macronix Fast Ethernet Driver"
 license cr_Sun license=cr_Sun
 license usr/src/uts/common/io/mxfe/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/mxfe/THIRDPARTYLICENSE

@@ -45,10 +45,8 @@ driver name=xdt
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/xdt group=sys
 file path=platform/i86xpv/kernel/drv/xdt group=sys
 file path=platform/i86xpv/kernel/drv/xdt.conf group=sys
-legacy pkg=SUNWxdt arch=$(ARCH) category=system \
+legacy pkg=SUNWxdt \
     desc="DTrace provider for tracing events in the xVM hypervisor" \
-    hotline="Please contact your local service provider" \
-    name="xVM Hypervisor Dynamic Tracing (DTrace) Provider" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="xVM Hypervisor Dynamic Tracing (DTrace) Provider"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

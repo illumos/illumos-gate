@@ -56,16 +56,10 @@ file path=usr/sadm/lib/wbem/libWBEMnfs.so group=sys
 file path=usr/sadm/mof/CIM2.7.mof group=sys
 file path=usr/sadm/mof/Solaris_DMGT1.0.mof group=sys
 file path=usr/sadm/mof/Solaris_NFS1.0.mof group=sys
-legacy pkg=SUNWdmgtr arch=$(ARCH) category=system \
-    desc="software for WBEM/CIM data device management" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Data Management WBEM/CIM API (root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWdmgtu arch=$(ARCH) category=system \
-    desc="software for WBEM/CIM data device management" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Data Management WBEM/CIM API (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWdmgtr desc="software for WBEM/CIM data device management" \
+    name="Solaris Data Management WBEM/CIM API (root)"
+legacy pkg=SUNWdmgtu desc="software for WBEM/CIM data device management" \
+    name="Solaris Data Management WBEM/CIM API (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libfsmgt.so target=./libfsmgt.so.1

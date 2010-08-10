@@ -41,15 +41,9 @@ file path=etc/default/telnetd group=sys \
     original_name=SUNWtnetd:etc/default/telnetd preserve=true
 file path=lib/svc/manifest/network/telnet.xml group=sys mode=0444
 file path=usr/sbin/in.telnetd mode=0555
-legacy pkg=SUNWtnetd arch=$(ARCH) category=system \
-    desc="Telnet Server Daemon (Usr)" \
-    hotline="Please contact your local service provider" \
-    name="Telnet Server Daemon (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWtnetr arch=$(ARCH) category=system \
-    desc="Telnet Server Daemon (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Telnet Server Daemon (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWtnetd desc="Telnet Server Daemon (Usr)" \
+    name="Telnet Server Daemon (Usr)"
+legacy pkg=SUNWtnetr desc="Telnet Server Daemon (Root)" \
+    name="Telnet Server Daemon (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

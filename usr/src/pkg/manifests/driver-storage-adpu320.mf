@@ -54,11 +54,8 @@ driver name=adpu320 class=scsi perms="adpu320ctl 0666 root root" \
 file path=kernel/drv/$(ARCH64)/adpu320 group=sys
 file path=kernel/drv/adpu320 group=sys
 file path=kernel/drv/adpu320.conf group=sys
-legacy pkg=SUNWadpu320 arch=$(ARCH) category=system \
-    desc="Adaptec 7902 SCSI Driver" \
-    hotline="Please contact your local service provider" \
-    name="Adaptec Ultra320 Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWadpu320 desc="Adaptec 7902 SCSI Driver" \
+    name="Adaptec Ultra320 Driver"
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble

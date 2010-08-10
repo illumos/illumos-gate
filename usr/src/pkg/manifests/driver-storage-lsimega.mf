@@ -49,11 +49,8 @@ driver name=lsimega class=scsi \
 file path=kernel/drv/$(ARCH64)/lsimega group=sys
 file path=kernel/drv/lsimega group=sys
 file path=kernel/drv/lsimega.conf group=sys
-legacy pkg=SUNWlsimega arch=$(ARCH) category=system \
-    desc="LSI Hardware RAID HBA Driver" \
-    hotline="Please contact your local service provider" \
-    name="LSI Hardware RAID HBA Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWlsimega desc="LSI Hardware RAID HBA Driver" \
+    name="LSI Hardware RAID HBA Driver"
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble

@@ -47,10 +47,8 @@ file path=usr/demo/mdb/Makefile.sparcv9
 file path=usr/demo/mdb/README
 file path=usr/demo/mdb/common/example1.c
 file path=usr/demo/mdb/common/example2.c
-legacy pkg=SUNWmdbdm arch=$(ARCH) category=system \
+legacy pkg=SUNWmdbdm \
     desc="Modular Debugger (MDB) demonstration modules and source code" \
-    hotline="Please contact your local service provider" \
-    name="Modular Debugger Demo Source" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Modular Debugger Demo Source"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

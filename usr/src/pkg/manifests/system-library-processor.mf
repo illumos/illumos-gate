@@ -95,31 +95,21 @@ $(sparc_ONLY)file path=platform/sun4v/lib/fs/ufs/bootblk group=sys mode=0444 \
     reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/lib/fs/zfs/bootblk group=sys mode=0444 \
     reboot-needed=true
-$(i386_ONLY)legacy pkg=SUNWcar.i arch=$(ARCH).i86pc category=system \
+$(i386_ONLY)legacy pkg=SUNWcar.i arch=$(ARCH).i86pc \
     desc="core software for a specific hardware platform group" \
-    hotline="Please contact your local service provider" \
-    name="Core Architecture, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-$(sparc_ONLY)legacy pkg=SUNWcar.u arch=$(ARCH).sun4u category=system \
+    name="Core Architecture, (Root)"
+$(sparc_ONLY)legacy pkg=SUNWcar.u arch=$(ARCH).sun4u \
     desc="core software for a specific hardware platform group" \
-    hotline="Please contact your local service provider" \
-    name="Core Architecture, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-$(sparc_ONLY)legacy pkg=SUNWcar.v arch=$(ARCH).sun4v category=system \
+    name="Core Architecture, (Root)"
+$(sparc_ONLY)legacy pkg=SUNWcar.v arch=$(ARCH).sun4v \
     desc="core software for a specific hardware platform group" \
-    hotline="Please contact your local service provider" \
-    name="Core Architecture, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-$(sparc_ONLY)legacy pkg=SUNWcart200.v arch=$(ARCH).sun4v category=system \
+    name="Core Architecture, (Root)"
+$(sparc_ONLY)legacy pkg=SUNWcart200.v arch=$(ARCH).sun4v \
     desc="core software for a specific hardware platform group" \
-    hotline="Please contact your local service provider" \
-    name="Core Architecture, sun4v-based platforms (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-$(i386_ONLY)legacy pkg=SUNWcarx.i arch=$(ARCH).i86pc category=system \
+    name="Core Architecture, sun4v-based platforms (Root)"
+$(i386_ONLY)legacy pkg=SUNWcarx.i arch=$(ARCH).i86pc \
     desc="core software for the i86xpv virtual hardware platform" \
-    hotline="Please contact your local service provider" \
-    name="Core Architecture i86xpv, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Core Architecture i86xpv, (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 $(sparc_ONLY)link path=platform/SUNW,Netra-210 target=SUNW,Sun-Fire-V240

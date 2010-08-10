@@ -845,16 +845,10 @@ file path=usr/share/lib/xml/dtd/topology.dtd.1 \
 #
 # legacy packaging and license
 #
-legacy pkg=SUNWfmd arch=$(ARCH) category=system \
-    desc="Fault Management Daemon and Utilities" \
-    hotline="Please contact your local service provider" \
-    name="Fault Management Daemon and Utilities" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWfmdr arch=$(ARCH) category=system \
-    desc="Fault Management Daemon and Utilities (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Fault Management Daemon and Utilities (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWfmd desc="Fault Management Daemon and Utilities" \
+    name="Fault Management Daemon and Utilities"
+legacy pkg=SUNWfmdr desc="Fault Management Daemon and Utilities (Root)" \
+    name="Fault Management Daemon and Utilities (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 #

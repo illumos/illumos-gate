@@ -42,10 +42,7 @@ driver name=rtw alias=pci10ec,8180 clone_perms="rtw 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/rtw group=sys
 file path=kernel/drv/rtw group=sys
-legacy pkg=SUNWrtw arch=$(ARCH) category=system \
-    desc="realtek 8180L 802.11b driver" \
-    hotline="Please contact your local service provider" \
-    name="realtek 8180L 802.11b driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWrtw desc="realtek 8180L 802.11b driver" \
+    name="realtek 8180L 802.11b driver"
 license usr/src/uts/common/io/rtw/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/rtw/THIRDPARTYLICENSE

@@ -56,10 +56,7 @@ driver name=elxl clone_perms="elxl 0666 root sys" perms="* 0666 root sys" \
     alias=pci10b7,9805
 file path=kernel/drv/$(ARCH64)/elxl group=sys
 file path=kernel/drv/elxl group=sys
-legacy pkg=SUNWelxl arch=$(ARCH) category=system \
-    desc="3Com Etherlink XL Ethernet Driver" \
-    hotline="Please contact your local service provider" \
-    name="3Com Etherlink XL Ethernet Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWelxl desc="3Com Etherlink XL Ethernet Driver" \
+    name="3Com Etherlink XL Ethernet Driver"
 license usr/src/uts/common/io/elxl/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/elxl/THIRDPARTYLICENSE

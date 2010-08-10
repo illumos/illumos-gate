@@ -122,15 +122,11 @@ hardlink path=usr/sbin/dscfgadm target=../bin/dscfgadm
 hardlink path=usr/sbin/dsstat target=../bin/dsstat
 hardlink path=usr/sbin/nscadm target=../bin/nscadm
 hardlink path=usr/sbin/scmadm target=../bin/scmadm
-legacy pkg=SUNWscmr arch=$(ARCH) category=system \
+legacy pkg=SUNWscmr \
     desc="Storage Cache Management of read-only bitmap volumes" \
-    hotline="Please contact your local service provider" \
-    name="Sun StorageTek Availability Suite Cache Management (root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWscmu arch=$(ARCH) category=system \
+    name="Sun StorageTek Availability Suite Cache Management (root)"
+legacy pkg=SUNWscmu \
     desc="Storage Cache Management of read-only bitmap volumes" \
-    hotline="Please contact your local service provider" \
-    name="Sun StorageTek Availability Suite Cache Management (usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Sun StorageTek Availability Suite Cache Management (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

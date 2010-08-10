@@ -45,10 +45,9 @@ file path=usr/lib/libgss.so.1
 file path=usr/lib/sasl/$(ARCH64)/gssapi.so.1
 file path=usr/lib/sasl/gssapi.so.1
 file path=usr/sbin/gsscred group=sys mode=0555
-legacy pkg=SUNWgss arch=$(ARCH) category=system \
+legacy pkg=SUNWgss \
     desc="Generic Security Service Application Program Interface, Version 2 - user" \
-    hotline="Please contact your local service provider" name="GSSAPI V2" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="GSSAPI V2"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libgss/THIRDPARTYLICENSE \

@@ -44,10 +44,7 @@ file path=kernel/drv/$(ARCH64)/hxge group=sys
 $(i386_ONLY)file path=kernel/drv/hxge group=sys
 file path=kernel/drv/hxge.conf group=sys \
     original_name=SUNWhxge:kernel/drv/hxge.conf preserve=renamenew
-legacy pkg=SUNWhxge arch=$(ARCH) category=system \
-    desc="SUN 10Gb hxge Ethernet Network Adapter Driver" \
-    hotline="Please contact your local service provider" \
-    name="SUN 10Gb hxge NIC Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWhxge desc="SUN 10Gb hxge Ethernet Network Adapter Driver" \
+    name="SUN 10Gb hxge NIC Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

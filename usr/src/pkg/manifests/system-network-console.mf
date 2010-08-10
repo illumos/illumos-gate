@@ -67,14 +67,9 @@ file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/cvc.conf group=sys
 file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/cvcredir.conf \
     group=sys
 file path=platform/SUNW,Ultra-Enterprise-10000/lib/cvcd group=sys mode=0700
-legacy pkg=SUNWcvc.u arch=$(ARCH).sun4u category=system desc="Network Console" \
-    hotline="Please contact your local service provider" \
-    name="Network Console" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWcvcr.u arch=$(ARCH).sun4u category=system \
-    desc="Network Console daemon" \
-    hotline="Please contact your local service provider" \
-    name="Network Console daemon" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWcvc.u arch=$(ARCH).sun4u desc="Network Console" \
+    name="Network Console"
+legacy pkg=SUNWcvcr.u arch=$(ARCH).sun4u desc="Network Console daemon" \
+    name="Network Console daemon"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

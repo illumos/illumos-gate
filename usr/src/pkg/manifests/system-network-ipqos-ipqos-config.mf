@@ -52,10 +52,7 @@ $(i386_ONLY)file path=kernel/ipp/dscpmk group=sys mode=0755
 $(i386_ONLY)file path=kernel/ipp/flowacct group=sys mode=0755
 $(i386_ONLY)file path=kernel/ipp/tokenmt group=sys mode=0755
 $(i386_ONLY)file path=kernel/ipp/tswtclmt group=sys mode=0755
-legacy pkg=SUNWqos arch=$(ARCH) category=system \
-    desc="Solaris IP Quality of Service (Root)" \
-    hotline="Please contact your local service provider" \
-    name="IP QoS, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWqos desc="Solaris IP Quality of Service (Root)" \
+    name="IP QoS, (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

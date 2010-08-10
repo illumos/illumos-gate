@@ -49,15 +49,13 @@ file path=lib/svc/manifest/application/print/ipp-listener.xml group=sys \
     mode=0444
 file path=usr/apache/libexec/mod_ipp.so mode=0555
 file path=var/lp/ipp-listener/index.html mode=0444
-legacy pkg=SUNWipplr arch=$(ARCH) category=system \
+legacy pkg=SUNWipplr \
     desc="Internet Printing Protocol(IPP) Apache configuration for service module" \
-    hotline="Please contact your local service provider" \
     name="Internet Printing Protocol(IPP) listener, (root)" \
-    vendor="Sun Microsystems, Inc." version=13.1,REV=2009.11.11
-legacy pkg=SUNWipplu arch=$(ARCH) category=system \
+    version=13.1,REV=2009.11.11
+legacy pkg=SUNWipplu \
     desc="Internet Printing Protocol(IPP) Apache module for listening service" \
-    hotline="Please contact your local service provider" \
     name="Internet Printing Protocol(IPP) listener module (/usr)" \
-    vendor="Sun Microsystems, Inc." version=13.1,REV=2009.11.11
+    version=13.1,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

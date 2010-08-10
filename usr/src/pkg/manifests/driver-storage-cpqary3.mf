@@ -67,10 +67,7 @@ driver name=cpqary3 class=scsi \
 file path=kernel/drv/$(ARCH64)/cpqary3 group=sys
 file path=kernel/drv/cpqary3 group=sys
 file path=kernel/drv/cpqary3.conf group=sys
-legacy pkg=CPQary3 arch=$(ARCH) category=system \
-    desc="HP Smart Array HBA Driver 2.2.0.1" \
-    hotline="Please contact your local service provider" \
-    name="HP Smart Array HBA Driver 2.2.0.1" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=CPQary3 desc="HP Smart Array HBA Driver 2.2.0.1" \
+    name="HP Smart Array HBA Driver 2.2.0.1"
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL

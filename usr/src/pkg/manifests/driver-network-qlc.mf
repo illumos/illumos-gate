@@ -83,11 +83,9 @@ $(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_2400 group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_2500 group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_6322 group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_8100 group=sys mode=0755
-legacy pkg=SUNWqlc arch=$(ARCH) category=system \
+legacy pkg=SUNWqlc \
     desc="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver" \
-    hotline="Please contact your local service provider" \
-    name="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/fibre-channel/fca/qlc/FIRMWARELICENSE \

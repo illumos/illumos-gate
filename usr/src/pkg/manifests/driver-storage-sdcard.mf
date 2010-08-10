@@ -50,10 +50,6 @@ $(i386_ONLY)file path=kernel/drv/$(ARCH64)/sdhost group=sys
 $(i386_ONLY)file path=kernel/drv/sdhost group=sys
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/sda group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/sda group=sys mode=0755
-$(i386_ONLY)legacy pkg=SUNWsdcard arch=$(ARCH) category=system \
-    desc="SD/MMC Drivers" \
-    hotline="Please contact your local service provider" \
-    name="SD/MMC Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+$(i386_ONLY)legacy pkg=SUNWsdcard desc="SD/MMC Drivers" name="SD/MMC Drivers"
 $(i386_ONLY)license cr_Sun license=cr_Sun
 $(i386_ONLY)license lic_CDDL license=lic_CDDL

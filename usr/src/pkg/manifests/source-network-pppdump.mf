@@ -54,11 +54,9 @@ file path=usr/share/src/ppputil/pppdump/pppdump.1m
 file path=usr/share/src/ppputil/pppdump/pppdump.c
 file path=usr/share/src/ppputil/pppdump/zlib.c
 file path=usr/share/src/ppputil/pppdump/zlib.h
-legacy pkg=SUNWpppgS arch=$(ARCH) category=system \
+legacy pkg=SUNWpppgS \
     desc="Source for the optional GNU utilities for use with PPP" \
-    hotline="Please contact your local service provider" \
-    name="Source for the GNU utilities for PPP" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Source for the GNU utilities for PPP"
 license cr_Sun license=cr_Sun
 license usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect \
     license=usr/src/cmd/cmd-inet/usr.bin/pppd/plugins/THIRDPARTYLICENSE.minconnect

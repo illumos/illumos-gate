@@ -46,10 +46,7 @@ driver name=audiohd \
 file path=kernel/drv/$(ARCH64)/audiohd group=sys
 file path=kernel/drv/audiohd group=sys
 file path=kernel/drv/audiohd.conf group=sys
-legacy pkg=SUNWaudiohd arch=$(ARCH) category=system \
-    desc="SunOS audio device driver for Munich workstation" \
-    hotline="Please contact your local service provider" \
-    name="SUNW High Definition Audio Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWaudiohd desc="SunOS audio device driver for Munich workstation" \
+    name="SUNW High Definition Audio Drivers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

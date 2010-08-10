@@ -42,11 +42,8 @@ file path=usr/lib/llib-lbrand
 file path=usr/lib/llib-lbrand.ln
 file path=usr/lib/llib-lzonecfg
 file path=usr/lib/llib-lzonecfg.ln
-legacy pkg=SUNWzoneint arch=$(ARCH) category=system \
-    desc="Solaris Zones internal files" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Zones Internal Files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.10.13
+legacy pkg=SUNWzoneint desc="Solaris Zones internal files" \
+    name="Solaris Zones Internal Files" version=11.11,REV=2009.10.13
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libbrand.so target=./libbrand.so.1

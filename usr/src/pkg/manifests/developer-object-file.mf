@@ -100,11 +100,9 @@ file path=usr/share/lib/ccs/nrform
 file path=usr/share/lib/ccs/yaccpar
 hardlink path=usr/bin/$(ARCH64)/strip target=../../bin/$(ARCH64)/mcs
 hardlink path=usr/bin/strip target=../bin/mcs
-legacy pkg=SUNWbtool arch=$(ARCH) category=system \
+legacy pkg=SUNWbtool \
     desc="software development utilities, including ar, dis, dump, elfdump, elfedit, lex, lorder, mcs, nm, prof, ranlib, rpcgen, size, strip, tsort, and yacc" \
-    hotline="Please contact your local service provider" \
-    name="CCS tools bundled with SunOS" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="CCS tools bundled with SunOS"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/backup/dump/THIRDPARTYLICENSE \

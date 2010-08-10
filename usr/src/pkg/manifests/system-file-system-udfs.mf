@@ -44,16 +44,10 @@ file path=usr/lib/fs/udfs/labelit mode=0555
 file path=usr/lib/fs/udfs/mkfs mode=0555
 file path=usr/lib/fs/udfs/mount mode=0555
 hardlink path=usr/lib/fs/udfs/fstyp target=../../../sbin/fstyp
-legacy pkg=SUNWudf arch=$(ARCH) category=system \
-    desc="Universal Disk Format 1.50 File System, (Usr)" \
-    hotline="Please contact your local service provider" \
-    name="Universal Disk Format 1.50, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWudfr arch=$(ARCH) category=system \
-    desc="Universal Disk Format 1.50 File System" \
-    hotline="Please contact your local service provider" \
-    name="Universal Disk Format 1.50" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWudf desc="Universal Disk Format 1.50 File System, (Usr)" \
+    name="Universal Disk Format 1.50, (Usr)"
+legacy pkg=SUNWudfr desc="Universal Disk Format 1.50 File System" \
+    name="Universal Disk Format 1.50"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/fs.d/udfs/fsck/THIRDPARTYLICENSE \

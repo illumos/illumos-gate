@@ -333,16 +333,12 @@ hardlink path=usr/share/lib/terminfo/a/att593hp \
     target=../../../../../usr/share/lib/terminfo/5/593hp
 hardlink path=usr/share/lib/terminfo/a/att593ibm \
     target=../../../../../usr/share/lib/terminfo/5/593ibm
-legacy pkg=SUNWpsr arch=$(ARCH) category=system \
+legacy pkg=SUNWpsr \
     desc="configuration and start-up files for the print service" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Print - LP Server, (root)" vendor="Sun Microsystems, Inc." \
-    version=13.1,REV=2009.11.11
-legacy pkg=SUNWpsu arch=$(ARCH) category=system \
+    name="Solaris Print - LP Server, (root)" version=13.1,REV=2009.11.11
+legacy pkg=SUNWpsu \
     desc="client configuration files and utilities for the print service" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Print - LP Server, (usr)" vendor="Sun Microsystems, Inc." \
-    version=13.1,REV=2009.11.11
+    name="Solaris Print - LP Server, (usr)" version=13.1,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=etc/lp/logs target=../../var/lp/logs

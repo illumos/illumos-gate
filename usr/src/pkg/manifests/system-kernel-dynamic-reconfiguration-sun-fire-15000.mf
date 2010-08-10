@@ -55,10 +55,8 @@ file path=platform/SUNW,Sun-Fire-15000/kernel/misc/$(ARCH64)/gptwo_pci \
     group=sys mode=0755
 file path=platform/SUNW,Sun-Fire-15000/kernel/misc/$(ARCH64)/sc_gptwocfg \
     group=sys mode=0755
-legacy pkg=SUNWdrcr.u arch=$(ARCH).sun4u category=system \
+legacy pkg=SUNWdrcr.u arch=$(ARCH).sun4u \
     desc="Dynamic Reconfiguration Modules for Sun Fire 15000" \
-    hotline="Please contact your local service provider" \
-    name="Dynamic Reconfiguration Modules for Sun Fire 15000" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Dynamic Reconfiguration Modules for Sun Fire 15000"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -35,11 +35,10 @@ dir path=usr/lib
 dir path=usr/lib/print group=lp
 file path=usr/lib/print/libhttp-core.so.1
 file path=usr/lib/print/psm-ipp.so.1
-legacy pkg=SUNWpsm-ipp arch=$(ARCH) category=system \
+legacy pkg=SUNWpsm-ipp \
     desc="Client side support for communicating with IPP based print servers" \
-    hotline="Please contact your local service provider" \
     name="FSG Open Printing API IPP Print Service Module" \
-    vendor="Sun Microsystems, Inc." version=11.11.0,REV=2009.11.11
+    version=11.11.0,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/print/libhttp-core/common/LICENSE.txt \

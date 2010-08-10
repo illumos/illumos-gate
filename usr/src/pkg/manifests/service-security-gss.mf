@@ -44,11 +44,9 @@ file path=etc/gss/mech group=sys original_name=SUNWgssc:etc/gss/mech \
 file path=etc/gss/qop group=sys original_name=SUNWgssc:etc/gss/qop \
     preserve=true
 file path=lib/svc/manifest/network/rpc/gss.xml group=sys mode=0444
-legacy pkg=SUNWgssc arch=$(ARCH) category=system \
+legacy pkg=SUNWgssc \
     desc="Generic Security Service Application Program Interface, Version 2 - config" \
-    hotline="Please contact your local service provider" \
-    name="GSSAPI CONFIG V2" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="GSSAPI CONFIG V2"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 #

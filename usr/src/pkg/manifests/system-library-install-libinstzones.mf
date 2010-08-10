@@ -33,11 +33,8 @@ dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
 file path=usr/include/instzones_api.h
-legacy pkg=SUNWinstallint arch=$(ARCH) category=system \
-    desc="Solaris Install internal files" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Install Internal Files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWinstallint desc="Solaris Install internal files" \
+    name="Solaris Install Internal Files"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libinstzones.so target=./libinstzones.so.1

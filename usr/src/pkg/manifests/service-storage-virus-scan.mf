@@ -52,21 +52,12 @@ file path=usr/lib/devfsadm/linkmod/SUNW_vscan_link.so group=sys
 file path=usr/lib/vscan/libvscan.so.1
 file path=usr/lib/vscan/vscand mode=0555
 file path=usr/sbin/vscanadm mode=0555
-legacy pkg=SUNWvscankr arch=$(ARCH) category=system \
-    desc="Virus Scan Service Kernel Root Components" \
-    hotline="Please contact your local service provider" \
-    name="Virus Scan Service Kernel (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWvscanr arch=$(ARCH) category=system \
-    desc="Virus Scan Service Root Components" \
-    hotline="Please contact your local service provider" \
-    name="Virus Scan Service (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWvscanu arch=$(ARCH) category=system \
-    desc="Virus Scan Service Usr Components" \
-    hotline="Please contact your local service provider" \
-    name="Virus Scan Service (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWvscankr desc="Virus Scan Service Kernel Root Components" \
+    name="Virus Scan Service Kernel (Root)"
+legacy pkg=SUNWvscanr desc="Virus Scan Service Root Components" \
+    name="Virus Scan Service (Root)"
+legacy pkg=SUNWvscanu desc="Virus Scan Service Usr Components" \
+    name="Virus Scan Service (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/vscan/libvscan.so target=libvscan.so.1

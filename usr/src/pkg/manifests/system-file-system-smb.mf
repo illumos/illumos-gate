@@ -82,21 +82,12 @@ file path=usr/lib/security/$(ARCH64)/pam_smbfs_login.so.1
 file path=usr/lib/security/pam_smbfs_login.so.1
 file path=usr/lib/smbfs/smbiod mode=0555
 file path=usr/lib/smbfs/smbiod-svc mode=0555
-legacy pkg=SUNWsmbfskr arch=$(ARCH) category=system \
-    desc="SMB/CIFS File System client support (Kernel)" \
-    hotline="Please contact your local service provider" \
-    name="SMB/CIFS File System client support (Kernel)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWsmbfsr arch=$(ARCH) category=system \
-    desc="SMB/CIFS File System client support (Root)" \
-    hotline="Please contact your local service provider" \
-    name="SMB/CIFS File System client support (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWsmbfsu arch=$(ARCH) category=system \
-    desc="SMB/CIFS File System client support (Usr)" \
-    hotline="Please contact your local service provider" \
-    name="SMB/CIFS File System client support (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWsmbfskr desc="SMB/CIFS File System client support (Kernel)" \
+    name="SMB/CIFS File System client support (Kernel)"
+legacy pkg=SUNWsmbfsr desc="SMB/CIFS File System client support (Root)" \
+    name="SMB/CIFS File System client support (Root)"
+legacy pkg=SUNWsmbfsu desc="SMB/CIFS File System client support (Usr)" \
+    name="SMB/CIFS File System client support (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.apple \

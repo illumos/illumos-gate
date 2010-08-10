@@ -50,11 +50,8 @@ file path=usr/include/netinet/ip_proxy.h
 file path=usr/include/netinet/ip_state.h
 file path=usr/include/netinet/ipf_stack.h
 file path=usr/include/netinet/ipl.h
-legacy pkg=SUNWipfh arch=$(ARCH) category=system \
-    desc="C header files for IP Filter" \
-    hotline="Please contact your local service provider" \
-    name="IP Filter header files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWipfh desc="C header files for IP Filter" \
+    name="IP Filter header files"
 license cr_Sun license=cr_Sun
 license usr/src/cmd/ipf/tools/IPFILTER.LICENCE \
     license=usr/src/cmd/ipf/tools/IPFILTER.LICENCE

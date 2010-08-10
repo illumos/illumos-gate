@@ -71,11 +71,7 @@ file path=usr/share/audio/samples/au/touchtone.pound.au
 file path=usr/share/audio/samples/au/touchtone.star.au
 file path=usr/share/audio/samples/au/train.au
 file path=usr/share/audio/samples/au/whistle.au
-legacy pkg=SUNWaudf arch=$(ARCH) category=system \
-    desc="SunOS audio sound files" \
-    hotline="Please contact your local service provider" \
-    name="Audio Sound Files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWaudf desc="SunOS audio sound files" name="Audio Sound Files"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/demo/SOUND/sounds target=../../share/audio/samples/au

@@ -81,11 +81,8 @@ file path=kernel/drv/$(ARCH64)_gart group=sys
 file path=kernel/drv/agpgart group=sys
 file path=kernel/drv/agpgart.conf group=sys
 file path=kernel/drv/agptarget group=sys
-legacy pkg=SUNWagp arch=$(ARCH) category=system \
-    desc="AGP GART driver for x86 workstations" \
-    hotline="Please contact your local service provider" \
-    name="AGP GART Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWagp desc="AGP GART driver for x86 workstations" \
+    name="AGP GART Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.agpgart \

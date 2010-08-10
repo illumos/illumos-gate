@@ -80,10 +80,8 @@ file path=kernel/strmod/vuid3ps2 group=sys mode=0755
 file path=kernel/strmod/vuidm3p group=sys mode=0755
 file path=kernel/strmod/vuidm4p group=sys mode=0755
 file path=kernel/strmod/vuidm5p group=sys mode=0755
-legacy pkg=SUNWpsdcr arch=$(ARCH) category=system \
+legacy pkg=SUNWpsdcr \
     desc="Platform Support, Bus-independent Device Drivers, (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Platform Support, Bus-independent Device Drivers (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Platform Support, Bus-independent Device Drivers (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

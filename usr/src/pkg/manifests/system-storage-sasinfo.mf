@@ -53,16 +53,11 @@ file path=usr/lib/libsun_sas.so.1
 file path=usr/lib/llib-lSMHBAAPI
 file path=usr/lib/llib-lSMHBAAPI.ln
 file path=usr/sbin/sasinfo mode=0555
-legacy pkg=SUNWsmhba arch=$(ARCH) category=system \
-    desc="T11 Storage Management HBA API Libraries and CLI" \
-    hotline="Please contact your local service provider" \
-    name="SM-HBA Libraries and CLI" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWsmhbar arch=$(ARCH) category=system \
+legacy pkg=SUNWsmhba desc="T11 Storage Management HBA API Libraries and CLI" \
+    name="SM-HBA Libraries and CLI"
+legacy pkg=SUNWsmhbar \
     desc="T11 Storage Management HBA API Libraries and CLI (root)" \
-    hotline="Please contact your local service provider" \
-    name="SM-HBA Libraries and CLI (root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="SM-HBA Libraries and CLI (root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/smhba/THIRDPARTYLICENSE \

@@ -41,10 +41,8 @@ dir path=kernel/drv/$(ARCH64) group=sys
 driver name=audiop16x alias=pci1102,6
 file path=kernel/drv/$(ARCH64)/audiop16x group=sys
 $(i386_ONLY)file path=kernel/drv/audiop16x group=sys
-legacy pkg=SUNWaudiop16x arch=$(ARCH) category=system \
+legacy pkg=SUNWaudiop16x \
     desc="SunOS audio device driver for Creative P16X (EMU10K1X)" \
-    hotline="Please contact your local service provider" \
-    name="Creative P16X Audio Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Creative P16X Audio Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

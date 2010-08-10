@@ -38,8 +38,5 @@ set name=variant.arch value=$(ARCH)
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
-legacy pkg=SUNWarbel arch=$(ARCH) category=system desc="Arbel HCA Driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun IB Arbel HCA driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWarbel desc="Arbel HCA Driver" name="Sun IB Arbel HCA driver"
 license cr_Sun license=cr_Sun

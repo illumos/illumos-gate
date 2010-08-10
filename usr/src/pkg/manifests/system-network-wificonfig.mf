@@ -33,15 +33,8 @@ dir path=sbin group=sys
 dir path=usr group=sys
 dir path=usr/sbin
 file path=sbin/wificonfig mode=4755
-legacy pkg=SUNWwlanr arch=$(ARCH) category=system \
-    desc="wifi config tool binaries" \
-    hotline="Please contact your local service provider" \
-    name="wifi config tool" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWwlanu arch=$(ARCH) category=system desc="wifi config tool" \
-    hotline="Please contact your local service provider" \
-    name="wifi config tool" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWwlanr desc="wifi config tool binaries" name="wifi config tool"
+legacy pkg=SUNWwlanu desc="wifi config tool" name="wifi config tool"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/sbin/wificonfig target=../../sbin/wificonfig

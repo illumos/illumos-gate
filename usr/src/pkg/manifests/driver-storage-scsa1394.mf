@@ -40,10 +40,7 @@ dir path=kernel/drv/$(ARCH64) group=sys
 driver name=scsa1394 alias=firewire00609e,010483 perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/scsa1394 group=sys
 $(i386_ONLY)file path=kernel/drv/scsa1394 group=sys
-legacy pkg=SUNWscsa1394 arch=$(ARCH) category=system \
-    desc="IEEE 1394 mass storage driver" \
-    hotline="Please contact your local service provider" \
-    name="IEEE 1394 mass storage driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWscsa1394 desc="IEEE 1394 mass storage driver" \
+    name="IEEE 1394 mass storage driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

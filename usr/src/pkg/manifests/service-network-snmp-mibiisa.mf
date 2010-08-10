@@ -33,10 +33,7 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/snmp group=sys
 file path=usr/lib/snmp/mibiisa group=sys mode=0755
-legacy pkg=SUNWmibii arch=$(ARCH) category=system \
-    desc="Solstice Enterprise Agents 1.0.3 snmp daemon" \
-    hotline="Please contact your local service provider" \
-    name="Solstice Enterprise Agents 1.0.3 SNMP daemon" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWmibii desc="Solstice Enterprise Agents 1.0.3 snmp daemon" \
+    name="Solstice Enterprise Agents 1.0.3 SNMP daemon"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

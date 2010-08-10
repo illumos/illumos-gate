@@ -71,16 +71,11 @@ hardlink path=etc/rc0.d/K52llc2 target=../../etc/init.d/llc2
 hardlink path=etc/rc1.d/K52llc2 target=../../etc/init.d/llc2
 hardlink path=etc/rc2.d/S40llc2 target=../../etc/init.d/llc2
 hardlink path=etc/rcS.d/K52llc2 target=../../etc/init.d/llc2
-legacy pkg=SUNWllc arch=$(ARCH) category=system \
+legacy pkg=SUNWllc \
     desc="LLC2 driver implementing IEEE 802.2 Logical Link Control 2 service" \
-    hotline="Please contact your local service provider" \
-    name="LLC2 driver and its initialization programs" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWllcr arch=$(ARCH) category=system \
-    desc="The configuration and startup files for llc2 driver" \
-    hotline="Please contact your local service provider" \
-    name="LLC2 driver configuration and startup files" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="LLC2 driver and its initialization programs"
+legacy pkg=SUNWllcr desc="The configuration and startup files for llc2 driver" \
+    name="LLC2 driver configuration and startup files"
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble

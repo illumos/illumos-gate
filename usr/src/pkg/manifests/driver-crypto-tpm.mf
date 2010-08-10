@@ -50,10 +50,7 @@ $(i386_ONLY)driver name=tpm devlink=type=ddi_pseudo;name=tpm\t\D \
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/tpm group=sys
 $(i386_ONLY)file path=kernel/drv/tpm group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/tpm group=sys
-legacy pkg=SUNWtpm arch=$(ARCH) category=system \
-    desc="Trusted Platform Module driver" \
-    hotline="Please contact your local service provider" \
-    name="Trusted Platform Module driver" vendor="Sun Microsystems, Inc." \
-    version=11.11.0,REV=2009.11.11
+legacy pkg=SUNWtpm desc="Trusted Platform Module driver" \
+    name="Trusted Platform Module driver" version=11.11.0,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

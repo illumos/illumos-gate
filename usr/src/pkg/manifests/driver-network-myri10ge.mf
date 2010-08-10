@@ -46,11 +46,8 @@ driver name=myri10ge clone_perms="myri10ge 0666 root sys" \
     alias=pciex14c1,9
 file path=kernel/drv/$(ARCH64)/myri10ge group=sys
 $(i386_ONLY)file path=kernel/drv/myri10ge group=sys
-legacy pkg=SUNWmyri10ge arch=$(ARCH) category=system \
-    desc="Myricom 10 Gigabit Ethernet Adapter Driver" \
-    hotline="Please contact your local service provider" \
-    name="Myricom 10Gb NIC Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWmyri10ge desc="Myricom 10 Gigabit Ethernet Adapter Driver" \
+    name="Myricom 10Gb NIC Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/myri10ge/THIRDPARTYLICENSE \

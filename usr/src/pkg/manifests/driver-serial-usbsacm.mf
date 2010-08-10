@@ -44,10 +44,7 @@ driver name=usbsacm perms="* 0666 root sys" \
     alias=usbif,class2.2
 file path=kernel/drv/$(ARCH64)/usbsacm group=sys
 $(i386_ONLY)file path=kernel/drv/usbsacm group=sys
-legacy pkg=SUNWuacm arch=$(ARCH) category=system \
-    desc="CDC ACM USB-to-serial driver" \
-    hotline="Please contact your local service provider" \
-    name="CDC ACM USB-to-serial driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWuacm desc="CDC ACM USB-to-serial driver" \
+    name="CDC ACM USB-to-serial driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

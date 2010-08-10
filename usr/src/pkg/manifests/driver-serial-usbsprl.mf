@@ -46,10 +46,7 @@ driver name=usbsprl perms="* 0666 root sys" \
     alias=usb67b,aaa2
 file path=kernel/drv/$(ARCH64)/usbsprl group=sys
 $(i386_ONLY)file path=kernel/drv/usbsprl group=sys
-legacy pkg=SUNWuprl arch=$(ARCH) category=system \
-    desc="Prolific PL2303 USB-to-serial driver" \
-    hotline="Please contact your local service provider" \
-    name="Prolific PL2303 USB-to-serial driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWuprl desc="Prolific PL2303 USB-to-serial driver" \
+    name="Prolific PL2303 USB-to-serial driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

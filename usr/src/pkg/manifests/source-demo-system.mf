@@ -280,11 +280,9 @@ file path=usr/demo/link_audit/src/truss.c
 file path=usr/demo/link_audit/src/who.c
 file path=usr/demo/link_audit/src/who.h
 file path=usr/demo/link_audit/src/whocalls.ksh
-legacy pkg=SUNWosdem arch=$(ARCH) category=system \
+legacy pkg=SUNWosdem \
     desc="Source code to demonstrate the use of OS interfaces: ELF" \
-    hotline="Please contact your local service provider" \
-    name="OS demo source" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="OS demo source"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libshell/THIRDPARTYLICENSE \

@@ -180,11 +180,9 @@ hardlink path=usr/bin/sort target=../../usr/lib/isaexec
 hardlink path=usr/bin/uncompress target=../../usr/bin/compress
 hardlink path=usr/bin/zcat target=../../usr/bin/compress
 hardlink path=usr/lib/fs/pcfs/fstyp target=../../../sbin/fstyp
-legacy pkg=SUNWesu arch=$(ARCH) category=system \
+legacy pkg=SUNWesu \
     desc="additional UNIX system utilities, including awk, bc, cal, compress, diff, dos2unix, last, rup, sort, spell, uniq, and uuencode" \
-    hotline="Please contact your local service provider" \
-    name="Extended System Utilities" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Extended System Utilities"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/compress/THIRDPARTYLICENSE \

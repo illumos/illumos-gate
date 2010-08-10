@@ -44,10 +44,8 @@ driver name=rwd alias=pci1814,401 clone_perms="rwd 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/rwd group=sys
 file path=kernel/drv/rwd group=sys
-legacy pkg=SUNWrwd arch=$(ARCH) category=system \
+legacy pkg=SUNWrwd \
     desc="Ralink RT2561/RT2561S/RT2661 IEEE802.11b/g Wireless Network Device" \
-    hotline="Please contact your local service provider" \
-    name="Ralink RT2561/RT2561S/RT2661 IEEE802.11b/g Wireless Network Device" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Ralink RT2561/RT2561S/RT2661 IEEE802.11b/g Wireless Network Device"
 license usr/src/uts/common/io/rwd/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/rwd/THIRDPARTYLICENSE

@@ -44,10 +44,7 @@ dir path=usr/lib/devfsadm group=sys
 dir path=usr/lib/devfsadm/linkmod group=sys
 file path=usr/include/sys/dcam/dcam1394_io.h
 file path=usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so group=sys
-legacy pkg=SUNWfwdcu arch=$(ARCH) category=system \
-    desc="Sun IEEE1394 Video Conferencing support" \
-    hotline="Please contact your local service provider" \
-    name="Sun IEEE1394 Video Conferencing Support (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWfwdcu desc="Sun IEEE1394 Video Conferencing support" \
+    name="Sun IEEE1394 Video Conferencing Support (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -448,10 +448,8 @@ file \
 file path=usr/share/lib/locale/com/sun/dhcpmgr/ui/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/slp/ClientLib_en.properties group=sys
 file path=usr/share/lib/locale/com/sun/slp/Server_en.properties group=sys
-legacy pkg=SUNW0on arch=all category=system \
+legacy pkg=SUNW0on arch=all \
     desc="localizable message files for the OS-Networking consolidation" \
-    hotline="Please contact your local service provider" \
-    name="Localizable ON message files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.10
+    name="Localizable ON message files" version=11.11,REV=2009.11.10
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

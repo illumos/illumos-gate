@@ -40,16 +40,12 @@ file path=usr/include/ima.h
 file path=usr/include/libsun_ima.h
 file path=usr/lib/$(ARCH64)/libima.so.1
 file path=usr/lib/libima.so.1
-legacy pkg=SUNWimac arch=$(ARCH) category=system \
+legacy pkg=SUNWimac \
     desc="SNIA iSCSI Managment API common library for iSCSI adapters" \
-    hotline="Please contact your local service provider" \
-    name="Solaris IMA Common Library" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWimacr arch=$(ARCH) category=system \
+    name="Solaris IMA Common Library"
+legacy pkg=SUNWimacr \
     desc="SNIA iSCSI Managment API common library for iSCSI adapters (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Solaris IMA Common Library (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Solaris IMA Common Library (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libima/THIRDPARTYLICENSE \

@@ -109,16 +109,10 @@ file path=usr/lib/uucp/uusched group=uucp mode=4511 owner=uucp
 file path=usr/lib/uucp/uuxqt group=uucp mode=4511 owner=uucp
 file path=usr/sbin/in.uucpd group=uucp mode=0555
 hardlink path=etc/rc2.d/S70uucp target=../../etc/init.d/uucp
-legacy pkg=SUNWbnur arch=$(ARCH) category=system \
-    desc="configuration and start-up files for UUCP utilities" \
-    hotline="Please contact your local service provider" \
-    name="Networking UUCP Utilities, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWbnuu arch=$(ARCH) category=system \
-    desc="UUCP utilities and daemon" \
-    hotline="Please contact your local service provider" \
-    name="Networking UUCP Utilities, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWbnur desc="configuration and start-up files for UUCP utilities" \
+    name="Networking UUCP Utilities, (Root)"
+legacy pkg=SUNWbnuu desc="UUCP utilities and daemon" \
+    name="Networking UUCP Utilities, (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/bnu/THIRDPARTYLICENSE \

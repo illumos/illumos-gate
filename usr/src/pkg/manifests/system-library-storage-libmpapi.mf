@@ -43,16 +43,11 @@ file path=lib/llib-lMPAPI variant.opensolaris.zone=global
 file path=lib/llib-lMPAPI.ln variant.opensolaris.zone=global
 file path=usr/include/mpapi-sun.h
 file path=usr/include/mpapi.h
-legacy pkg=SUNWmpapi arch=$(ARCH) category=system \
-    desc="Common Library based on SNIA MP API specification" \
-    hotline="Please contact your local service provider" \
-    name="SNIA Multipath Management API Common Library" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWmpapir arch=$(ARCH) category=system \
+legacy pkg=SUNWmpapi desc="Common Library based on SNIA MP API specification" \
+    name="SNIA Multipath Management API Common Library"
+legacy pkg=SUNWmpapir \
     desc="Common Library based on SNIA MP API specification (Root)" \
-    hotline="Please contact your local service provider" \
-    name="SNIA Multipath Management API Common Library (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="SNIA Multipath Management API Common Library (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/mpapi/libmpapi/THIRDPARTYLICENSE \

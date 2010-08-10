@@ -81,11 +81,9 @@ file path=sbin/flowadm mode=0555
 file path=sbin/flowstat mode=0555
 file path=sbin/ipadm mode=0555
 group groupname=netadm gid=65
-legacy pkg=SUNWcnetr arch=$(ARCH) category=system \
+legacy pkg=SUNWcnetr \
     desc="core software for network infrastructure configuration" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris Network Infrastructure (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Core Solaris Network Infrastructure (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 user username=dladm ftpuser=false gcos-field="Datalink Admin" group=netadm \

@@ -35,10 +35,8 @@ dir path=usr/share group=sys
 dir path=usr/share/hwdata group=sys
 file path=usr/share/hwdata/pci.ids
 file path=usr/share/hwdata/usb.ids
-legacy pkg=SUNWhwdata arch=$(ARCH) category=system \
+legacy pkg=SUNWhwdata \
     desc="ASCII databases describing various PCI, USB and other hardware" \
-    hotline="Please contact your local service provider" \
-    name="Hardware data files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Hardware data files"
 license usr/src/cmd/hwdata/THIRDPARTYLICENSE.pciids \
     license=usr/src/cmd/hwdata/THIRDPARTYLICENSE.pciids

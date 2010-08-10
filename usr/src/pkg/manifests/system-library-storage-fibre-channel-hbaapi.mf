@@ -40,16 +40,12 @@ file path=etc/hba.conf original_name=SUNWcfcl:etc/hba.conf preserve=true
 file path=usr/include/hbaapi.h
 file path=usr/lib/$(ARCH64)/libHBAAPI.so.1
 file path=usr/lib/libHBAAPI.so.1
-legacy pkg=SUNWcfcl arch=$(ARCH) category=system \
+legacy pkg=SUNWcfcl \
     desc="Common Fibre Channel HBA API Library based on the T11 FC-MI specification" \
-    hotline="Please contact your local service provider" \
-    name="Common Fibre Channel HBA API Library (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWcfclr arch=$(ARCH) category=system \
+    name="Common Fibre Channel HBA API Library (Usr)"
+legacy pkg=SUNWcfclr \
     desc="Common Fibre Channel HBA API Library based on the T11 FC-MI specification" \
-    hotline="Please contact your local service provider" \
-    name="Common Fibre Channel HBA API Library (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Common Fibre Channel HBA API Library (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/hbaapi/THIRDPARTYLICENSE \

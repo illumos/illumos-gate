@@ -58,15 +58,9 @@ file \
 file path=usr/sadm/lib/wbem/perfprovider.jar group=sys
 file path=usr/sadm/mof/Solaris_Performance1.0.mof group=sys
 hardlink path=usr/sadm/lib/wbem/rds target=../../../lib/isaexec
-legacy pkg=SUNWrmwbr arch=$(ARCH) category=system \
-    desc="Resource Management for Solaris" \
-    hotline="Please contact your local service provider" \
-    name="Resource Management WBEM Instrumentation (root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWrmwbu arch=$(ARCH) category=system \
-    desc="Resource Management for Solaris" \
-    hotline="Please contact your local service provider" \
-    name="Resource Management WBEM Instrumentation (usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWrmwbr desc="Resource Management for Solaris" \
+    name="Resource Management WBEM Instrumentation (root)"
+legacy pkg=SUNWrmwbu desc="Resource Management for Solaris" \
+    name="Resource Management WBEM Instrumentation (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

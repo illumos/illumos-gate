@@ -92,16 +92,10 @@ file path=usr/lib/brand/solaris10/uninstall mode=0755
 file path=usr/lib/brand/solaris10/version mode=0444
 file path=usr/lib/s10_brand.so.1
 file path=usr/lib/s10_npreload.so.1
-legacy pkg=SUNWs10brandr arch=$(ARCH) category=system \
-    desc="Support for the 'Solaris10' Brand" \
-    hotline="Please contact your local service provider" \
-    name="Solaris 10 Containers: solaris10 brand support (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWs10brandu arch=$(ARCH) category=system \
-    desc="Support for the 'solaris10' Brand" \
-    hotline="Please contact your local service provider" \
-    name="Solaris 10 Containers: solaris10 brand support (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWs10brandr desc="Support for the 'Solaris10' Brand" \
+    name="Solaris 10 Containers: solaris10 brand support (Root)"
+legacy pkg=SUNWs10brandu desc="Support for the 'solaris10' Brand" \
+    name="Solaris 10 Containers: solaris10 brand support (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/brand/solaris10/64 target=$(ARCH64)

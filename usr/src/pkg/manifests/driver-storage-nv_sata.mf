@@ -47,10 +47,7 @@ driver name=nv_sata class=scsi-self-identifying perms="* 0644 root sys" \
 file path=kernel/drv/$(ARCH64)/nv_sata group=sys
 file path=kernel/drv/nv_sata group=sys
 file path=kernel/drv/nv_sata.conf group=sys
-legacy pkg=SUNWnvsata arch=$(ARCH) category=system \
-    desc="Nvidia ck804 pro / mcp55 pro combo SATA driver" \
-    hotline="Please contact your local service provider" \
-    name="Nvidia ck804 pro / mcp55 pro combo SATA driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWnvsata desc="Nvidia ck804 pro / mcp55 pro combo SATA driver" \
+    name="Nvidia ck804 pro / mcp55 pro combo SATA driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

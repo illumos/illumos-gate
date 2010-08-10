@@ -46,11 +46,8 @@ driver name=us \
     alias=SUNW,UltraSPARC-IIIi+ \
     alias=SUNW,UltraSPARC-IIe
 file path=platform/sun4u/kernel/drv/$(ARCH64)/us group=sys
-legacy pkg=SUNWus.u arch=$(ARCH).sun4u category=system \
-    desc="UltraSPARC CPU Device Driver" \
-    hotline="Please contact your local service provider" \
-    name="UltraSPARC CPU Device Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWus.u arch=$(ARCH).sun4u desc="UltraSPARC CPU Device Driver" \
+    name="UltraSPARC CPU Device Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers

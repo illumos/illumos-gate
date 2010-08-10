@@ -80,11 +80,9 @@ file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/scsb.conf group=sys
 file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/se.conf group=sys
 file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/ttymux.conf \
     group=sys
-legacy pkg=SUNWcti2.u arch=$(ARCH).sun4u category=system \
+legacy pkg=SUNWcti2.u arch=$(ARCH).sun4u \
     desc="I2C and System Controller and Status Drivers for Netra ct cPCI platform" \
-    hotline="Please contact your local service provider" \
-    name="Netra ct I2C and System Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Netra ct I2C and System Drivers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=platform/SUNW,Netra-CP2300/kernel/dacf/$(ARCH64)/ttymux_dacf \

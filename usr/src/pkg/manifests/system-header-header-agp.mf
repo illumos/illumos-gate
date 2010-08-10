@@ -39,11 +39,8 @@ file path=usr/include/sys/agp/agpgart_impl.h
 file path=usr/include/sys/agp/agpmaster_io.h
 file path=usr/include/sys/agp/agptarget_io.h
 file path=usr/include/sys/agpgart.h
-legacy pkg=SUNWagph arch=$(ARCH) category=system \
-    desc="AGP GART Header Files for x86 Workstations" \
-    hotline="Please contact your local service provider" \
-    name="AGP GART Driver Header Files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWagph desc="AGP GART Header Files for x86 Workstations" \
+    name="AGP GART Driver Header Files"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.agpgart \

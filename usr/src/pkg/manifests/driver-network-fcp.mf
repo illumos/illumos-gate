@@ -42,10 +42,7 @@ driver name=fcp perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/fcp group=sys
 $(i386_ONLY)file path=kernel/drv/fcp group=sys
 file path=kernel/drv/fcp.conf group=sys
-legacy pkg=SUNWfcp arch=$(ARCH) category=system \
-    desc="Sun FCP SCSI Fibre Channel Device Driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun FCP SCSI Device Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWfcp desc="Sun FCP SCSI Fibre Channel Device Driver" \
+    name="Sun FCP SCSI Device Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

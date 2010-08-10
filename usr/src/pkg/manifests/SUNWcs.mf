@@ -2541,21 +2541,14 @@ hardlink path=usr/share/lib/zoneinfo/W-SU \
 hardlink path=usr/share/lib/zoneinfo/Zulu \
     target=../../../../usr/share/lib/zoneinfo/Etc/UTC
 hardlink path=usr/xpg4/bin/pfsh target=../../bin/pfexec
-legacy pkg=SUNWcsr arch=$(ARCH) category=system \
+legacy pkg=SUNWcsr \
     desc="core software for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWcsu arch=$(ARCH) category=system \
+    name="Core Solaris, (Root)"
+legacy pkg=SUNWcsu \
     desc="core software for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWftpr arch=$(ARCH) category=system \
-    desc="FTP Server Configuration Files" \
-    hotline="Please contact your local service provider" \
-    name="FTP Server, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Core Solaris, (Usr)"
+legacy pkg=SUNWftpr desc="FTP Server Configuration Files" \
+    name="FTP Server, (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE \

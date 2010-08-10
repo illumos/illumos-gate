@@ -45,10 +45,7 @@ $(i386_ONLY)driver name=hme alias=pci108e,1001
 $(sparc_ONLY)file path=kernel/drv/$(ARCH64)/fas group=sys
 file path=kernel/drv/$(ARCH64)/hme group=sys
 $(i386_ONLY)file path=kernel/drv/hme group=sys
-legacy pkg=SUNWhmd arch=$(ARCH) category=system \
-    desc="SunSwift Adapter Drivers" \
-    hotline="Please contact your local service provider" \
-    name="SunSwift Adapter Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWhmd desc="SunSwift Adapter Drivers" \
+    name="SunSwift Adapter Drivers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

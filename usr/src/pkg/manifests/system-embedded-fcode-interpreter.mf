@@ -80,31 +80,17 @@ file path=usr/lib/efcode/$(ARCH64)/lfc_jupiter.so
 file path=usr/lib/efcode/$(ARCH64)/lfc_upa.so
 file path=usr/lib/efcode/$(ARCH64)/lfc_upa_pci.so
 file path=usr/lib/efcode/efcode.sh mode=0555
-legacy pkg=SUNWefc.u arch=$(ARCH).sun4u category=system \
+legacy pkg=SUNWefc.u arch=$(ARCH).sun4u \
     desc="Embedded FCode Interpreter Drivers" \
-    hotline="Please contact your local service provider" \
-    name="Embedded FCode Interpreter Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWefck arch=$(ARCH) category=system \
-    desc="Embedded FCode Interpreter" \
-    hotline="Please contact your local service provider" \
-    name="Embedded FCode Interpreter Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWefcl arch=$(ARCH) category=system \
-    desc="Embedded FCode Libraries" \
-    hotline="Please contact your local service provider" \
-    name="Embedded FCode Libraries" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWefcr arch=$(ARCH) category=system \
-    desc="Embedded FCode Interpreter" \
-    hotline="Please contact your local service provider" \
-    name="Embedded FCode Interpreter (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWefcu arch=$(ARCH) category=system \
-    desc="Embedded FCode Interpreter" \
-    hotline="Please contact your local service provider" \
-    name="Embedded FCode Interpreter" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Embedded FCode Interpreter Drivers"
+legacy pkg=SUNWefck desc="Embedded FCode Interpreter" \
+    name="Embedded FCode Interpreter Drivers"
+legacy pkg=SUNWefcl desc="Embedded FCode Libraries" \
+    name="Embedded FCode Libraries"
+legacy pkg=SUNWefcr desc="Embedded FCode Interpreter" \
+    name="Embedded FCode Interpreter (Root)"
+legacy pkg=SUNWefcu desc="Embedded FCode Interpreter" \
+    name="Embedded FCode Interpreter"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/efcode/$(ARCH64)/lfc_gptwo_gptwo.so target=lfc_gptwo.so

@@ -40,11 +40,8 @@ $(i386_ONLY)file path=usr/kernel/drv/rsm group=sys
 file path=usr/kernel/drv/rsm.conf group=sys
 file path=usr/lib/$(ARCH64)/librsm.so.2
 file path=usr/lib/librsm.so.2
-legacy pkg=SUNWrsm arch=$(ARCH) category=system \
-    desc="Remote Shared Memory API Library, Driver" \
-    hotline="Please contact your local service provider" \
-    name="Remote Shared Memory" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWrsm desc="Remote Shared Memory API Library, Driver" \
+    name="Remote Shared Memory"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/librsm.so target=librsm.so.2

@@ -42,11 +42,9 @@ file path=usr/lib/$(ARCH64)/gss/mech_dh.so.1
 file path=usr/lib/gss/dh1024-0.so.1
 file path=usr/lib/gss/dh640-0.so.1
 file path=usr/lib/gss/mech_dh.so.1
-legacy pkg=SUNWgssdh arch=$(ARCH) category=system \
+legacy pkg=SUNWgssdh \
     desc="GSS-API mechanism libraries for NIS+ extended Diffie-Hellman" \
-    hotline="Please contact your local service provider" \
-    name="GSS Diffie-Hellman" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="GSS Diffie-Hellman"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/gss/dh1024-0.so target=dh1024-0.so.1

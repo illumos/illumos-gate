@@ -362,15 +362,9 @@ hardlink path=usr/bin/$(ARCH32)/adb target=../../../usr/bin/$(ARCH32)/mdb
 hardlink path=usr/bin/$(ARCH64)/adb target=../../../usr/bin/$(ARCH64)/mdb
 hardlink path=usr/bin/adb target=../../usr/lib/isaexec
 hardlink path=usr/bin/mdb target=../../usr/lib/isaexec
-legacy pkg=SUNWmdb arch=$(ARCH) category=system desc="Modular Debugger (MDB)" \
-    hotline="Please contact your local service provider" \
-    name="Modular Debugger" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWmdbr arch=$(ARCH) category=system \
-    desc="Modular Debugger (MDB) (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Modular Debugger (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWmdb desc="Modular Debugger (MDB)" name="Modular Debugger"
+legacy pkg=SUNWmdbr desc="Modular Debugger (MDB) (Root)" \
+    name="Modular Debugger (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE

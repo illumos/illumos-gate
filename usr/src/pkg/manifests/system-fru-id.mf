@@ -47,11 +47,8 @@ file path=usr/lib/libfrureg.so.1
 file path=usr/lib/libfruutils.so.1
 file path=usr/lib/libnvfru.so.1
 $(sparc_ONLY)file path=usr/sbin/prtfru mode=0755
-legacy pkg=SUNWfruid arch=$(ARCH) category=system \
-    desc="FRU ID prtfru command and libfru library" \
-    hotline="Please contact your local service provider" \
-    name="FRU ID Utility and Library (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWfruid desc="FRU ID prtfru command and libfru library" \
+    name="FRU ID Utility and Library (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libfru.so target=./libfru.so.1

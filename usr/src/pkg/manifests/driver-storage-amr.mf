@@ -47,11 +47,8 @@ driver name=amr class=scsi \
 file path=kernel/drv/$(ARCH64)/amr group=sys
 file path=kernel/drv/amr group=sys
 file path=kernel/drv/amr.conf group=sys
-legacy pkg=SUNWamr arch=$(ARCH) category=system \
-    desc="LSI MegaRAID SCSI HBA Driver" \
-    hotline="Please contact your local service provider" \
-    name="LSI MegaRAID SCSI HBA Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWamr desc="LSI MegaRAID SCSI HBA Driver" \
+    name="LSI MegaRAID SCSI HBA Driver"
 license cr_Sun license=cr_Sun
 license usr/src/uts/intel/io/amr/THIRDPARTYLICENSE \
     license=usr/src/uts/intel/io/amr/THIRDPARTYLICENSE

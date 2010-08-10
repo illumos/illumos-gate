@@ -44,11 +44,8 @@ file path=usr/lib/scsi/plugins/ses/vendor/LSILOGIC-SASX28-A.0.so
 file path=usr/lib/scsi/plugins/ses/vendor/SUN-Storage-J4400.so
 file path=usr/lib/scsi/plugins/ses/vendor/SUN-Storage-J4500.so
 file path=usr/lib/scsi/plugins/ses/vendor/SUN.so
-legacy pkg=SUNWscsip arch=$(ARCH) category=system \
-    desc="Vendor specific SCSI and SES plugins" \
-    hotline="Please contact your local service provider" \
-    name="SCSI/SES plugins" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWscsip desc="Vendor specific SCSI and SES plugins" \
+    name="SCSI/SES plugins"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)/LSILOGIC-SASX28-A.1.so \

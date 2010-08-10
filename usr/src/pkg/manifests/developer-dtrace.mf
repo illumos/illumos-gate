@@ -631,11 +631,8 @@ hardlink path=usr/sbin/dtrace target=../../usr/lib/isaexec
 hardlink path=usr/sbin/intrstat target=../../usr/lib/isaexec
 hardlink path=usr/sbin/lockstat target=../../usr/lib/isaexec
 hardlink path=usr/sbin/plockstat target=../../usr/lib/isaexec
-legacy pkg=SUNWdtrc arch=$(ARCH) category=system \
-    desc="Dynamic Tracing (DTrace) Clients" \
-    hotline="Please contact your local service provider" \
-    name="DTrace Clients" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWdtrc desc="Dynamic Tracing (DTrace) Clients" \
+    name="DTrace Clients"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libdtrace.so target=libdtrace.so.1

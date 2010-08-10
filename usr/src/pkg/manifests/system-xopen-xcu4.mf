@@ -97,11 +97,9 @@ hardlink path=usr/xpg4/bin/vedit target=../../../usr/xpg4/bin/edit
 hardlink path=usr/xpg4/bin/vi target=../../../usr/xpg4/bin/edit
 hardlink path=usr/xpg4/bin/view target=../../../usr/xpg4/bin/edit
 hardlink path=usr/xpg4/bin/wait target=../../../usr/xpg4/bin/alias
-legacy pkg=SUNWxcu4 arch=$(ARCH) category=system \
+legacy pkg=SUNWxcu4 \
     desc="utilities providing conformance with XCU4 specifications" \
-    hotline="Please contact your local service provider" \
-    name="XCU4 Utilities" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="XCU4 Utilities"
 license cr_ATT license=cr_ATT
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

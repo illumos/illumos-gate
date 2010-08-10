@@ -447,16 +447,12 @@ file path=usr/xpg4/lib/$(ARCH64)/libcurses.so.1
 file path=usr/xpg4/lib/$(ARCH64)/libcurses.so.2
 file path=usr/xpg4/lib/libcurses.so.1
 file path=usr/xpg4/lib/libcurses.so.2
-legacy pkg=SUNWcsl arch=$(ARCH) category=system \
+legacy pkg=SUNWcsl \
     desc="core shared libraries for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris, (Shared Libs)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWcslr arch=$(ARCH) category=system \
+    name="Core Solaris, (Shared Libs)"
+legacy pkg=SUNWcslr \
     desc="core software for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris Libraries (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Core Solaris Libraries (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL
