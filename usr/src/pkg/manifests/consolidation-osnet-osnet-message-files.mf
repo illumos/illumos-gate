@@ -137,6 +137,7 @@ file path=usr/lib/help/auths/locale/PrintPs.html
 file path=usr/lib/help/auths/locale/PrintUnlabeled.html
 file path=usr/lib/help/auths/locale/ProfmgrHeader.html
 file path=usr/lib/help/auths/locale/RoleHeader.html
+file path=usr/lib/help/auths/locale/SmfAllocate.html
 file path=usr/lib/help/auths/locale/SmfAutofsStates.html
 file path=usr/lib/help/auths/locale/SmfCoreadmStates.html
 file path=usr/lib/help/auths/locale/SmfCronStates.html

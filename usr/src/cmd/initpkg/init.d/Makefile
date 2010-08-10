@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		../../Makefile.cmd
@@ -32,7 +31,6 @@ i386_PROG=
 PROG=		\
 	README		\
 	cachefs.daemon	\
-	deallocate	\
 	devlinks	\
 	dhcp		\
 	drvconfig	\

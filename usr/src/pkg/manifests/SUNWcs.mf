@@ -71,7 +71,6 @@ dir path=etc/security/dev group=sys
 dir path=etc/security/exec_attr.d group=sys
 dir path=etc/security/lib group=sys
 dir path=etc/security/prof_attr.d group=sys
-dir path=etc/security/spool group=sys
 dir path=etc/skel group=sys
 dir path=etc/svc group=sys
 dir path=etc/svc/profile group=sys
@@ -398,7 +397,6 @@ file path=etc/inet/wanboot.conf.sample group=sys mode=0444
 file path=etc/init.d/PRESERVE group=sys mode=0744 preserve=true
 file path=etc/init.d/README group=sys preserve=true
 file path=etc/init.d/cachefs.daemon group=sys mode=0744 preserve=true
-file path=etc/init.d/deallocate group=sys mode=0744 preserve=true
 file path=etc/init.d/ldap.client group=sys mode=0744
 file path=etc/init.d/mkdtab group=sys mode=0744 preserve=true
 file path=etc/init.d/nscd group=sys mode=0744
@@ -446,8 +444,6 @@ file path=etc/security/audit_warn group=sys mode=0740 preserve=renamenew
 file path=etc/security/auth_attr group=sys preserve=true \
     timestamp=19700101T000000Z
 file path=etc/security/auth_attr.d/SUNWcs group=sys
-file path=etc/security/bsmconv group=sys mode=0740
-file path=etc/security/bsmunconv group=sys mode=0740
 file path=etc/security/crypt.conf group=sys preserve=renamenew
 file path=etc/security/dev/audio mode=0400
 file path=etc/security/dev/fd0 mode=0400
@@ -565,6 +561,7 @@ file path=lib/svc/manifest/system/console-login.xml group=sys mode=0444
 file path=lib/svc/manifest/system/coreadm.xml group=sys mode=0444
 file path=lib/svc/manifest/system/cron.xml group=sys mode=0444
 file path=lib/svc/manifest/system/cryptosvc.xml group=sys mode=0444
+file path=lib/svc/manifest/system/device/allocate.xml group=sys mode=0444
 file path=lib/svc/manifest/system/device/devices-audio.xml group=sys mode=0444
 file path=lib/svc/manifest/system/device/devices-local.xml group=sys mode=0444
 file path=lib/svc/manifest/system/device/mpxio-upgrade.xml group=sys mode=0444
@@ -625,6 +622,7 @@ file path=lib/svc/method/net-routing-setup mode=0555
 file path=lib/svc/method/net-svc mode=0555
 file path=lib/svc/method/rmtmpfiles mode=0555
 file path=lib/svc/method/rpc-bind mode=0555
+file path=lib/svc/method/svc-allocate mode=0555
 file path=lib/svc/method/svc-auditd mode=0555
 file path=lib/svc/method/svc-auditset mode=0555
 file path=lib/svc/method/svc-boot-config mode=0555
@@ -1073,6 +1071,7 @@ file path=usr/lib/help/auths/locale/C/NetworkVRRP.html
 file path=usr/lib/help/auths/locale/C/PriAdmin.html
 file path=usr/lib/help/auths/locale/C/ProfmgrHeader.html
 file path=usr/lib/help/auths/locale/C/RoleHeader.html
+file path=usr/lib/help/auths/locale/C/SmfAllocate.html
 file path=usr/lib/help/auths/locale/C/SmfAutofsStates.html
 file path=usr/lib/help/auths/locale/C/SmfCoreadmStates.html
 file path=usr/lib/help/auths/locale/C/SmfCronStates.html
@@ -2030,7 +2029,6 @@ hardlink path=etc/rc2.d/S73cachefs.daemon \
     target=../../etc/init.d/cachefs.daemon
 hardlink path=etc/rc2.d/S82mkdtab target=../../etc/init.d/mkdtab
 hardlink path=etc/rc2.d/S89PRESERVE target=../../etc/init.d/PRESERVE
-hardlink path=etc/rc2.d/S98deallocate target=../../etc/init.d/deallocate
 $(sparc_ONLY)hardlink path=etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
     target=./platform_SUNW,Sun-Fire-880.xml
 $(sparc_ONLY)hardlink \

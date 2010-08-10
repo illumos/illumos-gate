@@ -45,6 +45,7 @@ FIRST_SUBDIRS=		\
 
 COMMON_SUBDIRS=		\
 	agents		\
+	allocate	\
 	availdevs	\
 	lp		\
 	perl		\
@@ -69,7 +70,7 @@ COMMON_SUBDIRS=		\
 	basename	\
 	bc		\
 	bdiff		\
-	beadm 		\
+	beadm		\
 	bfs		\
 	bnu		\
 	boot		\
@@ -529,10 +530,8 @@ MSGSUBDIRS=		\
 	banner		\
 	bart		\
 	basename	\
-	beadm 		\
+	beadm		\
 	bnu		\
-	bsmconv		\
-	bsmunconv	\
 	busstat		\
 	cal		\
 	cat		\
@@ -792,10 +791,9 @@ $(CLOSED_BUILD)DCSUBDIRS += \
 	$(CLOSED)/cmd/pax
 
 #
-# commands that belong only to audit and device allocation
+# commands that belong only to audit.
 #
 AUDITSUBDIRS=		\
-	allocate	\
 	amt		\
 	audit		\
 	audit_warn	\
@@ -805,9 +803,7 @@ AUDITSUBDIRS=		\
 	auditreduce	\
 	auditset	\
 	auditstat	\
-	praudit		\
-	bsmconv		\
-	bsmunconv
+	praudit		
 
 #
 # commands not owned by the systems group

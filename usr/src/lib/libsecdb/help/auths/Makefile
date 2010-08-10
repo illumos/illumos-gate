@@ -65,6 +65,7 @@ HTMLENTS = \
 	DhcpmgrHeader.html \
 	DhcpmgrWrite.html \
 	BindStates.html \
+	SmfAllocate.html \
 	SmfAutofsStates.html \
 	SmfCoreadmStates.html \
 	SmfCronStates.html \

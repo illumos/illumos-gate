@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved. 
 #
 
 . /lib/svc/share/smf_include.sh
@@ -88,26 +87,18 @@ __ENABLE_OTHERS
 
 }
 
-do_bsmconv()
+do_audit_devalloc()
 {
-	# Run bsmconv so device allocation is enabled by
+	# Ensure auditing and device allocation are enabled by
 	# default with Trusted Extensions.
 	if [ "$ROOT_PATH" = "/" -o "$ROOT_PATH" = "" ]; then
-		BSMDIR=""
-	else
-		BSMDIR=$ROOT_PATH
-	fi
-	echo "Running bsmconv ..."
-	echo `TEXTDOMAIN="SUNW_OST_OSCMD" gettext "y"` | \
-	    $ROOT_PATH/etc/security/bsmconv $ROOT_PATH
-	# Run auditd so auditing is enabled by default
-	# with Trusted Extensions.
-	if [ "$BSMDIR" = "" ]; then
+		/usr/sbin/svcadm enable -s svc:/system/device/allocate:default
 		echo "Starting auditd ..."
 		/usr/sbin/audit -s
 	else
 		cat >> $ROOT_PATH/var/svc/profile/upgrade <<\_ENABLE_AUDITD
 			/usr/sbin/audit -s
+			/usr/sbin/svcadm enable -s svc:/system/device/allocate:default
 _ENABLE_AUDITD
 	fi
 }
@@ -274,7 +265,7 @@ do_commonstart()
 	do_otherservices
 
 	do_logindev
-	do_bsmconv
+	do_audit_devalloc
 	do_nscd
 	do_addpam
 

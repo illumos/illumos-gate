@@ -22,16 +22,14 @@
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 COMMON_STARTLST="\
 20sysetup \
 70uucp \
 73cachefs.daemon \
-82mkdtab \
-98deallocate"
+82mkdtab"
 
 INSDIR=${ROOT}/etc/rc2.d
 

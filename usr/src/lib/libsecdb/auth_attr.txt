@@ -122,6 +122,7 @@ solaris.smf.modify.dependency:::Modify Service Dependencies::help=SmfModifyDepen
 solaris.smf.modify.application:::Modify Application Type Properties::help=SmfModifyAppl.html
 solaris.smf.modify.framework:::Modify Framework Type Properties::help=SmfModifyFramework.html
 solaris.smf.manage.:::Manage All SMF Service States::help=SmfManageHeader.html
+solaris.smf.manage.allocate:::Manage Device Allocation Service::help=SmfAllocate.html
 solaris.smf.manage.audit:::Manage Audit Service States::help=SmfManageAudit.html
 solaris.smf.manage.autofs:::Manage Automount Service States::help=SmfAutofsStates.html
 solaris.smf.manage.bind:::Manage DNS Service States::help=BindStates.html
