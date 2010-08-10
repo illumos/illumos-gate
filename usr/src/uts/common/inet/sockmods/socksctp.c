@@ -145,6 +145,7 @@ sonodeops_t sosctp_seq_sonodeops = {
 	sosctp_close,			/* sop_close 	*/
 };
 
+/* All the upcalls expect the upper handle to be sonode. */
 sock_upcalls_t sosctp_sock_upcalls = {
 	so_newconn,
 	so_connected,
@@ -156,6 +157,7 @@ sock_upcalls_t sosctp_sock_upcalls = {
 	NULL,			/* su_signal_oob */
 };
 
+/* All the upcalls expect the upper handle to be sctp_sonode/sctp_soassoc. */
 sock_upcalls_t sosctp_assoc_upcalls = {
 	sctp_assoc_newconn,
 	sctp_assoc_connected,
@@ -175,7 +177,6 @@ sosctp_init(struct sonode *so, struct sonode *pso, struct cred *cr, int flags)
 	struct sctp_sonode *ss;
 	struct sctp_sonode *pss;
 	sctp_sockbuf_limits_t sbl;
-	sock_upcalls_t *upcalls;
 	int err;
 
 	ss = SOTOSSO(so);
@@ -200,19 +201,21 @@ sosctp_init(struct sonode *so, struct sonode *pso, struct cred *cr, int flags)
 		return (0);
 	}
 
-	if (so->so_type == SOCK_STREAM) {
-		upcalls = &sosctp_sock_upcalls;
-		so->so_mode = SM_CONNREQUIRED;
-	} else {
-		ASSERT(so->so_type == SOCK_SEQPACKET);
-		upcalls = &sosctp_assoc_upcalls;
-	}
-
 	if ((err = secpolicy_basic_net_access(cr)) != 0)
 		return (err);
 
-	so->so_proto_handle = (sock_lower_handle_t)sctp_create(so, NULL,
-	    so->so_family, so->so_type, SCTP_CAN_BLOCK, upcalls, &sbl, cr);
+	if (so->so_type == SOCK_STREAM) {
+		so->so_proto_handle = (sock_lower_handle_t)sctp_create(so,
+		    NULL, so->so_family, so->so_type, SCTP_CAN_BLOCK,
+		    &sosctp_sock_upcalls, &sbl, cr);
+		so->so_mode = SM_CONNREQUIRED;
+	} else {
+		ASSERT(so->so_type == SOCK_SEQPACKET);
+		so->so_proto_handle = (sock_lower_handle_t)sctp_create(ss,
+		    NULL, so->so_family, so->so_type, SCTP_CAN_BLOCK,
+		    &sosctp_assoc_upcalls, &sbl, cr);
+	}
+
 	if (so->so_proto_handle == NULL)
 		return (ENOMEM);
 
@@ -482,7 +485,7 @@ sosctp_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	int flags, error = 0;
 	struct T_unitdata_ind *tind;
 	ssize_t orig_resid = uiop->uio_resid;
-	int len, count, readcnt = 0, rxqueued;
+	int len, count, readcnt = 0;
 	socklen_t controllen, namelen;
 	void *opt;
 	mblk_t *mp;
@@ -591,8 +594,10 @@ again:
 			msg->msg_flags |= MSG_NOTIFICATION;
 		}
 
-		if (!(mp->b_flag & SCTP_PARTIAL_DATA))
+		if (!(mp->b_flag & SCTP_PARTIAL_DATA) &&
+		    !(rval.r_val1 & MOREDATA)) {
 			msg->msg_flags |= MSG_EOR;
+		}
 		freemsg(mp);
 	}
 done:
@@ -606,7 +611,6 @@ done:
 	 */
 	if (ssa == NULL) {
 		mutex_enter(&so->so_lock);
-		rxqueued = so->so_rcv_queued;
 		count = so->so_rcvbuf - so->so_rcv_queued;
 
 		ASSERT(so->so_rcv_q_head != NULL ||
@@ -614,16 +618,17 @@ done:
 		    so->so_rcv_queued == 0);
 
 		so_unlock_read(so);
-		mutex_exit(&so->so_lock);
 
-		if (readcnt > 0 && (((count > 0) &&
-		    ((rxqueued + readcnt) >= so->so_rcvlowat)) ||
-		    (rxqueued == 0))) {
-			/*
-			 * If amount of queued data is higher than watermark,
-			 * updata SCTP's idea of available buffer space.
-			 */
+		/*
+		 * so_dequeue_msg() sets r_val2 to true if flow control was
+		 * cleared and we need to update SCTP.  so_flowctrld was
+		 * cleared in so_dequeue_msg() via so_check_flow_control().
+		 */
+		if (rval.r_val2) {
+			mutex_exit(&so->so_lock);
 			sctp_recvd((struct sctp_s *)so->so_proto_handle, count);
+		} else {
+			mutex_exit(&so->so_lock);
 		}
 	} else {
 		/*
@@ -634,26 +639,23 @@ done:
 		 * done in so_dequeue_msg().
 		 */
 		mutex_enter(&so->so_lock);
-		rxqueued = ssa->ssa_rcv_queued;
-
-		ssa->ssa_rcv_queued = rxqueued - readcnt;
+		ssa->ssa_rcv_queued -= readcnt;
 		count = so->so_rcvbuf - ssa->ssa_rcv_queued;
 
 		so_unlock_read(so);
 
-		if (readcnt > 0 &&
-		    (((count > 0) && (rxqueued >= so->so_rcvlowat)) ||
-		    (ssa->ssa_rcv_queued == 0))) {
+		if (readcnt > 0 && ssa->ssa_flowctrld &&
+		    ssa->ssa_rcv_queued < so->so_rcvlowat) {
 			/*
-			 * If amount of queued data is higher than watermark,
-			 * updata SCTP's idea of available buffer space.
+			 * Need to clear ssa_flowctrld, different from 1-1
+			 * style.
 			 */
+			ssa->ssa_flowctrld = B_FALSE;
 			mutex_exit(&so->so_lock);
-
-			sctp_recvd((struct sctp_s *)ssa->ssa_conn, count);
-
+			sctp_recvd(ssa->ssa_conn, count);
 			mutex_enter(&so->so_lock);
 		}
+
 		/*
 		 * MOREDATA flag is set if all data could not be copied
 		 */
@@ -723,7 +725,6 @@ static int
 sosctp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
     struct cred *cr)
 {
-	struct sctp_sonode *ss = SOTOSSO(so);
 	mblk_t *mctl;
 	struct cmsghdr *cmsg;
 	struct sctp_sndrcvinfo *sinfo;
@@ -891,8 +892,8 @@ sosctp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	}
 
 	/* Copy in the message. */
-	if ((error = sosctp_uiomove(mctl, count, ss->ss_wrsize, ss->ss_wroff,
-	    uiop, flags)) != 0) {
+	if ((error = sosctp_uiomove(mctl, count, so->so_proto_props.sopp_maxblk,
+	    so->so_proto_props.sopp_wroff, uiop, flags)) != 0) {
 		goto error_ret;
 	}
 	error = sctp_sendmsg((struct sctp_s *)so->so_proto_handle, mctl, 0);
@@ -1031,9 +1032,8 @@ sosctp_seq_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 		} else {
 			mutex_exit(&so->so_lock);
 			ssa->ssa_state |= SS_ISDISCONNECTING;
-			sctp_recvd((struct sctp_s *)ssa->ssa_conn,
-			    so->so_rcvbuf);
-			error = sctp_disconnect((struct sctp_s *)ssa->ssa_conn);
+			sctp_recvd(ssa->ssa_conn, so->so_rcvbuf);
+			error = sctp_disconnect(ssa->ssa_conn);
 			mutex_enter(&so->so_lock);
 		}
 		goto refrele;
@@ -1825,8 +1825,8 @@ sosctp_close(struct sonode *so, int flag, struct cred *cr)
 	ss = SOTOSSO(so);
 
 	/*
-	 * Initiate connection shutdown.  Update SCTP's receive
-	 * window.
+	 * Initiate connection shutdown.  Tell SCTP if there is any data
+	 * left unread.
 	 */
 	sctp_recvd((struct sctp_s *)so->so_proto_handle,
 	    so->so_rcvbuf - so->so_rcv_queued);
@@ -1845,9 +1845,9 @@ sosctp_close(struct sonode *so, int flag, struct cred *cr)
 			sosctp_assoc_isdisconnected(ssa, 0);
 			mutex_exit(&so->so_lock);
 
-			sctp_recvd((struct sctp_s *)ssa->ssa_conn,
-			    so->so_rcvbuf - ssa->ssa_rcv_queued);
-			(void) sctp_disconnect((struct sctp_s *)ssa->ssa_conn);
+			sctp_recvd(ssa->ssa_conn, so->so_rcvbuf -
+			    ssa->ssa_rcv_queued);
+			(void) sctp_disconnect(ssa->ssa_conn);
 
 			mutex_enter(&so->so_lock);
 			SSA_REFRELE(ss, ssa);
@@ -1879,8 +1879,6 @@ sosctp_fini(struct sonode *so, struct cred *cr)
 	/* We are the sole owner of so now */
 	mutex_enter(&so->so_lock);
 
-	so_rcv_flush(so);
-
 	/* Free all pending connections */
 	so_acceptq_flush(so, B_TRUE);
 
@@ -1908,6 +1906,15 @@ sosctp_fini(struct sonode *so, struct cred *cr)
 		sctp_close((struct sctp_s *)so->so_proto_handle);
 	so->so_proto_handle = NULL;
 
+	/*
+	 * Note until sctp_close() is called, SCTP can still send up
+	 * messages, such as event notifications.  So we should flush
+	 * the recevie buffer after calling sctp_close().
+	 */
+	mutex_enter(&so->so_lock);
+	so_rcv_flush(so);
+	mutex_exit(&so->so_lock);
+
 	sonode_fini(so);
 }
 
@@ -1929,8 +1936,8 @@ sctp_assoc_newconn(sock_upper_handle_t parenthandle,
     sock_lower_handle_t connind, sock_downcalls_t *dc,
     struct cred *peer_cred, pid_t peer_cpid, sock_upcalls_t **ucp)
 {
-	struct sonode *lso = (struct sonode *)parenthandle;
-	struct sctp_sonode *lss = SOTOSSO(lso);
+	struct sctp_sonode *lss = (struct sctp_sonode *)parenthandle;
+	struct sonode *lso = &lss->ss_so;
 	struct sctp_soassoc *ssa;
 	sctp_assoc_t id;
 
@@ -2144,6 +2151,9 @@ sctp_assoc_recv(sock_upper_handle_t handle, mblk_t *mp, size_t len, int flags,
 
 	ssa->ssa_rcv_queued += len;
 	space_available = so->so_rcvbuf - ssa->ssa_rcv_queued;
+	if (space_available <= 0)
+		ssa->ssa_flowctrld = B_TRUE;
+
 	so_enqueue_msg(so, mp, len);
 
 	/* so_notify_data drops so_lock */
@@ -2179,32 +2189,44 @@ sctp_assoc_properties(sock_upper_handle_t handle,
     struct sock_proto_props *soppp)
 {
 	struct sctp_soassoc *ssa = (struct sctp_soassoc *)handle;
-	struct sctp_sonode *ss;
+	struct sonode *so;
 
 	if (ssa->ssa_type == SOSCTP_ASSOC) {
-		ss = ssa->ssa_sonode;
-		mutex_enter(&ss->ss_so.so_lock);
+		so = &ssa->ssa_sonode->ss_so;
 
-		/*
-		 * Only change them if they're set.
-		 */
-		if (soppp->sopp_wroff != 0) {
+		mutex_enter(&so->so_lock);
+
+		/* Per assoc_id properties. */
+		if (soppp->sopp_flags & SOCKOPT_WROFF)
 			ssa->ssa_wroff = soppp->sopp_wroff;
-		}
-		if (soppp->sopp_maxblk != 0) {
+		if (soppp->sopp_flags & SOCKOPT_MAXBLK)
 			ssa->ssa_wrsize = soppp->sopp_maxblk;
-		}
 	} else {
-		ss = (struct sctp_sonode *)handle;
-		mutex_enter(&ss->ss_so.so_lock);
+		so = &((struct sctp_sonode *)handle)->ss_so;
+		mutex_enter(&so->so_lock);
 
-		if (soppp->sopp_wroff != 0) {
-			ss->ss_wroff = soppp->sopp_wroff;
-		}
-		if (soppp->sopp_maxblk != 0) {
-			ss->ss_wrsize = soppp->sopp_maxblk;
+		if (soppp->sopp_flags & SOCKOPT_WROFF)
+			so->so_proto_props.sopp_wroff = soppp->sopp_wroff;
+		if (soppp->sopp_flags & SOCKOPT_MAXBLK)
+			so->so_proto_props.sopp_maxblk = soppp->sopp_maxblk;
+		if (soppp->sopp_flags & SOCKOPT_RCVHIWAT) {
+			ssize_t lowat;
+
+			so->so_rcvbuf = soppp->sopp_rxhiwat;
+			/*
+			 * The low water mark should be adjusted properly
+			 * if the high water mark is changed.  It should
+			 * not be bigger than 1/4 of high water mark.
+			 */
+			lowat = soppp->sopp_rxhiwat >> 2;
+			if (so->so_rcvlowat > lowat) {
+				/* Sanity check... */
+				if (lowat == 0)
+					so->so_rcvlowat = soppp->sopp_rxhiwat;
+				else
+					so->so_rcvlowat = lowat;
+			}
 		}
 	}
-
-	mutex_exit(&ss->ss_so.so_lock);
+	mutex_exit(&so->so_lock);
 }

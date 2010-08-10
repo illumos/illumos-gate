@@ -186,7 +186,7 @@ extern int	so_dequeue_msg(struct sonode *, mblk_t **, struct uio *,
     rval_t *, int);
 extern void	so_enqueue_msg(struct sonode *, mblk_t *, size_t);
 extern void	so_process_new_message(struct sonode *, mblk_t *, mblk_t *);
-extern void	so_check_flow_control(struct sonode *);
+extern boolean_t	so_check_flow_control(struct sonode *);
 
 extern mblk_t	*socopyinuio(uio_t *, ssize_t, size_t, ssize_t, size_t, int *);
 extern mblk_t 	*socopyoutuio(mblk_t *, struct uio *, ssize_t, int *);

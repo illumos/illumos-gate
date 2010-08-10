@@ -1119,7 +1119,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				 * protocol and here we just whack it.
 				 */
 				connp->conn_rcvbuf = sctp->sctp_rwnd = *i1;
-				sctp->sctp_irwnd = sctp->sctp_rwnd;
+				sctp->sctp_arwnd = sctp->sctp_rwnd;
 				sctp->sctp_pd_point = sctp->sctp_rwnd;
 
 				sopp.sopp_flags = SOCKOPT_RCVHIWAT;

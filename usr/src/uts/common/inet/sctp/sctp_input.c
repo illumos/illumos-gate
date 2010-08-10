@@ -1295,7 +1295,6 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	uint32_t tsn;
 	int dlen;
 	boolean_t tpfinished = B_TRUE;
-	int32_t new_rwnd;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 	int	error;
 
@@ -1542,31 +1541,27 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	sctp->sctp_rxqueued -= dlen;
 
 	if (can_deliver) {
-
 		/* step past header to the payload */
 		dmp->b_rptr = (uchar_t *)(dc + 1);
 		if (sctp_input_add_ancillary(sctp, &dmp, dc, fp,
 		    ipp, ira) == 0) {
 			dprint(1, ("sctp_data_chunk: delivering %lu bytes\n",
 			    msgdsize(dmp)));
-			sctp->sctp_rwnd -= dlen;
 			/*
 			 * We overload the meaning of b_flag for SCTP sockfs
 			 * internal use, to advise sockfs of partial delivery
 			 * semantics.
 			 */
 			dmp->b_flag = tpfinished ? 0 : SCTP_PARTIAL_DATA;
-			new_rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd, dmp,
-			    msgdsize(dmp), 0, &error, NULL);
-			/*
-			 * Since we always deliver the next TSN data chunk,
-			 * we may buffer a little more than allowed. In
-			 * that case, just mark the window as 0.
-			 */
-			if (new_rwnd < 0)
-				sctp->sctp_rwnd = 0;
-			else if (new_rwnd > sctp->sctp_rwnd)
-				sctp->sctp_rwnd = new_rwnd;
+			if (sctp->sctp_flowctrld) {
+				sctp->sctp_rwnd -= dlen;
+				if (sctp->sctp_rwnd < 0)
+					sctp->sctp_rwnd = 0;
+			}
+			if (sctp->sctp_ulp_recv(sctp->sctp_ulpd, dmp,
+			    msgdsize(dmp), 0, &error, NULL) <= 0) {
+				sctp->sctp_flowctrld = B_TRUE;
+			}
 			SCTP_ACK_IT(sctp, tsn);
 		} else {
 			/* No memory don't ack, the peer will retransmit. */
@@ -1689,7 +1684,6 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 			    ipp, ira) == 0) {
 				dprint(1, ("sctp_data_chunk: delivering %lu "
 				    "bytes\n", msgdsize(dmp)));
-				sctp->sctp_rwnd -= dlen;
 				/*
 				 * Meaning of b_flag overloaded for SCTP sockfs
 				 * internal use, advise sockfs of partial
@@ -1697,12 +1691,15 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 				 */
 				dmp->b_flag = tpfinished ?
 				    0 : SCTP_PARTIAL_DATA;
-				new_rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd,
-				    dmp, msgdsize(dmp), 0, &error, NULL);
-				if (new_rwnd < 0)
-					sctp->sctp_rwnd = 0;
-				else if (new_rwnd > sctp->sctp_rwnd)
-					sctp->sctp_rwnd = new_rwnd;
+				if (sctp->sctp_flowctrld) {
+					sctp->sctp_rwnd -= dlen;
+					if (sctp->sctp_rwnd < 0)
+						sctp->sctp_rwnd = 0;
+				}
+				if (sctp->sctp_ulp_recv(sctp->sctp_ulpd, dmp,
+				    msgdsize(dmp), 0, &error, NULL) <= 0) {
+					sctp->sctp_flowctrld = B_TRUE;
+				}
 				SCTP_ACK_IT(sctp, tsn);
 			} else {
 				/* don't ack, the peer will retransmit */
@@ -1772,6 +1769,8 @@ sctp_fill_sack(sctp_t *sctp, unsigned char *dst, int sacklen)
 	} else {
 		sc->ssc_a_rwnd = 0;
 	}
+	/* Remember the last window sent to peer. */
+	sctp->sctp_arwnd = sc->ssc_a_rwnd;
 	sc->ssc_numfrags = htons(num_gaps);
 	sc->ssc_numdups = 0;
 
@@ -2359,7 +2358,6 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 				dlen += MBLKL(pmp);
 			}
 			if (can_deliver) {
-				int32_t	nrwnd;
 				int error;
 
 				dmp->b_rptr = (uchar_t *)(dc + 1);
@@ -2368,20 +2366,22 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 				if (sctp_input_add_ancillary(sctp,
 				    &dmp, dc, fp, ipp, ira) == 0) {
 					sctp->sctp_rxqueued -= dlen;
-					sctp->sctp_rwnd -= dlen;
 					/*
 					 * Override b_flag for SCTP sockfs
 					 * internal use
 					 */
 
 					dmp->b_flag = 0;
-					nrwnd = sctp->sctp_ulp_recv(
+					if (sctp->sctp_flowctrld) {
+						sctp->sctp_rwnd -= dlen;
+						if (sctp->sctp_rwnd < 0)
+							sctp->sctp_rwnd = 0;
+					}
+					if (sctp->sctp_ulp_recv(
 					    sctp->sctp_ulpd, dmp, msgdsize(dmp),
-					    0, &error, NULL);
-					if (nrwnd < 0)
-						sctp->sctp_rwnd = 0;
-					else if (nrwnd > sctp->sctp_rwnd)
-						sctp->sctp_rwnd = nrwnd;
+					    0, &error, NULL) <= 0) {
+						sctp->sctp_flowctrld = B_TRUE;
+					}
 				} else {
 					/*
 					 * We will resume processing when
@@ -4409,33 +4409,30 @@ done:
 }
 
 /*
- * Some amount of data got removed from rx q.
- * Check if we should send a window update.
- *
- * Due to way sctp_rwnd updates are made, ULP can give reports out-of-order.
- * To keep from dropping incoming data due to this, we only update
- * sctp_rwnd when if it's larger than what we've reported to peer earlier.
+ * Some amount of data got removed from ULP's receive queue and we can
+ * push messages up if we are flow controlled before.  Reset the receive
+ * window to full capacity (conn_rcvbuf) and check if we should send a
+ * window update.
  */
 void
 sctp_recvd(sctp_t *sctp, int len)
 {
-	int32_t old, new;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
+	boolean_t	send_sack = B_FALSE;
 
 	ASSERT(sctp != NULL);
 	RUN_SCTP(sctp);
 
-	if (len < sctp->sctp_rwnd) {
-		WAKE_SCTP(sctp);
-		return;
-	}
+	sctp->sctp_flowctrld = B_FALSE;
+	/* This is the amount of data queued in ULP. */
+	sctp->sctp_ulp_rxqueued = connp->conn_rcvbuf - len;
 
-	old = sctp->sctp_rwnd - sctp->sctp_rxqueued;
-	new = len - sctp->sctp_rxqueued;
-	sctp->sctp_rwnd = len;
+	if (connp->conn_rcvbuf - sctp->sctp_arwnd >= sctp->sctp_mss)
+		send_sack = B_TRUE;
+	sctp->sctp_rwnd = connp->conn_rcvbuf;
 
-	if (sctp->sctp_state >= SCTPS_ESTABLISHED &&
-	    ((old <= new >> 1) || (old < sctp->sctp_mss))) {
+	if (sctp->sctp_state >= SCTPS_ESTABLISHED && send_sack) {
 		sctp->sctp_force_sack = 1;
 		SCTPS_BUMP_MIB(sctps, sctpOutWinUpdate);
 		(void) sctp_sack(sctp, NULL);

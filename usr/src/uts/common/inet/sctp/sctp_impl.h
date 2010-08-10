@@ -660,7 +660,7 @@ typedef struct sctp_s {
 #define	sctp_ulp_disconnected	sctp_upcalls->su_disconnected
 #define	sctp_ulp_opctl		sctp_upcalls->su_opctl
 #define	sctp_ulp_recv		sctp_upcalls->su_recv
-#define	sctp_ulp_xmitted	sctp_upcalls->su_txq_full
+#define	sctp_ulp_txq_full	sctp_upcalls->su_txq_full
 #define	sctp_ulp_prop		sctp_upcalls->su_set_proto_props
 
 	int32_t		sctp_state;
@@ -739,8 +739,9 @@ typedef struct sctp_s {
 
 	/* Inbound flow control */
 	int32_t		sctp_rwnd;		/* Current receive window */
-	int32_t		sctp_irwnd;		/* Initial receive window */
+	int32_t		sctp_arwnd;		/* Last advertised window */
 	int32_t		sctp_rxqueued;		/* No. of bytes in RX q's */
+	int32_t		sctp_ulp_rxqueued;	/* Data in ULP */
 
 	/* Pre-initialized composite headers */
 	uchar_t		*sctp_iphc;	/* v4 sctp/ip hdr template buffer */
@@ -800,7 +801,8 @@ typedef struct sctp_s {
 
 		sctp_txq_full : 1,	/* the tx queue is full */
 		sctp_ulp_discon_done : 1,	/* ulp_disconnecting done */
-		sctp_dummy : 6;
+		sctp_flowctrld : 1,	/* upper layer flow controlled */
+		sctp_dummy : 5;
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -838,6 +840,7 @@ typedef struct sctp_s {
 #define	sctp_zero_win_probe sctp_bits.sctp_zero_win_probe
 #define	sctp_txq_full sctp_bits.sctp_txq_full
 #define	sctp_ulp_discon_done sctp_bits.sctp_ulp_discon_done
+#define	sctp_flowctrld sctp_bits.sctp_flowctrld
 
 #define	sctp_recvsndrcvinfo sctp_events.sctp_recvsndrcvinfo
 #define	sctp_recvassocevnt sctp_events.sctp_recvassocevnt
@@ -960,7 +963,7 @@ typedef struct sctp_s {
 	if ((sctp)->sctp_txq_full && SCTP_TXQ_LEN(sctp) <=	\
 	    (sctp)->sctp_connp->conn_sndlowat) {		\
 		(sctp)->sctp_txq_full = 0;			\
-		(sctp)->sctp_ulp_xmitted((sctp)->sctp_ulpd,	\
+		(sctp)->sctp_ulp_txq_full((sctp)->sctp_ulpd,	\
 		    B_FALSE);					\
 	}
 

@@ -830,10 +830,10 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%<b>Flow Control%</b>\n");
 		mdb_printf("tconn_sndbuf\t%?d\n"
 		    "conn_sndlowat\t%?d\tfrwnd\t\t%?u\n"
-		    "rwnd\t\t%?u\tinitial rwnd\t%?u\n"
+		    "rwnd\t\t%?u\tlast advertised rwnd\t%?u\n"
 		    "rxqueued\t%?u\tcwnd_max\t%?u\n", connp->conn_sndbuf,
 		    connp->conn_sndlowat, sctp->sctp_frwnd,
-		    sctp->sctp_rwnd, sctp->sctp_irwnd, sctp->sctp_rxqueued,
+		    sctp->sctp_rwnd, sctp->sctp_arwnd, sctp->sctp_rxqueued,
 		    sctp->sctp_cwnd_max);
 	}
 

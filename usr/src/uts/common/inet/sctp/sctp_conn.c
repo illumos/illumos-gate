@@ -128,16 +128,6 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	    SCTP_BIND_HASH(ntohs(aconnp->conn_lport))], acceptor, 0);
 
 	SCTP_ASSOC_EST(sctps, acceptor);
-
-	/*
-	 * listener->sctp_rwnd should be the default window size or a
-	 * window size changed via SO_RCVBUF option.
-	 */
-	acceptor->sctp_rwnd = listener->sctp_rwnd;
-	acceptor->sctp_irwnd = acceptor->sctp_rwnd;
-	acceptor->sctp_pd_point = acceptor->sctp_rwnd;
-	acceptor->sctp_upcalls = listener->sctp_upcalls;
-
 	return (0);
 }
 
@@ -151,7 +141,6 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	int	err;
 	conn_t	*connp, *econnp;
 	sctp_stack_t	*sctps;
-	struct sock_proto_props sopp;
 	cred_t		*cr;
 	pid_t		cpid;
 	in6_addr_t	faddr, laddr;
@@ -348,17 +337,6 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	}
 	ASSERT(SCTP_IS_DETACHED(eager));
 	eager->sctp_detached = B_FALSE;
-	bzero(&sopp, sizeof (sopp));
-	sopp.sopp_flags = SOCKOPT_MAXBLK|SOCKOPT_WROFF;
-	sopp.sopp_maxblk = strmsgsz;
-	if (econnp->conn_family == AF_INET) {
-		sopp.sopp_wroff = sctps->sctps_wroff_xtra +
-		    sizeof (sctp_data_hdr_t) + sctp->sctp_hdr_len;
-	} else {
-		sopp.sopp_wroff = sctps->sctps_wroff_xtra +
-		    sizeof (sctp_data_hdr_t) + sctp->sctp_hdr6_len;
-	}
-	eager->sctp_ulp_prop(eager->sctp_ulpd, &sopp);
 	return (eager);
 }
 

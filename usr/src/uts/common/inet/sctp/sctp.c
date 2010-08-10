@@ -336,11 +336,10 @@ sctp_disconnect(sctp_t *sctp)
 		}
 
 		/*
-		 * In there is unread data, send an ABORT and terminate the
+		 * If there is unread data, send an ABORT and terminate the
 		 * association.
 		 */
-		if (sctp->sctp_rxqueued > 0 || sctp->sctp_irwnd >
-		    sctp->sctp_rwnd) {
+		if (sctp->sctp_rxqueued > 0 || sctp->sctp_ulp_rxqueued > 0) {
 			sctp_user_abort(sctp, NULL);
 			WAKE_SCTP(sctp);
 			return (error);
@@ -807,7 +806,8 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 	sctp->sctp_mtu_probe_intvl = sctps->sctps_mtu_probe_interval;
 
 	sctp->sctp_sack_gaps = 0;
-	sctp->sctp_sack_toggle = 2;
+	/* So we will not delay sending the first SACK. */
+	sctp->sctp_sack_toggle = sctps->sctps_deferred_acks_max;
 
 	/* Only need to do the allocation if there is no "cached" one. */
 	if (sctp->sctp_pad_mp == NULL) {
@@ -833,11 +833,13 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		if (err != 0)
 			goto failure;
 
+		sctp->sctp_upcalls = psctp->sctp_upcalls;
+
 		sctp->sctp_cookie_lifetime = psctp->sctp_cookie_lifetime;
 
 		sctp->sctp_cwnd_max = psctp->sctp_cwnd_max;
 		sctp->sctp_rwnd = psctp->sctp_rwnd;
-		sctp->sctp_irwnd = psctp->sctp_rwnd;
+		sctp->sctp_arwnd = psctp->sctp_arwnd;
 		sctp->sctp_pd_point = psctp->sctp_pd_point;
 		sctp->sctp_rto_max = psctp->sctp_rto_max;
 		sctp->sctp_rto_max_init = psctp->sctp_rto_max_init;
@@ -878,7 +880,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 
 		sctp->sctp_cwnd_max = sctps->sctps_cwnd_max_;
 		sctp->sctp_rwnd = connp->conn_rcvbuf;
-		sctp->sctp_irwnd = sctp->sctp_rwnd;
+		sctp->sctp_arwnd = connp->conn_rcvbuf;
 		sctp->sctp_pd_point = sctp->sctp_rwnd;
 		sctp->sctp_rto_max = MSEC_TO_TICK(sctps->sctps_rto_maxg);
 		sctp->sctp_rto_max_init = sctp->sctp_rto_max;
@@ -1661,6 +1663,13 @@ sctp_rq_tq_init(sctp_stack_t *sctps)
 	int thrs;
 	int max_tasks;
 
+	mutex_enter(&sctps->sctps_g_lock);
+	/* Someone may have beaten us in creating the taskqs. */
+	if (sctps->sctps_recvq_tq_list_cur_sz > 0) {
+		mutex_exit(&sctps->sctps_g_lock);
+		return;
+	}
+
 	thrs = MIN(sctp_recvq_tq_thr_max, MAX(sctp_recvq_tq_thr_min,
 	    MAX(ncpus, boot_ncpus)));
 	/*
@@ -1688,6 +1697,8 @@ sctp_rq_tq_init(sctp_stack_t *sctps)
 	sctps->sctps_recvq_tq_list[0] = taskq_create(tq_name, thrs,
 	    minclsyspri, sctp_recvq_tq_task_min, max_tasks, TASKQ_PREPOPULATE);
 	mutex_init(&sctps->sctps_rq_tq_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	mutex_exit(&sctps->sctps_g_lock);
 }
 
 static void

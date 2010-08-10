@@ -295,7 +295,7 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 	 */
 	if (SCTP_TXQ_LEN(sctp) >= connp->conn_sndbuf) {
 		sctp->sctp_txq_full = 1;
-		sctp->sctp_ulp_xmitted(sctp->sctp_ulpd, B_TRUE);
+		sctp->sctp_ulp_txq_full(sctp->sctp_ulpd, B_TRUE);
 	}
 	if (sctp->sctp_state == SCTPS_ESTABLISHED)
 		sctp_output(sctp, UINT_MAX);

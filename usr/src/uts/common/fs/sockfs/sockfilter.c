@@ -1344,7 +1344,7 @@ sof_filter_data_in_proc(struct sonode *so, mblk_t *mp, mblk_t **lastmp)
 		mutex_enter(&so->so_lock);
 		so->so_rcv_queued += diff;
 		/* so_check_flow_control drops so_lock */
-		so_check_flow_control(so);
+		(void) so_check_flow_control(so);
 	}
 
 	return (retmp);
@@ -1612,7 +1612,7 @@ sof_rcv_flowctrl(sof_handle_t handle, boolean_t enable)
 		}
 		so->so_state &= ~SS_FIL_RCV_FLOWCTRL;
 		/* so_check_flow_control drops so_lock */
-		so_check_flow_control(so);
+		(void) so_check_flow_control(so);
 	}
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 }
