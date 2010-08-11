@@ -19,22 +19,22 @@
 # CDDL HEADER END
 #
 #
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-LIBRARY =	libshare_nfs.a
+LIBRARY =	libshare_autofs.a
 VERS =		.1
-NFSLIB_DIR	= $(SRC)/cmd/fs.d/nfs/lib
+AUTOFSSMFLIB_DIR = $(SRC)/cmd/fs.d/nfs/lib
 
-LIBOBJS =	libshare_nfs.o
-OTHOBJS =	nfs_sec.o nfslog_config.o nfslogtab.o smfcfg.o
+LIBOBJS =	libshare_autofs.o
+OTHOBJS =	smfcfg.o
 OBJECTS =	$(LIBOBJS) $(OTHOBJS)
 
 include ../../../Makefile.lib
 
-ROOTLIBDIR =	$(ROOT)/usr/lib/fs/nfs
-ROOTLIBDIR64 =	$(ROOT)/usr/lib/fs/nfs/$(MACH64)
+ROOTLIBDIR =	$(ROOT)/usr/lib/fs/autofs
+ROOTLIBDIR64 =	$(ROOT)/usr/lib/fs/autofs/$(MACH64)
 
 LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 # we don't want to lint the sources for OTHOBJS since they are pre-existing files
@@ -42,23 +42,29 @@ LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lshare -lnsl -lscf -lumem -lc -lxml2
+LDLIBS +=	-lshare -lscf -lumem -lc -lxml2
 
 #add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) -I/usr/include/libxml2 \
-			-I$(SRCDIR)/../common
+CPPFLAGS +=	-D_REENTRANT -I$(AUTOFSSMFLIB_DIR) -I/usr/include/libxml2 \
+			-I$(SRCDIR)../common
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-install: all
+install: $(ROOTLIBDIR) $(ROOTLIBDIR64) all
 
 lint: lintcheck
 
-pics/%.o:  $(NFSLIB_DIR)/%.c
+pics/%.o:       $(AUTOFSSMFLIB_DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
+
+$(ROOTLIBDIR):
+	$(INS.dir)
+ 
+$(ROOTLIBDIR64):
+	$(INS.dir)
 
 include ../../../Makefile.targ

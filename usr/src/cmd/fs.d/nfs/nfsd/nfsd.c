@@ -62,6 +62,7 @@
 #include <netdir.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 #include <stropts.h>
 #include <sys/tihdr.h>
 #include <sys/wait.h>
@@ -73,8 +74,11 @@
 #include <rpcsvc/daemon_utils.h>
 #include <rpcsvc/nfs4_prot.h>
 #include <libnvpair.h>
+#include <libscf.h>
+#include <libshare.h>
 #include "nfs_tbind.h"
 #include "thrpool.h"
+#include "smfcfg.h"
 
 /* quiesce requests will be ignored if nfs_server_vers_max < QUIESCE_VERSMIN */
 #define	QUIESCE_VERSMIN	4
@@ -150,6 +154,8 @@ main(int ac, char *av[])
 	uint_t dss_npaths = 0;
 	char **dss_pathnames = NULL;
 	sigset_t sgset;
+	char name[PATH_MAX], value[PATH_MAX];
+	int ret, bufsz;
 
 	int pipe_fd = -1;
 
@@ -173,71 +179,81 @@ main(int ac, char *av[])
 	(void) enable_extended_FILE_stdio(-1, -1);
 
 	/*
-	 * Read in the values from config file first before we check
-	 * command line options so the options override the file.
+	 * Read in the values from SMF first before we check
+	 * command line options so the options override SMF values.
 	 */
-	if ((defopen(NFSADMIN)) == 0) {
-		if ((defval = defread("NFSD_MAX_CONNECTIONS=")) != NULL) {
-			errno = 0;
-			max_conns_allowed = strtol(defval, (char **)NULL, 10);
-			if (errno != 0) {
-				max_conns_allowed = -1;
-			}
-		}
-		if ((defval = defread("NFSD_LISTEN_BACKLOG=")) != NULL) {
-			errno = 0;
-			listen_backlog = strtol(defval, (char **)NULL, 10);
-			if (errno != 0) {
-				listen_backlog = 32;
-			}
-		}
-		if ((defval = defread("NFSD_PROTOCOL=")) != NULL) {
-			df_proto = strdup(defval);
-			opt_cnt++;
-			if (strncasecmp("ALL", defval, 3) == 0) {
-				free(df_proto);
-				df_proto = NULL;
-				df_allflag = 1;
-			}
-		}
-		if ((defval = defread("NFSD_DEVICE=")) != NULL) {
-			df_provider = strdup(defval);
-			opt_cnt++;
-		}
-		if ((defval = defread("NFSD_SERVERS=")) != NULL) {
-			errno = 0;
-			maxservers = strtol(defval, (char **)NULL, 10);
-			if (errno != 0) {
-				maxservers = 1;
-			} else {
-				maxservers_set = 1;
-			}
-		}
-		if ((defval = defread("NFS_SERVER_VERSMIN=")) != NULL) {
-			errno = 0;
-			nfs_server_vers_min =
-			    strtol(defval, (char **)NULL, 10);
-			if (errno != 0) {
-				nfs_server_vers_min = NFS_VERSMIN_DEFAULT;
-			}
-		}
-		if ((defval = defread("NFS_SERVER_VERSMAX=")) != NULL) {
-			errno = 0;
-			nfs_server_vers_max =
-			    strtol(defval, (char **)NULL, 10);
-			if (errno != 0) {
-				nfs_server_vers_max = NFS_VERSMAX_DEFAULT;
-			}
-		}
-		if ((defval = defread("NFS_SERVER_DELEGATION=")) != NULL) {
-			if (strcmp(defval, "off") == 0) {
-				nfs_server_delegation = FALSE;
-			}
-		}
-
-		/* close defaults file */
-		defopen(NULL);
+	bufsz = PATH_MAX;
+	ret = nfs_smf_get_prop("max_connections", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, NFSD, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		max_conns_allowed = strtol(value, (char **)NULL, 10);
+		if (errno != 0)
+			max_conns_allowed = -1;
 	}
+
+	bufsz = PATH_MAX;
+	ret = nfs_smf_get_prop("listen_backlog", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, NFSD, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		listen_backlog = strtol(value, (char **)NULL, 10);
+		if (errno != 0) {
+			listen_backlog = 32;
+		}
+	}
+
+	bufsz = PATH_MAX;
+	ret = nfs_smf_get_prop("protocol", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_ASTRING, NFSD, &bufsz);
+	if ((ret == SA_OK) && strlen(value) > 0) {
+		df_proto = strdup(value);
+		opt_cnt++;
+		if (strncasecmp("ALL", value, 3) == 0) {
+			free(df_proto);
+			df_proto = NULL;
+			df_allflag = 1;
+		}
+	}
+
+	bufsz = PATH_MAX;
+	ret = nfs_smf_get_prop("device", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_ASTRING, NFSD, &bufsz);
+	if ((ret == SA_OK) && strlen(value) > 0) {
+		df_provider = strdup(value);
+		opt_cnt++;
+	}
+
+	bufsz = PATH_MAX;
+	ret = nfs_smf_get_prop("servers", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, NFSD, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		maxservers = strtol(value, (char **)NULL, 10);
+		if (errno != 0)
+			maxservers = 1;
+		else
+			maxservers_set = 1;
+	}
+
+	bufsz = 4;
+	ret = nfs_smf_get_prop("server_versmin", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, NFSD, &bufsz);
+	if (ret == SA_OK)
+		nfs_server_vers_min = strtol(value, (char **)NULL, 10);
+
+	bufsz = 4;
+	ret = nfs_smf_get_prop("server_versmax", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, NFSD, &bufsz);
+	if (ret == SA_OK)
+		nfs_server_vers_max = strtol(value, (char **)NULL, 10);
+
+	bufsz = PATH_MAX;
+	ret = nfs_smf_get_prop("server_delegation", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_ASTRING, NFSD, &bufsz);
+	if (ret == SA_OK)
+		if (strncasecmp(value, "off", 3) == 0)
+			nfs_server_delegation = FALSE;
 
 	/*
 	 * Conflict options error messages.
@@ -245,10 +261,10 @@ main(int ac, char *av[])
 	if (opt_cnt > 1) {
 		(void) fprintf(stderr, "\nConflicting options, only one of "
 		    "the following options can be specified\n"
-		    "in " NFSADMIN ":\n"
-		    "\tNFSD_PROTOCOL=ALL\n"
-		    "\tNFSD_PROTOCOL=protocol\n"
-		    "\tNFSD_DEVICE=device\n\n");
+		    "in SMF:\n"
+		    "\tprotocol=ALL\n"
+		    "\tprotocol=protocol\n"
+		    "\tdevice=devicename\n\n");
 		usage();
 	}
 	opt_cnt = 0;

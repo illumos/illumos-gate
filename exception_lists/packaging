@@ -662,6 +662,9 @@ usr/include/sys/iscsit/radius_protocol.h
 usr/lib/libshare.so
 usr/lib/amd64/libshare.so		i386
 usr/lib/sparcv9/libshare.so		sparc
+usr/lib/fs/autofs/libshare_autofs.so
+usr/lib/fs/autofs/amd64/libshare_autofs.so		i386
+usr/lib/fs/autofs/sparcv9/libshare_autofs.so		sparc
 usr/lib/fs/nfs/libshare_nfs.so
 usr/lib/fs/nfs/amd64/libshare_nfs.so		i386
 usr/lib/fs/nfs/sparcv9/libshare_nfs.so		sparc

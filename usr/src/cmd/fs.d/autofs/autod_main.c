@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -47,6 +45,7 @@
 #include <thread.h>
 #include <locale.h>
 #include <door.h>
+#include <limits.h>
 #include "automount.h"
 #include <sys/vfs.h>
 #include <sys/mnttab.h>
@@ -61,6 +60,9 @@
 #include <nfs/rnode.h>
 #include <nfs/nfs.h>
 #include <wait.h>
+#include <libshare.h>
+#include <libscf.h>
+#include "smfcfg.h"
 
 static void autofs_doorfunc(void *, char *, size_t, door_desc_t *, uint_t);
 static void autofs_setdoor(int);
@@ -112,7 +114,8 @@ main(argc, argv)
 	pid_t pid;
 	int c, error;
 	struct rlimit rlset;
-	char *defval;
+	char defval[6];
+	int ret = 0, bufsz;
 
 	if (geteuid() != 0) {
 		(void) fprintf(stderr, "%s must be run as root\n", argv[0]);
@@ -120,33 +123,37 @@ main(argc, argv)
 	}
 
 	/*
-	 * Read in the values from config file first before we check
+	 * Read in the values from SMF first before we check
 	 * commandline options so the options override the file.
 	 */
-	if ((defopen(AUTOFSADMIN)) == 0) {
-		if ((defval = defread("AUTOMOUNTD_VERBOSE=")) != NULL) {
-			if (strncasecmp("true", defval, 4) == 0)
-				verbose = TRUE;
-			else
-				verbose = FALSE;
-		}
-		if ((defval = defread("AUTOMOUNTD_NOBROWSE=")) != NULL) {
-			if (strncasecmp("true", defval, 4) == 0)
-				automountd_nobrowse = TRUE;
-			else
-				automountd_nobrowse = FALSE;
-		}
-		if ((defval = defread("AUTOMOUNTD_TRACE=")) != NULL) {
-			errno = 0;
-			trace = strtol(defval, (char **)NULL, 10);
-			if (errno != 0)
-				trace = 0;
-		}
-		put_automountd_env();
-
-		/* close defaults file */
-		defopen(NULL);
+	bufsz = 6;
+	ret = autofs_smf_get_prop("automountd_verbose", defval,
+	    DEFAULT_INSTANCE, SCF_TYPE_BOOLEAN, AUTOMOUNTD, &bufsz);
+	if (ret == SA_OK) {
+		if (strncasecmp("true", defval, 4) == 0)
+			verbose = TRUE;
+		else
+			verbose = FALSE;
 	}
+	bufsz = 6;
+	ret = autofs_smf_get_prop("nobrowse", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_BOOLEAN, AUTOMOUNTD, &bufsz);
+	if (ret == SA_OK) {
+		if (strncasecmp("true", defval, 4) == 0)
+			automountd_nobrowse = TRUE;
+		else
+			automountd_nobrowse = FALSE;
+	}
+	bufsz = 6;
+	ret = autofs_smf_get_prop("trace", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, AUTOMOUNTD, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		trace = strtol(defval, (char **)NULL, 10);
+		if (errno != 0)
+			trace = 0;
+	}
+	put_automountd_env();
 
 	while ((c = getopt(argc, argv, "vnTD:")) != EOF) {
 		switch (c) {

@@ -43,16 +43,19 @@ dir path=usr/lib
 dir path=usr/lib/autofs group=sys
 dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/autofs group=sys
+dir path=usr/lib/fs/autofs/$(ARCH64) group=sys
 dir path=usr/sbin
 file path=etc/auto_home original_name=SUNWatfs:etc/auto_home preserve=true
 file path=etc/auto_master original_name=SUNWatfs:etc/auto_master preserve=true
 file path=etc/default/autofs group=sys \
-    original_name=SUNWatfs:etc/default/autofs preserve=true
+    original_name=SUNWatfs:etc/default/autofs preserve=renameold
 file path=lib/svc/manifest/system/filesystem/autofs.xml group=sys mode=0444
 file path=lib/svc/method/svc-autofs mode=0555
 file path=usr/lib/autofs/automountd mode=0555
+file path=usr/lib/fs/autofs/$(ARCH64)/libshare_autofs.so.1
 file path=usr/lib/fs/autofs/automount mode=0555
 file path=usr/lib/fs/autofs/dfshares mode=0555
+file path=usr/lib/fs/autofs/libshare_autofs.so.1
 file path=usr/lib/fs/autofs/mount mode=0555
 file path=usr/lib/fs/autofs/share mode=0555
 file path=usr/lib/fs/autofs/unshare mode=0555

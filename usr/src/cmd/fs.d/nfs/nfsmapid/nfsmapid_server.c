@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -800,7 +799,7 @@ idmap_kcall(int door_id)
 /*
  * Get the current NFS domain.
  *
- * If NFSMAPID_DOMAIN is set in /etc/default/nfs, then it is the NFS domain;
+ * If nfsmapid_domain is set in NFS SMF, then it is the NFS domain;
  * otherwise, the DNS domain is used.
  */
 void

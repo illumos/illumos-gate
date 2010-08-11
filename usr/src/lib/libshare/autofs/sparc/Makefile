@@ -19,9 +19,10 @@
 # CDDL HEADER END
 #
 #
+#
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-# Moved to SMF. Use sharectl(1M) to manage NFS properties.
-#
+include ../Makefile.com
+
+install: all $(ROOTLIBS) $(ROOTLINKS)

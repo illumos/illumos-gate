@@ -1,30 +1,26 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+    CDDL HEADER START
 
- CDDL HEADER START
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
 
- The contents of this file are subject to the terms of the
- Common Development and Distribution License, Version 1.0 only
- (the "License").  You may not use this file except in compliance
- with the License.
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
 
- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- or http://www.opensolaris.org/os/licensing.
- See the License for the specific language governing permissions
- and limitations under the License.
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
 
- When distributing Covered Code, include this CDDL HEADER in each
- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- If applicable, add the following below this CDDL HEADER, with the
- fields enclosed by brackets "[]" replaced with your own identifying
- information: Portions Copyright [yyyy] [name of copyright owner]
+    CDDL HEADER END
 
- CDDL HEADER END
-
-    ident	"%Z%%M%	%I%	%E% SMI"
+    Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 
     NOTE:  This service manifest is not editable; its contents will
     be overwritten by package or patch operations, including
@@ -42,10 +38,6 @@
 	name='system/filesystem/autofs'
 	type='service'
 	version='1'>
-
-	<create_default_instance enabled='false' />
-
-	<single_instance />
 
 	<dependency
 		name='fs'
@@ -111,6 +103,17 @@
 		<stability value='Evolving' />
 		<propval name='auto_enable' type='boolean' value='true' />
 	</property_group>
+
+	<instance name='default' enabled='false'>
+	  <property_group name='autofs-props' type='com.oracle.autofs,props'>
+	    <propval name='timeout' type='integer' value='600'/>
+	    <propval name='automount_verbose' type='boolean' value='false'/>
+	    <propval name='trace' type='integer' value='0'/>
+	    <propval name='nobrowse' type='boolean' value='false'/>
+	    <propval name='automountd_verbose' type='boolean' value='false'/>
+	    <propval name='environment' type='astring' value=''/>
+	  </property_group>
+	</instance>
 
 	<stability value='Stable' />
 

@@ -98,6 +98,17 @@ struct option_defs {
 #define	SVC_RQUOTAD	0x0040
 #define	SVC_NFSLOGD	0x0080
 #define	SVC_REPARSED	0x0100
+#define	SVC_CLIENT	0x0200
+
+/*
+ * NFS Restart/Refresh options
+ */
+#define	NFSD_REFRESH		0x0001
+#define	NFSD_RESTART		0x0002
+#define	NLOCKMGR_REFESH		0x0003
+#define	NLOCKMGR_RESTART	0x0004
+#define	MAPID_REFRESH		0x0005
+#define	MAPID_RESTART		0x0006
 
 /*
  * place holder for future service -- will move to daemon_utils.h when

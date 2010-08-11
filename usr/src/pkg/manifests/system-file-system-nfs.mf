@@ -58,7 +58,7 @@ dir path=var/nfs
 dir path=var/nfs/v4_oldstate group=daemon owner=daemon
 dir path=var/nfs/v4_state group=daemon owner=daemon
 file path=etc/default/nfs group=sys original_name=SUNWnfsc:etc/default/nfs \
-    preserve=true
+    preserve=renameold
 file path=etc/fs/nfs/mount mode=0555
 file path=etc/nfssec.conf group=sys original_name=SUNWnfsc:etc/nfssec.conf \
     preserve=true

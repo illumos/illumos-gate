@@ -28,16 +28,16 @@ ATTMK	  =	$(TYPEPROG)
 
 include		../../Makefile.fstype
 
-COMMON	  =	$(FSLIB) nfs_sec.o sharetab.o daemon.o
+COMMON	  =	$(FSLIB) nfs_sec.o sharetab.o daemon.o smfcfg.o
 LOCAL	  =	mountd.o netgroup.o rmtab.o nfsauth.o \
 		nfsauth_xdr.o exportlist.o hashset.o nfs_cmd.o
 OBJS	  = 	$(LOCAL) $(COMMON)
 SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c \
-		../lib/sharetab.c ../lib/daemon.c
+		../lib/sharetab.c ../lib/daemon.c ../lib/smfcfg.c
 DSRC	  =	mountd_dt.d
 DOBJ	  =	$(DSRC:%.d=%.o)
-LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol -lnvpair
-CPPFLAGS +=	-D_REENTRANT
+LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol -lnvpair -lscf
+CPPFLAGS +=	-D_REENTRANT -I../lib
 
 $(TYPEPROG):	$(OBJS)
 		$(COMPILE.d) -s $(DSRC) -o $(DOBJ) $(OBJS)
@@ -52,6 +52,9 @@ sharetab.o:	../lib/sharetab.c
 
 daemon.o:	../lib/daemon.c
 		$(COMPILE.c) ../lib/daemon.c
+
+smfcfg.o:	../lib/smfcfg.c
+		$(COMPILE.c) ../lib/smfcfg.c
 
 lint:
 	$(LINT.c) $(SRCS) $(LDLIBS)

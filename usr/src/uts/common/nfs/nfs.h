@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -54,11 +53,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-/*
- * Solaris NFS daemons configuration file location
- */
-#define	NFSADMIN	"/etc/default/nfs"
 
 /*
  * remote file service numbers

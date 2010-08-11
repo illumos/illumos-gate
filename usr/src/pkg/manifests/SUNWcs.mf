@@ -161,6 +161,8 @@ dir path=usr/lib/crypto
 dir path=usr/lib/devfsadm group=sys
 dir path=usr/lib/devfsadm/linkmod group=sys
 dir path=usr/lib/fs group=sys
+dir path=usr/lib/fs/autofs group=sys
+dir path=usr/lib/fs/autofs/$(ARCH64) group=sys
 dir path=usr/lib/fs/cachefs group=sys
 dir path=usr/lib/fs/ctfs group=sys
 dir path=usr/lib/fs/dev group=sys

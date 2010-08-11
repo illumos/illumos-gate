@@ -81,6 +81,10 @@
 #include <strings.h>
 #include <tsol/label.h>
 #include <zone.h>
+#include <limits.h>
+#include <libscf.h>
+#include <libshare.h>
+#include "smfcfg.h"
 
 extern void set_nfsv4_ephemeral_mount_to(void);
 
@@ -4020,76 +4024,66 @@ trace_host_cache()
 #endif /* CACHE_DEBUG */
 
 /*
- * Read the /etc/default/nfs configuration file to determine if the
+ * Read the NFS SMF properties to determine if the
  * client has been configured for a new min/max for the NFS version to
  * use.
  */
 
-#define	NFS_DEFAULT_CHECK 60  /* Seconds to check for nfs default changes */
+#define	SVC_NFS_CLIENT	"svc:/network/nfs/client"
 
 static void
 read_default_nfs(void)
 {
 	static time_t lastread = 0;
 	struct stat buf;
-	char *defval;
-	int errno;
-	int tmp;
+	char defval[4];
+	int errno, bufsz;
+	int tmp, ret = 0;
+
+	bufsz = 4;
+	ret = nfs_smf_get_prop("client_versmin", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, SVC_NFS_CLIENT, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		tmp = strtol(defval, (char **)NULL, 10);
+		if (errno == 0) {
+			vers_min_default = tmp;
+		}
+	}
+
+	bufsz = 4;
+	ret = nfs_smf_get_prop("client_versmax", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, SVC_NFS_CLIENT, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		tmp = strtol(defval, (char **)NULL, 10);
+		if (errno == 0) {
+			vers_max_default = tmp;
+		}
+	}
+
+	lastread = buf.st_mtime;
 
 	/*
-	 * Fail silently if we can't stat the default nfs config file
+	 * Quick sanity check on the values picked up from the
+	 * defaults file.  Make sure that a mistake wasn't
+	 * made that will confuse things later on.
+	 * If so, reset to compiled-in defaults
 	 */
-	if (stat(NFSADMIN, &buf))
-		return;
-
-	if (buf.st_mtime == lastread)
-		return;
-
-	/*
-	 * Fail silently if error in opening the default nfs config file
-	 * We'll check back in NFS_DEFAULT_CHECK seconds
-	 */
-	if ((defopen(NFSADMIN)) == 0) {
-		if ((defval = defread("NFS_CLIENT_VERSMIN=")) != NULL) {
-			errno = 0;
-			tmp = strtol(defval, (char **)NULL, 10);
-			if (errno == 0) {
-				vers_min_default = tmp;
-			}
-		}
-		if ((defval = defread("NFS_CLIENT_VERSMAX=")) != NULL) {
-			errno = 0;
-			tmp = strtol(defval, (char **)NULL, 10);
-			if (errno == 0) {
-				vers_max_default = tmp;
-			}
-		}
-		/* close defaults file */
-		defopen(NULL);
-
-		lastread = buf.st_mtime;
-
-		/*
-		 * Quick sanity check on the values picked up from the
-		 * defaults file.  Make sure that a mistake wasn't
-		 * made that will confuse things later on.
-		 * If so, reset to compiled-in defaults
-		 */
-		if (vers_min_default > vers_max_default ||
-		    vers_min_default < NFS_VERSMIN ||
-		    vers_max_default > NFS_VERSMAX) {
-			if (trace > 1) {
-				trace_prt(1,
+	if (vers_min_default > vers_max_default ||
+	    vers_min_default < NFS_VERSMIN ||
+	    vers_max_default > NFS_VERSMAX) {
+		if (trace > 1) {
+			trace_prt(1,
 	"  read_default: version minimum/maximum incorrectly configured\n");
-				trace_prt(1,
+			trace_prt(1,
 "  read_default: config is min=%d, max%d. Resetting to min=%d, max%d\n",
-				    vers_min_default, vers_max_default,
-				    NFS_VERSMIN_DEFAULT,
-				    NFS_VERSMAX_DEFAULT);
-			}
-			vers_min_default = NFS_VERSMIN_DEFAULT;
-			vers_max_default = NFS_VERSMAX_DEFAULT;
+			    vers_min_default, vers_max_default,
+			    NFS_VERSMIN_DEFAULT,
+			    NFS_VERSMAX_DEFAULT);
 		}
+		vers_min_default = NFS_VERSMIN_DEFAULT;
+		vers_max_default = NFS_VERSMAX_DEFAULT;
 	}
 }
 

@@ -21,11 +21,9 @@
 /*
  *	automount.c
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -38,6 +36,8 @@
 #include <dirent.h>
 #include <signal.h>
 #include <syslog.h>
+#include <libshare.h>
+#include <libscf.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/vfs.h>
@@ -54,6 +54,7 @@
 #include <deflt.h>
 #include <rpcsvc/daemon_utils.h>
 #include "automount.h"
+#include "smfcfg.h"
 
 static int mkdir_r(char *);
 struct autodir *dir_head;
@@ -99,6 +100,8 @@ main(int argc, char *argv[])
 	char **stkptr;
 	char *defval;
 	struct sigaction sigintact;
+	int ret = 0, bufsz = 0;
+	char valbuf[6];
 
 	/*
 	 * protect this command from session termination when run in background
@@ -111,27 +114,28 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Read in the values from config file first before we check
-	 * commandline options so the options override the file.
+	 * Read in the values from SMF first before we check
+	 * commandline options so the options override the SMF values.
 	 */
-	if ((defopen(AUTOFSADMIN)) == 0) {
-		if ((defval = defread("AUTOMOUNT_TIMEOUT=")) != NULL) {
-			errno = 0;
-			mount_timeout = strtol(defval, (char **)NULL, 10);
-			if (errno != 0)
-				mount_timeout = AUTOFS_MOUNT_TIMEOUT;
-		}
-		if ((defval = defread("AUTOMOUNT_VERBOSE=")) != NULL) {
-			if (strncasecmp("true", defval, 4) == 0)
-				verbose = TRUE;
-			else
-				verbose = FALSE;
-		}
-		put_automountd_env();
+	bufsz = 6;
+	ret = autofs_smf_get_prop("timeout", valbuf, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, AUTOMOUNTD, &bufsz);
+	if (ret == SA_OK)
+		/*
+		 * Ignore errno.  In event of failure, mount_timeout is
+		 * already initialized to the correct value.
+		 */
+		mount_timeout = strtol(valbuf, (char **)NULL, 10);
 
-		/* close defaults file */
-		defopen(NULL);
+	bufsz = 6;
+	ret = autofs_smf_get_prop("automount_verbose", valbuf, DEFAULT_INSTANCE,
+	    SCF_TYPE_BOOLEAN, AUTOMOUNTD, &bufsz);
+	if (ret == SA_OK) {
+		if (strncasecmp("true", valbuf, 4) == 0)
+			verbose = TRUE;
 	}
+
+	put_automountd_env();
 
 	while ((c = getopt(argc, argv, "mM:D:f:t:v?")) != EOF) {
 		switch (c) {
@@ -166,8 +170,7 @@ main(int argc, char *argv[])
 
 	if (optind < argc) {
 		pr_msg("%s: command line mountpoints/maps "
-			"no longer supported",
-			argv[optind]);
+		    "no longer supported", argv[optind]);
 		usage();
 	}
 
@@ -237,7 +240,7 @@ main(int argc, char *argv[])
 			 */
 			if (strcmp(mntp->mnt_fstype, MNTTYPE_AUTOFS) != 0) {
 				pr_msg("%s: already mounted",
-					mntp->mnt_mountp);
+				    mntp->mnt_mountp);
 				continue;
 			}
 
@@ -248,8 +251,8 @@ main(int argc, char *argv[])
 			 * with a remount.
 			 */
 			if (strcmp(mntp->mnt_special, dir->dir_map) == 0 &&
-				compare_opts(dir->dir_opts,
-					mntp->mnt_mntopts) == 0) {
+			    compare_opts(dir->dir_opts,
+			    mntp->mnt_mntopts) == 0) {
 				continue;	/* no change */
 			}
 
@@ -264,7 +267,7 @@ main(int argc, char *argv[])
 				if (hasmntopt(omntp, "direct") == NULL) {
 					if (verbose)
 						pr_msg("%s: cannot remount",
-							dir->dir_name);
+						    dir->dir_name);
 					continue;
 				}
 			}
@@ -301,15 +304,15 @@ main(int argc, char *argv[])
 			ai.key = "";
 
 		(void) sprintf(mntopts, "ignore,%s",
-			dir->dir_direct  ? "direct" : "indirect");
+		    dir->dir_direct  ? "direct" : "indirect");
 		if (dir->dir_opts && *dir->dir_opts) {
 			(void) strcat(mntopts, ",");
 			(void) strcat(mntopts, dir->dir_opts);
 		}
 		mntflgs = MS_OPTIONSTR | (dir->dir_remount ? MS_REMOUNT : 0);
 		if (mount(dir->dir_map, dir->dir_name, MS_DATA | mntflgs,
-				MNTTYPE_AUTOFS, &ai, sizeof (ai), mntopts,
-				MAX_MNTOPT_STR) < 0) {
+		    MNTTYPE_AUTOFS, &ai, sizeof (ai), mntopts,
+		    MAX_MNTOPT_STR) < 0) {
 			pr_msg("mount %s: %m", dir->dir_name);
 			continue;
 		}
@@ -520,7 +523,7 @@ do_unmounts()
 		if (umount(mnt->mnt_mountp) == 0) {
 			if (verbose) {
 				pr_msg("%s unmounted",
-					mnt->mnt_mountp);
+				    mnt->mnt_mountp);
 			}
 			count++;
 		}

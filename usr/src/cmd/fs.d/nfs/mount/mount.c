@@ -80,6 +80,9 @@
 #include "webnfs.h"
 #include <rpcsvc/nfs4_prot.h>
 #include <limits.h>
+#include <libscf.h>
+#include <libshare.h>
+#include "smfcfg.h"
 
 #include <nfs/nfssys.h>
 extern int _nfssys(enum nfssys_op, void *);
@@ -214,7 +217,7 @@ static rpcvers_t nfsretry_vers = 0;
  * There are the defaults (range) for the client when determining
  * which NFS version to use when probing the server (see above).
  * These will only be used when the vers mount option is not used and
- * these may be reset if /etc/default/nfs is configured to do so.
+ * these may be reset if NFS SMF is configured to do so.
  */
 static rpcvers_t vers_max_default = NFS_VERSMAX_DEFAULT;
 static rpcvers_t vers_min_default = NFS_VERSMIN_DEFAULT;
@@ -317,7 +320,7 @@ main(int argc, char *argv[])
 		(void) setpflags(NET_MAC_AWARE, 1);
 
 	/*
-	 * Read the defaults file to see if the min/max versions have
+	 * Read the NFS SMF defaults to see if the min/max versions have
 	 * been set and therefore would override the encoded defaults.
 	 * Then check to make sure that if they were set that the
 	 * values are reasonable.
@@ -326,10 +329,9 @@ main(int argc, char *argv[])
 	if (vers_min_default > vers_max_default ||
 	    vers_min_default < NFS_VERSMIN ||
 	    vers_max_default > NFS_VERSMAX) {
-		pr_err("%s %s\n%s %s\n",
+		pr_err("%s\n%s %s\n",
 		    gettext("Incorrect configuration of client\'s"),
-		    NFSADMIN,
-		    gettext("NFS_CLIENT_VERSMIN or NFS_CLIENT_VERSMAX"),
+		    gettext("client_versmin or client_versmax"),
 		    gettext("is either out of range or overlaps."));
 	}
 
@@ -2608,35 +2610,39 @@ retry(struct mnttab *mntp, int ro)
 }
 
 /*
- * Read the /etc/default/nfs configuration file to determine if the
+ * Read the NFS SMF Parameters  to determine if the
  * client has been configured for a new min/max for the NFS version to
  * use.
  */
 static void
 read_default(void)
 {
-	char *defval;
+	char value[4];
 	int errno;
-	int tmp;
+	int tmp = 0, bufsz = 0, ret = 0;
 
-	/* Fail silently if error in opening the default nfs config file */
-	if ((defopen(NFSADMIN)) == 0) {
-		if ((defval = defread("NFS_CLIENT_VERSMIN=")) != NULL) {
-			errno = 0;
-			tmp = strtol(defval, (char **)NULL, 10);
-			if (errno == 0) {
-				vers_min_default = tmp;
-			}
+	/* Maximum number of bytes expected. */
+	bufsz = 4;
+	ret = nfs_smf_get_prop("client_versmin", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, SVC_NFS_CLIENT, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		tmp = strtol(value, (char **)NULL, 10);
+		if (errno == 0) {
+			vers_min_default = tmp;
 		}
-		if ((defval = defread("NFS_CLIENT_VERSMAX=")) != NULL) {
-			errno = 0;
-			tmp = strtol(defval, (char **)NULL, 10);
-			if (errno == 0) {
-				vers_max_default = tmp;
-			}
+	}
+
+	/* Maximum number of bytes expected. */
+	bufsz = 4;
+	ret = nfs_smf_get_prop("client_versmax", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, SVC_NFS_CLIENT, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		tmp = strtol(value, (char **)NULL, 10);
+		if (errno == 0) {
+			vers_max_default = tmp;
 		}
-		/* close defaults file */
-		defopen(NULL);
 	}
 }
 

@@ -509,45 +509,9 @@ do_sec () {
 }
 
 #
-# update_nfs_file <new nfsv4 domain>
-#
-update_nfs_file () {
-	domain=$1
-	file=/etc/default/nfs
-
-	#
-	# For non-commented-out lines that set NFSMAPID_DOMAIN:
-	#	if not previously added by nwam, comment out with a note
-	#	if previously added by nwam, remove
-	# For commented-out lines that set NFSMAPID_DOMAIN:
-	#	if not commented out by NWAM, leave as-is
-	#	if commented out by NWAM, remove
-	# All other lines: leave as-is
-	#
-	$NAWK ' \
-		$0 ~ /^NFSMAPID_DOMAIN=/ {
-			if (index($0, "# Added by NWAM") == 0)
-				printf("#%s # Commented out by NWAM\n", $0);
-		}
-		$0 ~ /^#NFSMAPID_DOMAIN=/ {
-			if ($0 !~ /"# Commented out by NWAM"/)
-				printf("%s\n", $0);
-		}
-		$1 !~ /NFSMAPID_DOMAIN=/ {
-			printf("%s\n", $0);
-		}' $file >$file.$$
-
-	# Now add the desired value
-	echo "NFSMAPID_DOMAIN=$domain # Added by NWAM" >> $file.$$
-
-	# Finally, copy our working version to the real thing
-	$MV -f $file.$$ $file
-}
-
-#
 # do_nfsv4 <location>
 #
-# Updates NFSv4 domain for location
+# Updates NFSv4 domain for location in SMF
 #
 # Returns 0 on success, 1 on failure
 #
@@ -556,7 +520,8 @@ do_nfsv4 () {
 
 	nfsv4domain=`nwam_get_loc_prop $loc nfsv4-domain`
 	if [ $? -eq 0 ]; then
-		update_nfs_file $nfsv4domain
+		set_smf_prop $MAPID_FMRI \
+		    nfs-props/nfsmapid_domain $nfsv4domain
 		start_svc $MAPID_FMRI
 	else
 		stop_svc $MAPID_FMRI

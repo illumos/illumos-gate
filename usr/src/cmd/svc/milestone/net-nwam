@@ -34,6 +34,7 @@ NIS_CLIENT_FMRI="svc:/network/nis/client:default"
 NET_PHYS_FMRI="svc:/network/physical:default"
 NET_NWAM_FMRI="svc:/network/physical:nwam"
 NET_LOC_FMRI="svc:/network/location:default"
+NFS_MAPID_FMRI="svc:/network/nfs/mapid:default"
 
 #
 # Default *.conf files
@@ -233,11 +234,10 @@ create_legacy_loc () {
 	    $CREATE_LOC_LEGACY_FILE
 	write_loc_prop "default-domain" $DEFAULT_DOMAIN $CREATE_LOC_LEGACY_FILE
 
-	# Retrieve NFSv4 domain.
-	if [ -f /etc/default/nfs ]; then
-		copy_to_legacy_loc /etc/default/nfs
-		NFS_DOMAIN=`$NAWK '/^NFSMAPID_DOMAIN.*/ { FS="=" ; print $2 }' \
-		    < /etc/default/nfs`
+	# Retrieve NFSv4 domain from SMF.
+	if service_is_enabled $NFS_MAPID_FMRI; then
+		NFS_DOMAIN=`get_smf_prop NFS_MAPID_FMRI \
+		    nfs-props/nfsmapid_domain`    
 		write_loc_prop "nfsv4-domain" \
 		    $NFS_DOMAIN $CREATE_LOC_LEGACY_FILE
 	fi
@@ -377,8 +377,14 @@ revert_to_legacy_loc () {
 		$SVCADM enable ldap/client
 	fi
 
-	# Copy back nfs file
-        copy_from_legacy_loc /etc/default/nfs
+	# Copy back nfs NFSMAPID_DOMAIN
+	NFSMAPID_DOMAIN=`nwam_get_loc_prop Legacy nfsv4-domain`
+	if [ -n "$NFSMAPID_DOMAIN" ]; then
+		set_smf_prop $NFS_MAPID_FMRI \
+		    nfs-props/nfsmapid_domain $NFSMAPID_DOMAIN
+		$SVCADM refresh $NFS_MAPID_FMRI
+		$SVCADM enable $NFS_MAPID_FMRI
+	fi
 
 	# IPFilter, IPsec, and IKE
 	ipf_file=`nwam_get_loc_prop Legacy ipfilter-config-file`

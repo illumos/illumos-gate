@@ -22,6 +22,33 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-# Moved to SMF. Use sharectl(1M) to manage NFS properties.
-#
+include ../../Makefile.lib
+
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
+
+MSGFILES = 	libshare_autofs.c
+POFILE  =	libshare_autofs.po
+
+all	:=	TARGET= all
+clean	:=	TARGET= clean
+clobber	:=	TARGET= clobber
+install	:=	TARGET= install
+lint	:=	TARGET= lint
+
+.KEEP_STATE:
+
+all clean clobber install lint:	$(SUBDIRS)
+
+$(POFILE): 	$(MSGFILES)
+	$(BUILDPO.msgfiles)
+
+_msg:	$(MSGDOMAINPOFILE)
+
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
+
+include ../../Makefile.targ
+include ../../../Makefile.msg.targ

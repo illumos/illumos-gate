@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_MAPID_H
@@ -150,7 +149,7 @@ bool_t				 nfsmapid_debug = FALSE;
  *			domain configured for use in decoding/encoding
  *			outbound and inbound attr strings, accordingly.
  *
- * nfs_domain:		If /etc/default/nfs NFSMAPID_DOMAIN var
+ * nfs_domain:		If nfsmapid_domain var in SMF
  *			has been set, nfs_domain will hold this
  *			value for the duration of the instance;
  *			If the value ever changes, the change is
