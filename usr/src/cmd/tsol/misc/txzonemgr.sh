@@ -576,17 +576,17 @@ install() {
 		return 1
 	fi
 
+	if [ $NSCD_PER_LABEL = 0 ] ; then
+		sharePasswd $zonename
+	else
+		unsharePasswd $zonename
+	fi
+
 	zoneadm -z $zonename ready
 	zonestate=$(zoneadm -z $zonename list -p | cut -d : -f 3)
 	if [ $zonestate != ready ] ; then
 		gettext "error making zone $zonename ready.\n"
 		return 1
-	fi
-
-	if [ $NSCD_PER_LABEL = 0 ] ; then
-		sharePasswd $zonename
-	else
-		unsharePasswd $zonename
 	fi
 
 	initialize
@@ -1085,12 +1085,7 @@ sharePasswd() {
 		    add options ro; \
 		    end"
 	fi
-	zoneadm -z $1 ready >/dev/null 2>&1
-	if [ $? -eq 0 ] ; then
-		zoneadm -z $1 halt >/dev/null 2>&1
-	else
-		echo Skipping $1
-	fi
+	zoneadm -z $1 halt >/dev/null 2>&1
 }
 
 # This routine is a toggle -- if we find it configured for global nscd,
