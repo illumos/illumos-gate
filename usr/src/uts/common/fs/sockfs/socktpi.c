@@ -2076,13 +2076,20 @@ again:
 		eprintsoline(so, error);
 		goto disconnect_vp;
 	}
+	mutex_exit(&so->so_lock);
 	/*
 	 * If there is a sin/sin6 appended onto the T_OK_ACK use
 	 * that to set the local address. If this is not present
 	 * then we zero out the address and don't set the
 	 * sti_laddr_valid bit. For AF_UNIX endpoints we copy over
 	 * the pathname from the listening socket.
+	 * In the case where this is TCP or an AF_UNIX socket the
+	 * client side may have queued data or a T_ORDREL in the
+	 * transport. Having now sent the T_CONN_RES we may receive
+	 * those queued messages at any time. Hold the acceptor
+	 * so_lock until its state and laddr are finalized.
 	 */
+	mutex_enter(&nso->so_lock);
 	sinlen = (nso->so_family == AF_INET) ? sizeof (sin_t) : sizeof (sin6_t);
 	if ((nso->so_family == AF_INET) || (nso->so_family == AF_INET6) &&
 	    MBLKL(ack_mp) == (sizeof (struct T_ok_ack) + sinlen)) {
@@ -2103,12 +2110,14 @@ again:
 		bzero(nsti->sti_laddr_sa, nsti->sti_addr_size);
 		nsti->sti_laddr_sa->sa_family = nso->so_family;
 	}
+	nso->so_state |= SS_ISCONNECTED;
+	mutex_exit(&nso->so_lock);
+
 	freemsg(ack_mp);
 
+	mutex_enter(&so->so_lock);
 	so_unlock_single(so, SOLOCKED);
 	mutex_exit(&so->so_lock);
-
-	nso->so_state |= SS_ISCONNECTED;
 
 	/*
 	 * Pass out new socket.
