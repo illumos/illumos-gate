@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
  *  mpi.c
  *
@@ -41,13 +42,10 @@
  *
  * ***** END LICENSE BLOCK ***** */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Sun elects to use this software under the MPL license.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* $Id: mpi.c,v 1.45 2006/09/29 20:12:21 alexei.volkov.bugs%sun.com Exp $ */
 
@@ -160,6 +158,7 @@ mp_err mp_init_size(mp_int *mp, mp_size prec, int kmflag)
   SIGN(mp) = ZPOS;
   USED(mp) = 1;
   ALLOC(mp) = prec;
+  FLAG(mp) = kmflag;
 
   return MP_OKAY;
 
@@ -251,6 +250,7 @@ mp_err mp_copy(const mp_int *from, mp_int *to)
     /* Copy the precision and sign from the original */
     USED(to) = USED(from);
     SIGN(to) = SIGN(from);
+    FLAG(to) = FLAG(from);
   } /* end copy */
 
   return MP_OKAY;
@@ -2886,13 +2886,9 @@ void s_mp_copy(const mp_digit *sp, mp_digit *dp, mp_size count)
 /* Allocate ni records of nb bytes each, and return a pointer to that     */
 void    *s_mp_alloc(size_t nb, size_t ni, int kmflag)
 {
-  mp_int *mp;
   ++mp_allocs;
 #ifdef _KERNEL
-  mp = kmem_zalloc(nb * ni, kmflag);
-  if (mp != NULL)
-    FLAG(mp) = kmflag;
-  return (mp);
+  return kmem_zalloc(nb * ni, kmflag);
 #else
   return calloc(nb, ni);
 #endif
@@ -4870,3 +4866,4 @@ mp_to_fixlen_octets(const mp_int *mp, unsigned char *str, mp_size length)
 
 /*------------------------------------------------------------------------*/
 /* HERE THERE BE DRAGONS                                                  */
+/* END CSTYLED */
