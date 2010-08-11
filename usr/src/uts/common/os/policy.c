@@ -1296,7 +1296,9 @@ secpolicy_xvattr(xvattr_t *xvap, uid_t owner, cred_t *cr, vtype_t vtype)
 	    XVA_ISSET_REQ(xvap, XAT_HIDDEN) ||
 	    XVA_ISSET_REQ(xvap, XAT_READONLY) ||
 	    XVA_ISSET_REQ(xvap, XAT_SYSTEM) ||
-	    XVA_ISSET_REQ(xvap, XAT_CREATETIME)) {
+	    XVA_ISSET_REQ(xvap, XAT_CREATETIME) ||
+	    XVA_ISSET_REQ(xvap, XAT_OFFLINE) ||
+	    XVA_ISSET_REQ(xvap, XAT_SPARSE)) {
 		if ((error = secpolicy_vnode_owner(cr, owner)) != 0)
 			return (error);
 	}

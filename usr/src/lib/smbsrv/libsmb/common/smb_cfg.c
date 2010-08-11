@@ -877,16 +877,18 @@ smb_config_get_version(smb_version_t *version)
 	char *p;
 	int rc, i;
 	static smb_version_t ver_table [] = {
-		{ SMB_MAJOR_NT,		SMB_MINOR_NT	},
-		{ SMB_MAJOR_2000,	SMB_MINOR_2000	},
-		{ SMB_MAJOR_XP,		SMB_MINOR_XP	},
-		{ SMB_MAJOR_2003,	SMB_MINOR_2003	},
-		{ SMB_MAJOR_VISTA,	SMB_MINOR_VISTA	},
-		{ SMB_MAJOR_2008,	SMB_MINOR_2008	},
-		{ SMB_MAJOR_2008R2,	SMB_MINOR_2008R2}
+		{ 0, SMB_MAJOR_NT,	SMB_MINOR_NT,		1381,	0 },
+		{ 0, SMB_MAJOR_2000,	SMB_MINOR_2000,		2195,	0 },
+		{ 0, SMB_MAJOR_XP,	SMB_MINOR_XP,		2196,	0 },
+		{ 0, SMB_MAJOR_2003,	SMB_MINOR_2003,		2196,	0 },
+		{ 0, SMB_MAJOR_VISTA,	SMB_MINOR_VISTA,	6000,	0 },
+		{ 0, SMB_MAJOR_2008,	SMB_MINOR_2008,		6000,	0 },
+		{ 0, SMB_MAJOR_2008R2,	SMB_MINOR_2008R2,	7007,	0 },
+		{ 0, SMB_MAJOR_7,	SMB_MINOR_7,		7007,	0 }
 	};
 
 	*version = ver_table[1];
+	version->sv_size = sizeof (smb_version_t);
 
 	rc = smb_config_getstr(SMB_CI_VERSION, verstr, sizeof (verstr));
 	if (rc != SMBD_SMF_OK)
@@ -903,6 +905,7 @@ smb_config_get_version(smb_version_t *version)
 		if ((tmpver.sv_major == ver_table[i].sv_major) &&
 		    (tmpver.sv_minor == ver_table[i].sv_minor)) {
 			*version = ver_table[i];
+			version->sv_size = sizeof (smb_version_t);
 			break;
 		}
 	}

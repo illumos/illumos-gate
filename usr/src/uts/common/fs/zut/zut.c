@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -218,6 +217,8 @@ zut_stat64(vnode_t *vp, struct stat64 *sb, uint64_t *xvs, int flag, cred_t *cr)
 	XVA_SET_REQ(&xv, XAT_AV_QUARANTINED);
 	XVA_SET_REQ(&xv, XAT_AV_MODIFIED);
 	XVA_SET_REQ(&xv, XAT_REPARSE);
+	XVA_SET_REQ(&xv, XAT_OFFLINE);
+	XVA_SET_REQ(&xv, XAT_SPARSE);
 
 	xv.xva_vattr.va_mask |= AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
 	if (error = VOP_GETATTR(vp, &xv.xva_vattr, flag, cr, NULL))
@@ -266,6 +267,10 @@ zut_stat64(vnode_t *vp, struct stat64 *sb, uint64_t *xvs, int flag, cred_t *cr)
 		*xvs |= (1 << F_AV_MODIFIED);
 	if (XVA_ISSET_RTN(&xv, XAT_REPARSE) && xoap->xoa_reparse)
 		*xvs |= (1 << F_REPARSE);
+	if (XVA_ISSET_RTN(&xv, XAT_OFFLINE) && xoap->xoa_offline)
+		*xvs |= (1 << F_OFFLINE);
+	if (XVA_ISSET_RTN(&xv, XAT_SPARSE) && xoap->xoa_sparse)
+		*xvs |= (1 << F_SPARSE);
 
 	return (0);
 }

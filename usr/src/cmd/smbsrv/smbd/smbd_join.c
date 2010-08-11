@@ -43,6 +43,9 @@
 
 extern smbd_t smbd;
 
+static mutex_t smbd_dc_mutex;
+static cond_t smbd_dc_cv;
+
 static void *smbd_dc_monitor(void *);
 static void smbd_dc_update(void);
 static boolean_t smbd_set_netlogon_cred(void);
@@ -59,6 +62,9 @@ smbd_dc_monitor_init(void)
 	pthread_attr_t	attr;
 	int		rc;
 
+	(void) smb_config_getstr(SMB_CI_ADS_SITE, smbd.s_site,
+	    MAXHOSTNAMELEN);
+	(void) smb_config_getip(SMB_CI_DOMAIN_SRV, &smbd.s_pdc);
 	smb_ads_init();
 
 	if (smbd.s_secmode != SMB_SECMODE_DOMAIN)
@@ -72,18 +78,55 @@ smbd_dc_monitor_init(void)
 	return (rc);
 }
 
+void
+smbd_dc_monitor_refresh(void)
+{
+	char		site[MAXHOSTNAMELEN];
+	smb_inaddr_t	pdc;
+
+	site[0] = '\0';
+	bzero(&pdc, sizeof (smb_inaddr_t));
+	(void) smb_config_getstr(SMB_CI_ADS_SITE, site, MAXHOSTNAMELEN);
+	(void) smb_config_getip(SMB_CI_DOMAIN_SRV, &pdc);
+
+	(void) mutex_lock(&smbd_dc_mutex);
+
+	if ((bcmp(&smbd.s_pdc, &pdc, sizeof (smb_inaddr_t)) != 0) ||
+	    (smb_strcasecmp(smbd.s_site, site, 0) != 0)) {
+		bcopy(&pdc, &smbd.s_pdc, sizeof (smb_inaddr_t));
+		(void) strlcpy(smbd.s_site, site, MAXHOSTNAMELEN);
+		smbd.s_pdc_changed = B_TRUE;
+		(void) cond_signal(&smbd_dc_cv);
+	}
+
+	(void) mutex_unlock(&smbd_dc_mutex);
+}
+
 /*ARGSUSED*/
 static void *
 smbd_dc_monitor(void *arg)
 {
 	boolean_t	ds_not_responding = B_FALSE;
+	boolean_t	ds_cfg_changed = B_FALSE;
+	timestruc_t	delay;
 	int		i;
 
 	smbd_dc_update();
 	smbd_online_wait("smbd_dc_monitor");
 
 	while (smbd_online()) {
-		(void) sleep(SMBD_DC_MONITOR_INTERVAL);
+		delay.tv_sec = SMBD_DC_MONITOR_INTERVAL;
+		delay.tv_nsec = 0;
+
+		(void) mutex_lock(&smbd_dc_mutex);
+		(void) cond_reltimedwait(&smbd_dc_cv, &smbd_dc_mutex, &delay);
+
+		if (smbd.s_pdc_changed) {
+			smbd.s_pdc_changed = B_FALSE;
+			ds_cfg_changed = B_TRUE;
+		}
+
+		(void) mutex_unlock(&smbd_dc_mutex);
 
 		for (i = 0; i < SMBD_DC_MONITOR_ATTEMPTS; ++i) {
 			if (dssetup_check_service() == 0) {
@@ -95,10 +138,12 @@ smbd_dc_monitor(void *arg)
 			(void) sleep(SMBD_DC_MONITOR_RETRY_INTERVAL);
 		}
 
-		if (ds_not_responding) {
+		if (ds_not_responding)
 			smb_log(smbd.s_loghd, LOG_NOTICE,
 			    "smbd_dc_monitor: domain service not responding");
 
+		if (ds_not_responding || ds_cfg_changed) {
+			ds_cfg_changed = B_FALSE;
 			smb_ads_refresh();
 			smbd_dc_update();
 		}

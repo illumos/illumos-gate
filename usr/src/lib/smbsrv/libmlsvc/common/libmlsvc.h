@@ -277,9 +277,11 @@ void smb_quota_free(smb_quota_response_t *);
 uint32_t dfs_get_referrals(const char *, dfs_reftype_t, dfs_info_t *);
 void dfs_info_free(dfs_info_t *);
 
-/* spool functions */
-void spoolss_copy_spool_file(smb_inaddr_t *, char *, char *, char *);
-
+/*
+ * The spoolss installable copyfile API.
+ */
+typedef void (*spoolss_copyfile_t)(smb_inaddr_t *, char *, char *, char *);
+void spoolss_register_copyfile(spoolss_copyfile_t);
 
 #ifdef	__cplusplus
 }

@@ -1050,6 +1050,7 @@ typedef struct smb_user {
 #define	SMB_TREE_ABE			0x00008000
 #define	SMB_TREE_QUOTA			0x00010000
 #define	SMB_TREE_DFSROOT		0x00020000
+#define	SMB_TREE_SPARSE			0x00040000
 
 typedef enum {
 	SMB_TREE_STATE_CONNECTED = 0,

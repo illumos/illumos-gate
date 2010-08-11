@@ -1007,7 +1007,8 @@ smb_trans_net_workstation_getinfo(struct smb_request *sr, struct smb_xa *xa)
 	(void) smb_mbc_encodef(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
 	(void) smb_mbc_encodef(&str_mb, "s", domain);
 	(void) smb_mbc_encodef(&xa->rep_data_mb, "bbl",
-	    sr->sr_cfg->skc_version.sv_major, sr->sr_cfg->skc_version.sv_minor,
+	    (uint8_t)sr->sr_cfg->skc_version.sv_major,
+	    (uint8_t)sr->sr_cfg->skc_version.sv_minor,
 	    MBC_LENGTH(&str_mb));
 	(void) smb_mbc_encodef(&str_mb, "s", domain);
 	(void) smb_mbc_encodef(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
@@ -1070,8 +1071,8 @@ smb_trans_net_server_getinfo(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_mbc_encodef(&str_mb, "s",
 		    sr->sr_cfg->skc_system_comment);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "16cbbll", server_name,
-		    sr->sr_cfg->skc_version.sv_major,
-		    sr->sr_cfg->skc_version.sv_minor,
+		    (uint8_t)sr->sr_cfg->skc_version.sv_major,
+		    (uint8_t)sr->sr_cfg->skc_version.sv_minor,
 		    MY_SERVER_TYPE, max_data - MBC_LENGTH(&str_mb));
 		break;
 
@@ -1315,8 +1316,8 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 	(void) smb_mbc_encodef(&xa->rep_data_mb, "16c", hostname);
 	if (level == 1) {
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "bbll",
-		    sr->sr_cfg->skc_version.sv_major,
-		    sr->sr_cfg->skc_version.sv_minor,
+		    (uint8_t)sr->sr_cfg->skc_version.sv_major,
+		    (uint8_t)sr->sr_cfg->skc_version.sv_minor,
 		    MY_SERVER_TYPE, MBC_LENGTH(&str_mb));
 		(void) smb_mbc_encodef(&str_mb, "s", si->skc_system_comment);
 	}

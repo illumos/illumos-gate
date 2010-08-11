@@ -25,62 +25,61 @@
 /*
  * Printing and Spooling RPC service.
  */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <pthread.h>
-#include <synch.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/ndl/ndrtypes.ndl>
+#include <smbsrv/smb.h>
 #include <smbsrv/ndl/spoolss.ndl>
+#include <smbsrv/ndl/winreg.ndl>
 #include <smb/nterror.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/nmpipes.h>
-#include <wchar.h>
-#include <cups/cups.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <errno.h>
-#include <dlfcn.h>
 #include <mlsvc.h>
 
+#define	SPOOLSS_PRINTER		"Postscript"
+
 typedef struct smb_spool {
-	list_t sp_list;
-	int sp_cnt;
-	rwlock_t sp_rwl;
-	int sp_initialized;
+	list_t		sp_list;
+	int		sp_cnt;
+	rwlock_t	sp_rwl;
+	int		sp_initialized;
 } smb_spool_t;
 
+typedef struct smb_spooldoc {
+	uint32_t	sd_magic;
+	list_node_t	sd_lnd;
+	smb_inaddr_t	sd_ipaddr;
+	int		sd_spool_num;
+	char		sd_username[MAXNAMELEN];
+	char		sd_path[MAXPATHLEN];
+	char		sd_doc_name[MAXNAMELEN];
+	char		sd_printer_name[MAXPATHLEN];
+	int32_t		sd_fd;
+	ndr_hdid_t	sd_handle;
+} smb_spooldoc_t;
+
+typedef struct {
+	char		*name;
+	uint32_t	value;
+} spoolss_winreg_t;
+
+typedef struct {
+	uint8_t		*sd_buf;
+	uint32_t	sd_size;
+} spoolss_sd_t;
+
 static uint32_t spoolss_cnt;
-static uint32_t spoolss_jobnum = 1;
 static smb_spool_t spoolss_splist;
-static smb_cups_ops_t smb_cups;
-static mutex_t spoolss_cups_mutex;
 
-#define	SPOOLSS_PJOBLEN		256
-#define	SPOOLSS_JOB_NOT_ISSUED	3004
-#define	SPOOLSS_PRINTER		"Postscript"
-#define	SPOOLSS_FN_PREFIX	"cifsprintjob-"
-#define	SPOOLSS_CUPS_SPOOL_DIR	"//var//spool//cups"
-
-struct spoolss_printjob {
-	pid_t pj_pid;
-	int pj_sysjob;
-	int pj_fd;
-	time_t pj_start_time;
-	int pj_status;
-	size_t pj_size;
-	int pj_page_count;
-	boolean_t pj_isspooled;
-	boolean_t pj_jobnum;
-	char pj_filename[SPOOLSS_PJOBLEN];
-	char pj_jobname[SPOOLSS_PJOBLEN];
-	char pj_username[SPOOLSS_PJOBLEN];
-	char pj_queuename[SPOOLSS_PJOBLEN];
-};
+void (*spoolss_copyfile_callback)(smb_inaddr_t *, char *, char *, char *);
 
 DECL_FIXUP_STRUCT(spoolss_GetPrinter_result_u);
 DECL_FIXUP_STRUCT(spoolss_GetPrinter_result);
@@ -92,13 +91,10 @@ DECL_FIXUP_STRUCT(spoolss_RPC_V2_NOTIFY_INFO);
 DECL_FIXUP_STRUCT(spoolss_RFNPCNEX);
 
 uint32_t srvsvc_sd_set_relative(smb_sd_t *, uint8_t *);
-static int spoolss_s_make_sd(uint8_t *);
-static uint32_t spoolss_sd_format(smb_sd_t *);
-static int spoolss_find_fd(ndr_hdid_t *);
-static void spoolss_find_doc_and_print(ndr_hdid_t *);
-static void spoolss_add_spool_doc(smb_spooldoc_t *);
-static int spoolss_cups_init(void);
-static void spoolss_cups_fini(void);
+static int spoolss_getservername(char *, size_t);
+static uint32_t spoolss_make_sd(ndr_xa_t *, spoolss_sd_t *);
+static uint32_t spoolss_format_sd(smb_sd_t *);
+static int spoolss_find_document(ndr_hdid_t *);
 
 static int spoolss_s_OpenPrinter(void *, ndr_xa_t *);
 static int spoolss_s_ClosePrinter(void *, ndr_xa_t *);
@@ -116,7 +112,14 @@ static int spoolss_s_StartPagePrinter(void *, ndr_xa_t *);
 static int spoolss_s_EndPagePrinter(void *, ndr_xa_t *);
 static int spoolss_s_rfnpcnex(void *, ndr_xa_t *);
 static int spoolss_s_WritePrinter(void *, ndr_xa_t *);
+static int spoolss_s_AddForm(void *, ndr_xa_t *);
+static int spoolss_s_DeleteForm(void *, ndr_xa_t *);
 static int spoolss_s_EnumForms(void *, ndr_xa_t *);
+static int spoolss_s_AddMonitor(void *, ndr_xa_t *);
+static int spoolss_s_DeleteMonitor(void *, ndr_xa_t *);
+static int spoolss_s_DeletePort(void *, ndr_xa_t *);
+static int spoolss_s_AddPortEx(void *, ndr_xa_t *);
+static int spoolss_s_SetPort(void *, ndr_xa_t *);
 static int spoolss_s_stub(void *, ndr_xa_t *);
 
 static ndr_stub_table_t spoolss_stub_table[] = {
@@ -138,7 +141,14 @@ static ndr_stub_table_t spoolss_stub_table[] = {
 	{ spoolss_s_ScheduleJob,    	SPOOLSS_OPNUM_ScheduleJob },
 	{ spoolss_s_GetPrinterData,	SPOOLSS_OPNUM_GetPrinterData },
 	{ spoolss_s_ClosePrinter,	SPOOLSS_OPNUM_ClosePrinter },
+	{ spoolss_s_AddForm,		SPOOLSS_OPNUM_AddForm },
+	{ spoolss_s_DeleteForm,		SPOOLSS_OPNUM_DeleteForm },
 	{ spoolss_s_EnumForms,		SPOOLSS_OPNUM_EnumForms },
+	{ spoolss_s_AddMonitor,		SPOOLSS_OPNUM_AddMonitor },
+	{ spoolss_s_DeleteMonitor,	SPOOLSS_OPNUM_DeleteMonitor },
+	{ spoolss_s_DeletePort,		SPOOLSS_OPNUM_DeletePort },
+	{ spoolss_s_AddPortEx,		SPOOLSS_OPNUM_AddPortEx },
+	{ spoolss_s_SetPort,		SPOOLSS_OPNUM_SetPort },
 	{ spoolss_s_stub,		SPOOLSS_OPNUM_GetPrinterDriver2 },
 	{ spoolss_s_stub,		SPOOLSS_OPNUM_FCPN },
 	{ spoolss_s_stub,		SPOOLSS_OPNUM_ReplyOpenPrinter },
@@ -168,32 +178,66 @@ static ndr_service_t spoolss_service = {
 	spoolss_stub_table		/* stub_table */
 };
 
-/*
- * Defer calling spoolss_cups_init() until something actually
- * needs access to CUPS due to the libcups dependency on OpenSSL.
- * OpenSSL is not MT-safe and initializing CUPS here can crash
- * OpenSSL if it collides with other threads that are in other
- * libraries that are attempting to use OpenSSL.
- */
 void
 spoolss_initialize(void)
 {
+	if (!spoolss_splist.sp_initialized) {
+		list_create(&spoolss_splist.sp_list,
+		    sizeof (smb_spooldoc_t),
+		    offsetof(smb_spooldoc_t, sd_lnd));
+		spoolss_splist.sp_initialized = 1;
+	}
+
+	spoolss_copyfile_callback = NULL;
+
 	(void) ndr_svc_register(&spoolss_service);
 }
 
 void
 spoolss_finalize(void)
 {
-	spoolss_cups_fini();
+	spoolss_copyfile_callback = NULL;
+}
+
+/*
+ * Register a copyfile callback that the spoolss service can use to
+ * copy files to the spool directory.
+ *
+ * Set a null pointer to disable the copying of files to the spool
+ * directory.
+ */
+void
+spoolss_register_copyfile(spoolss_copyfile_t copyfile)
+{
+	spoolss_copyfile_callback = copyfile;
+}
+
+static void
+spoolss_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
+    char *docname)
+{
+	if (spoolss_copyfile_callback != NULL)
+		(*spoolss_copyfile_callback)(ipaddr, username, path, docname);
 }
 
 static int
 spoolss_s_OpenPrinter(void *arg, ndr_xa_t *mxa)
 {
 	struct spoolss_OpenPrinter *param = arg;
-	ndr_hdid_t *id;
+	char		*name = (char *)param->printer_name;
+	ndr_hdid_t	*id;
 
-	if ((id = ndr_hdalloc(mxa, 0)) == NULL) {
+	if (name != NULL && *name != '\0') {
+		if (strspn(name, "\\") > 2) {
+			bzero(&param->handle, sizeof (spoolss_handle_t));
+			param->status = ERROR_INVALID_PRINTER_NAME;
+			return (NDR_DRC_OK);
+		}
+
+		smb_tracef("spoolss_s_OpenPrinter: %s", name);
+	}
+
+	if ((id = ndr_hdalloc(mxa, NULL)) == NULL) {
 		bzero(&param->handle, sizeof (spoolss_handle_t));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
 		return (NDR_DRC_OK);
@@ -201,7 +245,6 @@ spoolss_s_OpenPrinter(void *arg, ndr_xa_t *mxa)
 
 	bcopy(id, &param->handle, sizeof (spoolss_handle_t));
 	param->status = 0;
-
 	return (NDR_DRC_OK);
 }
 
@@ -228,99 +271,9 @@ spoolss_s_EndPagePrinter(void *arg, ndr_xa_t *mxa)
 }
 
 /*
- *
- * adds new spool doc to the tail.  used by windows
- * XP and 2000 only
- *
- * Return values
- *      smb_spooldoc_t - NULL if not found
- */
-
-static void
-spoolss_add_spool_doc(smb_spooldoc_t *sp)
-{
-	(void) rw_wrlock(&spoolss_splist.sp_rwl);
-	if (!spoolss_splist.sp_initialized) {
-		list_create(&spoolss_splist.sp_list,
-		    sizeof (smb_spooldoc_t),
-		    offsetof(smb_spooldoc_t, sd_lnd));
-		spoolss_splist.sp_initialized = 1;
-	}
-	list_insert_tail(&spoolss_splist.sp_list, sp);
-	spoolss_splist.sp_cnt++;
-	(void) rw_unlock(&spoolss_splist.sp_rwl);
-}
-
-/*
- *
- * finds a completed spool doc using the RPC handle
- * as the key, then prints the doc
- *
- * XP and 2000 only
- *
- */
-
-static void
-spoolss_find_doc_and_print(ndr_hdid_t *handle)
-{
-	smb_spooldoc_t *sp;
-
-	if (!spoolss_splist.sp_initialized) {
-		syslog(LOG_ERR, "spoolss_find_doc_and_print: not initialized");
-		return;
-	}
-	(void) rw_wrlock(&spoolss_splist.sp_rwl);
-	sp = list_head(&spoolss_splist.sp_list);
-	while (sp != NULL) {
-		/*
-		 * search the spooldoc list for a matching RPC handle
-		 * and use the info to pass to cups for printing
-		 */
-		if (!memcmp(handle, &(sp->sd_handle), sizeof (ndr_hdid_t))) {
-			spoolss_copy_spool_file(&sp->sd_ipaddr,
-			    sp->sd_username, sp->sd_path, sp->sd_doc_name);
-			(void) close(sp->sd_fd);
-			list_remove(&spoolss_splist.sp_list, sp);
-			free(sp);
-			(void) rw_unlock(&spoolss_splist.sp_rwl);
-			return;
-		}
-		sp = list_next(&spoolss_splist.sp_list, sp);
-	}
-	syslog(LOG_ERR, "spoolss_find_doc_and_print: handle not found");
-	(void) rw_unlock(&spoolss_splist.sp_rwl);
-}
-
-static int
-spoolss_find_fd(ndr_hdid_t *handle)
-{
-	smb_spooldoc_t *sp;
-
-	if (!spoolss_splist.sp_initialized) {
-		syslog(LOG_ERR, "spoolss_find_fd: not initialized");
-		return (-1);
-	}
-	(void) rw_rdlock(&spoolss_splist.sp_rwl);
-	sp = list_head(&spoolss_splist.sp_list);
-	while (sp != NULL) {
-		/*
-		 * check for a matching rpc handle in the
-		 * spooldoc list
-		 */
-		if (!memcmp(handle, &(sp->sd_handle), sizeof (ndr_hdid_t))) {
-			(void) rw_unlock(&spoolss_splist.sp_rwl);
-			return (sp->sd_fd);
-		}
-		sp = list_next(&spoolss_splist.sp_list, sp);
-	}
-	syslog(LOG_ERR, "spoolss_find_fd: handle not found");
-	(void) rw_unlock(&spoolss_splist.sp_rwl);
-	return (-1);
-}
-
-/*
  * Windows XP and 2000 use this mechanism to write spool files.
- * Creates a spool file fd to be used by spoolss_s_WritePrinter.
+ * Create a spool file fd to be used by spoolss_s_WritePrinter
+ * and add it to the tail of the spool list.
  */
 static int
 spoolss_s_StartDocPrinter(void *arg, ndr_xa_t *mxa)
@@ -335,7 +288,7 @@ spoolss_s_StartDocPrinter(void *arg, ndr_xa_t *mxa)
 	int fd;
 
 	if (ndr_hdlookup(mxa, id) == NULL) {
-		syslog(LOG_ERR, "spoolss_s_StartDocPrinter: invalid handle");
+		smb_tracef("spoolss_s_StartDocPrinter: invalid handle");
 		param->status = ERROR_INVALID_HANDLE;
 		return (NDR_DRC_OK);
 	}
@@ -346,7 +299,7 @@ spoolss_s_StartDocPrinter(void *arg, ndr_xa_t *mxa)
 	}
 
 	if ((rc = smb_shr_get(SMB_SHARE_PRINT, &si)) != NERR_Success) {
-		syslog(LOG_INFO, "spoolss_s_StartDocPrinter: %s error=%d",
+		smb_tracef("spoolss_s_StartDocPrinter: %s error=%d",
 		    SMB_SHARE_PRINT, rc);
 		param->status = rc;
 		return (NDR_DRC_OK);
@@ -372,8 +325,8 @@ spoolss_s_StartDocPrinter(void *arg, ndr_xa_t *mxa)
 	spfile->sd_ipaddr = mxa->pipe->np_user.ui_ipaddr;
 	(void) strlcpy((char *)spfile->sd_username,
 	    mxa->pipe->np_user.ui_account, MAXNAMELEN);
-	(void) memcpy(&spfile->sd_handle, &param->handle,
-	    sizeof (rpc_handle_t));
+	(void) memcpy(&spfile->sd_handle, &param->handle, sizeof (ndr_hdid_t));
+
 	/*
 	 *	write temporary spool file to print$
 	 */
@@ -383,14 +336,22 @@ spoolss_s_StartDocPrinter(void *arg, ndr_xa_t *mxa)
 
 	fd = open(g_path, O_CREAT | O_RDWR, 0600);
 	if (fd == -1) {
-		syslog(LOG_INFO, "spoolss_s_StartDocPrinter: %s: %s",
+		smb_tracef("spoolss_s_StartDocPrinter: %s: %s",
 		    g_path, strerror(errno));
 		param->status = ERROR_OPEN_FAILED;
 		free(spfile);
 	} else {
 		(void) strlcpy((char *)spfile->sd_path, g_path, MAXPATHLEN);
 		spfile->sd_fd = (uint16_t)fd;
-		spoolss_add_spool_doc(spfile);
+
+		/*
+		 * Add the document to the spool list.
+		 */
+		(void) rw_wrlock(&spoolss_splist.sp_rwl);
+		list_insert_tail(&spoolss_splist.sp_list, spfile);
+		spoolss_splist.sp_cnt++;
+		(void) rw_unlock(&spoolss_splist.sp_rwl);
+
 		/*
 		 * JobId isn't used now, but if printQ management is added
 		 * this will have to be incremented per job submitted.
@@ -403,16 +364,44 @@ spoolss_s_StartDocPrinter(void *arg, ndr_xa_t *mxa)
 
 /*
  * Windows XP and 2000 use this mechanism to write spool files
+ * Search the spooldoc list for a matching RPC handle and pass
+ * the spool the file for printing.
  */
-
-/*ARGSUSED*/
 static int
 spoolss_s_EndDocPrinter(void *arg, ndr_xa_t *mxa)
 {
 	struct spoolss_EndDocPrinter *param = arg;
+	ndr_hdid_t	*id = (ndr_hdid_t *)&param->handle;
+	smb_spooldoc_t	*sp;
 
-	spoolss_find_doc_and_print((ndr_hdid_t *)&param->handle);
-	param->status = ERROR_SUCCESS;
+	if (ndr_hdlookup(mxa, id) == NULL) {
+		smb_tracef("spoolss_s_EndDocPrinter: invalid handle");
+		param->status = ERROR_INVALID_HANDLE;
+		return (NDR_DRC_OK);
+	}
+
+	param->status = ERROR_INVALID_HANDLE;
+	(void) rw_wrlock(&spoolss_splist.sp_rwl);
+
+	sp = list_head(&spoolss_splist.sp_list);
+	while (sp != NULL) {
+		if (!memcmp(id, &(sp->sd_handle), sizeof (ndr_hdid_t))) {
+			spoolss_copyfile(&sp->sd_ipaddr,
+			    sp->sd_username, sp->sd_path, sp->sd_doc_name);
+			(void) close(sp->sd_fd);
+			list_remove(&spoolss_splist.sp_list, sp);
+			free(sp);
+			param->status = ERROR_SUCCESS;
+			break;
+		}
+
+		sp = list_next(&spoolss_splist.sp_list, sp);
+	}
+
+	(void) rw_unlock(&spoolss_splist.sp_rwl);
+
+	if (param->status != ERROR_SUCCESS)
+		smb_tracef("spoolss_s_EndDocPrinter: document not found");
 	return (NDR_DRC_OK);
 }
 
@@ -440,8 +429,8 @@ static int
 spoolss_s_ClosePrinter(void *arg, ndr_xa_t *mxa)
 {
 	struct spoolss_ClosePrinter *param = arg;
-	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
-	ndr_handle_t *hd;
+	ndr_hdid_t	*id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t	*hd;
 
 	if ((hd = ndr_hdlookup(mxa, id)) != NULL) {
 		free(hd->nh_data);
@@ -454,20 +443,110 @@ spoolss_s_ClosePrinter(void *arg, ndr_xa_t *mxa)
 	return (NDR_DRC_OK);
 }
 
-/*ARGSUSED*/
-int
+static int
+spoolss_s_AddForm(void *arg, ndr_xa_t *mxa)
+{
+	struct spoolss_AddForm *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+
+	if (ndr_hdlookup(mxa, id) == NULL) {
+		bzero(param, sizeof (struct spoolss_AddForm));
+		param->status = ERROR_INVALID_HANDLE;
+		return (NDR_DRC_OK);
+	}
+
+	bzero(param, sizeof (struct spoolss_AddForm));
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+}
+
+static int
+spoolss_s_DeleteForm(void *arg, ndr_xa_t *mxa)
+{
+	struct spoolss_DeleteForm *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+
+	if (ndr_hdlookup(mxa, id) == NULL) {
+		bzero(param, sizeof (struct spoolss_DeleteForm));
+		param->status = ERROR_INVALID_HANDLE;
+		return (NDR_DRC_OK);
+	}
+
+	bzero(param, sizeof (struct spoolss_DeleteForm));
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+}
+
+static int
 spoolss_s_EnumForms(void *arg, ndr_xa_t *mxa)
 {
 	struct spoolss_EnumForms *param = arg;
-	DWORD status = ERROR_SUCCESS;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 
-	param->status = status;
+	if (ndr_hdlookup(mxa, id) == NULL) {
+		bzero(param, sizeof (struct spoolss_EnumForms));
+		param->status = ERROR_INVALID_HANDLE;
+		return (NDR_DRC_OK);
+	}
+
+	bzero(param, sizeof (struct spoolss_EnumForms));
+	param->status = ERROR_SUCCESS;
 	param->needed = 0;
 	return (NDR_DRC_OK);
 }
 
 /*ARGSUSED*/
-int
+static int
+spoolss_s_AddMonitor(void *arg, ndr_xa_t *mxa)
+{
+	struct spoolss_AddMonitor *param = arg;
+
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+}
+
+/*ARGSUSED*/
+static int
+spoolss_s_DeleteMonitor(void *arg, ndr_xa_t *mxa)
+{
+	struct spoolss_DeleteMonitor *param = arg;
+
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+}
+
+/*ARGSUSED*/
+static int
+spoolss_s_DeletePort(void *arg, ndr_xa_t *mxa)
+{
+	struct spoolss_DeletePort *param = arg;
+
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+}
+
+/*ARGSUSED*/
+static int
+spoolss_s_AddPortEx(void *arg, ndr_xa_t *mxa)
+{
+	struct spoolss_AddPortEx *param = arg;
+
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+}
+
+/*ARGSUSED*/
+static int
+spoolss_s_SetPort(void *arg, ndr_xa_t *mxa)
+{
+	struct spoolss_SetPort *param = arg;
+
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+}
+
+/*ARGSUSED*/
+static int
 spoolss_s_EnumJobs(void *arg, ndr_xa_t *mxa)
 {
 	struct spoolss_EnumJobs *param = arg;
@@ -510,7 +589,7 @@ static int
 spoolss_s_ScheduleJob(void *arg, ndr_xa_t *mxa)
 {
 	struct spoolss_ScheduleJob *param = arg;
-	DWORD status = SPOOLSS_JOB_NOT_ISSUED;
+	DWORD status = ERROR_SPL_NO_ADDJOB;
 
 	param->status = status;
 	return (NDR_DRC_OK);
@@ -552,20 +631,20 @@ spoolss_s_WritePrinter(void *arg, ndr_xa_t *mxa)
 	if (ndr_hdlookup(mxa, id) == NULL) {
 		param->written = 0;
 		param->status = ERROR_INVALID_HANDLE;
-		syslog(LOG_ERR, "spoolss_s_WritePrinter: invalid handle");
+		smb_tracef("spoolss_s_WritePrinter: invalid handle");
 		return (NDR_DRC_OK);
 	}
 
-	if ((spfd = spoolss_find_fd(id)) < 0) {
+	if ((spfd = spoolss_find_document(id)) < 0) {
 		param->written = 0;
 		param->status = ERROR_INVALID_HANDLE;
-		syslog(LOG_ERR, "spoolss_s_WritePrinter: cannot find fd");
+		smb_tracef("spoolss_s_WritePrinter: document not found");
 		return (NDR_DRC_OK);
 	}
 
 	written = write(spfd, param->pBuf, param->BufCount);
 	if (written < param->BufCount) {
-		syslog(LOG_ERR, "spoolss_s_WritePrinter: write failed");
+		smb_tracef("spoolss_s_WritePrinter: write failed");
 		param->written = 0;
 		param->status = ERROR_CANTWRITE;
 		return (NDR_DRC_OK);
@@ -577,274 +656,182 @@ spoolss_s_WritePrinter(void *arg, ndr_xa_t *mxa)
 }
 
 /*
- * All versions of windows use this function to print
- * spool files via the cups interface
+ * Find a document by RPC handle in the spool list and return the fd.
  */
-
-void
-spoolss_copy_spool_file(smb_inaddr_t *ipaddr, char *username,
-    char *path, char *doc_name)
+static int
+spoolss_find_document(ndr_hdid_t *handle)
 {
-	smb_cups_ops_t	*cups;
-	int		ret = 1;		/* Return value */
-	http_t		*http = NULL;		/* HTTP connection to server */
-	ipp_t		*request = NULL;	/* IPP Request */
-	ipp_t		*response = NULL;	/* IPP Response */
-	cups_lang_t	*language = NULL;	/* Default language */
-	char		uri[HTTP_MAX_URI];	/* printer-uri attribute */
-	char		new_jobname[SPOOLSS_PJOBLEN];
-	struct		spoolss_printjob pjob;
-	char 		clientname[INET6_ADDRSTRLEN];
-	struct stat 	sbuf;
+	smb_spooldoc_t *sp;
 
-	if (stat(path, &sbuf)) {
-		syslog(LOG_INFO, "spoolss_copy_spool_file: %s: %s",
-		    path, strerror(errno));
-		return;
-	}
+	(void) rw_rdlock(&spoolss_splist.sp_rwl);
 
-	/*
-	 * Remove zero size files and return; these were inadvertantly
-	 * created by XP or 2000.
-	 */
-	if (sbuf.st_blocks == 0) {
-		if (remove(path))
-			syslog(LOG_INFO,
-			    "spoolss_copy_spool_file: cannot remove %s", path);
-		return;
-	}
-
-	if ((cups = spoolss_cups_ops()) == NULL)
-		return;
-
-	if ((http = cups->httpConnect("localhost", 631)) == NULL) {
-		syslog(LOG_INFO, "spoolss_copy_spool_file: cupsd not running");
-		return;
-	}
-
-	if ((request = cups->ippNew()) == NULL) {
-		syslog(LOG_INFO, "spoolss_copy_spool_file: ipp not running");
-		return;
-	}
-	request->request.op.operation_id = IPP_PRINT_JOB;
-	request->request.op.request_id = 1;
-	language = cups->cupsLangDefault();
-
-	cups->ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_CHARSET,
-	    "attributes-charset", NULL, cups->cupsLangEncoding(language));
-
-	cups->ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_LANGUAGE,
-	    "attributes-natural-language", NULL, language->language);
-
-	(void) snprintf(uri, sizeof (uri), "ipp://localhost/printers/%s",
-	    SPOOLSS_PRINTER);
-	pjob.pj_pid = pthread_self();
-	pjob.pj_sysjob = 10;
-	(void) strlcpy(pjob.pj_filename, path, SPOOLSS_PJOBLEN);
-	pjob.pj_start_time = time(NULL);
-	pjob.pj_status = 2;
-	pjob.pj_size = sbuf.st_blocks * 512;
-	pjob.pj_page_count = 1;
-	pjob.pj_isspooled = B_TRUE;
-	pjob.pj_jobnum = spoolss_jobnum;
-
-	(void) strlcpy(pjob.pj_jobname, doc_name, SPOOLSS_PJOBLEN);
-	(void) strlcpy(pjob.pj_username, username, SPOOLSS_PJOBLEN);
-	(void) strlcpy(pjob.pj_queuename, SPOOLSS_CUPS_SPOOL_DIR,
-	    SPOOLSS_PJOBLEN);
-	cups->ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI,
-	    "printer-uri", NULL, uri);
-
-	cups->ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME,
-	    "requesting-user-name", NULL, pjob.pj_username);
-
-	if (smb_inet_ntop(ipaddr, clientname,
-	    SMB_IPSTRLEN(ipaddr->a_family)) == NULL) {
-		syslog(LOG_INFO, "spoolss_copy_spool_file: %s: unknown client",
-		    clientname);
-		goto out;
-	}
-	cups->ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME,
-	    "job-originating-host-name", NULL, clientname);
-
-	(void) snprintf(new_jobname, SPOOLSS_PJOBLEN, "%s%d",
-	    SPOOLSS_FN_PREFIX, pjob.pj_jobnum);
-	cups->ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME,
-	    "job-name", NULL, new_jobname);
-
-	(void) snprintf(uri, sizeof (uri) - 1, "/printers/%s", SPOOLSS_PRINTER);
-
-	response = cups->cupsDoFileRequest(http, request, uri,
-	    pjob.pj_filename);
-	if (response != NULL) {
-		if (response->request.status.status_code >= IPP_OK_CONFLICT) {
-			syslog(LOG_ERR,
-			    "spoolss_copy_spool_file: file print %s: %s",
-			    SPOOLSS_PRINTER,
-			    cups->ippErrorString(cups->cupsLastError()));
-		} else {
-			atomic_inc_32(&spoolss_jobnum);
-			ret = 0;
+	sp = list_head(&spoolss_splist.sp_list);
+	while (sp != NULL) {
+		if (!memcmp(handle, &(sp->sd_handle), sizeof (ndr_hdid_t))) {
+			(void) rw_unlock(&spoolss_splist.sp_rwl);
+			return (sp->sd_fd);
 		}
-	} else {
-		syslog(LOG_ERR,
-		    "spoolss_copy_spool_file: unable to print file to %s",
-		    cups->ippErrorString(cups->cupsLastError()));
+		sp = list_next(&spoolss_splist.sp_list, sp);
 	}
 
-	if (ret == 0)
-		(void) unlink(pjob.pj_filename);
-
-out:
-	if (response)
-		cups->ippDelete(response);
-
-	if (language)
-		cups->cupsLangFree(language);
-
-	if (http)
-		cups->httpClose(http);
+	(void) rw_unlock(&spoolss_splist.sp_rwl);
+	return (-1);
 }
 
+/*
+ * GetPrinterData is used t obtain values from the registry for a
+ * printer or a print server.  See [MS-RPRN] for value descriptions.
+ * The registry returns ERROR_FILE_NOT_FOUND for unknown keys.
+ */
 static int
 spoolss_s_GetPrinterData(void *arg, ndr_xa_t *mxa)
 {
+	static spoolss_winreg_t	reg[] = {
+		{ "ChangeId",			0x0050acf2 },
+		{ "W3SvcInstalled",		0x00000000 },
+		{ "BeepEnabled",		0x00000000 },
+		{ "EventLog",			0x0000001f },
+		{ "NetPopup",			0x00000000 },
+		{ "NetPopupToComputer",		0x00000000 },
+		{ "MajorVersion",		0x00000003 },
+		{ "MinorVersion",		0x00000000 },
+		{ "DsPresent",			0x00000000 }
+	};
+
 	struct spoolss_GetPrinterData *param = arg;
-	DWORD status = ERROR_SUCCESS;
+	char			*name = (char *)param->pValueName;
+	char			buf[MAXPATHLEN];
+	static uint8_t		reserved_buf[4];
+	spoolss_winreg_t	*rp;
+	smb_share_t		si;
+	smb_version_t		*osversion;
+	struct utsname		sysname;
+	smb_wchar_t		*wcs;
+	uint32_t		value;
+	uint32_t		status;
+	int			wcslen;
+	int			i;
 
-	if (param->Size > 0) {
-		param->Buf = NDR_NEWN(mxa, char, param->Size);
-		bzero(param->Buf, param->Size);
-	} else {
-		param->Buf = NDR_NEWN(mxa, uint32_t, 1);
-		param->Buf[0] = 1;
-		param->Buf[1] = 1;
-		param->Buf[2] = 2;
-		param->Buf[3] = 2;
+	if (name == NULL || *name == '\0') {
+		status = ERROR_FILE_NOT_FOUND;
+		goto report_error;
 	}
 
-	/*
-	 * Increment pType if the Printer Data changes
-	 * as specified by Microsoft documentation
-	 */
-	param->pType = 1;
-	if (strcasecmp((char *)param->pValueName, "ChangeId") == 0) {
-		param->pType = 4;
-		param->Buf[3] = 0x00;
-		param->Buf[2] = 0x50;
-		param->Buf[1] = 0xac;
-		param->Buf[0] = 0xf2;
-	} else if (strcasecmp((char *)param->pValueName,
-	    "UISingleJobStatusString") == 0) {
-		status = ERROR_FILE_NOT_FOUND;
-	} else if (strcasecmp((char *)param->pValueName,
-	    "W3SvcInstalled") == 0) {
-		status = ERROR_FILE_NOT_FOUND;
-	} else if (strcasecmp((char *)param->pValueName,
-	    "PrintProcCaps_NT EMF 1.008") == 0) {
-		status = ERROR_FILE_NOT_FOUND;
-	} else if (strcasecmp((char *)param->pValueName, "OSVersion") == 0) {
-		param->Buf = NDR_NEWN(mxa, char, param->Size);
-		bzero(param->Buf, param->Size);
-		param->Buf[0] = 0x14;
-		param->Buf[1] = 0x01;
-		param->Buf[4] = 0x05;
-		param->Buf[12] = 0x93;
-		param->Buf[13] = 0x08;
+	for (i = 0; i < sizeof (reg) / sizeof (reg[0]); ++i) {
+		param->pType = WINREG_DWORD;
+		param->Needed = sizeof (uint32_t);
+		rp = &reg[i];
+
+		if (strcasecmp(name, rp->name) != 0)
+			continue;
+
+		if (param->Size < sizeof (uint32_t)) {
+			param->Size = 0;
+			goto need_more_data;
+		}
+
+		if ((param->Buf = NDR_NEW(mxa, uint32_t)) == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			goto report_error;
+		}
+
+		value = rp->value;
+
+		if ((strcasecmp(name, "DsPresent") == 0) &&
+		    (smb_config_get_secmode() == SMB_SECMODE_DOMAIN))
+			value = 0x00000001;
+
+		bcopy(&value, param->Buf, sizeof (uint32_t));
+		param->Size = sizeof (uint32_t);
+		param->status = ERROR_SUCCESS;
+		return (NDR_DRC_OK);
 	}
+
+	if (strcasecmp(name, "OSVersion") == 0) {
+		param->pType = WINREG_BINARY;
+		param->Needed = sizeof (smb_version_t);
+
+		if (param->Size < sizeof (smb_version_t)) {
+			param->Size = sizeof (smb_version_t);
+			goto need_more_data;
+		}
+
+		if ((osversion = NDR_NEW(mxa, smb_version_t)) == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			goto report_error;
+		}
+
+		smb_config_get_version(osversion);
+		param->Buf = (uint8_t *)osversion;
+		param->status = ERROR_SUCCESS;
+		return (NDR_DRC_OK);
+	}
+
+	if (strcasecmp(name, "DNSMachineName") == 0) {
+		param->pType = WINREG_SZ;
+		buf[0] = '\0';
+		(void) smb_getfqhostname(buf, MAXHOSTNAMELEN);
+		goto encode_string;
+	}
+
+	if (strcasecmp(name, "DefaultSpoolDirectory") == 0) {
+		param->pType = WINREG_SZ;
+		buf[0] = '\0';
+
+		if (smb_shr_get(SMB_SHARE_PRINT, &si) != NERR_Success) {
+			status = ERROR_FILE_NOT_FOUND;
+			goto report_error;
+		}
+
+		(void) snprintf(buf, MAXPATHLEN, "C:/%s", si.shr_path);
+		(void) strcanon(buf, "/\\");
+		(void) strsubst(buf, '/', '\\');
+		goto encode_string;
+	}
+
+	if (strcasecmp(name, "Architecture") == 0) {
+		param->pType = WINREG_SZ;
+
+		if (uname(&sysname) < 0)
+			(void) strlcpy(buf, "Solaris", MAXPATHLEN);
+		else
+			(void) snprintf(buf, MAXPATHLEN, "%s %s",
+			    sysname.sysname, sysname.machine);
+
+		goto encode_string;
+	}
+
+	status = ERROR_FILE_NOT_FOUND;
+
+report_error:
+	bzero(param, sizeof (struct spoolss_GetPrinterData));
+	param->Buf = reserved_buf;
 	param->status = status;
-	param->Needed = param->Size;
 	return (NDR_DRC_OK);
-}
 
-smb_cups_ops_t *
-spoolss_cups_ops(void)
-{
-	if (spoolss_cups_init() != 0)
-		return (NULL);
-
-	return (&smb_cups);
-}
-
-static int
-spoolss_cups_init(void)
-{
-	(void) mutex_lock(&spoolss_cups_mutex);
-
-	if (smb_cups.cups_hdl != NULL) {
-		(void) mutex_unlock(&spoolss_cups_mutex);
-		return (0);
+encode_string:
+	wcslen = smb_wcequiv_strlen(buf) + sizeof (smb_wchar_t);
+	if (param->Size < wcslen) {
+		param->Needed = wcslen;
+		goto need_more_data;
 	}
 
-	if ((smb_cups.cups_hdl = dlopen("libcups.so.2", RTLD_NOW)) == NULL) {
-		(void) mutex_unlock(&spoolss_cups_mutex);
-		syslog(LOG_DEBUG, "spoolss_cups_init: cannot open libcups");
-		return (ENOENT);
+	if ((wcs = NDR_MALLOC(mxa, wcslen)) == NULL) {
+		status = ERROR_NOT_ENOUGH_MEMORY;
+		goto report_error;
 	}
 
-	smb_cups.cupsLangDefault =
-	    (cups_lang_t *(*)())dlsym(smb_cups.cups_hdl, "cupsLangDefault");
-	smb_cups.cupsLangEncoding = (const char *(*)(cups_lang_t *))
-	    dlsym(smb_cups.cups_hdl, "cupsLangEncoding");
-	smb_cups.cupsDoFileRequest =
-	    (ipp_t *(*)(http_t *, ipp_t *, const char *, const char *))
-	    dlsym(smb_cups.cups_hdl, "cupsDoFileRequest");
-	smb_cups.cupsLastError = (ipp_status_t (*)())
-	    dlsym(smb_cups.cups_hdl, "cupsLastError");
-	smb_cups.cupsLangFree = (void (*)(cups_lang_t *))
-	    dlsym(smb_cups.cups_hdl, "cupsLangFree");
-	smb_cups.cupsGetDests = (int (*)(cups_dest_t **))
-	    dlsym(smb_cups.cups_hdl, "cupsGetDests");
-	smb_cups.cupsFreeDests = (void (*)(int, cups_dest_t *))
-	    dlsym(smb_cups.cups_hdl, "cupsFreeDests");
+	(void) ndr_mbstowcs(NULL, wcs, buf, wcslen);
+	param->Buf = (uint8_t *)wcs;
+	param->Needed = wcslen;
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
 
-	smb_cups.httpClose = (void (*)(http_t *))
-	    dlsym(smb_cups.cups_hdl, "httpClose");
-	smb_cups.httpConnect = (http_t *(*)(const char *, int))
-	    dlsym(smb_cups.cups_hdl, "httpConnect");
-
-	smb_cups.ippNew = (ipp_t *(*)())dlsym(smb_cups.cups_hdl, "ippNew");
-	smb_cups.ippDelete = (void (*)())dlsym(smb_cups.cups_hdl, "ippDelete");
-	smb_cups.ippErrorString = (char *(*)())
-	    dlsym(smb_cups.cups_hdl, "ippErrorString");
-	smb_cups.ippAddString = (ipp_attribute_t *(*)())
-	    dlsym(smb_cups.cups_hdl, "ippAddString");
-
-	if (smb_cups.cupsLangDefault == NULL ||
-	    smb_cups.cupsLangEncoding == NULL ||
-	    smb_cups.cupsDoFileRequest == NULL ||
-	    smb_cups.cupsLastError == NULL ||
-	    smb_cups.cupsLangFree == NULL ||
-	    smb_cups.cupsGetDests == NULL ||
-	    smb_cups.cupsFreeDests == NULL ||
-	    smb_cups.ippNew == NULL ||
-	    smb_cups.httpClose == NULL ||
-	    smb_cups.httpConnect == NULL ||
-	    smb_cups.ippDelete == NULL ||
-	    smb_cups.ippErrorString == NULL ||
-	    smb_cups.ippAddString == NULL) {
-		smb_dlclose(smb_cups.cups_hdl);
-		smb_cups.cups_hdl = NULL;
-		(void) mutex_unlock(&spoolss_cups_mutex);
-		syslog(LOG_DEBUG, "spoolss_cups_init: cannot load libcups");
-		return (ENOENT);
-	}
-
-	(void) mutex_unlock(&spoolss_cups_mutex);
-	return (0);
-}
-
-static void
-spoolss_cups_fini(void)
-{
-	(void) mutex_lock(&spoolss_cups_mutex);
-
-	if (smb_cups.cups_hdl != NULL) {
-		smb_dlclose(smb_cups.cups_hdl);
-		smb_cups.cups_hdl = NULL;
-	}
-
-	(void) mutex_unlock(&spoolss_cups_mutex);
+need_more_data:
+	param->Size = 0;
+	param->Buf = reserved_buf;
+	param->status = ERROR_MORE_DATA;
+	return (NDR_DRC_OK);
 }
 
 void
@@ -864,73 +851,68 @@ smb_rpc_off(char *dst, char *src, uint32_t *offset, uint32_t *outoffset)
 int
 spoolss_s_GetPrinter(void *arg, ndr_xa_t *mxa)
 {
-	struct spoolss_GetPrinter *param = arg;
-	struct spoolss_GetPrinter0 *pinfo0;
-	struct spoolss_GetPrinter1 *pinfo1;
-	struct spoolss_GetPrinter2 *pinfo2;
-	struct spoolss_DeviceMode *devmode2;
-	DWORD status = ERROR_SUCCESS;
-	char *wname;
-	uint32_t offset;
-	smb_inaddr_t ipaddr;
-	struct hostent *h;
-	char hname[MAXHOSTNAMELEN];
-	char soutbuf[MAXNAMELEN];
-	char poutbuf[MAXNAMELEN];
-	char ipstr[INET6_ADDRSTRLEN];
-	int error;
-	uint8_t *tmpbuf;
+	struct spoolss_GetPrinter	*param = arg;
+	struct spoolss_GetPrinter0	*pinfo0;
+	struct spoolss_GetPrinter1	*pinfo1;
+	struct spoolss_GetPrinter2	*pinfo2;
+	struct spoolss_DeviceMode	*devmode2;
+	ndr_hdid_t	*id = (ndr_hdid_t *)&param->handle;
+	spoolss_sd_t	secdesc;
+	char		server[MAXNAMELEN];
+	char		printer[MAXNAMELEN];
+	DWORD		status = ERROR_SUCCESS;
+	char		*wname;
+	uint32_t	offset;
+	uint8_t		*tmpbuf;
 
-	if (param->BufCount == 0) {
-		status = ERROR_INSUFFICIENT_BUFFER;
+	if (ndr_hdlookup(mxa, id) == NULL) {
+		status = ERROR_INVALID_HANDLE;
 		goto error_out;
 	}
-	param->Buf = NDR_NEWN(mxa, char, param->BufCount);
+
+	if (spoolss_getservername(server, MAXNAMELEN) != 0) {
+		status = ERROR_INTERNAL_ERROR;
+		goto error_out;
+	}
+
+	(void) snprintf(printer, MAXNAMELEN, "%s\\%s", server, SPOOLSS_PRINTER);
+
+	switch (param->switch_value) {
+	case 0:
+	case 1:
+		param->needed = 460;
+		break;
+	case 2:
+		param->needed = 712;
+		break;
+	default:
+		status = ERROR_INVALID_LEVEL;
+		goto error_out;
+	}
+
+	if (param->BufCount < param->needed) {
+		param->BufCount = 0;
+		param->Buf = NULL;
+		param->status = ERROR_INSUFFICIENT_BUFFER;
+		return (NDR_DRC_OK);
+	}
+
+	if ((param->Buf = NDR_MALLOC(mxa, param->BufCount)) == NULL) {
+		status = ERROR_NOT_ENOUGH_MEMORY;
+		goto error_out;
+	}
+
 	bzero(param->Buf, param->BufCount);
+	wname = (char *)param->Buf;
+	offset = param->needed;
+
 	switch (param->switch_value) {
 	case 0:
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
 		pinfo0 = (struct spoolss_GetPrinter0 *)param->Buf;
-		break;
-	case 1:
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		pinfo1 = (struct spoolss_GetPrinter1 *)param->Buf;
-		break;
-	case 2:
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		pinfo2 = (struct spoolss_GetPrinter2 *)param->Buf;
-		break;
-	}
-	wname = (char *)param->Buf;
 
-	status = ERROR_INVALID_PARAMETER;
-	if (smb_gethostname(hname, MAXHOSTNAMELEN, 0) != 0) {
-		syslog(LOG_NOTICE, "spoolss_s_GetPrinter: gethostname failed");
-		goto error_out;
-	}
-	if ((h = smb_gethostbyname(hname, &error)) == NULL) {
-		syslog(LOG_NOTICE,
-		    "spoolss_s_GetPrinter: gethostbyname failed");
-		goto error_out;
-	}
-	bcopy(h->h_addr, &ipaddr, h->h_length);
-	ipaddr.a_family = h->h_addrtype;
-	freehostent(h);
-	if (smb_inet_ntop(&ipaddr, ipstr, SMB_IPSTRLEN(ipaddr.a_family))
-	    == NULL) {
-		syslog(LOG_NOTICE, "spoolss_s_GetPrinter: inet_ntop failed");
-		goto error_out;
-	}
-	status = ERROR_SUCCESS;
-	(void) snprintf(poutbuf, MAXNAMELEN, "\\\\%s\\%s",
-	    ipstr, SPOOLSS_PRINTER);
-	(void) snprintf(soutbuf, MAXNAMELEN, "\\\\%s", ipstr);
-	param->needed = 0;
-	switch (param->switch_value) {
-	case 0:
-		offset = 460;
-		smb_rpc_off(wname, "", &offset, &pinfo0->servername);
-		smb_rpc_off(wname, poutbuf, &offset, &pinfo0->printername);
+		smb_rpc_off(wname, server, &offset, &pinfo0->servername);
+		smb_rpc_off(wname, printer, &offset, &pinfo0->printername);
 		pinfo0->cjobs = 0;
 		pinfo0->total_jobs = 6;
 		pinfo0->total_bytes = 1040771;
@@ -948,16 +930,20 @@ spoolss_s_GetPrinter(void *arg, ndr_xa_t *mxa)
 		pinfo0->c_setprinter = 0;
 		break;
 	case 1:
+		/*LINTED E_BAD_PTR_CAST_ALIGN*/
+		pinfo1 = (struct spoolss_GetPrinter1 *)param->Buf;
+
 		pinfo1->flags = PRINTER_ENUM_ICON8;
-		offset = 460;
-		smb_rpc_off(wname, poutbuf, &offset, &pinfo1->flags);
-		smb_rpc_off(wname, poutbuf, &offset, &pinfo1->description);
-		smb_rpc_off(wname, poutbuf, &offset, &pinfo1->comment);
+		smb_rpc_off(wname, printer, &offset, &pinfo1->flags);
+		smb_rpc_off(wname, printer, &offset, &pinfo1->description);
+		smb_rpc_off(wname, printer, &offset, &pinfo1->comment);
 		break;
 	case 2:
-		offset = param->BufCount;
-		smb_rpc_off(wname, soutbuf, &offset, &pinfo2->servername);
-		smb_rpc_off(wname, poutbuf, &offset, &pinfo2->printername);
+		/*LINTED E_BAD_PTR_CAST_ALIGN*/
+		pinfo2 = (struct spoolss_GetPrinter2 *)param->Buf;
+
+		smb_rpc_off(wname, server, &offset, &pinfo2->servername);
+		smb_rpc_off(wname, printer, &offset, &pinfo2->printername);
 		smb_rpc_off(wname, SPOOLSS_PRINTER, &offset,
 		    &pinfo2->sharename);
 		smb_rpc_off(wname, "CIFS Printer Port", &offset,
@@ -966,11 +952,26 @@ spoolss_s_GetPrinter(void *arg, ndr_xa_t *mxa)
 		smb_rpc_off(wname, SPOOLSS_PRINTER, &offset,
 		    &pinfo2->comment);
 		smb_rpc_off(wname, "farside", &offset, &pinfo2->location);
+
+		offset -= sizeof (struct spoolss_DeviceMode);
+		pinfo2->devmode = offset;
+		/*LINTED E_BAD_PTR_CAST_ALIGN*/
+		devmode2 = (struct spoolss_DeviceMode *)(param->Buf + offset);
+
 		smb_rpc_off(wname, "farside", &offset, &pinfo2->sepfile);
 		smb_rpc_off(wname, "winprint", &offset,
 		    &pinfo2->printprocessor);
 		smb_rpc_off(wname, "RAW", &offset, &pinfo2->datatype);
-		smb_rpc_off(wname, "", &offset, &pinfo2->datatype);
+		smb_rpc_off(wname, "", &offset, &pinfo2->parameters);
+
+		status = spoolss_make_sd(mxa, &secdesc);
+		if (status == ERROR_SUCCESS) {
+			offset -= secdesc.sd_size;
+			pinfo2->secdesc = offset;
+			tmpbuf = (uint8_t *)(param->Buf + offset);
+			bcopy(secdesc.sd_buf, tmpbuf, secdesc.sd_size);
+		}
+
 		pinfo2->attributes = 0x00001048;
 		pinfo2->status = 0x00000000;
 		pinfo2->starttime = 0;
@@ -978,13 +979,10 @@ spoolss_s_GetPrinter(void *arg, ndr_xa_t *mxa)
 		pinfo2->cjobs = 0;
 		pinfo2->averageppm = 0;
 		pinfo2->defaultpriority = 0;
-		pinfo2->devmode = 568; // offset
+
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		devmode2 = (struct spoolss_DeviceMode *)(param->Buf
-		    + pinfo2->devmode);
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		(void) smb_mbstowcs(((smb_wchar_t *)
-		    (devmode2->devicename)), (const char *)poutbuf, 25);
+		(void) smb_mbstowcs((smb_wchar_t *)devmode2->devicename,
+		    printer, 32);
 		devmode2->specversion = 0x0401;
 		devmode2->driverversion = 1024;
 		devmode2->size = 220;
@@ -1004,8 +1002,8 @@ spoolss_s_GetPrinter(void *arg, ndr_xa_t *mxa)
 		devmode2->ttoption = 1;
 		devmode2->collate = 0;
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		(void) smb_mbstowcs(((smb_wchar_t *)
-		    (devmode2->formname)), (const char *)"Letter", 6);
+		(void) smb_mbstowcs((smb_wchar_t *)devmode2->formname,
+		    "Letter", 32);
 		devmode2->logpixels = 0;
 		devmode2->bitsperpel = 0;
 		devmode2->pelswidth = 0;
@@ -1020,51 +1018,92 @@ spoolss_s_GetPrinter(void *arg, ndr_xa_t *mxa)
 		devmode2->reserved2 = 0;
 		devmode2->panningwidth = 0;
 		devmode2->panningheight = 0;
-
-		pinfo2->secdesc = 84;
-		tmpbuf = (uint8_t *)(pinfo2->secdesc + (uint8_t *)param->Buf);
-		error = spoolss_s_make_sd(tmpbuf);
-		param->needed = 712;
 		break;
 
 	default:
-		syslog(LOG_NOTICE, "spoolss_s_GetPrinter: INVALID_LEVEL");
-		status = ERROR_INVALID_LEVEL;
 		break;
-
 	}
+
+	param->status = status;
+	return (NDR_DRC_OK);
+
 error_out:
+	smb_tracef("spoolss_s_GetPrinter: error %u", status);
+	bzero(param, sizeof (struct spoolss_GetPrinter));
 	param->status = status;
 	return (NDR_DRC_OK);
 }
 
-int
-spoolss_s_make_sd(uint8_t *sd_buf)
+static int
+spoolss_getservername(char *name, size_t namelen)
 {
-	smb_sd_t			sd;
-	uint32_t			status;
+	char		hostname[MAXHOSTNAMELEN];
+	char		ipstr[INET6_ADDRSTRLEN];
+	smb_inaddr_t	ipaddr;
+	struct hostent	*h;
+	const char	*p;
+	int		error;
 
-	bzero(&sd, sizeof (smb_sd_t));
-
-	if ((status = spoolss_sd_format(&sd)) == ERROR_SUCCESS) {
-		status = srvsvc_sd_set_relative(&sd, sd_buf);
-		smb_sd_term(&sd);
-		return (NDR_DRC_OK);
+	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 0) != 0) {
+		smb_tracef("spoolss_s_GetPrinter: gethostname failed");
+		return (-1);
 	}
-	syslog(LOG_NOTICE, "spoolss_s_make_sd: error status=%d", status);
-	smb_sd_term(&sd);
-	return (NDR_DRC_OK);
+
+	if ((h = smb_gethostbyname(hostname, &error)) == NULL) {
+		smb_tracef("spoolss_s_GetPrinter: gethostbyname failed: %d",
+		    error);
+		return (-1);
+	}
+
+	bcopy(h->h_addr, &ipaddr, h->h_length);
+	ipaddr.a_family = h->h_addrtype;
+	freehostent(h);
+
+	p = smb_inet_ntop(&ipaddr, ipstr, SMB_IPSTRLEN(ipaddr.a_family));
+	if (p == NULL) {
+		smb_tracef("spoolss_s_GetPrinter: inet_ntop failed");
+		return (-1);
+	}
+
+	(void) snprintf(name, namelen, "\\\\%s", ipstr);
+	return (0);
 }
 
 static uint32_t
-spoolss_sd_format(smb_sd_t *sd)
+spoolss_make_sd(ndr_xa_t *mxa, spoolss_sd_t *secdesc)
+{
+	smb_sd_t	sd;
+	uint8_t		*sd_buf;
+	uint32_t	sd_len;
+	uint32_t	status;
+
+	bzero(&sd, sizeof (smb_sd_t));
+
+	if ((status = spoolss_format_sd(&sd)) != ERROR_SUCCESS)
+		return (status);
+
+	sd_len = smb_sd_len(&sd, SMB_ALL_SECINFO);
+
+	if ((sd_buf = NDR_MALLOC(mxa, sd_len)) == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	secdesc->sd_buf = sd_buf;
+	secdesc->sd_size = sd_len;
+
+	status = srvsvc_sd_set_relative(&sd, sd_buf);
+	smb_sd_term(&sd);
+	return (status);
+}
+
+static uint32_t
+spoolss_format_sd(smb_sd_t *sd)
 {
 	smb_fssd_t	fs_sd;
 	acl_t		*acl;
 	uint32_t	status = ERROR_SUCCESS;
 
 	if (acl_fromtext("everyone@:full_set::allow", &acl) != 0) {
-		syslog(LOG_ERR, "spoolss_sd_format: NOT_ENOUGH_MEMORY");
+		smb_tracef("spoolss_format_sd: NOT_ENOUGH_MEMORY");
 		return (ERROR_NOT_ENOUGH_MEMORY);
 	}
 	smb_fssd_init(&fs_sd, SMB_ALL_SECINFO, SMB_FSSD_FLAGS_DIR);
@@ -1073,8 +1112,9 @@ spoolss_sd_format(smb_sd_t *sd)
 	fs_sd.sd_zdacl = acl;
 	fs_sd.sd_zsacl = NULL;
 
-	if (smb_sd_fromfs(&fs_sd, sd) != NT_STATUS_SUCCESS) {
-		syslog(LOG_NOTICE, "spoolss_sd_format: ACCESS_DENIED");
+	status = smb_sd_fromfs(&fs_sd, sd);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_tracef("spoolss_format_sd: %u", status);
 		status = ERROR_ACCESS_DENIED;
 	}
 	smb_fssd_term(&fs_sd);
@@ -1088,7 +1128,6 @@ spoolss_s_stub(void *arg, ndr_xa_t *mxa)
 	return (NDR_DRC_FAULT_PARAM_0_UNIMPLEMENTED);
 }
 
-/*ARGSUSED*/
 void
 fixup_spoolss_RFNPCNEX(struct spoolss_RFNPCNEX *val)
 {

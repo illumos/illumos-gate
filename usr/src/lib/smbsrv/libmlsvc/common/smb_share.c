@@ -52,7 +52,6 @@
 #include <smbsrv/smb.h>
 #include <mlsvc.h>
 #include <dfs.h>
-#include <cups/cups.h>
 
 #define	SMB_SHR_ERROR_THRESHOLD		3
 #define	SMB_SHR_CSC_BUFSZ		64
@@ -139,12 +138,10 @@ static boolean_t smb_shr_is_dot_or_dotdot(const char *);
 /*
  * sharemgr functions
  */
-static void *smb_shr_sa_loadall(void *);
 static void smb_shr_sa_loadgrp(sa_group_t);
 static uint32_t smb_shr_sa_load(sa_share_t, sa_resource_t);
 static uint32_t smb_shr_sa_loadbyname(char *);
 static uint32_t smb_shr_sa_get(sa_share_t, sa_resource_t, smb_share_t *);
-static void smb_shr_load_cups_printers();
 
 /*
  * .ZFS management functions
@@ -309,30 +306,6 @@ void
 smb_shr_sa_exit(void)
 {
 	(void) mutex_unlock(&smb_sa_handle.sa_mtx);
-}
-
-/*
- * Launches a thread to populate the share cache by share information
- * stored in sharemgr
- */
-int
-smb_shr_load(void)
-{
-	pthread_t load_thr;
-	pthread_attr_t tattr;
-	int rc;
-
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&load_thr, &tattr, smb_shr_sa_loadall, 0);
-	(void) pthread_attr_destroy(&tattr);
-
-	(void) mutex_lock(&smb_shr_exec_mtx);
-	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
-	    MAXPATHLEN);
-	(void) mutex_unlock(&smb_shr_exec_mtx);
-
-	return (rc);
 }
 
 /*
@@ -1458,17 +1431,21 @@ smb_shr_cache_freent(HT_ITEM *item)
  * Load shares from sharemgr
  */
 /*ARGSUSED*/
-static void *
-smb_shr_sa_loadall(void *args)
+void *
+smb_shr_load(void *args)
 {
 	sa_handle_t handle;
 	sa_group_t group, subgroup;
 	char *gstate;
 	boolean_t gdisabled;
-	boolean_t printing_enabled;
+
+	(void) mutex_lock(&smb_shr_exec_mtx);
+	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
+	    MAXPATHLEN);
+	(void) mutex_unlock(&smb_shr_exec_mtx);
 
 	if ((handle = smb_shr_sa_enter()) == NULL) {
-		syslog(LOG_ERR, "smb_shr_sa_loadall: ret NULL");
+		syslog(LOG_ERR, "smb_shr_load: load failed");
 		return (NULL);
 	}
 
@@ -1493,50 +1470,7 @@ smb_shr_sa_loadall(void *args)
 
 	}
 	smb_shr_sa_exit();
-	printing_enabled = smb_config_getbool(SMB_CI_PRINT_ENABLE);
-	if (printing_enabled)
-		smb_shr_load_cups_printers();
 	return (NULL);
-}
-
-/*
- * Load print shares from cups
- */
-static void
-smb_shr_load_cups_printers()
-{
-	uint32_t nerr;
-	int i;
-	cups_dest_t *dests;
-	int num_dests;
-	cups_dest_t *dest;
-	smb_share_t si;
-	smb_cups_ops_t	*cups;
-
-	if ((cups = spoolss_cups_ops()) == NULL)
-		return;
-
-	if (smb_shr_get(SMB_SHARE_PRINT, &si) != NERR_Success) {
-		syslog(LOG_DEBUG, "error getting print$");
-		return;
-	}
-
-	num_dests = cups->cupsGetDests(&dests);
-	for (i = num_dests, dest = dests; i > 0; i--, dest++) {
-		if (dest->instance == NULL) {
-			/*
-			 * Use the path from print$
-			 */
-			(void) strlcpy(si.shr_name, dest->name, MAXPATHLEN);
-			(void) strlcpy(si.shr_cmnt,
-			    SMB_SHARE_PRINT, SMB_SHARE_PRINT_LEN + 1);
-			si.shr_type = STYPE_PRINTQ;
-			nerr = smb_shr_add(&si);
-			if (nerr != NERR_Success)
-				break;
-		}
-	}
-	cups->cupsFreeDests(num_dests, dests);
 }
 
 /*

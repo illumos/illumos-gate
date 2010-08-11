@@ -32,6 +32,7 @@ SRCS=				\
 	smbd_nicmon.c		\
 	smbd_opipe_doorsvc.c	\
 	smbd_share_doorsvc.c	\
+	smbd_spool.c		\
 	smbd_vss.c
 
 include ../../Makefile.cmd

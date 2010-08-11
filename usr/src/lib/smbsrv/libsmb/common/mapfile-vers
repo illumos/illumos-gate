@@ -221,6 +221,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_kmod_file_close;
         smb_kmod_get_open_num;
 	smb_kmod_get_spool_doc;
+	smb_kmod_isbound;
 	smb_kmod_nbtlisten;
 	smb_kmod_nbtreceive;
 	smb_kmod_session_close;

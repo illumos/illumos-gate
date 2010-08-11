@@ -455,11 +455,11 @@ help()
 	    "idmap remove -a\n"
 	    "idmap remove [-f|-t] name\n"
 	    "idmap remove [-d] name1 name2\n"
-	    "idmap set-namemap [-a authenticationMethod] [-D bindDN] "
-	    "[-j passwdfile] name1 name2\n"
+	    "idmap set-namemap [-a authenticationMethod] [-D bindDN]\n"
+	    "    [-j passwdfile] name1 name2\n"
 	    "idmap show [-c] [-v] identity [targettype]\n"
-	    "idmap unset-namemap [-a authenticationMethod] [-D bindDN]"
-	    "[-j passwdfile] name\n");
+	    "idmap unset-namemap [-a authenticationMethod] [-D bindDN]\n"
+	    "    [-j passwdfile] name [targettype]\n");
 }
 
 /* The handler for the "help" command. */

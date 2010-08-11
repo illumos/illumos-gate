@@ -407,7 +407,6 @@ ndr_pipe_grow(ndr_pipe_t *np, size_t desired)
 	np->np_iov.iov_base = np->np_buf + np->np_uio.uio_offset;
 	np->np_uio.uio_resid += desired;
 	np->np_iov.iov_len += desired;
-	smb_tracef("ndr_pipe_grow: %d bytes", required);
 	return (0);
 }
 

@@ -60,6 +60,7 @@ SYMBOL_VERSION SUNWprivate {
 	directory_sid_from_group_name;
 	directory_sid_from_name;
 	directory_sid_from_user_name;
+	idmap_cache_get_data;		# used by idmap test suite
 	idmap_flush;
 	idmap_free;
 	idmap_get_create;

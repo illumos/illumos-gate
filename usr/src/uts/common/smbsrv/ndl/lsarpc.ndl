@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _MLSVC_LSA_NDL_
@@ -519,7 +518,7 @@ struct mslsa_LookupSids {
 	OUT	struct mslsa_domain_table *domain_table;
 	INOUT	struct mslsa_name_table name_table;
 
-	IN	DWORD lookup_level;
+	IN	WORD lookup_level;
 	INOUT	DWORD mapped_count;
  	OUT	DWORD status;
 };
@@ -577,15 +576,15 @@ struct mslsa_rid_table {
 
 OPERATION(LSARPC_OPNUM_LookupNames)
 struct mslsa_LookupNames {
-	IN		mslsa_handle_t handle;
+	IN	mslsa_handle_t handle;
 	IN	REFERENCE	struct mslsa_lup_name_table *name_table;
 
-	OUT		struct mslsa_domain_table *domain_table;
+	OUT	struct mslsa_domain_table *domain_table;
 	INOUT	struct mslsa_rid_table translated_sids;
 
-	IN		DWORD lookup_level;
+	IN	WORD lookup_level;
 	INOUT	DWORD mapped_count;
-	OUT		DWORD status;
+	OUT	DWORD status;
 };
 
 
@@ -879,7 +878,7 @@ struct lsar_lookup_sids2 {
 	IN		struct mslsa_lup_sid_table lup_sid_table;
 	OUT		struct mslsa_domain_table *domain_table;
 	INOUT	struct lsar_name_table2 name_table;
-	IN		DWORD lookup_level;
+	IN		WORD lookup_level;
 	INOUT	DWORD mapped_count;
 	IN		DWORD lookup_options;
 	IN		DWORD client_revision;
@@ -891,7 +890,7 @@ struct lsar_lookup_sids3 {
 	IN		struct mslsa_lup_sid_table	lup_sid_table;
 	OUT		struct mslsa_domain_table	*domain_table;
 	INOUT		lsar_translated_names_ex_t	name_table;
-	IN		DWORD				lookup_level;
+	IN		WORD				lookup_level;
 	INOUT		DWORD				mapped_count;
 	IN		DWORD				lookup_options;
 	IN		DWORD				client_revision;
@@ -930,7 +929,7 @@ struct lsar_LookupNames2 {
 	IN	REFERENCE	struct mslsa_lup_name_table *name_table;
 	OUT		struct mslsa_domain_table *domain_table;
 	INOUT	struct lsar_rid_table2 translated_sids;
-	IN		DWORD lookup_level;
+	IN		WORD lookup_level;
 	INOUT	DWORD mapped_count;
 	IN		DWORD lookup_options;
 	IN		DWORD client_revision;
@@ -959,7 +958,7 @@ struct lsar_LookupNames3 {
 	IN REFERENCE	struct mslsa_lup_name_table	*name_table;
 	OUT		struct mslsa_domain_table	*domain_table;
 	INOUT		struct lsar_sid_ex2_table	translated_sids;
-	IN		DWORD				lookup_level;
+	IN		WORD				lookup_level;
 	INOUT		DWORD				mapped_count;
 	IN		DWORD				lookup_options;
 	IN		DWORD				client_revision;
@@ -971,7 +970,7 @@ struct lsar_LookupNames4 {
 	IN REFERENCE	struct mslsa_lup_name_table	*name_table;
 	OUT		struct mslsa_domain_table	*domain_table;
 	INOUT		struct lsar_sid_ex2_table	translated_sids;
-	IN		DWORD				lookup_level;
+	IN		WORD				lookup_level;
 	INOUT		DWORD				mapped_count;
 	IN		DWORD				lookup_options;
 	IN		DWORD				client_revision;

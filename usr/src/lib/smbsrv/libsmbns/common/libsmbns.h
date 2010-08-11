@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSMBNS_H
@@ -96,7 +95,8 @@ extern boolean_t smb_ads_lookup_msdcs(char *, char *, char *, uint32_t);
 extern smb_ads_host_info_t *smb_ads_find_host(char *, char *);
 
 /* DYNDNS functions */
-extern int dyndns_start(void);
+extern void *dyndns_publisher(void *);
+extern void dyndns_start(void);
 extern void dyndns_stop(void);
 extern int dyndns_update(char *);
 extern void dyndns_update_zones(void);

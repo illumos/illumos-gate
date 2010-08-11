@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/tzfile.h>
@@ -834,8 +833,8 @@ smb_browser_send_HostAnnouncement(smb_hostinfo_t *hinfo,
 	    ++hinfo->hi_updatecnt,
 	    next_announcement * 60000,	/* Periodicity in MilliSeconds */
 	    hinfo->hi_nbname,
-	    hinfo->hi_version.sv_major,
-	    hinfo->hi_version.sv_minor,
+	    (uint8_t)hinfo->hi_version.sv_major,
+	    (uint8_t)hinfo->hi_version.sv_minor,
 	    type,
 	    SMB_SERVER_SIGNATURE,
 	    hinfo->hi_nic.nic_cmnt);

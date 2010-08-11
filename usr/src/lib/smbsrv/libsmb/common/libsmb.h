@@ -227,23 +227,6 @@ extern void smb_config_getdomaininfo(char *, char *, char *, char *, char *);
 extern void smb_config_setdomaininfo(char *, char *, char *, char *, char *);
 extern uint32_t smb_get_dcinfo(char *, uint32_t, smb_inaddr_t *);
 
-CONTEXT_HANDLE(rpc_handle) rpc_handle_t;
-
-typedef struct smb_spooldoc {
-	uint32_t	sd_magic;
-	list_node_t	sd_lnd;
-	smb_inaddr_t	sd_ipaddr;
-	int		sd_spool_num;
-	char		sd_username[MAXNAMELEN];
-	char		sd_path[MAXPATHLEN];
-	char		sd_doc_name[MAXNAMELEN];
-	char		sd_printer_name[MAXPATHLEN];
-	int32_t		sd_fd;
-	rpc_handle_t	sd_handle;
-} smb_spooldoc_t;
-
-int smb_kmod_get_spool_doc(uint32_t *, char *, char *, smb_inaddr_t *);
-
 /*
  * buffer context structure. This is used to keep track of the buffer
  * context.
@@ -895,6 +878,7 @@ uint32_t smb_sd_fromfs(smb_fssd_t *, smb_sd_t *);
 
 /* Kernel Module Interface */
 int smb_kmod_bind(void);
+boolean_t smb_kmod_isbound(void);
 int smb_kmod_setcfg(smb_kmod_cfg_t *);
 int smb_kmod_setgmtoff(int32_t);
 int smb_kmod_start(int, int, int);
@@ -914,6 +898,7 @@ smb_netsvc_t *smb_kmod_enum_init(smb_svcenum_t *);
 void smb_kmod_enum_fini(smb_netsvc_t *);
 int smb_kmod_session_close(const char *, const char *);
 int smb_kmod_file_close(uint32_t);
+int smb_kmod_get_spool_doc(uint32_t *, char *, char *, smb_inaddr_t *);
 
 void smb_name_parse(char *, char **, char **);
 uint32_t smb_name_validate_share(const char *);

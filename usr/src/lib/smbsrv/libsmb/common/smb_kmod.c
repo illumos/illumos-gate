@@ -63,6 +63,12 @@ smb_kmod_bind(void)
 	return (0);
 }
 
+boolean_t
+smb_kmod_isbound(void)
+{
+	return ((smbdrv_fd == -1) ? B_FALSE : B_TRUE);
+}
+
 int
 smb_kmod_setcfg(smb_kmod_cfg_t *cfg)
 {

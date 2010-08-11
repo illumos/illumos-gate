@@ -1107,7 +1107,8 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	} smb_mtype_t;
 
 	static smb_mtype_t smb_mtype[] = {
-		{ "zfs",    3,	SMB_TREE_UNICODE_ON_DISK | SMB_TREE_QUOTA },
+		{ "zfs",    3,	SMB_TREE_UNICODE_ON_DISK |
+		    SMB_TREE_QUOTA | SMB_TREE_SPARSE},
 		{ "ufs",    3,	SMB_TREE_UNICODE_ON_DISK },
 		{ "nfs",    3,	SMB_TREE_NFS_MOUNTED },
 		{ "tmpfs",  5,	SMB_TREE_NO_EXPORT }

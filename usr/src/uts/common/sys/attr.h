@@ -55,6 +55,8 @@ extern "C" {
 #define	A_GROUPSID		"groupsid"
 #define	A_REPARSE_POINT		"reparse"
 #define	A_GEN			"generation"
+#define	A_OFFLINE		"offline"
+#define	A_SPARSE		"sparse"
 
 /* Attribute option for utilities */
 #define	O_HIDDEN	 "H"
@@ -68,6 +70,8 @@ extern "C" {
 #define	O_AV_QUARANTINED "q"
 #define	O_AV_MODIFIED	 "m"
 #define	O_REPARSE_POINT	 "r"
+#define	O_OFFLINE	 "O"
+#define	O_SPARSE	 "s"
 #define	O_NONE		 ""
 
 /* ownersid and groupsid are composed of two nvpairs */
@@ -94,6 +98,8 @@ typedef enum {
 	F_FSID,
 	F_REPARSE,
 	F_GEN,
+	F_OFFLINE,
+	F_SPARSE,
 	F_ATTR_ALL
 } f_attr_t;
 

@@ -228,6 +228,12 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 		case F_GEN:
 			XVA_SET_REQ(&xvattr, XAT_GEN);
 			break;
+		case F_OFFLINE:
+			XVA_SET_REQ(&xvattr, XAT_OFFLINE);
+			break;
+		case F_SPARSE:
+			XVA_SET_REQ(&xvattr, XAT_SPARSE);
+			break;
 		default:
 			break;
 		}
@@ -319,6 +325,16 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 			VERIFY(nvlist_add_uint64(nvlp,
 			    attr_to_name(F_GEN),
 			    xoap->xoa_generation) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_OFFLINE)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_OFFLINE),
+			    xoap->xoa_offline) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_SPARSE)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_SPARSE),
+			    xoap->xoa_sparse) == 0);
 		}
 	}
 	/*
@@ -697,6 +713,14 @@ xattr_file_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 			XVA_SET_REQ(&xvattr, XAT_REPARSE);
 			xoap->xoa_reparse = value;
 			break;
+		case F_OFFLINE:
+			XVA_SET_REQ(&xvattr, XAT_OFFLINE);
+			xoap->xoa_offline = value;
+			break;
+		case F_SPARSE:
+			XVA_SET_REQ(&xvattr, XAT_SPARSE);
+			xoap->xoa_sparse = value;
+			break;
 		default:
 			break;
 		}
@@ -838,6 +862,8 @@ xattr_copy(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	XVA_SET_REQ(&xvattr, XAT_AV_QUARANTINED);
 	XVA_SET_REQ(&xvattr, XAT_CREATETIME);
 	XVA_SET_REQ(&xvattr, XAT_REPARSE);
+	XVA_SET_REQ(&xvattr, XAT_OFFLINE);
+	XVA_SET_REQ(&xvattr, XAT_SPARSE);
 
 	pdvp = gfs_file_parent(sdvp);
 	error = VOP_GETATTR(pdvp, &xvattr.xva_vattr, 0, cr, ct);

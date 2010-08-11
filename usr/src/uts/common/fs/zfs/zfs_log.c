@@ -169,6 +169,12 @@ zfs_log_xvattr(lr_attr_t *lrattr, xvattr_t *xvap)
 	if (XVA_ISSET_REQ(xvap, XAT_REPARSE))
 		*attrs |= (xoap->xoa_reparse == 0) ? 0 :
 		    XAT0_REPARSE;
+	if (XVA_ISSET_REQ(xvap, XAT_OFFLINE))
+		*attrs |= (xoap->xoa_offline == 0) ? 0 :
+		    XAT0_OFFLINE;
+	if (XVA_ISSET_REQ(xvap, XAT_SPARSE))
+		*attrs |= (xoap->xoa_sparse == 0) ? 0 :
+		    XAT0_SPARSE;
 }
 
 static void *

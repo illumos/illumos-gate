@@ -76,7 +76,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_shr_stop;
 	smb_token_destroy;
 	smb_token_log;
-	spoolss_copy_spool_file;
+	spoolss_register_copyfile;
     local:
 	*;
 };

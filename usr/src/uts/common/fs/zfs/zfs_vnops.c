@@ -2543,6 +2543,18 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			xoap->xoa_generation = zp->z_gen;
 			XVA_SET_RTN(xvap, XAT_GEN);
 		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_OFFLINE)) {
+			xoap->xoa_offline =
+			    ((zp->z_pflags & ZFS_OFFLINE) != 0);
+			XVA_SET_RTN(xvap, XAT_OFFLINE);
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_SPARSE)) {
+			xoap->xoa_sparse =
+			    ((zp->z_pflags & ZFS_SPARSE) != 0);
+			XVA_SET_RTN(xvap, XAT_SPARSE);
+		}
 	}
 
 	ZFS_TIME_DECODE(&vap->va_atime, zp->z_atime);
@@ -2720,6 +2732,8 @@ top:
 	    ((mask & AT_XVATTR) && (XVA_ISSET_REQ(xvap, XAT_HIDDEN) ||
 	    XVA_ISSET_REQ(xvap, XAT_READONLY) ||
 	    XVA_ISSET_REQ(xvap, XAT_ARCHIVE) ||
+	    XVA_ISSET_REQ(xvap, XAT_OFFLINE) ||
+	    XVA_ISSET_REQ(xvap, XAT_SPARSE) ||
 	    XVA_ISSET_REQ(xvap, XAT_CREATETIME) ||
 	    XVA_ISSET_REQ(xvap, XAT_SYSTEM)))) {
 		need_policy = zfs_zaccess(zp, ACE_WRITE_ATTRIBUTES, 0,

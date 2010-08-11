@@ -327,6 +327,14 @@ pid$target::samr_s_EnumDomainGroups:return
 }
 
 /*
+ * SPOOLSS
+ */
+pid$target::spoolss_*:entry,
+pid$target::spoolss_*:return
+{
+}
+
+/*
  * SVCCTL
  */
 pid$target::svcctl_s_*:entry,

@@ -128,6 +128,10 @@ zfs_replay_xvattr(lr_attr_t *lrattr, xvattr_t *xvap)
 		bcopy(scanstamp, xoap->xoa_av_scanstamp, AV_SCANSTAMP_SZ);
 	if (XVA_ISSET_REQ(xvap, XAT_REPARSE))
 		xoap->xoa_reparse = ((*attrs & XAT0_REPARSE) != 0);
+	if (XVA_ISSET_REQ(xvap, XAT_OFFLINE))
+		xoap->xoa_offline = ((*attrs & XAT0_OFFLINE) != 0);
+	if (XVA_ISSET_REQ(xvap, XAT_SPARSE))
+		xoap->xoa_sparse = ((*attrs & XAT0_SPARSE) != 0);
 }
 
 static int

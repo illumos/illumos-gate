@@ -34,6 +34,7 @@
 #define TABLE_DEVMODE 4
 #define TABLE_SECURITY_DESCRIPTOR 5
 
+#define SPOOLSS_OPNUM_EnumPrinters			0x00
 #define SPOOLSS_OPNUM_OpenPrinter			0x01
 #define SPOOLSS_OPNUM_GetJob				0x03
 #define SPOOLSS_OPNUM_EnumJobs				0x04
@@ -50,18 +51,27 @@
 #define SPOOLSS_OPNUM_ScheduleJob			0x19
 #define SPOOLSS_OPNUM_GetPrinterData			0x1a
 #define SPOOLSS_OPNUM_ClosePrinter			0x1d
+#define SPOOLSS_OPNUM_AddForm				0x1e
+#define SPOOLSS_OPNUM_DeleteForm			0x1f
 #define SPOOLSS_OPNUM_EndDocPrinter			0x17
 #define SPOOLSS_OPNUM_EnumForms				0x22
+#define SPOOLSS_OPNUM_EnumPorts				0x23
+#define	SPOOLSS_OPNUM_EnumMonitor			0x24
+#define SPOOLSS_OPNUM_DeletePort			0x27
 #define SPOOLSS_OPNUM_CreatePrinterIC			0x28
+#define	SPOOLSS_OPNUM_AddMonitor			0x2e
+#define	SPOOLSS_OPNUM_DeleteMonitor			0x2f
 #define SPOOLSS_OPNUM_ResetPrinter			0x34
 #define SPOOLSS_OPNUM_GetPrinterDriver2			0x35
 #define SPOOLSS_OPNUM_FCPN				0x38
 #define SPOOLSS_OPNUM_ReplyOpenPrinter			0x3a
 #define SPOOLSS_OPNUM_ReplyClosePrinter			0x3c
+#define SPOOLSS_OPNUM_AddPortEx				0x3d
 #define SPOOLSS_OPNUM_RFFPCNEX				0x41
 #define SPOOLSS_OPNUM_RRPCN				0x42
 #define SPOOLSS_OPNUM_RFNPCNEX				0x43
 #define SPOOLSS_OPNUM_OpenPrinterEx			0x45
+#define SPOOLSS_OPNUM_SetPort				0x47
 #define SPOOLSS_OPNUM_EnumPrinterData			0x48
 #define SPOOLSS_OPNUM_EnumPrinterDataEx			0x4f
 #define SPOOLSS_OPNUM_EnumPrinterKey			0x50
@@ -126,8 +136,8 @@ struct spoolss_OpenPrinter {
 	IN	LPTSTR printer_name;
 	OUT	spoolss_handle_t handle;
 	IN	LPTSTR data_type;
-	IN	struct spoolssDevmodeContainer dmodeContainer;
-	IN	DWORD AccessRequired;
+	/* IN	struct spoolssDevmodeContainer dmodeContainer; */
+	/* IN	DWORD AccessRequired; */
 	OUT	DWORD status;
 };
 
@@ -451,8 +461,8 @@ struct spoolss_GetPrinterData {
 	IN	spoolss_handle_t handle;
 	IN	REFERENCE LPTSTR pValueName;
 	OUT	DWORD pType;
-		SIZE_IS(Size)
-   	OUT	LPBYTE Buf;
+    SIZE_IS(Size)
+   	OUT	REFERENCE LPBYTE Buf;
 	IN	DWORD Size;
 	OUT	DWORD Needed;
 	OUT	DWORD status;
@@ -495,6 +505,54 @@ struct spoolss_StartDocPrinter {
 OPERATION(SPOOLSS_OPNUM_AbortPrinter)
 struct spoolss_AbortPrinter {
 	IN	spoolss_handle_t handle;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_EnumPorts)
+struct spoolss_EnumPorts {
+	IN	LPTSTR name;
+	IN	DWORD level;
+	OUT	DWORD needed;
+	OUT	DWORD returned;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_DeletePort)
+struct spoolss_DeletePort {
+	IN	LPTSTR name;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_AddPortEx)
+struct spoolss_AddPortEx {
+	IN	LPTSTR name;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_SetPort)
+struct spoolss_SetPort {
+	IN	LPTSTR name;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_EnumMonitor)
+struct spoolss_EnumMonitor {
+	IN	LPTSTR name;
+	IN	DWORD level;
+	OUT	DWORD needed;
+	OUT	DWORD returned;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_AddMonitor)
+struct spoolss_AddMonitor {
+	IN	LPTSTR name;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_DeleteMonitor)
+struct spoolss_DeleteMonitor {
+	IN	LPTSTR name;
 	OUT	DWORD status;
 };
 
@@ -570,6 +628,20 @@ struct spoolss_EndDocPrinter {
 	OUT	DWORD status;
 };
 
+OPERATION(SPOOLSS_OPNUM_AddForm)
+struct spoolss_AddForm {
+	IN	spoolss_handle_t handle;
+	/*	FORM_CONTAINER *form_container; */
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_DeleteForm)
+struct spoolss_DeleteForm {
+	IN	spoolss_handle_t handle;
+	/* IN	REFERENCE LPTSTR form_name; */
+	OUT	DWORD status;
+};
+
 OPERATION(SPOOLSS_OPNUM_EnumForms)
 struct spoolss_EnumForms {
 	IN	spoolss_handle_t handle;
@@ -637,6 +709,10 @@ OPERATION(SPOOLSS_OPNUM_OpenPrinterEx)
 struct spoolss_OpenPrinterEx {
 	IN	LPTSTR printer_name;
 	OUT	spoolss_handle_t handle;
+	IN	LPTSTR data_type;
+	/* IN	struct spoolssDevmodeContainer dmodeContainer; */
+	/* IN	DWORD AccessRequired; */
+	/* IN	CLIENT_CONTAINER client_info; */
 	OUT	DWORD status;
 };
 
@@ -692,7 +768,16 @@ union spoolss_interface {
 	
 	CASE(SPOOLSS_OPNUM_ResetPrinter)
 		struct spoolss_ResetPrinter ResetPrinter;
-	
+
+	CASE(SPOOLSS_OPNUM_EnumMonitor)
+		struct spoolss_EnumMonitor EnumMonitor;
+
+	CASE(SPOOLSS_OPNUM_AddMonitor)
+		struct spoolss_AddMonitor AddMonitor;
+
+	CASE(SPOOLSS_OPNUM_DeleteMonitor)
+		struct spoolss_DeleteMonitor DeleteMonitor;
+
 	CASE(SPOOLSS_OPNUM_WritePrinter)
 		struct spoolss_WritePrinter WritePrinter;
 	
@@ -717,12 +802,27 @@ union spoolss_interface {
 	CASE(SPOOLSS_OPNUM_ScheduleJob)
 		struct spoolss_ScheduleJob ScheduleJob;
 
+	CASE(SPOOLSS_OPNUM_AddForm)
+		struct spoolss_AddForm AddForm;
+
+	CASE(SPOOLSS_OPNUM_DeleteForm)
+		struct spoolss_DeleteForm DeleteForm;
+
 	CASE(SPOOLSS_OPNUM_EnumForms)
 		struct spoolss_EnumForms EnumForms;
 
-	CASE(SPOOLSS_OPNUM_EnumJobs)
-		struct spoolss_EnumJobs EnumJobs;
-	
+	CASE(SPOOLSS_OPNUM_EnumPorts)
+		struct spoolss_EnumPorts EnumPorts;
+
+	CASE(SPOOLSS_OPNUM_DeletePort)
+		struct spoolss_DeletePort DeletePort;
+
+	CASE(SPOOLSS_OPNUM_AddPortEx)
+		struct spoolss_AddPortEx AddPortEx;
+
+	CASE(SPOOLSS_OPNUM_SetPort)
+		struct spoolss_SetPort SetPort;
+
 	CASE(SPOOLSS_OPNUM_RFNPCNEX)
 		struct spoolss_RFNPCNEX RFNPCNEX;
 

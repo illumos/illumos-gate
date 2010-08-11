@@ -235,7 +235,7 @@ typedef struct smb_shr_execinfo {
  */
 int smb_shr_start(void);
 void smb_shr_stop(void);
-int smb_shr_load(void);
+void *smb_shr_load(void *);
 void smb_shr_iterinit(smb_shriter_t *);
 smb_share_t *smb_shr_iterate(smb_shriter_t *);
 void smb_shr_list(int, smb_shrlist_t *);

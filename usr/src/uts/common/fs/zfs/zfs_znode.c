@@ -1088,6 +1088,16 @@ zfs_xvattr_set(znode_t *zp, xvattr_t *xvap, dmu_tx_t *tx)
 		    zp->z_pflags, tx);
 		XVA_SET_RTN(xvap, XAT_REPARSE);
 	}
+	if (XVA_ISSET_REQ(xvap, XAT_OFFLINE)) {
+		ZFS_ATTR_SET(zp, ZFS_OFFLINE, xoap->xoa_offline,
+		    zp->z_pflags, tx);
+		XVA_SET_RTN(xvap, XAT_OFFLINE);
+	}
+	if (XVA_ISSET_REQ(xvap, XAT_SPARSE)) {
+		ZFS_ATTR_SET(zp, ZFS_SPARSE, xoap->xoa_sparse,
+		    zp->z_pflags, tx);
+		XVA_SET_RTN(xvap, XAT_SPARSE);
+	}
 }
 
 int
@@ -1564,6 +1574,8 @@ zfs_trunc(znode_t *zp, uint64_t end)
 	dmu_tx_t *tx;
 	rl_t *rl;
 	int error;
+	sa_bulk_attr_t bulk[2];
+	int count = 0;
 
 	/*
 	 * We will change zp_size, lock the whole file.
@@ -1600,9 +1612,15 @@ top:
 	}
 
 	zp->z_size = end;
+	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_SIZE(zfsvfs),
+	    NULL, &zp->z_size, sizeof (zp->z_size));
 
-	VERIFY(0 == sa_update(zp->z_sa_hdl, SA_ZPL_SIZE(zp->z_zfsvfs),
-	    &zp->z_size, sizeof (zp->z_size), tx));
+	if (end == 0) {
+		zp->z_pflags &= ~ZFS_SPARSE;
+		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs),
+		    NULL, &zp->z_pflags, 8);
+	}
+	VERIFY(sa_bulk_update(zp->z_sa_hdl, bulk, count, tx) == 0);
 
 	dmu_tx_commit(tx);
 
