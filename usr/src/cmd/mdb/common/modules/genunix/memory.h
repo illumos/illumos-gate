@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_MEMORY_H
@@ -46,10 +45,19 @@ int page_num2pp(uintptr_t, uint_t, int, const mdb_arg_t *);
 int seg_walk_init(mdb_walk_state_t *);
 int seg(uintptr_t, uint_t, int, const mdb_arg_t *);
 
+#define	SEGVN_PAGES_RESIDENT	(void *)(uintptr_t)0
+#define	SEGVN_PAGES_ALL		(void *)(uintptr_t)1
+int segvn_pages_walk_init(mdb_walk_state_t *);
+int segvn_pages_walk_step(mdb_walk_state_t *);
+void segvn_pages_walk_fini(mdb_walk_state_t *);
+
 int vnode2smap(uintptr_t, uint_t, int, const mdb_arg_t *);
 int addr2smap(uintptr_t, uint_t, int, const mdb_arg_t *);
 
+#define	ANON_WALK_ALLOC	(void *)(uintptr_t)0
+#define	ANON_WALK_ALL	(void *)(uintptr_t)1
 int anon_walk_init(mdb_walk_state_t *);
+int segvn_anon_walk_init(mdb_walk_state_t *);
 int anon_walk_step(mdb_walk_state_t *);
 void anon_walk_fini(mdb_walk_state_t *);
 int pmap(uintptr_t, uint_t, int, const mdb_arg_t *);
