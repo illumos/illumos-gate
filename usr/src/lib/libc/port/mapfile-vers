@@ -219,6 +219,7 @@ $endif
 	sigqueue;
 	sigtimedwait;
 	sigwaitinfo;
+	smt_pause;
 	strnlen;
 	strsep;
 	symlinkat;

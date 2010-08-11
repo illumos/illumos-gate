@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "lint.h"
@@ -196,4 +195,10 @@ __csigsetjmp(sigjmp_buf env, int savemask, gregset_t rs)
 	(void) memcpy(ucp->uc_mcontext.gregs, rs, _NGREG * sizeof (greg_t));
 
 	return (0);
+}
+
+void
+smt_pause(void)
+{
+	SMT_PAUSE();
 }

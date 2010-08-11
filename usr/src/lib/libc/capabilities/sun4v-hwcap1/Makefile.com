@@ -28,12 +28,13 @@ GEN_PLATFORM =	sun4v
 
 include		../../Makefile.com
 
-OBJECTS =	memcpy.o memset.o
+OBJECTS =	memcpy.o memset.o smt_pause.o
 
 include		$(SRC)/lib/Makefile.lib
 
 IFLAGS =	-I$(SRC)/uts/$(GEN_PLATFORM) \
 		-I$(ROOT)/usr/include/v9
+
 
 AS_CPPFLAGS +=	-D__STDC__ -D_ASM -DPIC -D_REENTRANT -D$(MACH) $(IFLAGS) \
 		-DNIAGARA_IMPL

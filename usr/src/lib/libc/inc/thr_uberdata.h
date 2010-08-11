@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _THR_UBERDATA_H
@@ -255,7 +254,7 @@ extern	void	ht_pause(void);		/* "pause" instruction */
 extern	void	SMT_PAUSE_FUNCTION(void);
 #define	SMT_PAUSE()	SMT_PAUSE_FUNCTION()
 #else
-#define	SMT_PAUSE()
+#define	SMT_PAUSE()	smt_pause()
 #endif	/* __x86 */
 
 /*

@@ -144,6 +144,7 @@ GENOBJS=			\
 	setjmp.o		\
 	siginfolst.o		\
 	siglongjmp.o		\
+	smt_pause.o		\
 	sparc_data.o		\
 	strcasecmp.o		\
 	strchr.o		\
@@ -1167,6 +1168,7 @@ ASSYMDEP_OBJS=			\
 	_stack_grow.o		\
 	asm_subr.o		\
 	setjmp.o		\
+	smt_pause.o		\
 	tls_get_addr.o		\
 	unwind_frame.o		\
 	vforkx.o

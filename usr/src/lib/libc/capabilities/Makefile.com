@@ -32,3 +32,5 @@ OBJCAP =	pics/objcap.o
 SYMCAP =	pics/symcap.o
 
 CLOBBERFILES +=	$(OBJCAP) $(SYMCAP)
+
+LIBCBASE =	$(SRC)/lib/libc

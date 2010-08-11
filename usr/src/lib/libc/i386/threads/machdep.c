@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "thr_uberdata.h"
@@ -255,4 +254,10 @@ __csigsetjmp(greg_t cs, greg_t ss, greg_t gs,
 	ucp->uc_mcontext.gregs[SS] = ss;
 
 	return (0);
+}
+
+void
+smt_pause(void)
+{
+	SMT_PAUSE();
 }
