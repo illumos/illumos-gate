@@ -1215,8 +1215,10 @@ immu_quiesce(void)
 
 	mutex_enter(&immu_lock);
 
-	if (immu_running == B_FALSE)
+	if (immu_running == B_FALSE) {
+		mutex_exit(&immu_lock);
 		return (DDI_SUCCESS);
+	}
 
 	immu = list_head(&immu_list);
 	for (; immu; immu = list_next(&immu_list, immu)) {
@@ -1249,12 +1251,12 @@ immu_quiesce(void)
 
 		mutex_exit(&(immu->immu_lock));
 	}
-	mutex_exit(&immu_lock);
 
 	if (ret == DDI_SUCCESS) {
 		immu_running = B_FALSE;
 		immu_quiesced = B_TRUE;
 	}
+	mutex_exit(&immu_lock);
 
 	return (ret);
 }
@@ -1271,8 +1273,10 @@ immu_unquiesce(void)
 
 	mutex_enter(&immu_lock);
 
-	if (immu_quiesced == B_FALSE)
+	if (immu_quiesced == B_FALSE) {
+		mutex_exit(&immu_lock);
 		return (DDI_SUCCESS);
+	}
 
 	immu = list_head(&immu_list);
 	for (; immu; immu = list_next(&immu_list, immu)) {

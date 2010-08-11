@@ -1988,10 +1988,11 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	sinfo = &dma->dp_sglinfo;
 	attr = &hp->dmai_attr;
 
+	/* convert the sleep flags */
 	if (dmareq->dmar_fp == DDI_DMA_SLEEP) {
-		dma->dp_sleep_flags = KM_SLEEP;
+		dma->dp_sleep_flags = kmflag = KM_SLEEP;
 	} else {
-		dma->dp_sleep_flags = KM_NOSLEEP;
+		dma->dp_sleep_flags = kmflag = KM_NOSLEEP;
 	}
 
 	hp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS;
@@ -2121,13 +2122,6 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	 * the bind interface would speed this case up.
 	 */
 	} else {
-		/* convert the sleep flags */
-		if (dmareq->dmar_fp == DDI_DMA_SLEEP) {
-			kmflag =  KM_SLEEP;
-		} else {
-			kmflag =  KM_NOSLEEP;
-		}
-
 		/*
 		 * Save away how much memory we allocated. If we're doing a
 		 * nosleep, the alloc could fail...

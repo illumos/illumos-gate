@@ -1793,6 +1793,7 @@ configure_ffc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	for (i = 0; i < nattrs; i++) {
 		if (strncmp(attrs[i].ka_name, "anythr", 7) == 0) {
 			if (secpolicy_cpc_cpu(crgetcred()) != 0) {
+				kmem_free(conf, sizeof (core_pcbe_config_t));
 				return (CPC_ATTR_REQUIRES_PRIVILEGE);
 			}
 			if (attrs[i].ka_val != 0) {
