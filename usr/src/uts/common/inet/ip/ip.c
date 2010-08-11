@@ -15163,13 +15163,13 @@ ip_tp_cpu_update(cpu_setup_t what, int id, void *arg)
 	netstack_t *ns;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	cpu_seqid = cpu[id]->cpu_seqid;
 
 	switch (what) {
 	case CPU_CONFIG:
 	case CPU_ON:
 	case CPU_INIT:
 	case CPU_CPUPART_IN:
+		cpu_seqid = cpu[id]->cpu_seqid;
 		netstack_next_init(&nh);
 		while ((ns = netstack_next(&nh)) != NULL) {
 			tcp_stack_cpu_add(ns->netstack_tcp, cpu_seqid);
