@@ -15052,6 +15052,18 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 			goto phys_create_done;
 		}
 
+		if (IS_SATA_DEVICE(dev_info)) {
+			if (ndi_prop_update_string(DDI_DEV_T_NONE,
+			    *lun_dip, MPTSAS_VARIANT, "sata") !=
+			    DDI_PROP_SUCCESS) {
+				mptsas_log(mpt, CE_WARN,
+				    "mptsas unable to create "
+				    "property for device variant ");
+				ndi_rtn = NDI_FAILURE;
+				goto phys_create_done;
+			}
+		}
+
 		if (IS_ATAPI_DEVICE(dev_info)) {
 			if (ndi_prop_update_string(DDI_DEV_T_NONE,
 			    *lun_dip, MPTSAS_VARIANT, "atapi") !=
@@ -15064,17 +15076,6 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 			}
 		}
 
-		if (IS_SATA_DEVICE(dev_info)) {
-			if (ndi_prop_update_string(DDI_DEV_T_NONE,
-			    *lun_dip, MPTSAS_VARIANT, "sata") !=
-			    DDI_PROP_SUCCESS) {
-				mptsas_log(mpt, CE_WARN,
-				    "mptsas unable to create "
-				    "property for device variant ");
-				ndi_rtn = NDI_FAILURE;
-				goto phys_create_done;
-			}
-		}
 phys_raid_lun:
 		/*
 		 * if this is a SAS controller, and the target is a SATA
