@@ -500,6 +500,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_is_referral_realm;
 	krb5_is_thread_safe;
 	krb5_kdc_rep_decrypt_proc;
+	krb5_kt_add_ad_entries;
 	krb5_kt_add_entry;
 	krb5_kt_close;
 	krb5_kt_default;
@@ -514,9 +515,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_kt_next_entry;
 	krb5_kt_read_service_key;
 	krb5_kt_register;
+	krb5_kt_remove_by_realm;
+	krb5_kt_remove_by_svcprinc;
 	krb5_kt_remove_entry;
 	krb5_kt_resolve;
 	krb5_kt_start_seq_get;
+	krb5_kt_ad_validate;
 	krb5_ktf_ops;
 	krb5_ktf_writable_ops;
 	krb5_ktfile_add;
