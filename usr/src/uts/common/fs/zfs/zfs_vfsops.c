@@ -822,22 +822,13 @@ zfs_owner_overquota(zfsvfs_t *zfsvfs, znode_t *zp, boolean_t isgroup)
 {
 	uint64_t fuid;
 	uint64_t quotaobj;
-	uid_t id;
 
 	quotaobj = isgroup ? zfsvfs->z_groupquota_obj : zfsvfs->z_userquota_obj;
 
-	id = isgroup ? zp->z_gid : zp->z_uid;
+	fuid = isgroup ? zp->z_gid : zp->z_uid;
 
 	if (quotaobj == 0 || zfsvfs->z_replay)
 		return (B_FALSE);
-
-	if (IS_EPHEMERAL(id)) {
-		VERIFY(0 == sa_lookup(zp->z_sa_hdl,
-		    isgroup ? SA_ZPL_GID(zfsvfs) : SA_ZPL_UID(zfsvfs),
-		    &fuid, sizeof (fuid)));
-	} else {
-		fuid = (uint64_t)id;
-	}
 
 	return (zfs_fuid_overquota(zfsvfs, isgroup, fuid));
 }

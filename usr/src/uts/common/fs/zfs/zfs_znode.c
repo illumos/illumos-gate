@@ -625,7 +625,6 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	vnode_t *vp;
 	uint64_t mode;
 	uint64_t parent;
-	uint64_t uid, gid;
 	sa_bulk_attr_t bulk[9];
 	int count = 0;
 
@@ -665,9 +664,9 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_ATIME(zfsvfs), NULL,
 	    &zp->z_atime, 16);
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_UID(zfsvfs), NULL,
-	    &uid, 8);
+	    &zp->z_uid, 8);
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_GID(zfsvfs), NULL,
-	    &gid, 8);
+	    &zp->z_gid, 8);
 
 	if (sa_bulk_lookup(zp->z_sa_hdl, bulk, count) != 0 || zp->z_gen == 0) {
 		if (hdl == NULL)
@@ -676,8 +675,6 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 		return (NULL);
 	}
 
-	zp->z_uid = zfs_fuid_map_id(zfsvfs, uid, CRED(), ZFS_OWNER);
-	zp->z_gid = zfs_fuid_map_id(zfsvfs, gid, CRED(), ZFS_GROUP);
 	zp->z_mode = mode;
 	vp->v_vfsp = zfsvfs->z_parent->z_vfs;
 
@@ -711,7 +708,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	case VREG:
 		vp->v_flag |= VMODSORT;
 		if (parent == zfsvfs->z_shares_dir) {
-			ASSERT(uid == 0 && gid == 0);
+			ASSERT(zp->z_uid == 0 && zp->z_gid == 0);
 			vn_setops(vp, zfs_sharevnodeops);
 		} else {
 			vn_setops(vp, zfs_fvnodeops);
@@ -1180,7 +1177,6 @@ zfs_rezget(znode_t *zp)
 	dmu_buf_t *db;
 	uint64_t obj_num = zp->z_id;
 	uint64_t mode;
-	uint64_t uid, gid;
 	sa_bulk_attr_t bulk[8];
 	int err;
 	int count = 0;
@@ -1226,9 +1222,9 @@ zfs_rezget(znode_t *zp)
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_ATIME(zfsvfs), NULL,
 	    &zp->z_atime, sizeof (zp->z_atime));
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_UID(zfsvfs), NULL,
-	    &uid, sizeof (uid));
+	    &zp->z_uid, sizeof (zp->z_uid));
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_GID(zfsvfs), NULL,
-	    &gid, sizeof (gid));
+	    &zp->z_gid, sizeof (zp->z_gid));
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MODE(zfsvfs), NULL,
 	    &mode, sizeof (mode));
 
@@ -1246,8 +1242,6 @@ zfs_rezget(znode_t *zp)
 		return (EIO);
 	}
 
-	zp->z_uid = zfs_fuid_map_id(zfsvfs, uid, CRED(), ZFS_OWNER);
-	zp->z_gid = zfs_fuid_map_id(zfsvfs, gid, CRED(), ZFS_GROUP);
 	zp->z_unlinked = (zp->z_links == 0);
 	zp->z_blksz = doi.doi_data_block_size;
 

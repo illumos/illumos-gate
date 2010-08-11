@@ -866,6 +866,8 @@ again:
 		 * been done, but that would still expose the ISUID/ISGID
 		 * to another app after the partial write is committed.
 		 *
+		 * Note: we don't call zfs_fuid_map_id() here because
+		 * user 0 is not an ephemeral uid.
 		 */
 		mutex_enter(&zp->z_acl_lock);
 		if ((zp->z_mode & (S_IXUSR | (S_IXUSR >> 3) |
@@ -2405,6 +2407,8 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
 
+	zfs_fuid_map_ids(zp, cr, &vap->va_uid, &vap->va_gid);
+
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs), NULL, &mtime, 16);
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL, &ctime, 16);
 
@@ -2418,7 +2422,8 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 * Also, if we are the owner don't bother, since owner should
 	 * always be allowed to read basic attributes of file.
 	 */
-	if (!(zp->z_pflags & ZFS_ACL_TRIVIAL) && (zp->z_uid != crgetuid(cr))) {
+	if (!(zp->z_pflags & ZFS_ACL_TRIVIAL) &&
+	    (vap->va_uid != crgetuid(cr))) {
 		if (error = zfs_zaccess(zp, ACE_READ_ATTRIBUTES, 0,
 		    skipaclchk, cr)) {
 			ZFS_EXIT(zfsvfs);
@@ -2434,8 +2439,6 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	mutex_enter(&zp->z_lock);
 	vap->va_type = vp->v_type;
 	vap->va_mode = zp->z_mode & MODEMASK;
-	vap->va_uid = zp->z_uid;
-	vap->va_gid = zp->z_gid;
 	vap->va_fsid = zp->z_zfsvfs->z_vfs->vfs_dev;
 	vap->va_nodeid = zp->z_id;
 	if ((vp->v_flag & VROOT) && zfs_show_ctldir(zp))
@@ -2773,8 +2776,7 @@ top:
 
 	mutex_enter(&zp->z_lock);
 	oldva.va_mode = zp->z_mode;
-	oldva.va_uid = zp->z_uid;
-	oldva.va_gid = zp->z_gid;
+	zfs_fuid_map_ids(zp, cr, &oldva.va_uid, &oldva.va_gid);
 	if (mask & AT_XVATTR) {
 		/*
 		 * Update xvattr mask to include only those attributes
@@ -2916,7 +2918,7 @@ top:
 		if (mask & AT_UID) {
 			new_uid = zfs_fuid_create(zfsvfs,
 			    (uint64_t)vap->va_uid, cr, ZFS_OWNER, &fuidp);
-			if (vap->va_uid != zp->z_uid &&
+			if (new_uid != zp->z_uid &&
 			    zfs_fuid_overquota(zfsvfs, B_FALSE, new_uid)) {
 				err = EDQUOT;
 				goto out2;
@@ -3022,26 +3024,24 @@ top:
 		if (mask & AT_UID) {
 			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_UID(zfsvfs), NULL,
 			    &new_uid, sizeof (new_uid));
-			zp->z_uid = zfs_fuid_map_id(zfsvfs, new_uid,
-			    cr, ZFS_OWNER);
+			zp->z_uid = new_uid;
 			if (attrzp) {
 				SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
 				    SA_ZPL_UID(zfsvfs), NULL, &new_uid,
 				    sizeof (new_uid));
-				attrzp->z_uid = zp->z_uid;
+				attrzp->z_uid = new_uid;
 			}
 		}
 
 		if (mask & AT_GID) {
 			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_GID(zfsvfs),
 			    NULL, &new_gid, sizeof (new_gid));
-			zp->z_gid = zfs_fuid_map_id(zfsvfs, new_gid, cr,
-			    ZFS_GROUP);
+			zp->z_gid = new_gid;
 			if (attrzp) {
 				SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
 				    SA_ZPL_GID(zfsvfs), NULL, &new_gid,
 				    sizeof (new_gid));
-				attrzp->z_gid = zp->z_gid;
+				attrzp->z_gid = new_gid;
 			}
 		}
 		if (!(mask & AT_MODE)) {
@@ -3866,6 +3866,7 @@ zfs_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
 	int		error;
 	int		zf = ZNEW;
 	uint64_t	parent;
+	uid_t		owner;
 
 	ASSERT(tdvp->v_type == VDIR);
 
@@ -3925,8 +3926,8 @@ zfs_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
 	}
 
 
-	if (szp->z_uid != crgetuid(cr) &&
-	    secpolicy_basic_link(cr) != 0) {
+	owner = zfs_fuid_map_id(zfsvfs, szp->z_uid, cr, ZFS_OWNER);
+	if (owner != crgetuid(cr) && secpolicy_basic_link(cr) != 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EPERM);
 	}

@@ -197,8 +197,8 @@ typedef struct znode {
 	uint64_t	z_atime[2];	/* atime (cached) */
 	uint64_t	z_links;	/* file links (cached) */
 	uint64_t	z_pflags;	/* pflags (cached) */
-	uid_t		z_uid;		/* uid mapped (cached) */
-	uid_t		z_gid;		/* gid mapped (cached) */
+	uint64_t	z_uid;		/* uid fuid (cached) */
+	uint64_t	z_gid;		/* gid fuid (cached) */
 	mode_t		z_mode;		/* mode (cached) */
 	uint32_t	z_sync_cnt;	/* synchronous open count */
 	kmutex_t	z_acl_lock;	/* acl data lock */
