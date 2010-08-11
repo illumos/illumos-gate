@@ -81,9 +81,8 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 
 		while (scn = elf_nextscn(amp->am_elf, scn)) {
 			if ((shdr = elf_getshdr(scn)) == NULL) {
-				eprintf(ofl->ofl_lml, ERR_ELF,
+				ld_eprintf(ofl, ERR_ELF,
 				    MSG_INTL(MSG_ELF_GETSHDR), amp->am_path);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 				return (S_ERROR);
 			}
 			if ((shdr->sh_type == SHT_SYMTAB) ||
@@ -91,9 +90,8 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 				break;
 		}
 		if ((data = elf_getdata(scn, NULL)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETDATA), amp->am_path);
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
+			    amp->am_path);
 			return (S_ERROR);
 		}
 		syms = (Sym *)data->d_buf;
@@ -106,15 +104,13 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 		 */
 		if ((scn = elf_getscn(amp->am_elf, (size_t)shdr->sh_link)) ==
 		    NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETSCN), amp->am_path);
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
+			    amp->am_path);
 			return (S_ERROR);
 		}
 		if ((data = elf_getdata(scn, NULL)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETDATA), amp->am_path);
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
+			    amp->am_path);
 			return (S_ERROR);
 		}
 		strs = data->d_buf;
@@ -200,14 +196,12 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	if (ofl->ofl_flags1 & FLG_OF1_ALLEXRT) {
 		start = NULL;
 	} else  if ((start = elf_getarsym(elf, &number)) == NULL) {
-		if (elf_errno()) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETARSYM), name);
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		} else {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_ELF_ARSYM), name);
-		}
+		if (elf_errno())
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETARSYM),
+			    name);
+		else
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_ELF_ARSYM),
+			    name);
 		return (0);
 	}
 
@@ -328,9 +322,7 @@ ar_member_name(const char *name, Elf *arelf, Ofl_desc *ofl)
 	Elf_Arhdr	*arhdr;
 
 	if ((arhdr = elf_getarhdr(arelf)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETARHDR),
-		    name);
-		ofl->ofl_flags |= FLG_OF_FATAL;
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETARHDR), name);
 		return (NULL);
 	}
 	return (arhdr->ar_name);
@@ -588,19 +580,17 @@ ar_extract_bysym(const char *name, int fd, Ar_desc *adp,
 				 */
 				if (elf_rand(adp->ad_elf, arsym->as_off) !=
 				    arsym->as_off) {
-					eprintf(ofl->ofl_lml, ERR_ELF,
+					ld_eprintf(ofl, ERR_ELF,
 					    MSG_INTL(MSG_ELF_ARMEM), name,
 					    EC_WORD(arsym->as_off),
 					    demangle(arsym->as_name));
-					ofl->ofl_flags |= FLG_OF_FATAL;
 					return (FALSE);
 				}
 
 				if ((arelf = elf_begin(fd, ELF_C_READ,
 				    adp->ad_elf)) == NULL) {
-					eprintf(ofl->ofl_lml, ERR_ELF,
+					ld_eprintf(ofl, ERR_ELF,
 					    MSG_INTL(MSG_ELF_BEGIN), name);
-					ofl->ofl_flags |= FLG_OF_FATAL;
 					return (FALSE);
 				}
 
@@ -870,8 +860,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	if ((found == 0) && rej.rej_type) {
 		Conv_reject_desc_buf_t rej_buf;
 
-		eprintf(ofl->ofl_lml, ERR_WARNING,
-		    MSG_INTL(reject[rej.rej_type]),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(reject[rej.rej_type]),
 		    rej.rej_name ? rej.rej_name : MSG_INTL(MSG_STR_UNKNOWN),
 		    conv_reject_desc(&rej, &rej_buf, ld_targ.t_m.m_mach));
 	}

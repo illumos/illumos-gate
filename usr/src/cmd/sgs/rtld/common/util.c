@@ -2866,11 +2866,9 @@ static char	errbuf[ERRSIZE], *nextptr = errbuf, *prevptr = NULL;
  * The RT_FL_APPLIC flag serves to indicate the transition between process
  * initialization and when the applications code is running.
  */
-/*PRINTFLIKE3*/
 void
-eprintf(Lm_list *lml, Error error, const char *format, ...)
+veprintf(Lm_list *lml, Error error, const char *format, va_list args)
 {
-	va_list		args;
 	int		overflow = 0;
 	static int	lock = 0;
 	Prfbuf		prf;
@@ -2891,8 +2889,6 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	 * still in the initialization stage, output the error directly and
 	 * add a newline.
 	 */
-	va_start(args, format);
-
 	prf.pr_buf = prf.pr_cur = nextptr;
 	prf.pr_len = ERRSIZE - (nextptr - errbuf);
 
@@ -2904,16 +2900,30 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	if (error > ERR_NONE) {
 		if ((error == ERR_FATAL) && (rtld_flags2 & RT_FL2_FTL2WARN))
 			error = ERR_WARNING;
-		if (error == ERR_WARNING) {
+		switch (error) {
+		case ERR_WARNING_NF:
+			if (err_strs[ERR_WARNING_NF] == NULL)
+				err_strs[ERR_WARNING_NF] =
+				    MSG_INTL(MSG_ERR_WARNING);
+			break;
+		case ERR_WARNING:
 			if (err_strs[ERR_WARNING] == NULL)
 				err_strs[ERR_WARNING] =
 				    MSG_INTL(MSG_ERR_WARNING);
-		} else if (error == ERR_FATAL) {
+			break;
+		case ERR_GUIDANCE:
+			if (err_strs[ERR_GUIDANCE] == NULL)
+				err_strs[ERR_GUIDANCE] =
+				    MSG_INTL(MSG_ERR_GUIDANCE);
+			break;
+		case ERR_FATAL:
 			if (err_strs[ERR_FATAL] == NULL)
 				err_strs[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
-		} else if (error == ERR_ELF) {
+			break;
+		case ERR_ELF:
 			if (err_strs[ERR_ELF] == NULL)
 				err_strs[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
+			break;
 		}
 		if (procname) {
 			if (bufprint(&prf, MSG_ORIG(MSG_STR_EMSGFOR1),
@@ -2980,7 +2990,6 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 		*(prf.pr_cur - 1) = '\0';
 
 	DBG_CALL(Dbg_util_str(lml, nextptr));
-	va_end(args);
 
 	/*
 	 * Determine if there was insufficient space left in the buffer to
@@ -3035,6 +3044,17 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 		}
 	}
 	lock = 0;
+}
+
+/*PRINTFLIKE3*/
+void
+eprintf(Lm_list *lml, Error error, const char *format, ...)
+{
+	va_list		args;
+
+	va_start(args, format);
+	veprintf(lml, error, format, args);
+	va_end(args);
 }
 
 #if	DEBUG

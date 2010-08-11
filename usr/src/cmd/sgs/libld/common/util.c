@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -93,7 +92,7 @@ dz_map(size_t size)
 	if ((addr = mmap(0, size, (PROT_READ | PROT_WRITE | PROT_EXEC),
 	    (MAP_PRIVATE | MAP_ANON), -1, 0)) == MAP_FAILED) {
 		int	err = errno;
-		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
+		eprintf(NULL, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
 		    strerror(err));
 		return (MAP_FAILED);
 	}
@@ -502,6 +501,17 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				}
 				break;
 			case 'f':
+				/*
+				 * Translate --fatal-warnings to
+				 * -z fatal-warnings.
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_FATWARN),
+				    0, NULL)) != 0) {
+					optarg = (char *)
+					    MSG_ORIG(MSG_ARG_FATWARN);
+					return (c);
+				}
 				/* Translate --filter <optarg> to -F <optarg> */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'F',
 				    MSG_ORIG(MSG_ARG_T_STDFLTR),
@@ -538,6 +548,18 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				}
 				break;
 			case 'n':
+				/*
+				 * Translate --no-fatal-warnings to
+				 * -z nofatal-warnings.
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_NOFATWARN),
+				    0, NULL)) != 0) {
+					optarg = (char *)
+					    MSG_ORIG(MSG_ARG_NOFATWARN);
+					return (c);
+				}
+
 				/* Translate --no-undefined to -zdefs */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
 				    MSG_ORIG(MSG_ARG_T_NOUNDEF), 0, NULL)) !=

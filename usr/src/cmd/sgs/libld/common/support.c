@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
@@ -73,7 +72,7 @@ ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 	 * with a fatal error.
 	 */
 	if ((handle = dlopen(obj, (RTLD_LAZY | RTLD_FIRST))) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SUP_NOLOAD),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SUP_NOLOAD),
 		    obj, dlerror());
 		return (S_ERROR);
 	}
@@ -119,7 +118,7 @@ ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 			 * than we support, we are unable to accept it.
 			 */
 			if (version > LD_SUP_VCURRENT) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_SUP_BADVERSION), obj,
 				    LD_SUP_VCURRENT, version);
 				(void) dlclose(handle);
@@ -273,9 +272,8 @@ ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
 
 		if ((data == NULL) &&
 		    ((data = elf_getdata(scn, NULL)) == NULL)) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETDATA), ifl->ifl_name);
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
+			    ifl->ifl_name);
 			return (S_ERROR);
 		}
 

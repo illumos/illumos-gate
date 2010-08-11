@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #define	ELF_TARGET_SPARC
 
@@ -76,12 +75,11 @@ ld_reg_check_sparc(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 	    (ELF_ST_BIND(nsym->st_info) == STB_LOCAL)) {
 		if (osym->st_value == nsym->st_value) {
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_INCOMPREG3),
 			    conv_sym_SPARC_value(osym->st_value, 0, &inv_buf1),
 			    sdp->sd_file->ifl_name, demangle(oname),
 			    ifl->ifl_name, demangle(nname));
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}
 		return (0);
@@ -94,12 +92,10 @@ ld_reg_check_sparc(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 		 */
 		if (((osym->st_name == 0) || (nsym->st_name == 0)) ||
 		    (strcmp(oname, nname) != 0)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_INCOMPREG1),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_INCOMPREG1),
 			    conv_sym_SPARC_value(osym->st_value, 0, &inv_buf1),
 			    sdp->sd_file->ifl_name, demangle(oname),
 			    ifl->ifl_name, demangle(nname));
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}
 
@@ -108,22 +104,19 @@ ld_reg_check_sparc(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 		 */
 		if ((osym->st_shndx == SHN_ABS) &&
 		    (nsym->st_shndx == SHN_ABS)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_MULTINIREG),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_MULTINIREG),
 			    conv_sym_SPARC_value(osym->st_value, 0, &inv_buf1),
 			    demangle(nname), sdp->sd_file->ifl_name,
 			    ifl->ifl_name);
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}
 
 	} else if (strcmp(oname, nname) == 0) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYM_INCOMPREG2),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_INCOMPREG2),
 		    demangle(sdp->sd_name), sdp->sd_file->ifl_name,
 		    conv_sym_SPARC_value(osym->st_value, 0, &inv_buf1),
 		    ifl->ifl_name,
 		    conv_sym_SPARC_value(nsym->st_value, 0, &inv_buf2));
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (1);
 	}
 	return (0);
@@ -141,16 +134,14 @@ ld_mach_sym_typecheck_sparc(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl,
 	if (otype != ntype) {
 		if ((otype == STT_SPARC_REGISTER) ||
 		    (ntype == STT_SPARC_REGISTER)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_DIFFTYPE), demangle(sdp->sd_name));
-			eprintf(ofl->ofl_lml, ERR_NONE,
-			    MSG_INTL(MSG_SYM_FILETYPES),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_DIFFTYPE),
+			    demangle(sdp->sd_name));
+			ld_eprintf(ofl, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 			    sdp->sd_file->ifl_name, conv_sym_info_type(
 			    sdp->sd_file->ifl_ehdr->e_machine, otype,
 			    0, &inv_buf1), ifl->ifl_name,
 			    conv_sym_info_type(ifl->ifl_ehdr->e_machine,
 			    ntype, 0, &inv_buf2));
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}
 	} else if (otype == STT_SPARC_REGISTER)
@@ -183,7 +174,7 @@ ld_is_regsym_sparc(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
 	 */
 	if ((sym->st_value < STO_SPARC_REGISTER_G1) ||
 	    (sym->st_value > STO_SPARC_REGISTER_G7)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYM_BADREG),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_BADREG),
 		    ifl->ifl_name, symsecname, symndx, EC_XWORD(sym->st_value));
 		return ((const char *)S_ERROR);
 	}
@@ -192,7 +183,7 @@ ld_is_regsym_sparc(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
 	 * A register symbol can only be undefined or defined (absolute).
 	 */
 	if ((shndx != SHN_ABS) && (shndx != SHN_UNDEF)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYM_BADREG),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_BADREG),
 		    ifl->ifl_name, symsecname, symndx, EC_XWORD(sym->st_value));
 		return ((const char *)S_ERROR);
 	}
@@ -208,8 +199,7 @@ ld_is_regsym_sparc(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
 		    (shndx != SHN_UNDEF)) {
 			Conv_inv_buf_t inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_BADSCRATCH),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_BADSCRATCH),
 			    ifl->ifl_name, symsecname, symndx,
 			    conv_sym_SPARC_value(sym->st_value, 0, &inv_buf));
 			return ((const char *)S_ERROR);

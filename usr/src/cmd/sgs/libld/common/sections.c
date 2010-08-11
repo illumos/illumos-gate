@@ -1001,6 +1001,19 @@ make_dynamic(Ofl_desc *ofl)
 			DBG_CALL(Dbg_unused_file(ofl->ofl_lml, ifl->ifl_soname,
 			    (ifl->ifl_flags & FLG_IF_NEEDSTR), 0));
 
+			/*
+			 * Guidance: Remove unused dependency.
+			 *
+			 * If -z ignore is in effect, this warning is not
+			 * needed because we will quietly remove the unused
+			 * dependency.
+			 */
+			if (OFL_GUIDANCE(ofl, FLG_OFG_NO_UNUSED) &&
+			    ((ifl->ifl_flags & FLG_IF_IGNORE) == 0))
+				ld_eprintf(ofl, ERR_GUIDANCE,
+				    MSG_INTL(MSG_GUIDE_UNUSED),
+				    ifl->ifl_soname);
+
 			if (ifl->ifl_flags & FLG_IF_NEEDSTR)
 				ifl->ifl_flags |= FLG_IF_DEPREQD;
 			else if (ifl->ifl_flags & FLG_IF_IGNORE)
@@ -1599,10 +1612,8 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 	 * created, warn the user.  This scenario can occur if none of the
 	 * input relocatable objects defined any object capabilities.
 	 */
-	if ((ofl->ofl_flags & FLG_OF_OTOSCAP) && (ofl->ofl_capsymcnt == 0)) {
-		eprintf(ofl->ofl_lml, ERR_WARNING,
-		    MSG_INTL(MSG_CAP_NOSYMSFOUND));
-	}
+	if ((ofl->ofl_flags & FLG_OF_OTOSCAP) && (ofl->ofl_capsymcnt == 0))
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_CAP_NOSYMSFOUND));
 
 	/*
 	 * If symbol capabilities have been collected, but no symbols are left
@@ -1611,8 +1622,7 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 	 */
 	if ((ofl->ofl_flags & FLG_OF_OTOSCAP) && ofl->ofl_capsymcnt &&
 	    (ofl->ofl_capfamilies == NULL)) {
-		eprintf(ofl->ofl_lml, ERR_WARNING,
-		    MSG_INTL(MSG_CAP_NOSYMSFOUND));
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_CAP_NOSYMSFOUND));
 		ld_cap_move_symtoobj(ofl);
 		ofl->ofl_capsymcnt = 0;
 		ofl->ofl_capgroups = NULL;
@@ -1832,7 +1842,7 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 			 * capabilities.
 			 */
 			for (APLIST_TRAVERSE(cgp->cg_secs, idx2, isp)) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_CAP_REDUNDANT),
 				    isp->is_file->ifl_name,
 				    EC_WORD(isp->is_scnndx), isp->is_name);

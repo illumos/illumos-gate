@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #define	ELF_TARGET_AMD64
@@ -362,7 +361,7 @@ ld_ent_setup(Ofl_desc *ofl, Xword segalign)
 	 * Initialize the elf library.
 	 */
 	if (elf_version(EV_CURRENT) == EV_NONE) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ELF_LIBELF),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ELF_LIBELF),
 		    EV_CURRENT);
 		return (S_ERROR);
 	}

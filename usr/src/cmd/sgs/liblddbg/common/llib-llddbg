@@ -36,6 +36,7 @@ const char *
 	Dbg_demangle_name(const char *);
 
 void	Dbg_args_file(Lm_list *, int, char *);
+void	Dbg_args_guidance_unknown(Lm_list *, const char *);
 void	Dbg_args_option(Lm_list *, int, int, char *);
 void	Dbg_args_str2chr(Lm_list *, int, const char *, int);
 void	Dbg_args_Wldel(Lm_list *, int, const char *);

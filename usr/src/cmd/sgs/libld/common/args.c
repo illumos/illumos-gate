@@ -95,6 +95,7 @@ static Setstate	dflag	= SET_UNKNOWN;
 static Setstate	zdflag	= SET_UNKNOWN;
 static Setstate	Qflag	= SET_UNKNOWN;
 static Setstate	Bdflag	= SET_UNKNOWN;
+static Setstate zfwflag	= SET_UNKNOWN;
 
 static Boolean	aflag	= FALSE;
 static Boolean	bflag	= FALSE;
@@ -114,7 +115,14 @@ static Boolean	Vflag	= FALSE;
  * ztflag's state is set by pointing it to the matching string:
  *	text | textoff | textwarn
  */
-static const char	*ztflag = 0;
+static const char	*ztflag = NULL;
+
+/*
+ * Remember the guidance flags that result from the initial -z guidance
+ * option, so that they can be compared to any that follow. We only want
+ * to issue a warning when they differ.
+ */
+static ofl_guideflag_t	initial_guidance_flags	= 0;
 
 static uintptr_t process_files_com(Ofl_desc *, int, char **);
 static uintptr_t process_flags_com(Ofl_desc *, int, char **, int *);
@@ -179,8 +187,10 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDFS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDRS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZE));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZFATW));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZFA));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZGP));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZGUIDE));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZH));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZIG));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZINA));
@@ -283,38 +293,42 @@ ld_rescan_archives(Ofl_desc *ofl, int isgrp, int end_arg_ndx)
 static uintptr_t
 check_flags(Ofl_desc * ofl, int argc)
 {
-	if (Plibpath && (Llibdir || Ulibdir)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_YP),
+	/*
+	 * If the user specified -zguidance=noall, then we can safely disable
+	 * the entire feature. The purpose of -zguidance=noall is to allow
+	 * the user to override guidance specified from a makefile via
+	 * the LD_OPTIONS environment variable, and so, we want to behave
+	 * in exactly the same manner we would have if no option were present.
+	 */
+	if ((ofl->ofl_guideflags & (FLG_OFG_ENABLE | FLG_OFG_NO_ALL)) ==
+	    (FLG_OFG_ENABLE | FLG_OFG_NO_ALL))
+		ofl->ofl_guideflags &= ~FLG_OFG_ENABLE;
+
+	if (Plibpath && (Llibdir || Ulibdir))
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_YP),
 		    Llibdir ? 'L' : 'U');
-		ofl->ofl_flags |= FLG_OF_FATAL;
-	}
 
 	if (rflag) {
 		if (dflag == SET_UNKNOWN)
 			dflag = SET_FALSE;
-		if (ofl->ofl_flags & FLG_OF_COMREL) {
-			/*
-			 * Combining relocations when building a relocatable
-			 * object isn't allowed.  Warn the user, but proceed.
-			 */
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_MARG_INCOMP), MSG_INTL(MSG_MARG_REL),
+		/*
+		 * Combining relocations when building a relocatable
+		 * object isn't allowed.  Warn the user, but proceed.
+		 */
+		if (ofl->ofl_flags & FLG_OF_COMREL)
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_MARG_INCOMP),
+			    MSG_INTL(MSG_MARG_REL),
 			    MSG_ORIG(MSG_ARG_ZCOMBRELOC));
-			ofl->ofl_flags &= ~FLG_OF_COMREL;
-		}
 		ofl->ofl_flags |= FLG_OF_RELOBJ;
 	} else {
 		/*
 		 * Translating object capabilities to symbol capabilities is
 		 * only meaningful when creating a relocatable object.
 		 */
-		if (ofl->ofl_flags & FLG_OF_OTOSCAP) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MARG_ONLY),
+		if (ofl->ofl_flags & FLG_OF_OTOSCAP)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_MARG_ONLY),
 			    MSG_ORIG(MSG_ARG_ZSYMBOLCAP),
 			    MSG_INTL(MSG_MARG_REL));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
 
 		/*
 		 * If the user hasn't explicitly requested that relocations
@@ -342,38 +356,24 @@ check_flags(Ofl_desc * ofl, int argc)
 	if (Beflag)
 		ofl->ofl_flags |= FLG_OF_AUTOELM;
 
-	if (Blflag && Beflag) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
+	if (Blflag && Beflag)
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
 		    MSG_ORIG(MSG_ARG_BELIMINATE), MSG_ORIG(MSG_ARG_BLOCAL));
-		ofl->ofl_flags |= FLG_OF_FATAL;
-	}
 
-	if (ofl->ofl_interp && (ofl->ofl_flags1 & FLG_OF1_NOINTRP)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
+	if (ofl->ofl_interp && (ofl->ofl_flags1 & FLG_OF1_NOINTRP))
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
 		    MSG_ORIG(MSG_ARG_CI), MSG_ORIG(MSG_ARG_ZNOINTERP));
-		ofl->ofl_flags |= FLG_OF_FATAL;
-	}
 
 	if ((ofl->ofl_flags1 & (FLG_OF1_NRLXREL | FLG_OF1_RLXREL)) ==
-	    (FLG_OF1_NRLXREL | FLG_OF1_RLXREL)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
+	    (FLG_OF1_NRLXREL | FLG_OF1_RLXREL))
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
 		    MSG_ORIG(MSG_ARG_ZRELAXRELOC),
 		    MSG_ORIG(MSG_ARG_ZNORELAXRELOC));
-		ofl->ofl_flags |= FLG_OF_FATAL;
-	}
 
-	if (ofl->ofl_filtees && !Gflag) {
-		if (ofl->ofl_flags & FLG_OF_AUX) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MARG_ST_ONLYAVL),
-			    MSG_INTL(MSG_MARG_FILTER_AUX));
-		} else {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MARG_ST_ONLYAVL),
-			    MSG_INTL(MSG_MARG_FILTER));
-		}
-		ofl->ofl_flags |= FLG_OF_FATAL;
-	}
+	if (ofl->ofl_filtees && !Gflag)
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_MARG_ST_ONLYAVL),
+		    ((ofl->ofl_flags & FLG_OF_AUX) ?
+		    MSG_INTL(MSG_MARG_FILTER_AUX) : MSG_INTL(MSG_MARG_FILTER)));
 
 	if (dflag != SET_FALSE) {
 		/*
@@ -383,24 +383,19 @@ check_flags(Ofl_desc * ofl, int argc)
 		ofl->ofl_flags |=
 		    (FLG_OF_DYNAMIC | FLG_OF_DYNLIBS | FLG_OF_PROCRED);
 
-		if (aflag) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_INCOMP), MSG_ORIG(MSG_ARG_DY),
-			    MSG_ORIG(MSG_ARG_A));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
+		if (aflag)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
+			    MSG_ORIG(MSG_ARG_DY), MSG_ORIG(MSG_ARG_A));
 
 		if (bflag)
 			ofl->ofl_flags |= FLG_OF_BFLAG;
 
 		if (Bgflag == TRUE) {
-			if (zdflag == SET_FALSE) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+			if (zdflag == SET_FALSE)
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_INCOMP),
 				    MSG_ORIG(MSG_ARG_BGROUP),
 				    MSG_ORIG(MSG_ARG_ZNODEF));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
 			ofl->ofl_dtflags_1 |= DF_1_GROUP;
 			ofl->ofl_flags |= FLG_OF_NOUNDEF;
 		}
@@ -411,8 +406,7 @@ check_flags(Ofl_desc * ofl, int argc)
 		 * job running this object.
 		 */
 		if ((ofl->ofl_dtflags_1 & DF_1_NODEFLIB) && !ofl->ofl_rpath)
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_ARG_NODEFLIB),
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_ARG_NODEFLIB),
 			    MSG_INTL(MSG_MARG_RPATH));
 
 		/*
@@ -422,10 +416,13 @@ check_flags(Ofl_desc * ofl, int argc)
 		 * generated unless specifically asked for.
 		 */
 		if ((ztflag == MSG_ORIG(MSG_ARG_ZTEXTOFF)) ||
-		    ((ztflag == 0) && bflag))
+		    ((ztflag == NULL) && bflag)) {
 			ofl->ofl_flags1 |= FLG_OF1_TEXTOFF;
-		else if (ztflag == MSG_ORIG(MSG_ARG_ZTEXT))
+			ofl->ofl_guideflags |= FLG_OFG_NO_TEXT;
+		} else if (ztflag == MSG_ORIG(MSG_ARG_ZTEXT)) {
 			ofl->ofl_flags |= FLG_OF_PURETXT;
+			ofl->ofl_guideflags |= FLG_OFG_NO_TEXT;
+		}
 
 		if (Gflag || !rflag) {
 			/*
@@ -450,6 +447,7 @@ check_flags(Ofl_desc * ofl, int argc)
 			if (Bdflag == SET_TRUE) {
 				ofl->ofl_dtflags_1 |= DF_1_DIRECT;
 				ofl->ofl_flags1 |= FLG_OF1_LAZYLD;
+				ofl->ofl_guideflags |= FLG_OFG_NO_LAZY;
 				ofl->ofl_flags |= FLG_OF_SYMINFO;
 			}
 
@@ -475,18 +473,21 @@ check_flags(Ofl_desc * ofl, int argc)
 			if (zdflag != SET_FALSE)
 				ofl->ofl_flags |= FLG_OF_NOUNDEF;
 
-			if (Bsflag) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+			/*
+			 * -z textwarn is the default for executables, and
+			 * only an explicit -z text* option can change that,
+			 * so there's no need to provide additional guidance.
+			 */
+			ofl->ofl_guideflags |= FLG_OFG_NO_TEXT;
+
+			if (Bsflag)
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_DY_INCOMP),
 				    MSG_ORIG(MSG_ARG_BSYMBOLIC));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
-			if (ofl->ofl_soname) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+			if (ofl->ofl_soname)
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_MARG_DY_INCOMP),
 				    MSG_INTL(MSG_MARG_SONAME));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
 		} else if (!rflag) {
 			/*
 			 * Shared library.
@@ -494,23 +495,32 @@ check_flags(Ofl_desc * ofl, int argc)
 			ofl->ofl_flags |= FLG_OF_SHAROBJ;
 
 			/*
-			 * By default, print text relocation errors for
-			 * executables but *not* for shared objects.
+			 * By default, print text relocation warnings for
+			 * executables but *not* for shared objects. However,
+			 * if -z guidance is on, issue warnings for shared
+			 * objects as well.
+			 *
+			 * If -z textwarn is explicitly specified, also issue
+			 * guidance messages if -z guidance is on, but not
+			 * for -z text or -z textoff.
 			 */
-			if (ztflag == 0)
-				ofl->ofl_flags1 |= FLG_OF1_TEXTOFF;
+			if (ztflag == NULL) {
+				if (!OFL_GUIDANCE(ofl, FLG_OFG_NO_TEXT))
+					ofl->ofl_flags1 |= FLG_OF1_TEXTOFF;
+			} else if ((ofl->ofl_flags & FLG_OF_PURETXT) ||
+			    (ofl->ofl_flags1 & FLG_OF1_TEXTOFF)) {
+				ofl->ofl_guideflags |= FLG_OFG_NO_TEXT;
+			}
 
 			if (Bsflag) {
 				/*
 				 * -Bsymbolic, and -Bnodirect make no sense.
 				 */
-				if (Bdflag == SET_FALSE) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+				if (Bdflag == SET_FALSE)
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_INCOMP),
 					    MSG_ORIG(MSG_ARG_BSYMBOLIC),
 					    MSG_ORIG(MSG_ARG_BNODIRECT));
-					ofl->ofl_flags |= FLG_OF_FATAL;
-				}
 				ofl->ofl_flags |= FLG_OF_SYMBOLIC;
 				ofl->ofl_dtflags |= DF_SYMBOLIC;
 			}
@@ -518,87 +528,64 @@ check_flags(Ofl_desc * ofl, int argc)
 			/*
 			 * Dynamic relocatable object.
 			 */
-			if (ztflag == 0)
+			if (ztflag == NULL)
 				ofl->ofl_flags1 |= FLG_OF1_TEXTOFF;
+			ofl->ofl_guideflags |= FLG_OFG_NO_TEXT;
 
-			if (ofl->ofl_interp) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+			if (ofl->ofl_interp)
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_MARG_INCOMP),
 				    MSG_INTL(MSG_MARG_REL),
 				    MSG_ORIG(MSG_ARG_CI));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
 		}
 	} else {
 		ofl->ofl_flags |= FLG_OF_STATIC;
 
-		if (bflag) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_ST_INCOMP), MSG_ORIG(MSG_ARG_B));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
-		if (ofl->ofl_soname) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MARG_ST_INCOMP),
+		if (bflag)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_ST_INCOMP),
+			    MSG_ORIG(MSG_ARG_B));
+		if (ofl->ofl_soname)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_MARG_ST_INCOMP),
 			    MSG_INTL(MSG_MARG_SONAME));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
-		if (ofl->ofl_depaudit) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_ST_INCOMP), MSG_ORIG(MSG_ARG_CP));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
-		if (ofl->ofl_audit) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_ST_INCOMP), MSG_ORIG(MSG_ARG_P));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
-		if (ofl->ofl_config) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_ST_INCOMP), MSG_ORIG(MSG_ARG_C));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
-		if (ztflag) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_ST_INCOMP),
+		if (ofl->ofl_depaudit)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_ST_INCOMP),
+			    MSG_ORIG(MSG_ARG_CP));
+		if (ofl->ofl_audit)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_ST_INCOMP),
+			    MSG_ORIG(MSG_ARG_P));
+		if (ofl->ofl_config)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_ST_INCOMP),
+			    MSG_ORIG(MSG_ARG_C));
+		if (ztflag)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_ST_INCOMP),
 			    MSG_ORIG(MSG_ARG_ZTEXTALL));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
-		if (Gflag) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MARG_ST_INCOMP),
+		if (Gflag)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_MARG_ST_INCOMP),
 			    MSG_INTL(MSG_MARG_SO));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
-		if (aflag && rflag) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MARG_INCOMP), MSG_ORIG(MSG_ARG_A),
-			    MSG_INTL(MSG_MARG_REL));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
+		if (aflag && rflag)
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_MARG_INCOMP),
+			    MSG_ORIG(MSG_ARG_A), MSG_INTL(MSG_MARG_REL));
 
 		if (rflag) {
 			/*
 			 * We can only strip the symbol table and string table
 			 * if no output relocations will refer to them.
 			 */
-			if (sflag) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+			if (sflag)
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_ARG_STRIP),
 				    MSG_INTL(MSG_MARG_REL),
 				    MSG_INTL(MSG_MARG_STRIP));
-			}
 
-			if (ztflag == 0)
+			if (ztflag == NULL)
 				ofl->ofl_flags1 |= FLG_OF1_TEXTOFF;
+			ofl->ofl_guideflags |= FLG_OFG_NO_TEXT;
 
-			if (ofl->ofl_interp) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+			if (ofl->ofl_interp)
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_MARG_INCOMP),
 				    MSG_INTL(MSG_MARG_REL),
 				    MSG_ORIG(MSG_ARG_CI));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
 		} else {
 			/*
 			 * Static executable.
@@ -684,12 +671,9 @@ check_flags(Ofl_desc * ofl, int argc)
 	 * object, or are set on a per-symbol basis from a mapfile.
 	 */
 	if (zlflag) {
-		if ((ofl->ofl_filtees == NULL) && (ofl->ofl_dtsfltrs == NULL)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_NOFLTR),
+		if ((ofl->ofl_filtees == NULL) && (ofl->ofl_dtsfltrs == NULL))
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_NOFLTR),
 			    MSG_ORIG(MSG_ARG_ZLOADFLTR));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
 		ofl->ofl_dtflags_1 |= DF_1_LOADFLTR;
 	}
 
@@ -705,8 +689,7 @@ check_flags(Ofl_desc * ofl, int argc)
 		    (argc == 2)) {
 			ofl->ofl_flags1 |= FLG_OF1_DONE;
 		} else {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_NOFILES));
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_NOFILES));
 			return (S_ERROR);
 		}
 	}
@@ -717,11 +700,11 @@ check_flags(Ofl_desc * ofl, int argc)
  * Decompose the string pointed by optarg into argv[][] so that argv[][] can be
  * used as an argument to getopt().
  *
- * If the second argument 'error' is not 0, then this is called from the first
- * pass. Else this is called from the second pass.
+ * If the second argument 'usage' is not NULL, then this is called from the
+ * first pass. Else this is called from the second pass.
  */
 static uintptr_t
-createargv(Ofl_desc *ofl, int *error)
+createargv(Ofl_desc *ofl, int *usage)
 {
 	int		argc = 0, idx = 0, ooptind;
 	uintptr_t	ret;
@@ -811,8 +794,8 @@ createargv(Ofl_desc *ofl, int *error)
 	/*
 	 * Dispatch to pass1 or pass2
 	 */
-	if (error)
-		ret = process_flags_com(ofl, argc, argv, error);
+	if (usage)
+		ret = process_flags_com(ofl, argc, argv, usage);
 	else
 		ret = process_files_com(ofl, argc, argv);
 
@@ -820,12 +803,118 @@ createargv(Ofl_desc *ofl, int *error)
 	return (ret);
 }
 
+/*
+ * Parse the items in a '-z guidance' value, and set the ofl_guideflags.
+ * A guidance option looks like this:
+ *
+ *	-z guidance[=item1,item2,...]
+ *
+ * Where each item specifies categories of guidance messages to suppress,
+ * each starting with the prefix 'no'. We allow arbitrary whitespace between
+ * the items, allow multiple ',' delimiters without an intervening item, and
+ * quietly ignore any items we don't recognize.
+ *
+ * -	Such items are likely to be known to newer versions of the linker,
+ *	and we do not want an older version of the linker to
+ *	complain about them.
+ *
+ * -	Times and standards can change, and so we wish to reserve the
+ *	right to make an old item that no longer makes sense go away.
+ *	Quietly ignoring unrecognized items facilitates this.
+ *
+ * However, we always display unrecognized items in debug output.
+ *
+ * entry:
+ *	ofl - Output descriptor
+ *	optarg - option string to be processed. This will either be a NULL
+ *		terminated 'guidance', or it will be 'guidance=' followed
+ *		by the item tokens as described above.
+ *
+ * exit:
+ *	Returns TRUE (1) on success, FALSE (0) on failure.
+ *
+ */
+static Boolean
+guidance_parse(Ofl_desc *ofl, char *optarg)
+{
+	typedef struct {
+		const char	*name;
+		ofl_guideflag_t	flag;
+	} item_desc;
+
+	static  item_desc items[] = {
+		{ MSG_ORIG(MSG_ARG_GUIDE_NO_ALL),	FLG_OFG_NO_ALL },
+
+		{ MSG_ORIG(MSG_ARG_GUIDE_NO_DEFS),	FLG_OFG_NO_DEFS },
+		{ MSG_ORIG(MSG_ARG_GUIDE_NO_DIRECT),	FLG_OFG_NO_DB },
+		{ MSG_ORIG(MSG_ARG_GUIDE_NO_LAZYLOAD),	FLG_OFG_NO_LAZY },
+		{ MSG_ORIG(MSG_ARG_GUIDE_NO_MAPFILE),	FLG_OFG_NO_MF },
+		{ MSG_ORIG(MSG_ARG_GUIDE_NO_TEXT),	FLG_OFG_NO_TEXT },
+		{ MSG_ORIG(MSG_ARG_GUIDE_NO_UNUSED),	FLG_OFG_NO_UNUSED },
+		{ NULL,					0 }
+	};
+
+	char		*lasts, *name;
+	item_desc	*item;
+	ofl_guideflag_t	ofl_guideflags = FLG_OFG_ENABLE;
+
+	/*
+	 * Skip the 'guidance' prefix. If NULL terminated, there are no
+	 * item values to parse. Otherwise, skip the '=' and parse the items.
+	 */
+	optarg += MSG_ARG_GUIDE_SIZE;
+	if (*optarg == '=') {
+		optarg++;
+
+		if ((name = libld_malloc(strlen(optarg) + 1)) == NULL)
+			return (FALSE);
+		(void) strcpy(name, optarg);
+
+		if ((name = strtok_r(name, MSG_ORIG(MSG_ARG_GUIDE_DELIM),
+		    &lasts)) != NULL) {
+			do {
+				for (item = items; item->name != NULL; item++)
+					if (strcasecmp(name, item->name) == 0)
+						break;
+				if (item->name == NULL) {
+					DBG_CALL(Dbg_args_guidance_unknown(
+					    ofl->ofl_lml, name));
+					continue;
+				}
+				ofl_guideflags |= item->flag;
+			} while ((name = strtok_r(NULL,
+			    MSG_ORIG(MSG_ARG_GUIDE_DELIM), &lasts)) != NULL);
+		}
+	}
+
+	/*
+	 * If -zguidance is used more than once, we take the first one. We
+	 * do this quietly if they have identical options, and with a warning
+	 * otherwise.
+	 */
+	if ((initial_guidance_flags & FLG_OFG_ENABLE) &&
+	    (ofl_guideflags != initial_guidance_flags)) {
+		ld_eprintf(ofl, ERR_WARNING_NF, MSG_INTL(MSG_ARG_MTONCE),
+		    MSG_ORIG(MSG_ARG_ZGUIDE));
+		return (TRUE);
+	}
+
+	/*
+	 * First time: Save the flags for comparison to any subsequent
+	 * -z guidance that comes along, and OR the resulting flags into
+	 * the flags kept in the output descriptor.
+	 */
+	initial_guidance_flags = ofl_guideflags;
+	ofl->ofl_guideflags |= ofl_guideflags;
+	return (TRUE);
+}
+
 static int	optitle = 0;
 /*
  * Parsing options pass1 for process_flags().
  */
 static uintptr_t
-parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
+parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *usage)
 {
 	int	c, ndx = optind;
 
@@ -850,12 +939,10 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			 * Here we sanity check the option incase some other
 			 * -3* option is mistakenly passed to us.
 			 */
-			if (optarg[0] != '2') {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+			if (optarg[0] != '2')
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_3), optarg);
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
 			continue;
 
 		case '6':
@@ -866,12 +953,10 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			 * Here we sanity check the option incase some other
 			 * -6* option is mistakenly passed to us.
 			 */
-			if (optarg[0] != '4') {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+			if (optarg[0] != '4')
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_6), optarg);
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
 			continue;
 
 		case 'a':
@@ -899,7 +984,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 		case 'c':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_config)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING_NF,
 				    MSG_INTL(MSG_ARG_MTONCE),
 				    MSG_ORIG(MSG_ARG_C));
 			else
@@ -915,30 +1000,29 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if ((optarg[0] == 'n') && (optarg[1] == '\0')) {
 				if (dflag != SET_UNKNOWN)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_D));
 				else
 					dflag = SET_FALSE;
 			} else if ((optarg[0] == 'y') && (optarg[1] == '\0')) {
 				if (dflag != SET_UNKNOWN)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_D));
 				else
 					dflag = SET_TRUE;
 			} else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_D), optarg);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 			break;
 
 		case 'e':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_entry)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING_NF,
 				    MSG_INTL(MSG_MARG_MTONCE),
 				    MSG_INTL(MSG_MARG_ENTRY));
 			else
@@ -949,11 +1033,10 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_filtees &&
 			    (!(ofl->ofl_flags & FLG_OF_AUX))) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_MARG_INCOMP),
 				    MSG_INTL(MSG_MARG_FILTER_AUX),
 				    MSG_INTL(MSG_MARG_FILTER));
-				ofl->ofl_flags |= FLG_OF_FATAL;
 			} else {
 				if ((ofl->ofl_filtees =
 				    add_string(ofl->ofl_filtees, optarg)) ==
@@ -967,11 +1050,10 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_filtees &&
 			    (ofl->ofl_flags & FLG_OF_AUX)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_MARG_INCOMP),
 				    MSG_INTL(MSG_MARG_FILTER),
 				    MSG_INTL(MSG_MARG_FILTER_AUX));
-				ofl->ofl_flags |= FLG_OF_FATAL;
 			} else {
 				if ((ofl->ofl_filtees =
 				    add_string(ofl->ofl_filtees, optarg)) ==
@@ -983,7 +1065,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 		case 'h':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_soname)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING_NF,
 				    MSG_INTL(MSG_MARG_MTONCE),
 				    MSG_INTL(MSG_MARG_SONAME));
 			else
@@ -998,7 +1080,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 		case 'I':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_interp)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING_NF,
 				    MSG_INTL(MSG_ARG_MTONCE),
 				    MSG_ORIG(MSG_ARG_CI));
 			else
@@ -1024,7 +1106,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 		case 'o':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_name)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING_NF,
 				    MSG_INTL(MSG_MARG_MTONCE),
 				    MSG_INTL(MSG_MARG_OUTFILE));
 			else
@@ -1107,7 +1189,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			 */
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_HELP),
 			    MSG_ARG_HELP_SIZE) == 0) {
-				usage_mesg(1);
+				usage_mesg(TRUE);
 				exit(0);
 			}
 
@@ -1119,57 +1201,53 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			    MSG_ARG_LD32_SIZE) == 0) ||
 			    (strncmp(optarg, MSG_ORIG(MSG_ARG_LD64),
 			    MSG_ARG_LD64_SIZE) == 0)) {
-				if (createargv(ofl, error) == S_ERROR)
+				if (createargv(ofl, usage) == S_ERROR)
 					return (S_ERROR);
 
 			} else if (
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_DEFS)) == 0) {
 				if (zdflag != SET_UNKNOWN)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_ZDEFNODEF));
 				else
 					zdflag = SET_TRUE;
+				ofl->ofl_guideflags |= FLG_OFG_NO_DEFS;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_NODEFS)) == 0) {
 				if (zdflag != SET_UNKNOWN)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_ZDEFNODEF));
 				else
 					zdflag = SET_FALSE;
+				ofl->ofl_guideflags |= FLG_OFG_NO_DEFS;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_TEXT)) == 0) {
 				if (ztflag &&
-				    (ztflag != MSG_ORIG(MSG_ARG_ZTEXT))) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+				    (ztflag != MSG_ORIG(MSG_ARG_ZTEXT)))
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_INCOMP),
 					    MSG_ORIG(MSG_ARG_ZTEXT),
 					    ztflag);
-					ofl->ofl_flags |= FLG_OF_FATAL;
-				}
 				ztflag = MSG_ORIG(MSG_ARG_ZTEXT);
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_TEXTOFF)) == 0) {
 				if (ztflag &&
-				    (ztflag != MSG_ORIG(MSG_ARG_ZTEXTOFF))) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+				    (ztflag != MSG_ORIG(MSG_ARG_ZTEXTOFF)))
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_INCOMP),
 					    MSG_ORIG(MSG_ARG_ZTEXTOFF),
 					    ztflag);
-					ofl->ofl_flags |= FLG_OF_FATAL;
-				}
 				ztflag = MSG_ORIG(MSG_ARG_ZTEXTOFF);
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_TEXTWARN)) == 0) {
 				if (ztflag &&
-				    (ztflag != MSG_ORIG(MSG_ARG_ZTEXTWARN))) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+				    (ztflag != MSG_ORIG(MSG_ARG_ZTEXTWARN)))
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_INCOMP),
 					    MSG_ORIG(MSG_ARG_ZTEXTWARN),
 					    ztflag);
-					ofl->ofl_flags |= FLG_OF_FATAL;
-				}
 				ztflag = MSG_ORIG(MSG_ARG_ZTEXTWARN);
 
 			/*
@@ -1276,10 +1354,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 					ofl->ofl_ars_gsandx = ndx;
 				} else if (ofl->ofl_ars_gsandx > 0) {
 					/* Another group is still open */
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_AR_GRP_OLAP),
 					    MSG_INTL(MSG_MARG_AR_GRPS));
-					ofl->ofl_flags |= FLG_OF_FATAL;
 					/* Don't report cascading errors */
 					ofl->ofl_ars_gsandx = -1;
 				}
@@ -1289,11 +1366,10 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 					ofl->ofl_ars_gsandx = 0;
 				} else if (ofl->ofl_ars_gsandx == 0) {
 					/* There was no matching begin */
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_AR_GRP_BAD),
 					    MSG_INTL(MSG_MARG_AR_GRP_END),
 					    MSG_INTL(MSG_MARG_AR_GRP_START));
-					ofl->ofl_flags |= FLG_OF_FATAL;
 					/* Don't report cascading errors */
 					ofl->ofl_ars_gsandx = -1;
 				}
@@ -1307,6 +1383,30 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 				if (ld_wrap_enter(ofl,
 				    optarg + MSG_ARG_WRAP_SIZE) == NULL)
 					return (S_ERROR);
+			} else if ((strncmp(optarg, MSG_ORIG(MSG_ARG_GUIDE),
+			    MSG_ARG_GUIDE_SIZE) == 0) &&
+			    ((optarg[MSG_ARG_GUIDE_SIZE] == '=') ||
+			    (optarg[MSG_ARG_GUIDE_SIZE] == '\0'))) {
+				if (!guidance_parse(ofl, optarg))
+					return (S_ERROR);
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_FATWARN)) == 0) {
+				if (zfwflag  == SET_FALSE) {
+					ld_eprintf(ofl, ERR_WARNING_NF,
+					    MSG_INTL(MSG_ARG_MTONCE),
+					    MSG_ORIG(MSG_ARG_ZFATWNOFATW));
+				} else {
+					zfwflag = SET_TRUE;
+					ofl->ofl_flags |= FLG_OF_FATWARN;
+				}
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_NOFATWARN)) == 0) {
+				if (zfwflag  == SET_TRUE)
+					ld_eprintf(ofl, ERR_WARNING_NF,
+					    MSG_INTL(MSG_ARG_MTONCE),
+					    MSG_ORIG(MSG_ARG_ZFATWNOFATW));
+				else
+					zfwflag = SET_FALSE;
 
 			/*
 			 * The following options just need validation as they
@@ -1340,10 +1440,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			    MSG_ARG_TARGET_SIZE) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_RESCAN_NOW)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_DEFERRED))) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_Z), optarg);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 
 			break;
@@ -1380,23 +1479,25 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (strcmp(optarg, MSG_ORIG(MSG_ARG_DIRECT)) == 0) {
 				if (Bdflag == SET_FALSE) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_INCOMP),
 					    MSG_ORIG(MSG_ARG_BNODIRECT),
 					    MSG_ORIG(MSG_ARG_BDIRECT));
-					ofl->ofl_flags |= FLG_OF_FATAL;
-				} else
+				} else {
 					Bdflag = SET_TRUE;
+					ofl->ofl_guideflags |= FLG_OFG_NO_DB;
+				}
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_NODIRECT)) == 0) {
 				if (Bdflag == SET_TRUE) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_INCOMP),
 					    MSG_ORIG(MSG_ARG_BDIRECT),
 					    MSG_ORIG(MSG_ARG_BNODIRECT));
-					ofl->ofl_flags |= FLG_OF_FATAL;
-				} else
+				} else {
 					Bdflag = SET_FALSE;
+					ofl->ofl_guideflags |= FLG_OFG_NO_DB;
+				}
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_STR_SYMBOLIC)) == 0)
 				Bsflag = TRUE;
@@ -1411,16 +1512,15 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 				Beflag = TRUE;
 			else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_TRANSLATOR)) == 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_ARG_UNSUPPORTED),
 				    MSG_ORIG(MSG_ARG_BTRANSLATOR));
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_STR_LD_DYNAMIC)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_STATIC))) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_CB), optarg);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 			break;
 
@@ -1448,23 +1548,22 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if ((optarg[0] == 'n') && (optarg[1] == '\0')) {
 				if (Qflag != SET_UNKNOWN)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_CQ));
 				else
 					Qflag = SET_FALSE;
 			} else if ((optarg[0] == 'y') && (optarg[1] == '\0')) {
 				if (Qflag != SET_UNKNOWN)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_CQ));
 				else
 					Qflag = SET_TRUE;
 			} else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_CQ), optarg);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 			break;
 
@@ -1487,7 +1586,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_LCOM), 2) == 0) {
 				if (Llibdir)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_CYL));
 				else
@@ -1495,7 +1594,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strncmp(optarg,
 			    MSG_ORIG(MSG_ARG_UCOM), 2) == 0) {
 				if (Ulibdir)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_CYU));
 				else
@@ -1503,22 +1602,23 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strncmp(optarg,
 			    MSG_ORIG(MSG_ARG_PCOM), 2) == 0) {
 				if (Plibpath)
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING_NF,
 					    MSG_INTL(MSG_ARG_MTONCE),
 					    MSG_ORIG(MSG_ARG_CYP));
 				else
 					Plibpath = optarg + 2;
 			} else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_CY), optarg);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 			break;
 
 		case '?':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
-			(*error)++;
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_ARG_UNKNOWN), optopt);
+			(*usage)++;
 			break;
 
 		default:
@@ -1561,10 +1661,9 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 						ofl->ofl_flags |=
 						    FLG_OF_DYNLIBS;
 					else {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
+						ld_eprintf(ofl, ERR_FATAL,
 						    MSG_INTL(MSG_ARG_ST_INCOMP),
 						    MSG_ORIG(MSG_ARG_BDYNAMIC));
-						ofl->ofl_flags |= FLG_OF_FATAL;
 					}
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_STATIC)) == 0)
@@ -1582,12 +1681,10 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				/*
 				 * Record DT_NEEDED string
 				 */
-				if (!(ofl->ofl_flags & FLG_OF_DYNAMIC)) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+				if (!(ofl->ofl_flags & FLG_OF_DYNAMIC))
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_ARG_ST_INCOMP),
 					    MSG_ORIG(MSG_ARG_CN));
-					ofl->ofl_flags |= FLG_OF_FATAL;
-				}
 				if (((ifl = libld_calloc(1,
 				    sizeof (Ifl_desc))) == NULL) ||
 				    (aplist_append(&ofl->ofl_sos, ifl,
@@ -1637,9 +1734,11 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_DIRECT)) == 0) {
 					ofl->ofl_flags1 |= FLG_OF1_ZDIRECT;
+					ofl->ofl_guideflags |= FLG_OFG_NO_DB;
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_NODIRECT)) == 0) {
 					ofl->ofl_flags1 &= ~FLG_OF1_ZDIRECT;
+					ofl->ofl_guideflags |= FLG_OFG_NO_DB;
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_IGNORE)) == 0) {
 					ofl->ofl_flags1 |= FLG_OF1_IGNORE;
@@ -1649,9 +1748,11 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_LAZYLOAD)) == 0) {
 					ofl->ofl_flags1 |= FLG_OF1_LAZYLD;
+					ofl->ofl_guideflags |= FLG_OFG_NO_LAZY;
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_NOLAZYLOAD)) == 0) {
 					ofl->ofl_flags1 &= ~ FLG_OF1_LAZYLD;
+					ofl->ofl_guideflags |= FLG_OFG_NO_LAZY;
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_GROUPPERM)) == 0) {
 					ofl->ofl_flags1 |= FLG_OF1_GRPPRM;
@@ -1745,7 +1846,7 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
  * Pass 1 -- process_flags: collects all options and sets flags
  */
 static uintptr_t
-process_flags_com(Ofl_desc *ofl, int argc, char **argv, int *e)
+process_flags_com(Ofl_desc *ofl, int argc, char **argv, int *usage)
 {
 	for (; optind < argc; optind++) {
 		/*
@@ -1755,8 +1856,8 @@ process_flags_com(Ofl_desc *ofl, int argc, char **argv, int *e)
 		 */
 		while ((optind < argc) && (argv[optind][0] == '-')) {
 			if (argv[optind][1] != '\0') {
-				if (parseopt_pass1(ofl, argc, argv, e) ==
-				    S_ERROR)
+				if (parseopt_pass1(ofl, argc, argv,
+				    usage) == S_ERROR)
 					return (S_ERROR);
 			} else if (++optind < argc)
 				continue;
@@ -1768,10 +1869,9 @@ process_flags_com(Ofl_desc *ofl, int argc, char **argv, int *e)
 
 	/* Did an unterminated archive group run off the end? */
 	if (ofl->ofl_ars_gsandx > 0) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_AR_GRP_BAD),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_AR_GRP_BAD),
 		    MSG_INTL(MSG_MARG_AR_GRP_START),
 		    MSG_INTL(MSG_MARG_AR_GRP_END));
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (S_ERROR);
 	}
 
@@ -1781,7 +1881,7 @@ process_flags_com(Ofl_desc *ofl, int argc, char **argv, int *e)
 uintptr_t
 ld_process_flags(Ofl_desc *ofl, int argc, char **argv)
 {
-	int	error = 0;	/* Collect all argument errors before exit */
+	int	usage = 0;	/* Collect all argument errors before exit */
 
 	if (argc < 2) {
 		usage_mesg(FALSE);
@@ -1793,14 +1893,14 @@ ld_process_flags(Ofl_desc *ofl, int argc, char **argv)
 	 */
 	opterr = 0;
 	optind = 1;
-	if (process_flags_com(ofl, argc, argv, &error) == S_ERROR)
+	if (process_flags_com(ofl, argc, argv, &usage) == S_ERROR)
 		return (S_ERROR);
 
 	/*
-	 * Having parsed everything, did we have any errors.
+	 * Having parsed everything, did we have any usage errors.
 	 */
-	if (error) {
-		usage_mesg(TRUE);
+	if (usage) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_USEHELP));
 		return (S_ERROR);
 	}
 
@@ -1839,9 +1939,8 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 		if ((fd = open(path, O_RDONLY)) == -1) {
 			int err = errno;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_SYS_OPEN), path, strerror(err));
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
 		}
 
@@ -1860,13 +1959,12 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 		if (rej.rej_type) {
 			Conv_reject_desc_buf_t rej_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(reject[rej.rej_type]),
 			    rej.rej_name ? rej.rej_name :
 			    MSG_INTL(MSG_STR_UNKNOWN),
 			    conv_reject_desc(&rej, &rej_buf,
 			    ld_targ.t_m.m_mach));
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}
 	}
@@ -1888,6 +1986,20 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 		return (S_ERROR);
 	if (ofl->ofl_flags & FLG_OF_FATAL)
 		return (1);
+
+	/*
+	 * Guidance: Use -B direct/nodirect or -z direct/nodirect.
+	 *
+	 * This is a backstop for the case where the link had no dependencies.
+	 * Otherwise, it will get caught by ld_process_ifl(). We need both,
+	 * because -z direct is positional, and its value at the time where
+	 * the first dependency is seen might be different than it is now.
+	 */
+	if ((ofl->ofl_flags & FLG_OF_DYNAMIC) &&
+	    OFL_GUIDANCE(ofl, FLG_OFG_NO_DB)) {
+		ld_eprintf(ofl, ERR_GUIDANCE, MSG_INTL(MSG_GUIDE_DIRECT));
+		ofl->ofl_guideflags |= FLG_OFG_NO_DB;
+	}
 
 	/*
 	 * Now that all command line files have been processed see if there are

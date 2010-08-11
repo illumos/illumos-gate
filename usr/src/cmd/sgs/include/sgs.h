@@ -47,6 +47,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/machelf.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <libelf.h>
 #include <assert.h>
 #include <alist.h>
@@ -118,15 +119,17 @@ typedef enum {
 } Boolean;
 
 /*
- * Types of errors (used by eprintf()), together with a generic error return
+ * Types of errors (used by veprintf()), together with a generic error return
  * value.
  */
 typedef enum {
-	ERR_NONE,
-	ERR_WARNING,
-	ERR_FATAL,
-	ERR_ELF,
-	ERR_NUM				/* Must be last */
+	ERR_NONE,		/* plain message */
+	ERR_WARNING_NF,		/* warning that cannot be promoted to fatal */
+	ERR_WARNING,		/* warning that can be promoted to fatal */
+	ERR_GUIDANCE,		/* guidance warning that can be promoted */
+	ERR_FATAL,		/* fatal error */
+	ERR_ELF,		/* fatal libelf error */
+	ERR_NUM			/* # of Error codes. Must be last */
 } Error;
 
 /*
@@ -258,6 +261,7 @@ typedef struct lm_list32	Lm_list32;
  */
 extern int	assfail(const char *, const char *, int);
 extern void	eprintf(Lm_list *, Error, const char *, ...);
+extern void	veprintf(Lm_list *, Error, const char *, va_list);
 extern uint_t	sgs_str_hash(const char *);
 extern uint_t	findprime(uint_t);
 

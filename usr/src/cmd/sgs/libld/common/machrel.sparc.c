@@ -581,7 +581,7 @@ plt_entry(Ofl_desc * ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 #endif /* _ELF64 */
 
 static uintptr_t
-ld_perform_outreloc(Rel_desc *orsp, Ofl_desc *ofl)
+ld_perform_outreloc(Rel_desc *orsp, Ofl_desc *ofl, Boolean *remain_seen)
 {
 	Os_desc		*relosp, *osp = NULL;
 	Xword		ndx, roffset, value;
@@ -732,8 +732,7 @@ ld_perform_outreloc(Rel_desc *orsp, Ofl_desc *ofl)
 		    ((rep->re_fsize == 8) && (roffset & 0x7))) {
 			Conv_inv_buf_t inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_NONALIGN),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_NONALIGN),
 			    conv_reloc_SPARC_type(orsp->rel_rtype, 0, &inv_buf),
 			    orsp->rel_isdesc->is_file->ifl_name,
 			    ld_reloc_sym_name(orsp), EC_XWORD(roffset));
@@ -802,7 +801,7 @@ ld_perform_outreloc(Rel_desc *orsp, Ofl_desc *ofl)
 	 * Determine if this relocation is against a non-writable, allocatable
 	 * section.  If so we may need to provide a text relocation diagnostic.
 	 */
-	ld_reloc_remain_entry(orsp, osp, ofl);
+	ld_reloc_remain_entry(orsp, osp, ofl, remain_seen);
 	return (1);
 }
 
@@ -1036,7 +1035,7 @@ gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	else
 		ifl_name = MSG_INTL(MSG_STR_NULL);
 
-	eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_BADGOTFIX),
+	ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_BADGOTFIX),
 	    conv_reloc_SPARC_type(arsp->rel_rtype, 0, &inv_buf),
 	    ifl_name, ld_reloc_sym_name(arsp));
 
@@ -1336,8 +1335,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 		if (arsp->rel_isdesc->is_indata->d_buf == 0) {
 			Conv_inv_buf_t	inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_EMPTYSEC),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_EMPTYSEC),
 			    conv_reloc_SPARC_type(arsp->rel_rtype, 0, &inv_buf),
 			    ifl_name, ld_reloc_sym_name(arsp),
 			    EC_WORD(arsp->rel_isdesc->is_scnndx),
@@ -1368,8 +1366,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			else
 				class = ERR_WARNING;
 
-			eprintf(ofl->ofl_lml, class,
-			    MSG_INTL(MSG_REL_INVALOFFSET),
+			ld_eprintf(ofl, class, MSG_INTL(MSG_REL_INVALOFFSET),
 			    conv_reloc_SPARC_type(arsp->rel_rtype, 0, &inv_buf),
 			    ifl_name, EC_WORD(arsp->rel_isdesc->is_scnndx),
 			    arsp->rel_isdesc->is_name, ld_reloc_sym_name(arsp),
@@ -1388,8 +1385,10 @@ ld_do_activerelocs(Ofl_desc *ofl)
 		if (OFL_DO_RELOC(ofl)) {
 			if (do_reloc_ld(arsp, addr, &value, ld_reloc_sym_name,
 			    ifl_name, OFL_SWAP_RELOC_DATA(ofl, arsp),
-			    ofl->ofl_lml) == 0)
+			    ofl->ofl_lml) == 0) {
+				ofl->ofl_flags |= FLG_OF_FATAL;
 				return_code = S_ERROR;
+			}
 		}
 	}
 	return (return_code);
@@ -1424,8 +1423,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		 * object - so emit the proper error message if that occurs.
 		 */
 		if ((rtype == R_SPARC_HIPLT22) || (rtype == R_SPARC_LOPLT10)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_UNRELREL),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_UNRELREL),
 			    conv_reloc_SPARC_type(rsp->rel_rtype, 0, &inv_buf),
 			    rsp->rel_isdesc->is_file->ifl_name,
 			    ld_reloc_sym_name(rsp));
@@ -1441,8 +1439,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		 */
 		if ((rtype == R_SPARC_H44) || (rtype == R_SPARC_M44) ||
 		    (rtype == R_SPARC_L44)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_SHOBJABS44),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_SHOBJABS44),
 			    conv_reloc_SPARC_type(rsp->rel_rtype, 0, &inv_buf),
 			    rsp->rel_isdesc->is_file->ifl_name,
 			    ld_reloc_sym_name(rsp));
@@ -1652,8 +1649,7 @@ ld_reloc_local(Rel_desc *rsp, Ofl_desc *ofl)
 		 */
 		if (osp && (osp->os_shdr->sh_type == SHT_SUNW_ANNOTATE))
 			return (0);
-		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
-		    MSG_INTL(MSG_REL_EXTERNSYM),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_EXTERNSYM),
 		    conv_reloc_SPARC_type(rsp->rel_rtype, 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    ld_reloc_sym_name(rsp), osp->os_name);
@@ -1885,8 +1881,7 @@ ld_assign_got(Ofl_desc *ofl, Sym_desc *sdp)
 			large_index += gotents;
 			break;
 		default:
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_ASSIGNGOT),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_ASSIGNGOT),
 			    EC_XWORD(gnp->gn_gotndx), demangle(sdp->sd_name));
 			return (S_ERROR);
 		}
@@ -2023,12 +2018,12 @@ ld_allocate_got(Ofl_desc * ofl)
 	 *		(M_GOT_MAXSMALL/2 - M_GOT_XNumber) mixed mode indices.
 	 */
 	if (smlgotcnt > M_GOT_MAXSMALL) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_SMALLGOT),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_SMALLGOT),
 		    EC_WORD(smlgotcnt), M_GOT_MAXSMALL);
 		return (S_ERROR);
 	}
 	if (mixgotcnt > (first_large_ndx - M_GOT_XNumber)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_MIXEDGOT),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_MIXEDGOT),
 		    EC_WORD(mixgotcnt), first_large_ndx - M_GOT_XNumber);
 		return (S_ERROR);
 	}

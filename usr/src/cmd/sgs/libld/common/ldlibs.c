@@ -312,15 +312,13 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	if (rej.rej_type) {
 		Conv_reject_desc_buf_t rej_buf;
 
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(reject[rej.rej_type]),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(reject[rej.rej_type]),
 		    rej.rej_name ? rej.rej_name : MSG_INTL(MSG_STR_UNKNOWN),
 		    conv_reject_desc(&rej, &rej_buf, ld_targ.t_m.m_mach));
 	} else {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_LIB_NOTFOUND),
-		    name);
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_LIB_NOTFOUND), name);
 	}
 
-	ofl->ofl_flags |= FLG_OF_FATAL;
 	return (0);
 }
 
@@ -385,7 +383,7 @@ ld_lib_setup(Ofl_desc *ofl)
 			if (cp == (char *)S_ERROR)
 				return (S_ERROR);
 			else if (cp)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_LIB_MALFORM));
 		}
 	}
@@ -398,7 +396,7 @@ ld_lib_setup(Ofl_desc *ofl)
 	if (cp == (char *)S_ERROR)
 		return (S_ERROR);
 	else if (cp) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_LIB_BADYP));
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_LIB_BADYP));
 		return (S_ERROR);
 	}
 	DBG_CALL(Dbg_libs_init(ofl->ofl_lml, ofl->ofl_ulibdirs,

@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -127,7 +126,7 @@ ld_open_outfile(Ofl_desc * ofl)
 				int	err = errno;
 
 				if (err != ENOENT) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_SYS_OPEN),
 					    ofl->ofl_name, strerror(err));
 					return (S_ERROR);
@@ -140,7 +139,7 @@ ld_open_outfile(Ofl_desc * ofl)
 			    (errno != ENOENT)) {
 				int err = errno;
 
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_SYS_UNLINK),
 				    ofl->ofl_name, strerror(err));
 				return (S_ERROR);
@@ -157,7 +156,7 @@ ld_open_outfile(Ofl_desc * ofl)
 	    mode)) < 0) {
 		int	err = errno;
 
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
 		    ofl->ofl_name, strerror(err));
 		return (S_ERROR);
 	}
@@ -194,12 +193,12 @@ pad_outfile(Ofl_desc *ofl)
 	 * section headers and data buffers as they relate to the new image.
 	 */
 	if (elf_update(ofl->ofl_welf, ELF_C_NULL) == -1) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 	if ((ehdr = elf_getehdr(ofl->ofl_welf)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETEHDR),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETEHDR),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
@@ -233,7 +232,7 @@ pad_outfile(Ofl_desc *ofl)
 			    offset);
 
 			if ((data = elf_newdata(oscn)) == NULL) {
-				eprintf(ofl->ofl_lml, ERR_ELF,
+				ld_eprintf(ofl, ERR_ELF,
 				    MSG_INTL(MSG_ELF_NEWDATA), ofl->ofl_name);
 				return (S_ERROR);
 			}
@@ -293,7 +292,7 @@ create_outsec(Ofl_desc *ofl, Sg_desc *sgp, Os_desc *osp, Word ptype, int shidx,
 	 * Get a section descriptor for the section.
 	 */
 	if ((scn = elf_newscn(ofl->ofl_welf)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_NEWSCN),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_NEWSCN),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
@@ -304,7 +303,7 @@ create_outsec(Ofl_desc *ofl, Sg_desc *sgp, Os_desc *osp, Word ptype, int shidx,
 	 * information from the in-core descriptor.
 	 */
 	if ((shdr = elf_getshdr(scn)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
@@ -408,7 +407,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	 * Tell the access library about our new temporary file.
 	 */
 	if ((ofl->ofl_welf = elf_begin(fd, cmd, 0)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
@@ -417,7 +416,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	 * Obtain a new Elf header.
 	 */
 	if ((ofl->ofl_nehdr = elf_newehdr(ofl->ofl_welf)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_NEWEHDR),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_NEWEHDR),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
@@ -598,7 +597,7 @@ ld_create_outfile(Ofl_desc *ofl)
 				 * the old data.
 				 */
 				if ((data = elf_newdata(osp->os_scn)) == NULL) {
-					eprintf(ofl->ofl_lml, ERR_ELF,
+					ld_eprintf(ofl, ERR_ELF,
 					    MSG_INTL(MSG_ELF_NEWDATA),
 					    ofl->ofl_name);
 					return (S_ERROR);
@@ -697,8 +696,8 @@ ld_create_outfile(Ofl_desc *ofl)
 	if (nseg) {
 		if ((ofl->ofl_phdr = elf_newphdr(ofl->ofl_welf,
 		    nseg)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_NEWPHDR), ofl->ofl_name);
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_NEWPHDR),
+			    ofl->ofl_name);
 			return (S_ERROR);
 		}
 	}
@@ -733,7 +732,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	 */
 	if ((ofl->ofl_size = (size_t)elf_update(ofl->ofl_welf,
 	    ELF_C_WRIMAGE)) == (size_t)-1) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
@@ -747,19 +746,19 @@ ld_create_outfile(Ofl_desc *ofl)
 	 */
 	if ((ofl->ofl_elf = elf_begin(0, ELF_C_IMAGE,
 	    ofl->ofl_welf)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 	if ((ofl->ofl_nehdr = elf_getehdr(ofl->ofl_elf)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETEHDR),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETEHDR),
 		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 	if (!(flags & FLG_OF_RELOBJ))
 		if ((ofl->ofl_phdr = elf_getphdr(ofl->ofl_elf)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETPHDR), ofl->ofl_name);
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETPHDR),
+			    ofl->ofl_name);
 			return (S_ERROR);
 		}
 
@@ -790,14 +789,14 @@ ld_create_outfile(Ofl_desc *ofl)
 			}
 			if ((osp->os_scn =
 			    elf_getscn(ofl->ofl_elf, ++ndx)) == NULL) {
-				eprintf(ofl->ofl_lml, ERR_ELF,
+				ld_eprintf(ofl, ERR_ELF,
 				    MSG_INTL(MSG_ELF_GETSCN), ofl->ofl_name,
 				    ndx);
 				return (S_ERROR);
 			}
 			if ((osp->os_shdr =
 			    elf_getshdr(osp->os_scn)) == NULL) {
-				eprintf(ofl->ofl_lml, ERR_ELF,
+				ld_eprintf(ofl, ERR_ELF,
 				    MSG_INTL(MSG_ELF_GETSHDR), ofl->ofl_name);
 				return (S_ERROR);
 			}
@@ -808,7 +807,7 @@ ld_create_outfile(Ofl_desc *ofl)
 
 				scn = sgp->sg_fscn;
 				if ((fndx = elf_ndxscn(scn)) == SHN_UNDEF) {
-					eprintf(ofl->ofl_lml, ERR_ELF,
+					ld_eprintf(ofl, ERR_ELF,
 					    MSG_INTL(MSG_ELF_NDXSCN),
 					    ofl->ofl_name);
 					return (S_ERROR);
@@ -821,7 +820,7 @@ ld_create_outfile(Ofl_desc *ofl)
 
 			if ((osp->os_outdata =
 			    elf_getdata(osp->os_scn, NULL)) == NULL) {
-				eprintf(ofl->ofl_lml, ERR_ELF,
+				ld_eprintf(ofl, ERR_ELF,
 				    MSG_INTL(MSG_ELF_GETDATA), ofl->ofl_name);
 				return (S_ERROR);
 			}

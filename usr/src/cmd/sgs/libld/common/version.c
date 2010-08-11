@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<string.h>
@@ -119,7 +118,7 @@ vers_visit_children(Ofl_desc *ofl, Ver_desc *vp, int flag)
 			 * cyclic dependency.
 			 */
 			if (err == 0) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_VER_CYCLIC));
 				err = 1;
 			}
@@ -127,14 +126,14 @@ vers_visit_children(Ofl_desc *ofl, Ver_desc *vp, int flag)
 				v = ver_stk.ver_stk[tmp_sp];
 				if ((v->vd_flags & FLG_VER_CYCLIC) == 0) {
 					v->vd_flags |= FLG_VER_CYCLIC;
-					eprintf(ofl->ofl_lml, ERR_NONE,
+					ld_eprintf(ofl, ERR_NONE,
 					    MSG_INTL(MSG_VER_ADDVER),
 					    v->vd_name);
 				}
 			}
 			if ((vp->vd_flags & FLG_VER_CYCLIC) == 0) {
 				vp->vd_flags |= FLG_VER_CYCLIC;
-				eprintf(ofl->ofl_lml, ERR_NONE,
+				ld_eprintf(ofl, ERR_NONE,
 				    MSG_INTL(MSG_VER_ADDVER), vp->vd_name);
 			}
 			return (err);
@@ -198,10 +197,9 @@ ld_vers_check_defs(Ofl_desc *ofl)
 		Aliste		idx2;
 
 		if (vdp->vd_ndx == 0) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_VER_UNDEF), name, vdp->vd_ref->vd_name,
 			    vdp->vd_ref->vd_file->ifl_name);
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
 		}
 
@@ -275,7 +273,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 			} else if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 			    (sdp->sd_sym->st_shndx != SHN_ABS) &&
 			    (sdp->sd_ref == REF_REL_NEED)) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_VER_DEFINED), name,
 				    sdp->sd_file->ifl_name);
 			}
@@ -544,12 +542,12 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 				continue;
 
 			if (fail++ == 0) {
-				eprintf(ofl->ofl_lml, ERR_NONE,
+				ld_eprintf(ofl, ERR_NONE,
 				    MSG_INTL(MSG_VER_ADDVERS), sdf->sdf_rfile,
 				    sdf->sdf_name);
 			}
-			eprintf(ofl->ofl_lml, ERR_NONE,
-			    MSG_INTL(MSG_VER_ADDVER), sdv->sdv_name);
+			ld_eprintf(ofl, ERR_NONE, MSG_INTL(MSG_VER_ADDVER),
+			    sdv->sdv_name);
 		}
 		if (fail)
 			return ((Ver_index *)S_ERROR);
@@ -562,7 +560,7 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
  * Process a version symbol index section.
  */
 int
-ld_vers_sym_process(Lm_list *lml, Is_desc *isp, Ifl_desc *ifl)
+ld_vers_sym_process(Ofl_desc *ofl, Is_desc *isp, Ifl_desc *ifl)
 {
 	Shdr	*symshdr;
 	Shdr	*vershdr = isp->is_shdr;
@@ -576,7 +574,7 @@ ld_vers_sym_process(Lm_list *lml, Is_desc *isp, Ifl_desc *ifl)
 	    vershdr->sh_entsize)) {
 		Is_desc	*sym_isp = ifl->ifl_isdesc[vershdr->sh_link];
 
-		eprintf(lml, ERR_WARNING, MSG_INTL(MSG_ELF_VERSYM),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_ELF_VERSYM),
 		    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name,
 		    EC_WORD(vershdr->sh_size / vershdr->sh_entsize),
 		    EC_WORD(sym_isp->is_scnndx), sym_isp->is_name,
@@ -612,10 +610,9 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		Aliste	idx;
 
 		for (ALIST_TRAVERSE(sdf->sdf_vers, idx, sdv)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_VER_NOEXIST), ifl->ifl_name,
 			    sdv->sdv_name, sdv->sdv_ref);
-			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
 		return (0);
 	}
@@ -628,9 +625,8 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * data section will be of the same revision.
 	 */
 	if (vdf->vd_version > VER_DEF_CURRENT)
-		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
-		    MSG_INTL(MSG_VER_HIGHER), ifl->ifl_name, vdf->vd_version,
-		    VER_DEF_CURRENT);
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_VER_HIGHER),
+		    ifl->ifl_name, vdf->vd_version, VER_DEF_CURRENT);
 
 
 	num = isp->is_shdr->sh_info;
@@ -788,12 +784,10 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 			}
 			if (found)
 				vers_select(ofl, ifl, vdp, sdv->sdv_ref);
-			else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+			else
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_VER_NOEXIST), ifl->ifl_name,
 				    sdv->sdv_name, sdv->sdv_ref);
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
 		}
 	} else {
 		Ver_index	*vip;
@@ -835,9 +829,8 @@ ld_vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * data section will be of the same revision.
 	 */
 	if (vnd->vn_version > VER_DEF_CURRENT) {
-		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
-		    MSG_INTL(MSG_VER_HIGHER), ifl->ifl_name, vnd->vn_version,
-		    VER_DEF_CURRENT);
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_VER_HIGHER),
+		    ifl->ifl_name, vnd->vn_version, VER_DEF_CURRENT);
 	}
 
 	num = isp->is_shdr->sh_info;
@@ -931,9 +924,8 @@ ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * version definition.
 	 */
 	if ((ifl->ifl_verndx == 0) || (vndx > ifl->ifl_vercnt)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_VER_INVALNDX),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_VER_INVALNDX),
 		    sdp->sd_name, ifl->ifl_name, vndx);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return;
 	}
 
@@ -1066,17 +1058,15 @@ ld_vers_verify(Ofl_desc *ofl)
 
 				vip = &ifl->ifl_verndx[vdp->vd_ndx];
 				if (!(vip->vi_flags & FLG_VER_AVAIL)) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_VER_UNAVAIL),
 					    ifl->ifl_name, sdv->sdv_name,
 					    sdv->sdv_ref);
-					ofl->ofl_flags |= FLG_OF_FATAL;
 				}
 			} else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_VER_NOEXIST), ifl->ifl_name,
 				    sdv->sdv_name, sdv->sdv_ref);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 		}
 	}

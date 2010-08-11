@@ -763,6 +763,7 @@ extern	void		Dbg_help(void);
  * External Dbg_*() interface routines.
  */
 extern	void	Dbg_args_file(Lm_list *, int, char *);
+extern	void	Dbg_args_guidance_unknown(Lm_list *, const char *);
 extern	void	Dbg_args_option(Lm_list *, int, int, char *);
 extern	void	Dbg_args_str2chr(Lm_list *, int, const char *, int);
 extern	void	Dbg_args_Wldel(Lm_list *, int, const char *);

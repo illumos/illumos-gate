@@ -203,7 +203,8 @@ typedef struct {
 	void		(* mr_mach_make_dynamic)(Ofl_desc *, size_t *);
 	void		(* mr_mach_update_odynamic)(Ofl_desc *, Dyn **);
 	Xword		(* mr_calc_plt_addr)(Sym_desc *, Ofl_desc *);
-	uintptr_t	(* mr_perform_outreloc)(Rel_desc *, Ofl_desc *);
+	uintptr_t	(* mr_perform_outreloc)(Rel_desc *, Ofl_desc *,
+			    Boolean *);
 	uintptr_t	(* mr_do_activerelocs)(Ofl_desc *);
 	uintptr_t	(* mr_add_outrel)(Word, Rel_desc *, Ofl_desc *);
 	uintptr_t	(* mr_reloc_register)(Rel_desc *, Is_desc *,
@@ -688,6 +689,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_disp_errmsg		ld64_disp_errmsg
 #define	ld_ent_check		ld64_ent_check
 #define	ld_ent_lookup		ld64_ent_lookup
+#define	ld_eprintf		ld64_eprintf
 #define	ld_exit			ld64_exit
 #define	ld_find_library		ld64_find_library
 #define	ld_finish_libs		ld64_finish_libs
@@ -784,6 +786,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_disp_errmsg		ld32_disp_errmsg
 #define	ld_ent_check		ld32_ent_check
 #define	ld_ent_lookup		ld32_ent_lookup
+#define	ld_eprintf		ld32_eprintf
 #define	ld_exit			ld32_exit
 #define	ld_find_library		ld32_find_library
 #define	ld_finish_libs		ld32_finish_libs
@@ -892,6 +895,7 @@ extern void		ld_disp_errmsg(const char *, Rel_desc *, Ofl_desc *);
 extern void		ld_ent_check(Ofl_desc *);
 extern Ent_desc		*ld_ent_lookup(Ofl_desc *, const char *name,
 			    avl_index_t *where);
+extern void		ld_eprintf(Ofl_desc *, Error, const char *, ...);
 extern int		ld_exit(Ofl_desc *);
 
 extern uintptr_t	ld_find_library(const char *, Ofl_desc *);
@@ -944,7 +948,7 @@ extern Rel_desc		*ld_reloc_enter(Ofl_desc *, Rel_cache *, Rel_desc *,
 extern uintptr_t	ld_reloc_GOT_relative(Boolean, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_reloc_plt(Rel_desc *, Ofl_desc *);
 extern void		ld_reloc_remain_entry(Rel_desc *, Os_desc *,
-			    Ofl_desc *);
+			    Ofl_desc *, Boolean *);
 extern Boolean		ld_reloc_set_aux_osdesc(Ofl_desc *, Rel_desc *,
 			    Os_desc *);
 extern Boolean		ld_reloc_set_aux_usym(Ofl_desc *, Rel_desc *,
@@ -1006,7 +1010,7 @@ extern Ver_desc		*ld_vers_find(const char *, Word, APlist *);
 extern uintptr_t	ld_vers_need_process(Is_desc *, Ifl_desc *, Ofl_desc *);
 extern void		ld_vers_promote(Sym_desc *, Word, Ifl_desc *,
 			    Ofl_desc *);
-extern int		ld_vers_sym_process(Lm_list *, Is_desc *, Ifl_desc *);
+extern int		ld_vers_sym_process(Ofl_desc *, Is_desc *, Ifl_desc *);
 extern int		ld_vers_verify(Ofl_desc *);
 extern WrapSymNode	*ld_wrap_enter(Ofl_desc *, const char *);
 

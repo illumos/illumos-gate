@@ -562,6 +562,8 @@
 			 removed"
 @ MSG_ARG_FILE		"arg[%d]\tfile=%s"
 
+@ MSG_ARG_NG_UNKNOWN	"warning: unrecognized -z guidance item: %s"
+
 
 # Bindings messages
 # NOTE: these are used by appcert(1) and lari(1), use care when changing.
