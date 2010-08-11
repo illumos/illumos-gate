@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <mdb/mdb_param.h>
@@ -3798,17 +3797,28 @@ panicinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 time(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+	uint_t opt_dec = FALSE;
 	uint_t opt_lbolt = FALSE;
+	uint_t opt_hex = FALSE;
+	const char *fmt;
+	hrtime_t result;
 
-	if (mdb_getopts(argc, argv, 'l', MDB_OPT_SETBITS, TRUE, &opt_lbolt,
+	if (mdb_getopts(argc, argv,
+	    'd', MDB_OPT_SETBITS, TRUE, &opt_dec,
+	    'l', MDB_OPT_SETBITS, TRUE, &opt_lbolt,
+	    'x', MDB_OPT_SETBITS, TRUE, &opt_hex,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (opt_lbolt)
-		mdb_printf("%ld\n", mdb_get_lbolt());
-	else
-		mdb_printf("%lld\n", mdb_gethrtime());
+	if (opt_dec && opt_hex)
+		return (DCMD_USAGE);
 
+	result = opt_lbolt ? mdb_get_lbolt() : mdb_gethrtime();
+	fmt =
+	    opt_hex ? "0x%llx\n" :
+	    opt_dec ? "0t%lld\n" : "%#llr\n";
+
+	mdb_printf(fmt, result);
 	return (DCMD_OK);
 }
 
@@ -3821,7 +3831,9 @@ time_help(void)
 	    "time if inspecting one; or the running hires time if we're \n"
 	    "looking at a live system.\n\n"
 	    "Switches:\n"
-	    "  -l   prints the number of clock ticks since system boot\n");
+	    "  -d   report times in decimal\n"
+	    "  -l   prints the number of clock ticks since system boot\n"
+	    "  -x   report times in hexadecimal\n");
 }
 
 static const mdb_dcmd_t dcmds[] = {
@@ -3862,7 +3874,7 @@ static const mdb_dcmd_t dcmds[] = {
 		"print sysevent subclass list", sysevent_subclass_list},
 	{ "system", NULL, "print contents of /etc/system file", sysfile },
 	{ "task", NULL, "display kernel task(s)", task },
-	{ "time", "[-l]", "display system time", time, time_help },
+	{ "time", "[-dlx]", "display system time", time, time_help },
 	{ "vnode2path", ":[-F]", "vnode address to pathname", vnode2path },
 	{ "whereopen", ":", "given a vnode, dumps procs which have it open",
 	    whereopen },
