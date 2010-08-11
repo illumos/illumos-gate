@@ -31,7 +31,6 @@
  * to zero.
  */
 
-
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_param.h>
 #include <mdb/mdb_modapi.h>
@@ -88,6 +87,8 @@ uintptr_t _mdb_ks_argsbase;
 unsigned long _mdb_ks_msg_bsize;
 unsigned long _mdb_ks_defaultstksz;
 int _mdb_ks_ncpu;
+int _mdb_ks_ncpu_log2;
+int _mdb_ks_ncpu_p2;
 
 /*
  * In-core copy of DNLC information:
@@ -97,8 +98,17 @@ int _mdb_ks_ncpu;
 #define	MDB_DNLC_NCACHE_SZ(ncp) (sizeof (ncache_t) + (ncp)->namlen)
 #define	MDB_DNLC_MAX_RETRY 4
 
-
 static ncache_t **dnlc_hash;	/* mdbs hash array of dnlc entries */
+
+/*
+ * copy of page_hash-related data
+ */
+static int page_hash_loaded;
+static long mdb_page_hashsz;
+static uint_t mdb_page_hashsz_shift;	/* Needed for PAGE_HASH_FUNC */
+static uintptr_t mdb_page_hash;		/* base address of page hash */
+#define	page_hashsz		mdb_page_hashsz
+#define	page_hashsz_shift	mdb_page_hashsz_shift
 
 /*
  * This will be the location of the vnodeops pointer for "autofs_vnodeops"
@@ -624,31 +634,77 @@ out:
 	return (cpu);
 }
 
+static int
+page_hash_load(void)
+{
+	if (page_hash_loaded) {
+		return (1);
+	}
+
+	if (mdb_readvar(&mdb_page_hashsz, "page_hashsz") == -1) {
+		mdb_warn("unable to read page_hashsz");
+		return (0);
+	}
+	if (mdb_readvar(&mdb_page_hashsz_shift, "page_hashsz_shift") == -1) {
+		mdb_warn("unable to read page_hashsz_shift");
+		return (0);
+	}
+	if (mdb_readvar(&mdb_page_hash, "page_hash") == -1) {
+		mdb_warn("unable to read page_hash");
+		return (0);
+	}
+
+	page_hash_loaded = 1;	/* zeroed on state change */
+	return (1);
+}
+
 uintptr_t
 mdb_page_lookup(uintptr_t vp, u_offset_t offset)
 {
-	long page_hashsz, ndx;
-	int page_hashsz_shift;	/* Needed for PAGE_HASH_FUNC */
-	uintptr_t page_hash, pp;
+	size_t ndx;
+	uintptr_t page_hash_entry, pp;
 
-	if (mdb_readvar(&page_hashsz, "page_hashsz") == -1 ||
-	    mdb_readvar(&page_hashsz_shift, "page_hashsz_shift") == -1 ||
-	    mdb_readvar(&page_hash, "page_hash") == -1)
+	if (!page_hash_loaded && !page_hash_load()) {
 		return (NULL);
+	}
 
 	ndx = PAGE_HASH_FUNC(vp, offset);
-	page_hash += ndx * sizeof (uintptr_t);
+	page_hash_entry = mdb_page_hash + ndx * sizeof (uintptr_t);
 
-	mdb_vread(&pp, sizeof (pp), page_hash);
+	if (mdb_vread(&pp, sizeof (pp), page_hash_entry) < 0) {
+		mdb_warn("unable to read page_hash[%ld] (%p)", ndx,
+		    page_hash_entry);
+		return (NULL);
+	}
 
 	while (pp != NULL) {
 		page_t page;
+		long nndx;
 
-		mdb_vread(&page, sizeof (page), pp);
+		if (mdb_vread(&page, sizeof (page), pp) < 0) {
+			mdb_warn("unable to read page_t at %p", pp);
+			return (NULL);
+		}
 
 		if ((uintptr_t)page.p_vnode == vp &&
 		    (uint64_t)page.p_offset == offset)
 			return (pp);
+
+		/*
+		 * Double check that the pages actually hash to the
+		 * bucket we're searching.  If not, our version of
+		 * PAGE_HASH_FUNC() doesn't match the kernel's, and we're
+		 * not going to be able to find the page.  The most
+		 * likely reason for this that mdb_ks doesn't match the
+		 * kernel we're running against.
+		 */
+		nndx = PAGE_HASH_FUNC(page.p_vnode, page.p_offset);
+		if (page.p_vnode != NULL && nndx != ndx) {
+			mdb_warn("mdb_page_lookup: mdb_ks PAGE_HASH_FUNC() "
+			    "mismatch: in bucket %ld, but page %p hashes to "
+			    "bucket %ld\n", ndx, pp, nndx);
+			return (NULL);
+		}
 
 		pp = (uintptr_t)page.p_hash;
 	}
@@ -1164,6 +1220,10 @@ update_vars(void *arg)
 	(void) mdb_readvar(&_mdb_ks_msg_bsize, "_msg_bsize");
 	(void) mdb_readvar(&_mdb_ks_defaultstksz, "_defaultstksz");
 	(void) mdb_readvar(&_mdb_ks_ncpu, "_ncpu");
+	(void) mdb_readvar(&_mdb_ks_ncpu_log2, "_ncpu_log2");
+	(void) mdb_readvar(&_mdb_ks_ncpu_p2, "_ncpu_p2");
+
+	page_hash_loaded = 0;	/* invalidate cached page_hash state */
 }
 
 const mdb_modinfo_t *

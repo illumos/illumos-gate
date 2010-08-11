@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_MDB_PARAM_H
 #define	_MDB_PARAM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -112,6 +108,8 @@ extern uintptr_t _mdb_ks_argsbase;
 extern unsigned long _mdb_ks_msg_bsize;
 extern unsigned long _mdb_ks_defaultstksz;
 extern int _mdb_ks_ncpu;
+extern int _mdb_ks_ncpu_log2;
+extern int _mdb_ks_ncpu_p2;
 
 /*
  * Now derive all the macros using the global variables defined in
@@ -134,6 +132,8 @@ extern int _mdb_ks_ncpu;
 #define	MSG_BSIZE	_mdb_ks_msg_bsize
 #define	DEFAULTSTKSZ	_mdb_ks_defaultstksz
 #define	NCPU		_mdb_ks_ncpu
+#define	NCPU_LOG2	_mdb_ks_ncpu_log2
+#define	NCPU_P2		_mdb_ks_ncpu_p2
 
 #define	_STRING_H	/* Do not re-include <string.h> */
 
