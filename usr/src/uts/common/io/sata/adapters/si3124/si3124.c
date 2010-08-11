@@ -3827,10 +3827,9 @@ si_schedule_intr_command_error(
 	}
 
 	args->siea_ctlp = si_ctlp;
-	args->siea_portp = si_portp;
 	args->siea_port = port;
 
-	(void) timeout(si_do_intr_command_error, args, 1);
+	(void) timeout(si_do_intr_command_error, si_portp, 1);
 
 	mutex_exit(&si_portp->siport_mutex);
 }
@@ -3847,13 +3846,14 @@ si_do_intr_command_error(void *arg)
 	si_port_state_t *si_portp;
 	int port;
 
-	args = arg;
-	si_ctlp = args->siea_ctlp;
-	si_portp = args->siea_portp;
-	port = args->siea_port;
-
+	si_portp = arg;
 	mutex_enter(&si_portp->siport_mutex);
+
+	args = si_portp->siport_event_args;
+	si_ctlp = args->siea_ctlp;
+	port = args->siea_port;
 	args->siea_ctlp = NULL;	/* mark siport_event_args as free */
+
 	mutex_exit(&si_portp->siport_mutex);
 	(void) si_intr_command_error(si_ctlp, si_portp, port);
 }
@@ -5407,10 +5407,9 @@ si_schedule_port_initialize(
 	}
 
 	args->siea_ctlp = si_ctlp;
-	args->siea_portp = si_portp;
 	args->siea_port = port;
 
-	(void) timeout(si_do_initialize_port, args, 1);
+	(void) timeout(si_do_initialize_port, si_portp, 1);
 }
 
 /*
@@ -5425,14 +5424,15 @@ si_do_initialize_port(void *arg)
 	si_port_state_t *si_portp;
 	int port;
 
-	args = arg;
-	si_portp = args->siea_portp;
+	si_portp = arg;
+	mutex_enter(&si_portp->siport_mutex);
+
+	args = si_portp->siport_event_args;
 	si_ctlp = args->siea_ctlp;
 	port = args->siea_port;
-
-	mutex_enter(&si_portp->siport_mutex);
 	args->siea_ctlp = NULL;	/* mark siport_event_args as free */
 	(void) si_initialize_port_wait_till_ready(si_ctlp, port);
+
 	mutex_exit(&si_portp->siport_mutex);
 }
 

@@ -100,6 +100,7 @@ add scsi_watch_request::swr_callback targets \
         sd.c:sd_media_watch_cb
 
 root si_fm_error_cb
+root si_quiesce
 
 add scsi_pkt::pkt_comp targets \
 	scsi_watch.c:scsi_watch_request_intr \

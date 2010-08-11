@@ -68,7 +68,6 @@ typedef struct si_sgblock {
 /* Argument to be used for calls to timeout() */
 typedef struct si_event_arg {
 	void *siea_ctlp;
-	void *siea_portp;
 	int siea_port;
 } si_event_arg_t;
 
