@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -70,9 +67,18 @@ static cond_t evq_cv;
 static ev_queue_t *eventq_head;
 static ev_queue_t *eventq_tail;
 
-#define	DELIVER_FAILED	gettext("/devices or /dev may not be current \
-				(devfsadmd not responding) Run devfsadm")
-#define	RETRY_MAX	3
+#define	DELIVERY_FAILED	\
+	gettext("devfsadmd not responding, /dev may not be current")
+
+#define	DELIVERY_RESUMED \
+	gettext("devfsadmd now responding again")
+
+/*
+ * Retry error recovery when attempting to send an event to devfsadmd
+ */
+#define	RETRY_DAEMON_RESTART	0
+#define	RETRY_MSG_THRESHOLD	60
+#define	RETRY_DAEMON_INTERVAL	60
 
 static int
 system1(const char *s_path, const char *s)
@@ -94,8 +100,8 @@ system1(const char *s_path, const char *s)
 		return (-1);
 	}
 	if (((geteuid() == st.st_uid) && ((st.st_mode & S_IXUSR) == 0)) ||
-		((getegid() == st.st_gid) && ((st.st_mode & S_IXGRP) == 0)) ||
-		((st.st_mode & S_IXOTH) == 0)) {
+	    ((getegid() == st.st_gid) && ((st.st_mode & S_IXGRP) == 0)) ||
+	    ((st.st_mode & S_IXOTH) == 0)) {
 		errno = EPERM;
 		return (-1);
 	}
@@ -208,7 +214,8 @@ thread_t deliver_thr_id;
 void
 devfsadmd_deliver_thr()
 {
-	int retry;
+	int retry = 0;
+	int msg_emitted = 0;
 	ev_queue_t *evqp;
 
 	(void) mutex_lock(&evq_lock);
@@ -230,33 +237,40 @@ devfsadmd_deliver_thr()
 			while (sysevent_send_event(sysevent_hp,
 			    evqp->evq_ev) != 0) {
 				/*
-				 * If we are using an alternate root, devfsadm
-				 * is run to handle node creation.
+				 * Invoke devfsadm to handle node creation
+				 * but not for an alternate root.
 				 */
-				if (use_alt_root == 0) {
-					/*
-					 * daemon unresponsive -
-					 * restart daemon and retry once more
-					 * if not installing
-					 */
-					if (errno == EBADF || errno == ENOENT) {
-						if (system1(
-						    DEVFSADMD_START_PATH,
-						    DEVFSADMD_START) != -1) {
-							(void) sleep(1);
-						}
-					}
-					++retry;
-					if (retry < RETRY_MAX) {
-						continue;
-					} else {
-						syslog(LOG_ERR, DELIVER_FAILED);
-						break;
-					}
-				} else {
+				if (use_alt_root != 0)
 					break;
+				/*
+				 * daemon unresponsive -
+				 * restart daemon and retry once more
+				 */
+				if ((errno == EBADF || errno == ENOENT) &&
+				    (retry == RETRY_DAEMON_RESTART) ||
+				    ((retry % RETRY_DAEMON_INTERVAL) == 0)) {
+					(void) system1(
+					    DEVFSADMD_START_PATH,
+					    DEVFSADMD_START);
 				}
+				if (retry == RETRY_MSG_THRESHOLD) {
+					syslog(LOG_ERR, DELIVERY_FAILED);
+					msg_emitted = 1;
+				}
+				(void) sleep(1);
+				++retry;
+				continue;
 			}
+
+			/*
+			 * Event delivered: remove from queue
+			 * and reset delivery retry state.
+			 */
+			if (msg_emitted) {
+				syslog(LOG_ERR, DELIVERY_RESUMED);
+				msg_emitted = 0;
+			}
+			retry = 0;
 			(void) mutex_lock(&evq_lock);
 			if (eventq_head != NULL) {
 				eventq_head = eventq_head->evq_next;
