@@ -183,7 +183,7 @@ retry:
 			    sizeof (struct sockaddr_storage));
 			if (curr->ifa_dstaddr == NULL)
 				goto fail;
-			(void) memcpy(curr->ifa_dstaddr, &lifrp->lifr_addr,
+			(void) memcpy(curr->ifa_dstaddr, &lifrl.lifr_addr,
 			    sizeof (struct sockaddr_storage));
 		} else if (curr->ifa_flags & IFF_BROADCAST) {
 			if (ioctl(s, SIOCGLIFBRDADDR, (caddr_t)&lifrl) < 0)
@@ -192,7 +192,7 @@ retry:
 			    sizeof (struct sockaddr_storage));
 			if (curr->ifa_broadaddr == NULL)
 				goto fail;
-			(void) memcpy(curr->ifa_broadaddr, &lifrp->lifr_addr,
+			(void) memcpy(curr->ifa_broadaddr, &lifrl.lifr_addr,
 			    sizeof (struct sockaddr_storage));
 		}
 

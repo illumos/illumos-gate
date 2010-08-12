@@ -1763,20 +1763,18 @@ print_sa_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 				}
 				break;
 			}
-			/*
-			 * For the non-persistent case, we need to show the
-			 * currently configured addresses for source and
-			 * destination.
-			 */
-			if (ifa->ifa_flags & IFF_POINTOPOINT) {
-				sockaddr2str(
-				    (struct sockaddr_storage *)ifa->ifa_dstaddr,
-				    dstbuf, sizeof (dstbuf));
-			}
 		}
+		/*
+		 * For the non-persistent case, we need to show the
+		 * currently configured addresses for source and
+		 * destination.
+		 */
 		sockaddr2str((struct sockaddr_storage *)ifa->ifa_addr,
 		    addrbuf, sizeof (addrbuf));
-		if (dstbuf[0] != '\0') {
+		if (ifa->ifa_flags & IFF_POINTOPOINT) {
+			sockaddr2str(
+			    (struct sockaddr_storage *)ifa->ifa_dstaddr,
+			    dstbuf, sizeof (dstbuf));
 			(void) snprintf(buf, bufsize, "%s->%s", addrbuf,
 			    dstbuf);
 		} else {
