@@ -2380,6 +2380,23 @@ format(char *path, char *dir, char *name, char *pg)
 			perror(manpname);
 			return (-1);
 		}
+
+		/*
+		 * If this is a directory, just ignore it.
+		 */
+		if (fstat(fileno(md), &statb) == NULL) {
+			if (S_ISDIR(statb.st_mode)) {
+				if (debug) {
+					(void) fprintf(stderr,
+					    "\tignoring directory %s\n",
+					    manpname);
+					(void) fflush(stderr);
+				}
+				(void) fclose(md);
+				return (-1);
+			}
+		}
+
 		if (fgets(manbuf, BUFSIZ-1, md) == NULL) {
 			(void) fclose(md);
 			(void) fprintf(stderr, gettext("%s: null file\n"),
