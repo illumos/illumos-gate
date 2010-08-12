@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * NOT a DDI compliant Sun Fibre Channel port driver(fp)
  *
@@ -6162,7 +6161,7 @@ fp_plogi_intr(fc_packet_t *pkt)
 	if ((pd = pkt->pkt_pd) == NULL) {
 		pd = fctl_get_remote_port_by_pwwn(port, &pwwn);
 		if (pd == NULL) {
-			FP_TRACE(FP_NHEAD2(9, 0), "fp_plogi_intr: fp %x pd %x",
+			FP_TRACE(FP_NHEAD2(1, 0), "fp_plogi_intr: fp %x pd %x",
 			    port->fp_port_id.port_id, d_id);
 			pd = fctl_create_remote_port(port, &nwwn, &pwwn, d_id,
 			    PD_PLOGI_INITIATOR, KM_NOSLEEP);
@@ -13089,7 +13088,7 @@ fp_ns_intr(fc_packet_t *pkt)
 
 		}
 
-		FP_TRACE(FP_NHEAD2(9, 0), "%x NS failure pkt state=%x"
+		FP_TRACE(FP_NHEAD2(1, 0), "%x NS failure pkt state=%x "
 		    "reason=%x, expln=%x, NSCMD=%04X, NSRSP=%04X",
 		    port->fp_port_id.port_id, pkt->pkt_state,
 		    pkt->pkt_reason, pkt->pkt_expln,
