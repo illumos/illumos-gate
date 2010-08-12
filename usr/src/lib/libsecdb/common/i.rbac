@@ -80,6 +80,20 @@ dbmerge() {
 		$mv_cmd $4.$$ $4.old
 	fi
 #
+# If the new file has an Oracle copyright, remove both the Sun and Oracle
+# copyrights from the old file.
+#
+	oracle_cr=`${egrep_cmd} '^# Copyright.*Oracle and/or its affiliates.' \
+	    $3 2>/dev/null`
+	if [ -n "${oracle_cr}" ]; then
+		$sed_cmd -e '/^# Copyright.*Sun Microsystems, Inc./d' \
+		    -e '/^# All rights reserved./d' \
+		    -e '/^# Use is subject to license terms./d' \
+		    -e '/^# Copyright.*Oracle and\/or its affiliates./d' \
+		    $4.old > $4.$$ 2>/dev/null
+		$mv_cmd $4.$$ $4.old
+	fi
+#
 # If the new file has the CDDL, remove it from the old file.
 #
 	newcr=`${egrep_cmd} '^# CDDL HEADER START' $3 2>/dev/null`
@@ -110,6 +124,21 @@ dbmerge() {
 	$sed_cmd -n -e '/^[^#]/,$d' -e '/^##/,$d' -e p $4.old > $4
 	$rm_cmd $4.old
 	$sed_cmd -n -e '/^[^#]/,$d' -e '/^##/,$d' -e p $3 >> $4
+#
+# If the output file now has both Sun and Oracle copyrights, remove
+# the Sun copyright.
+#
+	sun_cr=`${egrep_cmd} '^# Copyright.*Sun Microsystems, Inc.' \
+	    $4 2>/dev/null`
+	oracle_cr=`${egrep_cmd} '^# Copyright.*Oracle and/or its affiliates.' \
+	    $4 2>/dev/null`
+	if [ -n "${sun_cr}" ] && [ -n "${oracle_cr}" ]; then
+		$sed_cmd -e '/^# Copyright.*Sun Microsystems, Inc./d' \
+		    -e '/^# All rights reserved./d' \
+		    -e '/^# Use is subject to license terms./d' \
+		    $4 > $4.$$ 2>/dev/null
+		$mv_cmd $4.$$ $4
+	fi
 #
 # Handle line continuations (trailing \)
 #
