@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -31,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/types.h>
@@ -47,14 +44,16 @@
 extern const char strcase_charmap[];
 
 int
-strcasecmp(const char *s1, const char *s2)
+ascii_strncasecmp(const char *s1, const char *s2, size_t n)
 {
 	const unsigned char	*cm = (const unsigned char *)strcase_charmap;
 	const unsigned char	*us1 = (const unsigned char *)s1;
 	const unsigned char	*us2 = (const unsigned char *)s2;
 
-	while (cm[*us1] == cm[*us2++])
+	while (n != 0 && cm[*us1] == cm[*us2++]) {
 		if (*us1++ == '\0')
 			return (0);
-	return (cm[*us1] - cm[*(us2 - 1)]);
+		n--;
+	}
+	return (n == 0 ? 0 : cm[*us1] - cm[*(us2 - 1)]);
 }

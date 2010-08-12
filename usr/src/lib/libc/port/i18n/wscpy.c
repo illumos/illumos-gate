@@ -20,18 +20,18 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copy string s2 to s1. S1 must be large enough.
+ * wcscpy(): copy string s2 to s1. S1 must be large enough.
  * Return s1.
+ *
+ * wcpcpy(): copy string s2 to s1. S1 must be large enough.
+ * Return a pointer to the terminating null character of s1.
  */
 
 #pragma weak _wcscpy = wcscpy
@@ -47,7 +47,7 @@ wcscpy(wchar_t *s1, const wchar_t *s2)
 	wchar_t *os1 = s1;
 
 	while (*s1++ = *s2++)
-		;
+		continue;
 	return (os1);
 }
 
@@ -55,4 +55,12 @@ wchar_t *
 wscpy(wchar_t *s1, const wchar_t *s2)
 {
 	return (wcscpy(s1, s2));
+}
+
+wchar_t *
+wcpcpy(wchar_t *s1, const wchar_t *s2)
+{
+	while (*s1++ = *s2++)
+		continue;
+	return (s1 - 1);
 }

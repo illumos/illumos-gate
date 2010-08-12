@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -39,7 +40,7 @@
 extern void get_kbenv(void);
 extern void close_kbenv(void);
 extern caddr_t get_propval(char *name, char *node);
-extern void setprogname(char *prog);
+extern void setpname(char *prog);
 extern char *getbootcmd(void);
 
 char *boottree;
@@ -1052,7 +1053,7 @@ main(int argc, char **argv)
 	benv_des_t *bd;
 	char *file = NULL;
 
-	setprogname(argv[0]);
+	setpname(argv[0]);
 
 	while ((c = getopt(argc, argv, "f:Itv")) != -1)
 		switch (c) {

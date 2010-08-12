@@ -1,6 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -24,8 +23,6 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -64,7 +61,7 @@ static struct bufarea *getblk(struct bufarea *, daddr_t, long);
 void	flush(int32_t, struct bufarea *);
 int32_t	bread(int32_t, char *, daddr_t, long);
 void	bwrite(int, char *, daddr_t, long);
-static int32_t	getline(FILE *, char *, int32_t);
+static int32_t	getaline(FILE *, char *, int32_t);
 void errexit(char *, ...) __NORETURN;
 static long	diskreads, totalreads;	/* Disk cache statistics */
 offset_t	llseek();
@@ -86,7 +83,7 @@ pfatal(char *fmt, ...)
 		(void) printf("\n");
 		(void) printf(
 		    gettext("%s: UNEXPECTED INCONSISTENCY; RUN fsck "
-			"MANUALLY.\n"), devname);
+		    "MANUALLY.\n"), devname);
 		va_end(args);
 		exit(36);
 	}
@@ -172,7 +169,7 @@ getfilentry(uint32_t block, int len)
 
 	if (len > fsbsize) {
 		(void) printf(gettext("File entry at %x is too long "
-			"(%d bytes)\n"), block, len);
+		    "(%d bytes)\n"), block, len);
 		len = fsbsize;
 	}
 	bp = getdatablk((daddr_t)(block + part_start), fsbsize);
@@ -185,7 +182,7 @@ getfilentry(uint32_t block, int len)
 	err = verifytag(&fp->fe_tag, block, &fp->fe_tag, UD_FILE_ENTRY);
 	if (err) {
 		(void) printf(gettext("Tag error %s or bad file entry, "
-			"tag=%d\n"), tagerrs[err], fp->fe_tag.tag_id);
+		    "tag=%d\n"), tagerrs[err], fp->fe_tag.tag_id);
 		bp->b_flags &= ~B_INUSE;
 		return (NULL);
 	}
@@ -220,7 +217,7 @@ reply(char *question)
 		(void) printf(gettext(" yes\n\n"));
 		return (1);
 	}
-	if (getline(stdin, line, sizeof (line)) == EOF)
+	if (getaline(stdin, line, sizeof (line)) == EOF)
 		errexit("\n");
 	(void) printf("\n");
 	if (line[0] == 'y' || line[0] == 'Y')
@@ -232,7 +229,7 @@ reply(char *question)
 }
 
 int32_t
-getline(FILE *fp, char *loc, int32_t maxlen)
+getaline(FILE *fp, char *loc, int32_t maxlen)
 {
 	int n;
 	register char *p, *lastloc;
@@ -337,7 +334,7 @@ flush(int32_t fd, struct bufarea *bp)
 		return;
 	if (bp->b_errs != 0)
 		pfatal(gettext("WRITING ZERO'ED BLOCK %d TO DISK\n"),
-			bp->b_bno);
+		    bp->b_bno);
 	bp->b_dirty = 0;
 	bp->b_errs = 0;
 	bwrite(fd, bp->b_un.b_buf, bp->b_bno, (long)bp->b_size);
@@ -370,7 +367,7 @@ ckfini()
 	pbp = pdirbp = NULL;
 	if (bufhead.b_size != cnt)
 		errexit(gettext("Panic: lost %d buffers\n"),
-			bufhead.b_size - cnt);
+		    bufhead.b_size - cnt);
 	if (debug)
 		(void) printf("cache missed %ld of %ld (%ld%%)\n",
 		    diskreads, totalreads,
@@ -461,7 +458,7 @@ catchquit()
 	extern int returntosingle;
 
 	(void) printf(gettext("returning to single-user after filesystem "
-		"check\n"));
+	    "check\n"));
 	returntosingle = 1;
 	(void) signal(SIGQUIT, SIG_DFL);
 }
@@ -498,7 +495,7 @@ dofix(struct inodesc *idesc, char *msg)
 
 	default:
 		errexit(gettext("UNKNOWN INODESC FIX MODE %d\n"),
-			idesc->id_fix);
+		    idesc->id_fix);
 	}
 	/* NOTREACHED */
 }
@@ -535,7 +532,7 @@ mounted(char *name)
 				continue;
 			if (device_stat.st_rdev == mount_stat.st_dev) {
 				(void) strncpy(mnt.mnt_mountp, mountpoint,
-					sizeof (mountpoint));
+				    sizeof (mountpoint));
 				if (hasmntopt(&mnt, MNTOPT_RO) != 0)
 					found = 2;	/* mounted as RO */
 				else

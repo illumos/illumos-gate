@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
+/*
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <unistd.h>
 #include <rctl.h>
@@ -223,7 +222,7 @@ main(int argc, char **argv)
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
-	(void) setprogname(argv[0]);
+	(void) setpname(argv[0]);
 
 	while ((opt = getopt(argc, argv, "sPp:Fd:e:i:n:rt:v:x")) != EOF) {
 

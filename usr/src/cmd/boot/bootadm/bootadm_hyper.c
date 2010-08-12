@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -347,9 +347,8 @@ cvt_metal_option(char *optstr)
 
 	if ((strncmp(optstr, "ttya-mode", namlen) == 0) ||
 	    (strncmp(optstr, "ttyb-mode", namlen) == 0)) {
-		char *port = alloca(namlen + 1);
+		char *port = strndupa(optstr, namlen);
 
-		(void) strlcpy(port, optstr, namlen + 1);
 		return (serial_metal_to_hyper(port, value));
 	}
 
@@ -840,19 +839,15 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 		 * Process important lines from menu.lst boot entry.
 		 */
 		if (lp->flags == BAM_TITLE) {
-			title = alloca(strlen(lp->arg) + 1);
-			(void) strcpy(title, lp->arg);
+			title = strdupa(lp->arg);
 		} else if (lp->cmd != NULL) {
 			if (strcmp(lp->cmd, "findroot") == 0) {
-				findroot = alloca(strlen(lp->arg) + 1);
-				(void) strcpy(findroot, lp->arg);
+				findroot = strdupa(lp->arg);
 			} else if (strcmp(lp->cmd, "bootfs") == 0) {
-				bootfs = alloca(strlen(lp->arg) + 1);
-				(void) strcpy(bootfs, lp->arg);
+				bootfs = strdupa(lp->arg);
 			} else if (strcmp(lp->cmd,
 			    menu_cmds[MODULE_DOLLAR_CMD]) == 0) {
-				module = alloca(strlen(lp->arg) + 1);
-				(void) strcpy(module, lp->arg);
+				module = strdupa(lp->arg);
 			} else if ((strcmp(lp->cmd,
 			    menu_cmds[KERNEL_DOLLAR_CMD]) == 0) &&
 			    (ret = cvt_metal_kernel(lp->arg,
@@ -1065,25 +1060,19 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 		 * Process important lines from menu.lst boot entry.
 		 */
 		if (lp->flags == BAM_TITLE) {
-			title = alloca(strlen(lp->arg) + 1);
-			(void) strcpy(title, lp->arg);
+			title = strdupa(lp->arg);
 		} else if (lp->cmd != NULL) {
 			if (strcmp(lp->cmd, "findroot") == 0) {
-				findroot = alloca(strlen(lp->arg) + 1);
-				(void) strcpy(findroot, lp->arg);
+				findroot = strdupa(lp->arg);
 			} else if (strcmp(lp->cmd, "bootfs") == 0) {
-				bootfs = alloca(strlen(lp->arg) + 1);
-				(void) strcpy(bootfs, lp->arg);
+				bootfs = strdupa(lp->arg);
 			} else if (strcmp(lp->cmd,
 			    menu_cmds[MODULE_DOLLAR_CMD]) == 0) {
 				if (strstr(lp->arg, "boot_archive") == NULL) {
-					module = alloca(strlen(lp->arg) + 1);
-					(void) strcpy(module, lp->arg);
+					module = strdupa(lp->arg);
 					cvt_hyper_module(module, &kern_path);
 				} else {
-					barchive_path =
-					    alloca(strlen(lp->arg) + 1);
-					(void) strcpy(barchive_path, lp->arg);
+					barchive_path = strdupa(lp->arg);
 				}
 			} else if ((strcmp(lp->cmd,
 			    menu_cmds[KERNEL_DOLLAR_CMD]) == 0) &&

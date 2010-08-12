@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-	.file	"strcasecmp.s"
-
 /*
- * The strcasecmp() function is a case insensitive versions of strcmp().
+ * The ascii_strcasecmp() function is a case insensitive versions of strcmp().
  * It assumes the ASCII character set and ignores differences in case
  * when comparing lower and upper case characters. In other words, it
  * behaves as if both strings had been converted to lower case using
@@ -73,7 +70,7 @@
  * };
  *
  * int
- * strcasecmp(const char *s1, const char *s2)
+ * ascii_strcasecmp(const char *s1, const char *s2)
  * {
  *	const unsigned char	*cm = (const unsigned char *)charmap;
  *	const unsigned char	*us1 = (const unsigned char *)s1;
@@ -123,7 +120,7 @@
 	! lower-case if they are upper-case, and are checked against
 	! the source string.
 
-	ENTRY(strcasecmp)
+	ENTRY(ascii_strcasecmp)
 
 	.align 32
 
@@ -348,4 +345,4 @@
 	ret				! return
 	restore	%i0, %g0, %o0		! return tolower(*s1) - tolower(*s2)
 
-	SET_SIZE(strcasecmp)
+	SET_SIZE(ascii_strcasecmp)

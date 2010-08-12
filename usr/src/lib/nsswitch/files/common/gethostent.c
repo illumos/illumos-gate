@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <netdb.h>
 #include "files_common.h"
@@ -42,7 +39,6 @@
 static int	check_name(nss_XbyY_args_t *, const char *, int,
 			int, const char **, int *, void *, int *);
 static char *do_aliases();
-static char *strcasestr(const char *as1, const char *as2);
 nss_status_t __nss_files_XY_hostbyname();
 int __nss_files_2herrno();
 static int	__nss_files_get_addr(int, const char *, int,
@@ -678,37 +674,6 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 		free(abuf_start);
 
 	return (res);
-}
-
-/*
- * A case-insensitive version of strstr().
- */
-static char *
-strcasestr(const char *as1, const char *as2)
-{
-	int c2;
-	register const char *tptr;
-	register const char *s1, *s2;
-
-	s1 = as1;
-	s2 = as2;
-
-	if (s2 == NULL || *s2 == '\0')
-		return (0);
-
-	while (*s1) {
-		if (tolower(*s1++) == tolower(c2 = *s2)) {
-			tptr = s1;
-			while ((tolower(c2 = *++s2) ==
-			    tolower(*s1++)) && c2 != 0)
-				;
-			if (c2 == 0)
-				return ((char *)tptr - 1);
-			s1 = tptr;
-			s2 = as2;
-		}
-	}
-	return (0);
 }
 
 

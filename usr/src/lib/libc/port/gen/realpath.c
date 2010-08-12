@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/types.h>
@@ -42,18 +39,18 @@
 /*
  * Canonicalize the path given in file_name, resolving away all symbolic link
  * components.  Store the result into the buffer named by resolved_name, which
- * must be long enough (MAXPATHLEN bytes will suffice).  Returns NULL
+ * must be long enough (PATH_MAX bytes will suffice).  Returns NULL
  * on failure and resolved_name on success.  On failure, to maintain
  * compatibility with the past, the contents of file_name will be copied
  * into resolved_name.
  */
-char *
-realpath(const char *file_name, char *resolved_name)
+static char *
+realpath_impl(const char *file_name, char *resolved_name)
 {
 	char cwd[PATH_MAX];
 	int len;
 
-	if (file_name == NULL || resolved_name == NULL) {
+	if (file_name == NULL) {
 		errno = EINVAL;
 		return (NULL);
 	}
@@ -120,4 +117,33 @@ realpath(const char *file_name, char *resolved_name)
 
 	(void) strcpy(resolved_name, cwd);
 	return (resolved_name);
+}
+
+/*
+ * Canonicalize the path given in file_name, resolving away all symbolic link
+ * components.  If resolved_name is a null pointer, return a malloc()d
+ * buffer containing the result, else store the result into resolved_name
+ * and return resolved_name.  Return NULL on failure.
+ */
+char *
+realpath(const char *file_name, char *resolved_name)
+{
+	char buffer[PATH_MAX];
+
+	if (resolved_name != NULL)
+		return (realpath_impl(file_name, resolved_name));
+
+	if (realpath_impl(file_name, buffer) != NULL)
+		return (strdup(buffer));
+
+	return (NULL);
+}
+
+/*
+ * GNU extension.
+ */
+char *
+canonicalize_file_name(const char *path)
+{
+	return (realpath(path, NULL));
 }

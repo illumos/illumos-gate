@@ -336,8 +336,3 @@ void chown_priv_off(uid_t);
  */
 char *getusershell(void);
 void endusershell(void);
-
-/*
-   ** support/strcasestr.c
- */
-char *strcasestr(register char *s, register char *find);

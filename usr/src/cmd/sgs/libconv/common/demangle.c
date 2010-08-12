@@ -20,10 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<demangle.h>
@@ -50,8 +48,7 @@
  * buffer).  One model is:
  *
  *	if ((_name1 = demangle(name1)) != name1) {
- *		char *	__name1 = alloca(strlen(_name1) + 1);
- *		(void) strcpy(__name1, _name1);
+ *		char *	__name1 = strdupa(_name1);
  *		name1 = (const char *)__name1;
  *	}
  *	name2 = demangle(name2);

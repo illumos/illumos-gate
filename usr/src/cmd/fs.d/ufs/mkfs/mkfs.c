@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -420,7 +420,7 @@ static void block_sigint(sigset_t *old_mask);
 static void unblock_sigint(sigset_t *old_mask);
 static void recover_from_sigint(int signum);
 static int confirm_abort(void);
-static int getline(FILE *fp, char *loc, int maxlen);
+static int getaline(FILE *fp, char *loc, int maxlen);
 static void flush_writes(void);
 static long compute_maxcpg(long, long, long, long, long);
 static int in_64bit_mode(void);
@@ -5498,7 +5498,7 @@ confirm_abort(void)
 	    "you will be given instructions on how to\nrecover "
 	    "the filesystem.  Do you wish to cancel the filesystem "
 	    "grow\noperation (y/n)?"));
-	if (getline(stdin, line, sizeof (line)) == EOF)
+	if (getaline(stdin, line, sizeof (line)) == EOF)
 		line[0] = 'y';
 
 	printf("\n");
@@ -5510,7 +5510,7 @@ confirm_abort(void)
 }
 
 static int
-getline(FILE *fp, char *loc, int maxlen)
+getaline(FILE *fp, char *loc, int maxlen)
 {
 	int n;
 	char *p, *lastloc;

@@ -1,19 +1,15 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * users
@@ -28,7 +24,6 @@
 static char **names;
 static char **namp;
 
-static char *strndup(char *p, int n);
 static int scmp(const void *p, const void *q);
 static void summary(void);
 
@@ -59,7 +54,7 @@ main(int argc, char **argv)
 		if (nusers == bufflen) {
 			bufflen *= 2;
 			names = (char **)realloc(names,
-						bufflen * sizeof (char *));
+			    bufflen * sizeof (char *));
 			namp = names + nusers;
 		}
 		*namp++ = strndup(utmpx->ut_name, sizeof (utmpx->ut_name));
@@ -70,17 +65,6 @@ main(int argc, char **argv)
 
 	summary();
 	return (0);
-}
-
-static char *
-strndup(char *p, int n)
-{
-
-	register char	*x;
-	x = malloc(n + 1);
-	(void) strlcpy(x, p, n + 1);
-	return (x);
-
 }
 
 static int

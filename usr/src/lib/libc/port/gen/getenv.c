@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma	weak _putenv = putenv
 
@@ -441,6 +438,30 @@ unsetenv(const char *name)
 	}
 
 	lmutex_unlock(&update_lock);
+	return (0);
+}
+
+/*
+ * Dump entire environment.
+ */
+int
+clearenv(void)
+{
+	/*
+	 * Just drop the entire environment list on the floor, as it
+	 * would be non-trivial to try and free the used memory.
+	 */
+	static const char *nullp = NULL;
+
+	lmutex_lock(&update_lock);
+	_environ = &nullp;
+	my_environ = NULL;
+	environ_base = NULL;
+	environ_size = 0;
+	environ_gen++;
+	membar_producer();
+	lmutex_unlock(&update_lock);
+
 	return (0);
 }
 

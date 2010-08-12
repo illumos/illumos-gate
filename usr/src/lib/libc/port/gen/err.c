@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
+#include "thr_uberdata.h"
 #include <sys/types.h>
 #include <err.h>
 #include <stdio.h>
@@ -36,11 +34,51 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
+#include <dlfcn.h>
 #include "stdiom.h"
 
 /* Function exit/warning functions and global variables. */
 
-static const char *progname;
+const char *__progname;		/* GNU/Linux/BSD compatibility */
+
+#define	PROGNAMESIZE	128	/* buffer size for __progname */
+
+const char *
+getprogname(void)
+{
+	return (__progname);
+}
+
+void
+setprogname(const char *argv0)
+{
+	uberdata_t *udp = curthread->ul_uberdata;
+	const char *progname;
+
+	if ((progname = strrchr(argv0, '/')) == NULL)
+		progname = argv0;
+	else
+		progname++;
+
+	if (udp->progname == NULL)
+		udp->progname = lmalloc(PROGNAMESIZE);
+	(void) strlcpy(udp->progname, progname, PROGNAMESIZE);
+	__progname = udp->progname;
+}
+
+/* called only from libc_init() */
+void
+init_progname(void)
+{
+	Dl_argsinfo_t args;
+	const char *argv0;
+
+	if (dlinfo(RTLD_SELF, RTLD_DI_ARGSINFO, &args) < 0)
+		argv0 = "UNKNOWN";
+	else
+		argv0 = args.dla_argv[0];
+	setprogname(argv0);
+}
 
 /*
  * warncore() is the workhorse of these functions.  Everything else has
@@ -49,22 +87,12 @@ static const char *progname;
 static rmutex_t *
 warncore(FILE *fp, const char *fmt, va_list args)
 {
-	const char *execname;
 	rmutex_t *lk;
 
 	FLOCKFILE(lk, fp);
 
-	if (progname == NULL) {
-		execname = getexecname();
-		if ((execname != NULL) &&
-		    ((progname = strrchr(execname, '/')) != NULL))
-			progname++;
-		else
-			progname = execname;
-	}
-
-	if (progname != NULL)
-		(void) fprintf(fp, "%s: ", progname);
+	if (__progname != NULL)
+		(void) fprintf(fp, "%s: ", __progname);
 
 	if (fmt != NULL) {
 		(void) vfprintf(fp, fmt, args);

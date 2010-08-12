@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -362,6 +361,6 @@ extern Cell *bltin(Node **, int);
 extern Cell *call(Node **, int);
 extern Cell *arg(Node **, int);
 extern Cell *getnf(Node **, int);
-extern Cell *getline(Node **, int);
+extern Cell *getaline(Node **, int);
 
 #endif /* AWK_H */

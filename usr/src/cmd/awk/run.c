@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -359,7 +358,7 @@ jump(Node **a, int n)
 }
 
 Cell *
-getline(Node **a, int n)
+getaline(Node **a, int n)
 {
 	/* a[0] is variable, a[1] is operator, a[2] is filename */
 	register Cell *r, *x;

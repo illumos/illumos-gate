@@ -36,18 +36,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "config.h"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef lint
 static const char sccsid[] = "@(#)strsep.c	10.1 (Sleepycat) 4/12/97";
-static const char sccsi2[] = "%W% (Sun) %G%";
 #endif /* not lint */
 
 #ifndef NO_SYSTEM_INCLUDES
@@ -70,6 +67,9 @@ static const char sccsi2[] = "%W% (Sun) %G%";
  * PUBLIC: char *strsep __P((char **, const char *));
  * PUBLIC: #endif
  */
+
+#ifndef HAVE_STRSEP
+
 char *
 strsep(stringp, delim)
 	register char **stringp;
@@ -98,3 +98,5 @@ strsep(stringp, delim)
 	}
 	/* NOTREACHED */
 }
+
+#endif	/* HAVE_STRSEP */

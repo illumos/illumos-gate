@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -28,8 +28,6 @@
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_tty.h"
@@ -526,7 +524,7 @@ vchange(unsigned char c)
 			 */
 			*cursor = 0;
 			strcpy(genbuf, linebuf);
-			getline(*wdot);
+			getaline(*wdot);
 			if (strlen(genbuf) + strlen(wcursor) > LBSIZE - 2) {
 				getDOT();
 				(void) beep();
@@ -910,7 +908,7 @@ xdw(void)
 		if (vpastwh(linebuf) >= cursor)
 			wcursor = 0;
 		else {
-			getline(*wdot);
+			getaline(*wdot);
 			wcursor = strend(linebuf);
 			getDOT();
 		}

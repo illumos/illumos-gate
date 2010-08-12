@@ -958,8 +958,7 @@ fmd_module_dc_opendict(fmd_module_t *mp, const char *dict)
 
 	ASSERT(fmd_module_locked(mp));
 
-	dictnam = alloca(strlen(dict) + 1);
-	(void) strcpy(dictnam, fmd_strbasename(dict));
+	dictnam = strdupa(fmd_strbasename(dict));
 
 	if ((p = strrchr(dictnam, '.')) != NULL &&
 	    strcmp(p, ".dict") == 0)

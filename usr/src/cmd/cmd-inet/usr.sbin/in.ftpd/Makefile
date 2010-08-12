@@ -1,6 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG=		in.ftpd ftpcount ftpshut ftprestart privatepw
@@ -15,8 +14,7 @@ FTPD_OBJS=	$(COMMON_OBJS) ftpd.o ftpcmd.o glob.o logwtmp.o popen.o \
 		access.o extensions.o realpath.o acl.o private.o \
 		authenticate.o conversions.o rdservers.o paths.o hostacc.o \
 		routevector.o restrict.o domain.o wu_fnmatch.o timeout.o \
-		getpwnam.o strsep.o strcasestr.o inet.o xferlog.o gssutil.o \
-		privs.o
+		getpwnam.o inet.o xferlog.o gssutil.o privs.o
 FTPCOUNT_OBJS=	$(COMMON_OBJS) ftpcount.o rdservers.o inet.o
 FTPSHUT_OBJS=	$(COMMON_OBJS) ftpshut.o rdservers.o inet.o
 FTPREST_OBJS=	$(COMMON_OBJS) ftprestart.o rdservers.o inet.o

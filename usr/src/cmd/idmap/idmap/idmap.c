@@ -18,10 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1604,23 +1604,6 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 cleanup:
 	(void) print_mapping_fini(ph);
 	return (rc);
-}
-
-/*
- * The same as strdup, but length chars is duplicated, no matter on
- * '\0'. The caller must guarantee "length" chars in "from".
- */
-static char *
-strndup(char *from, size_t length)
-{
-	char *out = (char *)malloc(length + 1);
-	if (out == NULL) {
-		print_error(NULL, gettext("Not enough memory\n"));
-		return (NULL);
-	}
-	(void) strncpy(out, from, length);
-	out[length] = '\0';
-	return (out);
 }
 
 /*

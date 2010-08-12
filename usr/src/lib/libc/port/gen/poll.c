@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _poll = poll
 
@@ -32,6 +29,14 @@
 #include <sys/time.h>
 #include <sys/poll.h>
 #include "libc.h"
+
+int
+ppoll(struct pollfd *_RESTRICT_KYWD fds, nfds_t nfd,
+    const struct timespec *_RESTRICT_KYWD tsp,
+    const sigset_t *_RESTRICT_KYWD sigmask)
+{
+	return (_pollsys(fds, nfd, tsp, sigmask));
+}
 
 int
 poll(struct pollfd *fds, nfds_t nfd, int timeout)

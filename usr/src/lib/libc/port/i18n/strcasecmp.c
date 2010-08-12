@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -32,31 +31,33 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <sys/types.h>
 #include <strings.h>
-
-/*
- * This array is designed for mapping upper and lower case letter
- * together for a case independent comparison.  The mappings are
- * based upon ascii character sequences.
- */
-
-extern const char strcase_charmap[];
+#include <ctype.h>
 
 int
-strncasecmp(const char *s1, const char *s2, size_t n)
+strcasecmp(const char *s1, const char *s2)
 {
-	const unsigned char	*cm = (const unsigned char *)strcase_charmap;
-	const unsigned char	*us1 = (const unsigned char *)s1;
-	const unsigned char	*us2 = (const unsigned char *)s2;
+	extern int charset_is_ascii;
+	extern int ascii_strcasecmp(const char *s1, const char *s2);
+	int *cm;
+	const uchar_t *us1;
+	const uchar_t *us2;
 
-	while (n != 0 && cm[*us1] == cm[*us2++]) {
+	/*
+	 * If we are in a locale that uses the ASCII character set
+	 * (C or POSIX), use the fast ascii_strcasecmp() function.
+	 */
+	if (charset_is_ascii)
+		return (ascii_strcasecmp(s1, s2));
+
+	cm = __trans_lower;
+	us1 = (const uchar_t *)s1;
+	us2 = (const uchar_t *)s2;
+
+	while (cm[*us1] == cm[*us2++])
 		if (*us1++ == '\0')
 			return (0);
-		n--;
-	}
-	return (n == 0 ? 0 : cm[*us1] - cm[*(us2 - 1)]);
+	return (cm[*us1] - cm[*(us2 - 1)]);
 }

@@ -1,6 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -42,9 +41,6 @@
 char copyright[] = "@(#) Copyright (c) 1980 Regents of the University of "
 			"California.\nAll rights reserved.\n";
 #endif
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-		/* from UCB 5.1 5/31/85 */
 
 #include <stdio.h>
 #include <ctype.h>
@@ -172,7 +168,7 @@ static void	C_entries();
 static int	start_entry(char **lp, char *token, int *f);
 static void	Y_entries();
 static char	*toss_comment(char *start);
-static void	getline(long int where);
+static void	getaline(long int where);
 static void	free_tree(NODE *node);
 static void	add_node(NODE *node, NODE *cur_node);
 static void	put_entries(NODE *node);
@@ -371,7 +367,7 @@ char	*file;
 			 * throw away all the code before the second "%%"
 			 */
 			toss_yysec();
-			getline(lineftell);
+			getaline(lineftell);
 			pfnote("yylex", lineno, TRUE);
 			toss_yysec();
 			C_entries();
@@ -684,7 +680,7 @@ dotoken:
 				if (start_entry(&sp, token, &f)) {
 					(void) strncpy(tok, token, tp-token+1);
 					tok[tp-token+1] = 0;
-					getline(tokftell);
+					getaline(tokftell);
 					pfnote(tok, pfline, f);
 					gotone = f;	/* function */
 				}
@@ -844,7 +840,7 @@ Y_entries()
 	char		tok[BUFSIZ];
 
 	brace = 0;
-	getline(lineftell);
+	getaline(lineftell);
 	pfnote("yyparse", lineno, TRUE);
 	while (fgets(line, sizeof (line), inf) != NULL)
 		for (sp = line; *sp; sp++)
@@ -951,7 +947,7 @@ char	*start;
 }
 
 static void
-getline(where)
+getaline(where)
 long int where;
 {
 	long saveftell = ftell(inf);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -261,6 +260,15 @@ extern FILE		*_lastbuf;
 #endif	/* !__PRAGMA_REDEFINE_EXTNAME */
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
 
+#ifndef	_SSIZE_T
+#define	_SSIZE_T
+#if defined(_LP64) || defined(_I32LPx)
+typedef long	ssize_t;	/* size of something in bytes or -1 */
+#else
+typedef int	ssize_t;	/* (historical version) */
+#endif
+#endif	/* !_SSIZE_T */
+
 #if defined(__STDC__)
 
 #if defined(__EXTENSIONS__) || \
@@ -271,6 +279,7 @@ extern char	*tmpnam_r(char *);
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+extern int fcloseall(void);
 extern void setbuffer(FILE *, char *, size_t);
 extern int setlinebuf(FILE *);
 /* PRINTFLIKE2 */
@@ -278,6 +287,15 @@ extern int asprintf(char **, const char *, ...);
 /* PRINTFLIKE2 */
 extern int vasprintf(char **, const char *, __va_list);
 #endif
+
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+	/* || defined(_XPG7) */
+extern ssize_t getdelim(char **_RESTRICT_KYWD, size_t *_RESTRICT_KYWD,
+	int, FILE *_RESTRICT_KYWD);
+extern ssize_t getline(char **_RESTRICT_KYWD, size_t *_RESTRICT_KYWD,
+	FILE *_RESTRICT_KYWD);
+#endif	/* __EXTENSIONS__ ... */
 
 /*
  * The following are known to POSIX and XOPEN, but not to ANSI-C.
@@ -333,7 +351,7 @@ extern int	putw(int, FILE *);
 /*
  * The following are defined as part of the Large File Summit interfaces.
  */
-#if	defined(_LARGEFILE_SOURCE) || defined(_XPG5)
+#if defined(_LARGEFILE_SOURCE) || defined(_XPG5)
 extern int	fseeko(FILE *, off_t, int);
 extern off_t	ftello(FILE *);
 #endif
@@ -342,7 +360,7 @@ extern off_t	ftello(FILE *);
  * The following are defined as part of the transitional Large File Summit
  * interfaces.
  */
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
+#if defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern FILE	*fopen64(const char *, const char *);
 extern FILE	*freopen64(const char *, const char *, FILE *);
@@ -367,11 +385,18 @@ extern char	*tmpnam_r();
 #endif
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
+extern int fcloseall();
 extern void setbuffer();
 extern int setlinebuf();
 extern int asprintf();
 extern int vasprintf();
 #endif
+
+#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
+	/* || defined(_XPG7) */
+extern ssize_t getdelim();
+extern ssize_t getline();
+#endif	/* __EXTENSIONS__ ... */
 
 #if defined(__EXTENSIONS__) || defined(__XOPEN_OR_POSIX)
 extern FILE	*fdopen();
@@ -379,7 +404,7 @@ extern char	*ctermid();
 extern int	fileno();
 #endif	/* defined(__EXTENSIONS__) || defined(__XOPEN_OR_POSIX) */
 
-#if	defined(__EXTENSIONS__) || defined(_REENTRANT) || \
+#if defined(__EXTENSIONS__) || defined(_REENTRANT) || \
 	    (_POSIX_C_SOURCE - 0 >= 199506L)
 extern void	flockfile();
 extern int	ftrylockfile();
@@ -410,12 +435,12 @@ extern int	putw();
 
 #endif	/* defined(__EXTENSIONS__) || defined(_XOPEN_SOURCE) */
 
-#if	defined(_LARGEFILE_SOURCE) || defined(_XPG5)
+#if defined(_LARGEFILE_SOURCE) || defined(_XPG5)
 extern int	fseeko();
 extern off_t	ftello();
 #endif
 
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
+#if defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern FILE	*fopen64();
 extern FILE	*freopen64();
@@ -430,7 +455,7 @@ extern off64_t	ftello64();
 
 #if !defined(__lint)
 
-#if	defined(__EXTENSIONS__) || defined(_REENTRANT) || \
+#if defined(__EXTENSIONS__) || defined(_REENTRANT) || \
 	    (_POSIX_C_SOURCE - 0 >= 199506L)
 #ifndef	_LP64
 #ifdef	__STDC__

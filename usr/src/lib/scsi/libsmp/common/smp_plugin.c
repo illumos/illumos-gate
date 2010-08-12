@@ -31,7 +31,6 @@
 #include <scsi/libsmp.h>
 #include <scsi/libsmp_plugin.h>
 
-#include <alloca.h>
 #include <dlfcn.h>
 #include <link.h>
 #include <dirent.h>
@@ -319,18 +318,13 @@ smp_plugin_load_dir(smp_target_t *tp, const char *pluginroot)
 		return (0);
 
 	if (tp->st_component_vendor != NULL) {
-		c_vendor = alloca(strlen(tp->st_component_vendor) + 1);
-		(void) strcpy(c_vendor, tp->st_component_vendor);
+		c_vendor = strdupa(tp->st_component_vendor);
 		smp_plugin_cleanstr(c_vendor);
 	}
 
-	vendor = alloca(strlen(tp->st_vendor) + 1);
-	product = alloca(strlen(tp->st_product) + 1);
-	revision = alloca(strlen(tp->st_revision) + 1);
-
-	(void) strcpy(vendor, tp->st_vendor);
-	(void) strcpy(product, tp->st_product);
-	(void) strcpy(revision, tp->st_revision);
+	vendor = strdupa(tp->st_vendor);
+	product = strdupa(tp->st_product);
+	revision = strdupa(tp->st_revision);
 
 	smp_plugin_cleanstr(vendor);
 	smp_plugin_cleanstr(product);

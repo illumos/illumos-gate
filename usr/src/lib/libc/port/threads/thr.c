@@ -132,6 +132,7 @@ uberdata_t __uberdata = {
 	NULL,			/* atforklist */
 	NULL,			/* robustlocks */
 	NULL,			/* robustlist */
+	NULL,			/* progname */
 	NULL,			/* __tdb_bootstrap */
 	{			/* tdb */
 		NULL,		/* tdb_sync_addr_hash */
@@ -1259,6 +1260,7 @@ libc_init(void)
 		__tdb_bootstrap = oldself->ul_uberdata->tdb_bootstrap;
 		mutex_setup();
 		atfork_init();	/* every link map needs atfork() processing */
+		init_progname();
 		return;
 	}
 
@@ -1458,9 +1460,11 @@ libc_init(void)
 	/*
 	 * When we have initialized the primary link map, inform
 	 * the dynamic linker about our interface functions.
+	 * Set up our pointer to the program name.
 	 */
 	if (self->ul_primarymap)
 		_ld_libc((void *)rtld_funcs);
+	init_progname();
 
 	/*
 	 * Defer signals until TLS constructors have been called.

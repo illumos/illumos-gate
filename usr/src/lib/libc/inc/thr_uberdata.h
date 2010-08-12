@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _THR_UBERDATA_H
@@ -905,6 +905,7 @@ typedef struct uberdata {
 	atfork_t	*atforklist;	/* circular Q for fork handlers */
 	robust_t	**robustlocks;	/* table of registered robust locks */
 	robust_t	*robustlist;	/* list of registered robust locks */
+	char	*progname;	/* the basename of the program, from argv[0] */
 	struct uberdata **tdb_bootstrap;
 	tdb_t	tdb;		/* thread debug interfaces (for libc_db) */
 } uberdata_t;
@@ -1348,6 +1349,7 @@ extern	void	do_sigcancel(void);
 extern	void	setup_cancelsig(int);
 extern	void	init_sigev_thread(void);
 extern	void	init_aio(void);
+extern	void	init_progname(void);
 extern	void	_cancelon(void);
 extern	void	_canceloff(void);
 extern	void	_canceloff_nocancel(void);

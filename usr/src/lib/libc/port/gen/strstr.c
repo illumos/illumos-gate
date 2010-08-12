@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <string.h>
@@ -37,9 +34,9 @@
 /*
  * strstr() locates the first occurrence in the string as1 of
  * the sequence of characters (excluding the terminating null
- * character) in the string as2. strstr() returns a pointer
+ * character) in the string as2.  strstr() returns a pointer
  * to the located string, or a null pointer if the string is
- * not found. If as2 is "", the function returns as1.
+ * not found.  If as2 is empty, the function returns as1.
  */
 
 char *
@@ -54,19 +51,61 @@ strstr(const char *as1, const char *as2)
 
 	if (s2 == NULL || *s2 == '\0')
 		return ((char *)s1);
-	c = *s2;
 
-	while (*s1)
-		if (*s1++ == c) {
+	c = *s2;
+	while (*s1 != '\0') {
+		if (c == *s1++) {
 			tptr = s1;
-			while ((c = *++s2) == *s1++ && c)
-				;
-			if (c == 0)
+			while ((c = *++s2) == *s1++ && c != '\0')
+				continue;
+			if (c == '\0')
 				return ((char *)tptr - 1);
 			s1 = tptr;
 			s2 = as2;
 			c = *s2;
 		}
+	}
+
+	return (NULL);
+}
+
+/*
+ * strnstr() locates the first occurrence in the string as1 of
+ * the sequence of characters (excluding the terminating null
+ * character) in the string as2, where not more than n characters
+ * from the string as1 are searched.  strnstr() returns a pointer
+ * to the located string, or a null pointer if the string is
+ * not found.  If as2 is empty, the function returns as1.
+ */
+
+char *
+strnstr(const char *as1, const char *as2, size_t n)
+{
+	const char *s1, *s2;
+	const char *tptr;
+	size_t k;
+	char c;
+
+	s1 = as1;
+	s2 = as2;
+
+	if (s2 == NULL || *s2 == '\0')
+		return ((char *)s1);
+
+	c = *s2;
+	while (*s1 != '\0' && n--) {
+		if (c == *s1++) {
+			k = n;
+			tptr = s1;
+			while ((c = *++s2) == *s1++ && c != '\0' && k--)
+				continue;
+			if (c == '\0')
+				return ((char *)tptr - 1);
+			s1 = tptr;
+			s2 = as2;
+			c = *s2;
+		}
+	}
 
 	return (NULL);
 }

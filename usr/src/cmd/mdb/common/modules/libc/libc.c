@@ -845,11 +845,12 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    prt_addr(uberdata.ulwp_replace_last, 1),
 	    prt_addr(uberdata.atforklist, 0));
 
-	HD("robustlocks           robustlist");
-	mdb_printf(OFFSTR "%s %s\n",
+	HD("robustlocks           robustlist            progname");
+	mdb_printf(OFFSTR "%s %s %s\n",
 	    OFFSET(robustlocks),
 	    prt_addr(uberdata.robustlocks, 1),
-	    prt_addr(uberdata.robustlist, 0));
+	    prt_addr(uberdata.robustlist, 1),
+	    prt_addr(uberdata.progname, 0));
 
 	HD("tdb_bootstrap         tdb_sync_addr_hash    tdb_'count tdb_'fail");
 	mdb_printf(OFFSTR "%s %s %-10d %d\n",

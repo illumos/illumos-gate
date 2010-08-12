@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Compare strings ignoring case difference.
@@ -40,7 +37,7 @@
 #include "libc.h"
 
 int
-wscasecmp(const wchar_t *s1, const wchar_t *s2)
+wcscasecmp(const wchar_t *s1, const wchar_t *s2)
 {
 	if (s1 == s2)
 		return (0);
@@ -49,4 +46,10 @@ wscasecmp(const wchar_t *s1, const wchar_t *s2)
 		if (*s1++ == 0)
 			return (0);
 	return (towlower(*s1) - towlower(*(s2 - 1)));
+}
+
+int
+wscasecmp(const wchar_t *s1, const wchar_t *s2)
+{
+	return (wcscasecmp(s1, s2));
 }

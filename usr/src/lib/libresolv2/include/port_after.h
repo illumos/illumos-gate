@@ -1,8 +1,6 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 /*
  * Copyright (C) 2004-2008  Internet Systems Consortium, Inc. ("ISC")
@@ -65,7 +63,7 @@ const char *isc_strerror(int);
 #undef HAS_IN_ADDR6
 #define HAVE_SOCKADDR_STORAGE 1
 #undef NEED_GETTIMEOFDAY
-#undef HAVE_STRNDUP
+#define HAVE_STRNDUP
 #undef USE_FIONBIO_IOCTL
 #undef INNETGR_ARGS
 
@@ -538,4 +536,4 @@ char *vsprintf(char *, const char *, va_list);
 /* Solaris-specific changes */
 #include "sunw_port_after.h"
 
-#endif
+#endif	/* port_after_h */

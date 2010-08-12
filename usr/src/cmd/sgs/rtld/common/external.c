@@ -582,6 +582,26 @@ thr_min_stack()
 }
 
 /*
+ * Local str[n]casecmp() interfaces for the dynamic linker,
+ * to avoid problems when linking with libc_pic.a
+ */
+int
+strcasecmp(const char *s1, const char *s2)
+{
+	extern int ascii_strcasecmp(const char *, const char *);
+
+	return (ascii_strcasecmp(s1, s2));
+}
+
+int
+strncasecmp(const char *s1, const char *s2, size_t n)
+{
+	extern int ascii_strncasecmp(const char *, const char *, size_t);
+
+	return (ascii_strncasecmp(s1, s2, n));
+}
+
+/*
  * The following functions are cancellation points in libc.
  * They are called from other functions in libc that we extract
  * and use directly.  We don't do cancellation while we are in

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 /*
  * Routines to capture processor-dependencies in event specification.
@@ -33,7 +30,6 @@
 #include <sys/types.h>
 #include <string.h>
 #include <strings.h>
-#include <alloca.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <libintl.h>
@@ -407,7 +403,7 @@ cpc_strtoevent(int cpuver, const char *spec, cpc_event_t *event)
 
 	pic[0] = pic[1] = NULL;
 
-	opts = strcpy(alloca(strlen(spec) + 1), spec);
+	opts = strdupa(spec);
 	while (*opts != '\0') {
 		const struct keyval *kv;
 		int idx = getsubopt(&opts, tokens, &value);
@@ -629,7 +625,8 @@ cpc_eventtostr(cpc_event_t *event)
 		    xpes[0].inv, xpes[1].inv, 0, tokens[D_inv]);
 		flagstostr(buffer,
 		    xpes[0].pc, xpes[1].pc, 0, tokens[D_pc]);
-	}	break;
+		break;
+	}
 	case CPC_PENTIUM_MMX:
 	case CPC_PENTIUM:
 	{
@@ -654,7 +651,8 @@ cpc_eventtostr(cpc_event_t *event)
 		    xcesr.clk[0], xcesr.clk[1], 0, tokens[D_noedge]);
 		flagstostr(buffer,
 		    xcesr.pc[0], xcesr.pc[1], 0, tokens[D_pc]);
-	}	break;
+		break;
+	}
 	default:
 		return (NULL);
 	}

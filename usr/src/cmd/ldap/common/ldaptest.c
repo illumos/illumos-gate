@@ -1,11 +1,6 @@
 /*
- *
- * Portions Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -40,7 +35,7 @@ static void free_list();
 char *dnsuffix;
 
 static char *
-getline( char *line, int len, FILE *fp, char *prompt )
+getaline( char *line, int len, FILE *fp, char *prompt )
 {
 	printf(prompt);
 
@@ -62,7 +57,7 @@ get_list( char *prompt )
 	num = 0;
 	result = (char **) 0;
 	while ( 1 ) {
-		getline( buf, sizeof(buf), stdin, prompt );
+		getaline( buf, sizeof(buf), stdin, prompt );
 
 		if ( *buf == '\0' )
 			break;
@@ -161,14 +156,14 @@ get_modlist( char *prompt1, char *prompt2, char *prompt3 )
 	result = NULL;
 	while ( 1 ) {
 		if ( prompt1 ) {
-			getline( buf, sizeof(buf), stdin, prompt1 );
+			getaline( buf, sizeof(buf), stdin, prompt1 );
 			tmp.mod_op = atoi( buf );
 
 			if ( tmp.mod_op == -1 || buf[0] == '\0' )
 				break;
 		}
 
-		getline( buf, sizeof(buf), stdin, prompt2 );
+		getaline( buf, sizeof(buf), stdin, prompt2 );
 		if ( buf[0] == '\0' )
 			break;
 		tmp.mod_type = strdup( buf );
@@ -229,7 +224,7 @@ bind_prompt( LDAP *ld, char **dnp, char **passwdp, int *authmethodp,
 
 	if ( !freeit ) {
 #ifdef KERBEROS
-		getline( dn, sizeof(dn), stdin,
+		getaline( dn, sizeof(dn), stdin,
 		    "re-bind method (0->simple, 1->krbv41, 2->krbv42, 3->krbv41&2)? " );
 		if (( *authmethodp = atoi( dn )) == 3 ) {
 			*authmethodp = LDAP_AUTH_KRBV4;
@@ -240,12 +235,12 @@ bind_prompt( LDAP *ld, char **dnp, char **passwdp, int *authmethodp,
 		*authmethodp = LDAP_AUTH_SIMPLE;
 #endif /* KERBEROS */
 
-		getline( dn, sizeof(dn), stdin, "re-bind dn? " );
+		getaline( dn, sizeof(dn), stdin, "re-bind dn? " );
 		strcat( dn, dnsuffix );
 		*dnp = dn;
 
 		if ( *authmethodp == LDAP_AUTH_SIMPLE && dn[0] != '\0' ) {
-			getline( passwd, sizeof(passwd), stdin,
+			getaline( passwd, sizeof(passwd), stdin,
 			    "re-bind password? " );
 		} else {
 			passwd[0] = '\0';
@@ -394,7 +389,7 @@ main(int argc, char **argv )
 	timelimit.tv_usec = 0;
 	
 	(void) memset( line, '\0', sizeof(line) );
-	while ( getline( line, sizeof(line), stdin, "\ncommand? " ) != NULL ) {
+	while ( getaline( line, sizeof(line), stdin, "\ncommand? " ) != NULL ) {
 		command1 = line[0];
 		command2 = line[1];
 		command3 = line[2];
@@ -403,7 +398,7 @@ main(int argc, char **argv )
 		case 'a':	/* add or abandon */
 			switch ( command2 ) {
 			case 'd':	/* add */
-				getline( dn, sizeof(dn), stdin, "dn? " );
+				getaline( dn, sizeof(dn), stdin, "dn? " );
 				strcat( dn, dnsuffix );
 				if ( (attrs = get_modlist( NULL, "attr? ",
 				    "value? " )) == NULL )
@@ -424,7 +419,7 @@ main(int argc, char **argv )
 				break;
 
 			case 'b':	/* abandon */
-				getline( line, sizeof(line), stdin, "msgid? " );
+				getaline( line, sizeof(line), stdin, "msgid? " );
 				id = atoi( line );
 				if ( ldap_abandon( ld, id ) != 0 )
 					ldap_perror( ld, "ldap_abandon" );
@@ -438,17 +433,17 @@ main(int argc, char **argv )
 
 		case 'b':	/* asynch bind */
 #ifdef KERBEROS
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 			    "method (0->simple, 1->krbv41, 2->krbv42)? " );
 			method = atoi( line ) | 0x80;
 #else /* KERBEROS */
 			method = LDAP_AUTH_SIMPLE;
 #endif /* KERBEROS */
-			getline( dn, sizeof(dn), stdin, "dn? " );
+			getaline( dn, sizeof(dn), stdin, "dn? " );
 			strcat( dn, dnsuffix );
 
 			if ( method == LDAP_AUTH_SIMPLE && dn[0] != '\0' )
-				getline( passwd, sizeof(passwd), stdin,
+				getaline( passwd, sizeof(passwd), stdin,
 				    "password? " );
 			else
 				passwd[0] = '\0';
@@ -464,7 +459,7 @@ main(int argc, char **argv )
 
 		case 'B':	/* synch bind */
 #ifdef KERBEROS
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 			    "method 0->simple 1->krbv41 2->krbv42 3->krb? " );
 			method = atoi( line );
 			if ( method == 3 )
@@ -472,12 +467,12 @@ main(int argc, char **argv )
 			else
 				method = method | 0x80;
 #else /* KERBEROS */
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 					 "method 0->simple, 1->SASL? ");
 			method = atoi (line);
 			if (method == 1){
 				method = LDAP_AUTH_SASL;
-				getline( line, sizeof(line), stdin,
+				getaline( line, sizeof(line), stdin,
 						 "mechanism 0->CRAM_MD5, 1->TLS? ");
 				theInt = atoi(line);
 				if (theInt == 0){
@@ -491,11 +486,11 @@ main(int argc, char **argv )
 			}
 			
 #endif /* KERBEROS */
-			getline( dn, sizeof(dn), stdin, "dn? " );
+			getaline( dn, sizeof(dn), stdin, "dn? " );
 			strcat( dn, dnsuffix );
 
 			if ( dn[0] != '\0' )
-				getline( passwd, sizeof(passwd), stdin,
+				getaline( passwd, sizeof(passwd), stdin,
 				    "password? " );
 			else
 				passwd[0] = '\0';
@@ -531,10 +526,10 @@ main(int argc, char **argv )
 			break;
 
 		case 'c':	/* compare */
-			getline( dn, sizeof(dn), stdin, "dn? " );
+			getaline( dn, sizeof(dn), stdin, "dn? " );
 			strcat( dn, dnsuffix );
-			getline( attr, sizeof(attr), stdin, "attr? " );
-			getline( value, sizeof(value), stdin, "value? " );
+			getaline( attr, sizeof(attr), stdin, "attr? " );
+			getaline( value, sizeof(value), stdin, "value? " );
 
 			if (ldap_get_option(ld, LDAP_OPT_PROTOCOL_VERSION, &i) == LDAP_SUCCESS && i == LDAP_VERSION3){
 				bv.bv_val = value;
@@ -553,7 +548,7 @@ main(int argc, char **argv )
 
 		case 'd':	/* turn on debugging */
 #ifdef LDAP_DEBUG
-			getline( line, sizeof(line), stdin, "debug level? " );
+			getaline( line, sizeof(line), stdin, "debug level? " );
 			ldap_debug = atoi( line );
 			if ( ldap_debug & LDAP_DEBUG_PACKETS ) {
 				lber_debug = ldap_debug;
@@ -564,7 +559,7 @@ main(int argc, char **argv )
 			break;
 
 		case 'E':	/* explode a dn */
-			getline( line, sizeof(line), stdin, "dn? " );
+			getaline( line, sizeof(line), stdin, "dn? " );
 			exdn = ldap_explode_dn( line, 0 );
 			for ( i = 0; exdn != NULL && exdn[i] != NULL; i++ ) {
 				printf( "\t%s\n", exdn[i] );
@@ -572,19 +567,19 @@ main(int argc, char **argv )
 			break;
 
 		case 'g':	/* set next msgid */
-			getline( line, sizeof(line), stdin, "msgid? " );
+			getaline( line, sizeof(line), stdin, "msgid? " );
 			ld->ld_msgid = atoi( line );
 			break;
 
 		case 'v':	/* set version number */
-			getline( line, sizeof(line), stdin, "version? " );
+			getaline( line, sizeof(line), stdin, "version? " );
 			theInt = atoi(line);
 			ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &theInt);
 			break;
 
 		case 'm':	/* modify or modifyrdn */
 			if ( strncmp( line, "modify", 4 ) == 0 ) {
-				getline( dn, sizeof(dn), stdin, "dn? " );
+				getaline( dn, sizeof(dn), stdin, "dn? " );
 				strcat( dn, dnsuffix );
 				if ( (mods = get_modlist(
 				    "mod (0=>add, 1=>delete, 2=>replace -1=>done)? ",
@@ -604,10 +599,10 @@ main(int argc, char **argv )
 						printf( "Modify initiated with id %d\n", id );
 				}
 			} else if ( strncmp( line, "modrdn", 4 ) == 0 ) {
-				getline( dn, sizeof(dn), stdin, "dn? " );
+				getaline( dn, sizeof(dn), stdin, "dn? " );
 				strcat( dn, dnsuffix );
-				getline( rdn, sizeof(rdn), stdin, "newrdn? " );
-				getline( line, sizeof(line), stdin, "delete old rdn (0=>no, 1=>yes)?");
+				getaline( rdn, sizeof(rdn), stdin, "newrdn? " );
+				getaline( line, sizeof(line), stdin, "delete old rdn (0=>no, 1=>yes)?");
 				delrdn = atoi(line);
 				if (ldap_get_option(ld, LDAP_OPT_PROTOCOL_VERSION, &i) == LDAP_SUCCESS && i == LDAP_VERSION3){
 					if ((err = ldap_rename(ld, dn, rdn, NULL, delrdn, NULL,NULL, &id)) != LDAP_SUCCESS){
@@ -640,13 +635,13 @@ main(int argc, char **argv )
 		case 'r':	/* result or remove */
 			switch ( command3 ) {
 			case 's':	/* result */
-				getline( line, sizeof(line), stdin,
+				getaline( line, sizeof(line), stdin,
 				    "msgid (-1=>any)? " );
 				if ( line[0] == '\0' )
 					id = -1;
 				else
 					id = atoi( line );
-				getline( line, sizeof(line), stdin,
+				getaline( line, sizeof(line), stdin,
 				    "all (0=>any, 1=>all)? " );
 				if ( line[0] == '\0' )
 					all = 1;
@@ -667,7 +662,7 @@ main(int argc, char **argv )
 				break;
 
 			case 'm':	/* remove */
-				getline( dn, sizeof(dn), stdin, "dn? " );
+				getaline( dn, sizeof(dn), stdin, "dn? " );
 				strcat( dn, dnsuffix );
 				if (ldap_get_option(ld, LDAP_OPT_PROTOCOL_VERSION, &i) == LDAP_SUCCESS && i == LDAP_VERSION3){
 					if ((err = ldap_delete_ext( ld, dn, NULL, NULL, &id )) != LDAP_SUCCESS )
@@ -689,21 +684,21 @@ main(int argc, char **argv )
 			break;
 
 		case 's':	/* search */
-			getline( dn, sizeof(dn), stdin, "searchbase? " );
+			getaline( dn, sizeof(dn), stdin, "searchbase? " );
 			strcat( dn, dnsuffix );
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 			    "scope (0=Base, 1=One Level, 2=Subtree)? " );
 			scope = atoi( line );
-			getline( filter, sizeof(filter), stdin,
+			getaline( filter, sizeof(filter), stdin,
 			    "search filter (e.g. sn=jones)? " );
 			types = get_list( "attrs to return? " );
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 			    "attrsonly (0=attrs&values, 1=attrs only)? " );
 			attrsonly = atoi( line );
 
 			if ( cldapflg ) {
 #ifdef CLDAP
-			    getline( line, sizeof(line), stdin,
+			    getaline( line, sizeof(line), stdin,
 				"Requestor DN (for logging)? " );
 			    if ( cldap_search_s( ld, dn, scope, filter, types,
 				    attrsonly, &res, line ) != 0 ) {
@@ -719,7 +714,7 @@ main(int argc, char **argv )
 				theInt = 0;
 				if (ldap_get_option(ld, LDAP_OPT_PROTOCOL_VERSION, &i) == LDAP_SUCCESS && i == LDAP_VERSION3){
 					resultusetimelimit = 1;
-					getline( line, sizeof(line), stdin,
+					getaline( line, sizeof(line), stdin,
 							 "ldap_search_ext (0=>no, 1=>yes - default: yes)? " );
 					if (line[0] == '\0')
 						theInt = 1;
@@ -727,10 +722,10 @@ main(int argc, char **argv )
 						theInt = atoi( line );
 				}
 				if (theInt){
-					getline(line, sizeof(line), stdin, "time limit?");
+					getaline(line, sizeof(line), stdin, "time limit?");
 					timelimit.tv_sec = atoi(line);
 					resultusetimelimit = 1;
-					getline(line, sizeof(line), stdin, "size limit?");
+					getaline(line, sizeof(line), stdin, "size limit?");
 					sizelimit = atoi(line);
 					if (( err = ldap_search_ext(ld, dn, scope, filter, types, attrsonly, NULL, NULL,
 												&timelimit, sizelimit, &id)) != LDAP_SUCCESS){
@@ -751,20 +746,20 @@ main(int argc, char **argv )
 			break;
 
 		case 't':	/* set timeout value */
-			getline( line, sizeof(line), stdin, "timeout? " );
+			getaline( line, sizeof(line), stdin, "timeout? " );
 			timeout.tv_sec = atoi( line );
 			break;
 
 		case 'U':	/* set ufn search prefix */
-			getline( line, sizeof(line), stdin, "ufn prefix? " );
+			getaline( line, sizeof(line), stdin, "ufn prefix? " );
 			ldap_ufn_setprefix( ld, line );
 			break;
 
 		case 'u':	/* user friendly search w/optional timeout */
-			getline( dn, sizeof(dn), stdin, "ufn? " );
+			getaline( dn, sizeof(dn), stdin, "ufn? " );
 			strcat( dn, dnsuffix );
 			types = get_list( "attrs to return? " );
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 			    "attrsonly (0=attrs&values, 1=attrs only)? " );
 			attrsonly = atoi( line );
 
@@ -787,10 +782,10 @@ main(int argc, char **argv )
 			break;
 
 		case 'l':	/* URL search */
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 			    "attrsonly (0=attrs&values, 1=attrs only)? " );
 			attrsonly = atoi( line );
-			getline( line, sizeof(line), stdin, "LDAP URL? " );
+			getaline( line, sizeof(line), stdin, "LDAP URL? " );
 			if (( id = ldap_url_search( ld, line, attrsonly  ))
 				== -1 ) {
 			    ldap_perror( ld, "ldap_url_search" );
@@ -800,7 +795,7 @@ main(int argc, char **argv )
 			break;
 
 		case 'p':	/* parse LDAP URL */
-			getline( line, sizeof(line), stdin, "LDAP URL? " );
+			getaline( line, sizeof(line), stdin, "LDAP URL? " );
 			if (( i = ldap_url_parse( line, &ludp )) != 0 ) {
 			    fprintf( stderr, "ldap_url_parse: error %d\n", i );
 			} else {
@@ -842,7 +837,7 @@ main(int argc, char **argv )
 			    break;
 
 		case 'n':	/* set dn suffix, for convenience */
-			getline( line, sizeof(line), stdin, "DN suffix? " );
+			getaline( line, sizeof(line), stdin, "DN suffix? " );
 			strcpy( dnsuffix, line );
 			break;
 
@@ -850,9 +845,9 @@ main(int argc, char **argv )
 #ifdef NO_CACHE
 			printf( NOCACHEERRMSG );
 #else /* NO_CACHE */
-			getline( line, sizeof(line), stdin, "Cache timeout (secs)? " );
+			getaline( line, sizeof(line), stdin, "Cache timeout (secs)? " );
 			i = atoi( line );
-			getline( line, sizeof(line), stdin, "Maximum memory to use (bytes)? " );
+			getaline( line, sizeof(line), stdin, "Maximum memory to use (bytes)? " );
 			if ( ldap_enable_cache( ld, i, atoi( line )) == 0 ) {
 				printf( "local cache is on\n" ); 
 			} else {
@@ -865,7 +860,7 @@ main(int argc, char **argv )
 #ifdef NO_CACHE
 			printf( NOCACHEERRMSG );
 #else /* NO_CACHE */
-			getline( line, sizeof(line), stdin, "DN? " );
+			getaline( line, sizeof(line), stdin, "DN? " );
 			ldap_uncache_entry( ld, line );
 #endif /* NO_CACHE */
 			break;
@@ -874,33 +869,33 @@ main(int argc, char **argv )
 #ifdef NO_CACHE
 			printf( NOCACHEERRMSG );
 #else /* NO_CACHE */
-			getline( line, sizeof(line), stdin, "request msgid? " );
+			getaline( line, sizeof(line), stdin, "request msgid? " );
 			ldap_uncache_request( ld, atoi( line ));
 #endif /* NO_CACHE */
 			break;
 
 		case 'o':	/* set ldap options */
-			getline( line, sizeof(line), stdin, "alias deref (0=never, 1=searching, 2=finding, 3=always)?" );
+			getaline( line, sizeof(line), stdin, "alias deref (0=never, 1=searching, 2=finding, 3=always)?" );
 			theInt = atoi(line);
 			ldap_set_option(ld, LDAP_OPT_DEREF, &theInt );
-			getline( line, sizeof(line), stdin, "timelimit?" );
+			getaline( line, sizeof(line), stdin, "timelimit?" );
 			theInt = atoi(line);
 			ldap_set_option(ld, LDAP_OPT_TIMELIMIT,  &theInt);
-			getline( line, sizeof(line), stdin, "sizelimit?" );
+			getaline( line, sizeof(line), stdin, "sizelimit?" );
 			theInt = atoi(line);
 			ldap_set_option(ld, LDAP_OPT_SIZELIMIT, &theInt);
 
 			ld->ld_options = 0;
 
 #ifdef STR_TRANSLATION
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 				"Automatic translation of T.61 strings (0=no, 1=yes)?" );
 			if ( atoi( line ) == 0 ) {
 				ld->ld_lberoptions &= ~LBER_TRANSLATE_STRINGS;
 			} else {
 				ld->ld_lberoptions |= LBER_TRANSLATE_STRINGS;
 #ifdef LDAP_CHARSET_8859
-				getline( line, sizeof(line), stdin,
+				getaline( line, sizeof(line), stdin,
 					"Translate to/from ISO-8859 (0=no, 1=yes?" );
 				if ( atoi( line ) != 0 ) {
 					ldap_set_string_translators( ld,
@@ -912,18 +907,18 @@ main(int argc, char **argv )
 #endif /* STR_TRANSLATION */
 
 #ifdef LDAP_DNS
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 				"Use DN & DNS to determine where to send requests (0=no, 1=yes)?" );
 			if ( atoi( line ) != 0 ) {
 				ld->ld_options |= LDAP_OPT_DNS;
 			}
 #endif /* LDAP_DNS */
 
-			getline( line, sizeof(line), stdin,
+			getaline( line, sizeof(line), stdin,
 				"Recognize and chase referrals (0=no, 1=yes)?" );
 			if ( atoi( line ) != 0 ) {
 				theInt = LDAP_OPT_ON;
-				getline( line, sizeof(line), stdin,
+				getaline( line, sizeof(line), stdin,
 						 "Prompt for bind credentials when chasing referrals (0=no, 1=yes)?" );
 				if ( atoi( line ) != 0 ) {
 					ldap_set_option( ld, LDAP_OPT_REBIND_FN, bind_prompt );
@@ -935,7 +930,7 @@ main(int argc, char **argv )
 			break;
 
 		case 'k': /* Set some controls */
-			getline( line, sizeof(line), stdin, 
+			getaline( line, sizeof(line), stdin, 
 					 "Set control: (0 for none, 1 for ManageDSA, 2 for preferredLang, 3 for BAD)?");
 			theInt = atoi(line);
 			switch (theInt){
@@ -949,7 +944,7 @@ main(int argc, char **argv )
 				ldap_set_option(ld, LDAP_OPT_SERVER_CONTROLS, ctrls);
 				break;
 			case 2:
-				getline( line, sizeof(line), stdin,
+				getaline( line, sizeof(line), stdin,
 						 "Preferred Language Control : lang ?");
 				aCtrl.ldctl_oid = "1.3.6.1.4.1.1466.20035";
 				aCtrl.ldctl_iscritical = 1;
@@ -959,7 +954,7 @@ main(int argc, char **argv )
 				ldap_set_option(ld, LDAP_OPT_SERVER_CONTROLS, ctrls);
 				break;
 			default:
-				getline( line, sizeof(line), stdin,
+				getaline( line, sizeof(line), stdin,
 						 "Bad Control is critical (0=false, 1=true)?");
 				aCtrl.ldctl_oid = "1.1.1.1.1.1";
 				aCtrl.ldctl_iscritical = atoi(line);
@@ -973,7 +968,7 @@ main(int argc, char **argv )
 #ifdef NO_CACHE
 			printf( NOCACHEERRMSG );
 #else /* NO_CACHE */
-			getline( line, sizeof(line), stdin, "cache errors (0=smart, 1=never, 2=always)?" );
+			getaline( line, sizeof(line), stdin, "cache errors (0=smart, 1=never, 2=always)?" );
 			switch( atoi( line )) {
 			case 0:
 				ldap_set_cache_options( ld, 0 );

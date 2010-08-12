@@ -18,17 +18,14 @@
  * Similar to fgets(3) but can handle '\\' and NL is converted to NUL.
  * Returns NULL if error occured, EOF encounterd or input line is too long.
  */
-char *getline(str, size, file, linenum)
-register char	*str;
-size_t	size;
-FILE	*file;
-int	*linenum;
+char *
+getaline(char *str, size_t size, FILE *file, int *linenum)
 {
 	char *p;
 	int s, len;
 
 	do {
-		for (p = str, s = size;; p += (len - 1), s -= (len - 1)) {
+		for (p = str, s = size; ; p += (len - 1), s -= (len - 1)) {
 			/*
 			 * if an error occured, EOF was encounterd, or there
 			 * was no room to put NUL, return NULL.

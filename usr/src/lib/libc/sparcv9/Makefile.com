@@ -119,7 +119,6 @@ COMOBJS=			\
 	bcopy.o			\
 	bsearch.o		\
 	bzero.o			\
-	ffs.o			\
 	memccpy.o		\
 	qsort.o			\
 	strtol.o		\
@@ -132,6 +131,7 @@ GENOBJS=			\
 	_xregs_clrptr.o		\
 	abs.o			\
 	alloca.o		\
+	ascii_strcasecmp.o	\
 	byteorder.o		\
 	cuexit.o		\
 	ecvt.o			\
@@ -146,7 +146,6 @@ GENOBJS=			\
 	siglongjmp.o		\
 	smt_pause.o		\
 	sparc_data.o		\
-	strcasecmp.o		\
 	strchr.o		\
 	strcmp.o		\
 	strlcpy.o		\
@@ -350,6 +349,7 @@ PORTGEN=			\
 	a64l.o			\
 	abort.o			\
 	addsev.o		\
+	ascii_strncasecmp.o	\
 	assert.o		\
 	attrat.o		\
 	atof.o			\
@@ -393,6 +393,8 @@ PORTGEN=			\
 	fattach.o		\
 	fdetach.o		\
 	fdopendir.o		\
+	ffs.o			\
+	fls.o			\
 	fmtmsg.o		\
 	ftime.o			\
 	ftok.o			\
@@ -414,6 +416,7 @@ PORTGEN=			\
 	getlogin.o		\
 	getmntent.o		\
 	getnetgrent.o		\
+	get_nprocs.o		\
 	getopt.o		\
 	getopt_long.o		\
 	getpagesize.o		\
@@ -462,6 +465,7 @@ PORTGEN=			\
 	madvise.o		\
 	malloc.o		\
 	memalign.o		\
+	memmem.o		\
 	mkdev.o			\
 	mkdtemp.o		\
 	mkfifo.o		\
@@ -525,15 +529,18 @@ PORTGEN=			\
 	sigsetops.o		\
 	ssignal.o		\
 	stack.o			\
+	stpcpy.o		\
+	stpncpy.o		\
 	str2sig.o		\
 	strcase_charmap.o	\
 	strcat.o		\
+	strchrnul.o		\
 	strcspn.o		\
 	strdup.o		\
 	strerror.o		\
-	strncat.o		\
 	strlcat.o		\
-	strncasecmp.o		\
+	strncat.o		\
+	strndup.o		\
 	strpbrk.o		\
 	strrchr.o		\
 	strsep.o		\
@@ -563,6 +570,7 @@ PORTGEN=			\
 	tfind.o			\
 	time_data.o		\
 	time_gdata.o		\
+	tls_data.o		\
 	truncate.o		\
 	tsdalloc.o		\
 	tsearch.o		\
@@ -637,6 +645,7 @@ PORTSTDIO=			\
 	fwrite.o		\
 	getc.o			\
 	getchar.o		\
+	getline.o		\
 	getpass.o		\
 	gets.o			\
 	getw.o			\
@@ -669,7 +678,11 @@ PORTI18N=			\
 	getwchar.o		\
 	putwchar.o		\
 	putws.o			\
+	strcasecmp.o		\
+	strcasestr.o		\
+	strncasecmp.o		\
 	strtows.o		\
+	wcsnlen.o		\
 	wcstoimax.o		\
 	wcstol.o		\
 	wcstoul.o		\
@@ -964,8 +977,10 @@ BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 C99MODE=	$(C99_ENABLE)
 
 # libc method of building an archive
+# The "$(GREP) -v ' L '" part is necessary only until
+# lorder is fixed to ignore thread-local variables.
 BUILD.AR= $(RM) $@ ; \
-	$(AR) q $@ `$(LORDER) $(MOSTOBJS:%=$(DIR)/%)| $(TSORT)`
+	$(AR) q $@ `$(LORDER) $(MOSTOBJS:%=$(DIR)/%) | $(GREP) -v ' L ' | $(TSORT)`
 
 # extra files for the clean target
 CLEANFILES=			\
@@ -1023,6 +1038,7 @@ TIL=				\
 	atfork.o		\
 	cancel.o		\
 	door_calls.o		\
+	err.o			\
 	errno.o			\
 	getctxt.o		\
 	lwp.o			\
@@ -1055,6 +1071,9 @@ TIL=				\
 	unwind.o
 
 $(TIL:%=pics/%) := CFLAGS64 += $(LIBCBASE)/threads/sparcv9.il
+
+# This hack is needed until the sparc gcc is fixed for TLS
+pics/tls_data.o := CC = env 'CW_NO_SHADOW=1' $(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
 
 # Files in fp, port/fp subdirectories that need base.il inline template
 IL=				\

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <errno.h>
 #include <sys/types.h>
@@ -180,7 +177,7 @@ static int	free_ctx_ssl(http_conn_t *);
 static int	get_chunk_header(http_conn_t *);
 static int	init_bread(http_conn_t *);
 static int	get_msgcnt(http_conn_t *, ssize_t *);
-static int	getline(http_conn_t *, char *, int, boolean_t);
+static int	getaline(http_conn_t *, char *, int, boolean_t);
 static int	getbytes(http_conn_t *, char *, int);
 static int	http_srv_send(http_conn_t *, const void *, size_t);
 static int	http_srv_recv(http_conn_t *, void *, size_t);
@@ -945,7 +942,7 @@ http_process_headers(http_handle_t handle, http_respinfo_t **resp)
 	 * check the response status line, expecting
 	 * HTTP/1.1 200 OK
 	 */
-	i = getline(c_id, line, sizeof (line), B_FALSE);
+	i = getaline(c_id, line, sizeof (line), B_FALSE);
 	if (i == 0) {
 		if (resp != NULL) {
 			*resp = lresp;
@@ -1150,7 +1147,7 @@ http_process_part_headers(http_handle_t handle, http_respinfo_t **resp)
 
 	/* Look for the boundary line. */
 	count = 0;
-	while ((i = getline(c_id, line, sizeof (line), B_TRUE)) == 0 &&
+	while ((i = getaline(c_id, line, sizeof (line), B_TRUE)) == 0 &&
 	    count < FAILSAFE)
 		count ++;
 	if (i < 0 || count > limit) {
@@ -1662,7 +1659,7 @@ http_req(http_handle_t handle, const char *abs_path, http_req_t type,
 		 * Allow for concat(basic_auth_userid ":" basic_auth_password)
 		 */
 		authlen = strlen(c_id->basic_auth_userid) + 2 +
-			strlen(c_id->basic_auth_password);
+		    strlen(c_id->basic_auth_password);
 		if ((authstr = malloc(authlen + 1)) == NULL) {
 			free(request);
 			SET_ERR(c_id, ERRSRC_LIBHTTP, EHTTP_NOMEM);
@@ -1680,7 +1677,7 @@ http_req(http_handle_t handle, const char *abs_path, http_req_t type,
 		}
 
 		(void) EVP_EncodeBlock((unsigned char *)authencstr,
-			(unsigned char *)authstr, authlen);
+		    (unsigned char *)authstr, authlen);
 
 		/*
 		 * Finally do concat(Authorization: Basic " authencstr "\r\n")
@@ -2186,7 +2183,7 @@ check_cert_chain(http_conn_t *c_id, char *host)
 	if ((verify_err = SSL_get_verify_result(c_id->ssl)) != X509_V_OK) {
 		SET_ERR(c_id, ERRSRC_VERIFERR, verify_err);
 		libbootlog(BOOTLOG_CRIT,
-			"check_cert_chain: Certificate doesn't verify");
+		    "check_cert_chain: Certificate doesn't verify");
 		return (-1);
 	}
 
@@ -2207,7 +2204,7 @@ check_cert_chain(http_conn_t *c_id, char *host)
 		return (-1);
 	}
 	(void) X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
-		NID_commonName, peer_CN, 256);
+	    NID_commonName, peer_CN, 256);
 
 	if (verbosemode)
 		libbootlog(BOOTLOG_VERBOSE,
@@ -2283,7 +2280,7 @@ print_ciphers(SSL *ssl)
  *  c_id->resphdr.
  *
  *  Note that I/O errors are put into the error stack by http_srv_recv(),
- *  which is called by getline().
+ *  which is called by getaline().
  */
 static int
 read_headerlines(http_conn_t *c_id, boolean_t bread)
@@ -2298,7 +2295,7 @@ read_headerlines(http_conn_t *c_id, boolean_t bread)
 	/* process headers, stop when we get to an empty line */
 	cur = 0;
 	next = 0;
-	while ((n = getline(c_id, line, sizeof (line), bread)) > 0) {
+	while ((n = getaline(c_id, line, sizeof (line), bread)) > 0) {
 
 		if (verbosemode)
 			libbootlog(BOOTLOG_VERBOSE,
@@ -2430,11 +2427,11 @@ get_chunk_header(http_conn_t *c_id)
 		ok = 1;
 		c_id->is_firstchunk = B_FALSE;
 	} else {
-		ok = ((i = getline(c_id, line, sizeof (line), B_FALSE)) == 0);
+		ok = ((i = getaline(c_id, line, sizeof (line), B_FALSE)) == 0);
 	}
 
 	if (ok)
-		i = getline(c_id, line, sizeof (line), B_FALSE);
+		i = getaline(c_id, line, sizeof (line), B_FALSE);
 	if (!ok || i < 0) {
 		/*
 		 * If I/O error, the Cause was already put into
@@ -2619,7 +2616,7 @@ get_msgcnt(http_conn_t *c_id, ssize_t *msgcnt)
 }
 
 /*
- * getline - Get lines of data from the HTTP response, up to 'len' bytes.
+ * getaline - Get lines of data from the HTTP response, up to 'len' bytes.
  *	  NOTE: the line will not end with a NULL if all 'len' bytes
  *	  were read.
  *
@@ -2642,7 +2639,7 @@ get_msgcnt(http_conn_t *c_id, ssize_t *msgcnt)
  *  Note that I/O errors are put into the error stack by http_srv_recv().1
  */
 static int
-getline(http_conn_t *c_id, char *line, int len, boolean_t bread)
+getaline(http_conn_t *c_id, char *line, int len, boolean_t bread)
 {
 	int	i = 0;
 	ssize_t	msgcnt = 0;
@@ -2724,7 +2721,7 @@ getline(http_conn_t *c_id, char *line, int len, boolean_t bread)
  *
  *  Note that all reads performed here assume that a message body is being
  *  read. If this changes in the future, then the logic should more closely
- *  resemble getline().
+ *  resemble getaline().
  *
  *  Note that I/O errors are put into the error stack by http_srv_recv().
  */
@@ -2758,7 +2755,7 @@ getbytes(http_conn_t *c_id, char *line, int len)
 		if (c_id->inbuf.n != c_id->inbuf.i) {
 			nbytes = (int)MIN(cnt, c_id->inbuf.n - c_id->inbuf.i);
 			(void) memcpy(line, &c_id->inbuf.buf[c_id->inbuf.i],
-				nbytes);
+			    nbytes);
 			c_id->inbuf.i += nbytes;
 		} else {
 			nbytes = http_srv_recv(c_id, line, cnt);

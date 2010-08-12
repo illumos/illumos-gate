@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -342,7 +341,7 @@ resetmnttab(FILE *fp)
  * an ioctl() call.
  */
 static int
-getline(char *lp, FILE *fp)
+getaline(char *lp, FILE *fp)
 {
 	char	*cp;
 
@@ -372,7 +371,7 @@ getmntent_compat(FILE *fp, struct mnttab *mp)
 	}
 
 	/* skip leading spaces and comments */
-	if ((ret = getline(line, fp)) != 0)
+	if ((ret = getaline(line, fp)) != 0)
 		return (ret);
 
 	/* split up each field */

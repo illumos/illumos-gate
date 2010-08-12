@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"lint.h"
 #include	<mtlib.h>
@@ -66,7 +63,7 @@
 static const char	sepstr[] = " \t\n";
 static const char	dash[] = "-";
 
-static int	getline(char *, FILE *);
+static int	getaline(char *, FILE *);
 
 int
 getvfsspec(FILE *fd, struct vfstab *vgetp, char *special)
@@ -78,8 +75,8 @@ getvfsspec(FILE *fd, struct vfstab *vgetp, char *special)
 
 
 	if (special && stat64(special, &statb) == 0 &&
-		((bmode = (statb.st_mode & S_IFMT)) == S_IFBLK ||
-		bmode == S_IFCHR)) {
+	    ((bmode = (statb.st_mode & S_IFMT)) == S_IFBLK ||
+	    bmode == S_IFCHR)) {
 		bstat = 1;
 		brdev = statb.st_rdev;
 	} else
@@ -119,12 +116,12 @@ getvfsany(FILE *fd, struct vfstab *vgetp, struct vfstab *vrefp)
 
 	/* Match by straight strcmp */
 	while ((ret = getvfsent(fd, vgetp)) == 0 &&
-		(DIFF(vfs_special) || DIFF(vfs_fsckdev) ||
-		DIFF(vfs_mountp) ||
-		DIFF(vfs_fstype) ||
-		DIFF(vfs_fsckpass) ||
-		DIFF(vfs_automnt) ||
-		DIFF(vfs_mntopts)))
+	    (DIFF(vfs_special) || DIFF(vfs_fsckdev) ||
+	    DIFF(vfs_mountp) ||
+	    DIFF(vfs_fstype) ||
+	    DIFF(vfs_fsckpass) ||
+	    DIFF(vfs_automnt) ||
+	    DIFF(vfs_mntopts)))
 		;
 
 	/* If something other than EOF, return it */
@@ -139,31 +136,31 @@ getvfsany(FILE *fd, struct vfstab *vgetp, struct vfstab *vrefp)
 	(void) fseeko64(fd, start, SEEK_SET);
 
 	if (vrefp->vfs_special && stat64(vrefp->vfs_special, &statb) == 0 &&
-		((bmode = (statb.st_mode & S_IFMT)) == S_IFBLK ||
-		bmode == S_IFCHR)) {
+	    ((bmode = (statb.st_mode & S_IFMT)) == S_IFBLK ||
+	    bmode == S_IFCHR)) {
 		bstat = 1;
 		brdev = statb.st_rdev;
 	} else
 		bstat = 0;
 
 	if (vrefp->vfs_fsckdev && stat64(vrefp->vfs_fsckdev, &statb) == 0 &&
-		((cmode = (statb.st_mode & S_IFMT)) == S_IFBLK ||
-		cmode == S_IFCHR)) {
+	    ((cmode = (statb.st_mode & S_IFMT)) == S_IFBLK ||
+	    cmode == S_IFCHR)) {
 		cstat = 1;
 		crdev = statb.st_rdev;
 	} else
 		cstat = 0;
 
 	while ((ret = getvfsent(fd, vgetp)) == 0 &&
-		((bstat == 0 && DIFF(vfs_special)) ||
-		(bstat == 1 && SDIFF(vfs_special, bmode, brdev)) ||
-		(cstat == 0 && DIFF(vfs_fsckdev)) ||
-		(cstat == 1 && SDIFF(vfs_fsckdev, cmode, crdev)) ||
-		DIFF(vfs_mountp) ||
-		DIFF(vfs_fstype) ||
-		DIFF(vfs_fsckpass) ||
-		DIFF(vfs_automnt) ||
-		DIFF(vfs_mntopts)))
+	    ((bstat == 0 && DIFF(vfs_special)) ||
+	    (bstat == 1 && SDIFF(vfs_special, bmode, brdev)) ||
+	    (cstat == 0 && DIFF(vfs_fsckdev)) ||
+	    (cstat == 1 && SDIFF(vfs_fsckdev, cmode, crdev)) ||
+	    DIFF(vfs_mountp) ||
+	    DIFF(vfs_fstype) ||
+	    DIFF(vfs_fsckpass) ||
+	    DIFF(vfs_automnt) ||
+	    DIFF(vfs_mntopts)))
 		;
 	return (ret);
 }
@@ -179,7 +176,7 @@ getvfsent(FILE *fd, struct vfstab *vp)
 		return (0);
 
 	/* skip leading spaces and comments */
-	if ((ret = getline(line, fd)) != 0)
+	if ((ret = getaline(line, fd)) != 0)
 		return (ret);
 
 	/* split up each field */
@@ -199,7 +196,7 @@ getvfsent(FILE *fd, struct vfstab *vp)
 }
 
 static int
-getline(char *lp, FILE *fd)
+getaline(char *lp, FILE *fd)
 {
 	char	*cp;
 

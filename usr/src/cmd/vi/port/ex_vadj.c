@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -29,8 +28,6 @@
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_tune.h"
@@ -90,7 +87,7 @@ vopen(line *tp, int p)
 		 * and so it's not worth optimizing.
 		 */
 		vdirty(vcline+1, WECHO);
-	getline(*tp);
+	getaline(*tp);
 
 	/*
 	 * If we are opening at the top of the window, can try a window
@@ -685,7 +682,7 @@ vredraw(int p)
 		if (l == vcline)
 			strcLIN(temp);
 		else
-			getline(*tp);
+			getaline(*tp);
 
 		/*
 		 * Delete junk between displayed lines.
@@ -729,7 +726,7 @@ vredraw(int p)
 
 		vcline = l;
 		for (; tp <= dol && Peekkey != ATTN; tp++) {
-			getline(*tp);
+			getaline(*tp);
 			if (p + vdepth() - 1 > WBOT)
 				break;
 			vopen(tp, p);
@@ -897,7 +894,7 @@ vsync1(int p)
 				if (l == vcline)
 					strcLIN(temp);
 				else
-					getline(dot[l - vcline]);
+					getaline(dot[l - vcline]);
 				/*
 				 * Be careful that a long line doesn't cause the
 				 * screen to shoot up.

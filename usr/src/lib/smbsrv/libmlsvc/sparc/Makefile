@@ -19,13 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.com
+
+# With compiling with gcc, the symbol table goes over
+# the limit for Kpic, so we add -KPIC here.
+$(__GNUC)sparc_C_PICFLAGS =	-K PIC
+$(__GNUC)sparc_CC_PICFLAGS =	-KPIC
 
 DYNFLAGS +=	-R/usr/lib/smbsrv
 

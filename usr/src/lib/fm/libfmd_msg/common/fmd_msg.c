@@ -1380,9 +1380,7 @@ fmd_msg_getitem(fmd_msg_hdl_t *h,
 	if (locale != NULL && strcmp(h->fmh_locale, locale) == 0)
 		locale = NULL; /* simplify later tests */
 
-	dict = alloca((size_t)(p - code) + 1);
-	(void) strncpy(dict, code, (size_t)(p - code));
-	dict[(size_t)(p - code)] = '\0';
+	dict = strndupa(code, p - code);
 
 	fmd_msg_lock();
 
@@ -1392,8 +1390,7 @@ fmd_msg_getitem(fmd_msg_hdl_t *h,
 	 */
 	if (h->fmh_binding != NULL) {
 		p = bindtextdomain(dict, NULL);
-		old_b = alloca(strlen(p) + 1);
-		(void) strcpy(old_b, p);
+		old_b = strdupa(p);
 		(void) bindtextdomain(dict, h->fmh_binding);
 	}
 
@@ -1412,8 +1409,7 @@ fmd_msg_getitem(fmd_msg_hdl_t *h,
 	 * the text for a different locale, switch locales now under the lock.
 	 */
 	p = setlocale(LC_ALL, NULL);
-	old_c = alloca(strlen(p) + 1);
-	(void) strcpy(old_c, p);
+	old_c = strdupa(p);
 
 	if (locale != NULL)
 		(void) setlocale(LC_ALL, locale);
@@ -1559,9 +1555,7 @@ fmd_msg_gettext(fmd_msg_hdl_t *h,
 	if (locale != NULL && strcmp(h->fmh_locale, locale) == 0)
 		locale = NULL; /* simplify later tests */
 
-	dict = alloca((size_t)(p - code) + 1);
-	(void) strncpy(dict, code, (size_t)(p - code));
-	dict[(size_t)(p - code)] = '\0';
+	dict = strndupa(code, p - code);
 
 	fmd_msg_lock();
 
@@ -1571,8 +1565,7 @@ fmd_msg_gettext(fmd_msg_hdl_t *h,
 	 */
 	if (h->fmh_binding != NULL) {
 		p = bindtextdomain(dict, NULL);
-		old_b = alloca(strlen(p) + 1);
-		(void) strcpy(old_b, p);
+		old_b = strdupa(p);
 		(void) bindtextdomain(dict, h->fmh_binding);
 	}
 
@@ -1591,8 +1584,7 @@ fmd_msg_gettext(fmd_msg_hdl_t *h,
 	 * the text for a different locale, switch locales now under the lock.
 	 */
 	p = setlocale(LC_ALL, NULL);
-	old_c = alloca(strlen(p) + 1);
-	(void) strcpy(old_c, p);
+	old_c = strdupa(p);
 
 	if (locale != NULL)
 		(void) setlocale(LC_ALL, locale);

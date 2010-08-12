@@ -18,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -50,7 +50,7 @@ static const char *usage =
 #endif	/* __x86 */
 
 static void
-setprogname(const char *name)
+setpname(const char *name)
 {
 	char *p;
 
@@ -178,7 +178,7 @@ main(int argc, char *argv[])
 	int c, ret;
 	char hw_provider[SYS_NMLN];
 
-	setprogname(argv[0]);
+	setpname(argv[0]);
 	opts.o_promdev = "/dev/openprom";
 
 	while ((c = getopt(argc, argv, optstring)) != -1)  {

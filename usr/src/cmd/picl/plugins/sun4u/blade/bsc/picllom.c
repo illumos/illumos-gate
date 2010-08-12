@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 /*
  * This plugin creates PICL nodes and properties for objects handled through
@@ -102,7 +99,6 @@ static	int		read_fan_status(ptree_rarg_t *parg, void *buf);
 static	int		lookup_led_status(int8_t state, const char **string);
 static	int		read_led_status(ptree_rarg_t *parg, void *buf);
 static	void		convert_node_name(char *ptr);
-static const char	*strcasestr(const char *s1, const char *s2);
 static	int		add_temp_sensors(int lom_fd, picl_nodehdl_t lominfh);
 static	int		add_voltage_monitors(int lom_fd,
     picl_nodehdl_t lominfh);
@@ -300,7 +296,7 @@ get_lom_device_path(picl_nodehdl_t *lominfh)
 	char devices_path[PATH_MAX];
 
 	err = ptree_get_propval_by_name(*lominfh, PICL_PROP_DEVFS_PATH,
-		devfs_path, sizeof (devfs_path));
+	    devfs_path, sizeof (devfs_path));
 
 	/* Build up the full device path and set the global */
 	strcpy(devices_path, "/devices");
@@ -854,24 +850,6 @@ convert_node_name(char *ptr)
 	}
 }
 
-/*
- * find first occurrence of string s2 within string s1 (ignoring case)
- */
-static const char *
-strcasestr(const char *s1, const char *s2)
-{
-	int len1 = strlen(s1);
-	int len2 = strlen(s2);
-	int i;
-
-	for (i = 0; i <= len1 - len2; i++) {
-		if (strncasecmp(s1 + i, s2, len2) == 0)
-			return (s1 + i);
-	}
-
-	return (NULL);
-}
-
 static int
 add_temp_sensors(int lom_fd, picl_nodehdl_t lominfh)
 {
@@ -1060,10 +1038,10 @@ add_led(const lom_led_state_t *led_state, picl_nodehdl_t lominfh)
 	 */
 	if ((led_state->colour != LOM_LED_COLOUR_NONE) &&
 	    (led_state->colour != LOM_LED_COLOUR_ANY)) {
-	    err = add_regular_prop(ledh, PICL_PROP_COLOR,
-		PICL_PTYPE_CHARSTRING, PICL_READ,
-		colour_lkup[led_state->index].size,
-		colour_lkup[led_state->index].str_colour, &proph);
+		err = add_regular_prop(ledh, PICL_PROP_COLOR,
+		    PICL_PTYPE_CHARSTRING, PICL_READ,
+		    colour_lkup[led_state->index].size,
+		    colour_lkup[led_state->index].str_colour, &proph);
 	}
 	if (err != PICL_SUCCESS)
 		return;

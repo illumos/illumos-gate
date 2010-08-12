@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.cmd
@@ -42,16 +41,12 @@ all clean clobber install lint _msg: $(SUBDIRS)
 check: fpsd
 
 #
-# Note that the compilation of fptest is handled differently.
-# If the primary compiler is not a Sun Studio compiler, fptest will
-# *not* be compiled. This is because fptest is dependent on some Sun
+# The compilation of fptest is forced to be done with the Sun
+# Studio compiler.  This is because fptest is dependent on some Sun
 # performance libraries provided as part of the Sun Studio compiler
-# installation. fptest statically links libsunperf.a, libfui.a,
-# libfai.a, libfsu.a, and libsunmath.a. The other SUBDIRS will be
-# compiled.
-#
-# If the make macro __GNUC is "#", it means Sun Studio compiler is being
-# used for the compilation.
+# installation.  fptest statically links libsunperf.a, libfui.a,
+# libfai.a, libfsu.a, and libsunmath.a.  The other SUBDIRS will be
+# compiled normally.
 #
 
 $(SUBDIRS): FRC
@@ -63,14 +58,11 @@ $(SUBDIRS): FRC
 		*)							\
 			if [ $@ != fptest ];				\
 			then						\
-				cd $@; pwd; VERSION='$(VERSION)' $(MAKE) \
-                                $(TARGET);									\
+				cd $@; pwd; VERSION='$(VERSION)'	\
+				$(MAKE) $(TARGET);			\
 			else						\
-				if [ "$(__GNUC)" = "#" ];               \
-				then					\
-					cd $@; pwd; VERSION='$(VERSION)' \
-                                        $(MAKE) $(TARGET);								\
-				fi					\
+				cd $@; pwd; VERSION='$(VERSION)'	\
+				$(MAKE) __GNUC=$(POUND_SIGN) $(TARGET);	\
 			fi						\
 			;;						\
 	esac

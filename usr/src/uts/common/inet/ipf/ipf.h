@@ -6,14 +6,11 @@
  * @(#)ipf.h	1.12 6/5/96
  * $Id: ipf.h,v 2.71.2.7 2005/06/12 07:18:31 darrenr Exp $
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	__IPF_H__
 #define	__IPF_H__
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(__osf__)
 # define radix_mask ipf_radix_mask
@@ -208,7 +205,7 @@ extern int gethost __P((char *, i6addr_t *, int));
 extern int getport __P((struct frentry *, char *, u_short *));
 extern int getportproto __P((char *, int));
 extern int getproto __P((char *));
-extern char *getline __P((char *, size_t, FILE *, int *));
+extern char *getaline __P((char *, size_t, FILE *, int *));
 extern int genmask __P((char *, u_32_t *));
 extern char *getnattype __P((struct nat *, int));
 extern char *getsumd __P((u_32_t));

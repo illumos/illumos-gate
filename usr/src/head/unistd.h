@@ -162,11 +162,11 @@ extern "C" {
  * which need mutexes to support priority inheritance/ceiling.
  */
 #if defined(_XPG6)
-#define	_POSIX_THREAD_PRIO_INHERIT	200112L
-#define	_POSIX_THREAD_PRIO_PROTECT	200112L
+#define	_POSIX_THREAD_PRIO_INHERIT		200112L
+#define	_POSIX_THREAD_PRIO_PROTECT		200112L
 #else
-#define	_POSIX_THREAD_PRIO_INHERIT	1
-#define	_POSIX_THREAD_PRIO_PROTECT	1
+#define	_POSIX_THREAD_PRIO_INHERIT		1
+#define	_POSIX_THREAD_PRIO_PROTECT		1
 #endif
 
 #ifndef _POSIX_VDISABLE
@@ -558,6 +558,10 @@ extern int renameat(int, const char *, int, const char *);
 extern int symlinkat(const char *, int, const char *);
 extern int unlinkat(int, const char *, int);
 #endif	/* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+extern int get_nprocs(void);
+extern int get_nprocs_conf(void);
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 /* transitional large file interface versions */
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
@@ -855,6 +859,10 @@ extern int renameat();
 extern int symlinkat();
 extern int unlinkat();
 #endif	/* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+extern int get_nprocs();
+extern int get_nprocs_conf();
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 /* transitional large file interface versions */
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \

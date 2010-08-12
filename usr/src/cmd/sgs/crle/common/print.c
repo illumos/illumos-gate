@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<sys/types.h>
@@ -33,7 +32,6 @@
 #include	<unistd.h>
 #include	<errno.h>
 #include	<limits.h>
-#include	<alloca.h>
 #include	"sgs.h"
 #include	"rtc.h"
 #include	"conv.h"
@@ -346,7 +344,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		/*
 		 * Construct the original command line argument.
 		 */
-		cmd = strcpy(alloca(MSG_CMD_64_SIZE + 1), MSG_ORIG(MSG_CMD_64));
+		cmd = strdupa(MSG_ORIG(MSG_CMD_64));
 		if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 			return (INSCFG_RET_FAIL);
 	}
@@ -383,7 +381,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		 */
 		(void) snprintf(_cmd, PATH_MAX, MSG_ORIG(MSG_CMD_CONF),
 		    crle->c_confil);
-		cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+		cmd = strdupa(_cmd);
 		if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 			return (INSCFG_RET_FAIL);
 
@@ -395,7 +393,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			(void) snprintf(_cmd, PATH_MAX, MSG_ORIG(MSG_CMD_FLAGS),
 			    conv_dl_flag(head->ch_dlflags, CONV_FMT_ALT_CRLE,
 			    &dl_flag_buf));
-			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+			cmd = strdupa(_cmd);
 			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
@@ -443,13 +441,13 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			 */
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_OUTPUT), crle->c_objdir);
-			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+			cmd = strdupa(_cmd);
 			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_DUMPGRP), (strtbl + obj->co_name));
-			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+			cmd = strdupa(_cmd);
 			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
@@ -488,7 +486,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_EDLIB), str);
-			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+			cmd = strdupa(_cmd);
 			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
@@ -555,7 +553,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_ESLIB), str);
-			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+			cmd = strdupa(_cmd);
 			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
@@ -607,7 +605,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_ADLIB), str);
-			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+			cmd = strdupa(_cmd);
 			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
@@ -647,7 +645,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_ASLIB), str);
-			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+			cmd = strdupa(_cmd);
 			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
@@ -707,7 +705,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 				}
 				(void) printf(pfmt, str);
 				(void) snprintf(_cmd, PATH_MAX, sfmt, str);
-				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+				cmd = strdupa(_cmd);
 				if (aplist_append(&cmdline, cmd,
 				    AL_CNT_CRLE) == NULL)
 					return (INSCFG_RET_FAIL);
@@ -808,7 +806,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 				/* LINTED */
 				(void) snprintf(_cmd, PATH_MAX,
 				    getformat(dobj->co_flags), str);
-				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+				cmd = strdupa(_cmd);
 				if (aplist_append(&cmdline, cmd,
 				    AL_CNT_CRLE) == NULL)
 					return (INSCFG_RET_FAIL);
@@ -901,8 +899,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 					(void) snprintf(_cmd, PATH_MAX,
 					    MSG_ORIG(MSG_CMD_OUTPUT),
 					    crle->c_objdir);
-					cmd = strcpy(alloca(strlen(_cmd) + 1),
-					    _cmd);
+					cmd = strdupa(_cmd);
 					if (aplist_append(&cmdline, cmd,
 					    AL_CNT_CRLE) == NULL)
 						return (INSCFG_RET_FAIL);
@@ -911,7 +908,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 				/* LINTED */
 				(void) snprintf(_cmd, PATH_MAX,
 				    getformat(flags), str);
-				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
+				cmd = strdupa(_cmd);
 				if (aplist_append(&cmdline, cmd,
 				    AL_CNT_CRLE) == NULL)
 					return (INSCFG_RET_FAIL);

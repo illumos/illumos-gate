@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 /*
  * rcapd is a long-running daemon enforcing project-based resource caps (see
@@ -1217,7 +1215,7 @@ update_statistics(void)
 		if (fchmod(fd, 0644) == 0 && write(fd, &rs, sizeof (rs)) ==
 		    sizeof (rs)) {
 			list_walk_collection(report_collection_cb,
-				(void *)(intptr_t)fd);
+			    (void *)(intptr_t)fd);
 			/*
 			 * Replace the existing statistics file with this new
 			 * one.
@@ -1447,7 +1445,7 @@ main(int argc, char *argv[])
 	hrtime_t next_rss_sample;	/* (latest) time of next RSS sample */
 
 	(void) set_message_priority(RCM_INFO);
-	(void) setprogname("rcapd");
+	(void) setpname("rcapd");
 	rcapd_pid = getpid();
 	(void) chdir("/");
 	should_run = 1;

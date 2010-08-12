@@ -18,14 +18,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #ifndef _STRING_H
 #define	_STRING_H
@@ -89,16 +88,33 @@ extern void *memccpy(void *_RESTRICT_KYWD, const void *_RESTRICT_KYWD,
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
-extern int uucopy(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
-extern int uucopystr(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
-extern char *strsignal(int);
-extern size_t strnlen(const char *, size_t);
-extern int ffs(int);
+	/* || defined(_XPG7) */
 extern int strcasecmp(const char *, const char *);
 extern int strncasecmp(const char *, const char *, size_t);
+extern char *stpcpy(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD);
+extern char *stpncpy(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD, size_t);
+extern char *strndup(const char *, size_t);
+extern size_t strnlen(const char *, size_t);
+extern char *strsignal(int);
+#endif
+
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+extern int uucopy(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
+extern int uucopystr(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
+extern int ffs(int);
+extern int ffsl(long);
+extern int ffsll(long long);
+extern int fls(int);
+extern int flsl(long);
+extern int flsll(long long);
+extern void *memmem(const void *, size_t, const void *, size_t);
+extern char *strcasestr(const char *, const char *);
+extern char *strnstr(const char *, const char *, size_t);
 extern size_t strlcpy(char *, const char *, size_t);
 extern size_t strlcat(char *, const char *, size_t);
 extern char *strsep(char **stringp, const char *delim);
+extern char *strchrnul(const char *, int);
 #endif /* defined(__EXTENSIONS__)... */
 
 #if defined(__EXTENSIONS__) || \
@@ -106,6 +122,60 @@ extern char *strsep(char **stringp, const char *delim);
 	defined(_XPG4_2)
 extern char *strdup(const char *);
 #endif
+
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+#if defined(__GNUC__)
+
+/*
+ * gcc provides this inlining facility but Studio C does not.
+ * We should use it exclusively once Studio C also provides it.
+ */
+extern void *__builtin_alloca(size_t);
+
+#define	strdupa(s)							\
+	(__extension__(							\
+	{								\
+	char *__str = (char *)(s);					\
+	strcpy((char *)__builtin_alloca(strlen(__str) + 1), __str);	\
+	}))
+
+#define	strndupa(s, n)							\
+	(__extension__(							\
+	{								\
+	char *__str = (char *)(s);					\
+	size_t __len = strnlen(__str, (n));				\
+	(__str = strncpy((char *)__builtin_alloca(__len + 1),		\
+	    __str, __len),						\
+	__str[__len] = '\0', __str);					\
+	}))
+
+#else	/* __GNUC__ */
+
+#if defined(unix)	/* excludes c99 */
+/*
+ * Studio C currently can't do the gcc-style inlining,
+ * so we use thread-local storage instead.
+ */
+extern void *__builtin_alloca(size_t);
+extern __thread char *__strdupa_str;
+extern __thread size_t __strdupa_len;
+
+#define	strdupa(s)							\
+	(__strdupa_str = (char *)(s), 					\
+	strcpy((char *)__builtin_alloca(strlen(__strdupa_str) + 1),	\
+	    __strdupa_str))
+
+#define	strndupa(s, n)							\
+	(__strdupa_str = (char *)(s),					\
+	__strdupa_len = strnlen(__strdupa_str, (n)),			\
+	__strdupa_str = strncpy((char *)__builtin_alloca(__strdupa_len + 1), \
+	    __strdupa_str, __strdupa_len),				\
+	__strdupa_str[__strdupa_len] = '\0', __strdupa_str)
+#endif	/* unix */
+
+#endif	/* __GNUC__ */
+#endif	/* __EXTENSIONS__ ... */
 
 #else	/* __STDC__ */
 
@@ -124,17 +194,34 @@ extern char *strtok_r();
 extern void *memccpy();
 #endif
 
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
-extern int uucopy();
-extern int uucopystr();
-extern char *strsignal();
-extern size_t strnlen();
-extern int ffs();
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+	/* || defined(_XPG7) */
 extern int strcasecmp();
 extern int strncasecmp();
+extern char *stpcpy();
+extern char *stpncpy();
+extern char *strndup();
+extern size_t strnlen();
+extern char *strsignal();
+#endif
+
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+extern int uucopy();
+extern int uucopystr();
+extern int ffs();
+extern int ffsl();
+extern int ffsll();
+extern int fls();
+extern int flsl();
+extern int flsll();
+extern char *strcasestr();
+extern char *strnstr();
 extern size_t strlcpy();
 extern size_t strlcat();
 extern char *strsep();
+extern char *strchrnul();
 #endif /* defined(__EXTENSIONS__) ... */
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)

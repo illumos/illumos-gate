@@ -28,7 +28,6 @@
 #include <string.h>
 #undef  __EXTENSIONS__
 #include <signal.h>
-#include <alloca.h>
 #include <errno.h>
 #include "libproc.h"
 
@@ -613,7 +612,7 @@ proc_sysset2str(const sysset_t *set, const char *delim, int m,
 char *
 proc_str2fltset(const char *s, const char *delim, int m, fltset_t *set)
 {
-	char *p, *q, *t = alloca(strlen(s) + 1);
+	char *p, *q, *t;
 	int flt;
 
 	if (m) {
@@ -622,7 +621,7 @@ proc_str2fltset(const char *s, const char *delim, int m, fltset_t *set)
 		prfillset(set);
 	}
 
-	(void) strcpy(t, s);
+	t = strdupa(s);
 
 	for (p = strtok_r(t, delim, &q); p != NULL;
 	    p = strtok_r(NULL, delim, &q)) {
@@ -646,7 +645,7 @@ proc_str2fltset(const char *s, const char *delim, int m, fltset_t *set)
 char *
 proc_str2sigset(const char *s, const char *delim, int m, sigset_t *set)
 {
-	char *p, *q, *t = alloca(strlen(s) + 1);
+	char *p, *q, *t;
 	int sig;
 
 	if (m) {
@@ -655,7 +654,7 @@ proc_str2sigset(const char *s, const char *delim, int m, sigset_t *set)
 		prfillset(set);
 	}
 
-	(void) strcpy(t, s);
+	t = strdupa(s);
 
 	for (p = strtok_r(t, delim, &q); p != NULL;
 	    p = strtok_r(NULL, delim, &q)) {
@@ -679,7 +678,7 @@ proc_str2sigset(const char *s, const char *delim, int m, sigset_t *set)
 char *
 proc_str2sysset(const char *s, const char *delim, int m, sysset_t *set)
 {
-	char *p, *q, *t = alloca(strlen(s) + 1);
+	char *p, *q, *t;
 	int sys;
 
 	if (m) {
@@ -688,7 +687,7 @@ proc_str2sysset(const char *s, const char *delim, int m, sysset_t *set)
 		prfillset(set);
 	}
 
-	(void) strcpy(t, s);
+	t = strdupa(s);
 
 	for (p = strtok_r(t, delim, &q); p != NULL;
 	    p = strtok_r(NULL, delim, &q)) {

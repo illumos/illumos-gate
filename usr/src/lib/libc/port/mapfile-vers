@@ -124,6 +124,8 @@ $endif
 	backtrace;
 	backtrace_symbols;
 	backtrace_symbols_fd;
+	canonicalize_file_name;
+	clearenv;
 	clock_getres;
 	clock_gettime;
 	clock_nanosleep;
@@ -147,17 +149,29 @@ $endif
 	errx;
 	faccessat;
 	fchmodat;
+	fcloseall;
 	fdatasync;
+	ffsl;
+	ffsll;
 	fgetattr;
+	fls;
+	flsl;
+	flsll;
 	forkallx;
 	forkx;
 	fsetattr;
 	getattrat;
+	getdelim;
+	getline;
+	get_nprocs;
+	get_nprocs_conf;
+	getprogname;
 	htonl;
 	htonll;
 	htons;
 	linkat;
 	lio_listio;
+	memmem;
 	mkdirat;
 	mkdtemp;
 	mkfifoat;
@@ -187,6 +201,7 @@ $endif
 	posix_spawn_file_actions_addclosefrom_np;
 	posix_spawnattr_getsigignore_np;
 	posix_spawnattr_setsigignore_np;
+	ppoll;
 	priv_basicset;
 	pthread_key_create_once_np;
 	pthread_mutexattr_getrobust;
@@ -213,6 +228,7 @@ $endif
 	sem_unlink;
 	sem_wait;
 	setattrat;
+	setprogname;
 	_sharefs;
 	shm_open;
 	shm_unlink;
@@ -220,7 +236,13 @@ $endif
 	sigtimedwait;
 	sigwaitinfo;
 	smt_pause;
+	stpcpy;
+	stpncpy;
+	strcasestr;
+	strchrnul;
+	strndup;
 	strnlen;
+	strnstr;
 	strsep;
 	symlinkat;
 	thr_keycreate_once;
@@ -245,6 +267,12 @@ $endif
 	vwarnx;
 	warn;
 	warnx;
+	wcpcpy;
+	wcpncpy;
+	wcscasecmp;
+	wcsdup;
+	wcsncasecmp;
+	wcsnlen;
 
 $if lf64
 	aio_cancel64;
@@ -2531,8 +2559,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__nis_preftype;
 	__nis_server;
 	_nss_default_finders;
+	__progname		{ FLAGS = NODIRECT };
 	_smbuf;
 	_sp;
+	__strdupa_str		{ FLAGS = NODIRECT };
+	__strdupa_len		{ FLAGS = NODIRECT };
 	_tdb_bootstrap;
 	__threaded;
 	thr_probe_getfunc_addr;

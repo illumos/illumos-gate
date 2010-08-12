@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_UTILS_H
 #define	_UTILS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,7 +42,7 @@ extern "C" {
 
 extern void warn(const char *, ...);
 extern void die(char *, ...) __NORETURN;
-extern char *setprogname(char *);
+extern char *setpname(char *);
 
 #ifdef	__cplusplus
 }
