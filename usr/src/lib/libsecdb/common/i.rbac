@@ -124,18 +124,46 @@ dbmerge() {
  	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
  	    $3 > $4.new
 #
+# The nawk script below processes the old and new files using up to
+# three passes.  If the old file is empty, only the final pass over
+# the new file is required.
+#
+	if [ -s $4.old ]; then
+		nawk_pass1=$4.old
+		nawk_pass2=$4.new
+		nawk_pass3=$4.new
+	else
+		nawk_pass1=
+		nawk_pass2=
+		nawk_pass3=$4.new
+	fi
+#
 #!/usr/bin/nawk -f
 #
-#       dbmerge type=[auth|prof|user|exec] old-file new-file
+#       dbmerge type=[auth|prof|user|exec] [ old-file new-file ] new-file
 #
 #       Merge two versions of an RBAC database file. The output
 #       consists of the lines from the new-file, while preserving
-#       user customizations in the old-file. Specifically, the
-#       keyword/value section of each record contains the union
-#       of the entries found in both files. The value for each
-#       keyword is the value from the new-file, except for three
-#       keywords ("auths", "profiles", "roles") where the values
-#       from the old and new files are merged.
+#       user customizations in the old-file.
+#
+#	Entries in the new-file replace corresponding entries in the
+#	old-file, except as follows:  For exec_attr, all old entries
+#	for profiles contained in the new-file are discarded.  For
+#	user_attr, the "root" entry from the old-file is retained,
+#	and new keywords from the new-file are merged into it.
+#
+#	Records with the same key field(s) are merged, so that the
+#	keyword/value section of each output record contains the union
+#	of the keywords found in all input records with the same key
+#	field(s).  For selected multi-value keywords [1] the values from
+#	the new-file are merged with retained values from the old-file.
+#	Otherwise, the value for each keyword is the final value found
+#	in the new-file, except for keywords in the user_attr entry for
+#	"root" where values from the old-file are always retained.
+#
+#	[1] The following file type and keyword combinations are merged:
+#	    prof_attr: auths, profiles, privs
+#	    user_attr: auths, profiles, roles
 #
 #	The output is run through sort except for the comments
 #	which will appear first in the output.
@@ -143,8 +171,45 @@ dbmerge() {
 #
 	$nawk_cmd  '
 
+# This script may be invoked with up to three file names.  Each file
+# name corresponds to a separate processing pass.  The passes are
+# defined as follows:
+#
+# Pass 1: Read existing data.
+# Data from the old-file is read into memory.
+#
+# Pass 2: Remove obsolete data.
+# Discard any data from the old-file that is part of profiles that
+# are also in the new-file.  (As a special case, the user_attr entry
+# for 'root' is always retained.)
+#
+# Pass 3: Merge new data.
+# Data from the new-file is merged with the remaining old-file data.
+# (As a special case, exec_attr entries are replaced, not merged.)
+
 BEGIN {
+	# The variable 'pass' specifies which type of processing to perform.
+	# When processing only one file, skip passes 1 and 2.
+	if (ARGC == 3)
+		pass += 2;
+
+	# The array 'keyword_behavior' specifies the special treatment of
+	# [type, keyword] combinations subject to value merging.
+	keyword_behavior["prof", "auths"] =	"merge";
+	keyword_behavior["prof", "profiles"] =	"merge";
+	keyword_behavior["prof", "privs"] =	"merge";
+	keyword_behavior["user", "auths"] =	"merge";
+	keyword_behavior["user", "profiles"] =	"merge";
+	keyword_behavior["user", "roles"] =	"merge";
+
 	FS=":"
+}
+
+# When FNR (current file record number) is 1 it indicates that nawk
+# is starting to read the next file specified on its command line,
+# and is beginning the next processing pass.
+FNR == 1 {
+	pass++;
 }
 
 /^#/ || /^$/ {
@@ -180,55 +245,70 @@ BEGIN {
 
 type == "auth" {
 	key = $1 ":" $2 ":" $3 ;
-	if (NR == FNR) {
+	if (pass == 1) {
 		short_comment[key] = $4 ;
 		long_comment[key] = $5;
 		record[key] = $6;
-	}
-	else {
+	} else if (pass == 2) {
+		delete short_comment[key];
+		delete long_comment[key];
+		delete record[key];
+	} else if (pass == 3) {
 		if ( $4 != "" ) {
 			short_comment[key] = $4 ;
 		}
 		if ( $5 != "" ) {
 			long_comment[key] =  $5 ;
 		}
-		print key ":" short_comment[key] ":" long_comment[key] ":" \
-		    merge_attrs(record[key], $6);
-		delete record[key];
+		record[key] = merge_attrs(record[key], $6);
 	}
 }
 
 type == "prof" {
 	key = $1 ":" $2 ":" $3 ;
-	if (NR == FNR) {
+	if (pass == 1) {
 		comment[key] = $4;
 		record[key] = $5;
-	}
-	else {
+	} else if (pass == 2) {
+		delete comment[key];
+		delete record[key];
+	} else if (pass == 3) {
 		if ( $4 != "" ) {
 			comment[key] = $4 ;
 		}
 		if (key != "::") {
-			print key ":" comment[key] ":" \
-			    merge_attrs(record[key], $5);
+			record[key] = merge_attrs(record[key], $5);
 		}
-		delete record[key];
 	}
 }
 
 type == "exec" {
 	key = $1 ":" $2 ":" $3 ":" $4 ":" $5 ":" $6 ;
-	# Substitute new entries, do not merge.
-	record[key] = $7;
+	if (pass == 1) {
+		record[key] = $7;
+	} else if (pass == 2) {
+		# For exec_attr, deletion is based on the 'name' field only,
+		# so that all old entries for the profile are removed.
+		for (oldkey in record) {
+			split_escape(oldkey, oldkey_fields, ":");
+			if (oldkey_fields[1] == $1)
+				delete record[oldkey];
+		}
+	} else if (pass == 3) {
+		# Substitute new entries, do not merge.
+		record[key] = $7;
+	}
 }
 
 type == "user" {
 	key = $1 ":" $2 ":" $3 ":" $4 ;
-	if (NR == FNR)
+	if (pass == 1) {
 		record[key] = $5;
-	else {
-		print key ":" merge_attrs(record[key], $5);
-		delete record[key];
+	} else if (pass == 2) {
+		if ($1 != "root")
+			delete record[key];
+	} else if (pass == 3) {
+		record[key] = merge_attrs(record[key], $5);
 	}
 }
 
@@ -269,8 +349,18 @@ function merge_attrs(old, new, cnt, new_cnt, i, j, list, new_list, keyword)
 
 function merge_values(keyword, old, new, cnt, new_cnt, i, j, list, new_list, d)
 {
-	if (keyword != "auths" && keyword != "profiles")
-		return new;
+	# Keywords with multivalued attributes that are subject to merging
+	# are processed by the algorithm implemented further below.
+	# Otherwise, the keyword is not subject to merging, and:
+	#   For user_attr, the existing value is retained.
+	#   For any other file, the new value is substituted.
+	if (keyword_behavior[type, keyword] != "merge") {
+		if (type == "user") {
+			return old;
+		} else {
+			return new;
+		}
+	}
 
 	cnt = split(substr(old, length(keyword)+2), list, ",");
 	new_cnt = split(substr(new, length(keyword)+2), new_list, ",");
@@ -352,7 +442,7 @@ function unsplit(list, cnt, delim, str)
 		str = str delim list[i];
 	return str;
 }' \
-	type=$1 $4.old $4.new > $4.unsorted
+	type=$1 $nawk_pass1 $nawk_pass2 $nawk_pass3 > $4.unsorted
 	rc=$?
 	$sort_cmd < $4.unsorted >> $4
 	return $rc
