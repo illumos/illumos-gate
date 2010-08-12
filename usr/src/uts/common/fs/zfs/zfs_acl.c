@@ -1505,7 +1505,7 @@ zfs_acl_chmod(zfsvfs_t *zfsvfs, uint64_t mode, zfs_acl_t *aclp)
 	list_insert_tail(&aclp->z_acl, newnode);
 }
 
-int
+void
 zfs_acl_chmod_setattr(znode_t *zp, zfs_acl_t **aclp, uint64_t mode)
 {
 	mutex_enter(&zp->z_acl_lock);
@@ -1516,7 +1516,6 @@ zfs_acl_chmod_setattr(znode_t *zp, zfs_acl_t **aclp, uint64_t mode)
 	mutex_exit(&zp->z_lock);
 	mutex_exit(&zp->z_acl_lock);
 	ASSERT(*aclp);
-	return (0);
 }
 
 /*
@@ -2060,6 +2059,7 @@ top:
 
 	error = zfs_aclset_common(zp, aclp, cr, tx);
 	ASSERT(error == 0);
+	ASSERT(zp->z_acl_cached == NULL);
 	zp->z_acl_cached = aclp;
 
 	if (fuid_dirtied)

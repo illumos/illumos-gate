@@ -1369,6 +1369,8 @@ top:
 		error = zfs_dirent_lock(&dl, dzp, name, &zp, zflg,
 		    NULL, NULL);
 		if (error) {
+			if (have_acl)
+				zfs_acl_ids_free(&acl_ids);
 			if (strcmp(name, "..") == 0)
 				error = EISDIR;
 			ZFS_EXIT(zfsvfs);
@@ -1384,6 +1386,8 @@ top:
 		 * to reference it.
 		 */
 		if (error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, B_FALSE, cr)) {
+			if (have_acl)
+				zfs_acl_ids_free(&acl_ids);
 			goto out;
 		}
 
@@ -1394,6 +1398,8 @@ top:
 
 		if ((dzp->z_pflags & ZFS_XATTR) &&
 		    (vap->va_type != VREG)) {
+			if (have_acl)
+				zfs_acl_ids_free(&acl_ids);
 			error = EINVAL;
 			goto out;
 		}
@@ -1452,6 +1458,10 @@ top:
 		dmu_tx_commit(tx);
 	} else {
 		int aflags = (flag & FAPPEND) ? V_APPEND : 0;
+
+		if (have_acl)
+			zfs_acl_ids_free(&acl_ids);
+		have_acl = B_FALSE;
 
 		/*
 		 * A directory entry already exists for this name.
@@ -1540,11 +1550,11 @@ zfs_remove(vnode_t *dvp, char *name, cred_t *cr, caller_context_t *ct,
     int flags)
 {
 	znode_t		*zp, *dzp = VTOZ(dvp);
-	znode_t		*xzp = NULL;
+	znode_t		*xzp;
 	vnode_t		*vp;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
-	uint64_t	acl_obj, xattr_obj = 0;
+	uint64_t	acl_obj, xattr_obj;
 	uint64_t 	xattr_obj_unlinked = 0;
 	uint64_t	obj = 0;
 	zfs_dirlock_t	*dl;
@@ -1568,6 +1578,8 @@ zfs_remove(vnode_t *dvp, char *name, cred_t *cr, caller_context_t *ct,
 	}
 
 top:
+	xattr_obj = 0;
+	xzp = NULL;
 	/*
 	 * Attempt to lock directory; fail if entry doesn't exist.
 	 */
@@ -1627,7 +1639,7 @@ top:
 	/* are there any extended attributes? */
 	error = sa_lookup(zp->z_sa_hdl, SA_ZPL_XATTR(zfsvfs),
 	    &xattr_obj, sizeof (xattr_obj));
-	if (xattr_obj) {
+	if (error == 0 && xattr_obj) {
 		error = zfs_zget(zfsvfs, xattr_obj, &xzp);
 		ASSERT3U(error, ==, 0);
 		dmu_tx_hold_sa(tx, zp->z_sa_hdl, B_TRUE);
@@ -1646,6 +1658,8 @@ top:
 	if (error) {
 		zfs_dirent_unlock(dl);
 		VN_RELE(vp);
+		if (xzp)
+			VN_RELE(ZTOV(xzp));
 		if (error == ERESTART) {
 			dmu_tx_wait(tx);
 			dmu_tx_abort(tx);
@@ -2610,7 +2624,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	int		trim_mask = 0;
 	uint64_t	new_mode;
 	uint64_t	new_uid, new_gid;
-	uint64_t	xattr_obj = 0;
+	uint64_t	xattr_obj;
 	uint64_t	mtime[2], ctime[2];
 	znode_t		*attrzp;
 	int		need_policy = FALSE;
@@ -2618,7 +2632,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	zfs_fuid_info_t *fuidp = NULL;
 	xvattr_t *xvap = (xvattr_t *)vap;	/* vap may be an xvattr_t * */
 	xoptattr_t	*xoap;
-	zfs_acl_t	*aclp = NULL;
+	zfs_acl_t	*aclp;
 	boolean_t skipaclchk = (flags & ATTR_NOACLCHECK) ? B_TRUE : B_FALSE;
 	boolean_t	fuid_dirtied = B_FALSE;
 	sa_bulk_attr_t	bulk[7], xattr_bulk[7];
@@ -2697,6 +2711,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 
 top:
 	attrzp = NULL;
+	aclp = NULL;
 
 	/* Can this be moved to before the top label? */
 	if (zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) {
@@ -2921,10 +2936,10 @@ top:
 	mask = vap->va_mask;
 
 	if ((mask & (AT_UID | AT_GID))) {
-		(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_XATTR(zfsvfs), &xattr_obj,
-		    sizeof (xattr_obj));
+		err = sa_lookup(zp->z_sa_hdl, SA_ZPL_XATTR(zfsvfs),
+		    &xattr_obj, sizeof (xattr_obj));
 
-		if (xattr_obj) {
+		if (err == 0 && xattr_obj) {
 			err = zfs_zget(zp->z_zfsvfs, xattr_obj, &attrzp);
 			if (err)
 				goto out2;
@@ -2934,6 +2949,8 @@ top:
 			    (uint64_t)vap->va_uid, cr, ZFS_OWNER, &fuidp);
 			if (new_uid != zp->z_uid &&
 			    zfs_fuid_overquota(zfsvfs, B_FALSE, new_uid)) {
+				if (attrzp)
+					VN_RELE(ZTOV(attrzp));
 				err = EDQUOT;
 				goto out2;
 			}
@@ -2944,6 +2961,8 @@ top:
 			    cr, ZFS_GROUP, &fuidp);
 			if (new_gid != zp->z_gid &&
 			    zfs_fuid_overquota(zfsvfs, B_TRUE, new_gid)) {
+				if (attrzp)
+					VN_RELE(ZTOV(attrzp));
 				err = EDQUOT;
 				goto out2;
 			}
@@ -2956,8 +2975,7 @@ top:
 		uint64_t acl_obj;
 		new_mode = (pmode & S_IFMT) | (vap->va_mode & ~S_IFMT);
 
-		if (err = zfs_acl_chmod_setattr(zp, &aclp, new_mode))
-			goto out;
+		zfs_acl_chmod_setattr(zp, &aclp, new_mode);
 
 		mutex_enter(&zp->z_lock);
 		if (!zp->z_is_sa && ((acl_obj = zfs_external_acl(zp)) != 0)) {
@@ -3078,6 +3096,8 @@ top:
 		ASSERT3U((uintptr_t)aclp, !=, NULL);
 		err = zfs_aclset_common(zp, aclp, cr, tx);
 		ASSERT3U(err, ==, 0);
+		if (zp->z_acl_cached)
+			zfs_acl_free(zp->z_acl_cached);
 		zp->z_acl_cached = aclp;
 		aclp = NULL;
 	}
@@ -3193,7 +3213,6 @@ out:
 		err2 = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
 		dmu_tx_commit(tx);
 	}
-
 
 out2:
 	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
