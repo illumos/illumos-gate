@@ -619,6 +619,7 @@ build_manpath(char **pathv, int flags)
 	char *mandir = MANDIR;
 	int s;
 	struct dupnode *didup = NULL;
+	struct stat sb;
 
 	s = sizeof (struct man_node);
 	for (p = pathv; *p; ) {
@@ -631,6 +632,10 @@ build_manpath(char **pathv, int flags)
 			*p = mand;
 		}
 		q = split(*p, ',');
+		if (stat(q[0], &sb) != 0 || (sb.st_mode & S_IFDIR) == 0) {
+			freev(q);
+			goto next;
+		}
 
 		if (access(q[0], R_OK|X_OK) != 0) {
 			if (catmando) {
@@ -1461,10 +1466,12 @@ static void
 freev(char **v)
 {
 	int i;
-	for (i = 0; v[i] != NULL; i++) {
-		free(v[i]);
+	if (v != NULL) {
+		for (i = 0; v[i] != NULL; i++) {
+			free(v[i]);
+		}
+		free(v);
 	}
-	free(v);
 }
 
 /*
