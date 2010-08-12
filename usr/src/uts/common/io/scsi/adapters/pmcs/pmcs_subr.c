@@ -846,6 +846,8 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
 	if (result) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
@@ -859,12 +861,8 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 			    "%s: Issuing SMP ABORT for htag 0x%08x",
 			    __func__, htag);
 		}
-		pmcs_smp_release(iport);
-		pmcs_rele_iport(iport);
 		return (EIO);
 	}
-	pmcs_smp_release(iport);
-	pmcs_rele_iport(iport);
 	status = LE_32(iomb[stsoff]);
 
 	if (status != PMCOUT_STATUS_OK) {
@@ -4221,6 +4219,8 @@ again:
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);
@@ -4231,13 +4231,9 @@ again:
 			    "%s: SMP ABORT failed for cmd (htag 0x%08x)",
 			    __func__, htag);
 		}
-		pmcs_smp_release(iport);
-		pmcs_rele_iport(iport);
 		result = 0;
 		goto out;
 	}
-	pmcs_smp_release(iport);
-	pmcs_rele_iport(iport);
 
 	mutex_enter(&pwp->config_lock);
 	if (pwp->config_changed) {
@@ -4457,6 +4453,8 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	pmcs_unlock_phy(expander);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
 	pmcs_lock_phy(expander);
 	if (result) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
@@ -4466,13 +4464,9 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 			    "%s: SMP ABORT failed for cmd (htag 0x%08x)",
 			    __func__, htag);
 		}
-		pmcs_smp_release(iport);
-		pmcs_rele_iport(iport);
 		result = -ETIMEDOUT;
 		goto out;
 	}
-	pmcs_smp_release(iport);
-	pmcs_rele_iport(iport);
 
 	mutex_enter(&pwp->config_lock);
 	if (pwp->config_changed) {
