@@ -19042,3 +19042,114 @@ ill_lookup_usesrc(ill_t *usill)
 	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 	return (ill);
 }
+
+/*
+ * This comment applies to both ip_sioctl_get_ifhwaddr and
+ * ip_sioctl_get_lifhwaddr as the basic function of these two functions
+ * is the same.
+ *
+ * The goal here is to find an IP interface that corresponds to the name
+ * provided by the caller in the ifreq/lifreq structure held in the mblk_t
+ * chain and to fill out a sockaddr/sockaddr_storage structure with the
+ * mac address.
+ *
+ * The SIOCGIFHWADDR/SIOCGLIFHWADDR ioctl may return an error for a number
+ * of different reasons:
+ * ENXIO - the device name is not known to IP.
+ * EADDRNOTAVAIL - the device has no hardware address. This is indicated
+ * by ill_phys_addr not pointing to an actual address.
+ * EPFNOSUPPORT - this will indicate that a request is being made for a
+ * mac address that will not fit in the data structure supplier (struct
+ * sockaddr).
+ *
+ */
+/* ARGSUSED */
+int
+ip_sioctl_get_ifhwaddr(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *ipip, void *if_req)
+{
+	struct sockaddr *sock;
+	struct ifreq *ifr;
+	mblk_t *mp1;
+	ill_t *ill;
+
+	ASSERT(ipif != NULL);
+	ill = ipif->ipif_ill;
+
+	if (ill->ill_phys_addr == NULL) {
+		return (EADDRNOTAVAIL);
+	}
+	if (ill->ill_phys_addr_length > sizeof (sock->sa_data)) {
+		return (EPFNOSUPPORT);
+	}
+
+	ip1dbg(("ip_sioctl_get_hwaddr(%s)\n", ill->ill_name));
+
+	/* Existence of mp1 has been checked in ip_wput_nondata */
+	mp1 = mp->b_cont->b_cont;
+	ifr = (struct ifreq *)mp1->b_rptr;
+
+	sock = &ifr->ifr_addr;
+	/*
+	 * The "family" field in the returned structure is set to a value
+	 * that represents the type of device to which the address belongs.
+	 * The value returned may differ to that on Linux but it will still
+	 * represent the correct symbol on Solaris.
+	 */
+	sock->sa_family = arp_hw_type(ill->ill_mactype);
+	bcopy(ill->ill_phys_addr, &sock->sa_data, ill->ill_phys_addr_length);
+
+	return (0);
+}
+
+/*
+ * The expection of applications using SIOCGIFHWADDR is that data will
+ * be returned in the sa_data field of the sockaddr structure. With
+ * SIOCGLIFHWADDR, we're breaking new ground as there is no Linux
+ * equivalent. In light of this, struct sockaddr_dl is used as it
+ * offers more space for address storage in sll_data.
+ */
+/* ARGSUSED */
+int
+ip_sioctl_get_lifhwaddr(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *ipip, void *if_req)
+{
+	struct sockaddr_dl *sock;
+	struct lifreq *lifr;
+	mblk_t *mp1;
+	ill_t *ill;
+
+	ASSERT(ipif != NULL);
+	ill = ipif->ipif_ill;
+
+	if (ill->ill_phys_addr == NULL) {
+		return (EADDRNOTAVAIL);
+	}
+	if (ill->ill_phys_addr_length > sizeof (sock->sdl_data)) {
+		return (EPFNOSUPPORT);
+	}
+
+	ip1dbg(("ip_sioctl_get_lifhwaddr(%s)\n", ill->ill_name));
+
+	/* Existence of mp1 has been checked in ip_wput_nondata */
+	mp1 = mp->b_cont->b_cont;
+	lifr = (struct lifreq *)mp1->b_rptr;
+
+	/*
+	 * sockaddr_ll is used here because it is also the structure used in
+	 * responding to the same ioctl in sockpfp. The only other choice is
+	 * sockaddr_dl which contains fields that are not required here
+	 * because its purpose is different.
+	 */
+	lifr->lifr_type = ill->ill_type;
+	sock = (struct sockaddr_dl *)&lifr->lifr_addr;
+	sock->sdl_family = AF_LINK;
+	sock->sdl_index = ill->ill_phyint->phyint_ifindex;
+	sock->sdl_type = ill->ill_mactype;
+	sock->sdl_nlen = 0;
+	sock->sdl_slen = 0;
+	sock->sdl_alen = ill->ill_phys_addr_length;
+	bcopy(ill->ill_phys_addr, sock->sdl_data, ill->ill_phys_addr_length);
+
+	return (0);
+}

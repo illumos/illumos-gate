@@ -878,6 +878,9 @@ const struct ioc {
 	{ (uint_t)SIOCSIPMSFILTER,	"SIOCSIPMSFILTER",  "ip_msfilter" },
 	{ (uint_t)SIOCGLIFDADSTATE,	"SIOCGLIFDADSTATE",  "lifreq" },
 	{ (uint_t)SIOCSLIFPREFIX,	"SIOCSLIFPREFIX", "lifreq" },
+	{ (uint_t)SIOCGSTAMP,		"SIOCGSTAMP",		"timeval" },
+	{ (uint_t)SIOCGIFHWADDR,	"SIOCGIFHWADDR",	"ifreq" },
+	{ (uint_t)SIOCGLIFHWADDR,	"SIOCGLIFHWADDR",	"lifreq" },
 
 	/* DES encryption */
 	{ (uint_t)DESIOCBLOCK,	"DESIOCBLOCK", 	"desparams" },

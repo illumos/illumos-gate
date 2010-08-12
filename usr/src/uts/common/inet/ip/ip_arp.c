@@ -355,7 +355,7 @@ arp_m_lookup(t_uscalar_t mac_type)
 	return (NULL);
 }
 
-static uint32_t
+uint32_t
 arp_hw_type(t_uscalar_t mactype)
 {
 	arp_m_t *arm;

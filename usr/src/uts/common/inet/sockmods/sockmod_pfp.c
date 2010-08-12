@@ -39,8 +39,11 @@
 #include <sys/tihdr.h>
 #include <sys/zone.h>
 #include <sys/time.h>
+#include <sys/ethernet.h>
+#include <sys/llc1.h>
 #include <fs/sockfs/sockcommon.h>
 #include <net/if.h>
+#include <inet/ip_arp.h>
 
 #include <sys/dls.h>
 #include <sys/mac.h>
@@ -151,6 +154,12 @@ static smod_reg_t sinfo = {
 	NULL
 };
 
+static int accepted_protos[3][2] = {
+	{ ETH_P_ALL,	0 },
+	{ ETH_P_802_2,	LLC_SNAP_SAP },
+	{ ETH_P_803_3,	0 },
+};
+
 /*
  * Module linkage information for the kernel.
  */
@@ -252,6 +261,8 @@ sockpfp_create(int family, int type, int proto,
 {
 	struct pfpsock *ps;
 	int kmflags;
+	int newproto;
+	int i;
 
 	if (secpolicy_net_rawaccess(cred) != 0) {
 		*errorp = EACCES;
@@ -267,6 +278,33 @@ sockpfp_create(int family, int type, int proto,
 		*errorp = ESOCKTNOSUPPORT;
 		return (NULL);
 	}
+
+	/*
+	 * First check to see if the protocol number passed in via the socket
+	 * creation should be mapped to a different number for internal use.
+	 */
+	for (i = 0, newproto = -1;
+	    i < sizeof (accepted_protos)/ sizeof (accepted_protos[0]); i++) {
+		if (accepted_protos[i][0] == proto) {
+			newproto = accepted_protos[i][1];
+			break;
+		}
+	}
+
+	/*
+	 * If the mapping of the protocol that was under 0x800 failed to find
+	 * a local equivalent then fail the socket creation. If the protocol
+	 * for the socket is over 0x800 and it was not found in the mapping
+	 * table above, then use the value as is.
+	 */
+	if (newproto == -1) {
+		if (proto < 0x800) {
+			*errorp = ENOPROTOOPT;
+			return (NULL);
+		}
+		newproto = proto;
+	}
+	proto = newproto;
 
 	kmflags = (sflags & SOCKET_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
 	ps = kmem_zalloc(sizeof (*ps), kmflags);
@@ -838,6 +876,7 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 	struct timeval tival;
 #endif
 	mac_client_promisc_type_t mtype;
+	struct sockaddr_dl *sock;
 	datalink_id_t linkid;
 	struct lifreq lifreq;
 	struct ifreq ifreq;
@@ -854,6 +893,7 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 	case SIOCGLIFINDEX :
 	case SIOCGLIFFLAGS :
 	case SIOCGLIFMTU :
+	case SIOCGLIFHWADDR :
 		error = pfp_lifreq_getlinkid(arg, &lifreq, &linkid);
 		if (error != 0)
 			return (error);
@@ -936,8 +976,54 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 		break;
 
 	case SIOCGIFHWADDR :
-		mac_unicast_primary_get(mh, (uint8_t *)ifreq.ifr_addr.sa_data);
+		if (mac_addr_len(mh) > sizeof (ifreq.ifr_addr.sa_data)) {
+			error = EPFNOSUPPORT;
+			break;
+		}
+
+		if (mac_addr_len(mh) == 0) {
+			(void) memset(ifreq.ifr_addr.sa_data, 0,
+			    sizeof (ifreq.ifr_addr.sa_data));
+		} else {
+			mac_unicast_primary_get(mh,
+			    (uint8_t *)ifreq.ifr_addr.sa_data);
+		}
+
+		/*
+		 * The behaviour here in setting sa_family is consistent
+		 * with what applications such as tcpdump would expect
+		 * for a Linux PF_PACKET socket.
+		 */
 		ifreq.ifr_addr.sa_family = pfp_dl_to_arphrd(mac_type(mh));
+		break;
+
+	case SIOCGLIFHWADDR :
+		lifreq.lifr_type = 0;
+		sock = (struct sockaddr_dl *)&lifreq.lifr_addr;
+
+		if (mac_addr_len(mh) > sizeof (sock->sdl_data)) {
+			error = EPFNOSUPPORT;
+			break;
+		}
+
+		/*
+		 * Fill in the sockaddr_dl with link layer details. Of note,
+		 * the index is returned as 0 for a couple of reasons:
+		 * (1) there is no public API that uses or requires it
+		 * (2) the MAC index is currently 32bits and sdl_index is 16.
+		 */
+		sock->sdl_family = AF_LINK;
+		sock->sdl_index = 0;
+		sock->sdl_type = mac_type(mh);
+		sock->sdl_nlen = 0;
+		sock->sdl_alen = mac_addr_len(mh);
+		sock->sdl_slen = 0;
+		if (mac_addr_len(mh) == 0) {
+			(void) memset(sock->sdl_data, 0,
+			    sizeof (sock->sdl_data));
+		} else {
+			mac_unicast_primary_get(mh, (uint8_t *)sock->sdl_data);
+		}
 		break;
 
 	case SIOCGSTAMP :
@@ -961,6 +1047,7 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 		case SIOCGLIFINDEX :
 		case SIOCGLIFFLAGS :
 		case SIOCGLIFMTU :
+		case SIOCGLIFHWADDR :
 			error = ddi_copyout(&lifreq, (void *)arg,
 			    sizeof (lifreq), 0);
 			break;
@@ -1128,16 +1215,16 @@ pfp_setpacket_sockopt(sock_lower_handle_t handle, int option_name,
 		bcopy(optval, &mreq, sizeof (mreq));
 		if (ps->ps_linkid != mreq.mr_ifindex)
 			return (EINVAL);
-
-		if (mreq.mr_alen !=
-		    ((struct sockaddr_ll *)&ps->ps_sock)->sll_halen)
-			return (EINVAL);
 	}
 
 	switch (option_name) {
 	case PACKET_ADD_MEMBERSHIP :
 		switch (mreq.mr_type) {
 		case PACKET_MR_MULTICAST :
+			if (mreq.mr_alen !=
+			    ((struct sockaddr_ll *)&ps->ps_sock)->sll_halen)
+				return (EINVAL);
+
 			error = mac_multicast_add(ps->ps_mch, mreq.mr_address);
 			break;
 
@@ -1154,6 +1241,10 @@ pfp_setpacket_sockopt(sock_lower_handle_t handle, int option_name,
 	case PACKET_DROP_MEMBERSHIP :
 		switch (mreq.mr_type) {
 		case PACKET_MR_MULTICAST :
+			if (mreq.mr_alen !=
+			    ((struct sockaddr_ll *)&ps->ps_sock)->sll_halen)
+				return (EINVAL);
+
 			mac_multicast_remove(ps->ps_mch, mreq.mr_address);
 			break;
 
@@ -1393,11 +1484,19 @@ pfp_set_promisc(struct pfpsock *ps, mac_client_promisc_type_t turnon)
 
 /*
  * This table maps the MAC types in Solaris to the ARPHRD_* values used
- * on Linux. This is used with the SIOCGIFHWADDR ioctl.
+ * on Linux. This is used with the SIOCGIFHWADDR/SIOCGLIFHWADDR ioctl.
+ *
+ * The symbols in this table are *not* pulled in from <net/if_arp.h>,
+ * they are pulled from <netpacket/packet.h>, thus it acts as a source
+ * of supplementary information to the ARP table.
  */
 static uint_t arphrd_to_dl[][2] = {
-	{ ARPHRD_ETHER,		DL_ETHER },
 	{ ARPHRD_IEEE80211,	DL_WIFI },
+	{ ARPHRD_TUNNEL,	DL_IPV4 },
+	{ ARPHRD_TUNNEL,	DL_IPV6 },
+	{ ARPHRD_TUNNEL,	DL_6TO4 },
+	{ ARPHRD_AX25,		DL_X25 },
+	{ ARPHRD_ATM,		DL_ATM },
 	{ 0,			0 }
 };
 
@@ -1409,5 +1508,5 @@ pfp_dl_to_arphrd(int dltype)
 	for (i = 0; arphrd_to_dl[i][0] != 0; i++)
 		if (arphrd_to_dl[i][1] == dltype)
 			return (arphrd_to_dl[i][0]);
-	return (0);
+	return (arp_hw_type(dltype));
 }

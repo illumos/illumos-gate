@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -310,7 +309,12 @@ extern "C" {
 
 #define	SIOCSQPTR	_IOWR('i', 184, int)    /* set q_ptr of stream */
 
-#define	SIOCGIFHWADDR	_IOWR('i', 185, int)	/* PF_PACKET */
+/*
+ * SIOCGIFHWADDR and SIOCGLIFHWADDR (below) are available for PF_PACKET,
+ * PF_INET and PF_INET6 sockets.
+ */
+#define	SIOCGIFHWADDR	_IOWR('i', 185, struct ifreq)
+
 #define	SIOCGSTAMP	_IOWR('i', 186, struct timeval)	/* PF_PACKET */
 
 /*
@@ -336,6 +340,8 @@ extern "C" {
  * default token for the interface.
  */
 #define	SIOCSLIFPREFIX		_IOWR('i', 191, struct lifreq)
+
+#define	SIOCGLIFHWADDR	_IOWR('i', 192, struct lifreq)
 
 #ifdef	__cplusplus
 }

@@ -1,6 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -12,7 +11,6 @@
 #ifndef	_NET_IF_ARP_H
 #define	_NET_IF_ARP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* if_arp.h 1.5 88/08/19 SMI; from UCB 7.1 1/24/86	*/
 
 #include <sys/types.h>
@@ -35,12 +33,17 @@ extern "C" {
 struct	arphdr {
 	ushort_t ar_hrd;	/* format of hardware address */
 #define	ARPHRD_ETHER 	1	/* ethernet hardware address */
+#define	ARPHRD_EETHER	2	/* experimental ethernet */
+#define	ARPHRD_AX25	3	/* amateur readio ax.25 */
+#define	ARPHRD_CHAOS	5	/* Chaos net */
 #define	ARPHRD_IEEE802 	6	/* IEEE 802 hardware address */
+#define	ARPHRD_ARCNET	7	/* ARCNET */
 #define	ARPHRD_FRAME	15	/* Frame relay */
 #define	ARPHRD_ATM	16	/* ATM */
 #define	ARPHRD_HDLC	17	/* HDLC */
 #define	ARPHRD_FC	18	/* Fibre Channel RFC 4338 */
 #define	ARPHRD_IPATM	19	/* ATM RFC 2225 */
+#define	ARPHRD_METRICOM	23	/* Metricom */
 #define	ARPHRD_TUNNEL	31	/* IPsec Tunnel RFC 3456 */
 #define	ARPHRD_IB	32	/* IPoIB hardware address */
 	ushort_t ar_pro;	/* format of protocol address */

@@ -1101,7 +1101,8 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* SIOCSENABLESDP is handled by SDP */
 	/* 183 */ { IPI_DONTCARE /* SIOCSENABLESDP */, 0, 0, 0, NULL, NULL },
 	/* 184 */ { IPI_DONTCARE /* SIOCSQPTR */, 0, 0, 0, NULL, NULL },
-	/* 185 */ { IPI_DONTCARE /* SIOCGIFHWADDR */, 0, 0, 0, NULL, NULL },
+	/* 185 */ { SIOCGIFHWADDR, sizeof (struct ifreq), IPI_GET_CMD,
+			IF_CMD, ip_sioctl_get_ifhwaddr, NULL },
 	/* 186 */ { IPI_DONTCARE /* SIOCGSTAMP */, 0, 0, 0, NULL, NULL },
 	/* 187 */ { SIOCILB, 0, IPI_PRIV | IPI_GET_CMD, MISC_CMD,
 			ip_sioctl_ilb_cmd, NULL },
@@ -1110,7 +1111,9 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 190 */ { SIOCGLIFDADSTATE, sizeof (struct lifreq),
 			IPI_GET_CMD, LIF_CMD, ip_sioctl_get_dadstate, NULL },
 	/* 191 */ { SIOCSLIFPREFIX, sizeof (struct lifreq), IPI_PRIV | IPI_WR,
-			LIF_CMD, ip_sioctl_prefix, ip_sioctl_prefix_restart }
+			LIF_CMD, ip_sioctl_prefix, ip_sioctl_prefix_restart },
+	/* 192 */ { SIOCGLIFHWADDR, sizeof (struct lifreq), IPI_GET_CMD,
+			LIF_CMD, ip_sioctl_get_lifhwaddr, NULL }
 };
 
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);
