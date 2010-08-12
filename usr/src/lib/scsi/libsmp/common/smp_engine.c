@@ -378,6 +378,18 @@ smp_target_get_change_count(const smp_target_t *tp)
 	return (tp->st_change_count);
 }
 
+uint8_t
+smp_target_get_number_of_phys(const smp_target_t *tp)
+{
+	return (tp->st_repgen.srgr_number_of_phys);
+}
+
+uint16_t
+smp_target_get_exp_route_indexes(const smp_target_t *tp)
+{
+	return (tp->st_repgen.srgr_exp_route_indexes);
+}
+
 void
 smp_close(smp_target_t *tp)
 {

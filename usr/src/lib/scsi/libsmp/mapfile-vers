@@ -78,6 +78,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 		smp_plugin_register;
 		smp_plugin_setspecific;
 		smp_plugin_getspecific;
+		smp_target_get_number_of_phys;
+		smp_target_get_exp_route_indexes;
 
 		smp_alloc;
 		smp_zalloc;
