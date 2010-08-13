@@ -41,13 +41,12 @@ dir path=platform/sun4v/kernel/cpu group=sys
 dir path=platform/sun4v/kernel/cpu/$(ARCH64) group=sys
 dir path=platform/sun4v/kernel/pcbe group=sys
 dir path=platform/sun4v/kernel/pcbe/$(ARCH64) group=sys
+file path=platform/sun4v/kernel/cpu/$(ARCH64)/SPARC-T3 group=sys mode=0755
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T1 group=sys \
     mode=0755
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T2 group=sys \
     mode=0755
 file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T2+ group=sys \
-    mode=0755
-file path=platform/sun4v/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-T3 group=sys \
     mode=0755
 file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T1 \
     group=sys mode=0755
@@ -55,8 +54,7 @@ file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T2 \
     group=sys mode=0755
 file path=platform/sun4v/kernel/pcbe/$(ARCH64)/pcbe.SUNW,UltraSPARC-T2+ \
     group=sys mode=0755
-file path=platform/sun4v/kernel/pcbe/sparcv9/pcbe.SUNW,UltraSPARC-T3 group=sys \
-    mode=0755
+file path=platform/sun4v/kernel/pcbe/sparcv9/pcbe.SPARC-T3 group=sys mode=0755
 legacy pkg=SUNWust1.v arch=$(ARCH).sun4v \
     desc="UltraSPARC-T1 core kernel software" name="UltraSPARC-T1 (Root)"
 legacy pkg=SUNWust2.v arch=$(ARCH).sun4v \

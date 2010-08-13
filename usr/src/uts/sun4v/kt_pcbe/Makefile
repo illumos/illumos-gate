@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# This Makefile builds the UltraSPARC-KT Performance Counter BackEnd (PCBE).
+# This Makefile builds the SPARC-T3 Performance Counter BackEnd (PCBE).
 #
 
 UTSBASE = ../..
@@ -30,7 +29,7 @@ UTSBASE = ../..
 #
 #	Define module and object file sets.
 #
-MODULE		= pcbe.SUNW,UltraSPARC-T3
+MODULE		= pcbe.SPARC-T3
 OBJECTS		= $(N2_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(N2_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)

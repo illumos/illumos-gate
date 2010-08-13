@@ -249,8 +249,8 @@ static const char	*cpu_impl_name = "UltraSPARC T2+";
 static const char *cpu_pcbe_ref = "See the \"UltraSPARC T2+ User's Manual\" "
 			"for descriptions of these events." CPU_REF_URL;
 #elif defined(KT_IMPL)
-static const char	*cpu_impl_name = "UltraSPARC T3";
-static const char *cpu_pcbe_ref = "See the \"UltraSPARC T3 User's Manual\" "
+static const char	*cpu_impl_name = "SPARC T3";
+static const char *cpu_pcbe_ref = "See the \"SPARC T3 User's Manual\" "
 			"for descriptions of these events." CPU_REF_URL;
 #endif
 
@@ -820,7 +820,7 @@ static struct modlpcbe modlpcbe = {
 #elif defined(VFALLS_IMPL)
 	"UltraSPARC T2+ Performance Counters",
 #elif defined(KT_IMPL)
-	"UltraSPARC T3 Performance Counters",
+	"SPARC T3 Performance Counters",
 #endif
 	&ni2_pcbe_ops
 };
