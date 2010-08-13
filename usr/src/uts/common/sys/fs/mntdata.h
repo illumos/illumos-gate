@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_MNTFS_MNTDATA_H
@@ -29,6 +28,7 @@
 #include <sys/vnode.h>
 #include <sys/poll.h>
 #include <sys/mnttab.h>
+#include <sys/zone.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -70,18 +70,6 @@ typedef struct mntnode {
 	mntsnap_t mnt_ioctl;	/* data for ioctl() */
 } mntnode_t;
 
-struct zone;
-
-typedef struct mntdata {
-	struct zone *mnt_zone;		/* zone for mount point */
-	uint_t mnt_nopen;		/* count of vnodes open */
-	size_t mnt_size;		/* size of last normal snapshot */
-	size_t mnt_hidden_size;		/* size of last hidden snapshot */
-	timespec_t mnt_mtime;		/* mtime at last normal snapshot */
-	timespec_t mnt_hidden_mtime;	/* mtime at last hidden snapshot */
-	struct mntnode mnt_node;	/* embedded mntnode */
-} mntdata_t;
-
 /*
  * Conversion macros.
  */
@@ -94,6 +82,16 @@ typedef struct mntdata {
 #define	MNTFS_ELEM_IS_ALIVE(x)	!MNTFS_ELEM_IS_DEAD(x)
 
 #if defined(_KERNEL)
+
+typedef struct mntdata {
+	zone_ref_t mnt_zone_ref;	/* zone for mount point */
+	uint_t mnt_nopen;		/* count of vnodes open */
+	size_t mnt_size;		/* size of last normal snapshot */
+	size_t mnt_hidden_size;		/* size of last hidden snapshot */
+	timespec_t mnt_mtime;		/* mtime at last normal snapshot */
+	timespec_t mnt_hidden_mtime;	/* mtime at last hidden snapshot */
+	struct mntnode mnt_node;	/* embedded mntnode */
+} mntdata_t;
 
 /*
  * Value for a mntsnap_t's mnts_flags.

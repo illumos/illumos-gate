@@ -229,7 +229,7 @@ struct lofi_state {
 	struct dk_geom	ls_dkg;
 	struct vtoc	ls_vtoc;
 	struct dk_cinfo	ls_ci;
-	zone_t 		*ls_zone;
+	zone_ref_t	ls_zone;
 	list_node_t	ls_list;	/* all lofis */
 	dev_t		ls_dev;		/* this node's dev_t */
 

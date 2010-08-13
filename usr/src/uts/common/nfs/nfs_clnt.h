@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -37,6 +36,7 @@
 #include <nfs/rnode.h>
 #include <sys/list.h>
 #include <sys/condvar_impl.h>
+#include <sys/zone.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -287,6 +287,7 @@ typedef struct servinfo {
 #define	ORIG_KNCONF(mi) (mi->mi_curr_serv->sv_origknconf ? \
 	mi->mi_curr_serv->sv_origknconf : mi->mi_curr_serv->sv_knconf)
 
+#if	defined(_KERNEL)
 /*
  * NFS private data per mounted file system
  *	The mi_lock mutex protects the following fields:
@@ -418,7 +419,8 @@ typedef struct mntinfo {
 	/*
 	 * Zones support.
 	 */
-	struct zone	*mi_zone;	/* Zone mounted in */
+	struct zone	*mi_zone;	/* Zone in which FS is mounted */
+	zone_ref_t	mi_zone_ref;	/* Reference to aforementioned zone */
 	list_node_t	mi_zone_node;	/* Linkage into per-zone mi list */
 	/*
 	 * Serializes threads in failover_remap.
@@ -427,6 +429,7 @@ typedef struct mntinfo {
 	 */
 	kmutex_t	mi_remap_lock;
 } mntinfo_t;
+#endif	/* _KERNEL */
 
 /*
  * vfs pointer to mount info

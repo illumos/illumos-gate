@@ -3513,11 +3513,13 @@ vfs_list_add(struct vfs *vfsp)
 	/*
 	 * The zone that owns the mount is the one that performed the mount.
 	 * Note that this isn't necessarily the same as the zone mounted into.
-	 * The corresponding zone_rele() will be done when the vfs_t is
-	 * being free'd.
+	 * The corresponding zone_rele_ref() will be done when the vfs_t
+	 * is being free'd.
 	 */
 	vfsp->vfs_zone = curproc->p_zone;
-	zone_hold(vfsp->vfs_zone);
+	zone_init_ref(&vfsp->vfs_implp->vi_zone_ref);
+	zone_hold_ref(vfsp->vfs_zone, &vfsp->vfs_implp->vi_zone_ref,
+	    ZONE_REF_VFS);
 
 	/*
 	 * Find the zone mounted into, and put this mount on its vfs list.
@@ -4342,7 +4344,8 @@ vfs_rele(vfs_t *vfsp)
 		VFS_FREEVFS(vfsp);
 		lofi_remove(vfsp);
 		if (vfsp->vfs_zone)
-			zone_rele(vfsp->vfs_zone);
+			zone_rele_ref(&vfsp->vfs_implp->vi_zone_ref,
+			    ZONE_REF_VFS);
 		vfs_freemnttab(vfsp);
 		vfs_free(vfsp);
 	}

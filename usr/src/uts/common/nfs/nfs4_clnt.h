@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -48,6 +47,7 @@
 #include <rpc/auth.h>
 #include <sys/door.h>
 #include <sys/condvar_impl.h>
+#include <sys/zone.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -1083,7 +1083,8 @@ typedef struct mntinfo4 {
 	/*
 	 * Zones support.
 	 */
-	struct zone	*mi_zone; /* Zone mounted in */
+	struct zone	*mi_zone;	/* Zone in which FS is mounted */
+	zone_ref_t	mi_zone_ref;	/* Reference to aforementioned zone */
 	list_node_t	mi_zone_node;  /* linkage into per-zone mi list */
 
 	/*

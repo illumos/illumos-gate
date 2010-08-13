@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -605,7 +604,7 @@ shm_dtor(kipc_perm_t *perm)
 		rsize = ptob(btopr(sp->shm_segsz));
 		ipcs_lock(shm_svc);
 		sp->shm_perm.ipc_proj->kpj_data.kpd_shmmax -= rsize;
-		sp->shm_perm.ipc_zone->zone_shmmax -= rsize;
+		sp->shm_perm.ipc_zone_ref.zref_zone->zone_shmmax -= rsize;
 		ipcs_unlock(shm_svc);
 	}
 }
@@ -924,13 +923,13 @@ top:
 		    sp->shm_perm.ipc_proj->kpj_rctls, pp, rsize,
 		    RCA_SAFE) & RCT_DENY) ||
 		    (rctl_test(rc_zone_shmmax,
-		    sp->shm_perm.ipc_zone->zone_rctls, pp, rsize,
+		    sp->shm_perm.ipc_zone_ref.zref_zone->zone_rctls, pp, rsize,
 		    RCA_SAFE) & RCT_DENY)) {
 			ipc_cleanup(shm_svc, (kipc_perm_t *)sp);
 			return (EINVAL);
 		}
 		sp->shm_perm.ipc_proj->kpj_data.kpd_shmmax += rsize;
-		sp->shm_perm.ipc_zone->zone_shmmax += rsize;
+		sp->shm_perm.ipc_zone_ref.zref_zone->zone_shmmax += rsize;
 
 		lock = ipc_commit_end(shm_svc, &sp->shm_perm);
 	}
@@ -1258,7 +1257,7 @@ shm_rm_amp(kshmid_t *sp)
 	struct anon_map *amp = sp->shm_amp;
 	zone_t *zone;
 
-	zone = sp->shm_perm.ipc_zone;
+	zone = sp->shm_perm.ipc_zone_ref.zref_zone;
 	ASSERT(zone != NULL);
 	/*
 	 * Free up the anon_map.

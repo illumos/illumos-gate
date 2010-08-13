@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2932,7 +2931,8 @@ nfs4_mi_shutdown(zoneid_t zoneid, void *data)
 		 */
 		list_remove(&mig->mig_list, mi);
 		mutex_exit(&mig->mig_lock);
-		zone_rele(mi->mi_zone);
+		zone_rele_ref(&mi->mi_zone_ref, ZONE_REF_NFSV4);
+
 		/*
 		 * Release hold on vfs and mi done to prevent race with zone
 		 * shutdown. This releases the hold in nfs4_mi_zonelist_add.

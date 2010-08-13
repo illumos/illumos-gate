@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SMBFS_SMBFS_H
@@ -56,6 +55,7 @@
 #include <sys/vfs.h>
 #include <sys/vfs_opreg.h>
 #include <sys/fs/smbfs_mount.h>
+#include <sys/zone.h>
 
 /*
  * Path component length
@@ -140,7 +140,7 @@ typedef struct smbmntinfo {
 	/*
 	 * Zones support.
 	 */
-	struct zone		*smi_zone;	/* Zone mounted in */
+	zone_ref_t		smi_zone_ref;	/* Zone FS is mounted in */
 	list_node_t		smi_zone_node;	/* Link to per-zone smi list */
 	/* Lock for the list is: smi_globals_t -> smg_lock */
 

@@ -4171,7 +4171,7 @@ static const mdb_dcmd_t dcmds[] = {
 		pfiles_help },
 
 	/* from zone.c */
-	{ "zone", "?", "display kernel zone(s)", zoneprt },
+	{ "zone", "?[-r [-v]]", "display kernel zone(s)", zoneprt },
 	{ "zsd", ":[-v] [zsd_key]", "display zone-specific-data entries for "
 	    "selected zones", zsd },
 

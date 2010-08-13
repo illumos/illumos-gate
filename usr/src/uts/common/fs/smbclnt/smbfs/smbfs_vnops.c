@@ -257,7 +257,7 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	smi = VTOSMI(vp);
 	ssp = smi->smi_share;
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -434,7 +434,7 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	 * open; if we happen to get here from the wrong zone we can't do
 	 * anything over the wire.
 	 */
-	if (smi->smi_zone != curproc->p_zone) {
+	if (smi->smi_zone_ref.zref_zone != curproc->p_zone) {
 		/*
 		 * We could attempt to clean up locks, except we're sure
 		 * that the current process didn't acquire any locks on
@@ -591,7 +591,7 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	smi = VTOSMI(vp);
 	ssp = smi->smi_share;
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -676,7 +676,7 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	smi = VTOSMI(vp);
 	ssp = smi->smi_share;
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -787,7 +787,7 @@ smbfs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag,
 
 	smi = VTOSMI(vp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -853,7 +853,7 @@ smbfs_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 
 	smi = VTOSMI(vp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -908,7 +908,7 @@ smbfs_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	vfsp = vp->v_vfsp;
 	smi = VFTOSMI(vfsp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -980,7 +980,7 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	int have_fid = 0;
 	uint32_t rights = 0;
 
-	ASSERT(curproc->p_zone == VTOSMI(vp)->smi_zone);
+	ASSERT(curproc->p_zone == VTOSMI(vp)->smi_zone_ref.zref_zone);
 
 	/*
 	 * There are no settable attributes on the XATTR dir,
@@ -1252,7 +1252,7 @@ smbfs_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	vfsp = vp->v_vfsp;
 	smi = VFTOSMI(vfsp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -1281,7 +1281,7 @@ smbfs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -1399,7 +1399,7 @@ smbfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	vfs = dvp->v_vfsp;
 	smi = VFTOSMI(vfs);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (smi->smi_flags & SMI_DEAD || vfs->vfs_flag & VFS_UNMOUNTED)
@@ -1456,7 +1456,7 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr,
 	smi = VTOSMI(dvp);
 	dnp = VTOSMB(dvp);
 
-	ASSERT(curproc->p_zone == smi->smi_zone);
+	ASSERT(curproc->p_zone == smi->smi_zone_ref.zref_zone);
 
 #ifdef NOT_YET
 	vcp = SSTOVC(smi->smi_share);
@@ -1775,7 +1775,7 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	dnp = VTOSMB(dvp);
 	vp = NULL;
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -2007,7 +2007,7 @@ smbfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 
 	smi = VTOSMI(dvp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (smi->smi_flags & SMI_DEAD || dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -2101,8 +2101,8 @@ smbfs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 {
 	/* vnode_t		*realvp; */
 
-	if (curproc->p_zone != VTOSMI(odvp)->smi_zone ||
-	    curproc->p_zone != VTOSMI(ndvp)->smi_zone)
+	if (curproc->p_zone != VTOSMI(odvp)->smi_zone_ref.zref_zone ||
+	    curproc->p_zone != VTOSMI(ndvp)->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (VTOSMI(odvp)->smi_flags & SMI_DEAD ||
@@ -2133,7 +2133,7 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 	struct smb_cred	scred;
 	/* enum smbfsstat	status; */
 
-	ASSERT(curproc->p_zone == VTOSMI(odvp)->smi_zone);
+	ASSERT(curproc->p_zone == VTOSMI(odvp)->smi_zone_ref.zref_zone);
 
 	if (strcmp(onm, ".") == 0 || strcmp(onm, "..") == 0 ||
 	    strcmp(nnm, ".") == 0 || strcmp(nnm, "..") == 0)
@@ -2361,7 +2361,7 @@ smbfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 	int		nmlen = strlen(name);
 	int		error, hiderr;
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (smi->smi_flags & SMI_DEAD || dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -2440,7 +2440,7 @@ smbfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 	struct smb_cred	scred;
 	int		error;
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (smi->smi_flags & SMI_DEAD || dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -2536,7 +2536,7 @@ smbfs_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp,
 
 	smi = VTOSMI(vp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -2599,7 +2599,7 @@ smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 	int		nmlen, error;
 	ushort_t	reclen;
 
-	ASSERT(curproc->p_zone == VTOSMI(vp)->smi_zone);
+	ASSERT(curproc->p_zone == VTOSMI(vp)->smi_zone_ref.zref_zone);
 
 	/* Make sure we serialize for n_dirseq use. */
 	ASSERT(smbfs_rw_lock_held(&np->r_lkserlock, RW_WRITER));
@@ -2840,7 +2840,7 @@ smbfs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 
 	smi = VTOSMI(vp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -2871,7 +2871,7 @@ smbfs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	offset_t offset, struct flk_callback *flk_cbp, cred_t *cr,
 	caller_context_t *ct)
 {
-	if (curproc->p_zone != VTOSMI(vp)->smi_zone)
+	if (curproc->p_zone != VTOSMI(vp)->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (VTOSMI(vp)->smi_flags & SMI_LLOCK)
@@ -2897,7 +2897,7 @@ smbfs_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 
 	smi = VTOSMI(vp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -2951,7 +2951,7 @@ smbfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 	vfs = vp->v_vfsp;
 	smi = VFTOSMI(vfs);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -3019,7 +3019,7 @@ smbfs_getsecattr(vnode_t *vp, vsecattr_t *vsa, int flag, cred_t *cr,
 	vfsp = vp->v_vfsp;
 	smi = VFTOSMI(vfsp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -3060,7 +3060,7 @@ smbfs_setsecattr(vnode_t *vp, vsecattr_t *vsa, int flag, cred_t *cr,
 	vfsp = vp->v_vfsp;
 	smi = VFTOSMI(vfsp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -3102,7 +3102,7 @@ static int
 smbfs_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr,
 	caller_context_t *ct)
 {
-	if (curproc->p_zone != VTOSMI(vp)->smi_zone)
+	if (curproc->p_zone != VTOSMI(vp)->smi_zone_ref.zref_zone)
 		return (EIO);
 
 	if (VTOSMI(vp)->smi_flags & SMI_LLOCK)

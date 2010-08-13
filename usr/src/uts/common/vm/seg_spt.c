@@ -466,7 +466,7 @@ segspt_create(struct seg *seg, caddr_t argsp)
 			 * The zone will never be NULL, as a fully created
 			 * shm always has an owning zone.
 			 */
-			zone = sp->shm_perm.ipc_zone;
+			zone = sp->shm_perm.ipc_zone_ref.zref_zone;
 			ASSERT(zone != NULL);
 			if (anon_resv_zone(ptob(more_pgs), zone) == 0) {
 				err = ENOMEM;
