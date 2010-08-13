@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _VNET_GEN_H
@@ -91,6 +90,11 @@ extern "C" {
 #define	VGEN_TXDBLK_SZ		2048	/* Tx data buffer size */
 
 #define	VGEN_NUM_DESCRIPTORS_MIN	128	/* min # of descriptors */
+
+/*
+ * Number of rcv buffers in RxDringData mode
+ */
+#define	VGEN_RXDRING_NRBUFS	(vnet_num_descriptors * vgen_nrbufs_factor)
 
 static struct ether_addr etherbroadcastaddr = {
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff

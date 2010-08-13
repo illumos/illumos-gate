@@ -151,6 +151,7 @@ static int vsw_map_data(vsw_ldc_t *ldcp, dring_info_t *dp, void *pkt);
 static void vsw_set_lane_attr(vsw_t *, lane_t *);
 dring_info_t *vsw_map_dring_cmn(vsw_ldc_t *ldcp,
     vio_dring_reg_msg_t *dring_pkt);
+static int vsw_mapin_avail(vsw_ldc_t *ldcp);
 
 /* tx/msg/rcv thread routines */
 static void vsw_stop_tx_thread(vsw_ldc_t *ldcp);
@@ -234,6 +235,7 @@ extern uint8_t  vsw_dring_mode;
 extern uint32_t vsw_max_tx_qcount;
 extern boolean_t vsw_obp_ver_proto_workaround;
 extern uint32_t vsw_publish_macaddr_count;
+extern uint32_t vsw_nrbufs_factor;
 
 #define	LDC_ENTER_LOCK(ldcp)	\
 				mutex_enter(&((ldcp)->ldc_cblock));\
@@ -1938,10 +1940,9 @@ vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp)
 	 *
 	 * However, for versions >= 1.6, we could still fallback to TxDring
 	 * mode. This could happen if RxDringData mode has been disabled (see
-	 * vsw_dring_mode) on this guest or on the peer guest. This info is
-	 * determined as part of attr exchange phase of handshake. Hence, we
-	 * setup these pointers for v1.6 after attr msg phase completes during
-	 * handshake.
+	 * below) on this guest or on the peer guest. This info is determined
+	 * as part of attr exchange phase of handshake. Hence, we setup these
+	 * pointers for v1.6 after attr msg phase completes during handshake.
 	 */
 	if (VSW_VER_GTEQ(ldcp, 1, 6)) {
 		/*
@@ -1949,7 +1950,7 @@ vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp)
 		 * thread in TxDring mode or rcv worker thread in RxDringData
 		 * mode when attr phase of handshake completes.
 		 */
-		if (vsw_dring_mode == VIO_RX_DRING_DATA) {
+		if (vsw_mapin_avail(ldcp) == B_TRUE) {
 			lp->dring_mode = (VIO_RX_DRING_DATA | VIO_TX_DRING);
 		} else {
 			lp->dring_mode = VIO_TX_DRING;
@@ -2576,7 +2577,7 @@ vsw_process_attr_info(vsw_ldc_t *ldcp, vnet_attr_msg_t *msg)
 		 * that can be negotiated.
 		 */
 		if ((msg->options & VIO_RX_DRING_DATA) != 0 &&
-		    vsw_dring_mode == VIO_RX_DRING_DATA) {
+		    vsw_mapin_avail(ldcp) == B_TRUE) {
 			/*
 			 * The peer is capable of handling RxDringData AND we
 			 * are also capable of it; we enable RxDringData mode
@@ -4599,6 +4600,7 @@ vsw_map_data(vsw_ldc_t *ldcp, dring_info_t *dp, void *pkt)
 	vio_dring_reg_msg_t	*msg = pkt;
 	uint8_t			*buf = (uint8_t *)msg->cookie;
 	vsw_t			*vswp = ldcp->ldc_vswp;
+	ldc_mem_info_t		minfo;
 
 	/* skip over dring cookies */
 	ASSERT(msg->ncookies == 1);
@@ -4632,6 +4634,21 @@ vsw_map_data(vsw_ldc_t *ldcp, dring_info_t *dp, void *pkt)
 		cmn_err(CE_WARN, "ldc_mem_map failed\n");
 		DWARN(vswp, "%s (%lld) ldc_mem_map() failed: %d\n",
 		    __func__, ldcp->ldc_id, rv);
+		return (1);
+	}
+
+	/* get the map info */
+	rv = ldc_mem_info(dp->data_handle, &minfo);
+	if (rv != 0) {
+		cmn_err(CE_WARN, "ldc_mem_info failed\n");
+		DWARN(vswp, "%s (%lld) ldc_mem_info() failed: %d\n",
+		    __func__, ldcp->ldc_id, rv);
+		return (1);
+	}
+
+	if (minfo.mtype != LDC_DIRECT_MAP) {
+		DWARN(vswp, "%s (%lld) mtype(%d) is not direct map\n",
+		    __func__, ldcp->ldc_id, minfo.mtype);
 		return (1);
 	}
 
@@ -4785,6 +4802,30 @@ vsw_stop_tx_thread(vsw_ldc_t *ldcp)
 	}
 
 	D1(vswp, "%s(%lld):exit\n", __func__, ldcp->ldc_id);
+}
+
+static int
+vsw_mapin_avail(vsw_ldc_t *ldcp)
+{
+	int		rv;
+	ldc_info_t	info;
+	uint64_t	mapin_sz_req;
+	uint64_t	dblk_sz;
+	vsw_t		*vswp = ldcp->ldc_vswp;
+
+	rv = ldc_info(ldcp->ldc_handle, &info);
+	if (rv != 0) {
+		return (B_FALSE);
+	}
+
+	dblk_sz = RXDRING_DBLK_SZ(vswp->max_frame_size);
+	mapin_sz_req = (VSW_RXDRING_NRBUFS * dblk_sz);
+
+	if (info.direct_map_size_max >= mapin_sz_req) {
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }
 
 /*

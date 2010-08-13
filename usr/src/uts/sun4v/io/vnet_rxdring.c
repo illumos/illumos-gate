@@ -127,7 +127,7 @@ vgen_create_rx_dring(vgen_ldc_t *ldcp)
 
 	rxdsize = sizeof (vnet_rx_dringdata_desc_t);
 	ldcp->num_rxds = vnet_num_descriptors;
-	ldcp->num_rbufs = vnet_num_descriptors * vgen_nrbufs_factor;
+	ldcp->num_rbufs = VGEN_RXDRING_NRBUFS;
 
 	/* Create the receive descriptor ring */
 	rv = ldc_mem_dring_create(ldcp->num_rxds, rxdsize,
@@ -173,8 +173,7 @@ vgen_create_rx_dring(vgen_ldc_t *ldcp)
 	 * (receiver) manage the individual buffers and their state (see
 	 * VIO_MBLK_STATEs in vio_util.h).
 	 */
-	data_sz = vgenp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
-	data_sz = VNET_ROUNDUP_2K(data_sz);
+	data_sz = RXDRING_DBLK_SZ(vgenp->max_frame_size);
 
 	ldcp->rx_data_sz = data_sz * ldcp->num_rbufs;
 	ldcp->rx_dblk_sz = data_sz;
@@ -510,6 +509,7 @@ vgen_map_data(vgen_ldc_t *ldcp, void *pkt)
 	vio_dring_reg_msg_t	*msg = (vio_dring_reg_msg_t *)pkt;
 	uint8_t			*buf = (uint8_t *)msg->cookie;
 	vgen_t			*vgenp = LDC_TO_VGEN(ldcp);
+	ldc_mem_info_t		minfo;
 
 	/* skip over dring cookies */
 	ASSERT(msg->ncookies == 1);
@@ -539,8 +539,19 @@ vgen_map_data(vgen_ldc_t *ldcp, void *pkt)
 	    (caddr_t *)&ldcp->tx_datap, NULL);
 	if (rv != 0) {
 		DWARN(vgenp, ldcp, "ldc_mem_map() failed: %d\n", rv);
-		(void) ldc_mem_free_handle(ldcp->tx_data_handle);
-		ldcp->tx_data_handle = 0;
+		return (VGEN_FAILURE);
+	}
+
+	/* get the map info */
+	rv = ldc_mem_info(ldcp->tx_data_handle, &minfo);
+	if (rv != 0) {
+		DWARN(vgenp, ldcp, "ldc_mem_info() failed: %d\n", rv);
+		return (VGEN_FAILURE);
+	}
+
+	if (minfo.mtype != LDC_DIRECT_MAP) {
+		DWARN(vgenp, ldcp, "mtype(%d) is not direct map\n",
+		    minfo.mtype);
 		return (VGEN_FAILURE);
 	}
 

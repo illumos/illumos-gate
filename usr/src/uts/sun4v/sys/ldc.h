@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LDC_H
@@ -126,6 +125,11 @@ typedef struct ldc_mem_cookie {
 #define	LDC_DIRECT_MAP		0x2	/* share mem direct access */
 #define	LDC_IO_MAP		0x4	/* share mem for IOMMU/DMA access */
 
+/*
+ * Default mapin size supported with legacy f/w.
+ */
+#define	LDC_DIRECT_MAP_SIZE_DEFAULT	(64 * 1024 * 1024)
+
 /* LDC Memory Access Permissions  */
 #define	LDC_MEM_R		0x1	/* Memory region is read only */
 #define	LDC_MEM_W		0x2	/* Memory region is write only */
@@ -152,6 +156,11 @@ typedef struct ldc_mem_info {
 	uintptr_t	raddr;		/* base RA */
 	ldc_mstatus_t	status;		/* dring/mem handle status */
 } ldc_mem_info_t;
+
+/* LDC channel info */
+typedef struct ldc_info {
+	uint64_t direct_map_size_max;	/* Max direct mapin space size */
+} ldc_info_t;
 
 /* API functions */
 int ldc_register(ldc_cnex_t *cinfo);
@@ -207,6 +216,7 @@ int ldc_mem_dring_acquire(ldc_dring_handle_t dhandle, uint64_t start,
     uint64_t end);
 int ldc_mem_dring_release(ldc_dring_handle_t dhandle, uint64_t start,
     uint64_t end);
+int ldc_info(ldc_handle_t handle, ldc_info_t *info);
 
 /*
  * Shared Memory (Direct Map) Acquire and Release API

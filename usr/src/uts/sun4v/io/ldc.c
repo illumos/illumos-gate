@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -125,6 +124,11 @@ static int i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg);
 static int i_ldc_process_RDX(ldc_chan_t *ldcp, ldc_msg_t *msg);
 static int i_ldc_process_data_ACK(ldc_chan_t *ldcp, ldc_msg_t *msg);
 
+/* Imported functions */
+extern void i_ldc_mem_set_hsvc_vers(uint64_t major, uint64_t minor);
+extern void i_ldc_init_mapin(ldc_soft_state_t *ldcssp, uint64_t major,
+	uint64_t minor);
+
 /* LDC Version */
 static ldc_ver_t ldc_versions[] = { {1, 0} };
 
@@ -151,7 +155,7 @@ static struct modlinkage ml = {
 
 static uint64_t ldc_sup_minor;		/* Supported minor number */
 static hsvc_info_t ldc_hsvc = {
-	HSVC_REV_1, NULL, HSVC_GROUP_LDC, 1, 1, "ldc"
+	HSVC_REV_1, NULL, HSVC_GROUP_LDC, 1, 2, "ldc"
 };
 
 /*
@@ -208,6 +212,17 @@ static uint64_t ldc_debug_reset_mask = LDC_DEVCLASS_BIT(LDC_DEV_BLK_SVC) |
  * ldc_close(), to wait for pending interrupts to complete.
  */
 clock_t ldc_close_delay = LDC_CLOSE_DELAY;
+
+
+/*
+ * Reserved mapin space for descriptor rings.
+ */
+uint64_t ldc_dring_direct_map_rsvd = LDC_DIRECT_MAP_SIZE_DEFAULT;
+
+/*
+ * Maximum direct map space allowed per channel.
+ */
+uint64_t	ldc_direct_map_size_max = (16 * 1024 * 1024);	/* 16 MB */
 
 #ifdef DEBUG
 
@@ -374,7 +389,6 @@ int
 _init(void)
 {
 	int status;
-	extern void i_ldc_mem_set_hsvc_vers(uint64_t major, uint64_t minor);
 
 	status = hsvc_register(&ldc_hsvc, &ldc_sup_minor);
 	if (status != 0) {
@@ -390,6 +404,8 @@ _init(void)
 
 	/* allocate soft state structure */
 	ldcssp = kmem_zalloc(sizeof (ldc_soft_state_t), KM_SLEEP);
+
+	i_ldc_init_mapin(ldcssp, ldc_hsvc.hsvc_major, ldc_sup_minor);
 
 	/* Link the module into the system */
 	status = mod_install(&ml);
@@ -4709,6 +4725,58 @@ ldc_unregister(ldc_cnex_t *cinfo)
 	ldcssp->cinfo.clr_intr = NULL;
 
 	mutex_exit(&ldcssp->lock);
+
+	return (0);
+}
+
+int
+ldc_info(ldc_handle_t handle, ldc_info_t *info)
+{
+	ldc_chan_t	*ldcp;
+	uint64_t	avail;
+
+	if (handle == NULL || info == NULL) {
+		DWARN(DBG_ALL_LDCS, "ldc_get_info: invalid args\n");
+		return (EINVAL);
+	}
+
+	ldcp = (ldc_chan_t *)handle;
+
+	mutex_enter(&ldcp->lock);
+
+	/* check to see if channel is initalized */
+	if ((ldcp->tstate & ~TS_IN_RESET) < TS_INIT) {
+		DWARN(ldcp->id,
+		    "ldc_get_info: (0x%llx) channel not initialized\n",
+		    ldcp->id);
+		mutex_exit(&ldcp->lock);
+		return (EINVAL);
+	}
+
+	mutex_exit(&ldcp->lock);
+
+	/*
+	 * ldcssp->mapin_size is the max amount of shared memory supported by
+	 * the Hypervisor per guest. e.g, legacy HV supports 64MB; latest HV
+	 * support 1GB. This size is read during ldc module initialization.
+	 *
+	 * ldc_dring_direct_map_rsvd is the amount of memory reserved for
+	 * mapping in descriptor rings. In the initial implementation, we use a
+	 * simple approach to determine the amount of mapin space available per
+	 * channel. In future, we may implement strict accounting of the actual
+	 * memory consumed to determine the exact amount available per channel.
+	 */
+	if (ldcssp->mapin_size <= ldc_dring_direct_map_rsvd) {
+		info->direct_map_size_max = 0;
+		return (0);
+	}
+
+	avail = ldcssp->mapin_size - ldc_dring_direct_map_rsvd;
+	if (avail >= ldc_direct_map_size_max) {
+		info->direct_map_size_max = ldc_direct_map_size_max;
+	} else {
+		info->direct_map_size_max = 0;
+	}
 
 	return (0);
 }

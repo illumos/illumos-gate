@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _VNET_COMMON_H
@@ -95,6 +94,12 @@ extern "C" {
 #define	VNET_MAX_MTU		16000
 
 #define	VNET_NUM_HANDSHAKES	6	/* # of handshake attempts */
+
+/*
+ * Max frame size to data block size in RxDringData mode
+ */
+#define	RXDRING_DBLK_SZ(mfs) \
+	(VNET_ROUNDUP_2K((mfs) + VNET_IPALIGN + VNET_LDCALIGN))
 
 /* vnet descriptor */
 typedef struct vnet_public_desc {

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1052,6 +1051,16 @@ hv_reboot_data_set(uint64_t buffer_ra, uint64_t buffer_len)
 	  nop
 	SET_SIZE(hv_ldc_revoke)
 
+	/*
+	 * hv_ldc_mapin_size_max(uint64_t tbl_type, uint64_t *sz)
+	 */
+	ENTRY(hv_ldc_mapin_size_max)
+	mov	%o1, %g1
+	mov     LDC_MAPIN_SIZE_MAX, %o5
+	ta      FAST_TRAP
+	retl
+	  stx     %o1, [%g1]
+	SET_SIZE(hv_ldc_mapin_size_max)
 
 	/*
 	 * hvldc_intr_getcookie(uint64_t dev_hdl, uint32_t devino,

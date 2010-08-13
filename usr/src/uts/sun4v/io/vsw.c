@@ -286,14 +286,10 @@ int vsw_hio_cleanup_delay = 10000;
  * specified in the descriptor. The receiver simply picks up the data buffer
  * (owned by itself) without any copy operation into the receiving guest.
  *
- * We provide a tunable to enable RxDringData mode for versions >= v1.6 of VIO
- * Protocol. By default, this tunable is set to 1 (VIO_TX_DRING). To enable
- * RxDringData mode set this tunable to 4 (VIO_RX_DRING_DATA). This enables us
- * to negotiate RxDringData mode with peers that support versions >= v1.6. For
- * peers that support version < v1.6, we continue to operate in TxDring mode
- * with them though the tunable is enabled.
+ * We enable RxDringData mode during handshake negotiations if LDC supports
+ * mapping in large areas of shared memory(see ldc_is_viotsb_configured() API),
+ * which is required to support RxDringData mode.
  */
-uint8_t  vsw_dring_mode = VIO_TX_DRING;
 
 /*
  * Number of descriptors;  must be power of 2.

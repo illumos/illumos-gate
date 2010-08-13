@@ -201,7 +201,7 @@ vsw_create_rx_dring(vsw_ldc_t *ldcp)
 	dp->descriptor_size = sizeof (vnet_rx_dringdata_desc_t);
 	dp->options = VIO_RX_DRING_DATA;
 	dp->dring_ncookies = 1;	/* guaranteed by ldc */
-	dp->num_bufs = vsw_num_descriptors * vsw_nrbufs_factor;
+	dp->num_bufs = VSW_RXDRING_NRBUFS;
 
 	/*
 	 * Allocate a table that maps descriptor to its associated buffer;
@@ -277,8 +277,7 @@ vsw_setup_rx_dring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	 * (receiver) manage the individual buffers and their state (see
 	 * VIO_MBLK_STATEs in vio_util.h).
 	 */
-	data_sz = vswp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
-	data_sz = VNET_ROUNDUP_2K(data_sz);
+	data_sz = RXDRING_DBLK_SZ(vswp->max_frame_size);
 
 	dp->desc_data_sz = data_sz;
 	dp->data_sz = (dp->num_bufs * data_sz);
