@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -81,9 +80,6 @@ nwam_value_create(nwam_value_type_t value_type, void *values, uint_t numvalues,
 	nwam_error_t err = NWAM_SUCCESS;
 
 	*valuep = NULL;
-
-	if (numvalues > NWAM_MAX_NUM_VALUES)
-		return (NWAM_INVALID_ARG);
 
 	if ((newvalue = calloc(1, sizeof (struct nwam_value))) == NULL)
 		return (NWAM_NO_MEMORY);

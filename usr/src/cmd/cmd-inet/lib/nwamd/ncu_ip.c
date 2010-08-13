@@ -688,7 +688,8 @@ addrinfo_for_ipaddr(ipadm_addrobj_t ipaddr, const char *ifname,
  * finish the job of bringing the NCU online.
  */
 static boolean_t
-add_ip_address(const char *ifname, const struct nwamd_if_address *nifa)
+add_ip_address(const char *ifname, const struct nwamd_if_address *nifa,
+    boolean_t *do_inform)
 {
 	ipadm_status_t ipstatus;
 	ipadm_addr_info_t *addrinfo = NULL;
@@ -755,8 +756,18 @@ add_ip_address(const char *ifname, const struct nwamd_if_address *nifa)
 				}
 				return (B_FALSE);
 			}
-			/* Do DHCP_INFORM using async ipadm_refresh_addr() */
-			nwamd_dhcp(ifname, nifa->ipaddr, DHCP_INFORM);
+			/*
+			 * Do DHCP_INFORM using async ipadm_refresh_addr().
+			 * Only need to do this once per interface, and we
+			 * do *not* need to do it if we are also getting a
+			 * dhcp lease; so we only send the INFORM if the
+			 * passed-in flag says to, and we clear the flag
+			 * once we've initiated the INFORM transaction.
+			 */
+			if (*do_inform) {
+				nwamd_dhcp(ifname, nifa->ipaddr, DHCP_INFORM);
+				*do_inform = B_FALSE;
+			}
 		}
 	}
 
@@ -770,6 +781,10 @@ void
 nwamd_configure_interface_addresses(nwamd_ncu_t *ncu)
 {
 	struct nwamd_if_address *nifap, *nifa = ncu->ncu_if.nwamd_if_list;
+	boolean_t do_inform;
+
+	/* only need an inform if we're not also getting a dhcp lease */
+	do_inform = !ncu->ncu_if.nwamd_if_dhcp_requested;
 
 	nlog(LOG_DEBUG, "nwamd_configure_interface_addresses(%s)",
 	    ncu->ncu_name);
@@ -778,7 +793,8 @@ nwamd_configure_interface_addresses(nwamd_ncu_t *ncu)
 		if (nifap->configured)
 			continue;
 
-		nifap->configured = add_ip_address(ncu->ncu_name, nifap);
+		nifap->configured = add_ip_address(ncu->ncu_name, nifap,
+		    &do_inform);
 	}
 }
 
@@ -1319,7 +1335,7 @@ retry:
 	/* Make sure the NCU is in appropriate state for DHCP command */
 	ncu_obj = nwamd_ncu_object_find(NWAM_NCU_TYPE_INTERFACE, name);
 	if (ncu_obj == NULL) {
-		nlog(LOG_ERR, "start_dhcp: no IP object %s");
+		nlog(LOG_ERR, "start_dhcp: no IP object %s", name);
 		return (NULL);
 	}
 
