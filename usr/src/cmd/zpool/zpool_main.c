@@ -3243,7 +3243,7 @@ void
 print_scan_status(pool_scan_stat_t *ps)
 {
 	time_t start, end;
-	uint64_t elapsed, mins_left;
+	uint64_t elapsed, mins_left, hours_left;
 	uint64_t pass_exam, examined, total;
 	uint_t rate;
 	double fraction_done;
@@ -3320,15 +3320,24 @@ print_scan_status(pool_scan_stat_t *ps)
 	rate = pass_exam / elapsed;
 	rate = rate ? rate : 1;
 	mins_left = ((total - examined) / rate) / 60;
+	hours_left = mins_left / 60;
 
 	zfs_nicenum(examined, examined_buf, sizeof (examined_buf));
 	zfs_nicenum(total, total_buf, sizeof (total_buf));
 	zfs_nicenum(rate, rate_buf, sizeof (rate_buf));
 
-	(void) printf(gettext("    %s scanned out of %s at "
-	    "%s/s, %lluh%um to go\n"), examined_buf, total_buf, rate_buf,
-	    (u_longlong_t)(mins_left / 60),
-	    (uint_t)(mins_left % 60));
+	/*
+	 * do not print estimated time if hours_left is more than 30 days
+	 */
+	(void) printf(gettext("    %s scanned out of %s at %s/s"),
+	    examined_buf, total_buf, rate_buf);
+	if (hours_left < (30 * 24)) {
+		(void) printf(gettext(", %lluh%um to go\n"),
+		    (u_longlong_t)hours_left, (uint_t)(mins_left % 60));
+	} else {
+		(void) printf(gettext(
+		    ", (scan is slow, no estimated time)\n"));
+	}
 
 	if (ps->pss_func == POOL_SCAN_RESILVER) {
 		(void) printf(gettext("    %s resilvered, %.2f%% done\n"),
