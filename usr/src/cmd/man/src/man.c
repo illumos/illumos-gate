@@ -149,16 +149,17 @@ static const map_entry map[] = {
 static const struct preprocessor {
 	char	p_tag;
 	char	*p_nroff,
-		*p_troff;
+		*p_troff,
+		*p_stdin_char;
 } preprocessors [] = {
-	{'c',	"cw",				"cw"},
+	{'c',	"cw",				"cw",		"-"},
 	{'e',	"neqn /usr/share/lib/pub/eqnchar",
-			"eqn /usr/share/lib/pub/eqnchar"},
-	{'p',	"pic",				"pic"},
-	{'r',	"refer",			"refer"},
-	{'t',	"tbl",				"tbl"},
-	{'v',	"vgrind -f",			"vgrind -f"},
-	{0,	0,				0}
+			"eqn /usr/share/lib/pub/eqnchar",	"-"},
+	{'p',	"gpic",				"gpic",		"-"},
+	{'r',	"refer",			"refer",	"-"},
+	{'t',	"tbl",				"tbl",		""},
+	{'v',	"vgrind -f",			"vgrind -f",	"-"},
+	{0,	0,				0,		0}
 };
 
 struct suffix {
@@ -2579,7 +2580,8 @@ so_again:	if (++socount > SOLIMIT) {
 				 */
 				(void) sprintf(cbp, "%s %s |",
 				    troffit ? pp->p_troff : pp->p_nroff,
-				    pipestage++ == 0 ? manpname : "-");
+				    pipestage++ == 0 ? manpname :
+				    pp->p_stdin_char);
 				cbp += strlen(cbp);
 
 				/*

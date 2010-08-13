@@ -388,4 +388,8 @@ license usr/src/cmd/vgrind/THIRDPARTYLICENSE \
     license=usr/src/cmd/vgrind/THIRDPARTYLICENSE
 link path=usr/lib/tmac target=../share/lib/tmac
 link path=usr/man target=./share/man
+#
+# gpic is used as a preprocessor by the apropos command
+#
+depend fmri=text/groff type=require
 depend fmri=text/less type=require
