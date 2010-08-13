@@ -760,6 +760,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ib/clients/ibd/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ib/clients/eoib/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ib/clients/of/sol_ofs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -2068,6 +2072,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/clients/iser/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/clients/ibd/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/clients/eoib/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/clients/of/sol_ofs/%.c

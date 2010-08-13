@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -517,9 +517,10 @@ ibt_reprobe_dev(dev_info_t *dip)
  *	For a given pdip, of Port/VPPA devices, match it against all the
  *	registered HCAs's dip.  If match found return IBT_SUCCESS,
  *	else IBT_NO_HCAS_AVAILABLE.
+ *
  *	For IOC/Pseudo devices check if the given pdip is that of
- *	the ib(7d) nexus. If yes return IBT_SUCCESS,
- *	else IBT_NO_HCAS_AVAILABLE.
+ *	the ib(7d) nexus or that of the eoib(7d) nexus. If yes
+ *	return IBT_SUCCESS, else IBT_NO_HCAS_AVAILABLE.
  */
 ibt_status_t
 ibtl_ibnex_valid_hca_parent(dev_info_t *pdip)
@@ -530,9 +531,10 @@ ibtl_ibnex_valid_hca_parent(dev_info_t *pdip)
 	    pdip);
 
 	/* For Pseudo devices and IOCs */
-	if (strncmp(ddi_node_name(pdip), "ib", 2) == 0)
+	if (strncmp(ddi_node_name(pdip), "ib", 2) == 0 ||
+	    strncmp(ddi_node_name(pdip), "eibnx", 5) == 0) {
 		return (IBT_SUCCESS);
-	else {
+	} else {
 		/* For Port devices and VPPAs */
 		mutex_enter(&ibtl_clnt_list_mutex);
 		hca_devp = ibtl_hca_list;

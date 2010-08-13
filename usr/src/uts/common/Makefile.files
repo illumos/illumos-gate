@@ -1734,6 +1734,13 @@ IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 
 IBD_OBJS +=	ibd.o ibd_cm.o
 
+EIBNX_OBJS +=	enx_main.o enx_hdlrs.o enx_ibt.o enx_log.o enx_fip.o \
+		enx_misc.o enx_q.o enx_ctl.o
+
+EOIB_OBJS +=	eib_adm.o eib_chan.o eib_cmn.o eib_ctl.o eib_data.o \
+		eib_fip.o eib_ibt.o eib_log.o eib_mac.o eib_main.o \
+		eib_rsrc.o eib_svc.o eib_vnic.o
+
 DLPISTUB_OBJS += dlpistub.o
 
 SDP_OBJS +=	sdpddi.o
