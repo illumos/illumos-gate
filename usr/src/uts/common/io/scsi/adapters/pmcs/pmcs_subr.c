@@ -4797,6 +4797,7 @@ pmcs_pwork(pmcs_hw_t *pwp, pmcwork_t *p)
 	p->abt_htag = 0;
 	p->timer = 0;
 	p->onwire = 0;
+	p->ssp_event = 0;
 	mutex_exit(&p->lock);
 
 	if (mutex_tryenter(&pwp->wfree_lock) == 0) {
