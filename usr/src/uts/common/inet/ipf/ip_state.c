@@ -3,8 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #if defined(KERNEL) || defined(_KERNEL)
@@ -1192,11 +1191,16 @@ u_int flags;
 	is->is_v = fin->fin_v;
 	is->is_opt[0] = fin->fin_optmsk;
 	is->is_optmsk[0] = 0xffffffff;
-	is->is_optmsk[1] = 0xffffffff;
+	/*
+	 * The reverse direction option mask will be set in fr_matchsrcdst(),
+	 * when we will see the first packet from the peer. We will leave it
+	 * as zero for now.
+	 */
+	is->is_optmsk[1] = 0x0;
+
 	if (is->is_v == 6) {
 		is->is_opt[0] &= ~0x8;
 		is->is_optmsk[0] &= ~0x8;
-		is->is_optmsk[1] &= ~0x8;
 	}
 	is->is_sec = fin->fin_secmsk;
 	is->is_secmsk = 0xffff;
@@ -2135,8 +2139,10 @@ u_32_t cmask;
 	    is->is_ifp[idx] == ifp)
 		ret = 1;
 
-	if (ret == 0)
+	if (ret == 0) {
+		DTRACE_PROBE(no_match_on_iface);
 		return NULL;
+	}
 	ret = 0;
 
 	/*
@@ -2166,9 +2172,10 @@ u_32_t cmask;
 		}
 	}
 
-	if (ret == 0)
+	if (ret == 0) {
+		DTRACE_PROBE(no_match_on_addrs);
 		return NULL;
-
+	}
 	/*
 	 * Whether or not this should be here, is questionable, but the aim
 	 * is to get this out of the main line.
@@ -2249,9 +2256,16 @@ u_32_t cmask;
 	if ((cflx && (flx != (cflx & cmask))) ||
 	    ((fin->fin_optmsk & is->is_optmsk[rev]) != is->is_opt[rev]) ||
 	    ((fin->fin_secmsk & is->is_secmsk) != is->is_sec) ||
-	    ((fin->fin_auth & is->is_authmsk) != is->is_auth))
+	    ((fin->fin_auth & is->is_authmsk) != is->is_auth)) {
+		DTRACE_PROBE4(no_match_on_flags,
+		    int, (cflx && (flx != (cflx & cmask))),
+		    int,
+		    ((fin->fin_optmsk & is->is_optmsk[rev]) != is->is_opt[rev]),
+		    int, ((fin->fin_secmsk & is->is_secmsk) != is->is_sec),
+		    int, ((fin->fin_auth & is->is_authmsk) != is->is_auth)
+		);
 		return NULL;
-
+	}
 	/*
 	 * Only one of the source or destination port can be flagged as a
 	 * wildcard.  When filling it in, fill in a copy of the matched entry
@@ -2302,7 +2316,16 @@ u_32_t cmask;
 
 	if (is->is_flx[out][rev] == 0) {
 		is->is_flx[out][rev] = flx;
-		is->is_opt[rev] = fin->fin_optmsk;
+		/*
+		 * If we are dealing with the first packet coming in reverse
+		 * direction (sent by peer), then we have to set options into
+		 * state.
+		 */
+		if (rev == 1 && is->is_optmsk[1] == 0x0) {
+			is->is_optmsk[1] = 0xffffffff;
+			is->is_opt[1] = fin->fin_optmsk;
+			DTRACE_PROBE(set_rev_opts);
+		}
 		if (is->is_v == 6) {
 			is->is_opt[rev] &= ~0x8;
 			is->is_optmsk[rev] &= ~0x8;
