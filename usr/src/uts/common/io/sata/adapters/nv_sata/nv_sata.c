@@ -123,7 +123,7 @@ static void nv_uninit_ctl(nv_ctl_t *nvc);
 static void mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
 static void ck804_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
 static void nv_uninit_port(nv_port_t *nvp);
-static int nv_init_port(nv_port_t *nvp);
+static void nv_init_port(nv_port_t *nvp);
 static int nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
 static int mcp5x_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp);
 #ifdef NCQ
@@ -146,10 +146,10 @@ static void nv_resume(nv_port_t *nvp);
 static void nv_suspend(nv_port_t *nvp);
 static int nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt);
 static int nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason,
-    int flag);
+    boolean_t reset);
 static void nv_copy_registers(nv_port_t *nvp, sata_device_t *sd,
     sata_pkt_t *spkt);
-static void nv_report_add_remove(nv_port_t *nvp, int flags);
+static void nv_link_event(nv_port_t *nvp, int flags);
 static int nv_start_async(nv_port_t *nvp, sata_pkt_t *spkt);
 static int nv_wait3(nv_port_t *nvp, uchar_t onbits1, uchar_t offbits1,
     uchar_t failure_onbits2, uchar_t failure_offbits2,
@@ -158,9 +158,8 @@ static int nv_wait3(nv_port_t *nvp, uchar_t onbits1, uchar_t offbits1,
 static int nv_wait(nv_port_t *nvp, uchar_t onbits, uchar_t offbits,
     uint_t timeout_usec, int type_wait);
 static int nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp);
-static void nv_init_port_link_processing(nv_ctl_t *nvc);
-static void nv_setup_timeout(nv_port_t *nvp, int time);
-static void nv_monitor_reset(nv_port_t *nvp);
+static void nv_setup_timeout(nv_port_t *nvp, clock_t microseconds);
+static clock_t nv_monitor_reset(nv_port_t *nvp);
 static int nv_bm_status_clear(nv_port_t *nvp);
 static void nv_log(nv_ctl_t *nvc, nv_port_t *nvp, const char *fmt, ...);
 
@@ -323,69 +322,11 @@ static  struct modlinkage modlinkage = {
 	NULL
 };
 
-
-/*
- * Wait for a signature.
- * If this variable is non-zero, the driver will wait for a device signature
- * before reporting a device reset to the sata module.
- * Some (most?) drives will not process commands sent to them before D2H FIS
- * is sent to a host.
- */
-int nv_wait_for_signature = 1;
-
-/*
- * Check for a signature availability.
- * If this variable is non-zero, the driver will check task file error register
- * for indication of a signature availability before reading a signature.
- * Task file error register bit 0 set to 1 indicates that the drive
- * is ready and it has sent the D2H FIS with a signature.
- * This behavior of the error register is not reliable in the mcp5x controller.
- */
-int nv_check_tfr_error = 0;
-
-/*
- * Max signature acquisition time, in milliseconds.
- * The driver will try to acquire a device signature within specified time and
- * quit acquisition operation if signature was not acquired.
- */
-long nv_sig_acquisition_time = NV_SIG_ACQUISITION_TIME;
-
-/*
- * If this variable is non-zero, the driver will wait for a signature in the
- * nv_monitor_reset function without any time limit.
- * Used for debugging and drive evaluation.
- */
-int nv_wait_here_forever = 0;
-
-/*
- * Reset after hotplug.
- * If this variable is non-zero, driver will reset device after hotplug
- * (device attached) interrupt.
- * If the variable is zero, driver will not reset the new device nor will it
- * try to read device signature.
- * Chipset is generating a hotplug (device attached) interrupt with a delay, so
- * the device should have already sent the D2H FIS with the signature.
- */
-int nv_reset_after_hotplug = 1;
-
-/*
- * Delay after device hotplug.
- * It specifies the time between detecting a hotplugged device and sending
- * a notification to the SATA module.
- * It is used when device is not reset after hotpugging and acquiring signature
- * may be unreliable. The delay should be long enough for a device to become
- * ready to accept commands.
- */
-int nv_hotplug_delay = NV_HOTPLUG_DELAY;
-
-
 /*
  * Maximum number of consecutive interrupts processed in the loop in the
  * single invocation of the port interrupt routine.
  */
 int nv_max_intr_loops = NV_MAX_INTR_PER_DEV;
-
-
 
 /*
  * wait between checks of reg status
@@ -393,23 +334,47 @@ int nv_max_intr_loops = NV_MAX_INTR_PER_DEV;
 int nv_usec_delay = NV_WAIT_REG_CHECK;
 
 /*
- * The following is needed for nv_vcmn_err()
+ * The following used for nv_vcmn_err() and nv_log()
  */
-static kmutex_t nv_log_mutex; /* protects nv_log_buf */
-static char nv_log_buf[NV_LOGBUF_LEN];
-int nv_debug_flags =
-    NVDBG_HOT|NVDBG_RESET|NVDBG_ALWAYS|NVDBG_TIMEOUT|NVDBG_EVENT;
-int nv_log_to_console = B_FALSE;
-
-int nv_prom_print = B_FALSE;
 
 /*
- * for debugging
+ * temp buffer to save from wasting limited stack space
  */
-#ifdef DEBUG
-int ncq_commands = 0;
-int non_ncq_commands = 0;
-#endif
+static char nv_log_buf[NV_LOGBUF_LEN];
+
+/*
+ * protects nv_log_buf
+ */
+static kmutex_t nv_log_mutex;
+
+/*
+ * these on-by-default flags were chosen so that the driver
+ * logs as much non-usual run-time information as possible
+ * without overflowing the ring with useless information or
+ * causing any significant performance penalty.
+ */
+int nv_debug_flags =
+    NVDBG_HOT|NVDBG_RESET|NVDBG_ALWAYS|NVDBG_TIMEOUT|NVDBG_EVENT;
+
+/*
+ * normally debug information is not logged to the console
+ * but this allows it to be enabled.
+ */
+int nv_log_to_console = B_FALSE;
+
+/*
+ * normally debug information is not logged to cmn_err but
+ * in some cases it may be desired.
+ */
+int nv_log_to_cmn_err = B_FALSE;
+
+/*
+ * using prom print avoids using cmn_err/syslog and goes right
+ * to the console which may be desirable in some situations, but
+ * it may be synchronous, which would change timings and
+ * impact performance.  Use with caution.
+ */
+int nv_prom_print = B_FALSE;
 
 /*
  * Opaque state pointer to be initialized by ddi_soft_state_init()
@@ -444,7 +409,9 @@ static kmutex_t nv_sgp_c2c_mutex;
 static struct nv_sgp_cbp2cmn nv_sgp_cbp2cmn[NV_MAX_CBPS];
 #endif
 
-/* We still have problems in 40-bit DMA support, so disable it by default */
+/*
+ * control whether 40bit DMA is used or not
+ */
 int nv_sata_40bit_dma = B_TRUE;
 
 static sata_tran_hotplug_ops_t nv_hotplug_ops = {
@@ -600,7 +567,7 @@ nv_get8(ddi_acc_handle_t handle, uint8_t *dev_addr)
 static int
 nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	int status, attach_state, intr_types, bar, i, command;
+	int status, attach_state, intr_types, bar, i, j, command;
 	int inst = ddi_get_instance(dip);
 	ddi_acc_handle_t pci_conf_handle;
 	nv_ctl_t *nvc;
@@ -788,9 +755,34 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #endif	/* SGPIO_SUPPORT */
 
 		/*
-		 * Initiate link processing and device identification
+		 * Do initial reset so that signature can be gathered
 		 */
-		nv_init_port_link_processing(nvc);
+		for (j = 0; j < NV_NUM_PORTS; j++) {
+			ddi_acc_handle_t bar5_hdl;
+			uint32_t sstatus;
+			nv_port_t *nvp;
+
+			nvp = &(nvc->nvc_port[j]);
+			bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
+			sstatus = ddi_get32(bar5_hdl, nvp->nvp_sstatus);
+
+			if (SSTATUS_GET_DET(sstatus) ==
+			    SSTATUS_DET_DEVPRE_PHYCOM) {
+
+				nvp->nvp_state |= NV_ATTACH;
+				nvp->nvp_type = SATA_DTYPE_UNKNOWN;
+				mutex_enter(&nvp->nvp_mutex);
+				nv_reset(nvp, "attach");
+
+				while (nvp->nvp_state & NV_RESET) {
+					cv_wait(&nvp->nvp_reset_cv,
+					    &nvp->nvp_mutex);
+				}
+
+				mutex_exit(&nvp->nvp_mutex);
+			}
+		}
+
 		/*
 		 * attach to sata module
 		 */
@@ -1214,6 +1206,8 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 	uint8_t cport = sd->satadev_addr.cport;
 	uint8_t pmport = sd->satadev_addr.pmport;
 	uint8_t qual = sd->satadev_addr.qual;
+	uint8_t det;
+
 	nv_port_t *nvp;
 
 	if (cport >= NV_MAX_PORTS(nvc)) {
@@ -1237,7 +1231,7 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 	 * This check seems to be done in the SATA module.
 	 * It may not be required here
 	 */
-	if (nvp->nvp_state & NV_PORT_INACTIVE) {
+	if (nvp->nvp_state & NV_DEACTIVATED) {
 		nv_cmn_err(CE_WARN, nvc, nvp,
 		    "port inactive.  Use cfgadm to activate");
 		sd->satadev_type = SATA_DTYPE_UNKNOWN;
@@ -1247,10 +1241,10 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 		return (SATA_SUCCESS);
 	}
 
-	if (nvp->nvp_state & NV_PORT_FAILED) {
+	if (nvp->nvp_state & NV_FAILED) {
 		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 		    "probe: port failed", NULL);
-		sd->satadev_type = SATA_DTYPE_NONE;
+		sd->satadev_type = nvp->nvp_type;
 		sd->satadev_state = SATA_PSTATE_FAILED;
 		mutex_exit(&nvp->nvp_mutex);
 
@@ -1271,44 +1265,55 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 
 	nv_copy_registers(nvp, sd, NULL);
 
-	if (nvp->nvp_state & (NV_PORT_RESET | NV_PORT_RESET_RETRY)) {
+	if (nvp->nvp_state & (NV_RESET|NV_LINK_EVENT)) {
 		/*
-		 * We are waiting for reset to complete and to fetch
-		 * a signature.
-		 * Reset will cause the link to go down for a short period of
-		 * time.  If reset processing continues for less than
-		 * NV_LINK_DOWN_TIMEOUT, fake the status of the link so that
-		 * we will not report intermittent link down.
-		 * Maybe we should report previous link state?
+		 * during a reset or link event, fake the status
+		 * as it may be changing as a result of the reset
+		 * or link event.
 		 */
-		if (TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time) <
-		    NV_LINK_DOWN_TIMEOUT) {
-			SSTATUS_SET_IPM(sd->satadev_scr.sstatus,
-			    SSTATUS_IPM_ACTIVE);
-			SSTATUS_SET_DET(sd->satadev_scr.sstatus,
-			    SSTATUS_DET_DEVPRE_PHYCOM);
-			sd->satadev_type = nvp->nvp_type;
-			mutex_exit(&nvp->nvp_mutex);
+		DTRACE_PROBE(state_reset_link_event_faking_status_p);
+		DTRACE_PROBE1(nvp_state_h, int, nvp->nvp_state);
 
-			return (SATA_SUCCESS);
-		}
+		SSTATUS_SET_IPM(sd->satadev_scr.sstatus,
+		    SSTATUS_IPM_ACTIVE);
+		SSTATUS_SET_DET(sd->satadev_scr.sstatus,
+		    SSTATUS_DET_DEVPRE_PHYCOM);
+		sd->satadev_type = nvp->nvp_type;
+		mutex_exit(&nvp->nvp_mutex);
+
+		return (SATA_SUCCESS);
 	}
+
+	det = SSTATUS_GET_DET(sd->satadev_scr.sstatus);
+
+	/*
+	 * determine link status
+	 */
+	if (det != SSTATUS_DET_DEVPRE_PHYCOM) {
+		switch (det) {
+
+		case SSTATUS_DET_NODEV:
+		case SSTATUS_DET_PHYOFFLINE:
+			sd->satadev_type = SATA_DTYPE_NONE;
+			break;
+
+		default:
+			sd->satadev_type = SATA_DTYPE_UNKNOWN;
+			break;
+		}
+
+		mutex_exit(&nvp->nvp_mutex);
+
+		return (SATA_SUCCESS);
+	}
+
 	/*
 	 * Just report the current port state
 	 */
 	sd->satadev_type = nvp->nvp_type;
-	sd->satadev_state = nvp->nvp_state | SATA_PSTATE_PWRON;
-	mutex_exit(&nvp->nvp_mutex);
+	DTRACE_PROBE1(nvp_type_h, int, nvp->nvp_type);
 
-#ifdef SGPIO_SUPPORT
-	if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
-		nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
-	} else {
-		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
-	}
-#endif
+	mutex_exit(&nvp->nvp_mutex);
 
 	return (SATA_SUCCESS);
 }
@@ -1330,63 +1335,88 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 
 	mutex_enter(&nvp->nvp_mutex);
 
-	/*
-	 * record number of commands for debugging
-	 */
-	nvp->nvp_seq++;
+	if (nvp->nvp_state & NV_DEACTIVATED) {
 
-	if ((nvp->nvp_state & NV_PORT_INIT) == 0) {
-		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
 		NVLOG(NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: port not yet initialized", NULL);
+		    "nv_sata_start: NV_DEACTIVATED", NULL);
+		DTRACE_PROBE(nvp_state_inactive_p);
+
+		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
 		nv_copy_registers(nvp, &spkt->satapkt_device, NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (SATA_TRAN_PORT_ERROR);
 	}
 
-	if (nvp->nvp_state & NV_PORT_INACTIVE) {
-		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
+	if (nvp->nvp_state & NV_FAILED) {
+
 		NVLOG(NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: NV_PORT_INACTIVE", NULL);
+		    "nv_sata_start: NV_FAILED state", NULL);
+		DTRACE_PROBE(nvp_state_failed_p);
+
+		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
 		nv_copy_registers(nvp, &spkt->satapkt_device, NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (SATA_TRAN_PORT_ERROR);
 	}
 
-	if (nvp->nvp_state & NV_PORT_FAILED) {
-		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
-		NVLOG(NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: NV_PORT_FAILED state", NULL);
-		nv_copy_registers(nvp, &spkt->satapkt_device, NULL);
-		mutex_exit(&nvp->nvp_mutex);
+	if (nvp->nvp_state & NV_RESET) {
 
-		return (SATA_TRAN_PORT_ERROR);
-	}
-
-	if (nvp->nvp_state & NV_PORT_RESET) {
 		NVLOG(NVDBG_ERRS, nvc, nvp,
 		    "still waiting for reset completion", NULL);
+		DTRACE_PROBE(nvp_state_reset_p);
+
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		mutex_exit(&nvp->nvp_mutex);
 
 		/*
-		 * If in panic, timeouts do not occur, so fake one
-		 * so that the signature can be acquired to complete
-		 * the reset handling.
+		 * If in panic, timeouts do not occur, so invoke
+		 * reset handling directly so that the signature
+		 * can be acquired to complete the reset handling.
 		 */
 		if (ddi_in_panic()) {
-			nv_timeout(nvp);
+			NVLOG(NVDBG_ERRS, nvc, nvp,
+			    "nv_sata_start: calling nv_monitor_reset "
+			    "synchronously", NULL);
+
+			(void) nv_monitor_reset(nvp);
 		}
+
+		mutex_exit(&nvp->nvp_mutex);
 
 		return (SATA_TRAN_BUSY);
 	}
 
-	if (nvp->nvp_type == SATA_DTYPE_NONE) {
-		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
+	if (nvp->nvp_state & NV_LINK_EVENT) {
+
 		NVLOG(NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: SATA_DTYPE_NONE", NULL);
+		    "nv_sata_start(): link event ret bsy", NULL);
+		DTRACE_PROBE(nvp_state_link_event_p);
+
+		spkt->satapkt_reason = SATA_PKT_BUSY;
+
+		if (ddi_in_panic()) {
+			NVLOG(NVDBG_ERRS, nvc, nvp,
+			    "nv_sata_start: calling nv_timeout "
+			    "synchronously", NULL);
+
+			nv_timeout(nvp);
+		}
+
+		mutex_exit(&nvp->nvp_mutex);
+
+		return (SATA_TRAN_BUSY);
+	}
+
+
+	if ((nvp->nvp_type == SATA_DTYPE_NONE) ||
+	    (nvp->nvp_type == SATA_DTYPE_UNKNOWN)) {
+
+		NVLOG(NVDBG_ERRS, nvc, nvp,
+		    "nv_sata_start: nvp_type 0x%x", nvp->nvp_type);
+		DTRACE_PROBE1(not_ready_nvp_type_h, int, nvp->nvp_type);
+
+		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
 		nv_copy_registers(nvp, &spkt->satapkt_device, NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
@@ -1394,9 +1424,11 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 	}
 
 	if (spkt->satapkt_device.satadev_type == SATA_DTYPE_PMULT) {
-		ASSERT(nvp->nvp_type == SATA_DTYPE_PMULT);
+
 		nv_cmn_err(CE_WARN, nvc, nvp,
-		    "port multipliers not supported by controller");
+		    "port multiplier not supported by controller");
+
+		ASSERT(nvp->nvp_type == SATA_DTYPE_PMULT);
 		spkt->satapkt_reason = SATA_PKT_CMD_UNSUPPORTED;
 		mutex_exit(&nvp->nvp_mutex);
 
@@ -1410,41 +1442,62 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 	 * non-restore related commands should be processed.
 	 */
 	if (spkt->satapkt_cmd.satacmd_flags.sata_clear_dev_reset) {
-		nvp->nvp_state &= ~NV_PORT_RESTORE;
+
 		NVLOG(NVDBG_RESET, nvc, nvp,
-		    "nv_sata_start: clearing NV_PORT_RESTORE", NULL);
+		    "nv_sata_start: clearing NV_RESTORE", NULL);
+		DTRACE_PROBE(clearing_restore_p);
+		DTRACE_PROBE1(nvp_state_before_clear_h, int, nvp->nvp_state);
+
+		nvp->nvp_state &= ~NV_RESTORE;
 	}
 
 	/*
-	 * if the device was recently reset as indicated by NV_PORT_RESTORE,
+	 * if the device was recently reset as indicated by NV_RESTORE,
 	 * only allow commands which restore device state.  The sata module
-	 * marks such commands with with sata_ignore_dev_reset.
+	 * marks such commands with sata_ignore_dev_reset.
 	 *
-	 * during coredump, nv_reset is called and but then the restore
-	 * doesn't happen.  For now, workaround by ignoring the wait for
-	 * restore if the system is panicing.
+	 * during coredump, nv_reset is called but the restore isn't
+	 * processed, so ignore the wait for restore if the system
+	 * is panicing.
 	 */
-	if ((nvp->nvp_state & NV_PORT_RESTORE) &&
+	if ((nvp->nvp_state & NV_RESTORE) &&
 	    !(spkt->satapkt_cmd.satacmd_flags.sata_ignore_dev_reset) &&
 	    (ddi_in_panic() == 0)) {
-		spkt->satapkt_reason = SATA_PKT_BUSY;
+
 		NVLOG(NVDBG_RESET, nvc, nvp,
 		    "nv_sata_start: waiting for restore ", NULL);
-		mutex_exit(&nvp->nvp_mutex);
+		DTRACE_PROBE1(restore_no_ignore_reset_nvp_state_h,
+		    int, nvp->nvp_state);
 
-		return (SATA_TRAN_BUSY);
-	}
-
-	if (nvp->nvp_state & NV_PORT_ABORTING) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		NVLOG(NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: NV_PORT_ABORTING", NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (SATA_TRAN_BUSY);
 	}
 
-	/* Clear SError to be able to check errors after the command failure */
+	if (nvp->nvp_state & NV_ABORTING) {
+
+		NVLOG(NVDBG_ERRS, nvc, nvp,
+		    "nv_sata_start: NV_ABORTING", NULL);
+		DTRACE_PROBE1(aborting_nvp_state_h, int, nvp->nvp_state);
+
+		spkt->satapkt_reason = SATA_PKT_BUSY;
+		mutex_exit(&nvp->nvp_mutex);
+
+		return (SATA_TRAN_BUSY);
+	}
+
+	/*
+	 * record command sequence for debugging.
+	 */
+	nvp->nvp_seq++;
+
+	DTRACE_PROBE2(command_start, int *, nvp, int,
+	    spkt->satapkt_cmd.satacmd_cmd_reg);
+
+	/*
+	 * clear SError to be able to check errors after the command failure
+	 */
 	nv_put32(nvp->nvp_ctlp->nvc_bar_hdl[5], nvp->nvp_serror, 0xffffffff);
 
 	if (spkt->satapkt_op_mode &
@@ -1521,6 +1574,12 @@ nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt)
 		(*(nvc->nvc_set_intr))(nvp, NV_INTR_DISABLE);
 	}
 
+	/*
+	 * overload the satapkt_reason with BUSY so code below
+	 * will know when it's done
+	 */
+	spkt->satapkt_reason = SATA_PKT_BUSY;
+
 	if ((ret = nv_start_common(nvp, spkt)) != SATA_TRAN_ACCEPTED) {
 		if (spkt->satapkt_op_mode & SATA_OPMODE_POLLING) {
 			(*(nvc->nvc_set_intr))(nvp, NV_INTR_ENABLE);
@@ -1544,14 +1603,12 @@ nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt)
 
 	/*
 	 * non-polling synchronous mode handling.  The interrupt will signal
-	 * when the IO is completed.
+	 * when device IO is completed.
 	 */
-	cv_wait(&nvp->nvp_poll_cv, &nvp->nvp_mutex);
-
-	if (spkt->satapkt_reason != SATA_PKT_COMPLETED) {
-
-		spkt->satapkt_reason = SATA_PKT_TIMEOUT;
+	while (spkt->satapkt_reason == SATA_PKT_BUSY) {
+		cv_wait(&nvp->nvp_sync_cv, &nvp->nvp_mutex);
 	}
+
 
 	NVLOG(NVDBG_SYNC, nvp->nvp_ctlp, nvp, "nv_sata_satapkt_sync:"
 	    " done % reason %d", spkt->satapkt_reason);
@@ -1582,9 +1639,6 @@ nv_poll_wait(nv_port_t *nvp, sata_pkt_t *spkt)
 			mutex_enter(&nvp->nvp_mutex);
 			spkt->satapkt_reason = SATA_PKT_TIMEOUT;
 			nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
-			nvp->nvp_state |= NV_PORT_RESET;
-			nvp->nvp_state &= ~(NV_PORT_RESTORE |
-			    NV_PORT_RESET_RETRY);
 			nv_reset(nvp, "poll_wait");
 			nv_complete_io(nvp, spkt, 0);
 			mutex_exit(&nvp->nvp_mutex);
@@ -1609,9 +1663,6 @@ nv_poll_wait(nv_port_t *nvp, sata_pkt_t *spkt)
 			    " unclaimed -- resetting", NULL);
 			mutex_enter(&nvp->nvp_mutex);
 			nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
-			nvp->nvp_state |= NV_PORT_RESET;
-			nvp->nvp_state &= ~(NV_PORT_RESTORE |
-			    NV_PORT_RESET_RETRY);
 			nv_reset(nvp, "poll_wait intr not claimed");
 			spkt->satapkt_reason = SATA_PKT_TIMEOUT;
 			nv_complete_io(nvp, spkt, 0);
@@ -1650,7 +1701,7 @@ nv_sata_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 
 	mutex_enter(&nvp->nvp_mutex);
 
-	if (nvp->nvp_state & NV_PORT_INACTIVE) {
+	if (nvp->nvp_state & NV_DEACTIVATED) {
 		mutex_exit(&nvp->nvp_mutex);
 		nv_cmn_err(CE_WARN, nvc, nvp,
 		    "abort request failed: port inactive");
@@ -1689,7 +1740,8 @@ nv_sata_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
  * held and returns with it held.  Not NCQ aware.
  */
 static int
-nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason, int flag)
+nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason,
+    boolean_t reset)
 {
 	int aborted = 0, i, reset_once = B_FALSE;
 	struct nv_slot *nv_slotp;
@@ -1697,19 +1749,9 @@ nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason, int flag)
 
 	ASSERT(MUTEX_HELD(&nvp->nvp_mutex));
 
-	/*
-	 * return if the port is not configured
-	 */
-	if (nvp->nvp_slot == NULL) {
-		NVLOG(NVDBG_ENTRY, nvp->nvp_ctlp, nvp,
-		    "nv_abort_active: not configured so returning", NULL);
-
-		return (0);
-	}
-
 	NVLOG(NVDBG_ENTRY, nvp->nvp_ctlp, nvp, "nv_abort_active", NULL);
 
-	nvp->nvp_state |= NV_PORT_ABORTING;
+	nvp->nvp_state |= NV_ABORTING;
 
 	for (i = 0; i < nvp->nvp_queue_depth; i++) {
 
@@ -1744,13 +1786,10 @@ nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason, int flag)
 			nv_put8(bmhdl, nvp->nvp_bmicx,  0);
 
 			/*
-			 * Reset only if explicitly specified by the arg flag
+			 * Reset only if explicitly specified by the arg reset
 			 */
-			if (flag == B_TRUE) {
+			if (reset == B_TRUE) {
 				reset_once = B_TRUE;
-				nvp->nvp_state |= NV_PORT_RESET;
-				nvp->nvp_state &= ~(NV_PORT_RESTORE |
-				    NV_PORT_RESET_RETRY);
 				nv_reset(nvp, "abort_active");
 			}
 		}
@@ -1760,7 +1799,7 @@ nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason, int flag)
 		aborted++;
 	}
 
-	nvp->nvp_state &= ~NV_PORT_ABORTING;
+	nvp->nvp_state &= ~NV_ABORTING;
 
 	return (aborted);
 }
@@ -1775,7 +1814,7 @@ nv_sata_reset(dev_info_t *dip, sata_device_t *sd)
 	int cport = sd->satadev_addr.cport;
 	nv_ctl_t *nvc = ddi_get_soft_state(nv_statep, ddi_get_instance(dip));
 	nv_port_t *nvp = &(nvc->nvc_port[cport]);
-	int ret = SATA_SUCCESS;
+	int ret = SATA_FAILURE;
 
 	ASSERT(cport < NV_MAX_PORTS(nvc));
 
@@ -1788,15 +1827,78 @@ nv_sata_reset(dev_info_t *dip, sata_device_t *sd)
 	case SATA_ADDR_CPORT:
 		/*FALLTHROUGH*/
 	case SATA_ADDR_DCPORT:
-		nvp->nvp_state |= NV_PORT_RESET;
-		nvp->nvp_state &= ~NV_PORT_RESTORE;
+
+		ret = SATA_SUCCESS;
+
+		/*
+		 * If a reset is already in progress, don't disturb it
+		 */
+		if ((nvp->nvp_state & (NV_RESET|NV_RESTORE)) &&
+		    (ddi_in_panic() == 0)) {
+			NVLOG(NVDBG_RESET, nvc, nvp,
+			    "nv_sata_reset: reset already in progress", NULL);
+			DTRACE_PROBE(reset_already_in_progress_p);
+
+			break;
+		}
+
+		/*
+		 * log the pre-reset state of the driver because dumping the
+		 * blocks will disturb it.
+		 */
+		if (ddi_in_panic() == 1) {
+			NVLOG(NVDBG_RESET, nvc, nvp, "in_panic.  nvp_state: "
+			    "0x%x nvp_reset_time: %d nvp_last_cmd: 0x%x "
+			    "nvp_previous_cmd: 0x%x nvp_reset_count: %d "
+			    "nvp_first_reset_reason: %s "
+			    "nvp_reset_reason: %s nvp_seq: %d "
+			    "in_interrupt: %d", nvp->nvp_state,
+			    nvp->nvp_reset_time, nvp->nvp_last_cmd,
+			    nvp->nvp_previous_cmd, nvp->nvp_reset_count,
+			    nvp->nvp_first_reset_reason,
+			    nvp->nvp_reset_reason, nvp->nvp_seq,
+			    servicing_interrupt());
+		}
+
 		nv_reset(nvp, "sata_reset");
+
 		(void) nv_abort_active(nvp, NULL, SATA_PKT_RESET, B_FALSE);
+
+		/*
+		 * If the port is inactive, do a quiet reset and don't attempt
+		 * to wait for reset completion or do any post reset processing
+		 *
+		 */
+		if (nvp->nvp_state & NV_DEACTIVATED) {
+			nvp->nvp_state &= ~NV_RESET;
+			nvp->nvp_reset_time = 0;
+
+			break;
+		}
+
+		/*
+		 * clear the port failed flag.  It will get set again
+		 * if the port is still not functioning.
+		 */
+		nvp->nvp_state &= ~NV_FAILED;
+
+		/*
+		 * timeouts are not available while the system is
+		 * dropping core, so call nv_monitor_reset() directly
+		 */
+		if (ddi_in_panic() != 0) {
+			while (nvp->nvp_state & NV_RESET) {
+				drv_usecwait(1000);
+				(void) nv_monitor_reset(nvp);
+			}
+
+			break;
+		}
 
 		break;
 	case SATA_ADDR_CNTRL:
 		NVLOG(NVDBG_ENTRY, nvc, nvp,
-		    "nv_sata_reset: conroller reset not supported", NULL);
+		    "nv_sata_reset: controller reset not supported", NULL);
 
 		break;
 	case SATA_ADDR_PMPORT:
@@ -1808,24 +1910,7 @@ nv_sata_reset(dev_info_t *dip, sata_device_t *sd)
 		/*
 		 * unsupported case
 		 */
-		ret = SATA_FAILURE;
 		break;
-	}
-
-	if (ret == SATA_SUCCESS) {
-		/*
-		 * If the port is inactive, do a quiet reset and don't attempt
-		 * to wait for reset completion or do any post reset processing
-		 */
-		if (nvp->nvp_state & NV_PORT_INACTIVE) {
-			nvp->nvp_state &= ~NV_PORT_RESET;
-			nvp->nvp_reset_time = 0;
-		}
-
-		/*
-		 * clear the port failed flag
-		 */
-		nvp->nvp_state &= ~NV_PORT_FAILED;
 	}
 
 	mutex_exit(&nvp->nvp_mutex);
@@ -1843,6 +1928,8 @@ nv_sata_activate(dev_info_t *dip, sata_device_t *sd)
 	int cport = sd->satadev_addr.cport;
 	nv_ctl_t *nvc = ddi_get_soft_state(nv_statep, ddi_get_instance(dip));
 	nv_port_t *nvp = &(nvc->nvc_port[cport]);
+	ddi_acc_handle_t bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
+	uint32_t sstatus;
 
 	ASSERT(cport < NV_MAX_PORTS(nvc));
 	NVLOG(NVDBG_ENTRY, nvc, nvp, "nv_sata_activate", NULL);
@@ -1855,13 +1942,30 @@ nv_sata_activate(dev_info_t *dip, sata_device_t *sd)
 
 	(*(nvc->nvc_set_intr))(nvp, NV_INTR_ENABLE);
 
-	nvp->nvp_state &= ~NV_PORT_INACTIVE;
-	/* Initiate link probing and device signature acquisition */
+	/*
+	 * initiate link probing and device signature acquisition
+	 */
+
+	bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
+
+	sstatus = ddi_get32(bar5_hdl, nvp->nvp_sstatus);
+
 	nvp->nvp_type = SATA_DTYPE_NONE;
-	nvp->nvp_signature = 0;
-	nvp->nvp_state |= NV_PORT_RESET; /* | NV_PORT_PROBE; */
-	nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
-	nv_reset(nvp, "sata_activate");
+	nvp->nvp_signature = NV_NO_SIG;
+	nvp->nvp_state &= ~NV_DEACTIVATED;
+
+	if (SSTATUS_GET_DET(sstatus) ==
+	    SSTATUS_DET_DEVPRE_PHYCOM) {
+
+		nvp->nvp_state |= NV_ATTACH;
+		nvp->nvp_type = SATA_DTYPE_UNKNOWN;
+		nv_reset(nvp, "sata_activate");
+
+		while (nvp->nvp_state & NV_RESET) {
+			cv_wait(&nvp->nvp_reset_cv, &nvp->nvp_mutex);
+		}
+
+	}
 
 	mutex_exit(&nvp->nvp_mutex);
 
@@ -1889,7 +1993,7 @@ nv_sata_deactivate(dev_info_t *dip, sata_device_t *sd)
 	/*
 	 * make the device inaccessible
 	 */
-	nvp->nvp_state |= NV_PORT_INACTIVE;
+	nvp->nvp_state |= NV_DEACTIVATED;
 
 	/*
 	 * disable the interrupts on port
@@ -2003,8 +2107,8 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 			nv_slotp->nvslot_v_addr =
 			    spkt->satapkt_cmd.satacmd_bp->b_un.b_addr;
 			/*
-			 * Freeing DMA resources allocated by the framework
-			 * now to avoid buffer overwrite (dma sync) problems
+			 * Freeing DMA resources allocated by the sata common
+			 * module to avoid buffer overwrite (dma sync) problems
 			 * when the buffer is released at command completion.
 			 * Primarily an issue on systems with more than
 			 * 4GB of memory.
@@ -2024,7 +2128,7 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 		nv_slotp->nvslot_v_addr =
 		    spkt->satapkt_cmd.satacmd_bp->b_un.b_addr;
 		/*
-		 * Freeing DMA resources allocated by the framework now to
+		 * Freeing DMA resources allocated by the sata common module to
 		 * avoid buffer overwrite (dma sync) problems when the buffer
 		 * is released at command completion.  This is not an issue
 		 * for write because write does not update the buffer.
@@ -2098,22 +2202,9 @@ static void
 nv_read_signature(nv_port_t *nvp)
 {
 	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
-	int retry_once = 0;
+	int retry_count = 0;
 
 	retry:
-	/*
-	 * Task file error register bit 0 set to 1 indicate that drive
-	 * is ready and have sent D2H FIS with a signature.
-	 */
-	if (nv_check_tfr_error != 0) {
-		uint8_t tfr_error = nv_get8(cmdhdl, nvp->nvp_error);
-		if (!(tfr_error & SATA_ERROR_ILI)) {
-			NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
-			    "nv_read_signature: signature not ready", NULL);
-
-			return;
-		}
-	}
 
 	nvp->nvp_signature = nv_get8(cmdhdl, nvp->nvp_count);
 	nvp->nvp_signature |= (nv_get8(cmdhdl, nvp->nvp_sect) << 8);
@@ -2125,72 +2216,71 @@ nv_read_signature(nv_port_t *nvp)
 
 	switch (nvp->nvp_signature) {
 
-	case NV_SIG_DISK:
+	case NV_DISK_SIG:
 		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp, "drive is a disk", NULL);
+		DTRACE_PROBE(signature_is_disk_device_p)
 		nvp->nvp_type = SATA_DTYPE_ATADISK;
+
 		break;
-	case NV_SIG_ATAPI:
+	case NV_ATAPI_SIG:
 		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 		    "drive is an optical device", NULL);
+		DTRACE_PROBE(signature_is_optical_device_p)
 		nvp->nvp_type = SATA_DTYPE_ATAPICD;
 		break;
-	case NV_SIG_PM:
+	case NV_PM_SIG:
 		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 		    "device is a port multiplier", NULL);
+		DTRACE_PROBE(signature_is_port_multiplier_p)
 		nvp->nvp_type = SATA_DTYPE_PMULT;
 		break;
-	case NV_SIG_NOTREADY:
+	case NV_NO_SIG:
 		NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
-		    "signature not ready", NULL);
+		    "signature not available", NULL);
+		DTRACE_PROBE(sig_not_available_p);
 		nvp->nvp_type = SATA_DTYPE_UNKNOWN;
 		break;
 	default:
-		if (retry_once++ == 0) {
+		if (retry_count++ == 0) {
 			/*
 			 * this is a rare corner case where the controller
-			 * was in the middle of updating the registers as the
-			 * driver is reading them.  If this happens, wait a
-			 * bit and retry, but just once.
+			 * is updating the task file registers as the driver
+			 * is reading them.  If this happens, wait a bit and
+			 * retry once.
 			 */
 			NV_DELAY_NSEC(1000000);
+			NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
+			    "invalid signature 0x%x retry once",
+			    nvp->nvp_signature);
+			DTRACE_PROBE1(signature_invalid_retry_once_h,
+			    int, nvp->nvp_signature);
 
 			goto retry;
 		}
 
-		nv_cmn_err(CE_WARN, nvp->nvp_ctlp, nvp, "signature %X not"
-		    " recognized", nvp->nvp_signature);
+		nv_cmn_err(CE_WARN, nvp->nvp_ctlp, nvp,
+		    "invalid signature 0x%x", nvp->nvp_signature);
 		nvp->nvp_type = SATA_DTYPE_UNKNOWN;
+
 		break;
 	}
-
-	if (nvp->nvp_signature) {
-		nvp->nvp_state &= ~(NV_PORT_RESET_RETRY | NV_PORT_RESET);
-	}
-
-#ifdef SGPIO_SUPPORT
-	if (nvp->nvp_signature == NV_SIG_DISK) {
-		nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
-	} else {
-		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
-	}
-#endif
 }
 
 
 /*
- * Set up a new timeout or complete a timeout.
- * Timeout value has to be specified in microseconds. If time is zero, no new
- * timeout is scheduled.
- * Must be called at the end of the timeout routine.
+ * Set up a new timeout or complete a timeout in microseconds.
+ * If microseconds is zero, no new timeout is scheduled.  Must be
+ * called at the end of the timeout routine.
  */
 static void
-nv_setup_timeout(nv_port_t *nvp, int time)
+nv_setup_timeout(nv_port_t *nvp, clock_t microseconds)
 {
 	clock_t old_duration = nvp->nvp_timeout_duration;
 
-	ASSERT(time != 0);
+	if (microseconds == 0) {
+
+		return;
+	}
 
 	if (nvp->nvp_timeout_id != 0 && nvp->nvp_timeout_duration == 0) {
 		/*
@@ -2200,14 +2290,19 @@ nv_setup_timeout(nv_port_t *nvp, int time)
 		 * If nvp_timeout_duration is 0, then this function
 		 * was re-entered. Just exit.
 		 */
-	cmn_err(CE_WARN, "nv_setup_timeout re-entered");
+		cmn_err(CE_WARN, "nv_setup_timeout re-entered");
+
 		return;
 	}
+
 	nvp->nvp_timeout_duration = 0;
+
 	if (nvp->nvp_timeout_id == 0) {
-		/* Start new timer */
+		/*
+		 * start new timer
+		 */
 		nvp->nvp_timeout_id = timeout(nv_timeout, (void *)nvp,
-		    drv_usectohz(time));
+		    drv_usectohz(microseconds));
 	} else {
 		/*
 		 * If the currently running timeout is due later than the
@@ -2215,15 +2310,16 @@ nv_setup_timeout(nv_port_t *nvp, int time)
 		 * Our timeouts do not need to be accurate - we would be just
 		 * checking that the specified time was exceeded.
 		 */
-		if (old_duration > time) {
+		if (old_duration > microseconds) {
 			mutex_exit(&nvp->nvp_mutex);
 			(void) untimeout(nvp->nvp_timeout_id);
 			mutex_enter(&nvp->nvp_mutex);
 			nvp->nvp_timeout_id = timeout(nv_timeout, (void *)nvp,
-			    drv_usectohz(time));
+			    drv_usectohz(microseconds));
 		}
 	}
-	nvp->nvp_timeout_duration = time;
+
+	nvp->nvp_timeout_duration = microseconds;
 }
 
 
@@ -2232,8 +2328,6 @@ int nv_reset_length = NV_RESET_LENGTH;
 
 /*
  * Reset the port
- *
- * Entered with nvp mutex held
  */
 static void
 nv_reset(nv_port_t *nvp, char *reason)
@@ -2243,11 +2337,26 @@ nv_reset(nv_port_t *nvp, char *reason)
 	nv_ctl_t *nvc = nvp->nvp_ctlp;
 	uint32_t sctrl, serr, sstatus;
 	uint8_t bmicx;
-	int i, j, reset = 0;
+	int i, j;
+	boolean_t reset_success = B_FALSE;
 
 	ASSERT(mutex_owned(&nvp->nvp_mutex));
 
+	/*
+	 * If the port is reset right after the controller receives
+	 * the DMA activate command (or possibly any other FIS),
+	 * controller operation freezes without any known recovery
+	 * procedure.  Until Nvidia advises on a recovery mechanism,
+	 * avoid the situation by waiting sufficiently long to
+	 * ensure the link is not actively transmitting any FIS.
+	 * 100ms was empirically determined to be large enough to
+	 * ensure no transaction was left in flight but not too long
+	 * as to cause any significant thread delay.
+	 */
+	drv_usecwait(100000);
+
 	serr = nv_get32(bar5_hdl, nvp->nvp_serror);
+	DTRACE_PROBE1(serror_h, int, serr);
 
 	/*
 	 * stop DMA engine.
@@ -2255,13 +2364,39 @@ nv_reset(nv_port_t *nvp, char *reason)
 	bmicx = nv_get8(nvp->nvp_bm_hdl, nvp->nvp_bmicx);
 	nv_put8(nvp->nvp_bm_hdl, nvp->nvp_bmicx,  bmicx & ~BMICX_SSBM);
 
-	nvp->nvp_state |= NV_PORT_RESET;
-	nvp->nvp_reset_time = ddi_get_lbolt();
-	nvp->nvp_reset_count++;
+	/*
+	 * the current setting of the NV_RESET in nvp_state indicates whether
+	 * this is the first reset attempt or a retry.
+	 */
+	if (nvp->nvp_state & NV_RESET) {
+		nvp->nvp_reset_retry_count++;
 
-	if (strcmp(reason, "attach") != 0) {
-		nv_cmn_err(CE_NOTE, nvc, nvp, "nv_reset: reason: %s serr 0x%x",
-		    reason, serr);
+		NVLOG(NVDBG_RESET, nvc, nvp, "npv_reset_retry_count: %d",
+		    nvp->nvp_reset_retry_count);
+
+	} else {
+		nvp->nvp_reset_retry_count = 0;
+		nvp->nvp_reset_count++;
+		nvp->nvp_state |= NV_RESET;
+
+		NVLOG(NVDBG_RESET, nvc, nvp, "nvp_reset_count: %d reason: %s "
+		    "serror: 0x%x seq: %d run: %d cmd: 0x%x",
+		    nvp->nvp_reset_count, reason, serr, nvp->nvp_seq,
+		    nvp->nvp_non_ncq_run, nvp->nvp_last_cmd);
+	}
+
+	/*
+	 * a link event could have occurred slightly before excessive
+	 * interrupt processing invokes a reset.  Reset handling overrides
+	 * link event processing so it's safe to clear it here.
+	 */
+	nvp->nvp_state &= ~(NV_RESTORE|NV_LINK_EVENT);
+
+	nvp->nvp_reset_time = ddi_get_lbolt();
+
+	if ((nvp->nvp_state & (NV_ATTACH|NV_HOTPLUG)) == 0) {
+		nv_cmn_err(CE_NOTE, nvc, nvp, "nv_reset: reason: %s serr 0x%x"
+		    " nvp_state: 0x%x", reason, serr, nvp->nvp_state);
 		/*
 		 * keep a record of why the first reset occurred, for debugging
 		 */
@@ -2271,9 +2406,6 @@ nv_reset(nv_port_t *nvp, char *reason)
 			nvp->nvp_first_reset_reason[NV_REASON_LEN - 1] = '\0';
 		}
 	}
-
-	NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset_count: %d",
-	    nvp->nvp_reset_count);
 
 	(void) strncpy(nvp->nvp_reset_reason, reason, NV_REASON_LEN);
 
@@ -2285,30 +2417,35 @@ nv_reset(nv_port_t *nvp, char *reason)
 	/*
 	 * Issue hardware reset; retry if necessary.
 	 */
-	for (i = 0; i < NV_RESET_ATTEMPTS; i++) {
+	for (i = 0; i < NV_COMRESET_ATTEMPTS; i++) {
+
 		/*
-		 * Clear signature registers
+		 * clear signature registers and the error register too
 		 */
 		nv_put8(cmdhdl, nvp->nvp_sect, 0);
 		nv_put8(cmdhdl, nvp->nvp_lcyl, 0);
 		nv_put8(cmdhdl, nvp->nvp_hcyl, 0);
 		nv_put8(cmdhdl, nvp->nvp_count, 0);
 
-		/* Clear task file error register */
 		nv_put8(nvp->nvp_cmd_hdl, nvp->nvp_error, 0);
 
 		/*
 		 * assert reset in PHY by writing a 1 to bit 0 scontrol
 		 */
 		sctrl = nv_get32(bar5_hdl, nvp->nvp_sctrl);
+
 		nv_put32(bar5_hdl, nvp->nvp_sctrl,
 		    sctrl | SCONTROL_DET_COMRESET);
 
 		/* Wait at least 1ms, as required by the spec */
 		drv_usecwait(nv_reset_length);
 
+		serr = nv_get32(bar5_hdl, nvp->nvp_serror);
+		DTRACE_PROBE1(aftercomreset_serror_h, int, serr);
+
 		/* Reset all accumulated error bits */
 		nv_put32(bar5_hdl, nvp->nvp_serror, 0xffffffff);
+
 
 		sstatus = nv_get32(bar5_hdl, nvp->nvp_sstatus);
 		sctrl = nv_get32(bar5_hdl, nvp->nvp_sctrl);
@@ -2329,29 +2466,30 @@ nv_reset(nv_port_t *nvp, char *reason)
 			if ((SSTATUS_GET_IPM(sstatus) == SSTATUS_IPM_ACTIVE) &&
 			    (SSTATUS_GET_DET(sstatus) ==
 			    SSTATUS_DET_DEVPRE_PHYCOM)) {
-				reset = 1;
+				reset_success = B_TRUE;
 				break;
 			}
 		}
-		if (reset == 1)
+
+		if (reset_success == B_TRUE)
 			break;
 	}
-	serr = nv_get32(bar5_hdl, nvp->nvp_serror);
-	if (reset == 0) {
-		NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset not succeeded "
-		    "(serr 0x%x) after %d attempts", serr, i);
-	} else {
-		NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset succeeded (serr 0x%x)"
-		    "after %dms", serr, TICK_TO_MSEC(ddi_get_lbolt() -
-		    nvp->nvp_reset_time));
-	}
-	nvp->nvp_reset_time = ddi_get_lbolt();
 
-	if (servicing_interrupt()) {
-		nv_setup_timeout(nvp, NV_ONE_MSEC);
-	} else if (!(nvp->nvp_state & NV_PORT_RESET_RETRY)) {
-		nv_monitor_reset(nvp);
+
+	serr = nv_get32(bar5_hdl, nvp->nvp_serror);
+	DTRACE_PROBE1(last_serror_h, int, serr);
+
+	if (reset_success == B_FALSE) {
+		NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset not succeeded "
+		    "after %d attempts. serr: 0x%x", i, serr);
+	} else {
+		NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset succeeded"
+		    " after %dms. serr: 0x%x", TICK_TO_MSEC(ddi_get_lbolt() -
+		    nvp->nvp_reset_time), serr);
 	}
+
+	nvp->nvp_wait_sig  = NV_WAIT_SIG;
+	nv_setup_timeout(nvp, nvp->nvp_wait_sig);
 }
 
 
@@ -2570,7 +2708,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	stran.sata_tran_hba_rev = SATA_TRAN_HBA_REV;
 	stran.sata_tran_hba_dip = nvc->nvc_dip;
-	stran.sata_tran_hba_num_cports = NV_NUM_CPORTS;
+	stran.sata_tran_hba_num_cports = NV_NUM_PORTS;
 	stran.sata_tran_hba_features_support =
 	    SATA_CTLF_HOTPLUG | SATA_CTLF_ASN | SATA_CTLF_ATAPI;
 	stran.sata_tran_hba_qdepth = NV_QUEUE_SLOTS;
@@ -2602,7 +2740,8 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		mutex_init(&nvp->nvp_mutex, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(nvc->nvc_intr_pri));
 
-		cv_init(&nvp->nvp_poll_cv, NULL, CV_DRIVER, NULL);
+		cv_init(&nvp->nvp_sync_cv, NULL, CV_DRIVER, NULL);
+		cv_init(&nvp->nvp_reset_cv, NULL, CV_DRIVER, NULL);
 
 		nvp->nvp_data	= cmd_addr + NV_DATA;
 		nvp->nvp_error	= cmd_addr + NV_ERROR;
@@ -2627,7 +2766,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		 * Initialize dma handles, etc.
 		 * If it fails, the port is in inactive state.
 		 */
-		(void) nv_init_port(nvp);
+		nv_init_port(nvp);
 	}
 
 	/*
@@ -2657,7 +2796,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
  * making error handling more messy.  The easy way is to just allocate
  * all 32 slots, which is what most drives support anyway.
  */
-static int
+static void
 nv_init_port(nv_port_t *nvp)
 {
 	nv_ctl_t *nvc = nvp->nvp_ctlp;
@@ -2672,15 +2811,6 @@ nv_init_port(nv_port_t *nvp)
 	dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	dev_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
 	dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
-
-	if (nvp->nvp_state & NV_PORT_INIT) {
-		NVLOG(NVDBG_INIT, nvc, nvp,
-		    "nv_init_port previously initialized", NULL);
-
-		return (NV_SUCCESS);
-	} else {
-		NVLOG(NVDBG_INIT, nvc, nvp, "nv_init_port initializing", NULL);
-	}
 
 	nvp->nvp_sg_dma_hdl = kmem_zalloc(sizeof (ddi_dma_handle_t) *
 	    NV_QUEUE_SLOTS, KM_SLEEP);
@@ -2705,7 +2835,7 @@ nv_init_port(nv_port_t *nvp)
 		if (rc != DDI_SUCCESS) {
 			nv_uninit_port(nvp);
 
-			return (NV_FAILURE);
+			return;
 		}
 
 		rc = ddi_dma_mem_alloc(nvp->nvp_sg_dma_hdl[i], prd_size,
@@ -2716,7 +2846,7 @@ nv_init_port(nv_port_t *nvp)
 		if (rc != DDI_SUCCESS) {
 			nv_uninit_port(nvp);
 
-			return (NV_FAILURE);
+			return;
 		}
 
 		rc = ddi_dma_addr_bind_handle(nvp->nvp_sg_dma_hdl[i], NULL,
@@ -2727,7 +2857,7 @@ nv_init_port(nv_port_t *nvp)
 		if (rc != DDI_DMA_MAPPED) {
 			nv_uninit_port(nvp);
 
-			return (NV_FAILURE);
+			return;
 		}
 
 		ASSERT(count == 1);
@@ -2752,119 +2882,8 @@ nv_init_port(nv_port_t *nvp)
 	 * after interrupts are initialized.
 	 */
 	nvp->nvp_type = SATA_DTYPE_NONE;
-	nvp->nvp_signature = 0;
-
-	nvp->nvp_state |= NV_PORT_INIT;
-
-	return (NV_SUCCESS);
 }
 
-
-/*
- * Establish initial link & device type
- * Called only from nv_attach
- * Loops up to approximately 210ms; can exit earlier.
- * The time includes wait for the link up and completion of the initial
- * signature gathering operation.
- */
-static void
-nv_init_port_link_processing(nv_ctl_t *nvc)
-{
-	ddi_acc_handle_t bar5_hdl;
-	nv_port_t *nvp;
-	volatile uint32_t sstatus;
-	int port, links_up, ready_ports, i;
-
-
-	for (port = 0; port < NV_MAX_PORTS(nvc); port++) {
-		nvp = &(nvc->nvc_port[port]);
-		if (nvp != NULL && (nvp->nvp_state & NV_PORT_INIT)) {
-			/*
-			 * Initiate device identification, if any is attached
-			 * and reset was not already applied by hot-plug
-			 * event processing.
-			 */
-			mutex_enter(&nvp->nvp_mutex);
-			if (!(nvp->nvp_state & NV_PORT_RESET)) {
-				nvp->nvp_state |= NV_PORT_RESET | NV_PORT_PROBE;
-				nv_reset(nvp, "attach");
-			}
-			mutex_exit(&nvp->nvp_mutex);
-		}
-	}
-	/*
-	 * Wait up to 10ms for links up.
-	 * Spec says that link should be up in 1ms.
-	 */
-	for (i = 0; i < 10; i++) {
-		drv_usecwait(NV_ONE_MSEC);
-		links_up = 0;
-		for (port = 0; port < NV_MAX_PORTS(nvc); port++) {
-			nvp = &(nvc->nvc_port[port]);
-			mutex_enter(&nvp->nvp_mutex);
-			bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
-			sstatus = nv_get32(bar5_hdl, nvp->nvp_sstatus);
-			if ((SSTATUS_GET_IPM(sstatus) == SSTATUS_IPM_ACTIVE) &&
-			    (SSTATUS_GET_DET(sstatus) ==
-			    SSTATUS_DET_DEVPRE_PHYCOM)) {
-				if ((nvp->nvp_state & NV_PORT_RESET) &&
-				    nvp->nvp_type == SATA_DTYPE_NONE) {
-					nvp->nvp_type = SATA_DTYPE_UNKNOWN;
-				}
-				NVLOG(NVDBG_INIT, nvc, nvp,
-				    "nv_init_port_link_processing()"
-				    "link up; time from reset %dms",
-				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time));
-				links_up++;
-			}
-			mutex_exit(&nvp->nvp_mutex);
-		}
-		if (links_up == NV_MAX_PORTS(nvc)) {
-			break;
-		}
-	}
-	NVLOG(NVDBG_RESET, nvc, nvp, "nv_init_port_link_processing():"
-	    "%d links up", links_up);
-	/*
-	 * At this point, if any device is attached, the link is established.
-	 * Wait till devices are ready to be accessed, no more than 200ms.
-	 * 200ms is empirical time in which a signature should be available.
-	 */
-	for (i = 0; i < 200; i++) {
-		ready_ports = 0;
-		for (port = 0; port < NV_MAX_PORTS(nvc); port++) {
-			nvp = &(nvc->nvc_port[port]);
-			mutex_enter(&nvp->nvp_mutex);
-			bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
-			sstatus = nv_get32(bar5_hdl, nvp->nvp_sstatus);
-			if ((SSTATUS_GET_IPM(sstatus) == SSTATUS_IPM_ACTIVE) &&
-			    (SSTATUS_GET_DET(sstatus) ==
-			    SSTATUS_DET_DEVPRE_PHYCOM) &&
-			    !(nvp->nvp_state & (NV_PORT_RESET |
-			    NV_PORT_RESET_RETRY))) {
-				/*
-				 * Reset already processed
-				 */
-				NVLOG(NVDBG_RESET, nvc, nvp,
-				    "nv_init_port_link_processing()"
-				    "device ready; port state %x; "
-				    "time from reset %dms", nvp->nvp_state,
-				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time));
-
-				ready_ports++;
-			}
-			mutex_exit(&nvp->nvp_mutex);
-		}
-		if (ready_ports == links_up) {
-			break;
-		}
-		drv_usecwait(NV_ONE_MSEC);
-	}
-	NVLOG(NVDBG_RESET, nvc, nvp, "nv_init_port_link_processing():"
-	    "%d devices ready", ready_ports);
-}
 
 /*
  * Free dynamically allocated structures for port.
@@ -2873,19 +2892,6 @@ static void
 nv_uninit_port(nv_port_t *nvp)
 {
 	int i;
-
-	/*
-	 * It is possible to reach here before a port has been initialized or
-	 * after it has already been uninitialized.  Just return in that case.
-	 */
-	if (nvp->nvp_slot == NULL) {
-
-		return;
-	}
-	/*
-	 * Mark port unusable now.
-	 */
-	nvp->nvp_state &= ~NV_PORT_INIT;
 
 	NVLOG(NVDBG_INIT, nvp->nvp_ctlp, nvp,
 	    "nv_uninit_port uninitializing", NULL);
@@ -2991,7 +2997,8 @@ nv_uninit_ctl(nv_ctl_t *nvc)
 		nv_uninit_port(nvp);
 		mutex_exit(&nvp->nvp_mutex);
 		mutex_destroy(&nvp->nvp_mutex);
-		cv_destroy(&nvp->nvp_poll_cv);
+		cv_destroy(&nvp->nvp_sync_cv);
+		cv_destroy(&nvp->nvp_reset_cv);
 	}
 
 	kmem_free(nvc->nvc_port, NV_MAX_PORTS(nvc) * sizeof (nv_port_t));
@@ -3029,7 +3036,7 @@ ck804_intr(caddr_t arg1, caddr_t arg2)
 
 /*
  * Main interrupt handler for ck804.  handles normal device
- * interrupts as well as port hot plug and remove interrupts.
+ * interrupts and hot plug and remove interrupts.
  *
  */
 static void
@@ -3065,6 +3072,7 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 		int port_mask[] = {CK804_INT_PDEV_INT, CK804_INT_SDEV_INT};
 
 		if ((port_mask[port] & intr_status) == 0) {
+
 			continue;
 		}
 
@@ -3076,18 +3084,10 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 		mutex_enter(&nvp->nvp_mutex);
 
 		/*
-		 * there was a corner case found where an interrupt
-		 * arrived before nvp_slot was set.  Should
-		 * probably should track down why that happens and try
-		 * to eliminate that source and then get rid of this
-		 * check.
+		 * this case might be encountered when the other port
+		 * is active
 		 */
-		if (nvp->nvp_slot == NULL) {
-			status = nv_get8(nvp->nvp_ctl_hdl, nvp->nvp_status);
-			NVLOG(NVDBG_ALWAYS, nvc, nvp, "spurious interrupt "
-			    "received before initialization "
-			    "completed status=%x", status);
-			mutex_exit(&nvp->nvp_mutex);
+		if (nvp->nvp_state & NV_DEACTIVATED) {
 
 			/*
 			 * clear interrupt bits
@@ -3095,8 +3095,11 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 			nv_put8(bar5_hdl, nvc->nvc_ck804_int_status,
 			    port_mask[port]);
 
+			mutex_exit(&nvp->nvp_mutex);
+
 			continue;
 		}
+
 
 		if ((&(nvp->nvp_slot[0]))->nvslot_spkt == NULL)  {
 			status = nv_get8(nvp->nvp_ctl_hdl, nvp->nvp_status);
@@ -3195,9 +3198,9 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 
 		if ((sstatus & SSTATUS_DET_DEVPRE_PHYCOM) ==
 		    SSTATUS_DET_DEVPRE_PHYCOM) {
-			nv_report_add_remove(nvp, 0);
+			nv_link_event(nvp, NV_REM_DEV);
 		} else {
-			nv_report_add_remove(nvp, NV_PORT_HOTREMOVED);
+			nv_link_event(nvp, NV_ADD_DEV);
 		}
 	clear:
 		/*
@@ -3235,7 +3238,7 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 			(*(nvc->nvc_set_intr))(nvp, NV_INTR_DISABLE);
 			nv_port_state_change(nvp, SATA_EVNT_PORT_FAILED,
 			    SATA_ADDR_CPORT, SATA_PSTATE_FAILED);
-			nvp->nvp_state |= NV_PORT_FAILED;
+			nvp->nvp_state |= NV_FAILED;
 			(void) nv_abort_active(nvp, NULL, SATA_PKT_DEV_ERROR,
 			    B_TRUE);
 			nv_cmn_err(CE_WARN, nvc, nvp, "unable to clear "
@@ -3251,7 +3254,6 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 /*
  * Interrupt handler for mcp5x.  It is invoked by the wrapper for each port
  * on the controller, to handle completion and hot plug and remove events.
- *
  */
 static uint_t
 mcp5x_intr_port(nv_port_t *nvp)
@@ -3274,7 +3276,21 @@ mcp5x_intr_port(nv_port_t *nvp)
 		 */
 		int_status = nv_get16(bar5_hdl, nvp->nvp_mcp5x_int_status);
 
+		/*
+		 * if the port is deactivated, just clear the interrupt and
+		 * return.  can get here even if interrupts were disabled
+		 * on this port but enabled on the other.
+		 */
+		if (nvp->nvp_state & NV_DEACTIVATED) {
+			nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_status,
+			    int_status);
+
+			return (DDI_INTR_CLAIMED);
+		}
+
 		NVLOG(NVDBG_INTR, nvc, nvp, "int_status = %x", int_status);
+
+		DTRACE_PROBE1(int_status_before_h, int, int_status);
 
 		/*
 		 * MCP5X_INT_IGNORE interrupts will show up in the status,
@@ -3282,6 +3298,8 @@ mcp5x_intr_port(nv_port_t *nvp)
 		 * to the processor.  Ignore them here by masking them out.
 		 */
 		int_status &= ~(MCP5X_INT_IGNORE);
+
+		DTRACE_PROBE1(int_status_after_h, int, int_status);
 
 		/*
 		 * exit the loop when no more interrupts to process
@@ -3299,7 +3317,8 @@ mcp5x_intr_port(nv_port_t *nvp)
 			 * from the DDI's perspective even though the packet
 			 * completion may not have succeeded.  If it fails,
 			 * need to manually clear the interrupt, otherwise
-			 * clearing is implicit.
+			 * clearing is implicit as a result of reading the
+			 * task file status register.
 			 */
 			ret = DDI_INTR_CLAIMED;
 			if (mcp5x_packet_complete_intr(nvc, nvp) ==
@@ -3330,7 +3349,7 @@ mcp5x_intr_port(nv_port_t *nvp)
 			ret = DDI_INTR_CLAIMED;
 
 			mutex_enter(&nvp->nvp_mutex);
-			nv_report_add_remove(nvp, NV_PORT_HOTREMOVED);
+			nv_link_event(nvp, NV_REM_DEV);
 			mutex_exit(&nvp->nvp_mutex);
 
 		} else if (int_status & MCP5X_INT_ADD) {
@@ -3338,23 +3357,30 @@ mcp5x_intr_port(nv_port_t *nvp)
 			ret = DDI_INTR_CLAIMED;
 
 			mutex_enter(&nvp->nvp_mutex);
-			nv_report_add_remove(nvp, 0);
+			nv_link_event(nvp, NV_ADD_DEV);
 			mutex_exit(&nvp->nvp_mutex);
 		}
 		if (clear) {
 			nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_status, clear);
 			clear = 0;
 		}
-		/* Protect against a stuck interrupt */
+
+		/*
+		 * protect against a stuck interrupt
+		 */
 		if (intr_cycles++ == NV_MAX_INTR_LOOP) {
-			nv_cmn_err(CE_WARN, nvc, nvp, "excessive interrupt "
-			    "processing.  Disabling port int_status=%X"
+
+			NVLOG(NVDBG_INTR, nvc, nvp, "excessive interrupt "
+			    "processing.  Disabling interrupts int_status=%X"
 			    " clear=%X", int_status, clear);
+			DTRACE_PROBE(excessive_interrupts_f);
+
 			mutex_enter(&nvp->nvp_mutex);
 			(*(nvc->nvc_set_intr))(nvp, NV_INTR_DISABLE);
-			nv_port_state_change(nvp, SATA_EVNT_PORT_FAILED,
-			    SATA_ADDR_CPORT, SATA_PSTATE_FAILED);
-			nvp->nvp_state |= NV_PORT_FAILED;
+			/*
+			 * reset the device.  If it remains inaccessible
+			 * after a reset it will be failed then.
+			 */
 			(void) nv_abort_active(nvp, NULL, SATA_PKT_DEV_ERROR,
 			    B_TRUE);
 			mutex_exit(&nvp->nvp_mutex);
@@ -3496,7 +3522,9 @@ mcp5x_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 	bmstatus = nv_get8(bmhdl, nvp->nvp_bmisx);
 
 	if (!(bmstatus & (BMISX_IDEINTS | BMISX_IDERR))) {
-		NVLOG(NVDBG_INTR, nvc, nvp, "BMISX_IDEINTS not set", NULL);
+		DTRACE_PROBE1(bmstatus_h, int, bmstatus);
+		NVLOG(NVDBG_INTR, nvc, nvp, "BMISX_IDEINTS not set %x",
+		    bmstatus);
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (NV_FAILURE);
@@ -3506,7 +3534,7 @@ mcp5x_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 	 * Commands may have been processed by abort or timeout before
 	 * interrupt processing acquired the mutex. So we may be processing
 	 * an interrupt for packets that were already removed.
-	 * For functionning NCQ processing all slots may be checked, but
+	 * For functioning NCQ processing all slots may be checked, but
 	 * with NCQ disabled (current code), relying on *_run flags is OK.
 	 */
 	if (nvp->nvp_non_ncq_run) {
@@ -3518,6 +3546,7 @@ mcp5x_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 		if (status & SATA_STATUS_BSY) {
 			nv_cmn_err(CE_WARN, nvc, nvp,
 			    "unexpected SATA_STATUS_BSY set");
+			DTRACE_PROBE(unexpected_status_bsy_p);
 			mutex_exit(&nvp->nvp_mutex);
 			/*
 			 * calling function will clear interrupt.  then
@@ -3646,7 +3675,7 @@ nv_complete_io(nv_port_t *nvp, sata_pkt_t *spkt, int slot)
 		 * to signal the sleeping thread that the cmd is complete.
 		 */
 		if ((spkt->satapkt_op_mode & SATA_OPMODE_POLLING) == 0) {
-			cv_signal(&nvp->nvp_poll_cv);
+			cv_signal(&nvp->nvp_sync_cv);
 		}
 
 		return;
@@ -4025,14 +4054,15 @@ nv_rem_intrs(nv_ctl_t *nvc)
  * number if possible
  */
 static void
-nv_vcmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, va_list ap)
+nv_vcmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, const char *fmt, va_list ap,
+	boolean_t log_to_sata_ring)
 {
 	char port[NV_STR_LEN];
 	char inst[NV_STR_LEN];
 	dev_info_t *dip;
 
 	if (nvc) {
-		(void) snprintf(inst, NV_STR_LEN, "inst %d",
+		(void) snprintf(inst, NV_STR_LEN, "inst%d ",
 		    ddi_get_instance(nvc->nvc_dip));
 		dip = nvc->nvc_dip;
 	} else {
@@ -4040,7 +4070,8 @@ nv_vcmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, va_list ap)
 	}
 
 	if (nvp) {
-		(void) sprintf(port, "port%d", nvp->nvp_port_num);
+		(void) snprintf(port, NV_STR_LEN, "port%d",
+		    nvp->nvp_port_num);
 		dip = nvp->nvp_ctlp->nvc_dip;
 	} else {
 		port[0] = '\0';
@@ -4048,7 +4079,7 @@ nv_vcmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, va_list ap)
 
 	mutex_enter(&nv_log_mutex);
 
-	(void) sprintf(nv_log_buf, "nv_sata %s %s%s", inst, port,
+	(void) sprintf(nv_log_buf, "%s%s%s", inst, port,
 	    (inst[0]|port[0] ? ": " :""));
 
 	(void) vsnprintf(&nv_log_buf[strlen(nv_log_buf)],
@@ -4062,22 +4093,20 @@ nv_vcmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, va_list ap)
 		if (nv_prom_print) {
 			prom_printf("%s\n", nv_log_buf);
 		} else {
-			cmn_err(ce, "%s", nv_log_buf);
+			cmn_err(ce, "%s\n", nv_log_buf);
 		}
-
-
 	} else {
 		cmn_err(ce, "!%s", nv_log_buf);
 	}
 
+	if (log_to_sata_ring == B_TRUE) {
+		(void) sprintf(nv_log_buf, "%s%s", port, (port[0] ? ": " :""));
 
-	(void) sprintf(nv_log_buf, "%s%s", port, (port[0] ? ": " :""));
+		(void) vsnprintf(&nv_log_buf[strlen(nv_log_buf)],
+		    NV_LOGBUF_LEN - strlen(nv_log_buf), fmt, ap);
 
-	(void) vsnprintf(&nv_log_buf[strlen(nv_log_buf)],
-	    NV_LOGBUF_LEN - strlen(nv_log_buf), fmt, ap);
-
-	sata_trace_debug(dip, nv_log_buf);
-
+		sata_trace_debug(dip, nv_log_buf);
+	}
 
 	mutex_exit(&nv_log_mutex);
 }
@@ -4092,7 +4121,7 @@ nv_cmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	nv_vcmn_err(ce, nvc, nvp, fmt, ap);
+	nv_vcmn_err(ce, nvc, nvp, fmt, ap, B_TRUE);
 	va_end(ap);
 }
 
@@ -4101,6 +4130,13 @@ static void
 nv_log(nv_ctl_t *nvc, nv_port_t *nvp, const char *fmt, ...)
 {
 	va_list ap;
+
+	if (nv_log_to_cmn_err == B_TRUE) {
+		va_start(ap, fmt);
+		nv_vcmn_err(CE_CONT, nvc, nvp, fmt, ap, B_FALSE);
+		va_end(ap);
+
+	}
 
 	va_start(ap, fmt);
 
@@ -4120,7 +4156,8 @@ nv_log(nv_ctl_t *nvc, nv_port_t *nvp, const char *fmt, ...)
 
 	/*
 	 * nvp is not NULL, but nvc might be.  Reference nvp for both
-	 * port and dip.
+	 * port and dip, to get the port number prefixed on the
+	 * message.
 	 */
 	mutex_enter(&nv_log_mutex);
 
@@ -4185,6 +4222,7 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 		nv_put8(cmdhdl, nvp->nvp_feature,
 		    satacmd->satacmd_features_reg);
 
+
 		break;
 
 	case ATA_ADDR_LBA28:
@@ -4221,6 +4259,7 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 			nv_put8(cmdhdl, nvp->nvp_count,
 			    satacmd->satacmd_sec_count_lsb);
 		}
+
 		nv_put8(cmdhdl, nvp->nvp_feature,
 		    satacmd->satacmd_features_reg_ext);
 		nv_put8(cmdhdl, nvp->nvp_feature,
@@ -4232,6 +4271,7 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 		nv_put8(cmdhdl, nvp->nvp_hcyl, satacmd->satacmd_lba_high_msb);
 		nv_put8(cmdhdl, nvp->nvp_lcyl, satacmd->satacmd_lba_mid_msb);
 		nv_put8(cmdhdl, nvp->nvp_sect, satacmd->satacmd_lba_low_msb);
+
 		/*
 		 * Send the low-order half
 		 */
@@ -4540,8 +4580,6 @@ nv_start_pio_out(nv_port_t *nvp, int slot)
 	 */
 	nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
 	nv_complete_io(nvp, spkt, 0);
-	nvp->nvp_state |= NV_PORT_RESET;
-	nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
 	nv_reset(nvp, "pio_out");
 
 	return (SATA_TRAN_PORT_ERROR);
@@ -4581,12 +4619,12 @@ nv_start_pkt_pio(nv_port_t *nvp, int slot)
 
 	/*
 	 * The command is always sent via PIO, despite whatever the SATA
-	 * framework sets in the command.  Overwrite the DMA bit to do this.
+	 * common module sets in the command.  Overwrite the DMA bit to do this.
 	 * Also, overwrite the overlay bit to be safe (it shouldn't be set).
 	 */
 	nv_put8(cmdhdl, nvp->nvp_feature, 0);	/* deassert DMA and OVL */
 
-	/* set appropriately by the sata framework */
+	/* set appropriately by the sata common module */
 	nv_put8(cmdhdl, nvp->nvp_hcyl, satacmd->satacmd_lba_high_lsb);
 	nv_put8(cmdhdl, nvp->nvp_lcyl, satacmd->satacmd_lba_mid_lsb);
 	nv_put8(cmdhdl, nvp->nvp_sect, satacmd->satacmd_lba_low_lsb);
@@ -4630,8 +4668,6 @@ nv_start_pkt_pio(nv_port_t *nvp, int slot)
 
 		nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
 		nv_complete_io(nvp, spkt, 0);
-		nvp->nvp_state |= NV_PORT_RESET;
-		nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
 		nv_reset(nvp, "start_pkt_pio");
 
 		return (SATA_TRAN_PORT_ERROR);
@@ -4711,8 +4747,6 @@ nv_intr_pio_in(nv_port_t *nvp, nv_slot_t *nv_slotp)
 		sata_cmdp->satacmd_status_reg = nv_get8(ctlhdl,
 		    nvp->nvp_altstatus);
 		sata_cmdp->satacmd_error_reg = nv_get8(cmdhdl, nvp->nvp_error);
-		nvp->nvp_state |= NV_PORT_RESET;
-		nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
 		nv_reset(nvp, "intr_pio_in");
 
 		return;
@@ -4886,9 +4920,6 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 		} else {
 			nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
 			spkt->satapkt_reason = SATA_PKT_TIMEOUT;
-			nvp->nvp_state |= NV_PORT_RESET;
-			nvp->nvp_state &= ~(NV_PORT_RESTORE |
-			    NV_PORT_RESET_RETRY);
 			nv_reset(nvp, "intr_pkt_pio");
 		}
 
@@ -5009,7 +5040,7 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 
 			/*
 			 * In order to avoid clobbering the rqsense data
-			 * set by the SATA framework, the sense data read
+			 * set by the SATA common module, the sense data read
 			 * from the device is put in a separate buffer and
 			 * copied into the packet after the request sense
 			 * command successfully completes.
@@ -5071,7 +5102,7 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 			ctlr_count -= count;
 
 			if (ctlr_count > 0) {
-				/* consume remainding bytes */
+				/* consume remaining bytes */
 
 				for (; ctlr_count > 0;
 				    ctlr_count -= 2)
@@ -5103,6 +5134,7 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 		    "nv_intr_pkt_pio: done", NULL);
 	}
 }
+
 
 /*
  * ATA command, DMA data in/out
@@ -5148,13 +5180,12 @@ nv_intr_dma(nv_port_t *nvp, struct nv_slot *nv_slotp)
 	/*
 	 * check for bus master errors
 	 */
+
 	if (bm_status & BMISX_IDERR) {
 		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
 		sata_cmdp->satacmd_status_reg = nv_get8(ctlhdl,
 		    nvp->nvp_altstatus);
 		sata_cmdp->satacmd_error_reg = nv_get8(cmdhdl, nvp->nvp_error);
-		nvp->nvp_state |= NV_PORT_RESET;
-		nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
 		nv_reset(nvp, "intr_dma");
 
 		return;
@@ -5341,7 +5372,12 @@ nv_port_state_change(nv_port_t *nvp, int event, uint8_t addr_type, int state)
 
 	NVLOG(NVDBG_EVENT, nvp->nvp_ctlp, nvp,
 	    "nv_port_state_change: event 0x%x type 0x%x state 0x%x "
-	    "time %ld (ticks)", event, addr_type, state, ddi_get_lbolt());
+	    "lbolt %ld (ticks)", event, addr_type, state, ddi_get_lbolt());
+
+	if (ddi_in_panic() != 0) {
+
+		return;
+	}
 
 	bzero((void *)&sd, sizeof (sata_device_t));
 	sd.satadev_rev = SATA_DEVICE_REV;
@@ -5359,281 +5395,210 @@ nv_port_state_change(nv_port_t *nvp, int event, uint8_t addr_type, int state)
 }
 
 
-
 /*
  * Monitor reset progress and signature gathering.
- * This function may loop, so it should not be called from interrupt
- * context.
- *
- * Entered with nvp mutex held.
  */
-static void
+static clock_t
 nv_monitor_reset(nv_port_t *nvp)
 {
 	ddi_acc_handle_t bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
 	uint32_t sstatus;
-	int send_notification = B_FALSE;
-	uint8_t dev_type;
+
+	ASSERT(MUTEX_HELD(&nvp->nvp_mutex));
 
 	sstatus = nv_get32(bar5_hdl, nvp->nvp_sstatus);
 
 	/*
-	 * We do not know here the reason for port reset.
 	 * Check the link status. The link needs to be active before
-	 * we can check the link's status.
+	 * checking the link's status.
 	 */
 	if ((SSTATUS_GET_IPM(sstatus) != SSTATUS_IPM_ACTIVE) ||
 	    (SSTATUS_GET_DET(sstatus) != SSTATUS_DET_DEVPRE_PHYCOM)) {
 		/*
 		 * Either link is not active or there is no device
-		 * If the link remains down for more than NV_LINK_DOWN_TIMEOUT
+		 * If the link remains down for more than NV_LINK_EVENT_DOWN
 		 * (milliseconds), abort signature acquisition and complete
-		 * reset processing.
-		 * The link will go down when COMRESET is sent by nv_reset(),
-		 * so it is practically nvp_reset_time milliseconds.
+		 * reset processing.  The link will go down when COMRESET is
+		 * sent by nv_reset().
 		 */
 
 		if (TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time) >=
-		    NV_LINK_DOWN_TIMEOUT) {
-			NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
+		    NV_LINK_EVENT_DOWN) {
+
+			nv_cmn_err(CE_NOTE, nvp->nvp_ctlp, nvp,
 			    "nv_monitor_reset: no link - ending signature "
 			    "acquisition; time after reset %ldms",
 			    TICK_TO_MSEC(ddi_get_lbolt() -
 			    nvp->nvp_reset_time));
+
+			DTRACE_PROBE(no_link_reset_giving_up_f);
+
+			/*
+			 * If the drive was previously present and configured
+			 * and then subsequently removed, then send a removal
+			 * event to sata common module.
+			 */
+			if (nvp->nvp_type != SATA_DTYPE_NONE) {
+				nv_port_state_change(nvp,
+				    SATA_EVNT_DEVICE_DETACHED,
+				    SATA_ADDR_CPORT, 0);
+			}
+
+			nvp->nvp_type = SATA_DTYPE_NONE;
+			nvp->nvp_signature = NV_NO_SIG;
+			nvp->nvp_state &= ~(NV_DEACTIVATED);
+
+#ifdef SGPIO_SUPPORT
+			nv_sgp_drive_disconnect(nvp->nvp_ctlp,
+			    SGP_CTLR_PORT_TO_DRV(
+			    nvp->nvp_ctlp->nvc_ctlr_num,
+			    nvp->nvp_port_num));
+#endif
+
+			cv_signal(&nvp->nvp_reset_cv);
+
+			return (0);
 		}
-		nvp->nvp_state &= ~(NV_PORT_RESET | NV_PORT_RESET_RETRY |
-		    NV_PORT_PROBE | NV_PORT_HOTPLUG_DELAY);
-		/*
-		 * Else, if the link was lost (i.e. was present before)
-		 * the controller should generate a 'remove' interrupt
-		 * that will cause the appropriate event notification.
-		 */
-		return;
+
+		DTRACE_PROBE(link_lost_reset_keep_trying_p);
+
+		return (nvp->nvp_wait_sig);
 	}
 
 	NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
-	    "nv_monitor_reset: link up after reset; time %ldms",
+	    "nv_monitor_reset: link up.  time since reset %ldms",
 	    TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time));
 
-sig_read:
-	if (nvp->nvp_signature != 0) {
+	nv_read_signature(nvp);
+
+
+	if (nvp->nvp_signature != NV_NO_SIG) {
 		/*
-		 * The link is up. The signature was acquired before (device
-		 * was present).
-		 * But we may need to wait for the signature (D2H FIS) before
-		 * accessing the drive.
+		 * signature has been acquired, send the appropriate
+		 * event to the sata common module.
 		 */
-		if (nv_wait_for_signature != 0) {
-			uint32_t old_signature;
-			uint8_t old_type;
+		if (nvp->nvp_state & (NV_ATTACH|NV_HOTPLUG)) {
+			char *source;
 
-			old_signature = nvp->nvp_signature;
-			old_type = nvp->nvp_type;
-			nvp->nvp_signature = 0;
-			nv_read_signature(nvp);
-			if (nvp->nvp_signature == 0) {
-				nvp->nvp_signature = old_signature;
-				nvp->nvp_type = old_type;
+			if (nvp->nvp_state & NV_HOTPLUG) {
 
-#ifdef NV_DEBUG
-				/* FOR DEBUGGING */
-				if (nv_wait_here_forever) {
-					drv_usecwait(1000);
-					goto sig_read;
-				}
-#endif
-				/*
-				 * Wait, but not endlessly.
-				 */
-				if (TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time) <
-				    nv_sig_acquisition_time) {
-					drv_usecwait(1000);
-					goto sig_read;
-				} else if (!(nvp->nvp_state &
-				    NV_PORT_RESET_RETRY)) {
-					/*
-					 * Retry reset.
-					 */
-					NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
-					    "nv_monitor_reset: retrying reset "
-					    "time after first reset: %ldms",
-					    TICK_TO_MSEC(ddi_get_lbolt() -
-					    nvp->nvp_reset_time));
-					nvp->nvp_state |= NV_PORT_RESET_RETRY;
-					nv_reset(nvp, "monitor_reset 1");
-					goto sig_read;
-				}
-
-				NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
-				    "nv_monitor_reset: terminating signature "
-				    "acquisition (1); time after reset: %ldms",
-				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time));
-			} else {
-				NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
-				    "nv_monitor_reset: signature acquired; "
-				    "time after reset: %ldms",
-				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time));
-			}
-		}
-		/*
-		 * Clear reset state, set device reset recovery state
-		 */
-		nvp->nvp_state &= ~(NV_PORT_RESET | NV_PORT_RESET_RETRY |
-		    NV_PORT_PROBE);
-		nvp->nvp_state |= NV_PORT_RESTORE;
-
-		/*
-		 * Need to send reset event notification
-		 */
-		send_notification = B_TRUE;
-	} else {
-		/*
-		 * The link is up. The signature was not acquired before.
-		 * We can try to fetch a device signature.
-		 */
-		dev_type = nvp->nvp_type;
-
-acquire_signature:
-		nv_read_signature(nvp);
-		if (nvp->nvp_signature != 0) {
-			/*
-			 * Got device signature.
-			 */
-			NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
-			    "nv_monitor_reset: signature acquired; "
-			    "time after reset: %ldms",
-			    TICK_TO_MSEC(ddi_get_lbolt() -
-			    nvp->nvp_reset_time));
-
-			/* Clear internal reset state */
-			nvp->nvp_state &=
-			    ~(NV_PORT_RESET | NV_PORT_RESET_RETRY);
-
-			if (dev_type != SATA_DTYPE_NONE) {
-				/*
-				 * We acquired the signature for a
-				 * pre-existing device that was not identified
-				 * before and and was reset.
-				 * Need to enter the device reset recovery
-				 * state and to send the reset notification.
-				 */
-				nvp->nvp_state |= NV_PORT_RESTORE;
-				send_notification = B_TRUE;
-			} else {
-				/*
-				 * Else, We acquired the signature because a new
-				 * device was attached (the driver attach or
-				 * a hot-plugged device). There is no need to
-				 * enter the device reset recovery state or to
-				 * send the reset notification, but we may need
-				 * to send a device attached notification.
-				 */
-				if (nvp->nvp_state & NV_PORT_PROBE) {
-					nv_port_state_change(nvp,
-					    SATA_EVNT_DEVICE_ATTACHED,
-					    SATA_ADDR_CPORT, 0);
-					nvp->nvp_state &= ~NV_PORT_PROBE;
-				}
-			}
-		} else {
-			if (TICK_TO_MSEC(ddi_get_lbolt() -
-			    nvp->nvp_reset_time) < nv_sig_acquisition_time) {
-				drv_usecwait(1000);
-				goto acquire_signature;
-			} else if (!(nvp->nvp_state & NV_PORT_RESET_RETRY)) {
-				/*
-				 * Some drives may require additional
-				 * reset(s) to get a valid signature
-				 * (indicating that the drive is ready).
-				 * If a drive was not just powered
-				 * up, the signature should be available
-				 * within few hundred milliseconds
-				 * after reset.  Therefore, if more than
-				 * NV_SIG_ACQUISITION_TIME has elapsed
-				 * while waiting for a signature, reset
-				 * device again.
-				 */
-				NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
-				    "nv_monitor_reset: retrying reset "
-				    "time after first reset: %ldms",
-				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time));
-				nvp->nvp_state |= NV_PORT_RESET_RETRY;
-				nv_reset(nvp, "monitor_reset 2");
-				drv_usecwait(1000);
-				goto acquire_signature;
-			}
-			/*
-			 * Terminating signature acquisition.
-			 * Hopefully, the drive is ready.
-			 * The SATA module can deal with this as long as it
-			 * knows that some device is attached and a device
-			 * responds to commands.
-			 */
-			if (!(nvp->nvp_state & NV_PORT_PROBE)) {
-				send_notification = B_TRUE;
-			}
-			nvp->nvp_state &= ~(NV_PORT_RESET |
-			    NV_PORT_RESET_RETRY);
-			nvp->nvp_type = SATA_DTYPE_UNKNOWN;
-			if (nvp->nvp_state & NV_PORT_PROBE) {
+				source = "hotplugged";
 				nv_port_state_change(nvp,
 				    SATA_EVNT_DEVICE_ATTACHED,
-				    SATA_ADDR_CPORT, 0);
-				nvp->nvp_state &= ~NV_PORT_PROBE;
-			}
-			nvp->nvp_type = dev_type;
-			NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
-			    "nv_monitor_reset: terminating signature "
-			    "acquisition (2); time after reset: %ldms",
-			    TICK_TO_MSEC(ddi_get_lbolt() -
-			    nvp->nvp_reset_time));
-		}
-	}
+				    SATA_ADDR_CPORT, SATA_DSTATE_PWR_ACTIVE);
+				DTRACE_PROBE1(got_sig_for_hotplugged_device_h,
+				    int, nvp->nvp_state);
 
-	if (send_notification) {
+			} else {
+				source = "activated or attached";
+				DTRACE_PROBE1(got_sig_for_existing_device_h,
+				    int, nvp->nvp_state);
+			}
+
+			NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
+			    "signature acquired for %s device. sig:"
+			    " 0x%x state: 0x%x nvp_type: 0x%x", source,
+			    nvp->nvp_signature, nvp->nvp_state, nvp->nvp_type);
+
+
+			nvp->nvp_state &= ~(NV_RESET|NV_ATTACH|NV_HOTPLUG);
+
+#ifdef SGPIO_SUPPORT
+			if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
+				nv_sgp_drive_connect(nvp->nvp_ctlp,
+				    SGP_CTLR_PORT_TO_DRV(
+				    nvp->nvp_ctlp->nvc_ctlr_num,
+				    nvp->nvp_port_num));
+			} else {
+				nv_sgp_drive_disconnect(nvp->nvp_ctlp,
+				    SGP_CTLR_PORT_TO_DRV(
+				    nvp->nvp_ctlp->nvc_ctlr_num,
+				    nvp->nvp_port_num));
+			}
+#endif
+
+			cv_signal(&nvp->nvp_reset_cv);
+
+			return (0);
+		}
+
+		/*
+		 * Since this was not an attach, it was a reset of an
+		 * existing device
+		 */
+		nvp->nvp_state &= ~NV_RESET;
+		nvp->nvp_state |= NV_RESTORE;
+
+
+
+		DTRACE_PROBE(got_signature_reset_complete_p);
+		DTRACE_PROBE1(nvp_signature_h, int, nvp->nvp_signature);
+		DTRACE_PROBE1(nvp_state_h, int, nvp->nvp_state);
+
+		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
+		    "signature acquired reset complete. sig: 0x%x"
+		    " state: 0x%x", nvp->nvp_signature, nvp->nvp_state);
+
+		/*
+		 * interrupts may have been disabled so just make sure
+		 * they are cleared and re-enabled.
+		 */
+
+		(*(nvp->nvp_ctlp->nvc_set_intr))(nvp,
+		    NV_INTR_CLEAR_ALL|NV_INTR_ENABLE);
+
 		nv_port_state_change(nvp, SATA_EVNT_DEVICE_RESET,
 		    SATA_ADDR_DCPORT,
 		    SATA_DSTATE_RESET | SATA_DSTATE_PWR_ACTIVE);
+
+		return (0);
 	}
 
-#ifdef SGPIO_SUPPORT
-	if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
-		nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
-	} else {
-		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+
+	if (TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time) >
+	    NV_RETRY_RESET_SIG) {
+
+
+		if (nvp->nvp_reset_retry_count >= NV_MAX_RESET_RETRY) {
+
+			nvp->nvp_state |= NV_FAILED;
+			nvp->nvp_state &= ~(NV_RESET|NV_ATTACH|NV_HOTPLUG);
+
+			DTRACE_PROBE(reset_exceeded_waiting_for_sig_p);
+			DTRACE_PROBE(reset_exceeded_waiting_for_sig_f);
+			DTRACE_PROBE1(nvp_state_h, int, nvp->nvp_state);
+			NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
+			    "reset time exceeded waiting for sig nvp_state %x",
+			    nvp->nvp_state);
+
+			nv_port_state_change(nvp, SATA_EVNT_PORT_FAILED,
+			    SATA_ADDR_CPORT, 0);
+
+			cv_signal(&nvp->nvp_reset_cv);
+
+			return (0);
+		}
+
+		nv_reset(nvp, "retry");
+
+		return (nvp->nvp_wait_sig);
 	}
-#endif
+
+	/*
+	 * signature not received, keep trying
+	 */
+	DTRACE_PROBE(no_sig_keep_waiting_p);
+
+	/*
+	 * double the wait time for sig since the last try but cap it off at
+	 * 1 second.
+	 */
+	nvp->nvp_wait_sig = nvp->nvp_wait_sig * 2;
+
+	return (nvp->nvp_wait_sig > NV_ONE_SEC ? NV_ONE_SEC :
+	    nvp->nvp_wait_sig);
 }
 
-
-/*
- * Send a hotplug (add device) notification at the appropriate time after
- * hotplug detection.
- * Relies on nvp_reset_time set at a hotplug detection time.
- * Called only from nv_timeout when NV_PORT_HOTPLUG_DELAY flag is set in
- * the nvp_state.
- */
-static void
-nv_delay_hotplug_notification(nv_port_t *nvp)
-{
-
-	if (TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time) >=
-	    nv_hotplug_delay) {
-		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
-		    "nv_delay_hotplug_notification: notifying framework after "
-		    "%dms delay", TICK_TO_MSEC(ddi_get_lbolt() -
-		    nvp->nvp_reset_time));
-		nvp->nvp_state &= ~NV_PORT_HOTPLUG_DELAY;
-		nv_port_state_change(nvp, SATA_EVNT_DEVICE_ATTACHED,
-		    SATA_ADDR_CPORT, 0);
-	}
-}
 
 /*
  * timeout processing:
@@ -5641,10 +5606,10 @@ nv_delay_hotplug_notification(nv_port_t *nvp)
  * Check if any packets have crossed a timeout threshold.  If so,
  * abort the packet.  This function is not NCQ-aware.
  *
- * If reset was invoked, call reset monitoring function.
+ * If reset is in progress, call reset monitoring function.
  *
- * Timeout frequency may be lower for checking packet timeout (1s)
- * and higher for reset monitoring (1ms)
+ * Timeout frequency may be lower for checking packet timeout
+ * and higher for reset monitoring.
  *
  */
 static void
@@ -5652,37 +5617,150 @@ nv_timeout(void *arg)
 {
 	nv_port_t *nvp = arg;
 	nv_slot_t *nv_slotp;
-	int next_timeout = NV_ONE_SEC;	/* Default */
+	clock_t next_timeout_us = NV_ONE_SEC;
 	uint16_t int_status;
 	uint8_t status, bmstatus;
 	static int intr_warn_once = 0;
+	uint32_t serror;
+
 
 	ASSERT(nvp != NULL);
 
 	mutex_enter(&nvp->nvp_mutex);
 	nvp->nvp_timeout_id = 0;
 
-	/*
-	 * If the port is not in the init state, ignore it.
-	 */
-	if ((nvp->nvp_state & NV_PORT_INIT) == 0) {
-		NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
-		    "nv_timeout: port uninitialized", NULL);
-		next_timeout = 0;
+	if (nvp->nvp_state & (NV_DEACTIVATED|NV_FAILED)) {
+		next_timeout_us = 0;
 
 		goto finished;
 	}
 
-	if (nvp->nvp_state & (NV_PORT_RESET | NV_PORT_RESET_RETRY)) {
-		nv_monitor_reset(nvp);
-		next_timeout = NV_ONE_MSEC;	/* at least 1ms */
+	if (nvp->nvp_state & NV_RESET) {
+		next_timeout_us = nv_monitor_reset(nvp);
 
 		goto finished;
 	}
 
-	if ((nvp->nvp_state & NV_PORT_HOTPLUG_DELAY) != 0) {
-		nv_delay_hotplug_notification(nvp);
-		next_timeout = NV_ONE_MSEC;	/* at least 1ms */
+	if (nvp->nvp_state & NV_LINK_EVENT) {
+		boolean_t device_present = B_FALSE;
+		uint32_t sstatus;
+		ddi_acc_handle_t bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
+
+		if (TICK_TO_USEC(ddi_get_lbolt() -
+		    nvp->nvp_link_event_time) < NV_LINK_EVENT_SETTLE) {
+
+			next_timeout_us = 10 * NV_ONE_MSEC;
+
+			DTRACE_PROBE(link_event_set_no_timeout_keep_waiting_p);
+
+			goto finished;
+		}
+
+		DTRACE_PROBE(link_event_settled_now_process_p);
+
+		nvp->nvp_state &= ~NV_LINK_EVENT;
+
+		/*
+		 * ck804 routinely reports the wrong hotplug/unplug event,
+		 * and it's been seen on mcp55 when there are signal integrity
+		 * issues.  Therefore need to infer the event from the
+		 * current link status.
+		 */
+
+		sstatus = nv_get32(bar5_hdl, nvp->nvp_sstatus);
+
+		if ((SSTATUS_GET_IPM(sstatus) == SSTATUS_IPM_ACTIVE) &&
+		    (SSTATUS_GET_DET(sstatus) ==
+		    SSTATUS_DET_DEVPRE_PHYCOM)) {
+			device_present = B_TRUE;
+		}
+
+		if ((nvp->nvp_signature != NV_NO_SIG) &&
+		    (device_present == B_FALSE)) {
+
+			NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
+			    "nv_timeout: device detached", NULL);
+
+			DTRACE_PROBE(device_detached_p);
+
+			(void) nv_abort_active(nvp, NULL, SATA_PKT_PORT_ERROR,
+			    B_FALSE);
+
+			nv_port_state_change(nvp, SATA_EVNT_DEVICE_DETACHED,
+			    SATA_ADDR_CPORT, 0);
+
+			nvp->nvp_signature = NV_NO_SIG;
+			nvp->nvp_rem_time = ddi_get_lbolt();
+			nvp->nvp_type = SATA_DTYPE_NONE;
+			next_timeout_us = 0;
+
+#ifdef SGPIO_SUPPORT
+			nv_sgp_drive_disconnect(nvp->nvp_ctlp,
+			    SGP_CTLR_PORT_TO_DRV(nvp->nvp_ctlp->nvc_ctlr_num,
+			    nvp->nvp_port_num));
+#endif
+
+			goto finished;
+		}
+
+		/*
+		 * if the device was already present, and it's still present,
+		 * then abort any outstanding command and issue a reset.
+		 * This may result from transient link errors.
+		 */
+
+		if ((nvp->nvp_signature != NV_NO_SIG) &&
+		    (device_present == B_TRUE)) {
+
+			NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
+			    "nv_timeout: spurious link event", NULL);
+			DTRACE_PROBE(spurious_link_event_p);
+
+			(void) nv_abort_active(nvp, NULL, SATA_PKT_PORT_ERROR,
+			    B_FALSE);
+
+			nvp->nvp_signature = NV_NO_SIG;
+			nvp->nvp_trans_link_time = ddi_get_lbolt();
+			nvp->nvp_trans_link_count++;
+			next_timeout_us = 0;
+
+			nv_reset(nvp, "transient link event");
+
+			goto finished;
+		}
+
+
+		/*
+		 * a new device has been inserted
+		 */
+		if ((nvp->nvp_signature == NV_NO_SIG) &&
+		    (device_present == B_TRUE)) {
+			NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
+			    "nv_timeout: device attached", NULL);
+
+			DTRACE_PROBE(device_attached_p);
+			nvp->nvp_add_time = ddi_get_lbolt();
+			next_timeout_us = 0;
+			nvp->nvp_reset_count = 0;
+			nvp->nvp_state = NV_HOTPLUG;
+			nvp->nvp_type = SATA_DTYPE_UNKNOWN;
+			nv_reset(nvp, "hotplug");
+
+			goto finished;
+		}
+
+		/*
+		 * no link, and no prior device.  Nothing to do, but
+		 * log this.
+		 */
+		NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
+		    "nv_timeout: delayed hot processing no link no prior"
+		    " device", NULL);
+		DTRACE_PROBE(delayed_hotplug_no_link_no_prior_device_p);
+
+		nvp->nvp_trans_link_time = ddi_get_lbolt();
+		nvp->nvp_trans_link_count++;
+		next_timeout_us = 0;
 
 		goto finished;
 	}
@@ -5716,7 +5794,7 @@ nv_timeout(void *arg)
 		 * timeout not needed if there is a polling thread
 		 */
 		if (spkt->satapkt_op_mode & SATA_OPMODE_POLLING) {
-			next_timeout = 0;
+			next_timeout_us = 0;
 
 			goto finished;
 		}
@@ -5724,63 +5802,71 @@ nv_timeout(void *arg)
 		if (TICK_TO_SEC(ddi_get_lbolt() - nv_slotp->nvslot_stime) >
 		    spkt->satapkt_time) {
 
-			uint32_t serr = nv_get32(nvp->nvp_ctlp->nvc_bar_hdl[5],
+			serror = nv_get32(nvp->nvp_ctlp->nvc_bar_hdl[5],
 			    nvp->nvp_serror);
+			status = nv_get8(nvp->nvp_ctl_hdl,
+			    nvp->nvp_altstatus);
+			bmstatus = nv_get8(nvp->nvp_bm_hdl,
+			    nvp->nvp_bmisx);
 
 			nv_cmn_err(CE_NOTE, nvp->nvp_ctlp, nvp,
 			    "nv_timeout: aborting: "
-			    "nvslot_stime: %ld max ticks till timeout: "
-			    "%ld cur_time: %ld cmd=%x lba=%d seq=%d",
+			    "nvslot_stime: %ld max ticks till timeout: %ld "
+			    "cur_time: %ld cmd = 0x%x lba = %d seq = %d",
 			    nv_slotp->nvslot_stime,
 			    drv_usectohz(MICROSEC *
 			    spkt->satapkt_time), ddi_get_lbolt(),
 			    cmd, lba, nvp->nvp_seq);
 
 			NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
-			    "nv_timeout: SError at timeout: 0x%x", serr);
-
-			NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
-			    "nv_timeout: previous cmd=%x",
+			    "nv_timeout: altstatus = 0x%x  bmicx = 0x%x "
+			    "serror = 0x%x previous_cmd = "
+			    "0x%x", status, bmstatus, serror,
 			    nvp->nvp_previous_cmd);
 
+
+			DTRACE_PROBE1(nv_timeout_packet_p, int, nvp);
+
 			if (nvp->nvp_mcp5x_int_status != NULL) {
-				status = nv_get8(nvp->nvp_ctl_hdl,
-				    nvp->nvp_altstatus);
-				bmstatus = nv_get8(nvp->nvp_bm_hdl,
-				    nvp->nvp_bmisx);
+
 				int_status = nv_get16(
 				    nvp->nvp_ctlp->nvc_bar_hdl[5],
 				    nvp->nvp_mcp5x_int_status);
 				NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
-				    "nv_timeout: altstatus %x, bmicx %x, "
-				    "int_status %X", status, bmstatus,
-				    int_status);
+				    "int_status = 0x%x", int_status);
 
 				if (int_status & MCP5X_INT_COMPLETE) {
 					/*
-					 * Completion interrupt was missed!
-					 * Issue warning message once
+					 * Completion interrupt was missed.
+					 * Issue warning message once.
 					 */
 					if (!intr_warn_once) {
+
 						nv_cmn_err(CE_WARN,
 						    nvp->nvp_ctlp,
 						    nvp,
 						    "nv_sata: missing command "
-						    "completion interrupt(s)!");
+						    "completion interrupt");
 						intr_warn_once = 1;
+
 					}
+
 					NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp,
 					    nvp, "timeout detected with "
 					    "interrupt ready - calling "
 					    "int directly", NULL);
+
 					mutex_exit(&nvp->nvp_mutex);
 					(void) mcp5x_intr_port(nvp);
 					mutex_enter(&nvp->nvp_mutex);
+
 				} else {
 					/*
 					 * True timeout and not a missing
 					 * interrupt.
 					 */
+					DTRACE_PROBE1(timeout_abort_active_p,
+					    int *, nvp);
 					(void) nv_abort_active(nvp, spkt,
 					    SATA_PKT_TIMEOUT, B_TRUE);
 				}
@@ -5795,22 +5881,22 @@ nv_timeout(void *arg)
 			    " still in use so restarting timeout",
 			    NULL);
 
-			next_timeout = NV_ONE_SEC;
+			next_timeout_us = NV_ONE_SEC;
 		}
 	} else {
 		/*
 		 * there was no active packet, so do not re-enable timeout
 		 */
-		next_timeout = 0;
+		next_timeout_us = 0;
 		NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
 		    "nv_timeout: no active packet so not re-arming "
 		    "timeout", NULL);
 	}
 
 finished:
-	if (next_timeout != 0) {
-		nv_setup_timeout(nvp, next_timeout);
-	}
+
+	nv_setup_timeout(nvp, next_timeout_us);
+
 	mutex_exit(&nvp->nvp_mutex);
 }
 
@@ -5945,7 +6031,7 @@ nv_resume(nv_port_t *nvp)
 
 	mutex_enter(&nvp->nvp_mutex);
 
-	if (nvp->nvp_state & NV_PORT_INACTIVE) {
+	if (nvp->nvp_state & NV_DEACTIVATED) {
 		mutex_exit(&nvp->nvp_mutex);
 
 		return;
@@ -5960,8 +6046,6 @@ nv_resume(nv_port_t *nvp)
 	 * Force a reset which will cause a probe and re-establish
 	 * any state needed on the drive.
 	 */
-	nvp->nvp_state |= NV_PORT_RESET;
-	nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
 	nv_reset(nvp, "resume");
 
 	mutex_exit(&nvp->nvp_mutex);
@@ -5982,7 +6066,7 @@ nv_suspend(nv_port_t *nvp)
 	}
 #endif
 
-	if (nvp->nvp_state & NV_PORT_INACTIVE) {
+	if (nvp->nvp_state & NV_DEACTIVATED) {
 		mutex_exit(&nvp->nvp_mutex);
 
 		return;
@@ -6118,210 +6202,69 @@ nv_copy_registers(nv_port_t *nvp, sata_device_t *sd, sata_pkt_t *spkt)
 
 
 /*
- * Hot plug and remove interrupts can occur when the device is reset.  Just
- * masking the interrupt doesn't always work well because if a
+ * hot plug and remove interrupts can occur when the device is reset.
+ * Masking the interrupt doesn't always work well because if a
  * different interrupt arrives on the other port, the driver can still
  * end up checking the state of the other port and discover the hot
- * interrupt flag is set even though it was masked.  Checking for recent
- * reset activity and then ignoring turns out to be the easiest way.
- *
- * Entered with nvp mutex held.
+ * interrupt flag is set even though it was masked.  Also, when there are
+ * errors on the link there can be transient link events which need to be
+ * masked and eliminated as well.
  */
 static void
-nv_report_add_remove(nv_port_t *nvp, int flags)
+nv_link_event(nv_port_t *nvp, int flag)
 {
-	ddi_acc_handle_t bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
-	uint32_t sstatus;
-	int i;
-	clock_t nv_lbolt = ddi_get_lbolt();
 
+	NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp, "nv_link_event: flag: %s",
+	    flag ? "add" : "remove");
 
-	NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp, "nv_report_add_remove() - "
-	    "time (ticks) %d flags %x", nv_lbolt, flags);
+	ASSERT(MUTEX_HELD(&nvp->nvp_mutex));
+
+	nvp->nvp_link_event_time = ddi_get_lbolt();
 
 	/*
-	 * wait up to 1ms for sstatus to settle and reflect the true
-	 * status of the port.  Failure to do so can create confusion
-	 * in probe, where the incorrect sstatus value can still
-	 * persist.
+	 * if a port has been deactivated, ignore all link events
 	 */
-	for (i = 0; i < 1000; i++) {
-		sstatus = nv_get32(bar5_hdl, nvp->nvp_sstatus);
+	if (nvp->nvp_state & NV_DEACTIVATED) {
+		NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp, "ignoring link event"
+		    " port deactivated", NULL);
+		DTRACE_PROBE(ignoring_link_port_deactivated_p);
 
-		if ((flags == NV_PORT_HOTREMOVED) &&
-		    ((sstatus & SSTATUS_DET_DEVPRE_PHYCOM) !=
-		    SSTATUS_DET_DEVPRE_PHYCOM)) {
-			break;
-		}
-
-		if ((flags != NV_PORT_HOTREMOVED) &&
-		    ((sstatus & SSTATUS_DET_DEVPRE_PHYCOM) ==
-		    SSTATUS_DET_DEVPRE_PHYCOM)) {
-			break;
-		}
-		drv_usecwait(1);
+		return;
 	}
 
-	NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
-	    "sstatus took %d us for DEVPRE_PHYCOM to settle", i);
+	/*
+	 * if the drive has been reset, ignore any transient events.  If it's
+	 * a real removal event, nv_monitor_reset() will handle it.
+	 */
+	if (nvp->nvp_state & NV_RESET) {
+		NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp, "ignoring link event"
+		    " during reset", NULL);
+		DTRACE_PROBE(ignoring_link_event_during_reset_p);
 
-	if (flags == NV_PORT_HOTREMOVED) {
+		return;
+	}
 
-		(void) nv_abort_active(nvp, NULL, SATA_PKT_PORT_ERROR,
-		    B_FALSE);
+	/*
+	 * if link event processing is already enabled, nothing to
+	 * do.
+	 */
+	if (nvp->nvp_state & NV_LINK_EVENT) {
 
-		/*
-		 * No device, no point of bothering with device reset
-		 */
-		nvp->nvp_type = SATA_DTYPE_NONE;
-		nvp->nvp_signature = 0;
-		nvp->nvp_state &= ~(NV_PORT_RESET | NV_PORT_RESET_RETRY |
-		    NV_PORT_RESTORE);
 		NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
-		    "nv_report_add_remove() hot removed", NULL);
-		nv_port_state_change(nvp,
-		    SATA_EVNT_DEVICE_DETACHED,
-		    SATA_ADDR_CPORT, 0);
+		    "received link event while processing already in "
+		    "progress", NULL);
+		DTRACE_PROBE(nv_link_event_already_set_p);
 
-#ifdef SGPIO_SUPPORT
-		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
-#endif
-	} else {
-		/*
-		 * This is a hot plug or link up indication
-		 * Now, re-check the link state - no link, no device
-		 */
-		if ((SSTATUS_GET_IPM(sstatus) == SSTATUS_IPM_ACTIVE) &&
-		    (SSTATUS_GET_DET(sstatus) == SSTATUS_DET_DEVPRE_PHYCOM)) {
-
-			if (nvp->nvp_type == SATA_DTYPE_NONE) {
-				/*
-				 * Real device attach - there was no device
-				 * attached to this port before this report
-				 */
-				NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
-				    "nv_report_add_remove() new device hot"
-				    "plugged", NULL);
-				nvp->nvp_reset_time = ddi_get_lbolt();
-				if (!(nvp->nvp_state &
-				    (NV_PORT_RESET_RETRY | NV_PORT_RESET))) {
-
-					nvp->nvp_signature = 0;
-					if (nv_reset_after_hotplug != 0) {
-
-						/*
-						 * Send reset to obtain a device
-						 * signature
-						 */
-						nvp->nvp_state |=
-						    NV_PORT_RESET |
-						    NV_PORT_PROBE;
-						nv_reset(nvp,
-						    "report_add_remove");
-					} else {
-						nvp->nvp_type =
-						    SATA_DTYPE_UNKNOWN;
-					}
-				}
-
-				if (!(nvp->nvp_state & NV_PORT_PROBE)) {
-					if (nv_reset_after_hotplug == 0) {
-						/*
-						 * In case a hotplug interrupt
-						 * is generated right after a
-						 * link is up, delay reporting
-						 * a hotplug event to let the
-						 * drive to initialize and to
-						 * send a D2H FIS with a
-						 * signature.
-						 * The timeout will issue an
-						 * event notification after
-						 * the NV_HOTPLUG_DELAY
-						 * milliseconds delay.
-						 */
-						nvp->nvp_state |=
-						    NV_PORT_HOTPLUG_DELAY;
-						nvp->nvp_type =
-						    SATA_DTYPE_UNKNOWN;
-						/*
-						 * Make sure timer is running.
-						 */
-						nv_setup_timeout(nvp,
-						    NV_ONE_MSEC);
-					} else {
-						nv_port_state_change(nvp,
-						    SATA_EVNT_DEVICE_ATTACHED,
-						    SATA_ADDR_CPORT, 0);
-					}
-				}
-				return;
-			}
-			/*
-			 * Otherwise it is a bogus attach, indicating recovered
-			 * link loss. No real need to report it after-the-fact.
-			 * But we may keep some statistics, or notify the
-			 * sata module by reporting LINK_LOST/LINK_ESTABLISHED
-			 * events to keep track of such occurrences.
-			 * Anyhow, we may want to terminate signature
-			 * acquisition.
-			 */
-			NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
-			    "nv_report_add_remove() ignoring plug interrupt "
-			    "- recovered link?", NULL);
-
-			if (nvp->nvp_state &
-			    (NV_PORT_RESET_RETRY | NV_PORT_RESET)) {
-				NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
-				    "nv_report_add_remove() - "
-				    "time since last reset %dms",
-				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time));
-				/*
-				 * If the driver does not have to wait for
-				 * a signature, then terminate reset processing
-				 * now.
-				 */
-				if (nv_wait_for_signature == 0) {
-					NVLOG(NVDBG_RESET, nvp->nvp_ctlp,
-					    nvp, "nv_report_add_remove() - ",
-					    "terminating signature acquisition",
-					    ", time after reset: %dms",
-					    TICK_TO_MSEC(ddi_get_lbolt() -
-					    nvp->nvp_reset_time));
-
-					nvp->nvp_state &= ~(NV_PORT_RESET |
-					    NV_PORT_RESET_RETRY);
-
-					if (!(nvp->nvp_state & NV_PORT_PROBE)) {
-						nvp->nvp_state |=
-						    NV_PORT_RESTORE;
-						nvp->nvp_state &=
-						    ~NV_PORT_PROBE;
-
-						/*
-						 * It is not the initial device
-						 * probing, so notify sata
-						 * module that device was
-						 * reset
-						 */
-						nv_port_state_change(nvp,
-						    SATA_EVNT_DEVICE_RESET,
-						    SATA_ADDR_DCPORT,
-						    SATA_DSTATE_RESET |
-						    SATA_DSTATE_PWR_ACTIVE);
-					}
-
-				}
-			}
-			return;
-		}
-		NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp, "nv_report_add_remove()"
-		    "ignoring add dev interrupt - "
-		    "link is down or no device!", NULL);
+		return;
 	}
 
+	DTRACE_PROBE1(link_event_p, int, nvp);
+
+	nvp->nvp_state |= NV_LINK_EVENT;
+
+	nv_setup_timeout(nvp, NV_LINK_EVENT_SETTLE);
 }
+
 
 /*
  * Get request sense data and stuff it the command's sense buffer.
@@ -6329,15 +6272,15 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
  * in the sata packet's rqsense buffer.  The command completion
  * processing is in nv_intr_pkt_pio.
  *
- * The sata framework provides a function to allocate and set-up a
+ * The sata common module provides a function to allocate and set-up a
  * request sense packet command. The reasons it is not being used here is:
  * a) it cannot be called in an interrupt context and this function is
  *    called in an interrupt context.
  * b) it allocates DMA resources that are not used here because this is
  *    implemented using PIO.
  *
- * If, in the future, this is changed to use DMA, the sata framework should
- * be used to allocate and set-up the error retrieval (request sense)
+ * If, in the future, this is changed to use DMA, the sata common module
+ * should be used to allocate and set-up the error retrieval (request sense)
  * command.
  */
 static int
@@ -6391,10 +6334,12 @@ nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 	    4000000, 0) == B_FALSE) {
 		if (nv_get8(cmdhdl, nvp->nvp_status) &
 		    (SATA_STATUS_ERR | SATA_STATUS_DF)) {
+			spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
 			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
 			    "nv_start_rqsense_pio: rqsense dev error (HP0)",
 			    NULL);
 		} else {
+			spkt->satapkt_reason = SATA_PKT_TIMEOUT;
 			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
 			    "nv_start_rqsense_pio: rqsense timeout (HP0)",
 			    NULL);
@@ -6402,8 +6347,6 @@ nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 
 		nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
 		nv_complete_io(nvp, spkt, 0);
-		nvp->nvp_state |= NV_PORT_RESET;
-		nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
 		nv_reset(nvp, "rqsense_pio");
 
 		return (NV_FAILURE);
@@ -6462,9 +6405,9 @@ nv_quiesce(dev_info_t *dip)
 		nv_put8(cmdhdl, nvp->nvp_hcyl, 0);
 		nv_put8(cmdhdl, nvp->nvp_count, 0);
 
-		nvp->nvp_signature = 0;
-		nvp->nvp_type = 0;
-		nvp->nvp_state |= NV_PORT_RESET;
+		nvp->nvp_signature = NV_NO_SIG;
+		nvp->nvp_type = SATA_DTYPE_NONE;
+		nvp->nvp_state |= NV_RESET;
 		nvp->nvp_reset_time = ddi_get_lbolt();
 
 		/*

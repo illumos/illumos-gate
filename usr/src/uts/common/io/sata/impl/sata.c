@@ -44,6 +44,7 @@
 #include <sys/sysevent/dr.h>
 #include <sys/taskq.h>
 #include <sys/disp.h>
+#include <sys/sdt.h>
 
 #include <sys/sata/impl/sata.h>
 #include <sys/sata/sata_hba.h>
@@ -15520,16 +15521,7 @@ sata_ioctl_reset_port(sata_hba_inst_t *sata_hba_inst,
 		    cport_mutex);
 		rv = EIO;
 	}
-	/*
-	 * Beacuse the port was reset, it should be probed and
-	 * attached device reinitialized. At this point the
-	 * port state is unknown - it's state is HBA-specific.
-	 * Re-probe port to get its state.
-	 */
-	if (sata_reprobe_port(sata_hba_inst, sata_device,
-	    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS) {
-		rv = EIO;
-	}
+
 	return (rv);
 }
 
@@ -15624,7 +15616,6 @@ sata_ioctl_reset_all(sata_hba_inst_t *sata_hba_inst)
 	sata_device_t sata_device;
 	int rv = 0;
 	int tcport;
-	int tpmport = 0;
 
 	sata_device.satadev_rev = SATA_DEVICE_REV;
 
@@ -15681,27 +15672,6 @@ sata_ioctl_reset_all(sata_hba_inst_t *sata_hba_inst)
 			SATA_LOG_D((sata_hba_inst, CE_WARN,
 			    "sata_hba_ioctl: reset controller failed"));
 			return (EIO);
-		}
-		/*
-		 * Because ports were reset, port states are unknown.
-		 * They should be re-probed to get their state and
-		 * attached devices should be reinitialized.
-		 */
-		for (tcport = 0; tcport < SATA_NUM_CPORTS(sata_hba_inst);
-		    tcport++) {
-			sata_device.satadev_addr.cport = tcport;
-			sata_device.satadev_addr.pmport = tpmport;
-			sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
-
-			/*
-			 * The sata_reprobe_port() will mark a
-			 * SATA_EVNT_DEVICE_RESET event on the port
-			 * multiplier, all its sub-ports will be probed by
-			 * sata daemon afterwards.
-			 */
-			if (sata_reprobe_port(sata_hba_inst, &sata_device,
-			    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS)
-				rv = EIO;
 		}
 	}
 	/*
@@ -18624,6 +18594,8 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 			sata_log(sata_hba_inst, CE_WARN,
 			    "SATA device at port %d - device failed",
 			    saddr->cport);
+
+			DTRACE_PROBE(port_failed_f);
 		}
 		/*
 		 * No point of retrying - device failed or some other event
