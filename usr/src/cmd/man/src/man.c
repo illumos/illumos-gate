@@ -95,7 +95,6 @@
 #define	PLEN		3	/* prefix length {man, cat, fmt} */
 #define	TMPLEN		7	/* length of tmpfile prefix */
 #define	MAXTOKENS 	64
-#define	MAXSUFFIX	20	/* length of section suffix */
 
 #define	DOT_SO		".so "
 #define	PREPROC_SPEC	"'\\\" "
@@ -814,8 +813,8 @@ get_all_sect(struct man_node *manp)
 	char **dirv;
 	char **dv;
 	char **p;
-	char prev[MAXSUFFIX];
-	char tmp[MAXSUFFIX];
+	char *prev = NULL;
+	char *tmp = NULL;
 	int  plen;
 	int	maxentries = MAXTOKENS;
 	int	entries = 0;
@@ -839,8 +838,6 @@ get_all_sect(struct man_node *manp)
 			malloc_error();
 	}
 
-	(void) memset(tmp, 0, MAXSUFFIX);
-	(void) memset(prev, 0, MAXSUFFIX);
 	for (dv = dirv, p = manp->secv; *dv; dv++) {
 		plen = PLEN;
 		if (match(*dv, SGMLDIR, PLEN+1))
@@ -852,14 +849,26 @@ get_all_sect(struct man_node *manp)
 			continue;
 		}
 
+		if (tmp != NULL)
+			free(tmp);
+		tmp = strdup(*dv + plen);
+		if (tmp == NULL)
+			malloc_error();
 		(void) sprintf(tmp, "%s", *dv + plen);
 
-		if (strcmp(prev, tmp) == 0) {
-			/* release memory allocated by sortdir */
-			free(*dv);
-			continue;
+		if (prev != NULL) {
+			if (strcmp(prev, tmp) == 0) {
+				/* release memory allocated by sortdir */
+				free(*dv);
+				continue;
+			}
 		}
 
+		if (prev != NULL)
+			free(prev);
+		prev = strdup(*dv + plen);
+		if (prev == NULL)
+			malloc_error();
 		(void) sprintf(prev, "%s", *dv + plen);
 		/*
 		 * copy the string in (*dv + plen) to *p
