@@ -1636,12 +1636,6 @@ main(int argc, char *argv[])
 	long filebounds = -1;
 	char namelist[30], corefile[30], boundstr[30];
 
-	if (geteuid() != 0) {
-		(void) fprintf(stderr, "%s: %s %s\n", progname,
-		    gettext("you must be root to use"), progname);
-		exit(1);
-	}
-
 	startts = gethrtime();
 
 	(void) getrlimit(RLIMIT_NOFILE, &rl);
@@ -1679,6 +1673,12 @@ main(int argc, char *argv[])
 		case '?':
 			usage();
 		}
+	}
+
+	if (geteuid() != 0 && filebounds < 0) {
+		(void) fprintf(stderr, "%s: %s %s\n", progname,
+		    gettext("you must be root to use"), progname);
+		exit(1);
 	}
 
 	interactive = isatty(STDOUT_FILENO);
