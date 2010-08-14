@@ -399,6 +399,7 @@ extern uint_t i_mac_impl_count;
  */
 struct mac_impl_s {
 	krwlock_t		mi_rw_lock;
+	list_node_t		mi_node;
 	char			mi_name[LIFNAMSIZ];	/* WO */
 	uint32_t		mi_state_flags;
 	void			*mi_driver;		/* Driver private, WO */

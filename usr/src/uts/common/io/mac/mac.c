@@ -275,6 +275,7 @@
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/dlpi.h>
+#include <sys/list.h>
 #include <sys/modhash.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_client_impl.h>
@@ -314,7 +315,7 @@
 
 #define	IMPL_HASHSZ	67	/* prime */
 
-kmem_cache_t	*i_mac_impl_cachep;
+kmem_cache_t		*i_mac_impl_cachep;
 mod_hash_t		*i_mac_impl_hash;
 krwlock_t		i_mac_impl_lock;
 uint_t			i_mac_impl_count;
@@ -377,6 +378,13 @@ static void mac_rx_ring_quiesce(mac_ring_t *, uint_t);
 static int mac_start_group_and_rings(mac_group_t *);
 static void mac_stop_group_and_rings(mac_group_t *);
 static void mac_pool_event_cb(pool_event_t, int, void *);
+
+typedef struct netinfo_s {
+	list_node_t	ni_link;
+	void		*ni_record;
+	int		ni_size;
+	int		ni_type;
+} netinfo_t;
 
 /*
  * Module initialization functions.
@@ -5103,15 +5111,23 @@ mac_fini_macaddr(mac_impl_t *mip)
  * aggregate statistics like before.
  */
 
-/* Write the Flow description to the log file */
-int
+/* Write the flow description to a netinfo_t record */
+static netinfo_t *
 mac_write_flow_desc(flow_entry_t *flent, mac_client_impl_t *mcip)
 {
+	netinfo_t		*ninfo;
+	net_desc_t		*ndesc;
 	flow_desc_t		*fdesc;
 	mac_resource_props_t	*mrp;
-	net_desc_t		ndesc;
 
-	bzero(&ndesc, sizeof (net_desc_t));
+	ninfo = kmem_zalloc(sizeof (netinfo_t), KM_NOSLEEP);
+	if (ninfo == NULL)
+		return (NULL);
+	ndesc = kmem_zalloc(sizeof (net_desc_t), KM_NOSLEEP);
+	if (ndesc == NULL) {
+		kmem_free(ninfo, sizeof (netinfo_t));
+		return (NULL);
+	}
 
 	/*
 	 * Grab the fe_lock to see a self-consistent fe_flow_desc.
@@ -5121,111 +5137,150 @@ mac_write_flow_desc(flow_entry_t *flent, mac_client_impl_t *mcip)
 	fdesc = &flent->fe_flow_desc;
 	mrp = &flent->fe_resource_props;
 
-	ndesc.nd_name = flent->fe_flow_name;
-	ndesc.nd_devname = mcip->mci_name;
-	bcopy(fdesc->fd_src_mac, ndesc.nd_ehost, ETHERADDRL);
-	bcopy(fdesc->fd_dst_mac, ndesc.nd_edest, ETHERADDRL);
-	ndesc.nd_sap = htonl(fdesc->fd_sap);
-	ndesc.nd_isv4 = (uint8_t)fdesc->fd_ipversion == IPV4_VERSION;
-	ndesc.nd_bw_limit = mrp->mrp_maxbw;
-	if (ndesc.nd_isv4) {
-		ndesc.nd_saddr[3] = htonl(fdesc->fd_local_addr.s6_addr32[3]);
-		ndesc.nd_daddr[3] = htonl(fdesc->fd_remote_addr.s6_addr32[3]);
+	ndesc->nd_name = flent->fe_flow_name;
+	ndesc->nd_devname = mcip->mci_name;
+	bcopy(fdesc->fd_src_mac, ndesc->nd_ehost, ETHERADDRL);
+	bcopy(fdesc->fd_dst_mac, ndesc->nd_edest, ETHERADDRL);
+	ndesc->nd_sap = htonl(fdesc->fd_sap);
+	ndesc->nd_isv4 = (uint8_t)fdesc->fd_ipversion == IPV4_VERSION;
+	ndesc->nd_bw_limit = mrp->mrp_maxbw;
+	if (ndesc->nd_isv4) {
+		ndesc->nd_saddr[3] = htonl(fdesc->fd_local_addr.s6_addr32[3]);
+		ndesc->nd_daddr[3] = htonl(fdesc->fd_remote_addr.s6_addr32[3]);
 	} else {
-		bcopy(&fdesc->fd_local_addr, ndesc.nd_saddr, IPV6_ADDR_LEN);
-		bcopy(&fdesc->fd_remote_addr, ndesc.nd_daddr, IPV6_ADDR_LEN);
+		bcopy(&fdesc->fd_local_addr, ndesc->nd_saddr, IPV6_ADDR_LEN);
+		bcopy(&fdesc->fd_remote_addr, ndesc->nd_daddr, IPV6_ADDR_LEN);
 	}
-	ndesc.nd_sport = htons(fdesc->fd_local_port);
-	ndesc.nd_dport = htons(fdesc->fd_remote_port);
-	ndesc.nd_protocol = (uint8_t)fdesc->fd_protocol;
+	ndesc->nd_sport = htons(fdesc->fd_local_port);
+	ndesc->nd_dport = htons(fdesc->fd_remote_port);
+	ndesc->nd_protocol = (uint8_t)fdesc->fd_protocol;
 	mutex_exit(&flent->fe_lock);
 
-	return (exacct_commit_netinfo((void *)&ndesc, EX_NET_FLDESC_REC));
+	ninfo->ni_record = ndesc;
+	ninfo->ni_size = sizeof (net_desc_t);
+	ninfo->ni_type = EX_NET_FLDESC_REC;
+
+	return (ninfo);
 }
 
-/* Write the Flow statistics to the log file */
-int
+/* Write the flow statistics to a netinfo_t record */
+static netinfo_t *
 mac_write_flow_stats(flow_entry_t *flent)
 {
-	net_stat_t		nstat;
+	netinfo_t		*ninfo;
+	net_stat_t		*nstat;
 	mac_soft_ring_set_t	*mac_srs;
 	mac_rx_stats_t		*mac_rx_stat;
 	mac_tx_stats_t		*mac_tx_stat;
 	int			i;
 
-	bzero(&nstat, sizeof (net_stat_t));
-	nstat.ns_name = flent->fe_flow_name;
+	ninfo = kmem_zalloc(sizeof (netinfo_t), KM_NOSLEEP);
+	if (ninfo == NULL)
+		return (NULL);
+	nstat = kmem_zalloc(sizeof (net_stat_t), KM_NOSLEEP);
+	if (nstat == NULL) {
+		kmem_free(ninfo, sizeof (netinfo_t));
+		return (NULL);
+	}
+
+	nstat->ns_name = flent->fe_flow_name;
 	for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
 		mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
 		mac_rx_stat = &mac_srs->srs_rx.sr_stat;
 
-		nstat.ns_ibytes += mac_rx_stat->mrs_intrbytes +
+		nstat->ns_ibytes += mac_rx_stat->mrs_intrbytes +
 		    mac_rx_stat->mrs_pollbytes + mac_rx_stat->mrs_lclbytes;
-		nstat.ns_ipackets += mac_rx_stat->mrs_intrcnt +
+		nstat->ns_ipackets += mac_rx_stat->mrs_intrcnt +
 		    mac_rx_stat->mrs_pollcnt + mac_rx_stat->mrs_lclcnt;
-		nstat.ns_oerrors += mac_rx_stat->mrs_ierrors;
+		nstat->ns_oerrors += mac_rx_stat->mrs_ierrors;
 	}
 
 	mac_srs = (mac_soft_ring_set_t *)(flent->fe_tx_srs);
 	if (mac_srs != NULL) {
 		mac_tx_stat = &mac_srs->srs_tx.st_stat;
 
-		nstat.ns_obytes = mac_tx_stat->mts_obytes;
-		nstat.ns_opackets = mac_tx_stat->mts_opackets;
-		nstat.ns_oerrors = mac_tx_stat->mts_oerrors;
+		nstat->ns_obytes = mac_tx_stat->mts_obytes;
+		nstat->ns_opackets = mac_tx_stat->mts_opackets;
+		nstat->ns_oerrors = mac_tx_stat->mts_oerrors;
 	}
-	return (exacct_commit_netinfo((void *)&nstat, EX_NET_FLSTAT_REC));
+
+	ninfo->ni_record = nstat;
+	ninfo->ni_size = sizeof (net_stat_t);
+	ninfo->ni_type = EX_NET_FLSTAT_REC;
+
+	return (ninfo);
 }
 
-/* Write the Link Description to the log file */
-int
+/* Write the link description to a netinfo_t record */
+static netinfo_t *
 mac_write_link_desc(mac_client_impl_t *mcip)
 {
-	net_desc_t		ndesc;
+	netinfo_t		*ninfo;
+	net_desc_t		*ndesc;
 	flow_entry_t		*flent = mcip->mci_flent;
 
-	bzero(&ndesc, sizeof (net_desc_t));
+	ninfo = kmem_zalloc(sizeof (netinfo_t), KM_NOSLEEP);
+	if (ninfo == NULL)
+		return (NULL);
+	ndesc = kmem_zalloc(sizeof (net_desc_t), KM_NOSLEEP);
+	if (ndesc == NULL) {
+		kmem_free(ninfo, sizeof (netinfo_t));
+		return (NULL);
+	}
 
-	ndesc.nd_name = mcip->mci_name;
-	ndesc.nd_devname = mcip->mci_name;
-	ndesc.nd_isv4 = B_TRUE;
+	ndesc->nd_name = mcip->mci_name;
+	ndesc->nd_devname = mcip->mci_name;
+	ndesc->nd_isv4 = B_TRUE;
 	/*
 	 * Grab the fe_lock to see a self-consistent fe_flow_desc.
 	 * Updates to the fe_flow_desc are done under the fe_lock
 	 * after removing the flent from the flow table.
 	 */
 	mutex_enter(&flent->fe_lock);
-	bcopy(flent->fe_flow_desc.fd_src_mac, ndesc.nd_ehost, ETHERADDRL);
+	bcopy(flent->fe_flow_desc.fd_src_mac, ndesc->nd_ehost, ETHERADDRL);
 	mutex_exit(&flent->fe_lock);
 
-	return (exacct_commit_netinfo((void *)&ndesc, EX_NET_LNDESC_REC));
+	ninfo->ni_record = ndesc;
+	ninfo->ni_size = sizeof (net_desc_t);
+	ninfo->ni_type = EX_NET_LNDESC_REC;
+
+	return (ninfo);
 }
 
-/* Write the Link statistics to the log file */
-int
+/* Write the link statistics to a netinfo_t record */
+static netinfo_t *
 mac_write_link_stats(mac_client_impl_t *mcip)
 {
-	net_stat_t		nstat;
+	netinfo_t		*ninfo;
+	net_stat_t		*nstat;
 	flow_entry_t		*flent;
 	mac_soft_ring_set_t	*mac_srs;
 	mac_rx_stats_t		*mac_rx_stat;
 	mac_tx_stats_t		*mac_tx_stat;
 	int			i;
 
-	bzero(&nstat, sizeof (net_stat_t));
-	nstat.ns_name = mcip->mci_name;
+	ninfo = kmem_zalloc(sizeof (netinfo_t), KM_NOSLEEP);
+	if (ninfo == NULL)
+		return (NULL);
+	nstat = kmem_zalloc(sizeof (net_stat_t), KM_NOSLEEP);
+	if (nstat == NULL) {
+		kmem_free(ninfo, sizeof (netinfo_t));
+		return (NULL);
+	}
+
+	nstat->ns_name = mcip->mci_name;
 	flent = mcip->mci_flent;
 	if (flent != NULL)  {
 		for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
 			mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
 			mac_rx_stat = &mac_srs->srs_rx.sr_stat;
 
-			nstat.ns_ibytes += mac_rx_stat->mrs_intrbytes +
+			nstat->ns_ibytes += mac_rx_stat->mrs_intrbytes +
 			    mac_rx_stat->mrs_pollbytes +
 			    mac_rx_stat->mrs_lclbytes;
-			nstat.ns_ipackets += mac_rx_stat->mrs_intrcnt +
+			nstat->ns_ipackets += mac_rx_stat->mrs_intrcnt +
 			    mac_rx_stat->mrs_pollcnt + mac_rx_stat->mrs_lclcnt;
-			nstat.ns_oerrors += mac_rx_stat->mrs_ierrors;
+			nstat->ns_oerrors += mac_rx_stat->mrs_ierrors;
 		}
 	}
 
@@ -5233,23 +5288,40 @@ mac_write_link_stats(mac_client_impl_t *mcip)
 	if (mac_srs != NULL) {
 		mac_tx_stat = &mac_srs->srs_tx.st_stat;
 
-		nstat.ns_obytes = mac_tx_stat->mts_obytes;
-		nstat.ns_opackets = mac_tx_stat->mts_opackets;
-		nstat.ns_oerrors = mac_tx_stat->mts_oerrors;
+		nstat->ns_obytes = mac_tx_stat->mts_obytes;
+		nstat->ns_opackets = mac_tx_stat->mts_opackets;
+		nstat->ns_oerrors = mac_tx_stat->mts_oerrors;
 	}
-	return (exacct_commit_netinfo((void *)&nstat, EX_NET_LNSTAT_REC));
+
+	ninfo->ni_record = nstat;
+	ninfo->ni_size = sizeof (net_stat_t);
+	ninfo->ni_type = EX_NET_LNSTAT_REC;
+
+	return (ninfo);
 }
 
+typedef struct i_mac_log_state_s {
+	boolean_t	mi_last;
+	int		mi_fenable;
+	int		mi_lenable;
+	list_t		*mi_list;
+} i_mac_log_state_t;
+
 /*
- * For a given flow, if the descrition has not been logged before, do it now.
+ * For a given flow, if the description has not been logged before, do it now.
  * If it is a VNIC, then we have collected information about it from the MAC
  * table, so skip it.
+ *
+ * Called through mac_flow_walk_nolock()
+ *
+ * Return 0 if successful.
  */
-/*ARGSUSED*/
 static int
-mac_log_flowinfo(flow_entry_t *flent, void *args)
+mac_log_flowinfo(flow_entry_t *flent, void *arg)
 {
 	mac_client_impl_t	*mcip = flent->fe_mcip;
+	i_mac_log_state_t	*lstate = arg;
+	netinfo_t		*ninfo;
 
 	if (mcip == NULL)
 		return (0);
@@ -5267,12 +5339,13 @@ mac_log_flowinfo(flow_entry_t *flent, void *args)
 
 	if (!flent->fe_desc_logged) {
 		/*
-		 * We don't return error because we want to continu the
+		 * We don't return error because we want to continue the
 		 * walk in case this is the last walk which means we
 		 * need to reset fe_desc_logged in all the flows.
 		 */
-		if (mac_write_flow_desc(flent, mcip) != 0)
+		if ((ninfo = mac_write_flow_desc(flent, mcip)) == NULL)
 			return (0);
+		list_insert_tail(lstate->mi_list, ninfo);
 		flent->fe_desc_logged = B_TRUE;
 	}
 
@@ -5280,7 +5353,11 @@ mac_log_flowinfo(flow_entry_t *flent, void *args)
 	 * Regardless of the error, we want to proceed in case we have to
 	 * reset fe_desc_logged.
 	 */
-	(void) mac_write_flow_stats(flent);
+	ninfo = mac_write_flow_stats(flent);
+	if (ninfo == NULL)
+		return (-1);
+
+	list_insert_tail(lstate->mi_list, ninfo);
 
 	if (mcip != NULL && !(mcip->mci_state_flags & MCIS_DESC_LOGGED))
 		flent->fe_desc_logged = B_FALSE;
@@ -5288,36 +5365,32 @@ mac_log_flowinfo(flow_entry_t *flent, void *args)
 	return (0);
 }
 
-typedef struct i_mac_log_state_s {
-	boolean_t	mi_last;
-	int		mi_fenable;
-	int		mi_lenable;
-} i_mac_log_state_t;
-
 /*
- * Walk the mac_impl_ts and log the description for each mac client of this mac,
- * if it hasn't already been done. Additionally, log statistics for the link as
+ * Log the description for each mac client of this mac_impl_t, if it
+ * hasn't already been done. Additionally, log statistics for the link as
  * well. Walk the flow table and log information for each flow as well.
  * If it is the last walk (mci_last), then we turn off mci_desc_logged (and
  * also fe_desc_logged, if flow logging is on) since we want to log the
  * description if and when logging is restarted.
+ *
+ * Return 0 upon success or -1 upon failure
  */
-/*ARGSUSED*/
-static uint_t
-i_mac_log_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+static int
+i_mac_impl_log(mac_impl_t *mip, i_mac_log_state_t *lstate)
 {
-	mac_impl_t		*mip = (mac_impl_t *)val;
-	i_mac_log_state_t	*lstate = (i_mac_log_state_t *)arg;
-	int			ret;
 	mac_client_impl_t	*mcip;
+	netinfo_t		*ninfo;
 
+	i_mac_perim_enter(mip);
 	/*
 	 * Only walk the client list for NIC and etherstub
 	 */
 	if ((mip->mi_state_flags & MIS_DISABLED) ||
 	    ((mip->mi_state_flags & MIS_IS_VNIC) &&
-	    (mac_get_lower_mac_handle((mac_handle_t)mip) != NULL)))
-		return (MH_WALK_CONTINUE);
+	    (mac_get_lower_mac_handle((mac_handle_t)mip) != NULL))) {
+		i_mac_perim_exit(mip);
+		return (0);
+	}
 
 	for (mcip = mip->mi_clients_list; mcip != NULL;
 	    mcip = mcip->mci_client_next) {
@@ -5325,8 +5398,8 @@ i_mac_log_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 			continue;
 		if (lstate->mi_lenable) {
 			if (!(mcip->mci_state_flags & MCIS_DESC_LOGGED)) {
-				ret = mac_write_link_desc(mcip);
-				if (ret != 0) {
+				ninfo = mac_write_link_desc(mcip);
+				if (ninfo == NULL) {
 				/*
 				 * We can't terminate it if this is the last
 				 * walk, else there might be some links with
@@ -5339,29 +5412,97 @@ i_mac_log_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 				 * won't have written any flow stuff for this
 				 * link as we haven't logged the link itself.
 				 */
+					i_mac_perim_exit(mip);
 					if (lstate->mi_last)
-						return (MH_WALK_CONTINUE);
+						return (0);
 					else
-						return (MH_WALK_TERMINATE);
+						return (-1);
 				}
 				mcip->mci_state_flags |= MCIS_DESC_LOGGED;
+				list_insert_tail(lstate->mi_list, ninfo);
 			}
 		}
 
-		if (mac_write_link_stats(mcip) != 0 && !lstate->mi_last)
-			return (MH_WALK_TERMINATE);
+		ninfo = mac_write_link_stats(mcip);
+		if (ninfo == NULL && !lstate->mi_last) {
+			i_mac_perim_exit(mip);
+			return (-1);
+		}
+		list_insert_tail(lstate->mi_list, ninfo);
 
 		if (lstate->mi_last)
 			mcip->mci_state_flags &= ~MCIS_DESC_LOGGED;
 
 		if (lstate->mi_fenable) {
 			if (mcip->mci_subflow_tab != NULL) {
-				(void) mac_flow_walk(mcip->mci_subflow_tab,
-				    mac_log_flowinfo, mip);
+				(void) mac_flow_walk_nolock(
+				    mcip->mci_subflow_tab, mac_log_flowinfo,
+				    lstate);
 			}
 		}
 	}
+	i_mac_perim_exit(mip);
+	return (0);
+}
+
+/*
+ * modhash walker function to add a mac_impl_t to a list
+ */
+/*ARGSUSED*/
+static uint_t
+i_mac_impl_list_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	list_t			*list = (list_t *)arg;
+	mac_impl_t		*mip = (mac_impl_t *)val;
+
+	if ((mip->mi_state_flags & MIS_DISABLED) == 0) {
+		list_insert_tail(list, mip);
+		mip->mi_ref++;
+	}
+
 	return (MH_WALK_CONTINUE);
+}
+
+void
+i_mac_log_info(list_t *net_log_list, i_mac_log_state_t *lstate)
+{
+	list_t			mac_impl_list;
+	mac_impl_t		*mip;
+	netinfo_t		*ninfo;
+
+	/* Create list of mac_impls */
+	ASSERT(RW_LOCK_HELD(&i_mac_impl_lock));
+	list_create(&mac_impl_list, sizeof (mac_impl_t), offsetof(mac_impl_t,
+	    mi_node));
+	mod_hash_walk(i_mac_impl_hash, i_mac_impl_list_walker, &mac_impl_list);
+	rw_exit(&i_mac_impl_lock);
+
+	/* Create log entries for each mac_impl */
+	for (mip = list_head(&mac_impl_list); mip != NULL;
+	    mip = list_next(&mac_impl_list, mip)) {
+		if (i_mac_impl_log(mip, lstate) != 0)
+			continue;
+	}
+
+	/* Remove elements and destroy list of mac_impls */
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	while ((mip = list_remove_tail(&mac_impl_list)) != NULL) {
+		mip->mi_ref--;
+	}
+	rw_exit(&i_mac_impl_lock);
+	list_destroy(&mac_impl_list);
+
+	/*
+	 * Write log entries to files outside of locks, free associated
+	 * structures, and remove entries from the list.
+	 */
+	while ((ninfo = list_head(net_log_list)) != NULL) {
+		(void) exacct_commit_netinfo(ninfo->ni_record, ninfo->ni_type);
+		list_remove(net_log_list, ninfo);
+		kmem_free(ninfo->ni_record, ninfo->ni_size);
+		kmem_free(ninfo, sizeof (*ninfo));
+	}
+	list_destroy(net_log_list);
 }
 
 /*
@@ -5373,6 +5514,10 @@ void
 mac_log_linkinfo(void *arg)
 {
 	i_mac_log_state_t	lstate;
+	list_t			net_log_list;
+
+	list_create(&net_log_list, sizeof (netinfo_t),
+	    offsetof(netinfo_t, ni_link));
 
 	rw_enter(&i_mac_impl_lock, RW_READER);
 	if (!mac_flow_log_enable && !mac_link_log_enable) {
@@ -5382,16 +5527,15 @@ mac_log_linkinfo(void *arg)
 	lstate.mi_fenable = mac_flow_log_enable;
 	lstate.mi_lenable = mac_link_log_enable;
 	lstate.mi_last = B_FALSE;
-	rw_exit(&i_mac_impl_lock);
+	lstate.mi_list = &net_log_list;
 
-	mod_hash_walk(i_mac_impl_hash, i_mac_log_walker, &lstate);
+	/* Write log entries for each mac_impl in the list */
+	i_mac_log_info(&net_log_list, &lstate);
 
-	rw_enter(&i_mac_impl_lock, RW_WRITER);
 	if (mac_flow_log_enable || mac_link_log_enable) {
 		mac_logging_timer = timeout(mac_log_linkinfo, NULL,
 		    SEC_TO_TICK(mac_logging_interval));
 	}
-	rw_exit(&i_mac_impl_lock);
 }
 
 typedef struct i_mac_fastpath_state_s {
@@ -5399,9 +5543,10 @@ typedef struct i_mac_fastpath_state_s {
 	int		mf_err;
 } i_mac_fastpath_state_t;
 
+/* modhash walker function to enable or disable fastpath */
 /*ARGSUSED*/
 static uint_t
-i_mac_fastpath_disable_walker(mod_hash_key_t key, mod_hash_val_t *val,
+i_mac_fastpath_walker(mod_hash_key_t key, mod_hash_val_t *val,
     void *arg)
 {
 	i_mac_fastpath_state_t	*state = arg;
@@ -5421,8 +5566,9 @@ i_mac_fastpath_disable_walker(mod_hash_key_t key, mod_hash_val_t *val,
 int
 mac_start_logusage(mac_logtype_t type, uint_t interval)
 {
-	i_mac_fastpath_state_t state = {B_TRUE, 0};
-	int err;
+	i_mac_fastpath_state_t	dstate = {B_TRUE, 0};
+	i_mac_fastpath_state_t	estate = {B_FALSE, 0};
+	int			err;
 
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
 	switch (type) {
@@ -5443,13 +5589,10 @@ mac_start_logusage(mac_logtype_t type, uint_t interval)
 	}
 
 	/* Disable fastpath */
-	mod_hash_walk(i_mac_impl_hash, i_mac_fastpath_disable_walker, &state);
-	if ((err = state.mf_err) != 0) {
+	mod_hash_walk(i_mac_impl_hash, i_mac_fastpath_walker, &dstate);
+	if ((err = dstate.mf_err) != 0) {
 		/* Reenable fastpath  */
-		state.mf_disable = B_FALSE;
-		state.mf_err = 0;
-		mod_hash_walk(i_mac_impl_hash,
-		    i_mac_fastpath_disable_walker, &state);
+		mod_hash_walk(i_mac_impl_hash, i_mac_fastpath_walker, &estate);
 		rw_exit(&i_mac_impl_lock);
 		return (err);
 	}
@@ -5470,17 +5613,23 @@ mac_start_logusage(mac_logtype_t type, uint_t interval)
 }
 
 /*
- * Stop the logging timer if both Link and Flow logging are turned off.
+ * Stop the logging timer if both link and flow logging are turned off.
  */
 void
 mac_stop_logusage(mac_logtype_t type)
 {
 	i_mac_log_state_t	lstate;
-	i_mac_fastpath_state_t	state = {B_FALSE, 0};
+	i_mac_fastpath_state_t	estate = {B_FALSE, 0};
+	list_t			net_log_list;
+
+	list_create(&net_log_list, sizeof (netinfo_t),
+	    offsetof(netinfo_t, ni_link));
 
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
+
 	lstate.mi_fenable = mac_flow_log_enable;
 	lstate.mi_lenable = mac_link_log_enable;
+	lstate.mi_list = &net_log_list;
 
 	/* Last walk */
 	lstate.mi_last = B_TRUE;
@@ -5506,14 +5655,13 @@ mac_stop_logusage(mac_logtype_t type)
 	}
 
 	/* Reenable fastpath */
-	mod_hash_walk(i_mac_impl_hash, i_mac_fastpath_disable_walker, &state);
+	mod_hash_walk(i_mac_impl_hash, i_mac_fastpath_walker, &estate);
 
-	rw_exit(&i_mac_impl_lock);
 	(void) untimeout(mac_logging_timer);
 	mac_logging_timer = 0;
 
-	/* Last walk */
-	mod_hash_walk(i_mac_impl_hash, i_mac_log_walker, &lstate);
+	/* Write log entries for each mac_impl in the list */
+	i_mac_log_info(&net_log_list, &lstate);
 }
 
 /*
