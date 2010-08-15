@@ -45,8 +45,6 @@ public class ConfigureDhcp extends DhcpCfgFunction {
      */
     static final int supportedOptions[] = {
 	DhcpCfg.NON_NEGOTIABLE_LEASE,
-	DhcpCfg.HOSTS_RESOURCE,
-	DhcpCfg.HOSTS_DOMAIN,
 	DhcpCfg.LEASE_LENGTH,
 	DhcpCfg.DNS_ADDRESSES,
 	DhcpCfg.DNS_DOMAIN,
@@ -130,41 +128,6 @@ public class ConfigureDhcp extends DhcpCfgFunction {
 	    return (DhcpCfg.FAILURE);
 	}
 
-	// Retrieve the hosts resource and domain options and validate.
-	//
-	String hostsResource = options.valueOf(DhcpCfg.HOSTS_RESOURCE);
-	String hostsDomain = options.valueOf(DhcpCfg.HOSTS_DOMAIN);
-
-	if (hostsResource == null) {
-	    if (hostsDomain != null) {
-		String msg = getString("config_requires_hosts_resource_error");
-		throw new IllegalArgumentException(msg);
-	    }
-        } else if (hostsResource.equals(DhcpdOptions.DSVC_CV_DNS)) {
-            if (hostsDomain == null) {
-                Object [] arguments = new Object[1];
-                arguments[0] = hostsResource;
-                printErrMessage(
-                    getString("config_requires_hosts_domain_error"),
-                    arguments);
-                return (DhcpCfg.FAILURE);
-            }
-	} else if (hostsResource.equals(DhcpdOptions.DSVC_CV_FILES)) {
-	    if (hostsDomain != null) {
-		Object [] arguments = new Object[1];
-		arguments[0] = hostsResource;
-		printErrMessage(getString("config_hosts_domain_ignored_error"),
-		    arguments);
-		return (DhcpCfg.FAILURE);
-	    }
-	} else {
-	    Object [] arguments = new Object[1];
-	    arguments[0] = hostsResource;
-	    printErrMessage(getString("config_invalid_hosts_resource_error"),
-		arguments);
-	    return (DhcpCfg.FAILURE);
-	}
-
 	// Retrieve the leaseLength option and check its validity.
 	// The default (3600*24 = 1 day) should be defined as static somewhere.
 	//
@@ -238,12 +201,6 @@ public class ConfigureDhcp extends DhcpCfgFunction {
 	DhcpdOptions dhcpdOptions = new DhcpdOptions();
 	dhcpdOptions.setDaemonEnabled(true);
 	dhcpdOptions.setDhcpDatastore(getDhcpDatastore());
-	if (hostsResource != null) {
-	    dhcpdOptions.setHostsResource(hostsResource);
-	}
-	if (hostsDomain != null) {
-	    dhcpdOptions.setHostsDomain(hostsDomain);
-	}
 	try {
 	    getSvcMgr().writeDefaults(dhcpdOptions);
 	    printMessage(getString("config_create_conf_progress"));

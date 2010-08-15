@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -44,25 +42,25 @@ public class DhcpMgrImpl implements DhcpMgr {
     private static final File lockFile = new File(LOCK_FILE);
     private File currentlyOpenFile = null;
     private Object currentStream = null;
-    
+
     public DhcpMgrImpl() {
 	bridge = new Bridge();
     }
-    
+
     public DhcpNetMgr getNetMgr()  {
 	if (netMgr == null) {
 	    netMgr = new DhcpNetMgrImpl(bridge);
 	}
 	return netMgr;
     }
-    
+
     public DhcptabMgr getDhcptabMgr()  {
 	if (dtMgr == null) {
 	    dtMgr = new DhcptabMgrImpl(bridge);
 	}
 	return dtMgr;
     }
-    
+
     public DhcpServiceMgr getDhcpServiceMgr()  {
 	if (srvMgr == null) {
 	    srvMgr = new DhcpServiceMgrImpl(bridge);
@@ -166,7 +164,7 @@ public class DhcpMgrImpl implements DhcpMgr {
     } // openExportFile
 
     /**
-     * Close an export file, delete it if need be 
+     * Close an export file, delete it if need be
      * @param ref Reference to the open file, returned from openExportFile
      * @param delete true if file is to be deleted on close, false otherwise.
      */
@@ -218,9 +216,9 @@ public class DhcpMgrImpl implements DhcpMgr {
 	// Return reference caller can use to actually do the import
 	return file;
     }
-    
+
     /**
-     * Close an import file, delete it if need be 
+     * Close an import file, delete it if need be
      * @param ref Reference to the open file, returned from openImportFile
      * @param delete true if file is to be deleted on close, false otherwise.
      */
@@ -276,23 +274,23 @@ public class DhcpMgrImpl implements DhcpMgr {
 	}
 	return recArr;
     }
-	
+
     /**
      * Export a list of macros specified by name to a file.
      * @param ref A reference to the file, acquired from openExportFile()
      * @param allMacros true if all macros are to be exported
      * @param names names of macros to be exported if allMacros is false
      */
-    public void exportMacros(Object ref, boolean allMacros, String [] names) 
-    	    throws BridgeException, IOException {
+    public void exportMacros(Object ref, boolean allMacros, String [] names)
+	    throws BridgeException, IOException {
 	if (!isFileOpen((File)ref)) {
-    	    // throw an exception that this is a bad reference
+	    // throw an exception that this is a bad reference
 	    throw new FileNotFoundException(((File)ref).getName());
 	}
-	
+
 	Macro [] macros = getDhcptabMgr().getMacros();
 	if (!allMacros) {
-    	    // Grab only the ones we want
+	    // Grab only the ones we want
 	    ArrayList macArr = getSelectedRecs(names, macros);
 	    macros = (Macro [])macArr.toArray(new Macro[0]);
 	}
@@ -313,7 +311,7 @@ public class DhcpMgrImpl implements DhcpMgr {
 	    // throw an exception that this is a bad reference
 	    throw new FileNotFoundException(((File)ref).getName());
 	}
-	
+
 	Option [] options = getDhcptabMgr().getOptions();
 	if (!allOptions) {
 	    // Grab only the ones we want
@@ -333,10 +331,10 @@ public class DhcpMgrImpl implements DhcpMgr {
     public void exportNetwork(Object ref, Network net)
 	    throws BridgeException, IOException {
 	if (!isFileOpen((File)ref)) {
-    	    // throw an exception that this is a bad reference
+	    // throw an exception that this is a bad reference
 	    throw new FileNotFoundException(((File)ref).getName());
 	}
-	
+
 	// Get clients from database
 	DhcpClientRecord [] clients =
 	    getNetMgr().loadNetworkCompletely(net.toString());
@@ -362,7 +360,7 @@ public class DhcpMgrImpl implements DhcpMgr {
 	DhcptabRecord [] recs = new DhcptabRecord[0];
 
 	if (!isFileOpen((File)ref)) {
-    	    // No such file open; throw an exception
+	    // No such file open; throw an exception
 	    throw new FileNotFoundException(((File)ref).getName());
 	}
 	ObjectInputStream ois = (ObjectInputStream)currentStream;
@@ -415,7 +413,7 @@ public class DhcpMgrImpl implements DhcpMgr {
      * @return An array of errors in the import process; empty if all OK
      */
     public ActionError [] importOptions(Object ref, boolean overwrite)
-   	    throws IOException, OptionalDataException, ClassNotFoundException {
+	    throws IOException, OptionalDataException, ClassNotFoundException {
 	return importDhcptabRecs(DhcptabRecord.OPTION, ref, overwrite);
     }
 
@@ -426,7 +424,7 @@ public class DhcpMgrImpl implements DhcpMgr {
      * @return An array of errors in the import process; empty if all OK
      */
     public ActionError [] importMacros(Object ref, boolean overwrite)
-   	    throws IOException, OptionalDataException, ClassNotFoundException {
+	    throws IOException, OptionalDataException, ClassNotFoundException {
 	return importDhcptabRecs(DhcptabRecord.MACRO, ref, overwrite);
     }
 
@@ -441,10 +439,10 @@ public class DhcpMgrImpl implements DhcpMgr {
      */
     public ActionError [] importNetwork(Network net, Object ref,
 	    boolean overwrite) throws IOException, OptionalDataException,
-    	    ClassNotFoundException, BridgeException {
+	    ClassNotFoundException, BridgeException {
 
 	if (!isFileOpen((File)ref)) {
-    	    // No such file open; throw an exception
+	    // No such file open; throw an exception
 	    throw new FileNotFoundException(((File)ref).getName());
 	}
 
@@ -478,7 +476,7 @@ public class DhcpMgrImpl implements DhcpMgr {
 	    if (overwrite && netExisted) {
 		try {
 		    /*
-   		     * Hack alert!  We reset the signature to a default value
+		     * Hack alert!  We reset the signature to a default value
 		     * that the datastores will not interpret.  This allows us
 		     * to forcibly delete the record, even if it came from a
 		     * previous attempt to import this record.  Without this
@@ -491,7 +489,7 @@ public class DhcpMgrImpl implements DhcpMgr {
 		     * in the mix which uses serialization, such as RMI.
 		     */
 		    clients[i].setSignature(DhcpClientRecord.DEFAULT_SIGNATURE);
-		    mgr.deleteClient(clients[i], networkName, true);
+		    mgr.deleteClient(clients[i], networkName);
 		} catch (Throwable t) {
 		    // Ignore delete error, we'll probably have an error on add
 		}

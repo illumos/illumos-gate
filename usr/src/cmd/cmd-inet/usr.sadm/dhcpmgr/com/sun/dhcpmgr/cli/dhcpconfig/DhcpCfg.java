@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -36,7 +34,7 @@ import java.text.MessageFormat;
  * This class represents the entry point to the DHCP CLI dhcp configuration
  * administration.
  */
-public class DhcpCfg 
+public class DhcpCfg
     extends DhcpCliProgram {
 
     /**
@@ -48,7 +46,7 @@ public class DhcpCfg
      * The valid options for all DhcpCfg administration.
      */
     private static String optString =
-	"DUCnfxbkgh;I:R:N:X:r;p:u:l:d;a:m:t:y:s:o:P;Seq";
+	"DUCnfxbkgI:R:N:X:r;p:u:l:d;a:m:t:y:s:o:P;Seq";
 
     public static final int CONFIGURE_DHCP		= 'D';
     public static final int CONFIGURE_BOOTP		= 'R';
@@ -66,8 +64,6 @@ public class DhcpCfg
     public static final int DELETE_TABLES		= 'x';
     public static final int KEEP_TABLES			= 'k';
     public static final int POINT_TO_POINT		= 'b';
-    public static final int HOSTS_RESOURCE		= 'h';
-    public static final int DELETE_HOSTS		= 'h';
     public static final int RESOURCE			= 'r';
     public static final int RESOURCE_CONFIG		= 'u';
     public static final int PATH			= 'p';
@@ -82,7 +78,6 @@ public class DhcpCfg
     public static final int OPTION_LIST			= 'o';
     public static final int ROUTER_ADDRESSES		= 't';
     public static final int NIS_DOMAIN			= 'y';
-    public static final int HOSTS_DOMAIN		= 'y';
     public static final int SIGHUP			= 'g';
     public static final int SERVICE_ENABLE		= 'e';
     public static final int SERVICE_REENABLE		= 'r';
@@ -177,7 +172,7 @@ public class DhcpCfg
      * @param value the option value(if any)
      * @exception IllegalArgumentException if an invalid argument was entered
      */
-    public void processArg(int option, String value) 
+    public void processArg(int option, String value)
 	throws IllegalArgumentException {
 
     	switch (option) {

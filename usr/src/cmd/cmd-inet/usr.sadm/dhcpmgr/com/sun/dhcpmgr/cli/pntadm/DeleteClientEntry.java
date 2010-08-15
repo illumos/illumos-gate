@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -43,7 +41,6 @@ public class DeleteClientEntry extends PntAdmFunction {
      * The valid options associated with deleting a client entry.
      */
     static final int supportedOptions[] = {
-	PntAdm.DELETE_HOST,
 	PntAdm.RESOURCE,
 	PntAdm.RESOURCE_CONFIG,
 	PntAdm.PATH
@@ -83,14 +80,6 @@ public class DeleteClientEntry extends PntAdmFunction {
 
 	int returnCode = PntAdm.SUCCESS;
 
-	// Check to see if the user wants the host deleted.
-	//
-	boolean deleteHost = options.isSet(PntAdm.DELETE_HOST);
-	if (deleteHost && !isHostsManaged()) {
-		deleteHost = false;
-		returnCode = PntAdm.WARNING;
-	}
-
 	// Build up a DhcpClientRecord from the user specified options.
 	//
 	try {
@@ -108,7 +97,7 @@ public class DeleteClientEntry extends PntAdmFunction {
 	    // if requested.
 	    //
 	    getNetMgr().deleteClient(dhcpClientRecord, network.toString(),
-		deleteHost, getDhcpDatastore());
+		getDhcpDatastore());
 
 	} catch (NoEntryException e) {
 	    printErrMessage(getMessage(e));

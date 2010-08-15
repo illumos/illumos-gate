@@ -64,347 +64,6 @@ public class ConfigWizard extends DSWizard {
 	ResourceStrings.getString("cfg_wiz_days"),
 	ResourceStrings.getString("cfg_wiz_weeks") };
     private static final int [] unitMultiples = { 60*60, 24*60*60, 7*24*60*60 };
-    private HostResource hostResource = null;
-
-    /**
-     * This class defines a host resource component.
-     */
-    private class HostResource extends Box {
-
-	/**
-	 * The host resource(eg., files, dns).
-	 */
-	private String resource = null;
-
-	/**
-	 * The description of the resource.
-	 */
-	private String description = null;
-
-	/**
-	 * The button for the resource.
-	 */
-	private HostButton hostButton = null;
-
-	/**
-	 * The domain field for the resource (if any)
-	 */
-	private NoSpaceField domainField = null;
-
-	/**
-	 * The constructor.
-	 * @param resource the resource value for the config file
-	 * @param description description of the resource
-	 * @param defaultdomain default domain (if any) for the resource
-	 * @param enabled determines whether resource is selectable
-	 */
-	public HostResource(String resource, String description,
-	    String defaultDomain, String domainDescription, boolean enabled) {
-
-	    super(BoxLayout.X_AXIS);
-
-	    this.resource = resource;
-	    this.description = description;
-
-	    // Every host resource needs a button even if the resource
-	    // isn't one that will be selectable.
-	    //
-	    hostButton = new HostButton(this, false);
-	    hostButton.setAlignmentX(Component.LEFT_ALIGNMENT);
-	    add(hostButton);
-	    if (!enabled) {
-		hostButton.setEnabled(false);
-		defaultDomain = new String();
-	    }
-
-	    // If the defaultDomain is null, then the host resource
-	    // does not require a domain. Otherwise, the resource
-	    // must have a text field so that the user can supply
-	    // a domain.
-	    //
-	    if (defaultDomain != null) {
-		add(Box.createHorizontalStrut(20));
-
-		Box domainBox = Box.createHorizontalBox();
-
-		JLabel label = new JLabel(domainDescription);
-		label.setForeground(Color.black);
-		domainBox.add(label);
-
-		domainField = new NoSpaceField(defaultDomain, 10);
-		domainField.setEnabled(false);
-		domainField.setMaximumSize(domainField.getPreferredSize());
-
-		label.setLabelFor(domainField);
-		domainBox.add(domainField);
-		label.setToolTipText(description);
-
-		add(domainBox);
-
-		if (!enabled) {
-		    domainField.setEditable(false);
-		    label.setEnabled(false);
-		} else {
-		    // Disable the forward button if domain empty.
-		    DocumentListener listener = new DocumentListener() {
-			public void insertUpdate(DocumentEvent e) {
-			    setForwardEnabled(
-				domainField.getText().length() != 0);
-			}
-			public void changedUpdate(DocumentEvent e) {
-			    insertUpdate(e);
-			}
-			public void removeUpdate(DocumentEvent e) {
-			    insertUpdate(e);
-			}
-		    };
-		    domainField.getDocument().addDocumentListener(listener);
-		}
-
-	    }
-
-	} // constructor
-
-	/**
-	 * Sets or unsets the host resource.
-	 * @param isSelected if true, sets the resource, else unsets it
-	 */
-	public void setSelected(boolean isSelected) {
-	    if (isSelected) {
-		setHostResource(this);
-		if (!hostButton.isSelected()) {
-		    hostButton.setSelected(true);
-		}
-		if (domainField != null) {
-		    domainField.setEnabled(true);
-		    setForwardEnabled(domainField.getText().length() != 0);
-		} else {
-		    setForwardEnabled(true);
-		}
-	    } else {
-		if (domainField != null) {
-		    domainField.setEnabled(false);
-		}
-	    }
-	} // setSelected
-
-	/**
-	 * Returns the host resource.
-	 * @return the host resource.
-	 */
-	public String getResource() {
-	    return resource;
-	} // getResource
-
-	/**
-	 * Returns the resource description.
-	 * @return the resource description.
-	 */
-	public String getDescription() {
-	    return description;
-	} // getDescription
-
-	/**
-	 * Returns the domain for this component.
-	 * @return the domain for this component.
-	 */
-	public String getDomain() {
-	    if (domainField == null) {
-		return null;
-	    } else {
-		return domainField.getText();
-	    }
-	} // getDomain
-
-	/**
-	 * Returns the HostButton contained in this component.
-	 * @return the HostButton contained in this component.
-	 */
-	public HostButton getHostButton() {
-	    return hostButton;
-	} // getHostButton
-
-    } // hostResource
-
-    /**
-     * This class maps a radio button to its HostResource
-     */
-    private class HostButton extends JRadioButton {
-
-	/**
-	 * The HostResource to link to the radio button.
-	 */
-	private HostResource hostResource = null;
-
-	/**
-	 * Constructs a HostButton from a HostResource and determines
-	 * whether the button should be selected using the boolean argument.
-	 * @param hostResource the HostResource to map to the radio button.
-	 * @param selected select the radio button?
-	 */
-	public HostButton(HostResource hostResource, boolean selected) {
-	    super(hostResource.getDescription(), selected);
-	    this.hostResource = hostResource;
-	} // constructor
-
-	/**
-	 * Returns the HostResource mapped to the radio button.
-	 * @return the HostResource mapped to the radio button.
-	 */
-	public HostResource getHostResource() {
-	    return hostResource;
-	} // getHostResource
-
-    } // HostButton
-
-    // Select where host data will be stored.
-    class HostDataStep implements WizardStep {
-
-	/**
-	 * The component provided to the wizard.
-	 */
-	private Box stepBox;
-
-	/**
-	 * The basic constructor for the wizard step.
-	 */
-	public HostDataStep() {
-
-	    stepBox = Box.createVerticalBox();
-
-	    // Explanatory step text
-	    //
-	    JComponent c = Wizard.createTextArea(
-		ResourceStrings.getString("cfg_wiz_host_explain"), 2, 45);
-	    c.setAlignmentX(Component.LEFT_ALIGNMENT);
-	    stepBox.add(c);
-	    stepBox.add(Box.createVerticalStrut(5));
-
-	    // Create button listener, that will set the selected
-	    // host resource when the button is selected.
-	    //
-	    ChangeListener buttonListener = new ChangeListener() {
-		public void stateChanged(ChangeEvent e) {
-		    HostButton button = (HostButton)e.getSource();
-		    HostResource hostResource = button.getHostResource();
-		    hostResource.setSelected(button.isSelected());
-		}
-	    };
-
-	    // Create panel that will contain the buttons.
-	    //
-	    JPanel boxPanel = new JPanel();
-	    boxPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-	    boxPanel.setLayout(new GridLayout(4, 1));
-
-	    // List the host resource choices.
-	    //
-	    ButtonGroup buttonGroup = new ButtonGroup();
-
-	    // The "do not manage hosts" option.
-	    //
-	    String hostDescription =
-		ResourceStrings.getString("cfg_wiz_no_host_management");
-	    HostResource hostResource = new HostResource(null,
-		hostDescription, null, null, true);
-	    HostButton hbMgt = hostResource.getHostButton();
-            hbMgt.setToolTipText(hostDescription);
-	    hostResource.setSelected(true);
-	    hostResource.getHostButton().addChangeListener(buttonListener);
-	    buttonGroup.add(hostResource.getHostButton());
-	    boxPanel.add(hostResource);
-
-	    // The "files" option.
-	    //
-	    hostDescription =
-		ResourceStrings.getString("cfg_wiz_files");
-	    hostResource = new HostResource(DhcpConfigOpts.DSVC_CV_FILES,
-		hostDescription, null, null, true);
-	    HostButton hb = hostResource.getHostButton();
-	    hb.setToolTipText(hostDescription);
-	    hostResource.getHostButton().addChangeListener(buttonListener);
-	    buttonGroup.add(hostResource.getHostButton());
-	    boxPanel.add(hostResource);
-
-	    // The "dns" option. Only enabled if it can be managed
-	    // from the selected server.
-	    //
-	    String domainDefault = null;
-	    boolean enabled = false;
-	    String domainDescription =
-		ResourceStrings.getString("cfg_wiz_domain") + " ";
-	    try {
-		domainDefault =
-		    server.getStringOption(StandardOptions.CD_DNSDOMAIN, "");
-	    } catch (Throwable e) {
-		domainDefault = new String();
-	    }
-
-	    try {
-		enabled =
-		    server.isHostsValid(DhcpConfigOpts.DSVC_CV_DNS, "");
-	    } catch (Throwable e) {
-		enabled = false;
-	    }
-
-	    hostDescription =
-		ResourceStrings.getString("cfg_wiz_dns");
-
-	    hostResource = new HostResource(DhcpConfigOpts.DSVC_CV_DNS,
-		hostDescription, domainDefault, domainDescription, enabled);
-	    HostButton hbDNS = hostResource.getHostButton();
-            hbDNS.setToolTipText(hostDescription);
-	    hostResource.getHostButton().addChangeListener(buttonListener);
-	    buttonGroup.add(hostResource.getHostButton());
-	    boxPanel.add(hostResource);
-
-	    // Add the panel to the stepBox component.
-	    //
-	    stepBox.add(boxPanel);
-	    stepBox.add(Box.createVerticalStrut(10));
-	    stepBox.add(Box.createVerticalGlue());
-
-	} // constructor
-
-	public String getDescription() {
-	    return ResourceStrings.getString("cfg_wiz_hostdata_desc");
-	} // getDescription
-
-	public Component getComponent() {
-	    return stepBox;
-	} // getComponent
-
-	public void setActive(int direction) {
-	    setForwardEnabled(true);
-	} // setActive
-
-	public boolean setInactive(int direction) {
-
-	    // If moving forward, validate that the host resource/domain
-	    // input by the user is manageable from the selected server.
-	    //
-	    boolean valid = true;
-	    if (direction == FORWARD) {
-		String resource = getHostResource().getResource();
-		String domain = getHostResource().getDomain();
-		if (resource != null) {
-		    try {
-			valid = server.isHostsValid(resource, domain);
-		    } catch (Throwable e) {
-			valid = false;
-		    }
-		}
-		if (!valid) {
-		    JOptionPane.showMessageDialog(ConfigWizard.this,
-			ResourceStrings.getString("cfg_wiz_invalid_host"),
-			ResourceStrings.getString("input_error"),
-			JOptionPane.ERROR_MESSAGE);
-		}
-	    }
-	    return (valid);
-	} // setInactive
-
-    } // HostDataStep
 
     // This step specifies lease length and renewal policies for the server
     class LeaseStep implements WizardStep {
@@ -1161,7 +820,6 @@ public class ConfigWizard extends DSWizard {
 
     class ReviewStep implements WizardStep {
 	private JLabel storeLabel;
-	private JLabel hostLabel;
 	private JLabel leaseLabel;
 	private JLabel networkLabel;
 	private JLabel netTypeLabel;
@@ -1192,9 +850,6 @@ public class ConfigWizard extends DSWizard {
 	    if (fullConfig) {
 		addLabel("cfg_wiz_datastore");
 		storeLabel = addField("uninitialized");
-
-		addLabel("cfg_wiz_hosts_resource");
-		hostLabel = addField("uninitialized");
 
 		jlTmp = addLabelMnemonic("cfg_wiz_lease_length");
 		leaseLabel = addField("1 day");
@@ -1276,7 +931,6 @@ public class ConfigWizard extends DSWizard {
 	    setFinishEnabled(true);
 	    if (fullConfig) {
 		storeLabel.setText(getDsconf().getModule().getDescription());
-		hostLabel.setText(getHostResource().getDescription());
 
 		// Display lease length, reducing to largest units possible
 		int lengthVal = 0;
@@ -1378,7 +1032,6 @@ public class ConfigWizard extends DSWizard {
 		ResourceStrings.getString("cfg_wiz_explain"),
 		ResourceStrings.getString("cfg_wiz_store_explain")));
 	    addStep(new DatastoreModuleStep());
-	    addStep(new HostDataStep());
 	    addStep(new LeaseStep());
 	    addStep(new DnsStep());
 	}
@@ -1428,12 +1081,6 @@ public class ConfigWizard extends DSWizard {
 	    DhcpdOptions options = new DhcpdOptions();
 	    options.setDaemonEnabled(true);
 	    options.setDhcpDatastore(getDsconf().getDS());
-	    if (getHostResource().getResource() != null) {
-		options.setHostsResource(getHostResource().getResource());
-	    }
-	    if (getHostResource().getDomain() != null) {
-		options.setHostsDomain(getHostResource().getDomain());
-	    }
 	    try {
 		server.writeDefaults(options);
 	    } catch (Throwable e) {
@@ -1537,21 +1184,4 @@ public class ConfigWizard extends DSWizard {
 	    DhcpmgrApplet.showHelp("network_wizard");
 	}
     }
-
-    /**
-     * Sets hostResource.
-     * @param hostResource the host resource value.
-     */
-    public void setHostResource(HostResource hostResource) {
-	this.hostResource = hostResource;
-    } // setHostResource
-
-    /**
-     * Returns the hostResource.
-     * @return the hostResource.
-     */
-    public HostResource getHostResource() {
-	return hostResource;
-    } // getHostResource
-
 }

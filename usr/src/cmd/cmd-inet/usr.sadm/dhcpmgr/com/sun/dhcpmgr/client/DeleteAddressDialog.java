@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright 1998-2002 by Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -44,10 +42,9 @@ import com.sun.dhcpmgr.bridge.BridgeException;
  */
 
 public class DeleteAddressDialog extends MultipleOperationDialog {
-    private JCheckBox hostsBox;
     private DhcpClientRecord [] recs;
     private String table;
-    
+
     // Model for the list of addresses to be deleted
     class AddressTableModel extends AbstractTableModel {
 	public int getRowCount() {
@@ -57,11 +54,11 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
 		return recs.length;
 	    }
 	}
-	
+
 	public int getColumnCount() {
 	    return 2;
 	}
-	
+
 	public Object getValueAt(int row, int column) {
 	    if (column == 0) {
 		return recs[row].getClientIP();
@@ -75,7 +72,7 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
 		}
 	    }
 	}
-	    
+
 	public Class getColumnClass(int column) {
 	    if (column == 0) {
 		return IPAddress.class;
@@ -91,8 +88,8 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
 		return ResourceStrings.getString("client_name_column");
 	    }
 	}
-    }    
-    
+    }
+
     public DeleteAddressDialog(Frame f, DhcpClientRecord [] clients,
 	    String table) {
 	// Create the dialog without a reset button
@@ -100,7 +97,7 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
 	recs = clients;
 	this.table = table;
     }
-    
+
     public String getTitle() {
 	return ResourceStrings.getString("delete_address_title");
     }
@@ -108,7 +105,7 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
     protected JPanel getMainPanel() {
 	JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
 	mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-	
+
 	// Place a message at the top of the display
 	JLabel message = new JLabel(
 	    ResourceStrings.getString("delete_address_confirm"));
@@ -118,7 +115,7 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
 	    ResourceStrings.getString("delete_address_confirm"));
 
 	mainPanel.add(message, BorderLayout.NORTH);
-	
+
 	// Now show the list of addresses to be deleted in a table in the middle
 	JTable addressTable = new JTable(new AddressTableModel());
 	JScrollPane scrollPane = new JScrollPane(addressTable);
@@ -128,27 +125,6 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
 	addressTable.setDefaultRenderer(IPAddress.class,
 	    new ExtendedCellRenderer());
 	mainPanel.add(scrollPane, BorderLayout.CENTER);
-	
-	// Allow user to specify if hosts records will be deleted, too
-	hostsBox = new JCheckBox(
-	    ResourceStrings.getString("delete_hosts_checkbox"), true);
-	hostsBox.setToolTipText(
-	    ResourceStrings.getString("delete_hosts_checkbox"));
-
-	hostsBox.setHorizontalAlignment(SwingConstants.CENTER);
-	mainPanel.add(hostsBox, BorderLayout.SOUTH);
-
-	hostsBox.setEnabled(true);
-	try {
-	    DhcpdOptions opts =
-	    DataManager.get().getDhcpServiceMgr().readDefaults();
-	    if (opts.getHostsResource() == null) {
-		hostsBox.setEnabled(false);
-		hostsBox.setSelected(false);
-	    }
-	} catch (BridgeException e) {
-	    // Assume set
-	}
 
 	buttonPanel.setOkEnabled(true);
 	return mainPanel;
@@ -175,24 +151,16 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
         return new Thread() {
 	    public void run() {
 		DhcpNetMgr server = DataManager.get().getDhcpNetMgr();
-		boolean deleteHosts = hostsBox.isSelected();
 		for (int i = 0; i < recs.length; ++i) {
 		    try {
-			server.deleteClient(recs[i], table, deleteHosts);
+			server.deleteClient(recs[i], table);
 			updateProgress(i+1, recs[i].getClientIPAddress());
 		    } catch (InterruptedException e) {
 			// User asked us to stop
 			closeDialog();
 			return;
 		    } catch (Throwable e) {
-			if (e.getMessage().equals("hosts")) {
-			    // Failure was in deleting hosts entry
-			    addError(recs[i].getClientIP(),
-				ResourceStrings.getString(
-				    "hosts_entry_missing"));
-			} else {
-			    addError(recs[i].getClientIP(), e.getMessage());
-			}
+                        addError(recs[i].getClientIP(), e.getMessage());
 		    }
 		}
 		// Errors occurred, display them
@@ -200,7 +168,7 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
 		    displayErrors(
 			ResourceStrings.getString("delete_address_error"));
 		}
-	    	closeDialog();
+		closeDialog();
 	    }
 	};
     }
@@ -208,7 +176,7 @@ public class DeleteAddressDialog extends MultipleOperationDialog {
     protected String getHelpKey() {
 	return "delete_address";
     }
-    
+
     protected void fireActionPerformed() {
 	fireActionPerformed(this, DialogActions.DELETE);
     }

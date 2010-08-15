@@ -23,8 +23,9 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/SUNWrmwb@0.5.11,5.11-0.133
-set name=pkg.renamed value=true
+# Was renamed to pkg:/system/management/wbem/resource-management, both are now
+# obsolete.  This is made obsolete at $(PKGVERS) to match it.
+set name=pkg.fmri value=pkg:/SUNWrmwb@$(PKGVERS)
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/system/management/wbem/resource-management@0.5.11,5.11-0.133 \
-    type=require
+

@@ -59,7 +59,6 @@
 	<STRONG><A HREF="dhcp_relay_ref.html">Servers and Relays</A></STRONG><BR>
 	<IMG SRC="art/tip2.gif" WIDTH=12 HEIGHT=10 BORDER=0 ALT="">DHCP Config<BR>
 	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#store"><EM>Data Store</EM></A><BR>
-   &nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#dspath"><EM>Path</EM></A><BR>
    &nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#hostnmserv"><EM>Hosts Name Service</EM></A><BR>
 	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#lease"><EM>Lease Policy</EM></A><BR>
 	&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="#dns"><EM>DNS Domain/Server</EM></A><BR>
@@ -138,36 +137,6 @@ The DHCP Configuration Wizard, asks you to supply the following information.
 </td>
 </tr>
 <!-- end data store row -->
-	<tr>
-<td width=125 valign="top"><A NAME="dspath"><STRONG>Data store path</STRONG></A><br>
-</td>
-<td>If you chose text files or binary files as your data store, enter the path to the 
-	data (default=<tt>/var/dhcp</tt>).<p>
-	<P> </td></tr>
-
-	
-<tr>
-	<td width=125 valign="top"><A NAME="hostnmserv"><STRONG>Hosts name service</STRONG></A><br>
-	</td>
-	<td valign="top">Select the name service that the DHCP server should use to register host names associated with IP addresses that it allocates to clients. 
- <table cellspacing=3 cellpadding=3>
-		<tr>
-		<td width=90 valign="top"><em>Do not manage hosts records</em></td>
-		<td valign="top">The DHCP server will not attempt to add host name entries to any name service. An administrator should add the names manually to a name service. </td>
-		</tr>
-<tr>
-		<td width=90 valign="top"><em>/etc/hosts</em></td>
-		<td valign="top">The DHCP server will add host name entries to the servers /etc/hosts table. </td>
-		</tr>
-<tr>
-		<td width=90 valign="top"><em>DNS</em></td>
-		<td valign="top">The DHCP server will add host name entries to DNS if the DHCP daemon and DNS daemon are running on the same system.  You must supply the DNS domain name. </td>
-		</tr>
-</table>
-
-	</td> 
-	</tr>
-<!-- End of Hosts name service row -->
 	<tr>
 	<td width=125 valign="top"><A NAME="lease"><STRONG>Lease Policy</STRONG></A><br>
 	</td>

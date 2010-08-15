@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright 1998-2002 by Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -46,19 +44,19 @@ import com.sun.dhcpmgr.bridge.BridgeException;
  * A dialog to remove one or more networks from the DHCP configuration.
  */
 public class DeleteNetworksDialog extends MultipleOperationDialog {
-    
+
     class NetworkListModel extends AbstractListModel {
 	private Vector networks;
-	
+
 	public NetworkListModel() {
 	    networks = new Vector();
 	}
-	
+
 	public void setNetworks(Network [] nets) {
 	    networks.removeAllElements();
 	    addNetworks(nets);
 	}
-	
+
 	public void addNetworks(Object [] nets) {
 	    if (nets != null) {
 		for (int i = 0; i < nets.length; ++i) {
@@ -67,28 +65,27 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 	    }
 	    fireContentsChanged(this, 0, networks.size()-1);
 	}
-	
+
 	public void deleteNetworks(Object [] nets) {
 	    for (int i = 0; i < nets.length; ++i) {
 		networks.removeElement((Network)nets[i]);
 	    }
 	    fireContentsChanged(this, 0, networks.size()-1);
 	}
-	
+
 	public Object getElementAt(int index) {
 	    return networks.elementAt(index);
 	}
-	
+
 	public int getSize() {
 	    return networks.size();
-	}	
+	}
     }
-    
+
     private JList keepNets, deleteNets;
-    private JCheckBox deleteHosts;
     private LeftButton leftButton;
     private RightButton rightButton;
-    
+
     public DeleteNetworksDialog(Frame f) {
 	// We want a reset button
 	super(f, true);
@@ -101,7 +98,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
     protected JPanel getMainPanel() {
 	JPanel mainPanel = new JPanel(new BorderLayout());
 	mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-		
+
 	JPanel netBox = new JPanel(new ProportionalLayout());
 	JPanel panel = new JPanel(new BorderLayout(5, 5));
 
@@ -119,7 +116,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 	JScrollPane scrollPane = new JScrollPane(keepNets);
 	panel.add(scrollPane, BorderLayout.CENTER);
 	netBox.add("2", panel);
-	
+
 	panel = new JPanel(new VerticalButtonLayout());
 	leftButton = new LeftButton();
 	rightButton = new RightButton();
@@ -128,7 +125,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 	panel.add(rightButton);
 	panel.add(leftButton);
 	netBox.add("1", panel);
-	
+
 	panel = new JPanel(new BorderLayout(5, 5));
 
 	Mnemonic mnDel =
@@ -147,29 +144,9 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 	scrollPane = new JScrollPane(deleteNets);
 	panel.add(scrollPane, BorderLayout.CENTER);
 	netBox.add("2", panel);
-	
+
 	mainPanel.add(netBox, BorderLayout.CENTER);
-	
-	deleteHosts = new JCheckBox(
-	    ResourceStrings.getString("delete_networks_delete_hosts"));
-	deleteHosts.setToolTipText(
-	    ResourceStrings.getString("delete_networks_delete_hosts"));
 
-	panel = new JPanel();
-	panel.add(deleteHosts);
-	mainPanel.add(panel, BorderLayout.SOUTH);
-
-	deleteHosts.setEnabled(true);
-	try {
-	    DhcpdOptions opts =
-	    DataManager.get().getDhcpServiceMgr().readDefaults();
-	    if (opts.getHostsResource() == null) {
-		deleteHosts.setEnabled(false);		
-	    }
-	} catch (BridgeException e) {
-	    // Assume set
-	}
-	
 	// Handle enable and disable of buttons based on selection state
 	keepNets.addListSelectionListener(new ListSelectionListener() {
 	    public void valueChanged(ListSelectionEvent e) {
@@ -179,7 +156,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 		}
 	    }
 	});
-	
+
 	deleteNets.addListSelectionListener(new ListSelectionListener() {
 	    public void valueChanged(ListSelectionEvent e) {
 		leftButton.setEnabled(!deleteNets.isSelectionEmpty());
@@ -188,7 +165,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 		}
 	    }
 	});
-	
+
 	// Handle button presses
 	rightButton.addActionListener(new ActionListener() {
 	    public void actionPerformed(ActionEvent e) {
@@ -205,7 +182,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 		keepNets.clearSelection();
 	    }
 	});
-	
+
 	leftButton.addActionListener(new ActionListener() {
 	    public void actionPerformed(ActionEvent e) {
 		Object [] nets = deleteNets.getSelectedValues();
@@ -226,11 +203,10 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 
 	return mainPanel;
     }
-    
+
     protected void doReset() {
 	try {
 	    buttonPanel.setOkEnabled(false);
-	    deleteHosts.setSelected(false);
 	    ((NetworkListModel)deleteNets.getModel()).setNetworks(null);
 	    ((NetworkListModel)keepNets.getModel()).setNetworks(
 		DataManager.get().getNetworks(false));
@@ -247,7 +223,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
     protected int getProgressLength() {
         return deleteNets.getModel().getSize();
     }
-    
+
     protected String getErrorHeading() {
     	return ResourceStrings.getString("network_column");
     }
@@ -255,13 +231,13 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
     protected Thread getOperationThread() {
     	return new Thread() {
 	    public void run() {
-	        NetworkListModel model =
+		NetworkListModel model =
 		    (NetworkListModel)deleteNets.getModel();
 		for (int i = 0; i < model.getSize(); ++i) {
 		    Network net = (Network)model.getElementAt(i);
 		    try {
 			DataManager.get().getDhcpNetMgr().deleteNetwork(
-			    net.toString(), true, deleteHosts.isSelected());
+			    net.toString(), true);
 			updateProgress(i+1, net.toString());
 		    } catch (InterruptedException e) {
 			// User asked us to stop
@@ -273,7 +249,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
 		}
 		if (errorsOccurred()) {
 		    displayErrors(
-		        ResourceStrings.getString("delete_networks_error"));
+			ResourceStrings.getString("delete_networks_error"));
     		}
 		closeDialog();
 	    }
@@ -283,7 +259,7 @@ public class DeleteNetworksDialog extends MultipleOperationDialog {
     protected String getHelpKey() {
     	return "delete_network";
     }
-    
+
     protected void fireActionPerformed() {
 	fireActionPerformed(this, DialogActions.OK);
     }

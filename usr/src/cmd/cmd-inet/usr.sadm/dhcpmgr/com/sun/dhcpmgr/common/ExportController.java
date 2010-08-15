@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -195,7 +193,7 @@ public class ExportController {
 		// Load network list
 		setNetworks(server.getNetMgr().getNetworks());
 	    } catch (Exception e) {
-		displayException(e, 
+		displayException(e,
 		    ResourceStrings.getString("exp_err_loading_networks"));
 		return false;
 	    }
@@ -264,7 +262,7 @@ public class ExportController {
 		    ResourceStrings.getString("exp_exporting_options"));
 	    }
 	    try {
-	    	server.exportOptions(ref, allOptions, options);
+		server.exportOptions(ref, allOptions, options);
 	    } catch (BridgeException e) {
 		displayException(e,
 		    ResourceStrings.getString("exp_err_exporting_options"));
@@ -280,7 +278,7 @@ public class ExportController {
 
 	    // Now export the macros
 	    try {
-	    	server.exportMacros(ref, allMacros, macros);
+		server.exportMacros(ref, allMacros, macros);
 	    } catch (BridgeException e) {
 		displayException(e,
 		    ResourceStrings.getString("exp_err_exporting_macros"));
@@ -363,7 +361,7 @@ public class ExportController {
 		    nets[0] = networks[i].toString();
 		    exporter.updateProgress(progress, form.format(nets));
 		    try {
-		    	server.getNetMgr().deleteNetwork(nets[0], false, true);
+			server.getNetMgr().deleteNetwork(nets[0], false);
 		    } catch (BridgeException e) {
 			errList.add(new ActionError(nets[0], e));
 		    }
@@ -410,7 +408,7 @@ public class ExportController {
 	} finally {
 	    // Always close before leaving; display any resulting errors
 	    try {
-	    	server.closeExportFile(ref, deleteFile);
+		server.closeExportFile(ref, deleteFile);
 	    } catch (IOException e) {
 		displayException(e,
 		    ResourceStrings.getString("exp_err_closing_file"));

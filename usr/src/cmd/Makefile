@@ -429,7 +429,6 @@ COMMON_SUBDIRS=		\
 	vt		\
 	w		\
 	wall		\
-	wbem		\
 	which		\
 	who		\
 	whodo		\
@@ -723,7 +722,6 @@ MSGSUBDIRS=		\
 	vrrpadm		\
 	vscan		\
 	w		\
-	wbem		\
 	who		\
 	whodo		\
 	wracct		\

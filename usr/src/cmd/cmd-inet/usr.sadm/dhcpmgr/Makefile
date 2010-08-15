@@ -45,7 +45,6 @@ GUI_JARFILES=	com/sun/dhcpmgr/client/*.class \
 SERVER_JAR= 		dhcpsvc.jar
 SERVER_JARFILES=	com/sun/dhcpmgr/server/*.class \
 			com/sun/dhcpmgr/bridge/*.class \
-			com/sun/dhcpmgr/server/*.properties \
 			com/sun/dhcpmgr/bridge/*.properties
 
 

@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -45,8 +43,7 @@ public class UnconfigureDhcp extends DhcpCfgFunction {
      */
     static final int supportedOptions[] = {
 	DhcpCfg.FORCE,
-	DhcpCfg.DELETE_TABLES,
-	DhcpCfg.DELETE_HOSTS
+	DhcpCfg.DELETE_TABLES
     };
 
     /**
@@ -119,10 +116,6 @@ public class UnconfigureDhcp extends DhcpCfgFunction {
 	//
 	boolean deleteTables = options.isSet(DhcpCfg.DELETE_TABLES);
 
-	// Should we delete the host entries?
-	//
-	boolean deleteHosts = options.isSet(DhcpCfg.DELETE_HOSTS);
-	
 	// If this server is just acting as a relay then we don't need to
 	// clean up the dhcptab or the networks.
 	//
@@ -164,8 +157,7 @@ public class UnconfigureDhcp extends DhcpCfgFunction {
 		for (int i = 0; i < networks.length; ++i) {
 		    String netString = networks[i].toString();
 		    try {
-			getNetMgr().deleteNetwork(netString, false,
-			    deleteHosts);
+			getNetMgr().deleteNetwork(netString, false);
 			Object [] arguments = new Object[1];
 			arguments[0] = netString;
 			printMessage(getString("unconfigure_network_progress"),

@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -33,15 +32,12 @@
 CLASSFILES = 	DhcpMgrImpl.class \
 		DhcpNetMgrImpl.class \
 		DhcpServiceMgrImpl.class \
-		DhcptabMgrImpl.class \
-		DhcpHostsTable.class \
-		ResourceStrings.class
+		DhcptabMgrImpl.class
 
 
 include		$(SRC)/lib/Makefile.lib
 
-DIRTABLE_JAR =	/usr/sadm/lib/wbem/providerutility.jar
-CLASSPATH=	$(SRC)/cmd/cmd-inet/usr.sadm/dhcpmgr:$(DIRTABLE_JAR)
+CLASSPATH=	$(SRC)/cmd/cmd-inet/usr.sadm/dhcpmgr
 
 JAVAFILES =	$(CLASSFILES:.class=.java)
 
@@ -52,8 +48,6 @@ MSGDIRS =	$(ROOT)/usr/share/lib/locale \
 		$(ROOT)/usr/share/lib/locale/com/sun/dhcpmgr \
 		$(MSGDIR)
 
-MSGFILES =	ResourceBundle.properties
-MSGS =		$(MSGFILES:%=$(MSGDIR)/%)
 
 CLEANFILES=	*.class
 CLOBBERFILES=
@@ -64,12 +58,6 @@ all: $(CLASSFILES)
 
 install: all
 
-_msg: $(MSGDIRS) $(MSGS)
-
-$(MSGDIR)/%: %
-	$(INS.file)
-
-$(MSGDIRS):
-	$(INS.dir)
+_msg: 
 
 include $(SRC)/lib/Makefile.targ

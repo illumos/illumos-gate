@@ -305,7 +305,6 @@ COMMON_SUBDIRS = \
 	cmd/vrrpadm \
 	cmd/vt \
 	cmd/wall \
-	cmd/wbem \
 	cmd/who \
 	cmd/whodo \
 	cmd/wracct \

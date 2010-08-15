@@ -21,8 +21,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -119,7 +117,6 @@ get_dns_parms()
 #
 SRVNAME=`uname -n`
 SRVADDR=`get_server_ip`
-DHCPHOSTS_RSRC=files
 DHCP_DEFAULTS=/etc/inet/dhcpsvc.conf
 
 #
@@ -136,7 +133,7 @@ rm -f ${DHCP_DEFAULTS} >>${OUTFILE} 2>&1
 #
 # Config.
 #
-/usr/sbin/dhcpconfig -D -r ${DHCPRSRC} -p ${DHCPPATH} -h ${DHCPHOSTS_RSRC} >>${OUTFILE} 2>&1
+/usr/sbin/dhcpconfig -D -r ${DHCPRSRC} -p ${DHCPPATH} >>${OUTFILE} 2>&1
 RET=$?
 if [ "${RET}" != "0" ]
 then
@@ -184,17 +181,6 @@ DEFLINE=`grep "PATH=${DHCPPATH}" ${DHCP_DEFAULTS}`
 if [ -z "${DEFLINE}" ]
 then
     echo "PATH not set correctly in ${DHCP_DEFAULTS}"
-    echo "${TESTNAME} - Test failed!"
-    exit 1
-fi
-
-#
-# Verify that the hosts resource was defined in the defaults file
-#
-DEFLINE=`grep "HOSTS_RESOURCE=${DHCPHOSTS_RSRC}" ${DHCP_DEFAULTS}`
-if [ -z "${DEFLINE}" ]
-then
-    echo "HOSTS_RESOURCE not set correctly in ${DHCP_DEFAULTS}"
     echo "${TESTNAME} - Test failed!"
     exit 1
 fi

@@ -28,34 +28,12 @@ set name=pkg.description value="software for WBEM/CIM data device management"
 set name=pkg.summary value="Solaris Data Management WBEM/CIM API"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
-
-#
-# We skip automated dependencies for this package because it strictly
-# should depend on SUNWwbcou, but SUNWwbcou isn't available in the
-# main opensolaris.org repository and we don't want packages we
-# incorporate to depend on external packages.
-#
-set name=org.opensolaris.nodepend value=true
 set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/sadm
-dir path=usr/sadm/lib
-dir path=usr/sadm/lib/wbem group=sys
-dir path=usr/sadm/mof group=sys
-dir path=var group=sys
-dir path=var/sadm group=sys
-dir path=var/sadm/wbem group=sys
-dir path=var/sadm/wbem/logr group=sys
-dir path=var/sadm/wbem/logr/preReg group=sys
 file path=usr/lib/libfsmgt.so.1
 file path=usr/lib/llib-lfsmgt
 file path=usr/lib/llib-lfsmgt.ln
-file path=usr/sadm/lib/wbem/libWBEMdisk.so group=sys
-file path=usr/sadm/lib/wbem/libWBEMnfs.so group=sys
-file path=usr/sadm/mof/CIM2.7.mof group=sys
-file path=usr/sadm/mof/Solaris_DMGT1.0.mof group=sys
-file path=usr/sadm/mof/Solaris_NFS1.0.mof group=sys
 legacy pkg=SUNWdmgtr arch=$(ARCH) category=system \
     desc="software for WBEM/CIM data device management" \
     hotline="Please contact your local service provider" \

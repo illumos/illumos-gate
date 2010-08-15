@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -58,11 +56,11 @@ public class CreateAddressDialog extends JDialog
 	private Object currentValue;
 	private Macro [] data = null;
 	private String noMacro;
-	
+
 	public MacroListModel() {
 	    try {
 		noMacro = ResourceStrings.getString("no_macro_item");
-	        DhcptabMgr server = DataManager.get().getDhcptabMgr();
+		DhcptabMgr server = DataManager.get().getDhcptabMgr();
 		data = server.getMacros();
 	    } catch (NoTableException e) {
 		// can function without table
@@ -70,14 +68,14 @@ public class CreateAddressDialog extends JDialog
 		e.printStackTrace();
 	    }
 	}
-	
+
 	public int getSize() {
 	    if (data == null)
 		return 1;
 	    else
 		return data.length+1;
 	}
-	
+
 	public Object getElementAt(int index) {
 	    if (index == 0) {
 		return noMacro;
@@ -85,12 +83,12 @@ public class CreateAddressDialog extends JDialog
 		return data[index-1].getKey();
 	    }
 	}
-	
+
 	public void setSelectedItem(Object anItem) {
 	    currentValue = anItem;
 	    fireContentsChanged(this, -1, -1);
 	}
-	
+
 	public Object getSelectedItem() {
 	    return currentValue;
 	}
@@ -99,11 +97,10 @@ public class CreateAddressDialog extends JDialog
     public static final int CREATE = 0;
     public static final int EDIT = 1;
     public static final int DUPLICATE = 2;
-    
+
     private int mode = EDIT;
     private Network network;
     private IPAddressField address;
-    private HostnameField name;
     private JTextField server;
     private JComboBox macro;
     private JTextField clientId;
@@ -120,7 +117,7 @@ public class CreateAddressDialog extends JDialog
     private Vector listeners;
     private DateFormat dateFormat =
 	DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
-    
+
     public CreateAddressDialog(Frame f, int mode, DhcpClientRecord rec,
 	    Network net) {
 	super(f);
@@ -142,11 +139,11 @@ public class CreateAddressDialog extends JDialog
 	default:
 	    break;
 	}
-	
+
 	getContentPane().setLayout(new BorderLayout());
-	
+
 	JTabbedPane tabbedPane = new JTabbedPane();
-	
+
 	GridBagLayout bag = new GridBagLayout();
 	JPanel mainPanel = new JPanel(bag);
 	GridBagConstraints c = new GridBagConstraints();
@@ -155,7 +152,7 @@ public class CreateAddressDialog extends JDialog
 	c.fill = GridBagConstraints.HORIZONTAL;
 	c.insets = new Insets(5, 5, 5, 5);
 	c.weightx = c.weighty = 1.0;
-	
+
 	// Label and text field for address
 	Mnemonic mnIP =
             new Mnemonic(ResourceStrings.getString("ip_address_label"));
@@ -173,35 +170,6 @@ public class CreateAddressDialog extends JDialog
 	++c.gridx;
 	bag.setConstraints(address, c);
 	mainPanel.add(address);
-	
-	// Label and text field for name
-	Mnemonic mnClient =
-            new Mnemonic(ResourceStrings.getString("hostname_label"));
-        l = new JLabel(mnClient.getString(), SwingConstants.RIGHT);
-        ++c.gridy;
-        c.gridx = 0;
-        bag.setConstraints(l, c);
-        mainPanel.add(l);
-        name = new HostnameField();
-
-        l.setLabelFor(name);
-        l.setToolTipText(mnClient.getString());
-	l.setDisplayedMnemonic(mnClient.getMnemonic());
-
-	++c.gridx;
-	bag.setConstraints(name, c);
-	mainPanel.add(name);
-	
-	name.setEditable(true);
-	try {
-	    DhcpdOptions opts =
-	    DataManager.get().getDhcpServiceMgr().readDefaults();
-	    if (opts.getHostsResource() == null) {
-		name.setEditable(false);
-	    }
-	} catch (BridgeException e) {
-	    // Assume set
-	}
 
 	// label and field for owning server
 	Mnemonic mnOwn =
@@ -220,7 +188,7 @@ public class CreateAddressDialog extends JDialog
 	++c.gridx;
 	bag.setConstraints(server, c);
 	mainPanel.add(server);
-	
+
 	// label and combo box for macro
 	Mnemonic mnMacro =
             new Mnemonic(ResourceStrings.getString("config_macro_label"));
@@ -240,7 +208,7 @@ public class CreateAddressDialog extends JDialog
 	++c.gridx;
 	bag.setConstraints(macro, c);
 	mainPanel.add(macro);
-	
+
 	// Comment
 	Mnemonic mnComm =
             new Mnemonic(ResourceStrings.getString("comment_label"));
@@ -258,13 +226,13 @@ public class CreateAddressDialog extends JDialog
 	++c.gridx;
 	bag.setConstraints(comment, c);
 	mainPanel.add(comment);
-	
+
 	// Create first panel of tabs
 	tabbedPane.addTab(ResourceStrings.getString("address_tab_label"),
 	    mainPanel);
-	
+
 	mainPanel = new JPanel(new BorderLayout(5, 5));
-	
+
 	// Client ID
 	Mnemonic mnID =
             new Mnemonic(ResourceStrings.getString("client_id_label"));
@@ -277,14 +245,14 @@ public class CreateAddressDialog extends JDialog
         l.setToolTipText(mnID.getString());
 	l.setDisplayedMnemonic(mnID.getMnemonic());
 	idPanel.add(clientId);
-	
+
 	manual = new JCheckBox(ResourceStrings.getString("manual_checkbox"));
 	idPanel.add(manual);
 	manual.setToolTipText(
 	    ResourceStrings.getString("manual_checkbox"));
 
 	mainPanel.add(idPanel, BorderLayout.NORTH);
-	
+
 	// radio buttons for lease state
 	bag = new GridBagLayout();
 	JPanel leasePanel = new JPanel(bag);
@@ -297,11 +265,11 @@ public class CreateAddressDialog extends JDialog
 	    BorderFactory.createLineBorder(Color.black));
 	leasePanel.setBorder(BorderFactory.createTitledBorder(b,
 	    ResourceStrings.getString("lease_policy_label")));
-	
+
 	// Reset constraints
 	c.gridx = c.gridy = 0;
 	c.gridwidth = 1;
-	
+
 	buttonGroup = new ButtonGroup();
 	temporary = new JRadioButton();
 	buttonGroup.add(temporary);
@@ -316,7 +284,7 @@ public class CreateAddressDialog extends JDialog
 	c.weightx = 1.0;
 	bag.setConstraints(l, c);
 	leasePanel.add(l);
-	
+
 	expirationDate = new JTextField(30);
 
         l.setLabelFor(expirationDate);
@@ -326,7 +294,7 @@ public class CreateAddressDialog extends JDialog
 	++c.gridy;
 	bag.setConstraints(expirationDate, c);
 	leasePanel.add(expirationDate);
-	
+
 	permanent = new JRadioButton();
 	buttonGroup.add(permanent);
 	++c.gridy;
@@ -348,43 +316,43 @@ public class CreateAddressDialog extends JDialog
 	leasePanel.add(l);
 
 	mainPanel.add(leasePanel, BorderLayout.CENTER);
-		
+
 	// Flag checkboxes
 	JPanel southPanel = new JPanel(new BorderLayout(5, 5));
 	southPanel.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
 	bootp = new JCheckBox(ResourceStrings.getString("bootp_checkbox"));
 
 	bootp.setToolTipText(
-	    ResourceStrings.getString("bootp_checkbox")); 
+	    ResourceStrings.getString("bootp_checkbox"));
 
 	bootp.setHorizontalAlignment(SwingConstants.LEFT);
 	southPanel.add(bootp, BorderLayout.CENTER);
-	
+
 	unusable = new JCheckBox(
 	    ResourceStrings.getString("unusable_checkbox"));
 
         unusable.setToolTipText(
-            ResourceStrings.getString("unusable_checkbox"));            
+            ResourceStrings.getString("unusable_checkbox"));
 
 	unusable.setHorizontalAlignment(SwingConstants.LEFT);
 	southPanel.add(unusable, BorderLayout.SOUTH);
-	
+
 	mainPanel.add(southPanel, BorderLayout.SOUTH);
-	
+
 	tabbedPane.addTab(ResourceStrings.getString("lease_tab_label"),
 	    mainPanel);
 	JPanel borderPanel = new JPanel(new BorderLayout());
 	borderPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 	borderPanel.add(tabbedPane, BorderLayout.CENTER);
-	
+
 	getContentPane().add(borderPanel, BorderLayout.CENTER);
-	
+
 	buttonPanel = new ButtonPanel(true);
 	buttonPanel.addButtonPanelListener(this);
 	getContentPane().add(buttonPanel, BorderLayout.SOUTH);
-	
+
 	setClient(rec);
-	
+
 	DocumentListener docListener = new DocumentListener() {
 	    public void insertUpdate(DocumentEvent e) {
 		buttonPanel.setOkEnabled(address.getDocument().getLength() != 0
@@ -400,32 +368,23 @@ public class CreateAddressDialog extends JDialog
 
 	address.getDocument().addDocumentListener(docListener);
 	server.getDocument().addDocumentListener(docListener);
-	
+
 	if (mode == EDIT) {
 	    buttonPanel.setOkEnabled(true);
 	}
     }
-    
+
     public void setClient(DhcpClientRecord c) {
 	originalClient = (DhcpClientRecord)c.clone();
 	client = c;
 	resetValues();
     }
-    
+
     private void resetValues() {
 	if (mode == DUPLICATE) {
 	    address.setText("");
-	    name.setText("");
 	} else {
-	    String a = client.getClientIPAddress();
-	    String n = client.getClientName();
-	    address.setText(a);
-	    if (a.equals(n)) {
-		// If name == address, there is no name, so leave it blank
-		name.setText("");
-	    } else {
-		name.setText(n);
-	    }
+	    address.setText(client.getClientIPAddress());
 	}
 	if (mode == CREATE && (client.getServerName() == null ||
 		client.getServerName().length() == 0)) {
@@ -455,14 +414,14 @@ public class CreateAddressDialog extends JDialog
 	    expirationDate.setText(dateFormat.format(d));
 	}
     }
-    
+
     public void buttonPressed(int buttonId) {
 	switch (buttonId) {
 	case OK:
 	    IPAddress addr = address.getValue();
 	    if (addr == null) {
-	    	// Bad IP address
-	        MessageFormat form = new MessageFormat(
+		// Bad IP address
+		MessageFormat form = new MessageFormat(
 		    ResourceStrings.getString("invalid_address"));
 		Object [] args = new Object[] { address.getText() };
 		JOptionPane.showMessageDialog(this, form.format(args),
@@ -471,7 +430,7 @@ public class CreateAddressDialog extends JDialog
 		return;
 	    }
 	    if (!network.containsAddress(addr)) {
-	    	// Address is not on the network we're editing
+		// Address is not on the network we're editing
 		MessageFormat form = new MessageFormat(
 		    ResourceStrings.getString("bad_network_address"));
 		Object [] args = new Object[] {
@@ -484,23 +443,11 @@ public class CreateAddressDialog extends JDialog
 		return;
 	    }
 	    try {
-	    	client.setClientIP(address.getValue());
+		client.setClientIP(address.getValue());
 	    } catch (ValidationException e) {
-	        // This shouldn't happen, should have caught any problem already
+		// This shouldn't happen, should have caught any problem already
 	    }
 
-	    // This logic is needed because if the original client name
-	    // was equal to its IP address, then this really means that
-	    // that the name was not set. If this is the case and the
-	    // name field is empty, then no change was made. In all other
-	    // cases we can be assured that the client name was changed
-	    // or is valid.
-	    //
-	    if (!(name.getText().length() == 0 &&
-		originalClient.getClientIPAddress().equals(
-		originalClient.getClientName()))) {
-		client.setClientName(name.getText());
-	    }
 	    try {
 		if (!server.getText().equals(client.getServerName())) {
 		    // Don't bother resetting if it hasn't changed
@@ -508,7 +455,7 @@ public class CreateAddressDialog extends JDialog
 		}
 	    } catch (ValidationException e) {
 		// Bad server name
-	        MessageFormat form = new MessageFormat(
+		MessageFormat form = new MessageFormat(
 		    ResourceStrings.getString("invalid_server"));
 		Object [] args = new Object[] { server.getText() };
 		JOptionPane.showMessageDialog(this, form.format(args),
@@ -524,10 +471,10 @@ public class CreateAddressDialog extends JDialog
 	    }
 	    client.setComment(comment.getText());
 	    try {
-	    	client.setClientId(clientId.getText());
+		client.setClientId(clientId.getText());
 	    } catch (ValidationException e) {
-	    	// Bad client ID
-	        MessageFormat form = new MessageFormat(
+		// Bad client ID
+		MessageFormat form = new MessageFormat(
 		    ResourceStrings.getString("invalid_client_id"));
 		Object [] args = new Object[] { clientId.getText() };
 		JOptionPane.showMessageDialog(this, form.format(args),
@@ -547,8 +494,8 @@ public class CreateAddressDialog extends JDialog
 		    client.setExpiration(d);
 		}
 	    } catch (ParseException e) {
-	    	// Bad date/time entered
-	    	MessageFormat form = new MessageFormat(
+		// Bad date/time entered
+		MessageFormat form = new MessageFormat(
 		    ResourceStrings.getString("invalid_date"));
 		Object [] args = new Object[] {
 		    expirationDate.getText(),
@@ -564,7 +511,7 @@ public class CreateAddressDialog extends JDialog
 		DhcpNetMgr server = DataManager.get().getDhcpNetMgr();
 		if (mode == EDIT) {
 		    server.modifyClient(originalClient, client,
-		        network.toString());
+			network.toString());
 		} else {
 		    server.addClient(client, network.toString());
 		}
@@ -623,15 +570,15 @@ public class CreateAddressDialog extends JDialog
 	    break;
 	}
     }
-    
+
     public void addActionListener(ActionListener l) {
 	listeners.addElement(l);
     }
-    
+
     public void removeActionListener(ActionListener l) {
 	listeners.removeElement(l);
     }
-    
+
     protected void fireActionPerformed() {
 	String command = null;
 	switch (mode) {

@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -57,8 +55,6 @@ public class AddressWizard extends Wizard {
     private String server = DataManager.get().getShortServerName();
     private IPAddress serverIP;
     private IPAddress startAddress;
-    private boolean generateNames = false;
-    private String baseName = DataManager.get().getShortServerName();
     private String macro = DataManager.get().getShortServerName();
     private boolean unusable = false;
     private boolean dynamic = true;
@@ -68,26 +64,26 @@ public class AddressWizard extends Wizard {
     class Address {
 	IPAddress addr;
 	String name;
-	
+
 	public Address() {
 	    addr = null;
 	    name = "";
 	}
-	
+
 	public Address(int a, String n) {
 	    name = n;
 	    setAddr(a);
 	}
-	
+
 	public Address(String a, String n) {
 	    name = n;
 	    setAddr(a);
 	}
-	
+
 	public void setAddr(int a) {
 	    addr = new IPAddress(a);
 	}
-	
+
 	public void setAddr(String a) {
 	    try {
 		addr = new IPAddress(a);
@@ -95,7 +91,7 @@ public class AddressWizard extends Wizard {
 		// Do nothing
 	    }
 	}
-	
+
 	public String toString() {
 	    return addr.getHostAddress();
 	}
@@ -103,15 +99,15 @@ public class AddressWizard extends Wizard {
 
     class WizardTableModel extends AbstractTableModel {
 	private Vector addrs = new Vector();
-	
+
 	public int getRowCount() {
 	    return addrs.size();
 	}
-	
+
 	public int getColumnCount() {
 	    return 2;
 	}
-	
+
 	public Object getValueAt(int row, int column) {
 	    if (column == 0) {
 		return ((Address)addrs.elementAt(row)).addr;
@@ -119,7 +115,7 @@ public class AddressWizard extends Wizard {
 		return ((Address)addrs.elementAt(row)).name;
 	    }
 	}
-	
+
 	public Class getColumnClass(int column) {
 	    if (column == 0) {
 		return IPAddress.class;
@@ -127,7 +123,7 @@ public class AddressWizard extends Wizard {
 		return String.class;
 	    }
 	}
-	
+
 	public String getColumnName(int column) {
 	    if (column == 0) {
 		return ResourceStrings.getString("address_column");
@@ -135,7 +131,7 @@ public class AddressWizard extends Wizard {
 		return ResourceStrings.getString("client_name_column");
 	    }
 	}
-	
+
 	public long generateAddresses() {
 	    if (!network.containsAddress(startAddress)) {
 		return 0;
@@ -190,14 +186,7 @@ public class AddressWizard extends Wizard {
 		}
 		if (searchAddress != address) {
 		    // found an empty slot; create the address
-		    Address addr;
-		    if (generateNames) {
-			addr  = new Address((int)address,
-			    baseName + "-" + String.valueOf(index));
-		    } else {
-			addr  = new Address((int)address, "");
-		    }
-		    addrs.addElement(addr);
+		    addrs.addElement(new Address((int)address, ""));
 		    ++count;
 		}
 		++index;
@@ -207,34 +196,34 @@ public class AddressWizard extends Wizard {
 	    fireTableDataChanged();
 	    return count;
 	}
-	
+
 	public Address getAddressAt(int index) {
 	    return (Address)addrs.elementAt(index);
 	}
     }
-    
+
     // This step selects the number of addresses and a comment
     class NumberStep implements WizardStep {
 	private Box stepBox;
 	private IntegerField addressCount;
 	private JTextField commentField;
-	
+
 	public NumberStep() {
 	    stepBox = Box.createVerticalBox();
-	    
+
 	    // Explanatory text at the top
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("add_wiz_explain"), 4, 45));
 	    stepBox.add(Box.createVerticalStrut(10));
 	    stepBox.add(Box.createVerticalGlue());
-	    
+
 	    // Get the number of addresses to create
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("add_wiz_count_explain"), 1, 45));
 
 	    Mnemonic mnCount =
                 new Mnemonic(ResourceStrings.getString("add_wiz_count_label"));
-    	    JLabel label = new JLabel(mnCount.getString());
+	    JLabel label = new JLabel(mnCount.getString());
             addressCount = new IntegerField(); // Ensure numeric input
             addressCount.setMaximumSize(addressCount.getPreferredSize());
 
@@ -249,7 +238,7 @@ public class AddressWizard extends Wizard {
 	    box.add(addressCount);
 	    box.add(Box.createHorizontalGlue());
 	    stepBox.add(box);
-	    
+
 	    stepBox.add(Box.createVerticalStrut(10));
 	    stepBox.add(Box.createVerticalGlue());
 	    stepBox.add(Wizard.createTextArea(
@@ -274,7 +263,7 @@ public class AddressWizard extends Wizard {
 	    box.add(commentField);
 	    stepBox.add(box);
 	    stepBox.add(Box.createVerticalGlue());
-	    
+
 	    /*
 	     * This listener ensures that the forward button is enabled only
 	     * when there is a count of addresses in the addressCount field.
@@ -292,21 +281,21 @@ public class AddressWizard extends Wizard {
 		}
 	    });
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("add_wiz_number_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    addressCount.setValue(number);
 	    commentField.setText(comment);
 	    setForwardEnabled(addressCount.getValue() != 0);
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    number = addressCount.getValue();
 	    if (number == 0) {
@@ -329,17 +318,15 @@ public class AddressWizard extends Wizard {
     class ServerStep implements WizardStep {
 	private Box stepBox;
 	private IPAddressField startField;
-	private HostnameField baseNameField;
-	private JCheckBox generateNamesBox;
 	private HostnameField serverField;
-	
+
 	public ServerStep() {
 	    stepBox = Box.createVerticalBox();
-	    
+
 	    // Explanatory text at the top
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("add_wiz_server_explain"), 1, 45));
-	    
+
 	    // Server to own these addresses
 	    Mnemonic mnMan =
                 new Mnemonic(ResourceStrings.getString("add_wiz_server_label"));
@@ -350,17 +337,17 @@ public class AddressWizard extends Wizard {
             serverField = new HostnameField("", 15);
             jl.setLabelFor(serverField);
             jl.setToolTipText(mnMan.getString());
-	    jl.setDisplayedMnemonic(mnMan.getMnemonic()); 
+	    jl.setDisplayedMnemonic(mnMan.getMnemonic());
 
 	    serverField.setMaximumSize(serverField.getPreferredSize());
 	    box.add(serverField);
 	    box.add(Box.createHorizontalGlue());
 	    stepBox.add(box);
-	    
+
 	    // Add some spacing
 	    stepBox.add(Box.createVerticalStrut(5));
 	    stepBox.add(Box.createVerticalGlue());
-	    
+
 	    // Starting address
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("add_wiz_start_explain"), 2, 45));
@@ -379,60 +366,7 @@ public class AddressWizard extends Wizard {
 	    startField.setMaximumSize(startField.getPreferredSize());
 	    box.add(startField);
 	    stepBox.add(box);
-	    
-	    // Add some more spacing, and an explanation of generating names
-	    stepBox.add(Box.createVerticalStrut(5));
-	    stepBox.add(Box.createVerticalGlue());
-	    stepBox.add(Wizard.createTextArea(
-		ResourceStrings.getString("add_wiz_generate_explain"), 4, 45));
 
-	    // Control to indicate whether names should be generated
-	    JPanel panel = new JPanel(new GridLayout(2, 1, 0, 0));
-	    generateNamesBox = new JCheckBox(
-		ResourceStrings.getString("add_wiz_generate_label"));
-	    generateNamesBox.setToolTipText(
-	        ResourceStrings.getString("add_wiz_generate_label"));
-	    panel.add(generateNamesBox);
-
-	    generateNamesBox.setEnabled(true);
-	    try {
-		DhcpdOptions opts =
-		    DataManager.get().getDhcpServiceMgr().readDefaults();
-		if (opts.getHostsResource() == null) {
-		    generateNamesBox.setEnabled(false);		
-		}
-	    } catch (BridgeException e) {
-		// Assume set
-	    }
-
-	    baseNameField = new HostnameField();
-	    baseNameField.setEnabled(false);
-	    baseNameField.setMaximumSize(baseNameField.getPreferredSize());
-	    box = Box.createHorizontalBox();
-	    box.add(Box.createHorizontalStrut(17));
-
-	    Mnemonic mnRoot =
-                new Mnemonic(ResourceStrings.getString(
-		    "add_wiz_rootname_label"));
-            JLabel rootNameLbl = new JLabel(mnRoot.getString());
-            box.add(rootNameLbl);
-            rootNameLbl.setLabelFor(baseNameField);
-            rootNameLbl.setToolTipText(mnRoot.getString());
-	    rootNameLbl.setDisplayedMnemonic(mnRoot.getMnemonic());
-
-	    box.add(Box.createHorizontalStrut(5));
-	    box.add(baseNameField);
-	    panel.add(box);
-	    stepBox.add(panel);
-	    stepBox.add(Box.createVerticalGlue());
-	    
-	    // Only enable the text input if name generation is requested
-	    generateNamesBox.addActionListener(new ActionListener() {
-		public void actionPerformed(ActionEvent e) {
-		    baseNameField.setEnabled(generateNamesBox.isSelected());
-		}
-	    });
-	    
 	    DocumentListener docListener = new DocumentListener() {
 		public void insertUpdate(DocumentEvent e) {
 		    setForwardEnabled((startField.getText().length() != 0)
@@ -445,27 +379,25 @@ public class AddressWizard extends Wizard {
 		    insertUpdate(e);
 		}
 	    };
-	    
+
 	    startField.getDocument().addDocumentListener(docListener);
 	    serverField.getDocument().addDocumentListener(docListener);
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("add_wiz_server_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    serverField.setText(server);
 	    startField.setValue(startAddress);
-	    baseNameField.setText(baseName);
-	    generateNamesBox.setSelected(generateNames);
 	    setForwardEnabled(true);
 	}
-		
+
 	public boolean setInactive(int direction) {
 	    if (direction == FORWARD) {
 		// Validate that address is on the network we're working on
@@ -514,30 +446,28 @@ public class AddressWizard extends Wizard {
 	    }
 	    server = serverField.getText();
 	    startAddress = startField.getValue();
-	    generateNames = generateNamesBox.isSelected();
-	    baseName = baseNameField.getText();
 	    return true;
 	}
     }
-    
+
     // This step confirms the list of addresses to be generated
     class ConfirmStep implements WizardStep {
 	private JPanel stepPanel;
 	private JTable addressTable;
-	
+
 	public ConfirmStep() {
 	    stepPanel = new JPanel(new BorderLayout(10, 10));
-	    
+
 	    // Explanatory text at the top
 	    stepPanel.add(Wizard.createTextArea(
 		ResourceStrings.getString("add_wiz_confirm_explain"), 3, 45),
 		BorderLayout.NORTH);
-	    
+
 	    // Label the table
-       	    JPanel panel = new JPanel(new BorderLayout());
+	    JPanel panel = new JPanel(new BorderLayout());
             panel.setBorder(BorderFactory.createEmptyBorder(0, 15, 0, 15));
 	    Mnemonic mnIP =
-	        new Mnemonic(ResourceStrings.getString(
+		new Mnemonic(ResourceStrings.getString(
 		    "add_wiz_confirm_label"));
             JLabel label = new JLabel(mnIP.getString());
             panel.add(label, BorderLayout.NORTH);
@@ -562,15 +492,15 @@ public class AddressWizard extends Wizard {
 	    panel.add(scrollPane, BorderLayout.CENTER);
 	    stepPanel.add(panel, BorderLayout.CENTER);
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("add_wiz_confirm_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepPanel;
 	}
-	
+
 	public void setActive(int direction) {
 	    /*
 	     * If we're activating coming from the previous step,
@@ -608,12 +538,12 @@ public class AddressWizard extends Wizard {
 		setForwardEnabled(true);
 	    }
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    return true; // Nothing to do when leaving
 	}
     }
-    
+
     // This step selects the macro and flags
     class ConfigureStep implements WizardStep {
 
@@ -622,7 +552,7 @@ public class AddressWizard extends Wizard {
 		implements ComboBoxModel {
 	    private Object currentValue;
 	    private Macro data[] = null;
-	
+
 	    public int getSize() {
 		if (data == null) {
 		    try {
@@ -641,7 +571,7 @@ public class AddressWizard extends Wizard {
 		    return data.length+1;
 		}
 	    }
-	    
+
 	    public Object getElementAt(int index) {
 		if (data == null) {
 		    try {
@@ -659,7 +589,7 @@ public class AddressWizard extends Wizard {
 		    return data[index-1].getKey();
 		}
 	    }
-	    
+
 	    public void setSelectedItem(Object anItem) {
 		currentValue = noMacro.getKey();
 		for (int i = 0; data != null && i < data.length; i++) {
@@ -669,11 +599,11 @@ public class AddressWizard extends Wizard {
 		}
 		fireContentsChanged(this, -1, -1);
 	    }
-	    
+
 	    public Object getSelectedItem() {
 		return currentValue;
 	    }
-	    
+
 	    public Macro getMacroAt(int index) {
 		if (index == 0) {
 		    return noMacro;
@@ -682,13 +612,13 @@ public class AddressWizard extends Wizard {
 		}
 	    }
 	}
-	
+
 	private Box stepBox;
 	private JComboBox macroBox;
 	private MacroListModel macroBoxModel;
 	private JButton viewButton;
 	private JCheckBox unusableBox;
-	
+
 	public ConfigureStep() {
 	    stepBox = Box.createVerticalBox();
 
@@ -699,7 +629,7 @@ public class AddressWizard extends Wizard {
 	    stepBox.add(component);
 	    // Add some spacing
 	    stepBox.add(Box.createVerticalStrut(10));
-	    
+
 	    // Let 'em select the macro to use
 	    Mnemonic mnConf =
                 new Mnemonic(ResourceStrings.getString("add_wiz_macro_label"));
@@ -717,16 +647,16 @@ public class AddressWizard extends Wizard {
 	    panel.add(macroBox);
 	    // Button to view the contents of the selected macro
 
-	    Mnemonic mnView = 
-	        new Mnemonic(ResourceStrings.getString("add_wiz_view_button"));
+	    Mnemonic mnView =
+		new Mnemonic(ResourceStrings.getString("add_wiz_view_button"));
 	    viewButton = new JButton(mnView.getString());
 	    viewButton.setToolTipText(mnView.getString());
-	    viewButton.setMnemonic(mnView.getMnemonic()); 
+	    viewButton.setMnemonic(mnView.getMnemonic());
 
 	    panel.add(viewButton);
 	    panel.setAlignmentX(Component.LEFT_ALIGNMENT);
 	    stepBox.add(panel);
-	    
+
 	    // Give the option to mark them unusable for now
 	    component = Wizard.createTextArea(
 		ResourceStrings.getString("add_wiz_flag_explain"), 2, 45);
@@ -737,7 +667,7 @@ public class AddressWizard extends Wizard {
 	    unusableBox.setAlignmentX(Component.LEFT_ALIGNMENT);
 	    stepBox.add(unusableBox);
 	    stepBox.add(Box.createVerticalGlue());
-	    
+
 	    // When user presses View, show the macro's contents
 	    viewButton.addActionListener(new ActionListener() {
 		public void actionPerformed(ActionEvent e) {
@@ -747,51 +677,51 @@ public class AddressWizard extends Wizard {
 		     * context with the task.
 		     */
 		    ViewMacroDialog d = new ViewMacroDialog(
-		        AddressWizard.this, viewButton,
+			AddressWizard.this, viewButton,
 			macroBoxModel.getMacroAt(macroBox.getSelectedIndex()));
 		    d.pack();
 		    d.setVisible(true);
 		}
 	    });
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("add_wiz_configure_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    macroBox.setSelectedItem(macro);
 	    unusableBox.setSelected(unusable);
 	    setForwardEnabled(true);
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    macro = (String)macroBox.getSelectedItem();
 	    unusable = unusableBox.isSelected();
 	    return true;
 	}
     }
-    
+
     // This step selects the lease type
     class LeaseStep implements WizardStep {
 	private Box stepBox;
 	private JRadioButton dynamicButton, permanentButton;
 	private ButtonGroup buttonGroup;
-	
+
 	public LeaseStep() {
 	    stepBox = Box.createVerticalBox();
-	    
+
 	    // Start with explanatory text
 	    JComponent component = Wizard.createTextArea(
 		ResourceStrings.getString("add_wiz_lease_explain"), 0, 45);
 	    component.setAlignmentX(Component.LEFT_ALIGNMENT);
 	    stepBox.add(component);
 	    stepBox.add(Box.createVerticalStrut(10));
-	    
+
 	    // User has choice of dynamic or permanent leases
 	    Mnemonic mnLease =
                 new Mnemonic(ResourceStrings.getString("add_wiz_lease_label"));
@@ -816,26 +746,26 @@ public class AddressWizard extends Wizard {
 	    stepBox.add(panel);
 	    stepBox.add(Box.createVerticalGlue());
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("add_wiz_lease_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    dynamicButton.setSelected(dynamic);
 	    setForwardEnabled(true);
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    dynamic = dynamicButton.isSelected();
 	    return true;
 	}
     }
-    
+
     // Last chance to check work before committing to it
     class ReviewStep implements WizardStep {
 	private Box stepBox;
@@ -847,15 +777,15 @@ public class AddressWizard extends Wizard {
 	private JLabel macroLabel;
 	private JLabel flagLabel;
 	private JLabel leaseLabel;
-	
+
 	public ReviewStep() {
 	    stepBox = Box.createVerticalBox();
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("add_wiz_review_explain"), 4, 45));
-	    
+
 	    panel = new JPanel(new FieldLayout());
 	    JLabel tmpL;
-	    
+
 	    tmpL = addLabelMnemonic("add_wiz_count_label");
 	    numberLabel = addField("20");
 	    tmpL.setLabelFor(numberLabel);
@@ -876,17 +806,17 @@ public class AddressWizard extends Wizard {
 	    flagLabel = addField("Yes");
 	    tmpL.setLabelFor(flagLabel);
 	    tmpL.setToolTipText(
-	        ResourceStrings.getString("add_wiz_review_unusable"));
-	    
+		ResourceStrings.getString("add_wiz_review_unusable"));
+
 	    tmpL = addLabelMnemonic("add_wiz_lease_label");
 	    leaseLabel = addField(ResourceStrings.getString("dynamic"));
 	    tmpL.setLabelFor(leaseLabel);
-	    
+
 	    panel.setAlignmentX(Component.LEFT_ALIGNMENT);
 	    stepBox.add(panel);
-	    
+
 	    stepBox.add(Box.createVerticalStrut(5));
-	   
+
 	    Mnemonic mnAdd =
                 new Mnemonic(ResourceStrings.getString(
 		    "add_wiz_confirm_label"));
@@ -912,9 +842,9 @@ public class AddressWizard extends Wizard {
 	    stepBox.add(scrollPane);
 	    stepBox.add(Box.createVerticalGlue());
 	}
-	
+
 	private JLabel addLabel(String s) {
-	    JLabel l = new JLabel(ResourceStrings.getString(s)); 
+	    JLabel l = new JLabel(ResourceStrings.getString(s));
 	    panel.add(FieldLayout.LABEL, l);
 	    return l;
 	}
@@ -927,22 +857,22 @@ public class AddressWizard extends Wizard {
             panel.add(FieldLayout.LABEL, l);
             return l;
         }
-	
+
 	private JLabel addField(String s) {
 	    JLabel l = new JLabel(s);
 	    l.setForeground(Color.black);
 	    panel.add(FieldLayout.FIELD, l);
 	    return l;
 	}
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("add_wiz_review_desc");
 	}
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	}
-	
+
 	public void setActive(int direction) {
 	    // Use number of addresses actually generated, not requested
 	    numberLabel.setText(
@@ -962,21 +892,21 @@ public class AddressWizard extends Wizard {
 	    }
 	    setFinishEnabled(true);
 	}
-	
+
 	public boolean setInactive(int direction) {
 	    // Nothing to do
 	    return true;
 	}
     }
-     
+
     public AddressWizard(Frame owner, Network net) {
 	super(owner, "");
 	setTitle(MessageFormat.format(
 	    ResourceStrings.getString("address_wizard_title"), net.toString()));
-	
+
 	network = net;
 	startAddress = network.getAddress();
-	
+
 	try {
 	    noMacro = new Macro(ResourceStrings.getString("no_macro_item"));
 	} catch (ValidationException e) {
@@ -994,7 +924,7 @@ public class AddressWizard extends Wizard {
 	addStep(new ReviewStep());
 	showFirstStep();
     }
-    
+
     public void doFinish() {
 	/*
 	 * Method here is as follows:
@@ -1036,7 +966,7 @@ public class AddressWizard extends Wizard {
 			rec.setMacro(macro);
 		}
 		rec.setComment(comment);
-		
+
 		// This is final so it can be used in the errorDisplay Runnable
 		final ErrorTable failedTable = new ErrorTable(
 		    ResourceStrings.getString("address_column"),
@@ -1052,12 +982,12 @@ public class AddressWizard extends Wizard {
 			rec.setClientIP(addr.addr);
 			rec.setClientName(addr.name);
 			server.addClient(rec, network.toString());
-		    	progress.update(i+1, addr.addr.toString());
+			progress.update(i+1, addr.addr.toString());
 		    } catch (InterruptedException e) {
-		        SwingUtilities.invokeLater(finisher);
+			SwingUtilities.invokeLater(finisher);
 			return;
 		    } catch (Throwable e) {
-		        // Pick the best message for the exception thrown
+			// Pick the best message for the exception thrown
 			String msg;
 			if (e instanceof ExistsException) {
 			    msg = ResourceStrings.getString("address_exists");
@@ -1069,33 +999,33 @@ public class AddressWizard extends Wizard {
 			failedTable.addError(addr.addr, msg);
 		    }
 		}
-			
+
 		// If any errors occurred, display them all at once.
 		if (!failedTable.isEmpty()) {
 		    Runnable errorDisplay = new Runnable() {
-		        public void run() {
+			public void run() {
 			    Object [] objs = new Object[2];
 			    objs[0] =
-			        ResourceStrings.getString("add_wiz_error");
+				ResourceStrings.getString("add_wiz_error");
 			    JScrollPane scrollPane =
-			        new JScrollPane(failedTable);
+				new JScrollPane(failedTable);
 			    // Resize the table to something kind of small
 			    Dimension d =
-			        failedTable.
+				failedTable.
 				getPreferredScrollableViewportSize();
 			    d.height = 80;
 			    failedTable.setPreferredScrollableViewportSize(d);
 			    objs[1] = scrollPane;
 			    JOptionPane.showMessageDialog(AddressWizard.this,
-			        objs,
-			        ResourceStrings.getString("server_error_title"),
-			        JOptionPane.ERROR_MESSAGE);
-		    	}
+				objs,
+				ResourceStrings.getString("server_error_title"),
+				JOptionPane.ERROR_MESSAGE);
+			}
 		    };
 		    try {
-		        SwingUtilities.invokeAndWait(errorDisplay);
+			SwingUtilities.invokeAndWait(errorDisplay);
 		    } catch (Throwable e) {
-		    	e.printStackTrace();
+			e.printStackTrace();
 		    }
 		}
 		SwingUtilities.invokeLater(finisher);
@@ -1103,7 +1033,7 @@ public class AddressWizard extends Wizard {
 	};
 	addThread.start();
     }
-    
+
     protected void reallyFinish() {
         super.doFinish();
     }

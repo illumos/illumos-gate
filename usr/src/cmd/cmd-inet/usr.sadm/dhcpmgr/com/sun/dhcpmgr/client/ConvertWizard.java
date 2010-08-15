@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright 2001-2002 by Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -120,7 +118,7 @@ public class ConvertWizard extends DSWizard {
             saveTables = new JCheckBox(
                 ResourceStrings.getString("cvt_wiz_save_label"), false);
 	    saveTables.setToolTipText(
-	        ResourceStrings.getString("cvt_wiz_save_label"));
+		ResourceStrings.getString("cvt_wiz_save_label"));
             saveTables.setAlignmentX(Component.LEFT_ALIGNMENT);
             stepBox.add(saveTables);
             stepBox.add(Box.createVerticalGlue());
@@ -193,7 +191,7 @@ public class ConvertWizard extends DSWizard {
 	    stepBox.add(Wizard.createTextArea(
 		ResourceStrings.getString("cvt_wiz_review_explain"),
 		    3, 45));
-	    
+
 	    panel = new JPanel(new FieldLayout());
 
 	    addLabel("cvt_wiz_old_datastore").setToolTipText(
@@ -223,12 +221,12 @@ public class ConvertWizard extends DSWizard {
 	 * @param s the label string.
 	 */
 	private JLabel addLabel(String s) {
-	    JLabel addLbl = 
+	    JLabel addLbl =
 		new JLabel(ResourceStrings.getString(s));
 	    panel.add(FieldLayout.LABEL, addLbl);
 	    return addLbl;
 	} // addLabel
-	
+
 	/**
 	 * Adds a field to the review panel.
 	 * @param s the field value.
@@ -240,15 +238,15 @@ public class ConvertWizard extends DSWizard {
 	    panel.add(FieldLayout.FIELD, l);
 	    return l;
 	} // addField
-	
+
 	public String getDescription() {
 	    return ResourceStrings.getString("cvt_wiz_review_desc");
 	} // getDescription
-	
+
 	public Component getComponent() {
 	    return stepBox;
 	} // getComponent
-	
+
 	public void setActive(int direction) {
 
 	    setFinishEnabled(true);
@@ -274,17 +272,17 @@ public class ConvertWizard extends DSWizard {
 		message = ResourceStrings.getString("no");
 	    }
 	    saveLabel.setText(message);
-	    
+
 	} // setActive
-	
+
 	public boolean setInactive(int direction) {
 	    return true;
 	} // setInactive
 
     } // ReviewStep
-    
+
     /**
-     * Constructor for the ConvertWizard. 
+     * Constructor for the ConvertWizard.
      * @param owner owner of the wizard.
      * @param title title of the wizard.
      */
@@ -343,7 +341,7 @@ public class ConvertWizard extends DSWizard {
 	addStep(new ReviewStep());
 	showFirstStep();
     }
-    
+
     public void doFinish() {
 	/*
 	 * To convert the data store, we have to do the following items:
@@ -438,7 +436,7 @@ public class ConvertWizard extends DSWizard {
 	//
 	Thread convertThread = new Thread() {
 	    public void run() {
-	
+
 		String message = null;
 		MessageFormat form;
 		MessageFormat errForm;
@@ -446,7 +444,7 @@ public class ConvertWizard extends DSWizard {
 		boolean saveTables =
 		    saveTablesStep.isSaveTablesSelected();
 
-		// This is final so it can be used in the 
+		// This is final so it can be used in the
 		// errorDisplay Runnable.
 		//
 		final ErrorTable failedTable = new ErrorTable(
@@ -556,7 +554,7 @@ public class ConvertWizard extends DSWizard {
 			String netString = networks[i].toString();
 			args[0] = netString;
 			try {
-			    netServer.deleteNetwork(netString, false, false,
+			    netServer.deleteNetwork(netString, false,
 				oldDhcpDatastore);
 			    message = form.format(args);
 			} catch (Throwable e) {
@@ -609,7 +607,7 @@ public class ConvertWizard extends DSWizard {
 			message = ResourceStrings.getString(
 			    "cvt_wiz_server_started");
 		    } catch (Throwable e) {
-		        message =
+			message =
 			    ResourceStrings.getString("cvt_wiz_start_err");
 			failedTable.addError("", e.getMessage());
 		    } finally {
@@ -645,12 +643,12 @@ public class ConvertWizard extends DSWizard {
 				objs,
 				ResourceStrings.getString("server_error_title"),
 				JOptionPane.ERROR_MESSAGE);
-		    	}
+			}
 		    };
 		    try {
 			SwingUtilities.invokeAndWait(errorDisplay);
 		    } catch (Throwable e) {
-		    	e.printStackTrace();
+			e.printStackTrace();
 		    }
 		}
 		SwingUtilities.invokeLater(finisher);
@@ -658,7 +656,7 @@ public class ConvertWizard extends DSWizard {
 	};
 	convertThread.start();
     }
-    
+
     public void doHelp() {
 	DhcpmgrApplet.showHelp("convert_wizard");
     }

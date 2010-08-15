@@ -25,13 +25,9 @@
 DMDIR=/usr/sadm/admin/dhcpmgr
 DLDIR=/usr/lib/inet/dhcp/svcadm
 L10NDIR=/usr/share/lib/locale
-WBEMDIR=/usr/sadm/lib/wbem
 
-CLASSPATH=${L10NDIR}:${DMDIR}/dhcpmgr.jar:${DMDIR}/SUNWfiles.jar:${DMDIR}/SUNWbinfiles.jar:${DLDIR}/dhcpsvc.jar:${DLDIR}/dhcpcommon.jar:${WBEMDIR}/providerutility.jar
+CLASSPATH=${L10NDIR}:${DMDIR}/dhcpmgr.jar:${DMDIR}/SUNWfiles.jar:${DMDIR}/SUNWbinfiles.jar:${DLDIR}/dhcpsvc.jar:${DLDIR}/dhcpcommon.jar
 export CLASSPATH
-
-LD_LIBRARY_PATH=${WBEMDIR}
-export LD_LIBRARY_PATH
 
 # add /usr/dt/bin so sdtwebclient will be available for help
 PATH=${PATH}:/usr/dt/bin

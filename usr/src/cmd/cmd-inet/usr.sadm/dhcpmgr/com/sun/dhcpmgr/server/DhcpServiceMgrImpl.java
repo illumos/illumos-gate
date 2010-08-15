@@ -236,17 +236,4 @@ public class DhcpServiceMgrImpl implements DhcpServiceMgr {
     public boolean isServerRunning() throws BridgeException {
 	return bridge.isServerRunning();
     }
-
-    /**
-     * Determines the whether or not the hosts table under a given
-     * name service can be managed.
-     * @param resource name service resource (files, dns)
-     * @param domain the name service domain (ignored for files)
-     * @return true if the user can manage the table
-     */
-    public boolean isHostsValid(String resource, String domain) {
-
-	return DhcpHostsTable.isHostsValid(resource, domain);
-
-    } // isHostsManageable
 }

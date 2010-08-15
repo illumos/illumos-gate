@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -58,10 +56,10 @@ public interface DhcpNetMgr {
     public void addClient(DhcpClientRecord client, String table)
 	throws BridgeException;
     public void deleteClient(DhcpClientRecord client, String table,
-	boolean deleteHosts, DhcpDatastore datastore)
+	DhcpDatastore datastore)
 	throws BridgeException;
-    public void deleteClient(DhcpClientRecord client, String table,
-	boolean deleteHosts) throws BridgeException;
+    public void deleteClient(DhcpClientRecord client, String table)
+        throws BridgeException;
     public DhcpClientRecord getClient(DhcpClientRecord client, String table,
 	DhcpDatastore datastore) throws BridgeException;
     public void cvtNetwork(String network,
@@ -71,8 +69,8 @@ public interface DhcpNetMgr {
     public void createNetwork(String network)
 	throws BridgeException;
     public void deleteNetwork(String network, boolean deleteMacro,
-	boolean deleteHosts, DhcpDatastore datastore)
+	DhcpDatastore datastore)
 	throws BridgeException;
-    public void deleteNetwork(String network, boolean deleteMacro,
-	boolean deleteHosts) throws BridgeException;
+    public void deleteNetwork(String network, boolean deleteMacro)
+        throws BridgeException;
 }

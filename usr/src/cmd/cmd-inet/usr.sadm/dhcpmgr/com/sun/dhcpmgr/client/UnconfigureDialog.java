@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright 1998-2002 by Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -47,7 +45,7 @@ import com.sun.dhcpmgr.ui.*;
  * A dialog to confirm the user's request to unconfigure the service.
  */
 public class UnconfigureDialog extends MultipleOperationDialog {
-    private JCheckBox deleteTables, deleteHosts;
+    private JCheckBox deleteTables;
     private int networkCount = 0;
     private Network [] nets = new Network[0];
 
@@ -61,12 +59,12 @@ public class UnconfigureDialog extends MultipleOperationDialog {
     }
 
     protected JPanel getMainPanel() {
-	
+
 	JPanel mainPanel = new JPanel();
 	mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-	
+
 	Box box = Box.createVerticalBox();
-	
+
 	if (!DhcpmgrApplet.modeIsRelay) {
 	    JComponent c = Wizard.createTextArea(
 		ResourceStrings.getString("unconfigure_dhcp"), 4, 30);
@@ -76,41 +74,10 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 	    deleteTables = new JCheckBox(
 		ResourceStrings.getString("unconfigure_delete_tables"), false);
 	    deleteTables.setToolTipText(
-	        ResourceStrings.getString("unconfigure_delete_tables"));
+		ResourceStrings.getString("unconfigure_delete_tables"));
 	    deleteTables.setAlignmentX(Component.LEFT_ALIGNMENT);
 	    box.add(deleteTables);
 	    box.add(Box.createVerticalStrut(10));
-	    deleteHosts = new JCheckBox(
-		ResourceStrings.getString("unconfigure_delete_hosts"), false);
-	    deleteHosts.setToolTipText(
-	        ResourceStrings.getString("unconfigure_delete_hosts"));
-	    deleteHosts.setAlignmentX(Component.LEFT_ALIGNMENT);
-	    deleteHosts.setEnabled(false);
-	    box.add(deleteHosts);
-	    deleteTables.addActionListener(new ActionListener() {
-		public void actionPerformed(ActionEvent e) {
-
-		    if (!deleteTables.isSelected()) {
-			deleteHosts.setEnabled(false);
-			return;
-		    }
-
-		    // If the host resource is set in the configuration
-		    // file (or we can't tell), then enable the deleteHosts
-		    // checkbox.
-		    try {
-			DhcpServiceMgr serviceMgr =
-			    DataManager.get().getDhcpServiceMgr();
-			DhcpdOptions opts = serviceMgr.readDefaults();
-			if (opts.getHostsResource() != null) {
-			    deleteHosts.setEnabled(true);
-			}
-		    } catch (BridgeException ex) {
-			// Assume set
-			deleteHosts.setEnabled(true);
-		    }
-		}
-	    });
 	} else {
 	    JComponent c = Wizard.createTextArea(
 		ResourceStrings.getString("unconfigure_bootp"), 4, 30);
@@ -126,7 +93,7 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 	buttonPanel.setOkEnabled(true);
     	return mainPanel;
     }
-    
+
     protected String getProgressMessage() {
 	return ResourceStrings.getString("unconfigure_progress");
     }
@@ -138,12 +105,12 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 	    // Add one for deleting defaults file, and one for deleting macro
 	    length += 2;
 	    if (deleteTables.isSelected()) {
-	    	try {
+		try {
 		    nets = DataManager.get().getNetworks(false);
-	    	} catch (Throwable t) {
-	    	    // Ignore
-	    	}
-	    	length += nets.length + 1; // Add one for dhcptab
+		} catch (Throwable t) {
+		    // Ignore
+		}
+		length += nets.length + 1; // Add one for dhcptab
 	    }
 	}
 	return length;
@@ -156,7 +123,7 @@ public class UnconfigureDialog extends MultipleOperationDialog {
     protected Thread getOperationThread() {
 	return new Thread() {
 	    public void run() {
-	    	int checkpoint = 0;
+		int checkpoint = 0;
 		DhcpServiceMgr serviceMgr =
 		    DataManager.get().getDhcpServiceMgr();
 		// Shut down the server
@@ -164,7 +131,7 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 		    serviceMgr.shutdown();
 		} catch (Throwable e) {
 		    addError(
-		    	ResourceStrings.getString("unconfigure_error_shutdown"),
+			ResourceStrings.getString("unconfigure_error_shutdown"),
 			e.getMessage());
 		}
 		try {
@@ -175,24 +142,24 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 		    return;
 		}
 
-	    	// If this was a relay we're done
-	    	if (!DhcpmgrApplet.modeIsRelay) {
+		// If this was a relay we're done
+		if (!DhcpmgrApplet.modeIsRelay) {
 		    // Remove the server macro
 		    try {
-		    	DataManager.get().getDhcptabMgr().deleteRecord(
+			DataManager.get().getDhcptabMgr().deleteRecord(
 			    new Macro(DataManager.get().getShortServerName()),
 			    false);
 		    } catch (Throwable e) {
 			addError(ResourceStrings.getString(
 			    "unconfigure_error_macro"),
-		    	    e.getMessage());
+			    e.getMessage());
 		    }
 		    try {
 			updateProgress(++checkpoint, ResourceStrings.getString(
 			    "unconfigure_macro_deleted"));
 		    } catch (InterruptedException e) {
 			closeDialog();
-		    	return;
+			return;
 		    }
 
 		    // Delete all the network tables and the dhcptab
@@ -210,8 +177,7 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 				args[0] = netString;
 				try {
 				    DataManager.get().getDhcpNetMgr().
-					deleteNetwork(netString, true,
-					deleteHosts.isSelected());
+					deleteNetwork(netString, true);
 				} catch (Throwable e) {
 				    addError(errForm.format(args),
 					e.getMessage());
@@ -219,19 +185,19 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 				try {
 				    updateProgress(++checkpoint,
 					progForm.format(args));
-			    	} catch (InterruptedException e) {
+				} catch (InterruptedException e) {
 				    closeDialog();
 				    return;
 				}
 			    }
 			}
-		    	try {
+			try {
 			    DataManager.get().getDhcptabMgr().deleteDhcptab();
-		    	} catch (Throwable e) {
+			} catch (Throwable e) {
 			    addError(ResourceStrings.getString(
-			    	"unconfigure_error_dhcptab"),
+				"unconfigure_error_dhcptab"),
 				e.getMessage());
-		    	}
+			}
 			try {
 			    updateProgress(++checkpoint,
 				ResourceStrings.getString(
@@ -262,7 +228,7 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 		    displayErrors(ResourceStrings.getString(
 			"unconfigure_error_messages"));
 		}
-    	    	closeDialog();
+		closeDialog();
 	    }
 	};
     }
@@ -274,7 +240,7 @@ public class UnconfigureDialog extends MultipleOperationDialog {
 	    return "unconfigure_server";
 	}
     }
-    
+
     protected void fireActionPerformed() {
 	fireActionPerformed(this, DialogActions.OK);
     }

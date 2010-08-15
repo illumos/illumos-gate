@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -87,7 +85,7 @@ public class RemoveNetworkTable extends PntAdmFunction {
 
 	    // Delete the network table.
 	    //
-	    getNetMgr().deleteNetwork(network.toString(), false, false,
+	    getNetMgr().deleteNetwork(network.toString(), false,
 		getDhcpDatastore());
 	} catch (NoTableException e) {
 	    printErrMessage(getMessage(e));

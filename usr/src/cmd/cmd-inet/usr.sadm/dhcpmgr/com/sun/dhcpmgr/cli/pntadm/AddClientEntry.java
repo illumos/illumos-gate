@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -48,7 +46,6 @@ public class AddClientEntry extends PntAdmFunction {
 	PntAdm.COMMENT,
 	PntAdm.LEASE_EXPIRATION,
 	PntAdm.FLAGS,
-	PntAdm.HOST_NAME,
 	PntAdm.CLIENTID,
 	PntAdm.CONVERT_CLIENTID,
 	PntAdm.MACRO_NAME,
@@ -85,7 +82,7 @@ public class AddClientEntry extends PntAdmFunction {
 
     /**
      * Executes the "add client" functionality.
-     * @return PntAdm.SUCCESS, PntAdm.EXISTS, PntAdm.WARNING, or 
+     * @return PntAdm.SUCCESS, PntAdm.EXISTS, PntAdm.WARNING, or
      * PntAdm.CRITICAL
      */
     public int execute()
@@ -116,15 +113,6 @@ public class AddClientEntry extends PntAdmFunction {
 		dhcpClientRecord.setFlags(flags);
 	    }
 
-	    String clientName = options.valueOf(PntAdm.HOST_NAME);
-	    if (clientName != null) {
-		if (isHostsManaged()) {
-		    dhcpClientRecord.setClientName(clientName);
-		} else {
-		    returnCode = PntAdm.WARNING;
-		}
-	    }
-
 	    String serverIP = options.valueOf(PntAdm.SERVER);
 	    if (serverIP == null) {
 		serverIP = getSvcMgr().getServerName();
@@ -143,7 +131,7 @@ public class AddClientEntry extends PntAdmFunction {
 		    String msg = getString("no_macro_specified");
 		    throw new IllegalArgumentException(msg);
 		}
-		
+
 		// Create a Macro entry so that we can check to see if it
 		// exists in the dhcptab.
 		//

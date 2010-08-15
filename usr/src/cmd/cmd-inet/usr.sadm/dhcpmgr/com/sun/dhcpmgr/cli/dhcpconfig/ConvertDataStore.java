@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -73,7 +71,7 @@ public class ConvertDataStore extends DhcpCfgFunction {
 		options.valueOf(DhcpCfg.RESOURCE)));
 	    getDhcpDatastore().setLocation(options.valueOf(DhcpCfg.PATH));
 	    getDhcpDatastore().setConfig(
-	        options.valueOf(DhcpCfg.RESOURCE_CONFIG));
+		options.valueOf(DhcpCfg.RESOURCE_CONFIG));
 	} catch (Throwable e) {
 	    // resource will not be valid
 	}
@@ -218,8 +216,7 @@ public class ConvertDataStore extends DhcpCfgFunction {
 	    for (int i = 0; i < networks.length; ++i) {
 		String netString = networks[i].toString();
 		try {
-		    getNetMgr().deleteNetwork(netString, false, false,
-			oldDatastore);
+		    getNetMgr().deleteNetwork(netString, false, oldDatastore);
 		    Object [] arguments = new Object[1];
 		    arguments[0] = netString;
 		    printMessage(getString("convert_delete_network_progress"),

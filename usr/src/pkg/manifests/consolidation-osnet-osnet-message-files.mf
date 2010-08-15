@@ -69,7 +69,6 @@ dir path=usr/share/lib/locale/com/sun/dhcpmgr/client/help
 dir path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art
 dir path=usr/share/lib/locale/com/sun/dhcpmgr/common
 dir path=usr/share/lib/locale/com/sun/dhcpmgr/data
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/server
 dir path=usr/share/lib/locale/com/sun/dhcpmgr/ui
 dir path=usr/share/lib/locale/com/sun/slp
 file path=usr/lib/help/auths/locale/AllSolAuthsHeader.html
@@ -440,8 +439,6 @@ file \
 file \
     path=usr/share/lib/locale/com/sun/dhcpmgr/common/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/dhcpmgr/data/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/server/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/dhcpmgr/ui/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/slp/ClientLib_en.properties group=sys
 file path=usr/share/lib/locale/com/sun/slp/Server_en.properties group=sys

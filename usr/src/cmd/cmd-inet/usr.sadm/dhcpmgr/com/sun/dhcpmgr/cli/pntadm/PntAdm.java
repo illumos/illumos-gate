@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -46,7 +44,7 @@ public class PntAdm
     /**
      * The valid options for all PntAdm administration.
      */
-    private static String optString = "LPCRyavxA:D:M:r:p:u:s:i:f:e:h:m:c:n:B;";
+    private static String optString = "LPCRyavxA:D:M:r:p:u:s:i:f:e:m:c:n:B;";
 
     public static final int ADD_CLIENT_ENTRY		= 'A';
     public static final int MODIFY_CLIENT_ENTRY		= 'M';
@@ -58,7 +56,6 @@ public class PntAdm
     public static final int BATCH_EXECUTION		= 'B';
 
     public static final int VERIFY_MACRO	= 'y';
-    public static final int DELETE_HOST		= 'y';
     public static final int CONVERT_CLIENTID	= 'a';
     public static final int RAW			= 'x';
     public static final int VERBOSE		= 'v';
@@ -69,7 +66,6 @@ public class PntAdm
     public static final int CLIENTID		= 'i';
     public static final int FLAGS		= 'f';
     public static final int LEASE_EXPIRATION	= 'e';
-    public static final int HOST_NAME		= 'h';
     public static final int MACRO_NAME		= 'm';
     public static final int COMMENT		= 'c';
     public static final int NEW_IP		= 'n';
@@ -186,7 +182,7 @@ public class PntAdm
 	    DhcpCliPrint.printErrMessage(msg.toString());
 	    returnCode = CRITICAL;
 	}
-	
+
 	return (returnCode);
 
     } // execute
@@ -197,7 +193,7 @@ public class PntAdm
      * @param value the option value(if any)
      * @exception IllegalArgumentException if an invalid argument was entered
      */
-    public void processArg(int option, String value) 
+    public void processArg(int option, String value)
 	throws IllegalArgumentException {
 
     	switch (option) {
