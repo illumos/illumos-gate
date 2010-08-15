@@ -271,6 +271,7 @@ typedef struct sata_id {
 #define	SATA_ID_MODEL_LEN	40
 #define	SATA_ID_FW_LEN		8
 #define	SATA_ID_BDC_LEN		0x3c
+#define	SATA_ID_ATA_INFO_LEN	0x238
 
 /* Identify Device: common capability bits - word 49 */
 

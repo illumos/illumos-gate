@@ -3553,9 +3553,11 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
  * Device Identify cmd request. If device is detached and re-attached,
  * asynchronous event processing should fetch and refresh Identify Device
  * data.
- * Two VPD pages are supported now:
+ * VPD pages supported now:
  * Vital Product Data page
  * Unit Serial Number page
+ * Block Device Characteristics Page
+ * ATA Information Page
  *
  * Returns TRAN_ACCEPT and appropriate values in scsi_pkt fields.
  */
@@ -3566,6 +3568,7 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 #define	INQUIRY_USN_PAGE	0x80	/* Unit Serial Number Page Code */
 #define	INQUIRY_BDC_PAGE	0xB1	/* Block Device Characteristics Page */
 					/* Code */
+#define	INQUIRY_ATA_INFO_PAGE	0x89	/* ATA Information Page Code */
 #define	INQUIRY_DEV_IDENTIFICATION_PAGE 0x83 /* Not needed yet */
 
 static int
@@ -3578,7 +3581,7 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 	int count;
 	uint8_t *p;
 	int i, j;
-	uint8_t page_buf[0xff]; /* Max length */
+	uint8_t page_buf[1024]; /* Max length */
 	int rval, reason;
 	ushort_t rate;
 
@@ -3650,22 +3653,24 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 			    sdinfo->satadrv_type == SATA_DTYPE_ATADISK ?
 			    DTYPE_DIRECT : DTYPE_RODIRECT;
 
+			bzero(page_buf, sizeof (page_buf));
+
 			switch ((uint_t)scsipkt->pkt_cdbp[2]) {
 			case INQUIRY_SUP_VPD_PAGE:
 				/*
-				 * Request for suported Vital Product Data
-				 * pages - assuming only 2 page codes
-				 * supported.
+				 * Request for supported Vital Product Data
+				 * pages.
 				 */
 				page_buf[0] = peripheral_device_type;
 				page_buf[1] = INQUIRY_SUP_VPD_PAGE;
 				page_buf[2] = 0;
-				page_buf[3] = 3; /* page length */
+				page_buf[3] = 4; /* page length */
 				page_buf[4] = INQUIRY_SUP_VPD_PAGE;
 				page_buf[5] = INQUIRY_USN_PAGE;
 				page_buf[6] = INQUIRY_BDC_PAGE;
+				page_buf[7] = INQUIRY_ATA_INFO_PAGE;
 				/* Copy no more than requested */
-				count = MIN(bp->b_bcount, 7);
+				count = MIN(bp->b_bcount, 8);
 				bcopy(page_buf, bp->b_un.b_addr, count);
 				break;
 
@@ -3748,6 +3753,74 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 
 				count = MIN(bp->b_bcount,
 				    SATA_ID_BDC_LEN + 4);
+				bcopy(page_buf, bp->b_un.b_addr, count);
+				break;
+
+			case INQUIRY_ATA_INFO_PAGE:
+				/*
+				 * Request for ATA Information page.
+				 */
+				page_buf[0] = peripheral_device_type;
+				page_buf[1] = INQUIRY_ATA_INFO_PAGE;
+				page_buf[2] = (SATA_ID_ATA_INFO_LEN >> 8) &
+				    0xff;
+				page_buf[3] = SATA_ID_ATA_INFO_LEN & 0xff;
+				/* page_buf[4-7] reserved */
+#ifdef  _LITTLE_ENDIAN
+				bcopy("ATA     ", &page_buf[8], 8);
+				swab(sdinfo->satadrv_id.ai_model,
+				    &page_buf[16], 16);
+				if (strncmp(&sdinfo->satadrv_id.ai_fw[4],
+				    "    ", 4) == 0) {
+					swab(sdinfo->satadrv_id.ai_fw,
+					    &page_buf[32], 4);
+				} else {
+					swab(&sdinfo->satadrv_id.ai_fw[4],
+					    &page_buf[32], 4);
+				}
+#else   /* _LITTLE_ENDIAN */
+				bcopy("ATA     ", &page_buf[8], 8);
+				bcopy(sdinfo->satadrv_id.ai_model,
+				    &page_buf[16], 16);
+				if (strncmp(&sdinfo->satadrv_id.ai_fw[4],
+				    "    ", 4) == 0) {
+					bcopy(sdinfo->satadrv_id.ai_fw,
+					    &page_buf[32], 4);
+				} else {
+					bcopy(&sdinfo->satadrv_id.ai_fw[4],
+					    &page_buf[32], 4);
+				}
+#endif  /* _LITTLE_ENDIAN */
+				/*
+				 * page_buf[36-55] which defines the device
+				 * signature is not defined at this
+				 * time.
+				 */
+
+				/* Set the command code */
+				if (sdinfo->satadrv_type ==
+				    SATA_DTYPE_ATADISK) {
+					page_buf[56] = SATAC_ID_DEVICE;
+				} else if (sdinfo->satadrv_type ==
+				    SATA_DTYPE_ATAPI) {
+					page_buf[56] = SATAC_ID_PACKET_DEVICE;
+				}
+				/*
+				 * If the command code, page_buf[56], is not
+				 * zero and if one of the identify commands
+				 * succeeds, return the identify data.
+				 */
+				if ((page_buf[56] != 0) &&
+				    (sata_fetch_device_identify_data(
+				    spx->txlt_sata_hba_inst, sdinfo) ==
+				    SATA_SUCCESS)) {
+					bcopy(&sdinfo->satadrv_id,
+					    &page_buf[60], sizeof (sata_id_t));
+				}
+
+				/* Need to copy out the page_buf to bp */
+				count = MIN(bp->b_bcount,
+				    SATA_ID_ATA_INFO_LEN + 4);
 				bcopy(page_buf, bp->b_un.b_addr, count);
 				break;
 
