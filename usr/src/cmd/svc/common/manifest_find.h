@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <libscf.h>
 #include "manifest_hash.h"
 
 #define	CHECKHASH	0x1
@@ -50,7 +51,7 @@ typedef struct manifest_info {
  */
 
 
-int find_manifests(const char *, manifest_info_t ***, int);
+int find_manifests(scf_handle_t *, const char *, manifest_info_t ***, int);
 void free_manifest_array(manifest_info_t **);
 
 #ifdef __cplusplus

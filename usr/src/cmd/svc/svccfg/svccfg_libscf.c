@@ -16207,7 +16207,7 @@ create_manifest_tree(void)
 	 * is supported by multiple manifest files.
 	 */
 	for (c = 0; dirs[c]; c++) {
-		status = find_manifests(dirs[c], &manifests, CHECKEXT);
+		status = find_manifests(g_hndl, dirs[c], &manifests, CHECKEXT);
 		if (status < 0) {
 			uu_warn(gettext("file tree walk of %s encountered "
 			    "error %s\n"), dirs[c], strerror(errno));
@@ -17054,8 +17054,8 @@ lscf_hash_cleanup()
 	scf_property_t		*prop;
 	scf_value_t		*val;
 	scf_iter_t		*iter;
-	char			*pgname;
-	char			*mfile;
+	char			*pgname = NULL;
+	char			*mfile = NULL;
 	int			r;
 
 	svc = scf_service_create(g_hndl);
@@ -17148,39 +17148,45 @@ lscf_hash_cleanup()
 		if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
 			uu_warn(gettext("Unable to get value from %s\n"),
 			    pgname);
-			goto error_handle;
+
+			switch (scf_error()) {
+			case SCF_ERROR_DELETED:
+			case SCF_ERROR_CONSTRAINT_VIOLATED:
+			case SCF_ERROR_NOT_FOUND:
+			case SCF_ERROR_NOT_SET:
+				continue;
+
+			case SCF_ERROR_CONNECTION_BROKEN:
+				r = scferror2errno(scf_error());
+				goto out;
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_NOT_BOUND:
+			default:
+				bad_error("scf_property_get_value",
+				    scf_error());
+			}
 		}
 
-		if (scf_value_get_astring(val, mfile, max_scf_value_len + 1) ==
-		    -1) {
+		if (scf_value_get_astring(val, mfile, max_scf_value_len + 1)
+		    == -1) {
 			uu_warn(gettext("Unable to get astring from %s : %s\n"),
 			    pgname, scf_strerror(scf_error()));
-			goto error_handle;
+
+			switch (scf_error()) {
+			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_TYPE_MISMATCH:
+				continue;
+
+			default:
+				bad_error("scf_value_get_astring", scf_error());
+			}
 		}
 
 		if (access(mfile, F_OK) == 0)
 			continue;
 
 		(void) scf_pg_delete(pg);
-
-error_handle:
-		switch (scf_error()) {
-		case SCF_ERROR_DELETED:
-		case SCF_ERROR_CONSTRAINT_VIOLATED:
-		case SCF_ERROR_NOT_FOUND:
-		case SCF_ERROR_NOT_SET:
-			continue;
-
-		case SCF_ERROR_CONNECTION_BROKEN:
-			r = scferror2errno(scf_error());
-			goto out;
-
-		case SCF_ERROR_HANDLE_MISMATCH:
-		case SCF_ERROR_NOT_BOUND:
-		default:
-			bad_error("scf_value_get_astring",
-			    scf_error());
-		}
 	}
 
 out:

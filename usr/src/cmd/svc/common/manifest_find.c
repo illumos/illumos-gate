@@ -240,9 +240,17 @@ process(const char *fn, const struct stat *sp, int ftw_type,
  * Note, however, that *arrayp will be set to NULL if the selection is
  * empty, and a count of 0 will be returned.  In the case of failure, -1
  * will be returned and errno will be set.
+ *
+ * This function takes a repository handle argument from the caller and saves
+ * that handle in a thread specific data structure. The thread specific
+ * repository handle is used in process() to communicate with the appropriate
+ * repository. Thus callers should take care of thread safety with respect to
+ * the repository handle. Currently, the two callers of find_manifests are both
+ * single threaded, i.e. svccfg and mfstscan, so thread safety not an issue.
  */
 int
-find_manifests(const char *dir, manifest_info_t ***arrayp, int flags)
+find_manifests(scf_handle_t *hndl, const char *dir,
+    manifest_info_t ***arrayp, int flags)
 {
 	mftsd_t *tsdp;
 	int status = -1;
@@ -254,28 +262,8 @@ find_manifests(const char *dir, manifest_info_t ***arrayp, int flags)
 
 	tsdp->tsd_flags = flags;
 
-	/*
-	 * Create a handle for use by mhast_test_file() if
-	 * the flag is set to request hash checking be enabled.
-	 */
 	if (tsdp->tsd_flags & CHECKHASH) {
-		tsdp->tsd_hndl = scf_handle_create(SCF_VERSION);
-		if (tsdp->tsd_hndl == NULL) {
-			if (scf_error() == SCF_ERROR_NO_MEMORY) {
-				errno = ENOMEM;
-			} else {
-				errno = EINVAL;
-			}
-			goto out;
-		}
-		if (scf_handle_bind(tsdp->tsd_hndl) != SCF_SUCCESS) {
-			if (scf_error() == SCF_ERROR_NO_RESOURCES) {
-				errno = ENOMEM;
-			} else {
-				errno = EINVAL;
-			}
-			goto out;
-		}
+		tsdp->tsd_hndl = hndl;
 	}
 
 	if (nftw(dir, process, MAX_DEPTH, FTW_MOUNT) == 0) {
@@ -283,10 +271,6 @@ find_manifests(const char *dir, manifest_info_t ***arrayp, int flags)
 	}
 
 out:
-	if (tsdp->tsd_hndl != NULL) {
-		(void) scf_handle_unbind(tsdp->tsd_hndl);
-		(void) scf_handle_destroy(tsdp->tsd_hndl);
-	}
 	if (status == 0) {
 		*arrayp = tsdp->tsd_array;
 		count = tsdp->tsd_count;

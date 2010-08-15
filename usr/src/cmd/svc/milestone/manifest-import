@@ -34,15 +34,36 @@ EMI_SERVICE="svc:/system/early-manifest-import:default"
 PROFILE_DIR_SITE="/etc/svc/profile/site"
 
 X=
+ALT_REPOSITORY=
+ALT_MFST_DIR=
 early=false
 [ "$SMF_FMRI" == "$EMI_SERVICE" ] && early=true
-while getopts "n" opt; do
+
+usage()
+{
+	echo "Usage: /lib/svc/method/manifest-import [-n]" \
+	    "[-f repository-file -d manifest-directory]"
+	echo "\nOptions:"
+	echo "-n dryrun"
+	echo "-f and -d specify alternate repository and" \
+	    "manifest directory for import\n"
+	exit 2
+}
+
+while getopts "nd:f:" opt; do
 	case $opt in
 		n)	X=echo;;
-		?)	echo "Usage: /lib/svc/method/manifest-import [-n]\n"
-		exit 2;;
+		d)	ALT_MFST_DIR=$OPTARG;;
+		f)	ALT_REPOSITORY=$OPTARG;;
+		?)	usage;;
 	esac
 done
+
+#
+# Both -f and -d options must be specified together or not specified at all
+#
+[ -n "$ALT_REPOSITORY" -a -z "$ALT_MFST_DIR" ] && usage
+[ -n "$ALT_MFST_DIR" -a -z "$ALT_REPOSITORY" ] && usage
 
 function svccfg_apply {
 	$X /usr/sbin/svccfg apply $1
@@ -178,16 +199,17 @@ function preserve_system_profiles {
 #
 function import_manifests {
 	typeset basedir=$1
+	typeset console_print=$2
 	typeset logf="/etc/svc/volatile/manifest_import.$$"
 
 	rm -f $logf
 
-	nonsite_dirs=`/usr/bin/find $basedir/svc/manifest/* -name site \
+	nonsite_dirs=`/usr/bin/find $basedir/* -name site \
 	    -prune -o -type d -print -prune`
 
 	if [ -n "$_MFST_DEBUG" ]; then
 		nonsite_manifests=`/lib/svc/bin/mfstscan $nonsite_dirs`
-		site_manifests=`/lib/svc/bin/mfstscan $basedir/svc/manifest/site`
+		site_manifests=`/lib/svc/bin/mfstscan $basedir/site`
 
 		manifests="$nonsite_manifests $site_manifests"
 
@@ -196,18 +218,24 @@ function import_manifests {
 	fi
 
 	#
-	# Attempt of moving the repository to tmpfs.  If that doesn't
-	# work, reset doswitch so we don't attempt switching back.
+	# Upon boot, attempt to move the repository to tmpfs.
 	#
-	/usr/sbin/svcadm _smf_repository_switch fast
-	doswitch=$?
+	if [ -z "$ALT_REPOSITORY" -a -z "$ALT_MFST_DIR" ]; then 
+		/usr/sbin/svcadm _smf_repository_switch fast
+	fi
 
 	#
 	# Import the manifests while giving a running display of imports on
 	# console, and a final count in the logfile.
 	#
-	dirs="$nonsite_dirs $basedir/svc/manifest/site"
-	$X /usr/sbin/svccfg import -p /dev/msglog $dirs > $logf 2>&1
+	dirs="$nonsite_dirs"
+	[ -d "$basedir/site" ] && dirs="$dirs $basedir/site"
+
+	if [ "$console_print" = "true" ]; then
+		$X /usr/sbin/svccfg import -p /dev/msglog $dirs > $logf 2>&1
+	else
+		$X /usr/sbin/svccfg import $dirs > $logf 2>&1
+	fi
 
 	grep "Loaded .*. smf(5) service descriptions" $logf > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
@@ -222,7 +250,7 @@ function import_manifests {
 		fi
 		cat $logf
 
-		if [ $failures -eq 0 ]; then
+		if [ $failures -eq 0 -a "$console_print" = "true" ]; then
 			msg="svccfg import warnings.  See"
 			msg="$msg /var/svc/log/system-manifest-import:default.log ."
 			echo $msg > /dev/msglog
@@ -323,10 +351,10 @@ function handle_upgrade {
 #     under /etc/svc/profile/site directory.
 #
 function apply_site_profile {
-        typeset prefix="$1/svc/profile"
+        typeset prefix="$1"
 	[ -f $prefix/site.xml ] && svccfg_apply $prefix/site.xml
 
-	if [ -d $PROFILE_DIR_SITE -a "$1" = "/etc" ]; then
+	if [ -d $PROFILE_DIR_SITE -a "$1" = "/etc/svc/profile" ]; then
 		svccfg_apply $PROFILE_DIR_SITE
 	fi
 }
@@ -401,33 +429,45 @@ if [ "$early" = "false" ]; then
 fi
 
 #
+# If the alternate repository and directory are specified, simply set
+# SVCCFG_REPOSITORY env, run svccfg import on the given directory, and
+# exit.
+#
+if [ -n "$ALT_REPOSITORY" -a -n "$ALT_MFST_DIR" ]; then 
+	SVCCFG_REPOSITORY=$ALT_REPOSITORY export SVCCFG_REPOSITORY
+	import_manifests "$ALT_MFST_DIR" false
+	unset SVCCFG_REPOSITORY
+	exit 0
+fi
+
+#
 # Call import and apply profiles here
 #
 if [ "$early" = "true" ]; then
-	import_manifests "/lib"
+	import_manifests "/lib/svc/manifest" true
 	apply_profile
-	apply_site_profile "/etc"
+	apply_site_profile "/etc/svc/profile"
 else
 	#
-	# Process both /lib/svc and /var/svc
+	# Process both /lib/svc/manifest and /var/svc/manifest
 	# during late manifest-import
 	#
 	# First import the manifests
 	#
-	import_manifests "/lib"
-	import_manifests "/var"
+	import_manifests "/lib/svc/manifest" true
+	import_manifests "/var/svc/manifest" true
 
 	#
 	# Apply profiles
 	#
 	apply_profile
-	apply_site_profile "/etc"
+	apply_site_profile "/etc/svc/profile"
 
 	#
 	# Run the upgrade script
 	#
 	handle_upgrade
-	apply_site_profile "/var"
+	apply_site_profile "/var/svc/profile"
 fi
 
 
