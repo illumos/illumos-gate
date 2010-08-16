@@ -2471,6 +2471,7 @@ add_datalink(zlog_t *zlogp, char *zone_name, datalink_id_t linkid, char *dlname)
 {
 	dladm_status_t err;
 	boolean_t cpuset, poolset;
+	char *poolp;
 
 	/* First check if it's in use by global zone. */
 	if (zonecfg_ifname_exists(AF_INET, dlname) ||
@@ -2508,8 +2509,9 @@ add_datalink(zlog_t *zlogp, char *zone_name, datalink_id_t linkid, char *dlname)
 	}
 
 	if ((strlen(pool_name) != 0) && !cpuset && !poolset) {
+		poolp = pool_name;
 		err = dladm_set_linkprop(dld_handle, linkid, "pool",
-		    &pool_name, 1, DLADM_OPT_ACTIVE);
+		    &poolp, 1, DLADM_OPT_ACTIVE);
 		if (err != DLADM_STATUS_OK) {
 			zerror(zlogp, B_FALSE, "WARNING: unable to set "
 			    "pool %s to datalink %s", pool_name, dlname);
@@ -4516,6 +4518,8 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 			zerror(zlogp, B_FALSE, "WARNING: %s",
 			    zonecfg_strerror(res));
 	}
+
+	/* Update saved pool name in case it has changed */
 	(void) zonecfg_get_poolname(handle, zone_name, pool_name, MAXPATHLEN);
 
 	zonecfg_fini_handle(handle);
@@ -4806,12 +4810,6 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		zerror(zlogp, B_TRUE, "cannot add mapfile entry");
 		goto error;
 	}
-
-	if ((pool_name = malloc(MAXPATHLEN)) == NULL) {
-		zerror(zlogp, B_TRUE, "memory allocation failed");
-		return (Z_NOMEM);
-	}
-	bzero(pool_name, MAXPATHLEN);
 
 	/*
 	 * The following actions are not performed when merely mounting a zone
@@ -5277,8 +5275,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 			}
 		}
 	}
-
-	free(pool_name);
 
 	remove_mlps(zlogp, zoneid);
 

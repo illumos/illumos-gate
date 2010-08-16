@@ -1682,6 +1682,7 @@ file path=usr/include/wordexp.h
 file path=usr/include/xti.h
 file path=usr/include/xti_inet.h
 file path=usr/include/zone.h
+file path=usr/include/zonestat.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/acpidev.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/amd_iommu.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/asm_misc.h

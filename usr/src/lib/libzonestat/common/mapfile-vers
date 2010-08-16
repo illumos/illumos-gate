@@ -1,0 +1,101 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate {
+    global:
+        zs_close;
+        zs_open;
+        zs_property_int;
+        zs_property_size;
+        zs_property_string;
+        zs_property_uint;
+        zs_property_uint64;
+	zs_property_alloc;
+	zs_property_double;
+	zs_property_free;
+	zs_property_id;
+	zs_property_time;
+	zs_property_type;
+        zs_pset_first;
+        zs_pset_list;
+        zs_pset_next;
+        zs_pset_property;
+        zs_pset_total_time;
+        zs_pset_used_time;
+        zs_pset_total_cpus;
+        zs_pset_used_cpus;
+        zs_pset_used_pct;
+        zs_pset_zone_first;
+        zs_pset_zone_get_pset;
+        zs_pset_zone_get_zone;
+        zs_pset_zone_list;
+        zs_pset_zone_next;
+        zs_pset_zone_property;
+        zs_pset_zone_used_cpus;
+        zs_pset_zone_used_pct;
+        zs_pset_zone_used_time;
+        zs_resource_property;
+	zs_resource_type;
+        zs_resource_total_time;
+        zs_resource_used_time;
+        zs_resource_used_zone_time;
+        zs_resource_total_uint64;
+        zs_resource_used_uint64;
+        zs_resource_used_zone_uint64;
+        zs_resource_used_pct;
+        zs_resource_used_zone_pct;
+        zs_usage_compute;
+        zs_usage_free;
+        zs_usage_read;
+        zs_usage_set_add;
+        zs_usage_set_alloc;
+        zs_usage_set_compute;
+        zs_usage_set_count;
+        zs_usage_set_free;
+        zs_zone_limit_uint64;
+        zs_zone_limit_used_pct;
+        zs_zone_limit_used_time;
+        zs_zone_list;
+	zs_zone_first;
+	zs_zone_next;
+        zs_zone_property;
+    local:
+	*;
+};

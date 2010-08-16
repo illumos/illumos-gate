@@ -209,6 +209,7 @@ SUBDIRS += \
 	libbrand	.WAIT   \
 	libzonecfg	\
 	libzoneinfo	\
+	libzonestat	\
 	libtsnet	\
 	libtsol		\
 	gss_mechs/mech_spnego	\
@@ -479,6 +480,7 @@ HDRSUBDIRS=		\
 	libzfs		\
 	libzfs_jni	\
 	libzoneinfo	\
+	libzonestat	\
 	hal		\
 	policykit	\
 	lvm		\

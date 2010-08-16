@@ -62,13 +62,19 @@ file path=lib/svc/manifest/system/resource-mgmt.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
 file path=lib/svc/manifest/system/zones.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
+file path=lib/svc/manifest/system/zonestat.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
 file path=lib/svc/method/svc-resource-mgmt mode=0555 \
     variant.opensolaris.zone=global
 file path=lib/svc/method/svc-zones mode=0555 variant.opensolaris.zone=global
+file path=lib/svc/method/svc-zonestat mode=0555 \
+    variant.opensolaris.zone=global
+file path=usr/bin/zonestat mode=0555
 file path=usr/kernel/drv/$(ARCH64)/zcons group=sys
 $(i386_ONLY)file path=usr/kernel/drv/zcons group=sys
 file path=usr/lib/$(ARCH64)/libbrand.so.1
 file path=usr/lib/$(ARCH64)/libzonecfg.so.1
+file path=usr/lib/$(ARCH64)/libzonestat.so.1
 file path=usr/lib/brand/ipkg/config.xml mode=0444
 file path=usr/lib/brand/ipkg/platform.xml mode=0444
 file path=usr/lib/brand/shared/common.ksh mode=0444
@@ -76,7 +82,9 @@ file path=usr/lib/brand/shared/query mode=0755
 file path=usr/lib/brand/shared/uninstall.ksh mode=0444
 file path=usr/lib/libbrand.so.1
 file path=usr/lib/libzonecfg.so.1
+file path=usr/lib/libzonestat.so.1
 file path=usr/lib/zones/zoneadmd mode=0555
+file path=usr/lib/zones/zonestatd mode=0555 variant.opensolaris.zone=global
 file path=usr/sbin/zlogin mode=0555
 file path=usr/sbin/zoneadm mode=0555
 file path=usr/sbin/zonecfg mode=0555

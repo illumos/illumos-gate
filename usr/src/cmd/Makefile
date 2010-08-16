@@ -456,6 +456,7 @@ COMMON_SUBDIRS=		\
 	zonename	\
 	zpool		\
 	zlook		\
+	zonestat	\
 	zstreamdump	\
 	ztest
 
@@ -744,7 +745,8 @@ MSGSUBDIRS=		\
 	zoneadmd	\
 	zonecfg		\
 	zonename	\
-	zpool
+	zpool		\
+	zonestat
 
 $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/iconv	\
