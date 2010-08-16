@@ -1359,19 +1359,17 @@ ndmp_execute_cdb(ndmpd_session_t *session, char *adapter_name, int sid, int lun,
 		}
 
 		cmd.uscsi_buflen = request->datain_len;
-		cmd.uscsi_rqlen = sizeof (rq_buf);
-		cmd.uscsi_rqbuf = rq_buf;
 	} else if (request->flags == NDMP_SCSI_DATA_OUT) {
-		cmd.uscsi_flags = USCSI_WRITE;
+		cmd.uscsi_flags = USCSI_WRITE | USCSI_RQENABLE;
 		cmd.uscsi_bufaddr = request->dataout.dataout_val;
 		cmd.uscsi_buflen = request->dataout.dataout_len;
 	} else {
 		cmd.uscsi_flags = USCSI_RQENABLE;
 		cmd.uscsi_bufaddr = 0;
 		cmd.uscsi_buflen = 0;
-		cmd.uscsi_rqlen = sizeof (rq_buf);
-		cmd.uscsi_rqbuf = rq_buf;
 	}
+	cmd.uscsi_rqlen = sizeof (rq_buf);
+	cmd.uscsi_rqbuf = rq_buf;
 
 	cmd.uscsi_timeout = (request->timeout < 1000) ?
 	    1 : (request->timeout / 1000);
