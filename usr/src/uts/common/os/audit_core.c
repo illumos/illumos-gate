@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -160,7 +159,7 @@ audit_update_context(proc_t *p, cred_t *ncr)
 		if (pad->pad_flags & PAD_SETMASK) {
 			ainfo = crgetauinfo_modifiable(newcred);
 			if (ainfo == NULL) {
-				mutex_enter(&pad->pad_lock);
+				mutex_exit(&pad->pad_lock);
 				crfree(newcred);
 				return;
 			}
