@@ -624,7 +624,7 @@ au_doorio(au_kcontext_t *kctx) {
 	token_t		*sp;	/* last AR processed */
 	char		*bp;	/* start of free space in staging buffer */
 	unsigned char	*cp;	/* ptr to data to be moved */
-	int		error;  /* return from door upcall */
+	int		error = 0;  /* return from door upcall */
 
 	/*
 	 * size (data left in au_membuf - space in buffer)
