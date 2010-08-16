@@ -1917,9 +1917,7 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 
 			for (i = 0; i < mech_count; i++) {
 				pb += n;
-				l -= n;
-				if (l < 0)
-					l = 0;
+				l = (n >= l) ? 0 : l - n;
 
 				if (i == mech_count - 1)
 					(void) strcpy(space, "");
