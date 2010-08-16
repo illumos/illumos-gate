@@ -34,7 +34,17 @@ LIBSRCS = fmev_subscribe.c \
 OBJECTS = $(LIBSRCS:%.c=%.o)
 
 include ../../../Makefile.lib
-include ../../Makefile.lib
+
+# This library must install in /lib/fm since it is a dependency of
+# svc.startd and may be required in early boot.  Thus we cannot
+# include ../Makefile.lib - instead we set ROOTFMHDRDIR and
+# ROOTFMHDRS and redefine ROOTLIBDIR and ROOTLIBDIR64 accordingly
+
+ROOTFMHDRDIR = $(ROOTHDRDIR)/fm
+ROOTFMHDRS   = $(FMHDRS:%=$(ROOTFMHDRDIR)/%)
+
+ROOTLIBDIR=     $(ROOTFS_LIBDIR)/fm
+ROOTLIBDIR64=   $(ROOTFS_LIBDIR)/fm/$(MACH64)
 
 SRCS = $(LIBSRCS:%.c=../common/%.c)
 LIBS = $(DYNLIB) $(LINTLIB)
@@ -48,8 +58,15 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
-$(DYNLIB) := LDLIBS += -lumem -lnvpair -luutil -lsysevent -L$(ROOTLIBDIR) \
-	-ltopo -lc
+
+FMLIBDIR=usr/lib/fm
+$(BUILD64)FMLIBDIR64=usr/lib/fm/$(MACH64)
+
+$(DYNLIB) := LDLIBS += -lumem -lnvpair -luutil -lsysevent \
+	-L$(ROOT)/$(FMLIBDIR) -ltopo -lc
+
+$(BUILD64)$(DYNLIB) := LDLIBS64 += -lumem -lnvpair -luutil -lsysevent \
+	-L$(ROOT)/$(FMLIBDIR64) -ltopo -lc
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -m64

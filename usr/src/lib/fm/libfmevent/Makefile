@@ -23,7 +23,17 @@
 #
 
 include ../../Makefile.lib
-include ../Makefile.lib
+
+# This library must install in /lib since it is a dependency of
+# svc.startd and may be required in early boot.  Thus we cannot
+# include ../Makefile.lib - instead we set ROOTFMHDRDIR and
+# ROOTFMHDRS and redefine ROOTLIBDIR and ROOTLIBDIR64 accordingly
+
+ROOTFMHDRDIR = $(ROOTHDRDIR)/fm
+ROOTFMHDRS   = $(FMHDRS:%=$(ROOTFMHDRDIR)/%)
+
+ROOTLIBDIR=     $(ROOTFS_LIBDIR)/fm
+ROOTLIBDIR64=   $(ROOTFS_LIBDIR)/fm/$(MACH64)
 
 FMHDRS = libfmevent.h libfmevent_ruleset.h
 HDRDIR = common

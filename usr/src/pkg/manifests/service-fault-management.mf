@@ -57,12 +57,18 @@ dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 #
+# lib dirs:
+#
+dir path=lib/fm variant.opensolaris.zone=__NODEFAULT
+dir path=lib/fm/$(ARCH64) variant.opensolaris.zone=__NODEFAULT
+#
 # Our service manifests are common to global and non-global zones
 #
 dir path=lib/svc/manifest/system group=sys \
     variant.opensolaris.zone=__NODEFAULT
 dir path=lib/svc/manifest/system/fm group=sys \
     variant.opensolaris.zone=__NODEFAULT
+
 #
 # usr dirs:
 #	- most are common to both global and non-global zones
@@ -257,6 +263,17 @@ file path=etc/net-snmp/snmp/mibs/SUN-IREPORT-MIB.mib \
 file path=kernel/drv/$(ARCH64)/fm group=sys
 $(i386_ONLY)file path=kernel/drv/fm group=sys
 file path=kernel/drv/fm.conf group=sys
+
+#
+# Some libraries need to be in lib for install
+#
+file path=lib/fm/$(ARCH64)/libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=lib/fm/$(ARCH64)/llib-lfmevent.ln \
+    variant.opensolaris.zone=__NODEFAULT
+file path=lib/fm/libfmevent.so.1 variant.opensolaris.zone=__NODEFAULT
+file path=lib/fm/llib-lfmevent variant.opensolaris.zone=__NODEFAULT
+file path=lib/fm/llib-lfmevent.ln variant.opensolaris.zone=__NODEFAULT
 #
 # Service manifests are common to both global and non-global zones
 #
@@ -303,8 +320,6 @@ file path=usr/lib/fm/$(ARCH64)/libfmd_msg.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/libfmevent.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/$(ARCH64)/libfmnotify.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/libldom.so.1
@@ -328,8 +343,6 @@ file path=usr/lib/fm/$(ARCH64)/llib-lfmd_log.ln \
 file path=usr/lib/fm/$(ARCH64)/llib-lfmd_msg.ln \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/$(ARCH64)/llib-lfmd_snmp.ln \
-    variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/llib-lfmevent.ln \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/$(ARCH64)/llib-lfmnotify.ln \
     variant.opensolaris.zone=__NODEFAULT
@@ -513,7 +526,6 @@ file path=usr/lib/fm/libfmd_agent.so.1 variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/libfmd_log.so.1 variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/libfmd_msg.so.1 variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/libfmd_snmp.so.1 variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/libfmevent.so.1 variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/libfmnotify.so.1 variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/fm/libldom.so.1
 $(sparc_ONLY)file path=usr/lib/fm/libmdesc.so.1
@@ -536,8 +548,6 @@ file path=usr/lib/fm/llib-lfmd_msg variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/llib-lfmd_msg.ln variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/llib-lfmd_snmp variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/llib-lfmd_snmp.ln variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/llib-lfmevent variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/llib-lfmevent.ln variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/llib-lfmnotify variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/llib-lfmnotify.ln variant.opensolaris.zone=__NODEFAULT
 $(sparc_ONLY)file path=usr/lib/fm/llib-lldom
@@ -851,6 +861,15 @@ legacy pkg=SUNWfmdr desc="Fault Management Daemon and Utilities (Root)" \
     name="Fault Management Daemon and Utilities (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+
+#
+# libraries .so symlinks in lib
+#
+link path=lib/fm/$(ARCH64)/libfmevent.so target=./libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=lib/fm/libfmevent.so target=libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+
 #
 #	64-bit .so symlinks
 #
@@ -868,7 +887,11 @@ link path=usr/lib/fm/$(ARCH64)/libfmd_msg.so target=./libfmd_msg.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 link path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so target=./libfmd_snmp.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libfmevent.so target=./libfmevent.so.1 \
+link path=usr/lib/fm/$(ARCH64)/libfmevent.so \
+    target=../../../../lib/fm/$(ARCH64)/libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/libfmevent.so.1 \
+    target=../../../../lib/fm/$(ARCH64)/libfmevent.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 link path=usr/lib/fm/$(ARCH64)/libfmnotify.so target=./libfmnotify.so.1 \
     variant.opensolaris.zone=__NODEFAULT
@@ -877,6 +900,8 @@ $(sparc_ONLY)link path=usr/lib/fm/$(ARCH64)/libmdesc.so target=libmdesc.so.1
 link path=usr/lib/fm/$(ARCH64)/libseslog.so target=./libseslog.so.1
 link path=usr/lib/fm/$(ARCH64)/libtopo.so target=libtopo.so.1 \
     variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH64)/llib-lfmevent.ln \
+    target=../../../../lib/fm/$(ARCH64)/llib-lfmevent.ln
 #
 #	32-bit .so symlinks
 #
@@ -894,7 +919,9 @@ link path=usr/lib/fm/libfmd_msg.so target=libfmd_msg.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 link path=usr/lib/fm/libfmd_snmp.so target=libfmd_snmp.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/libfmevent.so target=libfmevent.so.1 \
+link path=usr/lib/fm/libfmevent.so target=../../../lib/fm/libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/libfmevent.so.1 target=../../../lib/fm/libfmevent.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 link path=usr/lib/fm/libfmnotify.so target=libfmnotify.so.1 \
     variant.opensolaris.zone=__NODEFAULT
@@ -903,6 +930,8 @@ $(sparc_ONLY)link path=usr/lib/fm/libmdesc.so target=libmdesc.so.1
 link path=usr/lib/fm/libseslog.so target=libseslog.so.1
 link path=usr/lib/fm/libtopo.so target=libtopo.so.1 \
     variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/llib-lfmevent target=../../../lib/fm/llib-lfmevent
+link path=usr/lib/fm/llib-lfmevent.ln target=../../../lib/fm/llib-lfmevent.ln
 #
 # symlinks for fmd plugins for particular platforms
 #
