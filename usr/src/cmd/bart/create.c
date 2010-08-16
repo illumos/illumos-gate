@@ -34,7 +34,8 @@ static int	sanitize_reloc_root(char *root, size_t bufsize);
 static int	create_manifest_filelist(char **argv, char *reloc_root);
 static int	create_manifest_rule(char *reloc_root, FILE *rule_fp);
 static void	output_manifest(void);
-static int	eval_file(const char *fname, const struct stat64 *statb);
+static int	eval_file(const char *fname, const struct stat64 *statb,
+	struct FTW *ftwx);
 static char	*sanitized_fname(const char *, boolean_t);
 static char	*get_acl_string(const char *fname, const struct stat64 *statb,
     int *err_code);
@@ -293,7 +294,7 @@ create_manifest_filelist(char **argv, char *reloc_root)
 			ret_status = WARNING_EXIT;
 			perror(input_fname);
 		} else {
-			ret = eval_file(input_fname, &stat_buf);
+			ret = eval_file(input_fname, &stat_buf, NULL);
 
 			if (ret == WARNING_EXIT)
 				ret_status = WARNING_EXIT;
@@ -382,7 +383,7 @@ walker(const char *name, const struct stat64 *sp, int type, struct FTW *ftwx)
 	}
 
 	/* This is the function which really processes the file */
-	ret = eval_file(name, sp);
+	ret = eval_file(name, sp, ftwx);
 
 	/*
 	 * Since the parameters to walker() are constrained by nftw(),
@@ -413,9 +414,9 @@ walker(const char *name, const struct stat64 *sp, int type, struct FTW *ftwx)
  * which is running output_manifest().
  */
 static int
-eval_file(const char *fname, const struct stat64 *statb)
+eval_file(const char *fname, const struct stat64 *statb, struct FTW *ftwx)
 {
-	int	fd, ret, err_code, i;
+	int	fd, ret, err_code, i, result;
 	char	last_field[PATH_MAX], ftype, *acl_str;
 	char	*quoted_name;
 
@@ -452,9 +453,12 @@ eval_file(const char *fname, const struct stat64 *statb)
 	/* First, make sure this file should be cataloged */
 
 	if ((subtree_root != NULL) &&
-	    (exclude_fname(fname, ftype, subtree_root)))
+	    ((result = exclude_fname(fname, ftype, subtree_root)) !=
+	    NO_EXCLUDE)) {
+		if ((result == EXCLUDE_PRUNE) && (ftwx != (struct FTW *)NULL))
+			ftwx->quit = FTW_PRUNE;
 		return (err_code);
-
+	}
 	for (i = 0; i < PATH_MAX; i++)
 		last_field[i] = '\0';
 
