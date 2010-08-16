@@ -376,6 +376,23 @@ hermon_cfg_profile_init_phase2(hermon_state_t *state)
 	/* Set whether to use MSIs or not */
 	cp->cp_use_msi_if_avail = hermon_use_msi_if_avail;
 
+#if !defined(_ELF64)
+	/*
+	 * Need to reduce the hermon kernel virtual memory footprint
+	 * on 32-bit kernels.
+	 */
+	cp->cp_log_num_mtt	-= 6;
+	cp->cp_log_num_dmpt	-= 6;
+	cp->cp_log_num_pd	-= 6;
+	cp->cp_log_num_qp	-= 6;
+	cp->cp_log_num_cq	-= 6;
+	cp->cp_log_num_srq	-= 6;
+	cp->cp_log_num_rdb	= cp->cp_log_num_qp +
+	    min(hermon_log_num_rdb_per_qp, devlim->log_max_ra_req_qp);
+	cp->cp_hca_max_rdma_in_qp = cp->cp_hca_max_rdma_out_qp =
+	    1 << min(hermon_log_num_rdb_per_qp, devlim->log_max_ra_req_qp);
+#endif
+
 	return (DDI_SUCCESS);
 }
 

@@ -2511,12 +2511,15 @@ hermon_soft_state_init(hermon_state_t *state)
 	hca_attr->hca_conn_send_inline_sz = 0;
 	hca_attr->hca_conn_rdmaw_inline_overhead = 4;
 
+#if defined(_ELF64)
+	/* 32-bit kernels are too small for Fibre Channel over IB */
 	if (state->hs_devlim.fcoib && (caps2 & IBT_HCA2_MEM_MGT_EXT)) {
 		caps2 |= IBT_HCA2_FC;
 		hca_attr->hca_rfci_max_log2_qp = 7;	/* 128 per port */
 		hca_attr->hca_fexch_max_log2_qp = 16;	/* 64K per port */
-		hca_attr->hca_fexch_max_log2_mem = 20;	/* 1MB per MPT - XXX */
+		hca_attr->hca_fexch_max_log2_mem = 20;	/* 1MB per MPT */
 	}
+#endif
 
 	hca_attr->hca_flags = caps;
 	hca_attr->hca_flags2 = caps2;
