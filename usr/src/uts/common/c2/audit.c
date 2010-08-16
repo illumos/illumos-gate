@@ -737,10 +737,10 @@ audit_closef(struct file *fp)
 	struct vattr attr;
 	au_emod_t evmod = 0;
 	const auditinfo_addr_t *ainfo;
-	int getattr_ret;
 	cred_t *cr;
 	au_kcontext_t	*kctx = GET_KCTX_PZ;
 	uint32_t auditing;
+	boolean_t audit_attr = B_FALSE;
 
 	fad = F2A(fp);
 	estate = kctx->auk_ets[AUE_CLOSE];
@@ -776,16 +776,16 @@ audit_closef(struct file *fp)
 	 */
 	if ((vp = fp->f_vnode) != NULL) {
 		attr.va_mask = AT_ALL;
-		getattr_ret = VOP_GETATTR(vp, &attr, 0, CRED(), NULL);
-	}
-
-	/*
-	 * When write was not used and the file can be considered public,
-	 * then skip the audit.
-	 */
-	if ((getattr_ret == 0) && ((fp->f_flag & FWRITE) == 0)) {
-		if (object_is_public(&attr)) {
-			return;
+		if (VOP_GETATTR(vp, &attr, 0, CRED(), NULL) == 0) {
+			if ((fp->f_flag & FWRITE) == 0 &&
+			    object_is_public(&attr)) {
+				/*
+				 * When write was not used and the file can be
+				 * considered public, then skip the audit.
+				 */
+				return;
+			}
+			audit_attr = B_TRUE;
 		}
 	}
 
@@ -802,7 +802,7 @@ audit_closef(struct file *fp)
 #endif
 	}
 
-	if (getattr_ret == 0) {
+	if (audit_attr) {
 		au_write((caddr_t *)&(ad), au_to_attr(&attr));
 		audit_sec_attributes((caddr_t *)&(ad), vp);
 	}
