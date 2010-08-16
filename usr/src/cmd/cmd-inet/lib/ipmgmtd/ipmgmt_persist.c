@@ -56,7 +56,12 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "ipmgmt_impl.h"
-#include <libscf.h>
+
+/* SCF related property group names and property names */
+#define	IPMGMTD_APP_PG		"ipmgmtd"
+#define	IPMGMTD_PROP_FBD	"first_boot_done"
+#define	IPMGMTD_PROP_DBVER	"datastore_version"
+#define	IPMGMTD_TRUESTR		"true"
 
 #define	ATYPE	"_atype"		/* name of the address type nvpair */
 #define	FLAGS	"_flags"		/* name of the flags nvpair */
@@ -412,6 +417,7 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 	boolean_t	writeop;
 	mode_t		mode;
 	pthread_t	tid;
+	pthread_attr_t	attr;
 
 	writeop = (db_op != IPADM_DB_READ);
 	if (writeop) {
@@ -443,8 +449,12 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 		err = ipmgmt_cpfile(IPADM_DB_FILE, IPADM_VOL_DB_FILE, B_TRUE);
 		if (err != 0)
 			goto done;
-		err = pthread_create(&tid, NULL, ipmgmt_db_restore_thread,
+		(void) pthread_attr_init(&attr);
+		(void) pthread_attr_setdetachstate(&attr,
+		    PTHREAD_CREATE_DETACHED);
+		err = pthread_create(&tid, &attr, ipmgmt_db_restore_thread,
 		    NULL);
+		(void) pthread_attr_destroy(&attr);
 		if (err != 0) {
 			(void) unlink(IPADM_VOL_DB_FILE);
 			goto done;
@@ -490,6 +500,7 @@ ipmgmt_db_update(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 	char			*name, *instrval = NULL, *dbstrval = NULL;
 	char			pval[MAXPROPVALLEN];
 
+	*errp = 0;
 	if (!ipmgmt_nvlist_intersects(db_nvl, in_nvl))
 		return (B_TRUE);
 
@@ -531,7 +542,6 @@ ipmgmt_db_update(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 		/* buffer overflow */
 		*errp = ENOBUFS;
 	}
-	*errp = 0;
 
 	/* we updated the DB entry, so do not continue */
 	return (B_FALSE);
@@ -1245,21 +1255,169 @@ ipmgmt_persist_aobjmap(ipmgmt_aobjmap_t *nodep, ipadm_db_op_t op)
 	return (err);
 }
 
-typedef struct scf_resources {
-	scf_handle_t *sr_handle;
-	scf_instance_t *sr_inst;
-	scf_propertygroup_t *sr_pg;
-	scf_property_t *sr_prop;
-	scf_value_t *sr_val;
-	scf_transaction_t *sr_tx;
-	scf_transaction_entry_t *sr_ent;
-} scf_resources_t;
+/*
+ * upgrades the ipadm data-store. It renames all the old private protocol
+ * property names which start with leading protocol names to begin with
+ * IPADM_PRIV_PROP_PREFIX.
+ */
+/* ARGSUSED */
+boolean_t
+ipmgmt_db_upgrade(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
+    int *errp)
+{
+	nvpair_t	*nvp;
+	char		*name, *pname = NULL, *protostr = NULL, *pval = NULL;
+	uint_t		proto, nproto;
+	char		nname[IPMGMT_STRSIZE], tmpstr[IPMGMT_STRSIZE];
+
+	*errp = 0;
+	/*
+	 * We are interested in lines which contain protocol properties. We
+	 * walk through other lines in the DB.
+	 */
+	if (nvlist_exists(db_nvl, IPADM_NVP_IFNAME) ||
+	    nvlist_exists(db_nvl, IPADM_NVP_AOBJNAME)) {
+		return (B_TRUE);
+	}
+	assert(nvlist_exists(db_nvl, IPADM_NVP_PROTONAME));
+
+	/*
+	 * extract the propname from the `db_nvl' and also extract the
+	 * protocol from the `db_nvl'.
+	 */
+	for (nvp = nvlist_next_nvpair(db_nvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(db_nvl, nvp)) {
+		name = nvpair_name(nvp);
+		if (strcmp(name, IPADM_NVP_PROTONAME) == 0) {
+			if (nvpair_value_string(nvp, &protostr) != 0)
+				return (B_TRUE);
+		} else {
+			assert(!IPADM_PRIV_NVP(name));
+			pname = name;
+			if (nvpair_value_string(nvp, &pval) != 0)
+				return (B_TRUE);
+		}
+	}
+
+	/* if the private property is in the right format return */
+	if (strncmp(pname, IPADM_PERSIST_PRIVPROP_PREFIX,
+	    strlen(IPADM_PERSIST_PRIVPROP_PREFIX)) == 0) {
+		return (B_TRUE);
+	}
+	/* if it's a public property move onto the next property */
+	nproto = proto = ipadm_str2proto(protostr);
+	if (ipadm_legacy2new_propname(pname, nname, sizeof (nname),
+	    &nproto) != 0) {
+		return (B_TRUE);
+	}
+
+	/* replace the old protocol with new protocol, if required */
+	if (nproto != proto) {
+		protostr = ipadm_proto2str(nproto);
+		if (nvlist_add_string(db_nvl, IPADM_NVP_PROTONAME,
+		    protostr) != 0) {
+			return (B_TRUE);
+		}
+	}
+
+	/* replace the old property name with new property name, if required */
+	/* add the prefix to property name */
+	(void) snprintf(tmpstr, sizeof (tmpstr), "_%s", nname);
+	if (nvlist_add_string(db_nvl, tmpstr, pval) != 0 ||
+	    nvlist_remove(db_nvl, pname, DATA_TYPE_STRING) != 0) {
+		return (B_TRUE);
+	}
+	(void) memset(buf, 0, buflen);
+	if (ipadm_nvlist2str(db_nvl, buf, buflen) == 0) {
+		/* buffer overflow */
+		*errp = ENOBUFS;
+	}
+	return (B_TRUE);
+}
 
 /*
- * Inputs:
- *   res is a pointer to the scf_resources_t to be released.
+ * Called during boot.
+ *
+ * Walk through the DB and apply all the global module properties. We plow
+ * through the DB even if we fail to apply property.
  */
-static void
+/* ARGSUSED */
+static boolean_t
+ipmgmt_db_init(void *cbarg, nvlist_t *db_nvl, char *buf, size_t buflen,
+    int *errp)
+{
+	ipadm_handle_t	iph = cbarg;
+	nvpair_t	*nvp, *pnvp;
+	char		*strval = NULL, *name, *mod = NULL, *pname;
+	char		tmpstr[IPMGMT_STRSIZE];
+	uint_t		proto;
+
+	/*
+	 * We could have used nvl_exists() directly, however we need several
+	 * calls to it and each call traverses the list. Since this codepath
+	 * is exercised during boot, let's traverse the list ourselves and do
+	 * the necessary checks.
+	 */
+	for (nvp = nvlist_next_nvpair(db_nvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(db_nvl, nvp)) {
+		name = nvpair_name(nvp);
+		if (IPADM_PRIV_NVP(name)) {
+			if (strcmp(name, IPADM_NVP_IFNAME) == 0 ||
+			    strcmp(name, IPADM_NVP_AOBJNAME) == 0)
+				return (B_TRUE);
+			else if (strcmp(name, IPADM_NVP_PROTONAME) == 0 &&
+			    nvpair_value_string(nvp, &mod) != 0)
+				return (B_TRUE);
+		} else {
+			/* possible a property */
+			pnvp = nvp;
+		}
+	}
+
+	/* if we are here than we found a global property */
+	assert(mod != NULL);
+	assert(nvpair_type(pnvp) == DATA_TYPE_STRING);
+
+	proto = ipadm_str2proto(mod);
+	name = nvpair_name(pnvp);
+	if (nvpair_value_string(pnvp, &strval) == 0) {
+		if (strncmp(name, IPADM_PERSIST_PRIVPROP_PREFIX,
+		    strlen(IPADM_PERSIST_PRIVPROP_PREFIX)) == 0) {
+			/* private protocol property */
+			pname = &name[1];
+		} else if (ipadm_legacy2new_propname(name, tmpstr,
+		    sizeof (tmpstr), &proto) == 0) {
+			pname = tmpstr;
+		} else {
+			pname = name;
+		}
+		if (ipadm_set_prop(iph, pname, strval, proto,
+		    IPADM_OPT_ACTIVE) != IPADM_SUCCESS) {
+			ipmgmt_log(LOG_WARNING, "Failed to reapply property %s",
+			    pname);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/* initialize global module properties */
+void
+ipmgmt_init_prop()
+{
+	ipadm_handle_t	iph = NULL;
+
+	if (ipadm_open(&iph, IPH_INIT) != IPADM_SUCCESS) {
+		ipmgmt_log(LOG_WARNING, "Could not reapply any of the "
+		    "persisted protocol properties");
+		return;
+	}
+	/* ipmgmt_db_init() logs warnings if there are any issues */
+	(void) ipmgmt_db_walk(ipmgmt_db_init, iph, IPADM_DB_READ);
+	ipadm_close(iph);
+}
+
+void
 ipmgmt_release_scf_resources(scf_resources_t *res)
 {
 	scf_entry_destroy(res->sr_ent);
@@ -1273,23 +1431,11 @@ ipmgmt_release_scf_resources(scf_resources_t *res)
 }
 
 /*
- * Inputs:
- *   fmri is the instance to look up
- * Outputs:
- *   res is a pointer to an scf_resources_t.  This is an internal
- *   structure that holds all the handles needed to get a specific
- *   property from the running snapshot; on a successful return it
- *   contains the scf_value_t that should be passed to the desired
- *   scf_value_get_foo() function, and must be freed after use by
- *   calling release_scf_resources().  On a failure return, any
- *   resources that may have been assigned to res are released, so
- *   the caller does not need to do any cleanup in the failure case.
- * Returns:
- *    0 on success
- *   -1 on failure
+ * It creates the necessary SCF handles and binds the given `fmri' to an
+ * instance. These resources are required for retrieving property value,
+ * creating property groups and modifying property values.
  */
-
-static int
+int
 ipmgmt_create_scf_resources(const char *fmri, scf_resources_t *res)
 {
 	res->sr_tx = NULL;
@@ -1299,71 +1445,83 @@ ipmgmt_create_scf_resources(const char *fmri, scf_resources_t *res)
 	res->sr_prop = NULL;
 	res->sr_val = NULL;
 
-	if ((res->sr_handle = scf_handle_create(SCF_VERSION)) == NULL) {
+	if ((res->sr_handle = scf_handle_create(SCF_VERSION)) == NULL)
 		return (-1);
-	}
 
 	if (scf_handle_bind(res->sr_handle) != 0) {
 		scf_handle_destroy(res->sr_handle);
 		return (-1);
 	}
-	if ((res->sr_inst = scf_instance_create(res->sr_handle)) == NULL) {
+	if ((res->sr_inst = scf_instance_create(res->sr_handle)) == NULL)
 		goto failure;
-	}
 	if (scf_handle_decode_fmri(res->sr_handle, fmri, NULL, NULL,
 	    res->sr_inst, NULL, NULL, SCF_DECODE_FMRI_REQUIRE_INSTANCE) != 0) {
 		goto failure;
 	}
-	if ((res->sr_pg = scf_pg_create(res->sr_handle)) == NULL) {
-		goto failure;
-	}
-	if ((res->sr_prop = scf_property_create(res->sr_handle)) == NULL) {
-		goto failure;
-	}
-	if ((res->sr_val = scf_value_create(res->sr_handle)) == NULL) {
-		goto failure;
-	}
-	if ((res->sr_tx = scf_transaction_create(res->sr_handle)) == NULL) {
-		goto failure;
-	}
-	if ((res->sr_ent = scf_entry_create(res->sr_handle)) == NULL) {
-		goto failure;
-	}
+	/* we will create the rest of the resources on demand */
 	return (0);
 
 failure:
+	ipmgmt_log(LOG_WARNING, "failed to create scf resources: %s",
+	    scf_strerror(scf_error()));
 	ipmgmt_release_scf_resources(res);
 	return (-1);
 }
 
+/*
+ * persists the `pval' for a given property `pname' in SCF. The only supported
+ * SCF property types are INTEGER and ASTRING.
+ */
 static int
-ipmgmt_set_property_value(scf_resources_t *res, const char *propname,
-    scf_type_t proptype)
+ipmgmt_set_scfprop_value(scf_resources_t *res, const char *pname, void *pval,
+    scf_type_t ptype)
 {
 	int result = -1;
 	boolean_t new;
 
-retry:
-	new = (scf_pg_get_property(res->sr_pg, propname, res->sr_prop) != 0);
-
-	if (scf_transaction_start(res->sr_tx, res->sr_pg) == -1) {
+	if ((res->sr_val = scf_value_create(res->sr_handle)) == NULL)
+		goto failure;
+	switch (ptype) {
+	case SCF_TYPE_INTEGER:
+		scf_value_set_integer(res->sr_val, *(int64_t *)pval);
+		break;
+	case SCF_TYPE_ASTRING:
+		if (scf_value_set_astring(res->sr_val, (char *)pval) != 0) {
+			ipmgmt_log(LOG_WARNING, "Error setting string value %s "
+			    "for property %s: %s", pval, pname,
+			    scf_strerror(scf_error()));
+			goto failure;
+		}
+		break;
+	default:
 		goto failure;
 	}
+
+	if ((res->sr_tx = scf_transaction_create(res->sr_handle)) == NULL)
+		goto failure;
+	if ((res->sr_ent = scf_entry_create(res->sr_handle)) == NULL)
+		goto failure;
+	if ((res->sr_prop = scf_property_create(res->sr_handle)) == NULL)
+		goto failure;
+
+retry:
+	new = (scf_pg_get_property(res->sr_pg, pname, res->sr_prop) != 0);
+	if (scf_transaction_start(res->sr_tx, res->sr_pg) == -1)
+		goto failure;
 	if (new) {
 		if (scf_transaction_property_new(res->sr_tx, res->sr_ent,
-		    propname, proptype) == -1) {
+		    pname, ptype) == -1) {
 			goto failure;
 		}
 	} else {
 		if (scf_transaction_property_change(res->sr_tx, res->sr_ent,
-		    propname, proptype) == -1) {
+		    pname, ptype) == -1) {
 			goto failure;
 		}
 	}
 
-	if (scf_entry_add_value(res->sr_ent, res->sr_val) != 0) {
+	if (scf_entry_add_value(res->sr_ent, res->sr_val) != 0)
 		goto failure;
-	}
 
 	result = scf_transaction_commit(res->sr_tx);
 	if (result == 0) {
@@ -1378,69 +1536,153 @@ retry:
 	return (0);
 
 failure:
+	ipmgmt_log(LOG_WARNING, "failed to save the data in SCF: %s",
+	    scf_strerror(scf_error()));
 	return (-1);
 }
 
 /*
- * Returns TRUE if this is the first boot, else return FALSE. The
- * "ipmgmtd/first_boot_done" property is persistently set up on
- * IPMGMTD_FMRI on the first boot. Note that the presence of
- * "first_boot_done" itself is sufficient to indicate that this is
- * not the first boot i.e., the value of the property is immaterial.
+ * Given a `pgname'/`pname', it retrieves the value based on `ptype' and
+ * places it in `pval'.
  */
-extern boolean_t
-ipmgmt_first_boot()
+static int
+ipmgmt_get_scfprop(scf_resources_t *res, const char *pgname, const char *pname,
+    void *pval, scf_type_t ptype)
 {
+	ssize_t		numvals;
 	scf_simple_prop_t *prop;
-	ssize_t	numvals;
-	scf_resources_t res;
-	scf_error_t err;
 
-	if (ipmgmt_create_scf_resources(IPMGMTD_FMRI, &res) != 0)
-		return (B_TRUE); /* err on the side of caution */
-	prop = scf_simple_prop_get(res.sr_handle,
-	    IPMGMTD_FMRI, "ipmgmtd", "first_boot_done");
+	prop = scf_simple_prop_get(res->sr_handle, IPMGMTD_FMRI, pgname, pname);
 	numvals = scf_simple_prop_numvalues(prop);
-	if (numvals > 0) {
-		scf_simple_prop_free(prop);
-		ipmgmt_release_scf_resources(&res);
-		return (B_FALSE);
+	if (numvals <= 0)
+		goto ret;
+	switch (ptype) {
+	case SCF_TYPE_INTEGER:
+		*(int64_t **)pval = scf_simple_prop_next_integer(prop);
+		break;
+	case SCF_TYPE_ASTRING:
+		*(char **)pval = scf_simple_prop_next_astring(prop);
+		break;
+	}
+ret:
+	scf_simple_prop_free(prop);
+	return (numvals);
+}
+
+/*
+ * It stores the `pval' for given `pgname'/`pname' property group in SCF.
+ */
+static int
+ipmgmt_set_scfprop(scf_resources_t *res, const char *pgname, const char *pname,
+    void *pval, scf_type_t ptype)
+{
+	scf_error_t		err;
+
+	if ((res->sr_pg = scf_pg_create(res->sr_handle)) == NULL) {
+		ipmgmt_log(LOG_WARNING, "failed to create property group: %s",
+		    scf_strerror(scf_error()));
+		return (-1);
 	}
 
-	/*
-	 * mark the first boot by setting ipmgmtd/first_boot_done to true
-	 */
-	if (scf_instance_add_pg(res.sr_inst, "ipmgmtd", SCF_GROUP_APPLICATION,
-	    0, res.sr_pg) != 0) {
-		if ((err = scf_error()) != SCF_ERROR_EXISTS)
-			goto failure;
+	if (scf_instance_add_pg(res->sr_inst, pgname, SCF_GROUP_APPLICATION,
+	    0, res->sr_pg) != 0) {
+		if ((err = scf_error()) != SCF_ERROR_EXISTS) {
+			ipmgmt_log(LOG_WARNING,
+			    "Error adding property group '%s/%s': %s",
+			    pgname, pname, scf_strerror(err));
+			return (-1);
+		}
 		/*
-		 * err == SCF_ERROR_EXISTS is by itself sufficient to declare
-		 * that this is not the first boot, but we create a simple
-		 * property as a place-holder, so that we don't leave an
-		 * empty process group behind.
+		 * if the property group already exists, then we get the
+		 * composed view of the property group for the given instance.
 		 */
-		if (scf_instance_get_pg_composed(res.sr_inst, NULL, "ipmgmtd",
-		    res.sr_pg) != 0) {
-			err = scf_error();
-			goto failure;
+		if (scf_instance_get_pg_composed(res->sr_inst, NULL, pgname,
+		    res->sr_pg) != 0) {
+			ipmgmt_log(LOG_WARNING, "Error getting composed view "
+			    "of the property group '%s/%s': %s", pgname, pname,
+			    scf_strerror(scf_error()));
+			return (-1);
 		}
 	}
 
-	if (scf_value_set_astring(res.sr_val, "true") != 0) {
-		err = scf_error();
-		goto failure;
-	}
+	return (ipmgmt_set_scfprop_value(res, pname, pval, ptype));
+}
 
-	if (ipmgmt_set_property_value(&res, "first_boot_done",
-	    SCF_TYPE_ASTRING) != 0) {
-		ipmgmt_log(LOG_WARNING,
-		    "Could not set rval of first_boot_done");
-	}
+/*
+ * Returns B_TRUE, if the non-global zone is being booted for the first time
+ * after being installed. This is required to setup the ipadm data-store for
+ * the first boot of the non-global zone. Please see, PSARC 2010/166,
+ * for more info.
+ *
+ * Note that, this API cannot be used to determine first boot post image-update.
+ * 'pkg image-update' clones the current BE and the existing value of
+ * ipmgmtd/first_boot_done will be carried forward and obviously it will be set
+ * to B_TRUE.
+ */
+boolean_t
+ipmgmt_ngz_firstboot_postinstall()
+{
+	scf_resources_t	res;
+	boolean_t	bval = B_TRUE;
+	char		*strval;
 
-failure:
-	ipmgmt_log(LOG_WARNING, "ipmgmt_first_boot scf error %s",
-	    scf_strerror(err));
+	/* we always err on the side of caution */
+	if (ipmgmt_create_scf_resources(IPMGMTD_FMRI, &res) != 0)
+		return (bval);
+
+	if (ipmgmt_get_scfprop(&res, IPMGMTD_APP_PG, IPMGMTD_PROP_FBD, &strval,
+	    SCF_TYPE_ASTRING) > 0) {
+		bval = (strcmp(strval, IPMGMTD_TRUESTR) == 0 ?
+		    B_FALSE : B_TRUE);
+	} else {
+		/*
+		 * IPMGMTD_PROP_FBD does not exist in the SCF. Lets create it.
+		 * Since we err on the side of caution, we ignore the return
+		 * error and return B_TRUE.
+		 */
+		(void) ipmgmt_set_scfprop(&res, IPMGMTD_APP_PG,
+		    IPMGMTD_PROP_FBD, IPMGMTD_TRUESTR, SCF_TYPE_ASTRING);
+	}
 	ipmgmt_release_scf_resources(&res);
-	return (B_TRUE);
+	return (bval);
+}
+
+/*
+ * Returns B_TRUE, if the data-store needs upgrade otherwise returns B_FALSE.
+ * Today we have to take care of, one case of, upgrading from version 0 to
+ * version 1, so we will use boolean_t as means to decide if upgrade is needed
+ * or not. Further, the upcoming projects might completely move the flatfile
+ * data-store into SCF and hence we shall keep this interface simple.
+ */
+boolean_t
+ipmgmt_needs_upgrade(scf_resources_t *res)
+{
+	boolean_t	bval = B_TRUE;
+	int64_t		*verp;
+
+	if (ipmgmt_get_scfprop(res, IPMGMTD_APP_PG, IPMGMTD_PROP_DBVER,
+	    &verp, SCF_TYPE_INTEGER) > 0) {
+		if (*verp == IPADM_DB_VERSION)
+			bval = B_FALSE;
+	}
+	/*
+	 * 'datastore_version' doesn't exist. Which means that we need to
+	 * upgrade the datastore. We will create 'datastore_version' and set
+	 * the version value to IPADM_DB_VERSION, after we upgrade the file.
+	 */
+	return (bval);
+}
+
+/*
+ * This is called after the successful upgrade of the local data-store. With
+ * the data-store upgraded to recent version we don't have to do anything on
+ * subsequent reboots.
+ */
+void
+ipmgmt_update_dbver(scf_resources_t *res)
+{
+	int64_t		version = IPADM_DB_VERSION;
+
+	(void) ipmgmt_set_scfprop(res, IPMGMTD_APP_PG,
+	    IPMGMTD_PROP_DBVER, &version, SCF_TYPE_INTEGER);
 }

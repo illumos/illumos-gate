@@ -217,24 +217,24 @@ static struct T_info_ack icmp_g_t_info_ack = {
  * All of these are alterable, within the min/max values given, at run time.
  *
  * Note: All those tunables which do not start with "icmp_" are Committed and
- * therefore are public. See PSARC 2009/306.
+ * therefore are public. See PSARC 2010/080.
  */
 static mod_prop_info_t icmp_propinfo_tbl[] = {
 	/* tunable - 0 */
-	{ "icmp_wroff_extra", MOD_PROTO_RAWIP,
+	{ "_wroff_extra", MOD_PROTO_RAWIP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 128, 32}, {32} },
 
-	{ "icmp_ipv4_ttl", MOD_PROTO_RAWIP,
+	{ "_ipv4_ttl", MOD_PROTO_RAWIP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 255, 255}, {255} },
 
-	{ "icmp_ipv6_hoplimit", MOD_PROTO_RAWIP,
+	{ "_ipv6_hoplimit", MOD_PROTO_RAWIP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, IPV6_MAX_HOPS, IPV6_DEFAULT_HOPS},
 	    {IPV6_DEFAULT_HOPS} },
 
-	{ "icmp_bsd_compat", MOD_PROTO_RAWIP,
+	{ "_bsd_compat", MOD_PROTO_RAWIP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
@@ -242,7 +242,7 @@ static mod_prop_info_t icmp_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {4096, 65536, 8192}, {8192} },
 
-	{ "icmp_xmit_lowat", MOD_PROTO_RAWIP,
+	{ "_xmit_lowat", MOD_PROTO_RAWIP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 65536, 1024}, {1024} },
 
@@ -250,15 +250,15 @@ static mod_prop_info_t icmp_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {4096, 65536, 8192}, {8192} },
 
-	{ "icmp_max_buf", MOD_PROTO_RAWIP,
+	{ "_max_buf", MOD_PROTO_RAWIP,
 	    mod_set_uint32, mod_get_uint32,
 	    {65536, 1024*1024*1024, 256*1024}, {256 * 1024} },
 
-	{ "icmp_pmtu_discovery", MOD_PROTO_RAWIP,
+	{ "_pmtu_discovery", MOD_PROTO_RAWIP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "icmp_sendto_ignerr", MOD_PROTO_RAWIP,
+	{ "_sendto_ignerr", MOD_PROTO_RAWIP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 

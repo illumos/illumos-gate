@@ -53,7 +53,7 @@
 typedef void cmdfunc_t(int, char **, const char *);
 static cmdfunc_t do_create_if, do_delete_if, do_enable_if, do_disable_if;
 static cmdfunc_t do_show_if;
-static cmdfunc_t do_set_prop, do_show_prop, do_init_prop, do_set_ifprop;
+static cmdfunc_t do_set_prop, do_show_prop, do_set_ifprop;
 static cmdfunc_t do_show_ifprop, do_reset_ifprop, do_reset_prop;
 static cmdfunc_t do_show_addrprop, do_set_addrprop, do_reset_addrprop;
 static cmdfunc_t do_create_addr, do_delete_addr, do_show_addr;
@@ -115,10 +115,7 @@ static cmd_t	cmds[] = {
 	    "\treset-prop\t[-t] -p <prop> <protocol>"			},
 	{ "show-prop",	do_show_prop,
 	    "\tshow-prop\t[[-c] -o <field>,...] [-p <prop>,...]"
-	    " [protocol]"						},
-
-	/* private sub-commands */
-	{ "init-prop",	do_init_prop, "\tinit-prop\n"			}
+	    " [protocol]"						}
 };
 
 static const struct option if_longopts[] = {
@@ -351,8 +348,6 @@ usage(void)
 	    gettext("usage:  ipadm <subcommand> <args> ...\n"));
 	for (i = 0; i < sizeof (cmds) / sizeof (cmds[0]); i++) {
 		cmdp = &cmds[i];
-		if (strcmp(cmdp->c_name, "init-prop") == 0)
-			continue;
 		if (cmdp->c_usage != NULL)
 			(void) fprintf(stderr, "%s\n", gettext(cmdp->c_usage));
 	}
@@ -1036,17 +1031,6 @@ static void
 do_reset_prop(int argc, char **argv, const char *use)
 {
 	set_prop(argc, argv,  _B_TRUE, use);
-}
-
-/*
- * Called on reboot by /lib/inet/netstart. Reads the persistent store
- * and applies all the global protocol properties.
- */
-/* ARGSUSED */
-static void
-do_init_prop(int argc, char **argv, const char *use)
-{
-	(void) ipadm_init_prop();
 }
 
 /* PRINTFLIKE1 */

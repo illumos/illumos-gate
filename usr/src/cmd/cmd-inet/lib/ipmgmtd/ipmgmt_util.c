@@ -61,9 +61,9 @@ ipmgmt_cpfile(const char *src, const char *dst, boolean_t rdonly)
 	struct stat statbuf;
 	FILE *sfp, *dfp;
 	char buf[IPMGMT_BUFSIZ];
-	size_t bytes;
 	int err = 0;
 
+	errno = 0;
 	/*
 	 * Attempt to open the destination file first since we
 	 * want to optimize for the case where it is read-only
@@ -89,13 +89,14 @@ ipmgmt_cpfile(const char *src, const char *dst, boolean_t rdonly)
 	/*
 	 * Copy the file.
 	 */
-	while (((bytes = fread(buf, 1, sizeof (buf), sfp)) != 0) &&
-	    (errno == 0)) {
-		(void) fwrite(buf, bytes, 1, dfp);
+	while (fgets(buf, sizeof (buf), sfp) != NULL && errno == 0) {
+		(void) fputs(buf, dfp);
 		if (errno != 0)
 			break;
 	}
 	if (errno != 0)
+		err = errno;
+	else if (fflush(dfp) == EOF)
 		err = errno;
 
 	(void) fclose(sfp);

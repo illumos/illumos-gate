@@ -1371,7 +1371,7 @@ i_ipadm_get_zone(ipadm_handle_t iph, const void *arg,
 }
 
 static ipadm_prop_desc_t *
-i_ipadm_getpropdesc(const char *pname)
+i_ipadm_get_addrprop_desc(const char *pname)
 {
 	int i;
 
@@ -1401,7 +1401,7 @@ ipadm_get_addrprop(ipadm_handle_t iph, const char *pname, char *buf,
 	}
 
 	/* find the property in the property description table */
-	if ((pdp = i_ipadm_getpropdesc(pname)) == NULL)
+	if ((pdp = i_ipadm_get_addrprop_desc(pname)) == NULL)
 		return (IPADM_PROP_UNKNOWN);
 
 	/*
@@ -1484,7 +1484,7 @@ ipadm_set_addrprop(ipadm_handle_t iph, const char *pname,
 	}
 
 	/* find the property in the property description table */
-	if ((pdp = i_ipadm_getpropdesc(pname)) == NULL)
+	if ((pdp = i_ipadm_get_addrprop_desc(pname)) == NULL)
 		return (IPADM_PROP_UNKNOWN);
 
 	if (pdp->ipd_set == NULL || (reset && pdp->ipd_get == NULL))

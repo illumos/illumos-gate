@@ -50,12 +50,6 @@ if [ `/sbin/zonename` != global ]; then
 	fi
 fi
 
-# Apply any persistent protocol (IP/TCP/SCTP/UDP/ICMP) properties
-# ipadm doesn't exist and init-prop isn't required inside S10C
-if [ -f /sbin/ipadm ]; then
-	/sbin/ipadm init-prop
-fi
-
 #
 # We must be now in a global zone or non-global zone with exclusive-IP stack.
 # Start the ipmgmtd daemon.

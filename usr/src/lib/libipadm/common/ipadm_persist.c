@@ -804,18 +804,24 @@ ipadm_process_db_line(db_wfunc_t *db_walk_func, void *arg, FILE *fp, FILE *nfp,
 		return (err);
 
 	if (db_op == IPADM_DB_WRITE) {
-		ipadm_dbwrite_cbarg_t	*cb = arg;
-		nvlist_t		*nvl = cb->dbw_nvl;
+		nvlist_t	*nvl;
 
 		/*
-		 * If the specified entry is not found above, we add
-		 * the entry to the configuration file, here.
+		 * `arg' will be NULL when we are doing in-line update of
+		 * entries.
 		 */
-		(void) memset(buf, 0, MAXLINELEN);
-		if (ipadm_nvlist2str(nvl, buf, MAXLINELEN) == 0)
-			err = ENOBUFS;
-		else if (fputs(buf, nfp) == EOF)
-			err = errno;
+		if (arg != NULL) {
+			nvl = ((ipadm_dbwrite_cbarg_t *)arg)->dbw_nvl;
+			/*
+			 * If the specified entry is not found above, we add
+			 * the entry to the configuration file, here.
+			 */
+			(void) memset(buf, 0, MAXLINELEN);
+			if (ipadm_nvlist2str(nvl, buf, MAXLINELEN) == 0)
+				err = ENOBUFS;
+			else if (fputs(buf, nfp) == EOF)
+				err = errno;
+		}
 		return (err);
 	}
 

@@ -73,7 +73,7 @@
 const char		*progname;
 
 /* readers-writers lock for reading/writing daemon data store */
-pthread_rwlock_t	ipmgmt_dbconf_lock;
+pthread_rwlock_t	ipmgmt_dbconf_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 /* tracks address object to {ifname|logical number|interface id} mapping */
 ipmgmt_aobjmap_list_t	aobjmap;
@@ -87,7 +87,6 @@ static int		ipmgmt_door_fd = -1;
 static void		ipmgmt_exit(int);
 static int		ipmgmt_init();
 static int		ipmgmt_init_privileges();
-static void		ipmgmt_ngz_init();
 static void		ipmgmt_ngz_persist_if();
 
 static ipadm_handle_t iph;
@@ -103,7 +102,36 @@ static ipmgmt_pif_t *ngz_pifs;
 static int
 ipmgmt_db_init()
 {
-	int		fd, err;
+	int		fd, err, scferr;
+	scf_resources_t	res;
+	boolean_t	upgrade = B_TRUE;
+
+	/*
+	 * Check to see if we need to upgrade the data-store. We need to
+	 * upgrade, if the version of the data-store does not match with
+	 * IPADM_DB_VERSION. Further, if we cannot determine the current
+	 * version of the data-store, we always err on the side of caution
+	 * and upgrade the data-store to current version.
+	 */
+	if ((scferr = ipmgmt_create_scf_resources(IPMGMTD_FMRI, &res)) == 0)
+		upgrade = ipmgmt_needs_upgrade(&res);
+	if (upgrade) {
+		err = ipmgmt_db_walk(ipmgmt_db_upgrade, NULL, IPADM_DB_WRITE);
+		if (err != 0) {
+			ipmgmt_log(LOG_ERR, "could not upgrade the "
+			    "ipadm data-store: %s", strerror(err));
+			err = 0;
+		} else {
+			/*
+			 * upgrade was success, let's update SCF with the
+			 * current data-store version number.
+			 */
+			if (scferr == 0)
+				ipmgmt_update_dbver(&res);
+		}
+	}
+	if (scferr == 0)
+		ipmgmt_release_scf_resources(&res);
 
 	/* creates the address object data store, if it doesn't exist */
 	if ((fd = open(ADDROBJ_MAPPING_DB_FILE, O_CREAT|O_RDONLY,
@@ -131,8 +159,6 @@ ipmgmt_db_init()
 			return (err);
 		err = 0;
 	}
-
-	(void) pthread_rwlock_init(&ipmgmt_dbconf_lock, NULL);
 
 	ipmgmt_ngz_persist_if(); /* create persistent interface info for NGZ */
 
@@ -289,7 +315,7 @@ ipmgmt_ngz_init()
 		 * available for restoring persistent configuration.
 		 */
 		if (strcmp(brand, NATIVE_BRAND_NAME) == 0)
-			firstboot = ipmgmt_first_boot();
+			firstboot = ipmgmt_ngz_firstboot_postinstall();
 		else
 			s10c = B_TRUE;
 
@@ -323,7 +349,7 @@ static int
 ipmgmt_init_privileges()
 {
 	struct stat	statbuf;
-	int err;
+	int		err;
 
 	/* create the IPADM_TMPFS_DIR directory */
 	if (stat(IPADM_TMPFS_DIR, &statbuf) < 0) {
@@ -351,6 +377,12 @@ ipmgmt_init_privileges()
 	 * address itself (for any IPI_PRIV ioctls like SLIFADDR)
 	 */
 	ipmgmt_ngz_init();
+
+	/*
+	 * Apply all protocol module properties. We need to apply all protocol
+	 * properties before we drop root privileges.
+	 */
+	ipmgmt_init_prop();
 
 	/*
 	 * limit the privileges of this daemon and set the uid of this

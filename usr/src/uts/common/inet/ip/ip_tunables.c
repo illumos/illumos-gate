@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 1990 Mentat Inc.
  */
+/* Copyright (c) 1990 Mentat Inc. */
 
 #include <inet/ip.h>
 #include <inet/ip6.h>
@@ -488,53 +488,53 @@ ip_get_hostmodel(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 /*
  * All of these are alterable, within the min/max values given, at run time.
  *
- * Note: All those tunables which do not start with "ip_" are Committed and
- * therefore are public. See PSARC 2009/306.
+ * Note: All those tunables which do not start with "_" are Committed and
+ * therefore are public. See PSARC 2010/080.
  */
 mod_prop_info_t ip_propinfo_tbl[] = {
 	/* tunable - 0 */
-	{ "ip_respond_to_address_mask_broadcast", MOD_PROTO_IP,
+	{ "_respond_to_address_mask_broadcast", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "ip_respond_to_echo_broadcast", MOD_PROTO_IP,
+	{ "_respond_to_echo_broadcast", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE},  {B_TRUE} },
 
-	{ "ip_respond_to_echo_multicast", MOD_PROTO_IP,
+	{ "_respond_to_echo_multicast", MOD_PROTO_IPV4,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip_respond_to_timestamp", MOD_PROTO_IP,
+	{ "_respond_to_timestamp", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "ip_respond_to_timestamp_broadcast", MOD_PROTO_IP,
+	{ "_respond_to_timestamp_broadcast", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "ip_send_redirects", MOD_PROTO_IP,
+	{ "_send_redirects", MOD_PROTO_IPV4,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip_forward_directed_broadcasts", MOD_PROTO_IP,
+	{ "_forward_directed_broadcasts", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "ip_mrtdebug", MOD_PROTO_IP,
+	{ "_mrtdebug", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 10, 0}, {0} },
 
-	{ "ip_ire_reclaim_fraction", MOD_PROTO_IP,
+	{ "_ire_reclaim_fraction", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 8, 3}, {3} },
 
-	{ "ip_nce_reclaim_fraction", MOD_PROTO_IP,
+	{ "_nce_reclaim_fraction", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 8, 3}, {3} },
 
 	/* tunable - 10 */
-	{ "ip_dce_reclaim_fraction", MOD_PROTO_IP,
+	{ "_dce_reclaim_fraction", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 8, 3}, {3} },
 
@@ -542,53 +542,53 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 255, 255}, {255} },
 
-	{ "ip_forward_src_routed", MOD_PROTO_IP,
+	{ "_forward_src_routed", MOD_PROTO_IPV4,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "ip_wroff_extra", MOD_PROTO_IP,
+	{ "_wroff_extra", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 256, 32}, {32} },
 
 	/* following tunable is in seconds - a deviant! */
-	{ "ip_pathmtu_interval", MOD_PROTO_IP,
+	{ "_pathmtu_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {2, 999999999, 60*20}, {60*20} },
 
-	{ "ip_icmp_return_data_bytes", MOD_PROTO_IP,
+	{ "_icmp_return_data_bytes", MOD_PROTO_IPV4,
 	    mod_set_uint32, mod_get_uint32,
 	    {8, 65536, 64}, {64} },
 
-	{ "ip_path_mtu_discovery", MOD_PROTO_IP,
+	{ "_path_mtu_discovery", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip_pmtu_min", MOD_PROTO_IP,
+	{ "_pmtu_min", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {68, 65535, 576}, {576} },
 
-	{ "ip_ignore_redirect", MOD_PROTO_IP,
+	{ "_ignore_redirect", MOD_PROTO_IPV4,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "ip_arp_icmp_error", MOD_PROTO_IP,
+	{ "_arp_icmp_error", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
 	/* tunable - 20 */
-	{ "ip_broadcast_ttl", MOD_PROTO_IP,
+	{ "_broadcast_ttl", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 254, 1}, {1} },
 
-	{ "ip_icmp_err_interval", MOD_PROTO_IP,
+	{ "_icmp_err_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 99999, 100}, {100} },
 
-	{ "ip_icmp_err_burst", MOD_PROTO_IP,
+	{ "_icmp_err_burst", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 99999, 10}, {10} },
 
-	{ "ip_reass_queue_bytes", MOD_PROTO_IP,
+	{ "_reass_queue_bytes", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 999999999, 1000000}, {1000000} },
 
@@ -596,33 +596,33 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	 * See comments for ip_strict_src_multihoming for an explanation
 	 * of the semantics of ip_strict_dst_multihoming
 	 */
-	{ "ip_strict_dst_multihoming", MOD_PROTO_IP,
+	{ "_strict_dst_multihoming", MOD_PROTO_IPV4,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 1, 0}, {0} },
 
-	{ "ip_addrs_per_if", MOD_PROTO_IP,
+	{ "_addrs_per_if", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, MAX_ADDRS_PER_IF, 256}, {256} },
 
-	{ "ipsec_override_persocket_policy", MOD_PROTO_IP,
+	{ "_ipsec_override_persocket_policy", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "icmp_accept_clear_messages", MOD_PROTO_IP,
+	{ "_icmp_accept_clear_messages", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "igmp_accept_clear_messages", MOD_PROTO_IP,
+	{ "_igmp_accept_clear_messages", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip_ndp_delay_first_probe_time", MOD_PROTO_IP,
+	{ "_ndp_delay_first_probe_time", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {2, 999999999, ND_DELAY_FIRST_PROBE_TIME},
 	    {ND_DELAY_FIRST_PROBE_TIME} },
 
 	/* tunable - 30 */
-	{ "ip_ndp_max_unicast_solicit", MOD_PROTO_IP,
+	{ "_ndp_max_unicast_solicit", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 999999999, ND_MAX_UNICAST_SOLICIT}, {ND_MAX_UNICAST_SOLICIT} },
 
@@ -630,23 +630,23 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 255, IPV6_MAX_HOPS}, {IPV6_MAX_HOPS} },
 
-	{ "ip6_icmp_return_data_bytes", MOD_PROTO_IP,
+	{ "_icmp_return_data_bytes", MOD_PROTO_IPV6,
 	    mod_set_uint32, mod_get_uint32,
 	    {8, IPV6_MIN_MTU, IPV6_MIN_MTU}, {IPV6_MIN_MTU} },
 
-	{ "ip6_forward_src_routed", MOD_PROTO_IP,
+	{ "_forward_src_routed", MOD_PROTO_IPV6,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "ip6_respond_to_echo_multicast", MOD_PROTO_IP,
+	{ "_respond_to_echo_multicast", MOD_PROTO_IPV6,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip6_send_redirects", MOD_PROTO_IP,
+	{ "_send_redirects", MOD_PROTO_IPV6,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip6_ignore_redirect", MOD_PROTO_IP,
+	{ "_ignore_redirect", MOD_PROTO_IPV6,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
@@ -654,57 +654,57 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	 * See comments for ip6_strict_src_multihoming for an explanation
 	 * of the semantics of ip6_strict_dst_multihoming
 	 */
-	{ "ip6_strict_dst_multihoming", MOD_PROTO_IP,
+	{ "_strict_dst_multihoming", MOD_PROTO_IPV6,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 1, 0}, {0} },
 
-	{ "ip_src_check", MOD_PROTO_IP,
+	{ "_src_check", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 2, 2}, {2} },
 
-	{ "ipsec_policy_log_interval", MOD_PROTO_IP,
+	{ "_ipsec_policy_log_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 999999, 1000}, {1000} },
 
 	/* tunable - 40 */
-	{ "pim_accept_clear_messages", MOD_PROTO_IP,
+	{ "_pim_accept_clear_messages", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip_ndp_unsolicit_interval", MOD_PROTO_IP,
+	{ "_ndp_unsolicit_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1000, 20000, 2000}, {2000} },
 
-	{ "ip_ndp_unsolicit_count", MOD_PROTO_IP,
+	{ "_ndp_unsolicit_count", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 20, 3}, {3} },
 
-	{ "ip6_ignore_home_address_opt", MOD_PROTO_IP,
+	{ "_ignore_home_address_opt", MOD_PROTO_IPV6,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip_policy_mask", MOD_PROTO_IP,
+	{ "_policy_mask", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 15, 0}, {0} },
 
-	{ "ip_ecmp_behavior", MOD_PROTO_IP,
+	{ "_ecmp_behavior", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 2, 2}, {2} },
 
-	{ "ip_multirt_ttl", MOD_PROTO_IP,
+	{ "_multirt_ttl", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 255, 1}, {1} },
 
 	/* following tunable is in seconds - a deviant */
-	{ "ip_ire_badcnt_lifetime", MOD_PROTO_IP,
+	{ "_ire_badcnt_lifetime", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 3600, 60}, {60} },
 
-	{ "ip_max_temp_idle", MOD_PROTO_IP,
+	{ "_max_temp_idle", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 999999, 60*60*24}, {60*60*24} },
 
-	{ "ip_max_temp_defend", MOD_PROTO_IP,
+	{ "_max_temp_defend", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 1000, 1}, {1} },
 
@@ -714,32 +714,32 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	 * defend up to ip_max_defend times, within any
 	 * ip_defend_interval span.
 	 */
-	{ "ip_max_defend", MOD_PROTO_IP,
+	{ "_max_defend", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 1000, 3}, {3} },
 
-	{ "ip_defend_interval", MOD_PROTO_IP,
+	{ "_defend_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 999999, 30}, {30} },
 
-	{ "ip_dup_recovery", MOD_PROTO_IP,
+	{ "_dup_recovery", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 3600000, 300000}, {300000} },
 
-	{ "ip_restrict_interzone_loopback", MOD_PROTO_IP,
+	{ "_restrict_interzone_loopback", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ip_lso_outbound", MOD_PROTO_IP,
+	{ "_lso_outbound", MOD_PROTO_IP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "igmp_max_version", MOD_PROTO_IP,
+	{ "_igmp_max_version", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {IGMP_V1_ROUTER, IGMP_V3_ROUTER, IGMP_V3_ROUTER},
 	    {IGMP_V3_ROUTER} },
 
-	{ "mld_max_version", MOD_PROTO_IP,
+	{ "_mld_max_version", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {MLD_V1_ROUTER, MLD_V2_ROUTER, MLD_V2_ROUTER}, {MLD_V2_ROUTER} },
 
@@ -751,52 +751,52 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	    ip_set_forwarding, ip_get_forwarding,
 	    {IP_FORWARD_NEVER}, {IP_FORWARD_NEVER} },
 
-	{ "ip_reasm_timeout", MOD_PROTO_IP,
+	{ "_reasm_timeout", MOD_PROTO_IPV4,
 	    mod_set_uint32, mod_get_uint32,
 	    {5, 255, IP_REASM_TIMEOUT},
 	    {IP_REASM_TIMEOUT} },
 
 	/* tunable - 60 */
-	{ "ip6_reasm_timeout", MOD_PROTO_IP,
+	{ "_reasm_timeout", MOD_PROTO_IPV6,
 	    mod_set_uint32, mod_get_uint32,
 	    {5, 255, IPV6_REASM_TIMEOUT},
 	    {IPV6_REASM_TIMEOUT} },
 
-	{ "ip_cgtp_filter", MOD_PROTO_IP,
+	{ "_cgtp_filter", MOD_PROTO_IP,
 	    ip_set_cgtp_filter, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
 	/* delay before sending first probe: */
-	{ "arp_probe_delay", MOD_PROTO_IP,
+	{ "_arp_probe_delay", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 20000, 1000}, {1000} },
 
-	{ "arp_fastprobe_delay", MOD_PROTO_IP,
+	{ "_arp_fastprobe_delay", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 20000, 100}, {100} },
 
 	/* interval at which DAD probes are sent: */
-	{ "arp_probe_interval", MOD_PROTO_IP,
+	{ "_arp_probe_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {10, 20000, 1500}, {1500} },
 
-	{ "arp_fastprobe_interval", MOD_PROTO_IP,
+	{ "_arp_fastprobe_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {10, 20000, 150}, {150} },
 
-	{ "arp_probe_count", MOD_PROTO_IP,
+	{ "_arp_probe_count", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 20, 3}, {3} },
 
-	{ "arp_fastprobe_count", MOD_PROTO_IP,
+	{ "_arp_fastprobe_count", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 20, 3}, {3} },
 
-	{ "ipv4_dad_announce_interval", MOD_PROTO_IP,
+	{ "_dad_announce_interval", MOD_PROTO_IPV4,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 3600000, 15000}, {15000} },
 
-	{ "ipv6_dad_announce_interval", MOD_PROTO_IP,
+	{ "_dad_announce_interval", MOD_PROTO_IPV6,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 3600000, 15000}, {15000} },
 
@@ -809,35 +809,35 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	 *			DAD defense.
 	 * defend_period: denominator for defend_rate (in seconds).
 	 */
-	{ "arp_defend_interval", MOD_PROTO_IP,
+	{ "_arp_defend_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 3600000, 300000}, {300000} },
 
-	{ "arp_defend_rate", MOD_PROTO_IP,
+	{ "_arp_defend_rate", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 20000, 100}, {100} },
 
-	{ "ndp_defend_interval", MOD_PROTO_IP,
+	{ "_ndp_defend_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 3600000, 300000}, {300000} },
 
-	{ "ndp_defend_rate", MOD_PROTO_IP,
+	{ "_ndp_defend_rate", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 20000, 100}, {100} },
 
-	{ "arp_defend_period", MOD_PROTO_IP,
+	{ "_arp_defend_period", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {5, 86400, 3600}, {3600} },
 
-	{ "ndp_defend_period", MOD_PROTO_IP,
+	{ "_ndp_defend_period", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {5, 86400, 3600}, {3600} },
 
-	{ "ipv4_icmp_return_pmtu", MOD_PROTO_IP,
+	{ "_icmp_return_pmtu", MOD_PROTO_IPV4,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "ipv6_icmp_return_pmtu", MOD_PROTO_IP,
+	{ "_icmp_return_pmtu", MOD_PROTO_IPV6,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
@@ -845,11 +845,11 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	 * publish count/interval values used to announce local addresses
 	 * for IPv4, IPv6.
 	 */
-	{ "ip_arp_publish_count", MOD_PROTO_IP,
+	{ "_arp_publish_count", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 20, 5}, {5} },
 
-	{ "ip_arp_publish_interval", MOD_PROTO_IP,
+	{ "_arp_publish_interval", MOD_PROTO_IP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1000, 20000, 2000}, {2000} },
 
@@ -893,16 +893,16 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	 *    the implementation of Strong ES as defined in Section 3.3.4.2 of
 	 *    RFC 1122
 	 */
-	{ "ip_strict_src_multihoming", MOD_PROTO_IP,
+	{ "_strict_src_multihoming", MOD_PROTO_IPV4,
 	    ip_set_src_multihoming, mod_get_uint32,
 	    {0, 2, 0}, {0} },
 
-	{ "ip6_strict_src_multihoming", MOD_PROTO_IP,
+	{ "_strict_src_multihoming", MOD_PROTO_IPV6,
 	    ip_set_src_multihoming, mod_get_uint32,
 	    {0, 2, 0}, {0} },
 
 #ifdef DEBUG
-	{ "ip6_drop_inbound_icmpv6", MOD_PROTO_IP,
+	{ "_drop_inbound_icmpv6", MOD_PROTO_IPV6,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 #else
@@ -917,7 +917,7 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	 * variable. Within these callback functions, we will be
 	 * setting/getting the global variable
 	 */
-	{ "ip_debug", MOD_PROTO_IP,
+	{ "_debug", MOD_PROTO_IP,
 	    ip_set_debug, ip_get_debug,
 	    {0, 20, 0}, {0} },
 

@@ -36,6 +36,7 @@ extern "C" {
 #include <ipadm_ipmgmt.h>
 #include <syslog.h>
 #include <pthread.h>
+#include <libscf.h>
 
 #define	IPMGMT_STRSIZE		256
 #define	IPMGMTD_FMRI		"svc:/network/ip-interface-management:default"
@@ -133,6 +134,17 @@ extern ipmgmt_aobjmap_list_t aobjmap;
 #define	ADDROBJ_LOOKUPADD	0x00000004
 #define	ADDROBJ_SETLIFNUM	0x00000008
 
+/* Permanent data store for ipadm */
+#define	IPADM_DB_FILE		"/etc/ipadm/ipadm.conf"
+#define	IPADM_FILE_MODE		(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+
+/*
+ * With the initial integration of the daemon (PSARC 2010/080), the version
+ * of the ipadm data-store (/etc/ipadm/ipadm.conf) was 0. A subsequent fix
+ * needed an upgrade to the data-store and we bumped the version to 1.
+ */
+#define	IPADM_DB_VERSION	1
+
 /*
  * A temporary file created in SMF volatile filesystem. This file captures the
  * in-memory copy of list `aobjmap' on disk. This is done to recover from
@@ -148,15 +160,34 @@ extern ipmgmt_aobjmap_list_t aobjmap;
  */
 #define	IPADM_VOL_DB_FILE	IPADM_TMPFS_DIR"/ipadm.conf"
 
+/* SCF resources required to interact with svc.configd */
+typedef struct scf_resources {
+	scf_handle_t		*sr_handle;
+	scf_instance_t		*sr_inst;
+	scf_propertygroup_t	*sr_pg;
+	scf_property_t		*sr_prop;
+	scf_value_t		*sr_val;
+	scf_transaction_t	*sr_tx;
+	scf_transaction_entry_t	*sr_ent;
+} scf_resources_t;
+
 extern int		ipmgmt_db_walk(db_wfunc_t *, void *, ipadm_db_op_t);
 extern int		ipmgmt_aobjmap_op(ipmgmt_aobjmap_t *, uint32_t);
 extern boolean_t	ipmgmt_aobjmap_init(void *, nvlist_t *, char *,
 			    size_t, int *);
 extern int 		ipmgmt_persist_aobjmap(ipmgmt_aobjmap_t *,
 			    ipadm_db_op_t);
-
-extern boolean_t	ipmgmt_first_boot();
+extern boolean_t	ipmgmt_ngz_firstboot_postinstall();
 extern int		ipmgmt_persist_if(ipmgmt_if_arg_t *);
+extern void		ipmgmt_init_prop();
+extern boolean_t	ipmgmt_db_upgrade(void *, nvlist_t *, char *,
+			    size_t, int *);
+extern int		ipmgmt_create_scf_resources(const char *,
+			    scf_resources_t *);
+extern void		ipmgmt_release_scf_resources(scf_resources_t *);
+extern boolean_t	ipmgmt_needs_upgrade(scf_resources_t *);
+extern void		ipmgmt_update_dbver(scf_resources_t *);
+
 #ifdef  __cplusplus
 }
 #endif

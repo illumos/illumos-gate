@@ -48,13 +48,13 @@
 #include "libipadm_impl.h"
 #include <inet/tunables.h>
 
-#define	IPADM_NONESTR	"none"
-#define	DEF_METRIC_VAL	0	/* default metric value */
+#define	IPADM_NONESTR		"none"
+#define	DEF_METRIC_VAL		0	/* default metric value */
 
 #define	A_CNT(arr)	(sizeof (arr) / sizeof (arr[0]))
 
-static ipadm_status_t i_ipadm_validate_if(ipadm_handle_t, const char *,
-    uint_t, uint_t);
+static ipadm_status_t	i_ipadm_validate_if(ipadm_handle_t, const char *,
+			    uint_t, uint_t);
 
 /*
  * Callback functions to retrieve property values from the kernel. These
@@ -269,6 +269,37 @@ i_ipadm_get_propdesc_table(uint_t proto)
 	}
 
 	return (NULL);
+}
+
+static ipadm_prop_desc_t *
+i_ipadm_get_prop_desc(const char *pname, uint_t proto, int *errp)
+{
+	int		err = 0;
+	boolean_t	matched_name = B_FALSE;
+	ipadm_prop_desc_t *ipdp = NULL, *ipdtbl;
+
+	if ((ipdtbl = i_ipadm_get_propdesc_table(proto)) == NULL) {
+		err = EINVAL;
+		goto ret;
+	}
+	for (ipdp = ipdtbl; ipdp->ipd_name != NULL; ipdp++) {
+		if (strcmp(pname, ipdp->ipd_name) == 0) {
+			matched_name = B_TRUE;
+			if (ipdp->ipd_proto == proto)
+				break;
+		}
+	}
+	if (ipdp->ipd_name == NULL) {
+		err = ENOENT;
+		/* if we matched name, but failed protocol check */
+		if (matched_name)
+			err = EPROTO;
+		ipdp = NULL;
+	}
+ret:
+	if (errp != NULL)
+		*errp = err;
+	return (ipdp);
 }
 
 char *
@@ -1042,7 +1073,13 @@ i_ipadm_get_prop(ipadm_handle_t iph, const void *arg,
 }
 
 /*
- * populates the ipmgmt_prop_arg_t based on the class of property.
+ * Populates the ipmgmt_prop_arg_t based on the class of property.
+ *
+ * For private protocol properties, while persisting information in ipadm
+ * data store, to ensure there is no collision of namespace between ipadm
+ * private nvpair names (which also starts with '_', see ipadm_ipmgmt.h)
+ * and private protocol property names, we will prepend IPADM_PRIV_PROP_PREFIX
+ * to property names.
  */
 static void
 i_ipadm_populate_proparg(ipmgmt_prop_arg_t *pargp, ipadm_prop_desc_t *pdp,
@@ -1059,6 +1096,11 @@ i_ipadm_populate_proparg(ipmgmt_prop_arg_t *pargp, ipadm_prop_desc_t *pdp,
 
 	switch (class) {
 	case IPADMPROP_CLASS_MODULE:
+		/* if it's a private property then add the prefix. */
+		if (pdp->ipd_name[0] == '_') {
+			(void) snprintf(pargp->ia_pname,
+			    sizeof (pargp->ia_pname), "_%s", pdp->ipd_name);
+		}
 		(void) strlcpy(pargp->ia_module, object,
 		    sizeof (pargp->ia_module));
 		break;
@@ -1104,28 +1146,19 @@ i_ipadm_getprop_common(ipadm_handle_t iph, const char *ifname,
     uint_t valtype)
 {
 	ipadm_status_t		status = IPADM_SUCCESS;
-	ipadm_prop_desc_t	*pdp, *pdtbl;
+	ipadm_prop_desc_t	*pdp;
 	char			priv_propname[MAXPROPNAMELEN];
-	boolean_t		matched_name = B_FALSE;
 	boolean_t		is_if = (ifname != NULL);
+	int			err = 0;
 
-	pdtbl = i_ipadm_get_propdesc_table(proto);
+	pdp = i_ipadm_get_prop_desc(pname, proto, &err);
+	if (err == EPROTO)
+		return (IPADM_BAD_PROTOCOL);
+	/* there are no private interface properties */
+	if (is_if && err == ENOENT)
+		return (IPADM_PROP_UNKNOWN);
 
-	/*
-	 * We already checked for supported protocol,
-	 * pdtbl better not be NULL.
-	 */
-	assert(pdtbl != NULL);
-
-	for (pdp = pdtbl; pdp->ipd_name != NULL; pdp++) {
-		if (strcmp(pname, pdp->ipd_name) == 0) {
-			matched_name = B_TRUE;
-			if (proto == pdp->ipd_proto)
-				break;
-		}
-	}
-
-	if (pdp->ipd_name != NULL) {
+	if (pdp != NULL) {
 		/*
 		 * check whether the property can be
 		 * applied on an interface
@@ -1140,17 +1173,6 @@ i_ipadm_getprop_common(ipadm_handle_t iph, const char *ifname,
 			return (IPADM_INVALID_ARG);
 
 	} else {
-		/*
-		 * if we matched name, but failed protocol check,
-		 * then return error
-		 */
-		if (matched_name)
-			return (IPADM_INVALID_ARG);
-
-		/* there are no private interface properties */
-		if (is_if)
-			return (IPADM_PROP_UNKNOWN);
-
 		/* private protocol properties, pass it to kernel directly */
 		pdp = &ipadm_privprop;
 		(void) strlcpy(priv_propname, pname, sizeof (priv_propname));
@@ -1325,35 +1347,23 @@ i_ipadm_setprop_common(ipadm_handle_t iph, const char *ifname,
 	ipadm_status_t		status = IPADM_SUCCESS;
 	boolean_t 		persist = (pflags & IPADM_OPT_PERSIST);
 	boolean_t		reset = (pflags & IPADM_OPT_DEFAULT);
-	ipadm_prop_desc_t	*pdp, *pdtbl;
+	ipadm_prop_desc_t	*pdp;
 	boolean_t		is_if = (ifname != NULL);
 	char			priv_propname[MAXPROPNAMELEN];
-	boolean_t		matched_name = B_FALSE;
+	int			err = 0;
 
 	/* Check that property value is within the allowed size */
 	if (!reset && strnlen(buf, MAXPROPVALLEN) >= MAXPROPVALLEN)
 		return (IPADM_INVALID_ARG);
 
-	pdtbl = i_ipadm_get_propdesc_table(proto);
-	/*
-	 * We already checked for supported protocol,
-	 * pdtbl better not be NULL.
-	 */
-	assert(pdtbl != NULL);
+	pdp = i_ipadm_get_prop_desc(pname, proto, &err);
+	if (err == EPROTO)
+		return (IPADM_BAD_PROTOCOL);
+	/* there are no private interface properties */
+	if (is_if && err == ENOENT)
+		return (IPADM_PROP_UNKNOWN);
 
-	/* Walk through the property table to match the given property name */
-	for (pdp = pdtbl; pdp->ipd_name != NULL; pdp++) {
-		/*
-		 * we find the entry which matches <pname, proto> tuple
-		 */
-		if (strcmp(pname, pdp->ipd_name) == 0) {
-			matched_name = B_TRUE;
-			if (pdp->ipd_proto == proto)
-				break;
-		}
-	}
-
-	if (pdp->ipd_name != NULL) {
+	if (pdp != NULL) {
 		/* do some sanity checks */
 		if (is_if) {
 			if (!(pdp->ipd_class & IPADMPROP_CLASS_IF))
@@ -1371,19 +1381,7 @@ i_ipadm_setprop_common(ipadm_handle_t iph, const char *ifname,
 			return (IPADM_INVALID_ARG);
 		}
 	} else {
-		/*
-		 * if we matched name, but failed protocol check,
-		 * then return error.
-		 */
-		if (matched_name)
-			return (IPADM_BAD_PROTOCOL);
-
-		/* Possibly a private property, pass it to kernel directly */
-
-		/* there are no private interface properties */
-		if (is_if)
-			return (IPADM_PROP_UNKNOWN);
-
+		/* private protocol property, pass it to kernel directly */
 		pdp = &ipadm_privprop;
 		(void) strlcpy(priv_propname, pname, sizeof (priv_propname));
 		pdp->ipd_name = priv_propname;
@@ -1653,7 +1651,6 @@ i_ipadm_persist_propval(ipadm_handle_t iph, ipadm_prop_desc_t *pdp,
 
 	bzero(&parg, sizeof (parg));
 	i_ipadm_populate_proparg(&parg, pdp, pval, object);
-
 	/*
 	 * Check if value to be persisted need to be appended or removed. This
 	 * is required for multi-valued property.
@@ -1677,79 +1674,6 @@ i_ipadm_persist_propval(ipadm_handle_t iph, ipadm_prop_desc_t *pdp,
 	 */
 	if (err == ENOENT)
 		err = 0;
-	return (ipadm_errno2status(err));
-}
-
-/*
- * Called during boot.
- *
- * Walk through the DB and apply all the global module properties. We plow
- * through the DB even if we fail to apply property.
- */
-/* ARGSUSED */
-boolean_t
-ipadm_db_init(void *cbarg, nvlist_t *db_nvl, char *buf, size_t buflen,
-    int *errp)
-{
-	ipadm_handle_t	iph = cbarg;
-	nvpair_t	*nvp, *pnvp;
-	char		*strval = NULL, *name, *mod = NULL;
-	uint_t		proto;
-
-	/*
-	 * We could have used nvl_exists() directly, however we need several
-	 * calls to it and each call traverses the list. Since this codepath
-	 * is exercised during boot, let's traverse the list ourselves and do
-	 * the necessary checks.
-	 */
-	for (nvp = nvlist_next_nvpair(db_nvl, NULL); nvp != NULL;
-	    nvp = nvlist_next_nvpair(db_nvl, nvp)) {
-		name = nvpair_name(nvp);
-		if (IPADM_PRIV_NVP(name)) {
-			if (strcmp(name, IPADM_NVP_IFNAME) == 0 ||
-			    strcmp(name, IPADM_NVP_AOBJNAME) == 0)
-				return (B_TRUE);
-			else if (strcmp(name, IPADM_NVP_PROTONAME) == 0 &&
-			    nvpair_value_string(nvp, &mod) != 0)
-				return (B_TRUE);
-		} else {
-			/* possible a property */
-			pnvp = nvp;
-		}
-	}
-
-	/* if we are here than we found a global property */
-	assert(mod != NULL);
-	assert(nvpair_type(pnvp) == DATA_TYPE_STRING);
-
-	proto = ipadm_str2proto(mod);
-	if (nvpair_value_string(pnvp, &strval) == 0) {
-		(void) ipadm_set_prop(iph, name, strval, proto,
-		    IPADM_OPT_ACTIVE);
-	}
-
-	return (B_TRUE);
-}
-
-/* initialize global module properties */
-ipadm_status_t
-ipadm_init_prop()
-{
-	ipadm_handle_t	iph = NULL;
-	ipadm_status_t	status;
-	int		err;
-
-	/* check for solaris.network.interface.config authorization */
-	if (!ipadm_check_auth())
-		return (IPADM_EAUTH);
-
-	if ((status = ipadm_open(&iph, IPH_INIT)) != IPADM_SUCCESS)
-		return (status);
-
-	err = ipadm_rw_db(ipadm_db_init, iph, IPADM_DB_FILE, IPADM_FILE_MODE,
-	    IPADM_DB_READ);
-
-	ipadm_close(iph);
 	return (ipadm_errno2status(err));
 }
 
@@ -1804,4 +1728,213 @@ i_ipadm_validate_if(ipadm_handle_t iph, const char *ifname,
 	if ((flags & IPADM_OPT_PERSIST) && !p_exists)
 		return (IPADM_TEMPORARY_OBJ);
 	return (IPADM_SUCCESS);
+}
+
+/*
+ * Private protocol properties namespace scheme:
+ *
+ * PSARC 2010/080 identified the private protocol property names to be the
+ * leading protocol names. For e.g. tcp_strong_iss, ip_strict_src_multihoming,
+ * et al,. However to be consistent with private data-link property names,
+ * which starts with '_', private protocol property names will start with '_'.
+ * For e.g. _strong_iss, _strict_src_multihoming, et al,.
+ */
+
+/* maps new private protocol property name to the old private property name */
+typedef struct ipadm_oname2nname_map {
+	char	*iom_oname;
+	char	*iom_nname;
+	uint_t	iom_proto;
+} ipadm_oname2nname_map_t;
+
+/*
+ * IP is a special case. It isn't straight forward to derive the legacy name
+ * from the new name and vice versa. No set standard was followed in naming
+ * the properties and hence we need a table to capture the mapping.
+ */
+static ipadm_oname2nname_map_t name_map[] = {
+	{ "arp_probe_delay",		"_arp_probe_delay",
+	    MOD_PROTO_IP },
+	{ "arp_fastprobe_delay",	"_arp_fastprobe_delay",
+	    MOD_PROTO_IP },
+	{ "arp_probe_interval",		"_arp_probe_interval",
+	    MOD_PROTO_IP },
+	{ "arp_fastprobe_interval",	"_arp_fastprobe_interval",
+	    MOD_PROTO_IP },
+	{ "arp_probe_count",		"_arp_probe_count",
+	    MOD_PROTO_IP },
+	{ "arp_fastprobe_count",	"_arp_fastprobe_count",
+	    MOD_PROTO_IP },
+	{ "arp_defend_interval",	"_arp_defend_interval",
+	    MOD_PROTO_IP },
+	{ "arp_defend_rate",		"_arp_defend_rate",
+	    MOD_PROTO_IP },
+	{ "arp_defend_period",		"_arp_defend_period",
+	    MOD_PROTO_IP },
+	{ "ndp_defend_interval",	"_ndp_defend_interval",
+	    MOD_PROTO_IP },
+	{ "ndp_defend_rate",		"_ndp_defend_rate",
+	    MOD_PROTO_IP },
+	{ "ndp_defend_period",		"_ndp_defend_period",
+	    MOD_PROTO_IP },
+	{ "igmp_max_version",		"_igmp_max_version",
+	    MOD_PROTO_IP },
+	{ "mld_max_version",		"_mld_max_version",
+	    MOD_PROTO_IP },
+	{ "ipsec_override_persocket_policy", "_ipsec_override_persocket_policy",
+	    MOD_PROTO_IP },
+	{ "ipsec_policy_log_interval",	"_ipsec_policy_log_interval",
+	    MOD_PROTO_IP },
+	{ "icmp_accept_clear_messages",	"_icmp_accept_clear_messages",
+	    MOD_PROTO_IP },
+	{ "igmp_accept_clear_messages",	"_igmp_accept_clear_messages",
+	    MOD_PROTO_IP },
+	{ "pim_accept_clear_messages",	"_pim_accept_clear_messages",
+	    MOD_PROTO_IP },
+	{ "ip_respond_to_echo_multicast", "_respond_to_echo_multicast",
+	    MOD_PROTO_IPV4 },
+	{ "ip_send_redirects",		"_send_redirects",
+	    MOD_PROTO_IPV4 },
+	{ "ip_forward_src_routed",	"_forward_src_routed",
+	    MOD_PROTO_IPV4 },
+	{ "ip_icmp_return_data_bytes",	"_icmp_return_data_bytes",
+	    MOD_PROTO_IPV4 },
+	{ "ip_ignore_redirect",		"_ignore_redirect",
+	    MOD_PROTO_IPV4 },
+	{ "ip_strict_dst_multihoming",	"_strict_dst_multihoming",
+	    MOD_PROTO_IPV4 },
+	{ "ip_reasm_timeout",		"_reasm_timeout",
+	    MOD_PROTO_IPV4 },
+	{ "ip_strict_src_multihoming",	"_strict_src_multihoming",
+	    MOD_PROTO_IPV4 },
+	{ "ipv4_dad_announce_interval",	"_dad_announce_interval",
+	    MOD_PROTO_IPV4 },
+	{ "ipv4_icmp_return_pmtu",	"_icmp_return_pmtu",
+	    MOD_PROTO_IPV4 },
+	{ "ipv6_dad_announce_interval",	"_dad_announce_interval",
+	    MOD_PROTO_IPV6 },
+	{ "ipv6_icmp_return_pmtu",	"_icmp_return_pmtu",
+	    MOD_PROTO_IPV6 },
+	{ NULL, NULL, MOD_PROTO_NONE }
+};
+
+/*
+ * Following API returns a new property name in `nname' for the given legacy
+ * property name in `oname'.
+ */
+int
+ipadm_legacy2new_propname(const char *oname, char *nname, uint_t nnamelen,
+    uint_t *proto)
+{
+	const char	*str;
+	ipadm_oname2nname_map_t *ionmp;
+
+	/* if it's a public property, there is nothing to return */
+	if (i_ipadm_get_prop_desc(oname, *proto, NULL) != NULL)
+		return (-1);
+
+	/*
+	 * we didn't find the `oname' in the table, check if the property
+	 * name begins with a leading protocol.
+	 */
+	str = oname;
+	switch (*proto) {
+	case MOD_PROTO_TCP:
+		if (strstr(oname, "tcp_") == oname)
+			str += strlen("tcp");
+		break;
+	case MOD_PROTO_SCTP:
+		if (strstr(oname, "sctp_") == oname)
+			str += strlen("sctp");
+		break;
+	case MOD_PROTO_UDP:
+		if (strstr(oname, "udp_") == oname)
+			str += strlen("udp");
+		break;
+	case MOD_PROTO_RAWIP:
+		if (strstr(oname, "icmp_") == oname)
+			str += strlen("icmp");
+		break;
+	case MOD_PROTO_IP:
+	case MOD_PROTO_IPV4:
+	case MOD_PROTO_IPV6:
+		if (strstr(oname, "ip6_") == oname) {
+			*proto = MOD_PROTO_IPV6;
+			str += strlen("ip6");
+		} else {
+			for (ionmp = name_map; ionmp->iom_oname != NULL;
+			    ionmp++) {
+				if (strcmp(oname, ionmp->iom_oname) == 0) {
+					str = ionmp->iom_nname;
+					*proto = ionmp->iom_proto;
+					break;
+				}
+			}
+			if (ionmp->iom_oname != NULL)
+				break;
+
+			if (strstr(oname, "ip_") == oname) {
+				*proto = MOD_PROTO_IP;
+				str += strlen("ip");
+			}
+		}
+		break;
+	default:
+		return (-1);
+	}
+	(void) snprintf(nname, nnamelen, "%s", str);
+	return (0);
+}
+
+/*
+ * Following API is required for ndd.c alone. To maintain backward
+ * compatibility with ndd output, we need to print the legacy name
+ * for the new name.
+ */
+int
+ipadm_new2legacy_propname(const char *oname, char *nname,
+    uint_t nnamelen, uint_t proto)
+{
+	char	*prefix;
+	ipadm_oname2nname_map_t *ionmp;
+
+	/* if it's a public property, there is nothing to prepend */
+	if (i_ipadm_get_prop_desc(oname, proto, NULL) != NULL)
+		return (-1);
+
+	switch (proto) {
+	case MOD_PROTO_TCP:
+		prefix = "tcp";
+		break;
+	case MOD_PROTO_SCTP:
+		prefix = "sctp";
+		break;
+	case MOD_PROTO_UDP:
+		prefix = "udp";
+		break;
+	case MOD_PROTO_RAWIP:
+		prefix = "icmp";
+		break;
+	case MOD_PROTO_IP:
+	case MOD_PROTO_IPV4:
+	case MOD_PROTO_IPV6:
+		/* handle special case for IP */
+		for (ionmp = name_map; ionmp->iom_oname != NULL; ionmp++) {
+			if (strcmp(oname, ionmp->iom_nname) == 0 &&
+			    ionmp->iom_proto == proto) {
+				(void) strlcpy(nname, ionmp->iom_oname,
+				    nnamelen);
+				return (0);
+			}
+		}
+		if (proto == MOD_PROTO_IPV6)
+			prefix = "ip6";
+		else
+			prefix = "ip";
+		break;
+	default:
+		return (-1);
+	}
+	(void) snprintf(nname, nnamelen, "%s%s", prefix, oname);
+	return (0);
 }
