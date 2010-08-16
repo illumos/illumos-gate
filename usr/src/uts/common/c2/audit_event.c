@@ -3549,12 +3549,22 @@ auf_accept(
 #else
 	sy_flags = sysent[scid].sy_flags & SE_RVAL_MASK;
 #endif
-	if (sy_flags == SE_32RVAL1)
+	switch (sy_flags) {
+	case SE_32RVAL1:
+		/* FALLTHRU */
+	case SE_32RVAL2|SE_32RVAL1:
 		fd = rval->r_val1;
-	if (sy_flags == (SE_32RVAL2|SE_32RVAL1))
-		fd = rval->r_val1;
-	if (sy_flags == SE_64RVAL)
+		break;
+	case SE_64RVAL:
 		fd = (int)rval->r_vals;
+		break;
+	default:
+		/*
+		 * should never happen, seems to be an internal error
+		 * in sysent => no fd, nothing to audit here, returning
+		 */
+		return;
+	}
 
 	if (error) {
 		/* can't trust socket contents. Just return */
