@@ -1092,7 +1092,7 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 				/* signal/timeout pending */
 				RDSV3_DPRINTF2("rdsv3_sendmsg",
 				    "woke due to signal: %d", ret);
-				ret = -ERESTART;
+				ret = -EINTR;
 				sk->sk_sleep->waitq_waiters--;
 				mutex_exit(&sk->sk_sleep->waitq_mutex);
 				goto out;

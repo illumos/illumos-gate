@@ -51,7 +51,6 @@
 
 /* converting this to RCU is a chore for another day.. */
 static krwlock_t rdsv3_conn_lock;
-static unsigned long rdsv3_conn_count;
 struct avl_tree rdsv3_conn_hash;
 static struct kmem_cache *rdsv3_conn_slab = NULL;
 
@@ -230,7 +229,6 @@ __rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
 		} else {
 			parent->c_passive = conn;
 			rdsv3_cong_add_conn(conn);
-			rdsv3_conn_count++;
 		}
 	} else {
 		/* Creating normal conn */
@@ -246,7 +244,6 @@ __rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
 			rdsv3_cong_add_conn(conn);
 			rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_reap_w,
 			    RDSV3_REAPER_WAIT_JIFFIES);
-			rdsv3_conn_count++;
 		}
 	}
 
@@ -411,7 +408,6 @@ rdsv3_conn_destroy(struct rdsv3_connection *conn)
 	ASSERT(list_is_empty(&conn->c_retrans));
 	kmem_cache_free(rdsv3_conn_slab, conn);
 
-	rdsv3_conn_count--;
 }
 
 /* ARGSUSED */

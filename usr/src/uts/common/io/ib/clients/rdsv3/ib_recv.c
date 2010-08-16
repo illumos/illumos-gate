@@ -122,7 +122,7 @@ rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
 
 	if (!recv->r_ibinc) {
 		if (!atomic_add_unless(&rdsv3_ib_allocation, 1,
-		    rdsv3_ib_sysctl_max_recv_allocation)) {
+		    ic->i_max_recv_alloc)) {
 			rdsv3_ib_stats_inc(s_ib_rx_alloc_limit);
 			goto out;
 		}

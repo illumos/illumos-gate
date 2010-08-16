@@ -29,6 +29,9 @@
 /* minor versions supported */
 #define	RDSV3_IB_SUPPORTED_PROTOCOLS	0x00000003
 
+#define	RDSV3_IB_MAX_RECV_ALLOC		((512 * 1024 * 1024) / RDSV3_FRAG_SIZE)
+#define	RDSV3_IB_WC_POLL_SIZE		16
+
 extern struct list rdsv3_ib_devices;
 
 /*
@@ -175,6 +178,8 @@ struct rdsv3_ib_connection {
 	/* Batched completions */
 	unsigned int		i_unsignaled_wrs;
 	long			i_unsignaled_bytes;
+
+	unsigned long		i_max_recv_alloc;
 };
 
 /* This assumes that atomic_t is at least 32 bits */

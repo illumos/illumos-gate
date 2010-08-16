@@ -133,8 +133,24 @@ unsigned int
 rdsv3_trans_stats_info_copy(struct rdsv3_info_iterator *iter,
     unsigned int avail)
 {
-	/*
-	 * XXX - Add this when we port info (info.c)
-	 */
-	return (0);
+	struct rdsv3_transport *trans;
+	unsigned int total = 0;
+	unsigned int part;
+	int i;
+
+	rw_enter(&trans_sem, RW_READER);
+
+	for (i = 0; i < RDS_TRANS_COUNT; i++) {
+		trans = transports[i];
+		if (!trans || !trans->stats_info_copy)
+			continue;
+
+		part = trans->stats_info_copy(iter, avail);
+		avail -= min(avail, part);
+		total += part;
+	}
+
+	rw_exit(&trans_sem);
+
+	return (total);
 }

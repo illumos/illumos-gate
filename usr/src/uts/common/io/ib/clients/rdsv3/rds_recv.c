@@ -539,7 +539,7 @@ rdsv3_recvmsg(struct rdsv3_sock *rs, uio_t *uio,
 					/* signal/timeout pending */
 					RDSV3_DPRINTF2("rdsv3_recvmsg",
 					    "woke due to signal");
-					ret = -ERESTART;
+					ret = -EINTR;
 					break;
 				}
 			}

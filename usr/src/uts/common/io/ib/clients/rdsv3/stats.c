@@ -167,7 +167,7 @@ int
 rdsv3_stats_init(void)
 {
 	/*
-	 * Note the max number of cpus that ths system can have at most.
+	 * Note the max number of cpus that this system can have at most.
 	 */
 	nr_cpus = max_ncpus;
 	ASSERT(rdsv3_stats == NULL);
