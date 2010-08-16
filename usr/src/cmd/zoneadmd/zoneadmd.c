@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -457,12 +456,14 @@ static int
 brand_prestatechg(zlog_t *zlogp, int state, int cmd)
 {
 	char cmdbuf[2 * MAXPATHLEN];
+	const char *altroot;
 
 	if (pre_statechg_hook[0] == '\0')
 		return (0);
 
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d", pre_statechg_hook,
-	    state, cmd) > sizeof (cmdbuf))
+	altroot = zonecfg_get_root();
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d %s", pre_statechg_hook,
+	    state, cmd, altroot) > sizeof (cmdbuf))
 		return (-1);
 
 	if (do_subproc(zlogp, cmdbuf, NULL) != 0)
@@ -478,12 +479,14 @@ static int
 brand_poststatechg(zlog_t *zlogp, int state, int cmd)
 {
 	char cmdbuf[2 * MAXPATHLEN];
+	const char *altroot;
 
 	if (post_statechg_hook[0] == '\0')
 		return (0);
 
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d", post_statechg_hook,
-	    state, cmd) > sizeof (cmdbuf))
+	altroot = zonecfg_get_root();
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d %s", post_statechg_hook,
+	    state, cmd, altroot) > sizeof (cmdbuf))
 		return (-1);
 
 	if (do_subproc(zlogp, cmdbuf, NULL) != 0)

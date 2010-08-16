@@ -519,6 +519,8 @@
 			0 - ready
 			1 - boot
 			4 - halt
+      3rd arg   Alternate root (zonepath is mounted under this root)
+			empty string if zone not mounted under alternate root
 -->
 <!ELEMENT prestatechange	(#PCDATA) >
 <!ATTLIST prestatechange>
@@ -534,7 +536,7 @@
 
       %z	Name of zone
       %R	Zonepath of zone
-    See prestatechange comment for 1st and 2nd argument values.
+    See prestatechange comment for 1st, 2nd and 3rd argument values.
 -->
 <!ELEMENT poststatechange	(#PCDATA) >
 <!ATTLIST poststatechange>

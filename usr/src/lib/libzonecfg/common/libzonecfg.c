@@ -238,6 +238,7 @@ char *zonecfg_root = "";
  * Set the root (/) path for all zonecfg configuration files.  This is a
  * private interface used by Live Upgrade extensions to access zone
  * configuration inside mounted alternate boot environments.
+ * This interface is also used by zoneadm mount and unmount subcommands.
  */
 void
 zonecfg_set_root(const char *rootpath)

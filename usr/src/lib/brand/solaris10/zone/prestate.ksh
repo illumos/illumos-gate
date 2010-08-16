@@ -19,9 +19,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 . /usr/lib/brand/solaris10/common.ksh
@@ -46,6 +46,7 @@ zonename=$1
 zonepath=$2
 state=$3
 cmd=$4
+altroot=$5		# unused at this time for s10 branded zones
 
 # If we're not readying the zone, then just return.
 if (( $cmd == 0 )); then
