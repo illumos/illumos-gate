@@ -54,7 +54,8 @@ PERL_DYNAMIC_EXT = \
 # Add any pure-perl extensions here.
 PERL_NONXS_EXT = \
     $(SUN_SOLARIS)/BSM \
-    $(SUN_SOLARIS)/PerlGcc
+    $(SUN_SOLARIS)/PerlGcc \
+    $(SUN_SOLARIS)/Pg
 
 PERL_EXT = $(PERL_DYNAMIC_EXT) $(PERL_NONXS_EXT)
 PERL_EXT_MAKEFILES = $(PERL_EXT:%=%/Makefile)

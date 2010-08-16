@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PG_H
@@ -43,7 +43,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/kstat.h>
 
-typedef uint_t		pgid_t;		/* processor group id */
+typedef int		pgid_t;		/* processor group id */
 typedef uint_t		pg_cid_t;	/* processor group class id */
 
 struct pg;

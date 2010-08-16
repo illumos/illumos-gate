@@ -336,6 +336,7 @@ file path=usr/perl5/5.8.4/lib/Sun/Solaris/Exacct/Object.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Intrs.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Kstat.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Lgrp.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Sun/Solaris/Pg.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Privilege.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Project.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Task.pm mode=0444

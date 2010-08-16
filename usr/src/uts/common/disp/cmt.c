@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -256,7 +255,7 @@ pg_cmt_policy(pghw_type_t hw)
 	case PGHW_CHIP:
 		return (CMT_BALANCE);
 	case PGHW_CACHE:
-		return (CMT_AFFINITY);
+		return (CMT_AFFINITY | CMT_BALANCE);
 	case PGHW_POW_ACTIVE:
 	case PGHW_POW_IDLE:
 		return (CMT_BALANCE);
@@ -1469,6 +1468,11 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 	pghw_type_t	hw;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	/*
+	 * Inform pghw layer that this PG is pruned.
+	 */
+	pghw_cmt_fini((pghw_t *)pg_bad);
 
 	hw = ((pghw_t *)pg_bad)->pghw_hw;
 

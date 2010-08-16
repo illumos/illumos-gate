@@ -61,6 +61,7 @@ dir path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Intrs
 dir path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Kstat
 dir path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Lgrp
 dir path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/PerlGcc
+dir path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Pg
 dir path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Privilege
 dir path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Project
 dir path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Task
@@ -134,6 +135,7 @@ file \
     path=usr/perl5/5.10.0/lib/PLAT-solaris-64int/auto/Sun/Solaris/Utils/Utils.so
 file path=usr/perl5/5.10.0/lib/Sun/Solaris/BSM/_BSMparse.pm
 file path=usr/perl5/5.10.0/lib/Sun/Solaris/PerlGcc/Config.pm
+file path=usr/perl5/5.10.0/lib/Sun/Solaris/Pg.pm
 license cr_Sun license=cr_Sun
 license usr/src/cmd/perl/THIRDPARTYLICENSE \
     license=usr/src/cmd/perl/THIRDPARTYLICENSE
