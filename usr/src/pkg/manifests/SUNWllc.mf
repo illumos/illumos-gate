@@ -23,7 +23,8 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/SUNWllc@0.5.11,5.11-0.133
-set name=pkg.renamed value=true
+# Was renamed to driver/network/llc2, both now obsolete
+
+set name=pkg.fmri value=pkg:/SUNWllc@$(PKGVERS)
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/driver/network/llc2@0.5.11,5.11-0.133 type=require

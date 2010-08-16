@@ -458,7 +458,6 @@ COMMON_SUBDIRS=		\
 $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/iconv	\
 	$(CLOSED)/cmd/ksh	\
-	$(CLOSED)/cmd/llc2	\
 	$(CLOSED)/cmd/localedef	\
 	$(CLOSED)/cmd/more_xpg4	\
 	$(CLOSED)/cmd/mtst	\
@@ -742,7 +741,6 @@ MSGSUBDIRS=		\
 $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/iconv	\
 	$(CLOSED)/cmd/ksh	\
-	$(CLOSED)/cmd/llc2	\
 	$(CLOSED)/cmd/localedef	\
 	$(CLOSED)/cmd/more_xpg4	\
 	$(CLOSED)/cmd/od	\

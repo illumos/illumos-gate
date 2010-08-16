@@ -36,3 +36,30 @@ kernel/drv/dprov.conf
 kernel/drv/sparcv9/dprov	sparc
 
 usr/has/bin/pfksh
+
+#
+# we don't deliver these closed bits anymore... this
+# list can go away once we purge closed from illumos entirely.
+#
+# llc2
+etc/init.d/llc2
+etc/llc2
+etc/llc2/default
+etc/llc2/llc2_start.default
+etc/rc0.d/K52llc2
+etc/rc1.d/K52llc2
+etc/rc2.d/S40llc2
+etc/rcS.d/K52llc2
+usr/kernel/drv/llc2		i386
+usr/kernel/drv/amd64/llc2	i386
+usr/kernel/drv/sparcv9/llc2	sparc
+usr/kernel/drv/llc2.conf
+usr/lib/llc2
+usr/lib/llc2/llc2_autoconfig
+usr/lib/llc2/llc2_config
+usr/lib/llc2/llc2_loop2
+usr/lib/llc2/llc2_loop3
+usr/lib/llc2/llc2_loop4
+usr/lib/llc2/llc2_stats
+usr/lib/llc2/llc2_tcap
+usr/lib/llc2/llc2_tparser
