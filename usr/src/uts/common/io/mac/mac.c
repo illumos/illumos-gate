@@ -3140,7 +3140,7 @@ mac_get_prop(mac_handle_t mh, mac_prop_id_t id, char *name, void *val,
 		uint32_t sdu;
 
 		ASSERT(valsize >= sizeof (uint32_t));
-		mac_sdu_get(mh, NULL, &sdu);
+		mac_sdu_get2(mh, NULL, &sdu, NULL);
 		bcopy(&sdu, val, sizeof (sdu));
 
 		return (0);
@@ -3398,7 +3398,7 @@ mac_prop_info(mac_handle_t mh, mac_prop_id_t id, char *name,
 	case MAC_PROP_MTU: {
 		uint32_t sdu;
 
-		mac_sdu_get(mh, NULL, &sdu);
+		mac_sdu_get2(mh, NULL, &sdu, NULL);
 
 		if (range != NULL && !(state.pr_flags &
 		    MAC_PROP_INFO_RANGE)) {

@@ -494,6 +494,7 @@ struct mac_impl_s {
 	uint32_t		mi_margin;		/* mi_rw_lock */
 	uint_t			mi_sdu_min;		/* mi_rw_lock */
 	uint_t			mi_sdu_max;		/* mi_rw_lock */
+	uint_t			mi_sdu_multicast;	/* mi_rw_lock */
 
 	/*
 	 * Cache of factory MAC addresses provided by the driver. If

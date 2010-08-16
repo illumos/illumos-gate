@@ -155,7 +155,7 @@
  * Changing the linkmode requires some bookkeeping in the driver. The
  * capabilities need to be re-reported to the mac layer. This is done by
  * calling mac_capab_update().  The maxsdu is updated by calling
- * mac_maxsdu_update().
+ * mac_maxsdu_update2().
  * The private properties retain their values across the change of linkmode.
  * NOTE:
  * - The port driver does not support any property apart from mtu.
@@ -2392,6 +2392,7 @@ ibd_register_mac(ibd_state_t *state, dev_info_t *dip)
 	macp->m_src_addr = (uint8_t *)&state->id_macaddr;
 	macp->m_callbacks = &ibd_m_callbacks;
 	macp->m_min_sdu = 0;
+	macp->m_multicast_sdu = IBD_DEF_MAX_SDU;
 	if (state->id_type == IBD_PORT_DRIVER) {
 		macp->m_max_sdu = IBD_DEF_RC_MAX_SDU;
 	} else if (state->id_enable_rc) {
@@ -4592,14 +4593,16 @@ ibd_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 					}
 					state->id_enable_rc = 1;
 					/* inform MAC framework of new MTU */
-					err = mac_maxsdu_update(state->id_mh,
-					    state->rc_mtu - IPOIB_HDRSIZE);
+					err = mac_maxsdu_update2(state->id_mh,
+					    state->rc_mtu - IPOIB_HDRSIZE,
+					    state->id_mtu - IPOIB_HDRSIZE);
 				} else {
 					if (!state->id_enable_rc) {
 						return (0);
 					}
 					state->id_enable_rc = 0;
-					err = mac_maxsdu_update(state->id_mh,
+					err = mac_maxsdu_update2(state->id_mh,
+					    state->id_mtu - IPOIB_HDRSIZE,
 					    state->id_mtu - IPOIB_HDRSIZE);
 				}
 				(void) ibd_record_capab(state);
@@ -6007,8 +6010,9 @@ ibd_start(ibd_state_t *state)
 	    state->id_mgid.gid_prefix, state->id_mgid.gid_guid);
 
 	if (!state->id_enable_rc) {
-		(void) mac_maxsdu_update(state->id_mh, state->id_mtu
-		    - IPOIB_HDRSIZE);
+		(void) mac_maxsdu_update2(state->id_mh,
+		    state->id_mtu - IPOIB_HDRSIZE,
+		    state->id_mtu - IPOIB_HDRSIZE);
 	}
 	mac_unicst_update(state->id_mh, (uint8_t *)&state->id_macaddr);
 
@@ -8272,6 +8276,7 @@ ibd_create_partition(void *karg, intptr_t arg, int mode, cred_t *credp,
 	macp->m_src_addr	= (uint8_t *)&state->id_macaddr;
 	macp->m_callbacks	= &ibd_m_callbacks;
 	macp->m_min_sdu		= 0;
+	macp->m_multicast_sdu	= IBD_DEF_MAX_SDU;
 	if (state->id_enable_rc) {
 		macp->m_max_sdu		= IBD_DEF_RC_MAX_SDU;
 	} else {

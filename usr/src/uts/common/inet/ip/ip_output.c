@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -328,7 +327,8 @@ conn_ip_output(mblk_t *mp, ip_xmit_attr_t *ixa)
 	 * An initial ixa_fragsize was set in ip_set_destination
 	 * and we update it if any routing changes above.
 	 * A change to ill_mtu with ifconfig will increase all dce_generation
-	 * so that we will detect that with the generation check.
+	 * so that we will detect that with the generation check. Ditto for
+	 * ill_mc_mtu.
 	 */
 
 	/*

@@ -3352,7 +3352,7 @@ ip_laddr_fanout_insert(conn_t *connp)
  * If uinfo is set, then we fill in the best available information
  * we have for the destination. This is based on (in priority order) any
  * metrics and path MTU stored in a dce_t, route metrics, and finally the
- * ill_mtu.
+ * ill_mtu/ill_mc_mtu.
  *
  * Tsol note: If we have a source route then dst_addr != firsthop. But we
  * always do the label check on dst_addr.
@@ -3681,8 +3681,13 @@ bad_addr:
 uint_t
 ip_get_base_mtu(ill_t *ill, ire_t *ire)
 {
-	uint_t mtu = ill->ill_mtu;
+	uint_t mtu;
 	uint_t iremtu = ire->ire_metrics.iulp_mtu;
+
+	if (ire->ire_type & (IRE_MULTICAST|IRE_BROADCAST))
+		mtu = ill->ill_mc_mtu;
+	else
+		mtu = ill->ill_mtu;
 
 	if (iremtu != 0 && iremtu < mtu)
 		mtu = iremtu;
@@ -3796,17 +3801,32 @@ ip_get_pmtu(ip_xmit_attr_t *ixa)
 		 * an ill. We'd use the above IP_MAXPACKET in that case just
 		 * to tell the transport something larger than zero.
 		 */
-		if (nce->nce_common->ncec_ill->ill_mtu < pmtu)
-			pmtu = nce->nce_common->ncec_ill->ill_mtu;
-		if (nce->nce_common->ncec_ill != nce->nce_ill &&
-		    nce->nce_ill->ill_mtu < pmtu) {
-			/*
-			 * for interfaces in an IPMP group, the mtu of
-			 * the nce_ill (under_ill) could be different
-			 * from the mtu of the ncec_ill, so we take the
-			 * min of the two.
-			 */
-			pmtu = nce->nce_ill->ill_mtu;
+		if (ire->ire_type & (IRE_MULTICAST|IRE_BROADCAST)) {
+			if (nce->nce_common->ncec_ill->ill_mc_mtu < pmtu)
+				pmtu = nce->nce_common->ncec_ill->ill_mc_mtu;
+			if (nce->nce_common->ncec_ill != nce->nce_ill &&
+			    nce->nce_ill->ill_mc_mtu < pmtu) {
+				/*
+				 * for interfaces in an IPMP group, the mtu of
+				 * the nce_ill (under_ill) could be different
+				 * from the mtu of the ncec_ill, so we take the
+				 * min of the two.
+				 */
+				pmtu = nce->nce_ill->ill_mc_mtu;
+			}
+		} else {
+			if (nce->nce_common->ncec_ill->ill_mtu < pmtu)
+				pmtu = nce->nce_common->ncec_ill->ill_mtu;
+			if (nce->nce_common->ncec_ill != nce->nce_ill &&
+			    nce->nce_ill->ill_mtu < pmtu) {
+				/*
+				 * for interfaces in an IPMP group, the mtu of
+				 * the nce_ill (under_ill) could be different
+				 * from the mtu of the ncec_ill, so we take the
+				 * min of the two.
+				 */
+				pmtu = nce->nce_ill->ill_mtu;
+			}
 		}
 	}
 
@@ -4681,6 +4701,22 @@ ip_dlnotify_alloc(uint_t notification, uint_t data)
 	notifyp = (dl_notify_ind_t *)mp->b_rptr;
 	notifyp->dl_notification = notification;
 	notifyp->dl_data = data;
+	return (mp);
+}
+
+mblk_t *
+ip_dlnotify_alloc2(uint_t notification, uint_t data1, uint_t data2)
+{
+	dl_notify_ind_t	*notifyp;
+	mblk_t		*mp;
+
+	if ((mp = ip_dlpi_alloc(DL_NOTIFY_IND_SIZE, DL_NOTIFY_IND)) == NULL)
+		return (NULL);
+
+	notifyp = (dl_notify_ind_t *)mp->b_rptr;
+	notifyp->dl_notification = notification;
+	notifyp->dl_data1 = data1;
+	notifyp->dl_data2 = data2;
 	return (mp);
 }
 
@@ -8449,7 +8485,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 	case DL_NOTIFY_IND: {
 		dl_notify_ind_t *notify = (dl_notify_ind_t *)mp->b_rptr;
-		uint_t orig_mtu;
+		uint_t orig_mtu, orig_mc_mtu;
 
 		switch (notify->dl_notification) {
 		case DL_NOTE_PHYS_ADDR:
@@ -8470,6 +8506,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			break;
 
 		case DL_NOTE_SDU_SIZE:
+		case DL_NOTE_SDU_SIZE2:
 			/*
 			 * The dce and fragmentation code can cope with
 			 * this changing while packets are being sent.
@@ -8479,11 +8516,23 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * Change the MTU size of the interface.
 			 */
 			mutex_enter(&ill->ill_lock);
-			ill->ill_current_frag = (uint_t)notify->dl_data;
+			orig_mtu = ill->ill_mtu;
+			orig_mc_mtu = ill->ill_mc_mtu;
+			switch (notify->dl_notification) {
+			case DL_NOTE_SDU_SIZE:
+				ill->ill_current_frag =
+				    (uint_t)notify->dl_data;
+				ill->ill_mc_mtu = (uint_t)notify->dl_data;
+				break;
+			case DL_NOTE_SDU_SIZE2:
+				ill->ill_current_frag =
+				    (uint_t)notify->dl_data1;
+				ill->ill_mc_mtu = (uint_t)notify->dl_data2;
+				break;
+			}
 			if (ill->ill_current_frag > ill->ill_max_frag)
 				ill->ill_max_frag = ill->ill_current_frag;
 
-			orig_mtu = ill->ill_mtu;
 			if (!(ill->ill_flags & ILLF_FIXEDMTU)) {
 				ill->ill_mtu = ill->ill_current_frag;
 
@@ -8495,20 +8544,32 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				    ill->ill_user_mtu < ill->ill_mtu)
 					ill->ill_mtu = ill->ill_user_mtu;
 
+				if (ill->ill_user_mtu != 0 &&
+				    ill->ill_user_mtu < ill->ill_mc_mtu)
+					ill->ill_mc_mtu = ill->ill_user_mtu;
+
 				if (ill->ill_isv6) {
 					if (ill->ill_mtu < IPV6_MIN_MTU)
 						ill->ill_mtu = IPV6_MIN_MTU;
+					if (ill->ill_mc_mtu < IPV6_MIN_MTU)
+						ill->ill_mc_mtu = IPV6_MIN_MTU;
 				} else {
 					if (ill->ill_mtu < IP_MIN_MTU)
 						ill->ill_mtu = IP_MIN_MTU;
+					if (ill->ill_mc_mtu < IP_MIN_MTU)
+						ill->ill_mc_mtu = IP_MIN_MTU;
 				}
+			} else if (ill->ill_mc_mtu > ill->ill_mtu) {
+				ill->ill_mc_mtu = ill->ill_mtu;
 			}
+
 			mutex_exit(&ill->ill_lock);
 			/*
 			 * Make sure all dce_generation checks find out
-			 * that ill_mtu has changed.
+			 * that ill_mtu/ill_mc_mtu has changed.
 			 */
-			if (orig_mtu != ill->ill_mtu) {
+			if (orig_mtu != ill->ill_mtu ||
+			    orig_mc_mtu != ill->ill_mc_mtu) {
 				dce_increment_all_generations(ill->ill_isv6,
 				    ill->ill_ipst);
 			}

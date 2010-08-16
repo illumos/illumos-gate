@@ -3717,6 +3717,7 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 		goto done;
 	ill->ill_current_frag = ill->ill_max_frag;
 	ill->ill_mtu = ill->ill_max_frag;	/* Initial value */
+	ill->ill_mc_mtu = ill->ill_mtu;
 	/*
 	 * ipif_loopback_name can't be pointed at directly because its used
 	 * by both the ipv4 and ipv6 interfaces.  When the ill is removed
@@ -4189,6 +4190,7 @@ ip_ll_subnet_defaults(ill_t *ill, mblk_t *mp)
 	ill->ill_max_frag = MAX(min_mtu, dlia->dl_max_sdu);
 	ill->ill_current_frag = ill->ill_max_frag;
 	ill->ill_mtu = ill->ill_max_frag;
+	ill->ill_mc_mtu = ill->ill_mtu;	/* Overridden by DL_NOTE_SDU_SIZE2 */
 
 	ill->ill_type = ipm->ip_m_type;
 
@@ -10816,6 +10818,10 @@ ip_sioctl_mtu(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		mutex_exit(&ill->ill_lock);
 		return (EINVAL);
 	}
+	/* Avoid increasing ill_mc_mtu */
+	if (ill->ill_mc_mtu > mtu)
+		ill->ill_mc_mtu = mtu;
+
 	/*
 	 * The dce and fragmentation code can handle changes to ill_mtu
 	 * concurrent with sending/fragmenting packets.
@@ -10826,7 +10832,7 @@ ip_sioctl_mtu(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	/*
 	 * Make sure all dce_generation checks find out
-	 * that ill_mtu has changed.
+	 * that ill_mtu/ill_mc_mtu has changed.
 	 */
 	dce_increment_all_generations(ill->ill_isv6, ill->ill_ipst);
 
@@ -11584,12 +11590,13 @@ ip_sioctl_lnkinfo(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 * here.
 		 */
 		ill->ill_mtu = MIN(ill->ill_current_frag, ill->ill_user_mtu);
+		ill->ill_mc_mtu = MIN(ill->ill_mc_mtu, ill->ill_user_mtu);
 	}
 	mutex_exit(&ill->ill_lock);
 
 	/*
 	 * Make sure all dce_generation checks find out
-	 * that ill_mtu has changed.
+	 * that ill_mtu/ill_mc_mtu has changed.
 	 */
 	if (!(ill->ill_flags & ILLF_FIXEDMTU) && (lir->lir_maxmtu != 0))
 		dce_increment_all_generations(ill->ill_isv6, ill->ill_ipst);

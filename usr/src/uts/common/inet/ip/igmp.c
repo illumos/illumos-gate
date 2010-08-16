@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1861,7 +1860,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
  * Sends an IGMP_V3_MEMBERSHIP_REPORT message out the ill.
  * The report will contain one group record
  * for each element of reclist.  If this causes packet length to
- * exceed ill->ill_mtu, multiple reports are sent.
+ * exceed ill->ill_mc_mtu, multiple reports are sent.
  * reclist is assumed to be made up of buffers allocated by mcast_bldmrec(),
  * and those buffers are freed here.
  */
@@ -1897,7 +1896,7 @@ nextpkt:
 	for (rp = cur_reclist; rp != NULL; rp = rp->mrec_next) {
 		rsize = sizeof (grphdra_t) +
 		    (rp->mrec_srcs.sl_numsrc * sizeof (ipaddr_t));
-		if (size + rsize > ill->ill_mtu) {
+		if (size + rsize > ill->ill_mc_mtu) {
 			if (rp == cur_reclist) {
 				/*
 				 * If the first mrec we looked at is too big
@@ -1908,7 +1907,7 @@ nextpkt:
 				 * other types).
 				 */
 				int srcspace, srcsperpkt;
-				srcspace = ill->ill_mtu - (size +
+				srcspace = ill->ill_mc_mtu - (size +
 				    sizeof (grphdra_t));
 
 				/*
@@ -2498,7 +2497,7 @@ mld_sendpkt(ilm_t *ilm, uchar_t type, const in6_addr_t *v6addr)
 /*
  * Sends an MLD_V2_LISTENER_REPORT message out the passed-in ill.  The
  * report will contain one multicast address record for each element of
- * reclist.  If this causes packet length to exceed ill->ill_mtu,
+ * reclist.  If this causes packet length to exceed ill->ill_mc_mtu,
  * multiple reports are sent.  reclist is assumed to be made up of
  * buffers allocated by mcast_bldmrec(), and those buffers are freed here.
  */
@@ -2542,7 +2541,7 @@ nextpkt:
 	    rp = rp->mrec_next, numrec++) {
 		rsize = sizeof (mld2mar_t) +
 		    (rp->mrec_srcs.sl_numsrc * sizeof (in6_addr_t));
-		if (size + rsize > ill->ill_mtu) {
+		if (size + rsize > ill->ill_mc_mtu) {
 			if (rp == cur_reclist) {
 				/*
 				 * If the first mrec we looked at is too big
@@ -2553,7 +2552,7 @@ nextpkt:
 				 * other types).
 				 */
 				int srcspace, srcsperpkt;
-				srcspace = ill->ill_mtu -
+				srcspace = ill->ill_mc_mtu -
 				    (size + sizeof (mld2mar_t));
 
 				/*

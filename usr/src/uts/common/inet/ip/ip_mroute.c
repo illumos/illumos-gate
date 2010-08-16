@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -3185,7 +3184,8 @@ tbf_send_packet(struct vif *vifp, mblk_t *mp)
 		 * statistics for input errors will be increased on the wrong
 		 * ill but that isn't a big deal.
 		 */
-		ip_forward_xmit_v4(nce, ill, mp, ipha, &iras, ill->ill_mtu, 0);
+		ip_forward_xmit_v4(nce, ill, mp, ipha, &iras, ill->ill_mc_mtu,
+		    0);
 		ASSERT(!(iras.ira_flags & IRAF_IPSEC_SECURE));
 
 		nce_refrele(nce);

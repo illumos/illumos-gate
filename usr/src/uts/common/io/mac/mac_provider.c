@@ -212,8 +212,14 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	mip->mi_info.mi_nativemedia = mtype->mt_nativetype;
 	if (mregp->m_max_sdu <= mregp->m_min_sdu)
 		goto fail;
+	if (mregp->m_multicast_sdu == 0)
+		mregp->m_multicast_sdu = mregp->m_max_sdu;
+	if (mregp->m_multicast_sdu < mregp->m_min_sdu ||
+	    mregp->m_multicast_sdu > mregp->m_max_sdu)
+		goto fail;
 	mip->mi_sdu_min = mregp->m_min_sdu;
 	mip->mi_sdu_max = mregp->m_max_sdu;
+	mip->mi_sdu_multicast = mregp->m_multicast_sdu;
 	mip->mi_info.mi_addr_length = mip->mi_type->mt_addr_length;
 	/*
 	 * If the media supports a broadcast address, cache a pointer to it
@@ -934,6 +940,13 @@ mac_capab_update(mac_handle_t mh)
 	i_mac_notify((mac_impl_t *)mh, MAC_NOTE_CAPAB_CHG);
 }
 
+/*
+ * Used by normal drivers to update the max sdu size.
+ * We need to handle the case of a smaller mi_sdu_multicast
+ * since this is called by mac_set_mtu() even for drivers that
+ * have differing unicast and multicast mtu and we don't want to
+ * increase the multicast mtu by accident in that case.
+ */
 int
 mac_maxsdu_update(mac_handle_t mh, uint_t sdu_max)
 {
@@ -942,6 +955,31 @@ mac_maxsdu_update(mac_handle_t mh, uint_t sdu_max)
 	if (sdu_max == 0 || sdu_max < mip->mi_sdu_min)
 		return (EINVAL);
 	mip->mi_sdu_max = sdu_max;
+	if (mip->mi_sdu_multicast > mip->mi_sdu_max)
+		mip->mi_sdu_multicast = mip->mi_sdu_max;
+
+	/* Send a MAC_NOTE_SDU_SIZE notification. */
+	i_mac_notify(mip, MAC_NOTE_SDU_SIZE);
+	return (0);
+}
+
+/*
+ * Version of the above function that is used by drivers that have a different
+ * max sdu size for multicast/broadcast vs. unicast.
+ */
+int
+mac_maxsdu_update2(mac_handle_t mh, uint_t sdu_max, uint_t sdu_multicast)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	if (sdu_max == 0 || sdu_max < mip->mi_sdu_min)
+		return (EINVAL);
+	if (sdu_multicast == 0)
+		sdu_multicast = sdu_max;
+	if (sdu_multicast > sdu_max || sdu_multicast < mip->mi_sdu_min)
+		return (EINVAL);
+	mip->mi_sdu_max = sdu_max;
+	mip->mi_sdu_multicast = sdu_multicast;
 
 	/* Send a MAC_NOTE_SDU_SIZE notification. */
 	i_mac_notify(mip, MAC_NOTE_SDU_SIZE);

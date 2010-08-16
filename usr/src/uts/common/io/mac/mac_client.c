@@ -783,6 +783,20 @@ mac_sdu_get(mac_handle_t mh, uint_t *min_sdu, uint_t *max_sdu)
 		*max_sdu = mip->mi_sdu_max;
 }
 
+void
+mac_sdu_get2(mac_handle_t mh, uint_t *min_sdu, uint_t *max_sdu,
+    uint_t *multicast_sdu)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	if (min_sdu != NULL)
+		*min_sdu = mip->mi_sdu_min;
+	if (max_sdu != NULL)
+		*max_sdu = mip->mi_sdu_max;
+	if (multicast_sdu != NULL)
+		*multicast_sdu = mip->mi_sdu_multicast;
+}
+
 /*
  * Update the MAC unicast address of the specified client's flows. Currently
  * only one unicast MAC unicast address is allowed per client.

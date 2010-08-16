@@ -1506,6 +1506,7 @@ typedef struct ill_lso_capab_s ill_lso_capab_t;
  *	ig_cast_ill		ipsq or ipmp_lock	ipsq and ipmp_lock
  *	ig_arpent		ipsq			ipsq
  *	ig_mtu			ipsq			ipsq
+ *	ig_mc_mtu		ipsq			ipsq
  */
 typedef struct ipmp_illgrp_s {
 	list_t		ig_if; 		/* list of all interfaces */
@@ -1515,7 +1516,8 @@ typedef struct ipmp_illgrp_s {
 	struct ill_s	*ig_ipmp_ill;	/* backpointer to IPMP meta-interface */
 	struct ill_s	*ig_cast_ill;	/* nominated ill for multi/broadcast */
 	list_t		ig_arpent;	/* list of ARP entries */
-	uint_t		ig_mtu;		/* ig_ipmp_ill->ill_max_mtu */
+	uint_t		ig_mtu;		/* ig_ipmp_ill->ill_mtu */
+	uint_t		ig_mc_mtu;	/* ig_ipmp_ill->ill_mc_mtu */
 } ipmp_illgrp_t;
 
 /*
@@ -1611,6 +1613,7 @@ typedef struct ill_s {
 	uint_t	ill_max_frag;		/* Max IDU from DLPI. */
 	uint_t	ill_current_frag;	/* Current IDU from DLPI. */
 	uint_t	ill_mtu;		/* User-specified MTU; SIOCSLIFMTU */
+	uint_t	ill_mc_mtu;		/* MTU for multi/broadcast */
 	uint_t	ill_metric;		/* BSD if metric, for compatibility. */
 	char	*ill_name;		/* Our name. */
 	uint_t	ill_ipif_dup_count;	/* Number of duplicate addresses. */
@@ -1905,6 +1908,7 @@ typedef struct ill_s {
  * ill_max_hops			ipsq			Not atomic
  *
  * ill_mtu			ill_lock		None
+ * ill_mc_mtu			ill_lock		None
  *
  * ill_user_mtu			ipsq + ill_lock		ill_lock
  * ill_reachable_time		ipsq + ill_lock		ill_lock
@@ -3189,6 +3193,7 @@ extern void	ill_nic_event_dispatch(ill_t *, lif_if_t, nic_event_t,
 extern mblk_t	*ip_carve_mp(mblk_t **, ssize_t);
 extern mblk_t	*ip_dlpi_alloc(size_t, t_uscalar_t);
 extern mblk_t	*ip_dlnotify_alloc(uint_t, uint_t);
+extern mblk_t	*ip_dlnotify_alloc2(uint_t, uint_t, uint_t);
 extern char	*ip_dot_addr(ipaddr_t, char *);
 extern const char *mac_colon_addr(const uint8_t *, size_t, char *, size_t);
 extern void	ip_lwput(queue_t *, mblk_t *);
