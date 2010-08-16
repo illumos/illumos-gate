@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _FMD_TOPO_H
@@ -45,7 +44,7 @@ typedef struct fmd_topo {
 	hrtime_t ft_time_end;
 } fmd_topo_t;
 
-extern void fmd_topo_update(boolean_t);
+extern void fmd_topo_update(void);
 extern fmd_topo_t *fmd_topo_hold(void);
 extern void fmd_topo_addref(fmd_topo_t *);
 extern void fmd_topo_rele(fmd_topo_t *);

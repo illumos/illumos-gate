@@ -134,7 +134,7 @@ fmd_dr_event(sysevent_t *sep)
 	(void) pthread_mutex_unlock(&fmd.d_stats_lock);
 
 	TRACE((FMD_DBG_XPRT, "dr event %p, gen=%llu", (void *)sep, gen));
-	fmd_topo_update(B_FALSE);
+	fmd_topo_update();
 
 	ftp = fmd_topo_hold();
 	e = fmd_event_create(FMD_EVT_TOPO, ftp->ft_time_end, NULL, ftp);

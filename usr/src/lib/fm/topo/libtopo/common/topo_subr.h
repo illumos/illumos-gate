@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _TOPO_SUBR_H
@@ -51,6 +50,7 @@ typedef struct topo_debug_mode {
 #define	TOPO_DBG_MODSVC	0x0004	/* enable module services debug messages */
 #define	TOPO_DBG_WALK	0x0008	/* enable walker debug messages */
 #define	TOPO_DBG_XML	0x0010	/* enable xml parsing debug messages */
+#define	TOPO_DBG_FORCE	0x0020	/* use DINFOFORCE snapshot for topology */
 #define	TOPO_DBG_ALL	0xffff	/* enable all debug modes */
 
 #define	TOPO_STABSTR_INTERNAL	"Internal"	/* private to libtopo */

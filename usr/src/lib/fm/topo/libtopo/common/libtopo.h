@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LIBTOPO_H
@@ -60,7 +59,6 @@ typedef struct topo_faclist {
 extern topo_hdl_t *topo_open(int, const char *, int *);
 extern void topo_close(topo_hdl_t *);
 extern char *topo_snap_hold(topo_hdl_t *, const char *, int *);
-extern char *topo_snap_hold_no_forceload(topo_hdl_t *, const char *, int *);
 extern void topo_snap_release(topo_hdl_t *);
 
 /*
