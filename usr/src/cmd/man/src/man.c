@@ -91,7 +91,7 @@
 
 #define	SOLIMIT		10	/* maximum allowed .so chain length */
 #define	MAXDIRS		128	/* max # of subdirs per manpath */
-#define	MAXPAGES	32	/* max # for multiple pages */
+#define	MAXPAGES	128	/* max # for multiple pages */
 #define	PLEN		3	/* prefix length {man, cat, fmt} */
 #define	TMPLEN		7	/* length of tmpfile prefix */
 #define	MAXTOKENS 	64
@@ -1945,7 +1945,7 @@ windex(char **secv, char *path, char *name)
 	FILE *fp;
 	struct stat sbuf;
 	struct suffix *sp;
-	struct suffix	psecs[MAXPAGES];
+	struct suffix	psecs[MAXPAGES+1];
 	char whatfile[MAXPATHLEN+1];
 	char page[MAXPATHLEN+1];
 	char *matches[MAXPAGES];
@@ -1982,8 +1982,20 @@ windex(char **secv, char *path, char *name)
 	 * Save and split sections
 	 * section() allocates memory for sp->ds
 	 */
-	for (sp = psecs, vp = matches; *vp; vp++, sp++)
-		section(sp, *vp);
+	for (sp = psecs, vp = matches; *vp; vp++, sp++) {
+		if ((sp - psecs) < MAXPAGES) {
+			section(sp, *vp);
+		} else {
+			if (debug)
+				(void) fprintf(stderr, gettext(
+				    "too many sections in %s windex entry\n"),
+				    name);
+
+			/* Setting sp->ds to NULL signifies end-of-data. */
+			sp->ds = 0;
+			goto finish;
+		}
+	}
 
 	sp->ds = 0;
 
