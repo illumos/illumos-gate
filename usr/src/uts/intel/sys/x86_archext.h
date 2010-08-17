@@ -585,7 +585,8 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-extern void *x86_featureset;
+#define	NUM_X86_FEATURES	35
+extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
 extern boolean_t is_x86_feature(void *featureset, uint_t feature);
@@ -687,7 +688,7 @@ struct cpuid_info;
 extern void setx86isalist(void);
 extern void cpuid_alloc_space(struct cpu *);
 extern void cpuid_free_space(struct cpu *);
-extern void *cpuid_pass1(struct cpu *);
+extern void cpuid_pass1(struct cpu *, uchar_t *);
 extern void cpuid_pass2(struct cpu *);
 extern void cpuid_pass3(struct cpu *);
 extern uint_t cpuid_pass4(struct cpu *);

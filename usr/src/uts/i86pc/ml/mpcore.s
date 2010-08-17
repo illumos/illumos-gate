@@ -315,7 +315,7 @@ kernel_cs_code:
 	 * Before going any further, enable usage of page table NX bit if 
 	 * that's how our page tables are set up.
 	 */
-	bt	$X86FSET_NX, x86_featureset
+	bt	$X86FSET_NX, x86_featureset(%rip)
 	jnc	1f
 	movl	$MSR_AMD_EFER, %ecx
 	rdmsr
@@ -568,7 +568,7 @@ kernel_cs_code:
 	 * Before going any further, enable usage of page table NX bit if 
 	 * that's how our page tables are set up.
 	 */
-	bt	$X86FSET_NX, x86_featureset
+	bt	$X86FSET_NX, x86_featureset(%rip)
 	jnc	1f
 	movl	$MSR_AMD_EFER, %ecx
 	rdmsr

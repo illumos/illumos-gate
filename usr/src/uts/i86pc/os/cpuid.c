@@ -48,8 +48,8 @@
 #include <sys/pg.h>
 #include <sys/fp.h>
 #include <sys/controlregs.h>
-#include <sys/auxv_386.h>
 #include <sys/bitmap.h>
+#include <sys/auxv_386.h>
 #include <sys/memnode.h>
 #include <sys/pci_cfgspace.h>
 
@@ -118,11 +118,9 @@ uint_t x86_clflush_size = 0;
 uint_t pentiumpro_bug4046376;
 uint_t pentiumpro_bug4064495;
 
-#define	NUM_X86_FEATURES	35
-void    *x86_featureset;
-ulong_t x86_featureset0[BT_SIZEOFMAP(NUM_X86_FEATURES)];
+uchar_t x86_featureset[BT_SIZEOFMAP(NUM_X86_FEATURES)];
 
-char *x86_feature_names[NUM_X86_FEATURES] = {
+static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"lgpg",
 	"tsc",
 	"msr",
@@ -158,18 +156,6 @@ char *x86_feature_names[NUM_X86_FEATURES] = {
 	"pclmulqdq",
 	"xsave",
 	"avx" };
-
-static void *
-init_x86_featureset(void)
-{
-	return (kmem_zalloc(BT_SIZEOFMAP(NUM_X86_FEATURES), KM_SLEEP));
-}
-
-void
-free_x86_featureset(void *featureset)
-{
-	kmem_free(featureset, BT_SIZEOFMAP(NUM_X86_FEATURES));
-}
 
 boolean_t
 is_x86_feature(void *featureset, uint_t feature)
@@ -868,11 +854,10 @@ setup_xfem(void)
 	xsave_bv_all = flags;
 }
 
-void *
-cpuid_pass1(cpu_t *cpu)
+void
+cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 {
 	uint32_t mask_ecx, mask_edx;
-	void *featureset;
 	struct cpuid_info *cpi;
 	struct cpuid_regs *cp;
 	int xcpuid;
@@ -889,9 +874,6 @@ cpuid_pass1(cpu_t *cpu)
 	if (cpu->cpu_id == 0) {
 		if (cpu->cpu_m.mcpu_cpi == NULL)
 			cpu->cpu_m.mcpu_cpi = &cpuid_info0;
-		featureset = x86_featureset0;
-	} else {
-		featureset = init_x86_featureset();
 	}
 
 	add_x86_feature(featureset, X86FSET_CPUID);
@@ -1588,7 +1570,6 @@ cpuid_pass1(cpu_t *cpu)
 
 pass1_done:
 	cpi->cpi_pass = 1;
-	return (featureset);
 }
 
 /*

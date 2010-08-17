@@ -1605,7 +1605,7 @@ static void
 mp_startup_common(boolean_t boot)
 {
 	cpu_t *cp = CPU;
-	void *new_x86_featureset;
+	uchar_t new_x86_featureset[BT_SIZEOFMAP(NUM_X86_FEATURES)];
 	extern void cpu_event_init_cpu(cpu_t *);
 
 	/*
@@ -1631,7 +1631,8 @@ mp_startup_common(boolean_t boot)
 	 */
 	(void) (*ap_mlsetup)();
 
-	new_x86_featureset = cpuid_pass1(cp);
+	bzero(new_x86_featureset, BT_SIZEOFMAP(NUM_X86_FEATURES));
+	cpuid_pass1(cp, new_x86_featureset);
 
 #ifndef __xpv
 	/*
@@ -1687,8 +1688,6 @@ mp_startup_common(boolean_t boot)
 	if (is_x86_feature(x86_featureset, X86FSET_MWAIT) !=
 	    is_x86_feature(new_x86_featureset, X86FSET_MWAIT))
 		panic("unsupported mixed cpu monitor/mwait support detected");
-
-	free_x86_featureset(new_x86_featureset);
 
 	/*
 	 * We could be more sophisticated here, and just mark the CPU

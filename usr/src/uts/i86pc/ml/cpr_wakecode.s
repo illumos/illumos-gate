@@ -672,7 +672,7 @@ kernel_wc_code:
 	 * Before proceeding, enable usage of the page table NX bit if
 	 * that's how the page tables are set up.
 	 */
-	bt      $X86FSET_NX, x86_featureset
+	bt      $X86FSET_NX, x86_featureset(%rip)
 	jnc     1f
 	movl    $MSR_AMD_EFER, %ecx
 	rdmsr

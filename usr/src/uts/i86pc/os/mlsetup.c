@@ -185,7 +185,7 @@ mlsetup(struct regs *rp)
 	 * want to set the feature bits to correspond to the feature
 	 * minimum) this value may be altered.
 	 */
-	x86_featureset = cpuid_pass1(cpu[0]);
+	cpuid_pass1(cpu[0], x86_featureset);
 
 #if !defined(__xpv)
 
