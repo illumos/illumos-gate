@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <locale.h>
@@ -94,10 +93,10 @@ switch (errorno) {
 			"Requested server and ticket don't match"));
 	case 27:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 27"));
+			"Server principal valid for user2user only"));
 	case 28:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 28"));
+			"KDC policy rejects transited path"));
 	case 29:
 		return (dgettext(TEXT_DOMAIN,
 			"A service is not available that is required to "
@@ -215,13 +214,13 @@ switch (errorno) {
 			"Certificate mismatch"));
 	case 67:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 67"));
+			"No ticket granting ticket"));
 	case 68:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 68"));
+			"Realm not local to KDC"));
 	case 69:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 69"));
+			"User to user required"));
 	case 70:
 		return (dgettext(TEXT_DOMAIN,
 			"Can't verify certificate"));

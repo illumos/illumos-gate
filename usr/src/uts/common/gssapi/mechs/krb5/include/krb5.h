@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* This is the prologue to krb5.h */
@@ -2120,6 +2119,20 @@ krb5_error_code krb5_send_tgs
 		const krb5_data *,
 		krb5_creds *,
 		krb5_response * );
+
+krb5_error_code krb5_send_tgs2
+	(krb5_context,
+		krb5_flags,
+		const krb5_ticket_times *,
+		const krb5_enctype *,
+		krb5_const_principal,
+		krb5_address * const *,
+		krb5_authdata * const *,
+		krb5_pa_data * const *,
+		const krb5_data *,
+		krb5_creds *,
+	        krb5_response * ,
+		char **);
 #endif
 
 #if KRB5_DEPRECATED
@@ -3003,8 +3016,8 @@ KRB5INT_END_DECLS
 #define KRB5KDC_ERR_PREAUTH_FAILED               (-1765328360L)
 #define KRB5KDC_ERR_PREAUTH_REQUIRED             (-1765328359L)
 #define KRB5KDC_ERR_SERVER_NOMATCH               (-1765328358L)
-#define KRB5PLACEHOLD_27                         (-1765328357L)
-#define KRB5PLACEHOLD_28                         (-1765328356L)
+#define KRB5KDC_ERR_MUST_USE_USER2USER           (-1765328357L)
+#define KRB5KDC_ERR_PATH_NOT_ACCEPTED            (-1765328356L)
 #define KRB5KDC_ERR_SVC_UNAVAILABLE              (-1765328355L)
 #define KRB5PLACEHOLD_30                         (-1765328354L)
 #define KRB5KRB_AP_ERR_BAD_INTEGRITY             (-1765328353L)
@@ -3043,9 +3056,9 @@ KRB5INT_END_DECLS
 #define KRB5KDC_ERR_INVALID_SIG                  (-1765328320L)
 #define KRB5KDC_ERR_DH_KEY_PARAMETERS_NOT_ACCEPTED (-1765328319L)
 #define KRB5KDC_ERR_CERTIFICATE_MISMATCH         (-1765328318L)
-#define KRB5PLACEHOLD_67                         (-1765328317L)
-#define KRB5PLACEHOLD_68                         (-1765328316L)
-#define KRB5PLACEHOLD_69                         (-1765328315L)
+#define KRB5KRB_AP_ERR_NO_TGT                    (-1765328317L)
+#define KRB5KDC_ERR_WRONG_REALM                  (-1765328316L)
+#define KRB5KRB_AP_ERR_USER_TO_USER_REQUIRED     (-1765328315L)
 #define KRB5KDC_ERR_CANT_VERIFY_CERTIFICATE      (-1765328314L)
 #define KRB5KDC_ERR_INVALID_CERTIFICATE          (-1765328313L)
 #define KRB5KDC_ERR_REVOKED_CERTIFICATE          (-1765328312L)

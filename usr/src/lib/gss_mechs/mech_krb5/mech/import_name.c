@@ -1,5 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -38,6 +39,7 @@
 #else
 #include <strings.h>
 #endif
+#include <locale.h>
 
 /*
  * errors:
@@ -103,18 +105,24 @@ krb5_gss_import_name(minor_status, input_name_buffer,
       xfree(tmp);
    } else if ((input_name_type != GSS_C_NULL_OID) &&
 	      (g_OID_equal(input_name_type, gss_nt_krb5_principal))) {
-      krb5_principal input;
+       krb5_principal input;
 
-      if (input_name_buffer->length != sizeof(krb5_principal)) {
-	 *minor_status = (OM_uint32) G_WRONG_SIZE;
-	 krb5_free_context(context);
-	 return(GSS_S_BAD_NAME);
+       if (input_name_buffer->length != sizeof(krb5_principal)) {
+	   *minor_status = (OM_uint32) G_WRONG_SIZE;
+	   /* Solaris Kerberos: spruce-up the err msg */
+	   krb5_set_error_message(context, *minor_status,
+				dgettext(TEXT_DOMAIN,
+					"The size of the specified principal is wrong"));
+	   save_error_info(*minor_status, context);
+	   krb5_free_context(context);
+	   return(GSS_S_BAD_NAME);
       }
 
       input = *((krb5_principal *) input_name_buffer->value);
 
       if ((code = krb5_copy_principal(context, input, &princ))) {
 	 *minor_status = code;
+	 save_error_info(*minor_status, context);
 	 krb5_free_context(context);
 	 return(GSS_S_FAILURE);
       }
@@ -200,11 +208,18 @@ krb5_gss_import_name(minor_status, input_name_buffer,
 	 code = krb5_parse_name(context, (char *) stringrep, &princ);
       else {
       fail_name:
-	 xfree(tmp);
-	 if (tmp2)
+	  xfree(tmp);
+	  if (tmp2)
 		 xfree(tmp2);
-	 krb5_free_context(context);
-	 return(GSS_S_BAD_NAME);
+
+	  /* Solaris Kerberos: spruce-up (not much, sigh) the err msg */
+	  krb5_set_error_message(context, *minor_status,
+				dgettext(TEXT_DOMAIN,
+					"Failed to convert the specified principal to GSS-API internal format"));
+	  save_error_info(*minor_status, context);
+
+	  krb5_free_context(context);
+	  return(GSS_S_BAD_NAME);
       }
       
       if (tmp2)
@@ -216,9 +231,17 @@ krb5_gss_import_name(minor_status, input_name_buffer,
       contains the return status */
 
    if (code) {
-      *minor_status = (OM_uint32) code;
-      krb5_free_context(context);
-      return(GSS_S_BAD_NAME);
+       /* Solaris Kerberos: spruce-up the err msg */
+       *minor_status = (OM_uint32) code;
+       /* krb5_sname_to_principal() sets specific err msg for bad hostname. */
+       if (*minor_status != (OM_uint32)KRB5_ERR_BAD_HOSTNAME)
+	    krb5_set_error_message(context, *minor_status,
+				dgettext(TEXT_DOMAIN,
+				  "Failed to convert the specified principal to GSS-API internal format: %s"),
+				error_message(code));
+       save_error_info(*minor_status, context);
+       krb5_free_context(context);
+       return(GSS_S_BAD_NAME);
    }
 
    /* save the name in the validation database */

@@ -1,9 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * lib/gssapi/krb5/k5sealv3.c
  *
@@ -566,6 +563,7 @@ gss_krb5int_unseal_token_v3(krb5_context *contextptr,
 	error:
 	    FREE(plain.data, plain.length);
 	    *minor_status = err;
+	    save_error_info(*minor_status, context);
 	    return GSS_S_BAD_SIG; /* XXX */
 	}
 	FREE(plain.data, plain.length);

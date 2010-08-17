@@ -1,9 +1,6 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * Copyright 2000,2002, 2003 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
@@ -724,11 +721,28 @@ mutual_auth(
 
    if (! krb5_principal_compare(context, ctx->there, 
 				(krb5_principal) target_name)) {
-      (void)krb5_gss_delete_sec_context(minor_status, 
+       /* Solaris Kerberos: spruce-up the err msg */
+       krb5_principal tname = (krb5_principal) target_name;
+       char *s_name = NULL, *s_princ= NULL;
+       int kret = krb5_unparse_name(context, tname, &s_name);
+       int kret1 = krb5_unparse_name(context, ctx->there, &s_princ);
+       code = KRB5_PRINC_NOMATCH;
+       if (kret == 0 && kret1 == 0) {
+	   krb5_set_error_message(context, code,
+				dgettext(TEXT_DOMAIN,
+					"Target name principal '%s' does not match '%s'"),
+				s_name, s_princ);
+	   save_error_info(code, context);
+       }
+       if (s_name)
+	   krb5_free_unparsed_name(context, s_name);
+       if (s_princ)
+	   krb5_free_unparsed_name(context, s_princ);
+
+       (void)krb5_gss_delete_sec_context(minor_status, 
 					context_handle, NULL);
-      code = 0;
-      major_status = GSS_S_BAD_NAME;
-      goto fail;
+       major_status = GSS_S_BAD_NAME;
+       goto fail;
    }
 
    /* verify the token and leave the AP_REP message in ap_rep */
@@ -875,8 +889,11 @@ krb5_gss_init_sec_context(minor_status, claimant_cred_handle,
 	   *minor_status = kerr;
 	   return GSS_S_FAILURE;
        }
-       if (GSS_ERROR(kg_sync_ccache_name(context, minor_status)))
+       if (GSS_ERROR(kg_sync_ccache_name(context, minor_status))) {
+	   save_error_info(*minor_status, context);
+	   krb5_free_context(context);
 	   return GSS_S_FAILURE;
+       }
    } else {
        context = ((krb5_gss_ctx_id_rec *)*context_handle)->k5_context;
    }
@@ -892,10 +909,23 @@ krb5_gss_init_sec_context(minor_status, claimant_cred_handle,
    /* verify that the target_name is valid and usable */
 
    if (! kg_validate_name(target_name)) {
-      *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-      if (*context_handle == GSS_C_NO_CONTEXT)
-	  krb5_free_context(context);
-      return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
+       /* Solaris Kerberos: spruce-up the err msg */
+       krb5_principal princ = (krb5_principal) target_name;
+       char *s_name = NULL;
+       int kret = krb5_unparse_name(context, princ, &s_name);
+       *minor_status = (OM_uint32) G_VALIDATE_FAILED;
+       if (kret == 0) {
+	   krb5_set_error_message(context, *minor_status,
+				dgettext(TEXT_DOMAIN,
+					"Target name principal '%s' is invalid"),
+				s_name);
+	   krb5_free_unparsed_name(context, s_name);
+	   save_error_info(*minor_status, context);
+	}
+
+        if (*context_handle == GSS_C_NO_CONTEXT)
+	    krb5_free_context(context);
+        return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
    }
 
    /* verify the credential, or use the default */
@@ -909,13 +939,15 @@ krb5_gss_init_sec_context(minor_status, claimant_cred_handle,
       major_status = get_default_cred(minor_status, context,
 				    (gss_cred_id_t *)&cred);
       if (major_status && GSS_ERROR(major_status)) {
-	 if (*context_handle == GSS_C_NO_CONTEXT)
-	    krb5_free_context(context);
+	  save_error_info(*minor_status, context);
+	  if (*context_handle == GSS_C_NO_CONTEXT)
+	      krb5_free_context(context);
 	 return(major_status);
       }
    } else {
       major_status = krb5_gss_validate_cred(minor_status, claimant_cred_handle);
       if (GSS_ERROR(major_status)) {
+          save_error_info(*minor_status, context);
 	  if (*context_handle == GSS_C_NO_CONTEXT)
 	      krb5_free_context(context);
 	  return(major_status);
@@ -975,9 +1007,10 @@ krb5_gss_init_sec_context(minor_status, claimant_cred_handle,
 				    output_token, ret_flags, time_rec,
 				    context, default_mech);
       k5_mutex_unlock(&cred->lock);
-      if (*context_handle == GSS_C_NO_CONTEXT)
+      if (*context_handle == GSS_C_NO_CONTEXT) {
+          save_error_info (*minor_status, context);
 	  krb5_free_context(context);
-      else
+      } else
 	  ((krb5_gss_ctx_id_rec *) *context_handle)->k5_context = context;
    } else {
       /* mutual_auth doesn't care about the credentials */
@@ -1409,11 +1442,13 @@ load_root_cred_using_keytab(
 		} else {
 			/* Try to set a useful error message */
 			char *princ = NULL;
-			krb5_unparse_name(context, me, &princ);
+			krb5_error_code ret;
+			ret = krb5_unparse_name(context, me, &princ);
 
 			krb5_set_error_message(context, code,
-			    gettext("Failed to find realm for %s in keytab"),
-			    princ ? princ : "<unknown>");
+					    dgettext(TEXT_DOMAIN,
+						    "Failed to find realm for %s in keytab"),
+					    ret == 0 ? princ : "unknown");
 			if (princ)
 				krb5_free_unparsed_name(context, princ);
 		}

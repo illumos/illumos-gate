@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -1391,6 +1390,7 @@ gsskrb5_extract_authz_data_from_sec_context(
      */
     if ((data_set == GSS_C_NO_BUFFER_SET) || (data_set->count == 0)) {
 	    gss_release_buffer_set(minor_status, &data_set);
+	    *minor_status = EINVAL;
 	    return GSS_S_FAILURE;
     }
 

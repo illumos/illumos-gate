@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -54,6 +52,7 @@ krb5_gss_display_name(minor_status, input_name, output_name_buffer,
    if ((code = krb5_unparse_name(context,
 				 (krb5_principal) input_name, &str))) {
       *minor_status = code;
+      save_error_info(*minor_status, context);
       krb5_free_context(context);
       return(GSS_S_FAILURE);
    }

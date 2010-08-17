@@ -1,9 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * lib/gssapi/krb5/import_sec_context.c
  *
@@ -107,8 +104,9 @@ krb5_gss_import_sec_context(minor_status, interprocess_token, context_handle)
 
     kret = krb5_gss_ser_init(context);
     if (kret) {
-	krb5_free_context(context);
 	*minor_status = kret;
+	save_error_info(*minor_status, context);
+	krb5_free_context(context);
 	return GSS_S_FAILURE;
     }
 
@@ -131,8 +129,9 @@ krb5_gss_import_sec_context(minor_status, interprocess_token, context_handle)
      * and it will get freed by delete_sec_context.
      */
     if (kret) {
-       krb5_free_context(context);
        *minor_status = (OM_uint32) kret;
+       save_error_info(*minor_status, context);
+       krb5_free_context(context);
        return(GSS_S_FAILURE);
     }
 

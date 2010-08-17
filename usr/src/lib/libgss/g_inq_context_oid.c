@@ -23,8 +23,7 @@
  *
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -32,6 +31,8 @@
  */
 
 #include "mglueP.h"
+#include "gssapiP_generic.h"
+
 #define gssint_get_mechanism __gss_get_mechanism /* SUNW17PACresync */
 
 OM_uint32

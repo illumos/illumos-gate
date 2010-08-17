@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+/*
  * lib/krb5/os/hostaddr.c
  *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
@@ -28,7 +31,7 @@
  */
 
 #include "k5-int.h"
-
+#include <locale.h>
 #include "fake-addrinfo.h"
 
 krb5_error_code
@@ -39,8 +42,9 @@ krb5_os_hostaddr(krb5_context context, const char *name, krb5_address ***ret_add
     int			i, j, r;
     struct addrinfo hints, *ai, *aip;
 
-    if (!name)
+    if (!name) {
 	return KRB5_ERR_BAD_HOSTNAME;
+    }
 
     memset (&hints, 0, sizeof (hints));
     hints.ai_flags = AI_NUMERICHOST;
@@ -55,8 +59,13 @@ krb5_os_hostaddr(krb5_context context, const char *name, krb5_address ***ret_add
 	hints.ai_flags &= ~AI_NUMERICHOST;
 	r = getaddrinfo (name, 0, &hints, &ai);
     }
-    if (r)
+    if (r) {
+        krb5_set_error_message(context, KRB5_ERR_BAD_HOSTNAME,
+			    dgettext(TEXT_DOMAIN,
+				    "Hostname cannot be canonicalized for '%s': %s"),
+			    name, strerror(r));
 	return KRB5_ERR_BAD_HOSTNAME;
+    }
 
     for (i = 0, aip = ai; aip; aip = aip->ai_next) {
 	switch (aip->ai_addr->sa_family) {

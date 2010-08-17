@@ -1,9 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * lib/krb5/krb/rd_priv.c
  *
@@ -37,7 +34,6 @@
 #include "cleanup.h"
 #include "auth_con.h"
 
-#define in_clock_skew(date) (labs((date)-currenttime) < context->clockskew)
 
 /*
 
@@ -228,15 +224,9 @@ krb5_rd_priv(krb5_context context, krb5_auth_context auth_context, const krb5_da
 
     if (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_DO_TIME) {
 	krb5_donot_replay replay;
-    	krb5_timestamp currenttime;
 
-	if ((retval = krb5_timeofday(context, &currenttime)))
+	if ((retval = krb5int_check_clockskew(context, replaydata.timestamp)))
 	    goto error;
-
-	if (!in_clock_skew(replaydata.timestamp)) {
-	    retval =  KRB5KRB_AP_ERR_SKEW;
-	    goto error;
-	}
 
 	if ((retval = krb5_gen_replay_name(context, auth_context->remote_addr, 
 					   "_priv", &replay.client)))

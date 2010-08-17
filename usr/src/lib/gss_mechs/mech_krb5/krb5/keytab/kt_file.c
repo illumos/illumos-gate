@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -32,6 +31,8 @@
 
 #include "k5-int.h"
 #include <stdio.h>
+#include <locale.h>
+#include <syslog.h>
 
 /*
  * Information needed by internal routines of the file-based ticket
@@ -1097,10 +1098,25 @@ krb5_ktfileint_open(krb5_context context, krb5_keytab id, int mode)
 	    errno = 0;
 	    KTFILEP(id) = fopen(KTFILENAME(id), fopen_mode_rbplus);
 	    if (!KTFILEP(id))
-		return errno ? errno : EMFILE;
+		goto report_errno;
 	    writevno = 1;
-	} else				/* some other error */
-	    return errno ? errno : EMFILE;
+	} else {
+        report_errno:
+            switch (errno) {
+            case 0:
+                /* XXX */
+                return EMFILE;
+            case ENOENT:
+                krb5_set_error_message(context, ENOENT,
+				       /* Solaris Kerberos - added dgettext */
+                                       dgettext(TEXT_DOMAIN,
+					   "Key table file '%s' not found"),
+                                       KTFILENAME(id));
+                return ENOENT;
+            default:
+                return errno;
+            }
+        }
     }
     if ((kerror = krb5_lock_file(context, fileno(KTFILEP(id)), mode))) {
 	(void) fclose(KTFILEP(id));

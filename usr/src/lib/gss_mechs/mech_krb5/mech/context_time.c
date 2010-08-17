@@ -1,5 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 /* Copyright 1993 by OpenVision Technologies, Inc.
  * 
  * Permission to use, copy, modify, distribute, and sell this software
@@ -53,6 +54,7 @@ krb5_gss_context_time(minor_status, context_handle, time_rec)
 
    if ((code = krb5_timeofday(ctx->k5_context, &now))) {
       *minor_status = code;
+      save_error_info(*minor_status, ctx->k5_context);
       return(GSS_S_FAILURE);
    }
 

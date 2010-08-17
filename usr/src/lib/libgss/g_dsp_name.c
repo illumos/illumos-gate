@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -29,6 +28,7 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -113,8 +113,10 @@ gss_OID *			output_name_type;
 		major_status = generic_gss_copy_oid(minor_status,
 						union_name->name_type,
 						output_name_type);
-		if (major_status != GSS_S_COMPLETE)
+		if (major_status != GSS_S_COMPLETE) {
+			map_errcode(minor_status);
 			return (major_status);
+		}
 	}
 
 	if ((output_name_buffer->value =

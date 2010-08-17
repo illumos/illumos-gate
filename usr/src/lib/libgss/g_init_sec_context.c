@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  *  glue routine for gss_init_sec_context
  */
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -211,6 +211,7 @@ OM_uint32 *			time_rec;
 		 * subsequent calls make the caller responsible for
 		 * calling gss_delete_sec_context
 		 */
+		map_error(minor_status, mech);
 		if (*context_handle == GSS_C_NO_CONTEXT) {
 			free(union_ctx_id->mech_type->elements);
 			free(union_ctx_id->mech_type);

@@ -1,4 +1,3 @@
-/* -*- mode: c; indent-tabs-mode: nil -*- */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -24,10 +23,20 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "gssapiP_krb5.h"
-#include "com_err.h"
-#include <syslog.h>
-/* XXXX internationalization!! */
+#include        <sys/param.h>
+#include        <unistd.h>
+#include        <assert.h>
+#include        <stdio.h>
+#include        <stdlib.h>
+#include        <string.h>
+#include        <k5-int.h>
+#include        <krb5.h>
+#include        <mglueP.h>
+#include        "gssapiP_spnego.h"
+#include        "gssapiP_generic.h"
+#include        <gssapi_err_generic.h>
+
+/* X internationalization!! */
 
 static inline int
 compare_OM_uint32 (OM_uint32 a, OM_uint32 b)
@@ -46,12 +55,11 @@ free_string (char *s)
 }
 #include "error_map.h"
 #include <stdio.h>
-/*
- * AKA krb5_gss_get_error_message.  See #define in gssapiP_krb5.h.
- */
+
+#define get_error_message spnego_gss_get_error_message
 char *get_error_message(OM_uint32 minor_code)
 {
-    gsserrmap *p = k5_getspecific(K5_KEY_GSS_KRB5_ERROR_MESSAGE);
+    gsserrmap *p = k5_getspecific(K5_KEY_GSS_SPNEGO_ERROR_MESSAGE);
     char *msg = NULL;
 
 #ifdef DEBUG
@@ -67,15 +75,15 @@ char *get_error_message(OM_uint32 minor_code)
 #endif
         }
     }
-    if (msg == NULL)
-        msg = (char *)error_message((krb5_error_code)minor_code);
+    if (msg == 0)
+        msg = (char *)error_message(minor_code);
 #ifdef DEBUG
     fprintf(stderr, " -> %p/%s\n", (void *) msg, msg);
 #endif
 
     return msg;
 }
-#define save_error_string_nocopy gss_krb5_save_error_string_nocopy
+
 static int save_error_string_nocopy(OM_uint32 minor_code, char *msg)
 {
     gsserrmap *p;
@@ -84,7 +92,7 @@ static int save_error_string_nocopy(OM_uint32 minor_code, char *msg)
 #ifdef DEBUG
     fprintf(stderr, "%s(%lu, %s)", __func__, (unsigned long) minor_code, msg);
 #endif
-    p = k5_getspecific(K5_KEY_GSS_KRB5_ERROR_MESSAGE);
+    p = k5_getspecific(K5_KEY_GSS_SPNEGO_ERROR_MESSAGE);
     if (!p) {
         p = malloc(sizeof(*p));
         if (p == NULL) {
@@ -97,7 +105,7 @@ static int save_error_string_nocopy(OM_uint32 minor_code, char *msg)
             ret = 1;
             goto fail;
         }
-        if (k5_setspecific(K5_KEY_GSS_KRB5_ERROR_MESSAGE, p) != 0) {
+        if (k5_setspecific(K5_KEY_GSS_SPNEGO_ERROR_MESSAGE, p) != 0) {
             gsserrmap_destroy(p);
             free(p);
             p = NULL;
@@ -106,7 +114,7 @@ static int save_error_string_nocopy(OM_uint32 minor_code, char *msg)
         }
     }
     ret = gsserrmap_replace_or_insert(p, minor_code, msg);
-    /* Solaris Kerberos */
+    /* Solaris SPNEGO */
     if (ret) {
             gsserrmap_destroy(p);
             free(p);
@@ -141,7 +149,7 @@ void save_error_message(OM_uint32 minor_code, const char *format, ...)
             free(s);
     }
 }
-void krb5_gss_save_error_info(OM_uint32 minor_code, krb5_context ctx)
+void spnego_gss_save_error_info(OM_uint32 minor_code, spnego_gss_ctx_id_t ctx)
 {
     char *s;
 
@@ -149,7 +157,7 @@ void krb5_gss_save_error_info(OM_uint32 minor_code, krb5_context ctx)
     fprintf(stderr, "%s(%lu, ctx=%p)\n", __func__,
             (unsigned long) minor_code, (void *)ctx);
 #endif
-    s = (char *)krb5_get_error_message(ctx, (krb5_error_code)minor_code);
+    s = (char *)spnego_get_error_message(ctx,  minor_code);
 #ifdef DEBUG
     fprintf(stderr, "%s(%lu, ctx=%p) saving: %s\n", __func__,
             (unsigned long) minor_code, (void *)ctx, s);
@@ -157,18 +165,16 @@ void krb5_gss_save_error_info(OM_uint32 minor_code, krb5_context ctx)
     save_error_string(minor_code, s);
     /* The get_error_message call above resets the error message in
        ctx.  Put it back, in case we make this call again *sigh*.  */
-    krb5_set_error_message(ctx, (krb5_error_code)minor_code, "%s", s);
-    krb5_free_error_message(ctx, s);
+    spnego_set_error_message(ctx, minor_code, "%s", s);
+    spnego_free_error_message(ctx, s);
 }
-void krb5_gss_delete_error_info(void *p)
+void spnego_gss_delete_error_info(void *p)
 {
     gsserrmap_destroy(p);
 }
 
-/**/
-
 OM_uint32
-krb5_gss_display_status(minor_status, status_value, status_type,
+spnego_gss_display_status2(minor_status, status_value, status_type,
                         mech_type, message_context, status_string)
     OM_uint32 *minor_status;
     OM_uint32 status_value;
@@ -181,8 +187,7 @@ krb5_gss_display_status(minor_status, status_value, status_type,
     status_string->value = NULL;
 
     if ((mech_type != GSS_C_NULL_OID) &&
-        !g_OID_equal(gss_mech_krb5, mech_type) &&
-        !g_OID_equal(gss_mech_krb5_old, mech_type)) {
+        !g_OID_equal(gss_mech_spnego, mech_type)) {
         *minor_status = 0;
         return(GSS_S_BAD_MECH);
     }
@@ -191,7 +196,14 @@ krb5_gss_display_status(minor_status, status_value, status_type,
         return(g_display_major_status(minor_status, status_value,
                                       message_context, status_string));
     } else if (status_type == GSS_C_MECH_CODE) {
-        (void) gss_krb5int_initialize_library();
+	/*
+	 * Solaris SPNEGO
+	 * This init call appears to be not needed as
+	 * gss_spnegoint_lib_init() is called on dl open.
+	 */
+#if 0
+        (void) gss_spnegoint_initialize_library();
+#endif
 
         if (*message_context) {
             *minor_status = (OM_uint32) G_BAD_MSG_CTX;
@@ -199,35 +211,15 @@ krb5_gss_display_status(minor_status, status_value, status_type,
         }
 
         /* If this fails, there's not much we can do...  */
-        /* Solaris Kerberos - cleaned-up/fixed the return checks/values here */
-        if (!g_make_string_buffer(krb5_gss_get_error_message(status_value),
-                                 status_string)) {
+        if (g_make_string_buffer(spnego_gss_get_error_message(status_value),
+                                 status_string) != 0) {
             *minor_status = ENOMEM;
-            return(GSS_S_FAILURE);
-        }
-        *minor_status = 0;
-        return(GSS_S_COMPLETE);
+	    return(GSS_S_FAILURE);
+        } else
+            *minor_status = 0;
+        return(0);
     } else {
         *minor_status = 0;
         return(GSS_S_BAD_STATUS);
     }
-}
-
-/*
- * Solaris Kerberos
- * Hack alert: workaround obfusicated func name issues for mech_spnego.so.
- */
-OM_uint32
-krb5_gss_display_status2(minor_status, status_value, status_type,
-                        mech_type, message_context, status_string)
-    OM_uint32 *minor_status;
-    OM_uint32 status_value;
-    int status_type;
-    gss_OID mech_type;
-    OM_uint32 *message_context;
-    gss_buffer_t status_string;
-{
-        return(krb5_gss_display_status(minor_status, status_value,
- 				  status_type, mech_type, message_context,
- 				  status_string));
 }

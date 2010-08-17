@@ -1,9 +1,6 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -300,5 +297,14 @@ generic_gss_oid_decompose(
     int *);             /* suffix */
 
 #endif /* 0 */
+
+#ifndef _KERNEL
+int gssint_mecherrmap_init(void);
+void gssint_mecherrmap_destroy(void);
+OM_uint32 gssint_mecherrmap_map(OM_uint32 minor, const gss_OID_desc *oid);
+int gssint_mecherrmap_get(OM_uint32 minor, gss_OID mech_oid,
+			OM_uint32 *mech_minor);
+OM_uint32 gssint_mecherrmap_map_errcode(OM_uint32 errcode);
+#endif
 
 #endif /* _GSSAPIP_GENERIC_H_ */

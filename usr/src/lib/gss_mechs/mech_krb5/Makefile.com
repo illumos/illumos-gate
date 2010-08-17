@@ -171,7 +171,7 @@ MECH= 	accept_sec_context.o store_cred.o \
 	util_cksum.o acquire_cred.o init_sec_context.o \
 	set_ccache.o acquire_cred_with_pw.o lucid_context.o \
 	set_allowable_enctypes.o oid_ops.o export_name.o gss_libinit.o \
-	util_buffer_set.o
+	util_buffer_set.o util_errmap.o
 
 MECH_UTS= delete_sec_context.o gssapi_krb5.o \
 	import_sec_context.o k5seal.o k5sealv3.o \

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -28,6 +27,7 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 
 OM_uint32
 gss_process_context_token(minor_status,
@@ -66,13 +66,15 @@ gss_buffer_t			token_buffer;
 
 	if (mech) {
 
-		if (mech->gss_process_context_token)
+		if (mech->gss_process_context_token) {
 			status = mech->gss_process_context_token(
 							mech->context,
 							minor_status,
 							ctx->internal_ctx_id,
 							token_buffer);
-		else
+			if (status != GSS_S_COMPLETE)
+				map_error(minor_status, mech);
+		} else
 			status = GSS_S_UNAVAILABLE;
 
 		return (status);

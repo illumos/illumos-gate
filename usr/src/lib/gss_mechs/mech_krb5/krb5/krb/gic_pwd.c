@@ -1,8 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved. */
 
 #include "k5-int.h"
 #include "com_err.h"
@@ -179,6 +176,7 @@ __krb5_get_init_creds_password(
    char admin_realm[1024], *cpw_service=NULL, *princ_str=NULL;
    kadm5_config_params  params;
    void *server_handle;
+   const char *err_msg_1 = NULL;
 
    use_master = 0;
    as_reply = NULL;
@@ -212,7 +210,6 @@ __krb5_get_init_creds_password(
 			     start_time, in_tkt_service, opte,
 			     krb5_get_as_key_password, (void *) &pw0,
 			     &use_master, &as_reply);
-
    /* check for success */
 
    if (ret == 0)
@@ -224,7 +221,7 @@ __krb5_get_init_creds_password(
    if ((ret == KRB5_KDC_UNREACH) ||
        (ret == KRB5_PREAUTH_FAILED) ||
        (ret == KRB5_LIBOS_PWDINTR) ||
-	   (ret == KRB5_REALM_CANT_RESOLVE))
+       (ret == KRB5_REALM_CANT_RESOLVE))
       goto cleanup;
 
    /* if the reply did not come from the master kdc, try again with
@@ -237,6 +234,9 @@ __krb5_get_init_creds_password(
 	  krb5_free_kdc_rep( context, as_reply);
 	  as_reply = NULL;
       }
+      
+      err_msg_1 = krb5_get_error_message(context, ret);
+
       ret2 = krb5_get_init_creds(context, creds, client, prompter, data,
 				 start_time, in_tkt_service, opte,
 				 krb5_get_as_key_password, (void *) &pw0,
@@ -250,12 +250,17 @@ __krb5_get_init_creds_password(
       /* if the master is unreachable, return the error from the
 	 slave we were able to contact or reset the use_master flag */
 
-       if ((ret2 != KRB5_KDC_UNREACH) &&
-	    (ret2 != KRB5_REALM_CANT_RESOLVE) &&
-	    (ret2 != KRB5_REALM_UNKNOWN))
-	   ret = ret2;
-       else
-	   use_master = 0;
+      if ((ret2 != KRB5_KDC_UNREACH) &&
+	(ret2 != KRB5_REALM_CANT_RESOLVE) &&
+	(ret2 != KRB5_REALM_UNKNOWN)) {
+	ret = ret2;
+      } else {
+	use_master = 0;
+	/* Solaris - if 2nd try failed, reset 1st err msg */
+	if (ret2 && err_msg_1) {
+	  krb5_set_error_message(context, ret, err_msg_1);
+	}
+      }
    }
 
 /* Solaris Kerberos: 163 resync */
@@ -409,6 +414,9 @@ __krb5_get_init_creds_password(
 			     &use_master, &as_reply);
 
 cleanup:
+   if (err_msg_1)
+     free((void *)err_msg_1);
+
    krb5int_set_prompt_types(context, 0);
    /* if getting the password was successful, then check to see if the
       password is about to expire, and warn if so */

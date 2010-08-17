@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -60,6 +59,9 @@
 /* For declaration of krb5_ser_context_init */
 #include "k5-int.h"
 #include "gssapiP_krb5.h"
+#ifndef	_KERNEL
+#include "gss_libinit.h"
+#endif
 
 /*
  * Solaris Kerberos
@@ -245,10 +247,12 @@ kg_get_ccache_name (OM_uint32 *minor_status, const char **out_name)
 	    if (name) {
 		name = strdup(name);
 		if (name == NULL)
-		    err = errno;
+		    err = ENOMEM;
 	    }
 	}
-	if (context)
+	if (err && context)
+	    save_error_info(err, context);
+   	if (context)
 	    krb5_free_context(context);
     }
 
@@ -375,4 +379,21 @@ krb5_gss_inquire_sec_context_by_oid (OM_uint32 *minor_status,
     return GSS_S_UNAVAILABLE;
 }
 
+
+#if 0 /* Solaris Kerberos - revisit for full 1.7/next resync */
+MAKE_INIT_FUNCTION(gss_krb5int_lib_init);
+MAKE_FINI_FUNCTION(gss_krb5int_lib_fini);
 #endif
+
+OM_uint32 gss_krb5int_initialize_library (void)
+{
+#if 0 /* Solaris Kerberos - revisit for full 1.7/next resync */
+#ifdef _GSS_STATIC_LINK
+	return gssint_mechglue_initialize_library();
+#else
+	return CALL_INIT_FUNCTION(gss_krb5int_lib_init);
+#endif
+#endif
+	return gssint_initialize_library();
+}
+#endif /* !KERNEL */

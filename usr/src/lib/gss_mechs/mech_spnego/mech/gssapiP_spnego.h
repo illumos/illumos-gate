@@ -1,12 +1,8 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 #ifndef	_GSSAPIP_SPNEGO_H_
 #define	_GSSAPIP_SPNEGO_H_
-
-/* #pragma ident	"@(#)gssapiP_spnego.h	1.3	03/09/18 SMI" */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -100,6 +96,7 @@ typedef struct {
 	OM_uint32 ctx_flags;
 	gss_name_t internal_name;
 	gss_OID actual_mech;
+        struct errinfo err;
 } spnego_gss_ctx_id_rec, *spnego_gss_ctx_id_t;
 
 /*
@@ -112,10 +109,6 @@ typedef struct {
 extern const gss_OID_desc * const gss_mech_spnego;
 extern const gss_OID_set_desc * const gss_mech_set_spnego;
 
-/* SUNW17PACresync */
-#define	TWRITE_STR(ptr, str, len) \
-	memcpy((ptr), (char *)(str), (len)); \
-	(ptr) += (len);
 
 #ifdef DEBUG
 #define	dsyslog(a) syslog(LOG_DEBUG, a)
@@ -273,6 +266,16 @@ OM_uint32 glue_spnego_gss_display_name
 );
 
 OM_uint32 spnego_gss_display_status
+(
+	OM_uint32 *,		/* minor_status */
+	OM_uint32,		/* status_value */
+	int,			/* status_type */
+	gss_OID,		/* mech_type */
+	OM_uint32 *,		/* message_context */
+	gss_buffer_t		/* status_string */
+);
+
+OM_uint32 spnego_gss_display_status2
 (
 	OM_uint32 *,		/* minor_status */
 	OM_uint32,		/* status_value */
@@ -507,13 +510,6 @@ spnego_gss_inquire_sec_context_by_oid
 );
 
 
-#ifdef _GSS_STATIC_LINK
-int gss_spnegoint_lib_init(void);
-void gss_spnegoint_lib_fini(void);
-#else
-gss_mechanism KRB5_CALLCONV gss_mech_initialize(void);
-#endif /* _GSS_STATIC_LINK */
-
 #if 0 /* SUNW17PACresync - will be needed for full MIT 1.7 resync */
 OM_uint32 spnego_gss_wrap_aead
 (
@@ -579,6 +575,26 @@ spnego_gss_complete_auth_token
 );
 #endif /* 0 */
 
+/*
+ * Solaris SPNEGO
+ * Cloned the krb5_*_error_message and krb5_gss_*_error_info APIs
+ * to give similar functionality to SPNEGO mech.
+ * See new files in this dir:
+ *     spnego_disp_status.c
+ *     spnego_kerrs.c
+ *     error_map.h
+ */
+typedef int spnego_error_code;
+void spnego_set_error_message (spnego_gss_ctx_id_t, spnego_error_code, const char *, ...);
+const char * spnego_get_error_message (spnego_gss_ctx_id_t, spnego_error_code);
+void spnego_free_error_message (spnego_gss_ctx_id_t, const char *);
+void spnego_clear_error_message (spnego_gss_ctx_id_t);
+
+void spnego_gss_save_error_info(OM_uint32 minor_code, spnego_gss_ctx_id_t ctx);
+char *spnego_gss_get_error_message(OM_uint32 minor_code);
+void spnego_gss_delete_error_info(void *p);
+
+OM_uint32 krb5_gss_display_status2();
 #ifdef	__cplusplus
 }
 #endif

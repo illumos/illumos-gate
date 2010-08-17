@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+/*
  * lib/krb5/krb/gc_via_tgt.c
  *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
@@ -30,15 +33,8 @@
 
 #include "k5-int.h"
 #include "int-proto.h"
-
-#define in_clock_skew(date, now) (labs((date)-(now)) < context->clockskew)
-
-#define IS_TGS_PRINC(c, p)				\
-    ((krb5_princ_size((c), (p)) == 2) &&		\
-     (krb5_princ_component((c), (p), 0)->length ==	\
-      KRB5_TGS_NAME_SIZE) &&				\
-     (!memcmp(krb5_princ_component((c), (p), 0)->data,	\
-	      KRB5_TGS_NAME, KRB5_TGS_NAME_SIZE)))
+#include <locale.h>
+#include <ctype.h>
 
 static krb5_error_code
 krb5_kdcrep2creds(krb5_context context, krb5_kdc_rep *pkdcrep, krb5_address *const *address, krb5_data *psectkt, krb5_creds **ppcreds)
@@ -166,6 +162,7 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
     krb5_error *err_reply;
     krb5_response tgsrep;
     krb5_enctype *enctypes = 0;
+    char *hostname_used = NULL;
 
 #ifdef DEBUG_REFERRALS
     printf("krb5_get_cred_via_tkt starting; referral flag is %s\n", kdcoptions&KDC_OPT_CANONICALIZE?"on":"off");
@@ -174,8 +171,24 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 #endif
 
     /* tkt->client must be equal to in_cred->client */
-    if (!krb5_principal_compare(context, tkt->client, in_cred->client))
+    if (!krb5_principal_compare(context, tkt->client, in_cred->client)) {
+        /* Solaris Kerberos */
+        char *r_name = NULL;
+	char *t_name = NULL;
+	krb5_error_code r_err, t_err;
+	t_err = krb5_unparse_name(context, tkt->client, &t_name);
+	r_err = krb5_unparse_name(context, in_cred->client, &r_name);
+	krb5_set_error_message(context, KRB5_PRINC_NOMATCH,
+			    dgettext(TEXT_DOMAIN,
+				    "Requested principal and ticket don't match:  Requested principal is '%s' and ticket is '%s'"),
+			    r_err ? "unknown" : r_name,
+			    t_err ? "unknown" : t_name);
+	if (r_name)
+	    krb5_free_unparsed_name(context, r_name);
+	if (t_name)
+	    krb5_free_unparsed_name(context, t_name);
 	return KRB5_PRINC_NOMATCH;
+    }
 
     if (!tkt->ticket.length)
 	return KRB5_NO_TKT_SUPPLIED;
@@ -212,12 +225,12 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 	enctypes[1] = 0;
     }
     
-    retval = krb5_send_tgs(context, kdcoptions, &in_cred->times, enctypes, 
+    retval = krb5_send_tgs2(context, kdcoptions, &in_cred->times, enctypes, 
 			   in_cred->server, address, in_cred->authdata,
 			   0,		/* no padata */
 			   (kdcoptions & KDC_OPT_ENC_TKT_IN_SKEY) ? 
 			   &in_cred->second_ticket : NULL,
-			   tkt, &tgsrep);
+			    tkt, &tgsrep, &hostname_used);
     if (enctypes)
 	free(enctypes);
     if (retval) {
@@ -249,9 +262,101 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 	    switch (err_reply->error) {
 	    case KRB_ERR_GENERIC:
 		krb5_set_error_message(context, retval,
-				       "KDC returned error string: %s",
-				       err_reply->text.data);
+				    /* Solaris Kerberos - added dgettext */
+				    dgettext(TEXT_DOMAIN,
+					    "KDC returned error string: %s"),
+				    err_reply->text.data);
 		break;
+            case KDC_ERR_S_PRINCIPAL_UNKNOWN:
+                {
+                    char *s_name;
+                    if (krb5_unparse_name(context, in_cred->server, &s_name) == 
+0) {
+			/* Solaris Kerberos - added dgettext */
+                        krb5_set_error_message(context, retval,
+                                               dgettext(TEXT_DOMAIN,
+							"Server %s not found in Kerberos database"),
+                                               s_name);
+                        krb5_free_unparsed_name(context, s_name);
+                    } else
+                        /* In case there's a stale S_PRINCIPAL_UNKNOWN
+                           report already noted.  */
+                        krb5_clear_error_message(context);
+                }
+                break;
+
+	    case KRB_AP_ERR_SKEW:
+		/* Solaris Kerberos */
+                {
+                    char *s_name = NULL;
+                    char *c_name = NULL;
+		    char stimestring[17];
+		    char ctimestring[17];
+		    char fill = ' ';
+		    int st_err, ct_err, serr, cerr;
+
+		    st_err = krb5_timestamp_to_sfstring(err_reply->stime,
+							stimestring,
+							sizeof (stimestring),
+							&fill);
+		    ct_err = krb5_timestamp_to_sfstring(err_reply->ctime,
+							ctimestring,
+							sizeof (ctimestring),
+							&fill);
+                    serr = krb5_unparse_name(context, in_cred->server, &s_name);
+                    cerr = krb5_unparse_name(context, in_cred->client, &c_name);
+		    krb5_set_error_message(context, retval,
+					dgettext(TEXT_DOMAIN,
+						"Clock skew too great: '%s' requesting ticket '%s' from KDC '%s' (%s). Skew is %dm."),
+					cerr == 0 ? c_name : "unknown",
+					serr == 0 ? s_name : "unknown",
+					hostname_used ?
+					  hostname_used : "host unknown",
+					st_err == 0 ? stimestring : "unknown",
+					(ct_err||st_err) ? 0 :
+					    abs(err_reply->stime -
+					        err_reply->ctime) / 60);
+
+		    if (s_name)
+			    krb5_free_unparsed_name(context, s_name);
+		    if (c_name)
+			    krb5_free_unparsed_name(context, c_name);
+                }
+	        break;
+	    case KRB_AP_ERR_TKT_NYV:
+		/* Solaris Kerberos */
+                {
+                    char *s_name = NULL;
+                    char *c_name = NULL;
+		    char timestring[17];
+		    char stimestring[17];
+		    char fill = ' ';
+		    krb5_error_code t_err, st_err, cerr, serr;
+
+		    t_err = krb5_timestamp_to_sfstring(tkt->times.starttime,
+						    timestring,
+						    sizeof (timestring),
+						    &fill);
+		    st_err = krb5_timestamp_to_sfstring(err_reply->stime,
+							stimestring,
+							sizeof (stimestring),
+							&fill);
+                    serr = krb5_unparse_name(context, in_cred->server, &s_name);
+                    cerr = krb5_unparse_name(context, in_cred->client, &c_name);
+		    krb5_set_error_message(context, retval,
+					dgettext(TEXT_DOMAIN,
+						"Ticket not yet valid: '%s' requesting ticket '%s' from '%s' (%s). TGT start time is %s"),
+					cerr ? "unknown" : c_name,
+					serr ? "unknown" : s_name,
+					hostname_used ? hostname_used : "host unknown",
+					st_err ? "unknown" : stimestring,
+					t_err ? "unknown" : timestring);
+		    if (s_name)
+		        krb5_free_unparsed_name(context, s_name);
+		    if (c_name)
+		        krb5_free_unparsed_name(context, c_name);
+                }
+	        break;
 	    default:
 #if 0 /* We should stop the KDC from sending back this text, because
 	 if the local language doesn't match the KDC's language, we'd
@@ -264,8 +369,10 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 		if (strlen (m) == err_reply->text.length-1
 		    && !strcmp(m, err_reply->text.data))
 		    break;
+		/* Solaris Kerberos - added dgettext */
 		krb5_set_error_message(context, retval,
-				       "%s (KDC supplied additional data: %s)",
+				    dgettext(TEXT_DOMAIN,
+					    "%s (KDC supplied additional data: %s)"),
 				       m, err_reply->text.data);
 #endif
 		break;
@@ -336,6 +443,8 @@ error_3:;
     krb5_free_kdc_rep(context, dec_rep);
 
 error_4:;
+    if (hostname_used)
+        free(hostname_used);
     free(tgsrep.response.data);
 #ifdef DEBUG_REFERRALS
     printf("krb5_get_cred_via_tkt ending; %s\n", retval?error_message(retval):"no error");

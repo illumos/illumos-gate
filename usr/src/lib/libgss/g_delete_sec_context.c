@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -28,6 +27,7 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -73,7 +73,6 @@ gss_buffer_t			output_token;
 {
 	OM_uint32		status;
 	gss_union_ctx_id_t	ctx;
-	gss_mechanism		mech;
 
 	status = val_del_sec_ctx_args(minor_status,
 				context_handle,
@@ -87,26 +86,21 @@ gss_buffer_t			output_token;
 	 */
 
 	ctx = (gss_union_ctx_id_t) *context_handle;
-	mech = __gss_get_mechanism(ctx->mech_type);
+	if (GSSINT_CHK_LOOP(ctx))
+		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CONTEXT);
 
-	if (mech) {
+	status = gssint_delete_internal_sec_context(minor_status,
+						    ctx->mech_type,
+						    &ctx->internal_ctx_id,
+						    output_token);
+	if (status)
+		return status;
 
-		if (mech->gss_delete_sec_context)
-			status = mech->gss_delete_sec_context(mech->context,
-							minor_status,
-							&ctx->internal_ctx_id,
-							output_token);
-		else
-			status = GSS_S_UNAVAILABLE;
+	/* now free up the space for the union context structure */
+	free(ctx->mech_type->elements);
+	free(ctx->mech_type);
+	free(*context_handle);
+	*context_handle = GSS_C_NO_CONTEXT;
 
-		/* now free up the space for the union context structure */
-		free(ctx->mech_type->elements);
-		free(ctx->mech_type);
-		free(*context_handle);
-		*context_handle = NULL;
-
-		return (status);
-	}
-
-	return (GSS_S_BAD_MECH);
+	return (GSS_S_COMPLETE);
 }

@@ -1,9 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * lib/krb5/krb/get_in_tkt.c
  *
@@ -34,6 +31,7 @@
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
 #endif
+#include <locale.h>
 
 /* helper function: convert flags to necessary KDC options */
 #define flags2options(flags) (flags & KDC_TKT_COMMON_MASK)
@@ -123,7 +121,22 @@ krb5_fwd_tgt_creds(krb5_context context, krb5_auth_context auth_context, char *r
 	goto errout;
 
     /* tgt->client must be equal to creds.client */
-    if (!krb5_principal_compare(context, tgt.client, creds.client)) {
+    if (!krb5_principal_compare(context, tgt.client, creds.client)) {	
+        /* Solaris Kerberos */
+        char *r_name = NULL;
+	char *t_name = NULL;
+	krb5_error_code r_err, t_err;
+	t_err = krb5_unparse_name(context, tgt.client, &t_name);
+	r_err = krb5_unparse_name(context, creds.client, &r_name);
+	krb5_set_error_message(context, KRB5_PRINC_NOMATCH,
+			    dgettext(TEXT_DOMAIN,
+				    "Requested principal and ticket don't match:  Requested principal is '%s' and TGT principal is '%s'"),
+			    r_err ? "unknown" : r_name,
+			    t_err ? "unknown" : t_name);
+	if (r_name)
+	    krb5_free_unparsed_name(context, r_name);
+	if (t_name)
+	    krb5_free_unparsed_name(context, t_name);
 	retval = KRB5_PRINC_NOMATCH;
 	goto errout;
     }

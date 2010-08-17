@@ -1,4 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 /*
  * lib/krb5/krb/walk_rtree.c
  *
@@ -86,6 +88,7 @@
 #define CONFIGURABLE_AUTHENTICATION_PATH
 #include "k5-int.h"
 #include "int-proto.h"
+#include <locale.h>
 
 /* internal function, used by krb5_get_cred_from_kdc() */
 
@@ -141,8 +144,25 @@ krb5_walk_realm_tree(krb5_context context, const krb5_data *client, const krb5_d
     printf("  server is %s\n",server->data);
 #endif
 
-    if (!(client->data &&server->data))
-      return KRB5_NO_TKT_IN_RLM;
+    if (!(client->data && server->data)) {
+	/* Solaris Kerberos - enhance error message */
+	if (!client->data && !server->data) {
+	    krb5_set_error_message(context, KRB5_NO_TKT_IN_RLM,
+				dgettext(TEXT_DOMAIN,
+					"Cannot find ticket for requested realm: unknown client and server"));
+	} else {
+	    if (!client->data) {
+		krb5_set_error_message(context, KRB5_NO_TKT_IN_RLM,
+				    dgettext(TEXT_DOMAIN,
+					    "Cannot find ticket for requested realm: unknown client"));
+	    } else {
+	       krb5_set_error_message(context, KRB5_NO_TKT_IN_RLM,
+				    dgettext(TEXT_DOMAIN,
+					    "Cannot find ticket for requested realm: unknown server"));
+	    }
+	}
+	return KRB5_NO_TKT_IN_RLM;
+    }
 #ifdef CONFIGURABLE_AUTHENTICATION_PATH
     if ((cap_client = (char *)malloc(client->length + 1)) == NULL)
 	return ENOMEM;
@@ -198,10 +218,15 @@ krb5_walk_realm_tree(krb5_context context, const krb5_data *client, const krb5_d
 	/* handle case of one ran out */
 	if (!clen) {
 	    /* construct path from client to server, down the tree */
-	    if (!slen)
+	    if (!slen) {
 		/* in the same realm--this means there is no ticket
 		   in this realm. */
+	        krb5_set_error_message(context, KRB5_NO_TKT_IN_RLM,
+				    dgettext(TEXT_DOMAIN,
+					    "Cannot find ticket for requested realm: client is '%s', server is '%s'"),
+				    client->data, server->data);
 		return KRB5_NO_TKT_IN_RLM;
+	    }
 	    if (*scp == realm_branch_char) {
 		/* one is a subdomain of the other */
 		com_cdot = client->data;

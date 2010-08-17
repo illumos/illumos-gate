@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -28,28 +27,50 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
+#include <errno.h>
 
-static OM_uint32 val_store_cred_args(
-	OM_uint32 *minor_status,
-	const gss_cred_id_t input_cred_handle,
-	gss_OID_set *elements_stored)
+static OM_uint32
+val_store_cred_args(
+        OM_uint32 *minor_status,
+        const gss_cred_id_t input_cred_handle,
+        gss_cred_usage_t cred_usage,
+	/*LINTED*/
+        const gss_OID desired_mech,
+	/*LINTED*/
+        OM_uint32 overwrite_cred,
+	/*LINTED*/
+        OM_uint32 default_cred,
+        gss_OID_set *elements_stored,
+	/*LINTED*/
+        gss_cred_usage_t *cred_usage_stored)
 {
 
-	/* Initialize outputs. */
+        /* Initialize outputs. */
 
-	if (minor_status != NULL)
-		*minor_status = 0;
+        if (minor_status != NULL)
+                *minor_status = 0;
 
-	if (elements_stored != NULL)
-		*elements_stored = GSS_C_NULL_OID_SET;
+        if (elements_stored != NULL)
+                *elements_stored = GSS_C_NULL_OID_SET;
 
-	/* Validate arguments. */
+       /* Validate arguments. */
 
-	if (minor_status == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+        if (minor_status == NULL)
+                return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
-	if (input_cred_handle == GSS_C_NO_CREDENTIAL)
-		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CRED);
+        if (input_cred_handle == GSS_C_NO_CREDENTIAL)
+                return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CRED);
+
+	if (cred_usage != GSS_C_ACCEPT
+	    && cred_usage != GSS_C_INITIATE
+	    && cred_usage != GSS_C_BOTH) {
+		if (minor_status) {
+			*minor_status = EINVAL;
+			map_errcode(minor_status);
+		}
+		return GSS_S_FAILURE;
+	}
 
 	return (GSS_S_COMPLETE);
 }
@@ -80,9 +101,14 @@ gss_cred_usage_t	*cred_usage_stored;
 	gss_OID			dmech;
 	int			i;
 
-	major_status = val_store_cred_args(minor_status,
-					input_cred_handle,
-					elements_stored);
+        major_status = val_store_cred_args(minor_status,
+                                           input_cred_handle,
+                                           cred_usage,
+                                           desired_mech,
+                                           overwrite_cred,
+                                           default_cred,
+                                           elements_stored,
+                                           cred_usage_stored);
 	if (major_status != GSS_S_COMPLETE)
 		return (major_status);
 
@@ -107,7 +133,7 @@ gss_cred_usage_t	*cred_usage_stored;
 		if (mech_cred == GSS_C_NO_CREDENTIAL)
 			return (GSS_S_NO_CRED);
 
-		return (mech->gss_store_cred(mech->context,
+		major_status = mech->gss_store_cred(mech->context,
 						minor_status,
 						(gss_cred_id_t)mech_cred,
 						cred_usage,
@@ -115,7 +141,10 @@ gss_cred_usage_t	*cred_usage_stored;
 						overwrite_cred,
 						default_cred,
 						elements_stored,
-						cred_usage_stored));
+						    cred_usage_stored);
+		if (major_status != GSS_S_COMPLETE)
+			map_error(minor_status, mech);
+		return major_status;
 	}
 
 	/* desired_mech == GSS_C_NULL_OID -> store all elements */
@@ -145,8 +174,10 @@ gss_cred_usage_t	*cred_usage_stored;
 						default_cred,
 						NULL,
 						cred_usage_stored);
-		if (major_status != GSS_S_COMPLETE)
+		if (major_status != GSS_S_COMPLETE) {
+			map_error(minor_status, mech);
 			continue;
+		}
 
 		/* Succeeded for at least one mech */
 

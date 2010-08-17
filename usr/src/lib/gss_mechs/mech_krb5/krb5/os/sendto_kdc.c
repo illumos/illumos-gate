@@ -36,6 +36,7 @@
 
 /* Solaris Kerberos */
 #include <syslog.h>
+#include <locale.h>
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -377,6 +378,21 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
 		 const krb5_data *realm, krb5_data *reply,
 		 int *use_master, int tcp_only)
 {
+	return (krb5_sendto_kdc2(context, message, realm, reply, use_master,
+				tcp_only, NULL));
+}
+
+/*
+ * Solaris Kerberos
+ * Same as krb5_sendto_kdc plus an extra arg to return the FQDN
+ * of the KDC sent the request.
+ * Caller (at top of stack) needs to free hostname_used.
+ */
+krb5_error_code
+krb5_sendto_kdc2 (krb5_context context, const krb5_data *message,
+		 const krb5_data *realm, krb5_data *reply,
+		int *use_master, int tcp_only, char **hostname_used)
+{
     krb5_error_code retval, retval2;
     struct addrlist addrs = ADDRLIST_INIT;	/* Solaris Kerberos */
     int socktype1 = 0, socktype2 = 0, addr_used;
@@ -470,6 +486,24 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
                     krb5int_free_addrlist (&addrs3);
                 }
             }
+
+	    if (hostname_used) {
+		struct sockaddr *sa;
+		char buf[NI_MAXHOST];
+		int err;
+
+		*hostname_used = NULL;
+		sa = addrs.addrs[addr_used].ai->ai_addr;
+		err = getnameinfo (sa, socklen (sa), buf, sizeof (buf), 0, 0,
+				AI_CANONNAME);
+		if (err)
+		    err = getnameinfo (sa, socklen (sa), buf,
+				    sizeof (buf), 0, 0,
+				    NI_NUMERICHOST);
+		if (!err)
+		    *hostname_used = strdup(buf);
+	            /* don't sweat strdup fail */
+	    }
             krb5int_free_addrlist (&addrs);
             return 0;
 	default:
@@ -480,8 +514,9 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
 		retval = KRB5KDC_ERR_SVC_UNAVAILABLE;
 	    } else {
 		krb5_set_error_message(context, retval,
-				       "Cannot contact any KDC for realm '%.*s'",
-				       realm->length, realm->data);
+				    dgettext(TEXT_DOMAIN,
+				    "Cannot contact any KDC for realm '%.*s'"),
+				    realm->length, realm->data);
 	    }
 	    break;
 	}

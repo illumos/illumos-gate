@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+/*
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -18,10 +21,6 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 /*
  *  RPC server procedures for the gssapi usermode daemon gssd.
@@ -35,7 +34,6 @@
 #include <strings.h>
 #include <limits.h>
 #include <sys/param.h>
-#include <sys/syslog.h>
 #include <mechglueP.h>
 #include "gssd.h"
 #include <gssapi/gssapi.h>
@@ -71,6 +69,60 @@ static int max_contexts;
 static int checkfrom(struct svc_req *, uid_t *);
 extern void set_gssd_uid(uid_t);
 extern int __rpc_get_local_uid(SVCXPRT *, uid_t *);
+
+/*
+ * Syslog (and output to stderr if debug set) the GSSAPI major
+ * and minor numbers.
+ */
+static void
+syslog_gss_error(OM_uint32 maj_stat, OM_uint32 min_stat, char *errstr)
+{
+	OM_uint32 gmaj_stat, gmin_stat;
+	gss_buffer_desc msg;
+	OM_uint32 msg_ctx = 0;
+
+
+	if (gssd_debug)
+		fprintf(stderr,
+		    "gssd: syslog_gss_err: called from %s: maj=%d min=%d\n",
+		    errstr ? errstr : "<null>", maj_stat, min_stat);
+
+	/* Print the major status error from the mech. */
+	/* msg_ctx - skip the check for it as is probably unnecesary */
+	gmaj_stat = gss_display_status(&gmin_stat, maj_stat,
+	    GSS_C_GSS_CODE,
+	    GSS_C_NULL_OID, &msg_ctx, &msg);
+	if ((gmaj_stat == GSS_S_COMPLETE)||
+	    (gmaj_stat == GSS_S_CONTINUE_NEEDED)) {
+		syslog(LOG_DAEMON|LOG_NOTICE,
+		    "GSSAPI error major: %s", (char *)msg.value);
+		if (gssd_debug)
+			(void) fprintf(stderr,
+			    "gssd: GSSAPI error major: %s\n",
+			    (char *)msg.value);
+
+		(void) gss_release_buffer(&gmin_stat, &msg);
+	}
+
+	/* Print the minor status error from the mech. */
+	msg_ctx = 0;
+	/* msg_ctx - skip the check for it as is probably unnecesary */
+	gmaj_stat = gss_display_status(&gmin_stat, min_stat,
+	    GSS_C_MECH_CODE,
+	    GSS_C_NULL_OID,
+	    &msg_ctx, &msg);
+	if ((gmaj_stat == GSS_S_COMPLETE)||
+	    (gmaj_stat == GSS_S_CONTINUE_NEEDED)) {
+		syslog(LOG_DAEMON|LOG_NOTICE,
+		    "GSSAPI error minor: %s",
+		    (char *)msg.value);
+		if (gssd_debug)
+			(void) fprintf(stderr,
+			    "gssd: GSSAPI error minor: %s\n",
+			    (char *)msg.value);
+		(void) gss_release_buffer(&gmin_stat, &msg);
+	}
+}
 
 void
 gssd_setup(char *arg)
@@ -490,7 +542,9 @@ gss_acquire_cred_1_svc(argp, res, rqstp)
 			gssd_time_verf = (OM_uint32)time(NULL);
 		}
 		res->gssd_cred_verifier = gssd_time_verf;
-	}
+	} else
+		syslog_gss_error(res->status, res->minor_status,
+		    "acquire_cred");
 
 	/*
 	 * now release the space allocated by the underlying gssapi mechanism
@@ -642,10 +696,9 @@ gss_add_cred_1_svc(argp, res, rqstp)
 				&res->acceptor_time_rec);
 
 	if ((res->status != GSS_S_COMPLETE) &&
-		(res->status != GSS_S_DUPLICATE_ELEMENT) &&
-		(gssd_debug))
-		fprintf(stderr, gettext("gss_add_cred failed status %d \n"),
-			res->status);
+		(res->status != GSS_S_DUPLICATE_ELEMENT))
+		syslog_gss_error(res->status, res->minor_status, "add_cred");
+
 	/*
 	 * convert the output args from the parameter given in the call to the
 	 * variable in the XDR result
@@ -1014,6 +1067,8 @@ struct svc_req *rqstp;
 		} else
 			res->actual_mech_type.GSS_OID_len = 0;
 	} else {
+		syslog_gss_error(res->status, res->minor_status,
+			    "init_sec_context");
 		if (context_handle != GSS_C_NO_CONTEXT) {
 			(void) gss_delete_sec_context(&minor_status,
 				&context_handle, NULL);
@@ -1306,6 +1361,9 @@ struct svc_req *rqstp;
 			res->mech_type.GSS_OID_len = 0;
 		}
 	} else {
+		syslog_gss_error(res->status, res->minor_status,
+			    "accept_sec_context");
+
 		if (context_handle != GSS_C_NO_CONTEXT) {
 			(void) gss_delete_sec_context(&minor_status,
 				&context_handle, NULL);
@@ -1377,6 +1435,9 @@ struct svc_req *rqstp;
 				context_handle,
 				&token_buffer);
 
+	if (GSS_ERROR(res->status))
+		syslog_gss_error(res->status, res->minor_status,
+			    "process_context_token");
 
 	/* return to caller */
 
@@ -1773,7 +1834,8 @@ struct svc_req *rqstp;
 	if (res->status == GSS_S_COMPLETE) {
 		res->msg_token.GSS_BUFFER_T_len = (uint_t)msg_token.length;
 		res->msg_token.GSS_BUFFER_T_val = (char *)msg_token.value;
-	}
+	} else
+		syslog_gss_error(res->status, res->minor_status, "sign");
 
 	/* return to caller */
 
@@ -1837,8 +1899,10 @@ struct svc_req *rqstp;
 				&token_buffer,
 				&res->qop_state);
 
-	/* return to caller */
+	if (GSS_ERROR(res->status))
+		syslog_gss_error(res->status, res->minor_status, "verify");
 
+	/* return to caller */
 	return (TRUE);
 }
 
@@ -1918,7 +1982,8 @@ struct svc_req *rqstp;
 				(uint_t)output_message_buffer.length;
 		res->output_message_buffer.GSS_BUFFER_T_val =
 				(char *)output_message_buffer.value;
-	}
+	} else
+		syslog_gss_error(res->status, res->minor_status, "seal");
 
 /* return to caller */
 
@@ -1998,7 +2063,8 @@ struct svc_req *rqstp;
 				(uint_t)output_message_buffer.length;
 		res->output_message_buffer.GSS_BUFFER_T_val =
 				(char *)output_message_buffer.value;
-	}
+	} else
+		syslog_gss_error(res->status, res->minor_status, "unseal");
 
 
 	/* return to caller */
@@ -2205,8 +2271,11 @@ struct svc_req *rqstp;
 					&res->cred_usage,
 					&mechanisms);
 
-	if (res->status != GSS_S_COMPLETE)
+	if (res->status != GSS_S_COMPLETE) {
+		syslog_gss_error(res->status, res->minor_status,
+				"inquire_cred");
 		return (TRUE);
+	}
 
 	/* convert the returned name from internal to external format */
 

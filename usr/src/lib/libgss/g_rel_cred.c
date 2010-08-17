@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,17 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine for gss_release_cred
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -64,10 +61,13 @@ gss_cred_id_t 		*cred_handle;
 	 */
 
 	union_cred = (gss_union_cred_t)*cred_handle;
-	*cred_handle = NULL;
-
 	if (union_cred == (gss_union_cred_t)GSS_C_NO_CREDENTIAL)
 		return (GSS_S_COMPLETE);
+
+	if (GSSINT_CHK_LOOP(union_cred))
+		return (GSS_S_NO_CRED | GSS_S_CALL_INACCESSIBLE_READ);
+
+	*cred_handle = NULL;
 
 	status = GSS_S_COMPLETE;
 
@@ -83,8 +83,10 @@ gss_cred_id_t 		*cred_handle;
 						(mech->context, minor_status,
 						&union_cred->cred_array[j]);
 
-				if (temp_status != GSS_S_COMPLETE)
+				if (temp_status != GSS_S_COMPLETE) {
+					map_error(minor_status, mech);
 					status = GSS_S_NO_CRED;
+				}
 			} else
 				status = GSS_S_UNAVAILABLE;
 		} else

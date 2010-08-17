@@ -1,8 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 #include <assert.h>
 
@@ -14,7 +12,6 @@
 #include "k5-platform.h"
 
 #include "mglueP.h"
-
 /*
  * Initialize the GSSAPI library.
  */
@@ -46,6 +43,10 @@ int gssint_lib_init(void)
     if (err)
 	return err;
     err = k5_key_register(K5_KEY_GSS_KRB5_CCACHE_NAME, free);
+    if (err)
+	return err;
+    err = k5_key_register(K5_KEY_GSS_KRB5_ERROR_MESSAGE,
+                          krb5_gss_delete_error_info);
     if (err)
 	return err;
 #ifndef _WIN32

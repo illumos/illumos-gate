@@ -31,6 +31,26 @@
  * get socket addresses for KDC.
  */
 
+/*
+ * Solaris Kerberos
+ * Re-factored the following routines to get a clear separation of locating
+ * KDC entries (krb5.conf/DNS-SRVrecs) versus mapping them to net addresses
+ * to allow us to output better error msgs:
+ *   krb5int_locate_server
+ *   prof_locate_server
+ *   dns_locate_server
+ *   krb5_locate_srv_conf_1 (removed)
+ *   krb5_locate_srv_dns_1  (removed)
+ *   prof_hostnames2netaddrs (new)
+ *   hostlist2str (new)
+ *   dns_hostnames2netaddrs (new)
+ *   dnslist2str (new)
+ * Also, for the profile get_master==1 case, the algorithm has been
+ * simplified to just do a profile_get_values on "admin_server" and
+ * not try to match those against "kdc" entries (does not seem necessary
+ * and the DNS-SRVrecs code does not do that).
+ */
+
 #include "fake-addrinfo.h"
 #include "k5-int.h"
 #include "os-proto.h"
@@ -48,6 +68,8 @@
 #ifndef T_SRV
 #define T_SRV 33
 #endif /* T_SRV */
+#include <syslog.h>
+#include <locale.h>
 
 /* for old Unixes and friends ... */
 #ifndef MAXHOSTNAMELEN
@@ -296,261 +318,6 @@ egress:
     return err;
 }
 
-/*
- * returns count of number of addresses found
- * if master is non-NULL, it is filled in with the index of
- * the master kdc
- */
-
-static krb5_error_code
-krb5_locate_srv_conf_1(krb5_context context, const krb5_data *realm,
-		       const char * name, struct addrlist *addrlist,
-		       int get_masters, int socktype,
-		       int udpport, int sec_udpport, int family)
-{
-    const char	*realm_srv_names[4];
-    char **masterlist, **hostlist, *host, *port, *cp;
-    krb5_error_code code;
-    int i, j, count, ismaster;
-
-    Tprintf ("looking in krb5.conf for realm %s entry %s; ports %d,%d\n",
-	     realm->data, name, ntohs (udpport), ntohs (sec_udpport));
-
-    if ((host = malloc(realm->length + 1)) == NULL) 
-	return ENOMEM;
-
-    strncpy(host, realm->data, realm->length);
-    host[realm->length] = '\0';
-    hostlist = 0;
-
-    masterlist = NULL;
-
-    realm_srv_names[0] = "realms";
-    realm_srv_names[1] = host;
-    realm_srv_names[2] = name;
-    realm_srv_names[3] = 0;
-
-    code = profile_get_values(context->profile, realm_srv_names, &hostlist);
-
-    if (code) {
-	Tprintf ("config file lookup failed: %s\n",
-		 error_message(code));
-        if (code == PROF_NO_SECTION || code == PROF_NO_RELATION)
-	    code = KRB5_REALM_UNKNOWN;
- 	krb5_xfree(host);
-  	return code;
-     }
-
-    count = 0;
-    while (hostlist && hostlist[count])
-	    count++;
-    Tprintf ("found %d entries under 'kdc'\n", count);
-    
-    if (count == 0) {
-        profile_free_list(hostlist);
-	krb5_xfree(host);
-	addrlist->naddrs = 0;
-	return 0;
-    }
-    
-    if (get_masters) {
-	realm_srv_names[0] = "realms";
-	realm_srv_names[1] = host;
-	realm_srv_names[2] = "admin_server";
-	realm_srv_names[3] = 0;
-
-	code = profile_get_values(context->profile, realm_srv_names,
-				  &masterlist);
-
-	krb5_xfree(host);
-
-	if (code == 0) {
-	    for (i=0; masterlist[i]; i++) {
-		host = masterlist[i];
-
-		/*
-		 * Strip off excess whitespace
-		 */
-		cp = strchr(host, ' ');
-		if (cp)
-		    *cp = 0;
-		cp = strchr(host, '\t');
-		if (cp)
-		    *cp = 0;
-		cp = strchr(host, ':');
-		if (cp)
-		    *cp = 0;
-	    }
-	}
-    } else {
-	krb5_xfree(host);
-    }
-
-    /* at this point, if master is non-NULL, then either the master kdc
-       is required, and there is one, or the master kdc is not required,
-       and there may or may not be one. */
-
-#ifdef HAVE_NETINET_IN_H
-    if (sec_udpport)
-	    count = count * 2;
-#endif
-
-    for (i=0; hostlist[i]; i++) {
-	int p1, p2;
-
-	host = hostlist[i];
-	Tprintf ("entry %d is '%s'\n", i, host);
-	/*
-	 * Strip off excess whitespace
-	 */
-	cp = strchr(host, ' ');
-	if (cp)
-	    *cp = 0;
-	cp = strchr(host, '\t');
-	if (cp)
-	    *cp = 0;
-	port = strchr(host, ':');
-	if (port) {
-	    *port = 0;
-	    port++;
-	}
-
-	ismaster = 0;
-	if (masterlist) {
-	    for (j=0; masterlist[j]; j++) {
-		if (strcasecmp(hostlist[i], masterlist[j]) == 0) {
-		    ismaster = 1;
-		}
-	    }
-	}
-
-	if (get_masters && !ismaster)
-	    continue;
-
-	if (port) {
-	    unsigned long l;
-#ifdef HAVE_STROUL
-	    char *endptr;
-	    l = strtoul (port, &endptr, 10);
-	    if (endptr == NULL || *endptr != 0)
-		return EINVAL;
-#else
-	    l = atoi (port);
-#endif
-	    /* L is unsigned, don't need to check <0.  */
-	    if (l > 65535)
-		return EINVAL;
-	    p1 = htons (l);
-	    p2 = 0;
-	} else {
-	    p1 = udpport;
-	    p2 = sec_udpport;
-	}
-
-	if (socktype != 0)
-	    code = add_host_to_list (addrlist, hostlist[i], p1, p2,
-				     socktype, family);
-	else {
-	    code = add_host_to_list (addrlist, hostlist[i], p1, p2,
-				     SOCK_DGRAM, family);
-	    if (code == 0)
-		code = add_host_to_list (addrlist, hostlist[i], p1, p2,
-					 SOCK_STREAM, family);
-	}
-	if (code) {
-	    Tprintf ("error %d (%s) returned from add_host_to_list\n", code,
-		     error_message (code));
-	    if (hostlist)
-		profile_free_list (hostlist);
-	    if (masterlist)
-		profile_free_list (masterlist);
-	    return code;
-	}
-    }
-
-    if (hostlist)
-        profile_free_list(hostlist);
-    if (masterlist)
-        profile_free_list(masterlist);
-
-    return 0;
-}
-
-#ifdef TEST
-static krb5_error_code
-krb5_locate_srv_conf(krb5_context context, const krb5_data *realm,
-		     const char *name, struct addrlist *al, int get_masters,
-		     int udpport, int sec_udpport)
-{
-    krb5_error_code ret;
-
-    ret = krb5_locate_srv_conf_1 (context, realm, name, al,
-				  get_masters, 0, udpport, sec_udpport, 0);
-    if (ret)
-	return ret;
-    if (al->naddrs == 0)	/* Couldn't resolve any KDC names */
-	return KRB5_REALM_CANT_RESOLVE;
-    return 0;
-}
-#endif
-
-#ifdef KRB5_DNS_LOOKUP
-static krb5_error_code
-krb5_locate_srv_dns_1 (const krb5_data *realm,
-		       const char *service,
-		       const char *protocol,
-		       struct addrlist *addrlist,
-		       int family)
-{
-    struct srv_dns_entry *head = NULL;
-    struct srv_dns_entry *entry = NULL, *next;
-    krb5_error_code code = 0;
-
-    code = krb5int_make_srv_query_realm(realm, service, protocol, &head);
-    if (code)
-	return 0;
-
-    /*
-     * Okay!  Now we've got a linked list of entries sorted by
-     * priority.  Start looking up A records and returning
-     * addresses.
-     */
-
-    if (head == NULL)
-	return 0;
-
-    /* Check for the "." case indicating no support.  */
-    if (head->next == 0 && head->host[0] == 0) {
-	free(head->host);
-	free(head);
-	return KRB5_ERR_NO_SERVICE;
-    }
-
-    Tprintf ("walking answer list:\n");
-    for (entry = head; entry != NULL; entry = next) {
-	Tprintf ("\tport=%d host=%s\n", entry->port, entry->host);
-	next = entry->next;
-	code = add_host_to_list (addrlist, entry->host, htons (entry->port), 0,
-				 (strcmp("_tcp", protocol)
-				  ? SOCK_DGRAM
-				  : SOCK_STREAM), family);
-	if (code) {
-	    break;
-	}
-	if (entry == head) {
-	    free(entry->host);
-	    free(entry);
-	    head = next;
-	    entry = 0;
-	}
-    }
-    Tprintf ("[end]\n");
-
-    krb5int_free_srv_dns_data(head);
-    return code;
-}
-#endif
-
 #include <locate_plugin.h>
 
 #if TARGET_OS_MAC
@@ -681,56 +448,75 @@ module_locate_server (krb5_context ctx, const krb5_data *realm,
 
 static krb5_error_code
 prof_locate_server (krb5_context context, const krb5_data *realm,
-		    struct addrlist *addrlist,
-		    enum locate_service_type svc, int socktype, int family)
+		    char ***hostlist,
+		    enum locate_service_type svc)
 {
-    const char *profname;
-    int dflport1, dflport2 = 0;
-    struct servent *serv;
+    const char	*realm_srv_names[4];
+    char **hl, *host, *profname;
+    krb5_error_code code;
+    int i, j, count;
+
+    *hostlist = NULL;  /* default - indicate no KDCs found */
 
     switch (svc) {
     case locate_service_kdc:
 	profname = "kdc";
-	/* We used to use /etc/services for these, but enough systems
-	   have old, crufty, wrong settings that this is probably
-	   better.  */
-    kdc_ports:
-	dflport1 = htons(KRB5_DEFAULT_PORT);
-	dflport2 = htons(KRB5_DEFAULT_SEC_PORT);
 	break;
     case locate_service_master_kdc:
-	profname = "master_kdc";
-	goto kdc_ports;
+        profname = "master_kdc";
+	break;
     case locate_service_kadmin:
 	profname = "admin_server";
-	dflport1 = htons(DEFAULT_KADM5_PORT);
 	break;
     case locate_service_krb524:
 	profname = "krb524_server";
-	serv = getservbyname(KRB524_SERVICE, "udp");
-	dflport1 = serv ? serv->s_port : htons (KRB524_PORT);
 	break;
     case locate_service_kpasswd:
 	profname = "kpasswd_server";
-	dflport1 = htons(DEFAULT_KPASSWD_PORT);
 	break;
     default:
-	return EBUSY;		/* XXX */
+	return EINVAL;
     }
 
-    return krb5_locate_srv_conf_1 (context, realm, profname, addrlist,
-				   0, socktype,
-				   dflport1, dflport2, family);
+    if ((host = malloc(realm->length + 1)) == NULL) 
+	return ENOMEM;
+
+    (void) strncpy(host, realm->data, realm->length);
+    host[realm->length] = '\0';
+    hl = 0;
+
+    realm_srv_names[0] = "realms";
+    realm_srv_names[1] = host;
+    realm_srv_names[2] = profname;
+    realm_srv_names[3] = 0;
+
+    code = profile_get_values(context->profile, realm_srv_names, &hl);
+    if (code) {
+	Tprintf ("config file lookup failed: %s\n",
+		 error_message(code));
+        if (code == PROF_NO_SECTION || code == PROF_NO_RELATION)
+	    code = KRB5_REALM_UNKNOWN;
+ 	krb5_xfree(host);
+  	return code;
+     }
+    krb5_xfree(host);
+
+    *hostlist = hl;
+
+    return 0;
 }
 
 static krb5_error_code
 dns_locate_server (krb5_context context, const krb5_data *realm,
-		   struct addrlist *addrlist,
-		   enum locate_service_type svc, int socktype, int family)
+		struct srv_dns_entry **dns_list_head,
+		enum locate_service_type svc, int socktype, int family)
 {
     const char *dnsname;
     int use_dns = _krb5_use_dns_kdc(context);
     krb5_error_code code;
+    struct srv_dns_entry *head = NULL;
+
+    *dns_list_head = NULL; /* default: indicate we have found no KDCs */
 
     if (!use_dns)
 	return KRB5_PLUGIN_NO_HANDLE;
@@ -757,15 +543,242 @@ dns_locate_server (krb5_context context, const krb5_data *realm,
 
     code = 0;
     if (socktype == SOCK_DGRAM || socktype == 0) {
-	code = krb5_locate_srv_dns_1(realm, dnsname, "_udp", addrlist, family);
+	code = krb5int_make_srv_query_realm(realm, dnsname, "_udp", &head);
 	if (code)
 	    Tprintf("dns udp lookup returned error %d\n", code);
     }
     if ((socktype == SOCK_STREAM || socktype == 0) && code == 0) {
-	code = krb5_locate_srv_dns_1(realm, dnsname, "_tcp", addrlist, family);
+	code = krb5int_make_srv_query_realm(realm, dnsname, "_tcp", &head);
 	if (code)
 	    Tprintf("dns tcp lookup returned error %d\n", code);
     }
+
+    if (head == NULL)
+	return 0;
+
+    /* Check for the "." case indicating no support.  */
+    if (head->next == 0 && head->host[0] == 0) {
+	free(head->host);
+	free(head);
+	return KRB5_ERR_NO_SERVICE;
+    }
+
+    /*
+     * Okay!  Now we've got a linked list of entries sorted by
+     * priority.  Return it so later we can map hostnames to net addresses.
+     */
+    *dns_list_head = head;
+
+    return 0;
+}
+
+/*
+ * Given the list of hostnames of KDCs found in DNS SRV recs, lets go
+ * thru NSS (name svc switch) to get the net addrs.
+ */
+static krb5_error_code
+dns_hostnames2netaddrs(
+	struct srv_dns_entry *head,
+	enum locate_service_type svc,
+	int socktype,
+	int family,
+	struct addrlist *addrlist)
+{
+    struct srv_dns_entry *entry = NULL, *next;
+    krb5_error_code code;
+
+    Tprintf ("walking answer list:\n");
+    for (entry = head; entry != NULL; entry = entry->next) {
+	code = 0;
+	if (socktype)
+	    code = add_host_to_list (addrlist, entry->host,
+				    htons (entry->port), 0,
+				    socktype, family);
+	else {
+	    (void) add_host_to_list (addrlist, entry->host,
+				    htons (entry->port), 0,
+				    SOCK_DGRAM, family);
+		
+	    code = add_host_to_list (addrlist, entry->host,
+				    htons (entry->port), 0,
+				    SOCK_STREAM, family);
+	}
+        if (code) {
+	    Tprintf("  fail add_host code=%d %s\n", code, entry->host);
+        }
+    }
+    Tprintf ("[end]\n");
+
+    return code;
+}
+
+/*
+ * Given the DNS SRV recs list, return a string of all the hosts like so:
+ *     "fqdn0[,fqdn1][,fqdnN]"
+ */
+static char *
+dnslist2str(struct srv_dns_entry *dns_list_head)
+{
+	struct srv_dns_entry *head = dns_list_head;
+	struct srv_dns_entry *entry = NULL, *next;
+	unsigned int size = 0, c = 0, buf_size;
+	char *s = NULL;
+
+	for (entry = head; entry; entry = entry->next, c++) {
+		size += strlen(entry->host);
+	}
+	if (!c)
+		return NULL;
+
+	/* hostnames + commas + NULL */
+	buf_size = size + (c - 1) + 1;
+	s = malloc(buf_size);
+	if (!s)
+		return NULL;
+
+	(void) strlcpy(s, head->host, buf_size);
+	for (entry = head->next; entry; entry = entry->next) {
+	    (void) strlcat(s, ",", buf_size);
+	    (void) strlcat(s, entry->host, buf_size);
+	}
+
+	return s;
+}
+
+/*
+ * Given the profile hostlist, return a string of all the hosts like so:
+ *     "fqdn0[,fqdn1][,fqdnN]"
+ */
+static char *
+hostlist2str(char **hostlist)
+{
+	unsigned int c = 0, size = 0, buf_size;
+	char **hl = hostlist, *s = NULL;
+	
+	while (hl && *hl) {
+	    size += strlen(*hl);
+	    hl++;
+	    c++;
+	}
+	if (!c)
+	    return NULL;
+
+	/* hostnames + commas + NULL */
+	buf_size = size + (c - 1) + 1;
+	s = malloc(buf_size);
+	if (!s)
+	    return NULL;
+
+	hl = hostlist;
+	(void) strlcpy(s, *hl, buf_size);
+	hl++;
+	while (hl && *hl) {
+	    (void) strlcat(s, ",", buf_size);
+	    (void) strlcat(s, *hl, buf_size);
+	    hl++;
+	}
+
+	return s;
+}
+
+/*
+ * Take the profile KDC list and return a list of net addrs.
+ */
+static krb5_error_code
+prof_hostnames2netaddrs(
+	char **hostlist,
+	enum locate_service_type svc,
+	int socktype,
+	int family,
+	struct addrlist *addrlist) /* output */
+{
+	int udpport  = 0 , sec_udpport = 0;
+	int code, i;
+	struct servent *serv;
+
+	int count = 0;
+	while (hostlist && hostlist[count])
+		count++;
+	if (count == 0) {
+		return 0;
+	}
+    
+    switch (svc) {
+    case locate_service_kdc:
+    case locate_service_master_kdc:
+	/* We used to use /etc/services for these, but enough systems
+	   have old, crufty, wrong settings that this is probably
+	   better.  */
+	udpport = htons(KRB5_DEFAULT_PORT);
+	sec_udpport = htons(KRB5_DEFAULT_SEC_PORT);
+	break;
+    case locate_service_kadmin:
+	udpport = htons(DEFAULT_KADM5_PORT);
+	break;
+    case locate_service_krb524:
+	serv = getservbyname(KRB524_SERVICE, "udp");
+	udpport = serv ? serv->s_port : htons (KRB524_PORT);
+	break;
+    case locate_service_kpasswd:
+	udpport = htons(DEFAULT_KPASSWD_PORT);
+	break;
+    default:
+	return EINVAL;
+    }
+
+    for (i=0; hostlist[i]; i++) {
+	int p1, p2;
+	char *cp, *port, *host;
+
+	host = hostlist[i];
+	/*
+	 * Strip off excess whitespace
+	 */
+	cp = strchr(host, ' ');
+	if (cp)
+	    *cp = 0;
+	cp = strchr(host, '\t');
+	if (cp)
+	    *cp = 0;
+	port = strchr(host, ':');
+	if (port) {
+	    *port = 0;
+	    port++;
+	}
+
+	if (port) {
+	    unsigned long l;
+#ifdef HAVE_STROUL
+	    char *endptr;
+	    l = strtoul (port, &endptr, 10);
+	    if (endptr == NULL || *endptr != 0)
+		return EINVAL;
+#else
+	    l = atoi (port);
+#endif
+	    /* L is unsigned, don't need to check <0.  */
+	    if (l == 0 || l > 65535)
+		return EINVAL;
+	    p1 = htons (l);
+	    p2 = 0;
+	} else {
+	    p1 = udpport;
+	    p2 = sec_udpport;
+	}
+
+
+	if (socktype != 0) {
+	    code = add_host_to_list (addrlist, hostlist[i], p1, p2,
+				     socktype, family);
+	} else {
+	    code = add_host_to_list (addrlist, hostlist[i], p1, p2,
+				     SOCK_DGRAM, family);
+	    if (code == 0)
+		code = add_host_to_list (addrlist, hostlist[i], p1, p2,
+					 SOCK_STREAM, family);
+	}
+    }
+
     return code;
 }
 
@@ -781,6 +794,8 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 {
     krb5_error_code code;
     struct addrlist al = ADDRLIST_INIT;
+    char **hostlist = NULL;
+    struct srv_dns_entry *dns_list_head = NULL;
 
     *addrlist = al;
 
@@ -792,19 +807,18 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	 * is no way to indicate "service not available" via the
 	 * config file.
 	 */
-
-	code = prof_locate_server(context, realm, &al, svc, socktype, family);
+	code = prof_locate_server(context, realm, &hostlist, svc);
 
 	/*
 	 * Solaris Kerberos:
 	 * If kpasswd_server has not been configured and dns_lookup_kdc -
 	 * dns_fallback are not configured then admin_server should
-	 * be inferenced, per krb5.conf(4).
+	 * be inferred, per krb5.conf(4).
 	 */
 	if (code && svc == locate_service_kpasswd &&
 	    !maybe_use_dns(context, "dns_lookup_kdc", 0)) {
-		code = krb5_locate_srv_conf_1(context, realm, "admin_server",
-		    &al, 0, socktype, htons(DEFAULT_KPASSWD_PORT), 0, family);
+		code = prof_locate_server(context, realm, &hostlist,
+			locate_service_kadmin);
 	}
 
 #ifdef KRB5_DNS_LOOKUP
@@ -816,41 +830,8 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	/* Try DNS for all profile errors?  */
 	if (code && !krb5_is_referral_realm(realm)) {
 	    krb5_error_code code2;
-	    code2 = dns_locate_server(context, realm, &al, svc, socktype,
-				      family);
-
-	    /*
-	     * Solaris Kerberos:
-	     * If an entry for _kerberos-master. does not exist (checked for
-	     * above) but _kpasswd. does then treat that as an entry for the
-	     * master KDC (but use port 88 not the kpasswd port). MS AD creates
-	     * kpasswd entries by default in DNS.
-	     */
-	    if (code2 == 0 && svc == locate_service_master_kdc &&
-		al.naddrs == 0) {
-
-		/* Look for _kpasswd._tcp|udp */
-		code2 = dns_locate_server(context, realm, &al,
-		    locate_service_kpasswd, socktype, family);
-
-		/* Set the port to 88 instead of the kpasswd port */
-		if (code2 == 0 ) {
-		    int i;
-		    struct addrinfo *a;
-
-		    for (i = 0; i < al.naddrs; i++) {
-			if (al.addrs[i].ai->ai_family == AF_INET)
-			    for (a = al.addrs[i].ai; a != NULL; a = a->ai_next)
-				((struct sockaddr_in *)a->ai_addr)->sin_port =
-				    htons(KRB5_DEFAULT_PORT);
-
-			if (al.addrs[i].ai->ai_family == AF_INET6)
-			    for (a = al.addrs[i].ai; a != NULL; a = a->ai_next)
-				((struct sockaddr_in6 *)a->ai_addr)->sin6_port =
-				    htons(KRB5_DEFAULT_PORT);
-		    }
-		}
-	    }
+	    code2 = dns_locate_server(context, realm, &dns_list_head,
+				    svc, socktype, family);
 
 	    if (code2 != KRB5_PLUGIN_NO_HANDLE)
 		code = code2;
@@ -860,26 +841,148 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	/* We could put more heuristics here, like looking up a hostname
 	   of "kerberos."+REALM, etc.  */
     }
-    if (code == 0)
-	Tprintf ("krb5int_locate_server found %d addresses\n",
-		 al.naddrs);
-    else
-	Tprintf ("krb5int_locate_server returning error code %d/%s\n",
-		 code, error_message(code));
+
     if (code != 0) {
 	if (al.space)
 	    free_list (&al);
+	if (hostlist)
+	    profile_free_list(hostlist);
+	if (dns_list_head)
+	    krb5int_free_srv_dns_data(dns_list_head);
+
 	return code;
     }
-    if (al.naddrs == 0) {	/* No good servers */
-	if (al.space)
-	    free_list (&al);
-	krb5_set_error_message(context, KRB5_REALM_CANT_RESOLVE,
-			       "Cannot resolve network address for KDC in realm %.*s",
-			       realm->length, realm->data);
+
+    /*
+     * At this point we have no errors, let's check to see if we have
+     * any KDC entries from krb5.conf or DNS.
+     */
+    if (!hostlist && !dns_list_head) {
+	switch(svc) {
+	case locate_service_master_kdc:
+	    krb5_set_error_message(context,
+				KRB5_REALM_CANT_RESOLVE,
+				dgettext(TEXT_DOMAIN,
+					"Cannot find a master KDC entry in krb5.conf(4) or DNS Service Location records for realm '%.*s'"),
+				realm->length, realm->data);
+	    break;
+	case locate_service_kadmin:
+	    krb5_set_error_message(context,
+				KRB5_REALM_CANT_RESOLVE,
+				dgettext(TEXT_DOMAIN,
+					"Cannot find a kadmin KDC entry in krb5.conf(4) or DNS Service Location records for realm '%.*s'"),
+				realm->length, realm->data);
+	    break;
+	case locate_service_kpasswd:
+	    krb5_set_error_message(context,
+				KRB5_REALM_CANT_RESOLVE,
+				dgettext(TEXT_DOMAIN,
+					"Cannot find a kpasswd KDC entry in krb5.conf(4) or DNS Service Location records for realm '%.*s'"),
+				realm->length, realm->data);
+	    break;
+	default: 	  /*  locate_service_kdc: */
+		krb5_set_error_message(context,
+				    KRB5_REALM_CANT_RESOLVE,
+				    dgettext(TEXT_DOMAIN,
+					    "Cannot find any KDC entries in krb5.conf(4) or DNS Service Location records for realm '%.*s'"),
+				    realm->length, realm->data);
 			       
+	}
 	return KRB5_REALM_CANT_RESOLVE;
     }
+
+    /* We have KDC entries, let see if we can get their net addrs. */
+    if (hostlist)
+	code = prof_hostnames2netaddrs(hostlist, svc,
+				    socktype, family, &al);
+    else if (dns_list_head)
+	code = dns_hostnames2netaddrs(dns_list_head, svc,
+				    socktype, family, &al);
+    if (code) {
+	if (hostlist)
+	    profile_free_list(hostlist);
+	if (dns_list_head)
+	    krb5int_free_srv_dns_data(dns_list_head);
+	return code;
+    }
+
+    /*
+     * Solaris Kerberos:
+     * If an entry for _kerberos-master. does not exist (checked for
+     * above) but _kpasswd. does then treat that as an entry for the
+     * master KDC (but use port 88 not the kpasswd port). MS AD creates
+     * kpasswd entries by default in DNS.
+     */
+    if (!dns_list_head && svc == locate_service_master_kdc &&
+	al.naddrs == 0) {
+
+	/* Look for _kpasswd._tcp|udp */
+	code = dns_locate_server(context, realm, &dns_list_head,
+				locate_service_kpasswd, socktype, family);
+
+	if (code == 0 && dns_list_head) {
+	    int i;
+	    struct addrinfo *a;
+
+	    code = dns_hostnames2netaddrs(dns_list_head, svc,
+					socktype, family, &al);
+
+	    /* Set the port to 88 instead of the kpasswd port */
+	    if (code == 0 && al.naddrs > 0) {
+		for (i = 0; i < al.naddrs; i++) {
+		    if (al.addrs[i].ai->ai_family == AF_INET)
+			for (a = al.addrs[i].ai; a != NULL; a = a->ai_next)
+			    ((struct sockaddr_in *)a->ai_addr)->sin_port =
+				htons(KRB5_DEFAULT_PORT);
+				
+		    if (al.addrs[i].ai->ai_family == AF_INET6)
+			for (a = al.addrs[i].ai; a != NULL; a = a->ai_next)
+			     ((struct sockaddr_in6 *)a->ai_addr)->sin6_port =
+				    htons(KRB5_DEFAULT_PORT);
+		}
+	    }
+	}
+    }
+
+    /* No errors so far, lets see if we have KDC net addrs */
+    if (al.naddrs == 0) {
+	char *hostlist_str = NULL, *dnslist_str  = NULL;
+	if (al.space)
+	    free_list (&al);
+
+	if (hostlist) {
+	    hostlist_str = hostlist2str(hostlist);
+	    krb5_set_error_message(context, KRB5_REALM_CANT_RESOLVE,
+				dgettext(TEXT_DOMAIN,
+					"Cannot resolve network address for KDCs '%s' specified in krb5.conf(4) for realm %.*s"),
+				hostlist_str ? hostlist_str : "unknown",
+				realm->length, realm->data);
+	    if (hostlist_str)
+		free(hostlist_str);
+	} else if (dns_list_head) {
+	    dnslist_str = dnslist2str(dns_list_head);
+	    krb5_set_error_message(context, KRB5_REALM_CANT_RESOLVE,
+				dgettext(TEXT_DOMAIN,
+					"Cannot resolve network address for KDCs '%s' discovered via DNS Service Location records for realm '%.*s'"),
+				dnslist_str ? dnslist_str : "unknown",
+				realm->length, realm->data);
+	    if (dnslist_str)
+		    free(dnslist_str);
+	}
+
+	if (hostlist)
+	    profile_free_list(hostlist);
+	if (dns_list_head)
+	    krb5int_free_srv_dns_data(dns_list_head);
+
+	return KRB5_REALM_CANT_RESOLVE;
+    }
+
+    if (hostlist)
+	    profile_free_list(hostlist);
+    if (dns_list_head)
+	    krb5int_free_srv_dns_data(dns_list_head);
+
     *addrlist = al;
     return 0;
 }

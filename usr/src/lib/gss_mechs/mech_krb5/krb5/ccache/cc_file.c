@@ -82,7 +82,7 @@ etc.
 #include "k5-int.h"
 #include <syslog.h>	/* Solaris Kerberos */
 #include <ctype.h>
-
+#include <locale.h>
 
 #include <stdio.h>
 #include <errno.h>
@@ -2548,8 +2548,9 @@ krb5_fcc_interpret(krb5_context context, int errnum)
     default:
 	retval = KRB5_CC_IO;		/* XXX */
 	krb5_set_error_message(context, retval,
-			       "Credentials cache I/O operation failed (%s)",
-			       strerror(errnum));
+			    dgettext(TEXT_DOMAIN,
+				"Credentials cache I/O operation failed (%s)"),
+			    strerror(errnum));
     }
     return retval;
 }

@@ -211,8 +211,14 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	encode_krb5_tgs_req;
 	encode_krb5_ticket;
 	error_message;
+	generic_gss_oid_to_str;
+	generic_gss_release_buffer;
 	ggss_error_table;
 	gss_krb5int_get_tkt_flags;
+	gssint_g_display_major_status;
+	gssint_g_make_string_buffer;
+	gssint_mecherrmap_map;
+	gssint_mecherrmap_map_errcode;
 	gsskrb5_extract_authz_data_from_sec_context;
 	gss_krb5_ccache_name;
 	gss_krb5_copy_ccache;
@@ -485,6 +491,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5_get_time_offsets;
 	krb5_get_validated_creds;
 	krb5_getenv;
+	krb5_gss_display_status2;
 	krb5_gss_import_name;
 	krb5_gss_oid_array;
 	krb5_gss_userok;
@@ -724,6 +731,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5int_get_error;
 	krb5int_getnameinfo;
 	krb5int_get_plugin_dir_data;
+	krb5int_getspecific;
 	krb5int_gmt_mktime;
 	krb5int_hash_sha1;
 	krb5int_init_context_kdc;
@@ -733,7 +741,9 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krb5int_open_plugin_dirs;
 	krb5int_pbkdf2_hmac_sha1;
 	krb5int_pthread_loaded;
+	krb5int_key_register;
 	krb5int_sendtokdc_debug_handler;
+	krb5int_setspecific;
 	krb5int_vset_error;
 	kwarn_add_warning;
 	kwarn_del_warning;

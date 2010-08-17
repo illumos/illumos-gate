@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -29,6 +28,7 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -36,7 +36,7 @@
 #include <string.h>
 #include <libintl.h>
 #include <errno.h>
-
+#include <syslog.h>
 #ifndef TEXT_DOMAIN
 #error TEXT_DOMAIN not defined
 #endif
@@ -60,8 +60,9 @@ const gss_OID req_mech_type;
 OM_uint32 *message_context;
 gss_buffer_t status_string;
 {
-	gss_OID mech_type = (gss_OID) req_mech_type;
-	gss_mechanism mech;
+	gss_OID			mech_type = (gss_OID) req_mech_type;
+	gss_mechanism		mech;
+	gss_OID_desc		m_oid = { 0, 0 };
 
 	if (minor_status != NULL)
 		*minor_status = 0;
@@ -75,7 +76,7 @@ gss_buffer_t status_string;
 	    message_context == NULL ||
 	    status_string == GSS_C_NO_BUFFER)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
+	
 	/* we handle major status codes, and the mechs do the minor */
 	if (status_type == GSS_C_GSS_CODE)
 		return (displayMajor(status_value, message_context,
@@ -86,15 +87,63 @@ gss_buffer_t status_string;
 	 * select the appropriate underlying mechanism routine and
 	 * call it.
 	 */
+
+	/* In this version, we only handle status codes that have been
+	   mapped to a flat numbering space.  Look up the value we got
+	   passed.  If it's not found, complain.  */
+	if (status_value == 0) {
+		status_string->value = strdup("Unknown error");
+		if (status_string->value == NULL) {
+			*minor_status = ENOMEM;
+			map_errcode(minor_status);
+			return GSS_S_FAILURE;
+		}
+		status_string->length = strlen(status_string->value);
+		*message_context = 0;
+		*minor_status = 0;
+		return GSS_S_COMPLETE;
+	}
+	{
+		int err;
+	        OM_uint32 m_status = 0, status;
+
+		err = gssint_mecherrmap_get(status_value, &m_oid, &m_status);
+		if (err) {
+			*minor_status = err;
+			map_errcode(minor_status);
+			return GSS_S_BAD_STATUS;
+		}
+
+		if (m_oid.length == 0) {
+			/* Magic flag for com_err values.  */
+			status = gssint_g_display_com_err_status(minor_status,
+							m_status,
+							status_string);
+			if (status != GSS_S_COMPLETE)
+				map_errcode(minor_status);
+			return status;
+		}
+		mech_type = &m_oid;
+		status_value = m_status;
+	}
+
 	mech = __gss_get_mechanism(mech_type);
 
 	if (mech && mech->gss_display_status) {
+		OM_uint32 r;
+
 		if (mech_type == GSS_C_NULL_OID)
 			mech_type = &mech->mech_type;
 
-		return (mech->gss_display_status(mech->context, minor_status,
+		r = mech->gss_display_status(mech->context, minor_status,
 				status_value, status_type, mech_type,
-				message_context, status_string));
+				message_context, status_string);
+		/* How's this for weird?  If we get an error returning the
+		mechanism-specific error code, we save away the
+		mechanism-specific error code describing the error.  */
+		if (r != GSS_S_COMPLETE)
+			map_error(minor_status, mech);
+		return r;
 	}
 
 	if (!mech)
@@ -354,12 +403,11 @@ gss_buffer_t outStr;
 
 	/* now copy the status code and return to caller */
 	outStr->length = strlen(errStr);
-	outStr->value = malloc((size_t)outStr->length+1);
+	outStr->value = strdup(errStr);
 	if (outStr->value == NULL) {
 		outStr->length = 0;
 		return (GSS_S_FAILURE);
 	}
 
-	(void) strcpy((char *)outStr->value, errStr);
 	return (GSS_S_COMPLETE);
 } /* displayMajor */

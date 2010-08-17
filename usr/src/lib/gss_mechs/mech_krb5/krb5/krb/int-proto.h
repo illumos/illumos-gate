@@ -54,5 +54,11 @@ krb5_preauth_supply_preauth_data(krb5_context context,
 				 const char *attr,
 				 const char *value);
 
+#define in_clock_skew(date, now) (labs((date)-(now)) < context->clockskew)
+
+#define IS_TGS_PRINC(c, p)                                              \
+    (krb5_princ_size((c), (p)) == 2 &&                                  \
+     data_eq_string(*krb5_princ_component((c), (p), 0), KRB5_TGS_NAME))
+
 #endif /* KRB5_INT_FUNC_PROTO__ */
 
