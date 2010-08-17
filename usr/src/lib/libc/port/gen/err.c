@@ -73,10 +73,11 @@ init_progname(void)
 	Dl_argsinfo_t args;
 	const char *argv0;
 
-	if (dlinfo(RTLD_SELF, RTLD_DI_ARGSINFO, &args) < 0)
+	if (dlinfo(RTLD_SELF, RTLD_DI_ARGSINFO, &args) < 0 ||
+	    args.dla_argc <= 0 ||
+	    (argv0 = args.dla_argv[0]) == NULL)
 		argv0 = "UNKNOWN";
-	else
-		argv0 = args.dla_argv[0];
+
 	setprogname(argv0);
 }
 
