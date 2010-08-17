@@ -24,17 +24,37 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <assert.h>
 #include <string.h>
 #include <libintl.h>
 #include "zonecfg.h"
 #include "zonecfg_grammar.tab.h"
+
+/*
+ * This constant defines the number of entries added to unclaimed_tokens[]
+ * when it runs out of space.
+ */
+#define	UNCLAIMED_TOKENS_BUFFER_GROWTH	4
+
+/*
+ * Invariants:
+ *
+ *	unclaimed_tokens == NULL IFF unclaimed_tokens_size == 0
+ *	unclaimed_tokens_size == 0 IFF num_unclaimed_tokens == 0
+ */
+static char **unclaimed_tokens;		/* TOKENs produced by Lex (see below) */
+					/* but not claimed by YACC reduction */
+					/* rules */
+static unsigned int unclaimed_tokens_size;	/* size of unclaimed_tokens */
+static unsigned int num_unclaimed_tokens;	/* number of unclaimed TOKENs */
 
 int lex_lineno = 1;	/* line number for error reporting */
 static int state = INITIAL;
 extern boolean_t cmd_file_mode;
 extern boolean_t saw_error;
 extern void yyerror(char *s);
-char *safe_strdup(char *s);
+
+static char *create_token(char *s);
 %}
 
 %a 7000
@@ -323,29 +343,29 @@ char *safe_strdup(char *s);
 <CSTATE>","	{ return COMMA; }
 
 <TSTATE>[^ \t\n\";=\[\]\(\)]+	{
-			yylval.strval = safe_strdup(yytext);
+			yylval.strval = create_token(yytext);
 			return TOKEN;
 		}
 
 <LSTATE>[^ \t\n\",;=\[\]\(\)]+	{
-			yylval.strval = safe_strdup(yytext);
+			yylval.strval = create_token(yytext);
 			return TOKEN;
 		}
 
 <CSTATE>[^ \t\n\",;=\(\)]+	{
-			yylval.strval = safe_strdup(yytext);
+			yylval.strval = create_token(yytext);
 			return TOKEN;
 		}
 
 <TSTATE>\"[^\"\n]*[\"\n] {
-			yylval.strval = safe_strdup(yytext + 1);
+			yylval.strval = create_token(yytext + 1);
 			if (yylval.strval[yyleng - 2] == '"')
 				yylval.strval[yyleng - 2] = 0;
 			return TOKEN;
 		}
 
 <LSTATE>\"[^\"\n]*[\"\n] {
-			yylval.strval = safe_strdup(yytext + 1);
+			yylval.strval = create_token(yytext + 1);
 			if (yylval.strval[yyleng - 2] == '"')
 				yylval.strval[yyleng - 2] = 0;
 			return TOKEN;
@@ -370,8 +390,88 @@ char *safe_strdup(char *s);
 
 %%
 
+/*
+ * Assert that there are no unclaimed tokens.  This function enforces the
+ * invariants mentioned at the top of this file.
+ */
+void
+assert_no_unclaimed_tokens(void)
+{
+	assert(num_unclaimed_tokens == 0);
+	assert(unclaimed_tokens == NULL);
+	assert(unclaimed_tokens_size == 0);
+}
+
+/*
+ * Claim the specified unclaimed TOKEN.  YACC reduction rules that
+ * use TOKENs should invoke this function immediately before freeing the TOKENs
+ * or adding them to data structures that will be cleaned up when the YACC
+ * parser finishes or encounters errors.  Reduction rules should only claim the
+ * TOKENs that they use.
+ *
+ * This function returns its argument but does not free its memory.
+ */
 char *
-safe_strdup(char *s)
+claim_token(char *token)
+{
+	unsigned int index;
+
+	/*
+	 * Find the token in the list of unclaimed tokens.
+	 */
+	assert(num_unclaimed_tokens > 0);
+	for (index = 0; index < num_unclaimed_tokens; index++) {
+		if (unclaimed_tokens[index] == token)
+			break;
+	}
+
+	/*
+	 * Abort if we didn't find the token.
+	 */
+	assert(index != num_unclaimed_tokens);
+
+	/*
+	 * Replace the token with the last unclaimed token.
+	 */
+	num_unclaimed_tokens--;
+	unclaimed_tokens[index] = unclaimed_tokens[num_unclaimed_tokens];
+
+	/*
+	 * Delete the list of unclaimed tokens if it's empty.
+	 */
+	if (num_unclaimed_tokens == 0) {
+		free(unclaimed_tokens);
+		unclaimed_tokens = NULL;
+		unclaimed_tokens_size = 0;
+	}
+
+	return (token);
+}
+
+/*
+ * Free all unclaimed TOKENs.  This should only be invoked when the YACC
+ * parser encounters errors.
+ */
+static void
+free_tokens(void)
+{
+	if (unclaimed_tokens != NULL) {
+		while (num_unclaimed_tokens > 0)
+			free(unclaimed_tokens[--num_unclaimed_tokens]);
+		free(unclaimed_tokens);
+		unclaimed_tokens = NULL;
+		unclaimed_tokens_size = 0;
+	}
+	assert_no_unclaimed_tokens();
+}
+
+/*
+ * Create a TOKEN from the specified string.  The TOKEN is merely a duplicate
+ * of the specified string.  TOKENs must be claimed by the YACC reduction rules
+ * that use them; see claim_token() above.
+ */
+char *
+create_token(char *s)
 {
 	char *result;
 
@@ -379,12 +479,39 @@ safe_strdup(char *s)
 		yyerror("Out of memory");
 		exit(Z_ERR);
 	}
+
+	/*
+	 * Add the new TOKEN to the list of unclaimed TOKENs.  The list might
+	 * have to be resized.
+	 *
+	 * Reduction rules should claim TOKENs via claim_token() (see above).
+	 */
+	if (num_unclaimed_tokens == unclaimed_tokens_size) {
+		char **new_unclaimed_tokens;
+
+		unclaimed_tokens_size += UNCLAIMED_TOKENS_BUFFER_GROWTH;
+		new_unclaimed_tokens = (char **)realloc(unclaimed_tokens,
+		    unclaimed_tokens_size * sizeof (char *));
+		if (new_unclaimed_tokens == NULL) {
+			yyerror("Out of memory");
+			free(result);
+			exit(Z_ERR);
+		}
+		unclaimed_tokens = new_unclaimed_tokens;
+	}
+	unclaimed_tokens[num_unclaimed_tokens] = result;
+	num_unclaimed_tokens++;
 	return (result);
 }
 
 void
 yyerror(char *s)
 {
+	/*
+	 * Ensure that we won't leak unclaimed tokens.
+	 */
+	free_tokens();
+
 	/* feof(yyin) is not an error; anything else is, so we set saw_error */
 	if (yytext[0] == '\0') {
 		if (!feof(yyin)) {

@@ -24,6 +24,14 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * This file defines zonecfg(1M)'s grammar.
+ *
+ * Reduction rules that consume TOKENs must invoke claim_token() immediately
+ * before freeing the TOKENs or adding them to data structures (e.g., cmd) that
+ * will be cleaned up when the parser finishes or encounters errors.
+ */
+
 #include <stdio.h>
 #include <strings.h>
 
@@ -159,6 +167,11 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 
 %%
 
+/*
+ * NOTE: Each commands reduction rule must invoke assert_no_unclaimed_tokens()
+ * before it completes if it isn't processing an error.  This ensures that
+ * reduction rules properly consume TOKENs.
+ */
 commands: command terminator
 	{
 		if ($1 != NULL) {
@@ -168,6 +181,7 @@ commands: command terminator
 			bzero(list, sizeof (list_property_t));
 			num_prop_vals = 0;
 		}
+		assert_no_unclaimed_tokens();
 		return (0);
 	}
 	| command error terminator
@@ -191,6 +205,7 @@ commands: command terminator
 	}
 	| terminator
 	{
+		assert_no_unclaimed_tokens();
 		return (0);
 	}
 
@@ -228,7 +243,7 @@ add_command: ADD
 		cmd = $$;
 		$$->cmd_handler = &add_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 	| ADD resource_type
@@ -269,7 +284,7 @@ cancel_command: CANCEL
 		cmd = $$;
 		$$->cmd_handler = &cancel_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 
@@ -289,7 +304,7 @@ create_command: CREATE
 		cmd = $$;
 		$$->cmd_handler = &create_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 	| CREATE TOKEN TOKEN
@@ -299,8 +314,8 @@ create_command: CREATE
 		cmd = $$;
 		$$->cmd_handler = &create_func;
 		$$->cmd_argc = 2;
-		$$->cmd_argv[0] = $2;
-		$$->cmd_argv[1] = $3;
+		$$->cmd_argv[0] = claim_token($2);
+		$$->cmd_argv[1] = claim_token($3);
 		$$->cmd_argv[2] = NULL;
 	}
 	| CREATE TOKEN TOKEN TOKEN
@@ -310,9 +325,9 @@ create_command: CREATE
 		cmd = $$;
 		$$->cmd_handler = &create_func;
 		$$->cmd_argc = 3;
-		$$->cmd_argv[0] = $2;
-		$$->cmd_argv[1] = $3;
-		$$->cmd_argv[2] = $4;
+		$$->cmd_argv[0] = claim_token($2);
+		$$->cmd_argv[1] = claim_token($3);
+		$$->cmd_argv[2] = claim_token($4);
 		$$->cmd_argv[3] = NULL;
 	}
 
@@ -332,7 +347,7 @@ commit_command: COMMIT
 		cmd = $$;
 		$$->cmd_handler = &commit_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 
@@ -352,7 +367,7 @@ delete_command: DELETE
 		cmd = $$;
 		$$->cmd_handler = &delete_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 
@@ -372,7 +387,7 @@ end_command: END
 		cmd = $$;
 		$$->cmd_handler = &end_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 
@@ -392,7 +407,7 @@ exit_command: EXIT
 		cmd = $$;
 		$$->cmd_handler = &exit_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 
@@ -412,7 +427,7 @@ export_command: EXPORT
 		cmd = $$;
 		$$->cmd_handler = &export_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 	| EXPORT TOKEN TOKEN
@@ -422,8 +437,8 @@ export_command: EXPORT
 		cmd = $$;
 		$$->cmd_handler = &export_func;
 		$$->cmd_argc = 2;
-		$$->cmd_argv[0] = $2;
-		$$->cmd_argv[1] = $3;
+		$$->cmd_argv[0] = claim_token($2);
+		$$->cmd_argv[1] = claim_token($3);
 		$$->cmd_argv[2] = NULL;
 	}
 
@@ -443,7 +458,7 @@ help_command:	HELP
 		cmd = $$;
 		$$->cmd_handler = &help_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 
@@ -461,7 +476,7 @@ info_command:	INFO
 		short_usage(CMD_INFO);
 		(void) fputs("\n", stderr);
 		usage(B_FALSE, HELP_RES_PROPS);
-		free($2);
+		free(claim_token($2));
 		YYERROR;
 	}
 	|	INFO resource_type
@@ -687,6 +702,7 @@ remove_command: REMOVE
 		short_usage(CMD_REMOVE);
 		(void) fputs("\n", stderr);
 		usage(B_FALSE, HELP_RES_PROPS);
+		free(claim_token($2));
 		YYERROR;
 	}
 	| REMOVE resource_type
@@ -705,7 +721,7 @@ remove_command: REMOVE
 		$$->cmd_handler = &remove_func;
 		$$->cmd_res_type = $3;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 	| REMOVE property_name property_value
@@ -774,7 +790,7 @@ revert_command: REVERT
 		cmd = $$;
 		$$->cmd_handler = &revert_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 
@@ -889,7 +905,7 @@ set_command: SET
 			YYERROR;
 		cmd = $$;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 		$$->cmd_handler = &set_func;
 		$$->cmd_prop_nv_pairs = 1;
@@ -929,7 +945,7 @@ verify_command: VERIFY
 		cmd = $$;
 		$$->cmd_handler = &verify_func;
 		$$->cmd_argc = 1;
-		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[0] = claim_token($2);
 		$$->cmd_argv[1] = NULL;
 	}
 
@@ -1046,7 +1062,7 @@ property_value: simple_prop_val
 simple_prop_val: TOKEN
 	{
 		$$ = simple_prop_val_func($1);
-		free($1);
+		free(claim_token($1));
 		if ($$ == NULL)
 			YYERROR;
 	}
@@ -1081,7 +1097,7 @@ complex_prop_val: OPEN_PAREN complex_piece CLOSE_PAREN
 complex_piece: property_name EQUAL TOKEN
 	{
 		$$ = complex_piece_func($1, $3, NULL);
-		free($3);
+		free(claim_token($3));
 		if ($$ == NULL)
 			YYERROR;
 	}
@@ -1098,7 +1114,7 @@ complex_piece: property_name EQUAL TOKEN
 	| property_name EQUAL TOKEN COMMA complex_piece 
 	{
 		$$ = complex_piece_func($1, $3, complex);
-		free($3);
+		free(claim_token($3));
 		if ($$ == NULL)
 			YYERROR;
 	}

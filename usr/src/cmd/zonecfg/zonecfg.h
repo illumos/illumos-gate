@@ -228,6 +228,12 @@ extern FILE *yyin;
 extern char *res_types[];
 extern char *prop_types[];
 
+/*
+ * NOTE: Only Lex and YACC should use the following functions.
+ */
+extern void assert_no_unclaimed_tokens(void);
+extern char *claim_token(char *);
+
 #ifdef __cplusplus
 }
 #endif
