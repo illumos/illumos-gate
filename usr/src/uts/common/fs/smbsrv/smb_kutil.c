@@ -889,9 +889,7 @@ smb_thread_init(
     smb_thread_t	*thread,
     char		*name,
     smb_thread_ep_t	ep,
-    void		*ep_arg,
-    smb_thread_aw_t	aw,
-    void		*aw_arg)
+    void		*ep_arg)
 {
 	ASSERT(thread->sth_magic != SMB_THREAD_MAGIC);
 
@@ -900,8 +898,6 @@ smb_thread_init(
 	(void) strlcpy(thread->sth_name, name, sizeof (thread->sth_name));
 	thread->sth_ep = ep;
 	thread->sth_ep_arg = ep_arg;
-	thread->sth_aw = aw;
-	thread->sth_aw_arg = aw_arg;
 	thread->sth_state = SMB_THREAD_STATE_EXITED;
 	mutex_init(&thread->sth_mtx, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&thread->sth_cv, NULL, CV_DEFAULT, NULL);
@@ -968,8 +964,7 @@ smb_thread_start(
  * state has been reached.
  */
 void
-smb_thread_stop(
-    smb_thread_t	*thread)
+smb_thread_stop(smb_thread_t *thread)
 {
 	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
 
@@ -979,8 +974,6 @@ smb_thread_stop(
 	case SMB_THREAD_STATE_STARTING:
 		if (!thread->sth_kill) {
 			thread->sth_kill = B_TRUE;
-			if (thread->sth_aw)
-				thread->sth_aw(thread, thread->sth_aw_arg);
 			cv_broadcast(&thread->sth_cv);
 			while (thread->sth_state != SMB_THREAD_STATE_EXITING)
 				cv_wait(&thread->sth_cv, &thread->sth_mtx);
@@ -1021,16 +1014,13 @@ smb_thread_stop(
  * This function signals a thread.
  */
 void
-smb_thread_signal(
-    smb_thread_t	*thread)
+smb_thread_signal(smb_thread_t *thread)
 {
 	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
 
 	mutex_enter(&thread->sth_mtx);
 	switch (thread->sth_state) {
 	case SMB_THREAD_STATE_RUNNING:
-		if (thread->sth_aw)
-			thread->sth_aw(thread, thread->sth_aw_arg);
 		cv_signal(&thread->sth_cv);
 		break;
 
@@ -1110,18 +1100,6 @@ smb_thread_continue_timedwait_locked(smb_thread_t *thread, int ticks)
 	result = (thread->sth_kill == 0);
 
 	return (result);
-}
-
-void
-smb_thread_set_awaken(smb_thread_t *thread, smb_thread_aw_t new_aw_fn,
-    void *new_aw_arg)
-{
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
-
-	mutex_enter(&thread->sth_mtx);
-	thread->sth_aw = new_aw_fn;
-	thread->sth_aw_arg = new_aw_arg;
-	mutex_exit(&thread->sth_mtx);
 }
 
 /*

@@ -261,18 +261,6 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 	case SMB_IOC_EVENT:
 		rc = smb_server_notify_event(&ioc->ioc_event);
 		break;
-	case SMB_IOC_NBT_LISTEN:
-		rc = smb_server_nbt_listen(&ioc->ioc_listen);
-		break;
-	case SMB_IOC_TCP_LISTEN:
-		rc = smb_server_tcp_listen(&ioc->ioc_listen);
-		break;
-	case SMB_IOC_NBT_RECEIVE:
-		rc = smb_server_nbt_receive();
-		break;
-	case SMB_IOC_TCP_RECEIVE:
-		rc = smb_server_tcp_receive();
-		break;
 	case SMB_IOC_GMTOFF:
 		rc = smb_server_set_gmtoff(&ioc->ioc_gmt);
 		break;

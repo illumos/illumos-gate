@@ -39,21 +39,17 @@ extern "C" {
 
 #define	SMB_IOC_CONFIG		_IOW(SMB_IOC_BASE, 1, int)
 #define	SMB_IOC_START		_IOW(SMB_IOC_BASE, 2, int)
-#define	SMB_IOC_NBT_LISTEN	_IOW(SMB_IOC_BASE, 3, int)
-#define	SMB_IOC_TCP_LISTEN	_IOW(SMB_IOC_BASE, 4, int)
-#define	SMB_IOC_NBT_RECEIVE	_IOW(SMB_IOC_BASE, 5, int)
-#define	SMB_IOC_TCP_RECEIVE	_IOW(SMB_IOC_BASE, 6, int)
-#define	SMB_IOC_GMTOFF		_IOW(SMB_IOC_BASE, 7, int)
-#define	SMB_IOC_SHARE		_IOW(SMB_IOC_BASE, 8, int)
-#define	SMB_IOC_UNSHARE		_IOW(SMB_IOC_BASE, 9, int)
-#define	SMB_IOC_NUMOPEN		_IOW(SMB_IOC_BASE, 10, int)
-#define	SMB_IOC_SVCENUM		_IOW(SMB_IOC_BASE, 11, int)
-#define	SMB_IOC_FILE_CLOSE	_IOW(SMB_IOC_BASE, 12, int)
-#define	SMB_IOC_SESSION_CLOSE	_IOW(SMB_IOC_BASE, 13, int)
-#define	SMB_IOC_STOP		_IOW(SMB_IOC_BASE, 14, int)
-#define	SMB_IOC_EVENT		_IOW(SMB_IOC_BASE, 15, int)
-#define	SMB_IOC_SHAREINFO	_IOW(SMB_IOC_BASE, 16, int)
-#define	SMB_IOC_SPOOLDOC	_IOW(SMB_IOC_BASE, 17, int)
+#define	SMB_IOC_GMTOFF		_IOW(SMB_IOC_BASE, 3, int)
+#define	SMB_IOC_SHARE		_IOW(SMB_IOC_BASE, 4, int)
+#define	SMB_IOC_UNSHARE		_IOW(SMB_IOC_BASE, 5, int)
+#define	SMB_IOC_NUMOPEN		_IOW(SMB_IOC_BASE, 6, int)
+#define	SMB_IOC_SVCENUM		_IOW(SMB_IOC_BASE, 7, int)
+#define	SMB_IOC_FILE_CLOSE	_IOW(SMB_IOC_BASE, 8, int)
+#define	SMB_IOC_SESSION_CLOSE	_IOW(SMB_IOC_BASE, 9, int)
+#define	SMB_IOC_STOP		_IOW(SMB_IOC_BASE, 10, int)
+#define	SMB_IOC_EVENT		_IOW(SMB_IOC_BASE, 11, int)
+#define	SMB_IOC_SHAREINFO	_IOW(SMB_IOC_BASE, 12, int)
+#define	SMB_IOC_SPOOLDOC	_IOW(SMB_IOC_BASE, 13, int)
 
 typedef struct smb_ioc_header {
 	uint32_t	version;
@@ -86,11 +82,6 @@ typedef struct smb_ioc_shareinfo {
 	char		shrname[MAXNAMELEN];
 	uint32_t	shortnames;
 } smb_ioc_shareinfo_t;
-
-typedef	struct smb_ioc_listen {
-	smb_ioc_header_t hdr;
-	int		error;
-} smb_ioc_listen_t;
 
 typedef	struct smb_ioc_start {
 	smb_ioc_header_t hdr;
@@ -181,7 +172,6 @@ typedef union smb_ioc {
 	smb_ioc_cfg_t		ioc_cfg;
 	smb_ioc_start_t		ioc_start;
 	smb_ioc_event_t		ioc_event;
-	smb_ioc_listen_t	ioc_listen;
 	smb_ioc_opennum_t	ioc_opennum;
 	smb_ioc_svcenum_t	ioc_svcenum;
 	smb_ioc_session_t	ioc_session;

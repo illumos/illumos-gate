@@ -148,21 +148,11 @@
  * SMB_SERVER_STATE_RUNNING
  *
  *    The server has been started. While in this state the threads listening on
- *    the sockets car be started. The smbd daemon does so through an Ioctl:
+ *    the sockets are started.
  *
- *	smb_drv_ioctl(SMB_IOC_NBT_LISTEN) --> smb_server_nbt_listen()
- *	smb_drv_ioctl(SMB_IOC_TCP_LISTEN) --> smb_server_nbt_listen()
- *
- *    When a client establishes a connection the thread listening leaves
- *    temporarily the kernel. While in user space it creates a thread for the
- *    new session. It then returns to kernel with the result of the thread
- *    creation. If the creation failed the new session context is destroyed
- *    before returning listening.
- *
- *    The new created thread enters the kernel though an Ioctl:
- *
- *	smb_drv_ioctl(SMB_IOC_NBT_RECEIVE) --> smb_server_nbt_receive()
- *	smb_drv_ioctl(SMB_IOC_TCP_RECEIVE) --> smb_server_tcp_receive()
+ *    When a client establishes a connection the thread listening dispatches
+ *    a task with the new session as an argument. If the dispatch fails the new
+ *    session context is destroyed.
  *
  * SMB_SERVER_STATE_STOPPING
  *
@@ -231,30 +221,40 @@
 
 extern void smb_reply_notify_change_request(smb_request_t *);
 
+typedef struct {
+	smb_listener_daemon_t	*ra_listener;
+	smb_session_t		*ra_session;
+} smb_receiver_arg_t;
+
 static void smb_server_kstat_init(smb_server_t *);
 static void smb_server_kstat_fini(smb_server_t *);
 static void smb_server_timers(smb_thread_t *, void *);
-static int smb_server_listen(smb_server_t *, smb_listener_daemon_t *,
-    in_port_t, int, int);
-static void smb_server_listen_fini(smb_listener_daemon_t *);
-static kt_did_t smb_server_listener_tid(smb_listener_daemon_t *);
 static int smb_server_lookup(smb_server_t **);
 static void smb_server_release(smb_server_t *);
 static void smb_server_store_cfg(smb_server_t *, smb_ioc_cfg_t *);
 static void smb_server_shutdown(smb_server_t *);
 static int smb_server_fsop_start(smb_server_t *);
 static void smb_server_fsop_stop(smb_server_t *);
-static void smb_server_signal_listeners(smb_server_t *);
 static void smb_event_cancel(smb_server_t *, uint32_t);
 static uint32_t smb_event_alloc_txid(void);
 
-static void smb_server_disconnect_share(smb_session_list_t *, const char *);
-static void smb_server_enum_private(smb_session_list_t *, smb_svcenum_t *);
-static int smb_server_sesion_disconnect(smb_session_list_t *, const char *,
+static void smb_server_disconnect_share(smb_llist_t *, const char *);
+static void smb_server_enum_private(smb_llist_t *, smb_svcenum_t *);
+static int smb_server_session_disconnect(smb_llist_t *, const char *,
     const char *);
-static int smb_server_fclose(smb_session_list_t *, uint32_t);
+static int smb_server_fclose(smb_llist_t *, uint32_t);
 static int smb_server_kstat_update(kstat_t *, int);
 static int smb_server_legacy_kstat_update(kstat_t *, int);
+static void smb_server_listener_init(smb_server_t *, smb_listener_daemon_t *,
+    char *, in_port_t, int);
+static void smb_server_listener_destroy(smb_listener_daemon_t *);
+static int smb_server_listener_start(smb_listener_daemon_t *);
+static void smb_server_listener_stop(smb_listener_daemon_t *);
+static void smb_server_listener(smb_thread_t *, void *);
+static void smb_server_receiver(void *);
+static void smb_server_create_session(smb_listener_daemon_t *, ksocket_t);
+static void smb_server_destroy_session(smb_listener_daemon_t *,
+    smb_session_t *);
 
 int smb_event_debug = 0;
 
@@ -379,9 +379,6 @@ smb_server_create(void)
 	smb_llist_constructor(&sv->sp_info.sp_fidlist,
 	    sizeof (smb_spoolfid_t), offsetof(smb_spoolfid_t, sf_lnd));
 
-	smb_session_list_constructor(&sv->sv_nbt_daemon.ld_session_list);
-	smb_session_list_constructor(&sv->sv_tcp_daemon.ld_session_list);
-
 	sv->si_cache_request = kmem_cache_create("smb_request_cache",
 	    sizeof (smb_request_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 	sv->si_cache_session = kmem_cache_create("smb_session_cache",
@@ -400,8 +397,7 @@ smb_server_create(void)
 	    sizeof (smb_event_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 
 	smb_thread_init(&sv->si_thread_timers,
-	    "smb_timers", smb_server_timers, sv,
-	    NULL, NULL);
+	    "smb_timers", smb_server_timers, sv);
 
 	sv->sv_pid = curproc->p_pid;
 	smb_srqueue_init(&sv->sv_srqueue);
@@ -442,8 +438,6 @@ int
 smb_server_delete(void)
 {
 	smb_server_t	*sv;
-	kt_did_t	nbt_tid;
-	kt_did_t	tcp_tid;
 	int		rc;
 
 	rc = smb_server_lookup(&sv);
@@ -457,24 +451,15 @@ smb_server_delete(void)
 	mutex_enter(&sv->sv_mutex);
 	switch (sv->sv_state) {
 	case SMB_SERVER_STATE_RUNNING:
-	case SMB_SERVER_STATE_STOPPING:
 		sv->sv_state = SMB_SERVER_STATE_STOPPING;
-		smb_server_signal_listeners(sv);
-		nbt_tid = smb_server_listener_tid(&sv->sv_nbt_daemon);
-		tcp_tid = smb_server_listener_tid(&sv->sv_tcp_daemon);
-		cv_broadcast(&sv->sp_info.sp_cv);
-
-		sv->sv_state = SMB_SERVER_STATE_DELETING;
 		mutex_exit(&sv->sv_mutex);
-
-		if (nbt_tid != 0)
-			thread_join(nbt_tid);
-		if (tcp_tid != 0)
-			thread_join(tcp_tid);
-
-		smb_server_listen_fini(&sv->sv_nbt_daemon);
-		smb_server_listen_fini(&sv->sv_tcp_daemon);
+		smb_server_shutdown(sv);
 		mutex_enter(&sv->sv_mutex);
+		cv_broadcast(&sv->sp_info.sp_cv);
+		sv->sv_state = SMB_SERVER_STATE_DELETING;
+		break;
+	case SMB_SERVER_STATE_STOPPING:
+		sv->sv_state = SMB_SERVER_STATE_DELETING;
 		break;
 	case SMB_SERVER_STATE_CONFIGURED:
 	case SMB_SERVER_STATE_CREATED:
@@ -499,7 +484,8 @@ smb_server_delete(void)
 	smb_llist_remove(&smb_servers, sv);
 	smb_llist_exit(&smb_servers);
 
-	smb_server_shutdown(sv);
+	smb_server_listener_destroy(&sv->sv_nbt_daemon);
+	smb_server_listener_destroy(&sv->sv_tcp_daemon);
 	rw_destroy(&sv->sv_cfg_lock);
 	smb_opipe_door_fini();
 	smb_kdoor_fini();
@@ -577,6 +563,7 @@ int
 smb_server_start(smb_ioc_start_t *ioc)
 {
 	int		rc = 0;
+	int		family;
 	smb_server_t	*sv;
 
 	rc = smb_server_lookup(&sv);
@@ -588,14 +575,19 @@ smb_server_start(smb_ioc_start_t *ioc)
 	case SMB_SERVER_STATE_CONFIGURED:
 		smb_codepage_init();
 
-		sv->sv_thread_pool = taskq_create("smb_workers",
+		sv->sv_worker_pool = taskq_create("smb_workers",
 		    sv->sv_cfg.skc_maxworkers, SMB_WORKER_PRIORITY,
 		    sv->sv_cfg.skc_maxworkers, INT_MAX,
 		    TASKQ_DYNAMIC|TASKQ_PREPOPULATE);
 
+		sv->sv_receiver_pool = taskq_create("smb_receivers",
+		    sv->sv_cfg.skc_maxconnections, SMB_WORKER_PRIORITY,
+		    sv->sv_cfg.skc_maxconnections, INT_MAX,
+		    TASKQ_DYNAMIC);
+
 		sv->sv_session = smb_session_create(NULL, 0, sv, 0);
 
-		if (sv->sv_thread_pool == NULL || sv->sv_session == NULL) {
+		if (sv->sv_worker_pool == NULL || sv->sv_session == NULL) {
 			rc = ENOMEM;
 			break;
 		}
@@ -616,11 +608,25 @@ smb_server_start(smb_ioc_start_t *ioc)
 		}
 		if (rc = smb_thread_start(&sv->si_thread_timers))
 			break;
+
+		family = AF_INET;
+		smb_server_listener_init(sv, &sv->sv_nbt_daemon,
+		    "smb_nbt_listener", IPPORT_NETBIOS_SSN, family);
+		if (sv->sv_cfg.skc_ipv6_enable)
+			family = AF_INET6;
+		smb_server_listener_init(sv, &sv->sv_tcp_daemon,
+		    "smb_tcp_listener", IPPORT_SMB, family);
+		rc = smb_server_listener_start(&sv->sv_nbt_daemon);
+		if (rc != 0)
+			break;
+		rc = smb_server_listener_start(&sv->sv_tcp_daemon);
+		if (rc != 0)
+			break;
+
 		sv->sv_state = SMB_SERVER_STATE_RUNNING;
 		sv->sv_start_time = gethrtime();
 		mutex_exit(&sv->sv_mutex);
 		smb_server_release(sv);
-
 		smb_export_start();
 		return (0);
 	default:
@@ -630,8 +636,8 @@ smb_server_start(smb_ioc_start_t *ioc)
 		return (ENOTTY);
 	}
 
-	smb_server_shutdown(sv);
 	mutex_exit(&sv->sv_mutex);
+	smb_server_shutdown(sv);
 	smb_server_release(sv);
 	return (rc);
 }
@@ -652,7 +658,9 @@ smb_server_stop(void)
 	switch (sv->sv_state) {
 	case SMB_SERVER_STATE_RUNNING:
 		sv->sv_state = SMB_SERVER_STATE_STOPPING;
-		smb_server_signal_listeners(sv);
+		mutex_exit(&sv->sv_mutex);
+		smb_server_shutdown(sv);
+		mutex_enter(&sv->sv_mutex);
 		cv_broadcast(&sv->sp_info.sp_cv);
 		break;
 	default:
@@ -715,148 +723,6 @@ smb_server_notify_event(smb_ioc_event_t *ioc)
 
 	if ((rc = smb_server_lookup(&sv)) == 0) {
 		smb_event_notify(sv, ioc->txid);
-		smb_server_release(sv);
-	}
-
-	return (rc);
-}
-
-/*
- * SMB-over-NetBIOS (port 139)
- *
- * Traditional SMB service over NetBIOS, which requires that a NetBIOS
- * session be established.
- */
-int
-smb_server_nbt_listen(smb_ioc_listen_t *ioc)
-{
-	smb_server_t	*sv;
-	int		rc;
-
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (rc);
-
-	mutex_enter(&sv->sv_mutex);
-	switch (sv->sv_state) {
-	case SMB_SERVER_STATE_RUNNING:
-		if ((sv->sv_nbt_daemon.ld_kth != NULL) &&
-		    (sv->sv_nbt_daemon.ld_kth != curthread)) {
-			mutex_exit(&sv->sv_mutex);
-			smb_server_release(sv);
-			return (EACCES);
-		} else {
-			sv->sv_nbt_daemon.ld_kth = curthread;
-			sv->sv_nbt_daemon.ld_ktdid = curthread->t_did;
-		}
-		break;
-	case SMB_SERVER_STATE_STOPPING:
-		mutex_exit(&sv->sv_mutex);
-		smb_server_release(sv);
-		return (ECANCELED);
-	default:
-		SMB_SERVER_STATE_VALID(sv->sv_state);
-		mutex_exit(&sv->sv_mutex);
-		smb_server_release(sv);
-		return (EFAULT);
-	}
-	mutex_exit(&sv->sv_mutex);
-
-	/*
-	 * netbios must be ipv4
-	 */
-	rc = smb_server_listen(sv, &sv->sv_nbt_daemon, IPPORT_NETBIOS_SSN,
-	    AF_INET, ioc->error);
-
-	mutex_enter(&sv->sv_mutex);
-	sv->sv_nbt_daemon.ld_kth = NULL;
-	mutex_exit(&sv->sv_mutex);
-
-	smb_server_release(sv);
-	return (rc);
-}
-
-/*
- *  SMB-over-TCP (port 445)
- */
-int
-smb_server_tcp_listen(smb_ioc_listen_t *ioc)
-{
-	smb_server_t	*sv;
-	int		rc;
-
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (rc);
-
-	mutex_enter(&sv->sv_mutex);
-	switch (sv->sv_state) {
-	case SMB_SERVER_STATE_RUNNING:
-		if ((sv->sv_tcp_daemon.ld_kth != NULL) &&
-		    (sv->sv_tcp_daemon.ld_kth != curthread)) {
-			mutex_exit(&sv->sv_mutex);
-			smb_server_release(sv);
-			return (EACCES);
-		} else {
-			sv->sv_tcp_daemon.ld_kth = curthread;
-			sv->sv_tcp_daemon.ld_ktdid = curthread->t_did;
-		}
-		break;
-	case SMB_SERVER_STATE_STOPPING:
-		mutex_exit(&sv->sv_mutex);
-		smb_server_release(sv);
-		return (ECANCELED);
-	default:
-		SMB_SERVER_STATE_VALID(sv->sv_state);
-		mutex_exit(&sv->sv_mutex);
-		smb_server_release(sv);
-		return (EFAULT);
-	}
-	mutex_exit(&sv->sv_mutex);
-
-	if (sv->sv_cfg.skc_ipv6_enable)
-		rc = smb_server_listen(sv, &sv->sv_tcp_daemon,
-		    IPPORT_SMB, AF_INET6, ioc->error);
-	else
-		rc = smb_server_listen(sv, &sv->sv_tcp_daemon,
-		    IPPORT_SMB, AF_INET, ioc->error);
-
-	mutex_enter(&sv->sv_mutex);
-	sv->sv_tcp_daemon.ld_kth = NULL;
-	mutex_exit(&sv->sv_mutex);
-
-	smb_server_release(sv);
-	return (rc);
-}
-
-/*
- * smb_server_nbt_receive
- */
-int
-smb_server_nbt_receive(void)
-{
-	int		rc;
-	smb_server_t	*sv;
-
-	if ((rc = smb_server_lookup(&sv)) == 0) {
-		rc = smb_session_daemon(&sv->sv_nbt_daemon.ld_session_list);
-		smb_server_release(sv);
-	}
-
-	return (rc);
-}
-
-/*
- * smb_server_tcp_receive
- */
-int
-smb_server_tcp_receive(void)
-{
-	int		rc;
-	smb_server_t	*sv;
-
-	if ((rc = smb_server_lookup(&sv)) == 0) {
-		rc = smb_session_daemon(&sv->sv_tcp_daemon.ld_session_list);
 		smb_server_release(sv);
 	}
 
@@ -947,10 +813,9 @@ smb_server_numopen(smb_ioc_opennum_t *ioc)
 int
 smb_server_enum(smb_ioc_svcenum_t *ioc)
 {
-	smb_svcenum_t		*svcenum = &ioc->svcenum;
-	smb_server_t		*sv;
-	smb_session_list_t	*se;
-	int			rc;
+	smb_svcenum_t	*svcenum = &ioc->svcenum;
+	smb_server_t	*sv;
+	int		rc;
 
 	switch (svcenum->se_type) {
 	case SMB_SVCENUM_TYPE_USER:
@@ -968,11 +833,8 @@ smb_server_enum(smb_ioc_svcenum_t *ioc)
 	svcenum->se_bused = 0;
 	svcenum->se_nitems = 0;
 
-	se = &sv->sv_nbt_daemon.ld_session_list;
-	smb_server_enum_private(se, svcenum);
-
-	se = &sv->sv_tcp_daemon.ld_session_list;
-	smb_server_enum_private(se, svcenum);
+	smb_server_enum_private(&sv->sv_nbt_daemon.ld_session_list, svcenum);
+	smb_server_enum_private(&sv->sv_tcp_daemon.ld_session_list, svcenum);
 
 	smb_server_release(sv);
 	return (0);
@@ -984,20 +846,20 @@ smb_server_enum(smb_ioc_svcenum_t *ioc)
 int
 smb_server_session_close(smb_ioc_session_t *ioc)
 {
-	smb_session_list_t	*se;
-	smb_server_t		*sv;
-	int			nbt_cnt;
-	int			tcp_cnt;
-	int			rc;
+	smb_llist_t	*ll;
+	smb_server_t	*sv;
+	int		nbt_cnt;
+	int		tcp_cnt;
+	int		rc;
 
 	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
 
-	se = &sv->sv_nbt_daemon.ld_session_list;
-	nbt_cnt = smb_server_sesion_disconnect(se, ioc->client, ioc->username);
+	ll = &sv->sv_nbt_daemon.ld_session_list;
+	nbt_cnt = smb_server_session_disconnect(ll, ioc->client, ioc->username);
 
-	se = &sv->sv_tcp_daemon.ld_session_list;
-	tcp_cnt = smb_server_sesion_disconnect(se, ioc->client, ioc->username);
+	ll = &sv->sv_tcp_daemon.ld_session_list;
+	tcp_cnt = smb_server_session_disconnect(ll, ioc->client, ioc->username);
 
 	smb_server_release(sv);
 
@@ -1012,20 +874,20 @@ smb_server_session_close(smb_ioc_session_t *ioc)
 int
 smb_server_file_close(smb_ioc_fileid_t *ioc)
 {
-	uint32_t		uniqid = ioc->uniqid;
-	smb_session_list_t	*se;
-	smb_server_t		*sv;
-	int			rc;
+	uint32_t	uniqid = ioc->uniqid;
+	smb_llist_t	*ll;
+	smb_server_t	*sv;
+	int		rc;
 
 	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
 
-	se = &sv->sv_nbt_daemon.ld_session_list;
-	rc = smb_server_fclose(se, uniqid);
+	ll = &sv->sv_nbt_daemon.ld_session_list;
+	rc = smb_server_fclose(ll, uniqid);
 
 	if (rc == ENOENT) {
-		se = &sv->sv_tcp_daemon.ld_session_list;
-		rc = smb_server_fclose(se, uniqid);
+		ll = &sv->sv_tcp_daemon.ld_session_list;
+		rc = smb_server_fclose(ll, uniqid);
 	}
 
 	smb_server_release(sv);
@@ -1045,12 +907,8 @@ smb_server_get_session_count(void)
 	if (smb_server_lookup(&sv))
 		return (0);
 
-	rw_enter(&sv->sv_nbt_daemon.ld_session_list.se_lock, RW_READER);
-	counter = sv->sv_nbt_daemon.ld_session_list.se_act.count;
-	rw_exit(&sv->sv_nbt_daemon.ld_session_list.se_lock);
-	rw_enter(&sv->sv_tcp_daemon.ld_session_list.se_lock, RW_READER);
-	counter += sv->sv_tcp_daemon.ld_session_list.se_act.count;
-	rw_exit(&sv->sv_tcp_daemon.ld_session_list.se_lock);
+	counter = smb_llist_get_count(&sv->sv_nbt_daemon.ld_session_list);
+	counter += smb_llist_get_count(&sv->sv_tcp_daemon.ld_session_list);
 
 	smb_server_release(sv);
 
@@ -1155,9 +1013,9 @@ smb_server_share(void *arg, boolean_t add_share)
 int
 smb_server_unshare(const char *sharename)
 {
-	smb_server_t		*sv;
-	smb_session_list_t	*slist;
-	int			rc;
+	smb_server_t	*sv;
+	smb_llist_t	*ll;
+	int		rc;
 
 	if ((rc = smb_server_lookup(&sv)))
 		return (rc);
@@ -1174,11 +1032,11 @@ smb_server_unshare(const char *sharename)
 	}
 	mutex_exit(&sv->sv_mutex);
 
-	slist = &sv->sv_nbt_daemon.ld_session_list;
-	smb_server_disconnect_share(slist, sharename);
+	ll = &sv->sv_nbt_daemon.ld_session_list;
+	smb_server_disconnect_share(ll, sharename);
 
-	slist = &sv->sv_tcp_daemon.ld_session_list;
-	smb_server_disconnect_share(slist, sharename);
+	ll = &sv->sv_tcp_daemon.ld_session_list;
+	smb_server_disconnect_share(ll, sharename);
 
 	smb_server_release(sv);
 	return (0);
@@ -1189,15 +1047,15 @@ smb_server_unshare(const char *sharename)
  * Typically called when a share has been removed.
  */
 static void
-smb_server_disconnect_share(smb_session_list_t *slist, const char *sharename)
+smb_server_disconnect_share(smb_llist_t *ll, const char *sharename)
 {
-	smb_session_t		*session;
+	smb_session_t	*session;
 
-	rw_enter(&slist->se_lock, RW_READER);
+	smb_llist_enter(ll, RW_READER);
 
-	session = list_head(&slist->se_act.lst);
+	session = smb_llist_head(ll);
 	while (session) {
-		ASSERT(session->s_magic == SMB_SESSION_MAGIC);
+		SMB_SESSION_VALID(session);
 		smb_rwx_rwenter(&session->s_lock, RW_READER);
 		switch (session->s_state) {
 		case SMB_SESSION_STATE_NEGOTIATED:
@@ -1209,10 +1067,10 @@ smb_server_disconnect_share(smb_session_list_t *slist, const char *sharename)
 			break;
 		}
 		smb_rwx_rwexit(&session->s_lock);
-		session = list_next(&slist->se_act.lst, session);
+		session = smb_llist_next(ll, session);
 	}
 
-	rw_exit(&slist->se_lock);
+	smb_llist_exit(ll);
 }
 
 /*
@@ -1522,7 +1380,7 @@ smb_server_legacy_kstat_update(kstat_t *ksp, int rw)
 }
 
 /*
- * The mutex of the server must have been entered before calling this function.
+ * smb_server_shutdown
  */
 static void
 smb_server_shutdown(smb_server_t *sv)
@@ -1537,110 +1395,185 @@ smb_server_shutdown(smb_server_t *sv)
 	smb_export_stop();
 	smb_server_fsop_stop(sv);
 
-	if (sv->sv_session) {
+	smb_server_listener_stop(&sv->sv_nbt_daemon);
+	smb_server_listener_stop(&sv->sv_tcp_daemon);
+
+	if (sv->sv_session != NULL) {
 		smb_session_delete(sv->sv_session);
 		sv->sv_session = NULL;
 	}
 
-	if (sv->sv_thread_pool) {
-		taskq_destroy(sv->sv_thread_pool);
-		sv->sv_thread_pool = NULL;
+	if (sv->sv_receiver_pool != NULL) {
+		taskq_destroy(sv->sv_receiver_pool);
+		sv->sv_receiver_pool = NULL;
+	}
+
+	if (sv->sv_worker_pool != NULL) {
+		taskq_destroy(sv->sv_worker_pool);
+		sv->sv_worker_pool = NULL;
 	}
 }
 
-static int
-smb_server_listen(
+/*
+ * smb_server_listener_init
+ *
+ * Initializes listener contexts.
+ */
+static void
+smb_server_listener_init(
     smb_server_t		*sv,
     smb_listener_daemon_t	*ld,
+    char			*name,
     in_port_t			port,
-    int				family,
-    int				pthread_create_error)
+    int				family)
 {
-	int			rc = 0;
-	ksocket_t		s_so;
-	uint32_t		on;
-	uint32_t		off;
-	uint32_t		txbuf_size;
-	smb_session_t		*session;
+	ASSERT(ld->ld_magic != SMB_LISTENER_MAGIC);
 
-	if (pthread_create_error) {
-		/*
-		 * Delete the last session created. The user space thread
-		 * creation failed.
-		 */
-		smb_session_list_delete_tail(&ld->ld_session_list);
+	bzero(ld, sizeof (*ld));
+
+	ld->ld_sv = sv;
+	ld->ld_family = family;
+	ld->ld_port = port;
+
+	if (family == AF_INET) {
+		ld->ld_sin.sin_family = (uint32_t)family;
+		ld->ld_sin.sin_port = htons(port);
+		ld->ld_sin.sin_addr.s_addr = htonl(INADDR_ANY);
+	} else {
+		ld->ld_sin6.sin6_family = (uint32_t)family;
+		ld->ld_sin6.sin6_port = htons(port);
+		(void) memset(&ld->ld_sin6.sin6_addr.s6_addr, 0,
+		    sizeof (ld->ld_sin6.sin6_addr.s6_addr));
 	}
 
+	smb_llist_constructor(&ld->ld_session_list, sizeof (smb_session_t),
+	    offsetof(smb_session_t, s_lnd));
+	smb_thread_init(&ld->ld_thread, name, smb_server_listener, ld);
+	ld->ld_magic = SMB_LISTENER_MAGIC;
+}
+
+/*
+ * smb_server_listener_destroy
+ *
+ * Destroyes listener contexts.
+ */
+static void
+smb_server_listener_destroy(smb_listener_daemon_t *ld)
+{
+	SMB_LISTENER_VALID(ld);
+	ASSERT(ld->ld_so == NULL);
+	smb_thread_destroy(&ld->ld_thread);
+	smb_llist_destructor(&ld->ld_session_list);
+	ld->ld_magic = 0;
+}
+
+/*
+ * smb_server_listener_start
+ *
+ * Starts the listener associated with the context passed in.
+ *
+ * Return:	0	Success
+ *		not 0	Failure
+ */
+static int
+smb_server_listener_start(smb_listener_daemon_t *ld)
+{
+	int		rc;
+	uint32_t	on;
+	uint32_t	off;
+
+	SMB_LISTENER_VALID(ld);
+
+	if (ld->ld_so != NULL)
+		return (EINVAL);
+
+	ld->ld_so = smb_socreate(ld->ld_family, SOCK_STREAM, 0);
 	if (ld->ld_so == NULL) {
-		/* First time listener */
-		if (family == AF_INET) {
-			ld->ld_sin.sin_family = (uint32_t)family;
-			ld->ld_sin.sin_port = htons(port);
-			ld->ld_sin.sin_addr.s_addr = htonl(INADDR_ANY);
-		} else {
-			ld->ld_sin6.sin6_family = (uint32_t)family;
-			ld->ld_sin6.sin6_port = htons(port);
-			(void) memset(&ld->ld_sin6.sin6_addr.s6_addr, 0,
-			    sizeof (ld->ld_sin6.sin6_addr.s6_addr));
-		}
-
-		ld->ld_so = smb_socreate(family, SOCK_STREAM, 0);
-		if (ld->ld_so == NULL) {
-			cmn_err(CE_WARN, "port %d: socket create failed", port);
-			return (ENOMEM);
-		}
-
-		off = 0;
-		(void) ksocket_setsockopt(ld->ld_so, SOL_SOCKET,
-		    SO_MAC_EXEMPT, &off, sizeof (off), CRED());
-
-		on = 1;
-		(void) ksocket_setsockopt(ld->ld_so, SOL_SOCKET,
-		    SO_REUSEADDR, &on, sizeof (on), CRED());
-
-		if (family == AF_INET) {
-			rc = ksocket_bind(ld->ld_so,
-			    (struct sockaddr *)&ld->ld_sin,
-			    sizeof (ld->ld_sin), CRED());
-		} else {
-			rc = ksocket_bind(ld->ld_so,
-			    (struct sockaddr *)&ld->ld_sin6,
-			    sizeof (ld->ld_sin6), CRED());
-		}
-
-		if (rc != 0) {
-			cmn_err(CE_WARN, "port %d: bind failed (%d)", port, rc);
-			smb_server_listen_fini(ld);
-			return (rc);
-		}
-
-		rc =  ksocket_listen(ld->ld_so, 20, CRED());
-		if (rc < 0) {
-			cmn_err(CE_WARN, "port %d: listen failed", port);
-			smb_server_listen_fini(ld);
-			return (rc);
-		}
+		cmn_err(CE_WARN, "port %d: socket create failed", ld->ld_port);
+		return (ENOMEM);
 	}
+
+	off = 0;
+	(void) ksocket_setsockopt(ld->ld_so, SOL_SOCKET,
+	    SO_MAC_EXEMPT, &off, sizeof (off), CRED());
+
+	on = 1;
+	(void) ksocket_setsockopt(ld->ld_so, SOL_SOCKET,
+	    SO_REUSEADDR, &on, sizeof (on), CRED());
+
+	if (ld->ld_family == AF_INET) {
+		rc = ksocket_bind(ld->ld_so,
+		    (struct sockaddr *)&ld->ld_sin,
+		    sizeof (ld->ld_sin), CRED());
+	} else {
+		rc = ksocket_bind(ld->ld_so,
+		    (struct sockaddr *)&ld->ld_sin6,
+		    sizeof (ld->ld_sin6), CRED());
+	}
+
+	if (rc != 0) {
+		cmn_err(CE_WARN, "port %d: bind failed", ld->ld_port);
+		return (rc);
+	}
+
+	rc =  ksocket_listen(ld->ld_so, 20, CRED());
+	if (rc < 0) {
+		cmn_err(CE_WARN, "port %d: listen failed", ld->ld_port);
+		return (rc);
+	}
+
+	ksocket_hold(ld->ld_so);
+	rc = smb_thread_start(&ld->ld_thread);
+	if (rc != 0) {
+		ksocket_rele(ld->ld_so);
+		cmn_err(CE_WARN, "port %d: listener failed to start",
+		    ld->ld_port);
+		return (rc);
+	}
+	return (0);
+}
+
+/*
+ * smb_server_listener_stop
+ *
+ * Stops the listener associated with the context passed in.
+ */
+static void
+smb_server_listener_stop(smb_listener_daemon_t *ld)
+{
+	SMB_LISTENER_VALID(ld);
+
+	if (ld->ld_so != NULL) {
+		smb_soshutdown(ld->ld_so);
+		smb_sodestroy(ld->ld_so);
+		smb_thread_stop(&ld->ld_thread);
+		ld->ld_so = NULL;
+	}
+}
+
+/*
+ * smb_server_listener
+ *
+ * Entry point of the listeners.
+ */
+static void
+smb_server_listener(smb_thread_t *thread, void *arg)
+{
+	_NOTE(ARGUNUSED(thread))
+	smb_listener_daemon_t	*ld;
+	smb_session_t		*session;
+	ksocket_t		s_so;
+	int			on;
+	int			txbuf_size;
+
+	ld = (smb_listener_daemon_t *)arg;
+
+	SMB_LISTENER_VALID(ld);
 
 	DTRACE_PROBE1(so__wait__accept, struct sonode *, ld->ld_so);
 
-	for (;;) {
-		if (smb_server_is_stopping()) {
-			rc = ECANCELED;
-			break;
-		}
-
-		rc = ksocket_accept(ld->ld_so, NULL, NULL, &s_so, CRED());
-		if (rc != 0)
-			break;
-
-		if (smb_server_is_stopping()) {
-			smb_soshutdown(s_so);
-			smb_sodestroy(s_so);
-			rc = ECANCELED;
-			break;
-		}
-
+	while (ksocket_accept(ld->ld_so, NULL, NULL, &s_so, CRED())
+	    == 0) {
 		DTRACE_PROBE1(so__accept, struct sonode *, s_so);
 
 		on = 1;
@@ -1658,45 +1591,35 @@ smb_server_listen(
 		/*
 		 * Create a session for this connection.
 		 */
-		session = smb_session_create(s_so, port, sv, family);
-		if (session) {
-			smb_session_list_append(&ld->ld_session_list, session);
-			rc = 0;
-			break;
-		} else {
-			smb_soshutdown(s_so);
-			smb_sodestroy(s_so);
-		}
+		smb_server_create_session(ld, s_so);
 	}
-
-	if (rc != 0)
-		smb_server_listen_fini(ld);
-
-	return (rc);
+	/* Disconnect all the sessions this listener created. */
+	smb_llist_enter(&ld->ld_session_list, RW_READER);
+	session = smb_llist_head(&ld->ld_session_list);
+	while (session != NULL) {
+		smb_session_disconnect(session);
+		session = smb_llist_next(&ld->ld_session_list, session);
+	}
+	smb_llist_exit(&ld->ld_session_list);
+	ksocket_rele(ld->ld_so);
 }
 
+/*
+ * smb_server_receiver
+ *
+ * Entry point of the receiver threads.
+ */
 static void
-smb_server_listen_fini(smb_listener_daemon_t *ld)
+smb_server_receiver(void *arg)
 {
-	if (ld->ld_so != NULL) {
-		smb_session_list_signal(&ld->ld_session_list);
-		smb_soshutdown(ld->ld_so);
-		smb_sodestroy(ld->ld_so);
-		ld->ld_so = NULL;
-	}
-}
+	smb_listener_daemon_t	*ld;
+	smb_session_t		*session;
 
-static kt_did_t
-smb_server_listener_tid(smb_listener_daemon_t *ld)
-{
-	kt_did_t	tid = 0;
-
-	if (ld->ld_ktdid != 0) {
-		tid = ld->ld_ktdid;
-		ld->ld_ktdid = 0;
-	}
-
-	return (tid);
+	ld = ((smb_receiver_arg_t *)arg)->ra_listener;
+	session = ((smb_receiver_arg_t *)arg)->ra_session;
+	smb_mem_free(arg);
+	smb_session_receiver(session);
+	smb_server_destroy_session(ld, session);
 }
 
 /*
@@ -1758,18 +1681,18 @@ smb_server_release(smb_server_t *sv)
  * Enumerate the users associated with a session list.
  */
 static void
-smb_server_enum_private(smb_session_list_t *se, smb_svcenum_t *svcenum)
+smb_server_enum_private(smb_llist_t *ll, smb_svcenum_t *svcenum)
 {
 	smb_session_t	*sn;
 	smb_llist_t	*ulist;
 	smb_user_t	*user;
 	int		rc = 0;
 
-	rw_enter(&se->se_lock, RW_READER);
-	sn = list_head(&se->se_act.lst);
+	smb_llist_enter(ll, RW_READER);
+	sn = smb_llist_head(ll);
 
 	while (sn != NULL) {
-		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
+		SMB_SESSION_VALID(sn);
 		ulist = &sn->s_user_list;
 		smb_llist_enter(ulist, RW_READER);
 		user = smb_llist_head(ulist);
@@ -1788,10 +1711,10 @@ smb_server_enum_private(smb_session_list_t *se, smb_svcenum_t *svcenum)
 		if (rc != 0)
 			break;
 
-		sn = list_next(&se->se_act.lst, sn);
+		sn = smb_llist_next(ll, sn);
 	}
 
-	rw_exit(&se->se_lock);
+	smb_llist_exit(ll);
 }
 
 /*
@@ -1799,7 +1722,7 @@ smb_server_enum_private(smb_session_list_t *se, smb_svcenum_t *svcenum)
  * Empty strings are treated as wildcards.
  */
 static int
-smb_server_sesion_disconnect(smb_session_list_t *se,
+smb_server_session_disconnect(smb_llist_t *ll,
     const char *client, const char *name)
 {
 	smb_session_t	*sn;
@@ -1808,14 +1731,14 @@ smb_server_sesion_disconnect(smb_session_list_t *se,
 	boolean_t	match;
 	int		count = 0;
 
-	rw_enter(&se->se_lock, RW_READER);
-	sn = list_head(&se->se_act.lst);
+	smb_llist_enter(ll, RW_READER);
+	sn = smb_llist_head(ll);
 
 	while (sn != NULL) {
-		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
+		SMB_SESSION_VALID(sn);
 
 		if ((*client != '\0') && (!smb_session_isclient(sn, client))) {
-			sn = list_next(&se->se_act.lst, sn);
+			sn = smb_llist_next(ll, sn);
 			continue;
 		}
 
@@ -1846,10 +1769,10 @@ smb_server_sesion_disconnect(smb_session_list_t *se,
 		}
 
 		smb_llist_exit(ulist);
-		sn = list_next(&se->se_act.lst, sn);
+		sn = smb_llist_next(ll, sn);
 	}
 
-	rw_exit(&se->se_lock);
+	smb_llist_exit(ll);
 	return (count);
 }
 
@@ -1857,18 +1780,18 @@ smb_server_sesion_disconnect(smb_session_list_t *se,
  * Close a file by its unique id.
  */
 static int
-smb_server_fclose(smb_session_list_t *se, uint32_t uniqid)
+smb_server_fclose(smb_llist_t *ll, uint32_t uniqid)
 {
 	smb_session_t	*sn;
 	smb_llist_t	*ulist;
 	smb_user_t	*user;
 	int		rc = ENOENT;
 
-	rw_enter(&se->se_lock, RW_READER);
-	sn = list_head(&se->se_act.lst);
+	smb_llist_enter(ll, RW_READER);
+	sn = smb_llist_head(ll);
 
 	while ((sn != NULL) && (rc == ENOENT)) {
-		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
+		SMB_SESSION_VALID(sn);
 		ulist = &sn->s_user_list;
 		smb_llist_enter(ulist, RW_READER);
 		user = smb_llist_head(ulist);
@@ -1883,10 +1806,10 @@ smb_server_fclose(smb_session_list_t *se, uint32_t uniqid)
 		}
 
 		smb_llist_exit(ulist);
-		sn = list_next(&se->se_act.lst, sn);
+		sn = smb_llist_next(ll, sn);
 	}
 
-	rw_exit(&se->se_lock);
+	smb_llist_exit(ll);
 	return (rc);
 }
 
@@ -1942,26 +1865,6 @@ smb_server_fsop_stop(smb_server_t *sv)
 	if (sv->si_root_smb_node != NULL) {
 		smb_node_release(sv->si_root_smb_node);
 		sv->si_root_smb_node = NULL;
-	}
-}
-
-static void
-smb_server_signal_listeners(smb_server_t *sv)
-{
-	SMB_SERVER_VALID(sv);
-	ASSERT(sv->sv_state == SMB_SERVER_STATE_STOPPING);
-	ASSERT(MUTEX_HELD(&sv->sv_mutex));
-
-	smb_event_cancel(sv, 0);
-
-	if (sv->sv_nbt_daemon.ld_kth != NULL) {
-		tsignal(sv->sv_nbt_daemon.ld_kth, SIGINT);
-		sv->sv_nbt_daemon.ld_kth = NULL;
-	}
-
-	if (sv->sv_tcp_daemon.ld_kth != NULL) {
-		tsignal(sv->sv_tcp_daemon.ld_kth, SIGINT);
-		sv->sv_tcp_daemon.ld_kth = NULL;
 	}
 }
 
@@ -2322,4 +2225,49 @@ smb_spool_add_doc(smb_kspooldoc_t *sp)
 	smb_llist_exit(splist);
 	smb_server_release(sv);
 	return (rc);
+}
+
+/*
+ * smb_server_create_session
+ */
+static void
+smb_server_create_session(smb_listener_daemon_t *ld, ksocket_t s_so)
+{
+	smb_session_t		*session;
+	smb_receiver_arg_t	*rarg;
+
+	session = smb_session_create(s_so, ld->ld_port, ld->ld_sv,
+	    ld->ld_family);
+
+	if (session != NULL) {
+		smb_llist_enter(&ld->ld_session_list, RW_WRITER);
+		smb_llist_insert_tail(&ld->ld_session_list, session);
+		smb_llist_exit(&ld->ld_session_list);
+
+		rarg = (smb_receiver_arg_t *)smb_mem_alloc(
+		    sizeof (smb_receiver_arg_t));
+		rarg->ra_listener = ld;
+		rarg->ra_session = session;
+
+		if (taskq_dispatch(ld->ld_sv->sv_receiver_pool,
+		    smb_server_receiver, rarg, TQ_NOQUEUE) != 0)
+			return;
+
+		smb_mem_free(rarg);
+		smb_session_disconnect(session);
+		smb_server_destroy_session(ld, session);
+	} else {
+		smb_soshutdown(s_so);
+		smb_sodestroy(s_so);
+	}
+	cmn_err(CE_WARN, "SMB Session: creation failed");
+}
+
+static void
+smb_server_destroy_session(smb_listener_daemon_t *ld, smb_session_t *session)
+{
+	smb_llist_enter(&ld->ld_session_list, RW_WRITER);
+	smb_llist_remove(&ld->ld_session_list, session);
+	smb_llist_exit(&ld->ld_session_list);
+	smb_session_delete(session);
 }

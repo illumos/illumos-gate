@@ -63,11 +63,6 @@
 #define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
 #define	SMB_DBDIR "/var/smb"
 
-static void *smbd_nbt_listener(void *);
-static void *smbd_tcp_listener(void *);
-static void *smbd_nbt_receiver(void *);
-static void *smbd_tcp_receiver(void *);
-
 static int smbd_daemonize_init(void);
 static void smbd_daemonize_fini(int, int);
 static int smb_init_daemon_priv(int, uid_t, gid_t);
@@ -96,17 +91,10 @@ static int smbd_refresh_init(void);
 static void smbd_refresh_fini(void);
 static void *smbd_refresh_monitor(void *);
 
-static int smbd_start_listeners(void);
-static void smbd_stop_listeners(void);
 static int smbd_kernel_start(void);
-
-static void smbd_fatal_error(const char *);
 
 static pthread_cond_t refresh_cond;
 static pthread_mutex_t refresh_mutex;
-
-static cond_t listener_cv;
-static mutex_t listener_mutex;
 
 /*
  * Mutex to ensure that smbd_service_fini() and smbd_service_init()
@@ -841,10 +829,7 @@ smbd_kernel_start(void)
 
 	rc = smb_kmod_start(smbd.s_door_opipe, smbd.s_door_lmshr,
 	    smbd.s_door_srv);
-	if (rc != 0)
-		return (rc);
 
-	rc = smbd_start_listeners();
 	if (rc != 0)
 		return (rc);
 
@@ -859,7 +844,6 @@ static void
 smbd_kernel_unbind(void)
 {
 	smbd_spool_fini();
-	smbd_stop_listeners();
 	smb_kmod_unbind();
 	smbd.s_kbound = B_FALSE;
 }
@@ -1076,181 +1060,6 @@ smbd_report(const char *fmt, ...)
 	va_end(ap);
 
 	(void) fprintf(stderr, "smbd: %s\n", buf);
-}
-
-static int
-smbd_start_listeners(void)
-{
-	int		rc1;
-	int		rc2;
-	pthread_attr_t	tattr;
-
-	(void) pthread_attr_init(&tattr);
-
-	if (!smbd.s_nbt_listener_running) {
-		rc1 = pthread_create(&smbd.s_nbt_listener_id, &tattr,
-		    smbd_nbt_listener, NULL);
-		if (rc1 != 0)
-			smbd_report("unable to start NBT service");
-		else
-			smbd.s_nbt_listener_running = B_TRUE;
-	}
-
-	if (!smbd.s_tcp_listener_running) {
-		rc2 = pthread_create(&smbd.s_tcp_listener_id, &tattr,
-		    smbd_tcp_listener, NULL);
-		if (rc2 != 0)
-			smbd_report("unable to start TCP service");
-		else
-			smbd.s_tcp_listener_running = B_TRUE;
-	}
-
-	(void) pthread_attr_destroy(&tattr);
-
-	if (rc1 != 0)
-		return (rc1);
-	return (rc2);
-}
-
-/*
- * Stop the listener threads.  In an attempt to ensure that the listener
- * threads get the signal, we use the timed wait loop to harass the
- * threads into terminating.  Then, if they are still running, we make
- * one final attempt to deliver the signal before calling thread join
- * to wait for them.  Note: if these threads don't terminate, smbd will
- * hang here and SMF will probably end up killing the contract.
- */
-static void
-smbd_stop_listeners(void)
-{
-	void		*status;
-	timestruc_t	delay;
-	int		rc = 0;
-
-	(void) mutex_lock(&listener_mutex);
-
-	while ((smbd.s_nbt_listener_running || smbd.s_tcp_listener_running) &&
-	    (rc != ETIME)) {
-		if (smbd.s_nbt_listener_running)
-			(void) pthread_kill(smbd.s_nbt_listener_id, SIGTERM);
-
-		if (smbd.s_tcp_listener_running)
-			(void) pthread_kill(smbd.s_tcp_listener_id, SIGTERM);
-
-		delay.tv_sec = 3;
-		delay.tv_nsec = 0;
-		rc = cond_reltimedwait(&listener_cv, &listener_mutex, &delay);
-	}
-
-	(void) mutex_unlock(&listener_mutex);
-
-	if (smbd.s_nbt_listener_running) {
-		syslog(LOG_WARNING, "NBT listener still running");
-		(void) pthread_kill(smbd.s_nbt_listener_id, SIGTERM);
-		(void) pthread_join(smbd.s_nbt_listener_id, &status);
-		smbd.s_nbt_listener_running = B_FALSE;
-	}
-
-	if (smbd.s_tcp_listener_running) {
-		syslog(LOG_WARNING, "TCP listener still running");
-		(void) pthread_kill(smbd.s_tcp_listener_id, SIGTERM);
-		(void) pthread_join(smbd.s_tcp_listener_id, &status);
-		smbd.s_tcp_listener_running = B_FALSE;
-	}
-}
-
-/*
- * Perform fatal error exit.
- */
-static void
-smbd_fatal_error(const char *msg)
-{
-	if (msg == NULL)
-		msg = "Fatal error";
-
-	smbd_report("%s", msg);
-	smbd.s_fatal_error = B_TRUE;
-	(void) kill(smbd.s_pid, SIGTERM);
-}
-
-/*ARGSUSED*/
-static void *
-smbd_nbt_receiver(void *arg)
-{
-	(void) smb_kmod_nbtreceive();
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static void *
-smbd_nbt_listener(void *arg)
-{
-	pthread_attr_t	tattr;
-	sigset_t	set;
-	sigset_t	oset;
-	pthread_t	tid;
-	int		error = 0;
-
-	(void) sigfillset(&set);
-	(void) sigdelset(&set, SIGTERM);
-	(void) sigdelset(&set, SIGINT);
-	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-
-	while (smb_kmod_nbtlisten(error) == 0)
-		error = pthread_create(&tid, &tattr, smbd_nbt_receiver, NULL);
-
-	(void) pthread_attr_destroy(&tattr);
-
-	if (!smbd.s_shutting_down)
-		smbd_fatal_error("NBT listener thread terminated unexpectedly");
-
-	(void) mutex_lock(&listener_mutex);
-	smbd.s_nbt_listener_running = B_FALSE;
-	(void) cond_broadcast(&listener_cv);
-	(void) mutex_unlock(&listener_mutex);
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static void *
-smbd_tcp_receiver(void *arg)
-{
-	(void) smb_kmod_tcpreceive();
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static void *
-smbd_tcp_listener(void *arg)
-{
-	pthread_attr_t	tattr;
-	sigset_t	set;
-	sigset_t	oset;
-	pthread_t	tid;
-	int		error = 0;
-
-	(void) sigfillset(&set);
-	(void) sigdelset(&set, SIGTERM);
-	(void) sigdelset(&set, SIGINT);
-	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-
-	while (smb_kmod_tcplisten(error) == 0)
-		error = pthread_create(&tid, &tattr, smbd_tcp_receiver, NULL);
-
-	(void) pthread_attr_destroy(&tattr);
-
-	if (!smbd.s_shutting_down)
-		smbd_fatal_error("TCP listener thread terminated unexpectedly");
-
-	(void) mutex_lock(&listener_mutex);
-	smbd.s_tcp_listener_running = B_FALSE;
-	(void) cond_broadcast(&listener_cv);
-	(void) mutex_unlock(&listener_mutex);
-	return (NULL);
 }
 
 /*

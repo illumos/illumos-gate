@@ -46,30 +46,28 @@ static void smb_request_init_command_mbuf(smb_request_t *sr);
 void dump_smb_inaddr(smb_inaddr_t *ipaddr);
 
 void
-smb_session_timers(smb_session_list_t *se)
+smb_session_timers(smb_llist_t *ll)
 {
 	smb_session_t	*session;
 
-	rw_enter(&se->se_lock, RW_READER);
-	session = list_head(&se->se_act.lst);
-	while (session) {
+	smb_llist_enter(ll, RW_READER);
+	session = smb_llist_head(ll);
+	while (session != NULL) {
 		/*
 		 * Walk through the table and decrement each keep_alive
 		 * timer that has not timed out yet. (keepalive > 0)
 		 */
-		ASSERT(session->s_magic == SMB_SESSION_MAGIC);
+		SMB_SESSION_VALID(session);
 		if (session->keep_alive &&
 		    (session->keep_alive != (uint32_t)-1))
 			session->keep_alive--;
-		session = list_next(&se->se_act.lst, session);
+		session = smb_llist_next(ll, session);
 	}
-	rw_exit(&se->se_lock);
+	smb_llist_exit(ll);
 }
 
 void
-smb_session_correct_keep_alive_values(
-    smb_session_list_t	*se,
-    uint32_t		new_keep_alive)
+smb_session_correct_keep_alive_values(smb_llist_t *ll, uint32_t new_keep_alive)
 {
 	smb_session_t		*sn;
 
@@ -84,21 +82,15 @@ smb_session_correct_keep_alive_values(
 	 * Walk through the table and set each session to the new keep_alive
 	 * value if they have not already timed out.  Block clock interrupts.
 	 */
-	rw_enter(&se->se_lock, RW_READER);
-	sn = list_head(&se->se_rdy.lst);
-	while (sn) {
-		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
-		sn->keep_alive = new_keep_alive;
-		sn = list_next(&se->se_rdy.lst, sn);
-	}
-	sn = list_head(&se->se_act.lst);
-	while (sn) {
-		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
-		if (sn->keep_alive)
+	smb_llist_enter(ll, RW_READER);
+	sn = smb_llist_head(ll);
+	while (sn != NULL) {
+		SMB_SESSION_VALID(sn);
+		if (sn->keep_alive != 0)
 			sn->keep_alive = new_keep_alive;
-		sn = list_next(&se->se_act.lst, sn);
+		sn = smb_llist_next(ll, sn);
 	}
-	rw_exit(&se->se_lock);
+	smb_llist_exit(ll);
 }
 
 /*
@@ -121,25 +113,25 @@ smb_session_correct_keep_alive_values(
  * there is no NetBIOS name.  See also Knowledge Base article Q301673.
  */
 void
-smb_session_reconnection_check(smb_session_list_t *se, smb_session_t *sess)
+smb_session_reconnection_check(smb_llist_t *ll, smb_session_t *sess)
 {
 	smb_session_t	*sn;
 
-	rw_enter(&se->se_lock, RW_READER);
-	sn = list_head(&se->se_act.lst);
-	while (sn) {
-		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
+	smb_llist_enter(ll, RW_READER);
+	sn = smb_llist_head(ll);
+	while (sn != NULL) {
+		SMB_SESSION_VALID(sn);
 		if ((sn != sess) &&
 		    smb_inet_equal(&sn->ipaddr, &sess->ipaddr) &&
 		    smb_inet_equal(&sn->local_ipaddr, &sess->local_ipaddr) &&
 		    (strcasecmp(sn->workstation, sess->workstation) == 0) &&
 		    (sn->opentime <= sess->opentime) &&
 		    (sn->s_kid < sess->s_kid)) {
-			tsignal(sn->s_thread, SIGUSR1);
+			smb_session_disconnect(sn);
 		}
-		sn = list_next(&se->se_act.lst, sn);
+		sn = smb_llist_next(ll, sn);
 	}
-	rw_exit(&se->se_lock);
+	smb_llist_exit(ll);
 }
 
 /*
@@ -465,34 +457,26 @@ smb_request_cancel(smb_request_t *sr)
 }
 
 /*
- * This is the entry point for processing SMB messages over NetBIOS or
- * SMB-over-TCP.
+ * smb_session_receiver
  *
- * NetBIOS connections require a session request to establish a session
- * on which to send session messages.
- *
- * Session requests are not valid on SMB-over-TCP.  We don't need to do
- * anything here as session requests will be treated as an error when
- * handling session messages.
+ * Receives request from the network and dispatches them to a worker.
  */
-int
-smb_session_daemon(smb_session_list_t *se)
+void
+smb_session_receiver(smb_session_t *session)
 {
-	int		rc = 0;
-	smb_session_t	*session;
+	int	rc;
 
-	session = smb_session_list_activate_head(se);
-	if (session == NULL)
-		return (EINVAL);
+	SMB_SESSION_VALID(session);
+
+	session->s_thread = curthread;
 
 	if (session->s_local_port == IPPORT_NETBIOS_SSN) {
 		rc = smb_session_request(session);
-		if (rc) {
+		if (rc != 0) {
 			smb_rwx_rwenter(&session->s_lock, RW_WRITER);
 			session->s_state = SMB_SESSION_STATE_DISCONNECTED;
 			smb_rwx_rwexit(&session->s_lock);
-			smb_session_list_terminate(se, session);
-			return (rc);
+			return;
 		}
 	}
 
@@ -500,7 +484,7 @@ smb_session_daemon(smb_session_list_t *se)
 	session->s_state = SMB_SESSION_STATE_ESTABLISHED;
 	smb_rwx_rwexit(&session->s_lock);
 
-	rc = smb_session_message(session);
+	(void) smb_session_message(session);
 
 	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
 	session->s_state = SMB_SESSION_STATE_DISCONNECTED;
@@ -511,15 +495,40 @@ smb_session_daemon(smb_session_list_t *se)
 	DTRACE_PROBE2(session__drop, struct session *, session, int, rc);
 
 	smb_session_cancel(session);
-
 	/*
 	 * At this point everything related to the session should have been
 	 * cleaned up and we expect that nothing will attempt to use the
 	 * socket.
 	 */
-	smb_session_list_terminate(se, session);
+}
 
-	return (rc);
+/*
+ * smb_session_disconnect
+ *
+ * Disconnects the session passed in.
+ */
+void
+smb_session_disconnect(smb_session_t *session)
+{
+	SMB_SESSION_VALID(session);
+
+	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
+	switch (session->s_state) {
+	case SMB_SESSION_STATE_INITIALIZED:
+	case SMB_SESSION_STATE_CONNECTED:
+	case SMB_SESSION_STATE_ESTABLISHED:
+	case SMB_SESSION_STATE_NEGOTIATED:
+	case SMB_SESSION_STATE_OPLOCK_BREAKING:
+	case SMB_SESSION_STATE_WRITE_RAW_ACTIVE:
+	case SMB_SESSION_STATE_READ_RAW_ACTIVE:
+		smb_soshutdown(session->sock);
+		session->s_state = SMB_SESSION_STATE_DISCONNECTED;
+		_NOTE(FALLTHRU)
+	case SMB_SESSION_STATE_DISCONNECTED:
+	case SMB_SESSION_STATE_TERMINATED:
+		break;
+	}
+	smb_rwx_rwexit(&session->s_lock);
 }
 
 /*
@@ -640,7 +649,7 @@ smb_session_message(smb_session_t *session)
 		sr->sr_time_submitted = gethrtime();
 		sr->sr_state = SMB_REQ_STATE_SUBMITTED;
 		smb_srqueue_waitq_enter(session->s_srqueue);
-		(void) taskq_dispatch(session->s_server->sv_thread_pool,
+		(void) taskq_dispatch(session->s_server->sv_worker_pool,
 		    smb_session_worker, sr, TQ_SLEEP);
 	}
 }
@@ -747,11 +756,6 @@ smb_session_delete(smb_session_t *session)
 
 	session->s_magic = 0;
 
-	if (session->s_local_port == IPPORT_NETBIOS_SSN)
-		smb_server_dec_nbt_sess(session->s_server);
-	else
-		smb_server_dec_tcp_sess(session->s_server);
-
 	smb_rwx_destroy(&session->s_lock);
 	smb_net_txl_destructor(&session->s_txlst);
 
@@ -771,6 +775,13 @@ smb_session_delete(smb_session_t *session)
 	ASSERT(session->s_dir_cnt == 0);
 
 	smb_idpool_destructor(&session->s_uid_pool);
+	if (session->sock != NULL) {
+		if (session->s_local_port == IPPORT_NETBIOS_SSN)
+			smb_server_dec_nbt_sess(session->s_server);
+		else
+			smb_server_dec_tcp_sess(session->s_server);
+		smb_sodestroy(session->sock);
+	}
 	kmem_cache_free(session->s_cache, session);
 }
 
@@ -866,154 +877,6 @@ smb_session_worker(void	*arg)
 		break;
 	}
 	smb_srqueue_runq_exit(srq);
-}
-
-void
-smb_session_list_constructor(smb_session_list_t *se)
-{
-	bzero(se, sizeof (*se));
-	rw_init(&se->se_lock, NULL, RW_DEFAULT, NULL);
-	list_create(&se->se_rdy.lst, sizeof (smb_session_t),
-	    offsetof(smb_session_t, s_lnd));
-	list_create(&se->se_act.lst, sizeof (smb_session_t),
-	    offsetof(smb_session_t, s_lnd));
-}
-
-void
-smb_session_list_destructor(smb_session_list_t *se)
-{
-	list_destroy(&se->se_rdy.lst);
-	list_destroy(&se->se_act.lst);
-	rw_destroy(&se->se_lock);
-}
-
-void
-smb_session_list_append(smb_session_list_t *se, smb_session_t *session)
-{
-	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-	ASSERT(session->s_state == SMB_SESSION_STATE_INITIALIZED);
-
-	rw_enter(&se->se_lock, RW_WRITER);
-	list_insert_tail(&se->se_rdy.lst, session);
-	se->se_rdy.count++;
-	se->se_wrop++;
-	rw_exit(&se->se_lock);
-}
-
-void
-smb_session_list_delete_tail(smb_session_list_t *se)
-{
-	smb_session_t	*session;
-
-	rw_enter(&se->se_lock, RW_WRITER);
-	session = list_tail(&se->se_rdy.lst);
-	if (session) {
-		ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-		ASSERT(session->s_state == SMB_SESSION_STATE_INITIALIZED);
-		list_remove(&se->se_rdy.lst, session);
-		ASSERT(se->se_rdy.count);
-		se->se_rdy.count--;
-		rw_exit(&se->se_lock);
-		smb_session_delete(session);
-		return;
-	}
-	rw_exit(&se->se_lock);
-}
-
-smb_session_t *
-smb_session_list_activate_head(smb_session_list_t *se)
-{
-	smb_session_t	*session;
-
-	rw_enter(&se->se_lock, RW_WRITER);
-	session = list_head(&se->se_rdy.lst);
-	if (session) {
-		ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-		smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-		ASSERT(session->s_state == SMB_SESSION_STATE_INITIALIZED);
-		session->s_thread = curthread;
-		session->s_ktdid = session->s_thread->t_did;
-		smb_rwx_rwexit(&session->s_lock);
-		list_remove(&se->se_rdy.lst, session);
-		se->se_rdy.count--;
-		list_insert_tail(&se->se_act.lst, session);
-		se->se_act.count++;
-		se->se_wrop++;
-	}
-	rw_exit(&se->se_lock);
-	return (session);
-}
-
-void
-smb_session_list_terminate(smb_session_list_t *se, smb_session_t *session)
-{
-	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-
-	rw_enter(&se->se_lock, RW_WRITER);
-
-	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-	ASSERT(session->s_state == SMB_SESSION_STATE_DISCONNECTED);
-	session->s_state = SMB_SESSION_STATE_TERMINATED;
-	smb_sodestroy(session->sock);
-	session->sock = NULL;
-	smb_rwx_rwexit(&session->s_lock);
-
-	list_remove(&se->se_act.lst, session);
-	se->se_act.count--;
-	se->se_wrop++;
-
-	ASSERT(session->s_thread == curthread);
-
-	rw_exit(&se->se_lock);
-
-	smb_session_delete(session);
-}
-
-/*
- * smb_session_list_signal
- *
- * This function signals all the session threads. The intent is to terminate
- * them. The sessions still in the SMB_SESSION_STATE_INITIALIZED are delete
- * immediately.
- *
- * This function must only be called by the threads listening and accepting
- * connections. They must pass in their respective session list.
- */
-void
-smb_session_list_signal(smb_session_list_t *se)
-{
-	smb_session_t	*session;
-
-	rw_enter(&se->se_lock, RW_WRITER);
-	while (session = list_head(&se->se_rdy.lst)) {
-
-		ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-
-		smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-		ASSERT(session->s_state == SMB_SESSION_STATE_INITIALIZED);
-		session->s_state = SMB_SESSION_STATE_TERMINATED;
-		smb_sodestroy(session->sock);
-		session->sock = NULL;
-		smb_rwx_rwexit(&session->s_lock);
-
-		list_remove(&se->se_rdy.lst, session);
-		se->se_rdy.count--;
-		se->se_wrop++;
-
-		rw_exit(&se->se_lock);
-		smb_session_delete(session);
-		rw_enter(&se->se_lock, RW_WRITER);
-	}
-	rw_downgrade(&se->se_lock);
-
-	session = list_head(&se->se_act.lst);
-	while (session) {
-
-		ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-		tsignal(session->s_thread, SIGUSR1);
-		session = list_next(&se->se_act.lst, session);
-	}
-	rw_exit(&se->se_lock);
 }
 
 /*

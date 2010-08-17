@@ -428,7 +428,7 @@ smb_handle_write_raw(smb_session_t *session, smb_request_t *sr)
 		smb_rwx_rwexit(&session->s_lock);
 		smb_srqueue_waitq_enter(session->s_srqueue);
 		sr->sr_state = SMB_REQ_STATE_SUBMITTED;
-		(void) taskq_dispatch(session->s_server->sv_thread_pool,
+		(void) taskq_dispatch(session->s_server->sv_worker_pool,
 		    smb_session_worker, sr, TQ_SLEEP);
 		smb_rwx_rwenter(&session->s_lock, RW_READER);
 		while (session->s_state == SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
