@@ -48,6 +48,15 @@ int fpu_exists = 1;
 int fp_kind = FP_387;
 
 /*
+ * Mechanism to save FPU state.
+ */
+#if defined(__amd64)
+int fp_save_mech = FP_FXSAVE;
+#elif defined(__i386)
+int fp_save_mech = FP_FNSAVE;
+#endif
+
+/*
  * The variable fpu_ignored is provided to allow other code to
  * determine whether emulation is being done because there is
  * no FPU or because of an override requested via /etc/system.
@@ -141,8 +150,20 @@ fpu_probe(void)
 		 */
 		if (is_x86_feature(x86_featureset, X86FSET_SSE) &&
 		    is_x86_feature(x86_featureset, X86FSET_SSE2)) {
-			fp_kind = __FP_SSE;
+			fp_kind |= __FP_SSE;
 			ENABLE_SSE();
+
+			if (is_x86_feature(x86_featureset, X86FSET_AVX)) {
+				ASSERT(is_x86_feature(x86_featureset,
+				    X86FSET_XSAVE));
+				fp_kind |= __FP_AVX;
+			}
+
+			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
+				fp_save_mech = FP_XSAVE;
+				fpsave_ctxt = xsave_ctxt;
+				patch_xsave();
+			}
 		}
 #elif defined(__i386)
 		/*
@@ -150,14 +171,36 @@ fpu_probe(void)
 		 * code to exploit it when present.
 		 */
 		if (is_x86_feature(x86_featureset, X86FSET_SSE)) {
-			fp_kind = __FP_SSE;
-			fpsave_ctxt = fpxsave_ctxt;
-			patch_sse();
-			if (is_x86_feature(x86_featureset, X86FSET_SSE2))
-				patch_sse2();
+			fp_kind |= __FP_SSE;
 			ENABLE_SSE();
+			fp_save_mech = FP_FXSAVE;
+			fpsave_ctxt = fpxsave_ctxt;
+
+			if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
+				patch_sse2();
+			}
+
+			if (is_x86_feature(x86_featureset, X86FSET_AVX)) {
+				ASSERT(is_x86_feature(x86_featureset,
+				    X86FSET_XSAVE));
+				fp_kind |= __FP_AVX;
+			}
+
+			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
+				fp_save_mech = FP_XSAVE;
+				fpsave_ctxt = xsave_ctxt;
+				patch_xsave();
+			} else {
+				patch_sse();	/* use fxrstor */
+			}
 		} else {
 			remove_x86_feature(x86_featureset, X86FSET_SSE2);
+			/*
+			 * We will not likely to have a chip with AVX but not
+			 * SSE. But to be safe we disable AVX if SSE is not
+			 * enabled.
+			 */
+			remove_x86_feature(x86_featureset, X86FSET_AVX);
 			/*
 			 * (Just in case the BIOS decided we wanted SSE
 			 * enabled when we didn't. See 4965674.)
@@ -169,7 +212,7 @@ fpu_probe(void)
 			use_sse_pagecopy = use_sse_pagezero = use_sse_copy = 1;
 		}
 
-		if (fp_kind == __FP_SSE) {
+		if (fp_kind & __FP_SSE) {
 			struct fxsave_state *fx;
 			uint8_t fxsave_state[sizeof (struct fxsave_state) +
 			    XMM_ALIGN];

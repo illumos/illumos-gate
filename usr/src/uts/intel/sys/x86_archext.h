@@ -112,9 +112,13 @@ extern "C" {
 #define	CPUID_INTC_ECX_MOVBE	0x00400000	/* MOVBE insn */
 #define	CPUID_INTC_ECX_POPCNT	0x00800000	/* POPCNT insn */
 #define	CPUID_INTC_ECX_AES	0x02000000	/* AES insns */
+#define	CPUID_INTC_ECX_XSAVE	0x04000000	/* XSAVE/XRESTOR insns */
+#define	CPUID_INTC_ECX_OSXSAVE	0x08000000	/* OS supports XSAVE insns */
+#define	CPUID_INTC_ECX_AVX	0x10000000	/* AVX supported */
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
+	"\35avx\34osxsav\33xsave"				\
 	"\32aes"						\
 	"\30popcnt\27movbe\25sse4.2\24sse4.1\23dca"		\
 	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
@@ -356,6 +360,8 @@ extern "C" {
 #define	X86FSET_64		30
 #define	X86FSET_AES		31
 #define	X86FSET_PCLMULQDQ	32
+#define	X86FSET_XSAVE		33
+#define	X86FSET_AVX		34
 
 /*
  * flags to patch tsc_read routine.
@@ -561,6 +567,20 @@ extern "C" {
 #define	X86_SOCKET_ASB2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x001000)
 #define	X86_SOCKET_C32		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x002000)
 
+/*
+ * xgetbv/xsetbv support
+ */
+
+#define	XFEATURE_ENABLED_MASK	0x0
+/*
+ * XFEATURE_ENABLED_MASK values (eax)
+ */
+#define	XFEATURE_LEGACY_FP	0x1
+#define	XFEATURE_SSE		0x2
+#define	XFEATURE_AVX		0x4
+#define	XFEATURE_MAX		XFEATURE_AVX
+#define	XFEATURE_FP_ALL		(XFEATURE_LEGACY_FP|XFEATURE_SSE|XFEATURE_AVX)
+
 #if !defined(_ASM)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
@@ -600,6 +620,13 @@ struct cpuid_regs {
 	uint32_t	cp_ecx;
 	uint32_t	cp_edx;
 };
+
+/*
+ * Utility functions to get/set extended control registers (XCR)
+ * Initial use is to get/set the contents of the XFEATURE_ENABLED_MASK.
+ */
+extern uint64_t get_xcr(uint_t);
+extern void set_xcr(uint_t, uint64_t);
 
 extern uint64_t rdmsr(uint_t);
 extern void wrmsr(uint_t, const uint64_t);
@@ -731,6 +758,8 @@ extern void patch_workaround_6323525(void);
 
 extern int get_hwenv(void);
 extern int is_controldom(void);
+
+extern void xsave_setup_msr(struct cpu *);
 
 /*
  * Defined hardware environments

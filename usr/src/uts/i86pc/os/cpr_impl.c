@@ -65,6 +65,7 @@
 #include <sys/reboot.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
+#include <sys/fp.h>
 
 #define	AFMT	"%lx"
 
@@ -942,6 +943,13 @@ i_cpr_start_cpu(void)
 	 */
 	if (is_x86_feature(x86_featureset, X86FSET_PAT))
 		pat_sync();
+
+	/*
+	 * If we use XSAVE, we need to restore XFEATURE_ENABLE_MASK register.
+	 */
+	if (fp_save_mech == FP_XSAVE) {
+		setup_xfem();
+	}
 
 	/*
 	 * Initialize this CPU's syscall handlers

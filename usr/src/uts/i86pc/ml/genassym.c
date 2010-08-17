@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_GENASSYM
@@ -122,6 +121,10 @@ main(int argc, char *argv[])
 	printf("#define\tFP_287 0x%x\n", FP_287);
 	printf("#define\tFP_387 0x%x\n", FP_387);
 	printf("#define\t__FP_SSE 0x%x\n", __FP_SSE);
+
+	printf("#define\tFP_FNSAVE 0x%x\n", FP_FNSAVE);
+	printf("#define\tFP_FXSAVE 0x%x\n", FP_FXSAVE);
+	printf("#define\tFP_XSAVE 0x%x\n", FP_XSAVE);
 
 	printf("#define\tAV_INT_SPURIOUS 0x%x\n", AV_INT_SPURIOUS);
 

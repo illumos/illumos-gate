@@ -58,6 +58,8 @@ extern void patch_sse(void);
 extern void patch_sse2(void);
 #endif
 
+extern void patch_xsave(void);
+
 extern void cli(void);
 extern void sti(void);
 
@@ -193,6 +195,7 @@ extern void patch_tsc_read(int);
 #if defined(__amd64) && !defined(__xpv)
 extern void patch_memops(uint_t);
 #endif	/* defined(__amd64) && !defined(__xpv) */
+extern void setup_xfem(void);
 #define	cpr_dprintf prom_printf
 #define	IN_XPV_PANIC() (__lintzero)
 #endif

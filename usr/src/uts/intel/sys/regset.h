@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
@@ -31,8 +28,6 @@
 
 #ifndef	_SYS_REGSET_H
 #define	_SYS_REGSET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -246,6 +241,18 @@ struct fxsave_state {
 #endif
 };	/* 512 bytes */
 
+/*
+ * This structure is written to memory by an 'xsave' instruction.
+ * First 512 byte is compatible with the format of an 'fxsave' area.
+ */
+struct xsave_state {
+	struct fxsave_state	xs_fxsave;
+	uint64_t		xs_xstate_bv;	/* 512 */
+	uint64_t		xs_rsv_mbz[2];
+	uint64_t		xs_reserved[5];
+	upad128_t		xs_ymm[16];	/* avx - 576 */
+};	/* 832 bytes, asserted in fpnoextflt() */
+
 #if defined(__amd64)
 
 typedef struct fpu {
@@ -352,6 +359,7 @@ typedef struct {
 #if defined(__i386)
 		struct fnsave_state kfpu_fn;
 #endif
+		struct xsave_state kfpu_xs;
 	} kfpu_u;
 	uint32_t kfpu_status;		/* saved at #mf exception */
 	uint32_t kfpu_xstatus;		/* saved at #xm exception */

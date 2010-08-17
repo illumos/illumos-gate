@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*      Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -31,7 +30,10 @@
 /*      Copyright (c) 1987, 1988 Microsoft Corporation  */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
@@ -152,6 +154,10 @@ void
 patch_sse2(void)
 {}
 
+void
+patch_xsave(void)
+{}
+
 #else	/* __lint */
 
 	ENTRY_NP(patch_sse)
@@ -188,16 +194,85 @@ _lfence_ret_insn:			/ see membar_consumer()
 	ret
 	SET_SIZE(patch_sse2)
 
+	/*
+	 * Patch lazy fp restore instructions in the trap handler
+	 * to use xrstor instead of frstor
+	 */
+	ENTRY_NP(patch_xsave)
+	_HOT_PATCH_PROLOG
+	/
+	/	frstor (%ebx); nop	-> xrstor (%ebx)
+	/
+	_HOT_PATCH(_xrstor_ebx_insn, _patch_xrstor_ebx, 3)
+	_HOT_PATCH_EPILOG
+	ret
+_xrstor_ebx_insn:			/ see ndptrap_frstor()
+	#xrstor (%ebx)
+	.byte	0x0f, 0xae, 0x2b
+	SET_SIZE(patch_xsave)
+
 #endif	/* __lint */
 #endif	/* __i386 */
 
+#if defined(__amd64)
+#if defined(__lint)
+
+void
+patch_xsave(void)
+{}
+
+#else	/* __lint */
+
+	/*
+	 * Patch lazy fp restore instructions in the trap handler
+	 * to use xrstor instead of fxrstorq
+	 */
+	ENTRY_NP(patch_xsave)
+	pushq	%rbx
+	pushq	%rbp
+	pushq	%r15
+	/
+	/	FXRSTORQ (%rbx);	-> xrstor (%rbx)
+	/ hot_patch(_xrstor_rbx_insn, _patch_xrstorq_rbx, 4)
+	/
+	leaq	_patch_xrstorq_rbx(%rip), %rbx
+	leaq	_xrstor_rbx_insn(%rip), %rbp
+	movq	$4, %r15
+1:
+	movq	%rbx, %rdi			/* patch address */
+	movzbq	(%rbp), %rsi			/* instruction byte */
+	movq	$1, %rdx			/* count */
+	call	hot_patch_kernel_text
+	addq	$1, %rbx
+	addq	$1, %rbp
+	subq	$1, %r15
+	jnz	1b
 	
+	popq	%r15
+	popq	%rbp
+	popq	%rbx
+	ret
+
+_xrstor_rbx_insn:			/ see ndptrap_frstor()
+	#rex.W=1 (.byte 0x48)
+	#xrstor (%rbx)
+	.byte	0x48, 0x0f, 0xae, 0x2b
+	SET_SIZE(patch_xsave)
+
+#endif	/* __lint */
+#endif	/* __amd64 */
+
 /*
  * One of these routines is called from any lwp with floating
  * point context as part of the prolog of a context switch.
  */
 
 #if defined(__lint)
+
+/*ARGSUSED*/
+void
+xsave_ctxt(void *arg)
+{}
 
 /*ARGSUSED*/
 void
@@ -242,6 +317,33 @@ fpnsave_ctxt(void *arg)
 			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(fpxsave_ctxt)
 
+	ENTRY_NP(xsave_ctxt)
+	cmpl	$FPU_EN, FPU_CTX_FPU_FLAGS(%rdi)
+	jne	1f
+	movl	$_CONST(FPU_VALID|FPU_EN), FPU_CTX_FPU_FLAGS(%rdi)
+	/*
+	 * Setup xsave flags in EDX:EAX
+	 */
+	movl	FPU_CTX_FPU_XSAVE_MASK(%rdi), %eax
+	movl	FPU_CTX_FPU_XSAVE_MASK+4(%rdi), %edx
+	leaq	FPU_CTX_FPU_REGS(%rdi), %rsi
+	#xsave	(%rsi)
+	.byte	0x0f, 0xae, 0x26
+	
+	/*
+	 * (see notes above about "exception pointers")
+	 * TODO: does it apply to any machine that uses xsave?
+	 */
+	btw	$7, FXSAVE_STATE_FSW(%rdi)	/* Test saved ES bit */
+	jnc	0f				/* jump if ES = 0 */
+	fnclex		/* clear pending x87 exceptions */
+0:	ffree	%st(7)	/* clear tag bit to remove possible stack overflow */
+	fildl	.fpzero_const(%rip)
+			/* dummy load changes all exception pointers */
+	STTS(%rsi)	/* trap on next fpu touch */
+1:	ret
+	SET_SIZE(xsave_ctxt)
+
 #elif defined(__i386)
 
 	ENTRY_NP(fpnsave_ctxt)
@@ -276,6 +378,32 @@ fpnsave_ctxt(void *arg)
 			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(fpxsave_ctxt)
 
+	ENTRY_NP(xsave_ctxt)
+	movl	4(%esp), %ecx		/* a struct fpu_ctx */
+	cmpl	$FPU_EN, FPU_CTX_FPU_FLAGS(%ecx)
+	jne	1f
+	
+	movl	$_CONST(FPU_VALID|FPU_EN), FPU_CTX_FPU_FLAGS(%ecx)
+	movl	FPU_CTX_FPU_XSAVE_MASK(%ecx), %eax
+	movl	FPU_CTX_FPU_XSAVE_MASK+4(%ecx), %edx
+	leal	FPU_CTX_FPU_REGS(%ecx), %ecx
+	#xsave	(%ecx)
+	.byte	0x0f, 0xae, 0x21
+	
+	/*
+	 * (see notes above about "exception pointers")
+	 * TODO: does it apply to any machine that uses xsave?
+	 */
+	btw	$7, FXSAVE_STATE_FSW(%ecx)	/* Test saved ES bit */
+	jnc	0f				/* jump if ES = 0 */
+	fnclex		/* clear pending x87 exceptions */
+0:	ffree	%st(7)	/* clear tag bit to remove possible stack overflow */
+	fildl	.fpzero_const
+			/* dummy load changes all exception pointers */
+	STTS(%edx)	/* trap on next fpu touch */
+1:	ret
+	SET_SIZE(xsave_ctxt)
+
 #endif	/* __i386 */
 
 	.align	8
@@ -298,6 +426,11 @@ void
 fpxsave(struct fxsave_state *f)
 {}
 
+/*ARGSUSED*/
+void
+xsave(struct xsave_state *f, uint64_t m)
+{}
+
 #else	/* __lint */
 
 #if defined(__amd64)
@@ -309,6 +442,19 @@ fpxsave(struct fxsave_state *f)
 	STTS(%rdi)			/* set TS bit in %cr0 (disable FPU) */
 	ret
 	SET_SIZE(fpxsave)
+
+	ENTRY_NP(xsave)
+	CLTS
+	movl	%esi, %eax		/* bv mask */
+	movq	%rsi, %rdx
+	shrq	$32, %rdx
+	#xsave	(%rdi)
+	.byte	0x0f, 0xae, 0x27
+	
+	fninit				/* clear exceptions, init x87 tags */
+	STTS(%rdi)			/* set TS bit in %cr0 (disable FPU) */
+	ret
+	SET_SIZE(xsave)
 
 #elif defined(__i386)
 
@@ -329,6 +475,19 @@ fpxsave(struct fxsave_state *f)
 	ret
 	SET_SIZE(fpxsave)
 
+	ENTRY_NP(xsave)
+	CLTS
+	movl	4(%esp), %ecx
+	movl	8(%esp), %eax
+	movl	12(%esp), %edx
+	#xsave	(%ecx)
+	.byte	0x0f, 0xae, 0x21
+	
+	fninit				/* clear exceptions, init x87 tags */
+	STTS(%eax)			/* set TS bit in %cr0 (disable FPU) */
+	ret
+	SET_SIZE(xsave)
+
 #endif	/* __i386 */
 #endif	/* __lint */
 
@@ -344,6 +503,11 @@ void
 fpxrestore(struct fxsave_state *f)
 {}
 
+/*ARGSUSED*/
+void
+xrestore(struct xsave_state *f, uint64_t m)
+{}
+
 #else	/* __lint */
 
 #if defined(__amd64)
@@ -353,6 +517,16 @@ fpxrestore(struct fxsave_state *f)
 	FXRSTORQ	((%rdi))
 	ret
 	SET_SIZE(fpxrestore)
+
+	ENTRY_NP(xrestore)
+	CLTS
+	movl	%esi, %eax		/* bv mask */
+	movq	%rsi, %rdx
+	shrq	$32, %rdx
+	#xrstor	(%rdi)
+	.byte	0x0f, 0xae, 0x2f
+	ret
+	SET_SIZE(xrestore)
 
 #elif defined(__i386)
 
@@ -369,6 +543,16 @@ fpxrestore(struct fxsave_state *f)
 	fxrstor	(%eax)
 	ret
 	SET_SIZE(fpxrestore)
+
+	ENTRY_NP(xrestore)
+	CLTS
+	movl	4(%esp), %ecx
+	movl	8(%esp), %eax
+	movl	12(%esp), %edx
+	#xrstor	(%ecx)
+	.byte	0x0f, 0xae, 0x29
+	ret
+	SET_SIZE(xrestore)
 
 #endif	/* __i386 */
 #endif	/* __lint */
@@ -418,8 +602,23 @@ fpinit(void)
 
 	ENTRY_NP(fpinit)
 	CLTS
+	cmpl	$FP_XSAVE, fp_save_mech
+	je	1f
+
+	/* fxsave */
 	leaq	sse_initial(%rip), %rax
 	FXRSTORQ	((%rax))		/* load clean initial state */
+	ret
+
+1:	/* xsave */
+	leaq	avx_initial(%rip), %rcx
+	xorl	%edx, %edx
+	movl	$XFEATURE_AVX, %eax
+	bt	$X86FSET_AVX, x86_featureset
+	cmovael	%edx, %eax
+	orl	$(XFEATURE_LEGACY_FP | XFEATURE_SSE), %eax
+	/* xrstor (%rcx) */
+	.byte	0x0f, 0xae, 0x29		/* load clean initial state */
 	ret
 	SET_SIZE(fpinit)
 
@@ -427,16 +626,31 @@ fpinit(void)
 
 	ENTRY_NP(fpinit)
 	CLTS
-	cmpl	$__FP_SSE, fp_kind
+	cmpl	$FP_FXSAVE, fp_save_mech
 	je	1f
+	cmpl	$FP_XSAVE, fp_save_mech
+	je	2f
 
+	/* fnsave */
 	fninit
 	movl	$x87_initial, %eax
 	frstor	(%eax)			/* load clean initial state */
 	ret
-1:
+
+1:	/* fxsave */
 	movl	$sse_initial, %eax
 	fxrstor	(%eax)			/* load clean initial state */
+	ret
+
+2:	/* xsave */
+	movl	$avx_initial, %ecx
+	xorl	%edx, %edx
+	movl	$XFEATURE_AVX, %eax
+	bt	$X86FSET_AVX, x86_featureset
+	cmovael	%edx, %eax
+	orl	$(XFEATURE_LEGACY_FP | XFEATURE_SSE), %eax
+	/* xrstor (%ecx) */
+	.byte	0x0f, 0xae, 0x29	/* load clean initial state */
 	ret
 	SET_SIZE(fpinit)
 

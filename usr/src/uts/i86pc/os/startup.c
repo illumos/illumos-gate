@@ -2193,6 +2193,13 @@ startup_end(void)
 	PRM_POINT("configure() done");
 
 	/*
+	 * We can now setup for XSAVE because fpu_probe is done in configure().
+	 */
+	if (fp_save_mech == FP_XSAVE) {
+		xsave_setup_msr(CPU);
+	}
+
+	/*
 	 * Set the isa_list string to the defined instruction sets we
 	 * support.
 	 */

@@ -62,6 +62,7 @@
 #include <sys/dtrace.h>
 #include <sys/brand.h>
 #include <sys/machbrand.h>
+#include <sys/cmn_err.h>
 
 extern const struct fnsave_state x87_initial;
 extern const struct fxsave_state sse_initial;
@@ -278,41 +279,43 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 			 */
 			fp_free(fpu, 0);
 		}
-#if !defined(__amd64)
-		if (fp_kind == __FP_SSE) {
-#endif
-			fpregset_to_fxsave(fp, &fpu->fpu_regs.kfpu_u.kfpu_fx);
-			fpu->fpu_regs.kfpu_xstatus =
-			    fp->fp_reg_set.fpchip_state.xstatus;
-#if !defined(__amd64)
-		} else
-			bcopy(fp, &fpu->fpu_regs.kfpu_u.kfpu_fn,
-			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
-#endif
-		fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
-		fpu->fpu_flags |= FPU_VALID;
-	} else {
-		/*
-		 * If we are trying to change the FPU state of a thread which
-		 * hasn't yet initialized floating point, store the state in
-		 * the pcb and indicate that the state is valid.  When the
-		 * thread enables floating point, it will use this state instead
-		 * of the default state.
-		 */
-#if !defined(__amd64)
-		if (fp_kind == __FP_SSE) {
-#endif
-			fpregset_to_fxsave(fp, &fpu->fpu_regs.kfpu_u.kfpu_fx);
-			fpu->fpu_regs.kfpu_xstatus =
-			    fp->fp_reg_set.fpchip_state.xstatus;
-#if !defined(__amd64)
-		} else
-			bcopy(fp, &fpu->fpu_regs.kfpu_u.kfpu_fn,
-			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
-#endif
-		fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
-		fpu->fpu_flags |= FPU_VALID;
 	}
+	/*
+	 * Else: if we are trying to change the FPU state of a thread which
+	 * hasn't yet initialized floating point, store the state in
+	 * the pcb and indicate that the state is valid.  When the
+	 * thread enables floating point, it will use this state instead
+	 * of the default state.
+	 */
+
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
+		bcopy(fp, &fpu->fpu_regs.kfpu_u.kfpu_fn,
+		    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
+		break;
+#endif
+	case FP_FXSAVE:
+		fpregset_to_fxsave(fp, &fpu->fpu_regs.kfpu_u.kfpu_fx);
+		fpu->fpu_regs.kfpu_xstatus =
+		    fp->fp_reg_set.fpchip_state.xstatus;
+		break;
+
+	case FP_XSAVE:
+		fpregset_to_fxsave(fp,
+		    &fpu->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave);
+		fpu->fpu_regs.kfpu_xstatus =
+		    fp->fp_reg_set.fpchip_state.xstatus;
+		fpu->fpu_regs.kfpu_u.kfpu_xs.xs_xstate_bv |=
+		    (XFEATURE_LEGACY_FP | XFEATURE_SSE);
+		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
+	}
+
+	fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
+	fpu->fpu_flags |= FPU_VALID;
 }
 
 /*
@@ -349,32 +352,54 @@ getfpregs(klwp_t *lwp, fpregset_t *fp)
 		/*
 		 * Cases 1 and 3.
 		 */
-#if !defined(__amd64)
-		if (fp_kind == __FP_SSE) {
+		switch (fp_save_mech) {
+#if defined(__i386)
+		case FP_FNSAVE:
+			bcopy(&fpu->fpu_regs.kfpu_u.kfpu_fn, fp,
+			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
+			break;
 #endif
+		case FP_FXSAVE:
 			fxsave_to_fpregset(&fpu->fpu_regs.kfpu_u.kfpu_fx, fp);
 			fp->fp_reg_set.fpchip_state.xstatus =
 			    fpu->fpu_regs.kfpu_xstatus;
-#if !defined(__amd64)
-		} else
-			bcopy(&fpu->fpu_regs.kfpu_u.kfpu_fn, fp,
-			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
-#endif
+			break;
+		case FP_XSAVE:
+			fxsave_to_fpregset(
+			    &fpu->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave, fp);
+			fp->fp_reg_set.fpchip_state.xstatus =
+			    fpu->fpu_regs.kfpu_xstatus;
+			break;
+		default:
+			panic("Invalid fp_save_mech");
+			/*NOTREACHED*/
+		}
 		fp->fp_reg_set.fpchip_state.status = fpu->fpu_regs.kfpu_status;
 	} else {
 		/*
 		 * Case 2.
 		 */
-#if !defined(__amd64)
-		if (fp_kind == __FP_SSE) {
+		switch (fp_save_mech) {
+#if defined(__i386)
+		case FP_FNSAVE:
+			bcopy(&x87_initial, fp, sizeof (x87_initial));
+			break;
 #endif
+		case FP_FXSAVE:
+		case FP_XSAVE:
+			/*
+			 * For now, we don't have any AVX specific field in ABI.
+			 * If we add any in the future, we need to initial them
+			 * as well.
+			 */
 			fxsave_to_fpregset(&sse_initial, fp);
 			fp->fp_reg_set.fpchip_state.xstatus =
 			    fpu->fpu_regs.kfpu_xstatus;
-#if !defined(__amd64)
-		} else
-			bcopy(&x87_initial, fp, sizeof (x87_initial));
-#endif
+			break;
+		default:
+			panic("Invalid fp_save_mech");
+			/*NOTREACHED*/
+		}
 		fp->fp_reg_set.fpchip_state.status = fpu->fpu_regs.kfpu_status;
 	}
 	kpreempt_enable();

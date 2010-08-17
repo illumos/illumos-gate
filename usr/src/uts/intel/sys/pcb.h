@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_PCB_H
@@ -37,6 +36,10 @@ extern "C" {
 #ifndef _ASM
 typedef struct fpu_ctx {
 	kfpu_t		fpu_regs;	/* kernel save area for FPU */
+	uint64_t	fpu_xsave_mask;	/* xsave mask for FPU/SSE/AVX */
+#if defined(__i386)
+	uint64_t	fpu_padding;	/* fix 32bit libmicro regression */
+#endif
 	uint_t		fpu_flags;	/* FPU state flags */
 } fpu_ctx_t;
 

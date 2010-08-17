@@ -1711,6 +1711,13 @@ mp_startup_common(boolean_t boot)
 	 */
 	cp->cpu_flags &= ~(CPU_POWEROFF | CPU_QUIESCED);
 
+	/*
+	 * Setup this processor for XSAVE.
+	 */
+	if (fp_save_mech == FP_XSAVE) {
+		xsave_setup_msr(cp);
+	}
+
 	cpuid_pass2(cp);
 	cpuid_pass3(cp);
 	(void) cpuid_pass4(cp);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_CONTROLREGS_H
@@ -108,9 +107,10 @@ extern "C" {
 					/* 0x1000 reserved */
 #define	CR4_VMXE	0x2000
 #define	CR4_SMXE	0x4000
+#define	CR4_OSXSAVE	0x40000		/* OS xsave/xrestore support	*/
 
 #define	FMT_CR4							\
-	"\20\17smxe\16vmxe\13xmme\12fxsr\11pce\10pge"		\
+	"\20\23osxsav\17smxe\16vmxe\13xmme\12fxsr\11pce\10pge"		\
 	"\7mce\6pae\5pse\4de\3tsd\2pvi\1vme"
 
 /*

@@ -118,7 +118,7 @@ uint_t x86_clflush_size = 0;
 uint_t pentiumpro_bug4046376;
 uint_t pentiumpro_bug4064495;
 
-#define	NUM_X86_FEATURES	33
+#define	NUM_X86_FEATURES	35
 void    *x86_featureset;
 ulong_t x86_featureset0[BT_SIZEOFMAP(NUM_X86_FEATURES)];
 
@@ -155,7 +155,9 @@ char *x86_feature_names[NUM_X86_FEATURES] = {
 	"clfsh",
 	"64",
 	"aes",
-	"pclmulqdq" };
+	"pclmulqdq",
+	"xsave",
+	"avx" };
 
 static void *
 init_x86_featureset(void)
@@ -217,6 +219,11 @@ print_x86_featureset(void *featureset)
 }
 
 uint_t enable486;
+
+static size_t xsave_state_size = 0;
+uint64_t xsave_bv_all = (XFEATURE_LEGACY_FP | XFEATURE_SSE);
+boolean_t xsave_force_disable = B_FALSE;
+
 /*
  * This is set to platform type Solaris is running on.
  */
@@ -245,6 +252,23 @@ struct mwait_info {
 	void		*buf_actual;	/* memory actually allocated */
 	uint32_t	support;	/* processor support of monitor/mwait */
 };
+
+/*
+ * xsave/xrestor info.
+ *
+ * This structure contains HW feature bits and size of the xsave save area.
+ * Note: the kernel will use the maximum size required for all hardware
+ * features. It is not optimize for potential memory savings if features at
+ * the end of the save area are not enabled.
+ */
+struct xsave_info {
+	uint32_t	xsav_hw_features_low;   /* Supported HW features */
+	uint32_t	xsav_hw_features_high;  /* Supported HW features */
+	size_t		xsav_max_size;  /* max size save area for HW features */
+	size_t		ymm_size;	/* AVX: size of ymm save area */
+	size_t		ymm_offset;	/* AVX: offset for ymm save area */
+};
+
 
 /*
  * These constants determine how many of the elements of the
@@ -327,6 +351,8 @@ struct cpuid_info {
 	uint_t cpi_procnodeid;		/* AMD: nodeID on HT, Intel: chipid */
 	uint_t cpi_procnodes_per_pkg;	/* AMD: # of nodes in the package */
 					/* Intel: 1 */
+
+	struct xsave_info cpi_xsave;	/* fn D: xsave/xrestor info */
 };
 
 
@@ -427,6 +453,12 @@ static struct cpuid_info cpuid_info0;
  */
 #define	MWAIT_NUM_SUBC_STATES(cpi, c_state)			\
 	BITX((cpi)->cpi_std[5].cp_edx, c_state + 3, c_state)
+
+/*
+ * XSAVE leaf 0xD enumeration
+ */
+#define	CPUID_LEAFD_2_YMM_OFFSET	576
+#define	CPUID_LEAFD_2_YMM_SIZE		256
 
 /*
  * Functions we consune from cpuid_subr.c;  don't publish these in a header
@@ -815,6 +847,27 @@ cpuid_amd_getids(cpu_t *cpu)
 	}
 }
 
+/*
+ * Setup XFeature_Enabled_Mask register. Required by xsave feature.
+ */
+void
+setup_xfem(void)
+{
+	uint64_t flags = XFEATURE_LEGACY_FP;
+
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_XSAVE));
+
+	if (is_x86_feature(x86_featureset, X86FSET_SSE))
+		flags |= XFEATURE_SSE;
+
+	if (is_x86_feature(x86_featureset, X86FSET_AVX))
+		flags |= XFEATURE_AVX;
+
+	set_xcr(XFEATURE_ENABLED_MASK, flags);
+
+	xsave_bv_all = flags;
+}
+
 void *
 cpuid_pass1(cpu_t *cpu)
 {
@@ -826,7 +879,6 @@ cpuid_pass1(cpu_t *cpu)
 #if !defined(__xpv)
 	extern int idle_cpu_prefer_mwait;
 #endif
-
 
 #if !defined(__xpv)
 	determine_platform();
@@ -1082,7 +1134,17 @@ cpuid_pass1(cpu_t *cpu)
 	 * Do not support MONITOR/MWAIT under a hypervisor
 	 */
 	mask_ecx &= ~CPUID_INTC_ECX_MON;
+	/*
+	 * Do not support XSAVE under a hypervisor for now
+	 */
+	xsave_force_disable = B_TRUE;
+
 #endif	/* __xpv */
+
+	if (xsave_force_disable) {
+		mask_ecx &= ~CPUID_INTC_ECX_XSAVE;
+		mask_ecx &= ~CPUID_INTC_ECX_AVX;
+	}
 
 	/*
 	 * Now we've figured out the masks that determine
@@ -1179,6 +1241,15 @@ cpuid_pass1(cpu_t *cpu)
 			}
 			if (cp->cp_ecx & CPUID_INTC_ECX_PCLMULQDQ) {
 				add_x86_feature(featureset, X86FSET_PCLMULQDQ);
+			}
+
+			if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
+				add_x86_feature(featureset, X86FSET_XSAVE);
+				/* We only test AVX when there is XSAVE */
+				if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
+					add_x86_feature(featureset,
+					    X86FSET_AVX);
+				}
 			}
 		}
 	}
@@ -1723,6 +1794,92 @@ cpuid_pass2(cpu_t *cpu)
 		/* Make cp NULL so that we don't stumble on others */
 		cp = NULL;
 	}
+
+	/*
+	 * XSAVE enumeration
+	 */
+	if (cpi->cpi_maxeax >= 0xD && cpi->cpi_vendor == X86_VENDOR_Intel) {
+		struct cpuid_regs regs;
+		boolean_t cpuid_d_valid = B_TRUE;
+
+		cp = &regs;
+		cp->cp_eax = 0xD;
+		cp->cp_edx = cp->cp_ebx = cp->cp_ecx = 0;
+
+		(void) __cpuid_insn(cp);
+
+		/*
+		 * Sanity checks for debug
+		 */
+		if ((cp->cp_eax & XFEATURE_LEGACY_FP) == 0 ||
+		    (cp->cp_eax & XFEATURE_SSE) == 0) {
+			cpuid_d_valid = B_FALSE;
+		}
+
+		cpi->cpi_xsave.xsav_hw_features_low = cp->cp_eax;
+		cpi->cpi_xsave.xsav_hw_features_high = cp->cp_edx;
+		cpi->cpi_xsave.xsav_max_size = cp->cp_ecx;
+
+		/*
+		 * If the hw supports AVX, get the size and offset in the save
+		 * area for the ymm state.
+		 */
+		if (cpi->cpi_xsave.xsav_hw_features_low & XFEATURE_AVX) {
+			cp->cp_eax = 0xD;
+			cp->cp_ecx = 2;
+			cp->cp_edx = cp->cp_ebx = 0;
+
+			(void) __cpuid_insn(cp);
+
+			if (cp->cp_ebx != CPUID_LEAFD_2_YMM_OFFSET ||
+			    cp->cp_eax != CPUID_LEAFD_2_YMM_SIZE) {
+				cpuid_d_valid = B_FALSE;
+			}
+
+			cpi->cpi_xsave.ymm_size = cp->cp_eax;
+			cpi->cpi_xsave.ymm_offset = cp->cp_ebx;
+		}
+
+		if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
+			xsave_state_size = 0;
+		} else if (cpuid_d_valid) {
+			xsave_state_size = cpi->cpi_xsave.xsav_max_size;
+		} else {
+			/* Broken CPUID 0xD, probably in HVM */
+			cmn_err(CE_WARN, "cpu%d: CPUID.0xD returns invalid "
+			    "value: hw_low = %d, hw_high = %d, xsave_size = %d"
+			    ", ymm_size = %d, ymm_offset = %d\n",
+			    cpu->cpu_id, cpi->cpi_xsave.xsav_hw_features_low,
+			    cpi->cpi_xsave.xsav_hw_features_high,
+			    (int)cpi->cpi_xsave.xsav_max_size,
+			    (int)cpi->cpi_xsave.ymm_size,
+			    (int)cpi->cpi_xsave.ymm_offset);
+
+			if (xsave_state_size != 0) {
+				/*
+				 * This must be a non-boot CPU. We cannot
+				 * continue, because boot cpu has already
+				 * enabled XSAVE.
+				 */
+				ASSERT(cpu->cpu_id != 0);
+				cmn_err(CE_PANIC, "cpu%d: we have already "
+				    "enabled XSAVE on boot cpu, cannot "
+				    "continue.", cpu->cpu_id);
+			} else {
+				/*
+				 * Must be from boot CPU, OK to disable XSAVE.
+				 */
+				ASSERT(cpu->cpu_id == 0);
+				remove_x86_feature(x86_featureset,
+				    X86FSET_XSAVE);
+				remove_x86_feature(x86_featureset, X86FSET_AVX);
+				CPI_FEATURES_ECX(cpi) &= ~CPUID_INTC_ECX_XSAVE;
+				CPI_FEATURES_ECX(cpi) &= ~CPUID_INTC_ECX_AVX;
+				xsave_force_disable = B_TRUE;
+			}
+		}
+	}
+
 
 	if ((cpi->cpi_xmaxeax & 0x80000000) == 0)
 		goto pass2_done;
@@ -2386,6 +2543,11 @@ cpuid_pass4(cpu_t *cpu)
 				*ecx &= ~CPUID_INTC_ECX_AES;
 			if (!is_x86_feature(x86_featureset, X86FSET_PCLMULQDQ))
 				*ecx &= ~CPUID_INTC_ECX_PCLMULQDQ;
+			if (!is_x86_feature(x86_featureset, X86FSET_XSAVE))
+				*ecx &= ~(CPUID_INTC_ECX_XSAVE |
+				    CPUID_INTC_ECX_OSXSAVE);
+			if (!is_x86_feature(x86_featureset, X86FSET_AVX))
+				*ecx &= ~CPUID_INTC_ECX_AVX;
 		}
 
 		/*
@@ -2419,6 +2581,9 @@ cpuid_pass4(cpu_t *cpu)
 				hwcap_flags |= AV_386_AES;
 			if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
 				hwcap_flags |= AV_386_PCLMULQDQ;
+			if ((*ecx & CPUID_INTC_ECX_XSAVE) &&
+			    (*ecx & CPUID_INTC_ECX_OSXSAVE))
+				hwcap_flags |= AV_386_XSAVE;
 		}
 		if (*ecx & CPUID_INTC_ECX_POPCNT)
 			hwcap_flags |= AV_386_POPCNT;
@@ -4270,6 +4435,31 @@ post_startup_cpu_fixups(void)
 		no_trap();
 	}
 #endif	/* !__xpv */
+}
+
+/*
+ * Setup necessary registers to enable XSAVE feature on this processor.
+ * This function needs to be called early enough, so that no xsave/xrstor
+ * ops will execute on the processor before the MSRs are properly set up.
+ *
+ * Current implementation has the following assumption:
+ * - cpuid_pass1() is done, so that X86 features are known.
+ * - fpu_probe() is done, so that fp_save_mech is chosen.
+ */
+void
+xsave_setup_msr(cpu_t *cpu)
+{
+	ASSERT(fp_save_mech == FP_XSAVE);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_XSAVE));
+
+	/* Enable OSXSAVE in CR4. */
+	setcr4(getcr4() | CR4_OSXSAVE);
+	/*
+	 * Update SW copy of ECX, so that /dev/cpu/self/cpuid will report
+	 * correct value.
+	 */
+	cpu->cpu_m.mcpu_cpi->cpi_std[1].cp_ecx |= CPUID_INTC_ECX_OSXSAVE;
+	setup_xfem();
 }
 
 /*

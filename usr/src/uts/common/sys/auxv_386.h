@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_AUXV_386_H
@@ -68,9 +67,12 @@ extern "C" {
 #define	AV_386_MOVBE		0x2000000 /* Intel MOVBE insns */
 #define	AV_386_AES		0x4000000 /* Intel AES insns */
 #define	AV_386_PCLMULQDQ	0x8000000 /* Intel PCLMULQDQ insn */
+#define	AV_386_XSAVE		0x10000000 /* Intel XSAVE/XRSTOR insns */
+#define	AV_386_AVX		0x20000000 /* Intel AVX insns */
 
 #define	FMT_AV_386							\
 	"\20"								\
+	"\36avx\35xsave"						\
 	"\34pclmulqdq\33aes"						\
 	"\32movbe\31sse4.2"						\
 	"\30sse4.1\27ssse3\26amd_lzcnt\25popcnt"			\

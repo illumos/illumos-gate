@@ -30,6 +30,11 @@
  */
 
 /*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
+
+/*
  * General assembly language routines.
  * It is the intent of this file to contain routines that are
  * independent of the specific kernel architecture, and those that are
@@ -2867,6 +2872,16 @@ void
 invalidate_cache(void)
 {}
 
+/*ARGSUSED*/
+uint64_t
+get_xcr(uint_t r)
+{ return (0); }
+
+/*ARGSUSED*/
+void
+set_xcr(uint_t r, const uint64_t val)
+{}
+
 #else  /* __lint */
 
 #define	XMSR_ACCESS_VAL		$0x9c5a203a
@@ -2914,7 +2929,26 @@ invalidate_cache(void)
 	leave
 	ret
 	SET_SIZE(xwrmsr)
-	
+
+	ENTRY(get_xcr)
+	movl	%edi, %ecx
+	#xgetbv
+	.byte	0x0f,0x01,0xd0
+	shlq	$32, %rdx
+	orq	%rdx, %rax
+	ret
+	SET_SIZE(get_xcr)
+
+	ENTRY(set_xcr)
+	movq	%rsi, %rdx
+	shrq	$32, %rdx
+	movl	%esi, %eax
+	movl	%edi, %ecx
+	#xsetbv
+	.byte	0x0f,0x01,0xd1
+	ret
+	SET_SIZE(set_xcr)
+
 #elif defined(__i386)
 
 	ENTRY(rdmsr)
@@ -2956,6 +2990,22 @@ invalidate_cache(void)
 	leave
 	ret
 	SET_SIZE(xwrmsr)
+
+	ENTRY(get_xcr)
+	movl	4(%esp), %ecx
+	#xgetbv
+	.byte	0x0f,0x01,0xd0
+	ret
+	SET_SIZE(get_xcr)
+
+	ENTRY(set_xcr)
+	movl	4(%esp), %ecx
+	movl	8(%esp), %eax
+	movl	12(%esp), %edx
+	#xsetbv
+	.byte	0x0f,0x01,0xd1
+	ret
+	SET_SIZE(set_xcr)
 
 #endif	/* __i386 */
 

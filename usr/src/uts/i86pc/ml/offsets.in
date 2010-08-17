@@ -165,6 +165,7 @@ _klwp
 fpu_ctx
 	fpu_regs		FPU_CTX_FPU_REGS
 	fpu_flags		FPU_CTX_FPU_FLAGS
+	fpu_xsave_mask		FPU_CTX_FPU_XSAVE_MASK
 
 fxsave_state	FXSAVE_STATE_SIZE
 	fx_fsw			FXSAVE_STATE_FSW

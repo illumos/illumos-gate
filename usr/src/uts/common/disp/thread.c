@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -186,11 +185,11 @@ thread_init(void)
 
 	/*
 	 * "struct _klwp" includes a "struct pcb", which includes a
-	 * "struct fpu", which needs to be 16-byte aligned on amd64
-	 * (and even on i386 for fxsave/fxrstor).
+	 * "struct fpu", which needs to be 64-byte aligned on amd64
+	 * (and even on i386) for xsave/xrstor.
 	 */
 	lwp_cache = kmem_cache_create("lwp_cache", sizeof (klwp_t),
-	    16, NULL, NULL, NULL, NULL, NULL, 0);
+	    64, NULL, NULL, NULL, NULL, NULL, 0);
 #else
 	/*
 	 * Allocate thread structures from static_arena.  This prevents

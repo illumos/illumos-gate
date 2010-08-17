@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -288,6 +287,14 @@ static const elfcap_desc_t hw1_386[ELFCAP_NUM_HW1_386] = {
 	{						/* 0x08000000 */
 		AV_386_PCLMULQDQ, STRDESC("AV_386_PCLMULQDQ"),
 		STRDESC("PCLMULQDQ"), STRDESC("pclmulqdq"),
+	},
+	{						/* 0x10000000 */
+		AV_386_XSAVE, STRDESC("AV_386_XSAVE"),
+		STRDESC("XSAVE"), STRDESC("xsave"),
+	},
+	{						/* 0x20000000 */
+		AV_386_AVX, STRDESC("AV_386_AVX"),
+		STRDESC("AVX"), STRDESC("avx"),
 	}
 };
 
