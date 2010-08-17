@@ -1755,7 +1755,7 @@ mandir(char **secv, char *path, char *name)
 			if (**secv == '\\') {
 				if (!eq(*secv + 1, *dv+plen))
 					continue;
-			} else if (!match(*secv, *dv+plen, len)) {
+			} else if (strncasecmp(*secv, *dv+plen, len) != 0) {
 				/* check to see if directory name changed */
 				if (!all &&
 				    (newsection = map_section(*secv, path))
