@@ -4718,6 +4718,15 @@ vfs_set_feature(vfs_t *vfsp, vfs_feature_t feature)
 	vfsp->vfs_featureset[VFTINDEX(feature)] |= VFTBITS(feature);
 }
 
+void
+vfs_clear_feature(vfs_t *vfsp, vfs_feature_t feature)
+{
+	/* Note that vfs_featureset[] is found in *vfsp->vfs_implp */
+	if (vfsp->vfs_implp == NULL)
+		return;
+	vfsp->vfs_featureset[VFTINDEX(feature)] &= VFTBITS(~feature);
+}
+
 /*
  * Query a vfs for a feature.
  * Returns 1 if feature is present, 0 if not
