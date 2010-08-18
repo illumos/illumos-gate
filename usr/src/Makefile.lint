@@ -293,6 +293,7 @@ COMMON_SUBDIRS = \
 	cmd/th_tools \
 	cmd/tip \
 	cmd/touch \
+	cmd/tr \
 	cmd/truss \
 	cmd/tty \
 	cmd/tzreload \
@@ -471,7 +472,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/pax \
 	$(CLOSED)/cmd/sed_xpg4 \
 	$(CLOSED)/cmd/tail \
-	$(CLOSED)/cmd/tr_xpg4 \
 	$(CLOSED)/lib/libc_i18n
 
 i386_SUBDIRS= \

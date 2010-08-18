@@ -402,6 +402,7 @@ COMMON_SUBDIRS=		\
 	touch		\
 	tplot		\
 	tput		\
+	tr		\
 	trapstat	\
 	troff		\
 	true		\
@@ -467,8 +468,7 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/printf	\
 	$(CLOSED)/cmd/sed	\
 	$(CLOSED)/cmd/sed_xpg4	\
-	$(CLOSED)/cmd/tail	\
-	$(CLOSED)/cmd/tr_xpg4
+	$(CLOSED)/cmd/tail
 
 i386_SUBDIRS=		\
 	acpihpd		\
@@ -749,8 +749,7 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/printf	\
 	$(CLOSED)/cmd/sed	\
 	$(CLOSED)/cmd/sed_xpg4	\
-	$(CLOSED)/cmd/tail	\
-	$(CLOSED)/cmd/tr_xpg4
+	$(CLOSED)/cmd/tail
 
 sparc_MSGSUBDIRS=	\
 	fruadm		\

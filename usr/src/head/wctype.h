@@ -95,6 +95,14 @@ struct	_wctype {
 	wchar_t *code;		/* conversion code */
 };
 
+
+#ifdef	_ILLUMOS_PRIVATE
+extern	int __iswrune(wint_t);
+extern	wint_t __nextwctype(wint_t, wctype_t);
+#define	iswrune(c)		__iswrune(c)
+#define	nextwctype(c, t)	__nextwctype(c, t)
+#endif
+
 /* character classification functions */
 
 /* iswascii is still a macro */

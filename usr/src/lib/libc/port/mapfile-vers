@@ -2496,6 +2496,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__inf_written;
 	__i_size;
 	_isnanf			{ TYPE = FUNCTION; FILTER = libm.so.2 };
+	__iswrune;
 	__libc_threaded;
 	_lib_version		{ FLAGS = NODIRECT };
 	_logb			{ TYPE = FUNCTION; FILTER = libm.so.2 };
@@ -2510,6 +2511,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_modff			{ TYPE = FUNCTION; FILTER = libm.so.2 };
 	__nan_read;
 	__nan_written;
+	__nextwctype;
 	__nis_debug_bind;
 	__nis_debug_calls;
 	__nis_debug_file;

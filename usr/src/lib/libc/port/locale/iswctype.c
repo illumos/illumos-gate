@@ -214,3 +214,24 @@ isnumber(wint_t wc)
 {
 	return (__istype(wc, _CTYPE_N));
 }
+
+/*
+ * FreeBSD has iswrune() for use by external programs, and this is used by
+ * the "tr" program.  As that program is part of our consolidation, we
+ * provide an _ILLUMOS_PRIVATE version of this function that we can use.
+ *
+ * No programs that are not part of the illumos stack itself should use
+ * this function -- programs that do reference will not be portable to
+ * other versions of SunOS or Solaris.
+ */
+int
+__iswrune(wint_t wc)
+{
+	/*
+	 * Note, FreeBSD ignored the low order byte, as they encode their
+	 * ctype values differently.  We can't do that (ctype is baked into
+	 * applications), but instead can just check if *any* bit is set in
+	 * the ctype.  Any bit being set indicates its a valid rune.
+	 */
+	return (__istype(wc, 0xffffffffU));
+}

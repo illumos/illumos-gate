@@ -2565,6 +2565,7 @@ license cmd/script/THIRDPARTYLICENSE license=cmd/script/THIRDPARTYLICENSE
 license cmd/stat/vmstat/THIRDPARTYLICENSE \
     license=cmd/stat/vmstat/THIRDPARTYLICENSE
 license cmd/tip/THIRDPARTYLICENSE license=cmd/tip/THIRDPARTYLICENSE
+license cmd/tr/THIRDPARTYLICENSE license=cmd/tr/THIRDPARTYLICENSE
 license cmd/vi/THIRDPARTYLICENSE license=cmd/vi/THIRDPARTYLICENSE
 license cmd/which/THIRDPARTYLICENSE license=cmd/which/THIRDPARTYLICENSE
 license cmd/xstr/THIRDPARTYLICENSE license=cmd/xstr/THIRDPARTYLICENSE

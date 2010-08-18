@@ -71,7 +71,6 @@ file path=usr/xpg4/bin/sed mode=0555
 file path=usr/xpg4/bin/sort mode=0555
 file path=usr/xpg4/bin/stty mode=0555
 file path=usr/xpg4/bin/tail mode=0555
-file path=usr/xpg4/bin/tr mode=0555
 file path=usr/xpg4/bin/who mode=0555
 hardlink path=usr/xpg4/bin/bg target=../../../usr/xpg4/bin/alias
 hardlink path=usr/xpg4/bin/cd target=../../../usr/xpg4/bin/alias
@@ -108,3 +107,4 @@ license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
 link path=usr/xpg4/bin/ipcs target=../../bin/ipcs
+link path=usr/xpg4/bin/tr target=../../bin/tr

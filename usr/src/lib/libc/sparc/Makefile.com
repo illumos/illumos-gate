@@ -803,6 +803,8 @@ PORTLOCALE=			\
 	mbstowcs.o		\
 	mbtowc.o		\
 	mskanji.o		\
+	nextwctype.o		\
+	nl_langinfo.o		\
 	none.o			\
 	regcomp.o		\
 	regfree.o		\
