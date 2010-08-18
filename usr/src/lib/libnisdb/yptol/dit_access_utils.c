@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION:	Contains dit_access interface support functions.
@@ -54,6 +50,9 @@
 #include "shim.h"
 #include "yptol.h"
 #include "dit_access_utils.h"
+
+#define	YPMULTI		"YP_MULTI_"
+#define	YPMULTISZ	9		/* == strlen(YPMULTI) */
 
 /*
  * Returns 'map,domain.'
@@ -852,8 +851,9 @@ ruleValueToDatum(__nis_table_mapping_t *t, __nis_rule_value_t *rv, int *statP) {
 
 datum *
 getKeyFromRuleValue(__nis_table_mapping_t *t, __nis_rule_value_t *rv, int *nv,
-					int *statP) {
-	int	i, j;
+    int *statP, bool_t xlate_to_lcase)
+{
+	int	i, j, k;
 	datum	*key = 0;
 	char	*str;
 	char	*myself = "getKeyFromRuleValue";
@@ -868,7 +868,7 @@ getKeyFromRuleValue(__nis_table_mapping_t *t, __nis_rule_value_t *rv, int *nv,
 		if (rv->colName[i] == 0)
 			continue;
 		if (strcasecmp(N2LKEY, rv->colName[i]) == 0 ||
-				strcasecmp(N2LIPKEY, rv->colName[i]) == 0) {
+		    strcasecmp(N2LIPKEY, rv->colName[i]) == 0) {
 			if ((*nv = rv->colVal[i].numVals) == 0)
 				return (0);
 			if ((key = am(myself, sizeof (key[0]) * *nv)) == 0) {
@@ -881,15 +881,15 @@ getKeyFromRuleValue(__nis_table_mapping_t *t, __nis_rule_value_t *rv, int *nv,
 					key[j].dptr = 0;
 				} else {
 					if (verifyIndexMatch(t, 0, 0,
-							rv->colName[i],
-								str) == 0) {
+					    rv->colName[i], str) == 0) {
 						key[j].dsize = 0;
 						key[j].dptr = 0;
 						continue;
 					}
+
 					key[j].dsize = strlen(str);
 					key[j].dptr = am(myself,
-							key[j].dsize + 1);
+					    key[j].dsize + 1);
 					if (key[j].dptr == 0) {
 						*statP = MAP_NO_MEMORY;
 						for (--j; j >= 0; j--)
@@ -897,7 +897,33 @@ getKeyFromRuleValue(__nis_table_mapping_t *t, __nis_rule_value_t *rv, int *nv,
 						sfree(key);
 						return (0);
 					}
-					bcopy(str, key[j].dptr, key[j].dsize);
+
+					/* transliterate key to lowercase */
+					if (xlate_to_lcase == TRUE) {
+
+						/*
+						 * For multi-homed
+						 * entries, skip over
+						 * "YP_MULTI_" prefix.
+						 */
+						k = 0;
+						if (strncmp(YPMULTI, str,
+						    YPMULTISZ) == 0) {
+							k = YPMULTISZ;
+							bcopy(str, key[j].dptr,
+							    YPMULTISZ);
+						}
+						while (k < key[j].dsize) {
+							key[j].dptr[k] =
+							    (char)tolower(
+							    (int)(uchar_t)
+							    str[k]);
+							k++;
+						}
+					} else {
+						bcopy(str, key[j].dptr,
+						    key[j].dsize);
+					}
 				}
 			}
 			return (key);
