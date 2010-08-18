@@ -981,6 +981,8 @@ ql_set_loop_back_mode(qlge_t *qlge)
 		qlge->port_cfg_info.link_cfg |= LOOP_INTERNAL_PARALLEL;
 	else if (qlge->loop_back_mode == QLGE_LOOP_INTERNAL_SERIAL)
 		qlge->port_cfg_info.link_cfg |= LOOP_INTERNAL_SERIAL;
+	else if (qlge->loop_back_mode == QLGE_LOOP_EXTERNAL_PHY)
+		qlge->port_cfg_info.link_cfg |= LOOP_EXTERNAL_PHY;
 
 	return (ql_set_mpi_port_config(qlge, qlge->port_cfg_info));
 

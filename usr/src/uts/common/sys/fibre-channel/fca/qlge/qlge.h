@@ -876,6 +876,7 @@ extern uint8_t ql_tx_hashing(qlge_t *qlge, caddr_t bp);
 extern void ql_atomic_set_32(volatile uint32_t *target, uint32_t newval);
 extern uint32_t ql_atomic_read_32(volatile uint32_t *target);
 extern void ql_restart_timer(qlge_t *qlge);
+extern int ql_route_initialize(qlge_t *);
 /*
  * Global Function Prototypes in qlge_flash.c source file.
  */

@@ -31,7 +31,7 @@ extern "C" {
 #endif
 
 #ifndef VERSIONSTR
-#define	VERSIONSTR	"100429-v1.05"
+#define	VERSIONSTR	"100721-v1.07"
 #endif
 
 #ifndef	QL_DEBUG
