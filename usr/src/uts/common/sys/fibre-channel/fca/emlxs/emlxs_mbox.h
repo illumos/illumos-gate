@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -391,7 +391,8 @@ typedef struct
 typedef struct
 {
 #ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd2:25;
+	uint32_t	rsvd2:24;
+	uint32_t	keep:1;
 	uint32_t	acknowledgment:1;
 	uint32_t	version:1;
 	uint32_t	erase_or_prog:1;
@@ -408,7 +409,8 @@ typedef struct
 	uint32_t	erase_or_prog:1;
 	uint32_t	version:1;
 	uint32_t	acknowledgment:1;
-	uint32_t	rsvd2:25;
+	uint32_t	keep:1;
+	uint32_t	rsvd2:24;
 #endif
 
 #define	DL_FROM_BDE	0	/* method */
@@ -3685,7 +3687,7 @@ typedef struct
 
 
 #define	PROG_DESCR_STR_LEN	24
-#define	MAX_LOAD_ENTRY		10
+#define	MAX_LOAD_ENTRY		32
 
 typedef struct
 {

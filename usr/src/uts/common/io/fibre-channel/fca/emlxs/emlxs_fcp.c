@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1353,6 +1353,7 @@ emlxs_port_online(emlxs_port_t *vport)
 			if (vport->vpi == 0) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_up_msg,
 				    "%s%s%s", linkspeed, topology, mode);
+
 			} else if (npiv_linkup) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_npiv_link_up_msg, "%s%s%s",
@@ -1372,6 +1373,7 @@ emlxs_port_online(emlxs_port_t *vport)
 			if (vport->vpi == 0) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_up_msg,
 				    "%s%s%s *", linkspeed, topology, mode);
+
 			} else if (npiv_linkup) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_npiv_link_up_msg, "%s%s%s *",

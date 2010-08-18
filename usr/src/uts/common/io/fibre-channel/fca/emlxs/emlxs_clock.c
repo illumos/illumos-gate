@@ -42,6 +42,7 @@ static void emlxs_timer_check_dhchap(emlxs_port_t *port);
 #endif /* DHCHAP_SUPPORT */
 
 static void	emlxs_timer(void *arg);
+static void	emlxs_timer_check_fw_update(emlxs_hba_t *hba);
 static void	emlxs_timer_check_heartbeat(emlxs_hba_t *hba);
 static uint32_t	emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag);
 static void	emlxs_timer_check_nodes(emlxs_port_t *port, uint8_t *flag);
@@ -156,6 +157,9 @@ emlxs_timer_checks(emlxs_hba_t *hba)
 
 	/* Check heartbeat timer */
 	emlxs_timer_check_heartbeat(hba);
+
+	/* Check fw update timer */
+	emlxs_timer_check_fw_update(hba);
 
 #ifdef IDLE_TIMER
 	emlxs_pm_idle_timer(hba);
@@ -808,6 +812,32 @@ emlxs_timer_check_heartbeat(emlxs_hba_t *hba)
 	return;
 
 } /* emlxs_timer_check_heartbeat() */
+
+
+static void
+emlxs_timer_check_fw_update(emlxs_hba_t *hba)
+{
+	emlxs_port_t *port = &PPORT;
+
+	if (!(hba->fw_flag & FW_UPDATE_NEEDED)) {
+		hba->fw_timer = 0;
+		return;
+	}
+
+	if (hba->timer_tics < hba->fw_timer) {
+		return;
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_update_msg,
+	"A manual HBA reset or link reset (using luxadm or fcadm) "
+	"is required.");
+
+	/* Set timer for 24 hours */
+	hba->fw_timer = hba->timer_tics + (60 * 60 * 24);
+
+	return;
+
+} /* emlxs_timer_check_fw_update() */
 
 
 static void

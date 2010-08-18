@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1730,6 +1730,20 @@ emlxs_msg_t emlxs_message[] =
 		MSG_FIRMWARE, \
 		"This indicates that a firmware core dump has occurred.", \
 		ACTION_CHK_HCFG, \
+		NULL, \
+		0)
+
+	DEFINE_MSG(1540, \
+		emlxs_fw_update_msg, \
+		"Firmware update required.", \
+		EMLXS_WARNING, \
+		MSG_FIRMWARE, \
+		"This indicates that a firmware update is required on the " \
+		"adapter.", \
+		"The user must perform a manual adapter reset or link reset" \
+		"once the host environment is stable to trigger an automatic" \
+		"firmware download. DO NOT POWER CYCLE OR REBOOT THE SYSTEM" \
+		"DURING THE DOWNLOAD OPERATION.", \
 		NULL, \
 		0)
 

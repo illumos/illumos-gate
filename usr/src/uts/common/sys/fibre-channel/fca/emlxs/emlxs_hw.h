@@ -2261,6 +2261,7 @@ typedef struct emlxs_be_fw_file
 	uint32_t	image_size;
 	uint32_t	block_size;
 	uint32_t	block_crc;
+	uint32_t	load_address;
 	char		label[BE_VERSION_SIZE];
 } emlxs_be_fw_file_t;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,6 +196,7 @@ emlxs_sli3_online(emlxs_hba_t *hba)
 	uint32_t read_rev_reset;
 	uint32_t key = 0;
 	uint32_t fw_check;
+	uint32_t kern_update = 0;
 	uint32_t rval = 0;
 	uint32_t offset;
 	uint8_t vpd_data[DMP_VPD_SIZE];
@@ -215,6 +216,29 @@ emlxs_sli3_online(emlxs_hba_t *hba)
 		(void) READ_SBUS_CSR_REG(hba, FC_SHS_REG(hba));
 	}
 
+	/*
+	 * Get a buffer which will be used repeatedly for mailbox commands
+	 */
+	mbq = (MAILBOXQ *) kmem_zalloc((sizeof (MAILBOXQ)), KM_SLEEP);
+
+	mb = (MAILBOX *)mbq;
+
+	hba->mbox_queue_flag = 0;
+	hba->sli.sli3.hc_copy = 0;
+	hba->fc_edtov = FF_DEF_EDTOV;
+	hba->fc_ratov = FF_DEF_RATOV;
+	hba->fc_altov = FF_DEF_ALTOV;
+	hba->fc_arbtov = FF_DEF_ARBTOV;
+
+	/* Set the fw_check flag */
+	fw_check = cfg[CFG_FW_CHECK].current;
+
+	if ((fw_check & 0x04) ||
+	    (hba->fw_flag & FW_UPDATE_KERNEL)) {
+		kern_update = 1;
+	}
+
+reset:
 	/* Initialize sli mode based on configuration parameter */
 	switch (cfg[CFG_SLI_MODE].current) {
 	case 2:	/* SLI2 mode */
@@ -243,24 +267,6 @@ emlxs_sli3_online(emlxs_hba_t *hba)
 		sli_mode = EMLXS_HBA_SLI2_MODE;
 		sli_mode_mask = EMLXS_SLI2_MASK;
 	}
-
-	/* Set the fw_check flag */
-	fw_check = cfg[CFG_FW_CHECK].current;
-
-	hba->mbox_queue_flag = 0;
-	hba->sli.sli3.hc_copy = 0;
-	hba->fc_edtov = FF_DEF_EDTOV;
-	hba->fc_ratov = FF_DEF_RATOV;
-	hba->fc_altov = FF_DEF_ALTOV;
-	hba->fc_arbtov = FF_DEF_ARBTOV;
-
-	/*
-	 * Get a buffer which will be used repeatedly for mailbox commands
-	 */
-	mbq = (MAILBOXQ *) kmem_zalloc((sizeof (MAILBOXQ)), KM_SLEEP);
-
-	mb = (MAILBOX *)mbq;
-reset:
 
 	/* Reset & Initialize the adapter */
 	if (emlxs_sli3_hba_init(hba)) {
@@ -682,8 +688,11 @@ reset:
 	 * If firmware checking is enabled and the adapter model indicates
 	 * a firmware image, then perform firmware version check
 	 */
-	if (((fw_check == 1) && (hba->model_info.flags & EMLXS_SUN_BRANDED) &&
-	    hba->model_info.fwid) || ((fw_check == 2) &&
+	hba->fw_flag = 0;
+	hba->fw_timer = 0;
+
+	if (((fw_check & 0x1) && (hba->model_info.flags & EMLXS_SUN_BRANDED) &&
+	    hba->model_info.fwid) || ((fw_check & 0x2) &&
 	    hba->model_info.fwid)) {
 		emlxs_firmware_t *fw;
 
@@ -701,7 +710,14 @@ reset:
 		 * versions of adapter
 		 */
 		if (fw) {
-			if ((fw->kern && (vpd->postKernRev != fw->kern)) ||
+			if (!kern_update &&
+			    ((fw->kern && (vpd->postKernRev != fw->kern)) ||
+			    (fw->stub && (vpd->opFwRev != fw->stub)))) {
+
+				hba->fw_flag |= FW_UPDATE_NEEDED;
+
+			} else if ((fw->kern && (vpd->postKernRev !=
+			    fw->kern)) ||
 			    (fw->stub && (vpd->opFwRev != fw->stub)) ||
 			    (fw->sli1 && (vpd->sli1FwRev != fw->sli1)) ||
 			    (fw->sli2 && (vpd->sli2FwRev != fw->sli2)) ||
@@ -728,6 +744,9 @@ reset:
 						EMLXS_MSGF(EMLXS_CONTEXT,
 						    &emlxs_init_msg,
 						    "Firmware update failed.");
+
+						hba->fw_flag |=
+						    FW_UPDATE_NEEDED;
 					}
 #ifdef MODFW_SUPPORT
 					/*
@@ -3569,8 +3588,9 @@ emlxs_sli3_prep_fct_iocb(emlxs_port_t *port, emlxs_buf_t *cmd_sbp,
 
 		iocb->ULPCOMMAND = CMD_FCP_TSEND64_CX;
 
-		if (dbuf->db_data_size ==
-		    fct_task->task_expected_xfer_length)
+		if ((hba->sli_mode == EMLXS_HBA_SLI3_MODE) &&
+		    (dbuf->db_data_size ==
+		    fct_task->task_expected_xfer_length))
 			iocb->ULPCT = 0x1;
 			/* enable auto-rsp AP feature */
 	}
