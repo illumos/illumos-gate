@@ -62,6 +62,8 @@ extern size_t (*__wcrtomb)(char *_RESTRICT_KYWD, wchar_t,
 extern size_t (*__wcsnrtombs)(char *_RESTRICT_KYWD,
     const wchar_t **_RESTRICT_KYWD, size_t, size_t, mbstate_t *_RESTRICT_KYWD);
 
+extern int charset_is_ascii;
+
 size_t __mbsnrtowcs_std(wchar_t *_RESTRICT_KYWD, const char **_RESTRICT_KYWD,
     size_t, size_t, mbstate_t *_RESTRICT_KYWD);
 size_t __wcsnrtombs_std(char *_RESTRICT_KYWD, const wchar_t **_RESTRICT_KYWD,

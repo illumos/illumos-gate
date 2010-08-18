@@ -66,6 +66,8 @@ _UTF8_init(_RuneLocale *rl)
 	__wcsnrtombs = _UTF8_wcsnrtombs;
 	_CurrentRuneLocale = rl;
 
+	charset_is_ascii = 0;
+
 	/*
 	 * In theory up to 6 bytes can be used for the encoding,
 	 * but only encodings with more than 4 bytes are illegal.

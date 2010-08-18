@@ -73,6 +73,7 @@ _ascii_init(_RuneLocale *rl)
 	__wcsnrtombs = _ascii_wcsnrtombs;
 	_CurrentRuneLocale = rl;
 	__ctype[520] = 1;
+	charset_is_ascii = 1;
 	return (0);
 }
 

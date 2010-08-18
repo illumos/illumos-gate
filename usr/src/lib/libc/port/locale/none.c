@@ -80,6 +80,8 @@ _none_init(_RuneLocale *rl)
 	 */
 	(void) memcpy(__ctype, __ctype_C, SZ_TOTAL);
 
+	charset_is_ascii = 1;
+
 	__ctype_mask = rl->__runetype;
 	__trans_upper = rl->__mapupper;
 	__trans_lower = rl->__maplower;

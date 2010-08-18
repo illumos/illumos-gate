@@ -271,3 +271,9 @@ unsigned int *__ctype_mask = _DefaultRuneLocale.__runetype;
 
 int *__trans_lower = _DefaultRuneLocale.__maplower;
 int *__trans_upper = _DefaultRuneLocale.__mapupper;
+
+/*
+ * Used in various string routines to conditionalize versions optimized for
+ * the ASCII case
+ */
+int charset_is_ascii = 1;

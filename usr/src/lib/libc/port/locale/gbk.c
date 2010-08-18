@@ -65,6 +65,7 @@ _GBK_init(_RuneLocale *rl)
 	__mbsinit = _GBK_mbsinit;
 	_CurrentRuneLocale = rl;
 	__ctype[520] = 2;
+	charset_is_ascii = 0;
 	return (0);
 }
 

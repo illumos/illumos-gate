@@ -60,6 +60,7 @@ _GB2312_init(_RuneLocale *rl)
 	__wcrtomb = _GB2312_wcrtomb;
 	__mbsinit = _GB2312_mbsinit;
 	__ctype[520] = 2;
+	charset_is_ascii = 0;
 	return (0);
 }
 

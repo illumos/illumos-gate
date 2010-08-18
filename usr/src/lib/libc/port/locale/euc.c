@@ -120,6 +120,7 @@ _EUC_init(_RuneLocale *rl)
 	__mbrtowc = _EUC_mbrtowc;
 	__wcrtomb = _EUC_wcrtomb;
 	__mbsinit = _EUC_mbsinit;
+	charset_is_ascii = 0;
 	return (0);
 }
 
