@@ -412,7 +412,6 @@ typedef struct dumpcfg {
 	char	*maxvm;		/* reserved VM for spare pages */
 	lock_t	helper_lock;	/* protect helper state */
 	char	helpers_wanted;	/* flag to enable parallelism */
-	char	helper_present;	/* at least one helper showed up */
 } dumpcfg_t;
 
 static dumpcfg_t dumpcfg;	/* config vars */
@@ -883,15 +882,10 @@ dumpsys_get_maxmem()
 	int k;
 
 	/*
-	 * Fall back to doing a serial dump if no helpers showed
-	 * up. It is possible for other CPUs to be stuck in PROM, or
-	 * DRd out. panic("sync initiated") in sync_handler() is one
-	 * case. A parallel dump will hang (dump time out) unless
-	 * there is at least one helper CPU. At this point dumpsys()
-	 * has done some I/O, which means there has been plenty of
-	 * time for helpers to arrive.
+	 * Setting dump_plat_mincpu to 0 at any time forces a serial
+	 * dump.
 	 */
-	if (!cfg->helper_present) {
+	if (dump_plat_mincpu == 0) {
 		cfg->clevel = 0;
 		return;
 	}
@@ -2189,8 +2183,6 @@ dumpsys_lzjbcompress(helper_t *hp)
 void
 dumpsys_helper()
 {
-	if (!dumpcfg.helper_present)
-		dumpcfg.helper_present = 1;
 	dumpsys_spinlock(&dumpcfg.helper_lock);
 	if (dumpcfg.helpers_wanted) {
 		helper_t *hp, *hpend = &dumpcfg.helper[dumpcfg.nhelper];
@@ -2229,8 +2221,6 @@ dumpsys_helper()
 void
 dumpsys_helper_nw()
 {
-	if (!dumpcfg.helper_present)
-		dumpcfg.helper_present = 1;
 	if (dumpcfg.helpers_wanted)
 		dumpsys_helper();
 }
@@ -2295,7 +2285,29 @@ dumpsys_main_task(void *arg)
 	cbuf_t *cp;
 	pgcnt_t baseoff, pfnoff;
 	pfn_t base, pfn;
-	int sec;
+	int sec, i, dumpserial;
+
+	/*
+	 * Fall back to serial mode if there are no helpers.
+	 * dump_plat_mincpu can be set to 0 at any time.
+	 * dumpcfg.helpermap must contain at least one member.
+	 */
+	dumpserial = 1;
+
+	if (dump_plat_mincpu != 0 && dumpcfg.clevel != 0) {
+		for (i = 0; i < BT_BITOUL(NCPU); ++i) {
+			if (dumpcfg.helpermap[i] != 0) {
+				dumpserial = 0;
+				break;
+			}
+		}
+	}
+
+	if (dumpserial) {
+		dumpcfg.clevel = 0;
+		if (dumpcfg.helper[0].lzbuf == NULL)
+			dumpcfg.helper[0].lzbuf = dumpcfg.helper[1].page;
+	}
 
 	dump_init_memlist_walker(&mlw);
 
@@ -2430,7 +2442,7 @@ dumpsys_main_task(void *arg)
 			 * If there are no helpers the main task does
 			 * non-streams lzjb compress.
 			 */
-			if (dumpcfg.clevel == 0) {
+			if (dumpserial) {
 				dumpsys_lzjb_page(dumpcfg.helper, cp);
 				break;
 			}

@@ -55,6 +55,7 @@
 #include <sys/cpu_sgnblk_defs.h>
 #include <sys/clock.h>
 #include <sys/cmn_err.h>
+#include <sys/dumphdr.h>
 #include <sys/promif.h>
 #include <sys/prom_debug.h>
 #include <sys/traptrace.h>
@@ -624,6 +625,11 @@ sync_handler(void)
 			CPUSET_DEL(cpu_ready_set, cpu[i]->cpu_id);
 		}
 	}
+
+	/*
+	 * Force a serial dump, since there are no CPUs to help.
+	 */
+	dump_plat_mincpu = 0;
 
 	/*
 	 * We've managed to get here without going through the
