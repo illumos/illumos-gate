@@ -117,6 +117,7 @@ zio_init(void)
 		size_t size = (c + 1) << SPA_MINBLOCKSHIFT;
 		size_t p2 = size;
 		size_t align = 0;
+		size_t cflags = (size > zio_buf_debug_limit) ? KMC_NODEBUG : 0;
 
 		while (p2 & (p2 - 1))
 			p2 &= p2 - 1;
@@ -133,13 +134,17 @@ zio_init(void)
 			char name[36];
 			(void) sprintf(name, "zio_buf_%lu", (ulong_t)size);
 			zio_buf_cache[c] = kmem_cache_create(name, size,
-			    align, NULL, NULL, NULL, NULL, NULL,
-			    size > zio_buf_debug_limit ? KMC_NODEBUG : 0);
+			    align, NULL, NULL, NULL, NULL, NULL, cflags);
 
+			/*
+			 * Since zio_data bufs do not appear in crash dumps, we
+			 * pass KMC_NOTOUCH so that no allocator metadata is
+			 * stored with the buffers.
+			 */
 			(void) sprintf(name, "zio_data_buf_%lu", (ulong_t)size);
 			zio_data_buf_cache[c] = kmem_cache_create(name, size,
 			    align, NULL, NULL, NULL, NULL, data_alloc_arena,
-			    size > zio_buf_debug_limit ? KMC_NODEBUG : 0);
+			    cflags | KMC_NOTOUCH);
 		}
 	}
 

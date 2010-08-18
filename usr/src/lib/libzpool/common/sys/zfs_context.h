@@ -315,6 +315,7 @@ extern void kstat_delete(kstat_t *);
 #define	KM_PUSHPAGE		KM_SLEEP
 #define	KM_NOSLEEP		UMEM_DEFAULT
 #define	KMC_NODEBUG		UMC_NODEBUG
+#define	KMC_NOTOUCH		0	/* not needed for userland caches */
 #define	kmem_alloc(_s, _f)	umem_alloc(_s, _f)
 #define	kmem_zalloc(_s, _f)	umem_zalloc(_s, _f)
 #define	kmem_free(_b, _s)	umem_free(_b, _s)
