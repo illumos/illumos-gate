@@ -1773,3 +1773,7 @@ extern int u8_validate(char *, size_t, char **, int, int *);
 extern int u8_strcmp(const char *, const char *, size_t, int, size_t, int *);
 extern size_t u8_textprep_str(char *, size_t *, char *, size_t *, int, size_t,
 	int *);
+
+/* private locale interfaces */
+wint_t __nextwctype(wint_t, wctype_t);
+int __iswrune(wint_t);
