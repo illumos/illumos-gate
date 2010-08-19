@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PGHW_H
@@ -153,6 +152,7 @@ extern void		pghw_init(pghw_t *, cpu_t *, pghw_type_t);
 extern void		pghw_fini(pghw_t *);
 extern void		pghw_cpu_add(pghw_t *, cpu_t *);
 extern pghw_t		*pghw_place_cpu(cpu_t *, pghw_type_t);
+extern void		pghw_cmt_fini(pghw_t *);
 
 /*
  * Physical ID cache creation / destruction
@@ -177,7 +177,6 @@ extern pghw_type_t	pg_plat_hw_rank(pghw_type_t, pghw_type_t);
  * String representation of the hardware type
  */
 extern char		*pghw_type_string(pghw_type_t);
-extern char		*pghw_type_shortstring(pghw_type_t);
 
 /*
  * What comprises a "core" may vary across processor implementations,

@@ -887,6 +887,28 @@ init_node(dev_info_t *dip)
 		NDI_CONFIG_DEBUG((CE_CONT, "init_node: %s 0x%p failed\n",
 		    path, (void *)dip));
 		remove_global_props(dip);
+
+		/*
+		 * If a nexus INITCHILD implementation calls ddi_devid_regster()
+		 * prior to setting devi_addr, the devid is not recorded in
+		 * the devid cache (i.e. DEVI_CACHED_DEVID is not set).
+		 * With mpxio, while the vhci client path may be missing
+		 * from the cache, phci pathinfo paths may have already be
+		 * added to the cache, against the client dip, by use of
+		 * e_devid_cache_pathinfo().  Because of this, when INITCHILD
+		 * of the client fails, we need to purge the client dip from
+		 * the cache even if DEVI_CACHED_DEVID is not set - if only
+		 * devi_devid_str is set.
+		 */
+		mutex_enter(&DEVI(dip)->devi_lock);
+		if ((DEVI(dip)->devi_flags & DEVI_CACHED_DEVID) ||
+		    DEVI(dip)->devi_devid_str) {
+			DEVI(dip)->devi_flags &= ~DEVI_CACHED_DEVID;
+			mutex_exit(&DEVI(dip)->devi_lock);
+			ddi_devid_unregister(dip);
+		} else
+			mutex_exit(&DEVI(dip)->devi_lock);
+
 		/* in case nexus driver didn't clear this field */
 		ddi_set_name_addr(dip, NULL);
 		error = DDI_FAILURE;
@@ -921,10 +943,12 @@ init_node(dev_info_t *dip)
 	 * may not have captured the path. Detect this situation and ensure that
 	 * the path enters the cache now that devi_addr is established.
 	 */
-	if (!(DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) &&
+	if (!(DEVI(dip)->devi_flags & DEVI_CACHED_DEVID) &&
 	    (ddi_devid_get(dip, &devid) == DDI_SUCCESS)) {
 		if (e_devid_cache_register(dip, devid) == DDI_SUCCESS) {
-			DEVI(dip)->devi_flags |= DEVI_REGISTERED_DEVID;
+			mutex_enter(&DEVI(dip)->devi_lock);
+			DEVI(dip)->devi_flags |= DEVI_CACHED_DEVID;
+			mutex_exit(&DEVI(dip)->devi_lock);
 		}
 
 		ddi_devid_free(devid);
@@ -1093,10 +1117,13 @@ uninit_node(dev_info_t *dip)
 	error = (*f)(pdip, pdip, DDI_CTLOPS_UNINITCHILD, dip, (void *)NULL);
 	if (error == DDI_SUCCESS) {
 		/* ensure that devids are unregistered */
-		if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
-			DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
+		mutex_enter(&DEVI(dip)->devi_lock);
+		if ((DEVI(dip)->devi_flags & DEVI_CACHED_DEVID)) {
+			DEVI(dip)->devi_flags &= ~DEVI_CACHED_DEVID;
+			mutex_exit(&DEVI(dip)->devi_lock);
 			ddi_devid_unregister(dip);
-		}
+		} else
+			mutex_exit(&DEVI(dip)->devi_lock);
 
 		/* if uninitchild forgot to set devi_addr to NULL do it now */
 		ddi_set_name_addr(dip, NULL);
@@ -1374,7 +1401,8 @@ detach_node(dev_info_t *dip, uint_t flag)
 	/*
 	 * Close any iommulib mediated linkage to an IOMMU
 	 */
-	iommulib_nex_close(dip);
+	if (IOMMU_USED(dip))
+		iommulib_nex_close(dip);
 #endif
 
 	/* destroy the taskq */

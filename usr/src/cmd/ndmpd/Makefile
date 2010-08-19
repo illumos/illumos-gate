@@ -65,7 +65,7 @@ LINTFLAGS += -xerroff=E_INCONS_VAL_TYPE_DECL2
 # argument used inconsistently
 LINTFLAGS += -xerroff=E_INCONS_ARG_USED2 
 
-LDLIBS   += -lsocket -lnsl -lzfs -lsec -lndmp -lmd5 -lnvpair -lumem -lbsm -lgen -lcmdutils
+LDLIBS   += -lsocket -lnsl -lzfs -lsec -lndmp -lmd5 -lnvpair -lumem -lbsm -lgen -lcmdutils -linetutil
 
 OBJS= \
 	$(NDMP_DIR)/ndmp_xdr.o \

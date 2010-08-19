@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -664,7 +663,7 @@ dce_increment_generation(dce_t *dce)
 
 /*
  * Increment the generation number on all dces that have a path MTU and
- * the default DCE. Used when ill_mtu changes.
+ * the default DCE. Used when ill_mtu or ill_mc_mtu changes.
  */
 void
 dce_increment_all_generations(boolean_t isv6, ip_stack_t *ipst)

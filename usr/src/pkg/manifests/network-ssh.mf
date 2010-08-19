@@ -47,14 +47,11 @@ file path=usr/bin/ssh-agent mode=0555
 file path=usr/lib/ssh/ssh-askpass mode=0555
 file path=usr/lib/ssh/ssh-http-proxy-connect mode=0555
 file path=usr/lib/ssh/ssh-socks5-proxy-connect mode=0555
-legacy pkg=SUNWsshr arch=$(ARCH) category=system \
+legacy pkg=SUNWsshr \
     desc="Secure Shell protocol Client and associated Utilities" \
-    hotline="Please contact your local service provider" \
-    name="SSH Client and utilities, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWsshu arch=$(ARCH) category=system \
+    name="SSH Client and utilities, (Root)"
+legacy pkg=SUNWsshu \
     desc="Secure Shell protocol Client and associated Utilities" \
-    hotline="Please contact your local service provider" \
-    name="SSH Client and utilities, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/ssh/THIRDPARTYLICENSE license=cmd/ssh/THIRDPARTYLICENSE
+    name="SSH Client and utilities, (Usr)"
+license usr/src/cmd/ssh/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ssh/THIRDPARTYLICENSE

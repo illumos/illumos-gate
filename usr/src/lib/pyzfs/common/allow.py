@@ -1,4 +1,4 @@
-#! /usr/bin/python2.4
+#! /usr/bin/python2.6
 #
 # CDDL HEADER START
 #
@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 """This module implements the "zfs allow" and "zfs unallow" subcommands.
@@ -219,6 +218,7 @@ perms_subcmd = dict(
     send="",
     hold=_("Allows adding a user hold to a snapshot"),
     release=_("Allows releasing a user hold which\n\t\t\t\tmight destroy the snapshot"),
+    diff=_("Allows lookup of paths within a dataset,\n\t\t\t\tgiven an object number. Ordinary users need this\n\t\t\t\tin order to use zfs diff"),
 )
 
 perms_other = dict(

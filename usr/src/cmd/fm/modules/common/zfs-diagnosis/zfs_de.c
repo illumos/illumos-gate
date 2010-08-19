@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -30,6 +29,8 @@
 #include <libzfs.h>
 #include <fm/fmd_api.h>
 #include <fm/libtopo.h>
+#include <sys/types.h>
+#include <sys/time.h>
 #include <sys/fs/zfs.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/fs/zfs.h>
@@ -59,6 +60,14 @@ typedef struct zfs_case_data {
 } zfs_case_data_t;
 
 /*
+ * Time-of-day
+ */
+typedef struct er_timeval {
+	uint64_t	ertv_sec;
+	uint64_t	ertv_nsec;
+} er_timeval_t;
+
+/*
  * In-core case structure.
  */
 typedef struct zfs_case {
@@ -69,12 +78,29 @@ typedef struct zfs_case {
 	uu_list_node_t	zc_node;
 	id_t		zc_remove_timer;
 	char		*zc_fru;
+	er_timeval_t	zc_when;
 } zfs_case_t;
 
 #define	CASE_DATA			"data"
 #define	CASE_FRU			"fru"
 #define	CASE_DATA_VERSION_INITIAL	1
 #define	CASE_DATA_VERSION_SERD		2
+
+typedef struct zfs_de_stats {
+	fmd_stat_t	old_drops;
+	fmd_stat_t	dev_drops;
+	fmd_stat_t	vdev_drops;
+	fmd_stat_t	import_drops;
+	fmd_stat_t	resource_drops;
+} zfs_de_stats_t;
+
+zfs_de_stats_t zfs_stats = {
+	{ "old_drops", FMD_TYPE_UINT64, "ereports dropped (from before load)" },
+	{ "dev_drops", FMD_TYPE_UINT64, "ereports dropped (dev during open)"},
+	{ "vdev_drops", FMD_TYPE_UINT64, "ereports dropped (weird vdev types)"},
+	{ "import_drops", FMD_TYPE_UINT64, "ereports dropped (during import)" },
+	{ "resource_drops", FMD_TYPE_UINT64, "resource related ereports" }
+};
 
 static hrtime_t zfs_remove_timeout;
 
@@ -154,7 +180,7 @@ zfs_case_unserialize(fmd_hdl_t *hdl, fmd_case_t *cp)
  * vdev which is no longer present on the system, close the associated case.
  */
 static void
-zfs_mark_vdev(uint64_t pool_guid, nvlist_t *vd)
+zfs_mark_vdev(uint64_t pool_guid, nvlist_t *vd, er_timeval_t *loaded)
 {
 	uint64_t vdev_guid;
 	uint_t c, children;
@@ -171,8 +197,10 @@ zfs_mark_vdev(uint64_t pool_guid, nvlist_t *vd)
 	for (zcp = uu_list_first(zfs_cases); zcp != NULL;
 	    zcp = uu_list_next(zfs_cases, zcp)) {
 		if (zcp->zc_data.zc_pool_guid == pool_guid &&
-		    zcp->zc_data.zc_vdev_guid == vdev_guid)
+		    zcp->zc_data.zc_vdev_guid == vdev_guid) {
 			zcp->zc_present = B_TRUE;
+			zcp->zc_when = *loaded;
+		}
 	}
 
 	/*
@@ -181,19 +209,19 @@ zfs_mark_vdev(uint64_t pool_guid, nvlist_t *vd)
 	if (nvlist_lookup_nvlist_array(vd, ZPOOL_CONFIG_CHILDREN, &child,
 	    &children) == 0) {
 		for (c = 0; c < children; c++)
-			zfs_mark_vdev(pool_guid, child[c]);
+			zfs_mark_vdev(pool_guid, child[c], loaded);
 	}
 
 	if (nvlist_lookup_nvlist_array(vd, ZPOOL_CONFIG_L2CACHE, &child,
 	    &children) == 0) {
 		for (c = 0; c < children; c++)
-			zfs_mark_vdev(pool_guid, child[c]);
+			zfs_mark_vdev(pool_guid, child[c], loaded);
 	}
 
 	if (nvlist_lookup_nvlist_array(vd, ZPOOL_CONFIG_SPARES, &child,
 	    &children) == 0) {
 		for (c = 0; c < children; c++)
-			zfs_mark_vdev(pool_guid, child[c]);
+			zfs_mark_vdev(pool_guid, child[c], loaded);
 	}
 }
 
@@ -203,7 +231,10 @@ zfs_mark_pool(zpool_handle_t *zhp, void *unused)
 {
 	zfs_case_t *zcp;
 	uint64_t pool_guid;
+	uint64_t *tod;
+	er_timeval_t loaded = { 0 };
 	nvlist_t *config, *vd;
+	uint_t nelem = 0;
 	int ret;
 
 	pool_guid = zpool_get_prop_int(zhp, ZPOOL_PROP_GUID, NULL);
@@ -222,12 +253,63 @@ zfs_mark_pool(zpool_handle_t *zhp, void *unused)
 		return (-1);
 	}
 
+	(void) nvlist_lookup_uint64_array(config, ZPOOL_CONFIG_LOADED_TIME,
+	    &tod, &nelem);
+	if (nelem == 2) {
+		loaded.ertv_sec = tod[0];
+		loaded.ertv_nsec = tod[1];
+		for (zcp = uu_list_first(zfs_cases); zcp != NULL;
+		    zcp = uu_list_next(zfs_cases, zcp)) {
+			if (zcp->zc_data.zc_pool_guid == pool_guid &&
+			    zcp->zc_data.zc_vdev_guid == 0) {
+				zcp->zc_when = loaded;
+			}
+		}
+	}
+
 	ret = nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &vd);
 	assert(ret == 0);
 
-	zfs_mark_vdev(pool_guid, vd);
+	zfs_mark_vdev(pool_guid, vd, &loaded);
 
 	zpool_close(zhp);
+
+	return (0);
+}
+
+struct load_time_arg {
+	uint64_t lt_guid;
+	er_timeval_t *lt_time;
+	boolean_t lt_found;
+};
+
+static int
+zpool_find_load_time(zpool_handle_t *zhp, void *arg)
+{
+	struct load_time_arg *lta = arg;
+	uint64_t pool_guid;
+	uint64_t *tod;
+	nvlist_t *config;
+	uint_t nelem;
+
+	if (lta->lt_found)
+		return (0);
+
+	pool_guid = zpool_get_prop_int(zhp, ZPOOL_PROP_GUID, NULL);
+	if (pool_guid != lta->lt_guid)
+		return (0);
+
+	if ((config = zpool_get_config(zhp, NULL)) == NULL) {
+		zpool_close(zhp);
+		return (-1);
+	}
+
+	if (nvlist_lookup_uint64_array(config, ZPOOL_CONFIG_LOADED_TIME,
+	    &tod, &nelem) == 0 && nelem == 2) {
+		lta->lt_found = B_TRUE;
+		lta->lt_time->ertv_sec = tod[0];
+		lta->lt_time->ertv_nsec = tod[1];
+	}
 
 	return (0);
 }
@@ -399,6 +481,37 @@ zfs_case_solve(fmd_hdl_t *hdl, zfs_case_t *zcp, const char *faultname,
 }
 
 /*
+ * This #define and function access a private interface of the FMA
+ * framework.  Ereports include a time-of-day upper bound.
+ * We want to look at that so we can compare it to when pools get
+ * loaded.
+ */
+#define	FMD_EVN_TOD	"__tod"
+
+static boolean_t
+timeval_earlier(er_timeval_t *a, er_timeval_t *b)
+{
+	return (a->ertv_sec < b->ertv_sec ||
+	    (a->ertv_sec == b->ertv_sec && a->ertv_nsec < b->ertv_nsec));
+}
+
+/*ARGSUSED*/
+static void
+zfs_ereport_when(fmd_hdl_t *hdl, nvlist_t *nvl, er_timeval_t *when)
+{
+	uint64_t *tod;
+	uint_t	nelem;
+
+	if (nvlist_lookup_uint64_array(nvl, FMD_EVN_TOD, &tod, &nelem) == 0 &&
+	    nelem == 2) {
+		when->ertv_sec = tod[0];
+		when->ertv_nsec = tod[1];
+	} else {
+		when->ertv_sec = when->ertv_nsec = UINT64_MAX;
+	}
+}
+
+/*
  * Main fmd entry point.
  */
 /*ARGSUSED*/
@@ -408,7 +521,10 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	zfs_case_t *zcp, *dcp;
 	int32_t pool_state;
 	uint64_t ena, pool_guid, vdev_guid;
+	er_timeval_t pool_load;
+	er_timeval_t er_when;
 	nvlist_t *detector;
+	boolean_t pool_found = B_FALSE;
 	boolean_t isresource;
 	char *fru, *type;
 
@@ -419,6 +535,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 */
 	if (fmd_nvl_class_match(hdl, nvl, "resource.sysevent.EC_zfs.*")) {
 		zfs_purge_cases(hdl);
+		zfs_stats.resource_drops.fmds_value.ui64++;
 		return;
 	}
 
@@ -447,8 +564,10 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 * and hence no persistent fault.  Some day we may want to do something
 	 * with these ereports, so we continue generating them internally.
 	 */
-	if (pool_state == SPA_LOAD_IMPORT)
+	if (pool_state == SPA_LOAD_IMPORT) {
+		zfs_stats.import_drops.fmds_value.ui64++;
 		return;
+	}
 
 	/*
 	 * Device I/O errors are ignored during pool open.
@@ -459,8 +578,10 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	    fmd_nvl_class_match(hdl, nvl,
 	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_IO)) ||
 	    fmd_nvl_class_match(hdl, nvl,
-	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_PROBE_FAILURE))))
+	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_PROBE_FAILURE)))) {
+		zfs_stats.dev_drops.fmds_value.ui64++;
 		return;
+	}
 
 	/*
 	 * We ignore ereports for anything except disks and files.
@@ -468,8 +589,10 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	if (nvlist_lookup_string(nvl, FM_EREPORT_PAYLOAD_ZFS_VDEV_TYPE,
 	    &type) == 0) {
 		if (strcmp(type, VDEV_TYPE_DISK) != 0 &&
-		    strcmp(type, VDEV_TYPE_FILE) != 0)
+		    strcmp(type, VDEV_TYPE_FILE) != 0) {
+			zfs_stats.vdev_drops.fmds_value.ui64++;
 			return;
+		}
 	}
 
 	/*
@@ -488,11 +611,67 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	if (nvlist_lookup_uint64(nvl, FM_EREPORT_ENA, &ena) != 0)
 		ena = 0;
 
+	zfs_ereport_when(hdl, nvl, &er_when);
+
 	for (zcp = uu_list_first(zfs_cases); zcp != NULL;
 	    zcp = uu_list_next(zfs_cases, zcp)) {
-		if (zcp->zc_data.zc_pool_guid == pool_guid &&
-		    zcp->zc_data.zc_vdev_guid == vdev_guid)
+		if (zcp->zc_data.zc_pool_guid == pool_guid) {
+			pool_found = B_TRUE;
+			pool_load = zcp->zc_when;
+		}
+		if (zcp->zc_data.zc_vdev_guid == vdev_guid)
 			break;
+	}
+
+	if (pool_found) {
+		fmd_hdl_debug(hdl, "pool %llx, "
+		    "ereport time %lld.%lld, pool load time = %lld.%lld\n",
+		    pool_guid, er_when.ertv_sec, er_when.ertv_nsec,
+		    pool_load.ertv_sec, pool_load.ertv_nsec);
+	}
+
+	/*
+	 * Avoid falsely accusing a pool of being faulty.  Do so by
+	 * not replaying ereports that were generated prior to the
+	 * current import.  If the failure that generated them was
+	 * transient because the device was actually removed but we
+	 * didn't receive the normal asynchronous notification, we
+	 * don't want to mark it as faulted and potentially panic. If
+	 * there is still a problem we'd expect not to be able to
+	 * import the pool, or that new ereports will be generated
+	 * once the pool is used.
+	 */
+	if (pool_found && timeval_earlier(&er_when, &pool_load)) {
+		zfs_stats.old_drops.fmds_value.ui64++;
+		return;
+	}
+
+	if (!pool_found) {
+		/*
+		 * Haven't yet seen this pool, but same situation
+		 * may apply.
+		 */
+		libzfs_handle_t *zhdl = fmd_hdl_getspecific(hdl);
+		struct load_time_arg la;
+
+		la.lt_guid = pool_guid;
+		la.lt_time = &pool_load;
+		la.lt_found = B_FALSE;
+
+		if (zhdl != NULL &&
+		    zpool_iter(zhdl, zpool_find_load_time, &la) == 0 &&
+		    la.lt_found == B_TRUE) {
+			pool_found = B_TRUE;
+			fmd_hdl_debug(hdl, "pool %llx, "
+			    "ereport time %lld.%lld, "
+			    "pool load time = %lld.%lld\n",
+			    pool_guid, er_when.ertv_sec, er_when.ertv_nsec,
+			    pool_load.ertv_sec, pool_load.ertv_nsec);
+			if (timeval_earlier(&er_when, &pool_load)) {
+				zfs_stats.old_drops.fmds_value.ui64++;
+				return;
+			}
+		}
 	}
 
 	if (zcp == NULL) {
@@ -503,8 +682,10 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		 * If this is one of our 'fake' resource ereports, and there is
 		 * no case open, simply discard it.
 		 */
-		if (isresource)
+		if (isresource) {
+			zfs_stats.resource_drops.fmds_value.ui64++;
 			return;
+		}
 
 		/*
 		 * Open a new case.
@@ -529,7 +710,10 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 
 		zcp = zfs_case_unserialize(hdl, cs);
 		assert(zcp != NULL);
+		if (pool_found)
+			zcp->zc_when = pool_load;
 	}
+
 
 	/*
 	 * If this is an ereport for a case with an associated vdev FRU, make
@@ -584,6 +768,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 				fmd_serd_reset(hdl,
 				    zcp->zc_data.zc_serd_checksum);
 		}
+		zfs_stats.resource_drops.fmds_value.ui64++;
 		return;
 	}
 
@@ -812,6 +997,9 @@ _fmd_init(fmd_hdl_t *hdl)
 	}
 
 	fmd_hdl_setspecific(hdl, zhdl);
+
+	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC, sizeof (zfs_stats) /
+	    sizeof (fmd_stat_t), (fmd_stat_t *)&zfs_stats);
 
 	/*
 	 * Iterate over all active cases and unserialize the associated buffers,

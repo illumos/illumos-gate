@@ -45,15 +45,16 @@ file path=usr/lib/libgss.so.1
 file path=usr/lib/sasl/$(ARCH64)/gssapi.so.1
 file path=usr/lib/sasl/gssapi.so.1
 file path=usr/sbin/gsscred group=sys mode=0555
-legacy pkg=SUNWgss arch=$(ARCH) category=system \
+legacy pkg=SUNWgss \
     desc="Generic Security Service Application Program Interface, Version 2 - user" \
-    hotline="Please contact your local service provider" name="GSSAPI V2" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="GSSAPI V2"
 license cr_Sun license=cr_Sun
-license lib/libgss/THIRDPARTYLICENSE license=lib/libgss/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
-license lic_gss license=lic_gss
-license uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE \
-    license=uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE
+license usr/src/lib/libgss/THIRDPARTYLICENSE \
+    license=usr/src/lib/libgss/THIRDPARTYLICENSE
+license usr/src/lib/sasl_plugins/gssapi/THIRDPARTYLICENSE \
+    license=usr/src/lib/sasl_plugins/gssapi/THIRDPARTYLICENSE
+license usr/src/uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libgss.so target=libgss.so.1
 link path=usr/lib/libgss.so target=libgss.so.1

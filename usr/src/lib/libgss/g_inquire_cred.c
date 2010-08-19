@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -28,6 +27,7 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -91,8 +91,10 @@ gss_OID_set *mechanisms;
 						lifetime, cred_usage,
 						mechanisms);
 
-		if (status != GSS_S_COMPLETE)
+		if (status != GSS_S_COMPLETE) {
+			map_error(minor_status, mech);
 			return (status);
+		}
 
 		if (name) {
 		/*
@@ -103,6 +105,7 @@ gss_OID_set *mechanisms;
 						internal_name, name);
 			if (status != GSS_S_COMPLETE) {
 				*minor_status = temp_minor_status;
+				map_error(minor_status, mech);
 				if (mechanisms && *mechanisms) {
 					(void) gss_release_oid_set(
 						&temp_minor_status,
@@ -144,7 +147,9 @@ gss_OID_set *mechanisms;
 	 */
 
 	if (name != NULL) {
-		if ((gss_import_name(minor_status,
+		if (union_cred->auxinfo.name.length == 0) {
+			*name = GSS_C_NO_NAME;
+		} else if ((gss_import_name(minor_status,
 					&union_cred->auxinfo.name,
 					union_cred->auxinfo.name_type,
 					name) != GSS_S_COMPLETE) ||
@@ -251,8 +256,10 @@ gss_inquire_cred_by_mech(minor_status, cred_handle, mech_type, name,
 					initiator_lifetime,
 					acceptor_lifetime, cred_usage);
 
-		if (status != GSS_S_COMPLETE)
+		if (status != GSS_S_COMPLETE) {
+			map_error(minor_status, mech);
 			return (status);
+		}
 
 		if (name) {
 			/*
@@ -263,6 +270,7 @@ gss_inquire_cred_by_mech(minor_status, cred_handle, mech_type, name,
 					internal_name, name);
 			if (status != GSS_S_COMPLETE) {
 				*minor_status = temp_minor_status;
+				map_error(minor_status, mech);
 				return (status);
 			}
 		}

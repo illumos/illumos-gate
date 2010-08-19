@@ -81,6 +81,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_kva2str;
 	_kva_dup;
 	_kva_free;
+	_kva_free_value;
 	_new_kva;
 	_str2kva;
 	_enum_profs;

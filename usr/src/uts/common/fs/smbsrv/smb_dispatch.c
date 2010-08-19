@@ -140,8 +140,12 @@
 #include <sys/sdt.h>
 #include <sys/spl.h>
 
+static int smb_legacy_dispatch_stats_update(kstat_t *, int);
 static int is_andx_com(unsigned char);
 static int smbsr_check_result(struct smb_request *, int, int);
+
+static kstat_t *smb_legacy_dispatch_ksp = NULL;
+static kmutex_t smb_legacy_dispatch_ksmtx;
 
 static smb_disp_entry_t	smb_disp_table[SMB_COM_NUM] = {
 	{ "SmbCreateDirectory", SMB_SDT_OPS(create_directory),  /* 0x00 000 */
@@ -1180,12 +1184,43 @@ smb_com_invalid(smb_request_t *sr)
 void
 smb_dispatch_stats_init(smb_kstat_req_t *ksr)
 {
-	int	i;
+	kstat_named_t	*ksn;
+	int		ks_ndata;
+	int		i;
 
 	for (i = 0; i < SMB_COM_NUM; i++, ksr++) {
 		smb_latency_init(&smb_disp_table[i].sdt_lat);
 		(void) strlcpy(ksr->kr_name, smb_disp_table[i].sdt_name,
 		    sizeof (ksr->kr_name));
+	}
+	/* Legacy Statistics */
+	for (i = 0, ks_ndata = 0; i < SMB_COM_NUM; i++) {
+		if (smb_disp_table[i].sdt_function != smb_com_invalid)
+			ks_ndata++;
+	}
+
+	smb_legacy_dispatch_ksp = kstat_create(SMBSRV_KSTAT_MODULE, 0,
+	    SMBSRV_KSTAT_NAME_CMDS, SMBSRV_KSTAT_CLASS,
+	    KSTAT_TYPE_NAMED, ks_ndata, 0);
+
+	if (smb_legacy_dispatch_ksp != NULL) {
+		ksn = smb_legacy_dispatch_ksp->ks_data;
+
+		for (i = 0, ks_ndata = 0; i < SMB_COM_NUM; i++) {
+			if (smb_disp_table[i].sdt_function != smb_com_invalid) {
+				(void) strlcpy(ksn->name,
+				    smb_disp_table[i].sdt_name,
+				    sizeof (ksn->name));
+				ksn->data_type = KSTAT_DATA_UINT64;
+				++ksn;
+			}
+		}
+		mutex_init(&smb_legacy_dispatch_ksmtx, NULL,
+		    MUTEX_DEFAULT, NULL);
+		smb_legacy_dispatch_ksp->ks_update =
+		    smb_legacy_dispatch_stats_update;
+		smb_legacy_dispatch_ksp->ks_lock = &smb_legacy_dispatch_ksmtx;
+		kstat_install(smb_legacy_dispatch_ksp);
 	}
 }
 
@@ -1198,6 +1233,12 @@ void
 smb_dispatch_stats_fini(void)
 {
 	int	i;
+
+	if (smb_legacy_dispatch_ksp != NULL) {
+		kstat_delete(smb_legacy_dispatch_ksp);
+		mutex_destroy(&smb_legacy_dispatch_ksmtx);
+		smb_legacy_dispatch_ksp = NULL;
+	}
 
 	for (i = 0; i < SMB_COM_NUM; i++)
 		smb_latency_destroy(&smb_disp_table[i].sdt_lat);
@@ -1230,5 +1271,39 @@ smb_dispatch_stats_update(smb_kstat_req_t *ksr, int first, int nreq)
 			smb_disp_table[i].sdt_lat.ly_d_sum = 0;
 			mutex_exit(&smb_disp_table[i].sdt_lat.ly_mutex);
 		}
+	}
+}
+
+/*
+ * smb_legacy_dispatch_stats_update
+ *
+ * This callback function updates the smb_legacy_dispatch_kstat_data when kstat
+ * command is invoked.
+ */
+static int
+smb_legacy_dispatch_stats_update(kstat_t *ksp, int rw)
+{
+	kstat_named_t   *ksn;
+	int		i;
+
+	ASSERT(MUTEX_HELD(ksp->ks_lock));
+
+	switch (rw) {
+	case KSTAT_WRITE:
+		return (EACCES);
+
+	case KSTAT_READ:
+		ksn = ksp->ks_data;
+		for (i = 0; i < SMB_COM_NUM; i++) {
+			if (smb_disp_table[i].sdt_function != smb_com_invalid) {
+				ksn->value.ui64 =
+				    smb_disp_table[i].sdt_lat.ly_a_nreq;
+				++ksn;
+			}
+		}
+		return (0);
+
+	default:
+		return (EIO);
 	}
 }

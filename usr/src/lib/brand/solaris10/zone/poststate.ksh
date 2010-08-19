@@ -19,9 +19,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+#
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 . /usr/lib/brand/solaris10/common.ksh
@@ -46,6 +47,7 @@ zonename=$1
 zonepath=$2
 state=$3
 cmd=$4
+altroot=$5		# unused at this time for s10 branded zones
 
 # If we're readying the zone, update the zone index file to look like this is
 # the global zone.

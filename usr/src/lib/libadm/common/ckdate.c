@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,12 +23,10 @@
 
 
 /*
- * Copyright (c) 1997,1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*LINTLIBRARY*/
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -51,7 +48,7 @@ static char	*p_date(char *, int, int, int);
 static char	*p_eday(char *, int, int);
 static char	*p_dlm(char *, char);
 
-#define	MLIM 9
+#define	MLIM 10
 #define	STDIG 2
 #define	LD2 10
 #define	LD 01
@@ -189,7 +186,7 @@ p_month(char *string, char mnabr)
 	copy = string;
 
 	while (((islower((unsigned char)*copy)) ||
-		(isupper((unsigned char)*copy))) && (imnth < mlen)) {
+	    (isupper((unsigned char)*copy))) && (imnth < mlen)) {
 		mletter[imnth] = toupper((unsigned char)*copy++);
 		imnth++;
 	}
@@ -317,40 +314,40 @@ ckdate_val(char *fmt, char *input)
 		if ((*fmt) == '%') {
 			fmt++;
 			switch (*fmt) {
-			    case 'd':
-				input = p_date(input, LD, UD, STDIG);
-				if (!input)
-					valid = 0;
-				break;
+				case 'd':
+					input = p_date(input, LD, UD, STDIG);
+					if (!input)
+						valid = 0;
+					break;
 
-			    case 'e':
-				input = p_eday(input, LD2, UD);
-				if (!input)
-					valid = 0;
-				break;
+				case 'e':
+					input = p_eday(input, LD2, UD);
+					if (!input)
+						valid = 0;
+					break;
 
-			    case 'm':
-				input = p_date(input, LM, UM, STDIG);
-				if (!input)
-					valid = 0;
-				break;
+				case 'm':
+					input = p_date(input, LM, UM, STDIG);
+					if (!input)
+						valid = 0;
+					break;
 
-			    case 'y':
-				input = p_date(input, LY, UY, STDIG);
-				if (!input)
-					valid = 0;
-				break;
+				case 'y':
+					input = p_date(input, LY, UY, STDIG);
+					if (!input)
+						valid = 0;
+					break;
 
-			    case 'Y':
-				input = p_date(input, LCY, UCY, CCYY);
-				if (!input)
-					valid = 0;
-				break;
+				case 'Y':
+					input = p_date(input, LCY, UCY, CCYY);
+					if (!input)
+						valid = 0;
+					break;
 
-			    case 'D':
-				input = p_date(input, LM, UM, STDIG);
-				if (!input) {
-					valid = 0;
+				case 'D':
+					input = p_date(input, LM, UM, STDIG);
+					if (!input) {
+						valid = 0;
 					break;
 				}
 				input = p_dlm(input, DELIM1);
@@ -373,22 +370,22 @@ ckdate_val(char *fmt, char *input)
 					valid = 0;
 				break;
 
-			    case 'h':
-			    case 'b':
-				input = p_month(input, 'a');
-				if (!input)
-					valid = 0;
-				break;
+				case 'h':
+				case 'b':
+					input = p_month(input, 'a');
+					if (!input)
+						valid = 0;
+					break;
 
-			    case 'B':
-				input = p_month(input, 'f');
-				if (!input)
-					valid = 0;
-				break;
+				case 'B':
+					input = p_month(input, 'f');
+					if (!input)
+						valid = 0;
+					break;
 
-			    default:
-				(void) sscanf(input, "%1c", &ltrl);
-				input++;
+				default:
+					(void) sscanf(input, "%1c", &ltrl);
+					input++;
 			}
 		} else {
 			dfl = '\0';

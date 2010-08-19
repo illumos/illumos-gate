@@ -54,9 +54,9 @@ dir path=usr/lib/iconv/$(ARCH64)
 $(i386_ONLY)dir path=usr/lib/libc
 dir path=usr/lib/lwp
 dir path=usr/lib/lwp/$(ARCH64)
-dir path=usr/lib/python2.4
-dir path=usr/lib/python2.4/vendor-packages
-dir path=usr/lib/python2.4/vendor-packages/solaris
+dir path=usr/lib/python2.6
+dir path=usr/lib/python2.6/vendor-packages
+dir path=usr/lib/python2.6/vendor-packages/solaris
 dir path=usr/lib/raidcfg
 dir path=usr/lib/raidcfg/$(ARCH64)
 dir path=usr/lib/scsi
@@ -365,9 +365,9 @@ file path=usr/lib/libzoneinfo.so.1
 file path=usr/lib/nss_ad.so.1
 file path=usr/lib/nss_ldap.so.1
 file path=usr/lib/passwdutil.so.1
-file path=usr/lib/python2.4/vendor-packages/solaris/__init__.py
-file path=usr/lib/python2.4/vendor-packages/solaris/__init__.pyc
-file path=usr/lib/python2.4/vendor-packages/solaris/misc.so
+file path=usr/lib/python2.6/vendor-packages/solaris/__init__.py
+file path=usr/lib/python2.6/vendor-packages/solaris/__init__.pyc
+file path=usr/lib/python2.6/vendor-packages/solaris/misc.so
 file path=usr/lib/raidcfg/$(ARCH64)/mpt.so.1
 file path=usr/lib/raidcfg/mpt.so.1
 file path=usr/lib/scsi/$(ARCH64)/libscsi.so.1
@@ -447,58 +447,68 @@ file path=usr/xpg4/lib/$(ARCH64)/libcurses.so.1
 file path=usr/xpg4/lib/$(ARCH64)/libcurses.so.2
 file path=usr/xpg4/lib/libcurses.so.1
 file path=usr/xpg4/lib/libcurses.so.2
-legacy pkg=SUNWcsl arch=$(ARCH) category=system \
+legacy pkg=SUNWcsl \
     desc="core shared libraries for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris, (Shared Libs)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWcslr arch=$(ARCH) category=system \
+    name="Core Solaris, (Shared Libs)"
+legacy pkg=SUNWcslr \
     desc="core software for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris Libraries (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license common/crypto/THIRDPARTYLICENSE.cryptogams \
-    license=common/crypto/THIRDPARTYLICENSE.cryptogams
-license common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
-    license=common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman
-license common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \
-    license=common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl
-license common/crypto/ecc/THIRDPARTYLICENSE \
-    license=common/crypto/ecc/THIRDPARTYLICENSE
-license common/crypto/md5/amd64/THIRDPARTYLICENSE \
-    license=common/crypto/md5/amd64/THIRDPARTYLICENSE
-license common/mpi/THIRDPARTYLICENSE license=common/mpi/THIRDPARTYLICENSE
+    name="Core Solaris Libraries (Root)"
 license cr_Sun license=cr_Sun
-license lib/libast/THIRDPARTYLICENSE license=lib/libast/THIRDPARTYLICENSE
-license lib/libbsdmalloc/THIRDPARTYLICENSE \
-    license=lib/libbsdmalloc/THIRDPARTYLICENSE
-license lib/libcmd/THIRDPARTYLICENSE license=lib/libcmd/THIRDPARTYLICENSE
-license lib/libdll/THIRDPARTYLICENSE license=lib/libdll/THIRDPARTYLICENSE
-license lib/libinetutil/common/THIRDPARTYLICENSE \
-    license=lib/libinetutil/common/THIRDPARTYLICENSE
-license lib/libkmf/THIRDPARTYLICENSE license=lib/libkmf/THIRDPARTYLICENSE
-license lib/libldap5/THIRDPARTYLICENSE license=lib/libldap5/THIRDPARTYLICENSE
-license lib/libmp/common/THIRDPARTYLICENSE \
-    license=lib/libmp/common/THIRDPARTYLICENSE
-license lib/libresolv/THIRDPARTYLICENSE \
-    license=lib/libresolv/THIRDPARTYLICENSE
-license lib/libresolv2/THIRDPARTYLICENSE \
-    license=lib/libresolv2/THIRDPARTYLICENSE
-license lib/libshell/THIRDPARTYLICENSE license=lib/libshell/THIRDPARTYLICENSE
-license lib/libsum/THIRDPARTYLICENSE license=lib/libsum/THIRDPARTYLICENSE
-license lib/libwrap/THIRDPARTYLICENSE license=lib/libwrap/THIRDPARTYLICENSE
-license lib/pam_modules/authtok_check/THIRDPARTYLICENSE \
-    license=lib/pam_modules/authtok_check/THIRDPARTYLICENSE
-license lib/passwdutil/THIRDPARTYLICENSE \
-    license=lib/passwdutil/THIRDPARTYLICENSE
-license lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE \
-    license=lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE
-license lic_AMD license=lic_AMD
 license lic_CDDL license=lic_CDDL
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
-license uts/common/sys/THIRDPARTYLICENSE.unicode \
-    license=uts/common/sys/THIRDPARTYLICENSE.unicode
+license usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams \
+    license=usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams
+license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
+    license=usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman
+license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \
+    license=usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl
+license usr/src/common/crypto/ecc/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/ecc/THIRDPARTYLICENSE
+license usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
+license usr/src/common/mpi/THIRDPARTYLICENSE \
+    license=usr/src/common/mpi/THIRDPARTYLICENSE
+license usr/src/lib/libast/THIRDPARTYLICENSE \
+    license=usr/src/lib/libast/THIRDPARTYLICENSE
+license usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE \
+    license=usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE
+$(i386_ONLY)license usr/src/lib/libc/$(ARCH64)/gen/THIRDPARTYLICENSE \
+    license=usr/src/lib/libc/$(ARCH64)/gen/THIRDPARTYLICENSE
+license usr/src/lib/libc/port/fp/THIRDPARTYLICENSE \
+    license=usr/src/lib/libc/port/fp/THIRDPARTYLICENSE
+license usr/src/lib/libcmd/THIRDPARTYLICENSE \
+    license=usr/src/lib/libcmd/THIRDPARTYLICENSE
+license usr/src/lib/libdll/THIRDPARTYLICENSE \
+    license=usr/src/lib/libdll/THIRDPARTYLICENSE
+license usr/src/lib/libinetutil/common/THIRDPARTYLICENSE \
+    license=usr/src/lib/libinetutil/common/THIRDPARTYLICENSE
+license usr/src/lib/libkmf/THIRDPARTYLICENSE \
+    license=usr/src/lib/libkmf/THIRDPARTYLICENSE
+license usr/src/lib/libldap4/THIRDPARTYLICENSE \
+    license=usr/src/lib/libldap4/THIRDPARTYLICENSE
+license usr/src/lib/libldap5/THIRDPARTYLICENSE \
+    license=usr/src/lib/libldap5/THIRDPARTYLICENSE
+license usr/src/lib/libmp/common/THIRDPARTYLICENSE \
+    license=usr/src/lib/libmp/common/THIRDPARTYLICENSE
+license usr/src/lib/libresolv/THIRDPARTYLICENSE \
+    license=usr/src/lib/libresolv/THIRDPARTYLICENSE
+license usr/src/lib/libresolv2/THIRDPARTYLICENSE \
+    license=usr/src/lib/libresolv2/THIRDPARTYLICENSE
+license usr/src/lib/libshell/THIRDPARTYLICENSE \
+    license=usr/src/lib/libshell/THIRDPARTYLICENSE
+license usr/src/lib/libsum/THIRDPARTYLICENSE \
+    license=usr/src/lib/libsum/THIRDPARTYLICENSE
+license usr/src/lib/libwrap/THIRDPARTYLICENSE \
+    license=usr/src/lib/libwrap/THIRDPARTYLICENSE
+license usr/src/lib/pam_modules/authtok_check/THIRDPARTYLICENSE \
+    license=usr/src/lib/pam_modules/authtok_check/THIRDPARTYLICENSE
+license usr/src/lib/passwdutil/THIRDPARTYLICENSE \
+    license=usr/src/lib/passwdutil/THIRDPARTYLICENSE
+license usr/src/lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE \
+    license=usr/src/lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 link path=lib/$(ARCH64)/libadm.so target=libadm.so.1
 link path=lib/$(ARCH64)/libaio.so target=libaio.so.1
 link path=lib/$(ARCH64)/libbsm.so target=libbsm.so.1
@@ -1199,6 +1209,7 @@ link path=usr/xpg4/lib/$(ARCH64)/libcurses.so target=libcurses.so.2
 link path=usr/xpg4/lib/64 target=$(ARCH64)
 link path=usr/xpg4/lib/libcurses.so target=./libcurses.so.2
 $(USE_INTERNAL_CRYPTO)depend fmri=driver/crypto/dprov type=require
+depend fmri=runtime/python-26 type=require
 #
 # libses.so needs to dlopen(3C) plugins from usr/lib/scsi/plugins/ses/vendor/,
 # a dependency which cannot be automatically derived

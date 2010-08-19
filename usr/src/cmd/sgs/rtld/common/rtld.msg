@@ -254,6 +254,7 @@
 # Error diagnostic standard prefixes.
 
 @ MSG_ERR_WARNING	"warning: "
+@ MSG_ERR_GUIDANCE	"guidance: "
 @ MSG_ERR_FATAL		"fatal: "
 @ MSG_ERR_ELF		"elf error: "
 
@@ -422,6 +423,3 @@
 
 @ MSG_LMID_FMT		"%s%d"
 @ MSG_LMID_MAXED	"ALTMAXEDOUT"
-
-@ MSG_AUD_PLTENTER	"la_pltenter"
-@ MSG_AUD_SYMBIND	"la_symbind"

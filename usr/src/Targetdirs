@@ -162,6 +162,7 @@ DIRS= \
 	/lib \
 	/lib/crypto \
 	/lib/inet \
+	/lib/fm \
 	/lib/secure \
 	/lib/svc \
 	/lib/svc/bin \
@@ -286,10 +287,11 @@ DIRS= \
 	/usr/net \
 	/usr/net/servers \
 	/usr/lib/pool \
-	/usr/lib/python2.4 \
-	/usr/lib/python2.4/vendor-packages \
-	/usr/lib/python2.4/vendor-packages/solaris \
-	/usr/lib/python2.4/vendor-packages/zfs \
+	/usr/lib/python2.6 \
+	/usr/lib/python2.6/vendor-packages \
+	/usr/lib/python2.6/vendor-packages/solaris \
+	/usr/lib/python2.6/vendor-packages/zfs \
+	/usr/lib/python2.6/vendor-packages/beadm \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
 	/usr/lib/sa  \
@@ -362,6 +364,7 @@ DIRS= \
 	/var/ld \
 	/var/log \
 	/var/log/pool \
+	/var/logadm \
 	/var/mail \
 	/var/news \
 	/var/opt \
@@ -443,6 +446,7 @@ DIRS64= \
 	$($(MACH64)_DIRS64) \
 	/lib/$(MACH64) \
 	/lib/crypto/$(MACH64) \
+	/lib/fm/$(MACH64) \
 	/lib/secure/$(MACH64) \
 	/usr/bin/$(MACH64) \
 	/usr/ccs/bin/$(MACH64)  \
@@ -1052,6 +1056,10 @@ $(ROOT)/usr/lib/nss_dns.so.1:=		REALPATH=../../lib/nss_dns.so.1
 $(ROOT)/usr/lib/nss_files.so.1:=	REALPATH=../../lib/nss_files.so.1
 $(ROOT)/usr/lib/nss_nis.so.1:=		REALPATH=../../lib/nss_nis.so.1
 $(ROOT)/usr/lib/nss_user.so.1:=		REALPATH=../../lib/nss_user.so.1
+$(ROOT)/usr/lib/fm/libfmevent.so.1:=    REALPATH=../../../lib/fm/libfmevent.so.1
+$(ROOT)/usr/lib/fm/libfmevent.so:=      REALPATH=../../../lib/fm/libfmevent.so.1
+$(ROOT)/usr/lib/fm/llib-lfmevent.ln:=   REALPATH=../../../lib/fm/llib-lfmevent.ln
+$(ROOT)/usr/lib/fm/llib-lfmevent:=      REALPATH=../../../lib/fm/llib-lfmevent
 
 $(ROOT)/lib/$(MACH64)/libposix4.so.1:= \
 	REALPATH=librt.so.1
@@ -1403,6 +1411,12 @@ $(ROOT)/usr/lib/$(MACH64)/nss_nis.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_nis.so.1
 $(ROOT)/usr/lib/$(MACH64)/nss_user.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_user.so.1
+$(ROOT)/usr/lib/fm/$(MACH64)/libfmevent.so.1:= \
+	REALPATH=../../../../lib/fm/$(MACH64)/libfmevent.so.1
+$(ROOT)/usr/lib/fm/$(MACH64)/libfmevent.so:= \
+	REALPATH=../../../../lib/fm/$(MACH64)/libfmevent.so.1
+$(ROOT)/usr/lib/fm/$(MACH64)/llib-lfmevent.ln:= \
+	REALPATH=../../../../lib/fm/$(MACH64)/llib-lfmevent.ln
 
 i386_SYM.USRLIB= \
 	/usr/lib/libfdisk.so \
@@ -1641,7 +1655,11 @@ SYM.USRLIB= \
 	/usr/lib/nss_dns.so.1 \
 	/usr/lib/nss_files.so.1 \
 	/usr/lib/nss_nis.so.1 \
-	/usr/lib/nss_user.so.1
+	/usr/lib/nss_user.so.1 \
+	/usr/lib/fm/libfmevent.so \
+	/usr/lib/fm/libfmevent.so.1 \
+	/usr/lib/fm/llib-lfmevent \
+	/usr/lib/fm/llib-lfmevent.ln
 
 sparcv9_SYM.USRLIB64= 
 
@@ -1824,7 +1842,10 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/nss_dns.so.1 \
 	/usr/lib/$(MACH64)/nss_files.so.1 \
 	/usr/lib/$(MACH64)/nss_nis.so.1 \
-	/usr/lib/$(MACH64)/nss_user.so.1
+	/usr/lib/$(MACH64)/nss_user.so.1 \
+	/usr/lib/fm/$(MACH64)/libfmevent.so \
+	/usr/lib/fm/$(MACH64)/libfmevent.so.1 \
+	/usr/lib/fm/$(MACH64)/llib-lfmevent.ln
 
 #
 # usr/src/Makefile uses INS.dir for any member of ROOTDIRS, the fact

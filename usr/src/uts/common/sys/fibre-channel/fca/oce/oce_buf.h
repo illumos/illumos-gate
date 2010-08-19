@@ -44,10 +44,9 @@ extern "C" {
 	: (((_START) + (_STEP)) - (_END)))
 
 #define	OCE_MAX_TX_HDL		8
-#define	OCE_MAX_TXDMA_COOKIES	16
+#define	OCE_MAX_TXDMA_COOKIES	18
 #define	OCE_TXMAP_ALIGN		1
 #define	OCE_TX_MAX_FRAGS	(OCE_MAX_TX_HDL * OCE_MAX_TXDMA_COOKIES)
-#define	OCE_TX_LO_WM		OCE_TX_MAX_FRAGS
 
 /* helper structure to access OS addresses */
 typedef union  oce_addr_s {
@@ -79,8 +78,8 @@ typedef struct oce_dma_buf_s {
 #define	DBUF_VA(obj) (((oce_dma_buf_t *)(obj))->base)
 #define	DBUF_DHDL(obj) (((oce_dma_buf_t *)(obj))->dma_handle)
 #define	DBUF_AHDL(obj) (((oce_dma_buf_t *)obj))->acc_handle)
-#define	DBUF_SYNC(obj, flags)	ddi_dma_sync(DBUF_DHDL(obj), 0,\
-			((oce_dma_buf_t *)obj)->len, (flags))
+#define	DBUF_SYNC(obj, flags)	(void) ddi_dma_sync(DBUF_DHDL(obj), 0,\
+			0, (flags))
 
 typedef struct oce_ring_buffer_s {
 	uint16_t    cidx; 	/* Get ptr */
@@ -92,12 +91,12 @@ typedef struct oce_ring_buffer_s {
 }oce_ring_buffer_t;
 
 typedef struct oce_rq_bdesc_s {
-	OCE_LIST_NODE_T  link;
 	oce_dma_buf_t	*rqb;
 	struct oce_rq	*rq;
 	oce_addr64_t 	frag_addr;
 	mblk_t		*mp;
 	frtn_t		fr_rtn;
+    uint32_t    ref_cnt;
 }oce_rq_bdesc_t;
 
 typedef struct oce_wq_bdesc_s {
@@ -119,6 +118,7 @@ enum entry_type {
 };
 
 typedef struct _oce_handle_s {
+    enum entry_type	type;
 	void		*hdl; /* opaque handle */
 }oce_handle_t;
 
@@ -128,13 +128,10 @@ typedef struct _oce_wqe_desc_s {
 	struct oce_nic_frag_wqe frag[OCE_TX_MAX_FRAGS];
 	struct oce_wq  *wq;
 	mblk_t		*mp;
-	enum entry_type	type;
-	uint16_t	wq_start_idx;
-	uint16_t	wq_end_idx;
 	uint16_t	wqe_cnt;
-	uint16_t	pkt_len; /* 64K MAX */
-	uint32_t	frag_cnt;
-	uint32_t	nhdl;
+	uint16_t	frag_idx;
+	uint16_t	frag_cnt;
+	uint16_t	nhdl;
 }oce_wqe_desc_t;
 
 #pragma pack(1)

@@ -54,10 +54,7 @@ file path=lib/svc/manifest/network/ibd-post-upgrade.xml group=sys mode=0444
 file path=lib/svc/method/ibd-post-upgrade mode=0555
 file path=sbin/ibd_delete_link mode=0555
 file path=sbin/ibd_upgrade mode=0555
-legacy pkg=SUNWipoib arch=$(ARCH) category=system \
-    desc="Sun IP over InfiniBand" \
-    hotline="Please contact your local service provider" \
-    name="Sun IP over InfiniBand" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWipoib desc="Sun IP over InfiniBand" \
+    name="Sun IP over InfiniBand"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

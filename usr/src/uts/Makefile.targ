@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This Makefiles contains the common targets and definitions for
 #	all kernels. It is to be included in the Makefiles for specific
@@ -381,18 +380,31 @@ RELSOFTLINKS = $(ROOTSOFTLINKS:$(ROOT)/%=%)
 MODSRC:sh=		pwd
 
 #
+# Generate module information for Install.sh, i.e., specify what files
+# Install.sh should include.  Each line looks like
+#   <tag> <srcdir> <arg1> <arg2> ...
+# where <tag> specifies the type of file, <srcdir> gives the source
+# path (useful if there is an error), and <argN> is one or more
+# additional bits of information that Install.sh needs (e.g., source
+# directory, install directory, filtering tags).  See Install.sh for
+# details on the arguments for each tag type, especially the functions
+# copymod, filtmod, and filtimpl.
+#
 # Changes to this target may require corresponding changes to
 # Install.sh.
+#
 # Don't issue a MOD entry if it's not in the install list.
 #
+
 $(MODLIST_DEPS): FRC
 	@case $@ in \
 	*32) \
 		class=32; \
-		relmodule=`dirname $(RELMODULE)`;; \
+		[ -n "$(RELMODULE)" ] && relmodule=`dirname $(RELMODULE)`;; \
 	*64) \
 		class=64; \
-		relmodule=`dirname $(RELMODULE)`/$(SUBDIR64);; \
+		[ -n "$(RELMODULE)" ] && \
+		    relmodule=`dirname $(RELMODULE)`/$(SUBDIR64);; \
 	esac; \
 	if [ -z "$(THISIMPL)" ]; then \
 		impl=all; \
@@ -408,8 +420,8 @@ $(MODLIST_DEPS): FRC
 		tinstall="$(INSTALL_TARGET)"; \
 		for t in $$tinstall; do \
 			if [ "$(ROOTMODULE)" = $$t ]; then \
-				echo MOD $$module $$relmodule \
-				    $$class $$impl $(MODSRC); \
+				echo MOD $(MODSRC) $$module $$relmodule \
+				    $$class $$impl; \
 				break; \
 			fi \
 		done \
@@ -418,7 +430,7 @@ $(MODLIST_DEPS): FRC
 		tinstall="$(INSTALL_TARGET)"; \
 		for t in $$tinstall; do \
 			if [ $(ROOT_CONFFILE) = $$t ]; then \
-				echo CONF $(RELCONF) \
+				echo CONF $(MODSRC) $(RELCONF) \
 				    $(MODSRC)/$(CONF_SRCDIR) $$impl $$module; \
 				break; \
 			fi \
@@ -427,17 +439,17 @@ $(MODLIST_DEPS): FRC
 	if [ -n "$(ROOTLINK)" ]; then \
 		rellinks="$(RELLINK)"; \
 		for r in $$rellinks; do \
-		if [ $$class = 32 ]; then \
-			linkdir=`dirname $$r`; \
-		else \
-			linkdir=`dirname $$r`/$(SUBDIR64); \
-		fi; \
-		echo LINK $$relmodule $$module \
-			$$linkdir `basename $$r` $$impl; \
+			if [ $$class = 32 ]; then \
+				linkdir=`dirname $$r`; \
+			else \
+				linkdir=`dirname $$r`/$(SUBDIR64); \
+			fi; \
+			echo LINK $(MODSRC) $$relmodule $$module \
+				$$linkdir `basename $$r` $$impl; \
 		done \
 	fi; \
 	if [ -n "$(UNIX32_LINK)" ]; then \
-		echo SYMLINK $(SUBDIR64)/$(UNIX) \
+		echo SYMLINK $(MODSRC) $(SUBDIR64)/$(UNIX) \
 		    `dirname $(RELUNIX)` unix $$impl $$module; \
 	fi; \
 	trelsoftlinks="$(RELSOFTLINKS)"; \
@@ -448,7 +460,7 @@ $(MODLIST_DEPS): FRC
 			linkdir=`dirname $$t`/$(SUBDIR64); \
 		fi; \
 		linkname=`basename $$t`; \
-		echo SYMLINK $(MODULE) $$linkdir $$linkname \
+		echo SYMLINK $(MODSRC) $(MODULE) $$linkdir $$linkname \
 		    $$impl $$module; \
 	done
 

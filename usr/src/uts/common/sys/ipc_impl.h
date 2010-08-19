@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_IPC_IMPL_H
 #define	_IPC_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -151,7 +148,7 @@ struct msqid_ds64 {
 	(*(rctl_qty_t *)(((char *)&p->ipc_proj->kpj_data.kpd_ipc) + \
 	s->ipcs_rctlofs))
 #define	IPC_ZONE_USAGE(p, s) \
-	(*(rctl_qty_t *)(((char *)&p->ipc_zone->zone_ipc) + \
+	(*(rctl_qty_t *)(((char *)&p->ipc_zone_ref.zref_zone->zone_ipc) + \
 	s->ipcs_rctlofs))
 #define	IPC_LOCKED(s, o) \
 	MUTEX_HELD(&s->ipcs_table[IPC_INDEX(o->ipc_id)].ipct_lock)
@@ -172,7 +169,7 @@ typedef struct kipc_perm {
 	kproject_t *ipc_proj;	/* creator's project		*/
 	uint_t	ipc_id;		/* id				*/
 	zoneid_t ipc_zoneid;	/* creator's zone id		*/
-	zone_t	*ipc_zone;	/* creator's zone		*/
+	zone_ref_t ipc_zone_ref; /* reference to creator's zone */
 } kipc_perm_t;
 
 typedef struct ipc_slot {

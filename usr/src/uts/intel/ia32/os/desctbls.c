@@ -1332,7 +1332,7 @@ brand_interpositioning_enable(void)
 
 #else
 
-	if (x86_feature & X86_ASYSC) {
+	if (is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
 		wrmsr(MSR_AMD_LSTAR, (uintptr_t)brand_sys_syscall);
 		wrmsr(MSR_AMD_CSTAR, (uintptr_t)brand_sys_syscall32);
 	}
@@ -1340,7 +1340,7 @@ brand_interpositioning_enable(void)
 #endif
 #endif	/* __amd64 */
 
-	if (x86_feature & X86_SEP)
+	if (is_x86_feature(x86_featureset, X86FSET_SEP))
 		wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)brand_sys_sysenter);
 }
 
@@ -1376,7 +1376,7 @@ brand_interpositioning_disable(void)
 
 #else
 
-	if (x86_feature & X86_ASYSC) {
+	if (is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
 		wrmsr(MSR_AMD_LSTAR, (uintptr_t)sys_syscall);
 		wrmsr(MSR_AMD_CSTAR, (uintptr_t)sys_syscall32);
 	}
@@ -1384,6 +1384,6 @@ brand_interpositioning_disable(void)
 #endif
 #endif	/* __amd64 */
 
-	if (x86_feature & X86_SEP)
+	if (is_x86_feature(x86_featureset, X86FSET_SEP))
 		wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)sys_sysenter);
 }

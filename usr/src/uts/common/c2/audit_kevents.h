@@ -159,8 +159,10 @@ extern "C" {
 #define	AUE_ASYNC_DAEMON_EXIT	114	/* =no async_daemon(2) exited */
 #define	AUE_NFSSVC_EXIT		115	/* =no nfssvc(2) exited */
 #define	AUE_PFEXEC		116	/* =ps,ex,ua,as execve(2) w/ pfexec */
+#define	AUE_OPEN_S		117	/* =fr open(2): search */
+#define	AUE_OPEN_E		118	/* =fr open(2): exec */
 /*
- * 117 - 129 are available for future growth (old SunOS_CMW events
+ * 119 - 129 are available for future growth (old SunOS_CMW events
  * that had no libbsm or praudit support or references)
  */
 #define	AUE_GETAUID		130	/* =aa getauid(2) */
@@ -343,12 +345,14 @@ extern "C" {
 #define	AUE_SETSID		307	/* =pm setsid(2) */
 #define	AUE_SETPGID		308	/* =pm setpgid(2) */
 #define	AUE_FACCESSAT		309	/* =no obsolete */
+#define	AUE_AUDITON_GETAMASK	310	/* =aa */
+#define	AUE_AUDITON_SETAMASK	311	/* =as */
 
 
 
 /* NOTE: update MAX_KEVENTS below if events are added. */
 
-#define	MAX_KEVENTS		309
+#define	MAX_KEVENTS		311
 
 
 #ifdef __cplusplus

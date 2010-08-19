@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -35,13 +34,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <netdb.h>
+#include <libuutil.h>
 #include <note.h>
 #include "idmapd.h"
 #include "directory.h"
 #include "directory_private.h"
 #include <rpcsvc/idmap_prot.h>
 #include "directory_server_impl.h"
-#include "miscutils.h"
 #include "sidutil.h"
 
 static directory_error_t sid_dav(directory_values_rpc *lvals,
@@ -91,7 +90,7 @@ directory_provider_builtin_get(
 		 * End-to-end error injection point.
 		 * NEEDSWORK:  should probably eliminate this for production
 		 */
-		if (streq(id, " DEBUG BUILTIN ERROR ")) {
+		if (uu_streq(id, " DEBUG BUILTIN ERROR ")) {
 			directory_entry_set_error(&del[i],
 			    directory_error("Directory_provider_builtin.debug",
 			    "Directory_provider_builtin:  artificial error",
@@ -183,21 +182,22 @@ directory_provider_builtin_populate(
 		val->found = FALSE;
 		de = NULL;
 
-		if (strcaseeq(a, "uid")) {
+		if (uu_strcaseeq(a, "uid")) {
 			de = str_list_dav(val, &wksid->winname, 1);
-		} else if (strcaseeq(a, "uidNumber")) {
+		} else if (uu_strcaseeq(a, "uidNumber")) {
 			if (wksid->pid != IDMAP_SENTINEL_PID &&
 			    wksid->is_user) {
 				de = uint_list_dav(val, &wksid->pid, 1);
 			}
-		} else if (strcaseeq(a, "gidNumber")) {
+		} else if (uu_strcaseeq(a, "gidNumber")) {
 			if (wksid->pid != IDMAP_SENTINEL_PID &&
 			    !wksid->is_user) {
 				de = uint_list_dav(val, &wksid->pid, 1);
 			}
-		} else if (strcaseeq(a, "displayName") || strcaseeq(a, "cn")) {
+		} else if (uu_strcaseeq(a, "displayName") ||
+		    uu_strcaseeq(a, "cn")) {
 			de = str_list_dav(val, &wksid->winname, 1);
-		} else if (strcaseeq(a, "distinguishedName")) {
+		} else if (uu_strcaseeq(a, "distinguishedName")) {
 			char *container;
 			if (wksid->domain == NULL) {
 				container = "Users";
@@ -213,7 +213,7 @@ directory_provider_builtin_populate(
 			const char *cdn = dn;
 			de = str_list_dav(val, &cdn, 1);
 			free(dn);
-		} else if (strcaseeq(a, "objectClass")) {
+		} else if (uu_strcaseeq(a, "objectClass")) {
 			if (wksid->is_wuser) {
 				static const char *objectClasses[] = {
 					"top",
@@ -222,18 +222,18 @@ directory_provider_builtin_populate(
 					"user",
 				};
 				de = str_list_dav(val, objectClasses,
-				    NELEM(objectClasses));
+				    UU_NELEM(objectClasses));
 			} else {
 				static const char *objectClasses[] = {
 					"top",
 					"group",
 				};
 				de = str_list_dav(val, objectClasses,
-				    NELEM(objectClasses));
+				    UU_NELEM(objectClasses));
 			}
-		} else if (strcaseeq(a, "objectSid")) {
+		} else if (uu_strcaseeq(a, "objectSid")) {
 			de = sid_dav(val, wksid);
-		} else if (strcaseeq(a, "x-sun-canonicalName")) {
+		} else if (uu_strcaseeq(a, "x-sun-canonicalName")) {
 			char *canon;
 
 			if (wksid->domain == NULL) {
@@ -241,7 +241,7 @@ directory_provider_builtin_populate(
 				(void) asprintf(&canon, "%s@%s",
 				    wksid->winname, _idmapdstate.hostname);
 				UNLOCK_CONFIG();
-			} else if (streq(wksid->domain, "")) {
+			} else if (uu_streq(wksid->domain, "")) {
 				canon = strdup(wksid->winname);
 			} else {
 				(void) asprintf(&canon, "%s@%s",
@@ -253,7 +253,7 @@ directory_provider_builtin_populate(
 			const char *ccanon = canon;
 			de = str_list_dav(val, &ccanon, 1);
 			free(canon);
-		} else if (strcaseeq(a, "x-sun-provider")) {
+		} else if (uu_strcaseeq(a, "x-sun-provider")) {
 			const char *provider = "Builtin";
 			de = str_list_dav(val, &provider, 1);
 		}

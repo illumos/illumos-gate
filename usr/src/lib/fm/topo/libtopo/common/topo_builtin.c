@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <pthread.h>
@@ -39,6 +38,7 @@
 #include <mod.h>
 #include <pkg.h>
 #include <svc.h>
+#include <sw.h>
 #include <zfs.h>
 
 static const struct topo_builtin _topo_builtins[] = {
@@ -48,6 +48,7 @@ static const struct topo_builtin _topo_builtins[] = {
 	{ "mem", MEM_VERSION, mem_init, mem_fini },
 	{ "pkg", PKG_VERSION, pkg_init, pkg_fini },
 	{ "svc", SVC_VERSION, svc_init, svc_fini },
+	{ "sw", SW_VERSION, sw_init, sw_fini },
 	{ "zfs", ZFS_VERSION, zfs_init, zfs_fini },
 	{ "mod", MOD_VERSION, mod_init, mod_fini },
 	{ "hc", HC_VERSION, hc_init, hc_fini },		/* hc must go last */

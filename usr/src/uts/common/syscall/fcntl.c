@@ -114,13 +114,21 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		goto out;
 
 	case F_GETFL:
-		if ((error = f_getfl(fdes, &flag)) == 0)
-			retval = (flag & (FMASK | FASYNC)) + FOPEN;
+		if ((error = f_getfl(fdes, &flag)) == 0) {
+			retval = (flag & (FMASK | FASYNC));
+			if ((flag & (FSEARCH | FEXEC)) == 0)
+				retval += FOPEN;
+			else
+				retval |= (flag & (FSEARCH | FEXEC));
+		}
 		goto out;
 
 	case F_GETXFL:
-		if ((error = f_getfl(fdes, &flag)) == 0)
-			retval = flag + FOPEN;
+		if ((error = f_getfl(fdes, &flag)) == 0) {
+			retval = flag;
+			if ((flag & (FSEARCH | FEXEC)) == 0)
+				retval += FOPEN;
+		}
 		goto out;
 
 	case F_BADFD:

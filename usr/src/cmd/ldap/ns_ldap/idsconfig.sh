@@ -22,8 +22,7 @@
 #
 # idsconfig -- script to setup iDS 5.x/6.x/7.x for Native LDAP II.
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -3965,7 +3964,6 @@ add_vlv_indexes()
     # Indexes added during NIS to LDAP transition
     _INDEX7="${LDAP_DOMAIN}.getauhoent;${LDAP_DOMAIN}_auho_vlv_index;automountmapname=auto_home;objectClass=automount"
     _INDEX8="${LDAP_DOMAIN}.getsoluent;${LDAP_DOMAIN}_solu_vlv_index;ou=people;objectClass=SolarisUserAttr"
-    _INDEX9="${LDAP_DOMAIN}.getauduent;${LDAP_DOMAIN}_audu_vlv_index;ou=people;objectClass=SolarisAuditUser"
     _INDEX10="${LDAP_DOMAIN}.getauthent;${LDAP_DOMAIN}_auth_vlv_index;ou=SolarisAuthAttr;objectClass=SolarisAuthAttr"
     _INDEX11="${LDAP_DOMAIN}.getexecent;${LDAP_DOMAIN}_exec_vlv_index;ou=SolarisProfAttr;&(objectClass=SolarisExecAttr)(SolarisKernelSecurityPolicy=*)"
     _INDEX12="${LDAP_DOMAIN}.getprofent;${LDAP_DOMAIN}_prof_vlv_index;ou=SolarisProfAttr;&(objectClass=SolarisProfAttr)(SolarisAttrLongDesc=*)"
@@ -4431,7 +4429,7 @@ modify_top_aci()
 dn: ${LDAP_BASEDN}
 changetype: modify
 add: aci
-aci: (targetattr = "cn||uid||uidNumber||gidNumber||homeDirectory||shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||memberUid||SolarisAuditAlways||SolarisAuditNever||SolarisAttrKeyValue||SolarisAttrReserved1||SolarisAttrReserved2||SolarisUserQualifier")(version 3.0; acl ${ACI_NAME}; deny (write) userdn = "ldap:///self";)
+aci: (targetattr = "cn||uid||uidNumber||gidNumber||homeDirectory||shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||memberUid||SolarisAttrKeyValue||SolarisAttrReserved1||SolarisAttrReserved2||SolarisUserQualifier")(version 3.0; acl ${ACI_NAME}; deny (write) userdn = "ldap:///self";)
 -
 EOF
 ) > ${TMPDIR}/top_aci

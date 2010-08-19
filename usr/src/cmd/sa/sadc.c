@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -116,6 +112,80 @@ static	int64_t	cpu_stat_adj[CPU_STATES] = {0};
 
 static	long	ninode;
 
+int caught_cont = 0;
+
+/*
+ * Sleep until *wakeup + interval, keeping cadence where desired
+ *
+ * *wakeup -	The time we last wanted to wake up. Updated.
+ * interval -	We want to sleep until *wakeup + interval
+ * *caught_cont - Global set by signal handler if we got a SIGCONT
+ */
+void
+sleep_until(hrtime_t *wakeup, hrtime_t interval, int *caught_cont)
+{
+	hrtime_t now, pause, pause_left;
+	struct timespec pause_tv;
+	int status;
+	now = gethrtime();
+	pause = *wakeup + interval - now;
+
+	if (pause <= 0 || pause < (interval / 4))
+		if (*caught_cont) {
+			/* Reset our cadence (see comment below) */
+			*wakeup = now + interval;
+			pause = interval;
+		} else {
+			/*
+			 * If we got here, then the time between the
+			 * output we just did, and the scheduled time
+			 * for the next output is < 1/4 of our requested
+			 * interval AND the number of intervals has been
+			 * requested AND we have never caught a SIGCONT
+			 * (so we have never been suspended).  In this
+			 * case, we'll try to stay to the desired
+			 * cadence, and we will pause for 1/2 the normal
+			 * interval this time.
+			 */
+			pause = interval / 2;
+			*wakeup += interval;
+		}
+	else
+		*wakeup += interval;
+	if (pause < 1000)
+		/* Near enough */
+		return;
+
+	/* Now do the actual sleep */
+	pause_left = pause;
+	do {
+		pause_tv.tv_sec = pause_left / NANOSEC;
+		pause_tv.tv_nsec = pause_left % NANOSEC;
+		status = nanosleep(&pause_tv, (struct timespec *)NULL);
+		if (status < 0)
+			if (errno == EINTR) {
+				now = gethrtime();
+				pause_left = *wakeup - now;
+				if (pause_left < 1000)
+					/* Near enough */
+					return;
+			} else {
+				fail(1, "nanosleep failed");
+			}
+	} while (status != 0);
+}
+
+/*
+ * Signal handler - so we can be aware of SIGCONT
+ */
+void
+cont_handler(int sig_number)
+{
+	/* Re-set the signal handler */
+	(void) signal(sig_number, cont_handler);
+	caught_cont = 1;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -127,13 +197,23 @@ main(int argc, char *argv[])
 	char *fname;
 	struct iodevinfo *iodev;
 	off_t flength;
+	hrtime_t start_n;
+	hrtime_t period_n;
+
 
 	ct = argc >= 3? atoi(argv[2]): 0;
 	min = time((time_t *)0);
 	ti = argc >= 3? atoi(argv[1]): 0;
 
+	period_n = (hrtime_t)ti * NANOSEC;
+
 	if ((kc = kstat_open()) == NULL)
 		fail(1, "kstat_open(): can't open /dev/kstat");
+
+	/* Set up handler for SIGCONT */
+	if (signal(SIGCONT, cont_handler) == SIG_ERR)
+		fail(1, "signal failed");
+
 	all_stat_init();
 	init_iodevs();
 
@@ -201,6 +281,8 @@ main(int argc, char *argv[])
 		}
 	}
 
+	start_n = gethrtime();
+
 	for (;;) {
 		do {
 			(void) kstat_chain_update(kc);
@@ -221,7 +303,7 @@ main(int argc, char *argv[])
 				ftruncate(fp, flength), fail(1, "write failed");
 		}
 		if (--ct > 0) {
-			sleep(ti);
+			sleep_until(&start_n, period_n, &caught_cont);
 		} else {
 			close(fp);
 			return (0);
@@ -267,10 +349,10 @@ all_stat_init(void)
 	if (ufs_inode_ksp != NULL) {
 		safe_kstat_read(kc, ufs_inode_ksp, NULL);
 		ufs_inode_size_knp = safe_kstat_data_lookup(ufs_inode_ksp,
-			"size");
+		    "size");
 		ninode = ((kstat_named_t *)
-			safe_kstat_data_lookup(ufs_inode_ksp,
-			"maxsize"))->value.l;
+		    safe_kstat_data_lookup(ufs_inode_ksp,
+		    "maxsize"))->value.l;
 	}
 
 	/*
@@ -408,14 +490,14 @@ all_stat_load(void)
 
 		d.kmi.km_mem[kmi_index] += (ulong_t)mem_total;
 		d.kmi.km_alloc[kmi_index] +=
-			(ulong_t)mem_total - buf_size * buf_avail;
+		    (ulong_t)mem_total - buf_size * buf_avail;
 		d.kmi.km_fail[kmi_index] += (ulong_t)alloc_fail;
 	}
 
 	safe_kstat_read(kc, kmem_oversize_ksp, NULL);
 
 	d.kmi.km_alloc[KMEM_OSIZE] = d.kmi.km_mem[KMEM_OSIZE] =
-		oversize_alloc_knp->value.ui64;
+	    oversize_alloc_knp->value.ui64;
 	d.kmi.km_fail[KMEM_OSIZE] = oversize_fail_knp->value.ui64;
 
 	/*
@@ -472,9 +554,9 @@ safe_kstat_lookup(kstat_ctl_t *kc, char *ks_module, int ks_instance,
 
 	if (ksp == NULL)
 		fail(0, "kstat_lookup('%s', %d, '%s') failed",
-			ks_module == NULL ? "" : ks_module,
-			ks_instance,
-			ks_name == NULL ? "" : ks_name);
+		    ks_module == NULL ? "" : ks_module,
+		    ks_instance,
+		    ks_name == NULL ? "" : ks_name);
 	return (ksp);
 }
 
@@ -485,7 +567,7 @@ safe_kstat_data_lookup(kstat_t *ksp, char *name)
 
 	if (fp == NULL)
 		fail(0, "kstat_data_lookup('%s', '%s') failed",
-			ksp->ks_name, name);
+		    ksp->ks_name, name);
 	return (fp);
 }
 
@@ -493,7 +575,7 @@ static int
 safe_kstat_data_index(kstat_t *ksp, char *name)
 {
 	return ((int)((char *)safe_kstat_data_lookup(ksp, name) -
-		(char *)ksp->ks_data) / (ksp->ks_data_size / ksp->ks_ndata));
+	    (char *)ksp->ks_data) / (ksp->ks_data_size / ksp->ks_ndata));
 }
 
 static int
@@ -534,7 +616,7 @@ init_iodevs(void)
 			iodev = iodev->next;
 		else {
 			safe_zalloc((void **) &iodev->next,
-				sizeof (struct iodevinfo), 0);
+			    sizeof (struct iodevinfo), 0);
 			iodev = iodev->next;
 			iodev->next = NULL;
 		}

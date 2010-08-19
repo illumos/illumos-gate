@@ -18,10 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SCSI_GENERIC_SMP_FRAMES_H
@@ -104,6 +102,7 @@ typedef enum smp_result {
 	SMP_RES_NO_PHYSICAL_PRESENCE		= 0x26,
 	SMP_RES_SAVING_NOT_SUPPORTED		= 0x27,
 	SMP_RES_SOURCE_ZONE_GROUP_DNE		= 0x28,
+	SMP_RES_DISABLED_PW_NOT_SUPPORTED	= 0x29,
 	SMP_RES_NONE				= -1
 } smp_result_t;
 
@@ -179,7 +178,7 @@ typedef struct smp_report_general_resp {
 	    srgr_saving_zone_phy_info_supported		:1,
 	    srgr_saving_zone_mgr_password_supported	:1,
 	    srgr_saving					:1,
-	    _reserved7					:4);
+	    _reserved7					:3);
 	uint16_t srgr_max_routed_sas_addrs;
 	uint64_t srgr_active_zm_sas_addr;
 	uint16_t srgr_zone_lock_inactivity_limit;
@@ -336,11 +335,27 @@ typedef uint8_t smp_zone_perm_descr256_t[32];
 	((__d)[31 - ((__z) >> 3)] &= ~(1 << ((__z) & 7)))
 
 /*
- * SAS-2 10.4.3.8 REPORT ZONE MANAGER PASSWORD (no additional request bytes)
+ * SAS-2 10.4.3.8 REPORT ZONE MANAGER PASSWORD
  */
+typedef enum smp_report_zmp_report_type {
+	SMP_ZMP_TYPE_CURRENT		= 0x0,
+	SMP_ZMP_TYPE_SAVED		= 0x2,
+	SMP_ZMP_TYPE_DEFAULT		= 0x3
+} smp_report_zmp_report_type_t;
+
+typedef struct smp_report_zone_mgr_password_req {
+	DECL_BITFIELD2(
+	    srzmpr_rpt_type		:2,
+	    _reserved1			:6);
+	uint8_t _reserved2[2];
+} smp_report_zone_mgr_password_req_t;
+
 typedef struct smp_report_zone_mgr_password_resp {
 	uint16_t srzmpr_exp_change_count;
-	uint8_t _reserved1[2];
+	DECL_BITFIELD2(
+	    srzmpr_rpt_type		:2,
+	    _reserved1			:6);
+	uint8_t _reserved2;
 	uint8_t srzmpr_zone_mgr_password[32];
 } smp_report_zone_mgr_password_resp_t;
 
@@ -638,6 +653,43 @@ typedef struct smp_report_route_info_resp {
 /*
  * SAS-2 10.4.3.14 SAS-2 REPORT PHY EVENT
  */
+typedef enum smp_phy_event_source {
+	SMP_PHY_EVENT_NO_EVENT				= 0x00,
+	SMP_PHY_EVENT_INVALID_DWORD_COUNT		= 0x01,
+	SMP_PHY_EVENT_RUNNING_DISPARITY_ERROR_COUNT	= 0x02,
+	SMP_PHY_EVENT_LOSS_OF_DWORD_SYNC_COUNT		= 0x03,
+	SMP_PHY_EVENT_PHY_RESET_PROBLEM_COUNT		= 0x04,
+	SMP_PHY_EVENT_ELASTICITY_BUFFER_OVERFLOW_COUNT	= 0x05,
+	SMP_PHY_EVENT_RX_ERROR_COUNT			= 0x06,
+	SMP_PHY_EVENT_RX_ADDR_FRAME_ERROR_COUNT		= 0x20,
+	SMP_PHY_EVENT_TX_ABANDON_CLASS_OPEN_REJ_COUNT	= 0x21,
+	SMP_PHY_EVENT_RX_ABANDON_CLASS_OPEN_REJ_COUNT	= 0x22,
+	SMP_PHY_EVENT_TX_RETRY_CLASS_OPEN_REJ_COUNT	= 0x23,
+	SMP_PHY_EVENT_RX_RETRY_CLASS_OPEN_REJ_COUNT	= 0x24,
+	SMP_PHY_EVENT_RX_AIP_W_O_PARTIAL_COUNT		= 0x25,
+	SMP_PHY_EVENT_RX_AIP_W_O_CONN_COUNT		= 0x26,
+	SMP_PHY_EVENT_TX_BREAK_COUNT			= 0x27,
+	SMP_PHY_EVENT_RX_BREAK_COUNT			= 0x28,
+	SMP_PHY_EVENT_BREAK_TIMEOUT_COUNT		= 0x29,
+	SMP_PHY_EVENT_CONNECTION_COUNT			= 0x2A,
+	SMP_PHY_EVENT_PEAK_TX_PATHWAY_BLOCKED_COUNT	= 0x2B,
+	SMP_PHY_EVENT_PEAK_TX_ARB_WAIT_TIME		= 0x2C,
+	SMP_PHY_EVENT_PEAK_ARB_TIME			= 0x2D,
+	SMP_PHY_EVENT_PEAK_CONNECTION_TIME		= 0x2E,
+	SMP_PHY_EVENT_TX_SSP_FRAME_COUNT		= 0x40,
+	SMP_PHY_EVENT_RX_SSP_FRAME_COUNT		= 0x41,
+	SMP_PHY_EVENT_TX_SSP_FRAME_ERROR_COUNT		= 0x42,
+	SMP_PHY_EVENT_RX_SSP_FRAME_ERROR_COUNT		= 0x43,
+	SMP_PHY_EVENT_TX_CREDIT_BLOCKED_COUNT		= 0x44,
+	SMP_PHY_EVENT_RX_CREDIT_BLOCKED_COUNT		= 0x45,
+	SMP_PHY_EVENT_TX_SATA_FRAME_COUNT		= 0x50,
+	SMP_PHY_EVENT_RX_SATA_FRAME_COUNT		= 0x51,
+	SMP_PHY_EVENT_SATA_FLOW_CTRL_BUF_OVERFLOW_COUNT	= 0x52,
+	SMP_PHY_EVENT_TX_SMP_FRAME_COUNT		= 0x60,
+	SMP_PHY_EVENT_RX_SMP_FRAME_COUNT		= 0x61,
+	SMP_PHY_EVENT_RX_SMP_FRAME_ERROR_COUNT		= 0x63
+} smp_phy_event_source_t;
+
 typedef struct smp_report_phy_event_req {
 	uint8_t _reserved1;
 	uint8_t _reserved2[4];
@@ -818,12 +870,15 @@ typedef struct smp_route_table_descr {
 typedef struct smp_report_exp_route_table_list_resp {
 	uint16_t srertlr_exp_change_count;
 	uint16_t srertlr_route_table_change_count;
-	DECL_BITFIELD3(
-	    _reserved1		:1,
-	    srertlr_configuring	:1,
-	    _reserved2		:6);
+	DECL_BITFIELD5(
+	    srertlr_zoning_enabled	:1,
+	    srertlr_configuring		:1,
+	    srertlr_zone_configuring	:1,
+	    srertlr_self_configuring	:1,
+	    _reserved2			:4);
 	uint8_t _reserved3;
-	uint16_t srertlr_n_descrs;
+	uint8_t srertlr_descr_length;
+	uint8_t srertlr_n_descrs;
 	uint16_t srertlr_first_routed_sas_addr_index;
 	uint16_t srertlr_last_routed_sas_addr_index;
 	uint8_t _reserved4[3];

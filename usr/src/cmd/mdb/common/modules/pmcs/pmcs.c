@@ -1533,9 +1533,6 @@ outbound_iomb_opcode(uint32_t opcode)
 	case PMCOUT_DEVICE_HANDLE_ARRIVED:
 		return ("DEVICE_HANDLE_ARRIVED");
 		break;
-	case PMCOUT_SMP_REQUEST_RECEIVED:
-		return ("SMP_REQUEST_RECEIVED");
-		break;
 	case PMCOUT_SSP_REQUEST_RECEIVED:
 		return ("SSP_REQUEST_RECEIVED");
 		break;
@@ -1611,13 +1608,196 @@ outbound_iomb_opcode(uint32_t opcode)
 	}
 }
 
+static uint32_t
+get_devid_from_ob_iomb(struct pmcs_hw ss, uint32_t *qentryp, uint16_t opcode)
+{
+	uint32_t devid = PMCS_INVALID_DEVICE_ID;
+
+	switch (opcode) {
+	/*
+	 * These are obtained via the HTAG which is in word 1
+	 */
+	case PMCOUT_SSP_COMPLETION:
+	case PMCOUT_SMP_COMPLETION:
+	case PMCOUT_DEREGISTER_DEVICE_HANDLE:
+	case PMCOUT_GET_DEVICE_HANDLE:
+	case PMCOUT_SATA_COMPLETION:
+	case PMCOUT_SSP_ABORT:
+	case PMCOUT_SATA_ABORT:
+	case PMCOUT_SMP_ABORT:
+	case PMCOUT_SAS_HW_EVENT_ACK_ACK: {
+		uint32_t	htag;
+		pmcwork_t	*wp;
+		pmcs_phy_t	*phy;
+		uintptr_t	_wp, _phy;
+		uint16_t	index;
+
+		htag = LE_32(*(qentryp + 1));
+		index = htag & PMCS_TAG_INDEX_MASK;
+
+		wp = mdb_alloc(sizeof (pmcwork_t), UM_SLEEP);
+		_wp = (uintptr_t)ss.work + (sizeof (pmcwork_t) * index);
+
+		if (MDB_RD(wp, sizeof (pmcwork_t), _wp) == -1) {
+			NOREAD(pmcwork_t, _wp);
+			mdb_free(wp, sizeof (pmcwork_t));
+			break;
+		}
+
+		phy = mdb_alloc(sizeof (pmcs_phy_t), UM_SLEEP);
+		if (wp->phy == NULL) {
+			_phy = (uintptr_t)wp->last_phy;
+		} else {
+			_phy = (uintptr_t)wp->phy;
+		}
+
+		/*
+		 * If we have a PHY, read it in and get it's handle
+		 */
+		if (_phy != NULL) {
+			if (MDB_RD(phy, sizeof (*phy), _phy) == -1) {
+				NOREAD(pmcs_phy_t, phy);
+			} else {
+				devid = phy->device_id;
+			}
+		}
+
+		mdb_free(phy, sizeof (pmcs_phy_t));
+		mdb_free(wp, sizeof (pmcwork_t));
+		break;
+	}
+
+	/*
+	 * The device ID is in the outbound IOMB at word 1
+	 */
+	case PMCOUT_SSP_REQUEST_RECEIVED:
+		devid = LE_32(*(qentryp + 1)) & PMCS_DEVICE_ID_MASK;
+		break;
+
+	/*
+	 * The device ID is in the outbound IOMB at word 2
+	 */
+	case PMCOUT_DEVICE_HANDLE_ARRIVED:
+	case PMCOUT_DEVICE_HANDLE_REMOVED:
+		devid = LE_32(*(qentryp + 2)) & PMCS_DEVICE_ID_MASK;
+		break;
+
+	/*
+	 * In this (very rare - never seen it) state, the device ID
+	 * comes from the HTAG in the inbound IOMB, which would be word
+	 * 3 in the outbound IOMB
+	 */
+	case PMCOUT_GENERAL_EVENT:
+	/*
+	 * The device ID is in the outbound IOMB at word 3
+	 */
+	case PMCOUT_DEVICE_REGISTRATION:
+	case PMCOUT_DEVICE_INFO:
+	case PMCOUT_SET_DEVICE_STATE:
+	case PMCOUT_GET_DEVICE_STATE:
+	case PMCOUT_SET_DEVICE_INFO:
+		devid = LE_32(*(qentryp + 3)) & PMCS_DEVICE_ID_MASK;
+		break;
+
+	/*
+	 * Device ID is in the outbound IOMB at word 4
+	 */
+	case PMCOUT_SATA_EVENT:
+	case PMCOUT_SSP_EVENT:
+		devid = LE_32(*(qentryp + 4)) & PMCS_DEVICE_ID_MASK;
+		break;
+	}
+
+	return (devid);
+}
+
+static boolean_t
+iomb_is_dev_hdl_specific(uint32_t word0, boolean_t inbound)
+{
+	uint16_t opcode = word0 & PMCS_IOMB_OPCODE_MASK;
+
+	if (inbound) {
+		switch (opcode) {
+		case PMCIN_SSP_INI_IO_START:
+		case PMCIN_SSP_INI_TM_START:
+		case PMCIN_SSP_INI_EXT_IO_START:
+		case PMCIN_SSP_TGT_IO_START:
+		case PMCIN_SSP_TGT_RESPONSE_START:
+		case PMCIN_SSP_ABORT:
+		case PMCIN_DEREGISTER_DEVICE_HANDLE:
+		case PMCIN_SMP_REQUEST:
+		case PMCIN_SMP_RESPONSE:
+		case PMCIN_SMP_ABORT:
+		case PMCIN_ASSISTED_DISCOVERY:
+		case PMCIN_SATA_HOST_IO_START:
+		case PMCIN_SATA_ABORT:
+		case PMCIN_GET_DEVICE_INFO:
+		case PMCIN_SET_DEVICE_STATE:
+		case PMCIN_GET_DEVICE_STATE:
+			return (B_TRUE);
+		}
+
+		return (B_FALSE);
+	}
+
+	switch (opcode) {
+	case PMCOUT_SSP_COMPLETION:
+	case PMCOUT_SMP_COMPLETION:
+	case PMCOUT_DEVICE_REGISTRATION:
+	case PMCOUT_DEREGISTER_DEVICE_HANDLE:
+	case PMCOUT_GET_DEVICE_HANDLE:
+	case PMCOUT_SATA_COMPLETION:
+	case PMCOUT_SATA_EVENT:
+	case PMCOUT_SSP_EVENT:
+	case PMCOUT_DEVICE_HANDLE_ARRIVED:
+	case PMCOUT_SSP_REQUEST_RECEIVED:
+	case PMCOUT_DEVICE_INFO:
+	case PMCOUT_FW_FLASH_UPDATE:
+	case PMCOUT_GENERAL_EVENT:
+	case PMCOUT_SSP_ABORT:
+	case PMCOUT_SATA_ABORT:
+	case PMCOUT_SAS_HW_EVENT_ACK_ACK:
+	case PMCOUT_SMP_ABORT:
+	case PMCOUT_DEVICE_HANDLE_REMOVED:
+	case PMCOUT_SET_DEVICE_STATE:
+	case PMCOUT_GET_DEVICE_STATE:
+	case PMCOUT_SET_DEVICE_INFO:
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static void
-dump_one_qentry_outbound(uint32_t *qentryp, int idx)
+dump_one_qentry_outbound(struct pmcs_hw ss, uint32_t *qentryp, int idx,
+    uint64_t devid_filter)
 {
 	int qeidx;
 	uint32_t word0 = LE_32(*qentryp);
 	uint32_t word1 = LE_32(*(qentryp + 1));
 	uint8_t iop_event;
+	uint32_t devid;
+
+	/*
+	 * Check to see if we're filtering on a device ID
+	 */
+	if (devid_filter != PMCS_INVALID_DEVICE_ID) {
+		if (!iomb_is_dev_hdl_specific(word0, B_FALSE)) {
+			return;
+		}
+
+		/*
+		 * Go find the device id.  It might be in the outbound
+		 * IOMB or we may have to go find the work structure and
+		 * get it from there.
+		 */
+		devid = get_devid_from_ob_iomb(ss, qentryp,
+		    word0 & PMCS_IOMB_OPCODE_MASK);
+		if ((devid == PMCS_INVALID_DEVICE_ID) ||
+		    (devid_filter != devid)) {
+			return;
+		}
+	}
 
 	mdb_printf("Entry #%02d\n", idx);
 	mdb_inc_indent(2);
@@ -1652,7 +1832,8 @@ dump_one_qentry_outbound(uint32_t *qentryp, int idx)
 }
 
 static void
-display_outbound_queues(struct pmcs_hw ss, uint_t verbose)
+display_outbound_queues(struct pmcs_hw ss, uint64_t devid_filter,
+    uint_t verbose)
 {
 	int		idx, qidx;
 	uintptr_t	obqp;
@@ -1709,7 +1890,8 @@ display_outbound_queues(struct pmcs_hw ss, uint_t verbose)
 				    last_consumed)));
 				break;
 			}
-			dump_one_qentry_outbound(qentryp, last_consumed);
+			dump_one_qentry_outbound(ss, qentryp, last_consumed,
+			    devid_filter);
 			mdb_printf("\n");
 			mdb_dec_indent(2);
 			continue;
@@ -1722,7 +1904,8 @@ display_outbound_queues(struct pmcs_hw ss, uint_t verbose)
 				    (obqp + (PMCS_QENTRY_SIZE * idx)));
 				break;
 			}
-			dump_one_qentry_outbound(qentryp, idx);
+			dump_one_qentry_outbound(ss, qentryp, idx,
+			    devid_filter);
 		}
 
 		mdb_printf("\n");
@@ -1734,10 +1917,24 @@ display_outbound_queues(struct pmcs_hw ss, uint_t verbose)
 }
 
 static void
-dump_one_qentry_inbound(uint32_t *qentryp, int idx)
+dump_one_qentry_inbound(uint32_t *qentryp, int idx, uint64_t devid_filter)
 {
 	int qeidx;
 	uint32_t word0 = LE_32(*qentryp);
+	uint32_t devid = LE_32(*(qentryp + 2));
+
+	/*
+	 * Check to see if we're filtering on a device ID
+	 */
+	if (devid_filter != PMCS_INVALID_DEVICE_ID) {
+		if (iomb_is_dev_hdl_specific(word0, B_TRUE)) {
+			if (devid_filter != devid) {
+				return;
+			}
+		} else {
+			return;
+		}
+	}
 
 	mdb_printf("Entry #%02d\n", idx);
 	mdb_inc_indent(2);
@@ -1769,7 +1966,7 @@ dump_one_qentry_inbound(uint32_t *qentryp, int idx)
 }
 
 static void
-display_inbound_queues(struct pmcs_hw ss, uint_t verbose)
+display_inbound_queues(struct pmcs_hw ss, uint64_t devid_filter, uint_t verbose)
 {
 	int		idx, qidx, iqci, last_consumed;
 	uintptr_t	ibqp;
@@ -1821,7 +2018,8 @@ display_inbound_queues(struct pmcs_hw ss, uint_t verbose)
 				    last_consumed)));
 				break;
 			}
-			dump_one_qentry_inbound(qentryp, last_consumed);
+			dump_one_qentry_inbound(qentryp, last_consumed,
+			    devid_filter);
 			mdb_printf("\n");
 			mdb_dec_indent(2);
 			continue;
@@ -1834,7 +2032,7 @@ display_inbound_queues(struct pmcs_hw ss, uint_t verbose)
 				    (ibqp + (PMCS_QENTRY_SIZE * idx)));
 				break;
 			}
-			dump_one_qentry_inbound(qentryp, idx);
+			dump_one_qentry_inbound(qentryp, idx, devid_filter);
 		}
 
 		mdb_printf("\n");
@@ -2835,6 +3033,9 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			dtc_info = FALSE;
 	uint_t			wserno = FALSE;
 	uint_t			fwlog = FALSE;
+	boolean_t		devid_filter = FALSE;
+	uintptr_t		pdevid;
+	uint32_t		devid;
 	int			rv = DCMD_OK;
 	void			*pmcs_state;
 	char			*state_str;
@@ -2858,6 +3059,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_getopts(argc, argv,
 	    'c', MDB_OPT_SETBITS, TRUE, &compq,
 	    'd', MDB_OPT_SETBITS, TRUE, &dtc_info,
+	    'D', MDB_OPT_UINTPTR_SET, &devid_filter, &pdevid,
 	    'e', MDB_OPT_SETBITS, TRUE, &fwlog,
 	    'h', MDB_OPT_SETBITS, TRUE, &hw_info,
 	    'i', MDB_OPT_SETBITS, TRUE, &ic_info,
@@ -2883,6 +3085,23 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	pis.pis_dtc_info = dtc_info;
 	if (damap_info || dtc_info) {
 		iport_info = TRUE;
+	}
+
+	/*
+	 * The -D option is meaningless without -q and/or -Q, and implies
+	 * verbosity.
+	 */
+	if (devid_filter) {
+		devid = (uint64_t)pdevid & 0xffffffff;
+		if (!ibq && !obq) {
+			mdb_printf("-D requires either -q or -Q\n");
+			return (DCMD_USAGE);
+		}
+		if (devid > PMCS_DEVICE_ID_MASK) {
+			mdb_printf("Device ID invalid\n");
+			return (DCMD_USAGE);
+		}
+		verbose = TRUE;
 	}
 
 	if (MDB_RD(&ss, sizeof (ss), addr) == -1) {
@@ -2956,10 +3175,10 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		display_ic(ss, verbose);
 
 	if (ibq)
-		display_inbound_queues(ss, verbose);
+		display_inbound_queues(ss, devid, verbose);
 
 	if (obq)
-		display_outbound_queues(ss, verbose);
+		display_outbound_queues(ss, devid, verbose);
 
 	if (iport_info)
 		display_iport(ss, addr, verbose, &pis);
@@ -2984,6 +3203,7 @@ pmcs_help()
 	mdb_printf("Prints summary information about each pmcs instance.\n"
 	    "    -c: Dump the completion queue\n"
 	    "    -d: Print per-iport information about device tree children\n"
+	    "    -D <device ID>: With -q/-Q, filter by device handle\n"
 	    "    -e: Display the in-memory firmware event log\n"
 	    "    -h: Print more detailed hardware information\n"
 	    "    -i: Print interrupt coalescing information\n"
@@ -3023,8 +3243,8 @@ pmcs_tag_help()
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "pmcs", "?[-cdehiImpQqtTuwWv]", "print pmcs information",
-	    pmcs_dcmd, pmcs_help
+	{ "pmcs", "?[-cdehiImpQqtTuwWv] [-D <device ID>]",
+	    "print pmcs information", pmcs_dcmd, pmcs_help
 	},
 	{ "pmcs_log",
 	    "?[-v] [-p PHY_PATH | -s SAS_ADDRESS | -l TAIL_LINES]",

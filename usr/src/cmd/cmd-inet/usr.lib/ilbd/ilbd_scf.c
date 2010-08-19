@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -533,7 +532,7 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 	int ret = ILB_STATUS_OK;
 	int i;
 	int scf_val_len = ILBD_MAX_VALUE_LEN;
-	char valstr[scf_val_len];
+	char *valstr = NULL;
 	int valint;
 	uint8_t valbool = 0;
 	ilbd_rule_t *r_ent = NULL;
@@ -556,6 +555,8 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 	if (v == NULL)
 		return (ILB_STATUS_INTERNAL);
 
+	if ((valstr = malloc(scf_val_len)) == NULL)
+			return (ILB_STATUS_ENOMEM);
 	switch (type) {
 	case ILBD_RULE_STATUS:
 		valbool = r_ent->irl_flags & ILB_FLAGS_RULE_ENABLED;
@@ -564,6 +565,7 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 		ret = ilbd_scf_ip_to_str(r_ent->irl_ipversion, &r_ent->irl_vip,
 		    scftype, valstr);
 		if (ret != ILB_STATUS_OK) {
+			free(valstr);
 			scf_value_destroy(v);
 			return (ret);
 		}
@@ -572,11 +574,11 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 		struct protoent *protoent;
 
 		protoent = getprotobynumber(r_ent->irl_proto);
-		(void) strlcpy(valstr, protoent->p_name, sizeof (valstr));
+		(void) strlcpy(valstr, protoent->p_name, scf_val_len);
 		break;
 	}
 	case ILBD_RULE_PORT:
-		(void) snprintf(valstr, sizeof (valstr), "%d-%d",
+		(void) snprintf(valstr, scf_val_len, "%d-%d",
 		    r_ent->irl_minport, r_ent->irl_maxport);
 		break;
 	case ILBD_RULE_ALGO:
@@ -589,6 +591,7 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 		ret = ilbd_scf_ip_to_str(r_ent->irl_ipversion,
 		    &r_ent->irl_nat_src_start, scftype, valstr);
 		if (ret != ILB_STATUS_OK) {
+			free(valstr);
 			scf_value_destroy(v);
 			return (ret);
 		}
@@ -597,6 +600,7 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 		ret = ilbd_scf_ip_to_str(r_ent->irl_ipversion,
 		    &r_ent->irl_nat_src_end, scftype, valstr);
 		if (ret != ILB_STATUS_OK) {
+			free(valstr);
 			scf_value_destroy(v);
 			return (ret);
 		}
@@ -605,17 +609,18 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 		ret = ilbd_scf_ip_to_str(r_ent->irl_ipversion,
 		    &r_ent->irl_stickymask, scftype, valstr);
 		if (ret != ILB_STATUS_OK) {
+			free(valstr);
 			scf_value_destroy(v);
 			return (ret);
 		}
 		break;
 	case ILBD_RULE_SGNAME:
-		(void) strlcpy(valstr, r_ent->irl_sgname, sizeof (valstr));
+		(void) strlcpy(valstr, r_ent->irl_sgname, scf_val_len);
 		break;
 	case ILBD_RULE_HCNAME:
 		if (r_ent->irl_hcname[0] != '\0')
 			(void) strlcpy(valstr, r_ent->irl_hcname,
-			    sizeof (valstr));
+			    scf_val_len);
 		else
 			bzero(valstr, ILBD_MAX_VALUE_LEN);
 		break;
@@ -638,13 +643,14 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 	case ILBD_SG_SERVER:
 		if (s_ent->isg_srvcount == 0) {
 			(void) strlcpy(valstr, "EMPTY_SERVERGROUP",
-			    sizeof (valstr));
+			    scf_val_len);
 			break;
 		}
 
 		varray = calloc(sizeof (*varray), s_ent->isg_srvcount);
 		if (varray == NULL) {
 			scf_value_destroy(v);
+			free(valstr);
 			return (ILB_STATUS_ENOMEM);
 		}
 
@@ -652,7 +658,7 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 			if (v == NULL) {
 				for (i--; i >= 0; i--)
 					scf_value_destroy(varray[i]);
-				free(varray);
+				free(valstr);
 				return (ILB_STATUS_ENOMEM);
 			}
 
@@ -661,6 +667,7 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 				scf_value_destroy(v);
 				for (i--; i >= 0; i--)
 					scf_value_destroy(varray[i]);
+				free(valstr);
 				free(varray);
 				return (ret);
 			}
@@ -672,9 +679,10 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 		scf_value_destroy(v);
 		*numval = s_ent->isg_srvcount;
 		*val = varray;
+		free(valstr);
 		return (ret);
 	case ILBD_HC_TEST:
-		(void) strlcpy(valstr, h_ent->ihc_test, sizeof (valstr));
+		(void) strlcpy(valstr, h_ent->ihc_test, scf_val_len);
 		break;
 	case ILBD_HC_TIMEOUT:
 		valint = h_ent->ihc_timeout;
@@ -709,6 +717,7 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 		    valstr);
 		break;
 	}
+	free(valstr);
 
 	varray = calloc(1, sizeof (*varray));
 	if (varray == NULL) {
@@ -718,7 +727,6 @@ ilbd_data_to_scfval(ilbd_scf_pg_type_t pg_type, ilbd_var_type_t type,
 	varray[0] = v;
 	*val = varray;
 	*numval = 1;
-
 	return (ret);
 }
 
@@ -734,7 +742,7 @@ ilbd_create_pg(ilbd_scf_pg_type_t pg_type, void *data)
 	scf_value_t **val;
 	scf_handle_t *h;
 	int scf_name_len = ILBD_MAX_NAME_LEN;
-	char scfpgname[scf_name_len];
+	char  *scfpgbuf; /* property group name or group type */
 	int i, i_st, i_end;
 
 	switch (pg_type) {
@@ -767,19 +775,21 @@ ilbd_create_pg(ilbd_scf_pg_type_t pg_type, void *data)
 		    pg_type, pgname);
 		return (ILB_STATUS_EINVAL);
 	}
+	if ((scfpgbuf = malloc(scf_name_len)) == NULL)
+		return (ILB_STATUS_ENOMEM);
 
-	ilbd_name_to_scfpgname(pg_type, pgname, scfpgname);
+	ilbd_name_to_scfpgname(pg_type, pgname, scfpgbuf);
 
-	ret = ilbd_scf_retrieve_pg(scfpgname, &pg, B_TRUE);
-	if (ret != ILB_STATUS_OK)
+	ret = ilbd_scf_retrieve_pg(scfpgbuf, &pg, B_TRUE);
+	if (ret != ILB_STATUS_OK) {
+		free(scfpgbuf);
 		return (ret);
+	}
 	h = scf_pg_handle(pg);
 
 	/* fill in props */
 	for (i = i_st; i < i_end; i++) {
 		int num, j;
-		int scf_name_len = ILBD_MAX_NAME_LEN;
-		char propname[scf_name_len];
 		scf_type_t scftype = prop_tbl[i].scf_proptype;
 
 		ret = ilbd_data_to_scfval(pg_type, prop_tbl[i].val_type, h,
@@ -790,12 +800,12 @@ ilbd_create_pg(ilbd_scf_pg_type_t pg_type, void *data)
 		for (j = 0; j < num; j++) {
 			if (pg_type == ILBD_SCF_SG) {
 				ret = ilbd_get_svr_info(data, j, NULL,
-				    propname);
+				    scfpgbuf);
 				if (ret == ILB_STATUS_ENOENT) {
-					(void) strlcpy(propname, "EMPTY_SERVER",
-					    ILBD_MAX_NAME_LEN);
+					(void) strlcpy(scfpgbuf,
+					    "EMPTY_SERVER", scf_name_len);
 				}
-				ret = ilbd_scf_set_prop(pg, propname,
+				ret = ilbd_scf_set_prop(pg, scfpgbuf,
 				    scftype, val[j]);
 			} else {
 				ret = ilbd_scf_set_prop(pg,
@@ -807,6 +817,7 @@ ilbd_create_pg(ilbd_scf_pg_type_t pg_type, void *data)
 	}
 
 done:
+	free(scfpgbuf);
 	ilbd_scf_destroy(h, NULL, NULL, pg);
 	return (ret);
 }
@@ -829,14 +840,16 @@ ilbd_destroy_pg(ilbd_scf_pg_type_t pg_t, const char *pgname)
 	ilb_status_t ret;
 	scf_propertygroup_t *pg;
 	int scf_name_len = ILBD_MAX_NAME_LEN;
-	char scfname[scf_name_len];
+	char *scfname;
 
+	if ((scfname = malloc(scf_name_len)) == NULL)
+		return (ILB_STATUS_ENOMEM);
 	ilbd_name_to_scfpgname(pg_t, pgname, scfname);
 
 	ret = ilbd_scf_retrieve_pg(scfname, &pg, B_FALSE);
+	free(scfname);
 	if (ret != ILB_STATUS_EEXIST)
 		return (ret);
-
 	ret = ilbd_scf_delete_pg(pg);
 	ilbd_scf_destroy(scf_pg_handle(pg), NULL, NULL, pg);
 	return (ret);
@@ -1023,8 +1036,7 @@ ilbd_scfval_to_data(const char *propname, ilbd_var_type_t ilb_type,
 	ilb_sg_info_t *s_ent = NULL;
 	ilb_hc_info_t *h_ent = NULL;
 	char ipstr[INET6_ADDRSTRLEN];
-	int scf_val_len = ILBD_MAX_VALUE_LEN;
-	char valstr[scf_val_len];
+	char *valstr;
 	int64_t valint;
 	uint8_t valbool;
 	int ipversion;
@@ -1042,33 +1054,47 @@ ilbd_scfval_to_data(const char *propname, ilbd_var_type_t ilb_type,
 	}
 
 	/* get scf value out */
+	if ((valstr = malloc(ILBD_MAX_VALUE_LEN)) == NULL)
+		return (ILB_STATUS_ENOMEM);
 	switch (scf_type) {
 		case SCF_TYPE_NET_ADDR_V4:
 			if (scf_value_get_as_string_typed(val,
-			    SCF_TYPE_NET_ADDR_V4, ipstr, INET_ADDRSTRLEN) < 0)
+			    SCF_TYPE_NET_ADDR_V4, ipstr, INET_ADDRSTRLEN) < 0) {
+				free(valstr);
 				return (ILB_STATUS_INTERNAL);
+			}
 			ipversion = AF_INET;
 			break;
 		case SCF_TYPE_NET_ADDR_V6:
 			if (scf_value_get_as_string_typed(val,
-			    SCF_TYPE_NET_ADDR_V6, ipstr, INET6_ADDRSTRLEN) < 0)
+			    SCF_TYPE_NET_ADDR_V6, ipstr,
+			    INET6_ADDRSTRLEN) < 0) {
+				free(valstr);
 				return (ILB_STATUS_INTERNAL);
+			}
 			ipversion = AF_INET6;
 			break;
 		case SCF_TYPE_BOOLEAN:
-			if (scf_value_get_boolean(val, &valbool) < 0)
+			if (scf_value_get_boolean(val, &valbool) < 0) {
+				free(valstr);
 				return (ILB_STATUS_INTERNAL);
+			}
 			break;
 		case SCF_TYPE_ASTRING:
-			if (scf_value_get_astring(val, valstr, sizeof (valstr))
-			    < 0)
+			if (scf_value_get_astring(val, valstr,
+			    ILBD_MAX_VALUE_LEN) < 0) {
+				free(valstr);
 				return (ILB_STATUS_INTERNAL);
+			}
 			break;
 		case SCF_TYPE_INTEGER:
-			if (scf_value_get_integer(val, &valint) < 0)
+			if (scf_value_get_integer(val, &valint) < 0) {
+				free(valstr);
 				return (ILB_STATUS_INTERNAL);
+			}
 			break;
 		default:
+			free(valstr);
 			return (ILB_STATUS_INTERNAL);
 	}
 
@@ -1207,6 +1233,7 @@ ilbd_scfval_to_data(const char *propname, ilbd_var_type_t ilb_type,
 		break;
 	}
 
+	free(valstr);
 	return (ret);
 }
 
@@ -1269,7 +1296,7 @@ ilbd_scf_pg_walk_props(scf_propertygroup_t *pg,
 	scf_iter_t *propiter;
 	scf_property_t *prop;
 	int scf_name_len = ILBD_MAX_NAME_LEN;
-	char prop_name[scf_name_len];
+	char *prop_name = NULL;
 	ilb_status_t ret = ILB_STATUS_OK;
 	int scf_ret = -1;
 
@@ -1285,8 +1312,12 @@ ilbd_scf_pg_walk_props(scf_propertygroup_t *pg,
 	if (scf_iter_pg_properties(propiter, pg) != 0)
 		goto out;
 
+	if ((prop_name = malloc(scf_name_len)) == NULL) {
+		ret = ILB_STATUS_ENOMEM;
+		goto out;
+	}
 	while ((scf_ret = scf_iter_next_property(propiter, prop)) == 1) {
-		if (scf_property_get_name(prop, prop_name, sizeof (prop_name))
+		if (scf_property_get_name(prop, prop_name, scf_name_len)
 		    < 0) {
 			ret = ilbd_scf_err_to_ilb_err();
 			goto out;
@@ -1296,6 +1327,8 @@ ilbd_scf_pg_walk_props(scf_propertygroup_t *pg,
 			break;
 	}
 out:
+	if (prop_name != NULL)
+		free(prop_name);
 	if (scf_ret == -1)
 		ret = ilbd_scf_err_to_ilb_err();
 	if (prop != NULL)
@@ -1319,6 +1352,8 @@ ilbd_scf_instance_walk_pg(scf_instance_t *inst,
 	scf_iter_t		*pgiter;
 	scf_propertygroup_t	*newpg;
 	int			port = *((int *)arg1);
+	int scf_name_len = ILBD_MAX_NAME_LEN;
+	char *pg_name = NULL;
 
 	if (inst == NULL)
 		return (ILB_STATUS_EINVAL);
@@ -1338,12 +1373,14 @@ ilbd_scf_instance_walk_pg(scf_instance_t *inst,
 	if ((scf_ret = scf_iter_instance_pgs(pgiter, inst)) < 0)
 		goto out;
 
+	if ((pg_name = malloc(scf_name_len)) == NULL) {
+		ret = ILB_STATUS_ENOMEM;
+		goto out;
+	}
 	while ((scf_ret = scf_iter_next_pg(pgiter, newpg)) > 0) {
 		ilbd_data_t data;
-		int scf_name_len = ILBD_MAX_NAME_LEN;
-		char pg_name[scf_name_len];
 
-		if (scf_pg_get_name(newpg, pg_name, sizeof (pg_name)) < 0) {
+		if (scf_pg_get_name(newpg, pg_name, scf_name_len) < 0) {
 			ret = ilbd_scf_err_to_ilb_err();
 			goto out;
 		}
@@ -1387,8 +1424,10 @@ ilbd_scf_instance_walk_pg(scf_instance_t *inst,
 			    strlen(ILBD_PG_NAME_SG)) == 0) {
 				data.sg_data = calloc(1,
 				    sizeof (ilb_sg_info_t));
-				if (data.sg_data == NULL)
-					return (ILB_STATUS_ENOMEM);
+				if (data.sg_data == NULL) {
+					ret = ILB_STATUS_ENOMEM;
+					goto out;
+				}
 				ret = ilbd_scf_pg_walk_props(newpg,
 				    ilbd_scf_load_prop, &data);
 				if (ret != ILB_STATUS_OK) {
@@ -1433,8 +1472,10 @@ ilbd_scf_instance_walk_pg(scf_instance_t *inst,
 			    strlen(ILBD_PG_NAME_HC)) == 0) {
 				data.hc_data = calloc(1,
 				    sizeof (ilb_hc_info_t));
-				if (data.hc_data == NULL)
-					return (ILB_STATUS_ENOMEM);
+				if (data.hc_data == NULL) {
+					ret = ILB_STATUS_ENOMEM;
+					goto out;
+				}
 				ret = ilbd_scf_pg_walk_props(newpg,
 				    ilbd_scf_load_prop, &data);
 				if (ret != ILB_STATUS_OK)
@@ -1454,6 +1495,8 @@ ilbd_scf_instance_walk_pg(scf_instance_t *inst,
 	}
 
 out:
+	if (pg_name != NULL)
+		free(pg_name);
 	if (scf_ret < 0)
 		ret = ilbd_scf_err_to_ilb_err();
 	scf_pg_destroy(newpg);
@@ -1528,14 +1571,17 @@ ilbd_change_prop(ilbd_scf_pg_type_t pg_type, const char *pg_name,
 {
 	int ret;
 	scf_propertygroup_t *scfpg = NULL;
-	int scf_name_len = ILBD_MAX_NAME_LEN;
-	char scf_pgname[scf_name_len];
+	char *scf_pgname = NULL;
 	scf_type_t scftype;
 	scf_value_t *scfval;
 	scf_handle_t *h;
 
+	if ((scf_pgname = malloc(ILBD_MAX_NAME_LEN)) == NULL)
+		return (ILB_STATUS_ENOMEM);
 	ilbd_name_to_scfpgname(pg_type, pg_name, scf_pgname);
 	ret = ilbd_scf_retrieve_pg(scf_pgname, &scfpg, B_FALSE);
+	free(scf_pgname);
+
 	if (ret != ILB_STATUS_EEXIST)
 		return (ret);
 
@@ -1583,8 +1629,10 @@ ilbd_scf_add_srv(ilbd_sg_t *sg, ilbd_srv_t *srv)
 	scf_value_t *val;
 	ilb_status_t ret;
 	int scf_name_len = ILBD_MAX_NAME_LEN;
-	char buf[scf_name_len];
-	char propname[scf_name_len];
+	char *buf = NULL;
+
+	if ((buf = malloc(scf_name_len)) == NULL)
+		return (ILB_STATUS_ENOMEM);
 
 	ilbd_name_to_scfpgname(ILBD_SCF_SG, sg->isg_name, buf);
 	ret = ilbd_scf_retrieve_pg(buf, &pg, B_FALSE);
@@ -1597,23 +1645,27 @@ ilbd_scf_add_srv(ilbd_sg_t *sg, ilbd_srv_t *srv)
 		logerr("ilbd_scf_add_srv: SCF update failed - entering"
 		    " maintenance mode");
 		(void) smf_maintain_instance(ILB_FMRI, SMF_IMMEDIATE);
+		free(buf);
 		return (ILB_STATUS_INTERNAL);
 	}
 
 	if ((h = scf_pg_handle(pg)) == NULL) {
 		ilbd_scf_destroy(NULL, NULL, NULL, pg);
+		free(buf);
 		return (ilbd_scf_err_to_ilb_err());
 	}
 
 	if ((val = scf_value_create(h)) == NULL) {
 		ilbd_scf_destroy(h, NULL, NULL, pg);
+		free(buf);
 		return (ILB_STATUS_ENOMEM);
 	}
 	ilbd_srv_scf_val(srv, buf);
 	(void) scf_value_set_astring(val, buf);
-	(void) snprintf(propname, sizeof (propname), "server%d", srv->isv_id);
-	ret = ilbd_scf_set_prop(pg, propname, SCF_TYPE_ASTRING, val);
 
+	(void) snprintf(buf, scf_name_len, "server%d", srv->isv_id);
+	ret = ilbd_scf_set_prop(pg, buf, SCF_TYPE_ASTRING, val);
+	free(buf);
 	ilbd_scf_destroy(h, NULL, NULL, pg);
 	scf_value_destroy(val);
 
@@ -1631,10 +1683,12 @@ ilbd_scf_del_srv(ilbd_sg_t *sg, ilbd_srv_t *srv)
 	scf_propertygroup_t *pg;
 	scf_handle_t *h;
 	int scf_name_len = ILBD_MAX_NAME_LEN;
-	char buf[scf_name_len];
+	char *buf;
 	scf_transaction_t *tx = NULL;
 	scf_transaction_entry_t *entry = NULL;
 
+	if ((buf = malloc(scf_name_len)) == NULL)
+		return (ILB_STATUS_ENOMEM);
 	ilbd_name_to_scfpgname(ILBD_SCF_SG, sg->isg_name, buf);
 	ret = ilbd_scf_retrieve_pg(buf, &pg, B_FALSE);
 	/*
@@ -1642,14 +1696,17 @@ ilbd_scf_del_srv(ilbd_sg_t *sg, ilbd_srv_t *srv)
 	 * cannot happen. THe caller of this function puts service in
 	 * maintenance mode.
 	 */
-	if (ret != ILB_STATUS_EEXIST)
+	if (ret != ILB_STATUS_EEXIST) {
+		free(buf);
 		return (ILB_STATUS_INTERNAL);
+	}
 	ret = ILB_STATUS_OK;
 
 	if ((h = scf_pg_handle(pg)) == NULL) {
 		logdebug("ilbd_scf_del_srv: scf_pg_handle: %s\n",
 		    scf_strerror(scf_error()));
 		ilbd_scf_destroy(NULL, NULL, NULL, pg);
+		free(buf);
 		return (ilbd_scf_err_to_ilb_err());
 	}
 
@@ -1661,7 +1718,7 @@ ilbd_scf_del_srv(ilbd_sg_t *sg, ilbd_srv_t *srv)
 		goto out;
 	}
 
-	(void) snprintf(buf, sizeof (buf), "server%d", srv->isv_id);
+	(void) snprintf(buf, scf_name_len, "server%d", srv->isv_id);
 
 	if (scf_transaction_start(tx, pg) == -1) {
 		logdebug("ilbd_scf_set_prop: start scf transaction failed: "
@@ -1682,6 +1739,7 @@ ilbd_scf_del_srv(ilbd_sg_t *sg, ilbd_srv_t *srv)
 	}
 
 out:
+	free(buf);
 	if (entry != NULL)
 		scf_entry_destroy(entry);
 	if (tx != NULL)

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -37,7 +36,7 @@
 
 #ifdef _KERNEL
 #include <sys/cpuvar.h>		/* cpu_t, CPU */
-#include <sys/x86_archext.h>	/* x86_feature, X86_AES */
+#include <sys/x86_archext.h>	/* x86_featureset, X86FSET_AES */
 #include <sys/disp.h>		/* kpreempt_disable(), kpreempt_enable */
 
 /* Workaround for no XMM kernel thread save/restore */
@@ -1779,7 +1778,7 @@ aes_alloc_keysched(size_t *size, int kmflag)
  * Cache the result, as the CPU can't change.
  *
  * Note: the userland version uses getisax().  The kernel version uses
- * global variable x86_feature.
+ * global variable x86_featureset.
  */
 static int
 intel_aes_instructions_present(void)
@@ -1788,7 +1787,7 @@ intel_aes_instructions_present(void)
 
 	if (cached_result == -1) { /* first time */
 #ifdef _KERNEL
-		cached_result = (x86_feature & X86_AES) != 0;
+		cached_result = is_x86_feature(x86_featureset, X86FSET_AES);
 #else
 		uint_t		ui = 0;
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_CPUVAR_H
@@ -564,6 +563,7 @@ extern int		boot_ncpus;	/* # cpus present @ boot */
 extern processorid_t	max_cpuid;	/* maximum CPU number */
 extern struct cpu	*cpu_inmotion;	/* offline or partition move target */
 extern cpu_t		*clock_cpu_list;
+extern processorid_t	max_cpu_seqid_ever;	/* maximum seqid ever given */
 
 #if defined(__i386) || defined(__amd64)
 extern struct cpu *curcpup(void);

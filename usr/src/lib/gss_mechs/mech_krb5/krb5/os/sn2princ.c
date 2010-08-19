@@ -1,8 +1,6 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 /*
  * lib/krb5/os/sn2princ.c
  *
@@ -40,6 +38,8 @@
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
+#include <locale.h>
+#include <syslog.h>
 
 #if !defined(DEFAULT_RDNS_LOOKUP)
 /* Solaris Kerberos */
@@ -94,7 +94,6 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
     printf("krb5_sname_to_principal(host=%s, sname=%s, type=%d)\n",hostname,sname,type);
     printf("      name types: 0=unknown, 3=srv_host\n");
 #endif
-
     if ((type == KRB5_NT_UNKNOWN) ||
 	(type == KRB5_NT_SRV_HST)) {
 
@@ -157,6 +156,11 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
 		KRB5_LOG(KRB5_ERR, "krb5_sname_to_principal()"
 		       " can't get AF_INET or AF_INET6 addr,"
 		       " err = %d", err);
+
+		krb5_set_error_message(context, KRB5_ERR_BAD_HOSTNAME,
+				    dgettext(TEXT_DOMAIN,
+					    "Hostname cannot be canonicalized for '%s': %s"),
+				    hostname, strerror(err));
 		return KRB5_ERR_BAD_HOSTNAME;
 	    }
 	    remote_host = strdup(hp ? hp->h_name : hostname);
@@ -239,6 +243,12 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
 #endif
 
 	if (!hrealms[0]) {
+	    /* Solaris Kerberos */
+	    krb5_set_error_message(context, KRB5_ERR_HOST_REALM_UNKNOWN,
+				dgettext(TEXT_DOMAIN,
+					"Cannot determine realm for host: host is '%s'"),
+				remote_host ? remote_host : "unknown");
+
 	    free(remote_host);
 	    krb5_xfree(hrealms);
 	    return KRB5_ERR_HOST_REALM_UNKNOWN;

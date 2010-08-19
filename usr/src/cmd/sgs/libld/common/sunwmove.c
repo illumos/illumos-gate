@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<string.h>
@@ -139,9 +138,8 @@ append_move_desc(Ofl_desc *ofl, Sym_desc *sdp, Move *mvp, Is_desc *isp)
 			    ((smdp->md_start + smdp->md_len) <= lmdp->md_start))
 				continue;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MOVE_OVERLAP), sdp->sd_file->ifl_name,
-			    EC_WORD(isp->is_scnndx),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_MOVE_OVERLAP),
+			    sdp->sd_file->ifl_name, EC_WORD(isp->is_scnndx),
 			    isp->is_name, demangle(sdp->sd_name),
 			    EC_XWORD(nmd.md_start), EC_XWORD(nmd.md_len),
 			    EC_XWORD(omdp->md_start), EC_XWORD(omdp->md_len));
@@ -183,7 +181,7 @@ ld_process_move(Ofl_desc *ofl)
 		mvp = (Move *)isp->is_indata->d_buf;
 
 		if (isp->is_shdr->sh_entsize == 0) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVSHENTSIZE),
 			    isp->is_file->ifl_name, EC_WORD(isp->is_scnndx),
 			    isp->is_name, EC_XWORD(0));
@@ -198,7 +196,7 @@ ld_process_move(Ofl_desc *ofl)
 
 			if ((ndx >= (Xword) isp->is_file->ifl_symscnt) ||
 			    (ndx == 0)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMINFO1),
 				    isp->is_file->ifl_name,
 				    EC_WORD(isp->is_scnndx), isp->is_name, i,
@@ -206,7 +204,7 @@ ld_process_move(Ofl_desc *ofl)
 				return (S_ERROR);
 			}
 			if (mvp->m_repeat == 0) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMREPEAT),
 				    isp->is_file->ifl_name,
 				    EC_WORD(isp->is_scnndx), isp->is_name, i,
@@ -225,7 +223,7 @@ ld_process_move(Ofl_desc *ofl)
 			case 1: case 2: case 4: case 8:
 				break;
 			default:
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMINFO2),
 				    isp->is_file->ifl_name,
 				    EC_WORD(isp->is_scnndx), isp->is_name, i,
@@ -338,7 +336,7 @@ ld_process_move(Ofl_desc *ofl)
 			if (OFL_IS_STATIC_EXEC(ofl)) {
 				if (ELF_ST_TYPE(sym->st_info) == STT_SECTION) {
 					errcnt++;
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_PSYM_CANNOTEXPND),
 					    sdp->sd_file->ifl_name,
 					    EC_WORD(isp->is_scnndx),
@@ -349,7 +347,7 @@ ld_process_move(Ofl_desc *ofl)
 				}
 			} else if ((ofl->ofl_flags1 & FLG_OF1_NOPARTI) != 0) {
 				if (ELF_ST_TYPE(sym->st_info) == STT_SECTION) {
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING,
 					    MSG_INTL(MSG_PSYM_CANNOTEXPND),
 					    sdp->sd_file->ifl_name,
 					    EC_WORD(isp->is_scnndx),

@@ -19,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <errno.h>
 #include <security/cryptoki.h>
+#include <strings.h>
 #include <sys/crypto/ioctl.h>
 #include "kernelGlobal.h"
 #include "kernelSlot.h"
@@ -107,6 +107,7 @@ kernel_get_func_list(kernel_slot_t *pslot)
 	int r;
 	int i;
 
+	(void) memset(&fl, 0, sizeof (fl));
 	fl.fl_provider_id = pslot->sl_provider_id;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_GET_FUNCTION_LIST, &fl)) < 0) {
@@ -127,65 +128,8 @@ kernel_get_func_list(kernel_slot_t *pslot)
 		return (rv);
 	}
 
-	pslot->sl_func_list.fl_digest_init = fl.fl_list.fl_digest_init;
-	pslot->sl_func_list.fl_digest = fl.fl_list.fl_digest;
-	pslot->sl_func_list.fl_digest_update = fl.fl_list.fl_digest_update;
-	pslot->sl_func_list.fl_digest_key = fl.fl_list.fl_digest_key;
-	pslot->sl_func_list.fl_digest_final = fl.fl_list.fl_digest_final;
-	pslot->sl_func_list.fl_encrypt_init = fl.fl_list.fl_encrypt_init;
-	pslot->sl_func_list.fl_encrypt = fl.fl_list.fl_encrypt;
-	pslot->sl_func_list.fl_encrypt_update = fl.fl_list.fl_encrypt_update;
-	pslot->sl_func_list.fl_encrypt_final = fl.fl_list.fl_encrypt_final;
-	pslot->sl_func_list.fl_decrypt_init = fl.fl_list.fl_decrypt_init;
-	pslot->sl_func_list.fl_decrypt = fl.fl_list.fl_decrypt;
-	pslot->sl_func_list.fl_decrypt_update = fl.fl_list.fl_decrypt_update;
-	pslot->sl_func_list.fl_decrypt_final = fl.fl_list.fl_decrypt_final;
-	pslot->sl_func_list.fl_mac_init = fl.fl_list.fl_mac_init;
-	pslot->sl_func_list.fl_mac = fl.fl_list.fl_mac;
-	pslot->sl_func_list.fl_mac_update = fl.fl_list.fl_mac_update;
-	pslot->sl_func_list.fl_mac_final = fl.fl_list.fl_mac_final;
-	pslot->sl_func_list.fl_sign_init = fl.fl_list.fl_sign_init;
-	pslot->sl_func_list.fl_sign = fl.fl_list.fl_sign;
-	pslot->sl_func_list.fl_sign_update = fl.fl_list.fl_sign_update;
-	pslot->sl_func_list.fl_sign_final = fl.fl_list.fl_sign_final;
-	pslot->sl_func_list.fl_sign_recover_init =
-	    fl.fl_list.fl_sign_recover_init;
-	pslot->sl_func_list.fl_sign_recover = fl.fl_list.fl_sign_recover;
-	pslot->sl_func_list.fl_digest_encrypt_update =
-	    fl.fl_list.fl_digest_encrypt_update;
-	pslot->sl_func_list.fl_decrypt_digest_update =
-	    fl.fl_list.fl_decrypt_digest_update;
-	pslot->sl_func_list.fl_sign_encrypt_update =
-	    fl.fl_list.fl_sign_encrypt_update;
-	pslot->sl_func_list.fl_decrypt_verify_update =
-	    fl.fl_list.fl_decrypt_verify_update;
-	pslot->sl_func_list.fl_seed_random = fl.fl_list.fl_seed_random;
-	pslot->sl_func_list.fl_generate_random = fl.fl_list.fl_generate_random;
-	pslot->sl_func_list.fl_session_open = fl.fl_list.fl_session_open;
-	pslot->sl_func_list.fl_session_close = fl.fl_list.fl_session_close;
-	pslot->sl_func_list.fl_session_login = fl.fl_list.fl_session_login;
-	pslot->sl_func_list.fl_session_logout = fl.fl_list.fl_session_logout;
-	pslot->sl_func_list.fl_object_create = fl.fl_list.fl_object_create;
-	pslot->sl_func_list.fl_object_copy = fl.fl_list.fl_object_copy;
-	pslot->sl_func_list.fl_object_destroy = fl.fl_list.fl_object_destroy;
-	pslot->sl_func_list.fl_object_get_size = fl.fl_list.fl_object_get_size;
-	pslot->sl_func_list.fl_object_get_attribute_value =
-	    fl.fl_list.fl_object_get_attribute_value;
-	pslot->sl_func_list.fl_object_set_attribute_value =
-	    fl.fl_list.fl_object_set_attribute_value;
-	pslot->sl_func_list.fl_object_find_init =
-	    fl.fl_list.fl_object_find_init;
-	pslot->sl_func_list.fl_object_find = fl.fl_list.fl_object_find;
-	pslot->sl_func_list.fl_object_find_final =
-	    fl.fl_list.fl_object_find_final;
-	pslot->sl_func_list.fl_key_generate = fl.fl_list.fl_key_generate;
-	pslot->sl_func_list.fl_key_generate_pair =
-	    fl.fl_list.fl_key_generate_pair;
-	pslot->sl_func_list.fl_key_wrap = fl.fl_list.fl_key_wrap;
-	pslot->sl_func_list.fl_key_unwrap = fl.fl_list.fl_key_unwrap;
-	pslot->sl_func_list.fl_init_token = fl.fl_list.fl_init_token;
-	pslot->sl_func_list.fl_init_pin = fl.fl_list.fl_init_pin;
-	pslot->sl_func_list.fl_set_pin = fl.fl_list.fl_set_pin;
+	/* copy data structure received from kernel */
+	pslot->sl_func_list = fl.fl_list;
 
 	pslot->sl_flags = 0;
 	if (fl.fl_list.prov_is_hash_limited) {

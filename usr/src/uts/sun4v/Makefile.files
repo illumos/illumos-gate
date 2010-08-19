@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This Makefile defines all file modules for the directory uts/sun4v
 #	and it's children. These are the source files which are sun4v
@@ -126,7 +125,7 @@ TRAPSTAT_OBJS	+= trapstat.o
 NIUMX_OBJS	+= niumx.o niumx_tools.o
 N2RNG_OBJS	+= n2rng.o n2rng_debug.o n2rng_hcall.o n2rng_kcf.o \
 		   n2rng_entp_algs.o n2rng_entp_setup.o n2rng_kstat.o \
-		   n2rng_provider.o
+		   n2rng_provider.o n2rng_post.o
 
 #
 # 			CPU/Memory Error Injector (memtest) sun4v driver

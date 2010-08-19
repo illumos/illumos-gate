@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -37,6 +36,7 @@
 #include <errno.h>
 #include <libdiskmgt.h>
 #include <libzfs.h>
+#include <uuid/uuid.h>
 
 #include "dconf.h"
 #include "minfree.h"
@@ -495,6 +495,24 @@ err:
 	return (-1);
 }
 
+int
+dconf_write_uuid(dumpconf_t *dcp)
+{
+	char uuidstr[36 + 1];
+	uuid_t uu;
+	int err;
+
+	uuid_generate(uu);
+	uuid_unparse(uu, uuidstr);
+
+	err = ioctl(dcp->dc_dump_fd, DIOCSETUUID, uuidstr);
+
+	if (err)
+		warn(gettext("kernel image uuid write failed"));
+
+	return (err == 0);
+}
+
 void
 dconf_print(dumpconf_t *dcp, FILE *fp)
 {
@@ -533,7 +551,6 @@ dconf_print(dumpconf_t *dcp, FILE *fp)
 
 	(void) fprintf(fp, gettext("  Savecore enabled: %s\n"),
 	    (dcp->dc_enable == DC_OFF) ? gettext("no") : gettext("yes"));
-
 	(void) fprintf(fp, gettext("   Save compressed: %s\n"),
 	    (dcp->dc_csave == DC_UNCOMPRESSED) ? gettext("off") :
 	    gettext("on"));

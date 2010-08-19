@@ -22,7 +22,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
 /*
@@ -48,8 +48,8 @@
 #include <sys/pg.h>
 #include <sys/fp.h>
 #include <sys/controlregs.h>
-#include <sys/auxv_386.h>
 #include <sys/bitmap.h>
+#include <sys/auxv_386.h>
 #include <sys/memnode.h>
 #include <sys/pci_cfgspace.h>
 
@@ -67,7 +67,7 @@
  *
  * Pass 1 of cpuid feature analysis happens just at the beginning of mlsetup()
  * for the boot CPU and does the basic analysis that the early kernel needs.
- * x86_feature is set based on the return value of cpuid_pass1() of the boot
+ * x86_featureset is set based on the return value of cpuid_pass1() of the boot
  * CPU.
  *
  * Pass 1 includes:
@@ -111,7 +111,6 @@
  * to the accessor code.
  */
 
-uint_t x86_feature = 0;
 uint_t x86_vendor = X86_VENDOR_IntelClone;
 uint_t x86_type = X86_TYPE_OTHER;
 uint_t x86_clflush_size = 0;
@@ -119,7 +118,98 @@ uint_t x86_clflush_size = 0;
 uint_t pentiumpro_bug4046376;
 uint_t pentiumpro_bug4064495;
 
+uchar_t x86_featureset[BT_SIZEOFMAP(NUM_X86_FEATURES)];
+
+static char *x86_feature_names[NUM_X86_FEATURES] = {
+	"lgpg",
+	"tsc",
+	"msr",
+	"mtrr",
+	"pge",
+	"de",
+	"cmov",
+	"mmx",
+	"mca",
+	"pae",
+	"cv8",
+	"pat",
+	"sep",
+	"sse",
+	"sse2",
+	"htt",
+	"asysc",
+	"nx",
+	"sse3",
+	"cx16",
+	"cmp",
+	"tscp",
+	"mwait",
+	"sse4a",
+	"cpuid",
+	"ssse3",
+	"sse4_1",
+	"sse4_2",
+	"1gpg",
+	"clfsh",
+	"64",
+	"aes",
+	"pclmulqdq",
+	"xsave",
+	"avx" };
+
+boolean_t
+is_x86_feature(void *featureset, uint_t feature)
+{
+	ASSERT(feature < NUM_X86_FEATURES);
+	return (BT_TEST((ulong_t *)featureset, feature));
+}
+
+void
+add_x86_feature(void *featureset, uint_t feature)
+{
+	ASSERT(feature < NUM_X86_FEATURES);
+	BT_SET((ulong_t *)featureset, feature);
+}
+
+void
+remove_x86_feature(void *featureset, uint_t feature)
+{
+	ASSERT(feature < NUM_X86_FEATURES);
+	BT_CLEAR((ulong_t *)featureset, feature);
+}
+
+boolean_t
+compare_x86_featureset(void *setA, void *setB)
+{
+	/*
+	 * We assume that the unused bits of the bitmap are always zero.
+	 */
+	if (memcmp(setA, setB, BT_SIZEOFMAP(NUM_X86_FEATURES)) == 0) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
+
+void
+print_x86_featureset(void *featureset)
+{
+	uint_t i;
+
+	for (i = 0; i < NUM_X86_FEATURES; i++) {
+		if (is_x86_feature(featureset, i)) {
+			cmn_err(CE_CONT, "?x86_feature: %s\n",
+			    x86_feature_names[i]);
+		}
+	}
+}
+
 uint_t enable486;
+
+static size_t xsave_state_size = 0;
+uint64_t xsave_bv_all = (XFEATURE_LEGACY_FP | XFEATURE_SSE);
+boolean_t xsave_force_disable = B_FALSE;
+
 /*
  * This is set to platform type Solaris is running on.
  */
@@ -148,6 +238,23 @@ struct mwait_info {
 	void		*buf_actual;	/* memory actually allocated */
 	uint32_t	support;	/* processor support of monitor/mwait */
 };
+
+/*
+ * xsave/xrestor info.
+ *
+ * This structure contains HW feature bits and size of the xsave save area.
+ * Note: the kernel will use the maximum size required for all hardware
+ * features. It is not optimize for potential memory savings if features at
+ * the end of the save area are not enabled.
+ */
+struct xsave_info {
+	uint32_t	xsav_hw_features_low;   /* Supported HW features */
+	uint32_t	xsav_hw_features_high;  /* Supported HW features */
+	size_t		xsav_max_size;  /* max size save area for HW features */
+	size_t		ymm_size;	/* AVX: size of ymm save area */
+	size_t		ymm_offset;	/* AVX: offset for ymm save area */
+};
+
 
 /*
  * These constants determine how many of the elements of the
@@ -230,6 +337,8 @@ struct cpuid_info {
 	uint_t cpi_procnodeid;		/* AMD: nodeID on HT, Intel: chipid */
 	uint_t cpi_procnodes_per_pkg;	/* AMD: # of nodes in the package */
 					/* Intel: 1 */
+
+	struct xsave_info cpi_xsave;	/* fn D: xsave/xrestor info */
 };
 
 
@@ -330,6 +439,12 @@ static struct cpuid_info cpuid_info0;
  */
 #define	MWAIT_NUM_SUBC_STATES(cpi, c_state)			\
 	BITX((cpi)->cpi_std[5].cp_edx, c_state + 3, c_state)
+
+/*
+ * XSAVE leaf 0xD enumeration
+ */
+#define	CPUID_LEAFD_2_YMM_OFFSET	576
+#define	CPUID_LEAFD_2_YMM_SIZE		256
 
 /*
  * Functions we consune from cpuid_subr.c;  don't publish these in a header
@@ -542,7 +657,7 @@ is_controldom(void)
 #endif	/* __xpv */
 
 static void
-cpuid_intel_getids(cpu_t *cpu, uint_t feature)
+cpuid_intel_getids(cpu_t *cpu, void *feature)
 {
 	uint_t i;
 	uint_t chipid_shift = 0;
@@ -555,7 +670,7 @@ cpuid_intel_getids(cpu_t *cpu, uint_t feature)
 	cpi->cpi_chipid = cpi->cpi_apicid >> chipid_shift;
 	cpi->cpi_clogid = cpi->cpi_apicid & ((1 << chipid_shift) - 1);
 
-	if (feature & X86_CMP) {
+	if (is_x86_feature(feature, X86FSET_CMP)) {
 		/*
 		 * Multi-core (and possibly multi-threaded)
 		 * processors.
@@ -591,7 +706,7 @@ cpuid_intel_getids(cpu_t *cpu, uint_t feature)
 			coreid_shift++;
 		cpi->cpi_coreid = cpi->cpi_apicid >> coreid_shift;
 		cpi->cpi_pkgcoreid = cpi->cpi_clogid >> coreid_shift;
-	} else if (feature & X86_HTT) {
+	} else if (is_x86_feature(feature, X86FSET_HTT)) {
 		/*
 		 * Single-core multi-threaded processors.
 		 */
@@ -718,11 +833,31 @@ cpuid_amd_getids(cpu_t *cpu)
 	}
 }
 
-uint_t
-cpuid_pass1(cpu_t *cpu)
+/*
+ * Setup XFeature_Enabled_Mask register. Required by xsave feature.
+ */
+void
+setup_xfem(void)
+{
+	uint64_t flags = XFEATURE_LEGACY_FP;
+
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_XSAVE));
+
+	if (is_x86_feature(x86_featureset, X86FSET_SSE))
+		flags |= XFEATURE_SSE;
+
+	if (is_x86_feature(x86_featureset, X86FSET_AVX))
+		flags |= XFEATURE_AVX;
+
+	set_xcr(XFEATURE_ENABLED_MASK, flags);
+
+	xsave_bv_all = flags;
+}
+
+void
+cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 {
 	uint32_t mask_ecx, mask_edx;
-	uint_t feature = X86_CPUID;
 	struct cpuid_info *cpi;
 	struct cpuid_regs *cp;
 	int xcpuid;
@@ -730,15 +865,19 @@ cpuid_pass1(cpu_t *cpu)
 	extern int idle_cpu_prefer_mwait;
 #endif
 
-
 #if !defined(__xpv)
 	determine_platform();
 #endif
 	/*
 	 * Space statically allocated for BSP, ensure pointer is set
 	 */
-	if (cpu->cpu_id == 0 && cpu->cpu_m.mcpu_cpi == NULL)
-		cpu->cpu_m.mcpu_cpi = &cpuid_info0;
+	if (cpu->cpu_id == 0) {
+		if (cpu->cpu_m.mcpu_cpi == NULL)
+			cpu->cpu_m.mcpu_cpi = &cpuid_info0;
+	}
+
+	add_x86_feature(featureset, X86FSET_CPUID);
+
 	cpi = cpu->cpu_m.mcpu_cpi;
 	ASSERT(cpi != NULL);
 	cp = &cpi->cpi_std[0];
@@ -977,7 +1116,17 @@ cpuid_pass1(cpu_t *cpu)
 	 * Do not support MONITOR/MWAIT under a hypervisor
 	 */
 	mask_ecx &= ~CPUID_INTC_ECX_MON;
+	/*
+	 * Do not support XSAVE under a hypervisor for now
+	 */
+	xsave_force_disable = B_TRUE;
+
 #endif	/* __xpv */
+
+	if (xsave_force_disable) {
+		mask_ecx &= ~CPUID_INTC_ECX_XSAVE;
+		mask_ecx &= ~CPUID_INTC_ECX_AVX;
+	}
 
 	/*
 	 * Now we've figured out the masks that determine
@@ -1004,58 +1153,91 @@ cpuid_pass1(cpu_t *cpu)
 	cp->cp_ecx |= cpuid_feature_ecx_include;
 	cp->cp_ecx &= ~cpuid_feature_ecx_exclude;
 
-	if (cp->cp_edx & CPUID_INTC_EDX_PSE)
-		feature |= X86_LARGEPAGE;
-	if (cp->cp_edx & CPUID_INTC_EDX_TSC)
-		feature |= X86_TSC;
-	if (cp->cp_edx & CPUID_INTC_EDX_MSR)
-		feature |= X86_MSR;
-	if (cp->cp_edx & CPUID_INTC_EDX_MTRR)
-		feature |= X86_MTRR;
-	if (cp->cp_edx & CPUID_INTC_EDX_PGE)
-		feature |= X86_PGE;
-	if (cp->cp_edx & CPUID_INTC_EDX_CMOV)
-		feature |= X86_CMOV;
-	if (cp->cp_edx & CPUID_INTC_EDX_MMX)
-		feature |= X86_MMX;
+	if (cp->cp_edx & CPUID_INTC_EDX_PSE) {
+		add_x86_feature(featureset, X86FSET_LARGEPAGE);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_TSC) {
+		add_x86_feature(featureset, X86FSET_TSC);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_MSR) {
+		add_x86_feature(featureset, X86FSET_MSR);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_MTRR) {
+		add_x86_feature(featureset, X86FSET_MTRR);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_PGE) {
+		add_x86_feature(featureset, X86FSET_PGE);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_CMOV) {
+		add_x86_feature(featureset, X86FSET_CMOV);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_MMX) {
+		add_x86_feature(featureset, X86FSET_MMX);
+	}
 	if ((cp->cp_edx & CPUID_INTC_EDX_MCE) != 0 &&
-	    (cp->cp_edx & CPUID_INTC_EDX_MCA) != 0)
-		feature |= X86_MCA;
-	if (cp->cp_edx & CPUID_INTC_EDX_PAE)
-		feature |= X86_PAE;
-	if (cp->cp_edx & CPUID_INTC_EDX_CX8)
-		feature |= X86_CX8;
-	if (cp->cp_ecx & CPUID_INTC_ECX_CX16)
-		feature |= X86_CX16;
-	if (cp->cp_edx & CPUID_INTC_EDX_PAT)
-		feature |= X86_PAT;
-	if (cp->cp_edx & CPUID_INTC_EDX_SEP)
-		feature |= X86_SEP;
+	    (cp->cp_edx & CPUID_INTC_EDX_MCA) != 0) {
+		add_x86_feature(featureset, X86FSET_MCA);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_PAE) {
+		add_x86_feature(featureset, X86FSET_PAE);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_CX8) {
+		add_x86_feature(featureset, X86FSET_CX8);
+	}
+	if (cp->cp_ecx & CPUID_INTC_ECX_CX16) {
+		add_x86_feature(featureset, X86FSET_CX16);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_PAT) {
+		add_x86_feature(featureset, X86FSET_PAT);
+	}
+	if (cp->cp_edx & CPUID_INTC_EDX_SEP) {
+		add_x86_feature(featureset, X86FSET_SEP);
+	}
 	if (cp->cp_edx & CPUID_INTC_EDX_FXSR) {
 		/*
 		 * In our implementation, fxsave/fxrstor
 		 * are prerequisites before we'll even
 		 * try and do SSE things.
 		 */
-		if (cp->cp_edx & CPUID_INTC_EDX_SSE)
-			feature |= X86_SSE;
-		if (cp->cp_edx & CPUID_INTC_EDX_SSE2)
-			feature |= X86_SSE2;
-		if (cp->cp_ecx & CPUID_INTC_ECX_SSE3)
-			feature |= X86_SSE3;
+		if (cp->cp_edx & CPUID_INTC_EDX_SSE) {
+			add_x86_feature(featureset, X86FSET_SSE);
+		}
+		if (cp->cp_edx & CPUID_INTC_EDX_SSE2) {
+			add_x86_feature(featureset, X86FSET_SSE2);
+		}
+		if (cp->cp_ecx & CPUID_INTC_ECX_SSE3) {
+			add_x86_feature(featureset, X86FSET_SSE3);
+		}
 		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSSE3)
-				feature |= X86_SSSE3;
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_1)
-				feature |= X86_SSE4_1;
-			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_2)
-				feature |= X86_SSE4_2;
-			if (cp->cp_ecx & CPUID_INTC_ECX_AES)
-				feature |= X86_AES;
+			if (cp->cp_ecx & CPUID_INTC_ECX_SSSE3) {
+				add_x86_feature(featureset, X86FSET_SSSE3);
+			}
+			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_1) {
+				add_x86_feature(featureset, X86FSET_SSE4_1);
+			}
+			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_2) {
+				add_x86_feature(featureset, X86FSET_SSE4_2);
+			}
+			if (cp->cp_ecx & CPUID_INTC_ECX_AES) {
+				add_x86_feature(featureset, X86FSET_AES);
+			}
+			if (cp->cp_ecx & CPUID_INTC_ECX_PCLMULQDQ) {
+				add_x86_feature(featureset, X86FSET_PCLMULQDQ);
+			}
+
+			if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
+				add_x86_feature(featureset, X86FSET_XSAVE);
+				/* We only test AVX when there is XSAVE */
+				if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
+					add_x86_feature(featureset,
+					    X86FSET_AVX);
+				}
+			}
 		}
 	}
-	if (cp->cp_edx & CPUID_INTC_EDX_DE)
-		feature |= X86_DE;
+	if (cp->cp_edx & CPUID_INTC_EDX_DE) {
+		add_x86_feature(featureset, X86FSET_DE);
+	}
 #if !defined(__xpv)
 	if (cp->cp_ecx & CPUID_INTC_ECX_MON) {
 
@@ -1065,7 +1247,7 @@ cpuid_pass1(cpu_t *cpu)
 		 */
 		if (cp->cp_edx & CPUID_INTC_EDX_CLFSH) {
 			cpi->cpi_mwait.support |= MWAIT_SUPPORT;
-			feature |= X86_MWAIT;
+			add_x86_feature(featureset, X86FSET_MWAIT);
 		} else {
 			extern int idle_cpu_assert_cflush_monitor;
 
@@ -1086,11 +1268,10 @@ cpuid_pass1(cpu_t *cpu)
 	 * we only capture this for the bootcpu.
 	 */
 	if (cp->cp_edx & CPUID_INTC_EDX_CLFSH) {
-		feature |= X86_CLFSH;
+		add_x86_feature(featureset, X86FSET_CLFSH);
 		x86_clflush_size = (BITX(cp->cp_ebx, 15, 8) * 8);
 	}
-
-	if (feature & X86_PAE)
+	if (is_x86_feature(featureset, X86FSET_PAE))
 		cpi->cpi_pabits = 36;
 
 	/*
@@ -1105,7 +1286,7 @@ cpuid_pass1(cpu_t *cpu)
 	if (cp->cp_edx & CPUID_INTC_EDX_HTT) {
 		cpi->cpi_ncpu_per_chip = CPI_CPU_COUNT(cpi);
 		if (cpi->cpi_ncpu_per_chip > 1)
-			feature |= X86_HTT;
+			add_x86_feature(featureset, X86FSET_HTT);
 	} else {
 		cpi->cpi_ncpu_per_chip = 1;
 	}
@@ -1180,27 +1361,31 @@ cpuid_pass1(cpu_t *cpu)
 			/*
 			 * Compute the additions to the kernel's feature word.
 			 */
-			if (cp->cp_edx & CPUID_AMD_EDX_NX)
-				feature |= X86_NX;
+			if (cp->cp_edx & CPUID_AMD_EDX_NX) {
+				add_x86_feature(featureset, X86FSET_NX);
+			}
 
 			/*
 			 * Regardless whether or not we boot 64-bit,
 			 * we should have a way to identify whether
 			 * the CPU is capable of running 64-bit.
 			 */
-			if (cp->cp_edx & CPUID_AMD_EDX_LM)
-				feature |= X86_64;
+			if (cp->cp_edx & CPUID_AMD_EDX_LM) {
+				add_x86_feature(featureset, X86FSET_64);
+			}
 
 #if defined(__amd64)
 			/* 1 GB large page - enable only for 64 bit kernel */
-			if (cp->cp_edx & CPUID_AMD_EDX_1GPG)
-				feature |= X86_1GPG;
+			if (cp->cp_edx & CPUID_AMD_EDX_1GPG) {
+				add_x86_feature(featureset, X86FSET_1GPG);
+			}
 #endif
 
 			if ((cpi->cpi_vendor == X86_VENDOR_AMD) &&
 			    (cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_FXSR) &&
-			    (cp->cp_ecx & CPUID_AMD_ECX_SSE4A))
-				feature |= X86_SSE4A;
+			    (cp->cp_ecx & CPUID_AMD_ECX_SSE4A)) {
+				add_x86_feature(featureset, X86FSET_SSE4A);
+			}
 
 			/*
 			 * If both the HTT and CMP_LGCY bits are set,
@@ -1208,10 +1393,10 @@ cpuid_pass1(cpu_t *cpu)
 			 * "AMD CPUID Specification" for more details.
 			 */
 			if (cpi->cpi_vendor == X86_VENDOR_AMD &&
-			    (feature & X86_HTT) &&
+			    is_x86_feature(featureset, X86FSET_HTT) &&
 			    (cp->cp_ecx & CPUID_AMD_ECX_CMP_LGCY)) {
-				feature &= ~X86_HTT;
-				feature |= X86_CMP;
+				remove_x86_feature(featureset, X86FSET_HTT);
+				add_x86_feature(featureset, X86FSET_CMP);
 			}
 #if defined(__amd64)
 			/*
@@ -1220,19 +1405,22 @@ cpuid_pass1(cpu_t *cpu)
 			 * instead.  In the amd64 kernel, things are -way-
 			 * better.
 			 */
-			if (cp->cp_edx & CPUID_AMD_EDX_SYSC)
-				feature |= X86_ASYSC;
+			if (cp->cp_edx & CPUID_AMD_EDX_SYSC) {
+				add_x86_feature(featureset, X86FSET_ASYSC);
+			}
 
 			/*
 			 * While we're thinking about system calls, note
 			 * that AMD processors don't support sysenter
 			 * in long mode at all, so don't try to program them.
 			 */
-			if (x86_vendor == X86_VENDOR_AMD)
-				feature &= ~X86_SEP;
+			if (x86_vendor == X86_VENDOR_AMD) {
+				remove_x86_feature(featureset, X86FSET_SEP);
+			}
 #endif
-			if (cp->cp_edx & CPUID_AMD_EDX_TSCP)
-				feature |= X86_TSCP;
+			if (cp->cp_edx & CPUID_AMD_EDX_TSCP) {
+				add_x86_feature(featureset, X86FSET_TSCP);
+			}
 			break;
 		default:
 			break;
@@ -1327,20 +1515,22 @@ cpuid_pass1(cpu_t *cpu)
 	/*
 	 * If more than one core, then this processor is CMP.
 	 */
-	if (cpi->cpi_ncore_per_chip > 1)
-		feature |= X86_CMP;
+	if (cpi->cpi_ncore_per_chip > 1) {
+		add_x86_feature(featureset, X86FSET_CMP);
+	}
 
 	/*
 	 * If the number of cores is the same as the number
 	 * of CPUs, then we cannot have HyperThreading.
 	 */
-	if (cpi->cpi_ncpu_per_chip == cpi->cpi_ncore_per_chip)
-		feature &= ~X86_HTT;
+	if (cpi->cpi_ncpu_per_chip == cpi->cpi_ncore_per_chip) {
+		remove_x86_feature(featureset, X86FSET_HTT);
+	}
 
 	cpi->cpi_apicid = CPI_APIC_ID(cpi);
 	cpi->cpi_procnodes_per_pkg = 1;
-
-	if ((feature & (X86_HTT | X86_CMP)) == 0) {
+	if (is_x86_feature(featureset, X86FSET_HTT) == B_FALSE &&
+	    is_x86_feature(featureset, X86FSET_CMP) == B_FALSE) {
 		/*
 		 * Single-core single-threaded processors.
 		 */
@@ -1354,7 +1544,7 @@ cpuid_pass1(cpu_t *cpu)
 			cpi->cpi_procnodeid = cpi->cpi_chipid;
 	} else if (cpi->cpi_ncpu_per_chip > 1) {
 		if (cpi->cpi_vendor == X86_VENDOR_Intel)
-			cpuid_intel_getids(cpu, feature);
+			cpuid_intel_getids(cpu, featureset);
 		else if (cpi->cpi_vendor == X86_VENDOR_AMD)
 			cpuid_amd_getids(cpu);
 		else {
@@ -1380,7 +1570,6 @@ cpuid_pass1(cpu_t *cpu)
 
 pass1_done:
 	cpi->cpi_pass = 1;
-	return (feature);
 }
 
 /*
@@ -1587,6 +1776,92 @@ cpuid_pass2(cpu_t *cpu)
 		cp = NULL;
 	}
 
+	/*
+	 * XSAVE enumeration
+	 */
+	if (cpi->cpi_maxeax >= 0xD && cpi->cpi_vendor == X86_VENDOR_Intel) {
+		struct cpuid_regs regs;
+		boolean_t cpuid_d_valid = B_TRUE;
+
+		cp = &regs;
+		cp->cp_eax = 0xD;
+		cp->cp_edx = cp->cp_ebx = cp->cp_ecx = 0;
+
+		(void) __cpuid_insn(cp);
+
+		/*
+		 * Sanity checks for debug
+		 */
+		if ((cp->cp_eax & XFEATURE_LEGACY_FP) == 0 ||
+		    (cp->cp_eax & XFEATURE_SSE) == 0) {
+			cpuid_d_valid = B_FALSE;
+		}
+
+		cpi->cpi_xsave.xsav_hw_features_low = cp->cp_eax;
+		cpi->cpi_xsave.xsav_hw_features_high = cp->cp_edx;
+		cpi->cpi_xsave.xsav_max_size = cp->cp_ecx;
+
+		/*
+		 * If the hw supports AVX, get the size and offset in the save
+		 * area for the ymm state.
+		 */
+		if (cpi->cpi_xsave.xsav_hw_features_low & XFEATURE_AVX) {
+			cp->cp_eax = 0xD;
+			cp->cp_ecx = 2;
+			cp->cp_edx = cp->cp_ebx = 0;
+
+			(void) __cpuid_insn(cp);
+
+			if (cp->cp_ebx != CPUID_LEAFD_2_YMM_OFFSET ||
+			    cp->cp_eax != CPUID_LEAFD_2_YMM_SIZE) {
+				cpuid_d_valid = B_FALSE;
+			}
+
+			cpi->cpi_xsave.ymm_size = cp->cp_eax;
+			cpi->cpi_xsave.ymm_offset = cp->cp_ebx;
+		}
+
+		if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
+			xsave_state_size = 0;
+		} else if (cpuid_d_valid) {
+			xsave_state_size = cpi->cpi_xsave.xsav_max_size;
+		} else {
+			/* Broken CPUID 0xD, probably in HVM */
+			cmn_err(CE_WARN, "cpu%d: CPUID.0xD returns invalid "
+			    "value: hw_low = %d, hw_high = %d, xsave_size = %d"
+			    ", ymm_size = %d, ymm_offset = %d\n",
+			    cpu->cpu_id, cpi->cpi_xsave.xsav_hw_features_low,
+			    cpi->cpi_xsave.xsav_hw_features_high,
+			    (int)cpi->cpi_xsave.xsav_max_size,
+			    (int)cpi->cpi_xsave.ymm_size,
+			    (int)cpi->cpi_xsave.ymm_offset);
+
+			if (xsave_state_size != 0) {
+				/*
+				 * This must be a non-boot CPU. We cannot
+				 * continue, because boot cpu has already
+				 * enabled XSAVE.
+				 */
+				ASSERT(cpu->cpu_id != 0);
+				cmn_err(CE_PANIC, "cpu%d: we have already "
+				    "enabled XSAVE on boot cpu, cannot "
+				    "continue.", cpu->cpu_id);
+			} else {
+				/*
+				 * Must be from boot CPU, OK to disable XSAVE.
+				 */
+				ASSERT(cpu->cpu_id == 0);
+				remove_x86_feature(x86_featureset,
+				    X86FSET_XSAVE);
+				remove_x86_feature(x86_featureset, X86FSET_AVX);
+				CPI_FEATURES_ECX(cpi) &= ~CPUID_INTC_ECX_XSAVE;
+				CPI_FEATURES_ECX(cpi) &= ~CPUID_INTC_ECX_AVX;
+				xsave_force_disable = B_TRUE;
+			}
+		}
+	}
+
+
 	if ((cpi->cpi_xmaxeax & 0x80000000) == 0)
 		goto pass2_done;
 
@@ -1703,7 +1978,7 @@ intel_cpubrand(const struct cpuid_info *cpi)
 {
 	int i;
 
-	if ((x86_feature & X86_CPUID) == 0 ||
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
 	    cpi->cpi_maxeax < 1 || cpi->cpi_family < 5)
 		return ("i486");
 
@@ -1837,7 +2112,7 @@ intel_cpubrand(const struct cpuid_info *cpi)
 static const char *
 amd_cpubrand(const struct cpuid_info *cpi)
 {
-	if ((x86_feature & X86_CPUID) == 0 ||
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
 	    cpi->cpi_maxeax < 1 || cpi->cpi_family < 5)
 		return ("i486 compatible");
 
@@ -1907,7 +2182,7 @@ amd_cpubrand(const struct cpuid_info *cpi)
 static const char *
 cyrix_cpubrand(struct cpuid_info *cpi, uint_t type)
 {
-	if ((x86_feature & X86_CPUID) == 0 ||
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
 	    cpi->cpi_maxeax < 1 || cpi->cpi_family < 5 ||
 	    type == X86_TYPE_CYRIX_486)
 		return ("i486 compatible");
@@ -2224,29 +2499,36 @@ cpuid_pass4(cpu_t *cpu)
 		/*
 		 * [these require explicit kernel support]
 		 */
-		if ((x86_feature & X86_SEP) == 0)
+		if (!is_x86_feature(x86_featureset, X86FSET_SEP))
 			*edx &= ~CPUID_INTC_EDX_SEP;
 
-		if ((x86_feature & X86_SSE) == 0)
+		if (!is_x86_feature(x86_featureset, X86FSET_SSE))
 			*edx &= ~(CPUID_INTC_EDX_FXSR|CPUID_INTC_EDX_SSE);
-		if ((x86_feature & X86_SSE2) == 0)
+		if (!is_x86_feature(x86_featureset, X86FSET_SSE2))
 			*edx &= ~CPUID_INTC_EDX_SSE2;
 
-		if ((x86_feature & X86_HTT) == 0)
+		if (!is_x86_feature(x86_featureset, X86FSET_HTT))
 			*edx &= ~CPUID_INTC_EDX_HTT;
 
-		if ((x86_feature & X86_SSE3) == 0)
+		if (!is_x86_feature(x86_featureset, X86FSET_SSE3))
 			*ecx &= ~CPUID_INTC_ECX_SSE3;
 
 		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if ((x86_feature & X86_SSSE3) == 0)
+			if (!is_x86_feature(x86_featureset, X86FSET_SSSE3))
 				*ecx &= ~CPUID_INTC_ECX_SSSE3;
-			if ((x86_feature & X86_SSE4_1) == 0)
+			if (!is_x86_feature(x86_featureset, X86FSET_SSE4_1))
 				*ecx &= ~CPUID_INTC_ECX_SSE4_1;
-			if ((x86_feature & X86_SSE4_2) == 0)
+			if (!is_x86_feature(x86_featureset, X86FSET_SSE4_2))
 				*ecx &= ~CPUID_INTC_ECX_SSE4_2;
-			if ((x86_feature & X86_AES) == 0)
+			if (!is_x86_feature(x86_featureset, X86FSET_AES))
 				*ecx &= ~CPUID_INTC_ECX_AES;
+			if (!is_x86_feature(x86_featureset, X86FSET_PCLMULQDQ))
+				*ecx &= ~CPUID_INTC_ECX_PCLMULQDQ;
+			if (!is_x86_feature(x86_featureset, X86FSET_XSAVE))
+				*ecx &= ~(CPUID_INTC_ECX_XSAVE |
+				    CPUID_INTC_ECX_OSXSAVE);
+			if (!is_x86_feature(x86_featureset, X86FSET_AVX))
+				*ecx &= ~CPUID_INTC_ECX_AVX;
 		}
 
 		/*
@@ -2280,6 +2562,9 @@ cpuid_pass4(cpu_t *cpu)
 				hwcap_flags |= AV_386_AES;
 			if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
 				hwcap_flags |= AV_386_PCLMULQDQ;
+			if ((*ecx & CPUID_INTC_ECX_XSAVE) &&
+			    (*ecx & CPUID_INTC_ECX_OSXSAVE))
+				hwcap_flags |= AV_386_XSAVE;
 		}
 		if (*ecx & CPUID_INTC_ECX_POPCNT)
 			hwcap_flags |= AV_386_POPCNT;
@@ -2326,14 +2611,14 @@ cpuid_pass4(cpu_t *cpu)
 		 */
 		switch (cpi->cpi_vendor) {
 		case X86_VENDOR_Intel:
-			if ((x86_feature & X86_TSCP) == 0)
+			if (!is_x86_feature(x86_featureset, X86FSET_TSCP))
 				*edx &= ~CPUID_AMD_EDX_TSCP;
 			break;
 
 		case X86_VENDOR_AMD:
-			if ((x86_feature & X86_TSCP) == 0)
+			if (!is_x86_feature(x86_featureset, X86FSET_TSCP))
 				*edx &= ~CPUID_AMD_EDX_TSCP;
-			if ((x86_feature & X86_SSE4A) == 0)
+			if (!is_x86_feature(x86_featureset, X86FSET_SSE4A))
 				*ecx &= ~CPUID_AMD_ECX_SSE4A;
 			break;
 
@@ -2349,7 +2634,7 @@ cpuid_pass4(cpu_t *cpu)
 			*edx &= ~(CPUID_AMD_EDX_MMXamd |
 			    CPUID_AMD_EDX_3DNow | CPUID_AMD_EDX_3DNowx);
 
-		if ((x86_feature & X86_NX) == 0)
+		if (!is_x86_feature(x86_featureset, X86FSET_NX))
 			*edx &= ~CPUID_AMD_EDX_NX;
 #if !defined(__amd64)
 		*edx &= ~CPUID_AMD_EDX_LM;
@@ -3340,7 +3625,7 @@ intel_walk_cacheinfo(struct cpuid_info *cpi,
 			des_b1_ct.ct_code = 0xb1;
 			des_b1_ct.ct_assoc = 4;
 			des_b1_ct.ct_line_size = 0;
-			if (x86_feature & X86_PAE) {
+			if (is_x86_feature(x86_featureset, X86FSET_PAE)) {
 				des_b1_ct.ct_size = 8;
 				des_b1_ct.ct_label = itlb2M_str;
 			} else {
@@ -3687,7 +3972,7 @@ cpuid_set_cpu_properties(void *dip, processorid_t cpu_id,
 			    "clock-frequency", (int)mul);
 	}
 
-	if ((x86_feature & X86_CPUID) == 0) {
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID)) {
 		return;
 	}
 
@@ -4083,7 +4368,7 @@ cpuid_deep_cstates_supported(void)
 
 	cpi = CPU->cpu_m.mcpu_cpi;
 
-	if (!(x86_feature & X86_CPUID))
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID))
 		return (0);
 
 	switch (cpi->cpi_vendor) {
@@ -4134,6 +4419,31 @@ post_startup_cpu_fixups(void)
 }
 
 /*
+ * Setup necessary registers to enable XSAVE feature on this processor.
+ * This function needs to be called early enough, so that no xsave/xrstor
+ * ops will execute on the processor before the MSRs are properly set up.
+ *
+ * Current implementation has the following assumption:
+ * - cpuid_pass1() is done, so that X86 features are known.
+ * - fpu_probe() is done, so that fp_save_mech is chosen.
+ */
+void
+xsave_setup_msr(cpu_t *cpu)
+{
+	ASSERT(fp_save_mech == FP_XSAVE);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_XSAVE));
+
+	/* Enable OSXSAVE in CR4. */
+	setcr4(getcr4() | CR4_OSXSAVE);
+	/*
+	 * Update SW copy of ECX, so that /dev/cpu/self/cpuid will report
+	 * correct value.
+	 */
+	cpu->cpu_m.mcpu_cpi->cpi_std[1].cp_ecx |= CPUID_INTC_ECX_OSXSAVE;
+	setup_xfem();
+}
+
+/*
  * Starting with the Westmere processor the local
  * APIC timer will continue running in all C-states,
  * including the deepest C-states.
@@ -4145,7 +4455,7 @@ cpuid_arat_supported(void)
 	struct cpuid_regs regs;
 
 	ASSERT(cpuid_checkpass(CPU, 1));
-	ASSERT(x86_feature & X86_CPUID);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
 
 	cpi = CPU->cpu_m.mcpu_cpi;
 
@@ -4178,7 +4488,8 @@ cpuid_iepb_supported(struct cpu *cp)
 
 	ASSERT(cpuid_checkpass(cp, 1));
 
-	if (!(x86_feature & X86_CPUID) || !(x86_feature & X86_MSR)) {
+	if (!(is_x86_feature(x86_featureset, X86FSET_CPUID)) ||
+	    !(is_x86_feature(x86_featureset, X86FSET_MSR))) {
 		return (0);
 	}
 
@@ -4194,6 +4505,38 @@ cpuid_iepb_supported(struct cpu *cp)
 	return (regs.cp_ecx & CPUID_EPB_SUPPORT);
 }
 
+/*
+ * Check support for TSC deadline timer
+ *
+ * TSC deadline timer provides a superior software programming
+ * model over local APIC timer that eliminates "time drifts".
+ * Instead of specifying a relative time, software specifies an
+ * absolute time as the target at which the processor should
+ * generate a timer event.
+ */
+int
+cpuid_deadline_tsc_supported(void)
+{
+	struct cpuid_info *cpi = CPU->cpu_m.mcpu_cpi;
+	struct cpuid_regs regs;
+
+	ASSERT(cpuid_checkpass(CPU, 1));
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
+
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
+		if (cpi->cpi_maxeax >= 1) {
+			regs.cp_eax = 1;
+			(void) cpuid_insn(NULL, &regs);
+			return (regs.cp_ecx & CPUID_DEADLINE_TSC);
+		} else {
+			return (0);
+		}
+	default:
+		return (0);
+	}
+}
+
 #if defined(__amd64) && !defined(__xpv)
 /*
  * Patch in versions of bcopy for high performance Intel Nhm processors
@@ -4205,7 +4548,8 @@ patch_memops(uint_t vendor)
 	size_t cnt, i;
 	caddr_t to, from;
 
-	if ((vendor == X86_VENDOR_Intel) && ((x86_feature & X86_SSE4_2) != 0)) {
+	if ((vendor == X86_VENDOR_Intel) &&
+	    is_x86_feature(x86_featureset, X86FSET_SSE4_2)) {
 		cnt = &bcopy_patch_end - &bcopy_patch_start;
 		to = &bcopy_ck_size;
 		from = &bcopy_patch_start;

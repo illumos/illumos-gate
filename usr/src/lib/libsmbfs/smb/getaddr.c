@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -142,8 +141,6 @@ smb_ctx_getaddr(struct smb_ctx *ctx)
 	/*
 	 * Default the server name we'll use in the
 	 * protocol (i.e. NTLM, tree connect).
-	 * If we get a canonical name, we'll
-	 * overwrite this below.
 	 */
 	strlcpy(ctx->ct_srvname, ctx->ct_fullserver,
 	    sizeof (ctx->ct_srvname));
@@ -159,25 +156,6 @@ smb_ctx_getaddr(struct smb_ctx *ctx)
 	hints.ai_socktype = SOCK_STREAM;
 	gaierr = getaddrinfo(srvaddr_str, NULL, &hints, &res);
 	if (gaierr == 0) {
-#if 1
-		/*
-		 * XXX Temporarily work-around CR 6831339:
-		 * getaddrinfo() sets ai_canonname incorrectly
-		 */
-		char tmphost[256];
-		gaierr2 = getnameinfo(res->ai_addr, res->ai_addrlen,
-		    tmphost, sizeof (tmphost),
-		    NULL, 0, NI_NAMEREQD);
-		if (gaierr2 == 0) {
-			DPRINT("cname: %s", tmphost);
-			strlcpy(ctx->ct_srvname, tmphost,
-			    sizeof (ctx->ct_srvname));
-		}
-#else
-		if (res->ai_canonname)
-			strlcpy(ctx->ct_srvname, res->ai_canonname,
-			    sizeof (ctx->ct_srvname));
-#endif
 		ctx->ct_addrinfo = res;
 		return (0);
 	}
@@ -186,9 +164,6 @@ smb_ctx_getaddr(struct smb_ctx *ctx)
 	 * If regular IP name lookup failed, try NetBIOS,
 	 * but only if given a valid NetBIOS name and if
 	 * NetBIOS name lookup is enabled.
-	 *
-	 * Note: we only have ssn_srvname if the full name
-	 * was also a valid NetBIOS name.
 	 */
 	if (nbc->nb_flags & NBCF_NS_ENABLE) {
 		gaierr2 = nbns_getaddrinfo(ctx->ct_fullserver, nbc, &res);

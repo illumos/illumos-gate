@@ -29,6 +29,10 @@
  */
 
 /*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/*
  * This header defines the cryptographic interface
  */
 
@@ -426,7 +430,8 @@ krb5_error_code crypto_load_certs
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_opts *idopts,			/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN/OUT */
-	krb5_principal princ);				/* IN */
+	krb5_principal princ,				/* IN */
+	int do_matching);				/* IN */
 
 /*
  * Free up information held from crypto_load_certs()

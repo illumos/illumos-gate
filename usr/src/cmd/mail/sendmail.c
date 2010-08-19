@@ -18,16 +18,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #include "mail.h"
 #include <sys/param.h>
@@ -160,7 +157,7 @@ char **argv;
 		}
 	}
 
-	while ((n = getline(line, sizeof (line), stdin)) > 0) {
+	while ((n = getaline(line, sizeof (line), stdin)) > 0) {
 		last1c = line[n-1];
 		if (pushrest) {
 			if (!wtmpf(line, n)) {
@@ -287,7 +284,7 @@ char **argv;
 	}
 
 	if (n == 1 && last1c == '\n') {	/* blank line -- suppress */
-		n = getline(buf, sizeof (buf), stdin);
+		n = getaline(buf, sizeof (buf), stdin);
 		if (n == 0 || (ttyf && !strncmp(buf, ".\n", 2))) {
 			/*
 			 * no content: put mime-version, content-type
@@ -385,7 +382,7 @@ char **argv;
 		}
 		count += n;
 		n = ttyf
-			? getline(buf, sizeof (buf), stdin)
+			? getaline(buf, sizeof (buf), stdin)
 			: fread(buf, 1, sizeof (buf), stdin);
 	}
 	setsig(SIGINT, saveint);

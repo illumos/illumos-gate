@@ -87,4 +87,8 @@ SYMBOL_SCOPE {
 			TYPE = FUNCTION;
 			FLAGS = extern;
 		};
+		veprintf {
+			TYPE = FUNCTION;
+			FLAGS = extern;
+		};
 };

@@ -117,6 +117,8 @@ file path=usr/bin/newform mode=0555
 file path=usr/bin/news mode=0555
 file path=usr/bin/nl mode=0555
 file path=usr/bin/pack mode=0555
+file path=usr/bin/pginfo mode=0555
+file path=usr/bin/pgstat mode=0555
 file path=usr/bin/sdiff mode=0555
 file path=usr/bin/spell mode=0555
 file path=usr/bin/split mode=0555
@@ -180,17 +182,19 @@ hardlink path=usr/bin/sort target=../../usr/lib/isaexec
 hardlink path=usr/bin/uncompress target=../../usr/bin/compress
 hardlink path=usr/bin/zcat target=../../usr/bin/compress
 hardlink path=usr/lib/fs/pcfs/fstyp target=../../../sbin/fstyp
-legacy pkg=SUNWesu arch=$(ARCH) category=system \
+legacy pkg=SUNWesu \
     desc="additional UNIX system utilities, including awk, bc, cal, compress, diff, dos2unix, last, rup, sort, spell, uniq, and uuencode" \
-    hotline="Please contact your local service provider" \
-    name="Extended System Utilities" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/compress/THIRDPARTYLICENSE license=cmd/compress/THIRDPARTYLICENSE
-license cmd/lastcomm/THIRDPARTYLICENSE license=cmd/lastcomm/THIRDPARTYLICENSE
-license cmd/look/THIRDPARTYLICENSE license=cmd/look/THIRDPARTYLICENSE
-license cmd/units/THIRDPARTYLICENSE license=cmd/units/THIRDPARTYLICENSE
+    name="Extended System Utilities"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/compress/THIRDPARTYLICENSE \
+    license=usr/src/cmd/compress/THIRDPARTYLICENSE
+license usr/src/cmd/lastcomm/THIRDPARTYLICENSE \
+    license=usr/src/cmd/lastcomm/THIRDPARTYLICENSE
+license usr/src/cmd/look/THIRDPARTYLICENSE \
+    license=usr/src/cmd/look/THIRDPARTYLICENSE
+license usr/src/cmd/units/THIRDPARTYLICENSE \
+    license=usr/src/cmd/units/THIRDPARTYLICENSE
 link path=usr/bin/dmesg target=../sbin/dmesg
 link path=usr/bin/pcat target=./unpack
 link path=usr/bin/strace target=../sbin/strace

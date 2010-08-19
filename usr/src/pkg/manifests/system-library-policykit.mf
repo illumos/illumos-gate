@@ -39,11 +39,10 @@ file path=usr/lib/llib-lpolkit
 file path=usr/lib/llib-lpolkit.ln
 file path=usr/lib/pkgconfig/polkit.pc
 file path=usr/sbin/polkit-is-privileged mode=0555
-legacy pkg=SUNWpolkit arch=$(ARCH) category=system \
+legacy pkg=SUNWpolkit \
     desc="Toolkit for controlling privileges (freedesktop.org)" \
-    hotline="Please contact your local service provider" name=PolicyKit \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/hal/LICENSE license=cmd/hal/LICENSE
+    name=PolicyKit
 license cr_Sun license=cr_Sun
+license usr/src/cmd/hal/LICENSE license=usr/src/cmd/hal/LICENSE
 link path=usr/lib/libpolkit.so target=./libpolkit.so.0.0.0
 link path=usr/lib/libpolkit.so.0 target=./libpolkit.so.0.0.0

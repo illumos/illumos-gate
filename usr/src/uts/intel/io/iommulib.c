@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma ident	"@(#)iommulib.c	1.6	08/09/07 SMI"
@@ -43,6 +42,7 @@ typedef struct iommulib_unit {
 	void* ilu_data;
 	struct iommulib_unit *ilu_next;
 	struct iommulib_unit *ilu_prev;
+	iommulib_nexhandle_t ilu_nex;
 } iommulib_unit_t;
 
 typedef struct iommulib_nex {
@@ -50,6 +50,7 @@ typedef struct iommulib_nex {
 	iommulib_nexops_t nex_ops;
 	struct iommulib_nex *nex_next;
 	struct iommulib_nex *nex_prev;
+	uint_t nex_ref;
 } iommulib_nex_t;
 
 /* *********  Globals ************************ */
@@ -230,6 +231,20 @@ iommulib_nexus_register(dev_info_t *dip, iommulib_nexops_t *nexops,
 		return (DDI_FAILURE);
 	}
 
+	if (nexops->nops_dmahdl_setprivate == NULL) {
+		cmn_err(CE_WARN, "%s: %s%d: NULL nops_dmahdl_setprivate op. "
+		    "Failing registration for ops vector: %p", f,
+		    driver, instance, (void *)nexops);
+		return (DDI_FAILURE);
+	}
+
+	if (nexops->nops_dmahdl_getprivate == NULL) {
+		cmn_err(CE_WARN, "%s: %s%d: NULL nops_dmahdl_getprivate op. "
+		    "Failing registration for ops vector: %p", f,
+		    driver, instance, (void *)nexops);
+		return (DDI_FAILURE);
+	}
+
 	/* Check for legacy ops */
 	if (nexops->nops_dma_map == NULL) {
 		cmn_err(CE_WARN, "%s: %s%d: NULL legacy nops_dma_map op. "
@@ -272,6 +287,15 @@ iommulib_nexus_register(dev_info_t *dip, iommulib_nexops_t *nexops,
 	if (nexp->nex_next != NULL)
 		nexp->nex_next->nex_prev = nexp;
 
+	nexp->nex_ref = 0;
+
+	/*
+	 * The nexus device won't be controlled by an IOMMU.
+	 */
+	DEVI(dip)->devi_iommulib_handle = IOMMU_HANDLE_UNUSED;
+
+	DEVI(dip)->devi_iommulib_nex_handle = nexp;
+
 	mutex_exit(&iommulib_nexus_lock);
 	mutex_exit(&iommulib_lock);
 
@@ -294,6 +318,9 @@ iommulib_nexus_unregister(iommulib_nexhandle_t handle)
 	const char *f = "iommulib_nexus_unregister";
 
 	ASSERT(nexp);
+
+	if (nexp->nex_ref != 0)
+		return (DDI_FAILURE);
 
 	mutex_enter(&iommulib_nexus_lock);
 
@@ -325,23 +352,6 @@ iommulib_nexus_unregister(iommulib_nexhandle_t handle)
 	return (DDI_SUCCESS);
 }
 
-static iommulib_nexops_t *
-lookup_nexops(dev_info_t *dip)
-{
-	iommulib_nex_t  *nexp;
-
-	mutex_enter(&iommulib_nexus_lock);
-	nexp = iommulib_nexus_list;
-	while (nexp) {
-		if (nexp->nex_dip == dip)
-			break;
-		nexp = nexp->nex_next;
-	}
-	mutex_exit(&iommulib_nexus_lock);
-
-	return (nexp ? &nexp->nex_ops : NULL);
-}
-
 int
 iommulib_iommu_register(dev_info_t *dip, iommulib_ops_t *ops,
     iommulib_handle_t *handle)
@@ -350,19 +360,10 @@ iommulib_iommu_register(dev_info_t *dip, iommulib_ops_t *ops,
 	iommulib_unit_t *unitp;
 	int instance = ddi_get_instance(dip);
 	const char *driver = ddi_driver_name(dip);
-	dev_info_t *pdip = ddi_get_parent(dip);
 	const char *f = "iommulib_register";
 
 	ASSERT(ops);
 	ASSERT(handle);
-
-	if (i_ddi_node_state(dip) < DS_PROBED || !DEVI_BUSY_OWNED(pdip)) {
-		cmn_err(CE_WARN, "%s: devinfo node not in DS_PROBED or "
-		    "busy held for ops vector (%p). Failing registration",
-		    f, (void *)ops);
-		return (DDI_FAILURE);
-	}
-
 
 	if (ops->ilops_vers != IOMMU_OPS_VERSION) {
 		cmn_err(CE_WARN, "%s: %s%d: Invalid IOMMULIB ops version "
@@ -494,6 +495,11 @@ iommulib_iommu_register(dev_info_t *dip, iommulib_ops_t *ops,
 	if (unitp->ilu_next)
 		unitp->ilu_next->ilu_prev = unitp;
 
+	/*
+	 * The IOMMU device itself is not controlled by an IOMMU.
+	 */
+	DEVI(dip)->devi_iommulib_handle = IOMMU_HANDLE_UNUSED;
+
 	mutex_exit(&unitp->ilu_lock);
 
 	iommulib_num_units++;
@@ -567,24 +573,20 @@ iommulib_iommu_unregister(iommulib_handle_t handle)
 }
 
 int
-iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
+iommulib_nex_open(dev_info_t *dip, dev_info_t *rdip)
 {
 	iommulib_unit_t *unitp;
 	int instance = ddi_get_instance(rdip);
 	const char *driver = ddi_driver_name(rdip);
 	const char *f = "iommulib_nex_open";
 
-	*errorp = 0;
-
-	if (IOMMU_USED(rdip))
-		return (DDI_SUCCESS);
-
+	ASSERT(DEVI(dip)->devi_iommulib_nex_handle != NULL);
 	ASSERT(DEVI(rdip)->devi_iommulib_handle == NULL);
 
 	/* prevent use of IOMMU for AMD IOMMU's DMA */
 	if (strcmp(driver, "amd_iommu") == 0) {
-		*errorp = ENOTSUP;
-		return (DDI_FAILURE);
+		DEVI(rdip)->devi_iommulib_handle = IOMMU_HANDLE_UNUSED;
+		return (DDI_ENOTSUP);
 	}
 
 	/*
@@ -608,16 +610,18 @@ iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
 			    instance, (void *)rdip, ddi_pathname(rdip, buf));
 			kmem_free(buf, MAXPATHLEN);
 		}
-		*errorp = ENOTSUP;
-		return (DDI_FAILURE);
+		DEVI(rdip)->devi_iommulib_handle = IOMMU_HANDLE_UNUSED;
+		return (DDI_ENOTSUP);
 	}
 
 	mutex_enter(&unitp->ilu_lock);
+	unitp->ilu_nex = DEVI(dip)->devi_iommulib_nex_handle;
 	unitp->ilu_ref++;
+	DEVI(rdip)->devi_iommulib_handle = unitp;
 	mutex_exit(&unitp->ilu_lock);
 	mutex_exit(&iommulib_lock);
 
-	DEVI(rdip)->devi_iommulib_handle = unitp;
+	atomic_inc_uint(&DEVI(dip)->devi_iommulib_nex_handle->nex_ref);
 
 	return (DDI_SUCCESS);
 }
@@ -629,22 +633,28 @@ iommulib_nex_close(dev_info_t *rdip)
 	const char *driver;
 	int instance;
 	uint32_t unitid;
+	iommulib_nex_t *nexp;
 	const char *f = "iommulib_nex_close";
 
-	unitp = (iommulib_unit_t *)DEVI(rdip)->devi_iommulib_handle;
-	if (unitp == NULL)
-		return;
+	ASSERT(IOMMU_USED(rdip));
 
-	DEVI(rdip)->devi_iommulib_handle = NULL;
+	unitp = DEVI(rdip)->devi_iommulib_handle;
 
 	mutex_enter(&iommulib_lock);
 	mutex_enter(&unitp->ilu_lock);
+
+	nexp = (iommulib_nex_t *)unitp->ilu_nex;
+	DEVI(rdip)->devi_iommulib_handle = NULL;
+
 	unitid = unitp->ilu_unitid;
 	driver = ddi_driver_name(unitp->ilu_dip);
 	instance = ddi_get_instance(unitp->ilu_dip);
+
 	unitp->ilu_ref--;
 	mutex_exit(&unitp->ilu_lock);
 	mutex_exit(&iommulib_lock);
+
+	atomic_dec_uint(&nexp->nex_ref);
 
 	if (iommulib_debug) {
 		char *buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
@@ -778,15 +788,38 @@ iommulib_nexdma_mctl(dev_info_t *dip, dev_info_t *rdip,
 	    request, offp, lenp, objpp, cache_flags));
 }
 
+int
+iommulib_nexdma_mapobject(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t dma_handle, struct ddi_dma_req *dmareq,
+    ddi_dma_obj_t *dmao)
+{
+	iommulib_handle_t handle = DEVI(rdip)->devi_iommulib_handle;
+	iommulib_unit_t *unitp = (iommulib_unit_t *)handle;
+
+	return (unitp->ilu_ops->ilops_dma_mapobject(handle, dip, rdip,
+	    dma_handle, dmareq, dmao));
+}
+
+int
+iommulib_nexdma_unmapobject(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t dma_handle, ddi_dma_obj_t *dmao)
+{
+	iommulib_handle_t handle = DEVI(rdip)->devi_iommulib_handle;
+	iommulib_unit_t *unitp = (iommulib_unit_t *)handle;
+
+	return (unitp->ilu_ops->ilops_dma_unmapobject(handle, dip, rdip,
+	    dma_handle, dmao));
+}
+
 /* Utility routines invoked by IOMMU drivers */
 int
 iommulib_iommu_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_attr_t *attr, int (*waitfp)(caddr_t), caddr_t arg,
     ddi_dma_handle_t *handlep)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_allochdl(dip, rdip, attr, waitfp, arg,
 	    handlep));
 }
@@ -795,9 +828,10 @@ int
 iommulib_iommu_dma_freehdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
+	ASSERT(nexops);
 	return (nexops->nops_dma_freehdl(dip, rdip, handle));
 }
 
@@ -806,9 +840,9 @@ iommulib_iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, struct ddi_dma_req *dmareq,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_bindhdl(dip, rdip, handle, dmareq,
 	    cookiep, ccountp));
 }
@@ -817,16 +851,18 @@ int
 iommulib_iommu_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_unbindhdl(dip, rdip, handle));
 }
 
 void
 iommulib_iommu_dma_reset_cookies(dev_info_t *dip, ddi_dma_handle_t handle)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	nexops->nops_dma_reset_cookies(dip, handle);
 }
 
@@ -834,9 +870,9 @@ int
 iommulib_iommu_dma_get_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
     ddi_dma_cookie_t **cookiepp, uint_t *ccountp)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_get_cookies(dip, handle, cookiepp, ccountp));
 }
 
@@ -844,27 +880,27 @@ int
 iommulib_iommu_dma_set_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
     ddi_dma_cookie_t *cookiep, uint_t ccount)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_set_cookies(dip, handle, cookiep, ccount));
 }
 
 int
 iommulib_iommu_dma_clear_cookies(dev_info_t *dip, ddi_dma_handle_t handle)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_clear_cookies(dip, handle));
 }
 
 int
 iommulib_iommu_dma_get_sleep_flags(dev_info_t *dip, ddi_dma_handle_t handle)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_get_sleep_flags(handle));
 }
 
@@ -872,9 +908,9 @@ int
 iommulib_iommu_dma_sync(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_sync(dip, rdip, handle, off, len,
 	    cache_flags));
 }
@@ -884,9 +920,9 @@ iommulib_iommu_dma_win(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, uint_t win, off_t *offp, size_t *lenp,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_win(dip, rdip, handle, win, offp, lenp,
 	    cookiep, ccountp));
 }
@@ -895,9 +931,9 @@ int
 iommulib_iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
     struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_map(dip, rdip, dmareq, handlep));
 }
 
@@ -906,11 +942,31 @@ iommulib_iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, enum ddi_dma_ctlops request, off_t *offp,
     size_t *lenp, caddr_t *objpp, uint_t cache_flags)
 {
-	iommulib_nexops_t *nexops = lookup_nexops(dip);
-	if (nexops == NULL)
-		return (DDI_FAILURE);
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
 	return (nexops->nops_dma_mctl(dip, rdip, handle, request, offp, lenp,
 	    objpp, cache_flags));
+}
+
+int
+iommulib_iommu_dmahdl_setprivate(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle, void *priv)
+{
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
+	return (nexops->nops_dmahdl_setprivate(dip, rdip, handle, priv));
+}
+
+void *
+iommulib_iommu_dmahdl_getprivate(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle)
+{
+	iommulib_nexops_t *nexops;
+
+	nexops = &DEVI(dip)->devi_iommulib_nex_handle->nex_ops;
+	return (nexops->nops_dmahdl_getprivate(dip, rdip, handle));
 }
 
 int

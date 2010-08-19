@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_TAVOR_MR_H
@@ -307,6 +306,8 @@ typedef struct tavor_mr_options_s {
 #define	TAVOR_BINDMEM_NORMAL		1
 #define	TAVOR_BINDMEM_BYPASS		0
 
+int tavor_dma_mr_register(tavor_state_t *state, tavor_pdhdl_t pdhdl,
+    ibt_dmr_attr_t *attr_p, tavor_mrhdl_t *mrhdl);
 int tavor_mr_register(tavor_state_t *state, tavor_pdhdl_t pdhdl,
     ibt_mr_attr_t *attr_p, tavor_mrhdl_t *mrhdl, tavor_mr_options_t *op);
 int tavor_mr_register_buf(tavor_state_t *state, tavor_pdhdl_t pdhdl,

@@ -1,8 +1,5 @@
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 2000-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/cmd-inet/usr.bin/pppdump/Makefile
 #
@@ -20,6 +17,14 @@ CPPFLAGS +=	-DPPP_DEFS_IN_NET
 .PARALLEL:	$(OBJS)
 
 all: $(PROG)
+
+CLOBBERFILES += THIRDPARTYLICENSE
+
+all install: THIRDPARTYLICENSE
+
+THIRDPARTYLICENSE: LICENSE.top COPYING.top
+	$(RM) $@
+	$(CAT) LICENSE.top COPYING.top > $@
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

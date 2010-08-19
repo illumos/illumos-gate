@@ -44,10 +44,8 @@ file path=usr/include/sys/audio/g711.h
 file path=usr/include/sys/audioio.h
 file path=usr/include/sys/mixer.h
 file path=usr/include/sys/soundcard.h
-legacy pkg=SUNWaudh arch=$(ARCH) category=system \
+legacy pkg=SUNWaudh \
     desc="SunOS C/C++ header files for audio drivers and applications" \
-    hotline="Please contact your local service provider" \
-    name="Audio Header Files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Audio Header Files"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

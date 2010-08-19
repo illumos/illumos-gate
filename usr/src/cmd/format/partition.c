@@ -18,21 +18,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * This file contains functions that operate on partition tables.
  */
+#include <string.h>
+#include <stdlib.h>
 #include "global.h"
 #include "partition.h"
 #include "misc.h"
 #include "menu_command.h"
 #include "menu_partition.h"
-#include <string.h>
-#include <stdlib.h>
 
 
 /*

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -29,7 +28,6 @@
 #include <string.h>
 #undef  __EXTENSIONS__
 #include <signal.h>
-#include <alloca.h>
 #include <errno.h>
 #include "libproc.h"
 
@@ -121,11 +119,11 @@ static const char *const systable[] = {
 	"write",		/*  4 */
 	"open",			/*  5 */
 	"close",		/*  6 */
-	NULL,			/*  7 */
+	"linkat",		/*  7 */
 	NULL,			/*  8 */
 	"link",			/*  9 */
 	"unlink",		/* 10 */
-	NULL,			/* 11 */
+	"symlinkat",		/* 11 */
 	"chdir",		/* 12 */
 	"time",			/* 13 */
 	"mknod",		/* 14 */
@@ -136,7 +134,7 @@ static const char *const systable[] = {
 	"lseek",		/* 19 */
 	"getpid",		/* 20 */
 	"mount",		/* 21 */
-	NULL,			/* 22 */
+	"readlinkat",		/* 22 */
 	"setuid",		/* 23 */
 	"getuid",		/* 24 */
 	"stime",		/* 25 */
@@ -162,7 +160,7 @@ static const char *const systable[] = {
 	"faccessat",		/* 45 */
 	"setgid",		/* 46 */
 	"getgid",		/* 47 */
-	"signal",		/* 48 */
+	"mknodat",		/* 48 */
 	"msgsys",		/* 49 */
 	"sysi86",		/* 50 */
 	"acct",			/* 51 */
@@ -215,8 +213,8 @@ static const char *const systable[] = {
 	"sigaction",		/* 98 */
 	"sigpending",		/* 99 */
 	"context",		/* 100 */
-	NULL,			/* 101 */
-	NULL,			/* 102 */
+	"fchmodat",		/* 101 */
+	"mkdirat",		/* 102 */
 	"statvfs",		/* 103 */
 	"fstatvfs",		/* 104 */
 	"getloadavg",		/* 105 */
@@ -614,7 +612,7 @@ proc_sysset2str(const sysset_t *set, const char *delim, int m,
 char *
 proc_str2fltset(const char *s, const char *delim, int m, fltset_t *set)
 {
-	char *p, *q, *t = alloca(strlen(s) + 1);
+	char *p, *q, *t;
 	int flt;
 
 	if (m) {
@@ -623,7 +621,7 @@ proc_str2fltset(const char *s, const char *delim, int m, fltset_t *set)
 		prfillset(set);
 	}
 
-	(void) strcpy(t, s);
+	t = strdupa(s);
 
 	for (p = strtok_r(t, delim, &q); p != NULL;
 	    p = strtok_r(NULL, delim, &q)) {
@@ -647,7 +645,7 @@ proc_str2fltset(const char *s, const char *delim, int m, fltset_t *set)
 char *
 proc_str2sigset(const char *s, const char *delim, int m, sigset_t *set)
 {
-	char *p, *q, *t = alloca(strlen(s) + 1);
+	char *p, *q, *t;
 	int sig;
 
 	if (m) {
@@ -656,7 +654,7 @@ proc_str2sigset(const char *s, const char *delim, int m, sigset_t *set)
 		prfillset(set);
 	}
 
-	(void) strcpy(t, s);
+	t = strdupa(s);
 
 	for (p = strtok_r(t, delim, &q); p != NULL;
 	    p = strtok_r(NULL, delim, &q)) {
@@ -680,7 +678,7 @@ proc_str2sigset(const char *s, const char *delim, int m, sigset_t *set)
 char *
 proc_str2sysset(const char *s, const char *delim, int m, sysset_t *set)
 {
-	char *p, *q, *t = alloca(strlen(s) + 1);
+	char *p, *q, *t;
 	int sys;
 
 	if (m) {
@@ -689,7 +687,7 @@ proc_str2sysset(const char *s, const char *delim, int m, sysset_t *set)
 		prfillset(set);
 	}
 
-	(void) strcpy(t, s);
+	t = strdupa(s);
 
 	for (p = strtok_r(t, delim, &q); p != NULL;
 	    p = strtok_r(NULL, delim, &q)) {

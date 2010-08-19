@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  *  glue routine for gss_acquire_cred
  */
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -76,35 +76,52 @@ create_actual_mechs(mechs_array, count)
 
 static OM_uint32
 val_acq_cred_args(
-	OM_uint32 *minor_status,
-	gss_cred_id_t *output_cred_handle,
-	gss_OID_set *actual_mechs,
-	OM_uint32 *time_rec)
+    OM_uint32 *minor_status,
+    /*LINTED*/
+    gss_name_t desired_name,
+    /*LINTED*/
+    OM_uint32 time_req,
+    /*LINTED*/
+    gss_OID_set desired_mechs,
+    int cred_usage,
+    gss_cred_id_t *output_cred_handle,
+    gss_OID_set *actual_mechs,
+    OM_uint32 *time_rec)
 {
 
-	/* Initialize outputs. */
+   /* Initialize outputs. */
 
-	if (minor_status != NULL)
-		*minor_status = 0;
+    if (minor_status != NULL)
+        *minor_status = 0;
 
-	if (output_cred_handle != NULL)
-		*output_cred_handle = GSS_C_NO_CREDENTIAL;
+    if (output_cred_handle != NULL)
+        *output_cred_handle = GSS_C_NO_CREDENTIAL;
 
-	if (actual_mechs != NULL)
-		*actual_mechs = GSS_C_NULL_OID_SET;
+    if (actual_mechs != NULL)
+        *actual_mechs = GSS_C_NULL_OID_SET;
 
-	if (time_rec != NULL)
-		*time_rec = 0;
+    if (time_rec != NULL)
+        *time_rec = 0;
 
-	/* Validate arguments. */
+    /* Validate arguments. */
 
-	if (minor_status == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+    if (minor_status == NULL)
+        return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
-	if (output_cred_handle == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+    if (output_cred_handle == NULL)
+        return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
-	return (GSS_S_COMPLETE);
+    if (cred_usage != GSS_C_ACCEPT
+        && cred_usage != GSS_C_INITIATE
+        && cred_usage != GSS_C_BOTH) {
+        if (minor_status) {
+            *minor_status = EINVAL;
+            map_errcode(minor_status);
+        }
+        return GSS_S_FAILURE;
+    }
+
+    return (GSS_S_COMPLETE);
 }
 
 OM_uint32
@@ -133,10 +150,14 @@ OM_uint32 *		time_rec;
 	gss_OID_set mechs;
 	gss_OID_desc default_OID;
 	gss_mechanism mech;
-	int i;
+	unsigned int i;
 	gss_union_cred_t creds;
 
 	major = val_acq_cred_args(minor_status,
+				desired_name,
+				time_req,
+				desired_mechs,
+				cred_usage,
 				output_cred_handle,
 				actual_mechs,
 				time_rec);
@@ -238,6 +259,15 @@ static OM_uint32
 val_add_cred_args(
 	OM_uint32 *minor_status,
 	gss_cred_id_t input_cred_handle,
+	/*LINTED*/
+	gss_name_t desired_name,
+	/*LINTED*/
+	gss_OID desired_mech,
+	gss_cred_usage_t cred_usage,
+	/*LINTED*/
+	OM_uint32 initiator_time_req,
+	/*LINTED*/
+	OM_uint32 acceptor_time_req,
 	gss_cred_id_t *output_cred_handle,
 	gss_OID_set *actual_mechs,
 	OM_uint32 *initiator_time_rec,
@@ -260,16 +290,24 @@ val_add_cred_args(
 
 	if (initiator_time_rec != NULL)
 		*initiator_time_rec = 0;
-
 	/* Validate arguments. */
 
 	if (minor_status == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
 	if (input_cred_handle == GSS_C_NO_CREDENTIAL &&
-		output_cred_handle == NULL)
-
+	    output_cred_handle == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE | GSS_S_NO_CRED);
+
+	if (cred_usage != GSS_C_ACCEPT
+	    && cred_usage != GSS_C_INITIATE
+	    && cred_usage != GSS_C_BOTH) {
+		if (minor_status) {
+			*minor_status = EINVAL;
+			map_errcode(minor_status);
+		}
+		return GSS_S_FAILURE;
+	}
 
 	return (GSS_S_COMPLETE);
 }
@@ -305,6 +343,11 @@ gss_add_cred(minor_status, input_cred_handle,
 
 	status = val_add_cred_args(minor_status,
 				input_cred_handle,
+				desired_name,
+				desired_mech,
+				cred_usage,
+				initiator_time_req,
+				acceptor_time_req,
 				output_cred_handle,
 				actual_mechs,
 				initiator_time_rec,
@@ -377,14 +420,18 @@ gss_add_cred(minor_status, input_cred_handle,
 	else if (cred_usage == GSS_C_BOTH)
 		time_req = (acceptor_time_req > initiator_time_req) ?
 			acceptor_time_req : initiator_time_req;
+	else
+		time_req = 0;
 
 	status = mech->gss_acquire_cred(mech->context, minor_status,
 				internal_name, time_req,
 				GSS_C_NULL_OID_SET, cred_usage,
 				&cred, NULL, &time_rec);
 
-	if (status != GSS_S_COMPLETE)
+	if (status != GSS_S_COMPLETE) {
+		map_error(minor_status, mech);
 		goto errout;
+	}
 
 	/* may need to set credential auxinfo structure */
 	if (union_cred->auxinfo.creation_time == 0) {

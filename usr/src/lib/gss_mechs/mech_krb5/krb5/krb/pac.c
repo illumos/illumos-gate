@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * lib/krb5/krb/pac.c
@@ -189,6 +188,10 @@ k5_pac_add_buffer(krb5_context context,
 
     /* Check there isn't already a buffer of this type */
     if (k5_pac_locate_buffer(context, pac, type, NULL) == 0) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, EINVAL,
+			    "Duplicate PAC buffer of type %d",
+			    type);
 	return EINVAL;
     }
 
@@ -284,20 +287,35 @@ k5_pac_locate_buffer(krb5_context context,
     PAC_INFO_BUFFER *buffer = NULL;
     size_t i;
 
-    if (pac == NULL)
+    if (pac == NULL) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, EINVAL,
+			    "Invalid argument 'pac' is NULL");
 	return EINVAL;
+    }
 
     for (i = 0; i < pac->pac->cBuffers; i++) {
 	if (pac->pac->Buffers[i].ulType == type) {
 	    if (buffer == NULL)
 		buffer = &pac->pac->Buffers[i];
-	    else
+	    else {
+	        /* Solaris Kerberos */
+	        krb5_set_error_message(context, EINVAL,
+				    "Invalid buffer found looping thru PAC buffers (type=%d, i=%d)",
+				    type, i);
 		return EINVAL;
+	    }
 	}
     }
 
-    if (buffer == NULL)
+    if (buffer == NULL) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, ENOENT,
+			    "No PAC buffer found (type=%d)",
+			    type);
+
 	return ENOENT;
+    }
 
     assert(buffer->Offset + buffer->cbBufferSize <= pac->data.length);
 
@@ -410,20 +428,35 @@ krb5_pac_parse(krb5_context context,
 
     *ppac = NULL;
 
-    if (len < PACTYPE_LENGTH)
+    if (len < PACTYPE_LENGTH) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, ERANGE,
+			    "PAC type length is out of range (len=%d)",
+			    len);
 	return ERANGE;
+    }
 
     cbuffers = load_32_le(p);
     p += 4;
     version = load_32_le(p);
     p += 4;
 
-    if (version != 0)
+    if (version != 0) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, EINVAL,
+			    "Invalid PAC version is %d, should be 0",
+			    version);
 	return EINVAL;
+    }
 
     header_len = PACTYPE_LENGTH + (cbuffers * PAC_INFO_BUFFER_LENGTH);
-    if (len < header_len)
+    if (len < header_len) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, ERANGE,
+			    "PAC header len (%d) out of range",
+			    len);
 	return ERANGE;
+    }
 
     ret = krb5_pac_init(context, &pac);
     if (ret != 0)
@@ -451,11 +484,17 @@ krb5_pac_parse(krb5_context context,
 
 	if (buffer->Offset % PAC_ALIGNMENT) {
 	    krb5_pac_free(context, pac);
+	    /* Solaris Kerberos */
+	    krb5_set_error_message(context, EINVAL,
+				"PAC buffer offset mis-aligned");
 	    return EINVAL;
 	}
 	if (buffer->Offset < header_len ||
 	    buffer->Offset + buffer->cbBufferSize > len) {
 	    krb5_pac_free(context, pac);
+	    /* Solaris Kerberos */
+	    krb5_set_error_message(context, ERANGE,
+				"PAC offset is out of range");
 	    return ERANGE;
 	}
     }
@@ -475,7 +514,7 @@ krb5_pac_parse(krb5_context context,
 }
 
 static krb5_error_code
-k5_time_to_seconds_since_1970(krb5_int64 ntTime, krb5_timestamp *elapsedSeconds)
+k5_time_to_seconds_since_1970(krb5_context context, krb5_int64 ntTime, krb5_timestamp *elapsedSeconds)
 {
     krb5_ui_8 abstime;
 
@@ -483,8 +522,9 @@ k5_time_to_seconds_since_1970(krb5_int64 ntTime, krb5_timestamp *elapsedSeconds)
 
     abstime = ntTime > 0 ? ntTime - NT_TIME_EPOCH : -ntTime;
 
-    if (abstime > KRB5_INT32_MAX)
+    if (abstime > KRB5_INT32_MAX) {
 	return ERANGE;
+    }
 
     *elapsedSeconds = abstime;
 
@@ -523,8 +563,13 @@ k5_pac_validate_client(krb5_context context,
     if (ret != 0)
 	return ret;
 
-    if (client_info.length < PAC_CLIENT_INFO_LENGTH)
+    if (client_info.length < PAC_CLIENT_INFO_LENGTH) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, ERANGE,
+			    "PAC client info length out of range",
+			    client_info.length);
 	return ERANGE;
+    }
 
     p = (unsigned char *)client_info.data;
     pac_nt_authtime = load_64_le(p);
@@ -532,13 +577,17 @@ k5_pac_validate_client(krb5_context context,
     pac_princname_length = load_16_le(p);
     p += 2;
 
-    ret = k5_time_to_seconds_since_1970(pac_nt_authtime, &pac_authtime);
+    ret = k5_time_to_seconds_since_1970(context, pac_nt_authtime, &pac_authtime);
     if (ret != 0)
 	return ret;
 
     if (client_info.length < PAC_CLIENT_INFO_LENGTH + pac_princname_length ||
-        pac_princname_length % 2)
+        pac_princname_length % 2) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, ERANGE,
+			    "PAC client info length is out of range");
 	return ERANGE;
+    }
 
     ret = krb5int_ucs2lecs_to_utf8s(p, (size_t)pac_princname_length / 2, &pac_princname, NULL);
     if (ret != 0)
@@ -550,12 +599,42 @@ k5_pac_validate_client(krb5_context context,
 	return ret;
     }
 
-    free(pac_princname);
 
-    if (pac_authtime != authtime ||
-	krb5_principal_compare(context, pac_principal, principal) == FALSE)
+    if (pac_authtime != authtime) {
+	/* Solaris Kerberos */
+	char timestring[17];
+	char pac_timestring[17];
+	char fill = ' ';
+	int err, pac_err;
+	/* Need better ret code here but don't see one */
 	ret = KRB5KRB_AP_WRONG_PRINC;
+	err = krb5_timestamp_to_sfstring(pac_authtime,
+					timestring,
+					sizeof (timestring), &fill);
+	pac_err = krb5_timestamp_to_sfstring(pac_authtime,
+					pac_timestring,
+					    sizeof (pac_timestring), &fill);
+	if (pac_princname && !err && !pac_err) {
+	    krb5_set_error_message(context, ret,
+				"PAC verify fail: PAC authtime '%s' does not match authtime '%s'.  PAC principal is '%s'",
+				pac_timestring, timestring, pac_princname);
+	}
+    } else if (krb5_principal_compare(context, pac_principal, principal) == FALSE) {
+	/* Solaris Kerberos */
+	char *p_name = NULL;
+	krb5_error_code perr;
+	ret = KRB5KRB_AP_WRONG_PRINC;
+	perr = krb5_unparse_name(context, principal, &p_name);
+	if (pac_princname && !perr) {
+	    krb5_set_error_message(context, ret,
+				"Wrong principal in request: PAC verify: Principal in PAC is '%s' and does not match '%s'",
+				pac_princname, p_name);
+	}
+	if (p_name)
+	    krb5_free_unparsed_name(context, p_name);
+    }
 
+    free(pac_princname);
     krb5_free_principal(context, pac_principal);
 
     return ret;
@@ -580,14 +659,21 @@ k5_pac_zero_signature(krb5_context context,
 	}
     }
 
-    if (buffer == NULL)
+    if (buffer == NULL) {
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, ENOENT,
+			    "No PAC buffer found (type=%d)",
+			    type);
 	return ENOENT;
+    }
 
-    if (buffer->Offset + buffer->cbBufferSize > pac->data.length)
+    if (buffer->Offset + buffer->cbBufferSize > pac->data.length) {
 	return ERANGE;
+    }
 
-    if (buffer->cbBufferSize < PAC_SIGNATURE_DATA_LENGTH)
+    if (buffer->cbBufferSize < PAC_SIGNATURE_DATA_LENGTH) {
 	return KRB5_BAD_MSIZE;
+    }
 
     /* Zero out the data portion of the checksum only */
     memset(data->data + buffer->Offset + PAC_SIGNATURE_DATA_LENGTH,
@@ -613,8 +699,9 @@ k5_pac_verify_server_checksum(krb5_context context,
     if (ret != 0)
 	return ret;
 
-    if (checksum_data.length < PAC_SIGNATURE_DATA_LENGTH)
+    if (checksum_data.length < PAC_SIGNATURE_DATA_LENGTH) {
 	return KRB5_BAD_MSIZE;
+    }
 
     p = (krb5_octet *)checksum_data.data;
     checksum.checksum_type = load_32_le(p);
@@ -648,8 +735,12 @@ k5_pac_verify_server_checksum(krb5_context context,
 	return ret;
     }
 
-    if (valid == FALSE)
+    if (valid == FALSE) {
 	ret = KRB5KRB_AP_ERR_BAD_INTEGRITY;
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, ret,
+			    "Decrypt integrity check failed for PAC");
+    }
 
     free(pac_data.data); /* SUNW17PACresync - mem leak fix */
     return ret;
@@ -670,15 +761,17 @@ k5_pac_verify_kdc_checksum(krb5_context context,
     if (ret != 0)
 	return ret;
 
-    if (privsvr_checksum.length < PAC_SIGNATURE_DATA_LENGTH)
+    if (privsvr_checksum.length < PAC_SIGNATURE_DATA_LENGTH) {
 	return KRB5_BAD_MSIZE;
+    }
 
     ret = k5_pac_locate_buffer(context, pac, PAC_SERVER_CHECKSUM, &server_checksum);
     if (ret != 0)
 	return ret;
 
-    if (server_checksum.length < PAC_SIGNATURE_DATA_LENGTH)
+    if (server_checksum.length < PAC_SIGNATURE_DATA_LENGTH) {
 	return KRB5_BAD_MSIZE;
+    }
 
     p = (krb5_octet *)privsvr_checksum.data;
     checksum.checksum_type = load_32_le(p);
@@ -693,8 +786,12 @@ k5_pac_verify_kdc_checksum(krb5_context context,
     if (ret != 0)
 	return ret;
 
-    if (valid == FALSE)
+    if (valid == FALSE) {
 	ret = KRB5KRB_AP_ERR_BAD_INTEGRITY;
+	/* Solaris Kerberos */
+	krb5_set_error_message(context, ret,
+			    "Decrypt integrity check failed for PAC");
+    }
 
     return ret;
 }
@@ -709,8 +806,9 @@ krb5_pac_verify(krb5_context context,
 {
     krb5_error_code ret;
 
-    if (server == NULL)
+    if (server == NULL) {
 	return EINVAL;
+    }
 
     ret = k5_pac_verify_server_checksum(context, pac, server);
     if (ret != 0)
@@ -812,8 +910,9 @@ k5_insert_checksum(krb5_context context,
     ret = k5_pac_locate_buffer(context, pac, type, &cksumdata);
     if (ret == 0) {
 	/* If we're resigning PAC, make sure we can fit checksum into existing buffer */
-	if (cksumdata.length != PAC_SIGNATURE_DATA_LENGTH + len)
+	if (cksumdata.length != PAC_SIGNATURE_DATA_LENGTH + len) {
 	    return ERANGE;
+	}
 
 	memset(cksumdata.data, 0, cksumdata.length);
     } else {
@@ -866,8 +965,9 @@ k5_pac_encode_header(krb5_context context, krb5_pac pac)
 
 	if (buffer->Offset % PAC_ALIGNMENT ||
 	    buffer->Offset + buffer->cbBufferSize > pac->data.length ||
-	    buffer->Offset < header_len)
+	    buffer->Offset < header_len) {
 	    return ERANGE;
+	}
     }
 
     return 0;

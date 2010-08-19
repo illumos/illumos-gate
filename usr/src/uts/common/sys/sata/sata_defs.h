@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SATA_DEFS_H
@@ -50,6 +49,7 @@ extern "C" {
 /*
  * ATA/ATAPI disk commands (subset)
  */
+#define	SATAC_DSM		0x06	/* Data Set Management */
 #define	SATAC_DEVICE_RESET	0x08    /* ATAPI device reset */
 #define	SATAC_DOWNLOAD_MICROCODE 0x92   /* Download microcode */
 #define	SATAC_EJECT		0xed	/* media eject */
@@ -197,7 +197,8 @@ typedef struct sata_id {
 	ushort_t ai_recmwdma;	   /*  66  rec multi-word dma cycle info  */
 	ushort_t ai_minpio;	   /*  67  min PIO cycle info		  */
 	ushort_t ai_minpioflow;	   /*  68  min PIO cycle info w/flow ctl  */
-	ushort_t ai_resv3[2];	   /* 69,70 reserved			  */
+	ushort_t ai_addsupported;  /*  69  additional supported		  */
+	ushort_t ai_resv3;	   /*  70 reserved			  */
 	ushort_t ai_typtime[2];	   /* 71-72 timing			  */
 	ushort_t ai_resv4[2];	   /* 73-74 reserved			  */
 	ushort_t ai_qdepth;	   /*  75  queue depth			  */
@@ -226,7 +227,8 @@ typedef struct sata_id {
 	ushort_t ai_streamperf[2]; /* 98-99 streaming performance gran.   */
 	ushort_t ai_addrsecxt[4];  /* 100 extended max LBA sector	  */
 	ushort_t ai_stream_xfer_p; /* 104 streaming transfer time (PIO)   */
-	ushort_t ai_padding1;	   /* 105 pad				  */
+	ushort_t ai_maxcount;	   /* 105 max count of 512-byte blocks of */
+				    /* LBA range entries		  */
 	ushort_t ai_phys_sect_sz;  /* 106 physical sector size		  */
 	ushort_t ai_seek_delay;	   /* 107 inter-seek delay time (usecs)	  */
 	ushort_t ai_naa_ieee_oui;  /* 108 NAA/IEEE OUI			  */
@@ -238,18 +240,19 @@ typedef struct sata_id {
 	ushort_t ai_words_lsec[2]; /* 117-118 words per logical sector	  */
 	ushort_t ai_cmdset119;	   /* 119 more command sets supported	  */
 	ushort_t ai_features120;   /* 120 enabled features		  */
-	ushort_t ai_padding2[6];   /* pad to 126			  */
+	ushort_t ai_padding1[6];   /* pad to 126			  */
 	ushort_t ai_rmsn;	   /* 127 removable media notification	  */
 	ushort_t ai_securestatus;  /* 128 security status		  */
 	ushort_t ai_vendor[31];	   /* 129-159 vendor specific		  */
-	ushort_t ai_padding3[8];   /* 160 pad to 168			  */
+	ushort_t ai_padding2[8];   /* 160 pad to 168			  */
 	ushort_t ai_nomformfactor; /* 168 nominal form factor		  */
-	ushort_t ai_padding4[7];   /* 169 pad to 176			  */
+	ushort_t ai_dsm;	   /* 169 data set management		  */
+	ushort_t ai_padding3[6];   /* 170 pad to 176			  */
 	ushort_t ai_curmedser[30]; /* 176-205 current media serial #	  */
 	ushort_t ai_sctsupport;	   /* 206 SCT command transport		  */
-	ushort_t ai_padding5[10];  /* 207 pad to 217			  */
+	ushort_t ai_padding4[10];  /* 207 pad to 217			  */
 	ushort_t ai_medrotrate;	   /* 217 nominal media rotation rate	  */
-	ushort_t ai_padding6[37];  /* 218 pad to 255			  */
+	ushort_t ai_padding5[37];  /* 218 pad to 255			  */
 	ushort_t ai_integrity;	   /* 255 integrity word		  */
 } sata_id_t;
 
@@ -268,6 +271,7 @@ typedef struct sata_id {
 #define	SATA_ID_MODEL_LEN	40
 #define	SATA_ID_FW_LEN		8
 #define	SATA_ID_BDC_LEN		0x3c
+#define	SATA_ID_ATA_INFO_LEN	0x238
 
 /* Identify Device: common capability bits - word 49 */
 
@@ -281,6 +285,11 @@ typedef struct sata_id {
 
 #define	SATA_VALIDINFO_88	0x0004	/* word 88 supported fields valid */
 #define	SATA_VALIDINFO_70_64	0x0004	/* words 70-64 fields valid */
+
+/* Identify Device: ai_addsupported (word 69) */
+
+#define	SATA_DETERMINISTIC_READ	0x4000	/* word 69 deterministic read supp. */
+#define	SATA_READ_ZERO		0x0020	/* word 69 read zero after TRIM supp. */
 
 /* Identify Device: ai_majorversion (word 80) */
 

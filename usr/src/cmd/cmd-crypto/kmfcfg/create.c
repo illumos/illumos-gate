@@ -140,7 +140,8 @@ kc_create(int argc, char *argv[])
 				if (plc.ta_name == NULL) {
 					(void) fprintf(stderr,
 					    gettext("Error name input.\n"));
-				} else {
+				} else if (strcasecmp(plc.ta_name,
+				    "search") != 0) {
 					KMF_X509_NAME taDN;
 					/* for syntax checking */
 					if (kmf_dn_parser(plc.ta_name,

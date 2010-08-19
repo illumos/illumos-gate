@@ -550,6 +550,7 @@ enum audiohd_pin_color {
 #define	AUDIOHD_PATH_MON	(1 << 2)
 #define	AUDIOHD_PATH_NOMON	(1 << 3)
 #define	AUDIOHD_PATH_BEEP	(1 << 4)
+#define	AUDIOHD_PATH_LOOPBACK	(1 << 5)
 
 typedef struct audiohd_path	audiohd_path_t;
 typedef struct audiohd_widget	audiohd_widget_t;
@@ -606,13 +607,14 @@ struct audiohd_widget {
 	wid_t		monitor_path_next[AUDIOHD_MAX_CONN];
 						/* output pin -> input pin */
 	wid_t		beep_path_next;		/* output pin -> beep widget */
+	wid_t		loopback_path_next;	/* ADC -> output pin */
 
 	uint16_t 	used;
 
 	/*
 	 * pointer to struct depending on widget type:
-	 *	1. DAC	audiohd_ostream_t
-	 *	2. ADC	audiohd_istream_t
+	 *	1. DAC	audiohd_path_t
+	 *	2. ADC	audiohd_path_t
 	 *	3. PIN	audiohd_pin_t
 	 */
 	void	*priv;
@@ -633,6 +635,7 @@ typedef enum {
 	PLAY = 0,
 	RECORD = 1,
 	BEEP = 2,
+	LOOPBACK = 3,
 } path_type_t;
 
 struct audiohd_path {
@@ -710,6 +713,7 @@ enum {
 	CTL_MONSRC,
 	CTL_RECSRC,
 	CTL_BEEP,
+	CTL_LOOP,
 
 	/* this one must be last */
 	CTL_MAX
@@ -739,7 +743,8 @@ struct audiohd_pin {
 	uint32_t	ctrl;
 	uint32_t	assoc;
 	uint32_t	seq;
-	wid_t		adc_dac_wid; /* AD/DA wid which can route to this pin */
+	wid_t		adc_wid;
+	wid_t		dac_wid;
 	wid_t		beep_wid;
 	int		no_phys_conn;
 	enum audiohda_device_type	device;
@@ -853,8 +858,9 @@ struct audiohd_state {
 	/*
 	 * Controls
 	 */
-	audiohd_ctrl_t		ctrls[CTL_MAX];
-	boolean_t		monitor_unsupported;
+	audiohd_ctrl_t	ctrls[CTL_MAX];
+	boolean_t	monitor_supported;
+	boolean_t	loopback_supported;
 
 	/* for multichannel */
 	uint8_t			chann[AUDIOHD_MAX_ASSOC];
@@ -913,7 +919,6 @@ struct audiohd_codec_info {
 	(void) audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_SET_PIN_CTRL, AUDIOHDC_PIN_CONTROL_IN_ENABLE | 4); \
 }
-
 
 /*
  * disable input pin

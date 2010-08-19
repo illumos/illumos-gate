@@ -1,8 +1,6 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 /*
  * Copyright (C) 1989,1990,1991,1992,1993,1994,1995,2000,2001, 2003,2006 by the Massachusetts Institute of Technology,
  * Cambridge, MA, USA.  All Rights Reserved.
@@ -317,6 +315,10 @@ struct sockaddr;
 					   /* required */
 #define KDC_ERR_SERVER_NOMATCH		26 /* Requested server and */
 					   /* ticket don't match*/
+#define KDC_ERR_MUST_USE_USER2USER      27 /* Server principal valid for */
+					   /*   user2user only */
+#define KDC_ERR_PATH_NOT_ACCEPTED       28 /* KDC policy rejected transited */
+					   /*   path */
 #define KDC_ERR_SVC_UNAVAILABLE		29 /* A service is not
 					    * available that is
 					    * required to process the
@@ -357,7 +359,12 @@ struct sockaddr;
 #define KDC_ERR_CLIENT_NOT_TRUSTED		62 /* client cert not trusted */
 #define KDC_ERR_INVALID_SIG			64 /* client signature verify failed */
 #define KDC_ERR_DH_KEY_PARAMETERS_NOT_ACCEPTED	65 /* invalid Diffie-Hellman parameters */
-#define KDC_ERR_CANT_VERIFY_CERTIFICATE		70 /* client cert not verifiable to */
+#define KDC_ERR_CERTIFICATE_MISMATCH            66
+#define KRB_AP_ERR_NO_TGT                       67
+#define KDC_ERR_WRONG_REALM                     68
+#define KRB_AP_ERR_USER_TO_USER_REQUIRED        69
+#define KDC_ERR_CANT_VERIFY_CERTIFICATE         70 /* client cert not verifiable
+ to */
 						   /* trusted root cert */
 #define KDC_ERR_INVALID_CERTIFICATE		71 /* client cert had invalid signature */
 #define KDC_ERR_REVOKED_CERTIFICATE		72 /* client cert was revoked */
@@ -658,6 +665,10 @@ krb5_error_code krb5_lock_file (krb5_context, int, int);
 krb5_error_code krb5_unlock_file (krb5_context, int);
 krb5_error_code krb5_sendto_kdc (krb5_context, const krb5_data *,
 				 const krb5_data *, krb5_data *, int *, int);
+/* Solaris Kerberos */
+krb5_error_code krb5_sendto_kdc2 (krb5_context, const krb5_data *,
+				const krb5_data *, krb5_data *, int *, int,
+				char **);
 
 
 krb5_error_code krb5_get_krbhst (krb5_context, const krb5_data *, char *** );
@@ -2686,11 +2697,53 @@ krb5int_c_mandatory_cksumtype (krb5_context, krb5_enctype, krb5_cksumtype *);
 extern int krb5int_crypto_init (void);
 extern int krb5int_prng_init(void);
 
+
 /*
  * SUNW14resync
  * Hack (?) to neuter C99 "inline" which causes warnings w/our build.
  */
 #define inline
+
+/* Some data comparison and conversion functions.  */
+#if 0
+static inline int data_cmp(krb5_data d1, krb5_data d2)
+{
+    if (d1.length < d2.length) return -1;
+    if (d1.length > d2.length) return 1;
+    return memcmp(d1.data, d2.data, d1.length);
+}
+static inline int data_eq (krb5_data d1, krb5_data d2)
+{
+    return data_cmp(d1, d2) == 0;
+}
+#else
+static inline int data_eq (krb5_data d1, krb5_data d2)
+{
+    return (d1.length == d2.length
+            && !memcmp(d1.data, d2.data, d1.length));
+}
+#endif
+static inline krb5_data string2data (char *str)
+{
+    krb5_data d;
+    d.magic = KV5M_DATA;
+    d.length = strlen(str);
+    d.data = str;
+    return d;
+}
+/*LINTED*/
+static inline int data_eq_string (krb5_data d, char *s)
+{
+    return data_eq(d, string2data(s));
+}
+/*LINTED*/
+static inline int authdata_eq (krb5_authdata a1, krb5_authdata a2)
+{
+    return (a1.ad_type == a2.ad_type
+            && a1.length == a2.length
+            && !memcmp(a1.contents, a2.contents, a1.length));
+}
+
 
 /* Solaris kerberos */
 krb5_boolean KRB5_CALLCONV is_in_keytype 

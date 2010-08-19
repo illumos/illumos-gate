@@ -1,0 +1,114 @@
+#! /bin/sh
+#
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+. /lib/svc/share/smf_include.sh
+
+DEVALLOC=/etc/security/device_allocate
+DEVMAPS=/etc/security/device_maps
+DEVFSADM=/usr/sbin/devfsadm
+MKDEVALLOC=/usr/sbin/mkdevalloc
+MKDEVMAPS=/usr/sbin/mkdevmaps
+HALFDI=/etc/hal/fdi/policy/30user/90-solaris-device-allocation.fdi
+
+# dev_allocation_convert
+#	All the real work gets done in this function
+
+dev_allocation_convert()
+{
+#
+# If allocation already configured, just return
+#
+if [ -f ${HALFDI} -a -f ${DEVALLOC} -a -f ${DEVMAPS} ]; then
+    return
+fi
+
+# Prevent automount of removable and hotpluggable volume
+# by forcing volume.ignore HAL property on all such volumes.
+if [ ! -f ${HALFDI} ]; then
+	cat > ${HALFDI} <<FDI
+<?xml version="1.0" encoding="UTF-8"?>
+<deviceinfo version="0.2">
+  <device>
+    <match key="info.capabilities" contains="volume">
+      <match key="@block.storage_device:storage.removable" bool="true">
+        <merge key="volume.ignore" type="bool">true</merge>
+      </match>
+      <match key="@block.storage_device:storage.hotpluggable" bool="true">
+        <merge key="volume.ignore" type="bool">true</merge>
+      </match>
+    </match>
+  </device>
+</deviceinfo>
+FDI
+fi
+
+# Initialize device allocation
+
+
+# Need to determine if Trusted Extensions is enabled.
+# Check the setting in etc/system (other methods won't work 
+# because TX is likely not yet fully active.)
+#
+grep "^[ 	]*set[ 	][ 	]*sys_labeling[ 	]*=[ 	]*1" \
+    /etc/system > /dev/null 2>&1
+
+if [ $? = 0 ]; then
+	# Trusted Extensions is enabled (but possibly not yet booted).
+	${DEVFSADM} -e
+else
+	if [ ! -f ${DEVALLOC} ]; then
+		echo "DEVICE_ALLOCATION=ON" > $DEVALLOC
+		${MKDEVALLOC} >> $DEVALLOC
+	fi
+	if [ ! -f ${DEVMAPS} ]; then
+		${MKDEVMAPS} > $DEVMAPS
+	fi
+fi
+}
+
+dev_allocation_unconvert()
+{
+	# Turn off device allocation.
+	${DEVFSADM} -d
+	/usr/bin/rm -f $DEVALLOC $DEVMAPS
+	# Restore default policy for removable and hotpluggable volumes
+	/usr/bin/rm -f $HALFDI
+}
+
+case "$1" in
+'start')
+	dev_allocation_convert
+	deallocate -Is
+	;;
+'stop')
+	state=`/usr/bin/svcprop -c -p general/enabled $SMF_FMRI 2>/dev/null`
+	if [ "$state" = "true" ] ; then
+		exit $SMF_EXIT_OK
+	fi
+	dev_allocation_unconvert
+	;;
+esac
+
+exit $SMF_EXIT_OK 

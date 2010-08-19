@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -45,6 +44,8 @@
  *
  * fmd_msg_gettext_nv - format the entire message for the given event
  * fmd_msg_gettext_id - format the entire message for the given event code
+ * fmd_msg_gettext_key - format the entire message for the given dict for the
+ *                       given explicit message key
  *
  * fmd_msg_getitem_nv - format a single message item for the given event
  * fmd_msg_getitem_id - format a single message item for the given event code
@@ -99,6 +100,7 @@
 
 #include <alloca.h>
 #include <assert.h>
+#include <netdb.h>
 #include <pthread.h>
 #include <synch.h>
 #include <strings.h>
@@ -106,6 +108,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <unistd.h>
 #include <sys/sysmacros.h>
 
 #include <fmd_msg.h>
@@ -1130,6 +1133,125 @@ eos:
 }
 
 /*
+ * This is a private interface used by the notification daemons to parse tokens
+ * in user-supplied message templates.
+ */
+char *
+fmd_msg_decode_tokens(nvlist_t *nvl, const char *msg, const char *url)
+{
+	fmd_msg_buf_t buf;
+	wchar_t *h, *u, *w, *p, *q;
+
+	char *s, *expr, host[MAXHOSTNAMELEN + 1];
+	size_t elen;
+	int i;
+
+	u = fmd_msg_mbstowcs(url);
+
+	(void) gethostname(host, MAXHOSTNAMELEN + 1);
+	h = fmd_msg_mbstowcs(host);
+
+	if ((w = fmd_msg_mbstowcs(msg)) == NULL)
+		return (NULL);
+
+	/*
+	 * Now expand any escape sequences in the string, storing the final
+	 * text in 'buf' in wide-character format, and then convert it back
+	 * to multi-byte for return.  We expand the following sequences:
+	 *
+	 * %%   - literal % character
+	 * %h   - hostname
+	 * %s   - base URL for knowledge articles
+	 * %<x> - expression x in the current event, if any
+	 *
+	 * If an invalid sequence is present, it is elided so we can safely
+	 * reserve any future characters for other types of expansions.
+	 */
+	fmd_msg_buf_init(&buf);
+
+	for (q = w, p = w; (p = wcschr(p, L'%')) != NULL; q = p) {
+		if (p > q)
+			fmd_msg_buf_write(&buf, q, (size_t)(p - q));
+
+		switch (p[1]) {
+		case L'%':
+			fmd_msg_buf_write(&buf, p, 1);
+			p += 2;
+			break;
+
+		case L'h':
+			if (h != NULL)
+				fmd_msg_buf_write(&buf, h, wcslen(h));
+
+			p += 2;
+			break;
+
+		case L's':
+			if (u != NULL)
+				fmd_msg_buf_write(&buf, u, wcslen(u));
+
+			p += 2;
+			break;
+
+		case L'<':
+			q = p + 2;
+			p = wcschr(p + 2, L'>');
+
+			if (p == NULL)
+				goto eos;
+
+			/*
+			 * The expression in %< > must be an ASCII string: as
+			 * such allocate its length in bytes plus an extra
+			 * MB_CUR_MAX for slop if a multi-byte character is in
+			 * there, plus another byte for \0.  Since we move a
+			 * byte at a time, any multi-byte chars will just be
+			 * silently overwritten and fail to parse, which is ok.
+			 */
+			elen = (size_t)(p - q);
+			expr = malloc(elen + MB_CUR_MAX + 1);
+
+			if (expr == NULL) {
+				buf.fmb_error = ENOMEM;
+				goto eos;
+			}
+
+			for (i = 0; i < elen; i++)
+				(void) wctomb(&expr[i], q[i]);
+
+			expr[i] = '\0';
+
+			if (nvl != NULL)
+				(void) fmd_msg_nv_parse_nvname(&buf, nvl, expr);
+			else
+				fmd_msg_buf_printf(&buf, "%%<%s>", expr);
+
+			free(expr);
+			p++;
+			break;
+
+		case L'\0':
+			goto eos;
+
+		default:
+			p += 2;
+			break;
+		}
+	}
+eos:
+	fmd_msg_buf_write(&buf, q, wcslen(q) + 1);
+
+	free(h);
+	free(u);
+	free(w);
+
+	s = fmd_msg_buf_read(&buf);
+	fmd_msg_buf_fini(&buf);
+
+	return (s);
+}
+
+/*
  * This function is the main engine for formatting an entire event message.
  * It retrieves the master format string for an event, formats the individual
  * items, and then produces the final string composing all of the items.  The
@@ -1179,7 +1301,8 @@ fmd_msg_gettext_locked(fmd_msg_hdl_t *h,
 	if (nvlist_lookup_int64_array(nvl, FM_SUSPECT_DIAG_TIME,
 	    &tv, &tn) == 0 && tn == 2 && (sec = (time_t)tv[0]) != (time_t)-1 &&
 	    (tmp = localtime_r(&sec, &tm)) != NULL)
-		(void) strftime(date, sizeof (date), "%C", tmp);
+		(void) strftime(date, sizeof (date), "%a %b %e %H:%M:%S %Z %Y",
+		    tmp);
 	else
 		(void) strlcpy(date, FMD_MSG_MISSING, sizeof (date));
 
@@ -1257,9 +1380,7 @@ fmd_msg_getitem(fmd_msg_hdl_t *h,
 	if (locale != NULL && strcmp(h->fmh_locale, locale) == 0)
 		locale = NULL; /* simplify later tests */
 
-	dict = alloca((size_t)(p - code) + 1);
-	(void) strncpy(dict, code, (size_t)(p - code));
-	dict[(size_t)(p - code)] = '\0';
+	dict = strndupa(code, p - code);
 
 	fmd_msg_lock();
 
@@ -1269,8 +1390,7 @@ fmd_msg_getitem(fmd_msg_hdl_t *h,
 	 */
 	if (h->fmh_binding != NULL) {
 		p = bindtextdomain(dict, NULL);
-		old_b = alloca(strlen(p) + 1);
-		(void) strcpy(old_b, p);
+		old_b = strdupa(p);
 		(void) bindtextdomain(dict, h->fmh_binding);
 	}
 
@@ -1289,8 +1409,7 @@ fmd_msg_getitem(fmd_msg_hdl_t *h,
 	 * the text for a different locale, switch locales now under the lock.
 	 */
 	p = setlocale(LC_ALL, NULL);
-	old_c = alloca(strlen(p) + 1);
-	(void) strcpy(old_c, p);
+	old_c = strdupa(p);
 
 	if (locale != NULL)
 		(void) setlocale(LC_ALL, locale);
@@ -1358,6 +1477,63 @@ fmd_msg_getitem_id(fmd_msg_hdl_t *h,
 	return (fmd_msg_getitem(h, locale, NULL, code, item));
 }
 
+char *
+fmd_msg_gettext_key(fmd_msg_hdl_t *h,
+    const char *locale, const char *dict, const char *key)
+{
+	char *old_b, *old_c, *p, *s;
+
+	fmd_msg_lock();
+
+	/*
+	 * If a non-default text domain binding was requested, save the old
+	 * binding perform the re-bind now that fmd_msg_lock() is held.
+	 */
+	if (h->fmh_binding != NULL) {
+		p = bindtextdomain(dict, NULL);
+		old_b = alloca(strlen(p) + 1);
+		(void) strcpy(old_b, p);
+		(void) bindtextdomain(dict, h->fmh_binding);
+	}
+
+	/*
+	 * Save the current locale string, and if we've been asked to fetch
+	 * the text for a different locale, switch locales now under the lock.
+	 */
+	p = setlocale(LC_ALL, NULL);
+	old_c = alloca(strlen(p) + 1);
+	(void) strcpy(old_c, p);
+
+	if (locale != NULL)
+		(void) setlocale(LC_ALL, locale);
+
+	/*
+	 * First attempt to fetch the string in the current locale.  If this
+	 * fails and we're in a non-default locale, attempt to fall back to the
+	 * C locale and try again.  If it still fails then we return NULL and
+	 * set errno.
+	 */
+	if ((s = dgettext(dict, key)) == key &&
+	    (locale != NULL || strcmp(h->fmh_locale, "C") != 0)) {
+		(void) setlocale(LC_ALL, "C");
+		locale = "C"; /* restore locale */
+
+		if ((s = dgettext(dict, key)) == key) {
+			s = NULL;
+			errno = ENOENT;
+		}
+	}
+	if (locale != NULL)
+		(void) setlocale(LC_ALL, old_c);
+
+	if (h->fmh_binding != NULL)
+		(void) bindtextdomain(dict, old_b);
+
+	fmd_msg_unlock();
+
+	return (s);
+}
+
 /*
  * Common code for fmd_msg_gettext_nv() and fmd_msg_gettext_id(): this function
  * handles locking, changing locales and domains, and restoring i18n state.
@@ -1379,9 +1555,7 @@ fmd_msg_gettext(fmd_msg_hdl_t *h,
 	if (locale != NULL && strcmp(h->fmh_locale, locale) == 0)
 		locale = NULL; /* simplify later tests */
 
-	dict = alloca((size_t)(p - code) + 1);
-	(void) strncpy(dict, code, (size_t)(p - code));
-	dict[(size_t)(p - code)] = '\0';
+	dict = strndupa(code, p - code);
 
 	fmd_msg_lock();
 
@@ -1391,8 +1565,7 @@ fmd_msg_gettext(fmd_msg_hdl_t *h,
 	 */
 	if (h->fmh_binding != NULL) {
 		p = bindtextdomain(dict, NULL);
-		old_b = alloca(strlen(p) + 1);
-		(void) strcpy(old_b, p);
+		old_b = strdupa(p);
 		(void) bindtextdomain(dict, h->fmh_binding);
 	}
 
@@ -1411,8 +1584,7 @@ fmd_msg_gettext(fmd_msg_hdl_t *h,
 	 * the text for a different locale, switch locales now under the lock.
 	 */
 	p = setlocale(LC_ALL, NULL);
-	old_c = alloca(strlen(p) + 1);
-	(void) strcpy(old_c, p);
+	old_c = strdupa(p);
 
 	if (locale != NULL)
 		(void) setlocale(LC_ALL, locale);

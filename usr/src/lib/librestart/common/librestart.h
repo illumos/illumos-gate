@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBRESTART_H
@@ -74,7 +73,7 @@ typedef uint32_t restarter_event_type_t;
  * protocol. In practice, increment RESTARTER_EVENT_VERSION whenever the
  * protocol might have changed.
  */
-#define	RESTARTER_EVENT_VERSION		4
+#define	RESTARTER_EVENT_VERSION		5
 
 #define	RESTARTER_FLAG_DEBUG		1
 
@@ -192,6 +191,43 @@ int restarter_event_get_current_states(restarter_event_t *,
     restarter_instance_state_t *, restarter_instance_state_t *);
 
 /*
+ * State transition reasons
+ */
+
+typedef enum {
+	restarter_str_none,
+	restarter_str_administrative_request,
+	restarter_str_bad_repo_state,
+	restarter_str_clear_request,
+	restarter_str_ct_ev_core,
+	restarter_str_ct_ev_exit,
+	restarter_str_ct_ev_hwerr,
+	restarter_str_ct_ev_signal,
+	restarter_str_dependencies_satisfied,
+	restarter_str_dependency_activity,
+	restarter_str_dependency_cycle,
+	restarter_str_disable_request,
+	restarter_str_enable_request,
+	restarter_str_fault_threshold_reached,
+	restarter_str_insert_in_graph,
+	restarter_str_invalid_dependency,
+	restarter_str_invalid_restarter,
+	restarter_str_method_failed,
+	restarter_str_per_configuration,
+	restarter_str_refresh,
+	restarter_str_restart_request,
+	restarter_str_restarting_too_quickly,
+	restarter_str_service_request,
+	restarter_str_startd_restart
+} restarter_str_t;
+
+struct restarter_state_transition_reason {
+	restarter_str_t	str_key;
+	const char	*str_short;
+	const char	*str_long;
+};
+
+/*
  * Functions for updating the repository.
  */
 
@@ -207,9 +243,19 @@ int restarter_event_get_current_states(restarter_event_t *,
 int restarter_set_states(restarter_event_handle_t *, const char *,
     restarter_instance_state_t, restarter_instance_state_t,
     restarter_instance_state_t, restarter_instance_state_t, restarter_error_t,
-    const char *);
+    restarter_str_t);
 int restarter_event_publish_retry(evchan_t *, const char *, const char *,
     const char *, const char *, nvlist_t *, uint32_t);
+
+/*
+ * functions for retrieving the state transition reason messages
+ */
+
+#define	RESTARTER_STRING_VERSION	1
+
+uint32_t restarter_str_version(void);
+const char *restarter_get_str_short(restarter_str_t);
+const char *restarter_get_str_long(restarter_str_t);
 
 int restarter_store_contract(scf_instance_t *, ctid_t,
     restarter_contract_type_t);

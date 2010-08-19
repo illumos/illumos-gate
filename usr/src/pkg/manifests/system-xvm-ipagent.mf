@@ -47,16 +47,10 @@ dir path=usr/lib/xen/bin
 file path=lib/svc/manifest/system/ipagent.xml group=sys mode=0444
 file path=lib/svc/method/svc-ipagent mode=0555
 file path=usr/lib/xen/bin/ipagent mode=0555
-legacy pkg=SUNWxvmipar arch=$(ARCH) category=system \
-    desc="xVM PV IP address agent" \
-    hotline="Please contact your local service provider" \
-    name="xVM PV IP address agent (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWxvmipau arch=$(ARCH) category=system \
-    desc="xVM PV IP address agent" \
-    hotline="Please contact your local service provider" \
-    name="xVM PV IP address agent (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWxvmipar desc="xVM PV IP address agent" \
+    name="xVM PV IP address agent (Root)"
+legacy pkg=SUNWxvmipau desc="xVM PV IP address agent" \
+    name="xVM PV IP address agent (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 depend fmri=system/xvm/xvmstore type=require

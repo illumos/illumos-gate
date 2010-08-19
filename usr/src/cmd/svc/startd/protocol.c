@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -215,7 +214,8 @@ restarter_protocol_init()
  *   Enqueue a restarter event.
  */
 static void
-restarter_event_enqueue(const char *inst, restarter_event_type_t event)
+restarter_event_enqueue(const char *inst, restarter_event_type_t event,
+    int32_t reason)
 {
 	restarter_protocol_event_t *e;
 	int r;
@@ -226,6 +226,7 @@ restarter_event_enqueue(const char *inst, restarter_event_type_t event)
 	e->rpe_inst = startd_alloc(strlen(inst) + 1);
 	(void) strlcpy(e->rpe_inst, inst, strlen(inst)+1);
 	e->rpe_type = event;
+	e->rpe_reason = reason;
 
 	MUTEX_LOCK(&restarter_queue->rpeq_lock);
 	uu_list_node_init(e, &e->rpe_link, restarter_protocol_event_queue_pool);
@@ -277,6 +278,7 @@ state_cb(sysevent_t *syse, void *cookie)
 {
 	char *fmri = (char *)cookie;
 	char *instance_name;
+	int32_t reason;
 	nvlist_t *attr_list = NULL;
 	int state, next_state;
 	char str_state[MAX_SCF_STATE_STRING_SZ];
@@ -298,13 +300,16 @@ state_cb(sysevent_t *syse, void *cookie)
 	    &next_state) != 0) ||
 	    (nvlist_lookup_int32(attr_list, RESTARTER_NAME_ERROR, &err) != 0) ||
 	    (nvlist_lookup_string(attr_list, RESTARTER_NAME_INSTANCE,
-	    &instance_name) != 0))
+	    &instance_name) != 0) ||
+	    (nvlist_lookup_int32(attr_list, RESTARTER_NAME_REASON, &reason) !=
+	    0))
 		uu_die("%s: can't decode nvlist\n", fmri);
 
 	states = startd_alloc(sizeof (protocol_states_t));
 	states->ps_state = state;
 	states->ps_state_next = next_state;
 	states->ps_err = err;
+	states->ps_reason = reason;
 
 	graph_protocol_send_event(instance_name, GRAPH_UPDATE_STATE_CHANGE,
 	    states);
@@ -415,7 +420,7 @@ out:
 
 void
 restarter_protocol_send_event(const char *inst, evchan_t *chan,
-    restarter_event_type_t event)
+    restarter_event_type_t event, int32_t reason)
 {
 	nvlist_t *attr;
 	int ret;
@@ -425,7 +430,7 @@ restarter_protocol_send_event(const char *inst, evchan_t *chan,
 	 * queue the event locally.
 	 */
 	if (chan == NULL) {
-		restarter_event_enqueue(inst, event);
+		restarter_event_enqueue(inst, event, reason);
 		MUTEX_LOCK(&ru->restarter_update_lock);
 		ru->restarter_update_wakeup = 1;
 		(void) pthread_cond_broadcast(&ru->restarter_update_cv);
@@ -440,7 +445,9 @@ restarter_protocol_send_event(const char *inst, evchan_t *chan,
 	    event_names[event], chan, inst);
 	if (nvlist_alloc(&attr, NV_UNIQUE_NAME, 0) != 0 ||
 	    nvlist_add_uint32(attr, RESTARTER_NAME_TYPE, event) != 0 ||
-	    nvlist_add_string(attr, RESTARTER_NAME_INSTANCE, (char *)inst) != 0)
+	    nvlist_add_string(attr, RESTARTER_NAME_INSTANCE, (char *)inst) !=
+	    0 || nvlist_add_uint32(attr, RESTARTER_NAME_REASON,
+	    reason) != 0)
 		uu_die("Allocation failure\n");
 
 	if ((ret = restarter_event_publish_retry(chan, "protocol", "restarter",

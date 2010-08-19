@@ -241,7 +241,8 @@ typedef struct {
 /*
  * Output file processing structure
  */
-typedef Lword ofl_flag_t;
+typedef Lword	ofl_flag_t;
+typedef Word	ofl_guideflag_t;
 struct ofl_desc {
 	char		*ofl_sgsid;	/* link-editor identification */
 	const char	*ofl_name;	/* full file name */
@@ -403,6 +404,7 @@ struct ofl_desc {
 	APlist		*ofl_maptext;	/* mapfile added text sections */
 	APlist		*ofl_mapdata;	/* mapfile added data sections */
 	avl_tree_t	*ofl_wrap;	/* -z wrap symbols */
+	ofl_guideflag_t	ofl_guideflags;	/* -z guide flags */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
@@ -460,6 +462,7 @@ struct ofl_desc {
 #define	FLG_OF_PTCAP	0x080000000000	/* PT_SUNWCAP required */
 #define	FLG_OF_CAPSTRS	0x100000000000	/* capability strings are required */
 #define	FLG_OF_EHFRAME	0x200000000000	/* output contains .eh_frame section */
+#define	FLG_OF_FATWARN	0x400000000000	/* make warnings fatal */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive
@@ -488,8 +491,7 @@ struct ofl_desc {
 #define	FLG_OF1_LAZYLD	0x0000008000	/* lazy loading of objects enabled */
 #define	FLG_OF1_GRPPRM	0x0000010000	/* dependencies are to have */
 					/*	GROUPPERM enabled */
-#define	FLG_OF1_OVRFLW	0x0000020000	/* size exceeds 32-bit limitation */
-					/*	of 32-bit libld */
+
 #define	FLG_OF1_NOPARTI	0x0000040000	/* -znopartial set */
 #define	FLG_OF1_BSSOREL	0x0000080000	/* output relocation against bss */
 					/*	section */
@@ -515,6 +517,30 @@ struct ofl_desc {
 #define	FLG_OF1_OVMACHCAP 0x0800000000	/* override CA_SUNW_MACH capability */
 #define	FLG_OF1_OVPLATCAP 0x1000000000	/* override CA_SUNW_PLAT capability */
 #define	FLG_OF1_OVIDCAP	0x2000000000	/* override CA_SUNW_ID capability */
+
+/*
+ * Guidance flags. The flags with the FLG_OFG_NO_ prefix are used to suppress
+ * messages for a given category, and use the lower 28 bits of the word,
+ * The upper nibble is reserved for other guidance status.
+ */
+#define	FLG_OFG_ENABLE		0x10000000	/* -z guidance option active */
+#define	FLG_OFG_ISSUED		0x20000000	/* -z guidance message issued */
+
+#define	FLG_OFG_NO_ALL		0x0fffffff	/* disable all guidance */
+#define	FLG_OFG_NO_DEFS		0x00000001	/* specify all dependencies */
+#define	FLG_OFG_NO_DB		0x00000002	/* use direct bindings */
+#define	FLG_OFG_NO_LAZY		0x00000004	/* be explicit about lazyload */
+#define	FLG_OFG_NO_MF		0x00000008	/* use v2 mapfile syntax */
+#define	FLG_OFG_NO_TEXT		0x00000010	/* verify pure text segment */
+#define	FLG_OFG_NO_UNUSED	0x00000020	/* remove unused dependency */
+
+/*
+ * Test to see if a guidance should be given for a given category
+ * or not. _no_flag is one of the FLG_OFG_NO_xxx flags. Returns TRUE
+ * if the guidance should be issued, and FALSE to remain silent.
+ */
+#define	OFL_GUIDANCE(_ofl, _no_flag) (((_ofl)->ofl_guideflags & \
+	(FLG_OFG_ENABLE | (_no_flag))) == FLG_OFG_ENABLE)
 
 /*
  * Test to see if the output file would allow the presence of
@@ -862,6 +888,7 @@ struct ifl_desc {			/* input file descriptor */
 #define	FLG_IF_OTOSCAP	0x00040000	/* convert object capabilities to */
 					/*	symbol capabilities */
 #define	FLG_IF_DEFERRED	0x00080000	/* dependency is deferred */
+#define	FLG_IF_RTLDINF	0x00100000	/* dependency has DT_SUNW_RTLTINF set */
 
 /*
  * Symbol states that require the generation of a DT_POSFLAG_1 .dynamic entry.

@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(__lint)
 #include <sys/asm_linkage.h>
@@ -218,9 +215,10 @@
 	stx	%g2, [%g5 + KREG_OFF(KREG_TBA)]
 
 1:
+	/* Update the PIL to 15 to block out most interrupts */
 	rdpr	%pil, %g4
 	stx	%g4, [%g5 + KREG_OFF(KREG_PIL)]
-	wrpr	%g0, 14, %pil
+	wrpr	%g0, 15, %pil
 
 	rd	%y, %g4
 	stx	%g4, [%g5 + KREG_OFF(KREG_Y)]

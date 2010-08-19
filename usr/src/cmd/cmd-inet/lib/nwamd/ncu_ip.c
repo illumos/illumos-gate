@@ -371,7 +371,7 @@ nwamd_static_addresses_configured(nwamd_ncu_t *ncu, sa_family_t family)
 boolean_t
 nwamd_dhcp_managing(int protocol, nwamd_ncu_t *ncu)
 {
-	struct sockaddr_storage *addr;
+	struct sockaddr_storage addr;
 	uint64_t flags;
 	boolean_t rv = B_FALSE;
 	ipadm_addr_info_t *addrinfo, *a;
@@ -386,9 +386,19 @@ nwamd_dhcp_managing(int protocol, nwamd_ncu_t *ncu)
 	}
 
 	for (a = addrinfo; a != NULL; a = IA_NEXT(a)) {
+		/*
+		 * WARNING: This memcpy() assumes knowledge of the
+		 * implementation of getifaddrs() and that it always
+		 * uses sockaddr_storage as the backing store for
+		 * address information, thus making it possible to
+		 * copy the entire structure rather than do it on
+		 * the size of the sockaddr according to family.
+		 * This assumption is made elsewhere in this file.
+		 */
+		(void) memcpy(&addr, a->ia_ifa.ifa_addr, sizeof (addr));
+
 		/* is this address an expected static one? */
-		addr = a->ia_ifa.ifa_addr;
-		if (find_static_address(addr, ncu) != NULL)
+		if (find_static_address(&addr, ncu) != NULL)
 			continue;
 
 		/*
@@ -400,11 +410,11 @@ nwamd_dhcp_managing(int protocol, nwamd_ncu_t *ncu)
 		 * as not being managed by DHCP and skip checking of flags.
 		 */
 		if ((protocol == AF_INET &&
-		    ((struct sockaddr_in *)addr)->sin_addr.s_addr ==
+		    ((struct sockaddr_in *)&addr)->sin_addr.s_addr ==
 		    INADDR_ANY) ||
 		    (protocol == AF_INET6 &&
 		    IN6_IS_ADDR_LINKLOCAL(
-		    &((struct sockaddr_in6 *)addr)->sin6_addr))) {
+		    &((struct sockaddr_in6 *)&addr)->sin6_addr))) {
 			continue;
 		}
 
@@ -561,7 +571,7 @@ stateless_running(const nwamd_ncu_t *ncu)
 	}
 
 	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
-		if (ainfop->ia_ifa.ifa_addr->ss_family != AF_INET6)
+		if (ainfop->ia_ifa.ifa_addr->sa_family != AF_INET6)
 			continue;
 		flags = ainfop->ia_ifa.ifa_flags;
 		if (flags & STATELESS_RUNNING) {
@@ -594,11 +604,14 @@ addrinfo_for_addr(const struct sockaddr_storage *caddr, const char *ifname,
 
 	*ainfo = NULL;
 	for (ainfop = addrinfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
+		struct sockaddr_storage addr;
+
+		(void) memcpy(&addr, ainfop->ia_ifa.ifa_addr, sizeof (addr));
 		/*
 		 * If addresses match, rearrange pointers so that addrinfo
 		 * does not contain a, and return a.
 		 */
-		if (sockaddrcmp(ainfop->ia_ifa.ifa_addr, caddr)) {
+		if (sockaddrcmp(&addr, caddr)) {
 			if (last != NULL)
 				last->ia_ifa.ifa_next = ainfop->ia_ifa.ifa_next;
 			else
@@ -675,7 +688,8 @@ addrinfo_for_ipaddr(ipadm_addrobj_t ipaddr, const char *ifname,
  * finish the job of bringing the NCU online.
  */
 static boolean_t
-add_ip_address(const char *ifname, const struct nwamd_if_address *nifa)
+add_ip_address(const char *ifname, const struct nwamd_if_address *nifa,
+    boolean_t *do_inform)
 {
 	ipadm_status_t ipstatus;
 	ipadm_addr_info_t *addrinfo = NULL;
@@ -742,8 +756,18 @@ add_ip_address(const char *ifname, const struct nwamd_if_address *nifa)
 				}
 				return (B_FALSE);
 			}
-			/* Do DHCP_INFORM using async ipadm_refresh_addr() */
-			nwamd_dhcp(ifname, nifa->ipaddr, DHCP_INFORM);
+			/*
+			 * Do DHCP_INFORM using async ipadm_refresh_addr().
+			 * Only need to do this once per interface, and we
+			 * do *not* need to do it if we are also getting a
+			 * dhcp lease; so we only send the INFORM if the
+			 * passed-in flag says to, and we clear the flag
+			 * once we've initiated the INFORM transaction.
+			 */
+			if (*do_inform) {
+				nwamd_dhcp(ifname, nifa->ipaddr, DHCP_INFORM);
+				*do_inform = B_FALSE;
+			}
 		}
 	}
 
@@ -757,6 +781,10 @@ void
 nwamd_configure_interface_addresses(nwamd_ncu_t *ncu)
 {
 	struct nwamd_if_address *nifap, *nifa = ncu->ncu_if.nwamd_if_list;
+	boolean_t do_inform;
+
+	/* only need an inform if we're not also getting a dhcp lease */
+	do_inform = !ncu->ncu_if.nwamd_if_dhcp_requested;
 
 	nlog(LOG_DEBUG, "nwamd_configure_interface_addresses(%s)",
 	    ncu->ncu_name);
@@ -765,7 +793,8 @@ nwamd_configure_interface_addresses(nwamd_ncu_t *ncu)
 		if (nifap->configured)
 			continue;
 
-		nifap->configured = add_ip_address(ncu->ncu_name, nifap);
+		nifap->configured = add_ip_address(ncu->ncu_name, nifap,
+		    &do_inform);
 	}
 }
 
@@ -785,7 +814,7 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 	ncu_obj = nwamd_object_find(NWAM_OBJECT_TYPE_NCU,
 	    event->event_object);
 	if (ncu_obj == NULL) {
-		nlog(LOG_ERR, "nwamd_ncu_handle_if_state_event: no object %s",
+		nlog(LOG_INFO, "nwamd_ncu_handle_if_state_event: no object %s",
 		    event->event_object);
 		nwamd_event_do_not_send(event);
 		return;
@@ -840,7 +869,7 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 		boolean_t stateful_ai_found = B_FALSE;
 		struct nwamd_if_address *nifa = NULL;
 		nwamd_if_t *u_if;
-		struct sockaddr_storage *addr, *ai_addr = 0;
+		struct sockaddr_storage *addr, ai_addr, *aip = NULL;
 		ushort_t family;
 		uint64_t flags = 0;
 
@@ -874,7 +903,9 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			}
 			addrinfo = ai;
 			flags = addrinfo->ia_ifa.ifa_flags;
-			ai_addr = addrinfo->ia_ifa.ifa_addr;
+			(void) memcpy(&ai_addr, addrinfo->ia_ifa.ifa_addr,
+			    sizeof (ai_addr));
+			aip = &ai_addr;
 
 			if (addrinfo->ia_atype == IPADM_ADDR_IPV6_ADDRCONF ||
 			    addrinfo->ia_atype == IPADM_ADDR_DHCP)
@@ -936,16 +967,22 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			    &ai)) {
 				ipadm_addr_info_t *a;
 				for (a = ai; a != NULL; a = IA_NEXT(a)) {
+					struct sockaddr_storage stor;
+
+					(void) memcpy(&stor, a->ia_ifa.ifa_addr,
+					    sizeof (stor));
 					/*
 					 * Since multiple addrinfo can have
 					 * the same ipaddr, find the one for
 					 * the address that generated this
 					 * state event.
 					 */
-					if (sockaddrcmp(addr,
-					    a->ia_ifa.ifa_addr)) {
+					if (sockaddrcmp(addr, &stor)) {
 						flags = a->ia_ifa.ifa_flags;
-						ai_addr = a->ia_ifa.ifa_addr;
+						(void) memcpy(&ai_addr,
+						    a->ia_ifa.ifa_addr,
+						    sizeof (ai_addr));
+						aip = &ai_addr;
 						addrinfo = a;
 					}
 					/*
@@ -981,10 +1018,10 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 			 * interfaces).
 			 */
 			if (((struct sockaddr_in *)addr)->sin_addr.s_addr
-			    == INADDR_ANY && ai_addr != 0) {
+			    == INADDR_ANY && aip != 0) {
 				struct sockaddr_in *a;
 				char astr[INET6_ADDRSTRLEN];
-				a = (struct sockaddr_in *)ai_addr;
+				a = (struct sockaddr_in *)aip;
 
 				if ((flags & IFF_UP) &&
 				    !(flags & IFF_RUNNING) &&
@@ -1026,7 +1063,7 @@ nwamd_ncu_handle_if_state_event(nwamd_event_t event)
 		 * in that case.
 		 */
 		if (!addr_added && !(flags & IFF_DUPLICATE)) {
-			if (ai_addr != 0 && sockaddrcmp(addr, ai_addr)) {
+			if (aip != 0 && sockaddrcmp(addr, aip)) {
 				nlog(LOG_INFO,
 				    "nwamd_ncu_handle_if_state_event: "
 				    "address %s is not really gone from %s, "
@@ -1298,7 +1335,7 @@ retry:
 	/* Make sure the NCU is in appropriate state for DHCP command */
 	ncu_obj = nwamd_ncu_object_find(NWAM_NCU_TYPE_INTERFACE, name);
 	if (ncu_obj == NULL) {
-		nlog(LOG_ERR, "start_dhcp: no IP object %s");
+		nlog(LOG_ERR, "start_dhcp: no IP object %s", name);
 		return (NULL);
 	}
 
@@ -1325,63 +1362,64 @@ retry:
 		}
 		ipstatus = ipadm_refresh_addr(ipadm_handle, aobjname,
 		    IPADM_OPT_ACTIVE | IPADM_OPT_INFORM);
-
 		break;
 	}
 	case DHCP_START:
-	{
 		ipstatus = ipadm_create_addr(ipadm_handle, ipaddr,
 		    IPADM_OPT_ACTIVE);
+		break;
+	default:
+		nlog(LOG_ERR, "start_dhcp: invalid dhcp_ipc_type_t: %d", type);
+		goto done;
+	}
 
-		if (ipstatus == IPADM_DHCP_IPC_TIMEOUT) {
-			/*
-			 * DHCP timed out: change state for this NCU and enqueue
-			 * event to check NCU priority-groups.  Only care for
-			 * DHCP requests (not informs).
-			 */
+	if (ipstatus == IPADM_DHCP_IPC_TIMEOUT) {
+		/*
+		 * DHCP timed out: for DHCP_START requests, change state for
+		 * this NCU and euqueue event to check NCU priority-groups;
+		 * for DHCP_INFORM requests, nothing to do.
+		 */
+		if (type == DHCP_START) {
 			char *object_name;
 
-			nlog(LOG_INFO, "start_dhcp: DHCP timed out for %s",
-			    name);
+			nlog(LOG_INFO,
+			    "start_dhcp: DHCP_START timed out for %s", name);
 
 			if (nwam_ncu_name_to_typed_name(name,
 			    NWAM_NCU_TYPE_INTERFACE, &object_name)
 			    != NWAM_SUCCESS) {
 				nlog(LOG_ERR, "start_dhcp: "
-				    "nwam_ncu_name_to_typed_name failed "
-				    "for %s", name);
+				    "nwam_ncu_name_to_typed_name failed for %s",
+				    name);
 				goto done;
 			}
 			nwamd_object_set_state(NWAM_OBJECT_TYPE_NCU,
 			    object_name, NWAM_STATE_OFFLINE_TO_ONLINE,
 			    NWAM_AUX_STATE_IF_DHCP_TIMED_OUT);
 			nwamd_create_ncu_check_event(0);
-
 			free(object_name);
-			goto done;
-
-		} else if (ipstatus == IPADM_DHCP_IPC_ERROR &&
-		    retries++ < NWAMD_DHCP_RETRIES) {
-			/*
-			 * Retry DHCP request as we may have been unplumbing
-			 * as part of the configuration phase.
-			 */
-			nlog(LOG_ERR, "start_dhcp: will retry on %s in %d sec",
-			    name, NWAMD_DHCP_RETRY_WAIT_TIME);
-			(void) sleep(NWAMD_DHCP_RETRY_WAIT_TIME);
-			goto retry;
+		} else {
+			nlog(LOG_INFO,
+			    "start_dhcp: DHCP_INFORM timed out for %s", name);
 		}
-		break;
-	}
-	default:
-		nlog(LOG_ERR, "start_dhcp: invalid dhcp_ipc_type_t: %d", type);
-		goto done;
-	}
 
-	if (ipstatus != IPADM_SUCCESS) {
+	} else if ((ipstatus == IPADM_DHCP_IPC_ERROR ||
+	    ipstatus == IPADM_IPC_ERROR) && retries++ < NWAMD_DHCP_RETRIES) {
+		/*
+		 * Retry DHCP request as we may have been unplumbing as part
+		 * of the configuration phase.
+		 */
+		nlog(LOG_ERR, "start_dhcp: ipadm_%s_addr on %s returned: %s, "
+		    "retrying in %d sec",
+		    (type == DHCP_START ? "create" : "refresh"), name,
+		    ipadm_status2str(ipstatus), NWAMD_DHCP_RETRY_WAIT_TIME);
+		(void) sleep(NWAMD_DHCP_RETRY_WAIT_TIME);
+		goto retry;
+
+	} else if (ipstatus != IPADM_SUCCESS) {
 		nlog(LOG_ERR, "start_dhcp: ipadm_%s_addr failed for %s: %s",
-		    (type == DHCP_START ? "create" : "refresh"),
-		    name, ipadm_status2str(ipstatus));
+		    (type == DHCP_START ? "create" : "refresh"), name,
+		    ipadm_status2str(ipstatus));
 	}
 
 done:

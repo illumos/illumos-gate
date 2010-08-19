@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -32,6 +31,7 @@
 
 #include "k5-int.h"
 #include "etypes.h"
+#include <locale.h>
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_make_random_key(krb5_context context, krb5_enctype enctype,
@@ -52,7 +52,9 @@ krb5_c_make_random_key(krb5_context context, krb5_enctype enctype,
     /* Solaris Kerberos: Better error message */
     if (i == krb5_enctypes_length) {
 	krb5_set_error_message(context, KRB5_BAD_ENCTYPE,
-	    "Unknown encryption type: %d", enctype);
+			    dgettext(TEXT_DOMAIN,
+				    "Unknown encryption type: %d"),
+			    enctype);
 	return(KRB5_BAD_ENCTYPE);
     }
 

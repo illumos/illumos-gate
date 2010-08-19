@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -222,14 +221,6 @@ typedef struct	tlm_library {
 } tlm_library_t;
 
 typedef struct {
-	unsigned char d_name[8];
-} device_info_t;
-
-typedef struct {
-	unsigned char p_number[4];
-} port_info_t;
-
-typedef struct {
 #ifdef _BIG_ENDIAN
 	uint8_t	di_peripheral_qual	: 3,
 		di_peripheral_dev_type	: 5;
@@ -267,16 +258,6 @@ typedef struct {
 	uint8_t	ni_ident_length;
 #endif
 } name_ident_t;
-
-typedef struct {
-	device_ident_header_t	np_header;
-	name_ident_t		np_node;
-	device_info_t		np_node_info;
-	name_ident_t		np_port;
-	device_info_t		np_port_info;
-	name_ident_t		np_portno;
-	port_info_t		np_portid;
-} device_name_page_t;
 
 #define	TLM_NO_ERRORS			0x00000000
 #define	TLM_ERROR_BUSY			0x00000001

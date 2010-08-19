@@ -104,7 +104,7 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *crp)
 	 */
 	if ((ifl->ifl_flags & FLG_IF_DISPDONE) &&
 	    (ofl->ofl_flags & FLG_OF_VERBOSE))
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_DISPREL2),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_DISPREL2),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 		    ld_targ.t_m.m_r_copy, 0, &inv_buf),
 		    ifl->ifl_name, demangle(sdp->sd_name));
@@ -161,8 +161,8 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *crp)
 					(void) strcpy(_str, str);
 					str = (const char *)_str;
 				}
-				eprintf(ofl->ofl_lml,
-				    ERR_WARNING, MSG_INTL(MSG_REL_DISPREL1),
+				ld_eprintf(ofl, ERR_WARNING,
+				    MSG_INTL(MSG_REL_DISPREL1),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 				    (uint_t)ELF_R_TYPE(reloc->r_info,
 				    ld_targ.t_m.m_mach),
@@ -191,8 +191,7 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *crp)
 				(void) strcpy(_str, str);
 				str = (const char *)_str;
 			}
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_REL_DISPREL1),
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_DISPREL1),
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 			    (uint_t)ELF_R_TYPE(reloc->r_info,
 			    ld_targ.t_m.m_mach), 0, &inv_buf),
@@ -346,7 +345,7 @@ ld_disp_errmsg(const char *msg, Rel_desc *rsp, Ofl_desc *ofl)
 	else
 		str = MSG_INTL(MSG_STR_UNKNOWN);
 
-	eprintf(ofl->ofl_lml, ERR_WARNING, msg,
+	ld_eprintf(ofl, ERR_WARNING, msg,
 	    conv_reloc_type(ifl->ifl_ehdr->e_machine, rsp->rel_rtype,
 	    0, &inv_buf), ifl->ifl_name, ld_reloc_sym_name(rsp), str,
 	    EC_OFF(rsp->rel_roffset));
@@ -866,43 +865,43 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 			return (S_ERROR);
 
 		/*
-		 * Now we initialize the GOT table entry.
+		 * Initialize the GOT table entry.
 		 *
-		 * Pseudo code to describe the the decisions below:
+		 * For global symbols, we clear the GOT table entry and create
+		 * a GLOB_DAT relocation against the symbol.
 		 *
-		 * If (local)
-		 * then
-		 *	enter symbol value in GOT table entry
-		 *	if (Shared Object)
-		 *	then
-		 *		create Relative relocation against symbol
-		 *	fi
-		 * else
-		 *	clear GOT table entry
-		 *	create a GLOB_DAT relocation against symbol
-		 * fi
+		 * For local symbols, we enter the symbol value into a GOT
+		 * table entry and create a relative relocation if all of
+		 * the following hold:
+		 *
+		 * -	Output is a shared object
+		 * -	Symbol is not ABS
+		 * -	Relocation is not against one of the special sections
+		 *	(COMMON, ...)
+		 * -	This is not one of the generated symbols we have
+		 *	to update after the output object has been fully
+		 *	laid out (_START_, _END_, ...)
+		 *
+		 * Local symbols that don't meet the above requirements
+		 * are processed as is.
 		 */
 		if (local == TRUE) {
-			if (flags & FLG_OF_SHAROBJ) {
+			if ((flags & FLG_OF_SHAROBJ) &&
+			    (((sdp->sd_flags & FLG_SY_SPECSEC) == 0) ||
+			    ((sdp->sd_sym->st_shndx != SHN_ABS)) ||
+			    (sdp->sd_aux && sdp->sd_aux->sa_symspec))) {
 				if (ld_add_actrel((FLG_REL_GOT | FLG_REL_GOTCL),
 				    rsp, ofl) == S_ERROR)
 					return (S_ERROR);
 
-				/*
-				 * Add a RELATIVE relocation if this is
-				 * anything but a ABS symbol.
-				 */
-				if ((((sdp->sd_flags & FLG_SY_SPECSEC) == 0) ||
-				    (sdp->sd_sym->st_shndx != SHN_ABS)) ||
-				    (sdp->sd_aux && sdp->sd_aux->sa_symspec)) {
-					rsp->rel_rtype =
-					    ld_targ.t_m.m_r_relative;
-					if ((*ld_targ.t_mr.mr_add_outrel)
-					    ((FLG_REL_GOT | FLG_REL_ADVAL), rsp,
-					    ofl) == S_ERROR)
-						return (S_ERROR);
-					rsp->rel_rtype = rtype;
-				}
+				rsp->rel_rtype = ld_targ.t_m.m_r_relative;
+
+				if ((*ld_targ.t_mr.mr_add_outrel)
+				    ((FLG_REL_GOT | FLG_REL_ADVAL),
+				    rsp, ofl) == S_ERROR)
+					return (S_ERROR);
+
+				rsp->rel_rtype = rtype;
 			} else {
 				if (ld_add_actrel(FLG_REL_GOT, rsp,
 				    ofl) == S_ERROR)
@@ -1079,7 +1078,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	if (ELF_ST_TYPE(sym->st_info) != STT_OBJECT) {
 		Conv_inv_buf_t inv_buf;
 
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_UNEXPSYM),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_UNEXPSYM),
 		    conv_sym_info_type(sdp->sd_file->ifl_ehdr->e_machine,
 		    ELF_ST_TYPE(sym->st_info), 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
@@ -1272,8 +1271,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		if (_sdp->sd_flags & FLG_SY_PROT) {
 			Conv_inv_buf_t inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_REL_COPY),
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_COPY),
 			    conv_reloc_type(_sdp->sd_file->ifl_ehdr->e_machine,
 			    ld_targ.t_m.m_r_copy, 0, &inv_buf),
 			    _sdp->sd_file->ifl_name, _sdp->sd_name);
@@ -1295,7 +1293,7 @@ reloc_generic(Rel_desc *rsp, Ofl_desc *ofl)
 	Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
 	Conv_inv_buf_t	inv_buf;
 
-	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_UNEXPREL),
+	ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_UNEXPREL),
 	    conv_reloc_type(ifl->ifl_ehdr->e_machine, rsp->rel_rtype,
 	    0, &inv_buf), ifl->ifl_name, ld_reloc_sym_name(rsp));
 
@@ -1354,8 +1352,7 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 			Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
 			Conv_inv_buf_t inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_PICREDLOC),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_PICREDLOC),
 			    ld_reloc_sym_name(rsp), ifl->ifl_name,
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 			    rsp->rel_rtype, 0, &inv_buf));
@@ -1411,7 +1408,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 * All TLS relocations are illegal in a static executable.
 	 */
 	if (OFL_IS_STATIC_EXEC(ofl)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
 		    conv_reloc_type(mach, rtype, 0, &inv_buf1), ifl->ifl_name,
 		    ld_reloc_sym_name(rsp));
 		return (S_ERROR);
@@ -1422,7 +1419,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 * are illegal.
 	 */
 	if ((type = ELF_ST_TYPE(sdp->sd_sym->st_info)) != STT_TLS) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBADSYM),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_TLSBADSYM),
 		    conv_reloc_type(mach, rtype, 0, &inv_buf1), ifl->ifl_name,
 		    ld_reloc_sym_name(rsp),
 		    conv_sym_info_type(mach, type, 0, &inv_buf2));
@@ -1436,7 +1433,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 */
 	if (!local && (IS_TLS_LD(rtype) ||
 	    ((flags & FLG_OF_EXEC) && IS_TLS_LE(rtype)))) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
 		    conv_reloc_type(mach, rtype, 0, &inv_buf1), ifl->ifl_name,
 		    ld_reloc_sym_name(rsp), sdp->sd_file->ifl_name);
 		return (S_ERROR);
@@ -1457,16 +1454,14 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 */
 	if ((flags & FLG_OF_EXEC) == 0) {
 		if (IS_TLS_LE(rtype)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_TLSLE),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_TLSLE),
 			    conv_reloc_type(mach, rtype, 0, &inv_buf1),
 			    ifl->ifl_name, ld_reloc_sym_name(rsp));
 			return (S_ERROR);
 
 		} else if ((IS_TLS_IE(rtype)) &&
 		    (flags & FLG_OF_VERBOSE)) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_REL_TLSIE),
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_TLSIE),
 			    conv_reloc_type(mach, rtype, 0, &inv_buf1),
 			    ifl->ifl_name, ld_reloc_sym_name(rsp));
 		}
@@ -1613,7 +1608,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	    IS_GOT_BASED(rtype)) {
 		Ifl_desc	*ifl = reld->rel_isdesc->is_file;
 
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_BADGOTBASED),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_BADGOTBASED),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
 		    0, &inv_buf), ifl->ifl_name, demangle(sdp->sd_name));
 		return (S_ERROR);
@@ -1631,8 +1626,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		if (RELAUX_GET_OSDESC(reld)->os_shdr->sh_flags & SHF_ALLOC) {
 			Ifl_desc	*ifl = reld->rel_isdesc->is_file;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_BADTLS),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_BADTLS),
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 			    rtype, 0, &inv_buf), ifl->ifl_name,
 			    demangle(sdp->sd_name));
@@ -1645,8 +1639,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	 */
 	if (IS_REGISTER(rtype)) {
 		if (ld_targ.t_mr.mr_reloc_register == NULL) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_NOREG));
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_NOREG));
 			return (S_ERROR);
 		}
 		return ((*ld_targ.t_mr.mr_reloc_register)(reld, isp, ofl));
@@ -1853,7 +1846,7 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp,
 
 		if (ofl->ofl_flags & FLG_OF_VERBOSE) {
 			if (sym->st_name != 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_REL_SLOPCDATNAM),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 				    reld->rel_rtype, 0, &inv_buf),
@@ -1864,7 +1857,7 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp,
 				    EC_WORD(isp->is_scnndx), isp->is_name,
 				    rep_sdp->sd_file->ifl_name);
 			} else {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_REL_SLOPCDATNONAM),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 				    reld->rel_rtype, 0, &inv_buf),
@@ -1901,7 +1894,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 * Make sure the relocation is in the valid range.
 	 */
 	if (rtype >= ld_targ.t_m.m_r_num) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_INVALRELT),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_INVALRELT),
 		    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name,
 		    rtype);
 		return (S_ERROR);
@@ -1921,8 +1914,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		    (void *)reloc, isp->is_name, isp->is_scnndx,
 		    ld_reloc_sym_name(reld)));
 		if (ld_targ.t_mr.mr_reloc_register == NULL) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_NOREG));
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_NOREG));
 			return (S_ERROR);
 		}
 		return ((*ld_targ.t_mr.mr_reloc_register)(reld, isp, ofl));
@@ -1957,14 +1949,14 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		    ld_targ.t_m.m_mach, ld_targ.t_m.m_rel_sht_type,
 		    (void *)reloc, isp->is_name, isp->is_scnndx,
 		    ld_reloc_sym_name(reld)));
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_NULL),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_NULL),
 		    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name);
 		return (1);
 	}
 
 	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
 	    IS_NOTSUP(rtype)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_NOTSUP),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_NOTSUP),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
 		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
 		    isp->is_name);
@@ -1976,7 +1968,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 * symbol. If no symbol is assigned, this is a fatal error.
 	 */
 	if (sdp == NULL) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYMBOL),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_NOSYMBOL),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
 		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
 		    isp->is_name, EC_XWORD(reloc->r_offset));
@@ -2028,7 +2020,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 				if (((ofl->ofl_flags & FLG_OF_VERBOSE) != 0) ||
 				    ((is_shdr->sh_flags & SHF_ALLOC) &&
 				    (reject != RLXREL_REJ_TARGET)))
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING,
 					    MSG_INTL(MSG_REL_SLOPCDATNOSYM),
 					    conv_reloc_type(
 					    ifl->ifl_ehdr->e_machine,
@@ -2045,8 +2037,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 			nsdp = ld_sym_find(sdp->sd_name, SYM_NOHASH, NULL, ofl);
 
 		if (nsdp == NULL) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_SYMDISC),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_SYMDISC),
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 			    reld->rel_rtype, 0, &inv_buf), ifl->ifl_name,
 			    EC_WORD(isp->is_scnndx), isp->is_name,
@@ -2084,7 +2075,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 */
 	if (sdp->sd_isc && (sdp->sd_isc->is_osdesc == 0) &&
 	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION)) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_RELINVSEC),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_RELINVSEC),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
 		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
 		    isp->is_name, EC_WORD(sdp->sd_isc->is_scnndx),
@@ -2100,7 +2091,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 */
 	if ((sdp->sd_flags & FLG_SY_INVALID) || (rsndx == 0) ||
 	    (rsndx >= ifl->ifl_symscnt)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_UNKNWSYM),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_UNKNWSYM),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
 		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
 		    isp->is_name, ld_reloc_sym_name(reld),
@@ -2116,7 +2107,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 */
 	if (IS_SIZE(rtype) &&
 	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSIZE),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSIZE),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
 		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
 		    isp->is_name);
@@ -2575,6 +2566,7 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 	Word		index = 0;
 	int		debug = 0;
 	uintptr_t	error = 1;
+	Boolean		remain_seen = FALSE;
 
 	if ((sorted_list = libld_malloc((size_t)(sizeof (Reloc_list) *
 	    ofl->ofl_reloccnt))) == NULL)
@@ -2604,8 +2596,8 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 		 * order that it was originally processed.
 		 */
 		if (orsp->rel_flags & FLG_REL_PLT) {
-			if ((*ld_targ.t_mr.mr_perform_outreloc)(orsp, ofl) ==
-			    S_ERROR)
+			if ((*ld_targ.t_mr.mr_perform_outreloc)
+			    (orsp, ofl, &remain_seen) == S_ERROR)
 				error = S_ERROR;
 			continue;
 		}
@@ -2649,9 +2641,13 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 	 */
 	for (index = 0; index < ofl->ofl_reloccnt; index++) {
 		if ((*ld_targ.t_mr.mr_perform_outreloc)
-		    (sorted_list[index].rl_rsp, ofl) == S_ERROR)
+		    (sorted_list[index].rl_rsp, ofl, &remain_seen) == S_ERROR)
 			error = S_ERROR;
 	}
+
+	/* Guidance: Use -z text when building shared objects */
+	if (remain_seen && OFL_GUIDANCE(ofl, FLG_OFG_NO_TEXT))
+		ld_eprintf(ofl, ERR_GUIDANCE, MSG_INTL(MSG_GUIDE_TEXT));
 
 	return (error);
 }
@@ -2761,7 +2757,7 @@ ld_reloc_process(Ofl_desc *ofl)
 	 */
 	if ((flags & (FLG_OF_PURETXT | FLG_OF_TEXTREL)) ==
 	    (FLG_OF_PURETXT | FLG_OF_TEXTREL)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_REMAIN_3));
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_REMAIN_3));
 		return (S_ERROR);
 	}
 
@@ -2803,25 +2799,10 @@ ld_reloc_process(Ofl_desc *ofl)
  * anything to fix the error - thus we've chosen not to give the user an error,
  * or warning, for this case.
  */
-static void
-reloc_remain_title(Ofl_desc *ofl, int warning)
-{
-	const char	*str1;
-
-	if (warning)
-		str1 = MSG_INTL(MSG_REL_RMN_ITM_13);
-	else
-		str1 = MSG_INTL(MSG_REL_RMN_ITM_11);
-
-	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_REL_REMAIN_FMT_1), str1,
-	    MSG_INTL(MSG_REL_RMN_ITM_31), MSG_INTL(MSG_REL_RMN_ITM_12),
-	    MSG_INTL(MSG_REL_RMN_ITM_2), MSG_INTL(MSG_REL_RMN_ITM_32));
-}
-
 void
-ld_reloc_remain_entry(Rel_desc *orsp, Os_desc *osp, Ofl_desc *ofl)
+ld_reloc_remain_entry(Rel_desc *orsp, Os_desc *osp, Ofl_desc *ofl,
+    Boolean *remain_seen)
 {
-	static Boolean	reloc_title = TRUE;
 
 	/*
 	 * -ztextoff
@@ -2847,19 +2828,22 @@ ld_reloc_remain_entry(Rel_desc *orsp, Os_desc *osp, Ofl_desc *ofl)
 	    (orsp->rel_sym->sd_sym->st_shndx == SHN_UNDEF))
 		return;
 
-	if (reloc_title) {
+	if (*remain_seen == FALSE) {
 		/*
 		 * If building with '-ztext' then emit a fatal error.  If
 		 * building a executable then only emit a 'warning'.
 		 */
-		if (ofl->ofl_flags & FLG_OF_PURETXT)
-			reloc_remain_title(ofl, 0);
-		else
-			reloc_remain_title(ofl, 1);
-		reloc_title = FALSE;
+		const char *str1 = (ofl->ofl_flags & FLG_OF_PURETXT) ?
+		    MSG_INTL(MSG_REL_RMN_ITM_11) : MSG_INTL(MSG_REL_RMN_ITM_13);
+
+		ld_eprintf(ofl, ERR_NONE, MSG_INTL(MSG_REL_REMAIN_FMT_1), str1,
+		    MSG_INTL(MSG_REL_RMN_ITM_31), MSG_INTL(MSG_REL_RMN_ITM_12),
+		    MSG_INTL(MSG_REL_RMN_ITM_2), MSG_INTL(MSG_REL_RMN_ITM_32));
+
+		*remain_seen = TRUE;
 	}
 
-	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_REL_REMAIN_2),
+	ld_eprintf(ofl, ERR_NONE, MSG_INTL(MSG_REL_REMAIN_2),
 	    ld_reloc_sym_name(orsp), EC_OFF(orsp->rel_roffset),
 	    orsp->rel_isdesc->is_file->ifl_name);
 }
@@ -3090,8 +3074,7 @@ ld_reloc_targval_get(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword *value)
 	default:
 		{
 			Conv_inv_buf_t inv_buf;
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_UNSUPSZ),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSZ),
 			    conv_reloc_type(ld_targ.t_m.m_mach, rsp->rel_rtype,
 			    0, &inv_buf), rsp->rel_isdesc->is_file->ifl_name,
 			    ld_reloc_sym_name(rsp), (int)rep->re_fsize);
@@ -3154,8 +3137,7 @@ ld_reloc_targval_set(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword value)
 	default:
 		{
 			Conv_inv_buf_t inv_buf;
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_UNSUPSZ),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSZ),
 			    conv_reloc_type(ld_targ.t_m.m_mach, rsp->rel_rtype,
 			    0, &inv_buf), rsp->rel_isdesc->is_file->ifl_name,
 			    ld_reloc_sym_name(rsp), (int)rep->re_fsize);

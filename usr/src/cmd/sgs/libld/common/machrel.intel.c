@@ -222,7 +222,7 @@ plt_entry(Ofl_desc * ofl, Word rel_off, Sym_desc * sdp)
 }
 
 static uintptr_t
-ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
+ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl, Boolean *remain_seen)
 {
 	Os_desc *	relosp, * osp = 0;
 	Word		ndx, roffset, value;
@@ -380,7 +380,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	if (orsp->rel_rtype == R_386_JMP_SLOT)
 		osp = ofl->ofl_osgot;
 
-	ld_reloc_remain_entry(orsp, osp, ofl);
+	ld_reloc_remain_entry(orsp, osp, ofl, remain_seen);
 	return (1);
 }
 
@@ -641,8 +641,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		{
 			Conv_inv_buf_t	inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_BADTLSINS),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_BADTLSINS),
 			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
 			    arsp->rel_isdesc->is_file->ifl_name,
 			    ld_reloc_sym_name(arsp),
@@ -708,8 +707,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		{
 			Conv_inv_buf_t	inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_BADTLSINS),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_BADTLSINS),
 			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
 			    arsp->rel_isdesc->is_file->ifl_name,
 			    ld_reloc_sym_name(arsp),
@@ -1028,8 +1026,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 		if (arsp->rel_isdesc->is_indata->d_buf == 0) {
 			Conv_inv_buf_t	inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_REL_EMPTYSEC),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_EMPTYSEC),
 			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
 			    ifl_name, ld_reloc_sym_name(arsp),
 			    EC_WORD(arsp->rel_isdesc->is_scnndx),
@@ -1060,8 +1057,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			else
 				class = ERR_WARNING;
 
-			eprintf(ofl->ofl_lml, class,
-			    MSG_INTL(MSG_REL_INVALOFFSET),
+			ld_eprintf(ofl, class, MSG_INTL(MSG_REL_INVALOFFSET),
 			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
 			    ifl_name, EC_WORD(arsp->rel_isdesc->is_scnndx),
 			    arsp->rel_isdesc->is_name, ld_reloc_sym_name(arsp),
@@ -1098,8 +1094,10 @@ ld_do_activerelocs(Ofl_desc *ofl)
 		if (OFL_DO_RELOC(ofl)) {
 			if (do_reloc_ld(arsp, addr, &value, ld_reloc_sym_name,
 			    ifl_name, OFL_SWAP_RELOC_DATA(ofl, arsp),
-			    ofl->ofl_lml) == 0)
+			    ofl->ofl_lml) == 0) {
+				ofl->ofl_flags |= FLG_OF_FATAL;
 				return_code = S_ERROR;
+			}
 		}
 	}
 	return (return_code);
@@ -1263,7 +1261,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 		 */
 		if (osp && (osp->os_shdr->sh_type == SHT_SUNW_ANNOTATE))
 			return (0);
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_EXTERNSYM),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_REL_EXTERNSYM),
 		    conv_reloc_386_type(rsp->rel_rtype, 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    ld_reloc_sym_name(rsp), osp->os_name);

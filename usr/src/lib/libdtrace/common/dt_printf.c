@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -32,6 +31,11 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <arpa/nameser.h>
 
 #include <dt_printf.h>
 #include <dt_string.h>
@@ -492,6 +496,49 @@ pfprint_time822(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 
 /*ARGSUSED*/
 static int
+pfprint_port(dtrace_hdl_t *dtp, FILE *fp, const char *format,
+    const dt_pfargd_t *pfd, const void *addr, size_t size, uint64_t normal)
+{
+	uint16_t port = htons(*((uint16_t *)addr));
+	char buf[256];
+	struct servent *sv, res;
+
+	if ((sv = getservbyport_r(port, NULL, &res, buf, sizeof (buf))) != NULL)
+		return (dt_printf(dtp, fp, format, sv->s_name));
+
+	(void) snprintf(buf, sizeof (buf), "%d", *((uint16_t *)addr));
+	return (dt_printf(dtp, fp, format, buf));
+}
+
+/*ARGSUSED*/
+static int
+pfprint_inetaddr(dtrace_hdl_t *dtp, FILE *fp, const char *format,
+    const dt_pfargd_t *pfd, const void *addr, size_t size, uint64_t normal)
+{
+	char *s = alloca(size + 1);
+	struct hostent *host, res;
+	char inetaddr[NS_IN6ADDRSZ];
+	char buf[1024];
+	int e;
+
+	bcopy(addr, s, size);
+	s[size] = '\0';
+
+	if (strchr(s, ':') == NULL && inet_pton(AF_INET, s, inetaddr) != -1) {
+		if ((host = gethostbyaddr_r(inetaddr, NS_INADDRSZ,
+		    AF_INET, &res, buf, sizeof (buf), &e)) != NULL)
+			return (dt_printf(dtp, fp, format, host->h_name));
+	} else if (inet_pton(AF_INET6, s, inetaddr) != -1) {
+		if ((host = getipnodebyaddr(inetaddr, NS_IN6ADDRSZ,
+		    AF_INET6, &e)) != NULL)
+			return (dt_printf(dtp, fp, format, host->h_name));
+	}
+
+	return (dt_printf(dtp, fp, format, s));
+}
+
+/*ARGSUSED*/
+static int
 pfprint_cstr(dtrace_hdl_t *dtp, FILE *fp, const char *format,
     const dt_pfargd_t *pfd, const void *addr, size_t size, uint64_t normal)
 {
@@ -595,6 +642,7 @@ static const dt_pfconv_t _dtrace_conversions[] = {
 { "hx", "x", "short", pfcheck_xshort, pfprint_uint },
 { "hX", "X", "short", pfcheck_xshort, pfprint_uint },
 { "i", "i", pfproto_xint, pfcheck_dint, pfprint_dint },
+{ "I", "s", pfproto_cstr, pfcheck_str, pfprint_inetaddr },
 { "k", "s", "stack", pfcheck_stack, pfprint_stack },
 { "lc", "lc", "int", pfcheck_type, pfprint_sint }, /* a.k.a. wint_t */
 { "ld",	"d", "long", pfcheck_type, pfprint_sint },
@@ -617,6 +665,7 @@ static const dt_pfconv_t _dtrace_conversions[] = {
 { "LG",	"G", "long double", pfcheck_type, pfprint_fp },
 { "o", "o", pfproto_xint, pfcheck_xint, pfprint_uint },
 { "p", "x", pfproto_addr, pfcheck_addr, pfprint_uint },
+{ "P", "s", "uint16_t", pfcheck_type, pfprint_port },
 { "s", "s", "char [] or string (or use stringof)", pfcheck_str, pfprint_cstr },
 { "S", "s", pfproto_cstr, pfcheck_str, pfprint_estr },
 { "T", "s", "int64_t", pfcheck_time, pfprint_time822 },

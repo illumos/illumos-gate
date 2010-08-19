@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <dlfcn.h>
@@ -204,7 +204,11 @@ pkcs11_slottable_delete() {
 					(void) cur_slot->
 					    sl_func_list->C_Finalize(NULL);
 				}
-				(void) dlclose(cur_slot->sl_dldesc);
+
+				/* metaslot won't have a sl_dldesc! */
+				if (cur_slot->sl_dldesc != NULL) {
+					(void) dlclose(cur_slot->sl_dldesc);
+				}
 
 				/*
 				 * Each provider maintains one disabled

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -177,7 +176,7 @@
 #include <sys/thread.h>
 #include <sys/types.h>
 #include <sys/var.h>
-#include <sys/x86_archext.h>	/* for x86_feature and X86_AMD */
+#include <sys/x86_archext.h>
 #include <vm/hat_i86.h>
 #include <vm/seg_kmem.h>
 #include <vm/vm_dep.h>

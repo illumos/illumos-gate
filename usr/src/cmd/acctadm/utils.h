@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_UTILS_H
@@ -42,7 +42,7 @@ extern dladm_handle_t dld_handle;
 
 extern void warn(const char *, ...);
 extern void die(char *, ...);
-extern char *setprogname(char *);
+extern char *setpname(char *);
 extern const char *ac_type_name(int);
 extern int open_exacct_file(const char *, int);
 extern boolean_t verify_exacct_file(const char *, int);

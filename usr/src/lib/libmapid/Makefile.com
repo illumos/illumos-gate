@@ -19,15 +19,17 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libmapid.a
 VERS	=	.1
-OBJECTS =	mapid.o
+SMF_DIR	=	$(SRC)/cmd/fs.d/nfs/lib
+
+LIBOBJS	=	mapid.o
+OTHOBJS	=	smfcfg.o
+OBJECTS =	$(LIBOBJS) $(OTHOBJS)
 
 include $(SRC)/lib/Makefile.lib
 
@@ -43,17 +45,29 @@ ROOTLIBDIR   =	$(ROOT)/usr/lib/nfs
 # SRCS is defined to be $(OBJECTS:%.o=$(SRCDIR)/%.c)
 #
 SRCDIR	=	../common
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+LIBSRCS	= $(LIBOBJS:%.o=$(SRCDIR)/%.c)
+$(LINTLIB) := SRCS = $(LINTSRC:%=$(SRCDIR)/%)
+lintcheck  :=	SRCS = $(LIBSRCS)
 
-LDLIBS	+=	-lresolv -lc
+LDLIBS	+=	-lresolv -lc -lscf
 
 CFLAGS	+=	$(CCVERBOSE)
-CPPFLAGS+=	-I$(SRCDIR) -D_REENTRANT
+CPPFLAGS +=	-I$(SRCDIR) -I$(SMF_DIR) -D_REENTRANT
+
 
 .KEEP_STATE:
 
-all:
+all:  $(LIBS)
 
-lint: lintcheck
+install: $(ROOTLIBDIR) all
 
-include $(SRC)/lib/Makefile.targ
+lint:	$(LINTLIB) lintcheck
+
+pics/%.o:	$(SMF_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+$(ROOTLIBDIR):
+	$(INS.dir)
+
+include ../../Makefile.targ

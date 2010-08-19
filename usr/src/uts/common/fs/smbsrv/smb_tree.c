@@ -166,9 +166,11 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_ktypes.h>
 #include <smbsrv/smb_fsops.h>
+#include <smbsrv/smb_share.h>
 
 int smb_tcon_mute = 0;
 
+static smb_tree_t *smb_tree_connect_core(smb_request_t *);
 static smb_tree_t *smb_tree_connect_disk(smb_request_t *, const char *);
 static smb_tree_t *smb_tree_connect_printq(smb_request_t *, const char *);
 static smb_tree_t *smb_tree_connect_ipc(smb_request_t *, const char *);
@@ -190,6 +192,22 @@ static int smb_tree_netinfo_encode(smb_tree_t *, uint8_t *, size_t, uint32_t *);
 static void smb_tree_netinfo_init(smb_tree_t *tree, smb_netconnectinfo_t *);
 static void smb_tree_netinfo_fini(smb_netconnectinfo_t *);
 
+smb_tree_t *
+smb_tree_connect(smb_request_t *sr)
+{
+	smb_tree_t	*tree;
+	smb_server_t	*sv = sr->sr_server;
+
+	if (smb_threshold_enter(&sv->sv_tcon_ct) != 0) {
+		smbsr_error(sr, RPC_NT_SERVER_TOO_BUSY, 0, 0);
+		return (NULL);
+	}
+
+	tree = smb_tree_connect_core(sr);
+	smb_threshold_exit(&sv->sv_tcon_ct, sv);
+	return (tree);
+}
+
 /*
  * Lookup the share name dispatch the appropriate stype handler.
  * Share names are case insensitive so we map the share name to
@@ -202,8 +220,8 @@ static void smb_tree_netinfo_fini(smb_netconnectinfo_t *);
  *	COMM    Communications device
  *	?????   Any type of device (wildcard)
  */
-smb_tree_t *
-smb_tree_connect(smb_request_t *sr)
+static smb_tree_t *
+smb_tree_connect_core(smb_request_t *sr)
 {
 	char		*unc_path = sr->sr_tcon.path;
 	smb_tree_t	*tree = NULL;
@@ -223,6 +241,14 @@ smb_tree_connect(smb_request_t *sr)
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 		return (NULL);
 	}
+
+	if (!strcasecmp(SMB_SHARE_PRINT, name)) {
+		smb_kshare_release(si);
+		smb_tree_log(sr, name, "access not permitted");
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
+		return (NULL);
+	}
+
 	sr->sr_tcon.si = si;
 
 	switch (si->shr_type & STYPE_MASK) {
@@ -681,6 +707,10 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	if (si->shr_flags & SMB_SHRF_DFSROOT)
 		sr->sr_tcon.optional_support |= SMB_SHARE_IS_IN_DFS;
 
+	/* if 'smb' zfs property: shortnames=disabled */
+	if (!smb_shortnames)
+		sr->arg.tcon.optional_support |= SMB_UNIQUE_FILE_NAME;
+
 	tree = smb_tree_alloc(user, si, snode, access,
 	    sr->sr_cfg->skc_execflags);
 
@@ -835,6 +865,10 @@ smb_tree_alloc(smb_user_t *user, const smb_kshare_t *si, smb_node_t *snode,
 	tree = kmem_cache_alloc(user->u_server->si_cache_tree, KM_SLEEP);
 	bzero(tree, sizeof (smb_tree_t));
 
+	tree->t_user = user;
+	tree->t_session = user->u_session;
+	tree->t_server = user->u_server;
+
 	if (STYPE_ISDSK(stype) || STYPE_ISPRN(stype)) {
 		if (smb_tree_getattr(si, snode, tree) != 0) {
 			smb_idpool_free(&user->u_tid_pool, tid);
@@ -869,9 +903,6 @@ smb_tree_alloc(smb_user_t *user, const smb_kshare_t *si, smb_node_t *snode,
 
 	mutex_init(&tree->t_mutex, NULL, MUTEX_DEFAULT, NULL);
 
-	tree->t_user = user;
-	tree->t_session = user->u_session;
-	tree->t_server = user->u_server;
 	tree->t_refcnt = 1;
 	tree->t_tid = tid;
 	tree->t_res_type = stype;
@@ -1076,7 +1107,8 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	} smb_mtype_t;
 
 	static smb_mtype_t smb_mtype[] = {
-		{ "zfs",    3,	SMB_TREE_UNICODE_ON_DISK | SMB_TREE_QUOTA },
+		{ "zfs",    3,	SMB_TREE_UNICODE_ON_DISK |
+		    SMB_TREE_QUOTA | SMB_TREE_SPARSE},
 		{ "ufs",    3,	SMB_TREE_UNICODE_ON_DISK },
 		{ "nfs",    3,	SMB_TREE_NFS_MOUNTED },
 		{ "tmpfs",  5,	SMB_TREE_NO_EXPORT }
@@ -1095,14 +1127,20 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	if (si->shr_flags & SMB_SHRF_ABE)
 		flags |= SMB_TREE_ABE;
 
+	if (smb_session_oplocks_enable(tree->t_session)) {
+		/* if 'smb' zfs property: oplocks=enabled */
+		flags |= SMB_TREE_OPLOCKS;
+	}
+
+	/* if 'smb' zfs property: shortnames=enabled */
+	if (smb_shortnames)
+		flags |= SMB_TREE_SHORTNAMES;
+
 	if (vfsp->vfs_flag & VFS_RDONLY)
 		flags |= SMB_TREE_READONLY;
 
 	if (vfsp->vfs_flag & VFS_XATTR)
 		flags |= SMB_TREE_STREAMS;
-
-	if (vfs_optionisset(vfsp, MNTOPT_NOATIME, NULL))
-		flags |= SMB_TREE_NO_ATIME;
 
 	name = vfssw[vfsp->vfs_fstype].vsw_name;
 

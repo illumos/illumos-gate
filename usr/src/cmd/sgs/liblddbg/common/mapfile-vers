@@ -42,7 +42,7 @@
 
 $mapfile_version 2
 
-SYMBOL_VERSION SUNWprivate_4.81 {
+SYMBOL_VERSION SUNWprivate_4.83 {
 	global:
 		dbg_desc {	# interposed - ld.so.1(1)
 			FLAGS = NODIRECT;
@@ -52,14 +52,22 @@ SYMBOL_VERSION SUNWprivate_4.81 {
 		};
 
 		Dbg_args_file;
+		Dbg_args_guidance_unknown;
 		Dbg_args_option;
 		Dbg_args_str2chr;
 		Dbg_args_Wldel;
+		Dbg_audit_activity;
 		Dbg_audit_ignore;
 		Dbg_audit_interface;
 		Dbg_audit_lib;
-		Dbg_audit_object;
-		Dbg_audit_symval;
+		Dbg_audit_objclose;
+		Dbg_audit_objfilter;
+		Dbg_audit_objopen;
+		Dbg_audit_objsearch;
+		Dbg_audit_pltenter;
+		Dbg_audit_pltexit;
+		Dbg_audit_preinit;
+		Dbg_audit_symbind;
 		Dbg_audit_skip;
 		Dbg_audit_terminate;
 		Dbg_audit_version;

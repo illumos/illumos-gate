@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _PI_IMPL_H
@@ -66,6 +65,7 @@ extern "C" {
 #define	MD_STR_NAME		"name"
 #define	MD_STR_PART_NUMBER	"part_number"		/* FWARC/2008/300 */
 #define	MD_STR_PATH		"path"
+#define	MD_STR_PHY_NUMBER	"phy_number"		/* FWARC/2010/185 */
 #define	MD_STR_PLATFORM		"platform"
 #define	MD_STR_PRODUCT		"product"		/* FWARC/2009/390 */
 #define	MD_STR_REVISION_NUMBER	"rev_number"		/* FWARC/2008/300 */
@@ -107,6 +107,7 @@ pi_enum_fn_t	pi_enum_generic;	/* Enumerate a generic PRI node */
 pi_enum_fn_t	pi_enum_niu;		/* Enumerate an NIU node */
 pi_enum_fn_t	pi_enum_hostbridge;	/* Enumerate a hostbridge node */
 pi_enum_fn_t	pi_enum_pciexrc;	/* Enumerate a PCIEX root complex */
+pi_enum_fn_t	pi_enum_bay;		/* Enumerate a bay PRI node */
 pi_enum_fn_t	pi_enum_top;		/* Enumerate a top-level PRI node */
 
 int pi_enum_generic_impl(topo_mod_t *, md_t *, mde_cookie_t, topo_instance_t,
@@ -145,18 +146,23 @@ void pi_walker_fini(topo_mod_t *);
 int	pi_find_mdenodes(topo_mod_t *, md_t *, mde_cookie_t, char *, char *,
     mde_cookie_t **, size_t *);
 int	pi_skip_node(topo_mod_t *, md_t *, mde_cookie_t);
+char   *pi_get_dipath(topo_mod_t *, di_node_t);
 char   *pi_get_productsn(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_chassisid(topo_mod_t *, md_t *, mde_cookie_t);
-char   *pi_get_topo_hc_name(topo_mod_t *, md_t *, mde_cookie_t);
+int	pi_get_fru(topo_mod_t *, md_t *, mde_cookie_t, int *);
 int	pi_get_instance(topo_mod_t *, md_t *, mde_cookie_t, topo_instance_t *);
+char   *pi_get_label(topo_mod_t *, md_t *, mde_cookie_t);
+int	pi_get_lun(topo_mod_t *, di_node_t);
 char   *pi_get_part(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_path(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_productid(topo_mod_t *, md_t *);
+int	pi_get_priphy(topo_mod_t *, md_t *, mde_cookie_t, uint8_t *);
+int	pi_get_phynum(topo_mod_t *, di_node_t);
 char   *pi_get_revision(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_serial(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_serverid(topo_mod_t *);
-int	pi_get_fru(topo_mod_t *, md_t *, mde_cookie_t, int *);
-char   *pi_get_label(topo_mod_t *, md_t *, mde_cookie_t);
+char   *pi_get_target_port(topo_mod_t *, di_node_t);
+char   *pi_get_topo_hc_name(topo_mod_t *, md_t *, mde_cookie_t);
 
 int	pi_set_auth(topo_mod_t *, md_t *, mde_cookie_t, tnode_t *, tnode_t *);
 int	pi_set_frufmri(topo_mod_t *, md_t *, mde_cookie_t, const char *,

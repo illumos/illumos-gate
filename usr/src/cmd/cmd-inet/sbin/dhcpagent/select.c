@@ -19,13 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * SELECTING state of the client state machine.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -41,6 +38,7 @@
 #include <netinet/ip_var.h>
 #include <netinet/udp_var.h>
 #include <dhcpmsg.h>
+#include <dhcp_hostconf.h>
 
 #include "states.h"
 #include "agent.h"
@@ -135,6 +133,9 @@ dhcp_selecting(dhcp_smach_t *dsmp)
 		goto failed;
 
 	}
+
+	/* Remove the stale hostconf file, if there is any */
+	(void) remove_hostconf(dsmp->dsm_name, dsmp->dsm_isv6);
 
 	dsmp->dsm_offer_timer = iu_schedule_timer(tq,
 	    dsmp->dsm_offer_wait, dhcp_requesting, dsmp);

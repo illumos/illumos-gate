@@ -73,12 +73,9 @@ file path=usr/lib/$(ARCH64)/libldstab.so.1
 file path=usr/lib/abi/spec2map mode=0755
 file path=usr/lib/abi/spec2trace mode=0755
 file path=usr/lib/ld/map.above4G mode=0444
-link path=usr/lib/ld/$(ARCH64)/map.above4G target=../map.above4G
 file path=usr/lib/ld/map.below4G mode=0444
-link path=usr/lib/ld/$(ARCH64)/map.below4G target=../map.below4G
 file path=usr/lib/ld/map.bssalign mode=0444
 file path=usr/lib/ld/map.default mode=0444
-link path=usr/lib/ld/$(ARCH64)/map.default target=../map.default
 file path=usr/lib/ld/map.execdata mode=0444
 file path=usr/lib/ld/map.filter mode=0444
 file path=usr/lib/ld/map.noexbss mode=0444
@@ -97,11 +94,9 @@ hardlink path=usr/bin/gcore target=../../usr/lib/isaexec
 hardlink path=usr/bin/plimit target=../../usr/lib/isaexec
 hardlink path=usr/bin/strings target=../../usr/lib/isaexec
 hardlink path=usr/bin/truss target=../../usr/lib/isaexec
-legacy pkg=SUNWtoo arch=$(ARCH) category=system \
+legacy pkg=SUNWtoo \
     desc="utilities for software development, including ld, ldd, od, and truss" \
-    hotline="Please contact your local service provider" \
-    name="Programming Tools" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Programming Tools"
 license cr_ATT license=cr_ATT
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
@@ -111,5 +106,8 @@ link path=usr/ccs/bin/$(ARCH64)/ld target=../../../bin/$(ARCH64)/ld
 link path=usr/ccs/bin/ld target=../../bin/ld
 link path=usr/ccs/bin/regcmp target=../../bin/regcmp
 link path=usr/ccs/lib/link_audit target=../../lib/link_audit
+link path=usr/lib/ld/$(ARCH64)/map.above4G target=../map.above4G
+link path=usr/lib/ld/$(ARCH64)/map.below4G target=../map.below4G
+link path=usr/lib/ld/$(ARCH64)/map.default target=../map.default
 link path=usr/lib/link_audit/32 target=.
 link path=usr/lib/link_audit/64 target=$(ARCH64)

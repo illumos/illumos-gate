@@ -144,7 +144,8 @@ MANIFEST_SUBDIRS=			\
 	vscan/vscand			\
 	xvm/ipagent			\
 	ypcmd/yppasswd			\
-	ypcmd/ypupdated
+	ypcmd/ypupdated			\
+	zonestat/zonestatd
 
 $(CLOSED_BUILD)MANIFEST_SUBDIRS +=		\
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked

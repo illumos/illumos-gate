@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/promif.h>
 #include <sys/promimpl.h>
@@ -154,7 +151,21 @@ prom_write(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 	static char smallbuf[256];
 
 	ASSERT(buf);
+#endif
 
+	/*
+	 * If the callback address is set, attempt to redirect
+	 * console output back into kernel terminal emulator.
+	 */
+	if (promif_redirect != NULL && fd == prom_stdout_ihandle()) {
+		ow = promif_preout();
+		rlen = promif_redirect(promif_redirect_arg, (uchar_t *)buf,
+		    len);
+		promif_postout(ow);
+		return (rlen);
+	}
+
+#ifdef PROM_32BIT_ADDRS
 	if ((uintptr_t)buf > (uint32_t)-1) {
 		/*
 		 * This is a hack for kernel message output.
@@ -167,7 +178,6 @@ prom_write(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 		 * promplat_alloc() can block on a mutex and so
 		 * is called here before calling promif_preprom().
 		 */
-
 		if (len > sizeof (smallbuf)) {
 			obuf = buf;
 			buf = promplat_alloc(len);
@@ -179,11 +189,17 @@ prom_write(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 	}
 #endif
 
+	/*
+	 * Normally we'd call promif_preprom() just before
+	 * calling into the prom (to enforce single-threaded
+	 * access) but here we need to call it before accessing
+	 * smallbuf, since smallbuf is statically allocated and
+	 * hence can only be accessed by one thread at a time.
+	 */
 	ow = promif_preout();
 	promif_preprom();
 
 #ifdef PROM_32BIT_ADDRS
-
 	if ((uintptr_t)buf > (uint32_t)-1) {
 		/*
 		 * If buf is small enough, use smallbuf
@@ -198,33 +214,17 @@ prom_write(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 		}
 	}
 #endif
-	/*
-	 * If the callback address is set, attempt to redirect
-	 * console output back into kernel terminal emulator.
-	 */
-	if (promif_redirect != NULL &&
-	    fd == prom_stdout_ihandle()) {
-		/*
-		 * even if we're re-directing output to the kernel
-		 * console device, we still have to call promif_preout()
-		 * and promif_preprom() because these functions make sure
-		 * that the console device is powered up before sending
-		 * output to it.
-		 */
-		rlen = promif_redirect(promif_redirect_arg,
-		    (uchar_t *)buf, len);
-	} else {
-		ci[0] = p1275_ptr2cell("write");	/* Service name */
-		ci[1] = (cell_t)3;			/* #argument cells */
-		ci[2] = (cell_t)1;			/* #result cells */
-		ci[3] = p1275_uint2cell((uint_t)fd);	/* Arg1: ihandle */
-		ci[4] = p1275_ptr2cell(buf);		/* Arg2: buffer addr */
-		ci[5] = p1275_size2cell(len);		/* Arg3: buffer len */
-		ci[6] = (cell_t)-1;			/* Res1: Prime result */
 
-		(void) p1275_cif_handler(&ci);
-		rlen = p1275_cell2size(ci[6]);		/* Res1: actual len */
-	}
+	ci[0] = p1275_ptr2cell("write");	/* Service name */
+	ci[1] = (cell_t)3;			/* #argument cells */
+	ci[2] = (cell_t)1;			/* #result cells */
+	ci[3] = p1275_uint2cell((uint_t)fd);	/* Arg1: ihandle */
+	ci[4] = p1275_ptr2cell(buf);		/* Arg2: buffer addr */
+	ci[5] = p1275_size2cell(len);		/* Arg3: buffer len */
+	ci[6] = (cell_t)-1;			/* Res1: Prime result */
+
+	(void) p1275_cif_handler(&ci);
+	rlen = p1275_cell2size(ci[6]);		/* Res1: actual len */
 
 	promif_postprom();
 	promif_postout(ow);

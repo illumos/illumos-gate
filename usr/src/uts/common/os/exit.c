@@ -375,7 +375,7 @@ proc_exit(int why, int what)
 	 */
 	if (PROC_IS_BRANDED(p)) {
 		lwp_detach_brand_hdlrs(lwp);
-		brand_clearbrand(p);
+		brand_clearbrand(p, B_FALSE);
 	}
 
 	/*
@@ -500,10 +500,6 @@ proc_exit(int why, int what)
 	 */
 	prbarrier(p);
 
-#ifdef	SUN_SRC_COMPAT
-	if (code == CLD_KILLED)
-		u.u_acflag |= AXSIG;
-#endif
 	sigfillset(&p->p_ignore);
 	sigemptyset(&p->p_siginfo);
 	sigemptyset(&p->p_sig);
@@ -1204,7 +1200,6 @@ freeproc(proc_t *p)
 {
 	proc_t *q;
 	task_t *tk;
-	zone_t *zone;
 
 	ASSERT(p->p_stat == SZOMB);
 	ASSERT(p->p_tlist == NULL);
@@ -1295,21 +1290,13 @@ freeproc(proc_t *p)
 	 * The process table slot is being freed, so it is now safe to give up
 	 * task and project membership.
 	 */
-	zone = p->p_zone;
 	mutex_enter(&p->p_lock);
 	tk = p->p_task;
 	task_detach(p);
-	p->p_task = task0p;
 	mutex_exit(&p->p_lock);
 
 	proc_detach(p);
-	pid_exit(p);	/* frees pid and proc structure */
-
-	mutex_enter(&zone->zone_nlwps_lock);
-	tk->tk_nprocs--;
-	tk->tk_proj->kpj_nprocs--;
-	zone->zone_nprocs--;
-	mutex_exit(&zone->zone_nlwps_lock);
+	pid_exit(p, tk);	/* frees pid and proc structure */
 
 	task_rele(tk);
 }

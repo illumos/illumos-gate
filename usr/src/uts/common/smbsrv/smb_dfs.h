@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMB_DFS_H
@@ -109,6 +108,8 @@ typedef enum {
 	DfsGlobalLowPriorityClass	= 4
 } dfs_target_pclass_t;
 
+#define	DFS_PRIORITY_RANK_MAX		0x001F
+
 #define	DFS_PROPERTY_FLAG_INSITE_REFERRALS	0x00000001
 #define	DFS_PROPERTY_FLAG_ROOT_SCALABILITY	0x00000002
 #define	DFS_PROPERTY_FLAG_SITE_COSTING		0x00000004
@@ -171,10 +172,12 @@ typedef struct dfs_info {
 	char		i_guid[UUID_PRINTABLE_STRING_LENGTH];
 	uint32_t	i_state;
 	uint32_t	i_timeout;
+	uint32_t	i_propflag_mask;
 	uint32_t	i_propflags;
 	uint32_t	i_type;
 	uint32_t	i_ntargets;
 	dfs_target_t	*i_targets;
+	uint32_t	i_flavor;
 } dfs_info_t;
 
 #ifdef __cplusplus

@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -90,14 +89,14 @@
 		type='method'
 		name='start'
 		exec='/lib/svc/method/ipfilter %m'
-		timeout_seconds='30' >
+		timeout_seconds='120' >
 	</exec_method>
 
 	<exec_method
 		type='method'
 		name='refresh'
 		exec='/lib/svc/method/ipfilter reload'
-		timeout_seconds='30' >
+		timeout_seconds='120' >
 	</exec_method>
 
 	<instance name='default' enabled='false'>

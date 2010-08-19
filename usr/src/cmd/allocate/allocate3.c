@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <auth_attr.h>
@@ -818,6 +817,12 @@ mk_revoke(int optflag, char *file)
 					    fuserpid);
 					continue;
 				}
+				if (strcmp(info.pr_fname, "deallocate")
+				    == NULL) {
+					dprintf("%d matched deallocate name\n",
+					    fuserpid);
+					continue;
+				}
 				dprintf("killing %s", info.pr_fname);
 				dprintf("(%d)\n", fuserpid);
 				if ((r =
@@ -1051,6 +1056,11 @@ _deallocate_dev(int optflag, devalloc_t *da, devmap_t *dm_in, uid_t uid,
 		goto out;
 	}
 	is_authorized = _is_dev_authorized(da, uid);
+	if (is_authorized == ALLOC_BY_NONE) {
+		dprintf("Not deallocating %s, not allocatable\n",
+		    da->da_devname);
+		goto out;
+	}
 	if (!(optflag & (FORCE | FORCE_ALL)) && !is_authorized) {
 		dprintf("User %d is unauthorized to deallocate\n", (int)uid);
 		error = UAUTHERR;

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -301,6 +300,7 @@ aes_check_mech_param(crypto_mechanism_t *mechanism, aes_ctx_t **ctx, int kmflag)
 		break;
 	default:
 		rv = CRYPTO_MECHANISM_INVALID;
+		return (rv);
 	}
 	if (param_required && mechanism->cm_param != NULL &&
 	    mechanism->cm_param_len != param_len) {

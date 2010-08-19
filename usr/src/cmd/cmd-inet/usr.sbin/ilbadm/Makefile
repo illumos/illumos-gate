@@ -23,13 +23,10 @@
 
 PROG=		ilbadm
 
-ILB_OBJS =	ilbadm.o ilbadm_sg.o ilbadm_rules.o ilbadm_hc.o
-ILB_OBJS +=	ilbadm_subr.o ilbadm_import.o ilbadm_nat.o ilbadm_stats.o
-OBJS =		$(ILB_OBJS)
+OBJS =	ilbadm.o ilbadm_sg.o ilbadm_rules.o ilbadm_hc.o
+OBJS +=	ilbadm_subr.o ilbadm_import.o ilbadm_nat.o ilbadm_stats.o
 
-ILB_SRCS=	$(ILB_OBJS:.o=.c)
-
-SRCS=		$(ILB_SRC) $(LIST_SRCS)
+SRCS=	$(OBJS:.o=.c)
 
 include	../../../Makefile.cmd
 include	../../../Makefile.ctf
@@ -40,7 +37,7 @@ CPPFLAGS +=	-I$(SRC)/lib/libilb/common -I$(SRC)/uts/common
 
 C99MODE =	$(C99_ENABLE)
 
-POFILES =	$(ILB_OBJS:%.o=%.po)
+POFILES =	$(OBJS:%.o=%.po)
 POFILE =	$(PROG)_all.po
 
 .KEEP_STATE:
@@ -61,11 +58,11 @@ install: all $(ROOTUSRSBINPROG)
 clean:	
 	$(RM) $(OBJS) $(POFILES)
 
-lint:	$(ILB_SRCS)
-	$(LINT.c) $(ILB_SRCS) $(LDLIBS)
+lint:	$(SRCS)
+	$(LINT.c) $(SRCS) $(LDLIBS)
 
-check:	$(ILB_SRCS) $(PROG).h
-	$(CSTYLE) -pP $(ILB_SRCS) $(PROG).h
+check:	$(SRCS) $(PROG).h
+	$(CSTYLE) -pP $(SRCS) $(PROG).h
 	$(HDRCHK) $(PROG).h
 
 include ../../../Makefile.targ

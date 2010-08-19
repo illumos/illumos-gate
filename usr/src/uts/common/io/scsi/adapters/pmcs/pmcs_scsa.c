@@ -479,21 +479,22 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		    target->target_num);
 		pwp->targets[target->target_num] = NULL;
 		target->target_num = PMCS_INVALID_TARGET_NUM;
-		/*
-		 * If the target still has a PHY pointer, break the linkage
-		 */
-		if (phyp) {
+		/* If the PHY has a pointer to this target, clear it */
+		if (phyp && (phyp->target == target)) {
 			phyp->target = NULL;
 		}
 		target->phy = NULL;
+		if (phyp) {
+			mutex_exit(&phyp->phy_lock);
+		}
 		pmcs_destroy_target(target);
 	} else {
 		mutex_exit(&target->statlock);
+		if (phyp) {
+			mutex_exit(&phyp->phy_lock);
+		}
 	}
 
-	if (phyp) {
-		mutex_exit(&phyp->phy_lock);
-	}
 	mutex_exit(&pwp->lock);
 }
 
@@ -1120,7 +1121,6 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	pmcs_smp_release(iport);
 	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
-
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);
 		if (pmcs_abort(pwp, pptr, htag, 0, 0)) {
@@ -1423,7 +1423,8 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		    (void *)tgt, tgt->target_num);
 		pwp->targets[tgt->target_num] = NULL;
 		tgt->target_num = PMCS_INVALID_TARGET_NUM;
-		if (phyp) {
+		/* If the PHY has a pointer to this target, clear it */
+		if (phyp && (phyp->target == tgt)) {
 			phyp->target = NULL;
 		}
 		tgt->phy = NULL;
@@ -1630,18 +1631,17 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 
 		pwrk->xp = xp;
 		pwrk->arg = sp;
+		pwrk->timer = 0;
 		sp->cmd_tag = pwrk->htag;
-		pwrk->timer = US2WT(CMD2PKT(sp)->pkt_time * 1000000);
-		if (pwrk->timer == 0) {
-			pwrk->timer = US2WT(1000000);
-		}
 
 		pwrk->dtype = xp->dtype;
 
 		if (xp->dtype == SAS) {
 			pwrk->ptr = (void *) pmcs_SAS_done;
 			if ((rval = pmcs_SAS_run(sp, pwrk)) != 0) {
-				sp->cmd_tag = NULL;
+				if (rval != PMCS_WQ_RUN_FAIL_RES_CMP) {
+					sp->cmd_tag = NULL;
+				}
 				pmcs_dec_phy_ref_count(phyp);
 				pmcs_pwork(pwp, pwrk);
 				SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
@@ -1844,8 +1844,9 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	pmcs_hw_t *pwp = CMD2PMC(sp);
 	struct scsi_pkt *pkt = CMD2PKT(sp);
 	pmcs_xscsi_t *xp = pwrk->xp;
-	uint32_t iq, *ptr;
+	uint32_t iq, lhtag, *ptr;
 	sas_ssp_cmd_iu_t sc;
+	int sp_pkt_time = 0;
 
 	ASSERT(xp != NULL);
 	mutex_enter(&xp->statlock);
@@ -1897,6 +1898,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 			if (STAILQ_EMPTY(&xp->wq)) {
 				STAILQ_INSERT_HEAD(&xp->wq, sp, cmd_next);
 				mutex_exit(&xp->wqlock);
+				return (PMCS_WQ_RUN_FAIL_RES);
 			} else {
 				mutex_exit(&xp->wqlock);
 				CMD2PKT(sp)->pkt_scbp[0] = STATUS_QFULL;
@@ -1904,6 +1906,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 				CMD2PKT(sp)->pkt_state |= STATE_GOT_BUS |
 				    STATE_GOT_TARGET | STATE_SENT_CMD |
 				    STATE_GOT_STATUS;
+				sp->cmd_tag = NULL;
 				mutex_enter(&pwp->cq_lock);
 				STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 				PMCS_CQ_RUN_LOCKED(pwp);
@@ -1911,8 +1914,8 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 				    "%s: Failed to dma_load for tgt %d (QF)",
 				    __func__, xp->target_num);
+				return (PMCS_WQ_RUN_FAIL_RES_CMP);
 			}
-			return (PMCS_WQ_RUN_FAIL_RES);
 		}
 	} else {
 		ptr[4] = LE_32(PMCIN_DATADIR_NONE);
@@ -1957,6 +1960,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	    min(SCSA_CDBLEN(sp), sizeof (sc.cdb)));
 	(void) memcpy(&ptr[5], &sc, sizeof (sas_ssp_cmd_iu_t));
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
+	lhtag = pwrk->htag;
 	mutex_exit(&pwrk->lock);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL,
 	    "%s: giving pkt %p (tag %x) to the hardware", __func__,
@@ -1967,7 +1971,16 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	mutex_enter(&xp->aqlock);
 	STAILQ_INSERT_TAIL(&xp->aq, sp, cmd_next);
 	mutex_exit(&xp->aqlock);
+	sp_pkt_time = CMD2PKT(sp)->pkt_time;
 	INC_IQ_ENTRY(pwp, iq);
+	mutex_enter(&pwrk->lock);
+	if (lhtag == pwrk->htag) {
+		pwrk->timer = US2WT(sp_pkt_time * 1000000);
+		if (pwrk->timer == 0) {
+			pwrk->timer = US2WT(1000000);
+		}
+	}
+	mutex_exit(&pwrk->lock);
 
 	/*
 	 * If we just submitted the last command queued from device state
@@ -2347,10 +2360,11 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	struct scsi_pkt *pkt = CMD2PKT(sp);
 	pmcs_xscsi_t *xp;
 	uint8_t cdb_base, asc, tag;
-	uint32_t *ptr, iq, nblk, i, mtype;
+	uint32_t *ptr, lhtag, iq, nblk, i, mtype;
 	fis_t fis;
 	size_t amt;
 	uint64_t lba;
+	int sp_pkt_time = 0;
 
 	xp = pwrk->xp;
 	ASSERT(xp != NULL);
@@ -2562,6 +2576,7 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	}
 
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
+	lhtag = pwrk->htag;
 	mutex_exit(&pwrk->lock);
 	xp->tagmap |= (1 << tag);
 	xp->actv_cnt++;
@@ -2579,7 +2594,16 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 #ifdef DEBUG
 	pmcs_print_entry(pwp, PMCS_PRT_DEBUG3, "SATA INI Message", ptr);
 #endif
+	sp_pkt_time = CMD2PKT(sp)->pkt_time;
 	INC_IQ_ENTRY(pwp, iq);
+	mutex_enter(&pwrk->lock);
+	if (lhtag == pwrk->htag) {
+		pwrk->timer = US2WT(sp_pkt_time * 1000000);
+		if (pwrk->timer == 0) {
+			pwrk->timer = US2WT(1000000);
+		}
+	}
+	mutex_exit(&pwrk->lock);
 
 	return (PMCS_WQ_RUN_SUCCESS);
 }
@@ -3191,6 +3215,14 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port, boolean_t alloc_tgt)
 			}
 		}
 
+		/*
+		 * Set this target pointer back up, since it's been
+		 * through pmcs_clear_xp().
+		 */
+		tgt->dev_gone = 0;
+		tgt->assigned = 1;
+		tgt->dtype = phyp->dtype;
+		tgt->dev_state = PMCS_DEVICE_STATE_OPERATIONAL;
 		tgt->phy = phyp;
 		phyp->target = tgt;
 

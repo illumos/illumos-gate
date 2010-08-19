@@ -53,10 +53,8 @@ file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/ngdr.conf group=sys \
     preserve=true
 file path=platform/SUNW,Ultra-Enterprise-10000/kernel/misc/$(ARCH64)/ngdrmach \
     group=sys mode=0755
-legacy pkg=SUNWdrr.u arch=$(ARCH).sun4u category=system \
+legacy pkg=SUNWdrr.u arch=$(ARCH).sun4u \
     desc="Dynamic Reconfiguration Modules for Sun Enterprise 10000" \
-    hotline="Please contact your local service provider" \
-    name="Dynamic Reconfiguration Modules for Sun Enterprise 10000" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Dynamic Reconfiguration Modules for Sun Enterprise 10000"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

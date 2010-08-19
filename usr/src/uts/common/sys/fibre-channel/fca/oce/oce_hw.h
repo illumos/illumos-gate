@@ -136,6 +136,13 @@ extern "C" {
 #define	ASYNC_EVENT_LINK_UP			0x1
 #define	ASYNC_EVENT_LINK_DOWN		0x0
 
+/* port link_status */
+#define	ASYNC_EVENT_LOGICAL		0x02
+
+/* Logical Link Status */
+#define	NTWK_LOGICAL_LINK_DOWN		0
+#define	NTWK_LOGICAL_LINK_UP		1
+
 /* Rx filter bits */
 #define	NTWK_RX_FILTER_IP_CKSUM 	0x1
 #define	NTWK_RX_FILTER_TCP_CKSUM	0x2
@@ -812,17 +819,10 @@ struct mbx_set_common_iface_multicast {
 	struct mbx_hdr hdr;
 	union {
 		struct {
-#ifdef _BIG_ENDIAN
-			/* dw 0 */
-			uint8_t if_id;
-			uint8_t promiscuous;
-			uint16_t num_mac;
-#else
 			/* dw 0 */
 			uint16_t num_mac;
 			uint8_t promiscuous;
 			uint8_t if_id;
-#endif
 			/* dw 1-48 */
 			struct {
 				uint8_t byte[6];
@@ -1254,6 +1254,36 @@ struct mbx_common_read_write_flashrom {
 	uint8_t		data_buffer[4];  /* + IMAGE_TRANSFER_SIZE */
 };
 
+/* ULP MODE SUPPORTED */
+enum {
+	ULP_TOE_MODE = 0x1,
+	ULP_NIC_MODE = 0x2,
+	ULP_RDMA_MODE = 0x4,
+	ULP_ISCSI_INI_MODE = 0x10,
+	ULP_ISCSI_TGT_MODE = 0x20,
+	ULP_FCOE_INI_MODE = 0x40,
+	ULP_FCOE_TGT_MODE = 0x80,
+	ULP_DAL_MODE = 0x100,
+	ULP_LRO_MODE = 0x200
+};
+
+/* Function Mode Supported */
+enum {
+	TOE_MODE = 0x1, /* TCP offload  */
+	NIC_MODE = 0x2, /* Raw Ethernet  */
+	RDMA_MODE = 0x4, /*  RDMA  */
+	VM_MODE = 0x8,   /* VM  */
+	ISCSI_INI_MODE = 0x10, /*  iSCSI initiator */
+	ISCSI_TGT_MODE = 0x20, /* iSCSI target plus initiator */
+	FCOE_INI_MODE = 0x40, /* FCoE Initiator */
+	FCOE_TGT_MODE = 0x80, /* FCoE target */
+	DAL_MODE = 0x100, /* DAL */
+	LRO_MODE = 0x200, /* LRO */
+	FLEX10_MODE = 0x400, /*  FLEX-10  or VNIC */
+	NCSI_MODE = 0x800, /* NCSI */
+	INVALID_MODE = 0x8000 /* Invalid */
+};
+
 struct mbx_common_query_fw_config {
 	struct mbx_hdr hdr;
 	union {
@@ -1266,32 +1296,23 @@ struct mbx_common_query_fw_config {
 			uint32_t    asic_revision;
 			uint32_t    port_id; /* used for stats retrieval */
 			uint32_t    function_mode;
-			uint32_t    ulp0_mode;
-			uint32_t    ulp0_nic_wqid_base;
-			uint32_t    ulp0_nic_wq_tot;
-			uint32_t    ulp0_toe_wqid_base;
-			uint32_t    ulp0_toe_wq_tot;
-			uint32_t    ulp0_toe_rqid_base;
-			uint32_t    ulp0_toe_rqid_tot;
-			uint32_t    ulp0_toe_defrqid_base;
-			uint32_t    ulp0_toe_defrq_tot;
-			uint32_t    ulp0_lro_rqid_base;
-			uint32_t    ulp0_lro_rqid_tot;
-			uint32_t    ulp0_iscsi_icd_base;
-			uint32_t    ulp0_iscsi_icd_tot;
-			uint32_t    ulp1_mode;
-			uint32_t    ulp1_nic_wqid_base;
-			uint32_t    ulp1_wq_tot;
-			uint32_t    ulp1_toe_wqid_base;
-			uint32_t    ulp1_toe_wq_tot;
-			uint32_t    ulp1_toe_rqid_base;
-			uint32_t    ulp1_toe_rqid_tot;
-			uint32_t    ulp1_toe_defrqid_base;
-			uint32_t    ulp1_toe_defrq_tot;
-			uint32_t    ulp1_lro_rqid_base;
-			uint32_t    ulp1_lro_rqid_tot;
-			uint32_t    ulp1_iscsi_icd_base;
-			uint32_t    ulp1_iscsi_icd_tot;
+			struct {
+
+				uint32_t    mode;
+				uint32_t    wq_base;
+				uint32_t    wq_count;
+				uint32_t    sq_base;
+				uint32_t    sq_count;
+				uint32_t    rq_base;
+				uint32_t    rq_count;
+				uint32_t    dq_base;
+				uint32_t    dq_count;
+				uint32_t    lro_base;
+				uint32_t    lro_count;
+				uint32_t    icd_base;
+				uint32_t    icd_count;
+			} ulp[2];
+			uint32_t function_caps;
 		}rsp;
 	}params;
 };

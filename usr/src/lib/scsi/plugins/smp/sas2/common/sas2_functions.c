@@ -236,6 +236,18 @@ sas2_report_zone_perm_table_rq_len(size_t user, smp_target_t *tp)
 
 /*ARGSUSED*/
 static size_t
+sas2_report_zone_mgr_password_rq_len(size_t user, smp_target_t *tp)
+{
+	if (user != 0) {
+		(void) smp_set_errno(ESMP_RANGE);
+		return (0);
+	}
+
+	return (SMP_REQ_MINLEN + sizeof (smp_report_zone_perm_table_req_t));
+}
+
+/*ARGSUSED*/
+static size_t
 sas2_report_broadcast_rq_len(size_t user, smp_target_t *tp)
 {
 	if (user != 0) {
@@ -658,7 +670,7 @@ smp_function_def_t sas2_functions[] = {
 {
 	.sfd_function = SMP_FUNC_REPORT_ZONE_MANAGER_PASSWORD,
 	.sfd_flags = SMP_FD_F_READ | SMP_FD_F_PROVIDES_CHANGE_COUNT,
-	.sfd_rq_len = sas2_rq_len,
+	.sfd_rq_len = sas2_report_zone_mgr_password_rq_len,
 	.sfd_rq_dataoff = sas2_rq_dataoff,
 	.sfd_rq_setframe = sas2_rq_setframe,
 	.sfd_rs_datalen = sas2_rs_datalen,
@@ -916,9 +928,10 @@ smp_default_request_len(uint_t cap, smp_function_t fn)
 	switch (fn) {
 	case SMP_FUNC_REPORT_GENERAL:
 	case SMP_FUNC_REPORT_MANUFACTURER_INFO:
-	case SMP_FUNC_REPORT_ZONE_MANAGER_PASSWORD:
 		return (SMP_REQ_MINLEN);
-
+	case SMP_FUNC_REPORT_ZONE_MANAGER_PASSWORD:
+		return (SMP_REQ_MINLEN +
+		    sizeof (smp_report_zone_mgr_password_req_t));
 	case SMP_FUNC_REPORT_SELF_CONFIG_STATUS:
 		if (cap & SMP_TARGET_C_LONG_RESP)
 			return (SMP_REQ_MINLEN +
@@ -1023,7 +1036,6 @@ smp_default_response_len(uint_t cap, smp_function_t fn)
 	switch (fn) {
 	case SMP_FUNC_REPORT_SELF_CONFIG_STATUS:
 	case SMP_FUNC_REPORT_ZONE_PERM_TABLE:
-	case SMP_FUNC_REPORT_ZONE_MANAGER_PASSWORD:
 	case SMP_FUNC_REPORT_BROADCAST:
 	case SMP_FUNC_REPORT_PHY_EVENT:
 	case SMP_FUNC_DISCOVER_LIST:
@@ -1043,7 +1055,9 @@ smp_default_response_len(uint_t cap, smp_function_t fn)
 	case SMP_FUNC_PHY_TEST_FUNCTION:
 	case SMP_FUNC_CONFIG_PHY_EVENT:
 		return (SMP_RESP_MINLEN);
-
+	case SMP_FUNC_REPORT_ZONE_MANAGER_PASSWORD:
+		return (SMP_RESP_MINLEN +
+		    sizeof (smp_report_zone_mgr_password_resp_t));
 	case SMP_FUNC_REPORT_GENERAL:
 		return (SMP_RESP_MINLEN + 24);
 	case SMP_FUNC_REPORT_MANUFACTURER_INFO:

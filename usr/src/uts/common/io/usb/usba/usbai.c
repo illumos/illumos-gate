@@ -17,9 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -76,11 +76,6 @@ int	usba_debug_chatty;		/* L1 msg on console */
 static char *usba_debug_buf = NULL;	/* The debug buf */
 static char *usba_buf_sptr, *usba_buf_eptr;
 static hrtime_t usba_last_timestamp;	/* last time stamp in trace */
-
-/*
- * Set to 1 to enable PM.
- */
-int usb_force_enable_pm = 0;
 
 /* USBA framework initializations */
 void
@@ -677,52 +672,11 @@ usb_req_lower_power(dev_info_t *dip, int comp, int level,
 int
 usb_is_pm_enabled(dev_info_t *dip)
 {
-	usba_device_t  *usba_device = usba_get_usba_device(dip);
-
-	switch (usb_force_enable_pm) {
-	case -1:
-		/* no PM at all */
-
-		return (USB_FAILURE);
-	case 1:
-		/* PM on all platforms, regardless of hcd */
-
-		return (USB_SUCCESS);
-	case 0:
-	default:
-
-		break;
-
-	}
-
-	if (usba_device) {
-		dev_info_t *root_hub_dip;
-		usba_hcdi_t *hcdi;
-		int rval;
-
-		root_hub_dip = usba_device->usb_root_hub_dip;
-		if (root_hub_dip == NULL) {
-
-			return (USB_FAILURE);
-		}
-
-		hcdi = usba_hcdi_get_hcdi(root_hub_dip);
-		if (hcdi && hcdi->hcdi_ops->usba_hcdi_pm_support) {
-			rval = hcdi->hcdi_ops->
-			    usba_hcdi_pm_support(root_hub_dip);
-			if (rval != USB_SUCCESS) {
-				USB_DPRINTF_L2(DPRINT_MASK_USBA,
-				    usbai_log_handle,
-				    "%s%d: no PM enabled for this device",
-				    ddi_driver_name(dip),
-				    ddi_get_instance(dip));
-			}
-
-			return (rval);
-		}
-	}
-
-	return (USB_FAILURE);
+	/*
+	 * At this point we should assume that all devices
+	 * are capable of supporting PM
+	 */
+	return (USB_SUCCESS);
 }
 
 

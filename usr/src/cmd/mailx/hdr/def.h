@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1985, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -39,8 +38,6 @@
 
 #ifndef _MAILX_DEF_H
 #define	_MAILX_DEF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -474,7 +471,7 @@ extern int		from(int *msgvec);
 extern off_t		fsize(FILE *iob);
 extern int		getfold(char *name);
 extern int	gethfield(register FILE *f, char linebuf[], register long rem);
-extern int	getline(char *line, int size, FILE *f, int *hasnulls);
+extern int	getaline(char *line, int size, FILE *f, int *hasnulls);
 extern int	getmessage(char *buf, int *vector, int flags);
 extern int	getmsglist(char *buf, int *vector, int flags);
 extern int	getname(uid_t uid, char namebuf[]);

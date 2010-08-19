@@ -103,6 +103,36 @@
  *   subtree (eg. multiple DISABLE events on vertices in the same subtree) then
  *   once the first vertex is disabled (GV_TODISABLE flag is removed), we
  *   continue to propagate the offline event to the vertex's dependencies.
+ *
+ *
+ * SMF state transition notifications
+ *
+ *   When an instance of a service managed by SMF changes state, svc.startd may
+ *   publish a GPEC sysevent. All transitions to or from maintenance, a
+ *   transition cause by a hardware error will generate an event.
+ *   Other transitions will generate an event if there exist notification
+ *   parameter for that transition. Notification parameters are stored in the
+ *   SMF repository for the service/instance they refer to. System-wide
+ *   notification parameters are stored in the global instance.
+ *   svc.startd can be told to send events for all SMF state transitions despite
+ *   of notification parameters by setting options/info_events_all to true in
+ *   restarter:default
+ *
+ *   The set of transitions that generate events is cached in the
+ *   dgraph_vertex_t gv_stn_tset for service/instance and in the global
+ *   stn_global for the system-wide set. They are re-read when instances are
+ *   refreshed.
+ *
+ *   The GPEC events published by svc.startd are consumed by fmd(1M). After
+ *   processing these events, fmd(1M) publishes the processed events to
+ *   notification agents. The notification agents read the notification
+ *   parameters from the SMF repository through libscf(3LIB) interfaces and send
+ *   the notification, or not, based on those parameters.
+ *
+ *   Subscription and publishing to the GPEC channels is done with the
+ *   libfmevent(3LIB) wrappers fmev_[r]publish_*() and
+ *   fmev_shdl_(un)subscribe().
+ *
  */
 
 #include <sys/uadmin.h>
@@ -111,8 +141,10 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <fm/libfmevent.h>
 #include <libscf.h>
 #include <libscf_priv.h>
+#include <librestart.h>
 #include <libuutil.h>
 #include <locale.h>
 #include <poll.h>
@@ -141,6 +173,28 @@
 
 #define	VERTEX_REMOVED	0	/* vertex has been freed  */
 #define	VERTEX_INUSE	1	/* vertex is still in use */
+
+#define	IS_ENABLED(v) ((v)->gv_flags & (GV_ENABLED | GV_ENBLD_NOOVR))
+
+/*
+ * stn_global holds the tset for the system wide notification parameters.
+ * It is updated on refresh of svc:/system/svc/global:default
+ *
+ * There are two assumptions that relax the need for a mutex:
+ *     1. 32-bit value assignments are atomic
+ *     2. Its value is consumed only in one point at
+ *     dgraph_state_transition_notify(). There are no test and set races.
+ *
+ *     If either assumption is broken, we'll need a mutex to synchronize
+ *     access to stn_global
+ */
+int32_t stn_global;
+/*
+ * info_events_all holds a flag to override notification parameters and send
+ * Information events for all state transitions.
+ * same about the need of a mutex here.
+ */
+int info_events_all;
 
 /*
  * Services in these states are not considered 'down' by the
@@ -858,7 +912,8 @@ vertex_send_event(graph_vertex_t *v, restarter_event_type_t e)
 		abort();
 	}
 
-	restarter_protocol_send_event(v->gv_name, v->gv_restarter_channel, e);
+	restarter_protocol_send_event(v->gv_name, v->gv_restarter_channel, e,
+	    v->gv_reason);
 }
 
 static void
@@ -3096,6 +3151,7 @@ configure_vertex(graph_vertex_t *v, scf_instance_t *inst)
 	int err;
 	int *path;
 	int deathrow;
+	int32_t tset;
 
 	restarter_fmri[0] = '\0';
 
@@ -3236,7 +3292,8 @@ configure_vertex(graph_vertex_t *v, scf_instance_t *inst)
 
 init_state:
 		switch (err = _restarter_commit_states(h, &idata,
-		    RESTARTER_STATE_UNINIT, RESTARTER_STATE_NONE, NULL)) {
+		    RESTARTER_STATE_UNINIT, RESTARTER_STATE_NONE,
+		    restarter_get_str_short(restarter_str_insert_in_graph))) {
 		case 0:
 			break;
 
@@ -3361,6 +3418,17 @@ init_state:
 		bad_error("libscf_get_basic_instance_data", err);
 	}
 
+	if ((tset = libscf_get_stn_tset(inst)) == -1) {
+		log_framework(LOG_WARNING,
+		    "Failed to get notification parameters for %s: %s\n",
+		    v->gv_name, scf_strerror(scf_error()));
+		v->gv_stn_tset = 0;
+	} else {
+		v->gv_stn_tset = tset;
+	}
+	if (strcmp(v->gv_name, SCF_INSTANCE_GLOBAL) == 0)
+		stn_global = v->gv_stn_tset;
+
 	if (enabled == -1) {
 		startd_free(restarter_fmri, max_scf_value_size);
 		return (0);
@@ -3382,7 +3450,7 @@ init_state:
 	if (err != 0) {
 		instance_data_t idata;
 		uint_t count = 0, msecs = ALLOC_DELAY;
-		const char *reason;
+		restarter_str_t reason;
 
 		if (err == ECONNABORTED) {
 			startd_free(restarter_fmri, max_scf_value_size);
@@ -3394,10 +3462,10 @@ init_state:
 		if (err == EINVAL) {
 			log_framework(LOG_ERR, emsg_invalid_restarter,
 			    v->gv_name, restarter_fmri);
-			reason = "invalid_restarter";
+			reason = restarter_str_invalid_restarter;
 		} else {
 			handle_cycle(v->gv_name, path);
-			reason = "dependency_cycle";
+			reason = restarter_str_dependency_cycle;
 		}
 
 		startd_free(restarter_fmri, max_scf_value_size);
@@ -3417,7 +3485,8 @@ init_state:
 
 set_maint:
 		switch (err = _restarter_commit_states(h, &idata,
-		    RESTARTER_STATE_MAINT, RESTARTER_STATE_NONE, reason)) {
+		    RESTARTER_STATE_MAINT, RESTARTER_STATE_NONE,
+		    restarter_get_str_short(reason))) {
 		case 0:
 			break;
 
@@ -4246,6 +4315,7 @@ dgraph_refresh_instance(graph_vertex_t *v, scf_instance_t *inst)
 {
 	int r;
 	int enabled;
+	int32_t tset;
 
 	assert(MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_type == GVT_INST);
@@ -4270,6 +4340,16 @@ dgraph_refresh_instance(graph_vertex_t *v, scf_instance_t *inst)
 	default:
 		bad_error("libscf_get_basic_instance_data", r);
 	}
+
+	if ((tset = libscf_get_stn_tset(inst)) == -1) {
+		log_framework(LOG_WARNING,
+		    "Failed to get notification parameters for %s: %s\n",
+		    v->gv_name, scf_strerror(scf_error()));
+		tset = 0;
+	}
+	v->gv_stn_tset = tset;
+	if (strcmp(v->gv_name, SCF_INSTANCE_GLOBAL) == 0)
+		stn_global = tset;
 
 	if (enabled == -1)
 		return (EINVAL);
@@ -4573,6 +4653,131 @@ recurse:
 	graph_walk_dependencies(v, disable_nonsubgraph_leaves, arg);
 }
 
+static int
+stn_restarter_state(restarter_instance_state_t rstate)
+{
+	static const struct statemap {
+		restarter_instance_state_t restarter_state;
+		int scf_state;
+	} map[] = {
+		{ RESTARTER_STATE_UNINIT, SCF_STATE_UNINIT },
+		{ RESTARTER_STATE_MAINT, SCF_STATE_MAINT },
+		{ RESTARTER_STATE_OFFLINE, SCF_STATE_OFFLINE },
+		{ RESTARTER_STATE_DISABLED, SCF_STATE_DISABLED },
+		{ RESTARTER_STATE_ONLINE, SCF_STATE_ONLINE },
+		{ RESTARTER_STATE_DEGRADED, SCF_STATE_DEGRADED }
+	};
+
+	int i;
+
+	for (i = 0; i < sizeof (map) / sizeof (map[0]); i++) {
+		if (rstate == map[i].restarter_state)
+			return (map[i].scf_state);
+	}
+
+	return (-1);
+}
+
+/*
+ * State transition counters
+ * Not incremented atomically - indicative only
+ */
+static uint64_t stev_ct_maint;
+static uint64_t stev_ct_hwerr;
+static uint64_t stev_ct_service;
+static uint64_t stev_ct_global;
+static uint64_t stev_ct_noprefs;
+static uint64_t stev_ct_from_uninit;
+static uint64_t stev_ct_bad_state;
+static uint64_t stev_ct_ovr_prefs;
+
+static void
+dgraph_state_transition_notify(graph_vertex_t *v,
+    restarter_instance_state_t old_state, restarter_str_t reason)
+{
+	restarter_instance_state_t new_state = v->gv_state;
+	int stn_transition, maint;
+	int from, to;
+	nvlist_t *attr;
+	fmev_pri_t pri = FMEV_LOPRI;
+	int raise = 0;
+
+	if ((from = stn_restarter_state(old_state)) == -1 ||
+	    (to = stn_restarter_state(new_state)) == -1) {
+		stev_ct_bad_state++;
+		return;
+	}
+
+	stn_transition = from << 16 | to;
+
+	maint = (to == SCF_STATE_MAINT || from == SCF_STATE_MAINT);
+
+	if (maint) {
+		/*
+		 * All transitions to/from maintenance state must raise
+		 * an event.
+		 */
+		raise++;
+		pri = FMEV_HIPRI;
+		stev_ct_maint++;
+	} else if (reason == restarter_str_ct_ev_hwerr) {
+		/*
+		 * All transitions caused by hardware fault must raise
+		 * an event
+		 */
+		raise++;
+		pri = FMEV_HIPRI;
+		stev_ct_hwerr++;
+	} else if (stn_transition & v->gv_stn_tset) {
+		/*
+		 * Specifically enabled event.
+		 */
+		raise++;
+		stev_ct_service++;
+	} else if (from == SCF_STATE_UNINIT) {
+		/*
+		 * Only raise these if specifically selected above.
+		 */
+		stev_ct_from_uninit++;
+	} else if (stn_transition & stn_global &&
+	    (IS_ENABLED(v) == 1 || to == SCF_STATE_DISABLED)) {
+		raise++;
+		stev_ct_global++;
+	} else {
+		stev_ct_noprefs++;
+	}
+
+	if (info_events_all) {
+		stev_ct_ovr_prefs++;
+		raise++;
+	}
+	if (!raise)
+		return;
+
+	if (nvlist_alloc(&attr, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_string(attr, "fmri", v->gv_name) != 0 ||
+	    nvlist_add_uint32(attr, "reason-version",
+	    restarter_str_version()) || nvlist_add_string(attr, "reason-short",
+	    restarter_get_str_short(reason)) != 0 ||
+	    nvlist_add_string(attr, "reason-long",
+	    restarter_get_str_long(reason)) != 0 ||
+	    nvlist_add_int32(attr, "transition", stn_transition) != 0) {
+		log_framework(LOG_WARNING,
+		    "FMEV: %s could not create nvlist for transition "
+		    "event: %s\n", v->gv_name, strerror(errno));
+		nvlist_free(attr);
+		return;
+	}
+
+	if (fmev_rspublish_nvl(FMEV_RULESET_SMF, "state-transition",
+	    instance_state_str[new_state], pri, attr) != FMEV_SUCCESS) {
+		log_framework(LOG_DEBUG,
+		    "FMEV: %s failed to publish transition event: %s\n",
+		    v->gv_name, fmev_strerror(fmev_errno));
+		nvlist_free(attr);
+	}
+}
+
 /*
  * Find the vertex for inst_name.  If it doesn't exist, return ENOENT.
  * Otherwise set its state to state.  If the instance has entered a state
@@ -4587,11 +4792,13 @@ recurse:
  */
 static int
 dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
-    restarter_instance_state_t state, restarter_error_t serr)
+    protocol_states_t *states)
 {
 	graph_vertex_t *v;
 	int err = 0;
 	restarter_instance_state_t old_state;
+	restarter_instance_state_t state = states->ps_state;
+	restarter_error_t serr = states->ps_err;
 
 	MUTEX_LOCK(&dgraph_lock);
 
@@ -4623,7 +4830,11 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
 	old_state = v->gv_state;
 	v->gv_state = state;
 
+	v->gv_reason = states->ps_reason;
 	err = gt_transition(h, v, serr, old_state);
+	if (err == 0 && v->gv_state != old_state) {
+		dgraph_state_transition_notify(v, old_state, states->ps_reason);
+	}
 
 	MUTEX_UNLOCK(&dgraph_lock);
 	return (err);
@@ -5559,8 +5770,7 @@ handle_graph_update_event(scf_handle_t *h, graph_protocol_event_t *e)
 	case GRAPH_UPDATE_STATE_CHANGE: {
 		protocol_states_t *states = e->gpe_data;
 
-		switch (r = dgraph_set_instance_state(h, e->gpe_inst,
-		    states->ps_state, states->ps_err)) {
+		switch (r = dgraph_set_instance_state(h, e->gpe_inst, states)) {
 		case 0:
 		case ENOENT:
 			break;
@@ -6379,6 +6589,12 @@ process_pg_event(scf_handle_t *h, scf_propertygroup_t *pg, scf_instance_t *inst,
 		startd_free(fmri, max_scf_fmri_size);
 		return (0);
 	}
+
+	/*
+	 * update the information events flag
+	 */
+	if (strcmp(pg_name, SCF_PG_OPTIONS) == 0)
+		info_events_all = libscf_get_info_events_all(pg);
 
 	prop = safe_scf_property_create(h);
 	val = safe_scf_value_create(h);

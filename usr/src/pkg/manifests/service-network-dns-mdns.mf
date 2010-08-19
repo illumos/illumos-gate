@@ -134,22 +134,17 @@ file path=usr/share/lib/java/javadoc/dnssd/api/serialized-form.html \
 file path=usr/share/lib/java/javadoc/dnssd/api/stylesheet.css group=other
 file path=usr/share/lib/java/javadoc/dnssd/examples/BrowserApp.jar group=sys
 file path=usr/share/lib/java/javadoc/dnssd/examples/SimpleChat.jar group=sys
-legacy pkg=SUNWdsdr arch=$(ARCH) category=system \
+legacy pkg=SUNWdsdr \
     desc="Root components for Multicast DNS daemon and service discovery support" \
-    hotline="Please contact your local service provider" \
-    name="Multicast DNS and Service Discovery (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWdsdu arch=$(ARCH) category=system \
-    desc="Multicast DNS daemon and service discovery modules" \
-    hotline="Please contact your local service provider" \
-    name="Multicast DNS and Service Discovery (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE
+    name="Multicast DNS and Service Discovery (Root)"
+legacy pkg=SUNWdsdu desc="Multicast DNS daemon and service discovery modules" \
+    name="Multicast DNS and Service Discovery (Usr)"
 license cr_Sun license=cr_Sun
-license lib/libdns_sd/THIRDPARTYLICENSE \
-    license=lib/libdns_sd/THIRDPARTYLICENSE
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE
+license usr/src/lib/libdns_sd/THIRDPARTYLICENSE \
+    license=usr/src/lib/libdns_sd/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libdns_sd.so target=libdns_sd.so.1
 link path=usr/lib/$(ARCH64)/libjdns_sd.so target=libjdns_sd.so.1
 link path=usr/lib/libdns_sd.so target=libdns_sd.so.1

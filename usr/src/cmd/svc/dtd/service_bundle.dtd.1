@@ -939,6 +939,44 @@
 
 <!ATTLIST template>
 
+<!-- Notification Parameters -->
+
+<!ELEMENT paramval EMPTY>
+
+<!ATTLIST paramval
+	name		CDATA #REQUIRED
+	value		CDATA #REQUIRED>
+
+<!ELEMENT parameter
+	( value_node* )>
+
+<!ATTLIST parameter
+	name		CDATA #REQUIRED>
+
+<!ELEMENT event EMPTY>
+
+<!ATTLIST event
+	value		CDATA #REQUIRED>
+
+<!ELEMENT type
+	( ( parameter | paramval )* )>
+
+<!ATTLIST type
+	name		CDATA #REQUIRED
+	active		( true | false ) "true" >
+
+<!--
+  notification parameters
+
+    This element sets the notification parameters for Software Events and
+    Fault Management problem lifecycle events.
+-->
+
+<!ELEMENT notification_parameters
+	( event, type+ )>
+
+<!ATTLIST notification_parameters>
+
 <!-- Services and instances -->
 
 <!--
@@ -991,7 +1029,8 @@
 
 <!ELEMENT instance
 	( restarter?, dependency*, dependent*, method_context?,
-	exec_method*, property_group*, template? ) >
+	exec_method*, notification_parameters*, property_group*,
+	template? ) >
 
 <!ATTLIST instance
 	name		CDATA #REQUIRED
@@ -1021,7 +1060,8 @@
 <!ELEMENT service
 	( create_default_instance?, single_instance?, restarter?,
 	dependency*, dependent*, method_context?, exec_method*,
-	property_group*, instance*, stability?, template? ) >
+	notification_parameters*, property_group*, instance*,
+	stability?, template? ) >
 
 <!ATTLIST service
 	name		CDATA #REQUIRED

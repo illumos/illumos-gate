@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -63,7 +64,7 @@ int
 lookupname(
 	char *fnamep,
 	enum uio_seg seg,
-	enum symfollow followlink,
+	int followlink,
 	vnode_t **dirvpp,
 	vnode_t **compvpp)
 {
@@ -79,7 +80,7 @@ int
 lookupnameatcred(
 	char *fnamep,			/* user pathname */
 	enum uio_seg seg,		/* addr space that name is in */
-	enum symfollow followlink,	/* follow sym links */
+	int followlink,			/* follow sym links */
 	vnode_t **dirvpp,		/* ret for ptr to parent dir vnode */
 	vnode_t **compvpp,		/* ret for ptr to component vnode */
 	vnode_t *startvp,		/* start path search from vp */
@@ -109,7 +110,7 @@ lookupnameatcred(
 }
 
 int
-lookupnameat(char *fnamep, enum uio_seg seg, enum symfollow followlink,
+lookupnameat(char *fnamep, enum uio_seg seg, int followlink,
     vnode_t **dirvpp, vnode_t **compvpp, vnode_t *startvp)
 {
 	return (lookupnameatcred(fnamep, seg, followlink, dirvpp, compvpp,
@@ -120,7 +121,7 @@ int
 lookuppn(
 	struct pathname *pnp,
 	struct pathname *rpnp,
-	enum symfollow followlink,
+	int followlink,
 	vnode_t **dirvpp,
 	vnode_t **compvpp)
 {
@@ -135,7 +136,7 @@ int
 lookuppnatcred(
 	struct pathname *pnp,		/* pathname to lookup */
 	struct pathname *rpnp,		/* if non-NULL, return resolved path */
-	enum symfollow followlink,	/* (don't) follow sym links */
+	int followlink,			/* (don't) follow sym links */
 	vnode_t **dirvpp,		/* ptr for parent vnode */
 	vnode_t **compvpp,		/* ptr for entry vnode */
 	vnode_t *startvp,		/* start search from this vp */
@@ -178,7 +179,7 @@ lookuppnatcred(
 
 int
 lookuppnat(struct pathname *pnp, struct pathname *rpnp,
-    enum symfollow followlink, vnode_t **dirvpp, vnode_t **compvpp,
+    int followlink, vnode_t **dirvpp, vnode_t **compvpp,
     vnode_t *startvp)
 {
 	return (lookuppnatcred(pnp, rpnp, followlink, dirvpp, compvpp, startvp,

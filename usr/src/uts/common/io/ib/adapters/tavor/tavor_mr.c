@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -597,27 +596,31 @@ tavor_mr_deregister(tavor_state_t *state, tavor_mrhdl_t *mrhdl, uint_t level,
 		}
 	}
 
-	/*
-	 * Decrement the MTT reference count.  Since the MTT resource
-	 * may be shared between multiple memory regions (as a result
-	 * of a "RegisterSharedMR" verb) it is important that we not
-	 * free up or unbind resources prematurely.  If it's not shared (as
-	 * indicated by the return status), then free the resource.
-	 */
-	shared_mtt = tavor_mtt_refcnt_dec(mtt_refcnt);
-	if (!shared_mtt) {
-		tavor_rsrc_free(state, &mtt_refcnt);
-	}
-
-	/*
-	 * Free up the MTT entries and unbind the memory.  Here, as above, we
-	 * attempt to free these resources only if it is appropriate to do so.
-	 */
-	if (!shared_mtt) {
-		if (level >= TAVOR_MR_DEREG_NO_HW2SW_MPT) {
-			tavor_mr_mem_unbind(state, bind);
+	/* mtt_refcnt is NULL in the case of tavor_dma_mr_register() */
+	if (mtt_refcnt != NULL) {
+		/*
+		 * Decrement the MTT reference count.  Since the MTT resource
+		 * may be shared between multiple memory regions (as a result
+		 * of a "RegisterSharedMR" verb) it is important that we not
+		 * free up or unbind resources prematurely.  If it's not shared
+		 * (as indicated by the return status), then free the resource.
+		 */
+		shared_mtt = tavor_mtt_refcnt_dec(mtt_refcnt);
+		if (!shared_mtt) {
+			tavor_rsrc_free(state, &mtt_refcnt);
 		}
-		tavor_rsrc_free(state, &mtt);
+
+		/*
+		 * Free up the MTT entries and unbind the memory.  Here,
+		 * as above, we attempt to free these resources only if
+		 * it is appropriate to do so.
+		 */
+		if (!shared_mtt) {
+			if (level >= TAVOR_MR_DEREG_NO_HW2SW_MPT) {
+				tavor_mr_mem_unbind(state, bind);
+			}
+			tavor_rsrc_free(state, &mtt);
+		}
 	}
 
 	/*
@@ -1480,6 +1483,178 @@ mrcommon_fail:
 	TNF_PROBE_1(tavor_mr_common_reg_fail, TAVOR_TNF_ERROR, "",
 	    tnf_string, msg, errormsg);
 	TAVOR_TNF_EXIT(tavor_mr_common_reg);
+	return (status);
+}
+
+int
+tavor_dma_mr_register(tavor_state_t *state, tavor_pdhdl_t pd,
+    ibt_dmr_attr_t *mr_attr, tavor_mrhdl_t *mrhdl)
+{
+	tavor_rsrc_t		*mpt, *rsrc;
+	tavor_hw_mpt_t		mpt_entry;
+	tavor_mrhdl_t		mr;
+	ibt_mr_flags_t		flags;
+	uint_t			sleep;
+	int			status;
+
+	/* Extract the flags field */
+	flags = mr_attr->dmr_flags;
+
+	/*
+	 * Check the sleep flag.  Ensure that it is consistent with the
+	 * current thread context (i.e. if we are currently in the interrupt
+	 * context, then we shouldn't be attempting to sleep).
+	 */
+	sleep = (flags & IBT_MR_NOSLEEP) ? TAVOR_NOSLEEP: TAVOR_SLEEP;
+	if ((sleep == TAVOR_SLEEP) &&
+	    (sleep != TAVOR_SLEEPFLAG_FOR_CONTEXT())) {
+		status = IBT_INVALID_PARAM;
+		goto mrcommon_fail;
+	}
+
+	/* Increment the reference count on the protection domain (PD) */
+	tavor_pd_refcnt_inc(pd);
+
+	/*
+	 * Allocate an MPT entry.  This will be filled in with all the
+	 * necessary parameters to define the memory region.  And then
+	 * ownership will be passed to the hardware in the final step
+	 * below.  If we fail here, we must undo the protection domain
+	 * reference count.
+	 */
+	status = tavor_rsrc_alloc(state, TAVOR_MPT, 1, sleep, &mpt);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto mrcommon_fail1;
+	}
+
+	/*
+	 * Allocate the software structure for tracking the memory region (i.e.
+	 * the Tavor Memory Region handle).  If we fail here, we must undo
+	 * the protection domain reference count and the previous resource
+	 * allocation.
+	 */
+	status = tavor_rsrc_alloc(state, TAVOR_MRHDL, 1, sleep, &rsrc);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto mrcommon_fail2;
+	}
+	mr = (tavor_mrhdl_t)rsrc->tr_addr;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
+	bzero(mr, sizeof (*mr));
+
+	/*
+	 * Setup and validate the memory region access flags.  This means
+	 * translating the IBTF's enable flags into the access flags that
+	 * will be used in later operations.
+	 */
+	mr->mr_accflag = 0;
+	if (flags & IBT_MR_ENABLE_WINDOW_BIND)
+		mr->mr_accflag |= IBT_MR_WINDOW_BIND;
+	if (flags & IBT_MR_ENABLE_LOCAL_WRITE)
+		mr->mr_accflag |= IBT_MR_LOCAL_WRITE;
+	if (flags & IBT_MR_ENABLE_REMOTE_READ)
+		mr->mr_accflag |= IBT_MR_REMOTE_READ;
+	if (flags & IBT_MR_ENABLE_REMOTE_WRITE)
+		mr->mr_accflag |= IBT_MR_REMOTE_WRITE;
+	if (flags & IBT_MR_ENABLE_REMOTE_ATOMIC)
+		mr->mr_accflag |= IBT_MR_REMOTE_ATOMIC;
+
+	/*
+	 * Calculate keys (Lkey, Rkey) from MPT index.  Each key is formed
+	 * from a certain number of "constrained" bits (the least significant
+	 * bits) and some number of "unconstrained" bits.  The constrained
+	 * bits must be set to the index of the entry in the MPT table, but
+	 * the unconstrained bits can be set to any value we wish.  Note:
+	 * if no remote access is required, then the RKey value is not filled
+	 * in.  Otherwise both Rkey and LKey are given the same value.
+	 */
+	tavor_mr_keycalc(state, mpt->tr_indx, &mr->mr_lkey);
+	if ((mr->mr_accflag & IBT_MR_REMOTE_READ) ||
+	    (mr->mr_accflag & IBT_MR_REMOTE_WRITE) ||
+	    (mr->mr_accflag & IBT_MR_REMOTE_ATOMIC)) {
+		mr->mr_rkey = mr->mr_lkey;
+	}
+
+	/*
+	 * Fill in the MPT entry.  This is the final step before passing
+	 * ownership of the MPT entry to the Tavor hardware.  We use all of
+	 * the information collected/calculated above to fill in the
+	 * requisite portions of the MPT.
+	 */
+	bzero(&mpt_entry, sizeof (tavor_hw_mpt_t));
+
+	mpt_entry.m_io	  = TAVOR_MEM_CYCLE_GENERATE;
+	mpt_entry.en_bind = (mr->mr_accflag & IBT_MR_WINDOW_BIND)   ? 1 : 0;
+	mpt_entry.atomic  = (mr->mr_accflag & IBT_MR_REMOTE_ATOMIC) ? 1 : 0;
+	mpt_entry.rw	  = (mr->mr_accflag & IBT_MR_REMOTE_WRITE)  ? 1 : 0;
+	mpt_entry.rr	  = (mr->mr_accflag & IBT_MR_REMOTE_READ)   ? 1 : 0;
+	mpt_entry.lw	  = (mr->mr_accflag & IBT_MR_LOCAL_WRITE)   ? 1 : 0;
+	mpt_entry.lr	  = 1;
+	mpt_entry.phys_addr = 1;	/* critical bit for this */
+	mpt_entry.reg_win = TAVOR_MPT_IS_REGION;
+
+	mpt_entry.page_sz	= mr->mr_logmttpgsz - 0xC;
+	mpt_entry.mem_key	= mr->mr_lkey;
+	mpt_entry.pd		= pd->pd_pdnum;
+	mpt_entry.win_cnt_limit = TAVOR_UNLIMITED_WIN_BIND;
+
+	mpt_entry.start_addr = mr_attr->dmr_paddr;
+	mpt_entry.reg_win_len = mr_attr->dmr_len;
+
+	mpt_entry.mttseg_addr_h = 0;
+	mpt_entry.mttseg_addr_l = 0;
+
+	/*
+	 * Write the MPT entry to hardware.  Lastly, we pass ownership of
+	 * the entry to the hardware if needed.  Note: in general, this
+	 * operation shouldn't fail.  But if it does, we have to undo
+	 * everything we've done above before returning error.
+	 *
+	 * For Tavor, this routine (which is common to the contexts) will only
+	 * set the ownership if needed - the process of passing the context
+	 * itself to HW will take care of setting up the MPT (based on type
+	 * and index).
+	 */
+
+	status = tavor_cmn_ownership_cmd_post(state, SW2HW_MPT, &mpt_entry,
+	    sizeof (tavor_hw_mpt_t), mpt->tr_indx, sleep);
+	if (status != TAVOR_CMD_SUCCESS) {
+		cmn_err(CE_CONT, "Tavor: SW2HW_MPT command failed: %08x\n",
+		    status);
+		status = ibc_get_ci_failure(0);
+		goto mrcommon_fail7;
+	}
+
+	/*
+	 * Fill in the rest of the Tavor Memory Region handle.  Having
+	 * successfully transferred ownership of the MPT, we can update the
+	 * following fields for use in further operations on the MR.
+	 */
+	mr->mr_mptrsrcp	   = mpt;
+	mr->mr_mttrsrcp	   = NULL;
+	mr->mr_pdhdl	   = pd;
+	mr->mr_rsrcp	   = rsrc;
+	mr->mr_is_umem	   = 0;
+	mr->mr_umemcookie  = NULL;
+	mr->mr_umem_cbfunc = NULL;
+	mr->mr_umem_cbarg1 = NULL;
+	mr->mr_umem_cbarg2 = NULL;
+
+	*mrhdl = mr;
+
+	return (DDI_SUCCESS);
+
+/*
+ * The following is cleanup for all possible failure cases in this routine
+ */
+mrcommon_fail7:
+	tavor_rsrc_free(state, &rsrc);
+mrcommon_fail2:
+	tavor_rsrc_free(state, &mpt);
+mrcommon_fail1:
+	tavor_pd_refcnt_dec(pd);
+mrcommon_fail:
 	return (status);
 }
 

@@ -19,14 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 .KEEP_STATE:
 .SUFFIXES:
 
-SRCS += fmdump.c asru.c error.c fault.c scheme.c
+SRCS += fmdump.c nvlrender.c asru.c error.c fault.c scheme.c info.c
 OBJS = $(SRCS:%.c=%.o)
 LINTFILES = $(SRCS:%.c=%.ln)
 

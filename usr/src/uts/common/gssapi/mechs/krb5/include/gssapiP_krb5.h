@@ -1,9 +1,6 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * Copyright 2000 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
@@ -843,6 +840,9 @@ gss_krb5int_extract_authtime_from_sec_context(OM_uint32 *,
                                               gss_buffer_set_t *);
 #endif /* _KERNEL */
 
+OM_uint32 gss_krb5int_initialize_library(void);
+void gss_krb5int_cleanup_library(void);
+
 /* For error message handling.  */
 /* Returns a shared string, not a private copy!  */
 extern char *
@@ -862,11 +862,12 @@ krb5_gss_save_error_message(OM_uint32 minor_code, const char *format, ...)
 #define save_error_message krb5_gss_save_error_message
 
 
-#if 0 /* SUNW17PACresync - revisit for full MIT 1.7 resync */
+/* Solaris Kerberos */
+#ifdef _KERNEL
+#define save_error_info(m, ctx)
+#else
 #define save_error_info krb5_gss_save_error_info
 #endif
-#define save_error_info(m, ctx)
-
 
 extern void krb5_gss_delete_error_info(void *p);
 

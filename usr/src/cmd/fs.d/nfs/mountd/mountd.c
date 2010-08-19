@@ -76,8 +76,11 @@
 #include <sys/tsol/label_macro.h>
 #include <libtsnet.h>
 #include <sys/sdt.h>
+#include <libscf.h>
+#include <limits.h>
 #include <sys/nvpair.h>
 #include <attr.h>
+#include "smfcfg.h"
 
 extern int daemonize_init(void);
 extern void daemonize_fini(int fd);
@@ -361,6 +364,8 @@ main(int argc, char *argv[])
 	bool_t	exclbind = TRUE;
 	bool_t	can_do_mlp;
 	long	thr_flags = (THR_NEW_LWP|THR_DAEMON);
+	char defval[4];
+	int defvers, ret, bufsz;
 
 	int	pipe_fd = -1;
 
@@ -412,33 +417,32 @@ main(int argc, char *argv[])
 	/*
 	 * Read in the NFS version values from config file.
 	 */
-	if ((defopen(NFSADMIN)) == 0) {
-		char *defval;
-		int defvers;
-
-		if ((defval = defread("NFS_SERVER_VERSMIN=")) != NULL) {
-			errno = 0;
-			defvers = strtol(defval, (char **)NULL, 10);
-			if (errno == 0) {
-				mount_vers_min = defvers;
-				/*
-				 * special because NFSv2 is
-				 * supported by mount v1 & v2
-				 */
-				if (defvers == NFS_VERSION)
-					mount_vers_min = MOUNTVERS;
-			}
+	bufsz = 4;
+	ret = nfs_smf_get_prop("server_versmin", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, NFSD, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		defvers = strtol(defval, (char **)NULL, 10);
+		if (errno == 0) {
+			mount_vers_min = defvers;
+			/*
+			 * special because NFSv2 is
+			 * supported by mount v1 & v2
+			 */
+			if (defvers == NFS_VERSION)
+				mount_vers_min = MOUNTVERS;
 		}
-		if ((defval = defread("NFS_SERVER_VERSMAX=")) != NULL) {
-			errno = 0;
-			defvers = strtol(defval, (char **)NULL, 10);
-			if (errno == 0) {
-				mount_vers_max = defvers;
-			}
-		}
+	}
 
-		/* close defaults file */
-		defopen(NULL);
+	bufsz = 4;
+	ret = nfs_smf_get_prop("server_versmax", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, NFSD, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		defvers = strtol(defval, (char **)NULL, 10);
+		if (errno == 0) {
+			mount_vers_max = defvers;
+		}
 	}
 
 	/*
@@ -447,7 +451,7 @@ main(int argc, char *argv[])
 	 * to start nfsauth service, so continue on regardless of values.
 	 */
 	if (mount_vers_min > mount_vers_max) {
-		fprintf(stderr, "NFS_SERVER_VERSMIN > NFS_SERVER_VERSMAX");
+		fprintf(stderr, "server_versmin > server_versmax");
 		mount_vers_max = mount_vers_min;
 	}
 	(void) setlocale(LC_ALL, "");

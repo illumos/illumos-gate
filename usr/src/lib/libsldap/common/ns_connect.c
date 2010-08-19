@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -75,7 +74,7 @@ extern int SetDoorInfoToUnixCred(char *buffer,
 		UnixCred_t **cred);
 
 static int openConnection(LDAP **, const char *, const ns_cred_t *,
-		int, ns_ldap_error_t **, int, int, ns_conn_user_t *);
+		int, ns_ldap_error_t **, int, int, ns_conn_user_t *, int);
 static void
 _DropConnection(ConnectionID cID, int flag, int fini);
 
@@ -780,7 +779,7 @@ makeConnection(Connection **conp, const char *serverAddr,
 			}
 		}
 		rc = openConnection(&ld, *bindHost, auth, timeoutSec, errorp,
-		    fail_if_new_pwd_reqd, passwd_mgmt, conn_user);
+		    fail_if_new_pwd_reqd, passwd_mgmt, conn_user, flags);
 		if (rc == NS_LDAP_SUCCESS || rc ==
 		    NS_LDAP_SUCCESS_WITH_INFO) {
 			exit_rc = rc;
@@ -852,7 +851,7 @@ makeConnection(Connection **conp, const char *serverAddr,
 		}
 		/* make the connection */
 		rc = openConnection(&ld, *bindHost, auth, timeoutSec, errorp,
-		    fail_if_new_pwd_reqd, passwd_mgmt, conn_user);
+		    fail_if_new_pwd_reqd, passwd_mgmt, conn_user, flags);
 		/* if success, go to create connection structure */
 		if (rc == NS_LDAP_SUCCESS ||
 		    rc == NS_LDAP_SUCCESS_WITH_INFO) {
@@ -1343,7 +1342,7 @@ static int
 openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 	int timeoutSec, ns_ldap_error_t **errorp,
 	int fail_if_new_pwd_reqd, int passwd_mgmt,
-	ns_conn_user_t *conn_user)
+	ns_conn_user_t *conn_user, int flags)
 {
 	LDAP			*ld = NULL;
 	int			ldapVersion = LDAP_VERSION3;
@@ -1353,6 +1352,7 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 	uint16_t		port = USE_DEFAULT_PORT;
 	char			*s;
 	char			errstr[MAXERROR];
+	int			followRef;
 
 	ns_ldap_return_code	ret_code = NS_LDAP_SUCCESS;
 
@@ -1407,14 +1407,27 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 	(void) ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldapVersion);
 	(void) ldap_set_option(ld, LDAP_OPT_DEREF, &derefOption);
 	/*
-	 * set LDAP_OPT_REFERRALS to OFF.
-	 * This library will handle the referral itself
-	 * based on API flags or configuration file
-	 * specification. If this option is not set
-	 * to OFF, libldap will never pass the
-	 * referral info up to this library
+	 * This library will handle the referral itself based on API flags or
+	 * configuration file specification. The LDAP bind operation is an
+	 * exception where we rely on the LDAP library to follow the referal.
+	 *
+	 * The LDAP follow referral option must be set to OFF for the libldap5
+	 * to pass the referral info up to this library. This option MUST be
+	 * set to OFF after we have performed a sucessful bind. If we are not
+	 * to follow referrals we MUST also set the LDAP follow referral option
+	 * to OFF before we perform an LDAP bind.
 	 */
-	(void) ldap_set_option(ld, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
+	ret_code = __s_api_toFollowReferrals(flags, &followRef, errorp);
+	if (ret_code != NS_LDAP_SUCCESS) {
+		(void) ldap_unbind(ld);
+		return (ret_code);
+	}
+
+	if (followRef)
+		(void) ldap_set_option(ld, LDAP_OPT_REFERRALS, LDAP_OPT_ON);
+	else
+		(void) ldap_set_option(ld, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
+
 	(void) ldap_set_option(ld, LDAP_OPT_TIMELIMIT, &zero);
 	(void) ldap_set_option(ld, LDAP_OPT_SIZELIMIT, &zero);
 	/* setup TCP/IP connect timeout */
@@ -1432,6 +1445,11 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 
 	if (ret_code == NS_LDAP_SUCCESS ||
 	    ret_code == NS_LDAP_SUCCESS_WITH_INFO) {
+		/*
+		 * Turn off LDAP referral following so that this library can
+		 * process referrals.
+		 */
+		(void) ldap_set_option(ld, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
 		*ldp = ld;
 	}
 
@@ -2548,19 +2566,6 @@ doSASLBind(const ns_cred_t *auth,
 		free(digest_md5_name);
 		break;
 	case NS_LDAP_SASL_GSSAPI:
-		if (sasl_gssapi_inited == 0) {
-			ret_code = __s_api_sasl_gssapi_init();
-			if (ret_code != NS_LDAP_SUCCESS) {
-				(void) snprintf(errstr, sizeof (errstr),
-				    gettext("openConnection: "
-				    "GSSAPI initialization "
-				    "failed"));
-				(void) ldap_unbind(ld);
-				MKERROR(LOG_WARNING, *errorp, ret_code,
-				    strdup(errstr), NS_LDAP_MEMORY);
-				return (ret_code);
-			}
-		}
 		(void) memset(&sasl_param, 0,
 		    sizeof (ns_sasl_cb_param_t));
 		sasl_param.authid = NULL;

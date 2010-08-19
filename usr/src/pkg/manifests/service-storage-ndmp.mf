@@ -58,19 +58,15 @@ file path=usr/lib/llib-lndmp.ln
 file path=usr/lib/ndmp/ndmpd mode=0555
 file path=usr/sbin/ndmpadm mode=0555
 file path=usr/sbin/ndmpstat mode=0555
-legacy pkg=SUNWndmpr arch=$(ARCH) category=system \
+legacy pkg=SUNWndmpr \
     desc="Network Data Management Protocol Service (root components)" \
-    hotline="Please contact your local service provider" \
-    name="Network Data Management Protocol Service (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWndmpu arch=$(ARCH) category=system \
+    name="Network Data Management Protocol Service (Root)"
+legacy pkg=SUNWndmpu \
     desc="Network Data Management Protocol Service (user components)" \
-    hotline="Please contact your local service provider" \
-    name="Network Data Management Protocol Service (User)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/ndmpd/LICENSE license=cmd/ndmpd/LICENSE
+    name="Network Data Management Protocol Service (User)"
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble
+license usr/src/cmd/ndmpd/LICENSE license=usr/src/cmd/ndmpd/LICENSE
 link path=usr/lib/$(ARCH64)/libndmp.so target=libndmp.so.1
 link path=usr/lib/libndmp.so target=libndmp.so.1

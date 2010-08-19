@@ -1,6 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -11,8 +10,6 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "e.h"
 #include <stdlib.h>
@@ -27,7 +24,7 @@ void error(int, char *, char *);
 
 static void do_inline(void);
 int eqn(int, char *[]);
-static int getline(char *);
+static int getaline(char *);
 static void init(void);
 void nrwid(int, int, int);
 int oalloc(void);
@@ -53,7 +50,7 @@ eqn(int argc, char *argv[])
 
 	setfile(argc, argv);
 	init_tbl();	/* install keywords in tables */
-	while ((type = getline(in)) != EOF) {
+	while ((type = getaline(in)) != EOF) {
 		eqline = linect;
 		if (in[0] == '.' && in[1] == 'E' && in[2] == 'Q') {
 			for (i = 11; i < 100; used[i++] = 0)
@@ -96,7 +93,7 @@ eqn(int argc, char *argv[])
 }
 
 static int
-getline(char *s)
+getaline(char *s)
 {
 	int c;
 	while ((*s++ = c = gtc()) != '\n' && c != EOF && c != lefteq)
@@ -130,7 +127,7 @@ do_inline(void)
 			ofree(eqnreg);
 		}
 		printf(".ps \\n(99\n.ft \\n(98\n");
-	} while (getline(in) == lefteq);
+	} while (getaline(in) == lefteq);
 	if (*in)
 		printf(".as %d \"%s", ds, in);
 	printf(".ps \\n(99\n.ft \\n(98\n");

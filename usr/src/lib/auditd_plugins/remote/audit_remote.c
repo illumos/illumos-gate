@@ -59,7 +59,6 @@
 
 #include "audit_remote.h"
 
-#define	DEFAULT_RETRIES	3	/* default connection retries */
 #define	DEFAULT_TIMEOUT	5	/* default connection timeout (in secs) */
 #define	NOSUCCESS_DELAY	20	/* unsuccessful delivery to all p_hosts */
 
@@ -68,13 +67,9 @@
 
 static int	nosuccess_cnt;	/* unsuccessful delivery counter */
 
-
-static int	retries = DEFAULT_RETRIES;	/* connection retries */
-int		timeout = DEFAULT_TIMEOUT;	/* connection timeout */
-static int	timeout_p_timeout = -1;		/* p_timeout attr storage */
-
-/* time reset mechanism; x .. timeout_p_timeout */
-#define	RST_TIMEOUT(x)		(x != -1 ? x : DEFAULT_TIMEOUT)
+static int	retries;		/* connection retries */
+int		timeout;		/* connection timeout */
+static int	timeout_p_timeout;	/* p_timeout attr storage */
 
 /* semi-exponential timeout back off; x .. attempts, y .. timeout */
 #define	BOFF_TIMEOUT(x, y)	(x < 3 ? y * 2 * x : y * 8)
@@ -84,6 +79,7 @@ pthread_mutex_t	plugin_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static struct hostlist_s	*current_host;
 static struct hostlist_s	*hosts;
+static struct hostlist_s	*hosts_prev;
 
 extern struct transq_hdr_s	transq_hdr;
 static long			transq_count_max;
@@ -101,7 +97,8 @@ FILE		*dfile;		/* debug file */
 /*
  * set_transq_count_max() - sets the transq_count_max value based on kernel
  * audit queue high water mark. This is backup solution for a case, when the
- * plugin audit_control(4) option lacks (intentionally) the qsize option.
+ * the default qsize zero value is (intentionally) set in the audit_remote(5)
+ * plugin configuration.
  */
 static auditd_rc_t
 set_transq_count_max()
@@ -180,6 +177,24 @@ trim_me(char *str_ptr) {
 	return (str_ptr);
 }
 
+/*
+ * Frees host list - should be called while keeping auditd_mutex.
+ */
+static void
+freehostlist(hostlist_t **hostlist_ptr)
+{
+	hostlist_t *h, *n;
+
+	h = *hostlist_ptr;
+
+	while (h != NULL)  {
+		n = h->next_host;
+		freehostent(h->host);
+		free(h);
+		h = n;
+	}
+	*hostlist_ptr = NULL;
+}
 
 /*
  * parsehosts() end parses the host string (hosts_str)
@@ -196,6 +211,7 @@ parsehosts(char *hosts_str, char **error)
 	gss_OID		mech_oid;
 	char 		*lasts_hpm;
 	hostlist_t 	*lasthost = NULL;
+	hostlist_t 	*hosts_new = NULL;
 	hostlist_t	*newhost;
 	struct hostent 	*hostentry;
 	int		error_num;
@@ -204,8 +220,6 @@ parsehosts(char *hosts_str, char **error)
 	char 		addr_buf[INET6_ADDRSTRLEN];
 	int		num_of_hosts = 0;
 #endif
-
-	hosts = lasthost;
 
 	DPRINT((dfile, "parsing %s\n", hosts_str));
 	while ((hostportmech = strtok_r(hosts_str, ",", &lasts_hpm)) != NULL) {
@@ -334,40 +348,26 @@ parsehosts(char *hosts_str, char **error)
 			lasthost = lasthost->next_host;
 		} else {
 			lasthost = newhost;
-			hosts = newhost;
+			hosts_new = newhost;
 		}
 #if DEBUG
 		num_of_hosts++;
 #endif
 	}
 
+	(void) pthread_mutex_lock(&plugin_mutex);
+	if (hosts_prev == NULL) {
+		hosts_prev = hosts;
+	}
+	hosts = hosts_new;
 	current_host = hosts;
+	(void) pthread_mutex_unlock(&plugin_mutex);
+
 	DPRINT((dfile, "Configured %d hosts.\n", num_of_hosts));
 
 	return (AUDITD_SUCCESS);
 }
 
-
-/*
- * Frees host list
- */
-static void
-freehostlist()
-{
-	hostlist_t *h, *n;
-
-	(void) pthread_mutex_lock(&plugin_mutex);
-	h = hosts;
-	while (h) {
-		n = h->next_host;
-		freehostent(h->host);
-		free(h);
-		h = n;
-	}
-	current_host = NULL;
-	hosts = NULL;
-	(void) pthread_mutex_unlock(&plugin_mutex);
-}
 
 #if DEBUG
 static char *
@@ -607,18 +607,21 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 			DPRINT((dfile, "success\n"));
 			nosuccess_cnt = 0;
 			rc = AUDITD_SUCCESS;
+			if (hosts_prev != NULL) {
+				freehostlist(&hosts_prev);
+				DPRINT((dfile, "stale host list freed\n"));
+			}
 			break;
 		case SEND_RECORD_NEXT:
-			DPRINT((dfile, "retry the same host: %s (penalty)\n",
-			    current_host->host->h_name));
+			DPRINT((dfile, "retry the same host: %s (penalty) "
+			    "rsn:%d\n", current_host->host->h_name, err_rsn));
 			attempts++;
 			break;
 		case SEND_RECORD_RETRY:
-			DPRINT((dfile, "retry the same host: %s (no penalty)\n",
-			    current_host->host->h_name));
+			DPRINT((dfile, "retry the same host: %s (no penalty) "
+			    "rsn:%d\n", current_host->host->h_name, err_rsn));
 			break;
 		}
-
 
 		if (send_record_rc == SEND_RECORD_NEXT) {
 
@@ -639,7 +642,6 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 			free(rsn_msg);
 			free(ext_error);
 
-
 			if (attempts < retries) {
 				/* semi-exponential timeout back off */
 				timeout = BOFF_TIMEOUT(attempts, timeout);
@@ -650,11 +652,10 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 				if (current_host == NULL) {
 					current_host = hosts;
 				}
-				timeout = RST_TIMEOUT(timeout_p_timeout);
+				timeout = timeout_p_timeout;
 				DPRINT((dfile, "New timeout=%d\n", timeout));
 				attempts = 0;
 			}
-
 
 			/* one cycle finished */
 			if (current_host == start_host && attempts == 0) {
@@ -722,42 +723,53 @@ auditd_plugin_open(const kva_t *kvlist, char **ret_list, char **error)
 	if (kvlist != NULL) {
 		DPRINT((dfile, "Action: initial open or `audit -s`\n"));
 		val_str = kva_match(kv, "p_timeout");
-		if (val_str != NULL) {
-			DPRINT((dfile, "val_str=%s\n", val_str));
-			errno = 0;
-			val = atoi(val_str);
-			if (errno == 0 && val >= 1) {
-				timeout_p_timeout = val;
-				timeout = val;
-			}
+		if (val_str == NULL) {
+			*error = strdup(
+			    gettext("p_timeout attribute not found"));
+			return (AUDITD_RETRY);
+		}
+		DPRINT((dfile, "val_str=%s\n", val_str));
+		errno = 0;
+		val = atoi(val_str);
+		if (errno == 0 && val >= 1) {
+			timeout_p_timeout = val;
+			timeout = val;
+		} else {
+			timeout_p_timeout = DEFAULT_TIMEOUT;
+			timeout = timeout_p_timeout;
+			DPRINT((dfile, "p_timeout set to default value: %d\n",
+			    timeout));
 		}
 
 		val_str = kva_match(kv, "p_retries");
-		if (val_str != NULL) {
-			DPRINT((dfile, "val_str=%s\n", val_str));
-			errno = 0;
-			val = atoi(val_str);
-			if (errno == 0 && val >= 0) {
-				retries = val;
-			}
+		if (val_str == NULL) {
+			*error = strdup(
+			    gettext("p_retries attribute not found"));
+			return (AUDITD_RETRY);
+		}
+		DPRINT((dfile, "val_str=%s\n", val_str));
+		errno = 0;
+		val = atoi(val_str);
+		if (errno == 0 && val >= 0) {
+			retries = val;
 		}
 
 		val_str = kva_match(kv, "qsize");
-		if (val_str != NULL) {
-			DPRINT((dfile, "qsize=%s\n", val_str));
-			errno = 0;
-			val_l = atol(val_str);
-			if (errno == 0 && val_l > 0) {
-				transq_count_max = val_l;
-			}
-
-		} else {
-			DPRINT((dfile, "qsize not in kvlist\n"));
-			if ((rc = set_transq_count_max()) != AUDITD_SUCCESS) {
-				*error = strdup(gettext("cannot get kernel "
-				    "auditd queue high water mark\n"));
-				return (rc);
-			}
+		if (val_str == NULL) {
+			*error = strdup(gettext("qsize attribute not found"));
+			return (AUDITD_RETRY);
+		}
+		DPRINT((dfile, "qsize=%s\n", val_str));
+		errno = 0;
+		val_l = atol(val_str);
+		if (errno == 0 && val_l >= 0) {
+			transq_count_max = val_l;
+		}
+		if (transq_count_max == 0 &&
+		    (rc = set_transq_count_max()) != AUDITD_SUCCESS) {
+			*error = strdup(gettext("cannot get kernel "
+			    "auditd queue high water mark\n"));
+			return (rc);
 		}
 		DPRINT((dfile, "timeout=%d, retries=%d, transq_count_max=%ld\n",
 		    timeout, retries, transq_count_max));
@@ -807,7 +819,11 @@ auditd_plugin_close(char **error)
 		return (AUDITD_RETRY);
 	}
 
-	freehostlist();
+	(void) pthread_mutex_lock(&plugin_mutex);
+	freehostlist(&hosts);
+	freehostlist(&hosts_prev);
+	(void) pthread_mutex_unlock(&plugin_mutex);
+	current_host = NULL;
 	*error = NULL;
 	return (AUDITD_SUCCESS);
 }

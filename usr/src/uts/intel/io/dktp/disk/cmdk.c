@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/scsi/scsi.h>
@@ -518,6 +517,15 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ddi_prop_remove_all(dip);
 
 	cmdk_destroy_obj(dip, dkp);	/* dadk/strategy linkage  */
+
+	/*
+	 * free the devid structure if allocated before
+	 */
+	if (dkp->dk_devid) {
+		ddi_devid_free(dkp->dk_devid);
+		dkp->dk_devid = NULL;
+	}
+
 	mutex_exit(&dkp->dk_mutex);
 	mutex_destroy(&dkp->dk_mutex);
 	rw_destroy(&dkp->dk_bbh_mutex);

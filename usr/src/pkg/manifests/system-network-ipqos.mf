@@ -55,9 +55,7 @@ file path=usr/lib/ipqosconf/ipgpc.types mode=0444
 file path=usr/lib/ipqosconf/tokenmt.types mode=0444
 file path=usr/lib/ipqosconf/tswtclmt.types mode=0444
 file path=usr/sbin/ipqosconf mode=0755
-legacy pkg=SUNWqosu arch=$(ARCH) category=system \
-    desc="Solaris IP Quality of Service (Usr)" \
-    hotline="Please contact your local service provider" name="IP QoS, (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWqosu desc="Solaris IP Quality of Service (Usr)" \
+    name="IP QoS, (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

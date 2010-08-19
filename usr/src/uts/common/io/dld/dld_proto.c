@@ -1128,6 +1128,7 @@ proto_notify_req(dld_str_t *dsp, mblk_t *mp)
 	    DL_NOTE_FASTPATH_FLUSH |
 	    DL_NOTE_SPEED |
 	    DL_NOTE_SDU_SIZE|
+	    DL_NOTE_SDU_SIZE2|
 	    DL_NOTE_ALLOWED_IPS;
 
 	if (MBLKL(mp) < sizeof (dl_notify_req_t)) {

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -37,6 +36,7 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <zone.h>
 
 #include <fmd_error.h>
 #include <fmd_string.h>
@@ -78,6 +78,7 @@ _umem_logging_init(void)
 static int
 daemonize_init(void)
 {
+	const char *gzp1, *gzp2, *gzp3, *gzp4, *gzp5;
 	int status, pfds[2];
 	sigset_t set, oset;
 	struct rlimit rlim;
@@ -111,14 +112,50 @@ daemonize_init(void)
 	 * Reset all of our privilege sets to the minimum set of required
 	 * privileges.  We continue to run as root so that files we create
 	 * such as logs and checkpoints are secured in the /var filesystem.
+	 *
+	 * In a non-global zone some of the privileges we retain in a
+	 * global zone are only optionally assigned to the zone, while others
+	 * are prohibited:
+	 *
+	 * PRIV_PROC_PRIOCNTL (optional in a non-global zone):
+	 *	There are no calls to priocntl(2) in fmd or plugins.
+	 *
+	 * PRIV_SYS_CONFIG (prohibited in a non-global zone):
+	 *	Required, I think, for sysevent_post_event and/or
+	 *	other legacy sysevent activity.  Legacy sysevent is not
+	 *	supported in a non-global zone.
+	 *
+	 * PRIV_SYS_DEVICES (prohibited in a non-global zone):
+	 *	Needed in the global zone for ioctls on various drivers
+	 *	such as memory-controller drivers.
+	 *
+	 * PRIV_SYS_RES_CONFIG (prohibited in a non-global zone):
+	 *	Require for p_online(2) calls to offline cpus.
+	 *
+	 * PRIV_SYS_NET_CONFIG (prohibited in a non-global zone):
+	 *	Required for ipsec in etm (which also requires
+	 *	PRIV_NET_PRIVADDR).
+	 *
+	 * We do without those privileges in a non-global zone.  It's
+	 * possible that there are other privs we could drop since
+	 * hardware-related plugins are not present.
 	 */
+	if (getzoneid() == GLOBAL_ZONEID) {
+		gzp1 = PRIV_PROC_PRIOCNTL;
+		gzp2 = PRIV_SYS_CONFIG;
+		gzp3 = PRIV_SYS_DEVICES;
+		gzp4 = PRIV_SYS_RES_CONFIG;
+		gzp5 = PRIV_SYS_NET_CONFIG;
+	} else {
+		gzp1 = gzp2 = gzp3 = gzp4 = gzp5 = NULL;
+	}
+
 	if (__init_daemon_priv(PU_RESETGROUPS | PU_LIMITPRIVS | PU_INHERITPRIVS,
 	    0, 0, /* run as uid 0 and gid 0 */
 	    PRIV_FILE_DAC_EXECUTE, PRIV_FILE_DAC_READ, PRIV_FILE_DAC_SEARCH,
 	    PRIV_FILE_DAC_WRITE, PRIV_FILE_OWNER, PRIV_PROC_OWNER,
-	    PRIV_PROC_PRIOCNTL, PRIV_SYS_ADMIN, PRIV_SYS_CONFIG,
-	    PRIV_SYS_DEVICES, PRIV_SYS_RES_CONFIG, PRIV_NET_PRIVADDR,
-	    PRIV_SYS_NET_CONFIG, NULL) != 0)
+	    PRIV_SYS_ADMIN, PRIV_NET_PRIVADDR,
+	    gzp1, gzp2, gzp3, gzp4, gzp5, NULL) != 0)
 		fmd_error(EFMD_EXIT, "additional privileges required to run\n");
 
 	/*

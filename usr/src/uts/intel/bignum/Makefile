@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the RSA KEF provider.
 #
@@ -34,6 +31,7 @@
 #
 UTSBASE	= ../..
 BIGNUMDIR = $(COMMONBASE)/bignum
+CRYPTODIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -62,9 +60,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy
+LDFLAGS += -dy -Nmisc/kcf
 
-CPPFLAGS	+= -I$(BIGNUMDIR)
+CPPFLAGS	+= -I$(BIGNUMDIR) -I$(CRYPTODIR)
 
 #
 #	Default build targets.

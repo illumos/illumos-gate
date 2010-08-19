@@ -23,7 +23,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-SUBDIRS=	fstyp
+SUBDIRS=	fstyp bootinstall
 
 all:=		TARGET= all
 install:=	TARGET= install

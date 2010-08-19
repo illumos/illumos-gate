@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/stat.h>
@@ -28,6 +27,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "dconf.h"
 #include "minfree.h"
@@ -37,7 +37,7 @@ static const char USAGE[] = "\
 Usage: %s [-nuy] [-c kernel | curproc | all ] [-d dump-device | swap ]\n\
 	[-m min {k|m|%%} ] [-s savecore-dir] [-r root-dir] [-z on|off]\n";
 
-static const char OPTS[] = "nuyc:d:m:s:r:z:";
+static const char OPTS[] = "inuyc:d:m:s:r:z:";
 
 static const char PATH_DEVICE[] = "/dev/dump";
 static const char PATH_CONFIG[] = "/etc/dumpadm.conf";
@@ -55,6 +55,8 @@ main(int argc, char *argv[])
 	int modified = 0;		/* have we modified the dump config? */
 	char *minfstr = NULL;		/* string value of -m argument */
 	dumpconf_t dc;			/* current configuration */
+	int chrooted = 0;
+	int douuid = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -66,7 +68,7 @@ main(int argc, char *argv[])
 	 */
 	while (optind < argc) {
 		while ((c = getopt(argc, argv, OPTS)) != (int)EOF) {
-			if (c == 'r' && chroot(optarg) == -1)
+			if (c == 'r' && ++chrooted && chroot(optarg) == -1)
 				die(gettext("failed to chroot to %s"), optarg);
 			else if (c == 'u')
 				dcmode = DC_OVERRIDE;
@@ -120,6 +122,16 @@ main(int argc, char *argv[])
 				modified++;
 				break;
 
+			case 'i':
+				/* undocumented option */
+				if (chrooted) {
+					warn(gettext("-i and -r cannot be "
+					    "used together\n"));
+					return (E_USAGE);
+				}
+				douuid++;
+				break;
+
 			case 'm':
 				minfstr = optarg;
 				break;
@@ -155,6 +167,9 @@ main(int argc, char *argv[])
 			}
 		}
 	}
+
+	if (douuid)
+		return (dconf_write_uuid(&dc) ? E_SUCCESS : E_ERROR);
 
 	if (minfstr != NULL) {
 		if (minfree_compute(dc.dc_savdir, minfstr, &minf) == -1)

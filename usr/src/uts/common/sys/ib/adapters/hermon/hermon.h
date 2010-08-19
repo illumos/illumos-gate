@@ -64,6 +64,7 @@
 #include <sys/ib/adapters/hermon/hermon_cmd.h>
 #include <sys/ib/adapters/hermon/hermon_cq.h>
 #include <sys/ib/adapters/hermon/hermon_event.h>
+#include <sys/ib/adapters/hermon/hermon_fcoib.h>
 #include <sys/ib/adapters/hermon/hermon_ioctl.h>
 #include <sys/ib/adapters/hermon/hermon_misc.h>
 #include <sys/ib/adapters/hermon/hermon_mr.h>
@@ -99,7 +100,7 @@ extern "C" {
 
 #define	HERMON_ONCLOSE_FLASH_INPROGRESS		(1 << 0)
 
-#define	HERMON_MSIX_MAX			8 /* max # of interrupt vectors */
+#define	HERMON_MSIX_MAX			256 /* max # of interrupt vectors */
 
 /*
  * VPD header size - or more rightfully, the area of interest for fwflash
@@ -139,17 +140,16 @@ extern "C" {
 /*
  * Macro used to output HCA warning messages.  Note: HCA warning messages
  * are only generated when an unexpected condition has been detected.  This
- * can be the result of a software bug or some other problem, but it is more
- * often an indication that the HCA firmware (and/or hardware) has done
- * something unexpected.  This warning message means that the driver state
- * in unpredictable and that shutdown/restart is suggested.
+ * can be the result of a software bug or some other problem.  Previously
+ * this was used for hardware errors, but those now use HERMON_FMANOTE
+ * instead, indicating that the driver state is more likely in an
+ * unpredictable state, and that shutdown/restart is suggested.
+ *
+ * HERMON_WARNING messages are not considered important enough to print
+ * to the console, just to the message log.
  */
 #define	HERMON_WARNING(state, string)					\
-	cmn_err(CE_WARN, "hermon%d: %s\n", (state)->hs_instance, string)
-
-
-#define	HERMON_NOTE(state, string)					\
-	cmn_err(CE_CONT, "hermon%d: %s\n", (state)->hs_instance, string)
+	cmn_err(CE_CONT, "!hermon%d: %s\n", (state)->hs_instance, string)
 
 /*
  * Macro used to set attach failure messages.  Also, the attach message buf
@@ -352,27 +352,17 @@ _NOTE(MUTEX_PROTECTS_DATA(hermon_cmd_reg_t::hcr_lock,
 struct hermon_state_s {
 	dev_info_t		*hs_dip;
 	int			hs_instance;
-int			hs_debug;	/* for debug, a way of tracing */
-uint32_t		hs_debug_lev;	/* for controlling prints, a bit mask */
-					/* see hermon.c for setting it */
+
 	/* PCI device, vendor, and revision IDs */
 	uint16_t		hs_vendor_id;
 	uint16_t		hs_device_id;
 	uint8_t			hs_revision_id;
-
-struct hermon_hw_qpc_s		hs_debug_qpc;
-struct hermon_hw_cqc_s		hs_debug_cqc;
-struct hermon_hw_eqc_s		hs_debug_eqc;
-
-	hermon_hw_sm_perfcntr_t	hs_debug_perf;
-
 
 	/*
 	 * DMA information for the InfiniHost Context Memory (ICM),
 	 * ICM Auxiliary allocation and the firmware. Also, record
 	 * of ICM and ICMA sizes, in bytes.
 	 */
-	/* JBDB -- store here hs_icm_table, with hs_icm_dma in */
 
 	uint64_t		hs_icm_sz;
 	hermon_icm_table_t	*hs_icm;
@@ -389,9 +379,17 @@ struct hermon_hw_eqc_s		hs_debug_eqc;
 	ddi_intr_handle_t	hs_intrmsi_hdl[HERMON_MSIX_MAX];
 	uint_t			hs_intrmsi_pri;
 	int			hs_intrmsi_cap;
+	ddi_cb_handle_t		hs_intr_cb_hdl;
 
-	/* assign EQs to CQs in a round robin fashion */
-	uint_t			hs_eq_dist;	/* increment when used */
+	/* Do not use reserved EQs */
+	uint_t			hs_rsvd_eqs;
+	uint_t			hs_cq_erreqnum;
+
+	/* cq_sched data */
+	kmutex_t		hs_cq_sched_lock;
+	hermon_cq_sched_t	*hs_cq_sched_array;
+	hermon_cq_sched_t	hs_cq_sched_default;
+	uint_t			hs_cq_sched_array_size;
 
 	/* hermon HCA name and HCA part number */
 	char			hs_hca_name[64];
@@ -555,9 +553,6 @@ struct hermon_hw_eqc_s		hs_debug_eqc;
 	 */
 	hermon_pdhdl_t		hs_pdhdl_internal;
 	hermon_eqhdl_t		hs_eqhdl[HERMON_NUM_EQ];
-	hermon_cqhdl_t		*hs_cqhdl;
-	hermon_qphdl_t		*hs_qphdl;
-	hermon_srqhdl_t		*hs_srqhdl;
 	kmutex_t		hs_dbr_lock;	/* lock for dbr mgmt */
 
 	/* linked list of kernel dbr resources */
@@ -706,6 +701,10 @@ struct hermon_hw_eqc_s		hs_debug_eqc;
 	mod_hash_t		*hs_fm_test_hash; /* testset */
 	mod_hash_t		*hs_fm_id_hash;	/* testid */
 #endif
+	/* FCoIB data */
+	hermon_fcoib_t		hs_fcoib;
+	boolean_t		hs_fcoib_may_be_running; /* cq_poll test */
+
 	/*
 	 * Hermon fastreboot support. To sw-reset Hermon HCA, the driver
 	 * needs to save/restore MSI-X tables and PBA. Those members are
@@ -889,7 +888,7 @@ typedef struct hermon_devmap_track_s {
 #define	HERMON_ICM_SPLIT	64
 #define	HERMON_ICM_SPAN		4096
 
-#define	hermon_bitmap(bitmap, dma_info, icm_table, split_index)	\
+#define	hermon_bitmap(bitmap, dma_info, icm_table, split_index, num_to_hdl) \
 	bitmap = (icm_table)->icm_bitmap[split_index];		\
 	if (bitmap == NULL) {					\
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(icm_table))) \
@@ -901,6 +900,12 @@ typedef struct hermon_devmap_track_s {
 		(icm_table)->icm_dma[split_index] =		\
 		    kmem_zalloc(num_spans * sizeof (hermon_dma_info_t), \
 		    KM_SLEEP);					\
+		if (num_to_hdl) {				\
+			ASSERT((icm_table)->num_to_hdl[split_index] == NULL); \
+			(icm_table)->num_to_hdl[split_index] =	\
+			    kmem_zalloc(num_spans *		\
+			    sizeof (void **), KM_SLEEP);	\
+		}						\
 	}							\
 	dma_info = (icm_table)->icm_dma[split_index]
 
@@ -934,9 +939,10 @@ struct hermon_icm_table_s {
 	uint32_t		rsrc_mask;
 	uint16_t		log_num_entries;
 	uint16_t		log_object_size;
-	/* two arrays of pointers, each pointer points to arrays */
+	/* three arrays of pointers, each pointer points to arrays */
 	uint8_t			*icm_bitmap[HERMON_ICM_SPLIT];
 	hermon_dma_info_t	*icm_dma[HERMON_ICM_SPLIT];
+	void			***num_to_hdl[HERMON_ICM_SPLIT]; /* qp/cq/srq */
 };
 /*
  * Split the rsrc index into three pieces:
@@ -959,6 +965,10 @@ int hermon_icm_alloc(hermon_state_t *state, hermon_rsrc_type_t type,
     uint32_t icm_index1, uint32_t icm_index2);
 void hermon_icm_free(hermon_state_t *state, hermon_rsrc_type_t type,
     uint32_t icm_index1, uint32_t icm_index2);
+void *hermon_icm_num_to_hdl(hermon_state_t *state, hermon_rsrc_type_t type,
+    uint32_t idx);
+void hermon_icm_set_num_to_hdl(hermon_state_t *state, hermon_rsrc_type_t type,
+    uint32_t idx, void *hdl);
 int hermon_device_mode(hermon_state_t *state);
 
 /* Defined in hermon_umap.c */

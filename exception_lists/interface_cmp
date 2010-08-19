@@ -51,6 +51,25 @@
 DELSYM	^(auditsvc|setauclassfile|setaueventfile|setauuserfile|testac)$	\
 	^SUNW_(0\.[7-8]|1\.[1-2])$	\
 	^MACH(lib)/libbsm\.so\.1$
+#
+# - Removed interfaces: getauusernam(3bsm)
+# 6914742 remove audit_user phase 1
+#	PSARC/2010/003 EOL and removal of audit_user(4) and getauusernam(3bsm)
+#
+DELSYM	^(getauuserent_r|getauusernam_r)$	\
+	^SUNW_(0\.8|1\.[1-2])$	\
+	^MACH(lib)/libbsm\.so\.1$
+DELSYM	^(endauuser|getauuserent|getauusernam|setauuser)$	\
+	^SUNW_(0\.[7-8]|1\.[1-2])$	\
+	^MACH(lib)/libbsm\.so\.1$
+#
+# - Removed interfaces: setac, getacna, getacmin, getacflg, getacdir, endac
+#	6875456 Solaris Audit configuration in SMF - phase 2
+#		(PSARC/2009/636, PSARC/2009/642)
+#
+DELSYM	^(setac|getacna|getacmin|getacflg|getacdir|endac)$	\
+	^SUNW_(0\.[7-8]|1\.[1-2])$	\
+	^MACH(lib)/libbsm\.so\.1$
 
 
 ## libmalloc / libmapmalloc

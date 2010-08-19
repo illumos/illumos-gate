@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_VIO_MAILBOX_H
@@ -339,6 +338,7 @@ typedef struct vio_raw_data_msg {
 #define	VIO_DESC_READY		0x2
 #define	VIO_DESC_ACCEPTED	0x3
 #define	VIO_DESC_DONE		0x4
+#define	VIO_DESC_INITIALIZING	0x5
 #define	VIO_DESC_MASK		0xf
 
 /* Macro to populate the generic fields of the DRing data msg */

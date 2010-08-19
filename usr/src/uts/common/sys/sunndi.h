@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SUNNDI_H

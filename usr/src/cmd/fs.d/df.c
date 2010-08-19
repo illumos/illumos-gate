@@ -210,9 +210,6 @@ static bool_int		V_option;
 static bool_int		P_option;	/* Added for XCU4 compliance */
 static bool_int		Z_option;
 static bool_int		v_option;
-#ifdef	_iBCS2
-char			*sysv3_set;
-#endif /* _iBCS2 */
 static bool_int		a_option;
 static bool_int		b_option;
 static bool_int		e_option;
@@ -284,10 +281,6 @@ main(int argc, char *argv[])
 	(void) textdomain(TEXT_DOMAIN);
 
 	program_name = basename(argv[0]);
-
-#ifdef	_iBCS2
-	sysv3_set = getenv("SYSV3");
-#endif	/* _iBCS2 */
 
 	if (EQ(program_name, DEVNM_CMD))
 		do_devnm(argc, argv);
@@ -1572,13 +1565,7 @@ static void
 strings_init(void)
 {
 	total_str = TRANSLATE("total");
-#ifdef	_iBCS2
-	/* ISC/SCO print i-nodes instead of files */
-	if (sysv3_set)
-		files_str = TRANSLATE("i-nodes");
-	else
-#endif	/* _iBCS2 */
-		files_str = TRANSLATE("files");
+	files_str = TRANSLATE("files");
 	blocks_str = TRANSLATE("blocks");
 	kilobytes_str = TRANSLATE("kilobytes");
 	strings_initialized = TRUE;

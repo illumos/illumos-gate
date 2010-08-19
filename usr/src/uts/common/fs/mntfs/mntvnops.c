@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/file.h>
@@ -399,7 +398,7 @@ mntfs_get_next_elem(mntsnap_t *snapp, mntelem_t *elemp)
 static void
 mntfs_freesnap(mntnode_t *mnp, mntsnap_t *snapp)
 {
-	zone_t *zonep = MTOD(mnp)->mnt_zone;
+	zone_t *zonep = MTOD(mnp)->mnt_zone_ref.zref_zone;
 	krwlock_t *dblockp = &zonep->zone_mntfs_db_lock;
 	mntelem_t **elempp = &zonep->zone_mntfs_db;
 	mntelem_t *elemp;
@@ -501,7 +500,7 @@ static void
 mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 {
 	mntdata_t	*mnd = MTOD(mnp);
-	zone_t		*zonep = mnd->mnt_zone;
+	zone_t		*zonep = mnd->mnt_zone_ref.zref_zone;
 	int		is_global_zone = (zonep == global_zone);
 	int		show_hidden = mnp->mnt_flags & MNT_SHOWHIDDEN;
 	vfs_t		*vfsp, *firstvfsp, *lastvfsp;
@@ -590,7 +589,8 @@ mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 			 * equal to the zone's root path. Since the zone's root
 			 * path isn't a mount point, we copy the vfs_t of the
 			 * zone's root vnode, and provide it with a fake mount
-			 * point and resource.
+			 * and resource. However, if the zone's root is a
+			 * zfs dataset, use the dataset name as the resource.
 			 *
 			 * Note that by cloning another vfs_t we also acquire
 			 * its high-resolution ctime. This might appear to
@@ -607,7 +607,9 @@ mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
 			 */
 			dummyvfs = *zonep->zone_rootvp->v_vfsp;
 			dummyvfs.vfs_mntpt = refstr_alloc(zonep->zone_rootpath);
-			dummyvfs.vfs_resource = dummyvfs.vfs_mntpt;
+			if (strcmp(vfssw[dummyvfs.vfs_fstype].vsw_name, "zfs")
+			    != 0)
+				dummyvfs.vfs_resource = dummyvfs.vfs_mntpt;
 			dummyvfsp = &dummyvfs;
 			if (firstvfsp == NULL) {
 				lastvfsp = dummyvfsp;
@@ -883,7 +885,7 @@ static int
 mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
-	zone_t *zonep = MTOD(mnp)->mnt_zone;
+	zone_t *zonep = MTOD(mnp)->mnt_zone_ref.zref_zone;
 	mntsnap_t *snapp = &mnp->mnt_read;
 	off_t off = uio->uio_offset;
 	size_t len = uio->uio_resid;
@@ -1470,7 +1472,7 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	mntnode_t *mnp = VTOM(vp);
 	mntsnap_t *snapp = &mnp->mnt_ioctl;
 	int error = 0;
-	zone_t *zonep = MTOD(mnp)->mnt_zone;
+	zone_t *zonep = MTOD(mnp)->mnt_zone_ref.zref_zone;
 	krwlock_t *dblockp = &zonep->zone_mntfs_db_lock;
 	model_t datamodel = flag & DATAMODEL_MASK;
 
@@ -1552,7 +1554,7 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 		size_t len;
 		uint_t start = 0;
 		mntdata_t *mntdata = MTOD(mnp);
-		zone_t *zone = mntdata->mnt_zone;
+		zone_t *zone = mntdata->mnt_zone_ref.zref_zone;
 
 		STRUCT_INIT(tagdesc, flag & DATAMODEL_MASK);
 		if (copyin(dp, STRUCT_BUF(tagdesc), STRUCT_SIZE(tagdesc))) {

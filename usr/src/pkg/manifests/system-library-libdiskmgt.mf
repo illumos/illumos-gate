@@ -37,11 +37,8 @@ file path=usr/lib/$(ARCH64)/llib-ldiskmgt.ln
 file path=usr/lib/libdiskmgt.so.1
 file path=usr/lib/llib-ldiskmgt
 file path=usr/lib/llib-ldiskmgt.ln
-legacy pkg=SUNWsmapi arch=$(ARCH) category=system \
-    desc="Software libraries for storage management" \
-    hotline="Please contact your local service provider" \
-    name="Storage Management APIs" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWsmapi desc="Software libraries for storage management" \
+    name="Storage Management APIs"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libdiskmgt.so target=./libdiskmgt.so.1

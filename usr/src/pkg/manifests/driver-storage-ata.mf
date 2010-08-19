@@ -59,10 +59,7 @@ file path=platform/i86pc/kernel/drv/pci-ide.conf group=sys
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/pci-ide group=sys
 file path=platform/i86xpv/kernel/drv/pci-ide group=sys
 file path=platform/i86xpv/kernel/drv/pci-ide.conf group=sys
-legacy pkg=SUNWpsdir arch=$(ARCH) category=system \
-    desc="Platform Support, ISA Bus Device Drivers, (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Platform Support, ISA Bus Device Drivers, (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWpsdir desc="Platform Support, ISA Bus Device Drivers, (Root)" \
+    name="Platform Support, ISA Bus Device Drivers, (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

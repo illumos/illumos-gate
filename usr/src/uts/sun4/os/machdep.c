@@ -831,9 +831,9 @@ plat_mem_do_mmio(struct uio *uio, enum uio_rw rw)
 
 /* cpu threshold for compressed dumps */
 #ifdef sun4v
-uint_t dump_plat_mincpu = DUMP_PLAT_SUN4V_MINCPU;
+uint_t dump_plat_mincpu_default = DUMP_PLAT_SUN4V_MINCPU;
 #else
-uint_t dump_plat_mincpu = DUMP_PLAT_SUN4U_MINCPU;
+uint_t dump_plat_mincpu_default = DUMP_PLAT_SUN4U_MINCPU;
 #endif
 
 int

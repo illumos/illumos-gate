@@ -45,15 +45,10 @@ file path=lib/svc/manifest/network/ssh.xml group=sys mode=0444
 file path=lib/svc/method/sshd mode=0555
 file path=usr/lib/ssh/sftp-server mode=0555
 file path=usr/lib/ssh/sshd mode=0555
-legacy pkg=SUNWsshdr arch=$(ARCH) category=system \
-    desc="Secure Shell protocol Server" \
-    hotline="Please contact your local service provider" \
-    name="SSH Server, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWsshdu arch=$(ARCH) category=system \
-    desc="Secure Shell protocol Server" \
-    hotline="Please contact your local service provider" \
-    name="SSH Server, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/ssh/THIRDPARTYLICENSE license=cmd/ssh/THIRDPARTYLICENSE
+legacy pkg=SUNWsshdr desc="Secure Shell protocol Server" \
+    name="SSH Server, (Root)"
+legacy pkg=SUNWsshdu desc="Secure Shell protocol Server" \
+    name="SSH Server, (Usr)"
+license usr/src/cmd/ssh/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ssh/THIRDPARTYLICENSE
 depend fmri=text/locale type=require

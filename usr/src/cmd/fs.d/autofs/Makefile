@@ -61,13 +61,14 @@ REAL_COMMON=	debug_alloc.o
 COMMON=		ns_generic.o ns_files.o ns_nis.o \
 		ns_ldap.o auto_mnttab.o auto_subr.o $(REAL_COMMON)
 
-AUTOOBJS=	automount.o $(COMMON) $(FSLIB)
+AUTOOBJS=	automount.o $(COMMON) $(FSLIB) smfcfg.o
 
 MOUNTOBJS=	mount.o $(FSLIB) $(REAL_COMMON)
 
 LOCAL=		autod_main.o \
 		autod_parse.o autod_mount.o autod_nfs.o nfs_cast.o \
-		autod_autofs.o autod_xdr.o autod_readdir.o autod_lookup.o
+		autod_autofs.o autod_xdr.o autod_readdir.o autod_lookup.o \
+		smfcfg.o
 
 TYPEOBJS=	$(LOCAL) $(COMMON) replica.o nfs_sec.o nfs_resolve.o nfs_subr.o \
 		$(FSLIB) webnfs_xdr.o webnfs_client.o selfcheck.o
@@ -95,7 +96,7 @@ MOUNTSRCS=	mount.c $(FSLIBSRC)
 TYPESRCS=	$(LOCAL:%.o=%.c) $(COMMON:%.o=%.c) \
 		../nfs/lib/replica.c ../nfs/lib/nfs_sec.c \
 		../nfs/lib/nfs_subr.c $(FSLIBSRC) ../nfs/lib/selfcheck.c \
-		../nfs/lib/nfs_resolve.c
+		../nfs/lib/nfs_resolve.c ../nfs/lib/smfcfg.c
 SHARESRCS=	$(SHARE:%=%.c)
 UNSHARESRCS=	$(UNSHARE:%=%.c)
 DFSHARESSRCS=	$(DFSHARES:%=%.sh)
@@ -166,6 +167,9 @@ nfs_subr.o:	../nfs/lib/nfs_subr.c
 
 selfcheck.o:	../nfs/lib/selfcheck.c
 		$(COMPILE.c) ../nfs/lib/selfcheck.c
+
+smfcfg.o: ../nfs/lib/smfcfg.c
+		$(COMPILE.c) ../nfs/lib/smfcfg.c
 
 nfs_resolve.o:	../nfs/lib/nfs_resolve.c
 		$(COMPILE.c) ../nfs/lib/nfs_resolve.c

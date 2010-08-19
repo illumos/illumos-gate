@@ -613,9 +613,10 @@ so_process_new_message(struct sonode *so, mblk_t *mp_head, mblk_t *mp_last_head)
 
 /*
  * Check flow control on a given sonode.  Must have so_lock held, and
- * this function will release the hold.
+ * this function will release the hold.  Return true if flow control
+ * is cleared.
  */
-void
+boolean_t
 so_check_flow_control(struct sonode *so)
 {
 	ASSERT(MUTEX_HELD(&so->so_lock));
@@ -635,8 +636,10 @@ so_check_flow_control(struct sonode *so)
 		}
 		/* filters can start injecting data */
 		sof_sonode_notify_filters(so, SOF_EV_INJECT_DATA_IN_OK, 0);
+		return (B_TRUE);
 	} else {
 		mutex_exit(&so->so_lock);
+		return (B_FALSE);
 	}
 }
 
@@ -709,7 +712,7 @@ again1:
 		so_process_new_message(so, new_msg_head, new_msg_last_head);
 	}
 	savemp = savemptail = NULL;
-	rvalp->r_val1 = 0;
+	rvalp->r_vals = 0;
 	error = 0;
 	mp = so->so_rcv_q_head;
 
@@ -822,7 +825,7 @@ again1:
 				 * so_check_flow_control() will drop
 				 * so->so_lock.
 				 */
-				so_check_flow_control(so);
+				rvalp->r_val2 = so_check_flow_control(so);
 			}
 		}
 		if (mp != NULL) { /* more data blocks in msg */
@@ -840,7 +843,8 @@ again1:
 					 * so_check_flow_control() will drop
 					 * so->so_lock.
 					 */
-					so_check_flow_control(so);
+					rvalp->r_val2 =
+					    so_check_flow_control(so);
 				}
 			} else if (partial_read && !somsghasdata(mp)) {
 				/*

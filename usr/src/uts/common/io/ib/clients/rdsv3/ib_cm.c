@@ -175,6 +175,8 @@ rdsv3_ib_cm_connect_complete(struct rdsv3_connection *conn,
 		    (void *)ic, SCQ_INTR_BIND_CPU, rds_ibdev->aft_hcagp,
 		    ic->i_snd_cq->ibt_cq);
 	}
+	/* rdsv3_ib_refill_fn is expecting i_max_recv_alloc set */
+	ic->i_max_recv_alloc = rdsv3_ib_sysctl_max_recv_allocation;
 	ic->i_refill_rq = rdsv3_af_thr_create(rdsv3_ib_refill_fn, (void *)conn,
 	    SCQ_WRK_BIND_CPU, rds_ibdev->aft_hcagp);
 	rdsv3_af_grp_draw(rds_ibdev->aft_hcagp);
@@ -319,7 +321,7 @@ rdsv3_ib_snd_tasklet_fn(void *data)
 	 */
 	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_snd_cq), &wc, 1, &polled) ==
 	    IBT_SUCCESS) {
-		RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
+		RDSV3_DPRINTF4("rdsv3_ib_snd_tasklet_fn",
 		    "wc_id 0x%llx type %d status %u byte_len %u imm_data %u\n",
 		    (unsigned long long)wc.wc_id, wc.wc_type, wc.wc_status,
 		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
@@ -329,8 +331,13 @@ rdsv3_ib_snd_tasklet_fn(void *data)
 	}
 	(void) ibt_enable_cq_notify(RDSV3_CQ2CQHDL(ic->i_snd_cq),
 	    IBT_NEXT_COMPLETION);
-	if (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_snd_cq), &wc, 1, &polled) ==
+	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_snd_cq), &wc, 1, &polled) ==
 	    IBT_SUCCESS) {
+		RDSV3_DPRINTF4("rdsv3_ib_snd_tasklet_fn",
+		    "wc_id 0x%llx type %d status %u byte_len %u imm_data %u\n",
+		    (unsigned long long)wc.wc_id, wc.wc_type, wc.wc_status,
+		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
+
 		ASSERT(wc.wc_id & RDSV3_IB_SEND_OP);
 		rdsv3_ib_send_cqe_handler(ic, &wc);
 	}
@@ -364,8 +371,9 @@ rdsv3_ib_tasklet_fn(void *data)
 	struct rdsv3_ib_connection *ic = (struct rdsv3_ib_connection *)data;
 	struct rdsv3_connection *conn = ic->conn;
 	struct rdsv3_ib_ack_state ack_state = { 0, };
-	ibt_wc_t wc;
+	ibt_wc_t wc[RDSV3_IB_WC_POLL_SIZE];
 	uint_t polled;
+	int i;
 
 	RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
 	    "Enter(conn: %p ic: %p)", conn, ic);
@@ -375,21 +383,44 @@ rdsv3_ib_tasklet_fn(void *data)
 	/*
 	 * Poll in a loop before and after enabling the next event
 	 */
-	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_cq), &wc, 1, &polled) ==
-	    IBT_SUCCESS) {
-		RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
-		    "wc_id 0x%llx type %d status %u byte_len %u imm_data %u\n",
-		    (unsigned long long)wc.wc_id, wc.wc_type, wc.wc_status,
-		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
+	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_cq), &wc[0],
+	    RDSV3_IB_WC_POLL_SIZE, &polled) == IBT_SUCCESS) {
+		for (i = 0; i < polled; i++) {
+			RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
+			"wc_id 0x%llx type %d status %u byte_len %u \
+			    imm_data %u\n",
+			    (unsigned long long)wc[i].wc_id, wc[i].wc_type,
+			    wc[i].wc_status, wc[i].wc_bytes_xfer,
+			    ntohl(wc[i].wc_immed_data));
 
-		if (wc.wc_id & RDSV3_IB_SEND_OP) {
-			rdsv3_ib_send_cqe_handler(ic, &wc);
-		} else {
-			rdsv3_ib_recv_cqe_handler(ic, &wc, &ack_state);
+			if (wc[i].wc_id & RDSV3_IB_SEND_OP) {
+				rdsv3_ib_send_cqe_handler(ic, &wc[i]);
+			} else {
+				rdsv3_ib_recv_cqe_handler(ic, &wc[i],
+				    &ack_state);
+			}
 		}
 	}
 	(void) ibt_enable_cq_notify(RDSV3_CQ2CQHDL(ic->i_cq),
 	    IBT_NEXT_SOLICITED);
+	while (ibt_poll_cq(RDSV3_CQ2CQHDL(ic->i_cq), &wc[0],
+	    RDSV3_IB_WC_POLL_SIZE, &polled) == IBT_SUCCESS) {
+		for (i = 0; i < polled; i++) {
+			RDSV3_DPRINTF4("rdsv3_ib_tasklet_fn",
+			"wc_id 0x%llx type %d status %u byte_len %u \
+			    imm_data %u\n",
+			    (unsigned long long)wc[i].wc_id, wc[i].wc_type,
+			    wc[i].wc_status, wc[i].wc_bytes_xfer,
+			    ntohl(wc[i].wc_immed_data));
+
+			if (wc[i].wc_id & RDSV3_IB_SEND_OP) {
+				rdsv3_ib_send_cqe_handler(ic, &wc[i]);
+			} else {
+				rdsv3_ib_recv_cqe_handler(ic, &wc[i],
+				    &ack_state);
+			}
+		}
+	}
 
 	if (ack_state.ack_next_valid) {
 		rdsv3_ib_set_ack(ic, ack_state.ack_next,
@@ -492,7 +523,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	ic->i_cq = ib_create_cq(dev, rdsv3_ib_cq_comp_handler,
 	    rdsv3_ib_cq_event_handler, conn,
 	    ic->i_recv_ring.w_nr + ic->i_send_ring.w_nr + 1,
-	    (intptr_t)rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
+	    rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
 	if (IS_ERR(ic->i_cq)) {
 		ret = PTR_ERR(ic->i_cq);
 		ic->i_cq = NULL;
@@ -503,7 +534,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	if (rdsv3_enable_snd_cq) {
 		ic->i_snd_cq = ib_create_cq(dev, rdsv3_ib_snd_cq_comp_handler,
 		    rdsv3_ib_cq_event_handler, conn, ic->i_send_ring.w_nr + 1,
-		    (intptr_t)rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
+		    rdsv3_af_grp_get_sched(ic->rds_ibdev->aft_hcagp));
 		if (IS_ERR(ic->i_snd_cq)) {
 			ret = PTR_ERR(ic->i_snd_cq);
 			(void) ib_destroy_cq(ic->i_cq);
@@ -564,7 +595,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	    sizeof (struct rdsv3_ib_send_work));
 
 	ic->i_send_wrs =
-	    kmem_alloc(RDSV3_IB_SEND_WRS * (sizeof (ibt_send_wr_t) +
+	    kmem_alloc(ic->i_send_ring.w_nr * (sizeof (ibt_send_wr_t) +
 	    RDSV3_IB_MAX_SGE * sizeof (ibt_wr_ds_t)), KM_NOSLEEP);
 	if (ic->i_send_wrs == NULL) {
 		ret = -ENOMEM;
@@ -573,8 +604,8 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 		goto out;
 	}
 	sgl = (ibt_wr_ds_t *)((uint8_t *)ic->i_send_wrs +
-	    (RDSV3_IB_SEND_WRS * sizeof (ibt_send_wr_t)));
-	for (i = 0; i < RDSV3_IB_SEND_WRS; i++) {
+	    (ic->i_send_ring.w_nr * sizeof (ibt_send_wr_t)));
+	for (i = 0; i < ic->i_send_ring.w_nr; i++) {
 		wrp = &ic->i_send_wrs[i];
 		wrp->wr_sgl = &sgl[i * RDSV3_IB_MAX_SGE];
 	}
@@ -1037,7 +1068,7 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 		ic->i_sends = NULL;
 	}
 	if (ic->i_send_wrs) {
-		kmem_free(ic->i_send_wrs, RDSV3_IB_SEND_WRS *
+		kmem_free(ic->i_send_wrs, ic->i_send_ring.w_nr *
 		    (sizeof (ibt_send_wr_t) +
 		    RDSV3_IB_MAX_SGE * sizeof (ibt_wr_ds_t)));
 		ic->i_send_wrs = NULL;
@@ -1055,18 +1086,6 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 
 	RDSV3_DPRINTF2("rdsv3_ib_conn_shutdown", "Return conn: %p", conn);
 }
-
-/*
- * the connection can be allocated from either rdsv3_conn_create_outgoing()
- * or rdsv3_conn_create(), so ddi_taskq_create() can be called with the
- * same string. This can print the kstat warning on the console. To prevent
- * it, this counter value is used.
- * Note that requests from rdsv3_conn_create_outgoing() refers to the cached
- * value with the mutex lock before it allocates the connection, so that
- * the warning cannot be produced in the case. (only between
- * rdsv3_conn_create() and rdsv3_conn_create_outgoing().
- */
-static int conn_cnt;
 
 /* ARGSUSED */
 int

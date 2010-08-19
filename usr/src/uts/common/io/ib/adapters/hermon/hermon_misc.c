@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -46,11 +45,8 @@
 
 #include <sys/ib/adapters/hermon/hermon.h>
 
-extern uint32_t hermon_kernel_data_ro;
 extern int hermon_rdma_debug;
-
-/* used for helping uniquify fmr pool taskq name */
-static uint_t hermon_debug_fmrpool_cnt = 0x00000000;
+int hermon_fmr_verbose = 0;
 
 static int hermon_mcg_qplist_add(hermon_state_t *state, hermon_mcghdl_t mcg,
     hermon_hw_mcg_qp_list_t *mcg_qplist, hermon_qphdl_t qp, uint_t *qp_found);
@@ -68,11 +64,7 @@ static int hermon_mcg_entry_invalidate(hermon_state_t *state,
     hermon_hw_mcg_t *mcg_entry, uint_t indx);
 static int hermon_mgid_is_valid(ib_gid_t gid);
 static int hermon_mlid_is_valid(ib_lid_t lid);
-static void hermon_fmr_processing(void *fmr_args);
-static int hermon_fmr_cleanup(hermon_state_t *state, hermon_fmrhdl_t pool);
-static void hermon_fmr_cache_init(hermon_fmrhdl_t fmr);
-static void hermon_fmr_cache_fini(hermon_fmrhdl_t fmr);
-static int hermon_fmr_avl_compare(const void *q, const void *e);
+static void hermon_fmr_cleanup(hermon_fmrhdl_t pool);
 
 
 #define	HERMON_MAX_DBR_PAGES_PER_USER	64
@@ -88,19 +80,20 @@ hermon_dbr_new_user_page(hermon_state_t *state, uint_t index,
 	uint_t cookiecnt;
 	int status;
 	hermon_umap_db_entry_t *umapdb;
+	ulong_t pagesize = PAGESIZE;
 
 	pagep = kmem_alloc(sizeof (*pagep), KM_SLEEP);
 	pagep->upg_index = page;
-	pagep->upg_nfree = PAGESIZE / sizeof (hermon_dbr_t);
+	pagep->upg_nfree = pagesize / sizeof (hermon_dbr_t);
 
 	/* Allocate 1 bit per dbr for free/alloc management (0 => "free") */
-	pagep->upg_free = kmem_zalloc(PAGESIZE / sizeof (hermon_dbr_t) / 8,
+	pagep->upg_free = kmem_zalloc(pagesize / sizeof (hermon_dbr_t) / 8,
 	    KM_SLEEP);
-	pagep->upg_kvaddr = ddi_umem_alloc(PAGESIZE, DDI_UMEM_SLEEP,
+	pagep->upg_kvaddr = ddi_umem_alloc(pagesize, DDI_UMEM_SLEEP,
 	    &pagep->upg_umemcookie); /* not HERMON_PAGESIZE here */
 
 	pagep->upg_buf = ddi_umem_iosetup(pagep->upg_umemcookie, 0,
-	    PAGESIZE, B_WRITE, 0, 0, NULL, DDI_UMEM_SLEEP);
+	    pagesize, B_WRITE, 0, 0, NULL, DDI_UMEM_SLEEP);
 
 	hermon_dma_attr_init(state, &dma_attr);
 #ifdef	__sparc
@@ -281,6 +274,7 @@ hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 	hermon_dbr_info_t 	*info;
 	caddr_t			dmaaddr;
 	uint64_t		dmalen;
+	ulong_t			pagesize = PAGESIZE;
 
 	info = kmem_zalloc(sizeof (hermon_dbr_info_t), KM_SLEEP);
 
@@ -290,7 +284,7 @@ hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 	 * page aligned.  Also use the configured value for IOMMU bypass
 	 */
 	hermon_dma_attr_init(state, &dma_attr);
-	dma_attr.dma_attr_align = PAGESIZE;
+	dma_attr.dma_attr_align = pagesize;
 	dma_attr.dma_attr_sgllen = 1;	/* make sure only one cookie */
 #ifdef	__sparc
 	if (state->hs_cfg_profile->cp_iommu_bypass == HERMON_BINDMEM_BYPASS)
@@ -305,7 +299,7 @@ hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 		return (DDI_FAILURE);
 	}
 
-	status = ddi_dma_mem_alloc(dma_hdl, PAGESIZE,
+	status = ddi_dma_mem_alloc(dma_hdl, pagesize,
 	    &state->hs_reg_accattr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
 	    NULL, &dmaaddr, (size_t *)&dmalen, &acc_hdl);
 	if (status != DDI_SUCCESS)	{
@@ -2559,7 +2553,6 @@ hermon_create_fmr_pool(hermon_state_t *state, hermon_pdhdl_t pd,
 	hermon_fmrhdl_t	fmrpool;
 	hermon_fmr_list_t *fmr, *fmr_next;
 	hermon_mrhdl_t   mr;
-	char		taskqname[48];
 	int		status;
 	int		sleep;
 	int		i;
@@ -2580,35 +2573,33 @@ hermon_create_fmr_pool(hermon_state_t *state, hermon_pdhdl_t pd,
 
 	mutex_init(&fmrpool->fmr_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(state->hs_intrmsi_pri));
+	mutex_init(&fmrpool->remap_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(state->hs_intrmsi_pri));
+	mutex_init(&fmrpool->dirty_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(state->hs_intrmsi_pri));
 
 	fmrpool->fmr_state	    = state;
 	fmrpool->fmr_flush_function = fmr_attr->fmr_func_hdlr;
 	fmrpool->fmr_flush_arg	    = fmr_attr->fmr_func_arg;
 	fmrpool->fmr_pool_size	    = 0;
-	fmrpool->fmr_cache	    = 0;
 	fmrpool->fmr_max_pages	    = fmr_attr->fmr_max_pages_per_fmr;
 	fmrpool->fmr_page_sz	    = fmr_attr->fmr_page_sz;
-	fmrpool->fmr_dirty_watermark = fmr_attr->fmr_dirty_watermark;
+	fmrpool->fmr_dirty_watermark = fmr_attr->fmr_pool_size / 4;
 	fmrpool->fmr_dirty_len	    = 0;
+	fmrpool->fmr_remap_watermark = fmr_attr->fmr_pool_size / 32;
+	fmrpool->fmr_remap_len	    = 0;
 	fmrpool->fmr_flags	    = fmr_attr->fmr_flags;
+	fmrpool->fmr_stat_register  = 0;
+	fmrpool->fmr_max_remaps	    = state->hs_cfg_profile->cp_fmr_max_remaps;
+	fmrpool->fmr_remap_gen	    = 1;
 
-	/* Create taskq to handle cleanup and flush processing */
-	(void) snprintf(taskqname, 50, "fmrpool/%d/%d @ 0x%" PRIx64,
-	    fmr_attr->fmr_pool_size, hermon_debug_fmrpool_cnt,
-	    (uint64_t)(uintptr_t)fmrpool);
-	fmrpool->fmr_taskq = ddi_taskq_create(state->hs_dip, taskqname,
-	    HERMON_TASKQ_NTHREADS, TASKQ_DEFAULTPRI, 0);
-	if (fmrpool->fmr_taskq == NULL) {
-		status = IBT_INSUFF_RESOURCE;
-		goto fail1;
-	}
-
-	fmrpool->fmr_free_list = NULL;
+	fmrpool->fmr_free_list_tail = &fmrpool->fmr_free_list;
 	fmrpool->fmr_dirty_list = NULL;
-
-	if (fmr_attr->fmr_cache) {
-		hermon_fmr_cache_init(fmrpool);
-	}
+	fmrpool->fmr_dirty_list_tail = &fmrpool->fmr_dirty_list;
+	fmrpool->fmr_remap_list = NULL;
+	fmrpool->fmr_remap_list_tail = &fmrpool->fmr_remap_list;
+	fmrpool->fmr_pool_size = fmrpool->fmr_free_len =
+	    fmr_attr->fmr_pool_size;
 
 	for (i = 0; i < fmr_attr->fmr_pool_size; i++) {
 		status = hermon_mr_alloc_fmr(state, pd, fmrpool, &mr);
@@ -2621,34 +2612,34 @@ hermon_create_fmr_pool(hermon_state_t *state, hermon_pdhdl_t pd,
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*fmr))
 
 		fmr->fmr = mr;
-		fmr->fmr_refcnt = 0;
 		fmr->fmr_remaps = 0;
+		fmr->fmr_remap_gen = fmrpool->fmr_remap_gen;
 		fmr->fmr_pool = fmrpool;
-		fmr->fmr_in_cache = 0;
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
 		mr->mr_fmr = fmr;
 
+		if (!i)		/* address of last entry's link */
+			fmrpool->fmr_free_list_tail = &fmr->fmr_next;
 		fmr->fmr_next = fmrpool->fmr_free_list;
 		fmrpool->fmr_free_list = fmr;
-		fmrpool->fmr_pool_size++;
 	}
 
 	/* Set to return pool */
 	*fmrpoolp = fmrpool;
 
+	IBTF_DPRINTF_L2("fmr", "create_fmr_pool SUCCESS");
 	return (IBT_SUCCESS);
 fail2:
-	hermon_fmr_cache_fini(fmrpool);
 	for (fmr = fmrpool->fmr_free_list; fmr != NULL; fmr = fmr_next) {
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*fmr))
 		fmr_next = fmr->fmr_next;
 		(void) hermon_mr_dealloc_fmr(state, &fmr->fmr);
 		kmem_free(fmr, sizeof (hermon_fmr_list_t));
 	}
-	ddi_taskq_destroy(fmrpool->fmr_taskq);
-fail1:
 	kmem_free(fmrpool, sizeof (*fmrpool));
 fail:
+	*fmrpoolp = NULL;
+	IBTF_DPRINTF_L2("fmr", "create_fmr_pool FAILED");
 	if (status == DDI_FAILURE) {
 		return (ibc_get_ci_failure(0));
 	} else {
@@ -2665,31 +2656,27 @@ int
 hermon_destroy_fmr_pool(hermon_state_t *state, hermon_fmrhdl_t fmrpool)
 {
 	hermon_fmr_list_t	*fmr, *fmr_next;
-	int			status;
 
 	mutex_enter(&fmrpool->fmr_lock);
-	status = hermon_fmr_cleanup(state, fmrpool);
-	if (status != DDI_SUCCESS) {
-		mutex_exit(&fmrpool->fmr_lock);
-		return (status);
-	}
-
-	if (fmrpool->fmr_cache) {
-		hermon_fmr_cache_fini(fmrpool);
-	}
+	hermon_fmr_cleanup(fmrpool);
 
 	for (fmr = fmrpool->fmr_free_list; fmr != NULL; fmr = fmr_next) {
 		fmr_next = fmr->fmr_next;
 
 		(void) hermon_mr_dealloc_fmr(state, &fmr->fmr);
 		kmem_free(fmr, sizeof (hermon_fmr_list_t));
+
+		--fmrpool->fmr_pool_size;
 	}
+	ASSERT(fmrpool->fmr_pool_size == 0);
 	mutex_exit(&fmrpool->fmr_lock);
 
-	ddi_taskq_destroy(fmrpool->fmr_taskq);
 	mutex_destroy(&fmrpool->fmr_lock);
+	mutex_destroy(&fmrpool->dirty_lock);
+	mutex_destroy(&fmrpool->remap_lock);
 
 	kmem_free(fmrpool, sizeof (*fmrpool));
+	IBTF_DPRINTF_L2("fmr", "destroy_fmr_pool SUCCESS");
 	return (DDI_SUCCESS);
 }
 
@@ -2698,24 +2685,23 @@ hermon_destroy_fmr_pool(hermon_state_t *state, hermon_fmrhdl_t fmrpool)
  * Ensure that all unmapped FMRs are fully invalidated.
  *     Context: Can be called from kernel context only.
  */
+/* ARGSUSED */
 int
 hermon_flush_fmr_pool(hermon_state_t *state, hermon_fmrhdl_t fmrpool)
 {
-	int		status;
-
 	/*
 	 * Force the unmapping of all entries on the dirty list, regardless of
 	 * whether the watermark has been hit yet.
 	 */
 	/* grab the pool lock */
 	mutex_enter(&fmrpool->fmr_lock);
-	status = hermon_fmr_cleanup(state, fmrpool);
+	hermon_fmr_cleanup(fmrpool);
 	mutex_exit(&fmrpool->fmr_lock);
-	return (status);
+	return (DDI_SUCCESS);
 }
 
 /*
- * hermon_deregister_fmr()
+ * hermon_register_physical_fmr()
  * Map memory into FMR
  *    Context: Can be called from interrupt or base context.
  */
@@ -2725,71 +2711,59 @@ hermon_register_physical_fmr(hermon_state_t *state, hermon_fmrhdl_t fmrpool,
     ibt_pmr_desc_t *mem_desc_p)
 {
 	hermon_fmr_list_t	*fmr;
-	hermon_fmr_list_t	query;
-	avl_index_t		where;
 	int			status;
 
 	/* Check length */
-	mutex_enter(&fmrpool->fmr_lock);
 	if (mem_pattr->pmr_len < 1 || (mem_pattr->pmr_num_buf >
 	    fmrpool->fmr_max_pages)) {
-		mutex_exit(&fmrpool->fmr_lock);
 		return (IBT_MR_LEN_INVALID);
 	}
 
-	mutex_enter(&fmrpool->fmr_cachelock);
-	/* lookup in fmr cache */
-	/* if exists, grab it, and return it */
-	if (fmrpool->fmr_cache) {
-		query.fmr_desc.pmd_iova = mem_pattr->pmr_iova;
-		query.fmr_desc.pmd_phys_buf_list_sz = mem_pattr->pmr_len;
-		fmr = (hermon_fmr_list_t *)avl_find(&fmrpool->fmr_cache_avl,
-		    &query, &where);
+	mutex_enter(&fmrpool->fmr_lock);
+	if (fmrpool->fmr_free_list == NULL) {
+		if (hermon_fmr_verbose & 2)
+			IBTF_DPRINTF_L2("fmr", "register needs remap");
+		mutex_enter(&fmrpool->remap_lock);
+		if (fmrpool->fmr_remap_list) {
+			/* add to free list */
+			*(fmrpool->fmr_free_list_tail) =
+			    fmrpool->fmr_remap_list;
+			fmrpool->fmr_remap_list = NULL;
+			fmrpool->fmr_free_list_tail =
+			    fmrpool->fmr_remap_list_tail;
 
-		/*
-		 * If valid FMR was found in cache, return that fmr info
-		 */
-		if (fmr != NULL) {
-			fmr->fmr_refcnt++;
-			/* Store pmr desc for use in cache */
-			(void) memcpy(mem_desc_p, &fmr->fmr_desc,
-			    sizeof (ibt_pmr_desc_t));
-			*mr = (hermon_mrhdl_t)fmr->fmr;
-			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
-			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(
-			    *(fmr->fmr->mr_mptrsrcp)))
-			if (hermon_rdma_debug & 0x4)
-				IBTF_DPRINTF_L2("fmr", "  reg cache: mr %p "
-				    "index %x", fmr->fmr,
-				    fmr->fmr->mr_mptrsrcp->hr_indx);
-			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(
-			    *(fmr->fmr->mr_mptrsrcp)))
-			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
-			mutex_exit(&fmrpool->fmr_cachelock);
-			mutex_exit(&fmrpool->fmr_lock);
-			return (DDI_SUCCESS);
+			/* reset list */
+			fmrpool->fmr_remap_list_tail = &fmrpool->fmr_remap_list;
+			fmrpool->fmr_free_len += fmrpool->fmr_remap_len;
+			fmrpool->fmr_remap_len = 0;
 		}
+		mutex_exit(&fmrpool->remap_lock);
 	}
-
-	/* FMR does not exist in cache, proceed with registration */
+	if (fmrpool->fmr_free_list == NULL) {
+		if (hermon_fmr_verbose & 2)
+			IBTF_DPRINTF_L2("fmr", "register needs cleanup");
+		hermon_fmr_cleanup(fmrpool);
+	}
 
 	/* grab next free entry */
 	fmr = fmrpool->fmr_free_list;
 	if (fmr == NULL) {
 		IBTF_DPRINTF_L2("fmr", "WARNING: no free fmr resource");
-		mutex_exit(&fmrpool->fmr_cachelock);
+		cmn_err(CE_CONT, "no free fmr resource\n");
 		mutex_exit(&fmrpool->fmr_lock);
 		return (IBT_INSUFF_RESOURCE);
 	}
 
-	fmrpool->fmr_free_list = fmrpool->fmr_free_list->fmr_next;
+	if ((fmrpool->fmr_free_list = fmr->fmr_next) == NULL)
+		fmrpool->fmr_free_list_tail = &fmrpool->fmr_free_list;
 	fmr->fmr_next = NULL;
+	fmrpool->fmr_stat_register++;
+	mutex_exit(&fmrpool->fmr_lock);
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*fmr))
 	status = hermon_mr_register_physical_fmr(state, mem_pattr, fmr->fmr,
 	    mem_desc_p);
 	if (status != DDI_SUCCESS) {
-		mutex_exit(&fmrpool->fmr_cachelock);
-		mutex_exit(&fmrpool->fmr_lock);
 		return (status);
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*fmr->fmr))
@@ -2797,24 +2771,15 @@ hermon_register_physical_fmr(hermon_state_t *state, hermon_fmrhdl_t fmrpool,
 		IBTF_DPRINTF_L2("fmr", "  reg: mr %p  key %x",
 		    fmr->fmr, fmr->fmr->mr_rkey);
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*fmr->fmr))
-
-	fmr->fmr_refcnt = 1;
-	fmr->fmr_remaps++;
-
-	/* Store pmr desc for use in cache */
-	(void) memcpy(&fmr->fmr_desc, mem_desc_p, sizeof (ibt_pmr_desc_t));
-	*mr = (hermon_mrhdl_t)fmr->fmr;
-
-	/* Store in cache */
-	if (fmrpool->fmr_cache) {
-		if (!fmr->fmr_in_cache) {
-			avl_insert(&fmrpool->fmr_cache_avl, fmr, where);
-			fmr->fmr_in_cache = 1;
-		}
+	if (fmr->fmr_remap_gen != fmrpool->fmr_remap_gen) {
+		fmr->fmr_remap_gen = fmrpool->fmr_remap_gen;
+		fmr->fmr_remaps = 0;
 	}
 
-	mutex_exit(&fmrpool->fmr_cachelock);
-	mutex_exit(&fmrpool->fmr_lock);
+	fmr->fmr_remaps++;
+
+	*mr = (hermon_mrhdl_t)fmr->fmr;
+
 	return (DDI_SUCCESS);
 }
 
@@ -2826,218 +2791,136 @@ hermon_register_physical_fmr(hermon_state_t *state, hermon_fmrhdl_t fmrpool,
 int
 hermon_deregister_fmr(hermon_state_t *state, hermon_mrhdl_t mr)
 {
-	hermon_fmr_list_t	*fmr;
 	hermon_fmrhdl_t		fmrpool;
-	int			status;
+	hermon_fmr_list_t	*fmr, **fmrlast;
+	int			len;
 
 	fmr = mr->mr_fmr;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*fmr))
 	fmrpool = fmr->fmr_pool;
 
-	/* Grab pool lock */
-	mutex_enter(&fmrpool->fmr_lock);
-	fmr->fmr_refcnt--;
+	/* mark as owned by software */
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
+	*(uint8_t *)(fmr->fmr->mr_mptrsrcp->hr_addr) = 0xF0;
 
-	if (fmr->fmr_refcnt == 0) {
-		/*
-		 * First, do some bit of invalidation, reducing our exposure to
-		 * having this region still registered in hardware.
-		 */
-		(void) hermon_mr_invalidate_fmr(state, mr);
+	if (fmr->fmr_remaps <
+	    state->hs_cfg_profile->cp_fmr_max_remaps) {
+		/* add to remap list */
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
+		if (hermon_rdma_debug & 0x4)
+			IBTF_DPRINTF_L2("fmr", "dereg: mr %p  key %x",
+			    fmr->fmr, fmr->fmr->mr_rkey);
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
+		mutex_enter(&fmrpool->remap_lock);
+		fmr->fmr_next = NULL;
+		*(fmrpool->fmr_remap_list_tail) = fmr;
+		fmrpool->fmr_remap_list_tail = &fmr->fmr_next;
+		fmrpool->fmr_remap_len++;
 
-		/*
-		 * If we've exhausted our remaps then add the FMR to the dirty
-		 * list, not allowing it to be re-used until we have done a
-		 * flush.  Otherwise, simply add it back to the free list for
-		 * re-mapping.
-		 */
-		if (fmr->fmr_remaps <
-		    state->hs_cfg_profile->cp_fmr_max_remaps) {
-			/* add to free list */
-			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
-			if (hermon_rdma_debug & 0x4)
-				IBTF_DPRINTF_L2("fmr", "dereg: mr %p  key %x",
-				    fmr->fmr, fmr->fmr->mr_rkey);
-			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
-			fmr->fmr_next = fmrpool->fmr_free_list;
-			fmrpool->fmr_free_list = fmr;
-		} else {
-			/* add to dirty list */
-			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
-			if (hermon_rdma_debug & 0x4)
-				IBTF_DPRINTF_L2("fmr", "dirty: mr %p  key %x",
-				    fmr->fmr, fmr->fmr->mr_rkey);
-			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
-			fmr->fmr_next = fmrpool->fmr_dirty_list;
-			fmrpool->fmr_dirty_list = fmr;
-			fmrpool->fmr_dirty_len++;
-
-			status = ddi_taskq_dispatch(fmrpool->fmr_taskq,
-			    hermon_fmr_processing, fmrpool, DDI_NOSLEEP);
-			if (status == DDI_FAILURE) {
-				mutex_exit(&fmrpool->fmr_lock);
-				return (IBT_INSUFF_RESOURCE);
-			}
+		/* conditionally add remap list back to free list */
+		fmrlast = NULL;
+		if (fmrpool->fmr_remap_len >=
+		    fmrpool->fmr_remap_watermark) {
+			fmr = fmrpool->fmr_remap_list;
+			fmrlast = fmrpool->fmr_remap_list_tail;
+			len = fmrpool->fmr_remap_len;
+			fmrpool->fmr_remap_len = 0;
+			fmrpool->fmr_remap_list = NULL;
+			fmrpool->fmr_remap_list_tail =
+			    &fmrpool->fmr_remap_list;
 		}
-	}
-	/* Release pool lock */
-	mutex_exit(&fmrpool->fmr_lock);
-
-	return (DDI_SUCCESS);
-}
-
-
-/*
- * hermon_fmr_processing()
- * If required, perform cleanup.
- *     Context: Called from taskq context only.
- */
-static void
-hermon_fmr_processing(void *fmr_args)
-{
-	hermon_fmrhdl_t		fmrpool;
-	int			status;
-
-	ASSERT(fmr_args != NULL);
-
-	fmrpool = (hermon_fmrhdl_t)fmr_args;
-
-	/* grab pool lock */
-	mutex_enter(&fmrpool->fmr_lock);
-	if (fmrpool->fmr_dirty_len >= fmrpool->fmr_dirty_watermark) {
-		status = hermon_fmr_cleanup(fmrpool->fmr_state, fmrpool);
-		if (status != DDI_SUCCESS) {
+		mutex_exit(&fmrpool->remap_lock);
+		if (fmrlast) {
+			mutex_enter(&fmrpool->fmr_lock);
+			*(fmrpool->fmr_free_list_tail) = fmr;
+			fmrpool->fmr_free_list_tail = fmrlast;
+			fmrpool->fmr_free_len += len;
 			mutex_exit(&fmrpool->fmr_lock);
-			return;
 		}
+	} else {
+		/* add to dirty list */
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
+		if (hermon_rdma_debug & 0x4)
+			IBTF_DPRINTF_L2("fmr", "dirty: mr %p  key %x",
+			    fmr->fmr, fmr->fmr->mr_rkey);
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
 
-		if (fmrpool->fmr_flush_function != NULL) {
-			(void) fmrpool->fmr_flush_function(
-			    (ibc_fmr_pool_hdl_t)fmrpool,
-			    fmrpool->fmr_flush_arg);
-		}
+		mutex_enter(&fmrpool->dirty_lock);
+		fmr->fmr_next = NULL;
+		*(fmrpool->fmr_dirty_list_tail) = fmr;
+		fmrpool->fmr_dirty_list_tail = &fmr->fmr_next;
+		fmrpool->fmr_dirty_len++;
+
+		if (fmrpool->fmr_dirty_len >=
+		    fmrpool->fmr_dirty_watermark) {
+			mutex_exit(&fmrpool->dirty_lock);
+			mutex_enter(&fmrpool->fmr_lock);
+			hermon_fmr_cleanup(fmrpool);
+			mutex_exit(&fmrpool->fmr_lock);
+		} else
+			mutex_exit(&fmrpool->dirty_lock);
 	}
-
-	/* let pool lock go */
-	mutex_exit(&fmrpool->fmr_lock);
+	return (DDI_SUCCESS);
 }
 
 /*
  * hermon_fmr_cleanup()
- * Perform cleaning processing, walking the list and performing the MTT sync
- * operation if required.
- *    Context: can be called from taskq or base context.
+ *     Context: Called from any context.
  */
-static int
-hermon_fmr_cleanup(hermon_state_t *state, hermon_fmrhdl_t fmrpool)
+static void
+hermon_fmr_cleanup(hermon_fmrhdl_t fmrpool)
 {
-	hermon_fmr_list_t	*fmr;
-	hermon_fmr_list_t	*fmr_next;
-	int			sync_needed;
 	int			status;
 
 	ASSERT(MUTEX_HELD(&fmrpool->fmr_lock));
 
-	sync_needed = 0;
-	for (fmr = fmrpool->fmr_dirty_list; fmr; fmr = fmr_next) {
-		fmr_next = fmr->fmr_next;
-		fmr->fmr_remaps = 0;
+	if (fmrpool->fmr_stat_register == 0)
+		return;
 
-		(void) hermon_mr_deregister_fmr(state, fmr->fmr);
+	fmrpool->fmr_stat_register = 0;
+	membar_producer();
 
-		/*
-		 * Update lists.
-		 * - add fmr back to free list
-		 * - remove fmr from dirty list
-		 */
-		fmr->fmr_next = fmrpool->fmr_free_list;
-		fmrpool->fmr_free_list = fmr;
-
-
-		/*
-		 * Because we have updated the dirty list, and deregistered the
-		 * FMR entry, we do need to sync the TPT, so we set the
-		 * 'sync_needed' flag here so we sync once we finish dirty_list
-		 * processing.
-		 */
-		sync_needed = 1;
+	if (hermon_fmr_verbose)
+		IBTF_DPRINTF_L2("fmr", "TPT_SYNC");
+	status = hermon_sync_tpt_cmd_post(fmrpool->fmr_state,
+	    HERMON_CMD_NOSLEEP_SPIN);
+	if (status != HERMON_CMD_SUCCESS) {
+		cmn_err(CE_WARN, "fmr SYNC_TPT failed(%x)\n", status);
 	}
+	fmrpool->fmr_remap_gen++;
 
-	fmrpool->fmr_dirty_list = NULL;
-	fmrpool->fmr_dirty_len = 0;
+	/* add everything back to the free list */
+	mutex_enter(&fmrpool->dirty_lock);
+	if (fmrpool->fmr_dirty_list) {
+		/* add to free list */
+		*(fmrpool->fmr_free_list_tail) = fmrpool->fmr_dirty_list;
+		fmrpool->fmr_dirty_list = NULL;
+		fmrpool->fmr_free_list_tail = fmrpool->fmr_dirty_list_tail;
 
-	if (sync_needed) {
-		status = hermon_sync_tpt_cmd_post(state,
-		    HERMON_CMD_NOSLEEP_SPIN);
-		if (status != HERMON_CMD_SUCCESS) {
-			return (status);
-		}
+		/* reset list */
+		fmrpool->fmr_dirty_list_tail = &fmrpool->fmr_dirty_list;
+		fmrpool->fmr_free_len += fmrpool->fmr_dirty_len;
+		fmrpool->fmr_dirty_len = 0;
 	}
+	mutex_exit(&fmrpool->dirty_lock);
 
-	return (DDI_SUCCESS);
-}
+	mutex_enter(&fmrpool->remap_lock);
+	if (fmrpool->fmr_remap_list) {
+		/* add to free list */
+		*(fmrpool->fmr_free_list_tail) = fmrpool->fmr_remap_list;
+		fmrpool->fmr_remap_list = NULL;
+		fmrpool->fmr_free_list_tail = fmrpool->fmr_remap_list_tail;
 
-/*
- * hermon_fmr_avl_compare()
- *    Context: Can be called from user or kernel context.
- */
-static int
-hermon_fmr_avl_compare(const void *q, const void *e)
-{
-	hermon_fmr_list_t *entry, *query;
-
-	entry = (hermon_fmr_list_t *)e;
-	query = (hermon_fmr_list_t *)q;
-
-	if (query->fmr_desc.pmd_iova < entry->fmr_desc.pmd_iova) {
-		return (-1);
-	} else if (query->fmr_desc.pmd_iova > entry->fmr_desc.pmd_iova) {
-		return (+1);
-	} else {
-		return (0);
+		/* reset list */
+		fmrpool->fmr_remap_list_tail = &fmrpool->fmr_remap_list;
+		fmrpool->fmr_free_len += fmrpool->fmr_remap_len;
+		fmrpool->fmr_remap_len = 0;
 	}
-}
+	mutex_exit(&fmrpool->remap_lock);
 
-
-/*
- * hermon_fmr_cache_init()
- *    Context: Can be called from user or kernel context.
- */
-static void
-hermon_fmr_cache_init(hermon_fmrhdl_t fmr)
-{
-	/* Initialize the lock used for FMR cache AVL tree access */
-	mutex_init(&fmr->fmr_cachelock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(fmr->fmr_state->hs_intrmsi_pri));
-
-	/* Initialize the AVL tree for the FMR cache */
-	avl_create(&fmr->fmr_cache_avl, hermon_fmr_avl_compare,
-	    sizeof (hermon_fmr_list_t),
-	    offsetof(hermon_fmr_list_t, fmr_avlnode));
-
-	fmr->fmr_cache = 1;
-}
-
-
-/*
- * hermon_fmr_cache_fini()
- *    Context: Can be called from user or kernel context.
- */
-static void
-hermon_fmr_cache_fini(hermon_fmrhdl_t fmr)
-{
-	void			*cookie;
-
-	/*
-	 * Empty all entries (if necessary) and destroy the AVL tree.
-	 * The FMRs themselves are freed as part of destroy_pool()
-	 */
-	cookie = NULL;
-	while (((void *)(hermon_fmr_list_t *)avl_destroy_nodes(
-	    &fmr->fmr_cache_avl, &cookie)) != NULL) {
-		/* loop through */
+	if (fmrpool->fmr_flush_function != NULL) {
+		(void) fmrpool->fmr_flush_function(
+		    (ibc_fmr_pool_hdl_t)fmrpool,
+		    fmrpool->fmr_flush_arg);
 	}
-	avl_destroy(&fmr->fmr_cache_avl);
-
-	/* Destroy the lock used for FMR cache */
-	mutex_destroy(&fmr->fmr_cachelock);
 }

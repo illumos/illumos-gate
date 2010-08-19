@@ -488,13 +488,44 @@ setpolicy(caddr_t data)
 }
 
 static int
+getamask(caddr_t data)
+{
+	au_kcontext_t	*kctx;
+
+	kctx = GET_KCTX_PZ;
+
+	if (copyout(&kctx->auk_info.ai_amask, data, sizeof (au_mask_t)))
+		return (EFAULT);
+
+	return (0);
+}
+
+static int
+setamask(caddr_t data)
+{
+	au_mask_t	mask;
+	au_kcontext_t	*kctx;
+
+	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
+		return (EINVAL);
+
+	kctx = GET_KCTX_NGZ;
+
+	if (copyin(data, &mask, sizeof (au_mask_t)))
+		return (EFAULT);
+
+	kctx->auk_info.ai_amask = mask;
+	return (0);
+}
+
+static int
 getkmask(caddr_t data)
 {
 	au_kcontext_t	*kctx;
 
 	kctx = GET_KCTX_PZ;
 
-	if (copyout(&kctx->auk_info.ai_mask, data, sizeof (au_mask_t)))
+	if (copyout(&kctx->auk_info.ai_namask, data, sizeof (au_mask_t)))
 		return (EFAULT);
 	return (0);
 }
@@ -513,7 +544,7 @@ setkmask(caddr_t data)
 	if (copyin(data, &mask, sizeof (au_mask_t)))
 		return (EFAULT);
 
-	kctx->auk_info.ai_mask = mask;
+	kctx->auk_info.ai_namask = mask;
 	return (0);
 }
 
@@ -531,7 +562,7 @@ getkaudit(caddr_t info_p, int len)
 		return (EOVERFLOW);
 
 	STRUCT_FSET(info, ai_auid, kctx->auk_info.ai_auid);
-	STRUCT_FSET(info, ai_mask, kctx->auk_info.ai_mask);
+	STRUCT_FSET(info, ai_mask, kctx->auk_info.ai_namask);
 #ifdef _LP64
 	if (model == DATAMODEL_ILP32) {
 		dev32_t dev;
@@ -597,7 +628,7 @@ setkaudit(caddr_t info_p, int len)
 
 	/* Set audit mask, termid and session id as specified */
 	kctx->auk_info.ai_auid = STRUCT_FGET(info, ai_auid);
-	kctx->auk_info.ai_mask = STRUCT_FGET(info, ai_mask);
+	kctx->auk_info.ai_namask = STRUCT_FGET(info, ai_mask);
 #ifdef _LP64
 	/* only convert to 64 bit if coming from a 32 bit binary */
 	if (model == DATAMODEL_ILP32)
@@ -1332,6 +1363,7 @@ auditctl(
 	int result;
 
 	switch (cmd) {
+	case A_GETAMASK:
 	case A_GETCOND:
 	case A_GETCAR:
 	case A_GETCLASS:
@@ -1358,6 +1390,12 @@ auditctl(
 		break;
 	case A_SETPOLICY:
 		result = setpolicy(data);
+		break;
+	case A_GETAMASK:
+		result = getamask(data);
+		break;
+	case A_SETAMASK:
+		result = setamask(data);
 		break;
 	case A_GETKMASK:
 		result = getkmask(data);

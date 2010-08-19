@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
@@ -70,9 +69,6 @@ MNTTAB=/etc/mnttab
 # slower shell constructs to reverse a file.
 
 PATH=/sbin:/usr/sbin:/usr/bin
-
-DEFERRED_ACTIVATION_PATCH_FLAG="/var/run/.patch_loopback_mode"
-SVC_STARTD="/lib/svc/bin/svc.startd"
 
 # Clear these in case they were already set in our inherited environment.
 FSType=
@@ -168,24 +164,6 @@ if [ -n "$FFLAG" -a "$FSType" != "nfs"  -a -n "$RFLAG" ]; then		# 7
 fi
 
 ZONENAME=`zonename`
-
-#
-# If we are in deferred activation patching, and the caller is 
-# svc.startd, then exit without unmounting any of the remaining 
-# file systems since the call path is from shutdown.  Note that
-# by the time we get here, smf stop methods for nfs, cachefs
-# etc, will have run.  
-#
-if [ -f $DEFERRED_ACTIVATION_PATCH_FLAG ] ; then 
-	ppid=`ps -o ppid= -p $$`	# parent of umountall will be sh
-					# from system()
-
-	ppid=`ps -o ppid= -p $ppid`	# parent of sh will be svc.startd
-	COMM=`ps -o comm= -p $ppid`
-	if [ "$COMM" = "$SVC_STARTD" ] ; then
-		exit
-	fi
-fi
 
 #
 # Take advantage of parallel unmounting at this point if we have no

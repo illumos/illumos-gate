@@ -42,6 +42,7 @@
 #include <sys/dmu_impl.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/sa.h>
+#include <sys/zfs_onexit.h>
 
 /*
  * Needed to close a window in dnode_move() that allows the objset to be freed
@@ -367,7 +368,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		os->os_secondary_cache = ZFS_CACHE_ALL;
 	}
 
-	os->os_zil_header = os->os_phys->os_zil_header;
+	if (ds == NULL || !dsl_dataset_is_snapshot(ds))
+		os->os_zil_header = os->os_phys->os_zil_header;
 	os->os_zil = zil_alloc(os, &os->os_zil_header);
 
 	for (i = 0; i < TXG_SIZE; i++) {
@@ -421,7 +423,7 @@ dmu_objset_from_ds(dsl_dataset_t *ds, objset_t **osp)
 	*osp = ds->ds_objset;
 	if (*osp == NULL) {
 		err = dmu_objset_open_impl(dsl_dataset_get_spa(ds),
-		    ds, &ds->ds_phys->ds_bp, osp);
+		    ds, dsl_dataset_get_blkptr(ds), osp);
 	}
 	mutex_exit(&ds->ds_opening_lock);
 	return (err);
@@ -601,11 +603,11 @@ dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	dnode_t *mdn;
 
 	ASSERT(dmu_tx_is_syncing(tx));
-	if (ds)
-		mutex_enter(&ds->ds_opening_lock);
-	VERIFY(0 == dmu_objset_open_impl(spa, ds, bp, &os));
-	if (ds)
-		mutex_exit(&ds->ds_opening_lock);
+	if (ds != NULL)
+		VERIFY(0 == dmu_objset_from_ds(ds, &os));
+	else
+		VERIFY(0 == dmu_objset_open_impl(spa, NULL, bp, &os));
+
 	mdn = DMU_META_DNODE(os);
 
 	dnode_allocate(mdn, DMU_OT_DNODE, 1 << DNODE_BLOCK_SHIFT,
@@ -694,34 +696,33 @@ static void
 dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
+	spa_t *spa = dd->dd_pool->dp_spa;
 	struct oscarg *oa = arg2;
-	uint64_t dsobj;
+	uint64_t obj;
 
 	ASSERT(dmu_tx_is_syncing(tx));
 
-	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
+	obj = dsl_dataset_create_sync(dd, oa->lastname,
 	    oa->clone_origin, oa->flags, oa->cr, tx);
 
 	if (oa->clone_origin == NULL) {
+		dsl_pool_t *dp = dd->dd_pool;
 		dsl_dataset_t *ds;
 		blkptr_t *bp;
 		objset_t *os;
 
-		VERIFY(0 == dsl_dataset_hold_obj(dd->dd_pool, dsobj,
-		    FTAG, &ds));
+		VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, obj, FTAG, &ds));
 		bp = dsl_dataset_get_blkptr(ds);
 		ASSERT(BP_IS_HOLE(bp));
 
-		os = dmu_objset_create_impl(dsl_dataset_get_spa(ds),
-		    ds, bp, oa->type, tx);
+		os = dmu_objset_create_impl(spa, ds, bp, oa->type, tx);
 
 		if (oa->userfunc)
 			oa->userfunc(os, oa->userarg, oa->cr, tx);
 		dsl_dataset_rele(ds, FTAG);
 	}
 
-	spa_history_log_internal(LOG_DS_CREATE, dd->dd_pool->dp_spa,
-	    tx, "dataset = %llu", dsobj);
+	spa_history_log_internal(LOG_DS_CREATE, spa, tx, "dataset = %llu", obj);
 }
 
 int
@@ -789,18 +790,8 @@ dmu_objset_destroy(const char *name, boolean_t defer)
 	dsl_dataset_t *ds;
 	int error;
 
-	/*
-	 * dsl_dataset_destroy() can free any claimed-but-unplayed
-	 * intent log, but if there is an active log, it has blocks that
-	 * are allocated, but may not yet be reflected in the on-disk
-	 * structure.  Only the ZIL knows how to free them, so we have
-	 * to call into it here.
-	 */
 	error = dsl_dataset_own(name, B_TRUE, FTAG, &ds);
 	if (error == 0) {
-		objset_t *os;
-		if (dmu_objset_from_ds(ds, &os) == 0)
-			zil_destroy(dmu_objset_zil(os), B_FALSE);
 		error = dsl_dataset_destroy(ds, FTAG, defer);
 		/* dsl_dataset_destroy() closes the ds. */
 	}
@@ -811,9 +802,14 @@ dmu_objset_destroy(const char *name, boolean_t defer)
 struct snaparg {
 	dsl_sync_task_group_t *dstg;
 	char *snapname;
+	char *htag;
 	char failed[MAXPATHLEN];
 	boolean_t recursive;
+	boolean_t needsuspend;
+	boolean_t temporary;
 	nvlist_t *props;
+	struct dsl_ds_holdarg *ha;	/* only needed in the temporary case */
+	dsl_dataset_t *newds;
 };
 
 static int
@@ -821,11 +817,41 @@ snapshot_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	objset_t *os = arg1;
 	struct snaparg *sn = arg2;
+	int error;
 
 	/* The props have already been checked by zfs_check_userprops(). */
 
-	return (dsl_dataset_snapshot_check(os->os_dsl_dataset,
-	    sn->snapname, tx));
+	error = dsl_dataset_snapshot_check(os->os_dsl_dataset,
+	    sn->snapname, tx);
+	if (error)
+		return (error);
+
+	if (sn->temporary) {
+		/*
+		 * Ideally we would just call
+		 * dsl_dataset_user_hold_check() and
+		 * dsl_dataset_destroy_check() here.  However the
+		 * dataset we want to hold and destroy is the snapshot
+		 * that we just confirmed we can create, but it won't
+		 * exist until after these checks are run.  Do any
+		 * checks we can here and if more checks are added to
+		 * those routines in the future, similar checks may be
+		 * necessary here.
+		 */
+		if (spa_version(os->os_spa) < SPA_VERSION_USERREFS)
+			return (ENOTSUP);
+		/*
+		 * Not checking number of tags because the tag will be
+		 * unique, as it will be the only tag.
+		 */
+		if (strlen(sn->htag) + MAX_TAG_PREFIX_LEN >= MAXNAMELEN)
+			return (E2BIG);
+
+		sn->ha = kmem_alloc(sizeof (struct dsl_ds_holdarg), KM_SLEEP);
+		sn->ha->temphold = B_TRUE;
+		sn->ha->htag = sn->htag;
+	}
+	return (error);
 }
 
 static void
@@ -842,6 +868,19 @@ snapshot_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 		pa.pa_props = sn->props;
 		pa.pa_source = ZPROP_SRC_LOCAL;
 		dsl_props_set_sync(ds->ds_prev, &pa, tx);
+	}
+
+	if (sn->temporary) {
+		struct dsl_ds_destroyarg da;
+
+		dsl_dataset_user_hold_sync(ds->ds_prev, sn->ha, tx);
+		kmem_free(sn->ha, sizeof (struct dsl_ds_holdarg));
+		sn->ha = NULL;
+		sn->newds = ds->ds_prev;
+
+		da.ds = ds->ds_prev;
+		da.defer = B_TRUE;
+		dsl_dataset_destroy_sync(&da, FTAG, tx);
 	}
 }
 
@@ -888,29 +927,27 @@ dmu_objset_snapshot_one(const char *name, void *arg)
 		return (sn->recursive ? 0 : EBUSY);
 	}
 
-	/*
-	 * NB: we need to wait for all in-flight changes to get to disk,
-	 * so that we snapshot those changes.  zil_suspend does this as
-	 * a side effect.
-	 */
-	err = zil_suspend(dmu_objset_zil(os));
-	if (err == 0) {
-		dsl_sync_task_create(sn->dstg, snapshot_check,
-		    snapshot_sync, os, sn, 3);
-	} else {
-		dmu_objset_rele(os, sn);
+	if (sn->needsuspend) {
+		err = zil_suspend(dmu_objset_zil(os));
+		if (err) {
+			dmu_objset_rele(os, sn);
+			return (err);
+		}
 	}
+	dsl_sync_task_create(sn->dstg, snapshot_check, snapshot_sync,
+	    os, sn, 3);
 
-	return (err);
+	return (0);
 }
 
 int
-dmu_objset_snapshot(char *fsname, char *snapname,
-    nvlist_t *props, boolean_t recursive)
+dmu_objset_snapshot(char *fsname, char *snapname, char *tag,
+    nvlist_t *props, boolean_t recursive, boolean_t temporary, int cleanup_fd)
 {
 	dsl_sync_task_t *dst;
 	struct snaparg sn;
 	spa_t *spa;
+	minor_t minor;
 	int err;
 
 	(void) strcpy(sn.failed, fsname);
@@ -919,10 +956,26 @@ dmu_objset_snapshot(char *fsname, char *snapname,
 	if (err)
 		return (err);
 
+	if (temporary) {
+		if (cleanup_fd < 0) {
+			spa_close(spa, FTAG);
+			return (EINVAL);
+		}
+		if ((err = zfs_onexit_fd_hold(cleanup_fd, &minor)) != 0) {
+			spa_close(spa, FTAG);
+			return (err);
+		}
+	}
+
 	sn.dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
 	sn.snapname = snapname;
+	sn.htag = tag;
 	sn.props = props;
 	sn.recursive = recursive;
+	sn.needsuspend = (spa_version(spa) < SPA_VERSION_FAST_SNAP);
+	sn.temporary = temporary;
+	sn.ha = NULL;
+	sn.newds = NULL;
 
 	if (recursive) {
 		err = dmu_objset_find(fsname,
@@ -938,14 +991,20 @@ dmu_objset_snapshot(char *fsname, char *snapname,
 	    dst = list_next(&sn.dstg->dstg_tasks, dst)) {
 		objset_t *os = dst->dst_arg1;
 		dsl_dataset_t *ds = os->os_dsl_dataset;
-		if (dst->dst_err)
+		if (dst->dst_err) {
 			dsl_dataset_name(ds, sn.failed);
-		zil_resume(dmu_objset_zil(os));
+		} else if (temporary) {
+			dsl_register_onexit_hold_cleanup(sn.newds, tag, minor);
+		}
+		if (sn.needsuspend)
+			zil_resume(dmu_objset_zil(os));
 		dmu_objset_rele(os, &sn);
 	}
 
 	if (err)
 		(void) strcpy(fsname, sn.failed);
+	if (temporary)
+		zfs_onexit_fd_rele(cleanup_fd);
 	dsl_sync_task_group_destroy(sn.dstg);
 	spa_close(spa, FTAG);
 	return (err);

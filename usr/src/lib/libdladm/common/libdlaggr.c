@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -276,7 +275,7 @@ i_dladm_aggr_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 	char		macstr[ETHERADDRL * 3];
 
 	attrp->lg_linkid = linkid;
-	if ((status = dladm_read_conf(handle, linkid, &conf)) !=
+	if ((status = dladm_getsnap_conf(handle, linkid, &conf)) !=
 	    DLADM_STATUS_OK)
 		return (status);
 
@@ -413,7 +412,7 @@ i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
 	 * PORT_DELIMITER (':').
 	 */
 	if (flags & DLADM_OPT_PERSIST) {
-		status = dladm_read_conf(handle, linkid, &conf);
+		status = dladm_open_conf(handle, linkid, &conf);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 
@@ -573,7 +572,7 @@ done:
 	 * persistent configuration if we've changed that.
 	 */
 	if ((status != DLADM_STATUS_OK) && (flags & DLADM_OPT_PERSIST)) {
-		if (dladm_read_conf(handle, linkid, &conf) == DLADM_STATUS_OK) {
+		if (dladm_open_conf(handle, linkid, &conf) == DLADM_STATUS_OK) {
 			u64 = orig_nports;
 			if ((dladm_set_conf_field(handle, conf, FNPORTS,
 			    DLADM_TYPE_UINT64, &u64) == DLADM_STATUS_OK) &&
@@ -1013,7 +1012,7 @@ dladm_aggr_persist_aggr_conf(dladm_handle_t handle, const char *link,
     const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
     aggr_lacp_timer_t lacp_timer, boolean_t force)
 {
-	dladm_conf_t conf = DLADM_INVALID_CONF;
+	dladm_conf_t conf;
 	char *portstr = NULL;
 	char macstr[ETHERADDRL * 3];
 	dladm_status_t status;
@@ -1302,7 +1301,7 @@ dladm_aggr_modify(dladm_handle_t handle, datalink_id_t linkid,
 	bcopy(mac_addr, new_attr.ld_mac, ETHERADDRL);
 
 	if (flags & DLADM_OPT_PERSIST) {
-		status = dladm_read_conf(handle, linkid, &conf);
+		status = dladm_open_conf(handle, linkid, &conf);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 
@@ -1330,7 +1329,7 @@ done:
 	status = i_dladm_aggr_modify_sys(handle, linkid, modify_mask,
 	    &new_attr);
 	if ((status != DLADM_STATUS_OK) && (flags & DLADM_OPT_PERSIST)) {
-		if (dladm_read_conf(handle, linkid, &conf) == DLADM_STATUS_OK) {
+		if (dladm_open_conf(handle, linkid, &conf) == DLADM_STATUS_OK) {
 			if (i_dladm_aggr_set_aggr_attr(handle, conf,
 			    modify_mask, &old_attr) == DLADM_STATUS_OK) {
 				(void) dladm_write_conf(handle, conf);
@@ -1463,7 +1462,7 @@ i_dladm_walk_key2linkid(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	i_walk_key_state_t *statep = (i_walk_key_state_t *)arg;
 	uint64_t u64;
 
-	if (dladm_read_conf(handle, linkid, &conf) != 0)
+	if (dladm_getsnap_conf(handle, linkid, &conf) != DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
 	status = dladm_get_conf_field(handle, conf, FKEY, &u64, sizeof (u64));

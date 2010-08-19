@@ -58,6 +58,11 @@ static int amd_iommu_win(iommulib_handle_t handle, dev_info_t *dip,
     dev_info_t *rdip, ddi_dma_handle_t dma_handle, uint_t win,
     off_t *offp, size_t *lenp, ddi_dma_cookie_t *cookiep,
     uint_t *ccountp);
+static int amd_iommu_mapobject(iommulib_handle_t handle, dev_info_t *dip,
+    dev_info_t *rdip, ddi_dma_handle_t dma_handle,
+    struct ddi_dma_req *dmareq, ddi_dma_obj_t *dmao);
+static int amd_iommu_unmapobject(iommulib_handle_t handle, dev_info_t *dip,
+    dev_info_t *rdip, ddi_dma_handle_t dma_handle, ddi_dma_obj_t *dmao);
 static int amd_iommu_map(iommulib_handle_t handle, dev_info_t *dip,
     dev_info_t *rdip, struct ddi_dma_req *dmareq,
     ddi_dma_handle_t *dma_handle);
@@ -105,6 +110,8 @@ struct iommulib_ops amd_iommulib_ops = {
 	amd_iommu_unbindhdl,
 	amd_iommu_sync,
 	amd_iommu_win,
+	amd_iommu_mapobject,
+	amd_iommu_unmapobject,
 	amd_iommu_map,
 	amd_iommu_mctl
 };
@@ -1911,6 +1918,23 @@ amd_iommu_mctl(iommulib_handle_t handle, dev_info_t *dip,
 	ASSERT(0);
 	return (iommulib_iommu_dma_mctl(dip, rdip, dma_handle,
 	    request, offp, lenp, objpp, cache_flags));
+}
+
+/*ARGSUSED*/
+static int
+amd_iommu_mapobject(iommulib_handle_t handle, dev_info_t *dip,
+    dev_info_t *rdip, ddi_dma_handle_t dma_handle,
+    struct ddi_dma_req *dmareq, ddi_dma_obj_t *dmao)
+{
+	return (DDI_ENOTSUP);
+}
+
+/*ARGSUSED*/
+static int
+amd_iommu_unmapobject(iommulib_handle_t handle, dev_info_t *dip,
+    dev_info_t *rdip, ddi_dma_handle_t dma_handle, ddi_dma_obj_t *dmao)
+{
+	return (DDI_ENOTSUP);
 }
 
 uint64_t

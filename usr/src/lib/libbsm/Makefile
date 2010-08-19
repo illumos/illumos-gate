@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.lib
@@ -46,7 +45,7 @@ COMMONDIR = common
 # Macros for libbsm header files. These define user-level only interfaces.
 #
 GENHDRS = audit_uevents.h
-HDRS = libbsm.h devices.h devalloc.h adt.h adt_event.h audit_private.h
+HDRS = libbsm.h devices.h devalloc.h adt.h adt_event.h audit_private.h 
 GENSRCS =	$(COMMONDIR)/adt_xlate.c $(COMMONDIR)/adt_event.h
 COMMONHDRS =	$(HDRS:%=$(COMMONDIR)/%)
 ROOTHDRDIR = 	$(ROOT)/usr/include/bsm
@@ -71,7 +70,7 @@ clean clobber delete: $(SUBDIRS)
 ROOTETCSECURITY = 	$(ROOT)/etc/security
 $(ROOTETCSECURITY) := 	DIRMODE = 0755
 
-ESFILES =		audit_class audit_control audit_event audit_user
+ESFILES =		audit_class audit_event
 ESSRC =			$(ESFILES:%=%.txt)
 ETCSECURITYFILES =	$(ESFILES:%=$(ROOTETCSECURITY)/%)
 $(ETCSECURITYFILES) :=	FILEMODE = 0644

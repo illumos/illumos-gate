@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,11 +36,13 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
 #include <string.h>
 #include <errno.h>
+#include <syslog.h>
 
 static OM_uint32 val_canon_name_args(
 	OM_uint32 *minor_status,
@@ -81,6 +82,8 @@ gss_name_t *output_name;
 {
 	gss_union_name_t in_union, out_union = NULL, dest_union = NULL;
 	OM_uint32 major_status = GSS_S_FAILURE;
+	/* Solaris Kerberos - need to preserve more important minor_status */
+	OM_uint32 tmp_status = 0;
 
 	major_status = val_canon_name_args(minor_status,
 					input_name,
@@ -119,11 +122,14 @@ gss_name_t *output_name;
 			goto allocation_failure;
 
 		if (in_union->name_type != GSS_C_NULL_OID) {
-			if ((major_status = generic_gss_copy_oid(minor_status,
-				in_union->name_type, &out_union->name_type)))
-			goto allocation_failure;
+			major_status = generic_gss_copy_oid(minor_status,
+							in_union->name_type,
+							&out_union->name_type);
+			if (major_status) {
+				map_errcode(minor_status);
+				goto allocation_failure;
+			}
 		}
-
 	}
 
 	/*
@@ -145,13 +151,15 @@ gss_name_t *output_name;
 
 	/* now let's create the new mech name */
 	if (major_status = generic_gss_copy_oid(minor_status, mech_type,
-						&dest_union->mech_type))
+						&dest_union->mech_type)) {
+		map_errcode(minor_status);
 		goto allocation_failure;
+	}
 
 	if (major_status =
 		__gss_import_internal_name(minor_status, mech_type,
 						dest_union,
-						&dest_union->mech_name))
+					&dest_union->mech_name))
 		goto allocation_failure;
 
 	if (output_name)
@@ -159,6 +167,7 @@ gss_name_t *output_name;
 
 	return (GSS_S_COMPLETE);
 
+/* Solaris Kerberos - note some fails are not "allocation fails".  Sigh. */
 allocation_failure:
 	/* do not delete the src name external name format */
 	if (output_name) {
@@ -168,7 +177,7 @@ allocation_failure:
 			free(out_union->external_name);
 		}
 		if (out_union->name_type)
-			(void) gss_release_oid(minor_status,
+			(void) gss_release_oid(&tmp_status,
 					    &out_union->name_type);
 
 		dest_union = out_union;
@@ -181,13 +190,13 @@ allocation_failure:
 	 */
 
 	if (dest_union->mech_name) {
-		(void) __gss_release_internal_name(minor_status,
+		(void) __gss_release_internal_name(&tmp_status,
 						dest_union->mech_type,
 						&dest_union->mech_name);
 	}
 
 	if (dest_union->mech_type)
-		(void) gss_release_oid(minor_status, &dest_union->mech_type);
+		(void) gss_release_oid(&tmp_status, &dest_union->mech_type);
 
 
 	if (output_name)

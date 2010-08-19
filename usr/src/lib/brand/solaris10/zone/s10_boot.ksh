@@ -33,6 +33,8 @@ ZONENAME=$1
 ZONEPATH=$2
 ZONEROOT=$ZONEPATH/root
 
+w_missing=$(gettext "Warning: \"%s\" is not installed in the global zone")
+
 arch=`uname -p`
 if [ "$arch" = "i386" ]; then
 	ARCH32=i86
@@ -74,6 +76,8 @@ EXIT_CODE=1
 #
 replace_with_native() {
 	path_dname=$ZONEROOT/`dirname $1`
+
+	[ ! -f $1 ] && printf "$w_missing" "$1"
 	if [ ! -h $path_dname -a -d $path_dname ]; then
 		safe_replace $ZONEROOT/$1 $BRANDDIR/s10_isaexec_wrapper $2 $3 \
 		    remove
@@ -82,14 +86,32 @@ replace_with_native() {
 
 replace_with_native_py() {
 	path_dname=$ZONEROOT/`dirname $1`
+
+	[ ! -f $1 ] && printf "$w_missing" "$1"
+
 	if [ ! -h $path_dname -a -d $path_dname ]; then
 		safe_replace $ZONEROOT/$1 $BRANDDIR/s10_python_wrapper $2 $3 \
 		    remove
 	fi
 }
 
+#
+# Create a new wrapper script that invokes s10_isaexec_wrapper in the
+# brand (for a non-existing s10c file) pointing to the native brand file.
+#
+# Parameters:
+#	$1	The full path of the wrapper file to create
+#	$2	The access mode of the replacement file in hex (e.g., 0555)
+#	$3	The name of the replacement file's owner (e.g., root:bin)
+#
 wrap_with_native() {
-	safe_wrap $ZONEROOT/$1 $BRANDDIR/s10_isaexec_wrapper $2 $3
+
+	[ ! -f $1 ] && printf "$w_missing" "$1"
+
+	path_dname=$ZONEROOT/`dirname $1`
+	if [ ! -h $path_dname -a -d $path_dname -a ! -f $ZONEROOT/$1 ]; then
+		safe_wrap $ZONEROOT/$1 $BRANDDIR/s10_isaexec_wrapper $2 $3
+	fi
 }
 
 #
@@ -133,17 +155,42 @@ wrap_with_native() {
 #
 # Validate that the zone filesystem looks like we expect it to.
 #
+safe_dir /lib
+safe_dir /lib/svc
+safe_dir /lib/svc/method
+safe_dir /lib/svc/share
 safe_dir /usr
+safe_dir /usr/bin
 safe_dir /usr/lib
 safe_dir /usr/lib/autofs
 safe_dir /usr/lib/fs
 safe_dir /usr/lib/fs/autofs
 safe_dir /usr/lib/fs/ufs
 safe_dir /usr/lib/fs/zfs
+safe_dir /usr/lib/inet
 safe_dir /usr/lib/zfs
-safe_dir /usr/bin
 safe_dir /usr/sbin
+if [ -n "$ARCH32" ]; then
+	safe_dir /usr/lib/ipf/$ARCH32
+	safe_dir /usr/sbin/$ARCH32
+fi
+if [ -n "$ARCH64" ]; then
+	safe_dir /usr/lib/ipf/$ARCH64
+	safe_dir /usr/sbin/$ARCH64
+fi
 safe_dir /sbin
+safe_dir /var
+safe_dir /var/svc
+safe_dir /var/svc/manifest
+safe_dir /var/svc/manifest/network
+
+#
+# Some of the native networking daemons such as in.mpathd are
+# expected under /lib/inet
+#
+mkdir -m 0755 -p $ZONEROOT/lib/inet
+chown root:bin $ZONEROOT/lib/inet
+safe_dir /lib/inet
 
 #
 # STEP TWO
@@ -154,7 +201,75 @@ safe_dir /sbin
 #
 # Replace various network-related programs with native wrappers.
 #
+replace_with_native /sbin/dhcpagent 0555 root:bin
+replace_with_native /sbin/dhcpinfo 0555 root:bin
 replace_with_native /sbin/ifconfig 0555 root:bin
+replace_with_native /usr/bin/netstat 0555 root:bin
+replace_with_native /usr/lib/inet/in.ndpd 0555 root:bin
+replace_with_native /usr/sbin/in.routed 0555 root:bin
+replace_with_native /usr/sbin/ndd 0555 root:bin
+replace_with_native /usr/sbin/snoop 0555 root:bin
+replace_with_native /usr/sbin/if_mpadm 0555 root:bin
+
+#
+# Replace IPFilter commands with native wrappers
+#
+if [ -n "$ARCH32" ]; then
+	replace_with_native /usr/lib/ipf/$ARCH32/ipftest 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH32/ipf 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH32/ipfs 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH32/ipfstat 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH32/ipmon 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH32/ipnat 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH32/ippool 0555 root:bin
+fi
+if [ -n "$ARCH64" ]; then
+	replace_with_native /usr/lib/ipf/$ARCH64/ipftest 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH64/ipf 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH64/ipfs 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH64/ipfstat 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH64/ipmon 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH64/ipnat 0555 root:bin
+	replace_with_native /usr/sbin/$ARCH64/ippool 0555 root:bin
+fi
+
+#
+# Replace in.mpathd daemon at /usr/lib/inet by native wrapper
+#
+if [ ! -h $ZONEROOT/usr/lib/inet -a -d $ZONEROOT/usr/lib/inet ]; then
+	safe_replace $ZONEROOT/usr/lib/inet/in.mpathd \
+	    /lib/inet/in.mpathd 0555 root:bin remove
+fi
+
+# 
+# Create wrapper at /lib/inet/in.mpathd as well because native ifconfig
+# looks up in.mpathd under /lib/inet.
+#
+wrap_with_native /lib/inet/in.mpathd 0555 root:bin
+
+# Create native wrapper for /sbin/ipmpstat
+wrap_with_native /sbin/ipmpstat 0555 root:bin
+
+#
+# Create ipmgmtd wrapper to native binary in s10 container
+# and copy ipmgmt service manifest and method.
+#
+wrap_with_native /lib/inet/ipmgmtd 0555 root:bin
+safe_copy /lib/svc/manifest/network/network-ipmgmt.xml \
+    $ZONEROOT/var/svc/manifest/network/network-ipmgmt.xml
+safe_copy /lib/svc/method/net-ipmgmt \
+    $ZONEROOT/lib/svc/method/net-ipmgmt
+
+#
+# To handle certain IPMP configurations, we need updated
+# net-physical method script and native net_include.sh
+#
+filename=$ZONEROOT/lib/svc/method/net-physical
+safe_backup $filename $filename.pre_p2v
+safe_copy /usr/lib/brand/solaris10/s10_net_physical $filename
+filename=$ZONEROOT/lib/svc/share/net_include.sh
+safe_backup $filename $filename.pre_p2v
+safe_copy /lib/svc/share/net_include.sh $filename
 
 #
 # PSARC 2009/306 removed the ND_SET/ND_GET ioctl's for modifying
@@ -175,7 +290,6 @@ replace_with_native /sbin/zfs 0555 root:bin
 replace_with_native /sbin/zpool 0555 root:bin
 replace_with_native /usr/lib/fs/ufs/quota 0555 root:bin
 replace_with_native /usr/lib/fs/zfs/fstyp 0555 root:bin
-replace_with_native /usr/lib/fs/zfs/zfsdle 0555 root:bin
 replace_with_native /usr/lib/zfs/availdevs 0555 root:bin
 replace_with_native /usr/sbin/df 0555 root:bin
 replace_with_native /usr/sbin/zstreamdump 0555 root:bin

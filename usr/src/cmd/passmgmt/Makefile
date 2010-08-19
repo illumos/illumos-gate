@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 
@@ -31,25 +30,20 @@ TXTS= 		$(FILE)
 include ../Makefile.cmd
 
 FILEMODE= 	0555
-RELSBIN=	../sbin
 ROOTFILE=	$(ROOTETC)/$(FILE)
-ROOTSYMLINK=	$(ROOTBIN)/$(PROG)
 
 # conditional assignment
 $(ROOTFILE):=	FILEMODE= $(LIBFILEMODE)
 
 .KEEP_STATE:
 
-LDLIBS +=	-lsecdb
+LDLIBS +=	-lsecdb -lnsl
 
 all: $(PROG) $(TXTS)
 
 XGETFLAGS= -a -x $(PROG).xcl 
 
-install: all $(ROOTUSRSBINPROG) $(ROOTFILE) $(ROOTSYMLINK)
-
-$(ROOTSYMLINK):
-	-$(RM) $@; $(SYMLINK) $(RELSBIN)/$(PROG) $@
+install: all $(ROOTLIBPROG) $(ROOTFILE)
 
 # datemsk is generated from datemsk.template because of a side-effect of
 # SCCS.  Some of the datemsk format strings include "%<letter>%", which

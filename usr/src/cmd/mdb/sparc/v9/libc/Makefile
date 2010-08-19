@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,21 +19,27 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MODULE = libc.so
 MDBTGT = proc
 
-MODSRCS = libc.c
+MODSRCS_DIR = ../../../common/modules/genunix
+
+MODSRCS = \
+	libc.c \
+	findstack.c \
+	findstack_subr.c
 
 include ../../../../Makefile.cmd
 
 CPPFLAGS += -I$(SRC)/lib/libc/inc
+CPPFLAGS += -I$(MODSRCS_DIR)
 
 include ../../../../Makefile.cmd.64
 include ../../Makefile.sparcv9
 include ../../../Makefile.module
+
+dmod/$(MODULE) := LDLIBS += -lavl
+

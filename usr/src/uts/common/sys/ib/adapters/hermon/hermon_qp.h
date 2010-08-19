@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_QP_H
@@ -55,9 +54,11 @@ extern "C" {
  * controlled via the "hermon_log_num_qp" configuration variables.
  * We also have a define for the minimum size of a QP.  QPs allocated
  * with size 0, 1, 2, or 3 will always get back a QP of size 4.
+ *
+ * Note: Increasing #QPs from 64K to 256K for reserved ranges for FCoIB.
  */
-#define	HERMON_NUM_QP_SHIFT		0x10
-#define	HERMON_NUM_QPS			(1 << HERMON_NUM_QP_SHIFT) /* 65,536 */
+#define	HERMON_NUM_QP_SHIFT		0x12
+#define	HERMON_NUM_QPS			(1 << HERMON_NUM_QP_SHIFT) /* 256K */
 #define	HERMON_QP_MIN_SIZE		0xf
 
 /*
@@ -80,7 +81,7 @@ extern "C" {
  * as recommended by the PRM.  All XRC QPs will have this bit set.
  */
 #define	HERMON_QP_MAXNUMBER_MSK		0x7FFFFF
-#define	HERMON_QP_XRC			0x800000
+#define	HERMON_QP_XRC_MSK		0x800000
 
 /*
  * This define and the following macro are used to find a schedule queue for
@@ -134,8 +135,10 @@ extern "C" {
  * to ensure the types match.
  */
 #define	HERMON_QP_TYPE_VALID(qp_trans, qp_serv)				\
-	((qp_trans == IBT_UD_SRV && qp_serv == HERMON_QP_UD) ||		\
-	(qp_trans == IBT_RC_SRV && qp_serv == HERMON_QP_RC) ||		\
+	((qp_trans == IBT_RC_SRV && qp_serv == HERMON_QP_RC) ||		\
+	(qp_trans == IBT_UD_SRV && (qp_serv == HERMON_QP_UD ||		\
+	qp_serv == HERMON_QP_RFCI || qp_serv == HERMON_QP_FCMND ||	\
+	qp_serv == HERMON_QP_FEXCH)) ||					\
 	(qp_trans == IBT_UC_SRV && qp_serv == HERMON_QP_UC))
 
 /*
@@ -163,6 +166,17 @@ typedef enum {
 #define	HERMON_QP_WQE_MLX_QP1_HDRS	0x70
 #define	HERMON_QP_WQE_LOG_MINIMUM	0x6
 
+
+/*
+ * The hermon_qp_range_t is used to manage a qp_range for RSS and FEXCH.
+ * It has a reference count.  When the reference count goes to 0,
+ * the qpc resource can be freed.
+ */
+typedef struct hermon_qp_range_s {
+	kmutex_t	hqpr_lock;
+	hermon_rsrc_t	*hqpr_qpcrsrc;
+	uint_t		hqpr_refcnt;
+} hermon_qp_range_t;
 
 /*
  * The hermon_qp_info_t structure is used internally by the Hermon driver to
@@ -231,11 +245,12 @@ struct hermon_sw_qp_s {
 	uint32_t		qp_qpnum;
 	hermon_pdhdl_t		qp_pdhdl;
 	uint_t			qp_serv_type;
+	ibt_qp_type_t		qp_type;
 	uint_t			qp_sl;		/* service level */
 	hermon_mrhdl_t		qp_mrhdl;
 	uint_t			qp_sq_sigtype;
 	uint_t			qp_is_special;
-	uint_t			qp_is_umap;
+	ibt_qp_alloc_flags_t	qp_alloc_flags;
 	uint32_t		qp_uarpg;
 	devmap_cookie_t		qp_umap_dhp;
 	uint_t			qp_portnum;	/* port 0/1 for HCA */
@@ -260,9 +275,9 @@ struct hermon_sw_qp_s {
 	uint32_t		qp_sq_sgl;
 	uint_t			qp_uses_lso;
 	uint32_t		qp_ring;
+	uint_t			qp_state_for_post_send; /* copy of qp_state */
 
 	/* Receive Work Queue - not used when SRQ is used */
-	kmutex_t		qp_rq_lock;
 	hermon_cqhdl_t		qp_rq_cqhdl;
 	hermon_workq_avl_t	qp_rq_wqavl;	/* needed for srq */
 	hermon_workq_hdr_t	*qp_rq_wqhdr;
@@ -290,7 +305,6 @@ struct hermon_sw_qp_s {
 
 	/* Shared Receive Queue */
 	hermon_srqhdl_t		qp_srqhdl;
-	uint_t			qp_srq_en;
 
 	/* Refcnt of QP belongs to an MCG */
 	uint_t			qp_mcg_refcnt;
@@ -300,6 +314,12 @@ struct hermon_sw_qp_s {
 	hermon_qpn_entry_t	*qp_qpn_hdl;
 
 	struct hermon_qalloc_info_s qp_wqinfo;
+
+	ibt_fc_attr_t		qp_fc_attr;
+
+	struct hermon_qp_range_s *qp_rangep;
+
+	/* Beware: 8-byte alignment needed here */
 
 	struct hermon_hw_qpc_s qpc;
 };
@@ -324,7 +344,7 @@ _NOTE(READ_ONLY_DATA(hermon_sw_qp_s::qp_qpnum
     hermon_sw_qp_s::qp_sq_sigtype
     hermon_sw_qp_s::qp_serv_type
     hermon_sw_qp_s::qp_is_special
-    hermon_sw_qp_s::qp_is_umap
+    hermon_sw_qp_s::qp_alloc_flags
     hermon_sw_qp_s::qp_uarpg
     hermon_sw_qp_s::qp_sq_wqhdr
     hermon_sw_qp_s::qp_rq_wqhdr
@@ -341,12 +361,19 @@ _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
     hermon_sw_qp_s::qp_pkeyindx
     hermon_sw_qp_s::qp_portnum))
 
+#define	HERMON_SET_QP_POST_SEND_STATE(qp, state)			\
+	mutex_enter(&qp->qp_sq_lock);					\
+	qp->qp_state_for_post_send = state;				\
+	mutex_exit(&qp->qp_sq_lock)
 
 /* Defined in hermon_qp.c */
 int hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
     uint_t sleepflag);
 int hermon_special_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
     uint_t sleepflag);
+int hermon_qp_alloc_range(hermon_state_t *state, uint_t log2,
+    hermon_qp_info_t *qpinfo, ibtl_qp_hdl_t *ibtl_qp_p, ibc_cq_hdl_t *send_cq_p,
+    ibc_cq_hdl_t *recv_cq_p, hermon_qphdl_t *qp_p, uint_t sleepflag);
 int hermon_qp_free(hermon_state_t *state, hermon_qphdl_t *qphdl,
     ibc_free_qp_flags_t free_qp_flags, ibc_qpn_hdl_t *qpnh, uint_t sleepflag);
 int hermon_qp_query(hermon_state_t *state, hermon_qphdl_t qphdl,

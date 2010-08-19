@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -61,15 +60,20 @@ static const topo_pgroup_info_t binding_pgroup = {
  * Return PCI Bus/Dev/Func
  */
 int
-bay_bdf(topo_mod_t *mod, smbios_hdl_t *shp, smbios_port_ext_t *epp,
-    uint16_t *bdf)
+bay_bdf(topo_mod_t *mod, smbios_port_ext_t *epp, uint16_t *bdf)
 {
 	int	devt;
 	id_t	dev_id;
 	uint8_t	bus, dev_funct;
 
 	char	*f = "bay_bdf";
+	smbios_hdl_t *shp;
 
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL) {
+		topo_mod_dprintf(mod, "%s: failed to load SMBIOS\n", f);
+		return (-1);
+	}
 	/*
 	 * Depending on device type, BDF comes from either slot (type-9) or
 	 * on-board (type-41) SMBIOS structure.
@@ -253,8 +257,8 @@ bay_update_tnode(topo_mod_t *mod, tnode_t *tnodep, uint16_t bdf, int phy)
  *   call "disk" enum passing in "bay" node
  */
 int
-x86pi_gen_bay(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp,
-    smbios_port_ext_t *eport, int instance)
+x86pi_gen_bay(topo_mod_t *mod, tnode_t *t_parent, smbios_port_ext_t *eport,
+    int instance)
 {
 	int		rv;
 	int		min = 0, max = 0;
@@ -265,6 +269,13 @@ x86pi_gen_bay(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp,
 	tnode_t		*tn_bay;
 
 	char		*f = "x86pi_gen_disk";
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL) {
+		topo_mod_dprintf(mod, "%s: failed to load SMBIOS\n", f);
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
+	}
 
 	/*
 	 * Label comes from the port (type-8) SMBIOS structure.
@@ -305,7 +316,7 @@ x86pi_gen_bay(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp,
 	/*
 	 * Determine the bay BDF.
 	 */
-	rv = bay_bdf(mod, shp, eport, &bdf);
+	rv = bay_bdf(mod, eport, &bdf);
 	if (rv != 0) {
 		topo_mod_dprintf(mod, "%s: failed to get BDF\n", f);
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));

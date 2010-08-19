@@ -40,10 +40,7 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=eri alias=pci108e,1101 clone_perms="eri 0666 root sys"
 file path=kernel/drv/$(ARCH64)/eri group=sys
-legacy pkg=SUNWerid arch=$(ARCH) category=system \
-    desc="Sun RIO 10/100 Mb Ethernet Drivers" \
-    hotline="Please contact your local service provider" \
-    name="Sun RIO 10/100 Mb Ethernet Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWerid desc="Sun RIO 10/100 Mb Ethernet Drivers" \
+    name="Sun RIO 10/100 Mb Ethernet Drivers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -45,11 +45,8 @@ driver name=zyd clone_perms="zyd 0666 root sys" perms="* 0666 root sys" \
     alias=usbace,1215
 file path=kernel/drv/$(ARCH64)/zyd group=sys
 file path=kernel/drv/zyd group=sys
-legacy pkg=SUNWzyd arch=$(ARCH) category=system \
-    desc="ZyDAS ZD1211 USB 802.11b/g Wireless Driver" \
-    hotline="Please contact your local service provider" \
-    name="ZyDAS ZD1211 USB 802.11b/g Wireless Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWzyd desc="ZyDAS ZD1211 USB 802.11b/g Wireless Driver" \
+    name="ZyDAS ZD1211 USB 802.11b/g Wireless Driver"
 license cr_Sun license=cr_Sun
-license uts/common/io/zyd/THIRDPARTYLICENSE \
-    license=uts/common/io/zyd/THIRDPARTYLICENSE
+license usr/src/uts/common/io/zyd/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/zyd/THIRDPARTYLICENSE

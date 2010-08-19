@@ -35,6 +35,7 @@
 #include <sys/zfs_vfsops.h>
 #include <sys/rrwlock.h>
 #include <sys/zfs_sa.h>
+#include <sys/zfs_stat.h>
 #endif
 #include <sys/zfs_acl.h>
 #include <sys/zil.h>
@@ -59,6 +60,8 @@ extern "C" {
 #define	ZFS_AV_QUARANTINED 	0x0000020000000000
 #define	ZFS_AV_MODIFIED 	0x0000040000000000
 #define	ZFS_REPARSE		0x0000080000000000
+#define	ZFS_OFFLINE		0x0000100000000000
+#define	ZFS_SPARSE		0x0000200000000000
 
 #define	ZFS_ATTR_SET(zp, attr, value, pflags, tx) \
 { \
@@ -196,8 +199,8 @@ typedef struct znode {
 	uint64_t	z_atime[2];	/* atime (cached) */
 	uint64_t	z_links;	/* file links (cached) */
 	uint64_t	z_pflags;	/* pflags (cached) */
-	uid_t		z_uid;		/* uid mapped (cached) */
-	uid_t		z_gid;		/* gid mapped (cached) */
+	uint64_t	z_uid;		/* uid fuid (cached) */
+	uint64_t	z_gid;		/* gid fuid (cached) */
 	mode_t		z_mode;		/* mode (cached) */
 	uint32_t	z_sync_cnt;	/* synchronous open count */
 	kmutex_t	z_acl_lock;	/* acl data lock */

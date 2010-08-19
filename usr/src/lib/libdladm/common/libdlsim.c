@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -142,8 +141,8 @@ i_dladm_get_simnet_info_persist(dladm_handle_t handle,
 	uint64_t u64;
 	boolean_t mac_fixed;
 
-	if ((status = dladm_read_conf(handle, attrp->sna_link_id, &conf)) !=
-	    DLADM_STATUS_OK)
+	if ((status = dladm_getsnap_conf(handle, attrp->sna_link_id,
+	    &conf)) != DLADM_STATUS_OK)
 		return (status);
 
 	status = dladm_get_conf_field(handle, conf, FSIMNETTYPE, &u64,
@@ -228,7 +227,7 @@ i_dladm_simnet_update_conf(dladm_handle_t handle, datalink_id_t simnet_id,
 	dladm_conf_t conf;
 	char simnetpeer[MAXLINKNAMELEN];
 
-	status = dladm_read_conf(handle, simnet_id, &conf);
+	status = dladm_open_conf(handle, simnet_id, &conf);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
@@ -474,7 +473,7 @@ static dladm_status_t
 dladm_simnet_persist_conf(dladm_handle_t handle, const char *name,
     dladm_simnet_attr_t *attrp)
 {
-	dladm_conf_t conf = DLADM_INVALID_CONF;
+	dladm_conf_t conf;
 	dladm_status_t status;
 	char mstr[ETHERADDRL * 3];
 	uint64_t u64;

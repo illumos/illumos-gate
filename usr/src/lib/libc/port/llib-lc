@@ -20,12 +20,13 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* LINTLIBRARY */
 /* PROTOLIB1 */
+
+#define	__EXTENSIONS__
 
 #include <aio.h>
 #include <alloca.h>
@@ -58,6 +59,7 @@
 #include <ndbm.h>
 #include <limits.h>
 #include <nl_types.h>
+#include <poll.h>
 #include <project.h>
 #include <priv.h>
 #include <pwd.h>
@@ -103,7 +105,6 @@
 #include <sys/mount.h>
 #include <sys/msg.h>
 #include <sys/param.h>
-#include <sys/poll.h>
 #include <sys/priocntl.h>
 #include <sys/procset.h>
 #include <sys/processor.h>
@@ -165,6 +166,12 @@
  * This really comes from the crt*.s startup modules.
  */
 char **environ;
+
+/*
+ * This is a GNU/Linux/BSD compatibility interface,
+ * not declared in any header file.
+ */
+const char *__progname;
 
 /*
  * POSIX versions of standard libc routines; these aren't extracted

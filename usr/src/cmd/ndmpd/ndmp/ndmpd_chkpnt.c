@@ -41,12 +41,12 @@
 #include "ndmpd.h"
 #include <libzfs.h>
 
-ndmp_chkpnt_vol_t *chkpnt_vols = NULL;
+typedef struct snap_param {
+	char *snp_name;
+	boolean_t snp_found;
+} snap_param_t;
 
-typedef struct chkpnt_param {
-	char *chp_name;
-	boolean_t chp_found;
-} chkpnt_param_t;
+static int cleanup_fd = -1;
 
 /*
  * ndmp_has_backup
@@ -67,23 +67,23 @@ static int
 ndmp_has_backup(zfs_handle_t *zhp, void *data)
 {
 	const char *name;
-	chkpnt_param_t *chp = (chkpnt_param_t *)data;
+	snap_param_t *chp = (snap_param_t *)data;
 
 	name = zfs_get_name(zhp);
 	if (name == NULL ||
-	    strstr(name, chp->chp_name) == NULL) {
+	    strstr(name, chp->snp_name) == NULL) {
 		zfs_close(zhp);
 		return (-1);
 	}
 
-	chp->chp_found = 1;
+	chp->snp_found = 1;
 	zfs_close(zhp);
 
 	return (0);
 }
 
 /*
- * ndmp_has_backup_chkpnt
+ * ndmp_has_backup_snapshot
  *
  * Returns TRUE if the volume has an active backup snapshot, otherwise,
  * returns FALSE.
@@ -96,136 +96,35 @@ ndmp_has_backup(zfs_handle_t *zhp, void *data)
  *  -1: otherwise
  */
 static int
-ndmp_has_backup_chkpnt(char *volname, char *jobname)
+ndmp_has_backup_snapshot(char *volname, char *jobname)
 {
 	zfs_handle_t *zhp;
-	chkpnt_param_t chkp;
+	snap_param_t snp;
 	char chname[ZFS_MAXNAMELEN];
 
 	(void) mutex_lock(&zlib_mtx);
 	if ((zhp = zfs_open(zlibh, volname, ZFS_TYPE_DATASET)) == 0) {
-		NDMP_LOG(LOG_ERR, "Cannot open checkpoint %s.", volname);
+		NDMP_LOG(LOG_ERR, "Cannot open snapshot %s.", volname);
 		(void) mutex_unlock(&zlib_mtx);
 		return (-1);
 	}
 
-	chkp.chp_found = 0;
+	snp.snp_found = 0;
 	(void) snprintf(chname, ZFS_MAXNAMELEN, "@%s", jobname);
-	chkp.chp_name = chname;
+	snp.snp_name = chname;
 
-	(void) zfs_iter_snapshots(zhp, ndmp_has_backup, &chkp);
+	(void) zfs_iter_snapshots(zhp, ndmp_has_backup, &snp);
 	zfs_close(zhp);
 	(void) mutex_unlock(&zlib_mtx);
 
-	return (chkp.chp_found);
+	return (snp.snp_found);
 }
 
-
 /*
- * ndmp_add_chk_pnt_vol
+ * ndmp_create_snapshot
  *
- * This function keep track of check points created by NDMP. Whenever the
- * NDMP check points need to be created, this function should be called.
- * If the value returned is bigger than 1, it indicates that the check point
- * has already exists and should not be created.
- *
- * Parameters:
- *   vol_name (input) - name of the volume
- *
- * Returns:
- *   The number of existing snapshots
- */
-static unsigned int
-ndmp_add_chk_pnt_vol(char *vol_name)
-{
-	ndmp_chkpnt_vol_t *new_chkpnt_vol;
-
-	for (new_chkpnt_vol = chkpnt_vols; new_chkpnt_vol != NULL;
-	    new_chkpnt_vol = new_chkpnt_vol->cv_next) {
-		if (strcmp(new_chkpnt_vol->cv_vol_name, vol_name) == 0) {
-			new_chkpnt_vol->cv_count++;
-			return (new_chkpnt_vol->cv_count);
-		}
-	}
-
-	new_chkpnt_vol = ndmp_malloc(sizeof (ndmp_chkpnt_vol_t));
-	if (new_chkpnt_vol == NULL)
-		return (0);
-
-	(void) memset(new_chkpnt_vol, 0, sizeof (ndmp_chkpnt_vol_t));
-	(void) strlcpy(new_chkpnt_vol->cv_vol_name, vol_name,
-	    sizeof (new_chkpnt_vol->cv_vol_name));
-
-	new_chkpnt_vol->cv_count++;
-
-	if (chkpnt_vols == NULL) {
-		chkpnt_vols = new_chkpnt_vol;
-	} else {
-		new_chkpnt_vol->cv_next = chkpnt_vols;
-		chkpnt_vols = new_chkpnt_vol;
-	}
-
-	return (new_chkpnt_vol->cv_count);
-}
-
-
-/*
- * ndmp_remove_chk_pnt_vol
- *
- * This function will decrement the usage counter belongs to the check point.
- * Whenever a check point needs to be removed, this function should be
- * called. When the return value is greater than zero, it indicates someone
- * else is still using the check point and the check point should not be
- * removed.
- *
- * Parameters:
- *   vol_name (input) - name of the volume
- *
- * Returns:
- *   The number of existing snapshots
- */
-static unsigned int
-ndmp_remove_chk_pnt_vol(char *vol_name)
-{
-	ndmp_chkpnt_vol_t *new_chkpnt_vol, *pre_chkpnt_vol;
-
-	pre_chkpnt_vol = chkpnt_vols;
-	for (new_chkpnt_vol = chkpnt_vols; new_chkpnt_vol != NULL;
-	    new_chkpnt_vol = new_chkpnt_vol->cv_next) {
-		if (strcmp(new_chkpnt_vol->cv_vol_name, vol_name) == 0) {
-			new_chkpnt_vol->cv_count--;
-
-			if (new_chkpnt_vol->cv_count == 0) {
-				if (pre_chkpnt_vol == new_chkpnt_vol &&
-				    new_chkpnt_vol->cv_next == NULL)
-					chkpnt_vols = NULL;
-				else if (pre_chkpnt_vol == new_chkpnt_vol)
-					chkpnt_vols = new_chkpnt_vol->cv_next;
-				else
-					pre_chkpnt_vol->cv_next =
-					    new_chkpnt_vol->cv_next;
-
-				free(new_chkpnt_vol);
-				return (0);
-			}
-			return (new_chkpnt_vol->cv_count);
-		}
-		if (new_chkpnt_vol != chkpnt_vols)
-			pre_chkpnt_vol = pre_chkpnt_vol->cv_next;
-	}
-
-	return (0);
-}
-
-
-
-
-/*
- * ndmp_start_check_point
- *
- * This function will parse the path, vol_name, to get the real volume name.
- * It will then check via ndmp_add_chk_pnt_vol to see if creating a check point
- * for the volume is necessary. If it is, a checkpoint is created.
+ * This function will parse the path to get the real volume name.
+ * It will then create a snapshot based on volume and job name.
  * This function should be called before the NDMP backup is started.
  *
  * Parameters:
@@ -236,40 +135,30 @@ ndmp_remove_chk_pnt_vol(char *vol_name)
  *   -1: otherwise
  */
 int
-ndmp_start_check_point(char *vol_name, char *jname)
+ndmp_create_snapshot(char *vol_name, char *jname)
 {
-	int erc = 0;
 	char vol[ZFS_MAXNAMELEN];
 
 	if (vol_name == 0 ||
 	    get_zfsvolname(vol, sizeof (vol), vol_name) == -1)
 		return (0);
 
-	if (ndmp_add_chk_pnt_vol(vol) > 0) {
-		/*
-		 * If there is an old checkpoint left from the previous
-		 * backup and the reference count of backup checkpoint of
-		 * the volume is 1 after increasing it, it shows that the
-		 * checkpoint on file system is a stale one and it must be
-		 * removed before using it.
-		 */
-		if (ndmp_has_backup_chkpnt(vol, jname))
-			(void) chkpnt_backup_successful(vol, jname, B_FALSE,
-			    NULL);
-		if ((erc = chkpnt_backup_prepare(vol, jname, B_FALSE))
-		    < 0)
-			(void) ndmp_remove_chk_pnt_vol(vol);
-	}
+	/*
+	 * If there is an old snapshot left from the previous
+	 * backup it could be stale one and it must be
+	 * removed before using it.
+	 */
+	if (ndmp_has_backup_snapshot(vol, jname))
+		(void) snapshot_destroy(vol, jname, B_FALSE, B_TRUE, NULL);
 
-	return (erc);
+	return (snapshot_create(vol, jname, B_FALSE, B_TRUE));
 }
 
 /*
- * ndmp_release_check_point
+ * ndmp_remove_snapshot
  *
- * This function will parse the path, vol_name, to get the real volume name.
- * It will then check via ndmp_remove_chk_pnt_vol to see if removing a check
- * point for the volume is necessary. If it is, a checkpoint is removed.
+ * This function will parse the path to get the real volume name.
+ * It will then remove the snapshot for that volume and job name.
  * This function should be called after NDMP backup is finished.
  *
  * Parameters:
@@ -280,17 +169,181 @@ ndmp_start_check_point(char *vol_name, char *jname)
  *   -1: otherwise
  */
 int
-ndmp_release_check_point(char *vol_name, char *jname)
+ndmp_remove_snapshot(char *vol_name, char *jname)
 {
-	int erc = 0;
 	char vol[ZFS_MAXNAMELEN];
 
 	if (vol_name == 0 ||
-	    get_zfsvolname(vol, sizeof (vol), vol_name))
+	    get_zfsvolname(vol, sizeof (vol), vol_name) == -1)
 		return (0);
 
-	if (ndmp_remove_chk_pnt_vol(vol) == 0)
-		erc = chkpnt_backup_successful(vol, jname, B_FALSE, NULL);
+	return (snapshot_destroy(vol, jname, B_FALSE, B_TRUE, NULL));
+}
 
-	return (erc);
+/*
+ * Put a hold on snapshot
+ */
+int
+snapshot_hold(char *volname, char *snapname, char *jname, boolean_t recursive)
+{
+	zfs_handle_t *zhp;
+	char *p;
+
+	if ((zhp = zfs_open(zlibh, volname, ZFS_TYPE_DATASET)) == 0) {
+		NDMP_LOG(LOG_ERR, "Cannot open volume %s.", volname);
+		return (-1);
+	}
+
+	if (cleanup_fd == -1 && (cleanup_fd = open(ZFS_DEV,
+	    O_RDWR|O_EXCL)) < 0) {
+		NDMP_LOG(LOG_ERR, "Cannot open dev %d", errno);
+		zfs_close(zhp);
+		return (-1);
+	}
+
+	p = strchr(snapname, '@') + 1;
+	if (zfs_hold(zhp, p, jname, recursive, B_TRUE, B_FALSE,
+	    cleanup_fd, 0, 0) != 0) {
+		NDMP_LOG(LOG_ERR, "Cannot hold snapshot %s", p);
+		zfs_close(zhp);
+		return (-1);
+	}
+	zfs_close(zhp);
+	return (0);
+}
+
+int
+snapshot_release(char *volname, char *snapname, char *jname,
+    boolean_t recursive)
+{
+	zfs_handle_t *zhp;
+	char *p;
+	int rv = 0;
+
+	if ((zhp = zfs_open(zlibh, volname, ZFS_TYPE_DATASET)) == 0) {
+		NDMP_LOG(LOG_ERR, "Cannot open volume %s", volname);
+		return (-1);
+	}
+
+	p = strchr(snapname, '@') + 1;
+	if (zfs_release(zhp, p, jname, recursive) != 0) {
+		NDMP_LOG(LOG_DEBUG, "Cannot release snapshot %s", p);
+		rv = -1;
+	}
+	if (cleanup_fd != -1) {
+		(void) close(cleanup_fd);
+		cleanup_fd = -1;
+	}
+	zfs_close(zhp);
+	return (rv);
+}
+
+/*
+ * Create a snapshot on the volume
+ */
+int
+snapshot_create(char *volname, char *jname, boolean_t recursive,
+    boolean_t hold)
+{
+	char snapname[ZFS_MAXNAMELEN];
+	int rv;
+
+	if (!volname || !*volname)
+		return (-1);
+
+	(void) snprintf(snapname, ZFS_MAXNAMELEN, "%s@%s", volname, jname);
+
+	(void) mutex_lock(&zlib_mtx);
+	if ((rv = zfs_snapshot(zlibh, snapname, recursive, NULL))
+	    == -1) {
+		if (errno == EEXIST) {
+			(void) mutex_unlock(&zlib_mtx);
+			return (0);
+		}
+		NDMP_LOG(LOG_DEBUG,
+		    "snapshot_create: %s failed (err=%d): %s",
+		    snapname, errno, libzfs_error_description(zlibh));
+		(void) mutex_unlock(&zlib_mtx);
+		return (rv);
+	}
+	if (hold && snapshot_hold(volname, snapname, jname, recursive) != 0) {
+		NDMP_LOG(LOG_DEBUG,
+		    "snapshot_create: %s hold failed (err=%d): %s",
+		    snapname, errno, libzfs_error_description(zlibh));
+		(void) mutex_unlock(&zlib_mtx);
+		return (-1);
+	}
+
+	(void) mutex_unlock(&zlib_mtx);
+	return (0);
+}
+
+/*
+ * Remove and release the backup snapshot
+ */
+int
+snapshot_destroy(char *volname, char *jname, boolean_t recursive,
+    boolean_t hold, int *zfs_err)
+{
+	char snapname[ZFS_MAXNAMELEN];
+	zfs_handle_t *zhp;
+	zfs_type_t ztype;
+	char *namep;
+	int err;
+
+	if (zfs_err)
+		*zfs_err = 0;
+
+	if (!volname || !*volname)
+		return (-1);
+
+	if (recursive) {
+		ztype = ZFS_TYPE_VOLUME | ZFS_TYPE_FILESYSTEM;
+		namep = volname;
+	} else {
+		(void) snprintf(snapname, ZFS_MAXNAMELEN, "%s@%s", volname,
+		    jname);
+		namep = snapname;
+		ztype = ZFS_TYPE_SNAPSHOT;
+	}
+
+	(void) mutex_lock(&zlib_mtx);
+	if (hold &&
+	    snapshot_release(volname, namep, jname, recursive) != 0) {
+		NDMP_LOG(LOG_DEBUG,
+		    "snapshot_destroy: %s release failed (err=%d): %s",
+		    namep, errno, libzfs_error_description(zlibh));
+		(void) mutex_unlock(&zlib_mtx);
+		return (-1);
+	}
+
+	if ((zhp = zfs_open(zlibh, namep, ztype)) == NULL) {
+		NDMP_LOG(LOG_DEBUG, "snapshot_destroy: open %s failed",
+		    namep);
+		(void) mutex_unlock(&zlib_mtx);
+		return (-1);
+	}
+
+	if (recursive) {
+		err = zfs_destroy_snaps(zhp, jname, B_TRUE);
+	} else {
+		err = zfs_destroy(zhp, B_TRUE);
+	}
+
+	if (err) {
+		NDMP_LOG(LOG_ERR, "%s (recursive destroy: %d): %d; %s; %s",
+		    namep,
+		    recursive,
+		    libzfs_errno(zlibh),
+		    libzfs_error_action(zlibh),
+		    libzfs_error_description(zlibh));
+
+		if (zfs_err)
+			*zfs_err = err;
+	}
+
+	zfs_close(zhp);
+	(void) mutex_unlock(&zlib_mtx);
+
+	return (0);
 }

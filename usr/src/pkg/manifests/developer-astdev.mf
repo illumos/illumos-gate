@@ -43,11 +43,10 @@ file path=usr/ast/bin/msgget mode=0555
 file path=usr/include/ast/pp.h
 file path=usr/include/ast/ppkey.h
 file path=usr/lib/libpp.so.1
-legacy pkg=SUNWastdev arch=$(ARCH) category=system \
-    desc="AT&T AST development utilities" \
-    hotline="Please contact your local service provider" \
-    name="AT&T AST development utilities" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/ast/THIRDPARTYLICENSE license=cmd/ast/THIRDPARTYLICENSE
+legacy pkg=SUNWastdev desc="AT&T AST development utilities" \
+    name="AT&T AST development utilities"
 license cr_Sun license=cr_Sun
-license lib/libpp/THIRDPARTYLICENSE license=lib/libpp/THIRDPARTYLICENSE
+license usr/src/cmd/ast/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ast/THIRDPARTYLICENSE
+license usr/src/lib/libpp/THIRDPARTYLICENSE \
+    license=usr/src/lib/libpp/THIRDPARTYLICENSE

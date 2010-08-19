@@ -37,9 +37,7 @@ solaris.admin.wusb.read:::Read Wireless USB Host and Device Information::help=WU
 solaris.admin.wusb.modify:::Add or delete information of Wireless USB Device::help=WUSBmodify.html
 solaris.admin.wusb.host:::Manage Wireless USB Host::help=WUSBhost.html
 #
-solaris.audit.:::Audit Management::help=AuditHeader.html
-solaris.audit.config:::Configure Auditing::help=AuditConfig.html
-solaris.audit.read:::Read Audit Trail::help=AuditRead.html
+solaris.audit.:::Audit System-wide Management::help=AuditHeader.html
 #
 solaris.device.:::Device Allocation::help=DevAllocHeader.html
 solaris.device.allocate:::Allocate Device::help=DevAllocate.html
@@ -124,6 +122,8 @@ solaris.smf.modify.dependency:::Modify Service Dependencies::help=SmfModifyDepen
 solaris.smf.modify.application:::Modify Application Type Properties::help=SmfModifyAppl.html
 solaris.smf.modify.framework:::Modify Framework Type Properties::help=SmfModifyFramework.html
 solaris.smf.manage.:::Manage All SMF Service States::help=SmfManageHeader.html
+solaris.smf.manage.allocate:::Manage Device Allocation Service::help=SmfAllocate.html
+solaris.smf.manage.audit:::Manage Audit Service States::help=SmfManageAudit.html
 solaris.smf.manage.autofs:::Manage Automount Service States::help=SmfAutofsStates.html
 solaris.smf.manage.bind:::Manage DNS Service States::help=BindStates.html
 solaris.smf.manage.coreadm:::Manage Coreadm Service States::help=SmfCoreadmStates.html
@@ -151,6 +151,8 @@ solaris.smf.manage.rmvolmgr:::Manage Rmvolmgr Service States::help=SmfRmvolmgrSt
 solaris.smf.manage.routing:::Manage Routing Service States::help=SmfRoutingStates.html
 solaris.smf.manage.rpc.bind:::Manage RPC Program number mapper::help=SmfRPCBind.html
 solaris.smf.manage.sendmail:::Manage Sendmail Service States::help=SmfSendmailStates.html
+solaris.smf.manage.smtp-notify:::Manage Email Event Notification Agent::
+solaris.smf.manage.snmp-notify:::Manage SNMP Event Notification Agent::
 solaris.smf.manage.ssh:::Manage Secure Shell Service States::help=SmfSshStates.html
 solaris.smf.manage.stmf:::Manage STMF Service States::help=SmfSTMFStates.html
 solaris.smf.manage.system-log:::Manage Syslog Service States::help=SmfSyslogStates.html
@@ -162,6 +164,7 @@ solaris.smf.manage.vt:::Manage Virtual Console Service States::help=SmfVtStates.
 solaris.smf.manage.wpa:::Manage WPA Service States::help=SmfWpaStates.html
 solaris.smf.manage.ndmp:::Manage NDMP Service States::help=SmfNDMPStates.html
 solaris.smf.value.:::Change Values of SMF Service Properties::help=SmfValueHeader.html
+solaris.smf.value.audit:::Configure the Audit Service::help=SmfValueAudit.html
 solaris.smf.value.coreadm:::Change Values of SMF Coreadm Properties::help=SmfValueCoreadm.html
 solaris.smf.value.discovery.printers.snmp:::Manage Network Attached Device Discovery Service Properties::help=SmfValueNADD.html
 solaris.smf.value.extended-accounting.flow:::Change Values of Flow Extended Accounting Service Properties::help=SmfValueExAcctFlow.html
@@ -175,6 +178,8 @@ solaris.smf.value.mdns:::Change Values of MDNS Service Properties::help=SmfValue
 solaris.smf.value.nwam:::Change Values of SMF Network Auto-Magic Properties::help=SmfValueNWAM.html
 solaris.smf.value.smb:::Change Values of SMB Service Properties::help=SmfValueSMB.html
 solaris.smf.read.smb:::Read permission for protected SMF SMB Service Properties::help=AuthReadSMB.html
+solaris.smf.value.smtp-notify:::Change values of Email Event Notification Agent properties::
+solaris.smf.value.snmp-notify:::Change values of SNMP Event Notification Agent properties::
 solaris.smf.read.stmf:::Read STMF Provider Private Data::help=SmfSTMFRead.html
 solaris.smf.value.routing:::Change Values of SMF Routing Properties::help=SmfValueRouting.html
 solaris.smf.value.tnd:::Change Trusted Network Daemon Service Property Values::help=ValueTND.html

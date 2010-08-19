@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * csplit - Context or line file splitter
@@ -83,7 +79,7 @@ static void fatal(char *, char *);
 static offset_t findline(char *, offset_t);
 static void flush(void);
 static FILE *getfile(void);
-static char *getline(int);
+static char *getaline(int);
 static void line_arg(char *);
 static void num_arg(char *, int);
 static void re_arg(char *);
@@ -143,13 +139,13 @@ main(int argc, char **argv)
 				if (errno == ENOSPC) {
 					(void) fprintf(stderr, "csplit: ");
 					(void) fprintf(stderr, gettext(
-						"No space left on device\n"));
+					    "No space left on device\n"));
 					exit(1);
 				} else {
 					(void) fprintf(stderr, "csplit: ");
 					(void) fprintf(stderr, gettext(
-						"Bad write to temporary "
-							"file\n"));
+					    "Bad write to temporary "
+					    "file\n"));
 					exit(1);
 				}
 
@@ -294,7 +290,7 @@ fatal(char *string, char *arg)
  * Its arguments are a pointer to the compiled regular expression(expr),
  * and an offset(oset).  The variable lncnt is used to count the number
  * of lines searched.  First the current stream location is saved via
- * ftello(), and getline is called so that R.E. searching starts at the
+ * ftello(), and getaline is called so that R.E. searching starts at the
  * line after the previously referenced line.  The while loop checks
  * that there are more lines(error if none), bumps the line count, and
  * checks for the R.E. on each line.  If the R.E. matches on one of the
@@ -310,11 +306,11 @@ findline(char *expr, offset_t oset)
 
 	saveloc = ftello(infile);
 	if (curline != (offset_t)1 || benhere)	/* If first line, first time, */
-		(void) getline(FALSE);		/* then don't skip */
+		(void) getaline(FALSE);		/* then don't skip */
 	else
 		lncnt--;
 	benhere = 1;
-	while (getline(FALSE) != NULL) {
+	while (getaline(FALSE) != NULL) {
 		lncnt++;
 		if ((sptr = strrchr(linbuf, '\n')) != NULL)
 			*sptr = '\0';
@@ -362,7 +358,8 @@ getfile()
 
 	if (create) {
 		if (fptr == 0)
-			for (fptr = file; *fptr != NULL; fptr++);
+			for (fptr = file; *fptr != NULL; fptr++)
+				continue;
 		(void) sprintf(fptr, "%.*d", fiwidth, ctr++);
 
 		/* check for suffix length overflow */
@@ -406,12 +403,12 @@ getfile()
 /*
  * Getline gets a line via fgets from the input stream "infile".
  * The line is put into linbuf and may not be larger than LINSIZ.
- * If getline is called with a non-zero value, the current line
+ * If getaline is called with a non-zero value, the current line
  * is bumped, otherwise it is not(for R.E. searching).
  */
 
 static char *
-getline(int bumpcur)
+getaline(int bumpcur)
 {
 	char *ret;
 	if (bumpcur)
@@ -570,15 +567,15 @@ to_line(offset_t ln)
 		if (curline > ln)
 			fatal("%s - out of range\n", targ);
 		while (curline < ln) {
-			if (getline(TRUE) == NULL)
+			if (getaline(TRUE) == NULL)
 				fatal("%s - out of range\n", targ);
 			flush();
 		}
 	} else		/* last file */
-		if (getline(TRUE) != NULL) {
+		if (getaline(TRUE) != NULL) {
 			flush();
 			for (;;) {
-				if (getline(TRUE) == NULL)
+				if (getaline(TRUE) == NULL)
 					break;
 				flush();
 			}
@@ -591,7 +588,7 @@ static void
 usage()
 {
 	(void) fprintf(stderr, gettext(
-		"usage: csplit [-ks] [-f prefix] [-n number] "
-			"file arg1 ...argn\n"));
+	    "usage: csplit [-ks] [-f prefix] [-n number] "
+	    "file arg1 ...argn\n"));
 	exit(1);
 }

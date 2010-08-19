@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -136,11 +135,21 @@ x86pi_smb_open(topo_mod_t *mod)
  * the structure count as well as the id(s) of the struct types.
  */
 void
-x86pi_smb_strcnt(smbios_hdl_t *shp, smbs_cnt_t *stype)
+x86pi_smb_strcnt(topo_mod_t *mod, smbs_cnt_t *stype)
 {
-	const smb_struct_t *sp = shp->sh_structs;
-	int nstructs = shp->sh_nstructs;
+	const smb_struct_t *sp;
+	int nstructs;
 	int i, cnt;
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL) {
+		stype->count = 0;
+		return;
+	}
+
+	nstructs = shp->sh_nstructs;
+	sp = shp->sh_structs;
 
 	for (i = 0, cnt = 0; i < nstructs; i++, sp++) {
 		if (sp->smbst_hdr->smbh_type == stype->type) {
@@ -548,7 +557,7 @@ x86pi_set_system(topo_mod_t *mod, tnode_t *t_node)
  */
 /* ARGSUSED */
 int
-x86pi_check_comp(topo_mod_t *mod, smbios_hdl_t *shp)
+x86pi_check_comp(topo_mod_t *mod)
 {
 	int rv;
 	int fd;
@@ -558,6 +567,11 @@ x86pi_check_comp(topo_mod_t *mod, smbios_hdl_t *shp)
 	char *ibuf = NULL, *obuf = NULL;
 	size_t insz = 0, outsz = 0;
 	char *f = "x86pi_check_comp";
+	smbios_hdl_t *shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (X86PI_NONE);
 
 	/* open /dev/fm */
 	fd = open("/dev/fm", O_RDONLY);

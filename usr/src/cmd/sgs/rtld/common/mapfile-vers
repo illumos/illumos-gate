@@ -87,6 +87,7 @@ SYMBOL_VERSION SUNWprivate_1.3 {
 		 dbg_desc;		# Diagnostic support
 		 dbg_print;
 		 eprintf;		# Error message printing
+		 veprintf;
 
 		 dgettext;		# Messaging support
 		 strerror;

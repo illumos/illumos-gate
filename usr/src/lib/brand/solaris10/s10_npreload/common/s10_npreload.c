@@ -28,6 +28,14 @@
 #include <s10_brand.h>
 #include <stdlib.h>
 #include <sys/syscall.h>
+#include <dlfcn.h>
+#include <link.h>
+#include <limits.h>
+#include <sys/mman.h>
+#include <strings.h>
+
+/* MAXCOMLEN is only defined in user.h in the kernel. */
+#define	MAXCOMLEN	16
 
 /*
  * This is a library that is LD_PRELOADed into native processes.
@@ -37,13 +45,37 @@
  * ld.so.1.  Instead it changes it to be the name of the real native
  * executable that we're runnning.  This allows things like pgrep to work
  * as expected.  Note that this brand operation only changes the process
- * name wrt the kernel.  From the process' perspective, the first
- * argument and AT_SUN_EXECNAME are still ld.so.1.
+ * name wrt the kernel.  From the process' perspective, AT_SUN_EXECNAME is
+ * still ld.so.1. ld.so.1 removes itself and its arguments from the argv list.
  */
 void
 init(void)
 {
+	int i;
+	Dl_argsinfo_t argsinfo;
 	sysret_t rval;
+	char	*pcomm;
+	char	cmd_buf[MAXCOMLEN + 1];
+	char	arg_buf[PSARGSZ];
 
-	(void) __systemcall(&rval, SYS_brand, B_S10_NATIVE);
+	if (dlinfo(RTLD_SELF, RTLD_DI_ARGSINFO, &argsinfo) == -1)
+		return;
+
+	/* get the base cmd name */
+	if ((pcomm = strrchr(argsinfo.dla_argv[0], '/')) != NULL)
+		pcomm = pcomm + 1;
+	else
+		pcomm = argsinfo.dla_argv[0];
+	(void) strlcpy(cmd_buf, pcomm, sizeof (cmd_buf));
+
+	(void) strlcpy(arg_buf, argsinfo.dla_argv[0], sizeof (arg_buf));
+
+	for (i = 1; i < argsinfo.dla_argc; i++) {
+		(void) strlcat(arg_buf, " ", sizeof (arg_buf));
+		if (strlcat(arg_buf, argsinfo.dla_argv[i], sizeof (arg_buf))
+		    >= sizeof (arg_buf))
+			break;
+	}
+
+	(void) __systemcall(&rval, SYS_brand, B_S10_NATIVE, cmd_buf, arg_buf);
 }

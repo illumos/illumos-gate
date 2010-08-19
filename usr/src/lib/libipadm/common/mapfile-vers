@@ -66,10 +66,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ipadm_if_enabled;
 	ipadm_if_info;
 	ipadm_if_move;
-	ipadm_init_prop;
 	ipadm_init_net_from_gz;
+	ipadm_legacy2new_propname;
 	ipadm_ndpd_read;
 	ipadm_ndpd_write;
+	ipadm_new2legacy_propname;
 	ipadm_nvlist2str;
 	ipadm_open;
 	ipadm_open_arp_on_udp;

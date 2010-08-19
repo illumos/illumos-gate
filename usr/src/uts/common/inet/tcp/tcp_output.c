@@ -1471,7 +1471,21 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	switch (tcp->tcp_state) {
 	case TCPS_CLOSED:
 	case TCPS_IDLE:
+		break;
 	case TCPS_BOUND:
+		if (tcp->tcp_listener != NULL) {
+			ASSERT(IPCL_IS_NONSTR(connp));
+			/*
+			 * Unlink from the listener and drop the reference
+			 * put on it by the eager. tcp_closei_local will not
+			 * do it because tcp_tconnind_started is TRUE.
+			 */
+			mutex_enter(&tcp->tcp_saved_listener->tcp_eager_lock);
+			tcp_eager_unlink(tcp);
+			mutex_exit(&tcp->tcp_saved_listener->tcp_eager_lock);
+			CONN_DEC_REF(tcp->tcp_saved_listener->tcp_connp);
+		}
+		break;
 	case TCPS_LISTEN:
 		break;
 	case TCPS_SYN_SENT:
@@ -1525,15 +1539,6 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 			tcp_eager_unlink(tcp);
 			mutex_exit(&tcp->tcp_saved_listener->tcp_eager_lock);
 			CONN_DEC_REF(tcp->tcp_saved_listener->tcp_connp);
-
-			/*
-			 * If the conn has received a RST, the only thing
-			 * left to do is to drop the ref.
-			 */
-			if (tcp->tcp_state <= TCPS_BOUND) {
-				CONN_DEC_REF(tcp->tcp_connp);
-				return;
-			}
 			break;
 		}
 
@@ -2781,6 +2786,238 @@ tcp_xmit_listeners_reset(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst,
 }
 
 /*
+ * Helper function for tcp_xmit_mp() in handling connection set up flag
+ * options setting.
+ */
+static void
+tcp_xmit_mp_aux_iss(tcp_t *tcp, conn_t *connp, tcpha_t *tcpha, mblk_t *mp,
+    uint_t *flags)
+{
+	uint32_t u1;
+	uint8_t	*wptr = mp->b_wptr;
+	tcp_stack_t *tcps = tcp->tcp_tcps;
+	boolean_t add_sack = B_FALSE;
+
+	/*
+	 * If TCP_ISS_VALID and the seq number is tcp_iss,
+	 * TCP can only be in SYN-SENT, SYN-RCVD or
+	 * FIN-WAIT-1 state.  It can be FIN-WAIT-1 if
+	 * our SYN is not ack'ed but the app closes this
+	 * TCP connection.
+	 */
+	ASSERT(tcp->tcp_state == TCPS_SYN_SENT ||
+	    tcp->tcp_state == TCPS_SYN_RCVD ||
+	    tcp->tcp_state == TCPS_FIN_WAIT_1);
+
+	/*
+	 * Tack on the MSS option.  It is always needed
+	 * for both active and passive open.
+	 *
+	 * MSS option value should be interface MTU - MIN
+	 * TCP/IP header according to RFC 793 as it means
+	 * the maximum segment size TCP can receive.  But
+	 * to get around some broken middle boxes/end hosts
+	 * out there, we allow the option value to be the
+	 * same as the MSS option size on the peer side.
+	 * In this way, the other side will not send
+	 * anything larger than they can receive.
+	 *
+	 * Note that for SYN_SENT state, the ndd param
+	 * tcp_use_smss_as_mss_opt has no effect as we
+	 * don't know the peer's MSS option value. So
+	 * the only case we need to take care of is in
+	 * SYN_RCVD state, which is done later.
+	 */
+	wptr[0] = TCPOPT_MAXSEG;
+	wptr[1] = TCPOPT_MAXSEG_LEN;
+	wptr += 2;
+	u1 = tcp->tcp_initial_pmtu - (connp->conn_ipversion == IPV4_VERSION ?
+	    IP_SIMPLE_HDR_LENGTH : IPV6_HDR_LEN) - TCP_MIN_HEADER_LENGTH;
+	U16_TO_BE16(u1, wptr);
+	wptr += 2;
+
+	/* Update the offset to cover the additional word */
+	tcpha->tha_offset_and_reserved += (1 << 4);
+
+	switch (tcp->tcp_state) {
+	case TCPS_SYN_SENT:
+		*flags = TH_SYN;
+
+		if (tcp->tcp_snd_sack_ok)
+			add_sack = B_TRUE;
+
+		if (tcp->tcp_snd_ts_ok) {
+			uint32_t llbolt = (uint32_t)LBOLT_FASTPATH;
+
+			if (add_sack) {
+				wptr[0] = TCPOPT_SACK_PERMITTED;
+				wptr[1] = TCPOPT_SACK_OK_LEN;
+				add_sack = B_FALSE;
+			} else {
+				wptr[0] = TCPOPT_NOP;
+				wptr[1] = TCPOPT_NOP;
+			}
+			wptr[2] = TCPOPT_TSTAMP;
+			wptr[3] = TCPOPT_TSTAMP_LEN;
+			wptr += 4;
+			U32_TO_BE32(llbolt, wptr);
+			wptr += 4;
+			ASSERT(tcp->tcp_ts_recent == 0);
+			U32_TO_BE32(0L, wptr);
+			wptr += 4;
+			tcpha->tha_offset_and_reserved += (3 << 4);
+		}
+
+		/*
+		 * Set up all the bits to tell other side
+		 * we are ECN capable.
+		 */
+		if (tcp->tcp_ecn_ok)
+			*flags |= (TH_ECE | TH_CWR);
+
+		break;
+
+	case TCPS_SYN_RCVD:
+		*flags |= TH_SYN;
+
+		/*
+		 * Reset the MSS option value to be SMSS
+		 * We should probably add back the bytes
+		 * for timestamp option and IPsec.  We
+		 * don't do that as this is a workaround
+		 * for broken middle boxes/end hosts, it
+		 * is better for us to be more cautious.
+		 * They may not take these things into
+		 * account in their SMSS calculation.  Thus
+		 * the peer's calculated SMSS may be smaller
+		 * than what it can be.  This should be OK.
+		 */
+		if (tcps->tcps_use_smss_as_mss_opt) {
+			u1 = tcp->tcp_mss;
+			/*
+			 * Note that wptr points just past the MSS
+			 * option value.
+			 */
+			U16_TO_BE16(u1, wptr - 2);
+		}
+
+		/*
+		 * tcp_snd_ts_ok can only be set in TCPS_SYN_RCVD
+		 * when the peer also uses timestamps option.  And
+		 * the TCP header template must have already been
+		 * updated to include the timestamps option.
+		 */
+		if (tcp->tcp_snd_sack_ok) {
+			if (tcp->tcp_snd_ts_ok) {
+				uint8_t *tmp_wptr;
+
+				/*
+				 * Use the NOP in the header just
+				 * before timestamps opton.
+				 */
+				tmp_wptr = (uint8_t *)tcpha +
+				    TCP_MIN_HEADER_LENGTH;
+				ASSERT(tmp_wptr[0] == TCPOPT_NOP &&
+				    tmp_wptr[1] == TCPOPT_NOP);
+				tmp_wptr[0] = TCPOPT_SACK_PERMITTED;
+				tmp_wptr[1] = TCPOPT_SACK_OK_LEN;
+			} else {
+				add_sack = B_TRUE;
+			}
+		}
+
+
+		/*
+		 * If the other side is ECN capable, reply
+		 * that we are also ECN capable.
+		 */
+		if (tcp->tcp_ecn_ok)
+			*flags |= TH_ECE;
+		break;
+
+	default:
+		/*
+		 * The above ASSERT() makes sure that this
+		 * must be FIN-WAIT-1 state.  Our SYN has
+		 * not been ack'ed so retransmit it.
+		 */
+		*flags |= TH_SYN;
+		break;
+	}
+
+	if (add_sack) {
+		wptr[0] = TCPOPT_NOP;
+		wptr[1] = TCPOPT_NOP;
+		wptr[2] = TCPOPT_SACK_PERMITTED;
+		wptr[3] = TCPOPT_SACK_OK_LEN;
+		wptr += TCPOPT_REAL_SACK_OK_LEN;
+		tcpha->tha_offset_and_reserved += (1 << 4);
+	}
+
+	if (tcp->tcp_snd_ws_ok) {
+		wptr[0] =  TCPOPT_NOP;
+		wptr[1] =  TCPOPT_WSCALE;
+		wptr[2] =  TCPOPT_WS_LEN;
+		wptr[3] = (uchar_t)tcp->tcp_rcv_ws;
+		wptr += TCPOPT_REAL_WS_LEN;
+		tcpha->tha_offset_and_reserved += (1 << 4);
+	}
+
+	mp->b_wptr = wptr;
+	u1 = (int)(mp->b_wptr - mp->b_rptr);
+	/*
+	 * Get IP set to checksum on our behalf
+	 * Include the adjustment for a source route if any.
+	 */
+	u1 += connp->conn_sum;
+	u1 = (u1 >> 16) + (u1 & 0xFFFF);
+	tcpha->tha_sum = htons(u1);
+	TCPS_BUMP_MIB(tcps, tcpOutControl);
+}
+
+/*
+ * Helper function for tcp_xmit_mp() in handling connection tear down
+ * flag setting and state changes.
+ */
+static void
+tcp_xmit_mp_aux_fss(tcp_t *tcp, ip_xmit_attr_t *ixa, uint_t *flags)
+{
+	if (!tcp->tcp_fin_acked) {
+		*flags |= TH_FIN;
+		TCPS_BUMP_MIB(tcp->tcp_tcps, tcpOutControl);
+	}
+	if (!tcp->tcp_fin_sent) {
+		tcp->tcp_fin_sent = B_TRUE;
+		switch (tcp->tcp_state) {
+		case TCPS_SYN_RCVD:
+			tcp->tcp_state = TCPS_FIN_WAIT_1;
+			DTRACE_TCP6(state__change, void, NULL,
+			    ip_xmit_attr_t *, ixa, void, NULL,
+			    tcp_t *, tcp, void, NULL,
+			    int32_t, TCPS_SYN_RCVD);
+			break;
+		case TCPS_ESTABLISHED:
+			tcp->tcp_state = TCPS_FIN_WAIT_1;
+			DTRACE_TCP6(state__change, void, NULL,
+			    ip_xmit_attr_t *, ixa, void, NULL,
+			    tcp_t *, tcp, void, NULL,
+			    int32_t, TCPS_ESTABLISHED);
+			break;
+		case TCPS_CLOSE_WAIT:
+			tcp->tcp_state = TCPS_LAST_ACK;
+			DTRACE_TCP6(state__change, void, NULL,
+			    ip_xmit_attr_t *, ixa, void, NULL,
+			    tcp_t *, tcp, void, NULL,
+			    int32_t, TCPS_CLOSE_WAIT);
+			break;
+		}
+		if (tcp->tcp_suna == tcp->tcp_snxt)
+			TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
+		tcp->tcp_snxt = tcp->tcp_fss + 1;
+	}
+}
+
+/*
  * tcp_xmit_mp is called to return a pointer to an mblk chain complete with
  * ip and tcp header ready to pass down to IP.  If the mp passed in is
  * non-NULL, then up to max_to_send bytes of data will be dup'ed off that
@@ -2815,7 +3052,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 	/* Allocate for our maximum TCP header + link-level */
 	mp1 = allocb(connp->conn_ht_iphc_allocated + tcps->tcps_wroff_xtra,
 	    BPRI_MED);
-	if (!mp1)
+	if (mp1 == NULL)
 		return (NULL);
 	data_length = 0;
 
@@ -2921,201 +3158,24 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 		}
 	}
 
+	/* Check if there is any special processing needs to be done. */
 	if (tcp->tcp_valid_bits) {
 		uint32_t u1;
 
+		/* We don't allow having SYN and FIN in the same segment... */
 		if ((tcp->tcp_valid_bits & TCP_ISS_VALID) &&
 		    seq == tcp->tcp_iss) {
-			uchar_t	*wptr;
-
-			/*
-			 * If TCP_ISS_VALID and the seq number is tcp_iss,
-			 * TCP can only be in SYN-SENT, SYN-RCVD or
-			 * FIN-WAIT-1 state.  It can be FIN-WAIT-1 if
-			 * our SYN is not ack'ed but the app closes this
-			 * TCP connection.
-			 */
-			ASSERT(tcp->tcp_state == TCPS_SYN_SENT ||
-			    tcp->tcp_state == TCPS_SYN_RCVD ||
-			    tcp->tcp_state == TCPS_FIN_WAIT_1);
-
-			/*
-			 * Tack on the MSS option.  It is always needed
-			 * for both active and passive open.
-			 *
-			 * MSS option value should be interface MTU - MIN
-			 * TCP/IP header according to RFC 793 as it means
-			 * the maximum segment size TCP can receive.  But
-			 * to get around some broken middle boxes/end hosts
-			 * out there, we allow the option value to be the
-			 * same as the MSS option size on the peer side.
-			 * In this way, the other side will not send
-			 * anything larger than they can receive.
-			 *
-			 * Note that for SYN_SENT state, the ndd param
-			 * tcp_use_smss_as_mss_opt has no effect as we
-			 * don't know the peer's MSS option value. So
-			 * the only case we need to take care of is in
-			 * SYN_RCVD state, which is done later.
-			 */
-			wptr = mp1->b_wptr;
-			wptr[0] = TCPOPT_MAXSEG;
-			wptr[1] = TCPOPT_MAXSEG_LEN;
-			wptr += 2;
-			u1 = tcp->tcp_initial_pmtu -
-			    (connp->conn_ipversion == IPV4_VERSION ?
-			    IP_SIMPLE_HDR_LENGTH : IPV6_HDR_LEN) -
-			    TCP_MIN_HEADER_LENGTH;
-			U16_TO_BE16(u1, wptr);
-			mp1->b_wptr = wptr + 2;
-			/* Update the offset to cover the additional word */
-			tcpha->tha_offset_and_reserved += (1 << 4);
-
-			/*
-			 * Note that the following way of filling in
-			 * TCP options are not optimal.  Some NOPs can
-			 * be saved.  But there is no need at this time
-			 * to optimize it.  When it is needed, we will
-			 * do it.
-			 */
-			switch (tcp->tcp_state) {
-			case TCPS_SYN_SENT:
-				flags = TH_SYN;
-
-				if (tcp->tcp_snd_ts_ok) {
-					uint32_t llbolt =
-					    (uint32_t)LBOLT_FASTPATH;
-
-					wptr = mp1->b_wptr;
-					wptr[0] = TCPOPT_NOP;
-					wptr[1] = TCPOPT_NOP;
-					wptr[2] = TCPOPT_TSTAMP;
-					wptr[3] = TCPOPT_TSTAMP_LEN;
-					wptr += 4;
-					U32_TO_BE32(llbolt, wptr);
-					wptr += 4;
-					ASSERT(tcp->tcp_ts_recent == 0);
-					U32_TO_BE32(0L, wptr);
-					mp1->b_wptr += TCPOPT_REAL_TS_LEN;
-					tcpha->tha_offset_and_reserved +=
-					    (3 << 4);
-				}
-
-				/*
-				 * Set up all the bits to tell other side
-				 * we are ECN capable.
-				 */
-				if (tcp->tcp_ecn_ok) {
-					flags |= (TH_ECE | TH_CWR);
-				}
-				break;
-			case TCPS_SYN_RCVD:
-				flags |= TH_SYN;
-
-				/*
-				 * Reset the MSS option value to be SMSS
-				 * We should probably add back the bytes
-				 * for timestamp option and IPsec.  We
-				 * don't do that as this is a workaround
-				 * for broken middle boxes/end hosts, it
-				 * is better for us to be more cautious.
-				 * They may not take these things into
-				 * account in their SMSS calculation.  Thus
-				 * the peer's calculated SMSS may be smaller
-				 * than what it can be.  This should be OK.
-				 */
-				if (tcps->tcps_use_smss_as_mss_opt) {
-					u1 = tcp->tcp_mss;
-					U16_TO_BE16(u1, wptr);
-				}
-
-				/*
-				 * If the other side is ECN capable, reply
-				 * that we are also ECN capable.
-				 */
-				if (tcp->tcp_ecn_ok)
-					flags |= TH_ECE;
-				break;
-			default:
-				/*
-				 * The above ASSERT() makes sure that this
-				 * must be FIN-WAIT-1 state.  Our SYN has
-				 * not been ack'ed so retransmit it.
-				 */
-				flags |= TH_SYN;
-				break;
-			}
-
-			if (tcp->tcp_snd_ws_ok) {
-				wptr = mp1->b_wptr;
-				wptr[0] =  TCPOPT_NOP;
-				wptr[1] =  TCPOPT_WSCALE;
-				wptr[2] =  TCPOPT_WS_LEN;
-				wptr[3] = (uchar_t)tcp->tcp_rcv_ws;
-				mp1->b_wptr += TCPOPT_REAL_WS_LEN;
-				tcpha->tha_offset_and_reserved += (1 << 4);
-			}
-
-			if (tcp->tcp_snd_sack_ok) {
-				wptr = mp1->b_wptr;
-				wptr[0] = TCPOPT_NOP;
-				wptr[1] = TCPOPT_NOP;
-				wptr[2] = TCPOPT_SACK_PERMITTED;
-				wptr[3] = TCPOPT_SACK_OK_LEN;
-				mp1->b_wptr += TCPOPT_REAL_SACK_OK_LEN;
-				tcpha->tha_offset_and_reserved += (1 << 4);
-			}
-
-			/* allocb() of adequate mblk assures space */
-			ASSERT((uintptr_t)(mp1->b_wptr - mp1->b_rptr) <=
-			    (uintptr_t)INT_MAX);
-			u1 = (int)(mp1->b_wptr - mp1->b_rptr);
-			/*
-			 * Get IP set to checksum on our behalf
-			 * Include the adjustment for a source route if any.
-			 */
-			u1 += connp->conn_sum;
-			u1 = (u1 >> 16) + (u1 & 0xFFFF);
-			tcpha->tha_sum = htons(u1);
-			TCPS_BUMP_MIB(tcps, tcpOutControl);
-		}
-		if ((tcp->tcp_valid_bits & TCP_FSS_VALID) &&
+			/* Need to do connection set up processing. */
+			tcp_xmit_mp_aux_iss(tcp, connp, tcpha, mp1, &flags);
+		} else if ((tcp->tcp_valid_bits & TCP_FSS_VALID) &&
 		    (seq + data_length) == tcp->tcp_fss) {
-			if (!tcp->tcp_fin_acked) {
-				flags |= TH_FIN;
-				TCPS_BUMP_MIB(tcps, tcpOutControl);
-			}
-			if (!tcp->tcp_fin_sent) {
-				tcp->tcp_fin_sent = B_TRUE;
-				switch (tcp->tcp_state) {
-				case TCPS_SYN_RCVD:
-					tcp->tcp_state = TCPS_FIN_WAIT_1;
-					DTRACE_TCP6(state__change, void, NULL,
-					    ip_xmit_attr_t *, ixa, void, NULL,
-					    tcp_t *, tcp, void, NULL,
-					    int32_t, TCPS_SYN_RCVD);
-					break;
-				case TCPS_ESTABLISHED:
-					tcp->tcp_state = TCPS_FIN_WAIT_1;
-					DTRACE_TCP6(state__change, void, NULL,
-					    ip_xmit_attr_t *, ixa, void, NULL,
-					    tcp_t *, tcp, void, NULL,
-					    int32_t, TCPS_ESTABLISHED);
-					break;
-				case TCPS_CLOSE_WAIT:
-					tcp->tcp_state = TCPS_LAST_ACK;
-					DTRACE_TCP6(state__change, void, NULL,
-					    ip_xmit_attr_t *, ixa, void, NULL,
-					    tcp_t *, tcp, void, NULL,
-					    int32_t, TCPS_CLOSE_WAIT);
-					break;
-				}
-				if (tcp->tcp_suna == tcp->tcp_snxt)
-					TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
-				tcp->tcp_snxt = tcp->tcp_fss + 1;
-			}
+			/* Need to do connection tear down processing. */
+			tcp_xmit_mp_aux_fss(tcp, ixa, &flags);
 		}
+
 		/*
+		 * Need to do urgent pointer processing.
+		 *
 		 * Note the trick here.  u1 is unsigned.  When tcp_urg
 		 * is smaller than seq, u1 will become a very huge value.
 		 * So the comparison will fail.  Also note that tcp_urp
@@ -3133,6 +3193,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 	tcp->tcp_rack = tcp->tcp_rnxt;
 	tcp->tcp_rack_cnt = 0;
 
+	/* Fill in the current value of timestamps option. */
 	if (tcp->tcp_snd_ts_ok) {
 		if (tcp->tcp_state != TCPS_SYN_SENT) {
 			uint32_t llbolt = (uint32_t)LBOLT_FASTPATH;
@@ -3144,6 +3205,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 		}
 	}
 
+	/* Fill in the SACK blocks. */
 	if (num_sack_blk > 0) {
 		uchar_t *wptr = (uchar_t *)tcpha + connp->conn_ht_ulp_len;
 		sack_blk_t *tmp;

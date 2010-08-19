@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -52,8 +51,8 @@
 #include <libscf_priv.h>
 #include <tsol/label.h>
 #include <bsm/libbsm.h>
-#include "auditconfig_impl.h"
-#include "audit_scf.h"
+#include <audit_policy.h>
+#include <audit_scf.h>
 
 enum	commands {
 	AC_ARG_ACONF,
@@ -69,9 +68,12 @@ enum	commands {
 	AC_ARG_GETCOND,
 	AC_ARG_GETCWD,
 	AC_ARG_GETESTATE,
+	AC_ARG_GETFLAGS,
 	AC_ARG_GETKAUDIT,
 	AC_ARG_GETKMASK,
+	AC_ARG_GETNAFLAGS,
 	AC_ARG_GETPINFO,
+	AC_ARG_GETPLUGIN,
 	AC_ARG_GETPOLICY,
 	AC_ARG_GETQBUFSZ,
 	AC_ARG_GETQCTRL,
@@ -86,8 +88,11 @@ enum	commands {
 	AC_ARG_SETAUDIT,
 	AC_ARG_SETAUID,
 	AC_ARG_SETCLASS,
+	AC_ARG_SETFLAGS,
 	AC_ARG_SETKAUDIT,
 	AC_ARG_SETKMASK,
+	AC_ARG_SETNAFLAGS,
+	AC_ARG_SETPLUGIN,
 	AC_ARG_SETPMASK,
 	AC_ARG_SETPOLICY,
 	AC_ARG_SETQBUFSZ,
@@ -134,9 +139,12 @@ static arg_entry_t arg_table[] = {
 	{ "-getcond",	"",			AC_ARG_GETCOND,	B_FALSE},
 	{ "-getcwd",	"",			AC_ARG_GETCWD,	B_FALSE},
 	{ "-getestate",	" event",		AC_ARG_GETESTATE, B_FALSE},
+	{ "-getflags",	"",			AC_ARG_GETFLAGS, B_FALSE},
 	{ "-getkaudit",	"",			AC_ARG_GETKAUDIT, B_FALSE},
 	{ "-getkmask",	"",			AC_ARG_GETKMASK, B_FALSE},
+	{ "-getnaflags", "",			AC_ARG_GETNAFLAGS, B_FALSE},
 	{ "-getpinfo",	" pid",			AC_ARG_GETPINFO, B_FALSE},
+	{ "-getplugin",	" [plugin]",		AC_ARG_GETPLUGIN, B_FALSE},
 	{ "-getpolicy",	"",			AC_ARG_GETPOLICY, B_TRUE},
 	{ "-getqbufsz",	"",			AC_ARG_GETQBUFSZ, B_TRUE},
 	{ "-getqctrl",	"",			AC_ARG_GETQCTRL, B_TRUE},
@@ -152,8 +160,12 @@ static arg_entry_t arg_table[] = {
 						AC_ARG_SETAUDIT, B_FALSE},
 	{ "-setauid",	" auid [cmd]",		AC_ARG_SETAUID,	B_FALSE},
 	{ "-setclass",	" event audit_flags",	AC_ARG_SETCLASS, B_FALSE},
+	{ "-setflags",	" audit_flags",		AC_ARG_SETFLAGS, B_FALSE},
 	{ "-setkaudit",	" type IP_address",	AC_ARG_SETKAUDIT, B_FALSE},
 	{ "-setkmask",	" audit_flags",		AC_ARG_SETKMASK, B_FALSE},
+	{ "-setnaflags", " audit_naflags",	AC_ARG_SETNAFLAGS, B_FALSE},
+	{ "-setplugin",	" name active|inactive [attributes [qsize]]",
+						AC_ARG_SETPLUGIN, B_FALSE},
 	{ "-setpmask",	" pid audit_flags",	AC_ARG_SETPMASK, B_FALSE},
 	{ "-setpolicy",	" [+|-]policy_flags",	AC_ARG_SETPOLICY, B_TRUE},
 	{ "-setqbufsz",	" bufsz",		AC_ARG_SETQBUFSZ, B_TRUE},
@@ -186,17 +198,18 @@ static int policy2str(uint32_t policy, char *policy_str, size_t len);
 static int str2type(char *s, uint_t *type);
 static int str2policy(char *policy_str, uint32_t *policy_mask);
 static int str2ipaddr(char *s, uint32_t *addr, uint32_t type);
-static int strisflags(char *s);
 static int strisipaddr(char *s);
 static int strisnum(char *s);
 static arg_entry_t *get_arg_ent(char *arg_str);
 static uid_t get_user_id(char *user);
+static void chk_arg_len(char *argv, uint_t len);
 static void chk_event_num(int etype, au_event_t event);
 static void chk_event_str(int etype, char *event_str);
+static void chk_known_plugin(char *plugin_str);
 static void chk_retval(char *retval_str);
 static void chk_sorf(char *sorf_str);
 static void do_aconf(void);
-static void do_args(char **argv);
+static void do_args(char **argv, au_mask_t *mask);
 static void do_audit(char *, char, int, char *);
 static void do_chkaconf(void);
 static void do_chkconf(void);
@@ -210,8 +223,11 @@ static void do_getcar(void);
 static void do_getclass(char *event_str);
 static void do_getcond(void);
 static void do_getcwd(void);
+static void do_getflags(void);
 static void do_getkmask(void);
+static void do_getnaflags(void);
 static void do_getpinfo(char *pid_str);
+static void do_getplugin(char *plugin_str);
 static void do_getpolicy(void);
 static void do_getqbufsz(void);
 static void do_getqctrl(void);
@@ -226,11 +242,15 @@ static void do_setasid(char *sid_str, char **argv);
 static void do_setaudit(char *user_str, char *mask_str, char *tid_str,
     char *sid_str, char **argv);
 static void do_setauid(char *user, char **argv);
-static void do_setclass(char *event_str, char *audit_flags);
-static void do_setkmask(char *audit_flags);
-static void do_setpmask(char *pid_str, char *audit_flags);
-static void do_setsmask(char *asid_str, char *audit_flags);
-static void do_setumask(char *auid_str, char *audit_flags);
+static void do_setclass(char *event_str, au_mask_t *mask);
+static void do_setflags(char *audit_flags, au_mask_t *amask);
+static void do_setkmask(au_mask_t *pmask);
+static void do_setnaflags(char *audit_naflags, au_mask_t *namask);
+static void do_setpmask(char *pid_str, au_mask_t *mask);
+static void do_setsmask(char *asid_str, au_mask_t *mask);
+static void do_setumask(char *auid_str, au_mask_t *mask);
+static void do_setplugin(char *plugin_str, boolean_t plugin_state,
+    char *plugin_attr, int plugin_qsize);
 static void do_setpolicy(char *policy_str);
 static void do_setqbufsz(char *bufsz);
 static void do_setqctrl(char *hiwater, char *lowater, char *bufsz, char *delay);
@@ -238,25 +258,25 @@ static void do_setqdelay(char *delay);
 static void do_setqhiwater(char *hiwater);
 static void do_setqlowater(char *lowater);
 static void do_setstat(void);
-static void str2mask(char *mask_str, au_mask_t *mp);
 static void str2tid(char *tid_str, au_tid_addr_t *tp);
-static void strsplit(char *s, char *p1, char *p2, char c);
 
 static void eauditon(int cmd, caddr_t data, int length);
+static void echkflags(char *auditflags, au_mask_t *mask);
 static void egetaudit(auditinfo_addr_t *ai, int size);
-static void egetkaudit(auditinfo_addr_t *ai, int size);
-static void esetkaudit(auditinfo_addr_t *ai, int size);
 static void egetauditflagsbin(char *auditflags, au_mask_t *pmask);
 static void egetauid(au_id_t *auid);
+static void egetkaudit(auditinfo_addr_t *ai, int size);
 static void esetaudit(auditinfo_addr_t *ai, int size);
 static void esetauid(au_id_t *auid);
+static void esetkaudit(auditinfo_addr_t *ai, int size);
 static void execit(char **argv);
 static void exit_error(char *fmt, ...);
 static void exit_usage(int status);
-static void parse_args(int argc, char **argv);
+static void parse_args(int argc, char **argv, au_mask_t *mask);
 static void print_asid(au_asid_t asid);
 static void print_auid(au_id_t auid);
 static void print_mask(char *desc, au_mask_t *pmp);
+static void print_plugin(char *plugin_name, kva_t *plugin_kva);
 static void print_tid_ex(au_tid_addr_t *tidp);
 
 #if !defined(TEXT_DOMAIN)
@@ -266,6 +286,8 @@ static void print_tid_ex(au_tid_addr_t *tidp);
 int
 main(int argc, char **argv)
 {
+	au_mask_t mask;			/* for options manipulating flags */
+
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -280,8 +302,8 @@ main(int argc, char **argv)
 		exit_usage(0);
 	}
 
-	parse_args(argc, argv);
-	do_args(argv);
+	parse_args(argc, argv, &mask);
+	do_args(argv, &mask);
 
 	return (0);
 }
@@ -295,11 +317,10 @@ main(int argc, char **argv)
  *              parse_args() returns without a value.
  */
 static void
-parse_args(int argc, char **argv)
+parse_args(int argc, char **argv, au_mask_t *mask)
 {
 	arg_entry_t *ae;
 
-	au_mask_t mask;
 	uint_t type;
 	uint_t addr[4];
 
@@ -359,7 +380,24 @@ parse_args(int argc, char **argv)
 		case AC_ARG_GETCAR:
 		case AC_ARG_GETCOND:
 		case AC_ARG_GETCWD:
+		case AC_ARG_GETFLAGS:
 		case AC_ARG_GETKMASK:
+		case AC_ARG_GETNAFLAGS:
+			break;
+
+		case AC_ARG_GETPLUGIN:
+			if (*++argv == NULL) {
+				--argv;
+				break;
+			}
+			if (get_arg_ent(*argv) != NULL) {
+				--argv;
+			} else {
+				chk_arg_len(*argv, PLUGIN_MAXBUF);
+				chk_known_plugin(*argv);
+			}
+			break;
+
 		case AC_ARG_GETPOLICY:
 		case AC_ARG_GETQBUFSZ:
 		case AC_ARG_GETQCTRL:
@@ -413,14 +451,55 @@ parse_args(int argc, char **argv)
 			++argv;
 			if (!*argv)
 				exit_usage(1);
-			str2mask(*argv, &mask);
+			echkflags(*argv, mask);
+			break;
+
+		case AC_ARG_SETFLAGS:
+			++argv;
+			if (!*argv)
+				exit_usage(1);
+			chk_arg_len(*argv, PRESELECTION_MAXBUF);
+			echkflags(*argv, mask);
 			break;
 
 		case AC_ARG_SETKMASK:
 			++argv;
 			if (!*argv)
 				exit_usage(1);
-			str2mask(*argv, &mask);
+			echkflags(*argv, mask);
+			break;
+
+		case AC_ARG_SETNAFLAGS:
+			++argv;
+			if (!*argv)
+				exit_usage(1);
+			chk_arg_len(*argv, PRESELECTION_MAXBUF);
+			echkflags(*argv, mask);
+			break;
+
+		case AC_ARG_SETPLUGIN:
+			if (*++argv == NULL || get_arg_ent(*argv) != NULL) {
+				exit_usage(1);
+			}
+			chk_known_plugin(*argv);
+			chk_arg_len(*argv, PLUGIN_MAXBUF);
+			if (*++argv == NULL || strcmp(*argv, "active") != 0 &&
+			    strcmp(*argv, "inactive") != 0) {
+				exit_usage(1);
+			}
+			if (*++argv == NULL || get_arg_ent(*argv) != NULL) {
+				--argv;
+				break;
+			}
+			chk_arg_len(*argv, PLUGIN_MAXATT);
+			if (*++argv == NULL || get_arg_ent(*argv) != NULL) {
+				--argv;
+				break;
+			}
+			if (atoi(*argv) < 0) {
+				exit_error(gettext("Incorrect qsize specified "
+				    "(%s)."), *argv);
+			}
 			break;
 
 		case AC_ARG_SETPOLICY:
@@ -445,7 +524,7 @@ parse_args(int argc, char **argv)
 			++argv;
 			if (!*argv)
 				exit_usage(1);
-			str2mask(*argv, &mask);
+			echkflags(*argv, mask);
 			break;
 
 		case AC_ARG_SETQBUFSZ:
@@ -517,7 +596,7 @@ parse_args(int argc, char **argv)
 			++argv;
 			if (!*argv)
 				exit_usage(1);
-			str2mask(*argv, &mask);
+			echkflags(*argv, mask);
 			break;
 
 		case AC_ARG_SET_TEMPORARY:
@@ -545,7 +624,7 @@ parse_args(int argc, char **argv)
  * otherwise.
  */
 static void
-do_args(char **argv)
+do_args(char **argv, au_mask_t *mask)
 {
 	arg_entry_t	*ae;
 
@@ -623,8 +702,35 @@ do_args(char **argv)
 			do_getcwd();
 			break;
 
+		case AC_ARG_GETFLAGS:
+			do_getflags();
+			break;
+
 		case AC_ARG_GETKMASK:
 			do_getkmask();
+			break;
+
+		case AC_ARG_GETNAFLAGS:
+			do_getnaflags();
+			break;
+
+		case AC_ARG_GETPLUGIN:
+			{
+				char	*plugin_str = NULL;
+
+				++argv;
+				if (*argv != NULL) {
+					if (get_arg_ent(*argv) != NULL) {
+						--argv;
+					} else {
+						plugin_str = *argv;
+					}
+				} else {
+					--argv;
+				}
+
+				do_getplugin(plugin_str);
+			}
 			break;
 
 		case AC_ARG_GETPOLICY:
@@ -722,17 +828,58 @@ do_args(char **argv)
 
 		case AC_ARG_SETCLASS:
 			{
-				char *event_str, *audit_flags;
+				char *event_str;
 
-				++argv; event_str = *argv;
-				++argv; audit_flags = *argv;
-				do_setclass(event_str, audit_flags);
+				++argv;
+				event_str = *argv;
+				do_setclass(event_str, mask);
+
+				++argv;
 			}
+			break;
+
+		case AC_ARG_SETFLAGS:
+			++argv;
+			do_setflags(*argv, mask);
 			break;
 
 		case AC_ARG_SETKMASK:
 			++argv;
-			do_setkmask(*argv);
+			do_setkmask(mask);
+			break;
+
+		case AC_ARG_SETNAFLAGS:
+			++argv;
+			do_setnaflags(*argv, mask);
+			break;
+
+		case AC_ARG_SETPLUGIN:
+			{
+				char		*plugin_str = NULL;
+				boolean_t	plugin_state = B_FALSE;
+				char 		*plugin_att = NULL;
+				int 		plugin_qsize = -1;
+
+				plugin_str = *++argv;
+				if (strcmp(*++argv, "active") == 0) {
+					plugin_state = B_TRUE;
+				}
+				if (*++argv != NULL &&
+				    get_arg_ent(*argv) == NULL) {
+					plugin_att = *argv;
+					if (*++argv != NULL &&
+					    get_arg_ent(*argv) == NULL) {
+						plugin_qsize = atoi(*argv);
+					} else {
+						--argv;
+					}
+				} else {
+					--argv;
+				}
+
+				do_setplugin(plugin_str, plugin_state,
+				    plugin_att, plugin_qsize);
+			}
 			break;
 
 		case AC_ARG_SETPOLICY:
@@ -753,13 +900,12 @@ do_args(char **argv)
 		case AC_ARG_SETPMASK:
 			{
 				char *pid_str;
-				char *audit_flags;
 
 				++argv;
 				pid_str = *argv;
+				do_setpmask(pid_str, mask);
+
 				++argv;
-				audit_flags = *argv;
-				do_setpmask(pid_str, audit_flags);
 			}
 			break;
 
@@ -801,25 +947,23 @@ do_args(char **argv)
 		case AC_ARG_SETSMASK:
 			{
 				char *asid_str;
-				char *audit_flags;
 
 				++argv;
 				asid_str = *argv;
+				do_setsmask(asid_str, mask);
+
 				++argv;
-				audit_flags = *argv;
-				do_setsmask(asid_str, audit_flags);
 			}
 			break;
 		case AC_ARG_SETUMASK:
 			{
 				char *auid_str;
-				char *audit_flags;
 
 				++argv;
 				auid_str = *argv;
+				do_setumask(auid_str, mask);
+
 				++argv;
-				audit_flags = *argv;
-				do_setumask(auid_str, audit_flags);
 			}
 			break;
 		case AC_ARG_SET_TEMPORARY:
@@ -916,7 +1060,7 @@ do_conf(void)
 			++i;
 			ec.ec_number = evp->ae_number;
 			ec.ec_class = evp->ae_class;
-			eauditon(A_SETCLASS, (caddr_t)&ec, (int)sizeof (ec));
+			eauditon(A_SETCLASS, (caddr_t)&ec, sizeof (ec));
 		}
 	}
 	endauevent();
@@ -932,35 +1076,33 @@ do_conf(void)
 static void
 do_chkaconf(void)
 {
-	char 		buf[1024];
+	char		*namask_cfg;
 	au_mask_t 	pmask, kmask;
 
-	if (getacna(buf, sizeof (buf)) < 0) {
-		(void) fprintf(stderr,
-		    gettext("bad non-attributable flags in audit_control\n"));
-		exit(1);
+	if (!do_getnaflags_scf(&namask_cfg) || namask_cfg == NULL) {
+		exit_error(gettext("Could not get configured value."));
 	}
+	egetauditflagsbin(namask_cfg, &pmask);
 
-	if (getauditflagsbin(buf, &pmask) < 0) {
-		(void) fprintf(stderr,
-		    gettext("bad audit flag value encountered\n"));
-		exit(1);
-	}
-
-	eauditon(A_GETKMASK, (caddr_t)&kmask, (int)sizeof (kmask));
+	eauditon(A_GETKMASK, (caddr_t)&kmask, sizeof (kmask));
 
 	if ((pmask.am_success != kmask.am_success) ||
 	    (pmask.am_failure != kmask.am_failure)) {
 		char kbuf[2048];
 		if (getauditflagschar(kbuf, &kmask, 0) < 0) {
+			free(namask_cfg);
 			(void) fprintf(stderr,
 			    gettext("bad kernel non-attributable mask\n"));
 			exit(1);
 		}
-		(void) printf(gettext("non-attributable event mismatch "));
-		(void) printf(gettext("audit_control(%s) kernel(%s)\n"),
-		    buf, kbuf);
+		(void) printf(
+		    gettext("non-attributable event flags mismatch:\n"));
+		(void) printf(gettext("active non-attributable audit flags "
+		    "= %s\n"), kbuf);
+		(void) printf(gettext("configured non-attributable audit flags "
+		    "= %s\n"), namask_cfg);
 	}
+	free(namask_cfg);
 }
 
 /*
@@ -970,23 +1112,17 @@ do_chkaconf(void)
 static void
 do_aconf(void)
 {
-	char buf[2048];
-	au_mask_t pmask;
+	au_mask_t 	namask;
+	char		*namask_cfg;
 
-	if (getacna(buf, sizeof (buf)) < 0) {
-		(void) fprintf(stderr,
-		    gettext("bad non-attributable flags in audit_control\n"));
-		exit(1);
+	if (!do_getnaflags_scf(&namask_cfg) || namask_cfg == NULL) {
+		exit_error(gettext("Could not get configured value."));
 	}
+	egetauditflagsbin(namask_cfg, &namask);
+	free(namask_cfg);
 
-	if (getauditflagsbin(buf, &pmask) < 0) {
-		(void) fprintf(stderr,
-		    gettext("bad audit flag value encountered\n"));
-		exit(1);
-	}
-
-	eauditon(A_SETKMASK, (caddr_t)&pmask, (int)sizeof (pmask));
-	(void) printf(gettext("Configured non-attributable events.\n"));
+	eauditon(A_SETKMASK, (caddr_t)&namask, sizeof (namask));
+	(void) printf(gettext("Configured non-attributable event mask.\n"));
 }
 
 /*
@@ -1140,7 +1276,7 @@ do_getcar(void)
 {
 	char path[MAXPATHLEN];
 
-	eauditon(A_GETCAR, (caddr_t)path, (int)sizeof (path));
+	eauditon(A_GETCAR, (caddr_t)path, sizeof (path));
 	(void) printf(gettext("current active root = %s\n"), path);
 }
 
@@ -1198,8 +1334,29 @@ do_getcwd(void)
 {
 	char path[MAXPATHLEN];
 
-	eauditon(A_GETCWD, (caddr_t)path, (int)sizeof (path));
+	eauditon(A_GETCWD, (caddr_t)path, sizeof (path));
 	(void) printf(gettext("current working directory = %s\n"), path);
+}
+
+/*
+ * do_getflags() - the printed value is for the global zone unless AUDIT_PERZONE
+ * is set.
+ */
+static void
+do_getflags(void)
+{
+	au_mask_t	amask;
+	char		*amask_cfg;
+
+	eauditon(A_GETAMASK, (caddr_t)&amask, sizeof (amask));
+	print_mask(gettext("active user default audit flags"), &amask);
+
+	if (!do_getflags_scf(&amask_cfg) || amask_cfg == NULL) {
+		exit_error(gettext("Could not get configured value."));
+	}
+	egetauditflagsbin(amask_cfg, &amask);
+	print_mask(gettext("configured user default audit flags"), &amask);
+	free(amask_cfg);
 }
 
 /*
@@ -1211,8 +1368,29 @@ do_getkmask(void)
 {
 	au_mask_t pmask;
 
-	eauditon(A_GETKMASK, (caddr_t)&pmask, (int)sizeof (pmask));
-	print_mask(gettext("audit flags for non-attributable events"), &pmask);
+	eauditon(A_GETKMASK, (caddr_t)&pmask, sizeof (pmask));
+	print_mask(gettext("active non-attributable audit flags"), &pmask);
+}
+
+/*
+ * do_getnaflags() - the printed value is for the global zone unless
+ * AUDIT_PERZONE is set.
+ */
+static void
+do_getnaflags(void)
+{
+	au_mask_t	namask;
+	char		*namask_cfg;
+
+	eauditon(A_GETKMASK, (caddr_t)&namask, sizeof (namask));
+	print_mask(gettext("active non-attributable audit flags"), &namask);
+
+	if (!do_getnaflags_scf(&namask_cfg) || namask_cfg == NULL) {
+		exit_error(gettext("Could not get configured value."));
+	}
+	egetauditflagsbin(namask_cfg, &namask);
+	print_mask(gettext("configured non-attributable audit flags"), &namask);
+	free(namask_cfg);
 }
 
 /*
@@ -1260,6 +1438,32 @@ do_getpinfo(char *pid_str)
 	print_mask(gettext("process preselection mask"), &(ap.ap_mask));
 	print_tid_ex(&(ap.ap_termid));
 	print_asid(ap.ap_asid);
+}
+
+/*
+ * do_getplugin() - print plugin configuration.
+ */
+static void
+do_getplugin(char *plugin_str)
+{
+	scf_plugin_kva_node_t	*plugin_kva_ll;
+	scf_plugin_kva_node_t	*plugin_kva_ll_head;
+
+	if (!do_getpluginconfig_scf(plugin_str, &plugin_kva_ll)) {
+		exit_error(gettext("Could not get plugin configuration."));
+	}
+
+	plugin_kva_ll_head = plugin_kva_ll;
+
+	while (plugin_kva_ll != NULL) {
+		print_plugin(plugin_kva_ll->plugin_name,
+		    plugin_kva_ll->plugin_kva);
+		plugin_kva_ll = plugin_kva_ll->next;
+		if (plugin_kva_ll != NULL) {
+			(void) printf("\n");
+		}
+	}
+	plugin_kva_ll_free(plugin_kva_ll_head);
 }
 
 /*
@@ -1583,7 +1787,7 @@ do_setaudit(char *user_str, char *mask_str, char *tid_str, char *sid_str,
 	auditinfo_addr_t ai;
 
 	ai.ai_auid = (au_id_t)get_user_id(user_str);
-	str2mask(mask_str, &ai.ai_mask),
+	egetauditflagsbin(mask_str, &ai.ai_mask),
 	    str2tid(tid_str, &ai.ai_termid);
 	ai.ai_asid = (au_asid_t)atol(sid_str);
 
@@ -1609,18 +1813,20 @@ do_setauid(char *user, char **argv)
  * per zone if AUDIT_PERZONE is set, else only in global zone.
  */
 static void
-do_setpmask(char *pid_str, char *audit_flags)
+do_setpmask(char *pid_str, au_mask_t *mask)
 {
 	struct auditpinfo ap;
 
-	if (strisnum(pid_str))
+	if (strisnum(pid_str)) {
 		ap.ap_pid = (pid_t)atoi(pid_str);
-	else
+	} else {
 		exit_usage(1);
+	}
 
-	str2mask(audit_flags, &ap.ap_mask);
+	ap.ap_mask.am_success = mask->am_success;
+	ap.ap_mask.am_failure = mask->am_failure;
 
-	eauditon(A_SETPMASK, (caddr_t)&ap, (int)sizeof (ap));
+	eauditon(A_SETPMASK, (caddr_t)&ap, sizeof (ap));
 }
 
 /*
@@ -1629,18 +1835,20 @@ do_setpmask(char *pid_str, char *audit_flags)
  * zone.
  */
 static void
-do_setsmask(char *asid_str, char *audit_flags)
+do_setsmask(char *asid_str, au_mask_t *mask)
 {
 	struct auditinfo ainfo;
 
-	if (strisnum(asid_str))
+	if (strisnum(asid_str)) {
 		ainfo.ai_asid = (au_asid_t)atoi(asid_str);
-	else
+	} else {
 		exit_usage(1);
+	}
 
-	str2mask(audit_flags, &ainfo.ai_mask);
+	ainfo.ai_mask.am_success = mask->am_success;
+	ainfo.ai_mask.am_failure = mask->am_failure;
 
-	eauditon(A_SETSMASK, (caddr_t)&ainfo, (int)sizeof (ainfo));
+	eauditon(A_SETSMASK, (caddr_t)&ainfo, sizeof (ainfo));
 }
 
 /*
@@ -1649,18 +1857,20 @@ do_setsmask(char *asid_str, char *audit_flags)
  * global zone.
  */
 static void
-do_setumask(char *auid_str, char *audit_flags)
+do_setumask(char *auid_str, au_mask_t *mask)
 {
 	struct auditinfo ainfo;
 
-	if (strisnum(auid_str))
+	if (strisnum(auid_str)) {
 		ainfo.ai_auid = (au_id_t)atoi(auid_str);
-	else
+	} else {
 		exit_usage(1);
+	}
 
-	str2mask(audit_flags, &ainfo.ai_mask);
+	ainfo.ai_mask.am_success = mask->am_success;
+	ainfo.ai_mask.am_failure = mask->am_failure;
 
-	eauditon(A_SETUMASK, (caddr_t)&ainfo, (int)sizeof (ainfo));
+	eauditon(A_SETUMASK, (caddr_t)&ainfo, sizeof (ainfo));
 }
 
 /*
@@ -1684,55 +1894,91 @@ do_setstat(void)
 	as.as_wblocked	= (uint_t)-1;
 	as.as_written	= (uint_t)-1;
 
-	eauditon(A_SETSTAT, (caddr_t)&as, (int)sizeof (as));
+	eauditon(A_SETSTAT, (caddr_t)&as, sizeof (as));
 	(void) printf("%s\n", gettext("audit stats reset"));
 }
 
 /*
  * do_setclass() - map the kernel event event_str to the classes specified by
- * audit flags audit_flags; valid per zone if AUDIT_PERZONE is set, else only in
+ * audit flags (mask); valid per zone if AUDIT_PERZONE is set, else only in
  * global zone.
  */
 static void
-do_setclass(char *event_str, char *audit_flags)
+do_setclass(char *event_str, au_mask_t *mask)
 {
 	au_event_t event;
-	int mask;
-	au_mask_t pmask;
 	au_evclass_map_t ec;
 	au_event_ent_t *evp;
 
-	if (strisnum(event_str))
+	if (strisnum(event_str)) {
 		event = (uint_t)atol(event_str);
-	else {
-		if ((evp = egetauevnam(event_str)) != NULL)
+	} else {
+		if ((evp = egetauevnam(event_str)) != NULL) {
 			event = evp->ae_number;
-	}
-
-	if (strisnum(audit_flags))
-		mask = atoi(audit_flags);
-	else {
-		str2mask(audit_flags, &pmask);
-		mask = pmask.am_success | pmask.am_failure;
+		}
 	}
 
 	ec.ec_number = event;
-	ec.ec_class = mask;
-	eauditon(A_SETCLASS, (caddr_t)&ec, (int)sizeof (ec));
+	ec.ec_class = (mask->am_success | mask->am_failure);
+
+	eauditon(A_SETCLASS, (caddr_t)&ec, sizeof (ec));
 }
 
 /*
- * do_setkmask() - set non-attributes selection flags of machine; valid per zone
+ * do_setflags() - set configured and active default user preselection masks;
+ * valid per zone if AUDIT_PERZONE is set, else only in global zone.
+ */
+static void
+do_setflags(char *audit_flags, au_mask_t *amask)
+{
+	eauditon(A_SETAMASK, (caddr_t)amask, sizeof (*amask));
+
+	if (!do_setflags_scf(audit_flags)) {
+		print_mask(gettext("active user default audit flags"), amask);
+		exit_error(gettext("Could not store configuration value."));
+	}
+	print_mask(gettext("user default audit flags"), amask);
+}
+
+/*
+ * do_setkmask() - set non-attributable audit flags of machine; valid per zone
  * if AUDIT_PERZONE is set, else only in global zone.
  */
 static void
-do_setkmask(char *audit_flags)
+do_setkmask(au_mask_t *pmask)
 {
-	au_mask_t pmask;
+	eauditon(A_SETKMASK, (caddr_t)pmask, sizeof (*pmask));
+	print_mask(gettext("active non-attributable audit flags"), pmask);
+}
 
-	str2mask(audit_flags, &pmask);
-	eauditon(A_SETKMASK, (caddr_t)&pmask, (int)sizeof (pmask));
-	print_mask(gettext("audit flags for non-attributable events"), &pmask);
+/*
+ * do_setnaflags() - set configured and active non-attributable selection flags
+ * of machine; valid per zone if AUDIT_PERZONE is set, else only in global zone.
+ */
+static void
+do_setnaflags(char *audit_naflags, au_mask_t *namask)
+{
+	eauditon(A_SETKMASK, (caddr_t)namask, sizeof (*namask));
+
+	if (!do_setnaflags_scf(audit_naflags)) {
+		print_mask(
+		    gettext("active non-attributable audit flags"), namask);
+		exit_error(gettext("Could not store configuration value."));
+	}
+	print_mask(gettext("non-attributable audit flags"), namask);
+}
+
+/*
+ * do_setplugin() - set the given plugin plugin_str configuration values.
+ */
+static void
+do_setplugin(char *plugin_str, boolean_t plugin_state, char *plugin_attr,
+    int plugin_qsize)
+{
+	if (!do_setpluginconfig_scf(plugin_str, plugin_state, plugin_attr,
+	    plugin_qsize)) {
+		exit_error(gettext("Could not set plugin configuration."));
+	}
 }
 
 /*
@@ -1961,14 +2207,31 @@ esetkaudit(auditinfo_addr_t *ai, int size)
 static void
 egetauditflagsbin(char *auditflags, au_mask_t *pmask)
 {
-	pmask->am_success = pmask->am_failure = 0;
-
-	if (strcmp(auditflags, "none") == 0)
+	if (strcmp(auditflags, "none") == 0) {
+		pmask->am_success = pmask->am_failure = 0;
 		return;
+	}
 
 	if (getauditflagsbin(auditflags, pmask) < 0) {
 		exit_error(gettext("Could not get audit flags (%s)"),
 		    auditflags);
+	}
+}
+
+static void
+echkflags(char *auditflags, au_mask_t *mask)
+{
+	char		*err = "";
+	char		*err_ptr;
+
+	if (!__chkflags(auditflags, mask, B_FALSE, &err)) {
+		err_ptr = err;
+		while (*err_ptr != ',' && *err_ptr != '\0') {
+			err_ptr++;
+		}
+		*err_ptr = '\0';
+		exit_error(gettext("Unknown audit flags and/or prefixes "
+		    "encountered: %s"), err);
 	}
 }
 
@@ -2063,47 +2326,6 @@ arg_ent_compare(const void *aep1, const void *aep2)
 }
 
 /*
- * Convert mask of the following forms:
- *
- *    audit_flags (ie. +lo,-ad,pc)
- *    0xffffffff,0xffffffff
- *    ffffffff,ffffffff
- *    20,20
- */
-static void
-str2mask(char *mask_str, au_mask_t *mp)
-{
-
-	char sp[256];
-	char fp[256];
-
-	mp->am_success = 0;
-	mp->am_failure = 0;
-
-	/*
-	 * a mask of the form +aa,bb,cc,-dd or
-	 * a mask of the form 0xffffffff,0xffffffff or 1,1
-	 */
-	if (strisflags(mask_str)) {
-		egetauditflagsbin(mask_str, mp);
-	} else {
-		strsplit(mask_str, sp, fp, ',');
-
-		if (strlen(sp) > (size_t)2 && !strncasecmp(sp, "0x", 2)) {
-			(void) sscanf(sp + 2, "%x", &mp->am_success);
-		} else {
-			(void) sscanf(sp, "%u", &mp->am_success);
-		}
-
-		if (strlen(fp) > (size_t)2 && !strncasecmp(fp, "0x", 2)) {
-			(void) sscanf(fp + 2, "%x", &mp->am_failure);
-		} else {
-			(void) sscanf(fp, "%u", &mp->am_failure);
-		}
-	}
-}
-
-/*
  * tid_str is major,minor,host  -- host is a name or an ip address
  */
 static void
@@ -2189,7 +2411,7 @@ cond2str(void)
 {
 	uint_t cond;
 
-	eauditon(A_GETCOND, (caddr_t)&cond, (int)sizeof (cond));
+	eauditon(A_GETCOND, (caddr_t)&cond, sizeof (cond));
 
 	switch (cond) {
 
@@ -2363,21 +2585,6 @@ strisnum(char *s)
 }
 
 static int
-strisflags(char *s)
-{
-	if (s == NULL || !*s)
-		return (0);
-
-	for (; *s; s++) {
-		if (!isalpha(*s) &&
-		    (*s != '+' && *s != '-' && *s != '^' && *s != ','))
-			return (0);
-	}
-
-	return (1);
-}
-
-static int
 strisipaddr(char *s)
 {
 	int dot = 0;
@@ -2406,18 +2613,12 @@ strisipaddr(char *s)
 }
 
 static void
-strsplit(char *s, char *p1, char *p2, char c)
+chk_arg_len(char *argv, uint_t len)
 {
-	*p1 = *p2 = '\0';
-
-	while (*s != '\0' && *s != c)
-		*p1++ = *s++;
-	*p1 = '\0';
-	s++;
-
-	while (*s != '\0')
-		*p2++ = *s++;
-	*p2 = '\0';
+	if ((strlen(argv) + 1) > len) {
+		*(argv + len - 1) = '\0';
+		exit_error(gettext("Argument too long (%s..)."), argv);
+	}
 }
 
 static void
@@ -2463,6 +2664,19 @@ chk_event_str(int etype, char *event_str)
 		    "Invalid user audit event string specified.\n"
 		    "\t\"%s\" appears to be a kernel event. "
 		    "Check configuration."), event_str);
+	}
+}
+
+static void
+chk_known_plugin(char *plugin_str)
+{
+	if ((strlen(plugin_str) + 1) > PLUGIN_MAXBUF) {
+		exit_error(gettext("Plugin name too long.\n"));
+	}
+
+	if (!plugin_avail_scf(plugin_str)) {
+		exit_error(gettext("No such plugin configured: %s"),
+		    plugin_str);
 	}
 }
 
@@ -2566,6 +2780,48 @@ print_mask(char *desc, au_mask_t *pmp)
 
 	(void) printf("%s = %s(0x%x,0x%x)\n",
 	    desc, auflags, pmp->am_success, pmp->am_failure);
+}
+
+static void
+print_plugin(char *plugin_name, kva_t *plugin_kva)
+{
+	char		att_str[PLUGIN_MAXATT];
+	boolean_t	plugin_active;
+	char		*active_str;
+	char		*qsize_ptr;
+	int		qsize;
+
+	if ((active_str = kva_match(plugin_kva, "active")) == NULL) {
+		(void) printf(gettext("Audit service configuration error: "
+		    "\"active\" property not found\n"));
+		return;
+	}
+
+	plugin_active = (boolean_t)atoi(active_str);
+	qsize_ptr = kva_match(plugin_kva, "qsize");
+	qsize = atoi(qsize_ptr == NULL ? "-1" : qsize_ptr);
+
+	(void) printf(gettext("Plugin: %s (%s)\n"), plugin_name,
+	    plugin_active ? "active" : "inactive");
+
+	free_static_att_kva(plugin_kva);
+
+	switch (_kva2str(plugin_kva, att_str, PLUGIN_MAXATT, "=", ";")) {
+	case 0:
+		(void) printf(gettext("\tAttributes: %s\n"), att_str);
+		break;
+	case 1:
+		exit_error(gettext("Internal error - buffer size too small."));
+		break;
+	default:
+		exit_error(gettext("Internal error."));
+		break;
+	}
+
+	if (qsize != 0) {
+		(void) printf(gettext("\tQueue size: %d %s\n"), qsize,
+		    qsize == -1 ? "(internal error: value not available)" : "");
+	}
 }
 
 static void

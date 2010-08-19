@@ -41,11 +41,8 @@ file path=lib/$(ARCH64)/liba5k.so.2
 file path=lib/$(ARCH64)/libg_fc.so.2
 file path=lib/liba5k.so.2
 file path=lib/libg_fc.so.2
-legacy pkg=SUNWluxopr arch=$(ARCH) category=system \
-    desc="Sun Enterprise Network Array libraries" \
-    hotline="Please contact your local service provider" \
-    name="Sun Enterprise Network Array libraries" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWluxopr desc="Sun Enterprise Network Array libraries" \
+    name="Sun Enterprise Network Array libraries"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=lib/$(ARCH64)/liba5k.so target=liba5k.so.2

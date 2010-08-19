@@ -849,7 +849,6 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	pmcs_smp_release(iport);
 	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
-
 	if (result) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
 
@@ -3976,6 +3975,8 @@ pmcs_check_expander(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 				ctmp->atdt = local->atdt;
 				ctmp->link_rate = local->link_rate;
 				ctmp->pend_dtype = local->dtype;
+				ctmp->att_port_pm_tmp = local->att_port_pm_tmp;
+				ctmp->tgt_port_pm_tmp = local->tgt_port_pm_tmp;
 			}
 		}
 
@@ -4221,7 +4222,18 @@ again:
 	pmcs_smp_release(iport);
 	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
-
+	if (result) {
+		pmcs_timed_out(pwp, htag, __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+		    "%s: Issuing SMP ABORT for htag 0x%08x", __func__, htag);
+		if (pmcs_abort(pwp, pptr, htag, 0, 1)) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+			    "%s: SMP ABORT failed for cmd (htag 0x%08x)",
+			    __func__, htag);
+		}
+		result = 0;
+		goto out;
+	}
 
 	mutex_enter(&pwp->config_lock);
 	if (pwp->config_changed) {
@@ -4232,22 +4244,6 @@ again:
 	}
 	mutex_exit(&pwp->config_lock);
 
-	if (result) {
-		pmcs_timed_out(pwp, htag, __func__);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-		    "%s: Issuing SMP ABORT for htag 0x%08x", __func__, htag);
-		if (pmcs_abort(pwp, pptr, htag, 0, 0)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-			    "%s: Unable to issue SMP ABORT for htag 0x%08x",
-			    __func__, htag);
-		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-			    "%s: Issuing SMP ABORT for htag 0x%08x",
-			    __func__, htag);
-		}
-		result = 0;
-		goto out;
-	}
 	ptr = (void *)pwp->scratch;
 	status = LE_32(ptr[2]);
 	if (status == PMCOUT_STATUS_UNDERFLOW ||
@@ -4460,6 +4456,17 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	pmcs_smp_release(iport);
 	pmcs_rele_iport(iport);
 	pmcs_lock_phy(expander);
+	if (result) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+		    "%s: Issuing SMP ABORT for htag 0x%08x", __func__, htag);
+		if (pmcs_abort(pwp, pptr, htag, 0, 1)) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
+			    "%s: SMP ABORT failed for cmd (htag 0x%08x)",
+			    __func__, htag);
+		}
+		result = -ETIMEDOUT;
+		goto out;
+	}
 
 	mutex_enter(&pwp->config_lock);
 	if (pwp->config_changed) {
@@ -4468,22 +4475,8 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 		result = 0;
 		goto out;
 	}
-	mutex_exit(&pwp->config_lock);
 
-	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
-		if (pmcs_abort(pwp, expander, htag, 0, 0)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-			    "%s: Unable to issue SMP ABORT for htag 0x%08x",
-			    __func__, htag);
-		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
-			    "%s: Issuing SMP ABORT for htag 0x%08x",
-			    __func__, htag);
-		}
-		result = -ETIMEDOUT;
-		goto out;
-	}
+	mutex_exit(&pwp->config_lock);
 	ptr = (void *)pwp->scratch;
 	/*
 	 * Point roff to the DMA offset for returned data
@@ -4764,6 +4757,7 @@ pmcs_gwork(pmcs_hw_t *pwp, uint32_t tag_type, pmcs_phy_t *phyp)
 	p->state = PMCS_WORK_STATE_READY;
 	p->ssp_event = 0;
 	p->dead = 0;
+	p->timer = 0;
 
 	if (phyp) {
 		p->phy = phyp;
@@ -4802,6 +4796,8 @@ pmcs_pwork(pmcs_hw_t *pwp, pmcwork_t *p)
 	p->phy = NULL;
 	p->abt_htag = 0;
 	p->timer = 0;
+	p->onwire = 0;
+	p->ssp_event = 0;
 	mutex_exit(&p->lock);
 
 	if (mutex_tryenter(&pwp->wfree_lock) == 0) {
@@ -6749,7 +6745,6 @@ pmcs_check_iomb_status(pmcs_hw_t *pwp, uint32_t *iomb)
 	case PMCOUT_SATA_EVENT:
 	case PMCOUT_SSP_EVENT:
 	case PMCOUT_DEVICE_HANDLE_ARRIVED:
-	case PMCOUT_SMP_REQUEST_RECEIVED:
 	case PMCOUT_GPIO:
 	case PMCOUT_GPIO_EVENT:
 	case PMCOUT_GET_TIME_STAMP:
@@ -6823,14 +6818,6 @@ pmcs_clear_xp(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp, "%s: Device 0x%p is gone.",
 	    __func__, (void *)xp);
 
-	/*
-	 * Clear the dip now.  This keeps pmcs_remove_device from attempting
-	 * to call us on the same device while we're still flushing queues.
-	 * The only side effect is we can no longer update SM-HBA properties,
-	 * but this device is going away anyway, so no matter.
-	 */
-	xp->dip = NULL;
-	xp->smpd = NULL;
 	xp->special_running = 0;
 	xp->recovering = 0;
 	xp->recover_wait = 0;
@@ -7586,6 +7573,7 @@ pmcs_clone_phy(pmcs_phy_t *orig_phy)
 	 */
 	local->sibling = NULL;
 	local->children = NULL;
+	local->target = NULL;
 	mutex_init(&local->phy_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(orig_phy->pwp->intr_pri));
 

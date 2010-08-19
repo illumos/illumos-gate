@@ -720,9 +720,13 @@ exacct_commit_task(void *arg)
 
 	/*
 	 * Don't do any extra work if the acctctl module isn't loaded.
+	 * If acctctl module is loaded when zone is in down state then
+	 * zone_getspecific can return NULL for that zone.
 	 */
 	if (exacct_zone_key != ZONE_KEY_UNINITIALIZED) {
 		acg = zone_getspecific(exacct_zone_key, zone);
+		if (acg == NULL)
+			goto err;
 		(void) exacct_assemble_task_usage(&acg->ac_task, tk,
 		    exacct_commit_callback, NULL, 0, &size, EW_FINAL);
 		if (tk->tk_zone != global_zone) {
@@ -734,6 +738,7 @@ exacct_commit_task(void *arg)
 	/*
 	 * Release associated project and finalize task.
 	 */
+err:
 	task_end(tk);
 }
 
@@ -1151,7 +1156,14 @@ exacct_commit_proc(proc_t *p, int wstat)
 		 */
 		return;
 	}
+
+	/*
+	 * If acctctl module is loaded when zone is in down state then
+	 * zone_getspecific can return NULL for that zone.
+	 */
 	acg = zone_getspecific(exacct_zone_key, zone);
+	if (acg == NULL)
+		return;
 	exacct_do_commit_proc(&acg->ac_proc, p, wstat);
 	if (zone != global_zone) {
 		gacg = zone_getspecific(exacct_zone_key, global_zone);

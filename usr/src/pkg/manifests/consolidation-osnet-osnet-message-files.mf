@@ -72,9 +72,7 @@ dir path=usr/share/lib/locale/com/sun/dhcpmgr/data
 dir path=usr/share/lib/locale/com/sun/dhcpmgr/ui
 dir path=usr/share/lib/locale/com/sun/slp
 file path=usr/lib/help/auths/locale/AllSolAuthsHeader.html
-file path=usr/lib/help/auths/locale/AuditConfig.html
 file path=usr/lib/help/auths/locale/AuditHeader.html
-file path=usr/lib/help/auths/locale/AuditRead.html
 file path=usr/lib/help/auths/locale/AuthJobsAdmin.html
 file path=usr/lib/help/auths/locale/AuthJobsUser.html
 file path=usr/lib/help/auths/locale/AuthProfmgrAssign.html
@@ -138,6 +136,7 @@ file path=usr/lib/help/auths/locale/PrintPs.html
 file path=usr/lib/help/auths/locale/PrintUnlabeled.html
 file path=usr/lib/help/auths/locale/ProfmgrHeader.html
 file path=usr/lib/help/auths/locale/RoleHeader.html
+file path=usr/lib/help/auths/locale/SmfAllocate.html
 file path=usr/lib/help/auths/locale/SmfAutofsStates.html
 file path=usr/lib/help/auths/locale/SmfCoreadmStates.html
 file path=usr/lib/help/auths/locale/SmfCronStates.html
@@ -152,6 +151,7 @@ file path=usr/lib/help/auths/locale/SmfIdmapStates.html
 file path=usr/lib/help/auths/locale/SmfInetdStates.html
 file path=usr/lib/help/auths/locale/SmfLocationStates.html
 file path=usr/lib/help/auths/locale/SmfMDNSStates.html
+file path=usr/lib/help/auths/locale/SmfManageAudit.html
 file path=usr/lib/help/auths/locale/SmfManageHeader.html
 file path=usr/lib/help/auths/locale/SmfManageHotplug.html
 file path=usr/lib/help/auths/locale/SmfManageZFSSnap.html
@@ -173,6 +173,7 @@ file path=usr/lib/help/auths/locale/SmfSendmailStates.html
 file path=usr/lib/help/auths/locale/SmfSshStates.html
 file path=usr/lib/help/auths/locale/SmfSyslogStates.html
 file path=usr/lib/help/auths/locale/SmfVRRPStates.html
+file path=usr/lib/help/auths/locale/SmfValueAudit.html
 file path=usr/lib/help/auths/locale/SmfValueCoreadm.html
 file path=usr/lib/help/auths/locale/SmfValueExAcctFlow.html
 file path=usr/lib/help/auths/locale/SmfValueExAcctNet.html
@@ -217,6 +218,7 @@ file path=usr/lib/help/auths/locale/ZoneLogin.html
 file path=usr/lib/help/auths/locale/ZoneManage.html
 file path=usr/lib/help/profiles/locale/RtAcctadm.html
 file path=usr/lib/help/profiles/locale/RtAll.html
+file path=usr/lib/help/profiles/locale/RtAuditCfg.html
 file path=usr/lib/help/profiles/locale/RtAuditCtrl.html
 file path=usr/lib/help/profiles/locale/RtAuditReview.html
 file path=usr/lib/help/profiles/locale/RtCPUPowerManagement.html
@@ -294,6 +296,7 @@ file path=usr/lib/help/profiles/locale/RtZoneSecurity.html
 file path=usr/lib/locale/C/LC_MESSAGES/AMD.po
 file path=usr/lib/locale/C/LC_MESSAGES/DISK.po
 file path=usr/lib/locale/C/LC_MESSAGES/FMD.po
+file path=usr/lib/locale/C/LC_MESSAGES/FMNOTIFY.po
 file path=usr/lib/locale/C/LC_MESSAGES/GMCA.po
 file path=usr/lib/locale/C/LC_MESSAGES/INTEL.po
 file path=usr/lib/locale/C/LC_MESSAGES/NXGE.po
@@ -303,6 +306,7 @@ file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.po
 file path=usr/lib/locale/C/LC_MESSAGES/SCA500.po
 file path=usr/lib/locale/C/LC_MESSAGES/SCF.po
 file path=usr/lib/locale/C/LC_MESSAGES/SENSOR.po
+file path=usr/lib/locale/C/LC_MESSAGES/SMF.po
 file path=usr/lib/locale/C/LC_MESSAGES/STORAGE.po
 file path=usr/lib/locale/C/LC_MESSAGES/SUN4.po
 file path=usr/lib/locale/C/LC_MESSAGES/SUN4U.po
@@ -442,10 +446,8 @@ file path=usr/share/lib/locale/com/sun/dhcpmgr/data/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/dhcpmgr/ui/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/slp/ClientLib_en.properties group=sys
 file path=usr/share/lib/locale/com/sun/slp/Server_en.properties group=sys
-legacy pkg=SUNW0on arch=all category=system \
+legacy pkg=SUNW0on arch=all \
     desc="localizable message files for the OS-Networking consolidation" \
-    hotline="Please contact your local service provider" \
-    name="Localizable ON message files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.10
+    name="Localizable ON message files" version=11.11,REV=2009.11.10
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

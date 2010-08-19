@@ -63,9 +63,7 @@ file path=usr/include/sys/usb/usbdevs.h
 file path=usr/include/sys/uwb/uwb.h
 file path=usr/include/sys/uwb/uwba/uwba.h
 file path=usr/include/sys/uwb/uwbai.h
-legacy pkg=SUNWusbu arch=$(ARCH) category=system desc="USB Headers" \
-    hotline="Please contact your local service provider" name="USB Headers" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWusbu desc="USB Headers" name="USB Headers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers

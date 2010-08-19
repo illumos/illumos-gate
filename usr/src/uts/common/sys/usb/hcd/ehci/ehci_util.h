@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_USB_EHCI_UTIL_H
@@ -102,6 +101,7 @@ extern int	ehci_wait_for_sof(
 				ehci_state_t		*ehcip);
 extern void	ehci_toggle_scheduler(
 				ehci_state_t		*ehcip);
+extern void	ehci_toggle_scheduler_on_pipe(ehci_state_t *ehcip);
 
 extern void	ehci_print_caps(ehci_state_t 		*ehcip);
 extern void	ehci_print_regs(ehci_state_t 		*ehcip);

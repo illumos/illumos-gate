@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -144,6 +143,23 @@ struct help_message help_messages[] = {
 "instance.  If the repository subcommand has not been used to select\n"
 "a repository, inform the instance's restarter to re-read the updated\n"
 "configuration."
+	},
+	{ SCC_DELNOTIFY, "delnotify <[-g] tset | class>\n\n"
+"Delete the existing notification parameters for the specified class or\n"
+"transition set. If the -g option is used, the notification parameters in\n"
+"svc:/system/svc/global:default are deleted.\n"
+	},
+	{ SCC_LISTNOTIFY, "listnotify <[-g] tset | class>\n\n"
+"Display the existing notification parameters for the specified class or\n"
+"transition set. If the -g option is used, the notification parameters in\n"
+"svc:/system/svc/global:default are displayed.\n"
+	},
+	{ SCC_SETNOTIFY,
+"setnotify {[-g] tset | class} <notification parameters> ...\n\n"
+"Set notification parameters for the specified class or transition set.\n"
+"If the -g option is used, the notification parameters are set in\n"
+"svc:/system/svc/global:default.\n"
+"This command overwrites existing notification parameters."
 	},
 	{ 0, NULL }
 };

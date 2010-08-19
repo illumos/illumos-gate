@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1475,7 +1475,7 @@ ire_recv_broadcast_v4(ire_t *ire, mblk_t *mp, void *iph_arg,
 		goto done;
 	}
 
-	ip_forward_xmit_v4(nce, ill, mp, ipha, ira, dst_ill->ill_mtu, 0);
+	ip_forward_xmit_v4(nce, ill, mp, ipha, ira, dst_ill->ill_mc_mtu, 0);
 	nce_refrele(nce);
 done:
 	/* Restore */

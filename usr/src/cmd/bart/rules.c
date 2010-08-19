@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <dirent.h>
 #include <fnmatch.h>
@@ -53,52 +51,58 @@ static struct rule	*first_rule = NULL, *current_rule = NULL;
  * catalog the C files (based upon pattern matching) in the subtree
  * '/home/nickiso'.
  *
- * Return non-zero if it should be excluded, 0 if it should be cataloged.
+ * exclude_fname depends on having the modifiers be pre-sorted to put
+ * negative directory modifiers first, so that the logic does
+ * not need to save complex state information.  This is valid because
+ * we are only cataloging things that meet all modifiers (AND logic.)
+ *
+ * Returns:
+ * NO_EXCLUDE
+ * EXCLUDE_SKIP
+ * EXCLUDE_PRUNE
  */
 int
 exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 {
-	char	*pattern, *ptr, *fname_ptr, fname_cp[PATH_MAX],
-		pattern_cp[PATH_MAX], saved_char;
-	int	match, num_pattern_slash, num_fname_slash, i, slashes_to_adv,
-		ret_val = 0;
+	char	*pattern, *ptr, *fname_ptr, saved_char;
+	char 	fname_cp[PATH_MAX], pattern_cp[PATH_MAX];
+	int	num_pattern_slash,  i, num_fname_slash, slashes_to_adv;
 	struct  tree_modifier   *mod_ptr;
-	boolean_t		dir_flag;
 
 	/*
-	 * For a given entry in the rules struct, the modifiers, e.g., '*.c',
-	 * are kept in a linked list.  Get a ptr to the head of the list.
+	 * If this is create and there are no modifiers, bail.
+	 * This will have to change once create handles multiple rules
+	 * during walk.
 	 */
-	mod_ptr = rule_ptr->modifiers;
-
+	if (rule_ptr->modifiers == NULL)
+		if (rule_ptr->attr_list == 0)
+			return (EXCLUDE_PRUNE);
+		else
+			return (NO_EXCLUDE);
 	/*
 	 * Walk through all the modifiers until its they are exhausted OR
 	 * until the file should definitely be excluded.
 	 */
-	while ((mod_ptr != NULL) && !ret_val) {
-		/* First, see if we should be matching files or dirs */
-		if (mod_ptr->mod_str[(strlen(mod_ptr->mod_str)-1)] == '/')
-			dir_flag = B_TRUE;
-		else
-			dir_flag = B_FALSE;
-
-		if (mod_ptr->mod_str[0] == '!') {
-			pattern = (mod_ptr->mod_str + 1);
-		} else {
-			pattern = mod_ptr->mod_str;
-		}
-
-		if (dir_flag == B_FALSE) {
+	for (mod_ptr = rule_ptr->modifiers; mod_ptr != NULL;
+	    mod_ptr = mod_ptr->next) {
+		/* leading !'s were processed in add_modifier */
+		pattern = mod_ptr->mod_str;
+		if (mod_ptr->is_dir == B_FALSE) {
 			/*
+			 * Pattern is a file pattern.
+			 *
 			 * In the case when a user is trying to filter on
-			 * FILES and the entry is a directory, its excluded!
+			 * a file pattern and the entry is a directory,
+			 * this is not a match.
+			 *
+			 * If a match is required, skip this file.  If
+			 * a match is forbidden, keep looking at modifiers.
 			 */
 			if (fname_type == 'D') {
-				if (mod_ptr->include == B_FALSE)
-					ret_val = 0;
+				if (mod_ptr->include == B_TRUE)
+					return (EXCLUDE_SKIP);
 				else
-					ret_val = 1;
-				break;
+					continue;
 			}
 
 			/*
@@ -115,8 +119,8 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 
 			/* Check for trivial exclude condition */
 			if (num_pattern_slash > num_fname_slash) {
-				ret_val = 1;
-				break;
+				if (mod_ptr->include == B_TRUE)
+					return (EXCLUDE_SKIP);
 			}
 
 			/*
@@ -141,17 +145,21 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 			}
 
 
-			/* OK, now do the fnmatch() and set the return value */
-			match = fnmatch(pattern, ptr, FNM_PATHNAME);
-
-			if (match == 0)
-				ret_val = 0;
-			else
-				ret_val = 1;
-
+			/* OK, now do the fnmatch() compare to the file */
+			if (fnmatch(pattern, ptr, FNM_PATHNAME) == 0) {
+				/* matches, is it an exclude? */
+				if (mod_ptr->include == B_FALSE)
+					return (EXCLUDE_SKIP);
+			} else if (mod_ptr->include == B_TRUE) {
+				/* failed a required filename match */
+				return (EXCLUDE_SKIP);
+			}
 		} else {
 			/*
 			 * The rule requires directory matching.
+			 *
+			 * Unlike filename matching, directory matching can
+			 * prune.
 			 *
 			 * First, make copies, since both the pattern and
 			 * filename need to be modified.
@@ -175,7 +183,7 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 			    sizeof (pattern_cp));
 
 			/*
-			 * For non-directory entries, remove the trailing
+			 * For non-directory files, remove the trailing
 			 * name, e.g., for a file /A/B/C/D where 'D' is
 			 * the actual filename, remove the 'D' since it
 			 * should *not* be considered in the directory match.
@@ -185,14 +193,16 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 				if (ptr != NULL)
 					*ptr = '\0';
 
-				/* Trivial case: simple filename */
-				if (strlen(fname_cp) == 0) {
-					if (mod_ptr->include == B_FALSE)
-						ret_val = 0;
-					else
-						ret_val = 1;
-					break;
-				}
+				/*
+				 * Trivial case: a simple filename does
+				 * not match a directory by definition,
+				 * so skip if match is required,
+				 * keep analyzing otherwise.
+				 */
+
+				if (strlen(fname_cp) == 0)
+					if (mod_ptr->include == B_TRUE)
+						return (EXCLUDE_SKIP);
 			}
 
 			/* Count the # of slashes in the pattern and fname */
@@ -200,19 +210,14 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 			num_fname_slash = count_slashes(fname_cp);
 
 			/*
-			 * fname_cp is too short, bail!
+			 * fname_cp is too short if this is not a dir
 			 */
-			if (num_pattern_slash > num_fname_slash) {
-				if (mod_ptr->include == B_FALSE)
-					ret_val = 0;
-				else
-					ret_val = 1;
-
-				break;
+			if ((num_pattern_slash > num_fname_slash) &&
+			    (fname_type != 'D')) {
+				if (mod_ptr->include == B_TRUE)
+					return (EXCLUDE_SKIP);
 			}
 
-			/* set the return value before we enter the loop */
-			ret_val = 1;
 
 			/*
 			 * Take the leading '/' from fname_cp before
@@ -261,22 +266,24 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 				*ptr = '\0';
 
 				/*
-				 * Try to match the current component with the
-				 * pattern we are looking for.
+				 * Call compare function for the current
+				 * component with the pattern we are looking
+				 * for.
 				 */
-				match = fnmatch(pattern_cp, fname_cp,
-				    FNM_PATHNAME);
-
-				/*
-				 * If we matched, set ret_val and break.
-				 * No need to invert ret_val here as it is done
-				 * outside of this inner while loop.
-				 */
-				if (match == 0) {
-					ret_val = 0;
-					break;
+				if (fnmatch(pattern_cp, fname_cp,
+				    FNM_PATHNAME) == 0) {
+					if (mod_ptr->include == B_TRUE) {
+						break;
+					} else if (fname_type == 'D')
+						return (EXCLUDE_PRUNE);
+					else
+						return (EXCLUDE_SKIP);
+				} else if (mod_ptr->include == B_TRUE) {
+					if (fname_type == 'D')
+						return (EXCLUDE_PRUNE);
+					else
+						return (EXCLUDE_SKIP);
 				}
-
 				/*
 				 * We didn't match, so restore the saved
 				 * character to the original position.
@@ -297,7 +304,7 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 				 * compensate for the one removed above.
 				 */
 				num_fname_slash--;
-			}
+			} /* end while loop looking down the path */
 
 			/*
 			 * If we didn't get a match above then we may be on the
@@ -306,40 +313,29 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 			 *    - filename is A/B/C/D/E and pattern may be D/E/
 			 *    - filename is D/E and pattern may be D/E/
 			 */
-			if ((ret_val != 0) &&
-			    (num_pattern_slash == (num_fname_slash + 1))) {
+			if (num_pattern_slash == (num_fname_slash + 1)) {
 
 				/* strip the trailing slash from the pattern */
 				ptr = strrchr(pattern_cp, '/');
 				*ptr = '\0';
 
-				match = fnmatch(pattern_cp,
-				    fname_cp, FNM_PATHNAME);
-				if (match == 0) {
-					/*
-					 * No need to invert ret_val as it is
-					 * done below.
-					 */
-					ret_val = 0;
-				}
+				/* fnmatch returns 0 for a match */
+				if (fnmatch(pattern_cp, fname_cp,
+				    FNM_PATHNAME) == 0) {
+					if (mod_ptr->include == B_FALSE) {
+						if (fname_type == 'D')
+							return (EXCLUDE_PRUNE);
+						else
+							return (EXCLUDE_SKIP);
+					}
+				} else if (mod_ptr->include == B_TRUE)
+					return (EXCLUDE_SKIP);
+
 			}
-		}
 
-		/*
-		 * Take into account whether or not this rule began with
-		 * a '!'
-		 */
-		if (mod_ptr->include == B_FALSE) {
-			if (ret_val == 0)
-				ret_val = 1;
-			else ret_val = 0;
 		}
-
-		/* Advance to the next modifier */
-		mod_ptr = mod_ptr->next;
 	}
-
-	return (ret_val);
+	return (NO_EXCLUDE);
 }
 
 static int
@@ -551,26 +547,40 @@ read_rules(FILE *file, char *reloc_root, uint_t in_flags, int create)
 
 	return (ret_code);
 }
-
+/*
+ * Add a modifier to the mod_ptr list in each rule, putting negative
+ * directory entries
+ * first to guarantee walks will be appropriately pruned.
+ */
 static void
 add_modifier(struct rule *rule, char *modifier_str)
 {
+	int	include, is_dir;
+	char	*pattern;
 	struct tree_modifier	*new_mod_ptr, *curr_mod_ptr;
 	struct rule		*this_rule;
 
-	this_rule = rule;
-	while (this_rule != NULL) {
-		new_mod_ptr = gen_tree_modifier();
-		new_mod_ptr->mod_str = safe_strdup(modifier_str);
-		/* Next, see if the pattern is an include or an exclude */
-		if (new_mod_ptr->mod_str[0] == '!') {
-			new_mod_ptr->mod_str = (new_mod_ptr->mod_str + 1);
-			new_mod_ptr->include = B_FALSE;
-		} else {
-			new_mod_ptr->include = B_TRUE;
-		}
+	include = B_TRUE;
+	pattern = modifier_str;
 
-		if (this_rule->modifiers == NULL)
+	/* see if the pattern is an include or an exclude */
+	if (pattern[0] == '!') {
+		include = B_FALSE;
+		pattern++;
+	}
+
+	is_dir = (pattern[0] != '\0' && pattern[strlen(pattern) - 1] == '/');
+
+	for (this_rule = rule; this_rule != NULL; this_rule = this_rule->next) {
+		new_mod_ptr = gen_tree_modifier();
+		new_mod_ptr->include = include;
+		new_mod_ptr->is_dir = is_dir;
+		new_mod_ptr->mod_str = safe_strdup(pattern);
+
+		if (is_dir && !include) {
+			new_mod_ptr->next = this_rule->modifiers;
+			this_rule->modifiers = new_mod_ptr;
+		} else if (this_rule->modifiers == NULL)
 			this_rule->modifiers = new_mod_ptr;
 		else {
 			curr_mod_ptr = this_rule->modifiers;
@@ -579,7 +589,6 @@ add_modifier(struct rule *rule, char *modifier_str)
 
 			curr_mod_ptr->next = new_mod_ptr;
 		}
-		this_rule = this_rule->next;
 	}
 }
 
@@ -601,11 +610,11 @@ add_modifier(struct rule *rule, char *modifier_str)
 static struct rule *
 add_subtree_rule(char *rule, char *reloc_root, int create, int *err_code)
 {
-	char			full_path[PATH_MAX], pattern[PATH_MAX],
-				new_dirname[PATH_MAX], *beg_pattern,
-				*end_pattern, *curr_dirname;
-	struct	dir_component	*current_level = NULL, *next_level = NULL,
-				*tmp_ptr;
+	char			full_path[PATH_MAX], pattern[PATH_MAX];
+	char			new_dirname[PATH_MAX];
+	char			*beg_pattern, *end_pattern, *curr_dirname;
+	struct	dir_component	*current_level = NULL, *next_level = NULL;
+	struct	dir_component	*tmp_ptr;
 	DIR			*dir_ptr;
 	struct dirent		*dir_entry;
 	struct rule		*begin_rule = NULL;
@@ -693,7 +702,7 @@ add_subtree_rule(char *rule, char *reloc_root, int create, int *err_code)
 					 * examined on the next iteration.
 					 */
 					if (curr_dirname[strlen(curr_dirname)-1]
-									!= '/')
+					    != '/')
 						(void) snprintf(new_dirname,
 						    sizeof (new_dirname),
 						    "%s/%s", curr_dirname,
@@ -1006,7 +1015,7 @@ check_rules(const char *fname, char type)
 	root = get_last_entry(B_TRUE);
 	while (root != NULL) {
 		if (match_subtree(fname, root->subtree)) {
-			if (exclude_fname(fname, type, root) == 0)
+			if (exclude_fname(fname, type, root) == NO_EXCLUDE)
 				break;
 		}
 		root = get_last_entry(B_FALSE);

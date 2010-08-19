@@ -57,15 +57,9 @@ file path=kernel/misc/$(ARCH64)/idm group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/idm group=sys mode=0755
 file path=usr/lib/mdb/kvm/$(ARCH64)/idm.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/idm.so group=sys mode=0555
-legacy pkg=SUNWiscsidmr arch=$(ARCH) category=system \
-    desc="Sun iSCSI Data Mover (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Sun iSCSI Data Mover (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWiscsidmu arch=$(ARCH) category=system \
-    desc="Sun iSCSI Data Mover (Usr)" \
-    hotline="Please contact your local service provider" \
-    name="Sun iSCSI Data Mover (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWiscsidmr desc="Sun iSCSI Data Mover (Root)" \
+    name="Sun iSCSI Data Mover (Root)"
+legacy pkg=SUNWiscsidmu desc="Sun iSCSI Data Mover (Usr)" \
+    name="Sun iSCSI Data Mover (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

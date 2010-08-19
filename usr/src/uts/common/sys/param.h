@@ -384,6 +384,7 @@ extern const int _ncpu_p2;
 extern const int _clsize;
 #endif	/* defined(_KERNEL) && !defined(_ASM) */
 
+/* Any additions to these #defines must be reflected in mdb_param.h+mdb_ks.c */
 #define	PAGESIZE	_pagesize
 #define	PAGESHIFT	_pageshift
 #define	PAGEOFFSET	_pageoffset

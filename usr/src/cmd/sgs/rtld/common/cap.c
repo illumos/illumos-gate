@@ -652,7 +652,8 @@ cap_dir(Alist **fdalpp, Lm_list *lml, const char *dname, Rt_map *clmp,
 
 int
 cap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
-    Rt_map *flmp, const char *ref, int mode, uint_t flags, int *in_nfavl)
+    Rt_map *flmp, Rt_map *clmp, const char *ref, int mode, uint_t flags,
+    int *in_nfavl)
 {
 	Alist		*fdalp = NULL;
 	Aliste		idx;
@@ -729,7 +730,7 @@ cap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
 		 * Finish processing the objects associated with this request.
 		 */
 		if (nlmp && ghp && (((nlmp = analyze_lmc(lml, nlmco, nlmp,
-		    in_nfavl)) == NULL) ||
+		    clmp, in_nfavl)) == NULL) ||
 		    (relocate_lmc(lml, nlmco, flmp, nlmp, in_nfavl) == 0)))
 			nlmp = NULL;
 

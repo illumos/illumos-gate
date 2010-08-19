@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SYSEVENT_H
@@ -226,6 +225,8 @@ extern int sysevent_evc_unsubscribe(evchan_t *, const char *);
 extern int sysevent_evc_publish(evchan_t *, const char *, const char *,
     const char *, const char *, nvlist_t *, uint32_t);
 extern int sysevent_evc_control(evchan_t *, int, ...);
+extern int sysevent_evc_setpropnvl(evchan_t *, nvlist_t *);
+extern int sysevent_evc_getpropnvl(evchan_t *, nvlist_t **);
 
 #ifndef	_KERNEL
 

@@ -67,8 +67,6 @@ SYMBOL_VERSION SUNW_0.8 {
 	getauevent_r;
 	getauevnam_r;
 	getauevnum_r;
-	getauuserent_r;
-	getauusernam_r;
 } SUNW_0.7;
 
 SYMBOL_VERSION SUNW_0.7 {
@@ -96,14 +94,8 @@ SYMBOL_VERSION SUNW_0.7 {
 	au_to_text;
 	au_user_mask;
 	au_write;
-	endac;
 	endauclass;
 	endauevent;
-	endauuser;
-	getacdir;
-	getacflg;
-	getacmin;
-	getacna;
 	getauclassent;
 	getauclassnam;
 	getaudit;
@@ -114,15 +106,11 @@ SYMBOL_VERSION SUNW_0.7 {
 	getauevnonam;
 	getauevnum;
 	getauid;
-	getauuserent;
-	getauusernam;
 	getfauditflags;
-	setac;
 	setauclass;
 	setaudit;
 	setauevent;
 	setauid;
-	setauuser;
 };
 
 SYMBOL_VERSION SUNWprivate_1.1 {
@@ -302,18 +290,31 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	da_rm_list_entry;
 	da_update_defattrs;
 	da_update_device;
-	_endac;
+	do_getflags_scf;
+	do_getnaflags_scf;
+	do_getpluginconfig_scf;
+	do_getpolicy_scf;
+	do_getqbufsz_scf;
+	do_getqctrl_scf;
+	do_getqdelay_scf;
+	do_getqhiwater_scf;
+	do_getqlowater_scf;
+	do_setflags_scf;
+	do_setnaflags_scf;
+	do_setpluginconfig_scf;
+	do_setpolicy_scf;
+	do_setqbufsz_scf;
+	do_setqctrl_scf;
+	do_setqdelay_scf;
+	do_setqhiwater_scf;
+	do_setqlowater_scf;
 	enddadefent;
 	enddaent;
 	enddmapent;
 	freedadefent;
 	freedaent;
 	freedmapent;
-	_getacdir;
-	_getacflg;
-	_getacmin;
-	_getacna;
-	_getacplug;
+	free_static_att_kva;
 	getdadefent;
 	getdadeftype;
 	getdadmline;
@@ -327,9 +328,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	getdmapfield;
 	getdmapnam;
 	getdmaptype;
+	get_policy;
 	__logpost;
-	_openac;
-	_rewindac;
+	plugin_avail_scf;
+	plugin_kva_ll_free;
+	prt_error_va;
 	setdadefent;
 	setdaent;
 	setdafile;

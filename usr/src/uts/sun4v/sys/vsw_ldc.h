@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -205,6 +204,11 @@ typedef struct ver_sup {
  */
 #define	VSW_NUM_MBLKS	1024
 
+/*
+ * Number of rcv buffers in RxDringData mode
+ */
+#define	VSW_RXDRING_NRBUFS	(vsw_num_descriptors * vsw_nrbufs_factor)
+
 /* increment recv index */
 #define	INCR_DESC_INDEX(dp, i)	\
 		((i) = (((i) + 1) & ((dp)->num_descriptors - 1)))
@@ -267,6 +271,7 @@ typedef struct dring_info {
 	uint32_t		next_rxi;	/* next expected recv index */
 	kmutex_t		restart_lock;	/* protect restart_reqd */
 	boolean_t		restart_reqd;	/* send restart msg */
+	uint32_t		restart_peer_txi; /* index to restart peer */
 	void			*pub_addr;	/* base of public section */
 	void			*priv_addr;	/* base of private section */
 	void			*data_addr;	/* base of data section */

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -342,7 +341,7 @@ update_instance_states(instance_t *inst, internal_inst_state_t new_cur_state,
 	scf_instance_t		*scf_inst = NULL;
 	scf_error_t		sret;
 	int			ret;
-	char			*aux = "none";
+	restarter_str_t		aux = restarter_str_none;
 
 	/* update the repository/cached internal state */
 	inst->cur_istate = new_cur_state;
@@ -369,12 +368,12 @@ update_instance_states(instance_t *inst, internal_inst_state_t new_cur_state,
 		 */
 		if (new_cur_state == IIS_MAINTENANCE) {
 			if (restarter_inst_ractions_from_tty(scf_inst) == 0)
-				aux = "service_request";
+				aux = restarter_str_service_request;
 			else
-				aux = "administrative_request";
+				aux = restarter_str_administrative_request;
 		}
 
-		if (strcmp(aux, "service_request") == 0) {
+		if (aux == restarter_str_service_request) {
 			if (restarter_inst_validate_ractions_aux_fmri(
 			    scf_inst) == 0) {
 				if (restarter_inst_set_aux_fmri(scf_inst))

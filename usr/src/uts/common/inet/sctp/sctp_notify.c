@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -77,14 +76,14 @@ sctp_notify(sctp_t *sctp, mblk_t *emp, size_t len)
 	/*
 	 * Fill in primary remote address.
 	 */
-	if (IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
+	if (IN6_IS_ADDR_V4MAPPED(&fp->sf_faddr)) {
 		struct sockaddr_in *sin4;
 
 		tudi->SRC_length = sizeof (*sin4);
 		sin4 = (struct sockaddr_in *)(tudi + 1);
 		sin4->sin_family = AF_INET;
 		sin4->sin_port = connp->conn_fport;
-		IN6_V4MAPPED_TO_IPADDR(&fp->faddr, sin4->sin_addr.s_addr);
+		IN6_V4MAPPED_TO_IPADDR(&fp->sf_faddr, sin4->sin_addr.s_addr);
 		mp->b_wptr = (uchar_t *)(sin4 + 1);
 	} else {
 		struct sockaddr_in6 *sin6;
@@ -93,7 +92,7 @@ sctp_notify(sctp_t *sctp, mblk_t *emp, size_t len)
 		sin6 = (struct sockaddr_in6 *)(tudi + 1);
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_port = connp->conn_fport;
-		sin6->sin6_addr = fp->faddr;
+		sin6->sin6_addr = fp->sf_faddr;
 		mp->b_wptr = (uchar_t *)(sin6 + 1);
 	}
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -379,8 +378,7 @@ hermon_srq_alloc(hermon_state_t *state, hermon_srq_info_t *srqinfo,
 	 * Put SRQ handle in Hermon SRQNum-to-SRQhdl list.  Then fill in the
 	 * "srqhdl" and return success
 	 */
-	ASSERT(state->hs_srqhdl[srqc->hr_indx] == NULL);
-	state->hs_srqhdl[srqc->hr_indx] = srq;
+	hermon_icm_set_num_to_hdl(state, HERMON_SRQC, srqc->hr_indx, srq);
 
 	/*
 	 * If this is a user-mappable SRQ, then we need to insert the
@@ -518,7 +516,7 @@ hermon_srq_free(hermon_state_t *state, hermon_srqhdl_t *srqhdl,
 	 * in-progress events to detect that the SRQ corresponding to this
 	 * number has been freed.
 	 */
-	state->hs_srqhdl[srqc->hr_indx] = NULL;
+	hermon_icm_set_num_to_hdl(state, HERMON_SRQC, srqc->hr_indx, NULL);
 
 	mutex_exit(&srq->srq_lock);
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*srq));
@@ -757,10 +755,6 @@ hermon_srq_modify(hermon_state_t *state, hermon_srqhdl_t srq, uint_t size,
 	srq_old_bufsz = srq->srq_wq_bufsz;
 	bcopy(srq->srq_wq_buf, buf, srq_old_bufsz * wqesz);
 
-	/* Sync entire "new" SRQ for use by hardware (if necessary) */
-	(void) ddi_dma_sync(bind.bi_dmahdl, 0, new_srqinfo.qa_size,
-	    DDI_DMA_SYNC_FORDEV);
-
 	/*
 	 * Setup MPT information for use in the MODIFY_MPT command
 	 */
@@ -957,7 +951,7 @@ hermon_srqhdl_from_srqnum(hermon_state_t *state, uint_t srqnum)
 	/* Calculate the SRQ table index from the srqnum */
 	srqmask = (1 << state->hs_cfg_profile->cp_log_num_srq) - 1;
 	srqindx = srqnum & srqmask;
-	return (state->hs_srqhdl[srqindx]);
+	return (hermon_icm_num_to_hdl(state, HERMON_SRQC, srqindx));
 }
 
 

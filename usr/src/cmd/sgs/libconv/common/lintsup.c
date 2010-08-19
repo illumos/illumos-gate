@@ -18,16 +18,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
- * Supplimental definitions for lint that help us avoid
+ * Supplemental definitions for lint that help us avoid
  * options like `-x' that filter out things we want to
  * know about as well as things we don't.
  */
@@ -54,6 +53,7 @@
  */
 #define	LINTSUP_SUPPRESS_STRINGS
 #include "arch_msg.h"
+#include "audit_msg.h"
 #include "c_literal_msg.h"
 #include "cap_msg.h"
 #include "config_msg.h"
@@ -89,6 +89,7 @@ foo()
 #define	USE(name) (void) name((Msg)&_ ## name[0])
 
 	USE(_sgs_msg_libconv_arch);
+	USE(_sgs_msg_libconv_audit);
 	USE(_sgs_msg_libconv_c_literal);
 	USE(_sgs_msg_libconv_cap);
 	USE(_sgs_msg_libconv_config);

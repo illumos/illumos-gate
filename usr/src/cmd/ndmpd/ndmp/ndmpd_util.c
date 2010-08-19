@@ -1359,19 +1359,17 @@ ndmp_execute_cdb(ndmpd_session_t *session, char *adapter_name, int sid, int lun,
 		}
 
 		cmd.uscsi_buflen = request->datain_len;
-		cmd.uscsi_rqlen = sizeof (rq_buf);
-		cmd.uscsi_rqbuf = rq_buf;
 	} else if (request->flags == NDMP_SCSI_DATA_OUT) {
-		cmd.uscsi_flags = USCSI_WRITE;
+		cmd.uscsi_flags = USCSI_WRITE | USCSI_RQENABLE;
 		cmd.uscsi_bufaddr = request->dataout.dataout_val;
 		cmd.uscsi_buflen = request->dataout.dataout_len;
 	} else {
 		cmd.uscsi_flags = USCSI_RQENABLE;
 		cmd.uscsi_bufaddr = 0;
 		cmd.uscsi_buflen = 0;
-		cmd.uscsi_rqlen = sizeof (rq_buf);
-		cmd.uscsi_rqbuf = rq_buf;
 	}
+	cmd.uscsi_rqlen = sizeof (rq_buf);
+	cmd.uscsi_rqbuf = rq_buf;
 
 	cmd.uscsi_timeout = (request->timeout < 1000) ?
 	    1 : (request->timeout / 1000);
@@ -2125,11 +2123,18 @@ ndmp_create_socket(ulong_t *addr, ushort_t *port)
 	int sd;
 	struct sockaddr_in sin;
 
+	/* Try the user's prefered NIC IP address */
 	p = ndmpd_get_prop(NDMP_MOVER_NIC);
 
+	/* Try host's IP address */
 	if (!p || *p == 0)
 		p = gethostaddr();
 
+	/* Try default NIC's IP address (if DNS failed) */
+	if (!p)
+		p = get_default_nic_addr();
+
+	/* Fail if no IP can be obtained */
 	if (!p) {
 		NDMP_LOG(LOG_ERR, "Undetermined network port.");
 		return (-1);

@@ -93,6 +93,7 @@ typedef uint32_t ipaddr_t;
 #define	IP_ABITS		32
 #define	IPV4_ABITS		IP_ABITS
 #define	IPV6_ABITS		128
+#define	IP_MAX_HW_LEN	40
 
 #define	IP_HOST_MASK		(ipaddr_t)0xffffffffU
 
@@ -1272,6 +1273,18 @@ typedef struct irb {
 	ip_stack_t	*irb_ipst;	/* Does not have a netstack_hold */
 } irb_t;
 
+/*
+ * This is the structure used to store the multicast physical addresses
+ * that an interface has joined.
+ * The refcnt keeps track of the number of multicast IP addresses mapping
+ * to a physical multicast address.
+ */
+typedef struct multiphysaddr_s {
+	struct	multiphysaddr_s  *mpa_next;
+	char	mpa_addr[IP_MAX_HW_LEN];
+	int	mpa_refcnt;
+} multiphysaddr_t;
+
 #define	IRB2RT(irb)	(rt_t *)((caddr_t)(irb) - offsetof(rt_t, rt_irb))
 
 /* Forward declarations */
@@ -1493,6 +1506,7 @@ typedef struct ill_lso_capab_s ill_lso_capab_t;
  *	ig_cast_ill		ipsq or ipmp_lock	ipsq and ipmp_lock
  *	ig_arpent		ipsq			ipsq
  *	ig_mtu			ipsq			ipsq
+ *	ig_mc_mtu		ipsq			ipsq
  */
 typedef struct ipmp_illgrp_s {
 	list_t		ig_if; 		/* list of all interfaces */
@@ -1502,7 +1516,8 @@ typedef struct ipmp_illgrp_s {
 	struct ill_s	*ig_ipmp_ill;	/* backpointer to IPMP meta-interface */
 	struct ill_s	*ig_cast_ill;	/* nominated ill for multi/broadcast */
 	list_t		ig_arpent;	/* list of ARP entries */
-	uint_t		ig_mtu;		/* ig_ipmp_ill->ill_max_mtu */
+	uint_t		ig_mtu;		/* ig_ipmp_ill->ill_mtu */
+	uint_t		ig_mc_mtu;	/* ig_ipmp_ill->ill_mc_mtu */
 } ipmp_illgrp_t;
 
 /*
@@ -1598,6 +1613,7 @@ typedef struct ill_s {
 	uint_t	ill_max_frag;		/* Max IDU from DLPI. */
 	uint_t	ill_current_frag;	/* Current IDU from DLPI. */
 	uint_t	ill_mtu;		/* User-specified MTU; SIOCSLIFMTU */
+	uint_t	ill_mc_mtu;		/* MTU for multi/broadcast */
 	uint_t	ill_metric;		/* BSD if metric, for compatibility. */
 	char	*ill_name;		/* Our name. */
 	uint_t	ill_ipif_dup_count;	/* Number of duplicate addresses. */
@@ -1803,6 +1819,9 @@ typedef struct ill_s {
 	uint32_t	ill_mrouter_cnt; /* mrouter allmulti joins */
 	uint32_t	ill_allowed_ips_cnt;
 	in6_addr_t	*ill_allowed_ips;
+
+	/* list of multicast physical addresses joined on this ill */
+	multiphysaddr_t *ill_mphysaddr_list;
 } ill_t;
 
 /*
@@ -1889,6 +1908,7 @@ typedef struct ill_s {
  * ill_max_hops			ipsq			Not atomic
  *
  * ill_mtu			ill_lock		None
+ * ill_mc_mtu			ill_lock		None
  *
  * ill_user_mtu			ipsq + ill_lock		ill_lock
  * ill_reachable_time		ipsq + ill_lock		ill_lock
@@ -1943,6 +1963,7 @@ typedef struct ill_s {
  * ill_grp (for underlying ill)	ipsq + ill_g_lock	ipsq OR ill_g_lock
  * ill_grp_pending		ill_mcast_serializer	ill_mcast_serializer
  * ill_mrouter_cnt		atomics			atomics
+ * ill_mphysaddr_list	ill_lock		ill_lock
  *
  * NOTE: It's OK to make heuristic decisions on an underlying interface
  *	 by using IS_UNDER_IPMP() or comparing ill_grp's raw pointer value.
@@ -3172,6 +3193,7 @@ extern void	ill_nic_event_dispatch(ill_t *, lif_if_t, nic_event_t,
 extern mblk_t	*ip_carve_mp(mblk_t **, ssize_t);
 extern mblk_t	*ip_dlpi_alloc(size_t, t_uscalar_t);
 extern mblk_t	*ip_dlnotify_alloc(uint_t, uint_t);
+extern mblk_t	*ip_dlnotify_alloc2(uint_t, uint_t, uint_t);
 extern char	*ip_dot_addr(ipaddr_t, char *);
 extern const char *mac_colon_addr(const uint8_t *, size_t, char *, size_t);
 extern void	ip_lwput(queue_t *, mblk_t *);
@@ -3425,7 +3447,7 @@ extern uint8_t	ipoptp_next(ipoptp_t *);
 extern uint8_t	ipoptp_first(ipoptp_t *, ipha_t *);
 extern int	ip_opt_get_user(conn_t *, uchar_t *);
 extern int	ipsec_req_from_conn(conn_t *, ipsec_req_t *, int);
-extern int	ip_snmp_get(queue_t *q, mblk_t *mctl, int level);
+extern int	ip_snmp_get(queue_t *q, mblk_t *mctl, int level, boolean_t);
 extern int	ip_snmp_set(queue_t *q, int, int, uchar_t *, int);
 extern void	ip_process_ioctl(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_quiesce_conn(conn_t *);

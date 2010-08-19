@@ -130,7 +130,6 @@ void mont_mulf_noconv(uint32_t *result, double *dm1, double *dm2, double *dt,
 extern BIGNUM big_One;
 extern BIGNUM big_Two;
 
-
 void printbignum(char *aname, BIGNUM *a);
 
 BIG_ERR_CODE big_init(BIGNUM *number, int size);
@@ -173,6 +172,11 @@ BIG_ERR_CODE big_mont_mul(BIGNUM *ret,
 int big_is_zero(BIGNUM *n);
 BIG_CHUNK_TYPE big_n0(BIG_CHUNK_TYPE n);
 
+
+/*
+ * Kernel bignum module: module integrity test
+ */
+extern int	bignum_fips_check(void);
 
 #if defined(HWCAP)
 

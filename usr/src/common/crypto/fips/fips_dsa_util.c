@@ -93,9 +93,13 @@ static uint8_t dsa_G[] = {
 /*
  * DSA Known Random Values (known random key block is 160-bits)
  * and (known random signature block is 160-bits).
+ * Note: known random key block must be numerically smaller than
+ * dsa_Q even after bignum_random() turns on the MSB.
  */
 static uint8_t dsa_known_random_key_block[] = {
-	"This is DSA RNG key!"
+	0x91, 0x22, 0x59, 0xdf, 0xe5, 0xec, 0x4c, 0x6e,
+	0xf9, 0x43, 0xf0, 0x4b, 0x2d, 0x50, 0x51, 0xc6,
+	0x91, 0x99, 0x8b, 0xcf
 };
 
 static uint8_t dsa_known_random_signature_block[] = {
@@ -160,19 +164,13 @@ fips_dsa_digest_sign(DSAbytekey *bkey,
 	if (sha1_context == NULL)
 		return (CKR_HOST_MEMORY);
 
+	/* hash the message: context is freed by the function */
 	rv = fips_sha1_hash(sha1_context, in, inlen, sha1_computed_digest);
 	if (rv != CKR_OK)
-		goto clean1;
+		return (rv);
 
-	rv = dsa_sign(bkey, sha1_computed_digest, FIPS_DSA_DIGEST_LENGTH, out);
-
-clean1:
-#ifdef _KERNEL
-	kmem_free(sha1_context, sizeof (SHA1_CTX));
-#else
-	free(sha1_context);
-#endif
-	return (rv);
+	return (dsa_sign(bkey, sha1_computed_digest,
+	    FIPS_DSA_DIGEST_LENGTH, out));
 }
 
 int
@@ -186,20 +184,13 @@ fips_dsa_verify(DSAbytekey *bkey, uint8_t *data, uint8_t *sig)
 	if (sha1_context == NULL)
 		return (CKR_HOST_MEMORY);
 
+	/* hash the message: context is freed by the function */
 	rv = fips_sha1_hash(sha1_context, data, FIPS_DSA_DIGEST_LENGTH,
 	    sha1_computed_digest);
 	if (rv != CKR_OK)
-		goto clean1;
+		return (rv);
 
-	rv = dsa_verify(bkey, sha1_computed_digest, sig);
-
-clean1:
-#ifdef _KERNEL
-	kmem_free(sha1_context, sizeof (SHA1_CTX));
-#else
-	free(sha1_context);
-#endif
-	return (rv);
+	return (dsa_verify(bkey, sha1_computed_digest, sig));
 }
 
 /*
@@ -211,6 +202,8 @@ fips_dsa_post(void)
 	DSAbytekey dsa_params;
 	CK_RV rv;
 	uint8_t dsa_computed_signature[FIPS_DSA_SIGNATURE_LENGTH];
+	uint8_t pubvalue[FIPS_DSA_PRIME_LENGTH];
+	uint8_t	privalue[FIPS_DSA_SUBPRIME_LENGTH];
 
 	/*
 	 * Generate a DSA public/private key pair.
@@ -221,6 +214,12 @@ fips_dsa_post(void)
 	dsa_params.subprime_bits = CRYPTO_BYTES2BITS(FIPS_DSA_SUBPRIME_LENGTH);
 	dsa_params.base = dsa_G;
 	dsa_params.base_bytes = FIPS_DSA_BASE_LENGTH;
+
+	/* Output from DSA key pair generation */
+	dsa_params.private_x = privalue;
+	dsa_params.private_x_bits = CRYPTO_BYTES2BITS(sizeof (privalue));
+	dsa_params.public_y = pubvalue;
+	dsa_params.public_y_bits = CRYPTO_BYTES2BITS(sizeof (pubvalue));
 
 	dsa_params.rfunc = fips_dsa_random_func;
 

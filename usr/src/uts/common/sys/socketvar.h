@@ -300,7 +300,7 @@ struct sonode {
 #define	SS_FILOP_OK		0x00040000 /* socket can attach filters */
 #define	SS_FIL_RCV_FLOWCTRL	0x00080000 /* filter asserted rcv flow ctrl */
 #define	SS_FIL_SND_FLOWCTRL	0x00100000 /* filter asserted snd flow ctrl */
-/*	unused 			0x00200000 */	/* was SS_DIRECT */
+#define	SS_FIL_STOP		0x00200000 /* no more filter actions */
 
 #define	SS_SODIRECT		0x00400000 /* transport supports sodirect */
 

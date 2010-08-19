@@ -15,7 +15,7 @@
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
-
+ *
  * CDDL HEADER END
  */
 /* LINTLIBRARY */
@@ -36,18 +36,29 @@ const char *
 	Dbg_demangle_name(const char *);
 
 void	Dbg_args_file(Lm_list *, int, char *);
+void	Dbg_args_guidance_unknown(Lm_list *, const char *);
 void	Dbg_args_option(Lm_list *, int, int, char *);
 void	Dbg_args_str2chr(Lm_list *, int, const char *, int);
 void	Dbg_args_Wldel(Lm_list *, int, const char *);
+void	Dbg_audit_activity(Lm_list *, const char *, const char *, uint_t);
 void	Dbg_audit_ignore(Rt_map *);
 void	Dbg_audit_interface(Lm_list *, const char *, const char *);
-void	Dbg_audit_lib(Lm_list *, const char *);
-void	Dbg_audit_object(Lm_list *, const char *, const char *);
-void	Dbg_audit_symval(Lm_list *, const char *, const char *, const char *,
-	    Addr, Addr);
+void	Dbg_audit_lib(Rt_map *, const char *, int);
+void	Dbg_audit_objclose(Lm_list *, const char *, const char *);
+void	Dbg_audit_objfilter(Lm_list *, int, const char *, const char *,
+	    const char *, const char *);
+void	Dbg_audit_objopen(Lm_list *, int, const char *, const char *, uint_t,
+	    Boolean);
+void	Dbg_audit_objsearch(Lm_list *, int, const char *, const char *, uint_t,
+	    const char *);
+void	Dbg_audit_pltenter(Lm_list *, int, const char *, const char *, Addr);
+void	Dbg_audit_pltexit(Lm_list *, const char *, const char *);
+void	Dbg_audit_preinit(Lm_list *, const char *, const char *);
+void	Dbg_audit_symbind(Lm_list *, int, const char *, const char *,
+	    Addr, uint_t);
 void	Dbg_audit_skip(Lm_list *, const char *, const char *);
 void	Dbg_audit_terminate(Lm_list *, const char *);
-void	Dbg_audit_version(Lm_list *, const char *, ulong_t);
+void	Dbg_audit_version(Lm_list *, const char *, uint_t, uint_t);
 
 void	Dbg_basic_collect(Lm_list *);
 void	Dbg_basic_create(Lm_list *);

@@ -43,12 +43,19 @@
 
 
 static int x86pi_enum_start(topo_mod_t *, x86pi_enum_t *);
-static int x86pi_enum_gentopo(topo_mod_t *, tnode_t *, smbios_hdl_t *);
+static int x86pi_enum_gentopo(topo_mod_t *, tnode_t *);
 
 /*
  * Entry point called by libtopo when enumeration is required
  */
 static topo_enum_f x86pi_enum;	/* libtopo enumeration entry point */
+
+/*
+ * Top level chassis node in a multiple chassis system; or the chassis
+ * node in a single chassis system.
+ */
+static tnode_t *motherchassis_node = NULL;
+
 
 /*
  * Declare the operations vector and information structure used during
@@ -171,7 +178,7 @@ x86pi_enum_start(topo_mod_t *mod, x86pi_enum_t *x86pi)
 		topo_mod_dprintf(mod, "%s: failed to open SMBIOS\n", f);
 		complvl = X86PI_NONE;
 	} else {
-		complvl = x86pi_check_comp(mod, shp);
+		complvl = x86pi_check_comp(mod);
 	}
 
 	topo_mod_dprintf(mod, "%s: SMBIOS x86pi compliance: %s\n", f,
@@ -198,7 +205,7 @@ x86pi_enum_start(topo_mod_t *mod, x86pi_enum_t *x86pi)
 	 * Create the topology.
 	 */
 	fac_done = 0;
-	rv = x86pi_enum_gentopo(mod, x86pi->t_parent, shp);
+	rv = x86pi_enum_gentopo(mod, x86pi->t_parent);
 
 	x86pi_hbr_enum_fini(mod);
 
@@ -208,11 +215,11 @@ x86pi_enum_start(topo_mod_t *mod, x86pi_enum_t *x86pi)
 	x86pi->mod = mod;
 
 	if (fac_done == 0) {
-		(void) topo_mod_enummap(mod, x86pi->t_parent, "chassis",
+		(void) topo_mod_enummap(mod, motherchassis_node, "chassis",
 		    FM_FMRI_SCHEME_HC);
-		(void) topo_mod_enummap(mod, x86pi->t_parent, "fan",
+		(void) topo_mod_enummap(mod, motherchassis_node, "fan",
 		    FM_FMRI_SCHEME_HC);
-		(void) topo_mod_enummap(mod, x86pi->t_parent, "psu",
+		(void) topo_mod_enummap(mod, motherchassis_node, "psu",
 		    FM_FMRI_SCHEME_HC);
 	}
 
@@ -238,7 +245,7 @@ x86pi_enum_start(topo_mod_t *mod, x86pi_enum_t *x86pi)
  *
  */
 static int
-x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
+x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent)
 {
 	int		rv;
 	int		nch, nbb, ncmp, i;
@@ -246,7 +253,6 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 	tnode_t		*chassis_node = NULL;
 	tnode_t		*basebd_node = NULL;
 	smbs_cnt_t	*smbc;
-	tnode_t		*motherchassis_node = NULL;
 	tnode_t		*pnode = NULL;
 	id_t		psmbid;
 	int		notvisited;
@@ -258,6 +264,13 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 	smbios_pciexrc_t hbr;
 	smbios_port_ext_t export;
 	char		*f = "x86pi_enum_gentopo";
+	smbios_hdl_t 	*shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL) {
+		topo_mod_dprintf(mod, "%s: failed to load SMBIOS\n", f);
+		return (-1);
+	}
 
 	if (t_parent == NULL) {
 		topo_mod_dprintf(mod, "%s: NULL parent\n", f);
@@ -269,7 +282,7 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 	 */
 	/* Type 3 structs */
 	stypes[SMB_TYPE_CHASSIS].type = SMB_TYPE_CHASSIS;
-	x86pi_smb_strcnt(shp, &stypes[SMB_TYPE_CHASSIS]);
+	x86pi_smb_strcnt(mod, &stypes[SMB_TYPE_CHASSIS]);
 
 	ch_count = stypes[SMB_TYPE_CHASSIS].count;
 
@@ -285,16 +298,15 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 		 */
 		if (nch == 0)
 			motherchassis_node = chassis_node =
-			    x86pi_gen_chassis(mod, t_parent, shp,
-			    ch_smbid, ch_inst++);
+			    x86pi_gen_chassis(mod, t_parent, ch_smbid,
+			    ch_inst++);
 		else {
 			if (motherchassis_node != NULL)
 				chassis_node = x86pi_gen_chassis(mod,
-				    motherchassis_node, shp,
-				    ch_smbid, ch_inst++);
+				    motherchassis_node, ch_smbid, ch_inst++);
 			else
 				chassis_node = x86pi_gen_chassis(mod,
-				    t_parent, shp, ch_smbid, ch_inst++);
+				    t_parent, ch_smbid, ch_inst++);
 		}
 
 		if (chassis_node == NULL) {
@@ -307,16 +319,24 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 		/* count SMBIOS extended port connector structures */
 		smbc = &stypes[SUN_OEM_EXT_PORT];
 		smbc->type = SUN_OEM_EXT_PORT;
-		x86pi_smb_strcnt(shp, smbc);
+		x86pi_smb_strcnt(mod, smbc);
 
-		/* enumerate direct attached SATA disks */
-		rv = topo_node_range_create(mod, chassis_node, BAY, 0,
-		    smbc->count + 1);
-		if (rv != 0) {
+		/*
+		 * enumerate direct attached SATA disks if we found a
+		 * SUN_OEM_EXT_PORT record.
+		 */
+		if (smbc->count > 0) {
+			rv = topo_node_range_create(mod, chassis_node, BAY, 0,
+			    smbc->count + 1);
+			if (rv != 0) {
+				topo_mod_dprintf(mod,
+				    "%s: Failed to create %s range: %s\n",
+				    f, BAY, topo_mod_errmsg(mod));
+				continue;
+			}
+		} else {
 			topo_mod_dprintf(mod,
-			    "%s: Failed to create %s range: %s\n",
-			    f, BAY, topo_mod_errmsg(mod));
-			continue;
+			    "Skipping disk bay enumeration\n");
 		}
 
 		for (i = 0; i < smbc->count; i++) {
@@ -335,8 +355,8 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 			 *   create "bay" node
 			 *   call "disk" enum passing in "bay" node
 			 */
-			rv = x86pi_gen_bay(mod, chassis_node, shp,
-			    &export, disk_inst);
+			rv = x86pi_gen_bay(mod, chassis_node, &export,
+			    disk_inst);
 			if (rv != 0)
 				topo_mod_dprintf(mod,
 				    "Failed to create disk %d\n", i);
@@ -349,7 +369,7 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 	 */
 	/* Type 2 structs */
 	stypes[SMB_TYPE_BASEBOARD].type = SMB_TYPE_BASEBOARD;
-	x86pi_smb_strcnt(shp, &stypes[SMB_TYPE_BASEBOARD]);
+	x86pi_smb_strcnt(mod, &stypes[SMB_TYPE_BASEBOARD]);
 	bb_count = notvisited = stypes[SMB_TYPE_BASEBOARD].count;
 
 	for (nbb = 0; nbb < bb_count; nbb++) {
@@ -357,7 +377,7 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 		stypes[SMB_TYPE_BASEBOARD].ids[nbb].con_by_id = 0;
 		stypes[SMB_TYPE_BASEBOARD].ids[nbb].node = NULL;
 	}
-	(void) x86pi_bb_contains(mod, shp);
+	(void) x86pi_bb_contains(mod);
 
 	min = 0;
 	nbb = 0;
@@ -388,7 +408,7 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 		 * If this Baseboard has no Baseboard parents
 		 * place it under the chassis that contains it
 		 */
-		bb_smbid = x86pi_bb_topparent(shp, nbb, &pnode, &psmbid);
+		bb_smbid = x86pi_bb_topparent(mod, nbb, &pnode, &psmbid);
 		if (bb_smbid == -1 || pnode == NULL) {
 			topo_mod_dprintf(mod,
 			    "Failed to get BaseBoard node (%d): parent\n",
@@ -411,8 +431,8 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 			notvisited--;
 		}
 
-		basebd_node = x86pi_gen_bboard(mod, pnode, shp,
-		    bb_smbid, nbb, psmbid);
+		basebd_node = x86pi_gen_bboard(mod, pnode, bb_smbid,
+		    nbb, psmbid);
 		if (basebd_node == NULL) {
 			topo_mod_dprintf(mod,
 			    "Failed to create BaseBoard node (%d)\n", nbb);
@@ -425,7 +445,7 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 		 * Look for contained handles here and if there are
 		 * make sure the chip handle below is part of it.
 		 */
-		ncmp = x86pi_bb_getchips(mod, shp, nbb, bb_count);
+		ncmp = x86pi_bb_getchips(mod, nbb, bb_count);
 		if (ncmp > 0) {
 			max = min + ncmp - 1;
 			/* make sure the chip enum is loaded */
@@ -476,7 +496,7 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 
 		smbc = &stypes[SUN_OEM_PCIEXRC];
 		smbc->type = SUN_OEM_PCIEXRC;
-		x86pi_smb_strcnt(shp, smbc);
+		x86pi_smb_strcnt(mod, smbc);
 		for (i = 0; i < smbc->count; i++) {
 			if (smbios_info_pciexrc(shp, smbc->ids[i].id,
 			    &hbr) != 0) {
@@ -488,7 +508,7 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 
 			if (hbr.smbpcie_bb != bb_smbid)
 				continue;
-			rv = x86pi_gen_hbr(mod, basebd_node, shp,
+			rv = x86pi_gen_hbr(mod, basebd_node,
 			    smbc->ids[i].id, hbri, &rci);
 			if (rv != 0)
 				topo_mod_dprintf(mod,

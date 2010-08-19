@@ -45,7 +45,8 @@
 
 #include <sys/ib/clients/rdsv3/rdsv3.h>
 
-RDSV3_DEFINE_PER_CPU(struct rdsv3_statistics, rdsv3_stats);
+struct rdsv3_statistics *rdsv3_stats = NULL;
+uint_t	nr_cpus;
 
 static char *rdsv3_stat_names[] = {
 	"conn_reset",
@@ -87,7 +88,7 @@ void
 rdsv3_stats_info_copy(struct rdsv3_info_iterator *iter,
     uint64_t *values, char **names, size_t nr)
 {
-	struct rdsv3_info_counter ctr;
+	struct rds_info_counter ctr;
 	size_t i;
 
 	for (i = 0; i < nr; i++) {
@@ -123,7 +124,7 @@ rdsv3_stats_info(struct rsock *sock, unsigned int len,
 	int cpu;
 	unsigned int avail;
 
-	avail = len / sizeof (struct rdsv3_info_counter);
+	avail = len / sizeof (struct rds_info_counter);
 
 	if (avail < ARRAY_SIZE(rdsv3_stat_names)) {
 		avail = 0;
@@ -132,7 +133,7 @@ rdsv3_stats_info(struct rsock *sock, unsigned int len,
 
 	bzero(&stats, sizeof (struct rdsv3_statistics));
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
 		src = (uint64_t *)&(rdsv3_per_cpu(rdsv3_stats, cpu));
 		sum = (uint64_t *)&stats;
 		for (i = 0;
@@ -146,7 +147,7 @@ rdsv3_stats_info(struct rsock *sock, unsigned int len,
 	avail -= ARRAY_SIZE(rdsv3_stat_names);
 
 trans:
-	lens->each = sizeof (struct rdsv3_info_counter);
+	lens->each = sizeof (struct rds_info_counter);
 	lens->nr = rdsv3_trans_stats_info_copy(iter, avail) +
 	    ARRAY_SIZE(rdsv3_stat_names);
 }
@@ -154,12 +155,25 @@ trans:
 void
 rdsv3_stats_exit(void)
 {
-	rdsv3_info_deregister_func(RDSV3_INFO_COUNTERS, rdsv3_stats_info);
+	rdsv3_info_deregister_func(RDS_INFO_COUNTERS, rdsv3_stats_info);
+
+	ASSERT(rdsv3_stats);
+	kmem_free(rdsv3_stats,
+	    nr_cpus * sizeof (struct rdsv3_statistics));
+	rdsv3_stats = NULL;
 }
 
 int
 rdsv3_stats_init(void)
 {
-	rdsv3_info_register_func(RDSV3_INFO_COUNTERS, rdsv3_stats_info);
+	/*
+	 * Note the max number of cpus that this system can have at most.
+	 */
+	nr_cpus = max_ncpus;
+	ASSERT(rdsv3_stats == NULL);
+	rdsv3_stats = kmem_zalloc(nr_cpus *
+	    sizeof (struct rdsv3_statistics), KM_SLEEP);
+
+	rdsv3_info_register_func(RDS_INFO_COUNTERS, rdsv3_stats_info);
 	return (0);
 }

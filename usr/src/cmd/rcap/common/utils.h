@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_UTILS_H
 #define	_UTILS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <libintl.h>
@@ -93,7 +91,7 @@ extern void info(char *, ...);
 extern rcm_level_t get_message_priority(void);
 extern rcm_level_t set_message_priority(rcm_level_t);
 extern rcm_dst_t set_message_destination(rcm_dst_t);
-extern char *setprogname(char *);
+extern char *setpname(char *);
 extern void warn(const char *, ...);
 extern int valid_abspath(char *);
 extern void vdprintfe(int, const char *, va_list);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1557,7 +1556,8 @@ i_ddi_cacheattr_to_hatacc(uint_t flags, uint_t *hataccp)
 	 * If write-combining is not supported, then it falls back
 	 * to uncacheable.
 	 */
-	if (cache_attr == IOMEM_DATA_UC_WR_COMBINE && !(x86_feature & X86_PAT))
+	if (cache_attr == IOMEM_DATA_UC_WR_COMBINE &&
+	    !is_x86_feature(x86_featureset, X86FSET_PAT))
 		cache_attr = IOMEM_DATA_UNCACHED;
 
 	/*

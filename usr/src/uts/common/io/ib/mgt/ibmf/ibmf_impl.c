@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -832,7 +832,7 @@ bail:
 
 /*
  * ibmf_i_uninit_ci():
- *	Free up the resources allocated when initalizing the CI structure.
+ *	Free up the resources allocated when initializing the CI structure.
  */
 static void
 ibmf_i_uninit_ci(ibmf_ci_t *cip)
@@ -3024,6 +3024,7 @@ ibmf_i_mgt_class_to_hdr_sz_off(uint32_t mgt_class, uint32_t *szp,
 	case MAD_MGMT_CLASS_BM :
 	case MAD_MGMT_CLASS_DEV_MGT :
 	case MAD_MGMT_CLASS_SNMP :
+	case MAD_MGMT_CLASS_COMM_MGT:
 		hdr_sz = IBMF_MAD_CL_HDR_SZ_1;
 		hdr_off = IBMF_MAD_CL_HDR_OFF_1;
 		break;
@@ -3031,21 +3032,29 @@ ibmf_i_mgt_class_to_hdr_sz_off(uint32_t mgt_class, uint32_t *szp,
 		hdr_sz = IBMF_MAD_CL_HDR_SZ_2;
 		hdr_off = IBMF_MAD_CL_HDR_OFF_2;
 		break;
+	default:
+		if (((mgt_class >= MAD_MGMT_CLASS_VENDOR_START) &&
+		    (mgt_class <= MAD_MGMT_CLASS_VENDOR_END)) ||
+		    ((mgt_class >= MAD_MGMT_CLASS_APPLICATION_START) &&
+		    (mgt_class <= MAD_MGMT_CLASS_APPLICATION_END))) {
+			hdr_sz = IBMF_MAD_CL_HDR_SZ_3;
+			hdr_off = IBMF_MAD_CL_HDR_OFF_1;
+		} else if ((mgt_class >= MAD_MGMT_CLASS_VENDOR2_START) &&
+		    (mgt_class <= MAD_MGMT_CLASS_VENDOR2_END)) {
+			hdr_sz = IBMF_MAD_CL_HDR_SZ_4;
+			hdr_off = IBMF_MAD_CL_HDR_OFF_2;
+		} else {
+			IBMF_TRACE_1(IBMF_TNF_DEBUG, DPRINT_L4,
+			    ibmf_i_mgt_class_to_hdr_sz_off_start,
+			    IBMF_TNF_TRACE, "",
+			    "ibmf_i_mgt_class_to_hdr_sz_off():"
+			    "got illegal management class = 0x%x\n",
+			    tnf_uint, mgt_class, mgt_class);
+		}
+		break;
 	}
 
-	if (((mgt_class >= MAD_MGMT_CLASS_VENDOR_START) &&
-	    (mgt_class <= MAD_MGMT_CLASS_VENDOR_END)) ||
-	    ((mgt_class >= MAD_MGMT_CLASS_APPLICATION_START) &&
-	    (mgt_class <= MAD_MGMT_CLASS_APPLICATION_END))) {
-		hdr_sz = IBMF_MAD_CL_HDR_SZ_3;
-		hdr_off = IBMF_MAD_CL_HDR_OFF_1;
-	}
 
-	if ((mgt_class >= MAD_MGMT_CLASS_VENDOR2_START) &&
-	    (mgt_class <= MAD_MGMT_CLASS_VENDOR2_END)) {
-		hdr_sz = IBMF_MAD_CL_HDR_SZ_4;
-		hdr_off = IBMF_MAD_CL_HDR_OFF_2;
-	}
 
 	*szp = hdr_sz;
 	*offp = hdr_off;

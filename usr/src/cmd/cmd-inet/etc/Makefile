@@ -18,17 +18,16 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 
-SYMPROG= hosts inetd.conf networks protocols services netmasks sock2path
+SYMPROG= hosts inetd.conf networks protocols services netmasks
 
 # New /etc/inet files shouldn't have /etc entries.
 EDITPROG= ipaddrsel.conf ipsecalgs
 PROG= datemsk.ndpd ipsecinit.sample ipqosconf.1.sample ipqosconf.2.sample \
     ipqosconf.3.sample wanboot.conf.sample
 ETCPROG= $(SYMPROG) $(EDITPROG) $(PROG)
-SUBDIRS= default dhcp init.d ike nca ppp secret
+SUBDIRS= default dhcp init.d ike nca ppp secret sock2path.d
 
 include ../../Makefile.cmd
 

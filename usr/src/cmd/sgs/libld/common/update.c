@@ -113,7 +113,7 @@ dynsort_dupwarn(Ofl_desc *ofl, Sym *ldynsym, const char *str,
 		addr = ldynsym[symsort[ndx]].st_value;
 		if (cmp_addr == addr) {
 			if (zverbose)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_DUPSORTADDR), secname,
 				    str + ldynsym[symsort[cmp_ndx]].st_name,
 				    str + ldynsym[symsort[ndx]].st_name,
@@ -513,7 +513,7 @@ update_osym(Ofl_desc *ofl)
 			etext_ndx = SHN_ABS;
 			etext_abs = 1;
 			if (flags & FLG_OF_VERBOSE)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_UPD_NOREADSEG));
 		}
 		if (dsgp) {
@@ -523,7 +523,7 @@ update_osym(Ofl_desc *ofl)
 			edata_ndx = SHN_ABS;
 			edata_abs = 1;
 			if (flags & FLG_OF_VERBOSE)
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_UPD_NORDWRSEG));
 		}
 
@@ -591,8 +591,7 @@ update_osym(Ofl_desc *ofl)
 			end = (Addr) 0;
 			end_ndx = SHN_ABS;
 			end_abs = 1;
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_UPD_NOSEG));
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_UPD_NOSEG));
 		}
 	}
 
@@ -921,7 +920,7 @@ update_osym(Ofl_desc *ofl)
 		sdp->sd_sym->st_size = sdp->sd_isc->is_osdesc->os_shdr->sh_size;
 
 	} else if (iosp && !(flags & FLG_OF_RELOBJ)) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_NOCRT),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_SYM_NOCRT),
 		    MSG_ORIG(MSG_SYM_INIT_U), MSG_ORIG(MSG_SCN_INIT));
 	}
 
@@ -933,7 +932,7 @@ update_osym(Ofl_desc *ofl)
 		sdp->sd_sym->st_size = sdp->sd_isc->is_osdesc->os_shdr->sh_size;
 
 	} else if (fosp && !(flags & FLG_OF_RELOBJ)) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_NOCRT),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_SYM_NOCRT),
 		    MSG_ORIG(MSG_SYM_FINI_U), MSG_ORIG(MSG_SCN_FINI));
 	}
 
@@ -1616,7 +1615,7 @@ update_osym(Ofl_desc *ofl)
 		if (sectndx == SHN_UNDEF) {
 			if (((sdp->sd_flags & FLG_SY_REGSYM) == 0) &&
 			    (sym->st_value != 0)) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_NOTNULL),
 				    demangle(name), sdp->sd_file->ifl_name);
 			}
@@ -2200,6 +2199,7 @@ update_odynamic(Ofl_desc *ofl)
 
 	if (not_relobj) {
 		Aliste	idx;
+		Sg_desc	*sgp;
 
 		if (ofl->ofl_config) {
 			dyn->d_tag = DT_CONFIG;
@@ -2502,19 +2502,10 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 
-		if (ofl->ofl_osdynamic->os_sgdesc &&
-		    (ofl->ofl_osdynamic->os_sgdesc->sg_phdr.p_flags & PF_W)) {
-			if (ofl->ofl_osinterp) {
-				dyn->d_tag = DT_DEBUG;
-				dyn->d_un.d_ptr = 0;
-				dyn++;
-			}
-
-			dyn->d_tag = DT_FEATURE_1;
-			if (ofl->ofl_osmove)
-				dyn->d_un.d_val = 0;
-			else
-				dyn->d_un.d_val = DTF_1_PARINIT;
+		if (((sgp = ofl->ofl_osdynamic->os_sgdesc) != NULL) &&
+		    (sgp->sg_phdr.p_flags & PF_W) && ofl->ofl_osinterp) {
+			dyn->d_tag = DT_DEBUG;
+			dyn->d_un.d_ptr = 0;
 			dyn++;
 		}
 
@@ -3572,7 +3563,7 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 	 * is within range for the input file.
 	 */
 	if (link >= ifl->ifl_shnum) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, msg, ifl->ifl_name,
+		ld_eprintf(ofl, ERR_WARNING, msg, ifl->ifl_name,
 		    EC_WORD(isp->is_scnndx), isp->is_name, EC_XWORD(link));
 		return (link);
 	}
@@ -3883,7 +3874,7 @@ ld_update_outfile(Ofl_desc *ofl)
 				p_e = p_s + (ofl->ofl_phdr[i]).p_memsz;
 				if (((p_s <= vaddr) && (p_e > vaddr)) ||
 				    ((vaddr <= p_s) && (v_e > p_s)))
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING,
 					    MSG_INTL(MSG_UPD_SEGOVERLAP),
 					    ofl->ofl_name, EC_ADDR(p_e),
 					    sgp->sg_name, EC_ADDR(vaddr));
@@ -3928,7 +3919,7 @@ ld_update_outfile(Ofl_desc *ofl)
 
 			if (shdr->sh_type != SHT_NOBITS) {
 				if (nobits) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_UPD_NOBITS));
 					return (S_ERROR);
 				}
@@ -3981,7 +3972,7 @@ ld_update_outfile(Ofl_desc *ofl)
 			if ((sgp->sg_flags & FLG_SG_P_VADDR)) {
 				if (_phdr && (vaddr > phdr->p_vaddr) &&
 				    (phdr->p_type == PT_LOAD))
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING,
 					    MSG_INTL(MSG_UPD_SEGOVERLAP),
 					    ofl->ofl_name, EC_ADDR(vaddr),
 					    sgp->sg_name,
@@ -4103,10 +4094,9 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * haven't exceeded any maximum segment length specification.
 		 */
 		if ((sgp->sg_length != 0) && (sgp->sg_length < phdr->p_memsz)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_UPD_LARGSIZE), ofl->ofl_name,
-			    sgp->sg_name, EC_XWORD(phdr->p_memsz),
-			    EC_XWORD(sgp->sg_length));
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_UPD_LARGSIZE),
+			    ofl->ofl_name, sgp->sg_name,
+			    EC_XWORD(phdr->p_memsz), EC_XWORD(sgp->sg_length));
 			return (S_ERROR);
 		}
 
@@ -4302,13 +4292,13 @@ ld_update_outfile(Ofl_desc *ofl)
 		Shdr	*shdr0;
 
 		if ((scn = elf_getscn(ofl->ofl_elf, 0)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETSCN), ofl->ofl_name);
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
+			    ofl->ofl_name);
 			return (S_ERROR);
 		}
 		if ((shdr0 = elf_getshdr(scn)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETSHDR), ofl->ofl_name);
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
+			    ofl->ofl_name);
 			return (S_ERROR);
 		}
 		ofl->ofl_nehdr->e_shstrndx = SHN_XINDEX;

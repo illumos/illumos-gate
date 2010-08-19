@@ -27,15 +27,11 @@
 #
 #
 All:suser:cmd:::*:
-Audit Control:suser:cmd:::/etc/security/bsmconv:uid=0
-Audit Control:suser:cmd:::/etc/security/bsmunconv:uid=0
-Audit Control:solaris:cmd:::/usr/sbin/audit:privs=sys_audit,file_dac_read,proc_owner
-Audit Control:suser:cmd:::/usr/sbin/audit:euid=0
-Audit Control:suser:cmd:::/usr/sbin/auditconfig:euid=0
-Audit Control:suser:cmd:::/usr/sbin/auditd:uid=0
-Audit Review:suser:cmd:::/usr/sbin/auditreduce:euid=0
-Audit Review:suser:cmd:::/usr/sbin/auditstat:euid=0
-Audit Review:suser:cmd:::/usr/sbin/praudit:euid=0
+Audit Control:solaris:cmd:::/usr/sbin/audit:privs=proc_owner,sys_audit
+Audit Configuration:solaris:::/usr/sbin/auditconfig:privs=sys_audit
+Audit Review:solaris:cmd:::/usr/sbin/auditreduce:euid=0
+Audit Review:solaris:cmd:::/usr/sbin/auditstat:privs=proc_audit
+Audit Review:solaris:cmd:::/usr/sbin/praudit:privs=file_dac_read
 Contract Observer:solaris:cmd:::/usr/bin/ctwatch:\
 	privs=contract_event,contract_observer
 Cron Management:suser:cmd:::/usr/bin/crontab:euid=0
@@ -165,6 +161,9 @@ Maintenance and Repair:suser:cmd:::/usr/sbin/reboot:uid=0
 Maintenance and Repair:suser:cmd:::/usr/sbin/syslogd:euid=0
 Maintenance and Repair:suser:cmd:::/sbin/bootadm:euid=0
 Maintenance and Repair:solaris:cmd:::/usr/sbin/ucodeadm:privs=all
+Maintenance and Repair:solaris:cmd:::/usr/sbin/cpustat:privs=basic,cpc_cpu
+Maintenance and Repair:solaris:cmd:::/usr/bin/pgstat:privs=basic,cpc_cpu
+Maintenance and Repair:solaris:cmd:::/usr/bin/kstat:privs=basic,cpc_cpu
 Media Backup:suser:cmd:::/usr/bin/mt:euid=0
 Media Backup:suser:cmd:::/usr/lib/fs/ufs/ufsdump:euid=0;gid=sys
 Media Backup:suser:cmd:::/usr/sbin/tar:euid=0
@@ -273,6 +272,7 @@ Process Management:solaris:cmd:::/usr/sbin/rcapadm:uid=0
 Project Management:solaris:cmd:::/usr/sbin/projadd:euid=0
 Project Management:solaris:cmd:::/usr/sbin/projmod:euid=0
 Project Management:solaris:cmd:::/usr/sbin/projdel:euid=0
+Software Installation:suser:cmd:::/sbin/beadm:uid=0;gid=bin
 Software Installation:suser:cmd:::/usr/bin/ln:euid=0
 Software Installation:suser:cmd:::/usr/bin/pkginfo:uid=0
 Software Installation:suser:cmd:::/usr/bin/pkgmk:uid=0
@@ -298,7 +298,6 @@ User Management:solaris:cmd:::/usr/sbin/groupadd:uid=0
 User Management:solaris:cmd:::/usr/sbin/groupdel:uid=0
 User Management:solaris:cmd:::/usr/sbin/groupmod:uid=0
 User Security:suser:cmd:::/usr/bin/passwd:uid=0
-User Security:solaris:cmd:::/usr/sbin/passmgmt:uid=0
 User Security:suser:cmd:::/usr/sbin/pwck:euid=0
 User Security:suser:cmd:::/usr/sbin/pwconv:euid=0
 DAT Administration:solaris:cmd:::/usr/sbin/datadm:euid=0

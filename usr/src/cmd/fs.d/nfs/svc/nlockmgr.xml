@@ -1,9 +1,6 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
-
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -23,6 +20,8 @@
 
  CDDL HEADER END
 
+	Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -39,10 +38,6 @@
 	name='network/nfs/nlockmgr'
 	type='service'
 	version='1'>
-
-	<create_default_instance enabled='false' />
-
-	<single_instance />
 
 	<dependency name='network'
 	    grouping='require_any'
@@ -95,7 +90,14 @@
 		<stability value='Evolving' />
 		<propval name='auto_enable' type='boolean' value='true' />
 	</property_group>
-
+	<instance name='default' enabled='false'>
+	  <property_group name='nfs-props' type='com.oracle.nfs,props'>
+	    <propval name='grace_period' type='integer' value='90'/>
+	    <propval name='lockd_listen_backlog' type='integer' value='32'/>
+	    <propval name='lockd_retransmit_timeout' type='integer' value='5'/>
+	    <propval name='lockd_servers' type='integer' value='20'/>
+	  </property_group>
+	</instance>
 	<stability value='Stable' />
 
 	<template>

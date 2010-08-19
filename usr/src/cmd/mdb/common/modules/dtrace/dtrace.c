@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -435,10 +434,12 @@ dtracemdb_bufsnap(dtrace_buffer_t *which, dtrace_bufdesc_t *desc)
 }
 
 /*
- * This is essentially identical to its cousin in the kernel.
+ * This is essentially identical to its cousin in the kernel -- with the
+ * notable exception that we automatically set DTRACEOPT_GRABANON if this
+ * state is an anonymous enabling.
  */
 static dof_hdr_t *
-dtracemdb_dof_create(dtrace_state_t *state)
+dtracemdb_dof_create(dtrace_state_t *state, int isanon)
 {
 	dof_hdr_t *dof;
 	dof_sec_t *sec;
@@ -489,6 +490,9 @@ dtracemdb_dof_create(dtrace_state_t *state)
 		opt[i].dofo_strtab = DOF_SECIDX_NONE;
 		opt[i].dofo_value = state->dts_options[i];
 	}
+
+	if (isanon)
+		opt[DTRACEOPT_GRABANON].dofo_value = 1;
 
 	return (dof);
 }
@@ -621,6 +625,7 @@ typedef struct dtracemdb_data {
 	char *dtmd_symstr;
 	char *dtmd_modstr;
 	uintptr_t dtmd_addr;
+	int dtmd_isanon;
 } dtracemdb_data_t;
 
 static int
@@ -645,7 +650,7 @@ dtracemdb_ioctl(void *varg, int cmd, void *arg)
 	case DTRACEIOC_DOFGET: {
 		dof_hdr_t *hdr = arg, *dof;
 
-		dof = dtracemdb_dof_create(state);
+		dof = dtracemdb_dof_create(state, data->dtmd_isanon);
 		bcopy(dof, hdr, MIN(hdr->dofh_loadsz, dof->dofh_loadsz));
 		mdb_free(dof, dof->dofh_loadsz);
 
@@ -974,6 +979,7 @@ dtrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	dtrace_optval_t val;
 	dtracemdb_data_t md;
 	int rval = DCMD_ERR;
+	dtrace_anon_t anon;
 
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
@@ -991,6 +997,15 @@ dtrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if (state.dts_anon != NULL) {
+		addr = (uintptr_t)state.dts_anon;
+
+		if (mdb_vread(&state, sizeof (state), addr) == -1) {
+			mdb_warn("couldn't read anonymous state at %p", addr);
+			return (DCMD_ERR);
+		}
+	}
+
 	bzero(&md, sizeof (md));
 	md.dtmd_state = &state;
 
@@ -1000,6 +1015,17 @@ dtrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    dtrace_errmsg(NULL, err));
 		return (DCMD_ERR);
 	}
+
+	/*
+	 * If this is the anonymous enabling, we need to set a bit indicating
+	 * that DTRACEOPT_GRABANON should be set.
+	 */
+	if (mdb_readvar(&anon, "dtrace_anon") == -1) {
+		mdb_warn("failed to read 'dtrace_anon'");
+		return (DCMD_ERR);
+	}
+
+	md.dtmd_isanon = ((uintptr_t)anon.dta_state == addr);
 
 	if (dtrace_go(dtp) != 0) {
 		mdb_warn("failed to initialize dtrace: %s\n",
@@ -1750,6 +1776,7 @@ typedef struct dtrace_dynvar_data {
 	uintptr_t dtdvd_hashsize;
 	uintptr_t dtdvd_next;
 	uintptr_t dtdvd_ndx;
+	uintptr_t dtdvd_sink;
 } dtrace_dynvar_data_t;
 
 int
@@ -1759,6 +1786,7 @@ dtrace_dynvar_init(mdb_walk_state_t *wsp)
 	dtrace_dstate_t dstate;
 	dtrace_dynvar_data_t *data;
 	size_t hsize;
+	GElf_Sym sym;
 
 	if ((addr = wsp->walk_addr) == NULL) {
 		mdb_warn("dtrace_dynvar walk needs dtrace_dstate_t\n");
@@ -1770,11 +1798,17 @@ dtrace_dynvar_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
+	if (mdb_lookup_by_name("dtrace_dynhash_sink", &sym) == -1) {
+		mdb_warn("couldn't find 'dtrace_dynhash_sink'");
+		return (WALK_ERR);
+	}
+
 	data = mdb_zalloc(sizeof (dtrace_dynvar_data_t), UM_SLEEP);
 
 	data->dtdvd_hashsize = dstate.dtds_hashsize;
 	hsize = dstate.dtds_hashsize * sizeof (dtrace_dynhash_t);
 	data->dtdvd_hash = mdb_alloc(hsize, UM_SLEEP);
+	data->dtdvd_sink = (uintptr_t)sym.st_value;
 
 	if (mdb_vread(data->dtdvd_hash, hsize,
 	    (uintptr_t)dstate.dtds_hash) == -1) {
@@ -1784,6 +1818,8 @@ dtrace_dynvar_init(mdb_walk_state_t *wsp)
 		mdb_free(data, sizeof (dtrace_dynvar_data_t));
 		return (WALK_ERR);
 	}
+
+	data->dtdvd_next = (uintptr_t)data->dtdvd_hash[0].dtdh_chain;
 
 	wsp->walk_data = data;
 	return (WALK_NEXT);
@@ -1798,7 +1834,7 @@ dtrace_dynvar_step(mdb_walk_state_t *wsp)
 	uintptr_t addr;
 	int nkeys;
 
-	while ((addr = data->dtdvd_next) == NULL) {
+	while ((addr = data->dtdvd_next) == data->dtdvd_sink) {
 		if (data->dtdvd_ndx == data->dtdvd_hashsize)
 			return (WALK_DONE);
 

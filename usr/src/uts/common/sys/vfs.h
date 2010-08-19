@@ -33,6 +33,7 @@
 #ifndef _SYS_VFS_H
 #define	_SYS_VFS_H
 
+#include <sys/zone.h>
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/cred.h>
@@ -173,26 +174,6 @@ extern avl_tree_t	vskstat_tree;
 extern kmutex_t		vskstat_tree_lock;
 
 /*
- * Private vfs data, NOT to be used by a file system implementation.
- */
-
-#define	VFS_FEATURE_MAXSZ	4
-
-typedef struct vfs_impl {
-	/* Counted array - Bitmap of vfs features */
-	uint32_t	vi_featureset[VFS_FEATURE_MAXSZ];
-	/*
-	 * Support for statistics on the vnode operations
-	 */
-	vsk_anchor_t	*vi_vskap;		/* anchor for vopstats' kstat */
-	vopstats_t	*vi_fstypevsp;		/* ptr to per-fstype vopstats */
-	vopstats_t	vi_vopstats;		/* per-mount vnode op stats */
-
-	timespec_t	vi_hrctime; 		/* High-res creation time */
-} vfs_impl_t;
-
-
-/*
  * Structure per mounted file system.  Each mounted file system has
  * an array of operations and an instance record.
  *
@@ -241,7 +222,7 @@ typedef struct vfs {
 	refstr_t	*vfs_resource;		/* mounted resource name */
 	refstr_t	*vfs_mntpt;		/* mount point name */
 	time_t		vfs_mtime;		/* time we were mounted */
-	vfs_impl_t 	*vfs_implp;		/* impl specific data */
+	struct vfs_impl	*vfs_implp;		/* impl specific data */
 	/*
 	 * Zones support.  Note that the zone that "owns" the mount isn't
 	 * necessarily the same as the zone in which the zone is visible.
@@ -442,7 +423,34 @@ enum {
 
 #define	VSW_INSTALLED	0x8000	/* this vsw is associated with a file system */
 
+/*
+ * A flag for vfs_setpath().
+ */
+#define	VFSSP_VERBATIM	0x1	/* do not prefix the supplied path */
+
 #if defined(_KERNEL)
+
+/*
+ * Private vfs data, NOT to be used by a file system implementation.
+ */
+
+#define	VFS_FEATURE_MAXSZ	4
+
+typedef struct vfs_impl {
+	/* Counted array - Bitmap of vfs features */
+	uint32_t	vi_featureset[VFS_FEATURE_MAXSZ];
+	/*
+	 * Support for statistics on the vnode operations
+	 */
+	vsk_anchor_t	*vi_vskap;		/* anchor for vopstats' kstat */
+	vopstats_t	*vi_fstypevsp;		/* ptr to per-fstype vopstats */
+	vopstats_t	vi_vopstats;		/* per-mount vnode op stats */
+
+	timespec_t	vi_hrctime; 		/* High-res creation time */
+
+	zone_ref_t	vi_zone_ref;		/* reference to zone */
+} vfs_impl_t;
+
 /*
  * Public operations.
  */
@@ -502,8 +510,8 @@ void	vfs_mnttab_modtimeupd(void);
 
 void	vfs_clearmntopt(struct vfs *, const char *);
 void	vfs_setmntopt(struct vfs *, const char *, const char *, int);
-void	vfs_setresource(struct vfs *, const char *);
-void	vfs_setmntpoint(struct vfs *, const char *);
+void	vfs_setresource(struct vfs *, const char *, uint32_t);
+void	vfs_setmntpoint(struct vfs *, const char *, uint32_t);
 refstr_t *vfs_getresource(const struct vfs *);
 refstr_t *vfs_getmntpoint(const struct vfs *);
 int	vfs_optionisset(const struct vfs *, const char *, char **);

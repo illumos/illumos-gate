@@ -490,6 +490,9 @@ smb_common_write(smb_request_t *sr, smb_rw_param_t *param)
 
 		smb_ofile_set_write_time_pending(ofile);
 
+		if (!smb_node_is_dir(node))
+			smb_oplock_break_levelII(node);
+
 		param->rw_count = lcount;
 		break;
 

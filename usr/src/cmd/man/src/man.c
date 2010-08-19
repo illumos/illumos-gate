@@ -95,7 +95,6 @@
 #define	PLEN		3	/* prefix length {man, cat, fmt} */
 #define	TMPLEN		7	/* length of tmpfile prefix */
 #define	MAXTOKENS 	64
-#define	MAXSUFFIX	20	/* length of section suffix */
 
 #define	DOT_SO		".so "
 #define	PREPROC_SPEC	"'\\\" "
@@ -149,16 +148,17 @@ static const map_entry map[] = {
 static const struct preprocessor {
 	char	p_tag;
 	char	*p_nroff,
-		*p_troff;
+		*p_troff,
+		*p_stdin_char;
 } preprocessors [] = {
-	{'c',	"cw",				"cw"},
+	{'c',	"cw",				"cw",		"-"},
 	{'e',	"neqn /usr/share/lib/pub/eqnchar",
-			"eqn /usr/share/lib/pub/eqnchar"},
-	{'p',	"pic",				"pic"},
-	{'r',	"refer",			"refer"},
-	{'t',	"tbl",				"tbl"},
-	{'v',	"vgrind -f",			"vgrind -f"},
-	{0,	0,				0}
+			"eqn /usr/share/lib/pub/eqnchar",	"-"},
+	{'p',	"gpic",				"gpic",		"-"},
+	{'r',	"refer",			"refer",	"-"},
+	{'t',	"tbl",				"tbl",		""},
+	{'v',	"vgrind -f",			"vgrind -f",	"-"},
+	{0,	0,				0,		0}
 };
 
 struct suffix {
@@ -303,7 +303,7 @@ static void freev(char **);
 static void fullpaths(struct man_node **);
 static void lower(char *);
 static int cmp(const void *, const void *);
-static void manual(struct man_node *, char *);
+static int manual(struct man_node *, char *);
 static void mandir(char **, char *, char *);
 static void sortdir(DIR *, char ***);
 static int searchdir(char *, char *, char *);
@@ -355,6 +355,7 @@ main(int argc, char *argv[])
 	char *manpath = NULL;
 	static struct man_node	*manpage = NULL;
 	int bmp_flags = 0;
+	int err = 0;
 
 	if (access(SROFF_CMD, F_OK | X_OK) != 0)
 		no_sroff = 1;
@@ -584,7 +585,7 @@ doargs:
 			} else if (printmp != 0) {
 				print_manpath(mp, argv[optind]);
 			} else {
-				manual(mp, argv[optind]);
+				err += manual(mp, argv[optind]);
 			}
 
 			if (mp != NULL && mp != manpage) {
@@ -593,7 +594,7 @@ doargs:
 			}
 		}
 	}
-	return (0);
+	return (err == 0 ? 0 : 1);
 	/*NOTREACHED*/
 }
 
@@ -618,6 +619,7 @@ build_manpath(char **pathv, int flags)
 	char *mandir = MANDIR;
 	int s;
 	struct dupnode *didup = NULL;
+	struct stat sb;
 
 	s = sizeof (struct man_node);
 	for (p = pathv; *p; ) {
@@ -630,6 +632,10 @@ build_manpath(char **pathv, int flags)
 			*p = mand;
 		}
 		q = split(*p, ',');
+		if (stat(q[0], &sb) != 0 || (sb.st_mode & S_IFDIR) == 0) {
+			freev(q);
+			goto next;
+		}
 
 		if (access(q[0], R_OK|X_OK) != 0) {
 			if (catmando) {
@@ -807,8 +813,8 @@ get_all_sect(struct man_node *manp)
 	char **dirv;
 	char **dv;
 	char **p;
-	char prev[MAXSUFFIX];
-	char tmp[MAXSUFFIX];
+	char *prev = NULL;
+	char *tmp = NULL;
 	int  plen;
 	int	maxentries = MAXTOKENS;
 	int	entries = 0;
@@ -832,8 +838,6 @@ get_all_sect(struct man_node *manp)
 			malloc_error();
 	}
 
-	(void) memset(tmp, 0, MAXSUFFIX);
-	(void) memset(prev, 0, MAXSUFFIX);
 	for (dv = dirv, p = manp->secv; *dv; dv++) {
 		plen = PLEN;
 		if (match(*dv, SGMLDIR, PLEN+1))
@@ -845,14 +849,26 @@ get_all_sect(struct man_node *manp)
 			continue;
 		}
 
+		if (tmp != NULL)
+			free(tmp);
+		tmp = strdup(*dv + plen);
+		if (tmp == NULL)
+			malloc_error();
 		(void) sprintf(tmp, "%s", *dv + plen);
 
-		if (strcmp(prev, tmp) == 0) {
-			/* release memory allocated by sortdir */
-			free(*dv);
-			continue;
+		if (prev != NULL) {
+			if (strcmp(prev, tmp) == 0) {
+				/* release memory allocated by sortdir */
+				free(*dv);
+				continue;
+			}
 		}
 
+		if (prev != NULL)
+			free(prev);
+		prev = strdup(*dv + plen);
+		if (prev == NULL)
+			malloc_error();
 		(void) sprintf(prev, "%s", *dv + plen);
 		/*
 		 * copy the string in (*dv + plen) to *p
@@ -1460,10 +1476,12 @@ static void
 freev(char **v)
 {
 	int i;
-	for (i = 0; v[i] != NULL; i++) {
-		free(v[i]);
+	if (v != NULL) {
+		for (i = 0; v[i] != NULL; i++) {
+			free(v[i]);
+		}
+		free(v);
 	}
-	free(v);
 }
 
 /*
@@ -1590,7 +1608,7 @@ cmp(const void *arg1, const void *arg2)
  *   and if it doesn't exist, do the hard way.
  */
 
-static void
+static int
 manual(struct man_node *manp, char *name)
 {
 	struct man_node *p;
@@ -1662,19 +1680,21 @@ manual(struct man_node *manp, char *name)
 		more(pages, nomore);
 	} else {
 		if (sargs) {
-			(void) printf(gettext("No entry for %s in section(s) "
-			    "%s of the manual.\n"), fullname, mansec);
+			(void) fprintf(stderr, gettext("No entry for %s in "
+			    "section(s) %s of the manual.\n"),
+			    fullname, mansec);
 		} else {
-			(void) printf(gettext(
+			(void) fprintf(stderr, gettext(
 			    "No manual entry for %s.\n"), fullname, mansec);
 		}
 
 		if (sman_no_man_no_sroff)
-			(void) printf(gettext("(An SGML manpage was found "
-			    "for '%s' but it cannot be displayed.)\n"),
+			(void) fprintf(stderr, gettext("(An SGML manpage was "
+			    "found for '%s' but it cannot be displayed.)\n"),
 			    fullname, mansec);
 	}
 	sman_no_man_no_sroff = 0;
+	return (!found);
 }
 
 
@@ -2377,6 +2397,23 @@ format(char *path, char *dir, char *name, char *pg)
 			perror(manpname);
 			return (-1);
 		}
+
+		/*
+		 * If this is a directory, just ignore it.
+		 */
+		if (fstat(fileno(md), &statb) == NULL) {
+			if (S_ISDIR(statb.st_mode)) {
+				if (debug) {
+					(void) fprintf(stderr,
+					    "\tignoring directory %s\n",
+					    manpname);
+					(void) fflush(stderr);
+				}
+				(void) fclose(md);
+				return (-1);
+			}
+		}
+
 		if (fgets(manbuf, BUFSIZ-1, md) == NULL) {
 			(void) fclose(md);
 			(void) fprintf(stderr, gettext("%s: null file\n"),
@@ -2552,7 +2589,8 @@ so_again:	if (++socount > SOLIMIT) {
 				 */
 				(void) sprintf(cbp, "%s %s |",
 				    troffit ? pp->p_troff : pp->p_nroff,
-				    pipestage++ == 0 ? manpname : "-");
+				    pipestage++ == 0 ? manpname :
+				    pp->p_stdin_char);
 				cbp += strlen(cbp);
 
 				/*

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -41,7 +40,9 @@
 #endif
 
 #include <gssapi/gssapi_ext.h>   /* SUNW15resync - mechglue.h in mit 1.5 */
-/* #include "gssapiP_generic.h" */
+#if 0 /* Solaris Kerberos */
+#include "gssapiP_generic.h"
+#endif
 
 #ifdef _KERNEL
 #include <rpc/rpc.h>
@@ -126,6 +127,18 @@ typedef	OM_uint32	    (*gss_acquire_cred_with_password_sfct)(
 		    OM_uint32 *		/* time_rec */
 	/* */);
 
+/*
+ * Rudimentary pointer validation macro to check whether the
+ * "loopback" field of an opaque struct points back to itself.  This
+ * field also catches some programming errors where an opaque pointer
+ * is passed to a function expecting the address of the opaque
+ * pointer.
+ */
+#if 0 /* Solaris Kerberos - revisit for full 1.7/next resync */
+#define GSSINT_CHK_LOOP(p) (!((p) != NULL && (p)->loopback == (p)))
+#else
+#define GSSINT_CHK_LOOP(p) ((p) == NULL)
+#endif
 
 
 /********************************************************/
@@ -580,6 +593,8 @@ OM_uint32 __gss_display_internal_name(OM_uint32 *, const gss_OID,
 	const gss_name_t, gss_buffer_t, gss_OID *);
 OM_uint32 __gss_release_internal_name(OM_uint32 *, const gss_OID,
 	gss_name_t *);
+OM_uint32 gssint_delete_internal_sec_context (OM_uint32 *, gss_OID,
+	gss_ctx_id_t *, gss_buffer_t);
 OM_uint32 __gss_convert_name_to_union_name(
 	OM_uint32 *,		/* minor_status */
 	gss_mechanism,	/* mech */
@@ -928,16 +943,27 @@ OM_uint32 generic_gss_release_buffer_set
 
 #else  /* _KERNEL */
 
-#include <syslog.h>
+/* Use this to map an error code that was returned from a mech
+   operation; the mech will be asked to produce the associated error
+   messages.
 
-#define map_error(MINORP, MECH)				\
-	(void) syslog(LOG_AUTH|LOG_DEBUG,		\
-		    "map_error: minor status=%x",	\
-		    (MINORP) ? *(MINORP) : 0xffffffff)
+   Remember that if the minor status code cannot be returned to the
+   caller (e.g., if it's stuffed in an automatic variable and then
+   ignored), then we don't care about producing a mapping.  */
+#define map_error(MINORP, MECH) \
+    (*(MINORP) = gssint_mecherrmap_map(*(MINORP), &(MECH)->mech_type))
+#define map_error_oid(MINORP, MECHOID) \
+    (*(MINORP) = gssint_mecherrmap_map(*(MINORP), (MECHOID)))
+
+/* Use this to map an errno value or com_err error code being
+   generated within the mechglue code (e.g., by calling generic oid
+   ops).  Any errno or com_err values produced by mech operations
+   should be processed with map_error.  This means they'll be stored
+   separately even if the mech uses com_err, because we can't assume
+   that it will use com_err.  */
 #define map_errcode(MINORP) \
-	(void) syslog(LOG_AUTH|LOG_DEBUG,		\
-		    "map_errcode: minor status=%x",	\
-		    (MINORP) ? *(MINORP) : 0xffffffff)
+    (*(MINORP) = gssint_mecherrmap_map_errcode(*(MINORP)))
+
 #endif /* _KERNEL */
 
 #endif /* _GSS_MECHGLUEP_H */

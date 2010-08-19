@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1122,7 +1121,9 @@ nfs3rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 	cv_init(&mi->mi_async_cv, NULL, CV_DEFAULT, NULL);
 
 	mi->mi_vfsp = vfsp;
-	zone_hold(mi->mi_zone = zone);
+	mi->mi_zone = zone;
+	zone_init_ref(&mi->mi_zone_ref);
+	zone_hold_ref(zone, &mi->mi_zone_ref, ZONE_REF_NFS);
 	nfs_mi_zonelist_add(mi);
 
 	/*

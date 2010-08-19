@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -43,16 +41,19 @@
 #include <sys/pathname.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
+#include <sys/fcntl.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
 #include <fs/fs_subr.h>
+#include <c2/audit.h>
 
 /*
  * Read the contents of a symbolic link.
  */
 ssize_t
-readlink(char *name, char *buf, size_t count)
+readlinkat(int dfd, char *name, char *buf, size_t count)
 {
+	vnode_t *startvp;
 	vnode_t *vp;
 	struct iovec aiov;
 	struct uio auio;
@@ -63,12 +64,19 @@ readlink(char *name, char *buf, size_t count)
 
 	if ((cnt = (ssize_t)count) < 0)
 		return (set_errno(EINVAL));
+	if (name == NULL)
+		return (set_errno(EFAULT));
+	if ((error = fgetstartvp(dfd, name, &startvp)) != 0)
+		return (set_errno(error));
 
 lookup:
-	if (error = lookupname(name, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp)) {
-		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
+	if (AU_AUDITING() && startvp != NULL)
+		audit_setfsat_path(1);
+	if (error = lookupnameat(name, UIO_USERSPACE, NO_FOLLOW,
+	    NULLVPP, &vp, startvp)) {
+		if (error == ESTALE && fs_need_estale_retry(estale_retry++))
 			goto lookup;
-		return (set_errno(error));
+		goto out;
 	}
 
 	if (vp->v_type != VLNK) {
@@ -83,7 +91,8 @@ lookup:
 			if ((error == ESTALE) &&
 			    fs_need_estale_retry(estale_retry++))
 				goto lookup;
-			return (set_errno(EINVAL));
+			error = EINVAL;
+			goto out;
 		}
 	}
 	aiov.iov_base = buf;
@@ -96,12 +105,20 @@ lookup:
 	auio.uio_resid = cnt;
 	error = VOP_READLINK(vp, &auio, CRED(), NULL);
 	VN_RELE(vp);
-	if (error) {
-		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
-			goto lookup;
+	if (error == ESTALE && fs_need_estale_retry(estale_retry++))
+		goto lookup;
+out:
+	if (startvp != NULL)
+		VN_RELE(startvp);
+	if (error)
 		return (set_errno(error));
-	}
 	return ((ssize_t)(cnt - auio.uio_resid));
+}
+
+ssize_t
+readlink(char *name, char *buf, size_t count)
+{
+	return (readlinkat(AT_FDCWD, name, buf, count));
 }
 
 #ifdef _SYSCALL32_IMPL
@@ -111,9 +128,16 @@ lookup:
  */
 
 ssize_t
+readlinkat32(int dfd, caddr32_t name, caddr32_t buf, size32_t count)
+{
+	return ((ssize32_t)readlinkat(dfd, (char *)(uintptr_t)name,
+	    (char *)(uintptr_t)buf, (ssize32_t)count));
+}
+
+ssize_t
 readlink32(caddr32_t name, caddr32_t buf, size32_t count)
 {
-	return ((ssize32_t)readlink((char *)(uintptr_t)name,
+	return ((ssize32_t)readlinkat(AT_FDCWD, (char *)(uintptr_t)name,
 	    (char *)(uintptr_t)buf, (ssize32_t)count));
 }
 

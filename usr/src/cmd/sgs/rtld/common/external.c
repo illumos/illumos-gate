@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -478,7 +477,8 @@ rt_thr_init(Lm_list *lml)
 	if ((fptr =
 	    (void (*)())lml->lm_lcs[CI_THRINIT].lc_un.lc_func) != NULL) {
 		lml->lm_lcs[CI_THRINIT].lc_un.lc_func = NULL;
-		leave(NULL, thr_flg_reenter);
+
+		leave(lml, thr_flg_reenter);
 		(*fptr)();
 		(void) enter(thr_flg_reenter);
 
@@ -578,11 +578,27 @@ mutex_destroy(mutex_t *mp)
 size_t
 thr_min_stack()
 {
-#ifdef _LP64
-	return (8 * 1024);
-#else
-	return (4 * 1024);
-#endif
+	return (sizeof (uintptr_t) * 1024);
+}
+
+/*
+ * Local str[n]casecmp() interfaces for the dynamic linker,
+ * to avoid problems when linking with libc_pic.a
+ */
+int
+strcasecmp(const char *s1, const char *s2)
+{
+	extern int ascii_strcasecmp(const char *, const char *);
+
+	return (ascii_strcasecmp(s1, s2));
+}
+
+int
+strncasecmp(const char *s1, const char *s2, size_t n)
+{
+	extern int ascii_strncasecmp(const char *, const char *, size_t);
+
+	return (ascii_strncasecmp(s1, s2, n));
 }
 
 /*
@@ -592,7 +608,6 @@ thr_min_stack()
  * the dynamic linker, so we redefine these to call the primitive,
  * non-cancellation interfaces.
  */
-
 int
 close(int fildes)
 {

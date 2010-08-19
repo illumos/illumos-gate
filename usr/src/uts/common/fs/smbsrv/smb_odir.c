@@ -248,7 +248,7 @@
 #include <sys/extdirent.h>
 
 /* static functions */
-static smb_odir_t *smb_odir_create(smb_request_t *, smb_node_t *,
+static uint16_t smb_odir_create(smb_request_t *, smb_node_t *,
     char *, uint16_t, cred_t *);
 static int smb_odir_single_fileinfo(smb_request_t *, smb_odir_t *,
     smb_fileinfo_t *);
@@ -257,6 +257,7 @@ static int smb_odir_wildcard_fileinfo(smb_request_t *, smb_odir_t *,
 static int smb_odir_next_odirent(smb_odir_t *, smb_odirent_t *);
 static boolean_t smb_odir_lookup_link(smb_request_t *, smb_odir_t *,
     char *, smb_node_t **);
+static boolean_t smb_odir_match_name(smb_odir_t *, smb_odirent_t *);
 
 
 /*
@@ -275,7 +276,7 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 	smb_tree_t	*tree;
 	smb_node_t	*dnode;
 	char		pattern[MAXNAMELEN];
-	smb_odir_t 	*od;
+	uint16_t 	odid;
 	cred_t		*cr;
 
 	ASSERT(sr);
@@ -313,9 +314,9 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 	else
 		cr = tree->t_user->u_cred;
 
-	od = smb_odir_create(sr, dnode, pattern, sattr, cr);
+	odid = smb_odir_create(sr, dnode, pattern, sattr, cr);
 	smb_node_release(dnode);
-	return (od ? od->d_odid : 0);
+	return (odid);
 }
 
 /*
@@ -333,7 +334,7 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 {
 	int		rc;
 	vnode_t		*xattr_dvp;
-	smb_odir_t	*od;
+	uint16_t	odid;
 	cred_t		*cr;
 	char		pattern[SMB_STREAM_PREFIX_LEN + 2];
 
@@ -370,14 +371,10 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 	}
 
 	(void) snprintf(pattern, sizeof (pattern), "%s*", SMB_STREAM_PREFIX);
-	od = smb_odir_create(sr, xattr_dnode, pattern, SMB_SEARCH_ATTRIBUTES,
+	odid = smb_odir_create(sr, xattr_dnode, pattern, SMB_SEARCH_ATTRIBUTES,
 	    cr);
 	smb_node_release(xattr_dnode);
-	if (od == NULL)
-		return (0);
-
-	od->d_flags |= SMB_ODIR_FLAG_XATTR;
-	return (od->d_odid);
+	return (odid);
 }
 
 /*
@@ -516,8 +513,7 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
 	for (;;) {
 		if ((rc = smb_odir_next_odirent(od, odirent)) != 0)
 			break;
-		if (smb_match_name(odirent->od_ino, odirent->od_name,
-		    od->d_pattern))
+		if (smb_odir_match_name(od, odirent))
 			break;
 	}
 
@@ -605,8 +601,7 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 			    U8_VALIDATE_ENTIRE, &errnum) < 0)
 				continue;
 
-			if (!smb_match_name(odirent->od_ino, odirent->od_name,
-			    od->d_pattern))
+			if (!smb_odir_match_name(od, odirent))
 				continue;
 
 			rc = smb_odir_wildcard_fileinfo(sr, od, odirent,
@@ -811,7 +806,7 @@ smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
  * smb_odir_create
  * Allocate and populate an odir obect and add it to the tree's list.
  */
-static smb_odir_t *
+static uint16_t
 smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
     char *pattern, uint16_t sattr, cred_t *cr)
 {
@@ -831,7 +826,7 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	if (smb_idpool_alloc(&tree->t_odid_pool, &odid)) {
 		smbsr_error(sr, NT_STATUS_TOO_MANY_OPENED_FILES,
 		    ERRDOS, ERROR_TOO_MANY_OPEN_FILES);
-		return (NULL);
+		return (0);
 	}
 
 	od = kmem_cache_alloc(tree->t_server->si_cache_odir, KM_SLEEP);
@@ -857,10 +852,14 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 		od->d_flags |= SMB_ODIR_FLAG_EDIRENT;
 	if (smb_tree_has_feature(tree, SMB_TREE_CASEINSENSITIVE))
 		od->d_flags |= SMB_ODIR_FLAG_IGNORE_CASE;
+	if (smb_tree_has_feature(tree, SMB_TREE_SHORTNAMES))
+		od->d_flags |= SMB_ODIR_FLAG_SHORTNAMES;
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		od->d_flags |= SMB_ODIR_FLAG_CATIA;
 	if (SMB_TREE_SUPPORTS_ABE(sr))
 		od->d_flags |= SMB_ODIR_FLAG_ABE;
+	if (dnode->flags & NODE_XATTR_DIR)
+		od->d_flags |= SMB_ODIR_FLAG_XATTR;
 	od->d_eof = B_FALSE;
 
 	smb_llist_enter(&tree->t_odir_list, RW_WRITER);
@@ -868,7 +867,7 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	smb_llist_exit(&tree->t_odir_list);
 
 	atomic_inc_32(&tree->t_session->s_dir_cnt);
-	return (od);
+	return (odid);
 }
 
 /*
@@ -1038,7 +1037,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	int		rc;
 	smb_node_t	*fnode, *tgt_node;
 	smb_attr_t	attr;
-	ino64_t		ino;
+	ino64_t		fid;
 	char		*name;
 	boolean_t	case_conflict = B_FALSE;
 	int		lookup_flags, flags = 0;
@@ -1101,11 +1100,15 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	}
 
 	name = fnode->od_name;
-	ino = attr.sa_vattr.va_nodeid;
-	if (case_conflict || smb_needs_mangled(name))
-		smb_mangle(name, ino, fileinfo->fi_shortname, SMB_SHORTNAMELEN);
-	if (case_conflict)
-		name = fileinfo->fi_shortname;
+	if (od->d_flags & SMB_ODIR_FLAG_SHORTNAMES) {
+		fid = attr.sa_vattr.va_nodeid;
+		if (case_conflict || smb_needs_mangled(name)) {
+			smb_mangle(name, fid, fileinfo->fi_shortname,
+			    SMB_SHORTNAMELEN);
+		}
+		if (case_conflict)
+			name = fileinfo->fi_shortname;
+	}
 
 	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
@@ -1194,14 +1197,18 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (ENOENT);
 	}
 
-	case_conflict = ((od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) &&
-	    (odirent->od_eflags & ED_CASE_CONFLICT));
-	if (case_conflict || smb_needs_mangled(odirent->od_name)) {
-		smb_mangle(odirent->od_name, odirent->od_ino,
-		    fileinfo->fi_shortname, SMB_SHORTNAMELEN);
+	name = odirent->od_name;
+	if (od->d_flags & SMB_ODIR_FLAG_SHORTNAMES) {
+		case_conflict = ((od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) &&
+		    (odirent->od_eflags & ED_CASE_CONFLICT));
+		if (case_conflict || smb_needs_mangled(name)) {
+			smb_mangle(name, odirent->od_ino,
+			    fileinfo->fi_shortname, SMB_SHORTNAMELEN);
+		}
+		if (case_conflict)
+			name = fileinfo->fi_shortname;
 	}
 
-	name = (case_conflict) ? fileinfo->fi_shortname : odirent->od_name;
 	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
 	fileinfo->fi_cookie = (uint32_t)od->d_offset;
@@ -1260,4 +1267,35 @@ smb_odir_lookup_link(smb_request_t *sr, smb_odir_t *od,
 	}
 
 	return (B_TRUE);
+}
+
+/*
+ * smb_odir_match_name
+ *
+ * Check if the directory entry name matches the search pattern:
+ * - Don't match reserved dos filenames.
+ * - Check if odirent->od_name matches od->d_pattern.
+ * - If shortnames are supported, generate the shortname from
+ *   odirent->od_name and check if it matches od->d_pattern.
+ */
+boolean_t
+smb_odir_match_name(smb_odir_t *od, smb_odirent_t *odirent)
+{
+	char	*name = odirent->od_name;
+	char	shortname[SMB_SHORTNAMELEN];
+	ino64_t	ino = odirent->od_ino;
+
+	if (smb_is_reserved_dos_name(name))
+		return (B_FALSE);
+
+	if (smb_match_ci(od->d_pattern, name))
+		return (B_TRUE);
+
+	if (od->d_flags & SMB_ODIR_FLAG_SHORTNAMES) {
+		smb_mangle(name, ino, shortname, SMB_SHORTNAMELEN);
+		if (smb_match_ci(od->d_pattern, shortname))
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }

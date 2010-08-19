@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1811,14 +1810,14 @@ tavor_soft_state_init(tavor_state_t *state)
 	 * either configuration variables or successful queries of the Tavor
 	 * hardware abilities
 	 */
-	state->ts_ibtfinfo.hca_ci_vers	= IBCI_V3;
-	state->ts_ibtfinfo.hca_dip	= state->ts_dip;
+	state->ts_ibtfinfo.hca_ci_vers	= IBCI_V4;
 	state->ts_ibtfinfo.hca_handle	= (ibc_hca_hdl_t)state;
 	state->ts_ibtfinfo.hca_ops	= &tavor_ibc_ops;
 
 	hca_attr = kmem_zalloc(sizeof (ibt_hca_attr_t), KM_SLEEP);
 	state->ts_ibtfinfo.hca_attr = hca_attr;
 
+	hca_attr->hca_dip = state->ts_dip;
 	hca_attr->hca_fw_major_version = state->ts_fw.fw_rev_major;
 	hca_attr->hca_fw_minor_version = state->ts_fw.fw_rev_minor;
 	hca_attr->hca_fw_micro_version = state->ts_fw.fw_rev_subminor;
@@ -1856,6 +1855,7 @@ tavor_soft_state_init(tavor_state_t *state)
 	    IBT_HCA_SI_GUID | IBT_HCA_RNR_NAK | IBT_HCA_CURRENT_QP_STATE |
 	    IBT_HCA_PORT_UP | IBT_HCA_SQD_STATE);
 	hca_attr->hca_flags = caps;
+	hca_attr->hca_flags2 = IBT_HCA2_DMA_MR;
 
 	/* Determine VendorID, DeviceID, and revision ID */
 	hca_attr->hca_vendor_id	 = state->ts_adapter.vendor_id;

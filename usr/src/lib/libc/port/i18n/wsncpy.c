@@ -20,19 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * Copy s2 to s1, truncating or null-padding to always copy n characters.
- * Return s1.
- */
 
 #pragma weak _wcsncpy = wcsncpy
 #pragma weak _wsncpy = wsncpy
@@ -41,14 +33,18 @@
 #include <stdlib.h>
 #include <wchar.h>
 
+/*
+ * Copy s2 to s1, truncating or null-padding to always copy n
+ * wide-character codes.  Return s1.
+ */
 wchar_t *
 wcsncpy(wchar_t *s1, const wchar_t *s2, size_t n)
 {
 	wchar_t *os1 = s1;
 
 	n++;
-	while ((--n > 0) && ((*s1++ = *s2++) != 0))
-		;
+	while (--n > 0 && (*s1++ = *s2++) != 0)
+		continue;
 	if (n > 0)
 		while (--n > 0)
 			*s1++ = 0;
@@ -59,4 +55,27 @@ wchar_t *
 wsncpy(wchar_t *s1, const wchar_t *s2, size_t n)
 {
 	return (wcsncpy(s1, s2, n));
+}
+
+/*
+ * Same as wcsncpy(), except return a pointer to the terminating null
+ * wide-character code in s1, or, if s1 is not null-terminated, s1 + n.
+ */
+wchar_t *
+wcpncpy(wchar_t *s1, const wchar_t *s2, size_t n)
+{
+	wchar_t *os1 = s1;
+
+	n++;
+	while (--n != 0) {
+		if ((*s1++ = *s2++) == 0) {
+			os1 = s1 - 1;
+			break;
+		}
+		os1 = s1;
+	}
+	if (n != 0)
+		while (--n != 0)
+			*s1++ = 0;
+	return (os1);
 }

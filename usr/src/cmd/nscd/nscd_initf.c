@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <nss_common.h>
 #include <nss_dbdefs.h>
@@ -239,9 +237,8 @@ nss_db_initf_t	nscd_nss_db_initf[] = {
 	_nss_initf_passwd_compat,
 	_nss_initf_group_compat,
 	/*
-	 * no initf() for pseudo-databases: passwd, shadow,
-	 * audit_user, user_attr, and group (when called from
-	 * the compat backend)
+	 * no initf() for pseudo-databases: passwd, shadow, audit_user,
+	 * user_attr, and group (when called from the compat backend)
 	 */
 	NULL,
 	NULL,

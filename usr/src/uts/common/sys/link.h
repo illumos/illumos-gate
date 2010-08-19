@@ -182,7 +182,7 @@ typedef struct {
 #define	DT_PLTPADSZ	0x6ffffdf9	/* pltpadding size */
 #define	DT_MOVEENT	0x6ffffdfa	/* move table entry size */
 #define	DT_MOVESZ	0x6ffffdfb	/* move table size */
-#define	DT_FEATURE_1	0x6ffffdfc	/* feature holder */
+#define	DT_FEATURE_1	0x6ffffdfc	/* feature holder (unused) */
 #define	DT_POSFLAG_1	0x6ffffdfd	/* flags for DT_* entries, effecting */
 					/*	the following DT_* entry. */
 					/*	See DF_P1_* definitions */
@@ -273,7 +273,7 @@ typedef struct {
 #define	DF_1_NOOPEN	0x00000040	/* set RTLD_NOOPEN for this object */
 #define	DF_1_ORIGIN	0x00000080	/* ORIGIN processing required */
 #define	DF_1_DIRECT	0x00000100	/* direct binding enabled */
-#define	DF_1_TRANS	0x00000200	/* unused historical name */
+#define	DF_1_TRANS	0x00000200	/* unused obsolete name */
 #define	DF_1_INTERPOSE	0x00000400	/* object is an interposer */
 #define	DF_1_NODEFLIB	0x00000800	/* ignore default library search path */
 #define	DF_1_NODUMP	0x00001000	/* object can't be dldump(3x)'ed */
@@ -297,7 +297,7 @@ typedef struct {
 #define	DF_1_SINGLETON	0x02000000	/* singleton symbols exist */
 
 /*
- * Values set to DT_FEATURE_1 tag's d_val.
+ * Values set to DT_FEATURE_1 tag's d_val (unused obsolete tag)
  */
 #define	DTF_1_PARINIT	0x00000001	/* partially initialization feature */
 #define	DTF_1_CONFEXP	0x00000002	/* configuration file expected */
@@ -461,7 +461,7 @@ typedef struct {
 					/*	to object containing defn. */
 #define	SYMINFO_FLG_FILTER	0x0002	/* symbol ref is associated to a */
 					/* 	standard filter */
-#define	SYMINFO_FLG_PASSTHRU	SYMINFO_FLG_FILTER /* unused historical name */
+#define	SYMINFO_FLG_PASSTHRU	SYMINFO_FLG_FILTER /* unused obsolete name */
 #define	SYMINFO_FLG_COPY	0x0004	/* symbol is a copy-reloc */
 #define	SYMINFO_FLG_LAZYLOAD	0x0008	/* object containing defn. should be */
 					/*	lazily-loaded */

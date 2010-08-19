@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ldapaddrbac.c
@@ -58,7 +55,7 @@ extern	char	*_strtok_escape(char *, char *, char **); /* from libnsl */
 #include <auth_attr.h>
 
 /*
- * The parsing routines for RBAC and audit_user databases
+ * The parsing routines for RBAC databases
  */
 
 /*
@@ -386,64 +383,6 @@ dump_auth_attr(ns_ldap_result_t *res)
 		(void) fprintf(stdout, "%s", value[0]);
 	(void) fprintf(stdout, ":");
 	value = __ns_ldap_getAttr(res->entry, "SolarisAttrKeyValue");
-	if (value && value[0])
-		(void) fprintf(stdout, "%s", value[0]);
-	(void) fprintf(stdout, "\n");
-}
-
-int
-genent_audit_user(char *line, int (*cback)())
-{
-	entry_col	*ecol;
-	au_user_str_t	data;
-	int		res, retval;
-
-	/*
-	 * parse entry into columns
-	 */
-	res = genent_attr(line, AUDITUSER_DB_NCOL, &ecol);
-	if (res != GENENT_OK)
-		return (res);
-
-	data.au_name = strdup(ecol[0].ec_value.ec_value_val);
-	data.au_always = strdup(ecol[1].ec_value.ec_value_val);
-	data.au_never = strdup(ecol[2].ec_value.ec_value_val);
-
-	if (flags & F_VERBOSE)
-		(void) fprintf(stdout,
-		    gettext("Adding entry : %s\n"), data.au_name);
-
-	retval = (*cback)(&data, 1);
-	if (retval != NS_LDAP_SUCCESS) {
-		if (retval == LDAP_NO_SUCH_OBJECT)
-			(void) fprintf(stdout,
-			gettext("Cannot add audit_user entry (%s), "
-			"add passwd entry first\n"), data.au_name);
-		if (continue_onerror == 0) res = GENENT_CBERR;
-	}
-
-	free(ecol);
-
-	return (res);
-}
-
-void
-dump_audit_user(ns_ldap_result_t *res)
-{
-	char	**value = NULL;
-
-	value = __ns_ldap_getAttr(res->entry, "uid");
-	if (value && value[0])
-		(void) fprintf(stdout, "%s", value[0]);
-	else
-		return;
-
-	(void) fprintf(stdout, ":");
-	value = __ns_ldap_getAttr(res->entry, "SolarisAuditAlways");
-	if (value && value[0])
-		(void) fprintf(stdout, "%s", value[0]);
-	(void) fprintf(stdout, ":");
-	value = __ns_ldap_getAttr(res->entry, "SolarisAuditNever");
 	if (value && value[0])
 		(void) fprintf(stdout, "%s", value[0]);
 	(void) fprintf(stdout, "\n");

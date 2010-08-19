@@ -102,15 +102,11 @@ file path=usr/lib/ldoms/vntsd mode=0555
 file path=usr/lib/libds.so.1
 file path=usr/lib/libpri.so.1
 file path=usr/lib/rcm/scripts/SUNW,vdevices.pl mode=0555
-legacy pkg=SUNWldomr.v arch=$(ARCH).sun4v category=system \
+legacy pkg=SUNWldomr.v arch=$(ARCH).sun4v \
     desc="Solaris Logical Domains Configuration Files" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Logical Domains (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWldomu.v arch=$(ARCH).sun4v category=system \
+    name="Solaris Logical Domains (Root)"
+legacy pkg=SUNWldomu.v arch=$(ARCH).sun4v \
     desc="Solaris Logical Domains Configuration and Administration" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Logical Domains (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Solaris Logical Domains (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

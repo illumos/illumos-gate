@@ -43,10 +43,8 @@ driver name=audioemu10k \
     alias=pci1102,8
 file path=kernel/drv/$(ARCH64)/audioemu10k group=sys
 file path=kernel/drv/audioemu10k group=sys
-legacy pkg=SUNWaudioemu10k arch=$(ARCH) category=system \
+legacy pkg=SUNWaudioemu10k \
     desc="SunOS audio device driver for Creative EMU10K" \
-    hotline="Please contact your local service provider" \
-    name="Creative EMU10K Audio Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Creative EMU10K Audio Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

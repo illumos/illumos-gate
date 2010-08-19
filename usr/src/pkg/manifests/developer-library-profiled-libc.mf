@@ -34,11 +34,9 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/libp
 dir path=usr/lib/libp/$(ARCH64)
-legacy pkg=SUNWdpl arch=$(ARCH) category=system \
+legacy pkg=SUNWdpl \
     desc="system libraries compiled with profiling for software development performance measurement" \
-    hotline="Please contact your local service provider" \
-    name="Developer Profiled Libraries" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Developer Profiled Libraries"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libp/$(ARCH64)/libc.so.1 \

@@ -309,7 +309,7 @@ static int getOidList(di_node_t root_node, int tpgID,
 
 					pOidList->oids[numNodes].
 					    objectSequenceNumber =
-					    sv_child_inst;
+					    osn;
 
 					pOidList->oids[numNodes].objectType =
 					    MP_OBJECT_TYPE_MULTIPATH_LU;

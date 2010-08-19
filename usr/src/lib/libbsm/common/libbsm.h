@@ -85,11 +85,6 @@ typedef struct au_user_str_s {
 } au_user_str_t;
 
 /*
- * opaque context value for getacval.c
- */
-typedef struct au_acinfo au_acinfo_t;
-
-/*
  * adrf's version of adr_t
  */
 typedef struct adrf_s {
@@ -176,46 +171,6 @@ extern au_class_ent_t *getauclassnam(char *);
 extern au_class_ent_t *getauclassnam_r(au_class_ent_t *, char *);
 
 /*
- * Functions that manipulate audit attributes of users
- */
-
-void	setauuser(void);
-void	endauuser(void);
-
-au_user_ent_t *getauuserent(void);
-au_user_ent_t *getauuserent_r(au_user_ent_t *);
-au_user_ent_t *getauusernam(char *);
-au_user_ent_t *getauusernam_r(au_user_ent_t *, char *);
-
-/*
- * Functions that manipulate the audit control file
- */
-
-void	endac(void);
-void	setac(void);
-
-int	getacdir(char *, int);
-int	getacmin(int *);
-int	getacna(char *, int);
-int	getacflg(char *, int);
-
-/*
- * Functions that manipulate the audit control file
- */
-
-
-au_acinfo_t	*_openac(char *);
-void		_endac(au_acinfo_t *);
-void		_rewindac(au_acinfo_t *);
-
-int		_getacdir(au_acinfo_t *, char *, int);
-int		_getaclib(au_acinfo_t *, kva_t **);
-int		_getacmin(au_acinfo_t *, int *);
-int		_getacna(au_acinfo_t *, char *, int);
-int		_getacflg(au_acinfo_t *, char *, int);
-int		_getacplug(au_acinfo_t *, kva_t **);
-
-/*
  * Functions that manipulate audit masks
  */
 
@@ -238,8 +193,6 @@ extern int	getauid(au_id_t *);
 extern int	setaudit(auditinfo_t *);
 extern int	setaudit_addr(auditinfo_addr_t *, int);
 extern int	setauid(au_id_t *);
-
-#define	BSM_TEXTBUFSZ	256 /* size of string for generic text token */
 
 /*
  * Defines for au_preselect(3)
@@ -264,7 +217,6 @@ extern int	setauid(au_id_t *);
 
 /* system audit files for auditd */
 #define	AUDITCLASSFILE		"/etc/security/audit_class"
-#define	AUDITCONTROLFILE	"/etc/security/audit_control"
 #define	AUDITEVENTFILE		"/etc/security/audit_event"
 #define	AUDITUSERFILE		"/etc/security/audit_user"
 

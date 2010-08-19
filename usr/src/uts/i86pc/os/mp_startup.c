@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -165,7 +164,8 @@ init_cpu_syscall(struct cpu *cp)
 	kpreempt_disable();
 
 #if defined(__amd64)
-	if ((x86_feature & (X86_MSR | X86_ASYSC)) == (X86_MSR | X86_ASYSC)) {
+	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
+	    is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
 
 #if !defined(__lint)
 		/*
@@ -205,7 +205,8 @@ init_cpu_syscall(struct cpu *cp)
 	 * On 64-bit kernels on Nocona machines, the 32-bit syscall
 	 * variant isn't available to 32-bit applications, but sysenter is.
 	 */
-	if ((x86_feature & (X86_MSR | X86_SEP)) == (X86_MSR | X86_SEP)) {
+	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
+	    is_x86_feature(x86_featureset, X86FSET_SEP)) {
 
 #if !defined(__lint)
 		/*
@@ -415,7 +416,8 @@ mp_cpu_configure_common(int cpun, boolean_t boot)
 	 */
 	cpuid_alloc_space(cp);
 #if !defined(__xpv)
-	if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait) {
+	if (is_x86_feature(x86_featureset, X86FSET_MWAIT) &&
+	    idle_cpu_prefer_mwait) {
 		cp->cpu_m.mcpu_mwait = cpuid_mwait_alloc(cp);
 		cp->cpu_m.mcpu_idle_cpu = cpu_idle_mwait;
 	} else
@@ -1142,7 +1144,7 @@ workaround_errata(struct cpu *cpu)
 		if (opteron_workaround_6323525) {
 			opteron_workaround_6323525++;
 #if defined(__xpv)
-		} else if (x86_feature & X86_SSE2) {
+		} else if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
 			if (DOMAIN_IS_INITDOMAIN(xen_info)) {
 				/*
 				 * XXPV	Use dom0_msr here when extended
@@ -1160,7 +1162,8 @@ workaround_errata(struct cpu *cpu)
 				opteron_workaround_6323525++;
 			}
 #else	/* __xpv */
-		} else if ((x86_feature & X86_SSE2) && ((opteron_get_nnodes() *
+		} else if (is_x86_feature(x86_featureset, X86FSET_SSE2) &&
+		    ((opteron_get_nnodes() *
 		    cpuid_get_ncpu_per_chip(cpu)) > 1)) {
 			if ((xrdmsr(MSR_AMD_BU_CFG) & (UINT64_C(1) << 33)) == 0)
 				opteron_workaround_6323525++;
@@ -1602,8 +1605,7 @@ static void
 mp_startup_common(boolean_t boot)
 {
 	cpu_t *cp = CPU;
-	uint_t new_x86_feature;
-	const char *fmt = "?cpu%d: %b\n";
+	uchar_t new_x86_featureset[BT_SIZEOFMAP(NUM_X86_FEATURES)];
 	extern void cpu_event_init_cpu(cpu_t *);
 
 	/*
@@ -1629,13 +1631,14 @@ mp_startup_common(boolean_t boot)
 	 */
 	(void) (*ap_mlsetup)();
 
-	new_x86_feature = cpuid_pass1(cp);
+	bzero(new_x86_featureset, BT_SIZEOFMAP(NUM_X86_FEATURES));
+	cpuid_pass1(cp, new_x86_featureset);
 
 #ifndef __xpv
 	/*
 	 * Program this cpu's PAT
 	 */
-	if (x86_feature & X86_PAT)
+	if (is_x86_feature(x86_featureset, X86FSET_PAT))
 		pat_sync();
 #endif
 
@@ -1643,7 +1646,7 @@ mp_startup_common(boolean_t boot)
 	 * Set up TSC_AUX to contain the cpuid for this processor
 	 * for the rdtscp instruction.
 	 */
-	if (x86_feature & X86_TSCP)
+	if (is_x86_feature(x86_featureset, X86FSET_TSCP))
 		(void) wrmsr(MSR_AMD_TSCAUX, cp->cpu_id);
 
 	/*
@@ -1671,9 +1674,10 @@ mp_startup_common(boolean_t boot)
 	 * likely to happen once the number of processors in a configuration
 	 * gets large enough.
 	 */
-	if ((x86_feature & new_x86_feature) != x86_feature) {
-		cmn_err(CE_CONT, fmt, cp->cpu_id, new_x86_feature,
-		    FMT_X86_FEATURE);
+	if (compare_x86_featureset(x86_featureset, new_x86_featureset) ==
+	    B_FALSE) {
+		cmn_err(CE_CONT, "cpu%d: featureset\n", cp->cpu_id);
+		print_x86_featureset(new_x86_featureset);
 		cmn_err(CE_WARN, "cpu%d feature mismatch", cp->cpu_id);
 	}
 
@@ -1681,7 +1685,8 @@ mp_startup_common(boolean_t boot)
 	 * We do not support cpus with mixed monitor/mwait support if the
 	 * boot cpu supports monitor/mwait.
 	 */
-	if ((x86_feature & ~new_x86_feature) & X86_MWAIT)
+	if (is_x86_feature(x86_featureset, X86FSET_MWAIT) !=
+	    is_x86_feature(new_x86_featureset, X86FSET_MWAIT))
 		panic("unsupported mixed cpu monitor/mwait support detected");
 
 	/*
@@ -1704,6 +1709,13 @@ mp_startup_common(boolean_t boot)
 	 * again if it's switched away with CPU_QUIESCED set.
 	 */
 	cp->cpu_flags &= ~(CPU_POWEROFF | CPU_QUIESCED);
+
+	/*
+	 * Setup this processor for XSAVE.
+	 */
+	if (fp_save_mech == FP_XSAVE) {
+		xsave_setup_msr(cp);
+	}
 
 	cpuid_pass2(cp);
 	cpuid_pass3(cp);
@@ -1775,7 +1787,7 @@ mp_startup_common(boolean_t boot)
 
 		if ((hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
 		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL) {
-			if (x86_feature & X86_MCA)
+			if (is_x86_feature(x86_featureset, X86FSET_MCA))
 				cmi_mca_init(hdl);
 			cp->cpu_m.mcpu_cmi_hdl = hdl;
 		}
@@ -1934,19 +1946,21 @@ mp_cpu_faulted_exit(struct cpu *cp)
  * The following two routines are used as context operators on threads belonging
  * to processes with a private LDT (see sysi86).  Due to the rarity of such
  * processes, these routines are currently written for best code readability and
- * organization rather than speed.  We could avoid checking x86_feature at every
- * context switch by installing different context ops, depending on the
- * x86_feature flags, at LDT creation time -- one for each combination of fast
- * syscall feature flags.
+ * organization rather than speed.  We could avoid checking x86_featureset at
+ * every context switch by installing different context ops, depending on
+ * x86_featureset, at LDT creation time -- one for each combination of fast
+ * syscall features.
  */
 
 /*ARGSUSED*/
 void
 cpu_fast_syscall_disable(void *arg)
 {
-	if ((x86_feature & (X86_MSR | X86_SEP)) == (X86_MSR | X86_SEP))
+	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
+	    is_x86_feature(x86_featureset, X86FSET_SEP))
 		cpu_sep_disable();
-	if ((x86_feature & (X86_MSR | X86_ASYSC)) == (X86_MSR | X86_ASYSC))
+	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
+	    is_x86_feature(x86_featureset, X86FSET_ASYSC))
 		cpu_asysc_disable();
 }
 
@@ -1954,16 +1968,18 @@ cpu_fast_syscall_disable(void *arg)
 void
 cpu_fast_syscall_enable(void *arg)
 {
-	if ((x86_feature & (X86_MSR | X86_SEP)) == (X86_MSR | X86_SEP))
+	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
+	    is_x86_feature(x86_featureset, X86FSET_SEP))
 		cpu_sep_enable();
-	if ((x86_feature & (X86_MSR | X86_ASYSC)) == (X86_MSR | X86_ASYSC))
+	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
+	    is_x86_feature(x86_featureset, X86FSET_ASYSC))
 		cpu_asysc_enable();
 }
 
 static void
 cpu_sep_enable(void)
 {
-	ASSERT(x86_feature & X86_SEP);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_SEP));
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
 	wrmsr(MSR_INTC_SEP_CS, (uint64_t)(uintptr_t)KCS_SEL);
@@ -1972,7 +1988,7 @@ cpu_sep_enable(void)
 static void
 cpu_sep_disable(void)
 {
-	ASSERT(x86_feature & X86_SEP);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_SEP));
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
 	/*
@@ -1985,7 +2001,7 @@ cpu_sep_disable(void)
 static void
 cpu_asysc_enable(void)
 {
-	ASSERT(x86_feature & X86_ASYSC);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_ASYSC));
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
 	wrmsr(MSR_AMD_EFER, rdmsr(MSR_AMD_EFER) |
@@ -1995,7 +2011,7 @@ cpu_asysc_enable(void)
 static void
 cpu_asysc_disable(void)
 {
-	ASSERT(x86_feature & X86_ASYSC);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_ASYSC));
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
 	/*

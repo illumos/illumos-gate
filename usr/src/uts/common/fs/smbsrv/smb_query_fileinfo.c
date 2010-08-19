@@ -50,7 +50,7 @@
  * SMB_FILE_STANDARD_INFORMATION
  * SMB_FILE_INTERNAL_INFORMATION
  * SMB_FILE_EA_INFORMATION
- * SMB_FILE_ACCESS_INFORMATION - not yet supported quen query by path
+ * SMB_FILE_ACCESS_INFORMATION - not yet supported when query by path
  * SMB_FILE_NAME_INFORMATION
  * SMB_FILE_ALL_INFORMATION
  * SMB_FILE_ALT_NAME_INFORMATION - not valid for pipes
@@ -63,6 +63,12 @@
  * SMB_QUERY_INFORMATION
  * SMB_QUERY_INFORMATION2
  */
+
+/*
+ * SMB_STREAM_ENCODE_FIXED_SIZE:
+ * 2 dwords + 2 quadwords => 4 + 4 + 8 + 8 => 24
+ */
+#define	SMB_STREAM_ENCODE_FIXED_SZ	24
 
 typedef struct smb_queryinfo {
 	smb_node_t	*qi_node;	/* NULL for pipes */
@@ -90,6 +96,7 @@ static int smb_query_encode_response(smb_request_t *, smb_xa_t *,
     uint16_t, smb_queryinfo_t *);
 static void smb_encode_stream_info(smb_request_t *, smb_xa_t *,
     smb_queryinfo_t *);
+static boolean_t smb_stream_fits(smb_request_t *, smb_xa_t *, char *, uint32_t);
 static int smb_query_pathname(smb_request_t *, smb_node_t *, boolean_t,
     smb_queryinfo_t *);
 static void smb_query_shortname(smb_node_t *, smb_queryinfo_t *);
@@ -598,8 +605,10 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
  * entries. The entries that have been read so far are returned and
  * no error is reported.
  *
- * Offset calculation:
- * 2 dwords + 2 quadwords => 4 + 4 + 8 + 8 => 24
+ * If the response buffer is not large enough to return all of the
+ * named stream entries, the entries that do fit are returned and
+ * a warning code is set (NT_STATUS_BUFFER_OVERFLOW). The next_offset
+ * value in the last returned entry must be 0.
  */
 static void
 smb_encode_stream_info(smb_request_t *sr, smb_xa_t *xa, smb_queryinfo_t *qinfo)
@@ -647,20 +656,36 @@ smb_encode_stream_info(smb_request_t *sr, smb_xa_t *xa, smb_queryinfo_t *qinfo)
 	if (!is_dir) {
 		stream_name = "::$DATA";
 		stream_nlen = smb_ascii_or_unicode_strlen(sr, stream_name);
+		next_offset = SMB_STREAM_ENCODE_FIXED_SZ + stream_nlen +
+		    smb_ascii_or_unicode_null_len(sr);
 
-		if (done)
-			next_offset = 0;
-		else
-			next_offset = 24 + stream_nlen +
-			    smb_ascii_or_unicode_null_len(sr);
+		/* Can unnamed stream fit in response buffer? */
+		if (MBC_ROOM_FOR(&xa->rep_data_mb, next_offset) == 0) {
+			done = B_TRUE;
+			smbsr_warn(sr, NT_STATUS_BUFFER_OVERFLOW,
+			    ERRDOS, ERROR_MORE_DATA);
+		} else {
+			/* Can first named stream fit in rsp buffer? */
+			if (!done && !smb_stream_fits(sr, xa, sinfo->si_name,
+			    next_offset)) {
+				done = B_TRUE;
+				smbsr_warn(sr, NT_STATUS_BUFFER_OVERFLOW,
+				    ERRDOS, ERROR_MORE_DATA);
+			}
 
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu", sr,
-		    next_offset, stream_nlen, datasz, allocsz, stream_name);
+			if (done)
+				next_offset = 0;
+
+			(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu", sr,
+			    next_offset, stream_nlen, datasz, allocsz,
+			    stream_name);
+		}
 	}
 
 	/*
-	 * Since last packet does not have a pad we need to check
-	 * for the next stream before we encode the current one
+	 * If there is no next entry, or there is not enough space in
+	 * the response buffer for the next entry, the next_offset and
+	 * padding are 0.
 	 */
 	while (!done) {
 		stream_nlen = smb_ascii_or_unicode_strlen(sr, sinfo->si_name);
@@ -669,15 +694,28 @@ smb_encode_stream_info(smb_request_t *sr, smb_xa_t *xa, smb_queryinfo_t *qinfo)
 		rc = smb_odir_read_streaminfo(sr, od, sinfo_next, &eos);
 		if ((rc != 0) || (eos)) {
 			done = B_TRUE;
-			next_offset = 0;
-			pad = 0;
 		} else {
-			next_offset = 24 + stream_nlen +
+			next_offset = SMB_STREAM_ENCODE_FIXED_SZ +
+			    stream_nlen +
 			    smb_ascii_or_unicode_null_len(sr);
 			pad = smb_pad_align(next_offset, 8);
 			next_offset += pad;
+
+			/* Can next named stream fit in response buffer? */
+			if (!smb_stream_fits(sr, xa, sinfo_next->si_name,
+			    next_offset)) {
+				done = B_TRUE;
+				smbsr_warn(sr, NT_STATUS_BUFFER_OVERFLOW,
+				    ERRDOS, ERROR_MORE_DATA);
+			}
 		}
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu#.",
+
+		if (done) {
+			next_offset = 0;
+			pad = 0;
+		}
+
+		rc = smb_mbc_encodef(&xa->rep_data_mb, "%llqqu#.",
 		    sr, next_offset, stream_nlen,
 		    sinfo->si_size, sinfo->si_alloc_size,
 		    sinfo->si_name, pad);
@@ -694,6 +732,32 @@ smb_encode_stream_info(smb_request_t *sr, smb_xa_t *xa, smb_queryinfo_t *qinfo)
 }
 
 /*
+ * smb_stream_fits
+ *
+ * Check if the named stream entry can fit in the response buffer.
+ *
+ * Required space =
+ *	offset (size of current entry)
+ *	+ SMB_STREAM_ENCODE_FIXED_SIZE
+ *      + length of encoded stream name
+ *	+ length of null terminator
+ *	+ alignment padding
+ */
+static boolean_t
+smb_stream_fits(smb_request_t *sr, smb_xa_t *xa, char *name, uint32_t offset)
+{
+	uint32_t len, pad;
+
+	len = SMB_STREAM_ENCODE_FIXED_SZ +
+	    smb_ascii_or_unicode_strlen(sr, name) +
+	    smb_ascii_or_unicode_null_len(sr);
+	pad = smb_pad_align(len, 8);
+	len += pad;
+
+	return (MBC_ROOM_FOR(&xa->rep_data_mb, offset + len) != 0);
+}
+
+/*
  * smb_query_fileinfo
  *
  * Populate smb_queryinfo_t structure for SMB_FTYPE_DISK
@@ -704,6 +768,16 @@ smb_query_fileinfo(smb_request_t *sr, smb_node_t *node, uint16_t infolev,
     smb_queryinfo_t *qinfo)
 {
 	int rc = 0;
+
+	/* If shortname required but not supported -> OBJECT_NAME_NOT_FOUND */
+	if ((infolev == SMB_QUERY_FILE_ALT_NAME_INFO) ||
+	    (infolev == SMB_FILE_ALT_NAME_INFORMATION)) {
+		if (!smb_tree_has_feature(sr->tid_tree, SMB_TREE_SHORTNAMES)) {
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+			return (-1);
+		}
+	}
 
 	(void) bzero(qinfo, sizeof (smb_queryinfo_t));
 
@@ -830,8 +904,7 @@ smb_query_shortname(smb_node_t *node, smb_queryinfo_t *qinfo)
 		smb_mangle(namep, qinfo->qi_attr.sa_vattr.va_nodeid,
 		    qinfo->qi_shortname, SMB_SHORTNAMELEN);
 	} else {
-		(void) strlcpy(qinfo->qi_shortname, namep,
-		    SMB_SHORTNAMELEN);
+		(void) strlcpy(qinfo->qi_shortname, namep, SMB_SHORTNAMELEN);
 		(void) smb_strupr(qinfo->qi_shortname);
 	}
 }

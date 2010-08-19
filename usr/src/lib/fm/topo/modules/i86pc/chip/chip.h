@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _CHIP_H
@@ -214,7 +213,8 @@ extern const char *chip_label_smbios_get(topo_mod_t *, tnode_t *, id_t, char *);
 extern const char *chip_serial_smbios_get(topo_mod_t *, id_t);
 extern const char *chip_part_smbios_get(topo_mod_t *, id_t);
 extern const char *chip_rev_smbios_get(topo_mod_t *, id_t);
-extern id_t memnode_to_smbiosid(uint16_t, const char *, uint64_t, void *);
+extern id_t memnode_to_smbiosid(topo_mod_t *, uint16_t, const char *,
+    uint64_t, void *);
 
 
 #ifdef __cplusplus

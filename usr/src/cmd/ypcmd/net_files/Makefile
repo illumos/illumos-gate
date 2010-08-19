@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #      Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
 #      All Rights Reserved
@@ -27,8 +26,6 @@
 # Portions of this source code were derived from Berkeley 
 # under license from the Regents of the University of  
 # California.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #----
 # It is somewhat confusing to note that Solaris 2.x uses /etc/auto_master
@@ -46,7 +43,7 @@ DIR =/etc
 #
 INETDIR=/etc/inet
 #
-# If the audit_user, auth_attr, exec_attr, prof_attr files
+# If the auth_attr, exec_attr, prof_attr files
 # live in a directory other than /etc/security, then you'll
 # need to change the following line.
 #
@@ -84,7 +81,7 @@ k:
 all: passwd group hosts ipnodes ethers networks rpc services protocols \
 	netgroup bootparams aliases publickey netid netmasks c2secure \
 	timezone auto.master auto.home ageing \
-	auth.attr exec.attr prof.attr user.attr audit.user
+	auth.attr exec.attr prof.attr user.attr
 
 c2secure:
 	-@if [ -f $(PWDIR)/security/passwd.adjunct ]; then \
@@ -444,26 +441,6 @@ user.attr.time:  $(DIR)/user_attr
 		echo "couldn't find $(DIR)/user_attr"; \
 	fi
 
-audit.user.time:  $(RBACDIR)/audit_user
-	-@if [ -f $(RBACDIR)/audit_user ]; then \
-		sed -e "/^#/d" -e s/#.*$$// $(RBACDIR)/audit_user \
-		|sed -e '/\\$$/{:l' -e 'N;s/\\\n//;t h' -e ':h' \
-		-e 's/\\$$/\\/;t l' -e } \
-		| (nawk 'BEGIN { FS=":"; OFS="\t" } /^[a-zA-Z0-9_]/ \
-		{print $$1, $$0 }' $(CHKPIPE)) \
-		| $(MAKEDBM) - $(YPDBDIR)/$(DOM)/audit_user; \
-		touch audit.user.time; \
-		echo "updated audit_user"; \
-		if [ ! $(NOPUSH) ]; then \
-			$(YPPUSH) audit_user; \
-			echo "pushed audit_user"; \
-		else \
-		: ; \
-		fi \
-	else \
-		echo "couldn't find $(RBACDIR)/audit_user"; \
-	fi
-
 ageing.time:  $(PWDIR)/shadow
 	-@if [ -f $(PWDIR)/shadow ]; then \
 		(awk 'BEGIN {FS=":"; OFS=":"} $$1 !~ /^#/ {printf "%s\t%s:%s:%s:%s:%s:%s:%s:%s\n", $$1,$$1,$$3,$$4,$$5,$$6,$$7,$$8,$$9}' $(PWDIR)/shadow) | $(MAKEDBM) - $(YPDBDIR)/$(DOM)/ageing.byname; \
@@ -472,8 +449,6 @@ ageing.time:  $(PWDIR)/shadow
 	else \
 		echo "couldn't find $(PWDIR)/shadow"; \
 	fi
-
-
 
 passwd: passwd.time
 group: group.time
@@ -500,7 +475,6 @@ auth.attr:auth.attr.time
 exec.attr:exec.attr.time
 prof.attr:prof.attr.time
 user.attr:user.attr.time
-audit.user:audit.user.time
 $(DIR)/netid:
 $(DIR)/timezone:
 $(DIR)/auto_master:
@@ -510,5 +484,4 @@ $(DIR)/auth_attr:
 $(DIR)/exec_attr:
 $(DIR)/prof_attr:
 $(DIR)/user_attr:
-$(DIR)/audit_user:
 ageing: ageing.time

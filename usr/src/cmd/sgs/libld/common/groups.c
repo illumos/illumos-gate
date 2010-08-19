@@ -113,9 +113,8 @@ ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 		}
 	}
 
-	eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ELF_NOGROUPSECT),
+	ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ELF_NOGROUPSECT),
 	    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name);
-	ofl->ofl_flags |= FLG_OF_FATAL;
 	return (NULL);
 }
 
@@ -137,17 +136,15 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	if ((gshdr->sh_link == SHN_UNDEF) ||
 	    (gshdr->sh_link >= gifl->ifl_shnum) ||
 	    ((isc = gifl->ifl_isdesc[gshdr->sh_link]) == NULL)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHLINK),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHLINK),
 		    gifl->ifl_name, EC_WORD(gisc->is_scnndx),
 		    gisc->is_name, EC_XWORD(gshdr->sh_link));
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	if (gshdr->sh_entsize == 0) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHENTSIZE),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHENTSIZE),
 		    gifl->ifl_name, EC_WORD(gisc->is_scnndx), gisc->is_name,
 		    EC_XWORD(gshdr->sh_entsize));
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
@@ -162,10 +159,9 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	if ((sshdr->sh_info == SHN_UNDEF) ||
 	    (gshdr->sh_info >= (Word)(sshdr->sh_size / sshdr->sh_entsize)) ||
 	    ((isc = gifl->ifl_isdesc[sshdr->sh_link]) == NULL)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
 		    gifl->ifl_name, EC_WORD(gisc->is_scnndx), gisc->is_name,
 		    EC_XWORD(gshdr->sh_info));
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
@@ -218,10 +214,9 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 				str = gisc->is_sym_name;
 		}
 
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_GRP_INVALSYM),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_GRP_INVALSYM),
 		    gifl->ifl_name, EC_WORD(gisc->is_scnndx),
 		    gisc->is_name, str);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
@@ -233,10 +228,9 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 		Word	gndx;
 
 		if ((gndx = gd.gd_data[ndx]) >= gifl->ifl_shnum) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_GRP_INVALNDX), gifl->ifl_name,
 			    EC_WORD(gisc->is_scnndx), gisc->is_name, ndx, gndx);
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}
 

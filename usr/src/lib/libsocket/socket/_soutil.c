@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -43,7 +42,7 @@
 
 /*
  * XXX The functions in this file are only needed to support transport
- * providers that have not yet been converted to use /etc/sock2path.
+ * providers that have not yet been converted to use /etc/sock2path.d.
  * Once all transport providers have been converted this file can be
  * removed.
  */

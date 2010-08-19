@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -637,30 +636,36 @@ _emul_done:
 	 * after a context switch -- we do the frequent path in ndptrap_frstor
 	 * below; for all other cases, we let the trap code handle it
 	 */
-	LOADCPU(%rbx)			/* swapgs handled in hypervisor */
+	LOADCPU(%rax)			/* swapgs handled in hypervisor */
 	cmpl	$0, fpu_exists(%rip)
 	je	.handle_in_trap		/* let trap handle no fp case */
-	movq	CPU_THREAD(%rbx), %r15	/* %r15 = curthread */
-	movl	$FPU_EN, %ebx
-	movq	T_LWP(%r15), %r15	/* %r15 = lwp */
-	testq	%r15, %r15
+	movq	CPU_THREAD(%rax), %rbx	/* %rbx = curthread */
+	movl	$FPU_EN, %eax
+	movq	T_LWP(%rbx), %rbx	/* %rbx = lwp */
+	testq	%rbx, %rbx
 	jz	.handle_in_trap		/* should not happen? */
 #if LWP_PCB_FPU	!= 0
-	addq	$LWP_PCB_FPU, %r15	/* &lwp->lwp_pcb.pcb_fpu */
+	addq	$LWP_PCB_FPU, %rbx	/* &lwp->lwp_pcb.pcb_fpu */
 #endif
-	testl	%ebx, PCB_FPU_FLAGS(%r15)
+	testl	%eax, PCB_FPU_FLAGS(%rbx)
 	jz	.handle_in_trap		/* must be the first fault */
 	CLTS
-	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%r15)
+	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%rbx)
 #if FPU_CTX_FPU_REGS != 0
-	addq	$FPU_CTX_FPU_REGS, %r15
+	addq	$FPU_CTX_FPU_REGS, %rbx
 #endif
+
+	movl	FPU_CTX_FPU_XSAVE_MASK(%rbx), %eax	/* for xrstor */
+	movl	FPU_CTX_FPU_XSAVE_MASK+4(%rbx), %edx	/* for xrstor */
+
 	/*
 	 * the label below is used in trap.c to detect FP faults in
 	 * kernel due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
-	FXRSTORQ	((%r15))
+	.globl  _patch_xrstorq_rbx
+_patch_xrstorq_rbx:
+	FXRSTORQ	((%rbx))
 	cmpw	$KCS_SEL, REGOFF_CS(%rsp)
 	je	.return_to_kernel
 
@@ -694,42 +699,56 @@ _emul_done:
 	pushq	%rbx
 	cmpw    $KCS_SEL, 24(%rsp)	/* did we come from kernel mode? */
 	jne     1f
-	LOADCPU(%rbx)			/* if yes, don't swapgs */
+	LOADCPU(%rax)			/* if yes, don't swapgs */
 	jmp	2f
-1:	
+1:
 	SWAPGS				/* if from user, need swapgs */
-	LOADCPU(%rbx)
+	LOADCPU(%rax)
 	SWAPGS
-2:				
+2:	
+	/*
+	 * Xrstor needs to use edx as part of its flag.
+	 * NOTE: have to push rdx after "cmpw ...24(%rsp)", otherwise rsp+$24
+	 * will not point to CS.
+	 */
+	pushq	%rdx
 	cmpl	$0, fpu_exists(%rip)
 	je	.handle_in_trap		/* let trap handle no fp case */
-	movq	CPU_THREAD(%rbx), %rax	/* %rax = curthread */
-	movl	$FPU_EN, %ebx
-	movq	T_LWP(%rax), %rax	/* %rax = lwp */
-	testq	%rax, %rax
+	movq	CPU_THREAD(%rax), %rbx	/* %rbx = curthread */
+	movl	$FPU_EN, %eax
+	movq	T_LWP(%rbx), %rbx	/* %rbx = lwp */
+	testq	%rbx, %rbx
 	jz	.handle_in_trap		/* should not happen? */
 #if LWP_PCB_FPU	!= 0
-	addq	$LWP_PCB_FPU, %rax	/* &lwp->lwp_pcb.pcb_fpu */
+	addq	$LWP_PCB_FPU, %rbx	/* &lwp->lwp_pcb.pcb_fpu */
 #endif
-	testl	%ebx, PCB_FPU_FLAGS(%rax)
+	testl	%eax, PCB_FPU_FLAGS(%rbx)
 	jz	.handle_in_trap		/* must be the first fault */
 	clts
-	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%rax)
+	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%rbx)
 #if FPU_CTX_FPU_REGS != 0
-	addq	$FPU_CTX_FPU_REGS, %rax
+	addq	$FPU_CTX_FPU_REGS, %rbx
 #endif
+
+	movl	FPU_CTX_FPU_XSAVE_MASK(%rbx), %eax	/* for xrstor */
+	movl	FPU_CTX_FPU_XSAVE_MASK+4(%rbx), %edx	/* for xrstor */
+
 	/*
 	 * the label below is used in trap.c to detect FP faults in
 	 * kernel due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
-	FXRSTORQ	((%rax))
+	.globl  _patch_xrstorq_rbx
+_patch_xrstorq_rbx:
+	FXRSTORQ	((%rbx))
+	popq	%rdx
 	popq	%rbx
 	popq	%rax
 	IRET
 	/*NOTREACHED*/
 
 .handle_in_trap:
+	popq	%rdx
 	popq	%rbx
 	popq	%rax
 	TRAP_NOERR(T_NOEXTFLT)	/* $7 */
@@ -749,6 +768,7 @@ _emul_done:
 	 */
 	pushl	%eax
 	pushl	%ebx
+	pushl	%edx			/* for xrstor */
 	pushl	%ds
 	pushl	%gs
 	movl	$KDS_SEL, %ebx
@@ -773,17 +793,24 @@ _emul_done:
 #if FPU_CTX_FPU_REGS != 0
 	addl	$FPU_CTX_FPU_REGS, %ebx
 #endif
+
+	movl	FPU_CTX_FPU_XSAVE_MASK(%ebx), %eax	/* for xrstor */
+	movl	FPU_CTX_FPU_XSAVE_MASK+4(%ebx), %edx	/* for xrstor */
+
 	/*
 	 * the label below is used in trap.c to detect FP faults in kernel
 	 * due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
-	.globl	_patch_fxrstor_ebx
+	.globl  _patch_fxrstor_ebx
 _patch_fxrstor_ebx:
+	.globl  _patch_xrstor_ebx
+_patch_xrstor_ebx:
 	frstor	(%ebx)		/* may be patched to fxrstor */
 	nop			/* (including this byte) */
 	popl	%gs
 	popl	%ds
+	popl	%edx
 	popl	%ebx
 	popl	%eax
 	IRET
@@ -791,6 +818,7 @@ _patch_fxrstor_ebx:
 .handle_in_trap:
 	popl	%gs
 	popl	%ds
+	popl	%edx
 	popl	%ebx
 	popl	%eax
 	TRAP_NOERR(T_NOEXTFLT)	/* $7 */

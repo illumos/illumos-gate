@@ -19,8 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/* Copyright (c) 1990 Mentat Inc. */
 
 #include <inet/ip.h>
 #include <inet/tcp_impl.h>
@@ -98,7 +99,7 @@ tcp_listener_conf_get(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 			break;
 		}
 	}
-ret:
+
 	mutex_exit(&tcps->tcps_listener_conf_lock);
 	return (err);
 }
@@ -188,36 +189,36 @@ tcp_listener_conf_del(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 /*
  * All of these are alterable, within the min/max values given, at run time.
  *
- * Note: All those tunables which do not start with "tcp_" are Committed and
- * therefore are public. See PSARC 2009/306.
+ * Note: All those tunables which do not start with "_" are Committed and
+ * therefore are public. See PSARC 2010/080.
  */
 mod_prop_info_t tcp_propinfo_tbl[] = {
 	/* tunable - 0 */
-	{ "tcp_time_wait_interval", MOD_PROTO_TCP,
+	{ "_time_wait_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*SECONDS, 10*MINUTES, 1*MINUTES}, {1*MINUTES} },
 
-	{ "tcp_conn_req_max_q", MOD_PROTO_TCP,
+	{ "_conn_req_max_q", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, UINT32_MAX, 128}, {128} },
 
-	{ "tcp_conn_req_max_q0", MOD_PROTO_TCP,
+	{ "_conn_req_max_q0", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, UINT32_MAX, 1024}, {1024} },
 
-	{ "tcp_conn_req_min", MOD_PROTO_TCP,
+	{ "_conn_req_min", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 1024, 1}, {1} },
 
-	{ "tcp_conn_grace_period", MOD_PROTO_TCP,
+	{ "_conn_grace_period", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0*MS, 20*SECONDS, 0*MS}, {0*MS} },
 
-	{ "tcp_cwnd_max", MOD_PROTO_TCP,
+	{ "_cwnd_max", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {128, (1<<30), 1024*1024}, {1024*1024} },
 
-	{ "tcp_debug", MOD_PROTO_TCP,
+	{ "_debug", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 10, 0}, {0} },
 
@@ -225,83 +226,83 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {1024, (32*1024), 1024}, {1024} },
 
-	{ "tcp_ip_abort_cinterval", MOD_PROTO_TCP,
+	{ "_ip_abort_cinterval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*SECONDS, UINT32_MAX, 3*MINUTES}, {3*MINUTES} },
 
-	{ "tcp_ip_abort_linterval", MOD_PROTO_TCP,
+	{ "_ip_abort_linterval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*SECONDS, UINT32_MAX, 3*MINUTES}, {3*MINUTES} },
 
 	/* tunable - 10 */
-	{ "tcp_ip_abort_interval", MOD_PROTO_TCP,
+	{ "_ip_abort_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {500*MS, UINT32_MAX, 5*MINUTES}, {5*MINUTES} },
 
-	{ "tcp_ip_notify_cinterval", MOD_PROTO_TCP,
+	{ "_ip_notify_cinterval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*SECONDS, UINT32_MAX, 10*SECONDS},
 	    {10*SECONDS} },
 
-	{ "tcp_ip_notify_interval", MOD_PROTO_TCP,
+	{ "_ip_notify_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {500*MS, UINT32_MAX, 10*SECONDS}, {10*SECONDS} },
 
-	{ "tcp_ipv4_ttl", MOD_PROTO_TCP,
+	{ "_ipv4_ttl", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 255, 64}, {64} },
 
-	{ "tcp_keepalive_interval", MOD_PROTO_TCP,
+	{ "_keepalive_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {10*SECONDS, 10*DAYS, 2*HOURS}, {2*HOURS} },
 
-	{ "tcp_maxpsz_multiplier", MOD_PROTO_TCP,
+	{ "_maxpsz_multiplier", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 100, 10}, {10} },
 
-	{ "tcp_mss_def_ipv4", MOD_PROTO_TCP,
+	{ "_mss_def_ipv4", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, TCP_MSS_MAX_IPV4, 536}, {536} },
 
-	{ "tcp_mss_max_ipv4", MOD_PROTO_TCP,
+	{ "_mss_max_ipv4", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, TCP_MSS_MAX_IPV4, TCP_MSS_MAX_IPV4},
 	    {TCP_MSS_MAX_IPV4} },
 
-	{ "tcp_mss_min", MOD_PROTO_TCP,
+	{ "_mss_min", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, TCP_MSS_MAX, 108}, {108} },
 
-	{ "tcp_naglim_def", MOD_PROTO_TCP,
+	{ "_naglim_def", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, (64*1024)-1, (4*1024)-1}, {(4*1024)-1} },
 
 	/* tunable - 20 */
-	{ "tcp_rexmit_interval_initial", MOD_PROTO_TCP,
+	{ "_rexmit_interval_initial", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*MS, 20*SECONDS, 1*SECONDS}, {1*SECONDS} },
 
-	{ "tcp_rexmit_interval_max", MOD_PROTO_TCP,
+	{ "_rexmit_interval_max", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*MS, 2*HOURS, 60*SECONDS}, {60*SECONDS} },
 
-	{ "tcp_rexmit_interval_min", MOD_PROTO_TCP,
+	{ "_rexmit_interval_min", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*MS, 2*HOURS, 400*MS}, {400*MS} },
 
-	{ "tcp_deferred_ack_interval", MOD_PROTO_TCP,
+	{ "_deferred_ack_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*MS, 1*MINUTES, 100*MS}, {100*MS} },
 
-	{ "tcp_snd_lowat_fraction", MOD_PROTO_TCP,
+	{ "_snd_lowat_fraction", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 16, 0}, {0} },
 
-	{ "tcp_dupack_fast_retransmit", MOD_PROTO_TCP,
+	{ "_dupack_fast_retransmit", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 10000, 3}, {3} },
 
-	{ "tcp_ignore_path_mtu", MOD_PROTO_TCP,
+	{ "_ignore_path_mtu", MOD_PROTO_TCP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
@@ -320,7 +321,7 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	    {TCP_XMIT_HIWATER} },
 
 	/* tunable - 30 */
-	{ "tcp_xmit_lowat", MOD_PROTO_TCP,
+	{ "_xmit_lowat", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {TCP_XMIT_LOWATER, (1<<30), TCP_XMIT_LOWATER},
 	    {TCP_XMIT_LOWATER} },
@@ -330,56 +331,56 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	    {TCP_RECV_LOWATER, (1<<30), TCP_RECV_HIWATER},
 	    {TCP_RECV_HIWATER} },
 
-	{ "tcp_recv_hiwat_minmss", MOD_PROTO_TCP,
+	{ "_recv_hiwat_minmss", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 65536, 4}, {4} },
 
-	{ "tcp_fin_wait_2_flush_interval", MOD_PROTO_TCP,
+	{ "_fin_wait_2_flush_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1*SECONDS, 2*HOURS, 60*SECONDS},
 	    {60*SECONDS} },
 
-	{ "tcp_max_buf", MOD_PROTO_TCP,
+	{ "_max_buf", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {8192, (1<<30), 1024*1024}, {1024*1024} },
 
 	/*
 	 * Question:  What default value should I set for tcp_strong_iss?
 	 */
-	{ "tcp_strong_iss", MOD_PROTO_TCP,
+	{ "_strong_iss", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 2, 1}, {1} },
 
-	{ "tcp_rtt_updates", MOD_PROTO_TCP,
+	{ "_rtt_updates", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 65536, 20}, {20} },
 
-	{ "tcp_wscale_always", MOD_PROTO_TCP,
+	{ "_wscale_always", MOD_PROTO_TCP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "tcp_tstamp_always", MOD_PROTO_TCP,
+	{ "_tstamp_always", MOD_PROTO_TCP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "tcp_tstamp_if_wscale", MOD_PROTO_TCP,
+	{ "_tstamp_if_wscale", MOD_PROTO_TCP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
 	/* tunable - 40 */
-	{ "tcp_rexmit_interval_extra", MOD_PROTO_TCP,
+	{ "_rexmit_interval_extra", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0*MS, 2*HOURS, 0*MS}, {0*MS} },
 
-	{ "tcp_deferred_acks_max", MOD_PROTO_TCP,
+	{ "_deferred_acks_max", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 16, 2}, {2} },
 
-	{ "tcp_slow_start_after_idle", MOD_PROTO_TCP,
+	{ "_slow_start_after_idle", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 16384, 4}, {4} },
 
-	{ "tcp_slow_start_initial", MOD_PROTO_TCP,
+	{ "_slow_start_initial", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 4, 4}, {4} },
 
@@ -387,30 +388,30 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 2, 2}, {2} },
 
-	{ "tcp_ipv6_hoplimit", MOD_PROTO_TCP,
+	{ "_ipv6_hoplimit", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, IPV6_MAX_HOPS, IPV6_DEFAULT_HOPS},
 	    {IPV6_DEFAULT_HOPS} },
 
-	{ "tcp_mss_def_ipv6", MOD_PROTO_TCP,
+	{ "_mss_def_ipv6", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, TCP_MSS_MAX_IPV6, 1220}, {1220} },
 
-	{ "tcp_mss_max_ipv6", MOD_PROTO_TCP,
+	{ "_mss_max_ipv6", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, TCP_MSS_MAX_IPV6, TCP_MSS_MAX_IPV6},
 	    {TCP_MSS_MAX_IPV6} },
 
-	{ "tcp_rev_src_routes", MOD_PROTO_TCP,
+	{ "_rev_src_routes", MOD_PROTO_TCP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "tcp_local_dack_interval", MOD_PROTO_TCP,
+	{ "_local_dack_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {10*MS, 500*MS, 50*MS}, {50*MS} },
 
 	/* tunable - 50 */
-	{ "tcp_local_dacks_max", MOD_PROTO_TCP,
+	{ "_local_dacks_max", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 16, 8}, {8} },
 
@@ -418,23 +419,23 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 2, 1}, {1} },
 
-	{ "tcp_rst_sent_rate_enabled", MOD_PROTO_TCP,
+	{ "_rst_sent_rate_enabled", MOD_PROTO_TCP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
-	{ "tcp_rst_sent_rate", MOD_PROTO_TCP,
+	{ "_rst_sent_rate", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, UINT32_MAX, 40}, {40} },
 
-	{ "tcp_push_timer_interval", MOD_PROTO_TCP,
+	{ "_push_timer_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 100*MS, 50*MS}, {50*MS} },
 
-	{ "tcp_use_smss_as_mss_opt", MOD_PROTO_TCP,
+	{ "_use_smss_as_mss_opt", MOD_PROTO_TCP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "tcp_keepalive_abort_interval", MOD_PROTO_TCP,
+	{ "_keepalive_abort_interval", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, UINT32_MAX, 8*MINUTES}, {8*MINUTES} },
 
@@ -442,15 +443,15 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	 * tcp_wroff_xtra is the extra space in front of TCP/IP header for link
 	 * layer header.  It has to be a multiple of 8.
 	 */
-	{ "tcp_wroff_xtra", MOD_PROTO_TCP,
+	{ "_wroff_xtra", MOD_PROTO_TCP,
 	    mod_set_aligned, mod_get_uint32,
 	    {0, 256, 32}, {32} },
 
-	{ "tcp_dev_flow_ctl", MOD_PROTO_TCP,
+	{ "_dev_flow_ctl", MOD_PROTO_TCP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "tcp_reass_timeout", MOD_PROTO_TCP,
+	{ "_reass_timeout", MOD_PROTO_TCP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, UINT32_MAX, 100*SECONDS}, {100*SECONDS} },
 
@@ -459,16 +460,16 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	    mod_set_extra_privports, mod_get_extra_privports,
 	    {1, ULP_MAX_PORT, 0}, {0} },
 
-	{ "tcp_1948_phrase", MOD_PROTO_TCP,
+	{ "_1948_phrase", MOD_PROTO_TCP,
 	    tcp_set_1948phrase, NULL, {0}, {0} },
 
-	{ "tcp_listener_limit_conf", MOD_PROTO_TCP,
+	{ "_listener_limit_conf", MOD_PROTO_TCP,
 	    NULL, tcp_listener_conf_get, {0}, {0} },
 
-	{ "tcp_listener_limit_conf_add", MOD_PROTO_TCP,
+	{ "_listener_limit_conf_add", MOD_PROTO_TCP,
 	    tcp_listener_conf_add, NULL, {0}, {0} },
 
-	{ "tcp_listener_limit_conf_del", MOD_PROTO_TCP,
+	{ "_listener_limit_conf_del", MOD_PROTO_TCP,
 	    tcp_listener_conf_del, NULL, {0}, {0} },
 
 	{ "?", MOD_PROTO_TCP, NULL, mod_get_allprop, {0}, {0} },

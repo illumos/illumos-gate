@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "bge_impl.h"
@@ -1276,6 +1275,7 @@ static boolean_t
 bge_check_serdes(bge_t *bgep, boolean_t recheck)
 {
 	uint32_t emac_status;
+	uint32_t tx_status;
 	uint32_t lpadv;
 	boolean_t linkup;
 	boolean_t linkup_old = bgep->param_link_up;
@@ -1289,8 +1289,11 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 		 * BCM5714, and BCM5715 devices.
 		 */
 		if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
-			emac_status =  bge_reg_get32(bgep, MI_STATUS_REG);
-			linkup = BIS(emac_status, MI_STATUS_LINK);
+			tx_status = bge_reg_get32(bgep,
+			    TRANSMIT_MAC_STATUS_REG);
+			linkup = BIS(tx_status, TRANSMIT_STATUS_LINK_UP);
+			emac_status = bge_reg_get32(bgep,
+			    ETHERNET_MAC_STATUS_REG);
 			bgep->serdes_status = emac_status;
 			if ((linkup && linkup_old) ||
 			    (!linkup && !linkup_old)) {

@@ -744,7 +744,7 @@ mibget(int sd)
 	req = (struct opthdr *)&tor[1];
 	req->level = EXPER_IP_AND_ALL_IRES;
 	req->name  = 0;
-	req->len   = 0;
+	req->len   = 1;
 
 	ctlbuf.buf = (char *)buf;
 	ctlbuf.len = tor->OPT_length + tor->OPT_offset;

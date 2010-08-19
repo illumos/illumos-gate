@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 	
 #include <sys/asm_linkage.h>
@@ -673,9 +672,8 @@ kernel_wc_code:
 	 * Before proceeding, enable usage of the page table NX bit if
 	 * that's how the page tables are set up.
 	 */
-	movl    x86_feature, %ecx
-	andl   	 $X86_NX, %ecx
-	jz      1f
+	bt      $X86FSET_NX, x86_featureset(%rip)
+	jnc     1f
 	movl    $MSR_AMD_EFER, %ecx
 	rdmsr
 	orl     $AMD_EFER_NXE, %eax
@@ -1092,9 +1090,8 @@ kernel_wc_code:
 	 * Before proceeding, enable usage of the page table NX bit if
 	 * that's how the page tables are set up.
 	 */
-	movl    x86_feature, %ecx
-	andl   	 $X86_NX, %ecx
-	jz      1f
+	bt      $X86FSET_NX, x86_featureset
+	jnc     1f
 	movl    $MSR_AMD_EFER, %ecx
 	rdmsr
 	orl     $AMD_EFER_NXE, %eax

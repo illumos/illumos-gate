@@ -1,5 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -90,7 +91,6 @@ krb5_gss_release_cred(minor_status, cred_handle)
        free(cred->req_enctypes);
 
    xfree(cred);
-   krb5_free_context(context);
 
    *cred_handle = NULL;
 
@@ -102,5 +102,8 @@ krb5_gss_release_cred(minor_status, cred_handle)
    if (code3)
       *minor_status = code3;
 
+   if (*minor_status)
+     save_error_info(*minor_status, context);
+   krb5_free_context(context);
    return(*minor_status?GSS_S_FAILURE:GSS_S_COMPLETE);
 }

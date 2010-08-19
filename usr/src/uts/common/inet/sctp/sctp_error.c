@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -101,7 +100,7 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
 	int len, hdrlen;
 	char *cause;
 	sctp_faddr_t *fp = sctp->sctp_current;
-	ip_xmit_attr_t	*ixa = fp->ixa;
+	ip_xmit_attr_t	*ixa = fp->sf_ixa;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	/*
@@ -124,7 +123,7 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
 	 * Create abort chunk.
 	 */
 	if (data) {
-		if (fp->isv4) {
+		if (fp->sf_isv4) {
 			hdrlen = sctp->sctp_hdr_len;
 		} else {
 			hdrlen = sctp->sctp_hdr6_len;
@@ -133,8 +132,8 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
 		cause = (char *)data->b_rptr;
 		len = data->b_wptr - data->b_rptr;
 
-		if (len + hdrlen > fp->sfa_pmss) {
-			len = fp->sfa_pmss - hdrlen;
+		if (len + hdrlen > fp->sf_pmss) {
+			len = fp->sf_pmss - hdrlen;
 		}
 	} else {
 		cause = NULL;
@@ -150,7 +149,7 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
 		freemsg(mp);
 		return;
 	}
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_opkts);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
@@ -282,7 +281,7 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 		ixa->ixa_ip_hdr_length = sctp->sctp_ip_hdr6_len;
 	}
 
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
 	if (is_system_labeled() && ixa->ixa_tsl != NULL) {
@@ -435,7 +434,7 @@ sctp_ootb_send_abort(uint32_t vtag, uint16_t serror, char *details,
 	ixas.ixa_ipst = ipst;
 	ixas.ixa_ifindex = 0;
 
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 
 	if (is_system_labeled()) {
 		ASSERT(ira->ira_tsl != NULL);
@@ -535,7 +534,7 @@ sctp_add_err(sctp_t *sctp, uint16_t serror, void *details, size_t len,
 		fp = dest;
 		SCTP_SET_CHUNK_DEST(emp, dest);
 	}
-	mss = fp->sfa_pmss;
+	mss = fp->sf_pmss;
 
 	/*
 	 * If the current output packet cannot include the new error chunk,
@@ -550,8 +549,8 @@ sctp_add_err(sctp_t *sctp, uint16_t serror, void *details, size_t len,
 			return;
 		}
 		sendmp->b_cont = sctp->sctp_err_chunks;
-		sctp_set_iplen(sctp, sendmp, fp->ixa);
-		(void) conn_ip_output(sendmp, fp->ixa);
+		sctp_set_iplen(sctp, sendmp, fp->sf_ixa);
+		(void) conn_ip_output(sendmp, fp->sf_ixa);
 		BUMP_LOCAL(sctp->sctp_opkts);
 
 		sctp->sctp_err_chunks = emp;
@@ -589,8 +588,8 @@ sctp_process_err(sctp_t *sctp)
 		goto done;
 	}
 	sendmp->b_cont = errmp;
-	sctp_set_iplen(sctp, sendmp, fp->ixa);
-	(void) conn_ip_output(sendmp, fp->ixa);
+	sctp_set_iplen(sctp, sendmp, fp->sf_ixa);
+	(void) conn_ip_output(sendmp, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 done:
 	sctp->sctp_err_chunks = NULL;

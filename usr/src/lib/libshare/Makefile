@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.lib
@@ -35,7 +33,7 @@ $(BUILD64)MACHS += $(MACH64)
 
 # Add plugin module directories here. They need to build after the libshare
 # objects are built.
-PLUGINS =	nfs smb smbfs
+PLUGINS =	nfs smb smbfs autofs
 $(PLUGINS):	$(MACHS)
 
 SUBDIRS =	$(MACHS) $(PLUGINS)

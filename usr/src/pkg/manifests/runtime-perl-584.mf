@@ -336,6 +336,7 @@ file path=usr/perl5/5.8.4/lib/Sun/Solaris/Exacct/Object.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Intrs.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Kstat.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Lgrp.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Sun/Solaris/Pg.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Privilege.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Project.pm mode=0444
 file path=usr/perl5/5.8.4/lib/Sun/Solaris/Task.pm mode=0444
@@ -1969,13 +1970,11 @@ file path=usr/perl5/5.8.4/lib/vmsish.pm mode=0444
 file path=usr/perl5/5.8.4/lib/warnings.pm mode=0444
 file path=usr/perl5/5.8.4/lib/warnings/register.pm mode=0444
 hardlink path=usr/perl5/5.8.4/bin/perl target=./perl5.8.4
-legacy pkg=SUNWperl584core arch=$(ARCH) category=system \
-    desc="Perl 5.8.4 programming language (core)" \
-    hotline="Please contact your local service provider" \
-    name="Perl 5.8.4 (core)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/perl/THIRDPARTYLICENSE license=cmd/perl/THIRDPARTYLICENSE
+legacy pkg=SUNWperl584core desc="Perl 5.8.4 programming language (core)" \
+    name="Perl 5.8.4 (core)"
 license cr_Sun license=cr_Sun
+license usr/src/cmd/perl/THIRDPARTYLICENSE \
+    license=usr/src/cmd/perl/THIRDPARTYLICENSE
 link path=usr/bin/perl target=../perl5/5.8.4/bin/perl
 $(i386_ONLY)link path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/libperl.so \
     target=./libperl.so.1

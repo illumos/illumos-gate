@@ -90,6 +90,7 @@ typedef struct ibcm_arp_ip_s {
 	} ip_sin;
 #define	ip_cm_sin		ip_sin.ip_sockaddr
 #define	ip_cm_sin6		ip_sin.ip_sockaddr6
+	zoneid_t	ip_zoneid;
 } ibcm_arp_ip_t;
 
 typedef struct ibcm_arp_ibd_insts_s {

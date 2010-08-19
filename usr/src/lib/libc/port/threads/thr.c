@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "lint.h"
@@ -133,6 +132,7 @@ uberdata_t __uberdata = {
 	NULL,			/* atforklist */
 	NULL,			/* robustlocks */
 	NULL,			/* robustlist */
+	NULL,			/* progname */
 	NULL,			/* __tdb_bootstrap */
 	{			/* tdb */
 		NULL,		/* tdb_sync_addr_hash */
@@ -1260,6 +1260,7 @@ libc_init(void)
 		__tdb_bootstrap = oldself->ul_uberdata->tdb_bootstrap;
 		mutex_setup();
 		atfork_init();	/* every link map needs atfork() processing */
+		init_progname();
 		return;
 	}
 
@@ -1459,9 +1460,11 @@ libc_init(void)
 	/*
 	 * When we have initialized the primary link map, inform
 	 * the dynamic linker about our interface functions.
+	 * Set up our pointer to the program name.
 	 */
 	if (self->ul_primarymap)
 		_ld_libc((void *)rtld_funcs);
+	init_progname();
 
 	/*
 	 * Defer signals until TLS constructors have been called.
@@ -1653,6 +1656,22 @@ postfork1_child()
 	}
 
 	/*
+	 * Do post-fork1 processing for subsystems that need it.
+	 * We need to do this before unmapping all of the abandoned
+	 * threads' stacks, below(), because the post-fork1 actions
+	 * might require access to those stacks.
+	 */
+	postfork1_child_sigev_aio();
+	postfork1_child_sigev_mq();
+	postfork1_child_sigev_timer();
+	postfork1_child_aio();
+	/*
+	 * The above subsystems use thread pools, so this action
+	 * must be performed after those actions.
+	 */
+	postfork1_child_tpool();
+
+	/*
 	 * All lwps except ourself are gone.  Mark them so.
 	 * First mark all of the lwps that have already been freed.
 	 * Then mark and free all of the active lwps except ourself.
@@ -1698,15 +1717,6 @@ postfork1_child()
 		udp->nzombies = 0;
 	}
 	trim_stack_cache(0);
-
-	/*
-	 * Do post-fork1 processing for subsystems that need it.
-	 */
-	postfork1_child_tpool();
-	postfork1_child_sigev_aio();
-	postfork1_child_sigev_mq();
-	postfork1_child_sigev_timer();
-	postfork1_child_aio();
 }
 
 lwpid_t

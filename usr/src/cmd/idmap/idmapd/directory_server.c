@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,6 +36,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
+#include <libuutil.h>
 #include <note.h>
 #include "idmapd.h"
 #include "directory.h"
@@ -45,7 +45,6 @@
 #include "directory_library_impl.h"
 #include "directory_server_impl.h"
 #include "sized_array.h"
-#include "miscutils.h"
 
 /*
  * Here's a list of all of the modules that provide directory
@@ -98,7 +97,7 @@ directory_get_common_1_svc(
 		}
 	}
 
-	for (i = 0; i < NELEM(providers); i++) {
+	for (i = 0; i < UU_NELEM(providers); i++) {
 		de = providers[i]->get(entries, &ids, types,
 		    &attrs);
 		if (de != NULL)
@@ -176,7 +175,7 @@ str_list_dav(directory_values_rpc *lvals, const char * const *str_list, int n)
 		int len;
 
 		len = strlen(str_list[i]);
-		dav[i].directory_value_rpc_val = memdup(str_list[i], len);
+		dav[i].directory_value_rpc_val = uu_memdup(str_list[i], len);
 		if (dav[i].directory_value_rpc_val == NULL)
 			goto nomem;
 		dav[i].directory_value_rpc_len = len;
@@ -224,7 +223,7 @@ uint_list_dav(directory_values_rpc *lvals, const unsigned int *array, int n)
 		(void) snprintf(buf, sizeof (buf), "%u", array[i]);
 
 		len = strlen(buf);
-		dav[i].directory_value_rpc_val = memdup(buf, len);
+		dav[i].directory_value_rpc_val = uu_memdup(buf, len);
 		if (dav[i].directory_value_rpc_val == NULL)
 			goto nomem;
 		dav[i].directory_value_rpc_len = len;
@@ -263,7 +262,7 @@ bin_list_dav(directory_values_rpc *lvals, const void *array, int n, size_t sz)
 	lvals->found = TRUE;
 
 	for (i = 0; i < n; i++) {
-		dav[i].directory_value_rpc_val = memdup(inbuf, sz);
+		dav[i].directory_value_rpc_val = uu_memdup(inbuf, sz);
 		if (dav[i].directory_value_rpc_val == NULL)
 			goto nomem;
 		dav[i].directory_value_rpc_len = sz;

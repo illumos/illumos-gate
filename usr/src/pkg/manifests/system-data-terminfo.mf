@@ -2305,10 +2305,9 @@ hardlink path=usr/share/lib/terminfo/z/zenith \
     target=../../../../../usr/share/lib/terminfo/h/h19
 hardlink path=usr/share/lib/terminfo/z/zenith29 \
     target=../../../../../usr/share/lib/terminfo/z/z29
-legacy pkg=SUNWter arch=$(ARCH) category=system \
+legacy pkg=SUNWter \
     desc="extensive terminfo database entries describing capabilities of terminals and pseudoterminals" \
-    hotline="Please contact your local service provider" \
-    name="Terminal Information" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/terminfo/THIRDPARTYLICENSE license=cmd/terminfo/THIRDPARTYLICENSE
+    name="Terminal Information"
+license usr/src/cmd/terminfo/THIRDPARTYLICENSE \
+    license=usr/src/cmd/terminfo/THIRDPARTYLICENSE
 link path=usr/lib/tabset target=../share/lib/tabset

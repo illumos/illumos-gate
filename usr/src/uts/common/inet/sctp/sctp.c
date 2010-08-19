@@ -109,13 +109,13 @@ static void	sctp_stack_fini(netstackid_t stackid, void *arg);
 
 /* /etc/system variables */
 /* The minimum number of threads for each taskq. */
-int		sctp_recvq_tq_thr_min = 4;
+int sctp_recvq_tq_thr_min = 4;
 /* The maximum number of threads for each taskq. */
-int		sctp_recvq_tq_thr_max = 16;
-/* The minimum number of tasks for each taskq. */
-int		sctp_recvq_tq_task_min = 5;
-/* The maxiimum number of tasks for each taskq. */
-int		sctp_recvq_tq_task_max = 50;
+int sctp_recvq_tq_thr_max = 48;
+/* The mnimum number of tasks for each taskq. */
+int sctp_recvq_tq_task_min = 8;
+/* Default value of sctp_recvq_tq_list_max_sz. */
+int sctp_recvq_tq_list_max = 16;
 
 /*
  * SCTP tunables related declarations. Definitions are in sctp_tunables.c
@@ -225,6 +225,9 @@ sctp_create_eager(sctp_t *psctp)
 	 */
 	SCTP_LINK(sctp, sctps);
 
+	/* If the listener has a limit, inherit the counter info. */
+	sctp->sctp_listen_cnt = psctp->sctp_listen_cnt;
+
 	return (sctp);
 }
 
@@ -333,11 +336,10 @@ sctp_disconnect(sctp_t *sctp)
 		}
 
 		/*
-		 * In there is unread data, send an ABORT and terminate the
+		 * If there is unread data, send an ABORT and terminate the
 		 * association.
 		 */
-		if (sctp->sctp_rxqueued > 0 || sctp->sctp_irwnd >
-		    sctp->sctp_rwnd) {
+		if (sctp->sctp_rxqueued > 0 || sctp->sctp_ulp_rxqueued > 0) {
 			sctp_user_abort(sctp, NULL);
 			WAKE_SCTP(sctp);
 			return (error);
@@ -374,7 +376,7 @@ sctp_disconnect(sctp_t *sctp)
 			sctp->sctp_running = B_FALSE;
 			while (sctp->sctp_state >= SCTPS_ESTABLISHED &&
 			    sctp->sctp_client_errno == 0) {
-				cv_broadcast(&sctp->sctp_cv);
+				cv_signal(&sctp->sctp_cv);
 				ret = cv_timedwait_sig(&sctp->sctp_cv,
 				    &sctp->sctp_lock, stoptime);
 				if (ret < 0) {
@@ -456,6 +458,13 @@ sctp_closei_local(sctp_t *sctp)
 {
 	mblk_t	*mp;
 	conn_t	*connp = sctp->sctp_connp;
+
+	/* The counter is incremented only for established associations. */
+	if (sctp->sctp_state >= SCTPS_ESTABLISHED)
+		SCTPS_ASSOC_DEC(sctp->sctp_sctps);
+
+	if (sctp->sctp_listen_cnt != NULL)
+		SCTP_DECR_LISTEN_CNT(sctp);
 
 	/* Sanity check, don't do the same thing twice.  */
 	if (connp->conn_state_flags & CONN_CLOSING) {
@@ -717,19 +726,17 @@ sctp_free(conn_t *connp)
 	bzero(&sctp->sctp_bits, sizeof (sctp->sctp_bits));
 
 	/* It is time to update the global statistics. */
-	UPDATE_MIB(&sctps->sctps_mib, sctpOutSCTPPkts, sctp->sctp_opkts);
-	UPDATE_MIB(&sctps->sctps_mib, sctpOutCtrlChunks, sctp->sctp_obchunks);
-	UPDATE_MIB(&sctps->sctps_mib, sctpOutOrderChunks, sctp->sctp_odchunks);
-	UPDATE_MIB(&sctps->sctps_mib,
-	    sctpOutUnorderChunks, sctp->sctp_oudchunks);
-	UPDATE_MIB(&sctps->sctps_mib, sctpRetransChunks, sctp->sctp_rxtchunks);
-	UPDATE_MIB(&sctps->sctps_mib, sctpInSCTPPkts, sctp->sctp_ipkts);
-	UPDATE_MIB(&sctps->sctps_mib, sctpInCtrlChunks, sctp->sctp_ibchunks);
-	UPDATE_MIB(&sctps->sctps_mib, sctpInOrderChunks, sctp->sctp_idchunks);
-	UPDATE_MIB(&sctps->sctps_mib,
-	    sctpInUnorderChunks, sctp->sctp_iudchunks);
-	UPDATE_MIB(&sctps->sctps_mib, sctpFragUsrMsgs, sctp->sctp_fragdmsgs);
-	UPDATE_MIB(&sctps->sctps_mib, sctpReasmUsrMsgs, sctp->sctp_reassmsgs);
+	SCTPS_UPDATE_MIB(sctps, sctpOutSCTPPkts, sctp->sctp_opkts);
+	SCTPS_UPDATE_MIB(sctps, sctpOutCtrlChunks, sctp->sctp_obchunks);
+	SCTPS_UPDATE_MIB(sctps, sctpOutOrderChunks, sctp->sctp_odchunks);
+	SCTPS_UPDATE_MIB(sctps, sctpOutUnorderChunks, sctp->sctp_oudchunks);
+	SCTPS_UPDATE_MIB(sctps, sctpRetransChunks, sctp->sctp_rxtchunks);
+	SCTPS_UPDATE_MIB(sctps, sctpInSCTPPkts, sctp->sctp_ipkts);
+	SCTPS_UPDATE_MIB(sctps, sctpInCtrlChunks, sctp->sctp_ibchunks);
+	SCTPS_UPDATE_MIB(sctps, sctpInOrderChunks, sctp->sctp_idchunks);
+	SCTPS_UPDATE_MIB(sctps, sctpInUnorderChunks, sctp->sctp_iudchunks);
+	SCTPS_UPDATE_MIB(sctps, sctpFragUsrMsgs, sctp->sctp_fragdmsgs);
+	SCTPS_UPDATE_MIB(sctps, sctpReasmUsrMsgs, sctp->sctp_reassmsgs);
 	sctp->sctp_opkts = 0;
 	sctp->sctp_obchunks = 0;
 	sctp->sctp_odchunks = 0;
@@ -766,64 +773,6 @@ sctp_free(conn_t *connp)
 	kmem_cache_free(sctp_conn_cache, connp);
 }
 
-/* Diagnostic routine used to return a string associated with the sctp state. */
-char *
-sctp_display(sctp_t *sctp, char *sup_buf)
-{
-	char	*buf;
-	char	buf1[30];
-	static char	priv_buf[INET6_ADDRSTRLEN * 2 + 80];
-	char	*cp;
-	conn_t	*connp;
-
-	if (sctp == NULL)
-		return ("NULL_SCTP");
-
-	connp = sctp->sctp_connp;
-	buf = (sup_buf != NULL) ? sup_buf : priv_buf;
-
-	switch (sctp->sctp_state) {
-	case SCTPS_IDLE:
-		cp = "SCTP_IDLE";
-		break;
-	case SCTPS_BOUND:
-		cp = "SCTP_BOUND";
-		break;
-	case SCTPS_LISTEN:
-		cp = "SCTP_LISTEN";
-		break;
-	case SCTPS_COOKIE_WAIT:
-		cp = "SCTP_COOKIE_WAIT";
-		break;
-	case SCTPS_COOKIE_ECHOED:
-		cp = "SCTP_COOKIE_ECHOED";
-		break;
-	case SCTPS_ESTABLISHED:
-		cp = "SCTP_ESTABLISHED";
-		break;
-	case SCTPS_SHUTDOWN_PENDING:
-		cp = "SCTP_SHUTDOWN_PENDING";
-		break;
-	case SCTPS_SHUTDOWN_SENT:
-		cp = "SCTPS_SHUTDOWN_SENT";
-		break;
-	case SCTPS_SHUTDOWN_RECEIVED:
-		cp = "SCTPS_SHUTDOWN_RECEIVED";
-		break;
-	case SCTPS_SHUTDOWN_ACK_SENT:
-		cp = "SCTPS_SHUTDOWN_ACK_SENT";
-		break;
-	default:
-		(void) mi_sprintf(buf1, "SCTPUnkState(%d)", sctp->sctp_state);
-		cp = buf1;
-		break;
-	}
-	(void) mi_sprintf(buf, "[%u, %u] %s",
-	    ntohs(connp->conn_lport), ntohs(connp->conn_fport), cp);
-
-	return (buf);
-}
-
 /*
  * Initialize protocol control block. If a parent exists, inherit
  * all values set through setsockopt().
@@ -857,7 +806,8 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 	sctp->sctp_mtu_probe_intvl = sctps->sctps_mtu_probe_interval;
 
 	sctp->sctp_sack_gaps = 0;
-	sctp->sctp_sack_toggle = 2;
+	/* So we will not delay sending the first SACK. */
+	sctp->sctp_sack_toggle = sctps->sctps_deferred_acks_max;
 
 	/* Only need to do the allocation if there is no "cached" one. */
 	if (sctp->sctp_pad_mp == NULL) {
@@ -883,11 +833,13 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		if (err != 0)
 			goto failure;
 
+		sctp->sctp_upcalls = psctp->sctp_upcalls;
+
 		sctp->sctp_cookie_lifetime = psctp->sctp_cookie_lifetime;
 
 		sctp->sctp_cwnd_max = psctp->sctp_cwnd_max;
 		sctp->sctp_rwnd = psctp->sctp_rwnd;
-		sctp->sctp_irwnd = psctp->sctp_rwnd;
+		sctp->sctp_arwnd = psctp->sctp_arwnd;
 		sctp->sctp_pd_point = psctp->sctp_pd_point;
 		sctp->sctp_rto_max = psctp->sctp_rto_max;
 		sctp->sctp_rto_max_init = psctp->sctp_rto_max_init;
@@ -928,7 +880,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 
 		sctp->sctp_cwnd_max = sctps->sctps_cwnd_max_;
 		sctp->sctp_rwnd = connp->conn_rcvbuf;
-		sctp->sctp_irwnd = sctp->sctp_rwnd;
+		sctp->sctp_arwnd = connp->conn_rcvbuf;
 		sctp->sctp_pd_point = sctp->sctp_rwnd;
 		sctp->sctp_rto_max = MSEC_TO_TICK(sctps->sctps_rto_maxg);
 		sctp->sctp_rto_max_init = sctp->sctp_rto_max;
@@ -1015,7 +967,7 @@ sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
 {
 	uint32_t	pmtu;
 	int32_t		mss;
-	ip_xmit_attr_t	*ixa = fp->ixa;
+	ip_xmit_attr_t	*ixa = fp->sf_ixa;
 
 	if (sctp->sctp_state < SCTPS_ESTABLISHED)
 		return;
@@ -1040,20 +992,20 @@ sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
 	/*
 	 * Nothing to change, so just return.
 	 */
-	if (mss == fp->sfa_pmss)
+	if (mss == fp->sf_pmss)
 		return;
 
 	/*
 	 * Currently, for ICMP errors, only PMTU decrease is handled.
 	 */
-	if (mss > fp->sfa_pmss && decrease_only)
+	if (mss > fp->sf_pmss && decrease_only)
 		return;
 
 #ifdef DEBUG
 	(void) printf("sctp_update_pmtu mss from %d to %d\n",
-	    fp->sfa_pmss, mss);
+	    fp->sf_pmss, mss);
 #endif
-	DTRACE_PROBE2(sctp_update_pmtu, int32_t, fp->sfa_pmss, uint32_t, mss);
+	DTRACE_PROBE2(sctp_update_pmtu, int32_t, fp->sf_pmss, uint32_t, mss);
 
 	/*
 	 * Update ixa_fragsize and ixa_pmtu.
@@ -1064,8 +1016,8 @@ sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
 	 * Make sure that sfa_pmss is a multiple of
 	 * SCTP_ALIGN.
 	 */
-	fp->sfa_pmss = mss & ~(SCTP_ALIGN - 1);
-	fp->pmtu_discovered = 1;
+	fp->sf_pmss = mss & ~(SCTP_ALIGN - 1);
+	fp->sf_pmtu_discovered = 1;
 
 #ifdef notyet
 	if (mss < sctp->sctp_sctps->sctps_mss_min)
@@ -1081,7 +1033,7 @@ sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
 	 */
 	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		if (!(ixa->ixa_flags & IXAF_PMTU_IPV4_DF)) {
-			fp->df = B_FALSE;
+			fp->sf_df = B_FALSE;
 			if (fp == sctp->sctp_current) {
 				sctp->sctp_ipha->
 				    ipha_fragment_offset_and_flags = 0;
@@ -1106,8 +1058,8 @@ sctp_notify(void *arg, ip_xmit_attr_t *ixa, ixa_notify_type_t ntype,
 	switch (ntype) {
 	case IXAN_PMTU:
 		/* Find the faddr based on the ip_xmit_attr_t pointer */
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-			if (fp->ixa == ixa)
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+			if (fp->sf_ixa == ixa)
 				break;
 		}
 		if (fp != NULL)
@@ -1208,7 +1160,7 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 				if (!sctp_icmp_verf(sctp, sctph, mp)) {
 					break;
 				}
-				BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+				SCTPS_BUMP_MIB(sctps, sctpAborted);
 				sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0,
 				    NULL);
 				sctp_clean_death(sctp, ECONNREFUSED);
@@ -1315,7 +1267,7 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
 			}
 			if (sctp->sctp_state == SCTPS_COOKIE_WAIT ||
 			    sctp->sctp_state == SCTPS_COOKIE_ECHOED) {
-				BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+				SCTPS_BUMP_MIB(sctps, sctpAborted);
 				sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0,
 				    NULL);
 				sctp_clean_death(sctp, ECONNREFUSED);
@@ -1344,7 +1296,7 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
 				break;
 			}
 			if (sctp->sctp_state == SCTPS_COOKIE_WAIT) {
-				BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+				SCTPS_BUMP_MIB(sctps, sctpAborted);
 				sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0,
 				    NULL);
 				sctp_clean_death(sctp, ECONNREFUSED);
@@ -1386,13 +1338,18 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int type, int flags,
 		sctps = psctp->sctp_sctps;
 		/* Increase here to have common decrease at end */
 		netstack_hold(sctps->sctps_netstack);
+		ASSERT(sctps->sctps_recvq_tq_list_cur_sz > 0);
 	} else {
 		netstack_t *ns;
 
 		ns = netstack_find_by_cred(credp);
-		ASSERT(ns != NULL);
 		sctps = ns->netstack_sctp;
-		ASSERT(sctps != NULL);
+		/*
+		 * Check if the receive queue taskq for this sctp_stack_t has
+		 * been set up.
+		 */
+		if (sctps->sctps_recvq_tq_list_cur_sz == 0)
+			sctp_rq_tq_init(sctps);
 
 		/*
 		 * For exclusive stacks we set the zoneid to zero
@@ -1570,6 +1527,7 @@ sctp_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	sctp_stack_t	*sctps;
 	size_t		arrsz;
+	int		i;
 
 	sctps = kmem_zalloc(sizeof (*sctps), KM_SLEEP);
 	sctps->sctps_netstack = ns;
@@ -1589,9 +1547,6 @@ sctp_stack_init(netstackid_t stackid, netstack_t *ns)
 	    KM_SLEEP);
 	bcopy(sctp_propinfo_tbl, sctps->sctps_propinfo_tbl, arrsz);
 
-	/* Initialize the recvq taskq. */
-	sctp_rq_tq_init(sctps);
-
 	/* saddr init */
 	sctp_saddr_init(sctps);
 
@@ -1599,10 +1554,29 @@ sctp_stack_init(netstackid_t stackid, netstack_t *ns)
 	list_create(&sctps->sctps_g_list, sizeof (sctp_t),
 	    offsetof(sctp_t, sctp_list));
 
-	/* Initialize sctp kernel stats. */
+	/* Initialize SCTP kstats. */
 	sctps->sctps_mibkp = sctp_kstat_init(stackid);
-	sctps->sctps_kstat =
-	    sctp_kstat2_init(stackid, &sctps->sctps_statistics);
+	sctps->sctps_kstat = sctp_kstat2_init(stackid);
+
+	mutex_init(&sctps->sctps_reclaim_lock, NULL, MUTEX_DEFAULT, NULL);
+	sctps->sctps_reclaim = B_FALSE;
+	sctps->sctps_reclaim_tid = 0;
+	sctps->sctps_reclaim_period = sctps->sctps_rto_maxg;
+
+	/* Allocate the per netstack stats */
+	mutex_enter(&cpu_lock);
+	sctps->sctps_sc_cnt = MAX(ncpus, boot_ncpus);
+	mutex_exit(&cpu_lock);
+	sctps->sctps_sc = kmem_zalloc(max_ncpus  * sizeof (sctp_stats_cpu_t *),
+	    KM_SLEEP);
+	for (i = 0; i < sctps->sctps_sc_cnt; i++) {
+		sctps->sctps_sc[i] = kmem_zalloc(sizeof (sctp_stats_cpu_t),
+		    KM_SLEEP);
+	}
+
+	mutex_init(&sctps->sctps_listener_conf_lock, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&sctps->sctps_listener_conf, sizeof (sctp_listener_t),
+	    offsetof(sctp_listener_t, sl_link));
 
 	return (sctps);
 }
@@ -1635,6 +1609,20 @@ static void
 sctp_stack_fini(netstackid_t stackid, void *arg)
 {
 	sctp_stack_t *sctps = (sctp_stack_t *)arg;
+	int i;
+
+	/*
+	 * Set sctps_reclaim to false tells sctp_reclaim_timer() not to restart
+	 * the timer.
+	 */
+	mutex_enter(&sctps->sctps_reclaim_lock);
+	sctps->sctps_reclaim = B_FALSE;
+	mutex_exit(&sctps->sctps_reclaim_lock);
+	if (sctps->sctps_reclaim_tid != 0)
+		(void) untimeout(sctps->sctps_reclaim_tid);
+	mutex_destroy(&sctps->sctps_reclaim_lock);
+
+	sctp_listener_conf_cleanup(sctps);
 
 	kmem_free(sctps->sctps_propinfo_tbl,
 	    sctp_propinfo_count * sizeof (mod_prop_info_t));
@@ -1653,12 +1641,14 @@ sctp_stack_fini(netstackid_t stackid, void *arg)
 	sctp_hash_destroy(sctps);
 
 	/* Destroy SCTP kernel stats. */
-	sctp_kstat2_fini(stackid, sctps->sctps_kstat);
-	sctps->sctps_kstat = NULL;
-	bzero(&sctps->sctps_statistics, sizeof (sctps->sctps_statistics));
+	for (i = 0; i < sctps->sctps_sc_cnt; i++)
+		kmem_free(sctps->sctps_sc[i], sizeof (sctp_stats_cpu_t));
+	kmem_free(sctps->sctps_sc, max_ncpus * sizeof (sctp_stats_cpu_t *));
 
 	sctp_kstat_fini(stackid, sctps->sctps_mibkp);
 	sctps->sctps_mibkp = NULL;
+	sctp_kstat2_fini(stackid, sctps->sctps_kstat);
+	sctps->sctps_kstat = NULL;
 
 	mutex_destroy(&sctps->sctps_g_lock);
 	mutex_destroy(&sctps->sctps_epriv_port_lock);
@@ -1666,26 +1656,37 @@ sctp_stack_fini(netstackid_t stackid, void *arg)
 	kmem_free(sctps, sizeof (*sctps));
 }
 
-void
-sctp_display_all(sctp_stack_t *sctps)
-{
-	sctp_t *sctp_walker;
-
-	mutex_enter(&sctps->sctps_g_lock);
-	for (sctp_walker = list_head(&sctps->sctps_g_list);
-	    sctp_walker != NULL;
-	    sctp_walker = (sctp_t *)list_next(&sctps->sctps_g_list,
-	    sctp_walker)) {
-		(void) sctp_display(sctp_walker, NULL);
-	}
-	mutex_exit(&sctps->sctps_g_lock);
-}
-
 static void
 sctp_rq_tq_init(sctp_stack_t *sctps)
 {
-	sctps->sctps_recvq_tq_list_max_sz = 16;
+	char tq_name[TASKQ_NAMELEN];
+	int thrs;
+	int max_tasks;
+
+	mutex_enter(&sctps->sctps_g_lock);
+	/* Someone may have beaten us in creating the taskqs. */
+	if (sctps->sctps_recvq_tq_list_cur_sz > 0) {
+		mutex_exit(&sctps->sctps_g_lock);
+		return;
+	}
+
+	thrs = MIN(sctp_recvq_tq_thr_max, MAX(sctp_recvq_tq_thr_min,
+	    MAX(ncpus, boot_ncpus)));
+	/*
+	 * Make sure that the maximum number of tasks is at least thrice as
+	 * large as the number of threads.
+	 */
+	max_tasks = MAX(sctp_recvq_tq_task_min, thrs) * 3;
+
+	/*
+	 * This helps differentiate the default taskqs in different IP stacks.
+	 */
+	(void) snprintf(tq_name, sizeof (tq_name), "sctp_def_rq_taskq_%d",
+	    sctps->sctps_netstack->netstack_stackid);
+
+	sctps->sctps_recvq_tq_list_max_sz = sctp_recvq_tq_list_max;
 	sctps->sctps_recvq_tq_list_cur_sz = 1;
+
 	/*
 	 * Initialize the recvq_tq_list and create the first recvq taskq.
 	 * What to do if it fails?
@@ -1693,17 +1694,20 @@ sctp_rq_tq_init(sctp_stack_t *sctps)
 	sctps->sctps_recvq_tq_list =
 	    kmem_zalloc(sctps->sctps_recvq_tq_list_max_sz * sizeof (taskq_t *),
 	    KM_SLEEP);
-	sctps->sctps_recvq_tq_list[0] = taskq_create("sctp_def_recvq_taskq",
-	    MIN(sctp_recvq_tq_thr_max, MAX(sctp_recvq_tq_thr_min, ncpus)),
-	    minclsyspri, sctp_recvq_tq_task_min, sctp_recvq_tq_task_max,
-	    TASKQ_PREPOPULATE);
+	sctps->sctps_recvq_tq_list[0] = taskq_create(tq_name, thrs,
+	    minclsyspri, sctp_recvq_tq_task_min, max_tasks, TASKQ_PREPOPULATE);
 	mutex_init(&sctps->sctps_rq_tq_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	mutex_exit(&sctps->sctps_g_lock);
 }
 
 static void
 sctp_rq_tq_fini(sctp_stack_t *sctps)
 {
 	int i;
+
+	if (sctps->sctps_recvq_tq_list_cur_sz == 0)
+		return;
 
 	for (i = 0; i < sctps->sctps_recvq_tq_list_cur_sz; i++) {
 		ASSERT(sctps->sctps_recvq_tq_list[i] != NULL);
@@ -1720,6 +1724,16 @@ sctp_inc_taskq(sctp_stack_t *sctps)
 {
 	taskq_t *tq;
 	char tq_name[TASKQ_NAMELEN];
+	int thrs;
+	int max_tasks;
+
+	thrs = MIN(sctp_recvq_tq_thr_max, MAX(sctp_recvq_tq_thr_min,
+	    MAX(ncpus, boot_ncpus)));
+	/*
+	 * Make sure that the maximum number of tasks is at least thrice as
+	 * large as the number of threads.
+	 */
+	max_tasks = MAX(sctp_recvq_tq_task_min, thrs) * 3;
 
 	mutex_enter(&sctps->sctps_rq_tq_lock);
 	if (sctps->sctps_recvq_tq_list_cur_sz + 1 >
@@ -1729,12 +1743,11 @@ sctp_inc_taskq(sctp_stack_t *sctps)
 		return;
 	}
 
-	(void) snprintf(tq_name, sizeof (tq_name), "sctp_recvq_taskq_%u",
+	(void) snprintf(tq_name, sizeof (tq_name), "sctp_rq_taskq_%d_%u",
+	    sctps->sctps_netstack->netstack_stackid,
 	    sctps->sctps_recvq_tq_list_cur_sz);
-	tq = taskq_create(tq_name,
-	    MIN(sctp_recvq_tq_thr_max, MAX(sctp_recvq_tq_thr_min, ncpus)),
-	    minclsyspri, sctp_recvq_tq_task_min, sctp_recvq_tq_task_max,
-	    TASKQ_PREPOPULATE);
+	tq = taskq_create(tq_name, thrs, minclsyspri, sctp_recvq_tq_task_min,
+	    max_tasks, TASKQ_PREPOPULATE);
 	if (tq == NULL) {
 		mutex_exit(&sctps->sctps_rq_tq_lock);
 		cmn_err(CE_NOTE, "SCTP recvq taskq creation failed");
@@ -2072,7 +2085,7 @@ sctp_conn_cache_init()
 {
 	sctp_conn_cache = kmem_cache_create("sctp_conn_cache",
 	    sizeof (sctp_t) + sizeof (conn_t), 0, sctp_conn_cache_constructor,
-	    sctp_conn_cache_destructor, NULL, NULL, NULL, 0);
+	    sctp_conn_cache_destructor, sctp_conn_reclaim, NULL, NULL, 0);
 }
 
 static void

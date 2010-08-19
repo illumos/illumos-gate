@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <errno.h>
@@ -1338,7 +1337,8 @@ copy_non_elf_to_temp_ar(
 	char    mem_header_buf[sizeof (struct ar_hdr) + 1];
 	char *file_buf;
 
-	if (strcmp(mem_header->ar_name, "/") != 0) {
+	if ((strcmp(mem_header->ar_name, "/") != 0) &&
+	    (strcmp(mem_header->ar_name, "/SYM64/") != 0)) {
 		(void) sprintf(mem_header_buf, FORMAT, mem_header->ar_rawname,
 		    mem_header->ar_date, (unsigned)mem_header->ar_uid,
 		    (unsigned)mem_header->ar_gid, (unsigned)mem_header->ar_mode,

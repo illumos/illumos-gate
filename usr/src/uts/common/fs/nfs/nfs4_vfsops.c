@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1180,7 +1179,8 @@ errout:
 			/* need to remove it from the zone */
 			removed = nfs4_mi_zonelist_remove(mi);
 			if (removed)
-				zone_rele(mi->mi_zone);
+				zone_rele_ref(&mi->mi_zone_ref,
+				    ZONE_REF_NFSV4);
 			MI4_RELE(mi);
 			if (!(uap->flags & MS_SYSSPACE) && args) {
 				nfs4_free_args(args);
@@ -2384,7 +2384,9 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	cv_init(&mi->mi_inact_req_cv, NULL, CV_DEFAULT, NULL);
 
 	mi->mi_vfsp = vfsp;
-	zone_hold(mi->mi_zone = zone);
+	mi->mi_zone = zone;
+	zone_init_ref(&mi->mi_zone_ref);
+	zone_hold_ref(zone, &mi->mi_zone_ref, ZONE_REF_NFSV4);
 	nfs4_mi_zonelist_add(mi);
 
 	/*
@@ -2616,7 +2618,7 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 		(void) strcat(resource, svp->sv_hostname);
 		(void) strcat(resource, ":");
 		(void) strcat(resource, svp->sv_path);
-		vfs_setresource(vfsp, resource);
+		vfs_setresource(vfsp, resource, 0);
 		kmem_free(resource, len);
 	}
 
@@ -2647,7 +2649,7 @@ bad:
 	nfs4_async_manager_stop(vfsp);
 	removed = nfs4_mi_zonelist_remove(mi);
 	if (removed)
-		zone_rele(mi->mi_zone);
+		zone_rele_ref(&mi->mi_zone_ref, ZONE_REF_NFSV4);
 
 	/*
 	 * This releases the initial "hold" of the mi since it will never
@@ -2772,7 +2774,7 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	nfs4_remove_mi_from_server(mi, NULL);
 	removed = nfs4_mi_zonelist_remove(mi);
 	if (removed)
-		zone_rele(mi->mi_zone);
+		zone_rele_ref(&mi->mi_zone_ref, ZONE_REF_NFSV4);
 
 	return (0);
 }
@@ -4403,7 +4405,7 @@ nfs4_free_mount(vfs_t *vfsp, int flag, cred_t *cr)
 
 	removed = nfs4_mi_zonelist_remove(mi);
 	if (removed)
-		zone_rele(mi->mi_zone);
+		zone_rele_ref(&mi->mi_zone_ref, ZONE_REF_NFSV4);
 }
 
 /* Referral related sub-routines */

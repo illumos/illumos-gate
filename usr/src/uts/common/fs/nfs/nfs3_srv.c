@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -1012,8 +1011,13 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
-	if (args->wlist)
+	if (args->wlist) {
+		if (args->count > clist_len(args->wlist)) {
+			error = EINVAL;
+			goto out;
+		}
 		rdma_used = 1;
+	}
 
 	/* use loaned buffers for TCP */
 	loaned_buffers = (nfs_loaned_buffers && !rdma_used) ? 1 : 0;

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -346,6 +345,7 @@ extern  boolean_t	ire_walk_ill_match(uint_t, uint_t, ire_t *, ill_t *,
 extern  void ire_increment_generation(ire_t *);
 extern  void ire_increment_multicast_generation(ip_stack_t *, boolean_t);
 extern	void ire_rebind(ire_t *);
+extern	boolean_t ire_clone_verify(ire_t *);
 
 #endif /* _KERNEL */
 

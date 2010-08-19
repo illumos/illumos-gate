@@ -313,12 +313,9 @@ ses_plugin_load_dir(ses_target_t *tp, const char *pluginroot)
 	 * Create a local copy of the vendor/product/revision, strip out any
 	 * questionable characters, and then attempt to load each plugin.
 	 */
-	vendor = alloca(strlen(libscsi_vendor(tp->st_target)) + 1);
-	product = alloca(strlen(libscsi_product(tp->st_target)) + 1);
-	revision = alloca(strlen(libscsi_revision(tp->st_target)) + 1);
-	(void) strcpy(vendor, libscsi_vendor(tp->st_target));
-	(void) strcpy(product, libscsi_product(tp->st_target));
-	(void) strcpy(revision, libscsi_revision(tp->st_target));
+	vendor = strdupa(libscsi_vendor(tp->st_target));
+	product = strdupa(libscsi_product(tp->st_target));
+	revision = strdupa(libscsi_revision(tp->st_target));
 
 	ses_plugin_cleanstr(vendor);
 	ses_plugin_cleanstr(product);

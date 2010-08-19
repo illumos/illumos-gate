@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -80,6 +81,7 @@
 char	_depends_on[] = "fs/sockfs";
 
 static au_event_t	aui_fchownat(au_event_t);
+static au_event_t	aui_fchmodat(au_event_t);
 static au_event_t	aui_open(au_event_t);
 static au_event_t	aui_openat(au_event_t);
 static au_event_t	aui_unlinkat(au_event_t);
@@ -114,9 +116,12 @@ static void	aus_fchownat(struct t_audit_data *);
 static void	aus_chmod(struct t_audit_data *);
 static void	aus_facl(struct t_audit_data *);
 static void	aus_fchmod(struct t_audit_data *);
+static void	aus_fchmodat(struct t_audit_data *);
 static void	aus_fcntl(struct t_audit_data *);
 static void	aus_mkdir(struct t_audit_data *);
+static void	aus_mkdirat(struct t_audit_data *);
 static void	aus_mknod(struct t_audit_data *);
+static void	aus_mknodat(struct t_audit_data *);
 static void	aus_mount(struct t_audit_data *);
 static void	aus_umount2(struct t_audit_data *);
 static void	aus_msgsys(struct t_audit_data *);
@@ -149,6 +154,7 @@ static void	aus_setreuid(struct t_audit_data *);
 static void	aus_labelsys(struct t_audit_data *);
 
 static void	auf_mknod(struct t_audit_data *, int, rval_t *);
+static void	auf_mknodat(struct t_audit_data *, int, rval_t *);
 static void	auf_msgsys(struct t_audit_data *, int, rval_t *);
 static void	auf_semsys(struct t_audit_data *, int, rval_t *);
 static void	auf_shmsys(struct t_audit_data *, int, rval_t *);
@@ -210,7 +216,7 @@ aui_open,	AUE_OPEN,	aus_open,	/* 5 open */
 		auf_null,	S2E_SP,
 aui_null,	AUE_CLOSE,	aus_close,	/* 6 close */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 7 (loadable) was wait */
+aui_null,	AUE_LINK,	aus_null,	/* 7 linkat */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 8 (loadable) was creat */
 		auf_null,	0,
@@ -218,14 +224,14 @@ aui_null,	AUE_LINK,	aus_null,	/* 9 link */
 		auf_null,	0,
 aui_null,	AUE_UNLINK,	aus_null,	/* 10 unlink */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 11 (loadable) was exec */
+aui_null,	AUE_SYMLINK,	aus_null,	/* 11 symlinkat */
 		auf_null,	0,
 aui_null,	AUE_CHDIR,	aus_null,	/* 12 chdir */
 		auf_null,	S2E_SP,
 aui_null,	AUE_NULL,	aus_null,	/* 13 time */
 		auf_null,	0,
 aui_null,	AUE_MKNOD,	aus_mknod,	/* 14 mknod */
-		auf_mknod,	0,
+		auf_mknod,	S2E_MLD,
 aui_null,	AUE_CHMOD,	aus_chmod,	/* 15 chmod */
 		auf_null,	0,
 aui_null,	AUE_CHOWN,	aus_chown,	/* 16 chown */
@@ -240,8 +246,8 @@ aui_null,	AUE_NULL,	aus_null,	/* 20 getpid */
 		auf_null,	0,
 aui_null,	AUE_MOUNT,	aus_mount,	/* 21 mount */
 		auf_null,	S2E_MLD,
-aui_null,	AUE_NULL,	aus_null,	/* 22 (loadable) was umount */
-		auf_null,	0,
+aui_null,	AUE_READLINK,	aus_null,	/* 22 readlinkat */
+		auf_null,	S2E_PUB,
 aui_null,	AUE_SETUID,	aus_setuid,	/* 23 setuid */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 24 getuid */
@@ -292,8 +298,8 @@ aui_null,	AUE_SETGID,	aus_setgid,	/* 46 setgid */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 47 getgid */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 48 (loadable) was ssig */
-		auf_null,	0,
+aui_null,	AUE_MKNOD,	aus_mknodat,	/* 48 mknodat */
+		auf_mknodat,	S2E_MLD,
 aui_msgsys,	AUE_MSGSYS,	aus_msgsys,	/* 49 (loadable) msgsys */
 		auf_msgsys,	0,
 #if defined(__x86)
@@ -403,9 +409,9 @@ aui_null,	AUE_NULL,	aus_null,	/* 99 sigpending */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 100 setcontext */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 101 (loadable) */
+aui_fchmodat,	AUE_NULL,	aus_fchmodat,	/* 101 fchmodat */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 102 (loadable) */
+aui_null,	AUE_MKDIR,	aus_mkdirat,	/* 102 mkdirat */
 		auf_null,	0,
 aui_null,	AUE_STATVFS,	aus_null,	/* 103 statvfs */
 		auf_null,	S2E_PUB,
@@ -890,7 +896,6 @@ aus_fchownat(struct t_audit_data *tad)
 	au_uwrite(au_to_arg32(4, "new file gid", gid));
 }
 
-/* chmod start function */
 /*ARGSUSED*/
 static void
 aus_chmod(struct t_audit_data *tad)
@@ -908,7 +913,6 @@ aus_chmod(struct t_audit_data *tad)
 	au_uwrite(au_to_arg32(2, "new file mode", fmode&07777));
 }
 
-/* chmod start function */
 /*ARGSUSED*/
 static void
 aus_fchmod(struct t_audit_data *tad)
@@ -929,14 +933,82 @@ aus_fchmod(struct t_audit_data *tad)
 
 	au_uwrite(au_to_arg32(2, "new file mode", fmode&07777));
 
-		/*
-		 * convert file pointer to file descriptor
-		 *   Note: fd ref count incremented here.
-		 */
+	/*
+	 * convert file pointer to file descriptor
+	 *   Note: fd ref count incremented here.
+	 */
 	if ((fp = getf(fd)) == NULL)
 		return;
 
-		/* get path from file struct here */
+	/* get path from file struct here */
+	fad = F2A(fp);
+	if (fad->fad_aupath != NULL) {
+		au_uwrite(au_to_path(fad->fad_aupath));
+	} else {
+		au_uwrite(au_to_arg32(1, "no path: fd", fd));
+	}
+
+	vp = fp->f_vnode;
+	audit_attributes(vp);
+
+	/* decrement file descriptor reference count */
+	releasef(fd);
+}
+
+static au_event_t
+aui_fchmodat(au_event_t e)
+{
+	klwp_t *clwp = ttolwp(curthread);
+
+	struct a {
+		long	fd;
+		long	fname;		/* char	* */
+		long	fmode;
+		long	flag;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	if (uap->fname == NULL)
+		e = AUE_FCHMOD;
+	else
+		e = AUE_CHMOD;
+
+	return (e);
+}
+
+/*ARGSUSED*/
+static void
+aus_fchmodat(struct t_audit_data *tad)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	uint32_t fmode;
+	uint32_t fd;
+	struct file  *fp;
+	struct vnode *vp;
+	struct f_audit_data *fad;
+
+	struct a {
+		long	fd;
+		long	fname;		/* char	* */
+		long	fmode;
+		long	flag;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	fd = (uint32_t)uap->fd;
+	fmode = (uint32_t)uap->fmode;
+
+	au_uwrite(au_to_arg32(2, "new file mode", fmode&07777));
+
+	if (fd == AT_FDCWD || uap->fname != NULL)	/* same as chmod() */
+		return;
+
+	/*
+	 * convert file pointer to file descriptor
+	 *   Note: fd ref count incremented here.
+	 */
+	if ((fp = getf(fd)) == NULL)
+		return;
+
+	/* get path from file struct here */
 	fad = F2A(fp);
 	if (fad->fad_aupath != NULL) {
 		au_uwrite(au_to_path(fad->fad_aupath));
@@ -959,7 +1031,7 @@ open_event(uint_t fm)
 {
 	au_event_t e;
 
-	switch (fm & (O_RDONLY|O_WRONLY|O_RDWR|O_CREAT|O_TRUNC)) {
+	switch (fm & (O_ACCMODE | O_CREAT | O_TRUNC)) {
 	case O_RDONLY:
 		e = AUE_OPEN_R;
 		break;
@@ -995,6 +1067,12 @@ open_event(uint_t fm)
 		break;
 	case O_RDWR | O_TRUNC | O_CREAT:
 		e = AUE_OPEN_RWTC;
+		break;
+	case O_SEARCH:
+		e = AUE_OPEN_S;
+		break;
+	case O_EXEC:
+		e = AUE_OPEN_E;
 		break;
 	default:
 		e = AUE_NULL;
@@ -1502,6 +1580,24 @@ aus_mkdir(struct t_audit_data *tad)
 
 /*ARGSUSED*/
 static void
+aus_mkdirat(struct t_audit_data *tad)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	uint32_t dmode;
+
+	struct a {
+		long	fd;
+		long	dirnamep;		/* char * */
+		long	dmode;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	dmode = (uint32_t)uap->dmode;
+
+	au_uwrite(au_to_arg32(2, "mode", dmode));
+}
+
+/*ARGSUSED*/
+static void
 aus_mknod(struct t_audit_data *tad)
 {
 	klwp_t *clwp = ttolwp(curthread);
@@ -1540,11 +1636,7 @@ auf_mknod(struct t_audit_data *tad, int error, rval_t *rval)
 	} *uap = (struct a *)clwp->lwp_ap;
 
 	/* no error, then already path token in audit record */
-	if (error != EPERM)
-		return;
-
-	/* not auditing this event, nothing then to do */
-	if (tad->tad_flag == 0)
+	if (error != EPERM && error != EINVAL)
 		return;
 
 	/* do the lookup to force generation of path token */
@@ -1553,6 +1645,68 @@ auf_mknod(struct t_audit_data *tad, int error, rval_t *rval)
 	error = lookupname(pnamep, UIO_USERSPACE, NO_FOLLOW, &dvp, NULLVPP);
 	if (error == 0)
 		VN_RELE(dvp);
+}
+
+/*ARGSUSED*/
+static void
+aus_mknodat(struct t_audit_data *tad)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	uint32_t fmode;
+	dev_t dev;
+
+	struct a {
+		long	fd;
+		long	pnamep;		/* char * */
+		long	fmode;
+		long	dev;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	fmode = (uint32_t)uap->fmode;
+	dev   = (dev_t)uap->dev;
+
+	au_uwrite(au_to_arg32(2, "mode", fmode));
+#ifdef _LP64
+	au_uwrite(au_to_arg64(3, "dev", dev));
+#else
+	au_uwrite(au_to_arg32(3, "dev", dev));
+#endif
+}
+
+/*ARGSUSED*/
+static void
+auf_mknodat(struct t_audit_data *tad, int error, rval_t *rval)
+{
+	klwp_t *clwp = ttolwp(curthread);
+	vnode_t	*startvp;
+	vnode_t	*dvp;
+	caddr_t pnamep;
+	int fd;
+
+	struct a {
+		long	fd;
+		long	pnamep;		/* char * */
+		long	fmode;
+		long	dev;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	/* no error, then already path token in audit record */
+	if (error != EPERM && error != EINVAL)
+		return;
+
+	/* do the lookup to force generation of path token */
+	fd = (int)uap->fd;
+	pnamep = (caddr_t)uap->pnamep;
+	if (pnamep == NULL ||
+	    fgetstartvp(fd, pnamep, &startvp) != 0)
+		return;
+	tad->tad_ctrl |= TAD_NOATTRB;
+	error = lookupnameat(pnamep, UIO_USERSPACE, NO_FOLLOW, &dvp, NULLVPP,
+	    startvp);
+	if (error == 0)
+		VN_RELE(dvp);
+	if (startvp != NULL)
+		VN_RELE(startvp);
 }
 
 /*ARGSUSED*/
@@ -2836,6 +2990,12 @@ aui_auditsys(au_event_t e)
 		case A_SETPOLICY:
 			e = AUE_AUDITON_SPOLICY;
 			break;
+		case A_GETAMASK:
+			e = AUE_AUDITON_GETAMASK;
+			break;
+		case A_SETAMASK:
+			e = AUE_AUDITON_SETAMASK;
+			break;
 		case A_GETKMASK:
 			e = AUE_AUDITON_GETKMASK;
 			break;
@@ -2984,6 +3144,14 @@ aus_auditsys(struct t_audit_data *tad)
 		au_uwrite(au_to_arg32((char)1, "asid",
 		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_asid)));
 		break;
+	case AUE_AUDITON_SETAMASK:
+		if (copyin((caddr_t)a2, &mask, sizeof (au_mask_t)))
+				return;
+		au_uwrite(au_to_arg32(
+		    2, "setamask:as_success", (uint32_t)mask.as_success));
+		au_uwrite(au_to_arg32(
+		    2, "setamask:as_failure", (uint32_t)mask.as_failure));
+		break;
 	case AUE_AUDITON_SETKMASK:
 		if (copyin((caddr_t)a2, &mask, sizeof (au_mask_t)))
 				return;
@@ -3075,6 +3243,7 @@ aus_auditsys(struct t_audit_data *tad)
 	case AUE_AUDIT:
 	case AUE_AUDITON_GPOLICY:
 	case AUE_AUDITON_GQCTRL:
+	case AUE_AUDITON_GETAMASK:
 	case AUE_AUDITON_GETKMASK:
 	case AUE_AUDITON_GETCWD:
 	case AUE_AUDITON_GETCAR:
@@ -3380,12 +3549,22 @@ auf_accept(
 #else
 	sy_flags = sysent[scid].sy_flags & SE_RVAL_MASK;
 #endif
-	if (sy_flags == SE_32RVAL1)
+	switch (sy_flags) {
+	case SE_32RVAL1:
+		/* FALLTHRU */
+	case SE_32RVAL2|SE_32RVAL1:
 		fd = rval->r_val1;
-	if (sy_flags == (SE_32RVAL2|SE_32RVAL1))
-		fd = rval->r_val1;
-	if (sy_flags == SE_64RVAL)
+		break;
+	case SE_64RVAL:
 		fd = (int)rval->r_vals;
+		break;
+	default:
+		/*
+		 * should never happen, seems to be an internal error
+		 * in sysent => no fd, nothing to audit here, returning
+		 */
+		return;
+	}
 
 	if (error) {
 		/* can't trust socket contents. Just return */

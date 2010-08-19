@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_RSRC_H
@@ -166,6 +165,10 @@ typedef enum {
 	HERMON_UARPG,
 	HERMON_INTR_IN_MBOX,
 	HERMON_INTR_OUT_MBOX,	/* type 0x1B */
+	HERMON_QPC_FEXCH_PORT1,
+	HERMON_QPC_FEXCH_PORT2,
+	HERMON_QPC_RFCI_PORT1,
+	HERMON_QPC_RFCI_PORT2,
 	HERMON_NUM_RESOURCES
 } hermon_rsrc_type_t;
 
@@ -374,6 +377,9 @@ int hermon_rsrc_init_phase2(hermon_state_t *state);
 void hermon_rsrc_fini(hermon_state_t *state,
     hermon_rsrc_cleanup_level_t clean);
 
+/* Exporting resource reservation capabilitity to FCoIB */
+int hermon_rsrc_reserve(hermon_state_t *state, hermon_rsrc_type_t rsrc,
+    uint_t num, uint_t sleepflag, hermon_rsrc_t **hdl);
 
 #ifdef __cplusplus
 }

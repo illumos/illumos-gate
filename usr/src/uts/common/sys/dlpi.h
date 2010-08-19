@@ -407,6 +407,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_NOTE_CAPAB_RENEG	0x0400	/* Initiate capability renegotiation */
 #define	DL_NOTE_REPLUMB		0x0800	/* Inform the link to replumb */
 #define	DL_NOTE_ALLOWED_IPS	0x1000	/* "allowed-ips"  notification */
+#define	DL_NOTE_SDU_SIZE2	0x2000	/* New unicast and multicast size */
 
 /*
  * DLPI notification codes for DL_NOTIFY_CONF primitives.
@@ -991,7 +992,13 @@ typedef struct {
 typedef struct {
 	t_uscalar_t	dl_primitive;	/* set to DL_NOTIFY_IND */
 	uint32_t	dl_notification; /* Which notification? */
-	uint32_t	dl_data;	/* notification specific */
+	union {
+		uint32_t	dlu_data32;	/* notification specific */
+		uint16_t	dlu_data16[2];	/* For DL_NOTE_SDU_SIZE2 */
+	} dl_dlu;
+#define	dl_data		dl_dlu.dlu_data32
+#define	dl_data1	dl_dlu.dlu_data16[0]	/* Unicast MTU */
+#define	dl_data2	dl_dlu.dlu_data16[1]	/* Multicast MTU */
 	t_uscalar_t	dl_addr_length;	/* length of complete DLSAP addr */
 	t_uscalar_t	dl_addr_offset;	/* offset from start of M_PROTO */
 } dl_notify_ind_t;

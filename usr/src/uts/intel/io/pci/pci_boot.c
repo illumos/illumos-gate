@@ -3244,28 +3244,28 @@ add_bus_available_prop(int bus)
 static void
 alloc_res_array(void)
 {
-	static int array_max = 0;
-	int old_max;
+	static int array_size = 0;
+	int old_size;
 	void *old_res;
 
-	if (array_max > pci_bios_maxbus + 1)
+	if (array_size > pci_bios_maxbus + 1)
 		return;	/* array is big enough */
 
-	old_max = array_max;
+	old_size = array_size;
 	old_res = pci_bus_res;
 
-	if (array_max == 0)
-		array_max = 16;	/* start with a reasonable number */
+	if (array_size == 0)
+		array_size = 16;	/* start with a reasonable number */
 
-	while (array_max < pci_bios_maxbus + 1)
-		array_max <<= 1;
+	while (array_size <= pci_bios_maxbus + 1)
+		array_size <<= 1;
 	pci_bus_res = (struct pci_bus_resource *)kmem_zalloc(
-	    array_max * sizeof (struct pci_bus_resource), KM_SLEEP);
+	    array_size * sizeof (struct pci_bus_resource), KM_SLEEP);
 
 	if (old_res) {	/* copy content and free old array */
 		bcopy(old_res, pci_bus_res,
-		    old_max * sizeof (struct pci_bus_resource));
-		kmem_free(old_res, old_max * sizeof (struct pci_bus_resource));
+		    old_size * sizeof (struct pci_bus_resource));
+		kmem_free(old_res, old_size * sizeof (struct pci_bus_resource));
 	}
 }
 

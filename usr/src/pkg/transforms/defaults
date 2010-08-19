@@ -76,12 +76,19 @@
 <transform file path=usr/share/src/grub/.+ -> default mode 0644>
 <transform file path=usr/share/.+ -> default mode 0444>
 
-
 #
 # For what's left, go with root:bin 0644, +x for directories
-#
 #
 <transform file dir -> default owner root>
 <transform file dir -> default group bin>
 <transform file -> default mode 0644>
 <transform dir -> default mode 0755>
+
+#
+# Default values for legacy actions
+#
+<transform legacy -> default vendor "Oracle Corporation">
+<transform legacy -> default hotline "Please contact your local service provider">
+<transform legacy -> default category system>
+<transform legacy -> default version "11.11,REV=2009.11.11">
+<transform legacy -> default arch $(ARCH)>

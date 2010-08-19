@@ -187,10 +187,13 @@ auto_getattr(
 		if (newvp == NULL)
 			goto defattr;
 
-		if (error = vn_vfsrlock_wait(vp))
+		if (error = vn_vfsrlock_wait(vp)) {
+			VN_RELE(newvp);
 			return (error);
+		}
 
 		vfsp = newvp->v_vfsp;
+		VN_RELE(newvp);
 	} else {
 		/*
 		 * Recursive auto_getattr/mount; go to the vfsp == NULL

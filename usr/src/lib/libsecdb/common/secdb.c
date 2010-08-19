@@ -49,7 +49,7 @@ kva_match(kva_t *kva, char *key)
 	kv_t	*data;
 
 	if (kva == NULL || key == NULL) {
-		return ((char *)NULL);
+		return (NULL);
 	}
 	data = kva->data;
 	for (i = 0; i < kva->length; i++) {
@@ -58,7 +58,7 @@ kva_match(kva_t *kva, char *key)
 		}
 	}
 
-	return ((char *)NULL);
+	return (NULL);
 }
 
 /*
@@ -89,6 +89,32 @@ _kva_free(kva_t *kva)
 }
 
 /*
+ * _kva_free_value(): Free up memory (value) for all the occurrences of
+ * the given key.
+ */
+void
+_kva_free_value(kva_t *kva, char *key)
+{
+	int	ctr;
+	kv_t	*data;
+
+	if (kva == NULL) {
+		return;
+	}
+
+	ctr = kva->length;
+	data = kva->data;
+
+	while (ctr--) {
+		if (strcmp(data->key, key) == 0 && data->value != NULL) {
+			free(data->value);
+			data->value = NULL;
+		}
+		data++;
+	}
+}
+
+/*
  * new_kva(): Allocate a key-value array.
  */
 kva_t  *
@@ -97,11 +123,11 @@ _new_kva(int size)
 	kva_t	*new_kva;
 
 	if ((new_kva = (kva_t *)calloc(1, sizeof (kva_t))) == NULL) {
-		return ((kva_t *)NULL);
+		return (NULL);
 	}
 	if ((new_kva->data = (kv_t *)calloc(1, (size*sizeof (kv_t)))) == NULL) {
 		free(new_kva);
-		return ((kva_t *)NULL);
+		return (NULL);
 	}
 
 	return (new_kva);
@@ -132,7 +158,7 @@ _str2kva(char *s, char *ass, char *del)
 	    *s == '\0' ||
 	    *s == '\n' ||
 	    (strlen(s) <= 1)) {
-		return ((kva_t *)NULL);
+		return (NULL);
 	}
 	p = s;
 	while ((p = _strpbrk_escape(p, ass)) != NULL) {
@@ -147,12 +173,12 @@ _str2kva(char *s, char *ass, char *del)
 		size = m * KV_ADD_KEYS;
 	}
 	if ((nkva = _new_kva(size)) == NULL) {
-		return ((kva_t *)NULL);
+		return (NULL);
 	}
 	data = nkva->data;
 	nkva->length = 0;
 	if ((buf = strdup(s)) == NULL) {
-		return ((kva_t *)NULL);
+		return (NULL);
 	}
 	pair = _strtok_escape(buf, del, &last_pair);
 	do {
@@ -172,43 +198,34 @@ _str2kva(char *s, char *ass, char *del)
  * (buf). Use delimeter (del) to separate pairs.  Use assignment character
  * (ass) to separate keys and values.
  *
- * Return Values: 0  Success 1  Buffer too small 2  Out of memory
+ * Return Values: 0  Success 1  Buffer too small
  */
 int
 _kva2str(kva_t *kva, char *buf, int buflen, char *ass, char *del)
 {
 	int	i;
-	int	length = 0;
-	char	*tmp;
+	int	len;
+	int	off = 0;
 	kv_t	*data;
 
 	if (kva == NULL) {
 		return (0);
 	}
+
+	buf[0] = '\0';
 	data = kva->data;
+
 	for (i = 0; i < kva->length; i++) {
 		if (data[i].value != NULL) {
-			length += 2 + strlen(data[i].value);
-		}
-	}
-	if (length > buflen) {
-		return (1);
-	}
-	(void) memset(buf, 0, buflen);
-	if ((tmp = (char *)malloc(buflen)) == NULL) {
-		return (2);
-	}
-	for (i = 0; i < kva->length; i++) {
-		if (data[i].value != NULL) {
-			if (snprintf(tmp, buflen, "%s%s%s%s",
-			    data[i].key, ass, data[i].value, del) >= buflen) {
-				free((void *)tmp);
-				return (0);
+			len = snprintf(buf + off, buflen - off, "%s%s%s%s",
+			    data[i].key, ass, data[i].value, del);
+			if (len < 0 || len + off >= buflen) {
+				return (1);
 			}
-			(void) strcat(buf, tmp);
+			off += len;
 		}
 	}
-	free((void *)tmp);
+
 	return (0);
 }
 
@@ -240,15 +257,15 @@ _kva_dup(kva_t *old_kva)
 	int	size;
 	kv_t	*old_data;
 	kv_t	*new_data;
-	kva_t 	*nkva = (kva_t *)NULL;
+	kva_t 	*nkva = NULL;
 
 	if (old_kva == NULL) {
-		return ((kva_t *)NULL);
+		return (NULL);
 	}
 	old_data = old_kva->data;
 	size = old_kva->length;
 	if ((nkva = _new_kva(size)) == NULL) {
-		return ((kva_t *)NULL);
+		return (NULL);
 	}
 	new_data = nkva->data;
 	nkva->length = old_kva->length;
@@ -309,10 +326,10 @@ _argv_to_csl(char **strings)
 {
 	int len = 0;
 	int i = 0;
-	char *newstr = (char *)NULL;
+	char *newstr = NULL;
 
 	if (strings == NULL)
-		return ((char *)NULL);
+		return (NULL);
 	for (i = 0; strings[i] != NULL; i++) {
 		len += strlen(strings[i]) + 1;
 	}
@@ -325,7 +342,7 @@ _argv_to_csl(char **strings)
 		newstr[len-1] = NULL;
 		return (newstr);
 	} else
-		return ((char *)NULL);
+		return (NULL);
 }
 
 
@@ -335,10 +352,10 @@ _csl_to_argv(char *csl)
 	int len = 0;
 	int ncommas = 0;
 	int i = 0;
-	char **spc = (char **)NULL;
-	char *copy = (char *)NULL;
+	char **spc = NULL;
+	char *copy = NULL;
 	char *pc;
-	char *lasts = (char *)NULL;
+	char *lasts = NULL;
 
 	len = strlen(csl);
 	for (i = 0; i < len; i++) {
@@ -346,7 +363,7 @@ _csl_to_argv(char *csl)
 			ncommas++;
 	}
 	if ((spc = (char **)malloc((ncommas + 2) * sizeof (char *))) == NULL) {
-		return ((char **)NULL);
+		return (NULL);
 	}
 	copy = strdup(csl);
 	for (pc = strtok_r(copy, ",", &lasts), i = 0; pc != NULL;
@@ -378,12 +395,14 @@ print_kva(kva_t *kva)
 	kv_t	*data;
 
 	if (kva == NULL) {
-		printf("  (empty)\n");
+		(void) printf("  (empty)\n");
 		return;
 	}
 	data = kva->data;
 	for (i = 0; i < kva->length; i++) {
-		printf("  %s = %s\n", data[i].key, data[i].value);
+		(void) printf("  %s = %s\n",
+		    data[i].key != NULL ? data[i].key : "NULL",
+		    data[i].value != NULL ? data[i].value : "NULL");
 	}
 }
 #endif  /* DEBUG */

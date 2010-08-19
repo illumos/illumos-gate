@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -85,7 +84,7 @@ struct xx
 	{ BREAK, "jump", "break"},
 	{ CONTINUE, "jump", "continue"},
 	{ FNCN, "fncn", "fncn"},
-	{ GETLINE, "getline", "getline"},
+	{ GETLINE, "getaline", "getline"},
 	{ 0, ""},
 };
 #define	SIZE	LASTTOKEN - FIRSTTOKEN

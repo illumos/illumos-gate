@@ -62,6 +62,7 @@
 #include <sys/dtrace.h>
 #include <sys/brand.h>
 #include <sys/machbrand.h>
+#include <sys/cmn_err.h>
 
 extern const struct fnsave_state x87_initial;
 extern const struct fxsave_state sse_initial;
@@ -278,41 +279,43 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 			 */
 			fp_free(fpu, 0);
 		}
-#if !defined(__amd64)
-		if (fp_kind == __FP_SSE) {
-#endif
-			fpregset_to_fxsave(fp, &fpu->fpu_regs.kfpu_u.kfpu_fx);
-			fpu->fpu_regs.kfpu_xstatus =
-			    fp->fp_reg_set.fpchip_state.xstatus;
-#if !defined(__amd64)
-		} else
-			bcopy(fp, &fpu->fpu_regs.kfpu_u.kfpu_fn,
-			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
-#endif
-		fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
-		fpu->fpu_flags |= FPU_VALID;
-	} else {
-		/*
-		 * If we are trying to change the FPU state of a thread which
-		 * hasn't yet initialized floating point, store the state in
-		 * the pcb and indicate that the state is valid.  When the
-		 * thread enables floating point, it will use this state instead
-		 * of the default state.
-		 */
-#if !defined(__amd64)
-		if (fp_kind == __FP_SSE) {
-#endif
-			fpregset_to_fxsave(fp, &fpu->fpu_regs.kfpu_u.kfpu_fx);
-			fpu->fpu_regs.kfpu_xstatus =
-			    fp->fp_reg_set.fpchip_state.xstatus;
-#if !defined(__amd64)
-		} else
-			bcopy(fp, &fpu->fpu_regs.kfpu_u.kfpu_fn,
-			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
-#endif
-		fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
-		fpu->fpu_flags |= FPU_VALID;
 	}
+	/*
+	 * Else: if we are trying to change the FPU state of a thread which
+	 * hasn't yet initialized floating point, store the state in
+	 * the pcb and indicate that the state is valid.  When the
+	 * thread enables floating point, it will use this state instead
+	 * of the default state.
+	 */
+
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
+		bcopy(fp, &fpu->fpu_regs.kfpu_u.kfpu_fn,
+		    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
+		break;
+#endif
+	case FP_FXSAVE:
+		fpregset_to_fxsave(fp, &fpu->fpu_regs.kfpu_u.kfpu_fx);
+		fpu->fpu_regs.kfpu_xstatus =
+		    fp->fp_reg_set.fpchip_state.xstatus;
+		break;
+
+	case FP_XSAVE:
+		fpregset_to_fxsave(fp,
+		    &fpu->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave);
+		fpu->fpu_regs.kfpu_xstatus =
+		    fp->fp_reg_set.fpchip_state.xstatus;
+		fpu->fpu_regs.kfpu_u.kfpu_xs.xs_xstate_bv |=
+		    (XFEATURE_LEGACY_FP | XFEATURE_SSE);
+		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
+	}
+
+	fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
+	fpu->fpu_flags |= FPU_VALID;
 }
 
 /*
@@ -349,32 +352,54 @@ getfpregs(klwp_t *lwp, fpregset_t *fp)
 		/*
 		 * Cases 1 and 3.
 		 */
-#if !defined(__amd64)
-		if (fp_kind == __FP_SSE) {
+		switch (fp_save_mech) {
+#if defined(__i386)
+		case FP_FNSAVE:
+			bcopy(&fpu->fpu_regs.kfpu_u.kfpu_fn, fp,
+			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
+			break;
 #endif
+		case FP_FXSAVE:
 			fxsave_to_fpregset(&fpu->fpu_regs.kfpu_u.kfpu_fx, fp);
 			fp->fp_reg_set.fpchip_state.xstatus =
 			    fpu->fpu_regs.kfpu_xstatus;
-#if !defined(__amd64)
-		} else
-			bcopy(&fpu->fpu_regs.kfpu_u.kfpu_fn, fp,
-			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
-#endif
+			break;
+		case FP_XSAVE:
+			fxsave_to_fpregset(
+			    &fpu->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave, fp);
+			fp->fp_reg_set.fpchip_state.xstatus =
+			    fpu->fpu_regs.kfpu_xstatus;
+			break;
+		default:
+			panic("Invalid fp_save_mech");
+			/*NOTREACHED*/
+		}
 		fp->fp_reg_set.fpchip_state.status = fpu->fpu_regs.kfpu_status;
 	} else {
 		/*
 		 * Case 2.
 		 */
-#if !defined(__amd64)
-		if (fp_kind == __FP_SSE) {
+		switch (fp_save_mech) {
+#if defined(__i386)
+		case FP_FNSAVE:
+			bcopy(&x87_initial, fp, sizeof (x87_initial));
+			break;
 #endif
+		case FP_FXSAVE:
+		case FP_XSAVE:
+			/*
+			 * For now, we don't have any AVX specific field in ABI.
+			 * If we add any in the future, we need to initial them
+			 * as well.
+			 */
 			fxsave_to_fpregset(&sse_initial, fp);
 			fp->fp_reg_set.fpchip_state.xstatus =
 			    fpu->fpu_regs.kfpu_xstatus;
-#if !defined(__amd64)
-		} else
-			bcopy(&x87_initial, fp, sizeof (x87_initial));
-#endif
+			break;
+		default:
+			panic("Invalid fp_save_mech");
+			/*NOTREACHED*/
+		}
 		fp->fp_reg_set.fpchip_state.status = fpu->fpu_regs.kfpu_status;
 	}
 	kpreempt_enable();
@@ -1129,10 +1154,17 @@ argcount(uintptr_t eip)
 
 /*
  * Print a stack backtrace using the specified frame pointer.  We delay two
- * seconds before continuing, unless this is the panic traceback.  Note
- * that the frame for the starting stack pointer value is omitted because
+ * seconds before continuing, unless this is the panic traceback.
+ * If we are in the process of panicking, we also attempt to write the
+ * stack backtrace to a staticly assigned buffer, to allow the panic
+ * code to find it and write it in to uncompressed pages within the
+ * system crash dump.
+ * Note that the frame for the starting stack pointer value is omitted because
  * the corresponding %eip is not known.
  */
+
+extern char *dump_stack_scratch;
+
 #if defined(__amd64)
 
 void
@@ -1143,9 +1175,16 @@ traceback(caddr_t fpreg)
 	uintptr_t	pc, nextpc;
 	ulong_t		off;
 	char		args[TR_ARG_MAX * 2 + 16], *sym;
+	uint_t	  offset = 0;
+	uint_t	  next_offset = 0;
+	char	    stack_buffer[1024];
 
 	if (!panicstr)
 		printf("traceback: %%fp = %p\n", (void *)fp);
+
+	if (panicstr && !dump_stack_scratch) {
+		printf("Warning - stack not written to the dump buffer\n");
+	}
 
 	fp = (struct frame *)plat_traceback(fpreg);
 	if ((uintptr_t)fp < KERNELBASE)
@@ -1177,9 +1216,33 @@ traceback(caddr_t fpreg)
 		if ((sym = kobj_getsymname(pc, &off)) != NULL) {
 			printf("%016lx %s:%s+%lx (%s)\n", (uintptr_t)fp,
 			    mod_containing_pc((caddr_t)pc), sym, off, args);
+			(void) snprintf(stack_buffer, sizeof (stack_buffer),
+			    "%s:%s+%lx (%s) | ",
+			    mod_containing_pc((caddr_t)pc), sym, off, args);
 		} else {
 			printf("%016lx %lx (%s)\n",
 			    (uintptr_t)fp, pc, args);
+			(void) snprintf(stack_buffer, sizeof (stack_buffer),
+			    "%lx (%s) | ", pc, args);
+		}
+
+		if (panicstr && dump_stack_scratch) {
+			next_offset = offset + strlen(stack_buffer);
+			if (next_offset < STACK_BUF_SIZE) {
+				bcopy(stack_buffer, dump_stack_scratch + offset,
+				    strlen(stack_buffer));
+				offset = next_offset;
+			} else {
+				/*
+				 * In attempting to save the panic stack
+				 * to the dumpbuf we have overflowed that area.
+				 * Print a warning and continue to printf the
+				 * stack to the msgbuf
+				 */
+				printf("Warning: stack in the dump buffer"
+				    " may be incomplete\n");
+				offset = next_offset;
+			}
 		}
 
 		pc = nextpc;
@@ -1189,6 +1252,8 @@ out:
 	if (!panicstr) {
 		printf("end of traceback\n");
 		DELAY(2 * MICROSEC);
+	} else if (dump_stack_scratch) {
+		dump_stack_scratch[offset] = '\0';
 	}
 }
 
@@ -1200,6 +1265,9 @@ traceback(caddr_t fpreg)
 	struct frame *fp = (struct frame *)fpreg;
 	struct frame *nextfp, *minfp, *stacktop;
 	uintptr_t pc, nextpc;
+	uint_t	  offset = 0;
+	uint_t	  next_offset = 0;
+	char	    stack_buffer[1024];
 
 	cpu_t *cpu;
 
@@ -1214,6 +1282,10 @@ traceback(caddr_t fpreg)
 
 	if (!panicstr)
 		printf("traceback: %%fp = %p\n", (void *)fp);
+
+	if (panicstr && !dump_stack_scratch) {
+		printf("Warning - stack not written to the dumpbuf\n");
+	}
 
 	/*
 	 * If we are panicking, all high-level interrupt information in
@@ -1275,9 +1347,35 @@ traceback(caddr_t fpreg)
 		if ((sym = kobj_getsymname(pc, &off)) != NULL) {
 			printf("%08lx %s:%s+%lx (%s)\n", (uintptr_t)fp,
 			    mod_containing_pc((caddr_t)pc), sym, off, args);
+			(void) snprintf(stack_buffer, sizeof (stack_buffer),
+			    "%s:%s+%lx (%s) | ",
+			    mod_containing_pc((caddr_t)pc), sym, off, args);
+
 		} else {
 			printf("%08lx %lx (%s)\n",
 			    (uintptr_t)fp, pc, args);
+			(void) snprintf(stack_buffer, sizeof (stack_buffer),
+			    "%lx (%s) | ", pc, args);
+
+		}
+
+		if (panicstr && dump_stack_scratch) {
+			next_offset = offset + strlen(stack_buffer);
+			if (next_offset < STACK_BUF_SIZE) {
+				bcopy(stack_buffer, dump_stack_scratch + offset,
+				    strlen(stack_buffer));
+				offset = next_offset;
+			} else {
+				/*
+				 * In attempting to save the panic stack
+				 * to the dumpbuf we have overflowed that area.
+				 * Print a warning and continue to printf the
+				 * stack to the msgbuf
+				 */
+				printf("Warning: stack in the dumpbuf"
+				    " may be incomplete\n");
+				offset = next_offset;
+			}
 		}
 
 		minfp = fp;
@@ -1288,7 +1386,10 @@ out:
 	if (!panicstr) {
 		printf("end of traceback\n");
 		DELAY(2 * MICROSEC);
+	} else if (dump_stack_scratch) {
+		dump_stack_scratch[offset] = '\0';
 	}
+
 }
 
 #endif	/* __i386 */

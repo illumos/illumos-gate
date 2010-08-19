@@ -1,8 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 #include "k5-int.h"
 #include "cleanup.h"
@@ -167,7 +165,6 @@ cleanup_cred:
 
 /*----------------------- krb5_rd_cred -----------------------*/
 
-#define in_clock_skew(date) (labs((date)-currenttime) < context->clockskew)
 
 /*
  * This functions takes as input an KRB_CRED message, validates it, and
@@ -195,30 +192,25 @@ krb5_rd_cred(krb5_context context, krb5_auth_context auth_context, krb5_data *pc
         return KRB5_RC_REQUIRED;
 
 
-/* If decrypting with the first keyblock we try fails, perhaps the
- * credentials are stored in the session key so try decrypting with
+   /*
+    * If decrypting with the first keyblock we try fails, perhaps the
+    * credentials are stored in the session key so try decrypting with
     * that.
-*/
+    */
     if ((retval = krb5_rd_cred_basic(context, pcreddata, keyblock,
 				     &replaydata, pppcreds))) {
 	if ((retval = krb5_rd_cred_basic(context, pcreddata,
 					 auth_context->keyblock,
 					 &replaydata, pppcreds))) {
 	    return retval;
-    }
+	}
     }
     
     if (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_DO_TIME) {
         krb5_donot_replay replay;
-        krb5_timestamp currenttime;
 
-        if ((retval = krb5_timeofday(context, &currenttime)))
-            goto error;
-
-        if (!in_clock_skew(replaydata.timestamp)) {
-            retval =  KRB5KRB_AP_ERR_SKEW;
-            goto error;
-        }
+	if ((retval = krb5int_check_clockskew(context, replaydata.timestamp)))
+	    goto error;
 
         if ((retval = krb5_gen_replay_name(context, auth_context->remote_addr,
 					   "_forw", &replay.client)))

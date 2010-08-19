@@ -32,9 +32,6 @@ dir path=usr group=sys
 dir path=usr/include
 file path=usr/include/picl.h
 file path=usr/include/picltree.h
-legacy pkg=SUNWpiclh arch=$(ARCH) category=system desc="PICL Header Files" \
-    hotline="Please contact your local service provider" \
-    name="PICL Header Files (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWpiclh desc="PICL Header Files" name="PICL Header Files (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

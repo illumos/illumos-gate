@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -134,7 +132,7 @@ generate_record(char *remuser,	/* username at machine requesting service */
 	rd = au_open();
 
 	(void) au_write(rd, au_to_subject_ex(uid, uid, gid, uid, gid, pid, pid,
-		&info.ai_termid));
+	    &info.ai_termid));
 	if (is_system_labeled())
 		(void) au_write(rd, au_to_mylabel());
 
@@ -150,13 +148,13 @@ generate_record(char *remuser,	/* username at machine requesting service */
 
 	if (strcmp(remuser, locuser) != 0) {
 		(void) snprintf(buf, sizeof (buf), dgettext(bsm_dom,
-			"remote user %s"), remuser);
+		    "remote user %s"), remuser);
 		(void) au_write(rd, au_to_text(buf));
 	}
 
 	if (sf_flag == -1) {
 		(void) snprintf(buf, sizeof (buf), dgettext(bsm_dom,
-			"local user %s"), locuser);
+		    "local user %s"), locuser);
 		(void) au_write(rd, au_to_text(buf));
 		(void) au_write(rd, au_to_text(msg));
 	}
@@ -175,27 +173,26 @@ generate_record(char *remuser,	/* username at machine requesting service */
 static int
 selected(uid_t uid, char *locuser, au_event_t event, int sf)
 {
-	int	rc, sorf;
-	char	naflags[512];
-	struct au_mask mask;
+	int		sorf;
+	struct au_mask	mask;
 
 	mask.am_success = mask.am_failure = 0;
 	if (uid > MAXEPHUID) {
-		rc = getacna(naflags, 256); /* get non-attrib flags */
-		if (rc == 0)
-			(void) getauditflagsbin(naflags, &mask);
+		/* get non-attrib flags */
+		(void) auditon(A_GETKMASK, (caddr_t)&mask, sizeof (mask));
 	} else {
-		rc = au_user_mask(locuser, &mask);
+		(void) au_user_mask(locuser, &mask);
 	}
 
-	if (sf == 0)
+	if (sf == 0) {
 		sorf = AU_PRS_SUCCESS;
-	else if (sf == -1)
+	} else if (sf == -1) {
 		sorf = AU_PRS_FAILURE;
-	else
+	} else {
 		sorf = AU_PRS_BOTH;
-	rc = au_preselect(event, &mask, sorf, AU_PRS_REREAD);
-	return (rc);
+	}
+
+	return (au_preselect(event, &mask, sorf, AU_PRS_REREAD));
 }
 
 static void

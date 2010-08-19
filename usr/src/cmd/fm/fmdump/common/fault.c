@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <fmdump.h>
@@ -34,22 +33,32 @@ flt_short(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	char buf[32], str[32];
 	char *class = NULL, *uuid = "-", *code = "-";
 
+	static const struct {
+		const char *class;
+		const char *tag;
+	} tags[] = {
+		{ FM_LIST_SUSPECT_CLASS,	"Diagnosed" },
+		{ FM_LIST_REPAIRED_CLASS,	"Repaired" },
+		{ FM_LIST_RESOLVED_CLASS,	"Resolved" },
+		{ FM_LIST_UPDATED_CLASS,	"Updated" },
+		{ FM_LIST_ISOLATED_CLASS,	"Isolated" },
+	};
+
 	(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_UUID, &uuid);
 	(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_DIAG_CODE, &code);
 
 	(void) nvlist_lookup_string(rp->rec_nvl, FM_CLASS, &class);
-	if (class != NULL && strcmp(class, FM_LIST_REPAIRED_CLASS) == 0) {
-		(void) snprintf(str, sizeof (str), "%s %s", code, "Repaired");
-		code = str;
-	}
-	if (class != NULL && strcmp(class, FM_LIST_RESOLVED_CLASS) == 0) {
-		(void) snprintf(str, sizeof (str), "%s %s", code, "Resolved");
-		code = str;
-	}
+	if (class != NULL) {
+		int i;
 
-	if (class != NULL && strcmp(class, FM_LIST_UPDATED_CLASS) == 0) {
-		(void) snprintf(str, sizeof (str), "%s %s", code, "Updated");
-		code = str;
+		for (i = 0; i < sizeof (tags) / sizeof (tags[0]); i++) {
+			if (strcmp(class, tags[i].class) == 0) {
+				(void) snprintf(str, sizeof (str), "%s %s",
+				    code, tags[i].tag);
+				code = str;
+				break;
+			}
+		}
 	}
 
 	fmdump_printf(fp, "%-20s %-32s %s\n",
@@ -138,7 +147,8 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 }
 
 static int
-flt_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+flt_verb23_cmn(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp,
+    nvlist_prtctl_t pctl)
 {
 	const struct fmdump_fmt *efp = &fmdump_err_ops.do_formats[FMDUMP_VERB1];
 	const struct fmdump_fmt *ffp = &fmdump_flt_ops.do_formats[FMDUMP_VERB2];
@@ -176,10 +186,37 @@ flt_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	}
 
 	fmdump_printf(fp, "\n");
-	nvlist_print(fp, rp->rec_nvl);
+	if (pctl)
+		nvlist_prt(rp->rec_nvl, pctl);
+	else
+		nvlist_print(fp, rp->rec_nvl);
 	fmdump_printf(fp, "\n");
 
 	return (0);
+}
+
+static int
+flt_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+{
+	return (flt_verb23_cmn(lp, rp, fp, NULL));
+}
+
+
+static int
+flt_pretty(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+{
+	nvlist_prtctl_t pctl;
+	int rc;
+
+	if ((pctl = nvlist_prtctl_alloc()) != NULL) {
+		nvlist_prtctl_setdest(pctl, fp);
+		nvlist_prtctlop_nvlist(pctl, fmdump_render_nvlist, NULL);
+	}
+
+	rc = flt_verb23_cmn(lp, rp, fp, pctl);
+
+	nvlist_prtctl_free(pctl);
+	return (rc);
 }
 
 /*
@@ -230,15 +267,21 @@ flt_msg(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 const fmdump_ops_t fmdump_flt_ops = {
 "fault", {
 {
-"TIME                 UUID                                 SUNW-MSG-ID",
+"TIME                 UUID                                 SUNW-MSG-ID "
+								"EVENT",
 (fmd_log_rec_f *)flt_short
 }, {
-"TIME                 UUID                                 SUNW-MSG-ID",
+"TIME                 UUID                                 SUNW-MSG-ID "
+								"EVENT",
 (fmd_log_rec_f *)flt_verb1
 }, {
 "TIME                           UUID"
 "                                 SUNW-MSG-ID",
 (fmd_log_rec_f *)flt_verb2
+}, {
+"TIME                           UUID"
+"                                 SUNW-MSG-ID",
+(fmd_log_rec_f *)flt_pretty
 }, {
 NULL,
 (fmd_log_rec_f *)flt_msg

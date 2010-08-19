@@ -42,8 +42,11 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/bitset.h>
 #include <sys/kstat.h>
+#include <sys/kmem.h>
 #include <sys/vmem.h>
 #include <sys/rootnex.h>
+#include <sys/iommulib.h>
+#include <sys/sdt.h>
 
 /*
  * Some ON drivers have bugs. Keep this define until all such drivers
@@ -63,6 +66,7 @@ typedef uint64_t hw_pdte_t;
 #define	IMMU_PAGEMASK	(~IMMU_PAGEOFFSET)
 #define	IMMU_BTOP(b)	(((uint64_t)b) >> IMMU_PAGESHIFT)
 #define	IMMU_PTOB(p)	(((uint64_t)p) << IMMU_PAGESHIFT)
+#define	IMMU_BTOPR(x)	((((x) + IMMU_PAGEOFFSET) >> IMMU_PAGESHIFT))
 #define	IMMU_PGTABLE_MAX_LEVELS	(6)
 #define	IMMU_ROUNDUP(size) (((size) + IMMU_PAGEOFFSET) & ~IMMU_PAGEOFFSET)
 #define	IMMU_ROUNDOWN(addr) ((addr) & ~IMMU_PAGEOFFSET)
@@ -70,9 +74,6 @@ typedef uint64_t hw_pdte_t;
 #define	IMMU_PGTABLE_LEVEL_MASK	((1<<IMMU_PGTABLE_LEVEL_STRIDE) - 1)
 #define	IMMU_PGTABLE_OFFSHIFT  (IMMU_PAGESHIFT - IMMU_PGTABLE_LEVEL_STRIDE)
 #define	IMMU_PGTABLE_MAXIDX  ((IMMU_PAGESIZE / sizeof (hw_pdte_t)) - 1)
-
-#define	IMMU_ROUNDUP(size) (((size) + IMMU_PAGEOFFSET) & ~IMMU_PAGEOFFSET)
-#define	IMMU_ROUNDOWN(addr) ((addr) & ~IMMU_PAGEOFFSET)
 
 /*
  * DMAR global defines
@@ -144,6 +145,8 @@ typedef struct rmrr {
 	list_t		rm_scope_list;
 	list_node_t	rm_node;
 } rmrr_t;
+
+#define	IMMU_UNIT_NAME	"iommu"
 
 /*
  * Macros based on PCI spec
@@ -460,6 +463,12 @@ typedef struct hw_rce {
 #define	CONT_GET_P(hcent) ((hcent)->lo & 0x1)
 #define	CONT_SET_P(hcent) ((hcent)->lo |= 0x1)
 
+#define	CONT_GET_ALH(hcent) ((hcent)->lo & 0x20)
+#define	CONT_SET_ALH(hcent) ((hcent)->lo |= 0x20)
+
+#define	CONT_GET_EH(hcent) ((hcent)->lo & 0x10)
+#define	CONT_SET_EH(hcent) ((hcent)->lo |= 0x10)
+
 
 /* we use the bit 63 (available for system SW) as a present bit */
 #define	PDTE_SW4(hw_pdte) ((hw_pdte) & ((uint64_t)1<<63))
@@ -507,7 +516,40 @@ typedef struct hw_rce {
 #define	PDTE_CLEAR_READ(hw_pdte) ((hw_pdte) &= ~(0x1))
 #define	PDTE_SET_READ(hw_pdte) ((hw_pdte) |= (0x1))
 
+#define	PDTE_MASK_R	((uint64_t)1 << 0)
+#define	PDTE_MASK_W	((uint64_t)1 << 1)
+#define	PDTE_MASK_SNP	((uint64_t)1 << 11)
+#define	PDTE_MASK_TM	((uint64_t)1 << 62)
+#define	PDTE_MASK_P	((uint64_t)1 << 63)
+
 struct immu_flushops;
+
+/*
+ * Used to wait for invalidation completion.
+ *     vstatus is the virtual address of the status word that will be written
+ *     pstatus is the physical addres
+ * If sync is true, then the the operation will be waited on for
+ * completion immediately. Else, the wait interface can be called
+ * to wait for completion later.
+ */
+
+#define	IMMU_INV_DATA_PENDING	1
+#define	IMMU_INV_DATA_DONE	2
+
+typedef struct immu_inv_wait {
+	volatile uint32_t iwp_vstatus;
+	uint64_t iwp_pstatus;
+	boolean_t iwp_sync;
+	const char *iwp_name;		/* ID for debugging/statistics */
+} immu_inv_wait_t;
+
+/*
+ * Used to batch IOMMU pagetable writes.
+ */
+typedef struct immu_dcookie {
+	paddr_t dck_paddr;
+	uint64_t dck_npages;
+} immu_dcookie_t;
 
 typedef struct immu {
 	kmutex_t		immu_lock;
@@ -547,10 +589,12 @@ typedef struct immu {
 	boolean_t		immu_dvma_coherent;
 	boolean_t		immu_TM_reserved;
 	boolean_t		immu_SNP_reserved;
+	uint64_t		immu_ptemask;
 
 	/* DVMA context related */
 	krwlock_t		immu_ctx_rwlock;
 	pgtable_t		*immu_ctx_root;
+	immu_inv_wait_t		immu_ctx_inv_wait;
 
 	/* DVMA domain related */
 	int			immu_max_domains;
@@ -569,6 +613,7 @@ typedef struct immu {
 	boolean_t		immu_intrmap_running;
 	intrmap_t		*immu_intrmap;
 	uint64_t		immu_intrmap_irta_reg;
+	immu_inv_wait_t		immu_intrmap_inv_wait;
 
 	/* queued invalidation related */
 	kmutex_t		immu_qinv_lock;
@@ -582,7 +627,18 @@ typedef struct immu {
 	list_node_t		immu_node;
 
 	struct immu_flushops	*immu_flushops;
+
+	kmem_cache_t		*immu_hdl_cache;
+	kmem_cache_t		*immu_pgtable_cache;
+
+	iommulib_handle_t	immu_iommulib_handle;
 } immu_t;
+
+/*
+ * Enough space to hold the decimal number of any device instance.
+ * Used for device/cache names.
+ */
+#define	IMMU_ISTRLEN 	11	/* log10(2^31)  + 1 */
 
 /* properties that control DVMA */
 #define	DDI_DVMA_MAPTYPE_ROOTNEX_PROP	"immu-dvma-mapping"
@@ -622,6 +678,9 @@ typedef struct domain {
 	list_node_t		dom_immu_node;
 
 	mod_hash_t 		*dom_cookie_hash;
+
+	/* topmost device in domain; usually the device itself (non-shared) */
+	dev_info_t		*dom_dip;
 } domain_t;
 
 typedef enum immu_pcib {
@@ -651,6 +710,9 @@ typedef struct immu_devi {
 	/* identifier for special devices */
 	boolean_t	imd_display;
 	boolean_t	imd_lpc;
+
+	/* set if premapped DVMA space is used */
+	boolean_t	imd_use_premap;
 
 	/* dmar unit to which this dip belongs */
 	immu_t		*imd_immu;
@@ -686,6 +748,21 @@ typedef struct immu_arg {
 	dev_info_t	*ima_ddip;
 } immu_arg_t;
 
+#define	IMMU_NDVSEG	8
+#define	IMMU_NDCK	64
+#define	IMMU_NPREPTES	8
+
+typedef struct immu_hdl_private {
+	immu_inv_wait_t ihp_inv_wait;
+	size_t ihp_ndvseg;
+	struct dvmaseg ihp_dvseg[IMMU_NDVSEG];
+	immu_dcookie_t ihp_dcookies[IMMU_NDCK];
+
+	hw_pdte_t *ihp_preptes[IMMU_NPREPTES];
+	uint64_t ihp_predvma;
+	int ihp_npremapped;
+} immu_hdl_priv_t;
+
 /*
  * Invalidation operation function pointers for context and IOTLB.
  * These will be set to either the register or the queue invalidation
@@ -693,28 +770,35 @@ typedef struct immu_arg {
  * both at the same time.
  */
 struct immu_flushops {
-	void (*imf_context_fsi)(immu_t *, uint8_t, uint16_t, uint_t);
-	void (*imf_context_dsi)(immu_t *, uint_t);
-	void (*imf_context_gbl)(immu_t *);
+	void (*imf_context_fsi)(immu_t *, uint8_t, uint16_t, uint_t,
+	    immu_inv_wait_t *);
+	void (*imf_context_dsi)(immu_t *, uint_t, immu_inv_wait_t *);
+	void (*imf_context_gbl)(immu_t *, immu_inv_wait_t *);
 
-	void (*imf_iotlb_psi)(immu_t *, uint_t, uint64_t, uint_t, uint_t);
-	void (*imf_iotlb_dsi)(immu_t *, uint_t);
-	void (*imf_iotlb_gbl)(immu_t *);
+	void (*imf_iotlb_psi)(immu_t *, uint_t, uint64_t, uint_t, uint_t,
+	    immu_inv_wait_t *);
+	void (*imf_iotlb_dsi)(immu_t *, uint_t, immu_inv_wait_t *);
+	void (*imf_iotlb_gbl)(immu_t *, immu_inv_wait_t *);
+
+	void (*imf_wait)(immu_inv_wait_t *);
 };
 
-#define	immu_flush_context_fsi(i, f, s, d) \
-	(i)->immu_flushops->imf_context_fsi(i, f, s, d)
-#define	immu_flush_context_dsi(i, d) \
-	(i)->immu_flushops->imf_context_dsi(i, d)
-#define	immu_flush_context_gbl(i) \
-	(i)->immu_flushops->imf_context_gbl(i)
+#define	immu_flush_context_fsi(i, f, s, d, w) \
+	(i)->immu_flushops->imf_context_fsi(i, f, s, d, w)
+#define	immu_flush_context_dsi(i, d, w) \
+	(i)->immu_flushops->imf_context_dsi(i, d, w)
+#define	immu_flush_context_gbl(i, w) \
+	(i)->immu_flushops->imf_context_gbl(i, w)
 
-#define	immu_flush_iotlb_psi(i, d, v, c, h) \
-	(i)->immu_flushops->imf_iotlb_psi(i, d, v, c, h)
-#define	immu_flush_iotlb_dsi(i, d) \
-	(i)->immu_flushops->imf_iotlb_dsi(i, d)
-#define	immu_flush_iotlb_gbl(i) \
-	(i)->immu_flushops->imf_iotlb_gbl(i)
+#define	immu_flush_iotlb_psi(i, d, v, c, h, w) \
+	(i)->immu_flushops->imf_iotlb_psi(i, d, v, c, h, w)
+#define	immu_flush_iotlb_dsi(i, d, w) \
+	(i)->immu_flushops->imf_iotlb_dsi(i, d, w)
+#define	immu_flush_iotlb_gbl(i, w) \
+	(i)->immu_flushops->imf_iotlb_gbl(i, w)
+
+#define	immu_flush_wait(i, w) \
+	(i)->immu_flushops->imf_wait(w)
 
 /*
  * Globals used by IOMMU code
@@ -723,11 +807,11 @@ struct immu_flushops {
 extern dev_info_t *root_devinfo;
 extern kmutex_t immu_lock;
 extern list_t immu_list;
-extern void *immu_pgtable_cache;
 extern boolean_t immu_setup;
 extern boolean_t immu_running;
 extern kmutex_t ioapic_drhd_lock;
 extern list_t ioapic_drhd_list;
+extern struct iommulib_ops immulib_ops;
 
 /* switches */
 
@@ -751,6 +835,9 @@ extern int64_t immu_flush_gran;
 
 extern immu_flags_t immu_global_dvma_flags;
 
+extern int immu_use_tm;
+extern int immu_use_alh;
+
 /* ################### Interfaces exported outside IOMMU code ############## */
 void immu_init(void);
 void immu_startup(void);
@@ -766,12 +853,6 @@ int immu_unquiesce(void);
 /* ######################################################################### */
 
 /* ################# Interfaces used within IOMMU code #################### */
-
-/* functions in rootnex.c */
-int rootnex_dvcookies_alloc(ddi_dma_impl_t *hp,
-    struct ddi_dma_req *dmareq, dev_info_t *rdip, void *arg);
-void rootnex_dvcookies_free(dvcookie_t *dvcookies, void *arg);
-
 /* immu_dmar.c interfaces */
 int immu_dmar_setup(void);
 int immu_dmar_parse(void);
@@ -780,7 +861,6 @@ void immu_dmar_shutdown(void);
 void immu_dmar_destroy(void);
 boolean_t immu_dmar_blacklisted(char **strings_array, uint_t nstrings);
 immu_t *immu_dmar_get_immu(dev_info_t *rdip);
-char *immu_dmar_unit_name(void *dmar_unit);
 dev_info_t *immu_dmar_unit_dip(void *dmar_unit);
 void immu_dmar_set_immu(void *dmar_unit, immu_t *immu);
 void *immu_dmar_walk_units(int seg, void *dmar_unit);
@@ -793,6 +873,7 @@ void immu_dmar_rmrr_map(void);
 int immu_walk_ancestor(dev_info_t *rdip, dev_info_t *ddip,
     int (*func)(dev_info_t *, void *arg), void *arg,
     int *level, immu_flags_t immu_flags);
+void immu_init_inv_wait(immu_inv_wait_t *iwp, const char *s, boolean_t sync);
 
 /* immu_regs.c interfaces */
 void immu_regs_setup(list_t *immu_list);
@@ -813,13 +894,14 @@ void immu_regs_wbf_flush(immu_t *immu);
 void immu_regs_cpu_flush(immu_t *immu, caddr_t addr, uint_t size);
 
 void immu_regs_context_fsi(immu_t *immu, uint8_t function_mask,
-    uint16_t source_id, uint_t domain_id);
-void immu_regs_context_dsi(immu_t *immu, uint_t domain_id);
-void immu_regs_context_gbl(immu_t *immu);
+    uint16_t source_id, uint_t domain_id, immu_inv_wait_t *iwp);
+void immu_regs_context_dsi(immu_t *immu, uint_t domain_id,
+    immu_inv_wait_t *iwp);
+void immu_regs_context_gbl(immu_t *immu, immu_inv_wait_t *iwp);
 void immu_regs_iotlb_psi(immu_t *immu, uint_t domain_id,
-    uint64_t dvma, uint_t count, uint_t hint);
-void immu_regs_iotlb_dsi(immu_t *immu, uint_t domain_id);
-void immu_regs_iotlb_gbl(immu_t *immu);
+    uint64_t dvma, uint_t count, uint_t hint, immu_inv_wait_t *iwp);
+void immu_regs_iotlb_dsi(immu_t *immu, uint_t domain_id, immu_inv_wait_t *iwp);
+void immu_regs_iotlb_gbl(immu_t *immu, immu_inv_wait_t *iwp);
 
 void immu_regs_set_root_table(immu_t *immu);
 void immu_regs_qinv_enable(immu_t *immu, uint64_t qinv_reg_value);
@@ -838,16 +920,21 @@ void immu_dvma_shutdown(immu_t *immu);
 void immu_dvma_destroy(list_t *immu_list);
 
 void immu_dvma_physmem_update(uint64_t addr, uint64_t size);
-int immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *,
-    uint_t prealloc_count, dev_info_t *rdip, immu_flags_t immu_flags);
+int immu_map_memrange(dev_info_t *, memrng_t *);
+int immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
+    uint_t prealloc_count, dev_info_t *rdip);
 int immu_dvma_unmap(ddi_dma_impl_t *hp, dev_info_t *rdip);
-int immu_dvma_alloc(dvcookie_t *first_dvcookie, void *arg);
-void immu_dvma_free(dvcookie_t *first_dvcookie, void *arg);
 int immu_devi_set(dev_info_t *dip, immu_flags_t immu_flags);
 immu_devi_t *immu_devi_get(dev_info_t *dip);
 immu_t *immu_dvma_get_immu(dev_info_t *dip, immu_flags_t immu_flags);
 int pgtable_ctor(void *buf, void *arg, int kmflag);
 void pgtable_dtor(void *buf, void *arg);
+
+int immu_hdl_priv_ctor(void *buf, void *arg, int kmf);
+
+int immu_dvma_device_setup(dev_info_t *rdip, immu_flags_t immu_flags);
+
+void immu_print_fault_info(uint_t sid, uint64_t dvma);
 
 /* immu_intrmap.c interfaces */
 void immu_intrmap_setup(list_t *immu_list);
@@ -867,18 +954,36 @@ void immu_qinv_shutdown(immu_t *immu);
 void immu_qinv_destroy(list_t *immu_list);
 
 void immu_qinv_context_fsi(immu_t *immu, uint8_t function_mask,
-    uint16_t source_id, uint_t domain_id);
-void immu_qinv_context_dsi(immu_t *immu, uint_t domain_id);
-void immu_qinv_context_gbl(immu_t *immu);
+    uint16_t source_id, uint_t domain_id, immu_inv_wait_t *iwp);
+void immu_qinv_context_dsi(immu_t *immu, uint_t domain_id,
+    immu_inv_wait_t *iwp);
+void immu_qinv_context_gbl(immu_t *immu, immu_inv_wait_t *iwp);
 void immu_qinv_iotlb_psi(immu_t *immu, uint_t domain_id,
-    uint64_t dvma, uint_t count, uint_t hint);
-void immu_qinv_iotlb_dsi(immu_t *immu, uint_t domain_id);
-void immu_qinv_iotlb_gbl(immu_t *immu);
+    uint64_t dvma, uint_t count, uint_t hint, immu_inv_wait_t *iwp);
+void immu_qinv_iotlb_dsi(immu_t *immu, uint_t domain_id, immu_inv_wait_t *iwp);
+void immu_qinv_iotlb_gbl(immu_t *immu, immu_inv_wait_t *iwp);
 
-void immu_qinv_intr_global(immu_t *immu);
-void immu_qinv_intr_one_cache(immu_t *immu, uint_t idx);
-void immu_qinv_intr_caches(immu_t *immu, uint_t idx, uint_t cnt);
+void immu_qinv_intr_global(immu_t *immu, immu_inv_wait_t *iwp);
+void immu_qinv_intr_one_cache(immu_t *immu, uint_t idx, immu_inv_wait_t *iwp);
+void immu_qinv_intr_caches(immu_t *immu, uint_t idx, uint_t cnt,
+    immu_inv_wait_t *);
 void immu_qinv_report_fault(immu_t *immu);
+
+#ifdef DEBUG
+#define	IMMU_DPROBE1(name, type1, arg1) \
+	DTRACE_PROBE1(name, type1, arg1)
+#define	IMMU_DPROBE2(name, type1, arg1, type2, arg2) \
+	DTRACE_PROBE2(name, type1, arg1, type2, arg2)
+#define	IMMU_DPROBE3(name, type1, arg1, type2, arg2, type3, arg3) \
+	DTRACE_PROBE3(name, type1, arg1, type2, arg2, type3, arg3)
+#define	IMMU_DPROBE4(name, type1, arg1, type2, arg2, type3, arg3, type4, arg4) \
+	DTRACE_PROBE4(name, type1, arg1, type2, arg2, type3, arg3, type4, arg4)
+#else
+#define	IMMU_DPROBE1(name, type1, arg1)
+#define	IMMU_DPROBE2(name, type1, arg1, type2, arg2)
+#define	IMMU_DPROBE3(name, type1, arg1, type2, arg2, type3, arg3)
+#define	IMMU_DPROBE4(name, type1, arg1, type2, arg2, type3, arg3, type4, arg4)
+#endif
 
 
 #ifdef	__cplusplus

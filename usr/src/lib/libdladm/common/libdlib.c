@@ -171,7 +171,7 @@ i_dladm_part_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 
 	bzero(attrp, sizeof (*attrp));
 	attrp->dia_partlinkid = linkid;
-	if ((status = dladm_read_conf(handle, linkid, &conf)) !=
+	if ((status = dladm_getsnap_conf(handle, linkid, &conf)) !=
 	    DLADM_STATUS_OK)
 		return (status);
 
@@ -622,7 +622,7 @@ i_dladm_part_up(dladm_handle_t handle, datalink_id_t plinkid, void *arg)
 	 * persistent configuration entry for this datalink ID. If this datalink
 	 * ID is not present in the persistent configuration return.
 	 */
-	if ((status = dladm_read_conf(handle, plinkid, &conf)) !=
+	if ((status = dladm_getsnap_conf(handle, plinkid, &conf)) !=
 	    DLADM_STATUS_OK)
 		return (status);
 
@@ -679,7 +679,7 @@ i_dladm_part_up(dladm_handle_t handle, datalink_id_t plinkid, void *arg)
 	/* Create the active IB Partition object. */
 	if (i_dladm_part_create(handle, &pattr) == DLADM_STATUS_OK &&
 	    dladm_up_datalink_id(handle, plinkid) != DLADM_STATUS_OK)
-			(void) i_dladm_part_delete(handle, linkid);
+		(void) i_dladm_part_delete(handle, linkid);
 
 done:
 	dladm_destroy_conf(handle, conf);

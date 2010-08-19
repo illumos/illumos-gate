@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains common code for handling Options Management requests
@@ -51,6 +48,7 @@
 #include <inet/snmpcom.h>
 
 #include <inet/ip.h>
+#include <sys/brand.h>
 
 #define	DEFAULT_LENGTH	sizeof (long)
 #define	DATA_MBLK_SIZE	1024
@@ -177,6 +175,7 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 	sor_t			*sreq;
 	struct T_optmgmt_req	*tor = (struct T_optmgmt_req *)mp->b_rptr;
 	struct T_optmgmt_ack	*toa;
+	boolean_t		legacy_req;
 
 	if (mp->b_cont) {	/* don't deal with multiple mblk's */
 		freemsg(mp->b_cont);
@@ -254,7 +253,18 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 		toa->OPT_offset = sizeof (struct T_optmgmt_ack);
 		toa->OPT_length = sizeof (struct opthdr);
 		toa->MGMT_flags = T_SUCCESS;
-		if (!(*getfn)(q, mpctl, req_start->level))
+		/*
+		 * If the current process is running inside a solaris10-
+		 * branded zone and len is 0 then it's a request for
+		 * legacy data.
+		 */
+		if (PROC_IS_BRANDED(curproc) &&
+		    (strcmp(curproc->p_brand->b_name, "solaris10") == 0) &&
+		    (req_start->len == 0))
+			legacy_req = B_TRUE;
+		else
+			legacy_req = B_FALSE;
+		if (!(*getfn)(q, mpctl, req_start->level, legacy_req))
 			freemsg(mpctl);
 		/*
 		 * all data for this module has now been sent upstream.  If

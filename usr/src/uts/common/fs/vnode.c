@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -965,7 +966,7 @@ vn_openat(
 		mode |= VREAD;
 	if (filemode & (FWRITE|FTRUNC))
 		mode |= VWRITE;
-	if (filemode & FXATTRDIROPEN)
+	if (filemode & (FSEARCH|FEXEC|FXATTRDIROPEN))
 		mode |= VEXEC;
 
 	/* symlink interpretation */
@@ -1075,6 +1076,18 @@ top:
 		 */
 		if (error = VOP_ACCESS(vp, mode, accessflags, CRED(), NULL))
 			goto out;
+		/*
+		 * Require FSEARCH to return a directory.
+		 * Require FEXEC to return a regular file.
+		 */
+		if ((filemode & FSEARCH) && vp->v_type != VDIR) {
+			error = ENOTDIR;
+			goto out;
+		}
+		if ((filemode & FEXEC) && vp->v_type != VREG) {
+			error = ENOEXEC;	/* XXX: error code? */
+			goto out;
+		}
 	}
 
 	/*
@@ -1558,6 +1571,13 @@ out:
 int
 vn_link(char *from, char *to, enum uio_seg seg)
 {
+	return (vn_linkat(NULL, from, NO_FOLLOW, NULL, to, seg));
+}
+
+int
+vn_linkat(vnode_t *fstartvp, char *from, enum symfollow follow,
+    vnode_t *tstartvp, char *to, enum uio_seg seg)
+{
 	struct vnode *fvp;		/* from vnode ptr */
 	struct vnode *tdvp;		/* to directory vnode ptr */
 	struct pathname pn;
@@ -1565,14 +1585,19 @@ vn_link(char *from, char *to, enum uio_seg seg)
 	struct vattr vattr;
 	dev_t fsid;
 	int estale_retry = 0;
+	uint32_t auditing = AU_AUDITING();
 
 top:
 	fvp = tdvp = NULL;
 	if (error = pn_get(to, seg, &pn))
 		return (error);
-	if (error = lookupname(from, seg, NO_FOLLOW, NULLVPP, &fvp))
+	if (auditing && fstartvp != NULL)
+		audit_setfsat_path(1);
+	if (error = lookupnameat(from, seg, follow, NULLVPP, &fvp, fstartvp))
 		goto out;
-	if (error = lookuppn(&pn, NULL, NO_FOLLOW, &tdvp, NULLVPP))
+	if (auditing && tstartvp != NULL)
+		audit_setfsat_path(3);
+	if (error = lookuppnat(&pn, NULL, NO_FOLLOW, &tdvp, NULLVPP, tstartvp))
 		goto out;
 	/*
 	 * Make sure both source vnode and target directory vnode are
@@ -1652,7 +1677,7 @@ top:
 	 * use the lib directory for the rename.
 	 */
 
-	if (auditing && (fdvp != NULL))
+	if (auditing && fdvp != NULL)
 		audit_setfsat_path(1);
 	/*
 	 * Lookup to and from directories.
@@ -1669,7 +1694,7 @@ top:
 		goto out;
 	}
 
-	if (auditing && (tdvp != NULL))
+	if (auditing && tdvp != NULL)
 		audit_setfsat_path(3);
 	if (error = lookuppnat(&tpn, NULL, NO_FOLLOW, &tovp, &targvp, tdvp)) {
 		goto out;

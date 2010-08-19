@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -42,10 +41,12 @@ dt_program_create(dtrace_hdl_t *dtp)
 {
 	dtrace_prog_t *pgp = dt_zalloc(dtp, sizeof (dtrace_prog_t));
 
-	if (pgp != NULL)
+	if (pgp != NULL) {
 		dt_list_append(&dtp->dt_programs, pgp);
-	else
+	} else {
 		(void) dt_set_errno(dtp, EDT_NOMEM);
+		return (NULL);
+	}
 
 	/*
 	 * By default, programs start with DOF version 1 so that output files

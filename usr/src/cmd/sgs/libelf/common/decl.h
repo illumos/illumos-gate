@@ -23,8 +23,7 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_DECL_H
@@ -391,6 +390,7 @@ NOTE(RWLOCK_COVERS_LOCKS(Elf::ed_rwlock, Elf_Scn::s_mutex))
 #define	EDF_MPROTECT	0x400	/* applies to slideable archives */
 #define	EDF_IMALLOC	0x800	/* wrimage dynamically allocated */
 #define	EDF_WRALLOC	0x1000	/* wrimage is to by dyn allocated */
+#define	EDF_ARSYM64	0x2000	/* archive symbol table is 64-bit format */
 
 
 typedef enum

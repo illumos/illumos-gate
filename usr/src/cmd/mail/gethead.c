@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mail.h"
 
@@ -129,7 +126,8 @@ gethead(int current, int all)
 		}
 
 		/* skip past trailing white space after header tag */
-		for (rc = 5; wline[rc] == ' ' || wline[rc] == '\t'; ++rc);
+		for (rc = 5; wline[rc] == ' ' || wline[rc] == '\t'; ++rc)
+			;
 		(void) strlcpy(hold, wline + rc, MAXHDRSIZE);
 		fgets(wline, MAXHDRSIZE, file);
 
@@ -171,12 +169,15 @@ gethead(int current, int all)
 		 * delimiting white space.
 		 */
 		for (; hold[rc] != '\0' && hold[rc] != ' ' &&
-		    hold[rc] != '\t'; ++rc);
-		for (; hold[rc] == ' ' || hold[rc] == '\t'; ++rc);
+		    hold[rc] != '\t'; ++rc)
+			;
+		for (; hold[rc] == ' ' || hold[rc] == '\t'; ++rc)
+			;
 
 		/* Get the date information. */
 		(void) strlcpy(wline, hold + rc, MAXHDRSIZE);
-		for (rc = 0; wline[rc] != '\0' && wline[rc] != '\n'; ++rc);
+		for (rc = 0; wline[rc] != '\0' && wline[rc] != '\n'; ++rc)
+			;
 		wline[rc] = '\0';
 
 		if (!flgh && current == ln) mark = '>';
@@ -224,7 +225,7 @@ wtmpf(char *str, int length)
  *	return number of bytes in length
  */
 int
-getline(char *ptr2line, int max, FILE *f)
+getaline(char *ptr2line, int max, FILE *f)
 {
 	int	i, ch;
 	for (i = 0; i < max-1 && (ch = getc(f)) != EOF; )
@@ -243,9 +244,9 @@ mktmp(void)
 	int fd = mkstemp(lettmp = tmpl);
 
 	if (fd < 0 || (tmpf = fdopen(fd, "w+")) == NULL) {
-	    fprintf(stderr,
+		fprintf(stderr,
 		    "%s: Can't open '%s', type: w+\n", program, lettmp);
-	    done(0);
+		done(0);
 	}
 }
 

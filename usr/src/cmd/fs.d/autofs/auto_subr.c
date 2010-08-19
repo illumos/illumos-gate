@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -35,6 +33,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <dirent.h>
+#include <limits.h>
 #include <thread.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -51,12 +50,16 @@
 #include <sys/utsname.h>
 #include <rpc/rpc.h>
 #include <rpcsvc/nfs_prot.h>
+#include <rpcsvc/daemon_utils.h>
 #include <assert.h>
 #include "automount.h"
 #include <deflt.h>
 #include <zone.h>
 #include <priv.h>
 #include <fcntl.h>
+#include <libshare.h>
+#include <libscf.h>
+#include "smfcfg.h"
 
 static char *check_hier(char *);
 static int arch(char *, size_t, bool_t);
@@ -192,7 +195,7 @@ dirinit(char *mntpnt, char *map, char *opts, int direct, char **stack,
 	}
 	if (p = check_hier(mntpnt)) {
 		pr_msg("hierarchical mountpoint: %s and %s",
-			p, mntpnt);
+		    p, mntpnt);
 		return;
 	}
 
@@ -314,8 +317,8 @@ getword(char *w, char *wq, char **p, char **pq, char delim, int wordsz)
 		(*p)++, (*pq)++;
 
 	while (**p &&
-		!((delim == ' ' ? isspace(**p) : **p == delim) &&
-			**pq == ' ')) {
+	    !((delim == ' ' ? isspace(**p) : **p == delim) &&
+	    **pq == ' ')) {
 		if (--count <= 0) {
 			*tmp = '\0';
 			*tmpq = '\0';
@@ -419,8 +422,8 @@ trim:
 			}
 		}
 		syslog(LOG_ERR,
-			"map %s: line too long (max %d chars)",
-			map, linesz-1);
+		    "map %s: line too long (max %d chars)",
+		    map, linesz-1);
 		*line = '\0';
 	}
 
@@ -881,7 +884,7 @@ add_dir_entry(char *name, struct dir_entry **list, struct dir_entry **last)
 		 */
 		/* LINTED pointer alignment */
 		e = (struct dir_entry *)
-			auto_rddir_malloc(sizeof (struct dir_entry));
+		    auto_rddir_malloc(sizeof (struct dir_entry));
 		if (e == NULL)
 			return (ENOMEM);
 		(void) memset((char *)e, 0, sizeof (*e));
@@ -1063,21 +1066,40 @@ platform(char *buf, size_t bufsize)
 }
 
 /*
- * Set environment variables specified in /etc/default/autofs.
+ * Set environment variables
  */
 void
 put_automountd_env(void)
 {
-	char *defval;
-	int defflags;
+	char defval[PATH_MAX], *p, *a, *c;
+	int ret = 0, bufsz = PATH_MAX;
 
-	if ((defval = defread("AUTOMOUNTD_ENV=")) != NULL) {
-		(void) putenv(strdup(defval));
-		defflags = defcntl(DC_GETFLAGS, 0);
-		TURNON(defflags, DC_NOREWIND);
-		defflags = defcntl(DC_SETFLAGS, defflags);
-		while ((defval = defread("AUTOMOUNTD_ENV=")) != NULL)
-			(void) putenv(strdup(defval));
-		(void) defcntl(DC_SETFLAGS, defflags);
+	ret = autofs_smf_get_prop("environment", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_ASTRING, AUTOMOUNTD, &bufsz);
+	if (ret == SA_OK) {
+		a = c = defval;
+		if (*a == NULL)
+			return;
+		/*
+		 * Environment variables can have more than one value
+		 * seperated by a comma and there can be multiple
+		 * environment variables. * a=b\,c,d=e. For multiple
+		 * valued environment variable, values are seperated
+		 * with an escape character.
+		 */
+		while ((p = strchr(c, ',')) != NULL) {
+			if (*(p - 1) == '\\') {
+				c = p + 1;
+				continue;
+			}
+			*p = '\0';
+			if ((c = strchr(a, '=')) != NULL)
+				putenv(strdup(a));
+			a = c = p + 1;
+		}
+		if (*a != NULL) {
+			if ((c = strchr(a, '=')) != NULL)
+				putenv(strdup(a));
+		}
 	}
 }

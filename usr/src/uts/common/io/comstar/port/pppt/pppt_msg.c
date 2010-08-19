@@ -354,8 +354,10 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	task->task_expected_xfer_length =
 	    scmd->icsc_task_expected_xfer_length;
 
-	bcopy(scmd->icsc_task_cdb, task->task_cdb,
-	    scmd->icsc_task_cdb_length);
+	if (scmd->icsc_task_cdb_length) {
+		bcopy(scmd->icsc_task_cdb, task->task_cdb,
+		    scmd->icsc_task_cdb_length);
+	}
 	bcopy(scmd->icsc_lun_id, ptask->pt_lun_id, 16);
 
 	if (scmd->icsc_immed_data_len) {

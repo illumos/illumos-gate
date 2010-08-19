@@ -199,16 +199,12 @@ $(sparc_ONLY)file path=usr/platform/sun4u/lib/libfruaccess.so.1 group=sys
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/picl/plugins/libpiclfrudata.so.1 \
     group=sys
 $(sparc_ONLY)file path=usr/platform/sun4u/sbin/fruadm group=sys mode=0755
-$(i386_ONLY)legacy pkg=SUNWfruip.i arch=$(ARCH).i86pc category=system \
+$(i386_ONLY)legacy pkg=SUNWfruip.i arch=$(ARCH).i86pc \
     desc="FRU ID platform data module and access library" \
-    hotline="Please contact your local service provider" \
-    name="FRU ID Platform Modules (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-$(sparc_ONLY)legacy pkg=SUNWfruip.u arch=$(ARCH).sun4u category=system \
+    name="FRU ID Platform Modules (Usr)"
+$(sparc_ONLY)legacy pkg=SUNWfruip.u arch=$(ARCH).sun4u \
     desc="FRU ID platform data module and access library" \
-    hotline="Please contact your local service provider" \
-    name="FRU ID Platform Modules (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="FRU ID Platform Modules (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/lib/libfruaccess.so \

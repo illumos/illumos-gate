@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -141,7 +140,35 @@ fips_random(n2rng_t *n2rng, uint8_t *out, size_t nbytes)
 
 		/* nbytes - i is bytes to go */
 		fips_random_inner(frsp->XKEY, tempout, entropy.as32);
-		bcopy(tempout, &out[i], min(nbytes - i,  SHA1BYTES));
+
+		/*
+		 * Compare last round with the results of this round, fail
+		 * if identical.  Save for next round.
+		 */
+		if (n2rng->n_is_fips == B_TRUE) {
+			uint32_t	differ = 0;
+			int		j;
+
+			for (j = 0; j < 5; j++) {
+				differ |= tempout[j] ^ frsp->x_jminus1[j];
+				frsp->x_jminus1[j] = tempout[j];
+			}
+			if (differ == 0) {
+				/*
+				 * If differ == 0, the RNG produced the same
+				 * answer twice.  By FIPS 140-2 Section 4.9 we
+				 * must enter an error state.
+				 */
+				mutex_exit(&frsp->mtx);
+				n2rng_failure(n2rng);
+				cmn_err(CE_WARN,
+				    "n2rng: Continuous random number generator"
+				    " test of FIPS-140 RNG failed.");
+				return (EIO);
+			}
+		}
+
+		bcopy(tempout, &out[i], min(nbytes - i, SHA1BYTES));
 
 		mutex_exit(&frsp->mtx);
 	}
@@ -171,6 +198,7 @@ n2rng_fips_random_init(n2rng_t *n2rng, fipsrandomstruct_t *frsp)
 	 */
 
 	int rv;
+	static uint32_t FIPS_RNG_NO_USER_INPUT[] = {0, 0, 0, 0, 0};
 
 	rv = n2rng_getentropy(n2rng, (void *)frsp->XKEY, ROUNDUP(SHA1BYTES, 8));
 	if (rv) {
@@ -178,6 +206,9 @@ n2rng_fips_random_init(n2rng_t *n2rng, fipsrandomstruct_t *frsp)
 	}
 	frsp->entropyhunger = 0;
 	mutex_init(&frsp->mtx, NULL, MUTEX_DRIVER, NULL);
+
+	/* compute the first (compare only) random value */
+	fips_random_inner(frsp->XKEY, frsp->x_jminus1, FIPS_RNG_NO_USER_INPUT);
 
 	return (0);
 }

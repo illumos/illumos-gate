@@ -144,6 +144,7 @@ typedef enum {
 	SMB_CI_KPASSWD_SEQNUM,
 	SMB_CI_NETLOGON_SEQNUM,
 	SMB_CI_IPV6_ENABLE,
+	SMB_CI_PRINT_ENABLE,
 	SMB_CI_MAP,
 	SMB_CI_UNMAP,
 	SMB_CI_DISPOSITION,
@@ -877,6 +878,7 @@ uint32_t smb_sd_fromfs(smb_fssd_t *, smb_sd_t *);
 
 /* Kernel Module Interface */
 int smb_kmod_bind(void);
+boolean_t smb_kmod_isbound(void);
 int smb_kmod_setcfg(smb_kmod_cfg_t *);
 int smb_kmod_setgmtoff(int32_t);
 int smb_kmod_start(int, int, int);
@@ -889,12 +891,14 @@ int smb_kmod_nbtreceive(void);
 void smb_kmod_unbind(void);
 int smb_kmod_share(nvlist_t *);
 int smb_kmod_unshare(nvlist_t *);
+int smb_kmod_shareinfo(char *, boolean_t *);
 int smb_kmod_get_open_num(smb_opennum_t *);
 int smb_kmod_enum(smb_netsvc_t *);
 smb_netsvc_t *smb_kmod_enum_init(smb_svcenum_t *);
 void smb_kmod_enum_fini(smb_netsvc_t *);
 int smb_kmod_session_close(const char *, const char *);
 int smb_kmod_file_close(uint32_t);
+int smb_kmod_get_spool_doc(uint32_t *, char *, char *, smb_inaddr_t *);
 
 void smb_name_parse(char *, char **, char **);
 uint32_t smb_name_validate_share(const char *);

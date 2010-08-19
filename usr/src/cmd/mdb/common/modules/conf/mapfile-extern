@@ -88,6 +88,7 @@ SYMBOL_SCOPE {
 		mdb_gelf_destroy		{ FLAGS = EXTERN };
 		mdb_gelf_sect_by_name		{ FLAGS = EXTERN };
 		mdb_gelf_sect_load		{ FLAGS = EXTERN };
+		mdb_getareg			{ FLAGS = EXTERN };
 		mdb_get_dot			{ FLAGS = EXTERN };
 		mdb_get_lbolt			{ FLAGS = EXTERN };
 		mdb_get_pipe			{ FLAGS = EXTERN };
@@ -113,6 +114,7 @@ SYMBOL_SCOPE {
 		mdb_memio_create		{ FLAGS = EXTERN };
 		mdb_name_to_major		{ FLAGS = EXTERN };
 		mdb_nhconvert			{ FLAGS = EXTERN };
+		mdb_object_iter			{ FLAGS = EXTERN };
 		mdb_one_bit			{ FLAGS = EXTERN };
 		mdb_page2pfn			{ FLAGS = EXTERN };
 		mdb_page_lookup			{ FLAGS = EXTERN };

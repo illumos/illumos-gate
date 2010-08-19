@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -48,6 +47,7 @@
  */
 
 #include "svcs.h"
+#include "notify_params.h"
 
 /* Get the byteorder macros to ease sorting. */
 #include <sys/types.h>
@@ -68,6 +68,7 @@
 #include <libscf.h>
 #include <libscf_priv.h>
 #include <libuutil.h>
+#include <libnvpair.h>
 #include <locale.h>
 #include <procfs.h>
 #include <stdarg.h>
@@ -2545,6 +2546,230 @@ restarter_common:
 	return (0);
 }
 
+int
+qsort_str_compare(const void *p1, const void *p2)
+{
+	return (strcmp((const char *)p1, (const char *)p2));
+}
+
+/*
+ * get_notify_param_classes()
+ * return the fma classes that don't have a tag in fma_tags[], otherwise NULL
+ */
+static char **
+get_notify_param_classes()
+{
+	scf_handle_t		*h = _scf_handle_create_and_bind(SCF_VERSION);
+	scf_instance_t		*inst = scf_instance_create(h);
+	scf_snapshot_t		*snap = scf_snapshot_create(h);
+	scf_snaplevel_t		*slvl = scf_snaplevel_create(h);
+	scf_propertygroup_t	*pg = scf_pg_create(h);
+	scf_iter_t		*iter = scf_iter_create(h);
+	int size = 4;
+	int n = 0;
+	size_t sz = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH) + 1;
+	int err;
+	char *pgname = safe_malloc(sz);
+	char **buf = safe_malloc(size * sizeof (char *));
+
+	if (h == NULL || inst == NULL || snap == NULL || slvl == NULL ||
+	    pg == NULL || iter == NULL) {
+		uu_die(gettext("Failed object creation: %s\n"),
+		    scf_strerror(scf_error()));
+	}
+
+	if (scf_handle_decode_fmri(h, SCF_NOTIFY_PARAMS_INST, NULL, NULL, inst,
+	    NULL, NULL, SCF_DECODE_FMRI_EXACT) != 0)
+		uu_die(gettext("Failed to decode %s: %s\n"),
+		    SCF_NOTIFY_PARAMS_INST, scf_strerror(scf_error()));
+
+	if (scf_instance_get_snapshot(inst, "running", snap) != 0)
+		uu_die(gettext("Failed to get snapshot: %s\n"),
+		    scf_strerror(scf_error()));
+
+	if (scf_snapshot_get_base_snaplevel(snap, slvl) != 0)
+		uu_die(gettext("Failed to get base snaplevel: %s\n"),
+		    scf_strerror(scf_error()));
+
+	if (scf_iter_snaplevel_pgs_typed(iter, slvl,
+	    SCF_NOTIFY_PARAMS_PG_TYPE) != 0)
+		uu_die(gettext("Failed to get iterator: %s\n"),
+		    scf_strerror(scf_error()));
+
+	while ((err = scf_iter_next_pg(iter, pg)) == 1) {
+		char *c;
+
+		if (scf_pg_get_name(pg, pgname, sz) == -1)
+			uu_die(gettext("Failed to get pg name: %s\n"),
+			    scf_strerror(scf_error()));
+		if ((c = strrchr(pgname, ',')) != NULL)
+			*c = '\0';
+		if (has_fma_tag(pgname))
+			continue;
+		if (!is_fma_token(pgname))
+			/*
+			 * We don't emmit a warning here so that we don't
+			 * pollute the output
+			 */
+			continue;
+
+		if (n + 1 >= size) {
+			size *= 2;
+			buf = realloc(buf, size * sizeof (char *));
+			if (buf == NULL)
+				uu_die(gettext("Out of memory.\n"));
+		}
+		buf[n] = safe_strdup(pgname);
+		++n;
+	}
+	/*
+	 * NULL terminate buf
+	 */
+	buf[n] = NULL;
+	if (err == -1)
+		uu_die(gettext("Failed to iterate pgs: %s\n"),
+		    scf_strerror(scf_error()));
+
+	/* sort the classes */
+	qsort((void *)buf, n, sizeof (char *), qsort_str_compare);
+
+	free(pgname);
+	scf_iter_destroy(iter);
+	scf_pg_destroy(pg);
+	scf_snaplevel_destroy(slvl);
+	scf_snapshot_destroy(snap);
+	scf_instance_destroy(inst);
+	scf_handle_destroy(h);
+
+	return (buf);
+}
+
+/*
+ * get_fma_notify_params()
+ * populates an nvlist_t with notifycation parameters for a given FMA class
+ * returns 0 if the nvlist is populated, 1 otherwise;
+ */
+int
+get_fma_notify_params(nvlist_t *nvl, const char *class)
+{
+	if (_scf_get_fma_notify_params(class, nvl, 0) != 0) {
+		/*
+		 * if the preferences have just been deleted
+		 * or does not exist, just skip.
+		 */
+		if (scf_error() != SCF_ERROR_NOT_FOUND &&
+		    scf_error() != SCF_ERROR_DELETED)
+			uu_warn(gettext(
+			    "Failed get_fma_notify_params %s\n"),
+			    scf_strerror(scf_error()));
+
+		return (1);
+	}
+
+	return (0);
+}
+
+/*
+ * print_notify_fma()
+ * outputs the notification paramets of FMA events.
+ * It first outputs classes in fma_tags[], then outputs the other classes
+ * sorted alphabetically
+ */
+static void
+print_notify_fma(void)
+{
+	nvlist_t *nvl;
+	char **tmp = NULL;
+	char **classes, *p;
+	const char *class;
+	uint32_t i;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		uu_die(gettext("Out of memory.\n"));
+
+	for (i = 0; (class = get_fma_class(i)) != NULL; ++i) {
+		if (get_fma_notify_params(nvl, class) == 0)
+			listnotify_print(nvl, get_fma_tag(i));
+	}
+
+	if ((classes = get_notify_param_classes()) == NULL)
+		goto cleanup;
+
+	tmp = classes;
+	for (p = *tmp; p; ++tmp, p = *tmp) {
+		if (get_fma_notify_params(nvl, p) == 0)
+			listnotify_print(nvl, re_tag(p));
+
+		free(p);
+	}
+
+	free(classes);
+
+cleanup:
+	nvlist_free(nvl);
+}
+
+/*
+ * print_notify_fmri()
+ * prints notifycation parameters for an SMF instance.
+ */
+static void
+print_notify_fmri(const char *fmri)
+{
+	nvlist_t *nvl;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		uu_die(gettext("Out of memory.\n"));
+
+	if (_scf_get_svc_notify_params(fmri, nvl, SCF_TRANSITION_ALL, 0, 0) !=
+	    SCF_SUCCESS) {
+		if (scf_error() != SCF_ERROR_NOT_FOUND &&
+		    scf_error() != SCF_ERROR_DELETED)
+			uu_warn(gettext(
+			    "Failed _scf_get_svc_notify_params: %s\n"),
+			    scf_strerror(scf_error()));
+	} else {
+		if (strcmp(SCF_INSTANCE_GLOBAL, fmri) == 0)
+			safe_printf(
+			    gettext("System wide notification parameters:\n"));
+		safe_printf("%s:\n", fmri);
+		listnotify_print(nvl, NULL);
+	}
+	nvlist_free(nvl);
+}
+
+/*
+ * print_notify_special()
+ * prints notification parameters for FMA events and system wide SMF state
+ * transitions parameters
+ */
+static void
+print_notify_special()
+{
+	safe_printf("Notification parameters for FMA Events\n");
+	print_notify_fma();
+	print_notify_fmri(SCF_INSTANCE_GLOBAL);
+}
+
+/*
+ * print_notify()
+ * callback function to print notification parameters for SMF state transition
+ * instances. It skips global and notify-params instances as they should be
+ * printed by print_notify_special()
+ */
+/* ARGSUSED */
+static int
+print_notify(void *unused, scf_walkinfo_t *wip)
+{
+	if (strcmp(SCF_INSTANCE_GLOBAL, wip->fmri) == 0 ||
+	    strcmp(SCF_NOTIFY_PARAMS_INST, wip->fmri) == 0)
+		return (0);
+
+	print_notify_fmri(wip->fmri);
+
+	return (0);
+}
+
 /*
  * Append a one-lined description of each process in inst's contract(s) and
  * return the augmented string.
@@ -3098,7 +3323,7 @@ main(int argc, char **argv)
 	int show_all = 0;
 	int show_header = 1;
 
-	const char * const options = "aHpvo:R:s:S:dDl?x";
+	const char * const options = "aHpvno:R:s:S:dDl?x";
 
 	(void) setlocale(LC_ALL, "");
 
@@ -3145,6 +3370,13 @@ main(int argc, char **argv)
 		case 'd':
 		case 'D':
 		case 'l':
+			if (opt_mode != 0)
+				argserr(progname);
+
+			opt_mode = opt;
+			break;
+
+		case 'n':
 			if (opt_mode != 0)
 				argserr(progname);
 
@@ -3214,6 +3446,7 @@ main(int argc, char **argv)
 		case 'd':
 		case 'D':
 		case 'l':
+		case 'n':
 		case 'x':
 			assert(opt_mode == optopt);
 			break;
@@ -3260,6 +3493,18 @@ main(int argc, char **argv)
 
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
 		    print_detailed, NULL, &exit_status, uu_warn)) != 0) {
+			uu_warn(gettext("failed to iterate over "
+			    "instances: %s\n"), scf_strerror(err));
+			exit_status = UU_EXIT_FATAL;
+		}
+
+		return (exit_status);
+	}
+
+	if (opt_mode == 'n') {
+		print_notify_special();
+		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
+		    print_notify, NULL, &exit_status, uu_warn)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -3376,6 +3621,9 @@ main(int argc, char **argv)
 		free(provider_scope);
 		free(provider_svc);
 		free(provider_inst);
+		break;
+
+	case 'n':
 		break;
 
 	default:

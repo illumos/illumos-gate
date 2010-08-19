@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -44,15 +43,13 @@
 	cur_attr++;				\
 }
 
-#define	CRYPTO_LAST_ERROR	(CRYPTO_WEAK_KEY + 1)
-
 /*
  * In order to fit everything on one line, the 'CRYPTO_' prefix
  * has been dropped from the KCF #defines, e.g.
  * CRYPTO_SUCCESS becomes SUCCESS.
  */
 
-static CK_RV error_number_table[CRYPTO_LAST_ERROR] = {
+static CK_RV error_number_table[CRYPTO_LAST_ERROR+1] = {
 CKR_OK,					/* SUCCESS */
 CKR_CANCEL,				/* CANCEL */
 CKR_HOST_MEMORY,			/* HOST_MEMORY */
@@ -136,7 +133,12 @@ CKR_GENERAL_ERROR,			/* UNKNOWN_PROVIDER */
 CKR_GENERAL_ERROR,			/* MODVERIFICATION_FAILED */
 CKR_GENERAL_ERROR,			/* OLD_CTX_TEMPLATE */
 CKR_GENERAL_ERROR,			/* WEAK_KEY */
+CKR_GENERAL_ERROR			/* FIPS140_ERROR */
 };
+
+#if CRYPTO_LAST_ERROR != CRYPTO_FIPS140_ERROR
+#error "Crypto to PKCS11 error mapping table needs to be updated!"
+#endif
 
 /*
  * Map KCF error codes into PKCS11 error codes.
@@ -144,7 +146,7 @@ CKR_GENERAL_ERROR,			/* WEAK_KEY */
 CK_RV
 crypto2pkcs11_error_number(uint_t n)
 {
-	if (n > CRYPTO_LAST_ERROR)
+	if (n >= sizeof (error_number_table) / sizeof (error_number_table[0]))
 		return (CKR_GENERAL_ERROR);
 
 	return (error_number_table[n]);

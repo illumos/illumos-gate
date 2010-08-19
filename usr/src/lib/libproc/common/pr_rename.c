@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -88,19 +87,33 @@ int
 pr_link(struct ps_prochandle *Pr, const char *existing, const char *new)
 {
 	sysret_t rval;
-	argdes_t argd[2];
+	argdes_t argd[5];
 	argdes_t *adp;
 	int error;
 
 	if (Pr == NULL)
 		return (link(existing, new));
 
-	adp = &argd[0];		/* existing argument */
+	adp = &argd[0];		/* first directory fd argument */
+	adp->arg_value = AT_FDCWD;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	adp++;			/* existing argument */
 	adp->arg_value = 0;
 	adp->arg_object = (void *)existing;
 	adp->arg_type = AT_BYREF;
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = strlen(existing) + 1;
+
+	adp++;			/* second directory fd argument */
+	adp->arg_value = AT_FDCWD;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
 
 	adp++;			/* new argument */
 	adp->arg_value = 0;
@@ -109,7 +122,14 @@ pr_link(struct ps_prochandle *Pr, const char *existing, const char *new)
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = strlen(new) + 1;
 
-	error = Psyscall(Pr, &rval, SYS_link, 2, &argd[0]);
+	adp++;			/* flag argument */
+	adp->arg_value = 0;
+	adp->arg_object = NULL;
+	adp->arg_type = AT_BYVAL;
+	adp->arg_inout = AI_INPUT;
+	adp->arg_size = 0;
+
+	error = Psyscall(Pr, &rval, SYS_linkat, 5, &argd[0]);
 
 	if (error) {
 		errno = (error > 0) ? error : ENOSYS;

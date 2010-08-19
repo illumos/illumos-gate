@@ -223,11 +223,11 @@ const struct systable systable[] = {
 {"write",	3, DEC, NOV, DEC, IOB, UNS},			/*   4 */
 {"open",	3, DEC, NOV, STG, OPN, OCT},			/*   5 */
 {"close",	1, DEC, NOV, DEC},				/*   6 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"linkat",	5, DEC, NOV, ATC, STG, ATC, STG, SNF},		/*   7 */
 { NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"link",	2, DEC, NOV, STG, STG},				/*   9 */
 {"unlink",	1, DEC, NOV, STG},				/*  10 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"symlinkat",	3, DEC, NOV, STG, ATC, STG},			/*  11 */
 {"chdir",	1, DEC, NOV, STG},				/*  12 */
 {"time",	0, DEC, NOV},					/*  13 */
 {"mknod",	3, DEC, NOV, STG, OCT, HEX},			/*  14 */
@@ -238,7 +238,7 @@ const struct systable systable[] = {
 {"lseek",	3, DEC, NOV, DEC, DEX, WHN},			/*  19 */
 {"getpid",	0, DEC, DEC},					/*  20 */
 {"mount",	8, DEC, NOV, STG, STG, MTF, MFT, HEX, DEC, HEX, DEC}, /* 21 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"readlinkat",	4, DEC, NOV, ATC, STG, RLK, UNS},		/*  22 */
 {"setuid",	1, DEC, NOV, UNS},				/*  23 */
 {"getuid",	0, UNS, UNS},					/*  24 */
 {"stime",	1, DEC, NOV, DEC},				/*  25 */
@@ -261,10 +261,10 @@ const struct systable systable[] = {
 {"pipe",	0, DEC, DEC},					/*  42 */
 {"times",	1, DEC, NOV, HEX},				/*  43 */
 {"profil",	4, DEC, NOV, HEX, UNS, HEX, OCT},		/*  44 */
-{"faccessat",	4, DEC, NOV, ATC, STG, ACC, DEC},		/*  45 */
+{"faccessat",	4, DEC, NOV, ATC, STG, ACC, FAT},		/*  45 */
 {"setgid",	1, DEC, NOV, UNS},				/*  46 */
 {"getgid",	0, UNS, UNS},					/*  47 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"mknodat",	4, DEC, NOV, ATC, STG, OCT, HEX},		/*  48 */
 {"msgsys",	6, DEC, NOV, DEC, DEC, DEC, DEC, DEC, DEC},	/*  49 */
 {"sysi86",	4, HEX, NOV, S86, HEX, HEX, HEX, DEC, DEC},	/*  50 */
 {"acct",	1, DEC, NOV, STG},				/*  51 */
@@ -272,7 +272,7 @@ const struct systable systable[] = {
 {"semsys",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/*  53 */
 {"ioctl",	3, DEC, NOV, DEC, IOC, IOA},			/*  54 */
 {"uadmin",	3, DEC, NOV, DEC, DEC, DEC},			/*  55 */
-{"fchownat",	5, DEC, NOV, ATC, STG, DEC, DEC, UTF},		/*  56 */
+{"fchownat",	5, DEC, NOV, ATC, STG, DEC, DEC, SNF},		/*  56 */
 {"utssys",	4, DEC, NOV, HEX, DEC, UTS, HEX},		/*  57 */
 {"fdsync",	2, DEC, NOV, DEC, FFG},				/*  58 */
 {"execve",	3, DEC, NOV, STG, HEX, HEX},			/*  59 */
@@ -281,9 +281,9 @@ const struct systable systable[] = {
 {"fcntl",	3, DEC, NOV, DEC, FCN, HEX},			/*  62 */
 {"ulimit",	2, DEX, NOV, ULM, DEC},				/*  63 */
 {"renameat",	4, DEC, NOV, ATC, STG, ATC, STG},		/*  64 */
-{"unlinkat",	3, DEC, NOV, ATC, STG, DEC},			/*  65 */
-{"fstatat",	4, DEC, NOV, ATC, STG, HEX, UTF},		/*  66 */
-{"fstatat64",	4, DEC, NOV, ATC, STG, HEX, UTF},		/*  67 */
+{"unlinkat",	3, DEC, NOV, ATC, STG, UAT},			/*  65 */
+{"fstatat",	4, DEC, NOV, ATC, STG, HEX, SNF},		/*  66 */
+{"fstatat64",	4, DEC, NOV, ATC, STG, HEX, SNF},		/*  67 */
 {"openat",	4, DEC, NOV, ATC, STG, OPN, OCT},		/*  68 */
 {"openat64",	4, DEC, NOV, ATC, STG, OPN, OCT},		/*  69 */
 {"tasksys",	5, DEC, NOV, DEC, DEC, DEC, HEX, DEC},		/*  70 */
@@ -317,8 +317,8 @@ const struct systable systable[] = {
 {"sigaction",	3, DEC, NOV, SIG, HEX, HEX},			/*  98 */
 {"sigpendsys",	2, DEC, NOV, DEC, HEX},				/*  99 */
 {"context",	2, DEC, NOV, DEC, HEX},				/* 100 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"fchmodat",	4, DEC, NOV, ATC, STG, OCT, SNF},		/* 101 */
+{"mkdirat",	3, DEC, NOV, ATC, STG, OCT},			/* 102 */
 {"statvfs",	2, DEC, NOV, STG, HEX},				/* 103 */
 {"fstatvfs",	2, DEC, NOV, DEC, HEX},				/* 104 */
 {"getloadavg",	2, DEC, NOV, HEX, DEC},				/* 105 */
@@ -484,18 +484,38 @@ const struct systable systable[] = {
  */
 
 const	struct systable	faccessattable[] = {
-{"faccessat",	4, DEC, NOV, ATC, STG, ACC, DEC},		/*  0 */
+{"faccessat",	4, DEC, NOV, ATC, STG, ACC, FAT},		/*  0 */
 {"access",	3, DEC, NOV, HID, STG, ACC},			/*  1 */
 };
 #define	NACCESSCODE	(sizeof (faccessattable) / sizeof (struct systable))
 
+const	struct systable	fchmodattable[] = {
+{"fchmodat",	4, DEC, NOV, ATC, STG, OCT, SNF},		/*  0 */
+{"chmod",	3, DEC, NOV, HID, STG, OCT},			/*  1 */
+{"fchmodat",	4, DEC, NOV, ATC, STG, OCT, SNF},		/*  2 */
+{"fchmod",	3, DEC, NOV, DEC, HID, OCT},			/*  3 */
+};
+#define	NCHMODCODE	(sizeof (fchmodattable) / sizeof (struct systable))
+
 const	struct systable	fchownattable[] = {
-{"fchownat",	5, DEC, NOV, ATC, STG, DEC, DEC, UTF},		/*  0 */
+{"fchownat",	5, DEC, NOV, ATC, STG, DEC, DEC, SNF},		/*  0 */
 {"chown",	4, DEC, NOV, HID, STG, DEC, DEC},		/*  1 */
 {"lchown",	4, DEC, NOV, HID, STG, DEC, DEC},		/*  2 */
 {"fchown",	4, DEC, NOV, DEC, HID, DEC, DEC},		/*  3 */
 };
 #define	NCHOWNCODE	(sizeof (fchownattable) / sizeof (struct systable))
+
+const	struct systable	mkdiratattable[] = {
+{"mkdirat",	3, DEC, NOV, ATC, STG, OCT},			/*  0 */
+{"mkdir",	3, DEC, NOV, HID, STG, OCT},			/*  1 */
+};
+#define	NMKDIRCODE	(sizeof (mkdiratattable) / sizeof (struct systable))
+
+const	struct systable	mknodatattable[] = {
+{"mknodat",	4, DEC, NOV, ATC, STG, OCT, HEX},		/*  0 */
+{"mknod",	4, DEC, NOV, HID, STG, OCT, HEX},		/*  1 */
+};
+#define	NMKMODCODE	(sizeof (mknodatattable) / sizeof (struct systable))
 
 const	struct systable	renameattable[] = {
 {"renameat",	4, DEC, NOV, ATC, STG, ATC, STG},		/*  0 */
@@ -503,15 +523,33 @@ const	struct systable	renameattable[] = {
 };
 #define	NRENAMECODE	(sizeof (renameattable) / sizeof (struct systable))
 
+const	struct systable	linkattable[] = {
+{"linkat",	5, DEC, NOV, ATC, STG, ATC, STG, SNF},		/*  0 */
+{"link",	4, DEC, NOV, HID, STG, HID, STG},		/*  1 */
+};
+#define	NLINKATCODE	(sizeof (linkattable) / sizeof (struct systable))
+
 const	struct systable	unlinkattable[] = {
-{"unlinkat",	3, DEC, NOV, ATC, STG, DEC},			/*  0 */
+{"unlinkat",	3, DEC, NOV, ATC, STG, UAT},			/*  0 */
 {"unlink",	2, DEC, NOV, HID, STG},				/*  1 */
 {"rmdir",	2, DEC, NOV, HID, STG},				/*  2 */
 };
 #define	NUNLINKCODE	(sizeof (unlinkattable) / sizeof (struct systable))
 
+const	struct systable	symlinkattable[] = {
+{"symlinkat",	3, DEC, NOV, STG, ATC, STG},			/*  0 */
+{"symlink",	3, DEC, NOV, STG, HID, STG},			/*  1 */
+};
+#define	NSYMLINKCODE	(sizeof (symlinkattable) / sizeof (struct systable))
+
+const	struct systable	readlinkattable[] = {
+{"readlinkat",	4, DEC, NOV, ATC, STG, RLK, UNS},		/*  0 */
+{"readlink",	4, DEC, NOV, HID, STG, RLK, UNS},		/*  1 */
+};
+#define	NREADLINKCODE	(sizeof (readlinkattable) / sizeof (struct systable))
+
 const	struct systable	fstatattable[] = {
-{"fstatat",	4, DEC, NOV, ATC, STG, HEX, UTF},		/*  0 */
+{"fstatat",	4, DEC, NOV, ATC, STG, HEX, SNF},		/*  0 */
 {"stat",	3, DEC, NOV, HID, STG, HEX},			/*  1 */
 {"lstat",	3, DEC, NOV, HID, STG, HEX},			/*  2 */
 {"fstat",	3, DEC, NOV, DEC, HID, HEX},			/*  3 */
@@ -519,7 +557,7 @@ const	struct systable	fstatattable[] = {
 #define	NSTATCODE	(sizeof (fstatattable) / sizeof (struct systable))
 
 const	struct systable	fstatat64table[] = {
-{"fstatat64",	4, DEC, NOV, ATC, STG, HEX, UTF},		/*  0 */
+{"fstatat64",	4, DEC, NOV, ATC, STG, HEX, SNF},		/*  0 */
 {"stat64",	3, DEC, NOV, HID, STG, HEX},			/*  1 */
 {"lstat64",	3, DEC, NOV, HID, STG, HEX},			/*  2 */
 {"fstat64",	3, DEC, NOV, DEC, HID, HEX},			/*  3 */
@@ -868,7 +906,7 @@ const	struct systable sidsystable[] = {
 
 const	struct systable utimesystable[] = {
 {"futimens",	3, DEC, NOV, HID, DEC, HEX},			/* 0 */
-{"utimensat",	5, DEC, NOV, HID, ATC, STG, HEX, UTF},		/* 1 */
+{"utimensat",	5, DEC, NOV, HID, ATC, STG, HEX, SNF},		/* 1 */
 };
 #define	NUTIMESYSCODE	(sizeof (utimesystable) / sizeof (struct systable))
 
@@ -1051,17 +1089,41 @@ subsys(int syscall, int subcode)
 			if ((unsigned)subcode < NACCESSCODE)
 				stp = &faccessattable[subcode];
 			break;
+		case SYS_fchmodat:
+			if ((unsigned)subcode < NCHMODCODE)
+				stp = &fchmodattable[subcode];
+			break;
 		case SYS_fchownat:
 			if ((unsigned)subcode < NCHOWNCODE)
 				stp = &fchownattable[subcode];
+			break;
+		case SYS_mkdirat:
+			if ((unsigned)subcode < NMKDIRCODE)
+				stp = &mkdiratattable[subcode];
+			break;
+		case SYS_mknodat:
+			if ((unsigned)subcode < NMKMODCODE)
+				stp = &mknodatattable[subcode];
 			break;
 		case SYS_renameat:
 			if ((unsigned)subcode < NRENAMECODE)
 				stp = &renameattable[subcode];
 			break;
+		case SYS_linkat:
+			if ((unsigned)subcode < NLINKATCODE)
+				stp = &linkattable[subcode];
+			break;
 		case SYS_unlinkat:
 			if ((unsigned)subcode < NUNLINKCODE)
 				stp = &unlinkattable[subcode];
+			break;
+		case SYS_symlinkat:
+			if ((unsigned)subcode < NSYMLINKCODE)
+				stp = &symlinkattable[subcode];
+			break;
+		case SYS_readlinkat:
+			if ((unsigned)subcode < NREADLINKCODE)
+				stp = &readlinkattable[subcode];
 			break;
 		case SYS_fstatat:
 			if ((unsigned)subcode < NSTATCODE)
@@ -1299,6 +1361,20 @@ getsubcode(private_t *pri)
 				subcode = ((int)Lsp->pr_sysarg[0] == AT_FDCWD &&
 				    Lsp->pr_sysarg[3] == 0)? 1 : 0;
 			break;
+		case SYS_fchmodat:
+			if (nsysarg > 1 && Lsp->pr_sysarg[1] == NULL) {
+				subcode = 3;
+				break;
+			}
+			if (nsysarg > 0 && (int)Lsp->pr_sysarg[0] != AT_FDCWD) {
+				subcode = 0;
+				break;
+			}
+			if (nsysarg > 3)
+				subcode = (Lsp->pr_sysarg[3] == 0)? 1 :
+				    (Lsp->pr_sysarg[3] == AT_SYMLINK_NOFOLLOW)?
+				    2 : 0;
+			break;
 		case SYS_fchownat:
 			if (nsysarg > 1 && Lsp->pr_sysarg[1] == NULL) {
 				subcode = 3;
@@ -1313,10 +1389,23 @@ getsubcode(private_t *pri)
 				    (Lsp->pr_sysarg[4] == AT_SYMLINK_NOFOLLOW)?
 				    2 : 0;
 			break;
+		case SYS_mkdirat:
+		case SYS_mknodat:
+		case SYS_readlinkat:
+			if (nsysarg > 0)
+				subcode = ((int)Lsp->pr_sysarg[0] == AT_FDCWD)?
+				    1 : 0;
+			break;
 		case SYS_renameat:
 			if (nsysarg > 2)
 				subcode = ((int)Lsp->pr_sysarg[0] == AT_FDCWD &&
 				    (int)Lsp->pr_sysarg[2] == AT_FDCWD)? 1 : 0;
+			break;
+		case SYS_linkat:
+			if (nsysarg > 4)
+				subcode = ((int)Lsp->pr_sysarg[0] == AT_FDCWD &&
+				    (int)Lsp->pr_sysarg[2] == AT_FDCWD &&
+				    Lsp->pr_sysarg[4] == 0)? 1 : 0;
 			break;
 		case SYS_unlinkat:
 			if (nsysarg > 2)
@@ -1324,6 +1413,11 @@ getsubcode(private_t *pri)
 				    ((int)Lsp->pr_sysarg[0] != AT_FDCWD)? 0 :
 				    (Lsp->pr_sysarg[2] == AT_REMOVEDIR)? 2 :
 				    (Lsp->pr_sysarg[2] == 0)? 1 : 0;
+			break;
+		case SYS_symlinkat:
+			if (nsysarg > 1)
+				subcode = ((int)Lsp->pr_sysarg[1] == AT_FDCWD)?
+				    1 : 0;
 			break;
 		case SYS_fstatat:
 		case SYS_fstatat64:
@@ -1426,9 +1520,15 @@ maxsyscalls()
 {
 	return (PRMAXSYS + 1
 	    + NACCESSCODE - 1
+	    + NCHMODCODE - 1
 	    + NCHOWNCODE - 1
+	    + NMKDIRCODE - 1
+	    + NMKMODCODE - 1
 	    + NRENAMECODE - 1
+	    + NLINKATCODE - 1
 	    + NUNLINKCODE - 1
+	    + NSYMLINKCODE - 1
+	    + NREADLINKCODE - 1
 	    + NSTATCODE - 1
 	    + NSTAT64CODE - 1
 	    + NOPENATCODE - 1
@@ -1478,12 +1578,24 @@ nsubcodes(int syscall)
 	switch (syscall) {
 	case SYS_faccessat:
 		return (NACCESSCODE);
+	case SYS_fchmodat:
+		return (NCHMODCODE);
 	case SYS_fchownat:
 		return (NCHOWNCODE);
+	case SYS_mkdirat:
+		return (NMKDIRCODE);
+	case SYS_mknodat:
+		return (NMKMODCODE);
 	case SYS_renameat:
 		return (NRENAMECODE);
+	case SYS_linkat:
+		return (NLINKATCODE);
 	case SYS_unlinkat:
 		return (NUNLINKCODE);
+	case SYS_symlinkat:
+		return (NSYMLINKCODE);
+	case SYS_readlinkat:
+		return (NREADLINKCODE);
 	case SYS_fstatat:
 		return (NSTATCODE);
 	case SYS_fstatat64:

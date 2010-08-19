@@ -41,11 +41,9 @@ file path=usr/include/tnf/probe.h
 file path=usr/include/tnf/tnf.h
 file path=usr/include/tnf/writer.h
 file path=usr/lib/libtnf.so.1
-legacy pkg=SUNWtnfd arch=$(ARCH) category=system \
+legacy pkg=SUNWtnfd \
     desc="utilities needed by developers using Trace Normal Format (TNF) facilities" \
-    hotline="Please contact your local service provider" \
-    name="TNF Developer Components" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="TNF Developer Components"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libtnf.so target=./libtnf.so.1

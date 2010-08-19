@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -91,7 +90,7 @@ static	void	prompt(char *);
 static	void	error(char *);
 static	void	terminit();
 static	void	compact();
-static	off_t	getline(FILE *);
+static	off_t	getaline(FILE *);
 static	int	mrdchar();
 static	off_t	find(int, off_t);
 static	int	search(char *, off_t);
@@ -159,7 +158,7 @@ static	wchar_t	leave_search = L't';
 static	short	nfiles;
 static	char	*shell;
 static	char	*promptstr = ":";
-static  off_t	nchars;			/* return from getline in find() */
+static  off_t	nchars;			/* return from getaline in find() */
 static	jmp_buf	restore;
 static	char	Line[LINSIZ+2];
 
@@ -1369,7 +1368,7 @@ off_t line;
 		else
 			(void) fseeko(f, (off_t)dol->l_addr, SEEK_SET);
 		dot = dol - 1;
-		while ((nchars = getline(f)) != EOF) {
+		while ((nchars = getaline(f)) != EOF) {
 			dot++;
 			newdol(f);
 			if (where == dot->l_no || brk_hit)
@@ -1396,7 +1395,7 @@ off_t line;
 		} else {
 			dot = zero + where - 1;
 			(void) fseeko(f, (off_t)dot->l_addr, SEEK_SET);
-			nchars = getline(f);
+			nchars = getaline(f);
 			return (dot->l_no);
 		}
 	}
@@ -1416,7 +1415,7 @@ mrdchar()
  */
 
 static off_t
-getline(f)
+getaline(f)
 FILE *f;
 {
 	char	*p;
@@ -1432,7 +1431,7 @@ FILE *f;
 		rdchar = (int (*)())fgetwc;
 
 	fileptr = f;
-	/* copy overlap from previous call to getline */
+	/* copy overlap from previous call to getaline */
 	if (savlength)
 		(void) strncpy(Line, multic, (size_t)savlength);
 	for (column = 0, p = Line + savlength; ; ) {
@@ -1482,7 +1481,7 @@ FILE *f;
 	if (c != '\n') { /* We're stopping in the middle of the line */
 		if (column != columns || !auto_right_margin)
 			*p++ = '\n';	/* for the display */
-		/* save overlap for next call to getline */
+		/* save overlap for next call to getaline */
 		savlength = length;
 		if (savlength == 0) {
 			/*

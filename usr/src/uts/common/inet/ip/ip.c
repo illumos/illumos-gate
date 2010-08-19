@@ -671,20 +671,21 @@ char		*ip_nv_lookup(nv_t *, int);
 void	ip_rput(queue_t *, mblk_t *);
 static void	ip_rput_dlpi_writer(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp,
 		    void *dummy_arg);
-int		ip_snmp_get(queue_t *, mblk_t *, int);
+int		ip_snmp_get(queue_t *, mblk_t *, int, boolean_t);
 static mblk_t	*ip_snmp_get_mib2_ip(queue_t *, mblk_t *,
-		    mib2_ipIfStatsEntry_t *, ip_stack_t *);
+		    mib2_ipIfStatsEntry_t *, ip_stack_t *, boolean_t);
 static mblk_t	*ip_snmp_get_mib2_ip_traffic_stats(queue_t *, mblk_t *,
-		    ip_stack_t *);
-static mblk_t	*ip_snmp_get_mib2_ip6(queue_t *, mblk_t *, ip_stack_t *);
+		    ip_stack_t *, boolean_t);
+static mblk_t	*ip_snmp_get_mib2_ip6(queue_t *, mblk_t *, ip_stack_t *,
+		    boolean_t);
 static mblk_t	*ip_snmp_get_mib2_icmp(queue_t *, mblk_t *, ip_stack_t *ipst);
 static mblk_t	*ip_snmp_get_mib2_icmp6(queue_t *, mblk_t *, ip_stack_t *ipst);
 static mblk_t	*ip_snmp_get_mib2_igmp(queue_t *, mblk_t *, ip_stack_t *ipst);
 static mblk_t	*ip_snmp_get_mib2_multi(queue_t *, mblk_t *, ip_stack_t *ipst);
 static mblk_t	*ip_snmp_get_mib2_ip_addr(queue_t *, mblk_t *,
-		    ip_stack_t *ipst);
+		    ip_stack_t *ipst, boolean_t);
 static mblk_t	*ip_snmp_get_mib2_ip6_addr(queue_t *, mblk_t *,
-		    ip_stack_t *ipst);
+		    ip_stack_t *ipst, boolean_t);
 static mblk_t	*ip_snmp_get_mib2_ip_group_src(queue_t *, mblk_t *,
 		    ip_stack_t *ipst);
 static mblk_t	*ip_snmp_get_mib2_ip6_group_src(queue_t *, mblk_t *,
@@ -739,6 +740,8 @@ static void	ip_kstat2_fini(netstackid_t, kstat_t *);
 
 static void	ipobs_init(ip_stack_t *);
 static void	ipobs_fini(ip_stack_t *);
+
+static int	ip_tp_cpu_update(cpu_setup_t, int, void *);
 
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 
@@ -1098,7 +1101,8 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* SIOCSENABLESDP is handled by SDP */
 	/* 183 */ { IPI_DONTCARE /* SIOCSENABLESDP */, 0, 0, 0, NULL, NULL },
 	/* 184 */ { IPI_DONTCARE /* SIOCSQPTR */, 0, 0, 0, NULL, NULL },
-	/* 185 */ { IPI_DONTCARE /* SIOCGIFHWADDR */, 0, 0, 0, NULL, NULL },
+	/* 185 */ { SIOCGIFHWADDR, sizeof (struct ifreq), IPI_GET_CMD,
+			IF_CMD, ip_sioctl_get_ifhwaddr, NULL },
 	/* 186 */ { IPI_DONTCARE /* SIOCGSTAMP */, 0, 0, 0, NULL, NULL },
 	/* 187 */ { SIOCILB, 0, IPI_PRIV | IPI_GET_CMD, MISC_CMD,
 			ip_sioctl_ilb_cmd, NULL },
@@ -1107,7 +1111,9 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 190 */ { SIOCGLIFDADSTATE, sizeof (struct lifreq),
 			IPI_GET_CMD, LIF_CMD, ip_sioctl_get_dadstate, NULL },
 	/* 191 */ { SIOCSLIFPREFIX, sizeof (struct lifreq), IPI_PRIV | IPI_WR,
-			LIF_CMD, ip_sioctl_prefix, ip_sioctl_prefix_restart }
+			LIF_CMD, ip_sioctl_prefix, ip_sioctl_prefix_restart },
+	/* 192 */ { SIOCGLIFHWADDR, sizeof (struct lifreq), IPI_GET_CMD,
+			LIF_CMD, ip_sioctl_get_lifhwaddr, NULL }
 };
 
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);
@@ -3346,7 +3352,7 @@ ip_laddr_fanout_insert(conn_t *connp)
  * If uinfo is set, then we fill in the best available information
  * we have for the destination. This is based on (in priority order) any
  * metrics and path MTU stored in a dce_t, route metrics, and finally the
- * ill_mtu.
+ * ill_mtu/ill_mc_mtu.
  *
  * Tsol note: If we have a source route then dst_addr != firsthop. But we
  * always do the label check on dst_addr.
@@ -3675,8 +3681,13 @@ bad_addr:
 uint_t
 ip_get_base_mtu(ill_t *ill, ire_t *ire)
 {
-	uint_t mtu = ill->ill_mtu;
+	uint_t mtu;
 	uint_t iremtu = ire->ire_metrics.iulp_mtu;
+
+	if (ire->ire_type & (IRE_MULTICAST|IRE_BROADCAST))
+		mtu = ill->ill_mc_mtu;
+	else
+		mtu = ill->ill_mtu;
 
 	if (iremtu != 0 && iremtu < mtu)
 		mtu = iremtu;
@@ -3790,17 +3801,32 @@ ip_get_pmtu(ip_xmit_attr_t *ixa)
 		 * an ill. We'd use the above IP_MAXPACKET in that case just
 		 * to tell the transport something larger than zero.
 		 */
-		if (nce->nce_common->ncec_ill->ill_mtu < pmtu)
-			pmtu = nce->nce_common->ncec_ill->ill_mtu;
-		if (nce->nce_common->ncec_ill != nce->nce_ill &&
-		    nce->nce_ill->ill_mtu < pmtu) {
-			/*
-			 * for interfaces in an IPMP group, the mtu of
-			 * the nce_ill (under_ill) could be different
-			 * from the mtu of the ncec_ill, so we take the
-			 * min of the two.
-			 */
-			pmtu = nce->nce_ill->ill_mtu;
+		if (ire->ire_type & (IRE_MULTICAST|IRE_BROADCAST)) {
+			if (nce->nce_common->ncec_ill->ill_mc_mtu < pmtu)
+				pmtu = nce->nce_common->ncec_ill->ill_mc_mtu;
+			if (nce->nce_common->ncec_ill != nce->nce_ill &&
+			    nce->nce_ill->ill_mc_mtu < pmtu) {
+				/*
+				 * for interfaces in an IPMP group, the mtu of
+				 * the nce_ill (under_ill) could be different
+				 * from the mtu of the ncec_ill, so we take the
+				 * min of the two.
+				 */
+				pmtu = nce->nce_ill->ill_mc_mtu;
+			}
+		} else {
+			if (nce->nce_common->ncec_ill->ill_mtu < pmtu)
+				pmtu = nce->nce_common->ncec_ill->ill_mtu;
+			if (nce->nce_common->ncec_ill != nce->nce_ill &&
+			    nce->nce_ill->ill_mtu < pmtu) {
+				/*
+				 * for interfaces in an IPMP group, the mtu of
+				 * the nce_ill (under_ill) could be different
+				 * from the mtu of the ncec_ill, so we take the
+				 * min of the two.
+				 */
+				pmtu = nce->nce_ill->ill_mtu;
+			}
 		}
 	}
 
@@ -4274,6 +4300,11 @@ ip_conn_input_icmp(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 void
 ip_ddi_destroy(void)
 {
+	/* This needs to be called before destroying any transports. */
+	mutex_enter(&cpu_lock);
+	unregister_cpu_setup_func(ip_tp_cpu_update, NULL);
+	mutex_exit(&cpu_lock);
+
 	tnet_fini();
 
 	icmp_ddi_g_destroy();
@@ -4531,6 +4562,11 @@ ip_ddi_init(void)
 	rts_ddi_g_init();
 	icmp_ddi_g_init();
 	ilb_ddi_g_init();
+
+	/* This needs to be called after all transports are initialized. */
+	mutex_enter(&cpu_lock);
+	register_cpu_setup_func(ip_tp_cpu_update, NULL);
+	mutex_exit(&cpu_lock);
 }
 
 /*
@@ -4665,6 +4701,22 @@ ip_dlnotify_alloc(uint_t notification, uint_t data)
 	notifyp = (dl_notify_ind_t *)mp->b_rptr;
 	notifyp->dl_notification = notification;
 	notifyp->dl_data = data;
+	return (mp);
+}
+
+mblk_t *
+ip_dlnotify_alloc2(uint_t notification, uint_t data1, uint_t data2)
+{
+	dl_notify_ind_t	*notifyp;
+	mblk_t		*mp;
+
+	if ((mp = ip_dlpi_alloc(DL_NOTIFY_IND_SIZE, DL_NOTIFY_IND)) == NULL)
+		return (NULL);
+
+	notifyp = (dl_notify_ind_t *)mp->b_rptr;
+	notifyp->dl_notification = notification;
+	notifyp->dl_data1 = data1;
+	notifyp->dl_data2 = data2;
 	return (mp);
 }
 
@@ -8210,6 +8262,9 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			ill_dlpi_done(ill, DL_BIND_REQ);
 			if (ill->ill_ifname_pending)
 				break;
+			mutex_enter(&ill->ill_lock);
+			ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
+			mutex_exit(&ill->ill_lock);
 			/*
 			 * Something went wrong with the bind.  We presumably
 			 * have an IOCTL hanging out waiting for completion.
@@ -8320,11 +8375,17 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 * sent by ill_dl_phys, in which case just return
 		 */
 		ill_dlpi_done(ill, DL_BIND_REQ);
+
 		if (ill->ill_ifname_pending) {
 			DTRACE_PROBE2(ip__rput__dlpi__ifname__pending,
 			    ill_t *, ill, mblk_t *, mp);
 			break;
 		}
+		mutex_enter(&ill->ill_lock);
+		ill->ill_dl_up = 1;
+		ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
+		mutex_exit(&ill->ill_lock);
+
 		if (!ioctl_aborted)
 			mp1 = ipsq_pending_mp_get(ipsq, &connp);
 		if (mp1 == NULL) {
@@ -8343,12 +8404,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 */
 		ip1dbg(("ip_rput_dlpi: bind_ack %s\n", ill->ill_name));
 		DTRACE_PROBE1(ip__rput__dlpi__bind__ack, ill_t *, ill);
-
-		mutex_enter(&ill->ill_lock);
-		ill->ill_dl_up = 1;
-		ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
 		ill_nic_event_dispatch(ill, 0, NE_UP, NULL, 0);
-		mutex_exit(&ill->ill_lock);
 
 		/*
 		 * Now bring up the resolver; when that is complete, we'll
@@ -8429,7 +8485,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 	case DL_NOTIFY_IND: {
 		dl_notify_ind_t *notify = (dl_notify_ind_t *)mp->b_rptr;
-		uint_t orig_mtu;
+		uint_t orig_mtu, orig_mc_mtu;
 
 		switch (notify->dl_notification) {
 		case DL_NOTE_PHYS_ADDR:
@@ -8450,6 +8506,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			break;
 
 		case DL_NOTE_SDU_SIZE:
+		case DL_NOTE_SDU_SIZE2:
 			/*
 			 * The dce and fragmentation code can cope with
 			 * this changing while packets are being sent.
@@ -8459,11 +8516,23 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * Change the MTU size of the interface.
 			 */
 			mutex_enter(&ill->ill_lock);
-			ill->ill_current_frag = (uint_t)notify->dl_data;
+			orig_mtu = ill->ill_mtu;
+			orig_mc_mtu = ill->ill_mc_mtu;
+			switch (notify->dl_notification) {
+			case DL_NOTE_SDU_SIZE:
+				ill->ill_current_frag =
+				    (uint_t)notify->dl_data;
+				ill->ill_mc_mtu = (uint_t)notify->dl_data;
+				break;
+			case DL_NOTE_SDU_SIZE2:
+				ill->ill_current_frag =
+				    (uint_t)notify->dl_data1;
+				ill->ill_mc_mtu = (uint_t)notify->dl_data2;
+				break;
+			}
 			if (ill->ill_current_frag > ill->ill_max_frag)
 				ill->ill_max_frag = ill->ill_current_frag;
 
-			orig_mtu = ill->ill_mtu;
 			if (!(ill->ill_flags & ILLF_FIXEDMTU)) {
 				ill->ill_mtu = ill->ill_current_frag;
 
@@ -8475,20 +8544,32 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				    ill->ill_user_mtu < ill->ill_mtu)
 					ill->ill_mtu = ill->ill_user_mtu;
 
+				if (ill->ill_user_mtu != 0 &&
+				    ill->ill_user_mtu < ill->ill_mc_mtu)
+					ill->ill_mc_mtu = ill->ill_user_mtu;
+
 				if (ill->ill_isv6) {
 					if (ill->ill_mtu < IPV6_MIN_MTU)
 						ill->ill_mtu = IPV6_MIN_MTU;
+					if (ill->ill_mc_mtu < IPV6_MIN_MTU)
+						ill->ill_mc_mtu = IPV6_MIN_MTU;
 				} else {
 					if (ill->ill_mtu < IP_MIN_MTU)
 						ill->ill_mtu = IP_MIN_MTU;
+					if (ill->ill_mc_mtu < IP_MIN_MTU)
+						ill->ill_mc_mtu = IP_MIN_MTU;
 				}
+			} else if (ill->ill_mc_mtu > ill->ill_mtu) {
+				ill->ill_mc_mtu = ill->ill_mtu;
 			}
+
 			mutex_exit(&ill->ill_lock);
 			/*
 			 * Make sure all dce_generation checks find out
-			 * that ill_mtu has changed.
+			 * that ill_mtu/ill_mc_mtu has changed.
 			 */
-			if (orig_mtu != ill->ill_mtu) {
+			if (orig_mtu != ill->ill_mtu ||
+			    orig_mc_mtu != ill->ill_mc_mtu) {
 				dce_increment_all_generations(ill->ill_isv6,
 				    ill->ill_ipst);
 			}
@@ -9361,7 +9442,7 @@ ip_input_options(ipha_t *ipha, ipaddr_t dst, mblk_t *mp,
 			 */
 			if (optval == IPOPT_SSRR) {
 				ire = ire_ftable_lookup_v4(dst, 0, 0,
-				    IRE_IF_ALL, NULL, ALL_ZONES,
+				    IRE_INTERFACE, NULL, ALL_ZONES,
 				    ira->ira_tsl,
 				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, 0, ipst,
 				    NULL);
@@ -9481,11 +9562,13 @@ bad_src_route:
  *
  * NOTE: original mpctl is copied for msg's 2..N, since its ctl part is
  * already filled in by the caller.
+ * If legacy_req is true then MIB structures needs to be truncated to their
+ * legacy sizes before being returned.
  * Return value of 0 indicates that no messages were sent and caller
  * should free mpctl.
  */
 int
-ip_snmp_get(queue_t *q, mblk_t *mpctl, int level)
+ip_snmp_get(queue_t *q, mblk_t *mpctl, int level, boolean_t legacy_req)
 {
 	ip_stack_t *ipst;
 	sctp_stack_t *sctps;
@@ -9518,23 +9601,24 @@ ip_snmp_get(queue_t *q, mblk_t *mpctl, int level)
 	}
 
 	if (level != MIB2_TCP) {
-		if ((mpctl = udp_snmp_get(q, mpctl)) == NULL) {
+		if ((mpctl = udp_snmp_get(q, mpctl, legacy_req)) == NULL) {
 			return (1);
 		}
 	}
 
 	if (level != MIB2_UDP) {
-		if ((mpctl = tcp_snmp_get(q, mpctl)) == NULL) {
+		if ((mpctl = tcp_snmp_get(q, mpctl, legacy_req)) == NULL) {
 			return (1);
 		}
 	}
 
 	if ((mpctl = ip_snmp_get_mib2_ip_traffic_stats(q, mpctl,
-	    ipst)) == NULL) {
+	    ipst, legacy_req)) == NULL) {
 		return (1);
 	}
 
-	if ((mpctl = ip_snmp_get_mib2_ip6(q, mpctl, ipst)) == NULL) {
+	if ((mpctl = ip_snmp_get_mib2_ip6(q, mpctl, ipst,
+	    legacy_req)) == NULL) {
 		return (1);
 	}
 
@@ -9554,11 +9638,13 @@ ip_snmp_get(queue_t *q, mblk_t *mpctl, int level)
 		return (1);
 	}
 
-	if ((mpctl = ip_snmp_get_mib2_ip_addr(q, mpctl, ipst)) == NULL) {
+	if ((mpctl = ip_snmp_get_mib2_ip_addr(q, mpctl, ipst,
+	    legacy_req)) == NULL) {
 		return (1);
 	}
 
-	if ((mpctl = ip_snmp_get_mib2_ip6_addr(q, mpctl, ipst)) == NULL) {
+	if ((mpctl = ip_snmp_get_mib2_ip6_addr(q, mpctl, ipst,
+	    legacy_req)) == NULL) {
 		return (1);
 	}
 
@@ -9607,11 +9693,12 @@ ip_snmp_get(queue_t *q, mblk_t *mpctl, int level)
 /* Get global (legacy) IPv4 statistics */
 static mblk_t *
 ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl, mib2_ipIfStatsEntry_t *ipmib,
-    ip_stack_t *ipst)
+    ip_stack_t *ipst, boolean_t legacy_req)
 {
 	mib2_ip_t		old_ip_mib;
 	struct opthdr		*optp;
 	mblk_t			*mp2ctl;
+	mib2_ipAddrEntry_t	mae;
 
 	/*
 	 * make a copy of the original message
@@ -9629,6 +9716,7 @@ ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl, mib2_ipIfStatsEntry_t *ipmib,
 	SET_MIB(old_ip_mib.ipReasmTimeout,
 	    ipst->ips_ip_reassembly_timeout);
 	SET_MIB(old_ip_mib.ipAddrEntrySize,
+	    (legacy_req) ? LEGACY_MIB_SIZE(&mae, mib2_ipAddrEntry_t) :
 	    sizeof (mib2_ipAddrEntry_t));
 	SET_MIB(old_ip_mib.ipRouteEntrySize,
 	    sizeof (mib2_ipRouteEntry_t));
@@ -9702,7 +9790,8 @@ ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl, mib2_ipIfStatsEntry_t *ipmib,
 
 /* Per interface IPv4 statistics */
 static mblk_t *
-ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
+ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst,
+    boolean_t legacy_req)
 {
 	struct opthdr		*optp;
 	mblk_t			*mp2ctl;
@@ -9710,6 +9799,7 @@ ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	ill_walk_context_t	ctx;
 	mblk_t			*mp_tail = NULL;
 	mib2_ipIfStatsEntry_t	global_ip_mib;
+	mib2_ipAddrEntry_t	mae;
 
 	/*
 	 * Make a copy of the original message
@@ -9740,14 +9830,19 @@ ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	SET_MIB(ipst->ips_ip_mib.ipIfStatsGroupSourceEntrySize,
 	    sizeof (ip_grpsrc_t));
 
-	if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
-	    (char *)&ipst->ips_ip_mib, (int)sizeof (ipst->ips_ip_mib))) {
-		ip1dbg(("ip_snmp_get_mib2_ip_traffic_stats: "
-		    "failed to allocate %u bytes\n",
-		    (uint_t)sizeof (ipst->ips_ip_mib)));
+	bcopy(&ipst->ips_ip_mib, &global_ip_mib, sizeof (global_ip_mib));
+
+	if (legacy_req) {
+		SET_MIB(global_ip_mib.ipIfStatsAddrEntrySize,
+		    LEGACY_MIB_SIZE(&mae, mib2_ipAddrEntry_t));
 	}
 
-	bcopy(&ipst->ips_ip_mib, &global_ip_mib, sizeof (global_ip_mib));
+	if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
+	    (char *)&global_ip_mib, (int)sizeof (global_ip_mib))) {
+		ip1dbg(("ip_snmp_get_mib2_ip_traffic_stats: "
+		    "failed to allocate %u bytes\n",
+		    (uint_t)sizeof (global_ip_mib)));
+	}
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V4(&ctx, ipst);
@@ -9779,7 +9874,8 @@ ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	if (mp2ctl == NULL)
 		return (NULL);
 
-	return (ip_snmp_get_mib2_ip(q, mp2ctl, &global_ip_mib, ipst));
+	return (ip_snmp_get_mib2_ip(q, mp2ctl, &global_ip_mib, ipst,
+	    legacy_req));
 }
 
 /* Global IPv4 ICMP statistics */
@@ -9863,7 +9959,8 @@ ip_snmp_get_mib2_multi(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 
 /* IPv4 address information */
 static mblk_t *
-ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
+ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst,
+    boolean_t legacy_req)
 {
 	struct opthdr		*optp;
 	mblk_t			*mp2ctl;
@@ -9872,13 +9969,17 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	ipif_t			*ipif;
 	uint_t			bitval;
 	mib2_ipAddrEntry_t	mae;
+	size_t			mae_size;
 	zoneid_t		zoneid;
-	ill_walk_context_t ctx;
+	ill_walk_context_t	ctx;
 
 	/*
 	 * make a copy of the original message
 	 */
 	mp2ctl = copymsg(mpctl);
+
+	mae_size = (legacy_req) ? LEGACY_MIB_SIZE(&mae, mib2_ipAddrEntry_t) :
+	    sizeof (mib2_ipAddrEntry_t);
 
 	/* ipAddrEntryTable */
 
@@ -9933,10 +10034,9 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			    ill->ill_reachable_retrans_time;
 
 			if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
-			    (char *)&mae, (int)sizeof (mib2_ipAddrEntry_t))) {
+			    (char *)&mae, (int)mae_size)) {
 				ip1dbg(("ip_snmp_get_mib2_ip_addr: failed to "
-				    "allocate %u bytes\n",
-				    (uint_t)sizeof (mib2_ipAddrEntry_t)));
+				    "allocate %u bytes\n", (uint_t)mae_size));
 			}
 		}
 	}
@@ -9951,7 +10051,8 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 
 /* IPv6 address information */
 static mblk_t *
-ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
+ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst,
+    boolean_t legacy_req)
 {
 	struct opthdr		*optp;
 	mblk_t			*mp2ctl;
@@ -9959,6 +10060,7 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	ill_t			*ill;
 	ipif_t			*ipif;
 	mib2_ipv6AddrEntry_t	mae6;
+	size_t			mae6_size;
 	zoneid_t		zoneid;
 	ill_walk_context_t	ctx;
 
@@ -9966,6 +10068,10 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	 * make a copy of the original message
 	 */
 	mp2ctl = copymsg(mpctl);
+
+	mae6_size = (legacy_req) ?
+	    LEGACY_MIB_SIZE(&mae6, mib2_ipv6AddrEntry_t) :
+	    sizeof (mib2_ipv6AddrEntry_t);
 
 	/* ipv6AddrEntryTable */
 
@@ -10038,11 +10144,10 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			mae6.ipv6AddrRetransmitTime =
 			    ill->ill_reachable_retrans_time;
 			if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
-			    (char *)&mae6,
-			    (int)sizeof (mib2_ipv6AddrEntry_t))) {
+			    (char *)&mae6, (int)mae6_size)) {
 				ip1dbg(("ip_snmp_get_mib2_ip6_addr: failed to "
 				    "allocate %u bytes\n",
-				    (uint_t)sizeof (mib2_ipv6AddrEntry_t)));
+				    (uint_t)mae6_size));
 			}
 		}
 	}
@@ -10585,13 +10690,17 @@ ip_snmp_get_mib2_ip6_route_media(queue_t *q, mblk_t *mpctl, int level,
  * IPv6 mib: One per ill
  */
 static mblk_t *
-ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
+ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst,
+    boolean_t legacy_req)
 {
 	struct opthdr		*optp;
 	mblk_t			*mp2ctl;
 	ill_t			*ill;
 	ill_walk_context_t	ctx;
 	mblk_t			*mp_tail = NULL;
+	mib2_ipv6AddrEntry_t	mae6;
+	mib2_ipIfStatsEntry_t	*ise;
+	size_t			ise_size, iae_size;
 
 	/*
 	 * Make a copy of the original message
@@ -10599,6 +10708,15 @@ ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	mp2ctl = copymsg(mpctl);
 
 	/* fixed length IPv6 structure ... */
+
+	if (legacy_req) {
+		ise_size = LEGACY_MIB_SIZE(&ipst->ips_ip6_mib,
+		    mib2_ipIfStatsEntry_t);
+		iae_size = LEGACY_MIB_SIZE(&mae6, mib2_ipv6AddrEntry_t);
+	} else {
+		ise_size = sizeof (mib2_ipIfStatsEntry_t);
+		iae_size = sizeof (mib2_ipv6AddrEntry_t);
+	}
 
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_IP6;
@@ -10641,9 +10759,15 @@ ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	    ipIfStatsHCInMcastPkts);
 
 	if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
-	    (char *)&ipst->ips_ip6_mib, (int)sizeof (ipst->ips_ip6_mib))) {
+	    (char *)&ipst->ips_ip6_mib, (int)ise_size)) {
 		ip1dbg(("ip_snmp_get_mib2_ip6: failed to allocate %u bytes\n",
-		    (uint_t)sizeof (ipst->ips_ip6_mib)));
+		    (uint_t)ise_size));
+	} else if (legacy_req) {
+		/* Adjust the EntrySize fields for legacy requests. */
+		ise =
+		    (mib2_ipIfStatsEntry_t *)(mp_tail->b_wptr - (int)ise_size);
+		SET_MIB(ise->ipIfStatsEntrySize, ise_size);
+		SET_MIB(ise->ipIfStatsAddrEntrySize, iae_size);
 	}
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
@@ -10673,10 +10797,15 @@ ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 		    ipIfStatsHCInMcastPkts);
 
 		if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
-		    (char *)ill->ill_ip_mib,
-		    (int)sizeof (*ill->ill_ip_mib))) {
+		    (char *)ill->ill_ip_mib, (int)ise_size)) {
 			ip1dbg(("ip_snmp_get_mib2_ip6: failed to allocate "
-			"%u bytes\n", (uint_t)sizeof (*ill->ill_ip_mib)));
+			"%u bytes\n", (uint_t)ise_size));
+		} else if (legacy_req) {
+			/* Adjust the EntrySize fields for legacy requests. */
+			ise = (mib2_ipIfStatsEntry_t *)(mp_tail->b_wptr -
+			    (int)ise_size);
+			SET_MIB(ise->ipIfStatsEntrySize, ise_size);
+			SET_MIB(ise->ipIfStatsAddrEntrySize, iae_size);
 		}
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
@@ -12850,7 +12979,8 @@ ip_output_options(mblk_t *mp, ipha_t *ipha, ip_xmit_attr_t *ixa, ill_t *ill)
 			 */
 			if (optval == IPOPT_SSRR) {
 				ire = ire_ftable_lookup_v4(dst, 0, 0,
-				    IRE_IF_ALL, NULL, ALL_ZONES, ixa->ixa_tsl,
+				    IRE_INTERFACE, NULL, ALL_ZONES,
+				    ixa->ixa_tsl,
 				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, 0, ipst,
 				    NULL);
 				if (ire == NULL) {
@@ -14148,7 +14278,7 @@ ip_fanout_sctp_raw(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, uint32_t ports,
 		 * Drop the packet here if the sctp checksum failed.
 		 */
 		if (iraflags & IRAF_SCTP_CSUM_ERR) {
-			BUMP_MIB(&sctps->sctps_mib, sctpChecksumError);
+			SCTPS_BUMP_MIB(sctps, sctpChecksumError);
 			freemsg(mp);
 			return;
 		}
@@ -15083,4 +15213,46 @@ ipif_lookup_testaddr_v4(ill_t *ill, const in_addr_t *v4srcp, ipif_t **ipifp)
 	ip1dbg(("ipif_lookup_testaddr_v4: cannot find ipif for src %x\n",
 	    *v4srcp));
 	return (B_FALSE);
+}
+
+/*
+ * Transport protocol call back function for CPU state change.
+ */
+/* ARGSUSED */
+static int
+ip_tp_cpu_update(cpu_setup_t what, int id, void *arg)
+{
+	processorid_t cpu_seqid;
+	netstack_handle_t nh;
+	netstack_t *ns;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	switch (what) {
+	case CPU_CONFIG:
+	case CPU_ON:
+	case CPU_INIT:
+	case CPU_CPUPART_IN:
+		cpu_seqid = cpu[id]->cpu_seqid;
+		netstack_next_init(&nh);
+		while ((ns = netstack_next(&nh)) != NULL) {
+			tcp_stack_cpu_add(ns->netstack_tcp, cpu_seqid);
+			sctp_stack_cpu_add(ns->netstack_sctp, cpu_seqid);
+			udp_stack_cpu_add(ns->netstack_udp, cpu_seqid);
+			netstack_rele(ns);
+		}
+		netstack_next_fini(&nh);
+		break;
+	case CPU_UNCONFIG:
+	case CPU_OFF:
+	case CPU_CPUPART_OUT:
+		/*
+		 * Nothing to do.  We don't remove the per CPU stats from
+		 * the IP stack even when the CPU goes offline.
+		 */
+		break;
+	default:
+		break;
+	}
+	return (0);
 }

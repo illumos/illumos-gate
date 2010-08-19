@@ -43,6 +43,8 @@
 #include <sys/bitmap.h>
 #include <sys/debug.h>
 #include <c2/audit.h>
+#include <sys/project.h>
+#include <sys/task.h>
 #include <sys/zone.h>
 
 /* directory entries for /proc */
@@ -260,10 +262,15 @@ proc_entry_free(struct pid *pidp)
 	mutex_exit(&pidlinklock);
 }
 
+/*
+ * The original task needs to be passed in since the process has already been
+ * detached from the task at this point in time.
+ */
 void
-pid_exit(proc_t *prp)
+pid_exit(proc_t *prp, struct task *tk)
 {
 	struct pid *pidp;
+	zone_t	*zone = prp->p_zone;
 
 	ASSERT(MUTEX_HELD(&pidlock));
 
@@ -300,6 +307,15 @@ pid_exit(proc_t *prp)
 	mutex_destroy(&prp->p_crlock);
 	kmem_cache_free(process_cache, prp);
 	nproc--;
+
+	/*
+	 * Decrement the process counts of the original task, project and zone.
+	 */
+	mutex_enter(&zone->zone_nlwps_lock);
+	tk->tk_nprocs--;
+	tk->tk_proj->kpj_nprocs--;
+	zone->zone_nprocs--;
+	mutex_exit(&zone->zone_nlwps_lock);
 }
 
 /*

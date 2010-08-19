@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -62,6 +59,9 @@ f none $SGSDIR/lib/librtld.so.1=lib/librtld.so.1 755 root bin
 s none $SGSDIR/lib/librtld_db.so=librtld_db.so.1
 f none $SGSDIR/lib/librtld_db.so.1=lib/librtld_db.so.1 755 root bin
 d none $SGSDIR/usr/bin 755 root bin
+f none $SGSDIR/usr/bin/ar=usr/bin/ar 555 root bin
+s none $SGSDIR/usr/ccs/bin/ar=../../bin/ar
+f none $SGSDIR/usr/xpg4/bin/ar=usr/xpg4/bin/ar 0555 root bin
 f none $SGSDIR/usr/bin/crle=usr/bin/crle 555 root bin
 f none $SGSDIR/usr/bin/ldd=usr/bin/ldd 555 root bin
 f none $SGSDIR/usr/bin/moe=usr/bin/moe 555 root bin
@@ -137,7 +137,7 @@ f none $SGSDIR/usr/xpg4/bin/nm=usr/xpg4/bin/nm 0555 root bin
 d none $SGSDIR/usr/demo 755 root bin
 d none $SGSDIR/usr/demo/ELF 755 root bin
 f none $SGSDIR/usr/demo/ELF/Makefile=usr/demo/ELF/Makefile 644 root bin
-f none $SGSDIR/usr/demo/ELF/README=usr/demo/ELF/README 644 root bin
+f none $SGSDIR/usr/demo/ELF/00README=usr/demo/ELF/00README 644 root bin
 f none $SGSDIR/usr/demo/ELF/acom.c=usr/demo/ELF/acom.c 644 root bin
 f none $SGSDIR/usr/demo/ELF/dcom.c=usr/demo/ELF/dcom.c 644 root bin
 f none $SGSDIR/usr/demo/ELF/dispsyms.c=usr/demo/ELF/dispsyms.c 644 root bin
@@ -246,10 +246,6 @@ f none opt/SUNWonld/man/man1l/sgsmsg.1l 444 root bin
 #d none $SGSDIR/usr/share 755 root bin
 #d none $SGSDIR/usr/share/lib 755 root bin
 #d none $SGSDIR/usr/share/lib/ccs 755 root bin
-
-#f none $SGSDIR/usr/bin/ar=usr/bin/ar 555 root bin
-#s none $SGSDIR/usr/ccs/bin/ar=../../bin/ar
-#f none $SGSDIR/usr/xpg4/bin/ar=usr/xpg4/bin/ar 0555 root bin
 
 #f none $SGSDIR/usr/bin/error=usr/bin/error 555 root bin
 #s none $SGSDIR/usr/ccs/bin/error=../../bin/error

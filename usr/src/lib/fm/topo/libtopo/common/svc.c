@@ -20,21 +20,20 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * This provides the basic mechanisms (str2nvl and nvl2str) for dealing with
  * the service schema.  The official version of a svc FMRI has the form:
  *
- * 	svc://[scope@][system-fqn]/service[:instance][@contract-id]
+ *	svc://[scope@][system-fqn]/service[:instance][@contract-id]
  *
  * Where 'service' is a slash-delimited list of names.  Of these fields, the
  * scope, constract-id, and system-fqn are rarely used, leaving the much more
  * common form such as:
  *
- * 	svc:///network/ssh:default
+ *	svc:///network/ssh:default
  *
  * Note that the SMF software typically uses a shorthard form, where the
  * authority is elided (svc:/network/ssh:default).  As this module deals with
@@ -49,6 +48,7 @@
 #include <sys/fm/protocol.h>
 #include <topo_method.h>
 #include <topo_subr.h>
+#include <topo_prop.h>
 #include <alloca.h>
 #include <assert.h>
 #include <svc.h>
@@ -67,11 +67,13 @@ static int svc_fmri_service_state(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 static int svc_fmri_unusable(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-static int svc_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *, void *);
-static void svc_release(topo_mod_t *, tnode_t *);
+static int svc_fmri_prop_get(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 
 static const topo_method_t svc_methods[] = {
+	{ TOPO_METH_PROP_GET, TOPO_METH_PROP_GET_DESC,
+	    TOPO_METH_PROP_GET_VERSION, TOPO_STABILITY_INTERNAL,
+	    svc_fmri_prop_get },
 	{ TOPO_METH_NVL2STR, TOPO_METH_NVL2STR_DESC, TOPO_METH_NVL2STR_VERSION,
 	    TOPO_STABILITY_INTERNAL, svc_fmri_nvl2str },
 	{ TOPO_METH_STR2NVL, TOPO_METH_STR2NVL_DESC, TOPO_METH_STR2NVL_VERSION,
@@ -89,6 +91,10 @@ static const topo_method_t svc_methods[] = {
 	    svc_fmri_unusable },
 	{ NULL }
 };
+
+static int svc_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
+    topo_instance_t, void *, void *);
+static void svc_release(topo_mod_t *, tnode_t *);
 
 static const topo_modops_t svc_ops =
 	{ svc_enum, svc_release };
@@ -134,6 +140,9 @@ svc_get_handle(topo_mod_t *mod)
 int
 svc_init(topo_mod_t *mod, topo_version_t version)
 {
+	if (getenv("TOPOSVCDEBUG"))
+		topo_mod_setdebug(mod);
+
 	if (version != SVC_VERSION)
 		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
 
@@ -157,13 +166,160 @@ svc_fini(topo_mod_t *mod)
 	topo_mod_unregister(mod);
 }
 
+static tnode_t *
+svc_create_node(topo_mod_t *mod, tnode_t *pnode, char *fmristr)
+{
+	nvlist_t *fmri;
+	tnode_t *tn;
+	char *fixed;
+	ssize_t len;
+	int i, j, err;
+
+	/*
+	 * the scf_{x}_to_fmri interfaces return short-hand svc-scheme FMRI's
+	 * that look like:
+	 *
+	 * svc:/service[:instance]
+	 *
+	 * But all our other code assumes a proper svc-scheme FMRI, so we
+	 * correct the fmri string before we try to convert it to an nvlist.
+	 *
+	 * The short-hand version is kept as the label and can be used when
+	 * dealing with the SMF libraries and CLI's.
+	 */
+	len = strlen(fmristr) + 1;
+	if ((fixed = topo_mod_zalloc(mod, len + 1)) == NULL) {
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		topo_mod_dprintf(mod, "topo_mod_zalloc() failed: %s",
+		    topo_mod_errmsg(mod));
+		return (NULL);
+	}
+	for (i = 0, j = 0; i < len; i++)
+		if (i == 5)
+			fixed[i] = '/';
+		else
+			fixed[i] = fmristr[j++];
+	fixed[i] = '\0';
+
+	if (topo_mod_str2nvl(mod, fixed, &fmri) < 0) {
+		topo_mod_dprintf(mod, "topo_mod_str2nvl() failed: %s",
+		    topo_mod_errmsg(mod));
+		topo_mod_free(mod, fixed, len + 1);
+		return (NULL);
+	}
+	topo_mod_free(mod, fixed, len + 1);
+
+	if (topo_node_range_create(mod, pnode, fmristr, 0, 0) < 0) {
+		topo_mod_dprintf(mod, "topo_node_range_create() failed: %s",
+		    topo_mod_errmsg(mod));
+		nvlist_free(fmri);
+		return (NULL);
+	}
+	if ((tn = topo_node_bind(mod, pnode, fmristr, 0, fmri)) == NULL) {
+		topo_mod_dprintf(mod, "topo_node_bind() failed: %s",
+		    topo_mod_errmsg(mod));
+		nvlist_free(fmri);
+		return (NULL);
+	}
+	nvlist_free(fmri);
+
+	if (topo_node_label_set(tn, fmristr, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set label: %s\n",
+		    topo_strerror(err));
+		return (NULL);
+	}
+	(void) topo_method_register(mod, tn, svc_methods);
+
+	return (tn);
+}
+
 /*ARGSUSED*/
 static int
 svc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
+	scf_handle_t *hdl;
+	scf_scope_t *sc = NULL;
+	scf_iter_t *svc_iter = NULL;
+	scf_iter_t *inst_iter = NULL;
+	scf_service_t *svc = NULL;
+	scf_instance_t *inst = NULL;
+	int ret = -1;
+	char *sfmri, *ifmri;
+	ssize_t slen, ilen;
+	tnode_t *svc_node;
+
 	(void) topo_method_register(mod, pnode, svc_methods);
-	return (0);
+
+	if ((hdl = svc_get_handle(mod)) == NULL)
+		goto out;
+
+	if ((sc = scf_scope_create(hdl)) == NULL ||
+	    (svc = scf_service_create(hdl)) == NULL ||
+	    (inst = scf_instance_create(hdl)) == NULL ||
+	    (svc_iter = scf_iter_create(hdl)) == NULL ||
+	    (inst_iter = scf_iter_create(hdl)) == NULL)
+		goto out;
+
+	if (scf_handle_get_scope(hdl, SCF_SCOPE_LOCAL, sc) != 0)
+		goto out;
+
+	if (scf_iter_scope_services(svc_iter, sc) != 0)
+		goto out;
+
+	while (scf_iter_next_service(svc_iter, svc) == 1) {
+		if (scf_iter_service_instances(inst_iter, svc) != 0)
+			continue;
+
+		if ((slen = scf_service_to_fmri(svc, NULL, 0)) < 0)
+			continue;
+
+		if ((sfmri = topo_mod_zalloc(mod, slen + 1)) == NULL) {
+			(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+			goto out;
+		}
+		if (scf_service_to_fmri(svc, sfmri, slen + 1) == -1)
+			goto out;
+
+		if ((svc_node = svc_create_node(mod, pnode, sfmri)) == NULL) {
+			topo_mod_free(mod, sfmri, slen + 1);
+			/* topo mod errno set */
+			goto out;
+		}
+
+		while (scf_iter_next_instance(inst_iter, inst) == 1) {
+			if ((ilen = scf_instance_to_fmri(inst, NULL, 0)) < 0)
+				continue;
+
+			if ((ifmri = topo_mod_zalloc(mod, ilen + 1))
+			    == NULL) {
+				(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+				topo_mod_free(mod, sfmri, slen + 1);
+				goto out;
+			}
+			if (scf_instance_to_fmri(inst, ifmri, ilen + 1) == -1)
+				goto out;
+
+			if ((svc_node = svc_create_node(mod, svc_node, ifmri))
+			    == NULL) {
+				topo_mod_free(mod, sfmri, slen + 1);
+				topo_mod_free(mod, ifmri, ilen + 1);
+				/* topo mod errno set */
+				goto out;
+			}
+			topo_mod_free(mod, ifmri, ilen + 1);
+		}
+		topo_mod_free(mod, sfmri, slen + 1);
+	}
+	ret = 0;
+out:
+	scf_scope_destroy(sc);
+	scf_service_destroy(svc);
+	scf_instance_destroy(inst);
+	scf_iter_destroy(svc_iter);
+	scf_iter_destroy(inst_iter);
+
+	return (ret);
 }
 
 static void
@@ -185,6 +341,76 @@ svc_component_valid(const char *str)
 		return (B_FALSE);
 
 	return (B_TRUE);
+}
+
+static int
+svc_fmri_prop_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	char *svc_name, *svc_inst = NULL;
+	nvlist_t *rsrc, *args;
+	char *pgroup, *pname;
+	tnode_t *svc_node;
+	char *search;
+	size_t len;
+	int err;
+
+	if (version > TOPO_METH_PROP_GET_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	err = nvlist_lookup_string(in, TOPO_PROP_GROUP, &pgroup);
+	err |= nvlist_lookup_string(in, TOPO_PROP_VAL_NAME, &pname);
+	err |= nvlist_lookup_nvlist(in, TOPO_PROP_RESOURCE, &rsrc);
+	if (err != 0)
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+
+	/*
+	 * Private args to prop method are optional
+	 */
+	if ((err = nvlist_lookup_nvlist(in, TOPO_PROP_PARGS, &args)) != 0) {
+		if (err != ENOENT)
+			return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+		else
+			args = NULL;
+	}
+
+	/*
+	 * Lookup a topo node named svc:/svc_name[:svc_inst]
+	 */
+	if (nvlist_lookup_string(rsrc, FM_FMRI_SVC_NAME, &svc_name) != 0)
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+
+	(void) nvlist_lookup_string(rsrc, FM_FMRI_SVC_INSTANCE, &svc_inst);
+
+	len = 5 + strlen(svc_name) +
+	    (svc_inst != NULL ? 1 + strlen(svc_inst) : 0) + 1;
+
+	if ((search = topo_mod_alloc(mod, len)) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	(void) snprintf(search, len, "svc:/%s", svc_name);
+	svc_node = topo_node_lookup(node, (const char *)search, 0);
+
+	if (svc_node == NULL) {
+		topo_mod_free(mod, search, len);
+		return (topo_mod_seterrno(mod, EMOD_NODE_NOENT));
+	}
+
+	if (svc_inst != NULL) {
+		(void) snprintf(search, len, "svc:/%s:%s", svc_name, svc_inst);
+		svc_node = topo_node_lookup(svc_node, (const char *)search, 0);
+		if (svc_node == NULL) {
+			topo_mod_free(mod, search, len);
+			return (topo_mod_seterrno(mod, EMOD_NODE_NOENT));
+		}
+	}
+
+	topo_mod_free(mod, search, len);
+
+	err = 0;
+	(void) topo_prop_getprop(svc_node, pgroup, pname, args, out, &err);
+
+	return (err);
 }
 
 /*ARGSUSED*/
@@ -417,10 +643,56 @@ nomem:
 }
 
 /*
- * This common function is shared by all consumers (present, unusable, and
- * service_state).  It returns one of the FMD_SERVICE_STATE_* states, where
- * FMD_SERVICE_STATE_UNKNOWN means that the FMRI is not present.
+ * This common function is shared by all consumers (present, replaced,
+ * service state and unusable).
+ *
+ *				svc_get_state succeeds
+ * Case				with FMD_SERVICE_STATE_*
+ * ----------------------------	------------------------
+ * svc name deleted		UNKNOWN
+ * svc name not found		UNKNOWN
+ * no fmri instance		OK
+ * instance deleted		UNKNOWN
+ * instance not found		UNKNOWN
+ *
+ * If none of the above apply and this is a call from the "present"
+ * or "replaced" method (presence_only == B_TRUE) then
+ * svc_get_state returns FMD_SERVICE_STATE_OK.
+ *
+ * The "present" method maps a svc_get_state return of UNKNOWN to
+ * "not present" and a svc_get_state return of OK to "present".
+ *
+ * The "replaced" methods maps a return of UNKNOWN to FMD_OBJ_STATE_NOT_PRESENT
+ * and OK to FMD_OBJ_STATE_UNKNOWN.
+ *
+ * For the "service state" and "unusable" methods svc_get_state goes on
+ * to return the instance state as below, and the two methods map that
+ * result as in the last two columns of the following table:
+ *
+ *			svc_get_state succeeds		Service
+ * Instance state	with FMD_SERVICE_STATE_*	State		Unusable
+ * --------------	-------------------------------	---------------	--------
+ * none			OK				OK
+ * uninitialized	OK				OK
+ * maintenance		UNUSABLE			UNUSABLE	Yes
+ * offline		OK				OK
+ * disabled		OK				OK
+ * online		OK				OK
+ * degraded		DEGRADED			DEGRADED
+ * legacy_run		OK (XXX can we see this?)	OK
+ *
+ * Note that *only* "maintenance" state should map to an unusable service state
+ * or unusable status.  That's because a service entering maintenance state
+ * is modelled as a defect fault diagnosis in FMA, but there is no
+ * corresponding isolation action from a response agent since the the service
+ * is already isolated by virtue of being in maintenance state.  Any transition
+ * from maintenance state, even to offline, is considered a repair.  If on
+ * repair fmd does not see the service usable again then the case hangs
+ * around in the "resolved but not all resources back online" state and
+ * further maintenance events for this service will not show up in fmd state
+ * because case duplicate checking code will find the old case.
  */
+
 static int
 svc_get_state(topo_mod_t *mod, nvlist_t *fmri, boolean_t presence_only,
     int *ret)
@@ -473,10 +745,6 @@ svc_get_state(topo_mod_t *mod, nvlist_t *fmri, boolean_t presence_only,
 		}
 	}
 
-	/*
-	 * If there is no instance, then it is always present, and always
-	 * usuable.
-	 */
 	if (nvlist_lookup_string(fmri, FM_FMRI_SVC_INSTANCE, &instance) != 0) {
 		*ret = FMD_SERVICE_STATE_OK;
 		goto out;
@@ -517,12 +785,13 @@ svc_get_state(topo_mod_t *mod, nvlist_t *fmri, boolean_t presence_only,
 	if (scf_value_get_astring(val, state, len + 1) < 0)
 		goto error;
 
-	if (strcmp(state, SCF_STATE_STRING_MAINT) == 0)
+	if (strcmp(state, SCF_STATE_STRING_MAINT) == 0) {
 		*ret = FMD_SERVICE_STATE_UNUSABLE;
-	else if (strcmp(state, SCF_STATE_STRING_DEGRADED) == 0)
+	} else if (strcmp(state, SCF_STATE_STRING_DEGRADED) == 0) {
 		*ret = FMD_SERVICE_STATE_DEGRADED;
-	else
+	} else {
 		*ret = FMD_SERVICE_STATE_OK;
+	}
 	goto out;
 
 error:

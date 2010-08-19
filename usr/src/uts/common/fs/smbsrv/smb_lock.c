@@ -120,9 +120,12 @@ smb_unlock_range(
 /*
  * smb_lock_range
  *
- * checks for integrity of file lock operation for the given range of file data.
+ * Checks for integrity of file lock operation for the given range of file data.
  * This is performed by applying lock rules with all the elements of the node
  * lock list.
+ *
+ * Break shared (levelII) oplocks. If there is an exclusive oplock, it is
+ * owned by this ofile and therefore should not be broken.
  *
  * The function returns with new lock added if lock request is non-conflicting
  * with existing range lock for the file. Otherwise smb request is filed
@@ -240,6 +243,9 @@ smb_lock_range(
 			smb_llist_insert_tail(&node->n_lock_list, lock);
 	}
 	smb_llist_exit(&node->n_lock_list);
+
+	if (result == NT_STATUS_SUCCESS)
+		smb_oplock_break_levelII(node);
 
 	return (result);
 }

@@ -46,6 +46,12 @@
  * clone-open, generating a unique minor number. The process then passes
  * along that file descriptor to each ioctl that might have a cleanup operation.
  *
+ * Consumers of the onexit routines should call zfs_onexit_fd_hold() early
+ * on to validate the given fd and add a reference to its file table entry.
+ * This allows the consumer to do its work and then add a callback, knowing
+ * that zfs_onexit_add_cb() won't fail with EBADF.  When finished, consumers
+ * should call zfs_onexit_fd_rele().
+ *
  * A simple example is zfs_ioc_recv(), where we might create an AVL tree
  * with dataset/GUID mappings and then reuse that tree on subsequent
  * zfs_ioc_recv() calls.
@@ -57,7 +63,8 @@
  *
  * The action handle is then passed from user space to subsequent
  * zfs_ioc_recv() calls, so that dmu_recv_stream() can fetch its AVL tree
- * by calling zfs_onexit_cb_data() with the cleanup fd and action handle.
+ * by calling zfs_onexit_cb_data() with the device minor number and
+ * action handle.
  *
  * If the user process exits abnormally, the callback is invoked implicitly
  * as part of the driver close operation.  Once the user space process is
@@ -97,37 +104,53 @@ zfs_onexit_destroy(zfs_onexit_t *zo)
 }
 
 static int
-zfs_onexit_fd_to_state(int fd, zfs_onexit_t **zo)
+zfs_onexit_minor_to_state(minor_t minor, zfs_onexit_t **zo)
+{
+	*zo = zfsdev_get_soft_state(minor, ZSST_CTLDEV);
+	if (*zo == NULL)
+		return (EBADF);
+
+	return (0);
+}
+
+/*
+ * Consumers might need to operate by minor number instead of fd, since
+ * they might be running in another thread (e.g. txg_sync_thread). Callers
+ * of this function must call zfs_onexit_fd_rele() when they're finished
+ * using the minor number.
+ */
+int
+zfs_onexit_fd_hold(int fd, minor_t *minorp)
 {
 	file_t *fp;
-	dev_t rdev;
+	zfs_onexit_t *zo;
 
 	fp = getf(fd);
 	if (fp == NULL)
 		return (EBADF);
 
-	rdev = fp->f_vnode->v_rdev;
-	*zo = zfsdev_get_soft_state(getminor(rdev), ZSST_CTLDEV);
-	if (*zo == NULL) {
-		releasef(fd);
-		return (EBADF);
-	}
+	*minorp = getminor(fp->f_vnode->v_rdev);
+	return (zfs_onexit_minor_to_state(*minorp, &zo));
+}
 
-	return (0);
+void
+zfs_onexit_fd_rele(int fd)
+{
+	releasef(fd);
 }
 
 /*
  * Add a callback to be invoked when the calling process exits.
  */
 int
-zfs_onexit_add_cb(int fd, void (*func)(void *), void *data,
+zfs_onexit_add_cb(minor_t minor, void (*func)(void *), void *data,
     uint64_t *action_handle)
 {
 	zfs_onexit_t *zo;
 	zfs_onexit_action_node_t *ap;
 	int error;
 
-	error = zfs_onexit_fd_to_state(fd, &zo);
+	error = zfs_onexit_minor_to_state(minor, &zo);
 	if (error)
 		return (error);
 
@@ -139,8 +162,8 @@ zfs_onexit_add_cb(int fd, void (*func)(void *), void *data,
 	mutex_enter(&zo->zo_lock);
 	list_insert_tail(&zo->zo_actions, ap);
 	mutex_exit(&zo->zo_lock);
-	*action_handle = (uint64_t)(uintptr_t)ap;
-	releasef(fd);
+	if (action_handle)
+		*action_handle = (uint64_t)(uintptr_t)ap;
 
 	return (0);
 }
@@ -167,13 +190,13 @@ zfs_onexit_find_cb(zfs_onexit_t *zo, uint64_t action_handle)
  * Delete the callback, triggering it first if 'fire' is set.
  */
 int
-zfs_onexit_del_cb(int fd, uint64_t action_handle, boolean_t fire)
+zfs_onexit_del_cb(minor_t minor, uint64_t action_handle, boolean_t fire)
 {
 	zfs_onexit_t *zo;
 	zfs_onexit_action_node_t *ap;
 	int error;
 
-	error = zfs_onexit_fd_to_state(fd, &zo);
+	error = zfs_onexit_minor_to_state(minor, &zo);
 	if (error)
 		return (error);
 
@@ -189,7 +212,6 @@ zfs_onexit_del_cb(int fd, uint64_t action_handle, boolean_t fire)
 		mutex_exit(&zo->zo_lock);
 		error = ENOENT;
 	}
-	releasef(fd);
 
 	return (error);
 }
@@ -200,7 +222,7 @@ zfs_onexit_del_cb(int fd, uint64_t action_handle, boolean_t fire)
  * calls, knowing that it will be cleaned up if the calling process exits.
  */
 int
-zfs_onexit_cb_data(int fd, uint64_t action_handle, void **data)
+zfs_onexit_cb_data(minor_t minor, uint64_t action_handle, void **data)
 {
 	zfs_onexit_t *zo;
 	zfs_onexit_action_node_t *ap;
@@ -208,7 +230,7 @@ zfs_onexit_cb_data(int fd, uint64_t action_handle, void **data)
 
 	*data = NULL;
 
-	error = zfs_onexit_fd_to_state(fd, &zo);
+	error = zfs_onexit_minor_to_state(minor, &zo);
 	if (error)
 		return (error);
 
@@ -219,7 +241,6 @@ zfs_onexit_cb_data(int fd, uint64_t action_handle, void **data)
 	else
 		error = ENOENT;
 	mutex_exit(&zo->zo_lock);
-	releasef(fd);
 
 	return (error);
 }

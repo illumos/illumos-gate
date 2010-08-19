@@ -19,8 +19,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -48,7 +47,7 @@ static void e1000g_free_rx_descriptors(e1000g_rx_data_t *);
 static int e1000g_alloc_tx_packets(e1000g_tx_ring_t *);
 static int e1000g_alloc_rx_packets(e1000g_rx_data_t *);
 static void e1000g_free_tx_packets(e1000g_tx_ring_t *);
-static void e1000g_free_rx_packets(e1000g_rx_data_t *);
+static void e1000g_free_rx_packets(e1000g_rx_data_t *, boolean_t);
 static int e1000g_alloc_dma_buffer(struct e1000g *,
     dma_buffer_t *, size_t, ddi_dma_attr_t *p_dma_attr);
 
@@ -175,8 +174,7 @@ e1000g_alloc_dma_resources(struct e1000g *Adapter)
 	while ((result != DDI_SUCCESS) &&
 	    (Adapter->tx_desc_num >= MIN_NUM_TX_DESCRIPTOR) &&
 	    (Adapter->rx_desc_num >= MIN_NUM_RX_DESCRIPTOR) &&
-	    (Adapter->tx_freelist_num >= MIN_NUM_TX_FREELIST) &&
-	    (Adapter->rx_freelist_num >= MIN_NUM_RX_FREELIST)) {
+	    (Adapter->tx_freelist_num >= MIN_NUM_TX_FREELIST)) {
 
 		result = e1000g_alloc_descriptors(Adapter);
 
@@ -203,7 +201,6 @@ e1000g_alloc_dma_resources(struct e1000g *Adapter)
 			    (Adapter->rx_desc_num >> 4) << 3;
 
 			Adapter->tx_freelist_num >>= 1;
-			Adapter->rx_freelist_num >>= 1;
 		}
 	}
 
@@ -773,7 +770,7 @@ e1000g_free_packets(struct e1000g *Adapter)
 	rx_data = Adapter->rx_ring->rx_data;
 
 	e1000g_free_tx_packets(tx_ring);
-	e1000g_free_rx_packets(rx_data);
+	e1000g_free_rx_packets(rx_data, B_FALSE);
 }
 
 #ifdef __sparc
@@ -1243,6 +1240,44 @@ tx_pkt_fail:
 	return (DDI_FAILURE);
 }
 
+
+int
+e1000g_increase_rx_packets(e1000g_rx_data_t *rx_data)
+{
+	int i;
+	p_rx_sw_packet_t packet;
+	p_rx_sw_packet_t cur, next;
+	struct e1000g *Adapter;
+	ddi_dma_attr_t dma_attr;
+
+	Adapter = rx_data->rx_ring->adapter;
+	dma_attr = e1000g_buf_dma_attr;
+	dma_attr.dma_attr_align = Adapter->rx_buf_align;
+	cur = NULL;
+
+	for (i = 0; i < RX_FREELIST_INCREASE_SIZE; i++) {
+		packet = e1000g_alloc_rx_sw_packet(rx_data, &dma_attr);
+		if (packet == NULL)
+			break;
+		packet->next = cur;
+		cur = packet;
+	}
+	Adapter->rx_freelist_num += i;
+	rx_data->avail_freepkt += i;
+
+	while (cur != NULL) {
+		QUEUE_PUSH_TAIL(&rx_data->free_list, &cur->Link);
+		next = cur->next;
+		cur->next = rx_data->packet_area;
+		rx_data->packet_area = cur;
+
+		cur = next;
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
 static int
 e1000g_alloc_rx_packets(e1000g_rx_data_t *rx_data)
 {
@@ -1264,7 +1299,7 @@ e1000g_alloc_rx_packets(e1000g_rx_data_t *rx_data)
 	 * need is equal to the number of receive descriptors plus the freelist
 	 * size.
 	 */
-	packet_num = Adapter->rx_desc_num + Adapter->rx_freelist_num;
+	packet_num = Adapter->rx_desc_num + RX_FREELIST_INCREASE_SIZE;
 	rx_data->packet_area = NULL;
 
 	for (i = 0; i < packet_num; i++) {
@@ -1276,13 +1311,14 @@ e1000g_alloc_rx_packets(e1000g_rx_data_t *rx_data)
 		rx_data->packet_area = packet;
 	}
 
+	Adapter->rx_freelist_num = RX_FREELIST_INCREASE_SIZE;
 	return (DDI_SUCCESS);
 
 rx_pkt_fail:
-	e1000g_free_rx_packets(rx_data);
-
+	e1000g_free_rx_packets(rx_data, B_TRUE);
 	return (DDI_FAILURE);
 }
+
 
 static p_rx_sw_packet_t
 e1000g_alloc_rx_sw_packet(e1000g_rx_data_t *rx_data, ddi_dma_attr_t *p_dma_attr)
@@ -1397,7 +1433,7 @@ e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet, boolean_t full_release)
 }
 
 static void
-e1000g_free_rx_packets(e1000g_rx_data_t *rx_data)
+e1000g_free_rx_packets(e1000g_rx_data_t *rx_data, boolean_t full_release)
 {
 	p_rx_sw_packet_t packet, next_packet;
 	uint32_t ref_cnt;
@@ -1413,7 +1449,7 @@ e1000g_free_rx_packets(e1000g_rx_data_t *rx_data)
 			atomic_inc_32(&rx_data->pending_count);
 			atomic_inc_32(&e1000g_mblks_pending);
 		} else {
-			e1000g_free_rx_sw_packet(packet, B_FALSE);
+			e1000g_free_rx_sw_packet(packet, full_release);
 		}
 
 		packet = next_packet;

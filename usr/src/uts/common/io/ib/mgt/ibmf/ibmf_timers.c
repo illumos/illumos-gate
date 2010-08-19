@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 /*
  * This file implements the timer setup and timeout handling functions.
@@ -378,10 +375,15 @@ ibmf_i_send_timeout(void *argp)
 	uint_t		ref_cnt;
 	int		status;
 
-	IBMF_TRACE_1(IBMF_TNF_DEBUG, DPRINT_L4,
+	IBMF_TRACE_5(IBMF_TNF_DEBUG, DPRINT_L4,
 	    ibmf_i_send_timeout_start, IBMF_TNF_TRACE, "",
-	    "ibmf_i_send_timeout_client(): msgp = 0x%p\n",
-	    tnf_opaque, msg, msgimplp);
+	    "ibmf_i_send_timeout_client(): msgp = 0x%p mgt_class = 0x%x "
+	    "local lid 0x%x remote lid 0x%x remote q# 0x%x\n",
+	    tnf_opaque, msg, msgimplp,
+	    tnf_uint, mgt_class, msgimplp->im_mgt_class,
+	    tnf_uint, local_lid, msgimplp->im_local_addr.ia_local_lid,
+	    tnf_uint, remote_lid, msgimplp->im_local_addr.ia_remote_lid,
+	    tnf_uint, qno, msgimplp->im_local_addr.ia_remote_qno);
 
 	mutex_enter(&msgimplp->im_mutex);
 

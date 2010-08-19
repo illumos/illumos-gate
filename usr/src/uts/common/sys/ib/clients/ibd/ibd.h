@@ -72,8 +72,43 @@ extern "C" {
 #define	IBD_ASYNC_LINK			9
 #define	IBD_ASYNC_EXIT			10
 #define	IBD_ASYNC_RC_TOO_BIG		11
-#define	IBD_ASYNC_RC_CLOSE_ACT_CHAN		12
-#define	IBD_ASYNC_RC_RECYCLE_ACE		13
+#define	IBD_ASYNC_RC_CLOSE_ACT_CHAN	12
+#define	IBD_ASYNC_RC_RECYCLE_ACE	13
+#define	IBD_ASYNC_RC_CLOSE_PAS_CHAN	14
+
+/*
+ * State of IBD driver initialization during attach/m_start
+ */
+#define	IBD_DRV_STATE_INITIALIZED	0x000001
+#define	IBD_DRV_RXINTR_ADDED		0x000002
+#define	IBD_DRV_TXINTR_ADDED		0x000004
+#define	IBD_DRV_IBTL_ATTACH_DONE	0x000008
+#define	IBD_DRV_HCA_OPENED		0x000010
+#define	IBD_DRV_PD_ALLOCD		0x000020
+#define	IBD_DRV_MAC_REGISTERED		0x000040
+#define	IBD_DRV_PORT_DETAILS_OBTAINED	0x000080
+#define	IBD_DRV_BCAST_GROUP_FOUND	0x000100
+#define	IBD_DRV_ACACHE_INITIALIZED	0x000200
+#define	IBD_DRV_CQS_ALLOCD		0x000400
+#define	IBD_DRV_UD_CHANNEL_SETUP	0x000800
+#define	IBD_DRV_TXLIST_ALLOCD		0x001000
+#define	IBD_DRV_SCQ_NOTIFY_ENABLED	0x002000
+#define	IBD_DRV_RXLIST_ALLOCD		0x004000
+#define	IBD_DRV_BCAST_GROUP_JOINED	0x008000
+#define	IBD_DRV_ASYNC_THR_CREATED	0x010000
+#define	IBD_DRV_RCQ_NOTIFY_ENABLED	0x020000
+#define	IBD_DRV_SM_NOTICES_REGISTERED	0x040000
+#define	IBD_DRV_STARTED			0x080000
+#define	IBD_DRV_RC_SRQ_ALLOCD		0x100000
+#define	IBD_DRV_RC_LARGEBUF_ALLOCD	0x200000
+#define	IBD_DRV_RC_LISTEN		0x400000
+#ifdef DEBUG
+#define	IBD_DRV_RC_PRIVATE_STATE	0x800000
+#endif
+#define	IBD_DRV_IN_DELETION		0x1000000
+#define	IBD_DRV_IN_LATE_HCA_INIT 	0x2000000
+#define	IBD_DRV_REQ_LIST_INITED 	0x4000000
+#define	IBD_DRV_RC_TIMEOUT		0x8000000
 
 /*
  * Miscellaneous constants
@@ -104,8 +139,13 @@ extern "C" {
 #define	IBD_DEF_UD_NUM_RWQE		4000
 #define	IBD_DEF_UD_NUM_SWQE		4000
 #define	IBD_DEF_RC_ENABLE_SRQ		B_TRUE
+#if defined(__i386)
+#define	IBD_DEF_RC_NUM_RWQE		511
+#define	IBD_DEF_RC_NUM_SWQE		255
+#else
 #define	IBD_DEF_RC_NUM_RWQE		2047
 #define	IBD_DEF_RC_NUM_SWQE		511
+#endif
 #define	IBD_DEF_NUM_AH			256
 #define	IBD_DEF_HASH_SIZE		32
 #define	IBD_DEF_RC_NUM_SRQ		(IBD_DEF_RC_NUM_RWQE - 1)
@@ -125,7 +165,11 @@ extern "C" {
 #define	IBD_MIN_HASH_SIZE		32
 #define	IBD_MAX_HASH_SIZE		1024
 
+#if defined(__i386)
+#define	IBD_MIN_RC_NUM_SWQE		255
+#else
 #define	IBD_MIN_RC_NUM_SWQE		511
+#endif
 #define	IBD_MAX_RC_NUM_SWQE		8000
 #define	IBD_MIN_RC_NUM_RWQE		511
 #define	IBD_MAX_RC_NUM_RWQE		8000
@@ -558,9 +602,7 @@ typedef struct ibd_rc_stat_s {
 	kstat_named_t		rc_rcv_copy_pkt;
 	kstat_named_t		rc_rcv_alloc_fail;
 
-	kstat_named_t		rc_rcq_invoke;
 	kstat_named_t		rc_rcq_err;	/* fail in rcq handler */
-	kstat_named_t		rc_scq_invoke;
 
 	kstat_named_t		rc_rwqe_short;	/* short rwqe */
 
@@ -601,6 +643,8 @@ typedef struct ibd_rc_stat_s {
 	kstat_named_t		rc_act_close_simultaneous;
 
 	kstat_named_t		rc_reset_cnt;	/* # of Reset RC channel */
+	kstat_named_t		rc_timeout_act;
+	kstat_named_t		rc_timeout_pas;
 } ibd_rc_stat_t;
 #endif
 
@@ -949,6 +993,14 @@ typedef struct ibd_state_s {
 	mblk_t			*rc_rx_mp_tail;
 	uint32_t		rc_rx_mp_len;
 
+	uint32_t		rc_num_tx_chan;
+	uint32_t		rc_num_rx_chan;
+
+	/* Protect rc_timeout_start and rc_timeout */
+	kmutex_t		rc_timeout_lock;
+	boolean_t		rc_timeout_start;
+	timeout_id_t		rc_timeout;
+
 	/* Counters for RC mode */
 	/* RX */
 	/*
@@ -969,8 +1021,6 @@ typedef struct ibd_state_s {
 	uint64_t		rc_rwqe_short;	/* short rwqe */
 #endif
 
-	/* # of invoke Receive CQ handler */
-	uint64_t		rc_rcq_invoke;
 	/* wc->wc_status != IBT_WC_SUCCESS */
 	uint64_t		rc_rcq_err;
 
@@ -1004,8 +1054,6 @@ typedef struct ibd_state_s {
 	uint64_t		rc_scq_no_swqe;
 	/* No large Tx buf even after call swqe recycle function */
 	uint64_t		rc_scq_no_largebuf;
-	/* # of invoke Send CQ handler */
-	uint64_t		rc_scq_invoke;
 
 	/* Connection setup and close */
 	uint64_t		rc_conn_succ;	/* time of succ connect */
@@ -1019,9 +1067,22 @@ typedef struct ibd_state_s {
 	uint64_t		rc_pas_close;	/* call ibd_rc_pas_close() */
 	uint64_t		rc_delay_ace_recycle;
 	uint64_t		rc_act_close_simultaneous;
+	/* Fail to close a channel because someone else is still using it */
+	uint64_t		rc_act_close_not_clean;
+	/* RCQ is being invoked when closing RC channel */
+	uint64_t		rc_pas_close_rcq_invoking;
 
 	/* the counter of reset RC channel */
 	uint64_t		rc_reset_cnt;
+
+	uint64_t		rc_timeout_act;
+	uint64_t		rc_timeout_pas;
+
+	/*
+	 * Fail to stop this port because this port is connecting to a remote
+	 * port
+	 */
+	uint64_t		rc_stop_connect;
 
 #ifdef DEBUG
 	kstat_t 		*rc_ksp;
@@ -1106,17 +1167,17 @@ typedef struct ibd_state_s {
 	 * ibd_rc_num_swqe - 1.
 	 *
 	 * id_rc_num_rwqe
-	 * 1) For non-SRQ, we pre-post ibd_rc_num_rwqe number of WRs
+	 * 1) For non-SRQ, we pre-post id_rc_num_rwqe number of WRs
 	 * via ibt_post_receive() for receive queue of each RC channel.
-	 * 2) For SRQ and non-SRQ, receive CQ size = ibd_rc_num_rwqe
+	 * 2) For SRQ and non-SRQ, receive CQ size = id_rc_num_rwqe
 	 *
 	 * For SRQ
-	 * If using SRQ, we allocate ibd_rc_num_srq number of buffers (the
+	 * If using SRQ, we allocate id_rc_num_srq number of buffers (the
 	 * size of each buffer is equal to RC mtu). And post them by
 	 * ibt_post_srq().
 	 *
 	 * id_rc_num_srq
-	 * ibd_rc_num_srq should not be larger than ibd_rc_num_rwqe,
+	 * id_rc_num_srq should not be larger than id_rc_num_rwqe,
 	 * otherwise it will cause a bug with the following warnings:
 	 * NOTICE: hermon0: Device Error: EQE cq overrun or protection error
 	 * NOTICE: hermon0: Device Error: EQE local work queue catastrophic
@@ -1166,10 +1227,6 @@ typedef struct ibd_rc_chan_s {
 	ibd_ace_t		*ace;
 	ibd_rc_chan_state_t	chan_state;
 
-	/* used to judge duplicate connection */
-	ib_gid_t		requester_gid;
-	ib_pkey_t		requester_pkey;
-
 	ibd_list_t		tx_wqe_list;	/* free wqe list */
 	ibd_list_t		tx_rel_list;	/* for swqe recycle */
 
@@ -1183,8 +1240,6 @@ typedef struct ibd_rc_chan_s {
 	ibt_cq_hdl_t		scq_hdl;	/* Tx completion queue */
 	ibt_wc_t		tx_wc[IBD_RC_MAX_CQ_WC];
 	ddi_softintr_t		scq_softintr;
-
-	uint32_t		tx_trans_error_cnt;
 
 	/* For chained send */
 	kmutex_t		tx_post_lock;
@@ -1222,6 +1277,18 @@ typedef struct ibd_rc_chan_s {
 	 * If "is_tx_chan == B_TRUE", this is a Tx channel.
 	 */
 	boolean_t		is_tx_chan;
+
+	/*
+	 * For the connection reaper routine ibd_rc_conn_timeout_call().
+	 * "is_used == B_FALSE" indicates this RC channel has not been used for
+	 * a long (=ibd_rc_conn_timeout) time.
+	 */
+	boolean_t		is_used;
+	/*
+	 * When closing this channel, we need to make sure
+	 * "chan->rcq_invoking == 0".
+	 */
+	uint32_t		rcq_invoking;
 } ibd_rc_chan_t;
 
 /*
@@ -1251,7 +1318,9 @@ ibt_status_t ibd_rc_connect(ibd_state_t *, ibd_ace_t *, ibt_path_info_t *,
 void ibd_rc_try_connect(ibd_state_t *, ibd_ace_t *,  ibt_path_info_t *);
 void ibd_rc_signal_act_close(ibd_state_t *, ibd_ace_t *);
 void ibd_rc_signal_ace_recycle(ibd_state_t *, ibd_ace_t *);
+int ibd_rc_pas_close(ibd_rc_chan_t *, boolean_t, boolean_t);
 void ibd_rc_close_all_chan(ibd_state_t *);
+void ibd_rc_conn_timeout_call(void *carg);
 
 /* Receive Functions */
 int ibd_rc_init_srq_list(ibd_state_t *);

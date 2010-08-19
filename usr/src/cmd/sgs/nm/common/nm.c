@@ -609,7 +609,7 @@ print_ar_files(int fd, Elf * elf_file, char *filename)
 			    prog_name, filename, elf_errmsg(-1));
 			return;
 		}
-		if ((int)strncmp(p_ar->ar_name, "/", 1) == 0) {
+		if (p_ar->ar_name[0] == '/') {
 			cmd = elf_next(arf);
 			(void) elf_end(arf);
 			continue;

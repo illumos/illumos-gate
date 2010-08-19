@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -70,7 +69,7 @@ typedef	struct rm_platter {
 	gate_desc_t	*rm_idt_base;
 	uint_t		rm_pdbr;	/* cr3 value */
 	uint_t		rm_cpu;		/* easy way to know which CPU we are */
-	uint_t		rm_x86feature;	/* X86 supported features */
+	uint_t		rm_filler3;
 	uint_t		rm_cr4;		/* cr4 value on cpu0 */
 #if defined(__amd64)
 	/*

@@ -528,14 +528,15 @@ IP_RTS_OBJS =	rts.o rts_opt_data.o
 IP_TCP_OBJS =	tcp.o tcp_fusion.o tcp_opt_data.o tcp_sack.o tcp_stats.o \
 		tcp_misc.o tcp_timers.o tcp_time_wait.o tcp_tpi.o tcp_output.o \
 		tcp_input.o tcp_socket.o tcp_bind.o tcp_cluster.o tcp_tunables.o
-IP_UDP_OBJS =	udp.o udp_opt_data.o udp_tunables.o
+IP_UDP_OBJS =	udp.o udp_opt_data.o udp_tunables.o udp_stats.o
 IP_SCTP_OBJS =	sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_init.o sctp_input.o sctp_cookie.o \
 		sctp_conn.o sctp_error.o sctp_snmp.o \
 		sctp_tunables.o sctp_shutdown.o sctp_common.o \
 		sctp_timer.o sctp_heartbeat.o sctp_hash.o \
 		sctp_bind.o sctp_notify.o sctp_asconf.o \
-		sctp_addr.o tn_ipopt.o tnet.o ip_netinfo.o
+		sctp_addr.o tn_ipopt.o tnet.o ip_netinfo.o \
+		sctp_misc.o
 IP_ILB_OBJS =	ilb.o ilb_nat.o ilb_conn.o ilb_alg_hash.o ilb_alg_rr.o
 
 IP_OBJS +=	igmp.o ipmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o \
@@ -696,7 +697,7 @@ HERMON_OBJS +=	hermon.o hermon_agents.o hermon_cfg.o hermon_ci.o hermon_cmd.o \
 		hermon_cq.o hermon_event.o hermon_ioctl.o hermon_misc.o \
 		hermon_mr.o hermon_qp.o hermon_qpmod.o hermon_rsrc.o \
 		hermon_srq.o hermon_stats.o hermon_umap.o hermon_wr.o \
-		hermon_fm.o
+		hermon_fcoib.o hermon_fm.o
 
 DAPLT_OBJS +=	daplt.o
 
@@ -708,6 +709,8 @@ SOL_UCMA_OBJS +=	sol_ucma.o
 
 SOL_UVERBS_OBJS +=	sol_uverbs.o sol_uverbs_comp.o sol_uverbs_event.o \
 			sol_uverbs_hca.o sol_uverbs_qp.o
+
+SOL_UMAD_OBJS += sol_umad.o
 
 KSTAT_OBJS +=	kstat.o
 
@@ -1326,6 +1329,7 @@ ZFS_COMMON_OBJS +=		\
 	ddt.o			\
 	ddt_zap.o		\
 	dmu.o			\
+	dmu_diff.o		\
 	dmu_send.o		\
 	dmu_object.o		\
 	dmu_objset.o		\
@@ -1514,7 +1518,8 @@ KCF_OBJS +=	kcf.o kcf_callprov.o kcf_cbufcall.o kcf_cipher.o kcf_crypto.o \
 		kcf_keys.o kcf_mac.o kcf_mech_tabs.o kcf_miscapi.o \
 		kcf_object.o kcf_policy.o kcf_prov_lib.o kcf_prov_tabs.o \
 		kcf_sched.o kcf_session.o kcf_sign.o kcf_spi.o kcf_verify.o \
-		kcf_random.o modes.o ecb.o cbc.o ctr.o ccm.o gcm.o fips_random.o
+		kcf_random.o modes.o ecb.o cbc.o ctr.o ccm.o gcm.o \
+		fips_random.o fips_checksum.o fips_test_vectors.o
 
 CRYPTOADM_OBJS += cryptoadm.o
 
@@ -1728,6 +1733,13 @@ IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_log.o misc.o ip_compat.o ip_nat6.o drand48.o
 
 IBD_OBJS +=	ibd.o ibd_cm.o
+
+EIBNX_OBJS +=	enx_main.o enx_hdlrs.o enx_ibt.o enx_log.o enx_fip.o \
+		enx_misc.o enx_q.o enx_ctl.o
+
+EOIB_OBJS +=	eib_adm.o eib_chan.o eib_cmn.o eib_ctl.o eib_data.o \
+		eib_fip.o eib_ibt.o eib_log.o eib_mac.o eib_main.o \
+		eib_rsrc.o eib_svc.o eib_vnic.o
 
 DLPISTUB_OBJS += dlpistub.o
 

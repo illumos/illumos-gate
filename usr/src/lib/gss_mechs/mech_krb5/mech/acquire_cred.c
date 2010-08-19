@@ -1,9 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * Copyright 2000 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
@@ -85,6 +82,9 @@
 #else
 #include <strings.h>
 #endif
+#include <syslog.h>
+#include <locale.h> /* Solaris Kerberos */
+#include "file/ktfile.h" /* Solaris Kerberos */
 
 #if defined(USE_LOGIN_LIBRARY)
 #include <Kerberos/KerberosLoginPrivate.h>
@@ -184,18 +184,27 @@ acquire_accept_cred(context, minor_status, desired_name, output_princ, cred)
       return(GSS_S_NO_CRED);
    }
 
-   if (desired_name != GSS_C_NO_NAME) {
-      princ = (krb5_principal) desired_name;
-      if ((code = krb5_kt_get_entry(context, kt, princ, 0, 0, &entry))) {
-	 (void) krb5_kt_close(context, kt);
-	 if (code == KRB5_KT_NOTFOUND)
-	    *minor_status = KG_KEYTAB_NOMATCH;
-	 else
-	    *minor_status = code;
+    if (desired_name != GSS_C_NO_NAME) {
+        princ = (krb5_principal) desired_name;
+        if ((code = krb5_kt_get_entry(context, kt, princ, 0, 0, &entry))) {
+	    if (code == KRB5_KT_NOTFOUND) {
+	        char *s_name;
+	        if (krb5_unparse_name(context, princ, &s_name) == 0) {
+		    krb5_set_error_message(context, KG_KEYTAB_NOMATCH,
+					dgettext(TEXT_DOMAIN,
+						"No principal in keytab ('%s') matches desired name %s"),
+					KTFILENAME(kt),
+					s_name);
+	            krb5_free_unparsed_name(context, s_name);
+		}
+		*minor_status = KG_KEYTAB_NOMATCH;
+	    } else
+	        *minor_status = code;
 	 /* Solaris Kerb NOTE: GSS_S_CRED_UNAVAIL is not RFC 2743 compliant */
-	 return(GSS_S_NO_CRED);
-      }
-      krb5_kt_free_entry(context, &entry);
+	    (void) krb5_kt_close(context, kt);
+	    return(GSS_S_NO_CRED);
+	}
+	krb5_kt_free_entry(context, &entry);
 
       /* Open the replay cache for this principal. */
       if ((code = krb5_get_server_rcache(context,
@@ -205,7 +214,7 @@ acquire_accept_cred(context, minor_status, desired_name, output_princ, cred)
 	 return(GSS_S_FAILURE);
       }
 
-   }
+    }
 
 /* hooray.  we made it */
 
@@ -491,9 +500,9 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
    /*SUPPRESS 29*/
    if ((desired_name != (gss_name_t) NULL) &&
        (! kg_validate_name(desired_name))) {
-      *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-      krb5_free_context(context);
-      return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
+	*minor_status = (OM_uint32) G_VALIDATE_FAILED;	
+	krb5_free_context(context);
+	return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
    }
 
    /* verify that the requested mechanism set is the default, or
@@ -571,6 +580,7 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
          k5_mutex_destroy(&cred->lock);
          xfree(cred);
 	 /* minor_status set by acquire_accept_cred() */
+	 save_error_info(*minor_status, context);
 	 krb5_free_context(context);
 	 return(ret);
       }
@@ -593,6 +603,7 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
          k5_mutex_destroy(&cred->lock);
          xfree(cred);
 	 /* minor_status set by acquire_init_cred() */
+         save_error_info(*minor_status, context);
 	 krb5_free_context(context);
 	 return(ret);
       }
@@ -613,6 +624,7 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
          k5_mutex_destroy(&cred->lock);
          xfree(cred);
 	 *minor_status = code;
+         save_error_info(*minor_status, context);
 	 krb5_free_context(context);
 	 return(GSS_S_FAILURE);
       }
@@ -637,6 +649,7 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
          k5_mutex_destroy(&cred->lock);
          xfree(cred);
 	 *minor_status = code;
+	 save_error_info(*minor_status, context);
 	 krb5_free_context(context);
 	 return(GSS_S_FAILURE);
       }
@@ -686,6 +699,7 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
       k5_mutex_destroy(&cred->lock);
       xfree(cred);
       *minor_status = (OM_uint32) G_VALIDATE_FAILED;
+      save_error_string(*minor_status, "error saving credentials");
       krb5_free_context(context);
       return(GSS_S_FAILURE);
    }

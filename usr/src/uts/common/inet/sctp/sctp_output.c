@@ -295,7 +295,7 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 	 */
 	if (SCTP_TXQ_LEN(sctp) >= connp->conn_sndbuf) {
 		sctp->sctp_txq_full = 1;
-		sctp->sctp_ulp_xmitted(sctp->sctp_ulpd, B_TRUE);
+		sctp->sctp_ulp_txq_full(sctp->sctp_ulpd, B_TRUE);
 	}
 	if (sctp->sctp_state == SCTPS_ESTABLISHED)
 		sctp_output(sctp, UINT_MAX);
@@ -342,7 +342,7 @@ sctp_chunkify(sctp_t *sctp, int mss, int firstseg_len, int bytes_to_send)
 	fp = SCTP_CHUNK_DEST(mdblk);
 	if (fp == NULL)
 		fp = sctp->sctp_current;
-	if (fp->isv4)
+	if (fp->sf_isv4)
 		xtralen = sctp->sctp_hdr_len + sctps->sctps_wroff_xtra +
 		    sizeof (*sdc);
 	else
@@ -377,10 +377,10 @@ nextmsg:
 		while (mp->b_next != NULL)
 			mp = mp->b_next;
 		chunk_len = ntohs(((sctp_data_hdr_t *)mp->b_rptr)->sdh_len);
-		if (fp->sfa_pmss - chunk_len > sizeof (*sdc))
-			count = chunksize = fp->sfa_pmss - chunk_len;
+		if (fp->sf_pmss - chunk_len > sizeof (*sdc))
+			count = chunksize = fp->sf_pmss - chunk_len;
 		else
-			count = chunksize = fp->sfa_pmss;
+			count = chunksize = fp->sf_pmss;
 		count = chunksize = count - sizeof (*sdc);
 	} else {
 		msg_hdr = (sctp_msg_hdr_t *)mdblk->b_rptr;
@@ -499,7 +499,7 @@ nextchunk:
 	bytes_to_send -= (chunksize - count);
 	if (chunk_mp != NULL) {
 next:
-		count = chunksize = fp->sfa_pmss - sizeof (*sdc);
+		count = chunksize = fp->sf_pmss - sizeof (*sdc);
 		goto nextchunk;
 	}
 	SCTP_DATA_SET_EBIT(sdc);
@@ -527,21 +527,21 @@ try_next:
 		if (fp == fp1) {
 			size_t len = MBLKL(mdblk->b_cont);
 			if ((count > 0) &&
-			    ((len > fp->sfa_pmss - sizeof (*sdc)) ||
+			    ((len > fp->sf_pmss - sizeof (*sdc)) ||
 			    (len <= count))) {
 				count -= sizeof (*sdc);
 				count = chunksize = count - (count & 0x3);
 			} else {
-				count = chunksize = fp->sfa_pmss -
+				count = chunksize = fp->sf_pmss -
 				    sizeof (*sdc);
 			}
 		} else {
-			if (fp1->isv4)
+			if (fp1->sf_isv4)
 				xtralen = sctp->sctp_hdr_len;
 			else
 				xtralen = sctp->sctp_hdr6_len;
 			xtralen += sctps->sctps_wroff_xtra + sizeof (*sdc);
-			count = chunksize = fp1->sfa_pmss - sizeof (*sdc);
+			count = chunksize = fp1->sf_pmss - sizeof (*sdc);
 			fp = fp1;
 		}
 		goto nextmsg;
@@ -570,7 +570,7 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 {
 	int hdrlen;
 	uchar_t *hdr;
-	int isv4 = fp->isv4;
+	int isv4 = fp->sf_isv4;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	if (error != NULL)
@@ -586,18 +586,18 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 	/*
 	 * A reject|blackhole could mean that the address is 'down'. Similarly,
 	 * it is possible that the address went down, we tried to send an
-	 * heartbeat and ended up setting fp->saddr as unspec because we
+	 * heartbeat and ended up setting fp->sf_saddr as unspec because we
 	 * didn't have any usable source address.  In either case
 	 * sctp_get_dest() will try find an IRE, if available, and set
 	 * the source address, if needed.  If we still don't have any
-	 * usable source address, fp->state will be SCTP_FADDRS_UNREACH and
+	 * usable source address, fp->sf_state will be SCTP_FADDRS_UNREACH and
 	 * we return EHOSTUNREACH.
 	 */
-	ASSERT(fp->ixa->ixa_ire != NULL);
-	if ((fp->ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
-	    SCTP_IS_ADDR_UNSPEC(fp->isv4, fp->saddr)) {
+	ASSERT(fp->sf_ixa->ixa_ire != NULL);
+	if ((fp->sf_ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
+	    SCTP_IS_ADDR_UNSPEC(fp->sf_isv4, fp->sf_saddr)) {
 		sctp_get_dest(sctp, fp);
-		if (fp->state == SCTP_FADDRS_UNREACH) {
+		if (fp->sf_state == SCTP_FADDRS_UNREACH) {
 			if (error != NULL)
 				*error = EHOSTUNREACH;
 			return (NULL);
@@ -636,9 +636,9 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		if (isv4) {
 			ipha_t *iph = (ipha_t *)mp->b_rptr;
 
-			IN6_V4MAPPED_TO_IPADDR(&fp->faddr, iph->ipha_dst);
-			if (!IN6_IS_ADDR_V4MAPPED_ANY(&fp->saddr)) {
-				IN6_V4MAPPED_TO_IPADDR(&fp->saddr,
+			IN6_V4MAPPED_TO_IPADDR(&fp->sf_faddr, iph->ipha_dst);
+			if (!IN6_IS_ADDR_V4MAPPED_ANY(&fp->sf_saddr)) {
+				IN6_V4MAPPED_TO_IPADDR(&fp->sf_saddr,
 				    iph->ipha_src);
 			} else if (sctp->sctp_bound_to_all) {
 				iph->ipha_src = INADDR_ANY;
@@ -646,9 +646,9 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		} else {
 			ip6_t *ip6h = (ip6_t *)mp->b_rptr;
 
-			ip6h->ip6_dst = fp->faddr;
-			if (!IN6_IS_ADDR_UNSPECIFIED(&fp->saddr)) {
-				ip6h->ip6_src = fp->saddr;
+			ip6h->ip6_dst = fp->sf_faddr;
+			if (!IN6_IS_ADDR_UNSPECIFIED(&fp->sf_saddr)) {
+				ip6h->ip6_src = fp->sf_saddr;
 			} else if (sctp->sctp_bound_to_all) {
 				ip6h->ip6_src = ipv6_all_zeros;
 			}
@@ -723,7 +723,8 @@ sctp_find_fast_rexmit_mblks(sctp_t *sctp, int *total, sctp_faddr_t **fp)
 				chunk_fp = SCTP_CHUNK_DEST(mp);
 				if (*fp == NULL) {
 					*fp = chunk_fp;
-					if ((*fp)->state != SCTP_FADDRS_ALIVE) {
+					if ((*fp)->sf_state !=
+					    SCTP_FADDRS_ALIVE) {
 						old_fp = *fp;
 						*fp = sctp->sctp_current;
 					}
@@ -746,7 +747,7 @@ sctp_find_fast_rexmit_mblks(sctp_t *sctp, int *total, sctp_faddr_t **fp)
 				 * PMTU may have changed.
 				 */
 				if (*total + msglen + extra >
-				    (*fp)->sfa_pmss && start_mp != NULL) {
+				    (*fp)->sf_pmss && start_mp != NULL) {
 					return (start_mp);
 				}
 				if ((nmp = dupmsg(mp)) == NULL)
@@ -759,7 +760,7 @@ sctp_find_fast_rexmit_mblks(sctp_t *sctp, int *total, sctp_faddr_t **fp)
 						return (start_mp);
 					}
 				}
-				BUMP_MIB(&sctps->sctps_mib, sctpOutFastRetrans);
+				SCTPS_BUMP_MIB(sctps, sctpOutFastRetrans);
 				BUMP_LOCAL(sctp->sctp_rxtchunks);
 				SCTP_CHUNK_CLEAR_REXMIT(mp);
 				if (start_mp == NULL) {
@@ -807,7 +808,7 @@ sctp_verify_chain(mblk_t *head, mblk_t *tail)
  * the unsent list, if any, and also as an input to sctp_chunkify() if so.
  *
  * firstseg_len indicates the space already used, cansend represents remaining
- * space in the window, ((sfa_pmss - firstseg_len) can therefore reasonably
+ * space in the window, ((sf_pmss - firstseg_len) can therefore reasonably
  * be used to compute the cansend arg).
  */
 mblk_t *
@@ -906,19 +907,19 @@ next_msg:
 		ASSERT(sctp->sctp_unsent > 0);
 		if (fp == NULL) {
 			fp = SCTP_CHUNK_DEST(sctp->sctp_xmit_unsent);
-			if (fp == NULL || fp->state != SCTP_FADDRS_ALIVE)
+			if (fp == NULL || fp->sf_state != SCTP_FADDRS_ALIVE)
 				fp = sctp->sctp_current;
 		} else {
 			/*
 			 * If user specified destination, try to honor that.
 			 */
 			fp1 = SCTP_CHUNK_DEST(sctp->sctp_xmit_unsent);
-			if (fp1 != NULL && fp1->state == SCTP_FADDRS_ALIVE &&
+			if (fp1 != NULL && fp1->sf_state == SCTP_FADDRS_ALIVE &&
 			    fp1 != fp) {
 				goto chunk_done;
 			}
 		}
-		meta = sctp_chunkify(sctp, fp->sfa_pmss, firstseg_len, cansend);
+		meta = sctp_chunkify(sctp, fp->sf_pmss, firstseg_len, cansend);
 		if (meta == NULL)
 			goto chunk_done;
 		/*
@@ -969,16 +970,16 @@ sctp_fast_rexmit(sctp_t *sctp)
 		SCTP_KSTAT(sctps, sctp_fr_add_hdr);
 		return;
 	}
-	if ((pktlen > fp->sfa_pmss) && fp->isv4) {
+	if ((pktlen > fp->sf_pmss) && fp->sf_isv4) {
 		ipha_t *iph = (ipha_t *)head->b_rptr;
 
 		iph->ipha_fragment_offset_and_flags = 0;
 	}
 
-	sctp_set_iplen(sctp, head, fp->ixa);
-	(void) conn_ip_output(head, fp->ixa);
+	sctp_set_iplen(sctp, head, fp->sf_ixa);
+	(void) conn_ip_output(head, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
-	sctp->sctp_active = fp->lastactive = ddi_get_lbolt64();
+	sctp->sctp_active = fp->sf_lastactive = ddi_get_lbolt64();
 }
 
 void
@@ -997,7 +998,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 	int32_t			pad = 0;
 	int32_t			pathmax;
 	int			extra;
-	int64_t			now = ddi_get_lbolt64();
+	int64_t			now = LBOLT_FASTPATH64;
 	sctp_faddr_t		*fp;
 	sctp_faddr_t		*lfp;
 	sctp_data_hdr_t		*sdc;
@@ -1015,7 +1016,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 		    (sizeof (sctp_sack_frag_t) * sctp->sctp_sack_gaps);
 		lfp = sctp->sctp_lastdata;
 		ASSERT(lfp != NULL);
-		if (lfp->state != SCTP_FADDRS_ALIVE)
+		if (lfp->sf_state != SCTP_FADDRS_ALIVE)
 			lfp = sctp->sctp_current;
 	}
 
@@ -1028,9 +1029,9 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 	 * trying to send into a zero window. This timer
 	 * ensures the blocked send attempt is retried.
 	 */
-	if ((cansend < sctp->sctp_current->sfa_pmss / 2) &&
+	if ((cansend < sctp->sctp_current->sf_pmss / 2) &&
 	    (sctp->sctp_unacked != 0) &&
-	    (sctp->sctp_unacked < sctp->sctp_current->sfa_pmss) &&
+	    (sctp->sctp_unacked < sctp->sctp_current->sf_pmss) &&
 	    !sctp->sctp_ndelay ||
 	    (cansend == 0 && sctp->sctp_unacked == 0 &&
 	    sctp->sctp_unsent != 0)) {
@@ -1074,7 +1075,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 		if (chunklen > cansend) {
 			head = NULL;
 			fp = SCTP_CHUNK_DEST(meta);
-			if (fp == NULL || fp->state != SCTP_FADDRS_ALIVE)
+			if (fp == NULL || fp->sf_state != SCTP_FADDRS_ALIVE)
 				fp = sctp->sctp_current;
 			goto unsent_data;
 		}
@@ -1084,13 +1085,14 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 		/*
 		 * Pick destination address, and check cwnd.
 		 */
-		if (sacklen > 0 && (seglen + extra <= lfp->cwnd - lfp->suna) &&
-		    (seglen + sacklen + extra <= lfp->sfa_pmss)) {
+		if (sacklen > 0 && (seglen + extra <= lfp->sf_cwnd -
+		    lfp->sf_suna) &&
+		    (seglen + sacklen + extra <= lfp->sf_pmss)) {
 			/*
 			 * Only include SACK chunk if it can be bundled
 			 * with a data chunk, and sent to sctp_lastdata.
 			 */
-			pathmax = lfp->cwnd - lfp->suna;
+			pathmax = lfp->sf_cwnd - lfp->sf_suna;
 
 			fp = lfp;
 			if ((nmp = dupmsg(mp)) == NULL) {
@@ -1124,18 +1126,18 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 			sacklen = 0;
 		} else {
 			fp = SCTP_CHUNK_DEST(meta);
-			if (fp == NULL || fp->state != SCTP_FADDRS_ALIVE)
+			if (fp == NULL || fp->sf_state != SCTP_FADDRS_ALIVE)
 				fp = sctp->sctp_current;
 			/*
 			 * If we haven't sent data to this destination for
 			 * a while, do slow start again.
 			 */
-			if (now - fp->lastactive > fp->rto) {
-				SET_CWND(fp, fp->sfa_pmss,
+			if (now - fp->sf_lastactive > fp->sf_rto) {
+				SET_CWND(fp, fp->sf_pmss,
 				    sctps->sctps_slow_start_after_idle);
 			}
 
-			pathmax = fp->cwnd - fp->suna;
+			pathmax = fp->sf_cwnd - fp->sf_suna;
 			if (seglen + extra > pathmax) {
 				head = NULL;
 				goto unsent_data;
@@ -1166,9 +1168,9 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 				goto unsent_data;
 			}
 		}
-		fp->lastactive = now;
-		if (pathmax > fp->sfa_pmss)
-			pathmax = fp->sfa_pmss;
+		fp->sf_lastactive = now;
+		if (pathmax > fp->sf_pmss)
+			pathmax = fp->sf_pmss;
 		SCTP_CHUNK_SENT(sctp, mp, sdc, fp, chunklen, meta);
 		mp = mp->b_next;
 
@@ -1258,7 +1260,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 			linkb(head, nmp);
 			mp = mp->b_next;
 		}
-		if ((seglen > fp->sfa_pmss) && fp->isv4) {
+		if ((seglen > fp->sf_pmss) && fp->sf_isv4) {
 			ipha_t *iph = (ipha_t *)head->b_rptr;
 
 			/*
@@ -1276,20 +1278,20 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 		    seglen - xtralen, ntohl(sdc->sdh_tsn),
 		    ntohs(sdc->sdh_ssn), (void *)fp, sctp->sctp_frwnd,
 		    cansend, sctp->sctp_lastack_rxd));
-		sctp_set_iplen(sctp, head, fp->ixa);
-		(void) conn_ip_output(head, fp->ixa);
+		sctp_set_iplen(sctp, head, fp->sf_ixa);
+		(void) conn_ip_output(head, fp->sf_ixa);
 		BUMP_LOCAL(sctp->sctp_opkts);
 		/* arm rto timer (if not set) */
-		if (!fp->timer_running)
-			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		if (!fp->sf_timer_running)
+			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 		notsent = B_FALSE;
 	}
 	sctp->sctp_active = now;
 	return;
 unsent_data:
 	/* arm persist timer (if rto timer not set) */
-	if (!fp->timer_running)
-		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+	if (!fp->sf_timer_running)
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 	if (head != NULL)
 		freemsg(head);
 }
@@ -1333,7 +1335,7 @@ sctp_free_ftsn_set(sctp_ftsn_set_t *s)
  * entry for stream id, sid, for this message already exists, the
  * sequence number, ssn, is updated if it is greater than the existing
  * one. If an entry for this sid does not exist, one is created if
- * the size does not exceed fp->sfa_pmss. We return false in case
+ * the size does not exceed fp->sf_pmss. We return false in case
  * or an error.
  */
 boolean_t
@@ -1350,7 +1352,7 @@ sctp_add_ftsn_set(sctp_ftsn_set_t **s, sctp_faddr_t *fp, mblk_t *meta,
 	ASSERT((*nsets == 0 && *s == NULL) || (*nsets > 0 && *s != NULL));
 
 	if (*s == NULL) {
-		ASSERT((*slen + sizeof (uint32_t)) <= fp->sfa_pmss);
+		ASSERT((*slen + sizeof (uint32_t)) <= fp->sf_pmss);
 		*s = kmem_cache_alloc(sctp_kmem_ftsn_set_cache, KM_NOSLEEP);
 		if (*s == NULL)
 			return (B_FALSE);
@@ -1373,7 +1375,7 @@ sctp_add_ftsn_set(sctp_ftsn_set_t **s, sctp_faddr_t *fp, mblk_t *meta,
 		if (SSN_GT(ssn, p->ftsn_entries.ftsn_ssn))
 			p->ftsn_entries.ftsn_ssn = ssn;
 	} else {
-		if ((*slen + sizeof (uint32_t)) > fp->sfa_pmss)
+		if ((*slen + sizeof (uint32_t)) > fp->sf_pmss)
 			return (B_FALSE);
 		p->next = kmem_cache_alloc(sctp_kmem_ftsn_set_cache,
 		    KM_NOSLEEP);
@@ -1408,7 +1410,7 @@ sctp_make_ftsn_chunk(sctp_t *sctp, sctp_faddr_t *fp, sctp_ftsn_set_t *sets,
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	seglen += sizeof (sctp_chunk_hdr_t);
-	if (fp->isv4)
+	if (fp->sf_isv4)
 		xtralen = sctp->sctp_hdr_len + sctps->sctps_wroff_xtra;
 	else
 		xtralen = sctp->sctp_hdr6_len + sctps->sctps_wroff_xtra;
@@ -1515,7 +1517,7 @@ ftsn_done:
 		sacklen = sizeof (sctp_chunk_hdr_t) +
 		    sizeof (sctp_sack_chunk_t) +
 		    (sizeof (sctp_sack_frag_t) * sctp->sctp_sack_gaps);
-		if (*seglen + sacklen > sctp->sctp_lastdata->sfa_pmss) {
+		if (*seglen + sacklen > sctp->sctp_lastdata->sf_pmss) {
 			/* piggybacked SACK doesn't fit */
 			sacklen = 0;
 		} else {
@@ -1755,8 +1757,8 @@ window_probe:
 		 * Send a window probe. Inflate frwnd to allow
 		 * sending one segment.
 		 */
-		if (sctp->sctp_frwnd < (oldfp->sfa_pmss - sizeof (*sdc)))
-			sctp->sctp_frwnd = oldfp->sfa_pmss - sizeof (*sdc);
+		if (sctp->sctp_frwnd < (oldfp->sf_pmss - sizeof (*sdc)))
+			sctp->sctp_frwnd = oldfp->sf_pmss - sizeof (*sdc);
 
 		/* next TSN to send */
 		sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
@@ -1772,7 +1774,7 @@ window_probe:
 		sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn - 1;
 		ASSERT(sctp->sctp_rxt_maxtsn >= sctp->sctp_rxt_nxttsn);
 		sctp->sctp_zero_win_probe = B_TRUE;
-		BUMP_MIB(&sctps->sctps_mib, sctpOutWinProbe);
+		SCTPS_BUMP_MIB(sctps, sctpOutWinProbe);
 	}
 	return;
 out:
@@ -1780,7 +1782,7 @@ out:
 	 * After a time out, assume that everything has left the network.  So
 	 * we can clear rxt_unacked for the original peer address.
 	 */
-	oldfp->rxt_unacked = 0;
+	oldfp->sf_rxt_unacked = 0;
 
 	/*
 	 * If we were probing for zero window, don't adjust retransmission
@@ -1795,13 +1797,13 @@ out:
 		 * and sctp_rxt_maxtsn will specify the ZWP packet.
 		 */
 		fp = oldfp;
-		if (oldfp->state != SCTP_FADDRS_ALIVE)
+		if (oldfp->sf_state != SCTP_FADDRS_ALIVE)
 			fp = sctp_rotate_faddr(sctp, oldfp);
 		pkt = sctp_rexmit_packet(sctp, &meta, &mp, fp, &pkt_len);
 		if (pkt != NULL) {
-			ASSERT(pkt_len <= fp->sfa_pmss);
-			sctp_set_iplen(sctp, pkt, fp->ixa);
-			(void) conn_ip_output(pkt, fp->ixa);
+			ASSERT(pkt_len <= fp->sf_pmss);
+			sctp_set_iplen(sctp, pkt, fp->sf_ixa);
+			(void) conn_ip_output(pkt, fp->sf_ixa);
 			BUMP_LOCAL(sctp->sctp_opkts);
 		} else {
 			SCTP_KSTAT(sctps, sctp_ss_rexmit_failed);
@@ -1811,25 +1813,25 @@ out:
 		 * The strikes will be clear by sctp_faddr_alive() when the
 		 * other side sends us an ack.
 		 */
-		oldfp->strikes++;
+		oldfp->sf_strikes++;
 		sctp->sctp_strikes++;
 
 		SCTP_CALC_RXT(sctp, oldfp, sctp->sctp_rto_max);
-		if (oldfp != fp && oldfp->suna != 0)
-			SCTP_FADDR_TIMER_RESTART(sctp, oldfp, fp->rto);
-		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
-		BUMP_MIB(&sctps->sctps_mib, sctpOutWinProbe);
+		if (oldfp != fp && oldfp->sf_suna != 0)
+			SCTP_FADDR_TIMER_RESTART(sctp, oldfp, fp->sf_rto);
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
+		SCTPS_BUMP_MIB(sctps, sctpOutWinProbe);
 		return;
 	}
 
 	/*
 	 * Enter slowstart for this destination
 	 */
-	oldfp->ssthresh = oldfp->cwnd / 2;
-	if (oldfp->ssthresh < 2 * oldfp->sfa_pmss)
-		oldfp->ssthresh = 2 * oldfp->sfa_pmss;
-	oldfp->cwnd = oldfp->sfa_pmss;
-	oldfp->pba = 0;
+	oldfp->sf_ssthresh = oldfp->sf_cwnd / 2;
+	if (oldfp->sf_ssthresh < 2 * oldfp->sf_pmss)
+		oldfp->sf_ssthresh = 2 * oldfp->sf_pmss;
+	oldfp->sf_cwnd = oldfp->sf_pmss;
+	oldfp->sf_pba = 0;
 	fp = sctp_rotate_faddr(sctp, oldfp);
 	ASSERT(fp != NULL);
 	sdc = (sctp_data_hdr_t *)mp->b_rptr;
@@ -1866,7 +1868,7 @@ out:
 		sacklen = sizeof (sctp_chunk_hdr_t) +
 		    sizeof (sctp_sack_chunk_t) +
 		    (sizeof (sctp_sack_frag_t) * sctp->sctp_sack_gaps);
-		if (seglen + sacklen > sctp->sctp_lastdata->sfa_pmss) {
+		if (seglen + sacklen > sctp->sctp_lastdata->sf_pmss) {
 			/* piggybacked SACK doesn't fit */
 			sacklen = 0;
 		} else {
@@ -1879,7 +1881,8 @@ out:
 			 * the fp is alive.
 			 */
 			if (sctp->sctp_lastdata != oldfp &&
-			    sctp->sctp_lastdata->state == SCTP_FADDRS_ALIVE) {
+			    sctp->sctp_lastdata->sf_state ==
+			    SCTP_FADDRS_ALIVE) {
 				fp = sctp->sctp_lastdata;
 			}
 		}
@@ -1894,8 +1897,8 @@ out:
 		sctp->sctp_out_time = 0;
 	}
 	/* Clear the counter as the RTT calculation may be off. */
-	fp->rtt_updates = 0;
-	oldfp->rtt_updates = 0;
+	fp->sf_rtt_updates = 0;
+	oldfp->sf_rtt_updates = 0;
 
 	/*
 	 * After a timeout, we should change the current faddr so that
@@ -1931,7 +1934,7 @@ out:
 
 try_bundle:
 	/* We can at least and at most send 1 packet at timeout. */
-	while (seglen < fp->sfa_pmss) {
+	while (seglen < fp->sf_pmss) {
 		int32_t new_len;
 
 		/* Go through the list to find more chunks to be bundled. */
@@ -1961,7 +1964,7 @@ try_bundle:
 			 * could be bundled with this retransmission.
 			 */
 			meta = sctp_get_msg_to_send(sctp, &mp, NULL, &error,
-			    seglen, fp->sfa_pmss - seglen, NULL);
+			    seglen, fp->sf_pmss - seglen, NULL);
 			if (error != 0 || meta == NULL) {
 				/* No more chunk to be bundled. */
 				break;
@@ -1976,7 +1979,7 @@ try_bundle:
 
 		if ((extra = new_len & (SCTP_ALIGN - 1)) != 0)
 			extra = SCTP_ALIGN - extra;
-		if ((new_len = seglen + new_len + extra) > fp->sfa_pmss)
+		if ((new_len = seglen + new_len + extra) > fp->sf_pmss)
 			break;
 		if ((nmp = dupmsg(mp)) == NULL)
 			break;
@@ -1999,7 +2002,7 @@ try_bundle:
 		mp = mp->b_next;
 	}
 done_bundle:
-	if ((seglen > fp->sfa_pmss) && fp->isv4) {
+	if ((seglen > fp->sf_pmss) && fp->sf_isv4) {
 		ipha_t *iph = (ipha_t *)head->b_rptr;
 
 		/*
@@ -2009,7 +2012,7 @@ done_bundle:
 		 */
 		iph->ipha_fragment_offset_and_flags = 0;
 	}
-	fp->rxt_unacked += seglen;
+	fp->sf_rxt_unacked += seglen;
 
 	dprint(2, ("sctp_rexmit: Sending packet %d bytes, tsn %x "
 	    "ssn %d to %p (rwnd %d, lastack_rxd %x)\n",
@@ -2019,8 +2022,8 @@ done_bundle:
 	sctp->sctp_rexmitting = B_TRUE;
 	sctp->sctp_rxt_nxttsn = first_ua_tsn;
 	sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn - 1;
-	sctp_set_iplen(sctp, head, fp->ixa);
-	(void) conn_ip_output(head, fp->ixa);
+	sctp_set_iplen(sctp, head, fp->sf_ixa);
+	(void) conn_ip_output(head, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 
 	/*
@@ -2028,7 +2031,7 @@ done_bundle:
 	 * the new fp timer for the retransmitted chunks.
 	 */
 restart_timer:
-	oldfp->strikes++;
+	oldfp->sf_strikes++;
 	sctp->sctp_strikes++;
 	SCTP_CALC_RXT(sctp, oldfp, sctp->sctp_rto_max);
 	/*
@@ -2037,8 +2040,8 @@ restart_timer:
 	 * continue to run so it will do its job in checking the reachability
 	 * of the oldfp.
 	 */
-	if (oldfp != fp && oldfp->suna != 0)
-		SCTP_FADDR_TIMER_RESTART(sctp, oldfp, oldfp->rto);
+	if (oldfp != fp && oldfp->sf_suna != 0)
+		SCTP_FADDR_TIMER_RESTART(sctp, oldfp, oldfp->sf_rto);
 
 	/*
 	 * Should we restart the timer of the new fp?  If there is
@@ -2053,7 +2056,7 @@ restart_timer:
 	 * is the chunk we just retransmitted.  So for now, let's
 	 * be conservative and restart the timer of the new fp.
 	 */
-	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 
 	sctp->sctp_active = ddi_get_lbolt64();
 }
@@ -2114,7 +2117,7 @@ sctp_rexmit_packet(sctp_t *sctp, mblk_t **meta, mblk_t **mp, sctp_faddr_t *fp,
 	*mp = (*mp)->b_next;
 
 try_bundle:
-	while (seglen < fp->sfa_pmss) {
+	while (seglen < fp->sf_pmss) {
 		int32_t new_len;
 
 		/*
@@ -2157,7 +2160,7 @@ try_bundle:
 
 		if ((extra = new_len & (SCTP_ALIGN - 1)) != 0)
 			extra = SCTP_ALIGN - extra;
-		if ((new_len = seglen + new_len + extra) > fp->sfa_pmss)
+		if ((new_len = seglen + new_len + extra) > fp->sf_pmss)
 			break;
 		if ((nmp = dupmsg(*mp)) == NULL)
 			break;
@@ -2185,7 +2188,7 @@ try_bundle:
 		*mp = (*mp)->b_next;
 	}
 	*packet_len = seglen;
-	fp->rxt_unacked += seglen;
+	fp->sf_rxt_unacked += seglen;
 	return (head);
 }
 
@@ -2258,10 +2261,10 @@ sctp_ss_rexmit(sctp_t *sctp)
 	 * retransmission, we skip this walk to save some time.  This should
 	 * not make the retransmission too aggressive to cause congestion.
 	 */
-	if (fp->cwnd <= fp->rxt_unacked)
-		tot_wnd = fp->sfa_pmss;
+	if (fp->sf_cwnd <= fp->sf_rxt_unacked)
+		tot_wnd = fp->sf_pmss;
 	else
-		tot_wnd = fp->cwnd - fp->rxt_unacked;
+		tot_wnd = fp->sf_cwnd - fp->sf_rxt_unacked;
 
 	/* Find the first unack'ed chunk */
 	for (meta = sctp->sctp_xmit_head; meta != NULL; meta = meta->b_next) {
@@ -2286,14 +2289,14 @@ sctp_ss_rexmit(sctp_t *sctp)
 	return;
 
 found_msg:
-	if (!fp->timer_running)
-		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+	if (!fp->sf_timer_running)
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 	pkt = sctp_rexmit_packet(sctp, &meta, &mp, fp, &pkt_len);
 	if (pkt == NULL) {
 		SCTP_KSTAT(sctps, sctp_ss_rexmit_failed);
 		return;
 	}
-	if ((pkt_len > fp->sfa_pmss) && fp->isv4) {
+	if ((pkt_len > fp->sf_pmss) && fp->sf_isv4) {
 		ipha_t	*iph = (ipha_t *)pkt->b_rptr;
 
 		/*
@@ -2303,12 +2306,12 @@ found_msg:
 		 */
 		iph->ipha_fragment_offset_and_flags = 0;
 	}
-	sctp_set_iplen(sctp, pkt, fp->ixa);
-	(void) conn_ip_output(pkt, fp->ixa);
+	sctp_set_iplen(sctp, pkt, fp->sf_ixa);
+	(void) conn_ip_output(pkt, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 
 	/* Check and see if there is more chunk to be retransmitted. */
-	if (tot_wnd <= pkt_len || tot_wnd - pkt_len < fp->sfa_pmss ||
+	if (tot_wnd <= pkt_len || tot_wnd - pkt_len < fp->sf_pmss ||
 	    meta == NULL)
 		return;
 	if (mp == NULL)

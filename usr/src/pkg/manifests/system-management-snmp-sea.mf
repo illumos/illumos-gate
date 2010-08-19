@@ -42,15 +42,13 @@ file path=usr/lib/libssagent.so.1
 file path=usr/lib/libssasnmp.so.1
 file path=usr/lib/snmp/snmpdx group=sys mode=0755
 file path=usr/sbin/snmp_trapsend mode=0755
-legacy pkg=SUNWsasnm arch=$(ARCH) category=system \
+legacy pkg=SUNWsasnm \
     desc="Solstice Enterprise Agents 1.0.3 Simple Network Management Protocol" \
-    hotline="Please contact your local service provider" \
-    name="Solstice Enterprise Agents 1.0.3 Simple Network Management Protocol" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/agents/snmp/THIRDPARTYLICENSE \
-    license=cmd/agents/snmp/THIRDPARTYLICENSE
+    name="Solstice Enterprise Agents 1.0.3 Simple Network Management Protocol"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/agents/snmp/THIRDPARTYLICENSE \
+    license=usr/src/cmd/agents/snmp/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libssagent.so target=./libssagent.so.1
 link path=usr/lib/$(ARCH64)/libssasnmp.so target=./libssasnmp.so.1
 link path=usr/lib/libssagent.so target=./libssagent.so.1

@@ -45,11 +45,8 @@ driver name=ural clone_perms="ural 0666 root sys" perms="* 0666 root sys" \
     alias=usb411,67
 file path=kernel/drv/$(ARCH64)/ural group=sys
 file path=kernel/drv/ural group=sys
-legacy pkg=SUNWural arch=$(ARCH) category=system \
-    desc="Ralink RT2500USB 802.11b/g Wireless Driver" \
-    hotline="Please contact your local service provider" \
-    name="Ralink RT2500USB 802.11b/g Wireless Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWural desc="Ralink RT2500USB 802.11b/g Wireless Driver" \
+    name="Ralink RT2500USB 802.11b/g Wireless Driver"
 license cr_Sun license=cr_Sun
-license uts/common/io/ural/THIRDPARTYLICENSE \
-    license=uts/common/io/ural/THIRDPARTYLICENSE
+license usr/src/uts/common/io/ural/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/ural/THIRDPARTYLICENSE

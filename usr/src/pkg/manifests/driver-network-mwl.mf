@@ -49,12 +49,10 @@ file path=kernel/drv/$(ARCH64)/mwl group=sys
 file path=kernel/drv/mwl group=sys
 file path=kernel/misc/$(ARCH64)/mwlfw group=sys mode=0755
 file path=kernel/misc/mwlfw group=sys mode=0755
-legacy pkg=SUNWmwl arch=$(ARCH) category=system \
+legacy pkg=SUNWmwl \
     desc="Marvell 88W8363 IEEE802.11b/g Wireless Network Device Driver" \
-    hotline="Please contact your local service provider" \
-    name="Marvell 88W8363 IEEE802.11b/g Wireless Network Device Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license uts/common/io/mwl/THIRDPARTYLICENSE \
-    license=uts/common/io/mwl/THIRDPARTYLICENSE
-license uts/common/io/mwl/mwl_fw/LICENSE \
-    license=uts/common/io/mwl/mwl_fw/LICENSE
+    name="Marvell 88W8363 IEEE802.11b/g Wireless Network Device Driver"
+license usr/src/uts/common/io/mwl/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/mwl/THIRDPARTYLICENSE
+license usr/src/uts/common/io/mwl/mwl_fw/LICENSE \
+    license=usr/src/uts/common/io/mwl/mwl_fw/LICENSE

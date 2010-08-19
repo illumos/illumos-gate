@@ -93,6 +93,13 @@ extern "C" {
 #define	DBG_SYM_REDUCE_GLOBAL	1	/* reporting global symbols to local */
 #define	DBG_SYM_REDUCE_RETAIN	2	/* reporting non reduced local syms */
 
+#define	DBG_AUD_CALL		1	/* original call to auditor */
+#define	DBG_AUD_RET		2	/* return from auditor diagnostic */
+
+#define	DBG_AUD_LOCAL		0	/* auditor is local */
+#define	DBG_AUD_GLOBAL		1	/* auditor is global */
+#define	DBG_AUD_PRELOAD		2	/* auditor is preloaded */
+
 /*
  * Group handle operations - passed to Dbg_file_hdl_title().  Indicate why
  * handle dependencies are being manipulated.
@@ -756,18 +763,31 @@ extern	void		Dbg_help(void);
  * External Dbg_*() interface routines.
  */
 extern	void	Dbg_args_file(Lm_list *, int, char *);
+extern	void	Dbg_args_guidance_unknown(Lm_list *, const char *);
 extern	void	Dbg_args_option(Lm_list *, int, int, char *);
 extern	void	Dbg_args_str2chr(Lm_list *, int, const char *, int);
 extern	void	Dbg_args_Wldel(Lm_list *, int, const char *);
+extern	void	Dbg_audit_activity(Lm_list *, const char *, const char *,
+		    uint_t);
 extern	void	Dbg_audit_ignore(Rt_map *);
 extern	void	Dbg_audit_interface(Lm_list *, const char *, const char *);
-extern	void	Dbg_audit_lib(Lm_list *, const char *);
-extern	void	Dbg_audit_object(Lm_list *, const char *, const char *);
-extern	void	Dbg_audit_symval(Lm_list *, const char *, const char *,
-		    const char *, Addr, Addr);
+extern	void	Dbg_audit_lib(Rt_map *, const char *, int);
+extern	void	Dbg_audit_objclose(Lm_list *, const char *, const char *);
+extern	void	Dbg_audit_objopen(Lm_list *, int, const char *, const char *,
+		    uint_t, Boolean);
+extern	void	Dbg_audit_objfilter(Lm_list *, int, const char *, const char *,
+		    const char *, const char *);
+extern	void	Dbg_audit_objsearch(Lm_list *, int, const char *, const char *,
+		    uint_t, const char *);
+extern	void	Dbg_audit_pltenter(Lm_list *, int, const char *, const char *,
+		    Addr);
+extern	void	Dbg_audit_pltexit(Lm_list *, const char *, const char *);
+extern	void	Dbg_audit_preinit(Lm_list *, const char *, const char *);
+extern	void	Dbg_audit_symbind(Lm_list *, int, const char *, const char *,
+		    Addr, uint_t);
 extern	void	Dbg_audit_skip(Lm_list *, const char *, const char *);
 extern	void	Dbg_audit_terminate(Lm_list *, const char *);
-extern	void	Dbg_audit_version(Lm_list *, const char *, ulong_t);
+extern	void	Dbg_audit_version(Lm_list *, const char *, uint_t, uint_t);
 
 extern	void	Dbg_basic_collect(Lm_list *);
 extern	void	Dbg_basic_create(Lm_list *);

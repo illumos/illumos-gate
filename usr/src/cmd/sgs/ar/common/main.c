@@ -22,52 +22,82 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "inc.h"
-#include "extern.h"
-
-static char *arnam;
+#include "conv.h"
 
 /*
- * Function prototypes
+ * Forward declarations
  */
 static void setup(int, char **, Cmd_info *);
-static void setcom(Cmd_info *, int (*)());
+static void setcom(Cmd_info *, Cmd_func);
 static void usage(void);
 static void sigexit(int sig);
 static int notfound(Cmd_info *);
 static void check_swap();
 
-#define	OPTSTR	":a:b:i:vucsrdxtplmqVCTzM"
+const char *
+_ar_msg(Msg mid)
+{
+	return (gettext(MSG_ORIG(mid)));
+}
+
+
+void
+establish_sighandler(void (*handler)())
+{
+	static const int signum[] = {SIGHUP, SIGINT, SIGQUIT, 0};
+	int i;
+
+	if (handler == SIG_IGN) {
+		/* Ignore all the specified signals */
+		for (i = 0; signum[i]; i++)
+			(void) signal(signum[i], SIG_IGN);
+
+	} else {
+		/*
+		 * Set any signal that doesn't default to being ignored
+		 * to our signal handler.
+		 */
+		for (i = 0; signum[i]; i++)
+			if (signal(signum[i], SIG_IGN) != SIG_IGN)
+				(void) signal(signum[i], handler);
+	}
+}
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv, char *envp[])
 {
-	int i;
 	int fd;
 	Cmd_info *cmd_info;
 	int ret;
 	char *new = NULL;
-	char *data = NULL;
 
-	(void) setlocale(LC_ALL, "");
-#if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
-#define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
+#ifndef	XPG4
+	/*
+	 * Check for a binary that better fits this architecture.
+	 */
+	(void) conv_check_native(argv, envp);
 #endif
-	(void) textdomain(TEXT_DOMAIN);
 
-	for (i = 0; signum[i]; i++)
-		if (signal(signum[i], SIG_IGN) != SIG_IGN)
-			(void) signal(signum[i], sigexit);
+	/*
+	 * Establish locale.
+	 */
+	(void) setlocale(LC_ALL, MSG_ORIG(MSG_STR_EMPTY));
+	(void) textdomain(MSG_ORIG(MSG_SUNW_OST_SGS));
+
+	/* Allow a graceful exit up until we start to write an archive */
+	establish_sighandler(sigexit);
+
 	/*
 	 * Initialize cmd_info
 	 */
 	cmd_info = (Cmd_info *)calloc(1, sizeof (Cmd_info));
 	if (cmd_info == NULL) {
-		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0);
+		int err = errno;
+		(void) fprintf(stderr, MSG_INTL(MSG_MALLOC), strerror(err));
 		exit(1);
 	}
 
@@ -80,10 +110,12 @@ main(int argc, char **argv)
 	if (argv[1][0] != '-') {
 		new = (char *)malloc(strlen(argv[1]) + 2);
 		if (new == NULL) {
-			error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0);
+			int err = errno;
+			(void) fprintf(stderr, MSG_INTL(MSG_MALLOC),
+			    strerror(err));
 			exit(1);
 		}
-		(void) strcpy(new, "-");
+		(void) strcpy(new, MSG_ORIG(MSG_STR_HYPHEN));
 		(void) strcat(new, argv[1]);
 		argv[1] = new;
 	}
@@ -92,37 +124,33 @@ main(int argc, char **argv)
 	/*
 	 * Check SWAP
 	 */
-	if (opt_FLAG((cmd_info), z_FLAG))
+	if (cmd_info->opt_flgs & z_FLAG)
 		check_swap();
 
-	if (cmd_info->comfun == 0) {
-		if (!(opt_FLAG((cmd_info), d_FLAG) ||
-		    opt_FLAG(cmd_info, r_FLAG) ||
-		    opt_FLAG(cmd_info, q_FLAG) || opt_FLAG(cmd_info, t_FLAG) ||
-		    opt_FLAG(cmd_info, p_FLAG) || opt_FLAG(cmd_info, m_FLAG) ||
-		    opt_FLAG(cmd_info, x_FLAG))) {
-			error_message(USAGE_01_ERROR, PLAIN_ERROR, (char *)0);
+	if (cmd_info->comfun == NULL) {
+		if ((cmd_info->opt_flgs & (d_FLAG | r_FLAG | q_FLAG |
+		    t_FLAG | p_FLAG | m_FLAG | x_FLAG)) == 0) {
+			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_01));
 			exit(1);
 		}
 	}
 
-	cmd_info->modified = opt_FLAG(cmd_info, s_FLAG);
+	cmd_info->modified = (cmd_info->opt_flgs & s_FLAG);
 	fd = getaf(cmd_info);
 
 	if ((fd == -1) &&
-	    (opt_FLAG(cmd_info, d_FLAG) || opt_FLAG(cmd_info, t_FLAG) ||
-	    opt_FLAG(cmd_info, p_FLAG) || opt_FLAG(cmd_info, m_FLAG) ||
-	    opt_FLAG(cmd_info, x_FLAG) ||
-	    (opt_FLAG(cmd_info, r_FLAG) && (opt_FLAG(cmd_info, a_FLAG) ||
-	    opt_FLAG(cmd_info, b_FLAG))))) {
-		error_message(NOT_FOUND_01_ERROR,
-		    PLAIN_ERROR, (char *)0, arnam);
+	    (cmd_info->opt_flgs &
+	    (d_FLAG | m_FLAG | p_FLAG | t_FLAG | x_FLAG)) ||
+	    ((cmd_info->opt_flgs & r_FLAG) &&
+	    (cmd_info->opt_flgs & (a_FLAG | b_FLAG)))) {
+		(void) fprintf(stderr, MSG_INTL(MSG_NOT_FOUND_AR),
+		    cmd_info->arnam);
 		exit(1);
 	}
 
 	(*cmd_info->comfun)(cmd_info);
 	if (cmd_info->modified) {
-		data = writefile(cmd_info);
+		writefile(cmd_info);
 	} else
 		(void) close(fd);
 
@@ -131,10 +159,9 @@ main(int argc, char **argv)
 	/*
 	 * Check SWAP
 	 */
-	if (opt_FLAG((cmd_info), z_FLAG))
+	if (cmd_info->opt_flgs & z_FLAG)
 		check_swap();
 
-	free(data);
 	free(new);
 	free(cmd_info);
 	return (ret);
@@ -142,7 +169,7 @@ main(int argc, char **argv)
 }
 
 /*
- * Option hadning function.
+ * Option handing function.
  *	Using getopt(), following xcu4 convention.
  */
 static void
@@ -152,7 +179,7 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 	int c;
 	int usage_err = 0;
 
-	while ((c = getopt(argc, argv, OPTSTR)) != -1) {
+	while ((c = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != -1) {
 		switch (c) {
 		case 'a': /* position after named archive member file */
 			cmd_info->opt_flgs |= a_FLAG;
@@ -174,8 +201,7 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 			setcom(cmd_info, dcmd);
 			cmd_info->opt_flgs |= d_FLAG;
 			break;
-		case 'l': /* temporary directory */
-			cmd_info->opt_flgs |= l_FLAG;
+		case 'l': /* ignored */
 			break;
 		case 'm':
 			/*
@@ -213,6 +239,9 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 		case 's': /* force symbol table regeneration */
 			cmd_info->opt_flgs |= s_FLAG;
 			break;
+		case 'S': /* Build SYM64 symbol table */
+			cmd_info->opt_flgs |= S_FLAG;
+			break;
 		case 't':
 			/*
 			 * key operation:
@@ -244,29 +273,33 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 			 * adjust command line access accounting
 			 */
 			if (Vflag == 0) {
-				(void) fprintf(stderr, "ar: %s %s\n",
+				(void) fprintf(stderr,
+				    MSG_ORIG(MSG_FMT_VERSION),
 				    (const char *)SGU_PKG,
 				    (const char *)SGU_REL);
 					Vflag++;
 			}
 			break;
 		case 'C':
-			cmd_info->OPT_flgs |= C_FLAG;
+			cmd_info->opt_flgs |= C_FLAG;
 			break;
 		case 'M':
-			cmd_info->OPT_flgs |= M_FLAG;
+			/*
+			 * -M was an original undocumented AT&T feature that
+			 * would force the use of mmap() instead of read()
+			 * for pulling file data into the process before
+			 * writing it to the archive. Ignored.
+			 */
 			break;
 		case 'T':
-			cmd_info->OPT_flgs |= T_FLAG;
+			cmd_info->opt_flgs |= T_FLAG;
 			break;
 		case ':':
-			error_message(USAGE_02_ERROR,
-			    PLAIN_ERROR, (char *)0, optopt);
+			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_02), optopt);
 			usage_err++;
 			break;
 		case '?':
-			error_message(USAGE_03_ERROR,
-			    PLAIN_ERROR, (char *)0, optopt);
+			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_03), optopt);
 			usage_err++;
 			break;
 		}
@@ -275,7 +308,7 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 	if (usage_err || argc - optind < 1)
 		usage();
 
-	cmd_info->arnam = arnam = argv[optind];
+	cmd_info->arnam = argv[optind];
 	cmd_info->namv = &argv[optind+1];
 	cmd_info->namc = argc - optind - 1;
 }
@@ -286,10 +319,10 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
  * Check that only one key is indicated.
  */
 static void
-setcom(Cmd_info *cmd_info, int (*fun)())
+setcom(Cmd_info *cmd_info, Cmd_func *fun)
 {
 	if (cmd_info->comfun != 0) {
-		error_message(USAGE_04_ERROR, PLAIN_ERROR, (char *)0);
+		(void) fprintf(stderr, MSG_INTL(MSG_USAGE_04));
 		exit(1);
 	}
 	cmd_info->comfun = fun;
@@ -298,14 +331,7 @@ setcom(Cmd_info *cmd_info, int (*fun)())
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext(
-"usage: ar -d[-vV] archive file ...\n"
-"       ar -m[-abivV] [posname] archive file ...\n"
-"       ar -p[-vV][-s] archive [file ...]\n"
-"       ar -q[-cuvV] [-abi] [posname] [file ...]\n"
-"       ar -r[-cuvV] [-abi] [posname] [file ...]\n"
-"       ar -t[-vV][-s] archive [file ...]\n"
-"       ar -x[-vV][-sCT] archive [file ...]\n"));
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE));
 	exit(1);
 }
 
@@ -326,8 +352,8 @@ notfound(Cmd_info *cmd_info)
 	n = 0;
 	for (i = 0; i < cmd_info->namc; i++)
 		if (cmd_info->namv[i]) {
-			error_message(NOT_FOUND_03_ERROR,
-			    PLAIN_ERROR, (char *)0, cmd_info->namv[i]);
+			(void) fprintf(stderr, MSG_INTL(MSG_NOT_FOUND_FILE),
+			    cmd_info->namv[i]);
 			n++;
 		}
 	return (n);
@@ -339,5 +365,5 @@ notfound(Cmd_info *cmd_info)
 static void
 check_swap(void)
 {
-	(void) system("/usr/sbin/swap -s");
+	(void) system(MSG_ORIG(MSG_CMD_SWAP));
 }

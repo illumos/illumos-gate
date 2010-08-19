@@ -79,6 +79,8 @@ static const fmd_modstat_t _fmd_modstat_tmpl = {
 { "fmd.buflimit", FMD_TYPE_SIZE, "limit on total buffer space" },
 { "fmd.thrtotal", FMD_TYPE_UINT32, "total number of auxiliary threads" },
 { "fmd.thrlimit", FMD_TYPE_UINT32, "limit on number of auxiliary threads" },
+{ "fmd.doorthrtotal", FMD_TYPE_UINT32, "total number of door server threads" },
+{ "fmd.doorthrlimit", FMD_TYPE_UINT32, "limit on door server threads" },
 { "fmd.caseopen", FMD_TYPE_UINT64, "cases currently open by module" },
 { "fmd.casesolved", FMD_TYPE_UINT64, "total cases solved by module" },
 { "fmd.caseclosed", FMD_TYPE_UINT64, "total cases closed by module" },
@@ -246,6 +248,9 @@ fmd_module_create(const char *path, const fmd_modops_t *ops)
 
 	(void) fmd_conf_getprop(fmd.d_conf, "client.thrlim",
 	    &mp->mod_stats->ms_thrlimit.fmds_value.ui32);
+
+	(void) fmd_conf_getprop(fmd.d_conf, "client.doorthrlim",
+	    &mp->mod_stats->ms_doorthrlimit.fmds_value.ui32);
 
 	(void) fmd_conf_getprop(fmd.d_conf, "client.xprtlim",
 	    &mp->mod_stats->ms_xprtlimit.fmds_value.ui32);
@@ -526,6 +531,7 @@ fmd_module_dispatch(fmd_module_t *mp, fmd_event_t *e)
 	fmd_event_impl_t *ep = (fmd_event_impl_t *)e;
 	fmd_hdl_t *hdl = (fmd_hdl_t *)mp;
 	fmd_modtimer_t *t;
+	fmd_topo_t *old_topo;
 	volatile int err;
 
 	/*
@@ -575,9 +581,22 @@ fmd_module_dispatch(fmd_module_t *mp, fmd_event_t *e)
 			fmd_case_publish(ep->ev_data, FMD_CASE_CURRENT);
 			break;
 		case FMD_EVT_TOPO:
-			fmd_topo_rele(mp->mod_topo_current);
+			/*
+			 * Save the pointer to the old topology and update
+			 * the pointer with the updated topology.
+			 * With this approach, other threads that reference the
+			 * topology either
+			 *  - finishes with old topology since
+			 *	it is released after updating
+			 *	mod_topo_current.
+			 *  - or is blocked while mod_topo_current is updated.
+			 */
+			old_topo = mp->mod_topo_current;
+			fmd_module_lock(mp);
 			mp->mod_topo_current = (fmd_topo_t *)ep->ev_data;
 			fmd_topo_addref(mp->mod_topo_current);
+			fmd_module_unlock(mp);
+			fmd_topo_rele(old_topo);
 			ops->fmdo_topo(hdl, mp->mod_topo_current->ft_hdl);
 			break;
 		}
@@ -939,8 +958,7 @@ fmd_module_dc_opendict(fmd_module_t *mp, const char *dict)
 
 	ASSERT(fmd_module_locked(mp));
 
-	dictnam = alloca(strlen(dict) + 1);
-	(void) strcpy(dictnam, fmd_strbasename(dict));
+	dictnam = strdupa(fmd_strbasename(dict));
 
 	if ((p = strrchr(dictnam, '.')) != NULL &&
 	    strcmp(p, ".dict") == 0)

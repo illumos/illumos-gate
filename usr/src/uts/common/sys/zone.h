@@ -204,7 +204,12 @@ typedef struct {
 #define	ZE_AREMOUNTS	2	/* there are mounts within the zone */
 #define	ZE_LABELINUSE	3	/* label is already in use by some other zone */
 
-/* zone_status */
+/*
+ * zone_status values
+ *
+ * You must modify zone_status_names in mdb(1M)'s genunix module
+ * (genunix/zone.c) when you modify this enum.
+ */
 typedef enum {
 	ZONE_IS_UNINITIALIZED = 0,
 	ZONE_IS_INITIALIZED,
@@ -274,10 +279,21 @@ typedef struct zone_cmd_rval {
  */
 #define	ZONE_DOOR_PATH		ZONES_TMPDIR "/%s.zoneadmd_door"
 
+
 /* zone_flags */
+/*
+ * Threads that read or write the following flag must hold zone_lock.
+ */
+#define	ZF_REFCOUNTS_LOGGED	0x1	/* a thread logged the zone's refs */
+
+/*
+ * The following threads are set when the zone is created and never changed.
+ * Threads that test for these flags don't have to hold zone_lock.
+ */
 #define	ZF_HASHED_LABEL		0x2	/* zone has a unique label */
 #define	ZF_IS_SCRATCH		0x4	/* scratch zone */
 #define	ZF_NET_EXCL		0x8	/* Zone has an exclusive IP stack */
+
 
 /* zone_create flags */
 #define	ZCF_NET_EXCL		0x1	/* Create a zone with exclusive IP */
@@ -298,6 +314,7 @@ typedef struct zone_net_data {
 
 
 #ifdef _KERNEL
+
 /*
  * We need to protect the definition of 'list_t' from userland applications and
  * libraries which may be defining ther own versions.
@@ -308,6 +325,38 @@ typedef struct zone_net_data {
 
 struct pool;
 struct brand;
+
+/*
+ * Each of these constants identifies a kernel subsystem that acquires and
+ * releases zone references.  Each subsystem that invokes
+ * zone_hold_ref() and zone_rele_ref() should specify the
+ * zone_ref_subsys_t constant associated with the subsystem.  Tracked holds
+ * help users and developers quickly identify subsystems that stall zone
+ * shutdowns indefinitely.
+ *
+ * NOTE: You must modify zone_ref_subsys_names in usr/src/uts/common/os/zone.c
+ * when you modify this enumeration.
+ */
+typedef enum zone_ref_subsys {
+	ZONE_REF_NFS,			/* NFS */
+	ZONE_REF_NFSV4,			/* NFSv4 */
+	ZONE_REF_SMBFS,			/* SMBFS */
+	ZONE_REF_MNTFS,			/* MNTFS */
+	ZONE_REF_LOFI,			/* LOFI devices */
+	ZONE_REF_VFS,			/* VFS infrastructure */
+	ZONE_REF_IPC,			/* IPC infrastructure */
+	ZONE_REF_NUM_SUBSYS		/* This must be the last entry. */
+} zone_ref_subsys_t;
+
+/*
+ * zone_ref represents a general-purpose references to a zone.  Each zone's
+ * references are linked into the zone's zone_t::zone_ref_list.  This allows
+ * debuggers to walk zones' references.
+ */
+typedef struct zone_ref {
+	struct zone	*zref_zone; /* the zone to which the reference refers */
+	list_node_t	zref_linkage; /* linkage for zone_t::zone_ref_list */
+} zone_ref_t;
 
 /*
  * Structure to record list of ZFS datasets exported to a zone.
@@ -353,6 +402,8 @@ typedef struct zone {
 	 * zone_lock protects the following fields of a zone_t:
 	 * 	zone_ref
 	 * 	zone_cred_ref
+	 * 	zone_subsys_ref
+	 * 	zone_ref_list
 	 * 	zone_ntasks
 	 * 	zone_flags
 	 * 	zone_zsd
@@ -367,6 +418,14 @@ typedef struct zone {
 	zoneid_t	zone_id;	/* ID of zone */
 	uint_t		zone_ref;	/* count of zone_hold()s on zone */
 	uint_t		zone_cred_ref;	/* count of zone_hold_cred()s on zone */
+	/*
+	 * Fixed-sized array of subsystem-specific reference counts
+	 * The sum of all of the counts must be less than or equal to zone_ref.
+	 * The array is indexed by the counts' subsystems' zone_ref_subsys_t
+	 * constants.
+	 */
+	uint_t		zone_subsys_ref[ZONE_REF_NUM_SUBSYS];
+	list_t		zone_ref_list;	/* list of zone_ref_t structs */
 	/*
 	 * zone_rootvp and zone_rootpath can never be modified once set.
 	 */
@@ -494,6 +553,9 @@ extern void zone_zsd_init(void);
 extern void zone_init(void);
 extern void zone_hold(zone_t *);
 extern void zone_rele(zone_t *);
+extern void zone_init_ref(zone_ref_t *);
+extern void zone_hold_ref(zone_t *, zone_ref_t *, zone_ref_subsys_t);
+extern void zone_rele_ref(zone_ref_t *, zone_ref_subsys_t);
 extern void zone_cred_hold(zone_t *);
 extern void zone_cred_rele(zone_t *);
 extern void zone_task_hold(zone_t *);

@@ -50,10 +50,7 @@ file path=platform/i86pc/kernel/drv/xsvc.conf group=sys
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/xsvc group=sys
 file path=platform/i86xpv/kernel/drv/xsvc group=sys
 file path=platform/i86xpv/kernel/drv/xsvc.conf group=sys
-legacy pkg=SUNWxsvc arch=$(ARCH) category=system \
-    desc="Sun Xserver pseudo driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun Xserver pseudo driver" vendor="Sun Microsystems, Inc." \
-    version=11.11.0,REV=2009.11.11
+legacy pkg=SUNWxsvc desc="Sun Xserver pseudo driver" \
+    name="Sun Xserver pseudo driver" version=11.11.0,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -680,10 +680,8 @@ $(sparc_ONLY)hardlink path=usr/share/lib/keytables/us_5 \
     target=../../../../usr/share/lib/keytables/type_4/us_5
 $(sparc_ONLY)hardlink path=usr/share/lib/keytables/us_hobo \
     target=../../../../usr/share/lib/keytables/type_4/us_hobo
-legacy pkg=SUNWkey arch=$(ARCH) category=system \
+legacy pkg=SUNWkey \
     desc="Configuration tables that specify keyboard attributes such as localized meanings for individual keys" \
-    hotline="Please contact your local service provider" \
-    name="Keyboard configuration tables" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Keyboard configuration tables"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

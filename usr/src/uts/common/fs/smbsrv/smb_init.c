@@ -54,18 +54,43 @@ static int smb_drv_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
  * with Windows NT4.0. Previous experiments with NT4.0 resulted in directory
  * listing problems so this buffer size is configurable based on the end-user
  * environment. When in doubt use 37KB.
+ *
+ * smb_raw_mode: read_raw and write_raw supported (1) or NOT supported (0).
  */
 int	smb_maxbufsize = SMB_NT_MAXBUF;
+int	smb_oplock_levelII = 1;
 int	smb_oplock_timeout = OPLOCK_STD_TIMEOUT;
+int	smb_oplock_min_timeout = OPLOCK_MIN_TIMEOUT;
 int	smb_flush_required = 1;
 int	smb_dirsymlink_enable = 1;
 int	smb_sign_debug = 0;
+int	smb_raw_mode = 1;
+int	smb_shortnames = 1;
 uint_t	smb_audit_flags =
 #ifdef	DEBUG
     SMB_AUDIT_NODE;
 #else
     0;
 #endif
+
+/*
+ * Maximum number of simultaneous authentication, share mapping, pipe open
+ * requests to be processed.
+ */
+int	smb_ssetup_threshold = 256;
+int	smb_tcon_threshold = 1024;
+int	smb_opipe_threshold = 1024;
+
+/*
+ * Number of milliseconds that a request will be stalled if it comes in after
+ * the maximum number of inflight operations are being proccessed.
+ */
+int	smb_ssetup_timeout = (30 * 1000);
+int	smb_tcon_timeout = (30 * 1000);
+int	smb_opipe_timeout = (30 * 1000);
+
+int	smb_threshold_debug = 0;
+
 
 /*
  * *****************************************************************************
@@ -257,6 +282,10 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 	case SMB_IOC_UNSHARE:
 		rc = smb_kshare_unexport_list(&ioc->ioc_share);
 		break;
+	case SMB_IOC_SHAREINFO:
+		rc = smb_kshare_info(&ioc->ioc_shareinfo);
+		copyout = B_TRUE;
+		break;
 	case SMB_IOC_NUMOPEN:
 		rc = smb_server_numopen(&ioc->ioc_opennum);
 		copyout = B_TRUE;
@@ -270,6 +299,10 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 		break;
 	case SMB_IOC_FILE_CLOSE:
 		rc = smb_server_file_close(&ioc->ioc_fileid);
+		break;
+	case SMB_IOC_SPOOLDOC:
+		rc = smb_server_spooldoc(&ioc->ioc_spooldoc);
+		copyout = B_TRUE;
 		break;
 	default:
 		rc = ENOTTY;

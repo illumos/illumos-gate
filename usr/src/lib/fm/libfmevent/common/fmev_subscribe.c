@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -38,13 +37,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <umem.h>
 #include <unistd.h>
+#include <fm/libtopo.h>
 
 #include <fm/libfmevent.h>
 
 #include "fmev_impl.h"
-#include "fmev_channels.h"
+
+static topo_hdl_t *g_topohdl;
 
 typedef struct {
 	struct fmev_hdl_cmn sh_cmn;
@@ -66,8 +66,8 @@ typedef struct {
 
 #define	SHDL_FL_SERIALIZE	0x1
 
-#define	API_ENTERV1(hdl) \
-	fmev_api_enter(&HDL2IHDL(hdl)->sh_cmn, LIBFMEVENT_VERSION_1)
+#define	FMEV_API_ENTER(hdl, v) \
+	fmev_api_enter(&HDL2IHDL(hdl)->sh_cmn, LIBFMEVENT_VERSION_##v)
 
 /*
  * For each subscription on a handle we add a node to an avl tree
@@ -115,7 +115,7 @@ fmev_shdlctl_serialize(fmev_shdl_t hdl)
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	if (!API_ENTERV1(hdl))
+	if (!FMEV_API_ENTER(hdl, 1))
 		return (fmev_errno);
 
 	if (!shdlctl_start(ihdl))
@@ -135,7 +135,7 @@ fmev_shdlctl_thrattr(fmev_shdl_t hdl, pthread_attr_t *attr)
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	if (!API_ENTERV1(hdl))
+	if (!FMEV_API_ENTER(hdl, 1))
 		return (fmev_errno);
 
 	if (!shdlctl_start(ihdl))
@@ -152,7 +152,7 @@ fmev_shdlctl_sigmask(fmev_shdl_t hdl, sigset_t *set)
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	if (!API_ENTERV1(hdl))
+	if (!FMEV_API_ENTER(hdl, 1))
 		return (fmev_errno);
 
 	if (!shdlctl_start(ihdl))
@@ -170,7 +170,7 @@ fmev_shdlctl_thrsetup(fmev_shdl_t hdl, door_xcreate_thrsetup_func_t *func,
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	if (!API_ENTERV1(hdl))
+	if (!FMEV_API_ENTER(hdl, 1))
 		return (fmev_errno);
 
 	if (!shdlctl_start(ihdl))
@@ -188,7 +188,7 @@ fmev_shdlctl_thrcreate(fmev_shdl_t hdl, door_xcreate_server_func_t *func,
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	if (!API_ENTERV1(hdl))
+	if (!FMEV_API_ENTER(hdl, 1))
 		return (fmev_errno);
 
 	if (!shdlctl_start(ihdl))
@@ -252,7 +252,7 @@ fmev_shdl_subscribe(fmev_shdl_t hdl, const char *pat, fmev_cbfunc_t func,
 	uint64_t nsid;
 	int serr;
 
-	if (!API_ENTERV1(hdl))
+	if (!FMEV_API_ENTER(hdl, 1))
 		return (fmev_errno);
 
 	if (pat == NULL || func == NULL)
@@ -354,7 +354,7 @@ fmev_shdl_unsubscribe(fmev_shdl_t hdl, const char *pat)
 	struct fmev_subinfo si;
 	int err;
 
-	if (!API_ENTERV1(hdl))
+	if (!FMEV_API_ENTER(hdl, 1))
 		return (fmev_errno);
 
 	if (pat == NULL)
@@ -386,30 +386,13 @@ fmev_shdl_unsubscribe(fmev_shdl_t hdl, const char *pat)
 	return (fmev_seterr(rv));
 }
 
-static void *
-dflt_alloc(size_t sz)
-{
-	return (umem_alloc(sz, UMEM_DEFAULT));
-}
-
-static void *
-dflt_zalloc(size_t sz)
-{
-	return (umem_zalloc(sz, UMEM_DEFAULT));
-}
-
-static void
-dflt_free(void *buf, size_t sz)
-{
-	umem_free(buf, sz);
-}
-
 void *
 fmev_shdl_alloc(fmev_shdl_t hdl, size_t sz)
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	(void) API_ENTERV1(hdl);
+	if (!FMEV_API_ENTER(hdl, 1))
+		return (NULL);
 
 	return (ihdl->sh_cmn.hc_alloc(sz));
 }
@@ -419,7 +402,8 @@ fmev_shdl_zalloc(fmev_shdl_t hdl, size_t sz)
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	(void) API_ENTERV1(hdl);
+	if (!FMEV_API_ENTER(hdl, 1))
+		return (NULL);
 
 	return (ihdl->sh_cmn.hc_zalloc(sz));
 }
@@ -429,9 +413,42 @@ fmev_shdl_free(fmev_shdl_t hdl, void *buf, size_t sz)
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	(void) API_ENTERV1(hdl);
+	if (!FMEV_API_ENTER(hdl, 1))
+		return;
 
 	ihdl->sh_cmn.hc_free(buf, sz);
+}
+
+char *
+fmev_shdl_strdup(fmev_shdl_t hdl, char *src)
+{
+	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
+	size_t srclen;
+	char *dst;
+
+	if (!FMEV_API_ENTER(hdl, 2))
+		return (NULL);
+
+	srclen = strlen(src);
+
+	if ((dst = ihdl->sh_cmn.hc_alloc(srclen + 1)) == NULL) {
+		(void) fmev_seterr(FMEVERR_ALLOC);
+		return (NULL);
+	}
+
+	(void) strncpy(dst, src, srclen);
+	dst[srclen] = '\0';
+	return (dst);
+}
+
+void
+fmev_shdl_strfree(fmev_shdl_t hdl, char *buf)
+{
+	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
+
+	(void) FMEV_API_ENTER(hdl, 2);
+
+	ihdl->sh_cmn.hc_free(buf, strlen(buf) + 1);
 }
 
 int
@@ -546,11 +563,100 @@ error:
 }
 
 fmev_err_t
+fmev_shdl_getauthority(fmev_shdl_t hdl, nvlist_t **nvlp)
+{
+	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
+	nvlist_t *propnvl;
+	fmev_err_t rc;
+
+	if (!FMEV_API_ENTER(hdl, 2))
+		return (fmev_errno);
+
+	(void) pthread_mutex_lock(&ihdl->sh_lock);
+
+	if (sysevent_evc_getpropnvl(ihdl->sh_binding, &propnvl) != 0) {
+		*nvlp = NULL;
+		(void) pthread_mutex_unlock(&ihdl->sh_lock);
+		return (fmev_seterr(FMEVERR_UNKNOWN));
+	}
+
+	if (propnvl == NULL) {
+		rc = FMEVERR_BUSY;	/* Other end has not bound */
+	} else {
+		nvlist_t *auth;
+
+		if (nvlist_lookup_nvlist(propnvl, "fmdauth", &auth) == 0) {
+			rc = (nvlist_dup(auth, nvlp, 0) == 0) ? FMEV_SUCCESS :
+			    FMEVERR_ALLOC;
+		} else {
+			rc = FMEVERR_INTERNAL;
+		}
+		nvlist_free(propnvl);
+	}
+
+	(void) pthread_mutex_unlock(&ihdl->sh_lock);
+
+	if (rc != FMEV_SUCCESS) {
+		*nvlp = NULL;
+		(void) fmev_seterr(rc);
+	}
+
+	return (rc);
+}
+
+char *
+fmev_shdl_nvl2str(fmev_shdl_t hdl, nvlist_t *nvl)
+{
+	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
+	char *fmri, *fmricp;
+	fmev_err_t err;
+	int topoerr;
+
+	if (!FMEV_API_ENTER(hdl, 2))
+		return (NULL);
+
+	if (g_topohdl == NULL) {
+		(void) pthread_mutex_lock(&ihdl->sh_lock);
+		if (g_topohdl == NULL)
+			g_topohdl = topo_open(TOPO_VERSION, NULL, &topoerr);
+		(void) pthread_mutex_unlock(&ihdl->sh_lock);
+
+		if (g_topohdl == NULL) {
+			(void) fmev_seterr(FMEVERR_INTERNAL);
+			return (NULL);
+		}
+	}
+
+	if (topo_fmri_nvl2str(g_topohdl, nvl, &fmri, &topoerr) == 0) {
+		fmricp = fmev_shdl_strdup(hdl, fmri);
+		topo_hdl_strfree(g_topohdl, fmri);
+		return (fmricp);	/* fmev_errno set if strdup failed */
+	}
+
+	switch (topoerr) {
+	case ETOPO_FMRI_NOMEM:
+		err = FMEVERR_ALLOC;
+		break;
+
+	case ETOPO_FMRI_MALFORM:
+	case ETOPO_METHOD_NOTSUP:
+	case ETOPO_METHOD_INVAL:
+	default:
+		err = FMEVERR_INVALIDARG;
+		break;
+	}
+
+	(void) fmev_seterr(err);
+	return (NULL);
+}
+
+fmev_err_t
 fmev_shdl_fini(fmev_shdl_t hdl)
 {
 	fmev_shdl_impl_t *ihdl = HDL2IHDL(hdl);
 
-	(void) API_ENTERV1(hdl);
+	if (!FMEV_API_ENTER(hdl, 1))
+		return (fmev_errno);
 
 	(void) pthread_mutex_lock(&ihdl->sh_lock);
 
@@ -593,6 +699,11 @@ fmev_shdl_fini(fmev_shdl_t hdl)
 	}
 
 	ihdl->sh_cmn.hc_magic = 0;
+
+	if (g_topohdl) {
+		topo_close(g_topohdl);
+		g_topohdl = NULL;
+	}
 
 	(void) pthread_mutex_unlock(&ihdl->sh_lock);
 	(void) pthread_mutex_destroy(&ihdl->sh_lock);

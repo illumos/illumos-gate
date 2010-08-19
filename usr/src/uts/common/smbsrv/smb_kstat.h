@@ -63,6 +63,7 @@ typedef struct smb_kstat_utilization {
 
 typedef struct smb_kstat_req {
 	char		kr_name[KSTAT_STRLEN];
+	char		kr_pad[(~(KSTAT_STRLEN & 0x07) + 1) & 0x07];
 	uint64_t	kr_sum;
 	uint64_t	kr_txb;
 	uint64_t	kr_rxb;

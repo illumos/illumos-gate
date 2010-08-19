@@ -670,7 +670,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	    (((xuio_t *)uio)->xu_type == UIOTYPE_ZEROCOPY))
 		xuio = (xuio_t *)uio;
 	else
-		uio_prefaultpages(n, uio);
+		uio_prefaultpages(MIN(n, max_blksz), uio);
 
 	/*
 	 * If in append mode, set the io offset pointer to eof.
@@ -866,6 +866,8 @@ again:
 		 * been done, but that would still expose the ISUID/ISGID
 		 * to another app after the partial write is committed.
 		 *
+		 * Note: we don't call zfs_fuid_map_id() here because
+		 * user 0 is not an ephemeral uid.
 		 */
 		mutex_enter(&zp->z_acl_lock);
 		if ((zp->z_mode & (S_IXUSR | (S_IXUSR >> 3) |
@@ -910,6 +912,9 @@ again:
 			break;
 		ASSERT(tx_bytes == nbytes);
 		n -= nbytes;
+
+		if (!xuio && n > 0)
+			uio_prefaultpages(MIN(n, max_blksz), uio);
 	}
 
 	zfs_range_unlock(rl);
@@ -1364,6 +1369,8 @@ top:
 		error = zfs_dirent_lock(&dl, dzp, name, &zp, zflg,
 		    NULL, NULL);
 		if (error) {
+			if (have_acl)
+				zfs_acl_ids_free(&acl_ids);
 			if (strcmp(name, "..") == 0)
 				error = EISDIR;
 			ZFS_EXIT(zfsvfs);
@@ -1379,6 +1386,8 @@ top:
 		 * to reference it.
 		 */
 		if (error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, B_FALSE, cr)) {
+			if (have_acl)
+				zfs_acl_ids_free(&acl_ids);
 			goto out;
 		}
 
@@ -1389,6 +1398,8 @@ top:
 
 		if ((dzp->z_pflags & ZFS_XATTR) &&
 		    (vap->va_type != VREG)) {
+			if (have_acl)
+				zfs_acl_ids_free(&acl_ids);
 			error = EINVAL;
 			goto out;
 		}
@@ -1447,6 +1458,10 @@ top:
 		dmu_tx_commit(tx);
 	} else {
 		int aflags = (flag & FAPPEND) ? V_APPEND : 0;
+
+		if (have_acl)
+			zfs_acl_ids_free(&acl_ids);
+		have_acl = B_FALSE;
 
 		/*
 		 * A directory entry already exists for this name.
@@ -1535,11 +1550,11 @@ zfs_remove(vnode_t *dvp, char *name, cred_t *cr, caller_context_t *ct,
     int flags)
 {
 	znode_t		*zp, *dzp = VTOZ(dvp);
-	znode_t		*xzp = NULL;
+	znode_t		*xzp;
 	vnode_t		*vp;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
-	uint64_t	acl_obj, xattr_obj = 0;
+	uint64_t	acl_obj, xattr_obj;
 	uint64_t 	xattr_obj_unlinked = 0;
 	uint64_t	obj = 0;
 	zfs_dirlock_t	*dl;
@@ -1563,6 +1578,8 @@ zfs_remove(vnode_t *dvp, char *name, cred_t *cr, caller_context_t *ct,
 	}
 
 top:
+	xattr_obj = 0;
+	xzp = NULL;
 	/*
 	 * Attempt to lock directory; fail if entry doesn't exist.
 	 */
@@ -1622,7 +1639,7 @@ top:
 	/* are there any extended attributes? */
 	error = sa_lookup(zp->z_sa_hdl, SA_ZPL_XATTR(zfsvfs),
 	    &xattr_obj, sizeof (xattr_obj));
-	if (xattr_obj) {
+	if (error == 0 && xattr_obj) {
 		error = zfs_zget(zfsvfs, xattr_obj, &xzp);
 		ASSERT3U(error, ==, 0);
 		dmu_tx_hold_sa(tx, zp->z_sa_hdl, B_TRUE);
@@ -1641,6 +1658,8 @@ top:
 	if (error) {
 		zfs_dirent_unlock(dl);
 		VN_RELE(vp);
+		if (xzp)
+			VN_RELE(ZTOV(xzp));
 		if (error == ERESTART) {
 			dmu_tx_wait(tx);
 			dmu_tx_abort(tx);
@@ -2181,7 +2200,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 	while (outcount < bytes_wanted) {
 		ino64_t objnum;
 		ushort_t reclen;
-		off64_t *next;
+		off64_t *next = NULL;
 
 		/*
 		 * Special case `.', `..', and `.zfs'.
@@ -2307,7 +2326,8 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 		} else {
 			offset += 1;
 		}
-		*next = offset;
+		if (next)
+			*next = offset;
 	}
 	zp->z_zn_prefetch = B_FALSE; /* a lookup will re-enable pre-fetching */
 
@@ -2401,6 +2421,8 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
 
+	zfs_fuid_map_ids(zp, cr, &vap->va_uid, &vap->va_gid);
+
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs), NULL, &mtime, 16);
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL, &ctime, 16);
 
@@ -2414,7 +2436,8 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 * Also, if we are the owner don't bother, since owner should
 	 * always be allowed to read basic attributes of file.
 	 */
-	if (!(zp->z_pflags & ZFS_ACL_TRIVIAL) && (zp->z_uid != crgetuid(cr))) {
+	if (!(zp->z_pflags & ZFS_ACL_TRIVIAL) &&
+	    (vap->va_uid != crgetuid(cr))) {
 		if (error = zfs_zaccess(zp, ACE_READ_ATTRIBUTES, 0,
 		    skipaclchk, cr)) {
 			ZFS_EXIT(zfsvfs);
@@ -2430,8 +2453,6 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	mutex_enter(&zp->z_lock);
 	vap->va_type = vp->v_type;
 	vap->va_mode = zp->z_mode & MODEMASK;
-	vap->va_uid = zp->z_uid;
-	vap->va_gid = zp->z_gid;
 	vap->va_fsid = zp->z_zfsvfs->z_vfs->vfs_dev;
 	vap->va_nodeid = zp->z_id;
 	if ((vp->v_flag & VROOT) && zfs_show_ctldir(zp))
@@ -2532,6 +2553,22 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			xoap->xoa_reparse = ((zp->z_pflags & ZFS_REPARSE) != 0);
 			XVA_SET_RTN(xvap, XAT_REPARSE);
 		}
+		if (XVA_ISSET_REQ(xvap, XAT_GEN)) {
+			xoap->xoa_generation = zp->z_gen;
+			XVA_SET_RTN(xvap, XAT_GEN);
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_OFFLINE)) {
+			xoap->xoa_offline =
+			    ((zp->z_pflags & ZFS_OFFLINE) != 0);
+			XVA_SET_RTN(xvap, XAT_OFFLINE);
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_SPARSE)) {
+			xoap->xoa_sparse =
+			    ((zp->z_pflags & ZFS_SPARSE) != 0);
+			XVA_SET_RTN(xvap, XAT_SPARSE);
+		}
 	}
 
 	ZFS_TIME_DECODE(&vap->va_atime, zp->z_atime);
@@ -2587,7 +2624,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	int		trim_mask = 0;
 	uint64_t	new_mode;
 	uint64_t	new_uid, new_gid;
-	uint64_t	xattr_obj = 0;
+	uint64_t	xattr_obj;
 	uint64_t	mtime[2], ctime[2];
 	znode_t		*attrzp;
 	int		need_policy = FALSE;
@@ -2595,7 +2632,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	zfs_fuid_info_t *fuidp = NULL;
 	xvattr_t *xvap = (xvattr_t *)vap;	/* vap may be an xvattr_t * */
 	xoptattr_t	*xoap;
-	zfs_acl_t	*aclp = NULL;
+	zfs_acl_t	*aclp;
 	boolean_t skipaclchk = (flags & ATTR_NOACLCHECK) ? B_TRUE : B_FALSE;
 	boolean_t	fuid_dirtied = B_FALSE;
 	sa_bulk_attr_t	bulk[7], xattr_bulk[7];
@@ -2674,6 +2711,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 
 top:
 	attrzp = NULL;
+	aclp = NULL;
 
 	/* Can this be moved to before the top label? */
 	if (zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) {
@@ -2709,6 +2747,8 @@ top:
 	    ((mask & AT_XVATTR) && (XVA_ISSET_REQ(xvap, XAT_HIDDEN) ||
 	    XVA_ISSET_REQ(xvap, XAT_READONLY) ||
 	    XVA_ISSET_REQ(xvap, XAT_ARCHIVE) ||
+	    XVA_ISSET_REQ(xvap, XAT_OFFLINE) ||
+	    XVA_ISSET_REQ(xvap, XAT_SPARSE) ||
 	    XVA_ISSET_REQ(xvap, XAT_CREATETIME) ||
 	    XVA_ISSET_REQ(xvap, XAT_SYSTEM)))) {
 		need_policy = zfs_zaccess(zp, ACE_WRITE_ATTRIBUTES, 0,
@@ -2765,8 +2805,7 @@ top:
 
 	mutex_enter(&zp->z_lock);
 	oldva.va_mode = zp->z_mode;
-	oldva.va_uid = zp->z_uid;
-	oldva.va_gid = zp->z_gid;
+	zfs_fuid_map_ids(zp, cr, &oldva.va_uid, &oldva.va_gid);
 	if (mask & AT_XVATTR) {
 		/*
 		 * Update xvattr mask to include only those attributes
@@ -2897,10 +2936,10 @@ top:
 	mask = vap->va_mask;
 
 	if ((mask & (AT_UID | AT_GID))) {
-		(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_XATTR(zfsvfs), &xattr_obj,
-		    sizeof (xattr_obj));
+		err = sa_lookup(zp->z_sa_hdl, SA_ZPL_XATTR(zfsvfs),
+		    &xattr_obj, sizeof (xattr_obj));
 
-		if (xattr_obj) {
+		if (err == 0 && xattr_obj) {
 			err = zfs_zget(zp->z_zfsvfs, xattr_obj, &attrzp);
 			if (err)
 				goto out2;
@@ -2908,8 +2947,10 @@ top:
 		if (mask & AT_UID) {
 			new_uid = zfs_fuid_create(zfsvfs,
 			    (uint64_t)vap->va_uid, cr, ZFS_OWNER, &fuidp);
-			if (vap->va_uid != zp->z_uid &&
+			if (new_uid != zp->z_uid &&
 			    zfs_fuid_overquota(zfsvfs, B_FALSE, new_uid)) {
+				if (attrzp)
+					VN_RELE(ZTOV(attrzp));
 				err = EDQUOT;
 				goto out2;
 			}
@@ -2920,6 +2961,8 @@ top:
 			    cr, ZFS_GROUP, &fuidp);
 			if (new_gid != zp->z_gid &&
 			    zfs_fuid_overquota(zfsvfs, B_TRUE, new_gid)) {
+				if (attrzp)
+					VN_RELE(ZTOV(attrzp));
 				err = EDQUOT;
 				goto out2;
 			}
@@ -2932,8 +2975,7 @@ top:
 		uint64_t acl_obj;
 		new_mode = (pmode & S_IFMT) | (vap->va_mode & ~S_IFMT);
 
-		if (err = zfs_acl_chmod_setattr(zp, &aclp, new_mode))
-			goto out;
+		zfs_acl_chmod_setattr(zp, &aclp, new_mode);
 
 		mutex_enter(&zp->z_lock);
 		if (!zp->z_is_sa && ((acl_obj = zfs_external_acl(zp)) != 0)) {
@@ -2941,7 +2983,7 @@ top:
 			 * Are we upgrading ACL from old V0 format
 			 * to V1 format?
 			 */
-			if (zfsvfs->z_version <= ZPL_VERSION_FUID &&
+			if (zfsvfs->z_version >= ZPL_VERSION_FUID &&
 			    zfs_znode_acl_version(zp) ==
 			    ZFS_ACL_VERSION_INITIAL) {
 				dmu_tx_hold_free(tx, acl_obj, 0,
@@ -3014,26 +3056,24 @@ top:
 		if (mask & AT_UID) {
 			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_UID(zfsvfs), NULL,
 			    &new_uid, sizeof (new_uid));
-			zp->z_uid = zfs_fuid_map_id(zfsvfs, new_uid,
-			    cr, ZFS_OWNER);
+			zp->z_uid = new_uid;
 			if (attrzp) {
 				SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
 				    SA_ZPL_UID(zfsvfs), NULL, &new_uid,
 				    sizeof (new_uid));
-				attrzp->z_uid = zp->z_uid;
+				attrzp->z_uid = new_uid;
 			}
 		}
 
 		if (mask & AT_GID) {
 			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_GID(zfsvfs),
 			    NULL, &new_gid, sizeof (new_gid));
-			zp->z_gid = zfs_fuid_map_id(zfsvfs, new_gid, cr,
-			    ZFS_GROUP);
+			zp->z_gid = new_gid;
 			if (attrzp) {
 				SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
 				    SA_ZPL_GID(zfsvfs), NULL, &new_gid,
 				    sizeof (new_gid));
-				attrzp->z_gid = zp->z_gid;
+				attrzp->z_gid = new_gid;
 			}
 		}
 		if (!(mask & AT_MODE)) {
@@ -3056,6 +3096,8 @@ top:
 		ASSERT3U((uintptr_t)aclp, !=, NULL);
 		err = zfs_aclset_common(zp, aclp, cr, tx);
 		ASSERT3U(err, ==, 0);
+		if (zp->z_acl_cached)
+			zfs_acl_free(zp->z_acl_cached);
 		zp->z_acl_cached = aclp;
 		aclp = NULL;
 	}
@@ -3171,7 +3213,6 @@ out:
 		err2 = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
 		dmu_tx_commit(tx);
 	}
-
 
 out2:
 	if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
@@ -3858,6 +3899,7 @@ zfs_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
 	int		error;
 	int		zf = ZNEW;
 	uint64_t	parent;
+	uid_t		owner;
 
 	ASSERT(tdvp->v_type == VDIR);
 
@@ -3917,8 +3959,8 @@ zfs_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
 	}
 
 
-	if (szp->z_uid != crgetuid(cr) &&
-	    secpolicy_basic_link(cr) != 0) {
+	owner = zfs_fuid_map_id(zfsvfs, szp->z_uid, cr, ZFS_OWNER);
+	if (owner != crgetuid(cr) && secpolicy_basic_link(cr) != 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EPERM);
 	}

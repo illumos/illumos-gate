@@ -36,11 +36,9 @@ dir path=usr/lib
 file path=usr/include/papi.h
 file path=usr/lib/libpapi-common.so.0
 file path=usr/lib/libpapi.so.0
-legacy pkg=SUNWpapi arch=$(ARCH) category=system \
-    desc="Free Standards Group Open Printing API, Draft v0.9" \
-    hotline="Please contact your local service provider" \
+legacy pkg=SUNWpapi desc="Free Standards Group Open Printing API, Draft v0.9" \
     name="Free Standards Group Open Printing API" \
-    vendor="Sun Microsystems, Inc." version=11.11.0,REV=2009.11.11
+    version=11.11.0,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libpapi-common.so target=./libpapi-common.so.0

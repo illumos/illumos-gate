@@ -235,7 +235,7 @@ smb_opipe_do_open(smb_request_t *sr, smb_opipe_t *opipe)
 	uint32_t buflen = SMB_OPIPE_DOOR_BUFSIZE;
 	uint32_t len;
 
-	if ((opipe->p_event = smb_event_create()) == NULL)
+	if ((opipe->p_event = smb_event_create(SMB_EVENT_TIMEOUT)) == NULL)
 		return (-1);
 
 	smb_user_netinfo_init(user, userinfo);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -212,6 +211,8 @@ extern int unsetenv(const char *);
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+extern char *canonicalize_file_name(const char *);
+extern int clearenv(void);
 extern void closefrom(int);
 extern int daemon(int, int);
 extern int dup2(int, int);
@@ -232,6 +233,8 @@ extern int isatty(int);
 extern void *memalign(size_t, size_t);
 extern char *ttyname(int);
 extern char *mkdtemp(char *);
+extern const char *getprogname(void);
+extern void setprogname(const char *);
 
 #if !defined(_STRICT_STDC) && defined(_LONGLONG_TYPE)
 extern char *lltostr(long long, char *);
@@ -315,6 +318,8 @@ extern int unsetenv();
 #endif
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
+extern char *canonicalize_file_name();
+extern int clearenv();
 extern void closefrom();
 extern int daemon();
 extern int dup2();
@@ -335,6 +340,8 @@ extern int isatty();
 extern void *memalign();
 extern char *ttyname();
 extern char *mkdtemp();
+extern char *getprogname();
+extern void setprogname();
 
 #if defined(_LONGLONG_TYPE)
 extern char *lltostr();

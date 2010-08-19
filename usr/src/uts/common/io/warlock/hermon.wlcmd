@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 one hermon_state_s
@@ -63,6 +62,7 @@ root	hermon_ci_query_mr
 root	hermon_ci_reregister_mr
 root	hermon_ci_reregister_buf
 root	hermon_ci_sync_mr
+root	hermon_ci_register_dma_mr
 root	hermon_ci_alloc_mw
 root	hermon_ci_free_mw
 root	hermon_ci_query_mw
@@ -93,6 +93,14 @@ root	hermon_ci_register_physical_fmr
 root	hermon_ci_deregister_fmr
 root	hermon_ci_alloc_io_mem
 root	hermon_ci_free_io_mem
+root	hermon_ci_query_cq_handler_id
+root	hermon_ci_not_supported
+
+### Hermon misc. (currently unused)
+root	hermon_config_int_mod
+root	hermon_hw_health_check
+root	hermon_rsrc_alloc_uarhdl
+root	hermon_sense_port_post
 
 ### Hermon Firmware commands (currently unused)
 root	hermon_sync_tpt_cmd_post
@@ -105,19 +113,22 @@ root	hermon_pci_capability_msix
 
 ### Hermon Event Queue function pointers
 add	hermon_eq_poll/eqfunction targets hermon_cq_handler		\
-    hermon_cq_err_handler hermon_comm_estbl_handler hermon_eq_arm	\
+    hermon_cq_err_handler hermon_comm_estbl_handler			\
     hermon_port_state_change_handler hermon_invreq_local_wq_err_handler	\
     hermon_local_acc_vio_wq_err_handler					\
     hermon_path_mig_handler hermon_path_mig_err_handler			\
     hermon_local_wq_cat_err_handler hermon_sendq_drained_handler	\
-    hermon_eq_overflow_handler hermon_cmd_complete_handler		\
+    hermon_cmd_complete_handler hermon_fexch_error_handler		\
     hermon_srq_last_wqe_reached_handler hermon_catastrophic_handler	\
-    hermon_ecc_detection_handler hermon_no_eqhandler hermon_eq_demux
+    hermon_no_eqhandler hermon_eq_demux
 
 ### Hermon agent callbacks
 root	hermon_agent_handle_req
 root	hermon_agent_request_cb
 root	hermon_agent_response_cb
+
+### Hermon interrupt allocation callback
+root	hermon_intr_cb_handler
 
 ### Hermon kmem_cache constructors and destructors
 root	hermon_rsrc_cqhdl_constructor
@@ -162,11 +173,9 @@ add	hermon_umap_db_handle_onclose_cb/callback targets \
 root	hermon_qpn_avl_compare
 
 ### Hermon FMR processing
-root	hermon_fmr_avl_compare
-root	hermon_fmr_processing
 add	hermon_sw_fmr_s::fmr_flush_function targets warlock_dummy
 
-### Hermon FMR processing
+### Hermon FMA processing
 root	hermon_inter_err_chk
 
 add	bus_ops::bus_add_eventcall	targets warlock_dummy

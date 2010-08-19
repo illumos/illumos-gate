@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -133,7 +132,7 @@ smb_kdoor_upcall(uint32_t cmd, void *req_data, xdrproc_t req_xdr,
 	if (rsp_data != NULL && rsp_xdr != NULL)
 		da.da_flags = SMB_DF_ASYNC;
 
-	if ((da.da_event = smb_event_create()) == NULL)
+	if ((da.da_event = smb_event_create(SMB_EVENT_TIMEOUT)) == NULL)
 		return (-1);
 
 	mutex_enter(&smb_kdoor_mutex);

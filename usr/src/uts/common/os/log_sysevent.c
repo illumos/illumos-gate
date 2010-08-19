@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -280,11 +277,11 @@ log_event_upcall(log_event_upcall_arg_t *arg)
 			}
 			if (retry > 4) {
 				LOG_DEBUG((CE_CONT,
-					"log_event_upcall: ebadf\n"));
+				    "log_event_upcall: ebadf\n"));
 				return (EBADF);
 			}
 			LOG_DEBUG((CE_CONT, "log_event_upcall: "
-				"retrying upcall after lookup\n"));
+			    "retrying upcall after lookup\n"));
 			darg = save_arg;
 			break;
 		default:
@@ -297,14 +294,14 @@ log_event_upcall(log_event_upcall_arg_t *arg)
 
 	if (neagain > 0 || neintr > 0) {
 		LOG_DEBUG((CE_CONT, "upcall: eagain=%d eintr=%d nticks=%d\n",
-			neagain, neintr, nticks));
+		    neagain, neintr, nticks));
 	}
 
 	LOG_DEBUG1((CE_CONT, "log_event_upcall:\n\t"
-		"error=%d rptr1=%p rptr2=%p dptr2=%p ret1=%x ret2=%x\n",
-		error, (void *)arg, (void *)darg.rbuf,
-		(void *)darg.data_ptr,
-		*((int *)(darg.rbuf)), *((int *)(darg.data_ptr))));
+	    "error=%d rptr1=%p rptr2=%p dptr2=%p ret1=%x ret2=%x\n",
+	    error, (void *)arg, (void *)darg.rbuf,
+	    (void *)darg.data_ptr,
+	    *((int *)(darg.rbuf)), *((int *)(darg.data_ptr))));
 
 	if (!error) {
 		/*
@@ -334,7 +331,7 @@ log_event_deliver()
 	callb_cpr_t cprinfo;
 
 	CALLB_CPR_INIT(&cprinfo, &eventq_head_mutex, callb_generic_cpr,
-				"logevent");
+	    "logevent");
 
 	/*
 	 * eventq_head_mutex is exited (released) when there are no more
@@ -440,7 +437,7 @@ log_event_deliver()
 			break;
 		default:
 			LOG_DEBUG((CE_CONT, "log_event_deliver: "
-				"upcall err %d\n", upcall_err));
+			    "upcall err %d\n", upcall_err));
 			sysevent_upcall_status = upcall_err;
 			/*
 			 * Signal everyone waiting that transport is down
@@ -521,8 +518,8 @@ sysevent_alloc(char *class, char *subclass, char *pub, int flag)
 	aligned_pub_sz = SE_ALIGN(pub_sz);
 
 	payload_sz = (aligned_class_sz - sizeof (uint64_t)) +
-		(aligned_subclass_sz - sizeof (uint64_t)) +
-		(aligned_pub_sz - sizeof (uint64_t)) - sizeof (uint64_t);
+	    (aligned_subclass_sz - sizeof (uint64_t)) +
+	    (aligned_pub_sz - sizeof (uint64_t)) - sizeof (uint64_t);
 
 	/*
 	 * Allocate event buffer plus additional sysevent queue
@@ -1611,7 +1608,7 @@ log_sysevent_filename(char *file)
 	/* Unbind old event door */
 	if (logevent_door_upcall_filename) {
 		kmem_free(logevent_door_upcall_filename,
-			logevent_door_upcall_filename_size);
+		    logevent_door_upcall_filename_size);
 		if (event_door) {
 			door_ki_rele(event_door);
 			event_door = NULL;
@@ -1619,7 +1616,7 @@ log_sysevent_filename(char *file)
 	}
 	logevent_door_upcall_filename_size = strlen(file) + 1;
 	logevent_door_upcall_filename = kmem_alloc(
-		logevent_door_upcall_filename_size, KM_SLEEP);
+	    logevent_door_upcall_filename_size, KM_SLEEP);
 	(void) strcpy(logevent_door_upcall_filename, file);
 
 	/*
@@ -1698,7 +1695,7 @@ restart:
 
 	/* Time stamp and assign ID */
 	SE_SEQ(ev) = eid->eid_seq = atomic_add_64_nv(&kernel_event_id,
-		(uint64_t)1);
+	    (uint64_t)1);
 	SE_TIME(ev) = eid->eid_ts = gethrtime();
 
 	LOG_DEBUG1((CE_CONT, "log_sysevent: class=%d type=%d id=0x%llx\n",
@@ -1756,7 +1753,7 @@ log_sysevent(sysevent_t *ev, int flag, sysevent_id_t *eid)
 	}
 	rval = queue_sysevent(ev_copy, eid, flag);
 	ASSERT(rval == 0 || rval == SE_ENOMEM || rval == SE_EQSIZE ||
-		rval == SE_NO_TRANSPORT);
+	    rval == SE_NO_TRANSPORT);
 	ASSERT(!(flag == SE_SLEEP && (rval == SE_EQSIZE || rval == SE_ENOMEM)));
 	return (rval);
 }
@@ -1775,7 +1772,7 @@ log_usr_sysevent(sysevent_t *ev, int ev_size, sysevent_id_t *eid)
 	log_eventq_t *qcopy;
 
 	copy_sz = ev_size + offsetof(log_eventq_t, arg) +
-		offsetof(log_event_upcall_arg_t, buf);
+	    offsetof(log_event_upcall_arg_t, buf);
 	qcopy = kmem_zalloc(copy_sz, KM_SLEEP);
 	ev_copy = (sysevent_t *)&qcopy->arg.buf;
 
@@ -1825,8 +1822,8 @@ ddi_log_sysevent(
 
 	if (sleep_flag == DDI_SLEEP && servicing_interrupt()) {
 		cmn_err(CE_NOTE, "!ddi_log_syevent: driver %s%d - cannot queue "
-			"event from interrupt context with sleep semantics\n",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    "event from interrupt context with sleep semantics\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		return (DDI_ECONTEXT);
 	}
 
@@ -1836,7 +1833,7 @@ ddi_log_sysevent(
 		publisher = pubstr;
 	} else {
 		publisher = kmem_alloc(n,
-			(sleep_flag == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
+		    (sleep_flag == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
 		if (publisher == NULL) {
 			return (DDI_ENOMEM);
 		}
@@ -1880,7 +1877,7 @@ ddi_log_sysevent(
 }
 
 uint64_t
-log_sysevent_new_id()
+log_sysevent_new_id(void)
 {
 	return (atomic_add_64_nv(&kernel_event_id, (uint64_t)1));
 }

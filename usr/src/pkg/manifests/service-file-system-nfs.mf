@@ -72,21 +72,13 @@ file path=usr/lib/reparse/$(ARCH64)/libnfs_basic.so.1
 file path=usr/lib/reparse/libnfs_basic.so.1
 file path=usr/sbin/exportfs mode=0555
 file path=usr/sbin/nfsref mode=0555
-legacy pkg=SUNWnfsskr arch=$(ARCH) category=system \
+legacy pkg=SUNWnfsskr \
     desc="Network File System (NFS) server kernel support (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Network File System (NFS) server kernel support (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWnfssr arch=$(ARCH) category=system \
-    desc="Network File System (NFS) server support (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Network File System (NFS) server support (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWnfssu arch=$(ARCH) category=system \
-    desc="Network File System (NFS) server support (Usr)" \
-    hotline="Please contact your local service provider" \
-    name="Network File System (NFS) server support (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Network File System (NFS) server kernel support (Root)"
+legacy pkg=SUNWnfssr desc="Network File System (NFS) server support (Root)" \
+    name="Network File System (NFS) server support (Root)"
+legacy pkg=SUNWnfssu desc="Network File System (NFS) server support (Usr)" \
+    name="Network File System (NFS) server support (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/reparse/$(ARCH64)/libnfs_basic.so target=./libnfs_basic.so.1

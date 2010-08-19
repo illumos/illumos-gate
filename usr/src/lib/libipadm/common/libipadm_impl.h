@@ -62,12 +62,6 @@ struct ipadm_handle {
 	zoneid_t	iph_zoneid;	/* zoneid where handle was opened */
 };
 
-/*
- * Indicates that the operation being invoked is in 'init' context. This is
- * a library private flag.
- */
-#define	IPH_INIT	0x10000000
-
 struct ipadm_addrobj_s {
 	char 			ipadm_ifname[LIFNAMSIZ];
 	int32_t			ipadm_lifnum;

@@ -57,12 +57,12 @@ extern "C" {
 
 
 /* Transport Interface version */
-typedef enum ibt_version_e {
-	IBTI_V1 = 1,
-	IBTI_V2 = 2,		/* FMR Support */
-	IBTI_V3 = 3,
-	IBTI_V_CURR = IBTI_V3
-} ibt_version_t;
+typedef int ibt_version_t;
+#define	IBTI_V1		1
+#define	IBTI_V2		2
+#define	IBTI_V3		3
+#define	IBTI_V4		4
+#define	IBTI_V_CURR	IBTI_V4
 
 /*
  * Driver class type. Identifies a type of client driver so that
@@ -128,6 +128,7 @@ typedef struct ibt_async_event_s {
 	ibt_srq_hdl_t		ev_srq_hdl;		/* SRQ handle */
 	ibt_port_change_t	ev_port_flags;		/* Port Change flags */
 	uint8_t			ev_port;		/* HCA port */
+	ibt_fc_syndrome_t	ev_fc;			/* FEXCH syndrome */
 } ibt_async_event_t;
 
 /*
@@ -204,48 +205,6 @@ typedef enum ibt_qflags_e {
 	IBT_SEND_Q	= 1 << 0,	/* Op applies to the Send Q */
 	IBT_RECV_Q	= 1 << 1	/* Op applies to the Recv Q */
 } ibt_qflags_t;
-
-/*
- * CQ priorities
- * The IBTF will attempt to implement a coarse 3 level priority scheme
- * (IBT_CQ_LOW, IBT_CQ_MEDIUM, IBT_CQ_HIGH) based on the class of client
- * driver. The requested priority is not guaranteed. If a CI implementation
- * has the ability to implement priority CQs, then the IBTF will take advantage
- * of that when calling the CI to create a CQ by passing a priority indicator
- * to the CI.
- */
-typedef enum ibt_cq_priority_e {
-	IBT_CQ_DEFAULT		= 0x0,
-	IBT_CQ_LOW		= 0x1,
-	IBT_CQ_MEDIUM		= 0x2,
-	IBT_CQ_HIGH		= 0x3,
-	IBT_CQ_OPAQUE_1		= 0x4,
-	IBT_CQ_OPAQUE_2		= 0x5,
-	IBT_CQ_OPAQUE_3		= 0x6,
-	IBT_CQ_OPAQUE_4		= 0x7,
-	IBT_CQ_OPAQUE_5		= 0x8,
-	IBT_CQ_OPAQUE_6		= 0x9,
-	IBT_CQ_OPAQUE_7		= 0xA,
-	IBT_CQ_OPAQUE_8		= 0xB,
-	IBT_CQ_OPAQUE_9		= 0xC,
-	IBT_CQ_OPAQUE_10	= 0xD,
-	IBT_CQ_OPAQUE_11	= 0xE,
-	IBT_CQ_OPAQUE_12	= 0xF,
-	IBT_CQ_OPAQUE_13	= 0x10,
-	IBT_CQ_OPAQUE_14	= 0x11,
-	IBT_CQ_OPAQUE_15	= 0x12,
-	IBT_CQ_OPAQUE_16	= 0x13
-} ibt_cq_priority_t;
-
-/*
- * Attributes when creating a Completion Queue Scheduling Handle.
- */
-typedef struct ibt_cq_sched_attr_s {
-	ibt_cq_sched_flags_t	cqs_flags;
-	ibt_cq_priority_t	cqs_priority;
-	uint_t			cqs_load;
-	ibt_sched_hdl_t		cqs_affinity_hdl;
-} ibt_cq_sched_attr_t;
 
 
 /*
@@ -1113,7 +1072,7 @@ ibt_status_t ibt_alloc_cq_sched(ibt_hca_hdl_t hca_hdl,
     ibt_cq_sched_attr_t *attr, ibt_sched_hdl_t *sched_hdl_p);
 
 ibt_status_t ibt_free_cq_sched(ibt_hca_hdl_t hca_hdl,
-    ibt_sched_hdl_t sched_hdl, uint_t load);
+    ibt_sched_hdl_t sched_hdl);
 
 /*
  * ibt_alloc_cq()
@@ -1170,6 +1129,13 @@ ibt_status_t ibt_poll_cq(ibt_cq_hdl_t ibt_cq, ibt_wc_t *work_completions,
  */
 ibt_status_t ibt_query_cq(ibt_cq_hdl_t ibt_cq, uint_t *entries,
     uint_t *count_p, uint_t *usec_p, ibt_cq_handler_id_t *hid_p);
+
+/*
+ * ibt_query_cq_handler_id()
+ *	Return interrupt characteristics of the CQ handler
+ */
+ibt_status_t ibt_query_cq_handler_id(ibt_hca_hdl_t hca_hdl,
+    ibt_cq_handler_id_t hid, ibt_cq_handler_attr_t *attrs);
 
 /*
  * ibt_resize_cq()
@@ -1300,6 +1266,13 @@ ibt_status_t ibt_register_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
 ibt_status_t ibt_reregister_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl,
     ibt_pd_hdl_t pd, ibt_pmr_attr_t *mem_pattr, ibt_mr_hdl_t *mr_hdl_p,
     ibt_pmr_desc_t *mem_desc_p);
+
+
+/*
+ * Register DMA Memory Region
+ */
+ibt_status_t ibt_register_dma_mr(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
+    ibt_dmr_attr_t *mem_attr, ibt_mr_hdl_t *mr_hdl_p, ibt_mr_desc_t *mem_desc);
 
 
 /*
@@ -1741,6 +1714,7 @@ typedef struct ibt_ip_path_attr_s {
 	uint_t			ipa_flow:20;		/* Optional */
 	uint8_t			ipa_hop;		/* Optional */
 	uint8_t			ipa_tclass;		/* Optional */
+	zoneid_t		ipa_zoneid;	/* Default 0 = Global Zone */
 } ibt_ip_path_attr_t;
 
 /*
@@ -1756,8 +1730,51 @@ ibt_status_t ibt_get_ip_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
     ibt_ip_path_attr_t *attr, ibt_path_info_t *paths_p, uint8_t *num_paths_p,
     ibt_path_ip_src_t *src_ip_p);
 
-ibt_status_t ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey,
-    ibt_ip_addr_t *src_ip);
+/*
+ * ibt_get_src_ip()
+ *	Get List of IP-Address that matches the parameters specified in
+ *	srcip_attr.  As a given MAC address can have both IPv4 and IPv6
+ *	addressed configured, caller can optional request to return only
+ *	the desired family by specifying the "sip_family" field.  If
+ *	"sip_family" is AF_UNSPEC, then all assigned IP address (IPv4
+ *	and/or IPv6) will be returned. In case of IPv6 address, scope_id
+ *	for that specific address will also be returned.
+ *	"sip_zoneid" will specify the zones the user is interested in.
+ *
+ *	Information on each ip-address is returned to the caller in the
+ *	form of an array of ibt_srcip_info_t.  ibt_get_src_ip() allocates the
+ *	memory for this array and returns a pointer to the array (src_info_p)
+ *	and the number of entries in the array (entries_p). This memory
+ *	should be freed by the client using ibt_free_srcip_info().
+ *
+ * ibt_free_srcip_info()
+ *	Free the memory allocated by successful ibt_get_src_ip()
+ */
+typedef struct ibt_srcip_attr_s {
+	ib_gid_t	sip_gid;	/* REQUIRED: Local Port GID */
+	zoneid_t	sip_zoneid;	/* Zero means Global Zone */
+	ib_pkey_t	sip_pkey;	/* Optional */
+	sa_family_t	sip_family;	/* Optional : IPv4 or IPv6 */
+} ibt_srcip_attr_t;
+
+/*
+ * ip_flag : Flag to indicate whether the returned list of ip-address
+ * has any duplicate records.
+ */
+#define	IBT_IPADDR_NO_FLAGS	0
+#define	IBT_IPADDR_DUPLICATE	1
+
+typedef struct ibt_srcip_info_s {
+	ibt_ip_addr_t	ip_addr;
+	zoneid_t	ip_zoneid;	/* ZoneId of this ip-addr */
+	uint_t		ip_flag;	/* Flag to indicate any gotchas */
+} ibt_srcip_info_t;
+
+ibt_status_t ibt_get_src_ip(ibt_srcip_attr_t *srcip_attr,
+    ibt_srcip_info_t **src_info_p, uint_t *entries_p);
+
+void ibt_free_srcip_info(ibt_srcip_info_t *src_info, uint_t entries);
+
 
 /*
  * Callback function that can be used in ibt_aget_ip_paths(), a Non-Blocking
@@ -1832,6 +1849,7 @@ typedef struct ibt_alt_ip_path_attr_s {
 	uint8_t			apa_sl:4;
 	uint8_t			apa_hop;
 	uint8_t			apa_tclass;
+	zoneid_t		apa_zoneid;	/* Default 0 = Global Zone */
 } ibt_alt_ip_path_attr_t;
 
 ibt_status_t ibt_get_ip_alt_path(ibt_channel_hdl_t rc_chan,
@@ -1933,6 +1951,14 @@ void ibt_unregister_part_attr_cb(void);
 ibt_status_t ibt_get_part_attr(datalink_id_t, ibt_part_attr_t *);
 ibt_status_t ibt_get_all_part_attr(ibt_part_attr_t **, int *);
 ibt_status_t ibt_free_part_attr(ibt_part_attr_t *, int);
+
+
+/*
+ * ibt_lid_to_node_info()
+ *	Retrieve node record information for the specified LID.
+ */
+ibt_status_t ibt_lid_to_node_info(ib_lid_t lid, ibt_node_info_t *node_info_p);
+
 
 #ifdef __cplusplus
 }

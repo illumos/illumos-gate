@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -398,9 +397,16 @@ clone_snap(char *snapshot_name, char *zonepath)
 
 	(void) printf(gettext("Cloning snapshot %s\n"), snapshot_name);
 
-	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0 ||
-	    nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARENFS),
-	    "off") != 0) {
+	/*
+	 * We turn off zfs SHARENFS and SHARESMB properties on the
+	 * zoneroot dataset in order to prevent the GZ from sharing
+	 * NGZ data by accident.
+	 */
+	if ((nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0) ||
+	    (nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARENFS),
+	    "off") != 0) ||
+	    (nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARESMB),
+	    "off") != 0)) {
 		if (props != NULL)
 			nvlist_free(props);
 		(void) fprintf(stderr, gettext("could not create ZFS clone "
@@ -998,9 +1004,16 @@ create_zfs_zonepath(char *zonepath)
 		return;
 	}
 
-	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0 ||
-	    nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARENFS),
-	    "off") != 0) {
+	/*
+	 * We turn off zfs SHARENFS and SHARESMB properties on the
+	 * zoneroot dataset in order to prevent the GZ from sharing
+	 * NGZ data by accident.
+	 */
+	if ((nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0) ||
+	    (nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARENFS),
+	    "off") != 0) ||
+	    (nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARESMB),
+	    "off") != 0)) {
 		if (props != NULL)
 			nvlist_free(props);
 		(void) fprintf(stderr, gettext("cannot create ZFS dataset %s: "

@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Standard install rules
@@ -222,20 +219,16 @@ $(SGSLINTOUT): FRC
 $(ROOTLIBDIR)/$(LINTLIBSRC): ../common/$(LINTLIBSRC)
 	$(INS.file) ../common/$(LINTLIBSRC)
 
-$(VAR_POUND_1)$(ROOTFS_LIBDIR)/$(LIBLINKS): \
-	$(ROOTFS_LIBDIR)/$(LIBLINKS)$(VERS)
-$(VAR_POUND_1)	$(INS.liblink)
+$(ROOTFS_LIBDIR)/$(LIBLINKS): $(ROOTFS_LIBDIR)/$(LIBLINKS)$(VERS)
+	$(INS.liblink)
 
-$(VAR_POUND_1)$(ROOTFS_LIBDIR64)/$(LIBLINKS): \
-	$(ROOTFS_LIBDIR64)/$(LIBLINKS)$(VERS)
-$(VAR_POUND_1)	$(INS.liblink64)
+$(ROOTFS_LIBDIR64)/$(LIBLINKS): $(ROOTFS_LIBDIR64)/$(LIBLINKS)$(VERS)
+	$(INS.liblink64)
 
-$(VAR_POUND_1)$(ROOTFS_LIBDIR)/$(LIBLINKSCCC): \
-	$(ROOTFS_LIBDIR)/$(LIBLINKSCCC)$(VERS)
-$(VAR_POUND_1)	$(INS.liblinkccc)
+$(ROOTFS_LIBDIR)/$(LIBLINKSCCC): $(ROOTFS_LIBDIR)/$(LIBLINKSCCC)$(VERS)
+	$(INS.liblinkccc)
 
-$(VAR_POUND_1)$(ROOTFS_LIBDIR64)/$(LIBLINKSCCC): \
-	$(ROOTFS_LIBDIR64)/$(LIBLINKSCCC)$(VERS)
-$(VAR_POUND_1)	$(INS.liblinkccc64)
+$(ROOTFS_LIBDIR64)/$(LIBLINKSCCC): $(ROOTFS_LIBDIR64)/$(LIBLINKSCCC)$(VERS)
+	$(INS.liblinkccc64)
 
 FRC:

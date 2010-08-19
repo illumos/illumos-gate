@@ -60,11 +60,11 @@ uint32_t lsa_lookup_sid(smb_sid_t *, smb_account_t *);
 
 extern boolean_t smb_locate_dc(char *, char *, smb_domainex_t *);
 
+extern int dssetup_check_service(void);
 extern void dssetup_clear_domain_info(void);
 extern void mlsvc_disconnect(const char *);
 extern int mlsvc_init(void);
 extern void mlsvc_fini(void);
-extern int mlsvc_ping(const char *);
 extern DWORD mlsvc_netlogon(char *, char *);
 extern DWORD mlsvc_join(smb_domainex_t *, char *, char *);
 
@@ -276,6 +276,12 @@ void smb_quota_free(smb_quota_response_t *);
 
 uint32_t dfs_get_referrals(const char *, dfs_reftype_t, dfs_info_t *);
 void dfs_info_free(dfs_info_t *);
+
+/*
+ * The spoolss installable copyfile API.
+ */
+typedef void (*spoolss_copyfile_t)(smb_inaddr_t *, char *, char *, char *);
+void spoolss_register_copyfile(spoolss_copyfile_t);
 
 #ifdef	__cplusplus
 }

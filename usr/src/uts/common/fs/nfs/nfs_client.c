@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All rights reserved.
@@ -3229,7 +3228,7 @@ nfs_free_mi(mntinfo_t *mi)
 	cv_destroy(&mi->mi_async_work_cv[NFS_ASYNC_PGOPS_QUEUE]);
 	cv_destroy(&mi->mi_async_reqs_cv);
 	cv_destroy(&mi->mi_async_cv);
-	zone_rele(mi->mi_zone);
+	zone_rele_ref(&mi->mi_zone_ref, ZONE_REF_NFS);
 	kmem_free(mi, sizeof (*mi));
 }
 

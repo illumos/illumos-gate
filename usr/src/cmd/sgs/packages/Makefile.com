@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -28,7 +27,7 @@ include		$(SRC)/Makefile.master
 LINTLOG=	../lint.$(MACH).log
 
 PKGARCHIVE=	.
-DATAFILES=	admin copyright prototype_com prototype_$(MACH) postinstall \
+DATAFILES=	copyright prototype_com prototype_$(MACH) postinstall \
 		preremove depend checkinstall
 README=		SUNWonld-README
 FILES=		$(DATAFILES) pkginfo

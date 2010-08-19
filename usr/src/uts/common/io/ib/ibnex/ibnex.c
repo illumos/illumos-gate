@@ -307,7 +307,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ibnex.ibnex_mutex, ibnex_node_data_s))
 _NOTE(LOCK_ORDER(ibdm.ibdm_hl_mutex ibnex.ibnex_mutex))
 
 /* The port settling time in seconds */
-int	ibnex_port_settling_time = 30;
+int	ibnex_port_settling_time = 8;
 
 /* create an array of properties supported, easier to add new ones here */
 static struct ibnex_property {

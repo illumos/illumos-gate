@@ -709,6 +709,8 @@ icmp_inbound_too_big_v6(icmp6_t *icmp6, ip_recv_attr_t *ira)
 	mutex_enter(&dce->dce_lock);
 	if (dce->dce_flags & DCEF_PMTU)
 		old_max_frag = dce->dce_pmtu;
+	else if (IN6_IS_ADDR_MULTICAST(&final_dst))
+		old_max_frag = ill->ill_mc_mtu;
 	else
 		old_max_frag = ill->ill_mtu;
 
@@ -1954,7 +1956,7 @@ ip_laddr_verify_v6(const in6_addr_t *v6src, zoneid_t zoneid,
  * If uinfo is set, then we fill in the best available information
  * we have for the destination. This is based on (in priority order) any
  * metrics and path MTU stored in a dce_t, route metrics, and finally the
- * ill_mtu.
+ * ill_mtu/ill_mc_mtu.
  *
  * Tsol note: If we have a source route then dst_addr != firsthop. But we
  * always do the label check on dst_addr.

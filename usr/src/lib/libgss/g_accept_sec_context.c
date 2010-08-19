@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -28,12 +27,15 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
 #include <string.h>
 #include <errno.h>
+#include <syslog.h>
 
+#ifndef LEAN_CLIENT
 static OM_uint32
 val_acc_sec_ctx_args(
 	OM_uint32 *minor_status,
@@ -116,7 +118,6 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 	gss_name_t		tmp_src_name = GSS_C_NO_NAME;
 	gss_OID_desc	token_mech_type_desc;
 	gss_OID		token_mech_type = &token_mech_type_desc;
-	gss_OID		actual_mech = GSS_C_NO_OID;
 	OM_uint32	flags;
 	gss_mechanism	mech;
 
@@ -195,7 +196,7 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 					input_token_buffer,
 					input_chan_bindings,
 					&internal_name,
-					&actual_mech,
+					mech_type,
 					output_token,
 					&flags,
 					time_rec,
@@ -206,11 +207,15 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 			return (GSS_S_CONTINUE_NEEDED);
 
 		/* if the call failed, return with failure */
-		if (status != GSS_S_COMPLETE)
+		if (status != GSS_S_COMPLETE) {
+			if (mech_type && (*mech_type != GSS_C_NULL_OID))
+				map_error_oid(minor_status, *mech_type);
+			else {
+				map_error(minor_status, mech);
+			}
 			goto error_out;
+		}
 
-		if (mech_type != NULL)
-			*mech_type = actual_mech;
 
 		/*
 		 * if src_name is non-NULL,
@@ -225,6 +230,7 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 				internal_name, &tmp_src_name);
 			if (temp_status != GSS_S_COMPLETE) {
 				*minor_status = t_minstat;
+				map_error(minor_status, mech);
 				if (output_token->length)
 					(void) gss_release_buffer(
 						&t_minstat,
@@ -253,9 +259,9 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 			 * try to re-wrap it.  This is for SPNEGO or other
 			 * pseudo-mechanisms.
 			 */
-			if (actual_mech != GSS_C_NO_OID &&
+			if (*mech_type != GSS_C_NO_OID &&
 			    token_mech_type != GSS_C_NO_OID &&
-			    !g_OID_equal(actual_mech, token_mech_type)) {
+			    !g_OID_equal(*mech_type, token_mech_type)) {
 				*d_cred = tmp_d_cred;
 			} else {
 				gss_union_cred_t d_u_cred = NULL;
@@ -272,7 +278,7 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 
 				status = generic_gss_copy_oid(
 					&t_minstat,
-					actual_mech,
+					*mech_type,
 					&d_u_cred->mechs_array);
 
 				if (status != GSS_S_COMPLETE) {
@@ -312,6 +318,9 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 						NULL);
 				}
 
+				if (status != GSS_S_COMPLETE)
+					map_error(minor_status, mech);
+
 				if (internal_name != NULL) {
 					temp_status =
 					    __gss_convert_name_to_union_name(
@@ -319,6 +328,7 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 						internal_name, &tmp_src_name);
 					if (temp_status != GSS_S_COMPLETE) {
 						*minor_status = t_minstat;
+						map_error(minor_status, mech);
 						if (output_token->length)
 						    (void) gss_release_buffer(
 								&t_minstat,
@@ -382,3 +392,4 @@ error_out:
 
 	return (status);
 }
+#endif /* LEAN_CLIENT */

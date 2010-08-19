@@ -115,7 +115,8 @@ K5_CC= cc_file.o cc_memory.o ccbase.o ccfns.o ccdefault.o ccdefops.o ser_cc.o cc
 
 # krb5/keytab
 K5_KT=	ktadd.o ktbase.o ktdefault.o ktfr_entry.o \
-	ktremove.o read_servi.o kt_file.o kt_srvtab.o ktfns.o kt_findrealm.o
+	ktremove.o read_servi.o kt_file.o kt_srvtab.o ktfns.o kt_findrealm.o \
+	kt_solaris.o
 
 K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	auth_con.o  bld_pr_ext.o  bld_princ.o  chk_trans.o \
@@ -170,7 +171,7 @@ MECH= 	accept_sec_context.o store_cred.o \
 	util_cksum.o acquire_cred.o init_sec_context.o \
 	set_ccache.o acquire_cred_with_pw.o lucid_context.o \
 	set_allowable_enctypes.o oid_ops.o export_name.o gss_libinit.o \
-	util_buffer_set.o
+	util_buffer_set.o util_errmap.o
 
 MECH_UTS= delete_sec_context.o gssapi_krb5.o \
 	import_sec_context.o k5seal.o k5sealv3.o \

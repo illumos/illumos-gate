@@ -20,18 +20,14 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * mkdtemp(3C) - create a directory with a unique name.
  */
 
 #include "lint.h"
-#include <alloca.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,11 +36,11 @@
 char *
 mkdtemp(char *template)
 {
-	char *t = alloca(strlen(template) + 1);
+	char *t;
 	char *r;
 
 	/* Save template */
-	(void) strcpy(t, template);
+	t = strdupa(template);
 	for (;;) {
 		r = mktemp(template);
 

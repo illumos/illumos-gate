@@ -102,9 +102,16 @@ extern "C" {
  */
 #define	SMB_PI_MAX_WORKERS_MIN		64
 
+/*
+ * sv_size is used by the RPC services and should be set to
+ * sizeof (smb_version_t).
+ */
 typedef struct smb_version {
-	uint8_t sv_major;
-	uint8_t sv_minor;
+	uint32_t	sv_size;
+	uint32_t	sv_major;
+	uint32_t	sv_minor;
+	uint32_t	sv_build_number;
+	uint32_t	sv_platform_id;
 } smb_version_t;
 
 typedef struct smb_kmod_cfg {
@@ -118,6 +125,7 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_sync_enable;
 	int32_t skc_secmode;
 	int32_t skc_ipv6_enable;
+	int32_t skc_print_enable;
 	uint32_t skc_execflags;
 	smb_version_t skc_version;
 	char skc_nbdomain[NETBIOS_NAME_SZ];
@@ -136,13 +144,14 @@ typedef struct smb_kmod_cfg {
 /*
  * Major version numbers
  */
-#define	SMB_MAJOR_NT		4
+#define	SMB_MAJOR_NT		4	/* Windows 95/98/Me, Windows NT4.0 */
 #define	SMB_MAJOR_2000		5
 #define	SMB_MAJOR_XP		5
 #define	SMB_MAJOR_2003		5
 #define	SMB_MAJOR_VISTA		6
 #define	SMB_MAJOR_2008		6
 #define	SMB_MAJOR_2008R2	6
+#define	SMB_MAJOR_7		6
 
 /*
  * Minor version numbers
@@ -154,6 +163,7 @@ typedef struct smb_kmod_cfg {
 #define	SMB_MINOR_VISTA		0
 #define	SMB_MINOR_2008		0
 #define	SMB_MINOR_2008R2	1
+#define	SMB_MINOR_7		1
 
 /*
  * Max version length in string format

@@ -28,6 +28,10 @@
  * SUCH DAMAGES.
  */
 
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
@@ -136,6 +140,7 @@ pkinit_init_identity_opts(pkinit_identity_opts **idopts)
     opts->token_label = NULL;
     opts->cert_id_string = NULL;
     opts->cert_label = NULL;
+    opts->PIN = NULL;
 #endif
 
     *idopts = opts;
@@ -219,6 +224,11 @@ pkinit_dup_identity_opts(pkinit_identity_opts *src_opts,
 	if (newopts->cert_label == NULL)
 	    goto cleanup;
     }
+    if (src_opts->PIN != NULL) {
+	newopts->PIN = strdup(src_opts->PIN);
+	if (newopts->PIN == NULL)
+	    goto cleanup;
+    }
 #endif
 
 
@@ -255,6 +265,10 @@ pkinit_fini_identity_opts(pkinit_identity_opts *idopts)
 	free(idopts->cert_id_string);
     if (idopts->cert_label != NULL)
 	free(idopts->cert_label);
+    if (idopts->PIN != NULL) {
+	(void) memset(idopts->PIN, 0, strlen(idopts->PIN));
+	free(idopts->PIN);
+    }
 #endif
     free(idopts);
 }
@@ -610,13 +624,13 @@ pkinit_identity_initialize(krb5_context context,
 	goto errout;
 
     retval = crypto_load_certs(context, plg_cryptoctx, req_cryptoctx,
-			       idopts, id_cryptoctx, princ);
+			       idopts, id_cryptoctx, princ, do_matching);
     if (retval)
 	goto errout;
 
     if (do_matching) {
 	retval = pkinit_cert_matching(context, plg_cryptoctx, req_cryptoctx,
-				      id_cryptoctx, princ);
+				      id_cryptoctx, princ, TRUE);
 	if (retval) {
 	    pkiDebug("%s: No matching certificate found\n", __FUNCTION__);
 	    (void) crypto_free_cert_info(context, plg_cryptoctx, req_cryptoctx,

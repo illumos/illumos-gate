@@ -26,6 +26,9 @@
 # All rights reserved.
 #
 
+NET_INADDR_ANY="0.0.0.0"
+NET_IN6ADDR_ANY_INIT="::0"
+
 # Print warnings to console
 warn_failed_ifs() {
 	echo "Failed to $1 interface(s):$2" >/dev/msglog
@@ -42,6 +45,17 @@ shcat() {
                 done < $1
                 shift
         done
+}
+
+net_record_err()
+{
+	message=$1
+	err=$2
+
+	echo "$message" | smf_console
+	if [ $err -ne 0 ]; then
+		echo "Error code = $err" | smf_console
+	fi
 }
 
 #
@@ -852,5 +866,26 @@ nwam_get_loc_prop()
 	value=`/usr/sbin/nwamcfg "select loc $1; get -V $2" 2>/dev/null`
 	rtn=$?
 	echo $value
+	return $rtn
+}
+
+#
+# nwam_get_loc_list_prop location property
+#
+# echoes a space-separated list of the property values for the given location
+# return:
+#	0 => property is set
+#	1 => property is not set
+#
+nwam_get_loc_list_prop()
+{
+	clist=`/usr/sbin/nwamcfg "select loc $1; get -V $2" 2>/dev/null`
+	rtn=$?
+	#
+	# nwamcfg gives us a comma-separated list;
+	# need to convert commas to spaces.
+	#
+	slist=`echo $clist | sed -e s/","/" "/g`
+	echo $slist
 	return $rtn
 }

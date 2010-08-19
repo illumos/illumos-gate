@@ -20,13 +20,13 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/fm/protocol.h>
 #include <sys/strlog.h>
 #include <sys/log.h>
+#include <libscf.h>
 
 #include <fm/fmd_api.h>
 #include <fm/fmd_msg.h>
@@ -175,13 +175,84 @@ syslog_emit(fmd_hdl_t *hdl, const char *msg)
 	}
 }
 
+static void
+free_notify_prefs(fmd_hdl_t *hdl, nvlist_t **prefs, uint_t nprefs)
+{
+	int i;
+
+	for (i = 0; i < nprefs; i++) {
+		if (prefs[i])
+			nvlist_free(prefs[i]);
+	}
+
+	fmd_hdl_free(hdl, prefs, sizeof (nvlist_t *) * nprefs);
+}
+
+static int
+get_notify_prefs(fmd_hdl_t *hdl, nvlist_t *ev_nvl, nvlist_t ***pref_nvl,
+    uint_t *nprefs)
+{
+	nvlist_t *top_nvl, **np_nvlarr, *mech_nvl;
+	nvlist_t **tmparr;
+	int ret, i;
+	uint_t nelem, nslelem;
+
+	if ((ret = smf_notify_get_params(&top_nvl, ev_nvl)) != SCF_SUCCESS) {
+		ret = scf_error();
+		if (ret != SCF_ERROR_NOT_FOUND) {
+			fmd_hdl_debug(hdl, "Error looking up notification "
+			    "preferences (%s)", scf_strerror(ret));
+			return (ret);
+		}
+		return (ret);
+	}
+
+	if (nvlist_lookup_nvlist_array(top_nvl, SCF_NOTIFY_PARAMS, &np_nvlarr,
+	    &nelem) != 0) {
+		fmd_hdl_debug(hdl, "Malformed preference nvlist\n");
+		ret = SCF_ERROR_INVALID_ARGUMENT;
+		goto pref_done;
+	}
+
+	tmparr = fmd_hdl_alloc(hdl, nelem * sizeof (nvlist_t *), FMD_SLEEP);
+	nslelem = 0;
+
+	for (i = 0; i < nelem; i++) {
+		if (nvlist_lookup_nvlist(np_nvlarr[i], "syslog", &mech_nvl)
+		    == 0)
+			tmparr[nslelem++] = fmd_nvl_dup(hdl, mech_nvl,
+			    FMD_SLEEP);
+	}
+
+	if (nslelem != 0) {
+		size_t sz = nslelem * sizeof (nvlist_t *);
+
+		*pref_nvl = fmd_hdl_zalloc(hdl, sz, FMD_SLEEP);
+		*nprefs = nslelem;
+		bcopy(tmparr, *pref_nvl, sz);
+		ret = 0;
+	} else {
+		*pref_nvl = NULL;
+		*nprefs = 0;
+		ret = SCF_ERROR_NOT_FOUND;
+	}
+
+	fmd_hdl_free(hdl, tmparr, nelem * sizeof (nvlist_t *));
+pref_done:
+	nvlist_free(top_nvl);
+	return (ret);
+}
+
 /*ARGSUSED*/
 static void
 syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
 	uint8_t version;
-	boolean_t domsg;
+	boolean_t domsg, *active;
 	char *msg;
+	nvlist_t **prefs;
+	uint_t nprefs, nelems;
+	int ret;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_SUSPECT_VERSION) {
@@ -197,6 +268,32 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		return; /* event is not to be messaged */
 	}
 
+	ret = get_notify_prefs(hdl, nvl, &prefs, &nprefs);
+	if (ret == SCF_ERROR_NOT_FOUND) {
+		/*
+		 * No syslog notification preferences specified for this type of
+		 * event, so we're done
+		 */
+		fmd_hdl_debug(hdl, "No syslog notification preferences "
+		    "configured for class %s\n", class);
+		syslog_stats.no_msg.fmds_value.ui64++;
+		return;
+	} else if (ret != 0 || nvlist_lookup_boolean_array(prefs[0], "active",
+	    &active, &nelems)) {
+		fmd_hdl_debug(hdl, "Failed to retrieve notification "
+		    "preferences for class %s\n", class);
+		if (ret == 0)
+			free_notify_prefs(hdl, prefs, nprefs);
+		return;
+	} else if (!active[0]) {
+		fmd_hdl_debug(hdl, "Syslog notifications disabled for "
+		    "class %s\n", class);
+		syslog_stats.no_msg.fmds_value.ui64++;
+		free_notify_prefs(hdl, prefs, nprefs);
+		return;
+	}
+	free_notify_prefs(hdl, prefs, nprefs);
+
 	if ((msg = fmd_msg_gettext_nv(syslog_msghdl, NULL, nvl)) == NULL) {
 		fmd_hdl_debug(hdl, "failed to format message");
 		syslog_stats.bad_code.fmds_value.ui64++;
@@ -204,8 +301,10 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	}
 
 	syslog_ctl.pri &= LOG_FACMASK;
-	if (strcmp(class, FM_LIST_RESOLVED_CLASS) == 0 ||
-	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
+	if (strcmp(class, FM_LIST_ISOLATED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_RESOLVED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_UPDATED_CLASS) == 0)
 		syslog_ctl.pri |= LOG_NOTICE;
 	else
 		syslog_ctl.pri |= LOG_ERR;
@@ -233,7 +332,7 @@ static const fmd_hdl_ops_t fmd_ops = {
 };
 
 static const fmd_hdl_info_t fmd_info = {
-	"Syslog Messaging Agent", "1.0", &fmd_ops, fmd_props
+	"Syslog Messaging Agent", "1.1", &fmd_ops, fmd_props
 };
 
 void
@@ -303,9 +402,16 @@ _fmd_init(fmd_hdl_t *hdl)
 	(void) fmd_msg_url_set(syslog_msghdl, urlbase);
 	fmd_prop_free_string(hdl, urlbase);
 
+	/*
+	 * We subscribe to all FM events and then consult the notification
+	 * preferences in the serice configuration repo to determine whether
+	 * or not to emit a console message.
+	 */
 	fmd_hdl_subscribe(hdl, FM_LIST_SUSPECT_CLASS);
 	fmd_hdl_subscribe(hdl, FM_LIST_REPAIRED_CLASS);
 	fmd_hdl_subscribe(hdl, FM_LIST_RESOLVED_CLASS);
+	fmd_hdl_subscribe(hdl, FM_LIST_ISOLATED_CLASS);
+	fmd_hdl_subscribe(hdl, FM_LIST_UPDATED_CLASS);
 }
 
 /*ARGSUSED*/

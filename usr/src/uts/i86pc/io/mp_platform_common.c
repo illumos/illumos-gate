@@ -45,6 +45,7 @@
 #include <sys/acpica.h>
 #include <sys/psm_common.h>
 #include <sys/apic.h>
+#include <sys/apic_timer.h>
 #include <sys/pit.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>

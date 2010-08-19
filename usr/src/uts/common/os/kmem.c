@@ -2971,6 +2971,7 @@ kmem_free(void *buf, size_t size)
 		/* fall through to kmem_cache_free() */
 
 	} else {
+		EQUIV(buf == NULL, size == 0);
 		if (buf == NULL && size == 0)
 			return;
 		vmem_free(kmem_oversize_arena, buf, size);

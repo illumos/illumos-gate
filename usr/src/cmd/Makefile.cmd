@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Definitions common to command source.
 #
@@ -500,12 +499,6 @@ $(ROOTVARSMB)/%: %
 TEXT_DOMAIN= SUNW_OST_OSCMD	
 
 CLOBBERFILES += $(XPG4) $(XPG6) $(DCFILE)
-
-# This flag is being added only for SCO (x86) compatibility
-i386_SPFLAG=    -D_iBCS2
-sparc_SPFLAG=
-
-iBCS2FLAG = $($(MACH)_SPFLAG)
 
 # This flag is for programs which should not build a 32-bit binary
 sparc_64ONLY= $(POUND_SIGN)

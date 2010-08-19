@@ -1,9 +1,6 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * lib/krb5/krb/rd_req_dec.c
  *
@@ -37,6 +34,8 @@
 
 #include "k5-int.h"
 #include "auth_con.h"
+#include <locale.h>
+#include <syslog.h>
 
 /*
  * essentially the same as krb_rd_req, but uses a decoded AP_REQ as
@@ -69,7 +68,6 @@ static krb5_error_code decrypt_authenticator
 	(krb5_context, const krb5_ap_req *, krb5_authenticator **,
 		   int);
 
-#define in_clock_skew(date) (labs((date)-currenttime) < context->clockskew)
 
 static krb5_error_code
 krb5_rd_req_decrypt_tkt_part(krb5_context context, const krb5_ap_req *req, krb5_keytab keytab)
@@ -77,7 +75,7 @@ krb5_rd_req_decrypt_tkt_part(krb5_context context, const krb5_ap_req *req, krb5_
     krb5_error_code 	  retval;
     krb5_enctype 	  enctype;
     krb5_keytab_entry 	  ktent;
-
+ 
     enctype = req->ticket->enc_part.enctype;
 
     /* Solaris Kerberos: */
@@ -99,8 +97,49 @@ krb5_rd_req_decrypt_tkt_part(krb5_context context, const krb5_ap_req *req, krb5_
     retval = krb5_decrypt_tkt_part(context, &ktent.key, req->ticket);
     /* Upon error, Free keytab entry first, then return */
 
+    if (retval == KRB5KRB_AP_ERR_BAD_INTEGRITY) {
+        /* Solaris Kerberos: spruce-up the err msg */
+        krb5_principal princ = (krb5_principal) req->ticket->server;
+	char *s_name = NULL;
+	int kret = krb5_unparse_name(context, princ, &s_name);
+	if (kret == 0) {
+	    krb5_set_error_message(context, retval,
+				dgettext(TEXT_DOMAIN,
+					"AP Request ticket decrypt fail for principal '%s' (kvno=%d, enctype=%d)"),
+				s_name,
+				req->ticket->enc_part.kvno,
+				enctype);
+	   krb5_free_unparsed_name(context, s_name);
+	}
+    }
+	    
     (void) krb5_kt_free_entry(context, &ktent);
     return retval;
+}
+
+/*
+ * Solaris Kerberos
+ * Same as krb5int_check_clockskew() plus return the skew in seconds.
+ */
+static krb5_error_code
+krb5int_check_clockskew2(krb5_context context,
+			krb5_timestamp date,
+			krb5_timestamp *ret_skew)
+{
+    krb5_timestamp currenttime, skew;
+    krb5_error_code retval;
+
+    retval = krb5_timeofday(context, &currenttime);
+    if (retval)
+        return retval;
+
+    skew = labs((date)-currenttime);
+    if (!(skew < context->clockskew)) {
+        *ret_skew = skew;
+        return KRB5KRB_AP_ERR_SKEW;
+    }
+
+    return 0;
 }
 
 static krb5_error_code
@@ -110,8 +149,8 @@ krb5_rd_req_decoded_opt(krb5_context context, krb5_auth_context *auth_context,
 			krb5_ticket **ticket, int check_valid_flag)
 {
     krb5_error_code 	  retval = 0;
-    krb5_timestamp 	  currenttime;
     krb5_principal_data princ_data;
+    krb5_timestamp	  skew = 0; /* Solaris Kerberos */
     
     req->ticket->enc_part2 == NULL;
     if (server && krb5_is_referral_realm(&server->realm)) {
@@ -129,7 +168,8 @@ krb5_rd_req_decoded_opt(krb5_context context, krb5_auth_context *auth_context,
 	if (krb5_unparse_name(context, server, &wanted_name) == 0
 	    && krb5_unparse_name(context, req->ticket->server, &found_name) == 0)
 	    krb5_set_error_message(context, KRB5KRB_AP_WRONG_PRINC,
-				   "Wrong principal in request (found %s, wanted %s)",
+				dgettext(TEXT_DOMAIN,
+					"Wrong principal in request (found %s, wanted %s)"),
 				   found_name, wanted_name);
 	krb5_free_unparsed_name(context, wanted_name);
 	krb5_free_unparsed_name(context, found_name);
@@ -255,6 +295,9 @@ goto cleanup;
 	    krb5_xfree(rep.client);
 	}
 
+	if (retval == KRB5KRB_AP_ERR_SKEW)
+	    goto err_skew;
+
 	if (retval)
 	    goto cleanup;
     }
@@ -263,19 +306,46 @@ goto cleanup;
     if (retval != 0)
 	    goto cleanup;
 
-    if ((retval = krb5_timeofday(context, &currenttime)))
-	goto cleanup;
-
-    if (!in_clock_skew((*auth_context)->authentp->ctime)) {
-	retval = KRB5KRB_AP_ERR_SKEW;
-	goto cleanup;
+err_skew:
+    if ((retval = krb5int_check_clockskew2(context,
+					(*auth_context)->authentp->ctime,
+					&skew))) {
+        /* Solaris Kerberos */
+        char *s_name = NULL;
+        char *c_name = NULL;
+	krb5_error_code serr, cerr;
+	serr = krb5_unparse_name(context, req->ticket->server, &s_name);
+	cerr = krb5_unparse_name(context, req->ticket->enc_part2->client,
+				&c_name);
+	krb5_set_error_message(context, retval,
+			    dgettext(TEXT_DOMAIN,
+				    "Clock skew too great: client '%s' AP request with ticket for '%s'. Skew is %dm (allowable %dm)."),
+			    cerr == 0 ? c_name : "unknown",
+			    serr == 0 ? s_name : "unknown",
+			    skew > 0 ? skew/60 : 0,
+			    context->clockskew > 0 ? context->clockskew/60 : 0);
+	if (s_name)
+	    krb5_free_unparsed_name(context, s_name);
+	if (c_name)
+	    krb5_free_unparsed_name(context, c_name);
+        goto cleanup;
     }
 
     if (check_valid_flag) {
-      if (req->ticket->enc_part2->flags & TKT_FLG_INVALID) {
-	retval = KRB5KRB_AP_ERR_TKT_INVALID;
-	goto cleanup;
-      }
+        if (req->ticket->enc_part2->flags & TKT_FLG_INVALID) {
+	    /* Solaris Kerberos */
+	    char *s_name = NULL;
+	    int err = krb5_unparse_name(context, req->ticket->server, &s_name);
+	    retval = KRB5KRB_AP_ERR_TKT_INVALID;
+	    if (!err) {
+	        krb5_set_error_message(context, retval,
+				    dgettext(TEXT_DOMAIN,
+				    "Ticket has invalid flag set for server '%s'"),
+				    s_name);
+	        krb5_free_unparsed_name(context, s_name);
+	    }
+	    goto cleanup;
+	}
     }
 
     /* check if the various etypes are permitted */
@@ -298,8 +368,9 @@ goto cleanup;
 	    retval = KRB5_NOPERM_ETYPE;
 	    if (krb5_enctype_to_string(etype, enctype_name, sizeof(enctype_name)) == 0)
 		krb5_set_error_message(context, retval,
-				       "Encryption type %s not permitted",
-				       enctype_name);
+				    dgettext(TEXT_DOMAIN,
+					    "Encryption type %s not permitted"),
+				    enctype_name);
 	    goto cleanup;
 	}
     } else {
@@ -316,8 +387,9 @@ goto cleanup;
 	    if (krb5_enctype_to_string(req->ticket->enc_part.enctype,
 				       enctype_name, sizeof(enctype_name)) == 0)
 		krb5_set_error_message(context, retval,
-				       "Encryption type %s not permitted",
-				       enctype_name);
+				    dgettext(TEXT_DOMAIN,
+					    "Encryption type %s not permitted"),
+				    enctype_name);
 	    goto cleanup;
 	}
 	
@@ -331,8 +403,9 @@ goto cleanup;
 	    if (krb5_enctype_to_string(req->ticket->enc_part2->session->enctype,
 				       enctype_name, sizeof(enctype_name)) == 0)
 		krb5_set_error_message(context, retval,
-				       "Encryption type %s not permitted",
-				       enctype_name);
+				    dgettext(TEXT_DOMAIN,
+					    "Encryption type %s not permitted"),
+				    enctype_name);
 	    goto cleanup;
 	}
 	
@@ -348,8 +421,9 @@ goto cleanup;
 					   enctype_name,
 					   sizeof(enctype_name)) == 0)
 		    krb5_set_error_message(context, retval,
-					   "Encryption type %s not permitted",
-					   enctype_name);
+					dgettext(TEXT_DOMAIN,
+					    "Encryption type %s not permitted"),
+					enctype_name);
 		goto cleanup;
 	    }
 	}

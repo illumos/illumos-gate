@@ -163,6 +163,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_elf_execfill;
 	_elf_getarhdrbase;
+	_elf_getarsymwordsize;
 	_elf_getnextoff;
 	_elf_getxoff;
 	_elf_outsync;

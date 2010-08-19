@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libconv.a
@@ -34,7 +33,8 @@ COMOBJS64 =	cap_machelf64.o		dynamic_machelf64.o \
 		globals_machelf64.o	sections_machelf64.o \
 		symbols_machelf64.o	symbols_sparc_machelf64.o
 
-COMOBJS=	arch.o			c_literal.o \
+COMOBJS=	arch.o			audit.o \
+		c_literal.o \
 		cap.o			config.o \
 		corenote.o 		data.o \
 		deftag.o 		demangle.o \
@@ -55,7 +55,8 @@ ELFCAP_OBJS=	elfcap.o
 
 ASOBJS=		vernote.o
 
-BLTOBJS=	arch_msg.o		c_literal_msg.o \
+BLTOBJS=	arch_msg.o		audit_msg.o \
+		c_literal_msg.o \
 		cap_msg.o		config_msg.o \
 		corenote_msg.o		data_msg.o \
 		deftag_msg.o		demangle_msg.o \
@@ -94,7 +95,7 @@ ONLDREADME=	../../packages/common/SUNWonld-README
 PICS=		$(OBJECTS:%=pics/%)
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc -I$(ELFCAP) \
-		-I$(SRC)/common/sgsrtcid $(VAR_LIBCONV_CPPFLAGS)
+		-I$(SRC)/common/sgsrtcid
 
 ARFLAGS=	cr
 

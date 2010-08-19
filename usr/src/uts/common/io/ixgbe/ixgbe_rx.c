@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,8 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -560,6 +562,7 @@ ixgbe_ring_rx(ixgbe_rx_ring_t *rx_ring, int poll_bytes)
 
 	if ((ixgbe->ixgbe_state & IXGBE_SUSPENDED) ||
 	    (ixgbe->ixgbe_state & IXGBE_ERROR) ||
+	    (ixgbe->ixgbe_state & IXGBE_OVERTEMP) ||
 	    !(ixgbe->ixgbe_state & IXGBE_STARTED))
 		return (NULL);
 

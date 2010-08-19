@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/x86_archext.h>
@@ -182,21 +178,22 @@ big_mul_add_vec_umul(uint32_t *r, uint32_t *a, int len, uint32_t digit)
 / Note:
 /   Using the cpuid instruction directly would work equally
 /   well in userland and in the kernel, but we do not use the
-/   cpuid instruction in the kernel, we use the x86_feature
-/   variable, instead.  This means we honor any decisions
-/   the kernel startup code may have made in setting this
-/   variable, including disabling SSE2 because of settings
-/   in /etc/system.  It might even be a good idea to honor
-/   this kind of setting in userland, as well, but the variable,
-/   x86-feature is not readily available to userland processes.
+/   cpuid instruction in the kernel, we use x86_featureset,
+/   instead.  This means we honor any decisions the kernel
+/   startup code may have made in setting this variable,
+/   including disabling SSE2.  It might even be a good idea
+/   to honor this kind of setting in userland, as well, but
+/   the variable, x86_featureset is not readily available to
+/   userland processes.
 /
 / uint32_t
 / bignum_use_sse2()
 
 	ENTRY(bignum_use_sse2)
 #if defined(_KERNEL)
-	movl	x86_feature, %eax
-	andl	$X86_SSE2, %eax
+	xor	%eax, %eax
+	bt	$X86FSET_SSE2, x86_featureset
+	adc     %eax, %eax
 #else	/* _KERNEL */
 	pushl	%ebx
 	movl	$1, %eax		/ Get feature information

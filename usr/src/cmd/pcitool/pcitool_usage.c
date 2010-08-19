@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PCITOOL_USAGE_TEXT_H
@@ -147,9 +147,13 @@ NULL
 static char *pcitool_usage_intr[] = {
 "Usage:",
 "Interrupt mode:",
-" %s pci@<unit-address> -i <[cpu#],ino#> | all",
+" X86:",
+" %s pci@<unit-address> -i <cpu#,ino#> | all",
 "       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
-" %s pci@<unit-address> -m <[cpu#],msi#> | all",
+" SPARC:",
+" %s pci@<unit-address> -i <ino#> | all",
+"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
+" %s pci@<unit-address> -m <msi#> | all",
 "       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
 "",
 "where",

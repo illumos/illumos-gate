@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1161,7 +1161,7 @@ get_cpu_mstate(cpu_t *cpu, hrtime_t *times)
 int
 checked_rdmsr(uint_t msr, uint64_t *value)
 {
-	if ((x86_feature & X86_MSR) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_MSR))
 		return (ENOTSUP);
 	*value = rdmsr(msr);
 	return (0);
@@ -1174,7 +1174,7 @@ checked_rdmsr(uint_t msr, uint64_t *value)
 int
 checked_wrmsr(uint_t msr, uint64_t value)
 {
-	if ((x86_feature & X86_MSR) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_MSR))
 		return (ENOTSUP);
 	wrmsr(msr, value);
 	return (0);
@@ -1226,9 +1226,9 @@ num_phys_pages()
 
 /* cpu threshold for compressed dumps */
 #ifdef _LP64
-uint_t dump_plat_mincpu = DUMP_PLAT_X86_64_MINCPU;
+uint_t dump_plat_mincpu_default = DUMP_PLAT_X86_64_MINCPU;
 #else
-uint_t dump_plat_mincpu = DUMP_PLAT_X86_32_MINCPU;
+uint_t dump_plat_mincpu_default = DUMP_PLAT_X86_32_MINCPU;
 #endif
 
 int

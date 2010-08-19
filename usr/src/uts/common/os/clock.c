@@ -398,7 +398,6 @@ clock(void)
 	uint_t	w_io;
 	cpu_t	*cp;
 	cpupart_t *cpupart;
-	extern void set_anoninfo();
 	extern	void	set_freemem();
 	void	(*funcp)();
 	int32_t ltemp;
@@ -411,7 +410,6 @@ clock(void)
 	if (panicstr)
 		return;
 
-	set_anoninfo();
 	/*
 	 * Make sure that 'freemem' do not drift too far from the truth
 	 */
@@ -839,6 +837,8 @@ clock(void)
 
 			maxswap = k_anoninfo.ani_mem_resv +
 			    k_anoninfo.ani_max +avail;
+			/* Update ani_free */
+			set_anoninfo();
 			free = k_anoninfo.ani_free + avail;
 			resv = k_anoninfo.ani_phys_resv +
 			    k_anoninfo.ani_mem_resv;

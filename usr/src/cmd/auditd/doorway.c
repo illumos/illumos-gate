@@ -19,9 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -66,7 +64,6 @@
 #include <audit_plugin.h>	/* libbsm */
 #include "plugin.h"
 #include <bsm/audit_door_infc.h>
-#include "audit_sig_infc.h"
 #include "queue.h"
 
 #define	DEBUG		0
@@ -430,9 +427,7 @@ open_return(plugin_t *p, char *attrval)
  *	- load plugins
  *
  * auditd_thread_init is called at auditd startup with an initial list
- * of plugins and again each time audit catches a AU_SIG_READ_CONTROL
- * or AU_SIG_NEXT_DIR.
- *
+ * of plugins and again each time audit catches a SIGHUP or SIGUSR1.
  */
 int
 auditd_thread_init()
@@ -521,10 +516,8 @@ auditd_thread_init()
 		} else if (p->plg_reopen) {
 			DPRINT((dbfp, "reopen %s\n", p->plg_path));
 			error_string = NULL;
-			if ((rc = p->plg_fplugin_open(
-			    p->plg_kvlist,
+			if ((rc = p->plg_fplugin_open(p->plg_kvlist,
 			    &open_params, &error_string)) != AUDITD_SUCCESS) {
-
 				report_error(rc, error_string, p->plg_path);
 				free(error_string);
 				p = unload_plugin(p);
@@ -932,7 +925,7 @@ queue_buffer(au_dbuf_t *kl)
 			policy_update(*(uint32_t *)kl->aub_buf);
 			break;
 		case AU_DBUF_SHUTDOWN:
-			(void) kill(getpid(), AU_SIG_DISABLE);
+			(void) kill(getpid(), SIGTERM);
 			DPRINT((dbfp, "AU_DBUF_SHUTDOWN message\n"));
 			break;
 		default:
@@ -1049,7 +1042,8 @@ queue_buffer(au_dbuf_t *kl)
  * time to catch up.
  */
 static void
-wait_a_while() {
+wait_a_while()
+{
 	struct timespec delay = {0, 500000000};	/* 1/2 second */;
 
 	(void) pthread_mutex_lock(&(in_thr.thd_mutex));
@@ -1066,7 +1060,8 @@ wait_a_while() {
  * timed wait as well.
  */
 static void
-adjust_priority() {
+adjust_priority()
+{
 	int		queue_near_full;
 	plugin_t	*p;
 	int		queue_size;
@@ -1105,7 +1100,7 @@ adjust_priority() {
 
 /*
  * input() is a door server; it blocks if any plugins have full queues
- * with the continue policy off. (auditconfig -policy -cnt)
+ * with the continue policy off. (auditconfig -setpolicy -cnt)
  *
  * input() is called synchronously from c2audit and is NOT
  * reentrant due to the (unprotected) static variables in

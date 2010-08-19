@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -41,6 +38,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <dhcp_hostconf.h>
 
 #include "states.h"
 #include "agent.h"
@@ -684,4 +682,26 @@ dhcpv6_status_code(const dhcpv6_option_t *d6o, uint_t olen, const char **estr,
 		}
 	}
 	return (status);
+}
+
+void
+write_lease_to_hostconf(dhcp_smach_t *dsmp)
+{
+	PKT_LIST *plp[2];
+	const char *hcfile;
+
+	hcfile = ifname_to_hostconf(dsmp->dsm_name, dsmp->dsm_isv6);
+	plp[0] = dsmp->dsm_ack;
+	plp[1] = dsmp->dsm_orig_ack;
+	if (write_hostconf(dsmp->dsm_name, plp, 2,
+	    monosec_to_time(dsmp->dsm_curstart_monosec),
+	    dsmp->dsm_isv6) != -1) {
+		dhcpmsg(MSG_DEBUG, "wrote lease to %s", hcfile);
+	} else if (errno == EROFS) {
+		dhcpmsg(MSG_DEBUG, "%s is on a read-only file "
+		    "system; not saving lease", hcfile);
+	} else {
+		dhcpmsg(MSG_ERR, "cannot write %s (reboot will "
+		    "not use cached configuration)", hcfile);
+	}
 }

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <alloca.h>
@@ -98,6 +97,7 @@ static const topo_debug_mode_t _topo_dbflag_modes[] = {
 	    TOPO_DBG_MODSVC },
 	{ "walk", "walker subsystem debug messages enabled", TOPO_DBG_WALK },
 	{ "xml", "xml file parsing messages enabled", TOPO_DBG_XML },
+	{ "devinfoforce", "devinfo DINFOFORCE snapshot used", TOPO_DBG_FORCE },
 	{ "all", "all debug modes enabled", TOPO_DBG_ALL},
 	{ NULL, NULL, 0 }
 };

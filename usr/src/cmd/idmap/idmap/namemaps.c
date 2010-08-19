@@ -351,7 +351,7 @@ idmap_fini_namemaps(idmap_nm_handle_t *p)
 
 
 idmap_stat
-idmap_init_namemaps(idmap_handle_t *handle, idmap_nm_handle_t **adh,
+idmap_init_namemaps(idmap_nm_handle_t **adh,
     char *user, char *passwd, char *auth, char *windomain,
     int direction)
 {
@@ -362,40 +362,40 @@ idmap_init_namemaps(idmap_handle_t *handle, idmap_nm_handle_t **adh,
 	if (p == NULL)
 		return (IDMAP_ERR_MEMORY);
 
-	rc = idmap_get_prop_str(handle, PROP_DEFAULT_DOMAIN,
+	rc = idmap_get_prop_str(PROP_DEFAULT_DOMAIN,
 	    &p->default_domain);
 	if (rc != IDMAP_SUCCESS) {
 		namemap_log(
 		    gettext("Error obtaining default domain from idmapd (%s)"),
-		    idmap_stat2string(NULL, rc));
+		    idmap_stat2string(rc));
 		goto cleanup;
 	}
 
-	rc = idmap_get_prop_str(handle, PROP_AD_UNIXUSER_ATTR,
+	rc = idmap_get_prop_str(PROP_AD_UNIXUSER_ATTR,
 	    &p->ad_unixuser_attr);
 	if (rc != IDMAP_SUCCESS) {
 		namemap_log(
 		    gettext("Error obtaining AD unixuser attribute (%s)"),
-		    idmap_stat2string(NULL, rc));
+		    idmap_stat2string(rc));
 		goto cleanup;
 	}
 
-	rc = idmap_get_prop_str(handle, PROP_AD_UNIXGROUP_ATTR,
+	rc = idmap_get_prop_str(PROP_AD_UNIXGROUP_ATTR,
 	    &p->ad_unixgroup_attr);
 	if (rc != IDMAP_SUCCESS) {
 		namemap_log(
 		    gettext("Error obtaining AD unixgroup attribute (%s)"),
-		    idmap_stat2string(NULL, rc));
+		    idmap_stat2string(rc));
 		goto cleanup;
 	}
 
 
-	rc = idmap_get_prop_str(handle, PROP_NLDAP_WINNAME_ATTR,
+	rc = idmap_get_prop_str(PROP_NLDAP_WINNAME_ATTR,
 	    &p->nldap_winname_attr);
 	if (rc != IDMAP_SUCCESS) {
 		namemap_log(
 		    gettext("Error obtaining AD unixgroup attribute (%s)"),
-		    idmap_stat2string(NULL, rc));
+		    idmap_stat2string(rc));
 		goto cleanup;
 	}
 

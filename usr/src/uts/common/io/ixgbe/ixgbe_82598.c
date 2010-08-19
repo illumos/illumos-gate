@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +21,14 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.162 sol_ixgbe_shared_339b */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.167 scm_061610_003709 */
 
 #include "ixgbe_type.h"
 #include "ixgbe_api.h"
@@ -192,6 +194,7 @@ ixgbe_init_ops_82598(struct ixgbe_hw *hw)
 	/* Link */
 	mac->ops.check_link = &ixgbe_check_mac_link_82598;
 	mac->ops.setup_link = &ixgbe_setup_mac_link_82598;
+	mac->ops.flap_tx_laser = NULL;
 	mac->ops.get_link_capabilities =
 	    &ixgbe_get_link_capabilities_82598;
 
@@ -441,20 +444,28 @@ ixgbe_fc_enable_82598(struct ixgbe_hw *hw, s32 packetbuf_num)
 	DEBUGFUNC("ixgbe_fc_enable_82598");
 
 	/*
-	 * On 82598 backplane having FC on causes resets while doing
-	 * KX, so turn off here.
+	 * On 82598 having Rx FC on causes resets while doing 1G
+	 * so if it's on turn it off once we know link_speed. For
+	 * more details see 82598 Specification update.
 	 */
 	hw->mac.ops.check_link(hw, &link_speed, &link_up, false);
-	if (link_up &&
-	    link_speed == IXGBE_LINK_SPEED_1GB_FULL &&
-	    hw->mac.ops.get_media_type(hw) == ixgbe_media_type_backplane) {
-		hw->fc.disable_fc_autoneg = true;
-		hw->fc.requested_mode = ixgbe_fc_none;
+	if (link_up && link_speed == IXGBE_LINK_SPEED_1GB_FULL) {
+		switch (hw->fc.requested_mode) {
+		case ixgbe_fc_full:
+			hw->fc.requested_mode = ixgbe_fc_tx_pause;
+			break;
+		case ixgbe_fc_rx_pause:
+			hw->fc.requested_mode = ixgbe_fc_none;
+			break;
+		default:
+			/* no change */
+			break;
+		}
 	}
 
 	/* Negotiate the fc mode to use */
 	ret_val = ixgbe_fc_autoneg(hw);
-	if (ret_val)
+	if (ret_val == IXGBE_ERR_FLOW_CONTROL)
 		goto out;
 
 	/* Disable any previous flow control settings */

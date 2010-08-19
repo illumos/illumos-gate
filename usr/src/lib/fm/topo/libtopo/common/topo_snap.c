@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -78,6 +77,7 @@
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
 #include <uuid/uuid.h>
+#include <zone.h>
 
 #include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
@@ -292,8 +292,14 @@ topo_snap_create(topo_hdl_t *thp, int *errp, boolean_t need_force)
 		return (NULL);
 	}
 
-	thp->th_di = di_init("/", (need_force ? DINFOFORCE : 0) |
-	    DINFOSUBTREE | DINFOMINOR | DINFOPROP | DINFOPATH);
+	if (need_force) {
+		topo_dprintf(thp, TOPO_DBG_FORCE,
+		    "taking a DINFOFORCE snapshot\n");
+		thp->th_di = di_init("/", DINFOFORCE |
+		    DINFOSUBTREE | DINFOMINOR | DINFOPROP | DINFOPATH);
+	} else {
+		thp->th_di = di_init("/", DINFOCACHE);
+	}
 	thp->th_pi = di_prom_init();
 
 	if (topo_tree_enum_all(thp) < 0) {
@@ -374,46 +380,16 @@ topo_snap_hold(topo_hdl_t *thp, const char *uuid, int *errp)
 	if (uuid == NULL) {
 		char *ret;
 
-		ret = topo_snap_create(thp, errp, B_TRUE);
-
-		/*
-		 * Now walk the tree and invoke any facility enumeration methods
-		 */
-		if (ret != NULL) {
-			if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC,
-			    fac_walker, (void *)0, errp)) == NULL) {
-				return (ret);
-			}
-			(void) topo_walk_step(twp, TOPO_WALK_CHILD);
-			topo_walk_fini(twp);
+		if (thp->th_debug & TOPO_DBG_FORCE) {
+			ret = topo_snap_create(thp, errp, B_TRUE);
+		} else {
+			ret = topo_snap_create(thp, errp, B_FALSE);
 		}
-		return (ret);
-	}
-	return (topo_snap_log_create(thp, uuid, errp));
-}
-
-/*
- * Return snapshot id. This variant calls di_init() without DINFOFORCE,
- * and is intended for use on DR events where there is no need to force
- * attach of all devices.
- */
-char *
-topo_snap_hold_no_forceload(topo_hdl_t *thp, const char *uuid, int *errp)
-{
-	topo_walk_t *twp;
-
-	if (thp == NULL)
-		return (NULL);
-
-	if (uuid == NULL) {
-		char *ret;
-
-		ret = topo_snap_create(thp, errp, B_FALSE);
 
 		/*
 		 * Now walk the tree and invoke any facility enumeration methods
 		 */
-		if (ret != NULL) {
+		if (ret != NULL && getzoneid() == 0) {
 			if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC,
 			    fac_walker, (void *)0, errp)) == NULL) {
 				return (ret);

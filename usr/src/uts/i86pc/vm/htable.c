@@ -2416,7 +2416,7 @@ x86pte_zero(htable_t *dest, uint_t entry, uint_t count)
 	size = count << mmu.pte_size_shift;
 	ASSERT(size > BLOCKZEROALIGN);
 #ifdef __i386
-	if ((x86_feature & X86_SSE2) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_SSE2))
 		bzero(dst_va, size);
 	else
 #endif

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -68,6 +67,12 @@
  */
 #define	__LIBMAPID_IMPL
 #include <nfs/mapid.h>
+#include <libshare.h>
+#include <libscf.h>
+#include <limits.h>
+#include <rpcsvc/daemon_utils.h>
+#include "smfcfg.h"
+
 #pragma	init(_lib_init)
 #pragma	fini(_lib_fini)
 
@@ -945,37 +950,21 @@ trim_wspace(char *dp)
 static void
 get_nfs_domain(void)
 {
-	char		*ndomain;
-	timestruc_t	 ntime;
-	void	*defp;
+	char value[NS_MAXCDNAME];
+	int	ret, bufsz = NS_MAXCDNAME;
 
 	/*
-	 * If we can't get stats for the config file, then
-	 * zap the NFS domain info.  If mtime hasn't changed,
-	 * then there's no work to do, so just return.
+	 * Get NFSMAPID_DOMAIN property value from SMF.
 	 */
-	if (get_mtime(NFSADMIN, &ntime) != 0) {
-		ZAP_DOMAIN(nfs);
-		return;
-	}
-
-	if (TIMESTRUC_EQ(ntime, nfs_mtime))
-		return;
-
-	/*
-	 * Get NFSMAPID_DOMAIN value from /etc/default/nfs for now.
-	 * Note: defread_r() returns a ptr to libc internal malloc.
-	 */
-	if ((defp = defopen_r(NFSADMIN)) != NULL) {
-		char	*dp = NULL;
-#ifdef	DEBUG
-		char	*whoami = "get_nfs_domain";
-		char	 orig[NS_MAXCDNAME] = {0};
-#endif
-		ndomain = defread_r("NFSMAPID_DOMAIN=", defp);
-#ifdef	DEBUG
-		if (ndomain)
-			(void) strncpy(orig, ndomain, NS_MAXCDNAME);
+	bzero(value, NS_MAXCDNAME);
+	ret = nfs_smf_get_prop("nfsmapid_domain", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_ASTRING, NFSMAPID, &bufsz);
+	if (ret == SA_OK && *value != NULL) {
+		char *dp = NULL;
+#ifdef DEBUG
+		char    *whoami = "get_nfs_domain";
+		char	orig[NS_MAXCDNAME] = {0};
+		(void) strncpy(orig, value, NS_MAXCDNAME);
 #endif
 		/*
 		 * NFSMAPID_DOMAIN was set, so it's time for validation. If
@@ -983,29 +972,25 @@ get_nfs_domain(void)
 		 * bail (syslog in DEBUG). We make nfsmapid more a bit
 		 * more forgiving of trailing and leading white space.
 		 */
-		if ((dp = trim_wspace(ndomain)) != NULL) {
+		if ((dp = trim_wspace(value)) != NULL) {
 			if (mapid_stdchk_domain(dp) > 0) {
 				nfs_domain_len = strlen(dp);
 				(void) strncpy(nfs_domain, dp, NS_MAXCDNAME);
 				nfs_domain[NS_MAXCDNAME] = '\0';
-				nfs_mtime = ntime;
-				defclose_r(defp);
 				return;
 			}
 		}
-		defclose_r(defp);
 #ifdef	DEBUG
 		if (orig[0] != '\0') {
 			syslog(LOG_ERR, gettext("%s: Invalid domain name \"%s\""
-			    " found in configuration file."), whoami, orig);
+			    " found in SMF."), whoami, orig);
 		}
 #endif
 	}
-
 	/*
-	 * So the NFS config file changed but it couldn't be opened or
-	 * it didn't specify NFSMAPID_DOMAIN or it specified an invalid
-	 * NFSMAPID_DOMAIN.  Time to zap current NFS domain info.
+	 * So the NFS SMF parameter nfsmapid_domain cannot be obtained or
+	 * there is an invalid nfsmapid_domain property value.
+	 * Time to zap current NFS domain info.
 	 */
 	ZAP_DOMAIN(nfs);
 }

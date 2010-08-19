@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #if !defined(lint)
@@ -191,12 +190,18 @@ u_longlong_t
 gettick(void)
 { return (0); }
 
+u_longlong_t
+randtick(void)
+{ return (0); }
+
 #else   /* lint */
 
 	ENTRY(gettick)
+	ALTENTRY(randtick)
 	GET_NATIVE_TIME(%o0,%o2,%o3,__LINE__)
 	retl
 	  nop
+	SET_SIZE(randtick)
 	SET_SIZE(gettick)
 
 #endif  /* lint */

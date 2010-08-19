@@ -19,16 +19,22 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MODULE = ext-event-transport
 CLASS = common
-SRCS = fmevt_main.c fmevt_outbound.c 
+SRCS = fmevt_main.c \
+	fmevt_outbound.c \
+	fmevt_inbound.c \
+	fmevt_inbound_default.c \
+	fmevt_inbound_on.c \
+	fmevt_inbound_smf.c \
+	fmevt_inbound_sunos.c
 
 include ../../Makefile.plugin
 
 CFLAGS += $(INCS)
 LINTFLAGS += $(INCS)
-LDLIBS += -lsysevent
+LDLIBS += -L$(ROOTLIB)/fm -lsysevent -lfmevent -ltopo -luuid -lscf -lc
+LDFLAGS += -R/usr/lib/fm

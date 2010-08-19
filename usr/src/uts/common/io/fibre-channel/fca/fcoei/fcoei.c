@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -896,6 +895,7 @@ fcoei_handle_comp_xch_list(fcoei_soft_state_t *ss)
  *	If it's solicited FLOGI, we need set SS_FLAG_FLOGI_FAILED
  *	If the link is down, we think it has timed out too.
  */
+/* ARGSUSED */
 static uint32_t
 fcoei_xch_check(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 {

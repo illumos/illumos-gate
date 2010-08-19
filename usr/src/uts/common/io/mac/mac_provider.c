@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -213,8 +212,14 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	mip->mi_info.mi_nativemedia = mtype->mt_nativetype;
 	if (mregp->m_max_sdu <= mregp->m_min_sdu)
 		goto fail;
+	if (mregp->m_multicast_sdu == 0)
+		mregp->m_multicast_sdu = mregp->m_max_sdu;
+	if (mregp->m_multicast_sdu < mregp->m_min_sdu ||
+	    mregp->m_multicast_sdu > mregp->m_max_sdu)
+		goto fail;
 	mip->mi_sdu_min = mregp->m_min_sdu;
 	mip->mi_sdu_max = mregp->m_max_sdu;
+	mip->mi_sdu_multicast = mregp->m_multicast_sdu;
 	mip->mi_info.mi_addr_length = mip->mi_type->mt_addr_length;
 	/*
 	 * If the media supports a broadcast address, cache a pointer to it
@@ -935,6 +940,13 @@ mac_capab_update(mac_handle_t mh)
 	i_mac_notify((mac_impl_t *)mh, MAC_NOTE_CAPAB_CHG);
 }
 
+/*
+ * Used by normal drivers to update the max sdu size.
+ * We need to handle the case of a smaller mi_sdu_multicast
+ * since this is called by mac_set_mtu() even for drivers that
+ * have differing unicast and multicast mtu and we don't want to
+ * increase the multicast mtu by accident in that case.
+ */
 int
 mac_maxsdu_update(mac_handle_t mh, uint_t sdu_max)
 {
@@ -943,6 +955,31 @@ mac_maxsdu_update(mac_handle_t mh, uint_t sdu_max)
 	if (sdu_max == 0 || sdu_max < mip->mi_sdu_min)
 		return (EINVAL);
 	mip->mi_sdu_max = sdu_max;
+	if (mip->mi_sdu_multicast > mip->mi_sdu_max)
+		mip->mi_sdu_multicast = mip->mi_sdu_max;
+
+	/* Send a MAC_NOTE_SDU_SIZE notification. */
+	i_mac_notify(mip, MAC_NOTE_SDU_SIZE);
+	return (0);
+}
+
+/*
+ * Version of the above function that is used by drivers that have a different
+ * max sdu size for multicast/broadcast vs. unicast.
+ */
+int
+mac_maxsdu_update2(mac_handle_t mh, uint_t sdu_max, uint_t sdu_multicast)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	if (sdu_max == 0 || sdu_max < mip->mi_sdu_min)
+		return (EINVAL);
+	if (sdu_multicast == 0)
+		sdu_multicast = sdu_max;
+	if (sdu_multicast > sdu_max || sdu_multicast < mip->mi_sdu_min)
+		return (EINVAL);
+	mip->mi_sdu_max = sdu_max;
+	mip->mi_sdu_multicast = sdu_multicast;
 
 	/* Send a MAC_NOTE_SDU_SIZE notification. */
 	i_mac_notify(mip, MAC_NOTE_SDU_SIZE);
@@ -1358,10 +1395,10 @@ mac_prop_info_set_default_str(mac_prop_info_handle_t ph, const char *str)
 	if (pr->pr_default == NULL)
 		return;
 
-	if (strlen(str) > pr->pr_default_size)
-		pr->pr_default_status = ENOBUFS;
+	if (strlen(str) >= pr->pr_default_size)
+		pr->pr_errno = ENOBUFS;
 	else
-		(void) strlcpy(pr->pr_default, str, strlen(str));
+		(void) strlcpy(pr->pr_default, str, pr->pr_default_size);
 	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
 }
 
@@ -1388,16 +1425,28 @@ mac_prop_info_set_range_uint32(mac_prop_info_handle_t ph, uint32_t min,
 {
 	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
 	mac_propval_range_t *range = pr->pr_range;
+	mac_propval_uint32_range_t *range32;
 
 	/* nothing to do if the caller doesn't want the range info */
 	if (range == NULL)
 		return;
 
-	range->mpr_count = 1;
-	range->mpr_type = MAC_PROPVAL_UINT32;
-	range->mpr_range_uint32[0].mpur_min = min;
-	range->mpr_range_uint32[0].mpur_max = max;
-	pr->pr_flags |= MAC_PROP_INFO_RANGE;
+	if (pr->pr_range_cur_count++ == 0) {
+		/* first range */
+		pr->pr_flags |= MAC_PROP_INFO_RANGE;
+		range->mpr_type = MAC_PROPVAL_UINT32;
+	} else {
+		/* all ranges of a property should be of the same type */
+		ASSERT(range->mpr_type == MAC_PROPVAL_UINT32);
+		if (pr->pr_range_cur_count > range->mpr_count) {
+			pr->pr_errno = ENOSPC;
+			return;
+		}
+	}
+
+	range32 = range->mpr_range_uint32;
+	range32[pr->pr_range_cur_count - 1].mpur_min = min;
+	range32[pr->pr_range_cur_count - 1].mpur_max = max;
 }
 
 void

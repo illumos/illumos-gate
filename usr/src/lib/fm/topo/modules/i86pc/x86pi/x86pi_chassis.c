@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -38,8 +37,7 @@
 
 
 tnode_t *
-x86pi_gen_chassis(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp,
-    int smb_id, int instance)
+x86pi_gen_chassis(topo_mod_t *mod, tnode_t *t_parent, int smb_id, int instance)
 {
 	int			rv;
 	smbios_info_t		ip;
@@ -47,7 +45,13 @@ x86pi_gen_chassis(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp,
 	x86pi_hcfmri_t		ch_hcfmri;
 	tnode_t			*ch_node;
 	char			*f = "x86pi_gen_chassis";
+	smbios_hdl_t		*shp;
 
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL) {
+		topo_mod_dprintf(mod, "%s: failed to load SMBIOS\n", f);
+		return (NULL);
+	}
 
 	/* init fmri struct */
 	bzero(&ch_hcfmri, sizeof (x86pi_hcfmri_t));

@@ -81,16 +81,10 @@ file path=usr/kernel/drv/ii.conf group=sys \
 file path=usr/lib/mdb/kvm/$(ARCH64)/ii.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/ii.so group=sys mode=0555
 hardlink path=lib/svc/method/svc-ii target=../../../etc/init.d/ii
-legacy pkg=SUNWiir arch=$(ARCH) category=system \
-    desc="Point-In-Time Copy and snapshot facility" \
-    hotline="Please contact your local service provider" \
-    name="Sun StorageTek Availability Suite Point-In-Time Copy (root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWiiu arch=$(ARCH) category=system \
-    desc="Point-In-Time Copy and snapshot facility" \
-    hotline="Please contact your local service provider" \
-    name="Sun StorageTek Availability Suite Point-In-Time Copy (usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWiir desc="Point-In-Time Copy and snapshot facility" \
+    name="Sun StorageTek Availability Suite Point-In-Time Copy (root)"
+legacy pkg=SUNWiiu desc="Point-In-Time Copy and snapshot facility" \
+    name="Sun StorageTek Availability Suite Point-In-Time Copy (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/cluster/lib/dscfg/start/05ii target=../../../sbin/ii

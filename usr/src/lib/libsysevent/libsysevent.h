@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSYSEVENT_H
 #define	_LIBSYSEVENT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <thread.h>
@@ -83,6 +79,8 @@ size_t sysevent_get_size(sysevent_t *ev);
 
 /* syseventd subscriber interfaces */
 sysevent_handle_t *sysevent_bind_handle(void (*event_handler)(sysevent_t *ev));
+sysevent_handle_t *sysevent_bind_xhandle(void (*event_handler)(sysevent_t *ev),
+    sysevent_subattr_t *);
 void sysevent_unbind_handle(sysevent_handle_t *sysevent_hdl);
 int sysevent_subscribe_event(sysevent_handle_t *sysevent_hdl,
 	const char *event_class, const char **event_subclass_list,
@@ -99,6 +97,8 @@ sysevent_handle_t *sysevent_open_channel_alt(const char *channel_path);
 void sysevent_close_channel(sysevent_handle_t *shp);
 int sysevent_bind_subscriber(sysevent_handle_t *shp,
 	void (*event_handler)(sysevent_t *ev));
+int sysevent_bind_xsubscriber(sysevent_handle_t *shp,
+	void (*event_handler)(sysevent_t *ev), sysevent_subattr_t *);
 void sysevent_unbind_subscriber(sysevent_handle_t *shp);
 int sysevent_bind_publisher(sysevent_handle_t *shp);
 void sysevent_unbind_publisher(sysevent_handle_t *shp);

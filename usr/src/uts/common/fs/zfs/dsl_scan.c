@@ -733,9 +733,6 @@ dsl_scan_recurse(dsl_scan_t *scn, dsl_dataset_t *ds, dmu_objset_type_t ostype,
 
 		osp = (*bufp)->b_data;
 
-		if (DSL_SCAN_IS_SCRUB_RESILVER(scn))
-			dsl_scan_zil(dp, &osp->os_zil_header);
-
 		dsl_scan_visitdnode(scn, ds, osp->os_type,
 		    &osp->os_meta_dnode, *bufp, DMU_META_DNODE_OBJECT, tx);
 
@@ -1078,8 +1075,22 @@ dsl_scan_visitds(dsl_scan_t *scn, uint64_t dsobj, dmu_tx_t *tx)
 {
 	dsl_pool_t *dp = scn->scn_dp;
 	dsl_dataset_t *ds;
+	objset_t *os;
 
 	VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
+
+	if (dmu_objset_from_ds(ds, &os))
+		goto out;
+
+	/*
+	 * Only the ZIL in the head (non-snapshot) is valid.  Even though
+	 * snapshots can have ZIL block pointers (which may be the same
+	 * BP as in the head), they must be ignored.  So we traverse the
+	 * ZIL here, rather than in scan_recurse(), because the regular
+	 * snapshot block-sharing rules don't apply to it.
+	 */
+	if (DSL_SCAN_IS_SCRUB_RESILVER(scn) && !dsl_dataset_is_snapshot(ds))
+		dsl_scan_zil(dp, &os->os_zil_header);
 
 	/*
 	 * Iterate over the bps in this ds.

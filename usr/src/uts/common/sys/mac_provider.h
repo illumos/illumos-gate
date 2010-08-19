@@ -450,14 +450,19 @@ typedef struct mac_register_s {
 	char			**m_priv_props;
 	uint32_t		m_margin;
 	uint32_t		m_v12n;		/* Virtualization level */
+	uint_t			m_multicast_sdu;
 } mac_register_t;
 
 /*
  * Driver interface functions.
  */
-extern void			mac_protect_get(mac_handle_t, mac_protect_t *);
+extern mac_protect_t		*mac_protect_get(mac_handle_t);
 extern void			mac_sdu_get(mac_handle_t, uint_t *, uint_t *);
+extern void			mac_sdu_get2(mac_handle_t, uint_t *, uint_t *,
+				    uint_t *);
 extern int			mac_maxsdu_update(mac_handle_t, uint_t);
+extern int			mac_maxsdu_update2(mac_handle_t, uint_t,
+				    uint_t);
 
 extern mac_register_t		*mac_alloc(uint_t);
 extern void			mac_free(mac_register_t *);

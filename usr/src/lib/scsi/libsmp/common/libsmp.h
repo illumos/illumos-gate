@@ -86,6 +86,8 @@ extern smp_target_t *smp_open(const smp_target_def_t *);
 extern uint_t smp_target_getcap(const smp_target_t *);
 extern uint16_t smp_target_get_change_count(const smp_target_t *);
 extern void smp_target_set_change_count(smp_target_t *, uint16_t);
+extern uint8_t smp_target_get_number_of_phys(const smp_target_t *);
+extern uint16_t smp_target_get_exp_route_indexes(const smp_target_t *);
 extern const char *smp_target_vendor(const smp_target_t *);
 extern const char *smp_target_product(const smp_target_t *);
 extern const char *smp_target_revision(const smp_target_t *);

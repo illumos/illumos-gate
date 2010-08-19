@@ -154,12 +154,20 @@
 			 \t\t\tdependencies\n"
 @ MSG_ARG_DETAIL_ZE	"\t[-z endfiltee]\tmarks a filtee such that it will \
 			 terminate a filters\n\t\t\tsearch\n"
+@ MSG_ARG_DETAIL_ZFATW	"\t[-z fatal-warnings | nofatal-warnings],\n\
+			 \t[--fatal-warnings | --no-fatal-warnings]\n\
+			 \t\tenable|disable treatment of warnings as fatal\n"
 @ MSG_ARG_DETAIL_ZFA	"\t[-z finiarray=function]\n\
 			 \t\t\tname of function to be appended to the \
 			 .fini_array\n"
 @ MSG_ARG_DETAIL_ZGP	"\t[-z groupperm | nogroupperm]\n\
 			 \t\t\tenable|disable setting of group permissions\n\
 			 \t\t\ton dynamic dependencies\n"
+@ MSG_ARG_DETAIL_ZGUIDE	"\t[-z guidance | -z guidance=item1,item2,...]\n\
+			 \t\t\tenable guidance warnings. items: \
+			 noall, nodefs,\n\
+			 \t\t\tnodirect, nolazyload, nomapfile, notext, \
+			 nounused\n"
 @ MSG_ARG_DETAIL_ZH	"\t[-z help], [--help]\n\
 			 \t\t\tprint this usage message\n"
 @ MSG_ARG_DETAIL_ZIG	"\t[-z ignore | record]\n\
@@ -506,7 +514,7 @@
 			 initialization: start=0x%llx, length=0x%llx: \
 			 start=0x%llx, length=0x%llx"
 @ MSG_PSYM_EXPREASON1	"output file is static object"
-@ MSG_PSYM_EXPREASON2	"-znopartial option in effect"
+@ MSG_PSYM_EXPREASON2	"-z nopartial option in effect"
 @ MSG_PSYM_EXPREASON3	"move infrastructure size is greater than move data"
 
 #
@@ -672,6 +680,17 @@
 			 unsupported: %s"
 @ MSG_REJ_ARCHIVE	"file %s: invalid archive use"
 
+# Guidance messages
+@ MSG_GUIDE_SUMMARY	"see ld(1) -z guidance for more information"
+@ MSG_GUIDE_DEFS	"-z defs option recommended for shared objects"
+@ MSG_GUIDE_DIRECT	"-B direct or -z direct option recommended before \
+			 first dependency"
+@ MSG_GUIDE_LAZYLOAD	"-z lazyload option recommended before \
+			 first dependency"
+@ MSG_GUIDE_MAPFILE	"version 2 mapfile syntax recommended: %s"
+@ MSG_GUIDE_TEXT	"position independent (PIC) code recommended for \
+			 shared objects"
+@ MSG_GUIDE_UNUSED	"removal of unused dependency recommended: %s"
 
 @ _END_
 
@@ -899,6 +918,9 @@
 @ MSG_ARG_NOENTRY	"entry point symbol '%s' is undefined"
 @ MSG_ARG_UNSUPPORTED	"option %s is no longer supported; ignored"
 @ MSG_MARG_ONLY		"option %s can only be used with a %s"
+@ MSG_ARG_UNKNOWN	"unrecognized option '-%c'"
+@ MSG_ARG_USEHELP	"use the -z help option for usage information"
+
 
 @ MSG_ARG_FLAGS		"flags processing errors"
 @ MSG_ARG_FILES		"file processing errors. No output written to %s"
@@ -1312,6 +1334,7 @@
 @ MSG_ARG_CYU		"-YU"
 @ MSG_ARG_Z		"-z"
 @ MSG_ARG_ZDEFNODEF	"-z[defs|nodefs]"
+@ MSG_ARG_ZGUIDE	"-zguidance"
 @ MSG_ARG_ZNODEF	"-znodefs"
 @ MSG_ARG_ZNOINTERP	"-znointerp"
 @ MSG_ARG_ZRELAXRELOC	"-zrelaxreloc"
@@ -1323,6 +1346,7 @@
 @ MSG_ARG_ZLOADFLTR	"-zloadfltr"
 @ MSG_ARG_ZCOMBRELOC	"-zcombreloc"
 @ MSG_ARG_ZSYMBOLCAP	"-zsymbolcap"
+@ MSG_ARG_ZFATWNOFATW	"-z[fatal-warnings|nofatalwarnings]"
 
 @ MSG_ARG_ABSEXEC	"absexec"
 @ MSG_ARG_ALTEXEC64	"altexec64"
@@ -1361,7 +1385,7 @@
 @ MSG_ARG_REDLOCSYM	"redlocsym"
 @ MSG_ARG_VERBOSE	"verbose"
 @ MSG_ARG_WEAKEXT	"weakextract"
-@ MSG_ARG_LOADFLTR	"loadfltr""
+@ MSG_ARG_LOADFLTR	"loadfltr"
 @ MSG_ARG_ALLEXTRT	"allextract"
 @ MSG_ARG_DFLEXTRT	"defaultextract"
 @ MSG_ARG_COMBRELOC	"combreloc"
@@ -1374,6 +1398,7 @@
 @ MSG_ARG_RESCAN_NOW	"rescan-now"
 @ MSG_ARG_RESCAN_START	"rescan-start"
 @ MSG_ARG_RESCAN_END	"rescan-end"
+@ MSG_ARG_GUIDE		"guidance"
 @ MSG_ARG_NOLDYNSYM	"noldynsym"
 @ MSG_ARG_RELAXRELOC	"relaxreloc"
 @ MSG_ARG_NORELAXRELOC	"norelaxreloc"
@@ -1381,6 +1406,8 @@
 @ MSG_ARG_GLOBAUDIT	"globalaudit"
 @ MSG_ARG_TARGET	"target="
 @ MSG_ARG_WRAP		"wrap="
+@ MSG_ARG_FATWARN	"fatal-warnings"
+@ MSG_ARG_NOFATWARN	"nofatal-warnings"
 @ MSG_ARG_HELP		"help"
 @ MSG_ARG_GROUP		"group"
 @ MSG_ARG_REDUCE	"reduce"
@@ -1404,6 +1431,8 @@
 @ MSG_ARG_T_ENDGROUP	"-end-group"
 @ MSG_ARG_T_ENTRY	"-entry"
 @ MSG_ARG_T_STDFLTR	"-filter"
+@ MSG_ARG_T_FATWARN	"-fatal-warnings"
+@ MSG_ARG_T_NOFATWARN	"-no-fatal-warnings"
 @ MSG_ARG_T_HELP	"-help"
 @ MSG_ARG_T_LIBRARY	"-library"
 @ MSG_ARG_T_LIBPATH	"-library-path"
@@ -1419,6 +1448,16 @@
 @ MSG_ARG_T_WRAP	"-wrap"
 @ MSG_ARG_T_OPAR	"("
 @ MSG_ARG_T_CPAR	")"
+
+# -z guidance=item strings
+@ MSG_ARG_GUIDE_DELIM		",: \t"
+@ MSG_ARG_GUIDE_NO_ALL		"noall"
+@ MSG_ARG_GUIDE_NO_DEFS		"nodefs"
+@ MSG_ARG_GUIDE_NO_DIRECT	"nodirect"
+@ MSG_ARG_GUIDE_NO_LAZYLOAD	"nolazyload"
+@ MSG_ARG_GUIDE_NO_MAPFILE	"nomapfile"
+@ MSG_ARG_GUIDE_NO_TEXT		"notext"
+@ MSG_ARG_GUIDE_NO_UNUSED	"nounused"
 
 # Environment variable strings
 

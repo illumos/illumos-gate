@@ -523,7 +523,7 @@ i_dladm_rename_link_c2(dladm_handle_t handle, datalink_id_t linkid1,
 	(void) dladm_set_linkprop(handle, linkid1, NULL, NULL, 0,
 	    DLADM_OPT_ACTIVE);
 
-	if (((status = dladm_read_conf(handle, linkid1, &conf1)) !=
+	if (((status = dladm_getsnap_conf(handle, linkid1, &conf1)) !=
 	    DLADM_STATUS_OK) ||
 	    ((status = dladm_get_conf_field(handle, conf1, FDEVNAME, devname,
 	    MAXLINKNAMELEN)) != DLADM_STATUS_OK) ||
@@ -531,7 +531,7 @@ i_dladm_rename_link_c2(dladm_handle_t handle, datalink_id_t linkid1,
 	    sizeof (uint64_t))) != DLADM_STATUS_OK) ||
 	    ((status = dladm_get_conf_field(handle, conf1, FPHYINST, &phyinst,
 	    sizeof (uint64_t))) != DLADM_STATUS_OK) ||
-	    ((status = dladm_read_conf(handle, linkid2, &conf2)) !=
+	    ((status = dladm_open_conf(handle, linkid2, &conf2)) !=
 	    DLADM_STATUS_OK)) {
 		dir.dir_linkid1 = linkid2;
 		dir.dir_linkid2 = linkid1;
@@ -601,7 +601,7 @@ i_dladm_rename_link_c3(dladm_handle_t handle, const char *link1,
 	if (!dladm_valid_linkname(link1))
 		return (DLADM_STATUS_LINKINVAL);
 
-	status = dladm_read_conf(handle, linkid2, &conf);
+	status = dladm_open_conf(handle, linkid2, &conf);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
@@ -823,7 +823,7 @@ dladm_phys_info(dladm_handle_t handle, datalink_id_t linkid,
 	case DLADM_OPT_PERSIST: {
 		dladm_conf_t	conf;
 
-		status = dladm_read_conf(handle, linkid, &conf);
+		status = dladm_getsnap_conf(handle, linkid, &conf);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _IP_ARP_H
@@ -115,6 +114,7 @@ extern	int		arl_get_muxid(ill_t *);
 extern	void		arp_send_replumb_conf(ill_t *);
 extern	void		arp_unbind_complete(ill_t *);
 extern  ill_t		*arl_to_ill(arl_t *);
+extern	uint32_t	arp_hw_type(t_uscalar_t);
 #endif
 
 #define	ARP_RETRANS_TIMER	500 /* time in milliseconds */

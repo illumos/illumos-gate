@@ -20,9 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* $Id: uri.c 146 2006-03-24 00:26:54Z njacobs $ */
@@ -36,23 +34,6 @@
 #include <sys/types.h>
 #include <errno.h>
 #include "uri.h"
-
-static char *
-strndup(char *string, size_t length)
-{
-	char *result = NULL;
-
-	if (length > 0) {
-		length++;
-
-
-		if ((result = calloc(1, length)) != NULL)
-			(void) strlcat(result, string, length);
-	}
-
-	return (result);
-}
-
 
 /*
  * This will handle the following forms:
@@ -91,7 +72,8 @@ uri_from_string(char *string, uri_t **uri)
 		string = ptr + 3; /* skip the :// */
 
 		if ((path = end = strchr(string, '/')) == NULL)
-			for (end = string; *end != '\0'; end++);
+			for (end = string; *end != '\0'; end++)
+				continue;
 
 		u->host_part = strndup(string, end - string);
 
@@ -101,7 +83,7 @@ uri_from_string(char *string, uri_t **uri)
 				u->user_part = strndup(string, host-string);
 				/* host+1 to end is the host part */
 				u->host_part = strndup(host + 1,
-							end - (host+1));
+				    end - (host+1));
 				user = string;
 				host++;
 				break;
@@ -113,7 +95,7 @@ uri_from_string(char *string, uri_t **uri)
 			for (password = user; (password < host - 1); password++)
 				if (*password == ':') {
 					u->password = strndup(password + 1,
-							host - password - 2);
+					    host - password - 2);
 					break;
 				}
 			u->user = strndup(user, password - user);
@@ -146,13 +128,15 @@ uri_from_string(char *string, uri_t **uri)
 				if ((query != NULL) && (*query != '\0')) {
 					u->query = strdup(query + 1);
 					end = query;
-				} else
-					for (end = path; *end != '\0'; end++);
+				} else {
+					for (end = path; *end != '\0'; end++)
+						continue;
+				}
 
 				fragment = strrchr(name, '#');
 				if ((fragment != NULL) && (*fragment != '\0')) {
 					u->fragment = strndup(fragment + 1,
-							end - fragment - 1);
+					    end - fragment - 1);
 					end = fragment;
 				}
 
@@ -215,7 +199,7 @@ uri_to_string(uri_t *uri, char *buffer, size_t buflen)
 		    (uri->query ? uri->query : ""));
 	} else {
 		(void) snprintf(buffer, buflen, "%s:%s", uri->scheme,
-				uri->scheme_part);
+		    uri->scheme_part);
 	}
 
 	return (0);

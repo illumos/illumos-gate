@@ -475,7 +475,7 @@ apix_init_intr()
 	if (nlvt >= 5) {
 		/* Enable performance counter overflow interrupt */
 
-		if ((x86_feature & X86_MSR) != X86_MSR)
+		if (!is_x86_feature(x86_featureset, X86FSET_MSR))
 			apic_enable_cpcovf_intr = 0;
 		if (apic_enable_cpcovf_intr) {
 			if (apic_cpcovf_vect == 0) {
@@ -1609,7 +1609,7 @@ apix_set_cpu(apix_vector_t *vecp, int new_cpu, int *result)
 	dev_info_t *dip;
 	int inum, cap_ptr;
 	ddi_acc_handle_t handle;
-	ddi_intr_msix_t *msix_p;
+	ddi_intr_msix_t *msix_p = NULL;
 	ushort_t msix_ctrl;
 	uintptr_t off;
 	uint32_t mask;
@@ -1628,7 +1628,7 @@ apix_set_cpu(apix_vector_t *vecp, int new_cpu, int *result)
 	/*
 	 * Mask MSI-X. It's unmasked when MSI-X gets enabled.
 	 */
-	if (vecp->v_type == APIX_TYPE_MSIX) {
+	if (vecp->v_type == APIX_TYPE_MSIX && IS_VECT_ENABLED(vecp)) {
 		if ((dip = APIX_GET_DIP(vecp)) == NULL)
 			return (NULL);
 		inum = vecp->v_devp->dv_inum;
@@ -1651,9 +1651,12 @@ apix_set_cpu(apix_vector_t *vecp, int new_cpu, int *result)
 	}
 
 	*result = 0;
-
 	if ((newp = apix_rebind(vecp, new_cpu, 1)) == NULL)
 		*result = EIO;
+
+	/* Restore mask bit */
+	if (msix_p != NULL)
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, mask);
 
 	return (newp);
 }

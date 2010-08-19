@@ -17,11 +17,11 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
-#
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
+
+
 
 4.0.4 code drop from Intel on 1/30/2003
 =======================================
@@ -757,3 +757,13 @@ Notes on packaging:
    6925276 e1000g not consistent with link_lock usage
    6933844 NULL ptr deref in e1000g_rx_setup() due to inconsistency between recv_list & rx_desc_num
 
+5.3.24
+=====
+  This version has the following fixes:
+   6861114 System Panics with FMA ereport.io.fire.epkt
+   6876953 Memory leaks found in e1000g_alloc_rx_sw_packet on snv_111b
+   6945160 netlbtest fails with Can't set loopback mode on device e1000g6
+   6960959 panic in e1000g_receive
+   6965855 e1000g(intel 82571 adapter) needs to support MTU size of 9000
+   6967530 Need version in e1000g driver
+   6967873 e1000g needs to clear the link-down status when being unplumbed

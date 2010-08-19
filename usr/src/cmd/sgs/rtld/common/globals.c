@@ -112,7 +112,7 @@ const char	*procname = NULL;
 const char	*rtldname = MSG_ORIG(MSG_FIL_RTLD);
 
 char		*lasterr = NULL;	/* string describing last error */
-					/*	cleared by each dlerror() */
+					/*    cleared by each dlerror() */
 Interp		*interp = NULL;		/* ELF interpreter info */
 APlist		*hdl_alp[HDLIST_SZ+2];	/* dlopen() handle list */
 size_t		syspagsz = 0;		/* system page size */
@@ -121,25 +121,27 @@ Uts_desc	*uts = NULL; 		/* utsname descriptor */
 Isa_desc	*isa = NULL;		/* isalist descriptor */
 
 uint_t		audit_argcnt = 64;	/* no. of stack args to copy (default */
-					/*	is all) */
+					/*    is all) */
 Audit_desc	*auditors = NULL;	/* global auditors (LD_AUDIT) */
+APlist		*aud_preinit = NULL;	/* list of objects defining local */
+APlist		*aud_activity = NULL;	/*    preinit and activity auditors */
 
 const char	*rpl_audit = NULL;	/* replaceable LD_AUDIT string */
 const char	*rpl_debug = NULL;	/* replaceable LD_DEBUG string */
 const char	*rpl_ldflags = NULL;	/* replaceable LD_FLAGS string */
 const char	*rpl_libpath = NULL;	/* replaceable LD_LIBRARY_PATH string */
-Alist		*rpl_libdirs = NULL;	/*	and associated Pdesc list */
+Alist		*rpl_libdirs = NULL;	/*    and associated Pdesc list */
 const char	*rpl_preload = NULL;	/* replaceable LD_PRELOAD string */
 
 const char	*prm_audit = NULL;	/* permanent LD_AUDIT string */
 const char	*prm_debug = NULL;	/* permanent LD_DEBUG string */
 const char	*prm_ldflags = NULL;	/* permanent LD_FLAGS string */
 const char	*prm_libpath = NULL;	/* permanent LD_LIBRARY_PATH string */
-Alist		*prm_libdirs = NULL;	/*	and associated Pdesc list */
+Alist		*prm_libdirs = NULL;	/*    and associated Pdesc list */
 const char	*prm_preload = NULL;	/* permanent LD_PRELOAD string */
 
 uint_t		env_info = 0;		/* information regarding environment */
-					/*	variables */
+					/*    variables */
 int		killsig = SIGKILL;	/* signal sent on fatal exit */
 APlist		*free_alp = NULL;	/* defragmentation list */
 

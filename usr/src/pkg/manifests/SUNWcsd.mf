@@ -74,11 +74,9 @@ file path=etc/security/device_policy group=sys preserve=true
 file path=etc/security/extra_privs group=sys preserve=true
 file path=lib/svc/manifest/system/sysevent.xml group=sys mode=0444
 file path=lib/svc/method/svc-syseventd mode=0555
-legacy pkg=SUNWcsd arch=$(ARCH) category=system \
+legacy pkg=SUNWcsd \
     desc="core entries for /dev and /devices needed for the initial boot of Solaris" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris Devices" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Core Solaris Devices"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=dev/stderr target=./fd/2

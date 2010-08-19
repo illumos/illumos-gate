@@ -80,16 +80,11 @@ file path=var/yp/aliases mode=0555 original_name=SUNWnis:var/yp/aliases \
     preserve=true
 file path=var/yp/nicknames original_name=SUNWnis:var/yp/nicknames \
     preserve=true
-legacy pkg=SUNWnisr arch=$(ARCH) category=system \
+legacy pkg=SUNWnisr \
     desc="configuration files and directories for the Network Information System (NIS)" \
-    hotline="Please contact your local service provider" \
-    name="Network Information System, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWnisu arch=$(ARCH) category=system \
-    desc="utilities for the Network Information System (NIS)" \
-    hotline="Please contact your local service provider" \
-    name="Network Information System, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Network Information System, (Root)"
+legacy pkg=SUNWnisu desc="utilities for the Network Information System (NIS)" \
+    name="Network Information System, (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libnisdb.so target=./libnisdb.so.2

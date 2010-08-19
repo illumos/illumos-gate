@@ -662,6 +662,9 @@ usr/include/sys/iscsit/radius_protocol.h
 usr/lib/libshare.so
 usr/lib/amd64/libshare.so		i386
 usr/lib/sparcv9/libshare.so		sparc
+usr/lib/fs/autofs/libshare_autofs.so
+usr/lib/fs/autofs/amd64/libshare_autofs.so		i386
+usr/lib/fs/autofs/sparcv9/libshare_autofs.so		sparc
 usr/lib/fs/nfs/libshare_nfs.so
 usr/lib/fs/nfs/amd64/libshare_nfs.so		i386
 usr/lib/fs/nfs/sparcv9/libshare_nfs.so		sparc
@@ -934,3 +937,13 @@ opt/onbld/bin/sparc/elfsign	sparc
 # Private socket filter API
 #
 usr/include/sys/sockfilter.h
+#
+# We don't actually validate license action payloads, and the license
+# staging area is provided as a separate basedir for package
+# publication.  The net result is that everything therein should be
+# ignored for packaging validation.
+#
+licenses
+# Libbe is private
+#
+usr/include/libbe_priv.h

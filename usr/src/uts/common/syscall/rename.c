@@ -42,74 +42,39 @@
 #include <sys/debug.h>
 #include <sys/file.h>
 #include <sys/fcntl.h>
+#include <c2/audit.h>
 
 /*
  * Rename a file relative to a given directory
  */
 int
-renameat(int fromfd, char *old, int tofd, char *new)
+renameat(int ffd, char *from, int tfd, char *to)
 {
-	vnode_t	*fromvp = NULL;
-	vnode_t	*tovp = NULL;
-	file_t *fp;
+	vnode_t *fstartvp = NULL;
+	vnode_t *tstartvp = NULL;
 	int error;
-	char oldstart;
-	char newstart;
 
-	if (copyin(old, &oldstart, sizeof (char)) ||
-	    copyin(new, &newstart, sizeof (char)))
+	if (from == NULL || to == NULL)
 		return (set_errno(EFAULT));
+	if ((error = fgetstartvp(ffd, from, &fstartvp)) != 0)
+		goto out;
+	if ((error = fgetstartvp(tfd, to, &tstartvp)) != 0)
+		goto out;
 
-	if (fromfd == AT_FDCWD || tofd == AT_FDCWD) {
-		proc_t *p = curproc;
+	error = vn_renameat(fstartvp, from, tstartvp, to, UIO_USERSPACE);
 
-		mutex_enter(&p->p_lock);
-		if (fromfd == AT_FDCWD) {
-			fromvp = PTOU(p)->u_cdir;
-			VN_HOLD(fromvp);
-		}
-		if (tofd == AT_FDCWD) {
-			tovp = PTOU(p)->u_cdir;
-			VN_HOLD(tovp);
-		}
-		mutex_exit(&p->p_lock);
-	}
-
-	if (fromvp == NULL && oldstart != '/') {
-		if ((fp = getf(fromfd)) == NULL) {
-			if (tovp != NULL)
-				VN_RELE(tovp);
-			return (set_errno(EBADF));
-		}
-		fromvp = fp->f_vnode;
-		VN_HOLD(fromvp);
-		releasef(fromfd);
-	}
-
-	if (tovp == NULL && newstart != '/') {
-		if ((fp = getf(tofd)) == NULL) {
-			if (fromvp != NULL)
-				VN_RELE(fromvp);
-			return (set_errno(EBADF));
-		}
-		tovp = fp->f_vnode;
-		VN_HOLD(tovp);
-		releasef(tofd);
-	}
-
-	error = vn_renameat(fromvp, old, tovp, new, UIO_USERSPACE);
-
-	if (fromvp != NULL)
-		VN_RELE(fromvp);
-	if (tovp != NULL)
-		VN_RELE(tovp);
+out:
+	if (fstartvp != NULL)
+		VN_RELE(fstartvp);
+	if (tstartvp != NULL)
+		VN_RELE(tstartvp);
 	if (error)
 		return (set_errno(error));
 	return (0);
 }
 
 int
-rename(char *old, char *new)
+rename(char *from, char *to)
 {
-	return (renameat(AT_FDCWD, old, AT_FDCWD, new));
+	return (renameat(AT_FDCWD, from, AT_FDCWD, to));
 }

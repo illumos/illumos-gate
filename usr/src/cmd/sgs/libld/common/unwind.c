@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<string.h>
@@ -419,7 +418,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 					ndx += 1;
 					/* BEGIN CSTYLED */
 					if (cieversion != 1) {
-					    eprintf(ofl->ofl_lml, ERR_FATAL,
+					    ld_eprintf(ofl, ERR_FATAL,
 						MSG_INTL(MSG_UNW_BADCIEVERS),
 						isp->is_file->ifl_name,
 						isp->is_name, off);

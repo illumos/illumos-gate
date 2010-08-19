@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -29,8 +28,6 @@
 
 #ifndef _SYS_FP_H
 #define	_SYS_FP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,7 +47,20 @@ extern "C" {
 #define	FP_387	3	/* 80387 chip present				*/
 #define	FP_487	6	/* 80487 chip present				*/
 #define	FP_486	6	/* 80486 chip present				*/
-#define	__FP_SSE 0x103	/* x87 plus SSE-capable CPU			*/
+/*
+ * The following values are bit flags instead of actual values.
+ * E.g. to know if we are using SSE, test (value & __FP_SSE) instead
+ * of (value == __FP_SSE).
+ */
+#define	__FP_SSE	0x100	/* .. plus SSE-capable CPU		*/
+#define	__FP_AVX	0x200	/* .. plus AVX-capable CPU		*/
+
+/*
+ * values that go into fp_save_mech
+ */
+#define	FP_FNSAVE	1	/* fnsave/frstor instructions		*/
+#define	FP_FXSAVE	2	/* fxsave/fxrstor instructions		*/
+#define	FP_XSAVE	3	/* xsave/xrstor instructions		*/
 
 /*
  * masks for 80387 control word
@@ -159,6 +169,7 @@ extern "C" {
 	"\10im\7daz\6pe\5ue\4oe\3ze\2de\1ie"
 
 extern int fp_kind;		/* kind of fp support			*/
+extern int fp_save_mech;	/* fp save/restore mechanism		*/
 extern int fpu_exists;		/* FPU hw exists			*/
 
 #ifdef _KERNEL
@@ -174,15 +185,19 @@ extern int fpu_probe_pentium_fdivbug(void);
 
 extern void fpnsave_ctxt(void *);
 extern void fpxsave_ctxt(void *);
+extern void xsave_ctxt(void *);
 extern void (*fpsave_ctxt)(void *);
 
 struct fnsave_state;
 struct fxsave_state;
+struct xsave_state;
 extern void fxsave_insn(struct fxsave_state *);
 extern void fpsave(struct fnsave_state *);
 extern void fprestore(struct fnsave_state *);
 extern void fpxsave(struct fxsave_state *);
 extern void fpxrestore(struct fxsave_state *);
+extern void xsave(struct xsave_state *, uint64_t);
+extern void xrestore(struct xsave_state *, uint64_t);
 
 extern void fpenable(void);
 extern void fpdisable(void);

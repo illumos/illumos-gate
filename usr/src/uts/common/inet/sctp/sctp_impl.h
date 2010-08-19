@@ -31,6 +31,9 @@
 #include <sys/list.h>
 #include <sys/strsun.h>
 #include <sys/zone.h>
+#include <sys/cpuvar.h>
+#include <sys/clock_impl.h>
+
 #include <netinet/ip6.h>
 #include <inet/optcom.h>
 #include <inet/tunables.h>
@@ -141,16 +144,16 @@ typedef struct sctpt_s {
 #define	SCTP_FADDR_TIMER_RESTART(sctp, fp, intvl)			\
 {									\
 	dprint(3, ("faddr_timer_restart: fp=%p %x:%x:%x:%x %d\n",	\
-	    (void *)(fp), SCTP_PRINTADDR((fp)->faddr), (int)(intvl)));	\
-	sctp_timer((sctp), (fp)->timer_mp, (intvl));			\
-	(fp)->timer_running = 1;					\
+	    (void *)(fp), SCTP_PRINTADDR((fp)->sf_faddr), (int)(intvl))); \
+	sctp_timer((sctp), (fp)->sf_timer_mp, (intvl));			\
+	(fp)->sf_timer_running = 1;					\
 }
 
 #define	SCTP_FADDR_TIMER_STOP(fp)			\
-	ASSERT((fp)->timer_mp != NULL);			\
-	if ((fp)->timer_running) {			\
-		sctp_timer_stop((fp)->timer_mp);	\
-		(fp)->timer_running = 0;		\
+	ASSERT((fp)->sf_timer_mp != NULL);		\
+	if ((fp)->sf_timer_running) {			\
+		sctp_timer_stop((fp)->sf_timer_mp);	\
+		(fp)->sf_timer_running = 0;		\
 	}
 
 /* For per endpoint association statistics */
@@ -161,15 +164,15 @@ typedef struct sctpt_s {
 	 * at the end of each stats request.		\
 	 */						\
 	(sctp)->sctp_maxrto =				\
-	    MAX((sctp)->sctp_maxrto, (fp)->rto);	\
+	    MAX((sctp)->sctp_maxrto, (fp)->sf_rto);	\
 	DTRACE_PROBE2(sctp__maxrto, sctp_t *,		\
 	    sctp, struct sctp_faddr_s, fp);		\
 }
 
 #define	SCTP_CALC_RXT(sctp, fp, max)	\
 {					\
-	if (((fp)->rto <<= 1) > (max))	\
-		(fp)->rto = (max);	\
+	if (((fp)->sf_rto <<= 1) > (max))	\
+		(fp)->sf_rto = (max);	\
 	SCTP_MAX_RTO(sctp, fp);		\
 }
 
@@ -269,9 +272,9 @@ typedef struct {
 		if (SCTP_CHUNK_ISACKED(mp)) {				\
 			(sctp)->sctp_unacked += (chunkdata);		\
 		} else {						\
-			ASSERT(SCTP_CHUNK_DEST(mp)->suna >= ((chunkdata) + \
+			ASSERT(SCTP_CHUNK_DEST(mp)->sf_suna >= ((chunkdata) + \
 							sizeof (*sdc))); \
-			SCTP_CHUNK_DEST(mp)->suna -= ((chunkdata) + 	\
+			SCTP_CHUNK_DEST(mp)->sf_suna -= ((chunkdata) + 	\
 					sizeof (*sdc));			\
 		}							\
 		DTRACE_PROBE3(sctp__chunk__sent2, sctp_t *, sctp,	\
@@ -281,10 +284,10 @@ typedef struct {
 		SCTP_CHUNK_SET_SACKCNT(mp, 0);				\
 		BUMP_LOCAL(sctp->sctp_rxtchunks);			\
 		BUMP_LOCAL((sctp)->sctp_T3expire);			\
-		BUMP_LOCAL((fp)->T3expire);				\
+		BUMP_LOCAL((fp)->sf_T3expire);				\
 	}								\
 	SCTP_SET_CHUNK_DEST(mp, fp);					\
-	(fp)->suna += ((chunkdata) + sizeof (*sdc));			\
+	(fp)->sf_suna += ((chunkdata) + sizeof (*sdc));			\
 }
 
 #define	SCTP_CHUNK_ISSENT(mp)	((mp)->b_flag & SCTP_CHUNK_FLAG_SENT)
@@ -349,6 +352,80 @@ typedef struct {
 	    ((sctps)->sctps_conn_hash_size - 1))
 
 /*
+ * Linked list struct to store SCTP listener association limit configuration
+ * per IP stack.  The list is stored at sctps_listener_conf in sctp_stack_t.
+ *
+ * sl_port: the listener port of this limit configuration
+ * sl_ratio: the maximum amount of memory consumed by all concurrent SCTP
+ *           connections created by a listener does not exceed 1/tl_ratio
+ *           of the total system memory.  Note that this is only an
+ *           approximation.
+ * sl_link: linked list struct
+ */
+typedef struct sctp_listener_s {
+	in_port_t	sl_port;
+	uint32_t	sl_ratio;
+	list_node_t	sl_link;
+} sctp_listener_t;
+
+/*
+ * If there is a limit set on the number of association allowed per each
+ * listener, the following struct is used to store that counter.  It keeps
+ * the number of SCTP association created by a listener.  Note that this needs
+ * to be separated from the listener since the listener can go away before
+ * all the associations are gone.
+ *
+ * When the struct is allocated, slc_cnt is set to 1.  When a new association
+ * is created by the listener, slc_cnt is incremented by 1.  When an
+ * association created by the listener goes away, slc_count is decremented by
+ * 1.  When the listener itself goes away, slc_cnt is decremented  by one.
+ * The last association (or the listener) which decrements slc_cnt to zero
+ * frees the struct.
+ *
+ * slc_max is the maximum number of concurrent associations created from a
+ * listener.  It is calculated when the sctp_listen_cnt_t is allocated.
+ *
+ * slc_report_time stores the time when cmn_err() is called to report that the
+ * max has been exceeeded.  Report is done at most once every
+ * SCTP_SLC_REPORT_INTERVAL mins for a listener.
+ *
+ * slc_drop stores the number of connection attempt dropped because the
+ * limit has reached.
+ */
+typedef struct sctp_listen_cnt_s {
+	uint32_t	slc_max;
+	uint32_t	slc_cnt;
+	int64_t		slc_report_time;
+	uint32_t	slc_drop;
+} sctp_listen_cnt_t;
+
+#define	SCTP_SLC_REPORT_INTERVAL	(30 * MINUTES)
+
+#define	SCTP_DECR_LISTEN_CNT(sctp)					\
+{									\
+	ASSERT((sctp)->sctp_listen_cnt->slc_cnt > 0);			\
+	if (atomic_add_32_nv(&(sctp)->sctp_listen_cnt->slc_cnt, -1) == 0) \
+		kmem_free((sctp)->sctp_listen_cnt, sizeof (sctp_listen_cnt_t));\
+	(sctp)->sctp_listen_cnt = NULL;					\
+}
+
+/* Increment and decrement the number of associations in sctp_stack_t. */
+#define	SCTPS_ASSOC_INC(sctps)						\
+	atomic_inc_64(							\
+	    (uint64_t *)&(sctps)->sctps_sc[CPU->cpu_seqid]->sctp_sc_assoc_cnt)
+
+#define	SCTPS_ASSOC_DEC(sctps)						\
+	atomic_dec_64(							\
+	    (uint64_t *)&(sctps)->sctps_sc[CPU->cpu_seqid]->sctp_sc_assoc_cnt)
+
+#define	SCTP_ASSOC_EST(sctps, sctp)					\
+{									\
+	(sctp)->sctp_state = SCTPS_ESTABLISHED;				\
+	(sctp)->sctp_assoc_start_time = (uint32_t)LBOLT_FASTPATH64;	\
+	SCTPS_ASSOC_INC(sctps);						\
+}
+
+/*
  * Bind hash array size and hash function.  The size must be a power
  * of 2 and lport must be in host byte order.
  */
@@ -403,17 +480,17 @@ typedef struct sctp_instr_s {
 
 /* Reassembly data structure (per-stream) */
 typedef struct sctp_reass_s {
-	uint16_t	ssn;
-	uint16_t	needed;
-	uint16_t	got;
-	uint16_t	msglen;		/* len of consecutive fragments */
+	uint16_t	sr_ssn;
+	uint16_t	sr_needed;
+	uint16_t	sr_got;
+	uint16_t	sr_msglen;	/* len of consecutive fragments */
 					/* from the begining (B-bit) */
-	mblk_t		*tail;
-	boolean_t	hasBchunk;	/* If the fragment list begins with */
+	mblk_t		*sr_tail;
+	boolean_t	sr_hasBchunk;	/* If the fragment list begins with */
 					/* a B-bit set chunk */
-	uint32_t	nexttsn;	/* TSN of the next fragment we */
+	uint32_t	sr_nexttsn;	/* TSN of the next fragment we */
 					/* are expecting */
-	boolean_t	partial_delivered;
+	boolean_t	sr_partial_delivered;
 } sctp_reass_t;
 
 /* debugging */
@@ -464,45 +541,45 @@ typedef enum {
 } faddr_state_t;
 
 typedef struct sctp_faddr_s {
-	struct sctp_faddr_s *next;
-	faddr_state_t	state;
+	struct sctp_faddr_s *sf_next;
+	faddr_state_t	sf_state;
 
-	in6_addr_t	faddr;
-	in6_addr_t	saddr;
+	in6_addr_t	sf_faddr;
+	in6_addr_t	sf_saddr;
 
-	int64_t		hb_expiry;	/* time to retransmit heartbeat */
-	uint32_t	hb_interval;	/* the heartbeat interval */
+	int64_t		sf_hb_expiry;	/* time to retransmit heartbeat */
+	uint32_t	sf_hb_interval;	/* the heartbeat interval */
 
-	int		rto;		/* RTO in tick */
-	int		srtt;		/* Smoothed RTT in tick */
-	int		rttvar;		/* RTT variance in tick */
-	uint32_t	rtt_updates;
-	int		strikes;
-	int		max_retr;
-	uint32_t	sfa_pmss;
-	uint32_t	cwnd;
-	uint32_t	ssthresh;
-	uint32_t	suna;		/* sent - unack'ed */
-	uint32_t	pba;		/* partial bytes acked */
-	uint32_t	acked;
-	int64_t		lastactive;
-	mblk_t		*timer_mp;	/* retransmission timer control */
+	int		sf_rto;		/* RTO in tick */
+	int		sf_srtt;	/* Smoothed RTT in tick */
+	int		sf_rttvar;	/* RTT variance in tick */
+	uint32_t	sf_rtt_updates;
+	int		sf_strikes;
+	int		sf_max_retr;
+	uint32_t	sf_pmss;
+	uint32_t	sf_cwnd;
+	uint32_t	sf_ssthresh;
+	uint32_t	sf_suna;	/* sent - unack'ed */
+	uint32_t	sf_pba;		/* partial bytes acked */
+	uint32_t	sf_acked;
+	int64_t		sf_lastactive;
+	mblk_t		*sf_timer_mp;	/* retransmission timer control */
 	uint32_t
-			hb_pending : 1,
-			timer_running : 1,
-			df : 1,
-			pmtu_discovered : 1,
+			sf_hb_pending : 1,
+			sf_timer_running : 1,
+			sf_df : 1,
+			sf_pmtu_discovered : 1,
 
-			rc_timer_running : 1,
-			isv4 : 1,
-			hb_enabled : 1;
+			sf_rc_timer_running : 1,
+			sf_isv4 : 1,
+			sf_hb_enabled : 1;
 
-	mblk_t		*rc_timer_mp;	/* reliable control chunk timer */
-	ip_xmit_attr_t	*ixa;		/* Transmit attributes */
-	uint32_t	T3expire;	/* # of times T3 timer expired */
+	mblk_t		*sf_rc_timer_mp; /* reliable control chunk timer */
+	ip_xmit_attr_t	*sf_ixa;	/* Transmit attributes */
+	uint32_t	sf_T3expire;	/* # of times T3 timer expired */
 
-	uint64_t	hb_secret;	/* per addr "secret" in heartbeat */
-	uint32_t	rxt_unacked;	/* # unack'ed retransmitted bytes */
+	uint64_t	sf_hb_secret;	/* per addr "secret" in heartbeat */
+	uint32_t	sf_rxt_unacked;	/* # unack'ed retransmitted bytes */
 } sctp_faddr_t;
 
 /* Flags to indicate supported address type in the PARM_SUP_ADDRS. */
@@ -515,8 +592,8 @@ typedef struct sctp_faddr_s {
  * as the jitter does not really need to be "very" random.
  */
 #define	SET_HB_INTVL(fp)					\
-	((fp)->hb_interval + (fp)->rto + ((fp)->rto >> 1) -	\
-	(uint_t)gethrtime() % (fp)->rto)
+	((fp)->sf_hb_interval + (fp)->sf_rto + ((fp)->sf_rto >> 1) -	\
+	(uint_t)gethrtime() % (fp)->sf_rto)
 
 #define	SCTP_IPIF_HASH	16
 
@@ -534,7 +611,7 @@ typedef	struct	sctp_ipif_hash_s {
  */
 #define	SET_CWND(fp, mss, def_max_init_cwnd)				\
 {									\
-	(fp)->cwnd = MIN(def_max_init_cwnd * (mss),			\
+	(fp)->sf_cwnd = MIN(def_max_init_cwnd * (mss),			\
 	    MIN(4 * (mss), MAX(2 * (mss), 4380 / (mss) * (mss))));	\
 }
 
@@ -583,7 +660,7 @@ typedef struct sctp_s {
 #define	sctp_ulp_disconnected	sctp_upcalls->su_disconnected
 #define	sctp_ulp_opctl		sctp_upcalls->su_opctl
 #define	sctp_ulp_recv		sctp_upcalls->su_recv
-#define	sctp_ulp_xmitted	sctp_upcalls->su_txq_full
+#define	sctp_ulp_txq_full	sctp_upcalls->su_txq_full
 #define	sctp_ulp_prop		sctp_upcalls->su_set_proto_props
 
 	int32_t		sctp_state;
@@ -662,8 +739,9 @@ typedef struct sctp_s {
 
 	/* Inbound flow control */
 	int32_t		sctp_rwnd;		/* Current receive window */
-	int32_t		sctp_irwnd;		/* Initial receive window */
+	int32_t		sctp_arwnd;		/* Last advertised window */
 	int32_t		sctp_rxqueued;		/* No. of bytes in RX q's */
+	int32_t		sctp_ulp_rxqueued;	/* Data in ULP */
 
 	/* Pre-initialized composite headers */
 	uchar_t		*sctp_iphc;	/* v4 sctp/ip hdr template buffer */
@@ -723,7 +801,8 @@ typedef struct sctp_s {
 
 		sctp_txq_full : 1,	/* the tx queue is full */
 		sctp_ulp_discon_done : 1,	/* ulp_disconnecting done */
-		sctp_dummy : 6;
+		sctp_flowctrld : 1,	/* upper layer flow controlled */
+		sctp_dummy : 5;
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -761,6 +840,7 @@ typedef struct sctp_s {
 #define	sctp_zero_win_probe sctp_bits.sctp_zero_win_probe
 #define	sctp_txq_full sctp_bits.sctp_txq_full
 #define	sctp_ulp_discon_done sctp_bits.sctp_ulp_discon_done
+#define	sctp_flowctrld sctp_bits.sctp_flowctrld
 
 #define	sctp_recvsndrcvinfo sctp_events.sctp_recvsndrcvinfo
 #define	sctp_recvassocevnt sctp_events.sctp_recvassocevnt
@@ -873,6 +953,9 @@ typedef struct sctp_s {
 	 * user request for stats on this endpoint.
 	 */
 	int	sctp_prev_maxrto;
+
+	/* For association counting. */
+	sctp_listen_cnt_t	*sctp_listen_cnt;
 } sctp_t;
 
 #define	SCTP_TXQ_LEN(sctp)	((sctp)->sctp_unsent + (sctp)->sctp_unacked)
@@ -880,7 +963,7 @@ typedef struct sctp_s {
 	if ((sctp)->sctp_txq_full && SCTP_TXQ_LEN(sctp) <=	\
 	    (sctp)->sctp_connp->conn_sndlowat) {		\
 		(sctp)->sctp_txq_full = 0;			\
-		(sctp)->sctp_ulp_xmitted((sctp)->sctp_ulpd,	\
+		(sctp)->sctp_ulp_txq_full((sctp)->sctp_ulpd,	\
 		    B_FALSE);					\
 	}
 
@@ -925,6 +1008,7 @@ extern void	sctp_conn_hash_remove(sctp_t *);
 extern void	sctp_conn_init(conn_t *);
 extern sctp_t	*sctp_conn_match(in6_addr_t **, uint32_t, in6_addr_t *,
 		    uint32_t, zoneid_t, iaflags_t, sctp_stack_t *);
+extern void	sctp_conn_reclaim(void *);
 extern sctp_t	*sctp_conn_request(sctp_t *, mblk_t *, uint_t, uint_t,
 		    sctp_init_chunk_t *, ip_recv_attr_t *);
 extern uint32_t	sctp_cumack(sctp_t *, uint32_t, mblk_t **);
@@ -943,6 +1027,7 @@ extern void	sctp_faddr_fini(void);
 extern void	sctp_faddr_init(void);
 extern void	sctp_fast_rexmit(sctp_t *);
 extern void	sctp_fill_sack(sctp_t *, unsigned char *, int);
+extern uint32_t sctp_find_listener_conf(sctp_stack_t *, in_port_t);
 extern void	sctp_free_faddr_timers(sctp_t *);
 extern void	sctp_free_ftsn_set(sctp_ftsn_set_t *);
 extern void	sctp_free_msg(mblk_t *);
@@ -978,17 +1063,18 @@ extern uint32_t	sctp_init2vtag(sctp_chunk_hdr_t *);
 extern void	sctp_intf_event(sctp_t *, in6_addr_t, int, int);
 extern void	sctp_input_data(sctp_t *, mblk_t *, ip_recv_attr_t *);
 extern void	sctp_instream_cleanup(sctp_t *, boolean_t);
-extern int	sctp_is_a_faddr_clean(sctp_t *);
+extern boolean_t sctp_is_a_faddr_clean(sctp_t *);
 
 extern void	*sctp_kstat_init(netstackid_t);
 extern void	sctp_kstat_fini(netstackid_t, kstat_t *);
-extern void	*sctp_kstat2_init(netstackid_t, sctp_kstat_t *);
+extern void	*sctp_kstat2_init(netstackid_t);
 extern void	sctp_kstat2_fini(netstackid_t, kstat_t *);
 
 extern ssize_t	sctp_link_abort(mblk_t *, uint16_t, char *, size_t, int,
 		    boolean_t);
 extern void	sctp_listen_hash_insert(sctp_tf_t *, sctp_t *);
 extern void	sctp_listen_hash_remove(sctp_t *);
+extern void	sctp_listener_conf_cleanup(sctp_stack_t *);
 extern sctp_t	*sctp_lookup(sctp_t *, in6_addr_t *, sctp_tf_t *, uint32_t *,
 		    int);
 extern sctp_faddr_t *sctp_lookup_faddr(sctp_t *, in6_addr_t *);
@@ -1058,6 +1144,7 @@ extern void	sctp_set_if_mtu(sctp_t *);
 extern void	sctp_set_iplen(sctp_t *, mblk_t *, ip_xmit_attr_t *);
 extern void	sctp_set_ulp_prop(sctp_t *);
 extern void	sctp_ss_rexmit(sctp_t *);
+extern void	sctp_stack_cpu_add(sctp_stack_t *, processorid_t);
 extern size_t	sctp_supaddr_param_len(sctp_t *);
 extern size_t	sctp_supaddr_param(sctp_t *, uchar_t *);
 

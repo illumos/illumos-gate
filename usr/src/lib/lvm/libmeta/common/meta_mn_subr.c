@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -64,7 +63,15 @@ meta_is_mn_set(
 	    (strcmp(sp->setname, MD_LOCAL_NAME) == 0))
 		return (0);
 	sd = metaget_setdesc(sp, ep);
-	ASSERT(sd != NULL);
+
+	/*
+	 * sd can be NULL if there is a difference between
+	 * the setrecords and the setlistp caches. This can happen
+	 * if this function is called while a set is being
+	 * removed during a cluster reconfiguration.
+	 */
+	if (sd == NULL)
+		return (0);
 	if (sd->sd_flags & MD_SR_MN)
 		return (1);
 	return (0);

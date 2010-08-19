@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -61,7 +60,7 @@ fmd_topo_rele_locked(fmd_topo_t *ftp)
 }
 
 void
-fmd_topo_update(boolean_t need_force)
+fmd_topo_update(void)
 {
 	int err;
 	topo_hdl_t *tp;
@@ -87,15 +86,9 @@ fmd_topo_update(boolean_t need_force)
 	ftp->ft_hdl = tp;
 	ftp->ft_time_begin = fmd_time_gethrtime();
 
-	if (need_force) {
-		if ((id = topo_snap_hold(tp, NULL, &err)) == NULL)
-			fmd_panic("failed to get topology snapshot: %s",
-			    topo_strerror(err));
-	} else {
-		if ((id = topo_snap_hold_no_forceload(tp, NULL, &err)) == NULL)
-			fmd_panic("failed to get topology snapshot: %s",
-			    topo_strerror(err));
-	}
+	if ((id = topo_snap_hold(tp, NULL, &err)) == NULL)
+		fmd_panic("failed to get topology snapshot: %s",
+		    topo_strerror(err));
 
 	topo_hdl_strfree(tp, id);
 
@@ -166,7 +159,7 @@ fmd_topo_rele_hdl(topo_hdl_t *thp)
 void
 fmd_topo_init(void)
 {
-	fmd_topo_update(B_TRUE);
+	fmd_topo_update();
 }
 
 void

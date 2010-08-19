@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v LDC Link Layer Shared Memory Routines
@@ -85,7 +82,7 @@ static int i_ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr,
  * support is currently implemented via shadow copy.
  * Direct map can be enabled by setting 'ldc_shmem_enabled'
  */
-int ldc_shmem_enabled = 0;
+int ldc_shmem_enabled = 1;
 
 /*
  * Use of directly mapped shared memory for LDC descriptor
@@ -122,6 +119,20 @@ uint64_t ldc_maptable_entries = LDC_MTBL_ENTRIES;
 	(((pg_szc) << LDC_COOKIE_PGSZC_SHIFT) | ((idx) << (pg_shift)))
 
 /*
+ * Pages imported over each channel are maintained in a global (per-guest)
+ * mapin table. Starting with HV LDC API version 1.2, HV supports APIs to
+ * obtain information about the total size of the memory that can be direct
+ * mapped through this mapin table. The minimum size of the mapin area that we
+ * expect is defined below.
+ */
+#define	GIGABYTE		((uint64_t)(1 << 30))
+uint64_t ldc_mapin_size_min = GIGABYTE;
+
+/* HV LDC API version that supports mapin size info */
+#define	LDC_MAPIN_VER_MAJOR	1
+#define	LDC_MAPIN_VER_MINOR	2
+
+/*
  * Sets ldc_dring_shmem_hv_ok to a non-zero value if the HV LDC
  * API version supports directly mapped shared memory or if it has
  * been explicitly enabled via ldc_dring_shmem_hv_force.
@@ -135,6 +146,41 @@ i_ldc_mem_set_hsvc_vers(uint64_t major, uint64_t minor)
 	    (ldc_dring_shmem_hv_force != 0)) {
 		ldc_dring_shmem_hv_ok = 1;
 	}
+}
+
+/*
+ * initialize mapin table.
+ */
+void
+i_ldc_init_mapin(ldc_soft_state_t *ldcssp, uint64_t major, uint64_t minor)
+{
+	int		rv;
+	uint64_t	sz;
+	uint64_t	table_type = LDC_MAPIN_TYPE_REGULAR;
+
+	/* set mapin size to default. */
+	ldcssp->mapin_size = LDC_DIRECT_MAP_SIZE_DEFAULT;
+
+	/* Check if the HV supports mapin size API. */
+	if ((major == LDC_MAPIN_VER_MAJOR &&
+	    minor < LDC_MAPIN_VER_MINOR) ||
+	    (major < LDC_MAPIN_VER_MAJOR)) {
+		/* Older version of HV. */
+		return;
+	}
+
+	/* Get info about the mapin size supported by HV */
+	rv = hv_ldc_mapin_size_max(table_type, &sz);
+	if (rv != 0) {
+		cmn_err(CE_NOTE, "Failed to get mapin information\n");
+		return;
+	}
+
+	/* Save the table size */
+	ldcssp->mapin_size = sz;
+
+	D1(DBG_ALL_LDCS, "%s: mapin_size read from HV is (0x%llx)\n",
+	    __func__, sz);
 }
 
 /*

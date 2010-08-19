@@ -525,11 +525,11 @@ char hw_serial[HW_HOSTID_LEN] = "0";
 
 /*
  * On sparc machines, read hw_serial from the firmware at boot time
- * and simply assert Sun is the hardware provider.  Hmm.
+ * and simply assert Oracle is the hardware provider.
  */
 char architecture[] = "sparcv9";
 char architecture_32[] = "sparc";
-char hw_provider[] = "Sun_Microsystems";
+char hw_provider[] = "Oracle Corporation";
 
 #elif defined(__i386)
 

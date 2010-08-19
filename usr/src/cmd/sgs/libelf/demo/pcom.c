@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -47,7 +46,7 @@ static const char	*CommentStr = ".comment";
 static void
 print_comment(Elf *elf, const char *file)
 {
-	Elf_Scn		*scn = 0;
+	Elf_Scn		*scn = NULL;
 	GElf_Shdr	shdr;
 	Elf_Data	*data;
 	size_t		shstrndx;
@@ -61,13 +60,13 @@ print_comment(Elf *elf, const char *file)
 		return;
 	}
 
-	while ((scn = elf_nextscn(elf, scn)) != 0) {
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
 		/*
 		 * Do a string compare to examine each section header
 		 * to see if it is a ".comment" section.  If it is then
 		 * this is the section we want to process.
 		 */
-		if (gelf_getshdr(scn, &shdr) == 0) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
 			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
 			    file, elf_errmsg(0));
 			return;
@@ -81,12 +80,13 @@ print_comment(Elf *elf, const char *file)
 			 * Get the data associated with the .comment
 			 * section.
 			 */
-			if ((data = elf_getdata(scn, 0)) == 0) {
+			if ((data = elf_getdata(scn, NULL)) == NULL) {
 				(void) fprintf(stderr,
 				    "%s: elf_getdata() failed: %s\n",
 				    file, elf_errmsg(0));
 				return;
 			}
+
 			/*
 			 * Data in a .comment section is a list of 'null'
 			 * terminated strings.  The following will print
@@ -103,7 +103,6 @@ print_comment(Elf *elf, const char *file)
 	}
 
 }
-
 
 static void
 process_elf(Elf *elf, char *file, int fd, int member)
@@ -125,10 +124,10 @@ process_elf(Elf *elf, char *file, int fd, int member)
 		 * in turn be examined with libelf.
 		 *
 		 * The below loop will iterate over each member of the
-		 * archive and recursivly call process_elf() for processing.
+		 * archive and recursively call process_elf().
 		 */
 		cmd = ELF_C_READ;
-		while ((_elf = elf_begin(fd, cmd, elf)) != 0) {
+		while ((_elf = elf_begin(fd, cmd, elf)) != NULL) {
 			Elf_Arhdr	*arhdr;
 			char		buffer[1024];
 
@@ -141,7 +140,7 @@ process_elf(Elf *elf, char *file, int fd, int member)
 			(void) sprintf(buffer, "%s(%s)", file, arhdr->ar_name);
 
 			/*
-			 * recursivly process the ELF members.
+			 * Recursively process the ELF members.
 			 */
 			process_elf(_elf, buffer, fd, 1);
 			cmd = elf_next(_elf);
@@ -161,7 +160,6 @@ int
 main(int argc, char **argv)
 {
 	int	i;
-
 
 	if (argc < 2) {
 		(void) printf("usage: %s elf_file ...\n", argv[0]);

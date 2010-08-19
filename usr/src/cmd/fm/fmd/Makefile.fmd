@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 .KEEP_STATE:
@@ -76,6 +75,11 @@ MANIFEST = ../common/$(PROG).xml
 
 MAPFILE-DMOD = $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
 
+
+LOGADMFILE =	$(PROG).logadm.conf
+LOGADMDIR =	$(ROOT)/etc/logadm.d
+LOGADMENT =	$(LOGADMDIR)/$(LOGADMFILE)
+$(LOGADMENT) :=	FILEMODE = 444
 
 ROOTPDIR = $(ROOT)/usr/lib/fm/$(PROG)
 ROOTVDIR = $(ROOT)/var/fm/$(PROG)
@@ -138,6 +142,12 @@ lint_prog := LINTFLAGS += -xerroff=E_FUNC_RET_ALWAYS_IGNOR2
 .PARALLEL: $(OBJS) $(LINTFILES)
 
 all: $(PROG) $(DMOD) install_h
+
+$(LOGADMDIR):
+	$(INS.dir)
+
+$(LOGADMDIR)/%.conf: ../common/%.conf
+	$(INS.file)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -234,7 +244,7 @@ $(ROOTDMOD): $(ROOT)/usr/lib/mdb/proc $(DMOD)
 
 install_h: $(ROOTHDIR) $(ROOTHDRS)
 
-install: all install_h $(ROOTPROG) $(ROOTDMOD) \
+install: all install_h $(ROOTPROG) $(ROOTDMOD) $(LOGADMDIR) $(LOGADMENT) \
 	$(ROOTCDIR) $(ROOTVDIR) $(ROOTVSUB) $(ROOTMANIFEST)
 
 check: $(CHKMANIFEST)

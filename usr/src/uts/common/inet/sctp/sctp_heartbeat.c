@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -104,8 +103,8 @@ sctp_return_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *hbcp, mblk_t *mp)
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	sctp_set_iplen(sctp, smp, fp->ixa);
-	(void) conn_ip_output(smp, fp->ixa);
+	sctp_set_iplen(sctp, smp, fp->sf_ixa);
+	(void) conn_ip_output(smp, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
@@ -128,13 +127,13 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	dprint(3, ("sctp_send_heartbeat: to %x:%x:%x:%x from %x:%x:%x:%x\n",
-	    SCTP_PRINTADDR(fp->faddr), SCTP_PRINTADDR(fp->saddr)));
+	    SCTP_PRINTADDR(fp->sf_faddr), SCTP_PRINTADDR(fp->sf_saddr)));
 
 	hblen = sizeof (*cp) +
 	    sizeof (*hpp) +
 	    sizeof (*t) +
-	    sizeof (fp->hb_secret) +
-	    sizeof (fp->faddr);
+	    sizeof (fp->sf_hb_secret) +
+	    sizeof (fp->sf_faddr);
 	hbmp = sctp_make_mp(sctp, fp, hblen);
 	if (hbmp == NULL) {
 		SCTP_KSTAT(sctps, sctp_send_hb_failed);
@@ -170,7 +169,7 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	 * spoofing of heartbeat ack to fake the validity of an address.
 	 */
 	t++;
-	bcopy(&fp->hb_secret, t, sizeof (uint64_t));
+	bcopy(&fp->sf_hb_secret, t, sizeof (uint64_t));
 
 	/*
 	 * Peer address
@@ -181,19 +180,19 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	 * in response to our heartbeat.
 	 */
 	a = (in6_addr_t *)(t + 1);
-	bcopy(&fp->faddr, a, sizeof (*a));
+	bcopy(&fp->sf_faddr, a, sizeof (*a));
 
 	hbmp->b_wptr += hblen;
 
 	/* Update the faddr's info */
-	fp->lastactive = now;
-	fp->hb_pending = B_TRUE;
+	fp->sf_lastactive = now;
+	fp->sf_hb_pending = B_TRUE;
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
-	BUMP_MIB(&sctps->sctps_mib, sctpTimHeartBeatProbe);
+	SCTPS_BUMP_MIB(sctps, sctpTimHeartBeatProbe);
 
-	sctp_set_iplen(sctp, hbmp, fp->ixa);
-	(void) conn_ip_output(hbmp, fp->ixa);
+	sctp_set_iplen(sctp, hbmp, fp->sf_ixa);
+	(void) conn_ip_output(hbmp, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
@@ -218,13 +217,13 @@ sctp_validate_peer(sctp_t *sctp)
 	 * send a heartbeat.  But we should only send at most sctp_maxburst
 	 * heartbeats.
 	 */
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
 		/* No need to validate unreachable address. */
-		if (fp->state == SCTP_FADDRS_UNREACH)
+		if (fp->sf_state == SCTP_FADDRS_UNREACH)
 			continue;
-		if (fp->state == SCTP_FADDRS_UNCONFIRMED) {
+		if (fp->sf_state == SCTP_FADDRS_UNCONFIRMED) {
 			if (cnt-- > 0) {
-				fp->hb_expiry = now + fp->rto;
+				fp->sf_hb_expiry = now + fp->sf_rto;
 				sctp_send_heartbeat(sctp, fp);
 			} else {
 				/*
@@ -233,14 +232,14 @@ sctp_validate_peer(sctp_t *sctp)
 				 * all the unsent probes are set to expire at
 				 * the same time.
 				 */
-				fp->hb_expiry = now +
+				fp->sf_hb_expiry = now +
 				    (sctp->sctp_rto_initial >> 1);
 			}
 		}
 		/* Find the earliest heartbeat expiry time for ALL fps. */
-		if (fp->hb_interval != 0 && (earliest_expiry == 0 ||
-		    fp->hb_expiry < earliest_expiry)) {
-			earliest_expiry = fp->hb_expiry;
+		if (fp->sf_hb_interval != 0 && (earliest_expiry == 0 ||
+		    fp->sf_hb_expiry < earliest_expiry)) {
+			earliest_expiry = fp->sf_hb_expiry;
 		}
 	}
 	/* We use heartbeat timer for autoclose. */
@@ -320,7 +319,7 @@ sctp_process_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *cp)
 		    (void *)sctp));
 		return;
 	}
-	if (secret != fp->hb_secret) {
+	if (secret != fp->sf_hb_secret) {
 		dprint(2,
 		    ("sctp_process_heartbeat: invalid secret in ack %p\n",
 		    (void *)sctp));
@@ -337,5 +336,5 @@ sctp_process_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *cp)
 	 * reset it to avoid going through the whole list of peer addresses
 	 * for each heartbeat ack as we probably are in interrupt context.
 	 */
-	fp->hb_expiry = now + SET_HB_INTVL(fp);
+	fp->sf_hb_expiry = now + SET_HB_INTVL(fp);
 }

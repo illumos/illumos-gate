@@ -401,6 +401,8 @@ typedef struct xoptattr {
 	uint8_t		xoa_av_modified;
 	uint8_t		xoa_av_scanstamp[AV_SCANSTAMP_SZ];
 	uint8_t		xoa_reparse;
+	uint8_t		xoa_offline;
+	uint8_t		xoa_sparse;
 } xoptattr_t;
 
 typedef struct vattr {

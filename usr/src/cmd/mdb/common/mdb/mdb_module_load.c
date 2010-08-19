@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -148,10 +148,10 @@ typedef struct mdb_modload_data {
 
 /*ARGSUSED*/
 static int
-module_load(void *fp, const mdb_map_t *map, const char *name)
+module_load(void *fp, const mdb_map_t *map, const char *fullname)
 {
 	mdb_modload_data_t *mld = fp;
-	name = strbasename(name);
+	const char *name = strbasename(fullname);
 
 	if (mdb_module_load(name, mld->mld_mode) == 0 && mdb.m_term != NULL) {
 		if (mld->mld_first == TRUE) {
@@ -160,6 +160,23 @@ module_load(void *fp, const mdb_map_t *map, const char *name)
 		}
 		mdb_iob_printf(mdb.m_out, " %s", name);
 		mdb_iob_flush(mdb.m_out);
+	}
+
+	if (strstr(fullname, "/libc/") != NULL) {
+		/*
+		 * A bit of a kludge:  because we manage alternately capable
+		 * libc instances by mounting the appropriately capable
+		 * instance over /lib/libc.so.1, we may find that our object
+		 * list does not contain libc.so.1, but rather one of its
+		 * hwcap variants.  Unfortunately, there is not a way of
+		 * getting from this shared object to the object that it is
+		 * effectively interposing on -- which means that without
+		 * special processing, we will not load any libc.so dmod.  So
+		 * if we see that we have a shared object coming out of the
+		 * "libc" directory, we assume that we have a "libc-like"
+		 * object, and explicitly load the "libc.so" dmod.
+		 */
+		return (module_load(fp, map, "libc.so.1"));
 	}
 
 	return (0);

@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FMD_MODULE_H
 #define	_FMD_MODULE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <fm/diagcode.h>
@@ -84,6 +81,8 @@ typedef struct fmd_modstat {
 	fmd_stat_t ms_buflimit;		/* limit on space consumed by buffers */
 	fmd_stat_t ms_thrtotal;		/* total number of auxiliary threads */
 	fmd_stat_t ms_thrlimit;		/* limit on auxiliary threads */
+	fmd_stat_t ms_doorthrtotal;	/* total number of doorserver threads */
+	fmd_stat_t ms_doorthrlimit;	/* limit on doorserver threads */
 	fmd_stat_t ms_caseopen;		/* cases currently open */
 	fmd_stat_t ms_casesolved;	/* total cases solved by module */
 	fmd_stat_t ms_caseclosed;	/* total cases closed by module */

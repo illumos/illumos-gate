@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYNCH_H
@@ -260,6 +259,13 @@ int _rw_read_held();
 int _rw_write_held();
 int _mutex_held();
 
+#endif	/* __STDC__ */
+
+/* Pause API */
+#ifdef	__STDC__
+void smt_pause(void);
+#else	/* __STDC__ */
+void smt_pause();
 #endif	/* __STDC__ */
 
 #endif /* _ASM */

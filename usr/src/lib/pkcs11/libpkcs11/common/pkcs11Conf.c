@@ -528,13 +528,14 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		}
 
 		/*
-		 * Open the provider. Use RTLD_NOW to make sure we
-		 * will not encounter symbol referencing errors later.
-		 * Use RTLD_GROUP to limit the provider to it's own
-		 * symbols, which prevents it from mistakenly accessing
-		 * the framework's C_* functions.
+		 * Open the provider. We assume all of our plugins have
+		 * their symbols properly defined, so the use of RTLD_NOW
+		 * to flush out errors immediately is not necessary.
+		 *
+		 * Note that for proper operation, all plugins must be
+		 * built with direct bindings enabled.
 		 */
-		dldesc = dlopen(fullpath, RTLD_NOW|RTLD_GROUP);
+		dldesc = dlopen(fullpath, RTLD_LAZY);
 
 		/*
 		 * If we failed to load it, we will just skip this

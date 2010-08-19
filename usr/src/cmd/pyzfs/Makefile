@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.cmd
@@ -31,6 +30,7 @@ PYSRCS=		pyzfs.py
 PYOBJS=		$(PYSRCS:%.py=%.pyc)
 PYFILES=	$(PYSRCS) $(PYOBJS)
 POFILE=		pyzfs.po
+PYTHON=		$(PYTHON_26)
 
 ROOTLIBZFSFILES= $(PYFILES:%=$(ROOTLIB)/zfs/%)
 

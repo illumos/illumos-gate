@@ -46,9 +46,6 @@ typedef int32_t	idmap_stat;
 
 typedef uint32_t	idmap_rid_t;
 
-/* Opaque client handle */
-typedef struct idmap_handle idmap_handle_t;
-
 /* Opaque "get-mapping" handle */
 typedef struct idmap_get_handle idmap_get_handle_t;
 
@@ -58,14 +55,9 @@ typedef void (*idmap_logger_t)(int, const char *, ...);
 /*
  * Setup API
  */
-/* Create/Init handle for userland clients */
-extern idmap_stat idmap_init(idmap_handle_t **);
-
-/* Finalize/close handle */
-extern idmap_stat idmap_fini(idmap_handle_t *);
 
 /* Status code to string */
-extern const char *idmap_stat2string(idmap_handle_t *, idmap_stat);
+extern const char *idmap_stat2string(idmap_stat);
 
 /* Free memory allocated by the API */
 extern void idmap_free(void *);
@@ -83,7 +75,7 @@ extern void idmap_free(void *);
  * API to batch SID to UID/GID mapping requests
  */
 /* Create handle */
-extern idmap_stat idmap_get_create(idmap_handle_t *, idmap_get_handle_t **);
+extern idmap_stat idmap_get_create(idmap_get_handle_t **);
 
 /* Given SID, get UID */
 extern idmap_stat idmap_get_uidbysid(idmap_get_handle_t *, char *,

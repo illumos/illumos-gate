@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_USER_ATTR_H
 #define	_USER_ATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -107,6 +104,7 @@ struct __FILE;		/* structure tag for type FILE defined in stdio.h */
 #define	USERATTR_PASSWD_AUTOMATIC	"automatic"
 #define	USERATTR_PASSWD_MANUAL		"manual"
 #define	USERATTR_TYPE_ROLE		USERATTR_TYPE_NONADMIN_KW
+#define	USERATTR_AUDIT_FLAGS_KW		"audit_flags"
 
 
 /*

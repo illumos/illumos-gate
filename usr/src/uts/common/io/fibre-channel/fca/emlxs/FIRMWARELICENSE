@@ -1,0 +1,105 @@
+This license applies to the firmware binary files associated with Emulex
+drivers.
+
+THIS PRODUCT CONTAINS FIRMWARE ("EMULEX FIRMWARE") THAT BELONGS TO EMULEX
+CORPORATION ("EMULEX"), THE USE OF WHICH IS SUBJECT TO THIS LICENSE AGREEMENT
+("AGREEMENT") UNLESS OTHERWISE AGREED TO IN WRITING BY EMULEX.  INSTALLING OR
+USING THE EMULEX FIRMWARE CONSTITUTES ACCEPTANCE OF ALL THE TERMS AND
+CONDITIONS OF THIS AGREEMENT UNLESS OTHERWISE AGREED TO IN WRITING BY EMULEX.
+IF LICENSEE DOES NOT AGREE TO THE TERMS AND CONDITIONS OF THIS AGREEMENT,
+LICENSEE SHALL NOT INSTALL OR USE THE EMULEX FIRMWARE.  WRITTEN APPROVAL IS
+NOT A PREREQUISITE TO THE VALIDITY OR ENFORCEABILITY OF THIS AGREEMENT.
+
+1.  Limited Licenses
+
+1.1  Derivatives.  Emulex hereby grants Licensee the personal,
+nontransferable, nonexclusive, royalty-free right and license to include the
+Emulex Firmware in derivative works that Licensee may create under the terms
+and conditions of License #1.  For avoidance of doubt, Licensee acknowledges
+that the Emulex Firmware is not licensed under nor otherwise subject to the
+terms and conditions of License #1.
+
+1.2  Distribution.  Emulex hereby grants Licensee the personal,
+nontransferable, nonexclusive, royalty free, right and license to use,
+distribute, and sublicense copies of Emulex Firmware solely for use with
+Emulex hardware products for which the Emulex Firmware was written and that
+Licensee has purchased from Sun Microsystems or its authorized distributors
+or resellers.  Such distribution may be on electronic media or via download
+from Licensee's website or other electronic means.  Licensee shall grant each
+sublicensee a nonexclusive, nontransferable license to use the Emulex
+Firmware in Object Code only and shall authorize such sublicensees to make
+one archival copy of the Emulex Firmware.  Licensee shall not use, reproduce,
+duplicate, copy, or otherwise sublicense, disclose, distribute, or
+disseminate the Emulex Firmware except as permitted under this Agreement.
+
+1.3  End User.  Emulex grants Licensee a personal, worldwide,
+nontransferable, nonexclusive, royalty-free right and license to use the
+Emulex Firmware only with Emulex hardware products and without circumventing
+any security or rights management features.
+
+1.4  Restrictions.  Licensee agrees to maintain intact and not modify or
+delete Emulex's copyright notice that is contained with each copy of the
+Emulex Firmware.  Licensee shall not (1) reverse engineer, reverse compile or
+reverse assemble all or any part of the Emulex Firmware, (2) disseminate
+performance information or analysis to any third party, other than solely for
+product support purposes, from any source relating to the Emulex Firmware, or
+cause or permit others to do either of both of the foregoing.  Licensee
+agrees to prevent any unauthorized copying of the Emulex Firmware.
+
+2.  Intellectual Property Rights.  The Emulex Firmware is licensed, not sold.
+Emulex or its licensors retain all right, title and interest, including
+without limitation all intellectual property rights, in and to all copies,
+regardless of form or media, of the Emulex Firmware.  The Emulex Firmware
+contains trade secrets of Emulex and Licensee agrees that it shall employ
+reasonable security precautions to maintain the confidentiality of such trade
+secrets.
+
+3.  Indemnity.  Licensee shall defend, indemnify and hold Emulex harmless
+from and against any and all claims, damages, liabilities, costs and expenses
+(including, without limitation, attorneys' fees) arising out of Licensee's
+breach of its obligations under this Agreement.
+
+4.  Term and termination.  The term of this Agreement shall continue until
+Licensee (a) ceases exercising its rights under Section 1 of this Agreement,
+(b) breaches a material term of this Agreement, or (c) gives written notice
+of termination to Emulex.  Upon termination of this Agreement, all copies of
+the Emulex Firmware in the possession of Licensee shall be either returned to
+Emulex or destroyed by Licensee.
+
+5.  Warranty Disclaimer.  Emulex makes no warranties whatsoever, express or
+implied, with respect to the Emulex Firmware.  Licensee agrees that the
+Emulex Firmware is accepted and utilized "AS IS."  EMULEX DISCLAIMS ANY AND
+ALL PROMISES, REPRESENTATIONS, AND WARRANTIES, EXCEPT AS EXPRESSLY SET FORTH
+IN THIS AGREEMENT, WITH RESPECT TO THE EMULEX FIRMWARE; ANY DATA,
+INFORMATION, OR OTHER MATERIAL FURNISHED TO THE LICENSEE HEREUNDER, INCLUDING
+THEIR CONDITION; CONFORMITY TO ANY REPRESENTATION OR DESCRIPTION; THE
+EXISTENCE OF ANY LATENT OR PATENT DEFECTS; AND TITLE, MERCHANTABILITY, OR
+FITNESS FOR A PARTICULAR PURPOSE OR USE.
+
+6.  Limitation of Liability.  Emulex shall have no liability to Licensee, or
+any third party, whether in contract, tort, negligence or products liability
+for any claim, loss of use, business interruption, lost data, lost files, or
+for any indirect, special, incidental, or consequential damages of any kind
+or nature whatsoever arising out of or in connection with the use of or
+inability to use the Emulex Firmware or the performance or operation of the
+Emulex Firmware, even if Emulex has been advised of the possibility of such
+damages occurring.
+
+8.  Miscellaneous.  The laws of the state of California, without regard to
+its choice of law rules, shall govern the interpretation and enforcement of
+this Agreement.  The parties are independent contractors of one another.
+Nothing herein shall be deemed to create any relationship of agency,
+partnership, or joint venture between the parties.  Licensee represents that
+it is acting on its own behalf and is not acting as an agent for or on behalf
+of any third party, and further agrees that it may not assign its rights or
+obligations under this Agreement without prior written consent of Emulex.
+Both parties shall adhere to all applicable laws, regulations, and rules
+relating to the export of Emulex Firmware and any other information provided
+hereunder.  If any term or condition of this Agreement is held invalid,
+illegal or unenforceable by a court of competent jurisdiction, all the other
+terms and conditions shall survive.  The Emulex Firmware may be provided to
+units or agencies of the U.S. government only as "commercial computer
+firmware," "restricted computer firmware," or with "restricted rights" as
+defined in applicable regulations, and may not be provided as source code.
+Manufacturer is Emulex Design & Manufacturing Corporation, 3333 Susan St.,
+Costa Mesa, CA 92626.

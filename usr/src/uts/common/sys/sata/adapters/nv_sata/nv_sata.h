@@ -53,6 +53,7 @@ typedef struct nv_sgp_cmn nv_sgp_cmn_t;
 #define	NV_LOGBUF_LEN	512
 #define	NV_REASON_LEN	30
 
+
 typedef struct nv_ctl {
 	/*
 	 * Each of these are specific to the chipset in use.
@@ -159,7 +160,8 @@ struct nv_port {
 	uint32_t	*nvp_sactive;
 
 	kmutex_t	nvp_mutex;	/* main per port mutex */
-	kcondvar_t	nvp_poll_cv;	/* handshake cv between poll & isr */
+	kcondvar_t	nvp_sync_cv;	/* handshake btwn ISR and start thrd */
+	kcondvar_t	nvp_reset_cv;	/* when reset is synchronous */
 
 	/*
 	 * nvp_slot is a pointer to an array of nv_slot
@@ -178,7 +180,10 @@ struct nv_port {
 
 	timeout_id_t	nvp_timeout_id;
 
-	clock_t		nvp_reset_time;	/* time of last reset */
+	clock_t		nvp_reset_time;		/* time of last reset */
+	clock_t		nvp_link_event_time;	/* time of last plug event */
+	int		nvp_reset_retry_count;
+	clock_t		nvp_wait_sig; /* wait before rechecking sig */
 
 	int		nvp_state; /* state of port. flags defined below */
 
@@ -188,7 +193,16 @@ struct nv_port {
 #ifdef SGPIO_SUPPORT
 	uint8_t		nvp_sgp_ioctl_mod; /* LEDs modified by ioctl */
 #endif
-	int		nvp_timeout_duration;
+	clock_t		nvp_timeout_duration;
+
+
+	/*
+	 * debug and statistical information
+	 */
+	clock_t		nvp_rem_time;
+	clock_t		nvp_add_time;
+	clock_t		nvp_trans_link_time;
+	int		nvp_trans_link_count;
 
 	uint8_t		nvp_last_cmd;
 	uint8_t		nvp_previous_cmd;
@@ -305,6 +319,7 @@ struct nv_sgp_cbp2cmn {
 #define	NV_SLEEP	1
 #define	NV_NOSLEEP	2
 
+
 /*
  * port offsets from base address ioaddr1
  */
@@ -386,21 +401,21 @@ struct nv_sgp_cbp2cmn {
 #define	MCP_SATA_AE_CTL_PRI_SWNCQ	(1 << 1) /* software NCQ chan 0 */
 #define	MCP_SATA_AE_CTL_SEC_SWNCQ	(1 << 2) /* software NCQ chan 1 */
 
-#define	NV_DELAY_NSEC(wait_ns) \
-{ \
-	hrtime_t start, end; \
-	start = end =  gethrtime(); \
-	while ((end - start) < wait_ns) \
-		end = gethrtime(); \
+#define	NV_DELAY_NSEC(wait_ns)		\
+{					\
+	hrtime_t start, end;		\
+	start = end =  gethrtime();	\
+	while ((end - start) < wait_ns)	\
+		end = gethrtime();	\
 }
 
 /*
- * signatures in task file registers after device reset
+ * signature in task file registers after device reset
  */
-#define	NV_SIG_DISK	0x00000101
-#define	NV_SIG_ATAPI	0xeb140101
-#define	NV_SIG_PM	0x96690101
-#define	NV_SIG_NOTREADY	0x00000000
+#define	NV_DISK_SIG	0x00000101
+#define	NV_ATAPI_SIG	0xeb140101
+#define	NV_PM_SIG	0x96690101
+#define	NV_NO_SIG	0x00000000
 
 /*
  * These bar5 offsets are common to mcp51/mcp55/ck804 and thus
@@ -574,12 +589,12 @@ typedef struct prde {
 
 #define	PRDE_EOT	((uint_t)0x80000000)
 
-#define	NV_DMA_NSEGS	256  /* XXX DEBUG TEST change back to 257 */
+#define	NV_DMA_NSEGS	257 /* at least 1MB (4KB/pg * 256) + 1 if misaligned */
 
 /*
  * ck804 and mcp55 both have 2 ports per controller
  */
-#define	NV_NUM_CPORTS	2
+#define	NV_NUM_PORTS	2
 
 /*
  * Number of slots to allocate in data nv_sata structures to handle
@@ -610,50 +625,66 @@ typedef struct prde {
 #define	NV_ONE_MSEC		1000
 
 /*
+ * initial wait before checking for signature, in microseconds
+ */
+#define	NV_WAIT_SIG	2500
+
+
+/*
  * Length of port reset (microseconds) - SControl bit 0 set to 1
  */
 #define	NV_RESET_LENGTH		1000
 
-#define	NV_RESET_ATTEMPTS	3
+/*
+ * the maximum number of comresets to issue while
+ * performing link reset in nv_reset()
+ */
+#define	NV_COMRESET_ATTEMPTS	3
 
 /*
- * The maximum amount of time (milliseconds) a link can be down during
- * reset without assuming that there is no device attached.
+ * amount of time to wait for a signature in reset, in ms, before
+ * issuing another reset
  */
-#define	NV_LINK_DOWN_TIMEOUT	10
+#define	NV_RETRY_RESET_SIG	5000
 
 /*
- * The maximum amount of time (milliseconds) the signature acquisition can
- * drag on before it is terminated.
- * Some disks have very long acquisition times after hotplug, related to
- * to spinning-up and reading some data from a media.
- * The value below is empirical (20s)
- *
+ * the maximum number of resets to issue to gather signature
+ * before giving up
  */
-#define	NV_SIG_ACQUISITION_TIME	20000
+#define	NV_MAX_RESET_RETRY	8
 
 /*
- * Minimum amount of time (milliseconds) to delay reporting hotplug
- * (device added) event.
- * It is the time allowed for a drive to initialize and to send a D2H FIS with
- * a device signature.
- * It varies between drives from a few milliseconds up to 20s.
+ * amount of time (us) to wait after receiving a link event
+ * before acting on it.  This is because of flakey hardware
+ * sometimes issues the wrong, multiple, or out of order link
+ * events.
  */
-#define	NV_HOTPLUG_DELAY	20000
+#define	NV_LINK_EVENT_SETTLE	500000
+
+/*
+ * The amount of time (ms) a link can be missing
+ * before declaring it removed.
+ */
+#define	NV_LINK_EVENT_DOWN	200
 
 /*
  * nvp_state flags
  */
-#define	NV_PORT_INACTIVE	0x001
-#define	NV_PORT_ABORTING	0x002
-#define	NV_PORT_HOTREMOVED	0x004
-#define	NV_PORT_INIT		0x008
-#define	NV_PORT_FAILED		0x010
-#define	NV_PORT_RESET		0x020
-#define	NV_PORT_RESET_RETRY	0x040
-#define	NV_PORT_RESTORE		0x080
-#define	NV_PORT_PROBE		0x100
-#define	NV_PORT_HOTPLUG_DELAY	0x200
+#define	NV_DEACTIVATED	0x001
+#define	NV_ABORTING	0x002
+#define	NV_FAILED	0x004
+#define	NV_RESET	0x008
+#define	NV_RESTORE	0x010
+#define	NV_LINK_EVENT	0x020
+#define	NV_ATTACH	0x040
+#define	NV_HOTPLUG	0x080
+
+
+/*
+ * flags for nv_report_link_event()
+ */
+#define	NV_ADD_DEV 0
+#define	NV_REM_DEV 1
 
 /*
  * nvc_state flags

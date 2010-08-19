@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <errno.h>
@@ -32,6 +29,7 @@
 #include <limits.h>
 #include <strings.h>
 #include <unistd.h>
+#include <zone.h>
 #include <topo_error.h>
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
@@ -96,9 +94,10 @@ static int
 mem_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
+	int isglobal = (getzoneid() == GLOBAL_ZONEID);
 	topo_mod_t *nmp;
 
-	if ((nmp = topo_mod_load(mod, PLATFORM_MEM_NAME,
+	if (isglobal && (nmp = topo_mod_load(mod, PLATFORM_MEM_NAME,
 	    PLATFORM_MEM_VERSION)) == NULL) {
 		if (topo_mod_errno(mod) == ETOPO_MOD_NOENT) {
 			/*
@@ -114,7 +113,7 @@ mem_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		}
 	}
 
-	if (topo_mod_enumerate(nmp, pnode, PLATFORM_MEM_NAME, name,
+	if (isglobal && topo_mod_enumerate(nmp, pnode, PLATFORM_MEM_NAME, name,
 	    min, max, NULL) < 0) {
 		topo_mod_dprintf(mod, "%s failed to enumerate: %s",
 		    PLATFORM_MEM_NAME, topo_mod_errmsg(mod));

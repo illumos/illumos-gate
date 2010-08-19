@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -391,6 +390,15 @@ Start no services.
 					</description>
 				</value>
 				</constraints>
+			</prop_pattern>
+			<prop_pattern name='info_event_all' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Override notification parameters and raise Information Events on all state transitions
+					</loctext>
+				</description>
+				<visibility value='hidden' />
 			</prop_pattern>
 		</pg_pattern>
 

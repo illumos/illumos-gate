@@ -1394,12 +1394,12 @@ dld_str_rx_unitdata(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
  * DL_NOTIFY_IND: DL_NOTE_SDU_SIZE
  */
 static void
-str_notify_sdu_size(dld_str_t *dsp, uint_t max_sdu)
+str_notify_sdu_size(dld_str_t *dsp, uint_t max_sdu, uint_t multicast_sdu)
 {
 	mblk_t		*mp;
 	dl_notify_ind_t *dlip;
 
-	if (!(dsp->ds_notifications & DL_NOTE_SDU_SIZE))
+	if (!(dsp->ds_notifications & (DL_NOTE_SDU_SIZE|DL_NOTE_SDU_SIZE2)))
 		return;
 
 	if ((mp = mexchange(dsp->ds_wq, NULL, sizeof (dl_notify_ind_t),
@@ -1409,8 +1409,14 @@ str_notify_sdu_size(dld_str_t *dsp, uint_t max_sdu)
 	bzero(mp->b_rptr, sizeof (dl_notify_ind_t));
 	dlip = (dl_notify_ind_t *)mp->b_rptr;
 	dlip->dl_primitive = DL_NOTIFY_IND;
-	dlip->dl_notification = DL_NOTE_SDU_SIZE;
-	dlip->dl_data = max_sdu;
+	if (dsp->ds_notifications & DL_NOTE_SDU_SIZE2) {
+		dlip->dl_notification = DL_NOTE_SDU_SIZE2;
+		dlip->dl_data1 = max_sdu;
+		dlip->dl_data2 = multicast_sdu;
+	} else {
+		dlip->dl_notification = DL_NOTE_SDU_SIZE;
+		dlip->dl_data = max_sdu;
+	}
 
 	qreply(dsp->ds_wq, mp);
 }
@@ -1725,7 +1731,7 @@ str_notify_allowed_ips(dld_str_t *dsp)
 	mblk_t		*mp;
 	dl_notify_ind_t	*dlip;
 	size_t		mp_size;
-	mac_protect_t	mrp;
+	mac_protect_t	*mrp;
 
 	if (!(dsp->ds_notifications & DL_NOTE_ALLOWED_IPS))
 		return;
@@ -1734,7 +1740,7 @@ str_notify_allowed_ips(dld_str_t *dsp)
 	if ((mp = mexchange(dsp->ds_wq, NULL, mp_size, M_PROTO, 0)) == NULL)
 		return;
 
-	mac_protect_get(dsp->ds_mh, &mrp);
+	mrp = mac_protect_get(dsp->ds_mh);
 	bzero(mp->b_rptr, mp_size);
 	dlip = (dl_notify_ind_t *)mp->b_rptr;
 	dlip->dl_primitive = DL_NOTIFY_IND;
@@ -1742,7 +1748,7 @@ str_notify_allowed_ips(dld_str_t *dsp)
 	dlip->dl_data = 0;
 	dlip->dl_addr_offset = sizeof (dl_notify_ind_t);
 	dlip->dl_addr_length = sizeof (mac_protect_t);
-	bcopy(&mrp, mp->b_rptr + sizeof (dl_notify_ind_t),
+	bcopy(mrp, mp->b_rptr + sizeof (dl_notify_ind_t),
 	    sizeof (mac_protect_t));
 
 	qreply(dsp->ds_wq, mp);
@@ -1865,8 +1871,9 @@ str_notify(void *arg, mac_notify_type_t type)
 
 	case MAC_NOTE_SDU_SIZE: {
 		uint_t  max_sdu;
-		mac_sdu_get(dsp->ds_mh, NULL, &max_sdu);
-		str_notify_sdu_size(dsp, max_sdu);
+		uint_t	multicast_sdu;
+		mac_sdu_get2(dsp->ds_mh, NULL, &max_sdu, &multicast_sdu);
+		str_notify_sdu_size(dsp, max_sdu, multicast_sdu);
 		break;
 	}
 

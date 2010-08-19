@@ -343,13 +343,13 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 		sin4 = (struct sockaddr_in *)sin_buf;
 		sin4->sin_family = AF_INET;
 		sin4->sin_port = connp->conn_fport;
-		IN6_V4MAPPED_TO_IPADDR(&fp->faddr, sin4->sin_addr.s_addr);
+		IN6_V4MAPPED_TO_IPADDR(&fp->sf_faddr, sin4->sin_addr.s_addr);
 		hdrlen = sizeof (*tudi) + sizeof (*sin4);
 	} else {
 		sin6 = sin_buf;
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_port = connp->conn_fport;
-		sin6->sin6_addr = fp->faddr;
+		sin6->sin6_addr = fp->sf_faddr;
 		hdrlen = sizeof (*tudi) + sizeof (*sin6);
 	}
 	/* If app asked to receive send / recv info */
@@ -641,7 +641,7 @@ sctp_free_reass(sctp_instr_t *sip)
 #ifdef	DEBUG
 			srp = (sctp_reass_t *)DB_BASE(mctl);
 			/* Partial delivery can leave empty srp */
-			ASSERT(mp->b_cont != NULL || srp->got == 0);
+			ASSERT(mp->b_cont != NULL || srp->sr_got == 0);
 #endif
 			mp = mp->b_cont;
 			mctl->b_cont = NULL;
@@ -816,12 +816,12 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 	ASSERT(DB_TYPE(hmp) == M_CTL);
 
 	dprint(4, ("trypartial: got=%d, needed=%d\n",
-	    (int)(srp->got), (int)(srp->needed)));
+	    (int)(srp->sr_got), (int)(srp->sr_needed)));
 
 	mp = hmp->b_cont;
 	qdc = (sctp_data_hdr_t *)mp->b_rptr;
 
-	ASSERT(SCTP_DATA_GET_BBIT(qdc) && srp->hasBchunk);
+	ASSERT(SCTP_DATA_GET_BBIT(qdc) && srp->sr_hasBchunk);
 
 	tsn = ntohl(qdc->sdh_tsn) + 1;
 
@@ -851,11 +851,11 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 	if (mp == NULL) {
 		dmp = hmp->b_cont;
 		hmp->b_cont = NULL;
-		srp->nexttsn = tsn;
-		srp->msglen = 0;
-		srp->needed = 0;
-		srp->got = 0;
-		srp->tail = NULL;
+		srp->sr_nexttsn = tsn;
+		srp->sr_msglen = 0;
+		srp->sr_needed = 0;
+		srp->sr_got = 0;
+		srp->sr_tail = NULL;
 	} else {
 		/*
 		 * There is a gap then some ordered frags which are not
@@ -866,7 +866,7 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 		dmp = hmp->b_cont;
 		hmp->b_cont = mp;
 	}
-	srp->hasBchunk = B_FALSE;
+	srp->sr_hasBchunk = B_FALSE;
 	/*
 	 * mp now points at the last chunk in the sequence,
 	 * and prev points to mp's previous in the list.
@@ -875,10 +875,10 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 	 * path unless they too exceed the sctp_pd_point.
 	 */
 	prev->b_cont = NULL;
-	srp->partial_delivered = B_TRUE;
+	srp->sr_partial_delivered = B_TRUE;
 
 	dprint(4, ("trypartial: got some, got=%d, needed=%d\n",
-	    (int)(srp->got), (int)(srp->needed)));
+	    (int)(srp->sr_got), (int)(srp->sr_needed)));
 
 	/*
 	 * Adjust all mblk's except the lead so their rptr's point to the
@@ -886,14 +886,14 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 	 * data chunk section, so leave it's rptr pointing at the data chunk.
 	 */
 	*dc = (sctp_data_hdr_t *)dmp->b_rptr;
-	if (srp->tail != NULL) {
-		srp->got--;
-		ASSERT(srp->got != 0);
-		if (srp->needed != 0) {
-			srp->needed--;
-			ASSERT(srp->needed != 0);
+	if (srp->sr_tail != NULL) {
+		srp->sr_got--;
+		ASSERT(srp->sr_got != 0);
+		if (srp->sr_needed != 0) {
+			srp->sr_needed--;
+			ASSERT(srp->sr_needed != 0);
 		}
-		srp->msglen -= ntohs((*dc)->sdh_len);
+		srp->sr_msglen -= ntohs((*dc)->sdh_len);
 	}
 	for (qmp = dmp->b_cont; qmp != NULL; qmp = qmp->b_cont) {
 		qdc = (sctp_data_hdr_t *)qmp->b_rptr;
@@ -903,17 +903,17 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 		 * Deduct the balance from got and needed here, now that
 		 * we know we are actually delivering these data.
 		 */
-		if (srp->tail != NULL) {
-			srp->got--;
-			ASSERT(srp->got != 0);
-			if (srp->needed != 0) {
-				srp->needed--;
-				ASSERT(srp->needed != 0);
+		if (srp->sr_tail != NULL) {
+			srp->sr_got--;
+			ASSERT(srp->sr_got != 0);
+			if (srp->sr_needed != 0) {
+				srp->sr_needed--;
+				ASSERT(srp->sr_needed != 0);
 			}
-			srp->msglen -= ntohs(qdc->sdh_len);
+			srp->sr_msglen -= ntohs(qdc->sdh_len);
 		}
 	}
-	ASSERT(srp->msglen == 0);
+	ASSERT(srp->sr_msglen == 0);
 	BUMP_LOCAL(sctp->sctp_reassmsgs);
 
 	return (dmp);
@@ -956,10 +956,10 @@ sctp_data_frag(sctp_t *sctp, mblk_t *dmp, sctp_data_hdr_t **dc, int *error,
 	reassq_next = reassq_prev = sip->istr_reass;
 	for (; reassq_next != NULL; reassq_next = reassq_next->b_next) {
 		srp = (sctp_reass_t *)DB_BASE(reassq_next);
-		if (ntohs((*dc)->sdh_ssn) == srp->ssn) {
+		if (ntohs((*dc)->sdh_ssn) == srp->sr_ssn) {
 			reassq_curr = reassq_next;
 			goto foundit;
-		} else if (SSN_GT(srp->ssn, ntohs((*dc)->sdh_ssn)))
+		} else if (SSN_GT(srp->sr_ssn, ntohs((*dc)->sdh_ssn)))
 			break;
 		reassq_prev = reassq_next;
 	}
@@ -1012,21 +1012,21 @@ sctp_data_frag(sctp_t *sctp, mblk_t *dmp, sctp_data_hdr_t **dc, int *error,
 		}
 		new_reassq->b_next = NULL;
 	}
-	srp->partial_delivered = B_FALSE;
-	srp->ssn = ntohs((*dc)->sdh_ssn);
-	srp->hasBchunk = B_FALSE;
+	srp->sr_partial_delivered = B_FALSE;
+	srp->sr_ssn = ntohs((*dc)->sdh_ssn);
+	srp->sr_hasBchunk = B_FALSE;
 empty_srp:
-	srp->needed = 0;
-	srp->got = 1;
+	srp->sr_needed = 0;
+	srp->sr_got = 1;
 	/* tail always the highest tsn on the reassembly queue for this ssn */
-	srp->tail = dmp;
+	srp->sr_tail = dmp;
 	if (SCTP_DATA_GET_BBIT(*dc)) {
 		/* Incoming frag is flagged as the beginning of message */
-		srp->msglen = ntohs((*dc)->sdh_len);
-		srp->nexttsn = ntohl((*dc)->sdh_tsn) + 1;
-		srp->hasBchunk = B_TRUE;
-	} else if (srp->partial_delivered &&
-	    srp->nexttsn == ntohl((*dc)->sdh_tsn)) {
+		srp->sr_msglen = ntohs((*dc)->sdh_len);
+		srp->sr_nexttsn = ntohl((*dc)->sdh_tsn) + 1;
+		srp->sr_hasBchunk = B_TRUE;
+	} else if (srp->sr_partial_delivered &&
+	    srp->sr_nexttsn == ntohl((*dc)->sdh_tsn)) {
 		/*
 		 * The real beginning fragment of the message was already
 		 * delivered upward, so this is the earliest frag expected.
@@ -1034,15 +1034,15 @@ empty_srp:
 		 * message.
 		 */
 		SCTP_DATA_SET_BBIT(*dc);
-		srp->hasBchunk = B_TRUE;
-		srp->msglen = ntohs((*dc)->sdh_len);
+		srp->sr_hasBchunk = B_TRUE;
+		srp->sr_msglen = ntohs((*dc)->sdh_len);
 		if (SCTP_DATA_GET_EBIT(*dc)) {
 			/* This frag is marked as the end of message */
-			srp->needed = 1;
+			srp->sr_needed = 1;
 			/* Got all fragments of this message now */
 			goto frag_done;
 		}
-		srp->nexttsn++;
+		srp->sr_nexttsn++;
 	}
 
 	/* The only fragment of this message currently queued */
@@ -1054,15 +1054,15 @@ foundit:
 	 * in the reassembly queue. Try the tail first, on the assumption
 	 * that the fragments are arriving in order.
 	 */
-	qmp = srp->tail;
+	qmp = srp->sr_tail;
 
 	/*
 	 * A NULL tail means all existing fragments of the message have
 	 * been entirely consumed during a partially delivery.
 	 */
 	if (qmp == NULL) {
-		ASSERT(srp->got == 0 && srp->needed == 0 &&
-		    srp->partial_delivered);
+		ASSERT(srp->sr_got == 0 && srp->sr_needed == 0 &&
+		    srp->sr_partial_delivered);
 		ASSERT(reassq_curr->b_cont == NULL);
 		reassq_curr->b_cont = dmp;
 		goto empty_srp;
@@ -1075,10 +1075,10 @@ foundit:
 		 * be set as the new head of list upon arrival. Fake B-bit
 		 * on that frag then see if it also completes the message.
 		 */
-		if (srp->partial_delivered &&
-		    srp->nexttsn == ntohl((*dc)->sdh_tsn)) {
+		if (srp->sr_partial_delivered &&
+		    srp->sr_nexttsn == ntohl((*dc)->sdh_tsn)) {
 			SCTP_DATA_SET_BBIT(*dc);
-			srp->hasBchunk = B_TRUE;
+			srp->sr_hasBchunk = B_TRUE;
 			if (SCTP_DATA_GET_EBIT(*dc)) {
 				/* Got all fragments of this message now */
 				goto frag_done;
@@ -1093,11 +1093,12 @@ foundit:
 	/* check if the frag goes on the tail in order */
 	if (SEQ_GT(ntohl((*dc)->sdh_tsn), ntohl(qdc->sdh_tsn))) {
 		qmp->b_cont = dmp;
-		srp->tail = dmp;
+		srp->sr_tail = dmp;
 		dmp->b_cont = NULL;
-		if (srp->hasBchunk && srp->nexttsn == ntohl((*dc)->sdh_tsn)) {
-			srp->msglen += ntohs((*dc)->sdh_len);
-			srp->nexttsn++;
+		if (srp->sr_hasBchunk && srp->sr_nexttsn ==
+		    ntohl((*dc)->sdh_tsn)) {
+			srp->sr_msglen += ntohs((*dc)->sdh_len);
+			srp->sr_nexttsn++;
 		}
 		goto inserted;
 	}
@@ -1109,8 +1110,8 @@ foundit:
 		dmp->b_cont = qmp;
 		reassq_curr->b_cont = dmp;
 		if (SCTP_DATA_GET_BBIT(*dc)) {
-			srp->hasBchunk = B_TRUE;
-			srp->nexttsn = ntohl((*dc)->sdh_tsn);
+			srp->sr_hasBchunk = B_TRUE;
+			srp->sr_nexttsn = ntohl((*dc)->sdh_tsn);
 		}
 		goto preinserted;
 	}
@@ -1134,13 +1135,13 @@ preinserted:
 	 * Need head of message and to be due to deliver, otherwise skip
 	 * the recalculation of the message length below.
 	 */
-	if (!srp->hasBchunk || ntohl((*dc)->sdh_tsn) != srp->nexttsn)
+	if (!srp->sr_hasBchunk || ntohl((*dc)->sdh_tsn) != srp->sr_nexttsn)
 		goto inserted;
 	/*
 	 * fraglen contains the length of consecutive chunks of fragments.
 	 * starting from the chunk we just inserted.
 	 */
-	tsn = srp->nexttsn;
+	tsn = srp->sr_nexttsn;
 	for (qmp = dmp; qmp != NULL; qmp = qmp->b_cont) {
 		qdc = (sctp_data_hdr_t *)qmp->b_rptr;
 		if (tsn != ntohl(qdc->sdh_tsn))
@@ -1148,23 +1149,23 @@ preinserted:
 		fraglen += ntohs(qdc->sdh_len);
 		tsn++;
 	}
-	srp->nexttsn = tsn;
-	srp->msglen += fraglen;
+	srp->sr_nexttsn = tsn;
+	srp->sr_msglen += fraglen;
 inserted:
-	srp->got++;
+	srp->sr_got++;
 	first_mp = reassq_curr->b_cont;
 	/* Prior to this frag either the beginning or end frag was missing */
-	if (srp->needed == 0) {
+	if (srp->sr_needed == 0) {
 		/* used to check if we have the first and last fragments */
 		bdc = (sctp_data_hdr_t *)first_mp->b_rptr;
-		edc = (sctp_data_hdr_t *)srp->tail->b_rptr;
+		edc = (sctp_data_hdr_t *)srp->sr_tail->b_rptr;
 
 		/*
 		 * If we now have both the beginning and the end of the message,
 		 * calculate how many fragments in the complete message.
 		 */
 		if (SCTP_DATA_GET_BBIT(bdc) && SCTP_DATA_GET_EBIT(edc)) {
-			srp->needed = ntohl(edc->sdh_tsn) -
+			srp->sr_needed = ntohl(edc->sdh_tsn) -
 			    ntohl(bdc->sdh_tsn) + 1;
 		}
 	}
@@ -1178,12 +1179,12 @@ inserted:
 	 * sctp_try_partial_delivery() will return a message consisting
 	 * of only consecutive fragments.
 	 */
-	if (srp->needed != srp->got) {
+	if (srp->sr_needed != srp->sr_got) {
 		/* we don't have the full message yet */
 		dmp = NULL;
 		if (ntohl((*dc)->sdh_tsn) <= sctp->sctp_ftsn &&
-		    srp->msglen >= sctp->sctp_pd_point &&
-		    srp->ssn == sip->nextseq) {
+		    srp->sr_msglen >= sctp->sctp_pd_point &&
+		    srp->sr_ssn == sip->nextseq) {
 			dmp = sctp_try_partial_delivery(sctp, reassq_curr,
 			    srp, dc);
 		}
@@ -1294,7 +1295,6 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	uint32_t tsn;
 	int dlen;
 	boolean_t tpfinished = B_TRUE;
-	int32_t new_rwnd;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 	int	error;
 
@@ -1349,7 +1349,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 
 	/* We can no longer deliver anything up, but still need to handle it. */
 	if (SCTP_IS_DETACHED(sctp)) {
-		BUMP_MIB(&sctps->sctps_mib, sctpInClosed);
+		SCTPS_BUMP_MIB(sctps, sctpInClosed);
 		can_deliver = B_FALSE;
 	}
 
@@ -1541,31 +1541,27 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	sctp->sctp_rxqueued -= dlen;
 
 	if (can_deliver) {
-
 		/* step past header to the payload */
 		dmp->b_rptr = (uchar_t *)(dc + 1);
 		if (sctp_input_add_ancillary(sctp, &dmp, dc, fp,
 		    ipp, ira) == 0) {
 			dprint(1, ("sctp_data_chunk: delivering %lu bytes\n",
 			    msgdsize(dmp)));
-			sctp->sctp_rwnd -= dlen;
 			/*
 			 * We overload the meaning of b_flag for SCTP sockfs
 			 * internal use, to advise sockfs of partial delivery
 			 * semantics.
 			 */
 			dmp->b_flag = tpfinished ? 0 : SCTP_PARTIAL_DATA;
-			new_rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd, dmp,
-			    msgdsize(dmp), 0, &error, NULL);
-			/*
-			 * Since we always deliver the next TSN data chunk,
-			 * we may buffer a little more than allowed. In
-			 * that case, just mark the window as 0.
-			 */
-			if (new_rwnd < 0)
-				sctp->sctp_rwnd = 0;
-			else if (new_rwnd > sctp->sctp_rwnd)
-				sctp->sctp_rwnd = new_rwnd;
+			if (sctp->sctp_flowctrld) {
+				sctp->sctp_rwnd -= dlen;
+				if (sctp->sctp_rwnd < 0)
+					sctp->sctp_rwnd = 0;
+			}
+			if (sctp->sctp_ulp_recv(sctp->sctp_ulpd, dmp,
+			    msgdsize(dmp), 0, &error, NULL) <= 0) {
+				sctp->sctp_flowctrld = B_TRUE;
+			}
 			SCTP_ACK_IT(sctp, tsn);
 		} else {
 			/* No memory don't ack, the peer will retransmit. */
@@ -1688,7 +1684,6 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 			    ipp, ira) == 0) {
 				dprint(1, ("sctp_data_chunk: delivering %lu "
 				    "bytes\n", msgdsize(dmp)));
-				sctp->sctp_rwnd -= dlen;
 				/*
 				 * Meaning of b_flag overloaded for SCTP sockfs
 				 * internal use, advise sockfs of partial
@@ -1696,12 +1691,15 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 				 */
 				dmp->b_flag = tpfinished ?
 				    0 : SCTP_PARTIAL_DATA;
-				new_rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd,
-				    dmp, msgdsize(dmp), 0, &error, NULL);
-				if (new_rwnd < 0)
-					sctp->sctp_rwnd = 0;
-				else if (new_rwnd > sctp->sctp_rwnd)
-					sctp->sctp_rwnd = new_rwnd;
+				if (sctp->sctp_flowctrld) {
+					sctp->sctp_rwnd -= dlen;
+					if (sctp->sctp_rwnd < 0)
+						sctp->sctp_rwnd = 0;
+				}
+				if (sctp->sctp_ulp_recv(sctp->sctp_ulpd, dmp,
+				    msgdsize(dmp), 0, &error, NULL) <= 0) {
+					sctp->sctp_flowctrld = B_TRUE;
+				}
 				SCTP_ACK_IT(sctp, tsn);
 			} else {
 				/* don't ack, the peer will retransmit */
@@ -1771,6 +1769,8 @@ sctp_fill_sack(sctp_t *sctp, unsigned char *dst, int sacklen)
 	} else {
 		sc->ssc_a_rwnd = 0;
 	}
+	/* Remember the last window sent to peer. */
+	sctp->sctp_arwnd = sc->ssc_a_rwnd;
 	sc->ssc_numfrags = htons(num_gaps);
 	sc->ssc_numdups = 0;
 
@@ -1869,7 +1869,7 @@ checks_done:
 	 */
 	if (sctp->sctp_err_chunks != NULL) {
 		fp = SCTP_CHUNK_DEST(sctp->sctp_err_chunks);
-		if (sctp->sctp_err_len + slen + dups_len > fp->sfa_pmss) {
+		if (sctp->sctp_err_len + slen + dups_len > fp->sf_pmss) {
 			if ((smp = sctp_make_mp(sctp, fp, 0)) == NULL) {
 				SCTP_KSTAT(sctps, sctp_send_err_failed);
 				SCTP_KSTAT(sctps, sctp_send_sack_failed);
@@ -1879,8 +1879,8 @@ checks_done:
 				return (NULL);
 			}
 			smp->b_cont = sctp->sctp_err_chunks;
-			sctp_set_iplen(sctp, smp, fp->ixa);
-			(void) conn_ip_output(smp, fp->ixa);
+			sctp_set_iplen(sctp, smp, fp->sf_ixa);
+			(void) conn_ip_output(smp, fp->sf_ixa);
 			BUMP_LOCAL(sctp->sctp_opkts);
 			sctp->sctp_err_chunks = NULL;
 			sctp->sctp_err_len = 0;
@@ -1935,14 +1935,14 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 	}
 	dprint(2, ("sctp_sack: sending to %p %x:%x:%x:%x\n",
 	    (void *)sctp->sctp_lastdata,
-	    SCTP_PRINTADDR(sctp->sctp_lastdata->faddr)));
+	    SCTP_PRINTADDR(sctp->sctp_lastdata->sf_faddr)));
 
-	sctp->sctp_active = ddi_get_lbolt64();
+	sctp->sctp_active = LBOLT_FASTPATH64;
 
-	BUMP_MIB(&sctps->sctps_mib, sctpOutAck);
+	SCTPS_BUMP_MIB(sctps, sctpOutAck);
 
-	sctp_set_iplen(sctp, smp, sctp->sctp_lastdata->ixa);
-	(void) conn_ip_output(smp, sctp->sctp_lastdata->ixa);
+	sctp_set_iplen(sctp, smp, sctp->sctp_lastdata->sf_ixa);
+	(void) conn_ip_output(smp, sctp->sctp_lastdata->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 	return (B_TRUE);
 }
@@ -1998,11 +1998,11 @@ sctp_check_abandoned_msg(sctp_t *sctp, mblk_t *meta)
 			return (ENOMEM);
 		}
 		SCTP_MSG_SET_ABANDONED(meta);
-		sctp_set_iplen(sctp, head, fp->ixa);
-		(void) conn_ip_output(head, fp->ixa);
+		sctp_set_iplen(sctp, head, fp->sf_ixa);
+		(void) conn_ip_output(head, fp->sf_ixa);
 		BUMP_LOCAL(sctp->sctp_opkts);
-		if (!fp->timer_running)
-			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		if (!fp->sf_timer_running)
+			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 		mp1 = mp1->b_next;
 		while (mp1 != NULL) {
 			ASSERT(!SCTP_CHUNK_ISSENT(mp1));
@@ -2087,21 +2087,21 @@ sctp_cumack(sctp_t *sctp, uint32_t tsn, mblk_t **first_unacked)
 					continue;
 				SCTP_CHUNK_SET_SACKCNT(mp, 0);
 				SCTP_CHUNK_ACKED(mp);
-				ASSERT(fp->suna >= chunklen);
-				fp->suna -= chunklen;
-				fp->acked += chunklen;
+				ASSERT(fp->sf_suna >= chunklen);
+				fp->sf_suna -= chunklen;
+				fp->sf_acked += chunklen;
 				cumack_forward += chunklen;
 				ASSERT(sctp->sctp_unacked >=
 				    (chunklen - sizeof (*sdc)));
 				sctp->sctp_unacked -=
 				    (chunklen - sizeof (*sdc));
-				if (fp->suna == 0) {
+				if (fp->sf_suna == 0) {
 					/* all outstanding data acked */
-					fp->pba = 0;
+					fp->sf_pba = 0;
 					SCTP_FADDR_TIMER_STOP(fp);
 				} else {
 					SCTP_FADDR_TIMER_RESTART(sctp, fp,
-					    fp->rto);
+					    fp->sf_rto);
 				}
 			} else {
 				goto cum_ack_done;
@@ -2124,7 +2124,7 @@ sctp_cumack(sctp_t *sctp, uint32_t tsn, mblk_t **first_unacked)
 cum_ack_done:
 	*first_unacked = mp;
 	if (cumack_forward > 0) {
-		BUMP_MIB(&sctps->sctps_mib, sctpInAck);
+		SCTPS_BUMP_MIB(sctps, sctpInAck);
 		if (SEQ_GT(sctp->sctp_lastack_rxd, sctp->sctp_recovery_tsn)) {
 			sctp->sctp_recovery_tsn = sctp->sctp_lastack_rxd;
 		}
@@ -2143,7 +2143,7 @@ cum_ack_done:
 		sctp->sctp_xmit_unacked = mp;
 	} else {
 		/* dup ack */
-		BUMP_MIB(&sctps->sctps_mib, sctpInDupAck);
+		SCTPS_BUMP_MIB(sctps, sctpInDupAck);
 	}
 	sctp->sctp_lastack_rxd = tsn;
 	if (SEQ_LT(sctp->sctp_adv_pap, sctp->sctp_lastack_rxd))
@@ -2223,7 +2223,7 @@ sctp_ftsn_check_frag(sctp_t *sctp, uint16_t ssn, sctp_instr_t *sip)
 	while (hmp != NULL) {
 		hmp_next = hmp->b_next;
 		srp = (sctp_reass_t *)DB_BASE(hmp);
-		if (SSN_GT(srp->ssn, ssn))
+		if (SSN_GT(srp->sr_ssn, ssn))
 			return (dlen);
 		/*
 		 * If we had sent part of this message up, send a partial
@@ -2232,15 +2232,15 @@ sctp_ftsn_check_frag(sctp_t *sctp, uint16_t ssn, sctp_instr_t *sip)
 		 * hence the ASSERT. See comments in sctp_data_chunk() for
 		 * trypartial.
 		 */
-		if (srp->partial_delivered) {
-			if (srp->ssn != sip->nextseq)
+		if (srp->sr_partial_delivered) {
+			if (srp->sr_ssn != sip->nextseq)
 				cmn_err(CE_WARN, "sctp partial"
 				    " delivery notify, sctp 0x%p"
 				    " sip = 0x%p ssn != nextseq"
 				    " ssn 0x%x nextseq 0x%x",
 				    (void *)sctp, (void *)sip,
-				    srp->ssn, sip->nextseq);
-			ASSERT(sip->nextseq == srp->ssn);
+				    srp->sr_ssn, sip->nextseq);
+			ASSERT(sip->nextseq == srp->sr_ssn);
 			sctp_partial_delivery_event(sctp);
 		}
 		/* Take it out of the reass queue */
@@ -2298,7 +2298,7 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 	remaining =  ntohs(ch->sch_len) - sizeof (*ch) - sizeof (*ftsn);
 
 	if (SCTP_IS_DETACHED(sctp)) {
-		BUMP_MIB(&sctps->sctps_mib, sctpInClosed);
+		SCTPS_BUMP_MIB(sctps, sctpInClosed);
 		can_deliver = B_FALSE;
 	}
 	/*
@@ -2358,7 +2358,6 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 				dlen += MBLKL(pmp);
 			}
 			if (can_deliver) {
-				int32_t	nrwnd;
 				int error;
 
 				dmp->b_rptr = (uchar_t *)(dc + 1);
@@ -2367,20 +2366,22 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 				if (sctp_input_add_ancillary(sctp,
 				    &dmp, dc, fp, ipp, ira) == 0) {
 					sctp->sctp_rxqueued -= dlen;
-					sctp->sctp_rwnd -= dlen;
 					/*
 					 * Override b_flag for SCTP sockfs
 					 * internal use
 					 */
 
 					dmp->b_flag = 0;
-					nrwnd = sctp->sctp_ulp_recv(
+					if (sctp->sctp_flowctrld) {
+						sctp->sctp_rwnd -= dlen;
+						if (sctp->sctp_rwnd < 0)
+							sctp->sctp_rwnd = 0;
+					}
+					if (sctp->sctp_ulp_recv(
 					    sctp->sctp_ulpd, dmp, msgdsize(dmp),
-					    0, &error, NULL);
-					if (nrwnd < 0)
-						sctp->sctp_rwnd = 0;
-					else if (nrwnd > sctp->sctp_rwnd)
-						sctp->sctp_rwnd = nrwnd;
+					    0, &error, NULL) <= 0) {
+						sctp->sctp_flowctrld = B_TRUE;
+					}
 				} else {
 					/*
 					 * We will resume processing when
@@ -2470,15 +2471,15 @@ sctp_check_abandoned_data(sctp_t *sctp, sctp_faddr_t *fp)
 		sctp_make_ftsns(sctp, meta, mp, &nmp, fp, &seglen);
 		if (nmp == NULL) {
 			sctp->sctp_adv_pap = adv_pap;
-			if (!fp->timer_running)
-				SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+			if (!fp->sf_timer_running)
+				SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 			return;
 		}
-		sctp_set_iplen(sctp, nmp, fp->ixa);
-		(void) conn_ip_output(nmp, fp->ixa);
+		sctp_set_iplen(sctp, nmp, fp->sf_ixa);
+		(void) conn_ip_output(nmp, fp->sf_ixa);
 		BUMP_LOCAL(sctp->sctp_opkts);
-		if (!fp->timer_running)
-			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		if (!fp->sf_timer_running)
+			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 	}
 }
 
@@ -2543,7 +2544,7 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 		 */
 		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
 		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
-			BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
+			SCTPS_BUMP_MIB(sctps, sctpInAckUnsent);
 			*trysend = -1;
 			return (acked);
 		} else if (SEQ_LT(gapend, gapstart) ||
@@ -2598,14 +2599,14 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 
 				fp = SCTP_CHUNK_DEST(mp);
 				chunklen = ntohs(sdc->sdh_len);
-				ASSERT(fp->suna >= chunklen);
-				fp->suna -= chunklen;
-				if (fp->suna == 0) {
+				ASSERT(fp->sf_suna >= chunklen);
+				fp->sf_suna -= chunklen;
+				if (fp->sf_suna == 0) {
 					/* All outstanding data acked. */
-					fp->pba = 0;
+					fp->sf_pba = 0;
 					SCTP_FADDR_TIMER_STOP(fp);
 				}
-				fp->acked += chunklen;
+				fp->sf_acked += chunklen;
 				acked += chunklen;
 				sctp->sctp_unacked -= chunklen - sizeof (*sdc);
 				ASSERT(sctp->sctp_unacked >= 0);
@@ -2673,13 +2674,13 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 					 * Entering fast recovery.
 					 */
 					fp = SCTP_CHUNK_DEST(mp);
-					fp->ssthresh = fp->cwnd / 2;
-					if (fp->ssthresh < 2 * fp->sfa_pmss) {
-						fp->ssthresh =
-						    2 * fp->sfa_pmss;
+					fp->sf_ssthresh = fp->sf_cwnd / 2;
+					if (fp->sf_ssthresh < 2 * fp->sf_pmss) {
+						fp->sf_ssthresh =
+						    2 * fp->sf_pmss;
 					}
-					fp->cwnd = fp->ssthresh;
-					fp->pba = 0;
+					fp->sf_cwnd = fp->sf_ssthresh;
+					fp->sf_pba = 0;
 					sctp->sctp_recovery_tsn =
 					    sctp->sctp_ltsn - 1;
 					*fast_recovery = B_TRUE;
@@ -2742,7 +2743,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		return (0);
 
 	if (SEQ_GT(cumtsn, sctp->sctp_ltsn - 1)) {
-		BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
+		SCTPS_BUMP_MIB(sctps, sctpInAckUnsent);
 		/* Send an ABORT */
 		return (-1);
 	}
@@ -2768,14 +2769,14 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			mp = sctp->sctp_xmit_head->b_cont;
 		else
 			mp = NULL;
-		BUMP_MIB(&sctps->sctps_mib, sctpInDupAck);
+		SCTPS_BUMP_MIB(sctps, sctpInDupAck);
 		/*
 		 * If we were doing a zero win probe and the win
 		 * has now opened to at least MSS, re-transmit the
 		 * zero win probe via sctp_rexmit_packet().
 		 */
 		if (mp != NULL && sctp->sctp_zero_win_probe &&
-		    ntohl(sc->ssc_a_rwnd) >= sctp->sctp_current->sfa_pmss) {
+		    ntohl(sc->ssc_a_rwnd) >= sctp->sctp_current->sf_pmss) {
 			mblk_t	*pkt;
 			uint_t	pkt_len;
 			mblk_t	*mp1 = mp;
@@ -2786,7 +2787,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			 * to send the ZWP.
 			 */
 			fp = sctp->sctp_current;
-			fp->rto = fp->srtt + 4 * fp->rttvar;
+			fp->sf_rto = fp->sf_srtt + 4 * fp->sf_rttvar;
 			SCTP_MAX_RTO(sctp, fp);
 			/* Resend the ZWP */
 			pkt = sctp_rexmit_packet(sctp, &meta, &mp1, fp,
@@ -2795,12 +2796,12 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 				SCTP_KSTAT(sctps, sctp_ss_rexmit_failed);
 				return (0);
 			}
-			ASSERT(pkt_len <= fp->sfa_pmss);
+			ASSERT(pkt_len <= fp->sf_pmss);
 			sctp->sctp_zero_win_probe = B_FALSE;
 			sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
 			sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn;
-			sctp_set_iplen(sctp, pkt, fp->ixa);
-			(void) conn_ip_output(pkt, fp->ixa);
+			sctp_set_iplen(sctp, pkt, fp->sf_ixa);
+			(void) conn_ip_output(pkt, fp->sf_ixa);
 			BUMP_LOCAL(sctp->sctp_opkts);
 		}
 	} else {
@@ -2810,7 +2811,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			 * to send the ZWP.
 			 */
 			fp = sctp->sctp_current;
-			fp->rto = fp->srtt + 4 * fp->rttvar;
+			fp->sf_rto = fp->sf_srtt + 4 * fp->sf_rttvar;
 			SCTP_MAX_RTO(sctp, fp);
 			sctp->sctp_zero_win_probe = B_FALSE;
 			/* This is probably not required */
@@ -2880,8 +2881,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 				    sctp->sctp_xmit_head, mp1,
 				    &trysend, &fast_recovery, gapstart);
 				if (trysend < 0) {
-					BUMP_MIB(&sctps->sctps_mib,
-					    sctpInAckUnsent);
+					SCTPS_BUMP_MIB(sctps, sctpInAckUnsent);
 					return (-1);
 				}
 				break;
@@ -2898,7 +2898,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		 */
 		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
 		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
-			BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
+			SCTPS_BUMP_MIB(sctps, sctpInAckUnsent);
 			return (-1);
 		} else if (SEQ_LT(gapend, gapstart) ||
 		    SEQ_LEQ(gapstart, cumtsn)) {
@@ -2931,13 +2931,13 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 					 * Entering fast recovery.
 					 */
 					fp = SCTP_CHUNK_DEST(mp);
-					fp->ssthresh = fp->cwnd / 2;
-					if (fp->ssthresh < 2 * fp->sfa_pmss) {
-						fp->ssthresh =
-						    2 * fp->sfa_pmss;
+					fp->sf_ssthresh = fp->sf_cwnd / 2;
+					if (fp->sf_ssthresh < 2 * fp->sf_pmss) {
+						fp->sf_ssthresh =
+						    2 * fp->sf_pmss;
 					}
-					fp->cwnd = fp->ssthresh;
-					fp->pba = 0;
+					fp->sf_cwnd = fp->sf_ssthresh;
+					fp->sf_pba = 0;
 					sctp->sctp_recovery_tsn =
 					    sctp->sctp_ltsn - 1;
 					fast_recovery = B_TRUE;
@@ -2952,12 +2952,12 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			if (SCTP_CHUNK_ISACKED(mp)) {
 				chunklen = ntohs(sdc->sdh_len);
 				fp = SCTP_CHUNK_DEST(mp);
-				fp->suna += chunklen;
+				fp->sf_suna += chunklen;
 				sctp->sctp_unacked += chunklen - sizeof (*sdc);
 				SCTP_CHUNK_CLEAR_ACKED(sctp, mp);
-				if (!fp->timer_running) {
+				if (!fp->sf_timer_running) {
 					SCTP_FADDR_TIMER_RESTART(sctp, fp,
-					    fp->rto);
+					    fp->sf_rto);
 				}
 			}
 
@@ -3001,14 +3001,14 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 
 				fp = SCTP_CHUNK_DEST(mp);
 				chunklen = ntohs(sdc->sdh_len);
-				ASSERT(fp->suna >= chunklen);
-				fp->suna -= chunklen;
-				if (fp->suna == 0) {
+				ASSERT(fp->sf_suna >= chunklen);
+				fp->sf_suna -= chunklen;
+				if (fp->sf_suna == 0) {
 					/* All outstanding data acked. */
-					fp->pba = 0;
+					fp->sf_pba = 0;
 					SCTP_FADDR_TIMER_STOP(fp);
 				}
-				fp->acked += chunklen;
+				fp->sf_acked += chunklen;
 				acked += chunklen;
 				sctp->sctp_unacked -= chunklen - sizeof (*sdc);
 				ASSERT(sctp->sctp_unacked >= 0);
@@ -3087,7 +3087,7 @@ ret:
 	if (sctp->sctp_frwnd == 0 && sctp->sctp_unacked == 0 &&
 	    sctp->sctp_unsent != 0) {
 		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
-		    sctp->sctp_current->rto);
+		    sctp->sctp_current->sf_rto);
 	}
 
 	/*
@@ -3097,32 +3097,33 @@ ret:
 	 * cwnd has been fully utilized (almost fully, need to allow
 	 * some leeway due to non-MSS sized messages).
 	 */
-	if (sctp->sctp_current->acked == acked) {
+	if (sctp->sctp_current->sf_acked == acked) {
 		/*
 		 * Fast-path, only data sent to sctp_current got acked.
 		 */
 		fp = sctp->sctp_current;
 		if (cumack_forward && !fast_recovery &&
-		    (fp->acked + fp->suna > fp->cwnd - fp->sfa_pmss)) {
-			if (fp->cwnd < fp->ssthresh) {
+		    (fp->sf_acked + fp->sf_suna > fp->sf_cwnd - fp->sf_pmss)) {
+			if (fp->sf_cwnd < fp->sf_ssthresh) {
 				/*
 				 * Slow start
 				 */
-				if (fp->acked > fp->sfa_pmss) {
-					fp->cwnd += fp->sfa_pmss;
+				if (fp->sf_acked > fp->sf_pmss) {
+					fp->sf_cwnd += fp->sf_pmss;
 				} else {
-					fp->cwnd += fp->acked;
+					fp->sf_cwnd += fp->sf_acked;
 				}
-				fp->cwnd = MIN(fp->cwnd, sctp->sctp_cwnd_max);
+				fp->sf_cwnd = MIN(fp->sf_cwnd,
+				    sctp->sctp_cwnd_max);
 			} else {
 				/*
 				 * Congestion avoidance
 				 */
-				fp->pba += fp->acked;
-				if (fp->pba >= fp->cwnd) {
-					fp->pba -= fp->cwnd;
-					fp->cwnd += fp->sfa_pmss;
-					fp->cwnd = MIN(fp->cwnd,
+				fp->sf_pba += fp->sf_acked;
+				if (fp->sf_pba >= fp->sf_cwnd) {
+					fp->sf_pba -= fp->sf_cwnd;
+					fp->sf_cwnd += fp->sf_pmss;
+					fp->sf_cwnd = MIN(fp->sf_cwnd,
 					    sctp->sctp_cwnd_max);
 				}
 			}
@@ -3130,40 +3131,41 @@ ret:
 		/*
 		 * Limit the burst of transmitted data segments.
 		 */
-		if (fp->suna + sctps->sctps_maxburst * fp->sfa_pmss <
-		    fp->cwnd) {
-			fp->cwnd = fp->suna + sctps->sctps_maxburst *
-			    fp->sfa_pmss;
+		if (fp->sf_suna + sctps->sctps_maxburst * fp->sf_pmss <
+		    fp->sf_cwnd) {
+			fp->sf_cwnd = fp->sf_suna + sctps->sctps_maxburst *
+			    fp->sf_pmss;
 		}
-		fp->acked = 0;
+		fp->sf_acked = 0;
 		goto check_ss_rxmit;
 	}
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-		if (cumack_forward && fp->acked && !fast_recovery &&
-		    (fp->acked + fp->suna > fp->cwnd - fp->sfa_pmss)) {
-			if (fp->cwnd < fp->ssthresh) {
-				if (fp->acked > fp->sfa_pmss) {
-					fp->cwnd += fp->sfa_pmss;
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+		if (cumack_forward && fp->sf_acked && !fast_recovery &&
+		    (fp->sf_acked + fp->sf_suna > fp->sf_cwnd - fp->sf_pmss)) {
+			if (fp->sf_cwnd < fp->sf_ssthresh) {
+				if (fp->sf_acked > fp->sf_pmss) {
+					fp->sf_cwnd += fp->sf_pmss;
 				} else {
-					fp->cwnd += fp->acked;
+					fp->sf_cwnd += fp->sf_acked;
 				}
-				fp->cwnd = MIN(fp->cwnd, sctp->sctp_cwnd_max);
+				fp->sf_cwnd = MIN(fp->sf_cwnd,
+				    sctp->sctp_cwnd_max);
 			} else {
-				fp->pba += fp->acked;
-				if (fp->pba >= fp->cwnd) {
-					fp->pba -= fp->cwnd;
-					fp->cwnd += fp->sfa_pmss;
-					fp->cwnd = MIN(fp->cwnd,
+				fp->sf_pba += fp->sf_acked;
+				if (fp->sf_pba >= fp->sf_cwnd) {
+					fp->sf_pba -= fp->sf_cwnd;
+					fp->sf_cwnd += fp->sf_pmss;
+					fp->sf_cwnd = MIN(fp->sf_cwnd,
 					    sctp->sctp_cwnd_max);
 				}
 			}
 		}
-		if (fp->suna + sctps->sctps_maxburst * fp->sfa_pmss <
-		    fp->cwnd) {
-			fp->cwnd = fp->suna + sctps->sctps_maxburst *
-			    fp->sfa_pmss;
+		if (fp->sf_suna + sctps->sctps_maxburst * fp->sf_pmss <
+		    fp->sf_cwnd) {
+			fp->sf_cwnd = fp->sf_suna + sctps->sctps_maxburst *
+			    fp->sf_pmss;
 		}
-		fp->acked = 0;
+		fp->sf_acked = 0;
 	}
 	fp = sctp->sctp_current;
 check_ss_rxmit:
@@ -3184,14 +3186,14 @@ check_ss_rxmit:
 			 * missing.
 			 */
 			if (cumack_forward) {
-				fp->rxt_unacked -= acked;
+				fp->sf_rxt_unacked -= acked;
 				sctp_ss_rexmit(sctp);
 			}
 		} else {
 			sctp->sctp_rexmitting = B_FALSE;
 			sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
 			sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn;
-			fp->rxt_unacked = 0;
+			fp->sf_rxt_unacked = 0;
 		}
 	}
 	return (trysend);
@@ -3409,8 +3411,8 @@ sctp_ootb_input(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst)
 
 	sctps = ipst->ips_netstack->netstack_sctp;
 
-	BUMP_MIB(&sctps->sctps_mib, sctpOutOfBlue);
-	BUMP_MIB(&sctps->sctps_mib, sctpInSCTPPkts);
+	SCTPS_BUMP_MIB(sctps, sctpOutOfBlue);
+	SCTPS_BUMP_MIB(sctps, sctpInSCTPPkts);
 
 	if (mp->b_cont != NULL) {
 		/*
@@ -3578,11 +3580,18 @@ sctp_process_abort(sctp_t *sctp, sctp_chunk_hdr_t *ch, int err)
 {
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
-	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+	SCTPS_BUMP_MIB(sctps, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 
-	sctp_assoc_event(sctp, SCTP_COMM_LOST,
-	    ntohs(((sctp_parm_hdr_t *)(ch + 1))->sph_type), ch);
+	/*
+	 * SCTP_COMM_LOST is only sent up if the association is
+	 * established (sctp_state >= SCTPS_ESTABLISHED).
+	 */
+	if (sctp->sctp_state >= SCTPS_ESTABLISHED) {
+		sctp_assoc_event(sctp, SCTP_COMM_LOST,
+		    ntohs(((sctp_parm_hdr_t *)(ch + 1))->sph_type), ch);
+	}
+
 	sctp_clean_death(sctp, err);
 }
 
@@ -3753,7 +3762,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 	gotdata = 0;
 	trysend = 0;
 
-	now = ddi_get_lbolt64();
+	now = LBOLT_FASTPATH64;
 	/* Process the chunks */
 	do {
 		dprint(3, ("sctp_dispatch_rput: state=%d, chunk id=%d\n",
@@ -3815,7 +3824,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 						goto done;
 					}
 					SCTP_FADDR_TIMER_RESTART(sctp, fp,
-					    fp->rto);
+					    fp->sf_rto);
 				}
 				break;
 			case CHUNK_SACK:
@@ -3861,8 +3870,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				if (sctp->sctp_state == SCTPS_SHUTDOWN_SENT) {
 					sctp_shutdown_complete(sctp);
-					BUMP_MIB(&sctps->sctps_mib,
-					    sctpShutdowns);
+					SCTPS_BUMP_MIB(sctps, sctpShutdowns);
 					sctp_assoc_event(sctp,
 					    SCTP_SHUTDOWN_COMP, 0, NULL);
 					sctp_clean_death(sctp, 0);
@@ -3897,7 +3905,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 						sctp_adaptation_event(sctp);
 					}
 				} else {
-					BUMP_MIB(&sctps->sctps_mib,
+					SCTPS_BUMP_MIB(sctps,
 					    sctpInInvalidCookie);
 				}
 				break;
@@ -3953,7 +3961,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaptation, &peer_src,
 				    ira) == -1) {
-					BUMP_MIB(&sctps->sctps_mib,
+					SCTPS_BUMP_MIB(sctps,
 					    sctpInInvalidCookie);
 					goto done;
 				}
@@ -3997,7 +4005,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				 * properly reprocessed on the
 				 * eager's queue.
 				 */
-				BUMP_MIB(&sctps->sctps_mib, sctpPassiveEstab);
+				SCTPS_BUMP_MIB(sctps, sctpPassiveEstab);
 				if (mlen > ntohs(ch->sch_len)) {
 					eager->sctp_cookie_mp = dupb(mp);
 					/*
@@ -4075,7 +4083,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaptation, NULL, ira) == -1) {
-					BUMP_MIB(&sctps->sctps_mib,
+					SCTPS_BUMP_MIB(sctps,
 					    sctpInInvalidCookie);
 					break;
 				}
@@ -4087,10 +4095,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 					sctp_set_ulp_prop(sctp);
 
 				}
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
-				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
+				SCTP_ASSOC_EST(sctps, sctp);
+				SCTPS_BUMP_MIB(sctps, sctpActiveEstab);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
 					sctp->sctp_cookie_mp = NULL;
@@ -4129,10 +4135,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				}
 				if (sctp->sctp_unacked == 0)
 					sctp_stop_faddr_timers(sctp);
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
-				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
+				SCTP_ASSOC_EST(sctps, sctp);
+				SCTPS_BUMP_MIB(sctps, sctpActiveEstab);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
@@ -4157,7 +4161,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
 				    sctph, &recv_adaptation, NULL, ira) == -1) {
-					BUMP_MIB(&sctps->sctps_mib,
+					SCTPS_BUMP_MIB(sctps,
 					    sctpInInvalidCookie);
 					break;
 				}
@@ -4171,10 +4175,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				}
 				if (sctp->sctp_unacked == 0)
 					sctp_stop_faddr_timers(sctp);
-				sctp->sctp_state = SCTPS_ESTABLISHED;
-				sctp->sctp_assoc_start_time =
-				    (uint32_t)ddi_get_lbolt();
-				BUMP_MIB(&sctps->sctps_mib, sctpActiveEstab);
+				SCTP_ASSOC_EST(sctps, sctp);
+				SCTPS_BUMP_MIB(sctps, sctpActiveEstab);
 				if (sctp->sctp_cookie_mp) {
 					freemsg(sctp->sctp_cookie_mp);
 					sctp->sctp_cookie_mp = NULL;
@@ -4206,7 +4208,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 					p = (sctp_parm_hdr_t *)(ch + 1);
 					if (p->sph_type ==
 					    htons(SCTP_ERR_STALE_COOKIE)) {
-						BUMP_MIB(&sctps->sctps_mib,
+						SCTPS_BUMP_MIB(sctps,
 						    sctpAborted);
 						sctp_error_event(sctp,
 						    ch, B_FALSE);
@@ -4241,7 +4243,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 				goto done;
 			case CHUNK_SHUTDOWN_COMPLETE:
 				BUMP_LOCAL(sctp->sctp_ibchunks);
-				BUMP_MIB(&sctps->sctps_mib, sctpShutdowns);
+				SCTPS_BUMP_MIB(sctps, sctpShutdowns);
 				sctp_assoc_event(sctp, SCTP_SHUTDOWN_COMP, 0,
 				    NULL);
 
@@ -4252,7 +4254,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 			case CHUNK_SHUTDOWN_ACK:
 				sctp_shutdown_complete(sctp);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
-				BUMP_MIB(&sctps->sctps_mib, sctpShutdowns);
+				SCTPS_BUMP_MIB(sctps, sctpShutdowns);
 				sctp_assoc_event(sctp, SCTP_SHUTDOWN_COMP, 0,
 				    NULL);
 				sctp_clean_death(sctp, 0);
@@ -4383,10 +4385,10 @@ nomorechunks:
 	 * If there is unsent data, make sure a timer is running, check
 	 * timer_mp, if sctp_closei_local() ran the timers may be free.
 	 */
-	if (sctp->sctp_unsent > 0 && !sctp->sctp_current->timer_running &&
-	    sctp->sctp_current->timer_mp != NULL) {
+	if (sctp->sctp_unsent > 0 && !sctp->sctp_current->sf_timer_running &&
+	    sctp->sctp_current->sf_timer_mp != NULL) {
 		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
-		    sctp->sctp_current->rto);
+		    sctp->sctp_current->sf_rto);
 	}
 
 done:
@@ -4407,35 +4409,32 @@ done:
 }
 
 /*
- * Some amount of data got removed from rx q.
- * Check if we should send a window update.
- *
- * Due to way sctp_rwnd updates are made, ULP can give reports out-of-order.
- * To keep from dropping incoming data due to this, we only update
- * sctp_rwnd when if it's larger than what we've reported to peer earlier.
+ * Some amount of data got removed from ULP's receive queue and we can
+ * push messages up if we are flow controlled before.  Reset the receive
+ * window to full capacity (conn_rcvbuf) and check if we should send a
+ * window update.
  */
 void
 sctp_recvd(sctp_t *sctp, int len)
 {
-	int32_t old, new;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
+	boolean_t	send_sack = B_FALSE;
 
 	ASSERT(sctp != NULL);
 	RUN_SCTP(sctp);
 
-	if (len < sctp->sctp_rwnd) {
-		WAKE_SCTP(sctp);
-		return;
-	}
+	sctp->sctp_flowctrld = B_FALSE;
+	/* This is the amount of data queued in ULP. */
+	sctp->sctp_ulp_rxqueued = connp->conn_rcvbuf - len;
 
-	old = sctp->sctp_rwnd - sctp->sctp_rxqueued;
-	new = len - sctp->sctp_rxqueued;
-	sctp->sctp_rwnd = len;
+	if (connp->conn_rcvbuf - sctp->sctp_arwnd >= sctp->sctp_mss)
+		send_sack = B_TRUE;
+	sctp->sctp_rwnd = connp->conn_rcvbuf;
 
-	if (sctp->sctp_state >= SCTPS_ESTABLISHED &&
-	    ((old <= new >> 1) || (old < sctp->sctp_mss))) {
+	if (sctp->sctp_state >= SCTPS_ESTABLISHED && send_sack) {
 		sctp->sctp_force_sack = 1;
-		BUMP_MIB(&sctps->sctps_mib, sctpOutWinUpdate);
+		SCTPS_BUMP_MIB(sctps, sctpOutWinUpdate);
 		(void) sctp_sack(sctp, NULL);
 	}
 	WAKE_SCTP(sctp);

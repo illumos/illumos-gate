@@ -42,8 +42,6 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=qus alias=pci1077,1016 class=scsi perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/qus group=sys
-legacy pkg=SUNWqus arch=$(ARCH) category=system \
+legacy pkg=SUNWqus \
     desc="Software to support Qlogic Ultra3 scsi host bus adapters" \
-    hotline="Please contact your local service provider" \
-    name="QLogic Ultra3 Scsi, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="QLogic Ultra3 Scsi, (Root)"

@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -255,10 +252,18 @@ __ipltospl(int ipl)
 
 /*
  * Print a stack backtrace using the specified stack pointer.  We delay two
- * seconds before continuing, unless this is the panic traceback.  Note
- * that the frame for the starting stack pointer value is omitted because
+ * seconds before continuing, unless this is the panic traceback.
+ * If we are in the process of panicking, we also attempt to write the
+ * stack backtrace to a staticly assigned buffer, to allow the panic
+ * code to find it and write it in to uncompressed pages within the
+ * system crash dump.
+ *
+ * Note that the frame for the starting stack pointer value is omitted because
  * the corresponding %pc is not known.
  */
+
+extern char *dump_stack_scratch;
+
 void
 traceback(caddr_t sp)
 {
@@ -268,10 +273,19 @@ traceback(caddr_t sp)
 
 	cpu_t *cpu;
 
+	uint_t  offset = 0;
+	uint_t  next_offset = 0;
+	char    stack_buffer[2048];
+	char    local_buffer[1024];
+
 	flush_windows();
 
 	if (!panicstr)
 		printf("traceback: %%sp = %p\n", (void *)sp);
+
+	if (panicstr && !dump_stack_scratch) {
+		printf("Warning - stack not written to the dumpbuf\n");
+	}
 
 	/*
 	 * If we are panicking, the high-level interrupt information in
@@ -321,20 +335,53 @@ traceback(caddr_t sp)
 			    nextfp->fr_arg[0], nextfp->fr_arg[1],
 			    nextfp->fr_arg[2], nextfp->fr_arg[3],
 			    nextfp->fr_arg[4], nextfp->fr_arg[5]);
+			(void) snprintf(stack_buffer, sizeof (stack_buffer),
+			    "%s:%s+%lx "
+			    "(%lx, %lx, %lx, %lx, %lx, %lx) | ",
+			    mod_containing_pc((caddr_t)pc), sym, off,
+			    nextfp->fr_arg[0], nextfp->fr_arg[1],
+			    nextfp->fr_arg[2], nextfp->fr_arg[3],
+			    nextfp->fr_arg[4], nextfp->fr_arg[5]);
 		} else {
-			printf("%016lx %p (%lx, %lx, %lx, %lx, %lx, %lx)\n",
+			(void) printf("%016lx %p (%lx, %lx, %lx, "
+			    "%lx, %lx, %lx)\n",
 			    (ulong_t)nextfp, (void *)pc,
+			    nextfp->fr_arg[0], nextfp->fr_arg[1],
+			    nextfp->fr_arg[2], nextfp->fr_arg[3],
+			    nextfp->fr_arg[4], nextfp->fr_arg[5]);
+			(void) snprintf(stack_buffer, sizeof (stack_buffer),
+			    "%p (%lx, %lx, %lx, %lx, %lx, %lx) | ",
+			    (void *)pc,
 			    nextfp->fr_arg[0], nextfp->fr_arg[1],
 			    nextfp->fr_arg[2], nextfp->fr_arg[3],
 			    nextfp->fr_arg[4], nextfp->fr_arg[5]);
 		}
 
-		printf("  %%l0-3: %016lx %016lx %016lx %016lx\n"
+		(void) snprintf(local_buffer, sizeof (local_buffer),
+		    "  %%l0-3: %016lx %016lx %016lx %016lx\n"
 		    "  %%l4-7: %016lx %016lx %016lx %016lx\n",
 		    nextfp->fr_local[0], nextfp->fr_local[1],
 		    nextfp->fr_local[2], nextfp->fr_local[3],
 		    nextfp->fr_local[4], nextfp->fr_local[5],
 		    nextfp->fr_local[6], nextfp->fr_local[7]);
+		if (panicstr && dump_stack_scratch) {
+			next_offset = offset + strlen(stack_buffer);
+			if (next_offset < STACK_BUF_SIZE) {
+				bcopy(stack_buffer, dump_stack_scratch + offset,
+				    strlen(stack_buffer));
+				offset = next_offset;
+			} else {
+				/*
+				 * In attempting to save the panic stack
+				 * to the dumpbuf we have overflowed that area.
+				 * Print a warning and continue to printf the
+				 * stack to the msgbuf
+				 */
+				printf("Warning: stack in the dump buffer"
+				    " may be incomplete\n");
+			}
+		}
+		printf("%s", local_buffer);
 
 		fp = nextfp;
 		minfp = fp;
@@ -343,6 +390,8 @@ traceback(caddr_t sp)
 	if (!panicstr) {
 		printf("end of traceback\n");
 		DELAY(2 * MICROSEC);
+	} else if (dump_stack_scratch) {
+		dump_stack_scratch[offset] = '\0';
 	}
 }
 

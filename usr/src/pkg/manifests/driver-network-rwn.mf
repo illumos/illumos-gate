@@ -44,12 +44,10 @@ driver name=rwn alias=pci1814,781 clone_perms="rwn 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/rwn group=sys
 file path=kernel/drv/rwn group=sys
-legacy pkg=SUNWrwn arch=$(ARCH) category=system \
+legacy pkg=SUNWrwn \
     desc="Ralink RT2700/RT2800 IEEE802.11 a/b/g/n Wireless Network Device" \
-    hotline="Please contact your local service provider" \
-    name="Ralink RT2700/2800 IEEE802.11 a/b/g/n Wireless Network Device" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license uts/common/io/rwn/THIRDPARTYLICENSE \
-    license=uts/common/io/rwn/THIRDPARTYLICENSE
-license uts/common/io/rwn/fw-rt2860/LICENSE \
-    license=uts/common/io/rwn/fw-rt2860/LICENSE
+    name="Ralink RT2700/2800 IEEE802.11 a/b/g/n Wireless Network Device"
+license usr/src/uts/common/io/rwn/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/rwn/THIRDPARTYLICENSE
+license usr/src/uts/common/io/rwn/fw-rt2860/LICENSE \
+    license=usr/src/uts/common/io/rwn/fw-rt2860/LICENSE

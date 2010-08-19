@@ -19,37 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <syslog.h>
 #include <strings.h>
-#include <synch.h>
 #include <smbsrv/libsmb.h>
-
-static idmap_handle_t *smb_idmap_hd;
-static mutex_t smb_idmap_mutex;
 
 static int smb_idmap_batch_binsid(smb_idmap_batch_t *sib);
 
-static void
-smb_idmap_reset(void)
-{
-	(void) mutex_lock(&smb_idmap_mutex);
-
-	if (smb_idmap_hd != NULL) {
-		(void) idmap_fini(smb_idmap_hd);
-		smb_idmap_hd = NULL;
-	}
-
-	(void) mutex_unlock(&smb_idmap_mutex);
-}
-
 /*
- * Report an idmap error.  If the error appears to be connection
- * related, use fini to reset.  A new handle will be generated on
- * the next open.
+ * Report an idmap error.
  */
 void
 smb_idmap_check(const char *s, idmap_stat stat)
@@ -58,44 +38,8 @@ smb_idmap_check(const char *s, idmap_stat stat)
 		if (s == NULL)
 			s = "smb_idmap_check";
 
-		syslog(LOG_ERR, "%s: %s", s, idmap_stat2string(NULL, stat));
-
-		switch (stat) {
-		case IDMAP_ERR_RPC_HANDLE:
-		case IDMAP_ERR_RPC:
-		case IDMAP_ERR_CLIENT_HANDLE:
-			smb_idmap_reset();
-			break;
-		default:
-			break;
-		}
+		syslog(LOG_ERR, "%s: %s", s, idmap_stat2string(stat));
 	}
-}
-
-static idmap_handle_t *
-smb_idmap_enter(void)
-{
-	idmap_stat stat;
-
-	(void) mutex_lock(&smb_idmap_mutex);
-
-	if (smb_idmap_hd == NULL) {
-		if ((stat = idmap_init(&smb_idmap_hd)) < 0) {
-			syslog(LOG_ERR,
-			    "smb_idmap_enter: idmap_init failed: %s",
-			    idmap_stat2string(NULL, stat));
-			(void) mutex_unlock(&smb_idmap_mutex);
-			return (NULL);
-		}
-	}
-
-	return (smb_idmap_hd);
-}
-
-static void
-smb_idmap_exit(void)
-{
-	(void) mutex_unlock(&smb_idmap_mutex);
 }
 
 /*
@@ -180,18 +124,13 @@ smb_idmap_getid(smb_sid_t *sid, uid_t *id, int *id_type)
 idmap_stat
 smb_idmap_batch_create(smb_idmap_batch_t *sib, uint16_t nmap, int flags)
 {
-	idmap_handle_t	*hd;
 	idmap_stat	stat;
 
 	if (!sib)
 		return (IDMAP_ERR_ARG);
 
-	if ((hd = smb_idmap_enter()) == NULL)
-		return (IDMAP_ERR_OTHER);
-
 	bzero(sib, sizeof (smb_idmap_batch_t));
-	stat = idmap_get_create(hd, &sib->sib_idmaph);
-	smb_idmap_exit();
+	stat = idmap_get_create(&sib->sib_idmaph);
 
 	if (stat != IDMAP_SUCCESS) {
 		smb_idmap_check("idmap_get_create", stat);
@@ -380,10 +319,8 @@ smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
 	smb_idmap_t *sim;
 	int i;
 
-	(void) mutex_lock(&smb_idmap_mutex);
 	if ((stat = idmap_get_mappings(sib->sib_idmaph)) != IDMAP_SUCCESS) {
 		smb_idmap_check("idmap_get_mappings", stat);
-		(void) mutex_unlock(&smb_idmap_mutex);
 		return (stat);
 	}
 
@@ -396,7 +333,6 @@ smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
 				smb_tracef("[%d] %d (%d)", sim->sim_idtype,
 				    sim->sim_rid, sim->sim_stat);
 			}
-			(void) mutex_unlock(&smb_idmap_mutex);
 			return (sim->sim_stat);
 		}
 	}
@@ -404,7 +340,6 @@ smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
 	if (smb_idmap_batch_binsid(sib) != 0)
 		stat = IDMAP_ERR_OTHER;
 
-	(void) mutex_unlock(&smb_idmap_mutex);
 	return (stat);
 }
 

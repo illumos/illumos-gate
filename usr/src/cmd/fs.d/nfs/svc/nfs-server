@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Start/stop processes required for server NFS
@@ -93,7 +92,7 @@ case "$1" in
 		startnfsd=1
 	fi
 
-	# Options for nfsd are now set in /etc/default/nfs
+	# Options for nfsd are now set in SMF
 	if [ $startnfsd -ne 0 ]; then
 		/usr/lib/nfs/mountd
 		rc=$?

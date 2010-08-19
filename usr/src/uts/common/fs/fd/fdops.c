@@ -383,7 +383,7 @@ fdmount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	/*
 	 * Having the resource be anything but "fd" doesn't make sense
 	 */
-	vfs_setresource(vfsp, "fd");
+	vfs_setresource(vfsp, "fd", 0);
 
 	vp = vn_alloc(KM_SLEEP);
 	vp->v_vfsp = vfsp;

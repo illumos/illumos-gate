@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	UTIL_H
 #define	UTIL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -77,6 +74,7 @@ boolean_t	bind_sock_v6(int, in_port_t, const in6_addr_t *);
 const char	*iffile_to_hostname(const char *);
 int		dhcpv6_status_code(const dhcpv6_option_t *, uint_t,
     const char **, const char **, uint_t *);
+void		write_lease_to_hostconf(dhcp_smach_t *);
 
 #ifdef	__cplusplus
 }

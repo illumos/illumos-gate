@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+/*
  * Copyright 2000 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -54,6 +57,7 @@
 #else
 #include <strings.h>
 #endif
+#include <locale.h> /* Solaris Kerberos */
 
 /*
  * $Id: add_cred.c 18396 2006-07-25 20:29:43Z lxs $
@@ -122,6 +126,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
     major_status = krb5_gss_validate_cred_1(minor_status, input_cred_handle,
 					    context);
     if (GSS_ERROR(major_status)) {
+        save_error_info(*minor_status, context);
 	krb5_free_context(context);
 	return major_status;
     }
@@ -150,6 +155,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
     }
 
     if (GSS_ERROR(kg_sync_ccache_name(context, minor_status))) {
+        save_error_info(*minor_status, context);
 	krb5_free_context(context);
 	return GSS_S_FAILURE;
     }
@@ -159,7 +165,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
     /*SUPPRESS 29*/
     if ((desired_name != (gss_name_t) NULL) &&
 	(! kg_validate_name(desired_name))) {
-	*minor_status = (OM_uint32) G_VALIDATE_FAILED;
+	*minor_status = (OM_uint32) G_VALIDATE_FAILED;	
 	krb5_free_context(context);
 	return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
     }
@@ -169,7 +175,24 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
     if (desired_name &&
 	!krb5_principal_compare(context, (krb5_principal) desired_name,
 				cred->princ)) {
-	*minor_status = 0;
+        /* Solaris Kerberos: spruce-up the err msg */
+        krb5_principal dname = (krb5_principal) desired_name;
+	char *s_name = NULL, *s_princ= NULL;
+	int kret = krb5_unparse_name(context, dname, &s_name);
+	int kret1 = krb5_unparse_name(context, cred->princ, &s_princ);
+	*minor_status = (OM_uint32) G_BAD_USAGE;
+	if (kret == 0 && kret1 == 0) {
+	    krb5_set_error_message(context, *minor_status,
+				dgettext(TEXT_DOMAIN,
+					"Desired name principal '%s' does not match '%s'"),
+				s_name, s_princ);
+	    save_error_info(*minor_status, context);
+	}
+	if (s_name)
+	    krb5_free_unparsed_name(context, s_name);
+	if (s_princ)
+	    krb5_free_unparsed_name(context, s_princ);
+
 	krb5_free_context(context);
 	return(GSS_S_BAD_NAME);
     }
@@ -203,6 +226,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 	    xfree(new_cred);
 
 	    *minor_status = code;
+	    save_error_info(*minor_status, context);
 	    krb5_free_context(context);
 	    return(GSS_S_FAILURE);
 	}
@@ -232,6 +256,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 		xfree(new_cred);
 
 		*minor_status = code;
+		save_error_info(*minor_status, context);
 		krb5_free_context(context);
 		return(GSS_S_FAILURE);
 	    }
@@ -243,6 +268,7 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 		xfree(new_cred);
 
 		*minor_status = code;
+		save_error_info(*minor_status, context);
 		krb5_free_context(context);
 		return(GSS_S_FAILURE);
 	    }
@@ -261,8 +287,9 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 		    krb5_free_principal(context, new_cred->princ);
 		xfree(new_cred);
 
-		krb5_free_context(context);
 		*minor_status = code;
+		save_error_info(*minor_status, context);
+		krb5_free_context(context);
 		return(GSS_S_FAILURE);
 	    }
 	} else {
@@ -301,9 +328,9 @@ krb5_gss_add_cred(minor_status, input_cred_handle,
 		if (new_cred->princ)
 		    krb5_free_principal(context, new_cred->princ);
 		xfree(new_cred);
-		krb5_free_context(context);
-
 		*minor_status = code;
+		save_error_info(*minor_status, context);
+		krb5_free_context(context);
 		return(GSS_S_FAILURE);
 	    }
 	} else {

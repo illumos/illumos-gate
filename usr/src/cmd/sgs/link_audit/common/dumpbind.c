@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdlib.h>
 #include	<unistd.h>
 #include	<sys/types.h>
@@ -205,13 +201,14 @@ main(int argc, char **argv)
 	if (pflag)
 		format_string = "%s|%s|%8d\n";
 	else {
-		if (!bflag)
-		    (void) printf(
-			"                           Bindings Summary Report\n\n"
-			"Library                             Symbol"
-			"                   Call Count\n"
-			"----------------------------------------------"
-			"--------------------------\n");
+		if (!bflag) {
+			(void) printf("                           "
+			    "Bindings Summary Report\n\n"
+			    "Library                             Symbol"
+			    "                   Call Count\n"
+			    "----------------------------------------------"
+			    "--------------------------\n");
+		}
 		format_string = "%-35s %-25s %5d\n";
 	}
 
@@ -241,12 +238,11 @@ main(int argc, char **argv)
 			(void) printf("bkt[%d] - %d entries\n", i, ent_cnt);
 	}
 
-	if (!bflag && !pflag)
-		(void) printf(
-			"----------------------------------------------"
-			"--------------------------\n"
-			"Symbol Count: %lu    Call Count: %lu\n\n",
-			symcount, callcount);
-
+	if (!bflag && !pflag) {
+		(void) printf("----------------------------------------------"
+		    "--------------------------\n"
+		    "Symbol Count: %lu    Call Count: %lu\n\n",
+		    symcount, callcount);
+	}
 	return (0);
 }

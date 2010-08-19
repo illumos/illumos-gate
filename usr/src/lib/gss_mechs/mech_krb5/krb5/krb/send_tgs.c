@@ -137,6 +137,28 @@ krb5_send_tgs(krb5_context context, krb5_flags kdcoptions,
 	      krb5_pa_data *const *padata, const krb5_data *second_ticket,
 	      krb5_creds *in_cred, krb5_response *rep)
 {
+	return (krb5_send_tgs2(context, kdcoptions,
+			    timestruct, ktypes,
+			    sname, addrs,
+			    authorization_data,
+			    padata, second_ticket,
+			    in_cred, rep,
+			    NULL));
+}
+
+/*
+ * Solaris Kerberos
+ * Same as krb5_send_tgs plus an extra arg to return the FQDN
+ * of the KDC sent the request.
+ */
+krb5_error_code
+krb5_send_tgs2(krb5_context context, krb5_flags kdcoptions,
+	      const krb5_ticket_times *timestruct, const krb5_enctype *ktypes,
+	      krb5_const_principal sname, krb5_address *const *addrs,
+	      krb5_authdata *const *authorization_data,
+	      krb5_pa_data *const *padata, const krb5_data *second_ticket,
+	    krb5_creds *in_cred, krb5_response *rep, char **hostname_used)
+{
     krb5_error_code retval;
     krb5_kdc_req tgsreq;
     krb5_data *scratch, scratch2;
@@ -271,9 +293,10 @@ krb5_send_tgs(krb5_context context, krb5_flags kdcoptions,
     /* now send request & get response from KDC */
 send_again:
     use_master = 0;
-    retval = krb5_sendto_kdc(context, scratch, 
-			     krb5_princ_realm(context, sname),
-			     &rep->response, &use_master, tcp_only);
+    retval = krb5_sendto_kdc2(context, scratch, 
+			    krb5_princ_realm(context, sname),
+			    &rep->response, &use_master, tcp_only,
+			    hostname_used);
     if (retval == 0) {
 	if (krb5_is_krb_error(&rep->response)) {
 	    if (!tcp_only) {

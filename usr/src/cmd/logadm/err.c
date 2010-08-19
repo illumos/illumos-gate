@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * logadm/err.c -- some basic error routines
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -37,6 +34,7 @@
 #include <errno.h>
 #include "err.h"
 
+jmp_buf	*Err_env_ptr;
 static const char *Myname;
 static int Exitcode;
 static FILE *Errorfile;
@@ -143,7 +141,7 @@ err(int flags, const char *fmt, ...)
 	va_end(ap);
 
 	if (jump)
-		longjmp(Err_env, 1);
+		longjmp(*Err_env_ptr, 1);
 
 	if (!warning && !fileline) {
 		err_done(1);

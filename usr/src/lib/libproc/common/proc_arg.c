@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -180,8 +179,7 @@ proc_grab_common(const char *arg, const char *path, int oflag, int gflag,
 				*perr = G_BADLWPS;
 				return (NULL);
 			}
-			core = alloca(strlen(arg) + 1);
-			(void) strcpy(core, arg);
+			core = strdupa(arg);
 			if ((Pr = Pfgrab_core(fd, path == NULL ?
 			    dirname(core) : path, perr)) != NULL) {
 				if (psp) {
@@ -216,8 +214,7 @@ proc_grab_common(const char *arg, const char *path, int oflag, int gflag,
 	}
 
 	if ((oflag & PR_ARG_CORES) && (fd = open_core(arg, perr)) != -1) {
-		core = alloca(strlen(arg) + 1);
-		(void) strcpy(core, arg);
+		core = strdupa(arg);
 		if ((Pr = Pfgrab_core(fd, path == NULL ? dirname(core) : path,
 		    perr)) != NULL) {
 			if (psp) {

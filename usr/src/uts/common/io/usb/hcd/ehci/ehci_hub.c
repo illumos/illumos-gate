@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 /*
  * EHCI Host Controller Driver (EHCI)
@@ -1080,11 +1078,11 @@ ehci_handle_port_reset(
 			    ~EHCI_RH_PORT_CLEAR_MASK;
 
 			/*
-			 * Enable over-current, connect, and disconnect
+			 * Disable over-current, connect, and disconnect
 			 * wakeup bits.
 			 */
-			Set_OpReg(ehci_rh_port_status[port], (port_status |
-			    EHCI_RH_PORT_OVER_CURENT_ENABLE |
+			Set_OpReg(ehci_rh_port_status[port], port_status &
+			    ~(EHCI_RH_PORT_OVER_CURENT_ENABLE |
 			    EHCI_RH_PORT_DISCONNECT_ENABLE |
 			    EHCI_RH_PORT_CONNECT_ENABLE));
 

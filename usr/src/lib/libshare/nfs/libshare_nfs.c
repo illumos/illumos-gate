@@ -35,18 +35,21 @@
 #include <errno.h>
 #include <locale.h>
 #include <signal.h>
+#include <strings.h>
 #include "libshare.h"
 #include "libshare_impl.h"
 #include <nfs/export.h>
 #include <pwd.h>
 #include <limits.h>
 #include <libscf.h>
+#include <syslog.h>
+#include <rpcsvc/daemon_utils.h>
 #include "nfslog_config.h"
 #include "nfslogtab.h"
 #include "libshare_nfs.h"
-#include <rpcsvc/daemon_utils.h>
 #include <nfs/nfs.h>
 #include <nfs/nfssys.h>
+#include "smfcfg.h"
 
 /* should really be in some global place */
 #define	DEF_WIN	30000
@@ -55,6 +58,7 @@
 int debug = 0;
 
 #define	NFS_SERVER_SVC	"svc:/network/nfs/server:default"
+#define	NFS_CLIENT_SVC	(char *)"svc:/network/nfs/client:default"
 
 /* internal functions */
 static int nfs_init();
@@ -1523,7 +1527,7 @@ err:
 		sa_free_attr_string(sectype);
 	if (options != NULL)
 		sa_free_derived_optionset(options);
-	return (NULL);
+	return (buff);
 }
 
 /*
@@ -2322,7 +2326,6 @@ struct proto_option_defs {
 	uint32_t svcs;
 	int32_t minval;
 	int32_t maxval;
-	char *file;
 	char *other;
 	int compare;
 #define	OPT_CMP_GE	0
@@ -2332,65 +2335,67 @@ struct proto_option_defs {
 #define	PROTO_OPT_NFSD_SERVERS			0
 	{"nfsd_servers",
 	    "servers", PROTO_OPT_NFSD_SERVERS, OPT_TYPE_NUMBER, 16, SVC_NFSD,
-	    1, INT32_MAX, NFSADMIN},
+	    1, INT32_MAX},
 #define	PROTO_OPT_LOCKD_LISTEN_BACKLOG		1
 	{"lockd_listen_backlog",
 	    "lockd_listen_backlog", PROTO_OPT_LOCKD_LISTEN_BACKLOG,
-	    OPT_TYPE_NUMBER, 32, SVC_LOCKD, 32, INT32_MAX, NFSADMIN},
+	    OPT_TYPE_NUMBER, 32, SVC_LOCKD, 32, INT32_MAX},
 #define	PROTO_OPT_LOCKD_SERVERS			2
 	{"lockd_servers",
 	    "lockd_servers", PROTO_OPT_LOCKD_SERVERS, OPT_TYPE_NUMBER, 20,
-	    SVC_LOCKD, 1, INT32_MAX, NFSADMIN},
+	    SVC_LOCKD, 1, INT32_MAX},
 #define	PROTO_OPT_LOCKD_RETRANSMIT_TIMEOUT	3
 	{"lockd_retransmit_timeout",
 	    "lockd_retransmit_timeout", PROTO_OPT_LOCKD_RETRANSMIT_TIMEOUT,
-	    OPT_TYPE_NUMBER, 5, SVC_LOCKD, 0, INT32_MAX, NFSADMIN},
+	    OPT_TYPE_NUMBER, 5, SVC_LOCKD, 0, INT32_MAX},
 #define	PROTO_OPT_GRACE_PERIOD			4
 	{"grace_period",
 	    "grace_period", PROTO_OPT_GRACE_PERIOD, OPT_TYPE_NUMBER, 90,
-	    SVC_LOCKD, 0, INT32_MAX, NFSADMIN},
+	    SVC_LOCKD, 0, INT32_MAX},
 #define	PROTO_OPT_NFS_SERVER_VERSMIN		5
 	{"nfs_server_versmin",
 	    "server_versmin", PROTO_OPT_NFS_SERVER_VERSMIN, OPT_TYPE_NUMBER,
 	    (int)NFS_VERSMIN_DEFAULT, SVC_NFSD|SVC_MOUNTD, NFS_VERSMIN,
-	    NFS_VERSMAX, NFSADMIN, "server_versmax", OPT_CMP_LE},
+	    NFS_VERSMAX, "server_versmax", OPT_CMP_LE},
 #define	PROTO_OPT_NFS_SERVER_VERSMAX		6
 	{"nfs_server_versmax",
 	    "server_versmax", PROTO_OPT_NFS_SERVER_VERSMAX, OPT_TYPE_NUMBER,
 	    (int)NFS_VERSMAX_DEFAULT, SVC_NFSD|SVC_MOUNTD, NFS_VERSMIN,
-	    NFS_VERSMAX, NFSADMIN, "server_versmin", OPT_CMP_GE},
+	    NFS_VERSMAX, "server_versmin", OPT_CMP_GE},
 #define	PROTO_OPT_NFS_CLIENT_VERSMIN		7
 	{"nfs_client_versmin",
 	    "client_versmin", PROTO_OPT_NFS_CLIENT_VERSMIN, OPT_TYPE_NUMBER,
-	    (int)NFS_VERSMIN_DEFAULT, NULL, NFS_VERSMIN, NFS_VERSMAX,
-	    NFSADMIN, "client_versmax", OPT_CMP_LE},
+	    (int)NFS_VERSMIN_DEFAULT, SVC_CLIENT, NFS_VERSMIN, NFS_VERSMAX,
+	    "client_versmax", OPT_CMP_LE},
 #define	PROTO_OPT_NFS_CLIENT_VERSMAX		8
 	{"nfs_client_versmax",
 	    "client_versmax", PROTO_OPT_NFS_CLIENT_VERSMAX, OPT_TYPE_NUMBER,
-	    (int)NFS_VERSMAX_DEFAULT, NULL, NFS_VERSMIN, NFS_VERSMAX,
-	    NFSADMIN, "client_versmin", OPT_CMP_GE},
+	    (int)NFS_VERSMAX_DEFAULT, SVC_CLIENT, NFS_VERSMIN, NFS_VERSMAX,
+	    "client_versmin", OPT_CMP_GE},
 #define	PROTO_OPT_NFS_SERVER_DELEGATION		9
 	{"nfs_server_delegation",
 	    "server_delegation", PROTO_OPT_NFS_SERVER_DELEGATION,
-	    OPT_TYPE_ONOFF, NFS_SERVER_DELEGATION_DEFAULT, SVC_NFSD, 0, 0,
-	    NFSADMIN},
+	    OPT_TYPE_ONOFF, NFS_SERVER_DELEGATION_DEFAULT, SVC_NFSD, 0, 0},
 #define	PROTO_OPT_NFSMAPID_DOMAIN		10
 	{"nfsmapid_domain",
 	    "nfsmapid_domain", PROTO_OPT_NFSMAPID_DOMAIN, OPT_TYPE_DOMAIN,
-	    NULL, SVC_NFSMAPID, 0, 0, NFSADMIN},
+	    NULL, SVC_NFSMAPID, 0, 0},
 #define	PROTO_OPT_NFSD_MAX_CONNECTIONS		11
 	{"nfsd_max_connections",
 	    "max_connections", PROTO_OPT_NFSD_MAX_CONNECTIONS,
-	    OPT_TYPE_NUMBER, -1, SVC_NFSD, -1, INT32_MAX, NFSADMIN},
+	    OPT_TYPE_NUMBER, -1, SVC_NFSD, -1, INT32_MAX},
 #define	PROTO_OPT_NFSD_PROTOCOL			12
 	{"nfsd_protocol",
 	    "protocol", PROTO_OPT_NFSD_PROTOCOL, OPT_TYPE_PROTOCOL, 0,
-	    SVC_NFSD, 0, 0, NFSADMIN},
+	    SVC_NFSD, 0, 0},
 #define	PROTO_OPT_NFSD_LISTEN_BACKLOG		13
 	{"nfsd_listen_backlog",
 	    "listen_backlog", PROTO_OPT_NFSD_LISTEN_BACKLOG,
-	    OPT_TYPE_NUMBER, 0,
-	    SVC_LOCKD, 0, INT32_MAX, NFSADMIN},
+	    OPT_TYPE_NUMBER, 0, SVC_NFSD, 0, INT32_MAX},
+#define	PROTO_OPT_NFSD_DEVICE			14
+	{"nfsd_device",
+	    "device", PROTO_OPT_NFSD_DEVICE,
+	    OPT_TYPE_STRING, NULL, SVC_NFSD, 0, 0},
 	{NULL}
 };
 
@@ -2432,21 +2437,6 @@ fixcaselower(char *str)
 }
 
 /*
- * fixcaseupper(str)
- *
- * convert a string to upper case (inplace).
- */
-
-static void
-fixcaseupper(char *str)
-{
-	while (*str) {
-		*str = toupper(*str);
-		str++;
-	}
-}
-
-/*
  * skipwhitespace(str)
  *
  * Skip leading white space. It is assumed that it is called with a
@@ -2480,7 +2470,7 @@ extractprop(char *name, char *value)
 	 */
 	name = skipwhitespace(name);
 
-	index = findprotoopt(name, 0);
+	index = findprotoopt(name, 1);
 	if (index >= 0) {
 		fixcaselower(name);
 		prop = sa_create_property(proto_options[index].name, value);
@@ -2492,74 +2482,110 @@ extractprop(char *name, char *value)
 	return (ret);
 }
 
-/*
- * initprotofromdefault()
- *
- * Read the default file(s) and add the defined values to the
- * protoset.  Note that default values are known from the built in
- * table in case the file doesn't have a definition. Not having the
- * /etc/default/nfs file is OK since we have builtin default
- * values. The default file will get constructed as needed if values
- * are changed from the defaults.
- */
-
-static int
-initprotofromdefault()
+scf_type_t
+getscftype(int type)
 {
-	FILE *nfs;
-	char buff[BUFSIZ];
-	char *name;
-	char *value;
-	int ret = SA_OK;
+	scf_type_t ret;
+
+	switch (type) {
+	case OPT_TYPE_NUMBER:
+		ret = SCF_TYPE_INTEGER;
+	break;
+	case OPT_TYPE_BOOLEAN:
+		ret = SCF_TYPE_BOOLEAN;
+	break;
+	default:
+		ret = SCF_TYPE_ASTRING;
+	}
+	return (ret);
+}
+
+char *
+getsvcname(uint32_t svcs)
+{
+	char *service;
+	switch (svcs) {
+		case SVC_LOCKD:
+			service = LOCKD;
+			break;
+		case SVC_STATD:
+			service = STATD;
+			break;
+		case SVC_NFSD:
+			service = NFSD;
+			break;
+		case SVC_CLIENT:
+			service = NFS_CLIENT_SVC;
+			break;
+		case SVC_NFS4CBD:
+			service = NFS4CBD;
+			break;
+		case SVC_NFSMAPID:
+			service = NFSMAPID;
+			break;
+		case SVC_RQUOTAD:
+			service = RQUOTAD;
+			break;
+		case SVC_NFSLOGD:
+			service = NFSLOGD;
+			break;
+		case SVC_REPARSED:
+			service = REPARSED;
+			break;
+		default:
+			service = NFSD;
+	}
+	return (service);
+}
+
+/*
+ * initprotofromsmf()
+ *
+ * Read NFS SMF properties and add the defined values to the
+ * protoset.  Note that default values are known from the built in
+ * table in case SMF doesn't have a definition. Not having
+ * SMF properties is OK since we have builtin default
+ * values.
+ */
+static int
+initprotofromsmf()
+{
+	char name[PATH_MAX];
+	char value[PATH_MAX];
+	int ret = SA_OK, bufsz = 0, i;
 
 	protoset = sa_create_protocol_properties("nfs");
-
 	if (protoset != NULL) {
-		nfs = fopen(NFSADMIN, "r");
-		if (nfs != NULL) {
-			while (ret == SA_OK &&
-			    fgets(buff, sizeof (buff), nfs) != NULL) {
-				switch (buff[0]) {
-				case '\n':
-				case '#':
-					/* skip */
-					break;
-				default:
-					name = buff;
-					buff[strlen(buff) - 1] = '\0';
-					value = strchr(name, '=');
-					if (value != NULL) {
-						*value++ = '\0';
-						ret = extractprop(name, value);
-					}
-				}
-			}
-			(void) fclose(nfs);
-		} else {
-			switch (errno) {
-			case EPERM:
-			case EACCES:
-				ret = SA_NO_PERMISSION;
-				break;
-			case ENOENT:
-				break;
-			default:
-				ret = SA_SYSTEM_ERR;
-				break;
+		for (i = 0; proto_options[i].tag != NULL; i++) {
+			scf_type_t ptype;
+			char *svc_name;
+
+			bzero(value, PATH_MAX);
+			(void) strncpy(name, proto_options[i].name, PATH_MAX);
+			/* Replace NULL with the correct instance */
+			ptype = getscftype(proto_options[i].type);
+			svc_name = getsvcname(proto_options[i].svcs);
+			bufsz = PATH_MAX;
+			ret = nfs_smf_get_prop(name, value,
+			    (char *)DEFAULT_INSTANCE, ptype,
+			    svc_name, &bufsz);
+			if (ret == SA_OK) {
+				ret = extractprop(name, value);
 			}
 		}
 	} else {
 		ret = SA_NO_MEMORY;
 	}
+
 	return (ret);
 }
 
 /*
  * add_defaults()
  *
- * Add the default values for any property not defined in the parsing
- * of the default files. Values are set according to their defined
- * types.
+ * Add the default values for any property not defined
+ * in NFS SMF repository.
+ * Values are set according to their defined types.
  */
 
 static void
@@ -2632,10 +2658,10 @@ nfs_init()
 		return (SA_CONFIG_ERR);
 	}
 
-	ret = initprotofromdefault();
+	ret = initprotofromsmf();
 	if (ret != SA_OK) {
 		(void) printf(dgettext(TEXT_DOMAIN,
-		    "NFS plugin problem with default file: %s\n"),
+		    "NFS plugin problem with SMF repository: %s\n"),
 		    sa_errorstr(ret));
 		ret = SA_OK;
 	}
@@ -2667,216 +2693,6 @@ static sa_protocol_properties_t
 nfs_get_proto_set()
 {
 	return (protoset);
-}
-
-struct deffile {
-	struct deffile *next;
-	char *line;
-};
-
-/*
- * read_default_file(fname)
- *
- * Read the specified default file. We return a list of entries. This
- * get used for adding or removing values.
- */
-
-static struct deffile *
-read_default_file(char *fname)
-{
-	FILE *file;
-	struct deffile *defs = NULL;
-	struct deffile *newdef;
-	struct deffile *prevdef = NULL;
-	char buff[BUFSIZ * 2];
-
-	file = fopen(fname, "r");
-	if (file != NULL) {
-		while (fgets(buff, sizeof (buff), file) != NULL) {
-			newdef = (struct deffile *)calloc(1,
-			    sizeof (struct deffile));
-			if (newdef != NULL) {
-				/* Make sure we skip any leading whitespace. */
-				newdef->line = strdup(skipwhitespace(buff));
-				if (defs == NULL) {
-					prevdef = defs = newdef;
-				} else {
-					prevdef->next = newdef;
-					prevdef = newdef;
-				}
-			}
-		}
-		(void) fclose(file);
-	} else {
-		int ret = SA_OK;
-		switch (errno) {
-		case EPERM:
-		case EACCES:
-			ret = SA_NO_PERMISSION;
-			break;
-		case ENOENT:
-			break;
-		default:
-			ret = SA_SYSTEM_ERR;
-			break;
-		}
-		if (ret == SA_OK) {
-			/* Want at least one comment line */
-			defs = (struct deffile *)
-			    calloc(1, sizeof (struct deffile));
-			defs->line = strdup("# NFS default file\n");
-		}
-	}
-	return (defs);
-}
-
-static void
-free_default_file(struct deffile *defs)
-{
-	struct deffile *curdefs = NULL;
-
-	while (defs != NULL) {
-		curdefs = defs;
-		defs = defs->next;
-		if (curdefs->line != NULL)
-			free(curdefs->line);
-		free(curdefs);
-	}
-}
-
-/*
- * write_default_file(fname, defs)
- *
- * Write the default file back.
- */
-
-static int
-write_default_file(char *fname, struct deffile *defs)
-{
-	FILE *file;
-	int ret = SA_OK;
-	sigset_t old, new;
-
-	file = fopen(fname, "w+");
-	if (file != NULL) {
-		(void) sigprocmask(SIG_BLOCK, NULL, &new);
-		(void) sigaddset(&new, SIGHUP);
-		(void) sigaddset(&new, SIGINT);
-		(void) sigaddset(&new, SIGQUIT);
-		(void) sigaddset(&new, SIGTSTP);
-		(void) sigprocmask(SIG_SETMASK, &new, &old);
-		while (defs != NULL) {
-			(void) fputs(defs->line, file);
-			defs = defs->next;
-		}
-		(void) fsync(fileno(file));
-		(void) sigprocmask(SIG_SETMASK, &old, NULL);
-		(void) fclose(file);
-	} else {
-		switch (errno) {
-		case EPERM:
-		case EACCES:
-			ret = SA_NO_PERMISSION;
-			break;
-		default:
-			ret = SA_SYSTEM_ERR;
-		}
-	}
-	return (ret);
-}
-
-
-/*
- * set_default_file_value(tag, value)
- *
- * Set the default file value for tag to value. Then rewrite the file.
- * tag and value are always set.  The caller must ensure this.
- */
-
-#define	MAX_STRING_LENGTH	256
-static int
-set_default_file_value(char *tag, char *value)
-{
-	int ret = SA_OK;
-	struct deffile *root;
-	struct deffile *defs;
-	struct deffile *prev;
-	char string[MAX_STRING_LENGTH];
-	int len;
-	boolean_t update = B_FALSE;
-
-	(void) snprintf(string, MAX_STRING_LENGTH, "%s=", tag);
-	len = strlen(string);
-
-	root = defs = read_default_file(NFSADMIN);
-	if (root == NULL) {
-		switch (errno) {
-		case EPERM:
-		case EACCES:
-			ret = SA_NO_PERMISSION;
-			break;
-		default:
-			ret = SA_NO_MEMORY;
-			break;
-		}
-		return (ret);
-	}
-
-	while (defs != NULL) {
-		if (defs->line != NULL &&
-		    strncasecmp(defs->line, string, len) == 0) {
-			/* replace with the new value */
-			free(defs->line);
-			fixcaseupper(tag);
-			(void) snprintf(string, sizeof (string),
-			    "%s=%s\n", tag, value);
-			string[MAX_STRING_LENGTH - 1] = '\0';
-			defs->line = strdup(string);
-			update = B_TRUE;
-			break;
-		}
-		defs = defs->next;
-	}
-	if (!update) {
-		defs = root;
-		/* didn't find, so see if it is a comment */
-		(void) snprintf(string, MAX_STRING_LENGTH, "#%s=", tag);
-		len = strlen(string);
-		while (defs != NULL) {
-			if (strncasecmp(defs->line, string, len) == 0) {
-				/* replace with the new value */
-				free(defs->line);
-				fixcaseupper(tag);
-				(void) snprintf(string, sizeof (string),
-				    "%s=%s\n", tag, value);
-				string[MAX_STRING_LENGTH - 1] = '\0';
-				defs->line = strdup(string);
-				update = B_TRUE;
-				break;
-			}
-			defs = defs->next;
-		}
-	}
-	if (!update) {
-		fixcaseupper(tag);
-		(void) snprintf(string, sizeof (string), "%s=%s\n",
-		    tag, value);
-		prev = root;
-		while (prev->next != NULL)
-			prev = prev->next;
-		defs = malloc(sizeof (struct deffile));
-		prev->next = defs;
-		if (defs != NULL) {
-			defs->next = NULL;
-			defs->line = strdup(string);
-			update = B_TRUE;
-		}
-	}
-	if (update) {
-		ret = write_default_file(NFSADMIN, root);
-	}
-	free_default_file(root);
-	return (ret);
 }
 
 /*
@@ -2945,6 +2761,9 @@ restart_service(uint32_t svcs)
 			break;
 		case SVC_REPARSED:
 			service = REPARSED;
+			break;
+		case SVC_CLIENT:
+			service = NFS_CLIENT_SVC;
 			break;
 		default:
 			continue;
@@ -3056,7 +2875,6 @@ nfs_validate_proto_prop(int index, char *name, char *value)
 #ifdef lint
 	name = name;
 #endif
-
 	switch (proto_options[index].type) {
 	case OPT_TYPE_NUMBER:
 		if (!is_a_number(value))
@@ -3143,15 +2961,32 @@ nfs_set_proto_prop(sa_property_t prop)
 	name = sa_get_property_attr(prop, "type");
 	value = sa_get_property_attr(prop, "value");
 	if (name != NULL && value != NULL) {
+		scf_type_t sctype;
+		char *svc_name;
+		char *instance = NULL;
 		int index = findprotoopt(name, 1);
-		if (index >= 0) {
-			/* should test for valid value */
-			ret = nfs_validate_proto_prop(index, name, value);
-			if (ret == SA_OK)
-				ret = set_default_file_value(
-				    proto_options[index].tag, value);
-			if (ret == SA_OK)
+
+		ret = nfs_validate_proto_prop(index, name, value);
+		if (ret == SA_OK) {
+			sctype = getscftype(proto_options[index].type);
+			svc_name = getsvcname(proto_options[index].svcs);
+			if (sctype == SCF_TYPE_BOOLEAN) {
+				if (value != NULL)
+					sa_free_attr_string(value);
+				if (string_to_boolean(value) == 0)
+					value = strdup("0");
+				else
+					value = strdup("1");
+			}
+			ret = nfs_smf_set_prop(name, value, instance, sctype,
+			    svc_name);
+			if (ret == SA_OK) {
 				restart_service(proto_options[index].svcs);
+			} else {
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "Cannot restart NFS services : %s\n"),
+				    sa_errorstr(ret));
+			}
 		}
 	}
 	if (name != NULL)

@@ -1,9 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * Copyright 2001 by the Massachusetts Institute of Technology.
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -728,6 +725,11 @@ kg_unseal(minor_status, context_handle, input_token_buffer,
     }
 
     *minor_status = err;
+
+#ifndef _KERNEL
+    if (err != 0)
+	save_error_info (*minor_status, ctx->k5_context);
+#endif
 
     KRB5_LOG(KRB5_INFO, "kg_unseal() end, err = %d", err);
 

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -28,8 +28,6 @@
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_argv.h"
@@ -1005,7 +1003,7 @@ caseline:
 			nonzero();
 			if (seensemi)
 				addr1 = addr2;
-			getline(*addr1);
+			getaline(*addr1);
 			if (c == CTRL('k')) {
 				flush1();
 				destline--;

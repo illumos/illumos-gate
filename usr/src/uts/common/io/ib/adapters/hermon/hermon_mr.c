@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -547,6 +546,7 @@ hermon_mr_alloc_fmr(hermon_state_t *state, hermon_pdhdl_t pd,
 	 */
 	status = hermon_rsrc_alloc(state, HERMON_MTT, nummtt, sleep, &mtt);
 	if (status != DDI_SUCCESS) {
+		IBTF_DPRINTF_L2("FMR", "FATAL: too few MTTs");
 		status = IBT_INSUFF_RESOURCE;
 		goto fmralloc_fail3;
 	}
@@ -874,27 +874,32 @@ hermon_mr_deregister(hermon_state_t *state, hermon_mrhdl_t *mrhdl, uint_t level,
 		}
 	}
 
-	/*
-	 * Decrement the MTT reference count.  Since the MTT resource
-	 * may be shared between multiple memory regions (as a result
-	 * of a "RegisterSharedMR" verb) it is important that we not
-	 * free up or unbind resources prematurely.  If it's not shared (as
-	 * indicated by the return status), then free the resource.
-	 */
-	shared_mtt = hermon_mtt_refcnt_dec(mtt_refcnt);
-	if (!shared_mtt) {
-		hermon_rsrc_free(state, &mtt_refcnt);
-	}
-
-	/*
-	 * Free up the MTT entries and unbind the memory.  Here, as above, we
-	 * attempt to free these resources only if it is appropriate to do so.
-	 */
-	if (!shared_mtt) {
-		if (level >= HERMON_MR_DEREG_NO_HW2SW_MPT) {
-			hermon_mr_mem_unbind(state, bind);
+	/* mtt_refcnt is NULL in the case of hermon_dma_mr_register() */
+	if (mtt_refcnt != NULL) {
+		/*
+		 * Decrement the MTT reference count.  Since the MTT resource
+		 * may be shared between multiple memory regions (as a result
+		 * of a "RegisterSharedMR" verb) it is important that we not
+		 * free up or unbind resources prematurely.  If it's not shared
+		 * (as indicated by the return status), then free the resource.
+		 */
+		shared_mtt = hermon_mtt_refcnt_dec(mtt_refcnt);
+		if (!shared_mtt) {
+			hermon_rsrc_free(state, &mtt_refcnt);
 		}
-		hermon_rsrc_free(state, &mtt);
+
+		/*
+		 * Free up the MTT entries and unbind the memory.  Here,
+		 * as above, we attempt to free these resources only if
+		 * it is appropriate to do so.
+		 * Note, 'bind' is NULL in the alloc_lkey case.
+		 */
+		if (!shared_mtt) {
+			if (level >= HERMON_MR_DEREG_NO_HW2SW_MPT) {
+				hermon_mr_mem_unbind(state, bind);
+			}
+			hermon_rsrc_free(state, &mtt);
+		}
 	}
 
 	/*
@@ -968,65 +973,6 @@ hermon_mr_dealloc_fmr(hermon_state_t *state, hermon_mrhdl_t *mrhdl)
 
 	/* Set the mrhdl pointer to NULL and return success */
 	*mrhdl = NULL;
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * hermon_mr_invalidate_fmr()
- *    Context: Can be called from interrupt or base context.
- */
-/* ARGSUSED */
-int
-hermon_mr_invalidate_fmr(hermon_state_t *state, hermon_mrhdl_t mr)
-{
-	hermon_rsrc_t		*mpt;
-	uint64_t		*mpt_table;
-
-	mutex_enter(&mr->mr_lock);
-	mpt = mr->mr_mptrsrcp;
-	mpt_table = (uint64_t *)mpt->hr_addr;
-
-	/* Write MPT status to SW bit */
-	*(uint8_t *)&mpt_table[0] = 0xF0;
-
-	membar_producer();
-
-	/* invalidate mem key value */
-	*(uint32_t *)&mpt_table[1] = 0;
-
-	/* invalidate lkey value */
-	*(uint32_t *)&mpt_table[4] = 0;
-
-	membar_producer();
-
-	/* Write MPT status to HW bit */
-	*(uint8_t *)&mpt_table[0] = 0x00;
-
-	mutex_exit(&mr->mr_lock);
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * hermon_mr_deregister_fmr()
- *    Context: Can be called from interrupt or base context.
- */
-/* ARGSUSED */
-int
-hermon_mr_deregister_fmr(hermon_state_t *state, hermon_mrhdl_t mr)
-{
-	hermon_rsrc_t		*mpt;
-	uint64_t		*mpt_table;
-
-	mutex_enter(&mr->mr_lock);
-	mpt = mr->mr_mptrsrcp;
-	mpt_table = (uint64_t *)mpt->hr_addr;
-
-	/* Write MPT status to SW bit */
-	*(uint8_t *)&mpt_table[0] = 0xF0;
-
-	mutex_exit(&mr->mr_lock);
 
 	return (DDI_SUCCESS);
 }
@@ -1874,6 +1820,442 @@ mrcommon_fail1:
 	hermon_pd_refcnt_dec(pd);
 mrcommon_fail:
 	return (status);
+}
+
+/*
+ * hermon_dma_mr_register()
+ *    Context: Can be called from base context.
+ */
+int
+hermon_dma_mr_register(hermon_state_t *state, hermon_pdhdl_t pd,
+    ibt_dmr_attr_t *mr_attr, hermon_mrhdl_t *mrhdl)
+{
+	hermon_rsrc_t		*mpt, *rsrc;
+	hermon_hw_dmpt_t	mpt_entry;
+	hermon_mrhdl_t		mr;
+	ibt_mr_flags_t		flags;
+	uint_t			sleep;
+	int			status;
+
+	/* Extract the flags field */
+	flags = mr_attr->dmr_flags;
+
+	/*
+	 * Check the sleep flag.  Ensure that it is consistent with the
+	 * current thread context (i.e. if we are currently in the interrupt
+	 * context, then we shouldn't be attempting to sleep).
+	 */
+	sleep = (flags & IBT_MR_NOSLEEP) ? HERMON_NOSLEEP: HERMON_SLEEP;
+	if ((sleep == HERMON_SLEEP) &&
+	    (sleep != HERMON_SLEEPFLAG_FOR_CONTEXT())) {
+		status = IBT_INVALID_PARAM;
+		goto mrcommon_fail;
+	}
+
+	/* Increment the reference count on the protection domain (PD) */
+	hermon_pd_refcnt_inc(pd);
+
+	/*
+	 * Allocate an MPT entry.  This will be filled in with all the
+	 * necessary parameters to define the memory region.  And then
+	 * ownership will be passed to the hardware in the final step
+	 * below.  If we fail here, we must undo the protection domain
+	 * reference count.
+	 */
+	status = hermon_rsrc_alloc(state, HERMON_DMPT, 1, sleep, &mpt);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto mrcommon_fail1;
+	}
+
+	/*
+	 * Allocate the software structure for tracking the memory region (i.e.
+	 * the Hermon Memory Region handle).  If we fail here, we must undo
+	 * the protection domain reference count and the previous resource
+	 * allocation.
+	 */
+	status = hermon_rsrc_alloc(state, HERMON_MRHDL, 1, sleep, &rsrc);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto mrcommon_fail2;
+	}
+	mr = (hermon_mrhdl_t)rsrc->hr_addr;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
+	bzero(mr, sizeof (*mr));
+
+	/*
+	 * Setup and validate the memory region access flags.  This means
+	 * translating the IBTF's enable flags into the access flags that
+	 * will be used in later operations.
+	 */
+	mr->mr_accflag = 0;
+	if (flags & IBT_MR_ENABLE_WINDOW_BIND)
+		mr->mr_accflag |= IBT_MR_WINDOW_BIND;
+	if (flags & IBT_MR_ENABLE_LOCAL_WRITE)
+		mr->mr_accflag |= IBT_MR_LOCAL_WRITE;
+	if (flags & IBT_MR_ENABLE_REMOTE_READ)
+		mr->mr_accflag |= IBT_MR_REMOTE_READ;
+	if (flags & IBT_MR_ENABLE_REMOTE_WRITE)
+		mr->mr_accflag |= IBT_MR_REMOTE_WRITE;
+	if (flags & IBT_MR_ENABLE_REMOTE_ATOMIC)
+		mr->mr_accflag |= IBT_MR_REMOTE_ATOMIC;
+
+	/*
+	 * Calculate keys (Lkey, Rkey) from MPT index.  Each key is formed
+	 * from a certain number of "constrained" bits (the least significant
+	 * bits) and some number of "unconstrained" bits.  The constrained
+	 * bits must be set to the index of the entry in the MPT table, but
+	 * the unconstrained bits can be set to any value we wish.  Note:
+	 * if no remote access is required, then the RKey value is not filled
+	 * in.  Otherwise both Rkey and LKey are given the same value.
+	 */
+	if (mpt)
+		mr->mr_rkey = mr->mr_lkey = hermon_mr_keycalc(mpt->hr_indx);
+
+	/*
+	 * Fill in the MPT entry.  This is the final step before passing
+	 * ownership of the MPT entry to the Hermon hardware.  We use all of
+	 * the information collected/calculated above to fill in the
+	 * requisite portions of the MPT.  Do this ONLY for DMPTs.
+	 */
+	bzero(&mpt_entry, sizeof (hermon_hw_dmpt_t));
+
+	mpt_entry.status  = HERMON_MPT_SW_OWNERSHIP;
+	mpt_entry.en_bind = (mr->mr_accflag & IBT_MR_WINDOW_BIND)   ? 1 : 0;
+	mpt_entry.atomic  = (mr->mr_accflag & IBT_MR_REMOTE_ATOMIC) ? 1 : 0;
+	mpt_entry.rw	  = (mr->mr_accflag & IBT_MR_REMOTE_WRITE)  ? 1 : 0;
+	mpt_entry.rr	  = (mr->mr_accflag & IBT_MR_REMOTE_READ)   ? 1 : 0;
+	mpt_entry.lw	  = (mr->mr_accflag & IBT_MR_LOCAL_WRITE)   ? 1 : 0;
+	mpt_entry.lr	  = 1;
+	mpt_entry.phys_addr = 1;	/* critical bit for this */
+	mpt_entry.reg_win = HERMON_MPT_IS_REGION;
+
+	mpt_entry.entity_sz	= mr->mr_logmttpgsz;
+	mpt_entry.mem_key	= mr->mr_lkey;
+	mpt_entry.pd		= pd->pd_pdnum;
+	mpt_entry.rem_acc_en = 0;
+	mpt_entry.fast_reg_en = 0;
+	mpt_entry.en_inval = 0;
+	mpt_entry.lkey = 0;
+	mpt_entry.win_cnt = 0;
+
+	mpt_entry.start_addr = mr_attr->dmr_paddr;
+	mpt_entry.reg_win_len = mr_attr->dmr_len;
+	if (mr_attr->dmr_len == 0)
+		mpt_entry.len_b64 = 1;	/* needed for 2^^64 length */
+
+	mpt_entry.mtt_addr_h = 0;
+	mpt_entry.mtt_addr_l = 0;
+
+	/*
+	 * Write the MPT entry to hardware.  Lastly, we pass ownership of
+	 * the entry to the hardware if needed.  Note: in general, this
+	 * operation shouldn't fail.  But if it does, we have to undo
+	 * everything we've done above before returning error.
+	 *
+	 * For Hermon, this routine (which is common to the contexts) will only
+	 * set the ownership if needed - the process of passing the context
+	 * itself to HW will take care of setting up the MPT (based on type
+	 * and index).
+	 */
+
+	mpt_entry.bnd_qp = 0;	/* dMPT for a qp, check for window */
+	status = hermon_cmn_ownership_cmd_post(state, SW2HW_MPT, &mpt_entry,
+	    sizeof (hermon_hw_dmpt_t), mpt->hr_indx, sleep);
+	if (status != HERMON_CMD_SUCCESS) {
+		cmn_err(CE_CONT, "Hermon: SW2HW_MPT command failed: %08x\n",
+		    status);
+		if (status == HERMON_CMD_INVALID_STATUS) {
+			hermon_fm_ereport(state, HCA_SYS_ERR, HCA_ERR_SRV_LOST);
+		}
+		status = ibc_get_ci_failure(0);
+		goto mrcommon_fail7;
+	}
+
+	/*
+	 * Fill in the rest of the Hermon Memory Region handle.  Having
+	 * successfully transferred ownership of the MPT, we can update the
+	 * following fields for use in further operations on the MR.
+	 */
+	mr->mr_mttaddr	   = 0;
+
+	mr->mr_log2_pgsz   = 0;
+	mr->mr_mptrsrcp	   = mpt;
+	mr->mr_mttrsrcp	   = NULL;
+	mr->mr_pdhdl	   = pd;
+	mr->mr_rsrcp	   = rsrc;
+	mr->mr_is_umem	   = 0;
+	mr->mr_is_fmr	   = 0;
+	mr->mr_umemcookie  = NULL;
+	mr->mr_umem_cbfunc = NULL;
+	mr->mr_umem_cbarg1 = NULL;
+	mr->mr_umem_cbarg2 = NULL;
+	mr->mr_lkey	   = hermon_mr_key_swap(mr->mr_lkey);
+	mr->mr_rkey	   = hermon_mr_key_swap(mr->mr_rkey);
+	mr->mr_mpt_type	   = HERMON_MPT_DMPT;
+
+	*mrhdl = mr;
+
+	return (DDI_SUCCESS);
+
+/*
+ * The following is cleanup for all possible failure cases in this routine
+ */
+mrcommon_fail7:
+	hermon_rsrc_free(state, &rsrc);
+mrcommon_fail2:
+	hermon_rsrc_free(state, &mpt);
+mrcommon_fail1:
+	hermon_pd_refcnt_dec(pd);
+mrcommon_fail:
+	return (status);
+}
+
+/*
+ * hermon_mr_alloc_lkey()
+ *    Context: Can be called from base context.
+ */
+int
+hermon_mr_alloc_lkey(hermon_state_t *state, hermon_pdhdl_t pd,
+    ibt_lkey_flags_t flags, uint_t nummtt, hermon_mrhdl_t *mrhdl)
+{
+	hermon_rsrc_t		*mpt, *mtt, *rsrc, *mtt_refcnt;
+	hermon_sw_refcnt_t	*swrc_tmp;
+	hermon_hw_dmpt_t	mpt_entry;
+	hermon_mrhdl_t		mr;
+	uint64_t		mtt_addr;
+	uint_t			sleep;
+	int			status;
+
+	/* Increment the reference count on the protection domain (PD) */
+	hermon_pd_refcnt_inc(pd);
+
+	sleep = (flags & IBT_KEY_NOSLEEP) ? HERMON_NOSLEEP: HERMON_SLEEP;
+
+	/*
+	 * Allocate an MPT entry.  This will be filled in with "some" of the
+	 * necessary parameters to define the memory region.  And then
+	 * ownership will be passed to the hardware in the final step
+	 * below.  If we fail here, we must undo the protection domain
+	 * reference count.
+	 *
+	 * The MTTs will get filled in when the FRWR is processed.
+	 */
+	status = hermon_rsrc_alloc(state, HERMON_DMPT, 1, sleep, &mpt);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto alloclkey_fail1;
+	}
+
+	/*
+	 * Allocate the software structure for tracking the memory region (i.e.
+	 * the Hermon Memory Region handle).  If we fail here, we must undo
+	 * the protection domain reference count and the previous resource
+	 * allocation.
+	 */
+	status = hermon_rsrc_alloc(state, HERMON_MRHDL, 1, sleep, &rsrc);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto alloclkey_fail2;
+	}
+	mr = (hermon_mrhdl_t)rsrc->hr_addr;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
+	bzero(mr, sizeof (*mr));
+	mr->mr_bindinfo.bi_type = HERMON_BINDHDL_LKEY;
+
+	mr->mr_lkey = hermon_mr_keycalc(mpt->hr_indx);
+
+	status = hermon_rsrc_alloc(state, HERMON_MTT, nummtt, sleep, &mtt);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto alloclkey_fail3;
+	}
+	mr->mr_logmttpgsz = PAGESHIFT;
+
+	/*
+	 * Allocate MTT reference count (to track shared memory regions).
+	 * This reference count resource may never be used on the given
+	 * memory region, but if it is ever later registered as "shared"
+	 * memory region then this resource will be necessary.  If we fail
+	 * here, we do pretty much the same as above to clean up.
+	 */
+	status = hermon_rsrc_alloc(state, HERMON_REFCNT, 1, sleep,
+	    &mtt_refcnt);
+	if (status != DDI_SUCCESS) {
+		status = IBT_INSUFF_RESOURCE;
+		goto alloclkey_fail4;
+	}
+	mr->mr_mttrefcntp = mtt_refcnt;
+	swrc_tmp = (hermon_sw_refcnt_t *)mtt_refcnt->hr_addr;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*swrc_tmp))
+	HERMON_MTT_REFCNT_INIT(swrc_tmp);
+
+	mtt_addr = (mtt->hr_indx << HERMON_MTT_SIZE_SHIFT);
+
+	bzero(&mpt_entry, sizeof (hermon_hw_dmpt_t));
+	mpt_entry.status = HERMON_MPT_FREE;
+	mpt_entry.lw = 1;
+	mpt_entry.lr = 1;
+	mpt_entry.reg_win = HERMON_MPT_IS_REGION;
+	mpt_entry.entity_sz = mr->mr_logmttpgsz;
+	mpt_entry.mem_key = mr->mr_lkey;
+	mpt_entry.pd = pd->pd_pdnum;
+	mpt_entry.fast_reg_en = 1;
+	mpt_entry.rem_acc_en = 1;
+	mpt_entry.en_inval = 1;
+	if (flags & IBT_KEY_REMOTE) {
+		mpt_entry.ren_inval = 1;
+	}
+	mpt_entry.mtt_size = nummtt;
+	mpt_entry.mtt_addr_h = mtt_addr >> 32;	/* only 8 more bits */
+	mpt_entry.mtt_addr_l = mtt_addr >> 3;	/* only 29 bits */
+
+	/*
+	 * Write the MPT entry to hardware.  Lastly, we pass ownership of
+	 * the entry to the hardware if needed.  Note: in general, this
+	 * operation shouldn't fail.  But if it does, we have to undo
+	 * everything we've done above before returning error.
+	 *
+	 * For Hermon, this routine (which is common to the contexts) will only
+	 * set the ownership if needed - the process of passing the context
+	 * itself to HW will take care of setting up the MPT (based on type
+	 * and index).
+	 */
+	status = hermon_cmn_ownership_cmd_post(state, SW2HW_MPT, &mpt_entry,
+	    sizeof (hermon_hw_dmpt_t), mpt->hr_indx, sleep);
+	if (status != HERMON_CMD_SUCCESS) {
+		cmn_err(CE_CONT, "Hermon: alloc_lkey: SW2HW_MPT command "
+		    "failed: %08x\n", status);
+		if (status == HERMON_CMD_INVALID_STATUS) {
+			hermon_fm_ereport(state, HCA_SYS_ERR, HCA_ERR_SRV_LOST);
+		}
+		status = ibc_get_ci_failure(0);
+		goto alloclkey_fail5;
+	}
+
+	/*
+	 * Fill in the rest of the Hermon Memory Region handle.  Having
+	 * successfully transferred ownership of the MPT, we can update the
+	 * following fields for use in further operations on the MR.
+	 */
+	mr->mr_accflag = IBT_MR_LOCAL_WRITE;
+	mr->mr_mttaddr = mtt_addr;
+	mr->mr_log2_pgsz = (mr->mr_logmttpgsz - HERMON_PAGESHIFT);
+	mr->mr_mptrsrcp = mpt;
+	mr->mr_mttrsrcp = mtt;
+	mr->mr_pdhdl = pd;
+	mr->mr_rsrcp = rsrc;
+	mr->mr_lkey = hermon_mr_key_swap(mr->mr_lkey);
+	mr->mr_rkey = mr->mr_lkey;
+	mr->mr_mpt_type = HERMON_MPT_DMPT;
+
+	*mrhdl = mr;
+	return (DDI_SUCCESS);
+
+alloclkey_fail5:
+	hermon_rsrc_free(state, &mtt_refcnt);
+alloclkey_fail4:
+	hermon_rsrc_free(state, &mtt);
+alloclkey_fail3:
+	hermon_rsrc_free(state, &rsrc);
+alloclkey_fail2:
+	hermon_rsrc_free(state, &mpt);
+alloclkey_fail1:
+	hermon_pd_refcnt_dec(pd);
+	return (status);
+}
+
+/*
+ * hermon_mr_fexch_mpt_init()
+ *    Context: Can be called from base context.
+ *
+ * This is the same as alloc_lkey, but not returning an mrhdl.
+ */
+int
+hermon_mr_fexch_mpt_init(hermon_state_t *state, hermon_pdhdl_t pd,
+    uint32_t mpt_indx, uint_t nummtt, uint64_t mtt_addr, uint_t sleep)
+{
+	hermon_hw_dmpt_t	mpt_entry;
+	int			status;
+
+	/*
+	 * The MTTs will get filled in when the FRWR is processed.
+	 */
+
+	bzero(&mpt_entry, sizeof (hermon_hw_dmpt_t));
+	mpt_entry.status = HERMON_MPT_FREE;
+	mpt_entry.lw = 1;
+	mpt_entry.lr = 1;
+	mpt_entry.rw = 1;
+	mpt_entry.rr = 1;
+	mpt_entry.reg_win = HERMON_MPT_IS_REGION;
+	mpt_entry.entity_sz = PAGESHIFT;
+	mpt_entry.mem_key = mpt_indx;
+	mpt_entry.pd = pd->pd_pdnum;
+	mpt_entry.fast_reg_en = 1;
+	mpt_entry.rem_acc_en = 1;
+	mpt_entry.en_inval = 1;
+	mpt_entry.ren_inval = 1;
+	mpt_entry.mtt_size = nummtt;
+	mpt_entry.mtt_addr_h = mtt_addr >> 32;	/* only 8 more bits */
+	mpt_entry.mtt_addr_l = mtt_addr >> 3;	/* only 29 bits */
+
+	/*
+	 * Write the MPT entry to hardware.  Lastly, we pass ownership of
+	 * the entry to the hardware if needed.  Note: in general, this
+	 * operation shouldn't fail.  But if it does, we have to undo
+	 * everything we've done above before returning error.
+	 *
+	 * For Hermon, this routine (which is common to the contexts) will only
+	 * set the ownership if needed - the process of passing the context
+	 * itself to HW will take care of setting up the MPT (based on type
+	 * and index).
+	 */
+	status = hermon_cmn_ownership_cmd_post(state, SW2HW_MPT, &mpt_entry,
+	    sizeof (hermon_hw_dmpt_t), mpt_indx, sleep);
+	if (status != HERMON_CMD_SUCCESS) {
+		cmn_err(CE_CONT, "Hermon: fexch_mpt_init: SW2HW_MPT command "
+		    "failed: %08x\n", status);
+		if (status == HERMON_CMD_INVALID_STATUS) {
+			hermon_fm_ereport(state, HCA_SYS_ERR, HCA_ERR_SRV_LOST);
+		}
+		status = ibc_get_ci_failure(0);
+		return (status);
+	}
+	/* Increment the reference count on the protection domain (PD) */
+	hermon_pd_refcnt_inc(pd);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * hermon_mr_fexch_mpt_fini()
+ *    Context: Can be called from base context.
+ *
+ * This is the same as deregister_mr, without an mrhdl.
+ */
+int
+hermon_mr_fexch_mpt_fini(hermon_state_t *state, hermon_pdhdl_t pd,
+    uint32_t mpt_indx, uint_t sleep)
+{
+	int			status;
+
+	status = hermon_cmn_ownership_cmd_post(state, HW2SW_MPT,
+	    NULL, 0, mpt_indx, sleep);
+	if (status != DDI_SUCCESS) {
+		cmn_err(CE_CONT, "Hermon: fexch_mpt_fini: HW2SW_MPT command "
+		    "failed: %08x\n", status);
+		if (status == HERMON_CMD_INVALID_STATUS) {
+			hermon_fm_ereport(state, HCA_SYS_ERR, HCA_ERR_SRV_LOST);
+		}
+		status = ibc_get_ci_failure(0);
+		return (status);
+	}
+
+	/* Decrement the reference count on the protection domain (PD) */
+	hermon_pd_refcnt_dec(pd);
+
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -2809,6 +3191,11 @@ static void
 hermon_mr_mem_unbind(hermon_state_t *state, hermon_bind_info_t *bind)
 {
 	int	status;
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*bind))
+	/* there is nothing to unbind for alloc_lkey */
+	if (bind->bi_type == HERMON_BINDHDL_LKEY)
+		return;
 
 	/*
 	 * In case of HERMON_BINDHDL_UBUF, the memory bi_buf points to

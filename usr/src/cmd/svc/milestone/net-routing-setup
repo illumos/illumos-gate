@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 
 # This script configures IP routing.
 
@@ -182,6 +181,23 @@ else
 	if [ "$ipv4_routing_set" = "false" ]; then
 		/sbin/routeadm -b -d ipv4-routing -u
 	fi
+fi
+
+#
+# See if static routes were created by install. If so, they were created
+# under /etc/svc/volatile. Copy them into their proper place.
+#
+if [ -f /etc/svc/volatile/etc/inet/static_routes ]; then
+	echo "Installing persistent routes"
+	if [ -f /etc/inet/static_routes ]; then
+		cat /etc/svc/volatile/etc/inet/static_routes | grep -v '^#' \
+		    >> /etc/inet/static_routes
+	else
+		cp /etc/svc/volatile/etc/inet/static_routes \
+		    /etc/inet/static_routes
+	fi
+	/usr/bin/rm /etc/svc/volatile/etc/inet/static_routes
+	
 fi
 
 #

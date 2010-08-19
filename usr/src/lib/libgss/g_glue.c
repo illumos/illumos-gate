@@ -3,7 +3,7 @@
  */
 
 #include "mglueP.h"
-
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>

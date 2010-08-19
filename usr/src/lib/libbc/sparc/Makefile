@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -60,8 +59,8 @@ asctime.o atof.o atoi.o atol.o bcmp.o bsearch.o\
 clock.o closedir.o crypt.o ctime.o ctype_.o\
 drand48.o dysize.o errlst.o execvp.o exit.o exportent.o ecvt.o\
 fabs.o fmod.o frexp.o\
-fstab.o ftok.o ftw.o getacinfo.o getauid.o getauditflags.o \
-getcwd.o getenv.o getfaudflgs.o getgraent.o getlogin.o \
+fstab.o ftok.o ftw.o getauid.o getauditflags.o \
+getcwd.o getenv.o getgraent.o getlogin.o \
 getopt.o getsubopt.o getpwaent.o  getttyent.o\
 getttynam.o getusershell.o grpauth.o hsearch.o\
 ieee_globals.o index.o isatty.o \
@@ -126,7 +125,7 @@ sprintf.o   vfprintf.o  vprintf.o   vsprintf.o
 
 SYSCOM=\
 _access.o acct.o  adjtime.o close.o _creat.o dup.o dup2.o \
-fchdir.o fchmod.o fchroot.o \
+fchdir.o fchroot.o \
 fdlist.o flock.o  fpathconf.o fsync.o ftruncate.o getdents.o \
 getdtablesize.o getgid.o  getitimer.o getpid.o gettimeofday.o \
 getuid.o ioctl.o kill.o lseek.o mincore.o mprotect.o munmap.o\
@@ -183,7 +182,7 @@ YP= yp_bind.o
 
 YP= yp_bind.o
 PSEUDO_SRCS= adjtime.s fchdir.s \
-fchmod.s   fchroot.s      \
+fchroot.s      \
 fpathconf.s getitimer.s    getpid.s    \
 mincore.s   mprotect.s munmap.s    \
 profil.s    setitimer.s \

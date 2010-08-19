@@ -6580,8 +6580,15 @@ print_linkprop_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		 * the persistent value of a non-persistable link property,
 		 * simply skip the output.
 		 */
-		if (statep->ls_status != DLADM_STATUS_OK)
+		if (statep->ls_status != DLADM_STATUS_OK) {
+			/*
+			 * Ignore the temponly error when we skip printing
+			 * link properties to avoid returning failure on exit.
+			 */
+			if (statep->ls_retstatus == DLADM_STATUS_TEMPONLY)
+				statep->ls_retstatus = DLADM_STATUS_OK;
 			goto skip;
+		}
 		ptr = statep->ls_line;
 		break;
 	case LINKPROP_PERM:
@@ -7230,8 +7237,6 @@ audit_secobj(char *auth, char *class, char *obj,
 	(void) adt_end_session(ah);
 }
 
-#define	MAX_SECOBJS		32
-#define	MAX_SECOBJ_NAMELEN	32
 static void
 do_create_secobj(int argc, char **argv, const char *use)
 {
@@ -7370,19 +7375,17 @@ do_delete_secobj(int argc, char **argv, const char *use)
 		}
 	}
 
-	if (optind == (argc - 1)) {
-		token = argv[optind];
-		if (token == NULL)
-			die("secure object name required");
-		while ((c = *token++) != NULL) {
-			if (c == ',')
-				nfields++;
-		}
-		token = strdup(argv[optind]);
-		if (token == NULL)
-			die("no memory");
-	} else if (optind != argc)
-		usage();
+	if (optind != (argc - 1))
+		die("secure object name required");
+
+	token = argv[optind];
+	while ((c = *token++) != NULL) {
+		if (c == ',')
+			nfields++;
+	}
+	token = strdup(argv[optind]);
+	if (token == NULL)
+		die("no memory");
 
 	success = check_auth(LINK_SEC_AUTH);
 	audit_secobj(LINK_SEC_AUTH, "unknown", argv[optind], success, B_FALSE);
@@ -9142,7 +9145,7 @@ print_part(show_part_state_t *state, datalink_id_t linkid)
 	 * we want up-part to always succeed even if the port is currently down
 	 * or P_Key is not yet available in the subnet.
 	 */
-	if ((status = dladm_read_conf(handle, linkid, &conf)) ==
+	if ((status = dladm_getsnap_conf(handle, linkid, &conf)) ==
 	    DLADM_STATUS_OK) {
 		(void) dladm_get_conf_field(handle, conf, FFORCE,
 		    &force_in_conf, sizeof (boolean_t));

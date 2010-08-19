@@ -720,6 +720,12 @@ extern	struct if_nameindex	*if_nameindex(void);
 extern	void			if_freenameindex(struct if_nameindex *);
 
 #define	IF_NAMESIZE	_LIFNAMSIZ
+/*
+ * If changing IF_MAX_INDEX to a value greater than UINT16_MAX, check if
+ * struct sockaddr_dl needs to be modified as the interface index is placed
+ * in this structure by the kernel.
+ */
+#define	IF_INDEX_MAX	UINT16_MAX
 
 #ifdef	__cplusplus
 }

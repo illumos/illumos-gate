@@ -46,7 +46,6 @@
 #include <sys/apic.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
-#include <sys/iommulib.h>
 #include <sys/immu.h>
 #include <sys/smp_impldefs.h>
 
@@ -639,14 +638,14 @@ dmar_table_print(dmar_table_t *tbl)
 }
 
 static void
-drhd_devi_create(drhd_t *drhd, char *name)
+drhd_devi_create(drhd_t *drhd, int unit)
 {
 	struct ddi_parent_private_data *pdptr;
 	struct regspec reg;
 	dev_info_t *dip;
 
-	ndi_devi_alloc_sleep(root_devinfo, name,
-	    DEVI_SID_NODEID, &dip);
+	dip = ddi_add_child(root_devinfo, IMMU_UNIT_NAME,
+	    DEVI_SID_NODEID, unit);
 
 	drhd->dr_dip = dip;
 
@@ -702,7 +701,6 @@ dmar_devinfos_create(dmar_table_t *tbl)
 {
 	list_t *drhd_list;
 	drhd_t *drhd;
-	char name[IMMU_MAXNAMELEN];
 	int i, unit;
 
 	for (i = 0; i < IMMU_MAXSEG; i++) {
@@ -715,9 +713,7 @@ dmar_devinfos_create(dmar_table_t *tbl)
 		drhd = list_head(drhd_list);
 		for (unit = 0; drhd;
 		    drhd = list_next(drhd_list, drhd), unit++) {
-			(void) snprintf(name, sizeof (name),
-			    "drhd%d,%d", i, unit);
-			drhd_devi_create(drhd, name);
+			drhd_devi_create(drhd, unit);
 		}
 	}
 }
@@ -807,8 +803,8 @@ dmar_table_destroy(dmar_table_t *tbl)
 	}
 
 	/* free strings */
-	kmem_free(tbl->tbl_oem_tblid, TBL_OEM_ID_SZ + 1);
-	kmem_free(tbl->tbl_oem_id, TBL_OEM_TBLID_SZ + 1);
+	kmem_free(tbl->tbl_oem_tblid, TBL_OEM_TBLID_SZ + 1);
+	kmem_free(tbl->tbl_oem_id, TBL_OEM_ID_SZ + 1);
 	tbl->tbl_raw = NULL; /* raw ACPI table doesn't have to be freed */
 	mutex_destroy(&(tbl->tbl_lock));
 	kmem_free(tbl, sizeof (dmar_table_t));
@@ -946,7 +942,6 @@ void
 immu_dmar_rmrr_map(void)
 {
 	int seg;
-	int e;
 	int count;
 	dev_info_t *rdip;
 	scope_t *scope;
@@ -1030,6 +1025,7 @@ immu_dmar_rmrr_map(void)
 				}
 				memlist_read_unlock();
 
+				(void) immu_dvma_device_setup(rdip, 0);
 
 				ddi_err(DER_LOG, rdip,
 				    "IMMU: Mapping RMRR range "
@@ -1042,16 +1038,8 @@ immu_dmar_rmrr_map(void)
 				    IMMU_ROUNDUP((uintptr_t)rmrr->rm_limit -
 				    (uintptr_t)rmrr->rm_base + 1) /
 				    IMMU_PAGESIZE;
-				e = immu_dvma_map(NULL, NULL, &mrng, 0, rdip,
-				    IMMU_FLAGS_READ | IMMU_FLAGS_WRITE |
-				    IMMU_FLAGS_MEMRNG);
-				/*
-				 * dip may have unity domain or xlate domain
-				 * If the former, PHYSICAL is returned else
-				 * MAPPED is returned.
-				 */
-				ASSERT(e == DDI_DMA_MAPPED ||
-				    e == DDI_DMA_USE_PHYSICAL);
+
+				(void) immu_map_memrange(rdip, &mrng);
 			}
 		}
 	}
@@ -1217,15 +1205,6 @@ found:
 	}
 
 	return (drhd->dr_immu);
-}
-
-char *
-immu_dmar_unit_name(void *dmar_unit)
-{
-	drhd_t *drhd = (drhd_t *)dmar_unit;
-
-	ASSERT(drhd->dr_dip);
-	return (ddi_node_name(drhd->dr_dip));
 }
 
 dev_info_t *

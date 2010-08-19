@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,22 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1997-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <link.h>
 
 #include "env.h"
 
-static Elist	*bindto_list = 0;
-static Elist	*bindfrom_list = 0;
+static Elist	*bindto_list = NULL;
+static Elist	*bindfrom_list = NULL;
 static FILE	*output = stdout;
 
 
@@ -43,30 +38,30 @@ la_version(uint_t version)
 {
 	if (version < LAV_CURRENT) {
 		(void) fprintf(stderr,
-			"symbindrep.so: unexpected version: %d\n",
-			version);
+		    "symbindrep.so: unexpected version: %d\n", version);
 		return (0);
 	}
 
 	build_env_list(&bindto_list, (const char *)"SYMBINDREP_BINDTO");
 	build_env_list(&bindfrom_list, (const char *)"SYMBINDREP_BINDFROM");
 
-	(void) fprintf(output,
 #ifdef _LP64
-	"                            Symbol Bindings\n\n"
-	"Referencing                  Defining\n"
-	"Object                       Object                       Symbol\n"
-	/* CSTYLED */
-	"----------------------------------------------------------------------------------\n");
+	(void) fprintf(output,
+	    "                            Symbol Bindings\n\n"
+	    "Referencing                  Defining\n"
+	    "Object                       Object                       Symbol\n"
+	    "---------------------------------------------------------------"
+	    "-------------------\n");
 #else
-	"                    Symbol Bindings\n\n"
-	"Referencing          Defining\n"
-	"Object               Object               Symbol\n"
-	"------------------------------------------------------------------\n");
+	(void) fprintf(output,
+	    "                    Symbol Bindings\n\n"
+	    "Referencing          Defining\n"
+	    "Object               Object               Symbol\n"
+	    "---------------------------------------------------------------"
+	    "---\n");
 #endif
 	return (LAV_CURRENT);
 }
-
 
 /* ARGSUSED1 */
 uint_t
@@ -74,13 +69,13 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 {
 	uint_t		flags;
 
-	if ((bindto_list == 0) ||
+	if ((bindto_list == NULL) ||
 	    (check_list(bindto_list, lmp->l_name)))
 		flags = LA_FLG_BINDTO;
 	else
 		flags = 0;
 
-	if ((bindfrom_list == 0) ||
+	if ((bindfrom_list == NULL) ||
 	    (check_list(bindfrom_list, lmp->l_name)))
 		flags |= LA_FLG_BINDFROM;
 

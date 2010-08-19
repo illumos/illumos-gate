@@ -29,6 +29,8 @@ set name=pkg.summary value="Solaris Kernel Packet"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
+dir path=etc group=sys
+dir path=etc/sock2path.d group=sys
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/include/net
@@ -39,6 +41,7 @@ dir path=usr/kernel/drv/$(ARCH64) group=sys
 dir path=usr/kernel/socketmod group=sys
 dir path=usr/kernel/socketmod/$(ARCH64) group=sys
 driver name=bpf perms="bpf 0666 root sys"
+file path=etc/sock2path.d/driver%2Fnetwork%2Fbpf group=sys
 file path=usr/include/net/bpf.h
 file path=usr/include/net/bpfdesc.h
 file path=usr/include/net/dlt.h
@@ -48,16 +51,12 @@ $(i386_ONLY)file path=usr/kernel/drv/bpf group=sys
 file path=usr/kernel/drv/bpf.conf group=sys
 file path=usr/kernel/socketmod/$(ARCH64)/sockpfp group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/socketmod/sockpfp group=sys mode=0755
-legacy pkg=SUNWpacketh arch=$(ARCH) category=system \
-    desc="C header files for BPF/PF_PACKET" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Packet header files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWpacketu arch=$(ARCH) category=system \
-    desc="BPF/PF_PACKET kernel packet modules" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Kernel Packet (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/ipf/tools/IPFILTER.LICENCE license=cmd/ipf/tools/IPFILTER.LICENCE
+legacy pkg=SUNWpacketh desc="C header files for BPF/PF_PACKET" \
+    name="Solaris Packet header files"
+legacy pkg=SUNWpacketu desc="BPF/PF_PACKET kernel packet modules" \
+    name="Solaris Kernel Packet (Usr)"
 license cr_Sun license=cr_Sun
-license uts/common/io/bpf/BPF.LICENCE license=uts/common/io/bpf/BPF.LICENCE
+license usr/src/cmd/ipf/tools/IPFILTER.LICENCE \
+    license=usr/src/cmd/ipf/tools/IPFILTER.LICENCE
+license usr/src/uts/common/io/bpf/BPF.LICENCE \
+    license=usr/src/uts/common/io/bpf/BPF.LICENCE

@@ -107,6 +107,7 @@ int		dump_timeout = 120;	/* timeout for dumping pages */
 int		dump_timeleft;		/* portion of dump_timeout remaining */
 int		dump_ioerr;		/* dump i/o error */
 int		dump_check_used;	/* enable check for used pages */
+char	    *dump_stack_scratch; /* scratch area for saving stack summary */
 
 /*
  * Tunables for dump compression and parallelism. These can be set via
@@ -129,6 +130,10 @@ int		dump_check_used;	/* enable check for used pages */
  */
 uint_t dump_ncpu_low = 4;	/* minimum config for parallel lzjb */
 uint_t dump_bzip2_level = 1;	/* bzip2 level (1-9) */
+
+/* Use dump_plat_mincpu_default unless this variable is set by /etc/system */
+#define	MINCPU_NOT_SET	((uint_t)-1)
+uint_t dump_plat_mincpu = MINCPU_NOT_SET;
 
 /* tunables for pre-reserved heap */
 uint_t dump_kmem_permap = 1024;
@@ -253,6 +258,12 @@ struct cbuf {
 	pfn_t pfn;			/* first pfn in mapped range */
 	int off;			/* byte offset to first pfn */
 };
+
+static char dump_osimage_uuid[36 + 1];
+
+#define	isdigit(ch)	((ch) >= '0' && (ch) <= '9')
+#define	isxdigit(ch)	(isdigit(ch) || ((ch) >= 'a' && (ch) <= 'f') || \
+			((ch) >= 'A' && (ch) <= 'F'))
 
 /*
  * cqueue_t queues: a uni-directional channel for communication
@@ -401,6 +412,7 @@ typedef struct dumpcfg {
 	char	*maxvm;		/* reserved VM for spare pages */
 	lock_t	helper_lock;	/* protect helper state */
 	char	helpers_wanted;	/* flag to enable parallelism */
+	char	helper_present;	/* at least one helper showed up */
 } dumpcfg_t;
 
 static dumpcfg_t dumpcfg;	/* config vars */
@@ -582,6 +594,10 @@ dump_update_clevel()
 
 	if (new->nhelper > DUMP_MAX_NHELPER)
 		new->nhelper = DUMP_MAX_NHELPER;
+
+	/* use platform default, unless /etc/system overrides */
+	if (dump_plat_mincpu == MINCPU_NOT_SET)
+		dump_plat_mincpu = dump_plat_mincpu_default;
 
 	/* increase threshold for faster disks */
 	new->threshold = dump_plat_mincpu;
@@ -866,6 +882,25 @@ dumpsys_get_maxmem()
 	dumpmlw_t mlw;
 	int k;
 
+	/*
+	 * Fall back to doing a serial dump if no helpers showed
+	 * up. It is possible for other CPUs to be stuck in PROM, or
+	 * DRd out. panic("sync initiated") in sync_handler() is one
+	 * case. A parallel dump will hang (dump time out) unless
+	 * there is at least one helper CPU. At this point dumpsys()
+	 * has done some I/O, which means there has been plenty of
+	 * time for helpers to arrive.
+	 */
+	if (!cfg->helper_present) {
+		cfg->clevel = 0;
+		return;
+	}
+
+	/*
+	 * There may be no point in looking for spare memory. If
+	 * dumping all memory, then none is spare. If doing a serial
+	 * dump, then already have buffers.
+	 */
 	if (cfg->maxsize == 0 || cfg->clevel < DUMP_CLEVEL_LZJB ||
 	    (dump_conflags & DUMP_ALL) != 0) {
 		if (cfg->clevel > DUMP_CLEVEL_LZJB)
@@ -1075,6 +1110,9 @@ dumphdr_init(void)
 		dumpcfg.pids = kmem_alloc(v.v_proc * sizeof (pid_t), KM_SLEEP);
 		dumpcfg.helpermap = kmem_zalloc(BT_SIZEOFMAP(NCPU), KM_SLEEP);
 		LOCK_INIT_HELD(&dumpcfg.helper_lock);
+		dump_stack_scratch = kmem_alloc(STACK_BUF_SIZE, KM_SLEEP);
+		(void) strncpy(dumphdr->dump_uuid, dump_get_uuid(),
+		    sizeof (dumphdr->dump_uuid));
 	}
 
 	npages = num_phys_pages();
@@ -1406,6 +1444,48 @@ dump_process(pid_t pid)
 	sprunlock(p);
 
 	return (0);
+}
+
+/*
+ * The following functions (dump_summary(), dump_ereports(), and
+ * dump_messages()), write data to an uncompressed area within the
+ * crashdump. The layout of these is
+ *
+ * +------------------------------------------------------------+
+ * |     compressed pages       | summary | ereports | messages |
+ * +------------------------------------------------------------+
+ *
+ * With the advent of saving a compressed crash dump by default, we
+ * need to save a little more data to describe the failure mode in
+ * an uncompressed buffer available before savecore uncompresses
+ * the dump. Initially this is a copy of the stack trace. Additional
+ * summary information should be added here.
+ */
+
+void
+dump_summary(void)
+{
+	u_offset_t dumpvp_start;
+	summary_dump_t sd;
+
+	if (dumpvp == NULL || dumphdr == NULL)
+		return;
+
+	dumpbuf.cur = dumpbuf.start;
+
+	dumpbuf.vp_limit = dumpvp_size - (DUMP_OFFSET + DUMP_LOGSIZE +
+	    DUMP_ERPTSIZE);
+	dumpvp_start = dumpbuf.vp_limit - DUMP_SUMMARYSIZE;
+	dumpbuf.vp_off = dumpvp_start;
+
+	sd.sd_magic = SUMMARY_MAGIC;
+	sd.sd_ssum = checksum32(dump_stack_scratch, STACK_BUF_SIZE);
+	dumpvp_write(&sd, sizeof (sd));
+	dumpvp_write(dump_stack_scratch, STACK_BUF_SIZE);
+
+	sd.sd_magic = 0; /* indicate end of summary */
+	dumpvp_write(&sd, sizeof (sd));
+	(void) dumpvp_flush();
 }
 
 void
@@ -2109,6 +2189,8 @@ dumpsys_lzjbcompress(helper_t *hp)
 void
 dumpsys_helper()
 {
+	if (!dumpcfg.helper_present)
+		dumpcfg.helper_present = 1;
 	dumpsys_spinlock(&dumpcfg.helper_lock);
 	if (dumpcfg.helpers_wanted) {
 		helper_t *hp, *hpend = &dumpcfg.helper[dumpcfg.nhelper];
@@ -2147,6 +2229,8 @@ dumpsys_helper()
 void
 dumpsys_helper_nw()
 {
+	if (!dumpcfg.helper_present)
+		dumpcfg.helper_present = 1;
 	if (dumpcfg.helpers_wanted)
 		dumpsys_helper();
 }
@@ -2827,6 +2911,10 @@ dumpsys(void)
 		size -= datahdr.dump_metrics;
 	}
 
+	/* record in the header whether this is a fault-management panic */
+	if (panicstr)
+		dumphdr->dump_fm_panic = is_fm_panic();
+
 	/* compression info in data header */
 	datahdr.dump_datahdr_magic = DUMP_DATAHDR_MAGIC;
 	datahdr.dump_datahdr_version = DUMP_DATAHDR_VERSION;
@@ -2873,6 +2961,7 @@ dumpsys(void)
 	 * thing we do because the dump process itself emits messages.
 	 */
 	if (panicstr) {
+		dump_summary();
 		dump_ereports();
 		dump_messages();
 	}
@@ -2934,4 +3023,48 @@ dumpvp_resize()
 	dumpvp_size = vattr.va_size & -DUMP_OFFSET;
 	mutex_exit(&dump_lock);
 	return (0);
+}
+
+int
+dump_set_uuid(const char *uuidstr)
+{
+	const char *ptr;
+	int i;
+
+	if (uuidstr == NULL || strnlen(uuidstr, 36 + 1) != 36)
+		return (EINVAL);
+
+	/* uuid_parse is not common code so check manually */
+	for (i = 0, ptr = uuidstr; i < 36; i++, ptr++) {
+		switch (i) {
+		case 8:
+		case 13:
+		case 18:
+		case 23:
+			if (*ptr != '-')
+				return (EINVAL);
+			break;
+
+		default:
+			if (!isxdigit(*ptr))
+				return (EINVAL);
+			break;
+		}
+	}
+
+	if (dump_osimage_uuid[0] != '\0')
+		return (EALREADY);
+
+	(void) strncpy(dump_osimage_uuid, uuidstr, 36 + 1);
+
+	cmn_err(CE_CONT, "?This Solaris instance has UUID %s",
+	    dump_osimage_uuid);
+
+	return (0);
+}
+
+const char *
+dump_get_uuid(void)
+{
+	return (dump_osimage_uuid[0] != '\0' ? dump_osimage_uuid : "");
 }

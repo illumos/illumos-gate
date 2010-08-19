@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -115,8 +114,7 @@ typedef struct {
 /*
  * A very large percentage of mapfile errors start with the
  * calling sequence:
- *	eprintf(ofl->ofl_lml, ERR_XXX, format, mf->mf_name,
- *		mf->mf_lineno...)
+ *	ld_eprintf(ofl, ERR_XXX, format, mf->mf_name, mf->mf_lineno...)
  * The mf_fatal() and mf_warn() varadic macros are used to supply all
  * of boilerplate, resulting in visually simpler code.
  *
@@ -126,17 +124,17 @@ typedef struct {
  * supported by the Sun compilers yet.
  */
 #define	mf_fatal0(_mf, _fmt) \
-	eprintf((_mf)->mf_ofl->ofl_lml, ERR_FATAL, _fmt, (_mf)->mf_name, \
+	ld_eprintf((_mf)->mf_ofl, ERR_FATAL, _fmt, (_mf)->mf_name, \
 	    EC_LINENO((_mf)->mf_lineno))
 #define	mf_fatal(_mf, _fmt, ...) \
-	eprintf((_mf)->mf_ofl->ofl_lml, ERR_FATAL, _fmt, (_mf)->mf_name, \
+	ld_eprintf((_mf)->mf_ofl, ERR_FATAL, _fmt, (_mf)->mf_name, \
 	    EC_LINENO((_mf)->mf_lineno), __VA_ARGS__)
 
 #define	mf_warn0(_mf, _fmt) \
-	eprintf((_mf)->mf_ofl->ofl_lml, ERR_WARNING, _fmt, (_mf)->mf_name, \
+	ld_eprintf((_mf)->mf_ofl, ERR_WARNING, _fmt, (_mf)->mf_name, \
 	    EC_LINENO((_mf)->mf_lineno))
 #define	mf_warn(_mf, _fmt, ...) \
-	eprintf((_mf)->mf_ofl->ofl_lml, ERR_WARNING, _fmt, (_mf)->mf_name, \
+	ld_eprintf((_mf)->mf_ofl, ERR_WARNING, _fmt, (_mf)->mf_name, \
 	    EC_LINENO((_mf)->mf_lineno), __VA_ARGS__)
 
 /* Possible return values from ld_map_gettoken */

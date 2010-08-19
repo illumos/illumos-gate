@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -140,12 +139,6 @@ mlsvc_join(smb_domainex_t *dxi, char *user, char *plain_text)
 
 	bzero(machine_passwd, sizeof (machine_passwd));
 	return (status);
-}
-
-int
-mlsvc_ping(const char *server)
-{
-	return (smbrdr_echo(server));
 }
 
 void

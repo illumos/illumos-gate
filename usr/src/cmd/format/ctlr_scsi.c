@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -482,15 +482,30 @@ scsi_format(start, end, list)
 
 	/* check if format with immed was successfully accepted */
 	if (status == 0) {
-		/* immed accepted pool to completion */
+		/* immed accepted poll to completion */
 		status = test_until_ready(cur_file);
 	} else {
-		/* clear defect header and try basecase format */
+		/* clear FOV and try again */
 		(void) memset((char *)fmt_long_param_header, 0,
 		    sizeof (fmt_long_param_header));
 		fmt_long_param_header[0] = prot_field_usage;
+		fmt_long_param_header[1] = FDH_IMMED;
 		status = uscsi_cmd(cur_file, &ucmd,
-			(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+		    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+		if (status == 0) {
+			/* immed accepted, poll for progress */
+			status = test_until_ready(cur_file);
+		} else {
+			/*
+			 * clear defect header and try basecase format
+			 * command will hang until format complete
+			 */
+			(void) memset((char *)fmt_long_param_header, 0,
+			    sizeof (fmt_long_param_header));
+			fmt_long_param_header[0] = prot_field_usage;
+			status = uscsi_cmd(cur_file, &ucmd,
+			    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+		}
 	}
 
 	/* format failure check					*/

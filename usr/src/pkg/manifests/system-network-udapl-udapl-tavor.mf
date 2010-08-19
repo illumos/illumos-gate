@@ -57,16 +57,11 @@ file path=usr/lib/udapl_tavor.so.1
 file path=usr/share/dat/SUNWudaplt.conf group=sys mode=0644
 hardlink path=etc/rc2.d/S81dodatadm.udaplt \
     target=../../etc/init.d/dodatadm.udaplt
-legacy pkg=SUNWudapltr arch=$(ARCH) category=system \
+legacy pkg=SUNWudapltr \
     desc="Sun uDAPL provider for Tavor driver and registration script" \
-    hotline="Please contact your local service provider" \
-    name="Sun uDAPL for Tavor (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWudapltu arch=$(ARCH) category=system \
-    desc="Sun uDAPL provider for Tavor" \
-    hotline="Please contact your local service provider" \
-    name="Sun uDAPL for Tavor (User)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Sun uDAPL for Tavor (Root)"
+legacy pkg=SUNWudapltu desc="Sun uDAPL provider for Tavor" \
+    name="Sun uDAPL for Tavor (User)"
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble

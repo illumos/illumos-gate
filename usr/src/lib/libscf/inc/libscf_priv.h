@@ -552,6 +552,41 @@ int scf_is_compatible_type(scf_type_t, scf_type_t);
  */
 void _check_services(char **);
 
+/*
+ * _scf_handle_create_and_bind()
+ * convenience function that creates and binds a handle
+ */
+scf_handle_t *_scf_handle_create_and_bind(scf_version_t);
+
+/*
+ * _smf_refresh_all_instances()
+ * refresh all intances of a service
+ * return SCF_SUCCESS or SCF_FAILED on _PERMISSION_DENIED, _BACKEND_ACCESS
+ * or _BACKEND_READONLY.
+ */
+int _smf_refresh_all_instances(scf_service_t *);
+
+/*
+ * _scf_get_fma_notify_params()
+ * Specialized fuction to get fma notifitation parameters
+ */
+int _scf_get_fma_notify_params(const char *, nvlist_t *, int);
+
+/*
+ * _scf_get_svc_notify_params()
+ * Specialized function to get SMF state transition notification parameters
+ */
+int _scf_get_svc_notify_params(const char *, nvlist_t *, int32_t, int, int);
+
+/*
+ * _scf_notify_get_params()
+ * Specialized function to get notification parametes from a pg into an
+ * nvlist_t
+ */
+int _scf_notify_get_params(scf_propertygroup_t *, nvlist_t *);
+
+#define	SCF_NOTIFY_PARAMS_SOURCE_NAME	((const char *)"preference_source")
+
 #ifdef	__cplusplus
 }
 #endif

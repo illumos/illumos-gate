@@ -58,10 +58,7 @@ file path=kernel/drv/$(ARCH64)/igb group=sys
 $(i386_ONLY)file path=kernel/drv/igb group=sys
 file path=kernel/drv/igb.conf group=sys \
     original_name=SUNWigb:kernel/drv/igb.conf preserve=renamenew
-legacy pkg=SUNWigb arch=$(ARCH) category=system \
-    desc="Intel 82575 1Gb PCI Express NIC Driver" \
-    hotline="Please contact your local service provider" \
-    name="Intel 82575 1Gb PCI Express NIC Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWigb desc="Intel 82575 1Gb PCI Express NIC Driver" \
+    name="Intel 82575 1Gb PCI Express NIC Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

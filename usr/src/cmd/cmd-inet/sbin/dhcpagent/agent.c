@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1446,9 +1445,7 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 
 		if ((isv6 && !check_main_lif(dsmp, &msg.ifam, msglen)) ||
 		    (!isv6 && !verify_lif(dsmp->dsm_lif))) {
-			dsmp->dsm_droprelease = B_TRUE;
-			(void) script_start(dsmp, isv6 ? EVENT_DROP6 :
-			    EVENT_DROP, dhcp_drop, NULL, NULL);
+			finished_smach(dsmp, DHCP_IPC_E_INVIF);
 			continue;
 		}
 

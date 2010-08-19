@@ -132,6 +132,7 @@
 ./usr/src/lib/crypt_modules/sha256/test.c
 ./usr/src/lib/efcode/fcode_test
 ./usr/src/lib/libkvm/common/test.c
+./usr/src/lib/libbe/tbeadm/*
 
 #
 # Ignore debugging code.
@@ -258,9 +259,23 @@
 ./usr/src/cmd/dfs.cmds/sharemgr/sparcv9/Makefile
 
 #
-# Ignore the license description file for Open Fabrics Alliance
-# license file (lic_of). This exception is needed because the
-# name of the license file does not have a prefix of :
-# 	THIRDPARTYLICENSE
+# Legitimately unreferenced license/copying files.  Please include
+# explanatory comments when adding items here.
 #
-./usr/src/uts/common/io/ib/clients/of/lic_of.descrip
+
+#
+# OPENSOLARIS.LICENSE needs to remain in usr/src as long as it is
+# referenced in the CDDL headers.
+#
+./usr/src/OPENSOLARIS.LICENSE
+
+# Though "COPYING" is usually used as a filename for GPL, the license
+# information for openssh is actually found in usr/src/cmd/ssh/doc/LICENSE.
+# The COPYING.Ylonen file is merely additional information.
+#
+./usr/src/cmd/ssh/doc/COPYING.Ylonen
+
+#
+# This covers header files that are not delivered.
+#
+./usr/src/uts/common/xen/public/COPYING

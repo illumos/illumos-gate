@@ -58,9 +58,7 @@ driver name=arcmsr class=scsi perms="* 0600 root sys" \
 file path=kernel/drv/$(ARCH64)/arcmsr group=sys
 file path=kernel/drv/arcmsr group=sys
 file path=kernel/drv/arcmsr.conf group=sys
-legacy pkg=SUNWarcmsr arch=$(ARCH) category=system desc="SAS/SATA RAID driver" \
-    hotline="Please contact your local service provider" \
-    name="Areca SAS/SATA RAID driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWarcmsr desc="SAS/SATA RAID driver" \
+    name="Areca SAS/SATA RAID driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

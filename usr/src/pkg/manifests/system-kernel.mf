@@ -42,6 +42,7 @@ dir path=boot/solaris group=sys
 dir path=boot/solaris/bin group=sys
 dir path=etc group=sys
 dir path=etc/crypto group=sys
+dir path=etc/sock2path.d group=sys
 dir path=kernel group=sys
 $(i386_ONLY)dir path=kernel/$(ARCH64) group=sys
 dir path=kernel/crypto group=sys
@@ -265,6 +266,7 @@ file path=etc/crypto/kcf.conf group=sys \
     original_name=SUNWckr:etc/crypto/kcf.conf preserve=true
 file path=etc/name_to_sysnum group=sys \
     original_name=SUNWckr:etc/name_to_sysnum preserve=renameold
+file path=etc/sock2path.d/system%2Fkernel group=sys
 file path=etc/system group=sys original_name=SUNWckr:etc/system preserve=true
 $(i386_ONLY)file path=kernel/$(ARCH64)/genunix group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/aes group=sys mode=0755
@@ -773,7 +775,6 @@ $(i386_ONLY)file path=kernel/sys/pset group=sys mode=0755
 $(i386_ONLY)file path=kernel/sys/semsys group=sys mode=0755
 $(i386_ONLY)file path=kernel/sys/shmsys group=sys mode=0755
 file path=lib/svc/manifest/system/dumpadm.xml group=sys mode=0444
-file path=lib/svc/manifest/system/fmd.xml group=sys mode=0444
 file path=lib/svc/manifest/system/intrd.xml group=sys mode=0444
 file path=lib/svc/manifest/system/scheduler.xml group=sys mode=0444
 file path=lib/svc/method/svc-dumpadm mode=0555
@@ -833,36 +834,38 @@ hardlink path=kernel/sys/$(ARCH64)/rpcmod \
     target=../../../kernel/strmod/$(ARCH64)/rpcmod
 $(i386_ONLY)hardlink path=kernel/sys/autofs target=../../kernel/fs/autofs
 $(i386_ONLY)hardlink path=kernel/sys/rpcmod target=../../kernel/strmod/rpcmod
-legacy pkg=SUNWckr arch=$(ARCH) category=system \
+legacy pkg=SUNWckr \
     desc="core kernel software for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris Kernel (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license common/crypto/THIRDPARTYLICENSE.cryptogams \
-    license=common/crypto/THIRDPARTYLICENSE.cryptogams
-license common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
-    license=common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman
-license common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \
-    license=common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl
-license common/crypto/ecc/THIRDPARTYLICENSE \
-    license=common/crypto/ecc/THIRDPARTYLICENSE
-license common/crypto/md5/amd64/THIRDPARTYLICENSE \
-    license=common/crypto/md5/amd64/THIRDPARTYLICENSE
-license common/mpi/THIRDPARTYLICENSE license=common/mpi/THIRDPARTYLICENSE
+    name="Core Solaris Kernel (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/common/inet/ip/THIRDPARTYLICENSE.rts \
-    license=uts/common/inet/ip/THIRDPARTYLICENSE.rts
-license uts/common/inet/tcp/THIRDPARTYLICENSE \
-    license=uts/common/inet/tcp/THIRDPARTYLICENSE
-license uts/common/io/THIRDPARTYLICENSE.etheraddr \
-    license=uts/common/io/THIRDPARTYLICENSE.etheraddr
-license uts/common/sys/THIRDPARTYLICENSE.icu \
-    license=uts/common/sys/THIRDPARTYLICENSE.icu
-license uts/common/sys/THIRDPARTYLICENSE.unicode \
-    license=uts/common/sys/THIRDPARTYLICENSE.unicode
-license uts/intel/io/acpica/THIRDPARTYLICENSE \
-    license=uts/intel/io/acpica/THIRDPARTYLICENSE
+license usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE \
+    license=usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE
+license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
+license usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams \
+    license=usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams
+$(i386_ONLY)license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
+    license=usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman
+$(i386_ONLY)license usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \
+    license=usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl
+license usr/src/common/crypto/ecc/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/ecc/THIRDPARTYLICENSE
+$(i386_ONLY)license usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE \
+    license=usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
+license usr/src/common/mpi/THIRDPARTYLICENSE \
+    license=usr/src/common/mpi/THIRDPARTYLICENSE
+license usr/src/uts/common/inet/ip/THIRDPARTYLICENSE.rts \
+    license=usr/src/uts/common/inet/ip/THIRDPARTYLICENSE.rts
+license usr/src/uts/common/inet/tcp/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/inet/tcp/THIRDPARTYLICENSE
+license usr/src/uts/common/io/THIRDPARTYLICENSE.etheraddr \
+    license=usr/src/uts/common/io/THIRDPARTYLICENSE.etheraddr
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.icu \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.icu
+license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
+    license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
+$(i386_ONLY)license usr/src/uts/intel/io/acpica/THIRDPARTYLICENSE \
+    license=usr/src/uts/intel/io/acpica/THIRDPARTYLICENSE
 $(i386_ONLY)link path=boot/solaris/bin/root_archive \
     target=../../../usr/sbin/root_archive
 link path=dev/dld target=../devices/pseudo/dld@0:ctl

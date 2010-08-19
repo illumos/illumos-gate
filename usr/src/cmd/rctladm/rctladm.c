@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <sys/rctl_impl.h>
 #include <sys/types.h>
@@ -452,7 +450,7 @@ main(int argc, char *argv[])
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
-	(void) setprogname(argv[0]);
+	(void) setpname(argv[0]);
 
 	while ((c = getopt(argc, argv, OPTS)) != EOF) {
 		switch (c) {

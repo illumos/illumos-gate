@@ -1067,13 +1067,13 @@ gcpu_mca_init(cmi_hdl_t hdl)
 		return;
 
 	/*
-	 * CPU startup code only calls cmi_mca_init if x86_feature indicates
-	 * both MCA and MCE support (i.e., X86_MCA).  P5, K6, and earlier
+	 * CPU startup code only calls cmi_mca_init if x86_featureset indicates
+	 * both MCA and MCE support (i.e., X86FSET_MCA).  P5, K6, and earlier
 	 * processors, which have their own more primitive way of doing
 	 * machine checks, will not have cmi_mca_init called since their
 	 * CPUID information will not indicate both MCA and MCE features.
 	 */
-	ASSERT(x86_feature & X86_MCA);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_MCA));
 
 	/*
 	 * Determine whether the IA32_MCG_CTL register is present.  If it
@@ -2018,13 +2018,13 @@ gcpu_mca_fini(cmi_hdl_t hdl)
 	int i;
 
 	/*
-	 * CPU startup code only calls cmi_mca_init if x86_feature indicates
-	 * both MCA and MCE support (i.e., X86_MCA).  P5, K6, and earlier
+	 * CPU startup code only calls cmi_mca_init if x86_featureset indicates
+	 * both MCA and MCE support (i.e., X86FSET_MCA).  P5, K6, and earlier
 	 * processors, which have their own more primitive way of doing
 	 * machine checks, will not have cmi_mca_init called since their
 	 * CPUID information will not indicate both MCA and MCE features.
 	 */
-	if ((x86_feature & X86_MCA) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_MCA))
 		return;
 #ifndef __xpv
 	/*

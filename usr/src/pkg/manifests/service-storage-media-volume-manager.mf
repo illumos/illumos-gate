@@ -48,16 +48,10 @@ file path=usr/bin/rmmount mode=0555
 file path=usr/bin/volcheck mode=0555
 file path=usr/bin/volrmmount mode=0555
 file path=usr/lib/rmvolmgr mode=0555
-legacy pkg=SUNWrmvolmgr arch=$(ARCH) category=system \
-    desc="Non-graphical removable volume manager" \
-    hotline="Please contact your local service provider" \
-    name="Removable volume manager" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWrmvolmgrr arch=$(ARCH) category=system \
-    desc="Non-graphical removable volume manager (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Removable volume manager (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWrmvolmgr desc="Non-graphical removable volume manager" \
+    name="Removable volume manager"
+legacy pkg=SUNWrmvolmgrr desc="Non-graphical removable volume manager (Root)" \
+    name="Removable volume manager (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/bin/rmumount target=./rmmount

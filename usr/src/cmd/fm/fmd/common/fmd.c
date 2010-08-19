@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -239,6 +238,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "client.buflim", &fmd_conf_size, "10m" },	/* client buffer space limit */
 { "client.dbout", &fmd_dbout_ops, NULL },	/* client debug output sinks */
 { "client.debug", &fmd_conf_bool, NULL },	/* client debug enable */
+{ "client.doorthrlim", &fmd_conf_uint32, "20" }, /* client door thread limit */
 { "client.error", &fmd_cerror_ops, "unload" },	/* client error policy */
 { "client.memlim", &fmd_conf_size, "10m" },	/* client allocation limit */
 { "client.evqlim", &fmd_conf_uint32, "256" },	/* client event queue limit */
@@ -265,6 +265,8 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "log.creator", &fmd_conf_string, "fmd" },	/* exacct log creator string */
 { "log.error", &fmd_conf_string, "var/fm/fmd/errlog" }, /* error log path */
 { "log.fault", &fmd_conf_string, "var/fm/fmd/fltlog" }, /* fault log path */
+{ "log.info", &fmd_conf_string, "var/fm/fmd/infolog" }, /* info log path */
+{ "log.info_hival", &fmd_conf_string, "var/fm/fmd/infolog_hival" }, /* hi pri */
 { "log.minfree", &fmd_conf_size, "2m" },	/* min log fsys free space */
 { "log.rsrc", &fmd_conf_string, "var/fm/fmd/rsrc" }, /* asru log dir path */
 { "log.tryrotate", &fmd_conf_uint32, "10" },	/* max log rotation attempts */
@@ -425,6 +427,8 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	(void) pthread_mutex_init(&dp->d_stats_lock, NULL);
 	(void) pthread_mutex_init(&dp->d_topo_lock, NULL);
 	(void) pthread_rwlock_init(&dp->d_log_lock, NULL);
+	(void) pthread_rwlock_init(&dp->d_hvilog_lock, NULL);
+	(void) pthread_rwlock_init(&dp->d_ilog_lock, NULL);
 	(void) pthread_mutex_init(&dp->d_fmd_lock, NULL);
 	(void) pthread_cond_init(&dp->d_fmd_cv, NULL);
 
@@ -695,6 +699,14 @@ fmd_gc(fmd_t *dp, id_t id, hrtime_t hrt)
 		(void) pthread_rwlock_rdlock(&dp->d_log_lock);
 		fmd_log_update(dp->d_errlog);
 		(void) pthread_rwlock_unlock(&dp->d_log_lock);
+
+		(void) pthread_rwlock_rdlock(&dp->d_hvilog_lock);
+		fmd_log_update(dp->d_hvilog);
+		(void) pthread_rwlock_unlock(&dp->d_hvilog_lock);
+
+		(void) pthread_rwlock_rdlock(&dp->d_ilog_lock);
+		fmd_log_update(dp->d_ilog);
+		(void) pthread_rwlock_unlock(&dp->d_ilog_lock);
 	}
 
 	(void) fmd_conf_getprop(dp->d_conf, "gc_interval", &delta);
@@ -771,6 +783,9 @@ fmd_door_server(void *dip)
 /*
  * Custom door server create callback.  Any fmd services that use doors will
  * require those threads to have their fmd-specific TSD initialized, etc.
+ * Modules should use door_xcreate and derivatives such as
+ * sysevent_evc_xsubscribe in order to use private doors that
+ * avoid this global door server function (see fmd_api_module comments).
  */
 static void
 fmd_door(door_info_t *dip)
@@ -896,6 +911,12 @@ fmd_run(fmd_t *dp, int pfd)
 	(void) fmd_conf_getprop(dp->d_conf, "log.fault", &name);
 	dp->d_fltlog = fmd_log_open(dp->d_rootdir, name, FMD_LOG_FAULT);
 
+	(void) fmd_conf_getprop(dp->d_conf, "log.info_hival", &name);
+	dp->d_hvilog = fmd_log_open(dp->d_rootdir, name, FMD_LOG_INFO);
+
+	(void) fmd_conf_getprop(dp->d_conf, "log.info", &name);
+	dp->d_ilog = fmd_log_open(dp->d_rootdir, name, FMD_LOG_INFO);
+
 	if (dp->d_asrus == NULL || dp->d_errlog == NULL || dp->d_fltlog == NULL)
 		fmd_error(EFMD_EXIT, "failed to initialize log files\n");
 
@@ -979,6 +1000,8 @@ fmd_run(fmd_t *dp, int pfd)
 
 	(void) fmd_conf_getprop(dp->d_conf, "agent.path", &pap);
 	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_proc_ops, NULL);
+
+	dp->d_loaded = 1; /* modules are now loaded */
 
 	/*
 	 * With all modules loaded, replay fault events from the ASRU cache for

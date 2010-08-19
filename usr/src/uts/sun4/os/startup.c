@@ -1063,7 +1063,7 @@ startup_memlist(void)
 		cmn_err(CE_PANIC,
 		    "no more nucleus memory after page free lists alloc");
 
-	if (ndata_alloc_hat(&ndata, npages) != 0)
+	if (ndata_alloc_hat(&ndata) != 0)
 		cmn_err(CE_PANIC, "no more nucleus memory after hat alloc");
 
 	if (ndata_alloc_memseg(&ndata, boot_physavail_len) != 0)
@@ -1497,8 +1497,7 @@ startup_modules(void)
 	size_t hme8blk_sz, hme1blk_sz;
 
 	/*
-	 * Let the platforms have a chance to change default
-	 * values before reading system file.
+	 * The system file /etc/system was read already under startup_memlist.
 	 */
 	if (&set_platform_defaults)
 		set_platform_defaults();

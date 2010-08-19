@@ -64,18 +64,16 @@ file path=usr/lib/libdhcpsvc.so.1
 file path=usr/sbin/dhcpconfig mode=0555
 file path=usr/sbin/dhtadm mode=0555
 file path=usr/sbin/pntadm mode=0555
-legacy pkg=SUNWdhcsr arch=$(ARCH) category=system \
+legacy pkg=SUNWdhcsr \
     desc="Root filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included." \
-    hotline="Please contact your local service provider" \
-    name="BOOTP/DHCP Server Services, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWdhcsu arch=$(ARCH) category=system \
+    name="BOOTP/DHCP Server Services, (Root)"
+legacy pkg=SUNWdhcsu \
     desc="Usr filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included." \
-    hotline="Please contact your local service provider" \
-    name="BOOTP/DHCP Server Services, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="BOOTP/DHCP Server Services, (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/usr.lib/in.dhcpd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.lib/in.dhcpd/THIRDPARTYLICENSE
 link path=usr/lib/inet/dhcp/svc/ds_SUNWfiles.so target=./ds_SUNWfiles.so.1
 depend fmri=network/dhcp/dhcpmgr type=require
 depend fmri=network/ftp type=require

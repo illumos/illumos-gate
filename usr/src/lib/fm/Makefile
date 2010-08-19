@@ -35,6 +35,8 @@ common_SUBDIRS = \
 	libfmd_msg \
 	libfmd_snmp \
 	libfmevent \
+	.WAIT \
+	libfmnotify \
 	topo
 
 sparc_SUBDIRS = \

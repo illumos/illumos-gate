@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -314,7 +313,8 @@ vnic_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 	node = cache_lookup(hd, rsrc, CACHE_REFRESH);
 	if (node == NULL) {
 		/* should not happen because the resource is registered. */
-		vnic_log_err(node->vc_linkid, errorp, "unrecognized resource");
+		vnic_log_err(DATALINK_INVALID_LINKID, errorp,
+		    "unrecognized resource");
 		(void) mutex_unlock(&cache_lock);
 		return (RCM_SUCCESS);
 	}

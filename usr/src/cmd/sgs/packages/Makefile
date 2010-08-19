@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -36,9 +35,8 @@ MACHS:sh=	if [ "$MACH" = "sparc" ]; \
 		else echo "unknown"; \
 		fi
 
-RDBDIRS=	$(MACHS:%=../librtld_db/rdb_demo/%)
+RDBDIRS=	$(MACHS:%=../librtld_db/demo/%)
 LDMAKEDIRS=	$(MACHS:%=../libldmake/%)
-
 
 SUBDIRS1=	../libconv \
 		.WAIT \
@@ -63,7 +61,6 @@ SUBDIRS2 =	../rtld \
 		../tools \
 		$(RDBDIRS)
 
-
 #
 # Package dirs are directories which specifically
 # have a 'package' target.  This target is used to key
@@ -76,6 +73,7 @@ PKGDIRS=	../libcrle \
 		../elfedit \
 		../elfedit/modules \
 		../elfwrap \
+		../ar \
 		../crle \
 		../dump \
 		../lari \

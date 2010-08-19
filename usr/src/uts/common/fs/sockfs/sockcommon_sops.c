@@ -1127,6 +1127,7 @@ so_newconn(sock_upper_handle_t parenthandle,
 		mutex_exit(&so->so_acceptq_lock);
 		ASSERT(nso->so_count == 1);
 		nso->so_count--;
+		nso->so_listener = NULL;
 		/* drop proto ref */
 		VN_RELE(SOTOV(nso));
 		socket_destroy(nso);
@@ -1466,6 +1467,9 @@ so_close(struct sonode *so, int flag, struct cred *cr)
 	so_rcv_flush(so);
 	mutex_exit(&so->so_lock);
 
+	if (so->so_filter_active > 0)
+		sof_sonode_closing(so);
+
 	if (so->so_state & SS_ACCEPTCONN) {
 		/*
 		 * We grab and release the accept lock to ensure that any
@@ -1479,9 +1483,6 @@ so_close(struct sonode *so, int flag, struct cred *cr)
 
 		so_acceptq_flush(so, B_TRUE);
 	}
-
-	if (so->so_filter_active > 0)
-		sof_sonode_closing(so);
 
 	error = (*so->so_downcalls->sd_close)(so->so_proto_handle, flag, cr);
 	switch (error) {

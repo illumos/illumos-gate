@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LINK_H
@@ -126,8 +125,9 @@ extern void	ld_section64();
 #define	LAV_VERSION2		2
 #define	LAV_VERSION3		3
 #define	LAV_VERSION4		4
-#define	LAV_CURRENT		LAV_VERSION4
-#define	LAV_NUM			5
+#define	LAV_VERSION5		5
+#define	LAV_CURRENT		LAV_VERSION5
+#define	LAV_NUM			6
 
 /*
  * Flags that can be or'd into the la_objopen() return code
@@ -165,6 +165,7 @@ extern void	ld_section64();
 #define	LA_ACT_CONSISTENT	0x00	/* add/deletion of objects complete */
 #define	LA_ACT_ADD		0x01	/* objects being added */
 #define	LA_ACT_DELETE		0x02	/* objects being deleted */
+#define	LA_ACT_MAX		3
 
 
 #ifndef	_KERNEL

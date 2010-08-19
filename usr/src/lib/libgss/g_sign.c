@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -28,6 +27,7 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 
 static OM_uint32
 val_sign_args(
@@ -96,7 +96,7 @@ gss_buffer_t		msg_token;
 	mech = __gss_get_mechanism(ctx->mech_type);
 
 	if (mech) {
-		if (mech->gss_sign)
+		if (mech->gss_sign) {
 			status = mech->gss_sign(
 						mech->context,
 						minor_status,
@@ -104,7 +104,9 @@ gss_buffer_t		msg_token;
 						qop_req,
 						message_buffer,
 						msg_token);
-		else
+			if (status != GSS_S_COMPLETE)
+				map_error(minor_status, mech);
+		} else
 			status = GSS_S_UNAVAILABLE;
 
 		return (status);

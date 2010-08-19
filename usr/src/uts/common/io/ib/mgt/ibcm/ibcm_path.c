@@ -3767,8 +3767,9 @@ ibcm_process_get_ip_paths(void *tq_arg)
 	dgid1.gid_prefix = dgid1.gid_guid = 0;
 	sgid.gid_prefix = sgid.gid_guid = 0;
 
-	retval = ibcm_arp_get_ibaddr(getzoneid(), p_arg->attr.ipa_src_ip,
-	    p_arg->attr.ipa_dst_ip[0], &sgid, &dgid1, &src_ip_p);
+	retval = ibcm_arp_get_ibaddr(p_arg->attr.ipa_zoneid,
+	    p_arg->attr.ipa_src_ip, p_arg->attr.ipa_dst_ip[0], &sgid,
+	    &dgid1, &src_ip_p);
 	if (retval) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
 		    "ibcm_arp_get_ibaddr() failed: %d", retval);
@@ -3806,7 +3807,7 @@ ibcm_process_get_ip_paths(void *tq_arg)
 	if (p_arg->attr.ipa_ndst > 1) {
 		/* Get DGID for all specified Dest IP Addr */
 		for (; i < p_arg->attr.ipa_ndst; i++) {
-			retval = ibcm_arp_get_ibaddr(getzoneid(),
+			retval = ibcm_arp_get_ibaddr(p_arg->attr.ipa_zoneid,
 			    p_arg->attr.ipa_src_ip, p_arg->attr.ipa_dst_ip[i],
 			    NULL, &dgid2, NULL);
 			if (retval) {
@@ -4299,8 +4300,9 @@ ibt_get_ip_alt_path(ibt_channel_hdl_t rc_chan, ibt_path_flags_t flags,
 	/* If optional attributes are specified, validate them. */
 	if (attrp) {
 		/* Get SGID and DGID for the specified input ip-addr */
-		retval = ibcm_arp_get_ibaddr(getzoneid(), attrp->apa_src_ip,
-		    attrp->apa_dst_ip, &new_sgid, &new_dgid, NULL);
+		retval = ibcm_arp_get_ibaddr(attrp->apa_zoneid,
+		    attrp->apa_src_ip, attrp->apa_dst_ip, &new_sgid,
+		    &new_dgid, NULL);
 		if (retval) {
 			IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: "
 			    "ibcm_arp_get_ibaddr() failed: %d", retval);

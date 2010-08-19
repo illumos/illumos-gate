@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -435,7 +434,6 @@ static void
 kill_door_servers(evchan_subscr_t *subp)
 {
 	door_arg_t da;
-	int i;
 
 	bzero(&da, sizeof (da));
 	subp->evsub_state = EVCHAN_SUB_STATE_CLOSING;
@@ -603,7 +601,6 @@ sysevent_evc_xsubscribe(evchan_t *scp, const char *sid, const char *class,
     int (*event_handler)(sysevent_t *ev, void *cookie),
     void *cookie, uint32_t flags, sysevent_subattr_t *attr)
 {
-	struct sysevent_subattr_impl sa;
 	struct sysevent_subattr_impl *xsa;
 
 	if (attr != NULL) {
@@ -809,11 +806,13 @@ sysevent_evc_control(evchan_t *scp, int cmd, /* arg */ ...)
 		rc = ioctl(EV_FD(scp), SEV_CHAN_CONTROL, (intptr_t)&uargs);
 		*chlenp = uargs.value;
 		break;
+
 	case EVCH_SET_CHAN_LEN:
 		/* Range change will be handled in framework */
 		uargs.value = va_arg(ap, uint32_t);
 		rc = ioctl(EV_FD(scp), SEV_CHAN_CONTROL, (intptr_t)&uargs);
 		break;
+
 	default:
 		rc = EINVAL;
 	}
@@ -827,4 +826,92 @@ sysevent_evc_control(evchan_t *scp, int cmd, /* arg */ ...)
 	va_end(ap);
 
 	return (errno = rc);
+}
+
+int
+sysevent_evc_setpropnvl(evchan_t *scp, nvlist_t *nvl)
+{
+	sev_propnvl_args_t uargs;
+	char *buf = NULL;
+	size_t nvlsz = 0;
+	int rc;
+
+	if (scp == NULL || misaligned(scp))
+		return (errno = EINVAL);
+
+	if (nvl != NULL &&
+	    nvlist_pack(nvl, &buf, &nvlsz, NV_ENCODE_NATIVE, 0) != 0)
+		return (errno);
+
+	uargs.packednvl.name = (uint64_t)(uintptr_t)buf;
+	uargs.packednvl.len = (uint32_t)nvlsz;
+
+	rc = ioctl(EV_FD(scp), SEV_SETPROPNVL, (intptr_t)&uargs);
+
+	if (buf)
+		free(buf);
+
+	return (rc);
+}
+
+int
+sysevent_evc_getpropnvl(evchan_t *scp, nvlist_t **nvlp)
+{
+	sev_propnvl_args_t uargs;
+	char buf[1024], *bufp = buf;	/* stack buffer */
+	size_t sz = sizeof (buf);
+	char *buf2 = NULL;		/* allocated if stack buf too small */
+	int64_t expgen = -1;
+	int rc;
+
+	if (scp == NULL || misaligned(scp) || nvlp == NULL)
+		return (errno = EINVAL);
+
+	*nvlp = NULL;
+
+again:
+	uargs.packednvl.name = (uint64_t)(uintptr_t)bufp;
+	uargs.packednvl.len = (uint32_t)sz;
+
+	rc = ioctl(EV_FD(scp), SEV_GETPROPNVL, (intptr_t)&uargs);
+
+	if (rc == E2BIG)
+		return (errno = E2BIG);	/* driver refuses to copyout */
+
+	/*
+	 * If the packed nvlist is too big for the buffer size we offered
+	 * then the ioctl returns EOVERFLOW and indicates in the 'len'
+	 * the size required for the current property nvlist generation
+	 * (itself returned in the generation member).
+	 */
+	if (rc == EOVERFLOW &&
+	    (buf2 == NULL || uargs.generation != expgen)) {
+		if (buf2 != NULL)
+			free(buf2);
+
+		if ((sz = uargs.packednvl.len) > 1024 * 1024)
+			return (E2BIG);
+
+		bufp = buf2 = malloc(sz);
+
+		if (buf2 == NULL)
+			return (errno = ENOMEM);
+
+		expgen = uargs.generation;
+		goto again;
+	}
+
+	/*
+	 * The chan prop nvlist can be absent, in which case the ioctl
+	 * returns success and uargs.packednvl.len of 0;  we have already
+	 * set *nvlp to NULL.  Otherwise we must unpack the nvl.
+	 */
+	if (rc == 0 && uargs.packednvl.len != 0 &&
+	    nvlist_unpack(bufp, uargs.packednvl.len, nvlp, 0) != 0)
+		rc = EINVAL;
+
+	if (buf2 != NULL)
+		free(buf2);
+
+	return (rc ? errno = rc : 0);
 }

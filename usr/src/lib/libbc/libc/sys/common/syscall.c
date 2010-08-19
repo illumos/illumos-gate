@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <errno.h>
@@ -37,9 +36,9 @@
 
 int syscallnum[190] = {	SYS_syscall,	SYS_exit,	-1 /*fork1*/,
 	SYS_read,	SYS_write,	-1 /*open*/,	SYS_close,
-        -1,		-1 /*creat*/,	SYS_link,	-1 /*unlink*/,
-	-1,		SYS_chdir,	0,		SYS_mknod,
-        SYS_chmod,	-1 /*lchown*/,	0,		0,
+        -1,		-1 /*creat*/,	-1 /*link*/,	-1 /*unlink*/,
+	-1,		SYS_chdir,	0,		-1 /*mknod*/,
+        -1 /*chmod*/,	-1 /*lchown*/,	0,		0,
         SYS_lseek,	SYS_getpid,	0,		0,
 	0,		SYS_getuid,	0,		0,
 	0,		0,		0,		0,
@@ -49,7 +48,7 @@ int syscallnum[190] = {	SYS_syscall,	SYS_exit,	-1 /*fork1*/,
 	0,		SYS_profil,	0,		0,
 	SYS_getgid,	0,		0,		0,
 	SYS_acct,	0,		-1,		SYS_ioctl,
-	-1 /*reboot*/,	0,		SYS_symlink,	SYS_readlink,
+	-1 /*reboot*/,	0,		-1 /*symlink*/,	-1 /*readlink*/,
 	SYS_execve,	SYS_umask,	SYS_chroot,	-1 /*fstat*/,
 	0,		-1/*getpagesize*/,-1,		0,
 	0,		0,		-1,		-1,
@@ -66,10 +65,10 @@ int syscallnum[190] = {	SYS_syscall,	SYS_exit,	-1 /*fork1*/,
 	-1 /*sigpause*/, -1 /*sigstack*/, -1 /*recvmsg*/, -1 /*sendmsg*/,
 	-1 /*vtrace*/,	SYS_gettimeofday, -1 /*getrusage*/, -1 /*getsockopt*/,
 	0,		SYS_readv,	SYS_writev,	-1 /*settimeofday*/,
-	-1 /*fchown*/,	SYS_fchmod,	-1 /*recvfrom*/, -1 /*setreuid*/,
+	-1 /*fchown*/,	-1 /*fchmod*/,	-1 /*recvfrom*/, -1 /*setreuid*/,
 	-1 /*getregid*/, -1 /*rename*/,	-1 /*truncate*/, -1 /*ftruncate*/,
 	-1 /*flock*/,	0,		-1 /*sendto*/,	-1 /*shutdown*/,
-	-1 /*socketpair*/,SYS_mkdir,	-1 /*rmdir*/,	-1 /*utimes*/,
+	-1 /*socketpair*/, -1 /*mkdir*/, -1 /*rmdir*/,	-1 /*utimes*/,
 	0,		SYS_adjtime,	-1 /*getpeername*/,-1 /*gethostid*/,
 	0,		SYS_getrlimit,	SYS_setrlimit,	-1 /*killpg*/,
 	0,		0,		0,		-1/*getsockname*/,
@@ -474,6 +473,11 @@ syscall(int sysnum, ...)
 			i3 = va_arg(ap, int);
 			va_end(ap);
 			return (poll(c1, i2, i3));
+		case XSYS_fchmod:
+			i1 = va_arg(ap, int);
+			i2 = va_arg(ap, int);
+			va_end(ap);
+			return (fchmod(i1, i2));
 		case XSYS_fchown:
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);
@@ -616,7 +620,6 @@ syscall(int sysnum, ...)
 		case XSYS_adjtime:
 		case XSYS_exit:
 		case XSYS_fchdir:
-		case XSYS_fchmod:
 		case XSYS_fchroot:
 		case XSYS_getgid:
 		case XSYS_getitimer:

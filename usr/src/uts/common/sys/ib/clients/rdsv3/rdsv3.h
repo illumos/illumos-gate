@@ -38,6 +38,9 @@ extern "C" {
 #include <sys/ib/clients/rdsv3/rdsv3_impl.h>
 #include <sys/ib/clients/rdsv3/info.h>
 
+#include <sys/cpuvar.h>
+#include <sys/disp.h>
+
 #define	NIPQUAD(addr)					\
 	(unsigned char)((ntohl(addr) >> 24) & 0xFF),	\
 	(unsigned char)((ntohl(addr) >> 16) & 0xFF),	\
@@ -66,17 +69,6 @@ extern "C" {
 
 #define	RDSV3_REAPER_WAIT_SECS		(5*60)
 #define	RDSV3_REAPER_WAIT_JIFFIES	SEC_TO_TICK(RDSV3_REAPER_WAIT_SECS)
-
-/*
- * This is the sad making.  Some kernels have a bug in the per_cpu() api which
- * makes DEFINE_PER_CPU trigger an oops on insmod because the per-cpu section
- * in the module is not cacheline-aligned.  As much as we'd like to tell users
- * with older kernels to stuff it, that's not reasonable.  We'll roll our own
- * until this doesn't have to build against older kernels.
- */
-#define	RDSV3_DEFINE_PER_CPU(type, var)  type var[NR_CPUS]
-#define	RDSV3_DECLARE_PER_CPU(type, var)  extern type var[NR_CPUS]
-#define	rdsv3_per_cpu(var, cpu)  var[cpu]
 
 static inline ulong_t
 ceil(ulong_t x, ulong_t y)
@@ -120,6 +112,7 @@ enum {
 
 struct rdsv3_connection {
 	struct avl_node		c_hash_node;
+	struct rdsv3_ip_bucket	*c_bucketp;
 	uint32_be_t		c_laddr;
 	uint32_be_t		c_faddr;
 	unsigned int		c_loopback:1;
@@ -241,7 +234,7 @@ struct rdsv3_incoming {
 	unsigned long		i_rx_jiffies;
 	uint32_be_t		i_saddr;
 
-	rdsv3_rdma_cookie_t	i_rdma_cookie;
+	rds_rdma_cookie_t	i_rdma_cookie;
 };
 
 /*
@@ -301,7 +294,7 @@ struct rdsv3_message {
 
 	struct rdsv3_sock	*m_rs;
 	struct rdsv3_rdma_op	*m_rdma_op;
-	rdsv3_rdma_cookie_t	m_rdma_cookie;
+	rds_rdma_cookie_t	m_rdma_cookie;
 	struct rdsv3_mr		*m_rdma_mr;
 	unsigned int		m_nents;
 	unsigned int		m_count;
@@ -390,7 +383,7 @@ struct rdsv3_transport {
 	unsigned int (*stats_info_copy)(struct rdsv3_info_iterator *iter,
 	    unsigned int avail);
 	void (*exit)(void);
-	void *(*get_mr)(struct rdsv3_iovec *sg, unsigned long nr_sg,
+	void *(*get_mr)(struct rds_iovec *sg, unsigned long nr_sg,
 	    struct rdsv3_sock *rs, uint32_t *key_ret);
 	void (*sync_mr)(void *trans_private, int direction);
 	void (*free_mr)(void *trans_private, int invalidate);
@@ -551,7 +544,9 @@ void __rdsv3_wake_sk_sleep(struct rsock *sk);
 int rdsv3_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
     socklen_t len, cred_t *cr);
 void rdsv3_remove_bound(struct rdsv3_sock *rs);
-struct rdsv3_sock *rdsv3_find_bound(uint32_be_t addr, uint16_be_t port);
+struct rdsv3_sock *rdsv3_find_bound(struct rdsv3_connection *conn,
+    uint16_be_t port);
+struct rdsv3_ip_bucket *rdsv3_find_ip_bucket(ipaddr_t, zoneid_t);
 
 /* conn.c */
 int rdsv3_conn_init(void);
@@ -652,16 +647,14 @@ void rdsv3_cong_exit(void);
 struct rdsv3_message *rdsv3_cong_update_alloc(struct rdsv3_connection *conn);
 
 /* stats.c */
-RDSV3_DECLARE_PER_CPU(struct rdsv3_statistics, rdsv3_stats);
-#define	rdsv3_stats_inc_which(which, member) do {		\
-	rdsv3_per_cpu(which, get_cpu()).member++;		\
-	put_cpu();						\
-} while (0)
-#define	rdsv3_stats_inc(member) rdsv3_stats_inc_which(rdsv3_stats, member)
+extern uint_t	nr_cpus;
+extern struct rdsv3_statistics	*rdsv3_stats;
+#define	rdsv3_per_cpu(var, cpu)  var[cpu]
 #define	rdsv3_stats_add_which(which, member, count) do {	\
-	rdsv3_per_cpu(which, get_cpu()).member += count;	\
-	put_cpu();						\
+	rdsv3_per_cpu(which, CPU->cpu_seqid).member += count;	\
 } while (0)
+#define	rdsv3_stats_inc(member) \
+	rdsv3_stats_add_which(rdsv3_stats, member, 1)
 #define	rdsv3_stats_add(member, count)	\
 	rdsv3_stats_add_which(rdsv3_stats, member, count)
 int rdsv3_stats_init(void);

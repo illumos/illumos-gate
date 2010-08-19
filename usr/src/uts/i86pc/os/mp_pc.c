@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -313,7 +312,6 @@ mach_cpucontext_xalloc(struct cpu *cp, int optype)
 	 */
 	rm->rm_pdbr = MAKECR3(kas.a_hat->hat_htable->ht_pfn);
 	rm->rm_cpu = cp->cpu_id;
-	rm->rm_x86feature = x86_feature;
 
 	/*
 	 * For hot-adding CPU at runtime, Machine Check and Performance Counter
@@ -624,7 +622,7 @@ out_enable_cmi:
 
 		if ((hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
 		    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp))) != NULL) {
-			if (x86_feature & X86_MCA)
+			if (is_x86_feature(x86_featureset, X86FSET_MCA))
 				cmi_mca_init(hdl);
 			cp->cpu_m.mcpu_cmi_hdl = hdl;
 		}

@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -89,22 +88,22 @@ def cmtblkchk(fh, blk_name, blk_text, filename=None,
 			lic.append(line)
 
 	if in_cmt:
-		output.write('Error: Incomplete %s block in file %s\n'
-			     '    at line %s\n''' % (blk_name, filename, start))
+		output.write('%s: %s: Error: Incomplete %s block\n''' %
+		    (filename, start, blk_name))
 
 	# Check for no comment block, warn if we're not being lenient
 	if not len(blocks) and not lenient:
 		if not ret:
 			ret = 2
-		output.write("Warning: No %s block in file %s\n" %
-			     (blk_name, filename))
+		output.write("%s: Warning: No %s block\n" %
+			     (filename, blk_name))
 
 	# Check for multiple comment blocks
 	if len(blocks) > 1:
 		ret = 1
-		output.write('Error: Multiple %s blocks in file %s\n'
+		output.write('%s: Error: Multiple %s blocks\n'
 			     '    at lines %s\n''' %
-			     (blk_name, filename,
+			     (filename, blk_name,
 			      ', '.join([str(x['start']) for x in blocks])))
 
 	# Validate each comment block
@@ -114,16 +113,16 @@ def cmtblkchk(fh, blk_name, blk_text, filename=None,
 		except CmtBlkError, e:
 			ret = 1
 			output.write(
-				"Error: Invalid line in %s block in file %s\n"
-				"    at line %d, should be\n"
+				"%s: %d: Error: Invalid line in %s block:\n"
+				"    should be\n"
 				"    '%s'\n"
 				"    is\n"
-				"    '%s'\n" % (blk_name, filename,
-						e.lineno, e.shouldbe, e.seen))
+				"    '%s'\n" % (filename, e.lineno, blk_name,
+						e.shouldbe, e.seen))
 			break
 		
 	if verbose and not ret:
-		output.write("Message: Valid %s block in file %s\n" %
-			     (blk_name, filename))
+		output.write("%s: Valid %s block\n" %
+			     (filename, blk_name))
 
 	return ret

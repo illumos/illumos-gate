@@ -47,10 +47,7 @@ driver name=pcwl clone_perms="pcwl 0666 root sys" perms="* 0666 root sys" \
     alias=pci1385,4105
 file path=kernel/drv/$(ARCH64)/pcwl group=sys
 $(i386_ONLY)file path=kernel/drv/pcwl group=sys
-legacy pkg=SUNWpcwl arch=$(ARCH) category=system \
-    desc="Lucent/PRISM-II 802.11b driver" \
-    hotline="Please contact your local service provider" \
-    name="Lucent/PRISM-II 802.11b driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license uts/common/io/pcwl/THIRDPARTYLICENSE \
-    license=uts/common/io/pcwl/THIRDPARTYLICENSE
+legacy pkg=SUNWpcwl desc="Lucent/PRISM-II 802.11b driver" \
+    name="Lucent/PRISM-II 802.11b driver"
+license usr/src/uts/common/io/pcwl/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/pcwl/THIRDPARTYLICENSE

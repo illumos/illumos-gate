@@ -20,10 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # tester - run logadm tests
@@ -91,6 +88,7 @@ umask 002;
 	"logadm17",
 	"logadm18",
 	"logadm19",
+	"logadm20",
 );
 
 use Getopt::Std;
@@ -191,11 +189,11 @@ if ($opt_s) {
 			print STDERR "  to do a fresh setup of this test.\n";
 			exit 1;
 		}
-		eval "runner('checktest')";
+		eval "runner('checktest', '-x', '> checktest.out 2>&1')";
 		if ($@) {
 			print " CHECKTEST FAILURE\n";
 			print STDERR "$myname: ERROR: $@";
-			print STDERR "results captured in directory $dir\n";
+			print STDERR "results captured in file $dir/checktest.out\n";
 			print STDERR "  or use: $myname -s $testname $bindir\n";
 			print STDERR "  to do a fresh setup of this test.\n";
 			exit 1;
@@ -223,8 +221,9 @@ exit 0;
 # is actually checking the program under test and not /bin/sh
 #
 sub runner {
-	my $cmd = shift;
-	my $fullcmd = "/bin/sh $cmd";
+	my ($cmd, $prefix, $suffix) = (@_, '', '');
+
+	my $fullcmd = "/bin/sh $prefix $cmd $suffix";
 	my $rc = 0xffff & system("$fullcmd");
 
 	if ($rc == 0) {
@@ -309,9 +308,9 @@ sub conftest1 {
 	set_testconffile;
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 /bin/sed '/^conffile <testfile.conf>:$/d' <std.out >sed.out
-exec /bin/diff sed.out testfile.conf
+exec /bin/diff testfile.conf sed.out
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -330,11 +329,11 @@ sub conftest2 {
 	set_file('testfile.conf', 'line fragment');
 
 	set_file('std.err.expect', <<'EOF');
-conftest: Warning: config file doesn't end with newline, last line ignored.
+conftest: Warning: file testfile.conf doesn't end with newline, last line ignored.
 EOF
 
 	set_file('checktest', <<'EOF');
-exec /bin/diff std.err std.err.expect
+exec /bin/diff std.err.expect std.err
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -544,8 +543,8 @@ total size: 0
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
-exec /bin/diff std.out std.out.expect
+[ -s std.err ] && { cat std.err; exit 1; }
+exec /bin/diff std.out.expect std.out
 EOF
 
 	$testglobs='\'file{A,B,C}name*\' \'file{A,B,C}name\' \'dir1/dirA/file*\' \'dir[13]/[e-z]*\' \'dir?/dir[AC]/fileBname[2-9]\' -r \'file[A-Z]n.*e([0-9]+)$0\'';
@@ -568,7 +567,7 @@ globtest: Error: Missing }
 EOF
 
 	set_file('checktest', <<'EOF');
-exec /bin/diff std.err std.err.expect
+exec /bin/diff std.err.expect std.err
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -634,12 +633,12 @@ $secondblob
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 /bin/sed -e '/^ *secs [0-9][0-9]*$/d'\
 	-e "s/%d/`/bin/env TZ=UTC /bin/date +%d`/g"\
 	-e "s/%Y/`/bin/env TZ=UTC /bin/date +%Y`/g"\
 	<std.out >sed.out
-exec /bin/diff sed.out sed.out.expect
+exec /bin/diff sed.out.expect sed.out
 EOF
 
 	$kwtest='kwtest /var/log/syslog \'$file.$n\' \'moose%d.$n\' \'/var/logs-%Y/moose-$isa$#porklips%d.$n\'';
@@ -705,12 +704,12 @@ $secondblob
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 /bin/sed -e '/^ *secs [0-9][0-9]*$/d'\
 	-e "s/%d/`/bin/env TZ=UTC /bin/date +%d`/g"\
 	-e "s/%Y/`/bin/env TZ=UTC /bin/date +%Y`/g"\
 	<std.out >sed.out
-exec /bin/diff sed.out sed.out.expect
+exec /bin/diff sed.out.expect sed.out
 EOF
 
 	$kwtest='kwtest /var/log/syslog \'$file.$n\' \'moose%d.$n\' \'/var/logs-%Y/moose-$isa$#porklips%d.$n\'';
@@ -723,6 +722,8 @@ HOME=
 export HOME
 USER=
 export USER
+TZ=UTC
+export TZ
 exec $bindir/$kwtest >std.out 2>std.err
 EOF
 }
@@ -749,8 +750,8 @@ dup lut contains:
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
-exec /bin/diff std.out std.out.expect
+[ -s std.err ] && { cat std.err; exit 1; }
+exec /bin/diff std.out.expect std.out
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -772,8 +773,8 @@ options: $options
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
-exec /bin/diff std.out std.out.expect
+[ -s std.err ] && { cat std.err; exit 1; }
+exec /bin/diff std.out.expect std.out
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -797,7 +798,7 @@ EOF
 
 	set_file('checktest', <<'EOF');
 [ -s std.out ] && exit 1
-exec /bin/diff std.err std.err.expect
+exec /bin/diff std.err.expect std.err
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -831,14 +832,14 @@ apache -C 24 -a '/usr/apache/bin/apachectl graceful' -p 1m -t '/var/apache/old-l
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
-exec /bin/diff std.out std.out.expect
+[ -s std.err ] && { cat std.err; exit 1; }
+exec /bin/diff std.out.expect std.out
 EOF
 
 	set_file('runtest', <<"EOF");
 # test "logadmV1"
 $envsetup
-exec $bindir/logadm -f testfile.conf -V >std.out 2>std.err
+exec $bindir/logadm -f testfile.conf -F testfile.conf -V >std.out 2>std.err
 EOF
 }
 
@@ -856,14 +857,14 @@ sub logadmV2 {
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
-exec /bin/diff std.out std.out.expect
+[ -s std.err ] && { cat std.err; exit 1; }
+exec /bin/diff std.out.expect std.out
 EOF
 
 	set_file('runtest', <<"EOF");
 # test "logadmV2"
 $envsetup
-exec $bindir/logadm -f testfile.conf -V /var/cron/log /var/adm/pacct >std.out 2>std.err
+exec $bindir/logadm -f testfile.conf -F testfile.conf -V /var/cron/log /var/adm/pacct >std.out 2>std.err
 EOF
 }
 
@@ -877,22 +878,22 @@ sub logadmr {
 	set_testconffile('testfile.conf.orig');
 
 	set_file('diff.out.expect', <<'EOF');
-17a18
-> /var/cron/log -s 512k -t /var/cron/olog
-21a23
-> /var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+18d17
+< /var/cron/log -s 512k -t /var/cron/olog
+23d21
+< /var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
-/bin/diff testfile.conf testfile.conf.orig > diff.out
-exec /bin/diff diff.out diff.out.expect
+[ -s std.err ] && { cat std.err; exit 1; }
+/bin/diff testfile.conf.orig testfile.conf > diff.out
+exec /bin/diff diff.out.expect diff.out
 EOF
 
 	set_file('runtest', <<"EOF");
 # test "logadmr"
 $envsetup
-exec $bindir/logadm -f testfile.conf -r /var/cron/log /var/adm/pacct >std.out 2>std.err
+exec $bindir/logadm -f testfile.conf -F testfile.conf -r /var/cron/log /var/adm/pacct >std.out 2>std.err
 EOF
 }
 
@@ -906,20 +907,20 @@ sub logadmw {
 	set_testconffile('testfile.conf.orig');
 
 	set_file('diff.out.expect', <<'EOF');
-31d30
-< moose -C 20 -a moose_after_cmd -g pig -m 664 -o cow -p never /moose/file
+30a31
+> moose -C 20 -a moose_after_cmd -g pig -m 664 -o cow -p never /moose/file
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
-/bin/diff testfile.conf testfile.conf.orig > diff.out
-exec /bin/diff diff.out diff.out.expect
+[ -s std.err ] && { cat std.err; exit 1; }
+/bin/diff testfile.conf.orig testfile.conf > diff.out
+exec /bin/diff diff.out.expect diff.out
 EOF
 
 	set_file('runtest', <<"EOF");
 # test "logadmw"
 $envsetup
-exec $bindir/logadm -f testfile.conf -w moose -C 20 -a moose_after_cmd -g pig -m 664 -o cow -p never /moose/file >std.out 2>std.err
+exec $bindir/logadm -f testfile.conf -F testfile.conf -w moose -C 20 -a moose_after_cmd -g pig -m 664 -o cow -p never /moose/file >std.out 2>std.err
 EOF
 }
 
@@ -936,7 +937,7 @@ sub logadm1 {
 		lstat 'logfile' or die "lstat logfile: $!\n";
 
 	set_file('checktest', <<"EOF");
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -s logfile ] && exit 1
 [ -f logfile.0 ] || exit 1
@@ -967,7 +968,7 @@ sub logadm1c {
 		lstat 'logfile' or die "lstat logfile: $!\n";
 
 	set_file('checktest', <<"EOF");
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -s logfile ] && exit 1
 [ -f logfile.0 ] || exit 1
@@ -996,7 +997,7 @@ sub logadm2 {
 	set_file('logfile.1', 'initially logfile.1');
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -s logfile ] && exit 1
 [ -f logfile.0 ] || exit 1
@@ -1025,7 +1026,7 @@ sub logadm3 {
 	set_file('logfile.1', 'initially logfile.1');
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -s logfile ] && exit 1
 [ -f logfile.0 ] || exit 1
@@ -1056,7 +1057,7 @@ sub logadm4 {
 	set_file('logfile', 'initially logfile');
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -s logfile ] && exit 1
 TZ=UTC export TZ
@@ -1088,14 +1089,14 @@ just expired: initially logfile.0
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -s logfile ] && exit 1
 [ -f logfile.0 ] || exit 1
 [ "xinitially logfile" = "x`/bin/cat logfile.0`" ] || exit 1
 [ -f logfile.1 ] || exit 1
 [ "xinitially logfile.0" = "x`/bin/cat logfile.1`" ] || exit 1
-exec /bin/diff cmd.out cmd.out.expect
+exec /bin/diff cmd.out.expect cmd.out
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -1119,13 +1120,13 @@ chown: unknown group id _nonexistentgroup_
 EOF
 
         set_file('checktest', <<'EOF');
-[ -s std.err ] || exit 1
+[ -s std.err ] || exit 1;
 [ -s std.out ] && exit 1
 [ -s logfile ] && exit 1
 [ -f logfile.0 ] || exit 1
 [ "xinitially logfile" = "x`/bin/cat logfile.0`" ] || exit 1
 [ "`/bin/ls -l logfile | /bin/awk '{ print $1; }'`" = "-r----x--x" ] || exit 1
-exec /bin/diff std.err std.err.expect
+exec /bin/diff std.err.expect std.err
 EOF
 
         set_file('runtest', <<"EOF");
@@ -1195,9 +1196,17 @@ kill -HUP $pid
 second kill -HUP $pid
 EOF
 
+	set_file('sed.out.expect', <<'EOF');
+# This file holds internal data for logadm(1M).
+# Do not edit.
+dir1/syslog
+dir2/messages
+EOF
+
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
+[ -s logadm.timestamps ] || exit 1
 [ -s std.err2 ] && exit 1
 [ -s std.out2 ] && exit 1
 [ -s std.err3 ] && exit 1
@@ -1234,8 +1243,9 @@ EOF
 [ -f dir2/messages.3 ] || exit 1
 [ "xinitially dir2/messages.1" = "x`/bin/cat dir2/messages.3`" ] || exit 1
 [ -f dir2/messages.4 ] && exit 1
-/bin/sed "s/-P '[^']*' *//" < logadm.conf > sed.out
-exec /bin/diff sed.out logadm.conf.orig
+/bin/sed "s/ -P '[^']*' *//" < logadm.timestamps > sed.out
+/bin/diff sed.out.expect sed.out || exit 1
+exec /bin/diff logadm.conf.orig logadm.conf
 EOF
 
         # first logadm call will rotate both syslog and messages
@@ -1245,12 +1255,12 @@ EOF
         set_file('runtest', <<"EOF");
 # test "logadm7"
 $envsetup
-$bindir/logadm -f logadm.conf >std.out 2>std.err || exit 1
-$bindir/logadm -f logadm.conf dir1/syslog dir2/messages >std.out2 2>std.err2 || exit 1
+$bindir/logadm -f logadm.conf -F logadm.timestamps >std.out 2>std.err || exit 1
+$bindir/logadm -f logadm.conf -F logadm.timestamps dir1/syslog dir2/messages >std.out2 2>std.err2 || exit 1
 echo something > dir1/syslog
 echo something > dir2/messages
-$bindir/logadm -f logadm.conf >std.out3 2>std.err3 || exit 1
-exec $bindir/logadm -f logadm.conf dir2/messages -p now -a 'echo second kill -HUP `cat /etc/syslog.pid` >> cmd.out' >std.out4 2>std.err4
+$bindir/logadm -f logadm.conf -F logadm.timestamps >std.out3 2>std.err3 || exit 1
+exec $bindir/logadm -f logadm.conf -F logadm.timestamps dir2/messages -p now -a 'echo second kill -HUP `cat /etc/syslog.pid` >> cmd.out' >std.out4 2>std.err4
 EOF
 }
 
@@ -1284,7 +1294,7 @@ sub logadm8 {
 	die "gzip dir1/syslog.7 didn't work\n" unless -f 'dir1/syslog.7.gz';
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -f dir1/syslog ] || exit 1
 [ -s dir1/syslog ] && exit 1
@@ -1332,12 +1342,14 @@ sub logadm9 {
 	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
 	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
 	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+	set_file('dir1/notes', 'initially dir1/notes');
 	mkdir 'dir2', 0777 or die "mkdir dir2: $!\n";
 	set_file('dir2/messages', 'initially dir2/messages');
 	set_file('dir2/messages.0', 'initially dir2/messages.0');
 	set_file('dir2/messages.1', 'initially dir2/messages.1');
 	set_file('dir2/messages.2', 'initially dir2/messages.2');
 	set_file('dir2/messages.3', 'initially dir2/messages.3');
+	set_file('dir2/log', 'initially dir2/log');
 
 	$now = time;
 	$nowstr = gmtime($now);
@@ -1354,12 +1366,27 @@ sub logadm9 {
 # now: $nowstr is $now
 # $closetoweek is $closetoweeksecs
 dir1/syslog -C 8 -P '$closetoweek'
+dir2/log -C 4
 # $lessthanweek is $lessthanweeksecs
-dir2/messages -C 4 -P '$lessthanweek'
+dir1/notes -C 2 -P '$lessthanweek'
+dir2/messages -C 4
+EOF
+	set_file('logadm.timestamps', <<"EOF");
+dir2/log -P '$closetoweek'
+dir2/messages -P '$lessthanweek'
+EOF
+
+	set_file('sed.out.expect', <<"EOF");
+# This file holds internal data for logadm(1M).
+# Do not edit.
+dir1/syslog
+dir2/log
+dir1/notes
+dir2/messages
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -f dir1/syslog ] || exit 1
 [ -s dir1/syslog ] && exit 1
@@ -1381,6 +1408,10 @@ EOF
 [ "xinitially dir1/syslog.6" = "x`/bin/cat dir1/syslog.7`" ] || exit 1
 [ -f dir1/syslog.8 ] && exit 1
 
+[ -s dir1/notes ] || exit 1
+[ "xinitially dir1/notes" = "x`/bin/cat dir1/notes`" ] || exit 1
+[ -f dir1/notes.0 ] && exit 1
+
 [ -f dir2/messages ] || exit 1
 [ "xinitially dir2/messages" = "x`/bin/cat dir2/messages`" ] || exit 1
 [ -f dir2/messages.0 ] || exit 1
@@ -1392,13 +1423,24 @@ EOF
 [ -f dir2/messages.3 ] || exit 1
 [ "xinitially dir2/messages.3" = "x`/bin/cat dir2/messages.3`" ] || exit 1
 [ -f dir2/messages.4 ] && exit 1
+
+[ -f dir2/log ] || exit 1
+[ -s dir2/log ] && exit 1
+[ -f dir2/log.0 ] || exit 1
+[ "xinitially dir2/log" = "x`/bin/cat dir2/log.0`" ] || exit 1
+[ -f dir2/log.1 ] && exit 1
+
+/bin/sed "s/ -P '[^']*' *//" < logadm.timestamps > sed.out
+/bin/diff sed.out.expect sed.out || exit 1
+/bin/sed -n "s/ -P '[^']*' */<&>/p" < logadm.conf > sed.out
+[ -s sed.out ] && exit 1
 exit 0
 EOF
 
         set_file('runtest', <<"EOF");
 # test "logadm9"
 $envsetup
-exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+exec $bindir/logadm -f logadm.conf -F logadm.timestamps >std.out 2>std.err
 EOF
 }
 
@@ -1443,7 +1485,7 @@ dir2/messages -p 1d -C 4 -P '$lessthanday'
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -f dir1/syslog ] || exit 1
 [ -s dir1/syslog ] && exit 1
@@ -1482,7 +1524,7 @@ EOF
         set_file('runtest', <<"EOF");
 # test "logadm9d"
 $envsetup
-exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+exec $bindir/logadm -f logadm.conf -F logadm.timestamps >std.out 2>std.err
 EOF
 }
 
@@ -1515,7 +1557,7 @@ dir2/messages -C 4 -s 30b
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -f dir1/syslog ] || exit 1
 [ -s dir1/syslog ] && exit 1
@@ -1554,7 +1596,7 @@ EOF
         set_file('runtest', <<"EOF");
 # test "logadm10"
 $envsetup
-exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+exec $bindir/logadm -f logadm.conf -F logadm.timestamps >std.out 2>std.err
 EOF
 }
 
@@ -1587,7 +1629,7 @@ dir2/messages -C 4 -s 30b -S 75b
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -f dir1/syslog ] || exit 1
 [ "xinitially dir1/syslog" = "x`/bin/cat dir1/syslog`" ] || exit 1
@@ -1620,7 +1662,7 @@ EOF
         set_file('runtest', <<"EOF");
 # test "logadm11"
 $envsetup
-exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+exec $bindir/logadm -f logadm.conf -F logadm.timestamps >std.out 2>std.err
 EOF
 }
 
@@ -1636,7 +1678,7 @@ EOF
 
 	set_file('checktest', <<"EOF");
 [ -s std.out ] && exit 1
-exec /bin/diff std.err std.err.expect
+exec /bin/diff std.err.expect std.err
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -1653,8 +1695,8 @@ EOF
 ###########################################################################
 sub logadm13 {
 	set_file('checktest', <<"EOF");
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
-[ -s std.err ] && exit 1
 exit 0
 EOF
 
@@ -1765,11 +1807,11 @@ chmod 664 dir2/messages
 # processing logname: /var/adm/pacct
 #     using default template: $file.$n
 sh -c echo kill -HUP `cat /etc/syslog.pid` >> cmd.out # -a cmd
-# logadm.conf unchanged
+# logadm.conf and logadm.timestamps unchanged
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -f std.out ] || exit 1
 [ -f dir1/syslog ] || exit 1
 [ "xinitially dir1/syslog" = "x`/bin/cat dir1/syslog`" ] || exit 1
@@ -1803,13 +1845,13 @@ EOF
 [ "xinitially dir2/messages.3" = "x`/bin/cat dir2/messages.3`" ] || exit 1
 [ -f dir2/messages.4 ] && exit 1
 /bin/grep -v 'recording rotation date' std.out > grep.out
-exec /bin/diff grep.out grep.out.expect
+exec /bin/diff grep.out.expect grep.out
 EOF
 
         set_file('runtest', <<"EOF");
 # test "logadm14"
 $envsetup
-exec $bindir/logadm -nv -f logadm.conf >std.out 2>std.err
+exec $bindir/logadm -nv -f logadm.conf -F logadm.timestamps >std.out 2>std.err
 EOF
 }
 
@@ -1832,7 +1874,7 @@ sub logadm15 {
 	set_file('logfile.9', 'initially logfile.9');
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -f logfile ] || exit 1
 [ "x" = "x`/bin/cat logfile`" ] || exit 1
@@ -1877,6 +1919,7 @@ Usage: logadm [options]
 
 General options:
         -e mailaddr     mail errors to given address
+        -F timestamps   use timestamps instead of /var/logadm/timestamps
         -f conffile     use conffile instead of /etc/logadm.conf
         -h              display help
         -N              not an error if log file nonexistent
@@ -1917,7 +1960,7 @@ EOF
 
 	set_file('checktest', <<'EOF');
 [ -s std.out ] && exit 1
-exec /bin/diff std.err std.err.expect
+exec /bin/diff std.err.expect std.err
 EOF
 
 	set_file('runtest', <<"EOF");
@@ -1936,7 +1979,7 @@ sub logadm17 {
 	set_file('logfile', 'initially logfile');
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -f dir1/dir2/logfile ] || exit 1
 [ -f logfile ] || exit 1
@@ -1973,7 +2016,7 @@ dir1/syslog -C 8 -s 1b -M '/bin/tr [a-z] [A-Z] < \$file > \$nfile; /bin/rm -f \$
 EOF
 
 	set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -f dir1/syslog ] || exit 1
 [ -s dir1/syslog ] && exit 1
@@ -2001,7 +2044,7 @@ EOF
         set_file('runtest', <<"EOF");
 # test "logadm18"
 $envsetup
-exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+exec $bindir/logadm -f logadm.conf -F logadm.timestamps >std.out 2>std.err
 EOF
 }
 
@@ -2014,7 +2057,7 @@ sub logadm19 {
         set_file('logfile', 'initially logfile');
 
         set_file('checktest', <<'EOF');
-[ -s std.err ] && exit 1
+[ -s std.err ] && { cat std.err; exit 1; }
 [ -s std.out ] && exit 1
 [ -s logfile ] && exit 1
 TZ= export TZ
@@ -2025,8 +2068,43 @@ exit 0
 EOF
 
         set_file('runtest', <<"EOF");
-# test "logadm4"
+# test "logadm19"
 $envsetup
 exec $bindir/logadm -f /dev/null -l -p now logfile -t '\$file.\%d\%H\%M' >std.out 2>std.err
+EOF
+}
+
+#############################################################################
+#
+#         logadm20 -- test of unquotables/error handling
+#
+#############################################################################
+sub logadm20 {
+	set_file('logadm.conf', <<'EOF');
+# non-trivial entry
+/var/log/syslog -C 8 -a 'kill -HUP `cat /var/run/syslog.pid`'
+EOF
+
+	set_file('std.err.expect', <<'EOF');
+logadm: Error: Can't protect quotes in </bin/echo "She can't take anymore, Cap'n!">
+logadm: Error: unsafe to update configuration file or timestamps
+logadm: Error: bailing out due to command line errors
+Use "logadm -h" for help.
+exit=1
+EOF
+
+        set_file('checktest', <<'EOF');
+[ -s std.err ] || exit 1
+[ -s std.out ] && exit 1
+[ -f logadm.conf????? ] && exit 1
+[ -f logadm.timestamps????? ] && exit 1
+exec /bin/diff std.err.expect std.err
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm20"
+$envsetup
+$bindir/logadm -f logadm.conf -F logadm.timestamps -w /a/b/c -p 1w -l -b "/bin/echo \\"She can't take anymore, Cap'n!\\"" >std.out 2>std.err
+echo exit=\$? >>std.err
 EOF
 }

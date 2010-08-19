@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -38,8 +38,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *      @(#) more.c 1.1 88/03/29 more:more.c
@@ -224,7 +222,7 @@ static void set_tty(void);
 static void reset_tty(void);
 static void rdline(register FILE *f);
 static off_t command(char *filename, register FILE *f);
-static int getline(register FILE *f, int *length);
+static int getaline(register FILE *f, int *length);
 static int number(char *cmd);
 static int colon(char *filename, int cmd, off_t nlines);
 
@@ -504,7 +502,7 @@ screen(register FILE *f, register off_t num_lines)
 
     for (;;) {
         while (num_lines > 0 && !Pause) {
-            if ((nchars = getline (f, &length)) == EOF)
+            if ((nchars = getaline (f, &length)) == EOF)
             {
                 if (clreol) clreos();
                 return;
@@ -726,7 +724,7 @@ wait_eof(void)
 */
 
 static int
-getline(register FILE *f, int *length)
+getaline(register FILE *f, int *length)
 {
     register int        c;
     register char       *p;

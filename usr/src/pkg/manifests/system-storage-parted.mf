@@ -52,12 +52,14 @@ file path=usr/include/parted/timer.h
 file path=usr/include/parted/unit.h
 file path=usr/lib/libparted.so.8
 file path=usr/sbin/parted mode=0555
-legacy pkg=SUNWparted arch=$(ARCH) category=system \
+legacy pkg=SUNWparted \
     desc="GNU Parted is for the display and manipulation of disk partitions" \
-    hotline="Please contact your local service provider" \
-    name="GNU Parted - Partition Editor" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="GNU Parted - Partition Editor"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/parted/THIRDPARTYLICENSE \
+    license=usr/src/cmd/parted/THIRDPARTYLICENSE
+license usr/src/lib/libparted/THIRDPARTYLICENSE \
+    license=usr/src/lib/libparted/THIRDPARTYLICENSE
 link path=usr/lib/libparted.so target=./libparted.so.8
 depend fmri=system/file-system/ntfsprogs type=require

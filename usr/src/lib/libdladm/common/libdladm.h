@@ -28,6 +28,7 @@
 #include <sys/dls_mgmt.h>
 #include <sys/dld.h>
 #include <sys/dlpi.h>
+#include <libnvpair.h>
 
 /*
  * This file includes structures, macros and common routines shared by all
@@ -180,7 +181,17 @@ typedef enum {
 	DLADM_TYPE_UINT64
 } dladm_datatype_t;
 
-typedef int dladm_conf_t;
+typedef struct {
+	boolean_t	ds_readonly;
+	union {
+		int	dsu_confid;
+		nvlist_t *dsu_nvl;
+	} ds_u;
+} dladm_conf_t;
+
+#define	ds_confid	ds_u.dsu_confid
+#define	ds_nvl		ds_u.dsu_nvl
+
 #define	DLADM_INVALID_CONF	0
 
 /* opaque dladm handle to libdladm functions */

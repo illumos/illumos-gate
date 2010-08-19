@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -252,7 +251,7 @@ fs_getdents(int fildes, struct dirent *buf, size_t *nbyte,
 			goto skip_entry;
 
 		(void) snprintf(file_path, PATH_MAX, "%s/", pn_path);
-		(void) strlcat(file_path, ptr->d_name, PATH_MAX);
+		(void) strlcat(file_path, ptr->d_name, PATH_MAX + 1);
 		(void) memset(&fh, 0, sizeof (fs_fhandle_t));
 
 		if (lstat64(file_path, &st) != 0) {
@@ -301,12 +300,12 @@ fs_readdir(fs_fhandle_t *ts_fh, char *path, long *dpos,
 		*el = 0;
 	} else {
 		(void) snprintf(file_path, PATH_MAX, "%s/", path);
-		(void) strlcat(file_path, dp->d_name, PATH_MAX);
+		(void) strlcat(file_path, dp->d_name, PATH_MAX + 1);
 
 		rv = fs_getstat(file_path, efh, est);
 		if (rv == 0) {
 			*dpos = telldir(dirp);
-			(void) strlcpy(nm, dp->d_name, NAME_MAX);
+			(void) strlcpy(nm, dp->d_name, NAME_MAX + 1);
 			*el = strlen(dp->d_name);
 		} else {
 			*el = 0;
@@ -674,10 +673,8 @@ traverse_level_nondir(struct fs_traverse *ftp,
 
 			NDMP_LOG(LOG_DEBUG, "Error %d on readdir(%s) pos %d",
 			    rv, pnp->tn_path, tsp->ts_dpos);
-			if (STOP_ONERR(ftp)) {
-				NEGATE(rv);
+			if (STOP_ONERR(ftp))
 				break;
-			}
 			/*
 			 * We cannot read the directory entry, we should
 			 * skip to the next directory.

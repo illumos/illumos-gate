@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/x86_archext.h>
@@ -217,8 +216,8 @@ pwrnow_supported()
 	struct cpuid_regs cpu_regs;
 
 	/* Required features */
-	if (!(x86_feature & X86_CPUID) ||
-	    !(x86_feature & X86_MSR)) {
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
+	    !is_x86_feature(x86_featureset, X86FSET_MSR)) {
 		PWRNOW_DEBUG(("No CPUID or MSR support."));
 		return (B_FALSE);
 	}

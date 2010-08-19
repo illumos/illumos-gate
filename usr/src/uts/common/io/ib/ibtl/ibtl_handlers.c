@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/ib/ibtl/impl/ibtl.h>
@@ -211,6 +210,7 @@ ibc_async_handler(ibc_clnt_hdl_t hca_devp, ibt_async_code_t code,
 	case IBT_ERROR_INVALID_REQUEST_QP:
 	case IBT_ERROR_ACCESS_VIOLATION_QP:
 	case IBT_EVENT_EMPTY_QP:
+	case IBT_FEXCH_ERROR:
 		ibtl_qp = event_p->ev_qp_hdl;
 		if (ibtl_qp == NULL) {
 			IBTF_DPRINTF_L2(ibtf_handlers, "ibc_async_handler: "

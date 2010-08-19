@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FMD_H
 #define	_FMD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libnvpair.h>
 #include <pthread.h>
@@ -70,6 +67,7 @@ typedef struct fmd {
 	pthread_key_t d_key;		/* key for fmd's thread-specific data */
 	volatile int d_signal;		/* signal indicating we should quit */
 	volatile int d_running;		/* flag set when fmd_run() succeeds */
+	volatile int d_loaded;		/* flag set when all modules loaded */
 	volatile int d_booted;		/* flag set when fmd_run() completes */
 
 	uint_t d_fmd_debug;		/* mask of fmd active debugging modes */
@@ -135,6 +133,13 @@ typedef struct fmd {
 	pthread_rwlock_t d_log_lock;	/* log pointer lock (r=use, w=rotate) */
 	struct fmd_log *d_errlog;	/* log file for error events */
 	struct fmd_log *d_fltlog;	/* log file for fault events */
+
+	pthread_rwlock_t d_hvilog_lock;	/* log pointer lock (r=use, w=rotate) */
+	struct fmd_log *d_hvilog;	/* log file for hi value info events */
+
+	pthread_rwlock_t d_ilog_lock;	/* log pointer lock (r=use, w=rotate) */
+	struct fmd_log *d_ilog;		/* log file for info events */
+
 	pthread_cond_t d_fmd_cv;	/* sync startup with rpc */
 	pthread_mutex_t d_fmd_lock;	/* sync startup with rpc */
 } fmd_t;

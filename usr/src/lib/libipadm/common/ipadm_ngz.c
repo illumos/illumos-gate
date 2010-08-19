@@ -112,7 +112,7 @@ again:
 
 		w.w_rtm.rtm_addrs |= RTA_NETMASK;
 		w_mask.sin_family = AF_INET;
-		if (plen2mask(masklen, AF_INET, &m4) != 0) {
+		if (plen2mask(masklen, AF_INET, (struct sockaddr *)&m4) != 0) {
 			return;
 		}
 		w_mask.sin_addr = ((struct sockaddr_in *)&m4)->sin_addr;
@@ -186,7 +186,8 @@ again:
 
 		w.w_rtm.rtm_addrs |= RTA_NETMASK;
 		w_mask.sin6_family = AF_INET6;
-		if (plen2mask(prefix_length, AF_INET6, &m6) != 0) {
+		if (plen2mask(prefix_length, AF_INET6,
+		    (struct sockaddr *)&m6) != 0) {
 			return;
 		}
 		w_mask.sin6_addr = ((struct sockaddr_in6 *)&m6)->sin6_addr;

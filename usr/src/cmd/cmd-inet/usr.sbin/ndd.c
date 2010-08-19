@@ -19,15 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/* Copyright (c) 1990 Mentat Inc. */
 
-/*
- * Copyright (c) 1990  Mentat Inc.
- * ndd.c 2.1, last change 11/14/90
- */
-
+#include <assert.h>
 #include <stdio.h>
 #include <errno.h>
 #include <ctype.h>
@@ -164,8 +160,20 @@ ndd_perm2str(uint_t perm)
 }
 
 /*
- * This function converts any new property names to old ndd name by consulting
- * ndd2ipadm_map_t. This is done to preserve backward compatibility.
+ * Print all the protocol properties for the given protocol name. The kernel
+ * returns all the properties for the given protocol therefore we have to
+ * apply some filters before we print them.
+ *
+ *	- convert any new ipadm name to old ndd name using the table.
+ *	  For example: `sack' --> `tcp_sack_permitted'.
+ *
+ *	- replace leading underscores with protocol name.
+ *	  For example: `_strong_iss' --> `tcp_strong_iss'
+ *
+ *	- don't print new public properties that are supported only by ipadm(1M)
+ *	  For example: `hostmodel' should be supported only from ipadm(1M).
+ *	  Such properties are identified by not having leading '_' and not
+ *	  being present in the mapping table.
  */
 static void
 print_ipadm2ndd(char *oldbuf, uint_t obufsize)
@@ -201,9 +209,22 @@ print_ipadm2ndd(char *oldbuf, uint_t obufsize)
 			(void) printf("%-30s (%s)\n", nimap->ndd_name,
 			    ndd_perm2str(perm));
 		}
-		if (!matched)
-			(void) printf("%-30s (%s)\n", pname,
+		/*
+		 * print only if it's a private property. We should
+		 * not be printing any new public property in ndd(1M)
+		 * output.
+		 */
+		if (!matched && pname[0] == '_') {
+			char	tmpstr[512];
+			int	err;
+
+			err = ipadm_new2legacy_propname(pname, tmpstr,
+			    sizeof (tmpstr), proto);
+			assert(err != -1);
+
+			(void) printf("%-30s (%s)\n", tmpstr,
 			    ndd_perm2str(perm));
+		}
 		for (pname = rwtag; *pname++; )
 			;
 	}
@@ -224,7 +245,7 @@ do_ipadm_getset(int cmd, char *buf, int buflen)
 	ipadm_status_t	status;
 	char		*mod;
 	uint_t		proto, perm = 0, flags = 0;
-	char		*pname, *pvalp;
+	char		*pname, *pvalp, nname[512];
 	int		i;
 
 	if ((mod = strrchr(modpath, '/')) == NULL)
@@ -239,15 +260,26 @@ do_ipadm_getset(int cmd, char *buf, int buflen)
 
 	pname = buf;
 	for (nimap = map; nimap->ndd_name != NULL; nimap++) {
-		if (strcmp(pname, nimap->ndd_name) == 0)
+		if (strcmp(pname, nimap->ndd_name) == 0) {
+			pname = nimap->ipadm_name;
+			proto = nimap->ipadm_proto;
+			flags = nimap->ipadm_flags;
+			perm = nimap->ndd_perm;
 			break;
+		}
 	}
-	if (nimap->ndd_name != NULL) {
-		pname = nimap->ipadm_name;
-		proto = nimap->ipadm_proto;
-		flags = nimap->ipadm_flags;
-		perm = nimap->ndd_perm;
+
+	if (nimap->ndd_name == NULL && strcmp(pname, "?") != 0) {
+		/* do not allow set/get of public properties from ndd(1M) */
+		if (ipadm_legacy2new_propname(pname, nname, sizeof (nname),
+		    &proto) != 0) {
+			status = IPADM_PROP_UNKNOWN;
+			goto fail;
+		} else {
+			pname = nname;
+		}
 	}
+
 	if (cmd == ND_GET) {
 		char		propval[MAXPROPVALLEN], allprop[64536];
 		uint_t		pvalsz;

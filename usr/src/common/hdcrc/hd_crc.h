@@ -25,8 +25,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_CRC_HD_H
@@ -51,12 +50,12 @@ extern "C" {
 #if defined(__i386) || defined(__amd_64) || defined(__x86_64)
 
 #ifdef _KERNEL
-#include <sys/x86_archext.h>	/* x86_feature, X86_AES */
+#include <sys/x86_archext.h>	/* x86_featureset, X86FSET_SSE4_2 */
 
 #else
 
 #include <sys/auxv.h>		/* getisax() */
-#include <sys/auxv_386.h>	/* AV_386_AES bit */
+#include <sys/auxv_386.h>	/* AV_386_SSE4_2 bit */
 
 #endif
 
@@ -248,7 +247,7 @@ hd_crc32_avail(uint32_t *crc32_table)
 	};
 
 #ifdef _KERNEL
-	if (!(x86_feature & X86_SSE4_2)) {
+	if (!is_x86_feature(x86_featureset, X86FSET_SSE4_2)) {
 		return (B_FALSE);
 	} else {
 #else

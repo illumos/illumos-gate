@@ -369,7 +369,7 @@ restart:
 
 	/* Nuke any messages we decided not to retransmit. */
 	if (!list_is_empty(&to_be_dropped))
-		rdsv3_send_remove_from_sock(&to_be_dropped, RDSV3_RDMA_DROPPED);
+		rdsv3_send_remove_from_sock(&to_be_dropped, RDS_RDMA_DROPPED);
 
 	if (conn->c_trans->xmit_complete)
 		conn->c_trans->xmit_complete(conn);
@@ -506,7 +506,19 @@ rdsv3_rdma_send_complete(struct rdsv3_message *rm, int status)
 	mutex_exit(&rm->m_rs_lock);
 
 	if (rs) {
+		struct rsock *sk = rdsv3_rs_to_sk(rs);
+		int error;
+
 		rdsv3_wake_sk_sleep(rs);
+
+		/* wake up anyone waiting in poll */
+		sk->sk_upcalls->su_recv(sk->sk_upper_handle, NULL,
+		    0, 0, &error, NULL);
+		if (error != 0) {
+			RDSV3_DPRINTF2("rdsv3_recv_incoming",
+			    "su_recv returned: %d", error);
+		}
+
 		rdsv3_sk_sock_put(rdsv3_rs_to_sk(rs));
 	}
 
@@ -699,7 +711,7 @@ XXX
 	mutex_exit(&conn->c_lock);
 
 	/* now remove the messages from the sock list as needed */
-	rdsv3_send_remove_from_sock(&list, RDSV3_RDMA_SUCCESS);
+	rdsv3_send_remove_from_sock(&list, RDS_RDMA_SUCCESS);
 
 	RDSV3_DPRINTF4("rdsv3_send_drop_acked", "Return(conn: %p)", conn);
 }
@@ -744,7 +756,7 @@ rdsv3_send_drop_to(struct rdsv3_sock *rs, struct sockaddr_in *dest)
 		 */
 		mutex_enter(&rm->m_rs_lock);
 		/* If this is a RDMA operation, notify the app. */
-		__rdsv3_rdma_send_complete(rs, rm, RDSV3_RDMA_CANCELED);
+		__rdsv3_rdma_send_complete(rs, rm, RDS_RDMA_CANCELED);
 		rm->m_rs = NULL;
 		mutex_exit(&rm->m_rs_lock);
 
@@ -889,15 +901,15 @@ rdsv3_cmsg_send(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 		 * rm->m_rdma_cookie and rm->m_rdma_mr.
 		 */
 		switch (cmsg->cmsg_type) {
-		case RDSV3_CMSG_RDMA_ARGS:
+		case RDS_CMSG_RDMA_ARGS:
 			ret = rdsv3_cmsg_rdma_args(rs, rm, cmsg);
 			break;
 
-		case RDSV3_CMSG_RDMA_DEST:
+		case RDS_CMSG_RDMA_DEST:
 			ret = rdsv3_cmsg_rdma_dest(rs, rm, cmsg);
 			break;
 
-		case RDSV3_CMSG_RDMA_MAP:
+		case RDS_CMSG_RDMA_MAP:
 			ret = rdsv3_cmsg_rdma_map(rs, rm, cmsg);
 			if (ret)
 				*allocated_mr = 1;
@@ -915,6 +927,8 @@ rdsv3_cmsg_send(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 
 	return (ret);
 }
+
+extern unsigned long rdsv3_max_bcopy_size;
 
 int
 rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
@@ -955,6 +969,13 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 	if (daddr == 0 || rs->rs_bound_addr == 0) {
 		ret = -ENOTCONN; /* XXX not a great errno */
 		RDSV3_DPRINTF2("rdsv3_sendmsg", "returning: %d", -ret);
+		goto out;
+	}
+
+	if (payload_len > rdsv3_max_bcopy_size) {
+		RDSV3_DPRINTF2("rdsv3_sendmsg", "Message too large: %d",
+		    payload_len);
+		ret = -EMSGSIZE;
 		goto out;
 	}
 
@@ -1071,7 +1092,7 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 				/* signal/timeout pending */
 				RDSV3_DPRINTF2("rdsv3_sendmsg",
 				    "woke due to signal: %d", ret);
-				ret = -ERESTART;
+				ret = -EINTR;
 				sk->sk_sleep->waitq_waiters--;
 				mutex_exit(&sk->sk_sleep->waitq_mutex);
 				goto out;
@@ -1095,7 +1116,7 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 	rdsv3_stats_inc(s_send_queued);
 
 	if (!test_bit(RDSV3_LL_SEND_FULL, &conn->c_flags))
-		(void) rdsv3_send_xmit(conn);
+		(void) rdsv3_send_worker(&conn->c_send_w.work);
 
 	rdsv3_message_put(rm);
 	RDSV3_DPRINTF4("rdsv3_sendmsg", "Return(rs: %p, len: %d)",

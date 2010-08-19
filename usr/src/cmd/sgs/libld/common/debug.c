@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
@@ -32,6 +31,7 @@
 #include	<debug.h>
 #include	<conv.h>
 #include	"msg.h"
+#include	"_libld.h"
 
 /*
  * dbg_setup() can be called a number of times.  The typical use through
@@ -110,7 +110,7 @@ dbg_setup(Ofl_desc *ofl, const char *options, int phase)
 			if (fptr == NULL) {
 				int	err = errno;
 
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_SYS_OPEN), ofile,
 				    strerror(err));
 				return (0);

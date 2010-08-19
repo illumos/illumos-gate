@@ -54,6 +54,7 @@ extern "C" {
 #define	FAN		"fan"
 #define	FANBOARD	"fanboard"
 #define	FANMODULE	"fanmodule"
+#define	HBA		"hba"
 #define	HOSTBRIDGE	"hostbridge"
 #define	INTERCONNECT	"interconnect"
 #define	IOBOARD		"ioboard"

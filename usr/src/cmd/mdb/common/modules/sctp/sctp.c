@@ -144,30 +144,31 @@ sctp_faddr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	statestr = sctp_faddr_state(fa->state);
-	mdb_printf("%<u>%p\t%<b>%N%</b>\t%s%</u>\n", addr, &fa->faddr,
+	statestr = sctp_faddr_state(fa->sf_state);
+	mdb_printf("%<u>%p\t%<b>%N%</b>\t%s%</u>\n", addr, &fa->sf_faddr,
 	    statestr);
-	mdb_printf("next\t\t%?p\tsaddr\t%N\n", fa->next, &fa->saddr);
-	mdb_printf("rto\t\t%?d\tsrtt\t\t%?d\n", fa->rto, fa->srtt);
-	mdb_printf("rttvar\t\t%?d\trtt_updates\t%?u\n", fa->rttvar,
-	    fa->rtt_updates);
-	mdb_printf("strikes\t\t%?d\tmax_retr\t%?d\n", fa->strikes,
-	    fa->max_retr);
-	mdb_printf("hb_expiry\t%?ld\thb_interval\t%?u\n", fa->hb_expiry,
-	    fa->hb_interval);
-	mdb_printf("pmss\t\t%?u\tcwnd\t\t%?u\n", fa->sfa_pmss, fa->cwnd);
-	mdb_printf("ssthresh\t%?u\tsuna\t\t%?u\n", fa->ssthresh, fa->suna);
-	mdb_printf("pba\t\t%?u\tacked\t\t%?u\n", fa->pba, fa->acked);
-	mdb_printf("lastactive\t%?ld\thb_secret\t%?#lx\n", fa->lastactive,
-	    fa->hb_secret);
-	mdb_printf("rxt_unacked\t%?u\n", fa->rxt_unacked);
-	mdb_printf("timer_mp\t%?p\tixa\t\t%?p\n", fa->timer_mp, fa->ixa);
+	mdb_printf("next\t\t%?p\tsaddr\t%N\n", fa->sf_next, &fa->sf_saddr);
+	mdb_printf("rto\t\t%?d\tsrtt\t\t%?d\n", fa->sf_rto, fa->sf_srtt);
+	mdb_printf("rttvar\t\t%?d\trtt_updates\t%?u\n", fa->sf_rttvar,
+	    fa->sf_rtt_updates);
+	mdb_printf("strikes\t\t%?d\tmax_retr\t%?d\n", fa->sf_strikes,
+	    fa->sf_max_retr);
+	mdb_printf("hb_expiry\t%?ld\thb_interval\t%?u\n", fa->sf_hb_expiry,
+	    fa->sf_hb_interval);
+	mdb_printf("pmss\t\t%?u\tcwnd\t\t%?u\n", fa->sf_pmss, fa->sf_cwnd);
+	mdb_printf("ssthresh\t%?u\tsuna\t\t%?u\n", fa->sf_ssthresh,
+	    fa->sf_suna);
+	mdb_printf("pba\t\t%?u\tacked\t\t%?u\n", fa->sf_pba, fa->sf_acked);
+	mdb_printf("lastactive\t%?ld\thb_secret\t%?#lx\n", fa->sf_lastactive,
+	    fa->sf_hb_secret);
+	mdb_printf("rxt_unacked\t%?u\n", fa->sf_rxt_unacked);
+	mdb_printf("timer_mp\t%?p\tixa\t\t%?p\n", fa->sf_timer_mp, fa->sf_ixa);
 	mdb_printf("hb_enabled\t%?d\thb_pending\t%?d\n"
 	    "timer_running\t%?d\tdf\t\t%?d\n"
 	    "pmtu_discovered\t%?d\tisv4\t\t%?d\n"
 	    "retransmissions\t%?u\n",
-	    fa->hb_enabled, fa->hb_pending, fa->timer_running, fa->df,
-	    fa->pmtu_discovered, fa->isv4, fa->T3expire);
+	    fa->sf_hb_enabled, fa->sf_hb_pending, fa->sf_timer_running,
+	    fa->sf_df, fa->sf_pmtu_discovered, fa->sf_isv4, fa->sf_T3expire);
 
 	return (DCMD_OK);
 }
@@ -453,8 +454,8 @@ sctp_reass_list(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
 		    "\t\tprev: %?p\tcont: %?p\n", addr, srpmp.b_next,
 		    srpmp.b_prev, srpmp.b_cont);
 		mdb_printf("\t\tssn: %hu\tneeded: %hu\tgot: %hu\ttail: %?p\n"
-		    "\t\tpartial_delivered: %s\n", srp.ssn, srp.needed,
-		    srp.got, srp.tail, srp.partial_delivered ? "TRUE" :
+		    "\t\tpartial_delivered: %s\n", srp.sr_ssn, srp.sr_needed,
+		    srp.sr_got, srp.sr_tail, srp.sr_partial_delivered ? "TRUE" :
 		    "FALSE");
 
 		/* display the contents of this ssn's reassemby list */
@@ -671,9 +672,9 @@ print_faddr(uintptr_t ptr, const void *addr, void *cbdata)
 	sctp_faddr_t *faddr = (sctp_faddr_t *)addr;
 	int *i = cbdata;
 
-	statestr = sctp_faddr_state(faddr->state);
+	statestr = sctp_faddr_state(faddr->sf_state);
 
-	mdb_printf("\t%d:\t%N\t%?p (%s)\n", (*i)++, &faddr->faddr, ptr,
+	mdb_printf("\t%d:\t%N\t%?p (%s)\n", (*i)++, &faddr->sf_faddr, ptr,
 	    statestr);
 	return (WALK_NEXT);
 }
@@ -732,7 +733,7 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* non-verbose faddrs, suitable for pipelines to sctp_faddr */
 	if (paddr != 0) {
 		sctp_faddr_t faddr, *fp;
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = faddr.next) {
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = faddr.sf_next) {
 			if (mdb_vread(&faddr, sizeof (faddr), (uintptr_t)fp)
 			    == -1) {
 				mdb_warn("failed to read faddr at %p",
@@ -754,7 +755,7 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		sctp_faddr_t faddr;
 		if (mdb_vread(&faddr, sizeof (faddr),
 		    (uintptr_t)sctp->sctp_faddrs) != -1)
-			mdb_printf("%<u> %N%</u>", &faddr.faddr);
+			mdb_printf("%<u> %N%</u>", &faddr.sf_faddr);
 	}
 	mdb_printf("\n");
 
@@ -829,10 +830,10 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%<b>Flow Control%</b>\n");
 		mdb_printf("tconn_sndbuf\t%?d\n"
 		    "conn_sndlowat\t%?d\tfrwnd\t\t%?u\n"
-		    "rwnd\t\t%?u\tinitial rwnd\t%?u\n"
+		    "rwnd\t\t%?u\tlast advertised rwnd\t%?u\n"
 		    "rxqueued\t%?u\tcwnd_max\t%?u\n", connp->conn_sndbuf,
 		    connp->conn_sndlowat, sctp->sctp_frwnd,
-		    sctp->sctp_rwnd, sctp->sctp_irwnd, sctp->sctp_rxqueued,
+		    sctp->sctp_rwnd, sctp->sctp_arwnd, sctp->sctp_rxqueued,
 		    sctp->sctp_cwnd_max);
 	}
 
@@ -1229,7 +1230,7 @@ sctp_walk_faddr_step(mdb_walk_state_t *wsp)
 	status = wsp->walk_callback(faddr_ptr, &sctp_faddr, wsp->walk_cbdata);
 	if (status != WALK_NEXT)
 		return (status);
-	if ((faddr_ptr = (uintptr_t)sctp_faddr.next) == NULL) {
+	if ((faddr_ptr = (uintptr_t)sctp_faddr.sf_next) == NULL) {
 		return (WALK_DONE);
 	} else {
 		wsp->walk_addr = faddr_ptr;
@@ -1499,6 +1500,68 @@ sctp_stack_ipif_walk_step(mdb_walk_state_t *wsp)
 	    wsp->walk_cbdata));
 }
 
+/*
+ * Initialization function for the per CPU SCTP stats counter walker of a given
+ * SCTP stack.
+ */
+int
+sctps_sc_walk_init(mdb_walk_state_t *wsp)
+{
+	sctp_stack_t sctps;
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_ERR);
+
+	if (mdb_vread(&sctps, sizeof (sctps), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read sctp_stack_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	if (sctps.sctps_sc_cnt == 0)
+		return (WALK_DONE);
+
+	/*
+	 * Store the sctp_stack_t pointer in walk_data.  The stepping function
+	 * used it to calculate if the end of the counter has reached.
+	 */
+	wsp->walk_data = (void *)wsp->walk_addr;
+	wsp->walk_addr = (uintptr_t)sctps.sctps_sc;
+	return (WALK_NEXT);
+}
+
+/*
+ * Stepping function for the per CPU SCTP stats counterwalker.
+ */
+int
+sctps_sc_walk_step(mdb_walk_state_t *wsp)
+{
+	int status;
+	sctp_stack_t sctps;
+	sctp_stats_cpu_t *stats;
+	char *next, *end;
+
+	if (mdb_vread(&sctps, sizeof (sctps), (uintptr_t)wsp->walk_data) ==
+	    -1) {
+		mdb_warn("failed to read sctp_stack_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&stats, sizeof (stats), wsp->walk_addr) == -1) {
+		mdb_warn("failed ot read sctp_stats_cpu_t at %p",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback((uintptr_t)stats, &stats, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+
+	next = (char *)wsp->walk_addr + sizeof (sctp_stats_cpu_t *);
+	end = (char *)sctps.sctps_sc + sctps.sctps_sc_cnt *
+	    sizeof (sctp_stats_cpu_t *);
+	if (next >= end)
+		return (WALK_DONE);
+	wsp->walk_addr = (uintptr_t)next;
+	return (WALK_NEXT);
+}
+
 static void
 sctp_help(void)
 {
@@ -1522,6 +1585,7 @@ sctp_help(void)
 	mdb_printf("\t-d\t Local and Peer addresses\n");
 	mdb_printf("\t-P\t Peer addresses\n");
 }
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "sctp", ":[-afhoimrSFHpRCcedP]",
 	    "display sctp control structure", sctp, sctp_help },
@@ -1591,8 +1655,8 @@ static const mdb_walker_t walkers[] = {
 		sctp_stack_ill_walk_init, sctp_stack_ill_walk_step, NULL },
 	{ "sctp_stack_walk_ipif", "walk the sctp_g_ipif list for one stack",
 		sctp_stack_ipif_walk_init, sctp_stack_ipif_walk_step, NULL },
-	{ "sctp_stacks", "walk all the sctp_stack_t",
-		sctp_stacks_walk_init, sctp_stacks_walk_step, NULL },
+	{ "sctps_sc", "walk all the per CPU stats counters of a sctp_stack_t",
+		sctps_sc_walk_init, sctps_sc_walk_step, NULL },
 	{ NULL }
 };
 

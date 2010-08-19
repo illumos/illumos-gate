@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved. 
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the misx/bignum module.
 #
@@ -33,6 +31,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
+CRYPTODIR = $(COMMONBASE)/crypto
 COM1_DIR = $(COMMONBASE)/bignum
 
 #
@@ -49,6 +48,12 @@ ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 include $(UTSBASE)/sparc/Makefile.sparc
 
 #
+#	FIPS-140 Self Integrity Test
+#
+POST_PROCESS	+= ; $(FIPS140_CHECK)
+
+
+#
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
@@ -58,14 +63,14 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy
+LDFLAGS += -dy -Nmisc/kcf
 
 #
 # lint pass one enforcement
 #
-CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR)
+CFLAGS		+= $(CCVERBOSE) -I$(CRYPTODIR) -I$(COM1_DIR)
 CFLAGS		+= -DUMUL64
-LINTFLAGS	+= -I$(COM1_DIR)
+LINTFLAGS	+= -I$(CRYPTODIR) -I$(COM1_DIR)
 
 
 #

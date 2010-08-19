@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MODULE	= sun4vpi
@@ -31,7 +30,8 @@ TOPODIR	= ../../../libtopo/common
 
 MODULESRCS =	pi_defer.c pi_ldom.c pi_walker.c pi_subr.c \
 		pi_cpu.c pi_mem.c pi_generic.c pi_pciexrc.c \
-		pi_hostbridge.c pi_niu.c pi_top.c sun4vpi.c pi_meth.c
+		pi_hostbridge.c pi_niu.c pi_top.c sun4vpi.c \
+		pi_meth.c pi_bay.c
 
 include ../../Makefile.plugin
 

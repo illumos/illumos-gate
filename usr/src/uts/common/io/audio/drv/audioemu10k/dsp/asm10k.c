@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -167,7 +166,7 @@ static int ngpr = 0;
 static char *infile;
 
 static int
-getline(FILE *input, char **tokens)
+getaline(FILE *input, char **tokens)
 {
 	char *s, *ls;
 	static char *stmt = NULL, *lasts = NULL;
@@ -1040,7 +1039,7 @@ main(int argc, char *argv[])
 
 	init_compiler();
 
-	while ((tokcnt = getline(input, tokens)) != -1) {
+	while ((tokcnt = getaline(input, tokens)) != -1) {
 		/* skip empty lines */
 		if (tokcnt == 0) {
 			continue;

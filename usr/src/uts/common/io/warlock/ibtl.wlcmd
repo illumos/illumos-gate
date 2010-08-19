@@ -57,6 +57,7 @@ root	ibt_register_physical_fmr
 root	ibt_deregister_fmr
 root	ibt_enable_cq_notify
 root	ibt_set_cq_handler
+root	ibt_query_cq_handler_id
 root	ibt_alloc_qp
 root	ibt_initialize_qp
 root	ibt_alloc_special_qp
@@ -115,6 +116,7 @@ root	ibt_alloc_rc_channel
 root	ibt_query_rc_channel
 root	ibt_modify_rc_channel
 root	ibt_alloc_ud_channel
+root	ibt_alloc_ud_channel_range
 root	ibt_query_ud_channel
 root	ibt_modify_ud_channel
 root	ibt_recover_ud_channel
@@ -156,6 +158,7 @@ root	ibt_unregister_part_attr_cb
 root	ibt_get_part_attr
 root	ibt_get_all_part_attr
 root	ibt_free_part_attr
+root	ibt_register_dma_mr
 
 # IBTF CI api entry points
 root	ibc_init
@@ -252,6 +255,7 @@ add	ibc_operations_s::ibc_alloc_cq_sched		targets	warlock_dummy
 add	ibc_operations_s::ibc_alloc_mw			targets	warlock_dummy
 add	ibc_operations_s::ibc_alloc_pd			targets	warlock_dummy
 add	ibc_operations_s::ibc_alloc_qp			targets	warlock_dummy
+add	ibc_operations_s::ibc_alloc_qp_range		targets	warlock_dummy
 add	ibc_operations_s::ibc_alloc_special_qp		targets	warlock_dummy
 add	ibc_operations_s::ibc_attach_mcg		targets	warlock_dummy
 add	ibc_operations_s::ibc_ci_data_in		targets	warlock_dummy
@@ -275,6 +279,7 @@ add	ibc_operations_s::ibc_post_recv			targets	warlock_dummy
 add	ibc_operations_s::ibc_post_send			targets	warlock_dummy
 add	ibc_operations_s::ibc_query_ah			targets	warlock_dummy
 add	ibc_operations_s::ibc_query_cq			targets	warlock_dummy
+add	ibc_operations_s::ibc_query_cq_handler_id	targets	warlock_dummy
 add	ibc_operations_s::ibc_query_hca_ports		targets	warlock_dummy
 add	ibc_operations_s::ibc_query_mr			targets	warlock_dummy
 add	ibc_operations_s::ibc_query_mw			targets	warlock_dummy
@@ -306,6 +311,7 @@ add	ibc_operations_s::ibc_alloc_io_mem		targets warlock_dummy
 add	ibc_operations_s::ibc_free_io_mem		targets warlock_dummy
 add	ibc_operations_s::ibc_map_mem_iov		targets warlock_dummy
 add	ibc_operations_s::ibc_unmap_mem_iov		targets warlock_dummy
+add	ibc_operations_s::ibc_register_dma_mr		targets warlock_dummy
 add	ibt_clnt_modinfo_s::mi_async_handler		targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_async_client_call/async_handler	targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_cq_handler_call/cq_handler	targets	warlock_dummy

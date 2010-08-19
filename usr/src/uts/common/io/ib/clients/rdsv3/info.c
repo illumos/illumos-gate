@@ -70,14 +70,14 @@
  */
 
 static kmutex_t rdsv3_info_lock;
-static rdsv3_info_func rdsv3_info_funcs[RDSV3_INFO_LAST - RDSV3_INFO_FIRST + 1];
+static rdsv3_info_func rdsv3_info_funcs[RDS_INFO_LAST - RDS_INFO_FIRST + 1];
 
 void
 rdsv3_info_register_func(int optname, rdsv3_info_func func)
 {
-	int offset = optname - RDSV3_INFO_FIRST;
+	int offset = optname - RDS_INFO_FIRST;
 
-	ASSERT(optname >= RDSV3_INFO_FIRST && optname <= RDSV3_INFO_LAST);
+	ASSERT(optname >= RDS_INFO_FIRST && optname <= RDS_INFO_LAST);
 
 	mutex_enter(&rdsv3_info_lock);
 	ASSERT(!rdsv3_info_funcs[offset]);
@@ -89,9 +89,9 @@ rdsv3_info_register_func(int optname, rdsv3_info_func func)
 void
 rdsv3_info_deregister_func(int optname, rdsv3_info_func func)
 {
-	int offset = optname - RDSV3_INFO_FIRST;
+	int offset = optname - RDS_INFO_FIRST;
 
-	ASSERT(optname >= RDSV3_INFO_FIRST && optname <= RDSV3_INFO_LAST);
+	ASSERT(optname >= RDS_INFO_FIRST && optname <= RDS_INFO_LAST);
 
 	mutex_enter(&rdsv3_info_lock);
 	rdsv3_info_funcs[offset] = NULL;
@@ -117,7 +117,7 @@ rdsv3_info_ioctl(struct rsock *sock, int optname, char *optval,
 	struct rds_info_arg arg;
 	uint32_t ulen = 0, klen;
 
-	func = rdsv3_info_funcs[optname - RDSV3_INFO_FIRST];
+	func = rdsv3_info_funcs[optname - RDS_INFO_FIRST];
 	if (func == NULL) {
 		RDSV3_DPRINTF2("rdsv3_info_ioctl",
 		    "No Info Function, optname: %d", optname);

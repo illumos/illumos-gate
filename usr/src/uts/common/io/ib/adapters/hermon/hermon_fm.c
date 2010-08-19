@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -626,6 +625,8 @@ hermon_fm_ereport_init(hermon_state_t *state)
 		    "UAR BAR mapping fails (ereport mode)");
 		goto error;
 	}
+
+	hermon_eq_reset_uar_baseaddr(state);
 
 	/* Drop the Hermon FM Attach Mode */
 	hermon_clr_state(state, HCA_ATTCH_FM);

@@ -33,18 +33,18 @@
 
 static void oce_free_wqed(struct oce_wq *wq,  oce_wqe_desc_t *wqed);
 static int oce_map_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed,
-    mblk_t *mp);
+    mblk_t *mp, uint32_t pkt_len);
 static int oce_bcopy_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed, mblk_t *mp,
     uint32_t pkt_len);
 static void oce_wqb_dtor(struct oce_wq *wq, oce_wq_bdesc_t *wqbd);
 static int oce_wqb_ctor(oce_wq_bdesc_t *wqbd, struct oce_wq *wq,
     size_t size, int flags);
-static oce_wq_bdesc_t *oce_wqb_alloc(struct oce_wq *wq);
+static inline oce_wq_bdesc_t *oce_wqb_alloc(struct oce_wq *wq);
 static void oce_wqb_free(struct oce_wq *wq, oce_wq_bdesc_t *wqbd);
 
-static void oce_wqmd_free(struct oce_wq *wq, oce_wqe_desc_t *wqed);
+static void oce_wqmd_free(struct oce_wq *wq, oce_wq_mdesc_t *wqmd);
 static void oce_wqm_free(struct oce_wq *wq, oce_wq_mdesc_t *wqmd);
-static inline oce_wq_mdesc_t *oce_wqm_alloc(struct oce_wq *wq);
+static oce_wq_mdesc_t *oce_wqm_alloc(struct oce_wq *wq);
 static int oce_wqm_ctor(oce_wq_mdesc_t *wqmd, struct oce_wq *wq);
 static void oce_wqm_dtor(struct oce_wq *wq, oce_wq_mdesc_t *wqmd);
 static void oce_fill_ring_descs(struct oce_wq *wq, oce_wqe_desc_t *wqed);
@@ -54,7 +54,7 @@ static inline int oce_process_tx_compl(struct oce_wq *wq, boolean_t rearm);
 
 
 static ddi_dma_attr_t tx_map_dma_attr = {
-	DMA_ATTR_V0,			/* version number */
+	DMA_ATTR_V0,		/* version number */
 	0x0000000000000000ull,	/* low address */
 	0xFFFFFFFFFFFFFFFFull,	/* high address */
 	0x0000000000010000ull,	/* dma counter max */
@@ -65,7 +65,23 @@ static ddi_dma_attr_t tx_map_dma_attr = {
 	0xFFFFFFFFFFFFFFFFull,	/* maximum segment size */
 	OCE_MAX_TXDMA_COOKIES,	/* scatter/gather list length */
 	0x00000001,		/* granularity */
-	0			/* DMA flags */
+	DDI_DMA_FLAGERR		/* dma_attr_flags */
+};
+
+
+ddi_dma_attr_t oce_tx_dma_buf_attr = {
+	DMA_ATTR_V0,		/* version number */
+	0x0000000000000000ull,	/* low address */
+	0xFFFFFFFFFFFFFFFFull,	/* high address */
+	0x00000000FFFFFFFFull,	/* dma counter max */
+	OCE_DMA_ALIGNMENT,	/* alignment */
+	0x000007FF,		/* burst sizes */
+	0x00000001,		/* minimum transfer size */
+	0x00000000FFFFFFFFull,	/* maximum transfer size */
+	0xFFFFFFFFFFFFFFFFull,	/* maximum segment size */
+	1,			/* scatter/gather list length */
+	0x00000001,		/* granularity */
+	DDI_DMA_FLAGERR		/* dma_attr_flags */
 };
 
 /*
@@ -245,7 +261,9 @@ oce_wqb_ctor(oce_wq_bdesc_t *wqbd, struct oce_wq *wq, size_t size, int flags)
 {
 	struct oce_dev *dev;
 	dev = wq->parent;
-	wqbd->wqb = oce_alloc_dma_buffer(dev, size, flags);
+
+	wqbd->wqb = oce_alloc_dma_buffer(dev, size, &oce_tx_dma_buf_attr,
+	    flags);
 	if (wqbd->wqb == NULL) {
 		return (DDI_FAILURE);
 	}
@@ -278,9 +296,7 @@ oce_wqb_dtor(struct oce_wq *wq, oce_wq_bdesc_t *wqbd)
 static inline oce_wq_bdesc_t *
 oce_wqb_alloc(struct oce_wq *wq)
 {
-	oce_wq_bdesc_t *wqbd;
-	wqbd = OCE_LIST_REM_HEAD(&wq->wq_buf_list);
-	return (wqbd);
+	return (OCE_LIST_REM_HEAD(&wq->wq_buf_list));
 }
 
 /*
@@ -307,10 +323,7 @@ oce_wqb_free(struct oce_wq *wq, oce_wq_bdesc_t *wqbd)
 static inline oce_wq_mdesc_t *
 oce_wqm_alloc(struct oce_wq *wq)
 {
-	oce_wq_mdesc_t *wqmd;
-	wqmd = OCE_LIST_REM_HEAD(&wq->wq_mdesc_list);
-	return (wqmd);
-
+	return (OCE_LIST_REM_HEAD(&wq->wq_mdesc_list));
 } /* oce_wqm_alloc */
 
 /*
@@ -336,19 +349,13 @@ oce_wqm_free(struct oce_wq *wq, oce_wq_mdesc_t *wqmd)
  * return none
  */
 static void
-oce_wqmd_free(struct oce_wq *wq, oce_wqe_desc_t *wqed)
+oce_wqmd_free(struct oce_wq *wq, oce_wq_mdesc_t *wqmd)
 {
-	int ndesc;
-	oce_wq_mdesc_t *wqmd;
-
-	if (wqed == NULL) {
+	if (wqmd == NULL) {
 		return;
 	}
-	for (ndesc = 0; ndesc < wqed->nhdl; ndesc++) {
-		wqmd = wqed->hdesc[ndesc].hdl;
-		(void) ddi_dma_unbind_handle(wqmd->dma_handle);
-		oce_wqm_free(wq, wqmd);
-	}
+	(void) ddi_dma_unbind_handle(wqmd->dma_handle);
+	oce_wqm_free(wq, wqmd);
 }
 
 /*
@@ -361,12 +368,10 @@ oce_wqmd_free(struct oce_wq *wq, oce_wqe_desc_t *wqed)
 int
 oce_wqe_desc_ctor(void *buf, void *arg, int kmflags)
 {
-	oce_wqe_desc_t *wqed = (oce_wqe_desc_t *)buf;
-
+	_NOTE(ARGUNUSED(buf));
 	_NOTE(ARGUNUSED(arg));
 	_NOTE(ARGUNUSED(kmflags));
 
-	bzero(wqed, sizeof (oce_wqe_desc_t));
 	return (DDI_SUCCESS);
 }
 
@@ -388,16 +393,26 @@ oce_wqe_desc_dtor(void *buf, void *arg)
  * function to choose a WQ given a mblk depending on priority, flowID etc.
  *
  * dev - software handle to device
- * pkt - the mblk to send
+ * mp - the mblk to send
  *
  * return pointer to the WQ selected
  */
+static uint8_t oce_tx_hash_policy = 0x4;
 struct oce_wq *
-oce_get_wq(struct oce_dev *dev, mblk_t *pkt)
+oce_get_wq(struct oce_dev *dev, mblk_t *mp)
 {
-	_NOTE(ARGUNUSED(pkt));
+	struct oce_wq *wq;
+	int qidx = 0;
+	if (dev->nwqs > 1) {
+		qidx = mac_pkt_hash(DL_ETHER, mp, oce_tx_hash_policy, B_TRUE);
+		qidx = qidx % dev->nwqs;
+
+	} else {
+		qidx = 0;
+	}
+	wq = dev->wq[qidx];
 	/* for the time being hardcode */
-	return (dev->wq[0]);
+	return (wq);
 } /* oce_get_wq */
 
 /*
@@ -442,6 +457,7 @@ oce_bcopy_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed, mblk_t *mp,
 	oce_wq_bdesc_t *wqbd;
 	caddr_t buf_va;
 	struct oce_dev *dev = wq->parent;
+	int len = 0;
 
 	wqbd = oce_wqb_alloc(wq);
 	if (wqbd == NULL) {
@@ -452,18 +468,16 @@ oce_bcopy_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed, mblk_t *mp,
 	}
 
 	/* create a fragment wqe for the packet */
-	wqed->frag[1].u0.s.frag_pa_hi = wqbd->frag_addr.dw.addr_hi;
-	wqed->frag[1].u0.s.frag_pa_lo = wqbd->frag_addr.dw.addr_lo;
+	wqed->frag[wqed->frag_idx].u0.s.frag_pa_hi = wqbd->frag_addr.dw.addr_hi;
+	wqed->frag[wqed->frag_idx].u0.s.frag_pa_lo = wqbd->frag_addr.dw.addr_lo;
 	buf_va = DBUF_VA(wqbd->wqb);
 
 	/* copy pkt into buffer */
-	for (; mp != NULL; mp = mp->b_cont) {
+	for (len = 0; mp != NULL && len < pkt_len; mp = mp->b_cont) {
 		bcopy(mp->b_rptr, buf_va, MBLKL(mp));
 		buf_va += MBLKL(mp);
+		len += MBLKL(mp);
 	}
-
-	wqed->frag[1].u0.s.frag_len   =  pkt_len;
-	wqed->hdesc[0].hdl = (void *)(wqbd);
 
 	(void) ddi_dma_sync(DBUF_DHDL(wqbd->wqb), 0, pkt_len,
 	    DDI_DMA_SYNC_FORDEV);
@@ -474,9 +488,12 @@ oce_bcopy_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed, mblk_t *mp,
 		oce_wqb_free(wq, wqbd);
 		return (EIO);
 	}
-	wqed->frag_cnt = 2;
-	wqed->nhdl = 1;
-	wqed->type = COPY_WQE;
+	wqed->frag[wqed->frag_idx].u0.s.frag_len   =  pkt_len;
+	wqed->hdesc[wqed->nhdl].hdl = (void *)(wqbd);
+	wqed->hdesc[wqed->nhdl].type = COPY_WQE;
+	wqed->frag_cnt++;
+	wqed->frag_idx++;
+	wqed->nhdl++;
 	return (0);
 } /* oce_bcopy_wqe */
 
@@ -490,75 +507,52 @@ oce_bcopy_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed, mblk_t *mp,
  * return DDI_SUCCESS=>success, DDI_FAILURE=>error
  */
 static  int
-oce_map_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed, mblk_t *mp)
+oce_map_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed, mblk_t *mp,
+    uint32_t pkt_len)
 {
 	ddi_dma_cookie_t cookie;
 	oce_wq_mdesc_t *wqmd;
-	int32_t nfrag = 1;
 	uint32_t ncookies;
 	int ret;
-	uint32_t len;
 	struct oce_dev *dev = wq->parent;
 
-	wqed->nhdl = 0;
-	wqed->mp = mp;
-
-	for (; mp != NULL; mp = mp->b_cont) {
-		len = MBLKL(mp);
-		if (len == 0) {
-			oce_log(dev, CE_NOTE, MOD_TX, "%s",
-			    "Zero len MBLK ");
-			continue;
-		}
-
-		wqmd = oce_wqm_alloc(wq);
-		if (wqmd == NULL) {
-			oce_log(dev, CE_WARN, MOD_TX, "%s",
-			    "wqm pool empty");
-			ret = ENOMEM;
-			goto map_fail;
-		}
-
-		ret = ddi_dma_addr_bind_handle(wqmd->dma_handle,
-		    (struct as *)0, (caddr_t)mp->b_rptr,
-		    len, DDI_DMA_WRITE | DDI_DMA_STREAMING,
-		    DDI_DMA_DONTWAIT, NULL, &cookie, &ncookies);
-		if (ret != DDI_DMA_MAPPED) {
-			oce_log(dev, CE_WARN, MOD_TX, "%s",
-			    "Failed to Map SGL");
-			/* free the last one */
-			oce_wqm_free(wq, wqmd);
-			goto map_fail;
-		}
-
-		do {
-			wqed->frag[nfrag].u0.s.frag_pa_hi =
-			    ADDR_HI(cookie.dmac_laddress);
-			wqed->frag[nfrag].u0.s.frag_pa_lo =
-			    ADDR_LO(cookie.dmac_laddress);
-			wqed->frag[nfrag].u0.s.frag_len =
-			    (uint32_t)cookie.dmac_size;
-			nfrag++;
-			if (--ncookies > 0)
-				ddi_dma_nextcookie(wqmd->dma_handle,
-				    &cookie);
-			else break;
-		} while (ncookies > 0);
-
-		wqed->hdesc[wqed->nhdl].hdl = (void *)wqmd;
-		wqed->nhdl++;
-
-		(void) ddi_dma_sync(wqmd->dma_handle,
-		    0, 0, DDI_DMA_SYNC_FORDEV);
+	wqmd = oce_wqm_alloc(wq);
+	if (wqmd == NULL) {
+		oce_log(dev, CE_WARN, MOD_TX, "%s",
+		    "wqm pool empty");
+		return (ENOMEM);
 	}
-	wqed->frag_cnt = nfrag;
-	wqed->type = MAPPED_WQE;
-	return (0);
 
-map_fail:
-	wqed->mp = NULL;
-	oce_wqmd_free(wq, wqed);
-	return (ret);
+	ret = ddi_dma_addr_bind_handle(wqmd->dma_handle,
+	    (struct as *)0, (caddr_t)mp->b_rptr,
+	    pkt_len, DDI_DMA_WRITE | DDI_DMA_STREAMING,
+	    DDI_DMA_DONTWAIT, NULL, &cookie, &ncookies);
+	if (ret != DDI_DMA_MAPPED) {
+		oce_log(dev, CE_WARN, MOD_TX, "MAP FAILED %d",
+		    ret);
+		/* free the last one */
+		oce_wqm_free(wq, wqmd);
+		return (ENOMEM);
+	}
+	do {
+		wqed->frag[wqed->frag_idx].u0.s.frag_pa_hi =
+		    ADDR_HI(cookie.dmac_laddress);
+		wqed->frag[wqed->frag_idx].u0.s.frag_pa_lo =
+		    ADDR_LO(cookie.dmac_laddress);
+		wqed->frag[wqed->frag_idx].u0.s.frag_len =
+		    (uint32_t)cookie.dmac_size;
+		wqed->frag_cnt++;
+		wqed->frag_idx++;
+		if (--ncookies > 0)
+			ddi_dma_nextcookie(wqmd->dma_handle,
+			    &cookie);
+			else break;
+	} while (ncookies > 0);
+
+	wqed->hdesc[wqed->nhdl].hdl = (void *)wqmd;
+	wqed->hdesc[wqed->nhdl].type = MAPPED_WQE;
+	wqed->nhdl++;
+	return (0);
 } /* oce_map_wqe */
 
 static inline int
@@ -703,14 +697,15 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	uint32_t pkt_len = 0;
 	int num_mblks = 0;
 	int ret = 0;
-	uint32_t flags = 0;
 	uint32_t mss = 0;
+	uint32_t flags = 0;
+	int len = 0;
 
 	/* retrieve the adap priv struct ptr */
 	dev = wq->parent;
 
 	/* check if we have enough free slots */
-	if (wq->wq_free < wq->cfg.q_len/2) {
+	if (wq->wq_free < dev->tx_reclaim_threshold) {
 		(void) oce_process_tx_compl(wq, B_FALSE);
 	}
 	if (wq->wq_free < OCE_MAX_TX_HDL) {
@@ -723,28 +718,28 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 		num_mblks++;
 	}
 
-	/* Retrieve LSO info */
+	if (pkt_len == 0 || num_mblks == 0) {
+		freemsg(mp);
+		return (NULL);
+	}
+
+	/* retrieve LSO information */
 	mac_lso_get(mp, &mss, &flags);
 
 	/* get the offload flags */
 	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &csum_flags);
 
-	/* Limit should be always less than Tx Buffer Size */
-	if (pkt_len < dev->tx_bcopy_limit) {
-		use_copy = B_TRUE;
-	} else {
-		/* restrict the mapped segment to wat we support */
-		if (num_mblks  > OCE_MAX_TX_HDL) {
-			nmp = msgpullup(mp, -1);
-			if (nmp == NULL) {
-				atomic_inc_32(&wq->pkt_drops);
-				freemsg(mp);
-				return (NULL);
-			}
-			/* Reset it to new collapsed mp */
+	/* restrict the mapped segment to wat we support */
+	if (num_mblks  > OCE_MAX_TX_HDL) {
+		nmp = msgpullup(mp, -1);
+		if (nmp == NULL) {
+			atomic_inc_32(&wq->pkt_drops);
 			freemsg(mp);
-			mp = nmp;
+			return (NULL);
 		}
+		/* Reset it to new collapsed mp */
+		freemsg(mp);
+		mp = nmp;
 	}
 
 	/* Get the packet descriptor for Tx */
@@ -767,14 +762,34 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 		etype = ntohs(eh->ether_type);
 		ip_offset = sizeof (struct ether_header);
 	}
-	bzero(wqed, sizeof (oce_wqe_desc_t));
 
 	/* Save the WQ pointer */
 	wqed->wq = wq;
-	if (use_copy == B_TRUE) {
+	wqed->frag_idx = 1; /* index zero is always header */
+	wqed->frag_cnt = 0;
+	wqed->nhdl = 0;
+	wqed->mp = NULL;
+	OCE_LIST_LINK_INIT(&wqed->link);
+
+	/* If entire packet is less than the copy limit  just do copy */
+	if (pkt_len < dev->tx_bcopy_limit) {
+		use_copy = B_TRUE;
 		ret = oce_bcopy_wqe(wq, wqed, mp, pkt_len);
 	} else {
-		ret = oce_map_wqe(wq, wqed, mp);
+		/* copy or dma map the individual fragments */
+		for (nmp = mp; nmp != NULL; nmp = nmp->b_cont) {
+			len = MBLKL(nmp);
+			if (len == 0) {
+				continue;
+			}
+			if (len < dev->tx_bcopy_limit) {
+				ret = oce_bcopy_wqe(wq, wqed, nmp, len);
+			} else {
+				ret = oce_map_wqe(wq, wqed, nmp, len);
+			}
+			if (ret != 0)
+				break;
+		}
 	}
 
 	/*
@@ -782,15 +797,14 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	 * drop the packet
 	 */
 	if (ret != 0) {
-		kmem_cache_free(wq->wqed_cache, wqed);
-		/* drop the packet */
+		oce_free_wqed(wq, wqed);
 		atomic_inc_32(&wq->pkt_drops);
 		freemsg(mp);
 		return (NULL);
 	}
 
-	/* increment pending wqed to be scheduled */
 	wqeh = (struct oce_nic_hdr_wqe *)&wqed->frag[0];
+	bzero(wqeh, sizeof (struct oce_nic_hdr_wqe));
 
 	/* fill rest of wqe header fields based on packet */
 	if (flags & HW_LSO) {
@@ -823,12 +837,13 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	wqeh->u0.s.crc = B_TRUE;
 	wqeh->u0.s.total_length = pkt_len;
 
-	/* frag count +  header wqe */
-	num_wqes = wqed->frag_cnt;
+	num_wqes = wqed->frag_cnt + 1;
 
 	/* h/w expects even no. of WQEs */
-	if (num_wqes & 0x1)
+	if (num_wqes & 0x1) {
+		bzero(&wqed->frag[num_wqes], sizeof (struct oce_nic_frag_wqe));
 		num_wqes++;
+	}
 	wqed->wqe_cnt = (uint16_t)num_wqes;
 	wqeh->u0.s.num_wqe = num_wqes;
 	DW_SWAP(u32ptr(&wqed->frag[0]), (wqed->wqe_cnt * NIC_WQE_SIZE));
@@ -840,7 +855,6 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 		goto wqe_fail;
 	}
 	atomic_add_32(&wq->wq_free, -num_wqes);
-	wqed->wq_start_idx = wq->ring->pidx;
 
 	/* fill the wq for adapter */
 	oce_fill_ring_descs(wq, wqed);
@@ -854,15 +868,16 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	reg_value = (num_wqes << 16) | wq->wq_id;
 	/* Ring the door bell  */
 	OCE_DB_WRITE32(dev, PD_TXULP_DB, reg_value);
+	mutex_exit(&wq->tx_lock);
 	if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
 	}
-	mutex_exit(&wq->tx_lock);
 
 	/* free mp if copied or packet chain collapsed */
 	if (use_copy == B_TRUE) {
 		freemsg(mp);
-	}
+	} else
+		wqed->mp = mp;
 	return (NULL);
 
 wqe_fail:
@@ -870,9 +885,6 @@ wqe_fail:
 	if (tagged) {
 		oce_insert_vtag(mp, vlan_tag);
 	}
-
-	/* set it to null in case map_wqe has set it */
-	wqed->mp = NULL;
 	oce_free_wqed(wq, wqed);
 	return (mp);
 } /* oce_send_packet */
@@ -889,16 +901,18 @@ wqe_fail:
 static void
 oce_free_wqed(struct oce_wq *wq, oce_wqe_desc_t *wqed)
 {
+	int i = 0;
 	if (wqed == NULL) {
 		return;
 	}
 
-	if (wqed->type == COPY_WQE) {
-		oce_wqb_free(wq, wqed->hdesc[0].hdl);
-	} else if (wqed->type == MAPPED_WQE) {
-		oce_wqmd_free(wq, wqed);
-	} else ASSERT(0);
-
+	for (i = 0; i < wqed->nhdl; i++) {
+		if (wqed->hdesc[i].type == COPY_WQE) {
+		oce_wqb_free(wq, wqed->hdesc[i].hdl);
+		} else 	if (wqed->hdesc[i].type == MAPPED_WQE) {
+			oce_wqmd_free(wq, wqed->hdesc[i].hdl);
+		}
+	}
 	if (wqed->mp)
 		freemsg(wqed->mp);
 	kmem_cache_free(wq->wqed_cache, wqed);

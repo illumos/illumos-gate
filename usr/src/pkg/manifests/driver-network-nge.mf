@@ -56,9 +56,7 @@ driver name=nge clone_perms="nge 0666 root sys" perms="* 0666 root sys" \
 file path=kernel/drv/$(ARCH64)/nge group=sys
 file path=kernel/drv/nge group=sys
 file path=kernel/drv/nge.conf group=sys
-legacy pkg=SUNWnge arch=$(ARCH) category=system desc="Nvidia CK8-04 GE driver" \
-    hotline="Please contact your local service provider" \
-    name="Nvidia CK8-04 GE driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWnge desc="Nvidia CK8-04 GE driver" \
+    name="Nvidia CK8-04 GE driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

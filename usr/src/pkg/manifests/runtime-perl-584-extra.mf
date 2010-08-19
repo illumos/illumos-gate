@@ -1508,11 +1508,9 @@ file path=usr/perl5/5.8.4/lib/utf8_heavy.pl mode=0444
 file path=usr/perl5/5.8.4/lib/validate.pl mode=0444
 hardlink path=usr/perl5/5.8.4/bin/psed target=s2p
 hardlink path=usr/perl5/5.8.4/bin/pstruct target=c2ph
-legacy pkg=SUNWperl584usr arch=$(ARCH) category=system \
-    desc="Perl 5.8.4 programming language (non-core)" \
-    hotline="Please contact your local service provider" \
-    name="Perl 5.8.4 (non-core)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/perl/THIRDPARTYLICENSE license=cmd/perl/THIRDPARTYLICENSE
+legacy pkg=SUNWperl584usr desc="Perl 5.8.4 programming language (non-core)" \
+    name="Perl 5.8.4 (non-core)"
 license cr_Sun license=cr_Sun
+license usr/src/cmd/perl/THIRDPARTYLICENSE \
+    license=usr/src/cmd/perl/THIRDPARTYLICENSE
 link path=usr/perl5/pod target=./5.8.4/lib/pod

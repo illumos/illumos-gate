@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -36,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -100,12 +96,12 @@ _socket_create(int family, int type, int protocol, int version)
 
 	/*
 	 * Try creating without knowing the device assuming that
-	 * the transport provider is registered in /etc/sock2path.
+	 * the transport provider is registered in /etc/sock2path.d.
 	 * If none found fall back to using /etc/netconfig to look
 	 * up the name of the transport device name. This provides
 	 * backwards compatibility for transport providers that have not
-	 * yet been converted to using /etc/sock2path.
-	 * XXX When all transport providers use /etc/sock2path this
+	 * yet been converted to using /etc/sock2path.d.
+	 * XXX When all transport providers use /etc/sock2path.d. this
 	 * part of the code can be removed.
 	 */
 	fd = _so_socket(family, type, protocol, NULL, version);
@@ -128,7 +124,7 @@ _socket_create(int family, int type, int protocol, int version)
 			return (-1);
 		}
 		if (_s_netconfig_path(family, type, protocol,
-					&devpath, &prototype) == -1) {
+		    &devpath, &prototype) == -1) {
 			errno = saved_errno;
 			return (-1);
 		}

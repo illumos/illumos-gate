@@ -75,13 +75,17 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	sysevent_attr_value;
 	sysevent_bind_publisher;
 	sysevent_bind_subscriber;
+	sysevent_bind_xhandle;
+	sysevent_bind_xsubscriber;
 	sysevent_cleanup_publishers;
 	sysevent_cleanup_subscribers;
 	sysevent_close_channel;
 	sysevent_dup;
 	sysevent_evc_bind;
 	sysevent_evc_control;
+	sysevent_evc_getpropnvl;
 	sysevent_evc_publish;
+	sysevent_evc_setpropnvl;
 	sysevent_evc_subscribe;
 	sysevent_evc_unbind;
 	sysevent_evc_unsubscribe;

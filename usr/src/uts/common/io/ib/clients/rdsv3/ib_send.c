@@ -62,15 +62,15 @@ rdsv3_ib_send_rdma_complete(struct rdsv3_message *rm,
 		return;
 
 	case IBT_WC_SUCCESS:
-		notify_status = RDSV3_RDMA_SUCCESS;
+		notify_status = RDS_RDMA_SUCCESS;
 		break;
 
 	case IBT_WC_REMOTE_ACCESS_ERR:
-		notify_status = RDSV3_RDMA_REMOTE_ERROR;
+		notify_status = RDS_RDMA_REMOTE_ERROR;
 		break;
 
 	default:
-		notify_status = RDSV3_RDMA_OTHER_ERROR;
+		notify_status = RDS_RDMA_OTHER_ERROR;
 		break;
 	}
 	rdsv3_rdma_send_complete(rm, notify_status);

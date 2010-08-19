@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -92,6 +92,10 @@ getdents32(int fd, void *buf, size_t count)
 	if (vp->v_type != VDIR) {
 		releasef(fd);
 		return (set_errno(ENOTDIR));
+	}
+	if (!(fp->f_flag & FREAD)) {
+		releasef(fd);
+		return (set_errno(EBADF));
 	}
 
 	/*
@@ -206,6 +210,10 @@ getdents64(int fd, void *buf, size_t count)
 	if (vp->v_type != VDIR) {
 		releasef(fd);
 		return (set_errno(ENOTDIR));
+	}
+	if (!(fp->f_flag & FREAD)) {
+		releasef(fd);
+		return (set_errno(EBADF));
 	}
 	aiov.iov_base = buf;
 	aiov.iov_len = count;

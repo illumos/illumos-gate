@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1357,8 +1356,10 @@ set_all_zone_usr_proc_sys(zoneid_t zoneid)
 		 */
 		if (zoneid == ALL_ZONES || p->p_zone->zone_id == zoneid) {
 			mutex_enter(&p->p_lock);
-			if ((t = p->p_tlist) == NULL)
+			if ((t = p->p_tlist) == NULL) {
+				mutex_exit(&p->p_lock);
 				continue;
+			}
 			/*
 			 * Set pre- and post-syscall processing flags
 			 * for all threads of the process

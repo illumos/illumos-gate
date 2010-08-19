@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -42,7 +41,11 @@
 
 #include "pi_impl.h"
 
-#define	MAX_PATH_DEPTH	(MAXPATHLEN / 256)	/* max pci path = 256 */
+/* max pci path = 256 */
+#define	MAX_PATH_DEPTH	(MAXPATHLEN / 256)
+
+/* max pci path + child + minor */
+#define	MAX_DIPATH_DEPTH	(MAX_PATH_DEPTH + 2)
 
 static const topo_pgroup_info_t sys_pgroup = {
 	TOPO_PGROUP_SYSTEM,
@@ -142,6 +145,77 @@ pi_skip_node(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 	}
 	return (0);
 }
+
+
+/*
+ * Build a device path without device names (PRI like) from a devinfo
+ * node. Return the PRI like path.
+ *
+ * The string must be freed with topo_mod_strfree()
+ */
+char *
+pi_get_dipath(topo_mod_t *mod, di_node_t dnode)
+{
+	int	i, j, rv;
+	int	depth = 0;
+	char	*bus_addr[MAX_DIPATH_DEPTH] = { NULL };
+	char	*dev_path[MAX_DIPATH_DEPTH] = { NULL };
+	char	*path = NULL;
+	size_t	path_len = 0;
+
+	/* loop through collecting bus addresses */
+	do {
+		/* stop at '/' */
+		if (strcmp(di_devfs_path(dnode), "/") == 0) {
+			break;
+		}
+
+		if (depth < MAX_DIPATH_DEPTH) {
+			bus_addr[depth] = topo_mod_strdup(mod,
+			    di_bus_addr(dnode));
+			++depth;
+		} else {
+			topo_mod_dprintf(mod, "pi_get_dipath: path too "
+			    "long (%d)\n", depth);
+			return (NULL);
+		}
+	} while ((dnode = di_parent_node(dnode)) != DI_NODE_NIL);
+
+	/* prepend '/@' to each bus address */
+	for (i = (depth - 1), j = 0; i >= 0; --i, j++) {
+		int len = strlen(bus_addr[i]) + strlen("/@") + 1;
+		path_len += len;
+		dev_path[j] = (char *)topo_mod_alloc(mod, len);
+		rv = snprintf(dev_path[j], len, "/@%s", bus_addr[i]);
+		if (rv < 0) {
+			return (NULL);
+		}
+	}
+
+	/*
+	 * Build the path from the bus addresses.
+	 */
+	path_len -= (depth - 1); /* leave room for one null char */
+	path = (char *)topo_mod_alloc(mod, path_len);
+	path = strcpy(path, dev_path[0]);
+
+	for (i = 1; i < depth; i++) {
+		path = strncat(path, dev_path[i], strlen(dev_path[i]) + 1);
+	}
+
+	for (i = 0; i < depth; i++) {
+		if (bus_addr[i] != NULL) {
+			topo_mod_strfree(mod, bus_addr[i]);
+		}
+		if (dev_path[i] != NULL) {
+			topo_mod_strfree(mod, dev_path[i]);
+		}
+	}
+
+	topo_mod_dprintf(mod, "pi_get_dipath: path (%s)\n", path);
+	return (path);
+}
+
 
 /*
  * Get the product serial number (the ID as far as the topo authority is
@@ -380,12 +454,23 @@ pi_get_label(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 	int	result;
 	int	is_fru;
 	char	*lp = NULL;
+	char	*hc_name = pi_get_topo_hc_name(mod, mdp, mde_node);
 
-	result = pi_get_fru(mod, mdp, mde_node, &is_fru);
-	if (result != 0 || is_fru == 0) {
-		/* This node is not a FRU.  It has no label */
-		return (NULL);
+	/*
+	 * The disk enumerator will set the "bay" node as a FRU and
+	 * expect the label from the PRI. The "fru" property can not
+	 * be set because hostconfig has no way to set the S/N, P/N,
+	 * etc.. in the PRI.
+	 */
+	if (strncmp(hc_name, BAY, strlen(BAY)) != 0) {
+		result = pi_get_fru(mod, mdp, mde_node, &is_fru);
+		if (result != 0 || is_fru == 0) {
+			/* This node is not a FRU.  It has no label */
+			topo_mod_strfree(mod, hc_name);
+			return (NULL);
+		}
 	}
+	topo_mod_strfree(mod, hc_name);
 
 	/*
 	 * The node is a FRU.  Get the NAC name to use as a label.
@@ -398,6 +483,56 @@ pi_get_label(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 
 	/* Return a copy of the label */
 	return (topo_mod_strdup(mod, lp));
+}
+
+
+/*
+ * Return the "lun" property.
+ */
+int
+pi_get_lun(topo_mod_t *mod, di_node_t node)
+{
+	int		lun;
+	int		*buf;
+	unsigned char	*chbuf;
+	di_prop_t	di_prop = DI_PROP_NIL;
+	di_path_t	dpath = DI_PATH_NIL;
+	di_path_prop_t	di_path_prop = DI_PROP_NIL;
+
+	/* look for pathinfo property */
+	while ((dpath = di_path_phci_next_path(node, dpath)) != DI_PATH_NIL) {
+		while ((di_path_prop =
+		    di_path_prop_next(dpath, di_path_prop)) != DI_PROP_NIL) {
+			if (strcmp("lun",
+			    di_path_prop_name(di_path_prop)) == 0) {
+				(void) di_path_prop_ints(di_path_prop, &buf);
+				bcopy(buf, &lun, sizeof (int));
+				goto found;
+			}
+		}
+	}
+
+	/* look for devinfo property */
+	for (di_prop = di_prop_next(node, DI_PROP_NIL);
+	    di_prop != DI_PROP_NIL;
+	    di_prop = di_prop_next(node, di_prop)) {
+		if (strncmp("lun", di_prop_name(di_prop),
+		    strlen(di_prop_name(di_prop))) == 0) {
+			if (di_prop_bytes(di_prop, &chbuf) < sizeof (uint_t)) {
+				continue;
+			}
+			bcopy(chbuf, &lun, sizeof (uint_t));
+			goto found;
+		}
+	}
+
+	if (di_prop == DI_PROP_NIL && (dpath == DI_PATH_NIL ||
+	    di_path_prop == DI_PROP_NIL)) {
+		return (-1);
+	}
+found:
+	topo_mod_dprintf(mod, "pi_get_lun: lun = (%d)\n", lun);
+	return (lun);
 }
 
 
@@ -591,6 +726,88 @@ pi_get_productid(topo_mod_t *mod, md_t *mdp)
 
 
 /*
+ * If the phy pointer is NULL just return the number of 'phy_number' properties
+ * from the PRI; otherwise pass the 'phy_number' property values back to the
+ * caller.
+ *
+ * The caller is responsible for managing allocated memory.
+ */
+int
+pi_get_priphy(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node, uint8_t *phyp)
+{
+	int	result;
+	uint8_t	*phy_num;
+	int	nphy;
+
+	result = md_get_prop_data(mdp, mde_node, MD_STR_PHY_NUMBER,
+	    &phy_num, &nphy);
+	if (result != 0) {
+		/* no phy_number property */
+		topo_mod_dprintf(mod,
+		    "node_0x%llx has no phy_number property\n",
+		    (uint64_t)mde_node);
+		return (-1);
+	}
+
+	if (phyp != NULL) {
+		bcopy(phy_num, phyp, nphy);
+	}
+	return (nphy);
+}
+
+
+/*
+ * Return "phy-num" devinfo/pathinfo property.
+ */
+int
+pi_get_phynum(topo_mod_t *mod, di_node_t node)
+{
+	int		phy;
+	int		*buf;
+	unsigned char	*chbuf;
+	di_prop_t	di_prop = DI_PROP_NIL;
+	di_path_t	dpath = DI_PATH_NIL;
+	di_path_prop_t	di_path_prop = DI_PROP_NIL;
+
+
+	/* look for pathinfo property */
+	while ((dpath = di_path_phci_next_path(node, dpath)) != DI_PATH_NIL) {
+		while ((di_path_prop =
+		    di_path_prop_next(dpath, di_path_prop)) != DI_PROP_NIL) {
+			if (strcmp("phy-num",
+			    di_path_prop_name(di_path_prop)) == 0) {
+				(void) di_path_prop_ints(di_path_prop, &buf);
+				bcopy(buf, &phy, sizeof (int));
+				goto found;
+			}
+		}
+	}
+
+	/* look for devinfo property */
+	for (di_prop = di_prop_next(node, DI_PROP_NIL);
+	    di_prop != DI_PROP_NIL;
+	    di_prop = di_prop_next(node, di_prop)) {
+		if (strncmp("phy-num", di_prop_name(di_prop),
+		    strlen("phy-num")) == 0) {
+			if (di_prop_bytes(di_prop, &chbuf) < sizeof (uint_t)) {
+				continue;
+			}
+			bcopy(chbuf, &phy, sizeof (uint_t));
+			goto found;
+		}
+	}
+
+	if (di_prop == DI_PROP_NIL && (dpath == DI_PATH_NIL ||
+	    di_path_prop == DI_PROP_NIL)) {
+		return (-1);
+	}
+found:
+	topo_mod_dprintf(mod, "pi_get_phynum: phy = %d\n", phy);
+	return (phy);
+}
+
+
+/*
  * Return the revision string to the caller.
  *
  * The string must be freed with topo_mod_strfree()
@@ -675,7 +892,58 @@ pi_get_serverid(topo_mod_t *mod)
 
 
 /*
- * Get the hc scheme name for the given node
+ * Return the "target-port" property.
+ *
+ * The string must be freed with topo_mod_strfree()
+ */
+char *
+pi_get_target_port(topo_mod_t *mod, di_node_t node)
+{
+	char		*tport;
+	di_prop_t	di_prop = DI_PROP_NIL;
+	di_path_t	dpath = DI_PATH_NIL;
+	di_path_prop_t	di_path_prop = DI_PROP_NIL;
+
+	/* look for pathinfo property */
+	while ((dpath = di_path_phci_next_path(node, dpath)) != DI_PATH_NIL) {
+		while ((di_path_prop =
+		    di_path_prop_next(dpath, di_path_prop)) != DI_PROP_NIL) {
+			if (strcmp("target-port",
+			    di_path_prop_name(di_path_prop)) == 0) {
+				(void) di_path_prop_strings(di_path_prop,
+				    &tport);
+				goto found;
+			}
+		}
+	}
+
+	/* look for devinfo property */
+	for (di_prop = di_prop_next(node, DI_PROP_NIL);
+	    di_prop != DI_PROP_NIL;
+	    di_prop = di_prop_next(node, di_prop)) {
+		if (strcmp("target-port", di_prop_name(di_prop)) == 0) {
+			if (di_prop_strings(di_prop, &tport) < 0) {
+				continue;
+			}
+			goto found;
+		}
+	}
+
+	if (di_prop == DI_PROP_NIL && (dpath == DI_PATH_NIL ||
+	    di_path_prop == DI_PROP_NIL)) {
+		return (NULL);
+	}
+found:
+	topo_mod_dprintf(mod, "pi_get_target_port: 'target-port' = (%s)\n",
+	    tport);
+	return (topo_mod_strdup(mod, tport));
+}
+
+
+/*
+ * Get the hc scheme name for the given node.
+ *
+ * The string must be freed with topo_mod_strfree()
  */
 char *
 pi_get_topo_hc_name(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
@@ -1131,18 +1399,23 @@ pi_node_bind(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	/*
 	 * We have bound the node.  Now decorate it with an appropriate
 	 * FRU and label (which may be inherited from the parent).
+	 *
+	 * The disk enumerator requires that 'bay' nodes not set their
+	 * fru property.
 	 */
-	result = pi_set_frufmri(mod, mdp, mde_node, hc_name, inst, t_parent,
-	    t_node);
-	if (result != 0) {
-		/*
-		 * Though we have failed to set the FRU FMRI we still continue.
-		 * The module errno is set by the called routine, so we report
-		 * the problem and move on.
-		 */
-		topo_mod_dprintf(mod,
-		    "failed to set FRU FMRI for node_0x%llx\n",
-		    (uint64_t)mde_node);
+	if (strncmp(hc_name, BAY, strlen(BAY)) != 0) {
+		result = pi_set_frufmri(mod, mdp, mde_node, hc_name, inst,
+		    t_parent, t_node);
+		if (result != 0) {
+			/*
+			 * Though we have failed to set the FRU FMRI we still
+			 * continue. The module errno is set by the called
+			 * routine, so we report the problem and move on.
+			 */
+			topo_mod_dprintf(mod,
+			    "failed to set FRU FMRI for node_0x%llx\n",
+			    (uint64_t)mde_node);
+		}
 	}
 
 	result = pi_set_label(mod, mdp, mde_node, t_node);

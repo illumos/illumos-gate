@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -85,7 +85,7 @@ die(char *format, ...)
 }
 
 char *
-setprogname(char *arg0)
+setpname(char *arg0)
 {
 	char *p = strrchr(arg0, '/');
 

@@ -4,8 +4,10 @@ read			3
 write			4
 open			5
 close			6
+linkat			7
 link			9
 unlink			10
+symlinkat		11
 chdir			12
 gtime			13
 mknod			14
@@ -16,6 +18,7 @@ stat			18
 lseek			19
 getpid			20
 mount			21
+readlinkat		22
 setuid			23
 getuid			24
 stime			25
@@ -39,6 +42,7 @@ profil			44
 faccessat		45
 setgid			46
 getgid			47
+mknodat			48
 msgsys			49
 sysi86			50
 sysacct			51
@@ -89,6 +93,8 @@ sigaltstack		97
 sigaction		98
 sigpending		99
 setcontext		100
+fchmodat		101
+mkdirat			102
 statvfs			103
 fstatvfs		104
 getloadavg		105

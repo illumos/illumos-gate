@@ -57,16 +57,9 @@ file path=usr/sbin/ftpshut mode=0555
 file path=usr/sbin/in.ftpd mode=0555
 file path=usr/sbin/privatepw mode=0555
 hardlink path=usr/sbin/ftpwho target=../../usr/sbin/ftpcount
-legacy pkg=SUNWftpr arch=$(ARCH) category=system \
-    desc="FTP Server Configuration Files" \
-    hotline="Please contact your local service provider" \
-    name="FTP Server, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWftpu arch=$(ARCH) category=system \
-    desc="FTP Server and Utilities" \
-    hotline="Please contact your local service provider" \
-    name="FTP Server, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license ../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
-    license=../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
+legacy pkg=SUNWftpr desc="FTP Server Configuration Files" \
+    name="FTP Server, (Root)"
+legacy pkg=SUNWftpu desc="FTP Server and Utilities" name="FTP Server, (Usr)"
 license cr_Sun license=cr_Sun
+license usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE

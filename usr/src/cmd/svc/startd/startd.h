@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_STARTD_H
@@ -333,6 +332,9 @@ typedef struct graph_vertex {
 	 * Currently, only relevant for GVT_SVC and GVT_INST type vertices.
 	 */
 	int 				gv_refs;
+
+	int32_t				gv_stn_tset;
+	int32_t				gv_reason;
 } graph_vertex_t;
 
 typedef struct graph_edge {
@@ -340,6 +342,9 @@ typedef struct graph_edge {
 	uu_list_node_t	ge_link;
 	graph_vertex_t	*ge_parent;
 } graph_edge_t;
+
+int libscf_get_info_events_all(scf_propertygroup_t *);
+int32_t libscf_get_stn_tset(scf_instance_t *);
 
 /*
  * Restarter transition outcomes
@@ -471,6 +476,7 @@ typedef struct restarter_instance_list {
 
 typedef struct restarter_instance_qentry {
 	restarter_event_type_t	riq_type;
+	int32_t			riq_reason;
 	uu_list_node_t		riq_link;
 } restarter_instance_qentry_t;
 
@@ -478,6 +484,7 @@ typedef struct fork_info {
 	int			sf_id;
 	int			sf_method_type;
 	restarter_error_t	sf_event_type;
+	restarter_str_t		sf_reason;
 } fork_info_t;
 
 typedef struct wait_info {
@@ -724,7 +731,7 @@ void restarter_start(void);
 int instance_in_transition(restarter_inst_t *);
 int restarter_instance_update_states(scf_handle_t *, restarter_inst_t *,
     restarter_instance_state_t, restarter_instance_state_t, restarter_error_t,
-    char *);
+    restarter_str_t);
 int stop_instance_fmri(scf_handle_t *, const char *, uint_t);
 restarter_inst_t *inst_lookup_by_id(int);
 void restarter_mark_pending_snapshot(const char *, uint_t);

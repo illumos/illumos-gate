@@ -63,6 +63,12 @@ smb_kmod_bind(void)
 	return (0);
 }
 
+boolean_t
+smb_kmod_isbound(void)
+{
+	return ((smbdrv_fd == -1) ? B_FALSE : B_TRUE);
+}
+
 int
 smb_kmod_setcfg(smb_kmod_cfg_t *cfg)
 {
@@ -78,6 +84,7 @@ smb_kmod_setcfg(smb_kmod_cfg_t *cfg)
 	ioc.sync_enable = cfg->skc_sync_enable;
 	ioc.secmode = cfg->skc_secmode;
 	ioc.ipv6_enable = cfg->skc_ipv6_enable;
+	ioc.print_enable = cfg->skc_print_enable;
 	ioc.exec_flags = cfg->skc_execflags;
 	ioc.version = cfg->skc_version;
 
@@ -213,6 +220,24 @@ smb_kmod_unshare(nvlist_t *shrlist)
 }
 
 int
+smb_kmod_shareinfo(char *shrname, boolean_t *shortnames)
+{
+	smb_ioc_shareinfo_t ioc;
+	int rc;
+
+	bzero(&ioc, sizeof (ioc));
+	(void) strlcpy(ioc.shrname, shrname, MAXNAMELEN);
+
+	rc = smb_kmod_ioctl(SMB_IOC_SHAREINFO, &ioc.hdr, sizeof (ioc));
+	if (rc == 0)
+		*shortnames = ioc.shortnames;
+	else
+		*shortnames = B_TRUE;
+
+	return (rc);
+}
+
+int
 smb_kmod_get_open_num(smb_opennum_t *opennum)
 {
 	smb_ioc_opennum_t ioc;
@@ -229,6 +254,24 @@ smb_kmod_get_open_num(smb_opennum_t *opennum)
 		opennum->open_files = ioc.open_files;
 	}
 
+	return (rc);
+}
+
+int
+smb_kmod_get_spool_doc(uint32_t *spool_num, char *username,
+    char *path, smb_inaddr_t *ipaddr)
+{
+	smb_ioc_spooldoc_t ioc;
+	int rc;
+
+	bzero(&ioc, sizeof (ioc));
+	rc = smb_kmod_ioctl(SMB_IOC_SPOOLDOC, &ioc.hdr, sizeof (ioc));
+	if (rc == 0) {
+		*spool_num = ioc.spool_num;
+		(void) strlcpy(username, ioc.username, MAXNAMELEN);
+		(void) strlcpy(path, ioc.path, MAXPATHLEN);
+		*ipaddr = ioc.ipaddr;
+	}
 	return (rc);
 }
 

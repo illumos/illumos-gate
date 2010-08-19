@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
  *  mpi.h
  *
@@ -40,16 +41,13 @@
  *
  * ***** END LICENSE BLOCK ***** */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Sun elects to use this software under the MPL license.
  */
 
 #ifndef _MPI_H
 #define _MPI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* $Id: mpi.h,v 1.22 2004/04/27 23:04:36 gerv%gerv.net Exp $ */
 
@@ -240,7 +238,7 @@ typedef          int      mp_sword;
 #define MP_MAX_RADIX         64
 
 typedef struct {
-  mp_sign       flag;    /* KM_SLEEP/KM_NOSLEEP        */
+  mp_flag       flag;    /* KM_SLEEP/KM_NOSLEEP        */
   mp_sign       sign;    /* sign of this quantity      */
   mp_size       alloc;   /* how many digits allocated  */
   mp_size       used;    /* how many digits used       */
@@ -392,3 +390,4 @@ mp_size mp_trailing_zeros(const mp_int *mp);
 #endif /* defined MP_API_COMPATIBLE */
 
 #endif /* _MPI_H */
+/* END CSTYLED */

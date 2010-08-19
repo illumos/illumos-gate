@@ -59,7 +59,7 @@
  *   Modules are created by sof_register() and placed in sof_module_list,
  *   which is protected by sof_module_lock. Each module has a reference count
  *   that is incremented when a filter entry is using the module. A module
- *   can be destroyed by sof_register() only when it's ref count is zero.
+ *   can be destroyed by sof_unregister() only when its ref count is zero.
  *
  * Socket filter instance (sof_instance_t):
  *
@@ -254,7 +254,6 @@ sof_setsockopt_impl(struct sonode *so, int option_name,
 			    (sof_handle_t)inst, so->so_family, so->so_type,
 			    so->so_protocol, cr, &inst->sofi_cookie);
 			if (rval != SOF_RVAL_CONTINUE) {
-				sof_instance_destroy(inst);
 				switch (rval) {
 				case SOF_RVAL_DETACH:
 					/*
@@ -272,6 +271,7 @@ sof_setsockopt_impl(struct sonode *so, int option_name,
 					error = sof_rval2errno(rval);
 					break;
 				}
+				sof_instance_destroy(inst);
 				return (error);
 			}
 		}
@@ -637,8 +637,14 @@ sof_sonode_closing(struct sonode *so)
 	 */
 	sof_sonode_notify_filters(so, SOF_EV_CLOSING, (uintptr_t)B_TRUE);
 
-	/* wait for filters that are sending out data */
+	/*
+	 * Stop any future attempts to inject data, and wait for any
+	 * pending operations to complete. This has to be done to ensure
+	 * that no data is sent down to the protocol once a close
+	 * downcall has been made.
+	 */
 	mutex_enter(&so->so_lock);
+	so->so_state |= SS_FIL_STOP;
 	while (so->so_filter_tx > 0)
 		cv_wait(&so->so_closing_cv, &so->so_lock);
 	mutex_exit(&so->so_lock);
@@ -1344,7 +1350,7 @@ sof_filter_data_in_proc(struct sonode *so, mblk_t *mp, mblk_t **lastmp)
 		mutex_enter(&so->so_lock);
 		so->so_rcv_queued += diff;
 		/* so_check_flow_control drops so_lock */
-		so_check_flow_control(so);
+		(void) so_check_flow_control(so);
 	}
 
 	return (retmp);
@@ -1612,7 +1618,7 @@ sof_rcv_flowctrl(sof_handle_t handle, boolean_t enable)
 		}
 		so->so_state &= ~SS_FIL_RCV_FLOWCTRL;
 		/* so_check_flow_control drops so_lock */
-		so_check_flow_control(so);
+		(void) so_check_flow_control(so);
 	}
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 }
@@ -1702,12 +1708,8 @@ sof_inject_data_out(sof_handle_t handle, mblk_t *mp, struct nmsghdr *msg,
 	struct sonode *so = inst->sofi_sonode;
 	int error;
 
-	/*
-	 * Data cannot be sent down to the protocol once the socket has
-	 * started the process of closing.
-	 */
 	mutex_enter(&so->so_lock);
-	if (so->so_state & SS_CLOSING) {
+	if (so->so_state & SS_FIL_STOP) {
 		mutex_exit(&so->so_lock);
 		freemsg(mp);
 		return (EPIPE);

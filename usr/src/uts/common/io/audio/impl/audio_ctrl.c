@@ -367,7 +367,7 @@ auimpl_save_controls(audio_dev_t *d)
 
 	for (ctrl = list_head(l); ctrl; ctrl = list_next(l, ctrl)) {
 		if ((!(ctrl->ctrl_flags & AUDIO_CTRL_FLAG_WRITEABLE)) ||
-		    (!(ctrl->ctrl_flags & AUDIO_CTRL_FLAG_WRITEABLE))) {
+		    (!(ctrl->ctrl_flags & AUDIO_CTRL_FLAG_READABLE))) {
 			continue;
 		}
 		ret = ctrl->ctrl_read_fn(ctrl->ctrl_arg, &ctrl->ctrl_saved);

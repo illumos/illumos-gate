@@ -2359,6 +2359,28 @@ unmount_subtree(fnnode_t *rootfnp, boolean_t force)
 		 */
 		if (currfnp->fn_unmount_ref_time < timestamp)
 			currfnp->fn_unmount_ref_time = timestamp;
+
+		/*
+		 * Don't descent below nodes, which are being unmounted/mounted.
+		 *
+		 * We need to hold both locks at once: fn_lock because we need
+		 * to read MF_INPROG and fn_rwlock to prevent anybody from
+		 * modifying fn_trigger until its used to traverse triggers
+		 * below.
+		 *
+		 * Acquire fn_rwlock in non-blocking mode to avoid deadlock.
+		 * If it can't be acquired, then acquire locks in correct
+		 * order.
+		 */
+		if (!rw_tryenter(&currfnp->fn_rwlock, RW_READER)) {
+			mutex_exit(&currfnp->fn_lock);
+			rw_enter(&currfnp->fn_rwlock, RW_READER);
+			mutex_enter(&currfnp->fn_lock);
+		}
+		if (currfnp->fn_flags & MF_INPROG) {
+			rw_exit(&currfnp->fn_rwlock);
+			continue;
+		}
 		mutex_exit(&currfnp->fn_lock);
 
 		/*
@@ -2366,7 +2388,6 @@ unmount_subtree(fnnode_t *rootfnp, boolean_t force)
 		 * mounts.
 		 */
 
-		rw_enter(&currfnp->fn_rwlock, RW_READER);
 		if ((nextfnp = currfnp->fn_trigger) != NULL) {
 			VN_HOLD(fntovn(nextfnp));
 			rw_exit(&currfnp->fn_rwlock);

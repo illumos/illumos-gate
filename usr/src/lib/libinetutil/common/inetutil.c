@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -29,6 +28,7 @@
 #include <libinetutil.h>
 #include <inet/ip.h>
 #include <strings.h>
+#include <stddef.h>
 #include <errno.h>
 #include <libsocket_priv.h>
 
@@ -100,26 +100,33 @@ sockaddrcmp(const struct sockaddr_storage *ssp1,
 
 /*
  * Stores the netmask in `mask' for the given prefixlen `plen' and also sets
- * `ss_family' in `mask'.
+ * `sa_family' in `mask'. Because this function does not require aligned
+ * access to the data inside of the sockaddr_in/6 structures, the code can
+ * use offsetof() to find the right place in the incoming structure. Why is
+ * using that beneficial? Less issues with lint. When using a direct cast
+ * of the struct sockaddr_storage structure to sockaddr_in6, a lint warning
+ * is generated because the former is composed of 16bit & 8bit elements whilst
+ * sockaddr_in6 has a 32bit alignment requirement.
  */
 int
-plen2mask(uint_t prefixlen, sa_family_t af, struct sockaddr_storage *mask)
+plen2mask(uint_t prefixlen, sa_family_t af, struct sockaddr *mask)
 {
 	uint8_t	*addr;
 
-	bzero(mask, sizeof (*mask));
-	mask->ss_family = af;
 	if (af == AF_INET) {
 		if (prefixlen > IP_ABITS)
 			return (EINVAL);
-		addr = (uint8_t *)&((struct sockaddr_in *)mask)->
-		    sin_addr.s_addr;
+		bzero(mask, sizeof (struct sockaddr_in));
+		addr = (uint8_t *)mask;
+		addr += offsetof(struct sockaddr_in, sin_addr);
 	} else {
 		if (prefixlen > IPV6_ABITS)
 			return (EINVAL);
-		addr = (uint8_t *)&((struct sockaddr_in6 *)mask)->
-		    sin6_addr.s6_addr;
+		bzero(mask, sizeof (struct sockaddr_in6));
+		addr = (uint8_t *)mask;
+		addr += offsetof(struct sockaddr_in6, sin6_addr);
 	}
+	mask->sa_family = af;
 
 	while (prefixlen > 0) {
 		if (prefixlen >= 8) {
@@ -136,23 +143,25 @@ plen2mask(uint_t prefixlen, sa_family_t af, struct sockaddr_storage *mask)
 /*
  * Convert a mask to a prefix length.
  * Returns prefix length on success, -1 otherwise.
+ * The comments (above) for plen2mask about the use of `mask' also apply
+ * to this function and the choice to use offsetof here too.
  */
 int
-mask2plen(const struct sockaddr_storage *mask)
+mask2plen(const struct sockaddr *mask)
 {
 	int rc = 0;
 	uint8_t last;
 	uint8_t *addr;
 	int limit;
 
-	if (mask->ss_family == AF_INET) {
+	if (mask->sa_family == AF_INET) {
 		limit = IP_ABITS;
-		addr = (uint8_t *)&((struct sockaddr_in *)mask)->
-		    sin_addr.s_addr;
+		addr = (uint8_t *)mask;
+		addr += offsetof(struct sockaddr_in, sin_addr);
 	} else {
 		limit = IPV6_ABITS;
-		addr = (uint8_t *)&((struct sockaddr_in6 *)mask)->
-		    sin6_addr.s6_addr;
+		addr = (uint8_t *)mask;
+		addr += offsetof(struct sockaddr_in6, sin6_addr);
 	}
 
 	while (*addr == 0xff) {
@@ -176,18 +185,20 @@ mask2plen(const struct sockaddr_storage *mask)
  * :: for IPv6. Otherwise, returns B_FALSE.
  */
 boolean_t
-sockaddrunspec(const struct sockaddr_storage *ss)
+sockaddrunspec(const struct sockaddr *ss)
 {
-	struct sockaddr_storage zeroaddr = {0};
+	struct sockaddr_storage data;
 
-	switch (ss->ss_family) {
+	switch (ss->sa_family) {
 	case AF_INET:
-		return (((struct sockaddr_in *)ss)->sin_addr.s_addr ==
+		(void) memcpy(&data, ss, sizeof (struct sockaddr_in));
+		return (((struct sockaddr_in *)&data)->sin_addr.s_addr ==
 		    INADDR_ANY);
 	case AF_INET6:
+		(void) memcpy(&data, ss, sizeof (struct sockaddr_in6));
 		return (IN6_IS_ADDR_UNSPECIFIED(
-		    &((struct sockaddr_in6 *)ss)->sin6_addr));
+		    &((struct sockaddr_in6 *)&data)->sin6_addr));
 	}
 
-	return (bcmp(&zeroaddr, ss, sizeof (zeroaddr)) == 0);
+	return (B_FALSE);
 }

@@ -55,8 +55,8 @@ extern struct rdma_cm_id *rdsv3_rdma_listen_id;
 extern kmutex_t rdsv3_sock_lock;
 extern list_t rdsv3_sock_list;
 
-extern void rdsv3_bind_tree_init();
-extern void rdsv3_bind_tree_exit();
+extern void rdsv3_bind_init();
+extern void rdsv3_bind_exit();
 
 int
 rdsv3_sock_init()
@@ -71,7 +71,7 @@ rdsv3_sock_init()
 		    "kmem_cache_create(rdsv3_alloc_cache) failed");
 		return (-1);
 	}
-	rdsv3_bind_tree_init();
+	rdsv3_bind_init();
 
 	mutex_init(&rdsv3_sock_lock, NULL, MUTEX_DRIVER, NULL);
 	list_create(&rdsv3_sock_list, sizeof (struct rdsv3_sock),
@@ -87,7 +87,7 @@ rdsv3_sock_exit()
 {
 	RDSV3_DPRINTF2("rdsv3_sock_exit", "Enter");
 
-	rdsv3_bind_tree_exit();
+	rdsv3_bind_exit();
 
 	kmem_cache_destroy(rdsv3_alloc_cache);
 

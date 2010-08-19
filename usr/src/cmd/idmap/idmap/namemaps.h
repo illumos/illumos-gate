@@ -52,7 +52,7 @@ extern idmap_stat idmap_get_namemap(idmap_nm_handle_t *p, int *, char **,
 
 extern void idmap_fini_namemaps(idmap_nm_handle_t *);
 
-extern idmap_stat idmap_init_namemaps(idmap_handle_t *, idmap_nm_handle_t **,
+extern idmap_stat idmap_init_namemaps(idmap_nm_handle_t **,
     char *, char *, char *, char *, int);
 
 #ifdef __cplusplus

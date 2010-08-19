@@ -731,11 +731,7 @@ platform_config_snapshot(void)
 	lastgen = curgen;
 	/* we're getting a new config, so clean up the last one */
 	if (Lastcfg != NULL) {
-		if (--Lastcfg->raw_refcnt == 0) {
-			if (Lastcfg->begin != NULL)
-				FREE(Lastcfg->begin);
-			FREE(Lastcfg);
-		}
+		config_free(Lastcfg);
 	}
 
 	Lastcfg = MALLOC(sizeof (struct cfgdata));
@@ -867,7 +863,7 @@ platform_get_files(const char *dirname[], const char *fnstr, int nodups)
 	fnlen = strlen(fnstr);
 
 	for (i = 0; dirname[i] != NULL; i++) {
-		out(O_DEBUG, "Looking for %s files in %s", fnstr, dirname[i]);
+		out(O_VERB, "Looking for %s files in %s", fnstr, dirname[i]);
 		if ((dirp = opendir(dirname[i])) == NULL) {
 			out(O_DEBUG|O_SYS,
 			    "platform_get_files: opendir failed for %s",
@@ -886,7 +882,7 @@ platform_get_files(const char *dirname[], const char *fnstr, int nodups)
 					if (lut_lookup(foundnames,
 					    (void *)snm,
 					    NULL) != NULL) {
-						out(O_DEBUG,
+						out(O_VERB,
 						    "platform_get_files: "
 						    "skipping repeated name "
 						    "%s/%s",
@@ -910,7 +906,7 @@ platform_get_files(const char *dirname[], const char *fnstr, int nodups)
 				totlen = strlen(dirname[i]) + 1;
 				totlen += strlen(dp->d_name) + 1;
 				files[nfiles] = MALLOC(totlen);
-				out(O_DEBUG, "File %d: \"%s/%s\"", nfiles,
+				out(O_VERB, "File %d: \"%s/%s\"", nfiles,
 				    dirname[i], dp->d_name);
 				(void) snprintf(files[nfiles++], totlen,
 				    "%s/%s", dirname[i], dp->d_name);

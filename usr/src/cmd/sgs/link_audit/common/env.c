@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -47,7 +43,7 @@ build_env_list(Elist **list, const char *env)
 	tok = strtok_r(envstr, token, &lasts);
 	while (tok) {
 		Elist	*lp;
-		if ((lp = (Elist *)malloc(sizeof (Elist))) == 0) {
+		if ((lp = (Elist *)malloc(sizeof (Elist))) == NULL) {
 			(void) printf("build_list: malloc failed\n");
 			exit(1);
 		}
@@ -69,16 +65,16 @@ check_list(Elist *list, const char *str)
 		return (NULL);
 
 	/*
-	 * Is this a basename or a relativepath name
+	 * Is this a basename or a relative path name
 	 */
-	if ((basestr = strrchr(str, '/')) != 0)
+	if ((basestr = strrchr(str, '/')) != NULL)
 		basestr++;
 	else
 		basestr = str;
 
 
 	for (; list; list = list->l_next) {
-		if (strchr(list->l_libname, '/') == 0) {
+		if (strchr(list->l_libname, '/') == NULL) {
 			if (strcmp(basestr, list->l_libname) == 0)
 				return (list);
 		} else {

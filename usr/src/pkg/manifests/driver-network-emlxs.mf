@@ -81,14 +81,14 @@ file path=kernel/misc/emlxs/$(ARCH64)/emlxs_fw group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/emlxs/emlxs_fw group=sys mode=0755
 file path=usr/lib/mdb/kvm/$(ARCH64)/emlxs.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/emlxs.so group=sys mode=0555
-legacy pkg=SUNWemlxs arch=$(ARCH) category=system \
+legacy pkg=SUNWemlxs \
     desc="Device driver kit for Emulex-Sun FC, FCoE, and NIC adapters" \
-    hotline="Please contact your local service provider" \
     name="Emulex-Sun driver kit for Fibre Channel and Converged Network Adapters (root)" \
-    vendor="Emulex Corporation" version=11.11,REV=2009.11.11
-legacy pkg=SUNWemlxu arch=$(ARCH) category=system \
+    vendor="Emulex Corporation"
+legacy pkg=SUNWemlxu \
     desc="Support software for Emulex-Sun LightPulse Fibre Channel adapters" \
-    hotline="Please contact your local service provider" \
     name="Emulex-Sun LightPulse Fibre Channel Adapter Utilties (usr)" \
-    vendor="Emulex Corporation" version=11.11,REV=2009.11.11
-license lic_Emulex license=lic_Emulex
+    vendor="Emulex Corporation"
+license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/io/fibre-channel/fca/emlxs/FIRMWARELICENSE \
+    license=usr/src/uts/common/io/fibre-channel/fca/emlxs/FIRMWARELICENSE

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpu_module.h>
@@ -138,6 +137,10 @@ cpu_change_speed(uint64_t divisor, uint64_t arg2)
 
 u_longlong_t
 gettick(void)
+{ return (0); }
+
+u_longlong_t
+randtick(void)
 { return (0); }
 
 uint64_t

@@ -1,0 +1,246 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:network-install'>
+
+<service
+	name='network/install'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency
+		name='ipmgmt'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/ip-interface-management' />
+	</dependency>
+
+	<dependent name='physical_default'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/physical:default' />
+	</dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/net-install'
+		timeout_seconds='600' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='0' />
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+	<!-- The following property group is used only at install time to
+	     configure an initial IPv4 network interface -->
+	<property_group name='install_ipv4_interface' type='application'>
+		<propval name='name' type='astring' value='' />
+		<propval name='address_type' type='astring' value='static' />
+		<propval name='static_address' type='net_address_v4'
+		    value='0.0.0.0/0' />
+		<propval name='dhcp_wait' type='astring' value='120' />
+		<propval name='default_route' type='net_address_v4'
+		    value='0.0.0.0' />
+	</property_group>
+
+	<!-- The following property group is used only at install time to
+	     configure an initial IPv6 network interface -->
+	<property_group name='install_ipv6_interface' type='application'>
+		<propval name='name' type='astring' value='' />
+		<propval name='address_type' type='astring' value='addrconf' />
+		<propval name='static_address' type='net_address_v6'
+		    value='::0/0' />
+		<propval name='interface_id' type='net_address_v6'
+		    value='::0/0' />
+		<propval name='stateless' type='astring' value='yes' />
+		<propval name='stateful' type='astring' value='yes'/>
+		<propval name='default_route' type='net_address_v6'
+		    value='::0' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				physical network interfaces install
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='ipadm' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+		<pg_pattern name='install_ipv4_interface' type='application'
+		    target='this' required='false'>
+			<description> <loctext xml:lang='C'>
+			    Install derived configuration data used to configure an initial IPv4 physical interface.
+			 </loctext> </description>
+			<prop_pattern name='name' type='astring'
+			    required='true'>
+				<description> <loctext xml:lang='C'>
+				    The "addrobj" value to be passed to the ipadm(1M) "create-addr" command.
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='address_type' type='astring'
+			    required='true'>
+				<description> <loctext xml:lang='C'>
+				    The "-T" option value to be passed to the ipadm(1M) "create-addr" command.
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='static'>
+					<description> <loctext xml:lang='C'>
+					    Signifies that the IPv4 interface will be configured with a static address defined by the "static_address" property.
+					</loctext> </description>
+				</value>
+				<value name='dhcp'>
+					<description> <loctext xml:lang='C'>
+					    Signifies that the IPv4 interface will be configured by DHCP. The "static_address" property will be ignored.
+					</loctext> </description>
+				</value>
+				</constraints>
+			</prop_pattern>
+			<prop_pattern name='static_address'
+			    type='net_address_v4' required='false'>
+				<description> <loctext xml:lang='C'>
+				    The "local" address value to be passed to the ipadm(1M) "create-addr" command. Only required if "address_type" has a value of "static".
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='dhcp_wait' type='astring'
+			    required='false'>
+				<description> <loctext xml:lang='C'>
+				    The "-w" option value to be passed to the ipadm(1M) "create-addr" command. Represents the maximum time to wait for DHCP offer.
+				</loctext> </description>
+				<units>
+				    <loctext xml:lang='C'>seconds</loctext>
+				</units>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='default_route'
+			    type='net_address_v4' required='false'>
+				<description> <loctext xml:lang='C'>
+				    The default route associated with this interface. Used to add a default route using route(1M).
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>
+		<pg_pattern name='install_ipv6_interface' type='application'
+			target='this' required='false'>
+			<description> <loctext xml:lang='C'>
+			    Install derived configuration data used to configure an initial IPv6 physical interface.
+			</loctext> </description>
+			<prop_pattern name='name' type='astring'
+			    required='true'>
+				<description> <loctext xml:lang='C'>
+				    The "addrobj" value to be passed to the ipadm(1M) "create-addr" command.
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='address_type' type='astring'
+			    required='true'>
+				<description> <loctext xml:lang='C'>
+				    The "-T" option value to be passed to the ipadm(1M) "create-addr" command.
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='static'>
+					<description> <loctext xml:lang='C'>
+					    Signifies that the IPv4 interface will be configured with a static address defined by the "static_address" property.
+					</loctext> </description>
+				</value>
+				<value name='addrconf'>
+					<description> <loctext xml:lang='C'>
+					    Signifies that the IPv6 interface will be configured by IPv6 auto-configuration. The "static_address" property will be ignored.
+					</loctext> </description>
+				</value>
+				</constraints>
+			</prop_pattern>
+			<prop_pattern name='static_address'
+			    type='net_address_v6' required='false'>
+				<description> <loctext xml:lang='C'>
+				    The "local" address value to be passed to the ipadm(1M) "create-addr" command. Only required if "address_type" has a value of "static".
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='interface_id'
+			    type='net_address_v6' required='false'>
+				<description> <loctext xml:lang='C'>
+				    The "-i" token value to be passed to the ipadm(1M) "create-addr" command. Ignored if "address_type" has a value of "static".
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<prop_pattern name='stateless'
+			    type='astring' required='false'>
+				<description> <loctext xml:lang='C'>
+				    The "stateless" value to be passed to the ipadm(1M) "create-addr" command. Ignored if "address_type" has a value of "static".
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='yes'/>
+				<value name='no'/>
+				</constraints>
+			</prop_pattern>
+			<prop_pattern name='stateful'
+			    type='astring' required='false'>
+				<description> <loctext xml:lang='C'>
+				    The "stateful" value to be passed to the ipadm(1M) "create-addr" command. Ignored if "address_type" has a value of "static".
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='yes'/>
+				<value name='no'/>
+				</constraints>
+			</prop_pattern>
+			<prop_pattern name='default_route'
+			    type='net_address_v6' required='false'>
+				<description> <loctext xml:lang='C'>
+				    The default route associated with this interface. Used to add a default route using route(1M).
+				</loctext> </description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>
+	</template>
+</service>
+
+</service_bundle>

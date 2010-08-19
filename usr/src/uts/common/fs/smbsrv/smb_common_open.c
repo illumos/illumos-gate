@@ -43,6 +43,9 @@ static uint32_t smb_open_subr(smb_request_t *);
 extern uint32_t smb_is_executable(char *);
 static void smb_delete_new_object(smb_request_t *);
 static int smb_set_open_timestamps(smb_request_t *, smb_ofile_t *, boolean_t);
+static void smb_open_oplock_break(smb_request_t *, smb_node_t *);
+static boolean_t smb_open_attr_only(smb_arg_open_t *);
+static boolean_t smb_open_overwrite(smb_arg_open_t *);
 
 /*
  * smb_access_generic_to_file
@@ -204,7 +207,6 @@ smb_common_open(smb_request_t *sr)
 	}
 
 	kmem_free(parg, sizeof (*parg));
-
 	return (status);
 }
 
@@ -232,17 +234,15 @@ smb_common_open(smb_request_t *sr)
  *
  * The following rules apply when processing a file open request:
  *
- * - Oplocks must be broken prior to share checking to prevent open
- * starvation due to batch oplocks.  Checking share reservations first
- * could potentially result in unnecessary open failures due to
- * open/close batching on the client.
+ * - Oplocks must be broken prior to share checking as the break may
+ *   cause other clients to close the file, which would affect sharing
+ *   checks.
  *
  * - Share checks must take place prior to access checks for correct
  * Windows semantics and to prevent unnecessary NFS delegation recalls.
  *
  * - Oplocks must be acquired after open to ensure the correct
  * synchronization with NFS delegation and FEM installation.
- *
  *
  * DOS readonly bit rules
  *
@@ -315,6 +315,7 @@ smb_open_subr(smb_request_t *sr)
 	int		lookup_flags = SMB_FOLLOW_LINKS;
 	uint32_t	uniq_fid;
 	smb_pathname_t	*pn = &op->fqi.fq_path;
+	smb_server_t	*sv = sr->sr_server;
 
 	is_dir = (op->create_options & FILE_DIRECTORY_FILE) ? 1 : 0;
 
@@ -341,7 +342,7 @@ smb_open_subr(smb_request_t *sr)
 
 	if (sr->session->s_file_cnt >= SMB_SESSION_OFILE_MAX) {
 		ASSERT(sr->uid_user);
-		cmn_err(CE_NOTE, "smbd[%s\\%s]: TOO_MANY_OPENED_FILES",
+		cmn_err(CE_NOTE, "smbsrv[%s\\%s]: TOO_MANY_OPENED_FILES",
 		    sr->uid_user->u_domain, sr->uid_user->u_name);
 
 		smbsr_error(sr, NT_STATUS_TOO_MANY_OPENED_FILES,
@@ -360,12 +361,21 @@ smb_open_subr(smb_request_t *sr)
 		break;
 
 	case STYPE_IPC:
+
+		if ((rc = smb_threshold_enter(&sv->sv_opipe_ct)) != 0) {
+			status = RPC_NT_SERVER_TOO_BUSY;
+			smbsr_error(sr, status, 0, 0);
+			return (status);
+		}
+
 		/*
 		 * No further processing for IPC, we need to either
 		 * raise an exception or return success here.
 		 */
 		if ((status = smb_opipe_open(sr)) != NT_STATUS_SUCCESS)
 			smbsr_error(sr, status, 0, 0);
+
+		smb_threshold_exit(&sv->sv_opipe_ct, sv);
 		return (status);
 
 	default:
@@ -558,8 +568,13 @@ smb_open_subr(smb_request_t *sr)
 			}
 		}
 
-		if (smb_oplock_conflict(node, sr->session, op))
-			(void) smb_oplock_break(node, sr->session, B_FALSE);
+		/*
+		 * Oplock break is done prior to sharing checks as the break
+		 * may cause other clients to close the file which would
+		 * affect the sharing checks.
+		 */
+		smb_node_inc_opening_count(node);
+		smb_open_oplock_break(sr, node);
 
 		smb_node_wrlock(node);
 
@@ -573,6 +588,7 @@ smb_open_subr(smb_request_t *sr)
 			    (!smb_sattr_check(op->fqi.fq_fattr.sa_dosattr,
 			    op->dattr))) {
 				smb_node_unlock(node);
+				smb_node_dec_opening_count(node);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -586,6 +602,7 @@ smb_open_subr(smb_request_t *sr)
 
 		if (status == NT_STATUS_SHARING_VIOLATION) {
 			smb_node_unlock(node);
+			smb_node_dec_opening_count(node);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			return (status);
@@ -598,6 +615,7 @@ smb_open_subr(smb_request_t *sr)
 			smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
 
 			smb_node_unlock(node);
+			smb_node_dec_opening_count(node);
 			smb_node_release(node);
 			smb_node_release(dnode);
 
@@ -619,6 +637,7 @@ smb_open_subr(smb_request_t *sr)
 			if (smb_node_is_dir(node)) {
 				smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
 				smb_node_unlock(node);
+				smb_node_dec_opening_count(node);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -641,6 +660,7 @@ smb_open_subr(smb_request_t *sr)
 			if (rc != 0) {
 				smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
 				smb_node_unlock(node);
+				smb_node_dec_opening_count(node);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				smbsr_errno(sr, rc);
@@ -657,6 +677,7 @@ smb_open_subr(smb_request_t *sr)
 					smb_fsop_unshrlock(sr->user_cr, node,
 					    uniq_fid);
 					smb_node_unlock(node);
+					smb_node_dec_opening_count(node);
 					smb_node_release(node);
 					smb_node_release(dnode);
 					return (sr->smb_error.status);
@@ -741,6 +762,7 @@ smb_open_subr(smb_request_t *sr)
 			}
 
 			node = op->fqi.fq_fnode;
+			smb_node_inc_opening_count(node);
 			smb_node_wrlock(node);
 
 			status = smb_fsop_shrlock(sr->user_cr, node, uniq_fid,
@@ -748,6 +770,7 @@ smb_open_subr(smb_request_t *sr)
 
 			if (status == NT_STATUS_SHARING_VIOLATION) {
 				smb_node_unlock(node);
+				smb_node_dec_opening_count(node);
 				smb_delete_new_object(sr);
 				smb_node_release(node);
 				smb_node_unlock(dnode);
@@ -772,6 +795,7 @@ smb_open_subr(smb_request_t *sr)
 			}
 
 			node = op->fqi.fq_fnode;
+			smb_node_inc_opening_count(node);
 			smb_node_wrlock(node);
 		}
 
@@ -833,6 +857,7 @@ smb_open_subr(smb_request_t *sr)
 		if (created)
 			smb_delete_new_object(sr);
 		smb_node_unlock(node);
+		smb_node_dec_opening_count(node);
 		smb_node_release(node);
 		if (created)
 			smb_node_unlock(dnode);
@@ -861,12 +886,8 @@ smb_open_subr(smb_request_t *sr)
 	sr->smb_fid = of->f_fid;
 	sr->fid_ofile = of;
 
-	smb_node_unlock(node);
-	if (created)
-		smb_node_unlock(dnode);
-
 	if (smb_node_is_file(node)) {
-		smb_oplock_acquire(node, of, op);
+		smb_oplock_acquire(sr, node, of);
 		op->dsize = op->fqi.fq_fattr.sa_vattr.va_size;
 	} else {
 		/* directory or symlink */
@@ -874,12 +895,75 @@ smb_open_subr(smb_request_t *sr)
 		op->dsize = 0;
 	}
 
+	smb_node_dec_opening_count(node);
+
+	smb_node_unlock(node);
+	if (created)
+		smb_node_unlock(dnode);
+
 	smb_node_release(node);
 	smb_node_release(dnode);
 
 	return (NT_STATUS_SUCCESS);
 }
 
+/*
+ * smb_open_oplock_break
+ *
+ * If the node has an ofile opened with share access none,
+ * (smb_node_share_check = FALSE) only break BATCH oplock.
+ * Otherwise:
+ * If overwriting, break to SMB_OPLOCK_NONE, else
+ * If opening for anything other than attribute access,
+ * break oplock to LEVEL_II.
+ */
+static void
+smb_open_oplock_break(smb_request_t *sr, smb_node_t *node)
+{
+	smb_arg_open_t	*op = &sr->sr_open;
+	uint32_t	flags = 0;
+
+	if (!smb_node_share_check(node))
+		flags |= SMB_OPLOCK_BREAK_BATCH;
+
+	if (smb_open_overwrite(op)) {
+		flags |= SMB_OPLOCK_BREAK_TO_NONE;
+		(void) smb_oplock_break(sr, node, flags);
+	} else if (!smb_open_attr_only(op)) {
+		flags |= SMB_OPLOCK_BREAK_TO_LEVEL_II;
+		(void) smb_oplock_break(sr, node, flags);
+	}
+}
+
+/*
+ * smb_open_attr_only
+ *
+ * Determine if file is being opened for attribute access only.
+ * This is used to determine whether it is necessary to break
+ * existing oplocks on the file.
+ */
+static boolean_t
+smb_open_attr_only(smb_arg_open_t *op)
+{
+	if (((op->desired_access & ~(FILE_READ_ATTRIBUTES |
+	    FILE_WRITE_ATTRIBUTES | SYNCHRONIZE)) == 0) &&
+	    (op->create_disposition != FILE_SUPERSEDE) &&
+	    (op->create_disposition != FILE_OVERWRITE)) {
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+static boolean_t
+smb_open_overwrite(smb_arg_open_t *op)
+{
+	if ((op->create_disposition == FILE_SUPERSEDE) ||
+	    (op->create_disposition == FILE_OVERWRITE_IF) ||
+	    (op->create_disposition == FILE_OVERWRITE)) {
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
 /*
  * smb_set_open_timestamps
  *

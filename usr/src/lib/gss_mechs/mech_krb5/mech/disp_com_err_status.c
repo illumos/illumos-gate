@@ -25,7 +25,6 @@
  */
 
 #include "gssapiP_generic.h"
-#include "gss_libinit.h"
 #include "com_err.h"
 
 /* XXXX internationalization!! */
@@ -53,11 +52,9 @@ g_display_com_err_status(minor_status, status_value, status_string)
    status_string->length = 0;
    status_string->value = NULL;
 
-   (void) gssint_initialize_library();
-
    if (! g_make_string_buffer(((status_value == 0)?no_error:
-			       error_message(status_value)),
-			      status_string)) {
+			    error_message(status_value)),
+			    status_string)) {
       *minor_status = ENOMEM;
       return(GSS_S_FAILURE);
    }

@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -72,6 +71,40 @@ static Ehdr	def_ehdr = { { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3,
 			    EV_CURRENT };
 
 /*
+ * ld-centric wrapper on top of veprintf():
+ * - Accepts output descriptor rather than linkmap list
+ * - Sets the FLG_OF_FATAL/FLG_OF_WARN flags as necessary
+ */
+void
+ld_eprintf(Ofl_desc *ofl, Error error, const char *format, ...)
+{
+	va_list	args;
+
+	/* Set flag indicating type of error being issued */
+	switch (error) {
+	case ERR_NONE:
+	case ERR_WARNING_NF:
+		break;
+	case ERR_WARNING:
+		ofl->ofl_flags |= FLG_OF_WARN;
+		break;
+	case ERR_GUIDANCE:
+		if ((ofl->ofl_guideflags & FLG_OFG_ENABLE) == 0)
+			return;
+		ofl->ofl_guideflags |= FLG_OFG_ISSUED;
+		ofl->ofl_flags |= FLG_OF_WARN;
+		break;
+	default:
+		ofl->ofl_flags |= FLG_OF_FATAL;
+	}
+
+	/* Issue the error */
+	va_start(args, format);
+	veprintf(ofl->ofl_lml, error, format, args);
+	va_end(args);
+}
+
+/*
  * Establish the global state necessary to link the desired machine
  * target, as reflected by the ld_targ global variable.
  */
@@ -113,6 +146,7 @@ ld_main(int argc, char **argv, Half mach)
 	char		*sgs_support;	/* SGS_SUPPORT environment string */
 	Half		etype;
 	Ofl_desc	*ofl;
+	ofl_flag_t	save_flg_of_warn;
 
 	/*
 	 * Establish a base time.  Total time diagnostics are relative to
@@ -153,10 +187,19 @@ ld_main(int argc, char **argv, Half mach)
 	 * end of mapfile processing.  The entrance criteria and segment
 	 * descriptors are complete and in their final form.
 	 */
-	if (ld_process_flags(ofl, argc, argv) == S_ERROR)
+	if (ld_process_flags(ofl, argc, argv) == S_ERROR) {
+		/* If any ERR_GUIDANCE messages were issued, add a summary */
+		if (ofl->ofl_guideflags & FLG_OFG_ISSUED)
+			ld_eprintf(ofl, ERR_GUIDANCE,
+			    MSG_INTL(MSG_GUIDE_SUMMARY));
 		return (1);
+	}
 	if (ofl->ofl_flags & FLG_OF_FATAL) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_FLAGS));
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_FLAGS));
+		/* If any ERR_GUIDANCE messages were issued, add a summary */
+		if (ofl->ofl_guideflags & FLG_OFG_ISSUED)
+			ld_eprintf(ofl, ERR_GUIDANCE,
+			    MSG_INTL(MSG_GUIDE_SUMMARY));
 		return (1);
 	}
 
@@ -272,7 +315,7 @@ ld_main(int argc, char **argv, Half mach)
 	if (ld_process_files(ofl, argc, argv) == S_ERROR)
 		return (ld_exit(ofl));
 	if (ofl->ofl_flags & FLG_OF_FATAL) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_FILES),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_FILES),
 		    ofl->ofl_name);
 		return (ld_exit(ofl));
 	}
@@ -299,6 +342,20 @@ ld_main(int argc, char **argv, Half mach)
 		return (ld_exit(ofl));
 
 	/*
+	 * We need to know if FLG_OF_WARN is currently set, in case
+	 * we need to honor a -z fatal-warnings request. However, we also
+	 * need to know if a warning due to symbol validation results from
+	 * the upcoming call to ld_sym_validate() in order to issue the
+	 * appropriate message for it. So we save the current value,
+	 * and clear the main flag.
+	 */
+	save_flg_of_warn = ofl->ofl_flags & FLG_OF_WARN;
+	ofl->ofl_flags &= ~FLG_OF_WARN;
+
+	if (ld_sym_validate(ofl) == S_ERROR)
+		return (ld_exit(ofl));
+
+	/*
 	 * Now that all symbol processing is complete see if any undefined
 	 * references still remain.  If we observed undefined symbols the
 	 * FLG_OF_FATAL bit will be set:  If creating a static executable, or a
@@ -306,19 +363,44 @@ ld_main(int argc, char **argv, Half mach)
 	 * condition is fatal.  If creating a shared object with the -Bsymbolic
 	 * flag set, this condition is simply a warning.
 	 */
-	if (ld_sym_validate(ofl) == S_ERROR)
-		return (ld_exit(ofl));
+	if (ofl->ofl_flags & FLG_OF_FATAL)
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_SYM_FATAL),
+		    ofl->ofl_name);
+	else if (ofl->ofl_flags & FLG_OF_WARN)
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_ARG_SYM_WARN));
 
-	if (ofl->ofl_flags1 & FLG_OF1_OVRFLW) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_FILES),
-		    ofl->ofl_name);
+	/*
+	 * Guidance: Use -z defs|nodefs when building shared objects.
+	 *
+	 * ld_sym_validate() will mask this guidance message out unless we are
+	 * intended to send it here, so all we need to do is use OFL_GUIDANCE()
+	 * to decide whether to issue it or not.
+	 */
+	if (OFL_GUIDANCE(ofl, FLG_OFG_NO_DEFS))
+		ld_eprintf(ofl, ERR_GUIDANCE, MSG_INTL(MSG_GUIDE_DEFS));
+
+	/*
+	 * Symbol processing was the final step before we start producing the
+	 * output object. At this time, if we've seen warnings and the
+	 * -z fatal-warnings option is specified, promote them to fatal, which
+	 * will cause us to exit without creating an object.
+	 *
+	 * We didn't do this as the warnings were reported in order to
+	 * maximize the number of problems a given link-editor invocation
+	 * can diagnose. This is safe, since warnings are by definition events
+	 * one can choose to ignore.
+	 */
+	if (((ofl->ofl_flags | save_flg_of_warn) &
+	    (FLG_OF_WARN | FLG_OF_FATWARN)) ==
+	    (FLG_OF_WARN | FLG_OF_FATWARN))
+		ofl->ofl_flags |= FLG_OF_FATAL;
+
+	/*
+	 * If fatal errors occurred in symbol processing, or due to warnings
+	 * promoted by -z fatal-warnings, this is the end of the line.
+	 */
+	if (ofl->ofl_flags & FLG_OF_FATAL)
 		return (ld_exit(ofl));
-	} else if (ofl->ofl_flags & FLG_OF_FATAL) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_SYM_FATAL),
-		    ofl->ofl_name);
-		return (ld_exit(ofl));
-	} else if (ofl->ofl_flags & FLG_OF_WARN)
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_ARG_SYM_WARN));
 
 	/*
 	 * Generate any necessary sections.
@@ -373,7 +455,7 @@ ld_main(int argc, char **argv, Half mach)
 	 */
 	if (((ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0) &&
 	    (_elf_swap_wrimage(ofl->ofl_elf) != 0)) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_SWAP_WRIMAGE),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_SWAP_WRIMAGE),
 		    ofl->ofl_name);
 		return (ld_exit(ofl));
 	}
@@ -382,7 +464,7 @@ ld_main(int argc, char **argv, Half mach)
 	 * We're done, so make sure the updates are flushed to the output file.
 	 */
 	if ((ofl->ofl_size = elf_update(ofl->ofl_welf, ELF_C_WRITE)) == 0) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
 		    ofl->ofl_name);
 		return (ld_exit(ofl));
 	}
@@ -396,6 +478,10 @@ ld_main(int argc, char **argv, Half mach)
 	 * Wrap up debug output file if one is open
 	 */
 	dbg_cleanup();
+
+	/* If any ERR_GUIDANCE messages were issued, add a summary */
+	if (ofl->ofl_guideflags & FLG_OFG_ISSUED)
+		ld_eprintf(ofl, ERR_GUIDANCE, MSG_INTL(MSG_GUIDE_SUMMARY));
 
 	/*
 	 * For performance reasons we don't actually free up the memory we've

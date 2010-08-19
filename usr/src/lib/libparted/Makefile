@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		../Makefile.lib
@@ -66,6 +66,14 @@ ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
 .KEEP_STATE:
 
 all clean clobber delete install package: $(SUBDIRS)
+
+all install: THIRDPARTYLICENSE
+
+CLOBBERFILES += THIRDPARTYLICENSE
+
+THIRDPARTYLICENSE: $(SRC)/common/GPLDISCLAIMER COPYING
+	$(RM) $@
+	$(CAT) $(SRC)/common/GPLDISCLAIMER COPYING > $@
 
 install_h: $(ROOTHDRDIR) $(ROOTHDRS)
 

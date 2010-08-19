@@ -4445,6 +4445,16 @@ l2arc_feed_thread(void)
 		ASSERT(spa != NULL);
 
 		/*
+		 * If the pool is read-only then force the feed thread to
+		 * sleep a little longer.
+		 */
+		if (!spa_writeable(spa)) {
+			next = ddi_get_lbolt() + 5 * l2arc_feed_secs * hz;
+			spa_config_exit(spa, SCL_L2ARC, dev);
+			continue;
+		}
+
+		/*
 		 * Avoid contributing to memory pressure.
 		 */
 		if (arc_reclaim_needed()) {

@@ -70,6 +70,7 @@
 #include <sys/reboot.h>
 #include <sys/hpet.h>
 #include <sys/apic_common.h>
+#include <sys/apic_timer.h>
 
 static void	apic_record_ioapic_rdt(void *intrmap_private,
 		    ioapic_rdt_t *irdt);
@@ -87,16 +88,10 @@ void	apic_unset_idlecpu(processorid_t);
 void	apic_shutdown(int, int);
 void	apic_preshutdown(int, int);
 processorid_t	apic_get_next_processorid(processorid_t);
-void	apic_timer_reprogram(hrtime_t);
-void	apic_timer_enable(void);
-void	apic_timer_disable(void);
 
 hrtime_t apic_gettime();
 
 enum apic_ioapic_method_type apix_mul_ioapic_method = APIC_MUL_IOAPIC_PCPLUSMP;
-
-int	apic_oneshot = 0;
-int	apic_oneshot_enable = 1; /* to allow disabling one-shot capability */
 
 /* Now the ones for Dynamic Interrupt distribution */
 int	apic_enable_dynamic_migration = 0;
@@ -146,9 +141,6 @@ int	apic_panic_on_apic_error = 0;
 
 int	apic_verbose = 0;	/* 0x1ff */
 
-/* minimum number of timer ticks to program to */
-int apic_min_timer_ticks = 1;
-
 #ifdef DEBUG
 int	apic_debug = 0;
 int	apic_restrict_vector = 0;
@@ -158,8 +150,6 @@ int	apic_debug_msgbufindex = 0;
 
 #endif /* DEBUG */
 
-uint_t apic_nsec_per_intr = 0;
-
 uint_t apic_nticks = 0;
 uint_t apic_skipped_redistribute = 0;
 
@@ -167,11 +157,6 @@ uint_t last_count_read = 0;
 lock_t	apic_gethrtime_lock;
 volatile int	apic_hrtime_stamp = 0;
 volatile hrtime_t apic_nsec_since_boot = 0;
-uint_t apic_hertz_count;
-
-uint64_t apic_ticks_per_SFnsecs;	/* # of ticks in SF nsecs */
-
-static hrtime_t apic_nsec_max;
 
 static	hrtime_t	apic_last_hrtime = 0;
 int		apic_hrtime_error = 0;
@@ -1075,7 +1060,7 @@ apic_cpu_remove(psm_cpu_request_t *reqp)
  * Return the number of APIC clock ticks elapsed for 8245 to decrement
  * (APIC_TIME_COUNT + pit_ticks_adj) ticks.
  */
-static uint_t
+uint_t
 apic_calibrate(volatile uint32_t *addr, uint16_t *pit_ticks_adj)
 {
 	uint8_t		pit_tick_lo;
@@ -1144,46 +1129,7 @@ apic_calibrate(volatile uint32_t *addr, uint16_t *pit_ticks_adj)
 int
 apic_clkinit(int hertz)
 {
-	uint_t		apic_ticks = 0;
-	uint_t		pit_ticks;
 	int		ret;
-	uint16_t	pit_ticks_adj;
-	static int	firsttime = 1;
-
-	if (firsttime) {
-		/* first time calibrate on CPU0 only */
-
-		apic_reg_ops->apic_write(APIC_DIVIDE_REG, apic_divide_reg_init);
-		apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
-		apic_ticks = apic_calibrate(apicadr, &pit_ticks_adj);
-
-		/* total number of PIT ticks corresponding to apic_ticks */
-		pit_ticks = APIC_TIME_COUNT + pit_ticks_adj;
-
-		/*
-		 * Determine the number of nanoseconds per APIC clock tick
-		 * and then determine how many APIC ticks to interrupt at the
-		 * desired frequency
-		 * apic_ticks / (pitticks / PIT_HZ) = apic_ticks_per_s
-		 * (apic_ticks * PIT_HZ) / pitticks = apic_ticks_per_s
-		 * apic_ticks_per_ns = (apic_ticks * PIT_HZ) / (pitticks * 10^9)
-		 * pic_ticks_per_SFns =
-		 *   (SF * apic_ticks * PIT_HZ) / (pitticks * 10^9)
-		 */
-		apic_ticks_per_SFnsecs =
-		    ((SF * apic_ticks * PIT_HZ) /
-		    ((uint64_t)pit_ticks * NANOSEC));
-
-		/* the interval timer initial count is 32 bit max */
-		apic_nsec_max = APIC_TICKS_TO_NSECS(APIC_MAXVAL);
-		firsttime = 0;
-	}
-
-	if (hertz != 0) {
-		/* periodic */
-		apic_nsec_per_intr = NANOSEC / hertz;
-		apic_hertz_count = APIC_NSECS_TO_TICKS(apic_nsec_per_intr);
-	}
 
 	apic_int_busy_mark = (apic_int_busy_mark *
 	    apic_sample_factor_redistribution) / 100;
@@ -1192,21 +1138,7 @@ apic_clkinit(int hertz)
 	apic_diff_for_redistribution = (apic_diff_for_redistribution *
 	    apic_sample_factor_redistribution) / 100;
 
-	if (hertz == 0) {
-		/* requested one_shot */
-		if (!tsc_gethrtime_enable || !apic_oneshot_enable)
-			return (0);
-		apic_oneshot = 1;
-		ret = (int)APIC_TICKS_TO_NSECS(1);
-	} else {
-		/* program the local APIC to interrupt at the given frequency */
-		apic_reg_ops->apic_write(APIC_INIT_COUNT, apic_hertz_count);
-		apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
-		    (apic_clkvect + APIC_BASE_VECT) | AV_TIME);
-		apic_oneshot = 0;
-		ret = NANOSEC / hertz;
-	}
-
+	ret = apic_timer_init(hertz);
 	return (ret);
 
 }
@@ -1417,137 +1349,6 @@ restart_sitka_bmc:
 	 */
 	drv_usecwait(7000000); /* wait seven seconds */
 
-}
-
-/*
- * This function will reprogram the timer.
- *
- * When in oneshot mode the argument is the absolute time in future to
- * generate the interrupt at.
- *
- * When in periodic mode, the argument is the interval at which the
- * interrupts should be generated. There is no need to support the periodic
- * mode timer change at this time.
- */
-void
-apic_timer_reprogram(hrtime_t time)
-{
-	hrtime_t now;
-	uint_t ticks;
-	int64_t delta;
-
-	/*
-	 * We should be called from high PIL context (CBE_HIGH_PIL),
-	 * so kpreempt is disabled.
-	 */
-
-	if (!apic_oneshot) {
-		/* time is the interval for periodic mode */
-		ticks = APIC_NSECS_TO_TICKS(time);
-	} else {
-		/* one shot mode */
-
-		now = gethrtime();
-		delta = time - now;
-
-		if (delta <= 0) {
-			/*
-			 * requested to generate an interrupt in the past
-			 * generate an interrupt as soon as possible
-			 */
-			ticks = apic_min_timer_ticks;
-		} else if (delta > apic_nsec_max) {
-			/*
-			 * requested to generate an interrupt at a time
-			 * further than what we are capable of. Set to max
-			 * the hardware can handle
-			 */
-
-			ticks = APIC_MAXVAL;
-#ifdef DEBUG
-			cmn_err(CE_CONT, "apic_timer_reprogram, request at"
-			    "  %lld  too far in future, current time"
-			    "  %lld \n", time, now);
-#endif
-		} else
-			ticks = APIC_NSECS_TO_TICKS(delta);
-	}
-
-	if (ticks < apic_min_timer_ticks)
-		ticks = apic_min_timer_ticks;
-
-	apic_reg_ops->apic_write(APIC_INIT_COUNT, ticks);
-}
-
-/*
- * This function will enable timer interrupts.
- */
-void
-apic_timer_enable(void)
-{
-	/*
-	 * We should be Called from high PIL context (CBE_HIGH_PIL),
-	 * so kpreempt is disabled.
-	 */
-
-	if (!apic_oneshot) {
-		apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
-		    (apic_clkvect + APIC_BASE_VECT) | AV_TIME);
-	} else {
-		/* one shot */
-		apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
-		    (apic_clkvect + APIC_BASE_VECT));
-	}
-}
-
-/*
- * This function will disable timer interrupts.
- */
-void
-apic_timer_disable(void)
-{
-	/*
-	 * We should be Called from high PIL context (CBE_HIGH_PIL),
-	 * so kpreempt is disabled.
-	 */
-	apic_reg_ops->apic_write(APIC_LOCAL_TIMER,
-	    (apic_clkvect + APIC_BASE_VECT) | AV_MASK);
-}
-
-/*
- * Set timer far into the future and return timer
- * current Count in nanoseconds.
- */
-hrtime_t
-apic_timer_stop_count(void)
-{
-	hrtime_t	ns_val;
-	int		enable_val, count_val;
-
-	/*
-	 * Should be called with interrupts disabled.
-	 */
-	ASSERT(!interrupts_enabled());
-
-	enable_val = apic_reg_ops->apic_read(APIC_LOCAL_TIMER);
-	if ((enable_val & AV_MASK) == AV_MASK)
-		return ((hrtime_t)-1);		/* timer is disabled */
-
-	count_val = apic_reg_ops->apic_read(APIC_CURR_COUNT);
-	ns_val = APIC_TICKS_TO_NSECS(count_val);
-
-	apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
-
-	return (ns_val);
-}
-
-/*
- * Reprogram timer after Deep C-State.
- */
-void
-apic_timer_restart(hrtime_t time)
-{
-	apic_timer_reprogram(time);
 }
 
 ddi_periodic_t apic_periodic_id;

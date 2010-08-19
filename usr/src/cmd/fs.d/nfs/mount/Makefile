@@ -34,10 +34,11 @@ $(ROOTLIBFSTYPE)/%:	$(ROOTLIBFSTYPE) %
 
 include		../../Makefile.fstype
 
-COMMON= $(FSLIB) nfs_sec.o replica.o nfs_subr.o selfcheck.o
+COMMON= $(FSLIB) nfs_sec.o replica.o nfs_subr.o selfcheck.o smfcfg.o
 OBJS=	$(LIBPROG).o $(COMMON) webnfs_client.o webnfs_xdr.o
 SRCS=	$(LIBPROG).c $(FSLIBSRC) ../lib/nfs_sec.c ../lib/replica.c \
-	../lib/nfs_subr.c webnfs_xdr.c webnfs_client.c ../lib/selfcheck.c
+	../lib/nfs_subr.c webnfs_xdr.c webnfs_client.c ../lib/selfcheck.c \
+	../lib/smfcfg.c
 
 UNCHECKED_HDRS=	webnfs.h
 
@@ -77,6 +78,9 @@ selfcheck.o:	../lib/selfcheck.c
 
 nfs_tbind.o:	../lib/nfs_tbind.c
 		$(COMPILE.c) ../lib/nfs_tbind.c
+
+smfcfg.o:	../lib/smfcfg.c
+		$(COMPILE.c) ../lib/smfcfg.c
 
 webnfs_xdr.c:	webnfs.x
 	$(RPCGEN) -M -C -c -o $@ webnfs.x

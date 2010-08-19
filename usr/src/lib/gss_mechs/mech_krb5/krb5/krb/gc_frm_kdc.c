@@ -1,9 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
 /*
  * Copyright (c) 1994,2003,2005 by the Massachusetts Institute of Technology.
  * Copyright (c) 1994 CyberSAFE Corporation
@@ -40,6 +37,7 @@
 #include "k5-int.h"
 #include <stdio.h>
 #include "int-proto.h"
+#include <locale.h>
 
 struct tr_state;
 
@@ -145,12 +143,6 @@ static void tr_dbg_rtree(struct tr_state *, const char *, krb5_principal);
 #define HARD_CC_ERR(r) ((r) && (r) != KRB5_CC_NOTFOUND &&	\
 	(r) != KRB5_CC_NOT_KTYPE)
 
-#define IS_TGS_PRINC(c, p)				\
-    ((krb5_princ_size((c), (p)) == 2) &&		\
-     (krb5_princ_component((c), (p), 0)->length ==	\
-      KRB5_TGS_NAME_SIZE) &&				\
-     (!memcmp(krb5_princ_component((c), (p), 0)->data,	\
-	      KRB5_TGS_NAME, KRB5_TGS_NAME_SIZE)))
 
 /*
  * Flags for ccache lookups of cross-realm TGTs.
@@ -475,9 +467,22 @@ find_nxt_kdc(struct tr_state *ts)
    * fetched TGT in ts->kdc_tgts. See changes in try_kdc()
    */
   /*  assert(ts->nxt_tgt == ts->kdc_tgts[ts->ntgts-1]); */
-    if (krb5_princ_size(ts->ctx, ts->nxt_tgt->server) != 2)
+    if (krb5_princ_size(ts->ctx, ts->nxt_tgt->server) != 2) {
+	/* Solaris Kerberos */
+	char *s_name = NULL;
+	int err = krb5_unparse_name(ts->ctx, ts->nxt_tgt->server, &s_name);
+	if (!err) {
+	    krb5_set_error_message(ts->ctx, KRB5_KDCREP_MODIFIED,
+				dgettext(TEXT_DOMAIN,
+					"KDC reply did not match expectations: server '%s' principal size should be 2"),
+				s_name);
+	    krb5_free_unparsed_name(ts->ctx, s_name);
+	} else
+	    krb5_set_error_message(ts->ctx, KRB5_KDCREP_MODIFIED,
+				dgettext(TEXT_DOMAIN,
+					"KDC reply did not match expectations: server principal size should be 2"));
 	return KRB5_KDCREP_MODIFIED;
-
+    }
     r1 = krb5_princ_component(ts->ctx, ts->nxt_tgt->server, 1);
 
     for (kdcptr = ts->cur_kdc + 1; *kdcptr != NULL; kdcptr++) {
@@ -507,6 +512,9 @@ find_nxt_kdc(struct tr_state *ts)
 	    ts->kdc_tgts[ts->ntgts] = NULL;
 	}
 	TR_DBG_RET(ts, "find_nxt_kdc", KRB5_KDCREP_MODIFIED);
+	krb5_set_error_message(ts->ctx, KRB5_KDCREP_MODIFIED,
+			    dgettext(TEXT_DOMAIN,
+				    "KDC reply did not match expectation: KDC not found.  Probably got an unexpected realm referral"));
 	return KRB5_KDCREP_MODIFIED;
     }
     ts->nxt_kdc = kdcptr;
@@ -1121,6 +1129,22 @@ krb5_get_cred_from_kdc_opt(krb5_context context, krb5_ccache ccache,
 	     * in a <type>/<host> format that
 	     * krb5_get_fallback_host_realm can deal with.
 	     */
+	    /* Solaris Kerberos */
+	    char *s_name = NULL;
+	    char *c_name = NULL;
+	    krb5_error_code s_err, c_err;
+	    s_err = krb5_unparse_name(context, server, &s_name);
+	    c_err = krb5_unparse_name(context, client, &c_name);
+	    krb5_set_error_message(context, KRB5_ERR_HOST_REALM_UNKNOWN,
+				dgettext(TEXT_DOMAIN,
+					"Cannot determine realm for host: Referral specified but no fallback realm available. Client is '%s' and Server is '%s'"),
+				c_err ? "unknown" : c_name,
+				s_err ? "unknown" : s_name);
+	    if (s_name)
+		krb5_free_unparsed_name(context, s_name);
+	    if (c_name)
+		krb5_free_unparsed_name(context, c_name);
+
 	    DPRINTF(("gc_from_kdc: referral specified "
 		     "but no fallback realm avaiable!\n"));
 	    return KRB5_ERR_HOST_REALM_UNKNOWN;

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -96,9 +95,9 @@ static ibt_status_t tavor_ci_resize_cq(ibc_hca_hdl_t, ibc_cq_hdl_t,
     uint_t, uint_t *);
 static ibt_status_t tavor_ci_modify_cq(ibc_hca_hdl_t, ibc_cq_hdl_t,
     uint_t, uint_t, ibt_cq_handler_id_t);
-static ibt_status_t tavor_ci_alloc_cq_sched(ibc_hca_hdl_t, ibt_cq_sched_flags_t,
-    ibc_cq_handler_attr_t *);
-static ibt_status_t tavor_ci_free_cq_sched(ibc_hca_hdl_t, ibt_cq_handler_id_t);
+static ibt_status_t tavor_ci_alloc_cq_sched(ibc_hca_hdl_t,
+    ibt_cq_sched_attr_t *, ibc_sched_hdl_t *);
+static ibt_status_t tavor_ci_free_cq_sched(ibc_hca_hdl_t, ibc_sched_hdl_t);
 
 /* EE Contexts */
 static ibt_status_t tavor_ci_alloc_eec(ibc_hca_hdl_t, ibc_eec_flags_t,
@@ -127,6 +126,8 @@ static ibt_status_t tavor_ci_reregister_buf(ibc_hca_hdl_t, ibc_mr_hdl_t,
     ibc_pd_hdl_t, ibt_smr_attr_t *, struct buf *, void *, ibc_mr_hdl_t *,
     ibt_mr_desc_t *);
 static ibt_status_t tavor_ci_sync_mr(ibc_hca_hdl_t, ibt_mr_sync_t *, size_t);
+static ibt_status_t tavor_ci_register_dma_mr(ibc_hca_hdl_t, ibc_pd_hdl_t,
+    ibt_dmr_attr_t *, void *, ibc_mr_hdl_t *, ibt_mr_desc_t *);
 
 /* Memory Windows */
 static ibt_status_t tavor_ci_alloc_mw(ibc_hca_hdl_t, ibc_pd_hdl_t,
@@ -209,6 +210,7 @@ static ibt_status_t tavor_ci_free_io_mem(ibc_hca_hdl_t, ibc_mem_alloc_hdl_t);
 static int tavor_mem_alloc(tavor_state_t *, size_t, ibt_mr_flags_t,
 	caddr_t *, tavor_mem_alloc_hdl_t *);
 
+static ibt_status_t tavor_ci_not_supported();
 
 /*
  * This ibc_operations_t structure includes pointers to all the entry points
@@ -252,6 +254,7 @@ ibc_operations_t tavor_ibc_ops = {
 	tavor_ci_modify_cq,
 	tavor_ci_alloc_cq_sched,
 	tavor_ci_free_cq_sched,
+	tavor_ci_not_supported,	/* query_cq_handler_id */
 
 	/* EE Contexts */
 	tavor_ci_alloc_eec,
@@ -317,8 +320,39 @@ ibc_operations_t tavor_ibc_ops = {
 
 	/* dmable memory */
 	tavor_ci_alloc_io_mem,
-	tavor_ci_free_io_mem
+	tavor_ci_free_io_mem,
+
+	/* XRC not yet supported */
+	tavor_ci_not_supported,	/* ibc_alloc_xrc_domain */
+	tavor_ci_not_supported,	/* ibc_free_xrc_domain */
+	tavor_ci_not_supported,	/* ibc_alloc_xrc_srq */
+	tavor_ci_not_supported,	/* ibc_free_xrc_srq */
+	tavor_ci_not_supported,	/* ibc_query_xrc_srq */
+	tavor_ci_not_supported,	/* ibc_modify_xrc_srq */
+	tavor_ci_not_supported,	/* ibc_alloc_xrc_tgt_qp */
+	tavor_ci_not_supported,	/* ibc_free_xrc_tgt_qp */
+	tavor_ci_not_supported,	/* ibc_query_xrc_tgt_qp */
+	tavor_ci_not_supported,	/* ibc_modify_xrc_tgt_qp */
+
+	/* Memory Region (physical) */
+	tavor_ci_register_dma_mr,
+
+	/* Next enhancements */
+	tavor_ci_not_supported,	/* ibc_enhancement1 */
+	tavor_ci_not_supported,	/* ibc_enhancement2 */
+	tavor_ci_not_supported,	/* ibc_enhancement3 */
+	tavor_ci_not_supported,	/* ibc_enhancement4 */
 };
+
+/*
+ * Not yet implemented OPS
+ */
+/* ARGSUSED */
+static ibt_status_t
+tavor_ci_not_supported()
+{
+	return (IBT_NOT_SUPPORTED);
+}
 
 
 /*
@@ -1294,29 +1328,18 @@ tavor_ci_modify_cq(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq,
  */
 /* ARGSUSED */
 static ibt_status_t
-tavor_ci_alloc_cq_sched(ibc_hca_hdl_t hca, ibt_cq_sched_flags_t flags,
-    ibc_cq_handler_attr_t *handler_attr_p)
+tavor_ci_alloc_cq_sched(ibc_hca_hdl_t hca, ibt_cq_sched_attr_t *attr,
+    ibc_sched_hdl_t *sched_hdl_p)
 {
-	TAVOR_TNF_ENTER(tavor_ci_alloc_cq_sched);
-
 	if (hca == NULL) {
-		TNF_PROBE_0(tavor_ci_alloc_cq_sched_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_alloc_cq_sched);
 		return (IBT_HCA_HDL_INVALID);
 	}
+	*sched_hdl_p = NULL;
 
 	/*
 	 * This is an unsupported interface for the Tavor driver.  Tavor
 	 * does not support CQ scheduling classes.
 	 */
-
-	TAVOR_TNF_EXIT(tavor_ci_alloc_cq_sched);
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*handler_attr_p))
-	handler_attr_p->h_id = NULL;
-	handler_attr_p->h_pri = 0;
-	handler_attr_p->h_bind = NULL;
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*handler_attr_p))
 	return (IBT_SUCCESS);
 }
 
@@ -1326,30 +1349,18 @@ tavor_ci_alloc_cq_sched(ibc_hca_hdl_t hca, ibt_cq_sched_flags_t flags,
  *    Free a CQ scheduling class resource
  *    Context: Can be called only from user or kernel context.
  */
+/* ARGSUSED */
 static ibt_status_t
-tavor_ci_free_cq_sched(ibc_hca_hdl_t hca, ibt_cq_handler_id_t handler_id)
+tavor_ci_free_cq_sched(ibc_hca_hdl_t hca, ibc_sched_hdl_t sched_hdl)
 {
-	TAVOR_TNF_ENTER(tavor_ci_free_cq_sched);
-
 	if (hca == NULL) {
-		TNF_PROBE_0(tavor_ci_free_cq_sched_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_free_cq_sched);
 		return (IBT_HCA_HDL_INVALID);
 	}
 
 	/*
 	 * This is an unsupported interface for the Tavor driver.  Tavor
-	 * does not support CQ scheduling classes.  Returning a NULL
-	 * hint is the way to treat this as unsupported.  We check for
-	 * the expected NULL, but do not fail in any case.
+	 * does not support CQ scheduling classes.
 	 */
-	if (handler_id != NULL) {
-		TNF_PROBE_1(tavor_ci_free_cq_sched, TAVOR_TNF_TRACE, "",
-		    tnf_opaque, handler_id, handler_id);
-	}
-
-	TAVOR_TNF_EXIT(tavor_ci_free_cq_sched);
 	return (IBT_SUCCESS);
 }
 
@@ -2194,6 +2205,76 @@ tavor_ci_query_mw(ibc_hca_hdl_t hca, ibc_mw_hdl_t mw,
 }
 
 
+/* ARGSUSED */
+static ibt_status_t
+tavor_ci_register_dma_mr(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
+    ibt_dmr_attr_t *mr_attr, void *ibtl_reserved, ibc_mr_hdl_t *mr_p,
+    ibt_mr_desc_t *mr_desc)
+{
+	tavor_state_t		*state;
+	tavor_pdhdl_t		pdhdl;
+	tavor_mrhdl_t		mrhdl;
+	int			status;
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr_desc))
+
+	ASSERT(mr_attr != NULL);
+	ASSERT(mr_p != NULL);
+	ASSERT(mr_desc != NULL);
+
+	/* Check for valid HCA handle */
+	if (hca == NULL) {
+		return (IBT_HCA_HDL_INVALID);
+	}
+
+	/* Check for valid PD handle pointer */
+	if (pd == NULL) {
+		return (IBT_PD_HDL_INVALID);
+	}
+
+	/*
+	 * Validate the access flags.  Both Remote Write and Remote Atomic
+	 * require the Local Write flag to be set
+	 */
+	if (((mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_WRITE) ||
+	    (mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_ATOMIC)) &&
+	    !(mr_attr->dmr_flags & IBT_MR_ENABLE_LOCAL_WRITE)) {
+		return (IBT_MR_ACCESS_REQ_INVALID);
+	}
+
+	/* Grab the Tavor softstate pointer and PD handle */
+	state = (tavor_state_t *)hca;
+	pdhdl = (tavor_pdhdl_t)pd;
+
+	status = tavor_dma_mr_register(state, pdhdl, mr_attr, &mrhdl);
+	if (status != DDI_SUCCESS) {
+		return (status);
+	}
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mrhdl))
+
+	/* Fill in the mr_desc structure */
+	mr_desc->md_vaddr = mr_attr->dmr_paddr;
+	mr_desc->md_lkey  = mrhdl->mr_lkey;
+	/* Only set RKey if remote access was requested */
+	if ((mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_ATOMIC) ||
+	    (mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_WRITE) ||
+	    (mr_attr->dmr_flags & IBT_MR_ENABLE_REMOTE_READ)) {
+		mr_desc->md_rkey = mrhdl->mr_rkey;
+	}
+
+	/*
+	 * If region is mapped for streaming (i.e. noncoherent), then set
+	 * sync is required
+	 */
+	mr_desc->md_sync_required = B_FALSE;
+
+	/* Return the Hermon MR handle */
+	*mr_p = (ibc_mr_hdl_t)mrhdl;
+
+	return (IBT_SUCCESS);
+}
+
+
 /*
  * tavor_ci_attach_mcg()
  *    Attach a Queue Pair to a Multicast Group
@@ -2988,19 +3069,211 @@ tavor_ci_unmap_mem_area(ibc_hca_hdl_t hca, ibc_ma_hdl_t ma_hdl)
 	return (IBT_NOT_SUPPORTED);
 }
 
+struct ibc_mi_s {
+	int			imh_len;
+	ddi_dma_handle_t	imh_dmahandle[1];
+};
+_NOTE(SCHEME_PROTECTS_DATA("safe sharing",
+    ibc_mi_s::imh_len
+    ibc_mi_s::imh_dmahandle))
+
+
+/*
+ * tavor_ci_map_mem_iov()
+ * Map the memory
+ *    Context: Can be called from interrupt or base context.
+ */
 /* ARGSUSED */
 static ibt_status_t
-tavor_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov,
+tavor_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
     ibt_all_wr_t *wr, ibc_mi_hdl_t *mi_hdl_p)
 {
-	return (IBT_NOT_SUPPORTED);
+	int			status;
+	int			i, j, nds, max_nds;
+	uint_t			len;
+	ibt_status_t		ibt_status;
+	ddi_dma_handle_t	dmahdl;
+	ddi_dma_cookie_t	dmacookie;
+	ddi_dma_attr_t		dma_attr;
+	uint_t			cookie_cnt;
+	ibc_mi_hdl_t		mi_hdl;
+	ibt_lkey_t		rsvd_lkey;
+	ibt_wr_ds_t		*sgl;
+	tavor_state_t		*state;
+	int			kmflag;
+	int			(*callback)(caddr_t);
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*wr))
+
+	if (mi_hdl_p == NULL)
+		return (IBT_MI_HDL_INVALID);
+
+	/* Check for valid HCA handle */
+	if (hca == NULL)
+		return (IBT_HCA_HDL_INVALID);
+
+	/* Tavor does not allow the default "use reserved lkey" */
+	if ((iov_attr->iov_flags & IBT_IOV_ALT_LKEY) == 0)
+		return (IBT_INVALID_PARAM);
+
+	rsvd_lkey = iov_attr->iov_alt_lkey;
+
+	state = (tavor_state_t *)hca;
+	tavor_dma_attr_init(&dma_attr);
+#ifdef	__sparc
+	if (state->ts_cfg_profile->cp_iommu_bypass == TAVOR_BINDMEM_BYPASS)
+		dma_attr.dma_attr_flags = DDI_DMA_FORCE_PHYSICAL;
+#endif
+
+	nds = 0;
+	max_nds = iov_attr->iov_wr_nds;
+	if (iov_attr->iov_lso_hdr_sz)
+		max_nds -= (iov_attr->iov_lso_hdr_sz + sizeof (uint32_t) +
+		    0xf) >> 4;	/* 0xf is for rounding up to a multiple of 16 */
+	if ((iov_attr->iov_flags & IBT_IOV_NOSLEEP) == 0) {
+		kmflag = KM_SLEEP;
+		callback = DDI_DMA_SLEEP;
+	} else {
+		kmflag = KM_NOSLEEP;
+		callback = DDI_DMA_DONTWAIT;
+	}
+
+	if (iov_attr->iov_flags & IBT_IOV_BUF) {
+		mi_hdl = kmem_alloc(sizeof (*mi_hdl), kmflag);
+		if (mi_hdl == NULL)
+			return (IBT_INSUFF_RESOURCE);
+		sgl = wr->send.wr_sgl;
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*sgl))
+
+		status = ddi_dma_alloc_handle(state->ts_dip, &dma_attr,
+		    callback, NULL, &dmahdl);
+		if (status != DDI_SUCCESS) {
+			kmem_free(mi_hdl, sizeof (*mi_hdl));
+			return (IBT_INSUFF_RESOURCE);
+		}
+		status = ddi_dma_buf_bind_handle(dmahdl, iov_attr->iov_buf,
+		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, callback, NULL,
+		    &dmacookie, &cookie_cnt);
+		if (status != DDI_DMA_MAPPED) {
+			ddi_dma_free_handle(&dmahdl);
+			kmem_free(mi_hdl, sizeof (*mi_hdl));
+			return (ibc_get_ci_failure(0));
+		}
+		while (cookie_cnt-- > 0) {
+			if (nds > max_nds) {
+				status = ddi_dma_unbind_handle(dmahdl);
+				ddi_dma_free_handle(&dmahdl);
+				return (IBT_SGL_TOO_SMALL);
+			}
+			sgl[nds].ds_va = dmacookie.dmac_laddress;
+			sgl[nds].ds_key = rsvd_lkey;
+			sgl[nds].ds_len = (ib_msglen_t)dmacookie.dmac_size;
+			nds++;
+			if (cookie_cnt != 0)
+				ddi_dma_nextcookie(dmahdl, &dmacookie);
+		}
+		wr->send.wr_nds = nds;
+		mi_hdl->imh_len = 1;
+		mi_hdl->imh_dmahandle[0] = dmahdl;
+		*mi_hdl_p = mi_hdl;
+		return (IBT_SUCCESS);
+	}
+
+	if (iov_attr->iov_flags & IBT_IOV_RECV)
+		sgl = wr->recv.wr_sgl;
+	else
+		sgl = wr->send.wr_sgl;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*sgl))
+
+	len = iov_attr->iov_list_len;
+	for (i = 0, j = 0; j < len; j++) {
+		if (iov_attr->iov[j].iov_len == 0)
+			continue;
+		i++;
+	}
+	mi_hdl = kmem_alloc(sizeof (*mi_hdl) +
+	    (i - 1) * sizeof (ddi_dma_handle_t), kmflag);
+	if (mi_hdl == NULL)
+		return (IBT_INSUFF_RESOURCE);
+	mi_hdl->imh_len = i;
+	for (i = 0, j = 0; j < len; j++) {
+		if (iov_attr->iov[j].iov_len == 0)
+			continue;
+		status = ddi_dma_alloc_handle(state->ts_dip, &dma_attr,
+		    callback, NULL, &dmahdl);
+		if (status != DDI_SUCCESS) {
+			ibt_status = IBT_INSUFF_RESOURCE;
+			goto fail2;
+		}
+		status = ddi_dma_addr_bind_handle(dmahdl, iov_attr->iov_as,
+		    iov_attr->iov[j].iov_addr, iov_attr->iov[j].iov_len,
+		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, callback, NULL,
+		    &dmacookie, &cookie_cnt);
+		if (status != DDI_DMA_MAPPED) {
+			ibt_status = ibc_get_ci_failure(0);
+			goto fail1;
+		}
+		if (nds + cookie_cnt > max_nds) {
+			ibt_status = IBT_SGL_TOO_SMALL;
+			goto fail2;
+		}
+		while (cookie_cnt-- > 0) {
+			sgl[nds].ds_va = dmacookie.dmac_laddress;
+			sgl[nds].ds_key = rsvd_lkey;
+			sgl[nds].ds_len = (ib_msglen_t)dmacookie.dmac_size;
+			nds++;
+			if (cookie_cnt != 0)
+				ddi_dma_nextcookie(dmahdl, &dmacookie);
+		}
+		mi_hdl->imh_dmahandle[i] = dmahdl;
+		i++;
+	}
+
+	if (iov_attr->iov_flags & IBT_IOV_RECV)
+		wr->recv.wr_nds = nds;
+	else
+		wr->send.wr_nds = nds;
+	*mi_hdl_p = mi_hdl;
+	return (IBT_SUCCESS);
+
+fail1:
+	ddi_dma_free_handle(&dmahdl);
+fail2:
+	while (--i >= 0) {
+		status = ddi_dma_unbind_handle(mi_hdl->imh_dmahandle[i]);
+		ddi_dma_free_handle(&mi_hdl->imh_dmahandle[i]);
+	}
+	kmem_free(mi_hdl, sizeof (*mi_hdl) +
+	    (len - 1) * sizeof (ddi_dma_handle_t));
+	*mi_hdl_p = NULL;
+	return (ibt_status);
 }
 
+/*
+ * tavor_ci_unmap_mem_iov()
+ * Unmap the memory
+ *    Context: Can be called from interrupt or base context.
+ */
 /* ARGSUSED */
 static ibt_status_t
 tavor_ci_unmap_mem_iov(ibc_hca_hdl_t hca, ibc_mi_hdl_t mi_hdl)
 {
-	return (IBT_NOT_SUPPORTED);
+	int		i;
+
+	/* Check for valid HCA handle */
+	if (hca == NULL)
+		return (IBT_HCA_HDL_INVALID);
+
+	if (mi_hdl == NULL)
+		return (IBT_MI_HDL_INVALID);
+
+	for (i = 0; i < mi_hdl->imh_len; i++) {
+		(void) ddi_dma_unbind_handle(mi_hdl->imh_dmahandle[i]);
+		ddi_dma_free_handle(&mi_hdl->imh_dmahandle[i]);
+	}
+	kmem_free(mi_hdl, sizeof (*mi_hdl) +
+	    (mi_hdl->imh_len - 1) * sizeof (ddi_dma_handle_t));
+	return (IBT_SUCCESS);
 }
 
 /* Allocate L_Key */

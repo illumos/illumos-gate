@@ -33,6 +33,14 @@
 #include <oce_stat.h>
 #include <oce_buf.h>
 
+int pow10[5] = {
+	0,
+	10,
+	100,
+	1000,
+	10000
+};
+
 /*
  * function called by kstat to update the stats counters
  *
@@ -176,7 +184,7 @@ oce_stat_init(struct oce_dev *dev)
 	/* allocate the device copy of the stats */
 	dev->stats_dbuf = oce_alloc_dma_buffer(dev,
 	    sizeof (struct mbx_get_nic_stats),
-	    DDI_DMA_CONSISTENT);
+	    NULL, DDI_DMA_CONSISTENT);
 	if (dev->stats_dbuf == NULL) {
 		oce_log(dev, CE_NOTE, MOD_CONFIG,
 		    "Could not allocate stats_dbuf: %p",
@@ -294,11 +302,16 @@ oce_m_stat(void *arg, uint_t stat, uint64_t *val)
 	}
 
 	switch (stat) {
-	case MAC_STAT_IFSPEED:
-		if (dev->state & STATE_MAC_STARTED)
-			*val = 10000000000ull;
-		else
-			*val = 0;
+	case MAC_STAT_IFSPEED: {
+		struct link_status link = {0};
+		if (dev->link_speed < 0) {
+			(void) oce_get_link_status(dev, &link);
+			dev->link_speed = link.qos_link_speed ?
+			    link.qos_link_speed * 10 :
+			    pow10[link.mac_speed];
+		}
+		*val = dev->link_speed * 1000000ull;
+	}
 	break;
 
 	case MAC_STAT_RBYTES:

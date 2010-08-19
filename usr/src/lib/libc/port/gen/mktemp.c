@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	mktemp() expects a string with up to six trailing 'X's.
@@ -97,29 +94,6 @@ chars[64] = {
 	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '_',
 };
 
-/*
- * Find highest one bit set.
- * Returns bit number of highest bit that is set.
- * Low order bit is number 0, high order bit is number 31.
- */
-static int
-highbit(uint_t i)
-{
-	int h = 0;
-
-	if (i & 0xffff0000)
-		h += 16, i >>= 16;
-	if (i & 0xff00)
-		h += 8, i >>= 8;
-	if (i & 0xf0)
-		h += 4, i >>= 4;
-	if (i & 0xc)
-		h += 2, i >>= 2;
-	if (i & 0x2)
-		h += 1;
-	return (h);
-}
-
 char *
 libc_mktemps(char *as, int slen)
 {
@@ -162,7 +136,7 @@ libc_mktemps(char *as, int slen)
 
 	/* for all possible values of pid, 0 <= pid < (1 << pidshift) */
 	if (pidshift == 0)	/* one-time initialization */
-		pidshift = highbit((uint_t)MAXPID) + 1;
+		pidshift = fls((uint_t)MAXPID);		/* high bit number */
 
 	/* count the X's */
 	xcnt = 0;

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	liblddbg.a
@@ -59,7 +58,7 @@ SRCDIR =	../common
 LINTFLAGS +=	-u -D_REENTRANT
 LINTFLAGS64 +=	-u -D_REENTRANT
 
-CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc $(VAR_LIBLDDBG_CPPFLAGS)
+CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc
 DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 

@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+/*
  * Copyright (C) 2006,2008 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -24,9 +27,6 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
  * A module that implements the spnego security mechanism.
  * It is used to negotiate the security mechanism between
  * peers using the GSS-API.
@@ -72,8 +72,9 @@
 #include	<krb5.h>
 #include	<mglueP.h>
 #include	"gssapiP_spnego.h"
+#include        "gssapiP_generic.h"
 #include	<gssapi_err_generic.h>
-
+#include	<locale.h>
 
 /*
  * SUNW17PACresync
@@ -217,6 +218,12 @@ static OM_uint32
 acc_ctx_hints(OM_uint32 *, gss_ctx_id_t *, gss_cred_id_t,
 	      gss_buffer_t *, OM_uint32 *, send_token_flag *);
 
+#ifdef _GSS_STATIC_LINK
+int gss_spnegoint_lib_init(void);
+void gss_spnegoint_lib_fini(void);
+#else
+gss_mechanism gss_mech_initialize(void);
+#endif /* _GSS_STATIC_LINK */
 
 /*
  * The Mech OID for SPNEGO:
@@ -286,7 +293,8 @@ static struct gss_config spnego_mechanism =
 #ifdef _GSS_STATIC_LINK
 #include "mglueP.h"
 
-static int gss_spnegomechglue_init(void)
+static
+int gss_spnegomechglue_init(void)
 {
 	struct gss_mech_config mech_spnego;
 
@@ -298,25 +306,48 @@ static int gss_spnegomechglue_init(void)
 	return gssint_register_mechinfo(&mech_spnego);
 }
 #else
+/* Entry point for libgss */
 gss_mechanism KRB5_CALLCONV
 gss_mech_initialize(void)
 {
+	int err;
+
+	err = k5_key_register(K5_KEY_GSS_SPNEGO_ERROR_MESSAGE,
+		spnego_gss_delete_error_info);
+	if (err) {
+	    syslog(LOG_NOTICE,
+		"SPNEGO gss_mech_initialize: error message TSD key register fail");
+	    return (NULL);
+	}
+
 	return (&spnego_mechanism);
 }
 
 #if 0 /* SUNW17PACresync */
 MAKE_INIT_FUNCTION(gss_krb5int_lib_init);
 MAKE_FINI_FUNCTION(gss_krb5int_lib_fini);
- int gss_krb5int_lib_init(void)
+int gss_krb5int_lib_init(void)
 #endif
 
 #endif /* _GSS_STATIC_LINK */
 
-static int gss_spnegoint_lib_init(void)
+static
+int gss_spnegoint_lib_init(void)
 {
 #ifdef _GSS_STATIC_LINK
 	return gss_spnegomechglue_init();
 #else
+	int err;
+
+	err = k5_key_register(K5_KEY_GSS_SPNEGO_ERROR_MESSAGE,
+		spnego_gss_delete_error_info);
+	if (err) {
+	    syslog(LOG_NOTICE,
+		"SPNEGO gss_mech_initialize: error message TSD key register fail: err=%d",
+		err);
+	    return err;
+	}
+
 	return 0;
 #endif
 }
@@ -465,7 +496,8 @@ create_spnego_ctx(void)
 	spnego_ctx->nego_done = 0;
 	spnego_ctx->internal_name = GSS_C_NO_NAME;
 	spnego_ctx->actual_mech = GSS_C_NO_OID;
-
+	spnego_ctx->err.msg = NULL;
+	spnego_ctx->err.scratch_buf[0] = 0;
 	check_spnego_options(spnego_ctx);
 
 	return (spnego_ctx);
@@ -679,6 +711,10 @@ init_ctx_cont(OM_uint32 *minor_status, gss_ctx_id_t *ctx, gss_buffer_t buf,
 	}
 	if (acc_negState == REJECT) {
 		*minor_status = ERR_SPNEGO_NEGOTIATION_FAILED;
+		/* Solaris SPNEGO */
+		spnego_set_error_message(sc, *minor_status,
+					dgettext(TEXT_DOMAIN,
+						"SPNEGO failed to negotiate a mechanism: server rejected request"));
 		map_errcode(minor_status);
 		*tokflag = NO_TOKEN_SEND;
 		ret = GSS_S_FAILURE;
@@ -742,6 +778,10 @@ init_ctx_nego(OM_uint32 *minor_status, spnego_gss_ctx_id_t sc,
 	}
 	if (acc_negState == ACCEPT_DEFECTIVE_TOKEN) {
 		*minor_status = ERR_SPNEGO_NEGOTIATION_FAILED;
+		/* Solaris SPNEGO */
+		spnego_set_error_message(sc, *minor_status,
+					dgettext(TEXT_DOMAIN,
+						"SPNEGO failed to negotiate a mechanism: defective token"));
 		map_errcode(minor_status);
 		return GSS_S_DEFECTIVE_TOKEN;
 	}
@@ -1004,6 +1044,11 @@ spnego_gss_init_sec_context(
 		}
 	}
 	spnego_ctx = (spnego_gss_ctx_id_t)*context_handle;
+
+	/* Solaris SPNEGO */
+	if (*minor_status == ERR_SPNEGO_NEGOTIATION_FAILED)
+		spnego_gss_save_error_info(*minor_status, spnego_ctx);
+
 	if (!spnego_ctx->mech_complete) {
 		ret = init_ctx_call_init(
 			minor_status, spnego_ctx,
@@ -1339,6 +1384,76 @@ cleanup:
 }
 
 /*
+ * Solaris SPNEGO
+ * mechoidset2str()
+ * Input an OID set of mechs and output a string like so:
+ *   '{ x y z } (mechname0), { a b c } (mechname1) ...'.
+ * On error return NULL.
+ * Caller needs to free returned string.
+ */
+static const char *mech_no_map = "Can't map OID to mechname via /etc/gss/mech";
+static const char *oid_no_map = "Can't map OID to string";
+static char *
+mechoidset2str(gss_OID_set mechset)
+{
+	int i, l;
+	char buf[256] = {0};
+	char *s = NULL;
+
+	if (!mechset)
+		return NULL;
+
+	for (i = 0; i < mechset->count; i++) {
+		OM_uint32 maj, min;
+		gss_buffer_desc oidstr;
+		gss_buffer_t oidstrp = &oidstr;
+		gss_OID mech_oid = &mechset->elements[i];
+		/* No need to free mech_name. */
+		const char *mech_name = __gss_oid_to_mech(mech_oid);
+
+		if (i > 0)
+			if (strlcat(buf, ", ", sizeof (buf)) >= sizeof (buf)) {
+				if (oidstrp->value)
+					gss_release_buffer(&min, oidstrp);
+				break;
+			}
+
+		/* Add '{ x y x ... }'. */
+		maj = gss_oid_to_str(&min, mech_oid, oidstrp);
+		if (strlcat(buf, maj ? oid_no_map : oidstrp->value,
+			    sizeof (buf)) >= sizeof (buf)) {
+			if (oidstrp->value)
+				gss_release_buffer(&min, oidstrp);
+			break;
+		}
+		if (oidstrp->value)
+			gss_release_buffer(&min, oidstrp);
+
+		/* Add '(mech name)'. */
+		if (strlcat(buf, " (", sizeof (buf)) >= sizeof (buf))
+			break;
+		if (strlcat(buf, mech_name ? mech_name : mech_no_map,
+			    sizeof (buf)) >= sizeof (buf))
+			break;
+		if (strlcat(buf, ") ", sizeof (buf)) >= sizeof (buf))
+			break;
+	}
+
+	/* Even if we have buf overflow, let's output what we got so far. */
+	if (mechset->count) {
+		l = strlen(buf);
+		if (l > 0) {
+			s = malloc(l + 1);
+			if (!s)
+				return NULL;
+			(void) strlcpy(s, buf, l);
+		}
+	}
+
+	return s ? s : NULL;
+}
+
+/*
  * Set negState to REJECT if the token is defective, else
  * ACCEPT_INCOMPLETE or REQUEST_MIC, depending on whether initiator's
  * preferred mechanism is supported.
@@ -1396,13 +1511,33 @@ acc_ctx_new(OM_uint32 *minor_status,
 	 * the acceptor will support.
 	 */
 	mech_wanted = negotiate_mech_type(minor_status,
-					  supported_mechSet,
-					  mechTypes,
-					  negState);
+					supported_mechSet,
+					mechTypes,
+					negState);
 	if (*negState == REJECT) {
+		/* Solaris SPNEGO: Spruce-up error msg */
+		char *mechTypesStr = mechoidset2str(mechTypes);
+		spnego_gss_ctx_id_t tmpsc = create_spnego_ctx();
+		if (tmpsc && *minor_status == ERR_SPNEGO_NEGOTIATION_FAILED) {
+			spnego_set_error_message(tmpsc, *minor_status,
+						dgettext(TEXT_DOMAIN,
+							"SPNEGO failed to negotiate a mechanism: client requested mech set '%s'"),
+				mechTypesStr ? mechTypesStr : "<null>");
+		}
+		if (mechTypesStr)
+			free(mechTypesStr);
+
+		/*
+		 * We save error here cuz the tmp ctx goes away (very) soon.
+		 * So callers of acc_ctx_new() should NOT call it again.
+		 */
+		spnego_gss_save_error_info(*minor_status, tmpsc);
+		if (tmpsc)
+			release_spnego_ctx(&tmpsc);
 		ret = GSS_S_BAD_MECH;
 		goto cleanup;
 	}
+
 	sc = (spnego_gss_ctx_id_t)*ctx;
 	if (sc != NULL) {
 		gss_release_buffer(&tmpmin, &sc->DER_mechTypes);
@@ -1535,6 +1670,31 @@ acc_ctx_vfy_oid(OM_uint32 *minor_status,
 	mech = gssint_get_mechanism(mechoid);
 	if (mech == NULL || mech->gss_indicate_mechs == NULL) {
 		*minor_status = ERR_SPNEGO_NEGOTIATION_FAILED;
+		{
+			/*
+			 * Solaris SPNEGO
+			 * Spruce-up error msg.
+			 */
+			OM_uint32 maj, maj_sc, min;
+			gss_buffer_desc oidstr, oidstr_sc;
+			/* No need to free mnamestr. */
+			const char *mnamestr = __gss_oid_to_mech(
+				sc->internal_mech);
+			maj_sc = gss_oid_to_str(&min,
+						sc->internal_mech,
+						&oidstr_sc);
+			maj = gss_oid_to_str(&min, mechoid, &oidstr);
+			spnego_set_error_message(sc, *minor_status,
+						dgettext(TEXT_DOMAIN,
+							"SPNEGO failed to negotiate a mechanism: unsupported mech OID ('%s') in the token. Negotiated mech OID is '%s' (%s)"),
+					maj ? oid_no_map: oidstr.value,
+					maj_sc ? oid_no_map: oidstr_sc.value,
+					mnamestr ? mnamestr : mech_no_map);
+			if (!maj)
+			        (void) gss_release_buffer(&min, &oidstr);
+			if (!maj_sc)
+			        (void) gss_release_buffer(&min, &oidstr_sc);
+		}
 		map_errcode(minor_status);
 		*negState = REJECT;
 		*tokflag = ERROR_TOKEN_SEND;
@@ -1551,7 +1711,30 @@ acc_ctx_vfy_oid(OM_uint32 *minor_status,
 	if (ret != GSS_S_COMPLETE)
 		goto cleanup;
 	if (!present) {
-		*minor_status = ERR_SPNEGO_NEGOTIATION_FAILED;
+		{
+			/*
+			 * Solaris SPNEGO
+			 * Spruce-up error msg.
+			 */
+			OM_uint32 maj, min;
+			gss_buffer_desc oidstr;
+			char *mech_set_str = mechoidset2str(mech_set);
+			/* No need to free mnamestr. */
+			const char *mnamestr =
+				__gss_oid_to_mech(sc->internal_mech);
+			maj = gss_oid_to_str(&min, sc->internal_mech, &oidstr);
+			*minor_status = ERR_SPNEGO_NEGOTIATION_FAILED;
+			spnego_set_error_message(sc, *minor_status,
+						dgettext(TEXT_DOMAIN,
+							"SPNEGO failed to negotiate a mechanism: negotiated mech OID '%s' (%s) not found in mechset ('%s') of token mech"),
+				maj ? oid_no_map: oidstr.value,
+				mnamestr ? mnamestr : mech_no_map,
+				mech_set_str ? mech_set_str : "<null>");
+			if (!maj)
+			        (void) gss_release_buffer(&min, &oidstr);
+			if (mech_set_str)
+				free(mech_set_str);
+		}
 		map_errcode(minor_status);
 		*negState = REJECT;
 		*tokflag = ERROR_TOKEN_SEND;
@@ -1587,7 +1770,7 @@ acc_ctx_call_acc(OM_uint32 *minor_status, spnego_gss_ctx_id_t sc,
 			return ret;
 		}
 		ret = acc_ctx_vfy_oid(minor_status, sc, &mechoid,
-				      negState, tokflag);
+				    negState, tokflag);
 		if (ret != GSS_S_COMPLETE)
 			return ret;
 	}
@@ -1772,6 +1955,10 @@ spnego_gss_accept_sec_context(
 		mechstat = GSS_S_CONTINUE_NEEDED;
 	}
 
+	/* Solaris SPNEGO */
+	if (*minor_status == ERR_SPNEGO_NEGOTIATION_FAILED)
+		spnego_gss_save_error_info(*minor_status, sc);
+
 	if (!HARD_ERROR(ret) && sc->mech_complete &&
 	    (sc->ctx_flags & GSS_C_INTEG_FLAG)) {
 
@@ -1872,16 +2059,30 @@ spnego_gss_display_status(
 		break;
 	    case ERR_SPNEGO_NEGOTIATION_FAILED:
 		/* CSTYLED */
-		*status_string = make_err_msg("SPNEGO failed to negotiate a mechanism");
-		break;
+		return(spnego_gss_display_status2(minor_status,
+						    status_value,
+						    status_type,
+						    mech_type,
+						    message_context,
+						    status_string));
 	    case ERR_SPNEGO_NO_TOKEN_FROM_ACCEPTOR:
 		/* CSTYLED */
 		*status_string = make_err_msg("SPNEGO acceptor did not return a valid token");
 		break;
 	    default:
-		status_string->length = 0;
-		status_string->value = "";
-		break;
+		/*
+		 * Solaris SPNEGO
+		 * If mech_spnego calls mech_krb5 (via libgss) and an
+		 * error occurs there, give it a shot.
+		 */
+		/* CSTYLED */
+		return(krb5_gss_display_status2(minor_status,
+						status_value,
+						status_type,
+						(gss_OID)&gss_mech_krb5_oid,
+						message_context,
+						status_string));
+
 	}
 
 	dsyslog("Leaving display_status\n");
@@ -2593,7 +2794,7 @@ get_available_mechs(OM_uint32 *minor_status,
 			spnego_mechanism.mech_type.elements,
 			spnego_mechanism.mech_type.length)) {
 			/*
-			 * Solaris Kerberos: gss_indicate_mechs is stupid as
+			 * Solaris SPNEGO Kerberos: gss_indicate_mechs is stupid as
 			 * it never inferences any of the related OIDs of the
 			 * mechanisms configured, e.g. KRB5_OLD, KRB5_WRONG.
 			 * We add KRB5_WRONG here so that old MS clients can
@@ -3108,7 +3309,7 @@ negotiate_mech_type(OM_uint32 *minor_status,
 		gss_OID mech_oid = &mechset->elements[i];
 
 		/*
-		 * Solaris Kerberos: MIT compares against MS' wrong OID, but
+		 * Solaris SPNEGO Kerberos: MIT compares against MS' wrong OID, but
 		 * we actually want to select it if the client supports, as this
 		 * will enable features on MS clients that allow credential
 		 * refresh on rekeying and caching system times from servers.
@@ -3139,6 +3340,9 @@ negotiate_mech_type(OM_uint32 *minor_status,
 		}
 		return (returned_mech);
 	}
+	/* Solaris SPNEGO */
+	*minor_status= ERR_SPNEGO_NEGOTIATION_FAILED;
+
 	*negResult = REJECT;
 	return (NULL);
 }

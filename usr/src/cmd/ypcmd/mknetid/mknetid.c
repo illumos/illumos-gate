@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SMI4.1 1.5 */
 
 /*
  * Network name to unix credential database generator.
@@ -57,7 +53,7 @@
 
 #define	NUMGIDS	(NGROUPS_MAX + 1)	/* group-access-list + gid */
 
-extern char **getline();
+extern char **getaline();
 extern char *malloc();
 extern char *strcpy();
 
@@ -172,7 +168,7 @@ domapfile(mapfile, mf)
 
 	curfile = mapfile;
 	curline = 0;
-	while (lp = getline(line, sizeof (line), mf, &curline, "#")) {
+	while (lp = getaline(line, sizeof (line), mf, &curline, "#")) {
 		check_getname(lp, name, WHITE, WHITE, "#");
 		if (wasprinted(name)) {
 			multdef(name);
@@ -219,7 +215,7 @@ dogrpfile(grpfile, gf)
 
 	curfile = grpfile;
 	curline = 0;
-	while (lp = getline(line, sizeof (line), gf, &curline, "")) {
+	while (lp = getaline(line, sizeof (line), gf, &curline, "")) {
 		check_getname(lp, name, WHITE, COLON, "");
 		if (name[0] == '+') {
 			continue;
@@ -252,7 +248,7 @@ dopwdfile(pwdfile, pf)
 	curfile = pwdfile;
 	curline = 0;
 
-	while (lp = getline(line, sizeof (line), pf, &curline, "")) {
+	while (lp = getaline(line, sizeof (line), pf, &curline, "")) {
 		check_getname(lp, user, WHITE, COLON, ""); 	/* username */
 		if (user[0] == '-' || user[0] == '+') {
 			continue;	/* NIS entry */
@@ -291,7 +287,7 @@ dohostfile(hostfile, hf)
 
 	curfile = hostfile;
 	curline = 0;
-	while (lp = getline(line, sizeof (line), hf, &curline, "#")) {
+	while (lp = getaline(line, sizeof (line), hf, &curline, "#")) {
 		check_getname(lp, name, WHITE, WHITE, "#");
 		if (getname(name, MAXNAMELEN, WHITE, WHITE, lp, "#") != 1) {
 			continue;

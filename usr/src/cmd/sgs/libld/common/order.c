@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -356,10 +355,10 @@ ld_process_ordered(Ofl_desc *ofl, Ifl_desc *ifl, Place_path_info *path_info,
 
 		isp2 = ifl->ifl_isdesc[keyshndx];
 		if (isp2->is_flags & FLG_IS_DISCARD) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_FIL_BADORDREF), ifl->ifl_name,
-			    EC_WORD(isp->is_scnndx), isp->is_name,
-			    EC_WORD(isp2->is_scnndx), isp2->is_name);
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_BADORDREF),
+			    ifl->ifl_name, EC_WORD(isp->is_scnndx),
+			    isp->is_name, EC_WORD(isp2->is_scnndx),
+			    isp2->is_name);
 			return (S_ERROR);
 		}
 
@@ -400,7 +399,7 @@ ld_sec_validate(Ofl_desc *ofl)
 
 		for (ALIST_TRAVERSE(sgp->sg_os_order, idx2, scop)) {
 			if ((scop->sco_flags & FLG_SGO_USED) == 0) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_MAP_SECORDER),
 				    sgp->sg_name, scop->sco_secname);
 			}

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_TCP_STATS_H
@@ -91,8 +91,8 @@ typedef struct tcp_stat {
 	kstat_named_t	tcp_no_listener;
 	kstat_named_t	tcp_listendrop;
 	kstat_named_t	tcp_listendropq0;
-	kstat_named_t   tcp_wsrv_called;
-	kstat_named_t   tcp_flwctl_on;
+	kstat_named_t	tcp_wsrv_called;
+	kstat_named_t	tcp_flwctl_on;
 	kstat_named_t	tcp_timer_fire_early;
 	kstat_named_t	tcp_timer_fire_miss;
 	kstat_named_t	tcp_zcopy_on;
@@ -135,6 +135,62 @@ typedef struct tcp_stat {
 #endif
 } tcp_stat_t;
 
+/*
+ * This struct contains only the counter part of tcp_stat_t.  It is used
+ * in tcp_stats_cpu_t instead of tcp_stat_t to save memory space.
+ */
+typedef struct tcp_stat_counter_s {
+	uint64_t	tcp_time_wait_syn_success;
+	uint64_t	tcp_clean_death_nondetached;
+	uint64_t	tcp_eager_blowoff_q;
+	uint64_t	tcp_eager_blowoff_q0;
+	uint64_t	tcp_no_listener;
+	uint64_t	tcp_listendrop;
+	uint64_t	tcp_listendropq0;
+	uint64_t	tcp_wsrv_called;
+	uint64_t	tcp_flwctl_on;
+	uint64_t	tcp_timer_fire_early;
+	uint64_t	tcp_timer_fire_miss;
+	uint64_t	tcp_zcopy_on;
+	uint64_t	tcp_zcopy_off;
+	uint64_t	tcp_zcopy_backoff;
+	uint64_t	tcp_fusion_flowctl;
+	uint64_t	tcp_fusion_backenabled;
+	uint64_t	tcp_fusion_urg;
+	uint64_t	tcp_fusion_putnext;
+	uint64_t	tcp_fusion_unfusable;
+	uint64_t	tcp_fusion_aborted;
+	uint64_t	tcp_fusion_unqualified;
+	uint64_t	tcp_fusion_rrw_busy;
+	uint64_t	tcp_fusion_rrw_msgcnt;
+	uint64_t	tcp_fusion_rrw_plugged;
+	uint64_t	tcp_in_ack_unsent_drop;
+	uint64_t	tcp_sock_fallback;
+	uint64_t	tcp_lso_enabled;
+	uint64_t	tcp_lso_disabled;
+	uint64_t	tcp_lso_times;
+	uint64_t	tcp_lso_pkt_out;
+	uint64_t	tcp_listen_cnt_drop;
+	uint64_t	tcp_listen_mem_drop;
+	uint64_t	tcp_zwin_mem_drop;
+	uint64_t	tcp_zwin_ack_syn;
+	uint64_t	tcp_rst_unsent;
+	uint64_t	tcp_reclaim_cnt;
+	uint64_t	tcp_reass_timeout;
+#ifdef TCP_DEBUG_COUNTER
+	uint64_t	tcp_time_wait;
+	uint64_t	tcp_rput_time_wait;
+	uint64_t	tcp_detach_time_wait;
+	uint64_t	tcp_timeout_calls;
+	uint64_t	tcp_timeout_cached_alloc;
+	uint64_t	tcp_timeout_cancel_reqs;
+	uint64_t	tcp_timeout_canceled;
+	uint64_t	tcp_timermp_freed;
+	uint64_t	tcp_push_timer_cnt;
+	uint64_t	tcp_ack_timer_cnt;
+#endif
+} tcp_stat_counter_t;
+
 typedef struct tcp_g_stat {
 	kstat_named_t	tcp_timermp_alloced;
 	kstat_named_t	tcp_timermp_allocfail;
@@ -144,9 +200,9 @@ typedef struct tcp_g_stat {
 
 /* Per CPU stats: TCP MIB2, TCP kstat and connection counter. */
 typedef struct {
-	int64_t		tcp_sc_conn_cnt;
-	mib2_tcp_t	tcp_sc_mib;
-	tcp_stat_t	tcp_sc_stats;
+	int64_t			tcp_sc_conn_cnt;
+	mib2_tcp_t		tcp_sc_mib;
+	tcp_stat_counter_t	tcp_sc_stats;
 } tcp_stats_cpu_t;
 
 #define	TCPS_BUMP_MIB(tcps, x) \
@@ -158,7 +214,7 @@ typedef struct {
 #if TCP_DEBUG_COUNTER
 #define	TCP_DBGSTAT(tcps, x)	\
 	atomic_inc_64(		\
-	    &((tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_stats.x.value.ui64))
+	    &((tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_stats.x))
 #define	TCP_G_DBGSTAT(x)	\
 	atomic_inc_64(&(tcp_g_statistics.x.value.ui64))
 #else
@@ -169,12 +225,13 @@ typedef struct {
 #define	TCP_G_STAT(x)	(tcp_g_statistics.x.value.ui64++)
 
 #define	TCP_STAT(tcps, x)		\
-	((tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_stats.x.value.ui64++)
+	((tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_stats.x++)
 #define	TCP_STAT_UPDATE(tcps, x, n)	\
-	((tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_stats.x.value.ui64 += (n))
+	((tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_stats.x += (n))
 #define	TCP_STAT_SET(tcps, x, n)	\
-	((tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_stats.x.value.ui64 = (n))
+	((tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_stats.x = (n))
 
+/* Global TCP stats for all IP stacks. */
 extern tcp_g_stat_t	tcp_g_statistics;
 extern kstat_t	*tcp_g_kstat;
 

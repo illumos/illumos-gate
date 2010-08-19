@@ -72,11 +72,8 @@ file path=kernel/drv/i915 group=sys
 file path=kernel/drv/radeon group=sys
 file path=kernel/misc/$(ARCH64)/drm group=sys mode=0755
 file path=kernel/misc/drm group=sys mode=0755
-legacy pkg=SUNWdrmr arch=$(ARCH) category=system \
-    desc="Direct Rendering Manager kernel drivers and modules" \
-    hotline="Please contact your local service provider" \
-    name="DRM Kernel Drivers, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWdrmr desc="Direct Rendering Manager kernel drivers and modules" \
+    name="DRM Kernel Drivers, (Root)"
 license cr_Sun license=cr_Sun
-license uts/common/io/drm/THIRDPARTYLICENSE \
-    license=uts/common/io/drm/THIRDPARTYLICENSE
+license usr/src/uts/common/io/drm/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/drm/THIRDPARTYLICENSE

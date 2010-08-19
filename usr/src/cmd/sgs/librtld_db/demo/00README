@@ -1,0 +1,61 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+This directory contains source code to the rdb debugger.  This debugger
+is distributed as an example client of the librtld_db.so.1 interface.
+As well as offering examples of the proper calling sequence for the
+librtld_db.so.1 interface rdb also offers a sample implementation of the
+proc_services (/usr/include/proc_service.h) that rdb is dependent upon.
+
+The following is an overview of the directory structure and highlight
+of some of the important files contained within:
+
+rdb.man		- man page for the rdb debugger
+Makefile.com
+Makefile.targ	- common Makefiles included by ${MACH)/Makefile
+common/*	- common source code used for all architectures
+amd64/		- build directory contains architecture specific source files
+i386/		 	"	"	"	"
+sparc/			"	"	"	"
+sparcv9/		"	"	"	"
+amd64/Makefile	- makefiles to build rdb for each architecture
+i386/Makefile		"	"	"	"
+sparc/Makefil		"	"	"	"
+sparcv9/Makefil		"	"	"	"
+test/*		- sample command files which can be used to test rdb
+
+
+Building rdb
+------------
+
+To build rdb:
+
+ % cd {amd64,i386,sparc,sparcv9}	- depending on which architecture
+					  you are building for
+ % make all
+
+To test the demo:
+
+ % make test

@@ -40,26 +40,22 @@ extern "C" {
  */
 
 enum {
-	SES_LOG_UNSUPPORTED_HW_ERROR = 1, /* Wrong product ID */
-	SES_LOG_FAILED_TO_OPEN_DEVICE, /* Couldn't open dev path */
-	SES_LOG_FAILED_TO_READ_DEVICE, /* Couldn't read the log data */
-	SES_LOG_FAILED_NVLIST_PROTOCOL, /* Couldn't add protocol */
-	SES_LOG_FAILED_NULL_TARGET_PATH, /* Null target path */
-	SES_LOG_FAILED_BAD_TARGET_PATH, /* Couldn't find valid target path */
-	SES_LOG_FAILED_MODE_SENSE, /* Mode sense error returned */
-	SES_LOG_FAILED_MODE_SENSE_OFFSET, /* Offset not correct */
-	SES_LOG_FAILED_BAD_DATA_LEN, /* Data length not correct */
-	SES_LOG_FAILED_BAD_CONTENT_LEN, /* Content length not correct */
-	SES_LOG_FAILED_FORMAT_PAGE_ERROR, /* Device doesn't support page */
-	SES_LOG_FAILED_SHORT_LOG_PARAM_INIT, /* Log paramter was too short */
-	SES_LOG_FAILED_SHORT_LOG_PARAM, /* Log paramter was too short */
-	SES_LOG_FAILED_NV_UNIQUE, /* Couldn't add unique to nvlist */
-	SES_LOG_FAILED_NV_LOG, /* Couldn't add log to nvlist */
-	SES_LOG_FAILED_NV_CODE, /* Couldn't add code to nvlist */
-	SES_LOG_FAILED_NV_SEV, /* Couldn't add sev to nvlist */
-	SES_LOG_FAILED_NV_ENTRY, /* Couldn't add entry to nvlist */
-	SES_LOG_FAILED_MODE_SELECT, /* Mode select failed */
-	SES_LOG_FAILED_NVLIST_CREATE   /* Couldn't create a nvlist */
+	SES_LOG_FAILED_TO_OPEN_DEVICE = 1, /* Couldn't open dev path */
+	SES_LOG_FAILED_TO_READ_DEVICE,	/* Couldn't read the log data */
+	SES_LOG_FAILED_NULL_TARGET_PATH,	/* Null target path */
+	SES_LOG_FAILED_BAD_TARGET_PATH,	/* Couldn't find valid target path */
+	SES_LOG_FAILED_MODE_SENSE,    	/* Mode sense error returned */
+	SES_LOG_FAILED_MODE_SENSE_OFFSET,	/* Offset not correct */
+	SES_LOG_FAILED_BAD_DATA_LEN, 	/* Data length not correct */
+	SES_LOG_FAILED_BAD_CONTENT_LEN,	/* Content length not correct */
+	SES_LOG_FAILED_FORMAT_PAGE_ERR,	/* Device doesn't support page */
+	SES_LOG_FAILED_NV_UNIQUE,	/* Couldn't add unique to nvlist */
+	SES_LOG_FAILED_NV_LOG,		/* Couldn't add log to nvlist */
+	SES_LOG_FAILED_NV_CODE,		/* Couldn't add code to nvlist */
+	SES_LOG_FAILED_NV_SEV,		/* Couldn't add sev to nvlist */
+	SES_LOG_FAILED_NV_ENTRY,    	/* Couldn't add entry to nvlist */
+	SES_LOG_FAILED_MODE_SELECT,	/* Mode select failed */
+	SES_LOG_FAILED_NVLIST_CREATE	/* Couldn't create a nvlist */
 };
 
 /*
@@ -68,29 +64,36 @@ enum {
 #define	SES_LOG_LEVEL_NOTICE 0
 #define	SES_LOG_LEVEL_DEBUG 1
 #define	SES_LOG_LEVEL_WARNING 2
-#define	SES_LOG_LEVEL_ERROR 3
-#define	SES_LOG_LEVEL_FATAL 4
+#define	SES_LOG_LEVEL_NO_MASK 3
+#define	SES_LOG_LEVEL_ERROR 4
+#define	SES_LOG_LEVEL_FATAL 5
 
 /* Valid size of log entry being returned by expander */
 #define	SES_LOG_VALID_LOG_SIZE 71
+
+/* The string log is made from 8 char entries */
+#define	SES_LOG_SPECIFIC_ENTRY_SIZE 8
+
 /* Index of where sequence number starts in returned string */
 #define	SES_LOG_SEQ_NUM_START 27
+/* Index of where log code starts */
+#define	SES_LOG_CODE_START 36
 /* Index of where log level starts in returned string */
 #define	SES_LOG_LEVEL_START 40
 
-/*
- * Error buffer size
- */
-#define	EBUFF_SZ	256
+/* Maximum size the each sub log entry can be */
+#define	ENTRY_MAX_SIZE	10
+/* Maximum save buffer log entry size */
+#define	MAX_LOG_ENTRY_SZ	256
 
-#define	MX_ALLOC_LEN (0xfffc)
+#define	MAX_ALLOC_LEN (0xfffc)
 /*
  * Sense return buffer length
  * Arbitrary, could be larger
  */
 #define	SENSE_BUFF_LEN	32
 /*
- * 60 seconds
+ * 60 seconds for SCSI timeout
  */
 #define	DEF_PT_TIMEOUT	60
 
@@ -110,8 +113,6 @@ enum {
 #define	ENTRY_SEVERITY	"severity"
 #define	ENTRY_CODE	"code"
 #define	ENTRY_LOG	"log"
-#define	PROTOCOL	"protocol"
-#define	PROTOCOL_TYPE	"ses"
 
 
 
@@ -133,7 +134,7 @@ struct log_clear_control_struct {
 /*
  * Struct to contain information needed to read logs
  */
-struct ses_log_call_struct {
+typedef struct ses_log_call_struct {
 	char target_path[MAXPATHLEN]; /* Path to device, passed in */
 	char product_id[MAXNAMELEN]; /* product id of expander, passed in */
 	hrtime_t poll_time; /* nanosecond poll time, passed in */
@@ -141,7 +142,7 @@ struct ses_log_call_struct {
 	int number_log_entries;  /* num of log entries read, passed back */
 	int size_of_log_entries; /* Total size of all logs read passed back */
 	nvlist_t *log_data;  /* Log data being returned, passed back */
-};
+} ses_log_call_t;
 
 /*
  * Basic library functions

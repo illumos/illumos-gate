@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SOCKSCTP_H_
@@ -59,9 +59,10 @@ struct sctp_soassoc {
 	uint_t			ssa_state;	/* same as so_state */
 	int			ssa_error;	/* same as so_error */
 	boolean_t		ssa_snd_qfull;
-	int			ssa_wroff;
-	size_t			ssa_wrsize;
+	ushort_t		ssa_wroff;
+	ssize_t			ssa_wrsize;
 	int			ssa_rcv_queued;	/* queued rx bytes/# of conn */
+	boolean_t		ssa_flowctrld;	/* receive flow controlled */
 };
 
 /* 1-N socket association cache defined in socksctp.c */

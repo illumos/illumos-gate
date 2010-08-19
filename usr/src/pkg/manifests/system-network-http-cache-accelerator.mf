@@ -42,6 +42,7 @@ dir path=etc/rc0.d group=sys
 dir path=etc/rc1.d group=sys
 dir path=etc/rc2.d group=sys
 dir path=etc/rcS.d group=sys
+dir path=etc/sock2path.d group=sys
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
@@ -65,6 +66,8 @@ file path=etc/nca/ncalogd.conf group=sys \
     original_name=SUNWnca:etc/nca/ncalogd.conf preserve=true
 file path=etc/nca/ncaport.conf group=sys \
     original_name=SUNWnca:etc/nca/ncaport.conf preserve=true
+file path=etc/sock2path.d/system%2Fnetwork%2Fhttp%2Fcache%2Faccelerator \
+    group=sys
 file path=kernel/drv/$(ARCH64)/nca group=sys
 $(i386_ONLY)file path=kernel/drv/nca group=sys
 file path=kernel/drv/nca.conf group=sys
@@ -80,16 +83,12 @@ hardlink path=etc/rcS.d/K34ncalogd target=../../etc/init.d/ncalogd
 hardlink path=kernel/strmod/$(ARCH64)/nca \
     target=../../../kernel/drv/$(ARCH64)/nca
 $(i386_ONLY)hardlink path=kernel/strmod/nca target=../../kernel/drv/nca
-legacy pkg=SUNWncar arch=$(ARCH) category=system \
+legacy pkg=SUNWncar \
     desc="core components to enable the network cache and accelerator" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Network Cache and Accelerator (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWncau arch=$(ARCH) category=system \
+    name="Solaris Network Cache and Accelerator (Root)"
+legacy pkg=SUNWncau \
     desc="components to enable the network cache and accelerator" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Network Cache and Accelerator (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Solaris Network Cache and Accelerator (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/ncad_addr.so target=./ncad_addr.so.1

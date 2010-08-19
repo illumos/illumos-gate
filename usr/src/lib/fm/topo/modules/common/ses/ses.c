@@ -2499,6 +2499,15 @@ ses_construct_phys_tree(ses_enum_data_t *sdp, ses_enum_chassis_t *cp,
 			 * counter to detect an indefinite insertion loop.
 			 */
 			u_inserted++;
+			if (child == u_watch) {
+				/*
+				 * watch dog node itself is inserted.
+				 * Set it to the tail and refresh the watching.
+				 */
+				u_watch = u_tail;
+				u_inserted = 0;
+				u_left = 0;
+			}
 		}
 	}
 

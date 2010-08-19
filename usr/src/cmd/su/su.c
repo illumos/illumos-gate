@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	  All Rights Reserved	*/
 
@@ -828,7 +826,7 @@ audit_success(int pw_change, struct passwd *pwd)
 	 * The preceeding code is a noop if audit isn't enabled,
 	 * but, let's not make a new process when it's not necessary.
 	 */
-	if (adt_audit_enabled()) {
+	if (adt_audit_state(AUC_AUDITING)) {
 		audit_logout(ah, event_id);	/* fork to catch logout */
 	}
 	(void) adt_end_session(ah);
@@ -920,8 +918,62 @@ audit_logout(adt_session_data_t *ah, au_event_t event_id)
 	}
 	closefrom(0);
 	priv_freeset(priv);
-	while (pid != waitpid(pid, &status, 0))
-		continue;
+
+	for (;;) {
+		if (pid != waitpid(pid, &status, WUNTRACED)) {
+			if (errno == ECHILD) {
+				/*
+				 * No existing child with the given pid. Lets
+				 * audit the logout.
+				 */
+				break;
+			}
+			continue;
+		}
+
+		if (WIFEXITED(status) || WIFSIGNALED(status)) {
+			/*
+			 * The child shell exited or was terminated by
+			 * a signal. Lets audit logout.
+			 */
+			break;
+		} else if (WIFSTOPPED(status)) {
+			pid_t pgid;
+			int fd;
+			void (*sg_handler)();
+			/*
+			 * The child shell has been stopped/suspended.
+			 * We need to suspend here as well and pass down
+			 * the control to the parent process.
+			 */
+			sg_handler = signal(WSTOPSIG(status), SIG_DFL);
+			(void) sigsend(P_PGID, getpgrp(), WSTOPSIG(status));
+			/*
+			 * We stop here. When resumed, mark the child
+			 * shell group as foreground process group
+			 * which gives the child shell a control over
+			 * the controlling terminal.
+			 */
+			(void) signal(WSTOPSIG(status), sg_handler);
+
+			pgid = getpgid(pid);
+			if ((fd = open("/dev/tty", O_RDWR)) != -1) {
+				/*
+				 * Pass down the control over the controlling
+				 * terminal iff we are in a foreground process
+				 * group. Otherwise, we are in a background
+				 * process group and the kernel will send
+				 * SIGTTOU signal to stop us (by default).
+				 */
+				if (tcgetpgrp(fd) == getpgrp()) {
+					(void) tcsetpgrp(fd, pgid);
+				}
+				(void) close(fd);
+			}
+			/* Wake up the child shell */
+			(void) sigsend(P_PGID, pgid, SIGCONT);
+		}
+	}
 
 	(void) adt_put_event(event, ADT_SUCCESS, ADT_SUCCESS);
 	adt_free_event(event);

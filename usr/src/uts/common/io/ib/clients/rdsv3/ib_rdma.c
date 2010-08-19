@@ -322,14 +322,14 @@ rdsv3_ib_create_mr_pool(struct rdsv3_ib_device *rds_ibdev)
 
 void
 rdsv3_ib_get_mr_info(struct rdsv3_ib_device *rds_ibdev,
-	struct rdsv3_info_rdma_connection *iinfo)
+	struct rds_info_rdma_connection *iinfo)
 {
 	iinfo->rdma_mr_max = rds_ibdev->max_fmrs;
 	iinfo->rdma_mr_size = rds_ibdev->fmr_message_size;
 }
 
 void *
-rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
+rdsv3_ib_get_mr(struct rds_iovec *args, unsigned long nents,
 	struct rdsv3_sock *rs, uint32_t *key_ret)
 {
 	struct rdsv3_ib_device *rds_ibdev;

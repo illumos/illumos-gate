@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -29,8 +28,6 @@
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_argv.h"
@@ -253,7 +250,7 @@ join(int c)
 	cp = genbuf;
 	*cp = 0;
 	for (a1 = addr1; a1 <= addr2; a1++) {
-		getline(*a1);
+		getaline(*a1);
 		cp1 = linebuf;
 		if (a1 != addr1 && c == 0) {
 			while (*cp1 == ' ' || *cp1 == '\t')
@@ -410,7 +407,7 @@ getcopy(void)
 
 	if (tad1 > addr2)
 		return (EOF);
-	getline(*tad1++);
+	getaline(*tad1++);
 	return (0);
 }
 
@@ -423,7 +420,7 @@ getput(void)
 
 	if (tad1 > unddol)
 		return (EOF);
-	getline(*tad1++);
+	getaline(*tad1++);
 	tad1++;
 	return (0);
 }
@@ -490,7 +487,7 @@ pragged(bool kill)
 	 * Get last line of undo area ("3") into linebuf.
 	 */
 
-	getline(*unddol);
+	getaline(*unddol);
 	if (kill)
 		*pkill[1] = 0;
 	
@@ -518,7 +515,7 @@ pragged(bool kill)
 	 * So linebuf = "1"
 	 */
 
-	getline(dol[1]);
+	getaline(dol[1]);
 	if (kill)
 		strcLIN(pkill[0]);
 	
@@ -1129,7 +1126,7 @@ zop2(int nlines, int op)
 	if (addr1 > addr2)
 		return;
 	if (op == EOF && zhadpr) {
-		getline(*addr1);
+		getaline(*addr1);
 		putchar((int)('\r' | QUOTE));
 		shudclob = 1;
 	} else if (znoclear == 0 && clear_screen != NOSTR && !inopen) {
@@ -1165,7 +1162,7 @@ plines(line *adr1, line *adr2, bool movedot)
 
 	pofix();
 	for (addr = adr1; addr <= adr2; addr++) {
-		getline(*addr);
+		getaline(*addr);
 		pline(lineno(addr));
 		if (inopen)
 			putchar((int)('\n' | QUOTE));

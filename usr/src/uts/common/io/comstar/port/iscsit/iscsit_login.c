@@ -2481,8 +2481,10 @@ iscsit_handle_boolean(iscsit_conn_t *ict, nvpair_t *nvp, boolean_t value,
 		if (value != iscsit_value) {
 			/* Respond back to initiator with our value */
 			value = iscsit_value;
+			nvrc = nvlist_add_boolean_value(
+			    lsm->icl_negotiated_values,
+			    ikvx->ik_key_name, value);
 			lsm->icl_login_transit = B_FALSE;
-			nvrc = 0;
 		} else {
 			/* Add this to our negotiated values */
 			nvrc = nvlist_add_nvpair(lsm->icl_negotiated_values,
@@ -2521,8 +2523,9 @@ iscsit_handle_numerical(iscsit_conn_t *ict, nvpair_t *nvp, uint64_t value,
 		if (value > iscsit_max_value) {
 			/* Respond back to initiator with our value */
 			value = iscsit_max_value;
+			nvrc = nvlist_add_uint64(lsm->icl_negotiated_values,
+			    ikvx->ik_key_name, value);
 			lsm->icl_login_transit = B_FALSE;
-			nvrc = 0;
 		} else {
 			/* Add this to our negotiated values */
 			nvrc = nvlist_add_nvpair(lsm->icl_negotiated_values,

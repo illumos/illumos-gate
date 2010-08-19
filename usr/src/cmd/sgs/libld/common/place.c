@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -617,13 +616,12 @@ eh_frame_muldef(Ofl_desc *ofl, Is_desc *isp)
 					continue;
 
 				isp1 = lst->apl_data[0];
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_UPD_MULEHFRAME),
 				    isp1->is_file->ifl_name,
 				    EC_WORD(isp1->is_scnndx), isp1->is_name,
 				    isp->is_file->ifl_name,
 				    EC_WORD(isp->is_scnndx), isp->is_name);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 				return;
 			}
 		}
@@ -1208,7 +1206,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	 */
 	if ((sgp->sg_phdr.p_type == PT_LOAD) &&
 	    ((osp->os_shdr->sh_flags & SHF_ALLOC) == 0)) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SCN_NONALLOC),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_SCN_NONALLOC),
 		    ofl->ofl_name, osp->os_name, sgp->sg_name);
 		osp->os_shdr->sh_flags |= SHF_ALLOC;
 	}

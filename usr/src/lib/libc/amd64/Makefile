@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
@@ -93,7 +92,6 @@ COMOBJS=			\
 	bcopy.o			\
 	bsearch.o		\
 	bzero.o			\
-	ffs.o			\
 	qsort.o			\
 	strtol.o		\
 	strtoul.o		\
@@ -176,7 +174,6 @@ COMSYSOBJS=			\
 	alarm.o			\
 	brk.o			\
 	chdir.o			\
-	chmod.o			\
 	chroot.o		\
 	cladm.o			\
 	close.o			\
@@ -184,7 +181,6 @@ COMSYSOBJS=			\
 	exit.o			\
 	facl.o			\
 	fchdir.o		\
-	fchmod.o		\
 	fchroot.o		\
 	fdsync.o		\
 	fpathconf.o		\
@@ -209,14 +205,11 @@ COMSYSOBJS=			\
 	ioctl.o			\
 	kaio.o			\
 	kill.o			\
-	link.o			\
 	llseek.o		\
 	lseek.o			\
 	mmapobjsys.o		\
 	memcntl.o		\
 	mincore.o		\
-	mkdir.o			\
-	mknod.o			\
 	mmap.o			\
 	modctl.o		\
 	mount.o			\
@@ -239,7 +232,6 @@ COMSYSOBJS=			\
 	putpmsg.o		\
 	pwrite.o		\
 	read.o			\
-	readlink.o		\
 	readv.o			\
 	resolvepath.o		\
 	seteguid.o		\
@@ -256,7 +248,6 @@ COMSYSOBJS=			\
 	statfs.o		\
 	statvfs.o		\
 	stty.o			\
-	symlink.o		\
 	sync.o			\
 	sysconfig.o		\
 	sysfs.o			\
@@ -336,6 +327,8 @@ PORTGEN=			\
 	a64l.o			\
 	abort.o			\
 	addsev.o		\
+	ascii_strcasecmp.o	\
+	ascii_strncasecmp.o	\
 	assert.o		\
 	atof.o			\
 	atoi.o			\
@@ -378,6 +371,8 @@ PORTGEN=			\
 	fattach.o		\
 	fdetach.o		\
 	fdopendir.o		\
+	ffs.o			\
+	fls.o			\
 	fmtmsg.o		\
 	ftime.o			\
 	ftok.o			\
@@ -399,6 +394,7 @@ PORTGEN=			\
 	getlogin.o		\
 	getmntent.o		\
 	getnetgrent.o		\
+	get_nprocs.o		\
 	getopt.o		\
 	getopt_long.o		\
 	getpagesize.o		\
@@ -446,6 +442,7 @@ PORTGEN=			\
 	madvise.o		\
 	malloc.o		\
 	memalign.o		\
+	memmem.o		\
 	mkdev.o			\
 	mkdtemp.o		\
 	mkfifo.o		\
@@ -509,18 +506,20 @@ PORTGEN=			\
 	sigsetops.o		\
 	ssignal.o		\
 	stack.o			\
+	stpcpy.o		\
+	stpncpy.o		\
 	str2sig.o		\
 	strcase_charmap.o	\
-	strcasecmp.o		\
 	strcat.o		\
 	strchr.o		\
+	strchrnul.o		\
 	strcspn.o		\
 	strdup.o		\
 	strerror.o		\
 	strlcat.o		\
 	strlcpy.o		\
-	strncasecmp.o		\
 	strncat.o		\
+	strndup.o		\
 	strpbrk.o		\
 	strrchr.o		\
 	strsep.o		\
@@ -550,6 +549,7 @@ PORTGEN=			\
 	tfind.o			\
 	time_data.o		\
 	time_gdata.o		\
+	tls_data.o		\
 	truncate.o		\
 	tsdalloc.o		\
 	tsearch.o		\
@@ -624,6 +624,7 @@ PORTSTDIO=			\
 	fwrite.o		\
 	getc.o			\
 	getchar.o		\
+	getline.o		\
 	getpass.o		\
 	gets.o			\
 	getw.o			\
@@ -651,7 +652,11 @@ PORTI18N=			\
 	getwchar.o		\
 	putwchar.o		\
 	putws.o			\
+	strcasecmp.o		\
+	strcasestr.o		\
+	strncasecmp.o		\
 	strtows.o		\
+	wcsnlen.o		\
 	wcsstr.o		\
 	wcstoimax.o		\
 	wcstol.o		\
@@ -840,6 +845,7 @@ PORTSYS=			\
 	access.o		\
 	acctctl.o		\
 	bsd_signal.o		\
+	chmod.o			\
 	chown.o			\
 	corectl.o		\
 	exacctsys.o		\
@@ -852,13 +858,15 @@ PORTSYS=			\
 	inst_sync.o		\
 	issetugid.o		\
 	label.o			\
-	libc_link.o		\
+	link.o			\
 	lockf.o			\
 	lwp.o			\
 	lwp_cond.o		\
 	lwp_rwlock.o		\
 	lwp_sigmask.o		\
 	meminfosys.o		\
+	mkdir.o			\
+	mknod.o			\
 	msgsys.o		\
 	nfssys.o		\
 	open.o			\
@@ -867,6 +875,7 @@ PORTSYS=			\
 	ppriv.o			\
 	psetsys.o		\
 	rctlsys.o		\
+	readlink.o		\
 	rename.o		\
 	sbrk.o			\
 	semsys.o		\
@@ -879,6 +888,7 @@ PORTSYS=			\
 	sigpending.o		\
 	sigstack.o		\
 	stat.o			\
+	symlink.o		\
 	tasksys.o		\
 	time.o			\
 	time_util.o		\
@@ -1007,8 +1017,10 @@ BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 C99MODE=	$(C99_ENABLE)
 
 # libc method of building an archive
+# The "$(GREP) -v ' L '" part is necessary only until
+# lorder is fixed to ignore thread-local variables.
 BUILD.AR= $(RM) $@ ; \
-	$(AR) q $@ `$(LORDER) $(MOSTOBJS:%=$(DIR)/%)| $(TSORT)`
+	$(AR) q $@ `$(LORDER) $(MOSTOBJS:%=$(DIR)/%) | $(GREP) -v ' L ' | $(TSORT)`
 
 # extra files for the clean target
 CLEANFILES=			\
@@ -1066,6 +1078,7 @@ TIL=				\
 	atfork.o		\
 	cancel.o		\
 	door_calls.o		\
+	err.o			\
 	errno.o			\
 	lwp.o			\
 	ma.o			\

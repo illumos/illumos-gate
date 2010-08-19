@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <mdb/mdb_param.h>
@@ -45,6 +44,7 @@
 #endif
 
 #include "avl.h"
+#include "memory.h"
 
 /*
  * Page walker.
@@ -965,13 +965,11 @@ seg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 /*ARGSUSED*/
 static int
-pmap_walk_anon(uintptr_t addr, const struct anon *anon, int *nres)
+pmap_walk_count_pages(uintptr_t addr, const void *data, void *out)
 {
-	uintptr_t pp =
-	    mdb_page_lookup((uintptr_t)anon->an_vp, (u_offset_t)anon->an_off);
+	pgcnt_t *nres = out;
 
-	if (pp != NULL)
-		(*nres)++;
+	(*nres)++;
 
 	return (WALK_NEXT);
 }
@@ -982,35 +980,34 @@ pmap_walk_seg(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
 
 	mdb_printf("%0?p %0?p %7dk", addr, seg->s_base, seg->s_size / 1024);
 
-	if (segvn == (uintptr_t)seg->s_ops) {
+	if (segvn == (uintptr_t)seg->s_ops && seg->s_data != NULL) {
 		struct segvn_data svn;
-		int nres = 0;
+		pgcnt_t nres = 0;
 
+		svn.vp = NULL;
 		(void) mdb_vread(&svn, sizeof (svn), (uintptr_t)seg->s_data);
 
-		if (svn.amp == NULL) {
-			mdb_printf(" %8s", "");
-			goto drive_on;
-		}
-
 		/*
-		 * We've got an amp for this segment; walk through
-		 * the amp, and determine mappings.
+		 * Use the segvn_pages walker to find all of the in-core pages
+		 * for this mapping.
 		 */
-		if (mdb_pwalk("anon", (mdb_walk_cb_t)pmap_walk_anon,
-		    &nres, (uintptr_t)svn.amp) == -1)
-			mdb_warn("failed to walk anon (amp=%p)", svn.amp);
-
-		mdb_printf(" %7dk", (nres * PAGESIZE) / 1024);
-drive_on:
+		if (mdb_pwalk("segvn_pages", pmap_walk_count_pages, &nres,
+		    (uintptr_t)seg->s_data) == -1) {
+			mdb_warn("failed to walk segvn_pages (s_data=%p)",
+			    seg->s_data);
+		}
+		mdb_printf(" %7ldk", (nres * PAGESIZE) / 1024);
 
 		if (svn.vp != NULL) {
 			char buf[29];
 
 			mdb_vnode2path((uintptr_t)svn.vp, buf, sizeof (buf));
 			mdb_printf(" %s", buf);
-		} else
+		} else {
 			mdb_printf(" [ anon ]");
+		}
+	} else {
+		mdb_printf(" %8s [ &%a ]", "?", seg->s_ops);
 	}
 
 	mdb_printf("\n");
@@ -1022,9 +1019,10 @@ pmap_walk_seg_quick(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
 {
 	mdb_printf("%0?p %0?p %7dk", addr, seg->s_base, seg->s_size / 1024);
 
-	if (segvn == (uintptr_t)seg->s_ops) {
+	if (segvn == (uintptr_t)seg->s_ops && seg->s_data != NULL) {
 		struct segvn_data svn;
 
+		svn.vp = NULL;
 		(void) mdb_vread(&svn, sizeof (svn), (uintptr_t)seg->s_data);
 
 		if (svn.vp != NULL) {
@@ -1032,6 +1030,8 @@ pmap_walk_seg_quick(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
 		} else {
 			mdb_printf(" [ anon ]");
 		}
+	} else {
+		mdb_printf(" [ &%a ]", seg->s_ops);
 	}
 
 	mdb_printf("\n");
@@ -1086,15 +1086,19 @@ pmap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 typedef struct anon_walk_data {
 	uintptr_t *aw_levone;
 	uintptr_t *aw_levtwo;
-	int aw_nlevone;
-	int aw_levone_ndx;
-	int aw_levtwo_ndx;
+	size_t aw_minslot;
+	size_t aw_maxslot;
+	pgcnt_t aw_nlevone;
+	pgcnt_t aw_levone_ndx;
+	size_t aw_levtwo_ndx;
+	struct anon_map	*aw_ampp;
 	struct anon_map aw_amp;
-	struct anon_hdr aw_ahp;
+	struct anon_hdr	aw_ahp;
+	int		aw_all;	/* report all anon pointers, even NULLs */
 } anon_walk_data_t;
 
 int
-anon_walk_init(mdb_walk_state_t *wsp)
+anon_walk_init_common(mdb_walk_state_t *wsp, ulong_t minslot, ulong_t maxslot)
 {
 	anon_walk_data_t *aw;
 
@@ -1104,6 +1108,7 @@ anon_walk_init(mdb_walk_state_t *wsp)
 	}
 
 	aw = mdb_alloc(sizeof (anon_walk_data_t), UM_SLEEP);
+	aw->aw_ampp = (struct anon_map *)wsp->walk_addr;
 
 	if (mdb_vread(&aw->aw_amp, sizeof (aw->aw_amp), wsp->walk_addr) == -1) {
 		mdb_warn("failed to read anon map at %p", wsp->walk_addr);
@@ -1118,39 +1123,33 @@ anon_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
+	/* update min and maxslot with the given constraints */
+	maxslot = MIN(maxslot, aw->aw_ahp.size);
+	minslot = MIN(minslot, maxslot);
+
 	if (aw->aw_ahp.size <= ANON_CHUNK_SIZE ||
 	    (aw->aw_ahp.flags & ANON_ALLOC_FORCE)) {
-		aw->aw_nlevone = aw->aw_ahp.size;
+		aw->aw_nlevone = maxslot;
+		aw->aw_levone_ndx = minslot;
 		aw->aw_levtwo = NULL;
 	} else {
 		aw->aw_nlevone =
-		    (aw->aw_ahp.size + ANON_CHUNK_OFF) >> ANON_CHUNK_SHIFT;
+		    (maxslot + ANON_CHUNK_OFF) >> ANON_CHUNK_SHIFT;
+		aw->aw_levone_ndx = 0;
 		aw->aw_levtwo =
 		    mdb_zalloc(ANON_CHUNK_SIZE * sizeof (uintptr_t), UM_SLEEP);
 	}
 
 	aw->aw_levone =
 	    mdb_alloc(aw->aw_nlevone * sizeof (uintptr_t), UM_SLEEP);
-
-	aw->aw_levone_ndx = 0;
-	aw->aw_levtwo_ndx = 0;
+	aw->aw_all = (wsp->walk_arg == ANON_WALK_ALL);
 
 	mdb_vread(aw->aw_levone, aw->aw_nlevone * sizeof (uintptr_t),
 	    (uintptr_t)aw->aw_ahp.array_chunk);
 
-	if (aw->aw_levtwo != NULL) {
-		while (aw->aw_levone[aw->aw_levone_ndx] == NULL) {
-			aw->aw_levone_ndx++;
-			if (aw->aw_levone_ndx == aw->aw_nlevone) {
-				mdb_warn("corrupt anon; couldn't"
-				    "find ptr to lev two map");
-				goto out;
-			}
-		}
-
-		mdb_vread(aw->aw_levtwo, ANON_CHUNK_SIZE * sizeof (uintptr_t),
-		    aw->aw_levone[aw->aw_levone_ndx]);
-	}
+	aw->aw_levtwo_ndx = 0;
+	aw->aw_minslot = minslot;
+	aw->aw_maxslot = maxslot;
 
 out:
 	wsp->walk_data = aw;
@@ -1160,48 +1159,78 @@ out:
 int
 anon_walk_step(mdb_walk_state_t *wsp)
 {
-	int status;
 	anon_walk_data_t *aw = (anon_walk_data_t *)wsp->walk_data;
 	struct anon anon;
 	uintptr_t anonptr;
+	ulong_t slot;
 
-again:
 	/*
 	 * Once we've walked through level one, we're done.
 	 */
-	if (aw->aw_levone_ndx == aw->aw_nlevone)
+	if (aw->aw_levone_ndx >= aw->aw_nlevone) {
 		return (WALK_DONE);
+	}
 
 	if (aw->aw_levtwo == NULL) {
 		anonptr = aw->aw_levone[aw->aw_levone_ndx];
 		aw->aw_levone_ndx++;
 	} else {
-		anonptr = aw->aw_levtwo[aw->aw_levtwo_ndx];
-		aw->aw_levtwo_ndx++;
+		if (aw->aw_levtwo_ndx == 0) {
+			uintptr_t levtwoptr;
 
+			/* The first time through, skip to our first index. */
+			if (aw->aw_levone_ndx == 0) {
+				aw->aw_levone_ndx =
+				    aw->aw_minslot / ANON_CHUNK_SIZE;
+				aw->aw_levtwo_ndx =
+				    aw->aw_minslot % ANON_CHUNK_SIZE;
+			}
+
+			levtwoptr = (uintptr_t)aw->aw_levone[aw->aw_levone_ndx];
+
+			if (levtwoptr == NULL) {
+				if (!aw->aw_all) {
+					aw->aw_levtwo_ndx = 0;
+					aw->aw_levone_ndx++;
+					return (WALK_NEXT);
+				}
+				bzero(aw->aw_levtwo,
+				    ANON_CHUNK_SIZE * sizeof (uintptr_t));
+
+			} else if (mdb_vread(aw->aw_levtwo,
+			    ANON_CHUNK_SIZE * sizeof (uintptr_t), levtwoptr) ==
+			    -1) {
+				mdb_warn("unable to read anon_map %p's "
+				    "second-level map %d at %p",
+				    aw->aw_ampp, aw->aw_levone_ndx,
+				    levtwoptr);
+				return (WALK_ERR);
+			}
+		}
+		slot = aw->aw_levone_ndx * ANON_CHUNK_SIZE + aw->aw_levtwo_ndx;
+		anonptr = aw->aw_levtwo[aw->aw_levtwo_ndx];
+
+		/* update the indices for next time */
+		aw->aw_levtwo_ndx++;
 		if (aw->aw_levtwo_ndx == ANON_CHUNK_SIZE) {
 			aw->aw_levtwo_ndx = 0;
+			aw->aw_levone_ndx++;
+		}
 
-			do {
-				aw->aw_levone_ndx++;
-
-				if (aw->aw_levone_ndx == aw->aw_nlevone)
-					return (WALK_DONE);
-			} while (aw->aw_levone[aw->aw_levone_ndx] == NULL);
-
-			mdb_vread(aw->aw_levtwo, ANON_CHUNK_SIZE *
-			    sizeof (uintptr_t),
-			    aw->aw_levone[aw->aw_levone_ndx]);
+		/* make sure the slot # is in the requested range */
+		if (slot >= aw->aw_maxslot) {
+			return (WALK_DONE);
 		}
 	}
 
 	if (anonptr != NULL) {
 		mdb_vread(&anon, sizeof (anon), anonptr);
-		status = wsp->walk_callback(anonptr, &anon, wsp->walk_cbdata);
-	} else
-		goto again;
-
-	return (status);
+		return (wsp->walk_callback(anonptr, &anon, wsp->walk_cbdata));
+	}
+	if (aw->aw_all) {
+		return (wsp->walk_callback(NULL, NULL, wsp->walk_cbdata));
+	}
+	return (WALK_NEXT);
 }
 
 void
@@ -1214,6 +1243,319 @@ anon_walk_fini(mdb_walk_state_t *wsp)
 
 	mdb_free(aw->aw_levone, aw->aw_nlevone * sizeof (uintptr_t));
 	mdb_free(aw, sizeof (anon_walk_data_t));
+}
+
+int
+anon_walk_init(mdb_walk_state_t *wsp)
+{
+	return (anon_walk_init_common(wsp, 0, ULONG_MAX));
+}
+
+int
+segvn_anon_walk_init(mdb_walk_state_t *wsp)
+{
+	const uintptr_t		svd_addr = wsp->walk_addr;
+	uintptr_t		amp_addr;
+	uintptr_t		seg_addr;
+	struct segvn_data	svd;
+	struct anon_map		amp;
+	struct seg		seg;
+
+	if (svd_addr == NULL) {
+		mdb_warn("segvn_anon walk doesn't support global walks\n");
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&svd, sizeof (svd), svd_addr) == -1) {
+		mdb_warn("segvn_anon walk: unable to read segvn_data at %p",
+		    svd_addr);
+		return (WALK_ERR);
+	}
+	if (svd.amp == NULL) {
+		mdb_warn("segvn_anon walk: segvn_data at %p has no anon map\n",
+		    svd_addr);
+		return (WALK_ERR);
+	}
+	amp_addr = (uintptr_t)svd.amp;
+	if (mdb_vread(&amp, sizeof (amp), amp_addr) == -1) {
+		mdb_warn("segvn_anon walk: unable to read amp %p for "
+		    "segvn_data %p", amp_addr, svd_addr);
+		return (WALK_ERR);
+	}
+	seg_addr = (uintptr_t)svd.seg;
+	if (mdb_vread(&seg, sizeof (seg), seg_addr) == -1) {
+		mdb_warn("segvn_anon walk: unable to read seg %p for "
+		    "segvn_data %p", seg_addr, svd_addr);
+		return (WALK_ERR);
+	}
+	if ((seg.s_size + (svd.anon_index << PAGESHIFT)) > amp.size) {
+		mdb_warn("anon map %p is too small for segment %p\n",
+		    amp_addr, seg_addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = amp_addr;
+	return (anon_walk_init_common(wsp,
+	    svd.anon_index, svd.anon_index + (seg.s_size >> PAGESHIFT)));
+}
+
+
+typedef struct {
+	u_offset_t		svs_offset;
+	uintptr_t		svs_page;
+} segvn_sparse_t;
+#define	SEGVN_MAX_SPARSE	((128 * 1024) / sizeof (segvn_sparse_t))
+
+typedef struct {
+	uintptr_t		svw_svdp;
+	struct segvn_data	svw_svd;
+	struct seg		svw_seg;
+	size_t			svw_walkoff;
+	ulong_t			svw_anonskip;
+	segvn_sparse_t		*svw_sparse;
+	size_t			svw_sparse_idx;
+	size_t			svw_sparse_count;
+	size_t			svw_sparse_size;
+	uint8_t			svw_sparse_overflow;
+	uint8_t			svw_all;
+} segvn_walk_data_t;
+
+static int
+segvn_sparse_fill(uintptr_t addr, const void *pp_arg, void *arg)
+{
+	segvn_walk_data_t	*const	svw = arg;
+	const page_t		*const	pp = pp_arg;
+	const u_offset_t		offset = pp->p_offset;
+	segvn_sparse_t		*const	cur =
+	    &svw->svw_sparse[svw->svw_sparse_count];
+
+	/* See if the page is of interest */
+	if ((u_offset_t)(offset - svw->svw_svd.offset) >= svw->svw_seg.s_size) {
+		return (WALK_NEXT);
+	}
+	/* See if we have space for the new entry, then add it. */
+	if (svw->svw_sparse_count >= svw->svw_sparse_size) {
+		svw->svw_sparse_overflow = 1;
+		return (WALK_DONE);
+	}
+	svw->svw_sparse_count++;
+	cur->svs_offset = offset;
+	cur->svs_page = addr;
+	return (WALK_NEXT);
+}
+
+static int
+segvn_sparse_cmp(const void *lp, const void *rp)
+{
+	const segvn_sparse_t *const	l = lp;
+	const segvn_sparse_t *const	r = rp;
+
+	if (l->svs_offset < r->svs_offset) {
+		return (-1);
+	}
+	if (l->svs_offset > r->svs_offset) {
+		return (1);
+	}
+	return (0);
+}
+
+/*
+ * Builds on the "anon_all" walker to walk all resident pages in a segvn_data
+ * structure.  For segvn_datas without an anon structure, it just looks up
+ * pages in the vnode.  For segvn_datas with an anon structure, NULL slots
+ * pass through to the vnode, and non-null slots are checked for residency.
+ */
+int
+segvn_pages_walk_init(mdb_walk_state_t *wsp)
+{
+	segvn_walk_data_t	*svw;
+	struct segvn_data	*svd;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("segvn walk doesn't support global walks\n");
+		return (WALK_ERR);
+	}
+
+	svw = mdb_zalloc(sizeof (*svw), UM_SLEEP);
+	svw->svw_svdp = wsp->walk_addr;
+	svw->svw_anonskip = 0;
+	svw->svw_sparse_idx = 0;
+	svw->svw_walkoff = 0;
+	svw->svw_all = (wsp->walk_arg == SEGVN_PAGES_ALL);
+
+	if (mdb_vread(&svw->svw_svd, sizeof (svw->svw_svd), wsp->walk_addr) ==
+	    -1) {
+		mdb_warn("failed to read segvn_data at %p", wsp->walk_addr);
+		mdb_free(svw, sizeof (*svw));
+		return (WALK_ERR);
+	}
+
+	svd = &svw->svw_svd;
+	if (mdb_vread(&svw->svw_seg, sizeof (svw->svw_seg),
+	    (uintptr_t)svd->seg) == -1) {
+		mdb_warn("failed to read seg at %p (from %p)",
+		    svd->seg, &((struct segvn_data *)(wsp->walk_addr))->seg);
+		mdb_free(svw, sizeof (*svw));
+		return (WALK_ERR);
+	}
+
+	if (svd->amp == NULL && svd->vp == NULL) {
+		/* make the walk terminate immediately;  no pages */
+		svw->svw_walkoff = svw->svw_seg.s_size;
+
+	} else if (svd->amp == NULL &&
+	    (svw->svw_seg.s_size >> PAGESHIFT) >= SEGVN_MAX_SPARSE) {
+		/*
+		 * If we don't have an anon pointer, and the segment is large,
+		 * we try to load the in-memory pages into a fixed-size array,
+		 * which is then sorted and reported directly.  This is much
+		 * faster than doing a mdb_page_lookup() for each possible
+		 * offset.
+		 *
+		 * If the allocation fails, or there are too many pages
+		 * in-core, we fall back to looking up the pages individually.
+		 */
+		svw->svw_sparse = mdb_alloc(
+		    SEGVN_MAX_SPARSE * sizeof (*svw->svw_sparse), UM_NOSLEEP);
+		if (svw->svw_sparse != NULL) {
+			svw->svw_sparse_size = SEGVN_MAX_SPARSE;
+
+			if (mdb_pwalk("page", segvn_sparse_fill, svw,
+			    (uintptr_t)svd->vp) == -1 ||
+			    svw->svw_sparse_overflow) {
+				mdb_free(svw->svw_sparse, SEGVN_MAX_SPARSE *
+				    sizeof (*svw->svw_sparse));
+				svw->svw_sparse = NULL;
+			} else {
+				qsort(svw->svw_sparse, svw->svw_sparse_count,
+				    sizeof (*svw->svw_sparse),
+				    segvn_sparse_cmp);
+			}
+		}
+
+	} else if (svd->amp != NULL) {
+		const char *const layer = (!svw->svw_all && svd->vp == NULL) ?
+		    "segvn_anon" : "segvn_anon_all";
+		/*
+		 * If we're not printing all offsets, and the segvn_data has
+		 * no backing VP, we can use the "segvn_anon" walker, which
+		 * efficiently skips NULL slots.
+		 *
+		 * Otherwise, we layer over the "segvn_anon_all" walker
+		 * (which reports all anon slots, even NULL ones), so that
+		 * segvn_pages_walk_step() knows the precise offset for each
+		 * element.  It uses that offset information to look up the
+		 * backing pages for NULL anon slots.
+		 */
+		if (mdb_layered_walk(layer, wsp) == -1) {
+			mdb_warn("segvn_pages: failed to layer \"%s\" "
+			    "for segvn_data %p", layer, svw->svw_svdp);
+			mdb_free(svw, sizeof (*svw));
+			return (WALK_ERR);
+		}
+	}
+
+	wsp->walk_data = svw;
+	return (WALK_NEXT);
+}
+
+int
+segvn_pages_walk_step(mdb_walk_state_t *wsp)
+{
+	segvn_walk_data_t	*const	svw = wsp->walk_data;
+	struct seg		*const	seg = &svw->svw_seg;
+	struct segvn_data	*const	svd = &svw->svw_svd;
+	uintptr_t		pp;
+	page_t			page;
+
+	/* If we've walked off the end of the segment, we're done. */
+	if (svw->svw_walkoff >= seg->s_size) {
+		return (WALK_DONE);
+	}
+
+	/*
+	 * If we've got a sparse page array, just send it directly.
+	 */
+	if (svw->svw_sparse != NULL) {
+		u_offset_t off;
+
+		if (svw->svw_sparse_idx >= svw->svw_sparse_count) {
+			pp = NULL;
+			if (!svw->svw_all) {
+				return (WALK_DONE);
+			}
+		} else {
+			segvn_sparse_t	*const svs =
+			    &svw->svw_sparse[svw->svw_sparse_idx];
+			off = svs->svs_offset - svd->offset;
+			if (svw->svw_all && svw->svw_walkoff != off) {
+				pp = NULL;
+			} else {
+				pp = svs->svs_page;
+				svw->svw_sparse_idx++;
+			}
+		}
+
+	} else if (svd->amp == NULL || wsp->walk_addr == NULL) {
+		/*
+		 * If there's no anon, or the anon slot is NULL, look up
+		 * <vp, offset>.
+		 */
+		if (svd->vp != NULL) {
+			pp = mdb_page_lookup((uintptr_t)svd->vp,
+			    svd->offset + svw->svw_walkoff);
+		} else {
+			pp = NULL;
+		}
+
+	} else {
+		const struct anon	*const	anon = wsp->walk_layer;
+
+		/*
+		 * We have a "struct anon"; if it's not swapped out,
+		 * look up the page.
+		 */
+		if (anon->an_vp != NULL || anon->an_off != 0) {
+			pp = mdb_page_lookup((uintptr_t)anon->an_vp,
+			    anon->an_off);
+			if (pp == 0 && mdb_get_state() != MDB_STATE_RUNNING) {
+				mdb_warn("walk segvn_pages: segvn_data %p "
+				    "offset %ld, anon page <%p, %llx> not "
+				    "found.\n", svw->svw_svdp, svw->svw_walkoff,
+				    anon->an_vp, anon->an_off);
+			}
+		} else {
+			if (anon->an_pvp == NULL) {
+				mdb_warn("walk segvn_pages: useless struct "
+				    "anon at %p\n", wsp->walk_addr);
+			}
+			pp = NULL;	/* nothing at this offset */
+		}
+	}
+
+	svw->svw_walkoff += PAGESIZE;	/* Update for the next call */
+	if (pp != NULL) {
+		if (mdb_vread(&page, sizeof (page_t), pp) == -1) {
+			mdb_warn("unable to read page_t at %#lx", pp);
+			return (WALK_ERR);
+		}
+		return (wsp->walk_callback(pp, &page, wsp->walk_cbdata));
+	}
+	if (svw->svw_all) {
+		return (wsp->walk_callback(NULL, NULL, wsp->walk_cbdata));
+	}
+	return (WALK_NEXT);
+}
+
+void
+segvn_pages_walk_fini(mdb_walk_state_t *wsp)
+{
+	segvn_walk_data_t	*const	svw = wsp->walk_data;
+
+	if (svw->svw_sparse != NULL) {
+		mdb_free(svw->svw_sparse, SEGVN_MAX_SPARSE *
+		    sizeof (*svw->svw_sparse));
+	}
+	mdb_free(svw, sizeof (*svw));
 }
 
 /*

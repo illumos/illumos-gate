@@ -75,7 +75,10 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 	msi_regs.mr_data = vector;
 	msi_regs.mr_addr = target_apic_id;
 
-	intrmap_tbl[0] = irq_ptr->airq_intrmap_private;
+	for (i = 0; i < count; i++) {
+		irqno = apic_vector_to_irq[vector + i];
+		intrmap_tbl[i] = apic_irq_table[irqno]->airq_intrmap_private;
+	}
 	apic_vt_ops->apic_intrmap_alloc_entry(intrmap_tbl, dip, type,
 	    count, 0xff);
 	for (i = 0; i < count; i++) {

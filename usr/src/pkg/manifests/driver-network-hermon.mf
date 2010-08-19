@@ -47,9 +47,6 @@ driver name=hermon perms="* 0666 root sys" \
 file path=kernel/drv/$(ARCH64)/hermon group=sys
 $(i386_ONLY)file path=kernel/drv/hermon group=sys
 file path=kernel/drv/hermon.conf group=sys
-legacy pkg=SUNWhermon arch=$(ARCH) category=system desc="Hermon HCA driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun IB Hermon HCA driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWhermon desc="Hermon HCA driver" name="Sun IB Hermon HCA driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

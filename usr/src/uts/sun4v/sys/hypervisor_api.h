@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_HYPERVISOR_API_H
@@ -162,6 +161,7 @@ extern "C" {
 #define	LDC_MAPIN		0xed
 #define	LDC_UNMAP		0xee
 #define	LDC_REVOKE		0xef
+#define	LDC_MAPIN_SIZE_MAX	0x187
 
 #ifdef SET_MMU_STATS
 #define	MMU_STAT_AREA		0xfc
@@ -335,6 +335,12 @@ struct mmu_stat {
 #define	LDC_CHANNEL_UP		0x1
 #define	LDC_CHANNEL_RESET	0x2
 
+/*
+ * LDC mapin table types
+ */
+#define	LDC_MAPIN_TYPE_REGULAR	0x1		/* 8K page-size table */
+#define	LDC_MAPIN_TYPE_LARGE	0x2		/* Large page-size table */
+
 #ifndef _ASM
 
 extern uint64_t hv_mmu_map_perm_addr(void *, int, uint64_t, int);
@@ -427,6 +433,7 @@ extern uint64_t hv_ldc_mapin(uint64_t channel, uint64_t cookie,
 extern uint64_t hv_ldc_unmap(uint64_t raddr);
 extern uint64_t hv_ldc_revoke(uint64_t channel, uint64_t cookie,
     uint64_t revoke_cookie);
+extern uint64_t hv_ldc_mapin_size_max(uint64_t tbl_type, uint64_t *sz);
 extern uint64_t hv_api_get_version(uint64_t api_group, uint64_t *majorp,
     uint64_t *minorp);
 extern uint64_t hv_api_set_version(uint64_t api_group, uint64_t major,

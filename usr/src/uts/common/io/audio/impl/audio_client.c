@@ -1113,7 +1113,7 @@ auimpl_client_destroy(audio_client_t *c)
 	rw_exit(&auimpl_client_lock);
 
 	ASSERT(!c->c_istream.s_running);
-	ASSERT(!c->c_istream.s_running);
+	ASSERT(!c->c_ostream.s_running);
 
 	/* release the device reference count */
 	auimpl_dev_release(c->c_dev);

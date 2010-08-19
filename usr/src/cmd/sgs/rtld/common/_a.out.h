@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_A_DOT_OUT_DOT_H
 #define	_A_DOT_OUT_DOT_H
@@ -46,7 +45,7 @@ extern	ulong_t	aout_bndr(caddr_t);
 extern	int	aout_get_mmap(Lm_list *, mmapobj_result_t *);
 extern	int	aout_lookup_sym(Slookup *, Sresult *, uint_t *, int *);
 extern	Rt_map	*aout_new_lmp(Lm_list *, Aliste, Fdesc *, Addr, size_t, void *,
-		    int *);
+		    Rt_map *, int *);
 extern	void	aout_plt_write(caddr_t, ulong_t);
 extern	int	aout_reloc(Rt_map *, uint_t, int *, APlist **);
 extern	void	aout_rtbndr(caddr_t);

@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -758,7 +757,83 @@ The host and network IPs, network interfaces, and ippools to exempt from the set
 				</description>
 			</prop_pattern>
 		</pg_pattern>
-
+		<pg_pattern type='notify_params' target='all' required='false'>
+			<common_name>
+				<loctext xml:lang='C'>
+FMA and SMF notification parameters
+				</loctext>
+			</common_name>
+			<description>
+				<loctext xml:lang='C'>
+Parameters for notification of FMA events and SMF state transitions.
+				</loctext>
+			</description>
+			<prop_pattern name='smtp,active' type='boolean'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+smtp notification active
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Notifcation mechanism smtp active status.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name='smtp,to' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+smtp notification recipient
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Recipient for smtp notification mechanism.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name='smtp,reply-to' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+smtp notification reply-to
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Header reply-to for smtp notification mechanism.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name='snmp,active' type='boolean'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+snmp notification active
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Notifcation mechanism snmp active status.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name='syslog,active' type='boolean'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+syslog notification active
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Notifcation mechanism syslog active status.
+					</loctext>
+				</description>
+			</prop_pattern>
+		</pg_pattern>
 	</template>
 </service>
 

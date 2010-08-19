@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/types.h>
@@ -31,7 +28,7 @@
 #include <sys/modctl.h>
 #include <sys/cmn_err.h>
 #include <sys/ddi.h>
-
+#include <fips/fips_checksum.h>
 
 extern struct mod_ops mod_cryptoops;
 
@@ -63,4 +60,15 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
+}
+
+int
+bignum_fips_check()
+{
+	if (fips_check_module("misc/bignum", (void *)_init) != 0) {
+		cmn_err(CE_WARN, "bignum: FIPS-140 Software Integrity Test "
+		    "failed");
+		return (EINVAL);
+	}
+	return (0);
 }

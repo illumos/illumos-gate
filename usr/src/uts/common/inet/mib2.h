@@ -18,8 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -135,6 +134,16 @@ extern "C" {
 #define	BUMP_LOCAL(x)		(x)++
 #define	UPDATE_LOCAL(x, y)	(x) += (y)
 #define	SYNC32_MIB(s, m32, m64)	SET_MIB((s)->m32, (s)->m64 & 0xffffffff)
+
+/*
+ * Each struct that has been extended have a macro (MIB_FIRST_NEW_ELM_type)
+ * that is set to the first new element of the extended struct.
+ * The LEGACY_MIB_SIZE macro can be used to determine the size of MIB
+ * objects that needs to be returned to older applications unaware of
+ * these extensions.
+ */
+#define	MIB_PTRDIFF(s, e)	(caddr_t)e - (caddr_t)s
+#define	LEGACY_MIB_SIZE(s, t)	MIB_PTRDIFF(s, &(s)->MIB_FIRST_NEW_ELM_##t)
 
 #define	OCTET_LENGTH	32	/* Must be at least LIFNAMSIZ */
 typedef struct Octet_s {
@@ -570,6 +579,7 @@ typedef struct mib2_ipIfStatsEntry {
 	Counter		udpNoPorts;
 #define	udpIfStatsNoPorts	udpNoPorts
 } mib2_ipIfStatsEntry_t;
+#define	MIB_FIRST_NEW_ELM_mib2_ipIfStatsEntry_t	ipIfStatsIPVersion
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
@@ -618,6 +628,7 @@ typedef struct mib2_ipAddrEntry {
 	}		ipAdEntInfo;
 	uint32_t	ipAdEntRetransmitTime;  /* ipInterfaceRetransmitTime */
 } mib2_ipAddrEntry_t;
+#define	MIB_FIRST_NEW_ELM_mib2_ipAddrEntry_t	ipAdEntRetransmitTime
 
 /*
  *	ipv6AddrTable OBJECT-TYPE
@@ -667,6 +678,7 @@ typedef struct mib2_ipv6AddrEntry {
 	uint32_t	ipv6AddrReachableTime;	/* InterfaceReachableTime */
 	uint32_t	ipv6AddrRetransmitTime; /* InterfaceRetransmitTime */
 } mib2_ipv6AddrEntry_t;
+#define	MIB_FIRST_NEW_ELM_mib2_ipv6AddrEntry_t	ipv6AddrReasmMaxSize
 
 /*
  * The IP routing table contains an entry for each route presently known to
@@ -717,6 +729,15 @@ typedef struct mib2_ipRouteEntry {
 		Counter		re_obpkt;
 		Counter		re_ibpkt;
 		int		re_flags;
+		/*
+		 * The following two elements (re_in_ill and re_in_src_addr)
+		 * are no longer used but are left here for the benefit of
+		 * old Apps that won't be able to handle the change in the
+		 * size of this struct. These elements will always be
+		 * set to zeroes.
+		 */
+		DeviceName	re_in_ill;	/* Input interface */
+		IpAddress	re_in_src_addr;	/* Input source address */
 	} 		ipRouteInfo;
 } mib2_ipRouteEntry_t;
 
@@ -1293,6 +1314,7 @@ typedef struct mib2_tcp {
 	/* total # of segments sent				{ tcp 18 } */
 	Counter64	tcpHCOutSegs;
 } mib2_tcp_t;
+#define	MIB_FIRST_NEW_ELM_mib2_tcp_t	tcpHCInSegs
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
@@ -1357,6 +1379,8 @@ typedef struct mib2_tcpConnEntry {
 	/* system uptime when the connection was created */
 	uint64_t	tcpConnCreationTime;
 } mib2_tcpConnEntry_t;
+#define	MIB_FIRST_NEW_ELM_mib2_tcpConnEntry_t	tcpConnCreationProcess
+
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
 #endif
@@ -1410,6 +1434,8 @@ typedef struct mib2_tcp6ConnEntry {
 	/* system uptime when the connection was created */
 	uint64_t	tcp6ConnCreationTime;
 } mib2_tcp6ConnEntry_t;
+#define	MIB_FIRST_NEW_ELM_mib2_tcp6ConnEntry_t	tcp6ConnCreationProcess
+
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
 #endif
@@ -1449,6 +1475,8 @@ typedef struct mib2_udp {
 	/* total # of dg's sent					{ udp 9 } */
 	Counter64	udpHCOutDatagrams;
 } mib2_udp_t;
+#define	MIB_FIRST_NEW_ELM_mib2_udp_t	udpHCInDatagrams
+
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
 #endif
@@ -1490,6 +1518,8 @@ typedef struct mib2_udpEntry {
 	/* system uptime when the endpoint was created */
 	uint64_t	udpCreationTime;
 } mib2_udpEntry_t;
+#define	MIB_FIRST_NEW_ELM_mib2_udpEntry_t	udpInstance
+
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
 #endif
@@ -1528,6 +1558,8 @@ typedef	struct mib2_udp6Entry {
 	/* system uptime when the endpoint was created */
 	uint64_t	udp6CreationTime;
 } mib2_udp6Entry_t;
+#define	MIB_FIRST_NEW_ELM_mib2_udp6Entry_t	udp6Instance
+
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
 #endif

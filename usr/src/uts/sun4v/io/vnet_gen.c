@@ -141,6 +141,7 @@ static int vgen_create_dring(vgen_ldc_t *ldcp);
 static void vgen_destroy_dring(vgen_ldc_t *ldcp);
 static int vgen_map_dring(vgen_ldc_t *ldcp, void *pkt);
 static void vgen_unmap_dring(vgen_ldc_t *ldcp);
+static int vgen_mapin_avail(vgen_ldc_t *ldcp);
 
 /* VIO Message Processing */
 static int vgen_handshake(vgen_ldc_t *ldcp);
@@ -317,14 +318,7 @@ uint32_t vgen_txwd_timeout = VGEN_TXWD_TIMEOUT;   /* tx timeout in msec */
 uint32_t vgen_ldc_max_resets = 5;
 
 /*
- * We provide a tunable to enable RxDringData mode for versions >= 1.6. By
- * default, this tunable is set to 1 (VIO_TX_DRING). To enable RxDringData mode
- * set this tunable to 4 (VIO_RX_DRING_DATA).
  * See comments in vsw.c for details on the dring modes supported.
- */
-uint8_t  vgen_dring_mode = VIO_TX_DRING;
-
-/*
  * In RxDringData mode, # of buffers is determined by multiplying the # of
  * descriptors with the factor below. Note that the factor must be > 1; i.e,
  * the # of buffers must always be > # of descriptors. This is needed because,
@@ -449,6 +443,7 @@ extern pri_t	maxclsyspri;
 extern proc_t	p0;
 extern uint32_t	vnet_ethermtu;
 extern uint16_t	vnet_default_vlan_id;
+extern uint32_t vnet_num_descriptors;
 
 #ifdef DEBUG
 
@@ -3655,16 +3650,15 @@ vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp)
 	 *
 	 * However, for versions >= 1.6, we can force to only use TxDring mode.
 	 * This could happen if RxDringData mode has been disabled (see
-	 * vgen_dring_mode) on this guest or on the peer guest. This info is
-	 * determined as part of attr exchange phase of handshake. Hence, we
-	 * setup these pointers for v1.6 after attr msg phase completes during
-	 * handshake.
+	 * below) on this guest or on the peer guest. This info is determined
+	 * as part of attr exchange phase of handshake. Hence, we setup these
+	 * pointers for v1.6 after attr msg phase completes during handshake.
 	 */
 	if (VGEN_VER_GTEQ(ldcp, 1, 6)) {	/* Ver >= 1.6 */
 		/*
 		 * Set data dring mode for vgen_send_attr_info().
 		 */
-		if (vgen_dring_mode == VIO_RX_DRING_DATA) {
+		if (vgen_mapin_avail(ldcp) == B_TRUE) {
 			lp->dring_mode = (VIO_RX_DRING_DATA | VIO_TX_DRING);
 		} else {
 			lp->dring_mode = VIO_TX_DRING;
@@ -4603,7 +4597,7 @@ vgen_handle_attr_info(vgen_ldc_t *ldcp, vnet_attr_msg_t *msg)
 		 * that can be negotiated.
 		 */
 		if ((msg->options & VIO_RX_DRING_DATA) != 0 &&
-		    vgen_dring_mode == VIO_RX_DRING_DATA) {
+		    vgen_mapin_avail(ldcp) == B_TRUE) {
 			/*
 			 * We are capable of handling RxDringData AND the peer
 			 * is also capable of it; we enable RxDringData mode on
@@ -5755,6 +5749,30 @@ vgen_init_dring_reg_msg(vgen_ldc_t *ldcp, vio_dring_reg_msg_t *msg,
 	 * vgen_handle_dring_reg().
 	 */
 	msg->dring_ident = 0;
+}
+
+static int
+vgen_mapin_avail(vgen_ldc_t *ldcp)
+{
+	int		rv;
+	ldc_info_t	info;
+	uint64_t	mapin_sz_req;
+	uint64_t	dblk_sz;
+	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
+
+	rv = ldc_info(ldcp->ldc_handle, &info);
+	if (rv != 0) {
+		return (B_FALSE);
+	}
+
+	dblk_sz = RXDRING_DBLK_SZ(vgenp->max_frame_size);
+	mapin_sz_req = (VGEN_RXDRING_NRBUFS * dblk_sz);
+
+	if (info.direct_map_size_max >= mapin_sz_req) {
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }
 
 #if DEBUG

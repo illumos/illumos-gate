@@ -46,10 +46,7 @@ driver name=n2cp \
     alias=SUNW,vf-cwq
 file path=platform/sun4v/kernel/drv/$(ARCH64)/n2cp group=sys
 file path=platform/sun4v/kernel/drv/n2cp.conf group=sys
-legacy pkg=SUNWn2cp.v arch=$(ARCH).sun4v category=system \
-    desc="UltraSPARC-T2 Crypto Provider" \
-    hotline="Please contact your local service provider" \
-    name="UltraSPARC-T2 Crypto Provider" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWn2cp.v arch=$(ARCH).sun4v desc="UltraSPARC-T2 Crypto Provider" \
+    name="UltraSPARC-T2 Crypto Provider"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

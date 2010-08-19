@@ -2282,7 +2282,7 @@ zio_vdev_io_start(zio_t *zio)
 
 	ASSERT(P2PHASE(zio->io_offset, align) == 0);
 	ASSERT(P2PHASE(zio->io_size, align) == 0);
-	ASSERT(zio->io_type != ZIO_TYPE_WRITE || spa_writeable(spa));
+	VERIFY(zio->io_type != ZIO_TYPE_WRITE || spa_writeable(spa));
 
 	/*
 	 * If this is a repair I/O, and there's no self-healing involved --

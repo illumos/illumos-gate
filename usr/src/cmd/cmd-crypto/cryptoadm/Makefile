@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG = cryptoadm
@@ -29,6 +28,7 @@ OBJS =  cryptoadm.o \
 	adm_kef.o \
 	adm_kef_ioctl.o \
 	adm_kef_util.o \
+	adm_fips_hw.o \
 	adm_util.o \
 	start_stop.o \
 	adm_metaslot.o

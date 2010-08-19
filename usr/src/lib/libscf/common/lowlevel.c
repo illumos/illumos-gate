@@ -793,6 +793,38 @@ scf_handle_create(scf_version_t v)
 	return (ret);
 }
 
+/*
+ * Fails with
+ *   _NO_MEMORY
+ *   _NO_SERVER - server door could not be open()ed
+ *		  door call failed
+ *		  door_info() failed
+ *   _VERSION_MISMATCH - server returned bad file descriptor
+ *			 server claimed bad request
+ *			 server reported version mismatch
+ *			 server refused with unknown reason
+ *   _INVALID_ARGUMENT
+ *   _NO_RESOURCES - server is out of memory
+ *   _PERMISSION_DENIED
+ *   _INTERNAL - could not set up entities or iters
+ *		 server response too big
+ */
+scf_handle_t *
+_scf_handle_create_and_bind(scf_version_t ver)
+{
+	scf_handle_t *h;
+
+	h = scf_handle_create(ver);
+	if (h == NULL)
+		return (NULL);
+
+	if (scf_handle_bind(h) == -1) {
+		scf_handle_destroy(h);
+		return (NULL);
+	}
+	return (h);
+}
+
 int
 scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 {
@@ -4073,6 +4105,9 @@ scf_transaction_destroy(scf_transaction_t *val)
 void
 scf_transaction_destroy_children(scf_transaction_t *tran)
 {
+	if (tran == NULL)
+		return;
+
 	scf_transaction_reset_impl(tran, 1, 0);
 }
 

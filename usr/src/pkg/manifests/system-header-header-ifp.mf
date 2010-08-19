@@ -40,10 +40,7 @@ file path=usr/include/sys/scsi/adapters/ifpcmd.h
 file path=usr/include/sys/scsi/adapters/ifpmail.h
 file path=usr/include/sys/scsi/adapters/ifpreg.h
 file path=usr/include/sys/scsi/adapters/ifpvar.h
-legacy pkg=SUNWifph arch=$(ARCH) category=system \
-    desc="SunOS Header Files For QLogic FC-AL Family" \
-    hotline="Please contact your local service provider" \
-    name="Sun Fibre Channel Arbitrated Loop Driver Header Files" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWifph desc="SunOS Header Files For QLogic FC-AL Family" \
+    name="Sun Fibre Channel Arbitrated Loop Driver Header Files"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

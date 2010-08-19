@@ -53,7 +53,7 @@
 typedef void cmdfunc_t(int, char **, const char *);
 static cmdfunc_t do_create_if, do_delete_if, do_enable_if, do_disable_if;
 static cmdfunc_t do_show_if;
-static cmdfunc_t do_set_prop, do_show_prop, do_init_prop, do_set_ifprop;
+static cmdfunc_t do_set_prop, do_show_prop, do_set_ifprop;
 static cmdfunc_t do_show_ifprop, do_reset_ifprop, do_reset_prop;
 static cmdfunc_t do_show_addrprop, do_set_addrprop, do_reset_addrprop;
 static cmdfunc_t do_create_addr, do_delete_addr, do_show_addr;
@@ -115,10 +115,7 @@ static cmd_t	cmds[] = {
 	    "\treset-prop\t[-t] -p <prop> <protocol>"			},
 	{ "show-prop",	do_show_prop,
 	    "\tshow-prop\t[[-c] -o <field>,...] [-p <prop>,...]"
-	    " [protocol]"						},
-
-	/* private sub-commands */
-	{ "init-prop",	do_init_prop, "\tinit-prop\n"			}
+	    " [protocol]"						}
 };
 
 static const struct option if_longopts[] = {
@@ -351,8 +348,6 @@ usage(void)
 	    gettext("usage:  ipadm <subcommand> <args> ...\n"));
 	for (i = 0; i < sizeof (cmds) / sizeof (cmds[0]); i++) {
 		cmdp = &cmds[i];
-		if (strcmp(cmdp->c_name, "init-prop") == 0)
-			continue;
 		if (cmdp->c_usage != NULL)
 			(void) fprintf(stderr, "%s\n", gettext(cmdp->c_usage));
 	}
@@ -1038,17 +1033,6 @@ do_reset_prop(int argc, char **argv, const char *use)
 	set_prop(argc, argv,  _B_TRUE, use);
 }
 
-/*
- * Called on reboot by /lib/inet/netstart. Reads the persistent store
- * and applies all the global protocol properties.
- */
-/* ARGSUSED */
-static void
-do_init_prop(int argc, char **argv, const char *use)
-{
-	(void) ipadm_init_prop();
-}
-
 /* PRINTFLIKE1 */
 static void
 warn(const char *format, ...)
@@ -1718,7 +1702,7 @@ print_sa_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		flags2str(ainfo->ia_pflags, pflags_mask, _B_TRUE, buf, bufsize);
 		break;
 	case SA_ADDR:
-		af = ifa->ifa_addr->ss_family;
+		af = ifa->ifa_addr->sa_family;
 		/*
 		 * If the address is 0.0.0.0 or :: and the origin is DHCP,
 		 * print STR_UNKNOWN_VAL.
@@ -1763,20 +1747,18 @@ print_sa_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 				}
 				break;
 			}
-			/*
-			 * For the non-persistent case, we need to show the
-			 * currently configured addresses for source and
-			 * destination.
-			 */
-			if (ifa->ifa_flags & IFF_POINTOPOINT) {
-				sockaddr2str(
-				    (struct sockaddr_storage *)ifa->ifa_dstaddr,
-				    dstbuf, sizeof (dstbuf));
-			}
 		}
+		/*
+		 * For the non-persistent case, we need to show the
+		 * currently configured addresses for source and
+		 * destination.
+		 */
 		sockaddr2str((struct sockaddr_storage *)ifa->ifa_addr,
 		    addrbuf, sizeof (addrbuf));
-		if (dstbuf[0] != '\0') {
+		if (ifa->ifa_flags & IFF_POINTOPOINT) {
+			sockaddr2str(
+			    (struct sockaddr_storage *)ifa->ifa_dstaddr,
+			    dstbuf, sizeof (dstbuf));
 			(void) snprintf(buf, bufsize, "%s->%s", addrbuf,
 			    dstbuf);
 		} else {

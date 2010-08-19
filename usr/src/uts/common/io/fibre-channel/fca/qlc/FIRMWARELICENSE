@@ -1,0 +1,184 @@
+This license applies to the firmware binary files associated with the
+QLogic qlc hba driver.
+
+THIS PRODUCT CONTAINS COMPUTER PROGRAMS AND RELATED DOCUMENTATION 
+("SOFTWARE") THAT BELONG TO QLOGIC CORPORATION ("QLOGIC"), THE USE OF WHICH
+IS SUBJECT TO THIS END USER SOFTWARE LICENSE AGREEMENT ("AGREEMENT") UNLESS
+OTHERWISE AGREED TO IN WRITING BY QLOGIC.  CLICKING ON THE "AGREE" BUTTON
+BELOW, INSTALLING/USING THE SOFTWARE OR ENTERING A LICENSE KEY CONSTITUTES
+ACCEPTANCE BY LICENSEE ("LICENSEE" MEANS YOU OR THE BUSINESS ENTITY ON WHOSE
+BEHALF YOU USE OR INSTALL THE SOFTWARE, AS APPLICABLE) OF ALL THE TERMS AND
+CONDITIONS OF THIS AGREEMENT UNLESS OTHERWISE AGREED TO IN WRITING BY QLOGIC.
+IF LICENSEE DOES NOT AGREE TO THE TERMS AND CONDITIONS OF THIS AGREEMENT,
+LICENSEE SHALL NOT INSTALL/USE THE SOFTWARE OR ENTER A LICENSE KEY.  WRITTEN
+APPROVAL IS NOT A PREREQUISITE TO THE VALIDITY OR ENFORCEABILITY OF THIS 
+AGREEMENT. 
+
+1. License Grant.  Subject to the terms and conditions of this 
+   Agreement, QLogic grants Licensee a limited, non-exclusive license 
+   to redistribute, install, download and/or use the Software (in 
+   object code form only) with certain approved products manufactured 
+   by or for QLogic and approved products manufactured by or for an OEM 
+   customer of QLogic ("QLogic Approved Products").  This license is 
+   only available to original end user purchasers of QLogic Approved 
+   Products that have been purchased through QLogic authorized 
+   distribution channels or approved OEM distribution channels.  This 
+   license is not available to any end users of QLogic products who 
+   have purchased QLogic products, which have previously been used and 
+   the license is not available to any purchaser of QLogic application 
+   specific integrated circuits ("ASICs") or any product incorporating 
+   an ASIC, unless the product incorporating the ASIC is a QLogic 
+   Approved Product.  No rights or licenses in the Software are granted 
+   to Licensee other than those rights expressly granted in this 
+   Agreement.  Nothing in this License entitles Licensee to any 
+   upgrades or updates to, or future releases of, the Software. If 
+   Licensee redistributes the Software, then Licensee shall reproduce 
+   all copyright notices and must include this Agreement or an 
+   agreement which is at least as restrictive as this Agreement.
+
+2. Permitted Use.  Licensee may only install and use the Software in 
+   accordance with the documentation provided with the Software and 
+   with QLogic Approved Products.  
+
+3. Intellectual Property Rights.  The Software contains or embodies 
+   intellectual property of QLogic (or any of its licensors). The 
+   structure, organization and code are valuable trade secrets of 
+   QLogic (or its licensors). QLogic and/or its licensors do not grant, 
+   convey or license to Licensee any rights under any patents, 
+   copyrights, trademarks or any other intellectual property except as 
+   specifically granted herein. The Software is protected under U.S. 
+   copyright laws, international treaty provisions and applicable laws 
+   (including patent laws, if applicable) of the country in which it is 
+   being used. Any unauthorized duplication of the Software is 
+   expressly forbidden.
+
+4. Ownership of Software. Notwithstanding anything to the contrary, 
+   QLogic and its licensors retain all title to and, except as 
+   expressly and unambiguously licensed herein, all rights and interest 
+   in (i) the Software, all copies and derivative works thereof (by 
+   whomever produced), and (ii) all copyright rights, patent rights, 
+   trade secret rights, moral rights and all other intellectual 
+   property and proprietary rights anywhere in the world in the 
+   Software.  The Software is only licensed to Licensee and is not 
+   sold. 
+
+5. Restrictions and Cooperation.  Licensee shall not (and shall not 
+   allow any third party to) (i) decompile, disassemble, or otherwise 
+   reverse engineer or attempt to reconstruct or discover any source 
+   code, or underlying ideas or algorithms of the Software (except to 
+   the extent expressly permitted under applicable law); (ii) provide, 
+   lease, lend, use for timesharing or otherwise use or allow others to 
+   use the Software to or for the benefit of third parties; (iii) 
+   except as specified in the applicable user documentation, modify, 
+   incorporate into or with other hardware or software, or create a 
+   derivative work of any part of the Software; (iv) disseminate 
+   performance information or analysis from any source relating to the 
+   Software; (v) make any copies of the Software except as required to 
+   use the Software as licensed hereunder, except for one (1) copy 
+   solely for archival and back-up purposes,  or (vi) remove any 
+   product identification, copyright notice or other proprietary legend 
+   from the Software.  Licensee agrees to cooperate with QLogic and its 
+   licensors in connection with their efforts to protect their 
+   copyright/patent rights and other legal rights in the Software.  
+   QLogic may, from time to time, implement additional security 
+   measures for the Software, and Licensee shall cooperate with 
+   such measures and be responsible for installing upgrades that 
+   include such measures.
+
+6. Further Obligations.  Licensee shall defend, indemnify and hold 
+   QLogic harmless from and against any and all claims, damages, 
+   liabilities, costs and expenses (including, without limitation, 
+   attorneys" fees) arising out of Licensee"s breach of its obligations 
+   under this Agreement.
+
+7. Term and Termination.  This Agreement will become effective on the 
+   date Licensee clicks on the "Agree" button below or otherwise uses 
+   the Software and will remain in force until terminated.  Licensee 
+   may terminate this Agreement at any time, and QLogic may terminate 
+   this Agreement if Licensee breaches any of the terms or conditions 
+   hereunder.  Licensee agrees to destroy or return to QLogic the 
+   original and all copies of the Software immediately upon any 
+   termination of this Agreement.
+
+8. Confidentiality.  Licensee acknowledges that the Software contains 
+   valuable trade secrets of QLogic and other information proprietary 
+   to QLogic and its licensors.  Licensee shall: (i)"keep confidential 
+   such trade secrets and proprietary information, including without 
+   limitation all information concerning ideas and algorithms related 
+   to the Software, (ii)"disclose such information only to its 
+   employees and agents to the extent required to use the Software 
+   under the terms of this Agreement and (iii)"bind its employees, 
+   consultants, agents and other third parties in writing to maintain 
+   the confidentiality of such trade secrets and proprietary 
+   information and not use or disclose such information except as 
+   permitted in this Agreement.
+
+9. Limited Warranty and Disclaimer. THE SOFTWARE IS PROVIDED "AS IS" 
+   WITHOUT ANY WARRANTY OF ANY KIND INCLUDING, WITHOUT LIMITATION, ANY 
+   WARRANTY OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
+   NON-INFRINGEMENT.  QLOGIC DOES NOT WARRANT THAT THE SOFTWARE IS 
+   ERROR-FREE OR THAT IT WILL OPERATE WITHOUT INTERRUPTION.  QLOGIC 
+   DOES NOT WARRANT, GUARANTEE OR MAKE ANY REPRESENTATION REGARDING THE 
+   USE, OR THE RESULTS OF THE USE OF THE SOFTWARE INCLUDING, WITHOUT 
+   LIMITATION, THE CORRECTNESS, ACCURACY OR RELIABILITY OF SUCH USE OR 
+   RESULTS.  
+
+10. Limitation of Liability.  TO THE MAXIMUM EXTENT PERMITTED BY LAW, 
+    IN NO EVENT WILL QLOGIC BE LIABLE TO LICENSEE OR ANY THIRD PARTY 
+    FOR ANY CONSEQUENTIAL, INCIDENTAL OR SPECIAL DAMAGES, INCLUDING, 
+    WITHOUT LIMITATION, LOST PROFITS, LOST DATA OR LOST SAVINGS, OR FOR 
+    THE COST OF PROCUREMENT OF SUBSTITUTE GOODS, SERVICES OR TECHNOLOGY 
+    EVEN IF QLOGIC HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES, 
+    OR FOR ANY CLAIM BY ANY THIRD PARTY.  
+
+11. Export.  Licensee represents, warrants and agrees that it will not, 
+    directly or indirectly, export, re-export or transmit the Software 
+    or any part thereof to any country in which such export, re-export 
+    or transmission is restricted by any applicable U.S. regulation or 
+    statute, without the prior written consent of both QLogic and, if 
+    required, of the Bureau of Export Administration of the U.S. 
+    Department of Commerce, or such other governmental entity as may 
+    have jurisdiction over such export or transmission. In addition to 
+    the above, Software may not, in the absence of authorization by 
+    U.S. and local law and regulations, as required, be used by or 
+    exported or reexported to (i) any U.S. sanctioned or embargoed 
+    country, or to nationals or residents of such countries; or (ii) 
+    any person, entity, organization or other party identified on the 
+    U.S. Department of Commerce's Denied Persons or Entity List, the 
+    U.S. Department of Treasury's Specially Designated Nationals or 
+    Blocked Persons Lists, or the Department of State's Debarred 
+    Parties List, as published and revised from time to time; or 
+    (iii) any party where the end-use involves nuclear, 
+    chemical/biological weapons, rocket systems or unmanned air 
+    vehicles.
+
+12. Miscellaneous.  A party"s failure to exercise or its delay in 
+    exercising any rights hereunder will not be deemed to be a waiver 
+    of such right.  If any provision of this Agreement shall be held by 
+    any court of competent jurisdiction to be unenforceable or invalid, 
+    that provision shall be limited or eliminated to the minimum extent 
+    necessary so that this Agreement shall otherwise remain in full 
+    force and effect and enforceable.  This Agreement shall be 
+    construed pursuant to the laws of the State of California and the 
+    United States without regard to conflicts of laws provisions 
+    thereof and without regard to the United Nations Convention on 
+    Authority for the International Sale of Goods.  Licensee 
+    irrevocably submits to the jurisdiction of any state or federal 
+    court sitting in the State of California, United States of America, 
+    and consents to venue in such forum with respect to any action or 
+    proceeding that relates to this Agreement.  No amendment 
+    to or modification of this Agreement will be binding unless in 
+    writing and signed by a duly authorized officer of QLogic.  The 
+    provisions of Sections 3-11 shall survive termination of this 
+    Agreement.  This Agreement is in the English language only, which 
+    language shall be controlling and any revision of this Agreement in 
+    any other language shall not be binding.  Both parties agree that 
+    this Agreement is the complete and exclusive statement of the 
+    mutual understanding of the parties and supersedes and cancels all 
+    previous written and oral agreements and communications relating to 
+    the subject matter of this Agreement.  NO VENDOR, DISTRIBUTOR, 
+    DEALER, RETAILER, SALES PERSON OR OTHER PERSON IS AUTHORIZED TO 
+    MODIFY THIS AGREEMENT OR TO MAKE ANY WARRANTY, REPRESENTATION OR 
+    PROMISE WHICH IS DIFFERENT THAN, OR IN ADDITION TO, THE 
+    REPRESENTATIONS OR PROMISES IN THIS AGREEMENT.
+

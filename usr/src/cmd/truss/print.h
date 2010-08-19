@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -48,14 +49,14 @@ extern "C" {
 #define	UTS	9		/* print utssys code */
 #define	OPN	10		/* print open code */
 #define	SIG	11		/* print signal name plus flags */
-/* Number 12 now available for reuse */
+#define	UAT	12		/* print unlinkat() flag */
 #define	MSC	13		/* print msgsys command */
 #define	MSF	14		/* print msgsys flags */
 #define	SMC	15		/* print semsys command */
 #define	SEF	16		/* print semsys flags */
 #define	SHC	17		/* print shmsys command */
 #define	SHF	18		/* print shmsys flags */
-/* Number 19 now available for reuse */
+#define	FAT	19		/* print faccessat() flag */
 #define	SFS	20		/* print sysfs code */
 #define	RST	21		/* print string returned by sys call */
 #define	SMF	22		/* print streams message flags */
@@ -133,7 +134,7 @@ extern "C" {
 #define	SPF	94		/* print rctlsys_projset flags */
 #define	UN1	95		/* unsigned except for -1 */
 #define	MOB	96		/* print mmapobj() flags */
-#define	UTF	97		/* print utimensat() flag */
+#define	SNF	97		/* print AT_SYMLINK_[NO]FOLLOW flag */
 #define	SKC	98		/* print sockconfig subcode */
 #define	HID	99		/* hidden argument, don't print */
 				/* make sure HID is always the last member */

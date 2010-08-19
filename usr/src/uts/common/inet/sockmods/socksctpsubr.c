@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -177,6 +176,7 @@ sosctp_assoc_create(struct sctp_sonode *ss, int kmflag)
 		ssa->ssa_error = 0;
 		ssa->ssa_snd_qfull = 0;
 		ssa->ssa_rcv_queued = 0;
+		ssa->ssa_flowctrld = B_FALSE;
 	}
 	dprint(2, ("sosctp_assoc_create %p %p\n", (void *)ss, (void *)ssa));
 	return (ssa);
@@ -515,32 +515,37 @@ sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
 {
 	mblk_t *mp, **nmp, *last_mp;
 	struct sctp_soassoc *tmp;
+	struct sonode *nso, *sso;
 
 	sosctp_so_inherit(ss, nss);
 
-	nss->ss_so.so_state |= (ss->ss_so.so_state & (SS_NDELAY|SS_NONBLOCK));
-	nss->ss_so.so_state |=
+	sso = &ss->ss_so;
+	nso = &nss->ss_so;
+
+	nso->so_state |= (sso->so_state & (SS_NDELAY|SS_NONBLOCK));
+	nso->so_state |=
 	    (ssa->ssa_state & (SS_ISCONNECTED|SS_ISCONNECTING|
 	    SS_ISDISCONNECTING|SS_CANTSENDMORE|SS_CANTRCVMORE|SS_ISBOUND));
-	nss->ss_so.so_error = ssa->ssa_error;
-	nss->ss_so.so_snd_qfull = ssa->ssa_snd_qfull;
-	nss->ss_wroff = ssa->ssa_wroff;
-	nss->ss_wrsize = ssa->ssa_wrsize;
-	nss->ss_so.so_rcv_queued = ssa->ssa_rcv_queued;
-	nss->ss_so.so_proto_handle = (sock_lower_handle_t)ssa->ssa_conn;
+	nso->so_error = ssa->ssa_error;
+	nso->so_snd_qfull = ssa->ssa_snd_qfull;
+	nso->so_proto_props.sopp_wroff = ssa->ssa_wroff;
+	nso->so_proto_props.sopp_maxblk = ssa->ssa_wrsize;
+	nso->so_rcv_queued = ssa->ssa_rcv_queued;
+	nso->so_flowctrld = ssa->ssa_flowctrld;
+	nso->so_proto_handle = (sock_lower_handle_t)ssa->ssa_conn;
 	/* The peeled off socket is connection oriented */
-	nss->ss_so.so_mode |= SM_CONNREQUIRED;
+	nso->so_mode |= SM_CONNREQUIRED;
 
 	/* Consolidate all data on a single rcv list */
-	if (ss->ss_so.so_rcv_head != NULL) {
-		so_process_new_message(&ss->ss_so, ss->ss_so.so_rcv_head,
-		    ss->ss_so.so_rcv_last_head);
-		ss->ss_so.so_rcv_head = NULL;
-		ss->ss_so.so_rcv_last_head = NULL;
+	if (sso->so_rcv_head != NULL) {
+		so_process_new_message(&ss->ss_so, sso->so_rcv_head,
+		    sso->so_rcv_last_head);
+		sso->so_rcv_head = NULL;
+		sso->so_rcv_last_head = NULL;
 	}
 
-	if (nss->ss_so.so_rcv_queued > 0) {
-		nmp = &ss->ss_so.so_rcv_q_head;
+	if (nso->so_rcv_queued > 0) {
+		nmp = &sso->so_rcv_q_head;
 		last_mp = NULL;
 		while ((mp = *nmp) != NULL) {
 			tmp = *(struct sctp_soassoc **)DB_BASE(mp);
@@ -560,13 +565,12 @@ sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
 			if (tmp == ssa) {
 				*nmp = mp->b_next;
 				ASSERT(DB_TYPE(mp) != M_DATA);
-				if (nss->ss_so.so_rcv_q_last_head == NULL) {
-					nss->ss_so.so_rcv_q_head = mp;
+				if (nso->so_rcv_q_last_head == NULL) {
+					nso->so_rcv_q_head = mp;
 				} else {
-					nss->ss_so.so_rcv_q_last_head->b_next =
-					    mp;
+					nso->so_rcv_q_last_head->b_next = mp;
 				}
-				nss->ss_so.so_rcv_q_last_head = mp;
+				nso->so_rcv_q_last_head = mp;
 				mp->b_next = NULL;
 			} else {
 				nmp = &mp->b_next;
@@ -574,7 +578,7 @@ sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
 			}
 		}
 
-		ss->ss_so.so_rcv_q_last_head = last_mp;
+		sso->so_rcv_q_last_head = last_mp;
 	}
 }
 

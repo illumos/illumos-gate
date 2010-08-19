@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -100,10 +99,9 @@ struct dis_scn {
 	Elf_Data	*ds_data;
 };
 
-/* Lifted from Psymtab.c */
+/* Lifted from Psymtab.c, omitting STT_TLS */
 #define	DATA_TYPES      \
-	((1 << STT_OBJECT) | (1 << STT_FUNC) | \
-	(1 << STT_COMMON) | (1 << STT_TLS))
+	((1 << STT_OBJECT) | (1 << STT_FUNC) | (1 << STT_COMMON))
 #define	IS_DATA_TYPE(tp)	(((1 << (tp)) & DATA_TYPES) != 0)
 
 /*

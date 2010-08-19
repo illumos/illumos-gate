@@ -30,8 +30,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/x86_archext.h>
@@ -58,7 +57,7 @@ void
 drm_clflush_pages(caddr_t *pages, unsigned long num_pages)
 {
 
-	if (x86_feature & X86_CLFSH) {
+	if (is_x86_feature(x86_featureset, X86FSET_CLFSH)) {
 		unsigned long i;
 
 		for (i = 0; i < num_pages; i++)

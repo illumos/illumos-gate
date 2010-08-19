@@ -36,9 +36,7 @@ dir path=usr/lib/ssh
 file path=usr/bin/ssh-keygen mode=0555
 file path=usr/bin/ssh-keyscan mode=0555
 file path=usr/lib/ssh/ssh-keysign mode=4555
-legacy pkg=SUNWsshcu arch=$(ARCH) category=system \
-    desc="Secure Shell protocol common Utilities" \
-    hotline="Please contact your local service provider" \
-    name="SSH Common, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/ssh/THIRDPARTYLICENSE license=cmd/ssh/THIRDPARTYLICENSE
+legacy pkg=SUNWsshcu desc="Secure Shell protocol common Utilities" \
+    name="SSH Common, (Usr)"
+license usr/src/cmd/ssh/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ssh/THIRDPARTYLICENSE

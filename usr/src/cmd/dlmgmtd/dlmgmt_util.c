@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -275,8 +274,11 @@ linkattr_unset(dlmgmt_linkattr_t **headp, const char *attr)
 {
 	dlmgmt_linkattr_t *attrp;
 
-	if ((attrp = linkattr_find(*headp, attr)) != NULL)
+	if ((attrp = linkattr_find(*headp, attr)) != NULL) {
 		linkattr_rm(headp, attrp);
+		free(attrp->lp_val);
+		free(attrp);
+	}
 }
 
 int
@@ -295,33 +297,6 @@ linkattr_get(dlmgmt_linkattr_t **headp, const char *attr, void **attrvalp,
 	return (0);
 }
 
-int
-linkprop_getnext(dlmgmt_linkattr_t **headp, const char *lastattr,
-    char **attrnamep, void **attrvalp, size_t *attrszp, dladm_datatype_t *typep)
-{
-	dlmgmt_linkattr_t	*attrp;
-
-	/* skip to entry following lastattr or pick first if none specified */
-	for (attrp = *headp; attrp != NULL; attrp = attrp->lp_next) {
-		if (!attrp->lp_linkprop)
-			continue;
-		if (lastattr[0] == '\0')
-			break;
-		if (strcmp(attrp->lp_name, lastattr) == 0) {
-			attrp = attrp->lp_next;
-			break;
-		}
-	}
-	if (attrp == NULL)
-		return (ENOENT);
-
-	*attrnamep = attrp->lp_name;
-	*attrvalp = attrp->lp_val;
-	*attrszp = attrp->lp_sz;
-	*typep = attrp->lp_type;
-	return (0);
-}
-
 boolean_t
 linkattr_equal(dlmgmt_linkattr_t **headp, const char *attr, void *attrval,
     size_t attrsz)
@@ -334,6 +309,18 @@ linkattr_equal(dlmgmt_linkattr_t **headp, const char *attr, void *attrval,
 
 	return ((saved_attrsz == attrsz) &&
 	    (memcmp(saved_attrval, attrval, attrsz) == 0));
+}
+
+void
+linkattr_destroy(dlmgmt_link_t *linkp)
+{
+	dlmgmt_linkattr_t *next, *attrp;
+
+	for (attrp = linkp->ll_head; attrp != NULL; attrp = next) {
+		next = attrp->lp_next;
+		free(attrp->lp_val);
+		free(attrp);
+	}
 }
 
 static int
@@ -367,13 +354,7 @@ dlmgmt_table_unlock(void)
 void
 link_destroy(dlmgmt_link_t *linkp)
 {
-	dlmgmt_linkattr_t *next, *attrp;
-
-	for (attrp = linkp->ll_head; attrp != NULL; attrp = next) {
-		next = attrp->lp_next;
-		free(attrp->lp_val);
-		free(attrp);
-	}
+	linkattr_destroy(linkp);
 	free(linkp);
 }
 
@@ -386,7 +367,7 @@ int
 link_activate(dlmgmt_link_t *linkp)
 {
 	int		err = 0;
-	zoneid_t	zoneid;
+	zoneid_t	zoneid = ALL_ZONES;
 
 	if (zone_check_datalink(&zoneid, linkp->ll_linkid) == 0) {
 		/*
@@ -398,7 +379,10 @@ link_activate(dlmgmt_link_t *linkp)
 				err = EEXIST;
 				goto done;
 			}
-			avl_remove(&dlmgmt_name_avl, linkp);
+
+			if (avl_find(&dlmgmt_name_avl, linkp, NULL) != NULL)
+				avl_remove(&dlmgmt_name_avl, linkp);
+
 			linkp->ll_zoneid = zoneid;
 			avl_add(&dlmgmt_name_avl, linkp);
 			avl_add(&dlmgmt_loan_avl, linkp);

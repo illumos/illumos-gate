@@ -43,10 +43,8 @@ dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
 driver name=sf
 file path=platform/sun4u/kernel/drv/$(ARCH64)/sf group=sys
 file path=platform/sun4u/kernel/drv/sf.conf group=sys
-legacy pkg=SUNWluxd.u arch=$(ARCH).sun4u category=system \
+legacy pkg=SUNWluxd.u arch=$(ARCH).sun4u \
     desc="Sun Enterprise Network Array sf Device Driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun Enterprise Network Array sf Device Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Sun Enterprise Network Array sf Device Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

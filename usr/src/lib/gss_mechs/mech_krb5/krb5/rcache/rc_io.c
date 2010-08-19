@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -30,6 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <syslog.h> /* SUNW */
+#include <locale.h> /* Solaris Kerberos */
 #include "rc_base.h"
 #include "rc_file.h"
 #include "rc_io.h"
@@ -153,16 +153,20 @@ krb5_rc_io_creat(krb5_context context, krb5_rc_iostuff *d, char **fn)
 	case EEXIST:
 	    retval = KRB5_RC_IO_PERM;
 	    krb5_set_error_message(context, retval,
-				   "Cannot create replay cache: %s",
-				   strerror(errno));
+				dgettext(TEXT_DOMAIN,
+					"Cannot create replay cache %s: %s"),
+				d->fn ? d->fn : "<null>",
+				strerror(errno));
 	    do_not_unlink = 1;
 	    goto cleanup;
 
 	default:
 	    retval = KRB5_RC_IO_UNKNOWN;
 	    krb5_set_error_message(context, retval,
-				   "Cannot create replay cache: %s",
-				   strerror(errno));
+				dgettext(TEXT_DOMAIN,
+					"Cannot create replay cache %s: %s"),
+				d->fn ? d->fn : "<null>",
+				strerror(errno));
 	    goto cleanup;
 	}
     }
@@ -296,14 +300,16 @@ krb5_rc_io_open_internal(krb5_context context, krb5_rc_iostuff *d, char *fn,
 	    case EROFS:
 		retval = KRB5_RC_IO_PERM;
 	    	krb5_set_error_message (context, retval,
-			    "Cannot open replay cache %s: %s",
+			    dgettext(TEXT_DOMAIN,
+				"Cannot open replay cache %s: %s"),
 			    d->fn, strerror(errno));
 		break;
 
 	    default:
 		retval = KRB5_RC_IO_UNKNOWN;
 		krb5_set_error_message (context, retval,
-			    "Cannot open replay cache %s: %s",
+			    dgettext(TEXT_DOMAIN,
+				"Cannot open replay cache %s: %s"),
 			    d->fn, strerror(errno));
 	}
     }
@@ -416,19 +422,22 @@ krb5_rc_io_write(krb5_context context, krb5_rc_iostuff *d, krb5_pointer buf,
 	case EFBIG:
 	case ENOSPC:
 	    krb5_set_error_message (context, KRB5_RC_IO_SPACE,
-				    "Can't write to replay cache: %s",
-				    strerror(errno));
+				    dgettext(TEXT_DOMAIN,
+					    "Can't write to replay cache %s: %s"),
+				    d->fn, strerror(errno));
 	    return KRB5_RC_IO_SPACE;
 	case EIO:
 	    krb5_set_error_message (context, KRB5_RC_IO_IO,
-				    "Can't write to replay cache: %s",
-				    strerror(errno));
+				    dgettext(TEXT_DOMAIN,
+					    "Can't write to replay cache %s: %s"),
+				    d->fn, strerror(errno));
 	    return KRB5_RC_IO_IO;
 	case EBADF:
 	default:
 	    krb5_set_error_message (context, KRB5_RC_IO_UNKNOWN,
-				    "Can't write to replay cache: %s",
-				    strerror(errno));
+				    dgettext(TEXT_DOMAIN,
+					    "Can't write to replay cache %s: %s"),
+				    d->fn, strerror(errno));
 	    return KRB5_RC_IO_UNKNOWN;
 	}
     return 0;
@@ -449,8 +458,9 @@ krb5_rc_io_sync(krb5_context context, krb5_rc_iostuff *d)
 	case EIO: return KRB5_RC_IO_IO;
 	default:
 	    krb5_set_error_message(context, KRB5_RC_IO_UNKNOWN,
-				   "Cannot sync replay cache file: %s",
-				   strerror(errno));
+				dgettext(TEXT_DOMAIN,
+					"Cannot sync replay cache file %s: %s"),
+				d->fn, strerror(errno));
 	    return KRB5_RC_IO_UNKNOWN;
 	}
     }
@@ -470,8 +480,9 @@ krb5_rc_io_read(krb5_context context, krb5_rc_iostuff *d, krb5_pointer buf,
 	case EBADF:
 	default:
 	    krb5_set_error_message(context, KRB5_RC_IO_UNKNOWN,
-				   "Can't read from replay cache: %s",
-				   strerror(errno));
+				dgettext(TEXT_DOMAIN,
+					"Can't read from replay cache %s: %s"),
+				d->fn, strerror(errno));
 	    return KRB5_RC_IO_UNKNOWN;
 	}
     if (count == 0)
@@ -504,21 +515,24 @@ krb5_rc_io_destroy(krb5_context context, krb5_rc_iostuff *d)
 	{
 	case EIO:
 	    krb5_set_error_message(context, KRB5_RC_IO_IO,
-				   "Can't destroy replay cache: %s",
-				   strerror(errno));
+				dgettext(TEXT_DOMAIN,
+					"Can't destroy replay cache %s: %s"),
+				d->fn, strerror(errno));
 	    return KRB5_RC_IO_IO;
 	case EPERM:
 	case EBUSY:
 	case EROFS:
 	    krb5_set_error_message(context, KRB5_RC_IO_PERM,
-				   "Can't destroy replay cache: %s",
-				   strerror(errno));
+				dgettext(TEXT_DOMAIN,
+					"Can't destroy replay cache %s: %s"),
+				d->fn, strerror(errno));
 	    return KRB5_RC_IO_PERM;
 	case EBADF:
 	default:
 	    krb5_set_error_message(context, KRB5_RC_IO_UNKNOWN,
-				   "Can't destroy replay cache: %s",
-				   strerror(errno));
+				dgettext(TEXT_DOMAIN,
+					"Can't destroy replay cache %s: %s"),
+				d->fn, strerror(errno));
 	    return KRB5_RC_IO_UNKNOWN;
 	}
     return 0;

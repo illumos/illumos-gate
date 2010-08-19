@@ -19,13 +19,12 @@
  * CDDL HEADER END
  */
 
+/*
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #include "mt.h"
 #include "uucp.h"
@@ -64,7 +63,7 @@ static int namematch(const char *label, char *line, const char *name);
 static int nextdialers(void);
 static int nextdevices(void);
 static int nextsystems(void);
-static int getline(FILE *, char *);
+static int getaline(FILE *, char *);
 
 /* pointer arrays might be dynamically allocated */
 static char *Systems[64];	/* list of Systems files */
@@ -189,7 +188,7 @@ scansys(const char *service)
 	}
 
 	if ((f = fopen(SYSFILES, "rF")) != 0) {
-		while (getline(f, buf) > 0) {
+		while (getaline(f, buf) > 0) {
 			/* got a (logical) line from Sysfiles */
 			/* strtok's of this buf continue in tokenize() */
 			tok = strtok(buf, " \t");
@@ -239,7 +238,7 @@ scancfg(char *service, char *device)
 	expecttime = EXPECTTIME;
 
 	if ((f = fopen(DEVCONFIG, "rF")) != 0) {
-		while (getline(f, buf) > 0) {
+		while (getaline(f, buf) > 0) {
 			/* got a (logical) line from Devconfig */
 			/* strtok's of this buf continue in tokenize() */
 			tok = strtok(buf, " \t");
@@ -264,7 +263,7 @@ scancfg(char *service, char *device)
  */
 
 static int
-getline(FILE *f, char *line)
+getaline(FILE *f, char *line)
 {	char *lptr, *lend;
 
 	lptr = line;
@@ -734,7 +733,7 @@ setconfig(void)
 	extern char _ProtoCfg[];
 
 	if ((f = fopen(CONFIG, "rF")) != 0) {
-	while (getline(f, buf) > 0) {
+	while (getaline(f, buf) > 0) {
 		/* got a (logical) line from Config file */
 		tok = strtok(buf, " \t");
 		if ((tok != NULL) && (*tok != '#')) {

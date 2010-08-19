@@ -200,7 +200,7 @@ kc_modify_policy(int argc, char *argv[])
 				if (plc.ta_name == NULL) {
 					(void) fprintf(stderr,
 					    gettext("Error name input.\n"));
-				} else {
+				} else if (strcasecmp(plc.ta_name, "search")) {
 					KMF_X509_NAME taDN;
 					/* for syntax checking */
 					if (kmf_dn_parser(plc.ta_name,
@@ -213,6 +213,8 @@ kc_modify_policy(int argc, char *argv[])
 						kmf_free_dn(&taDN);
 						flags |= KC_TA_NAME;
 					}
+				} else {
+					flags |= KC_TA_NAME;
 				}
 				break;
 			case 's':

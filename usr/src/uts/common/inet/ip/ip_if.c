@@ -580,6 +580,17 @@ ill_delete_tail(ill_t *ill)
 		ill->ill_grp = NULL;
 	}
 
+	if (ill->ill_mphysaddr_list != NULL) {
+		multiphysaddr_t *mpa, *tmpa;
+
+		mpa = ill->ill_mphysaddr_list;
+		ill->ill_mphysaddr_list = NULL;
+		while (mpa) {
+			tmpa = mpa->mpa_next;
+			kmem_free(mpa, sizeof (*mpa));
+			mpa = tmpa;
+		}
+	}
 	/*
 	 * Take us out of the list of ILLs. ill_glist_delete -> phyint_free
 	 * could free the phyint. No more reference to the phyint after this
@@ -3527,34 +3538,51 @@ phyint_exists(uint_t index, ip_stack_t *ipst)
 	    &index, NULL) != NULL);
 }
 
-/* Pick a unique ifindex */
+/*
+ * Pick a unique ifindex.
+ * When the index counter passes IF_INDEX_MAX for the first time, the wrap
+ * flag is set so that next time time ip_assign_ifindex() is called, it
+ * falls through and resets the index counter back to 1, the minimum value
+ * for the interface index. The logic below assumes that ips_ill_index
+ * can hold a value of IF_INDEX_MAX+1 without there being any loss
+ * (i.e. reset back to 0.)
+ */
 boolean_t
 ip_assign_ifindex(uint_t *indexp, ip_stack_t *ipst)
 {
-	uint_t starting_index;
+	uint_t loops;
 
 	if (!ipst->ips_ill_index_wrap) {
 		*indexp = ipst->ips_ill_index++;
-		if (ipst->ips_ill_index == 0) {
-			/* Reached the uint_t limit Next time wrap  */
+		if (ipst->ips_ill_index > IF_INDEX_MAX) {
+			/*
+			 * Reached the maximum ifindex value, set the wrap
+			 * flag to indicate that it is no longer possible
+			 * to assume that a given index is unallocated.
+			 */
 			ipst->ips_ill_index_wrap = B_TRUE;
 		}
 		return (B_TRUE);
 	}
+
+	if (ipst->ips_ill_index > IF_INDEX_MAX)
+		ipst->ips_ill_index = 1;
 
 	/*
 	 * Start reusing unused indexes. Note that we hold the ill_g_lock
 	 * at this point and don't want to call any function that attempts
 	 * to get the lock again.
 	 */
-	starting_index = ipst->ips_ill_index++;
-	for (; ipst->ips_ill_index != starting_index; ipst->ips_ill_index++) {
-		if (ipst->ips_ill_index != 0 &&
-		    !phyint_exists(ipst->ips_ill_index, ipst)) {
+	for (loops = IF_INDEX_MAX; loops > 0; loops--) {
+		if (!phyint_exists(ipst->ips_ill_index, ipst)) {
 			/* found unused index - use it */
 			*indexp = ipst->ips_ill_index;
 			return (B_TRUE);
 		}
+
+		ipst->ips_ill_index++;
+		if (ipst->ips_ill_index > IF_INDEX_MAX)
+			ipst->ips_ill_index = 1;
 	}
 
 	/*
@@ -3689,6 +3717,7 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 		goto done;
 	ill->ill_current_frag = ill->ill_max_frag;
 	ill->ill_mtu = ill->ill_max_frag;	/* Initial value */
+	ill->ill_mc_mtu = ill->ill_mtu;
 	/*
 	 * ipif_loopback_name can't be pointed at directly because its used
 	 * by both the ipv4 and ipv6 interfaces.  When the ill is removed
@@ -4161,6 +4190,7 @@ ip_ll_subnet_defaults(ill_t *ill, mblk_t *mp)
 	ill->ill_max_frag = MAX(min_mtu, dlia->dl_max_sdu);
 	ill->ill_current_frag = ill->ill_max_frag;
 	ill->ill_mtu = ill->ill_max_frag;
+	ill->ill_mc_mtu = ill->ill_mtu;	/* Overridden by DL_NOTE_SDU_SIZE2 */
 
 	ill->ill_type = ipm->ip_m_type;
 
@@ -10788,6 +10818,10 @@ ip_sioctl_mtu(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		mutex_exit(&ill->ill_lock);
 		return (EINVAL);
 	}
+	/* Avoid increasing ill_mc_mtu */
+	if (ill->ill_mc_mtu > mtu)
+		ill->ill_mc_mtu = mtu;
+
 	/*
 	 * The dce and fragmentation code can handle changes to ill_mtu
 	 * concurrent with sending/fragmenting packets.
@@ -10798,7 +10832,7 @@ ip_sioctl_mtu(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	/*
 	 * Make sure all dce_generation checks find out
-	 * that ill_mtu has changed.
+	 * that ill_mtu/ill_mc_mtu has changed.
 	 */
 	dce_increment_all_generations(ill->ill_isv6, ill->ill_ipst);
 
@@ -11556,12 +11590,13 @@ ip_sioctl_lnkinfo(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 * here.
 		 */
 		ill->ill_mtu = MIN(ill->ill_current_frag, ill->ill_user_mtu);
+		ill->ill_mc_mtu = MIN(ill->ill_mc_mtu, ill->ill_user_mtu);
 	}
 	mutex_exit(&ill->ill_lock);
 
 	/*
 	 * Make sure all dce_generation checks find out
-	 * that ill_mtu has changed.
+	 * that ill_mtu/ill_mc_mtu has changed.
 	 */
 	if (!(ill->ill_flags & ILLF_FIXEDMTU) && (lir->lir_maxmtu != 0))
 		dce_increment_all_generations(ill->ill_isv6, ill->ill_ipst);
@@ -14612,10 +14647,24 @@ ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	((dl_bind_req_t *)bind_mp->b_rptr)->dl_sap = ill->ill_sap;
 	((dl_bind_req_t *)bind_mp->b_rptr)->dl_service_mode = DL_CLDLS;
 
-	unbind_mp = ip_dlpi_alloc(sizeof (dl_unbind_req_t), DL_UNBIND_REQ);
-	if (unbind_mp == NULL)
-		goto bad;
-
+	/*
+	 * ill_unbind_mp would be non-null if the following sequence had
+	 * happened:
+	 * - send DL_BIND_REQ to driver, wait for response
+	 * - multiple ioctls that need to bring the ipif up are encountered,
+	 *   but they cannot enter the ipsq due to the outstanding DL_BIND_REQ.
+	 *   These ioctls will then be enqueued on the ipsq
+	 * - a DL_ERROR_ACK is returned for the DL_BIND_REQ
+	 * At this point, the pending ioctls in the ipsq will be drained, and
+	 * since ill->ill_dl_up was not set, ill_dl_up would be invoked with
+	 * a non-null ill->ill_unbind_mp
+	 */
+	if (ill->ill_unbind_mp == NULL) {
+		unbind_mp = ip_dlpi_alloc(sizeof (dl_unbind_req_t),
+		    DL_UNBIND_REQ);
+		if (unbind_mp == NULL)
+			goto bad;
+	}
 	/*
 	 * Record state needed to complete this operation when the
 	 * DL_BIND_ACK shows up.  Also remember the pre-allocated mblks.
@@ -14634,8 +14683,8 @@ ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	 * Save the unbind message for ill_dl_down(); it will be consumed when
 	 * the interface goes down.
 	 */
-	ASSERT(ill->ill_unbind_mp == NULL);
-	ill->ill_unbind_mp = unbind_mp;
+	if (ill->ill_unbind_mp == NULL)
+		ill->ill_unbind_mp = unbind_mp;
 
 	ill_dlpi_send(ill, bind_mp);
 	/* Send down link-layer capabilities probe if not already done. */
@@ -15932,7 +15981,7 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 */
 	ill = ipif->ipif_ill;
 	phyi = ill->ill_phyint;
-	if (ipif->ipif_id != 0 || index == 0) {
+	if (ipif->ipif_id != 0 || index == 0 || index > IF_INDEX_MAX) {
 		return (EINVAL);
 	}
 
@@ -18999,4 +19048,115 @@ ill_lookup_usesrc(ill_t *usill)
 	rw_exit(&ipst->ips_ill_g_lock);
 	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 	return (ill);
+}
+
+/*
+ * This comment applies to both ip_sioctl_get_ifhwaddr and
+ * ip_sioctl_get_lifhwaddr as the basic function of these two functions
+ * is the same.
+ *
+ * The goal here is to find an IP interface that corresponds to the name
+ * provided by the caller in the ifreq/lifreq structure held in the mblk_t
+ * chain and to fill out a sockaddr/sockaddr_storage structure with the
+ * mac address.
+ *
+ * The SIOCGIFHWADDR/SIOCGLIFHWADDR ioctl may return an error for a number
+ * of different reasons:
+ * ENXIO - the device name is not known to IP.
+ * EADDRNOTAVAIL - the device has no hardware address. This is indicated
+ * by ill_phys_addr not pointing to an actual address.
+ * EPFNOSUPPORT - this will indicate that a request is being made for a
+ * mac address that will not fit in the data structure supplier (struct
+ * sockaddr).
+ *
+ */
+/* ARGSUSED */
+int
+ip_sioctl_get_ifhwaddr(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *ipip, void *if_req)
+{
+	struct sockaddr *sock;
+	struct ifreq *ifr;
+	mblk_t *mp1;
+	ill_t *ill;
+
+	ASSERT(ipif != NULL);
+	ill = ipif->ipif_ill;
+
+	if (ill->ill_phys_addr == NULL) {
+		return (EADDRNOTAVAIL);
+	}
+	if (ill->ill_phys_addr_length > sizeof (sock->sa_data)) {
+		return (EPFNOSUPPORT);
+	}
+
+	ip1dbg(("ip_sioctl_get_hwaddr(%s)\n", ill->ill_name));
+
+	/* Existence of mp1 has been checked in ip_wput_nondata */
+	mp1 = mp->b_cont->b_cont;
+	ifr = (struct ifreq *)mp1->b_rptr;
+
+	sock = &ifr->ifr_addr;
+	/*
+	 * The "family" field in the returned structure is set to a value
+	 * that represents the type of device to which the address belongs.
+	 * The value returned may differ to that on Linux but it will still
+	 * represent the correct symbol on Solaris.
+	 */
+	sock->sa_family = arp_hw_type(ill->ill_mactype);
+	bcopy(ill->ill_phys_addr, &sock->sa_data, ill->ill_phys_addr_length);
+
+	return (0);
+}
+
+/*
+ * The expection of applications using SIOCGIFHWADDR is that data will
+ * be returned in the sa_data field of the sockaddr structure. With
+ * SIOCGLIFHWADDR, we're breaking new ground as there is no Linux
+ * equivalent. In light of this, struct sockaddr_dl is used as it
+ * offers more space for address storage in sll_data.
+ */
+/* ARGSUSED */
+int
+ip_sioctl_get_lifhwaddr(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *ipip, void *if_req)
+{
+	struct sockaddr_dl *sock;
+	struct lifreq *lifr;
+	mblk_t *mp1;
+	ill_t *ill;
+
+	ASSERT(ipif != NULL);
+	ill = ipif->ipif_ill;
+
+	if (ill->ill_phys_addr == NULL) {
+		return (EADDRNOTAVAIL);
+	}
+	if (ill->ill_phys_addr_length > sizeof (sock->sdl_data)) {
+		return (EPFNOSUPPORT);
+	}
+
+	ip1dbg(("ip_sioctl_get_lifhwaddr(%s)\n", ill->ill_name));
+
+	/* Existence of mp1 has been checked in ip_wput_nondata */
+	mp1 = mp->b_cont->b_cont;
+	lifr = (struct lifreq *)mp1->b_rptr;
+
+	/*
+	 * sockaddr_ll is used here because it is also the structure used in
+	 * responding to the same ioctl in sockpfp. The only other choice is
+	 * sockaddr_dl which contains fields that are not required here
+	 * because its purpose is different.
+	 */
+	lifr->lifr_type = ill->ill_type;
+	sock = (struct sockaddr_dl *)&lifr->lifr_addr;
+	sock->sdl_family = AF_LINK;
+	sock->sdl_index = ill->ill_phyint->phyint_ifindex;
+	sock->sdl_type = ill->ill_mactype;
+	sock->sdl_nlen = 0;
+	sock->sdl_slen = 0;
+	sock->sdl_alen = ill->ill_phys_addr_length;
+	bcopy(ill->ill_phys_addr, sock->sdl_data, ill->ill_phys_addr_length);
+
+	return (0);
 }

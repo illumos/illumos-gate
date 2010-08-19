@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FMDUMP_H
@@ -30,8 +29,10 @@
 extern "C" {
 #endif
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <synch.h>
 
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
@@ -40,10 +41,17 @@ extern "C" {
 #include <fm/fmd_msg.h>
 #include <fm/libtopo.h>
 
+#ifdef DEBUG
+#define	ASSERT(x) (assert(x))
+#else
+#define	ASSERT(x)
+#endif
+
 enum {
 	FMDUMP_SHORT,
 	FMDUMP_VERB1,
 	FMDUMP_VERB2,
+	FMDUMP_PRETTY,
 	FMDUMP_MSG,
 	FMDUMP_NFMTS
 };
@@ -72,6 +80,7 @@ typedef struct fmdump_lyr {
 extern const fmdump_ops_t fmdump_err_ops;
 extern const fmdump_ops_t fmdump_flt_ops;
 extern const fmdump_ops_t fmdump_asru_ops;
+extern const fmdump_ops_t fmdump_info_ops;
 
 extern const char *g_pname;
 extern ulong_t g_errs;
@@ -88,6 +97,9 @@ extern void fmdump_vwarn(const char *, va_list);
 extern char *fmdump_date(char *, size_t, const fmd_log_record_t *);
 extern char *fmdump_year(char *, size_t, const fmd_log_record_t *);
 extern char *fmdump_nvl2str(nvlist_t *nvl);
+
+extern int fmdump_render_nvlist(nvlist_prtctl_t, void *, nvlist_t *,
+    const char *, nvlist_t *);
 
 #ifdef	__cplusplus
 }

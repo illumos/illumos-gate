@@ -263,6 +263,7 @@ COMMON_SUBDIRS = \
 	cmd/rpcgen \
 	cmd/rpcsvc/rpc.bootparamd \
 	cmd/runat \
+	cmd/savecore \
 	cmd/sbdadm \
 	cmd/sdpadm \
 	cmd/setpgrp \
@@ -299,6 +300,7 @@ COMMON_SUBDIRS = \
 	cmd/tzreload \
 	cmd/uadmin \
 	cmd/ul \
+	cmd/userattr \
 	cmd/users \
 	cmd/utmp_update \
 	cmd/utmpd \
@@ -328,6 +330,8 @@ COMMON_SUBDIRS = \
 	cmd/ztest \
 	lib/abi \
 	lib/auditd_plugins \
+	lib/libbe \
+	lib/pylibbe \
 	lib/brand/sn1 \
 	lib/brand/solaris10 \
 	lib/crypt_modules \
@@ -424,6 +428,7 @@ COMMON_SUBDIRS = \
 	lib/libsrpt \
 	lib/libstmf \
 	lib/libsun_ima \
+	lib/libsysevent \
 	lib/libthread \
 	lib/libtsnet \
 	lib/libtsol \

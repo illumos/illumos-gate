@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -102,11 +101,12 @@
 #include <sys/dls_mgmt.h>
 
 #include <libzonecfg.h>
+#include <zonestat_impl.h>
 #include "zoneadmd.h"
 
 static char *progname;
 char *zone_name;	/* zone which we are managing */
-char *pool_name;
+char pool_name[MAXNAMELEN];
 char default_brand[MAXNAMELEN];
 char brand_name[MAXNAMELEN];
 boolean_t zone_isnative;
@@ -457,12 +457,14 @@ static int
 brand_prestatechg(zlog_t *zlogp, int state, int cmd)
 {
 	char cmdbuf[2 * MAXPATHLEN];
+	const char *altroot;
 
 	if (pre_statechg_hook[0] == '\0')
 		return (0);
 
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d", pre_statechg_hook,
-	    state, cmd) > sizeof (cmdbuf))
+	altroot = zonecfg_get_root();
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d %s", pre_statechg_hook,
+	    state, cmd, altroot) > sizeof (cmdbuf))
 		return (-1);
 
 	if (do_subproc(zlogp, cmdbuf, NULL) != 0)
@@ -478,18 +480,47 @@ static int
 brand_poststatechg(zlog_t *zlogp, int state, int cmd)
 {
 	char cmdbuf[2 * MAXPATHLEN];
+	const char *altroot;
 
 	if (post_statechg_hook[0] == '\0')
 		return (0);
 
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d", post_statechg_hook,
-	    state, cmd) > sizeof (cmdbuf))
+	altroot = zonecfg_get_root();
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %d %d %s", post_statechg_hook,
+	    state, cmd, altroot) > sizeof (cmdbuf))
 		return (-1);
 
 	if (do_subproc(zlogp, cmdbuf, NULL) != 0)
 		return (-1);
 
 	return (0);
+}
+
+/*
+ * Notify zonestatd of the new zone.  If zonestatd is not running, this
+ * will do nothing.
+ */
+static void
+notify_zonestatd(zoneid_t zoneid)
+{
+	int cmd[2];
+	int fd;
+	door_arg_t params;
+
+	fd = open(ZS_DOOR_PATH, O_RDONLY);
+	if (fd < 0)
+		return;
+
+	cmd[0] = ZSD_CMD_NEW_ZONE;
+	cmd[1] = zoneid;
+	params.data_ptr = (char *)&cmd;
+	params.data_size = sizeof (cmd);
+	params.desc_ptr = NULL;
+	params.desc_num = 0;
+	params.rbuf = NULL;
+	params.rsize = NULL;
+	(void) door_call(fd, &params);
+	(void) close(fd);
 }
 
 /*
@@ -903,6 +934,12 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 		zerror(zlogp, B_TRUE, "could not set zone boot arguments");
 		goto bad;
 	}
+
+	/*
+	 * Inform zonestatd of a new zone so that it can install a door for
+	 * the zone to contact it.
+	 */
+	notify_zonestatd(zone_id);
 
 	if (zone_boot(zoneid) == -1) {
 		zerror(zlogp, B_TRUE, "unable to boot zone");

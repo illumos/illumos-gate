@@ -332,6 +332,8 @@ smb_com_search(smb_request_t *sr)
 			break;
 
 		if (*fileinfo.fi_shortname == '\0') {
+			if (smb_needs_mangled(fileinfo.fi_name))
+				continue;
 			(void) strlcpy(fileinfo.fi_shortname, fileinfo.fi_name,
 			    SMB_SHORTNAMELEN - 1);
 			if (to_upper)
@@ -476,6 +478,8 @@ smb_com_find(smb_request_t *sr)
 			break;
 
 		if (*fileinfo.fi_shortname == '\0') {
+			if (smb_needs_mangled(fileinfo.fi_name))
+				continue;
 			(void) strlcpy(fileinfo.fi_shortname, fileinfo.fi_name,
 			    SMB_SHORTNAMELEN - 1);
 		}
@@ -660,6 +664,8 @@ smb_com_find_unique(struct smb_request *sr)
 			break;
 
 		if (*fileinfo.fi_shortname == '\0') {
+			if (smb_needs_mangled(fileinfo.fi_name))
+				continue;
 			(void) strlcpy(fileinfo.fi_shortname, fileinfo.fi_name,
 			    SMB_SHORTNAMELEN - 1);
 		}

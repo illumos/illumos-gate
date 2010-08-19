@@ -45,10 +45,7 @@ driver name=sfe perms="* 0666 root root" \
     alias=pci1039,900
 file path=kernel/drv/$(ARCH64)/sfe group=sys
 $(i386_ONLY)file path=kernel/drv/sfe group=sys
-legacy pkg=SUNWsfe arch=$(ARCH) category=system \
-    desc="SiS900 series Fast Ethernet Network Adapter Driver" \
-    hotline="Please contact your local service provider" \
-    name="SiS900 Ethernet Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license uts/common/io/sfe/THIRDPARTYLICENSE \
-    license=uts/common/io/sfe/THIRDPARTYLICENSE
+legacy pkg=SUNWsfe desc="SiS900 series Fast Ethernet Network Adapter Driver" \
+    name="SiS900 Ethernet Driver"
+license usr/src/uts/common/io/sfe/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/sfe/THIRDPARTYLICENSE

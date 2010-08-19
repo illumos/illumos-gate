@@ -1105,7 +1105,7 @@ rdsv3_put_cmsg(struct nmsghdr *msg, int level, int type, size_t size,
 	    "Enter(msg: %p level: %d type: %d sz: %d)",
 	    msg, level, type, size);
 
-	if (msg == NULL || msg->msg_controllen == 0 || payload == NULL) {
+	if (msg == NULL || msg->msg_controllen == 0) {
 		return (0);
 	}
 	/* check for first cmsg or this is another cmsg to be appended */
@@ -1140,55 +1140,11 @@ rdsv3_put_cmsg(struct nmsghdr *msg, int level, int type, size_t size,
 	return (0);
 }
 
-/* bind.c */
-extern kmutex_t rdsv3_bind_lock;
-extern avl_tree_t rdsv3_bind_tree;
-
 /* ARGSUSED */
 int
 rdsv3_verify_bind_address(ipaddr_t addr)
 {
 	return (1);
-}
-
-int
-rdsv3_bind_node_compare(const void *a, const void *b)
-{
-	uint64_t			needle = *(uint64_t *)a;
-	struct rdsv3_sock		*rs = (struct rdsv3_sock *)b;
-
-	if (needle > (((uint64_t)rs->rs_bound_addr << 32) | rs->rs_bound_port))
-		return (+1);
-	else if (needle <
-	    (((uint64_t)rs->rs_bound_addr << 32) | rs->rs_bound_port))
-		return (-1);
-
-	return (0);
-}
-
-void
-rdsv3_bind_tree_init()
-{
-	RDSV3_DPRINTF4("rdsv3_bind_tree_init", "Enter");
-
-	mutex_init(&rdsv3_bind_lock, NULL, MUTEX_DRIVER, NULL);
-	avl_create(&rdsv3_bind_tree, rdsv3_bind_node_compare,
-	    sizeof (struct rdsv3_sock),
-	    offsetof(struct rdsv3_sock, rs_bound_node));
-
-	RDSV3_DPRINTF4("rdsv3_bind_tree_init", "Return");
-}
-
-void
-rdsv3_bind_tree_exit()
-{
-	RDSV3_DPRINTF2("rdsv3_bind_tree_exit", "Enter");
-
-	ASSERT(avl_is_empty(&rdsv3_bind_tree));
-	avl_destroy(&rdsv3_bind_tree);
-	mutex_destroy(&rdsv3_bind_lock);
-
-	RDSV3_DPRINTF2("rdsv3_bind_tree_exit", "Return");
 }
 
 /* checksum */

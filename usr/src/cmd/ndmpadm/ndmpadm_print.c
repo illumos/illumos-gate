@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,6 +36,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
 #include <locale.h>
 #include <libndmp.h>
 #include "ndmpadm.h"
@@ -774,6 +775,11 @@ ndmp_devinfo_print(ndmp_devinfo_t *dip, size_t size)
 	}
 
 	for (i = 0; i < size; i++, dip++) {
+		/*
+		 * Don't print dead links.
+		 */
+		if ((access(dip->nd_name, F_OK) == -1) && (errno == ENOENT))
+			continue;
 		switch (dip->nd_dev_type) {
 		case NDMP_SINQ_TAPE_ROBOT:
 			(void) fprintf(stdout, gettext("Robot (Changer):\n"));

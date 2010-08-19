@@ -34,16 +34,10 @@ dir path=usr/lib
 file path=usr/lib/libfsmgt.so.1
 file path=usr/lib/llib-lfsmgt
 file path=usr/lib/llib-lfsmgt.ln
-legacy pkg=SUNWdmgtr arch=$(ARCH) category=system \
-    desc="software for WBEM/CIM data device management" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Data Management WBEM/CIM API (root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWdmgtu arch=$(ARCH) category=system \
-    desc="software for WBEM/CIM data device management" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Data Management WBEM/CIM API (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWdmgtr desc="software for WBEM/CIM data device management" \
+    name="Solaris Data Management WBEM/CIM API (root)"
+legacy pkg=SUNWdmgtu desc="software for WBEM/CIM data device management" \
+    name="Solaris Data Management WBEM/CIM API (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/libfsmgt.so target=./libfsmgt.so.1

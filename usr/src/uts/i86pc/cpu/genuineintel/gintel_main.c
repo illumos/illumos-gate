@@ -112,7 +112,7 @@ gintel_init(cmi_hdl_t hdl, void **datap)
 	if (gintel_ms_support_disable)
 		return (ENOTSUP);
 
-	if (!(x86_feature & X86_MCA))
+	if (!is_x86_feature(x86_featureset, X86FSET_MCA))
 		return (ENOTSUP);
 
 	nb_chipset = (*pci_getl_func)(0, 0, 0, 0x0);

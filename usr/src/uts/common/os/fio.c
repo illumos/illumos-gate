@@ -75,7 +75,6 @@ static uint32_t afd_wait;	/* count of waits on non-zero ref count */
 #endif	/* DEBUG */
 
 kmem_cache_t *file_cache;
-static int vpsetattr(vnode_t *, vattr_t *, int);
 
 static void port_close_fd(portfd_t *);
 
@@ -1087,6 +1086,7 @@ falloc(vnode_t *vp, int flag, file_t **fpp, int *fdp)
 	mutex_enter(&fp->f_tlock);
 	fp->f_count = 1;
 	fp->f_flag = (ushort_t)flag;
+	fp->f_flag2 = (flag & (FSEARCH|FEXEC)) >> 16;
 	fp->f_vnode = vp;
 	fp->f_offset = 0;
 	fp->f_audit_data = 0;
@@ -1195,7 +1195,7 @@ f_getfl(int fd, int *flagp)
 			error = EBADF;
 		else {
 			vnode_t *vp = fp->f_vnode;
-			int flag = fp->f_flag;
+			int flag = fp->f_flag | (fp->f_flag2 << 16);
 
 			/*
 			 * BSD fcntl() FASYNC compatibility.
@@ -1460,85 +1460,107 @@ close_exec(uf_info_t *fip)
 }
 
 /*
- * Common routine for modifying attributes of named files.
+ * Utility function called by most of the *at() system call interfaces.
+ *
+ * Generate a starting vnode pointer for an (fd, path) pair where 'fd'
+ * is an open file descriptor for a directory to be used as the starting
+ * point for the lookup of the relative pathname 'path' (or, if path is
+ * NULL, generate a vnode pointer for the direct target of the operation).
+ *
+ * If we successfully return a non-NULL startvp, it has been the target
+ * of VN_HOLD() and the caller must call VN_RELE() on it.
  */
 int
-namesetattr(char *fnamep, enum symfollow followlink, vattr_t *vap, int flags)
+fgetstartvp(int fd, char *path, vnode_t **startvpp)
 {
-	vnode_t *vp;
-	int error = 0;
+	vnode_t		*startvp;
+	file_t 		*startfp;
+	char 		startchar;
 
-	if (error = lookupname(fnamep, UIO_USERSPACE, followlink, NULLVPP, &vp))
-		return (set_errno(error));
-	if (error = vpsetattr(vp, vap, flags))
-		(void) set_errno(error);
-	VN_RELE(vp);
-	return (error);
-}
+	if (fd == AT_FDCWD && path == NULL)
+		return (EFAULT);
 
-/*
- * Common routine for modifying attributes of files referenced
- * by descriptor.
- */
-int
-fdsetattr(int fd, vattr_t *vap)
-{
-	file_t *fp;
-	vnode_t *vp;
-	int error = 0;
+	if (fd == AT_FDCWD) {
+		/*
+		 * Start from the current working directory.
+		 */
+		startvp = NULL;
+	} else {
+		if (path == NULL)
+			startchar = '\0';
+		else if (copyin(path, &startchar, sizeof (char)))
+			return (EFAULT);
 
-	if ((fp = getf(fd)) != NULL) {
-		vp = fp->f_vnode;
-		if (error = vpsetattr(vp, vap, 0)) {
-			(void) set_errno(error);
+		if (startchar == '/') {
+			/*
+			 * 'path' is an absolute pathname.
+			 */
+			startvp = NULL;
+		} else {
+			/*
+			 * 'path' is a relative pathname or we will
+			 * be applying the operation to 'fd' itself.
+			 */
+			if ((startfp = getf(fd)) == NULL)
+				return (EBADF);
+			startvp = startfp->f_vnode;
+			VN_HOLD(startvp);
+			releasef(fd);
 		}
-		releasef(fd);
-	} else
-		error = set_errno(EBADF);
-	return (error);
+	}
+	*startvpp = startvp;
+	return (0);
 }
 
 /*
- * Common routine to set the attributes for the given vnode.
- * If the vnode is a file and the filesize is being manipulated,
- * this makes sure that there are no conflicting non-blocking
- * mandatory locks in that region.
+ * Called from fchownat() and fchmodat() to set ownership and mode.
+ * The contents of *vap must be set before calling here.
  */
-static int
-vpsetattr(vnode_t *vp, vattr_t *vap, int flags)
+int
+fsetattrat(int fd, char *path, int flags, struct vattr *vap)
 {
-	int error = 0;
-	int in_crit = 0;
-	u_offset_t	begin;
-	vattr_t	vattr;
-	ssize_t	length;
+	vnode_t		*startvp;
+	vnode_t		*vp;
+	int 		error;
+
+	/*
+	 * Since we are never called to set the size of a file, we don't
+	 * need to check for non-blocking locks (via nbl_need_check(vp)).
+	 */
+	ASSERT(!(vap->va_mask & AT_SIZE));
+
+	if ((error = fgetstartvp(fd, path, &startvp)) != 0)
+		return (error);
+	if (AU_AUDITING() && startvp != NULL)
+		audit_setfsat_path(1);
+
+	/*
+	 * Do lookup for fchownat/fchmodat when path not NULL
+	 */
+	if (path != NULL) {
+		if (error = lookupnameat(path, UIO_USERSPACE,
+		    (flags == AT_SYMLINK_NOFOLLOW) ?
+		    NO_FOLLOW : FOLLOW,
+		    NULLVPP, &vp, startvp)) {
+			if (startvp != NULL)
+				VN_RELE(startvp);
+			return (error);
+		}
+	} else {
+		vp = startvp;
+		ASSERT(vp);
+		VN_HOLD(vp);
+	}
 
 	if (vn_is_readonly(vp)) {
 		error = EROFS;
+	} else {
+		error = VOP_SETATTR(vp, vap, 0, CRED(), NULL);
 	}
-	if (!error && (vap->va_mask & AT_SIZE) &&
-	    nbl_need_check(vp)) {
-		nbl_start_crit(vp, RW_READER);
-		in_crit = 1;
-		vattr.va_mask = AT_SIZE;
-		if (!(error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))) {
-			begin = vap->va_size > vattr.va_size ?
-			    vattr.va_size : vap->va_size;
-			length = vattr.va_size > vap->va_size ?
-			    vattr.va_size - vap->va_size :
-			    vap->va_size - vattr.va_size;
 
-			if (nbl_conflict(vp, NBL_WRITE, begin, length, 0,
-			    NULL)) {
-				error = EACCES;
-			}
-		}
-	}
-	if (!error)
-		error = VOP_SETATTR(vp, vap, flags, CRED(), NULL);
-
-	if (in_crit)
-		nbl_end_crit(vp);
+	if (startvp != NULL)
+		VN_RELE(startvp);
+	VN_RELE(vp);
 
 	return (error);
 }

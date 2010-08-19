@@ -695,14 +695,18 @@ tcp_timer(void *arg)
 		first_threshold =  tcp->tcp_first_ctimer_threshold;
 		second_threshold = tcp->tcp_second_ctimer_threshold;
 
-		/* Retransmit forever unless this is a passive open... */
+		/*
+		 * If an app has set the second_threshold to 0, it means that
+		 * we need to retransmit forever, unless this is a passive
+		 * open.  We need to set second_threshold back to a normal
+		 * value such that later comparison with it still makes
+		 * sense.  But we set dont_timeout to B_TRUE so that we will
+		 * never time out.
+		 */
 		if (second_threshold == 0) {
-			if (!tcp->tcp_active_open) {
-				second_threshold =
-				    tcps->tcps_ip_abort_linterval;
-			} else {
+			second_threshold = tcps->tcps_ip_abort_linterval;
+			if (tcp->tcp_active_open)
 				dont_timeout = B_TRUE;
-			}
 		}
 		break;
 	case TCPS_ESTABLISHED:
@@ -712,8 +716,10 @@ tcp_timer(void *arg)
 		 * forever.  But if the end point is closed, the normal
 		 * timeout applies.
 		 */
-		if (second_threshold == 0)
+		if (second_threshold == 0) {
+			second_threshold = tcps->tcps_ip_abort_linterval;
 			dont_timeout = B_TRUE;
+		}
 		/* FALLTHRU */
 	case TCPS_FIN_WAIT_1:
 	case TCPS_CLOSING:
@@ -892,8 +898,7 @@ tcp_timer(void *arg)
 		dont_timeout = B_FALSE;
 	}
 
-	if (!dont_timeout && second_threshold == 0)
-		second_threshold = tcps->tcps_ip_abort_interval;
+	ASSERT(second_threshold != 0);
 
 	if ((ms = tcp->tcp_ms_we_have_waited) > second_threshold) {
 		/*
@@ -903,8 +908,14 @@ tcp_timer(void *arg)
 			tcp->tcp_xmit_head = tcp_zcopy_backoff(tcp,
 			    tcp->tcp_xmit_head, B_TRUE);
 
-		if (dont_timeout)
+		if (dont_timeout) {
+			/*
+			 * Reset tcp_ms_we_have_waited to avoid overflow since
+			 * we are going to retransmit forever.
+			 */
+			tcp->tcp_ms_we_have_waited = second_threshold;
 			goto timer_rexmit;
+		}
 
 		/*
 		 * For zero window probe, we need to send indefinitely,

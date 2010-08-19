@@ -41,10 +41,7 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=socal alias=SUNW,socal
 file path=kernel/drv/$(ARCH64)/socal group=sys
-legacy pkg=SUNWluxl arch=$(ARCH) category=system \
-    desc="Sun Enterprise Network Array socal Device Driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun Enterprise Network Array socal Device Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWluxl desc="Sun Enterprise Network Array socal Device Driver" \
+    name="Sun Enterprise Network Array socal Device Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

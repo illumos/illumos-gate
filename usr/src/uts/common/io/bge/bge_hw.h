@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _BGE_HW_H
@@ -64,7 +63,9 @@ extern "C" {
 #define	DEVICE_ID_5704			0x1649
 #define	DEVICE_ID_5705C			0x1653
 #define	DEVICE_ID_5705_2		0x1654
+#define	DEVICE_ID_5717			0x1655
 #define	DEVICE_ID_5718			0x1656
+#define	DEVICE_ID_5724			0x165c
 #define	DEVICE_ID_5705M			0x165d
 #define	DEVICE_ID_5705MA3		0x165e
 #define	DEVICE_ID_5705F			0x166e
@@ -96,6 +97,7 @@ extern "C" {
 #define	DEVICE_ID_5764			0x1684
 #define	DEVICE_ID_5906			0x1712
 #define	DEVICE_ID_5906M			0x1713
+#define	DEVICE_ID_57780			0x1692
 
 #define	REVISION_ID_5700_B0		0x10
 #define	REVISION_ID_5700_B2		0x12
@@ -185,14 +187,17 @@ extern "C" {
 		(bgep->chipid.device == DEVICE_ID_5789))
 
 #define	DEVICE_5717_SERIES_CHIPSETS(bgep) \
-		(bgep->chipid.device == DEVICE_ID_5718)
+		(bgep->chipid.device == DEVICE_ID_5717) ||\
+		(bgep->chipid.device == DEVICE_ID_5718) ||\
+		(bgep->chipid.device == DEVICE_ID_5724)
 
 #define	DEVICE_5723_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5723) ||\
 		(bgep->chipid.device == DEVICE_ID_5761) ||\
 		(bgep->chipid.device == DEVICE_ID_5761E) ||\
 		(bgep->chipid.device == DEVICE_ID_5764) ||\
-		(bgep->chipid.device == DEVICE_ID_5785))
+		(bgep->chipid.device == DEVICE_ID_5785) ||\
+		(bgep->chipid.device == DEVICE_ID_57780))
 
 #define	DEVICE_5714_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5714C) ||\

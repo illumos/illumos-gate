@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,20 +23,17 @@
 
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"m4.h"
 
 
 /* storage params */
-int	hshsize 	= 199;		/* hash table size (prime) */
-int	bufsize 	= 4096;		/* pushback & arg text buffers */
-int	stksize 	= 100;		/* call stack */
-int	toksize 	= 512;		/* biggest word ([a-z_][a-z0-9_]*) */
+int	hshsize 	= DEF_HSHSIZE;	/* hash table size (prime) */
+int	bufsize 	= DEF_BUFSIZE;	/* pushback & arg text buffers */
+int	stksize 	= DEF_STKSIZE;	/* call stack */
+int	toksize 	= DEF_TOKSIZE;	/* biggest word ([a-z_][a-z0-9_]*) */
 
 
 /* pushback buffer */

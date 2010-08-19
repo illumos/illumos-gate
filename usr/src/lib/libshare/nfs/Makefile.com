@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libshare_nfs.a
@@ -30,7 +28,7 @@ VERS =		.1
 NFSLIB_DIR	= $(SRC)/cmd/fs.d/nfs/lib
 
 LIBOBJS =	libshare_nfs.o
-OTHOBJS =	nfs_sec.o nfslog_config.o nfslogtab.o
+OTHOBJS =	nfs_sec.o nfslog_config.o nfslogtab.o smfcfg.o
 OBJECTS =	$(LIBOBJS) $(OTHOBJS)
 
 include ../../../Makefile.lib
@@ -59,7 +57,7 @@ install: all
 
 lint: lintcheck
 
-pics/%.o:       $(NFSLIB_DIR)/%.c
+pics/%.o:  $(NFSLIB_DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

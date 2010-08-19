@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -407,7 +406,7 @@ convert_to_aclent_t(char *entryp, int *cntp, aclent_t **aclpp, int mode)
 {
 	aclent_t	*new_aclp;
 	aclent_t	tmpacl;
-	aclent_t	*taclp, *centry, *gentry;
+	aclent_t	*taclp, *centry = NULL, *gentry = NULL;
 	int		cur_cnt;
 	int		found = 0;
 	int		is_obj;

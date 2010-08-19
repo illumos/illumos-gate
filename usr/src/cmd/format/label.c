@@ -18,22 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * This file contains the code relating to label manipulation.
  */
 
-#include "global.h"
-#include "label.h"
-#include "misc.h"
-#include "main.h"
-#include "partition.h"
-#include "ctlr_scsi.h"
-#include "checkdev.h"
 #include <string.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -43,6 +36,13 @@
 #include <sys/uuid.h>
 #include <errno.h>
 #include <devid.h>
+#include "global.h"
+#include "label.h"
+#include "misc.h"
+#include "main.h"
+#include "partition.h"
+#include "ctlr_scsi.h"
+#include "checkdev.h"
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
 #include <sys/dktp/fdisk.h>

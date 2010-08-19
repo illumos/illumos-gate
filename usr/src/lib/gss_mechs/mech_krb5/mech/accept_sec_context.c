@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+/*
  * Copyright 2000, 2004  by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -70,10 +73,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-/*
- * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-
 #include "k5-int.h"
 #include "gssapiP_krb5.h"
 #ifdef HAVE_MEMORY_H
@@ -81,12 +80,13 @@
 #endif
 #include <assert.h>
 #include "auth_con.h"
-
 #ifdef CFX_EXERCISE
 #define CFX_ACCEPTOR_SUBKEY (time(0) & 1)
 #else
 #define CFX_ACCEPTOR_SUBKEY 1
 #endif
+#include <syslog.h>
+#include <locale.h> /* Solaris Kerberos */
 
 /*
  * Decode, decrypt and store the forwarded creds in the local ccache.
@@ -297,7 +297,8 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    krb5_address addr, *paddr;
    krb5_authenticator *authdat = 0;
    krb5_checksum reqcksum;
-   krb5_principal name = NULL;
+   krb5_principal client_name = NULL;
+   krb5_principal server_name = NULL;
    krb5_ui_4 gss_flags = 0;
    krb5_timestamp now;
    gss_buffer_desc token;
@@ -316,6 +317,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    int cred_rcache = 0;
    int no_encap;
    OM_uint32 t_minor_status = 0;
+   int acquire_fail = 0;
 
    KRB5_LOG0(KRB5_INFO,"krb5_gss_accept_sec_context() start");
 
@@ -477,7 +479,6 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 					    NULL, NULL);
 
        if (major_status != GSS_S_COMPLETE){
-
 	   /* Solaris kerberos: RFC2743 indicate this should be returned if we
 	    * can't aquire a default cred.
 	    */
@@ -485,7 +486,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 		  "krb5_gss_acquire_cred() error"
 		   "orig major_status = %d, now = GSS_S_NO_CRED\n",
 		   major_status);
-
+	   acquire_fail = 1;
 	   major_status = GSS_S_NO_CRED;
 	   goto fail;
        }
@@ -543,6 +544,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 
    if ((code = krb5_auth_con_init(context, &auth_context))) {
        major_status = GSS_S_FAILURE;
+       save_error_info((OM_uint32)code, context);
        /* Solaris Kerberos */
        KRB5_LOG(KRB5_ERR, "krb5_gss_accept_sec_context() "
 	      "krb5_auth_con_init() error code %d", code);
@@ -572,9 +574,29 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 
    if ((code = krb5_rd_req_decoded(context, &auth_context, request,
 			   cred->princ, cred->keytab, NULL, &ticket))) {
-      KRB5_LOG(KRB5_ERR, "krb5_gss_accept_sec_context() "
+       KRB5_LOG(KRB5_ERR, "krb5_gss_accept_sec_context() "
 	      "krb5_rd_req() error code %d", code);
-       if (code == KRB5_KT_KVNONOTFOUND || code == KRB5_KT_NOTFOUND) {
+       if (code == KRB5_KT_KVNONOTFOUND) {
+	   char *s_name;
+	   if (krb5_unparse_name(context, cred->princ, &s_name) == 0) {	
+	       krb5_set_error_message(context, KRB5KRB_AP_ERR_BADKEYVER,
+				    dgettext(TEXT_DOMAIN,
+					    "Key version %d is not available for principal %s"),
+				    request->ticket->enc_part.kvno,
+				    s_name);
+	       krb5_free_unparsed_name(context, s_name);
+	   }
+	   major_status = GSS_S_DEFECTIVE_CREDENTIAL;
+	   code = KRB5KRB_AP_ERR_BADKEYVER;
+       } else if (code == KRB5_KT_NOTFOUND) {
+	   char *s_name;
+	   if (krb5_unparse_name(context, cred->princ, &s_name) == 0) {	
+	       krb5_set_error_message(context, KRB5KRB_AP_ERR_NOKEY,
+				    dgettext(TEXT_DOMAIN,
+					    "Service key %s not available"),
+				    s_name);
+	       krb5_free_unparsed_name(context, s_name);
+	   }
            major_status = GSS_S_DEFECTIVE_CREDENTIAL;
 	   code = KRB5KRB_AP_ERR_NOKEY;
        }
@@ -1076,21 +1098,24 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 
    /* set the return arguments */
 
-   if (src_name) {
-       if ((code = krb5_copy_principal(context, ctx->there, &name))) {
-	   major_status = GSS_S_FAILURE;
-	   goto fail;
-       }
-       /* intern the src_name */
-       if (! kg_save_name((gss_name_t) name)) {
-	   code = G_VALIDATE_FAILED;
-	   major_status = GSS_S_FAILURE;
-	   goto fail;
-       }
+   /*
+    * Solaris Kerberos
+    * Regardless of src_name, get name for error msg if neeeded.
+    */
+   if ((code = krb5_copy_principal(context, ctx->there, &client_name))) {
+	major_status = GSS_S_FAILURE;
+	goto fail;
    }
-
-   if (mech_type)
-      *mech_type = (gss_OID) mech_used;
+   if ((code = krb5_copy_principal(context, ctx->here, &server_name))) {
+	major_status = GSS_S_FAILURE;
+	goto fail;
+   }
+   /* intern the src_name */
+   if (! kg_save_name((gss_name_t) client_name)) {
+	code = G_VALIDATE_FAILED;
+	major_status = GSS_S_FAILURE;
+	goto fail;
+   }
 
    if (time_rec)
       *time_rec = ctx->endtime - now;
@@ -1102,7 +1127,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    *output_token = token;
 
    if (src_name)
-      *src_name = (gss_name_t) name;
+      *src_name = (gss_name_t) client_name;
 
    if (delegated_cred_handle && deleg_cred) {
        if (!kg_save_cred_id((gss_cred_id_t) deleg_cred)) {
@@ -1123,6 +1148,21 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    major_status = GSS_S_COMPLETE;
 
  fail:
+   if (mech_type) {
+	unsigned int min;
+	gss_buffer_desc oidstr;
+	oidstr.value = NULL;
+
+	/*
+	 * This needs to be set/returned even on fail so
+	 * gss_accept_sec_context() can map_error_oid() the correct
+	 * error/oid for later use by gss_display_status().
+	 * (needed in CIFS/SPNEGO case)
+	 */
+	*mech_type = (gss_OID) mech_used;
+
+	(void) gss_oid_to_str(&min, *mech_type, &oidstr);
+   }
 
    if (authdat)
        krb5_free_authenticator(context, authdat);
@@ -1169,10 +1209,6 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    }
    if (token.value)
        xfree(token.value);
-   if (name) {
-       (void) kg_delete_name((gss_name_t) name);
-       krb5_free_principal(context, name);
-   }
 
    *minor_status = code;
 
@@ -1219,7 +1255,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 		    krb_error_data.e_data.length = len;
 	    }
 	    major_status = GSS_S_CONTINUE_NEEDED;
-	}
+       }
 
        code -= ERROR_TABLE_BASE_krb5;
        if (code < 0 || code > 128)
@@ -1252,7 +1288,6 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    }
 
 cleanup:
-
    /* Solaris Kerberos */
    if (krb_error_data.e_data.data != NULL)
         free(krb_error_data.e_data.data);
@@ -1260,6 +1295,45 @@ cleanup:
    if (!verifier_cred_handle && cred_handle) {
 	krb5_gss_release_cred(&t_minor_status, &cred_handle);
    }
+
+   /*
+    * Solaris Kerberos
+    * Enhance the error message.
+    */
+   if (GSS_ERROR(major_status)) {
+       if (client_name && server_name &&
+	 (*minor_status == (OM_uint32)KRB5KRB_AP_ERR_BAD_INTEGRITY)) {
+	    char *c_name = NULL;
+	    char *s_name = NULL;
+	    krb5_error_code cret, sret;
+	    cret = krb5_unparse_name(context, (krb5_principal) client_name,
+				    &c_name);
+	    sret = krb5_unparse_name(context, (krb5_principal) server_name,
+				    &s_name);
+	    krb5_set_error_message(context, *minor_status,
+				dgettext(TEXT_DOMAIN,
+					"Decrypt integrity check failed for client '%s' and server '%s'"),
+				cret == 0 ? c_name : "unknown",
+				sret == 0 ? s_name : "unknown");
+	    if (s_name)
+		    krb5_free_unparsed_name(context, s_name);
+	    if (c_name)
+		    krb5_free_unparsed_name(context, c_name);
+	    }
+       /*
+	* Solaris Kerberos
+	* krb5_gss_acquire_cred() does not take a context arg
+	* (and does a save_error_info() itself) so re-calling
+	* save_error_info() here is trouble.
+	*/
+       if (!acquire_fail)
+	    save_error_info(*minor_status, context);
+   }
+   if (client_name) {
+	(void) kg_delete_name((gss_name_t) client_name);
+   }
+   if (server_name)
+	krb5_free_principal(context, server_name);
    krb5_free_context(context);
 
    /* Solaris Kerberos */

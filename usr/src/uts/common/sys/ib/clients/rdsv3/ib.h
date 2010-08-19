@@ -18,8 +18,6 @@
 #define	RDSV3_FMR_SIZE			256
 #define	RDSV3_FMR_POOL_SIZE		(12 * 1024)
 
-#define	RDSV3_IB_SEND_WRS		64
-
 #define	RDSV3_IB_MAX_SGE		8
 #define	RDSV3_IB_RECV_SGE 		2
 
@@ -30,6 +28,9 @@
 
 /* minor versions supported */
 #define	RDSV3_IB_SUPPORTED_PROTOCOLS	0x00000003
+
+#define	RDSV3_IB_MAX_RECV_ALLOC		((512 * 1024 * 1024) / RDSV3_FRAG_SIZE)
+#define	RDSV3_IB_WC_POLL_SIZE		16
 
 extern struct list rdsv3_ib_devices;
 
@@ -177,6 +178,8 @@ struct rdsv3_ib_connection {
 	/* Batched completions */
 	unsigned int		i_unsignaled_wrs;
 	long			i_unsignaled_bytes;
+
+	unsigned long		i_max_recv_alloc;
 };
 
 /* This assumes that atomic_t is at least 32 bits */
@@ -305,8 +308,8 @@ static inline void rdsv3_ib_destroy_conns(struct rdsv3_ib_device *rds_ibdev)
 int rdsv3_ib_create_mr_pool(struct rdsv3_ib_device *);
 void rdsv3_ib_destroy_mr_pool(struct rdsv3_ib_device *);
 void rdsv3_ib_get_mr_info(struct rdsv3_ib_device *rds_ibdev,
-	struct rdsv3_info_rdma_connection *iinfo);
-void *rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
+	struct rds_info_rdma_connection *iinfo);
+void *rdsv3_ib_get_mr(struct rds_iovec *args, unsigned long nents,
 	struct rdsv3_sock *rs, uint32_t *key_ret);
 void rdsv3_ib_sync_mr(void *trans_private, int dir);
 void rdsv3_ib_free_mr(void *trans_private, int invalidate);
@@ -364,8 +367,9 @@ int rdsv3_ib_send_grab_credits(struct rdsv3_ib_connection *ic, uint32_t wanted,
     uint32_t *adv_credits, int need_posted);
 
 /* ib_stats.c */
-RDSV3_DECLARE_PER_CPU(struct rdsv3_ib_statistics, rdsv3_ib_stats);
-#define	rdsv3_ib_stats_inc(member) rdsv3_stats_inc_which(rdsv3_ib_stats, member)
+extern struct rdsv3_ib_statistics	*rdsv3_ib_stats;
+#define	rdsv3_ib_stats_inc(member) \
+	rdsv3_stats_add_which(rdsv3_ib_stats, member, 1)
 unsigned int rdsv3_ib_stats_info_copy(struct rdsv3_info_iterator *iter,
     unsigned int avail);
 

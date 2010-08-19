@@ -19,10 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG=		eject
@@ -32,9 +29,6 @@ include ../Makefile.cmd
 LDLIBS += -lvolmgt -ladm
 
 CFLAGS += $(CCVERBOSE)
-
-# This flag is being added only for SCO (x86) compatibility  
-CFLAGS += $(iBCS2FLAG)
 
 LINTFLAGS += -um
 

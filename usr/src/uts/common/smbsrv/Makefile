@@ -72,6 +72,7 @@ NDLHDRS= dssetup.ndl		\
 	netlogon.ndl		\
 	rpcpdu.ndl		\
 	samrpc.ndl		\
+	security.ndl		\
 	spoolss.ndl		\
 	srvsvc.ndl		\
 	svcctl.ndl		\

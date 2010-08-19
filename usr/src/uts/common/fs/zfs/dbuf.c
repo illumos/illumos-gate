@@ -1803,17 +1803,13 @@ dbuf_prefetch(dnode_t *dn, uint64_t blkid)
 
 	/* dbuf_find() returns with db_mtx held */
 	if (db = dbuf_find(dn, 0, blkid)) {
-		if (refcount_count(&db->db_holds) > 0) {
-			/*
-			 * This dbuf is active.  We assume that it is
-			 * already CACHED, or else about to be either
-			 * read or filled.
-			 */
-			mutex_exit(&db->db_mtx);
-			return;
-		}
+		/*
+		 * This dbuf is already in the cache.  We assume that
+		 * it is already CACHED, or else about to be either
+		 * read or filled.
+		 */
 		mutex_exit(&db->db_mtx);
-		db = NULL;
+		return;
 	}
 
 	if (dbuf_findbp(dn, 0, blkid, TRUE, &db, &bp) == 0) {

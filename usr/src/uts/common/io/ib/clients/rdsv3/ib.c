@@ -274,7 +274,7 @@ static int
 rds_ib_conn_info_visitor(struct rdsv3_connection *conn,
     void *buffer)
 {
-	struct rdsv3_info_rdma_connection *iinfo = buffer;
+	struct rds_info_rdma_connection *iinfo = buffer;
 	struct rdsv3_ib_connection *ic;
 
 	RDSV3_DPRINTF4("rds_ib_conn_info_visitor", "conn: %p buffer: %p",
@@ -321,7 +321,7 @@ rds_ib_ic_info(struct rsock *sock, unsigned int len,
 
 	rdsv3_for_each_conn_info(sock, len, iter, lens,
 	    rds_ib_conn_info_visitor,
-	    sizeof (struct rdsv3_info_rdma_connection));
+	    sizeof (struct rds_info_rdma_connection));
 }
 
 /*
@@ -379,12 +379,14 @@ rdsv3_ib_exit(void)
 {
 	RDSV3_DPRINTF4("rds_ib_exit", "Enter");
 
-	rdsv3_info_deregister_func(RDSV3_INFO_IB_CONNECTIONS, rds_ib_ic_info);
+	rdsv3_info_deregister_func(RDS_INFO_IB_CONNECTIONS, rds_ib_ic_info);
 	rdsv3_ib_destroy_nodev_conns();
 	ib_unregister_client(&rdsv3_ib_client);
 	rdsv3_ib_sysctl_exit();
 	rdsv3_ib_recv_exit();
 	rdsv3_trans_unregister(&rdsv3_ib_transport);
+	kmem_free(rdsv3_ib_stats,
+	    nr_cpus * sizeof (struct rdsv3_ib_statistics));
 	mutex_destroy(&ib_nodev_conns_lock);
 	list_destroy(&ib_nodev_conns);
 	list_destroy(&rdsv3_ib_devices);
@@ -435,6 +437,11 @@ rdsv3_ib_init(void)
 	    offsetof(struct rdsv3_ib_connection, ib_node));
 	mutex_init(&ib_nodev_conns_lock, NULL, MUTEX_DRIVER, NULL);
 
+	/* allocate space for ib statistics */
+	ASSERT(rdsv3_ib_stats == NULL);
+	rdsv3_ib_stats = kmem_zalloc(nr_cpus *
+	    sizeof (struct rdsv3_ib_statistics), KM_SLEEP);
+
 	rdsv3_ib_client.dip = rdsv3_dev_info;
 	ret = ib_register_client(&rdsv3_ib_client);
 	if (ret)
@@ -452,7 +459,7 @@ rdsv3_ib_init(void)
 	if (ret)
 		goto out_recv;
 
-	rdsv3_info_register_func(RDSV3_INFO_IB_CONNECTIONS, rds_ib_ic_info);
+	rdsv3_info_register_func(RDS_INFO_IB_CONNECTIONS, rds_ib_ic_info);
 
 	RDSV3_DPRINTF4("rds_ib_init", "Return");
 
@@ -465,6 +472,8 @@ out_sysctl:
 out_ibreg:
 	ib_unregister_client(&rdsv3_ib_client);
 out:
+	kmem_free(rdsv3_ib_stats,
+	    nr_cpus * sizeof (struct rdsv3_ib_statistics));
 	mutex_destroy(&ib_nodev_conns_lock);
 	list_destroy(&ib_nodev_conns);
 	list_destroy(&rdsv3_ib_devices);

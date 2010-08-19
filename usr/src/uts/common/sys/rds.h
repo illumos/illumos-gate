@@ -1,15 +1,10 @@
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- */
-
-/*
  * This file contains definitions used in OFED defined user/kernel
  * interfaces. These are imported from the OFED header <linux/rds.h>. Oracle
  * elects to have and use the contents of <linux/rds.h> under and governed
  * by the OpenIB.org BSD license (see below for full license text). However,
  * the following notice accompanied the original version of this file:
  */
-
 /*
  * Copyright (c) 2008 Oracle.  All rights reserved.
  *
@@ -42,50 +37,63 @@
  * SOFTWARE.
  *
  */
-
-/*
- * Include this file if the application uses rdsv3 sockets.
- */
-
-/*
- * This file contains definitions from the ofed rds.h and rds_rdma.h
- * header file.
- */
-#ifndef _RDSV3_RDS_H
-#define	_RDSV3_RDS_H
-
-#include <sys/types.h>
-#include <sys/socket.h>
+#ifndef _SYS_RDS_H
+#define	_SYS_RDS_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#if !(defined(__SVR4) && defined(__sun))
+#include <linux/types.h>
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#endif
+
+/*
+ * These sparse annotated types shouldn't be in any user
+ * visible header file. We should clean this up rather
+ * than kludging around them.
+ */
+#if !(defined(__SVR4) && defined(__sun))
+#ifndef __KERNEL__
+#define	__be16	u_int16_t
+#define	__be32	u_int32_t
+#define	__be64	u_int64_t
+#endif
+#else
+#define	u_int8_t	uint8_t
+#define	u_int16_t	uint16_t
+#define	u_int32_t	uint32_t
+#define	u_int64_t	uint64_t
+#endif
+
 #define	RDS_IB_ABI_VERSION		0x301
 
-#define	AF_RDS				AF_INET_OFFLOAD
-#define	PF_RDS				AF_INET_OFFLOAD
-
-#define	SOL_RDS				272
+#define	AF_RDS	AF_INET_OFFLOAD
+#define	PF_RDS	AF_INET_OFFLOAD
+#define	SOL_RDS	272
 
 /*
  * setsockopt/getsockopt for SOL_RDS
  */
-#define	RDSV3_CANCEL_SENT_TO		1
-#define	RDSV3_GET_MR			2
-#define	RDSV3_FREE_MR			3
+#define	RDS_CANCEL_SENT_TO	1
+#define	RDS_GET_MR			2
+#define	RDS_FREE_MR			3
 /* deprecated: RDS_BARRIER 4 */
-#define	RDSV3_RECVERR			5
-#define	RDSV3_CONG_MONITOR		6
-#define	RDSV3_GET_MR_FOR_DEST		7
+#define	RDS_RECVERR			5
+#define	RDS_CONG_MONITOR		6
+#define	RDS_GET_MR_FOR_DEST		7
+
 
 /*
  * Control message types for SOL_RDS.
  *
- * RDS_CMSG_RDMA_ARGS (sendmsg)
+ * CMSG_RDMA_ARGS (sendmsg)
  *	Request a RDMA transfer to/from the specified
  *	memory ranges.
- *	The cmsg_data is a struct rdsv3_rdma_args.
+ *	The cmsg_data is a struct rds_rdma_args.
  * RDS_CMSG_RDMA_DEST (recvmsg, sendmsg)
  *	Kernel informs application about intended
  *	source/destination of a RDMA transfer
@@ -93,177 +101,184 @@ extern "C" {
  *	Application asks kernel to map the given
  *	memory range into a IB MR, and send the
  *	R_Key along in an RDS extension header.
- *	The cmsg_data is a struct rdsv3_get_mr_args,
+ *	The cmsg_data is a struct rds_get_mr_args,
  *	the same as for the GET_MR setsockopt.
  * RDS_CMSG_RDMA_STATUS (recvmsg)
  *	Returns the status of a completed RDMA operation.
  */
-#define	RDSV3_CMSG_RDMA_ARGS		1
-#define	RDSV3_CMSG_RDMA_DEST		2
-#define	RDSV3_CMSG_RDMA_MAP		3
-#define	RDSV3_CMSG_RDMA_STATUS		4
-#define	RDSV3_CMSG_CONG_UPDATE		5
+#define	RDS_CMSG_RDMA_ARGS		1
+#define	RDS_CMSG_RDMA_DEST		2
+#define	RDS_CMSG_RDMA_MAP		3
+#define	RDS_CMSG_RDMA_STATUS		4
+#define	RDS_CMSG_CONG_UPDATE		5
 
-/* rds-info related */
-
-#define	RDSV3_INFO_FIRST		10000
-#define	RDSV3_INFO_COUNTERS		10000
-#define	RDSV3_INFO_CONNECTIONS		10001
+#define	RDS_INFO_FIRST			10000
+#define	RDS_INFO_COUNTERS		10000
+#define	RDS_INFO_CONNECTIONS		10001
 /* 10002 aka RDS_INFO_FLOWS is deprecated */
-#define	RDSV3_INFO_SEND_MESSAGES	10003
-#define	RDSV3_INFO_RETRANS_MESSAGES	10004
-#define	RDSV3_INFO_RECV_MESSAGES	10005
-#define	RDSV3_INFO_SOCKETS		10006
-#define	RDSV3_INFO_TCP_SOCKETS		10007
-#define	RDSV3_INFO_IB_CONNECTIONS	10008
-#define	RDSV3_INFO_CONNECTION_STATS	10009
-#define	RDSV3_INFO_IWARP_CONNECTIONS	10010
-#define	RDSV3_INFO_LAST			10010
+#define	RDS_INFO_SEND_MESSAGES		10003
+#define	RDS_INFO_RETRANS_MESSAGES	10004
+#define	RDS_INFO_RECV_MESSAGES		10005
+#define	RDS_INFO_SOCKETS		10006
+#define	RDS_INFO_TCP_SOCKETS		10007
+#define	RDS_INFO_IB_CONNECTIONS		10008
+#define	RDS_INFO_CONNECTION_STATS	10009
+#define	RDS_INFO_IWARP_CONNECTIONS	10010
+#define	RDS_INFO_LAST			10010
 
+#if defined(__SVR4) && defined(__sun)
 struct rds_info_arg {
 	uint64_t	lenp;
 	uint64_t	datap;
 };
+#endif
 
 #ifndef __lock_lint
 #pragma pack(1)
-struct rdsv3_info_counter {
-	uint8_t	name[32];
-	uint64_t	value;
+struct rds_info_counter {
+	u_int8_t	name[32];
+	u_int64_t	value;
 } __attribute__((packed));
 #pragma pack()
 #else
-struct rdsv3_info_counter {
-	uint8_t	name[32];
-	uint64_t	value;
+struct rds_info_counter {
+	u_int8_t	name[32];
+	u_int64_t	value;
 };
 #endif
 
-#define	RDSV3_INFO_CONNECTION_FLAG_SENDING	0x01
-#define	RDSV3_INFO_CONNECTION_FLAG_CONNECTING	0x02
-#define	RDSV3_INFO_CONNECTION_FLAG_CONNECTED	0x04
+#define	RDS_INFO_CONNECTION_FLAG_SENDING	0x01
+#define	RDS_INFO_CONNECTION_FLAG_CONNECTING	0x02
+#define	RDS_INFO_CONNECTION_FLAG_CONNECTED	0x04
 
 #define	TRANSNAMSIZ	16
 
 #ifndef __lock_lint
 #pragma pack(1)
-struct rdsv3_info_connection {
-	uint64_t	next_tx_seq;
-	uint64_t	next_rx_seq;
-	uint32_t	laddr;			/* network order */
-	uint32_t	faddr;			/* network order */
-	uint8_t		transport[15];		/* null term ascii */
-	uint8_t		flags;
+struct rds_info_connection {
+	u_int64_t	next_tx_seq;
+	u_int64_t	next_rx_seq;
+	u_int32_t	laddr;
+	u_int32_t	faddr;
+	u_int8_t	transport[TRANSNAMSIZ];		/* null term ascii */
+	u_int8_t	flags;
 } __attribute__((packed));
 #pragma pack()
 #else
-struct rdsv3_info_connection {
-	uint64_t	next_tx_seq;
-	uint64_t	next_rx_seq;
-	uint32_t	laddr;			/* network order */
-	uint32_t	faddr;			/* network order */
-	uint8_t		transport[15];		/* null term ascii */
-	uint8_t		flags;
+struct rds_info_connection {
+	u_int64_t	next_tx_seq;
+	u_int64_t	next_rx_seq;
+	u_int32_t	laddr;
+	u_int32_t	faddr;
+	u_int8_t	transport[TRANSNAMSIZ];		/* null term ascii */
+	u_int8_t	flags;
 };
 #endif
 
 #ifndef __lock_lint
 #pragma pack(1)
-struct rdsv3_info_flow {
-	uint32_t	laddr;			/* network order */
-	uint32_t	faddr;			/* network order */
-	uint32_t	bytes;
-	uint16_t	lport;			/* network order */
-	uint16_t	fport;			/* network order */
+struct rds_info_flow {
+	u_int32_t	laddr;
+	u_int32_t	faddr;
+	u_int32_t	bytes;
+	u_int16_t	lport;
+	u_int16_t	fport;
 } __attribute__((packed));
 #pragma pack()
 #else
-struct rdsv3_info_flow {
-	uint32_t	laddr;			/* network order */
-	uint32_t	faddr;			/* network order */
-	uint32_t	bytes;
-	uint16_t	lport;			/* network order */
-	uint16_t	fport;			/* network order */
+struct rds_info_flow {
+	u_int32_t	laddr;
+	u_int32_t	faddr;
+	u_int32_t	bytes;
+	u_int16_t	lport;
+	u_int16_t	fport;
 };
 #endif
 
-#define	RDSV3_INFO_MESSAGE_FLAG_ACK		0x01
-#define	RDSV3_INFO_MESSAGE_FLAG_FAST_ACK	0x02
+#define	RDS_INFO_MESSAGE_FLAG_ACK		0x01
+#define	RDS_INFO_MESSAGE_FLAG_FAST_ACK		0x02
 
 #ifndef __lock_lint
 #pragma pack(1)
-struct rdsv3_info_message {
-	uint64_t	seq;
-	uint32_t	len;
-	uint32_t	laddr;			/* network order */
-	uint32_t	faddr;			/* network order */
-	uint16_t	lport;			/* network order */
-	uint16_t	fport;			/* network order */
-	uint8_t		flags;
+struct rds_info_message {
+	u_int64_t	seq;
+	u_int32_t	len;
+	u_int32_t	laddr;
+	u_int32_t	faddr;
+	u_int16_t	lport;
+	u_int16_t	fport;
+	u_int8_t	flags;
 } __attribute__((packed));
 #pragma pack()
 #else
-struct rdsv3_info_message {
-	uint64_t	seq;
-	uint32_t	len;
-	uint32_t	laddr;			/* network order */
-	uint32_t	faddr;			/* network order */
-	uint16_t	lport;			/* network order */
-	uint16_t	fport;			/* network order */
-	uint8_t		flags;
-};
-#endif
-
-#ifndef __lock_lint
-#pragma pack(1)
-struct rdsv3_info_socket {
-	uint32_t	sndbuf;
-	uint32_t	bound_addr;		/* network order */
-	uint32_t	connected_addr;		/* network order */
-	uint16_t	bound_port;		/* network order */
-	uint16_t	connected_port;		/* network order */
-	uint32_t	rcvbuf;
-	uint64_t	inum;
-} __attribute__((packed));
-#pragma pack()
-#else
-struct rdsv3_info_socket {
-	uint32_t	sndbuf;
-	uint32_t	bound_addr;		/* network order */
-	uint32_t	connected_addr;		/* network order */
-	uint16_t	bound_port;		/* network order */
-	uint16_t	connected_port;		/* network order */
-	uint32_t	rcvbuf;
-	uint64_t	inum;
+struct rds_info_message {
+	u_int64_t	seq;
+	u_int32_t	len;
+	u_int32_t	laddr;
+	u_int32_t	faddr;
+	u_int16_t	lport;
+	u_int16_t	fport;
+	u_int8_t	flags;
 };
 #endif
 
 #ifndef __lock_lint
 #pragma pack(1)
-struct rdsv3_info_socket_v1 {
-	uint32_t	sndbuf;
-	uint32_t	bound_addr;		/* network order */
-	uint32_t	connected_addr;		/* network order */
-	uint16_t	bound_port;		/* network order */
-	uint16_t	connected_port;		/* network order */
-	uint32_t	rcvbuf;
+struct rds_info_socket {
+	u_int32_t	sndbuf;
+	u_int32_t	bound_addr;
+	u_int32_t	connected_addr;
+	u_int16_t	bound_port;
+	u_int16_t	connected_port;
+	u_int32_t	rcvbuf;
+	u_int64_t	inum;
 } __attribute__((packed));
 #pragma pack()
 #else
-struct rdsv3_info_socket_v1 {
-	uint32_t	sndbuf;
-	uint32_t	bound_addr;		/* network order */
-	uint32_t	connected_addr;		/* network order */
-	uint16_t	bound_port;		/* network order */
-	uint16_t	connected_port;		/* network order */
-	uint32_t	rcvbuf;
+struct rds_info_socket {
+	u_int32_t	sndbuf;
+	u_int32_t	bound_addr;
+	u_int32_t	connected_addr;
+	u_int16_t	bound_port;
+	u_int16_t	connected_port;
+	u_int32_t	rcvbuf;
+	u_int64_t	inum;
+};
+#endif
+
+#ifndef __lock_lint
+#pragma pack(1)
+struct rds_info_tcp_socket {
+	u_int32_t	local_addr;
+	u_int16_t	local_port;
+	u_int32_t	peer_addr;
+	u_int16_t	peer_port;
+	u_int64_t	hdr_rem;
+	u_int64_t	data_rem;
+	u_int32_t	last_sent_nxt;
+	u_int32_t	last_expected_una;
+	u_int32_t	last_seen_una;
+} __attribute__((packed));
+#pragma pack()
+#else
+struct rds_info_tcp_socket {
+	u_int32_t	local_addr;
+	u_int16_t	local_port;
+	u_int32_t	peer_addr;
+	u_int16_t	peer_port;
+	u_int64_t	hdr_rem;
+	u_int64_t	data_rem;
+	u_int32_t	last_sent_nxt;
+	u_int32_t	last_expected_una;
+	u_int32_t	last_seen_una;
+} __attribute__((packed));
 };
 #endif
 
 #define	RDS_IB_GID_LEN	16
-struct rdsv3_info_rdma_connection {
-	uint32_t	src_addr;		/* network order */
-	uint32_t	dst_addr;		/* network order */
+struct rds_info_rdma_connection {
+	u_int32_t	src_addr;
+	u_int32_t	dst_addr;
 	uint8_t		src_gid[RDS_IB_GID_LEN];
 	uint8_t		dst_gid[RDS_IB_GID_LEN];
 
@@ -273,10 +288,6 @@ struct rdsv3_info_rdma_connection {
 	uint32_t	rdma_mr_max;
 	uint32_t	rdma_mr_size;
 };
-
-#define	rdsv3_info_ib_connection rdsv3_info_rdma_connection
-#define	rdma_fmr_max rdma_mr_max
-#define	rdma_fmr_size rdma_mr_size
 
 /*
  * Congestion monitoring.
@@ -301,10 +312,10 @@ struct rdsv3_info_rdma_connection {
  * The correspondence between bits and ports is
  *	1 << (portnum % 64)
  */
-#define	RDSV3_CONG_MONITOR_SIZE	64
-#define	RDSV3_CONG_MONITOR_BIT(port)	\
-	(((unsigned int) port) % RDSV3_CONG_MONITOR_SIZE)
-#define	RDSV3_CONG_MONITOR_MASK(port) (1ULL << RDSV3_CONG_MONITOR_BIT(port))
+#define	RDS_CONG_MONITOR_SIZE	64
+#define	RDS_CONG_MONITOR_BIT(port)  \
+	(((unsigned int) port) % RDS_CONG_MONITOR_SIZE)
+#define	RDS_CONG_MONITOR_MASK(port) (1ULL << RDS_CONG_MONITOR_BIT(port))
 
 /*
  * RDMA related types
@@ -317,63 +328,64 @@ struct rdsv3_info_rdma_connection {
  * (so that the application does not have to worry about
  * alignment).
  */
-typedef uint64_t	rdsv3_rdma_cookie_t;
+typedef u_int64_t	rds_rdma_cookie_t;
 
-struct rdsv3_iovec {
-	uint64_t	addr;
-	uint64_t	bytes;
+struct rds_iovec {
+	u_int64_t	addr;
+	u_int64_t	bytes;
 };
 
-struct rdsv3_get_mr_args {
-	struct rdsv3_iovec vec;
-	uint64_t	cookie_addr;
+struct rds_get_mr_args {
+	struct rds_iovec vec;
+	u_int64_t	cookie_addr;
 	uint64_t	flags;
 };
 
-struct rdsv3_get_mr_for_dest_args {
-	struct sockaddr_storage	dest_addr;
-	struct rdsv3_iovec 	vec;
-	uint64_t		cookie_addr;
+struct rds_get_mr_for_dest_args {
+	struct sockaddr_storage dest_addr;
+	struct rds_iovec	vec;
+	u_int64_t		cookie_addr;
 	uint64_t		flags;
 };
 
-struct rdsv3_free_mr_args {
-	rdsv3_rdma_cookie_t cookie;
-	uint64_t	flags;
+
+struct rds_free_mr_args {
+	rds_rdma_cookie_t cookie;
+	u_int64_t	flags;
 };
 
-struct rdsv3_rdma_args {
-	rdsv3_rdma_cookie_t cookie;
-	struct rdsv3_iovec remote_vec;
-	uint64_t	local_vec_addr;
-	uint64_t	nr_local;
-	uint64_t	flags;
-	uint64_t	user_token;
+struct rds_rdma_args {
+	rds_rdma_cookie_t cookie;
+	struct rds_iovec remote_vec;
+	u_int64_t	local_vec_addr;
+	u_int64_t	nr_local;
+	u_int64_t	flags;
+	u_int64_t	user_token;
 };
 
-struct rdsv3_rdma_notify {
-	uint64_t	user_token;
+struct rds_rdma_notify {
+	u_int64_t	user_token;
 	int32_t		status;
 };
 
-#define	RDSV3_RDMA_SUCCESS	0
-#define	RDSV3_RDMA_REMOTE_ERROR	1
-#define	RDSV3_RDMA_CANCELED	2
-#define	RDSV3_RDMA_DROPPED	3
-#define	RDSV3_RDMA_OTHER_ERROR	4
+#define	RDS_RDMA_SUCCESS	0
+#define	RDS_RDMA_REMOTE_ERROR	1
+#define	RDS_RDMA_CANCELED	2
+#define	RDS_RDMA_DROPPED	3
+#define	RDS_RDMA_OTHER_ERROR	4
 
 /*
  * Common set of flags for all RDMA related structs
  */
-#define	RDSV3_RDMA_READWRITE	0x0001
-#define	RDSV3_RDMA_FENCE	0x0002	/* use FENCE for immediate send */
-#define	RDSV3_RDMA_INVALIDATE	0x0004	/* invalidate R_Key after freeing MR */
-#define	RDSV3_RDMA_USE_ONCE	0x0008	/* free MR after use */
-#define	RDSV3_RDMA_DONTWAIT	0x0010	/* Don't wait in SET_BARRIER */
-#define	RDSV3_RDMA_NOTIFY_ME	0x0020	/* Notify when operation completes */
+#define	RDS_RDMA_READWRITE	0x0001
+#define	RDS_RDMA_FENCE		0x0002	/* use FENCE for immediate send */
+#define	RDS_RDMA_INVALIDATE	0x0004	/* invalidate R_Key after freeing MR */
+#define	RDS_RDMA_USE_ONCE	0x0008	/* free MR after use */
+#define	RDS_RDMA_DONTWAIT	0x0010	/* Don't wait in SET_BARRIER */
+#define	RDS_RDMA_NOTIFY_ME	0x0020	/* Notify when operation completes */
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif /* _RDSV3_RDS_H */
+#endif /* _SYS_RDS_H */

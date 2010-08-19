@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-
 #
 # MAPFILE HEADER START
 #
@@ -46,6 +43,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	fletcher_4_byteswap;
 	fletcher_4_incremental_native;
 	fletcher_4_incremental_byteswap;
+	libzfs_add_handle;
+	libzfs_dataset_cmp;
 	libzfs_errno;
 	libzfs_error_action;
 	libzfs_error_description;
@@ -59,6 +58,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	libzfs_mnttab_cache;
 	libzfs_print_on_error;
 	zfs_allocatable_devs;
+	zfs_asprintf;
 	zfs_clone;
 	zfs_close;
 	zfs_create;
@@ -75,7 +75,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_get_type;
 	zfs_history_event_names;
 	zfs_hold;
-	zfs_hold_range;
 	zfs_is_mounted;
 	zfs_is_shared;
 	zfs_is_shared_nfs;
@@ -121,7 +120,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_receive;
 	zfs_refresh_properties;
 	zfs_release;
-	zfs_release_range;
 	zfs_rename;
 	zfs_rollback;
 	zfs_send;
@@ -129,6 +127,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_shareall;
 	zfs_share_nfs;
 	zfs_share_smb;
+	zfs_show_diffs;
 	zfs_smb_acl_add;
 	zfs_smb_acl_purge;
 	zfs_smb_acl_remove;

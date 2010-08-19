@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,18 +83,16 @@ display(Sys_tree *tree,
 		 */
 		(void) uname(&uts_buf);
 
-		log_printf(
-			dgettext(TEXT_DOMAIN, "System Configuration:  "
-				"Sun Microsystems  %s %s\n"), uts_buf.machine,
-					get_prop_val(find_prop(root,
-					"banner-name")), 0);
+		log_printf(dgettext(TEXT_DOMAIN, "System Configuration:  "
+		    "Oracle Corporation  %s %s\n"), uts_buf.machine,
+		    get_prop_val(find_prop(root, "banner-name")), 0);
 
 		/* display system clock frequency */
 		value = get_prop_val(find_prop(root, "clock-frequency"));
 		if (value != NULL) {
 			sys_clk = ((*((int *)value)) + 500000) / 1000000;
 			log_printf(dgettext(TEXT_DOMAIN, "System clock "
-				"frequency: %d MHz\n"), sys_clk, 0);
+			    "frequency: %d MHz\n"), sys_clk, 0);
 		}
 
 		/* Display the Memory Size */
@@ -124,7 +118,7 @@ display(Sys_tree *tree,
 		display_hp_fail_fault(tree, kstats);
 
 		display_diaginfo((syserrlog || (logging && exit_code)),
-			root, tree, kstats);
+		    root, tree, kstats);
 	}
 
 	return (exit_code);

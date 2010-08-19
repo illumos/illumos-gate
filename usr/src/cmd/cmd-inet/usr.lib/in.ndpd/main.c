@@ -18,8 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "defs.h"
@@ -2580,7 +2579,7 @@ phyint_check_ipadm_intfid(struct phyint *pi)
 	pi->pi_autoconf = _B_TRUE;
 	for (ainfop = addrinfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
 		ifap = &ainfop->ia_ifa;
-		if (ifap->ifa_addr->ss_family != AF_INET6 ||
+		if (ifap->ifa_addr->sa_family != AF_INET6 ||
 		    ainfop->ia_state == IFA_DISABLED)
 			continue;
 		sin6 = (struct sockaddr_in6 *)ifap->ifa_addr;

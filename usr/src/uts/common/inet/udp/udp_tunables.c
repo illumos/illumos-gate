@@ -19,9 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/* Copyright (c) 1990 Mentat Inc. */
 
 #include <inet/ip.h>
 #include <inet/ip6.h>
@@ -31,20 +31,20 @@
 /*
  * All of these are alterable, within the min/max values given, at run time.
  *
- * Note: All those tunables which do not start with "udp_" are Committed and
- * therefore are public. See PSARC 2009/306.
+ * Note: All those tunables which do not start with "_" are Committed and
+ * therefore are public. See PSARC 2010/080.
  */
 mod_prop_info_t udp_propinfo_tbl[] = {
 	/* tunable - 0 */
-	{ "udp_wroff_extra", MOD_PROTO_UDP,
+	{ "_wroff_extra", MOD_PROTO_UDP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, 256, 32}, {32} },
 
-	{ "udp_ipv4_ttl", MOD_PROTO_UDP,
+	{ "_ipv4_ttl", MOD_PROTO_UDP,
 	    mod_set_uint32, mod_get_uint32,
 	    {1, 255, 255}, {255} },
 
-	{ "udp_ipv6_hoplimit", MOD_PROTO_UDP,
+	{ "_ipv6_hoplimit", MOD_PROTO_UDP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, IPV6_MAX_HOPS, IPV6_DEFAULT_HOPS}, {IPV6_DEFAULT_HOPS} },
 
@@ -52,7 +52,7 @@ mod_prop_info_t udp_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {1024, (32 * 1024), 1024}, {1024} },
 
-	{ "udp_do_checksum", MOD_PROTO_UDP,
+	{ "_do_checksum", MOD_PROTO_UDP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_TRUE}, {B_TRUE} },
 
@@ -69,7 +69,7 @@ mod_prop_info_t udp_propinfo_tbl[] = {
 	    {UDP_XMIT_LOWATER, (1<<30), UDP_XMIT_HIWATER},
 	    {UDP_XMIT_HIWATER} },
 
-	{ "udp_xmit_lowat", MOD_PROTO_UDP,
+	{ "_xmit_lowat", MOD_PROTO_UDP,
 	    mod_set_uint32, mod_get_uint32,
 	    {0, (1<<30), UDP_XMIT_LOWATER},
 	    {UDP_XMIT_LOWATER} },
@@ -80,15 +80,15 @@ mod_prop_info_t udp_propinfo_tbl[] = {
 	    {UDP_RECV_HIWATER} },
 
 	/* tunable - 10 */
-	{ "udp_max_buf", MOD_PROTO_UDP,
+	{ "_max_buf", MOD_PROTO_UDP,
 	    mod_set_uint32, mod_get_uint32,
 	    {65536, (1<<30), 2*1024*1024}, {2*1024*1024} },
 
-	{ "udp_pmtu_discovery", MOD_PROTO_UDP,
+	{ "_pmtu_discovery", MOD_PROTO_UDP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 
-	{ "udp_sendto_ignerr", MOD_PROTO_UDP,
+	{ "_sendto_ignerr", MOD_PROTO_UDP,
 	    mod_set_boolean, mod_get_boolean,
 	    {B_FALSE}, {B_FALSE} },
 

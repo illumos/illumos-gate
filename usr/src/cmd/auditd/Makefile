@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG = auditd
@@ -33,16 +32,15 @@ include $(SRC)/cmd/Makefile.cmd
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 LIBBSM = $(SRC)/lib/libbsm/common
-AUDITCONFIG = $(SRC)/cmd/auditconfig
 AUDITD = $(SRC)/cmd/auditd
 
 CPPFLAGS += -D_REENTRANT
-CPPFLAGS += -I$(LIBBSM) -I$(AUDITCONFIG) -I$(AUDITD)
+CPPFLAGS += -I$(LIBBSM) -I$(AUDITD)
 
-LDLIBS += -lbsm -lsecdb -lscf
+LDLIBS += -lbsm -lsecdb
 
-OBJS = audit_scf_shared.o auditd.o doorway.o queue.o
-SRCS = $(AUDITCONFIG)/audit_scf_shared.c auditd.c doorway.c queue.c
+OBJS = auditd.o doorway.o queue.o
+SRCS = $(OBJS:%.o=%.c)
 
 POFILE =	$(PROG).po
 MSGFILES =	$(SRCS)
@@ -57,9 +55,6 @@ install:	all $(ROOTUSRSBINPROG) \
 $(PROG):	$(SRCS) $(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
-
-audit_scf%.o:
-		$(COMPILE.c) $(AUDITCONFIG)/$(@:%.o=%.c)
 
 lint:		lint_SRCS
 

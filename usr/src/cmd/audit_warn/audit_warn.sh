@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # This shell script warns the administrator when there are problems or
@@ -88,7 +87,7 @@ do
 
 	"soft" )	# Check soft arg
 			# One audit filesystem has filled to the soft limit
-			# set up in audit_control.
+			# that is configured in the audit service.
 
 			if [ ! -n "$2" ]
 			then
@@ -107,7 +106,7 @@ do
 
 	"allsoft" )	# Check all soft arg
 			# All the audit filesystems have filled to the soft
-			# limit set up in audit_control.
+			# limit set up in the audit service configuration.
 
 			# Set message
 			MESSAGE="Soft limit exceeded on all filesystems."
@@ -236,33 +235,6 @@ Must reboot to start auditing!"
  audit records after SIGTERM.  Some audit records may have been lost."
 			send_msg
 
-			break
-			;;
-
-	"getacdir" )	# Check getacdir arg
-			# There is a problem getting the directory list from
-			# /etc/security/audit_control.  Auditd is
-			# going to hang in a sleep loop until the file is
-			# fixed.
-
-			if [ ! -n "$2" ]
-			then
-				$DEBUG_OUT "$0: Need count arg with 'getacdir'!"
-				exit 1
-			else
-				COUNT=$2
-				if [ $COUNT -eq 1 ]; then
-					S=""
-				else
-					S="s"
-				fi
-			fi
-
-			# Set message
-			MESSAGE="There is a problem getting the directory\
- list or plugin list from audit_control(4).  The audit daemon will hang
- until this file is fixed.  This message has been displayed $COUNT time$S."
-			send_msg
 			break
 			;;
 

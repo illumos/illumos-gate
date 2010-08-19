@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
-
-
 
 #include <stdio.h>
 #include <errno.h>
@@ -92,7 +89,7 @@ static void	prereq(char *pkginst, char *pkgname,
 				boolean_t a_preinstallCheck);
 static void	incompat(char *pkginst, char *pkgname,
 				boolean_t a_preinstallCheck);
-static int	getline(FILE *fp);
+static int	getaline(FILE *fp);
 
 /*
  * *****************************************************************************
@@ -124,7 +121,7 @@ dockdeps(char *a_depfile, int a_removeFlag, boolean_t a_preinstallCheck)
 		}
 	}
 
-	while (getline(fp)) {
+	while (getaline(fp)) {
 		switch (type) {
 		    case 'I':
 		    case 'P':
@@ -323,7 +320,7 @@ deponme(char *pkginst, char *pkgname, boolean_t a_preinstallCheck)
 }
 
 static int
-getline(FILE *fp)
+getaline(FILE *fp)
 {
 	register int i, c, found;
 	char *pt, *new, line[LSIZE];
@@ -422,7 +419,7 @@ ckpreq(FILE *fp, char *dname, boolean_t a_preinstallCheck)
 	register int i;
 	char	*inst;
 
-	while (getline(fp)) {
+	while (getaline(fp)) {
 		if (type != 'P')
 			continue;
 

@@ -19,9 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PLUGIN_H
@@ -45,8 +43,8 @@ struct plg {
 	boolean_t	plg_initialized;	/* if threads, pools created */
 	boolean_t	plg_reopen;		/* call auditd_plugin_open */
 	/*
-	 * removed is 1 if last read of audit_control didn't list this
-	 * plugin; it needs to be removed.
+	 * removed is 1 if last read of audit configuration didn't list this
+	 * plugin or the plugin is marked as "inactive"; it needs to be removed.
 	 */
 	boolean_t	plg_removed;		/* plugin removed */
 	boolean_t	plg_to_be_removed;	/* tentative removal state */

@@ -738,8 +738,11 @@ OFHDRS=			\
 	ofed_kernel.h
 
 RDMAHDRS=		\
-	ib_verbs.h 	\
+	ib_addr.h	\
+	ib_user_mad.h	\
+	ib_user_sa.h	\
 	ib_user_verbs.h \
+	ib_verbs.h 	\
 	rdma_cm.h 	\
 	rdma_user_cm.h
 
@@ -750,6 +753,9 @@ SOL_UVERBSHDRS=		\
 	sol_uverbs_hca.h	\
 	sol_uverbs_qp.h		\
 	sol_uverbs_event.h
+
+SOL_UMADHDRS=		\
+	sol_umad.h
 
 SOL_UCMAHDRS=		\
 	sol_ucma.h	\
@@ -766,6 +772,9 @@ TAVORHDRS=		\
 
 HERMONHDRS=		\
 	hermon_ioctl.h
+
+MLNXHDRS=		\
+	mlnx_umap.h
 
 IDMHDRS=		\
 	idm.h		\
@@ -1170,6 +1179,7 @@ CHECKHDRS=						\
 	$(SOL_OFSHDRS:%.h=ib/clients/of/sol_ofs/%.check)	\
 	$(TAVORHDRS:%.h=ib/adapters/tavor/%.check)	\
 	$(HERMONHDRS:%.h=ib/adapters/hermon/%.check)	\
+	$(MLNXHDRS:%.h=ib/adapters/%.check)		\
 	$(IDMHDRS:%.h=idm/%.check)			\
 	$(ISCSIHDRS:%.h=iscsi/%.check)			\
 	$(ISCSITHDRS:%.h=iscsit/%.check)			\
@@ -1242,10 +1252,12 @@ CHECKHDRS=						\
 	$(ROOTOFHDRS)		\
 	$(ROOTRDMAHDRS)		\
 	$(ROOTSOL_OFSHDRS)	\
+	$(ROOTSOL_UMADHDRS)	\
 	$(ROOTSOL_UVERBSHDRS)	\
 	$(ROOTSOL_UCMAHDRS)	\
 	$(ROOTTAVORHDRS)	\
 	$(ROOTHERMONHDRS)	\
+	$(ROOTMLNXHDRS)		\
 	$(ROOTLVMHDRS)		\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\
@@ -1310,10 +1322,12 @@ install_h:			\
 	$(ROOTOFHDRS)		\
 	$(ROOTRDMAHDRS)		\
 	$(ROOTSOL_OFSHDRS)	\
+	$(ROOTSOL_UMADHDRS)	\
 	$(ROOTSOL_UVERBSHDRS)	\
 	$(ROOTSOL_UCMAHDRS)	\
 	$(ROOTTAVORHDRS)	\
 	$(ROOTHERMONHDRS)	\
+	$(ROOTMLNXHDRS)		\
 	$(ROOTLVMHDRS)		\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\

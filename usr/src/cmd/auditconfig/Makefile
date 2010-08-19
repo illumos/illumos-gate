@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # Makefile for auditconfig
@@ -29,18 +28,16 @@ PROG = auditconfig
 include $(SRC)/cmd/Makefile.cmd
 
 LIBBSM = $(SRC)/lib/libbsm/common
-AUDITCONFIG = $(SRC)/cmd/auditconfig
-AUDITD = $(SRC)/cmd/auditd
 
-LDLIBS += -lnsl -lbsm -lscf
+LDLIBS += -lnsl -lbsm -lsecdb
 
-OBJS = audit_scf.o audit_scf_shared.o auditconfig.o 
+OBJS = auditconfig.o 
 SRCS = $(OBJS:%.o=%.c)
 
 POFILE = $(PROG).po
 MSGFILES = $(SRCS)
 
-CPPFLAGS += -I$(LIBBSM) -I$(AUDITD) -I$(AUDITCONFIG) 
+CPPFLAGS += -I$(LIBBSM)
 
 .KEEP_STATE:
 

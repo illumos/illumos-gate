@@ -104,13 +104,15 @@ typedef int	selock_t;
 /*
  * PAGE_LLOCK_SIZE is 2 * NCPU, but no smaller than 128.
  * PAGE_LLOCK_SHIFT is log2(PAGE_LLOCK_SIZE).
+ *
+ * We use ? : instead of #if because <vm/page.h> is included everywhere;
+ * NCPU_P2 is only a constant in the "unix" module.
+ *
  */
-#if ((2*NCPU_P2) > 128)
-#define	PAGE_LLOCK_SHIFT	((unsigned)(NCPU_LOG2 + 1))
-#else
-#define	PAGE_LLOCK_SHIFT	7U
-#endif
-#define	PAGE_LLOCK_SIZE (1 << PAGE_LLOCK_SHIFT)
+#define	PAGE_LLOCK_SHIFT \
+	    ((unsigned)(((2*NCPU_P2) > 128) ? NCPU_LOG2 + 1 : 7))
+
+#define	PAGE_LLOCK_SIZE (1ul << PAGE_LLOCK_SHIFT)
 
 /*
  * The number of low order 0 (or less variable) bits in the page_t address.
@@ -573,28 +575,17 @@ typedef	page_t	devpage_t;
  * PH_SHIFT_SIZE is the amount to use for the successive shifts in the hash
  * function below.  The actual value is LOG2(PH_TABLE_SIZE), so that as many
  * bits as possible will filter thru PAGE_HASH_FUNC() and PAGE_HASH_MUTEX().
+ *
+ * We use ? : instead of #if because <vm/page.h> is included everywhere;
+ * NCPU maps to a global variable outside of the "unix" module.
  */
 #if defined(_LP64)
-
-#if NCPU < 4
-#define	PH_TABLE_SIZE	128
-#define	PH_SHIFT_SIZE	7
-#else
-#define	PH_TABLE_SIZE	(2 * NCPU_P2)
-#define	PH_SHIFT_SIZE	(NCPU_LOG2 + 1)
-#endif
-
+#define	PH_SHIFT_SIZE	((NCPU < 4) ? 7		: (NCPU_LOG2 + 1))
 #else	/* 32 bits */
-
-#if NCPU < 4
-#define	PH_TABLE_SIZE	16
-#define	PH_SHIFT_SIZE	4
-#else
-#define	PH_TABLE_SIZE	128
-#define	PH_SHIFT_SIZE	7
-#endif
-
+#define	PH_SHIFT_SIZE	((NCPU < 4) ? 4		: 7)
 #endif	/* _LP64 */
+
+#define	PH_TABLE_SIZE	(1ul << PH_SHIFT_SIZE)
 
 /*
  *
@@ -618,13 +609,14 @@ typedef	page_t	devpage_t;
 #define	PAGE_HASHAVELEN		4
 #define	PAGE_HASH_FUNC(vp, off) \
 	(((((uintptr_t)(off) >> PAGESHIFT) ^ \
-		((uintptr_t)(off) >> (PAGESHIFT + PH_SHIFT_SIZE))) ^ \
-		(((uintptr_t)(vp) >> 3) ^ \
-		((uintptr_t)(vp) >> (3 + PH_SHIFT_SIZE)) ^ \
-		((uintptr_t)(vp) >> (3 + 2 * PH_SHIFT_SIZE)) ^ \
-		((uintptr_t)(vp) << \
-		(page_hashsz_shift - AN_VPSHIFT - VNODE_ALIGN_LOG2)))) & \
-		(PAGE_HASHSZ - 1))
+	    ((uintptr_t)(off) >> (PAGESHIFT + PH_SHIFT_SIZE))) ^ \
+	    (((uintptr_t)(vp) >> 3) ^ \
+	    ((uintptr_t)(vp) >> (3 + PH_SHIFT_SIZE)) ^ \
+	    ((uintptr_t)(vp) >> (3 + 2 * PH_SHIFT_SIZE)) ^ \
+	    ((uintptr_t)(vp) << \
+	    (page_hashsz_shift - AN_VPSHIFT - VNODE_ALIGN_LOG2)))) & \
+	    (PAGE_HASHSZ - 1))
+
 #ifdef _KERNEL
 
 /*

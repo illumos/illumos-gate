@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <libintl.h>
@@ -68,7 +65,6 @@ static struct mapping maplist[] = {
 	{"prof_attr", "cn", "SolarisProfAttr", NULL},
 	{"exec_attr", "cn", "SolarisExecAttr", NULL},
 	{"user_attr", "uid", "SolarisUserAttr", NULL},
-	{"audit_user", "uid", "SolarisAuditUser", NULL},
 	{"tnrhtp", "ipTnetTemplateName", "ipTnetTemplate", NULL},
 	{"tnrhdb", "ipTnetNumber", "ipTnetHost", NULL},
 	{NULL, NULL, NULL, NULL}
@@ -115,15 +111,14 @@ printMapping()
 	int	i;
 
 	(void) fprintf(stdout,
-		gettext("database       default type        objectclass\n"));
+	    gettext("database       default type        objectclass\n"));
 	(void) fprintf(stdout,
-		gettext("=============  =================   =============\n"));
+	    gettext("=============  =================   =============\n"));
 	/* first dump auto_* and automount which are not in maplist[] */
 	(void) fprintf(stdout, "%-15s%-20s%s\n", "auto_*", "automountKey",
-		"automount");
+	    "automount");
 	(void) fprintf(stdout, "%-15s%-20s%s\n", "automount",
-		"automountMapName",
-		"automountMap");
+	    "automountMapName", "automountMap");
 	for (i = 0; maplist[i].database != NULL; i++) {
 		/* skip printing shadow */
 		if (strcasecmp(maplist[i].database, "shadow") == 0)
@@ -195,10 +190,10 @@ set_keys(char **key, char *attrtype)
 
 		if (keyeq) {
 			(void) snprintf(keyfilter + len, totlen - len,
-					"(%s)", k);
+			    "(%s)", k);
 		} else {
 			(void) snprintf(keyfilter + len, totlen - len,
-					"(%s=%s)", attrtype, k);
+			    "(%s=%s)", attrtype, k);
 		}
 		karray++;
 	}
@@ -266,10 +261,10 @@ set_keys_publickey(char **key, char *attrtype, int type, char **ret)
 
 		if (keyeq) {
 			(void) snprintf(pre_filter + len, totlen - len,
-					"(%s)", k);
+			    "(%s)", k);
 		} else {
 			(void) snprintf(pre_filter + len, totlen - len,
-					"(%s=%s)", attrtype, k);
+			    "(%s=%s)", attrtype, k);
 		}
 		karray++;
 		count++;
@@ -310,18 +305,17 @@ set_filter_publickey(char **key, char *database, int type, char **udata)
 
 	if (strcasecmp(database, maplist[PUBLICKEY].database) == SAME) {
 		rc = set_keys_publickey(key,
-				maplist[PUBLICKEY + type].def_type, type,
-				&keyfilter);
+		    maplist[PUBLICKEY + type].def_type, type, &keyfilter);
 		switch (rc) {
 		case -1:
 			filterlen = strlen(maplist[PUBLICKEY].objectclass) + 13;
 			udatalen = 3;
 			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-						udatalen, nomem);
+			    udatalen, nomem);
 			if (!nomem) {
 				(void) snprintf(filter, filterlen,
-					"objectclass=%s",
-					maplist[PUBLICKEY].objectclass);
+				    "objectclass=%s",
+				    maplist[PUBLICKEY].objectclass);
 				(void) snprintf(userdata, udatalen, "%%s");
 			}
 			break;
@@ -329,16 +323,16 @@ set_filter_publickey(char **key, char *database, int type, char **udata)
 			return (NULL);
 		default:
 			filterlen = strlen(maplist[PUBLICKEY].objectclass) +
-				strlen(keyfilter) + 18;
+			    strlen(keyfilter) + 18;
 			udatalen = strlen(keyfilter) + 8;
 			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-						udatalen, nomem);
+			    udatalen, nomem);
 			if (!nomem) {
-			    (void) snprintf(filter, filterlen,
-				"(&(objectclass=%s)%s)",
-				maplist[PUBLICKEY].objectclass, keyfilter);
-			    (void) snprintf(userdata, udatalen, "(&(%%s)%s)",
-					keyfilter);
+				(void) snprintf(filter, filterlen,
+				    "(&(objectclass=%s)%s)",
+				    maplist[PUBLICKEY].objectclass, keyfilter);
+				(void) snprintf(userdata, udatalen,
+				    "(&(%%s)%s)", keyfilter);
 			}
 		}
 	} else {
@@ -346,22 +340,22 @@ set_filter_publickey(char **key, char *database, int type, char **udata)
 			filterlen = 14;
 			udatalen = 3;
 			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-						udatalen, nomem);
+			    udatalen, nomem);
 			if (!nomem) {
 				(void) snprintf(filter, filterlen,
-						"objectclass=*");
+				    "objectclass=*");
 				(void) snprintf(userdata, udatalen, "%%s");
 			}
 		} else {
 			filterlen = strlen(keyfilter) + 1;
 			udatalen = strlen(keyfilter) + 8;
 			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-						udatalen, nomem);
+			    udatalen, nomem);
 			if (!nomem) {
 				(void) snprintf(filter, filterlen, "%s",
-						keyfilter);
+				    keyfilter);
 				(void) snprintf(userdata, udatalen,
-						"(&(%%s)%s)", keyfilter);
+				    "(&(%%s)%s)", keyfilter);
 			}
 		}
 	}
@@ -431,39 +425,39 @@ set_filter(char **key, char *database, char **udata)
 			else if (strcasecmp(database, "tnrhtp") == 0)
 				dbtp = 1;
 			if ((keyfilter = set_keys(key, maplist[i].def_type))
-							== NULL) {
+			    == NULL) {
 				filterlen = strlen(maplist[i].objectclass);
 				udatalen = 3;
 				if (dbpf)
 					filterlen += strlen(PROF_ATTR_FILTER)
-							+ 1;
+					    + 1;
 				else if (dbtp)
 					filterlen += strlen(TNRHTP_FILTER) + 1;
 				else
 					filterlen += OC_FLEN;
 
 				MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-						udatalen, nomem);
+				    udatalen, nomem);
 				if (nomem)
 					goto done;
 				if (dbpf)
 					(void) snprintf(filter, filterlen,
-						PROF_ATTR_FILTER, "");
+					    PROF_ATTR_FILTER, "");
 				else if (dbtp)
 					(void) snprintf(filter, filterlen,
-						TNRHTP_FILTER, "");
+					    TNRHTP_FILTER, "");
 				else
 					(void) snprintf(filter, filterlen,
-						OC_FILTER,
-						maplist[i].objectclass);
+					    OC_FILTER,
+					    maplist[i].objectclass);
 
 				(void) snprintf(userdata, udatalen, "%%s");
 			} else {
 				filterlen = strlen(maplist[i].objectclass) +
-					strlen(keyfilter);
+				    strlen(keyfilter);
 				if (dbpf)
 					filterlen += strlen(PROF_ATTR_FILTER)
-							+ 1;
+					    + 1;
 				else if (dbtp)
 					filterlen += strlen(TNRHTP_FILTER) + 1;
 				else
@@ -471,23 +465,22 @@ set_filter(char **key, char *database, char **udata)
 
 				udatalen = strlen(keyfilter) + 8;
 				MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-						udatalen, nomem);
+				    udatalen, nomem);
 				if (nomem)
 					goto done;
 				if (dbpf)
 					(void) snprintf(filter, filterlen,
-						PROF_ATTR_FILTER, keyfilter);
+					    PROF_ATTR_FILTER, keyfilter);
 				else if (dbtp)
 					(void) snprintf(filter, filterlen,
-						TNRHTP_FILTER, keyfilter);
+					    TNRHTP_FILTER, keyfilter);
 				else
 					(void) snprintf(filter, filterlen,
-						OC_FILTER2,
-						maplist[i].objectclass,
-						keyfilter);
+					    OC_FILTER2,
+					    maplist[i].objectclass, keyfilter);
 
 				(void) snprintf(userdata, udatalen,
-					"(&(%%s)%s)", keyfilter);
+				    "(&(%%s)%s)", keyfilter);
 			}
 			goto done;
 		}
@@ -497,121 +490,126 @@ set_filter(char **key, char *database, char **udata)
 
 	/* auto_* services */
 	if (strncasecmp(database, "auto_", 5) == SAME) {
-	    if (v2) {
-		if ((keyfilter = set_keys(key, "automountKey"))
-			!= NULL) {
-			filterlen = strlen(keyfilter) + 27;
-			udatalen = strlen(keyfilter) + 8;
-			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-					udatalen, nomem);
-			if (!nomem) {
-				(void) snprintf(filter, filterlen,
-				    "(&(objectclass=automount)%s)",
-					keyfilter);
-				(void) snprintf(userdata, udatalen,
-					"(&(%%s)%s)", keyfilter);
+		if (v2) {
+			if ((keyfilter = set_keys(key, "automountKey"))
+			    != NULL) {
+				filterlen = strlen(keyfilter) + 27;
+				udatalen = strlen(keyfilter) + 8;
+				MALLOC_FILTER_UDATA(filter, filterlen,
+				    userdata, udatalen, nomem);
+				if (!nomem) {
+					(void) snprintf(filter, filterlen,
+					    "(&(objectclass=automount)%s)",
+					    keyfilter);
+					(void) snprintf(userdata, udatalen,
+					    "(&(%%s)%s)", keyfilter);
+				}
+			} else {
+				filterlen = 22;
+				udatalen = 3;
+				MALLOC_FILTER_UDATA(filter, filterlen,
+				    userdata, udatalen, nomem);
+				if (!nomem) {
+					(void) strlcpy(filter,
+					    "objectclass=automount", filterlen);
+					(void) strlcpy(userdata, "%s",
+					    udatalen);
+				}
 			}
 		} else {
-			filterlen = 22;
-			udatalen = 3;
-			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-					udatalen, nomem);
-			if (!nomem) {
-				(void) strlcpy(filter, "objectclass=automount",
-					filterlen);
-				(void) strlcpy(userdata, "%s", udatalen);
+			if ((keyfilter = set_keys(key, "cn")) != NULL) {
+				filterlen = strlen(keyfilter) + 27;
+				udatalen = strlen(keyfilter) + 8;
+				MALLOC_FILTER_UDATA(filter, filterlen,
+				    userdata, udatalen, nomem);
+				if (!nomem) {
+					(void) snprintf(filter, filterlen,
+					    "(&(objectclass=nisObject)%s)",
+					    keyfilter);
+					(void) snprintf(userdata, udatalen,
+					    "(&(%%s)%s)", keyfilter);
+				}
+			} else {
+				filterlen = 22;
+				udatalen = 3;
+				MALLOC_FILTER_UDATA(filter, filterlen,
+				    userdata, udatalen, nomem);
+				if (!nomem) {
+					(void) strlcpy(filter,
+					    "objectclass=nisObject", filterlen);
+					(void) strlcpy(userdata, "%s",
+					    udatalen);
+				}
 			}
 		}
-	    } else {
-		if ((keyfilter = set_keys(key, "cn")) != NULL) {
-			filterlen = strlen(keyfilter) + 27;
-			udatalen = strlen(keyfilter) + 8;
-			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-					udatalen, nomem);
-			if (!nomem) {
-				(void) snprintf(filter, filterlen,
-				    "(&(objectclass=nisObject)%s)", keyfilter);
-				(void) snprintf(userdata, udatalen,
-					"(&(%%s)%s)", keyfilter);
-			}
-		} else {
-			filterlen = 22;
-			udatalen = 3;
-			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-					udatalen, nomem);
-			if (!nomem) {
-				(void) strlcpy(filter, "objectclass=nisObject",
-						filterlen);
-				(void) strlcpy(userdata, "%s", udatalen);
-			}
-		}
-	    }
-	    goto done;
+		goto done;
 	}
 
 	/* automount service */
 	if (strcasecmp(database, "automount") == SAME) {
-	    if (v2) {
-		if ((keyfilter = set_keys(key, "automountMapName"))
-			!= NULL) {
-			filterlen = strlen(keyfilter) + 30;
-			udatalen = strlen(keyfilter) + 8;
-			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-					udatalen, nomem);
-			if (!nomem) {
-				(void) snprintf(filter, filterlen,
-					"(&(objectclass=automountMap)%s)",
-					keyfilter);
-				(void) snprintf(userdata, udatalen,
-					"(&(%%s)%s)", keyfilter);
+		if (v2) {
+			if ((keyfilter = set_keys(key, "automountMapName"))
+			    != NULL) {
+				filterlen = strlen(keyfilter) + 30;
+				udatalen = strlen(keyfilter) + 8;
+				MALLOC_FILTER_UDATA(filter, filterlen,
+				    userdata, udatalen, nomem);
+				if (!nomem) {
+					(void) snprintf(filter, filterlen,
+					    "(&(objectclass=automountMap)%s)",
+					    keyfilter);
+					(void) snprintf(userdata, udatalen,
+					    "(&(%%s)%s)", keyfilter);
+				}
+			} else {
+				filterlen = 25;
+				udatalen = 3;
+				MALLOC_FILTER_UDATA(filter, filterlen,
+				    userdata, udatalen, nomem);
+				if (!nomem) {
+					(void) strlcpy(filter,
+					    "objectclass=automountMap",
+					    filterlen);
+					(void) strlcpy(userdata, "%s",
+					    udatalen);
+				}
 			}
 		} else {
-			filterlen = 25;
-			udatalen = 3;
-			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-					udatalen, nomem);
-			if (!nomem) {
-				(void) strlcpy(filter,
-					"objectclass=automountMap",
-					filterlen);
-				(void) strlcpy(userdata, "%s", udatalen);
+			if ((keyfilter = set_keys(key, "nisMapName"))
+			    != NULL) {
+				filterlen = strlen(keyfilter) + 24;
+				udatalen = strlen(keyfilter) + 8;
+				MALLOC_FILTER_UDATA(filter, filterlen,
+				    userdata, udatalen, nomem);
+				if (!nomem) {
+					(void) snprintf(filter, filterlen,
+					    "(&(objectclass=nisMap)%s)",
+					    keyfilter);
+					(void) snprintf(userdata, udatalen,
+					    "(&(%%s)%s)", keyfilter);
+				}
+			} else {
+				filterlen = 19;
+				udatalen = 3;
+				MALLOC_FILTER_UDATA(filter, filterlen,
+				    userdata, udatalen, nomem);
+				if (!nomem) {
+					(void) strlcpy(filter,
+					    "objectclass=nisMap", filterlen);
+					(void) strlcpy(userdata, "%s",
+					    udatalen);
+				}
 			}
 		}
-	    } else {
-		if ((keyfilter = set_keys(key, "nisMapName"))
-			!= NULL) {
-			filterlen = strlen(keyfilter) + 24;
-			udatalen = strlen(keyfilter) + 8;
-			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-					udatalen, nomem);
-			if (!nomem) {
-				(void) snprintf(filter, filterlen,
-					"(&(objectclass=nisMap)%s)",
-					keyfilter);
-				(void) snprintf(userdata, udatalen,
-					"(&(%%s)%s)", keyfilter);
-			}
-		} else {
-			filterlen = 19;
-			udatalen = 3;
-			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-					udatalen, nomem);
-			if (!nomem) {
-			    (void) strlcpy(filter, "objectclass=nisMap",
-					filterlen);
-			    (void) strlcpy(userdata, "%s", udatalen);
-			}
-		}
-	    }
-	    goto done;
+		goto done;
 	}
 
 	/* other services (catch all) */
 	if ((keyfilter = set_keys(key, "cn")) == NULL) {
 		filterlen = 14;
 		udatalen = 3;
-		MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-				udatalen, nomem);
+		MALLOC_FILTER_UDATA(filter, filterlen, userdata, udatalen,
+		    nomem);
 		if (!nomem) {
 			(void) snprintf(filter, filterlen, "objectclass=*");
 			(void) strlcpy(userdata, "%s", udatalen);
@@ -619,12 +617,12 @@ set_filter(char **key, char *database, char **udata)
 	} else {
 		filterlen = strlen(keyfilter) + 1;
 		udatalen = strlen(keyfilter) + 8;
-		MALLOC_FILTER_UDATA(filter, filterlen, userdata,
-				udatalen, nomem);
+		MALLOC_FILTER_UDATA(filter, filterlen, userdata, udatalen,
+		    nomem);
 		if (!nomem) {
 			(void) snprintf(filter, filterlen, "%s", keyfilter);
 			(void) snprintf(userdata, udatalen, "(&(%%s)%s)",
-					keyfilter);
+			    keyfilter);
 		}
 	}
 

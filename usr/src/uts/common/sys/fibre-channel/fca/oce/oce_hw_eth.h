@@ -72,6 +72,14 @@ enum {
 	OPCODE_CONFIG_NIC_RSS_ADVANCED = 16
 };
 
+enum {
+	RSS_ENABLE_NONE		= 0x0, /* (No RSS) */
+	RSS_ENABLE_IPV4		= 0x1, /* (IPV4 HASH enabled ) */
+	RSS_ENABLE_TCP_IPV4	= 0x2, /* (TCP IPV4 Hash enabled) */
+	RSS_ENABLE_IPV6		= 0x4, /* (IPV6 HASH enabled) */
+	RSS_ENABLE_TCP_IPV6	= 0x8  /* (TCP IPV6 HASH */
+
+};
 /* NIC header WQE */
 struct oce_nic_hdr_wqe {
 	union {
@@ -240,12 +248,12 @@ struct oce_nic_rx_cqe {
 			uint32_t rsvd0:1;
 			uint32_t vlan_tag_present:1;
 			uint32_t mac_dst:6;
-			uint32_t ip6_frame:1;
+			uint32_t ip_ver:1;
 			uint32_t l4_cksum_pass:1;
 			uint32_t ip_cksum_pass:1;
 			uint32_t udpframe:1;
 			uint32_t tcpframe:1;
-			uint32_t ip4_frame:1;
+			uint32_t ipframe:1;
 			uint32_t rss_hp:1;
 			uint32_t error:1;
 
@@ -272,12 +280,12 @@ struct oce_nic_rx_cqe {
 			/* dw 1 */
 			uint32_t error:1;
 			uint32_t rss_hp:1;
-			uint32_t ip4_frame:1;
+			uint32_t ipframe:1;
 			uint32_t tcpframe:1;
 			uint32_t udpframe:1;
 			uint32_t ip_cksum_pass:1;
 			uint32_t l4_cksum_pass:1;
-			uint32_t ip6_frame:1;
+			uint32_t ip_ver:1;
 			uint32_t mac_dst:6;
 			uint32_t vlan_tag_present:1;
 			uint32_t rsvd0:1;
@@ -633,6 +641,36 @@ struct mbx_get_nic_stats {
 			struct tx_stats tx;
 			struct rx_err_stats err_rx;
 			struct mem_stats mem;
+		}rsp;
+	}params;
+};
+
+/* [01] OPCODE_CONFIG_NIC_RSS */
+struct mbx_config_nic_rss {
+	struct mbx_hdr hdr;
+	union {
+		struct {
+#ifdef _BIG_ENDIAN
+			uint32_t if_id;
+			uint16_t cpu_tbl_sz_log2;
+			uint16_t enable_rss;
+			uint32_t hash[10];
+			uint8_t cputable[128];
+			uint8_t rsvd[3];
+			uint8_t flush;
+#else
+			uint32_t if_id;
+			uint16_t enable_rss;
+			uint16_t cpu_tbl_sz_log2;
+			uint32_t hash[10];
+			uint8_t cputable[128];
+			uint8_t flush;
+			uint8_t rsvd[3];
+#endif
+		}req;
+		struct {
+			uint8_t rsvd[3];
+			uint8_t rss_bank;
 		}rsp;
 	}params;
 };

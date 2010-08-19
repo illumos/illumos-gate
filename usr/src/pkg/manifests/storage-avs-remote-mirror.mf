@@ -101,16 +101,12 @@ hardlink path=usr/lib/sndrd target=../bin/sndrd
 hardlink path=usr/lib/sndrsyncd target=../bin/sndrsyncd
 hardlink path=usr/sbin/sndradm target=../bin/sndradm
 hardlink path=usr/sbin/sndrboot target=../bin/sndrboot
-legacy pkg=SUNWrdcr arch=$(ARCH) category=system \
+legacy pkg=SUNWrdcr \
     desc="Remote Mirror copy software provides replication across IP networks" \
-    hotline="Please contact your local service provider" \
-    name="Sun StorageTek Availability Suite Remote Mirror (root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWrdcu arch=$(ARCH) category=system \
+    name="Sun StorageTek Availability Suite Remote Mirror (root)"
+legacy pkg=SUNWrdcu \
     desc="Remote Mirror copy software provides replication across IP networks" \
-    hotline="Please contact your local service provider" \
-    name="Sun StorageTek Availability Suite Remote Mirror (usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Sun StorageTek Availability Suite Remote Mirror (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/cluster/lib/dscfg/start/10rdc target=../../../sbin/rdc

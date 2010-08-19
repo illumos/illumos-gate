@@ -4072,8 +4072,6 @@ static struct ttypelist_t ttypelist[] = {
 		filedbmline_comment, "SolarisExecAttr", "cn" },
 	{ NS_LDAP_TYPE_AUTHATTR, genent_auth_attr, dump_auth_attr,
 		filedbmline_comment, "SolarisAuthAttr", "cn" },
-	{ NS_LDAP_TYPE_AUUSER, genent_audit_user, dump_audit_user,
-		filedbmline_comment, "SolarisAuditUser", "uid" },
 	{ NS_LDAP_TYPE_TNRHDB, genent_tnrhdb, dump_tnrhdb,
 		filedbmline_comment, "ipTnetHost", "ipTnetNumber" },
 	{ NS_LDAP_TYPE_TNRHTP, genent_tnrhtp, dump_tnrhtp,

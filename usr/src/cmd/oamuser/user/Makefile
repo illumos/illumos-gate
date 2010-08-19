@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/oamuser/user/Makefile
 #
@@ -85,7 +84,7 @@ $(USERDEL) :=	LIBS = $(LIBUSRGRP)
 $(USERMOD) :=	OBJS = $(MOD_OBJ)
 $(USERMOD) :=	LIBS = $(LIBUSRGRP)
 
-LDLIBS +=	-lsecdb -lproject -ltsol
+LDLIBS +=	-lbsm -lnsl -lsecdb -lproject -ltsol
 
 .PARALLEL: $(OBJECTS)
 

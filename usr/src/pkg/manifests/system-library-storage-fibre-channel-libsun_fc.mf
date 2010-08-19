@@ -37,16 +37,11 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 file path=usr/lib/$(ARCH64)/libsun_fc.so.1
 file path=usr/lib/libsun_fc.so.1
-legacy pkg=SUNWfchba arch=$(ARCH) category=system \
-    desc="SNIA HBA library for Sun Fibre Channel adapters" \
-    hotline="Please contact your local service provider" \
-    name="Sun Fibre Channel Host Bus Adapter Library" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWfchbar arch=$(ARCH) category=system \
+legacy pkg=SUNWfchba desc="SNIA HBA library for Sun Fibre Channel adapters" \
+    name="Sun Fibre Channel Host Bus Adapter Library"
+legacy pkg=SUNWfchbar \
     desc="T11 FC-HBA library for Sun Fibre Channel adapters (root)" \
-    hotline="Please contact your local service provider" \
-    name="Sun Fibre Channel Host Bus Adapter Library (root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Sun Fibre Channel Host Bus Adapter Library (root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libsun_fc.so target=libsun_fc.so.1

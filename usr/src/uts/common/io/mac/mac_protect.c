@@ -2295,10 +2295,10 @@ allowed_ips_set(mac_resource_props_t *mrp, uint32_t af)
 	return (B_FALSE);
 }
 
-void
-mac_protect_get(mac_handle_t mh, mac_protect_t *mrp)
+mac_protect_t *
+mac_protect_get(mac_handle_t mh)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
-	*mrp = mip->mi_resource_props.mrp_protect;
+	return (&mip->mi_resource_props.mrp_protect);
 }

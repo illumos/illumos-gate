@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -77,4 +76,21 @@ dssetup_get_domain_info(ds_primary_domain_info_t *ds_info)
 
 	ndr_rpc_unbind(&handle);
 	return (0);
+}
+
+int
+dssetup_check_service(void)
+{
+	ds_primary_domain_info_t	ds_info;
+	int				rc;
+
+	bzero(&ds_info, sizeof (ds_primary_domain_info_t));
+
+	if ((rc = dssetup_get_domain_info(&ds_info)) == 0) {
+		free(ds_info.nt_domain);
+		free(ds_info.dns_domain);
+		free(ds_info.forest);
+	}
+
+	return (rc);
 }

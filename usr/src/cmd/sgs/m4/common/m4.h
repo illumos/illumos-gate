@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,11 +23,11 @@
 
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef	_M4_H
+#define	_M4_H
 
 #include	<ctype.h>
 #include	<stdio.h>
@@ -46,6 +45,12 @@
 #define	NOPUSH	0
 #define	OK	0
 #define	NOT_OK	1
+
+/* Used in m4.c and m4ext.c */
+#define	DEF_HSHSIZE	199	/* default hash table size (prime). */
+#define	DEF_BUFSIZE	4096	/* default pushback & arg text buffers size */
+#define	DEF_STKSIZE	100	/* default call stack size */
+#define	DEF_TOKSIZE	512	/* default token buffer size */
 
 #define	BUILTIN		0x40000000
 #define	INVALID_CHAR	0x80000000
@@ -181,3 +186,5 @@ extern int undef(wchar_t *);
 		*op++ = (c);	\
 	else	\
 		error2(gettext("more than %d chars of argument text"), bufsize)
+
+#endif	/* _M4_H */

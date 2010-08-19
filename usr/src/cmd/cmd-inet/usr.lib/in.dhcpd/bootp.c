@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -389,7 +387,7 @@ bootp(dsvc_clnt_t *pcd, PKT_LIST *plp)
 			/* Note that the conversation has completed. */
 			pcd->state = ACK;
 
-			(void) update_offer(pcd, dnlp, 0, &no_ip, B_TRUE);
+			(void) update_offer(pcd, &dnlp, 0, &no_ip, B_TRUE);
 			existing_offer = B_TRUE;
 		}
 

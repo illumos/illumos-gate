@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -601,7 +600,7 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 static void
 fastboot_init_fields(fastboot_info_t *nk)
 {
-	if (x86_feature & X86_PAE) {
+	if (is_x86_feature(x86_featureset, X86FSET_PAE)) {
 		nk->fi_has_pae = 1;
 		nk->fi_shift_amt = fastboot_shift_amt_pae;
 		nk->fi_ptes_per_table = 512;
@@ -1155,9 +1154,11 @@ load_kernel_retry:
 					goto err_out;
 				}
 
-				if ((x86_feature & X86_64) == 0 ||
-				    (x86_feature & X86_PAE) == 0) {
-					cmn_err(CE_NOTE, "!Fastboot: Cannot "
+				if (!is_x86_feature(x86_featureset,
+				    X86FSET_64) ||
+				    !is_x86_feature(x86_featureset,
+				    X86FSET_PAE)) {
+					cmn_err(CE_NOTE, "Fastboot: Cannot "
 					    "reboot to %s: "
 					    "not a 64-bit capable system",
 					    kern_bootfile);

@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * logadm/opts.c -- options handling routines
@@ -55,7 +52,47 @@ struct opts {
 	struct fn_list *op_cmdargs;	/* the op_cmdargs */
 };
 
+static off_t opts_parse_ctime(const char *o, const char *optarg);
+static off_t opts_parse_bytes(const char *o, const char *optarg);
+static off_t opts_parse_atopi(const char *o, const char *optarg);
+static off_t opts_parse_seconds(const char *o, const char *optarg);
+
 static struct lut *Info;		/* table driving parsing */
+
+/* table that drives argument parsing */
+struct optinfo Opttable[] = {
+	{ "e", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "F", OPTTYPE_STRING,	NULL,			OPTF_CLI },
+	{ "f", OPTTYPE_STRING,	NULL,			OPTF_CLI },
+	{ "h", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
+	{ "l", OPTTYPE_BOOLEAN, NULL,			OPTF_CLI|OPTF_CONF },
+	{ "N", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "n", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
+	{ "r", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
+	{ "V", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
+	{ "v", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
+	{ "w", OPTTYPE_STRING,	NULL,			OPTF_CLI },
+	{ "p", OPTTYPE_INT,	opts_parse_seconds,	OPTF_CLI|OPTF_CONF },
+	{ "P", OPTTYPE_INT,	opts_parse_ctime,	OPTF_CLI|OPTF_CONF },
+	{ "s", OPTTYPE_INT,	opts_parse_bytes,	OPTF_CLI|OPTF_CONF },
+	{ "a", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "b", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "c", OPTTYPE_BOOLEAN, NULL,			OPTF_CLI|OPTF_CONF },
+	{ "g", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "m", OPTTYPE_INT,	opts_parse_atopi,	OPTF_CLI|OPTF_CONF },
+	{ "M", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "o", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "R", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "t", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "z", OPTTYPE_INT,	opts_parse_atopi,	OPTF_CLI|OPTF_CONF },
+	{ "A", OPTTYPE_INT,	opts_parse_seconds,	OPTF_CLI|OPTF_CONF },
+	{ "C", OPTTYPE_INT,	opts_parse_atopi,	OPTF_CLI|OPTF_CONF },
+	{ "E", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+	{ "S", OPTTYPE_INT,	opts_parse_bytes,	OPTF_CLI|OPTF_CONF },
+	{ "T", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
+};
+
+int Opttable_cnt = sizeof (Opttable) / sizeof (struct optinfo);
 
 /*
  * opts_init -- set current options parsing table
@@ -87,24 +124,26 @@ opt_info(int c)
  * prints a message to stderr and calls err(EF_FILE|EF_JMP, ...) on error
  */
 struct opts *
-opts_parse(char **argv, int flags)
+opts_parse(struct opts *opts, char **argv, int flags)
 {
-	struct opts *ret = MALLOC(sizeof (*ret));
 	int dashdash = 0;
 	char *ptr;
 
-	ret->op_raw = ret->op_ints = NULL;
-	ret->op_cmdargs = fn_list_new(NULL);
+	if (opts == NULL) {
+		opts = MALLOC(sizeof (*opts));
+		opts->op_raw = opts->op_ints = NULL;
+		opts->op_cmdargs = fn_list_new(NULL);
+	}
 
 	/* no words to process, just return empty opts struct */
 	if (argv == NULL)
-		return (ret);
+		return (opts);
 
 	/* foreach word... */
 	for (; (ptr = *argv) != NULL; argv++) {
 		if (dashdash || *ptr != '-') {
 			/* found a cmdarg */
-			opts_setcmdarg(ret, ptr);
+			opts_setcmdarg(opts, ptr);
 			continue;
 		}
 		if (*++ptr == '\0')
@@ -138,7 +177,7 @@ opts_parse(char **argv, int flags)
 
 			/* for boolean options, we have all the info we need */
 			if (info->oi_t == OPTTYPE_BOOLEAN) {
-				(void) opts_set(ret, info->oi_o, "");
+				(void) opts_set(opts, info->oi_o, "");
 				continue;
 			}
 
@@ -148,12 +187,12 @@ opts_parse(char **argv, int flags)
 				err(EF_FILE|EF_JMP,
 				    "Option '%c' requires an argument",
 				    info->oi_o[0]);
-			opts_set(ret, info->oi_o, ptr);
+			opts_set(opts, info->oi_o, ptr);
 			break;
 		}
 	}
 
-	return (ret);
+	return (opts);
 }
 
 /*
@@ -277,7 +316,7 @@ opts_merge(struct opts *back, struct opts *front)
 /*
  * opts_parse_ctime -- parse a ctime format optarg
  */
-off_t
+static off_t
 opts_parse_ctime(const char *o, const char *optarg)
 {
 	struct tm tm;
@@ -297,7 +336,7 @@ opts_parse_ctime(const char *o, const char *optarg)
 /*
  * opts_parse_atopi -- parse a positive integer format optarg
  */
-off_t
+static off_t
 opts_parse_atopi(const char *o, const char *optarg)
 {
 	off_t ret = atoll(optarg);
@@ -315,7 +354,7 @@ opts_parse_atopi(const char *o, const char *optarg)
 /*
  * opts_parse_atopi -- parse a size format optarg into bytes
  */
-off_t
+static off_t
 opts_parse_bytes(const char *o, const char *optarg)
 {
 	off_t ret = atoll(optarg);
@@ -350,7 +389,7 @@ opts_parse_bytes(const char *o, const char *optarg)
 /*
  * opts_parse_seconds -- parse a time format optarg into seconds
  */
-off_t
+static off_t
 opts_parse_seconds(const char *o, const char *optarg)
 {
 	off_t ret;
@@ -436,13 +475,13 @@ opts_printword(const char *word, FILE *stream)
 		    strchr(word, '$') || strchr(word, '[') ||
 		    strchr(word, '?') || strchr(word, '{') ||
 		    strchr(word, '`') || strchr(word, ';')) {
-			if (strchr(word, '\''))
+			if (strchr(word, '\'') == NULL)
+				q = "'";
+			else if (strchr(word, '"') == NULL)
 				q = "\"";
-			else if (strchr(word, '"'))
+			else
 				err(EF_FILE|EF_JMP,
 				    "Can't protect quotes in <%s>", word);
-			else
-				q = "'";
 			(void) fprintf(stream, "%s%s%s", q, word, q);
 		} else
 			(void) fprintf(stream, "%s", word);
@@ -474,7 +513,7 @@ opts_print(struct opts *opts, FILE *stream, char *exclude)
 #ifdef	TESTMODULE
 
 /* table that drives argument parsing */
-static struct optinfo Opttable[] = {
+static struct optinfo Testopttable[] = {
 	{ "a", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
 	{ "b", OPTTYPE_STRING,	NULL,			OPTF_CLI },
 	{ "c", OPTTYPE_INT,	opts_parse_seconds,	OPTF_CLI|OPTF_CONF },
@@ -494,14 +533,15 @@ main(int argc, char *argv[])
 	err_init(argv[0]);
 	setbuf(stdout, NULL);
 
-	opts_init(Opttable, sizeof (Opttable) / sizeof (struct optinfo));
+	opts_init(Testopttable,
+	    sizeof (Testopttable) / sizeof (struct optinfo));
 
 	argv++;
 
 	if (SETJMP)
 		err(0, "opts parsing failed");
 	else
-		opts = opts_parse(argv, OPTF_CLI);
+		opts = opts_parse(NULL, argv, OPTF_CLI);
 
 	printf("options:");
 	opts_print(opts, stdout, NULL);

@@ -91,10 +91,8 @@ dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
 dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib
 dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract group=sys
 dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib
-legacy pkg=SUNWpstl.u arch=$(ARCH).sun4u category=system \
+legacy pkg=SUNWpstl.u arch=$(ARCH).sun4u \
     desc="Apptrace processor specific shared objects" \
-    hotline="Please contact your local service provider" \
-    name="Platform specific apptrace support" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="Platform specific apptrace support"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

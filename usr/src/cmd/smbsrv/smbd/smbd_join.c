@@ -37,17 +37,171 @@
 #include <smbsrv/smbinfo.h>
 #include "smbd.h"
 
+#define	SMBD_DC_MONITOR_ATTEMPTS		3
+#define	SMBD_DC_MONITOR_RETRY_INTERVAL		3	/* seconds */
+#define	SMBD_DC_MONITOR_INTERVAL		60	/* seconds */
 
-/*
- * This is a short-lived thread that triggers the initial DC discovery
- * at startup.
- */
-static pthread_t smb_locate_dc_thr;
+extern smbd_t smbd;
 
-static void *smbd_locate_dc_thread(void *);
+static mutex_t smbd_dc_mutex;
+static cond_t smbd_dc_cv;
+
+static void *smbd_dc_monitor(void *);
+static void smbd_dc_update(void);
+static boolean_t smbd_set_netlogon_cred(void);
 static int smbd_get_kpasswd_srv(char *, size_t);
 static uint32_t smbd_join_workgroup(smb_joininfo_t *);
 static uint32_t smbd_join_domain(smb_joininfo_t *);
+
+/*
+ * Launch the DC discovery and monitor thread.
+ */
+int
+smbd_dc_monitor_init(void)
+{
+	pthread_attr_t	attr;
+	int		rc;
+
+	(void) smb_config_getstr(SMB_CI_ADS_SITE, smbd.s_site,
+	    MAXHOSTNAMELEN);
+	(void) smb_config_getip(SMB_CI_DOMAIN_SRV, &smbd.s_pdc);
+	smb_ads_init();
+
+	if (smbd.s_secmode != SMB_SECMODE_DOMAIN)
+		return (0);
+
+	(void) pthread_attr_init(&attr);
+	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&smbd.s_dc_monitor_tid, &attr, smbd_dc_monitor,
+	    NULL);
+	(void) pthread_attr_destroy(&attr);
+	return (rc);
+}
+
+void
+smbd_dc_monitor_refresh(void)
+{
+	char		site[MAXHOSTNAMELEN];
+	smb_inaddr_t	pdc;
+
+	site[0] = '\0';
+	bzero(&pdc, sizeof (smb_inaddr_t));
+	(void) smb_config_getstr(SMB_CI_ADS_SITE, site, MAXHOSTNAMELEN);
+	(void) smb_config_getip(SMB_CI_DOMAIN_SRV, &pdc);
+
+	(void) mutex_lock(&smbd_dc_mutex);
+
+	if ((bcmp(&smbd.s_pdc, &pdc, sizeof (smb_inaddr_t)) != 0) ||
+	    (smb_strcasecmp(smbd.s_site, site, 0) != 0)) {
+		bcopy(&pdc, &smbd.s_pdc, sizeof (smb_inaddr_t));
+		(void) strlcpy(smbd.s_site, site, MAXHOSTNAMELEN);
+		smbd.s_pdc_changed = B_TRUE;
+		(void) cond_signal(&smbd_dc_cv);
+	}
+
+	(void) mutex_unlock(&smbd_dc_mutex);
+}
+
+/*ARGSUSED*/
+static void *
+smbd_dc_monitor(void *arg)
+{
+	boolean_t	ds_not_responding = B_FALSE;
+	boolean_t	ds_cfg_changed = B_FALSE;
+	timestruc_t	delay;
+	int		i;
+
+	smbd_dc_update();
+	smbd_online_wait("smbd_dc_monitor");
+
+	while (smbd_online()) {
+		delay.tv_sec = SMBD_DC_MONITOR_INTERVAL;
+		delay.tv_nsec = 0;
+
+		(void) mutex_lock(&smbd_dc_mutex);
+		(void) cond_reltimedwait(&smbd_dc_cv, &smbd_dc_mutex, &delay);
+
+		if (smbd.s_pdc_changed) {
+			smbd.s_pdc_changed = B_FALSE;
+			ds_cfg_changed = B_TRUE;
+		}
+
+		(void) mutex_unlock(&smbd_dc_mutex);
+
+		for (i = 0; i < SMBD_DC_MONITOR_ATTEMPTS; ++i) {
+			if (dssetup_check_service() == 0) {
+				ds_not_responding = B_FALSE;
+				break;
+			}
+
+			ds_not_responding = B_TRUE;
+			(void) sleep(SMBD_DC_MONITOR_RETRY_INTERVAL);
+		}
+
+		if (ds_not_responding)
+			smb_log(smbd.s_loghd, LOG_NOTICE,
+			    "smbd_dc_monitor: domain service not responding");
+
+		if (ds_not_responding || ds_cfg_changed) {
+			ds_cfg_changed = B_FALSE;
+			smb_ads_refresh();
+			smbd_dc_update();
+		}
+	}
+
+	smbd.s_dc_monitor_tid = 0;
+	return (NULL);
+}
+
+/*
+ * Locate a domain controller in the current resource domain and Update
+ * the Netlogon credential chain.
+ *
+ * The domain configuration will be updated upon successful DC discovery.
+ */
+static void
+smbd_dc_update(void)
+{
+	char		domain[MAXHOSTNAMELEN];
+	smb_domainex_t	info;
+	smb_domain_t	*primary;
+
+
+	if (smb_getfqdomainname(domain, MAXHOSTNAMELEN) != 0) {
+		(void) smb_getdomainname(domain, MAXHOSTNAMELEN);
+		(void) smb_strupr(domain);
+	}
+
+	if (!smb_locate_dc(domain, "", &info)) {
+		smb_log(smbd.s_loghd, LOG_NOTICE,
+		    "smbd_dc_update: %s: locate failed", domain);
+	} else {
+		primary = &info.d_primary;
+
+		smb_config_setdomaininfo(primary->di_nbname,
+		    primary->di_fqname,
+		    primary->di_sid,
+		    primary->di_u.di_dns.ddi_forest,
+		    primary->di_u.di_dns.ddi_guid);
+
+		smb_log(smbd.s_loghd, LOG_NOTICE,
+		    "smbd_dc_update: %s: located %s", domain, info.d_dc);
+	}
+
+	if (smbd_set_netlogon_cred()) {
+		/*
+		 * Restart required because the domain changed
+		 * or the credential chain setup failed.
+		 */
+		smb_log(smbd.s_loghd, LOG_NOTICE,
+		    "smbd_dc_update: %s: smb/server restart required");
+
+		if (smb_smf_restart_service() != 0)
+			smb_log(smbd.s_loghd, LOG_ERR,
+			    "restart failed: run 'svcs -xv smb/server'"
+			    " for more information");
+	}
+}
 
 /*
  * smbd_join
@@ -91,7 +245,7 @@ smbd_join(smb_joininfo_t *info)
  * If joining a new domain, the domain_name property must be set after a
  * successful credential chain setup.
  */
-boolean_t
+static boolean_t
 smbd_set_netlogon_cred(void)
 {
 	char kpasswd_srv[MAXHOSTNAMELEN];
@@ -102,9 +256,6 @@ smbd_set_netlogon_cred(void)
 	boolean_t new_domain = B_FALSE;
 	smb_domainex_t dxi;
 	smb_domain_t *di;
-
-	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
-		return (B_FALSE);
 
 	if (smb_match_netlogon_seqnum())
 		return (B_FALSE);
@@ -158,7 +309,7 @@ smbd_set_netlogon_cred(void)
 
 	smb_ipc_commit();
 	if (mlsvc_netlogon(dxi.d_dc, di->di_nbname)) {
-		syslog(LOG_ERR,
+		syslog(LOG_NOTICE,
 		    "failed to establish NETLOGON credential chain");
 		return (B_TRUE);
 	} else {
@@ -173,64 +324,6 @@ smbd_set_netlogon_cred(void)
 
 	return (new_domain);
 }
-
-/*
- * smbd_locate_dc_start()
- *
- * Initialization of the thread that triggers the initial DC discovery
- * when SMB daemon starts up.
- * Returns 0 on success, an error number if thread creation fails.
- */
-int
-smbd_locate_dc_start(void)
-{
-	pthread_attr_t tattr;
-	int rc;
-
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&smb_locate_dc_thr, &tattr, smbd_locate_dc_thread,
-	    NULL);
-	(void) pthread_attr_destroy(&tattr);
-	return (rc);
-}
-
-/*
- * smbd_locate_dc_thread()
- *
- * If necessary, set up Netlogon credential chain and locate a
- * domain controller in the given resource domain.
- *
- * The domain configuration will be updated upon a successful DC discovery.
- */
-/*ARGSUSED*/
-static void *
-smbd_locate_dc_thread(void *arg)
-{
-	char domain[MAXHOSTNAMELEN];
-	smb_domainex_t new_domain;
-	smb_domain_t *di;
-
-	if (!smb_match_netlogon_seqnum()) {
-		(void) smbd_set_netlogon_cred();
-	} else {
-		if (smb_getfqdomainname(domain, MAXHOSTNAMELEN) != 0) {
-			(void) smb_getdomainname(domain, MAXHOSTNAMELEN);
-			(void) smb_strupr(domain);
-		}
-
-		if (smb_locate_dc(domain, "", &new_domain)) {
-			di = &new_domain.d_primary;
-			smb_config_setdomaininfo(di->di_nbname, di->di_fqname,
-			    di->di_sid,
-			    di->di_u.di_dns.ddi_forest,
-			    di->di_u.di_dns.ddi_guid);
-		}
-	}
-
-	return (NULL);
-}
-
 
 /*
  * Retrieve the kpasswd server from krb5.conf.

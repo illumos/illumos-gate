@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "thr_uberdata.h"
@@ -148,10 +145,14 @@ initial_allocation(bucket_t *bp)	/* &__uberdata.bucket[0] */
 	ASSERT(((caddr_t)ptr - (caddr_t)base + 4 * SUBCHUNKSIZE) == BASE_SIZE);
 }
 
+/*
+ * This highbit code is the same as the code in fls_impl().
+ * We inline it here for speed.
+ */
 static int
 getbucketnum(size_t size)
 {
-	int highbit = 0;
+	int highbit = 1;
 
 	if (size-- <= MINSIZE)
 		return (0);
@@ -171,8 +172,8 @@ getbucketnum(size_t size)
 	if (size & 0x2)
 		highbit += 1;
 
-	ASSERT(highbit >= MINSHIFT);
-	return (highbit - (MINSHIFT - 1));
+	ASSERT(highbit > MINSHIFT);
+	return (highbit - MINSHIFT);
 }
 
 void *

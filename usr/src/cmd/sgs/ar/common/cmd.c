@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -29,8 +27,6 @@
  *	  All Rights Reserved
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Incompatible Archive Header
@@ -70,38 +66,34 @@
  */
 
 #include "inc.h"
-#include "extern.h"
 
 /*
- * Function prototypes
+ * Forward Declarations
  */
-static char *match(char *, Cmd_info *);
-
-static void cleanup(Cmd_info *);
-static void movefil(ARFILE *, struct stat *);
-static void mesg(int, char *, Cmd_info *);
-static void ar_select(int *, unsigned long);
-
-static FILE *stats(char *, struct stat *);
-
-static int create_extract(ARFILE *, int, int, Cmd_info *);
+static void	ar_select(int *, unsigned long);
+static void	cleanup(Cmd_info *);
+static int	create_extract(ARFILE *, int, int, Cmd_info *);
+static char	*match(char *, Cmd_info *);
+static void	mesg(int, char *, Cmd_info *);
+static void	movefil(ARFILE *, struct stat *);
+static FILE	*stats(char *, struct stat *);
 
 /*
  * Commands
  */
-int
+void
 rcmd(Cmd_info *cmd_info)
 {
-	FILE *f;
-	ARFILE *fileptr;
-	ARFILE	*abifile = NULL;
-	ARFILE	*backptr = NULL;
-	ARFILE	*endptr;
-	ARFILE	*moved_files;
-	ARFILE  *prev_entry, *new_listhead, *new_listend;
-	int	deleted;
-	struct stat stbuf;
-	char *gfile;
+	FILE		*f;
+	ARFILE		*fileptr;
+	ARFILE		*abifile = NULL;
+	ARFILE		*backptr = NULL;
+	ARFILE		*endptr;
+	ARFILE		*moved_files;
+	ARFILE  	*prev_entry, *new_listhead, *new_listend;
+	int		deleted;
+	struct stat	stbuf;
+	char		*gfile;
 
 	new_listhead  = NULL;
 	new_listend   = NULL;
@@ -110,7 +102,7 @@ rcmd(Cmd_info *cmd_info)
 	for (fileptr = getfile(cmd_info);
 	    fileptr; fileptr = getfile(cmd_info)) {
 		deleted = 0;
-		if (!abifile && cmd_info-> ponam &&
+		if (!abifile && cmd_info->ponam &&
 		    strcmp(fileptr->ar_longname, cmd_info->ponam) == 0)
 			abifile = fileptr;
 		else if (!abifile)
@@ -125,16 +117,18 @@ rcmd(Cmd_info *cmd_info)
 			 */
 			f = stats(gfile, &stbuf); /* gfile is set by match */
 			if (f == NULL) {
-				if (cmd_info->namc)
-					error_message(SYS_OPEN_ERROR,
-					    SYSTEM_ERROR, strerror(errno),
-					    gfile);
+				if (cmd_info->namc) {
+					int err = errno;
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_SYS_OPEN),
+					    gfile, strerror(err));
+				}
 				/*
 				 * Created
 				 */
 				mesg('c', gfile, cmd_info);
 			} else {
-				if (opt_FLAG(cmd_info, u_FLAG) &&
+				if ((cmd_info->opt_flgs & u_FLAG) &&
 				    stbuf.st_mtime <= fileptr->ar_date) {
 					(void) fclose(f);
 					continue;
@@ -147,9 +141,7 @@ rcmd(Cmd_info *cmd_info)
 				/*
 				 * Clear the previous contents.
 				 */
-				if (fileptr->ar_flag & F_MALLOCED)
-					free(fileptr->ar_contents);
-				else if (fileptr->ar_flag & F_ELFRAW) {
+				if (fileptr->ar_flag & F_ELFRAW) {
 					/*
 					 * clear ar_elf
 					 */
@@ -157,59 +149,23 @@ rcmd(Cmd_info *cmd_info)
 					fileptr->ar_elf = 0;
 				}
 				/* clear 'ar_flag' */
-				fileptr->ar_flag &=
-				    ~(F_ELFRAW | F_MMAPED | F_MALLOCED);
-				if ((cmd_info->OPT_flgs & M_FLAG) == 0) {
-					if ((cmd_info->bytes_in_mem +
-					    stbuf.st_size)
-					    < AR_MAX_BYTES_IN_MEM) {
-						if ((fileptr->ar_contents =
-						    malloc(ROUNDUP(
-						    stbuf.st_size))) == NULL) {
-							error_message(
-							    MALLOC_ERROR,
-							    PLAIN_ERROR,
-							    (char *)0);
-							exit(1);
-						}
-						fileptr->ar_flag &=
-						    ~(F_ELFRAW | F_MMAPED);
-						fileptr->ar_flag |= F_MALLOCED;
-						if (fread(fileptr->ar_contents,
-						    sizeof (char),
-						    stbuf.st_size, f) !=
-						    stbuf.st_size) {
-							error_message(
-							    SYS_READ_ERROR,
-							    SYSTEM_ERROR,
-							    strerror(errno),
-							    fileptr->
-							    ar_longname);
-							exit(1);
-						}
-						cmd_info->bytes_in_mem +=
-						    stbuf.st_size;
-					}
-				} else {
-					if ((fileptr->ar_contents = (char *)
-					    mmap(0, stbuf.st_size,
-					    PROT_READ,
-					    MAP_SHARED,
-					    fileno(f), 0)) == (char *)-1) {
-						error_message(MALLOC_ERROR,
-						    PLAIN_ERROR, (char *)0);
-						exit(1);
-					}
-					fileptr->ar_flag &=
-					    ~(F_ELFRAW | F_MALLOCED);
-					fileptr->ar_flag |= F_MMAPED;
-				}
+				fileptr->ar_flag &= ~F_ELFRAW;
+
+				/*
+				 * Defer reading contents until needed, and
+				 * then use an in-kernel file-to-file transfer
+				 * to avoid excessive in-process memory use.
+				 */
+				fileptr->ar_contents = NULL;
+
 				if (fileptr->ar_pathname != NULL)
 					free(fileptr->ar_pathname);
 				if ((fileptr->ar_pathname =
 				    malloc(strlen(gfile) + 1)) == NULL) {
-					error_message(MALLOC_ERROR,
-					    PLAIN_ERROR, (char *)0);
+					int err = errno;
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_MALLOC),
+					    strerror(err));
 					exit(1);
 				}
 
@@ -252,8 +208,8 @@ rcmd(Cmd_info *cmd_info)
 	if (cmd_info->ponam && endptr &&
 	    (((moved_files = endptr->ar_next) != NULL) || new_listhead)) {
 		if (!abifile) {
-			error_message(NOT_FOUND_02_ERROR,
-			    PLAIN_ERROR, (char *)0, cmd_info->ponam);
+			(void) fprintf(stderr, MSG_INTL(MSG_NOT_FOUND_POSNAM),
+			    cmd_info->ponam);
 			exit(2);
 		}
 		endptr->ar_next = NULL;
@@ -269,7 +225,7 @@ rcmd(Cmd_info *cmd_info)
 			moved_files = new_listhead;
 		}
 		/* 2: insert at appropriate position... */
-		if (opt_FLAG(cmd_info, b_FLAG))
+		if (cmd_info->opt_flgs & b_FLAG)
 			abifile = backptr;
 		if (abifile) {
 			listend->ar_next = abifile->ar_next;
@@ -280,12 +236,11 @@ rcmd(Cmd_info *cmd_info)
 		}
 		listend = endptr;
 	} else if (cmd_info->ponam && !abifile)
-		error_message(NOT_FOUND_02_ERROR,
-		    PLAIN_ERROR, (char *)0, cmd_info->ponam);
-	return (0);
+		(void) fprintf(stderr, MSG_INTL(MSG_NOT_FOUND_POSNAM),
+		    cmd_info->ponam);
 }
 
-int
+void
 dcmd(Cmd_info *cmd_info)
 {
 	ARFILE	*fptr;
@@ -319,25 +274,25 @@ dcmd(Cmd_info *cmd_info)
 			backptr = fptr;
 		}
 	}
-	return (0);
 }
 
-int
+void
 xcmd(Cmd_info *cmd_info)
 {
-	int f;
-	ARFILE *next;
-	int rawname = 0;
-	int f_len = 0;
+	int	f;
+	ARFILE	*next;
+	int	rawname = 0;
+	long	f_len = 0;
 
 	/*
 	 * If -T is specified, get the maximum file name length.
 	 */
-	if (cmd_info->OPT_flgs & T_FLAG) {
-		f_len = pathconf(".", _PC_NAME_MAX);
+	if (cmd_info->opt_flgs & T_FLAG) {
+		f_len = pathconf(MSG_ORIG(MSG_STR_PERIOD), _PC_NAME_MAX);
 		if (f_len == -1) {
-			error_message(PATHCONF_ERROR,
-			    SYSTEM_ERROR, strerror(errno));
+			int err = errno;
+			(void) fprintf(stderr, MSG_INTL(MSG_PATHCONF),
+			    strerror(err));
 			exit(1);
 		}
 	}
@@ -362,10 +317,11 @@ xcmd(Cmd_info *cmd_info)
 					if (write(f, next->ar_contents,
 					    (unsigned)next->ar_size) !=
 					    next->ar_size) {
-						error_message(SYS_WRITE_ERROR,
-						    SYSTEM_ERROR,
-						    strerror(errno),
-						    next->ar_rawname);
+						int err = errno;
+						(void) fprintf(stderr,
+						    MSG_INTL(MSG_SYS_WRITE),
+						    next->ar_rawname,
+						    strerror(err));
 						exit(1);
 					}
 				} else {
@@ -376,10 +332,11 @@ xcmd(Cmd_info *cmd_info)
 					if (write(f, next->ar_contents,
 					    (unsigned)next->ar_size) !=
 					    next->ar_size) {
-						error_message(SYS_WRITE_ERROR,
-						    SYSTEM_ERROR,
-						    strerror(errno),
-						    next->ar_longname);
+						int err = errno;
+						(void) fprintf(stderr,
+						    MSG_INTL(MSG_SYS_WRITE),
+						    next->ar_longname,
+						    strerror(err));
 						exit(1);
 					}
 				}
@@ -389,10 +346,9 @@ xcmd(Cmd_info *cmd_info)
 		}
 		rawname = 0;
 	} /* for */
-	return (0);
 }
 
-int
+void
 pcmd(Cmd_info *cmd_info)
 {
 	ARFILE	*next;
@@ -406,19 +362,19 @@ pcmd(Cmd_info *cmd_info)
 			 *	Refer to "Incompatible Archive Header"
 			 *	blocked comment at the beginning of this file.
 			 */
-			if (opt_FLAG(cmd_info, v_FLAG)) {
+			if (cmd_info->opt_flgs & v_FLAG) {
 				(void) fprintf(stdout,
-				    "\n<%s>\n\n", next->ar_longname);
+				    MSG_ORIG(MSG_FMT_P_TITLE),
+				    next->ar_longname);
 				(void) fflush(stdout);
 			}
 			(void) fwrite(next->ar_contents, sizeof (char),
 			    next->ar_size, stdout);
 		}
 	}
-	return (0);
 }
 
-int
+void
 mcmd(Cmd_info *cmd_info)
 {
 	ARFILE	*fileptr;
@@ -462,17 +418,17 @@ mcmd(Cmd_info *cmd_info)
 	}
 
 	if (!tmphead)
-		return (1);
+		return;
 
 	if (!cmd_info->ponam)
 		listend->ar_next = tmphead;
 	else {
 		if (!abifile) {
-			error_message(NOT_FOUND_02_ERROR,
-			    PLAIN_ERROR, (char *)0, cmd_info->ponam);
+			(void) fprintf(stderr, MSG_INTL(MSG_NOT_FOUND_POSNAM),
+			    cmd_info->ponam);
 			exit(2);
 		}
-		if (opt_FLAG(cmd_info, b_FLAG))
+		if (cmd_info->opt_flgs & b_FLAG)
 			abifile = backptr2;
 		if (abifile) {
 			tmpend->ar_next = abifile->ar_next;
@@ -483,24 +439,23 @@ mcmd(Cmd_info *cmd_info)
 		}
 	}
 	(cmd_info->modified)++;
-	return (0);
 }
 
-int
+void
 tcmd(Cmd_info *cmd_info)
 {
 	ARFILE	*next;
 	int	**mp;
 	char   buf[DATESIZE];
-	int m1[] = {1, ROWN, 'r', '-'};
-	int m2[] = {1, WOWN, 'w', '-'};
-	int m3[] = {2, SUID, 's', XOWN, 'x', '-'};
-	int m4[] = {1, RGRP, 'r', '-'};
-	int m5[] = {1, WGRP, 'w', '-'};
-	int m6[] = {2, SGID, 's', XGRP, 'x', '-'};
-	int m7[] = {1, ROTH, 'r', '-'};
-	int m8[] = {1, WOTH, 'w', '-'};
-	int m9[] = {2, STXT, 't', XOTH, 'x', '-'};
+	int m1[] = {1, S_IRUSR, 'r', '-'};
+	int m2[] = {1, S_IWUSR, 'w', '-'};
+	int m3[] = {2, S_ISUID, 's', S_IXUSR, 'x', '-'};
+	int m4[] = {1, S_IRGRP, 'r', '-'};
+	int m5[] = {1, S_IWGRP, 'w', '-'};
+	int m6[] = {2, S_ISGID, 's', S_IXGRP, 'x', '-'};
+	int m7[] = {1, S_IROTH, 'r', '-'};
+	int m8[] = {1, S_IWOTH, 'w', '-'};
+	int m9[] = {2, S_ISVTX, 't', S_IXOTH, 'x', '-'};
 	int *m[10];
 
 	m[0] = m1;
@@ -523,49 +478,48 @@ tcmd(Cmd_info *cmd_info)
 			 *	Refer to "Incompatible Archive Header"
 			 *	blocked comment at the beginning of this file.
 			 */
-			if (opt_FLAG(cmd_info, v_FLAG)) {
+			if (cmd_info->opt_flgs & v_FLAG) {
 				for (mp = &m[0]; mp < &m[9]; )
 					ar_select(*mp++, next->ar_mode);
 
-				(void) fprintf(stdout, "%6d/%6d", next->ar_uid,
-				    next->ar_gid);
-				(void) fprintf(stdout, "%7ld", next->ar_size);
+				(void) fprintf(stdout, MSG_ORIG(MSG_FMT_T_IDSZ),
+				    next->ar_uid, next->ar_gid,
+				    EC_XWORD(next->ar_size));
 				if ((strftime(buf,
-				    DATESIZE,
-				    "%b %e %H:%M %Y",
+				    DATESIZE, MSG_ORIG(MSG_FMT_T_DATE),
 				    localtime(&(next->ar_date)))) == 0) {
-					error_message(LOCALTIME_ERROR,
-					    PLAIN_ERROR, (char *)0);
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_LOCALTIME));
 					exit(1);
 				}
-				(void) fprintf(stdout, " %s ", buf);
+				(void) fprintf(stdout,
+				    MSG_ORIG(MSG_FMT_SPSTRSP), buf);
 			}
 			if ((next->ar_longname[0] == 0) &&
 			    (next->ar_rawname[0] != 0))
 				(void) fprintf(stdout,
-				    "%s\n", trim(next->ar_rawname));
+				    MSG_ORIG(MSG_FMT_STRNL),
+				    trim(next->ar_rawname));
 			else
 				(void) fprintf(stdout,
-				    "%s\n", trim(next->ar_longname));
+				    MSG_ORIG(MSG_FMT_STRNL),
+				    trim(next->ar_longname));
 		}
 	} /* for */
-	return (0);
 }
 
-int
+void
 qcmd(Cmd_info *cmd_info)
 {
 	ARFILE *fptr;
 
-	if (opt_FLAG(cmd_info, a_FLAG) || opt_FLAG(cmd_info, b_FLAG)) {
-		error_message(USAGE_05_ERROR,
-		    PLAIN_ERROR, (char *)0);
+	if (cmd_info->opt_flgs & (a_FLAG | b_FLAG)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_USAGE_05));
 		exit(1);
 	}
 	for (fptr = getfile(cmd_info); fptr; fptr = getfile(cmd_info))
 		;
 	cleanup(cmd_info);
-	return (0);
 }
 
 /*
@@ -607,10 +561,11 @@ cleanup(Cmd_info *cmd_info)
 		 */
 		mesg('a', cmd_info->namv[i], cmd_info);
 		f = stats(cmd_info->namv[i], &stbuf);
-		if (f == NULL)
-			error_message(SYS_OPEN_ERROR,
-			    SYSTEM_ERROR, strerror(errno), cmd_info->namv[i]);
-		else {
+		if (f == NULL) {
+			int err = errno;
+			(void) fprintf(stderr, MSG_INTL(MSG_SYS_OPEN),
+			    cmd_info->namv[i], strerror(err));
+		} else {
 			fileptr = newfile();
 			/* if short name */
 			(void) strncpy(fileptr->ar_name,
@@ -619,8 +574,9 @@ cleanup(Cmd_info *cmd_info)
 			if ((fileptr->ar_longname =
 			    malloc(strlen(trim(cmd_info->namv[i])) + 1)) ==
 			    NULL) {
-				error_message(MALLOC_ERROR,
-				    PLAIN_ERROR, (char *)0);
+				int err = errno;
+				(void) fprintf(stderr, MSG_INTL(MSG_MALLOC),
+				    strerror(err));
 				exit(1);
 			}
 
@@ -629,8 +585,9 @@ cleanup(Cmd_info *cmd_info)
 
 			if ((fileptr->ar_pathname =
 			    malloc(strlen(cmd_info->namv[i]) + 1)) == NULL) {
-				error_message(MALLOC_ERROR,
-				    PLAIN_ERROR, (char *)0);
+				int err = errno;
+				(void) fprintf(stderr, MSG_INTL(MSG_MALLOC),
+				    strerror(err));
 				exit(1);
 			}
 
@@ -639,43 +596,15 @@ cleanup(Cmd_info *cmd_info)
 			movefil(fileptr, &stbuf);
 
 			/* clear 'ar_flag' */
-			fileptr->ar_flag &= ~(F_ELFRAW | F_MMAPED | F_MALLOCED);
+			fileptr->ar_flag &= ~F_ELFRAW;
 
-			if ((cmd_info->OPT_flgs & M_FLAG) == 0) {
-				if ((cmd_info->bytes_in_mem + stbuf.st_size) <
-				    AR_MAX_BYTES_IN_MEM) {
-					fileptr->ar_flag &=
-					    ~(F_ELFRAW | F_MMAPED);
-					fileptr->ar_flag |= F_MALLOCED;
-					if ((fileptr->ar_contents =
-					    malloc(ROUNDUP(stbuf.st_size))) ==
-					    NULL) {
-						error_message(MALLOC_ERROR,
-						    PLAIN_ERROR, (char *)0);
-						exit(1);
-					}
-					if (fread(fileptr->ar_contents,
-					    sizeof (char), stbuf.st_size,
-					    f) != stbuf.st_size) {
-						error_message(SYS_READ_ERROR,
-						    SYSTEM_ERROR,
-						    strerror(errno),
-						    fileptr->ar_longname);
-						exit(1);
-					}
-					cmd_info->bytes_in_mem += stbuf.st_size;
-				}
-			} else {
-				fileptr->ar_flag &= ~(F_ELFRAW | F_MALLOCED);
-				fileptr->ar_flag |= F_MMAPED;
-				if ((fileptr->ar_contents =
-				    (char *)mmap(0, stbuf.st_size, PROT_READ,
-				    MAP_SHARED, fileno(f), 0)) == (char *)-1) {
-					error_message(MALLOC_ERROR,
-					    PLAIN_ERROR, (char *)0);
-					exit(1);
-				}
-			}
+			/*
+			 * Defer reading contents until needed, and then use
+			 * an in-kernel file-to-file transfer to avoid
+			 * excessive in-process memory use.
+			 */
+			fileptr->ar_contents = NULL;
+
 			(void) fclose(f);
 			(cmd_info->modified)++;
 			cmd_info->namv[i] = 0;
@@ -719,7 +648,7 @@ stats(char *file, struct stat *stbuf)
 {
 	FILE *f;
 
-	f = fopen(file, "r");
+	f = fopen(file, MSG_ORIG(MSG_STR_LCR));
 	if (f == NULL)
 		return (f);
 	if (stat(file, stbuf) < 0) {
@@ -747,14 +676,15 @@ create_extract(ARFILE *a, int rawname, int f_len, Cmd_info *cmd_info)
 	/*
 	 * If -T is specified, check the file length.
 	 */
-	if (cmd_info->OPT_flgs & T_FLAG) {
+	if (cmd_info->opt_flgs & T_FLAG) {
 		int len;
 		len = strlen(f_name);
 		if (f_len <= len) {
 			dup = malloc(f_len+1);
 			if (dup == NULL) {
-				error_message(MALLOC_ERROR,
-				    PLAIN_ERROR, (char *)0);
+				int err = errno;
+				(void) fprintf(stderr, MSG_INTL(MSG_MALLOC),
+				    strerror(err));
 				exit(1);
 			}
 			(void) strncpy(dup, f_name, f_len);
@@ -782,11 +712,11 @@ create_extract(ARFILE *a, int rawname, int f_len, Cmd_info *cmd_info)
 		/*
 		 * If -C is specified, this is an error anyway
 		 */
-		if (cmd_info->OPT_flgs & C_FLAG) {
+		if (cmd_info->opt_flgs & C_FLAG) {
+			(void) fprintf(stderr, MSG_INTL(MSG_OVERRIDE_WARN),
+			    f_name);
 			if (dup != NULL)
 				free(dup);
-			error_message(OVERRIDE_WARN_ERROR,
-			    PLAIN_ERROR, (char *)0, f_name);
 			return (-1);
 		}
 
@@ -802,10 +732,10 @@ create_extract(ARFILE *a, int rawname, int f_len, Cmd_info *cmd_info)
 			if ((s1.st_dev == s2.st_dev) &&
 			    (s1.st_ino == s2.st_ino)) {
 
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_OVERRIDE_WARN), f_name);
 				if (dup != NULL)
 					free(dup);
-				error_message(OVERRIDE_WARN_ERROR,
-				    PLAIN_ERROR, (char *)0, f_name);
 				return (-1);
 			}
 		}
@@ -816,8 +746,9 @@ create_extract(ARFILE *a, int rawname, int f_len, Cmd_info *cmd_info)
 	 */
 	f = creat(f_name, (mode_t)a->ar_mode & 0777);
 	if (f < 0) {
-		error_message(SYS_CREATE_01_ERROR,
-		    SYSTEM_ERROR, strerror(errno), f_name);
+		int err = errno;
+		(void) fprintf(stderr, MSG_INTL(MSG_SYS_OPEN), f_name,
+		    strerror(err));
 		/*
 		 * Created
 		 */
@@ -850,9 +781,9 @@ mesg(int c, char *file, Cmd_info *cmd_info)
 	 */
 	if (c == 'u')
 		c = 'c';
-	if (opt_FLAG(cmd_info, v_FLAG))
+	if (cmd_info->opt_flgs & v_FLAG)
 		if (c != 'c')
-			(void) fprintf(stdout, "%c - %s\n", c, file);
+			(void) fprintf(stdout, MSG_ORIG(MSG_FMT_FILE), c, file);
 }
 
 static void

@@ -47,16 +47,19 @@ extern "C" {
 #define	OCE_DEFAULT_LOG_SETTINGS	(CE_WARN	|	\
 					((MOD_CONFIG | MOD_TX | MOD_RX) << 16))
 
+#define	OCE_MAX_LOG_SETTINGS		(CE_IGNORE | ((MOD_CONFIG | MOD_TX | \
+					MOD_RX | MOD_ISR) << 16))
+
 #define	oce_log(dev_p, level, module, fmt, arg...) {	\
 	if (dev_p) {					\
 		if ((dev_p->mod_mask & module) && 	\
 		    (dev_p->severity < CE_IGNORE) && 	\
 		    ((uint32_t)level >= dev_p->severity)) 	\
-			cmn_err(level, "%s[%d]: %s[%d]: " fmt, OCE_MOD_NAME, \
-			    dev_p->dev_id, __FILE__, __LINE__, ## arg);	     \
+			cmn_err(level, "%s[%d]: " fmt, OCE_MOD_NAME,	\
+			    dev_p->dev_id, ## arg);			\
 	} else {							\
-		cmn_err(level, "%s[%d]: %s[%d]: " fmt, OCE_MOD_NAME,	\
-		    0, __FILE__, __LINE__, ## arg);			\
+		cmn_err(level, "%s[%d]: " fmt, OCE_MOD_NAME,		\
+		    0, ## arg);						\
 	}								\
 }
 
@@ -90,11 +93,13 @@ extern "C" {
 /* Utility Functions */
 
 #define	OCE_DW_SWAP(datap, length)	{			\
-	int len;						\
-	for (len = ((length)/4 - 1); len >= 0; len--) {		\
-		*((uint32_t *)(datap) + len) =			\
-		    LE_32(*((uint32_t *)(datap) + len));	\
-	}							\
+	int len;	                                \
+	uint32_t *wptr = (uint32_t *)(datap);                 \
+	len = (length) + (((length)  %4) ? (4  - (4 %(length))) : 0); \
+	for (len = len/4; len > 0; len--) {		\
+		*wptr = LE_32(*wptr);			\
+		wptr++;	                    \
+	}							        \
 }
 
 
@@ -110,14 +115,15 @@ typedef struct oce_list_entry {
 }OCE_LIST_NODE_T;
 
 typedef struct {
+	kmutex_t list_lock;
 	OCE_LIST_NODE_T head;
 	int32_t nitems;
-	kmutex_t list_lock;
-
 }OCE_LIST_T;
 
 /* externs for  list manipulation functions */
 
+
+void oce_list_link_init(OCE_LIST_NODE_T  *list_node);
 void oce_list_create(OCE_LIST_T  *list_hdr, void *arg);
 void oce_list_destroy(OCE_LIST_T *list_hdr);
 void oce_list_insert_tail(OCE_LIST_T *list_hdr, OCE_LIST_NODE_T *list_node);
@@ -125,6 +131,7 @@ void *oce_list_remove_head(OCE_LIST_T  *list_hdr);
 void oce_list_remove_node(OCE_LIST_T  *list_hdr, OCE_LIST_NODE_T *list_node);
 boolean_t oce_list_is_empty(OCE_LIST_T *list_hdr);
 int32_t oce_list_items_avail(OCE_LIST_T *list_hdr);
+int oce_atomic_reserve(uint32_t *count_p, uint32_t n);
 
 #define	OCE_LIST_CREATE(_LH, _LCK_PRI)	oce_list_create((_LH), (_LCK_PRI))
 #define	OCE_LIST_DESTROY(_LH)		oce_list_destroy((_LH))
@@ -135,6 +142,9 @@ int32_t oce_list_items_avail(OCE_LIST_T *list_hdr);
 #define	OCE_LIST_REMOVE(_LH, _N)				\
 			oce_list_remove_node((_LH), (void *)(_N))
 #define	OCE_LIST_SIZE(_LH)		oce_list_items_avail((_LH))
+#define	OCE_LIST_LINK_INIT(_N)		oce_list_link_init(_N)
+
+void oce_gen_hkey(char *hkey, int key_size);
 
 #ifdef __cplusplus
 }

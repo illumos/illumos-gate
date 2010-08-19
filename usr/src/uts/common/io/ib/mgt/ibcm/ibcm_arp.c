@@ -225,11 +225,15 @@ ibcm_arp_get_ibd_insts(ibcm_arp_ibd_insts_t *ibds)
 
 	if ((ibt_get_all_part_attr(&attr_list, &nparts) != IBT_SUCCESS) ||
 	    (nparts == 0)) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_ibd_insts: Failed to "
+		    "IB Part List - %d", nparts);
 		ibds->ibcm_arp_ibd_alloc = 0;
 		ibds->ibcm_arp_ibd_cnt = 0;
 		ibds->ibcm_arp_ip = NULL;
 		return;
 	}
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibd_insts: Found %d IB Part List",
+	    nparts);
 
 	ibds->ibcm_arp_ibd_alloc = nparts;
 	ibds->ibcm_arp_ibd_cnt = 0;
@@ -247,6 +251,14 @@ ibcm_arp_get_ibd_insts(ibcm_arp_ibd_insts_t *ibds)
 			ipp->ip_hca_guid = attr->pa_hca_guid;
 			ipp->ip_port_gid = port_gid;
 			ibds->ibcm_arp_ibd_cnt++;
+
+			IBTF_DPRINTF_L4(cmlog, "PartAttr: p-linkid %lX, "
+			    "d-linkid %lX, pkey 0x%lX", ipp->ip_linkid,
+			    attr->pa_dlinkid, ipp->ip_pkey);
+			IBTF_DPRINTF_L4(cmlog, "hca_guid 0x%llX, "
+			    "port_gid %llX \n attr-port_guid %llX",
+			    ipp->ip_hca_guid, ipp->ip_port_gid.gid_guid,
+			    attr->pa_port_guid);
 		}
 		attr++;
 	}
@@ -296,12 +308,13 @@ ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep, sa_family_t family_loc)
 
 	bzero(&lifn, sizeof (struct lifnum));
 	lifn.lifn_family = family_loc;
+	lifn.lifn_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
 
 	err = ibcm_do_ip_ioctl(SIOCGLIFNUM, sizeof (struct lifnum), &lifn);
 	if (err != 0)
 		return (err);
 
-	IBTF_DPRINTF_L4(cmlog, "ibcm_do_lifconf: Family %d, lifn_count %d",
+	IBTF_DPRINTF_L3(cmlog, "ibcm_do_lifconf: Family %d, lifn_count %d",
 	    family_loc, lifn.lifn_count);
 	/*
 	 * Pad the interface count to account for additional interfaces that
@@ -314,6 +327,7 @@ ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep, sa_family_t family_loc)
 	lifcp->lifc_family = family_loc;
 	lifcp->lifc_len = *bufsizep = lifn.lifn_count * sizeof (struct lifreq);
 	lifcp->lifc_buf = kmem_zalloc(*bufsizep, KM_SLEEP);
+	lifcp->lifc_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
 
 	err = ibcm_do_ip_ioctl(SIOCGLIFCONF, sizeof (struct lifconf), lifcp);
 	if (err != 0) {
@@ -329,7 +343,7 @@ ibcm_arp_lookup(ibcm_arp_ibd_insts_t *ibds, char *linkname)
 	datalink_id_t	linkid;
 	int		i;
 
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lookup: linkname =  %s\n", linkname);
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lookup: linkname =  %s", linkname);
 
 	/*
 	 * If at first we don't succeed, try again, just in case it is in
@@ -339,8 +353,8 @@ ibcm_arp_lookup(ibcm_arp_ibd_insts_t *ibds, char *linkname)
 	 */
 	if (dls_mgmt_get_linkid(linkname, &linkid) != 0) {
 		if (dls_devnet_macname2linkid(linkname, &linkid) != 0) {
-			IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lookup: could not "
-			    "get linkid from linkname\n");
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_lookup: could not "
+			    "get linkid from linkname (%s)", linkname);
 			return (NULL);
 		}
 	}
@@ -350,7 +364,8 @@ ibcm_arp_lookup(ibcm_arp_ibd_insts_t *ibds, char *linkname)
 			return (&ibds->ibcm_arp_ip[i]);
 	}
 
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lookup: returning NULL\n");
+	IBTF_DPRINTF_L2(cmlog, "ibcm_arp_lookup: returning NULL for "
+	    "linkname (%s)", linkname);
 	return (NULL);
 }
 
@@ -364,8 +379,13 @@ ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds, sa_family_t family_loc)
 	int i, nifs, naddr = 0;
 	uint_t bufsize;
 	struct lifconf lifc;
-	struct lifreq *lifrp;
+	struct lifreq *lifrp, lifr_copy;
 	ibcm_arp_ip_t *ipp;
+	lifgroupinfo_t	lifgr;
+	int err;
+	char    ifname[LIFNAMSIZ + 1];
+	uint64_t	ifflags = 0;
+	zoneid_t	ifzoneid;
 
 	if (ibcm_do_lifconf(&lifc, &bufsize, family_loc) != 0)
 		return (B_FALSE);
@@ -376,12 +396,95 @@ ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds, sa_family_t family_loc)
 	    family_loc, nifs);
 
 	for (lifrp = lifc.lifc_req, i = 0; i < nifs; i++, lifrp++) {
+
 		if (lifrp->lifr_type != IFT_IB)
 			continue;
 
-		if ((ipp = ibcm_arp_lookup(ibds, lifrp->lifr_name)) == NULL)
+		IBTF_DPRINTF_L4(cmlog, "\nInterface# : %d", i);
+		IBTF_DPRINTF_L4(cmlog, "lifr_name : %s, lifr_family :%X, "
+		    "lifr_type : 0x%lX", lifrp->lifr_name,
+		    lifrp->lifr_addr.ss_family, lifrp->lifr_type);
+
+		(void) strlcpy(ifname, lifrp->lifr_name, LIFNAMSIZ);
+
+		/* Get ZoneId. */
+		lifr_copy = *lifrp;
+		ifzoneid = 0;
+		err = ibcm_do_ip_ioctl(SIOCGLIFZONE, sizeof (struct lifreq),
+		    &lifr_copy);
+		if (err != 0) {
+			IBTF_DPRINTF_L2(cmlog, "IFZONE ioctl Failed: err = %d",
+			    err);
+		} else  {
+			IBTF_DPRINTF_L4(cmlog, "lifr_zoneid     : 0x%X",
+			    lifr_copy.lifr_zoneid);
+			ifzoneid = lifr_copy.lifr_zoneid;
+		}
+
+		/* Get IfIndex. */
+		lifr_copy = *lifrp;
+		err = ibcm_do_ip_ioctl(SIOCGLIFINDEX, sizeof (struct lifreq),
+		    &lifr_copy);
+		if (err != 0) {
+			IBTF_DPRINTF_L2(cmlog, "IFINDEX ioctl Failed: err = %d",
+			    err);
+		} else
+			IBTF_DPRINTF_L4(cmlog, "lifr_index      : 0x%X",
+			    lifr_copy.lifr_index);
+
+		/* Get Interface flags. */
+		lifr_copy = *lifrp;
+		err = ibcm_do_ip_ioctl(SIOCGLIFFLAGS, sizeof (struct lifreq),
+		    &lifr_copy);
+		if (err != 0) {
+			IBTF_DPRINTF_L2(cmlog, "IFFLAGS ioctl Failed: err = %d",
+			    err);
+		} else  {
+			ifflags = lifr_copy.lifr_flags;
+			IBTF_DPRINTF_L4(cmlog, "lifr_flags      : 0x%llX",
+			    ifflags);
+		}
+
+		lifr_copy = *lifrp;
+		err = ibcm_do_ip_ioctl(SIOCGLIFGROUPNAME,
+		    sizeof (struct lifreq), &lifr_copy);
+		if (err != 0) {
+			IBTF_DPRINTF_L3(cmlog, "IFGroupName ioctl Failed: "
+			    "err = %d", err);
+		}
+
+		if (lifr_copy.lifr_groupname[0] != '\0') {
+			IBTF_DPRINTF_L4(cmlog, "lifr_groupname  : %s",
+			    lifr_copy.lifr_groupname);
+			(void) strlcpy(lifgr.gi_grname,
+			    lifr_copy.lifr_groupname, LIFGRNAMSIZ);
+			err = ibcm_do_ip_ioctl(SIOCGLIFGROUPINFO,
+			    sizeof (struct lifgroupinfo), &lifgr);
+			if (err != 0) {
+				IBTF_DPRINTF_L2(cmlog, "IFGroupINFO ioctl "
+				    "Failed: err = %d", err);
+			} else {
+				IBTF_DPRINTF_L4(cmlog, "lifgroupinfo details");
+				IBTF_DPRINTF_L4(cmlog, "grname : %s, grifname :"
+				    " %s, m4ifname : %s, m6ifname : %s",
+				    lifgr.gi_grname, lifgr.gi_grifname,
+				    lifgr.gi_m4ifname, lifgr.gi_m6ifname);
+				IBTF_DPRINTF_L4(cmlog, "gi_bcifname  : %s",
+				    lifgr.gi_bcifname);
+				IBTF_DPRINTF_L4(cmlog, "gi_v4 %d, gi_v6 %d, "
+				    "gi_nv4 %d, gi_nv6 %d, gi_mactype %d",
+				    lifgr.gi_v4, lifgr.gi_v6, lifgr.gi_nv4,
+				    lifgr.gi_nv6, lifgr.gi_mactype);
+
+				(void) strlcpy(ifname, lifgr.gi_bcifname,
+				    LIFNAMSIZ);
+			}
+		}
+
+		if ((ipp = ibcm_arp_lookup(ibds, ifname)) == NULL)
 			continue;
 
+		ipp->ip_zoneid = ifzoneid;	/* Copy back the zoneid info */
 		switch (lifrp->lifr_addr.ss_family) {
 		case AF_INET:
 			ipp->ip_inet_family = AF_INET;

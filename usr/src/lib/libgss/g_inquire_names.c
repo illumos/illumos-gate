@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -28,6 +27,7 @@
  */
 
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 
 #define	MAX_MECH_OID_PAIRS 32
 
@@ -68,13 +68,15 @@ gss_OID_set *		name_types;
 
 	if (mech) {
 
-		if (mech->gss_inquire_names_for_mech)
+		if (mech->gss_inquire_names_for_mech) {
 			status = mech->gss_inquire_names_for_mech(
 					mech->context,
 					minor_status,
 					mechanism,
 					name_types);
-		else
+			if (status != GSS_S_COMPLETE)
+				map_error(minor_status, mech);
+		} else
 			status = GSS_S_UNAVAILABLE;
 
 		return (status);

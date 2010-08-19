@@ -30,8 +30,8 @@
 
 #include <assert.h>
 #include <string.h>
+#include <libuutil.h>
 #include "idmapd.h"
-#include "miscutils.h"
 
 /*
  * Table for well-known SIDs.
@@ -232,7 +232,7 @@ find_wksid_by_name(const char *name, const char *domain, idmap_id_type type)
 	(void) strcpy(my_host_name, _idmapdstate.hostname);
 	UNLOCK_CONFIG();
 
-	for (i = 0; i < NELEM(wksids); i++) {
+	for (i = 0; i < UU_NELEM(wksids); i++) {
 		/* Check to see if this entry yields the desired type */
 		switch (type) {
 		case IDMAP_UID:
@@ -295,7 +295,7 @@ find_wksid_by_sid(const char *sid, int rid, idmap_id_type type)
 	(void) strcpy(my_machine_sid, _idmapdstate.cfg->pgcfg.machine_sid);
 	UNLOCK_CONFIG();
 
-	for (i = 0; i < NELEM(wksids); i++) {
+	for (i = 0; i < UU_NELEM(wksids); i++) {
 		int sidcmp;
 
 		/* Check to see if this entry yields the desired type */
@@ -352,7 +352,7 @@ find_wksid_by_pid(uid_t pid, int is_user)
 	if (pid == IDMAP_SENTINEL_PID)
 		return (NULL);
 
-	for (i = 0; i < NELEM(wksids); i++) {
+	for (i = 0; i < UU_NELEM(wksids); i++) {
 		if (wksids[i].pid == pid &&
 		    wksids[i].is_user == is_user &&
 		    (wksids[i].direction == IDMAP_DIRECTION_BI ||
@@ -380,7 +380,7 @@ find_wk_by_sid(char *sid)
 	(void) strcpy(my_machine_sid, _idmapdstate.cfg->pgcfg.machine_sid);
 	UNLOCK_CONFIG();
 
-	for (i = 0; i < NELEM(wksids); i++) {
+	for (i = 0; i < UU_NELEM(wksids); i++) {
 		int len;
 		const char *prefix;
 		char *p;

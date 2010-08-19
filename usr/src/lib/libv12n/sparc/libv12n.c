@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <dlfcn.h>
@@ -722,8 +721,10 @@ v12n_get_ldma_system_msg(int msgtype, char **strp)
 	 * 'agent-system' client registration/message at a time.
 	 */
 	(void) mutex_lock(&v12n_ldma_lock);
-	if ((err = v12n_libds_init()) != 0)
-		goto done;
+	if ((err = v12n_libds_init()) != 0) {
+		(void) mutex_unlock(&v12n_ldma_lock);
+		return (err);
+	}
 
 	v12n_ldma_msgtype = msgtype;
 	v12n_ldma_msgstr = NULL;

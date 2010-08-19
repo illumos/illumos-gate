@@ -384,6 +384,20 @@ fm_panic(const char *format, ...)
 }
 
 /*
+ * Simply tell the caller if fm_panicstr is set, ie. an fma event has
+ * caused the panic. If so, something other than the default panic
+ * diagnosis method will diagnose the cause of the panic.
+ */
+int
+is_fm_panic()
+{
+	if (fm_panicstr)
+		return (1);
+	else
+		return (0);
+}
+
+/*
  * Print any appropriate FMA banner message before the panic message.  This
  * function is called by panicsys() and prints the message for fm_panic().
  * We print the message here so that it comes after the system is quiesced.

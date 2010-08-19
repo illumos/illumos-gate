@@ -116,15 +116,13 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Word flags, Ofl_desc *ofl,
 		Shdr	*shdr0;
 
 		if ((scn = elf_getscn(elf, 0)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETSCN), name);
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
+			    name);
 			return ((Ifl_desc *)S_ERROR);
 		}
 		if ((shdr0 = elf_getshdr(scn)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETSHDR), name);
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
+			    name);
 			return ((Ifl_desc *)S_ERROR);
 		}
 		ifl->ifl_shnum = (Word)shdr0->sh_size;
@@ -181,9 +179,8 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	isp->is_keyident = ident;
 
 	if ((isp->is_indata = elf_getdata(scn, NULL)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
 		    ifl->ifl_name);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
@@ -261,7 +258,7 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 		 * building a 32-bit object.
 		 */
 		if (val & SF1_SUNW_ADDR32) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
+			ld_eprintf(ofl, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_INADDR32SF1), ifl->ifl_name,
 			    EC_WORD(cisp->is_scnndx), cisp->is_name);
 			val &= ~SF1_SUNW_ADDR32;
@@ -280,13 +277,13 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 	 * an F1_SUNW_FPUSED by itself is viewed as bad practice.
 	 */
 	if ((badval = (val & ~SF1_SUNW_MASK)) != 0) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
 		    ifl->ifl_name, EC_WORD(cisp->is_scnndx), cisp->is_name,
 		    EC_XWORD(badval));
 		val &= SF1_SUNW_MASK;
 	}
 	if ((val & FP_FLAGS) == SF1_SUNW_FPUSED) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
 		    ifl->ifl_name, EC_WORD(cisp->is_scnndx), cisp->is_name,
 		    EC_XWORD(val));
 		return;
@@ -310,7 +307,7 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 		if ((val & SF1_SUNW_ADDR32) && (ofl->ofl_flags & FLG_OF_EXEC) &&
 		    ((ofl->ofl_ocapset.oc_sf_1.cm_val &
 		    SF1_SUNW_ADDR32) == 0)) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
+			ld_eprintf(ofl, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_EXADDR32SF1), ifl->ifl_name,
 			    EC_WORD(cisp->is_scnndx), cisp->is_name);
 		}
@@ -774,12 +771,11 @@ ld_cap_add_family(Ofl_desc *ofl, Sym_desc *lsdp, Sym_desc *csdp, Cap_group *cgp,
 		 */
 		msdp = mcsp->cs_sdp;
 
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_CAP_MULDEF),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_CAP_MULDEF),
 		    demangle(lsdp->sd_name));
-		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_CAP_MULDEFSYMS),
+		ld_eprintf(ofl, ERR_NONE, MSG_INTL(MSG_CAP_MULDEFSYMS),
 		    msdp->sd_file->ifl_name, msdp->sd_name,
 		    csdp->sd_file->ifl_name, csdp->sd_name);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 	}
 
 	/*
@@ -893,10 +889,9 @@ process_cap(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *cisp)
 			break;
 
 		default:
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_FIL_UNKCAP), ifl->ifl_name,
-			    EC_WORD(cisp->is_scnndx), cisp->is_name,
-			    data->c_tag);
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_FIL_UNKCAP),
+			    ifl->ifl_name, EC_WORD(cisp->is_scnndx),
+			    cisp->is_name, data->c_tag);
 		}
 	}
 
@@ -908,11 +903,9 @@ process_cap(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *cisp)
 		Word	info = cisp->is_shdr->sh_info;
 
 		if ((info == 0) || (info > ifl->ifl_shnum)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_FIL_INVSHINFO), ifl->ifl_name,
-			    EC_WORD(cisp->is_scnndx), cisp->is_name,
-			    EC_XWORD(info));
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
+			    ifl->ifl_name, EC_WORD(cisp->is_scnndx),
+			    cisp->is_name, EC_XWORD(info));
 			return (S_ERROR);
 		}
 		strs = (char *)ifl->ifl_isdesc[info]->is_indata->d_buf;
@@ -1195,7 +1188,7 @@ process_capinfo(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *isp)
 		 * compilation environment a little more freedom.
 		 */
 		if ((sdp = ifl->ifl_oldndx[cndx]) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
+			ld_eprintf(ofl, ERR_WARNING,
 			    MSG_INTL(MSG_CAPINFO_INVALSYM), ifl->ifl_name,
 			    EC_WORD(isp->is_scnndx), isp->is_name, cndx,
 			    MSG_INTL(MSG_STR_UNKNOWN));
@@ -1204,7 +1197,7 @@ process_capinfo(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *isp)
 		if ((lndx == 0) || (lndx >= ifl->ifl_symscnt) ||
 		    ((lsdp = ifl->ifl_oldndx[lndx]) == NULL) ||
 		    (ELF_ST_BIND(lsdp->sd_sym->st_info) != STB_GLOBAL)) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
+			ld_eprintf(ofl, ERR_WARNING,
 			    MSG_INTL(MSG_CAPINFO_INVALLEAD), ifl->ifl_name,
 			    EC_WORD(isp->is_scnndx), isp->is_name, cndx, lsdp ?
 			    demangle(lsdp->sd_name) : MSG_INTL(MSG_STR_UNKNOWN),
@@ -1363,7 +1356,7 @@ process_strtab(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	if (size) {
 		data = isp->is_indata->d_buf;
 		if (data[0] != '\0' || data[size - 1] != '\0')
-			eprintf(ofl->ofl_lml, ERR_WARNING,
+			ld_eprintf(ofl, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_MALSTR), ifl->ifl_name,
 			    EC_WORD(isp->is_scnndx), name);
 	} else
@@ -1383,7 +1376,7 @@ invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 {
 	Conv_inv_buf_t inv_buf;
 
-	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
+	ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
 	    ifl->ifl_name, EC_WORD(ndx), name,
 	    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
 	    ifl->ifl_ehdr->e_machine, shdr->sh_type, 0, &inv_buf));
@@ -1461,7 +1454,7 @@ process_progbits_alloc(const char *name, Ifl_desc *ifl, Shdr *shdr,
 			 */
 			if (ld_targ.t_m.m_sht_unwind == SHT_PROGBITS)
 				break;
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_EXEHFRMTYP), ifl->ifl_name,
 			    EC_WORD(ndx), name,
 			    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
@@ -1470,7 +1463,6 @@ process_progbits_alloc(const char *name, Ifl_desc *ifl, Shdr *shdr,
 			    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
 			    ifl->ifl_ehdr->e_machine, ld_targ.t_m.m_sht_unwind,
 			    CONV_FMT_ALT_CF, &inv_buf2));
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (FALSE);
 		case 'g':
 			if (is_name_cmp(name, MSG_ORIG(MSG_SCN_GOT),
@@ -1690,7 +1682,7 @@ process_sym_shndx(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 
 		if ((isp == NULL) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
 		    (isp->is_shdr->sh_type != SHT_DYNSYM))) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVSHLINK), ifl->ifl_name,
 			    EC_WORD(ndx), name, EC_XWORD(shdr->sh_link));
 			return (S_ERROR);
@@ -1712,7 +1704,7 @@ sym_shndx_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 		if ((isp == NULL) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
 		    (isp->is_shdr->sh_type != SHT_DYNSYM))) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVSHLINK), isc->is_file->ifl_name,
 			    EC_WORD(isc->is_scnndx), isc->is_name,
 			    EC_XWORD(isc->is_shdr->sh_link));
@@ -1750,9 +1742,8 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 * Find the string section associated with the .dynamic section.
 	 */
 	if ((strscn = elf_getscn(ifl->ifl_elf, shdr->sh_link)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
 		    ifl->ifl_name);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	dp = elf_getdata(strscn, NULL);
@@ -2117,14 +2108,19 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	Dyn		*data, *dyn;
 	char		*str, *rpath = NULL;
 	const char	*soname, *needed;
+	Boolean		no_undef;
 
 	data = (Dyn *)isc->is_indata->d_buf;
 	str = (char *)ifl->ifl_isdesc[isc->is_shdr->sh_link]->is_indata->d_buf;
 
+	/* Determine if we need to examine the runpaths and NEEDED entries */
+	no_undef = (ofl->ofl_flags & (FLG_OF_NOUNDEF | FLG_OF_SYMBOLIC)) ||
+	    OFL_GUIDANCE(ofl, FLG_OFG_NO_DEFS);
+
 	/*
 	 * First loop through the dynamic section looking for a run path.
 	 */
-	if (ofl->ofl_flags & (FLG_OF_NOUNDEF | FLG_OF_SYMBOLIC)) {
+	if (no_undef) {
 		for (dyn = data; dyn->d_tag != DT_NULL; dyn++) {
 			if ((dyn->d_tag != DT_RPATH) &&
 			    (dyn->d_tag != DT_RUNPATH))
@@ -2153,8 +2149,7 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		    (dyn->d_tag == DT_USED)) {
 			Sdf_desc	*sdf;
 
-			if (!(ofl->ofl_flags &
-			    (FLG_OF_NOUNDEF | FLG_OF_SYMBOLIC)))
+			if (!no_undef)
 				continue;
 			if ((needed = str + (size_t)dyn->d_un.d_val) == NULL)
 				continue;
@@ -2191,6 +2186,22 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			if (dyn->d_un.d_val & DF_1_NODIRECT)
 				ifl->ifl_flags |= FLG_IF_NODIRECT;
 
+			/*
+			 * If we are building an executable, and this
+			 * dependency is tagged as an interposer, then
+			 * assume that it is required even if symbol
+			 * resolution uncovers no evident use.
+			 *
+			 * If we are building a shared object, then an
+			 * interposer dependency has no special meaning, and we
+			 * treat it as a regular dependency. By definition, all
+			 * interposers must be visible to the runtime linker
+			 * at initialization time, and cannot be added later.
+			 */
+			if ((dyn->d_un.d_val & DF_1_INTERPOSE) &&
+			    (ofl->ofl_flags & FLG_OF_EXEC))
+				ifl->ifl_flags |= FLG_IF_DEPREQD;
+
 		} else if ((dyn->d_tag == DT_AUDIT) &&
 		    (ifl->ifl_flags & FLG_IF_NEEDED)) {
 			/*
@@ -2211,6 +2222,14 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * be exercised as part of process initialization.
 			 */
 			ifl->ifl_flags &= ~MSK_IF_POSFLAG1;
+
+			/*
+			 * libc is not subject to the usual guidance checks
+			 * for lazy loading. It cannot be lazy loaded, libld
+			 * ignores the request, and rtld would ignore the
+			 * setting if it were present.
+			 */
+			ifl->ifl_flags |= FLG_IF_RTLDINF;
 		}
 	}
 
@@ -2258,10 +2277,9 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				else
 					hint = MSG_ORIG(MSG_STR_EMPTY);
 
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_REC_OBJCNFLT), sifl->ifl_name,
 				    ifl->ifl_name, sifl->ifl_soname, hint);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 				return (0);
 			}
 		}
@@ -2273,10 +2291,9 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 */
 		if (ofl->ofl_soname &&
 		    (strcmp(ofl->ofl_soname, ifl->ifl_soname) == 0)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_REC_OPTCNFLT), ifl->ifl_name,
 			    MSG_INTL(MSG_MARG_SONAME), ifl->ifl_soname);
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}
 	}
@@ -2338,11 +2355,10 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * Make sure this is a valid relocation we can handle.
 	 */
 	if (shdr->sh_type != ld_targ.t_m.m_rel_sht_type) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
 		    ifl->ifl_name, EC_WORD(isc->is_scnndx), isc->is_name,
 		    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
 		    ifl->ifl_ehdr->e_machine, shdr->sh_type, 0, &inv_buf));
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
@@ -2358,10 +2374,9 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		/*
 		 * Broken input file.
 		 */
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
 		    ifl->ifl_name, EC_WORD(isc->is_scnndx), isc->is_name,
 		    EC_XWORD(rndx));
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	if (rndx == 0) {
@@ -2388,7 +2403,7 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					return (S_ERROR);
 				return (1);
 			}
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVRELOC1), ifl->ifl_name,
 			    EC_WORD(isc->is_scnndx), isc->is_name,
 			    EC_WORD(risc->is_scnndx), risc->is_name);
@@ -2424,7 +2439,7 @@ process_exclude(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		/*
 		 * A conflict, issue an warning message, and ignore the section.
 		 */
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_EXCLUDE),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_FIL_EXCLUDE),
 		    ifl->ifl_name, EC_WORD(ndx), name);
 		return (0);
 	}
@@ -2531,22 +2546,19 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 	sndx = ifl->ifl_shstrndx;
 	if ((scn = elf_getscn(elf, (size_t)sndx)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
 		    ifl->ifl_name);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	if ((shdr = elf_getshdr(scn)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
 		    ifl->ifl_name);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	if ((name = elf_strptr(elf, (size_t)sndx, (size_t)shdr->sh_name)) ==
 	    NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_STRPTR),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_STRPTR),
 		    ifl->ifl_name);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
@@ -2560,9 +2572,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 */
 	if ((name = elf_strptr(elf, (size_t)sndx, (size_t)shdr->sh_name)) ==
 	    NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_STRPTR),
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_STRPTR),
 		    ifl->ifl_name);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
@@ -2599,9 +2610,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			continue;
 
 		if ((shdr = elf_getshdr(scn)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETSHDR), ifl->ifl_name);
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
+			    ifl->ifl_name);
 			return (0);
 		}
 		name = str + (size_t)(shdr->sh_name);
@@ -2650,7 +2660,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			if (row < (Word)SHT_LOSUNW) {
 				Conv_inv_buf_t inv_buf;
 
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_FIL_INVALSEC), ifl->ifl_name,
 				    EC_WORD(ndx), name, conv_sec_type(
 				    ifl->ifl_ehdr->e_ident[EI_OSABI],
@@ -2898,7 +2908,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 * `needed' entries in the same manner as will be generated from the
 	 * .dynamic's NEEDED entries.
 	 */
-	if (vndisp && (ofl->ofl_flags & (FLG_OF_NOUNDEF | FLG_OF_SYMBOLIC)))
+	if (vndisp && ((ofl->ofl_flags & (FLG_OF_NOUNDEF | FLG_OF_SYMBOLIC)) ||
+	    OFL_GUIDANCE(ofl, FLG_OFG_NO_DEFS)))
 		if (ld_vers_need_process(vndisp, ifl, ofl) == S_ERROR)
 			return (S_ERROR);
 
@@ -2907,7 +2918,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 * version sections.
 	 */
 	if (vsyisp)
-		(void) ld_vers_sym_process(ofl->ofl_lml, vsyisp, ifl);
+		(void) ld_vers_sym_process(ofl, vsyisp, ifl);
 
 	if (ifl->ifl_versym &&
 	    (vdfisp || (sdf && (sdf->sdf_flags & FLG_SDF_SELECT))))
@@ -3126,9 +3137,8 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 * because of a -z rescan.
 		 */
 		if (elf_cntl(elf, ELF_C_FDREAD) == -1) {
-			eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_CNTL),
+			ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_CNTL),
 			    name);
-			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}
 
@@ -3225,7 +3235,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 					    (strcmp(name, ifl->ifl_name) == 0) ?
 					    MSG_INTL(MSG_FIL_MULINC_1) :
 					    MSG_INTL(MSG_FIL_MULINC_2);
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING,
 					    errmsg, name, ifl->ifl_name);
 				}
 				if (ifl_ret)
@@ -3260,9 +3270,8 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		case ET_DYN:
 			if ((ofl->ofl_flags & FLG_OF_STATIC) ||
 			    !(ofl->ofl_flags & FLG_OF_DYNLIBS)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_FIL_SOINSTAT), name);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 				return (0);
 			}
 
@@ -3301,6 +3310,28 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			 */
 			if (ifl->ifl_flags & MSK_IF_SYMINFO)
 				ofl->ofl_flags |= FLG_OF_SYMINFO;
+
+			/*
+			 * Guidance: Use -z lazyload/nolazyload.
+			 * libc is exempt from this advice, because it cannot
+			 * be lazy loaded, and requests to do so are ignored.
+			 */
+			if (OFL_GUIDANCE(ofl, FLG_OFG_NO_LAZY) &&
+			    ((ifl->ifl_flags & FLG_IF_RTLDINF) == 0)) {
+				ld_eprintf(ofl, ERR_GUIDANCE,
+				    MSG_INTL(MSG_GUIDE_LAZYLOAD));
+				ofl->ofl_guideflags |= FLG_OFG_NO_LAZY;
+			}
+
+			/*
+			 * Guidance: Use -B direct/nodirect or
+			 * -z direct/nodirect.
+			 */
+			if (OFL_GUIDANCE(ofl, FLG_OFG_NO_DB)) {
+				ld_eprintf(ofl, ERR_GUIDANCE,
+				    MSG_INTL(MSG_GUIDE_DIRECT));
+				ofl->ofl_guideflags |= FLG_OFG_NO_DB;
+			}
 
 			break;
 		default:
@@ -3351,8 +3382,7 @@ ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
 	const char	*nfile = ofile;
 
 	if ((elf = elf_begin(*fd, ELF_C_READ, NULL)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), npath);
-		ofl->ofl_flags |= FLG_OF_FATAL;
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), npath);
 		return (0);
 	}
 
@@ -3393,8 +3423,7 @@ ld_process_mem(const char *path, const char *file, char *addr, size_t size,
 	Ifl_desc	*ifl;
 
 	if ((elf = elf_memory(addr, size)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_MEMORY), path);
-		ofl->ofl_flags |= FLG_OF_FATAL;
+		ld_eprintf(ofl, ERR_ELF, MSG_INTL(MSG_ELF_MEMORY), path);
 		return (0);
 	}
 
@@ -3429,9 +3458,8 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 	dlen++;
 	plen = dlen + strlen(file) + 1;
 	if (plen > PATH_MAX) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_PTHTOLONG),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_PTHTOLONG),
 		    _dir, file);
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
@@ -3528,15 +3556,15 @@ ld_finish_libs(Ofl_desc *ofl)
 			DBG_CALL(Dbg_libs_req(ofl->ofl_lml, sdf->sdf_name,
 			    sdf->sdf_rfile, file));
 			if ((fd = open(file, O_RDONLY)) == -1) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_FIL_NOTFOUND), file,
 				    sdf->sdf_rfile);
 			} else {
 				uintptr_t	open_ret;
 				Rej_desc	_rej = { 0 };
 
-				open_ret = ld_process_open(file, ++slash, &fd,
-				    ofl, 0, &_rej, &ifl);
+				open_ret = ld_process_open(file, ++slash,
+				    &fd, ofl, 0, &_rej, &ifl);
 				if (fd != -1)
 					(void) close(fd);
 				if (open_ret == S_ERROR)
@@ -3545,7 +3573,7 @@ ld_finish_libs(Ofl_desc *ofl)
 				if (_rej.rej_type) {
 					Conv_reject_desc_buf_t rej_buf;
 
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING,
 					    MSG_INTL(reject[_rej.rej_type]),
 					    _rej.rej_name ? rej.rej_name :
 					    MSG_INTL(MSG_STR_UNKNOWN),
@@ -3657,14 +3685,14 @@ ld_finish_libs(Ofl_desc *ofl)
 		if (rej.rej_type) {
 			Conv_reject_desc_buf_t rej_buf;
 
-			eprintf(ofl->ofl_lml, ERR_WARNING,
+			ld_eprintf(ofl, ERR_WARNING,
 			    MSG_INTL(reject[rej.rej_type]),
 			    rej.rej_name ? rej.rej_name :
 			    MSG_INTL(MSG_STR_UNKNOWN),
 			    conv_reject_desc(&rej, &rej_buf,
 			    ld_targ.t_m.m_mach));
 		} else {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
+			ld_eprintf(ofl, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_NOTFOUND), file, sdf->sdf_rfile);
 		}
 	}

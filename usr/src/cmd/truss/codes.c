@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -877,6 +878,9 @@ const struct ioc {
 	{ (uint_t)SIOCSIPMSFILTER,	"SIOCSIPMSFILTER",  "ip_msfilter" },
 	{ (uint_t)SIOCGLIFDADSTATE,	"SIOCGLIFDADSTATE",  "lifreq" },
 	{ (uint_t)SIOCSLIFPREFIX,	"SIOCSLIFPREFIX", "lifreq" },
+	{ (uint_t)SIOCGSTAMP,		"SIOCGSTAMP",		"timeval" },
+	{ (uint_t)SIOCGIFHWADDR,	"SIOCGIFHWADDR",	"ifreq" },
+	{ (uint_t)SIOCGLIFHWADDR,	"SIOCGLIFHWADDR",	"lifreq" },
 
 	/* DES encryption */
 	{ (uint_t)DESIOCBLOCK,	"DESIOCBLOCK", 	"desparams" },
@@ -1235,6 +1239,14 @@ const struct ioc {
 	{ (uint_t)ZFS_IOC_OBJSET_RECVD_PROPS,	"ZFS_IOC_OBJSET_RECVD_PROPS",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_VDEV_SPLIT,		"ZFS_IOC_VDEV_SPLIT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_NEXT_OBJ,		"ZFS_IOC_NEXT_OBJ",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_DIFF,			"ZFS_IOC_DIFF",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_TMP_SNAPSHOT,		"ZFS_IOC_TMP_SNAPSHOT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_OBJ_TO_STATS,		"ZFS_IOC_OBJ_TO_STATS",
 		"zfs_cmd_t" },
 
 	/* kssl ioctls */
@@ -1894,9 +1906,12 @@ openarg(private_t *pri, int arg)
 {
 	char *str = pri->code_buf;
 
-	switch (arg & ~ALL_O_FLAGS) {
+	if ((arg & ~(O_ACCMODE | ALL_O_FLAGS)) != 0)
+		return (NULL);
+
+	switch (arg & O_ACCMODE) {
 	default:
-		return ((char *)NULL);
+		return (NULL);
 	case O_RDONLY:
 		(void) strcpy(str, "O_RDONLY");
 		break;
@@ -1905,6 +1920,12 @@ openarg(private_t *pri, int arg)
 		break;
 	case O_RDWR:
 		(void) strcpy(str, "O_RDWR");
+		break;
+	case O_SEARCH:
+		(void) strcpy(str, "O_SEARCH");
+		break;
+	case O_EXEC:
+		(void) strcpy(str, "O_EXEC");
 		break;
 	}
 

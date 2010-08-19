@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -736,10 +737,10 @@ audit_closef(struct file *fp)
 	struct vattr attr;
 	au_emod_t evmod = 0;
 	const auditinfo_addr_t *ainfo;
-	int getattr_ret;
 	cred_t *cr;
 	au_kcontext_t	*kctx = GET_KCTX_PZ;
 	uint32_t auditing;
+	boolean_t audit_attr = B_FALSE;
 
 	fad = F2A(fp);
 	estate = kctx->auk_ets[AUE_CLOSE];
@@ -775,16 +776,16 @@ audit_closef(struct file *fp)
 	 */
 	if ((vp = fp->f_vnode) != NULL) {
 		attr.va_mask = AT_ALL;
-		getattr_ret = VOP_GETATTR(vp, &attr, 0, CRED(), NULL);
-	}
-
-	/*
-	 * When write was not used and the file can be considered public,
-	 * then skip the audit.
-	 */
-	if ((getattr_ret == 0) && ((fp->f_flag & FWRITE) == 0)) {
-		if (object_is_public(&attr)) {
-			return;
+		if (VOP_GETATTR(vp, &attr, 0, CRED(), NULL) == 0) {
+			if ((fp->f_flag & FWRITE) == 0 &&
+			    object_is_public(&attr)) {
+				/*
+				 * When write was not used and the file can be
+				 * considered public, then skip the audit.
+				 */
+				return;
+			}
+			audit_attr = B_TRUE;
 		}
 	}
 
@@ -801,7 +802,7 @@ audit_closef(struct file *fp)
 #endif
 	}
 
-	if (getattr_ret == 0) {
+	if (audit_attr) {
 		au_write((caddr_t *)&(ad), au_to_attr(&attr));
 		audit_sec_attributes((caddr_t *)&(ad), vp);
 	}
@@ -1026,20 +1027,26 @@ audit_setfsat_path(int argnum)
 
 	switch (tad->tad_scid) {
 	case SYS_faccessat:
+	case SYS_fchmodat:
 	case SYS_fchownat:
 	case SYS_fstatat:
 	case SYS_fstatat64:
+	case SYS_mkdirat:
+	case SYS_mknodat:
 	case SYS_openat:
 	case SYS_openat64:
+	case SYS_readlinkat:
 	case SYS_unlinkat:
 		fd = uap->arg1;
 		break;
+	case SYS_linkat:
 	case SYS_renameat:
 		if (argnum == 3)
 			fd = uap->arg3;
 		else
 			fd = uap->arg1;
 		break;
+	case SYS_symlinkat:
 	case SYS_utimesys:
 		fd = uap->arg2;
 		break;
@@ -1910,9 +1917,7 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 
 			for (i = 0; i < mech_count; i++) {
 				pb += n;
-				l -= n;
-				if (l < 0)
-					l = 0;
+				l = (n >= l) ? 0 : l - n;
 
 				if (i == mech_count - 1)
 					(void) strcpy(space, "");

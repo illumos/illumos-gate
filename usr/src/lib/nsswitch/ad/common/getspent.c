@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <shadow.h>
@@ -80,7 +79,6 @@ getbynam(ad_backend_ptr be, void *a)
 	idmap_stat	idmaprc;
 	uid_t		uid;
 	int		is_user, is_wuser;
-	idmap_handle_t	*ih;
 
 	be->db_type = NSS_AD_DB_SHADOW_BYNAME;
 
@@ -98,14 +96,10 @@ getbynam(ad_backend_ptr be, void *a)
 	 * Use idmap service to verify that the given
 	 * name is a valid Windows name.
 	 */
-	idmaprc = idmap_init(&ih);
-	if (idmaprc != IDMAP_SUCCESS)
-		return ((nss_status_t)NSS_NOTFOUND);
 	is_wuser = -1;
 	is_user = 1;
-	idmaprc = idmap_get_w2u_mapping(ih, NULL, NULL, name, dname,
+	idmaprc = idmap_get_w2u_mapping(NULL, NULL, name, dname,
 	    0, &is_user, &is_wuser, &uid, NULL, NULL, NULL);
-	(void) idmap_fini(ih);
 	if (idmaprc != IDMAP_SUCCESS) {
 		RESET_ERRNO();
 		return ((nss_status_t)NSS_NOTFOUND);

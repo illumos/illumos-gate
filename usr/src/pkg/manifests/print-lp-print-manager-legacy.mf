@@ -66,16 +66,10 @@ file path=usr/sadm/admin/printmgr/classes/pmserver.jar group=lp
 file path=usr/sadm/admin/printmgr/lib/libpmgr.so.1 group=lp
 file path=usr/sbin/ppdmgr group=lp mode=0555
 file path=var/lp/ppd/manufaliases group=lp mode=0444
-legacy pkg=SUNWppm arch=$(ARCH) category=system \
-    desc="Graphical tool for managing printers under Solaris." \
-    hotline="Please contact your local service provider" \
-    name="Solaris Print Manager" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWppmr arch=$(ARCH) category=system \
-    desc="Graphical tool for managing printers under Solaris." \
-    hotline="Please contact your local service provider" \
-    name="Solaris Print Manager (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWppm desc="Graphical tool for managing printers under Solaris." \
+    name="Solaris Print Manager"
+legacy pkg=SUNWppmr desc="Graphical tool for managing printers under Solaris." \
+    name="Solaris Print Manager (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/sadm/admin/printmgr/lib/libpmgr.so target=./libpmgr.so.1

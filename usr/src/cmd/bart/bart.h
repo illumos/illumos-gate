@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_BART_H
 #define	_BART_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -49,6 +46,10 @@ extern "C" {
 #define	EXIT		0
 #define	WARNING_EXIT	1
 #define	FATAL_EXIT	2
+
+#define	NO_EXCLUDE	0
+#define	EXCLUDE_SKIP	1
+#define	EXCLUDE_PRUNE	2
 
 #define	CHECK		0
 #define	NOCHECK		1
@@ -104,7 +105,8 @@ extern "C" {
 
 struct tree_modifier {
 	char			*mod_str;
-	int			include;
+	boolean_t		include;
+	boolean_t		is_dir;
 	struct tree_modifier	*next;
 };
 

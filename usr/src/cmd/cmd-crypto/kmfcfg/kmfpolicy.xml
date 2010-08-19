@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+ Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 
  CDDL HEADER START
 
@@ -23,13 +22,11 @@
  CDDL HEADER END
  
  Sample KMF Policy Database file.
-
-        ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!DOCTYPE kmf-policy-db SYSTEM "/usr/share/lib/xml/dtd/kmfpolicy.dtd">
 <kmf-policy-db>
   
-<kmf-policy name="default" ignore-date="TRUE" ignore-trust-anchor="TRUE">
+<kmf-policy name="default" ta-name="SEARCH">
 	<validation-methods>
 		<ocsp>
 			<ocsp-basic uri-from-cert="TRUE"

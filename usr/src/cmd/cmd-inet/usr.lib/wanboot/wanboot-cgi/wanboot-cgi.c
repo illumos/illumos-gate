@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +39,7 @@
 #include <sys/sysmacros.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/utsname.h>
 #include <sys/wanboot_impl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -677,12 +675,17 @@ mkisofs(const char *image_dir, const char *image)
 
 /*
  * This function, when invoked with a file name, optional network and
- * client * ID strings, and callback function will walk the directory
- * hierarchy between the concatenation of NB_NETBOOT_ROOT, the network
- * number, and client ID, invoking the callback function each time it
- * finds a file with the specified name until the hierarchy walk
- * terminates or the callback function returns a value other than
- * WBCGI_FTW_CBCONT.
+ * client ID strings, and callback function will search for the file
+ * in the following locations:
+ *
+ * NB_NETBOOT_ROOT/<network>/<client id>/<file>
+ * NB_NETBOOT_ROOT/<client id>/<file>
+ * NB_NETBOOT_ROOT/<network>/<file>
+ * NB_NETBOOT_ROOT/<file>
+ *
+ * The callback function is invoked each time the file is found until
+ * we have searched all of the above locations or the callback function
+ * returns a value other than WBCGI_FTW_CBCONT.
  *
  * Arguments:
  *	filename - Name of file to search for.
@@ -698,69 +701,41 @@ static int
 netboot_ftw(const char *filename, const char *net, const char *cid,
     int (*cb)(const char *, void *arg), void *arg)
 {
-	char		ckpath[MAXPATHLEN];
-	char		*ptr;
+	char		ckpath[4][MAXPATHLEN];
 	int		ret;
 	struct		stat buf;
+	int		i = 0;
 
-	/*
-	 * All searches start at the root.
-	 */
-	if (strlcpy(ckpath, NB_NETBOOT_ROOT,
-	    sizeof (ckpath)) >= sizeof (ckpath)) {
+	if (snprintf(ckpath[i++], MAXPATHLEN, "%s%s", NB_NETBOOT_ROOT, filename)
+	    >= MAXPATHLEN)
 		return (WBCGI_FTW_CBERR);
-	}
 
-	/*
-	 * Remaining part of path depends on 'net' and 'cid'. Note that
-	 * it is not valid to have a NULL 'net', but non-NULL 'cid'.
-	 */
-	if (net == NULL && cid != NULL) {
+	if (net != NULL && snprintf(ckpath[i++], MAXPATHLEN, "%s%s/%s",
+	    NB_NETBOOT_ROOT, net, filename) >= MAXPATHLEN)
 		return (WBCGI_FTW_CBERR);
-	}
-	if (net != NULL) {
-		if (strlcat(ckpath, net, sizeof (ckpath)) >= sizeof (ckpath) ||
-		    strlcat(ckpath, "/", sizeof (ckpath)) >= sizeof (ckpath)) {
-			return (WBCGI_FTW_CBERR);
-		}
-	}
+
 	if (cid != NULL) {
-		if (strlcat(ckpath, cid, sizeof (ckpath)) >= sizeof (ckpath) ||
-		    strlcat(ckpath, "/", sizeof (ckpath)) >= sizeof (ckpath)) {
+		if (snprintf(ckpath[i++], MAXPATHLEN, "%s%s/%s",
+		    NB_NETBOOT_ROOT, cid, filename) >= MAXPATHLEN)
 			return (WBCGI_FTW_CBERR);
-		}
+
+		if (net != NULL && snprintf(ckpath[i++], MAXPATHLEN,
+		    "%s%s/%s/%s", NB_NETBOOT_ROOT, net, cid, filename) >=
+		    MAXPATHLEN)
+			return (WBCGI_FTW_CBERR);
 	}
 
 	/*
 	 * Loop through hierarchy and check for file existence.
 	 */
-	for (;;) {
-		if (strlcat(ckpath, filename,
-		    sizeof (ckpath)) >= sizeof (ckpath)) {
-			return (WBCGI_FTW_CBERR);
-		}
-		if (WBCGI_FILE_EXISTS(ckpath, buf)) {
-			if ((ret = cb(ckpath, arg)) != WBCGI_FTW_CBCONT) {
+	while (i > 0) {
+		--i;
+		if (WBCGI_FILE_EXISTS(ckpath[i], buf)) {
+			if ((ret = cb(ckpath[i], arg)) != WBCGI_FTW_CBCONT)
 				return (ret);
-			}
-		}
-
-		/*
-		 * Remove last component (which would be the
-		 * filename). If this leaves the root, then
-		 * hierarchy search has been completed. Otherwise,
-		 * remove the trailing directory and go try again.
-		 */
-		ptr = strrchr(ckpath, '/');
-		*++ptr = '\0';
-		if (strcmp(NB_NETBOOT_ROOT, ckpath) == 0) {
-			return (WBCGI_FTW_DONE);
-		} else {
-			*--ptr = '\0';
-			ptr = strrchr(ckpath, '/');
-			*++ptr = '\0';
 		}
 	}
+	return (WBCGI_FTW_DONE);
 }
 
 /*ARGSUSED*/
@@ -1001,19 +976,46 @@ resolve_hostname(const char *hostname, nvlist_t *nvl, boolean_t may_be_crap)
 {
 	struct sockaddr_in	sin;
 	struct hostent		*hp;
+	struct utsname		un;
+	static char 		myname[SYS_NMLN] = { '\0' };
+	char			*cp = NULL;
+	char			msg[WBCGI_MAXBUF];
 
-	if (((hp = gethostbyname(hostname)) == NULL) ||
-	    (hp->h_addrtype != AF_INET) ||
-	    (hp->h_length != sizeof (struct in_addr))) {
-		if (!may_be_crap) {
-			print_status(500, "(error resolving hostname)");
+	/*
+	 *  Initialize cached nodename
+	 */
+	if (strlen(myname) == 0) {
+		if (uname(&un) == -1) {
+			(void) snprintf(msg, sizeof (msg),
+			    "(unable to retrieve uname, errno %d)", errno);
+			print_status(500, msg);
+			return (B_FALSE);
 		}
-		return (may_be_crap);
+		(void) strcpy(myname, un.nodename);
 	}
-	(void) memcpy(&sin.sin_addr, hp->h_addr, hp->h_length);
 
-	if (nvlist_add_string(nvl,
-	    (char *)hostname, inet_ntoa(sin.sin_addr)) != 0) {
+	/*
+	 * If hostname is local node name, return the address this
+	 * request came in on, which is supplied as SERVER_ADDR in the
+	 * cgi environment.  This ensures we don't send back a possible
+	 * alternate address that may be unreachable from the client's
+	 * network.  Otherwise, just resolve with nameservice.
+	 */
+	if ((strcmp(hostname, myname) != 0) ||
+	    ((cp = getenv("SERVER_ADDR")) == NULL)) {
+		if (((hp = gethostbyname(hostname)) == NULL) ||
+		    (hp->h_addrtype != AF_INET) ||
+		    (hp->h_length != sizeof (struct in_addr))) {
+			if (!may_be_crap) {
+				print_status(500, "(error resolving hostname)");
+			}
+			return (may_be_crap);
+		}
+		(void) memcpy(&sin.sin_addr, hp->h_addr, hp->h_length);
+		cp = inet_ntoa(sin.sin_addr);
+	}
+
+	if (nvlist_add_string(nvl, (char *)hostname, cp) != 0) {
 		print_status(500, "(error adding hostname to nvlist)");
 		return (B_FALSE);
 	}
@@ -1360,7 +1362,7 @@ wanbootfs_payload(const char *net, const char *cid, const char *nonce,
 			print_status(500, "(truststore not found)");
 		}
 		if (netboot_ftw(NB_CA_CERT, net, cid,
-			build_trustfile, truststorepath) == WBCGI_FTW_CBERR) {
+		    build_trustfile, truststorepath) == WBCGI_FTW_CBERR) {
 			goto cleanup;
 		}
 
@@ -1747,9 +1749,8 @@ main(int argc, char **argv)
 			print_status(500, "(hmac utility not found)");
 			goto cleanup;
 		}
-		if (keyfile == NULL &&
-		    netboot_ftw(NB_CLIENT_KEY, net, cid,
-			set_pathname, &keyfile) != WBCGI_FTW_CBOK) {
+		if (keyfile == NULL && netboot_ftw(NB_CLIENT_KEY, net, cid,
+		    set_pathname, &keyfile) != WBCGI_FTW_CBOK) {
 			print_status(500, "(keystore not found)");
 			goto cleanup;
 		}
@@ -1768,9 +1769,8 @@ main(int argc, char **argv)
 			print_status(500, "(encr utility not found)");
 			goto cleanup;
 		}
-		if (keyfile == NULL &&
-		    netboot_ftw(NB_CLIENT_KEY, net, cid,
-			set_pathname, &keyfile) != WBCGI_FTW_CBOK) {
+		if (keyfile == NULL && netboot_ftw(NB_CLIENT_KEY, net, cid,
+		    set_pathname, &keyfile) != WBCGI_FTW_CBOK) {
 			print_status(500, "(keystore not found)");
 			goto cleanup;
 		}

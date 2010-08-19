@@ -39,6 +39,7 @@ SYMBOL_SCOPE {
 	fmd_case_getspecific		{ TYPE = function; FLAGS = extern };
 	fmd_case_next			{ TYPE = function; FLAGS = extern };
 	fmd_case_open			{ TYPE = function; FLAGS = extern };
+	fmd_case_open_uuid		{ TYPE = function; FLAGS = extern };
 	fmd_case_prev			{ TYPE = function; FLAGS = extern };
 	fmd_case_reset			{ TYPE = function; FLAGS = extern };
 	fmd_case_setprincipal		{ TYPE = function; FLAGS = extern };
@@ -48,8 +49,12 @@ SYMBOL_SCOPE {
 	fmd_case_uuclose		{ TYPE = function; FLAGS = extern };
 	fmd_case_uuclosed		{ TYPE = function; FLAGS = extern };
 	fmd_case_uuid			{ TYPE = function; FLAGS = extern };
+	fmd_case_uuisresolved		{ TYPE = function; FLAGS = extern };
 	fmd_case_uulookup		{ TYPE = function; FLAGS = extern };
 	fmd_case_uuresolved		{ TYPE = function; FLAGS = extern };
+
+	fmd_doorthr_create		{ TYPE = function; FLAGS = extern };
+	fmd_doorthr_setup		{ TYPE = function; FLAGS = extern };
 
 	fmd_event_local			{ TYPE = function; FLAGS = extern };
 	fmd_event_ena_create		{ TYPE = function; FLAGS = extern };
@@ -59,7 +64,9 @@ SYMBOL_SCOPE {
 	fmd_hdl_debug			{ TYPE = function; FLAGS = extern };
 	fmd_hdl_error			{ TYPE = function; FLAGS = extern };
 	fmd_hdl_free			{ TYPE = function; FLAGS = extern };
+	fmd_hdl_fmauth			{ TYPE = function; FLAGS = extern };
 	fmd_hdl_getspecific		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_modauth			{ TYPE = function; FLAGS = extern };
 	fmd_hdl_opendict		{ TYPE = function; FLAGS = extern };
 	fmd_hdl_register		{ TYPE = function; FLAGS = extern };
 	fmd_hdl_setspecific		{ TYPE = function; FLAGS = extern };
@@ -77,6 +84,7 @@ SYMBOL_SCOPE {
 
 	fmd_nvl_alloc			{ TYPE = function; FLAGS = extern };
 	fmd_nvl_class_match		{ TYPE = function; FLAGS = extern };
+	fmd_nvl_create_defect		{ TYPE = function; FLAGS = extern };
 	fmd_nvl_create_fault		{ TYPE = function; FLAGS = extern };
 	fmd_nvl_dup			{ TYPE = function; FLAGS = extern };
 	fmd_nvl_fmri_expand		{ TYPE = function; FLAGS = extern };

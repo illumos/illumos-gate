@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * write binary audit records directly to a file.
  */
@@ -115,7 +114,8 @@ static int		binfile_is_open = 0;
 static int		minfree = -1;
 static int		minfreeblocks;		/* minfree in blocks */
 
-static dirlist_t	*activeDir = NULL;	/* current directory */
+static dirlist_t	*lastOpenDir = NULL;    /* last activeDir */
+static dirlist_t	*activeDir = NULL;	/* to be current directory */
 static dirlist_t	*startdir;		/* first dir in the ring */
 static int		activeCount = 0;	/* number of dirs in the ring */
 
@@ -156,12 +156,35 @@ freedirlist(dirlist_t *head)
 	}
 }
 
+dirlist_t *
+dupdirnode(dirlist_t *node_orig)
+{
+	dirlist_t	*node_new;
+
+	if ((node_new = calloc(1, sizeof (dirlist_t))) == NULL) {
+		return (NULL);
+	}
+
+	if (node_orig->dl_dirname != NULL &&
+	    (node_new->dl_dirname = strdup(node_orig->dl_dirname)) == NULL ||
+	    node_orig->dl_filename != NULL &&
+	    (node_new->dl_filename = strdup(node_orig->dl_filename)) == NULL) {
+		freedirlist(node_new);
+		return (NULL);
+	}
+
+	node_new->dl_next = node_new;
+	node_new->dl_space = node_orig->dl_space;
+	node_new->dl_flags = node_orig->dl_flags;
+	node_new->dl_fd = node_orig->dl_fd;
+
+	return (node_new);
+}
 
 /*
  * add to a linked list of directories available for writing
  *
  */
-
 static int
 growauditlist(dirlist_t **listhead, char *dirlist,
     dirlist_t *endnode, int *count)
@@ -232,113 +255,43 @@ growauditlist(dirlist_t **listhead, char *dirlist,
  * error.  (Positive returns are for AUDITD_<error code> values)
  *
  */
-
 static int
 loadauditlist(char *dirstr, char *minfreestr)
 {
-	char		buf[MAXPATHLEN];
-	char		*bs, *be;
-	dirlist_t	 *node, *n1, *n2;
-	dirlist_t	 **node_p;
+	dirlist_t	*n1, *n2;
 	dirlist_t	*listhead = NULL;
 	dirlist_t	*thisdir;
-	int		acresult;
 	int		node_count = 0;
 	int		rc;
 	int		temp_minfree;
-	au_acinfo_t	*ach;
 
 	static dirlist_t	*activeList = NULL;	/* directory list */
 
-	DPRINT((dbfp, "binfile: Loading audit list from auditcontrol\n"));
+	DPRINT((dbfp, "binfile: Loading audit list from audit service "
+	    "(audit_binfile)\n"));
 
-	/*
-	 * Build new directory list
-	 */
-	/* part 1 -- using pre Sol 10 audit_control directives */
-	node_p = &listhead;
-
-	ach = _openac(NULL);
-	if (ach == NULL)
+	if (dirstr == NULL || minfreestr == NULL) {
+		DPRINT((dbfp, "binfile: internal error"));
 		return (-1);
-
-	/* at least one directory is needed */
-	while ((acresult = _getacdir(ach, buf, sizeof (buf))) == 0 ||
-	    acresult == 2 || acresult == -3) {
-		/*
-		 * loop if the result is 0 (success), 2 (a warning
-		 * that the audit_control file has been rewound),
-		 * or -3 (a directory entry was found, but it
-		 * was badly formatted.
-		 */
-		if (acresult == 0) {
-			/*
-			 * A directory entry was found.
-			 */
-			node_count++;
-			node = malloc(sizeof (dirlist_t));
-			if (node == NULL)
-				return (AUDITD_NO_MEMORY);
-
-			node->dl_flags = 0;
-			node->dl_fd = -1;
-			node->dl_space = PLENTY_SPACE;
-			node->dl_filename = NULL;
-
-			node->dl_dirname = malloc((unsigned)strlen(buf) + 1);
-			if (node->dl_dirname == NULL)
-				return (AUDITD_NO_MEMORY);
-
-			bs = buf;
-			while ((*bs == ' ') || (*bs == '\t'))
-				bs++;
-			be = bs + strlen(bs) - 1;
-			while (be > bs) {	/* trim trailing blanks */
-				if ((*bs != ' ') && (*bs != '\t'))
-					break;
-				be--;
-			}
-			*(be + 1) = '\0';
-			(void) strlcpy(node->dl_dirname, bs, AUDIT_FNAME_SZ);
-
-			if (listhead != NULL)
-				node->dl_next = listhead;
-			else
-				node->dl_next = node;
-			*node_p = node;
-			node_p = &(node->dl_next);
-		}
-	}   /* end of getacdir while */
-	/*
-	 * part 2 -- use directories and minfree from the (new as of Sol 10)
-	 * plugin directive
-	 */
-	if (dirstr != NULL) {
-		if (node_count == 0) {
-			listhead = NULL;
-			node = NULL;
-		}
-		rc = growauditlist(&listhead, dirstr, node, &node_count);
-		if (rc)
-			return (rc);
+	}
+	if ((rc = growauditlist(&listhead, dirstr, NULL, &node_count)) != 0) {
+		return (rc);
 	}
 	if (node_count == 0) {
 		/*
 		 * there was a problem getting the directory
-		 * list or remote host info from the audit_control file
-		 * even though auditd thought there was at least 1 good
-		 * entry
+		 * list or remote host info from the audit_binfile
+		 * configuration even though auditd thought there was
+		 * at least 1 good entry
 		 */
 		DPRINT((dbfp, "binfile: "
 		    "problem getting directory / libpath list "
-		    "from audit_control.\n"));
-
-		_endac(ach);
+		    "from audit_binfile configuration.\n"));
 		return (-1);
 	}
+
 #if DEBUG
 	/* print out directory list */
-
 	if (listhead != NULL) {
 		(void) fprintf(dbfp, "Directory list:\n\t%s\n",
 		    listhead->dl_dirname);
@@ -350,13 +303,11 @@ loadauditlist(char *dirstr, char *minfreestr)
 		}
 	}
 #endif	/* DEBUG */
-	thisdir = listhead;
-	/*
-	 * See if the list has changed.
-	 * If there was a change  rc = 0 if no change, else 1
-	 */
-	rc = 0;	/* no change */
 
+	thisdir = listhead;
+
+	/* See if the list has changed (rc = 0 if no change, else 1) */
+	rc = 0;
 	if (node_count == activeCount) {
 		n1 = listhead;
 		n2 = activeList;
@@ -374,14 +325,15 @@ loadauditlist(char *dirstr, char *minfreestr)
 			n2 = n2->dl_next;
 		} while ((n1 != listhead) && (n2 != activeList));
 	} else {
-		DPRINT((dbfp, "binfile:  old dir count = %d\n"
+		DPRINT((dbfp, "binfile: dir counts differs\n"
+		    "binfile:  old dir count = %d\n"
 		    "binfile:  new dir count = %d\n",
 		    activeCount, node_count));
 		rc = -2;
 	}
 	if (rc == -2) {
 		(void) pthread_mutex_lock(&log_mutex);
-		DPRINT((dbfp, "loadauditlist:  close / open log\n"));
+		DPRINT((dbfp, "loadauditlist:  close / open audit.log(4)\n"));
 		if (open_log(listhead) == 0) {
 			openNewFile = 1;	/* try again later */
 		} else {
@@ -392,17 +344,13 @@ loadauditlist(char *dirstr, char *minfreestr)
 		activeDir = startdir = thisdir;
 		activeCount = node_count;
 		(void) pthread_mutex_unlock(&log_mutex);
-	} else
+	} else {
 		freedirlist(listhead);
-	/*
-	 * Get the minfree value.  If minfree comes in via the attribute
-	 * list, ignore the possibility it may also be listed on a separate
-	 * audit_control line.
-	 */
+	}
+
+	/* Get the minfree value. */
 	if (minfreestr != NULL)
 		temp_minfree = atoi(minfreestr);
-	else if (!(_getacmin(ach, &temp_minfree) == 0))
-		temp_minfree = 0;
 
 	if ((temp_minfree < 0) || (temp_minfree > 100))
 		temp_minfree = 0;
@@ -413,11 +361,9 @@ loadauditlist(char *dirstr, char *minfreestr)
 		rc = -2;		/* data change */
 		minfree = temp_minfree;
 	}
-	_endac(ach);
 
 	return (rc);
 }
-
 
 /*
  * getauditdate - get the current time (GMT) and put it in the form
@@ -493,11 +439,12 @@ write_file_token(int fd, char *name)
  *	newname - the name of the new log file (for the trailer)
  */
 static void
-close_log(dirlist_t *currentdir, char *oname, char *newname)
+close_log(dirlist_t **lastOpenDir_ptr, char *oname, char *newname)
 {
-	char	auditdate[AUDIT_DATE_SZ+1];
-	char	*name;
-	char	oldname[AUDIT_FNAME_SZ+1];
+	char		auditdate[AUDIT_DATE_SZ+1];
+	char		*name;
+	char		oldname[AUDIT_FNAME_SZ+1];
+	dirlist_t 	*currentdir = *lastOpenDir_ptr;
 
 	if ((currentdir == NULL) || (currentdir->dl_fd == -1))
 		return;
@@ -537,8 +484,8 @@ close_log(dirlist_t *currentdir, char *oname, char *newname)
 
 	DPRINT((dbfp, "binfile: Log closed %s\n", oldname));
 
-	free(currentdir->dl_filename);
-	currentdir->dl_filename = NULL;
+	freedirlist(currentdir);
+	*lastOpenDir_ptr = NULL;
 }
 
 
@@ -561,19 +508,17 @@ open_log(dirlist_t *current_dir)
 	char	oldname[AUDIT_FNAME_SZ + 1] = "";
 	char	newname[AUDIT_FNAME_SZ + 1];
 	char	*name;			/* pointer into oldname */
-	int	opened;
+	int	opened = 0;
 	int	error = 0;
 	int	newfd = 0;
 
 	static char		host[MAXHOSTNAMELEN + 1] = "";
 	/* previous directory with open log file */
-	static dirlist_t	*lastOpenDir = NULL;
 
 	if (host[0] == '\0')
 		(void) gethostname(host, MAXHOSTNAMELEN);
 
 	/* Get a filename which does not already exist */
-	opened = 0;
 	while (!opened) {
 		getauditdate(auditdate);
 		(void) snprintf(newname, AUDIT_FNAME_SZ,
@@ -589,6 +534,22 @@ open_log(dirlist_t *current_dir)
 				    "(will try another)\n", newname));
 				(void) sleep(1);
 				break;
+			case ENOENT: {
+				/* invalid path */
+				char	*msg;
+				(void) asprintf(&msg,
+				    gettext("No such p_dir: %s\n"),
+				    current_dir->dl_dirname);
+				DPRINT((dbfp,
+				    "open_log says about %s: %s\n",
+				    newname, strerror(errno)));
+				__audit_syslog("audit_binfile.so",
+				    LOG_CONS | LOG_NDELAY,
+				    LOG_DAEMON, LOG_ERR, msg);
+				free(msg);
+				current_dir = current_dir->dl_next;
+				return (0);
+			}
 			default:
 				/* open failed */
 				DPRINT((dbfp,
@@ -617,7 +578,7 @@ open_log(dirlist_t *current_dir)
 		(void) memcpy(name + AUDIT_DATE_SZ + 1, auditdate,
 		    AUDIT_DATE_SZ);
 
-		close_log(lastOpenDir, oldname, newname);
+		close_log(&lastOpenDir, oldname, newname);
 	}
 	error = write_file_token(newfd, oldname);
 	if (error) {
@@ -631,9 +592,27 @@ open_log(dirlist_t *current_dir)
 		current_dir = current_dir->dl_next;
 		return (0);
 	} else {
-		lastOpenDir = current_dir;
-		current_dir->dl_fd = newfd;
+		if (current_dir->dl_filename != NULL) {
+			free(current_dir->dl_filename);
+		}
 		current_dir->dl_filename = strdup(newname);
+		current_dir->dl_fd = newfd;
+
+		if (lastOpenDir == NULL) {
+			freedirlist(lastOpenDir);
+			if ((lastOpenDir = dupdirnode(current_dir)) == NULL) {
+				__audit_syslog("audit_binfile.so",
+				    LOG_CONS | LOG_NDELAY,
+				    LOG_DAEMON, LOG_ERR, gettext("no memory"));
+				return (0);
+			}
+			DPRINT((dbfp, "open_log created new lastOpenDir "
+			    "(%s, %s [fd: %d])\n",
+			    lastOpenDir->dl_dirname == NULL ? "" :
+			    lastOpenDir->dl_dirname,
+			    lastOpenDir->dl_filename == NULL ? "" :
+			    lastOpenDir->dl_filename, lastOpenDir->dl_fd));
+		}
 
 		/*
 		 * New file opened, so reset file size statistic (used
@@ -953,18 +932,13 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 
 
 /*
- * the open function uses getacdir() and getacmin to determine which
- * directories to use and when to switch.  It takes no inputs.
- *
  * It may be called multiple times as auditd handles SIGHUP and SIGUSR1
  * corresponding to the audit(1M) flags -s and -n
  *
- * kvlist is NULL only if auditd caught a SIGUSR1, so after the first
- * time open is called, the reason is -s if kvlist != NULL and -n
- * otherwise.
+ * kvlist is NULL only if auditd caught a SIGUSR1 (audit -n), so after the first
+ * time open is called; the reason is -s if kvlist != NULL and -n otherwise.
  *
  */
-
 auditd_rc_t
 auditd_plugin_open(const kva_t *kvlist, char **ret_list, char **error)
 {
@@ -1052,7 +1026,7 @@ auditd_plugin_close(char **error)
 	*error = NULL;
 
 	(void) pthread_mutex_lock(&log_mutex);
-	close_log(activeDir, "", "");
+	close_log(&lastOpenDir, "", "");
 	freedirlist(activeDir);
 	activeDir = NULL;
 	(void) pthread_mutex_unlock(&log_mutex);

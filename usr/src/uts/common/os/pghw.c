@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -30,6 +29,7 @@
 #include <sys/cpuvar.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
+#include <sys/policy.h>
 #include <sys/group.h>
 #include <sys/pg.h>
 #include <sys/pghw.h>
@@ -117,7 +117,7 @@ struct pghw_kstat {
 	kstat_named_t	pg_hw;
 	kstat_named_t	pg_policy;
 } pghw_kstat = {
-	{ "id",			KSTAT_DATA_UINT32 },
+	{ "id",			KSTAT_DATA_INT32 },
 	{ "pg_class",		KSTAT_DATA_STRING },
 	{ "ncpus",		KSTAT_DATA_UINT32 },
 	{ "instance_id",	KSTAT_DATA_UINT32 },
@@ -135,13 +135,15 @@ kmutex_t		pghw_kstat_lock;
  *
  * kstat fields:
  *
- *   pgid		PG ID for PG described by this kstat
+ *   pg_id		PG ID for PG described by this kstat
+ *
+ *   pg_parent		Parent PG ID. The value -1 means "no parent".
  *
  *   pg_ncpus		Number of CPUs within this PG
  *
  *   pg_cpus		String describing CPUs within this PG
  *
- *   pg_sharing		Name of sharing relationship for this PG
+ *   pg_relationship	Name of sharing relationship for this PG
  *
  *   pg_generation	Generation value that increases whenever any CPU leaves
  *			  or joins PG. Two kstat snapshots for the same
@@ -164,6 +166,7 @@ kmutex_t		pghw_kstat_lock;
  */
 struct pghw_cu_kstat {
 	kstat_named_t	pg_id;
+	kstat_named_t	pg_parent_id;
 	kstat_named_t	pg_ncpus;
 	kstat_named_t	pg_generation;
 	kstat_named_t	pg_hw_util;
@@ -172,9 +175,10 @@ struct pghw_cu_kstat {
 	kstat_named_t	pg_hw_util_rate;
 	kstat_named_t	pg_hw_util_rate_max;
 	kstat_named_t	pg_cpus;
-	kstat_named_t	pg_sharing;
+	kstat_named_t	pg_relationship;
 } pghw_cu_kstat = {
-	{ "id",			KSTAT_DATA_UINT32 },
+	{ "pg_id",		KSTAT_DATA_INT32 },
+	{ "parent_pg_id",	KSTAT_DATA_INT32 },
 	{ "ncpus",		KSTAT_DATA_UINT32 },
 	{ "generation",		KSTAT_DATA_UINT32   },
 	{ "hw_util",		KSTAT_DATA_UINT64   },
@@ -183,7 +187,7 @@ struct pghw_cu_kstat {
 	{ "hw_util_rate",	KSTAT_DATA_UINT64   },
 	{ "hw_util_rate_max",	KSTAT_DATA_UINT64   },
 	{ "cpus",		KSTAT_DATA_STRING   },
-	{ "sharing_relation",	KSTAT_DATA_STRING   },
+	{ "relationship",	KSTAT_DATA_STRING   },
 };
 
 /*
@@ -213,6 +217,7 @@ static void		pghw_set_remove(group_t *, pghw_t *);
 
 static void		pghw_cpulist_alloc(pghw_t *);
 static int		cpu2id(void *);
+static pgid_t		pghw_parent_id(pghw_t *);
 
 /*
  * Initialize the physical portion of a hardware PG
@@ -261,6 +266,8 @@ pghw_fini(pghw_t *pg)
 {
 	group_t		*hwset;
 
+	pghw_cmt_fini(pg);
+
 	hwset = pghw_set_lookup(pg->pghw_hw);
 	ASSERT(hwset != NULL);
 
@@ -271,6 +278,14 @@ pghw_fini(pghw_t *pg)
 	if (pg->pghw_kstat != NULL)
 		kstat_delete(pg->pghw_kstat);
 
+}
+
+/*
+ * PG is removed from CMT hierarchy
+ */
+void
+pghw_cmt_fini(pghw_t *pg)
+{
 	/*
 	 * Destroy string representation of CPUs
 	 */
@@ -280,8 +295,13 @@ pghw_fini(pghw_t *pg)
 		pg->pghw_cpulist = NULL;
 	}
 
-	if (pg->pghw_cu_kstat != NULL)
+	/*
+	 * Destroy CU kstats
+	 */
+	if (pg->pghw_cu_kstat != NULL) {
 		kstat_delete(pg->pghw_cu_kstat);
+		pg->pghw_cu_kstat = NULL;
+	}
 }
 
 /*
@@ -467,34 +487,6 @@ pghw_type_string(pghw_type_t hw)
 }
 
 /*
- * Return a short string name given a pg_hw sharing type
- */
-char *
-pghw_type_shortstring(pghw_type_t hw)
-{
-	switch (hw) {
-	case PGHW_IPIPE:
-		return ("instr_pipeline");
-	case PGHW_CACHE:
-		return ("Cache");
-	case PGHW_FPU:
-		return ("FPU");
-	case PGHW_MPIPE:
-		return ("memory_pipeline");
-	case PGHW_CHIP:
-		return ("Socket");
-	case PGHW_MEMORY:
-		return ("Memory");
-	case PGHW_POW_ACTIVE:
-		return ("CPU_PM_Active");
-	case PGHW_POW_IDLE:
-		return ("CPU_PM_Idle");
-	default:
-		return ("unknown");
-	}
-}
-
-/*
  * Create / Update routines for PG hw kstats
  *
  * It is the intention of these kstats to provide some level
@@ -504,10 +496,17 @@ pghw_type_shortstring(pghw_type_t hw)
 void
 pghw_kstat_create(pghw_t *pg)
 {
-	char *class = pghw_type_string(pg->pghw_hw);
+	char *sharing = pghw_type_string(pg->pghw_hw);
+	char name[KSTAT_STRLEN + 1];
 
 	/*
-	 * Create a physical pg kstat
+	 * Canonify PG name to conform to kstat name rules
+	 */
+	(void) strncpy(name, pghw_type_string(pg->pghw_hw), KSTAT_STRLEN + 1);
+	strident_canon(name, KSTAT_STRLEN + 1);
+
+	/*
+	 * Create a hardware performance kstat
 	 */
 	if ((pg->pghw_kstat = kstat_create("pg", ((pg_t *)pg)->pg_id,
 	    "pg", "pg",
@@ -531,8 +530,8 @@ pghw_kstat_create(pghw_t *pg)
 	/*
 	 * Create a physical pg kstat
 	 */
-	if ((pg->pghw_cu_kstat = kstat_create("pg", ((pg_t *)pg)->pg_id,
-	    "hardware", class,
+	if ((pg->pghw_cu_kstat = kstat_create("pg_hw_perf", ((pg_t *)pg)->pg_id,
+	    name, "processor_group",
 	    KSTAT_TYPE_NAMED,
 	    sizeof (pghw_cu_kstat) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL)) != NULL) {
@@ -540,7 +539,7 @@ pghw_kstat_create(pghw_t *pg)
 		pg->pghw_cu_kstat->ks_data = &pghw_cu_kstat;
 		pg->pghw_cu_kstat->ks_update = pghw_cu_kstat_update;
 		pg->pghw_cu_kstat->ks_private = pg;
-		pg->pghw_cu_kstat->ks_data_size += strlen(class) + 1;
+		pg->pghw_cu_kstat->ks_data_size += strlen(sharing) + 1;
 		/* Allow space for CPU strings */
 		pg->pghw_cu_kstat->ks_data_size += PGHW_KSTAT_STR_LEN_MAX;
 		pg->pghw_cu_kstat->ks_data_size += pg_cpulist_maxlen;
@@ -572,11 +571,21 @@ pghw_cu_kstat_update(kstat_t *ksp, int rw)
 	struct pghw_cu_kstat	*pgsp = &pghw_cu_kstat;
 	pghw_t			*pg = ksp->ks_private;
 	pghw_util_t		*hw_util = &pg->pghw_stats;
+	boolean_t		has_cpc_privilege;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	pgsp->pg_id.value.ui32 = ((pg_t *)pg)->pg_id;
+	/*
+	 * Check whether the caller has priv_cpc_cpu privilege. If he doesn't,
+	 * he will not get hardware utilization data.
+	 */
+
+	has_cpc_privilege = (secpolicy_cpc_cpu(crgetcred()) == 0);
+
+	pgsp->pg_id.value.i32 = ((pg_t *)pg)->pg_id;
+	pgsp->pg_parent_id.value.i32 = (int)pghw_parent_id(pg);
+
 	pgsp->pg_ncpus.value.ui32 = GROUP_SIZE(&((pg_t *)pg)->pg_cpus);
 
 	/*
@@ -613,22 +622,37 @@ pghw_cu_kstat_update(kstat_t *ksp, int rw)
 			(void) group2intlist(&(((pg_t *)pg)->pg_cpus),
 			    pg->pghw_cpulist, pg->pghw_cpulist_len, cpu2id);
 		}
-		cu_pg_update(pg);
+
+		if (has_cpc_privilege)
+			cu_pg_update(pg);
+
 		mutex_exit(&cpu_lock);
 	}
 
 	pgsp->pg_generation.value.ui32 = pg->pghw_kstat_gen;
-	pgsp->pg_hw_util.value.ui64 = hw_util->pghw_util;
-	pgsp->pg_hw_util_time_running.value.ui64 = hw_util->pghw_time_running;
-	pgsp->pg_hw_util_time_stopped.value.ui64 = hw_util->pghw_time_stopped;
-	pgsp->pg_hw_util_rate.value.ui64 = hw_util->pghw_rate;
-	pgsp->pg_hw_util_rate_max.value.ui64 = hw_util->pghw_rate_max;
 	if (pg->pghw_cpulist != NULL)
 		kstat_named_setstr(&pgsp->pg_cpus, pg->pghw_cpulist);
 	else
 		kstat_named_setstr(&pgsp->pg_cpus, "");
 
-	kstat_named_setstr(&pgsp->pg_sharing, pghw_type_string(pg->pghw_hw));
+	kstat_named_setstr(&pgsp->pg_relationship,
+	    pghw_type_string(pg->pghw_hw));
+
+	if (has_cpc_privilege) {
+		pgsp->pg_hw_util.value.ui64 = hw_util->pghw_util;
+		pgsp->pg_hw_util_time_running.value.ui64 =
+		    hw_util->pghw_time_running;
+		pgsp->pg_hw_util_time_stopped.value.ui64 =
+		    hw_util->pghw_time_stopped;
+		pgsp->pg_hw_util_rate.value.ui64 = hw_util->pghw_rate;
+		pgsp->pg_hw_util_rate_max.value.ui64 = hw_util->pghw_rate_max;
+	} else {
+		pgsp->pg_hw_util.value.ui64 = 0;
+		pgsp->pg_hw_util_time_running.value.ui64 = 0;
+		pgsp->pg_hw_util_time_stopped.value.ui64 = 0;
+		pgsp->pg_hw_util_rate.value.ui64 = 0;
+		pgsp->pg_hw_util_rate_max.value.ui64 = 0;
+	}
 
 	return (0);
 }
@@ -700,4 +724,25 @@ cpu2id(void *v)
 	ASSERT(v != NULL);
 
 	return (cp->cpu_id);
+}
+
+/*
+ * Return parent ID or -1 if there is no parent.
+ * All hardware PGs are currently also CMT PGs, but for safety we check the
+ * class matches cmt before we upcast the pghw pointer to pg_cmt_t.
+ */
+static pgid_t
+pghw_parent_id(pghw_t *pghw)
+{
+	pg_t *pg = (pg_t *)pghw;
+	pgid_t parent_id = -1;
+
+	if (pg != NULL && strcmp(pg->pg_class->pgc_name, "cmt") == 0) {
+		pg_cmt_t *cmt = (pg_cmt_t *)pg;
+		pg_t *parent = (pg_t *)cmt->cmt_parent;
+		if (parent != NULL)
+			parent_id = parent->pg_id;
+	}
+
+	return (parent_id);
 }

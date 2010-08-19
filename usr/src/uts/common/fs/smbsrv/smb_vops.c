@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -328,6 +327,8 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		XVA_SET_REQ(&tmp_xvattr, XAT_ARCHIVE);
 		XVA_SET_REQ(&tmp_xvattr, XAT_CREATETIME);
 		XVA_SET_REQ(&tmp_xvattr, XAT_REPARSE);
+		XVA_SET_REQ(&tmp_xvattr, XAT_OFFLINE);
+		XVA_SET_REQ(&tmp_xvattr, XAT_SPARSE);
 
 		error = VOP_GETATTR(use_vp, &tmp_xvattr.xva_vattr, flags,
 		    cr, &smb_ct);
@@ -365,6 +366,17 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 			    (xoap->xoa_reparse)) {
 				ret_attr->sa_dosattr |=
 				    FILE_ATTRIBUTE_REPARSE_POINT;
+			}
+
+			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_OFFLINE)) &&
+			    (xoap->xoa_offline)) {
+				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_OFFLINE;
+			}
+
+			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_SPARSE)) &&
+			    (xoap->xoa_sparse)) {
+				ret_attr->sa_dosattr |=
+				    FILE_ATTRIBUTE_SPARSE_FILE;
 			}
 
 			ret_attr->sa_crtime = xoap->xoa_createtime;
@@ -442,7 +454,8 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *attr,
 	if (attr->sa_mask & SMB_AT_DOSATTR) {
 		attr->sa_dosattr &=
 		    (FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_READONLY |
-		    FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM);
+		    FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM |
+		    FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_SPARSE_FILE);
 	}
 
 	if (unnamed_vp) {
@@ -860,6 +873,8 @@ smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
 		XVA_SET_REQ(xvattr, XAT_SYSTEM);
 		XVA_SET_REQ(xvattr, XAT_READONLY);
 		XVA_SET_REQ(xvattr, XAT_HIDDEN);
+		XVA_SET_REQ(xvattr, XAT_OFFLINE);
+		XVA_SET_REQ(xvattr, XAT_SPARSE);
 
 		/*
 		 * smb_attr->sa_dosattr: If a given bit is not set,
@@ -879,6 +894,12 @@ smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
 
 		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_HIDDEN)
 			xoap->xoa_hidden = 1;
+
+		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_OFFLINE)
+			xoap->xoa_offline = 1;
+
+		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_SPARSE_FILE)
+			xoap->xoa_sparse = 1;
 	}
 
 	if (smb_attr->sa_mask & SMB_AT_CRTIME) {

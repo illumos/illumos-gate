@@ -18,11 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../../../Makefile.cmd
@@ -55,7 +53,9 @@ PERL_DYNAMIC_EXT = \
 # Add any pure-perl extensions here.
 PERL_NONXS_EXT = \
     $(SUN_SOLARIS)/BSM \
-    $(SUN_SOLARIS)/PerlGcc
+    $(SUN_SOLARIS)/PerlGcc \
+    $(SUN_SOLARIS)/Pg
+
 
 PERL_EXT = $(PERL_DYNAMIC_EXT) $(PERL_NONXS_EXT)
 PERL_EXT_MAKEFILES = $(PERL_EXT:%=%/Makefile)

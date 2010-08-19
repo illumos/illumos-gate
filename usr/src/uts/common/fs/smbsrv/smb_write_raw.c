@@ -255,6 +255,12 @@ smb_com_write_raw(struct smb_request *sr)
 	if (sr->session->s_state != SMB_SESSION_STATE_WRITE_RAW_ACTIVE)
 		return (SDRC_DROP_VC);
 
+	if (!smb_raw_mode) {
+		smbsr_error(sr, NT_STATUS_NOT_SUPPORTED, ERRDOS,
+		    ERROR_NOT_SUPPORTED);
+		return (SDRC_ERROR);
+	}
+
 	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);

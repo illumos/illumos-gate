@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * Editor
@@ -331,7 +327,7 @@ static void	nonzero(void);
 static void	setzeroasone(void);
 static long	putline(void);
 static LINE	address(void);
-static char	*getline(long);
+static char	*getaline(long);
 static char	*getblock(long, long);
 static char	*place(char *, char *, char *);
 static void	comple(wchar_t);
@@ -693,7 +689,7 @@ swch:
 				putd();
 				putchr('\t');
 			}
-			puts(getline((a1++)->cur));
+			puts(getaline((a1++)->cur));
 		}
 		while (a1 <= addr2);
 		dot = addr2;
@@ -1441,7 +1437,7 @@ putfile(void)
 	fp = genbuf;
 	a1 = addr1;
 	do {
-		lp = getline(a1++->cur);
+		lp = getaline(a1++->cur);
 		if (fss.Ffill && fss.Flim && lenchk(linebuf, &fss) < 0) {
 			write(1, gettext("line too long: lno = "),
 				strlen(gettext("line too long: lno = ")));
@@ -1676,7 +1672,7 @@ gdelete(void)
 }
 
 static char *
-getline(long tl)
+getaline(long tl)
 {
 	char *bp, *lp;
 	int nl;
@@ -1911,7 +1907,7 @@ join(void)
 		return;
 	gp = genbuf;
 	for (a1 = addr1; a1 <= addr2; a1++) {
-		lp = getline(a1->cur);
+		lp = getaline(a1->cur);
 		while (*gp = *lp++)
 			if (gp++ > &genbuf[LBSIZE-1])
 				(void) error(27);
@@ -2259,7 +2255,7 @@ getcopy(void)
 
 	if (addr1 > addr2)
 		return (EOF);
-	(void) getline((addr1++)->cur);
+	(void) getaline((addr1++)->cur);
 	return (0);
 }
 
@@ -2292,7 +2288,7 @@ execute(int gf, LINE addr)
 	else {
 		if (addr == zero)
 			return (0);
-		p1 = getline(addr->cur);
+		p1 = getaline(addr->cur);
 		locs = 0;
 	}
 	return (step(p1, expbuf));
@@ -2595,7 +2591,7 @@ globaln(int k)
 		if (a1->cur & 01) {
 			a1->cur &= ~01;
 			dot = a1;
-			puts(getline(a1->cur));
+			puts(getaline(a1->cur));
 			if ((c = get_wchr()) == EOF)
 				(void) error(52);
 			if (c == 'a' || c == 'i' || c == 'c')

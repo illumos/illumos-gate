@@ -19,13 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MANIFEST = keymap.xml
 SVCMETHOD = keymap
-DEFAULTFILES = kbd.dfl
 
 include ../Makefile.cmd
 
@@ -35,10 +33,11 @@ ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 PROG	= kbd
 CFLAGS	+= $(CCVERBOSE)
+LDLIBS	+= -lscf
 
 all: $(PROG)
 
-install: all $(ROOTETCDEFAULTFILES) $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+install: all $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:	$(CHKMANIFEST)
 

@@ -48,6 +48,7 @@ ulwp_t
 	ul_siglink
 	ul_sigmask
 	ul_unwind_ret
+	ul_lwpid
 
 sigjmp_struct_t
 	sjs_sp

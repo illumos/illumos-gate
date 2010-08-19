@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -237,7 +237,7 @@ pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 {
 	switch (hw) {
 	case PGHW_IPIPE:
-		if (x86_feature & (X86_HTT)) {
+		if (is_x86_feature(x86_featureset, X86FSET_HTT)) {
 			/*
 			 * Hyper-threading is SMT
 			 */
@@ -251,7 +251,8 @@ pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 		else
 			return (0);
 	case PGHW_CHIP:
-		if (x86_feature & (X86_CMP|X86_HTT))
+		if (is_x86_feature(x86_featureset, X86FSET_CMP) ||
+		    is_x86_feature(x86_featureset, X86FSET_HTT))
 			return (1);
 		else
 			return (0);
@@ -1017,7 +1018,8 @@ mach_init()
 		idle_cpu = cpu_idle_adaptive;
 		CPU->cpu_m.mcpu_idle_cpu = cpu_idle;
 #ifndef __xpv
-		if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait) {
+		if (is_x86_feature(x86_featureset, X86FSET_MWAIT) &&
+		    idle_cpu_prefer_mwait) {
 			CPU->cpu_m.mcpu_mwait = cpuid_mwait_alloc(CPU);
 			/*
 			 * Protect ourself from insane mwait size.
@@ -1130,7 +1132,8 @@ mach_smpinit(void)
 	if (idle_cpu_use_hlt) {
 		disp_enq_thread = cpu_wakeup;
 #ifndef __xpv
-		if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait)
+		if (is_x86_feature(x86_featureset, X86FSET_MWAIT) &&
+		    idle_cpu_prefer_mwait)
 			disp_enq_thread = cpu_wakeup_mwait;
 		non_deep_idle_disp_enq_thread = disp_enq_thread;
 #endif
@@ -1239,7 +1242,7 @@ mach_getcpufreq(void)
 	uint32_t pit_counter;
 	uint64_t processor_clks;
 
-	if (x86_feature & X86_TSC) {
+	if (is_x86_feature(x86_featureset, X86FSET_TSC)) {
 		/*
 		 * We have a TSC. freq_tsc() knows how to measure the number
 		 * of clock cycles sampled against the PIT.
@@ -1411,7 +1414,7 @@ mach_clkinit(int preferred_mode, int *set_mode)
 
 	cpu_freq = machhztomhz(cpu_freq_hz);
 
-	if (!(x86_feature & X86_TSC) || (cpu_freq == 0))
+	if (!is_x86_feature(x86_featureset, X86FSET_TSC) || (cpu_freq == 0))
 		tsc_gethrtime_enable = 0;
 
 #ifndef __xpv

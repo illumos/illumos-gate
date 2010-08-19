@@ -19,84 +19,142 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#ifndef _MLSVC_SPOOLSS_NDL_
-#define _MLSVC_SPOOLSS_NDL_
-
-/*
- * Printing and Spooling RPC interface definition.
- */
+#ifndef _SPOOLSS_NDL_
+#define	_SPOOLSS_NDL_
 
 #include "ndrtypes.ndl"
+#include "security.ndl"
 
+#define TABLE_STRING 1
+#define TABLE_DWORD  2
+#define TABLE_TIME   3
+#define TABLE_DEVMODE 4
+#define TABLE_SECURITY_DESCRIPTOR 5
 
-/*
- * The spoolss opcodes.
- */
+#define SPOOLSS_OPNUM_EnumPrinters			0x00
 #define SPOOLSS_OPNUM_OpenPrinter			0x01
 #define SPOOLSS_OPNUM_GetJob				0x03
+#define SPOOLSS_OPNUM_EnumJobs				0x04
 #define SPOOLSS_OPNUM_DeletePrinter			0x06
+#define SPOOLSS_OPNUM_GetPrinter			0x08
 #define SPOOLSS_OPNUM_GetPrinterDriver			0x0b
 #define SPOOLSS_OPNUM_DeletePrinterDriver		0x0d
-#define SPOOLSS_OPNUM_AddPrintProcessor			0x0e
-#define SPOOLSS_OPNUM_GetPrintProcessorDirectory	0x10
+#define SPOOLSS_OPNUM_StartDocPrinter			0x11
+#define SPOOLSS_OPNUM_StartPagePrinter			0x12
+#define SPOOLSS_OPNUM_WritePrinter			0x13
+#define SPOOLSS_OPNUM_EndPagePrinter			0x14
 #define SPOOLSS_OPNUM_AbortPrinter			0x15
-#define SPOOLSS_OPNUM_ReadPrinter			0x16
-#define SPOOLSS_OPNUM_WaitForPrinterChange		0x1c
+#define SPOOLSS_OPNUM_AddJob				0x18
+#define SPOOLSS_OPNUM_ScheduleJob			0x19
+#define SPOOLSS_OPNUM_GetPrinterData			0x1a
+#define SPOOLSS_OPNUM_ClosePrinter			0x1d
 #define SPOOLSS_OPNUM_AddForm				0x1e
 #define SPOOLSS_OPNUM_DeleteForm			0x1f
-#define SPOOLSS_OPNUM_GetForm				0x20
-#define SPOOLSS_OPNUM_SetForm				0x21
-#define SPOOLSS_OPNUM_EnumMonitors			0x24
-#define SPOOLSS_OPNUM_AddPort				0x25
-#define SPOOLSS_OPNUM_ConfigurePort			0x26
+#define SPOOLSS_OPNUM_EndDocPrinter			0x17
+#define SPOOLSS_OPNUM_EnumForms				0x22
+#define SPOOLSS_OPNUM_EnumPorts				0x23
+#define	SPOOLSS_OPNUM_EnumMonitor			0x24
 #define SPOOLSS_OPNUM_DeletePort			0x27
-#define SPOOLSS_OPNUM_CreatePrinterIc			0x28
-#define SPOOLSS_OPNUM_PlayDescriptionPrinterIc		0x29
-#define SPOOLSS_OPNUM_DeletePrinterIc			0x2a
-#define SPOOLSS_OPNUM_AddPrinterConnection		0x2b
-#define SPOOLSS_OPNUM_DeletePrinterConnection		0x2c
-#define SPOOLSS_OPNUM_PrinterMessageBox			0x2d
-#define SPOOLSS_OPNUM_AddMonitor			0x2e
-#define SPOOLSS_OPNUM_DeleteMonitor			0x2f
-#define SPOOLSS_OPNUM_DeletePrintProcessor		0x30
-#define SPOOLSS_OPNUM_AddPrintProvider			0x31
-#define SPOOLSS_OPNUM_DeletePrintProvider		0x32
+#define SPOOLSS_OPNUM_CreatePrinterIC			0x28
+#define	SPOOLSS_OPNUM_AddMonitor			0x2e
+#define	SPOOLSS_OPNUM_DeleteMonitor			0x2f
 #define SPOOLSS_OPNUM_ResetPrinter			0x34
-#define SPOOLSS_OPNUM_FindFirstChangeNotify		0x36
-#define SPOOLSS_OPNUM_FindNextChangeNotify		0x37
-#define SPOOLSS_OPNUM_RouterFindFirstNotify		0x39
+#define SPOOLSS_OPNUM_GetPrinterDriver2			0x35
+#define SPOOLSS_OPNUM_FCPN				0x38
 #define SPOOLSS_OPNUM_ReplyOpenPrinter			0x3a
-#define SPOOLSS_OPNUM_RouterReplyPrinter                0x3b
 #define SPOOLSS_OPNUM_ReplyClosePrinter			0x3c
 #define SPOOLSS_OPNUM_AddPortEx				0x3d
-#define SPOOLSS_OPNUM_RemoteFindFirstChangeNotify	0x3e
-#define SPOOLSS_OPNUM_SpoolerInitialize			0x3f
-#define SPOOLSS_OPNUM_ResetPrinterEx			0x40
-#define SPOOLSS_OPNUM_RouterRefreshChangeNotify		0x42
-#define SPOOLSS_OPNUM_OpenPrinter2			0x45
-
+#define SPOOLSS_OPNUM_RFFPCNEX				0x41
+#define SPOOLSS_OPNUM_RRPCN				0x42
+#define SPOOLSS_OPNUM_RFNPCNEX				0x43
+#define SPOOLSS_OPNUM_OpenPrinterEx			0x45
+#define SPOOLSS_OPNUM_SetPort				0x47
+#define SPOOLSS_OPNUM_EnumPrinterData			0x48
+#define SPOOLSS_OPNUM_EnumPrinterDataEx			0x4f
+#define SPOOLSS_OPNUM_EnumPrinterKey			0x50
 
 CONTEXT_HANDLE(spoolss_handle) spoolss_handle_t;
 
+struct spoolssDevmodeContainer {
+	BYTE 	DevContCount;
+  SIZE_IS(DevContCount)
+  	BYTE	*DevMode;
+};
+
+
+struct spoolss_DeviceMode {
+	BYTE devicename[64];
+	WORD specversion;
+	WORD driverversion;
+	WORD size;
+	WORD driverextra_length;
+	DWORD	fields;
+	WORD orientation;
+	WORD papersize;
+	WORD paperlength;
+	WORD paperwidth;
+	WORD scale;
+	WORD copies;
+	WORD defaultsource;
+	WORD printquality;
+	WORD color;
+	WORD duplex;
+	WORD yresolution;
+	WORD ttoption;
+	WORD collate;
+	BYTE formname[64];
+	WORD logpixels;
+	DWORD	bitsperpel;
+	DWORD	pelswidth;
+	DWORD	pelsheight;
+	DWORD	displayflags;
+	DWORD	displayfrequency;
+	DWORD	icmmethod;
+	DWORD	icmintent;
+	DWORD	mediatype;
+	DWORD	dithertype;
+	DWORD	reserved1;
+	DWORD	reserved2;
+	DWORD	panningwidth;
+	DWORD	panningheight;
+	struct spoolssDevmodeContainer driverextra_data;
+};
+
+OPERATION(SPOOLSS_OPNUM_CreatePrinterIC)
+struct spoolss_CreatePrinterIC {
+	IN	spoolss_handle_t handle;
+	OUT	spoolss_handle_t gdi_handle;
+	IN	struct spoolssDevmodeContainer dmodeContainer;
+	OUT	DWORD status;
+};
 
 OPERATION(SPOOLSS_OPNUM_OpenPrinter)
 struct spoolss_OpenPrinter {
-	IN	DWORD dontcare;
+	IN	LPTSTR printer_name;
 	OUT	spoolss_handle_t handle;
+	IN	LPTSTR data_type;
+	/* IN	struct spoolssDevmodeContainer dmodeContainer; */
+	/* IN	DWORD AccessRequired; */
 	OUT	DWORD status;
 };
 
-
-OPERATION(SPOOLSS_OPNUM_GetJob)
-struct spoolss_GetJob {
-	IN	DWORD dontcare;
+OPERATION(SPOOLSS_OPNUM_EnumJobs)
+struct spoolss_EnumJobs {
+	IN	spoolss_handle_t handle;
+	IN	DWORD FirstJob;
+	IN	DWORD NoJobs;
+	IN	DWORD level;
+	IN	DWORD Buf2;
+	IN	DWORD 	BufCount;
+		SIZE_IS(BufCount)
+  	OUT		BYTE *pJob;
+	OUT	DWORD needed;
+	OUT	DWORD needed2;
 	OUT	DWORD status;
 };
-
 
 OPERATION(SPOOLSS_OPNUM_DeletePrinter)
 struct spoolss_DeletePrinter {
@@ -104,6 +162,311 @@ struct spoolss_DeletePrinter {
 	OUT	DWORD status;
 };
 
+#define SPOOLSS_ARCHITECTURE_NT_X86	( "Windows NT x86" )
+struct spoolss_Time {
+	WORD year;
+	WORD month;
+	WORD day_of_week;
+	WORD day;
+	WORD hour;
+	WORD minute;
+	WORD second;
+	WORD millisecond;
+};
+
+struct spoolss_GetPrinter0 {
+	DWORD printername;
+	DWORD servername;
+	DWORD cjobs;
+	DWORD total_jobs;
+	DWORD total_bytes;
+	DWORD time0;
+	DWORD time1;
+	DWORD time2;
+	DWORD time3;
+	DWORD global_counter;
+	DWORD total_pages;
+	DWORD version;
+	DWORD ffreebuild;
+	DWORD cspooling;
+	DWORD cmaxspooling;
+	DWORD session_counter;
+	DWORD out_of_paper;
+	DWORD not_ready;
+	DWORD job_error;
+	DWORD num_processors;
+	DWORD type_processor;
+	DWORD high_part_total_bytes;
+	DWORD change_id;
+	DWORD last_error;
+	DWORD status;
+	DWORD enum_network_printers;
+	DWORD c_setprinter;
+	WORD processor_arch;
+	WORD processor_level;
+	DWORD ref;
+	DWORD reserved2;
+	DWORD reserved3;
+};
+
+/* bitmap spoolss_EnumPrinterFlags */
+#define PRINTER_ENUM_DEFAULT ( 0x00000001 )
+#define PRINTER_ENUM_LOCAL ( 0x00000002 )
+#define PRINTER_ENUM_CONNECTIONS ( 0x00000004 )
+#define PRINTER_ENUM_FAVORITE ( 0x00000004 )
+#define PRINTER_ENUM_NAME ( 0x00000008 )
+#define PRINTER_ENUM_REMOTE ( 0x00000010 )
+#define PRINTER_ENUM_SHARED ( 0x00000020 )
+#define PRINTER_ENUM_NETWORK ( 0x00000040 )
+#define PRINTER_ENUM_EXPAND ( 0x00004000 )
+#define PRINTER_ENUM_CONTAINER ( 0x00008000 )
+#define PRINTER_ENUM_ICON1 ( 0x00010000 )
+#define PRINTER_ENUM_ICON2 ( 0x00020000 )
+#define PRINTER_ENUM_ICON3 ( 0x00040000 )
+#define PRINTER_ENUM_ICON4 ( 0x00080000 )
+#define PRINTER_ENUM_ICON5 ( 0x00100000 )
+#define PRINTER_ENUM_ICON6 ( 0x00200000 )
+#define PRINTER_ENUM_ICON7 ( 0x00400000 )
+#define PRINTER_ENUM_ICON8 ( 0x00800000 )
+#define PRINTER_ENUM_HIDE ( 0x01000000 )
+
+struct spoolss_GetPrinter1 {
+	DWORD flags;
+	DWORD name;
+	DWORD description;
+	DWORD comment;
+};
+
+/* bitmap spoolss_PrinterAttributes */
+#define PRINTER_ATTRIBUTE_QUEUED ( 0x00000001 )
+#define PRINTER_ATTRIBUTE_DIRECT ( 0x00000002 )
+#define PRINTER_ATTRIBUTE_DEFAULT ( 0x00000004 )
+#define PRINTER_ATTRIBUTE_SHARED ( 0x00000008 )
+#define PRINTER_ATTRIBUTE_NETWORK ( 0x00000010 )
+#define PRINTER_ATTRIBUTE_HIDDEN ( 0x00000020 )
+#define PRINTER_ATTRIBUTE_LOCAL ( 0x00000040 )
+#define PRINTER_ATTRIBUTE_ENABLE_DEVQ ( 0x00000080 )
+#define PRINTER_ATTRIBUTE_KEEPPRINTEDJOBS ( 0x00000100 )
+#define PRINTER_ATTRIBUTE_DO_COMPLETE_FIRST ( 0x00000200 )
+#define PRINTER_ATTRIBUTE_WORK_OFFLINE ( 0x00000400 )
+#define PRINTER_ATTRIBUTE_ENABLE_BIDI ( 0x00000800 )
+#define PRINTER_ATTRIBUTE_RAW_ONLY ( 0x00001000 )
+#define PRINTER_ATTRIBUTE_PUBLISHED ( 0x00002000 )
+#define PRINTER_ATTRIBUTE_FAX ( 0x00004000 )
+#define PRINTER_ATTRIBUTE_TS ( 0x00008000 )
+
+/* bitmap spoolss_PrinterStatus */
+#define PRINTER_STATUS_PAUSED ( 0x00000001 )
+#define PRINTER_STATUS_ERROR ( 0x00000002 )
+#define PRINTER_STATUS_PENDING_DELETION ( 0x00000004 )
+#define PRINTER_STATUS_PAPER_JAM ( 0x00000008 )
+#define PRINTER_STATUS_PAPER_OUT ( 0x00000010 )
+#define PRINTER_STATUS_MANUAL_FEED ( 0x00000020 )
+#define PRINTER_STATUS_PAPER_PROBLEM ( 0x00000040 )
+#define PRINTER_STATUS_OFFLINE ( 0x00000080 )
+#define PRINTER_STATUS_IO_ACTIVE ( 0x00000100 )
+#define PRINTER_STATUS_BUSY ( 0x00000200 )
+#define PRINTER_STATUS_PRINTING ( 0x00000400 )
+#define PRINTER_STATUS_OUTPUT_BIN_FULL ( 0x00000800 )
+#define PRINTER_STATUS_NOT_AVAILABLE ( 0x00001000 )
+#define PRINTER_STATUS_WAITING ( 0x00002000 )
+#define PRINTER_STATUS_PROCESSING ( 0x00004000 )
+#define PRINTER_STATUS_INITIALIZING ( 0x00008000 )
+#define PRINTER_STATUS_WARMING_UP ( 0x00010000 )
+#define PRINTER_STATUS_TONER_LOW ( 0x00020000 )
+#define PRINTER_STATUS_NO_TONER ( 0x00040000 )
+#define PRINTER_STATUS_PAGE_PUNT ( 0x00080000 )
+#define PRINTER_STATUS_USER_INTERVENTION ( 0x00100000 )
+#define PRINTER_STATUS_OUT_OF_MEMORY ( 0x00200000 )
+#define PRINTER_STATUS_DOOR_OPEN ( 0x00400000 )
+#define PRINTER_STATUS_SERVER_UNKNOWN ( 0x00800000 )
+#define PRINTER_STATUS_POWER_SAVE ( 0x01000000 )
+
+struct spoolss_GetPrinter2 {
+	DWORD servername;
+	DWORD printername;
+	DWORD sharename;
+	DWORD portname;
+	DWORD drivername;
+	DWORD comment;
+	DWORD location;
+	DWORD devmode;
+	DWORD sepfile;
+	DWORD printprocessor;
+	DWORD datatype;
+	DWORD parameters;
+	DWORD secdesc; 
+	DWORD attributes;
+	DWORD priority;
+	DWORD defaultpriority;
+	DWORD starttime;
+	DWORD untiltime;
+	DWORD status;
+	DWORD cjobs;
+	DWORD averageppm;
+};
+
+typedef struct spoolss_GetPrinter2 spoolss_GetPrinter2_t;
+
+struct spoolss_GetPrinter3 {
+	DWORD dummy;
+};
+
+struct spoolss_GetPrinter4 {
+	DWORD printername;
+	DWORD servername;
+	DWORD attributes;
+};
+
+struct spoolss_GetPrinter5 {
+	DWORD printername;
+	DWORD portname;
+	DWORD attributes;
+	DWORD device_not_selected_timeout;
+	DWORD transmission_retry_timeout;
+};
+
+struct spoolss_GetPrinter6 {
+	DWORD status;
+};
+
+/* bitmap spoolss_DsPrintAction */
+#define DSPRINT_PUBLISH ( 0x00000001 )
+#define DSPRINT_UPDATE ( 0x00000002 )
+#define DSPRINT_UNPUBLISH ( 0x00000004 )
+#define DSPRINT_REPUBLISH ( 0x00000008 )
+#define DSPRINT_PENDING ( 0x80000000 )
+
+struct spoolss_GetPrinter7 {
+	DWORD guid;
+	DWORD action;
+};
+
+struct spoolss_GetPrinter8 {
+	DWORD flags;
+	DWORD name;
+	DWORD description;
+	DWORD comment;
+};
+
+union spoolss_GetPrinter_result_u {
+	UNION_INFO_ENT(0, spoolss_GetPrinter);
+	UNION_INFO_ENT(1, spoolss_GetPrinter);
+	UNION_INFO_ENT(2, spoolss_GetPrinter);
+	UNION_INFO_ENT(3, spoolss_GetPrinter);
+	UNION_INFO_ENT(4, spoolss_GetPrinter);
+	UNION_INFO_ENT(5, spoolss_GetPrinter);
+	UNION_INFO_ENT(6, spoolss_GetPrinter);
+	UNION_INFO_ENT(7, spoolss_GetPrinter);
+	UNION_INFO_ENT(8, spoolss_GetPrinter);
+	DEFAULT char *nullptr;
+};
+
+struct spoolss_GetPrinter_result {
+	DWORD switch_value;
+	SWITCH(switch_value)
+		union spoolss_GetPrinter_result_u ru;
+};
+
+struct spoolss_RPC_V2_NOTIFY_OPTIONS_TYPE {
+	WORD type;
+	WORD reserved0;
+	DWORD reserved1;
+	DWORD reserved2;
+	DWORD count;
+	SIZE_IS(count)
+		WORD *pFields;
+};
+
+struct spoolss_RPC_V2_NOTIFY_OPTIONS {
+	DWORD version;
+	DWORD reserved;
+	DWORD count;
+	SIZE_IS(count)
+		struct spoolss_RPC_V2_NOTIFY_OPTIONS_TYPE *ptypes;
+};
+
+struct SYSTEMTIME {
+	WORD year;
+	WORD month;
+	WORD dayofweek;
+	WORD day;
+	WORD hour;
+	WORD minute;
+	WORD second;
+	WORD millisecs;
+};
+
+struct SECURITY_CONTAINER {
+	DWORD count;
+	SIZE_IS(count)
+		BYTE *psecurity;
+};
+
+struct SYSTEMTIME_CONTAINER {
+	DWORD count;
+	struct SYSTEMTIME *psystemtime;
+};
+
+struct STRING_CONTAINER {
+	DWORD count;
+	SIZE_IS(count / 2)
+		LPTSTR pstring;
+};
+
+union spoolss_RPC_V2_NOTIFY_INFO_DATA_DATA {
+	CASE(TABLE_STRING)
+		struct STRING_CONTAINER pcont;
+	CASE(TABLE_DWORD)
+		DWORD data[2];
+	CASE(TABLE_TIME)
+		struct SYSTEMTIME_CONTAINER system_time;
+	CASE(TABLE_DEVMODE)
+		struct spoolssDevmodeContainer devmode;
+	CASE(TABLE_SECURITY_DESCRIPTOR)
+		struct SECURITY_CONTAINER security_descriptor;
+};
+
+struct spoolss_RPC_V2_NOTIFY_INFO_DATA {
+	WORD Type;
+	WORD Field;
+	DWORD Reserved;
+	DWORD Id;
+	SWITCH(Reserved & 0x0000FFFF)
+		union spoolss_RPC_V2_NOTIFY_INFO_DATA_DATA data;
+};
+
+struct spoolss_RPC_V2_NOTIFY_INFO {
+	DWORD Version;
+	DWORD Flags;
+	DWORD Count;
+	SIZE_IS(Count)
+		struct spoolss_RPC_V2_NOTIFY_INFO_DATA *aData;
+};
+	
+OPERATION(SPOOLSS_OPNUM_GetPrinter)
+struct spoolss_GetPrinter {
+	IN	spoolss_handle_t handle;
+	IN 	DWORD 	switch_value;
+  	IN	DWORD   Buf2;
+	IN	DWORD 	BufCount;
+		SIZE_IS(BufCount)
+  	OUT		BYTE *Buf;
+	OUT	DWORD needed;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_GetPrinterData)
+struct spoolss_GetPrinterData {
+	IN	spoolss_handle_t handle;
+	IN	REFERENCE LPTSTR pValueName;
+	OUT	DWORD pType;
+    SIZE_IS(Size)
+   	OUT	REFERENCE LPBYTE Buf;
+	IN	DWORD Size;
+	OUT	DWORD Needed;
+	OUT	DWORD status;
+};
 
 OPERATION(SPOOLSS_OPNUM_GetPrinterDriver)
 struct spoolss_GetPrinterDriver {
@@ -111,223 +474,203 @@ struct spoolss_GetPrinterDriver {
 	OUT	DWORD status;
 };
 
-
 OPERATION(SPOOLSS_OPNUM_DeletePrinterDriver)
 struct spoolss_DeletePrinterDriver {
 	IN	DWORD dontcare;
 	OUT	DWORD status;
 };
 
+struct spoolss_DocInfo {
+	LPTSTR doc_name;
+	LPTSTR printer_name;
+	LPTSTR type;
+};
+typedef struct spoolss_DocInfo spoolss_DocInfo_t;
 
-OPERATION(SPOOLSS_OPNUM_AddPrintProcessor)
-struct spoolss_AddPrintProcessor {
-	IN	DWORD dontcare;
+struct spoolss_DocInfo_Container {
+	DWORD level;
+	DWORD switch_value;
+	spoolss_DocInfo_t *DocInfoContainer;
+};
+typedef struct spoolss_DocInfo_Container spoolss_DocInfo_Container_t;
+
+OPERATION(SPOOLSS_OPNUM_StartDocPrinter)
+struct spoolss_StartDocPrinter {
+	IN	spoolss_handle_t handle;
+	IN	spoolss_DocInfo_Container_t dinfo;
+	OUT	DWORD JobId;
 	OUT	DWORD status;
 };
-
-
-OPERATION(SPOOLSS_OPNUM_GetPrintProcessorDirectory)
-struct spoolss_GetPrintProcessorDirectory {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
 
 OPERATION(SPOOLSS_OPNUM_AbortPrinter)
 struct spoolss_AbortPrinter {
-	IN	DWORD dontcare;
+	IN	spoolss_handle_t handle;
 	OUT	DWORD status;
 };
 
-
-OPERATION(SPOOLSS_OPNUM_ReadPrinter)
-struct spoolss_ReadPrinter {
-	IN	DWORD dontcare;
+OPERATION(SPOOLSS_OPNUM_EnumPorts)
+struct spoolss_EnumPorts {
+	IN	LPTSTR name;
+	IN	DWORD level;
+	OUT	DWORD needed;
+	OUT	DWORD returned;
 	OUT	DWORD status;
 };
-
-
-OPERATION(SPOOLSS_OPNUM_WaitForPrinterChange)
-struct spoolss_WaitForPrinterChange {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_AddForm)
-struct spoolss_AddForm {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_DeleteForm)
-struct spoolss_DeleteForm {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_GetForm)
-struct spoolss_GetForm {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_SetForm)
-struct spoolss_SetForm {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_EnumMonitors)
-struct spoolss_EnumMonitors {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_AddPort)
-struct spoolss_AddPort {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_ConfigurePort)
-struct spoolss_ConfigurePort {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
 
 OPERATION(SPOOLSS_OPNUM_DeletePort)
 struct spoolss_DeletePort {
-	IN	DWORD dontcare;
+	IN	LPTSTR name;
 	OUT	DWORD status;
 };
 
-
-OPERATION(SPOOLSS_OPNUM_CreatePrinterIc)
-struct spoolss_CreatePrinterIc {
-	IN	DWORD dontcare;
+OPERATION(SPOOLSS_OPNUM_AddPortEx)
+struct spoolss_AddPortEx {
+	IN	LPTSTR name;
 	OUT	DWORD status;
 };
 
-
-OPERATION(SPOOLSS_OPNUM_PlayDescriptionPrinterIc)
-struct spoolss_PlayDescriptionPrinterIc {
-	IN	DWORD dontcare;
+OPERATION(SPOOLSS_OPNUM_SetPort)
+struct spoolss_SetPort {
+	IN	LPTSTR name;
 	OUT	DWORD status;
 };
 
-
-OPERATION(SPOOLSS_OPNUM_DeletePrinterIc)
-struct spoolss_DeletePrinterIc {
-	IN	DWORD dontcare;
+OPERATION(SPOOLSS_OPNUM_EnumMonitor)
+struct spoolss_EnumMonitor {
+	IN	LPTSTR name;
+	IN	DWORD level;
+	OUT	DWORD needed;
+	OUT	DWORD returned;
 	OUT	DWORD status;
 };
-
-
-OPERATION(SPOOLSS_OPNUM_AddPrinterConnection)
-struct spoolss_AddPrinterConnection {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_DeletePrinterConnection)
-struct spoolss_DeletePrinterConnection {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_PrinterMessageBox)
-struct spoolss_PrinterMessageBox {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
 
 OPERATION(SPOOLSS_OPNUM_AddMonitor)
 struct spoolss_AddMonitor {
-	IN	DWORD dontcare;
+	IN	LPTSTR name;
 	OUT	DWORD status;
 };
-
 
 OPERATION(SPOOLSS_OPNUM_DeleteMonitor)
 struct spoolss_DeleteMonitor {
-	IN	DWORD dontcare;
+	IN	LPTSTR name;
 	OUT	DWORD status;
 };
-
-
-OPERATION(SPOOLSS_OPNUM_DeletePrintProcessor)
-struct spoolss_DeletePrintProcessor {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_AddPrintProvider)
-struct spoolss_AddPrintProvider {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_DeletePrintProvider)
-struct spoolss_DeletePrintProvider {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
 
 OPERATION(SPOOLSS_OPNUM_ResetPrinter)
 struct spoolss_ResetPrinter {
+	IN	spoolss_handle_t handle;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_StartPagePrinter)
+struct spoolss_StartPagePrinter {
+	IN	spoolss_handle_t handle;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_EndPagePrinter)
+struct spoolss_EndPagePrinter {
+	IN	spoolss_handle_t handle;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_WritePrinter)
+struct spoolss_WritePrinter {
+	IN	spoolss_handle_t handle;
+	IN	DWORD BufCount;
+		SIZE_IS(BufCount)
+  	IN	REFERENCE LPBYTE pBuf;
+	OUT	DWORD written;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_ScheduleJob)
+struct spoolss_ScheduleJob {
+	IN	spoolss_handle_t handle;
+	IN 	DWORD 	JobId;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_GetJob)
+struct spoolss_GetJob {
+	IN	spoolss_handle_t handle;
+	IN 	DWORD 	JobId;
+	IN	DWORD 	level;
+		SIZE_IS(BufCount)
+  	INOUT		BYTE *pJob;
+	IN	DWORD BufCount;
+	OUT	DWORD needed;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_AddJob)
+struct spoolss_AddJob {
+	IN	spoolss_handle_t handle;
+	IN 	DWORD 	level;
+  	IN	DWORD   Buf2;
+	IN	DWORD 	BufCount;
+		SIZE_IS(BufCount)
+  	OUT		BYTE *pAddJob;
+	OUT	DWORD needed;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_ClosePrinter)
+struct spoolss_ClosePrinter {
+	IN	spoolss_handle_t handle;
+	OUT	spoolss_handle_t result_handle;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_EndDocPrinter)
+struct spoolss_EndDocPrinter {
+	IN	spoolss_handle_t handle;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_AddForm)
+struct spoolss_AddForm {
+	IN	spoolss_handle_t handle;
+	/*	FORM_CONTAINER *form_container; */
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_DeleteForm)
+struct spoolss_DeleteForm {
+	IN	spoolss_handle_t handle;
+	/* IN	REFERENCE LPTSTR form_name; */
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_EnumForms)
+struct spoolss_EnumForms {
+	IN	spoolss_handle_t handle;
+	IN 	DWORD 	level;
+	IN	DWORD 	BufCount;
+		SIZE_IS(BufCount)
+  	INOUT		BYTE *pEnumForms;
+	OUT	DWORD needed;
+	OUT	DWORD pcRet;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_GetPrinterDriver2)
+struct spoolss_GetPrinterDriver2 {
 	IN	DWORD dontcare;
 	OUT	DWORD status;
 };
 
-
-OPERATION(SPOOLSS_OPNUM_FindFirstChangeNotify)
-struct spoolss_FindFirstChangeNotify {
+OPERATION(SPOOLSS_OPNUM_FCPN)
+struct spoolss_FCPN {
 	IN	DWORD dontcare;
 	OUT	DWORD status;
 };
-
-
-OPERATION(SPOOLSS_OPNUM_FindNextChangeNotify)
-struct spoolss_FindNextChangeNotify {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_RouterFindFirstNotify)
-struct spoolss_RouterFindFirstNotify {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
 
 OPERATION(SPOOLSS_OPNUM_ReplyOpenPrinter)
 struct spoolss_ReplyOpenPrinter {
 	IN	DWORD dontcare;
 	OUT	DWORD status;
 };
-
-
-OPERATION(SPOOLSS_OPNUM_RouterReplyPrinter)
-struct spoolss_RouterReplyPrinter {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
 
 OPERATION(SPOOLSS_OPNUM_ReplyClosePrinter)
 struct spoolss_ReplyClosePrinter {
@@ -336,146 +679,155 @@ struct spoolss_ReplyClosePrinter {
 };
 
 
-OPERATION(SPOOLSS_OPNUM_AddPortEx)
-struct spoolss_AddPortEx {
+OPERATION(SPOOLSS_OPNUM_RFFPCNEX)
+struct spoolss_RFFPCNEX {
+	IN	spoolss_handle_t handle;
+	OUT	DWORD status;
+};
+
+struct spoolss_infores {
+	DWORD entriesread;
+	struct spoolss_RPC_V2_NOTIFY_INFO *pinfo;
+};
+
+OPERATION(SPOOLSS_OPNUM_RFNPCNEX)
+struct spoolss_RFNPCNEX {
+	IN	spoolss_handle_t handle;
+	IN 	DWORD color;
+	IN	struct spoolss_RPC_V2_NOTIFY_OPTIONS *poptions;
+	OUT	struct spoolss_infores *ppinfo;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_RRPCN)
+struct spoolss_RRPCN {
 	IN	DWORD dontcare;
 	OUT	DWORD status;
 };
 
-
-OPERATION(SPOOLSS_OPNUM_RemoteFindFirstChangeNotify)
-struct spoolss_RemoteFindFirstChangeNotify {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_SpoolerInitialize)
-struct spoolss_SpoolerInitialize {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_ResetPrinterEx)
-struct spoolss_ResetPrinterEx {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_RouterRefreshChangeNotify)
-struct spoolss_RouterRefreshChangeNotify {
-	IN	DWORD dontcare;
-	OUT	DWORD status;
-};
-
-
-OPERATION(SPOOLSS_OPNUM_OpenPrinter2)
-struct spoolss_OpenPrinter2 {
-	IN	DWORD dontcare;
+OPERATION(SPOOLSS_OPNUM_OpenPrinterEx)
+struct spoolss_OpenPrinterEx {
+	IN	LPTSTR printer_name;
 	OUT	spoolss_handle_t handle;
+	IN	LPTSTR data_type;
+	/* IN	struct spoolssDevmodeContainer dmodeContainer; */
+	/* IN	DWORD AccessRequired; */
+	/* IN	CLIENT_CONTAINER client_info; */
 	OUT	DWORD status;
 };
 
+OPERATION(SPOOLSS_OPNUM_EnumPrinterData)
+struct spoolss_EnumPrinterData {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_EnumPrinterDataEx)
+struct spoolss_EnumPrinterDataEx {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+OPERATION(SPOOLSS_OPNUM_EnumPrinterKey)
+struct spoolss_EnumPrinterKey {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
 
 /*
  ***********************************************************************
  * The spoolss interface definition.
  ***********************************************************************
  */
+
 INTERFACE(0)
 union spoolss_interface {
  	CASE(SPOOLSS_OPNUM_OpenPrinter)
-		struct spoolss_OpenPrinter		OpenPrinter;
- 	CASE(SPOOLSS_OPNUM_GetJob)
-		struct spoolss_GetJob			GetJob;
+		struct spoolss_OpenPrinter OpenPrinter;
+
 	CASE(SPOOLSS_OPNUM_DeletePrinter)
-		struct spoolss_DeletePrinter		DeletePrinter;
-	CASE(SPOOLSS_OPNUM_GetPrinterDriver)
-		struct spoolss_GetPrinterDriver		GetPrinterDriver;
-	CASE(SPOOLSS_OPNUM_DeletePrinterDriver)
-		struct spoolss_DeletePrinterDriver	DeletePrinterDriver;
-	CASE(SPOOLSS_OPNUM_AddPrintProcessor)
-		struct spoolss_AddPrintProcessor	AddPrintProcessor;
-	CASE(SPOOLSS_OPNUM_GetPrintProcessorDirectory)
-		struct spoolss_GetPrintProcessorDirectory
-						GetPrintProcessorDirectory;
+		struct spoolss_DeletePrinter DeletePrinter;
+
+	CASE(SPOOLSS_OPNUM_GetPrinter)
+		struct spoolss_GetPrinter GetPrinter;
+
+	CASE(SPOOLSS_OPNUM_GetPrinterData)
+		struct spoolss_GetPrinterData GetPrinterData;
+	
 	CASE(SPOOLSS_OPNUM_AbortPrinter)
-		struct spoolss_AbortPrinter		AbortPrinter;
-	CASE(SPOOLSS_OPNUM_ReadPrinter)
-		struct spoolss_ReadPrinter		ReadPrinter;
-	CASE(SPOOLSS_OPNUM_WaitForPrinterChange)
-		struct spoolss_WaitForPrinterChange	WaitForPrinterChange;
-	CASE(SPOOLSS_OPNUM_AddForm)
-		struct spoolss_AddForm			AddForm;
-	CASE(SPOOLSS_OPNUM_DeleteForm)
-		struct spoolss_DeleteForm		DeleteForm;
-	CASE(SPOOLSS_OPNUM_GetForm)
-		struct spoolss_GetForm			GetForm;
-	CASE(SPOOLSS_OPNUM_SetForm)
-		struct spoolss_SetForm			SetForm;
-	CASE(SPOOLSS_OPNUM_EnumMonitors)
-		struct spoolss_EnumMonitors		EnumMonitors;
-	CASE(SPOOLSS_OPNUM_AddPort)
-		struct spoolss_AddPort			AddPort;
-	CASE(SPOOLSS_OPNUM_ConfigurePort)
-		struct spoolss_ConfigurePort		ConfigurePort;
-	CASE(SPOOLSS_OPNUM_DeletePort)
-		struct spoolss_DeletePort		DeletePort;
-	CASE(SPOOLSS_OPNUM_CreatePrinterIc)
-		struct spoolss_CreatePrinterIc		CreatePrinterIc;
-	CASE(SPOOLSS_OPNUM_PlayDescriptionPrinterIc)
-		struct spoolss_PlayDescriptionPrinterIc
-						PlayDescriptionPrinterIc;
-	CASE(SPOOLSS_OPNUM_DeletePrinterIc)
-		struct spoolss_DeletePrinterIc		DeletePrinterIc;
-	CASE(SPOOLSS_OPNUM_AddPrinterConnection)
-		struct spoolss_AddPrinterConnection	AddPrinterConnection;
-	CASE(SPOOLSS_OPNUM_DeletePrinterConnection)
-		struct spoolss_DeletePrinterConnection	DeletePrinterConnection;
-	CASE(SPOOLSS_OPNUM_PrinterMessageBox)
-		struct spoolss_PrinterMessageBox	PrinterMessageBox;
-	CASE(SPOOLSS_OPNUM_AddMonitor)
-		struct spoolss_AddMonitor		AddMonitor;
-	CASE(SPOOLSS_OPNUM_DeleteMonitor)
-		struct spoolss_DeleteMonitor		DeleteMonitor;
-	CASE(SPOOLSS_OPNUM_DeletePrintProcessor)
-		struct spoolss_DeletePrintProcessor	DeletePrintProcessor;
-	CASE(SPOOLSS_OPNUM_AddPrintProvider)
-		struct spoolss_AddPrintProvider		AddPrintProvider;
-	CASE(SPOOLSS_OPNUM_DeletePrintProvider)
-		struct spoolss_DeletePrintProvider	DeletePrintProvider;
+		struct spoolss_AbortPrinter AbortPrinter;
+	
+	CASE(SPOOLSS_OPNUM_StartDocPrinter)
+		struct spoolss_StartDocPrinter StartDocPrinter;
+	
+	CASE(SPOOLSS_OPNUM_EndDocPrinter)
+		struct spoolss_EndDocPrinter EndDocPrinter;
+	
+	CASE(SPOOLSS_OPNUM_CreatePrinterIC)
+		struct spoolss_CreatePrinterIC CreatePrinterIC;
+	
 	CASE(SPOOLSS_OPNUM_ResetPrinter)
-		struct spoolss_ResetPrinter		ResetPrinter;
-	CASE(SPOOLSS_OPNUM_FindFirstChangeNotify)
-		struct spoolss_FindFirstChangeNotify	FindFirstChangeNotify;
-	CASE(SPOOLSS_OPNUM_FindNextChangeNotify)
-		struct spoolss_FindNextChangeNotify	FindNextChangeNotify;
-	CASE(SPOOLSS_OPNUM_RouterFindFirstNotify)
-		struct spoolss_RouterFindFirstNotify	RouterFindFirstNotify;
-	CASE(SPOOLSS_OPNUM_ReplyOpenPrinter)
-		struct spoolss_ReplyOpenPrinter		ReplyOpenPrinter;
-	CASE(SPOOLSS_OPNUM_RouterReplyPrinter)
-		struct spoolss_RouterReplyPrinter	RouterReplyPrinter;
-	CASE(SPOOLSS_OPNUM_ReplyClosePrinter)
-		struct spoolss_ReplyClosePrinter	ReplyClosePrinter;
+		struct spoolss_ResetPrinter ResetPrinter;
+
+	CASE(SPOOLSS_OPNUM_EnumMonitor)
+		struct spoolss_EnumMonitor EnumMonitor;
+
+	CASE(SPOOLSS_OPNUM_AddMonitor)
+		struct spoolss_AddMonitor AddMonitor;
+
+	CASE(SPOOLSS_OPNUM_DeleteMonitor)
+		struct spoolss_DeleteMonitor DeleteMonitor;
+
+	CASE(SPOOLSS_OPNUM_WritePrinter)
+		struct spoolss_WritePrinter WritePrinter;
+	
+	CASE(SPOOLSS_OPNUM_StartPagePrinter)
+		struct spoolss_StartPagePrinter StartPagePrinter;
+	
+	CASE(SPOOLSS_OPNUM_EndPagePrinter)
+		struct spoolss_EndPagePrinter EndPagePrinter;
+	
+	CASE(SPOOLSS_OPNUM_ClosePrinter)
+		struct spoolss_ClosePrinter ClosePrinter;
+
+	CASE(SPOOLSS_OPNUM_OpenPrinterEx)
+		struct spoolss_OpenPrinterEx OpenPrinterEx;
+	
+	CASE(SPOOLSS_OPNUM_AddJob)
+		struct spoolss_AddJob AddJob;
+
+	CASE(SPOOLSS_OPNUM_GetJob)
+		struct spoolss_GetJob GetJob;
+
+	CASE(SPOOLSS_OPNUM_ScheduleJob)
+		struct spoolss_ScheduleJob ScheduleJob;
+
+	CASE(SPOOLSS_OPNUM_AddForm)
+		struct spoolss_AddForm AddForm;
+
+	CASE(SPOOLSS_OPNUM_DeleteForm)
+		struct spoolss_DeleteForm DeleteForm;
+
+	CASE(SPOOLSS_OPNUM_EnumForms)
+		struct spoolss_EnumForms EnumForms;
+
+	CASE(SPOOLSS_OPNUM_EnumPorts)
+		struct spoolss_EnumPorts EnumPorts;
+
+	CASE(SPOOLSS_OPNUM_DeletePort)
+		struct spoolss_DeletePort DeletePort;
+
 	CASE(SPOOLSS_OPNUM_AddPortEx)
-		struct spoolss_AddPortEx		AddPortEx;
-	CASE(SPOOLSS_OPNUM_RemoteFindFirstChangeNotify)
-		struct spoolss_RemoteFindFirstChangeNotify
-						RemoteFindFirstChangeNotify;
-	CASE(SPOOLSS_OPNUM_SpoolerInitialize)
-		struct spoolss_SpoolerInitialize	SpoolerInitialize;
-	CASE(SPOOLSS_OPNUM_ResetPrinterEx)
-		struct spoolss_ResetPrinterEx		ResetPrinterEx;
-	CASE(SPOOLSS_OPNUM_RouterRefreshChangeNotify)
-		struct spoolss_RouterRefreshChangeNotify
-						RouterRefreshChangeNotify;
-	CASE(SPOOLSS_OPNUM_OpenPrinter2)
-		struct spoolss_OpenPrinter2		OpenPrinter2;
+		struct spoolss_AddPortEx AddPortEx;
+
+	CASE(SPOOLSS_OPNUM_SetPort)
+		struct spoolss_SetPort SetPort;
+
+	CASE(SPOOLSS_OPNUM_RFNPCNEX)
+		struct spoolss_RFNPCNEX RFNPCNEX;
+
 };
 typedef union spoolss_interface	spoolss_interface_t;
 EXTERNTYPEINFO(spoolss_interface)
 
-#endif /* _MLSVC_SPOOLSS_NDL_ */
+#endif /* _SPOOLSS_NDL_ */

@@ -18,16 +18,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,7 +102,7 @@ static int readin(char *name, struct diff *dd);
 static int number(char **lc);
 static int digit(int c);
 static int getchange(FILE *b);
-static int getline(FILE *b);
+static int getaline(FILE *b);
 static void merge(int m1, int m2);
 static void separate(char *s);
 static void change(int i, struct range *rold, int dup);
@@ -154,9 +151,9 @@ main(int argc, char **argv)
 		usage();
 	if (oflag) {
 		(void) snprintf(f1mark, sizeof (f1mark), "<<<<<<< %s",
-						argc >= 7 ? argv[6] : argv[3]);
+		    argc >= 7 ? argv[6] : argv[3]);
 		(void) snprintf(f3mark, sizeof (f3mark), ">>>>>>> %s",
-						argc >= 8 ? argv[7] : argv[5]);
+		    argc >= 8 ? argv[7] : argv[5]);
 	}
 
 	m = readin(argv[1], d13);
@@ -165,7 +162,7 @@ main(int argc, char **argv)
 		if ((fp[i] = fopen(argv[i+3], "r")) == NULL) {
 			save_err = errno;
 			(void) fprintf(stderr, "diff3: can't open %s: ",
-				argv[i+3]);
+			    argv[i+3]);
 			errno = save_err;
 			perror("");
 			exit(1);
@@ -250,14 +247,14 @@ digit(int c)
 static int
 getchange(FILE *b)
 {
-	while (getline(b))
+	while (getaline(b))
 		if (digit(line[0]))
 			return (1);
 	return (0);
 }
 
 static int
-getline(FILE *b)
+getaline(FILE *b)
 {
 	int i, c;
 	for (i = 0; i < sizeof (line)-1; i++) {
@@ -288,10 +285,10 @@ merge(int m1, int m2)
 	for (; (t1 = d1 < d13+m1) | (t2 = d2 < d23+m2); ) {
 		if (debug) {
 			(void) printf("%d,%d=%d,%d %d,%d=%d,%d\n",
-			d1->old.from, d1->old.to,
-			d1->new.from, d1->new.to,
-			d2->old.from, d2->old.to,
-			d2->new.from, d2->new.to);
+			    d1->old.from, d1->old.to,
+			    d1->new.from, d1->new.to,
+			    d2->old.from, d2->old.to,
+			    d2->new.from, d2->new.to);
 		}
 
 		/* first file is different from others */
@@ -454,7 +451,7 @@ skip(int i, int from, char *pr)
 {
 	int j, n;
 	for (n = 0; cline[i] < from-1; n += j) {
-		if ((j = getline(fp[i])) == 0)
+		if ((j = getaline(fp[i])) == 0)
 			trouble();
 		if (pr)
 			(void) printf("%s%s", pr, line);

@@ -47,11 +47,8 @@ file path=kernel/drv/sdpib.conf group=sys
 hardlink path=kernel/strmod/$(ARCH64)/sdpib \
     target=../../../kernel/drv/$(ARCH64)/sdpib
 $(i386_ONLY)hardlink path=kernel/strmod/sdpib target=../../kernel/drv/sdpib
-legacy pkg=SUNWibsdpib arch=$(ARCH) category=system \
-    desc="Sun InfiniBand Sockets Direct Protocol" \
-    hotline="Please contact your local service provider" \
-    name="Sun InfiniBand Sockets Direct Protocol" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWibsdpib desc="Sun InfiniBand Sockets Direct Protocol" \
+    name="Sun InfiniBand Sockets Direct Protocol"
 license cr_Sun license=cr_Sun
 license lic_OSBL license=lic_OSBL
 license lic_OSBL_preamble license=lic_OSBL_preamble

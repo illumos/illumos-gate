@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY = libfmevent.a
@@ -29,24 +28,45 @@ VERS = .1
 LIBSRCS = fmev_subscribe.c \
 	fmev_evaccess.c \
 	fmev_errstring.c \
-	fmev_util.c
+	fmev_util.c \
+	fmev_publish.c
 
 OBJECTS = $(LIBSRCS:%.c=%.o)
 
 include ../../../Makefile.lib
-include ../../Makefile.lib
+
+# This library must install in /lib/fm since it is a dependency of
+# svc.startd and may be required in early boot.  Thus we cannot
+# include ../Makefile.lib - instead we set ROOTFMHDRDIR and
+# ROOTFMHDRS and redefine ROOTLIBDIR and ROOTLIBDIR64 accordingly
+
+ROOTFMHDRDIR = $(ROOTHDRDIR)/fm
+ROOTFMHDRS   = $(FMHDRS:%=$(ROOTFMHDRDIR)/%)
+
+ROOTLIBDIR=     $(ROOTFS_LIBDIR)/fm
+ROOTLIBDIR64=   $(ROOTFS_LIBDIR)/fm/$(MACH64)
 
 SRCS = $(LIBSRCS:%.c=../common/%.c)
 LIBS = $(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
+C99MODE = $(C99_ENABLE)
+
 CPPFLAGS += -I../common -I.
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
-LDLIBS += -lumem -lnvpair -luutil -lsysevent -lc
+
+FMLIBDIR=usr/lib/fm
+$(BUILD64)FMLIBDIR64=usr/lib/fm/$(MACH64)
+
+$(DYNLIB) := LDLIBS += -lumem -lnvpair -luutil -lsysevent \
+	-L$(ROOT)/$(FMLIBDIR) -ltopo -lc
+
+$(BUILD64)$(DYNLIB) := LDLIBS64 += -lumem -lnvpair -luutil -lsysevent \
+	-L$(ROOT)/$(FMLIBDIR64) -ltopo -lc
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -m64

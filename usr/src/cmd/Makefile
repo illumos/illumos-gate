@@ -45,6 +45,7 @@ FIRST_SUBDIRS=		\
 
 COMMON_SUBDIRS=		\
 	agents		\
+	allocate	\
 	availdevs	\
 	lp		\
 	perl		\
@@ -69,6 +70,7 @@ COMMON_SUBDIRS=		\
 	basename	\
 	bc		\
 	bdiff		\
+	beadm		\
 	bfs		\
 	bnu		\
 	boot		\
@@ -291,6 +293,8 @@ COMMON_SUBDIRS=		\
 	pcitool		\
 	pfexec		\
 	pfexecd		\
+	pginfo		\
+	pgstat		\
 	pgrep		\
 	picl		\
 	plimit		\
@@ -417,6 +421,7 @@ COMMON_SUBDIRS=		\
 	units		\
 	unlink		\
 	unpack		\
+	userattr	\
 	users		\
 	utmp_update	\
 	utmpd		\
@@ -453,6 +458,7 @@ COMMON_SUBDIRS=		\
 	zonename	\
 	zpool		\
 	zlook		\
+	zonestat	\
 	zstreamdump	\
 	ztest
 
@@ -512,8 +518,10 @@ MSGSUBDIRS=		\
 	asa		\
 	audio		\
 	audit		\
+	auditconfig	\
 	auditd		\
 	auditrecord	\
+	auditset	\
 	auths		\
 	autopush	\
 	avs		\
@@ -523,9 +531,8 @@ MSGSUBDIRS=		\
 	banner		\
 	bart		\
 	basename	\
+	beadm		\
 	bnu		\
-	bsmconv		\
-	bsmunconv	\
 	busstat		\
 	cal		\
 	cat		\
@@ -713,6 +720,7 @@ MSGSUBDIRS=		\
 	units		\
 	unlink		\
 	unpack		\
+	userattr	\
 	valtools	\
 	vgrind		\
 	vi		\
@@ -736,7 +744,8 @@ MSGSUBDIRS=		\
 	zoneadmd	\
 	zonecfg		\
 	zonename	\
-	zpool
+	zpool		\
+	zonestat
 
 $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/iconv	\
@@ -781,10 +790,9 @@ $(CLOSED_BUILD)DCSUBDIRS += \
 	$(CLOSED)/cmd/pax
 
 #
-# commands that belong only to audit and device allocation
+# commands that belong only to audit.
 #
 AUDITSUBDIRS=		\
-	allocate	\
 	amt		\
 	audit		\
 	audit_warn	\
@@ -792,10 +800,9 @@ AUDITSUBDIRS=		\
 	auditd		\
 	auditrecord	\
 	auditreduce	\
+	auditset	\
 	auditstat	\
-	praudit		\
-	bsmconv		\
-	bsmunconv
+	praudit		
 
 #
 # commands not owned by the systems group

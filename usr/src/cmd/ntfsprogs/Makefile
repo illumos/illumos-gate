@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MKNTFS=		mkntfs
@@ -80,6 +79,14 @@ ROOTPROG=	$(MKNTFS:%=$(ROOTUSRSBIN)/%) \
 all:		$(MKNTFS) $(NTFSCAT) $(NTFSCLONE) $(NTFSCLUSTER) \
 		$(NTFSCMP) $(NTFSCP) $(NTFSFIX) $(NTFSINFO) \
 		$(NTFSLABEL) $(NTFSLS) $(NTFSRESIZE) $(NTFSUNDELETE)
+
+all install:	THIRDPARTYLICENSE
+
+CLOBBERFILES += THIRDPARTYLICENSE
+
+THIRDPARTYLICENSE: $(SRC)/common/GPLDISCLAIMER COPYING
+	$(RM) $@
+	$(CAT) $(SRC)/common/GPLDISCLAIMER COPYING > $@
 
 $(MKNTFS):	$(MKNTFSOBJS)
 	$(LINK.c) -o $(MKNTFS) $(MKNTFSOBJS) $(LDLIBS) -luuid

@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Makefile for name service cache daemon
 #
@@ -35,7 +34,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 
 OBJS=	server.o getpw.o getgr.o gethost.o getnode.o \
 	getether.o getrpc.o getproto.o getnet.o \
-	getbootp.o getauuser.o getauth.o getserv.o \
+	getbootp.o getauth.o getserv.o \
 	getnetmasks.o getprinter.o getproject.o \
 	getexec.o getprof.o getuser.o cache.o \
 	nscd_biggest.o nscd_wait.o \

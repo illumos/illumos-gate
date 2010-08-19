@@ -381,7 +381,7 @@ nwamd_loc_check_conditions(void)
 		else
 			winning_loc = NWAM_LOC_NAME_AUTOMATIC;
 	}
-	nlog(LOG_INFO, "nwamd_loc_check_conditions: winning loc is %s",
+	nlog(LOG_DEBUG, "nwamd_loc_check_conditions: winning loc is %s",
 	    winning_loc);
 
 	/* If the winning location is already active, do nothing */
@@ -471,7 +471,7 @@ nwamd_loc_handle_fini_event(nwamd_event_t event)
 	/* Don't disable the location, as this can enable the Automatic loc */
 	if ((object = nwamd_object_find(NWAM_OBJECT_TYPE_LOC,
 	    event->event_object)) == NULL) {
-		nlog(LOG_ERR, "nwamd_loc_handle_fini_event: "
+		nlog(LOG_INFO, "nwamd_loc_handle_fini_event: "
 		    "loc %s not found", event->event_object);
 		nwamd_event_do_not_send(event);
 		return;
@@ -552,7 +552,7 @@ nwamd_loc_handle_state_event(nwamd_event_t event)
 
 	if ((object = nwamd_object_find(NWAM_OBJECT_TYPE_LOC,
 	    event->event_object)) == NULL) {
-		nlog(LOG_ERR, "nwamd_loc_handle_state_event: "
+		nlog(LOG_INFO, "nwamd_loc_handle_state_event: "
 		    "state event for nonexistent loc %s", event->event_object);
 		nwamd_event_do_not_send(event);
 		return;

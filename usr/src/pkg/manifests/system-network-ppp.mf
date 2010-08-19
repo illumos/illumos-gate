@@ -80,24 +80,18 @@ hardlink path=etc/rcS.d/K50pppd target=../../etc/init.d/pppd
 hardlink path=usr/kernel/strmod/$(ARCH64)/sppptun \
     target=../../drv/$(ARCH64)/sppptun
 $(i386_ONLY)hardlink path=usr/kernel/strmod/sppptun target=../drv/sppptun
-legacy pkg=SUNWpppd arch=$(ARCH) category=system \
+legacy pkg=SUNWpppd \
     desc="Device drivers implementing point-to-point protocol (PPP)" \
-    hotline="Please contact your local service provider" \
-    name="Solaris PPP Device Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWpppdr arch=$(ARCH) category=system \
+    name="Solaris PPP Device Drivers"
+legacy pkg=SUNWpppdr \
     desc="Configuration files for Solaris Point-to-Point Protocol (PPP)" \
-    hotline="Please contact your local service provider" \
-    name="Solaris PPP configuration files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWpppdu arch=$(ARCH) category=system \
+    name="Solaris PPP configuration files"
+legacy pkg=SUNWpppdu \
     desc="Daemon and utilities for Point-to-Point Protocol (PPP)" \
-    hotline="Please contact your local service provider" \
-    name="Solaris PPP daemon and utilities" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE
+    name="Solaris PPP daemon and utilities"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/common/io/ppp/THIRDPARTYLICENSE \
-    license=uts/common/io/ppp/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.bin/pppd/THIRDPARTYLICENSE
+license usr/src/uts/common/io/ppp/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/ppp/THIRDPARTYLICENSE

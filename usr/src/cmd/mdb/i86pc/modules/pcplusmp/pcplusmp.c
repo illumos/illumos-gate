@@ -19,10 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "intr_common.h"
+#include <sys/apic_timer.h>
 
 /*
  * Globals
@@ -97,8 +98,10 @@ static const mdb_dcmd_t dcmds[] = {
 	    interrupt_help},
 	{ "softint", "?[-d]", "print soft interrupts", soft_interrupt_dump,
 	    soft_interrupt_help},
+#ifdef _KMDB
 	{ "apic", NULL, "print apic register contents", apic },
 	{ "ioapic", NULL, "print ioapic register contents", ioapic },
+#endif /* _KMDB */
 	{ NULL }
 };
 

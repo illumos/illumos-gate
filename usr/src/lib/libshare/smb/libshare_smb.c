@@ -912,6 +912,8 @@ struct smb_proto_option_defs {
 	{ SMB_CI_AUTOHOME_MAP, 0, MAX_VALUE_BUFLEN, path_validator, 0 },
 	{ SMB_CI_IPV6_ENABLE, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_PRINT_ENABLE, 0, 0, true_false_validator,
+	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_MAP, 0, MAX_VALUE_BUFLEN, cmd_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_UNMAP, 0, MAX_VALUE_BUFLEN, cmd_validator,
 	    SMB_REFRESH_REFRESH },

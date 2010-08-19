@@ -133,7 +133,7 @@ preload(const char *str, Rt_map *mlmp, Rt_map **clmp)
 		    PD_FLG_EXTLOAD, 0) != 0)
 			nlmp = load_one(&lml_main, ALIST_OFF_DATA, palp, *clmp,
 			    MODE(mlmp), flags, 0, NULL);
-		remove_plist(&palp, 0);
+		remove_alist(&palp, 0);
 		if (rtld_flags & RT_FL_SECURE)
 			rtld_flags2 &= ~RT_FL2_FTL2WARN;
 		if (nlmp && (bind_one(*clmp, nlmp, BND_NEEDED) == 0))
@@ -333,8 +333,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	if (alist_append(&lml_rtld.lm_lists, NULL, sizeof (Lm_cntl),
 	    AL_CNT_LMLISTS) == NULL)
 		return (0);
-	lml_rtld.lm_flags |= (LML_FLG_RTLDLM | LML_FLG_NOAUDIT |
-	    LML_FLG_HOLDLOCK);
+	lml_rtld.lm_flags |= (LML_FLG_RTLDLM | LML_FLG_HOLDLOCK);
+	lml_rtld.lm_tflags |= LML_TFLG_NOAUDIT;
 	lml_rtld.lm_lmid = LM_ID_LDSO;
 	lml_rtld.lm_lmidstr = (char *)MSG_ORIG(MSG_LMID_LDSO);
 
@@ -427,7 +427,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		return (0);
 	if ((rlmp = elf_new_lmp(&lml_rtld, ALIST_OFF_DATA, &fdr,
 	    (Addr)mpp->mr_addr, (size_t)((uintptr_t)eaddr - (uintptr_t)ld_base),
-	    NULL, NULL)) == NULL)
+	    NULL, NULL, NULL)) == NULL)
 		return (0);
 
 	MMAPS(rlmp) = mpp;
@@ -481,7 +481,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		fdm.fd_dev = status.st_dev;
 		fdm.fd_ino = status.st_ino;
 
-		if ((mlmp = load_file(&lml_main, ALIST_OFF_DATA, &fdm,
+		if ((mlmp = load_file(&lml_main, ALIST_OFF_DATA, NULL, &fdm,
 		    NULL)) == NULL)
 			return (0);
 
@@ -545,7 +545,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			    stravl_insert(execname, 0, 0, 0)) == NULL)
 				return (0);
 			if ((mlmp = aout_new_lmp(&lml_main, ALIST_OFF_DATA,
-			    &fdm, 0, 0, aoutdyn, NULL)) == NULL)
+			    &fdm, 0, 0, aoutdyn, NULL, NULL)) == NULL)
 				return (0);
 
 			/*
@@ -678,8 +678,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			if ((fdm.fd_nname =
 			    stravl_insert(execname, 0, 0, 0)) == NULL)
 				return (0);
-			if ((mlmp = elf_new_lmp(&lml_main, ALIST_OFF_DATA, &fdm,
-			    (Addr)hmpp->mr_addr, msize, NULL, NULL)) == NULL)
+			if ((mlmp = elf_new_lmp(&lml_main, ALIST_OFF_DATA,
+			    &fdm, (Addr)hmpp->mr_addr, msize,
+			    NULL, NULL, NULL)) == NULL)
 				return (0);
 
 			MMAPS(mlmp) = fmpp;
@@ -1033,7 +1034,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	/*
 	 * Load all dependent (needed) objects.
 	 */
-	if (analyze_lmc(&lml_main, ALIST_OFF_DATA, mlmp, NULL) == NULL)
+	if (analyze_lmc(&lml_main, ALIST_OFF_DATA, mlmp, mlmp, NULL) == NULL)
 		return (0);
 
 	/*
@@ -1102,9 +1103,11 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 */
 	rd_event(&lml_main, RD_PREINIT, 0);
 
-	if ((lml_main.lm_tflags | AFLAGS(mlmp)) & LML_TFLG_AUD_ACTIVITY)
+	if (aud_activity ||
+	    ((lml_main.lm_tflags | AFLAGS(mlmp)) & LML_TFLG_AUD_ACTIVITY))
 		audit_activity(mlmp, LA_ACT_CONSISTENT);
-	if ((lml_main.lm_tflags | AFLAGS(mlmp)) & LML_TFLG_AUD_PREINIT)
+	if (aud_preinit ||
+	    ((lml_main.lm_tflags | AFLAGS(mlmp)) & LML_TFLG_AUD_PREINIT))
 		audit_preinit(mlmp);
 
 	/*
@@ -1194,8 +1197,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		rt_thr_init(&lml_main);
 	}
 
-	rtld_flags |= RT_FL_APPLIC;
-
 	/*
 	 * Fire all dependencies .init sections.  Identify any unused
 	 * dependencies, and leave the runtime linker - effectively calling
@@ -1213,7 +1214,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 	DBG_CALL(Dbg_util_call_main(mlmp));
 
-	rtld_flags |= RT_FL_OPERATION;
+	rtld_flags |= (RT_FL_OPERATION | RT_FL_APPLIC);
+
 	leave(LIST(mlmp), 0);
 
 	return (mlmp);

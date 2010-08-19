@@ -47,19 +47,19 @@
 #include <sys/ib/clients/rdsv3/ib.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
-RDSV3_DEFINE_PER_CPU(struct rdsv3_ib_statistics, rdsv3_ib_stats);
+struct rdsv3_ib_statistics	*rdsv3_ib_stats = NULL;
 
 static char *rdsv3_ib_stat_names[] = {
 	"ib_connect_raced",
 	"ib_listen_closed_stale",
-	"ib_tx_cq_call",
+	"ib_evt_handler_call",
+	"ib_tasklet_call",
 	"ib_tx_cq_event",
 	"ib_tx_ring_full",
 	"ib_tx_throttle",
 	"ib_tx_sg_mapping_failure",
 	"ib_tx_stalled",
 	"ib_tx_credit_updates",
-	"ib_rx_cq_call",
 	"ib_rx_cq_event",
 	"ib_rx_ring_empty",
 	"ib_rx_refill_from_cq",
@@ -95,7 +95,7 @@ rdsv3_ib_stats_info_copy(struct rdsv3_info_iterator *iter,
 	if (avail < ARRAY_SIZE(rdsv3_ib_stat_names))
 		goto out;
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
 		src = (uint64_t *)&(rdsv3_per_cpu(rdsv3_ib_stats, cpu));
 		sum = (uint64_t *)&stats;
 		for (i = 0; i < sizeof (stats) / sizeof (uint64_t); i++)

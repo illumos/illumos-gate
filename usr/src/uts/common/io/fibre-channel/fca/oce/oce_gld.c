@@ -41,8 +41,9 @@ char *oce_priv_props[] = {
 	NULL
 };
 
+extern int pow10[];
+
 /* ---[ static function declarations ]----------------------------------- */
-static int oce_power10(int power);
 static int oce_set_priv_prop(struct oce_dev *dev, const char *name,
     uint_t size, const void *val);
 
@@ -103,35 +104,25 @@ int
 oce_start(struct oce_dev *dev)
 {
 	int qidx = 0;
-	int ret;
+	struct link_status link = {0};
 
-	ret = oce_alloc_intr(dev);
-	if (ret != DDI_SUCCESS)
-		goto  start_fail;
-	ret = oce_setup_handlers(dev);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Interrupt handler setup failed with %d", ret);
-		(void) oce_teardown_intr(dev);
-		goto  start_fail;
-	}
 	/* get link status */
-	(void) oce_get_link_status(dev, &dev->link);
+	(void) oce_get_link_status(dev, &link);
 
-	if (dev->link.mac_speed == PHY_LINK_SPEED_ZERO) {
-		oce_log(dev, CE_NOTE, MOD_CONFIG,
-		    "LINK_DOWN: 0x%x", dev->link.mac_speed);
-		mac_link_update(dev->mac_handle, LINK_STATE_DOWN);
-	} else {
-		oce_log(dev, CE_NOTE, MOD_CONFIG,
-		    "(f,s,d,pp)=(0x%x, 0x%x, 0x%x, 0x%x)",
-		    dev->link.mac_fault, dev->link.mac_speed,
-		    dev->link.mac_duplex, dev->link.physical_port);
-		mac_link_update(dev->mac_handle, LINK_STATE_UP);
+	dev->link_status  = (link.logical_link_status == NTWK_LOGICAL_LINK_UP) ?
+	    LINK_STATE_UP : LINK_STATE_DOWN;
+
+	dev->link_speed = link.qos_link_speed ? link.qos_link_speed * 10 :
+	    pow10[link.mac_speed];
+
+	mac_link_update(dev->mac_handle, dev->link_status);
+
+	for (qidx = 0; qidx < dev->nwqs; qidx++) {
+		(void) oce_start_wq(dev->wq[qidx]);
 	}
-
-	(void) oce_start_wq(dev->wq[0]);
-	(void) oce_start_rq(dev->rq[0]);
+	for (qidx = 0; qidx < dev->nrqs; qidx++) {
+		(void) oce_start_rq(dev->rq[qidx]);
+	}
 	(void) oce_start_mq(dev->mq);
 	/* enable interrupts */
 	oce_ei(dev);
@@ -139,11 +130,8 @@ oce_start(struct oce_dev *dev)
 	for (qidx = 0; qidx < dev->neqs; qidx++) {
 		oce_arm_eq(dev, dev->eq[qidx]->eq_id, 0, B_TRUE, B_FALSE);
 	}
-
-	/* update state */
+	/* TODO update state */
 	return (DDI_SUCCESS);
-start_fail:
-	return (DDI_FAILURE);
 } /* oce_start */
 
 
@@ -168,19 +156,24 @@ oce_m_stop(void *arg)
 void
 oce_stop(struct oce_dev *dev)
 {
+	int qidx;
 	/* disable interrupts */
 	oce_di(dev);
-	oce_remove_handler(dev);
-	(void) oce_teardown_intr(dev);
-	mutex_enter(&dev->wq[0]->tx_lock);
-	mutex_enter(&dev->rq[0]->rx_lock);
+	for (qidx = 0; qidx < dev->nwqs; qidx++) {
+		mutex_enter(&dev->wq[qidx]->tx_lock);
+	}
 	mutex_enter(&dev->mq->lock);
 	/* complete the pending Tx */
-	oce_clean_wq(dev->wq[0]);
+	for (qidx = 0; qidx < dev->nwqs; qidx++)
+		oce_clean_wq(dev->wq[qidx]);
 	/* Release all the locks */
 	mutex_exit(&dev->mq->lock);
-	mutex_exit(&dev->rq[0]->rx_lock);
-	mutex_exit(&dev->wq[0]->tx_lock);
+	for (qidx = 0; qidx < dev->nwqs; qidx++)
+		mutex_exit(&dev->wq[qidx]->tx_lock);
+	if (dev->link_status == LINK_STATE_UP) {
+		dev->link_status = LINK_STATE_UNKNOWN;
+		mac_link_update(dev->mac_handle, dev->link_status);
+	}
 
 } /* oce_stop */
 
@@ -191,7 +184,7 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 	struct oce_dev *dev = (struct oce_dev *)arg;
 	struct ether_addr  *mca_drv_list;
 	struct ether_addr  mca_hw_list[OCE_MAX_MCA];
-	uint16_t new_mcnt = 0;
+	uint16_t new_mcnt = dev->num_mca;
 	int ret;
 	int i;
 
@@ -206,7 +199,7 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 	DEV_LOCK(dev);
 	if (add) {
 		/* check if we exceeded hw max  supported */
-		if (dev->num_mca <= OCE_MAX_MCA) {
+		if (new_mcnt < OCE_MAX_MCA) {
 			/* copy entire dev mca to the mbx */
 			bcopy((void*)mca_drv_list,
 			    (void*)mca_hw_list,
@@ -215,7 +208,7 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 			bcopy(mca, &mca_hw_list[dev->num_mca],
 			    sizeof (struct ether_addr));
 		}
-		new_mcnt = dev->num_mca + 1;
+		new_mcnt++;
 	} else {
 		struct ether_addr *hwlistp = &mca_hw_list[0];
 		for (i = 0; i < dev->num_mca; i++) {
@@ -224,16 +217,18 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 				bcopy(mca_drv_list + i, hwlistp,
 				    ETHERADDRL);
 				hwlistp++;
+			} else {
+				new_mcnt--;
 			}
 		}
-		new_mcnt = dev->num_mca - 1;
 	}
 
 	if (dev->suspended) {
 		goto finish;
 	}
-	if (new_mcnt == 0 || new_mcnt > OCE_MAX_MCA) {
-		ret = oce_set_multicast_table(dev, dev->if_id, NULL, 0, B_TRUE);
+	if (new_mcnt > OCE_MAX_MCA) {
+		ret = oce_set_multicast_table(dev, dev->if_id, &mca_hw_list[0],
+		    OCE_MAX_MCA, B_TRUE);
 	} else {
 		ret = oce_set_multicast_table(dev, dev->if_id,
 		    &mca_hw_list[0], new_mcnt, B_FALSE);
@@ -249,8 +244,9 @@ finish:
 	if (new_mcnt && new_mcnt <= OCE_MAX_MCA) {
 		bcopy(mca_hw_list, mca_drv_list,
 		    new_mcnt * sizeof (struct ether_addr));
+
+		dev->num_mca = (uint16_t)new_mcnt;
 	}
-	dev->num_mca = (uint16_t)new_mcnt;
 	DEV_UNLOCK(dev);
 	return (0);
 } /* oce_m_multicast */
@@ -274,6 +270,7 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 		DEV_UNLOCK(dev);
 		return (EIO);
 	}
+	bzero(dev->unicast_addr, ETHERADDRL);
 
 	/* Set the New MAC addr earlier is no longer valid */
 	ret = oce_add_mac(dev, dev->if_id, uca, &dev->pmac_id);
@@ -281,10 +278,15 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 		DEV_UNLOCK(dev);
 		return (EIO);
 	}
+	bcopy(uca, dev->unicast_addr, ETHERADDRL);
 	DEV_UNLOCK(dev);
 	return (ret);
 } /* oce_m_unicast */
 
+/*
+ * Hashing policy for load balancing over the set of TX rings
+ * available to the driver.
+ */
 mblk_t *
 oce_m_send(void *arg, mblk_t *mp)
 {
@@ -300,7 +302,10 @@ oce_m_send(void *arg, mblk_t *mp)
 		return (NULL);
 	}
 	DEV_UNLOCK(dev);
-	wq = dev->wq[0];
+	/*
+	 * Hash to pick a wq
+	 */
+	wq = oce_get_wq(dev, mp);
 
 	while (mp != NULL) {
 		/* Save the Pointer since mp will be freed in case of copy */
@@ -469,12 +474,20 @@ oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
 
 	case MAC_PROP_SPEED: {
 		uint64_t *speed = (uint64_t *)val;
+		struct link_status link = {0};
 
 		ASSERT(size >= sizeof (uint64_t));
 		*speed = 0;
-		if ((dev->state & STATE_MAC_STARTED) &&
-		    (dev->link.mac_speed != 0)) {
-			*speed = 1000000ull * oce_power10(dev->link.mac_speed);
+
+		if (dev->state & STATE_MAC_STARTED) {
+			if (dev->link_speed < 0) {
+				(void) oce_get_link_status(dev, &link);
+				dev->link_speed = link.qos_link_speed ?
+				    link.qos_link_speed * 10 :
+				    pow10[link.mac_speed];
+			}
+
+			*speed = dev->link_speed * 1000000ull;
 		}
 		break;
 	}
@@ -630,18 +643,6 @@ oce_m_promiscuous(void *arg, boolean_t enable)
 	DEV_UNLOCK(dev);
 	return (ret);
 } /* oce_m_promiscuous */
-
-static int
-oce_power10(int power)
-{
-	int ret = 1;
-
-	while (power) {
-		ret *= 10;
-		power--;
-	}
-	return (ret);
-}
 
 /*
  * function to set a private property.

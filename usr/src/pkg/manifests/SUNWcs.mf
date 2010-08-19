@@ -47,6 +47,7 @@ dir path=etc/ftpd group=sys
 dir path=etc/inet group=sys
 dir path=etc/init.d group=sys
 dir path=etc/lib group=sys
+dir path=etc/logadm.d group=sys
 dir path=etc/mail group=mail
 dir path=etc/net group=sys
 dir path=etc/net/ticlts group=sys
@@ -70,7 +71,6 @@ dir path=etc/security/dev group=sys
 dir path=etc/security/exec_attr.d group=sys
 dir path=etc/security/lib group=sys
 dir path=etc/security/prof_attr.d group=sys
-dir path=etc/security/spool group=sys
 dir path=etc/skel group=sys
 dir path=etc/svc group=sys
 dir path=etc/svc/profile group=sys
@@ -161,6 +161,8 @@ dir path=usr/lib/crypto
 dir path=usr/lib/devfsadm group=sys
 dir path=usr/lib/devfsadm/linkmod group=sys
 dir path=usr/lib/fs group=sys
+dir path=usr/lib/fs/autofs group=sys
+dir path=usr/lib/fs/autofs/$(ARCH64) group=sys
 dir path=usr/lib/fs/cachefs group=sys
 dir path=usr/lib/fs/ctfs group=sys
 dir path=usr/lib/fs/dev group=sys
@@ -288,6 +290,7 @@ dir path=var/inet group=sys
 dir path=var/ld
 dir path=var/ld/$(ARCH64)
 dir path=var/log group=sys
+dir path=var/logadm
 dir path=var/mail group=mail mode=1777
 dir path=var/mail/:saved group=mail mode=0775
 dir path=var/news
@@ -362,7 +365,6 @@ file path=etc/default/cron group=sys preserve=true
 file path=etc/default/devfsadm group=sys preserve=true
 file path=etc/default/fs group=sys preserve=true
 file path=etc/default/init group=sys preserve=true
-file path=etc/default/kbd group=sys preserve=true
 file path=etc/default/keyserv group=sys preserve=true
 file path=etc/default/login group=sys preserve=true
 file path=etc/default/nss group=sys preserve=true
@@ -397,7 +399,6 @@ file path=etc/inet/wanboot.conf.sample group=sys mode=0444
 file path=etc/init.d/PRESERVE group=sys mode=0744 preserve=true
 file path=etc/init.d/README group=sys preserve=true
 file path=etc/init.d/cachefs.daemon group=sys mode=0744 preserve=true
-file path=etc/init.d/deallocate group=sys mode=0744 preserve=true
 file path=etc/init.d/ldap.client group=sys mode=0744
 file path=etc/init.d/mkdtab group=sys mode=0744 preserve=true
 file path=etc/init.d/nscd group=sys mode=0744
@@ -406,7 +407,7 @@ file path=etc/init.d/ufs_quota group=sys mode=0744 preserve=true
 file path=etc/inittab group=sys preserve=true
 file path=etc/ioctl.syscon group=sys preserve=true
 file path=etc/ksh.kshrc group=sys preserve=renameold
-file path=etc/logadm.conf group=sys preserve=true
+file path=etc/logadm.conf group=sys preserve=true timestamp=19700101T000000Z
 file path=etc/logindevperm group=sys preserve=true
 file path=etc/magic mode=0444
 file path=etc/mail/mailx.rc preserve=true
@@ -440,15 +441,11 @@ file path=etc/saf/_sactab group=sys preserve=true
 file path=etc/saf/_sysconfig group=sys preserve=true
 file path=etc/saf/zsmon/_pmtab group=sys preserve=true
 file path=etc/security/audit_class group=sys preserve=renamenew
-file path=etc/security/audit_control group=sys preserve=renamenew
 file path=etc/security/audit_event group=sys preserve=renamenew
-file path=etc/security/audit_user group=sys preserve=renamenew
 file path=etc/security/audit_warn group=sys mode=0740 preserve=renamenew
 file path=etc/security/auth_attr group=sys preserve=true \
     timestamp=19700101T000000Z
 file path=etc/security/auth_attr.d/SUNWcs group=sys
-file path=etc/security/bsmconv group=sys mode=0740
-file path=etc/security/bsmunconv group=sys mode=0740
 file path=etc/security/crypt.conf group=sys preserve=renamenew
 file path=etc/security/dev/audio mode=0400
 file path=etc/security/dev/fd0 mode=0400
@@ -526,6 +523,7 @@ file path=lib/svc/manifest/milestone/single-user.xml group=sys mode=0444
 file path=lib/svc/manifest/milestone/sysconfig.xml group=sys mode=0444
 file path=lib/svc/manifest/network/dlmgmt.xml group=sys mode=0444
 file path=lib/svc/manifest/network/dns/client.xml group=sys mode=0444
+file path=lib/svc/manifest/network/dns/install.xml group=sys mode=0444
 file path=lib/svc/manifest/network/forwarding.xml group=sys mode=0444
 file path=lib/svc/manifest/network/inetd-upgrade.xml group=sys mode=0444
 file path=lib/svc/manifest/network/inetd.xml group=sys mode=0444
@@ -535,6 +533,7 @@ file path=lib/svc/manifest/network/ipsec/manual-key.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ipsec/policy.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ldap/client.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-initial.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-install.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-ipmgmt.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-ipqos.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-iptun.xml group=sys mode=0444
@@ -555,6 +554,7 @@ file path=lib/svc/manifest/network/shares/reparsed.xml group=sys mode=0444
 file path=lib/svc/manifest/network/socket-filter-kssl.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ssl/kssl-proxy.xml group=sys mode=0444
 file path=lib/svc/manifest/system/auditd.xml group=sys mode=0444
+file path=lib/svc/manifest/system/auditset.xml group=sys mode=0444
 file path=lib/svc/manifest/system/boot-archive-update.xml group=sys mode=0444
 file path=lib/svc/manifest/system/boot-archive.xml group=sys mode=0444
 file path=lib/svc/manifest/system/boot-config.xml group=sys mode=0444
@@ -563,6 +563,7 @@ file path=lib/svc/manifest/system/console-login.xml group=sys mode=0444
 file path=lib/svc/manifest/system/coreadm.xml group=sys mode=0444
 file path=lib/svc/manifest/system/cron.xml group=sys mode=0444
 file path=lib/svc/manifest/system/cryptosvc.xml group=sys mode=0444
+file path=lib/svc/manifest/system/device/allocate.xml group=sys mode=0444
 file path=lib/svc/manifest/system/device/devices-audio.xml group=sys mode=0444
 file path=lib/svc/manifest/system/device/devices-local.xml group=sys mode=0444
 file path=lib/svc/manifest/system/device/mpxio-upgrade.xml group=sys mode=0444
@@ -579,6 +580,7 @@ file path=lib/svc/manifest/system/hotplug.xml group=sys mode=0444
 file path=lib/svc/manifest/system/identity.xml group=sys mode=0444
 file path=lib/svc/manifest/system/idmap.xml group=sys mode=0444
 file path=lib/svc/manifest/system/keymap.xml group=sys mode=0444
+file path=lib/svc/manifest/system/logadm-upgrade.xml group=sys mode=0444
 file path=lib/svc/manifest/system/manifest-import.xml group=sys mode=0444
 file path=lib/svc/manifest/system/name-service-cache.xml group=sys mode=0444
 file path=lib/svc/manifest/system/pfexecd.xml group=sys mode=0444
@@ -595,6 +597,7 @@ file path=lib/svc/method/boot-archive-update mode=0555
 file path=lib/svc/method/console-login mode=0555
 file path=lib/svc/method/devices-audio mode=0555
 file path=lib/svc/method/devices-local mode=0555
+file path=lib/svc/method/dns-install mode=0555
 file path=lib/svc/method/fs-local mode=0555
 file path=lib/svc/method/fs-minimal mode=0555
 file path=lib/svc/method/fs-root mode=0555
@@ -604,9 +607,11 @@ file path=lib/svc/method/identity-node mode=0555
 file path=lib/svc/method/inetd-upgrade mode=0555
 file path=lib/svc/method/keymap mode=0555
 file path=lib/svc/method/ldap-client mode=0555
+file path=lib/svc/method/logadm-upgrade mode=0555
 file path=lib/svc/method/manifest-import mode=0555
 file path=lib/svc/method/mpxio-upgrade mode=0555
 file path=lib/svc/method/net-init mode=0555
+file path=lib/svc/method/net-install mode=0555
 file path=lib/svc/method/net-ipmgmt mode=0555
 file path=lib/svc/method/net-ipqos mode=0555
 file path=lib/svc/method/net-iptun mode=0555
@@ -619,7 +624,9 @@ file path=lib/svc/method/net-routing-setup mode=0555
 file path=lib/svc/method/net-svc mode=0555
 file path=lib/svc/method/rmtmpfiles mode=0555
 file path=lib/svc/method/rpc-bind mode=0555
+file path=lib/svc/method/svc-allocate mode=0555
 file path=lib/svc/method/svc-auditd mode=0555
+file path=lib/svc/method/svc-auditset mode=0555
 file path=lib/svc/method/svc-boot-config mode=0555
 file path=lib/svc/method/svc-consadm mode=0555
 file path=lib/svc/method/svc-cron mode=0555
@@ -879,6 +886,7 @@ file path=usr/bin/true mode=0555
 file path=usr/bin/tty mode=0555
 file path=usr/bin/tzselect mode=0555
 file path=usr/bin/updatemedia mode=0555
+file path=usr/bin/userattr mode=0555
 file path=usr/bin/vmstat mode=0555
 file path=usr/bin/which mode=0555
 file path=usr/bin/who mode=0555
@@ -1023,9 +1031,7 @@ file path=usr/lib/fs/ufs/ufsrestore mode=4555
 file path=usr/lib/fs/ufs/volcopy mode=0555
 file path=usr/lib/getoptcvt mode=0555
 file path=usr/lib/help/auths/locale/C/AllSolAuthsHeader.html
-file path=usr/lib/help/auths/locale/C/AuditConfig.html
 file path=usr/lib/help/auths/locale/C/AuditHeader.html
-file path=usr/lib/help/auths/locale/C/AuditRead.html
 file path=usr/lib/help/auths/locale/C/AuthJobsAdmin.html
 file path=usr/lib/help/auths/locale/C/AuthJobsUser.html
 file path=usr/lib/help/auths/locale/C/AuthProfmgrAssign.html
@@ -1067,6 +1073,7 @@ file path=usr/lib/help/auths/locale/C/NetworkVRRP.html
 file path=usr/lib/help/auths/locale/C/PriAdmin.html
 file path=usr/lib/help/auths/locale/C/ProfmgrHeader.html
 file path=usr/lib/help/auths/locale/C/RoleHeader.html
+file path=usr/lib/help/auths/locale/C/SmfAllocate.html
 file path=usr/lib/help/auths/locale/C/SmfAutofsStates.html
 file path=usr/lib/help/auths/locale/C/SmfCoreadmStates.html
 file path=usr/lib/help/auths/locale/C/SmfCronStates.html
@@ -1081,6 +1088,7 @@ file path=usr/lib/help/auths/locale/C/SmfIdmapStates.html
 file path=usr/lib/help/auths/locale/C/SmfInetdStates.html
 file path=usr/lib/help/auths/locale/C/SmfLocationStates.html
 file path=usr/lib/help/auths/locale/C/SmfMDNSStates.html
+file path=usr/lib/help/auths/locale/C/SmfManageAudit.html
 file path=usr/lib/help/auths/locale/C/SmfManageHeader.html
 file path=usr/lib/help/auths/locale/C/SmfManageHotplug.html
 file path=usr/lib/help/auths/locale/C/SmfManageZFSSnap.html
@@ -1102,6 +1110,7 @@ file path=usr/lib/help/auths/locale/C/SmfSendmailStates.html
 file path=usr/lib/help/auths/locale/C/SmfSshStates.html
 file path=usr/lib/help/auths/locale/C/SmfSyslogStates.html
 file path=usr/lib/help/auths/locale/C/SmfVRRPStates.html
+file path=usr/lib/help/auths/locale/C/SmfValueAudit.html
 file path=usr/lib/help/auths/locale/C/SmfValueCoreadm.html
 file path=usr/lib/help/auths/locale/C/SmfValueExAcctFlow.html
 file path=usr/lib/help/auths/locale/C/SmfValueExAcctNet.html
@@ -1143,6 +1152,7 @@ file path=usr/lib/help/auths/locale/C/ZoneLogin.html
 file path=usr/lib/help/auths/locale/C/ZoneManage.html
 file path=usr/lib/help/profiles/locale/C/RtAcctadm.html
 file path=usr/lib/help/profiles/locale/C/RtAll.html
+file path=usr/lib/help/profiles/locale/C/RtAuditCfg.html
 file path=usr/lib/help/profiles/locale/C/RtAuditCtrl.html
 file path=usr/lib/help/profiles/locale/C/RtAuditReview.html
 file path=usr/lib/help/profiles/locale/C/RtCPUPowerManagement.html
@@ -1249,6 +1259,7 @@ file path=usr/lib/localedef/extensions/single_byte.x mode=0444
 file path=usr/lib/makekey mode=0555
 file path=usr/lib/more.help
 file path=usr/lib/newsyslog group=sys mode=0555
+file path=usr/lib/passmgmt group=sys mode=0555
 file path=usr/lib/pci/pcidr mode=0555
 file path=usr/lib/pci/pcidr_plugin.so
 file path=usr/lib/pfexecd mode=0555
@@ -1399,7 +1410,6 @@ file path=usr/sbin/nlsadmin group=adm mode=0755
 file path=usr/sbin/nscd mode=0555
 file path=usr/sbin/nwamadm mode=0555
 file path=usr/sbin/nwamcfg mode=0555
-file path=usr/sbin/passmgmt group=sys mode=0555
 file path=usr/sbin/pmadm group=sys mode=0555
 file path=usr/sbin/praudit mode=0555
 $(i386_ONLY)file path=usr/sbin/prtdiag group=sys mode=2755
@@ -1434,8 +1444,8 @@ file path=usr/sbin/syncstat mode=0555
 file path=usr/sbin/syseventadm group=sys mode=0555
 file path=usr/sbin/syslogd group=sys mode=0555
 file path=usr/sbin/tar mode=0555
-file path=usr/sbin/trapstat mode=0555
 file path=usr/sbin/traceroute mode=4555
+file path=usr/sbin/trapstat mode=0555
 file path=usr/sbin/ttyadm group=sys mode=0755
 $(i386_ONLY)file path=usr/sbin/ucodeadm mode=0555
 file path=usr/sbin/umountall group=sys mode=0555
@@ -1948,6 +1958,7 @@ file path=usr/share/lib/zoneinfo/PST8PDT
 file path=usr/share/lib/zoneinfo/Pacific/Apia
 file path=usr/share/lib/zoneinfo/Pacific/Auckland
 file path=usr/share/lib/zoneinfo/Pacific/Chatham
+file path=usr/share/lib/zoneinfo/Pacific/Chuuk
 file path=usr/share/lib/zoneinfo/Pacific/Easter
 file path=usr/share/lib/zoneinfo/Pacific/Efate
 file path=usr/share/lib/zoneinfo/Pacific/Enderbury
@@ -1973,14 +1984,13 @@ file path=usr/share/lib/zoneinfo/Pacific/Noumea
 file path=usr/share/lib/zoneinfo/Pacific/Pago_Pago
 file path=usr/share/lib/zoneinfo/Pacific/Palau
 file path=usr/share/lib/zoneinfo/Pacific/Pitcairn
-file path=usr/share/lib/zoneinfo/Pacific/Ponape
+file path=usr/share/lib/zoneinfo/Pacific/Pohnpei
 file path=usr/share/lib/zoneinfo/Pacific/Port_Moresby
 file path=usr/share/lib/zoneinfo/Pacific/Rarotonga
 file path=usr/share/lib/zoneinfo/Pacific/Saipan
 file path=usr/share/lib/zoneinfo/Pacific/Tahiti
 file path=usr/share/lib/zoneinfo/Pacific/Tarawa
 file path=usr/share/lib/zoneinfo/Pacific/Tongatapu
-file path=usr/share/lib/zoneinfo/Pacific/Truk
 file path=usr/share/lib/zoneinfo/Pacific/Wake
 file path=usr/share/lib/zoneinfo/Pacific/Wallis
 file path=usr/share/lib/zoneinfo/WET
@@ -2021,7 +2031,6 @@ hardlink path=etc/rc2.d/S73cachefs.daemon \
     target=../../etc/init.d/cachefs.daemon
 hardlink path=etc/rc2.d/S82mkdtab target=../../etc/init.d/mkdtab
 hardlink path=etc/rc2.d/S89PRESERVE target=../../etc/init.d/PRESERVE
-hardlink path=etc/rc2.d/S98deallocate target=../../etc/init.d/deallocate
 $(sparc_ONLY)hardlink path=etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
     target=./platform_SUNW,Sun-Fire-880.xml
 $(sparc_ONLY)hardlink \
@@ -2477,10 +2486,14 @@ hardlink path=usr/share/lib/zoneinfo/Navajo \
     target=../../../../usr/share/lib/zoneinfo/America/Denver
 hardlink path=usr/share/lib/zoneinfo/PRC \
     target=../../../../usr/share/lib/zoneinfo/Asia/Shanghai
+hardlink path=usr/share/lib/zoneinfo/Pacific/Ponape \
+    target=../../../../../usr/share/lib/zoneinfo/Pacific/Pohnpei
 hardlink path=usr/share/lib/zoneinfo/Pacific/Samoa \
     target=../../../../../usr/share/lib/zoneinfo/Pacific/Pago_Pago
+hardlink path=usr/share/lib/zoneinfo/Pacific/Truk \
+    target=../../../../../usr/share/lib/zoneinfo/Pacific/Chuuk
 hardlink path=usr/share/lib/zoneinfo/Pacific/Yap \
-    target=../../../../../usr/share/lib/zoneinfo/Pacific/Truk
+    target=../../../../../usr/share/lib/zoneinfo/Pacific/Chuuk
 hardlink path=usr/share/lib/zoneinfo/Poland \
     target=../../../../usr/share/lib/zoneinfo/Europe/Warsaw
 hardlink path=usr/share/lib/zoneinfo/Portugal \
@@ -2528,49 +2541,55 @@ hardlink path=usr/share/lib/zoneinfo/W-SU \
 hardlink path=usr/share/lib/zoneinfo/Zulu \
     target=../../../../usr/share/lib/zoneinfo/Etc/UTC
 hardlink path=usr/xpg4/bin/pfsh target=../../bin/pfexec
-legacy pkg=SUNWcsr arch=$(ARCH) category=system \
+legacy pkg=SUNWcsr \
     desc="core software for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWcsu arch=$(ARCH) category=system \
+    name="Core Solaris, (Root)"
+legacy pkg=SUNWcsu \
     desc="core software for a specific instruction-set architecture" \
-    hotline="Please contact your local service provider" \
-    name="Core Solaris, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWftpr arch=$(ARCH) category=system \
-    desc="FTP Server Configuration Files" \
-    hotline="Please contact your local service provider" \
-    name="FTP Server, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license ../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
-    license=../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
-license cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE
-license cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE
-license cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp \
-    license=cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp
-license cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route \
-    license=cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route
-license cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE
-license cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE \
-    license=cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE
-license cmd/csh/THIRDPARTYLICENSE license=cmd/csh/THIRDPARTYLICENSE
-license cmd/eeprom/THIRDPARTYLICENSE license=cmd/eeprom/THIRDPARTYLICENSE
-license cmd/fs.d/ufs/THIRDPARTYLICENSE license=cmd/fs.d/ufs/THIRDPARTYLICENSE
-license cmd/mt/THIRDPARTYLICENSE license=cmd/mt/THIRDPARTYLICENSE
-license cmd/script/THIRDPARTYLICENSE license=cmd/script/THIRDPARTYLICENSE
-license cmd/stat/vmstat/THIRDPARTYLICENSE \
-    license=cmd/stat/vmstat/THIRDPARTYLICENSE
-license cmd/tip/THIRDPARTYLICENSE license=cmd/tip/THIRDPARTYLICENSE
-license cmd/tr/THIRDPARTYLICENSE license=cmd/tr/THIRDPARTYLICENSE
-license cmd/vi/THIRDPARTYLICENSE license=cmd/vi/THIRDPARTYLICENSE
-license cmd/which/THIRDPARTYLICENSE license=cmd/which/THIRDPARTYLICENSE
-license cmd/xstr/THIRDPARTYLICENSE license=cmd/xstr/THIRDPARTYLICENSE
+    name="Core Solaris, (Usr)"
+legacy pkg=SUNWftpr desc="FTP Server Configuration Files" \
+    name="FTP Server, (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp \
+    license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp
+license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route \
+    license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route
+license usr/src/cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE
+license usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
+license usr/src/cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE
+license usr/src/cmd/cron/THIRDPARTYLICENSE \
+    license=usr/src/cmd/cron/THIRDPARTYLICENSE
+license usr/src/cmd/csh/THIRDPARTYLICENSE \
+    license=usr/src/cmd/csh/THIRDPARTYLICENSE
+license usr/src/cmd/eeprom/THIRDPARTYLICENSE \
+    license=usr/src/cmd/eeprom/THIRDPARTYLICENSE
+license usr/src/cmd/fs.d/ufs/THIRDPARTYLICENSE \
+    license=usr/src/cmd/fs.d/ufs/THIRDPARTYLICENSE
+license usr/src/cmd/mt/THIRDPARTYLICENSE \
+    license=usr/src/cmd/mt/THIRDPARTYLICENSE
+license usr/src/cmd/script/THIRDPARTYLICENSE \
+    license=usr/src/cmd/script/THIRDPARTYLICENSE
+license usr/src/cmd/stat/vmstat/THIRDPARTYLICENSE \
+    license=usr/src/cmd/stat/vmstat/THIRDPARTYLICENSE
+license usr/src/cmd/tip/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tip/THIRDPARTYLICENSE
+license usr/src/cmd/tr/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tr/THIRDPARTYLICENSE
+license usr/src/cmd/vi/THIRDPARTYLICENSE \
+    license=usr/src/cmd/vi/THIRDPARTYLICENSE
+license usr/src/cmd/which/THIRDPARTYLICENSE \
+    license=usr/src/cmd/which/THIRDPARTYLICENSE
+license usr/src/cmd/xstr/THIRDPARTYLICENSE \
+    license=usr/src/cmd/xstr/THIRDPARTYLICENSE
+license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
 link path=bin target=./usr/bin
 link path=etc/TIMEZONE target=./default/init
 link path=etc/autopush target=../sbin/autopush
@@ -2644,7 +2663,6 @@ link path=usr/bin/cachefspack target=../lib/fs/cachefs/cachefspack
 link path=usr/bin/cachefsstat target=../lib/fs/cachefs/cachefsstat
 link path=usr/bin/df target=../sbin/df
 link path=usr/bin/jsh target=ksh93
-link path=usr/bin/passmgmt target=../sbin/passmgmt
 link path=usr/bin/pwconv target=../sbin/pwconv
 link path=usr/bin/rmail target=./mail
 link path=usr/bin/sh target=$(ARCH32)/ksh93

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -31,8 +29,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * uuencode [-m] [input] decode_pathname
@@ -136,7 +132,7 @@ main(int argc, char **argv)
 	 */
 	if (base64flag) {
 		(void) memcpy(encode_table, base64_table_initializer,
-		    sizeof (base64_table_initializer));
+		    sizeof (encode_table));
 	} else {
 		for (i = 0; i < TABLE_SIZE; i++)
 			encode_table[i] = (unsigned char)i + 0x20;

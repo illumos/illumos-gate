@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -126,6 +125,7 @@ smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 	unc_name = kmem_alloc(unc_len, KM_SLEEP);
 	(void) snprintf(unc_name, unc_len, "\\\\%s\\%s",
 	    vcp->vc_srvname, ssp->ss_name);
+	SMBSDEBUG("unc_name: \"%s\"", unc_name);
 
 	/*
 	 * The password is now pre-computed in the
@@ -178,21 +178,33 @@ smb_smb_treeconnect(struct smb_share *ssp, struct smb_cred *scred)
 	rqp->sr_flags |= SMBR_NOINTR_RECV;
 	error = smb_rq_simple(rqp);
 	SMBSDEBUG("%d\n", error);
-	if (error)
+	if (error) {
+		/*
+		 * If we get the server name wrong, i.e. due to
+		 * mis-configured name services, this will be
+		 * NT_STATUS_DUPLICATE_NAME.  Log this error.
+		 */
+		SMBERROR("(%s) failed, status=0x%x",
+		    unc_name, rqp->sr_error);
 		goto out;
+	}
 
 	/*
 	 * Parse the TCON response
 	 */
 	smb_rq_getreply(rqp, &mdp);
 	md_get_uint8(mdp, &wc);
-	if (wc != 3) {
+	if (wc != 3 && wc != 7) {
 		error = EBADRPC;
 		goto out;
 	}
 	md_get_uint16le(mdp, NULL);		/* AndX cmd */
 	md_get_uint16le(mdp, NULL);		/* AndX off */
 	md_get_uint16le(mdp, &options);		/* option bits (DFS, search) */
+	if (wc == 7) {
+		md_get_uint32le(mdp, NULL);	/* MaximalShareAccessRights */
+		md_get_uint32le(mdp, NULL);	/* GuestMaximalShareAcc... */
+	}
 	error = md_get_uint16le(mdp, &bcnt);	/* byte count */
 	if (error)
 		goto out;

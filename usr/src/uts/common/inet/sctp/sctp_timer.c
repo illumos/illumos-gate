@@ -57,6 +57,16 @@ typedef struct sctp_tb_s {
 	clock_t			sctp_tb_time_left;
 } sctp_tb_t;
 
+/*
+ * Early abort threshold when the system is under pressure, sctps_reclaim
+ * is on.
+ *
+ * sctp_pa_early_abort: number of strikes per association before abort
+ * sctp_pp_early_abort: number of strikes per peer address before abort
+ */
+uint32_t sctp_pa_early_abort = 5;
+uint32_t sctp_pp_early_abort = 3;
+
 static void sctp_timer_fire(sctp_tb_t *);
 
 /*
@@ -371,7 +381,7 @@ sctp_ack_timer(sctp_t *sctp)
 
 	sctp->sctp_ack_timer_running = 0;
 	sctp->sctp_sack_toggle = sctps->sctps_deferred_acks_max;
-	BUMP_MIB(&sctps->sctps_mib, sctpOutAckDelayed);
+	SCTPS_BUMP_MIB(sctps, sctpOutAckDelayed);
 	(void) sctp_sack(sctp, NULL);
 }
 
@@ -386,21 +396,21 @@ sctp_heartbeat_timer(sctp_t *sctp)
 	int64_t		earliest_expiry;
 	int		cnt;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	int		pp_max_retr;
 
 	if (sctp->sctp_strikes >= sctp->sctp_pa_max_rxt) {
 		/*
-		 * If there is a peer address with no strikes,
-		 * don't give up yet. If enough other peer
-		 * address are down, we could otherwise fail
-		 * the association prematurely.  This is a
-		 * byproduct of our aggressive probe approach
-		 * when a heartbeat fails to connect. We may
-		 * wish to revisit this...
+		 * If there is a peer address with no strikes, don't give up
+		 * yet unless we are under memory pressure.  If enough other
+		 * peer  address are down, we could otherwise fail the
+		 * association prematurely.  This is a byproduct of our
+		 * aggressive probe approach when a heartbeat fails to
+		 * connect. We may wish to revisit this...
 		 */
-		if (!sctp_is_a_faddr_clean(sctp)) {
+		if (sctps->sctps_reclaim || !sctp_is_a_faddr_clean(sctp)) {
 			/* time to give up */
-			BUMP_MIB(&sctps->sctps_mib, sctpAborted);
-			BUMP_MIB(&sctps->sctps_mib, sctpTimHeartBeatDrop);
+			SCTPS_BUMP_MIB(sctps, sctpAborted);
+			SCTPS_BUMP_MIB(sctps, sctpTimHeartBeatDrop);
 			sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
 			sctp_clean_death(sctp, sctp->sctp_client_errno ?
 			    sctp->sctp_client_errno : ETIMEDOUT);
@@ -423,7 +433,12 @@ sctp_heartbeat_timer(sctp_t *sctp)
 	 * and the number of peer addresses should not be big, this should
 	 * be OK.
 	 */
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+		if (sctps->sctps_reclaim)
+			pp_max_retr = MIN(sctp_pp_early_abort, fp->sf_max_retr);
+		else
+			pp_max_retr = fp->sf_max_retr;
+
 		/*
 		 * If the peer is unreachable because there is no available
 		 * source address, call sctp_get_dest() to see if it is
@@ -434,28 +449,29 @@ sctp_heartbeat_timer(sctp_t *sctp)
 		 * up to the normal heartbeat max times.  But if heartbeat
 		 * is disable, this retry may go on forever.
 		 */
-		if (fp->state == SCTP_FADDRS_UNREACH) {
+		if (fp->sf_state == SCTP_FADDRS_UNREACH) {
 			sctp_get_dest(sctp, fp);
-			if (fp->state == SCTP_FADDRS_UNREACH) {
-				if (fp->hb_enabled &&
-				    ++fp->strikes > fp->max_retr &&
+			if (fp->sf_state == SCTP_FADDRS_UNREACH) {
+				if (fp->sf_hb_enabled &&
+				    ++fp->sf_strikes > pp_max_retr &&
 				    sctp_faddr_dead(sctp, fp,
 				    SCTP_FADDRS_DOWN) == -1) {
 					/* Assoc is dead */
 					return;
 				}
-				fp->hb_expiry = now + SET_HB_INTVL(fp);
+				fp->sf_hb_expiry = now + SET_HB_INTVL(fp);
 				goto set_expiry;
 			} else {
 				/* Send a heartbeat immediately. */
-				fp->hb_expiry = now;
+				fp->sf_hb_expiry = now;
 			}
 		}
 		/*
 		 * Don't send heartbeat to this address if it is not
 		 * hb_enabled and the address has been confirmed.
 		 */
-		if (!fp->hb_enabled && fp->state != SCTP_FADDRS_UNCONFIRMED) {
+		if (!fp->sf_hb_enabled && fp->sf_state !=
+		    SCTP_FADDRS_UNCONFIRMED) {
 			continue;
 		}
 
@@ -470,15 +486,15 @@ sctp_heartbeat_timer(sctp_t *sctp)
 		 * heartbeat timeout value.  If there is no heartbeat pending,
 		 * just send out one.
 		 */
-		if (now >= fp->hb_expiry) {
-			if (fp->hb_pending) {
+		if (now >= fp->sf_hb_expiry) {
+			if (fp->sf_hb_pending) {
 				/*
 				 * If an address is not confirmed, no need
 				 * to bump the overall counter as it doesn't
 				 * matter as we will not use it to send data
 				 * and it should not affect the association.
 				 */
-				switch (fp->state) {
+				switch (fp->sf_state) {
 				case SCTP_FADDRS_ALIVE:
 					sctp->sctp_strikes++;
 					/* FALLTHRU */
@@ -487,9 +503,9 @@ sctp_heartbeat_timer(sctp_t *sctp)
 					 * Retransmission implies that RTO
 					 * is probably not correct.
 					 */
-					fp->rtt_updates = 0;
-					fp->strikes++;
-					if (fp->strikes > fp->max_retr) {
+					fp->sf_rtt_updates = 0;
+					fp->sf_strikes++;
+					if (fp->sf_strikes > pp_max_retr) {
 						if (sctp_faddr_dead(sctp, fp,
 						    SCTP_FADDRS_DOWN) == -1) {
 							/* Assoc is dead */
@@ -499,18 +515,20 @@ sctp_heartbeat_timer(sctp_t *sctp)
 						 * Addr is down; keep initial
 						 * RTO
 						 */
-						fp->rto =
+						fp->sf_rto =
 						    sctp->sctp_rto_initial;
 						goto dead_addr;
 					} else {
 						SCTP_CALC_RXT(sctp, fp,
 						    sctp->sctp_rto_max);
-						fp->hb_expiry = now + fp->rto;
+						fp->sf_hb_expiry = now +
+						    fp->sf_rto;
 					}
 					break;
 				case SCTP_FADDRS_DOWN:
 dead_addr:
-					fp->hb_expiry = now + SET_HB_INTVL(fp);
+					fp->sf_hb_expiry = now +
+					    SET_HB_INTVL(fp);
 					break;
 				default:
 					continue;
@@ -520,11 +538,12 @@ dead_addr:
 				 * If there is unack'ed data, no need to
 				 * send a heart beat.
 				 */
-				if (fp->suna > 0) {
-					fp->hb_expiry = now + SET_HB_INTVL(fp);
+				if (fp->sf_suna > 0) {
+					fp->sf_hb_expiry = now +
+					    SET_HB_INTVL(fp);
 					goto set_expiry;
 				} else {
-					fp->hb_expiry = now + fp->rto;
+					fp->sf_hb_expiry = now + fp->sf_rto;
 				}
 			}
 			/*
@@ -537,12 +556,13 @@ dead_addr:
 			 * is not sent, it will not affect the state of the
 			 * peer address.
 			 */
-			if (fp->state != SCTP_FADDRS_UNCONFIRMED || cnt-- > 0)
+			if (fp->sf_state != SCTP_FADDRS_UNCONFIRMED ||
+			    cnt-- > 0)
 				sctp_send_heartbeat(sctp, fp);
 		}
 set_expiry:
-		if (fp->hb_expiry < earliest_expiry || earliest_expiry == 0)
-			earliest_expiry = fp->hb_expiry;
+		if (fp->sf_hb_expiry < earliest_expiry || earliest_expiry == 0)
+			earliest_expiry = fp->sf_hb_expiry;
 	}
 	if (sctp->sctp_autoclose != 0) {
 		int64_t expire;
@@ -570,30 +590,40 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	mblk_t 		*mp;
 	uint32_t	rto_max = sctp->sctp_rto_max;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	int		pp_max_retr, pa_max_retr;
 
 	ASSERT(fp != NULL);
 
 	dprint(3, ("sctp_timer: faddr=%x:%x:%x:%x\n",
-	    SCTP_PRINTADDR(fp->faddr)));
+	    SCTP_PRINTADDR(fp->sf_faddr)));
 
-	fp->timer_running = 0;
+	fp->sf_timer_running = 0;
+
+	if (!sctps->sctps_reclaim) {
+		pp_max_retr = fp->sf_max_retr;
+		pa_max_retr = sctp->sctp_pa_max_rxt;
+	} else {
+		/* App may have set a very aggressive retransmission limit. */
+		pp_max_retr = MIN(sctp_pp_early_abort, fp->sf_max_retr);
+		pa_max_retr = MIN(sctp_pa_early_abort, sctp->sctp_pa_max_rxt);
+	}
 
 	/* Check is we've reached the max for retries */
 	if (sctp->sctp_state < SCTPS_ESTABLISHED) {
-		if (fp->strikes >= sctp->sctp_max_init_rxt) {
+		if (fp->sf_strikes >= sctp->sctp_max_init_rxt) {
 			/* time to give up */
-			BUMP_MIB(&sctps->sctps_mib, sctpAborted);
-			BUMP_MIB(&sctps->sctps_mib, sctpTimRetransDrop);
+			SCTPS_BUMP_MIB(sctps, sctpAborted);
+			SCTPS_BUMP_MIB(sctps, sctpTimRetransDrop);
 			sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0, NULL);
 			sctp_clean_death(sctp, sctp->sctp_client_errno ?
 			    sctp->sctp_client_errno : ETIMEDOUT);
 			return;
 		}
 	} else if (sctp->sctp_state >= SCTPS_ESTABLISHED) {
-		if (sctp->sctp_strikes >= sctp->sctp_pa_max_rxt) {
+		if (sctp->sctp_strikes >= pa_max_retr) {
 			/* time to give up */
-			BUMP_MIB(&sctps->sctps_mib, sctpAborted);
-			BUMP_MIB(&sctps->sctps_mib, sctpTimRetransDrop);
+			SCTPS_BUMP_MIB(sctps, sctpAborted);
+			SCTPS_BUMP_MIB(sctps, sctpTimRetransDrop);
 			sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
 			sctp_clean_death(sctp, sctp->sctp_client_errno ?
 			    sctp->sctp_client_errno : ETIMEDOUT);
@@ -601,7 +631,7 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 		}
 	}
 
-	if (fp->strikes >= fp->max_retr) {
+	if (fp->sf_strikes >= pp_max_retr) {
 		if (sctp_faddr_dead(sctp, fp, SCTP_FADDRS_DOWN) == -1) {
 			return;
 		}
@@ -624,7 +654,7 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 			return;
 		}
 
-		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
+		SCTPS_BUMP_MIB(sctps, sctpTimRetrans);
 
 		sctp_rexmit(sctp, fp);
 		/*
@@ -643,8 +673,8 @@ rxmit_init:
 		 */
 		mp = sctp_init_mp(sctp, fp);
 		if (mp != NULL) {
-			BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
-			(void) conn_ip_output(mp, fp->ixa);
+			SCTPS_BUMP_MIB(sctps, sctpTimRetrans);
+			(void) conn_ip_output(mp, fp->sf_ixa);
 			BUMP_LOCAL(sctp->sctp_opkts);
 		}
 		rto_max = sctp->sctp_rto_max_init;
@@ -658,15 +688,15 @@ rxmit_init:
 		mp = dupmsg(sctp->sctp_cookie_mp);
 		if (mp == NULL)
 			break;
-		(void) conn_ip_output(mp, fp->ixa);
+		(void) conn_ip_output(mp, fp->sf_ixa);
 		BUMP_LOCAL(sctp->sctp_opkts);
-		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
+		SCTPS_BUMP_MIB(sctps, sctpTimRetrans);
 		rto_max = sctp->sctp_rto_max_init;
 		break;
 	case SCTPS_SHUTDOWN_SENT:
 		BUMP_LOCAL(sctp->sctp_T2expire);
 		sctp_send_shutdown(sctp, 1);
-		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
+		SCTPS_BUMP_MIB(sctps, sctpTimRetrans);
 		break;
 	case SCTPS_SHUTDOWN_ACK_SENT:
 		/* We shouldn't have any more outstanding data */
@@ -676,18 +706,18 @@ rxmit_init:
 		BUMP_LOCAL(sctp->sctp_T2expire);
 		(void) sctp_shutdown_received(sctp, NULL, B_FALSE, B_TRUE,
 		    NULL);
-		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
+		SCTPS_BUMP_MIB(sctps, sctpTimRetrans);
 		break;
 	default:
 		ASSERT(0);
 		break;
 	}
 
-	fp->strikes++;
+	fp->sf_strikes++;
 	sctp->sctp_strikes++;
 	SCTP_CALC_RXT(sctp, fp, rto_max);
 
-	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 }
 
 /*
@@ -705,10 +735,10 @@ sctp_update_rtt(sctp_t *sctp, sctp_faddr_t *fp, clock_t delta)
 	dprint(5, ("sctp_update_rtt: fp = %p, rtt = %d\n", (void *)fp, rtt));
 
 	/* Is this the first RTT measurement? */
-	if (fp->srtt == -1) {
-		fp->srtt = rtt;
-		fp->rttvar = rtt / 2;
-		fp->rto = 3 * rtt; /* == rtt + 4 * rttvar ( == rtt / 2) */
+	if (fp->sf_srtt == -1) {
+		fp->sf_srtt = rtt;
+		fp->sf_rttvar = rtt / 2;
+		fp->sf_rto = 3 * rtt; /* == rtt + 4 * rttvar ( == rtt / 2) */
 	} else {
 		int abs;
 		/*
@@ -716,28 +746,28 @@ sctp_update_rtt(sctp_t *sctp, sctp_faddr_t *fp, clock_t delta)
 		 * alpha and beta are NOT tunable in this implementation,
 		 * and so are hard-coded in. alpha = 1/8, beta = 1/4.
 		 */
-		abs = fp->srtt - rtt;
+		abs = fp->sf_srtt - rtt;
 		abs = abs >= 0 ? abs : -abs;
-		fp->rttvar = (3 * fp->rttvar + abs) >> 2;
-		fp->rttvar = fp->rttvar != 0 ? fp->rttvar : 1;
+		fp->sf_rttvar = (3 * fp->sf_rttvar + abs) >> 2;
+		fp->sf_rttvar = fp->sf_rttvar != 0 ? fp->sf_rttvar : 1;
 
-		fp->srtt = (7 * fp->srtt + rtt) >> 3;
-		fp->rto = fp->srtt + 4 * fp->rttvar;
+		fp->sf_srtt = (7 * fp->sf_srtt + rtt) >> 3;
+		fp->sf_rto = fp->sf_srtt + 4 * fp->sf_rttvar;
 	}
 
 	dprint(5, ("sctp_update_rtt: srtt = %d, rttvar = %d, rto = %d\n",
-	    fp->srtt, fp->rttvar, fp->rto));
+	    fp->sf_srtt, fp->sf_rttvar, fp->sf_rto));
 
 	/* Bound the RTO by configured min and max values */
-	if (fp->rto < sctp->sctp_rto_min) {
-		fp->rto = sctp->sctp_rto_min;
+	if (fp->sf_rto < sctp->sctp_rto_min) {
+		fp->sf_rto = sctp->sctp_rto_min;
 	}
-	if (fp->rto > sctp->sctp_rto_max) {
-		fp->rto = sctp->sctp_rto_max;
+	if (fp->sf_rto > sctp->sctp_rto_max) {
+		fp->sf_rto = sctp->sctp_rto_max;
 	}
 
 	SCTP_MAX_RTO(sctp, fp);
-	fp->rtt_updates++;
+	fp->sf_rtt_updates++;
 }
 
 void
@@ -745,16 +775,16 @@ sctp_free_faddr_timers(sctp_t *sctp)
 {
 	sctp_faddr_t *fp;
 
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-		if (fp->timer_mp != NULL) {
-			sctp_timer_free(fp->timer_mp);
-			fp->timer_mp = NULL;
-			fp->timer_running = 0;
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+		if (fp->sf_timer_mp != NULL) {
+			sctp_timer_free(fp->sf_timer_mp);
+			fp->sf_timer_mp = NULL;
+			fp->sf_timer_running = 0;
 		}
-		if (fp->rc_timer_mp != NULL) {
-			sctp_timer_free(fp->rc_timer_mp);
-			fp->rc_timer_mp = NULL;
-			fp->rc_timer_running = 0;
+		if (fp->sf_rc_timer_mp != NULL) {
+			sctp_timer_free(fp->sf_rc_timer_mp);
+			fp->sf_rc_timer_mp = NULL;
+			fp->sf_rc_timer_running = 0;
 		}
 	}
 }
@@ -764,7 +794,7 @@ sctp_stop_faddr_timers(sctp_t *sctp)
 {
 	sctp_faddr_t *fp;
 
-	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
 		SCTP_FADDR_TIMER_STOP(fp);
 		SCTP_FADDR_RC_TIMER_STOP(fp);
 	}

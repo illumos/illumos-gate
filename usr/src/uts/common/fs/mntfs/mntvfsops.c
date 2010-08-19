@@ -201,7 +201,7 @@ mntmount(struct vfs *vfsp, struct vnode *mvp,
 	/*
 	 * Having the resource be anything but "mnttab" doesn't make sense
 	 */
-	vfs_setresource(vfsp, "mnttab");
+	vfs_setresource(vfsp, "mnttab", 0);
 
 	mnt = kmem_zalloc(sizeof (*mnt), KM_SLEEP);
 	mutex_enter(&mvp->v_lock);
@@ -213,7 +213,8 @@ mntmount(struct vfs *vfsp, struct vnode *mvp,
 	}
 	mutex_exit(&mvp->v_lock);
 
-	zone_hold(mnt->mnt_zone = zone);
+	zone_init_ref(&mnt->mnt_zone_ref);
+	zone_hold_ref(zone, &mnt->mnt_zone_ref, ZONE_REF_MNTFS);
 	mnp = &mnt->mnt_node;
 
 	vfsp->vfs_fstype = mntfstype;
@@ -256,7 +257,7 @@ mntunmount(struct vfs *vfsp, int flag, struct cred *cr)
 	}
 
 	mutex_exit(&vp->v_lock);
-	zone_rele(mnt->mnt_zone);
+	zone_rele_ref(&mnt->mnt_zone_ref, ZONE_REF_MNTFS);
 	vn_invalid(vp);
 	vn_free(vp);
 	kmem_free(mnt, sizeof (*mnt));

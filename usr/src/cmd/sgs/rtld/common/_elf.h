@@ -58,10 +58,10 @@ extern	int	elf_lookup_filtee(Slookup *, Sresult *, uint_t *, uint_t,
 		    int *);
 extern	int	elf_mach_flags_check(Rej_desc *, Ehdr *);
 extern	Rt_map	*elf_new_lmp(Lm_list *, Aliste, Fdesc *, Addr, size_t, void *,
-		    int *);
-extern	Rt_map	*elf_obj_file(Lm_list *, Aliste, const char *,
+		    Rt_map *, int *);
+extern	Rt_map	*elf_obj_file(Lm_list *, Aliste, Rt_map *, const char *,
 		    mmapobj_result_t *, mmapobj_result_t *, uint_t);
-extern	Rt_map	*elf_obj_fini(Lm_list *, Rt_map *, int *);
+extern	Rt_map	*elf_obj_fini(Lm_list *, Rt_map *, Rt_map *, int *);
 extern	void	elf_plt_init(void *, caddr_t);
 #if	defined(__sparcv9)
 extern	void	elf_plt2_init(uint_t *, Rt_map *);

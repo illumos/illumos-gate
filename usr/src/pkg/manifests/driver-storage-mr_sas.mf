@@ -49,10 +49,8 @@ $(i386_ONLY)driver name=mr_sas class=scsi-self-identifying \
 file path=kernel/drv/$(ARCH64)/mr_sas group=sys
 $(i386_ONLY)file path=kernel/drv/mr_sas group=sys
 file path=kernel/drv/mr_sas.conf group=sys
-legacy pkg=SUNWmrsas arch=$(ARCH) category=system \
-    desc="LSI MegaRAID SAS2.0 Controller HBA Driver" \
-    hotline="Please contact your local service provider" \
-    name="LSI MegaRAID SAS2.0 HBA Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWmrsas desc="LSI MegaRAID SAS2.0 Controller HBA Driver" \
+    name="LSI MegaRAID SAS2.0 HBA Driver"
 license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE

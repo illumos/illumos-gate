@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/fm/util.h>
@@ -236,7 +233,7 @@ fmd_rpc_fini(void)
 /*
  * Utillity function to fetch the XPRT's ucred and determine if we should deny
  * the request.  For now, we implement a simple policy of rejecting any caller
- * who does not have the PRIV_SYS_CONFIG bit in their Effective privilege set,
+ * who does not have the PRIV_SYS_ADMIN bit in their Effective privilege set,
  * unless the caller is loading a module, which requires all privileges.
  */
 int
@@ -265,5 +262,5 @@ fmd_rpc_deny(struct svc_req *rqp)
 	if (rqp->rq_proc == FMD_ADM_MODLOAD)
 		return (!priv_isfullset(psp));
 #endif
-	return (!priv_ismember(psp, PRIV_SYS_CONFIG));
+	return (!priv_ismember(psp, PRIV_SYS_ADMIN));
 }

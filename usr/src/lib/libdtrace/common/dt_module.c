@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -717,9 +717,24 @@ dt_module_unload(dtrace_hdl_t *dtp, dt_module_t *dmp)
 void
 dt_module_destroy(dtrace_hdl_t *dtp, dt_module_t *dmp)
 {
+	uint_t h = dt_strtab_hash(dmp->dm_name, NULL) % dtp->dt_modbuckets;
+	dt_module_t **dmpp = &dtp->dt_mods[h];
+
 	dt_list_delete(&dtp->dt_modlist, dmp);
 	assert(dtp->dt_nmods != 0);
 	dtp->dt_nmods--;
+
+	/*
+	 * Now remove this module from its hash chain.  We expect to always
+	 * find the module on its hash chain, so in this loop we assert that
+	 * we don't run off the end of the list.
+	 */
+	while (*dmpp != dmp) {
+		dmpp = &((*dmpp)->dm_next);
+		assert(*dmpp != NULL);
+	}
+
+	*dmpp = dmp->dm_next;
 
 	dt_module_unload(dtp, dmp);
 	free(dmp);

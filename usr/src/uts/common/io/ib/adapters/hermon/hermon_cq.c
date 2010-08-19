@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -59,8 +58,6 @@ static void hermon_cq_cqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
     hermon_hw_cqe_t *cqe, ibt_wc_t *wc);
 static void hermon_cq_errcqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
     hermon_hw_cqe_t *cqe, ibt_wc_t *wc);
-static void hermon_cqe_sync(hermon_cqhdl_t cq, hermon_hw_cqe_t *cqe,
-    uint_t flag);
 
 
 /*
@@ -85,6 +82,7 @@ hermon_cq_alloc(hermon_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	uint32_t		log_cq_size, uarpg;
 	uint_t			cq_is_umap;
 	uint32_t		status, flag;
+	hermon_cq_sched_t	*cq_schedp;
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*cq_attr))
 
@@ -143,6 +141,8 @@ hermon_cq_alloc(hermon_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*cq))
 	cq->cq_is_umap = cq_is_umap;
 	cq->cq_cqnum = cqc->hr_indx;	/* just use index, implicit in Hermon */
+	cq->cq_intmod_count = 0;
+	cq->cq_intmod_usec = 0;
 
 	/*
 	 * If this will be a user-mappable CQ, then allocate an entry for
@@ -252,9 +252,40 @@ hermon_cq_alloc(hermon_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
 
-	/* Sync entire CQ for use by the hardware. */
-	(void) ddi_dma_sync(mr->mr_bindinfo.bi_dmahdl, 0,
-	    cq->cq_cqinfo.qa_size, DDI_DMA_SYNC_FORDEV);
+	cq->cq_erreqnum = HERMON_CQ_ERREQNUM_GET(state);
+	if (cq_attr->cq_flags & IBT_CQ_HID) {
+		if (!HERMON_HID_VALID(state, cq_attr->cq_hid)) {
+			IBTF_DPRINTF_L2("CQalloc", "bad handler id 0x%x",
+			    cq_attr->cq_hid);
+			status = IBT_INVALID_PARAM;
+			goto cqalloc_fail5;
+		}
+		cq->cq_eqnum = HERMON_HID_TO_EQNUM(state, cq_attr->cq_hid);
+		IBTF_DPRINTF_L2("cqalloc", "hid: eqn %d", cq->cq_eqnum);
+	} else {
+		cq_schedp = (hermon_cq_sched_t *)cq_attr->cq_sched;
+		if (cq_schedp == NULL) {
+			cq_schedp = &state->hs_cq_sched_default;
+		} else if (cq_schedp != &state->hs_cq_sched_default) {
+			int i;
+			hermon_cq_sched_t *tmp;
+
+			tmp = state->hs_cq_sched_array;
+			for (i = 0; i < state->hs_cq_sched_array_size; i++)
+				if (cq_schedp == &tmp[i])
+					break;	/* found it */
+			if (i >= state->hs_cq_sched_array_size) {
+				cmn_err(CE_CONT, "!Invalid cq_sched argument: "
+				    "ignored\n");
+				cq_schedp = &state->hs_cq_sched_default;
+			}
+		}
+		cq->cq_eqnum = HERMON_HID_TO_EQNUM(state,
+		    HERMON_CQSCHED_NEXT_HID(cq_schedp));
+		IBTF_DPRINTF_L2("cqalloc", "sched: first-1 %d, len %d, "
+		    "eqn %d", cq_schedp->cqs_start_hid - 1,
+		    cq_schedp->cqs_len, cq->cq_eqnum);
+	}
 
 	/*
 	 * Fill in the CQC entry.  This is the final step before passing
@@ -265,9 +296,6 @@ hermon_cq_alloc(hermon_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	 * appropriately (otherwise it's a "don't care")
 	 */
 	bzero(&cqc_entry, sizeof (hermon_hw_cqc_t));
-
-	cq->cq_eqnum		= HERMON_CQ_EQNUM_GET(state);
-	cq->cq_erreqnum		= HERMON_CQ_ERREQNUM_GET(state);
 
 	cqc_entry.state		= HERMON_CQ_DISARMED;
 	cqc_entry.pg_offs	= cq->cq_cqinfo.qa_pgoffs >> 5;
@@ -327,8 +355,7 @@ hermon_cq_alloc(hermon_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	 * Put CQ handle in Hermon CQNum-to-CQHdl list.  Then fill in the
 	 * "actual_size" and "cqhdl" and return success
 	 */
-	ASSERT(state->hs_cqhdl[cqc->hr_indx] == NULL);
-	state->hs_cqhdl[cqc->hr_indx] = cq;
+	hermon_icm_set_num_to_hdl(state, HERMON_CQC, cqc->hr_indx, cq);
 
 	/*
 	 * If this is a user-mappable CQ, then we need to insert the previously
@@ -458,7 +485,7 @@ hermon_cq_free(hermon_state_t *state, hermon_cqhdl_t *cqhdl, uint_t sleepflag)
 	 * in-progress events to detect that the CQ corresponding to this
 	 * number has been freed.
 	 */
-	state->hs_cqhdl[cqc->hr_indx] = NULL;
+	hermon_icm_set_num_to_hdl(state, HERMON_CQC, cqc->hr_indx, NULL);
 
 	mutex_exit(&cq->cq_lock);
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*cq))
@@ -654,9 +681,6 @@ hermon_cq_resize(hermon_state_t *state, hermon_cqhdl_t cq, uint_t req_size,
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
 
-	(void) ddi_dma_sync(mr->mr_bindinfo.bi_dmahdl, 0,
-	    new_cqinfo.qa_size, DDI_DMA_SYNC_FORDEV);
-
 	/*
 	 * Now we grab the CQ lock.  Since we will be updating the actual
 	 * CQ location and the producer/consumer indexes, we should hold
@@ -733,10 +757,6 @@ hermon_cq_resize(hermon_state_t *state, hermon_cqhdl_t cq, uint_t req_size,
 	bcopy(&new_cqinfo, &(resize_hdl->cq_cqinfo),
 	    sizeof (struct hermon_qalloc_info_s));
 
-	/* sync the new buffer for use by the device */
-	(void) ddi_dma_sync(mr->mr_bindinfo.bi_dmahdl, 0,
-	    new_cqinfo.qa_size, DDI_DMA_SYNC_FORDEV);
-
 	/* now, save the address in the cq_handle */
 	cq->cq_resize_hdl = resize_hdl;
 
@@ -763,8 +783,6 @@ cqresize_fail:
 /*
  * hermon_cq_modify()
  *    Context: Can be called base context.
- *
- * XXX - still need to implement use of the 'hid' argument.
  */
 /* ARGSUSED */
 int
@@ -784,8 +802,8 @@ hermon_cq_modify(hermon_state_t *state, hermon_cqhdl_t cq,
 		    cq->cq_cqnum, MODIFY_MODERATION_CQ, sleepflag);
 		if (status != HERMON_CMD_SUCCESS) {
 			mutex_exit(&cq->cq_lock);
-			cmn_err(CE_CONT, "Hermon: MODIFY_CQ command failed: "
-			    "%08x\n", status);
+			cmn_err(CE_CONT, "Hermon: MODIFY_MODERATION_CQ "
+			    "command failed: %08x\n", status);
 			if (status == HERMON_CMD_INVALID_STATUS) {
 				hermon_fm_ereport(state, HCA_SYS_ERR,
 				    HCA_ERR_SRV_LOST);
@@ -794,6 +812,23 @@ hermon_cq_modify(hermon_state_t *state, hermon_cqhdl_t cq,
 		}
 		cq->cq_intmod_count = count;
 		cq->cq_intmod_usec = usec;
+	}
+	if (hid && (hid - 1 != cq->cq_eqnum)) {
+		bzero(&cqc_entry, sizeof (hermon_hw_cqc_t));
+		cqc_entry.c_eqn = HERMON_HID_TO_EQNUM(state, hid);
+		status = hermon_modify_cq_cmd_post(state, &cqc_entry,
+		    cq->cq_cqnum, MODIFY_EQN, sleepflag);
+		if (status != HERMON_CMD_SUCCESS) {
+			mutex_exit(&cq->cq_lock);
+			cmn_err(CE_CONT, "Hermon: MODIFY_EQN command failed: "
+			    "%08x\n", status);
+			if (status == HERMON_CMD_INVALID_STATUS) {
+				hermon_fm_ereport(state, HCA_SYS_ERR,
+				    HCA_ERR_SRV_LOST);
+			}
+			return (ibc_get_ci_failure(0));
+		}
+		cq->cq_eqnum = hid - 1;
 	}
 	mutex_exit(&cq->cq_lock);
 	return (DDI_SUCCESS);
@@ -834,7 +869,7 @@ hermon_cq_poll(hermon_state_t *state, hermon_cqhdl_t cq, ibt_wc_t *wc_p,
 {
 	hermon_hw_cqe_t	*cqe;
 	uint_t		opcode;
-	uint32_t	cons_indx, wrap_around_mask;
+	uint32_t	cons_indx, wrap_around_mask, shift, mask;
 	uint32_t	polled_cnt, spec_op = 0;
 	int		status;
 
@@ -851,6 +886,8 @@ hermon_cq_poll(hermon_state_t *state, hermon_cqhdl_t cq, ibt_wc_t *wc_p,
 
 	/* Get the consumer index */
 	cons_indx = cq->cq_consindx;
+	shift = cq->cq_log_cqsz;
+	mask = cq->cq_bufsz;
 
 	/*
 	 * Calculate the wrap around mask.  Note: This operation only works
@@ -860,9 +897,6 @@ hermon_cq_poll(hermon_state_t *state, hermon_cqhdl_t cq, ibt_wc_t *wc_p,
 
 	/* Calculate the pointer to the first CQ entry */
 	cqe = &cq->cq_buf[cons_indx & wrap_around_mask];
-
-	/* Sync the current CQE to read */
-	hermon_cqe_sync(cq, cqe, DDI_DMA_SYNC_FORCPU);
 
 	/*
 	 * Keep pulling entries from the CQ until we find an entry owned by
@@ -875,7 +909,7 @@ hermon_cq_poll(hermon_state_t *state, hermon_cqhdl_t cq, ibt_wc_t *wc_p,
 	 * completion).
 	 */
 	polled_cnt = 0;
-	while (HERMON_CQE_OWNER_IS_SW(cq, cqe, cons_indx)) {
+	while (HERMON_CQE_OWNER_IS_SW(cq, cqe, cons_indx, shift, mask)) {
 		if (cq->cq_resize_hdl != 0) {	/* in midst of resize */
 			/* peek at the opcode */
 			opcode = HERMON_CQE_OPCODE_GET(cq, cqe);
@@ -891,9 +925,6 @@ hermon_cq_poll(hermon_state_t *state, hermon_cqhdl_t cq, ibt_wc_t *wc_p,
 				/* Update the pointer to the next CQ entry */
 				cqe = &cq->cq_buf[cons_indx & wrap_around_mask];
 
-				/* Sync the next CQE to read */
-				hermon_cqe_sync(cq, cqe, DDI_DMA_SYNC_FORCPU);
-
 				continue;
 			}
 		}	/* in resizing CQ */
@@ -904,17 +935,11 @@ hermon_cq_poll(hermon_state_t *state, hermon_cqhdl_t cq, ibt_wc_t *wc_p,
 		 */
 		hermon_cq_cqe_consume(state, cq, cqe, &wc_p[polled_cnt++]);
 
-		/* Sync the current CQE for device */
-		hermon_cqe_sync(cq, cqe, DDI_DMA_SYNC_FORDEV);
-
 		/* Increment the consumer index */
 		cons_indx = (cons_indx + 1);
 
 		/* Update the pointer to the next CQ entry */
 		cqe = &cq->cq_buf[cons_indx & wrap_around_mask];
-
-		/* Sync the next CQE to read */
-		hermon_cqe_sync(cq, cqe, DDI_DMA_SYNC_FORCPU);
 
 		/*
 		 * If we have run out of space to store work completions,
@@ -927,9 +952,7 @@ hermon_cq_poll(hermon_state_t *state, hermon_cqhdl_t cq, ibt_wc_t *wc_p,
 
 	/*
 	 * Now we only ring the doorbell (to update the consumer index) if
-	 * we've actually consumed a CQ entry.  If we have, for example,
-	 * pulled from a CQE that we are still in the process of "recycling"
-	 * for error purposes, then we would not update the consumer index.
+	 * we've actually consumed a CQ entry.
 	 */
 	if ((polled_cnt != 0) && (cq->cq_consindx != cons_indx)) {
 		/*
@@ -1029,23 +1052,13 @@ retry:
  * hermon_cq_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 int
 hermon_cq_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
 {
 	hermon_cqhdl_t		cq;
 	uint_t			cqnum;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-	ASSERT(eqe_evttype == HERMON_EVT_COMPLETION ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	/* Get the CQ handle from CQ number in event descriptor */
 	cqnum = HERMON_EQE_CQNUM_GET(eq, eqe);
@@ -1085,6 +1098,7 @@ hermon_cq_handler(hermon_state_t *state, hermon_eqhdl_t eq,
  * hermon_cq_err_handler()
  *    Context: Only called from interrupt context
  */
+/* ARGSUSED */
 int
 hermon_cq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
     hermon_hw_eqe_t *eqe)
@@ -1093,18 +1107,6 @@ hermon_cq_err_handler(hermon_state_t *state, hermon_eqhdl_t eq,
 	uint_t			cqnum;
 	ibc_async_event_t	event;
 	ibt_async_code_t	type;
-	uint_t			eqe_evttype;
-
-	eqe_evttype = HERMON_EQE_EVTTYPE_GET(eq, eqe);
-
-
-	ASSERT(eqe_evttype == HERMON_EVT_CQ_ERRORS ||
-	    eqe_evttype == HERMON_EVT_EQ_OVERFLOW);
-
-	if (eqe_evttype == HERMON_EVT_EQ_OVERFLOW) {
-		hermon_eq_overflow_handler(state, eq, eqe);
-		return (DDI_FAILURE);
-	}
 
 	HERMON_FMANOTE(state, HERMON_FMA_OVERRUN);
 	/* Get the CQ handle from CQ number in event descriptor */
@@ -1278,7 +1280,7 @@ hermon_cqhdl_from_cqnum(hermon_state_t *state, uint_t cqnum)
 	/* Calculate the CQ table index from the cqnum */
 	cqmask = (1 << state->hs_cfg_profile->cp_log_num_cq) - 1;
 	cqindx = cqnum & cqmask;
-	return (state->hs_cqhdl[cqindx]);
+	return (hermon_icm_num_to_hdl(state, HERMON_CQC, cqindx));
 }
 
 /*
@@ -1318,20 +1320,18 @@ hermon_cq_cqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 	 * be associated with it (e.g. whether immediate data is present).
 	 */
 	flags = IBT_WC_NO_FLAGS;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(state->hs_fcoib_may_be_running))
 	if (HERMON_CQE_SENDRECV_GET(cq, cqe) != HERMON_COMPLETION_RECV) {
 
 		/* Send CQE */
 		switch (opcode) {
 		case HERMON_CQE_SND_RDMAWR_IMM:
-			flags |= IBT_WC_IMMED_DATA_PRESENT;
-			/* FALLTHROUGH */
 		case HERMON_CQE_SND_RDMAWR:
 			type = IBT_WRC_RDMAW;
 			break;
 
+		case HERMON_CQE_SND_SEND_INV:
 		case HERMON_CQE_SND_SEND_IMM:
-			flags |= IBT_WC_IMMED_DATA_PRESENT;
-			/* FALLTHROUGH */
 		case HERMON_CQE_SND_SEND:
 			type = IBT_WRC_SEND;
 			break;
@@ -1356,16 +1356,70 @@ hermon_cq_cqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 			type = IBT_WRC_BIND;
 			break;
 
+		case HERMON_CQE_SND_FRWR:
+			type = IBT_WRC_FAST_REG_PMR;
+			break;
+
+		case HERMON_CQE_SND_LCL_INV:
+			type = IBT_WRC_LOCAL_INVALIDATE;
+			break;
+
 		default:
 			HERMON_WARNING(state, "unknown send CQE type");
 			wc->wc_status = IBT_WC_LOCAL_QP_OP_ERR;
 			return;
 		}
+	} else if ((state->hs_fcoib_may_be_running == B_TRUE) &&
+	    hermon_fcoib_is_fexch_qpn(state, HERMON_CQE_QPNUM_GET(cq, cqe))) {
+		type = IBT_WRC_RECV;
+		if (HERMON_CQE_FEXCH_DIFE(cq, cqe))
+			flags |= IBT_WC_DIF_ERROR;
+		wc->wc_bytes_xfer = HERMON_CQE_BYTECNT_GET(cq, cqe);
+		wc->wc_fexch_seq_cnt = HERMON_CQE_FEXCH_SEQ_CNT(cq, cqe);
+		wc->wc_fexch_tx_bytes_xfer = HERMON_CQE_FEXCH_TX_BYTES(cq, cqe);
+		wc->wc_fexch_rx_bytes_xfer = HERMON_CQE_FEXCH_RX_BYTES(cq, cqe);
+		wc->wc_fexch_seq_id = HERMON_CQE_FEXCH_SEQ_ID(cq, cqe);
+		wc->wc_detail = HERMON_CQE_FEXCH_DETAIL(cq, cqe) &
+		    IBT_WC_DETAIL_FC_MATCH_MASK;
+		wc->wc_rkey = HERMON_CQE_IMM_ETH_PKEY_CRED_GET(cq, cqe);
+		flags |= IBT_WC_FEXCH_FMT | IBT_WC_RKEY_INVALIDATED;
 	} else {
+		/*
+		 * Parse the remaining contents of the CQE into the work
+		 * completion.  This means filling in SL, QP number, SLID,
+		 * immediate data, etc.
+		 *
+		 * Note: Not all of these fields are valid in a given
+		 * completion.  Many of them depend on the actual type of
+		 * completion.  So we fill in all of the fields and leave
+		 * it up to the IBTF and consumer to sort out which are
+		 * valid based on their context.
+		 */
+		wc->wc_sl	  = HERMON_CQE_SL_GET(cq, cqe);
+		wc->wc_qpn	  = HERMON_CQE_DQPN_GET(cq, cqe);
+		wc->wc_slid	  = HERMON_CQE_DLID_GET(cq, cqe);
+		wc->wc_immed_data =
+		    HERMON_CQE_IMM_ETH_PKEY_CRED_GET(cq, cqe);
+		wc->wc_ethertype  = (wc->wc_immed_data & 0xFFFF);
+		wc->wc_pkey_ix	  = (wc->wc_immed_data &
+		    ((1 << state->hs_queryport.log_max_pkey) - 1));
+		/*
+		 * Fill in "bytes transferred" as appropriate.  Also,
+		 * if necessary, fill in the "path bits" field.
+		 */
+		wc->wc_path_bits = HERMON_CQE_PATHBITS_GET(cq, cqe);
+		wc->wc_bytes_xfer = HERMON_CQE_BYTECNT_GET(cq, cqe);
+
+		/*
+		 * Check for GRH, update the flags, then fill in "wc_flags"
+		 * field in the work completion
+		 */
+		if (HERMON_CQE_GRH_GET(cq, cqe) != 0) {
+			flags |= IBT_WC_GRH_PRESENT;
+		}
 
 		/* Receive CQE */
-		switch (opcode & 0x1F) {
-		/* for sendonly w/imm or sendlast w/imm */
+		switch (opcode) {
 		case HERMON_CQE_RCV_SEND_IMM:
 			/*
 			 * Note:  According to the PRM, all QP1 recv
@@ -1380,7 +1434,7 @@ hermon_cq_cqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 				flags |= IBT_WC_IMMED_DATA_PRESENT;
 			}
 			/* FALLTHROUGH */
-		/* for sendonly or sendlast */
+
 		case HERMON_CQE_RCV_SEND:
 			type = IBT_WRC_RECV;
 			if (HERMON_CQE_IS_IPOK(cq, cqe)) {
@@ -1390,14 +1444,19 @@ hermon_cq_cqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 				    HERMON_CQE_IPOIB_STATUS(cq, cqe);
 			}
 			break;
-		/* for RDMAwrite only or RDMAwrite last w/imm */
+
+		case HERMON_CQE_RCV_SEND_INV:
+			type = IBT_WRC_RECV;
+			flags |= IBT_WC_RKEY_INVALIDATED;
+			wc->wc_rkey = wc->wc_immed_data; /* same field in cqe */
+			break;
+
 		case HERMON_CQE_RCV_RDMAWR_IMM:
 			flags |= IBT_WC_IMMED_DATA_PRESENT;
 			type = IBT_WRC_RECV_RDMAWI;
 			break;
 
 		default:
-		/* still don't support send/invalidate, need to add later */
 
 			HERMON_WARNING(state, "unknown recv CQE type");
 			wc->wc_status = IBT_WC_LOCAL_QP_OP_ERR;
@@ -1405,47 +1464,8 @@ hermon_cq_cqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 		}
 	}
 	wc->wc_type = type;
-
-	/*
-	 * Check for GRH, update the flags, then fill in "wc_flags" field
-	 * in the work completion
-	 */
-	if (HERMON_CQE_GRH_GET(cq, cqe) != 0) {
-		flags |= IBT_WC_GRH_PRESENT;
-	}
 	wc->wc_flags = flags;
-
-	/* If we got here, completion status must be success */
 	wc->wc_status = IBT_WC_SUCCESS;
-
-	/*
-	 * Parse the remaining contents of the CQE into the work completion.
-	 * This means filling in SL, QP number, SLID, immediate data, etc.
-	 * Note:  Not all of these fields are valid in a given completion.
-	 * Many of them depend on the actual type of completion.  So we fill
-	 * in all of the fields and leave it up to the IBTF and consumer to
-	 * sort out which are valid based on their context.
-	 */
-	wc->wc_sl	  = HERMON_CQE_SL_GET(cq, cqe);
-	wc->wc_immed_data = HERMON_CQE_IMM_ETH_PKEY_CRED_GET(cq, cqe);
-	wc->wc_qpn	  = HERMON_CQE_DQPN_GET(cq, cqe);
-	wc->wc_slid	  = HERMON_CQE_DLID_GET(cq, cqe);
-	wc->wc_ethertype  = (wc->wc_immed_data & 0xFFFF);
-	wc->wc_pkey_ix	  = (wc->wc_immed_data &
-	    ((1 << state->hs_queryport.log_max_pkey) - 1));
-	/*
-	 * Depending on whether the completion was a receive or a send
-	 * completion, fill in "bytes transferred" as appropriate.  Also,
-	 * if necessary, fill in the "path bits" field.
-	 */
-	if (HERMON_CQE_SENDRECV_GET(cq, cqe) == HERMON_COMPLETION_RECV) {
-		wc->wc_path_bits = HERMON_CQE_PATHBITS_GET(cq, cqe);
-		wc->wc_bytes_xfer = HERMON_CQE_BYTECNT_GET(cq, cqe);
-
-	} else if ((wc->wc_type == IBT_WRC_RDMAR) ||
-	    (wc->wc_type == IBT_WRC_CSWAP) || (wc->wc_type == IBT_WRC_FADD)) {
-		wc->wc_bytes_xfer = HERMON_CQE_BYTECNT_GET(cq, cqe);
-	}
 }
 
 /*
@@ -1474,26 +1494,26 @@ hermon_cq_errcqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 	imm_eth_pkey_cred = HERMON_CQE_ERROR_SYNDROME_GET(cq, cqe);
 	status = imm_eth_pkey_cred;
 	if (status != HERMON_CQE_WR_FLUSHED_ERR)
-		IBTF_DPRINTF_L2("errcqe", "cqe %p  indx %x  status 0x%x  "
-		    "vendor syndrome %x", cqe, HERMON_CQE_WQECNTR_GET(cq, cqe),
-		    status, ((uint8_t *)cqe)[26]);
-
+		IBTF_DPRINTF_L2("CQE ERR", "cqe %p QPN %x indx %x status 0x%x  "
+		    "vendor syndrome %x", cqe, HERMON_CQE_QPNUM_GET(cq, cqe),
+		    HERMON_CQE_WQECNTR_GET(cq, cqe), status,
+		    HERMON_CQE_ERROR_VENDOR_SYNDROME_GET(cq, cqe));
 	switch (status) {
 	case HERMON_CQE_LOC_LEN_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_LOCLEN);
+		HERMON_WARNING(state, HERMON_FMA_LOCLEN);
 		ibt_status = IBT_WC_LOCAL_LEN_ERR;
 		break;
 
 	case HERMON_CQE_LOC_OP_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_LOCQPOP);
+		HERMON_WARNING(state, HERMON_FMA_LOCQPOP);
 		ibt_status = IBT_WC_LOCAL_QP_OP_ERR;
 		break;
 
 	case HERMON_CQE_LOC_PROT_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_LOCPROT);
+		HERMON_WARNING(state, HERMON_FMA_LOCPROT);
 		ibt_status = IBT_WC_LOCAL_PROTECT_ERR;
+		IBTF_DPRINTF_L2("ERRCQE", "is at %p", cqe);
 		if (hermon_should_panic) {
-			IBTF_DPRINTF_L2("ERRCQE", "is at %p", cqe);
 			cmn_err(CE_PANIC, "Hermon intentional PANIC - "
 			    "Local Protection Error\n");
 		}
@@ -1504,42 +1524,42 @@ hermon_cq_errcqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 		break;
 
 	case HERMON_CQE_MW_BIND_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_MWBIND);
+		HERMON_WARNING(state, HERMON_FMA_MWBIND);
 		ibt_status = IBT_WC_MEM_WIN_BIND_ERR;
 		break;
 
 	case HERMON_CQE_BAD_RESPONSE_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_RESP);
+		HERMON_WARNING(state, HERMON_FMA_RESP);
 		ibt_status = IBT_WC_BAD_RESPONSE_ERR;
 		break;
 
 	case HERMON_CQE_LOCAL_ACCESS_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_LOCACC);
+		HERMON_WARNING(state, HERMON_FMA_LOCACC);
 		ibt_status = IBT_WC_LOCAL_ACCESS_ERR;
 		break;
 
 	case HERMON_CQE_REM_INV_REQ_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_REMREQ);
+		HERMON_WARNING(state, HERMON_FMA_REMREQ);
 		ibt_status = IBT_WC_REMOTE_INVALID_REQ_ERR;
 		break;
 
 	case HERMON_CQE_REM_ACC_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_REMACC);
+		HERMON_WARNING(state, HERMON_FMA_REMACC);
 		ibt_status = IBT_WC_REMOTE_ACCESS_ERR;
 		break;
 
 	case HERMON_CQE_REM_OP_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_REMOP);
+		HERMON_WARNING(state, HERMON_FMA_REMOP);
 		ibt_status = IBT_WC_REMOTE_OP_ERR;
 		break;
 
 	case HERMON_CQE_TRANS_TO_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_XPORTCNT);
+		HERMON_WARNING(state, HERMON_FMA_XPORTCNT);
 		ibt_status = IBT_WC_TRANS_TIMEOUT_ERR;
 		break;
 
 	case HERMON_CQE_RNRNAK_TO_ERR:
-		HERMON_FMANOTE(state, HERMON_FMA_RNRCNT);
+		HERMON_WARNING(state, HERMON_FMA_RNRCNT);
 		ibt_status = IBT_WC_RNR_NAK_TIMEOUT_ERR;
 		break;
 
@@ -1562,29 +1582,6 @@ hermon_cq_errcqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 	}
 
 	wc->wc_status = ibt_status;
-}
-
-
-/*
- * hermon_cqe_sync()
- *    Context: Can be called from interrupt or base context.
- */
-static void
-hermon_cqe_sync(hermon_cqhdl_t cq, hermon_hw_cqe_t *cqe, uint_t flag)
-{
-	ddi_dma_handle_t	dmahdl;
-	off_t			offset;
-	int			status;
-
-	/* Get the DMA handle from CQ context */
-	dmahdl = cq->cq_mrhdl->mr_bindinfo.bi_dmahdl;
-
-	/* Calculate offset of next CQE */
-	offset = (off_t)((uintptr_t)cqe - (uintptr_t)&cq->cq_buf[0]);
-	status = ddi_dma_sync(dmahdl, offset, sizeof (hermon_hw_cqe_t), flag);
-	if (status != DDI_SUCCESS) {
-		return;
-	}
 }
 
 
@@ -1655,6 +1652,7 @@ hermon_cq_entries_flush(hermon_state_t *state, hermon_qphdl_t qp)
 	hermon_workq_hdr_t	*wq;
 	uint32_t		cons_indx, tail_cons_indx, wrap_around_mask;
 	uint32_t		new_indx, check_indx, qpnum;
+	uint32_t		shift, mask;
 	int			outstanding_cqes;
 
 	qpnum = qp->qp_qpnum;
@@ -1664,16 +1662,21 @@ hermon_cq_entries_flush(hermon_state_t *state, hermon_qphdl_t qp)
 		wq = NULL;
 	cq = qp->qp_rq_cqhdl;
 
+	if (cq == NULL) {
+		cq = qp->qp_sq_cqhdl;
+	}
+
 do_send_cq:	/* loop back to here if send_cq is not the same as recv_cq */
+	if (cq == NULL)
+		return;
 
 	cons_indx = cq->cq_consindx;
-	wrap_around_mask = (cq->cq_bufsz - 1);
+	shift = cq->cq_log_cqsz;
+	mask = cq->cq_bufsz;
+	wrap_around_mask = mask - 1;
 
 	/* Calculate the pointer to the first CQ entry */
 	cqe = &cq->cq_buf[cons_indx & wrap_around_mask];
-
-	/* Sync the current CQE to read */
-	hermon_cqe_sync(cq, cqe, DDI_DMA_SYNC_FORCPU);
 
 	/*
 	 * Loop through the CQ looking for entries owned by software.  If an
@@ -1684,7 +1687,7 @@ do_send_cq:	/* loop back to here if send_cq is not the same as recv_cq */
 	 */
 	outstanding_cqes = 0;
 	tail_cons_indx = cons_indx;
-	while (HERMON_CQE_OWNER_IS_SW(cq, cqe, tail_cons_indx)) {
+	while (HERMON_CQE_OWNER_IS_SW(cq, cqe, tail_cons_indx, shift, mask)) {
 		/* increment total cqes count */
 		outstanding_cqes++;
 
@@ -1693,9 +1696,6 @@ do_send_cq:	/* loop back to here if send_cq is not the same as recv_cq */
 
 		/* update the pointer to the next cq entry */
 		cqe = &cq->cq_buf[tail_cons_indx & wrap_around_mask];
-
-		/* sync the next cqe to read */
-		hermon_cqe_sync(cq, cqe, DDI_DMA_SYNC_FORCPU);
 	}
 
 	/*
@@ -1766,4 +1766,223 @@ do_send_cq:	/* loop back to here if send_cq is not the same as recv_cq */
 		cq = qp->qp_sq_cqhdl;
 		goto do_send_cq;
 	}
+}
+
+/*
+ * hermon_get_cq_sched_list()
+ *    Context: Only called from attach() path context
+ *
+ * Read properties, creating entries in hs_cq_sched_list with
+ * information about the requested "expected" and "minimum"
+ * number of MSI-X interrupt vectors per list entry.
+ */
+static int
+hermon_get_cq_sched_list(hermon_state_t *state)
+{
+	char **listp, ulp_prop[HERMON_CQH_MAX + 4];
+	uint_t nlist, i, j, ndata;
+	int *data;
+	size_t len;
+	hermon_cq_sched_t *cq_schedp;
+
+	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, state->hs_dip,
+	    DDI_PROP_DONTPASS, "cqh-group-list", &listp, &nlist) !=
+	    DDI_PROP_SUCCESS)
+		return (0);
+
+	state->hs_cq_sched_array_size = nlist;
+	state->hs_cq_sched_array = cq_schedp = kmem_zalloc(nlist *
+	    sizeof (hermon_cq_sched_t), KM_SLEEP);
+	for (i = 0; i < nlist; i++) {
+		if ((len = strlen(listp[i])) >= HERMON_CQH_MAX) {
+			cmn_err(CE_CONT, "'cqh' property name too long\n");
+			goto game_over;
+		}
+		for (j = 0; j < i; j++) {
+			if (strcmp(listp[j], listp[i]) == 0) {
+				cmn_err(CE_CONT, "Duplicate 'cqh' property\n");
+				goto game_over;
+			}
+		}
+		(void) strncpy(cq_schedp[i].cqs_name, listp[i], HERMON_CQH_MAX);
+		ulp_prop[0] = 'c';
+		ulp_prop[1] = 'q';
+		ulp_prop[2] = 'h';
+		ulp_prop[3] = '-';
+		(void) strncpy(ulp_prop + 4, listp[i], len + 1);
+		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, state->hs_dip,
+		    DDI_PROP_DONTPASS, ulp_prop, &data, &ndata) !=
+		    DDI_PROP_SUCCESS) {
+			cmn_err(CE_CONT, "property '%s' not found\n", ulp_prop);
+			goto game_over;
+		}
+		if (ndata != 2) {
+			cmn_err(CE_CONT, "property '%s' does not "
+			    "have 2 integers\n", ulp_prop);
+			goto game_over_free_data;
+		}
+		cq_schedp[i].cqs_desired = data[0];
+		cq_schedp[i].cqs_minimum = data[1];
+		cq_schedp[i].cqs_refcnt = 0;
+		ddi_prop_free(data);
+	}
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, state->hs_dip,
+	    DDI_PROP_DONTPASS, "cqh-default", &data, &ndata) !=
+	    DDI_PROP_SUCCESS) {
+		cmn_err(CE_CONT, "property 'cqh-default' not found\n");
+		goto game_over;
+	}
+	if (ndata != 2) {
+		cmn_err(CE_CONT, "property 'cqh-default' does not "
+		    "have 2 integers\n");
+		goto game_over_free_data;
+	}
+	cq_schedp = &state->hs_cq_sched_default;
+	cq_schedp->cqs_desired = data[0];
+	cq_schedp->cqs_minimum = data[1];
+	cq_schedp->cqs_refcnt = 0;
+	ddi_prop_free(data);
+	ddi_prop_free(listp);
+	return (1);		/* game on */
+
+game_over_free_data:
+	ddi_prop_free(data);
+game_over:
+	cmn_err(CE_CONT, "Error in 'cqh' properties in hermon.conf\n");
+	cmn_err(CE_CONT, "completion handler groups not being used\n");
+	kmem_free(cq_schedp, nlist * sizeof (hermon_cq_sched_t));
+	state->hs_cq_sched_array_size = 0;
+	ddi_prop_free(listp);
+	return (0);
+}
+
+/*
+ * hermon_cq_sched_init()
+ *    Context: Only called from attach() path context
+ *
+ * Read the hermon.conf properties looking for cq_sched info,
+ * creating reserved pools of MSI-X interrupt ranges for the
+ * specified ULPs.
+ */
+int
+hermon_cq_sched_init(hermon_state_t *state)
+{
+	hermon_cq_sched_t *cq_schedp, *defp;
+	int i, desired, array_size;
+
+	mutex_init(&state->hs_cq_sched_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(state->hs_intrmsi_pri));
+
+	mutex_enter(&state->hs_cq_sched_lock);
+	state->hs_cq_sched_array = NULL;
+
+	/* initialize cq_sched_default */
+	defp = &state->hs_cq_sched_default;
+	defp->cqs_start_hid = 1;
+	defp->cqs_len = state->hs_intrmsi_allocd;
+	defp->cqs_next_alloc = defp->cqs_len - 1;
+	(void) strncpy(defp->cqs_name, "default", 8);
+
+	/* Read properties to determine which ULPs use cq_sched */
+	if (hermon_get_cq_sched_list(state) == 0)
+		goto done;
+
+	/* Determine if we have enough vectors, or if we have to scale down */
+	desired = defp->cqs_desired;	/* default desired (from hermon.conf) */
+	if (desired <= 0)
+		goto done;		/* all interrupts in the default pool */
+	cq_schedp = state->hs_cq_sched_array;
+	array_size = state->hs_cq_sched_array_size;
+	for (i = 0; i < array_size; i++)
+		desired += cq_schedp[i].cqs_desired;
+	if (desired > state->hs_intrmsi_allocd) {
+		cmn_err(CE_CONT, "#interrupts allocated (%d) is less than "
+		    "the #interrupts desired (%d)\n",
+		    state->hs_intrmsi_allocd, desired);
+		cmn_err(CE_CONT, "completion handler groups not being used\n");
+		goto done;		/* all interrupts in the default pool */
+	}
+	/* Game on.  For each cq_sched group, reserve the MSI-X range */
+	for (i = 0; i < array_size; i++) {
+		desired = cq_schedp[i].cqs_desired;
+		cq_schedp[i].cqs_start_hid = defp->cqs_start_hid;
+		cq_schedp[i].cqs_len = desired;
+		cq_schedp[i].cqs_next_alloc = desired - 1;
+		defp->cqs_len -= desired;
+		defp->cqs_start_hid += desired;
+	}
+	/* reset default's start allocation seed */
+	state->hs_cq_sched_default.cqs_next_alloc =
+	    state->hs_cq_sched_default.cqs_len - 1;
+
+done:
+	mutex_exit(&state->hs_cq_sched_lock);
+	return (IBT_SUCCESS);
+}
+
+void
+hermon_cq_sched_fini(hermon_state_t *state)
+{
+	mutex_enter(&state->hs_cq_sched_lock);
+	if (state->hs_cq_sched_array_size) {
+		kmem_free(state->hs_cq_sched_array, sizeof (hermon_cq_sched_t) *
+		    state->hs_cq_sched_array_size);
+		state->hs_cq_sched_array_size = 0;
+		state->hs_cq_sched_array = NULL;
+	}
+	mutex_exit(&state->hs_cq_sched_lock);
+	mutex_destroy(&state->hs_cq_sched_lock);
+}
+
+int
+hermon_cq_sched_alloc(hermon_state_t *state, ibt_cq_sched_attr_t *attr,
+    hermon_cq_sched_t **cq_sched_pp)
+{
+	hermon_cq_sched_t	*cq_schedp;
+	int			i;
+	char			*name;
+	ibt_cq_sched_flags_t	flags;
+
+	flags = attr->cqs_flags;
+	if ((flags & (IBT_CQS_SCHED_GROUP | IBT_CQS_EXACT_SCHED_GROUP)) == 0) {
+		*cq_sched_pp = NULL;
+		return (IBT_SUCCESS);
+	}
+	name = attr->cqs_pool_name;
+
+	mutex_enter(&state->hs_cq_sched_lock);
+	cq_schedp = state->hs_cq_sched_array;
+	for (i = 0; i < state->hs_cq_sched_array_size; i++, cq_schedp++) {
+		if (strcmp(name, cq_schedp->cqs_name) == 0) {
+			if (cq_schedp->cqs_len != 0)
+				cq_schedp->cqs_refcnt++;
+			break;	/* found it */
+		}
+	}
+	if ((i == state->hs_cq_sched_array_size) ||	/* not found, or */
+	    (cq_schedp->cqs_len == 0)) /* defined, but no dedicated intr's */
+		cq_schedp = NULL;
+	mutex_exit(&state->hs_cq_sched_lock);
+
+	*cq_sched_pp = cq_schedp;	/* set to valid hdl, or to NULL */
+	if ((cq_schedp == NULL) &&
+	    (attr->cqs_flags & IBT_CQS_EXACT_SCHED_GROUP))
+		return (IBT_CQ_NO_SCHED_GROUP);
+	else
+		return (IBT_SUCCESS);
+}
+
+int
+hermon_cq_sched_free(hermon_state_t *state, hermon_cq_sched_t *cq_schedp)
+{
+	if (cq_schedp != NULL) {
+		/* Just decrement refcnt */
+		mutex_enter(&state->hs_cq_sched_lock);
+		if (cq_schedp->cqs_refcnt == 0)
+			HERMON_WARNING(state, "cq_sched free underflow\n");
+		else
+			cq_schedp->cqs_refcnt--;
+		mutex_exit(&state->hs_cq_sched_lock);
+	}
+	return (IBT_SUCCESS);
 }

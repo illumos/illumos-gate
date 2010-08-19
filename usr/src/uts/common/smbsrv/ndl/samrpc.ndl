@@ -32,7 +32,7 @@
 #include "ndrtypes.ndl"
 
 /* Windows NT */
-#define SAMR_OPNUM_ConnectAnon			0x00	/* SamrConnect */
+#define SAMR_OPNUM_Connect			0x00	/* SamrConnect */
 #define SAMR_OPNUM_CloseHandle			0x01
 #define SAMR_OPNUM_SetSecObject			0x02
 #define SAMR_OPNUM_QuerySecObject		0x03
@@ -91,16 +91,16 @@
 #define	SAMR_OPNUM_ChangeUserOemPassword	0x36
 #define SAMR_OPNUM_ChangeUserPasswd		0x37	/* UnicodePasswd */
 #define SAMR_OPNUM_GetDomainPwInfo		0x38
-#define SAMR_OPNUM_Connect			0x39	/* SamrConnect2 */
+#define SAMR_OPNUM_Connect2                     0x39    /* SamrConnect2 */
 #define SAMR_OPNUM_SetUserInfo			0x3a
 #define	SAMR_OPNUM_SetBootKeyInformation	0x3b
 #define	SAMR_OPNUM_GetBootKeyInformation	0x3c
-#define	SAMR_OPNUM_Connect2			0x3d	/* SamrConnect3 */
-#define	SAMR_OPNUM_Connect3			0x3e	/* SamrConnect4 */
+#define	SAMR_OPNUM_Connect3			0x3d	/* NotUsedOnWire */
+#define	SAMR_OPNUM_Connect4			0x3e	/* SamrConnect4 */
 #define	SAMR_OPNUM_ChangeUserUnicodePassword3	0x3f
 
 /* Windows XP and Windows Server 2003 */
-#define	SAMR_OPNUM_Connect4			0x40	/* SamrConnect5 */
+#define	SAMR_OPNUM_Connect5			0x40	/* SamrConnect5 */
 #define	SAMR_OPNUM_RidToSid                     0x41
 #define	SAMR_OPNUM_SetDSRMPassword              0x42
 #define	SAMR_OPNUM_ValidatePassword             0x43
@@ -362,12 +362,11 @@ struct samr_oem_password {
 
 /*
  ***********************************************************************
- * ConnectAnon. It looks like the SAM handle is identical to an LSA
- * handle. See Connect.
+ * SamrConnect.
  ***********************************************************************
  */
-OPERATION(SAMR_OPNUM_ConnectAnon)
-struct samr_ConnectAnon {
+OPERATION(SAMR_OPNUM_Connect)
+struct samr_Connect {
 	IN	DWORD *servername;
 	IN	DWORD access_mask;
 	OUT	samr_handle_t handle;
@@ -377,12 +376,11 @@ struct samr_ConnectAnon {
 
 /*
  ***********************************************************************
- * Connect. I'm not sure what the difference is between Connect and 
- * ConnectAnon but this call seems to work better than ConnectAnon.
+ * SamrConnect2.
  ***********************************************************************
  */
-OPERATION(SAMR_OPNUM_Connect)
-struct samr_Connect {
+OPERATION(SAMR_OPNUM_Connect2)
+struct samr_Connect2 {
 	IN	LPTSTR servername;
 	IN	DWORD access_mask;
 	OUT	samr_handle_t handle;
@@ -392,14 +390,12 @@ struct samr_Connect {
 
 /*
  ***********************************************************************
- * SamrConnect3. A new form of connect first seen with Windows 2000.
+ * SamrConnect4. A new form of connect first seen with Windows 2000.
  * A new field has been added to the input request. Value: 0x00000002.
- * I haven't looked at the Win2K response yet to see if it differs
- * from SAMR_OPNUM_Connect.
  ***********************************************************************
  */
-OPERATION(SAMR_OPNUM_Connect3)
-struct samr_Connect3 {
+OPERATION(SAMR_OPNUM_Connect4)
+struct samr_Connect4 {
 	IN	LPTSTR servername;
 	IN	DWORD revision;
 	IN	DWORD access_mask;
@@ -410,7 +406,7 @@ struct samr_Connect3 {
 
 /*
  ***********************************************************************
- * SamrConnect4. A new form of connect first seen with Windows XP.
+ * SamrConnect5. A new form of connect first seen with Windows XP.
  * The server name is the fully qualified domain name, i.e.
  *	\\server.sun.com.
  *
@@ -437,8 +433,8 @@ union samr_revision_info {
 	DEFAULT	char *nullptr;
 };
 
-OPERATION(SAMR_OPNUM_Connect4)
-struct samr_Connect4 {
+OPERATION(SAMR_OPNUM_Connect5)
+struct samr_Connect5 {
 	IN		LPTSTR servername;
 	IN		DWORD access_mask;
 	INOUT	DWORD unknown2_00000001;
@@ -1426,8 +1422,8 @@ struct samr_SetUserInfo {
  */
 INTERFACE(0)
 union samr_interface {
-	CASE(SAMR_OPNUM_ConnectAnon)
-		struct samr_ConnectAnon		ConnectAnon;
+	CASE(SAMR_OPNUM_Connect)
+		struct samr_Connect		Connect;
 	CASE(SAMR_OPNUM_CloseHandle)
 		struct samr_CloseHandle		CloseHandle;
 	CASE(SAMR_OPNUM_LookupDomain)
@@ -1466,14 +1462,14 @@ union samr_interface {
 		struct samr_ChangeUserPasswd	ChangeUserPasswd;
 	CASE(SAMR_OPNUM_GetDomainPwInfo)
 		struct samr_GetDomainPwInfo	GetDomainPwInfo;
-	CASE(SAMR_OPNUM_Connect)
-		struct samr_Connect		Connect;
+	CASE(SAMR_OPNUM_Connect2)
+		struct samr_Connect2		Connect2;
 	CASE(SAMR_OPNUM_SetUserInfo)
 		struct samr_SetUserInfo		SetUserInfo;
-	CASE(SAMR_OPNUM_Connect3)
-		struct samr_Connect3		Connect3;
 	CASE(SAMR_OPNUM_Connect4)
 		struct samr_Connect4		Connect4;
+	CASE(SAMR_OPNUM_Connect5)
+		struct samr_Connect5		Connect5;
 	CASE(SAMR_OPNUM_QueryDispInfo)
 		struct samr_QueryDispInfo	QueryDispInfo;
 	CASE(SAMR_OPNUM_OpenAlias)

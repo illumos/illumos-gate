@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY = libmdesc.a
@@ -31,6 +30,7 @@ LIBSRCS =	\
 	mdesc_findname.c \
 	mdesc_findnodeprop.c \
 	mdesc_getproparcs.c \
+	mdesc_getpropdata.c \
 	mdesc_getpropstr.c \
 	mdesc_getpropval.c \
 	mdesc_init_intern.c \

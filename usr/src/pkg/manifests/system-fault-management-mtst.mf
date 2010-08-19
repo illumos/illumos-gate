@@ -90,17 +90,14 @@ $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memtestio_vf.h
 $(i386_ONLY)legacy pkg=SUNWonmtst.i arch=$(ARCH).i86pc category=internal \
     desc="CPU/memory error injector for internal testing" \
     hotline="Please contact fma-interest@sun.com" \
-    name="CPU/memory error injector" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="CPU/memory error injector"
 $(sparc_ONLY)legacy pkg=SUNWonmtst.u arch=$(ARCH).sun4u category=internal \
     desc="CPU/memory error injector for internal testing" \
     hotline="Please contact fma-interest@sun.com" \
-    name="CPU/memory error injector" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="CPU/memory error injector"
 $(sparc_ONLY)legacy pkg=SUNWonmtst.v arch=$(ARCH).sun4v category=internal \
     desc="CPU/memory error injector for internal testing" \
     hotline="Please contact ei-support@sun.com" \
-    name="CPU/memory error injector" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="CPU/memory error injector"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

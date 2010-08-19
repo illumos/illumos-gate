@@ -161,18 +161,18 @@ $(i386_ONLY)file path=kernel/kmdb/sppp group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/ufs group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/uhci group=sys mode=0555
 $(i386_ONLY)file path=kernel/kmdb/usba group=sys mode=0555
-$(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/pcplusmp group=sys \
-    mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/apix group=sys \
+    mode=0555
+$(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/pcplusmp group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/uppc group=sys \
     mode=0555
+$(i386_ONLY)file path=platform/i86pc/kernel/kmdb/apix group=sys mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/pcplusmp group=sys mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/unix group=sys mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/uppc group=sys mode=0555
-$(i386_ONLY)file path=platform/i86pc/kernel/kmdb/apix group=sys mode=0555
 $(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/xpv_psm group=sys \
@@ -308,21 +308,21 @@ file path=usr/lib/mdb/proc/libuutil.so group=sys mode=0555
 file path=usr/lib/mdb/proc/mdb_ds.so group=sys mode=0555
 file path=usr/lib/mdb/proc/svc.configd.so group=sys mode=0555
 file path=usr/lib/mdb/proc/svc.startd.so group=sys mode=0555
-$(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/pcplusmp.so \
-    group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/apix.so \
+    group=sys mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/pcplusmp.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/uppc.so \
     group=sys mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/apix.so group=sys \
+    mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/pcplusmp.so group=sys \
     mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/unix.so group=sys \
     mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/uppc.so group=sys \
-    mode=0555
-$(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/apix.so group=sys \
     mode=0555
 $(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
@@ -362,17 +362,16 @@ hardlink path=usr/bin/$(ARCH32)/adb target=../../../usr/bin/$(ARCH32)/mdb
 hardlink path=usr/bin/$(ARCH64)/adb target=../../../usr/bin/$(ARCH64)/mdb
 hardlink path=usr/bin/adb target=../../usr/lib/isaexec
 hardlink path=usr/bin/mdb target=../../usr/lib/isaexec
-legacy pkg=SUNWmdb arch=$(ARCH) category=system desc="Modular Debugger (MDB)" \
-    hotline="Please contact your local service provider" \
-    name="Modular Debugger" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWmdbr arch=$(ARCH) category=system \
-    desc="Modular Debugger (MDB) (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Modular Debugger (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWmdb desc="Modular Debugger (MDB)" name="Modular Debugger"
+legacy pkg=SUNWmdbr desc="Modular Debugger (MDB) (Root)" \
+    name="Modular Debugger (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
+license usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE
+license usr/src/uts/common/zmod/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/zmod/THIRDPARTYLICENSE
 $(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/niumx target=intr
 $(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/pcipsy target=intr
 $(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/pcisch target=intr

@@ -89,6 +89,7 @@ ndmpd_cfg_param_t ndmpd_cfg_table[] =
 	{"restore-quarantine",		"",	0, NDMP_CF_NOTINIT},
 	{"overwrite-quarantine",	"",	0, NDMP_CF_NOTINIT},
 	{"zfs-force-override",		"",	0, NDMP_CF_NOTINIT},
+	{"drive-type",			"",	0, NDMP_CF_NOTINIT},
 };
 
 /*

@@ -60,6 +60,14 @@ dump_setup()
 	fi
 }
 
+#
+# Write a unique id into this kernel image; this will be included
+# in the dump header and panicbuf of any crashdump of this image.
+#
+if [ -x /usr/sbin/dumpadm ]; then
+	/usr/sbin/dumpadm -i
+fi
+
 rootiszfs=0
 # get the fstype of root
 readmnttab / </etc/mnttab

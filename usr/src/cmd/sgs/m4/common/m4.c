@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<signal.h>
 #include	<unistd.h>
@@ -344,6 +341,9 @@ getflags(int *xargc, char ***xargv, int *option_end)
 			case 'B':
 				chkspace(&arg, xargc, xargv);
 				bufsize = atoi(&arg[2]);
+				if (bufsize <= 0) {
+					bufsize = DEF_BUFSIZE;
+				}
 				break;
 			case 'D':
 				initalloc();
@@ -363,14 +363,23 @@ getflags(int *xargc, char ***xargv, int *option_end)
 			case 'H':
 				chkspace(&arg, xargc, xargv);
 				hshsize = atoi(&arg[2]);
+				if (hshsize <= 0) {
+					hshsize = DEF_HSHSIZE;
+				}
 				break;
 			case 'S':
 				chkspace(&arg, xargc, xargv);
 				stksize = atoi(&arg[2]);
+				if (stksize <= 0) {
+					stksize = DEF_STKSIZE;
+				}
 				break;
 			case 'T':
 				chkspace(&arg, xargc, xargv);
 				toksize = atoi(&arg[2]);
+				if (toksize <= 0) {
+					toksize = DEF_TOKSIZE;
+				}
 				break;
 			case 'U':
 				initalloc();

@@ -20,17 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_WCHAR_H
 #define	_WCHAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
-
 #include <iso/wchar_iso.h>
 #include <iso/wchar_c99.h>
 
@@ -146,6 +142,18 @@ extern int wcwidth(wchar_t);
 extern wctype_t wctype(const char *);
 #endif /* !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE)... */
 
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+	/* || defined(_XPG7) */
+extern wchar_t *wcsdup(const wchar_t *);
+extern size_t wcsnlen(const wchar_t *, size_t);
+extern wchar_t *wcpcpy(wchar_t *_RESTRICT_KYWD, const wchar_t *_RESTRICT_KYWD);
+extern wchar_t *wcpncpy(wchar_t *_RESTRICT_KYWD, const wchar_t *_RESTRICT_KYWD,
+    size_t);
+extern int wcscasecmp(const wchar_t *, const wchar_t *);
+extern int wcsncasecmp(const wchar_t *, const wchar_t *, size_t);
+#endif
+
 #else /* __STDC__ */
 
 #if !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
@@ -168,6 +176,17 @@ extern int wcswidth();
 extern int wcwidth();
 extern wctype_t wctype();
 #endif /* !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE)... */
+
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+	/* || defined(_XPG7) */
+extern wchar_t *wcsdup();
+extern size_t wcsnlen();
+extern wchar_t *wcpcpy();
+extern wchar_t *wcpncpy();
+extern int wcscasecmp();
+extern int wcsncasecmp();
+#endif
 
 #endif /* __STDC__ */
 

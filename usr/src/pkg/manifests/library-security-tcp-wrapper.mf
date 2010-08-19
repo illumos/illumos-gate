@@ -52,9 +52,8 @@ file path=usr/share/man/man4/hosts.allow.4
 file path=usr/share/man/man4/hosts.deny.4
 file path=usr/share/man/man4/hosts_access.4
 file path=usr/share/man/man4/hosts_options.4
-legacy pkg=SUNWtcpd arch=$(ARCH) category=system \
+legacy pkg=SUNWtcpd \
     desc="tcpd - access control facility for internet services" \
-    hotline="Please contact your local service provider" \
-    name="tcpd - access control facility for internet services" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/tcpd/THIRDPARTYLICENSE license=cmd/tcpd/THIRDPARTYLICENSE
+    name="tcpd - access control facility for internet services"
+license usr/src/cmd/tcpd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tcpd/THIRDPARTYLICENSE

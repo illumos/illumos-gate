@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -248,7 +249,6 @@ _init(void)
 	sn1_emulation_table[SYS_times] = 1;			/*  43 */
 	sn1_emulation_table[SYS_getgid] = 1;			/*  47 */
 	sn1_emulation_table[SYS_utssys] = 1;			/*  57 */
-	sn1_emulation_table[SYS_readlink] = 1;			/*  90 */
 	sn1_emulation_table[SYS_waitid] = 1;			/* 107 */
 	sn1_emulation_table[SYS_uname] = 1;			/* 135 */
 

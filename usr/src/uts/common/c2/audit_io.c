@@ -624,7 +624,7 @@ au_doorio(au_kcontext_t *kctx) {
 	token_t		*sp;	/* last AR processed */
 	char		*bp;	/* start of free space in staging buffer */
 	unsigned char	*cp;	/* ptr to data to be moved */
-	int		error;  /* return from door upcall */
+	int		error = 0;  /* return from door upcall */
 
 	/*
 	 * size (data left in au_membuf - space in buffer)
@@ -808,9 +808,9 @@ audit_async_start(label_t *jb, au_event_t event, int sorf)
 	estate = kctx->auk_ets[event];
 
 	if (sorf & AUM_SUCC)
-		success = kctx->auk_info.ai_mask.as_success & estate;
+		success = kctx->auk_info.ai_namask.as_success & estate;
 	if (sorf & AUM_FAIL)
-		failure = kctx->auk_info.ai_mask.as_failure & estate;
+		failure = kctx->auk_info.ai_namask.as_failure & estate;
 
 	if ((success | failure) == NULL)
 		return (1);

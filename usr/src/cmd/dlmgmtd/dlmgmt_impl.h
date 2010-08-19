@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -103,8 +102,7 @@ int		linkattr_set(dlmgmt_linkattr_t **, const char *, void *,
 		    size_t, dladm_datatype_t);
 int		linkattr_get(dlmgmt_linkattr_t **, const char *, void **,
 		    size_t *, dladm_datatype_t *);
-int		linkprop_getnext(dlmgmt_linkattr_t **, const char *,
-		    char **, void **, size_t *, dladm_datatype_t *);
+void		linkattr_destroy(dlmgmt_link_t *);
 
 void		link_destroy(dlmgmt_link_t *);
 int		link_activate(dlmgmt_link_t *);

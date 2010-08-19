@@ -43,7 +43,7 @@ extern "C" {
 #define	KV_EMPTY		""
 #define	KV_ESCAPE		'\\'
 #define	KV_ADD_KEYS		16    /* number of key value pairs to realloc */
-#define	KV_SPECIAL		"=;:\\";
+#define	KV_SPECIAL		"=;:\\"
 #define	KV_TOKEN_DELIMIT	":"
 #define	KV_WILDCARD		"*"
 #define	KV_WILDCHAR		'*'
@@ -52,6 +52,7 @@ extern "C" {
 #define	KV_SEPSTR		","
 #define	KV_OBJECTCHAR		'/'
 #define	KV_OBJECT		"/"
+#define	KV_AUDIT_DELIMIT	":"
 
 #define	KV_FLAG_NONE		0x0000
 #define	KV_FLAG_REQUIRED	0x0001
@@ -85,6 +86,7 @@ extern int _insert2kva(kva_t *, char *, char *);
 extern int _kva2str(kva_t *, char *, int, char *, char *);
 extern kva_t *_kva_dup(kva_t *);
 extern void _kva_free(kva_t *);
+extern void _kva_free_value(kva_t *, char *);
 extern kva_t *_new_kva(int size);
 extern kva_t *_str2kva(char *, char *, char *);
 extern int _enum_auths(const char *, int (*)(const char *, void *, void *),

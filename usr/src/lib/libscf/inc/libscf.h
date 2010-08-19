@@ -29,6 +29,7 @@
 
 #include <stddef.h>
 #include <sys/types.h>
+#include <libnvpair.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -286,6 +287,7 @@ typedef struct scf_tmpl_error scf_tmpl_error_t;
 /*
  * Standard property names
  */
+#define	SCF_PROPERTY_ACTIVE_POSTFIX	((const char *)"active")
 #define	SCF_PROPERTY_AUX_STATE		((const char *)"auxiliary_state")
 #define	SCF_PROPERTY_AUX_FMRI		((const char *)"auxiliary_fmri")
 #define	SCF_PROPERTY_AUX_TTY		((const char *)"auxiliary_tty")
@@ -400,6 +402,38 @@ typedef struct scf_tmpl_error scf_tmpl_error_t;
 #define	SCF_STATE_ONLINE		0x00000010
 #define	SCF_STATE_DEGRADED		0x00000020
 #define	SCF_STATE_ALL			0x0000003F
+
+/*
+ * software fma svc-transition class
+ */
+#define	SCF_NOTIFY_PARAMS_VERSION	0X0
+#define	SCF_NOTIFY_NAME_FMRI		((const char *)"fmri")
+#define	SCF_NOTIFY_NAME_VERSION		((const char *)"version")
+#define	SCF_NOTIFY_NAME_TSET		((const char *)"tset")
+#define	SCF_NOTIFY_PG_POSTFIX		((const char *)"fmnotify")
+#define	SCF_NOTIFY_PARAMS		((const char *)"notify-params")
+#define	SCF_NOTIFY_PARAMS_INST \
+	((const char *)"svc:/system/fm/notify-params:default")
+#define	SCF_SVC_TRANSITION_CLASS \
+	((const char *)"ireport.os.smf.state-transition")
+#define	SCF_NOTIFY_PARAMS_PG_TYPE	((const char *)"notify_params")
+
+/*
+ * Useful transition macros
+ */
+#define	SCF_TRANS_SHIFT_INITIAL_STATE(s)	((s) << 16)
+#define	SCF_TRANSITION_ALL \
+	(SCF_TRANS_SHIFT_INITIAL_STATE(SCF_STATE_ALL) | SCF_STATE_ALL)
+#define	SCF_TRANS(f, t)	(SCF_TRANS_SHIFT_INITIAL_STATE(f) | (t))
+#define	SCF_TRANS_VALID(t)	(!((t) & ~SCF_TRANSITION_ALL))
+#define	SCF_TRANS_INITIAL_STATE(t)	((t) >> 16 & SCF_STATE_ALL)
+#define	SCF_TRANS_FINAL_STATE(t)	((t) & SCF_STATE_ALL)
+
+/*
+ * Prefixes for states in state transition notification
+ */
+#define	SCF_STN_PREFIX_FROM		((const char *)"from-")
+#define	SCF_STN_PREFIX_TO		((const char *)"to-")
 
 #define	SCF_PG_FLAG_NONPERSISTENT	0x1
 
@@ -773,6 +807,27 @@ char *scf_simple_prop_next_astring(scf_simple_prop_t *);
 char *scf_simple_prop_next_ustring(scf_simple_prop_t *);
 void *scf_simple_prop_next_opaque(scf_simple_prop_t *, size_t *);
 void scf_simple_prop_next_reset(scf_simple_prop_t *);
+
+/*
+ * smf_state_from_string()
+ * return SCF_STATE_* value for the input
+ * -1 on error. String "all" maps to SCF_STATE_ALL macro
+ */
+int32_t smf_state_from_string(const char *);
+
+/*
+ * smf_state_to_string()
+ * return SCF_STATE_STRING* value for the input
+ * NULL on error.
+ */
+const char *smf_state_to_string(int32_t);
+
+/*
+ * Notification interfaces
+ */
+int smf_notify_set_params(const char *, nvlist_t *);
+int smf_notify_get_params(nvlist_t **, nvlist_t *);
+int smf_notify_del_params(const char *, const char *, int32_t);
 
 /*
  * SMF exit status definitions

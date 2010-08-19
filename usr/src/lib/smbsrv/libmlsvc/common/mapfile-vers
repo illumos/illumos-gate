@@ -21,7 +21,6 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
 
 #
 # MAPFILE HEADER START
@@ -43,6 +42,7 @@ SYMBOL_VERSION SUNWprivate {
     global:
 	dfs_get_referrals;
 	dfs_info_free;
+	dssetup_check_service;
 	dssetup_clear_domain_info;
 	lsa_lookup_name;
 	lsa_lookup_sid;
@@ -76,6 +76,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_shr_stop;
 	smb_token_destroy;
 	smb_token_log;
+	spoolss_register_copyfile;
     local:
 	*;
 };

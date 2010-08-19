@@ -28,4 +28,3 @@
 set name=pkg.fmri value=pkg:/SUNWrmwb@$(PKGVERS)
 set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-

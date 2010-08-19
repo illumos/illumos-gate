@@ -18,10 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -214,7 +214,6 @@ struct pos_sds {
 static struct pos_sds *positions;
 
 /* Handles for idmap_api batch */
-static idmap_handle_t *handle = NULL;
 static idmap_udt_handle_t *udt = NULL;
 
 typedef struct {
@@ -456,11 +455,11 @@ help()
 	    "idmap remove -a\n"
 	    "idmap remove [-f|-t] name\n"
 	    "idmap remove [-d] name1 name2\n"
-	    "idmap set-namemap [-a authenticationMethod] [-D bindDN] "
-	    "[-j passwdfile] name1 name2\n"
+	    "idmap set-namemap [-a authenticationMethod] [-D bindDN]\n"
+	    "    [-j passwdfile] name1 name2\n"
 	    "idmap show [-c] [-v] identity [targettype]\n"
-	    "idmap unset-namemap [-a authenticationMethod] [-D bindDN]"
-	    "[-j passwdfile] name\n");
+	    "idmap unset-namemap [-a authenticationMethod] [-D bindDN]\n"
+	    "    [-j passwdfile] name [targettype]\n");
 }
 
 /* The handler for the "help" command. */
@@ -472,61 +471,17 @@ do_help(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	return (0);
 }
 
-/* Initialization of the idmap api batch */
-static int
-init_batch()
-{
-	idmap_stat stat;
-
-	stat = idmap_init(&handle);
-	if (stat != IDMAP_SUCCESS) {
-		print_error(NULL,
-		    gettext("Connection not established (%s)\n"),
-		    idmap_stat2string(NULL, stat));
-		handle = NULL;
-		return (-1);
-	}
-
-	return (0);
-}
-
-/* Initialization of the libidmap API (idmap help doesn't run that) */
-static int
-init_command()
-{
-	if (batch_mode)
-		return (0);
-
-	return (init_batch());
-}
-
-/* Finalization of the libidmap API */
-static void
-fini_command()
-{
-	if (batch_mode)
-		return;
-
-	if (handle != NULL) {
-		(void) idmap_fini(handle);
-		handle = NULL;
-	}
-}
-
 /* Initialization of the commands which perform write operations  */
 static int
 init_udt_batch()
 {
 	idmap_stat stat;
 
-	if (init_batch())
-		return (-1);
-
-	stat = idmap_udt_create(handle, &udt);
+	stat = idmap_udt_create(&udt);
 	if (stat != IDMAP_SUCCESS) {
 		print_error(NULL,
 		    gettext("Error initiating transaction (%s)"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 		return (-1);
 	}
 
@@ -577,7 +532,7 @@ fini_udt_command(int ok, cmd_pos_t *pos)
 		if (stat1 != IDMAP_SUCCESS) {
 			print_error(NULL,
 			    gettext("Error diagnosing transaction (%s)\n"),
-			    idmap_stat2string(handle, stat1));
+			    idmap_stat2string(stat1));
 			goto out;
 		}
 
@@ -589,7 +544,7 @@ fini_udt_command(int ok, cmd_pos_t *pos)
 
 		print_error(reported_pos,
 		    gettext("Error commiting transaction (%s)\n"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 	}
 
 out:
@@ -668,10 +623,6 @@ init_nm_command(char *user, char *passwd, char *auth, char *windomain,
 {
 	idmap_stat stat;
 
-	if (!batch_mode)
-		if (init_batch() < 0)
-			return (-1);
-
 	if (namemaps.handle != NULL && (
 	    strcmp_null(user, namemaps.user) != 0 ||
 	    strcmp_null(passwd, namemaps.passwd) != 0 ||
@@ -682,13 +633,13 @@ init_nm_command(char *user, char *passwd, char *auth, char *windomain,
 	}
 
 	if (namemaps.handle == NULL) {
-		stat = idmap_init_namemaps(handle, &namemaps.handle, user,
+		stat = idmap_init_namemaps(&namemaps.handle, user,
 		    passwd, auth, windomain, direction);
 		if (stat != IDMAP_SUCCESS) {
 			print_error(pos,
 			    gettext("Error: could not perform directory-based "
 			    "name mapping operation (%s)"),
-			    idmap_stat2string(handle, stat));
+			    idmap_stat2string(stat));
 			namemaps_free();
 			return (-1);
 		}
@@ -1597,9 +1548,6 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	int		flag = 0;
 	idmap_info	info;
 
-	if (init_command())
-		return (-1);
-
 	ph = print_mapping_init(f[n_FLAG] != NULL ? MAPPING_NAME : MAPPING_ID,
 	    stdout);
 	if (ph == NULL)
@@ -1608,11 +1556,11 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (f[v_FLAG] != NULL)
 		flag = IDMAP_REQ_FLG_MAPPING_INFO;
 
-	stat = idmap_iter_mappings(handle, &ihandle, flag);
+	stat = idmap_iter_mappings(&ihandle, flag);
 	if (stat < 0) {
 		print_error(pos,
 		    gettext("Iteration handle not obtained (%s)\n"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 		rc = -1;
 		goto cleanup;
 	}
@@ -1646,7 +1594,7 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (stat < 0 && stat != IDMAP_ERR_NOTFOUND) {
 		print_error(pos,
 		    gettext("Error during iteration (%s)\n"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 		rc = -1;
 		goto cleanup;
 	}
@@ -1655,25 +1603,7 @@ do_dump(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 
 cleanup:
 	(void) print_mapping_fini(ph);
-	fini_command();
 	return (rc);
-}
-
-/*
- * The same as strdup, but length chars is duplicated, no matter on
- * '\0'. The caller must guarantee "length" chars in "from".
- */
-static char *
-strndup(char *from, size_t length)
-{
-	char *out = (char *)malloc(length + 1);
-	if (out == NULL) {
-		print_error(NULL, gettext("Not enough memory\n"));
-		return (NULL);
-	}
-	(void) strncpy(out, from, length);
-	out[length] = '\0';
-	return (out);
 }
 
 /*
@@ -2167,7 +2097,7 @@ flush_nm(boolean_t is_user, cmd_pos_t *pos)
 		print_error(pos,
 		    is_user ? gettext("Unable to flush users (%s).\n")
 		    : gettext("Unable to flush groups (%s).\n"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 		return (-1);
 	}
 
@@ -2257,7 +2187,7 @@ do_import(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 			if (stat < 0) {
 				print_error(&pos2,
 				    gettext("Transaction error (%s)\n"),
-				    idmap_stat2string(handle, stat));
+				    idmap_stat2string(stat));
 				rc = -1;
 			}
 
@@ -2299,11 +2229,11 @@ list_name_mappings(format_t format, FILE *fi)
 	boolean_t is_wuser;
 	print_handle_t *ph;
 
-	stat = idmap_iter_namerules(handle, NULL, 0, 0, NULL, NULL, &ihandle);
+	stat = idmap_iter_namerules(NULL, 0, 0, NULL, NULL, &ihandle);
 	if (stat < 0) {
 		print_error(NULL,
 		    gettext("Iteration handle not obtained (%s)\n"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 		idmap_iter_destroy(ihandle);
 		return (-1);
 	}
@@ -2337,7 +2267,7 @@ list_name_mappings(format_t format, FILE *fi)
 	if (stat < 0 && stat !=  IDMAP_ERR_NOTFOUND) {
 		print_error(NULL,
 		    gettext("Error during iteration (%s)\n"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 		idmap_iter_destroy(ihandle);
 		return (-1);
 	}
@@ -2370,15 +2300,8 @@ do_export(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		}
 	}
 
-	if (init_command() < 0) {
-		rc = -1;
-		goto cleanup;
-	}
-
 	/* List the requested types: */
 	rc = list_name_mappings(format, fi);
-
-	fini_command();
 
 cleanup:
 	if (fi != NULL && fi != stdout)
@@ -2393,14 +2316,9 @@ do_list_name_mappings(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 {
 	int rc;
 
-	if (init_command()) {
-		return (-1);
-	}
-
 	/* List the requested types: */
 	rc = list_name_mappings(DEFAULT_FORMAT, stdout);
 
-	fini_command();
 	return (rc);
 }
 
@@ -2707,7 +2625,7 @@ do_add_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (stat != IDMAP_SUCCESS) {
 		print_error(pos,
 		    gettext("Mapping not created (%s)\n"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 		rc = -1;
 	}
 
@@ -2814,7 +2732,7 @@ do_remove_name_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		if (stat != IDMAP_SUCCESS) {
 			print_error(pos,
 			    gettext("Mapping not deleted (%s)\n"),
-			    idmap_stat2string(handle, stat));
+			    idmap_stat2string(stat));
 			rc = -1;
 			break;
 		}
@@ -2849,18 +2767,14 @@ do_flush(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	else
 		op = IDMAP_FLUSH_EXPIRE;
 
-	if (init_command())
-		return (-1);
-
-	stat = idmap_flush(handle, op);
+	stat = idmap_flush(op);
 	if (stat != IDMAP_SUCCESS) {
 		print_error(pos,
 		    gettext("%s\n"),
-		    idmap_stat2string(handle, stat));
+		    idmap_stat2string(stat));
 		rc = -1;
 	}
 
-	fini_command();
 	return (rc);
 }
 
@@ -2968,9 +2882,6 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (f[V_FLAG] != NULL)
 		flag |= IDMAP_REQ_FLG_TRACE;
 
-	if (init_command())
-		return (-1);
-
 	nm = name_mapping_init();
 	if (nm == NULL)
 		goto cleanup;
@@ -3032,7 +2943,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	    type_from  == TYPE_GSID || type_from  == TYPE_USID ||
 	    type_to  == TYPE_GSID || type_to  == TYPE_USID) {
 		if (type_from & IS_WIN) {
-			map_stat = idmap_get_w2u_mapping(handle,
+			map_stat = idmap_get_w2u_mapping(
 			    nm->sidprefix,
 			    &nm->rid,
 			    nm->winname,
@@ -3044,7 +2955,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 			    &nm->direction,
 			    &info);
 		} else {
-			map_stat = idmap_get_u2w_mapping(handle,
+			map_stat = idmap_get_u2w_mapping(
 			    &nm->pid,
 			    nm->unixname,
 			    flag,
@@ -3067,12 +2978,12 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 
 
 		/* Create an in-memory structure for all the batch: */
-		stat = idmap_get_create(handle, &ghandle);
+		stat = idmap_get_create(&ghandle);
 		if (stat != IDMAP_SUCCESS) {
 			print_error(pos,
 			    gettext("Unable to create handle for communicating"
 			    " with idmapd(1M) (%s)\n"),
-			    idmap_stat2string(handle, stat));
+			    idmap_stat2string(stat));
 			idmap_get_destroy(ghandle);
 			goto cleanup;
 		}
@@ -3129,7 +3040,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		if (stat < 0) {
 			print_error(pos,
 			    gettext("Request for %.3s not sent (%s)\n"),
-			    argv[0], idmap_stat2string(handle, stat));
+			    argv[0], idmap_stat2string(stat));
 			idmap_get_destroy(ghandle);
 			goto cleanup;
 		}
@@ -3140,7 +3051,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 			print_error(pos,
 			    gettext("Mappings not obtained because of"
 			    " RPC problem (%s)\n"),
-			    idmap_stat2string(handle, stat));
+			    idmap_stat2string(stat));
 			idmap_get_destroy(ghandle);
 			goto cleanup;
 		}
@@ -3193,7 +3104,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 errormsg:
 	if (map_stat < 0) {
 		print_error(pos, gettext("Error:\t%s\n"),
-		    idmap_stat2string(handle, map_stat));
+		    idmap_stat2string(map_stat));
 		print_error_info(&info);
 	} else {
 		print_info(&info);
@@ -3203,7 +3114,6 @@ errormsg:
 cleanup:
 	if (nm != NULL)
 		name_mapping_fini(nm);
-	fini_command();
 	return (stat < 0 || map_stat < 0 ? -1 : 0);
 }
 
@@ -3342,7 +3252,7 @@ do_set_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (stat != IDMAP_SUCCESS) {
 		print_error(pos,
 		    gettext("Failed to set namemap (%s).\n"),
-		    idmap_stat2string(NULL, stat));
+		    idmap_stat2string(stat));
 	}
 
 	if (passwd != NULL) {
@@ -3425,7 +3335,7 @@ do_unset_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (stat != IDMAP_SUCCESS) {
 		print_error(pos,
 		    gettext("Failed to unset namemap (%s).\n"),
-		    idmap_stat2string(NULL, stat));
+		    idmap_stat2string(stat));
 	}
 
 cleanup:
@@ -3498,7 +3408,7 @@ do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (stat != IDMAP_SUCCESS) {
 		print_error(pos,
 		    gettext("Failed to get namemap info (%s).\n"),
-		    idmap_stat2string(NULL, stat));
+		    idmap_stat2string(stat));
 		goto cleanup;
 	}
 
@@ -3616,8 +3526,6 @@ main(int argc, char *argv[])
 			rc = -1;
 		fini_nm_command();
 	}
-
-	fini_command();
 
 	(void) engine_fini();
 	return (rc == 0 ? 0 : 1);

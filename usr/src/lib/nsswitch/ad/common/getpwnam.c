@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <pwd.h>
@@ -192,9 +191,7 @@ _nss_ad_passwd2str(ad_backend_ptr be, nss_XbyY_args_t *argp)
 	nss_result = NSS_STR_PARSE_PARSE;
 
 	/* Create handles for idmap service */
-	if (be->ih == NULL && idmap_init(&be->ih) != 0)
-		goto result_pwd2str;
-	if (idmap_get_create(be->ih, &ig) != 0)
+	if (idmap_get_create(&ig) != 0)
 		goto result_pwd2str;
 
 	/* Get name */
@@ -278,8 +275,6 @@ _nss_ad_passwd2str(ad_backend_ptr be, nss_XbyY_args_t *argp)
 
 result_pwd2str:
 	idmap_get_destroy(ig);
-	(void) idmap_fini(be->ih);
-	be->ih = NULL;
 	(void) adutils_freeresult(&be->result);
 	free(domain);
 	if (homedir != NULL_STR && homedir_v != NULL &&
@@ -310,7 +305,6 @@ getbyname(ad_backend_ptr be, void *a)
 	uid_t		uid;
 	gid_t		gid;
 	int		is_user, is_wuser, try_idmap;
-	idmap_handle_t	*ih;
 
 	be->db_type = NSS_AD_DB_PASSWD_BYNAME;
 
@@ -329,17 +323,13 @@ getbyname(ad_backend_ptr be, void *a)
 	 * call fails then this will save us doing AD discovery and
 	 * AD lookup here.
 	 */
-	if (idmap_init(&be->ih) != IDMAP_SUCCESS)
-		return ((nss_status_t)NSS_NOTFOUND);
 	flag = (strcasecmp(dname, WK_DOMAIN) == 0) ?
 	    IDMAP_REQ_FLG_WK_OR_LOCAL_SIDS_ONLY : 0;
 	is_wuser = -1;
 	is_user = 1;
-	if (idmap_get_w2u_mapping(be->ih, NULL, NULL, name,
+	if (idmap_get_w2u_mapping(NULL, NULL, name,
 	    dname, flag, &is_user, &is_wuser, &be->uid, NULL,
 	    NULL, NULL) != IDMAP_SUCCESS) {
-		(void) idmap_fini(be->ih);
-		be->ih = NULL;
 		RESET_ERRNO();
 		return ((nss_status_t)NSS_NOTFOUND);
 	}
@@ -357,11 +347,8 @@ getbyname(ad_backend_ptr be, void *a)
 		    dname, &try_idmap);
 		free(searchfilter);
 
-		if (!try_idmap) {
-			(void) idmap_fini(be->ih);
-			be->ih = NULL;
+		if (!try_idmap)
 			return (stat);
-		}
 
 	}
 
@@ -372,10 +359,8 @@ getbyname(ad_backend_ptr be, void *a)
 	 */
 	is_wuser = -1;
 	is_user = 0; /* Map name to primary gid */
-	idmaprc = idmap_get_w2u_mapping(be->ih, NULL, NULL, name, dname,
+	idmaprc = idmap_get_w2u_mapping(NULL, NULL, name, dname,
 	    flag, &is_user, &is_wuser, &gid, NULL, NULL, NULL);
-	(void) idmap_fini(be->ih);
-	be->ih = NULL;
 	if (idmaprc != IDMAP_SUCCESS) {
 		RESET_ERRNO();
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -424,9 +409,7 @@ getbyuid(ad_backend_ptr be, void *a)
 		goto out;
 
 	/* Map the given UID to a SID using the idmap service */
-	if (idmap_init(&be->ih) != 0)
-		goto out;
-	if (idmap_get_u2w_mapping(be->ih, &argp->key.uid, NULL, 0,
+	if (idmap_get_u2w_mapping(&argp->key.uid, NULL, 0,
 	    1, NULL, &sidprefix, &rid, &winname, &windomain,
 	    NULL, NULL) != 0) {
 		RESET_ERRNO();
@@ -461,12 +444,9 @@ getbyuid(ad_backend_ptr be, void *a)
 	/* Map winname to primary gid using idmap service */
 	is_user = 0;
 	is_wuser = -1;
-	idmaprc = idmap_get_w2u_mapping(be->ih, NULL, NULL,
+	idmaprc = idmap_get_w2u_mapping(NULL, NULL,
 	    winname, windomain, 0, &is_user, &is_wuser, &gid,
 	    NULL, NULL, NULL);
-
-	(void) idmap_fini(be->ih);
-	be->ih = NULL;
 
 	if (idmaprc != IDMAP_SUCCESS) {
 		RESET_ERRNO();
@@ -486,8 +466,6 @@ out:
 	idmap_free(sidprefix);
 	idmap_free(winname);
 	idmap_free(windomain);
-	(void) idmap_fini(be->ih);
-	be->ih = NULL;
 	return (stat);
 }
 

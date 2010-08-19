@@ -173,6 +173,11 @@ typedef struct ipadm_handle	*ipadm_handle_t;
 #define	IPH_VRRP		0x00000001	/* Caller is VRRP */
 #define	IPH_LEGACY		0x00000002	/* Caller is legacy app */
 #define	IPH_IPMGMTD		0x00000004	/* Caller is ipmgmtd itself */
+/*
+ * Indicates that the operation being invoked is in 'init' context. This is
+ * a library private flag.
+ */
+#define	IPH_INIT		0x10000000
 
 /* opaque address object structure */
 typedef struct ipadm_addrobj_s	*ipadm_addrobj_t;
@@ -338,7 +343,6 @@ extern ipadm_status_t	ipadm_set_prop(ipadm_handle_t, const char *,
 			    const char *, uint_t, uint_t);
 extern ipadm_status_t	ipadm_get_prop(ipadm_handle_t, const char *, char *,
 			    uint_t *, uint_t, uint_t);
-extern ipadm_status_t	ipadm_init_prop(void);
 
 /*
  * miscellaneous helper functions.
@@ -349,6 +353,10 @@ extern size_t		ipadm_nvlist2str(nvlist_t *, char *, size_t);
 extern char		*ipadm_proto2str(uint_t);
 extern uint_t		ipadm_str2proto(const char *);
 extern ipadm_status_t	ipadm_open_arp_on_udp(const char *, int *);
+extern int		ipadm_legacy2new_propname(const char *, char *,
+			    uint_t, uint_t *);
+extern int		ipadm_new2legacy_propname(const char *, char *,
+			    uint_t, uint_t);
 
 #ifdef	__cplusplus
 }

@@ -42,16 +42,20 @@ dir path=kernel/drv/$(ARCH64) group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
 driver name=sol_ucma perms="* 0666 root sys"
+driver name=sol_umad perms="* 0666 root sys"
 driver name=sol_uverbs perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/sol_ucma group=sys
+file path=kernel/drv/$(ARCH64)/sol_umad group=sys
 file path=kernel/drv/$(ARCH64)/sol_uverbs group=sys
 $(i386_ONLY)file path=kernel/drv/sol_ucma group=sys
 file path=kernel/drv/sol_ucma.conf group=sys
+$(i386_ONLY)file path=kernel/drv/sol_umad group=sys
+file path=kernel/drv/sol_umad.conf group=sys
 $(i386_ONLY)file path=kernel/drv/sol_uverbs group=sys
 file path=kernel/drv/sol_uverbs.conf group=sys
 file path=kernel/misc/$(ARCH64)/sol_ofs group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/sol_ofs group=sys mode=0755
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license uts/common/io/ib/clients/of/lic_of \
-    license=uts/common/io/ib/clients/of/lic_of
+license usr/src/uts/common/io/ib/clients/of/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/ib/clients/of/THIRDPARTYLICENSE

@@ -47,11 +47,6 @@ extern "C" {
 /*
  * Data store read/write utilities related declarations.
  */
-/* Permanent data store for ipadm */
-#define	IPADM_DB_FILE		"/etc/ipadm/ipadm.conf"
-#define	IPADM_FILE_MODE		(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
-#define	IPADM_TMPFS_DIR		"/etc/svc/volatile/ipadm"
-
 /*
  * For more information on these definitions please refer to the top of
  * ipadm_persist.c. These are the name of the nvpairs which hold the
@@ -77,7 +72,15 @@ extern "C" {
 #define	IPADM_NVP_STATELESS	"_stateless"	/* IPv6 autoconf stateless */
 #define	IPADM_NVP_STATEFUL	"_stateful"	/* IPv6 autoconf dhcpv6 */
 
-#define	IPADM_PRIV_NVP(s) ((s)[0] == '_')
+#define	IPADM_PRIV_NVP(s) ((s)[0] == '_' && (s)[1] != '_')
+
+/*
+ * All protocol properties that are private to ipadm are stored in the
+ * ipadm datastore with "__" as prefix. This is to ensure there
+ * is no collision of namespace between ipadm private nvpair names and
+ * the private protocol property names.
+ */
+#define	IPADM_PERSIST_PRIVPROP_PREFIX	"__"
 
 /* data-store operations */
 typedef enum {

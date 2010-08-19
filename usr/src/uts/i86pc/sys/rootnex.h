@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ROOTNEX_H
@@ -55,16 +54,22 @@ extern "C" {
 #define	ROOTNEX_DPROF_DEC(addr)		atomic_add_64(addr, -1)
 #define	ROOTNEX_DPROBE1(name, type1, arg1) \
 	DTRACE_PROBE1(name, type1, arg1)
+#define	ROOTNEX_DPROBE2(name, type1, arg1, type2, arg2) \
+	DTRACE_PROBE2(name, type1, arg1, type2, arg2)
 #define	ROOTNEX_DPROBE3(name, type1, arg1, type2, arg2, type3, arg3) \
 	DTRACE_PROBE3(name, type1, arg1, type2, arg2, type3, arg3)
+#define	ROOTNEX_DPROBE4(name, type1, arg1, type2, arg2, type3, arg3, \
+    type4, arg4) \
+	DTRACE_PROBE4(name, type1, arg1, type2, arg2, type3, arg3, type4, arg4)
 #else
 #define	ROOTNEX_DPROF_INC(addr)
 #define	ROOTNEX_DPROF_DEC(addr)
 #define	ROOTNEX_DPROBE1(name, type1, arg1)
+#define	ROOTNEX_DPROBE2(name, type1, arg1, type2, arg2)
 #define	ROOTNEX_DPROBE3(name, type1, arg1, type2, arg2, type3, arg3)
+#define	ROOTNEX_DPROBE4(name, type1, arg1, type2, arg2, type3, arg3, \
+    type4, arg4)
 #endif
-#define	ROOTNEX_PROF_INC(addr)		atomic_inc_64(addr)
-#define	ROOTNEX_PROF_DEC(addr)		atomic_add_64(addr, -1)
 
 /* set in dmac_type to signify that this cookie uses the copy buffer */
 #define	ROOTNEX_USES_COPYBUF		0x80000000
@@ -83,6 +88,12 @@ typedef struct rootnex_intprop_s {
  * isolate get_sgl() as much as possible so it can be easily replaced.
  */
 typedef struct rootnex_sglinfo_s {
+	/*
+	 * Used to simplify calculations to get the maximum number
+	 * of cookies.
+	 */
+	boolean_t	si_cancross;
+
 	/*
 	 * These are passed into rootnex_get_sgl().
 	 *
@@ -210,16 +221,6 @@ typedef struct rootnex_window_s {
 #endif
 } rootnex_window_t;
 
-typedef struct dvcookie {
-	uint64_t dvck_dvma;
-	uint64_t dvck_npages;
-} dvcookie_t;
-
-typedef struct dcookie {
-	paddr_t dck_paddr;
-	uint64_t dck_npages;
-} dcookie_t;
-
 /* per dma handle private state */
 typedef struct rootnex_dma_s {
 	/*
@@ -241,7 +242,10 @@ typedef struct rootnex_dma_s {
 	boolean_t		dp_trim_required;
 	boolean_t		dp_granularity_power_2;
 	uint64_t		dp_maxxfer;
+
+	boolean_t		dp_dvma_used;
 	ddi_dma_obj_t		dp_dma;
+	ddi_dma_obj_t		dp_dvma;
 	rootnex_sglinfo_t	dp_sglinfo;
 
 	/*
@@ -315,6 +319,8 @@ typedef struct rootnex_dma_s {
 	ddi_dma_cookie_t	*dp_saved_cookies;
 	boolean_t		dp_need_to_switch_cookies;
 
+	void			*dp_iommu_private;
+
 	/*
 	 * pre allocated space for the bind state, allocated during alloc
 	 * handle. For a lot of devices, this will save us from having to do
@@ -323,18 +329,6 @@ typedef struct rootnex_dma_s {
 	 * expensive on x86.
 	 */
 	uchar_t			*dp_prealloc_buffer;
-
-	/*
-	 * Intel IOMMU (immu) related state
-	 * dv_cookies saves the dvma allocated for this handler
-	 * max index of dvcookies in dvmax
-	 */
-	dvcookie_t		*dp_dvcookies;
-	uint64_t		dp_dvmax;
-	dcookie_t		*dp_dcookies;
-	uint64_t		dp_dmax;
-	uint64_t		dp_max_cookies;
-	uint64_t		dp_max_dcookies;
 
 	/*
 	 * sleep flags set on bind and unset on unbind

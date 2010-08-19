@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -711,7 +710,6 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 	boolean_t		found_type = B_FALSE;
 	dladm_datatype_t	type = DLADM_TYPE_STR;
 	int			i, len;
-	int			err = 0;
 	char			*curr;
 	char			attr_name[MAXLINKATTRLEN];
 	size_t			attr_buf_len = 0;
@@ -720,7 +718,7 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 	curr = buf;
 	len = strlen(buf);
 	attr_name[0] = '\0';
-	for (i = 0; i < len && err == 0; i++) {
+	for (i = 0; i < len; i++) {
 		char		c = buf[i];
 		boolean_t	match = (c == '=' ||
 		    (c == ',' && !found_type) || c == ';');
@@ -751,26 +749,36 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 				goto parse_fail;
 
 			if (strcmp(attr_name, "linkid") == 0) {
-				(void) read_int64(curr, &attr_buf);
+				if (read_int64(curr, &attr_buf) == 0)
+					goto parse_fail;
 				linkp->ll_linkid =
 				    (datalink_class_t)*(int64_t *)attr_buf;
 			} else if (strcmp(attr_name, "name") == 0) {
-				(void) read_str(curr, &attr_buf);
+				if (read_str(curr, &attr_buf) == 0)
+					goto parse_fail;
 				(void) snprintf(linkp->ll_link,
 				    MAXLINKNAMELEN, "%s", attr_buf);
 			} else if (strcmp(attr_name, "class") == 0) {
-				(void) read_int64(curr, &attr_buf);
+				if (read_int64(curr, &attr_buf) == 0)
+					goto parse_fail;
 				linkp->ll_class =
 				    (datalink_class_t)*(int64_t *)attr_buf;
 			} else if (strcmp(attr_name, "media") == 0) {
-				(void) read_int64(curr, &attr_buf);
+				if (read_int64(curr, &attr_buf) == 0)
+					goto parse_fail;
 				linkp->ll_media =
 				    (uint32_t)*(int64_t *)attr_buf;
 			} else {
 				attr_buf_len = translators[type].read_func(curr,
 				    &attr_buf);
-				err = linkattr_set(&(linkp->ll_head), attr_name,
-				    attr_buf, attr_buf_len, type);
+				if (attr_buf_len == 0)
+					goto parse_fail;
+
+				if (linkattr_set(&(linkp->ll_head), attr_name,
+				    attr_buf, attr_buf_len, type) != 0) {
+					free(attr_buf);
+					goto parse_fail;
+				}
 			}
 
 			free(attr_buf);
@@ -806,9 +814,19 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 		curr = buf + i + 1;
 	}
 
-	return (err);
+	/* Correct any erroneous IPTUN datalink class constant in the file */
+	if (linkp->ll_class == 0x60) {
+		linkp->ll_class = DATALINK_CLASS_IPTUN;
+		rewrite_needed = B_TRUE;
+	}
+
+	return (0);
 
 parse_fail:
+	/*
+	 * Free linkp->ll_head (link attribute list)
+	 */
+	linkattr_destroy(linkp);
 	return (-1);
 }
 
@@ -986,6 +1004,12 @@ process_db_write(dlmgmt_db_req_t *req, FILE *fp, FILE *nfp)
 
 	while (err == 0 && fgets(buf, sizeof (buf), fp) != NULL &&
 	    process_link_line(buf, &link_in_file)) {
+		/*
+		 * Only the link name is needed. Free the memory allocated for
+		 * the link attributes list of link_in_file.
+		 */
+		linkattr_destroy(&link_in_file);
+
 		if (link_in_file.ll_link[0] == '\0' || done) {
 			/*
 			 * this is a comment line or we are done updating the
@@ -1089,16 +1113,20 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 		/*
 		 * Skip the comment line.
 		 */
-		if (link_in_file.ll_link[0] == '\0')
+		if (link_in_file.ll_link[0] == '\0') {
+			linkattr_destroy(&link_in_file);
 			continue;
+		}
 
 		if ((req->ls_flags & DLMGMT_ACTIVE) &&
-		    link_in_file.ll_linkid == DATALINK_INVALID_LINKID)
+		    link_in_file.ll_linkid == DATALINK_INVALID_LINKID) {
+			linkattr_destroy(&link_in_file);
 			continue;
+		}
 
 		link_in_file.ll_zoneid = req->ls_zoneid;
-		link_in_db = avl_find(&dlmgmt_name_avl, &link_in_file,
-		    &name_where);
+		link_in_db = link_by_name(link_in_file.ll_link,
+		    link_in_file.ll_zoneid);
 		if (link_in_db != NULL) {
 			/*
 			 * If the link in the database already has the flag
@@ -1110,6 +1138,7 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 				dlmgmt_log(LOG_WARNING, "Duplicate links "
 				    "in the repository: %s",
 				    link_in_file.ll_link);
+				linkattr_destroy(&link_in_file);
 			} else {
 				if (req->ls_flags & DLMGMT_PERSIST) {
 					/*
@@ -1119,6 +1148,8 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 					assert(link_in_db->ll_head == NULL);
 					link_in_db->ll_head =
 					    link_in_file.ll_head;
+				} else {
+					linkattr_destroy(&link_in_file);
 				}
 				link_in_db->ll_flags |= req->ls_flags;
 			}
@@ -1132,6 +1163,7 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 				dlmgmt_log(LOG_WARNING, "Unable to allocate "
 				    "memory to create new link %s",
 				    link_in_file.ll_link);
+				linkattr_destroy(&link_in_file);
 				continue;
 			}
 			bcopy(&link_in_file, newlink, sizeof (*newlink));
@@ -1140,9 +1172,13 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 				newlink->ll_linkid = dlmgmt_nextlinkid;
 			if (avl_find(&dlmgmt_id_avl, newlink, &id_where) !=
 			    NULL) {
+				dlmgmt_log(LOG_WARNING, "Link ID %d is already"
+				    " in use, destroying link %s",
+				    newlink->ll_linkid, newlink->ll_link);
 				link_destroy(newlink);
 				continue;
 			}
+
 			if ((req->ls_flags & DLMGMT_ACTIVE) &&
 			    link_activate(newlink) != 0) {
 				dlmgmt_log(LOG_WARNING, "Unable to activate %s",
@@ -1150,8 +1186,18 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 				link_destroy(newlink);
 				continue;
 			}
-			avl_insert(&dlmgmt_name_avl, newlink, name_where);
+
 			avl_insert(&dlmgmt_id_avl, newlink, id_where);
+			/*
+			 * link_activate call above can insert newlink in
+			 * dlmgmt_name_avl tree when activating a link that is
+			 * assigned to a NGZ.
+			 */
+			if (avl_find(&dlmgmt_name_avl, newlink,
+			    &name_where) == NULL)
+				avl_insert(&dlmgmt_name_avl, newlink,
+				    name_where);
+
 			dlmgmt_advance(newlink);
 			newlink->ll_flags |= req->ls_flags;
 		}

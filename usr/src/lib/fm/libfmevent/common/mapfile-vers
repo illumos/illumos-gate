@@ -38,6 +38,15 @@
 
 $mapfile_version 2
 
+SYMBOL_VERSION SUNW_1.2 {
+    global:
+	fmev_ev2shdl;
+	fmev_shdl_getauthority;
+	fmev_shdl_nvl2str;
+	fmev_shdl_strdup;
+	fmev_shdl_strfree;
+} SUNW_1.1;
+
 SYMBOL_VERSION SUNW_1.1 {
     global:
 	fmev_attr_list;
@@ -68,6 +77,11 @@ SYMBOL_VERSION SUNW_1.1 {
 
 SYMBOL_VERSION SUNWprivate {
     global:
+	fmev_pri_string;
+	fmev_publish		{ FLAGS = NODYNSORT };
+	fmev_rspublish		{ FLAGS = NODYNSORT };
+	_i_fmev_publish;
+	_i_fmev_publish_nvl;
 	__fmev_errno;
     local:
 	*;

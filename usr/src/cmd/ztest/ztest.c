@@ -2878,7 +2878,7 @@ ztest_snapshot_create(char *osname, uint64_t id)
 	    (u_longlong_t)id);
 
 	error = dmu_objset_snapshot(osname, strchr(snapname, '@') + 1,
-	    NULL, B_FALSE);
+	    NULL, NULL, B_FALSE, B_FALSE, -1);
 	if (error == ENOSPC) {
 		ztest_record_enospc(FTAG);
 		return (B_FALSE);
@@ -3083,7 +3083,7 @@ ztest_dsl_dataset_promote_busy(ztest_ds_t *zd, uint64_t id)
 	(void) snprintf(snap3name, MAXNAMELEN, "%s@s3_%llu", clone1name, id);
 
 	error = dmu_objset_snapshot(osname, strchr(snap1name, '@')+1,
-	    NULL, B_FALSE);
+	    NULL, NULL, B_FALSE, B_FALSE, -1);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc(FTAG);
@@ -3107,7 +3107,7 @@ ztest_dsl_dataset_promote_busy(ztest_ds_t *zd, uint64_t id)
 	}
 
 	error = dmu_objset_snapshot(clone1name, strchr(snap2name, '@')+1,
-	    NULL, B_FALSE);
+	    NULL, NULL, B_FALSE, B_FALSE, -1);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc(FTAG);
@@ -3117,7 +3117,7 @@ ztest_dsl_dataset_promote_busy(ztest_ds_t *zd, uint64_t id)
 	}
 
 	error = dmu_objset_snapshot(clone1name, strchr(snap3name, '@')+1,
-	    NULL, B_FALSE);
+	    NULL, NULL, B_FALSE, B_FALSE, -1);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc(FTAG);
@@ -4307,7 +4307,8 @@ ztest_dmu_snapshot_hold(ztest_ds_t *zd, uint64_t id)
 	 * Create snapshot, clone it, mark snap for deferred destroy,
 	 * destroy clone, verify snap was also destroyed.
 	 */
-	error = dmu_objset_snapshot(osname, snapname, NULL, FALSE);
+	error = dmu_objset_snapshot(osname, snapname, NULL, NULL, FALSE,
+	    FALSE, -1);
 	if (error) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_objset_snapshot");
@@ -4349,7 +4350,8 @@ ztest_dmu_snapshot_hold(ztest_ds_t *zd, uint64_t id)
 	 * destroy a held snapshot, mark for deferred destroy,
 	 * release hold, verify snapshot was destroyed.
 	 */
-	error = dmu_objset_snapshot(osname, snapname, NULL, FALSE);
+	error = dmu_objset_snapshot(osname, snapname, NULL, NULL, FALSE,
+	    FALSE, -1);
 	if (error) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_objset_snapshot");
@@ -4847,19 +4849,19 @@ ztest_spa_import_export(char *oldname, char *newname)
 	/*
 	 * Import it under the new name.
 	 */
-	VERIFY3U(0, ==, spa_import(newname, config, NULL));
+	VERIFY3U(0, ==, spa_import(newname, config, NULL, 0));
 
 	ztest_walk_pool_directory("pools after import");
 
 	/*
 	 * Try to import it again -- should fail with EEXIST.
 	 */
-	VERIFY3U(EEXIST, ==, spa_import(newname, config, NULL));
+	VERIFY3U(EEXIST, ==, spa_import(newname, config, NULL, 0));
 
 	/*
 	 * Try to import it under a different name -- should fail with EEXIST.
 	 */
-	VERIFY3U(EEXIST, ==, spa_import(oldname, config, NULL));
+	VERIFY3U(EEXIST, ==, spa_import(oldname, config, NULL, 0));
 
 	/*
 	 * Verify that the pool is no longer visible under the old name.

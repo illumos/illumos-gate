@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Floating point configuration.
@@ -49,6 +46,15 @@
 int fpu_exists = 1;
 
 int fp_kind = FP_387;
+
+/*
+ * Mechanism to save FPU state.
+ */
+#if defined(__amd64)
+int fp_save_mech = FP_FXSAVE;
+#elif defined(__i386)
+int fp_save_mech = FP_FNSAVE;
+#endif
 
 /*
  * The variable fpu_ignored is provided to allow other code to
@@ -142,24 +148,59 @@ fpu_probe(void)
 		 *
 		 * (Perhaps we should complain more about this case!)
 		 */
-		if ((x86_feature & X86_SSE|X86_SSE2) == (X86_SSE|X86_SSE2)) {
-			fp_kind = __FP_SSE;
+		if (is_x86_feature(x86_featureset, X86FSET_SSE) &&
+		    is_x86_feature(x86_featureset, X86FSET_SSE2)) {
+			fp_kind |= __FP_SSE;
 			ENABLE_SSE();
+
+			if (is_x86_feature(x86_featureset, X86FSET_AVX)) {
+				ASSERT(is_x86_feature(x86_featureset,
+				    X86FSET_XSAVE));
+				fp_kind |= __FP_AVX;
+			}
+
+			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
+				fp_save_mech = FP_XSAVE;
+				fpsave_ctxt = xsave_ctxt;
+				patch_xsave();
+			}
 		}
 #elif defined(__i386)
 		/*
 		 * SSE and SSE2 are both optional, and we patch kernel
 		 * code to exploit it when present.
 		 */
-		if (x86_feature & X86_SSE) {
-			fp_kind = __FP_SSE;
-			fpsave_ctxt = fpxsave_ctxt;
-			patch_sse();
-			if (x86_feature & X86_SSE2)
-				patch_sse2();
+		if (is_x86_feature(x86_featureset, X86FSET_SSE)) {
+			fp_kind |= __FP_SSE;
 			ENABLE_SSE();
+			fp_save_mech = FP_FXSAVE;
+			fpsave_ctxt = fpxsave_ctxt;
+
+			if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
+				patch_sse2();
+			}
+
+			if (is_x86_feature(x86_featureset, X86FSET_AVX)) {
+				ASSERT(is_x86_feature(x86_featureset,
+				    X86FSET_XSAVE));
+				fp_kind |= __FP_AVX;
+			}
+
+			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
+				fp_save_mech = FP_XSAVE;
+				fpsave_ctxt = xsave_ctxt;
+				patch_xsave();
+			} else {
+				patch_sse();	/* use fxrstor */
+			}
 		} else {
-			x86_feature &= ~X86_SSE2;
+			remove_x86_feature(x86_featureset, X86FSET_SSE2);
+			/*
+			 * We will not likely to have a chip with AVX but not
+			 * SSE. But to be safe we disable AVX if SSE is not
+			 * enabled.
+			 */
+			remove_x86_feature(x86_featureset, X86FSET_AVX);
 			/*
 			 * (Just in case the BIOS decided we wanted SSE
 			 * enabled when we didn't. See 4965674.)
@@ -167,11 +208,11 @@ fpu_probe(void)
 			DISABLE_SSE();
 		}
 #endif
-		if (x86_feature & X86_SSE2) {
+		if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
 			use_sse_pagecopy = use_sse_pagezero = use_sse_copy = 1;
 		}
 
-		if (fp_kind == __FP_SSE) {
+		if (fp_kind & __FP_SSE) {
 			struct fxsave_state *fx;
 			uint8_t fxsave_state[sizeof (struct fxsave_state) +
 			    XMM_ALIGN];

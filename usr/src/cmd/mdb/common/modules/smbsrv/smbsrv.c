@@ -375,6 +375,8 @@ static int smb_node(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int smb_node_walk_init(mdb_walk_state_t *);
 static int smb_node_walk_step(mdb_walk_state_t *);
 static int smb_lock(uintptr_t, uint_t, int, const mdb_arg_t *);
+static int smb_oplock(uintptr_t, uint_t, int, const mdb_arg_t *);
+static int smb_oplock_grant(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int smb_ace(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int smb_ace_walk_init(mdb_walk_state_t *);
 static int smb_ace_walk_step(mdb_walk_state_t *);
@@ -443,8 +445,12 @@ static const mdb_dcmd_t dcmds[] = {
 	    smb_dcmd_odir },
 	{   "smbofile",
 	    "[-v]",
-	    "print smb_odir_t information",
+	    "print smb_file_t information",
 	    smb_dcmd_ofile },
+	{   "smboplock", NULL,
+	    "print smb_oplock_t information", smb_oplock },
+	{   "smboplockgrant", NULL,
+	    "print smb_oplock_grant_t information", smb_oplock_grant },
 	{   "smbstat", NULL,
 	    "print all smb dispatched requests statistics",
 	    smb_stats },
@@ -799,7 +805,7 @@ static const char *smb_request_state[SMB_REQ_STATE_SENTINEL] =
 #define	SMB_REQUEST_BANNER	\
 	"%<b>%<u>%-?s %-?s %-14s %-14s %-16s %-32s%</u>%</b>\n"
 #define	SMB_REQUEST_FORMAT	\
-	"%-?p %-?p %e %e %-16s %s\n"
+	"%-?p %-?p %-14lld %-14lld %-16s %s\n"
 
 static int
 smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -866,10 +872,12 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "FID(file): %u (%p)\n"
 			    "PID: %u\n"
 			    "MID: %u\n\n"
-			    "waiting time: %1.3e\n"
-			    "running time: %1.3e",
-			    sr->first_smb_com, smb_com[sr->first_smb_com],
-			    sr->smb_com, smb_com[sr->smb_com],
+			    "waiting time: %lld\n"
+			    "running time: %lld\n",
+			    sr->first_smb_com,
+			    smb_com[sr->first_smb_com].smb_com,
+			    sr->smb_com,
+			    smb_com[sr->smb_com].smb_com,
 			    sr->sr_state, state,
 			    sr->smb_tid, sr->tid_tree,
 			    sr->smb_uid, sr->uid_user,
@@ -897,7 +905,7 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    waiting,
 			    running,
 			    state,
-			    smb_com[sr->smb_com]);
+			    smb_com[sr->smb_com].smb_com);
 		}
 	}
 	return (DCMD_OK);
@@ -1403,13 +1411,14 @@ static int
 smb_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	smb_node_t	node;
+	int		rc;
 	int		verbose = FALSE;
 	int		print_full_path = FALSE;
 	int		stack_trace = FALSE;
 	vnode_t		vnode;
 	char		od_name[MAXNAMELEN];
 	char		path_name[1024];
-	uintptr_t	list_addr;
+	uintptr_t	list_addr, oplock_addr;
 
 	if (mdb_getopts(argc, argv,
 	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
@@ -1446,9 +1455,10 @@ smb_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "%-18s "
 			    "%-6s "
 			    "%-6s "
+			    "%-8s "
 			    "%-6s%</u>%</b>\n",
 			    "ADDR", "VP", "NODE-NAME", "OFILES", "LOCKS",
-			    "REF");
+			    "OPLOCK", "REF");
 		}
 	}
 
@@ -1489,11 +1499,25 @@ smb_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				}
 				(void) mdb_dec_indent(SMB_DCMD_INDENT);
 			}
+			if (node.n_oplock.ol_count == 0) {
+				mdb_printf("Opportunistic Locks: 0\n");
+			} else {
+				oplock_addr =
+				    addr + offsetof(smb_node_t, n_oplock);
+				mdb_printf("Opportunistic Lock: %p\n",
+				    oplock_addr);
+				rc = mdb_call_dcmd("smboplock", oplock_addr,
+				    flags, argc, argv);
+				if (rc != DCMD_OK)
+					return (rc);
+			}
 			mdb_printf("Reference Count: %u\n\n", node.n_refcnt);
 		} else {
-			mdb_printf("%-?p %-?p %-18s %-6d %-6d %-6d\n",
+			mdb_printf("%-?p %-?p %-18s %-6d %-6d %-8d %-6d ",
 			    addr, node.vp, od_name, node.n_ofile_list.ll_count,
-			    node.n_lock_list.ll_count, node.n_refcnt);
+			    node.n_lock_list.ll_count,
+			    node.n_oplock.ol_count, node.n_refcnt);
+
 			if (print_full_path)
 				mdb_printf("\t%s\n", path_name);
 		}
@@ -1708,6 +1732,99 @@ smb_lock(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("failed to read struct smb_request at %p", addr);
 		return (DCMD_ERR);
 	}
+
+	return (DCMD_OK);
+}
+
+/*
+ * *****************************************************************************
+ * ************************** smb_oplock_grant_t *******************************
+ * *****************************************************************************
+ */
+/*ARGSUSED*/
+static int
+smb_oplock_grant(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	smb_oplock_grant_t	grant;
+	char			 *level;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	/*
+	 * If this is the first invocation of the command, print a nice
+	 * header line for the output that will follow.
+	 */
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf("%<u>%-16s %-10s %-16s%</u>\n",
+		    "Grants:", "LEVEL", "OFILE");
+	}
+
+	if (mdb_vread(&grant, sizeof (grant), addr) == sizeof (grant)) {
+		switch (grant.og_level) {
+		case SMB_OPLOCK_EXCLUSIVE:
+			level = "EXCLUSIVE";
+			break;
+		case SMB_OPLOCK_BATCH:
+			level = "BATCH";
+			break;
+		case SMB_OPLOCK_LEVEL_II:
+			level = "LEVEL_II";
+			break;
+		default:
+			level = "UNKNOWN";
+			break;
+		}
+
+		mdb_printf("%-16p %-10s %-16p", addr, level, grant.og_ofile);
+	}
+	return (DCMD_OK);
+}
+
+/*
+ * *****************************************************************************
+ * ***************************** smb_oplock_t **********************************
+ * *****************************************************************************
+ */
+/*ARGSUSED*/
+static int
+smb_oplock(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	smb_oplock_t	oplock;
+	uintptr_t	list_addr;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&oplock, sizeof (oplock), addr) != sizeof (oplock)) {
+		mdb_warn("failed to read struct smb_oplock at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (oplock.ol_count == 0)
+		return (DCMD_OK);
+
+	(void) mdb_inc_indent(SMB_DCMD_INDENT);
+	switch (oplock.ol_break) {
+	case SMB_OPLOCK_BREAK_TO_NONE:
+		mdb_printf("Break Pending: BREAK_TO_NONE\n");
+		break;
+	case SMB_OPLOCK_BREAK_TO_LEVEL_II:
+		mdb_printf(
+		    "Break Pending: BREAK_TO_LEVEL_II\n");
+		break;
+	default:
+		break;
+	}
+
+	list_addr = addr + offsetof(smb_oplock_t, ol_grants);
+
+	if (mdb_pwalk_dcmd("list", "smboplockgrant",
+	    argc, argv, list_addr)) {
+		mdb_warn("failed to walk oplock grants");
+	}
+
+	(void) mdb_dec_indent(SMB_DCMD_INDENT);
 
 	return (DCMD_OK);
 }

@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -129,7 +127,7 @@ out:
 	else
 		(void) printf(gettext("                                      "
 		    "state: %s\n"), *persistent ? gettext("enabled") :
-			gettext("disabled"));
+		    gettext("disabled"));
 
 	(void) printf(gettext("           memory cap enforcement"
 	    " threshold: %d%%\n"), conf.rcfg_memory_cap_enforcement_pressure);
@@ -190,7 +188,7 @@ main(int argc, char *argv[])
 	char *zonename;
 	char *maxrss = NULL;
 
-	(void) setprogname("rcapadm");
+	(void) setpname("rcapadm");
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 

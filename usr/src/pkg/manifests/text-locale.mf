@@ -71,10 +71,8 @@ file path=usr/lib/locale/iso_8859_1/iso_8859_1.so.3 mode=0555
 file path=usr/lib/localedef/src/iso_8859_1/charmap.src mode=0444
 file path=usr/lib/localedef/src/iso_8859_1/extension.src mode=0444
 file path=usr/lib/localedef/src/iso_8859_1/localedef.src mode=0444
-legacy pkg=SUNWloc arch=$(ARCH) category=system \
+legacy pkg=SUNWloc \
     desc="localization utilities and C locale (POSIX default) definitions" \
-    hotline="Please contact your local service provider" \
-    name="System Localization" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="System Localization"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

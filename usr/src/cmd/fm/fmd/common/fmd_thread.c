@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <signal.h>
 
@@ -47,6 +43,7 @@ fmd_thread_xcreate(fmd_module_t *mp, pthread_t tid)
 	tp->thr_trdata = fmd_trace_create();
 	tp->thr_trfunc = (fmd_tracebuf_f *)fmd.d_thr_trace;
 	tp->thr_errdepth = 0;
+	tp->thr_isdoor = 0;
 
 	(void) pthread_mutex_lock(&fmd.d_thr_lock);
 	fmd_list_append(&fmd.d_thr_list, tp);
@@ -63,15 +60,18 @@ fmd_thread_start(void *arg)
 	if (pthread_setspecific(fmd.d_key, tp) != 0)
 		fmd_panic("failed to initialize thread key to %p", arg);
 
-	(void) pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	if (!tp->thr_isdoor) {
+		(void) pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+		(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	}
 
 	tp->thr_func(tp->thr_arg);
 	return (NULL);
 }
 
-fmd_thread_t *
-fmd_thread_create(fmd_module_t *mp, fmd_thread_f *func, void *arg)
+static fmd_thread_t *
+fmd_thread_create_cmn(fmd_module_t *mp, fmd_thread_f *func, void *arg,
+    int isdoor)
 {
 	fmd_thread_t *tp = fmd_alloc(sizeof (fmd_thread_t), FMD_SLEEP);
 	sigset_t oset, nset;
@@ -83,10 +83,12 @@ fmd_thread_create(fmd_module_t *mp, fmd_thread_f *func, void *arg)
 	tp->thr_trdata = fmd_trace_create();
 	tp->thr_trfunc = (fmd_tracebuf_f *)fmd.d_thr_trace;
 	tp->thr_errdepth = 0;
+	tp->thr_isdoor = isdoor;
 
 	(void) sigfillset(&nset);
 	(void) sigdelset(&nset, SIGABRT); /* always unblocked for fmd_panic() */
-	(void) sigdelset(&nset, fmd.d_thr_sig); /* for fmd_thr_signal() */
+	if (!isdoor)
+		(void) sigdelset(&nset, fmd.d_thr_sig); /* fmd_thr_signal() */
 
 	(void) pthread_sigmask(SIG_SETMASK, &nset, &oset);
 	err = pthread_create(&tp->thr_tid, NULL, fmd_thread_start, tp);
@@ -102,6 +104,18 @@ fmd_thread_create(fmd_module_t *mp, fmd_thread_f *func, void *arg)
 	(void) pthread_mutex_unlock(&fmd.d_thr_lock);
 
 	return (tp);
+}
+
+fmd_thread_t *
+fmd_thread_create(fmd_module_t *mp, fmd_thread_f *func, void *arg)
+{
+	return (fmd_thread_create_cmn(mp, func, arg, 0));
+}
+
+fmd_thread_t *
+fmd_doorthread_create(fmd_module_t *mp, fmd_thread_f *func, void *arg)
+{
+	return (fmd_thread_create_cmn(mp, func, arg, 1));
 }
 
 void

@@ -97,21 +97,12 @@ file path=usr/sbin/smbstat mode=0555
 file path=var/smb/cvol/windows/system32/eventlog.dll mode=0755
 file path=var/smb/smbpasswd group=sys mode=0400 \
     original_name=SUNWsmbs:var/smb/smbpasswd preserve=true
-legacy pkg=SUNWsmbskr arch=$(ARCH) category=system \
-    desc="SMB Server kernel root components" \
-    hotline="Please contact your local service provider" \
-    name="SMB Server (Kernel)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWsmbsr arch=$(ARCH) category=system \
-    desc="SMB Server root components" \
-    hotline="Please contact your local service provider" \
-    name="SMB Server (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWsmbsu arch=$(ARCH) category=system \
-    desc="SMB Server libraries and commands" \
-    hotline="Please contact your local service provider" \
-    name="SMB Server (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWsmbskr desc="SMB Server kernel root components" \
+    name="SMB Server (Kernel)"
+legacy pkg=SUNWsmbsr desc="SMB Server root components" \
+    name="SMB Server (Root)"
+legacy pkg=SUNWsmbsu desc="SMB Server libraries and commands" \
+    name="SMB Server (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/reparse/libreparse_smb.so target=libreparse_smb.so.1

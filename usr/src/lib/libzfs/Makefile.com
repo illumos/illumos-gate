@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY= libzfs.a
@@ -39,6 +38,7 @@ OBJS_COMMON=			\
 	libzfs_changelist.o	\
 	libzfs_config.o		\
 	libzfs_dataset.o	\
+	libzfs_diff.o		\
 	libzfs_fru.o		\
 	libzfs_graph.o		\
 	libzfs_import.o		\
@@ -68,7 +68,7 @@ C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
 	-ladm -lidmap -ltsol -lmd -lumem
-CPPFLAGS +=	$(INCS) -D_REENTRANT
+CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRC)/common/zfs/%.c)

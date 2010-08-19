@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,19 +18,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #ifndef _SYS_ACCT_H
 #define	_SYS_ACCT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/types32.h>
@@ -104,11 +100,6 @@ int	acct_fs_in_use(struct vnode *);
 
 #define	AFORK	0001		/* has executed fork, but no exec */
 #define	ASU	0002		/* used super-user privileges */
-#ifdef SUN_SRC_COMPAT
-#define	ACOMPAT	0004		/* used compatibility mode (VAX) */
-#define	ACORE	0010		/* dumped core */
-#define	AXSIG	0020		/* killed by a signal */
-#endif /* SUN_SRC_COMPAT */
 #define	AEXPND	0040		/* expanded acct structure */
 #define	ACCTF	0300		/* record type: 00 = acct */
 

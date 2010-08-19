@@ -59,9 +59,6 @@ file path=platform/i86pc/kernel/drv/ioat.conf group=sys
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/ioat group=sys
 file path=platform/i86xpv/kernel/drv/ioat group=sys
 file path=platform/i86xpv/kernel/drv/ioat.conf group=sys
-legacy pkg=SUNWdcopy arch=$(ARCH) category=system desc="Sun dcopy DMA drivers" \
-    hotline="Please contact your local service provider" \
-    name="Sun dcopy DMA drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWdcopy desc="Sun dcopy DMA drivers" name="Sun dcopy DMA drivers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

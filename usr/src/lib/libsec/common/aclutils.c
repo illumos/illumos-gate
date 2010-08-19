@@ -740,7 +740,6 @@ acl_error(const char *fmt, ...)
 int
 sid_to_id(char *sid, boolean_t user, uid_t *id)
 {
-	idmap_handle_t *idmap_hdl = NULL;
 	idmap_get_handle_t *get_hdl = NULL;
 	char *rid_start = NULL;
 	idmap_stat status;
@@ -757,8 +756,7 @@ sid_to_id(char *sid, boolean_t user, uid_t *id)
 		errno = 0;
 		rid = strtoul(rid_start--, &end, 10);
 		if (errno == 0 && *end == '\0') {
-			if (idmap_init(&idmap_hdl) == IDMAP_SUCCESS &&
-			    idmap_get_create(idmap_hdl, &get_hdl) ==
+			if (idmap_get_create(&get_hdl) ==
 			    IDMAP_SUCCESS) {
 				if (user)
 					error = idmap_get_uidbysid(get_hdl,
@@ -781,8 +779,6 @@ sid_to_id(char *sid, boolean_t user, uid_t *id)
 			}
 			if (get_hdl)
 				idmap_get_destroy(get_hdl);
-			if (idmap_hdl)
-				(void) idmap_fini(idmap_hdl);
 		} else {
 			error = 1;
 		}

@@ -66,10 +66,8 @@ file path=kernel/drv/$(ARCH64)/audio810 group=sys
 file path=kernel/drv/audio810 group=sys
 file path=kernel/drv/audio810.conf group=sys \
     original_name=SUNWad810:kernel/drv/audio810.conf preserve=true
-legacy pkg=SUNWad810 arch=$(ARCH) category=system \
+legacy pkg=SUNWad810 \
     desc="SunOS audio device driver for W1100z & W2100z workstations" \
-    hotline="Please contact your local service provider" \
-    name="SUNW W1100z & W2100z Audio Drivers" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="SUNW W1100z & W2100z Audio Drivers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

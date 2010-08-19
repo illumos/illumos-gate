@@ -18,14 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * This file contains functions to implement the partition menu commands.
  */
+#include <stdlib.h>
+#include <string.h>
 #include "global.h"
 #include "partition.h"
 #include "menu_partition.h"
@@ -35,9 +37,6 @@
 #include "misc.h"
 #include "label.h"
 #include "auto_sense.h"
-
-#include <stdlib.h>
-#include <string.h>
 
 #ifdef __STDC__
 

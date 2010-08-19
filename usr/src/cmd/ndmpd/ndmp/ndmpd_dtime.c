@@ -184,12 +184,12 @@ ddates_pathname(char *buf)
 
 
 /*
- * getline
+ * getaline
  *
  * Get a line from the file and handle the continued lines.
  */
 static char *
-getline(FILE *fp, char *line, int llen)
+getaline(FILE *fp, char *line, int llen)
 {
 	char *save;
 	int len;
@@ -483,7 +483,7 @@ getrecord(FILE *fp, dumpdates_t *ddatep, int *recno)
 		return (-1);
 
 	do {
-		if (getline(fp, tbuf, sizeof (tbuf)) != tbuf)
+		if (getaline(fp, tbuf, sizeof (tbuf)) != tbuf)
 			return (-1);
 	} while (!*tbuf);
 

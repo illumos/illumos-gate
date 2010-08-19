@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -58,18 +57,26 @@ fmev_tsd_destructor(void *data)
 int
 fmev_api_init(struct fmev_hdl_cmn *hc)
 {
-	if (!fmev_api_enter(NULL, 0))
+	uint32_t v = hc->hc_api_vers;
+	int rc;
+
+	if (!fmev_api_enter((struct fmev_hdl_cmn *)fmev_api_init, 0))
 		return (0);
-	/*
-	 * We implement only version 1 of the ABI at this point.
-	 */
-	if (hc->hc_api_vers != LIBFMEVENT_VERSION_1) {
+
+	switch (v) {
+	case LIBFMEVENT_VERSION_1:
+	case LIBFMEVENT_VERSION_2:
+		rc = 1;
+		break;
+
+	default:
 		if (key_inited)
 			(void) fmev_seterr(FMEVERR_VERSION_MISMATCH);
-		return (0);
+		rc = 0;
+		break;
 	}
 
-	return (1);
+	return (rc);
 }
 
 /*
@@ -82,6 +89,7 @@ fmev_api_init(struct fmev_hdl_cmn *hc)
 int
 fmev_api_enter(struct fmev_hdl_cmn *hc, uint32_t ver_intro)
 {
+	uint32_t v;
 	struct fmev_tsd *tsd;
 
 	/* Initialize key on first visit */
@@ -106,13 +114,18 @@ fmev_api_enter(struct fmev_hdl_cmn *hc, uint32_t ver_intro)
 
 	tsd->ts_lasterr = 0;
 
-	if (hc == NULL) {
-		return (1);
+	if (hc == (struct fmev_hdl_cmn *)fmev_api_init)
+		return (1);	/* special case from fmev_api_init only */
+
+	if (hc == NULL || hc->hc_magic != _FMEV_SHMAGIC) {
+		tsd->ts_lasterr = FMEVERR_API;
+		return (0);
 	}
 
+	v = hc->hc_api_vers;	/* API version opened */
+
 	/* Enforce version adherence. */
-	if (ver_intro > hc->hc_api_vers ||
-	    hc->hc_api_vers > LIBFMEVENT_VERSION_LATEST ||
+	if (ver_intro > v || v > LIBFMEVENT_VERSION_LATEST ||
 	    ver_intro > LIBFMEVENT_VERSION_LATEST) {
 		tsd->ts_lasterr = FMEVERR_VERSION_MISMATCH;
 		return (0);
@@ -177,4 +190,22 @@ __fmev_errno(void)
 		return (&unknownerr);
 
 	return ((const fmev_err_t *)&tsd->ts_lasterr);
+}
+
+void *
+dflt_alloc(size_t sz)
+{
+	return (umem_alloc(sz, UMEM_DEFAULT));
+}
+
+void *
+dflt_zalloc(size_t sz)
+{
+	return (umem_zalloc(sz, UMEM_DEFAULT));
+}
+
+void
+dflt_free(void *buf, size_t sz)
+{
+	umem_free(buf, sz);
 }

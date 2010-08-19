@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_N2RNG_H
@@ -121,6 +120,11 @@ typedef struct {
 #define	N2RNG_NOANALOGOUT	0x2
 
 /*
+ * n2rng: config variable in the n2rng.conf file
+ */
+#define	N2RNG_FIPS_STRING	"n2rng-fips-140"
+
+/*
  * There can only be N2_RNG_FIPS_INSTANCES concurrent RNG requsts from
  * the framework.  Making this value large helps benchmarks.  It
  * should probably come from a conf file, but for now it is hard
@@ -134,6 +138,7 @@ struct fipsrandomstruct {
 	kmutex_t	mtx;
 	uint64_t	entropyhunger;  /* RNGs generated with no entropy */
 	uint32_t	XKEY[6]; /* one extra word for getentropy */
+	uint32_t	x_jminus1[5];	/* store the last output */
 };
 
 typedef struct {
@@ -234,6 +239,7 @@ typedef struct n2rng {
 	md_t			*n_mdp;
 	uint64_t		n_sticks_per_usec;
 	ddi_taskq_t		*n_taskq;
+	boolean_t		n_is_fips;
 } n2rng_t;
 
 typedef kstat_named_t n2rng_kstat_bias_t[N2RNG_MAX_RNGS][N2RNG_NOSC];
@@ -365,6 +371,11 @@ uint64_t hv_rng_data_read_diag(uint64_t data_pa,
 uint64_t hv_rng_data_read_diag_v2(uint64_t data_pa,
     size_t  datalen, uint64_t rngid, uint64_t *tdelta);
 uint64_t hv_rng_data_read(uint64_t data_pa, uint64_t *tdelta);
+
+/*
+ * n2rng_post.c
+ */
+int n2rng_fips_rng_post(void);
 
 #endif /* _KERNEL */
 #endif /* !_ASM */

@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	string duplication
@@ -42,10 +39,16 @@
 #include "libc.h"
 
 wchar_t *
-wsdup(const wchar_t *s1)
+wcsdup(const wchar_t *s1)
 {
 	wchar_t *s2;
 
 	s2 = malloc((wcslen(s1) + 1) * sizeof (wchar_t));
 	return (s2 == NULL ? NULL : wcscpy(s2, s1));
+}
+
+wchar_t *
+wsdup(const wchar_t *s1)
+{
+	return (wcsdup(s1));
 }

@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <sys/param.h>
 #include <libintl.h>
@@ -154,7 +152,7 @@ info(char *format, ...)
 }
 
 char *
-setprogname(char *arg0)
+setpname(char *arg0)
 {
 	char *p = strrchr(arg0, '/');
 

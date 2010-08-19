@@ -209,6 +209,7 @@ SUBDIRS += \
 	libbrand	.WAIT   \
 	libzonecfg	\
 	libzoneinfo	\
+	libzonestat	\
 	libtsnet	\
 	libtsol		\
 	gss_mechs/mech_spnego	\
@@ -238,6 +239,8 @@ SUBDIRS += \
 	udapl		\
 	libzpool	\
 	libzfs		\
+	libbe 		\
+	pylibbe 	\
 	libzfs_jni	\
 	pyzfs		\
 	pysolaris	\
@@ -477,6 +480,7 @@ HDRSUBDIRS=		\
 	libzfs		\
 	libzfs_jni	\
 	libzoneinfo	\
+	libzonestat	\
 	hal		\
 	policykit	\
 	lvm		\
@@ -569,6 +573,7 @@ $(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
 libast: 	libsocket
 libadutils: 	libldap5 libresolv libsocket libnsl
 nsswitch:	libadutils libidmap
+libbe: 		libzfs
 libbsm:		libtsol
 libcmd: 	libsum libast libsocket libnsl
 libcmdutils:	libavl
@@ -589,7 +594,7 @@ libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
 libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
-libidmap:	libadutils libldap5 libavl libsldap
+libidmap:	libadutils libldap5 libavl libsldap libuutil
 libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
 		libdladm libsecdb
 libiscsit:	libc libnvpair libstmf libuuid libnsl
@@ -659,6 +664,7 @@ sun_fc:		libdevinfo libsysevent libnvpair
 libsun_ima:	libdevinfo libsysevent libnsl
 sun_sas:	libdevinfo libsysevent libnvpair libkstat libdevid
 libgrubmgmt:	libdevinfo libzfs libfstyp
+pylibbe: 	libbe libzfs
 pyzfs:		libnvpair libzfs
 pysolaris:	libsec libidmap
 libreparse:	libnvpair

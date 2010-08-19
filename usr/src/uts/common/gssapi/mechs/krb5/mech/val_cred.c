@@ -1,5 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 /*
  * Copyright 1997 by Massachusetts Institute of Technology
  * All Rights Reserved.
@@ -90,7 +91,8 @@ krb5_gss_validate_cred(minor_status, cred_handle)
 	krb5_gss_cred_id_t cred = (krb5_gss_cred_id_t) cred_handle;
 	k5_mutex_assert_locked(&cred->lock);
 	k5_mutex_unlock(&cred->lock);
-    }
+    } else /* Solaris Kerberos - added this else */
+        save_error_info(*minor_status, context);
     krb5_free_context(context);
     return maj;
 }

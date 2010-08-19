@@ -52,6 +52,7 @@ uu_list_pool_t *string_pool;
 %token SCC_LISTSNAP SCC_SELECTSNAP SCC_REVERT SCC_REFRESH
 %token SCS_REDIRECT SCS_NEWLINE SCS_EQUALS SCS_LPAREN SCS_RPAREN
 %token SCV_WORD SCV_STRING
+%token SCC_DELNOTIFY SCC_SETNOTIFY SCC_LISTNOTIFY
 
 %type <tok> command_token
 %type <str> SCV_WORD SCV_STRING
@@ -108,6 +109,9 @@ command : terminator
 	| revert_cmd
 	| refresh_cmd
 	| unknown_cmd
+	| delnotify_cmd
+	| listnotify_cmd
+	| setnotify_cmd
 	| error terminator	{ semerr(gettext("Syntax error.\n")); }
 
 unknown_cmd : SCV_WORD terminator
@@ -548,6 +552,71 @@ revert_cmd: SCC_REVERT opt_word terminator	{ lscf_revert($2); free ($2); }
 refresh_cmd: SCC_REFRESH terminator	{ lscf_refresh(); }
 	| SCC_REFRESH error terminator	{ synerr(SCC_REFRESH); return(0); }
 
+delnotify_cmd : SCC_DELNOTIFY SCV_WORD terminator
+	{
+		lscf_delnotify($2, 0);
+		free($2);
+	}
+	| SCC_DELNOTIFY SCV_WORD SCV_WORD terminator
+	{
+		if (strcmp($2, "-g") == 0) {
+			lscf_delnotify($3, 1);
+			free($2);
+			free($3);
+		} else {
+			synerr(SCC_DELNOTIFY);
+			free($2);
+			free($3);
+			return(0);
+		}
+	}
+	| SCC_DELNOTIFY error terminator { synerr(SCC_DELNOTIFY); return(0); }
+
+listnotify_cmd : SCC_LISTNOTIFY terminator
+	{
+		lscf_listnotify("all", 0);
+	}	
+	| SCC_LISTNOTIFY SCV_WORD terminator
+	{
+		if (strcmp($2, "-g") == 0) {
+			lscf_listnotify("all", 1);
+		} else {
+			lscf_listnotify($2, 0);
+		}
+		free($2);
+	}
+	| SCC_LISTNOTIFY SCV_WORD SCV_WORD terminator
+	{
+		if (strcmp($2, "-g") == 0) {
+			lscf_listnotify($3, 1);
+			free($2);
+			free($3);
+		} else {
+			synerr(SCC_LISTNOTIFY);
+			free($2);
+			free($3);
+			return(0);
+		}
+	}
+	| SCC_LISTNOTIFY error terminator { synerr(SCC_LISTNOTIFY); return(0); }
+
+setnotify_cmd : SCC_SETNOTIFY string_list terminator
+	{
+		string_list_t *slp;
+		void *cookie = NULL;
+
+		if (lscf_setnotify($2) == -2)
+			synerr(SCC_SETNOTIFY);
+
+		while ((slp = uu_list_teardown($2, &cookie)) != NULL) {
+			free(slp->str);
+			free(slp);
+		}
+
+		uu_list_destroy($2);
+	}
+	| SCC_SETNOTIFY error terminator { synerr(SCC_SETNOTIFY); return(0); }
+
 terminator : SCS_NEWLINE
 
 string_list :
@@ -624,3 +693,6 @@ command_token : SCC_VALIDATE	{ $$ = SCC_VALIDATE; }
 	| SCC_REVERT		{ $$ = SCC_REVERT; }
 	| SCC_REFRESH		{ $$ = SCC_REFRESH; }
 	| SCC_DESCRIBE		{ $$ = SCC_DESCRIBE; }
+	| SCC_DELNOTIFY		{ $$ = SCC_DELNOTIFY; }
+	| SCC_LISTNOTIFY	{ $$ = SCC_LISTNOTIFY; }
+	| SCC_SETNOTIFY		{ $$ = SCC_SETNOTIFY; }

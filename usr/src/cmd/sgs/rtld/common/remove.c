@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -140,10 +139,11 @@ purge_exit_handlers(Lm_list *lml, Rt_map **tobj)
 
 /*
  * Break down an Alist containing pathname descriptors.  In most instances, the
- * Alist is cleaned of all entries, but retained for later use.
+ * Alist is removed completely.  However, in some instances the alist is cleaned
+ * of all entries, but retained for later use.
  */
 void
-remove_plist(Alist **alpp, int complete)
+remove_alist(Alist **alpp, int complete)
 {
 	Alist	*alp = *alpp;
 
@@ -152,8 +152,7 @@ remove_plist(Alist **alpp, int complete)
 			free((void *)alp);
 			*alpp = NULL;
 		} else {
-			alp->al_nitems = 0;
-			alp->al_next = ALIST_OFF_DATA;
+			alist_reset(alp);
 		}
 	}
 }
@@ -170,23 +169,14 @@ void
 remove_lml(Lm_list *lml)
 {
 	if (lml && (lml->lm_head == NULL)) {
-		/*
-		 * As a whole link-map list is being removed, the debuggers
-		 * would have been alerted of this deletion (or an addition
-		 * in the case we're here to clean up from a failure).  Set
-		 * the main link-map list so that a consistent registration
-		 * can be signaled to the debuggers when we leave ld.so.1.
-		 */
-		lml_main.lm_flags |= LML_FLG_DBNOTIF;
-
 		if (lml->lm_lmidstr)
 			free(lml->lm_lmidstr);
 		if (lml->lm_alp)
 			free(lml->lm_alp);
 		if (lml->lm_lists)
 			free(lml->lm_lists);
-		if (lml->lm_actaudit)
-			free(lml->lm_actaudit);
+		if (lml->lm_aud_cookies)
+			free(lml->lm_aud_cookies);
 
 		/*
 		 * Cleanup any pending RTLDINFO in the case where it was
@@ -219,7 +209,7 @@ remove_lml(Lm_list *lml)
  * link-map creation failure.
  */
 void
-remove_so(Lm_list *lml, Rt_map *lmp)
+remove_so(Lm_list *lml, Rt_map *lmp, Rt_map *clmp)
 {
 	Dyninfo	*dip;
 
@@ -230,7 +220,7 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	 * Unlink the link map from the link-map list.
 	 */
 	if (lml && lmp)
-		lm_delete(lml, lmp);
+		lm_delete(lml, lmp, clmp);
 
 	/*
 	 * If this object contributed any local external vectors for the current
@@ -255,6 +245,33 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	}
 
 	DBG_CALL(Dbg_file_delete(lmp));
+
+	/*
+	 * If this object is an auditor, determine whether any link-map lists
+	 * are maintaining cookies to represent this auditor.  These cookies
+	 * are established for local auditing preinit and activity events.
+	 */
+	if (FLAGS(lmp) & FLG_RT_AUDIT) {
+		Lm_list	*nlml;
+		Aliste	idx1;
+
+		for (APLIST_TRAVERSE(dynlm_list, idx1, nlml)) {
+			Rt_map  	*hlmp = nlml->lm_head;
+			Audit_client	*acp;
+			Aliste		idx2;
+
+			if ((hlmp == NULL) || (FLAGS(hlmp) & FLG_RT_AUDIT))
+				continue;
+
+			for (ALIST_TRAVERSE(nlml->lm_aud_cookies, idx2, acp)) {
+				if (acp->ac_lmp != lmp) {
+					alist_delete(nlml->lm_aud_cookies,
+					    &idx2);
+					break;
+				}
+			}
+		}
+	}
 
 	/*
 	 * If this is a temporary link-map, put in place to facilitate the
@@ -288,7 +305,7 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 			    ((dip->di_flags & MSK_DI_FILTER) == 0))
 				continue;
 
-			remove_plist((Alist **)&(dip->di_info), 1);
+			remove_alist((Alist **)&(dip->di_info), 1);
 		}
 	}
 
@@ -296,7 +313,7 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	 * Deallocate any remaining cruft and free the link-map.
 	 */
 	if (RLIST(lmp))
-		remove_plist(&RLIST(lmp), 1);
+		remove_alist(&RLIST(lmp), 1);
 
 	if (AUDITORS(lmp))
 		audit_desc_cleanup(lmp);
@@ -488,7 +505,7 @@ remove_cntl(Lm_list *lml, Aliste lmco)
  * that are apart of this link-map control list.
  */
 static void
-remove_incomplete(Lm_list *lml, Aliste lmco)
+remove_incomplete(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 {
 	Rt_map	*lmp;
 	Lm_cntl	*lmc;
@@ -497,7 +514,20 @@ remove_incomplete(Lm_list *lml, Aliste lmco)
 	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, lmco);
 
 	/*
-	 * First, remove any lists that may point between objects.
+	 * If auditing is in effect, the loading of these objects might have
+	 * resulted in la_objopen() events being posted.  Normally, an
+	 * la_objclose() event is posted after an object's .fini is executed,
+	 * just before the objects are unloaded.  These failed objects do not
+	 * have their .fini's executed, but an la_objclose() event should still
+	 * be posted to any auditors.
+	 */
+	if ((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_OBJCLOSE) {
+		for (lmp = lmc->lc_head; lmp; lmp = NEXT_RT_MAP(lmp))
+			audit_objclose(lmp, clmp);
+	}
+
+	/*
+	 * Remove any lists that may point between objects.
 	 */
 	for (lmp = lmc->lc_head; lmp; lmp = NEXT_RT_MAP(lmp))
 		remove_lists(lmp, 1);
@@ -508,7 +538,7 @@ remove_incomplete(Lm_list *lml, Aliste lmco)
 	 * next link-map.
 	 */
 	while ((lmp = lmc->lc_head) != NULL)
-		remove_so(lml, lmp);
+		remove_so(lml, lmp, clmp);
 
 	lmc->lc_head = lmc->lc_tail = NULL;
 }
@@ -541,7 +571,7 @@ is_deletable(APlist **lmalp, APlist **ghalp, Rt_map *lmp)
 	 * this parent will have callers that are not apart of this dlclose()
 	 * family, and thus would be caught by the CALLERS test below.  However,
 	 * if the caller had itself been dlopen'ed, it may not have any explicit
-	 * callers registered for itself.  Thus, but looking for objects with
+	 * callers registered for itself.  Thus, by looking for objects with
 	 * handles we can ferret out these outsiders.
 	 */
 	for (APLIST_TRAVERSE(HANDLES(lmp), idx, ghp)) {
@@ -869,7 +899,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Aliste lmco, const char *name)
 	 * list, and any handle that may have been created.
 	 */
 	if ((lmc->lc_flags & LMC_FLG_RELOCATING) == 0) {
-		remove_incomplete(lml, lmco);
+		remove_incomplete(lml, lmco, clmp);
 
 		if (ghp) {
 			ghp->gh_refcnt = 1;
@@ -981,7 +1011,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Aliste lmco, const char *name)
  *  -	Remove the handle descriptors for each deleted object, and hopefully
  *	the whole handle.
  *
- * An handle that can't be deleted is added to an orphans list.  This list is
+ * A handle that can't be deleted is added to an orphans list.  This list is
  * revisited any time another dlclose() request results in handle descriptors
  * being deleted.  These deleted descriptors can be sufficient to allow the
  * final deletion of the orphaned handles.
@@ -1294,14 +1324,6 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		Rt_map	**tobj;
 
 		/*
-		 * If we're being audited tell the audit library that we're
-		 * about to go deleting dependencies.
-		 */
-		if (clmp && ((LIST(clmp)->lm_tflags | AFLAGS(clmp)) &
-		    LML_TFLG_AUD_ACTIVITY))
-			audit_activity(clmp, LA_ACT_DELETE);
-
-		/*
 		 * Sort and fire all fini's of the objects selected for
 		 * deletion.  Note that we have to start our search from the
 		 * link-map head - there's no telling whether this object has
@@ -1317,23 +1339,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		    (RT_SORT_DELETE | RT_SORT_FWD))) != NULL) &&
 		    (tobj != (Rt_map **)S_ERROR)) {
 			error = purge_exit_handlers(lml, tobj);
-			call_fini(lml, tobj);
-		}
-
-		/*
-		 * Audit the closure of the dlopen'ed object to any local
-		 * auditors.  Any global auditors would have been caught by
-		 * call_fini(), but as the link-maps CALLERS was removed
-		 * already we do the local auditors explicitly.
-		 */
-		for (APLIST_TRAVERSE(ghalp, idx1, ghp2)) {
-			Grp_hdl	*ghp = ghp2;
-			Rt_map	*dlmp = ghp->gh_ownlmp;
-
-			if (clmp && dlmp &&
-			    ((LIST(dlmp)->lm_flags & LML_FLG_NOAUDIT) == 0) &&
-			    (AFLAGS(clmp) & LML_TFLG_AUD_OBJCLOSE))
-				_audit_objclose(AUDITORS(clmp)->ad_list, dlmp);
+			call_fini(lml, tobj, clmp);
 		}
 	}
 
@@ -1466,7 +1472,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			if ((FLAGS(lmp) & FLG_RT_DELETE) &&
 			    ((flags & GPD_PARENT) == 0)) {
 				tls_modaddrem(lmp, TM_FLG_MODREM);
-				remove_so(LIST(lmp), lmp);
+				remove_so(LIST(lmp), lmp, clmp);
 			}
 		}
 

@@ -386,7 +386,8 @@ __profile_get_realm_entry(profile_t profile, char *realm, char *name,
 	if (code == 0 && values != NULL)
 		*ret_value = values;
 
-	code = PROF_NO_RELATION ? 0 : code;
+	if (code == PROF_NO_RELATION)
+		code = 0;
 
 	return (code);
 }
@@ -457,7 +458,8 @@ __profile_get_default_realm(profile_t profile, char **realm)
 	if (code == 0 && value != NULL)
 		*realm = value;
 
-	code = PROF_NO_RELATION ? 0 : code;
+	if (code == PROF_NO_RELATION)
+		code = 0;
 
 	return (code);
 }
@@ -672,7 +674,7 @@ __profile_remove_realm(profile_t profile, char *realm)
 {
 	const char	*hierarchy[4];
 	errcode_t	code;
-	char		*drealm;
+	char		*drealm = NULL;
 
 	if (profile == NULL || realm == NULL)
 		return (EINVAL);
@@ -690,8 +692,10 @@ __profile_remove_realm(profile_t profile, char *realm)
 	else if (drealm != NULL) {
 		if (strcmp(drealm, realm) == 0) {
 			code = profile_clear_relation(profile, hierarchy);
-			if (code != 0)
+			if (code != 0) {
+				free(drealm);
 				return (code);
+			}
 		}
 		free(drealm);
 	}
@@ -780,6 +784,11 @@ __profile_add_xrealm_mapping(profile_t profile, char *source, char *target,
  *	2. all required entries are present
  *	3. all relations are defined between default realm, realm, and
  *		domain - realm mappings
+ *
+ * Note: The return value of this function is based on the error code returned
+ * by the framework/mechanism.  The function could return zero with the
+ * validation error code set to non-zero if the profile is invalid in any way.
+ *
  * Caution: This function could return false positives on valid
  * configurations and should only be used by the CIFS team for
  * specific purposes.

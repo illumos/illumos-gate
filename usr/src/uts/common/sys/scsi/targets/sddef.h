@@ -659,6 +659,7 @@ _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
 	sd_lun::un_f_allow_bus_device_reset
 	sd_lun::un_sys_blocksize
 	sd_lun::un_tgt_blocksize
+	sd_lun::un_phy_blocksize
 	sd_lun::un_additional_codes))
 
 _NOTE(SCHEME_PROTECTS_DATA("stable data",

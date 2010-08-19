@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MYPROG =	svccfg
@@ -43,7 +42,8 @@ MYOBJS =	$(SRCS:%.c=%.o) \
 		svccfg_grammar.o \
 		svccfg_lex.o \
 		manifest_find.o \
-		manifest_hash.o 
+		manifest_hash.o \
+		notify_params.o
 OBJS =		$(MYOBJS)
 
 POFILES = 	$(SRCS:%.c=%.po) \
@@ -79,7 +79,7 @@ YFLAGS = -d
 CLOBBERFILES += svccfg_lex.c svccfg_grammar.c svccfg_grammar.h \
     $(MYPROG:%=%-native)
 
-SVCCFG_EXTRA_LIBS = -lxml2 -lscf -ll -luutil -lumem -lmd5
+SVCCFG_EXTRA_LIBS = -lxml2 -lscf -ll -luutil -lumem -lmd5 -lnvpair
 $(NOT_NATIVE)SVCCFG_EXTRA_LIBS += -ltecla
 
 LIBSCF		= $(SRC)/lib/libscf
@@ -89,7 +89,7 @@ LIBUUTIL	= $(SRC)/lib/libuutil
 debug := COPTFLAG = -g
 
 lint := LINTFLAGS = -mux
-lint := SVCCFG_EXTRA_LIBS = -lscf -ll -luutil -lumem -lmd5
+lint := SVCCFG_EXTRA_LIBS = -lscf -ll -luutil -lumem -lmd5 -lnvpair
 
 LDLIBS += $(SVCCFG_EXTRA_LIBS)
 

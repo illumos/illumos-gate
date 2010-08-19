@@ -66,10 +66,7 @@ file path=kernel/drv/$(ARCH64)/usbftdi group=sys
 $(i386_ONLY)file path=kernel/drv/usbftdi group=sys
 file path=kernel/drv/usbftdi.conf group=sys \
     original_name=SUNWuftdi:kernel/drv/usbftdi.conf preserve=true
-legacy pkg=SUNWuftdi arch=$(ARCH) category=system \
-    desc="FTDI FT232R USB serial driver" \
-    hotline="Please contact your local service provider" \
-    name="FT232R USB UART" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWuftdi desc="FTDI FT232R USB serial driver" \
+    name="FT232R USB UART"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -91,6 +91,7 @@ dir path=usr/include/sys/ib/clients/of
 dir path=usr/include/sys/ib/clients/of/rdma
 dir path=usr/include/sys/ib/clients/of/sol_ofs
 dir path=usr/include/sys/ib/clients/of/sol_ucma
+dir path=usr/include/sys/ib/clients/of/sol_umad
 dir path=usr/include/sys/ib/clients/of/sol_uverbs
 dir path=usr/include/sys/ib/ibnex
 dir path=usr/include/sys/ib/ibtl
@@ -1076,10 +1077,14 @@ $(i386_ONLY)file path=usr/include/sys/i8272A.h
 file path=usr/include/sys/ia.h
 file path=usr/include/sys/iapriocntl.h
 file path=usr/include/sys/ib/adapters/hermon/hermon_ioctl.h
+file path=usr/include/sys/ib/adapters/mlnx_umap.h
 file path=usr/include/sys/ib/adapters/tavor/tavor_ioctl.h
 file path=usr/include/sys/ib/clients/ibd/ibd.h
 file path=usr/include/sys/ib/clients/of/ofa_solaris.h
 file path=usr/include/sys/ib/clients/of/ofed_kernel.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_addr.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_user_mad.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_user_sa.h
 file path=usr/include/sys/ib/clients/of/rdma/ib_user_verbs.h
 file path=usr/include/sys/ib/clients/of/rdma/ib_verbs.h
 file path=usr/include/sys/ib/clients/of/rdma/rdma_cm.h
@@ -1090,6 +1095,7 @@ file path=usr/include/sys/ib/clients/of/sol_ofs/sol_kverb_impl.h
 file path=usr/include/sys/ib/clients/of/sol_ofs/sol_ofs_common.h
 file path=usr/include/sys/ib/clients/of/sol_ucma/sol_rdma_user_cm.h
 file path=usr/include/sys/ib/clients/of/sol_ucma/sol_ucma.h
+file path=usr/include/sys/ib/clients/of/sol_umad/sol_umad.h
 file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs.h
 file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs2ucma.h
 file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_comp.h
@@ -1676,6 +1682,7 @@ file path=usr/include/wordexp.h
 file path=usr/include/xti.h
 file path=usr/include/xti_inet.h
 file path=usr/include/zone.h
+file path=usr/include/zonestat.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/acpidev.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/amd_iommu.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/asm_misc.h
@@ -1842,14 +1849,14 @@ $(sparc_ONLY)file path=usr/platform/sun4v/include/vm/mach_sfmmu.h
 file path=usr/xpg4/include/curses.h
 file path=usr/xpg4/include/term.h
 file path=usr/xpg4/include/unctrl.h
-legacy pkg=SUNWhea arch=$(ARCH) category=system \
+legacy pkg=SUNWhea \
     desc="SunOS C/C++ header files for general development of software" \
-    hotline="Please contact your local service provider" \
-    name="SunOS Header Files" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="SunOS Header Files"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers
+license usr/src/lib/pkcs11/include/THIRDPARTYLICENSE \
+    license=usr/src/lib/pkcs11/include/THIRDPARTYLICENSE
 link path=usr/include/iso/assert_iso.h target=../assert.h
 link path=usr/include/iso/errno_iso.h target=../errno.h
 link path=usr/include/iso/float_iso.h target=../float.h

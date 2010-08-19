@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Get definitions for the relocation types supported. */
@@ -1808,7 +1807,8 @@ dump_ar_hdr(int fd, Elf *elf_file, char *filename)
 			    elf_errmsg(-1));
 			continue;
 		}
-		if (strcmp(p_ar->ar_name, "/") == 0) {
+		if ((strcmp(p_ar->ar_name, "/") == 0) ||
+		    (strcmp(p_ar->ar_name, "/SYM64/") == 0)) {
 			if (g_flag)
 				ar_sym_read(elf_file, filename);
 		} else if (strcmp(p_ar->ar_name, "//") == 0) {
@@ -1893,8 +1893,7 @@ dump_ar_files(int fd, Elf *elf_file, char *filename)
 			    prog_name, filename, elf_errmsg(-1));
 			return;
 		}
-		if ((strcmp(p_ar->ar_name, "/") == 0) ||
-		    (strcmp(p_ar->ar_name, "//") == 0)) {
+		if (p_ar->ar_name[0] == '/') {
 			cmd = elf_next(arf);
 			(void) elf_end(arf);
 			continue;

@@ -1,9 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved. */
 /*
  * lib/krb5/krb/get_in_tkt.c
  *
@@ -34,10 +30,12 @@
  */
 
 #include <string.h>
-
+#include <ctype.h>
 #include "k5-int.h"
 #include "int-proto.h"
 #include "os-proto.h"
+#include <locale.h>
+#include <syslog.h>
 
 /*
  All-purpose initial ticket routine, usually called via
@@ -114,11 +112,13 @@ static krb5_int32 krb5int_addint32 (krb5_int32 x, krb5_int32 y)
  * unexpected response, an error is returned.
  */
 static krb5_error_code
-send_as_request(krb5_context 		context,
+send_as_request2(krb5_context 		context,
 		krb5_kdc_req		*request,
 		krb5_error ** 		ret_err_reply,
 		krb5_kdc_rep ** 	ret_as_reply,
-		int 			    *use_master)
+		int 			*use_master,
+		char			**hostname_used)
+
 {
     krb5_kdc_rep *as_reply = 0;
     krb5_error_code retval;
@@ -143,9 +143,9 @@ send_as_request(krb5_context 		context,
 
     k4_version = packet->data[0];
 send_again:
-    retval = krb5_sendto_kdc(context, packet, 
-			     krb5_princ_realm(context, request->client),
-			     &reply, use_master, tcp_only);
+    retval = krb5_sendto_kdc2(context, packet, 
+			    krb5_princ_realm(context, request->client),
+			    &reply, use_master, tcp_only, hostname_used);
     if (retval)
 	goto cleanup;
 
@@ -167,8 +167,10 @@ send_again:
 		goto send_again;
 	    }
 	    *ret_err_reply = err_reply;
-	} else
+	} else {
 	    krb5_free_error(context, err_reply);
+	    err_reply = NULL;
+	}
 	goto cleanup;
     }
 
@@ -220,6 +222,21 @@ cleanup:
     if (reply.data)
 	free(reply.data);
     return retval;
+}
+
+static krb5_error_code
+send_as_request(krb5_context 		context,
+		krb5_kdc_req		*request,
+		krb5_error ** 		ret_err_reply,
+		krb5_kdc_rep ** 	ret_as_reply,
+		int 			    *use_master)
+{
+	return send_as_request2(context,
+			    request,
+			    ret_err_reply,
+			    ret_as_reply,
+			    use_master,
+			    NULL);
 }
 
 static krb5_error_code
@@ -520,9 +537,26 @@ krb5_get_in_tkt(krb5_context context,
     int			loopcount = 0;
     krb5_int32		do_more = 0;
     int             use_master = 0;
+    char *hostname_used = NULL;
 
-    if (! krb5_realm_compare(context, creds->client, creds->server))
+    if (! krb5_realm_compare(context, creds->client, creds->server)) {
+	/* Solaris Kerberos */
+	char *s_name = NULL;
+	char *c_name = NULL;
+	krb5_error_code serr, cerr;
+	serr = krb5_unparse_name(context, creds->server, &s_name);
+	cerr = krb5_unparse_name(context, creds->client, &c_name);
+	krb5_set_error_message(context, KRB5_IN_TKT_REALM_MISMATCH,
+			    dgettext(TEXT_DOMAIN,
+				    "Client/server realm mismatch in initial ticket request: '%s' requesting ticket '%s'"),
+			    cerr ? "unknown" : c_name,
+			    serr ? "unknown" : s_name);
+	if (s_name)
+	    krb5_free_unparsed_name(context, s_name);
+	if (c_name)
+	    krb5_free_unparsed_name(context, c_name);
 	return KRB5_IN_TKT_REALM_MISMATCH;
+    }
 
     if (ret_as_reply)
 	*ret_as_reply = 0;
@@ -599,6 +633,24 @@ krb5_get_in_tkt(krb5_context context,
     while (1) {
 	if (loopcount++ > MAX_IN_TKT_LOOPS) {
 	    retval = KRB5_GET_IN_TKT_LOOP;
+	    /* Solaris Kerberos */
+	    {
+                char *s_name = NULL;
+		char *c_name = NULL;
+		krb5_error_code serr, cerr;
+		serr = krb5_unparse_name(context, creds->server, &s_name);
+		cerr = krb5_unparse_name(context, creds->client, &c_name);
+		krb5_set_error_message(context, retval,
+				    dgettext(TEXT_DOMAIN,
+					    "Looping detected getting ticket: '%s' requesting ticket '%s'. Max loops is %d.  Make sure a KDC is available"),
+				    cerr ? "unknown" : c_name,
+				    serr ? "unknown" : s_name,
+				    MAX_IN_TKT_LOOPS);
+		if (s_name)
+		    krb5_free_unparsed_name(context, s_name);
+		if (c_name)
+		    krb5_free_unparsed_name(context, c_name);
+	    }
 	    goto cleanup;
 	}
 
@@ -621,8 +673,9 @@ krb5_get_in_tkt(krb5_context context,
          */
 	request.nonce = (krb5_int32) time_now;
 
-	if ((retval = send_as_request(context, &request, &err_reply,
-				      &as_reply, &use_master)))
+	if ((retval = send_as_request2(context, &request, &err_reply,
+				    &as_reply, &use_master,
+				    &hostname_used)))
 	    goto cleanup;
 
 	if (err_reply) {
@@ -631,6 +684,7 @@ krb5_get_in_tkt(krb5_context context,
 		retval = decode_krb5_padata_sequence(&err_reply->e_data,
 						     &preauth_to_use);
 		krb5_free_error(context, err_reply);
+                err_reply = NULL;
 		if (retval)
 		    goto cleanup;
                 retval = sort_krb5_padata_sequence(context,
@@ -643,6 +697,7 @@ krb5_get_in_tkt(krb5_context context,
 		retval = (krb5_error_code) err_reply->error 
 		    + ERROR_TABLE_BASE_krb5;
 		krb5_free_error(context, err_reply);
+                err_reply = NULL;
 		goto cleanup;
 	    }
 	} else if (!as_reply) {
@@ -690,6 +745,9 @@ cleanup:
 	else
 	    krb5_free_kdc_rep(context, as_reply);
     }
+    if (hostname_used)
+        free(hostname_used);
+
     return (retval);
 }
 
@@ -894,6 +952,24 @@ sort_krb5_padata_sequence(krb5_context context, krb5_data *realm,
     return 0;
 }
 
+/*
+ * Solaris Kerberos
+ * Return 1 if any char in string is lower-case.
+ */
+static int
+is_lower_case(char *s)
+{
+    if (!s)
+	return 0;
+
+    while (*s) {
+	if (islower((int)*s))
+	    return 1;
+	s++;
+    }
+    return 0;
+}
+
 krb5_error_code KRB5_CALLCONV
 krb5_get_init_creds(krb5_context context,
 		    krb5_creds *creds,
@@ -920,11 +996,12 @@ krb5_get_init_creds(krb5_context context,
     krb5_data salt;
     krb5_data s2kparams;
     krb5_keyblock as_key;
-    krb5_error *err_reply;
+    krb5_error *err_reply = NULL;
     krb5_kdc_rep *local_as_reply;
     krb5_timestamp time_now;
     krb5_enctype etype = 0;
     krb5_preauth_client_rock get_data_rock;
+    char *hostname_used = NULL;
 
     /* initialize everything which will be freed at cleanup */
 
@@ -944,9 +1021,7 @@ krb5_get_init_creds(krb5_context context,
 
     (void) memset(&as_key, 0, sizeof(as_key));
 
-	local_as_reply = 0;
-
-    err_reply = NULL;
+    local_as_reply = 0;
 
     /*
      * Set up the basic request structure
@@ -1221,10 +1296,11 @@ krb5_get_init_creds(krb5_context context,
 	if (ret)
 	    goto cleanup;
 
-	err_reply = 0;
+	err_reply = NULL;
 	local_as_reply = 0;
-	if ((ret = send_as_request(context, &request, &err_reply,
-				   &local_as_reply, use_master)))
+	if ((ret = send_as_request2(context, &request, &err_reply,
+				    &local_as_reply, use_master,
+				    &hostname_used)))
 	    goto cleanup;
 
 	if (err_reply) {
@@ -1237,8 +1313,8 @@ krb5_get_init_creds(krb5_context context,
 		}
 		ret = decode_krb5_padata_sequence(&err_reply->e_data,
 						  &preauth_to_use);
-		krb5_free_error(context, err_reply);
-		err_reply = NULL;
+ 		krb5_free_error(context, err_reply);
+ 		err_reply = NULL;
 		if (ret)
 		    goto cleanup;
 		ret = sort_krb5_padata_sequence(context,
@@ -1254,7 +1330,6 @@ krb5_get_init_creds(krb5_context context,
 		    /* error + no hints = give up */
 		    ret = (krb5_error_code) err_reply->error
 		          + ERROR_TABLE_BASE_krb5;
-		    krb5_free_error(context, err_reply);
 		    goto cleanup;
 		}
 	    }
@@ -1268,6 +1343,24 @@ krb5_get_init_creds(krb5_context context,
 
     if (loopcount == MAX_IN_TKT_LOOPS) {
 	ret = KRB5_GET_IN_TKT_LOOP;
+	/* Solaris Kerberos */
+	{
+            char *s_name = NULL;
+	    char *c_name = NULL;
+	    krb5_error_code serr, cerr;
+	    serr = krb5_unparse_name(context, creds->server, &s_name);
+	    cerr = krb5_unparse_name(context, creds->client, &c_name);
+	    krb5_set_error_message(context, ret,
+				dgettext(TEXT_DOMAIN,
+					"Looping detected getting initial creds: '%s' requesting ticket '%s'. Max loops is %d.  Make sure a KDC is available"),
+				cerr ? "unknown" : c_name,
+				serr ? "unknown" : s_name,
+				MAX_IN_TKT_LOOPS);
+	    if (s_name)
+		krb5_free_unparsed_name(context, s_name);
+	    if (c_name)
+		krb5_free_unparsed_name(context, c_name);
+	}
 	goto cleanup;
     }
 
@@ -1340,6 +1433,95 @@ krb5_get_init_creds(krb5_context context,
     ret = 0;
 
 cleanup:
+    if (ret != 0) {
+        char *client_name = NULL;
+        /* See if we can produce a more detailed error message.  */
+        switch (ret) {
+        case KRB5KDC_ERR_C_PRINCIPAL_UNKNOWN:
+            if (krb5_unparse_name(context, client, &client_name) == 0) {
+                krb5_set_error_message(context, ret,
+                                       dgettext(TEXT_DOMAIN,
+						"Client '%s' not found in Kerberos database"),
+                                       client_name);
+                free(client_name);
+            }
+            break;
+        /* Solaris Kerberos: spruce-up the err msg */
+	case KRB5_PREAUTH_FAILED:
+	case KRB5KDC_ERR_PREAUTH_FAILED:
+            if (krb5_unparse_name(context, client, &client_name) == 0) {
+                krb5_set_error_message(context, ret,
+				    dgettext(TEXT_DOMAIN,
+				      "Client '%s' pre-authentication failed"),
+                                       client_name);
+                free(client_name);
+            }
+            break;
+	/* Solaris Kerberos: spruce-up the err msg */
+	case KRB5KRB_AP_ERR_SKEW: /* KRB_AP_ERR_SKEW + ERROR_TABLE_BASE_krb5 */
+	    {
+                char *s_name = NULL;
+		char *c_name = NULL;
+		char stimestring[17];
+		char fill = ' ';
+		krb5_error_code c_err, s_err, s_time;
+
+		s_err = krb5_unparse_name(context,
+					err_reply->server, &s_name);
+		s_time = krb5_timestamp_to_sfstring(err_reply->stime,
+						    stimestring,
+						    sizeof (stimestring),
+						    &fill);
+		c_err = krb5_unparse_name(context, client, &c_name);
+		krb5_set_error_message(context, ret,
+				    dgettext(TEXT_DOMAIN,
+					    "Clock skew too great: '%s' requesting ticket '%s' from KDC '%s' (%s). Skew is %dm"),
+				    c_err == 0 ? c_name : "unknown",
+				    s_err == 0 ? s_name : "unknown",
+				    hostname_used ? hostname_used : "unknown",
+				    s_time == 0 ? stimestring : "unknown",
+				    (s_time != 0) ? 0 :
+				      (abs(err_reply->stime - time_now) / 60));
+		if (s_name)
+			krb5_free_unparsed_name(context, s_name);
+		if (c_name)
+			krb5_free_unparsed_name(context, c_name);
+	    }
+	    break;
+	case KRB5_KDCREP_MODIFIED:
+            if (krb5_unparse_name(context, client, &client_name) == 0) {
+		/*
+		 * Solaris Kerberos
+		 * Extra err msg for common(?) case of 
+		 * 'kinit user@lower-case-def-realm'.
+		 * DNS SRV recs will match (case insensitive) and trigger sendto
+		 * KDC and result in this error (at least w/MSFT AD KDC).
+		 */
+		char *realm = strpbrk(client_name, "@");
+		int set = 0;
+		if (realm++) {
+		    if (realm && realm[0] && is_lower_case(realm)) {
+			krb5_set_error_message(context, ret,
+					    dgettext(TEXT_DOMAIN,
+						    "KDC reply did not match expectations for client '%s': lower-case detected in realm '%s'"),
+					    client_name, realm);
+			set = 1;
+		    }
+		}
+		if (!set)
+		    krb5_set_error_message(context, ret,
+					dgettext(TEXT_DOMAIN,
+						"KDC reply did not match expectations for client '%s'"),                                 
+					client_name);
+                free(client_name);
+            }
+	    break;
+        default:
+            break;
+        }
+    }
+    if (err_reply)
+	    krb5_free_error(context, err_reply);
     krb5_preauth_request_context_fini(context);
     if (encoded_previous_request != NULL) {
 	krb5_free_data(context, encoded_previous_request);
@@ -1374,6 +1556,7 @@ cleanup:
 	*as_reply = local_as_reply;
     else if (local_as_reply)
 	krb5_free_kdc_rep(context, local_as_reply);
-
+    if (hostname_used)
+        free(hostname_used);
     return(ret);
 }

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMBSRV_MLSVC_H
@@ -50,6 +49,7 @@ void netdfs_initialize(void);
 
 void logr_finalize(void);
 void svcctl_finalize(void);
+void spoolss_finalize(void);
 void netdfs_finalize(void);
 
 int netr_open(char *, char *, mlsvc_handle_t *);

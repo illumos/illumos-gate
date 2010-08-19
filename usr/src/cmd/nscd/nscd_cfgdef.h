@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_NSCD_CFGDEF_H
@@ -857,12 +856,11 @@ static nscd_cfg_nsw_db_data_t nscd_cfg_nsw_db_data_default = {
 	}
 
 /*
- * shadow, user_attr, and audit_user use the same switch policy
+ * shadow, and user_attr use the same switch policy
  * as that of passwd. exec_attr use that of prof_attr.
  */
 static char *nscd_cfg_shadow_cfg_db	= NSS_DBNAM_PASSWD;
 static char *nscd_cfg_userattr_cfg_db	= NSS_DBNAM_PASSWD;
-static char *nscd_cfg_auuser_cfg_db	= NSS_DBNAM_PASSWD;
 static char *nscd_cfg_execattr_cfg_db	= NSS_DBNAM_PROFATTR;
 
 /*
@@ -911,14 +909,6 @@ nscd_cfg_nsw_spc_default_t	_nscd_cfg_nsw_spc_default[] = {
 		nscd_cfg_switch_t,
 		&nscd_cfg_userattr_cfg_db,
 		sizeof (nscd_cfg_userattr_cfg_db)),
-
-	NSCD_CFG_DB_DEFAULT_PARAM(
-		NSS_DBNAM_AUDITUSER,
-		sw,
-		nsw_config_db,
-		nscd_cfg_switch_t,
-		&nscd_cfg_auuser_cfg_db,
-		sizeof (nscd_cfg_auuser_cfg_db)),
 
 	NSCD_CFG_DB_DEFAULT_PARAM(
 		NSS_DBNAM_EXECATTR,

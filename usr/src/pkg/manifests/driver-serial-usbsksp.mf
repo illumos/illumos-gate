@@ -44,10 +44,7 @@ driver name=usbsksp perms="* 0666 root sys" \
     alias=usb6cd,131
 file path=kernel/drv/$(ARCH64)/usbsksp group=sys
 $(i386_ONLY)file path=kernel/drv/usbsksp group=sys
-legacy pkg=SUNWuksp arch=$(ARCH) category=system \
-    desc="USB Keyspan serial driver" \
-    hotline="Please contact your local service provider" \
-    name="USB Keyspan serial driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWuksp desc="USB Keyspan serial driver" \
+    name="USB Keyspan serial driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

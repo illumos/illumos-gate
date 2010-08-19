@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * This module contains core functions for managing DHCP state machine
  * instances.
@@ -1612,7 +1611,7 @@ verify_smach(dhcp_smach_t *dsmp)
 	}
 
 smach_terminate:
-	finished_smach(dsmp, DHCP_IPC_E_UNKIF);
+	finished_smach(dsmp, DHCP_IPC_E_INVIF);
 	release_smach(dsmp);
 
 	return (B_FALSE);

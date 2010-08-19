@@ -33,9 +33,6 @@ SRCS=	$(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
 
-# This flag is being added only for SCO (x86) compatibility  
-CFLAGS += $(iBCS2FLAG)
-
 #
 # for message cataloge
 #

@@ -1,7 +1,9 @@
 /*
  * Open Boot Prom eeprom utility
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+
+/*
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -42,7 +44,7 @@ typedef union {
 } Oppbuf;
 
 extern int _error(int do_perror, char *fmt, ...);
-extern void setprogname(char *);
+extern void setpname(char *);
 static int get_password(char *, int);
 extern int loadlogo(char *, int, int, char *);
 
@@ -133,7 +135,7 @@ main(int argc, char **argv)
 			    "[variable[=value] ...]", argv[0]));
 		}
 
-	setprogname(argv[0]);
+	setpname(argv[0]);
 
 	/*
 	 * If no arguments, dump all fields.

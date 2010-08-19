@@ -388,7 +388,6 @@ smb_kshare_export_list(smb_ioc_share_t *ioc)
 	}
 
 	nvlist_free(shrlist);
-
 	return (0);
 }
 
@@ -444,6 +443,17 @@ smb_kshare_unexport_list(smb_ioc_share_t *ioc)
 	if (unexport)
 		smb_thread_signal(&smb_export.e_unexport_thread);
 
+	return (0);
+}
+
+/*
+ * Get properties (currently only shortname enablement)
+ * of specified share.
+ */
+int
+smb_kshare_info(smb_ioc_shareinfo_t *ioc)
+{
+	ioc->shortnames = smb_shortnames;
 	return (0);
 }
 
@@ -589,7 +599,6 @@ smb_kshare_lookup(const char *shrname)
 
 	key.shr_name = (char *)shrname;
 	shr = smb_avl_lookup(&smb_export.e_share_avl, &key);
-
 	return (shr);
 }
 
@@ -604,7 +613,6 @@ smb_kshare_release(smb_kshare_t *shr)
 
 	smb_avl_release(&smb_export.e_share_avl, shr);
 }
-
 
 /*
  * Add the given share in the specified server.
@@ -795,6 +803,13 @@ smb_kshare_decode(nvlist_t *share)
 		return (NULL);
 	}
 
+	rc = nvlist_lookup_uint32(smb, "type", &tmp.shr_type);
+	if (rc != 0) {
+		cmn_err(CE_WARN, "kshare[%s]: failed getting the share type"
+		    " (%d)", tmp.shr_name, rc);
+		return (NULL);
+	}
+
 	(void) nvlist_lookup_string(smb, SHOPT_AD_CONTAINER,
 	    &tmp.shr_container);
 	(void) nvlist_lookup_string(smb, SHOPT_NONE, &tmp.shr_access_none);
@@ -815,7 +830,7 @@ smb_kshare_decode(nvlist_t *share)
 		rc = nvlist_lookup_uint32(smb, "uid", &tmp.shr_uid);
 		rc |= nvlist_lookup_uint32(smb, "gid", &tmp.shr_gid);
 		if (rc != 0) {
-			cmn_err(CE_WARN, "kshare: failed looking up UID/GID"
+			cmn_err(CE_WARN, "kshare: failed looking up uid/gid"
 			    " (%d)", rc);
 			return (NULL);
 		}
@@ -846,7 +861,7 @@ smb_kshare_decode(nvlist_t *share)
 
 	shr->shr_oemname = smb_kshare_oemname(shr->shr_name);
 	shr->shr_flags = tmp.shr_flags | smb_kshare_is_admin(shr->shr_name);
-	shr->shr_type = STYPE_DISKTREE | smb_kshare_is_special(shr->shr_name);
+	shr->shr_type = tmp.shr_type | smb_kshare_is_special(shr->shr_name);
 
 	shr->shr_uid = tmp.shr_uid;
 	shr->shr_gid = tmp.shr_gid;

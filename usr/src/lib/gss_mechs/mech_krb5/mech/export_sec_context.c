@@ -92,6 +92,9 @@ krb5_gss_export_sec_context(minor_status, context_handle, interprocess_token)
     return (GSS_S_COMPLETE);
 
 error_out:
+    if (retval != GSS_S_COMPLETE)
+        if (kret != 0 && context != 0)
+	    save_error_info((OM_uint32)kret, context);
     if (obuffer && bufsize) {
 	    memset(obuffer, 0, bufsize);
 	    xfree(obuffer);

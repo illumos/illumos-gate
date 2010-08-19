@@ -70,7 +70,7 @@
  * from being stored in the 'length' member of 'struct rdsv3_scatterlist'.
  */
 static unsigned int
-rdsv3_pages_in_vec(struct rdsv3_iovec *vec)
+rdsv3_pages_in_vec(struct rds_iovec *vec)
 {
 	if ((vec->addr + vec->bytes <= vec->addr) ||
 	    (vec->bytes > (uint64_t)UINT_MAX)) {
@@ -164,12 +164,12 @@ rdsv3_rdma_drop_keys(struct rdsv3_sock *rs)
 }
 
 static int
-__rdsv3_rdma_map(struct rdsv3_sock *rs, struct rdsv3_get_mr_args *args,
+__rdsv3_rdma_map(struct rdsv3_sock *rs, struct rds_get_mr_args *args,
 	uint64_t *cookie_ret, struct rdsv3_mr **mr_ret)
 {
 	struct rdsv3_mr *mr = NULL, *found;
 	void *trans_private;
-	rdsv3_rdma_cookie_t cookie;
+	rds_rdma_cookie_t cookie;
 	unsigned int nents = 0;
 	int ret;
 
@@ -194,11 +194,11 @@ __rdsv3_rdma_map(struct rdsv3_sock *rs, struct rdsv3_get_mr_args *args,
 	mr->r_trans = rs->rs_transport;
 	mr->r_sock = rs;
 
-	if (args->flags & RDSV3_RDMA_USE_ONCE)
+	if (args->flags & RDS_RDMA_USE_ONCE)
 		mr->r_use_once = 1;
-	if (args->flags & RDSV3_RDMA_INVALIDATE)
+	if (args->flags & RDS_RDMA_INVALIDATE)
 		mr->r_invalidate = 1;
-	if (args->flags & RDSV3_RDMA_READWRITE)
+	if (args->flags & RDS_RDMA_READWRITE)
 		mr->r_write = 1;
 
 	/*
@@ -233,7 +233,7 @@ __rdsv3_rdma_map(struct rdsv3_sock *rs, struct rdsv3_get_mr_args *args,
 	if (args->cookie_addr) {
 		ret = ddi_copyout((void *)&cookie,
 		    (void *)((intptr_t)args->cookie_addr),
-		    sizeof (rdsv3_rdma_cookie_t), 0);
+		    sizeof (rds_rdma_cookie_t), 0);
 		if (ret != 0) {
 			ret = -EFAULT;
 			goto out;
@@ -268,14 +268,14 @@ out:
 int
 rdsv3_get_mr(struct rdsv3_sock *rs, const void *optval, int optlen)
 {
-	struct rdsv3_get_mr_args args;
+	struct rds_get_mr_args args;
 
-	if (optlen != sizeof (struct rdsv3_get_mr_args))
+	if (optlen != sizeof (struct rds_get_mr_args))
 		return (-EINVAL);
 
 #if 1
-	bcopy((struct rdsv3_get_mr_args *)optval, &args,
-	    sizeof (struct rdsv3_get_mr_args));
+	bcopy((struct rds_get_mr_args *)optval, &args,
+	    sizeof (struct rds_get_mr_args));
 #else
 	if (ddi_copyin(optval, &args, optlen, 0))
 		return (-EFAULT);
@@ -288,15 +288,15 @@ int
 rdsv3_get_mr_for_dest(struct rdsv3_sock *rs, const void *optval,
     int optlen)
 {
-	struct rdsv3_get_mr_for_dest_args args;
-	struct rdsv3_get_mr_args new_args;
+	struct rds_get_mr_for_dest_args args;
+	struct rds_get_mr_args new_args;
 
-	if (optlen != sizeof (struct rdsv3_get_mr_for_dest_args))
+	if (optlen != sizeof (struct rds_get_mr_for_dest_args))
 		return (-EINVAL);
 
 #if 1
-	bcopy((struct rdsv3_get_mr_for_dest_args *)optval, &args,
-	    sizeof (struct rdsv3_get_mr_for_dest_args));
+	bcopy((struct rds_get_mr_for_dest_args *)optval, &args,
+	    sizeof (struct rds_get_mr_for_dest_args));
 #else
 	if (ddi_copyin(optval, &args, optlen, 0))
 		return (-EFAULT);
@@ -320,18 +320,18 @@ rdsv3_get_mr_for_dest(struct rdsv3_sock *rs, const void *optval,
 int
 rdsv3_free_mr(struct rdsv3_sock *rs, const void *optval, int optlen)
 {
-	struct rdsv3_free_mr_args args;
+	struct rds_free_mr_args args;
 	struct rdsv3_mr *mr;
 
-	if (optlen != sizeof (struct rdsv3_free_mr_args))
+	if (optlen != sizeof (struct rds_free_mr_args))
 		return (-EINVAL);
 
 #if 1
-	bcopy((struct rdsv3_free_mr_args *)optval, &args,
-	    sizeof (struct rdsv3_free_mr_args));
+	bcopy((struct rds_free_mr_args *)optval, &args,
+	    sizeof (struct rds_free_mr_args));
 #else
-	if (ddi_copyin((struct rdsv3_free_mr_args *)optval, &args,
-	    sizeof (struct rdsv3_free_mr_args), 0))
+	if (ddi_copyin((struct rds_free_mr_args *)optval, &args,
+	    sizeof (struct rds_free_mr_args), 0))
 		return (-EFAULT);
 #endif
 
@@ -354,7 +354,7 @@ rdsv3_free_mr(struct rdsv3_sock *rs, const void *optval, int optlen)
 	if (mr) {
 		avl_remove(&rs->rs_rdma_keys, &mr->r_rb_node);
 		RB_CLEAR_NODE(&mr->r_rb_node);
-		if (args.flags & RDSV3_RDMA_INVALIDATE)
+		if (args.flags & RDS_RDMA_INVALIDATE)
 			mr->r_invalidate = 1;
 	}
 	mutex_exit(&rs->rs_rdma_lock);
@@ -398,6 +398,8 @@ rdsv3_rdma_unuse(struct rdsv3_sock *rs, uint32_t r_key, int force)
 		avl_remove(&rs->rs_rdma_keys, &mr->r_rb_node);
 		RB_CLEAR_NODE(&mr->r_rb_node);
 		zot_me = 1;
+	} else {
+		atomic_add_32(&mr->r_refcount, 1);
 	}
 	mutex_exit(&rs->rs_rdma_lock);
 
@@ -438,12 +440,12 @@ rdsv3_rdma_free_op(struct rdsv3_rdma_op *ro)
  * args is a pointer to an in-kernel copy in the sendmsg cmsg.
  */
 static struct rdsv3_rdma_op *
-rdsv3_rdma_prepare(struct rdsv3_sock *rs, struct rdsv3_rdma_args *args)
+rdsv3_rdma_prepare(struct rdsv3_sock *rs, struct rds_rdma_args *args)
 {
-	struct rdsv3_iovec vec;
+	struct rds_iovec vec;
 	struct rdsv3_rdma_op *op = NULL;
 	unsigned int nr_bytes;
-	struct rdsv3_iovec *local_vec;
+	struct rds_iovec *local_vec;
 	unsigned int nr;
 	unsigned int i;
 	ddi_umem_cookie_t umem_cookie;
@@ -468,9 +470,9 @@ rdsv3_rdma_prepare(struct rdsv3_sock *rs, struct rdsv3_rdma_args *args)
 		goto out;
 	}
 
-	op->r_write = !!(args->flags & RDSV3_RDMA_READWRITE);
-	op->r_fence = !!(args->flags & RDSV3_RDMA_FENCE);
-	op->r_notify = !!(args->flags & RDSV3_RDMA_NOTIFY_ME);
+	op->r_write = !!(args->flags & RDS_RDMA_READWRITE);
+	op->r_fence = !!(args->flags & RDS_RDMA_FENCE);
+	op->r_notify = !!(args->flags & RDS_RDMA_NOTIFY_ME);
 	op->r_recverr = rs->rs_recverr;
 
 	if (op->r_notify || op->r_recverr) {
@@ -487,7 +489,7 @@ rdsv3_rdma_prepare(struct rdsv3_sock *rs, struct rdsv3_rdma_args *args)
 			goto out;
 		}
 		op->r_notifier->n_user_token = args->user_token;
-		op->r_notifier->n_status = RDSV3_RDMA_SUCCESS;
+		op->r_notifier->n_status = RDS_RDMA_SUCCESS;
 	}
 
 	/*
@@ -510,12 +512,12 @@ rdsv3_rdma_prepare(struct rdsv3_sock *rs, struct rdsv3_rdma_args *args)
 	    (unsigned long long)args->remote_vec.addr,
 	    op->r_key);
 
-	local_vec = (struct rdsv3_iovec *)(unsigned long) args->local_vec_addr;
+	local_vec = (struct rds_iovec *)(unsigned long) args->local_vec_addr;
 
 	/* pin the scatter list of user buffers */
 	for (i = 0; i < args->nr_local; i++) {
 		if (ddi_copyin(&local_vec[i], &vec,
-		    sizeof (struct rdsv3_iovec), 0)) {
+		    sizeof (struct rds_iovec), 0)) {
 			ret = -EFAULT;
 			goto out;
 		}
@@ -573,6 +575,8 @@ out:
 	return (op);
 }
 
+#define	CEIL(x, y)	(((x) + (y) - 1) / (y))
+
 /*
  * The application asks for a RDMA transfer.
  * Extract all arguments and set up the rdma_op
@@ -582,17 +586,19 @@ rdsv3_cmsg_rdma_args(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	struct cmsghdr *cmsg)
 {
 	struct rdsv3_rdma_op *op;
-	struct rdsv3_rdma_args *ap;
+	/* uint64_t alignment on the buffer */
+	uint64_t buf[CEIL(CMSG_LEN(sizeof (struct rds_rdma_args)),
+	    sizeof (uint64_t))];
 
-	if (cmsg->cmsg_len < CMSG_LEN(sizeof (struct rdsv3_rdma_args)) ||
+	if (cmsg->cmsg_len != CMSG_LEN(sizeof (struct rds_rdma_args)) ||
 	    rm->m_rdma_op != NULL)
 		return (-EINVAL);
 
-	/* uint64_t alignment on struct rdsv3_get_mr_args */
-	ap = (struct rdsv3_rdma_args *)kmem_alloc(cmsg->cmsg_len, KM_SLEEP);
-	bcopy(CMSG_DATA(cmsg), ap, cmsg->cmsg_len);
-	op = rdsv3_rdma_prepare(rs, ap);
-	kmem_free(ap, cmsg->cmsg_len);
+	ASSERT(sizeof (buf) >= cmsg->cmsg_len && ((uintptr_t)buf & 0x7) == 0);
+
+	bcopy(CMSG_DATA(cmsg), (char *)buf, cmsg->cmsg_len);
+	op = rdsv3_rdma_prepare(rs, (struct rds_rdma_args *)buf);
+
 	if (IS_ERR(op))
 		return (PTR_ERR(op));
 	rdsv3_stats_inc(s_send_rdma);
@@ -612,7 +618,7 @@ rdsv3_cmsg_rdma_dest(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	uint32_t r_key;
 	int err = 0;
 
-	if (cmsg->cmsg_len < CMSG_LEN(sizeof (rdsv3_rdma_cookie_t)) ||
+	if (cmsg->cmsg_len != CMSG_LEN(sizeof (rds_rdma_cookie_t)) ||
 	    rm->m_rdma_cookie != 0)
 		return (-EINVAL);
 
@@ -652,17 +658,20 @@ int
 rdsv3_cmsg_rdma_map(struct rdsv3_sock *rs, struct rdsv3_message *rm,
 	struct cmsghdr *cmsg)
 {
-	struct rdsv3_get_mr_args *mrp;
+	/* uint64_t alignment on the buffer */
+	uint64_t buf[CEIL(CMSG_LEN(sizeof (struct rds_get_mr_args)),
+	    sizeof (uint64_t))];
 	int status;
 
-	if (cmsg->cmsg_len < CMSG_LEN(sizeof (struct rdsv3_get_mr_args)) ||
+	if (cmsg->cmsg_len != CMSG_LEN(sizeof (struct rds_get_mr_args)) ||
 	    rm->m_rdma_cookie != 0)
 		return (-EINVAL);
 
-	/* uint64_t alignment on struct rdsv3_get_mr_args */
-	mrp = (struct rdsv3_get_mr_args *)kmem_alloc(cmsg->cmsg_len, KM_SLEEP);
-	bcopy(CMSG_DATA(cmsg), mrp, cmsg->cmsg_len);
-	status = __rdsv3_rdma_map(rs, mrp, &rm->m_rdma_cookie, &rm->m_rdma_mr);
-	kmem_free(mrp, cmsg->cmsg_len);
+	ASSERT(sizeof (buf) >= cmsg->cmsg_len && ((uintptr_t)buf & 0x7) == 0);
+
+	bcopy(CMSG_DATA(cmsg), (char *)buf, cmsg->cmsg_len);
+	status = __rdsv3_rdma_map(rs, (struct rds_get_mr_args *)buf,
+	    &rm->m_rdma_cookie, &rm->m_rdma_mr);
+
 	return (status);
 }

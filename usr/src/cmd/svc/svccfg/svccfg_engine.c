@@ -725,7 +725,8 @@ engine_import(uu_list_t *args)
 		}
 
 		/* Get list of manifests that we should import for this path. */
-		if ((count = find_manifests(file, &manifests, fm_flags)) < 0) {
+		if ((count = find_manifests(g_hndl, file, &manifests,
+		    fm_flags)) < 0) {
 			if (isdir) {
 				semerr(gettext("Could not hash directory %s\n"),
 				    file);
@@ -929,7 +930,9 @@ engine_apply(const char *file, int apply_changes)
 	}
 
 	/* Get list of profiles to be applied. */
-	if ((profile_count = find_manifests(file, &profiles, fm_flags)) < 0) {
+	if ((profile_count = find_manifests(g_hndl, file, &profiles,
+	    fm_flags)) < 0) {
+
 		if (isdir) {
 			semerr(gettext("Could not hash directory %s\n"), file);
 		} else {
@@ -1074,7 +1077,9 @@ help(int com)
 		    "Property group commands: listpg addpg delpg\n"
 		    "Property commands:	 listprop setprop delprop editprop\n"
 		    "Property value commands: addpropvalue delpropvalue "
-		    "setenv unsetenv\n"));
+		    "setenv unsetenv\n"
+		    "Notification parameters: "
+		    "listnotify setnotify delnotify\n"));
 		return;
 	}
 

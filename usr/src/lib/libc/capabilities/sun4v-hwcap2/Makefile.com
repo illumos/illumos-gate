@@ -28,7 +28,7 @@ GEN_PLATFORM =	sun4v
 
 include		../../Makefile.com
 
-OBJECTS =	memcpy.o
+OBJECTS =	memcpy.o smt_pause.o
 
 include		$(SRC)/lib/Makefile.lib
 

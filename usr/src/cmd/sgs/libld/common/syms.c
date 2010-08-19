@@ -82,14 +82,13 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
 
 	if (name) {
 		if ((ifl->ifl_flags & FLG_IF_HSTRTAB) == 0) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_FIL_NOSTRTABLE), ifl->ifl_name,
-			    EC_WORD(symsecndx), symsecname, symndx,
-			    EC_XWORD(name));
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_NOSTRTABLE),
+			    ifl->ifl_name, EC_WORD(symsecndx), symsecname,
+			    symndx, EC_XWORD(name));
 			return (NULL);
 		}
 		if (name >= (Word)strsize) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_EXCSTRTABLE), ifl->ifl_name,
 			    EC_WORD(symsecndx), symsecname, symndx,
 			    EC_XWORD(name), strsecname, EC_XWORD(strsize));
@@ -121,7 +120,7 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
 	 * world and hasn't, as yet, been a problem.
 	 */
 	if ((name == 0) && (ELF_ST_BIND(sym->st_info) != STB_LOCAL)) {
-		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_NONAMESYM),
+		ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_FIL_NONAMESYM),
 		    ifl->ifl_name, EC_WORD(symsecndx), symsecname, symndx,
 		    EC_XWORD(name));
 	}
@@ -217,9 +216,8 @@ ld_sym_nodirect(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		/*
 		 * Broken input file
 		 */
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
 		    ifl->ifl_name, isp->is_name, EC_XWORD(sifshdr->sh_link));
-		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	symshdr = ifl->ifl_isdesc[sifshdr->sh_link]->is_shdr;
@@ -414,10 +412,8 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		 * out as many error conditions as possible.
 		 */
 		if ((etype == ET_REL) && (sdp->sd_isc == NULL)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_INVSEC), name, ifl->ifl_name,
-			    EC_XWORD(shndx));
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_INVSEC),
+			    name, ifl->ifl_name, EC_XWORD(shndx));
 			return (sdp);
 		}
 	}
@@ -697,9 +693,8 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 
 			DBG_CALL(Dbg_syms_updated(ofl, usdp, uname));
 		} else
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_SYM_RESERVE), uname,
-			    usdp->sd_file->ifl_name);
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_SYM_RESERVE),
+			    uname, usdp->sd_file->ifl_name);
 	} else {
 		/*
 		 * If the symbol does not exist create it.
@@ -791,23 +786,6 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 
 
 /*
- * Print undefined symbols.
- */
-static Boolean	undef_title = TRUE;
-
-static void
-sym_undef_title(Ofl_desc *ofl)
-{
-	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FMT_UNDEF),
-	    MSG_INTL(MSG_SYM_UNDEF_ITM_11),
-	    MSG_INTL(MSG_SYM_UNDEF_ITM_21),
-	    MSG_INTL(MSG_SYM_UNDEF_ITM_12),
-	    MSG_INTL(MSG_SYM_UNDEF_ITM_22));
-
-	undef_title = FALSE;
-}
-
-/*
  * Undefined symbols can fall into one of four types:
  *
  *  -	the symbol is really undefined (SHN_UNDEF).
@@ -839,15 +817,47 @@ static const Msg format[] = {
 	MSG_SYM_UND_BNDLOCAL		/* MSG_INTL(MSG_SYM_UND_BNDLOCAL) */
 };
 
+/*
+ * Issue an undefined symbol message for the given symbol.
+ *
+ * entry:
+ *	ofl - Output descriptor
+ *	sdp - Undefined symbol to report
+ *	type - Type of undefined symbol
+ *	ofl_flag - One of 0, FLG_OF_FATAL, or FLG_OF_WARN.
+ *	undef_state - Address of variable to be initialized to 0
+ *		before the first call to sym_undef_entry, and passed
+ *		to each subsequent call. A non-zero value for *undef_state
+ *		indicates that this is not the first call in the series.
+ *
+ * exit:
+ *	If *undef_state is 0, a title is issued.
+ *
+ *	A message for the undefined symbol is issued.
+ *
+ *	If ofl_flag is non-zero, its value is OR'd into *undef_state. Otherwise,
+ *	all bits other than FLG_OF_FATAL and FLG_OF_WARN are set, in order to
+ *	provide *undef_state with a non-zero value. These other bits have
+ *	no meaning beyond that, and serve to ensure that *undef_state is
+ *	non-zero if sym_undef_entry() has been called.
+ */
 static void
-sym_undef_entry(Ofl_desc *ofl, Sym_desc *sdp, Type type)
+sym_undef_entry(Ofl_desc *ofl, Sym_desc *sdp, Type type, ofl_flag_t ofl_flag,
+    ofl_flag_t *undef_state)
 {
 	const char	*name1, *name2, *name3;
 	Ifl_desc	*ifl = sdp->sd_file;
 	Sym_aux		*sap = sdp->sd_aux;
 
-	if (undef_title)
-		sym_undef_title(ofl);
+	if (*undef_state == 0)
+		ld_eprintf(ofl, ERR_NONE, MSG_INTL(MSG_SYM_FMT_UNDEF),
+		    MSG_INTL(MSG_SYM_UNDEF_ITM_11),
+		    MSG_INTL(MSG_SYM_UNDEF_ITM_21),
+		    MSG_INTL(MSG_SYM_UNDEF_ITM_12),
+		    MSG_INTL(MSG_SYM_UNDEF_ITM_22));
+
+	ofl->ofl_flags |= ofl_flag;
+	*undef_state |= ofl_flag ? ofl_flag : ~(FLG_OF_FATAL | FLG_OF_WARN);
 
 	switch (type) {
 	case UNDEF:
@@ -870,7 +880,7 @@ sym_undef_entry(Ofl_desc *ofl, Sym_desc *sdp, Type type)
 		return;
 	}
 
-	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(format[type]),
+	ld_eprintf(ofl, ERR_NONE, MSG_INTL(format[type]),
 	    demangle(sdp->sd_name), name1, name2, name3);
 }
 
@@ -1078,17 +1088,15 @@ ensure_sym_local(Ofl_desc *ofl, Sym_desc *sdp, const char *str)
 {
 	if (sdp->sd_sym->st_shndx == SHN_UNDEF) {
 		if (str) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_UNDEF), str,
-			    demangle((char *)sdp->sd_name));
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_UNDEF),
+			    str, demangle((char *)sdp->sd_name));
 		}
 		return (1);
 	}
 	if (sdp->sd_ref != REF_REL_NEED) {
 		if (str) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_EXTERN), str,
-			    demangle((char *)sdp->sd_name),
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYM_EXTERN),
+			    str, demangle((char *)sdp->sd_name),
 			    sdp->sd_file->ifl_name);
 		}
 		return (1);
@@ -1153,6 +1161,7 @@ ld_sym_validate(Ofl_desc *ofl)
 #endif
 	int		ret, allow_ldynsym;
 	uchar_t		type;
+	ofl_flag_t	undef_state = 0;
 
 	DBG_CALL(Dbg_basic_validate(ofl->ofl_lml));
 
@@ -1170,21 +1179,29 @@ ld_sym_validate(Ofl_desc *ofl)
 #endif
 
 	/*
-	 * If a symbol is undefined and this link-edit calls for no undefined
-	 * symbols to remain (this is the default case when generating an
-	 * executable but can be enforced for any object using -z defs), the
-	 * symbol is classified as undefined and a fatal error condition will
-	 * be indicated.
+	 * Determine how undefined symbols are handled:
 	 *
-	 * If the symbol is undefined and we're creating a shared object with
-	 * the -Bsymbolic flag, then the symbol is also classified as undefined
-	 * and a warning condition will be indicated.
+	 * fatal:
+	 *	If this link-edit calls for no undefined symbols to remain
+	 *	(this is the default case when generating an executable but
+	 *	can be enforced for any object using -z defs), a fatal error
+	 *	condition will be indicated.
+	 *
+	 * warning:
+	 *	If we're creating a shared object, and either the -Bsymbolic
+	 *	flag is set, or the user has turned on the -z guidance feature,
+	 *	then a non-fatal warning is issued for each symbol.
+	 *
+	 * ignore:
+	 *	In all other cases, undefined symbols are quietly allowed.
 	 */
-	if ((oflags & (FLG_OF_SHAROBJ | FLG_OF_SYMBOLIC)) ==
-	    (FLG_OF_SHAROBJ | FLG_OF_SYMBOLIC))
-		undef = FLG_OF_WARN;
-	if (oflags & FLG_OF_NOUNDEF)
+	if (oflags & FLG_OF_NOUNDEF) {
 		undef = FLG_OF_FATAL;
+	} else if (oflags & FLG_OF_SHAROBJ) {
+		if ((oflags & FLG_OF_SYMBOLIC) ||
+		    OFL_GUIDANCE(ofl, FLG_OFG_NO_DEFS))
+			undef = FLG_OF_WARN;
+	}
 
 	/*
 	 * If the symbol is referenced from an implicitly included shared object
@@ -1193,6 +1210,9 @@ ld_sym_validate(Ofl_desc *ofl)
 	 */
 	if ((oflags & FLG_OF_NOUNDEF) || !(oflags & FLG_OF_SHAROBJ))
 		needed = FLG_OF_FATAL;
+	else if ((oflags & FLG_OF_SHAROBJ) &&
+	    OFL_GUIDANCE(ofl, FLG_OFG_NO_DEFS))
+		needed = FLG_OF_WARN;
 
 	/*
 	 * If the output image is being versioned, then all symbol definitions
@@ -1244,10 +1264,12 @@ ld_sym_validate(Ofl_desc *ofl)
 		sdp = sav->sav_sdp;
 
 		/*
-		 * If undefined symbols are allowed ignore any symbols that are
+		 * If undefined symbols are allowed, and we're not being
+		 * asked to supply guidance, ignore any symbols that are
 		 * not needed.
 		 */
 		if (!(oflags & FLG_OF_NOUNDEF) &&
+		    !OFL_GUIDANCE(ofl, FLG_OFG_NO_DEFS) &&
 		    (sdp->sd_ref == REF_DYN_SEEN))
 			continue;
 
@@ -1276,10 +1298,9 @@ ld_sym_validate(Ofl_desc *ofl)
 
 			if ((isp == NULL) || (isp->is_shdr == NULL) ||
 			    ((isp->is_shdr->sh_flags & SHF_TLS) == 0)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
+				ld_eprintf(ofl, ERR_FATAL,
 				    MSG_INTL(MSG_SYM_TLS),
 				    demangle(sdp->sd_name), ifl->ifl_name);
-				ofl->ofl_flags |= FLG_OF_FATAL;
 				continue;
 			}
 		}
@@ -1308,8 +1329,8 @@ ld_sym_validate(Ofl_desc *ofl)
 		    (sym->st_shndx == SHN_UNDEF) &&
 		    (ELF_ST_BIND(sym->st_info) != STB_WEAK)) {
 			if (vis && (vis != STV_SINGLETON)) {
-				sym_undef_entry(ofl, sdp, BNDLOCAL);
-				ofl->ofl_flags |= FLG_OF_FATAL;
+				sym_undef_entry(ofl, sdp, BNDLOCAL,
+				    FLG_OF_FATAL, &undef_state);
 				continue;
 			}
 		}
@@ -1367,8 +1388,8 @@ ld_sym_validate(Ofl_desc *ofl)
 			    ((sdp->sd_flags &
 			    (FLG_SY_MAPREF | FLG_SY_MAPUSED | FLG_SY_HIDDEN |
 			    FLG_SY_PROTECT)) == FLG_SY_MAPREF))) {
-				sym_undef_entry(ofl, sdp, UNDEF);
-				ofl->ofl_flags |= undef;
+				sym_undef_entry(ofl, sdp, UNDEF, undef,
+				    &undef_state);
 				undeferr = 1;
 			}
 
@@ -1386,8 +1407,8 @@ ld_sym_validate(Ofl_desc *ofl)
 			if ((sdp->sd_flags &
 			    (FLG_SY_MAPREF | FLG_SY_MAPUSED)) ==
 			    FLG_SY_MAPREF) {
-				sym_undef_entry(ofl, sdp, UNDEF);
-				ofl->ofl_flags |= FLG_OF_WARN;
+				sym_undef_entry(ofl, sdp, UNDEF, FLG_OF_WARN,
+				    &undef_state);
 				undeferr = 1;
 			}
 		}
@@ -1420,8 +1441,8 @@ ld_sym_validate(Ofl_desc *ofl)
 				if (vip->vi_flags & FLG_VER_AVAIL) {
 					vip->vi_flags |= FLG_VER_REFER;
 				} else {
-					sym_undef_entry(ofl, sdp, NOTAVAIL);
-					ofl->ofl_flags |= FLG_OF_FATAL;
+					sym_undef_entry(ofl, sdp, NOTAVAIL,
+					    FLG_OF_FATAL, &undef_state);
 					continue;
 				}
 			}
@@ -1435,9 +1456,10 @@ ld_sym_validate(Ofl_desc *ofl)
 		if (needed && !undeferr && (sdp->sd_flags & FLG_SY_GLOBREF) &&
 		    (sdp->sd_ref == REF_DYN_NEED) &&
 		    (sdp->sd_flags & FLG_SY_NOTAVAIL)) {
-			sym_undef_entry(ofl, sdp, IMPLICIT);
-			ofl->ofl_flags |= needed;
-			continue;
+			sym_undef_entry(ofl, sdp, IMPLICIT, needed,
+			    &undef_state);
+			if (needed == FLG_OF_FATAL)
+				continue;
 		}
 
 		/*
@@ -1447,8 +1469,8 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if ((sdp->sd_ref == REF_DYN_NEED) &&
 		    (sdp->sd_flags & (FLG_SY_HIDDEN | FLG_SY_PROTECT))) {
-			sym_undef_entry(ofl, sdp, BNDLOCAL);
-			ofl->ofl_flags |= FLG_OF_FATAL;
+			sym_undef_entry(ofl, sdp, BNDLOCAL, FLG_OF_FATAL,
+			    &undef_state);
 			continue;
 		}
 
@@ -1465,8 +1487,8 @@ ld_sym_validate(Ofl_desc *ofl)
 			} else {
 				if (!SYM_IS_HIDDEN(sdp) && sdp->sd_aux &&
 				    (sdp->sd_aux->sa_overndx == 0)) {
-					sym_undef_entry(ofl, sdp, NOVERSION);
-					ofl->ofl_flags |= verdesc;
+					sym_undef_entry(ofl, sdp, NOVERSION,
+					    verdesc, &undef_state);
 					continue;
 				}
 			}
@@ -1621,6 +1643,16 @@ ld_sym_validate(Ofl_desc *ofl)
 	}
 
 	/*
+	 * Guidance: Use -z defs|nodefs when building shared objects.
+	 *
+	 * Our caller issues this, unless we mask it out here. So we mask it
+	 * out unless we've issued at least one warnings or fatal error.
+	 */
+	if (!((oflags & FLG_OF_SHAROBJ) && OFL_GUIDANCE(ofl, FLG_OFG_NO_DEFS) &&
+	    (undef_state & (FLG_OF_FATAL | FLG_OF_WARN))))
+		ofl->ofl_guideflags |= FLG_OFG_NO_DEFS;
+
+	/*
 	 * If we've encountered a fatal error during symbol validation then
 	 * return now.
 	 */
@@ -1685,8 +1717,8 @@ ld_sym_validate(Ofl_desc *ofl)
 	if (ofl->ofl_entry) {
 		if ((sdp = ld_sym_find(ofl->ofl_entry, SYM_NOHASH,
 		    NULL, ofl)) == NULL) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_NOENTRY), ofl->ofl_entry);
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_NOENTRY),
+			    ofl->ofl_entry);
 			ret++;
 		} else if (ensure_sym_local(ofl, sdp,
 		    MSG_INTL(MSG_SYM_ENTRY)) != 0) {
@@ -1822,26 +1854,22 @@ static void
 issue_badaddr_msg(Ifl_desc *ifl, Ofl_desc *ofl, Sym_desc *sdp,
     Sym *sym, Word shndx)
 {
-	ofl_flag_t	flag;
 	Error		err;
 	const char	*msg;
 
 	if ((sdp->sd_isc->is_shdr->sh_flags & (SHF_WRITE | SHF_ALLOC)) ==
 	    SHF_ALLOC) {
 		msg = MSG_INTL(MSG_SYM_BADADDR_ROTXT);
-		flag = FLG_OF_WARN;
 		err = ERR_WARNING;
 	} else {
 		msg = MSG_INTL(MSG_SYM_BADADDR);
-		flag = FLG_OF_FATAL;
 		err = ERR_FATAL;
 	}
 
-	eprintf(ofl->ofl_lml, err, msg, demangle(sdp->sd_name),
+	ld_eprintf(ofl, err, msg, demangle(sdp->sd_name),
 	    ifl->ifl_name, shndx, sdp->sd_isc->is_name,
 	    EC_XWORD(sdp->sd_isc->is_shdr->sh_size),
 	    EC_XWORD(sym->st_value), EC_XWORD(sym->st_size));
-	ofl->ofl_flags |= flag;
 }
 
 /*
@@ -1948,7 +1976,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	if (ifl->ifl_flags & FLG_IF_HSTRTAB) {
 		ndx = shdr->sh_link;
 		if ((ndx == 0) || (ndx >= ifl->ifl_shnum)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVSHLINK), ifl->ifl_name,
 			    EC_WORD(symsecndx), symsecname, EC_XWORD(ndx));
 			return (S_ERROR);
@@ -2035,17 +2063,15 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 */
 			if ((name = string(ofl, ifl, sym, strs, strsize, ndx,
 			    shndx, symsecndx, symsecname, strsecname,
-			    &sdflags)) == NULL) {
-				ofl->ofl_flags |= FLG_OF_FATAL;
+			    &sdflags)) == NULL)
 				continue;
-			}
 
 			/*
 			 * Now that we have the name, if the section index
 			 * was bad, report it.
 			 */
 			if (shndx_bad) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle_symname(name, symsecname, ndx),
 				    ifl->ifl_name,
@@ -2171,7 +2197,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 */
 			if ((type = ELF_ST_TYPE(sym->st_info)) == STT_SECTION) {
 				if (sym->st_shndx == SHN_UNDEF) {
-					eprintf(ofl->ofl_lml, ERR_WARNING,
+					ld_eprintf(ofl, ERR_WARNING,
 					    MSG_INTL(MSG_SYM_INVSHNDX),
 					    demangle_symname(name, symsecname,
 					    ndx), ifl->ifl_name,
@@ -2235,11 +2261,10 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 				if ((isp == NULL) || (isp->is_shdr == NULL) ||
 				    ((isp->is_shdr->sh_flags & SHF_TLS) == 0)) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
+					ld_eprintf(ofl, ERR_FATAL,
 					    MSG_INTL(MSG_SYM_TLS),
 					    demangle(sdp->sd_name),
 					    ifl->ifl_name);
-					ofl->ofl_flags |= FLG_OF_FATAL;
 					continue;
 				}
 			}
@@ -2257,7 +2282,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    ((type == STT_FILE) &&
 			    (sym->st_shndx != SHN_ABS))) ||
 			    (sdp->sd_isc && (sdp->sd_isc->is_osdesc == NULL))) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle_symname(name, symsecname, ndx),
 				    ifl->ifl_name,
@@ -2352,17 +2377,14 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * Check if st_name has a valid value or not.
 		 */
 		if ((name = string(ofl, ifl, nsym, strs, strsize, ndx, shndx,
-		    symsecndx, symsecname, strsecname, &sdflags)) == NULL) {
-			ofl->ofl_flags |= FLG_OF_FATAL;
+		    symsecndx, symsecname, strsecname, &sdflags)) == NULL)
 			continue;
-		}
 
 		/*
 		 * Now that we have the name, report an erroneous section index.
 		 */
 		if (shndx_bad) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_SYM_INVSHNDX),
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_SYM_INVSHNDX),
 			    demangle_symname(name, symsecname, ndx),
 			    ifl->ifl_name,
 			    conv_sym_shndx(osabi, mach, nsym->st_shndx,
@@ -2446,8 +2468,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 */
 		bind = ELF_ST_BIND(nsym->st_info);
 		if ((bind != STB_GLOBAL) && (bind != STB_WEAK)) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_SYM_NONGLOB),
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_SYM_NONGLOB),
 			    demangle_symname(name, symsecname, ndx),
 			    ifl->ifl_name,
 			    conv_sym_info_bind(bind, 0, &inv_buf));
@@ -2471,7 +2492,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				 * the output file, which won't be a problem
 				 * unless a relocation is required against it.
 				 */
-				eprintf(ofl->ofl_lml, ERR_WARNING,
+				ld_eprintf(ofl, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle_symname(name, symsecname, ndx),
 				    ifl->ifl_name,

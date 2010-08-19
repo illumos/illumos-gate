@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "mtlib.h"
@@ -721,6 +718,55 @@ fclose(FILE *iop)
 		cancel_safe_mutex_unlock(&_first_link_lock);
 
 	return (res);
+}
+
+/* close all open streams */
+int
+fcloseall(void)
+{
+	FPDECL(iop);
+
+	struct _link_ *lp;
+	rmutex_t *lk;
+
+	if (__libc_threaded)
+		cancel_safe_mutex_lock(&_first_link_lock);
+
+	lp = &__first_link;
+
+	do {
+		int i;
+
+		FIRSTFP(lp, iop);
+		for (i = lp->niob; --i >= 0; NEXTFP(iop)) {
+			/* code stolen from fclose(), above */
+
+			FLOCKFILE(lk, iop);
+			if (iop->_flag == 0) {
+				FUNLOCKFILE(lk);
+				continue;
+			}
+
+			/* Not unbuffered and opened for read and/or write? */
+			if (!(iop->_flag & _IONBF) &&
+			    (iop->_flag & (_IOWRT | _IOREAD | _IORW)))
+				(void) _fflush_u(iop);
+			(void) close(GET_FD(iop));
+			if (iop->_flag & _IOMYBUF)
+				free((char *)iop->_base - PUSHBACK);
+			iop->_base = NULL;
+			iop->_ptr = NULL;
+			iop->_cnt = 0;
+			iop->_flag = 0;		/* marks it as available */
+			FUNLOCKFILE(lk);
+			fcloses++;
+		}
+	} while ((lp = lp->next) != NULL);
+
+	if (__libc_threaded)
+		cancel_safe_mutex_unlock(&_first_link_lock);
+
+	return (0);
 }
 
 /* flush buffer, close fd but keep the stream used by freopen() */

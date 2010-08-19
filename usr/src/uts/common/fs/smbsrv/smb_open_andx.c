@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -264,6 +263,7 @@ smb_com_open(smb_request_t *sr)
 	} else {
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 	}
+	op->op_oplock_levelII = B_FALSE;
 
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
@@ -371,6 +371,8 @@ smb_com_open_andx(smb_request_t *sr)
 	op->create_options = FILE_NON_DIRECTORY_FILE;
 	if (op->omode & SMB_DA_WRITE_THROUGH)
 		op->create_options |= FILE_WRITE_THROUGH;
+
+	op->op_oplock_levelII = B_FALSE;
 
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
@@ -480,6 +482,7 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 	} else {
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 	}
+	op->op_oplock_levelII = B_FALSE;
 
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);

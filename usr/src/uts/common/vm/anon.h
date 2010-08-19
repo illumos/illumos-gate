@@ -198,24 +198,27 @@ struct anoninfo32 {
  */
 
 typedef	struct	ani_free {
-	kmutex_t	ani_lock;
 	pgcnt_t		ani_count;
-	uchar_t		pad[64 - sizeof (kmutex_t) - sizeof (pgcnt_t)];
+	uchar_t		pad[64 - sizeof (pgcnt_t)];
 			/* XXX 64 = cacheline size */
 } ani_free_t;
 
-#define	ANI_MAX_POOL	128
-extern	ani_free_t	ani_free_pool[];
+#define	ANI_MAX_POOL	(NCPU_P2)
+extern	ani_free_t	*ani_free_pool;
 
+/*
+ * Since each CPU has its own bucket in ani_free_pool, there should be no
+ * contention here.
+ */
 #define	ANI_ADD(inc)	{ \
-	ani_free_t	*anifp; \
-	int		index; \
-	index = (CPU->cpu_id & (ANI_MAX_POOL - 1)); \
-	anifp = &ani_free_pool[index]; \
-	mutex_enter(&anifp->ani_lock); \
-	anifp->ani_count += inc; \
-	mutex_exit(&anifp->ani_lock); \
+	pgcnt_t	*ani_countp; \
+	int	index; \
+	index = (CPU->cpu_seqid & (ANI_MAX_POOL - 1)); \
+	ani_countp = &ani_free_pool[index].ani_count; \
+	atomic_add_long(ani_countp, inc); \
 }
+
+extern void	set_anoninfo(void);
 
 /*
  * Anon array pointers are allocated in chunks. Each chunk

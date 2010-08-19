@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "uucp.h"
 
@@ -55,7 +51,7 @@
 /* private variables */
 static void tokenize(), nameparse(), setfile(), setioctl(),
 	scansys(), scancfg(), setconfig();
-static int namematch(), nextdialers(), nextdevices(), nextsystems(), getline();
+static int namematch(), nextdialers(), nextdevices(), nextsystems(), getaline();
 
 /* pointer arrays might be dynamically allocated */
 static char *Systems[64] = {0};	/* list of Systems files */
@@ -164,7 +160,7 @@ char *service;
 
 	Systems[0] = Devices[0] = Dialers[0] = NULL;
 	if ((f = fopen(SYSFILES, "r")) != 0) {
-		while (getline(f, buf) > 0) { 
+		while (getaline(f, buf) > 0) { 
 			/* got a (logical) line from Sysfiles */
 			/* strtok's of this buf continue in tokenize() */
 			tok = strtok(buf, " \t");
@@ -215,7 +211,7 @@ char *service, *device;
 	msgtime = MSGTIME;
 
 	if ((f = fopen(DEVCONFIG, "r")) != 0) {
-		while (getline(f, buf) > 0) {
+		while (getaline(f, buf) > 0) {
 			/* got a (logical) line from Devconfig */
 			/* strtok's of this buf continue in tokenize() */
 			tok = strtok(buf, " \t");
@@ -241,7 +237,7 @@ char *service, *device;
  */
 
 static int
-getline(f, line)
+getaline(f, line)
 FILE *f;
 char *line;
 {	char *lptr, *lend;
@@ -484,7 +480,7 @@ char *buf;
 
 	ASSERT(len >= BUFSIZ, "BUFFER TOO SMALL", "getsysline", 0);
 	for(;;) {
-		while (getline(fsystems, buf) != NULL)
+		while (getaline(fsystems, buf) != NULL)
 		    if ((*buf != '#') && (*buf != ' ') &&
 			(*buf != '\t') && (*buf != '\n')) {
 			(void) _uu_resetlocale(LC_ALL, prev);
@@ -752,7 +748,7 @@ setconfig()
     extern char _ProtoCfg[];
 
     if ((f = fopen(CONFIG, "r")) != 0) {
-	while (getline(f, buf) > 0) { 
+	while (getaline(f, buf) > 0) { 
 	    /* got a (logical) line from Config file */
 	    tok = strtok(buf, " \t");
 	    if ( (tok != NULL) && (*tok != '#') ) {

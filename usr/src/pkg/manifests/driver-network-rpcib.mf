@@ -44,10 +44,7 @@ file path=kernel/drv/$(ARCH64)/rpcib group=sys
 $(i386_ONLY)file path=kernel/drv/rpcib group=sys
 file path=kernel/drv/rpcib.conf group=sys \
     original_name=SUNWrpcib:kernel/drv/rpcib.conf preserve=true
-legacy pkg=SUNWrpcib arch=$(ARCH) category=system \
-    desc="InfiniBand plugin implementation of RPC over RDMA" \
-    hotline="Please contact your local service provider" \
-    name="InfiniBand plugin to RPC over RDMA" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWrpcib desc="InfiniBand plugin implementation of RPC over RDMA" \
+    name="InfiniBand plugin to RPC over RDMA"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

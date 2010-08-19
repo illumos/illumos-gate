@@ -1620,6 +1620,17 @@ iscsit_tpg_modify(iscsit_tpg_t *tpg, it_tpg_t *cfg_tpg)
 		if (it_portal_lookup(cfg_tpg, &portal->portal_addr) == NULL) {
 			avl_remove(&tpg->tpg_portal_list, portal);
 			iscsit_portal_delete(portal);
+			/*
+			 * If the last portal is deleted from the target
+			 * portal group, then the tpg->tpg_online count
+			 * must be decremented. The other two callers of
+			 * iscsit_portal_delete() destroy the target portal
+			 * after deleting the portal so it is not necessary
+			 * to decrement the tpg->tpg_online count.
+			 */
+			if (avl_is_empty(&tpg->tpg_portal_list)) {
+				tpg->tpg_online--;
+			}
 		}
 	}
 

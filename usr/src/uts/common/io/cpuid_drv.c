@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -111,7 +110,7 @@ cpuid_read(dev_t dev, uio_t *uio, cred_t *cr)
 	struct cpuid_regs crs;
 	int error = 0;
 
-	if ((x86_feature & X86_CPUID) == 0)
+	if (!is_x86_feature(x86_featureset, X86FSET_CPUID))
 		return (ENXIO);
 
 	if (uio->uio_resid & (sizeof (crs) - 1))

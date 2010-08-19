@@ -20,10 +20,10 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <libintl.h>
 #include <librestart.h>
 #include <librestart_priv.h>
 #include <libscf.h>
@@ -106,6 +106,334 @@ struct restarter_event {
 	restarter_instance_state_t	re_state;
 	restarter_instance_state_t	re_next_state;
 };
+
+/*
+ * Long reasons must all parse/read correctly in the following contexts:
+ *
+ * "A service instance transitioned state: %s."
+ * "A service failed: %s."
+ * "Reason: %s."
+ * "The service transitioned state (%s) and ..."
+ *
+ * With the exception of restart_str_none they must also fit the following
+ * moulds:
+ *
+ * "An instance transitioned because %s, and ..."
+ * "An instance transitioned to <new-state> because %s, and ..."
+ *
+ * Note that whoever is rendering the long message must provide the
+ * terminal punctuation - don't include it here.  Similarly, do not
+ * provide an initial capital letter in reason-long.
+ *
+ * The long reason strings are Volatile - within the grammatical constraints
+ * above we may improve them as need be.  The intention is that a consumer
+ * may blindly render the string along the lines of the above examples,
+ * but has no other guarantees as to the exact wording.  Long reasons
+ * are localized.
+ *
+ * We define revisions of the set of short reason strings in use.  Within
+ * a given revision, all short reasons are Committed.  Consumers must check
+ * the revision in use before relying on the semantics of the short reason
+ * codes - if the version exceeds that which they are familiar with they should
+ * fail gracefully.  Having checked for version compatability, a consumer
+ * is assured that
+ *
+ *	"short_reason_A iff semantic_A", provided:
+ *
+ *		. the restarter uses this short reason code at all,
+ *		. the short reason is not "none" (which a restarter could
+ *		  specifiy for any transition semantics)
+ *
+ * To split/refine such a Committed semantic_A into further cases,
+ * we are required to bump the revision number.  This should be an
+ * infrequent occurence.  If you bump the revision number you may
+ * need to make corresponding changes in any source that calls
+ * restarter_str_version (e.g., FMA event generation).
+ *
+ * To add additional reasons to the set you must also bump the version
+ * number.
+ */
+
+/*
+ * The following describes revision 0 of the set of transition reasons.
+ * Read the preceding block comment before making any changes.
+ */
+static const struct restarter_state_transition_reason restarter_str[] = {
+	/*
+	 * Any transition for which the restarter has not provided a reason.
+	 */
+	{
+	    restarter_str_none,
+	    "none",
+	    "the restarter gave no reason"
+	},
+
+	/*
+	 * A transition to maintenance state due to a
+	 * 'svcadm mark maintenance <fmri>'.  *Not* used if the libscf
+	 * interface smf_maintain_instance(3SCF) is used to request maintenance.
+	 */
+	{
+	    restarter_str_administrative_request,
+	    "administrative_request",
+	    "maintenance was requested by an administrator"
+	},
+
+	/*
+	 * A transition to maintenance state if a repository inconsistency
+	 * exists when the service/instance state is first read by startd
+	 * into the graph engine (this can also happen during startd restart).
+	 */
+	{
+	    restarter_str_bad_repo_state,
+	    "bad_repo_state",
+	    "an SMF repository inconsistecy exists"
+	},
+
+	/*
+	 * A transition 'maintenance -> uninitialized' resulting always
+	 * from 'svcadm clear <fmri>'.  *Not* used if the libscf interface
+	 * smf_restore_instance(3SCF) is used.
+	 */
+	{
+	    restarter_str_clear_request,
+	    "clear_request",
+	    "maintenance clear was requested by an administrator"
+	},
+
+	/*
+	 * A transition 'online -> offline' due to a process core dump.
+	 */
+	{
+	    restarter_str_ct_ev_core,
+	    "ct_ev_core",
+	    "a process dumped core"
+	},
+
+	/*
+	 * A transition 'online -> offline' due to an empty process contract,
+	 * i.e., the last process in a contract type service has exited.
+	 */
+	{
+	    restarter_str_ct_ev_exit,
+	    "ct_ev_exit",
+	    "all processes in the service have exited"
+	},
+
+	/*
+	 * A transition 'online -> offline' due to a hardware error.
+	 */
+	{
+	    restarter_str_ct_ev_hwerr,
+	    "ct_ev_hwerr",
+	    "a process was killed due to uncorrectable hardware error"
+	},
+
+	/*
+	 * A transition 'online -> offline' due to a process in the service
+	 * having received a fatal signal originating from outside the
+	 * service process contract.
+	 */
+	{
+	    restarter_str_ct_ev_signal,
+	    "ct_ev_signal",
+	    "a process received a fatal signal from outside the service"
+	},
+
+	/*
+	 * A transition 'offline -> online' when all dependencies for the
+	 * service have been met.
+	 */
+	{
+	    restarter_str_dependencies_satisfied,
+	    "dependencies_satisfied",
+	    "all dependencies have been satisfied"
+	},
+
+	/*
+	 * A transition 'online -> offline' because some dependency for the
+	 * service is no-longer met.
+	 */
+	{
+	    restarter_str_dependency_activity,
+	    "dependency_activity",
+	    "a dependency activity required a stop"
+	},
+
+	/*
+	 * A transition to maintenance state due to a cycle in the
+	 * service dependencies.
+	 */
+	{
+	    restarter_str_dependency_cycle,
+	    "dependency_cycle",
+	    "a dependency cycle exists"
+	},
+
+	/*
+	 * A transition 'online -> offline -> disabled' due to a
+	 * 'svcadm disable [-t] <fmri>' or smf_disable_instance(3SCF) call.
+	 */
+	{
+	    restarter_str_disable_request,
+	    "disable_request",
+	    "a disable was requested"
+	},
+
+	/*
+	 * A transition 'disabled -> offline' due to a
+	 * 'svcadm enable [-t] <fmri>' or smf_enable_instance(3SCF) call.
+	 */
+	{
+	    restarter_str_enable_request,
+	    "enable_request",
+	    "an enable was requested"
+	},
+
+	/*
+	 * A transition to maintenance state when a method fails
+	 * repeatedly for a retryable reason.
+	 */
+	{
+	    restarter_str_fault_threshold_reached,
+	    "fault_threshold_reached",
+	    "a method is failing in a retryable manner but too often"
+	},
+
+	/*
+	 * A transition to uninitialized state when startd reads the service
+	 * configuration and inserts it into the graph engine.
+	 */
+	{
+	    restarter_str_insert_in_graph,
+	    "insert_in_graph",
+	    "the instance was inserted in the graph"
+	},
+
+	/*
+	 * A transition to maintenance state due to an invalid dependency
+	 * declared for the service.
+	 */
+	{
+	    restarter_str_invalid_dependency,
+	    "invalid_dependency",
+	    "a service has an invalid dependency"
+	},
+
+	/*
+	 * A transition to maintenance state because the service-declared
+	 * restarter is invalid.
+	 */
+	{
+	    restarter_str_invalid_restarter,
+	    "invalid_restarter",
+	    "the service restarter is invalid"
+	},
+
+	/*
+	 * A transition to maintenance state because a restarter method
+	 * exited with one of SMF_EXIT_ERR_CONFIG, SMF_EXIT_ERR_NOSMF,
+	 * SMF_EXIT_ERR_PERM, or SMF_EXIT_ERR_FATAL.
+	 */
+	{
+	    restarter_str_method_failed,
+	    "method_failed",
+	    "a start, stop or refresh method failed"
+	},
+
+	/*
+	 * A transition 'uninitialized -> {disabled|offline}' after
+	 * "insert_in_graph" to match the state configured in the
+	 * repository.
+	 */
+	{
+	    restarter_str_per_configuration,
+	    "per_configuration",
+	    "the SMF repository configuration specifies this state"
+	},
+
+	/*
+	 * Refresh requested - no state change.
+	 */
+	{
+	    restarter_str_refresh,
+	    NULL,
+	    "a refresh was requested (no change of state)"
+	},
+
+	/*
+	 * A transition 'online -> offline -> online' due to a
+	 * 'svcadm restart <fmri> or equivlaent libscf API call.
+	 * Both the 'online -> offline' and 'offline -> online' transtions
+	 * specify this reason.
+	 */
+	{
+	    restarter_str_restart_request,
+	    "restart_request",
+	    "a restart was requested"
+	},
+
+	/*
+	 * A transition to maintenance state because the start method is
+	 * being executed successfully but too frequently.
+	 */
+	{
+	    restarter_str_restarting_too_quickly,
+	    "restarting_too_quickly",
+	    "the instance is restarting too quickly"
+	},
+
+	/*
+	 * A transition to maintenance state due a service requesting
+	 * 'svcadm mark maintenance <fmri>' or equivalent libscf API call.
+	 * A command line 'svcadm mark maintenance <fmri>' does not produce
+	 * this reason - it produces administrative_request instead.
+	 */
+	{
+	    restarter_str_service_request,
+	    "service_request",
+	    "maintenance was requested by another service"
+	},
+
+	/*
+	 * An instanced inserted into the graph at its existing state
+	 * during a startd restart - no state change.
+	 */
+	{
+	    restarter_str_startd_restart,
+	    NULL,
+	    "the instance was inserted in the graph due to startd restart"
+	}
+};
+
+uint32_t
+restarter_str_version(void)
+{
+	return (RESTARTER_STRING_VERSION);
+}
+
+const char *
+restarter_get_str_short(restarter_str_t key)
+{
+	int i;
+	for (i = 0; i < sizeof (restarter_str) /
+	    sizeof (struct restarter_state_transition_reason); i++)
+		if (key == restarter_str[i].str_key)
+			return (restarter_str[i].str_short);
+	return (NULL);
+}
+
+const char *
+restarter_get_str_long(restarter_str_t key)
+{
+	int i;
+	for (i = 0; i < sizeof (restarter_str) /
+	    sizeof (struct restarter_state_transition_reason); i++)
+		if (key == restarter_str[i].str_key)
+			return (dgettext(TEXT_DOMAIN,
+			    restarter_str[i].str_long));
+	return (NULL);
+}
 
 /*
  * A static no memory error message mc_error_t structure
@@ -495,8 +823,6 @@ restarter_event_publish_retry(evchan_t *scp, const char *class,
  * Commit the state, next state, and auxiliary state into the repository.
  * Let the graph engine know about the state change and error.  On success,
  * return 0. On error, return
- *   EINVAL - aux has spaces
- *	    - inst is invalid or not an instance FMRI
  *   EPROTO - librestart compiled against different libscf
  *   ENOMEM - out of memory
  *	    - repository server out of resources
@@ -517,26 +843,17 @@ restarter_set_states(restarter_event_handle_t *h, const char *inst,
     restarter_instance_state_t new_cur_state,
     restarter_instance_state_t next_state,
     restarter_instance_state_t new_next_state, restarter_error_t e,
-    const char *aux)
+    restarter_str_t aux)
 {
 	nvlist_t *attr;
 	scf_handle_t *scf_h;
 	instance_data_t id;
 	int ret = 0;
-	char *p = (char *)aux;
+	const char *p = restarter_get_str_short(aux);
 
 	assert(h->reh_master_channel != NULL);
 	assert(h->reh_master_channel_name != NULL);
 	assert(h->reh_master_subscriber_id != NULL);
-
-	/* Validate format of auxiliary state: no spaces allowed */
-	if (p != NULL) {
-		while (*p != '\0') {
-			if (isspace(*p))
-				return (EINVAL);
-			p++;
-		}
-	}
 
 	if ((scf_h = scf_handle_create(SCF_VERSION)) == NULL) {
 		switch (scf_error()) {
@@ -572,7 +889,8 @@ restarter_set_states(restarter_event_handle_t *h, const char *inst,
 	    nvlist_add_int32(attr, RESTARTER_NAME_NEXT_STATE, new_next_state)
 	    != 0 ||
 	    nvlist_add_int32(attr, RESTARTER_NAME_ERROR, e) != 0 ||
-	    nvlist_add_string(attr, RESTARTER_NAME_INSTANCE, inst) != 0) {
+	    nvlist_add_string(attr, RESTARTER_NAME_INSTANCE, inst) != 0 ||
+	    nvlist_add_int32(attr, RESTARTER_NAME_REASON, aux) != 0) {
 		ret = ENOMEM;
 	} else {
 		id.i_fmri = inst;
@@ -580,7 +898,7 @@ restarter_set_states(restarter_event_handle_t *h, const char *inst,
 		id.i_next_state = next_state;
 
 		ret = _restarter_commit_states(scf_h, &id, new_cur_state,
-		    new_next_state, aux);
+		    new_next_state, p);
 
 		if (ret == 0) {
 			ret = restarter_event_publish_retry(

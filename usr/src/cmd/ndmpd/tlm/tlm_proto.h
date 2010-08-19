@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -106,8 +105,6 @@ extern int tlm_library_count(void);
 
 extern boolean_t fs_is_rdonly(char *);
 extern boolean_t fs_is_chkpntvol();
-extern int chkpnt_backup_successful();
-extern int chkpnt_backup_prepare();
 extern int get_zfsvolname(char *, int, char *);
 extern int chkpnt_creationtime_bypattern();
 

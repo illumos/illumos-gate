@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LDC_IMPL_H
 #define	_LDC_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -505,6 +502,8 @@ typedef struct ldc_soft_state {
 
 	kmem_cache_t	*memhdl_cache;	/* Memory handle cache */
 	kmem_cache_t	*memseg_cache;	/* Memory segment cache */
+
+	uint64_t	mapin_size;		/* Total mapin sz per guest  */
 } ldc_soft_state_t;
 
 

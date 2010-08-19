@@ -18,14 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <alloca.h>
 #include <errno.h>
 #include <libintl.h>
 
@@ -491,7 +490,7 @@ cpc_strtoset(cpc_t *cpcin, const char *spec, int smt)
 
 	toks[x] = NULL;
 
-	opts = strcpy(alloca(strlen(spec) + 1), spec);
+	opts = strdupa(spec);
 	while (*opts != '\0') {
 		int idx = getsubopt(&opts, toks, &val);
 

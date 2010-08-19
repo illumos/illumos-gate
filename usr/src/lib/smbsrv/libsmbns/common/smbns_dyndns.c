@@ -104,7 +104,6 @@ static dyndns_queue_t dyndns_queue;
 
 static void dyndns_queue_request(int, const char *);
 static void dyndns_queue_flush(list_t *);
-static void *dyndns_publisher(void *);
 static void dyndns_process(list_t *);
 static int dyndns_update_core(char *);
 static int dyndns_clear_rev_zone(char *);
@@ -112,20 +111,14 @@ static void dyndns_msgid_init(void);
 static int dyndns_get_msgid(void);
 static void dyndns_syslog(int, int, const char *);
 
-int
+void
 dyndns_start(void)
 {
-	pthread_t publisher;
-	pthread_attr_t tattr;
-	int rc;
-
-	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
-		return (0);
-
 	(void) mutex_lock(&dyndns_queue.ddq_mtx);
+
 	if (dyndns_queue.ddq_state != DYNDNS_STATE_INIT) {
 		(void) mutex_unlock(&dyndns_queue.ddq_mtx);
-		return (0);
+		return;
 	}
 
 	dyndns_msgid_init();
@@ -133,13 +126,8 @@ dyndns_start(void)
 	list_create(&dyndns_queue.ddq_list, sizeof (dyndns_qentry_t),
 	    offsetof(dyndns_qentry_t, dqe_lnd));
 	dyndns_queue.ddq_state = DYNDNS_STATE_READY;
-	(void) mutex_unlock(&dyndns_queue.ddq_mtx);
 
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&publisher, &tattr, dyndns_publisher, 0);
-	(void) pthread_attr_destroy(&tattr);
-	return (rc);
+	(void) mutex_unlock(&dyndns_queue.ddq_mtx);
 }
 
 void
@@ -194,6 +182,9 @@ dyndns_update_zones(void)
 
 /*
  * Add a request to the queue.
+ *
+ * To comply with RFC 4120 section 6.2.1, entry->dqe_fqdn is converted
+ * to lower case.
  */
 static void
 dyndns_queue_request(int op, const char *fqdn)
@@ -203,33 +194,27 @@ dyndns_queue_request(int op, const char *fqdn)
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		return;
 
+	if ((entry = malloc(sizeof (dyndns_qentry_t))) == NULL)
+		return;
+
+	bzero(entry, sizeof (dyndns_qentry_t));
+	entry->dqe_op = op;
+	(void) strlcpy(entry->dqe_fqdn, fqdn, MAXNAMELEN);
+	(void) smb_strlwr(entry->dqe_fqdn);
+
 	(void) mutex_lock(&dyndns_queue.ddq_mtx);
 
 	switch (dyndns_queue.ddq_state) {
 	case DYNDNS_STATE_READY:
 	case DYNDNS_STATE_PUBLISHING:
+		list_insert_tail(&dyndns_queue.ddq_list, entry);
+		(void) cond_signal(&dyndns_queue.ddq_cv);
 		break;
 	default:
-		(void) mutex_unlock(&dyndns_queue.ddq_mtx);
-		return;
+		free(entry);
+		break;
 	}
 
-	if ((entry = malloc(sizeof (dyndns_qentry_t))) == NULL) {
-		(void) mutex_unlock(&dyndns_queue.ddq_mtx);
-		return;
-	}
-
-	bzero(entry, sizeof (dyndns_qentry_t));
-	entry->dqe_op = op;
-	(void) strlcpy(entry->dqe_fqdn, fqdn, MAXNAMELEN);
-	/*
-	 * To comply with RFC 4120 section 6.2.1, entry->dqe_fqdn is converted
-	 * to lower case.
-	 */
-	(void) smb_strlwr(entry->dqe_fqdn);
-
-	list_insert_tail(&dyndns_queue.ddq_list, entry);
-	(void) cond_signal(&dyndns_queue.ddq_cv);
 	(void) mutex_unlock(&dyndns_queue.ddq_mtx);
 }
 
@@ -255,7 +240,7 @@ dyndns_queue_flush(list_t *lst)
  * to retry.
  */
 /*ARGSUSED*/
-static void *
+void *
 dyndns_publisher(void *arg)
 {
 	dyndns_qentry_t *entry;

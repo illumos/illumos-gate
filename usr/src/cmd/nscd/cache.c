@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Cache routines for nscd
@@ -169,7 +166,6 @@ char *cache_name[CACHE_CTX_COUNT] = {
 	NSS_DBNAM_PROTOCOLS,
 	NSS_DBNAM_NETWORKS,
 	NSS_DBNAM_BOOTPARAMS,
-	NSS_DBNAM_AUDITUSER,
 	NSS_DBNAM_AUTHATTR,
 	NSS_DBNAM_SERVICES,
 	NSS_DBNAM_NETMASKS,
@@ -193,7 +189,6 @@ static cache_init_ctx_t cache_init_ctx[CACHE_CTX_COUNT] = {
 	proto_init_ctx,
 	net_init_ctx,
 	bootp_init_ctx,
-	auuser_init_ctx,
 	auth_init_ctx,
 	serv_init_ctx,
 	netmask_init_ctx,

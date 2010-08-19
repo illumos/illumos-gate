@@ -232,7 +232,7 @@ rdsv3_rdma_init()
 
 	mutex_enter(&rdsv3_rdma_listen_id_lock);
 	if (rdsv3_rdma_listen_id != NULL) {
-		RDSV3_DPRINTF2("rdsv3_rdma_init",
+		RDSV3_DPRINTF5("rdsv3_rdma_init",
 		    "rdsv3_rdma_listen_id is already initialized: %p",
 		    rdsv3_rdma_listen_id);
 		mutex_exit(&rdsv3_rdma_listen_id_lock);

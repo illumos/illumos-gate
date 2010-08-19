@@ -483,6 +483,10 @@ module_stat(uintptr_t addr, const void *data, void *wsp)
 	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
 	(void) fmd_stat((uintptr_t)&mod_stats->ms_thrlimit,
 	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_doorthrtotal,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_doorthrlimit,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
 	(void) fmd_stat((uintptr_t)&mod_stats->ms_caseopen,
 	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
 	(void) fmd_stat((uintptr_t)&mod_stats->ms_casesolved,
@@ -876,6 +880,9 @@ fmd_case(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		break;
 	case FMD_CASE_REPAIRED:
 		(void) strcpy(name, "RPAIR");
+		break;
+	case FMD_CASE_RESOLVED:
+		(void) strcpy(name, "RSLVD");
 		break;
 	default:
 		(void) mdb_snprintf(name, sizeof (name), "%u", ci.ci_state);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -335,6 +334,9 @@ smb_com_trans2_query_fs_information(smb_request_t *sr, smb_xa_t *xa)
 
 		if (tree->t_flags & SMB_TREE_QUOTA)
 			flags |= FILE_VOLUME_QUOTAS;
+
+		if (tree->t_flags & SMB_TREE_SPARSE)
+			flags |= FILE_SUPPORTS_SPARSE_FILES;
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, encode_str, sr,
 		    flags,

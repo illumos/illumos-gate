@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * BOUND state of the DHCP client state machine.
  */
@@ -152,6 +151,7 @@ dhcp_bound(dhcp_smach_t *dsmp, PKT_LIST *ack)
 		}
 
 		dsmp->dsm_curstart_monosec = dsmp->dsm_newstart_monosec;
+		write_lease_to_hostconf(dsmp);
 		break;
 
 	case SELECTING:
@@ -275,6 +275,7 @@ dhcp_bound(dhcp_smach_t *dsmp, PKT_LIST *ack)
 		    EVENT_EXTEND, bound_event_cb, NULL, NULL);
 
 		dsmp->dsm_curstart_monosec = dsmp->dsm_newstart_monosec;
+		write_lease_to_hostconf(dsmp);
 
 		/* Stop sending requests now */
 		stop_pkt_retransmission(dsmp);
@@ -302,13 +303,6 @@ dhcp_bound(dhcp_smach_t *dsmp, PKT_LIST *ack)
 		return (B_FALSE);
 	}
 
-	/*
-	 * remove any stale hostconf file that might be lying around for
-	 * this state machine. (in general, it's harmless, since we'll write a
-	 * fresh one when we exit anyway, but just to reduce confusion..)
-	 */
-
-	(void) remove_hostconf(dsmp->dsm_name, dsmp->dsm_isv6);
 	return (B_TRUE);
 }
 
@@ -340,6 +334,7 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 		(void) script_start(dsmp, EVENT_BOUND6, bound_event_cb, NULL,
 		    NULL);
 		dsmp->dsm_curstart_monosec = dsmp->dsm_newstart_monosec;
+		write_lease_to_hostconf(dsmp);
 		return;
 	}
 
@@ -419,6 +414,7 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 	}
 
 	dsmp->dsm_curstart_monosec = dsmp->dsm_newstart_monosec;
+	write_lease_to_hostconf(dsmp);
 }
 
 /*

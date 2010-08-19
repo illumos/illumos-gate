@@ -18,17 +18,17 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
+/*
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include <sys/types.h>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <libintl.h>
+#include <libscf.h>
 #include <libuutil.h>
 #include <locale.h>
 #include <stdio.h>
@@ -63,6 +63,7 @@ main(int argc, char *argv[])
 {
 	manifest_info_t **entry;
 	manifest_info_t **manifests;
+	scf_handle_t *hndl = NULL;
 	int i;
 	int paths_walked = 0;
 	struct stat sb;
@@ -87,6 +88,13 @@ main(int argc, char *argv[])
 	if (optind >= argc)
 		usage();
 
+	if ((hndl = scf_handle_create(SCF_VERSION)) == NULL)
+		uu_die(gettext("Unexpected libscf error: %s.  Exiting.\n"),
+		    scf_strerror(scf_error()));
+
+	if (scf_handle_bind(hndl) != SCF_SUCCESS)
+		uu_die(gettext("Couldn't bind to svc.configd.\n"));
+
 	for (i = optind; i < argc; i++) {
 		if (tflag) {
 			char *pname = mhash_filename_to_propname(argv[i],
@@ -106,7 +114,7 @@ main(int argc, char *argv[])
 			continue;
 		}
 
-		status = find_manifests(argv[i], &manifests,
+		status = find_manifests(hndl, argv[i], &manifests,
 		    CHECKHASH|CHECKEXT);
 		if (status < 0) {
 			uu_warn(gettext("file tree walk of %s encountered "
@@ -128,6 +136,11 @@ main(int argc, char *argv[])
 
 	if (!paths_walked)
 		uu_die(gettext("no paths walked\n"));
+
+	if (hndl != NULL) {
+		(void) scf_handle_unbind(hndl);
+		(void) scf_handle_destroy(hndl);
+	}
 
 	return (0);
 }

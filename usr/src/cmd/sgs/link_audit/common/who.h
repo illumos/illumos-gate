@@ -18,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef WHO_DOT_H
 #define	WHO_DOT_H
 

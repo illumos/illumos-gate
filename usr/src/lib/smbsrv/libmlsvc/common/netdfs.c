@@ -708,17 +708,13 @@ netdfs_s_addstdroot(void *arg, ndr_xa_t *mxa)
 	}
 
 	dfs_setpriv(PRIV_ON);
-
 	/* For now only allow a single standalone namespace */
-	if (dfs_namespace_count() == 0) {
+	if (dfs_namespace_count() == 0)
 		param->status = dfs_namespace_add(share, comment);
-		if (param->status == ERROR_SUCCESS)
-			(void) smb_config_setnum(SMB_CI_DFS_STDROOT_NUM, 1);
-	} else {
+	else
 		param->status = ERROR_NOT_SUPPORTED;
-	}
-
 	dfs_setpriv(PRIV_OFF);
+
 	return (NDR_DRC_OK);
 }
 
@@ -737,13 +733,10 @@ netdfs_s_remstdroot(void *arg, ndr_xa_t *mxa)
 
 	dfs_setpriv(PRIV_ON);
 
-	if (ndr_is_admin(mxa)) {
+	if (ndr_is_admin(mxa))
 		param->status = dfs_namespace_remove(share);
-		if (param->status == ERROR_SUCCESS)
-			(void) smb_config_setnum(SMB_CI_DFS_STDROOT_NUM, 0);
-	} else {
+	else
 		param->status = ERROR_ACCESS_DENIED;
-	}
 
 	dfs_setpriv(PRIV_OFF);
 	return (NDR_DRC_OK);
@@ -879,6 +872,12 @@ netdfs_setinfo_104(dfs_path_t *path, netdfs_info104_t *netinfo,
 	if ((t_server == NULL) || (t_share == NULL))
 		return (ERROR_INVALID_PARAMETER);
 
+	if (netinfo->priority_class > DfsGlobalLowPriorityClass)
+		return (ERROR_INVALID_PARAMETER);
+
+	if (netinfo->priority_rank > DFS_PRIORITY_RANK_MAX)
+		return (ERROR_INVALID_PARAMETER);
+
 	bzero(&info, sizeof (dfs_info_t));
 	bzero(&target, sizeof (dfs_target_t));
 
@@ -905,15 +904,21 @@ static uint32_t
 netdfs_setinfo_105(dfs_path_t *path, netdfs_info105_t *netinfo)
 {
 	dfs_info_t info;
-	uint32_t status;
+	uint32_t status, flavor;
 	char *cmnt = (char *)netinfo->comment;
 
 	bzero(&info, sizeof (dfs_info_t));
+
+	flavor = dfs_namespace_getflavor(path->p_unc.unc_share);
+	if (flavor == 0)
+		return (ERROR_INTERNAL_ERROR);
+	info.i_flavor = flavor;
 
 	if (cmnt != NULL)
 		(void) strlcpy(info.i_comment, cmnt, sizeof (info.i_comment));
 	info.i_state = netinfo->state;
 	info.i_timeout = netinfo->timeout;
+	info.i_propflag_mask = netinfo->property_flag_mask;
 	info.i_propflags =
 	    netinfo->property_flags & netinfo->property_flag_mask;
 

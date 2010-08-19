@@ -408,15 +408,9 @@ dofcntl(struct ps_prochandle *Pr, int fd, int mandatory, int isdoor)
 	}
 }
 
-#ifdef O_PRIV
-#define	ALL_O_FLAGS	O_ACCMODE | O_NDELAY | O_NONBLOCK | O_APPEND | \
-			O_PRIV | O_SYNC | O_DSYNC | O_RSYNC | O_XATTR | \
-			O_CREAT | O_TRUNC | O_EXCL | O_NOCTTY | O_LARGEFILE
-#else
 #define	ALL_O_FLAGS	O_ACCMODE | O_NDELAY | O_NONBLOCK | O_APPEND | \
 			O_SYNC | O_DSYNC | O_RSYNC | O_XATTR | \
 			O_CREAT | O_TRUNC | O_EXCL | O_NOCTTY | O_LARGEFILE
-#endif
 
 static void
 show_fileflags(int flags)
@@ -434,6 +428,12 @@ show_fileflags(int flags)
 	case O_RDWR:
 		(void) strcpy(str, "O_RDWR");
 		break;
+	case O_SEARCH:
+		(void) strcpy(str, "O_SEARCH");
+		break;
+	case O_EXEC:
+		(void) strcpy(str, "O_EXEC");
+		break;
 	default:
 		(void) sprintf(str, "0x%x", flags & O_ACCMODE);
 		break;
@@ -445,10 +445,6 @@ show_fileflags(int flags)
 		(void) strcat(str, "|O_NONBLOCK");
 	if (flags & O_APPEND)
 		(void) strcat(str, "|O_APPEND");
-#ifdef O_PRIV
-	if (flags & O_PRIV)
-		(void) strcat(str, "|O_PRIV");
-#endif
 	if (flags & O_SYNC)
 		(void) strcat(str, "|O_SYNC");
 	if (flags & O_DSYNC)

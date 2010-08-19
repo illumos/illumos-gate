@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../../Makefile.cmd
@@ -40,6 +39,7 @@ FSMANIFESTS= $(FSSVCS:%=$(ROOTSVCSYSTEMFILESYSTEM)/%)
 
 NETSVCS= \
 	network-initial.xml \
+	network-install.xml \
 	network-iptun.xml \
 	network-ipqos.xml \
 	network-location.xml \
@@ -112,6 +112,7 @@ SVCMETHOD=\
 	net-loc \
 	net-loopback \
 	net-init \
+	net-install \
 	net-iptun \
 	net-ipqos \
 	net-netmask \

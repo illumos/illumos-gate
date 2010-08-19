@@ -165,19 +165,14 @@ file path=usr/sbin/hal-get-property mode=0555
 file path=usr/sbin/hal-set-property mode=0555
 file path=usr/sbin/lshal mode=0555
 file path=usr/share/lib/xml/dtd/fdi.dtd.1
-legacy pkg=SUNWhal arch=$(ARCH) category=system \
-    desc="Hardware Abstraction Layer, HAL (freedesktop.org)" \
-    hotline="Please contact your local service provider" \
-    name="Hardware Abstraction Layer" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWhalr arch=$(ARCH) category=system \
+legacy pkg=SUNWhal desc="Hardware Abstraction Layer, HAL (freedesktop.org)" \
+    name="Hardware Abstraction Layer"
+legacy pkg=SUNWhalr \
     desc="Hardware Abstraction Layer, HAL (freedesktop.org) (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Hardware Abstraction Layer (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/hal/LICENSE license=cmd/hal/LICENSE
+    name="Hardware Abstraction Layer (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/cmd/hal/LICENSE license=usr/src/cmd/hal/LICENSE
 link path=usr/lib/$(ARCH64)/libhal-storage.so target=./libhal-storage.so.1.0.0
 link path=usr/lib/$(ARCH64)/libhal-storage.so.1 \
     target=./libhal-storage.so.1.0.0

@@ -577,9 +577,9 @@ end:
 void
 ibnex_handle_hca_attach(void *cb_arg)
 {
-	ib_guid_t hca_guid = *((ib_guid_t *)cb_arg);
-	dev_info_t	*phci;
-	int		ii, circ;
+	ib_guid_t hca_guid	= *((ib_guid_t *)cb_arg);
+	dev_info_t		*phci;
+	int			ii, circ;
 	ibdm_hca_list_t		*hca_list;
 
 	IBTF_DPRINTF_L4("ibnex", "handle_hca_attach(%llx)", hca_guid);
@@ -602,8 +602,8 @@ ibnex_handle_hca_attach(void *cb_arg)
 	}
 	ibnex_create_hcasvc_nodes(phci, hca_list->hl_hca_port_attr);
 	for (ii = 0; ii < hca_list->hl_nports; ii++) {
-		ibnex_create_vppa_nodes(
-		    phci, &hca_list->hl_port_attr[ii]);
+		ibnex_create_port_nodes(phci, &hca_list->hl_port_attr[ii]);
+		ibnex_create_vppa_nodes(phci, &hca_list->hl_port_attr[ii]);
 	}
 	ibdm_ibnex_free_hca_list(hca_list);
 	ndi_devi_exit(phci, circ);

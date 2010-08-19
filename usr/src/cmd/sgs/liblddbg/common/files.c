@@ -441,23 +441,17 @@ Dbg_file_filter(Lm_list *lml, const char *filter, const char *filtee,
 void
 Dbg_file_filtee(Lm_list *lml, const char *filter, const char *filtee, int audit)
 {
-	if (audit) {
-		if (DBG_NOTCLASS(DBG_C_AUDITING | DBG_C_FILES))
-			return;
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
 
-		Dbg_util_nl(lml, DBG_NL_STD);
+	Dbg_util_nl(lml, DBG_NL_STD);
+
+	if (audit)
 		dbg_print(lml, MSG_INTL(MSG_FIL_FILTEE_3), filtee);
-	} else {
-		if (DBG_NOTCLASS(DBG_C_FILES))
-			return;
-
-		Dbg_util_nl(lml, DBG_NL_STD);
-		if (filter)
-			dbg_print(lml, MSG_INTL(MSG_FIL_FILTEE_1), filtee,
-			    filter);
-		else
-			dbg_print(lml, MSG_INTL(MSG_FIL_FILTEE_2), filtee);
-	}
+	else if (filter)
+		dbg_print(lml, MSG_INTL(MSG_FIL_FILTEE_1), filtee, filter);
+	else
+		dbg_print(lml, MSG_INTL(MSG_FIL_FILTEE_2), filtee);
 }
 
 void

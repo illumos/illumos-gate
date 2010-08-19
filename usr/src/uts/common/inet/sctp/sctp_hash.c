@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/socket.h>
@@ -255,9 +255,10 @@ sctp_conn_match(in6_addr_t **faddrpp, uint32_t nfaddr, in6_addr_t *laddr,
 			continue;
 
 		/* check for faddr match */
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
 			for (faddrs = faddrpp; faddrs < endaddrs; faddrs++) {
-				if (IN6_ARE_ADDR_EQUAL(*faddrs, &fp->faddr)) {
+				if (IN6_ARE_ADDR_EQUAL(*faddrs,
+				    &fp->sf_faddr)) {
 					/* check for laddr match */
 					if (sctp_saddr_lookup(sctp, laddr, 0)
 					    != NULL) {
@@ -866,8 +867,8 @@ sctp_lookup(sctp_t *sctp1, in6_addr_t *faddr, sctp_tf_t *tf, uint32_t *ports,
 		}
 
 		/* check for faddr match */
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-			if (IN6_ARE_ADDR_EQUAL(faddr, &fp->faddr)) {
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->sf_next) {
+			if (IN6_ARE_ADDR_EQUAL(faddr, &fp->sf_faddr)) {
 				break;
 			}
 		}

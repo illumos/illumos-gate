@@ -129,9 +129,6 @@ static void ndmpd_zfs_zerr_dma_log(ndmpd_zfs_args_t *);
 
 static int ndmpd_zfs_backup(ndmpd_zfs_args_t *);
 
-#define	snapshot_create chkpnt_backup_prepare
-#define	snapshot_destroy chkpnt_backup_successful
-
 /*
  * Syntax for com.sun.ndmp:incr property value:
  *	#.#.n|u/$LEVEL.$DMP_NAME.$ZFS_MODE(/ ...)
@@ -1037,6 +1034,7 @@ ndmpd_zfs_pre_backup(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	nctxp->nc_plversion = ndmp_pl->np_plversion;
 	nctxp->nc_plname = ndmpd_get_prop(NDMP_PLUGIN_PATH);
 	nctxp->nc_ddata = (void *) session;
+	nctxp->nc_params = ndmpd_zfs_params;
 
 	err = ndmp_pl->np_pre_backup(ndmp_pl, nctxp,
 	    ndmpd_zfs_args->nz_dataset);
@@ -1094,6 +1092,7 @@ ndmpd_zfs_pre_restore(ndmpd_zfs_args_t *ndmpd_zfs_args)
 
 	(void) memset(nctxp, 0, sizeof (ndmp_context_t));
 	nctxp->nc_ddata = (void *) session;
+	nctxp->nc_params = ndmpd_zfs_params;
 
 	err = ndmp_pl->np_pre_restore(ndmp_pl, nctxp, bkpath,
 	    ndmpd_zfs_args->nz_dataset);
@@ -1739,7 +1738,8 @@ ndmpd_zfs_snapshot_prepare(ndmpd_zfs_args_t *ndmpd_zfs_args)
 				recursive = B_TRUE;
 
 			(void) snapshot_destroy(ndmpd_zfs_args->nz_dataset,
-			    ndmpd_zfs_args->nz_snapname, recursive, &zfs_err);
+			    ndmpd_zfs_args->nz_snapname, recursive, B_FALSE,
+			    &zfs_err);
 		}
 
 		return (-1);
@@ -1847,7 +1847,7 @@ ndmpd_zfs_snapshot_create(ndmpd_zfs_args_t *ndmpd_zfs_args)
 		recursive = B_TRUE;
 
 	if (snapshot_create(ndmpd_zfs_args->nz_dataset,
-	    ndmpd_zfs_args->nz_snapname, recursive) != 0) {
+	    ndmpd_zfs_args->nz_snapname, recursive, B_FALSE) != 0) {
 		NDMP_LOG(LOG_ERR, "could not create snapshot %s@%s",
 		    ndmpd_zfs_args->nz_dataset, ndmpd_zfs_args->nz_snapname);
 		return (-1);
@@ -1886,7 +1886,7 @@ ndmpd_zfs_snapshot_unuse(ndmpd_zfs_args_t *ndmpd_zfs_args,
 			recursive = B_TRUE;
 
 		err = snapshot_destroy(ndmpd_zfs_args->nz_dataset,
-		    snapdata_p->nzs_snapname, recursive, &zfs_err);
+		    snapdata_p->nzs_snapname, recursive, B_FALSE, &zfs_err);
 
 		if (err) {
 			NDMP_LOG(LOG_ERR, "snapshot_destroy: %s@%s;"

@@ -64,7 +64,7 @@ ao_ms_init(cmi_hdl_t hdl, void **datap)
 	if (ao_ms_support_disable || cmi_hdl_model(hdl) >= ao_model_limit)
 		return (ENOTSUP);
 
-	if (!(x86_feature & X86_MCA))
+	if (!is_x86_feature(x86_featureset, X86FSET_MCA))
 		return (ENOTSUP);
 
 	if (cmi_hdl_rdmsr(hdl, IA32_MSR_MCG_CAP, &cap) != CMI_SUCCESS)

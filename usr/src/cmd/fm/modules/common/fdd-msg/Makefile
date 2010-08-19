@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MODULE = fdd-msg
@@ -29,4 +28,9 @@ SRCS = fdd_msg.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -lipmi
+LDLIBS_sparc = -lipmi
+LDLIBS_i386 = -L$(ROOT)/usr/lib/fm -lipmi -lumem -lfmd_agent
+LDFLAGS_sparc =
+LDFLAGS_i386 = -R/usr/lib/fm
+LDLIBS += $(LDLIBS_$(MACH))
+LDFLAGS += $(LDFLAGS_$(MACH))

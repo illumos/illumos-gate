@@ -98,26 +98,18 @@ rtld_db_postinit(Lm_list *lml)
  * We also don't want to trigger multiple RD_ADD/RD_DELETE events any time we
  * enter ld.so.1.
  *
- * With auditors, we may be in the process of relocating a collection of
- * objects, and will leave() ld.so.1 to call the auditor.  At this point we
- * must indicate an RD_CONSISTENT event, but librtld_db will not report an
- * object to the debuggers until relocation processing has been completed on it.
- * To allow for the collection of these objects that are pending relocation, an
- * RD_ADD event is set after completing a series of relocations on the primary
- * link-map control list.
- *
  * Set an RD_ADD/RD_DELETE event and indicate that an RD_CONSISTENT event is
- * required later (LML_FLG_DBNOTIF):
+ * required later (RT_FL_DBNOTIF):
  *
- *  i	the first time we add or delete an object to the primary link-map
+ *  i.	the first time we add or delete an object to the primary link-map
  *	control list.
- *  ii	the first time we move a secondary link-map control list to the primary
+ *  ii.	the first time we move a secondary link-map control list to the primary
  *	link-map control list (effectively, this is like adding a group of
  *	objects to the primary link-map control list).
  *
- * Set an RD_CONSISTENT event when it is required (LML_FLG_DBNOTIF is set) and
+ * Set an RD_CONSISTENT event when it is required (RT_FL_DBNOTIF is set):
  *
- *  i	each time we leave the runtime linker.
+ *  i.	each time we leave the runtime linker.
  */
 void
 rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
@@ -134,8 +126,6 @@ rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
 	case RD_DLACTIVITY:
 		switch (state) {
 		case RT_CONSISTENT:
-			lml->lm_flags &= ~LML_FLG_DBNOTIF;
-
 			/*
 			 * Do we need to send a notification?
 			 */
@@ -145,8 +135,6 @@ rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
 			break;
 		case RT_ADD:
 		case RT_DELETE:
-			lml->lm_flags |= LML_FLG_DBNOTIF;
-
 			/*
 			 * If we are already in an inconsistent state, no
 			 * notification is required.
@@ -628,8 +616,8 @@ is_dep_init(Rt_map *dlmp, Rt_map *clmp)
 	 * If the caller is an auditor, and the destination isn't, then don't
 	 * run any .inits (see comments in load_completion()).
 	 */
-	if ((LIST(clmp)->lm_flags & LML_FLG_NOAUDIT) &&
-	    (LIST(clmp) != LIST(dlmp)))
+	if ((LIST(clmp)->lm_tflags & LML_TFLG_NOAUDIT) &&
+	    ((LIST(dlmp)->lm_tflags & LML_TFLG_NOAUDIT) == 0))
 		return;
 
 	if ((dlmp == clmp) || (rtld_flags & RT_FL_INITFIRST))
@@ -680,13 +668,16 @@ call_array(Addr *array, uint_t arraysz, Rt_map *lmp, Word shtype)
 	 * Call the .*array[] entries
 	 */
 	for (ndx = start; ndx != stop; ndx += incr) {
-		void (*fptr)(void) = (void(*)())array[ndx];
+		uint_t	rtldflags;
+		void	(*fptr)(void) = (void(*)())array[ndx];
 
 		DBG_CALL(Dbg_util_call_array(lmp, (void *)fptr, ndx, shtype));
 
+		APPLICATION_ENTER(rtldflags);
 		leave(LIST(lmp), 0);
 		(*fptr)();
 		(void) enter(0);
+		APPLICATION_RETURN(rtldflags);
 	}
 }
 
@@ -717,23 +708,11 @@ call_init(Rt_map **tobj, int flag)
 	for (_tobj = _nobj = tobj, _nobj++; *_tobj != NULL; _tobj++, _nobj++) {
 		Rt_map	*lmp = *_tobj;
 		void	(*iptr)() = INIT(lmp);
-		uint_t	rtldflags;
 
 		if (FLAGS(lmp) & FLG_RT_INITCALL)
 			continue;
 
 		FLAGS(lmp) |= FLG_RT_INITCALL;
-
-		/*
-		 * It is possible, that during the initial handshake with libc,
-		 * an interposition object has resolved a symbol binding, and
-		 * that this objects .init must be fired.  As we're about to
-		 * run user code, make sure any dynamic linking errors remain
-		 * internal (ie., only obtainable from dlerror()), and are not
-		 * flushed to stderr.
-		 */
-		rtldflags = (rtld_flags & RT_FL_APPLIC) ? 0 : RT_FL_APPLIC;
-		rtld_flags |= rtldflags;
 
 		/*
 		 * Establish an initfirst state if necessary - no other inits
@@ -747,9 +726,13 @@ call_init(Rt_map **tobj, int flag)
 			DBG_CALL(Dbg_util_call_init(lmp, flag));
 
 		if (iptr) {
+			uint_t	rtldflags;
+
+			APPLICATION_ENTER(rtldflags);
 			leave(LIST(lmp), 0);
 			(*iptr)();
 			(void) enter(0);
+			APPLICATION_RETURN(rtldflags);
 		}
 
 		call_array(INITARRAY(lmp), INITARRAYSZ(lmp), lmp,
@@ -757,11 +740,6 @@ call_init(Rt_map **tobj, int flag)
 
 		if (INITARRAY(lmp) || iptr)
 			DBG_CALL(Dbg_util_call_init(lmp, DBG_INIT_DONE));
-
-		/*
-		 * Return to a non-application setting if necessary.
-		 */
-		rtld_flags &= ~rtldflags;
 
 		/*
 		 * Set the initdone flag regardless of whether this object
@@ -796,20 +774,18 @@ call_init(Rt_map **tobj, int flag)
 }
 
 /*
- * Function called by atexit(3C).  Calls all .fini sections related with the
- * mains dependent shared libraries in the order in which the shared libraries
- * have been loaded.  Skip any .fini defined in the main executable, as this
- * will be called by crt0 (main was never marked as initdone).
+ * Call .fini sections for the topologically sorted list of objects.  This
+ * routine is called from remove_hdl() for any objects being torn down as part
+ * of a dlclose() operation, and from atexit() processing for all the remaining
+ * objects within the process.
  */
 void
-call_fini(Lm_list * lml, Rt_map ** tobj)
+call_fini(Lm_list *lml, Rt_map **tobj, Rt_map *clmp)
 {
 	Rt_map **_tobj;
 
 	for (_tobj = tobj; *_tobj != NULL; _tobj++) {
-		Rt_map		*clmp, * lmp = *_tobj;
-		Aliste		idx;
-		Bnd_desc	*bdp;
+		Rt_map		*lmp = *_tobj;
 
 		/*
 		 * Only fire a .fini if the objects corresponding .init has
@@ -827,9 +803,13 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 			    SHT_FINI_ARRAY);
 
 			if (fptr) {
-				leave(LIST(lmp), 0);
+				uint_t	rtldflags;
+
+				APPLICATION_ENTER(rtldflags);
+				leave(lml, 0);
 				(*fptr)();
 				(void) enter(0);
+				APPLICATION_RETURN(rtldflags);
 			}
 		}
 
@@ -840,40 +820,25 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 			continue;
 
 		/*
-		 * Audit `close' operations at this point.  The library has
-		 * exercised its last instructions (regardless of whether it
-		 * will be unmapped or not).
-		 *
-		 * First call any global auditing.
+		 * This object has exercised its last instructions (regardless
+		 * of whether it will be unmapped or not).  Audit this closure.
 		 */
-		if (lml->lm_tflags & LML_TFLG_AUD_OBJCLOSE)
-			_audit_objclose(auditors->ad_list, lmp);
-
-		/*
-		 * Finally determine whether this object has local auditing
-		 * requirements by inspecting itself and then its dependencies.
-		 */
-		if ((lml->lm_flags & LML_FLG_LOCAUDIT) == 0)
-			continue;
-
-		if (AFLAGS(lmp) & LML_TFLG_AUD_OBJCLOSE)
-			_audit_objclose(AUDITORS(lmp)->ad_list, lmp);
-
-		for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
-			clmp = bdp->b_caller;
-
-			if (AFLAGS(clmp) & LML_TFLG_AUD_OBJCLOSE) {
-				_audit_objclose(AUDITORS(clmp)->ad_list, lmp);
-				break;
-			}
-		}
+		if ((lml->lm_tflags & LML_TFLG_NOAUDIT) == 0)
+			audit_objclose(lmp, clmp);
 	}
+
 	DBG_CALL(Dbg_bind_plt_summary(lml, M_MACH, pltcnt21d, pltcnt24d,
 	    pltcntu32, pltcntu44, pltcntfull, pltcntfar));
 
 	free(tobj);
 }
 
+/*
+ * Function called by atexit(3C).  Calls all .fini sections within the objects
+ * that make up the process.  As .fini processing is the last opportunity for
+ * any new bindings to be established, this is also a convenient location to
+ * check for unused objects.
+ */
 void
 atexit_fini()
 {
@@ -895,19 +860,7 @@ atexit_fini()
 	 */
 	if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != NULL) &&
 	    (tobj != (Rt_map **)S_ERROR))
-		call_fini(lml, tobj);
-
-	/*
-	 * Add an explicit close to main and ld.so.1.  Although main's .fini is
-	 * collected in call_fini() to provide for FINITARRAY processing, its
-	 * audit_objclose is explicitly skipped.  This provides for it to be
-	 * called last, here.  This is the reverse of the explicit calls to
-	 * audit_objopen() made in setup().
-	 */
-	if ((lml->lm_tflags | AFLAGS(lmp)) & LML_TFLG_AUD_MASK) {
-		audit_objclose(lmp, (Rt_map *)lml_rtld.lm_head);
-		audit_objclose(lmp, lmp);
-	}
+		call_fini(lml, tobj, NULL);
 
 	/*
 	 * Now that all .fini code has been run, see what unreferenced objects
@@ -916,18 +869,17 @@ atexit_fini()
 	unused(lml);
 
 	/*
-	 * Traverse any alternative link-map lists.
+	 * Traverse any alternative link-map lists, looking for non-auditors.
 	 */
 	for (APLIST_TRAVERSE(dynlm_list, idx, lml)) {
 		/*
 		 * Ignore the base-link-map list, which has already been
-		 * processed, and the runtime linkers link-map list, which is
-		 * typically processed last.
+		 * processed, the runtime linkers link-map list, which is
+		 * processed last, and any auditors.
 		 */
-		if (lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM))
-			continue;
-
-		if ((lmp = (Rt_map *)lml->lm_head) == NULL)
+		if ((lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM)) ||
+		    (lml->lm_tflags & LML_TFLG_AUD_MASK) ||
+		    ((lmp = (Rt_map *)lml->lm_head) == NULL))
 			continue;
 
 		lml->lm_flags |= LML_FLG_ATEXIT;
@@ -938,7 +890,49 @@ atexit_fini()
 		 */
 		if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != NULL) &&
 		    (tobj != (Rt_map **)S_ERROR))
-			call_fini(lml, tobj);
+			call_fini(lml, tobj, NULL);
+
+		unused(lml);
+	}
+
+	/*
+	 * Add an explicit close to main and ld.so.1.  Although main's .fini is
+	 * collected in call_fini() to provide for FINITARRAY processing, its
+	 * audit_objclose is explicitly skipped.  This provides for it to be
+	 * called last, here.  This is the reverse of the explicit calls to
+	 * audit_objopen() made in setup().
+	 */
+	lml = &lml_main;
+	lmp = (Rt_map *)lml->lm_head;
+
+	if ((lml->lm_tflags | AFLAGS(lmp)) & LML_TFLG_AUD_MASK) {
+		audit_objclose((Rt_map *)lml_rtld.lm_head, lmp);
+		audit_objclose(lmp, lmp);
+	}
+
+	/*
+	 * Traverse any alternative link-map lists, looking for non-auditors.
+	 */
+	for (APLIST_TRAVERSE(dynlm_list, idx, lml)) {
+		/*
+		 * Ignore the base-link-map list, which has already been
+		 * processed, the runtime linkers link-map list, which is
+		 * processed last, and any non-auditors.
+		 */
+		if ((lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM)) ||
+		    ((lml->lm_tflags & LML_TFLG_AUD_MASK) == 0) ||
+		    ((lmp = (Rt_map *)lml->lm_head) == NULL))
+			continue;
+
+		lml->lm_flags |= LML_FLG_ATEXIT;
+		lml->lm_flags &= ~LML_FLG_INTRPOSETSORT;
+
+		/*
+		 * Reverse topologically sort the link-map for .fini execution.
+		 */
+		if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != NULL) &&
+		    (tobj != (Rt_map **)S_ERROR))
+			call_fini(lml, tobj, NULL);
 
 		unused(lml);
 	}
@@ -954,7 +948,7 @@ atexit_fini()
 
 	if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != NULL) &&
 	    (tobj != (Rt_map **)S_ERROR))
-		call_fini(lml, tobj);
+		call_fini(lml, tobj, NULL);
 
 	leave(&lml_main, 0);
 }
@@ -1046,15 +1040,15 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 	(lml->lm_obj)++;
 
 	/*
-	 * If we're about to add a new object to the main link-map control list,
-	 * alert the debuggers that we are about to mess with this list.
-	 * Additions of individual objects to the main link-map control list
-	 * occur during initial setup as the applications immediate dependencies
-	 * are loaded.  Individual objects are also loaded on the main link-map
-	 * control list of new alternative link-map control lists.
+	 * If we're about to add a new object to the main link-map control
+	 * list, alert the debuggers.  Additions of individual objects to the
+	 * main link-map control list occur during initial setup as the
+	 * applications immediate dependencies are loaded.  Additional objects
+	 * are loaded on the main link-map control list after they have been
+	 * fully initialized on an alternative link-map control list.  See
+	 * lm_move().
 	 */
-	if ((lmco == ALIST_OFF_DATA) &&
-	    ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
+	if (lmco == ALIST_OFF_DATA)
 		rd_event(lml, RD_DLACTIVITY, RT_ADD);
 
 	/* LINTED */
@@ -1162,7 +1156,7 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
  * Delete an item from the specified link map control list.
  */
 void
-lm_delete(Lm_list *lml, Rt_map *lmp)
+lm_delete(Lm_list *lml, Rt_map *lmp, Rt_map *clmp)
 {
 	Lm_cntl	*lmc;
 
@@ -1175,11 +1169,18 @@ lm_delete(Lm_list *lml, Rt_map *lmp)
 
 	/*
 	 * If we're about to delete an object from the main link-map control
-	 * list, alert the debuggers that we are about to mess with this list.
+	 * list, alert the debuggers.
 	 */
-	if ((CNTL(lmp) == ALIST_OFF_DATA) &&
-	    ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
+	if (CNTL(lmp) == ALIST_OFF_DATA)
 		rd_event(lml, RD_DLACTIVITY, RT_DELETE);
+
+	/*
+	 * If we're being audited tell the audit library that we're
+	 * about to go deleting dependencies.
+	 */
+	if (clmp && (aud_activity ||
+	    ((LIST(clmp)->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_ACTIVITY)))
+		audit_activity(clmp, LA_ACT_DELETE);
 
 	/* LINTED */
 	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, CNTL(lmp));
@@ -1222,12 +1223,11 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 
 	/*
 	 * If we're about to add a new family of objects to the main link-map
-	 * control list, alert the debuggers that we are about to mess with this
-	 * list.  Additions of object families to the main link-map control
-	 * list occur during lazy loading, filtering and dlopen().
+	 * control list, alert the debuggers.  Additions of object families to
+	 * the main link-map control list occur during lazy loading, filtering
+	 * and dlopen().
 	 */
-	if ((plmco == ALIST_OFF_DATA) &&
-	    ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
+	if (plmco == ALIST_OFF_DATA)
 		rd_event(lml, RD_DLACTIVITY, RT_ADD);
 
 	DBG_CALL(Dbg_file_cntl(lml, nlmco, plmco));
@@ -1526,8 +1526,10 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		} else if ((len == MSG_LD_CONFGEN_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_CONFGEN), MSG_LD_CONFGEN_SIZE) == 0)) {
 			/*
-			 * Set by crle(1) to indicate it's building a
-			 * configuration file, not documented for general use.
+			 * This variable is not documented for general use.
+			 * Although originaly designed for internal use with
+			 * crle(1), this variable is in use by the Studio
+			 * auditing tools.  Hence, it can't be removed.
 			 */
 			select |= SEL_ACT_SPEC_2;
 			variable = ENV_FLG_CONFGEN;
@@ -1625,8 +1627,10 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		} else if ((len == MSG_LD_LOADAVAIL_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_LOADAVAIL), MSG_LD_LOADAVAIL_SIZE) == 0)) {
 			/*
-			 * Internal use by crle(1), not documented for general
-			 * use.
+			 * This variable is not documented for general use.
+			 * Although originaly designed for internal use with
+			 * crle(1), this variable is in use by the Studio
+			 * auditing tools.  Hence, it can't be removed.
 			 */
 			select |= SEL_ACT_LML;
 			val = LML_FLG_LOADAVAIL;
@@ -2862,11 +2866,9 @@ static char	errbuf[ERRSIZE], *nextptr = errbuf, *prevptr = NULL;
  * The RT_FL_APPLIC flag serves to indicate the transition between process
  * initialization and when the applications code is running.
  */
-/*PRINTFLIKE3*/
 void
-eprintf(Lm_list *lml, Error error, const char *format, ...)
+veprintf(Lm_list *lml, Error error, const char *format, va_list args)
 {
-	va_list		args;
 	int		overflow = 0;
 	static int	lock = 0;
 	Prfbuf		prf;
@@ -2887,12 +2889,10 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	 * still in the initialization stage, output the error directly and
 	 * add a newline.
 	 */
-	va_start(args, format);
-
 	prf.pr_buf = prf.pr_cur = nextptr;
 	prf.pr_len = ERRSIZE - (nextptr - errbuf);
 
-	if (!(rtld_flags & RT_FL_APPLIC))
+	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		prf.pr_fd = 2;
 	else
 		prf.pr_fd = -1;
@@ -2900,16 +2900,30 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	if (error > ERR_NONE) {
 		if ((error == ERR_FATAL) && (rtld_flags2 & RT_FL2_FTL2WARN))
 			error = ERR_WARNING;
-		if (error == ERR_WARNING) {
+		switch (error) {
+		case ERR_WARNING_NF:
+			if (err_strs[ERR_WARNING_NF] == NULL)
+				err_strs[ERR_WARNING_NF] =
+				    MSG_INTL(MSG_ERR_WARNING);
+			break;
+		case ERR_WARNING:
 			if (err_strs[ERR_WARNING] == NULL)
 				err_strs[ERR_WARNING] =
 				    MSG_INTL(MSG_ERR_WARNING);
-		} else if (error == ERR_FATAL) {
+			break;
+		case ERR_GUIDANCE:
+			if (err_strs[ERR_GUIDANCE] == NULL)
+				err_strs[ERR_GUIDANCE] =
+				    MSG_INTL(MSG_ERR_GUIDANCE);
+			break;
+		case ERR_FATAL:
 			if (err_strs[ERR_FATAL] == NULL)
 				err_strs[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
-		} else if (error == ERR_ELF) {
+			break;
+		case ERR_ELF:
 			if (err_strs[ERR_ELF] == NULL)
 				err_strs[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
+			break;
 		}
 		if (procname) {
 			if (bufprint(&prf, MSG_ORIG(MSG_STR_EMSGFOR1),
@@ -2976,7 +2990,6 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 		*(prf.pr_cur - 1) = '\0';
 
 	DBG_CALL(Dbg_util_str(lml, nextptr));
-	va_end(args);
 
 	/*
 	 * Determine if there was insufficient space left in the buffer to
@@ -3031,6 +3044,17 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 		}
 	}
 	lock = 0;
+}
+
+/*PRINTFLIKE3*/
+void
+eprintf(Lm_list *lml, Error error, const char *format, ...)
+{
+	va_list		args;
+
+	va_start(args, format);
+	veprintf(lml, error, format, args);
+	va_end(args);
 }
 
 #if	DEBUG
@@ -3348,33 +3372,23 @@ unused(Lm_list *lml)
 
 /*
  * Generic cleanup routine called prior to returning control to the user.
- * Insures that any ld.so.1 specific file descriptors or temporary mapping are
+ * Ensures that any ld.so.1 specific file descriptors or temporary mapping are
  * released, and any locks dropped.
  */
 void
 leave(Lm_list *lml, int flags)
 {
-	Lm_list		*elml = lml;
-	Rt_map		*clmp;
-	Aliste		idx;
-
 	/*
-	 * Alert the debuggers that the link-maps are consistent.  Note, in the
-	 * case of tearing down a whole link-map list, lml will be null.  In
-	 * this case use the main link-map list to test for a notification.
+	 * Alert the debuggers that the link-maps are consistent.
 	 */
-	if (elml == NULL)
-		elml = &lml_main;
-	if (elml->lm_flags & LML_FLG_DBNOTIF)
-		rd_event(elml, RD_DLACTIVITY, RT_CONSISTENT);
+	rd_event(lml, RD_DLACTIVITY, RT_CONSISTENT);
 
 	/*
 	 * Alert any auditors that the link-maps are consistent.
 	 */
-	for (APLIST_TRAVERSE(elml->lm_actaudit, idx, clmp)) {
-		audit_activity(clmp, LA_ACT_CONSISTENT);
-
-		aplist_delete(elml->lm_actaudit, &idx);
+	if (lml->lm_flags & LML_FLG_ACTAUDIT) {
+		audit_activity(lml->lm_head, LA_ACT_CONSISTENT);
+		lml->lm_flags &= ~LML_FLG_ACTAUDIT;
 	}
 
 	if (nu_fd != FD_UNAVAIL) {
@@ -3402,7 +3416,7 @@ leave(Lm_list *lml, int flags)
 	 *  -	 The ld.so.1's link-map list.
 	 *  -	 The auditor's link-map if the environment is pre-UPM.
 	 */
-	if (lml && (lml->lm_flags & LML_FLG_HOLDLOCK))
+	if (lml->lm_flags & LML_FLG_HOLDLOCK)
 		return;
 
 	if (rt_bind_clear(0) & THR_FLG_RTLD) {

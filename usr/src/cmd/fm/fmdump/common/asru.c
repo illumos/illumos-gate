@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <fmdump.h>
@@ -71,7 +70,8 @@ asru_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 
 /*ARGSUSED*/
 static int
-asru_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+asru_verb23_cmn(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp,
+    nvlist_prtctl_t pctl)
 {
 	char *uuid = "-";
 	boolean_t f = 0, u = 0;
@@ -95,10 +95,37 @@ asru_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	fmdump_printf(fp, "%-20s.%9.9llu %-36s %s\n",
 	    fmdump_year(buf, sizeof (buf), rp), rp->rec_nsec, uuid, state + 1);
 
-	nvlist_print(fp, rp->rec_nvl);
+	if (pctl)
+		nvlist_prt(rp->rec_nvl, pctl);
+	else
+		nvlist_print(fp, rp->rec_nvl);
+
 	fmdump_printf(fp, "\n");
 
 	return (0);
+}
+
+static int
+asru_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+{
+	return (asru_verb23_cmn(lp, rp, fp, NULL));
+}
+
+static int
+asru_pretty(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+{
+	nvlist_prtctl_t pctl;
+	int rc;
+
+	if ((pctl = nvlist_prtctl_alloc()) != NULL) {
+		nvlist_prtctl_setdest(pctl, fp);
+		nvlist_prtctlop_nvlist(pctl, fmdump_render_nvlist, NULL);
+	}
+
+	rc = asru_verb23_cmn(lp, rp, fp, pctl);
+
+	nvlist_prtctl_free(pctl);
+	return (rc);
 }
 
 const fmdump_ops_t fmdump_asru_ops = {
@@ -112,6 +139,9 @@ const fmdump_ops_t fmdump_asru_ops = {
 }, {
 "TIME                           UUID                                 STATE",
 (fmd_log_rec_f *)asru_verb2
+}, {
+"TIME                           UUID                                 STATE",
+(fmd_log_rec_f *)asru_pretty
 }, {
 NULL, NULL
 } }

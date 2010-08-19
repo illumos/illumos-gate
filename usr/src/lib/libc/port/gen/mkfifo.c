@@ -20,27 +20,30 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mkfifo(3c) - create a named pipe (FIFO). This code provides
  * a POSIX mkfifo function.
- *
  */
-
-#pragma weak _mkfifo = mkfifo
 
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 
+int
+mkfifoat(int fd, const char *path, mode_t mode)
+{
+	mode &= 0777;		/* only allow file access permissions */
+	mode |= S_IFIFO;	/* creating a FIFO	*/
+	return (mknodat(fd, path, mode, 0));
+}
+
+#pragma weak _mkfifo = mkfifo
 int
 mkfifo(const char *path, mode_t mode)
 {

@@ -19,15 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  *  glue routine gss_export_sec_context
  */
 
+#ifndef LEAN_CLIENT
+
 #include <mechglueP.h>
+#include "gssapiP_generic.h"
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -146,6 +148,7 @@ gss_ctx_id_t 		*context_handle;
 		*context_handle = (gss_ctx_id_t)ctx;
 		return (GSS_S_COMPLETE);
 	}
+	map_error(minor_status, mech);
 
 error_out:
 	if (ctx) {
@@ -158,3 +161,4 @@ error_out:
 	}
 	return (status);
 }
+#endif /* LEAN_CLIENT */

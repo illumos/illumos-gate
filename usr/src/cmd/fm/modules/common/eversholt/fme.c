@@ -386,7 +386,12 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 	 */
 	init_size = alloc_total();
 	out(O_ALTFP|O_STAMP, "start config_snapshot using %d bytes", init_size);
+	nvlist_free(detector);
+	pathstr = ipath2str(NULL, e0ipp);
 	cfgdata = config_snapshot();
+	platform_units_translate(0, cfgdata->cooked, NULL, NULL,
+	    &detector, pathstr);
+	FREE(pathstr);
 	platform_save_config(hdl, fmcase);
 	out(O_ALTFP|O_STAMP, "config_snapshot added %d bytes",
 	    alloc_total() - init_size);
@@ -2779,14 +2784,14 @@ publish_suspects(struct fme *fmep, struct rsl *srl)
 			ipath_print(O_DEBUG|O_NONL,
 			    rp->suspect->enode->u.event.ename->u.name.s,
 			    rp->suspect->ipp);
-			out(O_DEBUG, " has no FITrate (using 1)");
+			out(O_VERB, " has no FITrate (using 1)");
 			fr = 1;
 		} else if (fr == 0) {
 			out(O_DEBUG|O_NONL, "event ");
 			ipath_print(O_DEBUG|O_NONL,
 			    rp->suspect->enode->u.event.ename->u.name.s,
 			    rp->suspect->ipp);
-			out(O_DEBUG, " has zero FITrate (using 1)");
+			out(O_VERB, " has zero FITrate (using 1)");
 			fr = 1;
 		}
 

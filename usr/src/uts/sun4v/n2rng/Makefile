@@ -20,8 +20,7 @@
 #
 # uts/sun4v/n2rng/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 #
@@ -49,6 +48,11 @@ CONF_SRCDIR     = $(UTSBASE)/sun4v/io/n2rng
 #	Include common rules.
 #
 include $(UTSBASE)/sun4v/Makefile.sun4v
+
+#
+#	FIPS-140 Self Integrity Test
+#
+POST_PROCESS	+= ; $(FIPS140_CHECK)
 
 #
 #	Override defaults to build a unique, local modstubs.o.

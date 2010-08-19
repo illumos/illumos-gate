@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -111,12 +110,14 @@
 #include <sys/cmn_err.h>
 #include <sys/cpuvar.h>
 #include <sys/ddi.h>
+#include <sys/systm.h>
 #include <sys/disp.h>
 #include <sys/sdt.h>
 #include <sys/sunddi.h>
 #include <sys/thread.h>
 #include <sys/pghw.h>
 #include <sys/cmt.h>
+#include <sys/policy.h>
 #include <sys/x_call.h>
 #include <sys/cap_util.h>
 
@@ -226,6 +227,8 @@ static kcpc_request_list_t	*cu_cpc_reqs = NULL;
  *
  *   cu_cpu_id		CPU ID for this kstat
  *
+ *   cu_pg_id		PG ID for this kstat
+ *
  *   cu_generation	Generation value that increases whenever any CPU goes
  *			  offline or online. Two kstat snapshots for the same
  *			  CPU may only be compared if they have the same
@@ -245,25 +248,29 @@ static kcpc_request_list_t	*cu_cpc_reqs = NULL;
  *   cu_cpu_rate	Utilization rate, expressed in operations per second.
  *
  *   cu_cpu_rate_max	Maximum observed value of utilization rate.
+ *
+ *   cu_cpu_relationship Name of sharing relationship for the PG in this kstat
  */
 struct cu_cpu_kstat {
 	kstat_named_t	cu_cpu_id;
-	kstat_named_t	cu_generation;
 	kstat_named_t	cu_pg_id;
+	kstat_named_t	cu_generation;
 	kstat_named_t	cu_cpu_util;
 	kstat_named_t	cu_cpu_time_running;
 	kstat_named_t	cu_cpu_time_stopped;
 	kstat_named_t	cu_cpu_rate;
 	kstat_named_t	cu_cpu_rate_max;
+	kstat_named_t	cu_cpu_relationship;
 } cu_cpu_kstat = {
-	{ "id",				KSTAT_DATA_UINT32 },
+	{ "cpu_id",			KSTAT_DATA_UINT32 },
+	{ "pg_id",			KSTAT_DATA_INT32 },
 	{ "generation",			KSTAT_DATA_UINT32 },
-	{ "pg_id",			KSTAT_DATA_LONG },
 	{ "hw_util",			KSTAT_DATA_UINT64 },
 	{ "hw_util_time_running",	KSTAT_DATA_UINT64 },
 	{ "hw_util_time_stopped",	KSTAT_DATA_UINT64 },
 	{ "hw_util_rate",		KSTAT_DATA_UINT64 },
 	{ "hw_util_rate_max",		KSTAT_DATA_UINT64 },
+	{ "relationship",		KSTAT_DATA_STRING },
 };
 
 /*
@@ -1289,8 +1296,9 @@ cu_cpu_fini(cpu_t *cp)
 static void
 cu_cpu_kstat_create(pghw_t *pg, cu_cntr_info_t *cntr_info)
 {
-	char		*class, *sh_name;
 	kstat_t		*ks;
+	char 		*sharing = pghw_type_string(pg->pghw_hw);
+	char		name[KSTAT_STRLEN + 1];
 
 	/*
 	 * Just return when no counter info or CPU
@@ -1299,14 +1307,14 @@ cu_cpu_kstat_create(pghw_t *pg, cu_cntr_info_t *cntr_info)
 		return;
 
 	/*
-	 * Get the class name from the leaf PG that this CPU belongs to.
-	 * If there are no PGs, just use the default class "cpu".
+	 * Canonify PG name to conform to kstat name rules
 	 */
-	class = pg ? pghw_type_string(pg->pghw_hw) : "cpu";
-	sh_name = pg ? pghw_type_shortstring(pg->pghw_hw) : "cpu";
+	(void) strncpy(name, pghw_type_string(pg->pghw_hw), KSTAT_STRLEN + 1);
+	strident_canon(name, TASKQ_NAMELEN + 1);
 
-	if ((ks = kstat_create_zone("pg_cpu", cntr_info->ci_cpu->cpu_id,
-	    sh_name, class, KSTAT_TYPE_NAMED,
+	if ((ks = kstat_create_zone("pg_hw_perf_cpu",
+	    cntr_info->ci_cpu->cpu_id,
+	    name, "processor_group", KSTAT_TYPE_NAMED,
 	    sizeof (cu_cpu_kstat) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL, GLOBAL_ZONEID)) == NULL)
 		return;
@@ -1314,6 +1322,7 @@ cu_cpu_kstat_create(pghw_t *pg, cu_cntr_info_t *cntr_info)
 	ks->ks_lock = &pg_cpu_kstat_lock;
 	ks->ks_data = &cu_cpu_kstat;
 	ks->ks_update = cu_cpu_kstat_update;
+	ks->ks_data_size += strlen(sharing) + 1;
 
 	ks->ks_private = cntr_info;
 	cntr_info->ci_kstat = ks;
@@ -1336,29 +1345,50 @@ cu_cpu_kstat_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
+	cp = cntr_info->ci_cpu;
+	pg = cntr_info->ci_pg;
+	kstat->cu_cpu_id.value.ui32 = cp->cpu_id;
+	kstat->cu_pg_id.value.i32 = ((pg_t *)pg)->pg_id;
+
+	/*
+	 * The caller should have priv_cpc_cpu privilege to get utilization
+	 * data. Callers who do not have the privilege will see zeroes as the
+	 * values.
+	 */
+	if (secpolicy_cpc_cpu(crgetcred()) != 0) {
+		kstat->cu_generation.value.ui32 = cp->cpu_generation;
+		kstat_named_setstr(&kstat->cu_cpu_relationship,
+		    pghw_type_string(pg->pghw_hw));
+
+		kstat->cu_cpu_util.value.ui64 = 0;
+		kstat->cu_cpu_rate.value.ui64 = 0;
+		kstat->cu_cpu_rate_max.value.ui64 = 0;
+		kstat->cu_cpu_time_running.value.ui64 = 0;
+		kstat->cu_cpu_time_stopped.value.ui64 = 0;
+
+		return (0);
+	}
+
 	kpreempt_disable();
 
 	/*
 	 * Update capacity and utilization statistics needed for CPU's PG (CPU)
 	 * kstats
 	 */
-	cp = cntr_info->ci_cpu;
+
 	(void) cu_cpu_update(cp, B_TRUE);
 
-	pg = cntr_info->ci_pg;
 	stats = cntr_info->ci_stats;
-	kstat->cu_cpu_id.value.ui32 = cp->cpu_id;
 	kstat->cu_generation.value.ui32 = cp->cpu_generation;
-	if (pg == NULL)
-		kstat->cu_pg_id.value.l = -1;
-	else
-		kstat->cu_pg_id.value.l = pg->pghw_pg.pg_id;
+	kstat_named_setstr(&kstat->cu_cpu_relationship,
+	    pghw_type_string(pg->pghw_hw));
 
 	kstat->cu_cpu_util.value.ui64 = stats->cs_value_total;
 	kstat->cu_cpu_rate.value.ui64 = stats->cs_rate;
 	kstat->cu_cpu_rate_max.value.ui64 = stats->cs_rate_max;
 	kstat->cu_cpu_time_running.value.ui64 = stats->cs_time_running;
 	kstat->cu_cpu_time_stopped.value.ui64 = stats->cs_time_stopped;
+
 	/*
 	 * Counters are stopped now, so the cs_time_stopped was last
 	 * updated at cs_time_start time. Add the time passed since then

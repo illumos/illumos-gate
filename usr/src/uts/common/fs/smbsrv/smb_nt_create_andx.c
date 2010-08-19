@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -231,7 +230,6 @@ smb_sdrc_t
 smb_com_nt_create_andx(struct smb_request *sr)
 {
 	struct open_param	*op = &sr->arg.open;
-	unsigned char		OplockLevel;
 	unsigned char		DirFlag;
 	smb_attr_t		attr;
 	smb_node_t		*node;
@@ -275,28 +273,14 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		op->fqi.fq_dnode = op->dir->f_node;
 	}
 
+	op->op_oplock_levelII = B_TRUE;
+
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
 
 	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
 	case STYPE_PRINTQ:
-		switch (op->op_oplock_level) {
-		case SMB_OPLOCK_EXCLUSIVE:
-			OplockLevel = 1;
-			break;
-		case SMB_OPLOCK_BATCH:
-			OplockLevel = 2;
-			break;
-		case SMB_OPLOCK_LEVEL_II:
-			OplockLevel = 3;
-			break;
-		case SMB_OPLOCK_NONE:
-		default:
-			OplockLevel = 0;
-			break;
-		}
-
 		if (op->create_options & FILE_DELETE_ON_CLOSE)
 			smb_ofile_set_delete_on_close(sr->fid_ofile);
 
@@ -312,7 +296,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		    34,
 		    sr->andx_com,
 		    0x67,
-		    OplockLevel,
+		    op->op_oplock_level,
 		    sr->smb_fid,
 		    op->action_taken,
 		    &attr.sa_crtime,
@@ -329,12 +313,11 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		break;
 
 	case STYPE_IPC:
-		OplockLevel = 0;
 		rc = smbsr_encode_result(sr, 34, 0, "bb.wbwlqqqqlqqwwbw",
 		    34,
 		    sr->andx_com,
 		    0x67,
-		    OplockLevel,
+		    0,
 		    sr->smb_fid,
 		    op->action_taken,
 		    0LL,

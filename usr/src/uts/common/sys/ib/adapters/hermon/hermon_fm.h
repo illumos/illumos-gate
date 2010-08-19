@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_FM_H
@@ -119,10 +118,13 @@ typedef struct i_hca_fm_test hermon_test_t;
  * At each place where the planned FMA error matrix specifies that
  * an ereport will be generated, for now there is a HERMON_FMANOTE()
  * call generating an appropriate message string.
+ *
+ * This has been revised since it has been realized that FMA is only
+ * to be used for hardware errors.  HERMON_FMANOTE() is used to report
+ * errors that are likely to be hardware, but possibly are not.
  */
-
 #define	HERMON_FMANOTE(state, string)					\
-	cmn_err(CE_NOTE, "hermon%d: Device Error: %s",			\
+	cmn_err(CE_WARN, "hermon%d: Device Error: %s",			\
 		(state)->hs_instance, string)
 
 /* CQE Syndrome errors - see hermon_cq.c */

@@ -71,15 +71,9 @@ file path=usr/sbin/revnetgroup mode=0555
 file path=var/yp/Makefile mode=0555 original_name=SUNWyp:var/yp/Makefile \
     preserve=renamenew
 file path=var/yp/updaters mode=0500
-legacy pkg=SUNWypr arch=$(ARCH) category=system \
-    desc="NIS Server for Solaris 2.6 and up" \
-    hotline="Please contact your local service provider" \
-    name="NIS Server for Solaris (root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWypu arch=$(ARCH) category=system \
-    desc="NIS Server for Solaris 2.6 and up" \
-    hotline="Please contact your local service provider" \
-    name="NIS Server for Solaris (usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWypr desc="NIS Server for Solaris 2.6 and up" \
+    name="NIS Server for Solaris (root)"
+legacy pkg=SUNWypu desc="NIS Server for Solaris 2.6 and up" \
+    name="NIS Server for Solaris (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -151,18 +151,11 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 	mlsvc_handle_t netr_handle;
 	smb_domainex_t di;
 	uint32_t status;
-	int retries = 0, server_changed = 0;
+	int retries = 0;
 
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 
-	if (!smb_domain_getinfo(&di))
-		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
-
-	if (mlsvc_ping(di.d_dc) < 0) {
-		/*
-		 * We had a session to the DC but it's not responding.
-		 * So drop the credential chain.
-		 */
+	if (!smb_domain_getinfo(&di)) {
 		netr_invalidate_chain();
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 	}
@@ -175,12 +168,12 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 		if (di.d_dc && (*netr_global_info.server != '\0')) {
 			(void) snprintf(server, sizeof (server),
 			    "\\\\%s", di.d_dc);
-			server_changed = strncasecmp(netr_global_info.server,
-			    server, strlen(server));
+			if (strncasecmp(netr_global_info.server,
+			    server, strlen(server)) != 0)
+				netr_invalidate_chain();
 		}
 
-		if (server_changed ||
-		    (netr_global_info.flags & NETR_FLG_VALID) == 0 ||
+		if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
 		    !smb_match_netlogon_seqnum()) {
 			status = netlogon_auth(di.d_dc, &netr_handle,
 			    NETR_FLG_NULL);

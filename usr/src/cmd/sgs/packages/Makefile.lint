@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/sgs/packages/Makefile.lint
 
@@ -60,6 +57,7 @@ LINTLDIRS=	../libld \
 		../elfedit \
 		../elfedit/modules \
 		../elfwrap \
+		../ar \
 		../crle \
 		../dump \
 		../ld \

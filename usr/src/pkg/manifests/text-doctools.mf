@@ -356,29 +356,40 @@ hardlink path=usr/share/lib/nterm/tab.300s-12 \
     target=../../../../usr/share/lib/nterm/tab.300S-12
 hardlink path=usr/share/lib/nterm/tab.4000a \
     target=../../../../usr/share/lib/nterm/tab.4000A
-legacy pkg=SUNWdoc arch=$(ARCH) category=system \
+legacy pkg=SUNWdoc \
     desc="utilities and fonts for development, display, and production of documentation such as manual pages (nroff/troff)" \
-    hotline="Please contact your local service provider" \
-    name="Documentation Tools" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/checkeq/THIRDPARTYLICENSE license=cmd/checkeq/THIRDPARTYLICENSE
-license cmd/checknr/THIRDPARTYLICENSE license=cmd/checknr/THIRDPARTYLICENSE
-license cmd/eqn/THIRDPARTYLICENSE license=cmd/eqn/THIRDPARTYLICENSE
-license cmd/man/src/THIRDPARTYLICENSE license=cmd/man/src/THIRDPARTYLICENSE
-license cmd/man/src/util/THIRDPARTYLICENSE \
-    license=cmd/man/src/util/THIRDPARTYLICENSE
-license cmd/man/src/util/instant.src/THIRDPARTYLICENSE \
-    license=cmd/man/src/util/instant.src/THIRDPARTYLICENSE
-license cmd/man/src/util/nsgmls.src/COPYING \
-    license=cmd/man/src/util/nsgmls.src/COPYING
-license cmd/man/src/util/solbookv2/THIRDPARTYLICENSE \
-    license=cmd/man/src/util/solbookv2/THIRDPARTYLICENSE
-license cmd/refer/THIRDPARTYLICENSE license=cmd/refer/THIRDPARTYLICENSE
-license cmd/soelim/THIRDPARTYLICENSE license=cmd/soelim/THIRDPARTYLICENSE
-license cmd/tbl/THIRDPARTYLICENSE license=cmd/tbl/THIRDPARTYLICENSE
-license cmd/ul/THIRDPARTYLICENSE license=cmd/ul/THIRDPARTYLICENSE
-license cmd/vgrind/THIRDPARTYLICENSE license=cmd/vgrind/THIRDPARTYLICENSE
+    name="Documentation Tools"
 license cr_Sun license=cr_Sun
+license usr/src/cmd/checkeq/THIRDPARTYLICENSE \
+    license=usr/src/cmd/checkeq/THIRDPARTYLICENSE
+license usr/src/cmd/checknr/THIRDPARTYLICENSE \
+    license=usr/src/cmd/checknr/THIRDPARTYLICENSE
+license usr/src/cmd/eqn/THIRDPARTYLICENSE \
+    license=usr/src/cmd/eqn/THIRDPARTYLICENSE
+license usr/src/cmd/man/src/THIRDPARTYLICENSE \
+    license=usr/src/cmd/man/src/THIRDPARTYLICENSE
+license usr/src/cmd/man/src/util/THIRDPARTYLICENSE \
+    license=usr/src/cmd/man/src/util/THIRDPARTYLICENSE
+license usr/src/cmd/man/src/util/instant.src/THIRDPARTYLICENSE \
+    license=usr/src/cmd/man/src/util/instant.src/THIRDPARTYLICENSE
+license usr/src/cmd/man/src/util/nsgmls.src/COPYING \
+    license=usr/src/cmd/man/src/util/nsgmls.src/COPYING
+license usr/src/cmd/man/src/util/solbookv2/THIRDPARTYLICENSE \
+    license=usr/src/cmd/man/src/util/solbookv2/THIRDPARTYLICENSE
+license usr/src/cmd/refer/THIRDPARTYLICENSE \
+    license=usr/src/cmd/refer/THIRDPARTYLICENSE
+license usr/src/cmd/soelim/THIRDPARTYLICENSE \
+    license=usr/src/cmd/soelim/THIRDPARTYLICENSE
+license usr/src/cmd/tbl/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tbl/THIRDPARTYLICENSE
+license usr/src/cmd/ul/THIRDPARTYLICENSE \
+    license=usr/src/cmd/ul/THIRDPARTYLICENSE
+license usr/src/cmd/vgrind/THIRDPARTYLICENSE \
+    license=usr/src/cmd/vgrind/THIRDPARTYLICENSE
 link path=usr/lib/tmac target=../share/lib/tmac
 link path=usr/man target=./share/man
+#
+# gpic is used as a preprocessor by the apropos command
+#
+depend fmri=text/groff type=require
 depend fmri=text/less type=require

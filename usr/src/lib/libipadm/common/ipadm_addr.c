@@ -372,6 +372,8 @@ retry:
 		return (IPADM_SUCCESS);
 	bzero(&lifr, sizeof (lifr));
 	for (ifap = ifa; ifap != NULL; ifap = ifap->ifa_next) {
+		struct sockaddr_storage data;
+
 		(void) strlcpy(cifname, ifap->ifa_name, sizeof (cifname));
 		lnum = 0;
 		if ((sep = strrchr(cifname, ':')) != NULL) {
@@ -403,37 +405,44 @@ retry:
 		cifaddr->ifa_addr = malloc(sizeof (struct sockaddr_storage));
 		if (cifaddr->ifa_addr == NULL)
 			goto fail;
-		*cifaddr->ifa_addr = *ifap->ifa_addr;
+		(void) memcpy(cifaddr->ifa_addr, ifap->ifa_addr,
+		    sizeof (struct sockaddr_storage));
 		cifaddr->ifa_netmask = malloc(sizeof (struct sockaddr_storage));
 		if (cifaddr->ifa_netmask == NULL)
 			goto fail;
-		*cifaddr->ifa_netmask = *ifap->ifa_netmask;
+		(void) memcpy(cifaddr->ifa_netmask, ifap->ifa_netmask,
+		    sizeof (struct sockaddr_storage));
 		if (ifap->ifa_flags & IFF_POINTOPOINT) {
 			cifaddr->ifa_dstaddr = malloc(
 			    sizeof (struct sockaddr_storage));
 			if (cifaddr->ifa_dstaddr == NULL)
 				goto fail;
-			*cifaddr->ifa_dstaddr = *ifap->ifa_dstaddr;
+			(void) memcpy(cifaddr->ifa_dstaddr, ifap->ifa_dstaddr,
+			    sizeof (struct sockaddr_storage));
 		} else if (ifap->ifa_flags & IFF_BROADCAST) {
 			cifaddr->ifa_broadaddr = malloc(
 			    sizeof (struct sockaddr_storage));
 			if (cifaddr->ifa_broadaddr == NULL)
 				goto fail;
-			*cifaddr->ifa_broadaddr = *ifap->ifa_broadaddr;
+			(void) memcpy(cifaddr->ifa_broadaddr,
+			    ifap->ifa_broadaddr,
+			    sizeof (struct sockaddr_storage));
 		}
 		/* Get the addrobj name stored for this logical interface. */
 		ipaddr.ipadm_aobjname[0] = '\0';
 		(void) strlcpy(ipaddr.ipadm_ifname, cifname,
 		    sizeof (ipaddr.ipadm_ifname));
 		ipaddr.ipadm_lifnum = lnum;
-		ipaddr.ipadm_af = ifap->ifa_addr->ss_family;
+		ipaddr.ipadm_af = ifap->ifa_addr->sa_family;
 		status = i_ipadm_get_lif2addrobj(iph, &ipaddr);
 
 		/*
 		 * Find address type from ifa_flags, if we could not get it
 		 * from daemon.
 		 */
-		sin6 = SIN6(ifap->ifa_addr);
+		(void) memcpy(&data, ifap->ifa_addr,
+		    sizeof (struct sockaddr_in6));
+		sin6 = SIN6(&data);
 		flags = ifap->ifa_flags;
 		if (status == IPADM_SUCCESS) {
 			(void) strlcpy(curr->ia_aobjname, ipaddr.ipadm_aobjname,
@@ -461,7 +470,7 @@ retry:
 			if (flags & IFF_RUNNING) {
 				(void) strlcpy(lifr.lifr_name, ifap->ifa_name,
 				    sizeof (lifr.lifr_name));
-				sock = (ifap->ifa_addr->ss_family == AF_INET) ?
+				sock = (ifap->ifa_addr->sa_family == AF_INET) ?
 				    iph->iph_sock : iph->iph_sock6;
 				if (ioctl(sock, SIOCGLIFDADSTATE,
 				    (caddr_t)&lifr) < 0) {
@@ -677,7 +686,6 @@ i_ipadm_nvl2ainfo_persist(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 	ipadm_addr_type_t	atype;
 	boolean_t		is_addr = B_FALSE;
 	size_t			size = sizeof (struct sockaddr_storage);
-	struct sockaddr_in6	*sin6;
 	uint32_t		plen = 0;
 	int			err;
 	ipadm_status_t		status;
@@ -709,6 +717,8 @@ i_ipadm_nvl2ainfo_persist(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 	if (ifa->ifa_name == NULL && (ifa->ifa_name = strdup(ifname)) == NULL)
 		return (IPADM_NO_MEMORY);
 	if (is_addr) {
+		struct sockaddr_in6 data;
+
 		/*
 		 * We got an address from the nvlist `nvl'.
 		 * Parse `nvladdr' and populate `ifa->ifa_addr'.
@@ -718,16 +728,15 @@ i_ipadm_nvl2ainfo_persist(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 			return (IPADM_NO_MEMORY);
 		switch (atype) {
 		case IPADM_ADDR_STATIC:
-			ifa->ifa_addr->ss_family = af;
+			ifa->ifa_addr->sa_family = af;
 			break;
 		case IPADM_ADDR_DHCP:
-			ifa->ifa_addr->ss_family = AF_INET;
+			ifa->ifa_addr->sa_family = AF_INET;
 			break;
 		case IPADM_ADDR_IPV6_ADDRCONF:
-			sin6 = SIN6(ifa->ifa_addr);
-			sin6->sin6_family = AF_INET6;
+			data.sin6_family = AF_INET6;
 			if (i_ipadm_nvl2in6_addr(nvladdr, IPADM_NVP_IPNUMADDR,
-			    &sin6->sin6_addr) != IPADM_SUCCESS)
+			    &data.sin6_addr) != IPADM_SUCCESS)
 				return (IPADM_NO_MEMORY);
 			err = nvlist_lookup_uint32(nvladdr, IPADM_NVP_PREFIXLEN,
 			    &plen);
@@ -737,6 +746,7 @@ i_ipadm_nvl2ainfo_persist(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 				return (IPADM_NO_MEMORY);
 			if ((err = plen2mask(plen, af, ifa->ifa_netmask)) != 0)
 				return (ipadm_errno2status(err));
+			(void) memcpy(ifa->ifa_addr, &data, sizeof (data));
 			break;
 		default:
 			return (IPADM_FAILURE);
@@ -756,7 +766,7 @@ i_ipadm_nvl2ainfo_persist(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 			 * found a valid `ainfo->ia_ifa.ifa_addr' by now.
 			 */
 			assert(ifa->ifa_addr != NULL);
-			err = plen2mask(atoi(propstr), ifa->ifa_addr->ss_family,
+			err = plen2mask(atoi(propstr), ifa->ifa_addr->sa_family,
 			    ifa->ifa_netmask);
 			if (err != 0)
 				return (ipadm_errno2status(err));
@@ -911,7 +921,7 @@ i_ipadm_set_prefixlen(ipadm_handle_t iph, const void *arg,
 	if (prefixlen == 0 || prefixlen == (abits - 1))
 		return (IPADM_INVALID_ARG);
 
-	if ((err = plen2mask(prefixlen, af, &netmask)) != 0)
+	if ((err = plen2mask(prefixlen, af, (struct sockaddr *)&netmask)) != 0)
 		return (ipadm_errno2status(err));
 
 	s = (af == AF_INET ? iph->iph_sock : iph->iph_sock6);
@@ -1114,7 +1124,8 @@ i_ipadm_get_broadcast(ipadm_handle_t iph, const void *arg,
 			return (status);
 
 		plen = atoi(val);
-		if ((err = plen2mask(plen, AF_INET, &mask)) != 0)
+		if ((err = plen2mask(plen, AF_INET,
+		    (struct sockaddr *)&mask)) != 0)
 			return (ipadm_errno2status(err));
 		maddr = (SIN(&mask))->sin_addr.s_addr;
 		broadaddr.s_addr = (addr & maddr) | ~maddr;
@@ -1360,7 +1371,7 @@ i_ipadm_get_zone(ipadm_handle_t iph, const void *arg,
 }
 
 static ipadm_prop_desc_t *
-i_ipadm_getpropdesc(const char *pname)
+i_ipadm_get_addrprop_desc(const char *pname)
 {
 	int i;
 
@@ -1390,7 +1401,7 @@ ipadm_get_addrprop(ipadm_handle_t iph, const char *pname, char *buf,
 	}
 
 	/* find the property in the property description table */
-	if ((pdp = i_ipadm_getpropdesc(pname)) == NULL)
+	if ((pdp = i_ipadm_get_addrprop_desc(pname)) == NULL)
 		return (IPADM_PROP_UNKNOWN);
 
 	/*
@@ -1473,7 +1484,7 @@ ipadm_set_addrprop(ipadm_handle_t iph, const char *pname,
 	}
 
 	/* find the property in the property description table */
-	if ((pdp = i_ipadm_getpropdesc(pname)) == NULL)
+	if ((pdp = i_ipadm_get_addrprop_desc(pname)) == NULL)
 		return (IPADM_PROP_UNKNOWN);
 
 	if (pdp->ipd_set == NULL || (reset && pdp->ipd_get == NULL))
@@ -1644,7 +1655,7 @@ i_ipadm_get_default_prefixlen(struct sockaddr_storage *addr, uint32_t *plen)
 		get_netmask4(&ia, &m->sin_addr);
 		m->sin_addr.s_addr = htonl(m->sin_addr.s_addr);
 		m->sin_family = AF_INET;
-		prefixlen = mask2plen(&mask);
+		prefixlen = mask2plen((struct sockaddr *)&mask);
 		break;
 	case AF_INET6:
 		sin6 = SIN6(addr);
@@ -2299,7 +2310,7 @@ i_ipadm_addr_exists_on_if(ipadm_handle_t iph, const char *ifname,
 	}
 	if (ioctl(sock, SIOCGLIFADDR, (caddr_t)&lifr) < 0)
 		return (ipadm_errno2status(errno));
-	*exists = !sockaddrunspec(&lifr.lifr_addr);
+	*exists = !sockaddrunspec((struct sockaddr *)&lifr.lifr_addr);
 
 	return (IPADM_SUCCESS);
 }
@@ -2522,6 +2533,7 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 				}
 				/* Check for a valid dst address. */
 				if (!legacy && sockaddrunspec(
+				    (struct sockaddr *)
 				    &addr->ipadm_static_dst_addr)) {
 					status = IPADM_BAD_ADDR;
 					goto fail;
@@ -2636,7 +2648,8 @@ i_ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t ipaddr, uint32_t flags)
 			return (status);
 		default_prefixlen = B_TRUE;
 	}
-	(void) plen2mask(ipaddr->ipadm_static_prefixlen, af, mask);
+	(void) plen2mask(ipaddr->ipadm_static_prefixlen, af,
+	    (struct sockaddr *)mask);
 
 	/*
 	 * Create a new logical interface if needed; otherwise, just
@@ -3312,6 +3325,7 @@ ipadm_refresh_addr(ipadm_handle_t iph, const char *aobjname,
 	if (!ipadm_check_auth())
 		return (IPADM_EAUTH);
 
+	bzero(&ipaddr, sizeof (ipaddr));
 	/* validate input */
 	if (aobjname == NULL || strlcpy(ipaddr.ipadm_aobjname, aobjname,
 	    IPADM_AOBJSIZ) >= IPADM_AOBJSIZ) {
@@ -3337,6 +3351,9 @@ ipadm_refresh_addr(ipadm_handle_t iph, const char *aobjname,
 		if (status != IPADM_SUCCESS)
 			return (status);
 		if (inform) {
+			if (dhcp_start_agent(DHCP_IPC_MAX_WAIT) == -1)
+				return (IPADM_DHCP_START_ERROR);
+
 			ipaddr.ipadm_wait = IPADM_DHCP_WAIT_DEFAULT;
 			return (i_ipadm_op_dhcp(&ipaddr, DHCP_INFORM, NULL));
 		}
@@ -3452,7 +3469,8 @@ i_ipadm_validate_create_addr(ipadm_handle_t iph, ipadm_addrobj_t ipaddr,
 		if ((islo || isvni) && ipaddr->ipadm_static_dname[0] != '\0')
 			return (IPADM_INVALID_ARG);
 		/* Check for a valid src address */
-		if (!legacy && sockaddrunspec(&ipaddr->ipadm_static_addr))
+		if (!legacy && sockaddrunspec(
+		    (struct sockaddr *)&ipaddr->ipadm_static_addr))
 			return (IPADM_BAD_ADDR);
 		break;
 	case IPADM_ADDR_DHCP:

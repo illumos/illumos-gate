@@ -97,10 +97,8 @@ file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_unconfig.html mode=0444
 file path=usr/sadm/admin/dhcpmgr/help/dhcp_server_serv.html mode=0444
 file path=usr/sadm/admin/dhcpmgr/help/dhcp_server_unconfig.html mode=0444
 file path=usr/sadm/admin/dhcpmgr/help/dhcp_solaris_about.html mode=0444
-legacy pkg=SUNWdhcm arch=$(ARCH) category=system \
-    desc="Graphical management interface for the DHCP server" \
-    hotline="Please contact your local service provider" name="DHCP Manager" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWdhcm desc="Graphical management interface for the DHCP server" \
+    name="DHCP Manager"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/sbin/dhcpmgr target=../sadm/admin/bin/dhcpmgr

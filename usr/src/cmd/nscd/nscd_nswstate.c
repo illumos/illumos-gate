@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -423,7 +422,7 @@ _get_nsw_state_int(
 	 * if getting a nsw state for a request from the compat
 	 * backend, create the new switch structures if this
 	 * is the first time around for a passwd, shadow, group,
-	 * audit_user, or user_attr database
+	 * or user_attr database
 	 */
 	if (params->compati != -1) {
 

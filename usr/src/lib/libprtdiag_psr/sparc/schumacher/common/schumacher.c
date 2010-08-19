@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,7 +56,7 @@
 #define	EM_PRTDIAG_FAIL		dgettext(TEXT_DOMAIN, "Prtdiag failed!\n")
 
 #define	SIGN_ON_MSG	dgettext(TEXT_DOMAIN,\
-	"System Configuration: Sun Microsystems ")
+	"System Configuration: Oracle Corporation ")
 #define	SYSCLK_FREQ_MSG	dgettext(TEXT_DOMAIN,\
 	"System clock frequency: %d MHZ\n")
 #define	MEM_SIZE_MSG	dgettext(TEXT_DOMAIN, "Memory size: ")
@@ -167,8 +163,8 @@ is_io_device(char *device_class)
 	int i;
 
 	for (i = 0; i < NIODEVICE; i++) {
-	    if (strcmp(device_class, io_device_table[i]) == 0)
-		return (1);
+		if (strcmp(device_class, io_device_table[i]) == 0)
+			return (1);
 	}
 
 	return (0);
@@ -184,8 +180,8 @@ is_bus(char *device_class)
 	int i;
 
 	for (i = 0; i < NBUS; i++) {
-	    if (strcmp(device_class, bus_table[i]) == 0)
-		return (1);
+		if (strcmp(device_class, bus_table[i]) == 0)
+			return (1);
 	}
 
 	return (0);
@@ -215,7 +211,7 @@ picldiag_get_node_by_name(picl_nodehdl_t rooth, char *name,
 		    nodename, (strlen(name) + 1));
 		if (err != PICL_SUCCESS) {
 			err = picl_get_propval_by_name(childh, PICL_PROP_PEER,
-				&childh, sizeof (picl_nodehdl_t));
+			    &childh, sizeof (picl_nodehdl_t));
 			continue;
 		}
 
@@ -252,7 +248,7 @@ picldiag_get_string_propval(picl_nodehdl_t modh, char *prop_name, char **outbuf)
 	 * If it is not a string prop, return NULL
 	 */
 	if (pinfo.type != PICL_PTYPE_CHARSTRING)
-	    return (PICL_FAILURE);
+		return (PICL_FAILURE);
 
 	prop_value = malloc(pinfo.size);
 	if (prop_value == NULL)
@@ -294,8 +290,8 @@ picldiag_get_int_propval(picl_nodehdl_t modh, char *prop_name, int *ret)
 	 * If it is not an int, uint or byte array prop, return failure
 	 */
 	if ((pinfo.type != PICL_PTYPE_INT) &&
-		(pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
-		(pinfo.type != PICL_PTYPE_BYTEARRAY)) {
+	    (pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
+	    (pinfo.type != PICL_PTYPE_BYTEARRAY)) {
 		*ret = PICL_FAILURE;
 		return (0);
 	}
@@ -347,7 +343,7 @@ picldiag_get_uint_propval(picl_nodehdl_t modh, char *prop_name, int *ret)
 	 * If it is not an int or uint prop, return failure
 	 */
 	if ((pinfo.type != PICL_PTYPE_INT) &&
-		(pinfo.type != PICL_PTYPE_UNSIGNED_INT)) {
+	    (pinfo.type != PICL_PTYPE_UNSIGNED_INT)) {
 		*ret = PICL_FAILURE;
 		return (0);
 	}
@@ -615,7 +611,7 @@ picldiag_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 	err = picl_get_propinfo_by_name(nodeh, OBP_PROP_COMPATIBLE,
 	    &pinfo, &proph);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	if (pinfo.type == PICL_PTYPE_CHARSTRING) {
 		pval = malloc(pinfo.size);
@@ -644,7 +640,7 @@ picldiag_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 
 	err = picl_get_propinfo(rowproph, &pinfo);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	pval = malloc(pinfo.size);
 	if (pval == NULL)
@@ -923,12 +919,12 @@ display_cpu_info(picl_nodehdl_t plafh)
 	 */
 	logprintf_header(dgettext(TEXT_DOMAIN, "CPUs"), DEFAULT_LINE_WIDTH);
 	log_printf(dgettext(TEXT_DOMAIN, "               E$          CPU"
-		"                    CPU\n"));
+	    "                    CPU\n"));
 	log_printf(dgettext(TEXT_DOMAIN,
 	    "CPU  Freq      Size        Implementation"
-		"         Mask    Status      Location\n"));
+	    "         Mask    Status      Location\n"));
 	log_printf("---  --------  ----------  ---------------------  "
-		"-----   ------      --------\n");
+	    "-----   ------      --------\n");
 
 	err = picl_walk_tree_by_class(plafh, PICL_CLASS_CPU, PICL_CLASS_CPU,
 	    cpu_callback);
@@ -1267,7 +1263,7 @@ find_memory_module_group(picl_nodehdl_t mch, int *print_header)
 			if (*print_header == 1) {
 				log_printf(
 				    dgettext(TEXT_DOMAIN,
-					"\nMemory Module Groups:\n"));
+				    "\nMemory Module Groups:\n"));
 				log_printf("--------------------------");
 				log_printf("------\n");
 				log_printf(dgettext(TEXT_DOMAIN,
@@ -2021,12 +2017,12 @@ picldiag_display_io_cards(struct io_card *list)
 		log_printf(dgettext(TEXT_DOMAIN,
 		    "Bus   Freq      Slot +  Name +\n"), 0);
 		log_printf(dgettext(TEXT_DOMAIN, "Type  MHz       Status  "
-			"Path                          "
-			"Model"), 0);
+		    "Path                          "
+		    "Model"), 0);
 		log_printf("\n", 0);
 		log_printf("----  ----  ----------  "
-			"----------------------------  "
-			"--------------------", 0);
+		    "----------------------------  "
+		    "--------------------", 0);
 		log_printf("\n", 0);
 		banner = 1;
 	}
@@ -3112,7 +3108,7 @@ flashprom_callback(picl_nodehdl_t flashpromh, void *arg)
 		/* get first row */
 		err = picl_get_propinfo(rowproph, &pinfo);
 		if (err != PICL_SUCCESS)
-		    return (err);
+			return (err);
 
 		prom_version = alloca(pinfo.size);
 		if (prom_version == NULL)

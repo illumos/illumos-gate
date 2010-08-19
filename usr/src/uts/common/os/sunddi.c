@@ -8048,7 +8048,7 @@ ddi_devid_register(dev_info_t *dip, ddi_devid_t devid)
 		 */
 		if (e_devid_cache_register(dip, devid) == DDI_SUCCESS) {
 			mutex_enter(&DEVI(dip)->devi_lock);
-			DEVI(dip)->devi_flags |= DEVI_REGISTERED_DEVID;
+			DEVI(dip)->devi_flags |= DEVI_CACHED_DEVID;
 			mutex_exit(&DEVI(dip)->devi_lock);
 		} else if (ddi_get_name_addr(dip)) {
 			/*
@@ -8085,7 +8085,7 @@ void
 ddi_devid_unregister(dev_info_t *dip)
 {
 	mutex_enter(&DEVI(dip)->devi_lock);
-	DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
+	DEVI(dip)->devi_flags &= ~DEVI_CACHED_DEVID;
 	mutex_exit(&DEVI(dip)->devi_lock);
 	e_devid_cache_unregister(dip);
 	i_ddi_devid_unregister(dip);

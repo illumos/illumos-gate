@@ -20,14 +20,18 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  *  Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.
  *  Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T
  *    All Rights Reserved
+ */
+
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
  */
 
 /*
@@ -889,7 +893,7 @@ _tsc_lfence_end:
  * is called by callers who do not need to have a guarenteed
  * correct tick value.  The proper routine to use is tsc_read().
  */
-hrtime_t
+u_longlong_t
 randtick(void)
 {
 	return (0);
@@ -2868,6 +2872,16 @@ void
 invalidate_cache(void)
 {}
 
+/*ARGSUSED*/
+uint64_t
+get_xcr(uint_t r)
+{ return (0); }
+
+/*ARGSUSED*/
+void
+set_xcr(uint_t r, const uint64_t val)
+{}
+
 #else  /* __lint */
 
 #define	XMSR_ACCESS_VAL		$0x9c5a203a
@@ -2915,7 +2929,26 @@ invalidate_cache(void)
 	leave
 	ret
 	SET_SIZE(xwrmsr)
-	
+
+	ENTRY(get_xcr)
+	movl	%edi, %ecx
+	#xgetbv
+	.byte	0x0f,0x01,0xd0
+	shlq	$32, %rdx
+	orq	%rdx, %rax
+	ret
+	SET_SIZE(get_xcr)
+
+	ENTRY(set_xcr)
+	movq	%rsi, %rdx
+	shrq	$32, %rdx
+	movl	%esi, %eax
+	movl	%edi, %ecx
+	#xsetbv
+	.byte	0x0f,0x01,0xd1
+	ret
+	SET_SIZE(set_xcr)
+
 #elif defined(__i386)
 
 	ENTRY(rdmsr)
@@ -2957,6 +2990,22 @@ invalidate_cache(void)
 	leave
 	ret
 	SET_SIZE(xwrmsr)
+
+	ENTRY(get_xcr)
+	movl	4(%esp), %ecx
+	#xgetbv
+	.byte	0x0f,0x01,0xd0
+	ret
+	SET_SIZE(get_xcr)
+
+	ENTRY(set_xcr)
+	movl	4(%esp), %ecx
+	movl	8(%esp), %eax
+	movl	12(%esp), %edx
+	#xsetbv
+	.byte	0x0f,0x01,0xd1
+	ret
+	SET_SIZE(set_xcr)
 
 #endif	/* __i386 */
 
@@ -3086,8 +3135,8 @@ getcregs(struct cregs *crp)
 	movl	%eax, CREG_CR2(%edx)	/* cr2 */
 	movl	%cr3, %eax
 	movl	%eax, CREG_CR3(%edx)	/* cr3 */
-	testl	$X86_LARGEPAGE, x86_feature
-	jz	.nocr4
+	bt	$X86FSET_LARGEPAGE, x86_featureset
+	jnc	.nocr4
 	movl	%cr4, %eax
 	movl	%eax, CREG_CR4(%edx)	/* cr4 */
 	jmp	.skip
@@ -4242,22 +4291,6 @@ ftrace_interrupt_enable(ftrace_icookie_t cookie)
 
 #endif	/* __i386 */
 #endif	/* __lint */
-
-#if defined (__lint)
-
-/*ARGSUSED*/
-void
-iommu_cpu_nop(void)
-{}
-
-#else /* __lint */
-
-	ENTRY(iommu_cpu_nop)
-	rep;	nop
-	ret
-	SET_SIZE(iommu_cpu_nop)
-
-#endif /* __lint */
 
 #if defined (__lint)
 

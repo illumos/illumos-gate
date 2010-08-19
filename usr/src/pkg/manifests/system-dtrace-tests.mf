@@ -1894,9 +1894,8 @@ $(i386_ONLY)file path=opt/SUNWdtrt/tst/i86xpv/xdt/tst.memenable.ksh mode=0444
 $(i386_ONLY)file path=opt/SUNWdtrt/tst/i86xpv/xdt/tst.schedargs.ksh mode=0444
 $(i386_ONLY)file path=opt/SUNWdtrt/tst/i86xpv/xdt/tst.schedenable.ksh \
     mode=0444
-legacy pkg=SUNWdtrt arch=$(ARCH) category=internal \
+legacy pkg=SUNWdtrt category=internal \
     desc="DTrace Test Suite Internal Distribution" \
-    hotline="Contact the DTrace discussion forum" name="DTrace Test Suite" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    hotline="Contact the DTrace discussion forum" name="DTrace Test Suite"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

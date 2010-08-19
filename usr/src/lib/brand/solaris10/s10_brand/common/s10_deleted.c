@@ -204,12 +204,26 @@ s10_lwp_sema_wait(sysret_t *rval, void *sp)
 	    sp, NULL, 0));
 }
 
+int
+s10_chmod(sysret_t *rval, const char *name, mode_t mode)
+{
+	return (__systemcall(rval, SYS_fchmodat + 1024,
+	    AT_FDCWD, name, mode, 0));
+}
+
+int
+s10_fchmod(sysret_t *rval, int filedes, mode_t mode)
+{
+	return (__systemcall(rval, SYS_fchmodat + 1024,
+	    filedes, NULL, mode, 0));
+}
+
 static int
 s10_fchownat(sysret_t *rval,
-    int fd, const char *name, uid_t uid, gid_t gid, int flags)
+    int fd, const char *name, uid_t uid, gid_t gid, int flag)
 {
 	return (__systemcall(rval, SYS_fchownat + 1024,
-	    fd, name, uid, gid, flags));
+	    fd, name, uid, gid, flag));
 }
 
 int
@@ -231,6 +245,27 @@ s10_fchown(sysret_t *rval, int filedes, uid_t uid, gid_t gid)
 {
 	return (__systemcall(rval, SYS_fchownat + 1024,
 	    filedes, NULL, uid, gid, 0));
+}
+
+int
+s10_mkdir(sysret_t *rval, const char *dname, int dmode)
+{
+	return (__systemcall(rval, SYS_mkdirat + 1024,
+	    AT_FDCWD, dname, dmode));
+}
+
+int
+s10_mknod(sysret_t *rval, const char *fname, int fmode, dev_t dev)
+{
+	return (__systemcall(rval, SYS_mknodat + 1024,
+	    AT_FDCWD, fname, fmode, dev));
+}
+
+int
+s10_link(sysret_t *rval, const char *path1, const char *path2)
+{
+	return (__systemcall(rval, SYS_linkat + 1024,
+	    AT_FDCWD, path1, AT_FDCWD, path2, 0));
 }
 
 static int
@@ -267,6 +302,20 @@ s10_rename(sysret_t *rval, const char *oldname, const char *newname)
 {
 	return (__systemcall(rval, SYS_renameat + 1024,
 	    AT_FDCWD, oldname, AT_FDCWD, newname));
+}
+
+int
+s10_symlink(sysret_t *rval, const char *path1, const char *path2)
+{
+	return (__systemcall(rval, SYS_symlinkat +  1024,
+	    path1, AT_FDCWD, path2));
+}
+
+int
+s10_readlink(sysret_t *rval, const char *path, char *buf, size_t bufsize)
+{
+	return (__systemcall(rval, SYS_readlinkat +  1024,
+	    AT_FDCWD, path, buf, bufsize));
 }
 
 static int
@@ -409,7 +458,8 @@ s10_xmknod(sysret_t *rval, int version, const char *path,
 #else
 	if (version != _MKNOD_VER)
 		return (EINVAL);
-	return (__systemcall(rval, SYS_mknod + 1024, path, mode, dev));
+	return (__systemcall(rval, SYS_mknodat + 1024,
+	    AT_FDCWD, path, mode, dev));
 #endif
 }
 

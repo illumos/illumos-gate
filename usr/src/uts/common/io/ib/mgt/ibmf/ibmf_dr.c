@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 /*
  * This file implements the Directed Route (DR) loopback support in IBMF.
@@ -31,6 +29,8 @@
 
 #include <sys/ib/mgt/ibmf/ibmf_impl.h>
 #include <sys/ib/mgt/ib_mad.h>
+
+#define	MELLANOX_VENDOR	0x15b3
 
 extern int ibmf_trace_level;
 
@@ -67,10 +67,12 @@ ibmf_i_check_for_loopback(ibmf_msg_impl_t *msgimplp, ibmf_msg_cb_t msg_cb,
 	 * its sweep with loopback DR MADs.
 	 * This ibmf workaround does the loopback without passing the MAD
 	 * into the transport layer.
+	 * We should really check a property of the hardware to determine
+	 * whether or not an IB HCA can "hear" itself rather than
+	 * checking for specific HCAs or vendor of HCAs.
 	 */
 	if ((dr_hdr->MgmtClass == MAD_MGMT_CLASS_SUBN_DIRECT_ROUTE) &&
-	    (dr_hdr->HopCount == 0) && (cip->ci_vendor_id == 0x15b3) &&
-	    ((cip->ci_device_id == 0x5a44) || (cip->ci_device_id == 0x6278))) {
+	    (dr_hdr->HopCount == 0) && (cip->ci_vendor_id == MELLANOX_VENDOR)) {
 		if (msg_cb == NULL) {
 			blocking = B_TRUE;
 		} else {

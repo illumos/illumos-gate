@@ -1186,7 +1186,8 @@ static int undi_probe(struct dev *dev, struct pci_device *pci)
  * this list.
  */
 static struct pci_id undi_nics[] = {
-	/* PCI_ROM(0x0000, 0x0000, "undi", "UNDI adaptor"), */
+	PCI_ROM(0x10de, 0x0057, "ck804", "nVidia Corporation CK804 Ethernet"),
+	PCI_ROM(0x10de, 0x0373, "mcp55", "nVidia Corporation MCP55 Ethernet")
 };
 
 struct pci_driver undi_driver = {

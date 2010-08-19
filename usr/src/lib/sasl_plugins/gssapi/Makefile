@@ -1,7 +1,14 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include		../Makefile.subdirs
+
+all install: THIRDPARTYLICENSE
+
+THIRDPARTYLICENSE: gssapi.c
+	$(SED) -e '/GSSAPI SASL plugin/,/^$$/ p' -e 'd' gssapi.c > $@
+
+CLOBBERFILES += THIRDPARTYLICENSE
+
+include $(SRC)/lib/Makefile.targ

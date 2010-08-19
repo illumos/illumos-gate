@@ -69,6 +69,18 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	uint32_t auditing = AU_AUDITING();
 	char startchar;
 
+	if (filemode & (FSEARCH|FEXEC)) {
+		/*
+		 * Must be one or the other and neither FREAD nor FWRITE
+		 * Must not be any of FAPPEND FCREAT FTRUNC FXATTR FXATTRDIROPEN
+		 * XXX: Should these just be silently ignored?
+		 */
+		if ((filemode & (FREAD|FWRITE)) ||
+		    (filemode & (FSEARCH|FEXEC)) == (FSEARCH|FEXEC) ||
+		    (filemode & (FAPPEND|FCREAT|FTRUNC|FXATTR|FXATTRDIROPEN)))
+			return (set_errno(EINVAL));
+	}
+
 	if (startfd == AT_FDCWD) {
 		/*
 		 * Regular open()
@@ -99,9 +111,8 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	 * Handle __openattrdirat() requests
 	 */
 	if (filemode & FXATTRDIROPEN) {
-		if (auditing && (startvp != NULL))
+		if (auditing && startvp != NULL)
 			audit_setfsat_path(1);
-
 		if (error = lookupnameat(fname, seg, FOLLOW,
 		    NULLVPP, &vp, startvp))
 			return (set_errno(error));
@@ -188,12 +199,12 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	}
 
 noxattr:
-	if ((filemode & (FREAD|FWRITE|FXATTRDIROPEN)) != 0) {
+	if ((filemode & (FREAD|FWRITE|FSEARCH|FEXEC|FXATTRDIROPEN)) != 0) {
 		if ((filemode & (FNONBLOCK|FNDELAY)) == (FNONBLOCK|FNDELAY))
 			filemode &= ~FNDELAY;
 		error = falloc((vnode_t *)NULL, filemode, &fp, &fd);
 		if (error == 0) {
-			if (auditing && (startvp != NULL))
+			if (auditing && startvp != NULL)
 				audit_setfsat_path(1);
 			/*
 			 * Last arg is a don't-care term if
@@ -259,13 +270,13 @@ out:
 	return (set_errno(error));
 }
 
-#define	OPENMODE32(fmode)	((int)((fmode)-FOPEN))
+#define	OPENMODE32(fmode)	(((fmode) & (FSEARCH | FEXEC))? \
+				    (fmode) : (fmode) - FOPEN)
 #define	OPENMODE64(fmode)	(OPENMODE32(fmode) | FOFFMAX)
-#define	OPENMODEATTRDIR		FXATTRDIROPEN
 #ifdef _LP64
 #define	OPENMODE(fmode)		OPENMODE64(fmode)
 #else
-#define	OPENMODE		OPENMODE32
+#define	OPENMODE(fmode)		OPENMODE32(fmode)
 #endif
 
 /*

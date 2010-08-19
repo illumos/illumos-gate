@@ -145,12 +145,7 @@ driver name=mega_sas class=scsi \
 file path=kernel/drv/$(ARCH64)/mega_sas group=sys
 file path=kernel/drv/mega_sas group=sys
 file path=kernel/drv/mega_sas.conf group=sys
-legacy pkg=SUNWmegasas arch=$(ARCH) category=system \
-    desc="LSI MegaSAS RAID Controller HBA Driver" \
-    hotline="Please contact your local service provider" \
-    name="LSI MegaSAS RAID Controller HBA Driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-license uts/common/io/mega_sas/THIRDPARTYLICENSE \
-    license=uts/common/io/mega_sas/THIRDPARTYLICENSE
+legacy pkg=SUNWmegasas desc="LSI MegaSAS RAID Controller HBA Driver" \
+    name="LSI MegaSAS RAID Controller HBA Driver"
+license usr/src/uts/common/io/mega_sas/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/mega_sas/THIRDPARTYLICENSE

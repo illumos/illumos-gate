@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <strings.h>
@@ -80,7 +79,9 @@ fmd_fmri_present(nvlist_t *nvl)
 	uint_t hcnprs;
 
 	err = nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcprs, &hcnprs);
-	err |= nvlist_lookup_string(hcprs[0], FM_FMRI_HC_NAME, &nm);
+	if (err != 0)
+		return (fmd_fmri_set_errno(EINVAL));
+	err = nvlist_lookup_string(hcprs[0], FM_FMRI_HC_NAME, &nm);
 	if (err != 0)
 		return (fmd_fmri_set_errno(EINVAL));
 
@@ -102,7 +103,9 @@ fmd_fmri_replaced(nvlist_t *nvl)
 	uint_t hcnprs;
 
 	err = nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcprs, &hcnprs);
-	err |= nvlist_lookup_string(hcprs[0], FM_FMRI_HC_NAME, &nm);
+	if (err != 0)
+		return (fmd_fmri_set_errno(EINVAL));
+	err = nvlist_lookup_string(hcprs[0], FM_FMRI_HC_NAME, &nm);
 	if (err != 0)
 		return (fmd_fmri_set_errno(EINVAL));
 

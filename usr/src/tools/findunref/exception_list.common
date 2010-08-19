@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -74,16 +71,6 @@
 # built or used during a nightly.
 #
 */tools
-
-#
-# Ignore license files. This should be temporary, and these lines
-# should be removed once we start generating the opensolaris.org
-# deliverables from the nightly gate builds.
-#
-*/COPYING*
-*/LICENSE*
-*/THIRDPARTYLICENSE*
-*/OPENSOLARIS.LICENSE
 
 #
 # Ignore file list generators

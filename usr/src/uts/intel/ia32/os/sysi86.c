@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -29,8 +28,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -170,7 +167,7 @@ sysi86(short cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 			break;
 		}
 		fpsetcw((uint16_t)arg2, (uint32_t)arg3);
-		return (fp_kind == __FP_SSE ? 1 : 0);
+		return ((fp_kind & __FP_SSE) ? 1 : 0);
 
 	/* real time clock management commands */
 

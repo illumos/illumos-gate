@@ -138,12 +138,16 @@ lib32:	$(MACH_COMP) $(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 		exit 1; \
 	fi
 
+$(MACHLIBS):	$(MACH_COMP)
+
 lib64:	$(MACH_COMP) $(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS64)
 	@if $(ELFDUMP) -r $(MACH64)/$(DYNLIB) | $(GREP) -w environ ; then \
 		$(ECHO) "Error: Invalid reference to environ" ; \
 		$(ECHO) "Error: See comments in port/gen/env_data.c" ; \
 		exit 1; \
 	fi
+
+$(MACHLIBS64):	$(MACH_COMP)
 
 $(VARIANTLIBS): FRC
 	@cd $(@D); pwd; VERSION='$(VERSION)' $(MAKE) $(@F)

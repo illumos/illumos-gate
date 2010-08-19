@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -140,7 +139,6 @@ smb_sdrc_t
 smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 {
 	struct open_param *op = &sr->arg.open;
-	uint8_t			OplockLevel;
 	uint8_t			DirFlag;
 	smb_attr_t		attr;
 	smb_node_t		*node;
@@ -184,6 +182,8 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		op->fqi.fq_dnode = op->dir->f_node;
 	}
 
+	op->op_oplock_levelII = B_TRUE;
+
 	status = smb_common_open(sr);
 
 	if (status != NT_STATUS_SUCCESS)
@@ -192,22 +192,6 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
 	case STYPE_PRINTQ:
-		switch (op->op_oplock_level) {
-		case SMB_OPLOCK_EXCLUSIVE:
-			OplockLevel = 1;
-			break;
-		case SMB_OPLOCK_BATCH:
-			OplockLevel = 2;
-			break;
-		case SMB_OPLOCK_LEVEL_II:
-			OplockLevel = 3;
-			break;
-		case SMB_OPLOCK_NONE:
-		default:
-			OplockLevel = 0;
-			break;
-		}
-
 		if (op->create_options & FILE_DELETE_ON_CLOSE)
 			smb_ofile_set_delete_on_close(sr->fid_ofile);
 
@@ -220,7 +204,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		}
 
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
-		    OplockLevel,
+		    op->op_oplock_level,
 		    sr->smb_fid,
 		    op->action_taken,
 		    0,	/* EaErrorOffset */

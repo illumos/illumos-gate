@@ -107,9 +107,8 @@ file path=usr/share/src/tcp_wrappers/update.c
 file path=usr/share/src/tcp_wrappers/update.c.org
 file path=usr/share/src/tcp_wrappers/vfprintf.c
 file path=usr/share/src/tcp_wrappers/workarounds.c
-legacy pkg=SUNWtcpdS arch=$(ARCH) category=system \
+legacy pkg=SUNWtcpdS \
     desc="tcpd - access control facility for internet services (Source)" \
-    hotline="Please contact your local service provider" \
-    name="tcpd - access control facility for internet services (Source)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-license cmd/tcpd/THIRDPARTYLICENSE license=cmd/tcpd/THIRDPARTYLICENSE
+    name="tcpd - access control facility for internet services (Source)"
+license usr/src/cmd/tcpd/THIRDPARTYLICENSE \
+    license=usr/src/cmd/tcpd/THIRDPARTYLICENSE

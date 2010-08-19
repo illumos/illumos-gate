@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -59,6 +58,10 @@ ld_exit(Ofl_desc *ofl)
 	 */
 	dbg_cleanup();
 
+	/* If any ERR_GUIDANCE messages were issued, add a summary */
+	if (ofl->ofl_guideflags & FLG_OFG_ISSUED)
+		ld_eprintf(ofl, ERR_GUIDANCE, MSG_INTL(MSG_GUIDE_SUMMARY));
+
 	return (1);
 }
 
@@ -79,7 +82,7 @@ static Signals signals[] = {
 	{ SIGTERM,	SIG_IGN },
 	{ 0,		0 } };
 
-static Ofl_desc	*Ofl = 0;
+static Ofl_desc	*Ofl = NULL;
 
 /*
  * Define our signal handler.
@@ -114,7 +117,7 @@ handler(int sig, siginfo_t *sip, void *utp)
 	 * Thus we catch all bus errors and hope we can decode a better error.
 	 */
 	if ((sig == SIGBUS) && sip && Ofl->ofl_name) {
-		eprintf(Ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INTERRUPT),
+		ld_eprintf(Ofl, ERR_FATAL, MSG_INTL(MSG_FIL_INTERRUPT),
 		    Ofl->ofl_name, strerror(sip->si_errno));
 	}
 	/*

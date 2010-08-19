@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -163,11 +162,11 @@ extern "C" {
  * which need mutexes to support priority inheritance/ceiling.
  */
 #if defined(_XPG6)
-#define	_POSIX_THREAD_PRIO_INHERIT	200112L
-#define	_POSIX_THREAD_PRIO_PROTECT	200112L
+#define	_POSIX_THREAD_PRIO_INHERIT		200112L
+#define	_POSIX_THREAD_PRIO_PROTECT		200112L
 #else
-#define	_POSIX_THREAD_PRIO_INHERIT	1
-#define	_POSIX_THREAD_PRIO_PROTECT	1
+#define	_POSIX_THREAD_PRIO_INHERIT		1
+#define	_POSIX_THREAD_PRIO_PROTECT		1
 #endif
 
 #ifndef _POSIX_VDISABLE
@@ -300,10 +299,6 @@ extern int fattach(int, const char *);
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int fchdir(int);
 extern int fchown(int, uid_t, gid_t);
-#if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
-	defined(__EXTENSIONS__)
-extern int fchownat(int, const char *, uid_t, gid_t, int);
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int fchroot(int);
@@ -464,10 +459,6 @@ extern ssize_t readlink(const char *_RESTRICT_KYWD, char *_RESTRICT_KYWD,
 	defined(__EXTENSIONS__)
 extern int rename(const char *, const char *);
 #endif /* (!defined(__XOPEN_OR_POSIX) || (defined(_XPG3)... */
-#if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
-	defined(__EXTENSIONS__)
-extern int renameat(int, const char *, int, const char *);
-#endif /* !defined(__XOPEN_OR_POSIX || defined(_ATFILE_SOURCE)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int resolvepath(const char *, char *, size_t);
 /* per RFC 3542; This is also defined in netdb.h */
@@ -541,10 +532,6 @@ extern char *ttyname(int);
 extern useconds_t ualarm(useconds_t, useconds_t);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 extern int unlink(const char *);
-#if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
-	defined(__EXTENSIONS__)
-extern int unlinkat(int, const char *, int);
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int usleep(useconds_t);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
@@ -558,10 +545,23 @@ extern ssize_t write(int, const void *, size_t);
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern void yield(void);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
+
 #if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
 	defined(__EXTENSIONS__)
+	/* || defined(_XPG7) */
 extern int faccessat(int, const char *, int, int);
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
+extern int fchownat(int, const char *, uid_t, gid_t, int);
+extern int linkat(int, const char *, int, const char *, int);
+extern ssize_t readlinkat(int, const char *_RESTRICT_KYWD,
+	char *_RESTRICT_KYWD, size_t);
+extern int renameat(int, const char *, int, const char *);
+extern int symlinkat(const char *, int, const char *);
+extern int unlinkat(int, const char *, int);
+#endif	/* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+extern int get_nprocs(void);
+extern int get_nprocs_conf(void);
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 /* transitional large file interface versions */
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
@@ -627,10 +627,6 @@ extern int fattach();
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int fchdir();
 extern int fchown();
-#if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
-	defined(__EXTENSIONS__)
-extern int fchownat();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int fchroot();
@@ -765,10 +761,6 @@ extern ssize_t readlink();
 #if (!defined(__XOPEN_OR_POSIX) || (defined(_XPG3) && !defined(_XPG4))) || \
 	defined(__EXTENSIONS__)
 extern int rename();
-#if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
-	defined(__EXTENSIONS__)
-extern int renameat();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
 #endif /* (!defined(__XOPEN_OR_POSIX) || (defined(_XPG3)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int resolvepath();
@@ -842,10 +834,6 @@ extern char *ttyname();
 extern useconds_t ualarm();
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 extern int unlink();
-#if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
-	defined(__EXTENSIONS__)
-extern int unlinkat();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int usleep();
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
@@ -859,10 +847,22 @@ extern ssize_t write();
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern void yield();
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
+
 #if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
 	defined(__EXTENSIONS__)
+	/* || defined(_XPG7) */
 extern int faccessat();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
+extern int fchownat();
+extern int linkat();
+extern ssize_t readlinkat();
+extern int renameat();
+extern int symlinkat();
+extern int unlinkat();
+#endif	/* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+extern int get_nprocs();
+extern int get_nprocs_conf();
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 /* transitional large file interface versions */
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \

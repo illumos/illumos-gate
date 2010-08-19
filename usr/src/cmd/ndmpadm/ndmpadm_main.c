@@ -104,7 +104,8 @@ static char *prop_table[] = {
 	"backup-quarantine",
 	"restore-quarantine",
 	"overwrite-quarantine",
-	"zfs-force-override"
+	"zfs-force-override",
+	"drive-type"
 };
 
 #define	NDMPADM_NPROP	(sizeof (prop_table) / sizeof (prop_table[0]))

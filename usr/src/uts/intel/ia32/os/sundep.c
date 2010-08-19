@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -858,7 +857,7 @@ lwp_installctx(klwp_t *lwp)
 	 * sep_save zeros the sysenter stack pointer msr; sep_restore sets
 	 * it to the lwp's kernel stack pointer (kstktop).
 	 */
-	if (x86_feature & X86_SEP) {
+	if (is_x86_feature(x86_featureset, X86FSET_SEP)) {
 #if defined(__amd64)
 		caddr_t kstktop = (caddr_t)lwp->lwp_regs;
 #elif defined(__i386)

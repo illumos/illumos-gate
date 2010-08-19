@@ -68,20 +68,11 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/nxge group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/nxge.conf group=sys \
     original_name=SUNWnxge:platform/sun4v/kernel/drv/nxge.conf \
     preserve=renamenew
-$(i386_ONLY)legacy pkg=SUNWnxge arch=$(ARCH) category=system \
-    desc="Sun NIU 10Gb/1Gb leaf driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun NIU leaf driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-$(sparc_ONLY)legacy pkg=SUNWnxge.u arch=$(ARCH).sun4u category=system \
-    desc="Sun NIU 10Gb/1Gb driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun NIU leaf driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-$(sparc_ONLY)legacy pkg=SUNWnxge.v arch=$(ARCH).sun4v category=system \
-    desc="Sun NIU leaf driver" \
-    hotline="Please contact your local service provider" \
-    name="Sun NIU leaf driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+$(i386_ONLY)legacy pkg=SUNWnxge desc="Sun NIU 10Gb/1Gb leaf driver" \
+    name="Sun NIU leaf driver"
+$(sparc_ONLY)legacy pkg=SUNWnxge.u arch=$(ARCH).sun4u \
+    desc="Sun NIU 10Gb/1Gb driver" name="Sun NIU leaf driver"
+$(sparc_ONLY)legacy pkg=SUNWnxge.v arch=$(ARCH).sun4v \
+    desc="Sun NIU leaf driver" name="Sun NIU leaf driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

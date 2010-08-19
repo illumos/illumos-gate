@@ -242,9 +242,9 @@ mod_get_allprop(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 
 	for (prop = ptbl; prop->mpi_name != NULL; prop++) {
 		if (prop->mpi_name[0] == '\0' ||
-		    strcmp(prop->mpi_name, "mtu") == 0 ||
-		    strcmp(prop->mpi_name, "?") == 0)
+		    strcmp(prop->mpi_name, "?") == 0) {
 			continue;
+		}
 		nbytes = snprintf(pval, size, "%s %d %d", prop->mpi_name,
 		    prop->mpi_proto, prop_perm2const(prop));
 		size -= nbytes + 1;

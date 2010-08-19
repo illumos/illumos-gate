@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_MDB_MODAPI_H
 #define	_MDB_MODAPI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MDB Module API
@@ -164,6 +162,13 @@ typedef struct mdb_pipe {
 	size_t pipe_len;		/* Array length */
 } mdb_pipe_t;
 
+typedef struct mdb_object {
+	const char *obj_name;		/* name of object */
+	const char *obj_fullname;	/* full name of object */
+	uintptr_t obj_base;		/* base address of object */
+	uintptr_t obj_size;		/* in memory size of object in bytes */
+} mdb_object_t;
+
 extern int mdb_pwalk(const char *, mdb_walk_cb_t, void *, uintptr_t);
 extern int mdb_walk(const char *, mdb_walk_cb_t, void *);
 
@@ -210,6 +215,11 @@ extern ssize_t mdb_writevar(const void *, const char *);
 extern int mdb_lookup_by_name(const char *, GElf_Sym *);
 extern int mdb_lookup_by_obj(const char *, const char *, GElf_Sym *);
 extern int mdb_lookup_by_addr(uintptr_t, uint_t, char *, size_t, GElf_Sym *);
+
+typedef uintptr_t mdb_tid_t;
+typedef uint64_t mdb_reg_t;
+
+extern int mdb_getareg(mdb_tid_t, const char *, mdb_reg_t *);
 
 #define	MDB_OPT_SETBITS	1			/* Set specified flag bits */
 #define	MDB_OPT_CLRBITS	2			/* Clear specified flag bits */
@@ -271,6 +281,9 @@ extern void mdb_get_pipe(mdb_pipe_t *);
 extern void mdb_set_pipe(const mdb_pipe_t *);
 
 extern ssize_t mdb_get_xdata(const char *, void *, size_t);
+
+typedef int (*mdb_object_cb_t)(mdb_object_t *, void *);
+extern int mdb_object_iter(mdb_object_cb_t, void *);
 
 #define	MDB_STATE_IDLE		0	/* Target is idle (not running yet) */
 #define	MDB_STATE_RUNNING	1	/* Target is currently executing */

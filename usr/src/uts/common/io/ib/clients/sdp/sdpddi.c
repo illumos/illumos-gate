@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -55,10 +54,10 @@
 
 /*
  * This is a pseudo driver which creates an entry for /dev/sdp in the device
- * tree. A regular installation will end up modifying sock2path file announcing
- * support for sdp using AF_INET/SOCK_STREAM/PROTO_SDP parameters in socket
- * call. On a non IB hardware, following are the constraints within which
- * the sdp project operates. The sdpib driver which is the real driver
+ * tree. A regular installation will end up adding a file to sock2path.d
+ * announcing support for sdp using AF_INET/SOCK_STREAM/PROTO_SDP parameters in
+ * socket call. On a non IB hardware, following are the constraints within
+ * which the sdp project operates. The sdpib driver which is the real driver
  * (in terms of moving data) should not be loaded since it has dependency on
  * ibcm and ibtl modules which will be loaded in the memory. This will consume
  * precious memory and needs to be avoided. As a result the sdpib driver

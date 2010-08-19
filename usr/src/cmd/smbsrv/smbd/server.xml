@@ -64,7 +64,7 @@ file.
 	<!-- Must have idmap service started -->
 	<dependency name='idmap'
 	    grouping='require_all'
-	    restart_on='restart'
+	    restart_on='none'
 	    type='service'>
 		<service_fmri value='svc:/system/idmap:default'/>
 	</dependency>

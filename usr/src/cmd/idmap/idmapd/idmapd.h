@@ -142,25 +142,28 @@ typedef struct lookup_state {
 } lookup_state_t;
 
 #define	NLDAP_OR_MIXED(nm) \
-	(nm == IDMAP_NM_NLDAP || nm == IDMAP_NM_MIXED)
+	((nm) == IDMAP_NM_NLDAP || (nm) == IDMAP_NM_MIXED)
 #define	AD_OR_MIXED(nm) \
-	(nm == IDMAP_NM_AD || nm == IDMAP_NM_MIXED)
+	((nm) == IDMAP_NM_AD || (nm) == IDMAP_NM_MIXED)
+
+#define	PID_UID_OR_UNKNOWN(pidtype) \
+	((pidtype) == IDMAP_UID || (pidtype) == IDMAP_POSIXID)
+#define	PID_GID_OR_UNKNOWN(pidtype) \
+	((pidtype) == IDMAP_GID || (pidtype) == IDMAP_POSIXID)
 
 #define	NLDAP_OR_MIXED_MODE(pidtype, ls) \
-	((pidtype == IDMAP_UID && NLDAP_OR_MIXED(ls->nm_siduid)) || \
-	(pidtype == IDMAP_GID && NLDAP_OR_MIXED(ls->nm_sidgid)))
+	(NLDAP_MODE(pidtype, ls) || MIXED_MODE(pidtype, ls))
 #define	AD_OR_MIXED_MODE(pidtype, ls)\
-	((pidtype == IDMAP_UID && AD_OR_MIXED(ls->nm_siduid)) || \
-	(pidtype == IDMAP_GID && AD_OR_MIXED(ls->nm_sidgid)))
+	(AD_MODE(pidtype, ls) || MIXED_MODE(pidtype, ls))
 #define	NLDAP_MODE(pidtype, ls) \
-	((pidtype == IDMAP_UID && ls->nm_siduid == IDMAP_NM_NLDAP) || \
-	(pidtype == IDMAP_GID && ls->nm_sidgid == IDMAP_NM_NLDAP))
+	((PID_UID_OR_UNKNOWN(pidtype) && (ls)->nm_siduid == IDMAP_NM_NLDAP) || \
+	(PID_GID_OR_UNKNOWN(pidtype) && (ls)->nm_sidgid == IDMAP_NM_NLDAP))
 #define	AD_MODE(pidtype, ls) \
-	((pidtype == IDMAP_UID && ls->nm_siduid == IDMAP_NM_AD) || \
-	(pidtype == IDMAP_GID && ls->nm_sidgid == IDMAP_NM_AD))
+	((PID_UID_OR_UNKNOWN(pidtype) && (ls)->nm_siduid == IDMAP_NM_AD) || \
+	(PID_GID_OR_UNKNOWN(pidtype) && (ls)->nm_sidgid == IDMAP_NM_AD))
 #define	MIXED_MODE(pidtype, ls) \
-	((pidtype == IDMAP_UID && ls->nm_siduid == IDMAP_NM_MIXED) || \
-	(pidtype == IDMAP_GID && ls->nm_sidgid == IDMAP_NM_MIXED))
+	((PID_UID_OR_UNKNOWN(pidtype) && (ls)->nm_siduid == IDMAP_NM_MIXED) || \
+	(PID_GID_OR_UNKNOWN(pidtype) && (ls)->nm_sidgid == IDMAP_NM_MIXED))
 
 
 typedef struct list_cb_data {

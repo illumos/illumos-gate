@@ -117,8 +117,13 @@ typedef struct devi_bus_priv {
 	devi_port_t port_down;
 } devi_bus_priv_t;
 
+#if defined(__x86)
 struct iommulib_unit;
 typedef struct iommulib_unit *iommulib_handle_t;
+struct iommulib_nex;
+typedef struct iommulib_nex *iommulib_nexhandle_t;
+#endif
+
 typedef uint8_t	ndi_flavor_t;
 struct ddi_hp_cn_handle;
 
@@ -258,11 +263,12 @@ struct dev_info  {
 	struct i_ddi_prop_dyn	*devi_prop_dyn_driver;	/* prop_op */
 	struct i_ddi_prop_dyn	*devi_prop_dyn_parent;	/* bus_prop_op */
 
+#if defined(__x86)
 	/* For x86 (Intel and AMD) IOMMU support */
 	void		*devi_iommu;
-
-	/* IOMMU handle */
 	iommulib_handle_t	devi_iommulib_handle;
+	iommulib_nexhandle_t	devi_iommulib_nex_handle;
+#endif
 
 	/* Generic callback mechanism */
 	ddi_cb_t	*devi_cb_p;
@@ -596,7 +602,7 @@ struct dev_info  {
 #define	DEVI_ATTACHED_CHILDREN	0x00000004 /* attached all existing children */
 #define	DEVI_BRANCH_HELD	0x00000008 /* branch rooted at this dip held */
 #define	DEVI_NO_BIND		0x00000010 /* prevent driver binding */
-#define	DEVI_REGISTERED_DEVID	0x00000020 /* device registered a devid */
+#define	DEVI_CACHED_DEVID	0x00000020 /* devid cached in devid cache */
 #define	DEVI_PHCI_SIGNALS_VHCI	0x00000040 /* pHCI ndi_devi_exit signals vHCI */
 #define	DEVI_REBIND		0x00000080 /* post initchild driver rebind */
 #define	DEVI_RETIRED		0x00000100 /* device is retired */

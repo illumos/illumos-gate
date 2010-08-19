@@ -75,6 +75,7 @@
 #include <sys/reboot.h>
 #include <sys/hpet.h>
 #include <sys/apic_common.h>
+#include <sys/apic_timer.h>
 
 /*
  *	Local Function Prototypes
@@ -86,8 +87,6 @@ static void apic_init_intr(void);
  */
 static int	apic_probe(void);
 static int	apic_getclkirq(int ipl);
-static uint_t	apic_calibrate(volatile uint32_t *addr,
-    uint16_t *pit_ticks_adj);
 static void	apic_init(void);
 static void	apic_picinit(void);
 static int	apic_post_cpu_start(void);
@@ -371,7 +370,7 @@ apic_init_intr(void)
 	if (nlvt >= 5) {
 		/* Enable performance counter overflow interrupt */
 
-		if ((x86_feature & X86_MSR) != X86_MSR)
+		if (!is_x86_feature(x86_featureset, X86FSET_MSR))
 			apic_enable_cpcovf_intr = 0;
 		if (apic_enable_cpcovf_intr) {
 			if (apic_cpcovf_vect == 0) {

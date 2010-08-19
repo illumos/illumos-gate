@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -224,7 +223,7 @@ set_platform_defaults(void)
 	set_max_mmu_ctxdoms();
 
 	/* set OPL threshold for compressed dumps */
-	dump_plat_mincpu = DUMP_PLAT_SUN4U_OPL_MINCPU;
+	dump_plat_mincpu_default = DUMP_PLAT_SUN4U_OPL_MINCPU;
 }
 
 /*

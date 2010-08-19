@@ -247,7 +247,7 @@ kcf_fips140_integrity_check()
 {
 	door_arg_t darg;
 	door_handle_t ldh;
-	kcf_door_arg_t *kda = { 0 }, *rkda;
+	kcf_door_arg_t *kda = { 0 }, *rkda = NULL;
 	int ret = 0;
 
 	KCF_FRMWRK_DEBUG(1, ("Starting IC check"));
@@ -294,7 +294,7 @@ kcf_fips140_integrity_check()
 	KCF_FRMWRK_DEBUG(1, ("Integrity Check succeeds.\n"));
 
 exit:
-	if (rkda != kda)
+	if ((rkda != NULL) && (rkda != kda))
 		kmem_free(rkda, darg.rsize);
 
 	kmem_free(kda, sizeof (kcf_door_arg_t));

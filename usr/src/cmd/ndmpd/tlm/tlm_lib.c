@@ -45,6 +45,7 @@
 #include <pthread.h>
 #include "tlm.h"
 #include "tlm_proto.h"
+#include <ndmpd_prop.h>
 #include <sys/mtio.h>
 #include <sys/mnttab.h>
 #include <sys/mntent.h>
@@ -1015,6 +1016,7 @@ probe_scsi(void)
 	char *p;
 	int lun = 0;
 	int sid = 0;
+	char *drive_type;
 
 	/* Initialize the scsi adapter link */
 	sa->sa_link_head.sl_next = &sa->sa_link_head;
@@ -1050,18 +1052,35 @@ probe_scsi(void)
 		NDMP_LOG(LOG_DEBUG,
 		    "Tape directory read error %s", SCSI_TAPE_DIR);
 	} else {
+		drive_type = ndmpd_get_prop(NDMP_DRIVE_TYPE);
+
+		if ((strcasecmp(drive_type, "sysv") != 0) &&
+		    (strcasecmp(drive_type, "bsd") != 0)) {
+			NDMP_LOG(LOG_ERR, "Invalid ndmpd/drive-type value. "
+			    "Valid values are 'sysv' and 'bsd'.");
+			return (-1);
+		}
+
 		while ((dp = readdir(dirp)) != NULL) {
 			if ((strcmp(dp->d_name, ".") == 0) ||
 			    (strcmp(dp->d_name, "..") == 0))
 				continue;
 
 			/* Skip special modes */
-			if (strpbrk(dp->d_name, "bchlmu") != 0)
+			if (strpbrk(dp->d_name, "chlmu") != NULL)
 				continue;
 
 			/* Pick the non-rewind device */
 			if (strchr(dp->d_name, 'n') == NULL)
 				continue;
+
+			if (strcasecmp(drive_type, "sysv") == 0) {
+				if (strchr(dp->d_name, 'b') != NULL)
+					continue;
+			} else if (strcasecmp(drive_type, "bsd") == 0) {
+				if (strchr(dp->d_name, 'b') == NULL)
+					continue;
+			}
 
 			sid = atoi(dp->d_name);
 
@@ -1168,111 +1187,6 @@ tlm_ioctl(int fd, int cmd, void *data)
 /*
  * Checkpoint or snapshot calls
  */
-
-/*
- * Create a snapshot on the volume
- */
-int
-chkpnt_backup_prepare(char *volname, char *jname, boolean_t recursive)
-{
-	char chk_name[PATH_MAX];
-	char *p;
-	int rv;
-
-	if (!volname || !*volname)
-		return (-1);
-
-	/* Should also return -1 if checkpoint not enabled */
-
-	/* Remove the leading slash */
-	p = volname;
-	while (*p == '/')
-		p++;
-
-	(void) snprintf(chk_name, PATH_MAX, "%s@%s", p, jname);
-
-	(void) mutex_lock(&zlib_mtx);
-	if ((rv = zfs_snapshot(zlibh, chk_name, recursive, NULL))
-	    == -1) {
-		if (errno == EEXIST) {
-			(void) mutex_unlock(&zlib_mtx);
-			return (0);
-		}
-		NDMP_LOG(LOG_DEBUG,
-		    "chkpnt_backup_prepare: %s failed (err=%d): %s",
-		    chk_name, errno, libzfs_error_description(zlibh));
-		(void) mutex_unlock(&zlib_mtx);
-		return (rv);
-	}
-	(void) mutex_unlock(&zlib_mtx);
-	return (0);
-}
-
-/*
- * Remove the 'backup' snapshot if backup was successful
- */
-int
-chkpnt_backup_successful(char *volname, char *jname, boolean_t recursive,
-    int *zfs_err)
-{
-	char chk_name[PATH_MAX];
-	zfs_handle_t *zhp;
-	zfs_type_t ztype;
-	int err;
-	char *p;
-
-	if (zfs_err)
-		*zfs_err = 0;
-
-	if (!volname || !*volname)
-		return (-1);
-
-	/* Should also return -1 if checkpoint not enabled */
-
-	/* Remove the leading slash */
-	p = volname;
-	while (*p == '/')
-		p++;
-
-	if (recursive) {
-		ztype = ZFS_TYPE_VOLUME | ZFS_TYPE_FILESYSTEM;
-	} else {
-		(void) snprintf(chk_name, PATH_MAX, "%s@%s", p, jname);
-		p = chk_name;
-		ztype = ZFS_TYPE_SNAPSHOT;
-	}
-
-	(void) mutex_lock(&zlib_mtx);
-	if ((zhp = zfs_open(zlibh, p, ztype)) == NULL) {
-		NDMP_LOG(LOG_DEBUG, "chkpnt_backup_successful: open %s failed",
-		    p);
-		(void) mutex_unlock(&zlib_mtx);
-		return (-1);
-	}
-
-	if (recursive) {
-		err = zfs_destroy_snaps(zhp, jname, B_TRUE);
-	} else {
-		err = zfs_destroy(zhp, B_TRUE);
-	}
-
-	if (err) {
-		NDMP_LOG(LOG_ERR, "%s (recursive destroy: %d): %d; %s; %s",
-		    p,
-		    recursive,
-		    libzfs_errno(zlibh),
-		    libzfs_error_action(zlibh),
-		    libzfs_error_description(zlibh));
-
-		if (zfs_err)
-			*zfs_err = err;
-	}
-
-	zfs_close(zhp);
-	(void) mutex_unlock(&zlib_mtx);
-
-	return (0);
-}
 
 /*
  * Get the snapshot creation time

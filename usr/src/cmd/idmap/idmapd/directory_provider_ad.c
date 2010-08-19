@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -36,6 +35,7 @@
 #include <stdlib.h>
 #include <netdb.h>
 #include <libadutils.h>
+#include <libuutil.h>
 #include <note.h>
 #include <assert.h>
 #include "directory.h"
@@ -43,7 +43,6 @@
 #include "idmapd.h"
 #include <rpcsvc/idmap_prot.h>
 #include "directory_server_impl.h"
-#include "miscutils.h"
 
 /*
  * Information required by the function that handles the callback from LDAP
@@ -85,7 +84,7 @@ void
 maybe_add_to_list(const char **list, const char *s)
 {
 	for (; *list != NULL; list++) {
-		if (strcaseeq(*list, s))
+		if (uu_strcaseeq(*list, s))
 			return;
 	}
 	*list = s;
@@ -117,7 +116,7 @@ copy_and_augment_attr_list(char **req_list, int req_list_len)
 		 * Note that you must update MAX_EXTRA_ATTRS above if you
 		 * add to this list.
 		 */
-		if (strcaseeq(a, "x-sun-canonicalName")) {
+		if (uu_strcaseeq(a, "x-sun-canonicalName")) {
 			maybe_add_to_list(new_list, "sAMAccountName");
 			continue;
 		}
@@ -222,7 +221,7 @@ directory_provider_ad_get(
 
 			vw[0] = name;
 
-			if (streq(domain, "")) {
+			if (uu_streq(domain, "")) {
 				vw[1] = default_domain;
 			} else {
 				vw[1] = domain;
@@ -427,7 +426,7 @@ directory_provider_ad_cb1(
 			ldap_value_free_len(bv);
 			if (de != NULL)
 				goto err;
-		} else if (strcaseeq(a, "x-sun-canonicalName")) {
+		} else if (uu_strcaseeq(a, "x-sun-canonicalName")) {
 			bv = ldap_get_values_len(ld, msg, "sAMAccountName");
 			if (bv != NULL) {
 				int n = ldap_count_values_len(bv);
@@ -445,7 +444,7 @@ directory_provider_ad_cb1(
 						goto err;
 				}
 			}
-		} else if (strcaseeq(a, "x-sun-provider")) {
+		} else if (uu_strcaseeq(a, "x-sun-provider")) {
 			const char *provider = "LDAP-AD";
 			de = str_list_dav(val, &provider, 1);
 		}
@@ -492,7 +491,7 @@ bv_list_dav(directory_values_rpc *lvals, struct berval **bv)
 
 	for (i = 0; i < n; i++) {
 		dav[i].directory_value_rpc_val =
-		    memdup(bv[i]->bv_val, bv[i]->bv_len);
+		    uu_memdup(bv[i]->bv_val, bv[i]->bv_len);
 		if (dav[i].directory_value_rpc_val == NULL)
 			goto nomem;
 		dav[i].directory_value_rpc_len = bv[i]->bv_len;

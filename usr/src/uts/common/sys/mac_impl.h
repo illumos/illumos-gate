@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_MAC_IMPL_H
@@ -400,6 +399,7 @@ extern uint_t i_mac_impl_count;
  */
 struct mac_impl_s {
 	krwlock_t		mi_rw_lock;
+	list_node_t		mi_node;
 	char			mi_name[LIFNAMSIZ];	/* WO */
 	uint32_t		mi_state_flags;
 	void			*mi_driver;		/* Driver private, WO */
@@ -494,6 +494,7 @@ struct mac_impl_s {
 	uint32_t		mi_margin;		/* mi_rw_lock */
 	uint_t			mi_sdu_min;		/* mi_rw_lock */
 	uint_t			mi_sdu_max;		/* mi_rw_lock */
+	uint_t			mi_sdu_multicast;	/* mi_rw_lock */
 
 	/*
 	 * Cache of factory MAC addresses provided by the driver. If
@@ -694,10 +695,11 @@ extern int mac_dbg;
 typedef struct mac_prop_info_state_s {
 	uint8_t			pr_flags;
 	uint8_t			pr_perm;
+	uint8_t			pr_errno;
 	void			*pr_default;
 	size_t			pr_default_size;
-	uint8_t			pr_default_status;
 	mac_propval_range_t	*pr_range;
+	uint_t			pr_range_cur_count;
 } mac_prop_info_state_t;
 
 #define	MAC_PROTECT_ENABLED(mcip, type) \

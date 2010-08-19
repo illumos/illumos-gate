@@ -132,14 +132,14 @@ sctp_send_shutdown(sctp_t *sctp, int rexmit)
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
 	/* Send the shutdown and restart the timer */
-	sctp_set_iplen(sctp, sendmp, fp->ixa);
-	(void) conn_ip_output(sendmp, fp->ixa);
+	sctp_set_iplen(sctp, sendmp, fp->sf_ixa);
+	(void) conn_ip_output(sendmp, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 
 done:
 	sctp->sctp_state = SCTPS_SHUTDOWN_SENT;
 	SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
-	    sctp->sctp_current->rto);
+	    sctp->sctp_current->sf_rto);
 }
 
 int
@@ -211,8 +211,8 @@ sctp_shutdown_complete(sctp_t *sctp)
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	sctp_set_iplen(sctp, scmp, sctp->sctp_current->ixa);
-	(void) conn_ip_output(scmp, sctp->sctp_current->ixa);
+	sctp_set_iplen(sctp, scmp, sctp->sctp_current->sf_ixa);
+	(void) conn_ip_output(scmp, sctp->sctp_current->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
@@ -405,11 +405,11 @@ sctp_send_shutdown_ack(sctp_t *sctp, sctp_faddr_t *fp, boolean_t crwsd)
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	sctp_set_iplen(sctp, samp, fp->ixa);
-	(void) conn_ip_output(samp, fp->ixa);
+	sctp_set_iplen(sctp, samp, fp->sf_ixa);
+	(void) conn_ip_output(samp, fp->sf_ixa);
 	BUMP_LOCAL(sctp->sctp_opkts);
 
 dotimer:
 	sctp->sctp_state = SCTPS_SHUTDOWN_ACK_SENT;
-	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->sf_rto);
 }

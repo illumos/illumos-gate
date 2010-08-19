@@ -854,6 +854,7 @@ ehci_halt_hs_qh(
 
 	/* Remove this qh from the HCD's view, but do not reclaim it */
 	ehci_remove_qh(ehcip, pp, B_FALSE);
+	ehci_toggle_scheduler_on_pipe(ehcip);
 
 	/*
 	 * Wait for atleast one SOF, just in case the HCD is in the
@@ -871,6 +872,7 @@ ehci_halt_hs_qh(
 
 	/* Insert this QH back into the HCD's view */
 	ehci_insert_qh(ehcip, ph);
+	ehci_toggle_scheduler_on_pipe(ehcip);
 }
 
 
@@ -894,6 +896,7 @@ ehci_halt_fls_ctrl_and_bulk_qh(
 
 	/* Remove this qh from the HCD's view, but do not reclaim it */
 	ehci_remove_qh(ehcip, pp, B_FALSE);
+	ehci_toggle_scheduler_on_pipe(ehcip);
 
 	/*
 	 * Wait for atleast one SOF, just in case the HCD is in the
@@ -921,6 +924,7 @@ ehci_halt_fls_ctrl_and_bulk_qh(
 
 	/* Insert this QH back into the HCD's view */
 	ehci_insert_qh(ehcip, ph);
+	ehci_toggle_scheduler_on_pipe(ehcip);
 }
 
 

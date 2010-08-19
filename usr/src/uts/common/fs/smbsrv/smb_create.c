@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -199,6 +198,7 @@ smb_common_create(smb_request_t *sr)
 	} else {
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 	}
+	op->op_oplock_levelII = B_FALSE;
 
 	status = smb_common_open(sr);
 

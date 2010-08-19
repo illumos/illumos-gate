@@ -169,7 +169,8 @@ retry:
 
 	/* Create the link-local address */
 	bzero(&lifr.lifr_addr, sizeof (lifr.lifr_addr));
-	(void) plen2mask(PREFIXLEN_LINKLOCAL, AF_INET6, &lifr.lifr_addr);
+	(void) plen2mask(PREFIXLEN_LINKLOCAL, AF_INET6,
+	    (struct sockaddr *)&lifr.lifr_addr);
 	if ((err = ioctl(iph->iph_sock6, SIOCSLIFNETMASK, (caddr_t)&lifr)) < 0)
 		goto fail;
 	if (addr->ipadm_intfidlen == 0) {

@@ -43,6 +43,7 @@
 #include <pwd.h>
 #include <signal.h>
 #include <dirent.h>
+#include <dlfcn.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
@@ -137,7 +138,6 @@ static boolean_t smb_shr_is_dot_or_dotdot(const char *);
 /*
  * sharemgr functions
  */
-static void *smb_shr_sa_loadall(void *);
 static void smb_shr_sa_loadgrp(sa_group_t);
 static uint32_t smb_shr_sa_load(sa_share_t, sa_resource_t);
 static uint32_t smb_shr_sa_loadbyname(char *);
@@ -309,30 +309,6 @@ smb_shr_sa_exit(void)
 }
 
 /*
- * Launches a thread to populate the share cache by share information
- * stored in sharemgr
- */
-int
-smb_shr_load(void)
-{
-	pthread_t load_thr;
-	pthread_attr_t tattr;
-	int rc;
-
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&load_thr, &tattr, smb_shr_sa_loadall, 0);
-	(void) pthread_attr_destroy(&tattr);
-
-	(void) mutex_lock(&smb_shr_exec_mtx);
-	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
-	    MAXPATHLEN);
-	(void) mutex_unlock(&smb_shr_exec_mtx);
-
-	return (rc);
-}
-
-/*
  * Return the total number of shares
  */
 int
@@ -447,6 +423,9 @@ smb_shr_add(smb_share_t *si)
 
 			/* If path is ZFS, add the .zfs/shares/<share> entry. */
 			smb_shr_zfs_add(si);
+
+			if ((si->shr_flags & SMB_SHRF_DFSROOT) != 0)
+				dfs_namespace_load(si->shr_name);
 
 			return (NERR_Success);
 		}
@@ -571,6 +550,7 @@ smb_shr_rename(char *from_name, char *to_name)
 
 	bcopy(from_si, &to_si, sizeof (smb_share_t));
 	(void) strlcpy(to_si.shr_name, to_name, sizeof (to_si.shr_name));
+
 
 	/* If path is ZFS, rename the .zfs/shares/<share> entry. */
 	smb_shr_zfs_rename(from_si, &to_si);
@@ -1394,8 +1374,10 @@ smb_shr_cache_addent(smb_share_t *si)
 
 	(void) smb_strlwr(si->shr_name);
 
-	if ((si->shr_type & STYPE_IPC) == 0)
+	if (((si->shr_type & STYPE_PRINTQ) == 0) &&
+	    (si->shr_type & STYPE_IPC) == 0)
 		si->shr_type = STYPE_DISKTREE;
+
 	si->shr_type |= smb_shr_is_special(cache_ent->shr_name);
 
 	if (smb_shr_is_admin(cache_ent->shr_name))
@@ -1449,16 +1431,23 @@ smb_shr_cache_freent(HT_ITEM *item)
  * Load shares from sharemgr
  */
 /*ARGSUSED*/
-static void *
-smb_shr_sa_loadall(void *args)
+void *
+smb_shr_load(void *args)
 {
 	sa_handle_t handle;
 	sa_group_t group, subgroup;
 	char *gstate;
 	boolean_t gdisabled;
 
-	if ((handle = smb_shr_sa_enter()) == NULL)
+	(void) mutex_lock(&smb_shr_exec_mtx);
+	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
+	    MAXPATHLEN);
+	(void) mutex_unlock(&smb_shr_exec_mtx);
+
+	if ((handle = smb_shr_sa_enter()) == NULL) {
+		syslog(LOG_ERR, "smb_shr_load: load failed");
 		return (NULL);
+	}
 
 	for (group = sa_get_group(handle, NULL);
 	    group != NULL; group = sa_get_next_group(group)) {
@@ -1480,7 +1469,6 @@ smb_shr_sa_loadall(void *args)
 		}
 
 	}
-
 	smb_shr_sa_exit();
 	return (NULL);
 }
@@ -1561,9 +1549,6 @@ smb_shr_sa_load(sa_share_t share, sa_resource_t resource)
 		    si.shr_name, status);
 		return (status);
 	}
-
-	if ((si.shr_flags & SMB_SHRF_DFSROOT) != 0)
-		dfs_namespace_load(si.shr_name);
 
 	return (NERR_Success);
 }
@@ -2431,6 +2416,8 @@ smb_shr_encode(smb_share_t *si, nvlist_t **nvlist)
 
 	if ((csc = smb_shr_sa_csc_name(si)) != NULL)
 		rc |= nvlist_add_string(smb, SHOPT_CSC, csc);
+
+	rc |= nvlist_add_uint32(smb, "type", si->shr_type);
 
 	rc |= nvlist_add_nvlist(share, "smb", smb);
 	rc |= nvlist_add_nvlist(list, si->shr_name, share);

@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	misc.a
@@ -33,18 +32,19 @@ include ../../Makefile.lib
 
 LIBLINKS = 
 SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python2.4/vendor-packages/solaris
+ROOTLIBDIR=	$(ROOT)/usr/lib/python2.6/vendor-packages/solaris
 PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYSOLFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
+PYTHON=		$(PYTHON_26)
 
 C99MODE=        -xc99=%all
 C99LMODE=       -Xc99=%all
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lsec -lidmap -lpython2.4
+LDLIBS +=	-lc -lsec -lidmap -lpython2.6
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I/usr/include/python2.4
+CPPFLAGS +=	-I/usr/include/python2.6
 
 .KEEP_STATE:
 

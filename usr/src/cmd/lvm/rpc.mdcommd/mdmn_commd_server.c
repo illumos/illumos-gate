@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -786,6 +785,7 @@ mdmn_init_set(set_t setno, int todo)
 		size_t	filesize;
 		caddr_t	addr;
 		char table_name[32];
+		struct flock	fl;
 
 		filesize = (sizeof (md_mn_mct_t));
 		(void) snprintf(table_name, sizeof (table_name), "%s%d",
@@ -800,6 +800,53 @@ mdmn_init_set(set_t setno, int todo)
 		if (fd < 0) {
 			commd_debug(MD_MMV_MISC,
 			    "init_set: Can't open MCT\n");
+			return (-1);
+		}
+		/*
+		 * Ensure that we are the only process that has this file
+		 * mapped. If another instance of rpc.mdcommd has beaten us
+		 * then we display the failing process and attempt to terminate
+		 * it. The next call of this routine should establish us as
+		 * the only rpc.mdcommd on the system.
+		 */
+		(void) memset(&fl, 0, sizeof (fl));
+		fl.l_type = F_WRLCK;
+		fl.l_whence = SEEK_SET;
+		fl.l_start = 0;
+		fl.l_len = filesize + 1;
+
+		if (fcntl(fd, F_SETLK, &fl) == -1) {
+			commd_debug(MD_MMV_SYSLOG,
+			    "init_set: Cannot lock MCT '%s'\n", table_name);
+			if (fcntl(fd, F_GETLK, &fl) != -1) {
+				commd_debug(MD_MMV_SYSLOG, "rpc.mdcommd:"
+				    "Process %d holds lock\n", fl.l_pid);
+				(void) close(fd);
+			} else {
+				commd_debug(MD_MMV_SYSLOG, "rpc.mdcommd:"
+				    "F_GETLK failed\n");
+				(void) close(fd);
+				return (-1);
+			}
+
+			/*
+			 * Try to terminate other mdcommd process so that we
+			 * can establish ourselves.
+			 */
+			if (sigsend(P_PID, fl.l_pid, 0) == 0) {
+				if (sigsend(P_PID, fl.l_pid, SIGKILL) < 0) {
+					commd_debug(MD_MMV_SYSLOG,
+					    "rpc.mdcommd:"
+					    "SIGKILL of %d failed\n", fl.l_pid);
+				} else {
+					commd_debug(MD_MMV_SYSLOG,
+					    "rpc.mdcommd:"
+					    "Process %d killed\n", fl.l_pid);
+				}
+			} else {
+				commd_debug(MD_MMV_SYSLOG, "rpc.mdcommd:"
+				    "Process %d not killable\n", fl.l_pid);
+			}
 			return (-1);
 		}
 		/*

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -389,6 +388,9 @@ topo_node_lookup(tnode_t *pnode, const char *name, topo_instance_t inst)
 	int h;
 	tnode_t *node;
 	topo_nodehash_t *nhp;
+
+	topo_dprintf(pnode->tn_hdl, TOPO_DBG_MODSVC,
+	    "topo_node_lookup: looking for '%s' instance %d\n", name, inst);
 
 	topo_node_lock(pnode);
 	for (nhp = topo_list_next(&pnode->tn_children); nhp != NULL;

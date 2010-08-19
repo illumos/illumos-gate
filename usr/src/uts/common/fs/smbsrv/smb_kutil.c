@@ -501,6 +501,7 @@ smb_llist_constructor(
 	ll->ll_count = 0;
 	ll->ll_wrop = 0;
 	ll->ll_deleteq_count = 0;
+	ll->ll_flushing = B_FALSE;
 }
 
 /*
@@ -567,6 +568,11 @@ smb_llist_flush(smb_llist_t *ll)
 	smb_dtor_t    *dtor;
 
 	mutex_enter(&ll->ll_mutex);
+	if (ll->ll_flushing) {
+		mutex_exit(&ll->ll_mutex);
+		return;
+	}
+	ll->ll_flushing = B_TRUE;
 
 	dtor = list_head(&ll->ll_deleteq);
 	while (dtor != NULL) {
@@ -583,6 +589,7 @@ smb_llist_flush(smb_llist_t *ll)
 		mutex_enter(&ll->ll_mutex);
 		dtor = list_head(&ll->ll_deleteq);
 	}
+	ll->ll_flushing = B_FALSE;
 
 	mutex_exit(&ll->ll_mutex);
 }
@@ -2346,4 +2353,112 @@ smb_srqueue_update(smb_srqueue_t *srq, smb_kstat_utilization_t *kd)
 	scalehrtime(&kd->ku_rtime);
 	scalehrtime(&kd->ku_wlentime);
 	scalehrtime(&kd->ku_wtime);
+}
+
+void
+smb_threshold_init(smb_cmd_threshold_t *ct, char *cmd, int threshold,
+    int timeout)
+{
+	bzero(ct, sizeof (smb_cmd_threshold_t));
+	mutex_init(&ct->ct_mutex, NULL, MUTEX_DEFAULT, NULL);
+	ct->ct_cmd = cmd;
+	ct->ct_threshold = threshold;
+	ct->ct_event = smb_event_create(timeout);
+	ct->ct_event_id = smb_event_txid(ct->ct_event);
+
+	if (smb_threshold_debug) {
+		cmn_err(CE_NOTE, "smb_threshold_init[%s]: threshold (%d), "
+		    "timeout (%d)", cmd, threshold, timeout);
+	}
+}
+
+/*
+ * This function must be called prior to SMB_SERVER_STATE_STOPPING state
+ * so that ct_event can be successfully removed from the event list.
+ * It should not be called when the server mutex is held or when the
+ * server is removed from the server list.
+ */
+void
+smb_threshold_fini(smb_cmd_threshold_t *ct)
+{
+	smb_event_destroy(ct->ct_event);
+	mutex_destroy(&ct->ct_mutex);
+	bzero(ct, sizeof (smb_cmd_threshold_t));
+}
+
+/*
+ * This threshold mechanism can be used to limit the number of simultaneous
+ * requests, which serves to limit the stress that can be applied to the
+ * service and also allows the service to respond to requests before the
+ * client times out and reports that the server is not responding,
+ *
+ * If the number of requests exceeds the threshold, new requests will be
+ * stalled until the number drops back to the threshold.  Stalled requests
+ * will be notified as appropriate, in which case 0 will be returned.
+ * If the timeout expires before the request is notified, a non-zero errno
+ * value will be returned.
+ *
+ * To avoid a flood of messages, the message rate is throttled as well.
+ */
+int
+smb_threshold_enter(smb_cmd_threshold_t *ct)
+{
+	int	rc;
+
+	mutex_enter(&ct->ct_mutex);
+	if (ct->ct_active_cnt >= ct->ct_threshold && ct->ct_event != NULL) {
+		atomic_inc_32(&ct->ct_blocked_cnt);
+
+		if (smb_threshold_debug) {
+			cmn_err(CE_NOTE, "smb_threshold_enter[%s]: blocked "
+			    "(blocked ops: %u, inflight ops: %u)",
+			    ct->ct_cmd, ct->ct_blocked_cnt, ct->ct_active_cnt);
+		}
+
+		mutex_exit(&ct->ct_mutex);
+
+		if ((rc = smb_event_wait(ct->ct_event)) != 0) {
+			if (rc == ECANCELED)
+				return (rc);
+
+			mutex_enter(&ct->ct_mutex);
+			if (ct->ct_active_cnt >= ct->ct_threshold) {
+
+				if ((ct->ct_error_cnt %
+				    SMB_THRESHOLD_REPORT_THROTTLE) == 0) {
+					cmn_err(CE_NOTE, "%s: server busy: "
+					    "threshold %d exceeded)",
+					    ct->ct_cmd, ct->ct_threshold);
+				}
+
+				atomic_inc_32(&ct->ct_error_cnt);
+				mutex_exit(&ct->ct_mutex);
+				return (rc);
+			}
+
+			mutex_exit(&ct->ct_mutex);
+
+		}
+
+		mutex_enter(&ct->ct_mutex);
+		atomic_dec_32(&ct->ct_blocked_cnt);
+		if (smb_threshold_debug) {
+			cmn_err(CE_NOTE, "smb_threshold_enter[%s]: resumed "
+			    "(blocked ops: %u, inflight ops: %u)", ct->ct_cmd,
+			    ct->ct_blocked_cnt, ct->ct_active_cnt);
+		}
+	}
+
+	atomic_inc_32(&ct->ct_active_cnt);
+	mutex_exit(&ct->ct_mutex);
+	return (0);
+}
+
+void
+smb_threshold_exit(smb_cmd_threshold_t *ct, smb_server_t *sv)
+{
+	mutex_enter(&ct->ct_mutex);
+	atomic_dec_32(&ct->ct_active_cnt);
+	mutex_exit(&ct->ct_mutex);
+	smb_event_notify(sv, ct->ct_event_id);
 }

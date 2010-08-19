@@ -18,21 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /* Copyright (c) 1981 Regents of the University of California */
 
 #ifndef _EX_H
 #define	_EX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -604,7 +601,7 @@ void vroll(int);
 void vrollR(int);
 void vnline(unsigned char *);
 void noerror();
-void getline(line);
+void getaline(line);
 void viprintf();
 void gettmode(void);
 void setterm(unsigned char *);

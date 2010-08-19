@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SPC3_TYPES_H
 #define	_SPC3_TYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -161,6 +158,8 @@ typedef enum spc3_cmd {
 	SPC3_CMD_CHANGE_DEFINITION = 0x40,
 	SPC3_CMD_WRITE_SAME = 0x41,
 	SPC3_CMD_WRITE_SAME10 = 0x41,
+	SPC3_CMD_UNMAP = 0x42,
+	SPC3_CMD_UNMAP10 = 0x42,
 	SPC3_CMD_READ_SUBCHANNEL = SCMD_READ_SUBCHANNEL,
 	SPC3_CMD_READ_TOC = SCMD_READ_TOC,
 	SPC3_CMD_REPORT_DENSITY_SUPPORT = SCMD_REPORT_DENSITIES,

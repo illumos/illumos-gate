@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -208,7 +207,7 @@ _locore_start(struct boot_syscalls *sysp, ulong_t rsi, struct bootops *bop)
 	/*
 	 * (We just assert this works by virtue of being here) 
 	 */
-	orl	$X86_CPUID, x86_feature(%rip)
+	bts	$X86FSET_CPUID, x86_featureset(%rip)
 
 	/*
 	 * mlsetup() gets called with a struct regs as argument, while
@@ -623,7 +622,7 @@ have_cpuid:
 	/*
 	 * cpuid instruction present
 	 */
-	orl	$X86_CPUID, x86_feature
+	bts	$X86FSET_CPUID, x86_featureset	/ Just to set; Ignore the CF
 	movl	$0, %eax
 	cpuid
 
@@ -2340,7 +2339,7 @@ cpu_vendor:
 
 	.globl	CyrixInstead
 
-	.globl	x86_feature
+	.globl	x86_featureset
 	.globl	x86_type
 	.globl	x86_vendor
 #endif

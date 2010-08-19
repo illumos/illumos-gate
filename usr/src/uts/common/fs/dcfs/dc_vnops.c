@@ -395,11 +395,16 @@ dc_frlock(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
     cred_t *cr, caller_context_t *ctp)
 {
 	struct dcnode *dp = VTODC(vp);
+	int error;
+	struct vattr vattr;
 
 	/*
 	 * If file is being mapped, disallow frlock.
 	 */
-	if (dp->dc_mapcnt > 0)
+	vattr.va_mask = AT_MODE;
+	if (error = VOP_GETATTR(dp->dc_subvp, &vattr, 0, cr, ctp))
+		return (error);
+	if (dp->dc_mapcnt > 0 && MANDLOCK(vp, vattr.va_mode))
 		return (EAGAIN);
 
 	return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr, ctp));

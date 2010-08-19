@@ -43,10 +43,7 @@ driver name=audiocmi \
     alias=pci13f6,111
 file path=kernel/drv/$(ARCH64)/audiocmi group=sys
 file path=kernel/drv/audiocmi group=sys
-legacy pkg=SUNWaudiocmi arch=$(ARCH) category=system \
-    desc="SunOS audio device driver for C-Media 8738" \
-    hotline="Please contact your local service provider" \
-    name="C-Media 8738 Family Audio Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWaudiocmi desc="SunOS audio device driver for C-Media 8738" \
+    name="C-Media 8738 Family Audio Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

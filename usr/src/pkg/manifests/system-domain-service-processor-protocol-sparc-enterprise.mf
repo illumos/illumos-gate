@@ -67,16 +67,12 @@ file path=usr/platform/SUNW,SPARC-Enterprise/lib/dscp.ppp.options group=sys \
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so.1
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/llib-ldscp.ln group=sys
 file path=usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp mode=0755
-legacy pkg=SUNWdscpr.u arch=$(ARCH).sun4u category=system \
+legacy pkg=SUNWdscpr.u arch=$(ARCH).sun4u \
     desc="Domain to Service Processor Communications Protocol (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Domain to Service Processor Communications Protocol (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWdscpu.u arch=$(ARCH).sun4u category=system \
+    name="Domain to Service Processor Communications Protocol (Root)"
+legacy pkg=SUNWdscpu.u arch=$(ARCH).sun4u \
     desc="Domain to Service Processor Communications Protocol (Kvm)" \
-    hotline="Please contact your local service provider" \
-    name="Domain to Service Processor Communications Protocol (Kvm)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Domain to Service Processor Communications Protocol (Kvm)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so \

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -32,7 +31,7 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<ctype.h>
-#include	<libelf.h>
+#include	<_libelf.h>
 #include	<link.h>
 #include	<stdarg.h>
 #include	<unistd.h>
@@ -595,12 +594,29 @@ archive(const char *file, int fd, Elf *elf, uint_t flags,
 		size_t		cnt;
 		char		index[MAXNDXSIZE];
 		size_t		offset = 0, _offset = 0;
+		const char	*fmt_arsym1, *fmt_arsym2;
 
 		/*
-		 * Print out all the symbol entries.
+		 * Print out all the symbol entries. The format width used
+		 * corresponds to whether the archive symbol table is 32
+		 * or 64-bit. We see them via Elf_Arhdr as size_t values
+		 * in either case with no information loss (see the comments
+		 * in libelf/getarsym.c) so this is done simply to improve
+		 * the user presentation.
 		 */
-		dbg_print(0, MSG_INTL(MSG_ARCHIVE_SYMTAB));
-		dbg_print(0, MSG_INTL(MSG_ARCHIVE_FIELDS));
+		if (_elf_getarsymwordsize(elf) == 8) {
+			dbg_print(0, MSG_INTL(MSG_ARCHIVE_SYMTAB_64));
+			dbg_print(0, MSG_INTL(MSG_ARCHIVE_FIELDS_64));
+
+			fmt_arsym1 = MSG_ORIG(MSG_FMT_ARSYM1_64);
+			fmt_arsym2 = MSG_ORIG(MSG_FMT_ARSYM2_64);
+		} else {
+			dbg_print(0, MSG_INTL(MSG_ARCHIVE_SYMTAB_32));
+			dbg_print(0, MSG_INTL(MSG_ARCHIVE_FIELDS_32));
+
+			fmt_arsym1 = MSG_ORIG(MSG_FMT_ARSYM1_32);
+			fmt_arsym2 = MSG_ORIG(MSG_FMT_ARSYM2_32);
+		}
 
 		for (cnt = 0; cnt < ptr; cnt++, arsym++) {
 			/*
@@ -637,16 +653,15 @@ archive(const char *file, int fd, Elf *elf, uint_t flags,
 			(void) snprintf(index, MAXNDXSIZE,
 			    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(cnt));
 			if (arsym->as_off)
-				dbg_print(0, MSG_ORIG(MSG_FMT_ARSYM1), index,
-				    /* LINTED */
-				    (int)arsym->as_off, arhdr ? arhdr->ar_name :
+				dbg_print(0, fmt_arsym1, index,
+				    EC_XWORD(arsym->as_off),
+				    arhdr ? arhdr->ar_name :
 				    MSG_INTL(MSG_STR_UNKNOWN), (arsym->as_name ?
 				    demangle(arsym->as_name, flags) :
 				    MSG_INTL(MSG_STR_NULL)));
 			else
-				dbg_print(0, MSG_ORIG(MSG_FMT_ARSYM2), index,
-				    /* LINTED */
-				    (int)arsym->as_off);
+				dbg_print(0, fmt_arsym2, index,
+				    EC_XWORD(arsym->as_off));
 		}
 
 		if (_elf)

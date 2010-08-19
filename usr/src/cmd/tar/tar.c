@@ -438,13 +438,8 @@ static void delete_target(int fd, char *comp, char *namep);
 static void doDirTimes(char *name, timestruc_t modTime);
 static void done(int n);
 static void dorep(char *argv[]);
-#ifdef	_iBCS2
-static void dotable(char *argv[], int cnt);
-static void doxtract(char *argv[], int cnt);
-#else
 static void dotable(char *argv[]);
 static void doxtract(char *argv[]);
-#endif
 static int tar_chdir(const char *path);
 static int is_directory(char *name);
 static int has_dot_dot(char *name);
@@ -494,10 +489,6 @@ static int build_dblock(const char *, const char *, const char,
 	const int filetype, const struct stat *, const dev_t, const char *);
 static unsigned int hash(char *str);
 
-#ifdef	_iBCS2
-static void initarg(char *argv[], char *file);
-static char *nextarg();
-#endif
 static blkcnt_t kcheck(char *kstr);
 static off_t bsrch(char *s, int n, off_t l, off_t h);
 static void onintr(int sig);
@@ -567,16 +558,12 @@ static	struct stat stbuf;
 
 static	char	*myname;
 static	int	checkflag = 0;
-#ifdef	_iBCS2
-static	int	Fileflag;
-char    *sysv3_env;
-#endif
 static	int	Xflag, Fflag, iflag, hflag, Bflag, Iflag;
 static	int	rflag, xflag, vflag, tflag, mt, svmt, cflag, mflag, pflag;
 static	int	uflag;
-static	int	eflag, errflag, qflag;
+static	int	errflag;
 static	int	oflag;
-static	int	bflag, kflag, Aflag;
+static	int	bflag, Aflag;
 static 	int	Pflag;			/* POSIX conformant archive */
 static	int	Eflag;			/* Allow files greater than 8GB */
 static	int	atflag;			/* traverse extended attributes */
@@ -628,7 +615,6 @@ static	char	archive[] = "archive0=";
 static	char	*Xfile;
 static	char	*usefile;
 static	char	tfname[1024];
-static	char	*Filefile;
 
 static	int	mulvol;		/* multi-volume option selected */
 static	blkcnt_t	blocklim; /* number of blocks to accept per volume */
@@ -730,10 +716,6 @@ main(int argc, char *argv[])
 	pid_t		pid;
 	int		wstat;
 
-#ifdef	_iBCS2
-	int	tbl_cnt = 0;
-	sysv3_env = getenv("SYSV3");
-#endif
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
@@ -809,15 +791,7 @@ main(int argc, char *argv[])
 			usefile = *argv++;
 			break;
 		case 'F':
-#ifdef	_iBCS2
-			if (sysv3_env) {
-				assert_string(*argv, gettext(
-				    "tar: 'F' requires a file name\n"));
-				Filefile = *argv++;
-				Fileflag++;
-			} else
-#endif	/*  _iBCS2 */
-				Fflag++;
+			Fflag++;
 			break;
 		case 'c':
 			cflag++;
@@ -891,16 +865,6 @@ main(int argc, char *argv[])
 			bflag++;
 			nblock = bcheck(*argv++);
 			break;
-		case 'q':
-			qflag++;
-			break;
-		case 'k':
-			assert_string(*argv, gettext(
-			    "tar: size value must be specified with 'k' "
-			    "function modifier\n"));
-			kflag++;
-			blocklim = kcheck(*argv++);
-			break;
 		case 'n':		/* not a magtape (instead of 'k') */
 			NotTape++;	/* assume non-magtape */
 			break;
@@ -908,13 +872,7 @@ main(int argc, char *argv[])
 			linkerrok++;
 			break;
 		case 'e':
-#ifdef	_iBCS2
-			/* If sysv3 IS set, don't be as verbose */
-			if (!sysv3_env)
-#endif	/* _iBCS2 */
-				errflag++;
-			eflag++;
-			break;
+			errflag++;
 		case 'o':
 			oflag++;
 			break;
@@ -953,14 +911,6 @@ main(int argc, char *argv[])
 			usage();
 		}
 
-#ifdef	_iBCS2
-	if (Xflag && Fileflag) {
-		(void) fprintf(stderr, gettext(
-		"tar: specify only one of X or F.\n"));
-		usage();
-	}
-#endif	/*  _iBCS2 */
-
 	if (!rflag && !xflag && !tflag)
 		usage();
 	if ((rflag && xflag) || (xflag && tflag) || (rflag && tflag)) {
@@ -986,7 +936,7 @@ main(int argc, char *argv[])
 		    "the global zone.\n"));
 		usage();
 	}
-	if (cflag && *argv == NULL && Filefile == NULL)
+	if (cflag && *argv == NULL)
 		fatal(gettext("Missing filenames"));
 	if (usefile == NULL)
 		fatal(gettext("device argument required"));
@@ -1166,14 +1116,6 @@ main(int argc, char *argv[])
 					Iflag = 1;
 					argv[argc] = argv[argc+2];
 					build_table(include_tbl, argv[++argc]);
-#ifdef	_iBCS2
-					if (Fileflag) {
-						(void) fprintf(stderr, gettext(
-						"tar: only one of I or F.\n"));
-						usage();
-					}
-#endif	/*  _iBCS2 */
-
 				}
 			}
 		}
@@ -1199,18 +1141,9 @@ main(int argc, char *argv[])
 				(void) printf(gettext(
 				    "Suppressing absolute pathnames.\n"));
 
-#ifdef	_iBCS2
-			doxtract(argv, tbl_cnt);
-#else
 			doxtract(argv);
-#endif
 		} else if (tflag)
-
-#ifdef	_iBCS2
-			dotable(argv, tbl_cnt);
-#else
 			dotable(argv);
-#endif
 	}
 	else
 		usage();
@@ -1224,39 +1157,19 @@ main(int argc, char *argv[])
 static void
 usage(void)
 {
-
-#ifdef	_iBCS2
-	if (sysv3_env) {
-		(void) fprintf(stderr, gettext(
+	(void) fprintf(stderr, gettext(
 #if defined(O_XATTR)
 #if defined(_PC_SATTR_ENABLED)
-		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw@/[0-7]][bfFk][X...] "
+	    "Usage: tar {c|r|t|u|x}[BDeEFhilmnopPTvw@/[0-7]][bf][X...] "
 #else
-		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw@[0-7]][bfFk][X...] "
+	    "Usage: tar {c|r|t|u|x}[BDeEFhilmnopPTvw@[0-7]][bf][X...] "
 #endif	/* _PC_SATTR_ENABLED */
 #else
-		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw[0-7]][bfFk][X...] "
+	    "Usage: tar {c|r|t|u|x}[BDeEFhilmnopPTvw[0-7]][bf][X...] "
 #endif	/* O_XATTR */
-		"[j|z|Z] "
-		"[blocksize] [tarfile] [filename] [size] [exclude-file...] "
-		"{file | -I include-file | -C directory file}...\n"));
-	} else
-#endif	/* _iBCS2 */
-	{
-		(void) fprintf(stderr, gettext(
-#if defined(O_XATTR)
-#if defined(_PC_SATTR_ENABLED)
-		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw@/[0-7]][bfk][X...] "
-#else
-		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw@[0-7]][bfk][X...] "
-#endif	/* _PC_SATTR_ENABLED */
-#else
-		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw[0-7]][bfk][X...] "
-#endif	/* O_XATTR */
-		"[j|z|Z] "
-		"[blocksize] [tarfile] [size] [exclude-file...] "
-		"{file | -I include-file | -C directory file}...\n"));
-	}
+	    "[j|z|Z] "
+	    "[blocksize] [tarfile] [size] [exclude-file...] "
+	    "{file | -I include-file | -C directory file}...\n"));
 	done(1);
 }
 
@@ -1274,7 +1187,6 @@ dorep(char *argv[])
 	char wdir[PATH_MAX+2], tempdir[PATH_MAX+2], *parent;
 	char file[PATH_MAX*2], origdir[PATH_MAX+1];
 	FILE *fp = (FILE *)NULL;
-	FILE *ff = (FILE *)NULL;
 	int archtype;
 	int ret;
 
@@ -1352,19 +1264,6 @@ dorep(char *argv[])
 			    K((blocklim - 1)), K(nblock));
 	}
 
-#ifdef	_iBCS2
-	if (Fileflag) {
-		if (Filefile != NULL) {
-			if ((ff = fopen(Filefile, "r")) == NULL)
-				vperror(0, "%s", Filefile);
-		} else {
-			(void) fprintf(stderr, gettext(
-			    "tar: F requires a file name.\n"));
-			usage();
-		}
-	}
-#endif	/*  _iBCS2 */
-
 	/*
 	 * Save the original directory before it gets
 	 * changed.
@@ -1376,15 +1275,8 @@ dorep(char *argv[])
 
 	(void) strcpy(wdir, origdir);
 
-	while ((*argv || fp || ff) && !term) {
+	while ((*argv || fp) && !term) {
 		if (fp || (strcmp(*argv, "-I") == 0)) {
-#ifdef	_iBCS2
-			if (Fileflag) {
-				(void) fprintf(stderr, gettext(
-				"tar: only one of I or F.\n"));
-				usage();
-			}
-#endif	/*  _iBCS2 */
 			if (fp == NULL) {
 				if (*++argv == NULL)
 					fatal(gettext(
@@ -1402,14 +1294,6 @@ dorep(char *argv[])
 					*p = 0;
 			}
 		} else if ((strcmp(*argv, "-C") == 0) && argv[1]) {
-#ifdef	_iBCS2
-			if (Fileflag) {
-				(void) fprintf(stderr, gettext(
-				"tar: only one of F or C\n"));
-				usage();
-			}
-#endif	/*  _iBCS2 */
-
 			if (tar_chdir(*++argv) < 0)
 				vperror(0, gettext(
 				    "can't change directories to %s"), *argv);
@@ -1417,18 +1301,6 @@ dorep(char *argv[])
 				(void) getcwd(wdir, (sizeof (wdir)));
 			argv++;
 			continue;
-#ifdef	_iBCS2
-		} else if (Fileflag && (ff != NULL)) {
-			if ((fgets(file, PATH_MAX-1, ff)) == NULL) {
-				(void) fclose(ff);
-				ff = NULL;
-				continue;
-			} else {
-				cp = cp2 = file;
-				if (p = strchr(cp2, '\n'))
-					*p = 0;
-			}
-#endif	/*  _iBCS2 */
 		} else
 			cp = cp2 = strcpy(file, *argv++);
 
@@ -2348,16 +2220,6 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 
 		/* correctly handle end of volume */
 		while (mulvol && tapepos + blocks + 1 > blocklim) {
-			/* file won't fit */
-			if (eflag) {
-				if (blocks <= blocklim) {
-					newvol();
-					break;
-				}
-				(void) fprintf(stderr, gettext(
-				    "tar: Single file cannot fit on volume\n"));
-				done(3);
-			}
 			/* split if floppy has some room and file is large */
 			if (((blocklim - tapepos) >= EXTMIN) &&
 			    ((blocks + 1) >= blocklim/10)) {
@@ -2456,16 +2318,6 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 		tomodes(&stbuf);
 
 		while (mulvol && tapepos + blocks + 1 > blocklim) {
-			if (eflag) {
-				if (blocks <= blocklim) {
-					newvol();
-					break;
-				}
-				(void) fprintf(stderr, gettext(
-				    "tar: Single file cannot fit on volume\n"));
-				done(3);
-			}
-
 			if (((blocklim - tapepos) >= EXTMIN) &&
 			    ((blocks + 1) >= blocklim/10)) {
 				splitfile(longname, infile, name,
@@ -2518,16 +2370,6 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 		tomodes(&stbuf);
 
 		while (mulvol && tapepos + blocks + 1 > blocklim) {
-			if (eflag) {
-				if (blocks <= blocklim) {
-					newvol();
-					break;
-				}
-				(void) fprintf(stderr, gettext(
-				    "tar: Single file cannot fit on volume\n"));
-				done(3);
-			}
-
 			if (((blocklim - tapepos) >= EXTMIN) &&
 			    ((blocks + 1) >= blocklim/10)) {
 				splitfile(longname, infile, name,
@@ -2579,16 +2421,6 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 		tomodes(&stbuf);
 
 		while (mulvol && tapepos + blocks + 1 > blocklim) {
-			if (eflag) {
-				if (blocks <= blocklim) {
-					newvol();
-					break;
-				}
-				(void) fprintf(stderr, gettext(
-				    "tar: Single file cannot fit on volume\n"));
-				done(3);
-			}
-
 			if (((blocklim - tapepos) >= EXTMIN) &&
 			    ((blocks + 1) >= blocklim/10)) {
 				splitfile(longname, infile,
@@ -2997,11 +2829,7 @@ open_attr_dir(char *attrname, char *dirp, int cwd, attr_data_t *attrinfo)
 #endif
 
 static void
-#ifdef	_iBCS2
-doxtract(char *argv[], int tbl_cnt)
-#else
 doxtract(char *argv[])
-#endif
 {
 	struct	stat	xtractbuf;	/* stat on file after extracting */
 	blkcnt_t blocks;
@@ -3044,17 +2872,7 @@ doxtract(char *argv[])
 
 	dumping = 0;	/* for newvol(), et al:  we are not writing */
 
-	/*
-	 * Count the number of files that are to be extracted
-	 */
 	Uid = getuid();
-
-#ifdef	_iBCS2
-	initarg(argv, Filefile);
-	while (nextarg() != NULL)
-		++fcnt;
-	fcnt += tbl_cnt;
-#endif	/*  _iBCS2 */
 
 	for (;;) {
 		convflag = 0;
@@ -3732,7 +3550,8 @@ filedone:
 		}
 
 		if (!oflag)
-		    resugname(dirfd, comp, symflag); /* set file ownership */
+			/* set file ownership */
+			resugname(dirfd, comp, symflag);
 
 		if (pflag && newfile == TRUE && !dir &&
 		    (dblock.dbuf.typeflag == '0' ||
@@ -3936,7 +3755,7 @@ filedone:
 	if (fcnt > xcnt) {
 		(void) fprintf(stderr,
 		    gettext("tar: %d file(s) not extracted\n"),
-		fcnt-xcnt);
+		    fcnt-xcnt);
 		Errflg = 1;
 	}
 }
@@ -4224,15 +4043,10 @@ notsame(void)
 }
 
 static void
-#ifdef	_iBCS2
-dotable(char *argv[], int tbl_cnt)
-#else
 dotable(char *argv[])
-#endif
-
 {
-	int tcnt;			/* count # files tabled */
-	int fcnt;			/* count # files in argv list */
+	int tcnt = 0;			/* count # files tabled */
+	int fcnt = 0;			/* count # files in argv list */
 	char *namep, *dirp, *comp;
 	int want;
 	char aclchar = ' ';			/* either blank or '+' */
@@ -4249,17 +4063,6 @@ dotable(char *argv[])
 		nblock = 1;
 #endif
 	}
-	/*
-	 * Count the number of files that are to be tabled
-	 */
-	fcnt = tcnt = 0;
-
-#ifdef	_iBCS2
-	initarg(argv, Filefile);
-	while (nextarg() != NULL)
-		++fcnt;
-	fcnt += tbl_cnt;
-#endif	/*  _iBCS2 */
 
 	for (;;) {
 
@@ -5474,118 +5277,6 @@ copy(void *dst, void *src)
 	(void) memcpy(dst, src, TBLOCK);
 }
 
-#ifdef	_iBCS2
-/*
- *	initarg -- initialize things for nextarg.
- *
- *	argv		filename list, a la argv.
- *	filefile	name of file containing filenames.  Unless doing
- *		a create, seeks must be allowable (e.g. no named pipes).
- *
- *	- if filefile is non-NULL, it will be used first, and argv will
- *	be used when the data in filefile are exhausted.
- *	- otherwise argv will be used.
- */
-static char **Cmdargv = NULL;
-static FILE *FILEFile = NULL;
-static long seekFile = -1;
-static char *ptrtoFile, *begofFile, *endofFile;
-
-static	void
-initarg(char *argv[], char *filefile)
-{
-	struct stat statbuf;
-	char *p;
-	int nbytes;
-
-	Cmdargv = argv;
-	if (filefile == NULL)
-		return;		/* no -F file */
-	if (FILEFile != NULL) {
-		/*
-		 * need to REinitialize
-		 */
-		if (seekFile != -1)
-			(void) fseek(FILEFile, seekFile, 0);
-		ptrtoFile = begofFile;
-		return;
-	}
-	/*
-	 * first time initialization
-	 */
-	if ((FILEFile = fopen(filefile, "r")) == NULL)
-		fatal(gettext("cannot open (%s)"), filefile);
-	(void) fstat(fileno(FILEFile), &statbuf);
-	if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
-		(void) fprintf(stderr, gettext(
-		    "tar: %s is not a regular file\n"), filefile);
-		(void) fclose(FILEFile);
-		done(1);
-	}
-	ptrtoFile = begofFile = endofFile;
-	seekFile = 0;
-	if (!xflag)
-		return;		/* the file will be read only once anyway */
-	nbytes = statbuf.st_size;
-	while ((begofFile = calloc(nbytes, sizeof (char))) == NULL)
-		nbytes -= 20;
-	if (nbytes < 50) {
-		free(begofFile);
-		begofFile = endofFile;
-		return;		/* no room so just do plain reads */
-	}
-	if (fread(begofFile, 1, nbytes, FILEFile) != nbytes)
-		fatal(gettext("could not read %s"), filefile);
-	ptrtoFile = begofFile;
-	endofFile = begofFile + nbytes;
-	for (p = begofFile; p < endofFile; ++p)
-		if (*p == '\n')
-			*p = '\0';
-	if (nbytes != statbuf.st_size)
-		seekFile = nbytes + 1;
-	else
-		(void) fclose(FILEFile);
-}
-
-/*
- *	nextarg -- get next argument of arglist.
- *
- *	The argument is taken from wherever is appropriate.
- *
- *	If the 'F file' function modifier has been specified, the argument
- *	will be taken from the file, unless EOF has been reached.
- *	Otherwise the argument will be taken from argv.
- *
- *	WARNING:
- *	  Return value may point to static data, whose contents are over-
- *	  written on each call.
- */
-static	char  *
-nextarg(void)
-{
-	static char nameFile[PATH_MAX + 1];
-	int n;
-	char *p;
-
-	if (FILEFile) {
-		if (ptrtoFile < endofFile) {
-			p = ptrtoFile;
-			while (*ptrtoFile)
-				++ptrtoFile;
-			++ptrtoFile;
-			return (p);
-		}
-		if (fgets(nameFile, PATH_MAX + 1, FILEFile) != NULL) {
-			n = strlen(nameFile);
-			if (n > 0 && nameFile[n-1] == '\n')
-				nameFile[n-1] = '\0';
-			return (nameFile);
-		}
-	}
-	return (*Cmdargv++);
-}
-#endif	/*  _iBCS2 */
-
 /*
  * kcheck()
  *	- checks the validity of size values for non-tape devices
@@ -5608,10 +5299,9 @@ kcheck(char *kstr)
 		(void) fprintf(stderr, gettext(
 		    "tar: sizes below %luK not supported (%" FMT_blkcnt_t
 		    ").\n"), (ulong_t)MINSIZE, kval);
-		if (!kflag)
-			(void) fprintf(stderr, gettext(
-			    "bad size entry for %s in %s.\n"),
-			    archive, DEF_FILE);
+		(void) fprintf(stderr, gettext(
+		    "bad size entry for %s in %s.\n"),
+		    archive, DEF_FILE);
 		done(1);
 	}
 	mulvol++;

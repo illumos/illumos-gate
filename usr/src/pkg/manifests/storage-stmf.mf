@@ -105,16 +105,11 @@ $(i386_ONLY)file path=usr/lib/mdb/kvm/stmf.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/stmf_sbd.so group=sys mode=0555
 file path=usr/sbin/sbdadm mode=0555
 file path=usr/sbin/stmfadm mode=0555
-legacy pkg=SUNWstmf arch=$(ARCH) category=system \
-    desc="Sun Common Multiprotocol SCSI Target device drivers" \
-    hotline="Please contact your local service provider" \
-    name="Sun Common Multiprotocol SCSI Target" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWstmfu arch=$(ARCH) category=system \
+legacy pkg=SUNWstmf desc="Sun Common Multiprotocol SCSI Target device drivers" \
+    name="Sun Common Multiprotocol SCSI Target"
+legacy pkg=SUNWstmfu \
     desc="Sun Common Multiprotocol SCSI Target Libraries and Tools" \
-    hotline="Please contact your local service provider" \
-    name="Sun Common Multiprotocol SCSI Target Libraries and Tools" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Sun Common Multiprotocol SCSI Target Libraries and Tools"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libstmf.so target=libstmf.so.1

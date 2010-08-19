@@ -232,7 +232,7 @@ x86pi_gen_pci_pciexrc(topo_mod_t *mod, tnode_t *tn_hbr, uint16_t bdf,
 }
 
 int
-x86pi_gen_hbr(topo_mod_t *mod, tnode_t *tn_bb, smbios_hdl_t *shp,
+x86pi_gen_hbr(topo_mod_t *mod, tnode_t *tn_bb,
     int hbr_smbid, topo_instance_t hbri, topo_instance_t *rcip)
 {
 	x86pi_hcfmri_t	hcfmri = {0};
@@ -241,6 +241,11 @@ x86pi_gen_hbr(topo_mod_t *mod, tnode_t *tn_bb, smbios_hdl_t *shp,
 	smbios_pciexrc_t smb_rc;
 	int		i, rv, err = 0;
 	const char	*f = "x86pi_gen_hbr";
+	smbios_hdl_t 	*shp;
+
+	shp = topo_mod_smbios(mod);
+	if (shp == NULL)
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 
 	hcfmri.hc_name = HOSTBRIDGE;
 	hcfmri.instance = hbri;

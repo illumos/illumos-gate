@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
-/* Copyright (c) 1990 Mentat Inc. */
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -729,6 +728,85 @@ ip_addmulti_impl(const in6_addr_t *v6group, ill_t *ill, zoneid_t zoneid,
 }
 
 /*
+ * Looks up the list of multicast physical addresses this interface
+ * listens to. Add to the list if not present already.
+ */
+boolean_t
+ip_mphysaddr_add(ill_t *ill, uchar_t *hw_addr)
+{
+	multiphysaddr_t *mpa = NULL;
+	int	hw_addr_length = ill->ill_phys_addr_length;
+
+	mutex_enter(&ill->ill_lock);
+	for (mpa = ill->ill_mphysaddr_list; mpa != NULL; mpa = mpa->mpa_next) {
+		if (bcmp(hw_addr, &(mpa->mpa_addr[0]), hw_addr_length) == 0) {
+			mpa->mpa_refcnt++;
+			mutex_exit(&ill->ill_lock);
+			return (B_FALSE);
+		}
+	}
+
+	mpa = kmem_zalloc(sizeof (multiphysaddr_t), KM_NOSLEEP);
+	if (mpa == NULL) {
+		/*
+		 * We risk not having the multiphysadd structure. At this
+		 * point we can't fail. We can't afford to not send a
+		 * DL_ENABMULTI_REQ also. It is better than pre-allocating
+		 * the structure and having the code to track it also.
+		 */
+		ip0dbg(("ip_mphysaddr_add: ENOMEM. Some multicast apps"
+		    " may have issues. hw_addr: %p ill_name: %s\n",
+		    (void *)hw_addr, ill->ill_name));
+		mutex_exit(&ill->ill_lock);
+		return (B_TRUE);
+	}
+	bcopy(hw_addr, &(mpa->mpa_addr[0]), hw_addr_length);
+	mpa->mpa_refcnt = 1;
+	mpa->mpa_next = ill->ill_mphysaddr_list;
+	ill->ill_mphysaddr_list = mpa;
+	mutex_exit(&ill->ill_lock);
+	return (B_TRUE);
+}
+
+/*
+ * Look up hw_addr from the list of physical multicast addresses this interface
+ * listens to.
+ * Remove the entry if the refcnt is 0
+ */
+boolean_t
+ip_mphysaddr_del(ill_t *ill, uchar_t *hw_addr)
+{
+	multiphysaddr_t *mpap = NULL, **mpapp = NULL;
+	int hw_addr_length = ill->ill_phys_addr_length;
+	boolean_t ret = B_FALSE;
+
+	mutex_enter(&ill->ill_lock);
+	for (mpapp = &ill->ill_mphysaddr_list; (mpap = *mpapp) != NULL;
+	    mpapp = &(mpap->mpa_next)) {
+		if (bcmp(hw_addr, &(mpap->mpa_addr[0]), hw_addr_length) == 0)
+			break;
+	}
+	if (mpap == NULL) {
+		/*
+		 * Should be coming here only when there was a memory
+		 * exhaustion and we were not able to allocate
+		 * a multiphysaddr_t. We still send a DL_DISABMULTI_REQ down.
+		 */
+
+		ip0dbg(("ip_mphysaddr_del: No entry for this addr. Some "
+		    "multicast apps might have had issues. hw_addr: %p "
+		    " ill_name: %s\n", (void *)hw_addr, ill->ill_name));
+		ret = B_TRUE;
+	} else if (--mpap->mpa_refcnt == 0) {
+		*mpapp = mpap->mpa_next;
+		kmem_free(mpap, sizeof (multiphysaddr_t));
+		ret = B_TRUE;
+	}
+	mutex_exit(&ill->ill_lock);
+	return (ret);
+}
+
+/*
  * Send a multicast request to the driver for enabling or disabling
  * multicast reception for v6groupp address. The caller has already
  * checked whether it is appropriate to send one or not.
@@ -742,6 +820,7 @@ ip_ll_send_multireq(ill_t *ill, const in6_addr_t *v6groupp, t_uscalar_t prim)
 	mblk_t	*mp;
 	uint32_t addrlen, addroff;
 	ill_t *release_ill = NULL;
+	uchar_t *cp;
 	int err = 0;
 
 	ASSERT(RW_LOCK_HELD(&ill->ill_mcast_lock));
@@ -774,15 +853,29 @@ ip_ll_send_multireq(ill_t *ill, const in6_addr_t *v6groupp, t_uscalar_t prim)
 		err = ENOMEM;
 		goto done;
 	}
+	cp = mp->b_rptr;
 
-	switch (((union DL_primitives *)mp->b_rptr)->dl_primitive) {
+	switch (((union DL_primitives *)cp)->dl_primitive) {
 	case DL_ENABMULTI_REQ:
+		cp += ((dl_enabmulti_req_t *)cp)->dl_addr_offset;
+		if (!ip_mphysaddr_add(ill, cp)) {
+			freemsg(mp);
+			err = 0;
+			goto done;
+		}
 		mutex_enter(&ill->ill_lock);
 		/* Track the state if this is the first enabmulti */
 		if (ill->ill_dlpi_multicast_state == IDS_UNKNOWN)
 			ill->ill_dlpi_multicast_state = IDS_INPROGRESS;
 		mutex_exit(&ill->ill_lock);
 		break;
+	case DL_DISABMULTI_REQ:
+		cp += ((dl_disabmulti_req_t *)cp)->dl_addr_offset;
+		if (!ip_mphysaddr_del(ill, cp)) {
+			freemsg(mp);
+			err = 0;
+			goto done;
+		}
 	}
 	ill_dlpi_queue(ill, mp);
 done:

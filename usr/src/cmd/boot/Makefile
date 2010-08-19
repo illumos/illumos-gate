@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -38,6 +37,9 @@ i386_SUBDIRS=		\
 	mbr		\
 	symdef
 
+sparc_SUBDIRS=		\
+	installboot
+
 COMMON_LINTSUBDIRS=	\
 	bootadm	
 
@@ -46,12 +48,18 @@ i386_LINTSUBDIRS=	\
 	installgrub	\
 	symdef
 
+sparc_LINTSUBDIRS=	\
+	installboot
+
 COMMON_MSGSUBDIRS=	\
 	bootadm		\
 	fiocompress
 
 i386_MSGSUBDIRS=	\
 	installgrub
+
+sparc_MSGSUBDIRS=	\
+	installboot
 
 
 all:=		TARGET= all

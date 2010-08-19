@@ -49,11 +49,11 @@
 #include <inet/ip_if.h>		/* for ETHERTYPE_IPV6 */
 #include <inet/ip6.h>		/* for ip6_t */
 #include <netinet/icmp6.h>	/* for icmp6_t */
-#include <sys/ib/ibtl/ibvti.h>	/* for ace->ac_dest->ud_dst_qpn */
 
 #include <sys/ib/clients/ibd/ibd.h>
 
 extern ibd_global_state_t ibd_gstate;
+extern int ibd_rc_conn_timeout;
 uint_t ibd_rc_tx_softintr = 1;
 /*
  * If the number of WRs in receive queue of each RC connection less than
@@ -85,14 +85,13 @@ static ibt_cm_status_t ibd_rc_dispatch_pass_mad(void *,
     ibt_cm_event_t *, ibt_cm_return_args_t *, void *, ibt_priv_data_len_t);
 static ibt_cm_status_t ibd_rc_dispatch_actv_mad(void *,
     ibt_cm_event_t *, ibt_cm_return_args_t *, void *, ibt_priv_data_len_t);
-static int ibd_rc_pas_close(ibd_rc_chan_t *);
-static void ibd_rc_act_close(ibd_rc_chan_t *);
+static void ibd_rc_act_close(ibd_rc_chan_t *, boolean_t);
 
 static inline void ibd_rc_add_to_chan_list(ibd_rc_chan_list_t *,
     ibd_rc_chan_t *);
 static inline ibd_rc_chan_t *ibd_rc_rm_header_chan_list(
     ibd_rc_chan_list_t *);
-static inline void ibd_rc_rm_from_chan_list(ibd_rc_chan_list_t *,
+static inline ibd_rc_chan_t *ibd_rc_rm_from_chan_list(ibd_rc_chan_list_t *,
     ibd_rc_chan_t *);
 
 /* CQ handlers */
@@ -129,7 +128,7 @@ ibd_async_rc_close_act_chan(ibd_state_t *state, ibd_req_t *req)
 		ace = rc_chan->ace;
 		ASSERT(ace != NULL);
 		/* Close old RC channel */
-		ibd_rc_act_close(rc_chan);
+		ibd_rc_act_close(rc_chan, B_TRUE);
 		mutex_enter(&state->id_ac_mutex);
 		ASSERT(ace->ac_ref != 0);
 		atomic_dec_32(&ace->ac_ref);
@@ -157,7 +156,7 @@ ibd_async_rc_recycle_ace(ibd_state_t *state, ibd_req_t *req)
 	rc_chan = ace->ac_chan;
 	ASSERT(rc_chan != NULL);
 	/* Close old RC channel */
-	ibd_rc_act_close(rc_chan);
+	ibd_rc_act_close(rc_chan, B_TRUE);
 	mutex_enter(&state->id_ac_mutex);
 	ASSERT(ace->ac_ref != 0);
 	atomic_dec_32(&ace->ac_ref);
@@ -296,6 +295,93 @@ too_big_fail:
 	mutex_exit(&ace->tx_too_big_mutex);
 }
 
+/*
+ * Check all active/passive channels. If any ative/passive
+ * channel has not been used for a long time, close it.
+ */
+void
+ibd_rc_conn_timeout_call(void *carg)
+{
+	ibd_state_t *state = carg;
+	ibd_ace_t *ace, *pre_ace;
+	ibd_rc_chan_t *chan, *pre_chan, *next_chan;
+	ibd_req_t *req;
+
+	/* Check all active channels. If chan->is_used == B_FALSE, close it */
+	mutex_enter(&state->id_ac_mutex);
+	ace = list_head(&state->id_ah_active);
+	while ((pre_ace = ace) != NULL) {
+		ace = list_next(&state->id_ah_active, ace);
+		if (pre_ace->ac_chan != NULL) {
+			chan = pre_ace->ac_chan;
+			ASSERT(state->id_enable_rc == B_TRUE);
+			if (chan->chan_state == IBD_RC_STATE_ACT_ESTAB) {
+				if (chan->is_used == B_FALSE) {
+					state->rc_timeout_act++;
+					INC_REF(pre_ace, 1);
+					IBD_ACACHE_PULLOUT_ACTIVE(state,
+					    pre_ace);
+					chan->chan_state =
+					    IBD_RC_STATE_ACT_CLOSING;
+					ibd_rc_signal_act_close(state, pre_ace);
+				} else {
+					chan->is_used = B_FALSE;
+				}
+			}
+		}
+	}
+	mutex_exit(&state->id_ac_mutex);
+
+	/* Check all passive channels. If chan->is_used == B_FALSE, close it */
+	mutex_enter(&state->rc_pass_chan_list.chan_list_mutex);
+	next_chan = state->rc_pass_chan_list.chan_list;
+	pre_chan = NULL;
+	while ((chan = next_chan) != NULL) {
+		next_chan = chan->next;
+		if (chan->is_used == B_FALSE) {
+			req = kmem_cache_alloc(state->id_req_kmc, KM_NOSLEEP);
+			if (req != NULL) {
+				/* remove it */
+				state->rc_timeout_pas++;
+				req->rq_ptr = chan;
+				ibd_queue_work_slot(state, req,
+				    IBD_ASYNC_RC_CLOSE_PAS_CHAN);
+			} else {
+				ibd_print_warn(state, "ibd_rc_conn_timeout: "
+				    "alloc ibd_req_t fail");
+				if (pre_chan == NULL) {
+					state->rc_pass_chan_list.chan_list =
+					    chan;
+				} else {
+					pre_chan->next = chan;
+				}
+				pre_chan = chan;
+			}
+		} else {
+			if (pre_chan == NULL) {
+				state->rc_pass_chan_list.chan_list = chan;
+			} else {
+				pre_chan->next = chan;
+			}
+			pre_chan = chan;
+			chan->is_used = B_FALSE;
+		}
+	}
+	if (pre_chan != NULL) {
+		pre_chan->next = NULL;
+	} else {
+		state->rc_pass_chan_list.chan_list = NULL;
+	}
+	mutex_exit(&state->rc_pass_chan_list.chan_list_mutex);
+
+	mutex_enter(&state->rc_timeout_lock);
+	if (state->rc_timeout_start == B_TRUE) {
+		state->rc_timeout = timeout(ibd_rc_conn_timeout_call, state,
+		    SEC_TO_TICK(ibd_rc_conn_timeout));
+	}
+	mutex_exit(&state->rc_timeout_lock);
+}
+
 #ifdef DEBUG
 /*
  * ibd_rc_update_stats - update driver private kstat counters
@@ -323,9 +409,7 @@ ibd_rc_update_stats(kstat_t *ksp, int rw)
 	ibd_rc_ksp->rc_rcv_copy_pkt.value.ul = state->rc_rcv_copy_pkt;
 	ibd_rc_ksp->rc_rcv_alloc_fail.value.ul = state->rc_rcv_alloc_fail;
 
-	ibd_rc_ksp->rc_rcq_invoke.value.ul = state->rc_rcq_invoke;
 	ibd_rc_ksp->rc_rcq_err.value.ul = state->rc_rcq_err;
-	ibd_rc_ksp->rc_scq_invoke.value.ul = state->rc_scq_invoke;
 
 	ibd_rc_ksp->rc_rwqe_short.value.ul = state->rc_rwqe_short;
 
@@ -356,6 +440,8 @@ ibd_rc_update_stats(kstat_t *ksp, int rw)
 	ibd_rc_ksp->rc_act_close_simultaneous.value.ul =
 	    state->rc_act_close_simultaneous;
 	ibd_rc_ksp->rc_reset_cnt.value.ul = state->rc_reset_cnt;
+	ibd_rc_ksp->rc_timeout_act.value.ul = state->rc_timeout_act;
+	ibd_rc_ksp->rc_timeout_pas.value.ul = state->rc_timeout_pas;
 
 	return (0);
 }
@@ -372,14 +458,15 @@ ibd_rc_init_stats(ibd_state_t *state)
 {
 	kstat_t *ksp;
 	ibd_rc_stat_t *ibd_rc_ksp;
-	char stat_name[32];
+	char stat_name[KSTAT_STRLEN];
 	int inst;
 
 	/*
 	 * Create and init kstat
 	 */
 	inst = ddi_get_instance(state->id_dip);
-	(void) snprintf(stat_name, 31, "statistics%d_%x", inst, state->id_pkey);
+	(void) snprintf(stat_name, KSTAT_STRLEN, "statistics%d_%x_%u", inst,
+	    state->id_pkey, state->id_plinkid);
 	ksp = kstat_create("ibd", 0, stat_name, "net", KSTAT_TYPE_NAMED,
 	    sizeof (ibd_rc_stat_t) / sizeof (kstat_named_t), 0);
 
@@ -407,13 +494,8 @@ ibd_rc_init_stats(ibd_state_t *state)
 	kstat_named_init(&ibd_rc_ksp->rc_rcv_alloc_fail, "RC: Rx alloc fail",
 	    KSTAT_DATA_ULONG);
 
-	kstat_named_init(&ibd_rc_ksp->rc_rcq_invoke, "RC: invoke of Recv CQ "
-	    "handler", KSTAT_DATA_ULONG);
 	kstat_named_init(&ibd_rc_ksp->rc_rcq_err, "RC: fail in Recv CQ handler",
 	    KSTAT_DATA_ULONG);
-
-	kstat_named_init(&ibd_rc_ksp->rc_scq_invoke, "RC: invoke of Send CQ "
-	    "handler", KSTAT_DATA_ULONG);
 
 	kstat_named_init(&ibd_rc_ksp->rc_rwqe_short, "RC: Short rwqe",
 	    KSTAT_DATA_ULONG);
@@ -462,6 +544,10 @@ ibd_rc_init_stats(ibd_state_t *state)
 	kstat_named_init(&ibd_rc_ksp->rc_act_close_simultaneous, "RC: "
 	    "simultaneous ibd_rc_act_close", KSTAT_DATA_ULONG);
 	kstat_named_init(&ibd_rc_ksp->rc_reset_cnt, "RC: Reset RC channel",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ibd_rc_ksp->rc_act_close, "RC: timeout act side",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ibd_rc_ksp->rc_pas_close, "RC: timeout pas side",
 	    KSTAT_DATA_ULONG);
 
 	/*
@@ -527,7 +613,7 @@ ibd_rc_alloc_chan(ibd_rc_chan_t **ret_chan, ibd_state_t *state,
 
 	if (ibt_modify_cq(chan->scq_hdl, state->id_rc_tx_comp_count,
 	    state->id_rc_tx_comp_usec, 0) != IBT_SUCCESS) {
-		ibd_print_warn(state, "ibd_rc_alloc_chan: Send CQ "
+		DPRINT(30, "ibd_rc_alloc_chan: Send CQ "
 		    "interrupt moderation failed");
 	}
 
@@ -548,7 +634,7 @@ ibd_rc_alloc_chan(ibd_rc_chan_t **ret_chan, ibd_state_t *state,
 
 	if (ibt_modify_cq(chan->rcq_hdl, state->id_rc_rx_comp_count,
 	    state->id_rc_rx_comp_usec, 0) != IBT_SUCCESS) {
-		ibd_print_warn(state, "ibd_rc_alloc_chan: Receive CQ "
+		DPRINT(30, "ibd_rc_alloc_chan: Receive CQ "
 		    "interrupt moderation failed");
 	}
 
@@ -639,6 +725,14 @@ ibd_rc_alloc_chan(ibd_rc_chan_t **ret_chan, ibd_state_t *state,
 		goto alloc_scq_enable_err;
 	}
 
+	if (is_tx_chan)
+		atomic_inc_32(&state->rc_num_tx_chan);
+	else
+		atomic_inc_32(&state->rc_num_rx_chan);
+
+	/* For the connection reaper routine ibd_rc_conn_timeout_call() */
+	chan->is_used = B_TRUE;
+
 	*ret_chan = chan;
 	return (IBT_SUCCESS);
 
@@ -710,10 +804,12 @@ ibd_rc_free_chan(ibd_rc_chan_t *chan)
 		if (ibd_rc_tx_softintr == 1) {
 			ddi_remove_softintr(chan->scq_softintr);
 		}
+		atomic_dec_32(&chan->state->rc_num_tx_chan);
 	} else {
 		if (!chan->state->rc_enable_srq) {
 			ibd_rc_fini_rxlist(chan);
 		}
+		atomic_dec_32(&chan->state->rc_num_rx_chan);
 	}
 
 	mutex_destroy(&chan->tx_poll_lock);
@@ -737,6 +833,7 @@ ibd_rc_add_to_chan_list(ibd_rc_chan_list_t *list, ibd_rc_chan_t *chan)
 	mutex_enter(&list->chan_list_mutex);
 	if (list->chan_list == NULL) {
 		list->chan_list = chan;
+		chan->next = NULL;
 	} else {
 		chan->next = list->chan_list;
 		list->chan_list = chan;
@@ -744,8 +841,30 @@ ibd_rc_add_to_chan_list(ibd_rc_chan_list_t *list, ibd_rc_chan_t *chan)
 	mutex_exit(&list->chan_list_mutex);
 }
 
+static boolean_t
+ibd_rc_re_add_to_pas_chan_list(ibd_rc_chan_t *chan)
+{
+	ibd_state_t *state = chan->state;
+
+	mutex_enter(&state->rc_pass_chan_list.chan_list_mutex);
+	if ((state->id_mac_state & IBD_DRV_STARTED) == 0) {
+		mutex_exit(&state->rc_pass_chan_list.chan_list_mutex);
+		return (B_FALSE);
+	} else {
+		if (state->rc_pass_chan_list.chan_list == NULL) {
+			state->rc_pass_chan_list.chan_list = chan;
+			chan->next = NULL;
+		} else {
+			chan->next = state->rc_pass_chan_list.chan_list;
+			state->rc_pass_chan_list.chan_list = chan;
+		}
+		mutex_exit(&state->rc_pass_chan_list.chan_list_mutex);
+		return (B_TRUE);
+	}
+}
+
 /* Remove a RC channel */
-static inline void
+static inline ibd_rc_chan_t *
 ibd_rc_rm_from_chan_list(ibd_rc_chan_list_t *list, ibd_rc_chan_t *chan)
 {
 	ibd_rc_chan_t *pre_chan;
@@ -760,15 +879,17 @@ ibd_rc_rm_from_chan_list(ibd_rc_chan_list_t *list, ibd_rc_chan_t *chan)
 		while (pre_chan != NULL) {
 			if (pre_chan->next == chan) {
 				DPRINT(30, "ibd_rc_rm_from_chan_list"
-				    "(middle): found chan(%p) in "
-				    "rc_pass_chan_list", chan);
+				    "(middle): found chan(%p)", chan);
 				pre_chan->next = chan->next;
 				break;
 			}
 			pre_chan = pre_chan->next;
 		}
+		if (pre_chan == NULL)
+			chan = NULL;
 	}
 	mutex_exit(&list->chan_list_mutex);
+	return (chan);
 }
 
 static inline ibd_rc_chan_t *
@@ -875,10 +996,32 @@ ibd_rc_init_srq_list(ibd_state_t *state)
 	ret = ibt_alloc_srq(state->id_hca_hdl, IBT_SRQ_NO_FLAGS,
 	    state->id_pd_hdl, &srq_sizes, &state->rc_srq_hdl, &srq_real_sizes);
 	if (ret != IBT_SUCCESS) {
-		DPRINT(10, "ibd_rc_init_srq_list: ibt_alloc_srq failed."
-		    "req_sgl_sz=%d, req_wr_sz=0x%x, ret=%d",
-		    srq_sizes.srq_sgl_sz, srq_sizes.srq_wr_sz, ret);
-		return (DDI_FAILURE);
+		/*
+		 * The following code is for CR 6932460 (can't configure ibd
+		 * interface on 32 bits x86 systems). 32 bits x86 system has
+		 * less memory resource than 64 bits x86 system. If current
+		 * resource request can't be satisfied, we request less
+		 * resource here.
+		 */
+		len = state->id_rc_num_srq;
+		while ((ret == IBT_HCA_WR_EXCEEDED) &&
+		    (len >= 2 * IBD_RC_MIN_CQ_SIZE)) {
+			len = len/2;
+			srq_sizes.srq_sgl_sz = 1;
+			srq_sizes.srq_wr_sz = len;
+			ret = ibt_alloc_srq(state->id_hca_hdl,
+			    IBT_SRQ_NO_FLAGS, state->id_pd_hdl, &srq_sizes,
+			    &state->rc_srq_hdl, &srq_real_sizes);
+		}
+		if (ret != IBT_SUCCESS) {
+			DPRINT(10, "ibd_rc_init_srq_list: ibt_alloc_srq failed."
+			    "req_sgl_sz=%d, req_wr_sz=0x%x, final_req_wr_sz="
+			    "0x%x, ret=%d", srq_sizes.srq_sgl_sz,
+			    srq_sizes.srq_wr_sz, len, ret);
+			return (DDI_FAILURE);
+		}
+		state->id_rc_num_srq = len;
+		state->id_rc_num_rwqe = state->id_rc_num_srq + 1;
 	}
 
 	state->rc_srq_size = srq_real_sizes.srq_wr_sz;
@@ -1334,6 +1477,8 @@ ibd_rc_process_rx(ibd_rc_chan_t *chan, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	 */
 	ASSERT(!wc->wc_flags & IBT_WC_GRH_PRESENT);
 
+	/* For the connection reaper routine ibd_rc_conn_timeout_call() */
+	chan->is_used = B_TRUE;
 
 #ifdef DEBUG
 	if (rxcnt < state->id_rc_rx_rwqe_thresh) {
@@ -1574,13 +1719,13 @@ ibd_rc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 	ibd_rc_chan_t *chan = (ibd_rc_chan_t *)arg;
 	ibd_state_t *state = chan->state;
 
+	atomic_inc_32(&chan->rcq_invoking);
 	ASSERT(chan->chan_state == IBD_RC_STATE_PAS_ESTAB);
 
 	/*
 	 * Poll for completed entries; the CQ will not interrupt any
 	 * more for incoming (or transmitted) packets.
 	 */
-	state->rc_rcq_invoke++;
 	ibd_rc_poll_rcq(chan, chan->rcq_hdl);
 
 	/*
@@ -1635,6 +1780,7 @@ ibd_rc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			mutex_exit(&chan->rx_lock);
 		}
 	}
+	atomic_dec_32(&chan->rcq_invoking);
 }
 
 /*
@@ -2024,24 +2170,65 @@ ibd_rc_drain_scq(ibd_rc_chan_t *chan, ibt_cq_hdl_t cq_hdl)
 	ibd_state_t *state = chan->state;
 	ibd_wqe_t *wqe;
 	ibt_wc_t *wc, *wcs;
+	ibd_ace_t *ace;
 	uint_t numwcs, real_numwcs;
 	int i;
+	boolean_t encount_error;
 
 	wcs = chan->tx_wc;
 	numwcs = IBD_RC_MAX_CQ_WC;
+	encount_error = B_FALSE;
 
 	while (ibt_poll_cq(cq_hdl, wcs, numwcs, &real_numwcs) == IBT_SUCCESS) {
 		for (i = 0, wc = wcs; i < real_numwcs; i++, wc++) {
 			wqe = (ibd_wqe_t *)(uintptr_t)wc->wc_id;
 			if (wc->wc_status != IBT_WC_SUCCESS) {
-				chan->tx_trans_error_cnt ++;
-				DPRINT(30, "ibd_rc_drain_scq: "
-				    "wc_status(%d) != SUCC, "
-				    "chan=%p, ace=%p, link_state=%d",
-				    wc->wc_status, chan, chan->ace,
-				    chan->state->id_link_state);
-			} else {
-				chan->tx_trans_error_cnt = 0;
+				if (encount_error == B_FALSE) {
+					/*
+					 * This RC channle is in error status,
+					 * remove it.
+					 */
+					encount_error = B_TRUE;
+					mutex_enter(&state->id_ac_mutex);
+					if ((chan->chan_state ==
+					    IBD_RC_STATE_ACT_ESTAB) &&
+					    (chan->state->id_link_state ==
+					    LINK_STATE_UP) &&
+					    ((ace = ibd_acache_find(state,
+					    &chan->ace->ac_mac, B_FALSE, 0))
+					    != NULL) && (ace == chan->ace)) {
+						ASSERT(ace->ac_mce == NULL);
+						INC_REF(ace, 1);
+						IBD_ACACHE_PULLOUT_ACTIVE(
+						    state, ace);
+						chan->chan_state =
+						    IBD_RC_STATE_ACT_CLOSING;
+						mutex_exit(&state->id_ac_mutex);
+						state->rc_reset_cnt++;
+						DPRINT(30, "ibd_rc_drain_scq: "
+						    "wc_status(%d) != SUCC, "
+						    "chan=%p, ace=%p, "
+						    "link_state=%d"
+						    "reset RC channel",
+						    wc->wc_status, chan,
+						    chan->ace, chan->state->
+						    id_link_state);
+						ibd_rc_signal_act_close(
+						    state, ace);
+					} else {
+						mutex_exit(&state->id_ac_mutex);
+						state->
+						    rc_act_close_simultaneous++;
+						DPRINT(40, "ibd_rc_drain_scq: "
+						    "wc_status(%d) != SUCC, "
+						    "chan=%p, chan_state=%d,"
+						    "ace=%p, link_state=%d."
+						    "other thread is closing "
+						    "it", wc->wc_status, chan,
+						    chan->chan_state, chan->ace,
+						    chan->state->id_link_state);
+					}
+				}
 			}
 			ibd_rc_tx_cleanup(WQE_TO_SWQE(wqe));
 		}
@@ -2112,8 +2299,6 @@ ibd_rc_scq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 {
 	ibd_rc_chan_t *chan = (ibd_rc_chan_t *)arg;
 
-	chan->state->rc_scq_invoke++;
-
 	if (ibd_rc_tx_softintr == 1) {
 		mutex_enter(&chan->tx_poll_lock);
 		if (chan->tx_poll_busy & IBD_CQ_POLLING) {
@@ -2132,7 +2317,6 @@ static uint_t
 ibd_rc_tx_recycle(caddr_t arg)
 {
 	ibd_rc_chan_t *chan = (ibd_rc_chan_t *)arg;
-	ibd_ace_t *ace;
 	ibd_state_t *state = chan->state;
 	int flag, redo_flag;
 	int redo = 1;
@@ -2173,12 +2357,6 @@ ibd_rc_tx_recycle(caddr_t arg)
 
 		ibd_rc_drain_scq(chan, chan->scq_hdl);
 
-		if (chan->tx_trans_error_cnt > 3) {
-			mutex_enter(&chan->tx_poll_lock);
-			chan->tx_poll_busy = 0;
-			mutex_exit(&chan->tx_poll_lock);
-			goto error_reset_chan;
-		}
 		mutex_enter(&chan->tx_poll_lock);
 		if (chan->tx_poll_busy & redo_flag)
 			chan->tx_poll_busy &= ~redo_flag;
@@ -2190,33 +2368,6 @@ ibd_rc_tx_recycle(caddr_t arg)
 
 	} while (redo);
 
-	return (DDI_INTR_CLAIMED);
-
-error_reset_chan:
-	/*
-	 * Channel being torn down.
-	 */
-	mutex_enter(&state->id_ac_mutex);
-	if ((chan->chan_state == IBD_RC_STATE_ACT_ESTAB) &&
-	    (chan->state->id_link_state == LINK_STATE_UP) &&
-	    ((ace = ibd_acache_find(state, &chan->ace->ac_mac, B_FALSE, 0))
-	    != NULL) && (ace == chan->ace)) {
-		ASSERT(ace->ac_mce == NULL);
-		INC_REF(ace, 1);
-		IBD_ACACHE_PULLOUT_ACTIVE(state, ace);
-		chan->chan_state = IBD_RC_STATE_ACT_CLOSING;
-		mutex_exit(&state->id_ac_mutex);
-		state->rc_reset_cnt++;
-		DPRINT(30, "ibd_rc_tx_recycle(chan=%p, ace=%p): "
-		    " reset RC channel", chan, chan->ace);
-		ibd_rc_signal_act_close(state, ace);
-	} else {
-		mutex_exit(&state->id_ac_mutex);
-		state->rc_act_close_simultaneous++;
-		DPRINT(40, "ibd_rc_tx_recycle: other thread is closing"
-		    " it. chan=%p, act_state=%d, link_state=%d, ace=%p",
-		    chan, chan->chan_state, state->id_link_state, ace);
-	}
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -2412,7 +2563,7 @@ void
 ibd_rc_close_all_chan(ibd_state_t *state)
 {
 	ibd_rc_chan_t *rc_chan;
-	ibd_ace_t *ace;
+	ibd_ace_t *ace, *pre_ace;
 	uint_t attempts;
 
 	/* Disable all Rx routines */
@@ -2446,30 +2597,54 @@ ibd_rc_close_all_chan(ibd_state_t *state)
 	/* Close all passive RC channels */
 	rc_chan = ibd_rc_rm_header_chan_list(&state->rc_pass_chan_list);
 	while (rc_chan != NULL) {
-		(void) ibd_rc_pas_close(rc_chan);
+		(void) ibd_rc_pas_close(rc_chan, B_TRUE, B_FALSE);
 		rc_chan = ibd_rc_rm_header_chan_list(&state->rc_pass_chan_list);
 	}
 
 	/* Close all active RC channels */
 	mutex_enter(&state->id_ac_mutex);
+	state->id_ac_hot_ace = NULL;
 	ace = list_head(&state->id_ah_active);
-	while (ace != NULL) {
-		if (ace->ac_chan != NULL) {
-			ibd_rc_add_to_chan_list(&state->rc_obs_act_chan_list,
-			    ace->ac_chan);
-		}
+	while ((pre_ace = ace) != NULL) {
 		ace = list_next(&state->id_ah_active, ace);
+		if (pre_ace->ac_chan != NULL) {
+			INC_REF(pre_ace, 1);
+			IBD_ACACHE_PULLOUT_ACTIVE(state, pre_ace);
+			pre_ace->ac_chan->chan_state = IBD_RC_STATE_ACT_CLOSING;
+			ibd_rc_add_to_chan_list(&state->rc_obs_act_chan_list,
+			    pre_ace->ac_chan);
+		}
 	}
 	mutex_exit(&state->id_ac_mutex);
 
 	rc_chan = ibd_rc_rm_header_chan_list(&state->rc_obs_act_chan_list);
 	while (rc_chan != NULL) {
 		ace = rc_chan->ace;
-		ibd_rc_act_close(rc_chan);
-		if (ace != NULL)
+		ibd_rc_act_close(rc_chan, B_TRUE);
+		if (ace != NULL) {
+			mutex_enter(&state->id_ac_mutex);
+			ASSERT(ace->ac_ref != 0);
+			atomic_dec_32(&ace->ac_ref);
 			ace->ac_chan = NULL;
+			if ((ace->ac_ref == 0) || (ace->ac_ref == CYCLEVAL)) {
+				IBD_ACACHE_INSERT_FREE(state, ace);
+				ace->ac_ref = 0;
+			} else {
+				ace->ac_ref |= CYCLEVAL;
+				state->rc_delay_ace_recycle++;
+			}
+			mutex_exit(&state->id_ac_mutex);
+		}
 		rc_chan = ibd_rc_rm_header_chan_list(
 		    &state->rc_obs_act_chan_list);
+	}
+
+	attempts = 400;
+	while (((state->rc_num_tx_chan != 0) ||
+	    (state->rc_num_rx_chan != 0)) && (attempts > 0)) {
+		/* Other thread is closing CM channel, wait it */
+		delay(drv_usectohz(100000));
+		attempts--;
 	}
 }
 
@@ -2478,12 +2653,17 @@ ibd_rc_try_connect(ibd_state_t *state, ibd_ace_t *ace,  ibt_path_info_t *path)
 {
 	ibt_status_t status;
 
+	if ((state->id_mac_state & IBD_DRV_STARTED) == 0)
+		return;
+
 	status = ibd_rc_connect(state, ace, path,
 	    IBD_RC_SERVICE_ID_OFED_INTEROP);
 
 	if (status != IBT_SUCCESS) {
 		/* wait peer side remove stale channel */
 		delay(drv_usectohz(10000));
+		if ((state->id_mac_state & IBD_DRV_STARTED) == 0)
+			return;
 		status = ibd_rc_connect(state, ace, path,
 		    IBD_RC_SERVICE_ID_OFED_INTEROP);
 	}
@@ -2491,6 +2671,8 @@ ibd_rc_try_connect(ibd_state_t *state, ibd_ace_t *ace,  ibt_path_info_t *path)
 	if (status != IBT_SUCCESS) {
 		/* wait peer side remove stale channel */
 		delay(drv_usectohz(10000));
+		if ((state->id_mac_state & IBD_DRV_STARTED) == 0)
+			return;
 		(void) ibd_rc_connect(state, ace, path,
 		    IBD_RC_SERVICE_ID);
 	}
@@ -2510,6 +2692,7 @@ ibd_rc_connect(ibd_state_t *state, ibd_ace_t *ace,  ibt_path_info_t *path,
 	ibd_rc_msg_hello_t hello_req_msg;
 	ibd_rc_msg_hello_t *hello_ack_msg;
 	ibd_rc_chan_t *chan;
+	ibt_ud_dest_query_attr_t dest_attrs;
 
 	ASSERT(ace != NULL);
 	ASSERT(ace->ac_mce == NULL);
@@ -2540,8 +2723,15 @@ ibd_rc_connect(ibd_state_t *state, ibd_ace_t *ace,  ibt_path_info_t *path,
 	/*
 	 * update path record with the SID
 	 */
+	if ((status = ibt_query_ud_dest(ace->ac_dest, &dest_attrs))
+	    != IBT_SUCCESS) {
+		DPRINT(40, "ibd_rc_connect: ibt_query_ud_dest() failed, "
+		    "ret=%d", status);
+		return (status);
+	}
+
 	path->pi_sid =
-	    ietf_cm_service_id | ((ace->ac_dest->ud_dst_qpn) & 0xffffff);
+	    ietf_cm_service_id | ((dest_attrs.ud_dst_qpn) & 0xffffff);
 
 
 	/* pre-allocate memory for hello ack message */
@@ -2550,8 +2740,8 @@ ibd_rc_connect(ibd_state_t *state, ibd_ace_t *ace,  ibt_path_info_t *path,
 
 	open_args.oc_path = path;
 
-	open_args.oc_path_rnr_retry_cnt	= 7;
-	open_args.oc_path_retry_cnt = 7;
+	open_args.oc_path_rnr_retry_cnt	= 1;
+	open_args.oc_path_retry_cnt = 1;
 
 	/* We don't do RDMA */
 	open_args.oc_rdma_ra_out = 0;
@@ -2587,7 +2777,7 @@ ibd_rc_connect(ibd_state_t *state, ibd_ace_t *ace,  ibt_path_info_t *path,
 	    "ret status = %d, reason=%d, ace=%p, mtu=0x%x, qpn=0x%x,"
 	    " peer qpn=0x%x", status, (int)open_returns.rc_status, ace,
 	    hello_req_msg.rx_mtu, hello_req_msg.reserved_qpn,
-	    ace->ac_dest->ud_dst_qpn);
+	    dest_attrs.ud_dst_qpn);
 	kmem_free(hello_ack_msg, sizeof (ibd_rc_msg_hello_t));
 	return (status);
 }
@@ -2637,9 +2827,16 @@ ibd_rc_signal_ace_recycle(ibd_state_t *state, ibd_ace_t *ace)
 	ibd_queue_work_slot(state, req, IBD_ASYNC_RC_RECYCLE_ACE);
 }
 
+/*
+ * Close an active channel
+ *
+ * is_close_rc_chan: if B_TRUE, we will call ibt_close_rc_channel()
+ */
 static void
-ibd_rc_act_close(ibd_rc_chan_t *chan)
+ibd_rc_act_close(ibd_rc_chan_t *chan, boolean_t is_close_rc_chan)
 {
+	ibd_state_t *state;
+	ibd_ace_t *ace;
 	uint_t times;
 	ibt_status_t ret;
 
@@ -2653,18 +2850,38 @@ ibd_rc_act_close(ibd_rc_chan_t *chan)
 		    "act_state=%d, chan=%p", chan->chan_state, chan);
 		chan->chan_state = IBD_RC_STATE_ACT_CLOSED;
 		ibt_set_cq_handler(chan->rcq_hdl, 0, 0);
-		/* Wait send queue empty */
-		times = 0;
+		/*
+		 * Wait send queue empty. Its old value is 50 (5 seconds). But
+		 * in my experiment, 5 seconds is not enough time to let IBTL
+		 * return all buffers and ace->ac_ref. I tried 25 seconds, it
+		 * works well. As another evidence, I saw IBTL takes about 17
+		 * seconds every time it cleans a stale RC channel.
+		 */
+		times = 250;
+		ace = chan->ace;
+		ASSERT(ace != NULL);
+		state = chan->state;
+		ASSERT(state != NULL);
+		mutex_enter(&state->id_ac_mutex);
 		mutex_enter(&chan->tx_wqe_list.dl_mutex);
 		mutex_enter(&chan->tx_rel_list.dl_mutex);
 		while (((chan->tx_wqe_list.dl_cnt + chan->tx_rel_list.dl_cnt)
-		    != chan->scq_size) && (times < 50)) {
-			DPRINT(30, "ibd_rc_act_close: dl_cnt(tx_wqe_list=%d,"
-			    " tx_rel_list=%d) != chan->scq_size=%d",
-			    chan->tx_wqe_list.dl_cnt, chan->tx_rel_list.dl_cnt,
-			    chan->scq_size);
+		    != chan->scq_size) || ((ace->ac_ref != 1) &&
+		    (ace->ac_ref != (CYCLEVAL+1)))) {
 			mutex_exit(&chan->tx_rel_list.dl_mutex);
 			mutex_exit(&chan->tx_wqe_list.dl_mutex);
+			mutex_exit(&state->id_ac_mutex);
+			times--;
+			if (times == 0) {
+				state->rc_act_close_not_clean++;
+				DPRINT(40, "ibd_rc_act_close: dl_cnt(tx_wqe_"
+				    "list=%d, tx_rel_list=%d) != chan->"
+				    "scq_size=%d, OR ac_ref(=%d) not clean",
+				    chan->tx_wqe_list.dl_cnt,
+				    chan->tx_rel_list.dl_cnt,
+				    chan->scq_size, ace->ac_ref);
+				break;
+			}
 			mutex_enter(&chan->tx_poll_lock);
 			if (chan->tx_poll_busy & IBD_CQ_POLLING) {
 				DPRINT(40, "ibd_rc_act_close: multiple "
@@ -2679,21 +2896,29 @@ ibd_rc_act_close(ibd_rc_chan_t *chan)
 				mutex_exit(&chan->tx_poll_lock);
 			}
 			delay(drv_usectohz(100000));
-			times++;
+			mutex_enter(&state->id_ac_mutex);
 			mutex_enter(&chan->tx_wqe_list.dl_mutex);
 			mutex_enter(&chan->tx_rel_list.dl_mutex);
 		}
-		mutex_exit(&chan->tx_rel_list.dl_mutex);
-		mutex_exit(&chan->tx_wqe_list.dl_mutex);
+		if (times != 0) {
+			mutex_exit(&chan->tx_rel_list.dl_mutex);
+			mutex_exit(&chan->tx_wqe_list.dl_mutex);
+			mutex_exit(&state->id_ac_mutex);
+		}
+
 		ibt_set_cq_handler(chan->scq_hdl, 0, 0);
-		ret = ibt_close_rc_channel(chan->chan_hdl,
-		    IBT_BLOCKING|IBT_NOCALLBACKS, NULL, 0, NULL, NULL, 0);
-		if (ret != IBT_SUCCESS) {
-			DPRINT(40, "ibd_rc_act_close-2: ibt_close_rc_channel "
-			    "fail, chan=%p, returned=%d", chan, ret);
-		} else {
-			DPRINT(30, "ibd_rc_act_close-2: ibt_close_rc_channel "
-			    "succ, chan=%p", chan);
+		if (is_close_rc_chan) {
+			ret = ibt_close_rc_channel(chan->chan_hdl,
+			    IBT_BLOCKING|IBT_NOCALLBACKS, NULL, 0, NULL, NULL,
+			    0);
+			if (ret != IBT_SUCCESS) {
+				DPRINT(40, "ibd_rc_act_close: ibt_close_rc_"
+				    "channel fail, chan=%p, ret=%d",
+				    chan, ret);
+			} else {
+				DPRINT(30, "ibd_rc_act_close: ibt_close_rc_"
+				    "channel succ, chan=%p", chan);
+			}
 		}
 
 		ibd_rc_free_chan(chan);
@@ -2712,8 +2937,24 @@ ibd_rc_act_close(ibd_rc_chan_t *chan)
 	}
 }
 
-static int
-ibd_rc_pas_close(ibd_rc_chan_t *chan)
+/*
+ * Close a passive channel
+ *
+ * is_close_rc_chan: if B_TRUE, we will call ibt_close_rc_channel()
+ *
+ * is_timeout_close: if B_TRUE, this function is called by the connection
+ * reaper (refer to function ibd_rc_conn_timeout_call). When the connection
+ * reaper calls ibd_rc_pas_close(), and if it finds that dl_bufs_outstanding
+ * or chan->rcq_invoking is non-zero, then it can simply put that channel back
+ * on the passive channels list and move on, since it might be an indication
+ * that the channel became active again by the time we started it's cleanup.
+ * It is costlier to do the cleanup and then reinitiate the channel
+ * establishment and hence it will help to be conservative when we do the
+ * cleanup.
+ */
+int
+ibd_rc_pas_close(ibd_rc_chan_t *chan, boolean_t is_close_rc_chan,
+    boolean_t is_timeout_close)
 {
 	uint_t times;
 	ibt_status_t ret;
@@ -2723,6 +2964,15 @@ ibd_rc_pas_close(ibd_rc_chan_t *chan)
 
 	switch (chan->chan_state) {
 	case IBD_RC_STATE_PAS_ESTAB:
+		if (is_timeout_close) {
+			if ((chan->rcq_invoking != 0) ||
+			    ((!chan->state->rc_enable_srq) &&
+			    (chan->rx_wqe_list.dl_bufs_outstanding > 0))) {
+				if (ibd_rc_re_add_to_pas_chan_list(chan)) {
+					return (DDI_FAILURE);
+				}
+			}
+		}
 		/*
 		 * First, stop receive interrupts; this stops the
 		 * connection from handing up buffers to higher layers.
@@ -2730,6 +2980,8 @@ ibd_rc_pas_close(ibd_rc_chan_t *chan)
 		 * after 5 seconds.
 		 */
 		ibt_set_cq_handler(chan->rcq_hdl, 0, 0);
+		/* Wait 0.01 second to let ibt_set_cq_handler() take effect */
+		delay(drv_usectohz(10000));
 		if (!chan->state->rc_enable_srq) {
 			times = 50;
 			while (chan->rx_wqe_list.dl_bufs_outstanding > 0) {
@@ -2745,20 +2997,33 @@ ibd_rc_pas_close(ibd_rc_chan_t *chan)
 				}
 			}
 		}
+		times = 50;
+		while (chan->rcq_invoking != 0) {
+			delay(drv_usectohz(100000));
+			if (--times == 0) {
+				DPRINT(40, "ibd_rc_pas_close : "
+				    "rcq handler is being invoked");
+				chan->state->rc_pas_close_rcq_invoking++;
+				break;
+			}
+		}
 		ibt_set_cq_handler(chan->scq_hdl, 0, 0);
 		chan->chan_state = IBD_RC_STATE_PAS_CLOSED;
 		DPRINT(30, "ibd_rc_pas_close-1: close and free chan, "
 		    "chan_state=%d, chan=%p", chan->chan_state, chan);
-		ret = ibt_close_rc_channel(chan->chan_hdl,
-		    IBT_BLOCKING|IBT_NOCALLBACKS, NULL, 0, NULL, NULL, 0);
-		if (ret != IBT_SUCCESS) {
-			DPRINT(40, "ibd_rc_pas_close-2: ibt_close_rc_channel()"
-			    " fail, chan=%p, returned=%d", chan, ret);
-		} else {
-			DPRINT(30, "ibd_rc_pas_close-2: ibt_close_rc_channel()"
-			    " succ, chan=%p", chan);
+		if (is_close_rc_chan) {
+			ret = ibt_close_rc_channel(chan->chan_hdl,
+			    IBT_BLOCKING|IBT_NOCALLBACKS, NULL, 0, NULL, NULL,
+			    0);
+			if (ret != IBT_SUCCESS) {
+				DPRINT(40, "ibd_rc_pas_close: ibt_close_rc_"
+				    "channel() fail, chan=%p, ret=%d", chan,
+				    ret);
+			} else {
+				DPRINT(30, "ibd_rc_pas_close: ibt_close_rc_"
+				    "channel() succ, chan=%p", chan);
+			}
 		}
-
 		ibd_rc_free_chan(chan);
 		break;
 	case IBD_RC_STATE_PAS_REQ_RECV:
@@ -2771,49 +3036,6 @@ ibd_rc_pas_close(ibd_rc_chan_t *chan)
 		    chan->chan_state, chan);
 	}
 	return (DDI_SUCCESS);
-}
-
-/*
- * Remove duplicate RC channel which comes from the same mac
- *
- * From the IP point of view, we could check for same MAC:
- * GID, P_Key (or QPN, though in a reboot this is likely to
- * change so P_Key is better). The GID usually will equate to
- * port (since typically it uses the port GUID in the low 64 bits).
- * These fields exists in the REQ messages.
- */
-void
-ibd_rc_handle_req_rm_dup(ibd_state_t *state, ibt_cm_event_t *ibt_cm_event)
-{
-	ibd_rc_chan_t *chan, *pre_chan;
-
-	pre_chan = NULL;
-	mutex_enter(&state->rc_pass_chan_list.chan_list_mutex);
-	chan = state->rc_pass_chan_list.chan_list;
-	while (chan != NULL) {
-		if ((bcmp(&chan->requester_gid,
-		    &ibt_cm_event->cm_event.req.req_prim_addr.av_dgid,
-		    sizeof (ib_gid_t)) == 0) && (chan->requester_pkey ==
-		    ibt_cm_event->cm_event.req.req_pkey)) {
-			if (pre_chan == NULL) {
-				state->rc_pass_chan_list.chan_list = chan->next;
-			} else {
-				pre_chan->next = chan->next;
-			}
-			break;
-		}
-		pre_chan = chan;
-		chan = chan->next;
-	}
-	mutex_exit(&state->rc_pass_chan_list.chan_list_mutex);
-	if (chan) {
-		DPRINT(30, "ibd_rc_handle_req_rm_dup: same gid and pkey, "
-		    "remove duplicate channal, chan=%p", chan);
-		if (ibd_rc_pas_close(chan) != DDI_SUCCESS) {
-			ibd_rc_add_to_chan_list(&state->rc_pass_chan_list,
-			    chan);
-		}
-	}
 }
 
 /*
@@ -2831,8 +3053,6 @@ ibd_rc_handle_req(void *arg, ibd_rc_chan_t **ret_conn,
 	ibd_rc_msg_hello_t *hello_msg;
 	ibd_state_t *state = (ibd_state_t *)arg;
 	ibd_rc_chan_t *chan;
-
-	ibd_rc_handle_req_rm_dup(state, ibt_cm_event);
 
 	if (ibd_rc_alloc_chan(&chan, state, B_FALSE) != IBT_SUCCESS) {
 		DPRINT(40, "ibd_rc_handle_req: ibd_rc_alloc_chan() failed");
@@ -2869,8 +3089,6 @@ ibd_rc_handle_req(void *arg, ibd_rc_chan_t **ret_conn,
 	hello_msg->reserved_qpn = htonl(state->id_qpnum);
 	hello_msg->rx_mtu = htonl(state->rc_mtu);
 
-	chan->requester_gid = ibt_cm_event->cm_event.req.req_prim_addr.av_dgid;
-	chan->requester_pkey = ibt_cm_event->cm_event.req.req_pkey;
 	chan->chan_state = IBD_RC_STATE_PAS_REQ_RECV;	/* ready to receive */
 	*ret_conn = chan;
 
@@ -2947,7 +3165,6 @@ ibd_rc_dispatch_actv_mad(void *arg, ibt_cm_event_t *ibt_cm_event,
 	ibd_rc_chan_t *rc_chan;
 	ibd_state_t *state;
 	ibd_rc_msg_hello_t *hello_ack;
-	uint_t times;
 
 	switch (ibt_cm_event->cm_type) {
 	case IBT_CM_EVENT_REP_RCV:
@@ -2997,45 +3214,7 @@ ibd_rc_dispatch_actv_mad(void *arg, ibt_cm_event_t *ibt_cm_event,
 			    "chan_state=%d", rc_chan->chan_state);
 			return (IBT_CM_ACCEPT);
 		}
-		/* wait until the send queue clean */
-		times = 0;
-		mutex_enter(&rc_chan->tx_wqe_list.dl_mutex);
-		mutex_enter(&rc_chan->tx_rel_list.dl_mutex);
-		while (((rc_chan->tx_wqe_list.dl_cnt +
-		    rc_chan->tx_rel_list.dl_cnt)
-		    != rc_chan->scq_size) && (times < 50)) {
-			DPRINT(40, "ibd_rc_dispatch_act_mad: dl_cnt"
-			    "(tx_wqe_list=%d, tx_rel_list=%d) != "
-			    "chan->scq_size=%d",
-			    rc_chan->tx_wqe_list.dl_cnt,
-			    rc_chan->tx_rel_list.dl_cnt,
-			    rc_chan->scq_size);
-			mutex_exit(&rc_chan->tx_rel_list.dl_mutex);
-			mutex_exit(&rc_chan->tx_wqe_list.dl_mutex);
-			mutex_enter(&rc_chan->tx_poll_lock);
-			if (rc_chan->tx_poll_busy & IBD_CQ_POLLING) {
-				DPRINT(40, "ibd_rc_dispatch_actv_mad: "
-				    "multiple polling threads");
-				mutex_exit(&rc_chan->tx_poll_lock);
-			} else {
-				rc_chan->tx_poll_busy = IBD_CQ_POLLING;
-				mutex_exit(&rc_chan->tx_poll_lock);
-				ibd_rc_drain_scq(rc_chan, rc_chan->scq_hdl);
-				mutex_enter(&rc_chan->tx_poll_lock);
-				rc_chan->tx_poll_busy = 0;
-				mutex_exit(&rc_chan->tx_poll_lock);
-			}
-			delay(drv_usectohz(100000));
-			times++;
-			mutex_enter(&rc_chan->tx_wqe_list.dl_mutex);
-			mutex_enter(&rc_chan->tx_rel_list.dl_mutex);
-		}
-		mutex_exit(&rc_chan->tx_rel_list.dl_mutex);
-		mutex_exit(&rc_chan->tx_wqe_list.dl_mutex);
-		rc_chan->chan_state = IBD_RC_STATE_ACT_CLOSED;
-		ibd_rc_free_chan(rc_chan);
-		DPRINT(30, "ibd_rc_dispatch_actv_mad: "
-		    "IBT_CM_EVENT_CONN_CLOSED, ref=%x", ace->ac_ref);
+		ibd_rc_act_close(rc_chan, B_FALSE);
 		mutex_enter(&state->id_ac_mutex);
 		ace->ac_chan = NULL;
 		ASSERT(ace->ac_ref != 0);
@@ -3121,8 +3300,10 @@ ibd_rc_dispatch_pass_mad(void *arg, ibt_cm_event_t *ibt_cm_event,
 	case IBT_CM_EVENT_CONN_CLOSED:
 		DPRINT(30, "ibd_rc_dispatch_pass_mad: IBT_CM_EVENT_CONN_CLOSED,"
 		    " chan=%p, reason=%d", chan, ibt_cm_event->cm_event.closed);
-		ibd_rc_rm_from_chan_list(&chan->state->rc_pass_chan_list, chan);
-		ibd_rc_free_chan(chan);
+		chan = ibd_rc_rm_from_chan_list(&chan->state->rc_pass_chan_list,
+		    chan);
+		if (chan != NULL)
+			(void) ibd_rc_pas_close(chan, B_FALSE, B_FALSE);
 		break;
 	case IBT_CM_EVENT_FAILURE:
 		DPRINT(30, "ibd_rc_dispatch_pass_mad: IBT_CM_EVENT_FAILURE,"
@@ -3130,9 +3311,10 @@ ibd_rc_dispatch_pass_mad(void *arg, ibt_cm_event_t *ibt_cm_event,
 		    ibt_cm_event->cm_event.failed.cf_code,
 		    ibt_cm_event->cm_event.failed.cf_msg,
 		    ibt_cm_event->cm_event.failed.cf_reason);
-
-		ibd_rc_rm_from_chan_list(&chan->state->rc_pass_chan_list, chan);
-		ibd_rc_free_chan(chan);
+		chan = ibd_rc_rm_from_chan_list(&chan->state->rc_pass_chan_list,
+		    chan);
+		if (chan != NULL)
+			(void) ibd_rc_pas_close(chan, B_FALSE, B_FALSE);
 		return (IBT_CM_ACCEPT);
 	case IBT_CM_EVENT_MRA_RCV:
 		DPRINT(40, "ibd_rc_dispatch_pass_mad: IBT_CM_EVENT_MRA_RCV");

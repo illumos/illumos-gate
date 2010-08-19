@@ -49,16 +49,10 @@ file path=usr/lib/libdat.so.1
 file path=usr/lib/llib-ldat
 file path=usr/lib/llib-ldat.ln
 file path=usr/sbin/datadm mode=0555
-legacy pkg=SUNWudaplr arch=$(ARCH) category=system \
-    desc="DAT static registry file" \
-    hotline="Please contact your local service provider" \
-    name="Sun User Direct Access Programming Library (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWudaplu arch=$(ARCH) category=system \
-    desc="Sun DAT registry library and datadm" \
-    hotline="Please contact your local service provider" \
-    name="Sun User Direct Access Programming Library (User)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWudaplr desc="DAT static registry file" \
+    name="Sun User Direct Access Programming Library (Root)"
+legacy pkg=SUNWudaplu desc="Sun DAT registry library and datadm" \
+    name="Sun User Direct Access Programming Library (User)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libdat.so target=libdat.so.1

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -1176,10 +1175,10 @@ ilbd_Xable_server(ilb_sg_info_t *sg, const struct passwd *ps,
 	char		*dot;
 	int		scf_name_len = ILBD_MAX_NAME_LEN;
 	int		scf_val_len = ILBD_MAX_VALUE_LEN;
-	char		prop_name[scf_name_len];
+	char		*prop_name = NULL;
 	ilb_ip_addr_t	ipaddr;
 	void		*addrptr;
-	char		ipstr[INET6_ADDRSTRLEN], valstr[scf_val_len];
+	char		ipstr[INET6_ADDRSTRLEN], *valstr = NULL;
 	int		ipver, vallen;
 	char		sgname[ILB_NAMESZ];
 	uint32_t	nflags;
@@ -1399,11 +1398,18 @@ ilbd_Xable_server(ilb_sg_info_t *sg, const struct passwd *ps,
 		goto rollback_rules;
 	}
 
-	(void) snprintf(valstr, sizeof (valstr), "%s;%d;%d-%d;%d",
+	if ((prop_name = malloc(scf_name_len)) == NULL)
+		return (ILB_STATUS_ENOMEM);
+	if ((valstr = malloc(scf_val_len)) == NULL) {
+		free(prop_name);
+		return (ILB_STATUS_ENOMEM);
+	}
+
+	(void) snprintf(valstr, scf_val_len, "%s;%d;%d-%d;%d",
 	    ipstr, ipver,
 	    ntohs(tmp_srv->isv_minport),
 	    ntohs(tmp_srv->isv_maxport), nflags);
-	(void) snprintf(prop_name, sizeof (prop_name), "server%d",
+	(void) snprintf(prop_name, scf_name_len, "server%d",
 	    tmp_srv->isv_id);
 
 	switch (cmd) {
@@ -1420,6 +1426,8 @@ ilbd_Xable_server(ilb_sg_info_t *sg, const struct passwd *ps,
 			SET_SRV_ENABLED(&tmp_srv->isv_srv);
 		break;
 	}
+	free(prop_name);
+	free(valstr);
 	if (rc == ILB_STATUS_OK) {
 		switch (cmd) {
 		case stat_disable_server:

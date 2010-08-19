@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
@@ -211,13 +210,11 @@ ld_ent_check(Ofl_desc * ofl)
 
 
 		if (alist_nitems(enp->ec_files) > 0) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_ENT_NOSEC_1), enp->ec_segment->sg_name,
-			    enp->ec_is_name);
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_ENT_NOSEC_1),
+			    enp->ec_segment->sg_name, enp->ec_is_name);
 		} else {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_ENT_NOSEC_2), enp->ec_segment->sg_name,
-			    enp->ec_is_name);
+			ld_eprintf(ofl, ERR_WARNING, MSG_INTL(MSG_ENT_NOSEC_2),
+			    enp->ec_segment->sg_name, enp->ec_is_name);
 		}
 	}
 }

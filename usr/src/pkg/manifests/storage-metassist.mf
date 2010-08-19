@@ -49,15 +49,9 @@ file path=usr/share/lib/xml/dtd/volume-config.dtd group=sys
 file path=usr/share/lib/xml/dtd/volume-defaults.dtd group=sys
 file path=usr/share/lib/xml/dtd/volume-request.dtd group=sys
 file path=usr/share/lib/xml/style/volume-command.xsl group=sys
-legacy pkg=SUNWmdar arch=$(ARCH) category=system \
-    desc="Solaris Volume Manager Assistant (Root)" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Volume Manager Assistant (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWmdau arch=$(ARCH) category=system \
-    desc="Solaris Volume Manager Assistant (Usr)" \
-    hotline="Please contact your local service provider" \
-    name="Solaris Volume Manager Assistant (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWmdar desc="Solaris Volume Manager Assistant (Root)" \
+    name="Solaris Volume Manager Assistant (Root)"
+legacy pkg=SUNWmdau desc="Solaris Volume Manager Assistant (Usr)" \
+    name="Solaris Volume Manager Assistant (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

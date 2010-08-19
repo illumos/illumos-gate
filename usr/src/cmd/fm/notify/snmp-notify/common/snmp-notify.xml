@@ -1,0 +1,142 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWckr:fmd'>
+
+<service
+	name='system/fm/snmp-notify'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<!--
+	 Just one instance of snmp-notify should be running in any OS instance.
+	-->
+	<single_instance />
+
+	<!--
+	    Add a dependency on SUNWfmd being installed
+	-->
+	<dependency
+	    name='SUNWfmd'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='path'>
+		<service_fmri value='file://localhost/usr/lib/fm/notify/snmp-notify' />
+	</dependency>
+
+	<dependency
+	    name='startup_req'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/milestone/multi-user:default' />
+		<service_fmri value='svc:/system/fmd:default' />
+		<service_fmri value='svc:/application/management/net-snmp:default' />
+	</dependency>
+
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec='/usr/lib/fm/notify/snmp-notify'
+	    timeout_seconds='0' />
+
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec=':kill'
+	    timeout_seconds='60' />
+
+        <exec_method
+                type='method'
+                name='refresh'
+                exec=':kill -HUP'
+                timeout_seconds='30'>
+                <method_context>
+                        <method_credential user='root' group='root' />
+                </method_context>
+        </exec_method>
+
+	<property_group name="general" type="framework">
+		<propval name='action_authorization' type='astring'
+                    value='solaris.smf.manage.snmp-notify' />
+		<propval name='value_authorization' type='astring'
+                    value='solaris.smf.value.snmp-notify' />
+	</property_group>
+
+	<property_group name="config" type="application">
+		<propval name="debug" type="boolean" value="false"/>
+		<propval name="rootdir" type="astring" value="/"/>
+		<propval name='action_authorization' type='astring'
+                    value='solaris.smf.manage.snmp-notify' />
+		<propval name='value_authorization' type='astring'
+                    value='solaris.smf.value.snmp-notify' />
+	</property_group>
+
+	<stability value='Evolving' />
+
+	<template>
+	    	<common_name>
+		    	<loctext xml:lang='C'>
+				Solaris SNMP Event Notification Agent
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='snmp-notify' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+		<pg_pattern name='config' type='application' target='this'
+		    required='false'>
+			<prop_pattern name='debug' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+When set to true, smtp-notify will spool debug messages to /var/fm/notify/snmp-notify.log
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='rootdir' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The root directory that will be used for all pathnames evaluated by snmp-notify
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>	 
+	</template>
+</service>
+
+</service_bundle>

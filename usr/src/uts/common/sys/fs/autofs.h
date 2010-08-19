@@ -107,6 +107,8 @@ typedef struct fninfo {
  *                 - Grab writers to add a new fnnode under fn_dirents and
  *		     to remove a node pointed to by fn_dirents or fn_next.
  *
+ *	Lock ordering:
+ *		fn_rwlock > fn_lock
  *
  * The flags:
  *	MF_INPROG:

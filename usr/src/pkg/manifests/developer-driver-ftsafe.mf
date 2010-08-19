@@ -42,15 +42,9 @@ file path=kernel/drv/bofi.conf group=sys
 file path=usr/lib/th_script mode=0555
 file path=usr/sbin/th_define mode=0555
 file path=usr/sbin/th_manage mode=0555
-legacy pkg=SUNWftdur arch=$(ARCH) category=system \
-    desc="Driver Hardening Test Harness" \
-    hotline="Please contact your local service provider" \
-    name="ftSafe developer utilities package (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWftduu arch=$(ARCH) category=system \
-    desc="Driver Hardening Test Harness (usr)" \
-    hotline="Please contact your local service provider" \
-    name="ftSafe developer utilities package (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWftdur desc="Driver Hardening Test Harness" \
+    name="ftSafe developer utilities package (Root)"
+legacy pkg=SUNWftduu desc="Driver Hardening Test Harness (usr)" \
+    name="ftSafe developer utilities package (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

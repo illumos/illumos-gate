@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _PACKET_H
 #define	_PACKET_H
 
 #include <sys/socket_impl.h>
+#include <net/if_arp.h>
 #include <net/bpf.h>
 
 /*
@@ -116,26 +116,25 @@ struct sock_fprog {
  *
  * The numbers above 50000 are because their real value is unknown from
  * libpcap's source, so a number has been chosen that is unlikely to be
- * confused with the real one on Linux.
+ * confused with the real one on Linux. Those that are already found in
+ * Solaris inside <net/if_arp.h> may have a different value to that found
+ * in Linux but it should be used instead as the Solaris value originates
+ * from the IANA whereas the Linux values seem to ignore it.
  */
-#define	ARPHRD_ADAPT			50001
-#define	ARPHRD_ARCNET			50002
-#define	ARPHRD_ATM			19
-#define	ARPHRD_AX25			50003
-#define	ARPHRD_CHAOS			50004
-#define	ARPHRD_CISCO			513
+/* ARPHRD_AX25				see <net/if_arp.h> */
+/* ARPHRD_CHAOS				see <net/if_arp.h> */
 #define	ARPHRD_CSLIP			50005
 #define	ARPHRD_CSLIP6			50006
 #define	ARPHRD_DLCI			15
-#define	ARPHRD_EETHER			50007
-#define	ARPHRD_ETHER			50008
+/* ARPHRD_EETHER			see <net/if_arp.h> */
+/* ARPHRD_ETHER				see <net/if_arp.h> */
 #define	ARPHRD_FCAL			785
 #define	ARPHRD_FCFABRIC			787
 #define	ARPHRD_FCPL			786
 #define	ARPHRD_FCPP			784
 #define	ARPHRD_FRAD			770
 #define	ARPHRD_FDDI			774
-#define	ARPHRD_IEEE802			50009
+/* ARPHRD_IEEE802			see <net/if_arp.h> */
 #define	ARPHRD_IEEE802_TR		800
 #define	ARPHRD_IEEE80211		801
 #define	ARPHRD_IEEE80211_PRISM		802
@@ -144,14 +143,21 @@ struct sock_fprog {
 #define	ARPHRD_LAPD			8445
 #define	ARPHRD_LOCALTLK			50010
 #define	ARPHRD_LOOPBACK			50011
-#define	ARPHRD_METRICOM			50012
+/* ARPHRD_METRICOM			see <net/if_arp.h> */
 #define	ARPHRD_PRONET			50013
 #define	ARPHRD_PPP			50014
 #define	ARPHRD_RAWHDLC			518
 #define	ARPHRD_SIT			776
 #define	ARPHRD_SLIP6			50015
 #define	ARPHRD_SLIP			50016
-#define	ARPHRD_TUNNEL			50017
+/* ARPHRD_TUNNEL			see <net/if_arp.h> */
+
+#define	ETH_P_ALL			0
+#define	ETH_P_802_2			0xaa	/* LSAP_SAP */
+#define	ETH_P_803_3			0
+#define	ETH_P_IP			0x800
+#define	ETH_P_ARP			0x806
+#define	ETH_P_IPV6			0x86dd
 
 #ifdef _KERNEL
 /*

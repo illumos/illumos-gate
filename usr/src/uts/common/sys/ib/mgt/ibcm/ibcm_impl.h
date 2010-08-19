@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_IB_MGT_IBCM_IBCM_IMPL_H
@@ -493,7 +492,7 @@ _NOTE(SCHEME_PROTECTS_DATA("Serailized access by block_client_cv",
     close_ret_priv_data_len close_ret_status}))
 
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ibcm_state_data_s::{timedout_state
-    cm_handler mra_msg abort_flag}))
+    cm_handler mra_msg abort_flag local_qp_rnr_cnt}))
 
 /*
  * Definitions for send mad flags. Respective bits in send_mad_flags or

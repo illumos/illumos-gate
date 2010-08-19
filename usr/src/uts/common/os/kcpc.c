@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -2281,9 +2280,10 @@ kcpc_reqs_add(kcpc_request_list_t *req_list, char *event, uint64_t preset,
 {
 	kcpc_request_t	*req;
 
-	ASSERT(req_list->krl_max != 0);
 	if (req_list == NULL || req_list->krl_list == NULL)
 		return (-1);
+
+	ASSERT(req_list->krl_max != 0);
 
 	/*
 	 * Allocate more space (if needed)

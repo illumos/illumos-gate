@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <strings.h>
@@ -722,6 +721,7 @@ fmd_adm_logrotate_1_svc(char *name, int *rvp, struct svc_req *req)
 {
 	fmd_log_t **lpp, *old, *new;
 	int try = 1, trylimit = 1;
+	pthread_rwlock_t *lockp;
 
 	hrtime_t nsec = 0;
 	timespec_t tv;
@@ -731,11 +731,19 @@ fmd_adm_logrotate_1_svc(char *name, int *rvp, struct svc_req *req)
 		return (TRUE);
 	}
 
-	if (strcmp(name, "errlog") == 0)
+	if (strcmp(name, "errlog") == 0) {
 		lpp = &fmd.d_errlog;
-	else if (strcmp(name, "fltlog") == 0)
+		lockp = &fmd.d_log_lock;
+	} else if (strcmp(name, "fltlog") == 0) {
 		lpp = &fmd.d_fltlog;
-	else {
+		lockp = &fmd.d_log_lock;
+	} else if (strcmp(name, "infolog") == 0) {
+		lpp = &fmd.d_ilog;
+		lockp = &fmd.d_ilog_lock;
+	} else if (strcmp(name, "infolog_hival") == 0) {
+		lpp = &fmd.d_hvilog;
+		lockp = &fmd.d_hvilog_lock;
+	} else {
 		*rvp = FMD_ADM_ERR_ROTSRCH;
 		return (TRUE);
 	}
@@ -755,7 +763,7 @@ fmd_adm_logrotate_1_svc(char *name, int *rvp, struct svc_req *req)
 		if (try > 1)
 			(void) nanosleep(&tv, NULL); /* wait for checkpoints */
 
-		(void) pthread_rwlock_wrlock(&fmd.d_log_lock);
+		(void) pthread_rwlock_wrlock(lockp);
 		old = *lpp;
 
 		if ((new = fmd_log_rotate(old)) != NULL) {
@@ -763,7 +771,7 @@ fmd_adm_logrotate_1_svc(char *name, int *rvp, struct svc_req *req)
 			*lpp = new;
 		}
 
-		(void) pthread_rwlock_unlock(&fmd.d_log_lock);
+		(void) pthread_rwlock_unlock(lockp);
 
 	} while (new == NULL && errno == EFMD_LOG_ROTBUSY && try++ < trylimit);
 

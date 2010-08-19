@@ -181,13 +181,6 @@ static size_t	udp_set_rcv_hiwat(udp_t *udp, size_t size);
 static void	*udp_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	udp_stack_fini(netstackid_t stackid, void *arg);
 
-static void	*udp_kstat_init(netstackid_t stackid);
-static void	udp_kstat_fini(netstackid_t stackid, kstat_t *ksp);
-static void	*udp_kstat2_init(netstackid_t, udp_stat_t *);
-static void	udp_kstat2_fini(netstackid_t, kstat_t *);
-static int	udp_kstat_update(kstat_t *kp, int rw);
-
-
 /* Common routines for TPI and socket module */
 static void	udp_ulp_recv(conn_t *, mblk_t *, uint_t, ip_recv_attr_t *);
 
@@ -1128,7 +1121,7 @@ udp_icmp_error_ipv6(conn_t *connp, mblk_t *mp, ip_recv_attr_t *ira)
 		udi_size = sizeof (struct T_unitdata_ind) + sizeof (sin6_t) +
 		    opt_length;
 		if ((newmp = allocb(udi_size, BPRI_MED)) == NULL) {
-			BUMP_MIB(&us->us_udp_mib, udpInErrors);
+			UDPS_BUMP_MIB(us, udpInErrors);
 			break;
 		}
 
@@ -2265,7 +2258,7 @@ udp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			/* Allocation failed. Drop packet */
 			mutex_exit(&connp->conn_lock);
 			freemsg(mp);
-			BUMP_MIB(&us->us_udp_mib, udpInErrors);
+			UDPS_BUMP_MIB(us, udpInErrors);
 			return;
 		}
 		mutex_exit(&connp->conn_lock);
@@ -2328,7 +2321,7 @@ udp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		mp1 = allocb(udi_size, BPRI_MED);
 		if (mp1 == NULL) {
 			freemsg(mp);
-			BUMP_MIB(&us->us_udp_mib, udpInErrors);
+			UDPS_BUMP_MIB(us, udpInErrors);
 			return;
 		}
 		mp1->b_cont = mp;
@@ -2377,7 +2370,7 @@ udp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		mp1 = allocb(udi_size, BPRI_MED);
 		if (mp1 == NULL) {
 			freemsg(mp);
-			BUMP_MIB(&us->us_udp_mib, udpInErrors);
+			UDPS_BUMP_MIB(us, udpInErrors);
 			return;
 		}
 		mp1->b_cont = mp;
@@ -2440,312 +2433,13 @@ udp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		pkt_len -= hdr_length;
 	}
 
-	BUMP_MIB(&us->us_udp_mib, udpHCInDatagrams);
+	UDPS_BUMP_MIB(us, udpHCInDatagrams);
 	udp_ulp_recv(connp, mp1, pkt_len, ira);
 	return;
 
 tossit:
 	freemsg(mp);
-	BUMP_MIB(&us->us_udp_mib, udpInErrors);
-}
-
-/*
- * return SNMP stuff in buffer in mpdata. We don't hold any lock and report
- * information that can be changing beneath us.
- */
-mblk_t *
-udp_snmp_get(queue_t *q, mblk_t *mpctl)
-{
-	mblk_t			*mpdata;
-	mblk_t			*mp_conn_ctl;
-	mblk_t			*mp_attr_ctl;
-	mblk_t			*mp6_conn_ctl;
-	mblk_t			*mp6_attr_ctl;
-	mblk_t			*mp_conn_tail;
-	mblk_t			*mp_attr_tail;
-	mblk_t			*mp6_conn_tail;
-	mblk_t			*mp6_attr_tail;
-	struct opthdr		*optp;
-	mib2_udpEntry_t		ude;
-	mib2_udp6Entry_t	ude6;
-	mib2_transportMLPEntry_t mlp;
-	int			state;
-	zoneid_t		zoneid;
-	int			i;
-	connf_t			*connfp;
-	conn_t			*connp = Q_TO_CONN(q);
-	int			v4_conn_idx;
-	int			v6_conn_idx;
-	boolean_t		needattr;
-	udp_t			*udp;
-	ip_stack_t		*ipst = connp->conn_netstack->netstack_ip;
-	udp_stack_t		*us = connp->conn_netstack->netstack_udp;
-	mblk_t			*mp2ctl;
-
-	/*
-	 * make a copy of the original message
-	 */
-	mp2ctl = copymsg(mpctl);
-
-	mp_conn_ctl = mp_attr_ctl = mp6_conn_ctl = NULL;
-	if (mpctl == NULL ||
-	    (mpdata = mpctl->b_cont) == NULL ||
-	    (mp_conn_ctl = copymsg(mpctl)) == NULL ||
-	    (mp_attr_ctl = copymsg(mpctl)) == NULL ||
-	    (mp6_conn_ctl = copymsg(mpctl)) == NULL ||
-	    (mp6_attr_ctl = copymsg(mpctl)) == NULL) {
-		freemsg(mp_conn_ctl);
-		freemsg(mp_attr_ctl);
-		freemsg(mp6_conn_ctl);
-		freemsg(mpctl);
-		freemsg(mp2ctl);
-		return (0);
-	}
-
-	zoneid = connp->conn_zoneid;
-
-	/* fixed length structure for IPv4 and IPv6 counters */
-	SET_MIB(us->us_udp_mib.udpEntrySize, sizeof (mib2_udpEntry_t));
-	SET_MIB(us->us_udp_mib.udp6EntrySize, sizeof (mib2_udp6Entry_t));
-	/* synchronize 64- and 32-bit counters */
-	SYNC32_MIB(&us->us_udp_mib, udpInDatagrams, udpHCInDatagrams);
-	SYNC32_MIB(&us->us_udp_mib, udpOutDatagrams, udpHCOutDatagrams);
-
-	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
-	optp->level = MIB2_UDP;
-	optp->name = 0;
-	(void) snmp_append_data(mpdata, (char *)&us->us_udp_mib,
-	    sizeof (us->us_udp_mib));
-	optp->len = msgdsize(mpdata);
-	qreply(q, mpctl);
-
-	mp_conn_tail = mp_attr_tail = mp6_conn_tail = mp6_attr_tail = NULL;
-	v4_conn_idx = v6_conn_idx = 0;
-
-	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
-		connp = NULL;
-
-		while ((connp = ipcl_get_next_conn(connfp, connp,
-		    IPCL_UDPCONN))) {
-			udp = connp->conn_udp;
-			if (zoneid != connp->conn_zoneid)
-				continue;
-
-			/*
-			 * Note that the port numbers are sent in
-			 * host byte order
-			 */
-
-			if (udp->udp_state == TS_UNBND)
-				state = MIB2_UDP_unbound;
-			else if (udp->udp_state == TS_IDLE)
-				state = MIB2_UDP_idle;
-			else if (udp->udp_state == TS_DATA_XFER)
-				state = MIB2_UDP_connected;
-			else
-				state = MIB2_UDP_unknown;
-
-			needattr = B_FALSE;
-			bzero(&mlp, sizeof (mlp));
-			if (connp->conn_mlp_type != mlptSingle) {
-				if (connp->conn_mlp_type == mlptShared ||
-				    connp->conn_mlp_type == mlptBoth)
-					mlp.tme_flags |= MIB2_TMEF_SHARED;
-				if (connp->conn_mlp_type == mlptPrivate ||
-				    connp->conn_mlp_type == mlptBoth)
-					mlp.tme_flags |= MIB2_TMEF_PRIVATE;
-				needattr = B_TRUE;
-			}
-			if (connp->conn_anon_mlp) {
-				mlp.tme_flags |= MIB2_TMEF_ANONMLP;
-				needattr = B_TRUE;
-			}
-			switch (connp->conn_mac_mode) {
-			case CONN_MAC_DEFAULT:
-				break;
-			case CONN_MAC_AWARE:
-				mlp.tme_flags |= MIB2_TMEF_MACEXEMPT;
-				needattr = B_TRUE;
-				break;
-			case CONN_MAC_IMPLICIT:
-				mlp.tme_flags |= MIB2_TMEF_MACIMPLICIT;
-				needattr = B_TRUE;
-				break;
-			}
-			mutex_enter(&connp->conn_lock);
-			if (udp->udp_state == TS_DATA_XFER &&
-			    connp->conn_ixa->ixa_tsl != NULL) {
-				ts_label_t *tsl;
-
-				tsl = connp->conn_ixa->ixa_tsl;
-				mlp.tme_flags |= MIB2_TMEF_IS_LABELED;
-				mlp.tme_doi = label2doi(tsl);
-				mlp.tme_label = *label2bslabel(tsl);
-				needattr = B_TRUE;
-			}
-			mutex_exit(&connp->conn_lock);
-
-			/*
-			 * Create an IPv4 table entry for IPv4 entries and also
-			 * any IPv6 entries which are bound to in6addr_any
-			 * (i.e. anything a IPv4 peer could connect/send to).
-			 */
-			if (connp->conn_ipversion == IPV4_VERSION ||
-			    (udp->udp_state <= TS_IDLE &&
-			    IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6))) {
-				ude.udpEntryInfo.ue_state = state;
-				/*
-				 * If in6addr_any this will set it to
-				 * INADDR_ANY
-				 */
-				ude.udpLocalAddress = connp->conn_laddr_v4;
-				ude.udpLocalPort = ntohs(connp->conn_lport);
-				if (udp->udp_state == TS_DATA_XFER) {
-					/*
-					 * Can potentially get here for
-					 * v6 socket if another process
-					 * (say, ping) has just done a
-					 * sendto(), changing the state
-					 * from the TS_IDLE above to
-					 * TS_DATA_XFER by the time we hit
-					 * this part of the code.
-					 */
-					ude.udpEntryInfo.ue_RemoteAddress =
-					    connp->conn_faddr_v4;
-					ude.udpEntryInfo.ue_RemotePort =
-					    ntohs(connp->conn_fport);
-				} else {
-					ude.udpEntryInfo.ue_RemoteAddress = 0;
-					ude.udpEntryInfo.ue_RemotePort = 0;
-				}
-
-				/*
-				 * We make the assumption that all udp_t
-				 * structs will be created within an address
-				 * region no larger than 32-bits.
-				 */
-				ude.udpInstance = (uint32_t)(uintptr_t)udp;
-				ude.udpCreationProcess =
-				    (connp->conn_cpid < 0) ?
-				    MIB2_UNKNOWN_PROCESS :
-				    connp->conn_cpid;
-				ude.udpCreationTime = connp->conn_open_time;
-
-				(void) snmp_append_data2(mp_conn_ctl->b_cont,
-				    &mp_conn_tail, (char *)&ude, sizeof (ude));
-				mlp.tme_connidx = v4_conn_idx++;
-				if (needattr)
-					(void) snmp_append_data2(
-					    mp_attr_ctl->b_cont, &mp_attr_tail,
-					    (char *)&mlp, sizeof (mlp));
-			}
-			if (connp->conn_ipversion == IPV6_VERSION) {
-				ude6.udp6EntryInfo.ue_state  = state;
-				ude6.udp6LocalAddress = connp->conn_laddr_v6;
-				ude6.udp6LocalPort = ntohs(connp->conn_lport);
-				mutex_enter(&connp->conn_lock);
-				if (connp->conn_ixa->ixa_flags &
-				    IXAF_SCOPEID_SET) {
-					ude6.udp6IfIndex =
-					    connp->conn_ixa->ixa_scopeid;
-				} else {
-					ude6.udp6IfIndex = connp->conn_bound_if;
-				}
-				mutex_exit(&connp->conn_lock);
-				if (udp->udp_state == TS_DATA_XFER) {
-					ude6.udp6EntryInfo.ue_RemoteAddress =
-					    connp->conn_faddr_v6;
-					ude6.udp6EntryInfo.ue_RemotePort =
-					    ntohs(connp->conn_fport);
-				} else {
-					ude6.udp6EntryInfo.ue_RemoteAddress =
-					    sin6_null.sin6_addr;
-					ude6.udp6EntryInfo.ue_RemotePort = 0;
-				}
-				/*
-				 * We make the assumption that all udp_t
-				 * structs will be created within an address
-				 * region no larger than 32-bits.
-				 */
-				ude6.udp6Instance = (uint32_t)(uintptr_t)udp;
-				ude6.udp6CreationProcess =
-				    (connp->conn_cpid < 0) ?
-				    MIB2_UNKNOWN_PROCESS :
-				    connp->conn_cpid;
-				ude6.udp6CreationTime = connp->conn_open_time;
-
-				(void) snmp_append_data2(mp6_conn_ctl->b_cont,
-				    &mp6_conn_tail, (char *)&ude6,
-				    sizeof (ude6));
-				mlp.tme_connidx = v6_conn_idx++;
-				if (needattr)
-					(void) snmp_append_data2(
-					    mp6_attr_ctl->b_cont,
-					    &mp6_attr_tail, (char *)&mlp,
-					    sizeof (mlp));
-			}
-		}
-	}
-
-	/* IPv4 UDP endpoints */
-	optp = (struct opthdr *)&mp_conn_ctl->b_rptr[
-	    sizeof (struct T_optmgmt_ack)];
-	optp->level = MIB2_UDP;
-	optp->name = MIB2_UDP_ENTRY;
-	optp->len = msgdsize(mp_conn_ctl->b_cont);
-	qreply(q, mp_conn_ctl);
-
-	/* table of MLP attributes... */
-	optp = (struct opthdr *)&mp_attr_ctl->b_rptr[
-	    sizeof (struct T_optmgmt_ack)];
-	optp->level = MIB2_UDP;
-	optp->name = EXPER_XPORT_MLP;
-	optp->len = msgdsize(mp_attr_ctl->b_cont);
-	if (optp->len == 0)
-		freemsg(mp_attr_ctl);
-	else
-		qreply(q, mp_attr_ctl);
-
-	/* IPv6 UDP endpoints */
-	optp = (struct opthdr *)&mp6_conn_ctl->b_rptr[
-	    sizeof (struct T_optmgmt_ack)];
-	optp->level = MIB2_UDP6;
-	optp->name = MIB2_UDP6_ENTRY;
-	optp->len = msgdsize(mp6_conn_ctl->b_cont);
-	qreply(q, mp6_conn_ctl);
-
-	/* table of MLP attributes... */
-	optp = (struct opthdr *)&mp6_attr_ctl->b_rptr[
-	    sizeof (struct T_optmgmt_ack)];
-	optp->level = MIB2_UDP6;
-	optp->name = EXPER_XPORT_MLP;
-	optp->len = msgdsize(mp6_attr_ctl->b_cont);
-	if (optp->len == 0)
-		freemsg(mp6_attr_ctl);
-	else
-		qreply(q, mp6_attr_ctl);
-
-	return (mp2ctl);
-}
-
-/*
- * Return 0 if invalid set request, 1 otherwise, including non-udp requests.
- * NOTE: Per MIB-II, UDP has no writable data.
- * TODO:  If this ever actually tries to set anything, it needs to be
- * to do the appropriate locking.
- */
-/* ARGSUSED */
-int
-udp_snmp_set(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr, int len)
-{
-	switch (level) {
-	case MIB2_UDP:
-		return (0);
-	default:
-		return (1);
-	}
+	UDPS_BUMP_MIB(us, udpInErrors);
 }
 
 /*
@@ -2922,7 +2616,7 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	 */
 	ixa = conn_get_ixa_exclusive(connp);
 	if (ixa == NULL) {
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		freemsg(mp);
 		return (ENOMEM);
 	}
@@ -2945,7 +2639,7 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		ixa->ixa_cred = connp->conn_cred;	/* Restore */
 		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		freemsg(mp);
 		return (ENOMEM);
 	}
@@ -2953,7 +2647,7 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	error = ip_pkt_copy(&connp->conn_xmit_ipp, ipp, KM_NOSLEEP);
 	mutex_exit(&connp->conn_lock);
 	if (error != 0) {
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		freemsg(mp);
 		goto done;
 	}
@@ -2989,7 +2683,7 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		 * module for "is_absreq_failure"
 		 */
 		freemsg(mp);
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		goto done;
 	}
 	ASSERT(is_absreq_failure == 0);
@@ -3085,7 +2779,7 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	default:
 	failed:
 		freemsg(mp);
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		goto done;
 	}
 
@@ -3101,7 +2795,7 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		/* Using UDP MLP requires SCM_UCRED from user */
 		if (connp->conn_mlp_type != mlptSingle &&
 		    !((ixa->ixa_flags & IXAF_UCRED_TSL))) {
-			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+			UDPS_BUMP_MIB(us, udpOutErrors);
 			error = ECONNREFUSED;
 			freemsg(mp);
 			goto done;
@@ -3121,7 +2815,7 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		error = conn_update_label(connp, ixa, &v6dst, ipp);
 		if (error != 0) {
 			freemsg(mp);
-			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+			UDPS_BUMP_MIB(us, udpOutErrors);
 			goto done;
 		}
 	}
@@ -3129,17 +2823,17 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	    flowinfo, mp, &error);
 	if (mp == NULL) {
 		ASSERT(error != 0);
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		goto done;
 	}
 	if (ixa->ixa_pktlen > IP_MAXPACKET) {
 		error = EMSGSIZE;
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		freemsg(mp);
 		goto done;
 	}
 	/* We're done.  Pass the packet to ip. */
-	BUMP_MIB(&us->us_udp_mib, udpHCOutDatagrams);
+	UDPS_BUMP_MIB(us, udpHCOutDatagrams);
 
 	DTRACE_UDP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
 	    void_ip_t *, mp->b_rptr, udp_t *, udp, udpha_t *,
@@ -3203,7 +2897,7 @@ udp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	 */
 	ixa = conn_get_ixa(connp, B_FALSE);
 	if (ixa == NULL) {
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		freemsg(mp);
 		return (ENOMEM);
 	}
@@ -3224,7 +2918,7 @@ udp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 		ixa->ixa_cred = connp->conn_cred;	/* Restore */
 		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		freemsg(mp);
 		return (error);
 	}
@@ -3283,7 +2977,7 @@ udp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
 			freemsg(mp);
-			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+			UDPS_BUMP_MIB(us, udpOutErrors);
 			return (error);
 		}
 	} else {
@@ -3293,7 +2987,7 @@ udp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	ASSERT(ixa->ixa_ire != NULL);
 
 	/* We're done.  Pass the packet to ip. */
-	BUMP_MIB(&us->us_udp_mib, udpHCOutDatagrams);
+	UDPS_BUMP_MIB(us, udpHCOutDatagrams);
 
 	DTRACE_UDP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
 	    void_ip_t *, mp->b_rptr, udp_t *, udp, udpha_t *,
@@ -3355,7 +3049,7 @@ udp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 		ixa->ixa_cred = connp->conn_cred;	/* Restore */
 		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		freemsg(mp);
 		return (error);
 	}
@@ -3414,7 +3108,7 @@ udp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
 			freemsg(mp);
-			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+			UDPS_BUMP_MIB(us, udpOutErrors);
 			return (error);
 		}
 	} else {
@@ -3423,7 +3117,7 @@ udp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 	}
 
 	/* We're done.  Pass the packet to ip. */
-	BUMP_MIB(&us->us_udp_mib, udpHCOutDatagrams);
+	UDPS_BUMP_MIB(us, udpHCOutDatagrams);
 
 	DTRACE_UDP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
 	    void_ip_t *, mp->b_rptr, udp_t *, udp, udpha_t *,
@@ -3679,7 +3373,7 @@ udp_wput(queue_t *q, mblk_t *mp)
 	case M_DATA:
 		if (!udp->udp_issocket || udp->udp_state != TS_DATA_XFER) {
 			/* Not connected; address is required */
-			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+			UDPS_BUMP_MIB(us, udpOutErrors);
 			UDP_DBGSTAT(us, udp_data_notconn);
 			UDP_STAT(us, udp_out_err_notconn);
 			freemsg(mp);
@@ -3694,7 +3388,7 @@ udp_wput(queue_t *q, mblk_t *mp)
 		cr = msg_getcred(mp, &pid);
 		ASSERT(cr != NULL);
 		if (cr == NULL) {
-			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+			UDPS_BUMP_MIB(us, udpOutErrors);
 			freemsg(mp);
 			return;
 		}
@@ -3946,7 +3640,7 @@ udp_wput(queue_t *q, mblk_t *mp)
 	return;
 
 ud_error2:
-	BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+	UDPS_BUMP_MIB(us, udpOutErrors);
 	freemsg(data_mp);
 	UDP_STAT(us, udp_out_err_output);
 	ASSERT(mp != NULL);
@@ -4227,7 +3921,7 @@ udp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 	}
 
 	/* We're done.  Pass the packet to ip. */
-	BUMP_MIB(&us->us_udp_mib, udpHCOutDatagrams);
+	UDPS_BUMP_MIB(us, udpHCOutDatagrams);
 
 	DTRACE_UDP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
 	    void_ip_t *, data_mp->b_rptr, udp_t *, udp, udpha_t *,
@@ -4276,7 +3970,7 @@ ud_error:
 	ixa_refrele(ixa);
 
 	freemsg(data_mp);
-	BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+	UDPS_BUMP_MIB(us, udpOutErrors);
 	UDP_STAT(us, udp_out_err_output);
 	return (error);
 }
@@ -4688,7 +4382,18 @@ udp_stack_init(netstackid_t stackid, netstack_t *ns)
 	    KM_SLEEP);
 	bcopy(udp_propinfo_tbl, us->us_propinfo_tbl, arrsz);
 
-	us->us_kstat = udp_kstat2_init(stackid, &us->us_statistics);
+	/* Allocate the per netstack stats */
+	mutex_enter(&cpu_lock);
+	us->us_sc_cnt = MAX(ncpus, boot_ncpus);
+	mutex_exit(&cpu_lock);
+	us->us_sc = kmem_zalloc(max_ncpus  * sizeof (udp_stats_cpu_t *),
+	    KM_SLEEP);
+	for (i = 0; i < us->us_sc_cnt; i++) {
+		us->us_sc[i] = kmem_zalloc(sizeof (udp_stats_cpu_t),
+		    KM_SLEEP);
+	}
+
+	us->us_kstat = udp_kstat2_init(stackid);
 	us->us_mibkp = udp_kstat_init(stackid);
 
 	major = mod_name_to_major(INET_NAME);
@@ -4715,6 +4420,10 @@ udp_stack_fini(netstackid_t stackid, void *arg)
 
 	us->us_bind_fanout = NULL;
 
+	for (i = 0; i < us->us_sc_cnt; i++)
+		kmem_free(us->us_sc[i], sizeof (udp_stats_cpu_t));
+	kmem_free(us->us_sc, max_ncpus * sizeof (udp_stats_cpu_t *));
+
 	kmem_free(us->us_propinfo_tbl,
 	    udp_propinfo_count * sizeof (mod_prop_info_t));
 	us->us_propinfo_tbl = NULL;
@@ -4724,130 +4433,10 @@ udp_stack_fini(netstackid_t stackid, void *arg)
 
 	udp_kstat2_fini(stackid, us->us_kstat);
 	us->us_kstat = NULL;
-	bzero(&us->us_statistics, sizeof (us->us_statistics));
 
 	mutex_destroy(&us->us_epriv_port_lock);
 	ldi_ident_release(us->us_ldi_ident);
 	kmem_free(us, sizeof (*us));
-}
-
-static void *
-udp_kstat2_init(netstackid_t stackid, udp_stat_t *us_statisticsp)
-{
-	kstat_t *ksp;
-
-	udp_stat_t template = {
-		{ "udp_sock_fallback",		KSTAT_DATA_UINT64 },
-		{ "udp_out_opt",		KSTAT_DATA_UINT64 },
-		{ "udp_out_err_notconn",	KSTAT_DATA_UINT64 },
-		{ "udp_out_err_output",		KSTAT_DATA_UINT64 },
-		{ "udp_out_err_tudr",		KSTAT_DATA_UINT64 },
-#ifdef DEBUG
-		{ "udp_data_conn",		KSTAT_DATA_UINT64 },
-		{ "udp_data_notconn",		KSTAT_DATA_UINT64 },
-		{ "udp_out_lastdst",		KSTAT_DATA_UINT64 },
-		{ "udp_out_diffdst",		KSTAT_DATA_UINT64 },
-		{ "udp_out_ipv6",		KSTAT_DATA_UINT64 },
-		{ "udp_out_mapped",		KSTAT_DATA_UINT64 },
-		{ "udp_out_ipv4",		KSTAT_DATA_UINT64 },
-#endif
-	};
-
-	ksp = kstat_create_netstack(UDP_MOD_NAME, 0, "udpstat", "net",
-	    KSTAT_TYPE_NAMED, sizeof (template) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL, stackid);
-
-	if (ksp == NULL)
-		return (NULL);
-
-	bcopy(&template, us_statisticsp, sizeof (template));
-	ksp->ks_data = (void *)us_statisticsp;
-	ksp->ks_private = (void *)(uintptr_t)stackid;
-
-	kstat_install(ksp);
-	return (ksp);
-}
-
-static void
-udp_kstat2_fini(netstackid_t stackid, kstat_t *ksp)
-{
-	if (ksp != NULL) {
-		ASSERT(stackid == (netstackid_t)(uintptr_t)ksp->ks_private);
-		kstat_delete_netstack(ksp, stackid);
-	}
-}
-
-static void *
-udp_kstat_init(netstackid_t stackid)
-{
-	kstat_t	*ksp;
-
-	udp_named_kstat_t template = {
-		{ "inDatagrams",	KSTAT_DATA_UINT64, 0 },
-		{ "inErrors",		KSTAT_DATA_UINT32, 0 },
-		{ "outDatagrams",	KSTAT_DATA_UINT64, 0 },
-		{ "entrySize",		KSTAT_DATA_INT32, 0 },
-		{ "entry6Size",		KSTAT_DATA_INT32, 0 },
-		{ "outErrors",		KSTAT_DATA_UINT32, 0 },
-	};
-
-	ksp = kstat_create_netstack(UDP_MOD_NAME, 0, UDP_MOD_NAME, "mib2",
-	    KSTAT_TYPE_NAMED,
-	    NUM_OF_FIELDS(udp_named_kstat_t), 0, stackid);
-
-	if (ksp == NULL || ksp->ks_data == NULL)
-		return (NULL);
-
-	template.entrySize.value.ui32 = sizeof (mib2_udpEntry_t);
-	template.entry6Size.value.ui32 = sizeof (mib2_udp6Entry_t);
-
-	bcopy(&template, ksp->ks_data, sizeof (template));
-	ksp->ks_update = udp_kstat_update;
-	ksp->ks_private = (void *)(uintptr_t)stackid;
-
-	kstat_install(ksp);
-	return (ksp);
-}
-
-static void
-udp_kstat_fini(netstackid_t stackid, kstat_t *ksp)
-{
-	if (ksp != NULL) {
-		ASSERT(stackid == (netstackid_t)(uintptr_t)ksp->ks_private);
-		kstat_delete_netstack(ksp, stackid);
-	}
-}
-
-static int
-udp_kstat_update(kstat_t *kp, int rw)
-{
-	udp_named_kstat_t *udpkp;
-	netstackid_t	stackid = (netstackid_t)(uintptr_t)kp->ks_private;
-	netstack_t	*ns;
-	udp_stack_t	*us;
-
-	if ((kp == NULL) || (kp->ks_data == NULL))
-		return (EIO);
-
-	if (rw == KSTAT_WRITE)
-		return (EACCES);
-
-	ns = netstack_find_by_stackid(stackid);
-	if (ns == NULL)
-		return (-1);
-	us = ns->netstack_udp;
-	if (us == NULL) {
-		netstack_rele(ns);
-		return (-1);
-	}
-	udpkp = (udp_named_kstat_t *)kp->ks_data;
-
-	udpkp->inDatagrams.value.ui64 =	us->us_udp_mib.udpHCInDatagrams;
-	udpkp->inErrors.value.ui32 =	us->us_udp_mib.udpInErrors;
-	udpkp->outDatagrams.value.ui64 = us->us_udp_mib.udpHCOutDatagrams;
-	udpkp->outErrors.value.ui32 =	us->us_udp_mib.udpOutErrors;
-	netstack_rele(ns);
-	return (0);
 }
 
 static size_t
@@ -4894,6 +4483,25 @@ void
 udp_lwput(queue_t *q, mblk_t *mp)
 {
 	freemsg(mp);
+}
+
+/*
+ * When a CPU is added, we need to allocate the per CPU stats struct.
+ */
+void
+udp_stack_cpu_add(udp_stack_t *us, processorid_t cpu_seqid)
+{
+	int i;
+
+	if (cpu_seqid < us->us_sc_cnt)
+		return;
+	for (i = us->us_sc_cnt; i <= cpu_seqid; i++) {
+		ASSERT(us->us_sc[i] == NULL);
+		us->us_sc[i] = kmem_zalloc(sizeof (udp_stats_cpu_t),
+		    KM_SLEEP);
+	}
+	membar_producer();
+	us->us_sc_cnt = cpu_seqid + 1;
 }
 
 /*
@@ -6297,7 +5905,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	/* Connected? */
 	if (msg->msg_name == NULL) {
 		if (udp->udp_state != TS_DATA_XFER) {
-			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+			UDPS_BUMP_MIB(us, udpOutErrors);
 			return (EDESTADDRREQ);
 		}
 		if (msg->msg_controllen != 0) {
@@ -6312,13 +5920,13 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 			return (error);
 	}
 	if (udp->udp_state == TS_DATA_XFER) {
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		return (EISCONN);
 	}
 	error = proto_verify_ip_addr(connp->conn_family,
 	    (struct sockaddr *)msg->msg_name, msg->msg_namelen);
 	if (error != 0) {
-		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+		UDPS_BUMP_MIB(us, udpOutErrors);
 		return (error);
 	}
 	switch (connp->conn_family) {
@@ -6341,7 +5949,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 			 * since it is bound to a mapped address.
 			 */
 			if (IN6_IS_ADDR_V4MAPPED(&connp->conn_saddr_v6)) {
-				BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+				UDPS_BUMP_MIB(us, udpOutErrors);
 				return (EADDRNOTAVAIL);
 			}
 			if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
@@ -6349,7 +5957,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 			ipversion = IPV6_VERSION;
 		} else {
 			if (connp->conn_ipv6_v6only) {
-				BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+				UDPS_BUMP_MIB(us, udpOutErrors);
 				return (EADDRNOTAVAIL);
 			}
 
@@ -6362,7 +5970,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 			 */
 			if (!IN6_IS_ADDR_V4MAPPED(&connp->conn_saddr_v6) &&
 			    !IN6_IS_ADDR_UNSPECIFIED(&connp->conn_saddr_v6)) {
-				BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+				UDPS_BUMP_MIB(us, udpOutErrors);
 				return (EADDRNOTAVAIL);
 			}
 
@@ -6382,7 +5990,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		if (msg->msg_controllen == 0) {
 			ixa = conn_get_ixa(connp, B_FALSE);
 			if (ixa == NULL) {
-				BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+				UDPS_BUMP_MIB(us, udpOutErrors);
 				return (ENOMEM);
 			}
 		} else {
@@ -6402,7 +6010,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 			    &sin2->sin6_addr) &&
 			    sin6->sin6_family == sin2->sin6_family) {
 				mutex_exit(&connp->conn_lock);
-				BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+				UDPS_BUMP_MIB(us, udpOutErrors);
 				if (ixa != NULL)
 					ixa_refrele(ixa);
 				return (error);
@@ -6445,7 +6053,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		if (msg->msg_controllen == 0) {
 			ixa = conn_get_ixa(connp, B_FALSE);
 			if (ixa == NULL) {
-				BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+				UDPS_BUMP_MIB(us, udpOutErrors);
 				return (ENOMEM);
 			}
 		} else {
@@ -6463,7 +6071,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 			if (sin->sin_port == sin2->sin_port &&
 			    sin->sin_addr.s_addr == sin2->sin_addr.s_addr) {
 				mutex_exit(&connp->conn_lock);
-				BUMP_MIB(&us->us_udp_mib, udpOutErrors);
+				UDPS_BUMP_MIB(us, udpOutErrors);
 				if (ixa != NULL)
 					ixa_refrele(ixa);
 				return (error);

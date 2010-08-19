@@ -62,9 +62,18 @@ oce_drain_mq_cq(void *arg)
 			acqe = (struct oce_async_cqe_link_state *)cqe;
 			if (acqe->u0.s.event_code ==
 			    ASYNC_EVENT_CODE_LINK_STATE) {
-				link_status = (acqe->u0.s.link_status)?
-				    LINK_STATE_UP : LINK_STATE_DOWN;
+				/*
+				 * don't care logical or not,
+				 * just check up down
+				 */
+
+				link_status = ((acqe->u0.s.link_status &
+				    ~ASYNC_EVENT_LOGICAL) ==
+				    ASYNC_EVENT_LINK_UP) ?
+				    LINK_STATE_UP: LINK_STATE_DOWN;
 				mac_link_update(dev->mac_handle, link_status);
+				dev->link_status = link_status;
+				dev->link_speed = -1;
 			}
 		}
 		cqe->u0.dw[3] = 0;

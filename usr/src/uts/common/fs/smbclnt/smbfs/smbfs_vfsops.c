@@ -314,8 +314,8 @@ smbfs_free_smi(smbmntinfo_t *smi)
 	if (smi == NULL)
 		return;
 
-	if (smi->smi_zone != NULL)
-		zone_rele(smi->smi_zone);
+	if (smi->smi_zone_ref.zref_zone != NULL)
+		zone_rele_ref(&smi->smi_zone_ref, ZONE_REF_SMBFS);
 
 	if (smi->smi_share != NULL)
 		smb_share_rele(smi->smi_share);
@@ -481,7 +481,14 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	smi->smi_share = ssp;
 	ssp = NULL;
-	smi->smi_zone = mntzone;
+
+	/*
+	 * Convert the anonymous zone hold acquired via zone_hold() above
+	 * into a zone reference.
+	 */
+	zone_init_ref(&smi->smi_zone_ref);
+	zone_hold_ref(mntzone, &smi->smi_zone_ref, ZONE_REF_SMBFS);
+	zone_rele(mntzone);
 	mntzone = NULL;
 
 	/*
@@ -736,7 +743,7 @@ smbfs_root(vfs_t *vfsp, vnode_t **vpp)
 
 	smi = VFTOSMI(vfsp);
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)
@@ -770,7 +777,7 @@ smbfs_statvfs(vfs_t *vfsp, statvfs64_t *sbp)
 	hrtime_t now;
 	smb_cred_t	scred;
 
-	if (curproc->p_zone != smi->smi_zone)
+	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
 
 	if (smi->smi_flags & SMI_DEAD || vfsp->vfs_flag & VFS_UNMOUNTED)

@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -80,17 +80,17 @@ extern int	pn_fixslash(struct pathname *);
 extern int	pn_addslash(struct pathname *);
 extern void	pn_free(struct pathname *);
 
-extern int lookupname(char *, enum uio_seg, enum symfollow,
+extern int lookupname(char *, enum uio_seg, int follow,
 		vnode_t **, vnode_t **);
-extern int lookupnameat(char *, enum uio_seg, enum symfollow,
+extern int lookupnameat(char *, enum uio_seg, int follow,
 		vnode_t **, vnode_t **, vnode_t *);
-extern int lookupnameatcred(char *, enum uio_seg, enum symfollow,
+extern int lookupnameatcred(char *, enum uio_seg, int follow,
 		vnode_t **, vnode_t **, vnode_t *, cred_t *);
-extern int lookuppn(struct pathname *, struct pathname *, enum symfollow,
+extern int lookuppn(struct pathname *, struct pathname *, int follow,
 		vnode_t **, vnode_t **);
-extern int lookuppnat(struct pathname *, struct pathname *, enum symfollow,
+extern int lookuppnat(struct pathname *, struct pathname *, int follow,
 		vnode_t **, vnode_t **, vnode_t *);
-extern int lookuppnatcred(struct pathname *, struct pathname *, enum symfollow,
+extern int lookuppnatcred(struct pathname *, struct pathname *, int follow,
 		vnode_t **, vnode_t **, vnode_t *, cred_t *);
 
 extern int lookuppnvp(struct pathname *, struct pathname *, int follow,

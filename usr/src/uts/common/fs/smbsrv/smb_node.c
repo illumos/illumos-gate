@@ -31,20 +31,11 @@
  *		    | T0
  *		    |
  *		    v
- *    +----------------------------+        T1
- *    |  SMB_NODE_STATE_AVAILABLE  |--------------------+
- *    +----------------------------+			|
- *		    |	     ^				|
- *		    |	     |				v
- *		    |	     |	  T2	+-------------------------------+
- *		    |	     |<---------| SMB_NODE_STATE_OPLOCK_GRANTED |
- *		    |	     |		+-------------------------------+
- *		    | T5     |				|
- *		    |	     |				| T3
- *		    |	     |				v
- *		    |	     |	  T4	+--------------------------------+
- *		    |	     +----------| SMB_NODE_STATE_OPLOCK_BREAKING |
- *		    |			+--------------------------------+
+ *    +----------------------------+
+ *    |  SMB_NODE_STATE_AVAILABLE  |
+ *    +----------------------------+
+ *		    |
+ *		    | T1
  *		    |
  *		    v
  *    +-----------------------------+
@@ -52,7 +43,7 @@
  *    +-----------------------------+
  *		    |
  *		    |
- *		    | T6
+ *		    | T2
  *		    |
  *		    +----------> Deletion/Free
  *
@@ -64,42 +55,11 @@
  *
  * Transition T1
  *
- *    This transition occurs smb_oplock_acquire() during an OPEN.
- *
- * Transition T2
- *
- *    This transition occurs in smb_oplock_release(). The events triggering
- *    it are:
- *
- *	- LockingAndX sent by the client that was granted the oplock.
- *	- Closing of the file.
- *
- * Transition T3
- *
- *    This transition occurs in smb_oplock_break(). The events triggering
- *    it are:
- *
- *	- Another client wants to open the file.
- *	- A client is trying to delete the file.
- *	- A client is trying to rename the file.
- *	- A client is trying to set/modify  the file attributes.
- *
- * Transition T4
- *
- *    This transition occurs in smb_oplock_release or smb_oplock_break(). The
- *    events triggering it are:
- *
- *	- The client that was granting the oplock releases it (close or
- *	  LockingAndx).
- *	- The time alloted to release the oplock expired.
- *
- * Transition T5
- *
  *    This transition occurs in smb_node_release(). If the reference count
  *    drops to zero the state is moved to SMB_NODE_STATE_DESTROYING and no more
  *    reference count will be given out for that node.
  *
- * Transition T6
+ * Transition T2
  *
  *    This transition occurs in smb_node_release(). The structure is deleted.
  *
@@ -332,8 +292,6 @@ smb_node_lookup(
 				DTRACE_PROBE1(smb_node_lookup_hit,
 				    smb_node_t *, node);
 				switch (node->n_state) {
-				case SMB_NODE_STATE_OPLOCK_GRANTED:
-				case SMB_NODE_STATE_OPLOCK_BREAKING:
 				case SMB_NODE_STATE_AVAILABLE:
 					/* The node was found. */
 					node->n_refcnt++;
@@ -457,8 +415,6 @@ smb_node_ref(smb_node_t *node)
 	mutex_enter(&node->n_mutex);
 	switch (node->n_state) {
 	case SMB_NODE_STATE_AVAILABLE:
-	case SMB_NODE_STATE_OPLOCK_GRANTED:
-	case SMB_NODE_STATE_OPLOCK_BREAKING:
 		node->n_refcnt++;
 		ASSERT(node->n_refcnt);
 		DTRACE_PROBE1(smb_node_ref_exit, smb_node_t *, node);
@@ -584,8 +540,6 @@ smb_node_rename(
 	mutex_enter(&ret_node->n_mutex);
 	switch (ret_node->n_state) {
 	case SMB_NODE_STATE_AVAILABLE:
-	case SMB_NODE_STATE_OPLOCK_GRANTED:
-	case SMB_NODE_STATE_OPLOCK_BREAKING:
 		ret_node->n_dnode = to_dnode;
 		mutex_exit(&ret_node->n_mutex);
 		ASSERT(to_dnode->n_dnode != ret_node);
@@ -807,6 +761,29 @@ smb_node_delete_check(smb_node_t *node)
 		return (NT_STATUS_SUCCESS);
 }
 
+/*
+ * smb_node_share_check
+ *
+ * Returns: TRUE    - ofiles have non-zero share access
+ *          B_FALSE - ofile with share access NONE.
+ */
+boolean_t
+smb_node_share_check(smb_node_t *node)
+{
+	smb_ofile_t	*of;
+	boolean_t	status = B_TRUE;
+
+	SMB_NODE_VALID(node);
+
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	of = smb_llist_head(&node->n_ofile_list);
+	if (of)
+		status = smb_ofile_share_check(of);
+	smb_llist_exit(&node->n_ofile_list);
+
+	return (status);
+}
+
 void
 smb_node_notify_change(smb_node_t *node)
 {
@@ -894,19 +871,6 @@ smb_node_unlock(smb_node_t *node)
 	rw_exit(&node->n_lock);
 }
 
-uint32_t
-smb_node_get_ofile_count(smb_node_t *node)
-{
-	uint32_t	cntr;
-
-	SMB_NODE_VALID(node);
-
-	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	cntr = smb_llist_get_count(&node->n_ofile_list);
-	smb_llist_exit(&node->n_ofile_list);
-	return (cntr);
-}
-
 void
 smb_node_add_ofile(smb_node_t *node, smb_ofile_t *of)
 {
@@ -957,17 +921,29 @@ smb_node_dec_open_ofiles(smb_node_t *node)
 	smb_node_clear_cached_data(node);
 }
 
-uint32_t
-smb_node_get_open_ofiles(smb_node_t *node)
+/*
+ * smb_node_inc_opening_count
+ */
+void
+smb_node_inc_opening_count(smb_node_t *node)
 {
-	uint32_t	cnt;
-
 	SMB_NODE_VALID(node);
-
 	mutex_enter(&node->n_mutex);
-	cnt = node->n_open_count;
+	node->n_opening_count++;
 	mutex_exit(&node->n_mutex);
-	return (cnt);
+}
+
+/*
+ * smb_node_dec_opening_count
+ */
+void
+smb_node_dec_opening_count(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+	mutex_enter(&node->n_mutex);
+	ASSERT(node->n_opening_count > 0);
+	node->n_opening_count--;
+	mutex_exit(&node->n_mutex);
 }
 
 /*
@@ -1106,6 +1082,10 @@ smb_node_alloc(
 	node->n_unode = NULL;
 	node->delete_on_close_cred = NULL;
 	node->n_delete_on_close_flags = 0;
+	node->n_oplock.ol_fem = B_FALSE;
+	node->n_oplock.ol_xthread = NULL;
+	node->n_oplock.ol_count = 0;
+	node->n_oplock.ol_break = SMB_OPLOCK_NO_BREAK;
 
 	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
 	if (strcmp(od_name, XATTR_DIR) == 0)
@@ -1135,7 +1115,9 @@ smb_node_free(smb_node_t *node)
 	VERIFY(!list_link_active(&node->n_lnd));
 	VERIFY(node->n_lock_list.ll_count == 0);
 	VERIFY(node->n_ofile_list.ll_count == 0);
+	VERIFY(node->n_oplock.ol_count == 0);
 	VERIFY(node->n_oplock.ol_xthread == NULL);
+	VERIFY(node->n_oplock.ol_fem == B_FALSE);
 	VERIFY(mutex_owner(&node->n_mutex) == NULL);
 	VERIFY(!RW_LOCK_HELD(&node->n_lock));
 	VN_RELE(node->vp);
@@ -1159,6 +1141,9 @@ smb_node_constructor(void *buf, void *un, int kmflags)
 	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
 	cv_init(&node->n_oplock.ol_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&node->n_oplock.ol_mutex, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&node->n_oplock.ol_grants, sizeof (smb_oplock_grant_t),
+	    offsetof(smb_oplock_grant_t, og_lnd));
 	rw_init(&node->n_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&node->n_mutex, NULL, MUTEX_DEFAULT, NULL);
 	smb_node_create_audit_buf(node, kmflags);
@@ -1179,8 +1164,10 @@ smb_node_destructor(void *buf, void *un)
 	mutex_destroy(&node->n_mutex);
 	rw_destroy(&node->n_lock);
 	cv_destroy(&node->n_oplock.ol_cv);
+	mutex_destroy(&node->n_oplock.ol_mutex);
 	smb_llist_destructor(&node->n_lock_list);
 	smb_llist_destructor(&node->n_ofile_list);
+	list_destroy(&node->n_oplock.ol_grants);
 }
 
 /*
@@ -1608,7 +1595,7 @@ smb_node_set_cached_allocsz(smb_node_t *node, smb_attr_t *attr)
  * request in smb_node_getattr and smb_node_setattr above.)
  * Timestamps remain cached while there are open ofiles for the node.
  * This includes open ofiles for named streams.
- * n_open_ofiles cannot be used as this doesn't include ofiles opened
+ * n_ofile_list cannot be used as this doesn't include ofiles opened
  * for the node's named streams. Thus n_timestamps contains a count
  * of open ofiles (t_open_ofiles), including named streams' ofiles,
  * to be used to control timestamp caching.

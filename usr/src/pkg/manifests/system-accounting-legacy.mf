@@ -100,16 +100,12 @@ file path=usr/lib/sa/sadc mode=0555
 file path=usr/sbin/sar mode=0555
 file path=var/spool/cron/crontabs/sys group=sys mode=0600 \
     original_name=SUNWacc:var/spool/cron/crontabs/sys preserve=true
-legacy pkg=SUNWaccr arch=$(ARCH) category=system \
+legacy pkg=SUNWaccr \
     desc="utilities for accounting and reporting of system activity" \
-    hotline="Please contact your local service provider" \
-    name="System Accounting, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWaccu arch=$(ARCH) category=system \
+    name="System Accounting, (Root)"
+legacy pkg=SUNWaccu \
     desc="utilities for accounting and reporting of system activity" \
-    hotline="Please contact your local service provider" \
-    name="System Accounting, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="System Accounting, (Usr)"
 license cr_ATT license=cr_ATT
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

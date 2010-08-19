@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -30,7 +29,10 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation		*/
 /*		All Rights Reserved				*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -56,6 +58,10 @@
 #include <sys/debug.h>
 #include <sys/x86_archext.h>
 #include <sys/sysmacros.h>
+#include <sys/cmn_err.h>
+
+/* Legacy fxsave layout + xsave header + ymm */
+#define	AVX_XSAVE_SIZE		(512 + 64 + 256)
 
 /*CSTYLED*/
 #pragma	align 16 (sse_initial)
@@ -83,6 +89,45 @@ const struct fxsave_state sse_initial = {
 	/* rest of structure is zero */
 };
 
+/*CSTYLED*/
+#pragma	align 64 (avx_initial)
+
+/*
+ * Initial kfpu state for AVX used by fpinit()
+ */
+const struct xsave_state avx_initial = {
+	/*
+	 * The definition below needs to be identical with sse_initial
+	 * defined above.
+	 */
+	{
+		FPU_CW_INIT,	/* fx_fcw */
+		0,		/* fx_fsw */
+		0,		/* fx_fctw */
+		0,		/* fx_fop */
+#if defined(__amd64)
+		0,		/* fx_rip */
+		0,		/* fx_rdp */
+#else
+		0,		/* fx_eip */
+		0,		/* fx_cs */
+		0,		/* __fx_ign0 */
+		0,		/* fx_dp */
+		0,		/* fx_ds */
+		0,		/* __fx_ign1 */
+#endif /* __amd64 */
+		SSE_MXCSR_INIT	/* fx_mxcsr */
+		/* rest of structure is zero */
+	},
+	/*
+	 * bit0 = 1 for XSTATE_BV to indicate that legacy fields are valid,
+	 * and CPU should initialize XMM/YMM.
+	 */
+	1,
+	{0, 0}	/* These 2 bytes must be zero */
+	/* rest of structure is zero */
+};
+
 /*
  * mxcsr_mask value (possibly reset in fpu_probe); used to avoid
  * the #gp exception caused by setting unsupported bits in the
@@ -103,11 +148,16 @@ const struct fnsave_state x87_initial = {
 };
 
 #if defined(__amd64)
-#define	fpsave_ctxt	fpxsave_ctxt
+/*
+ * This vector is patched to xsave_ctxt() if we discover we have an
+ * XSAVE-capable chip in fpu_probe.
+ */
+void (*fpsave_ctxt)(void *) = fpxsave_ctxt;
 #elif defined(__i386)
 /*
- * This vector is patched to fpxsave_ctxt() if we discover
- * we have an SSE-capable chip in fpu_probe().
+ * This vector is patched to fpxsave_ctxt() if we discover we have an
+ * SSE-capable chip in fpu_probe(). It is patched to xsave_ctxt
+ * if we discover we have an XSAVE-capable chip in fpu_probe.
  */
 void (*fpsave_ctxt)(void *) = fpnsave_ctxt;
 #endif
@@ -129,6 +179,10 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	struct fpu_ctx *fp;		/* parent fpu context */
 	struct fpu_ctx *cfp;		/* new fpu context */
 	struct fxsave_state *fx, *cfx;
+#if defined(__i386)
+	struct fnsave_state *fn, *cfn;
+#endif
+	struct xsave_state *cxs;
 
 	ASSERT(fp_kind != FP_NO);
 
@@ -145,27 +199,41 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	cfp->fpu_regs.kfpu_status = 0;
 	cfp->fpu_regs.kfpu_xstatus = 0;
 
-#if defined(__amd64)
-	fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
-	cfx = &cfp->fpu_regs.kfpu_u.kfpu_fx;
-	bcopy(&sse_initial, cfx, sizeof (*cfx));
-	cfx->fx_mxcsr = fx->fx_mxcsr & ~SSE_MXCSR_EFLAGS;
-	cfx->fx_fcw = fx->fx_fcw;
-#else
-	if (fp_kind == __FP_SSE) {
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
+		fn = &fp->fpu_regs.kfpu_u.kfpu_fn;
+		cfn = &cfp->fpu_regs.kfpu_u.kfpu_fn;
+		bcopy(&x87_initial, cfn, sizeof (*cfn));
+		cfn->f_fcw = fn->f_fcw;
+		break;
+#endif
+	case FP_FXSAVE:
 		fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
 		cfx = &cfp->fpu_regs.kfpu_u.kfpu_fx;
 		bcopy(&sse_initial, cfx, sizeof (*cfx));
 		cfx->fx_mxcsr = fx->fx_mxcsr & ~SSE_MXCSR_EFLAGS;
 		cfx->fx_fcw = fx->fx_fcw;
-	} else {
-		struct fnsave_state *fn = &fp->fpu_regs.kfpu_u.kfpu_fn;
-		struct fnsave_state *cfn = &cfp->fpu_regs.kfpu_u.kfpu_fn;
+		break;
 
-		bcopy(&x87_initial, cfn, sizeof (*cfn));
-		cfn->f_fcw = fn->f_fcw;
+	case FP_XSAVE:
+		cfp->fpu_xsave_mask = fp->fpu_xsave_mask;
+
+		fx = &fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave;
+		cxs = &cfp->fpu_regs.kfpu_u.kfpu_xs;
+		cfx = &cxs->xs_fxsave;
+
+		bcopy(&avx_initial, cxs, sizeof (*cxs));
+		cfx->fx_mxcsr = fx->fx_mxcsr & ~SSE_MXCSR_EFLAGS;
+		cfx->fx_fcw = fx->fx_fcw;
+		cxs->xs_xstate_bv |= (get_xcr(XFEATURE_ENABLED_MASK) &
+		    XFEATURE_FP_ALL);
+		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
 	}
-#endif
+
 	installctx(ct, cfp,
 	    fpsave_ctxt, NULL, fp_new_lwp, fp_new_lwp, NULL, fp_free);
 	/*
@@ -212,7 +280,7 @@ fp_free(struct fpu_ctx *fp, int isexec)
 	if (curthread->t_lwp && fp == &curthread->t_lwp->lwp_pcb.pcb_fpu) {
 		/* Clear errors if any to prevent frstor from complaining */
 		(void) fperr_reset();
-		if (fp_kind == __FP_SSE)
+		if (fp_kind & __FP_SSE)
 			(void) fpxerr_reset();
 		fpdisable();
 	}
@@ -234,18 +302,24 @@ fp_save(struct fpu_ctx *fp)
 	}
 	ASSERT(curthread->t_lwp && fp == &curthread->t_lwp->lwp_pcb.pcb_fpu);
 
-#if defined(__amd64)
-	fpxsave(&fp->fpu_regs.kfpu_u.kfpu_fx);
-#else
-	switch (fp_kind) {
-	case __FP_SSE:
-		fpxsave(&fp->fpu_regs.kfpu_u.kfpu_fx);
-		break;
-	default:
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
 		fpsave(&fp->fpu_regs.kfpu_u.kfpu_fn);
 		break;
-	}
 #endif
+	case FP_FXSAVE:
+		fpxsave(&fp->fpu_regs.kfpu_u.kfpu_fx);
+		break;
+
+	case FP_XSAVE:
+		xsave(&fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
+		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
+	}
+
 	fp->fpu_flags |= FPU_VALID;
 	kpreempt_enable();
 }
@@ -259,15 +333,24 @@ fp_save(struct fpu_ctx *fp)
 void
 fp_restore(struct fpu_ctx *fp)
 {
-#if defined(__amd64)
-	fpxrestore(&fp->fpu_regs.kfpu_u.kfpu_fx);
-#else
-	/* case 2 */
-	if (fp_kind == __FP_SSE)
-		fpxrestore(&fp->fpu_regs.kfpu_u.kfpu_fx);
-	else
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
 		fprestore(&fp->fpu_regs.kfpu_u.kfpu_fn);
+		break;
 #endif
+	case FP_FXSAVE:
+		fpxrestore(&fp->fpu_regs.kfpu_u.kfpu_fx);
+		break;
+
+	case FP_XSAVE:
+		xrestore(&fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
+		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
+	}
+
 	fp->fpu_flags &= ~FPU_VALID;
 }
 
@@ -289,6 +372,11 @@ fp_seed(void)
 	/*
 	 * Always initialize a new context and initialize the hardware.
 	 */
+	if (fp_save_mech == FP_XSAVE) {
+		fp->fpu_xsave_mask = get_xcr(XFEATURE_ENABLED_MASK) &
+		    XFEATURE_FP_ALL;
+	}
+
 	installctx(curthread, fp,
 	    fpsave_ctxt, NULL, fp_new_lwp, fp_new_lwp, NULL, fp_free);
 	fpinit();
@@ -324,6 +412,9 @@ fpnoextflt(struct regs *rp)
 	ASSERT(sizeof (struct fxsave_state) == 512 &&
 	    sizeof (struct fnsave_state) == 108);
 	ASSERT((offsetof(struct fxsave_state, fx_xmm[0]) & 0xf) == 0);
+
+	ASSERT(sizeof (struct xsave_state) >= AVX_XSAVE_SIZE);
+
 #if defined(__i386)
 	ASSERT(sizeof (struct fpu) == sizeof (struct __old_fpu));
 #endif	/* __i386 */
@@ -375,8 +466,9 @@ fpnoextflt(struct regs *rp)
 	 * configured to enable fully fledged (%xmm) fxsave/fxrestor on
 	 * this CPU.  For the non-SSE case, ensure that it isn't.
 	 */
-	ASSERT((fp_kind == __FP_SSE && (getcr4() & CR4_OSFXSR) == CR4_OSFXSR) ||
-	    (fp_kind != __FP_SSE &&
+	ASSERT(((fp_kind & __FP_SSE) &&
+	    (getcr4() & CR4_OSFXSR) == CR4_OSFXSR) ||
+	    (!(fp_kind & __FP_SSE) &&
 	    (getcr4() & (CR4_OSXMMEXCPT|CR4_OSFXSR)) == 0));
 #endif
 
@@ -451,24 +543,35 @@ fpexterrflt(struct regs *rp)
 	fp_save(fp);
 
 	/* clear exception flags in saved state, as if by fnclex */
-#if defined(__amd64)
-	fpsw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
-	fpcw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fcw;
-	fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw &= ~FPS_SW_EFLAGS;
-#else
-		switch (fp_kind) {
-		case __FP_SSE:
-			fpsw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
-			fpcw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fcw;
-			fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw &= ~FPS_SW_EFLAGS;
-			break;
-		default:
-			fpsw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw;
-			fpcw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw;
-			fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw &= ~FPS_SW_EFLAGS;
-			break;
-		}
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
+		fpsw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw;
+		fpcw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw;
+		fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw &= ~FPS_SW_EFLAGS;
+		break;
 #endif
+
+	case FP_FXSAVE:
+		fpsw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
+		fpcw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fcw;
+		fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw &= ~FPS_SW_EFLAGS;
+		break;
+
+	case FP_XSAVE:
+		fpsw = fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave.fx_fsw;
+		fpcw = fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave.fx_fcw;
+		fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave.fx_fsw &= ~FPS_SW_EFLAGS;
+		/*
+		 * Always set LEGACY_FP as it may have been cleared by XSAVE
+		 * instruction
+		 */
+		fp->fpu_regs.kfpu_u.kfpu_xs.xs_xstate_bv |= XFEATURE_LEGACY_FP;
+		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
+	}
 
 	fp->fpu_regs.kfpu_status = fpsw;
 
@@ -493,7 +596,7 @@ fpsimderrflt(struct regs *rp)
 	uint32_t mxcsr, xmask;
 	fpu_ctx_t *fp = &ttolwp(curthread)->lwp_pcb.pcb_fpu;
 
-	ASSERT(fp_kind == __FP_SSE);
+	ASSERT(fp_kind & __FP_SSE);
 
 	/*
 	 * NOTE: Interrupts are disabled during execution of this
@@ -625,20 +728,30 @@ fpsetcw(uint16_t fcw, uint32_t mxcsr)
 	 */
 	fp_save(fp);
 
-#if defined(__amd64)
-	fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
-	fx->fx_fcw = fcw;
-	fx->fx_mxcsr = sse_mxcsr_mask & mxcsr;
-#else
-	switch (fp_kind) {
-	case __FP_SSE:
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
+		fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw = fcw;
+		break;
+#endif
+	case FP_FXSAVE:
 		fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
 		fx->fx_fcw = fcw;
 		fx->fx_mxcsr = sse_mxcsr_mask & mxcsr;
 		break;
-	default:
-		fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw = fcw;
+
+	case FP_XSAVE:
+		fx = &fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave;
+		fx->fx_fcw = fcw;
+		fx->fx_mxcsr = sse_mxcsr_mask & mxcsr;
+		/*
+		 * Always set LEGACY_FP as it may have been cleared by XSAVE
+		 * instruction
+		 */
+		fp->fpu_regs.kfpu_u.kfpu_xs.xs_xstate_bv |= XFEATURE_LEGACY_FP;
 		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
 	}
-#endif
 }

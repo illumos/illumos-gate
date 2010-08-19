@@ -19,12 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/tar/Makefile
 
 PROG= tar
 DEFAULTFILES= tar.dfl
@@ -41,9 +37,6 @@ LINTFLAGS += -u
 LDLIBS += -lsec -lcmdutils -lnvpair -ltsol
 
 CFLAGS += $(CCVERBOSE)
-
-# This flag is being added only for SCO (x86) compatibility  
-CFLAGS += $(iBCS2FLAG)
 
 CPPFLAGS += -DEUC
 

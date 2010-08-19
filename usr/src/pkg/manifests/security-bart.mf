@@ -32,10 +32,7 @@ set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/bin
 file path=usr/bin/bart mode=0555
-legacy pkg=SUNWbart arch=$(ARCH) category=system \
-    desc="Basic Audit Reporting Tool (BART)" \
-    hotline="Please contact your local service provider" \
-    name="Basic Audit Reporting Tool" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWbart desc="Basic Audit Reporting Tool (BART)" \
+    name="Basic Audit Reporting Tool"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

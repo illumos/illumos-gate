@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
@@ -87,12 +86,10 @@ typedef union {
 /*
  * Print a message to stdout
  */
-/* VARARGS3 */
 void
-eprintf(Lm_list *lml, Error error, const char *format, ...)
+veprintf(Lm_list *lml, Error error, const char *format, va_list args)
 {
-	va_list			args;
-	static const char	*strings[ERR_NUM] = { MSG_ORIG(MSG_STR_EMPTY) };
+	static const char	*strings[ERR_NUM];
 
 #if	defined(lint)
 	/*
@@ -101,23 +98,38 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	 */
 	lml = 0;
 #endif
-	if (error > ERR_NONE) {
-		if (error == ERR_WARNING) {
-			if (strings[ERR_WARNING] == 0)
-				strings[ERR_WARNING] =
-				    MSG_INTL(MSG_ERR_WARNING);
-		} else if (error == ERR_FATAL) {
-			if (strings[ERR_FATAL] == 0)
-				strings[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
-		} else if (error == ERR_ELF) {
-			if (strings[ERR_ELF] == 0)
-				strings[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
-		}
-		(void) fputs(MSG_ORIG(MSG_STR_LDDIAG), stderr);
+	/*
+	 * For error types we issue a prefix for, make sure the necessary
+	 * string has been internationalized and is ready.
+	 */
+	switch (error) {
+	case ERR_WARNING_NF:
+		if (strings[ERR_WARNING_NF] == NULL)
+			strings[ERR_WARNING_NF] = MSG_INTL(MSG_ERR_WARNING);
+		break;
+	case ERR_WARNING:
+		if (strings[ERR_WARNING] == NULL)
+			strings[ERR_WARNING] = MSG_INTL(MSG_ERR_WARNING);
+		break;
+	case ERR_GUIDANCE:
+		if (strings[ERR_GUIDANCE] == NULL)
+			strings[ERR_GUIDANCE] = MSG_INTL(MSG_ERR_GUIDANCE);
+		break;
+	case ERR_FATAL:
+		if (strings[ERR_FATAL] == NULL)
+			strings[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
+		break;
+	case ERR_ELF:
+		if (strings[ERR_ELF] == NULL)
+			strings[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
 	}
-	(void) fputs(strings[error], stderr);
 
-	va_start(args, format);
+	/* If strings[] element for our error type is non-NULL, issue prefix */
+	if (strings[error] != NULL) {
+		(void) fputs(MSG_ORIG(MSG_STR_LDDIAG), stderr);
+		(void) fputs(strings[error], stderr);
+	}
+
 	(void) vfprintf(stderr, format, args);
 	if (error == ERR_ELF) {
 		int	elferr;
@@ -128,6 +140,20 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	}
 	(void) fprintf(stderr, MSG_ORIG(MSG_STR_NL));
 	(void) fflush(stderr);
+}
+
+
+/*
+ * Print a message to stdout
+ */
+/* VARARGS3 */
+void
+eprintf(Lm_list *lml, Error error, const char *format, ...)
+{
+	va_list	args;
+
+	va_start(args, format);
+	veprintf(lml, error, format, args);
 	va_end(args);
 }
 

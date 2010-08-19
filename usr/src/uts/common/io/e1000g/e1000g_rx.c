@@ -19,8 +19,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -266,10 +265,12 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	 */
 	rctl = E1000_RCTL_EN |		/* Enable Receive Unit */
 	    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
-	    E1000_RCTL_LPE |		/* Large Packet Enable bit */
 	    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
 	    E1000_RCTL_RDMTS_HALF |
 	    E1000_RCTL_LBM_NO;		/* Loopback Mode = none */
+
+	if (Adapter->default_mtu > ETHERMTU)
+		rctl |= E1000_RCTL_LPE;  /* Large Packet Enable bit */
 
 	if (Adapter->strip_crc)
 		rctl |= E1000_RCTL_SECRC;	/* Strip Ethernet CRC */
@@ -368,29 +369,44 @@ static p_rx_sw_packet_t
 e1000g_get_buf(e1000g_rx_data_t *rx_data)
 {
 	p_rx_sw_packet_t packet;
+	struct e1000g *Adapter;
+
+	Adapter = rx_data->rx_ring->adapter;
 
 	mutex_enter(&rx_data->freelist_lock);
 	packet = (p_rx_sw_packet_t)
 	    QUEUE_POP_HEAD(&rx_data->free_list);
 	if (packet != NULL) {
 		rx_data->avail_freepkt--;
-	} else {
-		/*
-		 * If the freelist has no packets, check the recycle list
-		 * to see if there are any available descriptor there.
-		 */
-		mutex_enter(&rx_data->recycle_lock);
-		QUEUE_SWITCH(&rx_data->free_list, &rx_data->recycle_list);
-		rx_data->avail_freepkt = rx_data->recycle_freepkt;
-		rx_data->recycle_freepkt = 0;
-		mutex_exit(&rx_data->recycle_lock);
+		goto end;
+	}
+
+	/*
+	 * If the freelist has no packets, check the recycle list
+	 * to see if there are any available descriptor there.
+	 */
+	mutex_enter(&rx_data->recycle_lock);
+	QUEUE_SWITCH(&rx_data->free_list, &rx_data->recycle_list);
+	rx_data->avail_freepkt = rx_data->recycle_freepkt;
+	rx_data->recycle_freepkt = 0;
+	mutex_exit(&rx_data->recycle_lock);
+	packet = (p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_data->free_list);
+	if (packet != NULL) {
+		rx_data->avail_freepkt--;
+		goto end;
+	}
+
+	if (Adapter->rx_freelist_num < Adapter->rx_freelist_limit) {
+		(void) e1000g_increase_rx_packets(rx_data);
 		packet = (p_rx_sw_packet_t)
 		    QUEUE_POP_HEAD(&rx_data->free_list);
-		if (packet != NULL)
+		if (packet != NULL) {
 			rx_data->avail_freepkt--;
+		}
 	}
-	mutex_exit(&rx_data->freelist_lock);
 
+end:
+	mutex_exit(&rx_data->freelist_lock);
 	return (packet);
 }
 
@@ -580,12 +596,15 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 				 * drop this fragment, do the processing of
 				 * the end of the packet.
 				 */
-				ASSERT(rx_data->rx_mblk_tail != NULL);
+				if (rx_data->rx_mblk_tail == NULL) {
+					E1000G_STAT(rx_ring->stat_crc_only_pkt);
+					goto rx_next_desc;
+				}
+
 				rx_data->rx_mblk_tail->b_wptr -=
 				    ETHERFCSL - length;
 				rx_data->rx_mblk_len -=
 				    ETHERFCSL - length;
-
 				goto rx_end_of_packet;
 			}
 		}

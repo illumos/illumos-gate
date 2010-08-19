@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
@@ -842,7 +841,7 @@ ipc_rele(ipc_service_t *s, kipc_perm_t *perm)
 		ASSERT(IPC_FREE(perm));		/* ipc_rmid clears IPC_ALLOC */
 		s->ipcs_dtor(perm);
 		project_rele(perm->ipc_proj);
-		zone_rele(perm->ipc_zone);
+		zone_rele_ref(&perm->ipc_zone_ref, ZONE_REF_IPC);
 		kmem_free(perm, s->ipcs_ssize);
 	}
 }
@@ -1064,12 +1063,13 @@ ipc_commit_begin(ipc_service_t *service, key_t key, int flag,
 	ASSERT(IPC_FREE(newperm));
 
 	/*
-	 * Set ipc_proj and ipc_zone so that future calls to ipc_cleanup()
+	 * Set ipc_proj and ipc_zone_ref so that future calls to ipc_cleanup()
 	 * clean up the necessary state.  This must be done before the
 	 * potential call to ipcs_dtor() below.
 	 */
 	newperm->ipc_proj = pp->p_task->tk_proj;
-	newperm->ipc_zone = pp->p_zone;
+	zone_init_ref(&newperm->ipc_zone_ref);
+	zone_hold_ref(pp->p_zone, &newperm->ipc_zone_ref, ZONE_REF_IPC);
 
 	mutex_enter(&service->ipcs_lock);
 	/*
@@ -1097,6 +1097,7 @@ ipc_commit_begin(ipc_service_t *service, key_t key, int flag,
 errout:
 	mutex_exit(&service->ipcs_lock);
 	service->ipcs_dtor(newperm);
+	zone_rele_ref(&newperm->ipc_zone_ref, ZONE_REF_IPC);
 	kmem_free(newperm, service->ipcs_ssize);
 	return (error);
 }
@@ -1118,7 +1119,6 @@ ipc_commit_end(ipc_service_t *service, kipc_perm_t *perm)
 	ASSERT(MUTEX_HELD(&curproc->p_lock));
 
 	(void) project_hold(perm->ipc_proj);
-	(void) zone_hold(perm->ipc_zone);
 	mutex_exit(&curproc->p_lock);
 
 	/*
@@ -1173,6 +1173,8 @@ ipc_cleanup(ipc_service_t *service, kipc_perm_t *perm)
 		mutex_exit(&service->ipcs_lock);
 		service->ipcs_dtor(perm);
 	}
+	if (perm->ipc_zone_ref.zref_zone != NULL)
+		zone_rele_ref(&perm->ipc_zone_ref, ZONE_REF_IPC);
 	kmem_free(perm, service->ipcs_ssize);
 }
 

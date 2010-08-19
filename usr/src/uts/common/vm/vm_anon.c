@@ -129,7 +129,7 @@ int anon_debug;
 
 kmutex_t	anoninfo_lock;
 struct		k_anoninfo k_anoninfo;
-ani_free_t	ani_free_pool[ANI_MAX_POOL];
+ani_free_t	*ani_free_pool;
 pad_mutex_t	anon_array_lock[ANON_LOCKSIZE];
 kcondvar_t	anon_array_cv[ANON_LOCKSIZE];
 
@@ -237,6 +237,10 @@ anon_init(void)
 	    anonmap_cache_constructor, anonmap_cache_destructor, NULL,
 	    NULL, NULL, 0);
 	swap_maxcontig = (1024 * 1024) >> PAGESHIFT;	/* 1MB of pages */
+
+	tmp = kmem_zalloc((ANI_MAX_POOL * sizeof (ani_free_t)) + 63, KM_SLEEP);
+	/* Round ani_free_pool to cacheline boundary to avoid false sharing. */
+	ani_free_pool = (ani_free_t *)P2ROUNDUP((uintptr_t)tmp, 64);
 
 	anon_vp = vn_alloc(KM_SLEEP);
 	vn_setops(anon_vp, swap_vnodeops);
@@ -727,19 +731,35 @@ anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t oldseg_pgs,
 
 
 /*
- * Called from clock handler to sync ani_free value.
+ * Called to sync ani_free value.
  */
 
 void
 set_anoninfo(void)
 {
-	int	ix;
-	pgcnt_t	total = 0;
+	processorid_t	ix, max_seqid;
+	pgcnt_t		total = 0;
+	static clock_t	last_time;
+	clock_t		new_time;
 
-	for (ix = 0; ix < ANI_MAX_POOL; ix++) {
-		total += ani_free_pool[ix].ani_count;
+	if (ani_free_pool == NULL)
+		return;
+
+	/*
+	 * Recompute ani_free at most once per tick. Use max_cpu_seqid_ever to
+	 * identify the maximum number of CPUs were ever online.
+	 */
+	new_time = ddi_get_lbolt();
+	if (new_time > last_time) {
+
+		max_seqid = max_cpu_seqid_ever;
+		ASSERT(ANI_MAX_POOL > max_seqid);
+		for (ix = 0; ix <= max_seqid; ix++)
+			total += ani_free_pool[ix].ani_count;
+
+		last_time = new_time;
+		k_anoninfo.ani_free = total;
 	}
-	k_anoninfo.ani_free = total;
 }
 
 /*

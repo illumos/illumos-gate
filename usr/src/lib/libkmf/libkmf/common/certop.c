@@ -2275,6 +2275,10 @@ find_ta_cert(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE *kstype,
 	/* Get the TA name and serial number from the policy */
 	policy = handle->policy;
 	ta_name = policy->ta_name;
+
+	/*
+	 * Use name and serial from policy.
+	 */
 	ret = kmf_hexstr_to_bytes((uchar_t *)policy->ta_serial,
 	    &bytes, &bytelen);
 	if (ret != KMF_OK || bytes == NULL) {
@@ -2285,40 +2289,35 @@ find_ta_cert(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE *kstype,
 	serial.len = bytelen;
 
 	/* set up fc_attrlist for kmf_find_cert */
-	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_KEYSTORE_TYPE_ATTR,
-	    kstype, sizeof (KMF_KEYSTORE_TYPE));
-	fc_numattr++;
-
-	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_SUBJECT_NAME_ATTR,
-	    ta_name, strlen(ta_name));
-	fc_numattr++;
-
-	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_BIGINT_ATTR,
+	kmf_set_attr_at_index(fc_attrlist,
+	    fc_numattr++, KMF_BIGINT_ATTR,
 	    &serial, sizeof (KMF_BIGINT));
-	fc_numattr++;
+
+	kmf_set_attr_at_index(fc_attrlist,
+	    fc_numattr++, KMF_SUBJECT_NAME_ATTR,
+	    ta_name, strlen(ta_name));
+
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr++, KMF_KEYSTORE_TYPE_ATTR,
+	    kstype, sizeof (KMF_KEYSTORE_TYPE));
 
 	if (*kstype == KMF_KEYSTORE_NSS && slotlabel != NULL) {
-		kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr++,
 		    KMF_TOKEN_LABEL_ATTR, slotlabel, strlen(slotlabel));
-		fc_numattr++;
 	}
 
 	if (*kstype == KMF_KEYSTORE_OPENSSL) {
 		if (dirpath == NULL) {
-			kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+			kmf_set_attr_at_index(fc_attrlist, fc_numattr++,
 			    KMF_DIRPATH_ATTR, dir, strlen(dir));
-			fc_numattr++;
 		} else {
-			kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+			kmf_set_attr_at_index(fc_attrlist, fc_numattr++,
 			    KMF_DIRPATH_ATTR, dirpath, strlen(dirpath));
-			fc_numattr++;
 		}
 	}
 
 	num = 0;
-	kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr++,
 	    KMF_COUNT_ATTR, &num, sizeof (uint32_t));
-	fc_numattr++;
 
 	ret = kmf_find_cert(handle, fc_numattr, fc_attrlist);
 	if (ret != KMF_OK || num != 1)  {
@@ -2376,14 +2375,14 @@ out:
 	if (ta_retrCert.certificate.Data)
 		kmf_free_kmf_cert(handle, &ta_retrCert);
 
-	if ((ret != KMF_OK) && (ta_cert->Data != NULL))
-		free(ta_cert->Data);
+	if ((ret != KMF_OK))
+		kmf_free_data(ta_cert);
+
+	if (ta_subject != NULL)
+		free(ta_subject);
 
 	if (serial.val != NULL)
 		free(serial.val);
-
-	if (ta_subject)
-		free(ta_subject);
 
 	return (ret);
 }
@@ -2446,12 +2445,9 @@ kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	if ((ret = kmf_get_cert_issuer_str(handle, pcert,
 	    &user_issuer)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
-		goto out;
-	}
-
-	if ((ret = kmf_dn_parser(user_issuer,  &user_issuerDN)) != KMF_OK) {
+	} else if ((ret = kmf_dn_parser(user_issuer,  &user_issuerDN)) !=
+	    KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
-		goto out;
 	}
 
 	/*
@@ -2460,17 +2456,13 @@ kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	if ((ret = kmf_get_cert_subject_str(handle, pcert,
 	    &user_subject)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
-		kmf_free_dn(&user_issuerDN);
-		goto out;
-	}
-
-	if ((ret = kmf_dn_parser(user_subject,  &user_subjectDN)) != KMF_OK) {
+	} else if ((ret = kmf_dn_parser(user_subject,  &user_subjectDN)) !=
+	    KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
-		kmf_free_dn(&user_issuerDN);
-		goto out;
 	}
 
-	if ((kmf_compare_rdns(&user_issuerDN, &user_subjectDN)) == 0) {
+	if ((*result & KMF_CERT_VALIDATE_ERR_USER) == 0 &&
+	    (kmf_compare_rdns(&user_issuerDN, &user_subjectDN)) == 0) {
 		/*
 		 * this is a self-signed cert
 		 */
@@ -2485,7 +2477,6 @@ kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	ret = cert_ku_check(handle, pcert);
 	if (ret != KMF_OK)  {
 		*result |= KMF_CERT_VALIDATE_ERR_KEYUSAGE;
-		goto out;
 	}
 
 	/*
@@ -2494,7 +2485,6 @@ kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	ret = cert_eku_check(handle, pcert);
 	if (ret != KMF_OK)  {
 		*result |= KMF_CERT_VALIDATE_ERR_EXT_KEYUSAGE;
-		goto out;
 	}
 
 	/*
@@ -2508,10 +2498,8 @@ kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 		 * Validate expiration date
 		 */
 		ret = kmf_check_cert_date(handle, pcert);
-		if (ret != KMF_OK)  {
+		if (ret != KMF_OK)
 			*result |= KMF_CERT_VALIDATE_ERR_TIME;
-			goto out;
-		}
 	}
 
 	/*
@@ -2523,6 +2511,10 @@ kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	 * are defined as optional attributes in policy dtd, but they
 	 * should exist in policy when "ignore_trust_anchor" is set
 	 * to FALSE. The policy verification code has enforced that.
+	 *
+	 * The serial number may be NULL if the ta_name == "search"
+	 * which indicates that KMF should try to locate the issuer
+	 * of the subject cert instead of using a specific TA name.
 	 */
 	if (policy->ignore_trust_anchor) {
 		goto check_revocation;
@@ -2534,19 +2526,40 @@ kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	 */
 	if (self_signed) {
 		ret = verify_cert_with_cert(handle, pcert, pcert);
-	} else {
-		ret = find_ta_cert(handle, kstype, &ta_cert,
-		    &user_issuerDN, slotlabel, dirpath);
+		if (ret != KMF_OK)
+			*result |= KMF_CERT_VALIDATE_ERR_SIGNATURE;
+	} else if (user_issuer != NULL) {
+		if (policy->ta_name != NULL &&
+		    strcasecmp(policy->ta_name, "search") == 0) {
+			ret = find_issuer_cert(handle, kstype, user_issuer,
+			    &issuer_cert, slotlabel, dirpath);
+			if (ret != KMF_OK)  {
+				*result |= KMF_CERT_VALIDATE_ERR_TA;
+			} else {
+				ta_cert = issuer_cert; /* used later */
+			}
+		} else {
+			/*
+			 * If we didnt find the user_issuer string, we
+			 * won't have a "user_issuerDN" either.
+			 */
+			ret = find_ta_cert(handle, kstype, &ta_cert,
+			    &user_issuerDN, slotlabel, dirpath);
+		}
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_TA;
-			goto out;
 		}
 
-		ret = verify_cert_with_cert(handle, pcert, &ta_cert);
-	}
-	if (ret != KMF_OK)  {
-		*result |= KMF_CERT_VALIDATE_ERR_SIGNATURE;
-		goto out;
+		/* Only verify if we got the TA without an error. */
+		if ((*result & KMF_CERT_VALIDATE_ERR_TA) == 0) {
+			ret = verify_cert_with_cert(handle, pcert,
+			    &ta_cert);
+			if (ret != KMF_OK)
+				*result |= KMF_CERT_VALIDATE_ERR_SIGNATURE;
+		}
+	} else {
+		/* No issuer was found, so we cannot find a trust anchor */
+		*result |= KMF_CERT_VALIDATE_ERR_TA;
 	}
 
 check_revocation:
@@ -2570,30 +2583,38 @@ check_revocation:
 		goto out;
 	}
 
-	ret = find_issuer_cert(handle, kstype, user_issuer, &issuer_cert,
-	    slotlabel, dirpath);
-	if (ret != KMF_OK)  {
-		*result |= KMF_CERT_VALIDATE_ERR_ISSUER;
-		goto out;
-	}
-
-	if (policy->revocation & KMF_REVOCATION_METHOD_CRL) {
-		ret = cert_crl_check(handle, kstype, pcert, &issuer_cert);
+	/*
+	 * If we did not find the issuer cert earlier
+	 * (when policy->ta_name == "search"), get it here.
+	 * We need the issuer cert if the revocation method is
+	 * CRL or OCSP.
+	 */
+	if (issuer_cert.Length == 0 &&
+	    policy->revocation & KMF_REVOCATION_METHOD_CRL ||
+	    policy->revocation & KMF_REVOCATION_METHOD_OCSP) {
+		ret = find_issuer_cert(handle, kstype, user_issuer,
+		    &issuer_cert, slotlabel, dirpath);
 		if (ret != KMF_OK)  {
-			*result |= KMF_CERT_VALIDATE_ERR_CRL;
-			goto out;
+			*result |= KMF_CERT_VALIDATE_ERR_ISSUER;
 		}
 	}
 
-	if (policy->revocation & KMF_REVOCATION_METHOD_OCSP) {
+	if (policy->revocation & KMF_REVOCATION_METHOD_CRL &&
+	    (*result & KMF_CERT_VALIDATE_ERR_ISSUER) == 0) {
+		ret = cert_crl_check(handle, kstype, pcert, &issuer_cert);
+		if (ret != KMF_OK)  {
+			*result |= KMF_CERT_VALIDATE_ERR_CRL;
+		}
+	}
+
+	if (policy->revocation & KMF_REVOCATION_METHOD_OCSP &&
+	    (*result & KMF_CERT_VALIDATE_ERR_ISSUER) == 0) {
 		ret = cert_ocsp_check(handle, kstype, pcert, &issuer_cert,
 		    ocsp_response, slotlabel, dirpath);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_OCSP;
-			goto out;
 		}
 	}
-
 out:
 	if (user_issuer) {
 		kmf_free_dn(&user_issuerDN);
@@ -2603,14 +2624,24 @@ out:
 	if (user_subject)
 		free(user_subject);
 
-	if (ta_cert.Data)
-		free(ta_cert.Data);
+	/*
+	 * If we did not copy ta_cert to issuer_cert, free it.
+	 */
+	if (issuer_cert.Data &&
+	    issuer_cert.Data != ta_cert.Data)
+		kmf_free_data(&issuer_cert);
 
-	if (issuer_cert.Data)
-		free(issuer_cert.Data);
+	kmf_free_data(&ta_cert);
+
+	/*
+	 * If we got an error flag from any of the checks,
+	 * remap the return code to a generic "CERT_VALIDATION"
+	 * error so the caller knows to check the individual flags.
+	 */
+	if (*result != 0)
+		ret = KMF_ERR_CERT_VALIDATION;
 
 	return (ret);
-
 }
 
 KMF_RETURN

@@ -112,13 +112,10 @@ hardlink path=usr/sbin/ipfstat target=../../usr/lib/isaexec
 hardlink path=usr/sbin/ipmon target=../../usr/lib/isaexec
 hardlink path=usr/sbin/ipnat target=../../usr/lib/isaexec
 hardlink path=usr/sbin/ippool target=../../usr/lib/isaexec
-legacy pkg=SUNWipfr arch=$(ARCH) category=system desc="IP Filter Utilities" \
-    hotline="Please contact your local service provider" \
-    name="IP Filter utilities, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-legacy pkg=SUNWipfu arch=$(ARCH) category=system desc="IP Filter Utilities" \
-    hotline="Please contact your local service provider" \
-    name="IP Filter utilities, (Usr)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
-license cmd/ipf/tools/IPFILTER.LICENCE license=cmd/ipf/tools/IPFILTER.LICENCE
+legacy pkg=SUNWipfr desc="IP Filter Utilities" \
+    name="IP Filter utilities, (Root)"
+legacy pkg=SUNWipfu desc="IP Filter Utilities" \
+    name="IP Filter utilities, (Usr)"
 license cr_Sun license=cr_Sun
+license usr/src/cmd/ipf/tools/IPFILTER.LICENCE \
+    license=usr/src/cmd/ipf/tools/IPFILTER.LICENCE

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * devctl - device control utility
@@ -107,7 +103,7 @@ typedef struct cmds {
 
 extern int errno;
 
-static void setprogname(char *name);
+static void setpname(char *name);
 static void print_bus_state(char *devname, uint_t state);
 static void print_dev_state(char *devname, uint_t state);
 static int dev_getstate(devctl_hdl_t);
@@ -191,7 +187,7 @@ main(int argc, char *argv[])
 	devctl_hdl_t dcp;
 	struct stat stat_buf;
 
-	setprogname(argv[0]);
+	setpname(argv[0]);
 	while ((c = getopt(argc, argv, "vd")) != -1)  {
 		switch (c)  {
 		case 'v':
@@ -255,8 +251,8 @@ main(int argc, char *argv[])
 			if ((pathlen = readlink(orig_path, devctl_device,
 			    MAXPATHLEN)) == -1)  {
 				(void) fprintf(stderr,
-					"devctl: readlink(%s) - %s\n",
-					orig_path, strerror(errno));
+				    "devctl: readlink(%s) - %s\n",
+				    orig_path, strerror(errno));
 				exit(-1);
 			}
 			devctl_device[pathlen] = '\0';
@@ -308,16 +304,16 @@ main(int argc, char *argv[])
 		dcp = devctl_pm_dev_acquire(devctl_device, 0);
 		if (dcp == NULL) {
 			(void) fprintf(stderr,
-				"devctl: device_pm_dev_acquire %s - %s\n",
-				devctl_device, strerror(errno));
+			    "devctl: device_pm_dev_acquire %s - %s\n",
+			    devctl_device, strerror(errno));
 			exit(-1);
 		}
 	} else {
 		dcp = devctl_device_acquire(devctl_device, 0);
 		if (dcp == NULL) {
 			(void) fprintf(stderr,
-				"devctl: device_acquire %s - %s\n",
-				devctl_device, strerror(errno));
+			    "devctl: device_acquire %s - %s\n",
+			    devctl_device, strerror(errno));
 			exit(-1);
 		}
 	}
@@ -516,7 +512,7 @@ print_dev_state(char *devname, uint_t state)
 }
 
 static void
-setprogname(char *name)
+setpname(char *name)
 {
 	register char *p;
 

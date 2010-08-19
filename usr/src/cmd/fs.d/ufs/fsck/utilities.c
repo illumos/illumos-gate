@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -70,7 +69,7 @@ static void vdirerror(fsck_ino_t, caddr_t, va_list);
 static struct mnttab *search_mnttab(caddr_t, caddr_t, caddr_t, size_t);
 static struct vfstab *search_vfstab(caddr_t, caddr_t, caddr_t, size_t);
 static void vpwarn(caddr_t, va_list);
-static int getline(FILE *, caddr_t, int);
+static int getaline(FILE *, caddr_t, int);
 static struct bufarea *alloc_bufarea(void);
 static void rwerror(caddr_t, diskaddr_t, int rval);
 static void debugclean(void);
@@ -156,7 +155,7 @@ reply(caddr_t fmt, ...)
 		return (1);
 	}
 	(void) fflush(stdout);
-	if (getline(stdin, line, sizeof (line)) == EOF)
+	if (getaline(stdin, line, sizeof (line)) == EOF)
 		errexit("\n");
 	(void) printf("\n");
 	if (line[0] == 'y' || line[0] == 'Y') {
@@ -167,7 +166,7 @@ reply(caddr_t fmt, ...)
 }
 
 int
-getline(FILE *fp, caddr_t loc, int maxlen)
+getaline(FILE *fp, caddr_t loc, int maxlen)
 {
 	int n;
 	caddr_t p, lastloc;

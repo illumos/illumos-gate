@@ -19,14 +19,23 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../../Makefile.lib
-include ../Makefile.lib
 
-FMHDRS = libfmevent.h
+# This library must install in /lib since it is a dependency of
+# svc.startd and may be required in early boot.  Thus we cannot
+# include ../Makefile.lib - instead we set ROOTFMHDRDIR and
+# ROOTFMHDRS and redefine ROOTLIBDIR and ROOTLIBDIR64 accordingly
+
+ROOTFMHDRDIR = $(ROOTHDRDIR)/fm
+ROOTFMHDRS   = $(FMHDRS:%=$(ROOTFMHDRDIR)/%)
+
+ROOTLIBDIR=     $(ROOTFS_LIBDIR)/fm
+ROOTLIBDIR64=   $(ROOTFS_LIBDIR)/fm/$(MACH64)
+
+FMHDRS = libfmevent.h libfmevent_ruleset.h
 HDRDIR = common
 
 SUBDIRS = $(MACH) 

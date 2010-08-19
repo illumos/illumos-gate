@@ -668,12 +668,6 @@ is_valid_backup_dir_v3(ndmpd_module_params_t *params, char *bkpath)
 		    "\"%s\" is not a directory.\n", bkpath);
 		return (FALSE);
 	}
-	if (ndmp_is_chkpnt_root(bkpath)) {
-		/* it is the chkpnt root directory */
-		MOD_LOGV3(params, NDMP_LOG_ERROR,
-		    "\"%s\" is a checkpoint root directory.\n", bkpath);
-		return (FALSE);
-	}
 	if (fs_is_rdonly(bkpath) && !fs_is_chkpntvol(bkpath) &&
 	    fs_is_chkpnt_enabled(bkpath)) {
 		/* it is not a chkpnted path */
@@ -2312,7 +2306,7 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	}
 	ft.ft_arg = &bp;
 	ft.ft_logfp = (ft_log_t)ndmp_log;
-	ft.ft_flags = FST_VERBOSE;	/* Solaris */
+	ft.ft_flags = FST_VERBOSE | FST_STOP_ONERR;
 
 	/* take into account the header written to the stream so far */
 	n = tlm_get_data_offset(lcmd);
@@ -2328,6 +2322,11 @@ backup_reader_v3(backup_reader_arg_t *argp)
 			n = tlm_get_data_offset(lcmd) - bpos;
 			nlp->nlp_session->
 			    ns_data.dd_module.dm_stats.ms_bytes_processed += n;
+		} else {
+			MOD_LOGV3(nlp->nlp_params, NDMP_LOG_ERROR,
+			    "Filesystem traverse error.\n");
+			ndmpd_data_error(nlp->nlp_session,
+			    NDMP_DATA_HALT_INTERNAL_ERROR);
 		}
 	}
 
@@ -3755,7 +3754,7 @@ ndmpd_tar_backup_starter_v3(void *arg)
 
 	err = 0;
 	if (!NLP_ISCHKPNTED(nlp) &&
-	    ndmp_start_check_point(nlp->nlp_backup_path, jname) < 0) {
+	    ndmp_create_snapshot(nlp->nlp_backup_path, jname) < 0) {
 		MOD_LOGV3(params, NDMP_LOG_ERROR,
 		    "Creating checkpoint on \"%s\".\n",
 		    nlp->nlp_backup_path);
@@ -3785,7 +3784,7 @@ ndmpd_tar_backup_starter_v3(void *arg)
 	}
 
 	if (!NLP_ISCHKPNTED(nlp))
-		(void) ndmp_release_check_point(nlp->nlp_backup_path, jname);
+		(void) ndmp_remove_snapshot(nlp->nlp_backup_path, jname);
 
 	NDMP_LOG(LOG_DEBUG, "err %d, update %c",
 	    err, NDMP_YORN(NLP_SHOULD_UPDATE(nlp)));

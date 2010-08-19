@@ -159,6 +159,7 @@ extern "C" {
 #define	DEFAULT_TX_RECYCLE_THRESHOLD	(MAX_COOKIE + 1)
 #define	DEFAULT_TX_OVERLOAD_THRESHOLD	MIN_NUM_TX_DESC
 #define	DEFAULT_TX_RESCHED_THRESHOLD	128
+#define	DEFAULT_TX_RESCHED_THRESHOLD_LOW	32
 #define	DEFAULT_MCAST_NUM		4096
 
 #define	IGB_LSO_MAXLEN			65535
@@ -379,6 +380,7 @@ typedef struct dma_buffer {
  */
 typedef struct tx_control_block {
 	single_link_t		link;
+	uint32_t		last_index;
 	uint32_t		frag_num;
 	uint32_t		desc_num;
 	mblk_t			*mp;

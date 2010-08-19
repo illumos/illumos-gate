@@ -45,10 +45,7 @@ driver name=dmfe clone_perms="dmfe 0666 root sys" perms="* 0666 root sys" \
     alias=pci128h,9102
 file path=kernel/drv/$(ARCH64)/dmfe group=sys
 $(i386_ONLY)file path=kernel/drv/dmfe group=sys
-legacy pkg=SUNWdmfe arch=$(ARCH) category=system \
-    desc="Davicom 9102 Fast Ethernet Network Adapter Driver" \
-    hotline="Please contact your local service provider" \
-    name="Davicom 9102 Fast Ethernet Driver" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+legacy pkg=SUNWdmfe desc="Davicom 9102 Fast Ethernet Network Adapter Driver" \
+    name="Davicom 9102 Fast Ethernet Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

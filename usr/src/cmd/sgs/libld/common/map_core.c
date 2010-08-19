@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2280,8 +2279,8 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 	 */
 	if (stat(mapfile, &stat_buf) == -1) {
 		err = errno;
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_STAT),
-		    mapfile, strerror(err));
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYS_STAT), mapfile,
+		    strerror(err));
 		return (FALSE);
 	}
 	if (S_ISDIR(stat_buf.st_mode)) {
@@ -2312,16 +2311,15 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		(void) closedir(dirp);
 		return (TRUE);
 	} else if (!S_ISREG(stat_buf.st_mode)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_NOTREG),
-		    mapfile);
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYS_NOTREG), mapfile);
 		return (FALSE);
 	}
 
 	/* Open file */
 	if ((mapfile_fd = open(mapfile, O_RDONLY)) == -1) {
 		err = errno;
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
-		    mapfile, strerror(err));
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), mapfile,
+		    strerror(err));
 		return (FALSE);
 	}
 
@@ -2341,8 +2339,8 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 	if (read(mapfile_fd, mf->mf_text, stat_buf.st_size) !=
 	    stat_buf.st_size) {
 		err = errno;
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_READ),
-		    mapfile, strerror(err));
+		ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_SYS_READ), mapfile,
+		    strerror(err));
 		(void) close(mapfile_fd);
 		return (FALSE);
 	}
@@ -2371,6 +2369,11 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 
 	switch (mf->mf_version) {
 	case MFV_SYSV:
+		/* Guidance: Use newer mapfile syntax */
+		if (OFL_GUIDANCE(ofl, FLG_OFG_NO_MF))
+			ld_eprintf(ofl, ERR_GUIDANCE,
+			    MSG_INTL(MSG_GUIDE_MAPFILE), mapfile);
+
 		mf->mf_tokdisp = gettok_dispatch_v1;
 		if (!ld_map_parse_v1(mf))
 			return (FALSE);
@@ -2522,7 +2525,7 @@ sort_seg_list(Ofl_desc *ofl)
 				    (sgp1->sg_flags & FLG_SG_EMPTY))) {
 					if (sgp1->sg_phdr.p_vaddr ==
 					    sgp2->sg_phdr.p_vaddr) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
+						ld_eprintf(ofl, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_SEGSAME),
 						    sgp1->sg_name,
 						    sgp2->sg_name);
@@ -2800,7 +2803,7 @@ ld_map_post_process(Ofl_desc *ofl)
 		    (first_seg->sg_phdr.p_type != PT_LOAD)) {
 			Conv_inv_buf_t	inv_buf;
 
-			eprintf(ofl->ofl_lml, ERR_FATAL,
+			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_SEG_FIRNOTLOAD),
 			    conv_phdr_type(ELFOSABI_SOLARIS, ld_targ.t_m.m_mach,
 			    first_seg->sg_phdr.p_type, 0, &inv_buf),

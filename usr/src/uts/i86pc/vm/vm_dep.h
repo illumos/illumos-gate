@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -55,7 +54,7 @@ extern "C" {
  * correct tick value.  The proper routine to use is tsc_read().
  */
 
-extern hrtime_t		randtick();
+extern u_longlong_t	randtick();
 extern uint_t page_create_update_flags_x86(uint_t);
 
 extern size_t plcnt_sz(size_t);

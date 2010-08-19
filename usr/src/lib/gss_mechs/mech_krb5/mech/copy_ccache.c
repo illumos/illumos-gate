@@ -1,4 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include "gssapiP_krb5.h"
 
@@ -43,6 +45,7 @@ gss_krb5int_copy_ccache(minor_status, cred_handle, out_ccache)
    if (code) {
        k5_mutex_unlock(&k5creds->lock);
        *minor_status = code;
+       save_error_info(*minor_status, context);
        krb5_free_context(context);
        return(GSS_S_FAILURE);
    }
@@ -53,6 +56,7 @@ gss_krb5int_copy_ccache(minor_status, cred_handle, out_ccache)
    krb5_free_context(context);
    if (code) {
        *minor_status = code;
+       save_error_info(*minor_status, context);
        return(GSS_S_FAILURE);
    } else {
        *minor_status = 0;

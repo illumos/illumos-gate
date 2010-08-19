@@ -229,8 +229,6 @@
 #include <smbsrv/smb_door.h>
 #include <smbsrv/smb_kstat.h>
 
-#define	SMB_EVENT_TIMEOUT		45	/* seconds */
-
 extern void smb_reply_notify_change_request(smb_request_t *);
 
 static void smb_server_kstat_init(smb_server_t *);
@@ -248,7 +246,6 @@ static int smb_server_fsop_start(smb_server_t *);
 static void smb_server_fsop_stop(smb_server_t *);
 static void smb_server_signal_listeners(smb_server_t *);
 static void smb_event_cancel(smb_server_t *, uint32_t);
-static void smb_event_notify(smb_server_t *, uint32_t);
 static uint32_t smb_event_alloc_txid(void);
 
 static void smb_server_disconnect_share(smb_session_list_t *, const char *);
@@ -257,6 +254,7 @@ static int smb_server_sesion_disconnect(smb_session_list_t *, const char *,
     const char *);
 static int smb_server_fclose(smb_session_list_t *, uint32_t);
 static int smb_server_kstat_update(kstat_t *, int);
+static int smb_server_legacy_kstat_update(kstat_t *, int);
 
 int smb_event_debug = 0;
 
@@ -287,6 +285,8 @@ smb_server_svc_init(void)
 		if (rc = smb_vop_init())
 			continue;
 		if (rc = smb_node_init())
+			continue;
+		if (rc = smb_oplock_init())
 			continue;
 		if (rc = smb_fem_init())
 			continue;
@@ -327,6 +327,7 @@ smb_server_svc_fini(void)
 		smb_notify_fini();
 		smb_fem_fini();
 		smb_node_fini();
+		smb_oplock_fini();
 		smb_vop_fini();
 		smb_mbc_fini();
 		smb_llist_destructor(&smb_servers);
@@ -372,6 +373,12 @@ smb_server_create(void)
 	smb_llist_constructor(&sv->sv_event_list, sizeof (smb_event_t),
 	    offsetof(smb_event_t, se_lnd));
 
+	smb_llist_constructor(&sv->sp_info.sp_list, sizeof (smb_kspooldoc_t),
+	    offsetof(smb_kspooldoc_t, sd_lnd));
+
+	smb_llist_constructor(&sv->sp_info.sp_fidlist,
+	    sizeof (smb_spoolfid_t), offsetof(smb_spoolfid_t, sf_lnd));
+
 	smb_session_list_constructor(&sv->sv_nbt_daemon.ld_session_list);
 	smb_session_list_constructor(&sv->sv_tcp_daemon.ld_session_list);
 
@@ -404,13 +411,24 @@ smb_server_create(void)
 	smb_server_kstat_init(sv);
 
 	mutex_init(&sv->sv_mutex, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&sv->sp_info.sp_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&sv->sv_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&sv->sp_info.sp_cv, NULL, CV_DEFAULT, NULL);
+
 	sv->sv_state = SMB_SERVER_STATE_CREATED;
 	sv->sv_magic = SMB_SERVER_MAGIC;
 	sv->sv_zid = zid;
 
 	smb_llist_insert_tail(&smb_servers, sv);
 	smb_llist_exit(&smb_servers);
+
+	smb_threshold_init(&sv->sv_ssetup_ct, SMB_SSETUP_CMD,
+	    smb_ssetup_threshold, smb_ssetup_timeout);
+	smb_threshold_init(&sv->sv_tcon_ct, SMB_TCON_CMD, smb_tcon_threshold,
+	    smb_tcon_timeout);
+	smb_threshold_init(&sv->sv_opipe_ct, SMB_OPIPE_CMD, smb_opipe_threshold,
+	    smb_opipe_timeout);
+
 	return (0);
 }
 
@@ -432,6 +450,10 @@ smb_server_delete(void)
 	if (rc != 0)
 		return (rc);
 
+	smb_threshold_fini(&sv->sv_ssetup_ct);
+	smb_threshold_fini(&sv->sv_tcon_ct);
+	smb_threshold_fini(&sv->sv_opipe_ct);
+
 	mutex_enter(&sv->sv_mutex);
 	switch (sv->sv_state) {
 	case SMB_SERVER_STATE_RUNNING:
@@ -440,6 +462,7 @@ smb_server_delete(void)
 		smb_server_signal_listeners(sv);
 		nbt_tid = smb_server_listener_tid(&sv->sv_nbt_daemon);
 		tcp_tid = smb_server_listener_tid(&sv->sv_tcp_daemon);
+		cv_broadcast(&sv->sp_info.sp_cv);
 
 		sv->sv_state = SMB_SERVER_STATE_DELETING;
 		mutex_exit(&sv->sv_mutex);
@@ -630,6 +653,7 @@ smb_server_stop(void)
 	case SMB_SERVER_STATE_RUNNING:
 		sv->sv_state = SMB_SERVER_STATE_STOPPING;
 		smb_server_signal_listeners(sv);
+		cv_broadcast(&sv->sp_info.sp_cv);
 		break;
 	default:
 		SMB_SERVER_STATE_VALID(sv->sv_state);
@@ -836,6 +860,54 @@ smb_server_tcp_receive(void)
 		smb_server_release(sv);
 	}
 
+	return (rc);
+}
+
+/*
+ * smb_server_spooldoc
+ *
+ * Waits for print file close broadcast.
+ * Gets the head of the fid list,
+ * then searches the spooldoc list and returns
+ * this info via the ioctl to user land.
+ *
+ * rc - 0 success
+ */
+
+int
+smb_server_spooldoc(smb_ioc_spooldoc_t *ioc)
+{
+	smb_server_t	*sv;
+	int		rc;
+	smb_kspooldoc_t *spdoc;
+	uint16_t	fid;
+
+	if ((rc = smb_server_lookup(&sv)) == 0) {
+		if (sv->sv_state != SMB_SERVER_STATE_RUNNING) {
+			smb_server_release(sv);
+			return (ECANCELED);
+		}
+		mutex_enter(&sv->sp_info.sp_mutex);
+		spdoc = kmem_zalloc(sizeof (smb_kspooldoc_t), KM_SLEEP);
+		cv_wait(&sv->sp_info.sp_cv, &sv->sp_info.sp_mutex);
+		if (sv->sv_state != SMB_SERVER_STATE_RUNNING)
+			rc = ECANCELED;
+		else {
+			fid = smb_spool_get_fid();
+			atomic_inc_32(&sv->sp_info.sp_cnt);
+			if (smb_spool_lookup_doc_byfid(fid, spdoc)) {
+				ioc->spool_num = spdoc->sd_spool_num;
+				ioc->ipaddr = spdoc->sd_ipaddr;
+				(void) strlcpy(ioc->path, spdoc->sd_path,
+				    MAXPATHLEN);
+				(void) strlcpy(ioc->username,
+				    spdoc->sd_username, MAXNAMELEN);
+			}
+		}
+		kmem_free(spdoc, sizeof (smb_kspooldoc_t));
+		mutex_exit(&sv->sp_info.sp_mutex);
+		smb_server_release(sv);
+	}
 	return (rc);
 }
 
@@ -1303,6 +1375,8 @@ smb_server_timers(smb_thread_t *thread, void *arg)
 static void
 smb_server_kstat_init(smb_server_t *sv)
 {
+	char	name[KSTAT_STRLEN];
+
 	sv->sv_ksp = kstat_create_zone(SMBSRV_KSTAT_MODULE, sv->sv_zid,
 	    SMBSRV_KSTAT_STATISTICS, SMBSRV_KSTAT_CLASS, KSTAT_TYPE_RAW,
 	    sizeof (smbsrv_kstats_t), 0, sv->sv_zid);
@@ -1318,6 +1392,36 @@ smb_server_kstat_init(smb_server_t *sv)
 	} else {
 		cmn_err(CE_WARN, "SMB Server: Statistics unavailable");
 	}
+
+	(void) snprintf(name, sizeof (name), "%s%d",
+	    SMBSRV_KSTAT_NAME, sv->sv_zid);
+
+	sv->sv_legacy_ksp = kstat_create(SMBSRV_KSTAT_MODULE, sv->sv_zid,
+	    name, SMBSRV_KSTAT_CLASS, KSTAT_TYPE_NAMED,
+	    sizeof (smb_server_legacy_kstat_t) / sizeof (kstat_named_t), 0);
+
+	if (sv->sv_legacy_ksp != NULL) {
+		smb_server_legacy_kstat_t *ksd;
+
+		ksd = sv->sv_legacy_ksp->ks_data;
+
+		(void) strlcpy(ksd->ls_files.name, "open_files",
+		    sizeof (ksd->ls_files.name));
+		ksd->ls_files.data_type = KSTAT_DATA_UINT32;
+
+		(void) strlcpy(ksd->ls_trees.name, "connections",
+		    sizeof (ksd->ls_trees.name));
+		ksd->ls_trees.data_type = KSTAT_DATA_UINT32;
+
+		(void) strlcpy(ksd->ls_users.name, "connections",
+		    sizeof (ksd->ls_users.name));
+		ksd->ls_users.data_type = KSTAT_DATA_UINT32;
+
+		mutex_init(&sv->sv_legacy_ksmtx, NULL, MUTEX_DEFAULT, NULL);
+		sv->sv_legacy_ksp->ks_lock = &sv->sv_legacy_ksmtx;
+		sv->sv_legacy_ksp->ks_update = smb_server_legacy_kstat_update;
+		kstat_install(sv->sv_legacy_ksp);
+	}
 }
 
 /*
@@ -1326,6 +1430,12 @@ smb_server_kstat_init(smb_server_t *sv)
 static void
 smb_server_kstat_fini(smb_server_t *sv)
 {
+	if (sv->sv_legacy_ksp != NULL) {
+		kstat_delete(sv->sv_legacy_ksp);
+		mutex_destroy(&sv->sv_legacy_ksmtx);
+		sv->sv_legacy_ksp = NULL;
+	}
+
 	if (sv->sv_ksp != NULL) {
 		kstat_delete(sv->sv_ksp);
 		sv->sv_ksp = NULL;
@@ -1377,6 +1487,38 @@ smb_server_kstat_update(kstat_t *ksp, int rw)
 		return (EACCES);
 
 	return (EIO);
+}
+
+static int
+smb_server_legacy_kstat_update(kstat_t *ksp, int rw)
+{
+	smb_server_t			*sv;
+	smb_server_legacy_kstat_t	*ksd;
+	int				rc;
+
+	switch (rw) {
+	case KSTAT_WRITE:
+		rc = EACCES;
+		break;
+	case KSTAT_READ:
+		if (!smb_server_lookup(&sv)) {
+			ASSERT(MUTEX_HELD(ksp->ks_lock));
+			ASSERT(sv->sv_legacy_ksp == ksp);
+			ksd = (smb_server_legacy_kstat_t *)ksp->ks_data;
+			ksd->ls_files.value.ui32 = sv->sv_files + sv->sv_pipes;
+			ksd->ls_trees.value.ui32 = sv->sv_trees;
+			ksd->ls_users.value.ui32 = sv->sv_users;
+			smb_server_release(sv);
+			rc = 0;
+			break;
+		}
+		_NOTE(FALLTHRU)
+	default:
+		rc = EIO;
+		break;
+	}
+	return (rc);
+
 }
 
 /*
@@ -1547,7 +1689,7 @@ smb_server_listen_fini(smb_listener_daemon_t *ld)
 static kt_did_t
 smb_server_listener_tid(smb_listener_daemon_t *ld)
 {
-	kt_did_t	tid;
+	kt_did_t	tid = 0;
 
 	if (ld->ld_ktdid != 0) {
 		tid = ld->ld_ktdid;
@@ -1769,6 +1911,7 @@ smb_server_store_cfg(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 	sv->sv_cfg.skc_sync_enable = ioc->sync_enable;
 	sv->sv_cfg.skc_secmode = ioc->secmode;
 	sv->sv_cfg.skc_ipv6_enable = ioc->ipv6_enable;
+	sv->sv_cfg.skc_print_enable = ioc->print_enable;
 	sv->sv_cfg.skc_execflags = ioc->exec_flags;
 	sv->sv_cfg.skc_version = ioc->version;
 	(void) strlcpy(sv->sv_cfg.skc_nbdomain, ioc->nbdomain,
@@ -1823,7 +1966,7 @@ smb_server_signal_listeners(smb_server_t *sv)
 }
 
 smb_event_t *
-smb_event_create(void)
+smb_event_create(int timeout)
 {
 	smb_server_t	*sv;
 	smb_event_t	*event;
@@ -1844,6 +1987,7 @@ smb_event_create(void)
 	event->se_magic = SMB_EVENT_MAGIC;
 	event->se_txid = smb_event_alloc_txid();
 	event->se_server = sv;
+	event->se_timeout = timeout;
 
 	smb_llist_enter(&sv->sv_event_list, RW_WRITER);
 	smb_llist_insert_tail(&sv->sv_event_list, event);
@@ -1920,7 +2064,7 @@ smb_event_wait(smb_event_t *event)
 		if (event->se_errno != 0)
 			break;
 
-		if (event->se_waittime > SMB_EVENT_TIMEOUT) {
+		if (event->se_waittime > event->se_timeout) {
 			event->se_errno = ETIME;
 			break;
 		}
@@ -1978,7 +2122,7 @@ smb_event_cancel(smb_server_t *sv, uint32_t txid)
  * If txid is non-zero, notify the specified event.
  * Otherwise, notify all events.
  */
-static void
+void
 smb_event_notify(smb_server_t *sv, uint32_t txid)
 {
 	smb_event_t	*event;
@@ -2035,4 +2179,147 @@ smb_event_alloc_txid(void)
 	mutex_exit(&txmutex);
 
 	return (txid_ret);
+}
+
+/*
+ * Called by the ioctl to find the corresponding
+ * spooldoc node.  removes node on success
+ *
+ * Return values
+ * rc
+ * B_FALSE - not found
+ * B_TRUE  - found
+ *
+ */
+
+boolean_t
+smb_spool_lookup_doc_byfid(uint16_t fid, smb_kspooldoc_t *spdoc)
+{
+	smb_kspooldoc_t *sp;
+	smb_llist_t	*splist;
+	smb_server_t	*sv;
+	int		rc;
+
+	rc = smb_server_lookup(&sv);
+	if (rc)
+		return (B_FALSE);
+
+	splist = &sv->sp_info.sp_list;
+	smb_llist_enter(splist, RW_WRITER);
+	sp = smb_llist_head(splist);
+	while (sp != NULL) {
+		/*
+		 * check for a matching fid
+		 */
+		if (sp->sd_fid == fid) {
+			*spdoc = *sp;
+			smb_llist_remove(splist, sp);
+			smb_llist_exit(splist);
+			kmem_free(sp, sizeof (smb_kspooldoc_t));
+			smb_server_release(sv);
+			return (B_TRUE);
+		}
+		sp = smb_llist_next(splist, sp);
+	}
+	cmn_err(CE_WARN, "smb_spool_lookup_user_byfid: no fid:%d", fid);
+	smb_llist_exit(splist);
+	smb_server_release(sv);
+	return (B_FALSE);
+}
+
+/*
+ * Adds the spool fid to a linked list to be used
+ * as a search key in the spooldoc queue
+ *
+ * Return values
+ *      rc non-zero error
+ *	rc zero success
+ *
+ */
+
+int
+smb_spool_add_fid(uint16_t fid)
+{
+	smb_llist_t	*fidlist;
+	smb_server_t	*sv;
+	smb_spoolfid_t  *sf;
+	int rc = 0;
+
+	rc = smb_server_lookup(&sv);
+	if (rc)
+		return (rc);
+
+	sf = kmem_zalloc(sizeof (smb_spoolfid_t), KM_SLEEP);
+	fidlist = &sv->sp_info.sp_fidlist;
+	smb_llist_enter(fidlist, RW_WRITER);
+	sf->sf_fid = fid;
+	smb_llist_insert_tail(fidlist, sf);
+	smb_llist_exit(fidlist);
+	smb_server_release(sv);
+	return (rc);
+}
+
+/*
+ * Called by the ioctl to get and remove the head of the fid list
+ *
+ * Return values
+ * int fd
+ * greater than 0 success
+ * 0 - error
+ *
+ */
+
+uint16_t
+smb_spool_get_fid()
+{
+	smb_spoolfid_t	*spfid;
+	smb_llist_t	*splist;
+	smb_server_t	*sv;
+	int 		rc = 0;
+	uint16_t	fid;
+
+	rc = smb_server_lookup(&sv);
+	if (rc)
+		return (0);
+
+	splist = &sv->sp_info.sp_fidlist;
+	smb_llist_enter(splist, RW_WRITER);
+	spfid = smb_llist_head(splist);
+	if (spfid != NULL) {
+		fid = spfid->sf_fid;
+		smb_llist_remove(&sv->sp_info.sp_fidlist, spfid);
+		kmem_free(spfid, sizeof (smb_spoolfid_t));
+	} else {
+		fid = 0;
+	}
+	smb_llist_exit(splist);
+	smb_server_release(sv);
+	return (fid);
+}
+
+/*
+ * Adds the spooldoc to the tail of the spooldoc list
+ *
+ * Return values
+ *      rc non-zero error
+ *	rc zero success
+ */
+int
+smb_spool_add_doc(smb_kspooldoc_t *sp)
+{
+	smb_llist_t	*splist;
+	smb_server_t	*sv;
+	int rc = 0;
+
+	rc = smb_server_lookup(&sv);
+	if (rc)
+		return (rc);
+
+	splist = &sv->sp_info.sp_list;
+	smb_llist_enter(splist, RW_WRITER);
+	sp->sd_spool_num = sv->sp_info.sp_cnt;
+	smb_llist_insert_tail(splist, sp);
+	smb_llist_exit(splist);
+	smb_server_release(sv);
+	return (rc);
 }

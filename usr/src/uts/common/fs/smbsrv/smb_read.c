@@ -19,13 +19,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 
+/*
+ * There may be oplock break requests waiting to be sent after
+ * a read raw request completes.
+ */
+#define	SMB_OPLOCK_BREAKS_PENDING(sr) \
+	!list_is_empty(&(sr)->session->s_oplock_brkreqs)
 
 /*
  * The maximum number of bytes to return from SMB Core
@@ -283,7 +288,12 @@ smb_post_read_raw(smb_request_t *sr)
 	mbuf_chain_t	*mbc;
 
 	if (sr->session->s_state == SMB_SESSION_STATE_READ_RAW_ACTIVE) {
-		sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+		if (SMB_OPLOCK_BREAKS_PENDING(sr)) {
+			sr->session->s_state =
+			    SMB_SESSION_STATE_OPLOCK_BREAKING;
+		} else {
+			sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+		}
 
 		while ((mbc = list_head(&sr->session->s_oplock_brkreqs)) !=
 		    NULL) {
@@ -305,6 +315,9 @@ smb_sdrc_t
 smb_com_read_raw(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
+
+	if (!smb_raw_mode)
+		return (SDRC_DROP_VC);
 
 	switch (sr->session->s_state) {
 	case SMB_SESSION_STATE_NEGOTIATED:
@@ -341,7 +354,8 @@ smb_com_read_raw(smb_request_t *sr)
 	if (param->rw_mincnt > param->rw_count)
 		param->rw_mincnt = 0;
 
-	if (smb_common_read(sr, param) != 0) {
+	if ((smb_common_read(sr, param) != 0) ||
+	    (SMB_OPLOCK_BREAKS_PENDING(sr))) {
 		(void) smb_session_send(sr->session, 0, NULL);
 		m_freem(sr->raw_data.chain);
 		sr->raw_data.chain = NULL;
@@ -491,6 +505,12 @@ smb_com_read_andx(smb_request_t *sr)
  * protocol read functions should lookup the fid before calling this
  * function.  We can't move the fid lookup here because lock-and-read
  * requires the fid to do locking before attempting the read.
+ *
+ * Reading from a file should break oplocks on the file to LEVEL_II.
+ * A call to smb_oplock_break(SMB_OPLOCK_BREAK_TO_LEVEL_II) is not
+ * required as it is a no-op. If there's anything greater than a
+ * LEVEL_II oplock on the file, the oplock MUST be owned by the ofile
+ * on which the read is occuring and therefore would not be broken.
  *
  * Returns errno values.
  */

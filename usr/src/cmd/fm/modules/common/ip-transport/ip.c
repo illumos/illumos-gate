@@ -34,7 +34,6 @@
 #include <strings.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <alloca.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <netdb.h>
@@ -1028,8 +1027,7 @@ _fmd_init(fmd_hdl_t *hdl)
 		(void) nvlist_add_uint8(ip_auth,
 		    FM_VERSION, FM_FMRI_AUTH_VERSION);
 
-		s = alloca(strlen(auth) + 1);
-		(void) strcpy(s, auth);
+		s = strdupa(auth);
 		fmd_prop_free_string(hdl, auth);
 
 		for (p = strtok_r(s, ",", &q); p != NULL;

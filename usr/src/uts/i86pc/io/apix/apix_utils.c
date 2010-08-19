@@ -312,7 +312,8 @@ apix_pci_msi_enable_vector(apix_vector_t *vecp, dev_info_t *dip, int type,
 	msi_regs.mr_data = vector;
 	msi_regs.mr_addr = target_apic_id;
 
-	intrmap_tbl[0] = vecp->v_intrmap_private;
+	for (i = 0; i < count; i++)
+		intrmap_tbl[i] = xv_intrmap_private(vecp->v_cpuid, vector + i);
 	apic_vt_ops->apic_intrmap_alloc_entry(intrmap_tbl, dip, type,
 	    count, 0xff);
 	for (i = 0; i < count; i++)

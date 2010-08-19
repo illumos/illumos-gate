@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -80,6 +79,10 @@
 #include "nfs_subr.h"
 #include "webnfs.h"
 #include <rpcsvc/nfs4_prot.h>
+#include <limits.h>
+#include <libscf.h>
+#include <libshare.h>
+#include "smfcfg.h"
 
 #include <nfs/nfssys.h>
 extern int _nfssys(enum nfssys_op, void *);
@@ -214,7 +217,7 @@ static rpcvers_t nfsretry_vers = 0;
  * There are the defaults (range) for the client when determining
  * which NFS version to use when probing the server (see above).
  * These will only be used when the vers mount option is not used and
- * these may be reset if /etc/default/nfs is configured to do so.
+ * these may be reset if NFS SMF is configured to do so.
  */
 static rpcvers_t vers_max_default = NFS_VERSMAX_DEFAULT;
 static rpcvers_t vers_min_default = NFS_VERSMIN_DEFAULT;
@@ -317,7 +320,7 @@ main(int argc, char *argv[])
 		(void) setpflags(NET_MAC_AWARE, 1);
 
 	/*
-	 * Read the defaults file to see if the min/max versions have
+	 * Read the NFS SMF defaults to see if the min/max versions have
 	 * been set and therefore would override the encoded defaults.
 	 * Then check to make sure that if they were set that the
 	 * values are reasonable.
@@ -326,10 +329,9 @@ main(int argc, char *argv[])
 	if (vers_min_default > vers_max_default ||
 	    vers_min_default < NFS_VERSMIN ||
 	    vers_max_default > NFS_VERSMAX) {
-		pr_err("%s %s\n%s %s\n",
+		pr_err("%s\n%s %s\n",
 		    gettext("Incorrect configuration of client\'s"),
-		    NFSADMIN,
-		    gettext("NFS_CLIENT_VERSMIN or NFS_CLIENT_VERSMAX"),
+		    gettext("client_versmin or client_versmax"),
 		    gettext("is either out of range or overlaps."));
 	}
 
@@ -949,12 +951,27 @@ static char *optlist[] = {
 	NULL
 };
 
-#define	bad(val) (val == NULL || !isdigit(*val))
+static int
+convert_int(int *val, char *str)
+{
+	long lval;
+
+	if (str == NULL || !isdigit(*str))
+		return (-1);
+
+	lval = strtol(str, &str, 10);
+	if (*str != '\0' || lval > INT_MAX)
+		return (-2);
+
+	*val = (int)lval;
+	return (0);
+}
 
 static int
 set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 {
 	char *saveopt, *optstr, *opts, *newopts, *val;
+	int num;
 	int largefiles = 0;
 	int invalid = 0;
 	int attrpref = 0;
@@ -1030,9 +1047,9 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			args->flags |= NFSMNT_NOAC;
 			break;
 		case OPT_PORT:
-			if (bad(val))
+			if (convert_int(&num, val) != 0)
 				goto badopt;
-			nfs_port = htons((ushort_t)atoi(val));
+			nfs_port = htons((ushort_t)num);
 			break;
 
 		case OPT_SECURE:
@@ -1049,62 +1066,54 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			break;
 
 		case OPT_RSIZE:
-			args->flags |= NFSMNT_RSIZE;
-			if (bad(val))
+			if (convert_int(&args->rsize, val) != 0)
 				goto badopt;
-			args->rsize = atoi(val);
+			args->flags |= NFSMNT_RSIZE;
 			break;
 		case OPT_WSIZE:
-			args->flags |= NFSMNT_WSIZE;
-			if (bad(val))
+			if (convert_int(&args->wsize, val) != 0)
 				goto badopt;
-			args->wsize = atoi(val);
+			args->flags |= NFSMNT_WSIZE;
 			break;
 		case OPT_TIMEO:
-			args->flags |= NFSMNT_TIMEO;
-			if (bad(val))
+			if (convert_int(&args->timeo, val) != 0)
 				goto badopt;
-			args->timeo = atoi(val);
+			args->flags |= NFSMNT_TIMEO;
 			break;
 		case OPT_RETRANS:
-			args->flags |= NFSMNT_RETRANS;
-			if (bad(val))
+			if (convert_int(&args->retrans, val) != 0)
 				goto badopt;
-			args->retrans = atoi(val);
+			args->flags |= NFSMNT_RETRANS;
 			break;
 		case OPT_ACTIMEO:
-			args->flags |= NFSMNT_ACDIRMAX;
-			args->flags |= NFSMNT_ACREGMAX;
-			args->flags |= NFSMNT_ACDIRMIN;
-			args->flags |= NFSMNT_ACREGMIN;
-			if (bad(val))
+			if (convert_int(&args->acregmax, val) != 0)
 				goto badopt;
 			args->acdirmin = args->acregmin = args->acdirmax
-			    = args->acregmax = atoi(val);
+			    = args->acregmax;
+			args->flags |= NFSMNT_ACDIRMAX;
+			args->flags |= NFSMNT_ACREGMAX;
+			args->flags |= NFSMNT_ACDIRMIN;
+			args->flags |= NFSMNT_ACREGMIN;
 			break;
 		case OPT_ACREGMIN:
-			args->flags |= NFSMNT_ACREGMIN;
-			if (bad(val))
+			if (convert_int(&args->acregmin, val) != 0)
 				goto badopt;
-			args->acregmin = atoi(val);
+			args->flags |= NFSMNT_ACREGMIN;
 			break;
 		case OPT_ACREGMAX:
-			args->flags |= NFSMNT_ACREGMAX;
-			if (bad(val))
+			if (convert_int(&args->acregmax, val) != 0)
 				goto badopt;
-			args->acregmax = atoi(val);
+			args->flags |= NFSMNT_ACREGMAX;
 			break;
 		case OPT_ACDIRMIN:
-			args->flags |= NFSMNT_ACDIRMIN;
-			if (bad(val))
+			if (convert_int(&args->acdirmin, val) != 0)
 				goto badopt;
-			args->acdirmin = atoi(val);
+			args->flags |= NFSMNT_ACDIRMIN;
 			break;
 		case OPT_ACDIRMAX:
-			args->flags |= NFSMNT_ACDIRMAX;
-			if (bad(val))
+			if (convert_int(&args->acdirmax, val) != 0)
 				goto badopt;
-			args->acdirmax = atoi(val);
+			args->flags |= NFSMNT_ACDIRMAX;
 			break;
 		case OPT_BG:
 			bg++;
@@ -1113,9 +1122,8 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			bg = 0;
 			break;
 		case OPT_RETRY:
-			if (bad(val))
+			if (convert_int(&retries, val) != 0)
 				goto badopt;
-			retries = atoi(val);
 			break;
 		case OPT_LLOCK:
 			args->flags |= NFSMNT_LLOCK;
@@ -1124,9 +1132,9 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			posix = 1;
 			break;
 		case OPT_VERS:
-			if (bad(val))
+			if (convert_int(&num, val) != 0)
 				goto badopt;
-			nfsvers = (rpcvers_t)atoi(val);
+			nfsvers = (rpcvers_t)num;
 			break;
 		case OPT_PROTO:
 			if (val == NULL)
@@ -2602,35 +2610,39 @@ retry(struct mnttab *mntp, int ro)
 }
 
 /*
- * Read the /etc/default/nfs configuration file to determine if the
+ * Read the NFS SMF Parameters  to determine if the
  * client has been configured for a new min/max for the NFS version to
  * use.
  */
 static void
 read_default(void)
 {
-	char *defval;
+	char value[4];
 	int errno;
-	int tmp;
+	int tmp = 0, bufsz = 0, ret = 0;
 
-	/* Fail silently if error in opening the default nfs config file */
-	if ((defopen(NFSADMIN)) == 0) {
-		if ((defval = defread("NFS_CLIENT_VERSMIN=")) != NULL) {
-			errno = 0;
-			tmp = strtol(defval, (char **)NULL, 10);
-			if (errno == 0) {
-				vers_min_default = tmp;
-			}
+	/* Maximum number of bytes expected. */
+	bufsz = 4;
+	ret = nfs_smf_get_prop("client_versmin", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, SVC_NFS_CLIENT, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		tmp = strtol(value, (char **)NULL, 10);
+		if (errno == 0) {
+			vers_min_default = tmp;
 		}
-		if ((defval = defread("NFS_CLIENT_VERSMAX=")) != NULL) {
-			errno = 0;
-			tmp = strtol(defval, (char **)NULL, 10);
-			if (errno == 0) {
-				vers_max_default = tmp;
-			}
+	}
+
+	/* Maximum number of bytes expected. */
+	bufsz = 4;
+	ret = nfs_smf_get_prop("client_versmax", value, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, SVC_NFS_CLIENT, &bufsz);
+	if (ret == SA_OK) {
+		errno = 0;
+		tmp = strtol(value, (char **)NULL, 10);
+		if (errno == 0) {
+			vers_max_default = tmp;
 		}
-		/* close defaults file */
-		defopen(NULL);
 	}
 }
 

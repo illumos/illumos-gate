@@ -34,6 +34,7 @@
 #include <fcntl.h>
 #include <strings.h>
 #include <sys/varargs.h>
+#include <zone.h>
 #include "ksslcfg.h"
 
 /*
@@ -237,6 +238,15 @@ main(int argc, char **argv)
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
+
+	/* Running from within a non-global zone is not supported yet. */
+	if (getzoneid() != GLOBAL_ZONEID) {
+		(void) fprintf(stderr,
+		    gettext("Error: Configuring KSSL from within a non-global "
+		    "zone is not supported.\nPlease run the command from "
+		    "the global zone.\n"));
+		return (ERROR_USAGE);
+	}
 
 	if (argc < 2) {
 		usage_all();

@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LDAPADDENT_H
 #define	_LDAPADDENT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ldapaddent.h
@@ -74,7 +71,6 @@ extern int genent_user_attr(char *line, int (*cback)());
 extern int genent_prof_attr(char *line, int (*cback)());
 extern int genent_exec_attr(char *line, int (*cback)());
 extern int genent_auth_attr(char *line, int (*cback)());
-extern int genent_audit_user(char *line, int (*cback)());
 extern int genent_tnrhdb(char *line, int (*cback)());
 extern int genent_tnrhtp(char *line, int (*cback)());
 
@@ -82,7 +78,6 @@ extern void dump_user_attr(ns_ldap_result_t *res);
 extern void dump_prof_attr(ns_ldap_result_t *res);
 extern void dump_exec_attr(ns_ldap_result_t *res);
 extern void dump_auth_attr(ns_ldap_result_t *res);
-extern void dump_audit_user(ns_ldap_result_t *res);
 extern void dump_tnrhdb(ns_ldap_result_t *res);
 extern void dump_tnrhtp(ns_ldap_result_t *res);
 

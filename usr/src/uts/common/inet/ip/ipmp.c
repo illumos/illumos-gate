@@ -79,7 +79,7 @@ static void	ipmp_grp_destroy_kstats(ipmp_grp_t *);
 static ill_t	*ipmp_illgrp_min_ill(ipmp_illgrp_t *);
 static ill_t	*ipmp_illgrp_max_ill(ipmp_illgrp_t *);
 static void	ipmp_illgrp_set_cast(ipmp_illgrp_t *, ill_t *);
-static void	ipmp_illgrp_set_mtu(ipmp_illgrp_t *, uint_t);
+static void	ipmp_illgrp_set_mtu(ipmp_illgrp_t *, uint_t, uint_t);
 static boolean_t ipmp_ill_activate(ill_t *);
 static void	ipmp_ill_deactivate(ill_t *);
 static void	ipmp_ill_ire_mark_testhidden(ire_t *, char *);
@@ -556,7 +556,7 @@ ipmp_illgrp_create(ill_t *ill)
 
 	illg->ig_ipmp_ill = ill;
 	ill->ill_grp = illg;
-	ipmp_illgrp_set_mtu(illg, mtu);
+	ipmp_illgrp_set_mtu(illg, mtu, mtu);
 
 	return (illg);
 }
@@ -995,7 +995,7 @@ ipmp_illgrp_find_ill(ipmp_illgrp_t *illg, uchar_t *physaddr, uint_t paddrlen)
  * Caller must be inside the IPSQ unless this is initialization.
  */
 static void
-ipmp_illgrp_set_mtu(ipmp_illgrp_t *illg, uint_t mtu)
+ipmp_illgrp_set_mtu(ipmp_illgrp_t *illg, uint_t mtu, uint_t mc_mtu)
 {
 	ill_t *ill = illg->ig_ipmp_ill;
 	mblk_t *mp;
@@ -1005,8 +1005,9 @@ ipmp_illgrp_set_mtu(ipmp_illgrp_t *illg, uint_t mtu)
 	/*
 	 * If allocation fails, we have bigger problems than MTU.
 	 */
-	if ((mp = ip_dlnotify_alloc(DL_NOTE_SDU_SIZE, mtu)) != NULL) {
+	if ((mp = ip_dlnotify_alloc2(DL_NOTE_SDU_SIZE2, mtu, mc_mtu)) != NULL) {
 		illg->ig_mtu = mtu;
+		illg->ig_mc_mtu = mc_mtu;
 		put(ill->ill_rq, mp);
 	}
 }
@@ -1021,6 +1022,7 @@ ipmp_illgrp_refresh_mtu(ipmp_illgrp_t *illg)
 	ill_t *ill;
 	ill_t *ipmp_ill = illg->ig_ipmp_ill;
 	uint_t mtu = 0;
+	uint_t mc_mtu = 0;
 
 	ASSERT(IAM_WRITER_ILL(ipmp_ill));
 
@@ -1035,6 +1037,8 @@ ipmp_illgrp_refresh_mtu(ipmp_illgrp_t *illg)
 		mutex_enter(&ill->ill_lock);
 		if (mtu == 0 || ill->ill_mtu < mtu)
 			mtu = ill->ill_mtu;
+		if (mc_mtu == 0 || ill->ill_mc_mtu < mc_mtu)
+			mc_mtu = ill->ill_mc_mtu;
 		mutex_exit(&ill->ill_lock);
 	}
 
@@ -1042,9 +1046,9 @@ ipmp_illgrp_refresh_mtu(ipmp_illgrp_t *illg)
 	 * MTU must be at least the minimum MTU.
 	 */
 	mtu = MAX(mtu, ipmp_ill->ill_isv6 ? IPV6_MIN_MTU : IP_MIN_MTU);
-
-	if (illg->ig_mtu != mtu)
-		ipmp_illgrp_set_mtu(illg, mtu);
+	mc_mtu = MAX(mc_mtu, ipmp_ill->ill_isv6 ? IPV6_MIN_MTU : IP_MIN_MTU);
+	if (illg->ig_mtu != mtu || illg->ig_mc_mtu != mc_mtu)
+		ipmp_illgrp_set_mtu(illg, mtu, mc_mtu);
 }
 
 /*
@@ -1174,7 +1178,7 @@ ipmp_ill_join_illgrp(ill_t *ill, ipmp_illgrp_t *illg)
 			ipmp_ill->ill_flags |= ILLF_COS_ENABLED;
 			mutex_exit(&ipmp_ill->ill_lock);
 		}
-		ipmp_illgrp_set_mtu(illg, ill->ill_mtu);
+		ipmp_illgrp_set_mtu(illg, ill->ill_mtu, ill->ill_mc_mtu);
 	} else {
 		ASSERT(ipmp_ill->ill_phys_addr_length ==
 		    ill->ill_phys_addr_length);
@@ -1185,8 +1189,11 @@ ipmp_ill_join_illgrp(ill_t *ill, ipmp_illgrp_t *illg)
 			ipmp_ill->ill_flags &= ~ILLF_COS_ENABLED;
 			mutex_exit(&ipmp_ill->ill_lock);
 		}
-		if (illg->ig_mtu > ill->ill_mtu)
-			ipmp_illgrp_set_mtu(illg, ill->ill_mtu);
+		if (illg->ig_mtu > ill->ill_mtu ||
+		    illg->ig_mc_mtu > ill->ill_mc_mtu) {
+			ipmp_illgrp_set_mtu(illg, ill->ill_mtu,
+			    ill->ill_mc_mtu);
+		}
 	}
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);

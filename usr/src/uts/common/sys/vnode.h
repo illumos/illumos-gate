@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -397,6 +398,9 @@ typedef struct xoptattr {
 	uint8_t		xoa_av_modified;
 	uint8_t		xoa_av_scanstamp[AV_SCANSTAMP_SZ];
 	uint8_t		xoa_reparse;
+	uint64_t	xoa_generation;
+	uint8_t		xoa_offline;
+	uint8_t		xoa_sparse;
 } xoptattr_t;
 
 /*
@@ -576,11 +580,14 @@ typedef vattr_t		vattr32_t;
 #define	XAT0_AV_MODIFIED	0x00000800	/* anti-virus modified */
 #define	XAT0_AV_SCANSTAMP	0x00001000	/* anti-virus scanstamp */
 #define	XAT0_REPARSE	0x00002000	/* FS reparse point */
+#define	XAT0_GEN	0x00004000	/* object generation number */
+#define	XAT0_OFFLINE	0x00008000	/* offline */
+#define	XAT0_SPARSE	0x00010000	/* sparse */
 
 #define	XAT0_ALL_ATTRS	(XAT0_CREATETIME|XAT0_ARCHIVE|XAT0_SYSTEM| \
     XAT0_READONLY|XAT0_HIDDEN|XAT0_NOUNLINK|XAT0_IMMUTABLE|XAT0_APPENDONLY| \
-    XAT0_NODUMP|XAT0_OPAQUE|XAT0_AV_QUARANTINED| \
-    XAT0_AV_MODIFIED|XAT0_AV_SCANSTAMP|XAT0_REPARSE)
+    XAT0_NODUMP|XAT0_OPAQUE|XAT0_AV_QUARANTINED|  XAT0_AV_MODIFIED| \
+    XAT0_AV_SCANSTAMP|XAT0_REPARSE|XATO_GEN|XAT0_OFFLINE|XAT0_SPARSE)
 
 /* Support for XAT_* optional attributes */
 #define	XVA_MASK		0xffffffff	/* Used to mask off 32 bits */
@@ -614,6 +621,9 @@ typedef vattr_t		vattr32_t;
 #define	XAT_AV_MODIFIED		((XAT0_INDEX << XVA_SHFT) | XAT0_AV_MODIFIED)
 #define	XAT_AV_SCANSTAMP	((XAT0_INDEX << XVA_SHFT) | XAT0_AV_SCANSTAMP)
 #define	XAT_REPARSE		((XAT0_INDEX << XVA_SHFT) | XAT0_REPARSE)
+#define	XAT_GEN			((XAT0_INDEX << XVA_SHFT) | XAT0_GEN)
+#define	XAT_OFFLINE		((XAT0_INDEX << XVA_SHFT) | XAT0_OFFLINE)
+#define	XAT_SPARSE		((XAT0_INDEX << XVA_SHFT) | XAT0_SPARSE)
 
 /*
  * The returned attribute map array (xva_rtnattrmap[]) is located past the
@@ -1159,7 +1169,7 @@ extern int	fop_retzcbuf(vnode_t *, xuio_t *, cred_t *, caller_context_t *);
 /*
  * Flags for VOP_LOOKUP
  *
- * Defined in file.h, but also possible, FIGNORECASE
+ * Defined in file.h, but also possible, FIGNORECASE and FSEARCH
  *
  */
 #define	LOOKUP_DIR		0x01	/* want parent dir vp */
@@ -1244,6 +1254,8 @@ void	vn_rele_async(struct vnode *vp, struct taskq *taskq);
 void	vn_rele_dnlc(struct vnode *vp);
 void	vn_rele_stream(struct vnode *vp);
 int	vn_link(char *from, char *to, enum uio_seg seg);
+int	vn_linkat(vnode_t *fstartvp, char *from, enum symfollow follow,
+		vnode_t *tstartvp, char *to, enum uio_seg seg);
 int	vn_rename(char *from, char *to, enum uio_seg seg);
 int	vn_renameat(vnode_t *fdvp, char *fname, vnode_t *tdvp, char *tname,
 		enum uio_seg seg);

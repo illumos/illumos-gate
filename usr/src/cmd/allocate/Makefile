@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 ETCTSOLFILES =	devalloc_defaults
@@ -33,6 +32,10 @@ ROOTSECDEV =	$(ROOTSEC)/dev
 ROOTSECLIB =	$(ROOTSEC)/lib
 ROOTSECAUD =	$(ROOTSEC)/audio
 ROOTDIRS =	$(ROOTSECDEV) $(ROOTSECLIB) $(ROOTSECAUD)
+
+ROOTMANIFESTDIR=	$(ROOTSVCSYSTEMDEVICE)
+SVCMETHOD =	svc-allocate	
+MANIFEST =	allocate.xml
 
 RTLCKS =	audio fd0 sr0 st0 st1
 CLEANfd =	fd_clean
@@ -107,8 +110,8 @@ CLOBBERFILES +=	$(SCRIPTS)
 all :		$(PROG) $(RTLCKS) $(SCRIPTS)
 
 install :	$(PROG) $(ROOTDIRS) $(ROOTPROG) $(ROOTLOCKS) \
-		$(ROOTSCRIPTS) $(ROOTLINKS) $(ROOTWDWLINKS) $(ROOTETCTSOLFILES)
-
+		$(ROOTSCRIPTS) $(ROOTLINKS) $(ROOTWDWLINKS) \
+		$(ROOTETCTSOLFILES) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 $(RTLCKS):
 		$(TOUCH) $@
 

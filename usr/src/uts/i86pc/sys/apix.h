@@ -30,6 +30,7 @@
 #include <sys/traptrace.h>
 #include <sys/apic.h>
 #include <sys/apic_common.h>
+#include <sys/apic_timer.h>
 
 #ifdef	__cplusplus
 extern	"C" {

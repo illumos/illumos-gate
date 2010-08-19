@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -24,8 +23,6 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -377,7 +374,7 @@ pass5(void)
 
 		bad_cgblks_cg = (memcmp((void *)&cg_blks(fs, cg, 0)[0],
 		    (void *)&cg_blks(fs, newcg, 0)[0],
-		    fs->fs_cpg * fs->fs_nrpos * sizeof (int32_t)) != 0);
+		    fs->fs_cpg * fs->fs_nrpos * sizeof (int16_t)) != 0);
 
 		if (bad_cgblks_cg) {
 			if (!verbose)
@@ -387,7 +384,7 @@ pass5(void)
 				(void) memmove((void *)&cg_blks(fs, cg, 0)[0],
 				    (void *)&cg_blks(fs, newcg, 0)[0],
 				    fs->fs_cpg * fs->fs_nrpos *
-				    sizeof (int32_t));
+				    sizeof (int16_t));
 				cgdirty();
 				if (preen ||
 				    (!verbose && update_bitmaps))

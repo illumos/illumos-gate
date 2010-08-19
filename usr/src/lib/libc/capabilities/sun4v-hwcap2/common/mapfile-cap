@@ -35,6 +35,7 @@ SYMBOL_SCOPE {
 		_memmove;
 		memcpy;
 		memmove;
+		smt_pause;
 	local:
 		*;
 };

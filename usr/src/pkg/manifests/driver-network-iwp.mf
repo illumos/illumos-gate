@@ -47,13 +47,10 @@ driver name=iwp clone_perms="iwp 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,4239
 file path=kernel/drv/$(ARCH64)/iwp group=sys
 file path=kernel/drv/iwp group=sys
-legacy pkg=SUNWiwp arch=$(ARCH) category=system \
-    desc="Intel(R) WiFi Link 6000 series driver" \
-    hotline="Please contact your local service provider" \
-    name="Intel(R) WiFi Link 6000 series driver" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWiwp desc="Intel(R) WiFi Link 6000 series driver" \
+    name="Intel(R) WiFi Link 6000 series driver"
 license cr_Sun license=cr_Sun
-license uts/common/io/iwp/THIRDPARTYLICENSE \
-    license=uts/common/io/iwp/THIRDPARTYLICENSE
-license uts/common/io/iwp/fw-iw/LICENSE \
-    license=uts/common/io/iwp/fw-iw/LICENSE
+license usr/src/uts/common/io/iwp/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/iwp/THIRDPARTYLICENSE
+license usr/src/uts/common/io/iwp/fw-iw/LICENSE \
+    license=usr/src/uts/common/io/iwp/fw-iw/LICENSE

@@ -18,14 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -51,7 +50,7 @@ static const char *usage =
 #endif	/* __x86 */
 
 static void
-setprogname(const char *name)
+setpname(const char *name)
 {
 	char *p;
 
@@ -179,7 +178,7 @@ main(int argc, char *argv[])
 	int c, ret;
 	char hw_provider[SYS_NMLN];
 
-	setprogname(argv[0]);
+	setpname(argv[0]);
 	opts.o_promdev = "/dev/openprom";
 
 	while ((c = getopt(argc, argv, optstring)) != -1)  {
@@ -343,17 +342,11 @@ main(int argc, char *argv[])
 	/*
 	 * If 0 bytes are returned (the system returns '1', for the \0),
 	 * we're probably on x86, and there has been no si-hw-provider
-	 * set in /etc/bootrc, so just default to Sun.
+	 * set in /etc/bootrc, default to Oracle.
 	 */
 	if (ret <= 1) {
-		(void) strncpy(hw_provider, "Sun Microsystems",
+		(void) strncpy(hw_provider, "Oracle Corporation",
 		    sizeof (hw_provider));
-	} else {
-		/*
-		 * Provide backward compatibility by stripping out the _.
-		 */
-		if (strcmp(hw_provider, "Sun_Microsystems") == 0)
-			hw_provider[3] = ' ';
 	}
 	(void) printf("System Configuration:  %s  %s\n", hw_provider,
 	    opts.o_uts.machine);

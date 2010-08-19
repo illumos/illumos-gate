@@ -1,11 +1,12 @@
-<HTML>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <!--
     CDDL HEADER START
 
     The contents of this file are subject to the terms of the
-    Common Development and Distribution License, Version 1.0 only
-    (the "License").  You may not use this file except in compliance
-    with the License.
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
 
     You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
     or http://www.opensolaris.org/os/licensing.
@@ -20,21 +21,23 @@
 
     CDDL HEADER END
 
--- Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+    Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
 -->
-<HEAD>
-	<TITLE> </TITLE>
-	 
-	
-</HEAD>
-<BODY>
-<!-- ident	"%Z%%M%	%I%	%E% SMI" -->
+<head>
+<title>Audit Control</title>
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1" />
+</head>
 
-When Audit Control is in the Rights Included column, it grants the right to manage the audit subsystem (which keeps track of event information), but not the right to read the audit files (see Audit Review).
+<body>
 <p>
-If Audit Control is grayed, then you are not entitled to Add or Remove this right.
+	When Audit Control is in the Rights Included column, it grants the right
+	to manage the audit service states (enable/disable/refresh/restart)
+	but not the right to read the audit configuration
+	(see Audit Configuration).
+</p>
 <p>
-<p>
-</BODY>
-</HTML>
+	If Audit Control is grayed, then you are not entitled to Add or Remove
+	this right.
+</p>
+</body>
+</html>

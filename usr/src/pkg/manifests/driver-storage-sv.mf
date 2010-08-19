@@ -80,16 +80,10 @@ $(i386_ONLY)file path=usr/lib/mdb/kvm/sv.so group=sys mode=0555
 hardlink path=lib/svc/method/svc-sv target=../../../etc/init.d/sv
 hardlink path=usr/sbin/svadm target=../bin/svadm
 hardlink path=usr/sbin/svboot target=../bin/svboot
-legacy pkg=SUNWspsvr arch=$(ARCH) category=system \
-    desc="Raw/Block Device Interface to Storage Volumes (SV)" \
-    hotline="Please contact your local service provider" \
-    name="Sun StorageTek Availability Suite Volume Driver (root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
-legacy pkg=SUNWspsvu arch=$(ARCH) category=system \
-    desc="Raw/Block Device Interface to Storage Volumes (SV)" \
-    hotline="Please contact your local service provider" \
-    name="Sun StorageTek Availability Suite Volume Driver (usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWspsvr desc="Raw/Block Device Interface to Storage Volumes (SV)" \
+    name="Sun StorageTek Availability Suite Volume Driver (root)"
+legacy pkg=SUNWspsvu desc="Raw/Block Device Interface to Storage Volumes (SV)" \
+    name="Sun StorageTek Availability Suite Volume Driver (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/cluster/lib/dscfg/start/15sv target=../../../sbin/sv

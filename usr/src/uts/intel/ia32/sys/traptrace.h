@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _IA32_SYS_TRAPTRACE_H
@@ -245,8 +245,8 @@ extern trap_trace_rec_t	trap_trace_postmort;	/* Entry used after death */
 #define	TRACE_STAMP(reg)			\
 	xorl	%eax, %eax;			\
 	xorl	%edx, %edx;			\
-	testl	$X86_TSC, x86_feature;		\
-	jz	9f;				\
+	btl	$X86FSET_TSC, x86_featureset;	\
+	jnc	9f;				\
 	rdtsc;					\
 9:	movl	%eax, TTR_STAMP(reg);		\
 	movl	%edx, TTR_STAMP+4(reg)

@@ -116,7 +116,6 @@ IN_KERNEL_SYSCALL(getuid,	SYS_getuid)		/*  24 */
 IN_KERNEL_SYSCALL(times,	SYS_times)		/*  43 */
 IN_KERNEL_SYSCALL(getgid,	SYS_getgid)		/*  47 */
 IN_KERNEL_SYSCALL(utssys,	SYS_utssys)		/*  57 */
-IN_KERNEL_SYSCALL(readlink,	SYS_readlink)		/*  90 */
 IN_KERNEL_SYSCALL(waitid,	SYS_waitid)		/* 107 */
 
 /*
@@ -223,7 +222,7 @@ brand_sysent_table_t brand_sysent_table[] = {
 	NOSYS,					/*  87 */
 	NOSYS,					/*  88 */
 	NOSYS,					/*  89 */
-	EMULATE(sn1_readlink, 3 | RV_DEFAULT),	/*  90 */
+	NOSYS,					/*  90 */
 	NOSYS,					/*  91 */
 	NOSYS,					/*  92 */
 	NOSYS,					/*  93 */

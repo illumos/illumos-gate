@@ -65,6 +65,9 @@ fmd_scheme_fmd_present(nvlist_t *nvl)
 	    nvlist_lookup_string(nvl, FM_FMRI_FMD_VERSION, &version) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
 
+	if (!fmd.d_loaded)
+		return (1);
+
 	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, name)) != NULL) {
 		rv = mp->mod_vers != NULL &&
 		    strcmp(mp->mod_vers, version) == 0;
@@ -85,6 +88,9 @@ fmd_scheme_fmd_replaced(nvlist_t *nvl)
 	    nvlist_lookup_string(nvl, FM_FMRI_FMD_VERSION, &version) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
 
+	if (!fmd.d_loaded)
+		return (FMD_OBJ_STATE_UNKNOWN);
+
 	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, name)) != NULL) {
 		rv = mp->mod_vers != NULL &&
 		    strcmp(mp->mod_vers, version) == 0;
@@ -104,6 +110,9 @@ fmd_scheme_fmd_service_state(nvlist_t *nvl)
 	if (nvlist_lookup_string(nvl, FM_FMRI_FMD_NAME, &name) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
 
+	if (!fmd.d_loaded)
+		return (FMD_SERVICE_STATE_UNKNOWN);
+
 	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, name)) != NULL) {
 		rv = mp->mod_error != 0;
 		fmd_module_rele(mp);
@@ -121,6 +130,9 @@ fmd_scheme_fmd_unusable(nvlist_t *nvl)
 
 	if (nvlist_lookup_string(nvl, FM_FMRI_FMD_NAME, &name) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
+
+	if (!fmd.d_loaded)
+		return (0);
 
 	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, name)) != NULL) {
 		rv = mp->mod_error != 0;

@@ -137,7 +137,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dladm_datalink_id2info;
 	dladm_walk_datalink_id;
 	dladm_create_conf;
-	dladm_read_conf;
+	dladm_open_conf;
+	dladm_getsnap_conf;
 	dladm_write_conf;
 	dladm_remove_conf;
 	dladm_destroy_conf;

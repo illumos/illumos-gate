@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_ARCHSYSTM_H
@@ -48,7 +47,6 @@ extern void setcr0(ulong_t);
 extern ulong_t getcr8(void);
 extern void setcr8(ulong_t);
 extern ulong_t getcr2(void);
-extern void iommu_cpu_nop(void);
 extern void clflush_insn(caddr_t addr);
 extern void mfence_insn(void);
 
@@ -59,6 +57,8 @@ extern void setgs(uint16_t);
 extern void patch_sse(void);
 extern void patch_sse2(void);
 #endif
+
+extern void patch_xsave(void);
 
 extern void cli(void);
 extern void sti(void);
@@ -195,6 +195,7 @@ extern void patch_tsc_read(int);
 #if defined(__amd64) && !defined(__xpv)
 extern void patch_memops(uint_t);
 #endif	/* defined(__amd64) && !defined(__xpv) */
+extern void setup_xfem(void);
 #define	cpr_dprintf prom_printf
 #define	IN_XPV_PANIC() (__lintzero)
 #endif

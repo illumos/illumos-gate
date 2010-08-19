@@ -111,15 +111,19 @@ extern int vhci_debug;
 #define	VHCIPKT2HBAPKT(pkt) (pkt->pkt_hba_pkt)
 #define	VHCIPKT2TGTPKT(pkt) (pkt->pkt_tgt_pkt)
 
-#define	VHCI_DECR_PATH_CMDCOUNT(svp)	mutex_enter(&(svp)->svp_mutex); \
-					(svp)->svp_cmds--; \
-					if ((svp)->svp_cmds == 0)  \
-						cv_broadcast(&(svp)->svp_cv); \
-					mutex_exit(&(svp)->svp_mutex);
+#define	VHCI_DECR_PATH_CMDCOUNT(svp) { \
+	mutex_enter(&(svp)->svp_mutex); \
+	(svp)->svp_cmds--; \
+	if ((svp)->svp_cmds == 0)  \
+		cv_broadcast(&(svp)->svp_cv); \
+	mutex_exit(&(svp)->svp_mutex); \
+}
 
-#define	VHCI_INCR_PATH_CMDCOUNT(svp)	mutex_enter(&(svp)->svp_mutex); \
-					(svp)->svp_cmds++; \
-					mutex_exit(&(svp)->svp_mutex);
+#define	VHCI_INCR_PATH_CMDCOUNT(svp) { \
+	mutex_enter(&(svp)->svp_mutex); \
+	(svp)->svp_cmds++; \
+	mutex_exit(&(svp)->svp_mutex); \
+}
 
 /*
  * When a LUN is HELD it results in new IOs being returned to the target

@@ -3076,8 +3076,11 @@ main(int argc, char **argv)
 				fatal("can't open '%s': %s",
 				    target, strerror(ENOMEM));
 			}
-			if ((error = spa_import(name, cfg, NULL)) != 0)
-				error = spa_import_verbatim(name, cfg, NULL);
+			if ((error = spa_import(name, cfg, NULL,
+			    ZFS_IMPORT_MISSING_LOG)) != 0) {
+				error = spa_import(name, cfg, NULL,
+				    ZFS_IMPORT_VERBATIM);
+			}
 		}
 	}
 

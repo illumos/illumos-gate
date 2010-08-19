@@ -375,7 +375,6 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= marvell88sx
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bcm_sata
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= memtest
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= mpt
-$(CLOSED_BUILD)CLOSED_DRV_KMODS_32	+= ncrs
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= pcn
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= atiatom
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= acpi_toshiba
@@ -490,7 +489,8 @@ DRV_KMODS	+= dcam1394
 #
 #	InfiniBand pseudo drivers
 #
-DRV_KMODS	+= ib ibp rdsib sdp iser daplt hermon tavor sol_ucma sol_uverbs
+DRV_KMODS	+= ib ibp eibnx eoib rdsib sdp iser daplt hermon tavor sol_ucma sol_uverbs
+DRV_KMODS	+= sol_umad 
 
 #
 #	LVM modules

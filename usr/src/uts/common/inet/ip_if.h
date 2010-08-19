@@ -33,7 +33,6 @@ extern "C" {
 #endif
 
 #define	PREFIX_INFINITY	0xffffffffUL
-#define	IP_MAX_HW_LEN	40
 
 #define	IP_LOOPBACK_MTU	(8*1024)
 
@@ -478,6 +477,11 @@ extern int ip_sioctl_get_lifsrcof(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
 
 extern int ip_sioctl_get_dadstate(ipif_t *, sin_t *, queue_t *, mblk_t *,
+    ip_ioctl_cmd_t *, void *);
+
+extern int ip_sioctl_get_ifhwaddr(ipif_t *, sin_t *, queue_t *, mblk_t *,
+    ip_ioctl_cmd_t *, void *);
+extern int ip_sioctl_get_lifhwaddr(ipif_t *, sin_t *, queue_t *, mblk_t *,
     ip_ioctl_cmd_t *, void *);
 
 extern	void	ip_sioctl_copyin_resume(ipsq_t *, queue_t *, mblk_t *, void *);

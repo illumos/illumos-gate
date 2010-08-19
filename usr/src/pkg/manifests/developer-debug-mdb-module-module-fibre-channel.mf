@@ -41,10 +41,7 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/fctl.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/fcip.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/fcp.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/fctl.so group=sys mode=0555
-legacy pkg=SUNWfcmdb arch=$(ARCH) category=system \
-    desc="Fibre Channel adb macros and mdb modules" \
-    hotline="Please contact your local service provider" \
-    name="Fibre Channel adb macros and mdb modules" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWfcmdb desc="Fibre Channel adb macros and mdb modules" \
+    name="Fibre Channel adb macros and mdb modules"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

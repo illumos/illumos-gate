@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * logadm/conf.c -- configuration file module
@@ -40,6 +37,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <limits.h>
 #include "err.h"
 #include "lut.h"
 #include "fn.h"
@@ -47,17 +45,27 @@
 #include "conf.h"
 
 /* forward declarations of functions private to this module */
-static void fillconflist(int lineno, const char *entry, char **args,
+static void fillconflist(int lineno, const char *entry,
     struct opts *opts, const char *com, int flags);
 static void fillargs(char *arg);
 static char *nexttok(char **ptrptr);
-static void conf_print(FILE *stream);
+static void conf_print(FILE *cstream, FILE *tstream);
 
 static const char *Confname;	/* name of the confile file */
-static char *Confbuf;		/* copy of the config file (a la mmap()) */
-static int Conflen;		/* length of mmap'd area */
 static int Conffd = -1;		/* file descriptor for config file */
-static boolean_t Confchanged;	/* true if we need to write changes back */
+static char *Confbuf;		/* copy of the config file (a la mmap()) */
+static int Conflen;		/* length of mmap'd config file area */
+static const char *Timesname;	/* name of the timestamps file */
+static int Timesfd = -1;	/* file descriptor for timestamps file */
+static char *Timesbuf;		/* copy of the timestamps file (a la mmap()) */
+static int Timeslen;		/* length of mmap'd timestamps area */
+static int Singlefile;		/* Conf and Times in the same file */
+static int Changed;		/* what changes need to be written back */
+static int Canchange;		/* what changes can be written back */
+static int Changing;		/* what changes have been requested */
+#define	CHG_NONE	0
+#define	CHG_TIMES	1
+#define	CHG_BOTH	3
 
 /*
  * our structured representation of the configuration file
@@ -67,7 +75,6 @@ struct confinfo {
 	struct confinfo *cf_next;
 	int cf_lineno;		/* line number in file */
 	const char *cf_entry;	/* name of entry, if line has an entry */
-	char **cf_args;		/* raw rhs of entry */
 	struct opts *cf_opts;	/* parsed rhs of entry */
 	const char *cf_com;	/* any comment text found */
 	int cf_flags;
@@ -82,7 +89,7 @@ static struct fn_list *Confentries;	/* list of valid entry names */
 
 /* allocate & fill in another entry in our list */
 static void
-fillconflist(int lineno, const char *entry, char **args,
+fillconflist(int lineno, const char *entry,
     struct opts *opts, const char *com, int flags)
 {
 	struct confinfo *cp = MALLOC(sizeof (*cp));
@@ -90,7 +97,6 @@ fillconflist(int lineno, const char *entry, char **args,
 	cp->cf_next = NULL;
 	cp->cf_lineno = lineno;
 	cp->cf_entry = entry;
-	cp->cf_args = args;
 	cp->cf_opts = opts;
 	cp->cf_com = com;
 	cp->cf_flags = flags;
@@ -163,54 +169,33 @@ nexttok(char **ptrptr)
 }
 
 /*
- * conf_open -- open the configuration file, lock it if we have write perms
+ * scan the memory image of a file
+ *	returns: 0: error, 1: ok, 3: -P option found
  */
-void
-conf_open(const char *fname, int needwrite)
+static int
+conf_scan(const char *fname, char *buf, int buflen, int timescan,
+    struct opts *cliopts)
 {
-	struct stat stbuf;
+	int ret = 1;
 	int lineno = 0;
 	char *line;
 	char *eline;
 	char *ebuf;
-	char *comment;
+	char *entry, *comment;
 
-	Confname = fname;
-	Confentries = fn_list_new(NULL);
+	ebuf = &buf[buflen];
 
-	/* special case this so we don't even try locking the file */
-	if (strcmp(Confname, "/dev/null") == 0)
-		return;
+	if (buf[buflen - 1] != '\n')
+		err(EF_WARN|EF_FILE, "file %s doesn't end with newline, "
+		    "last line ignored.", fname);
 
-	if ((Conffd = open(Confname, (needwrite) ? O_RDWR : O_RDONLY)) < 0)
-		err(EF_SYS, "%s", Confname);
+	for (line = buf; line < ebuf; line = eline) {
+		char *ap;
+		struct opts *opts = NULL;
+		struct confinfo *cp;
 
-	if (fstat(Conffd, &stbuf) < 0)
-		err(EF_SYS, "fstat on %s", Confname);
-
-	if (needwrite && lockf(Conffd, F_LOCK, 0) < 0)
-		err(EF_SYS, "lockf on %s", Confname);
-
-	if (stbuf.st_size == 0)
-		return;	/* empty file, don't bother parsing it */
-
-	if ((Confbuf = (char *)mmap(0, stbuf.st_size,
-	    PROT_READ | PROT_WRITE, MAP_PRIVATE, Conffd, 0)) == (char *)-1)
-		err(EF_SYS, "mmap on %s", Confname);
-
-	Conflen = stbuf.st_size;
-	Confchanged = B_FALSE;
-
-	ebuf = &Confbuf[Conflen];
-
-	if (Confbuf[Conflen - 1] != '\n')
-		err(EF_WARN|EF_FILE, "config file doesn't end with "
-		    "newline, last line ignored.");
-
-	line = Confbuf;
-	while (line < ebuf) {
 		lineno++;
-		err_fileline(Confname, lineno);
+		err_fileline(fname, lineno);
 		eline = line;
 		comment = NULL;
 		for (; eline < ebuf; eline++) {
@@ -220,7 +205,7 @@ conf_open(const char *fname, int needwrite)
 				*eline = ' ';
 				*(eline + 1) = ' ';
 				lineno++;
-				err_fileline(Confname, lineno);
+				err_fileline(fname, lineno);
 				continue;
 			}
 
@@ -237,64 +222,213 @@ conf_open(const char *fname, int needwrite)
 		}
 		if (comment >= ebuf)
 			comment = NULL;
-		if (eline < ebuf) {
-			char *entry;
-
-			*eline++ = '\0';
-
-			/*
-			 * now we have the entry, if any, at "line"
-			 * and the comment, if any, at "comment"
-			 */
-
-			/* entry is first token */
-			if ((entry = nexttok(&line)) != NULL &&
-			    strcmp(entry, "logadm-version") == 0) {
-				/*
-				 * we somehow opened some future format
-				 * conffile that we likely don't understand.
-				 * if the given version is "1" then go on,
-				 * otherwise someone is mixing versions
-				 * and we can't help them other than to
-				 * print an error and exit.
-				 */
-				if ((entry = nexttok(&line)) != NULL &&
-				    strcmp(entry, "1") != 0)
-					err(0, "%s version not "
-					    "supported by "
-					    "this version of logadm.",
-					    Confname);
-			} else if (entry) {
-				char *ap;
-				char **args;
-				int i;
-
-				ArgsI = 0;
-				while (ap = nexttok(&line))
-					fillargs(ap);
-				if (ArgsI == 0) {
-					/* short entry allowed */
-					fillconflist(lineno, entry,
-					    NULL, NULL, comment, 0);
-				} else {
-					Args[ArgsI++] = NULL;
-					args = MALLOC(sizeof (char *) * ArgsI);
-					for (i = 0; i < ArgsI; i++)
-						args[i] = Args[i];
-					fillconflist(lineno, entry,
-					    args, NULL, comment, 0);
-				}
-			} else
-				fillconflist(lineno, entry, NULL, NULL,
-				    comment, 0);
+		if (eline >= ebuf) {
+			/* discard trailing unterminated line */
+			continue;
 		}
-		line = eline;
+		*eline++ = '\0';
+
+		/*
+		 * now we have the entry, if any, at "line"
+		 * and the comment, if any, at "comment"
+		 */
+
+		/* entry is first token */
+		entry = nexttok(&line);
+		if (entry == NULL) {
+			/* it's just a comment line */
+			if (!timescan)
+				fillconflist(lineno, entry, NULL, comment, 0);
+			continue;
+		}
+		if (strcmp(entry, "logadm-version") == 0) {
+			/*
+			 * we somehow opened some future format
+			 * conffile that we likely don't understand.
+			 * if the given version is "1" then go on,
+			 * otherwise someone is mixing versions
+			 * and we can't help them other than to
+			 * print an error and exit.
+			 */
+			if ((entry = nexttok(&line)) != NULL &&
+			    strcmp(entry, "1") != 0)
+				err(0, "%s version not supported "
+				    "by this version of logadm.",
+				    fname);
+			continue;
+		}
+
+		/* form an argv array */
+		ArgsI = 0;
+		while (ap = nexttok(&line))
+			fillargs(ap);
+		Args[ArgsI] = NULL;
+
+		LOCAL_ERR_BEGIN {
+			if (SETJMP) {
+				err(EF_FILE, "cannot process invalid entry %s",
+				    entry);
+				ret = 0;
+				LOCAL_ERR_BREAK;
+			}
+
+			if (timescan) {
+				/* append to config options */
+				cp = lut_lookup(Conflut, entry);
+				if (cp == NULL) {
+					/* orphaned entry */
+					if (opts_count(cliopts, "v"))
+						err(EF_FILE, "stale timestamp "
+						    "for %s", entry);
+					LOCAL_ERR_BREAK;
+				}
+				opts = cp->cf_opts;
+			}
+			opts = opts_parse(opts, Args, OPTF_CONF);
+			if (!timescan) {
+				fillconflist(lineno, entry, opts, comment, 0);
+			}
+		LOCAL_ERR_END }
+
+		if (ret == 1 && opts && opts_optarg(opts, "P") != NULL)
+			ret = 3;
 	}
+
+	err_fileline(NULL, 0);
+	return (ret);
+}
+
+/*
+ * conf_open -- open the configuration file, lock it if we have write perms
+ */
+int
+conf_open(const char *cfname, const char *tfname, struct opts *cliopts)
+{
+	struct stat stbuf1, stbuf2, stbuf3;
+	struct flock	flock;
+	int ret;
+
+	Confname = cfname;
+	Timesname = tfname;
+	Confentries = fn_list_new(NULL);
+	Changed = CHG_NONE;
+
+	Changing = CHG_TIMES;
+	if (opts_count(cliopts, "Vn") != 0)
+		Changing = CHG_NONE;
+	else if (opts_count(cliopts, "rw") != 0)
+		Changing = CHG_BOTH;
+
+	Singlefile = strcmp(Confname, Timesname) == 0;
+	if (Singlefile && Changing == CHG_TIMES)
+		Changing = CHG_BOTH;
+
+	/* special case this so we don't even try locking the file */
+	if (strcmp(Confname, "/dev/null") == 0)
+		return (0);
+
+	while (Conffd == -1) {
+		Canchange = CHG_BOTH;
+		if ((Conffd = open(Confname, O_RDWR)) < 0) {
+			if (Changing == CHG_BOTH)
+				err(EF_SYS, "open %s", Confname);
+			Canchange = CHG_TIMES;
+			if ((Conffd = open(Confname, O_RDONLY)) < 0)
+				err(EF_SYS, "open %s", Confname);
+		}
+
+		flock.l_type = (Canchange == CHG_BOTH) ? F_WRLCK : F_RDLCK;
+		flock.l_whence = SEEK_SET;
+		flock.l_start = 0;
+		flock.l_len = 1;
+		if (fcntl(Conffd, F_SETLKW, &flock) < 0)
+			err(EF_SYS, "flock on %s", Confname);
+
+		/* wait until after file is locked to get filesize */
+		if (fstat(Conffd, &stbuf1) < 0)
+			err(EF_SYS, "fstat on %s", Confname);
+
+		/* verify that we've got a lock on the active file */
+		if (stat(Confname, &stbuf2) < 0 ||
+		    !(stbuf2.st_dev == stbuf1.st_dev &&
+		    stbuf2.st_ino == stbuf1.st_ino)) {
+			/* wrong config file, try again */
+			(void) close(Conffd);
+			Conffd = -1;
+		}
+	}
+
+	while (!Singlefile && Timesfd == -1) {
+		if ((Timesfd = open(Timesname, O_CREAT|O_RDWR, 0644)) < 0) {
+			if (Changing != CHG_NONE)
+				err(EF_SYS, "open %s", Timesname);
+			Canchange = CHG_NONE;
+			if ((Timesfd = open(Timesname, O_RDONLY)) < 0)
+				err(EF_SYS, "open %s", Timesname);
+		}
+
+		flock.l_type = (Canchange != CHG_NONE) ? F_WRLCK : F_RDLCK;
+		flock.l_whence = SEEK_SET;
+		flock.l_start = 0;
+		flock.l_len = 1;
+		if (fcntl(Timesfd, F_SETLKW, &flock) < 0)
+			err(EF_SYS, "flock on %s", Timesname);
+
+		/* wait until after file is locked to get filesize */
+		if (fstat(Timesfd, &stbuf2) < 0)
+			err(EF_SYS, "fstat on %s", Timesname);
+
+		/* verify that we've got a lock on the active file */
+		if (stat(Timesname, &stbuf3) < 0 ||
+		    !(stbuf2.st_dev == stbuf3.st_dev &&
+		    stbuf2.st_ino == stbuf3.st_ino)) {
+			/* wrong timestamp file, try again */
+			(void) close(Timesfd);
+			Timesfd = -1;
+			continue;
+		}
+
+		/* check that Timesname isn't an alias for Confname */
+		if (stbuf2.st_dev == stbuf1.st_dev &&
+		    stbuf2.st_ino == stbuf1.st_ino)
+			err(0, "Timestamp file %s can't refer to "
+			    "Configuration file %s", Timesname, Confname);
+	}
+
+	Conflen = stbuf1.st_size;
+	Timeslen = stbuf2.st_size;
+
+	if (Conflen == 0)
+		return (1);	/* empty file, don't bother parsing it */
+
+	if ((Confbuf = (char *)mmap(0, Conflen,
+	    PROT_READ | PROT_WRITE, MAP_PRIVATE, Conffd, 0)) == (char *)-1)
+		err(EF_SYS, "mmap on %s", Confname);
+
+	ret = conf_scan(Confname, Confbuf, Conflen, 0, cliopts);
+	if (ret == 3 && !Singlefile && Canchange == CHG_BOTH) {
+		/*
+		 * arrange to transfer any timestamps
+		 * from conf_file to timestamps_file
+		 */
+		Changing = Changed = CHG_BOTH;
+	}
+
+	if (Timesfd != -1 && Timeslen != 0) {
+		if ((Timesbuf = (char *)mmap(0, Timeslen,
+		    PROT_READ | PROT_WRITE, MAP_PRIVATE,
+		    Timesfd, 0)) == (char *)-1)
+			err(EF_SYS, "mmap on %s", Timesname);
+		ret &= conf_scan(Timesname, Timesbuf, Timeslen, 1, cliopts);
+	}
+
 	/*
 	 * possible future enhancement:  go through and mark any entries:
 	 * 		logfile -P <date>
 	 * as DELETED if the logfile doesn't exist
 	 */
+
+	return (ret);
 }
 
 /*
@@ -303,34 +437,99 @@ conf_open(const char *fname, int needwrite)
 void
 conf_close(struct opts *opts)
 {
-	FILE *fp;
+	char cuname[PATH_MAX], tuname[PATH_MAX];
+	int cfd, tfd;
+	FILE *cfp = NULL, *tfp = NULL;
+	boolean_t safe_update = B_TRUE;
 
-	if (Confchanged && opts_count(opts, "n") == 0 && Conffd != -1) {
+	if (Changed == CHG_NONE || opts_count(opts, "n") != 0) {
 		if (opts_count(opts, "v"))
-			(void) out("# writing changes to %s\n", Confname);
-		if (Debug > 1) {
-			(void) fprintf(stderr, "conf_close, %s changed to:\n",
-			    Confname);
-			conf_print(stderr);
-		}
-		if (lseek(Conffd, (off_t)0, SEEK_SET) < 0)
-			err(EF_SYS, "lseek on %s", Confname);
-		if (ftruncate(Conffd, (off_t)0) < 0)
-			err(EF_SYS, "ftruncate on %s", Confname);
-		if ((fp = fdopen(Conffd, "w")) == NULL)
-			err(EF_SYS, "fdopen on %s", Confname);
-		conf_print(fp);
-		if (fclose(fp) < 0)
-			err(EF_SYS, "fclose on %s", Confname);
-		Conffd = -1;
-		Confchanged = B_FALSE;
-	} else if (opts_count(opts, "v")) {
-		(void) out("# %s unchanged\n", Confname);
+			(void) out("# %s and %s unchanged\n",
+			    Confname, Timesname);
+		goto cleanup;
 	}
 
+	if (Debug > 1) {
+		(void) fprintf(stderr, "conf_close, saving logadm context:\n");
+		conf_print(stderr, NULL);
+	}
+
+	cuname[0] = tuname[0] = '\0';
+	LOCAL_ERR_BEGIN {
+		if (SETJMP) {
+			safe_update = B_FALSE;
+			LOCAL_ERR_BREAK;
+		}
+		if (Changed == CHG_BOTH) {
+			if (Canchange != CHG_BOTH)
+				err(EF_JMP, "internal error: attempting "
+				    "to update %s without locking", Confname);
+			(void) snprintf(cuname, sizeof (cuname), "%sXXXXXX",
+			    Confname);
+			if ((cfd = mkstemp(cuname)) == -1)
+				err(EF_SYS|EF_JMP, "open %s replacement",
+				    Confname);
+			if (opts_count(opts, "v"))
+				(void) out("# writing changes to %s\n", cuname);
+			if (fchmod(cfd, 0644) == -1)
+				err(EF_SYS|EF_JMP, "chmod %s", cuname);
+			if ((cfp = fdopen(cfd, "w")) == NULL)
+				err(EF_SYS|EF_JMP, "fdopen on %s", cuname);
+		} else {
+			/* just toss away the configuration data */
+			cfp = fopen("/dev/null", "w");
+		}
+		if (!Singlefile) {
+			if (Canchange == CHG_NONE)
+				err(EF_JMP, "internal error: attempting "
+				    "to update %s without locking", Timesname);
+			(void) snprintf(tuname, sizeof (tuname), "%sXXXXXX",
+			    Timesname);
+			if ((tfd = mkstemp(tuname)) == -1)
+				err(EF_SYS|EF_JMP, "open %s replacement",
+				    Timesname);
+			if (opts_count(opts, "v"))
+				(void) out("# writing changes to %s\n", tuname);
+			if (fchmod(tfd, 0644) == -1)
+				err(EF_SYS|EF_JMP, "chmod %s", tuname);
+			if ((tfp = fdopen(tfd, "w")) == NULL)
+				err(EF_SYS|EF_JMP, "fdopen on %s", tuname);
+		}
+
+		conf_print(cfp, tfp);
+		if (fclose(cfp) < 0)
+			err(EF_SYS|EF_JMP, "fclose on %s", Confname);
+		if (tfp != NULL && fclose(tfp) < 0)
+			err(EF_SYS|EF_JMP, "fclose on %s", Timesname);
+	LOCAL_ERR_END }
+
+	if (!safe_update) {
+		if (cuname[0] != 0)
+			(void) unlink(cuname);
+		if (tuname[0] != 0)
+			(void) unlink(tuname);
+		err(EF_JMP, "unsafe to update configuration file "
+		    "or timestamps");
+		return;
+	}
+
+	/* rename updated files into place */
+	if (cuname[0] != '\0')
+		if (rename(cuname, Confname) < 0)
+			err(EF_SYS, "rename %s to %s", cuname, Confname);
+	if (tuname[0] != '\0')
+		if (rename(tuname, Timesname) < 0)
+			err(EF_SYS, "rename %s to %s", tuname, Timesname);
+	Changed = CHG_NONE;
+
+cleanup:
 	if (Conffd != -1) {
 		(void) close(Conffd);
 		Conffd = -1;
+	}
+	if (Timesfd != -1) {
+		(void) close(Timesfd);
+		Timesfd = -1;
 	}
 	if (Conflut) {
 		lut_free(Conflut, free);
@@ -345,16 +544,14 @@ conf_close(struct opts *opts)
 /*
  * conf_lookup -- lookup an entry in the config file
  */
-char **
+void *
 conf_lookup(const char *lhs)
 {
 	struct confinfo *cp = lut_lookup(Conflut, lhs);
 
-	if (cp != NULL) {
+	if (cp != NULL)
 		err_fileline(Confname, cp->cf_lineno);
-		return (cp->cf_args);
-	} else
-		return (NULL);
+	return (cp);
 }
 
 /*
@@ -365,14 +562,9 @@ conf_opts(const char *lhs)
 {
 	struct confinfo *cp = lut_lookup(Conflut, lhs);
 
-	if (cp != NULL) {
-		if (cp->cf_opts)
-			return (cp->cf_opts);	/* already parsed */
-		err_fileline(Confname, cp->cf_lineno);
-		cp->cf_opts = opts_parse(cp->cf_args, OPTF_CONF);
+	if (cp != NULL)
 		return (cp->cf_opts);
-	}
-	return (opts_parse(NULL, OPTF_CONF));
+	return (opts_parse(NULL, NULL, OPTF_CONF));
 }
 
 /*
@@ -388,12 +580,13 @@ conf_replace(const char *lhs, struct opts *newopts)
 
 	if (cp != NULL) {
 		cp->cf_opts = newopts;
-		cp->cf_args = NULL;
+		/* cp->cf_args = NULL; */
 		if (newopts == NULL)
 			cp->cf_flags |= CONFF_DELETED;
 	} else
-		fillconflist(0, lhs, NULL, newopts, NULL, 0);
-	Confchanged = B_TRUE;
+		fillconflist(0, lhs, newopts, NULL, 0);
+
+	Changed = CHG_BOTH;
 }
 
 /*
@@ -408,17 +601,18 @@ conf_set(const char *entry, char *o, const char *optarg)
 		return;
 
 	if (cp != NULL) {
-		if (cp->cf_opts == NULL)
-			cp->cf_opts = opts_parse(cp->cf_args, OPTF_CONF);
 		cp->cf_flags &= ~CONFF_DELETED;
 	} else {
-		fillconflist(0, STRDUP(entry), NULL,
-		    opts_parse(NULL, OPTF_CONF), NULL, 0);
+		fillconflist(0, STRDUP(entry),
+		    opts_parse(NULL, NULL, OPTF_CONF), NULL, 0);
 		if ((cp = lut_lookup(Conflut, entry)) == NULL)
 			err(0, "conf_set internal error");
 	}
 	(void) opts_set(cp->cf_opts, o, optarg);
-	Confchanged = B_TRUE;
+	if (strcmp(o, "P") == 0)
+		Changed |= CHG_TIMES;
+	else
+		Changed = CHG_BOTH;
 }
 
 /*
@@ -432,33 +626,41 @@ conf_entries(void)
 
 /* print the config file */
 static void
-conf_print(FILE *stream)
+conf_print(FILE *cstream, FILE *tstream)
 {
 	struct confinfo *cp;
+	char *exclude_opts = "PFfhnrvVw";
+	const char *timestamp;
 
+	if (tstream == NULL) {
+		exclude_opts++;		/* -P option goes to config file */
+	} else {
+		(void) fprintf(tstream, gettext(
+		    "# This file holds internal data for logadm(1M).\n"
+		    "# Do not edit.\n"));
+	}
 	for (cp = Confinfo; cp; cp = cp->cf_next) {
 		if (cp->cf_flags & CONFF_DELETED)
 			continue;
 		if (cp->cf_entry) {
-			char **p;
-
-			opts_printword(cp->cf_entry, stream);
-			if (cp->cf_opts) {
-				/* existence of opts overrides args */
-				opts_print(cp->cf_opts, stream, "fhnrvVw");
-			} else if (cp->cf_args) {
-				for (p = cp->cf_args; *p; p++) {
-					(void) fprintf(stream, " ");
-					opts_printword(*p, stream);
-				}
+			opts_printword(cp->cf_entry, cstream);
+			if (cp->cf_opts)
+				opts_print(cp->cf_opts, cstream, exclude_opts);
+			/* output timestamps to tstream */
+			if (tstream != NULL && (timestamp =
+			    opts_optarg(cp->cf_opts, "P")) != NULL) {
+				opts_printword(cp->cf_entry, tstream);
+				(void) fprintf(tstream, " -P ");
+				opts_printword(timestamp, tstream);
+				(void) fprintf(tstream, "\n");
 			}
 		}
 		if (cp->cf_com) {
 			if (cp->cf_entry)
-				(void) fprintf(stream, " ");
-			(void) fprintf(stream, "#%s", cp->cf_com);
+				(void) fprintf(cstream, " ");
+			(void) fprintf(cstream, "#%s", cp->cf_com);
 		}
-		(void) fprintf(stream, "\n");
+		(void) fprintf(cstream, "\n");
 	}
 }
 
@@ -470,18 +672,23 @@ conf_print(FILE *stream)
 int
 main(int argc, char *argv[])
 {
+	struct opts *opts;
+
 	err_init(argv[0]);
 	setbuf(stdout, NULL);
+	opts_init(Opttable, Opttable_cnt);
+
+	opts = opts_parse(NULL, NULL, 0);
 
 	if (argc != 2)
 		err(EF_RAW, "usage: %s conffile\n", argv[0]);
 
-	conf_open(argv[1], 1);
+	conf_open(argv[1], argv[1], opts);
 
 	printf("conffile <%s>:\n", argv[1]);
-	conf_print(stdout);
+	conf_print(stdout, NULL);
 
-	conf_close(opts_parse(NULL, 0));
+	conf_close(opts);
 
 	err_done(0);
 	/* NOTREACHED */

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -41,8 +40,8 @@ static int	tcp_kstat_update(kstat_t *kp, int rw);
 static int	tcp_kstat2_update(kstat_t *kp, int rw);
 static void	tcp_sum_mib(tcp_stack_t *, mib2_tcp_t *);
 
-static void	tcp_cp_mib(mib2_tcp_t *, mib2_tcp_t *);
-static void	tcp_cp_stats(tcp_stat_t *, tcp_stat_t *);
+static void	tcp_add_mib(mib2_tcp_t *, mib2_tcp_t *);
+static void	tcp_add_stats(tcp_stat_counter_t *, tcp_stat_t *);
 static void	tcp_clr_stats(tcp_stat_t *);
 
 tcp_g_stat_t	tcp_g_statistics;
@@ -89,7 +88,7 @@ tcp_snmp_state(tcp_t *tcp)
  * Return SNMP stuff in buffer in mpdata.
  */
 mblk_t *
-tcp_snmp_get(queue_t *q, mblk_t *mpctl)
+tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 {
 	mblk_t			*mpdata;
 	mblk_t			*mp_conn_ctl = NULL;
@@ -115,6 +114,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	ip_stack_t		*ipst;
 	mblk_t			*mp2ctl;
 	mib2_tcp_t		tcp_mib;
+	size_t			tcp_mib_size, tce_size, tce6_size;
 
 	/*
 	 * make a copy of the original message
@@ -138,6 +138,16 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 
 	ipst = connp->conn_netstack->netstack_ip;
 	tcps = connp->conn_netstack->netstack_tcp;
+
+	if (legacy_req) {
+		tcp_mib_size = LEGACY_MIB_SIZE(&tcp_mib, mib2_tcp_t);
+		tce_size = LEGACY_MIB_SIZE(&tce, mib2_tcpConnEntry_t);
+		tce6_size = LEGACY_MIB_SIZE(&tce6, mib2_tcp6ConnEntry_t);
+	} else {
+		tcp_mib_size = sizeof (mib2_tcp_t);
+		tce_size = sizeof (mib2_tcpConnEntry_t);
+		tce6_size = sizeof (mib2_tcp6ConnEntry_t);
+	}
 
 	bzero(&tcp_mib, sizeof (tcp_mib));
 
@@ -267,7 +277,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			tce6.tcp6ConnCreationTime = connp->conn_open_time;
 
 			(void) snmp_append_data2(mp6_conn_ctl->b_cont,
-			    &mp6_conn_tail, (char *)&tce6, sizeof (tce6));
+			    &mp6_conn_tail, (char *)&tce6, tce6_size);
 
 			mlp.tme_connidx = v6_conn_idx++;
 			if (needattr)
@@ -334,7 +344,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				tce.tcpConnCreationTime = connp->conn_open_time;
 
 				(void) snmp_append_data2(mp_conn_ctl->b_cont,
-				    &mp_conn_tail, (char *)&tce, sizeof (tce));
+				    &mp_conn_tail, (char *)&tce, tce_size);
 
 				mlp.tme_connidx = v4_conn_idx++;
 				if (needattr)
@@ -348,6 +358,10 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 
 	tcp_sum_mib(tcps, &tcp_mib);
 
+	/* Fixed length structure for IPv4 and IPv6 counters */
+	SET_MIB(tcp_mib.tcpConnTableSize, tce_size);
+	SET_MIB(tcp_mib.tcp6ConnTableSize, tce6_size);
+
 	/*
 	 * Synchronize 32- and 64-bit counters.  Note that tcpInSegs and
 	 * tcpOutSegs are not updated anywhere in TCP.  The new 64 bits
@@ -360,7 +374,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_TCP;
 	optp->name = 0;
-	(void) snmp_append_data(mpdata, (char *)&tcp_mib, sizeof (tcp_mib));
+	(void) snmp_append_data(mpdata, (char *)&tcp_mib, tcp_mib_size);
 	optp->len = msgdsize(mpdata);
 	qreply(q, mpctl);
 
@@ -568,6 +582,10 @@ tcp_kstat_update(kstat_t *kp, int rw)
 	bzero(&tcp_mib, sizeof (tcp_mib));
 	tcp_sum_mib(tcps, &tcp_mib);
 
+	/* Fixed length structure for IPv4 and IPv6 counters */
+	SET_MIB(tcp_mib.tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
+	SET_MIB(tcp_mib.tcp6ConnTableSize, sizeof (mib2_tcp6ConnEntry_t));
+
 	tcpkp->activeOpens.value.ui32 = tcp_mib.tcpActiveOpens;
 	tcpkp->passiveOpens.value.ui32 = tcp_mib.tcpPassiveOpens;
 	tcpkp->attemptFails.value.ui32 = tcp_mib.tcpAttemptFails;
@@ -773,18 +791,18 @@ tcp_kstat2_update(kstat_t *kp, int rw)
 	 */
 	cnt = tcps->tcps_sc_cnt;
 	for (i = 0; i < cnt; i++)
-		tcp_cp_stats(&tcps->tcps_sc[i]->tcp_sc_stats, stats);
+		tcp_add_stats(&tcps->tcps_sc[i]->tcp_sc_stats, stats);
 
 	netstack_rele(ns);
 	return (0);
 }
 
 /*
- * To copy stats from one mib2_tcp_t to another.  Static fields are not copied.
+ * To add stats from one mib2_tcp_t to another.  Static fields are not added.
  * The caller should set them up propertly.
  */
 void
-tcp_cp_mib(mib2_tcp_t *from, mib2_tcp_t *to)
+tcp_add_mib(mib2_tcp_t *from, mib2_tcp_t *to)
 {
 	to->tcpActiveOpens += from->tcpActiveOpens;
 	to->tcpPassiveOpens += from->tcpPassiveOpens;
@@ -855,17 +873,13 @@ tcp_sum_mib(tcp_stack_t *tcps, mib2_tcp_t *tcp_mib)
 	 */
 	cnt = tcps->tcps_sc_cnt;
 	for (i = 0; i < cnt; i++)
-		tcp_cp_mib(&tcps->tcps_sc[i]->tcp_sc_mib, tcp_mib);
-
-	/* Fixed length structure for IPv4 and IPv6 counters */
-	SET_MIB(tcp_mib->tcpConnTableSize, sizeof (mib2_tcpConnEntry_t));
-	SET_MIB(tcp_mib->tcp6ConnTableSize, sizeof (mib2_tcp6ConnEntry_t));
+		tcp_add_mib(&tcps->tcps_sc[i]->tcp_sc_mib, tcp_mib);
 }
 
 /*
  * To set all tcp_stat_t counters to 0.
  */
-void
+static void
 tcp_clr_stats(tcp_stat_t *stats)
 {
 	stats->tcp_time_wait_syn_success.value.ui64 = 0;
@@ -921,106 +935,107 @@ tcp_clr_stats(tcp_stat_t *stats)
 }
 
 /*
- * To copy counters from one tcp_stat_t to another.
+ * To add counters from the per CPU tcp_stat_counter_t to the stack
+ * tcp_stat_t.
  */
-void
-tcp_cp_stats(tcp_stat_t *from, tcp_stat_t *to)
+static void
+tcp_add_stats(tcp_stat_counter_t *from, tcp_stat_t *to)
 {
 	to->tcp_time_wait_syn_success.value.ui64 +=
-	    from->tcp_time_wait_syn_success.value.ui64;
+	    from->tcp_time_wait_syn_success;
 	to->tcp_clean_death_nondetached.value.ui64 +=
-	    from->tcp_clean_death_nondetached.value.ui64;
+	    from->tcp_clean_death_nondetached;
 	to->tcp_eager_blowoff_q.value.ui64 +=
-	    from->tcp_eager_blowoff_q.value.ui64;
+	    from->tcp_eager_blowoff_q;
 	to->tcp_eager_blowoff_q0.value.ui64 +=
-	    from->tcp_eager_blowoff_q0.value.ui64;
+	    from->tcp_eager_blowoff_q0;
 	to->tcp_no_listener.value.ui64 +=
-	    from->tcp_no_listener.value.ui64;
+	    from->tcp_no_listener;
 	to->tcp_listendrop.value.ui64 +=
-	    from->tcp_listendrop.value.ui64;
+	    from->tcp_listendrop;
 	to->tcp_listendropq0.value.ui64 +=
-	    from->tcp_listendropq0.value.ui64;
+	    from->tcp_listendropq0;
 	to->tcp_wsrv_called.value.ui64 +=
-	    from->tcp_wsrv_called.value.ui64;
+	    from->tcp_wsrv_called;
 	to->tcp_flwctl_on.value.ui64 +=
-	    from->tcp_flwctl_on.value.ui64;
+	    from->tcp_flwctl_on;
 	to->tcp_timer_fire_early.value.ui64 +=
-	    from->tcp_timer_fire_early.value.ui64;
+	    from->tcp_timer_fire_early;
 	to->tcp_timer_fire_miss.value.ui64 +=
-	    from->tcp_timer_fire_miss.value.ui64;
+	    from->tcp_timer_fire_miss;
 	to->tcp_zcopy_on.value.ui64 +=
-	    from->tcp_zcopy_on.value.ui64;
+	    from->tcp_zcopy_on;
 	to->tcp_zcopy_off.value.ui64 +=
-	    from->tcp_zcopy_off.value.ui64;
+	    from->tcp_zcopy_off;
 	to->tcp_zcopy_backoff.value.ui64 +=
-	    from->tcp_zcopy_backoff.value.ui64;
+	    from->tcp_zcopy_backoff;
 	to->tcp_fusion_flowctl.value.ui64 +=
-	    from->tcp_fusion_flowctl.value.ui64;
+	    from->tcp_fusion_flowctl;
 	to->tcp_fusion_backenabled.value.ui64 +=
-	    from->tcp_fusion_backenabled.value.ui64;
+	    from->tcp_fusion_backenabled;
 	to->tcp_fusion_urg.value.ui64 +=
-	    from->tcp_fusion_urg.value.ui64;
+	    from->tcp_fusion_urg;
 	to->tcp_fusion_putnext.value.ui64 +=
-	    from->tcp_fusion_putnext.value.ui64;
+	    from->tcp_fusion_putnext;
 	to->tcp_fusion_unfusable.value.ui64 +=
-	    from->tcp_fusion_unfusable.value.ui64;
+	    from->tcp_fusion_unfusable;
 	to->tcp_fusion_aborted.value.ui64 +=
-	    from->tcp_fusion_aborted.value.ui64;
+	    from->tcp_fusion_aborted;
 	to->tcp_fusion_unqualified.value.ui64 +=
-	    from->tcp_fusion_unqualified.value.ui64;
+	    from->tcp_fusion_unqualified;
 	to->tcp_fusion_rrw_busy.value.ui64 +=
-	    from->tcp_fusion_rrw_busy.value.ui64;
+	    from->tcp_fusion_rrw_busy;
 	to->tcp_fusion_rrw_msgcnt.value.ui64 +=
-	    from->tcp_fusion_rrw_msgcnt.value.ui64;
+	    from->tcp_fusion_rrw_msgcnt;
 	to->tcp_fusion_rrw_plugged.value.ui64 +=
-	    from->tcp_fusion_rrw_plugged.value.ui64;
+	    from->tcp_fusion_rrw_plugged;
 	to->tcp_in_ack_unsent_drop.value.ui64 +=
-	    from->tcp_in_ack_unsent_drop.value.ui64;
+	    from->tcp_in_ack_unsent_drop;
 	to->tcp_sock_fallback.value.ui64 +=
-	    from->tcp_sock_fallback.value.ui64;
+	    from->tcp_sock_fallback;
 	to->tcp_lso_enabled.value.ui64 +=
-	    from->tcp_lso_enabled.value.ui64;
+	    from->tcp_lso_enabled;
 	to->tcp_lso_disabled.value.ui64 +=
-	    from->tcp_lso_disabled.value.ui64;
+	    from->tcp_lso_disabled;
 	to->tcp_lso_times.value.ui64 +=
-	    from->tcp_lso_times.value.ui64;
+	    from->tcp_lso_times;
 	to->tcp_lso_pkt_out.value.ui64 +=
-	    from->tcp_lso_pkt_out.value.ui64;
+	    from->tcp_lso_pkt_out;
 	to->tcp_listen_cnt_drop.value.ui64 +=
-	    from->tcp_listen_cnt_drop.value.ui64;
+	    from->tcp_listen_cnt_drop;
 	to->tcp_listen_mem_drop.value.ui64 +=
-	    from->tcp_listen_mem_drop.value.ui64;
+	    from->tcp_listen_mem_drop;
 	to->tcp_zwin_mem_drop.value.ui64 +=
-	    from->tcp_zwin_mem_drop.value.ui64;
+	    from->tcp_zwin_mem_drop;
 	to->tcp_zwin_ack_syn.value.ui64 +=
-	    from->tcp_zwin_ack_syn.value.ui64;
+	    from->tcp_zwin_ack_syn;
 	to->tcp_rst_unsent.value.ui64 +=
-	    from->tcp_rst_unsent.value.ui64;
+	    from->tcp_rst_unsent;
 	to->tcp_reclaim_cnt.value.ui64 +=
-	    from->tcp_reclaim_cnt.value.ui64;
+	    from->tcp_reclaim_cnt;
 	to->tcp_reass_timeout.value.ui64 +=
-	    from->tcp_reass_timeout.value.ui64;
+	    from->tcp_reass_timeout;
 
 #ifdef TCP_DEBUG_COUNTER
 	to->tcp_time_wait.value.ui64 +=
-	    from->tcp_time_wait.value.ui64;
+	    from->tcp_time_wait;
 	to->tcp_rput_time_wait.value.ui64 +=
-	    from->tcp_rput_time_wait.value.ui64;
+	    from->tcp_rput_time_wait;
 	to->tcp_detach_time_wait.value.ui64 +=
-	    from->tcp_detach_time_wait.value.ui64;
+	    from->tcp_detach_time_wait;
 	to->tcp_timeout_calls.value.ui64 +=
-	    from->tcp_timeout_calls.value.ui64;
+	    from->tcp_timeout_calls;
 	to->tcp_timeout_cached_alloc.value.ui64 +=
-	    from->tcp_timeout_cached_alloc.value.ui64;
+	    from->tcp_timeout_cached_alloc;
 	to->tcp_timeout_cancel_reqs.value.ui64 +=
-	    from->tcp_timeout_cancel_reqs.value.ui64;
+	    from->tcp_timeout_cancel_reqs;
 	to->tcp_timeout_canceled.value.ui64 +=
-	    from->tcp_timeout_canceled.value.ui64;
+	    from->tcp_timeout_canceled;
 	to->tcp_timermp_freed.value.ui64 +=
-	    from->tcp_timermp_freed.value.ui64;
+	    from->tcp_timermp_freed;
 	to->tcp_push_timer_cnt.value.ui64 +=
-	    from->tcp_push_timer_cnt.value.ui64;
+	    from->tcp_push_timer_cnt;
 	to->tcp_ack_timer_cnt.value.ui64 +=
-	    from->tcp_ack_timer_cnt.value.ui64;
+	    from->tcp_ack_timer_cnt;
 #endif
 }

@@ -52,10 +52,8 @@ file path=usr/include/sys/dktp/tgdk.h
 file path=usr/include/sys/fd_debug.h
 file path=usr/include/sys/fdc.h
 file path=usr/include/sys/fdmedia.h
-legacy pkg=SUNWpsh arch=$(ARCH) category=system \
+legacy pkg=SUNWpsh \
     desc="SunOS C/C++ header files for development of software for device drivers specific to bus and platform" \
-    hotline="Please contact your local service provider" \
-    name="Platform Support, Driver Header Files" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    name="Platform Support, Driver Header Files"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

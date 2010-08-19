@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -467,7 +466,7 @@ segspt_create(struct seg *seg, caddr_t argsp)
 			 * The zone will never be NULL, as a fully created
 			 * shm always has an owning zone.
 			 */
-			zone = sp->shm_perm.ipc_zone;
+			zone = sp->shm_perm.ipc_zone_ref.zref_zone;
 			ASSERT(zone != NULL);
 			if (anon_resv_zone(ptob(more_pgs), zone) == 0) {
 				err = ENOMEM;
@@ -2487,19 +2486,59 @@ spt_unlockedbytes(pgcnt_t npages, page_t **ppa)
 	return (unlocked);
 }
 
+extern	u_longlong_t randtick(void);
+/* number of locks to reserve/skip by spt_lockpages() and spt_unlockpages() */
+#define	NLCK	(NCPU_P2)
+/* Random number with a range [0, n-1], n must be power of two */
+#define	RAND_P2(n)	\
+	((((long)curthread >> PTR24_LSB) ^ (long)randtick()) & ((n) - 1))
+
 int
 spt_lockpages(struct seg *seg, pgcnt_t anon_index, pgcnt_t npages,
     page_t **ppa, ulong_t *lockmap, size_t pos,
     rctl_qty_t *locked)
 {
-	struct shm_data *shmd = seg->s_data;
-	struct spt_data *sptd = shmd->shm_sptseg->s_data;
+	struct	shm_data *shmd = seg->s_data;
+	struct	spt_data *sptd = shmd->shm_sptseg->s_data;
 	ulong_t	i;
 	int	kernel;
+	pgcnt_t	nlck = 0;
+	int	rv = 0;
+	int	use_reserved = 1;
 
 	/* return the number of bytes actually locked */
 	*locked = 0;
+
+	/*
+	 * To avoid contention on freemem_lock, availrmem and pages_locked
+	 * global counters are updated only every nlck locked pages instead of
+	 * every time.  Reserve nlck locks up front and deduct from this
+	 * reservation for each page that requires a lock.  When the reservation
+	 * is consumed, reserve again.  nlck is randomized, so the competing
+	 * threads do not fall into a cyclic lock contention pattern. When
+	 * memory is low, the lock ahead is disabled, and instead page_pp_lock()
+	 * is used to lock pages.
+	 */
 	for (i = 0; i < npages; anon_index++, pos++, i++) {
+		if (nlck == 0 && use_reserved == 1) {
+			nlck = NLCK + RAND_P2(NLCK);
+			/* if fewer loops left, decrease nlck */
+			nlck = MIN(nlck, npages - i);
+			/*
+			 * Reserve nlck locks up front and deduct from this
+			 * reservation for each page that requires a lock.  When
+			 * the reservation is consumed, reserve again.
+			 */
+			mutex_enter(&freemem_lock);
+			if ((availrmem - nlck) < pages_pp_maximum) {
+				/* Do not do advance memory reserves */
+				use_reserved = 0;
+			} else {
+				availrmem	-= nlck;
+				pages_locked	+= nlck;
+			}
+			mutex_exit(&freemem_lock);
+		}
 		if (!(shmd->shm_vpage[anon_index] & DISM_PG_LOCKED)) {
 			if (sptd->spt_ppa_lckcnt[anon_index] <
 			    (ushort_t)DISM_LOCK_MAX) {
@@ -2511,13 +2550,17 @@ spt_lockpages(struct seg *seg, pgcnt_t anon_index, pgcnt_t npages,
 					    anon_index << PAGESHIFT);
 				}
 				kernel = (sptd->spt_ppa &&
-				    sptd->spt_ppa[anon_index]) ? 1 : 0;
-				if (!page_pp_lock(ppa[i], 0, kernel)) {
+				    sptd->spt_ppa[anon_index]);
+				if (!page_pp_lock(ppa[i], 0, kernel ||
+				    use_reserved)) {
 					sptd->spt_ppa_lckcnt[anon_index]--;
-					return (EAGAIN);
+					rv = EAGAIN;
+					break;
 				}
 				/* if this is a newly locked page, count it */
 				if (ppa[i]->p_lckcnt == 1) {
+					if (kernel == 0 && use_reserved == 1)
+						nlck--;
 					*locked += PAGESIZE;
 				}
 				shmd->shm_lckpgs++;
@@ -2527,6 +2570,86 @@ spt_lockpages(struct seg *seg, pgcnt_t anon_index, pgcnt_t npages,
 			}
 		}
 	}
+	/* Return unused lock reservation */
+	if (nlck != 0 && use_reserved == 1) {
+		mutex_enter(&freemem_lock);
+		availrmem	+= nlck;
+		pages_locked	-= nlck;
+		mutex_exit(&freemem_lock);
+	}
+
+	return (rv);
+}
+
+int
+spt_unlockpages(struct seg *seg, pgcnt_t anon_index, pgcnt_t npages,
+    rctl_qty_t *unlocked)
+{
+	struct shm_data	*shmd = seg->s_data;
+	struct spt_data	*sptd = shmd->shm_sptseg->s_data;
+	struct anon_map	*amp = sptd->spt_amp;
+	struct anon 	*ap;
+	struct vnode 	*vp;
+	u_offset_t 	off;
+	struct page	*pp;
+	int		kernel;
+	anon_sync_obj_t	cookie;
+	ulong_t		i;
+	pgcnt_t		nlck = 0;
+	pgcnt_t		nlck_limit = NLCK;
+
+	ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
+	for (i = 0; i < npages; i++, anon_index++) {
+		if (shmd->shm_vpage[anon_index] & DISM_PG_LOCKED) {
+			anon_array_enter(amp, anon_index, &cookie);
+			ap = anon_get_ptr(amp->ahp, anon_index);
+			ASSERT(ap);
+
+			swap_xlate(ap, &vp, &off);
+			anon_array_exit(&cookie);
+			pp = page_lookup(vp, off, SE_SHARED);
+			ASSERT(pp);
+			/*
+			 * availrmem is decremented only for pages which are not
+			 * in seg pcache, for pages in seg pcache availrmem was
+			 * decremented in _dismpagelock()
+			 */
+			kernel = (sptd->spt_ppa && sptd->spt_ppa[anon_index]);
+			ASSERT(pp->p_lckcnt > 0);
+
+			/*
+			 * lock page but do not change availrmem, we do it
+			 * ourselves every nlck loops.
+			 */
+			page_pp_unlock(pp, 0, 1);
+			if (pp->p_lckcnt == 0) {
+				if (kernel == 0)
+					nlck++;
+				*unlocked += PAGESIZE;
+			}
+			page_unlock(pp);
+			shmd->shm_vpage[anon_index] &= ~DISM_PG_LOCKED;
+			sptd->spt_ppa_lckcnt[anon_index]--;
+			shmd->shm_lckpgs--;
+		}
+
+		/*
+		 * To reduce freemem_lock contention, do not update availrmem
+		 * until at least NLCK pages have been unlocked.
+		 * 1. No need to update if nlck is zero
+		 * 2. Always update if the last iteration
+		 */
+		if (nlck > 0 && (nlck == nlck_limit || i == npages - 1)) {
+			mutex_enter(&freemem_lock);
+			availrmem	+= nlck;
+			pages_locked	-= nlck;
+			mutex_exit(&freemem_lock);
+			nlck = 0;
+			nlck_limit = NLCK + RAND_P2(NLCK);
+		}
+	}
+	ANON_LOCK_EXIT(&amp->a_rwlock);
+
 	return (0);
 }
 
@@ -2646,17 +2769,8 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 		kmem_free(ppa, ((sizeof (page_t *)) * a_npages));
 
 	} else if (op == MC_UNLOCK) { /* unlock */
-		struct anon_map *amp;
-		struct anon 	*ap;
-		struct vnode 	*vp;
-		u_offset_t 	off;
-		struct page	*pp;
-		int		kernel;
-		anon_sync_obj_t cookie;
-		rctl_qty_t	unlocked = 0;
 		page_t		**ppa;
 
-		amp = sptd->spt_amp;
 		mutex_enter(&sptd->spt_lock);
 		if (shmd->shm_lckpgs == 0) {
 			mutex_exit(&sptd->spt_lock);
@@ -2669,37 +2783,7 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 			sptd->spt_flags |= DISM_PPA_CHANGED;
 
 		mutex_enter(&sp->shm_mlock);
-		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-		for (i = 0; i < npages; i++, an_idx++) {
-			if (shmd->shm_vpage[an_idx] & DISM_PG_LOCKED) {
-				anon_array_enter(amp, an_idx, &cookie);
-				ap = anon_get_ptr(amp->ahp, an_idx);
-				ASSERT(ap);
-
-				swap_xlate(ap, &vp, &off);
-				anon_array_exit(&cookie);
-				pp = page_lookup(vp, off, SE_SHARED);
-				ASSERT(pp);
-				/*
-				 * the availrmem is decremented only for
-				 * pages which are not in seg pcache,
-				 * for pages in seg pcache availrmem was
-				 * decremented in _dismpagelock() (if
-				 * they were not locked here)
-				 */
-				kernel = (sptd->spt_ppa &&
-				    sptd->spt_ppa[an_idx]) ? 1 : 0;
-				ASSERT(pp->p_lckcnt > 0);
-				page_pp_unlock(pp, 0, kernel);
-				if (pp->p_lckcnt == 0)
-					unlocked += PAGESIZE;
-				page_unlock(pp);
-				shmd->shm_vpage[an_idx] &= ~DISM_PG_LOCKED;
-				sptd->spt_ppa_lckcnt[an_idx]--;
-				shmd->shm_lckpgs--;
-			}
-		}
-		ANON_LOCK_EXIT(&amp->a_rwlock);
+		sts = spt_unlockpages(seg, an_idx, npages, &unlocked);
 		if ((ppa = sptd->spt_ppa) != NULL)
 			sptd->spt_flags |= DISM_PPA_CHANGED;
 		mutex_exit(&sptd->spt_lock);

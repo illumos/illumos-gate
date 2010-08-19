@@ -18,19 +18,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #ifndef _SYS_FILE_H
 #define	_SYS_FILE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.28 */
 
 #include <sys/t_lock.h>
 #ifdef _KERNEL
@@ -61,7 +58,7 @@ extern "C" {
 typedef struct file {
 	kmutex_t	f_tlock;	/* short term lock */
 	ushort_t	f_flag;
-	ushort_t	f_pad;		/* Explicit pad to 4 byte boundary */
+	ushort_t	f_flag2;	/* extra flags (FSEARCH, FEXEC) */
 	struct vnode	*f_vnode;	/* pointer to vnode structure */
 	offset_t	f_offset;	/* read/write character pointer */
 	struct cred	*f_cred;	/* credentials of user who opened it */
@@ -77,7 +74,7 @@ typedef struct fpollinfo {
 	struct fpollinfo	*fp_next;
 } fpollinfo_t;
 
-/* flags */
+/* f_flag */
 
 #define	FOPEN		0xffffffff
 #define	FREAD		0x01	/* <sys/aiocb.h> LIO_READ must be identical */
@@ -110,6 +107,11 @@ typedef struct fpollinfo {
 #define	FNOLINKS	0x40000	/* don't allow multiple hard links */
 #define	FIGNORECASE	0x80000 /* request case-insensitive lookups */
 #define	FXATTRDIROPEN	0x100000  /* only opening hidden attribute directory */
+
+/* f_flag2 (open-only) */
+
+#define	FSEARCH		0x200000	/* O_SEARCH = 0x200000 */
+#define	FEXEC		0x400000	/* O_EXEC = 0x400000 */
 
 #ifdef _KERNEL
 
@@ -170,6 +172,7 @@ typedef struct fpollinfo {
  */
 struct proc;	/* forward reference for function prototype */
 struct vnodeops;
+struct vattr;
 
 extern file_t *getf(int);
 extern void releasef(int);
@@ -199,6 +202,8 @@ extern void close_exec(uf_info_t *);
 extern void clear_stale_fd(void);
 extern void clear_active_fd(int);
 extern void free_afd(afd_t *afd);
+extern int fgetstartvp(int, char *, struct vnode **);
+extern int fsetattrat(int, char *, int, struct vattr *);
 extern int fisopen(struct vnode *);
 extern void delfpollinfo(int);
 extern void addfpollinfo(int);

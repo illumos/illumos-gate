@@ -48,10 +48,8 @@ file path=kernel/drv/$(ARCH64)/pcs group=sys
 $(i386_ONLY)file path=kernel/drv/pcic group=sys
 file path=kernel/drv/pcic.conf group=sys
 $(i386_ONLY)file path=kernel/drv/pcs group=sys
-legacy pkg=SUNWpcmci arch=$(ARCH) category=system \
+legacy pkg=SUNWpcmci \
     desc="kernel modules and start-up files for PCMCIA card services" \
-    hotline="Please contact your local service provider" \
-    name="PCMCIA Card Services, (Root)" vendor="Sun Microsystems, Inc." \
-    version=11.11,REV=2009.11.11
+    name="PCMCIA Card Services, (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

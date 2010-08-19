@@ -262,7 +262,7 @@ pid$target::netr_*:return
 /*
  * SAMR
  */
-pid$target::samr_s_ConnectAnon:entry,
+pid$target::samr_s_Connect:entry,
 pid$target::samr_s_CloseHandle:entry,
 pid$target::samr_s_LookupDomain:entry,
 pid$target::samr_s_EnumLocalDomains:entry,
@@ -275,14 +275,14 @@ pid$target::samr_s_DeleteUser:entry,
 pid$target::samr_s_QueryUserInfo:entry,
 pid$target::samr_s_QueryUserGroups:entry,
 pid$target::samr_s_OpenGroup:entry,
-pid$target::samr_s_Connect:entry,
+pid$target::samr_s_Connect2:entry,
 pid$target::samr_s_GetUserPwInfo:entry,
 pid$target::samr_s_CreateUser:entry,
 pid$target::samr_s_ChangeUserPasswd:entry,
 pid$target::samr_s_GetDomainPwInfo:entry,
 pid$target::samr_s_SetUserInfo:entry,
-pid$target::samr_s_Connect3:entry,
 pid$target::samr_s_Connect4:entry,
+pid$target::samr_s_Connect5:entry,
 pid$target::samr_s_QueryDispInfo:entry,
 pid$target::samr_s_OpenAlias:entry,
 pid$target::samr_s_CreateDomainAlias:entry,
@@ -294,7 +294,7 @@ pid$target::samr_s_EnumDomainGroups:entry
 {
 }
 
-pid$target::samr_s_ConnectAnon:return,
+pid$target::samr_s_Connect:return,
 pid$target::samr_s_CloseHandle:return,
 pid$target::samr_s_LookupDomain:return,
 pid$target::samr_s_EnumLocalDomains:return,
@@ -307,14 +307,14 @@ pid$target::samr_s_DeleteUser:return,
 pid$target::samr_s_QueryUserInfo:return,
 pid$target::samr_s_QueryUserGroups:return,
 pid$target::samr_s_OpenGroup:return,
-pid$target::samr_s_Connect:return,
+pid$target::samr_s_Connect2:return,
 pid$target::samr_s_GetUserPwInfo:return,
 pid$target::samr_s_CreateUser:return,
 pid$target::samr_s_ChangeUserPasswd:return,
 pid$target::samr_s_GetDomainPwInfo:return,
 pid$target::samr_s_SetUserInfo:return,
-pid$target::samr_s_Connect3:return,
 pid$target::samr_s_Connect4:return,
+pid$target::samr_s_Connect5:return,
 pid$target::samr_s_QueryDispInfo:return,
 pid$target::samr_s_OpenAlias:return,
 pid$target::samr_s_CreateDomainAlias:return,
@@ -323,6 +323,14 @@ pid$target::samr_s_QueryAliasInfo:return,
 pid$target::samr_s_DeleteDomainAlias:return,
 pid$target::samr_s_EnumDomainAliases:return,
 pid$target::samr_s_EnumDomainGroups:return
+{
+}
+
+/*
+ * SPOOLSS
+ */
+pid$target::spoolss_*:entry,
+pid$target::spoolss_*:return
 {
 }
 

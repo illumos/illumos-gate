@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_ADAPTERS_HERMON_MISC_H
@@ -566,56 +565,61 @@ typedef struct hermon_loopback_state_s {
  * Mellanox FMR
  */
 typedef struct hermon_fmr_list_s {
-	avl_node_t			fmr_avlnode;
 	struct hermon_fmr_list_s		*fmr_next;
 
 	hermon_mrhdl_t			fmr;
-	ibt_pmr_desc_t			fmr_desc;
 	hermon_fmrhdl_t			fmr_pool;
-	uint_t				fmr_refcnt;
 	uint_t				fmr_remaps;
-	uint_t				fmr_in_cache;
+	uint_t				fmr_remap_gen; /* generation */
 } hermon_fmr_list_t;
 
 struct hermon_sw_fmr_s {
 	hermon_state_t			*fmr_state;
 
 	kmutex_t			fmr_lock;
-	ddi_taskq_t			*fmr_taskq;
+	hermon_fmr_list_t		*fmr_free_list;
+	hermon_fmr_list_t		**fmr_free_list_tail;
+	int				fmr_free_len;
+	int				fmr_pool_size;
+	int				fmr_max_pages;
+	int				fmr_flags;
+	int				fmr_stat_register;
 
 	ibt_fmr_flush_handler_t		fmr_flush_function;
 	void				*fmr_flush_arg;
 
-	int				fmr_pool_size;
-	int				fmr_max_pages;
+	int				fmr_max_remaps;
+	uint_t				fmr_remap_gen; /* generation */
 	int				fmr_page_sz;
+
+	kmutex_t			remap_lock;
+	hermon_fmr_list_t		*fmr_remap_list;
+	hermon_fmr_list_t		**fmr_remap_list_tail;
+	int				fmr_remap_watermark;
+	int				fmr_remap_len;
+
+	kmutex_t			dirty_lock;
+	hermon_fmr_list_t		*fmr_dirty_list;
+	hermon_fmr_list_t		**fmr_dirty_list_tail;
 	int				fmr_dirty_watermark;
 	int				fmr_dirty_len;
-	int				fmr_flags;
-
-	hermon_fmr_list_t		*fmr_free_list;
-	hermon_fmr_list_t		*fmr_dirty_list;
-
-	int				fmr_cache;
-	avl_tree_t			fmr_cache_avl;
-	kmutex_t			fmr_cachelock;
 };
 _NOTE(MUTEX_PROTECTS_DATA(hermon_sw_fmr_s::fmr_lock,
-    hermon_sw_fmr_s::fmr_state
     hermon_sw_fmr_s::fmr_pool_size
-    hermon_sw_fmr_s::fmr_max_pages
     hermon_sw_fmr_s::fmr_page_sz
+    hermon_sw_fmr_s::fmr_flags
+    hermon_sw_fmr_s::fmr_free_list))
+_NOTE(MUTEX_PROTECTS_DATA(hermon_sw_fmr_s::dirty_lock,
     hermon_sw_fmr_s::fmr_dirty_watermark
     hermon_sw_fmr_s::fmr_dirty_len
-    hermon_sw_fmr_s::fmr_flags
-    hermon_sw_fmr_s::fmr_free_list
-    hermon_sw_fmr_s::fmr_dirty_list
-    hermon_sw_fmr_s::fmr_cache))
+    hermon_sw_fmr_s::fmr_dirty_list))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(hermon_sw_fmr_s::fmr_remap_gen
+    hermon_sw_fmr_s::fmr_state
+    hermon_sw_fmr_s::fmr_max_pages
+    hermon_sw_fmr_s::fmr_max_remaps))
 
-_NOTE(MUTEX_PROTECTS_DATA(hermon_sw_fmr_s::fmr_cachelock,
-    hermon_sw_fmr_s::fmr_cache_avl))
-
-#define	HERMON_FMR_MAX_REMAPS		128
+/* FRWR guarantees 8 bits of key; avoid corner cases by using "-2" */
+#define	HERMON_FMR_MAX_REMAPS		(256 - 2)
 
 /* Hermon doorbell record routines */
 

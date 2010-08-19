@@ -562,6 +562,8 @@
 			 removed"
 @ MSG_ARG_FILE		"arg[%d]\tfile=%s"
 
+@ MSG_ARG_NG_UNKNOWN	"warning: unrecognized -z guidance item: %s"
+
 
 # Bindings messages
 # NOTE: these are used by appcert(1) and lari(1), use care when changing.
@@ -660,7 +662,7 @@
 @ MSG_FIL_FILTER_1	"file=%s;  filter for %s  (configuration definition)"
 @ MSG_FIL_FILTER_2	"file=%s;  filter for %s"
 @ MSG_FIL_FILTEE_2	"file=%s;  filtee processing failed"
-@ MSG_FIL_FILTEE_3	"file=%s;  filtee skipped  (auditing directed)"
+@ MSG_FIL_FILTEE_3	"file=%s;  filtee skipped  (auditor directed)"
 @ MSG_FIL_FIXNAME	"file=%s;  required name=%s"
 @ MSG_FIL_PROMOTE	"file=%s;  promoting mode to %s"
 @ MSG_FIL_DEFERRED	"file=%s;  deferred dependency exchanged for file=%s"
@@ -772,8 +774,8 @@
 
 @ MSG_LIB_FIND		"find object=%s; searching"
 @ MSG_LIB_TRYING	" trying path=%s%s"
-@ MSG_LIB_ALTER		" trying path=%s  (auditing supplied alternative)"
-@ MSG_LIB_SKIP		"   skip path=%s  (auditing directed)"
+@ MSG_LIB_ALTER		" trying path=%s  (auditor returned alternative)"
+@ MSG_LIB_SKIP		"   skip path=%s  (auditor directed)"
 @ MSG_LIB_IGNORE	" ignore path=%s  (insecure directory name)"
 @ MSG_LIB_INUSE		"    use path=%s  (implicitly secure, as directory \
 			 has already provided dependencies)"
@@ -1043,17 +1045,36 @@
 
 # Link-Auditing Messages
 
-@ MSG_AUD_INIT		"audit library %s: processing"
-@ MSG_AUD_VERSION	"audit library %s: running at version: %d"
-@ MSG_AUD_INTERFACE	"audit library %s: provides interface: %s"
-@ MSG_AUD_OBJECT	"audit library %s: offered object: %s"
-@ MSG_AUD_SYM		"audit library %s: %s: symbol: %s: value: 0x%llx %s"
-@ MSG_AUD_SYMNEW	"modified to: 0x%llx"
+@ MSG_AUD_LIB		"auditor %s: required by: %s  %s"
+@ MSG_AUD_INTERFACE	"auditor %s: provides interface: %s"
+
+@ MSG_AUD_VERSION	"auditor %s: la_version(): %d: returned %d"
+@ MSG_AUD_ACTIVITY	"auditor %s: la_activity(): %s  %s"
+@ MSG_AUD_PREINIT	"auditor %s: la_preinit(): %s"
+@ MSG_AUD_OBJFILTER	"auditor %s: la_objfilter(): %s: filtee=%s  [ %s ]"
+@ MSG_AUD_OBJFILTER_R	"auditor %s: la_objfilter(): %s: returned 0  (filtee \
+			 ignored)"
+@ MSG_AUD_OBJOPEN	"auditor %s: la_objopen(): %s"
+@ MSG_AUD_OBJOPEN_R	"auditor %s: la_objopen(): %s: returned %s"
+@ MSG_AUD_OBJOPEN_RI	"auditor %s: la_objopen(): %s: returned %s  (flags \
+			 ignored)"
+@ MSG_AUD_OBJSEARCH	"auditor %s: la_objsearch(): %s  %s"
+@ MSG_AUD_OBJSEARCH_R	"auditor %s: la_objsearch(): %s: alternative path \
+			 returned: %s"
+@ MSG_AUD_OBJSEARCH_S	"auditor %s: la_objsearch(): %s: alternative path \
+			 returned: 0  (path skipped)"
+@ MSG_AUD_OBJCLOSE	"auditor %s: la_objclose(): %s"
+@ MSG_AUD_SYMBIND	"auditor %s: la_symbind(): %s: value: 0x%llx  %s"
+@ MSG_AUD_SYMBIND_R	"auditor %s: la_symbind(): %s: returned value: \
+			 0x%llx  %s"
+@ MSG_AUD_PLTENTER	"auditor %s: la_pltenter(): %s: value: 0x%llx"
+@ MSG_AUD_PLTENTER_R	"auditor %s: la_pltenter(): %s: returned value: 0x%llx"
+@ MSG_AUD_PLTEXIT	"auditor %s: la_pltexit(): %s"
 
 @ MSG_AUD_IGNORE	"file=%s;  global auditing request ignored: object \
 			 did not initiate process" 
 @ MSG_AUD_SKIP		"file=%s;  skipped: using auditor from %s"
-@ MSG_AUD_TERM		"file=%s;  auditing terminated search"
+@ MSG_AUD_TERM		"file=%s;  auditor has indicated path should be skipped"
 
 # GOT Messages
 
@@ -1744,3 +1765,8 @@
 @ MSG_MR_PADDING	"[ PADDING ]"
 @ MSG_MR_HDR_ELF	"[ HDR_ELF ]"
 @ MSG_MR_HDR_AOUT	"[ HDR_AOUT ]"
+
+# audit originator
+
+@ MSG_AUD_PRELOAD	"[ LD_AUDIT ]"
+@ MSG_AUD_GLOBAL	"[ GLOBAL AUDIT ]"

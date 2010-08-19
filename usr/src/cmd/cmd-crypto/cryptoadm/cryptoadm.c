@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -550,11 +549,26 @@ do_list(int argc, char **argv)
 
 	if ((argc == 3) && (strncmp(argv[2], FIPS_KEYWORD,
 	    strlen(FIPS_KEYWORD))) == 0) {
+		int	success_count = 0;
 		/*
 		 * cryptoadm list fips-140
 		 */
 		rc = do_fips_actions(FIPS140_STATUS, NOT_REFRESH);
-		return (rc);
+		if (rc == SUCCESS)
+			success_count++;
+		(void) printf(gettext("\nKernel hardware providers:\n"));
+		(void) printf(gettext("=========================:\n"));
+		rc = do_fips_hw_actions(FIPS140_STATUS, HW_PROVIDER_NCP);
+		if (rc == SUCCESS)
+			success_count++;
+		rc = do_fips_hw_actions(FIPS140_STATUS, HW_PROVIDER_N2CP);
+		if (rc == SUCCESS)
+			success_count++;
+		rc = do_fips_hw_actions(FIPS140_STATUS, HW_PROVIDER_N2RNG);
+		if (rc == SUCCESS)
+			success_count++;
+		/* succeed to get status from config file? */
+		return ((success_count > 0) ? SUCCESS: FAILURE);
 	}
 
 	argc -= 1;
@@ -741,11 +755,34 @@ do_disable(int argc, char **argv)
 
 	if ((argc == 3) && (strncmp(argv[2], FIPS_KEYWORD,
 	    strlen(FIPS_KEYWORD))) == 0) {
+		int	success_count = 0;
 		/*
 		 * cryptoadm disable fips-140
 		 */
 		rc = do_fips_actions(FIPS140_DISABLE, NOT_REFRESH);
-		return (rc);
+		if (rc == SUCCESS)
+			success_count++;
+		(void) printf(gettext("\nKernel hardware providers:\n"));
+		(void) printf(gettext("=========================:\n"));
+		rc = do_fips_hw_actions(FIPS140_DISABLE, HW_PROVIDER_NCP);
+		if (rc == SUCCESS)
+			success_count++;
+		rc = do_fips_hw_actions(FIPS140_DISABLE, HW_PROVIDER_N2CP);
+		if (rc == SUCCESS)
+			success_count++;
+		rc = do_fips_hw_actions(FIPS140_DISABLE, HW_PROVIDER_N2RNG);
+		if (rc == SUCCESS)
+			success_count++;
+
+		if (success_count > 0) {
+			(void) printf(gettext(
+			    "\nThe FIPS-140 mode has changed.\n"));
+			(void) printf(gettext(
+			    "The system will require a reboot.\n"));
+			return (SUCCESS);
+		} else {
+			return (FAILURE);
+		}
 	}
 
 	if ((argc < 3) || (argc > 5)) {
@@ -869,11 +906,34 @@ do_enable(int argc, char **argv)
 
 	if ((argc == 3) && (strncmp(argv[2], FIPS_KEYWORD,
 	    strlen(FIPS_KEYWORD))) == 0) {
+		int	success_count = 0;
 		/*
 		 * cryptoadm enable fips-140
 		 */
 		rc = do_fips_actions(FIPS140_ENABLE, NOT_REFRESH);
-		return (rc);
+		if (rc == SUCCESS)
+			success_count++;
+		(void) printf(gettext("\nKernel hardware providers:\n"));
+		(void) printf(gettext("=========================:\n"));
+		rc = do_fips_hw_actions(FIPS140_ENABLE, HW_PROVIDER_NCP);
+		if (rc == SUCCESS)
+			success_count++;
+		rc = do_fips_hw_actions(FIPS140_ENABLE, HW_PROVIDER_N2CP);
+		if (rc == SUCCESS)
+			success_count++;
+		rc = do_fips_hw_actions(FIPS140_ENABLE, HW_PROVIDER_N2RNG);
+		if (rc == SUCCESS)
+			success_count++;
+
+		if (success_count > 0) {
+			(void) printf(gettext(
+			    "\nThe FIPS-140 mode has changed.\n"));
+			(void) printf(gettext(
+			    "The system will require a reboot.\n"));
+			return (SUCCESS);
+		} else {
+			return (FAILURE);
+		}
 	}
 
 	if ((argc < 3) || (argc > 6)) {

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -136,7 +135,7 @@ static int
 smb_token_sids2ids(smb_token_t *token)
 {
 	idmap_stat stat;
-	int nmaps, retries = 0;
+	int nmaps;
 	smb_idmap_batch_t sib;
 
 	/*
@@ -148,21 +147,19 @@ smb_token_sids2ids(smb_token_t *token)
 	else
 		nmaps = token->tkn_win_grps.i_cnt + 3;
 
-	do {
-		stat = smb_idmap_batch_create(&sib, nmaps, SMB_IDMAP_SID2ID);
-		if (stat != IDMAP_SUCCESS)
-			return (-1);
+	stat = smb_idmap_batch_create(&sib, nmaps, SMB_IDMAP_SID2ID);
+	if (stat != IDMAP_SUCCESS)
+		return (-1);
 
-		stat = smb_token_idmap(token, &sib);
-		if (stat != IDMAP_SUCCESS) {
-			smb_idmap_batch_destroy(&sib);
-			return (-1);
-		}
-
-		stat = smb_idmap_batch_getmappings(&sib);
+	stat = smb_token_idmap(token, &sib);
+	if (stat != IDMAP_SUCCESS) {
 		smb_idmap_batch_destroy(&sib);
-		smb_idmap_check("smb_idmap_batch_getmappings", stat);
-	} while (stat == IDMAP_ERR_RPC_HANDLE && retries++ < 3);
+		return (-1);
+	}
+
+	stat = smb_idmap_batch_getmappings(&sib);
+	smb_idmap_batch_destroy(&sib);
+	smb_idmap_check("smb_idmap_batch_getmappings", stat);
 
 	return (stat == IDMAP_SUCCESS ? 0 : -1);
 }
