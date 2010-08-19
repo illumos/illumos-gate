@@ -282,7 +282,7 @@ genrange(STR *s, int was_octal)
 		return (0);
 	}
 	p = malloc((NCHARS_SB + 1) * sizeof (int));
-	if ((s = (void *)p) == NULL)
+	if ((s->set = (void *)p) == NULL)
 		err(1, "genrange() malloc");
 	for (cnt = 0; cnt < NCHARS_SB; cnt++)
 		if (charcoll((const void *)&cnt, (const void *)&(s->lastch)) >=
