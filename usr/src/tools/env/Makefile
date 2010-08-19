@@ -24,7 +24,7 @@
 ENVFILES= \
 	developer \
 	gatekeeper \
-	opensolaris
+	illumos
 
 include ../Makefile.tools
 

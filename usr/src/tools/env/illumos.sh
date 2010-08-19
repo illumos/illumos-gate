@@ -45,14 +45,15 @@ GATE=testws;			export GATE
 # CODEMGR_WS - where is your workspace at (or what should nightly name it)
 CODEMGR_WS="/export/$GATE";			export CODEMGR_WS
 
+#
+#  The following two macros are the closed/crypto binaries.  Once
+#  Illumos has totally freed itself, we can remove these references.
+#
 # Location of encumbered binaries.
 ON_CLOSED_BINS="$CODEMGR_WS/closed";		export ON_CLOSED_BINS
+# Location of signed cryptographic binaries.
+ON_CRYPTO_BINS="$CODEMGR_WS/on-crypto.$MACH.tar.bz2" export ON_CRYPTO_BINS
 
-# This flag controls whether to build the closed source.  If
-# undefined, nightly(1) and bldenv(1) will set it according to whether
-# the closed source tree is present.  CLOSED_IS_PRESENT="no" means not
-# building the closed sources.
-# CLOSED_IS_PRESENT="no";		export CLOSED_IS_PRESENT
 
 # Maximum number of dmake jobs.  The recommended number is 2 + (2 *
 # NCPUS), where NCPUS is the number of CPUs on your build system.
@@ -71,7 +72,7 @@ ONBLD_BIN="/opt/onbld/bin"
 PARENT_WS="";			export PARENT_WS
 
 # CLONE_WS is the workspace nightly should do a bringover from.
-CLONE_WS="ssh://anon@hg.opensolaris.org//hg/onnv/onnv-gate"
+CLONE_WS="http://hg.illumos.org/illumos-gate"
 export CLONE_WS
 
 # The bringover, if any, is done as STAFFER.
@@ -92,10 +93,6 @@ LOCKNAME="`basename $CODEMGR_WS`_nightly.lock"; export LOCKNAME
 ATLOG="$CODEMGR_WS/log";			export ATLOG
 LOGFILE="$ATLOG/nightly.log";			export LOGFILE
 MACH=`uname -p`;				export MACH
-
-# Location of signed cryptographic binaries.
-ON_CRYPTO_BINS="$CODEMGR_WS/on-crypto.$MACH.tar.bz2"
-export ON_CRYPTO_BINS
 
 # REF_PROTO_LIST - for comparing the list of stuff in your proto area
 # with. Generally this should be left alone, since you want to see differences
@@ -171,11 +168,6 @@ SPRO_VROOT=$SPRO_ROOT;				export SPRO_VROOT
 # Set this flag to 'n' to disable the use of 'checkpaths'.  The default,
 # if the 'N' option is not specified, is to run this test.
 #CHECK_PATHS=y
-
-# BRINGOVER_FILES is the list of files nightly passes to bringover.
-# If not set the default is "usr", but it can be used for bringing
-# over deleted_files or other nifty directories.
-#BRINGOVER_FILES="usr deleted_files"
 
 # POST_NIGHTLY can be any command to be run at the end of nightly.  See
 # nightly(1) for interactions between environment variables and this command.
