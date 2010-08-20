@@ -738,6 +738,7 @@ PORTLOCALE=			\
 	fnmatch.o		\
 	fgetwc.o		\
 	fgetws.o		\
+	fix_grouping.o		\
 	fputwc.o		\
 	fputws.o		\
 	fwide.o			\
@@ -756,6 +757,7 @@ PORTLOCALE=			\
 	mbrlen.o		\
 	mbrtowc.o		\
 	mbsinit.o		\
+	mbsnrtowcs.o		\
 	mbsrtowcs.o		\
 	mbstowcs.o		\
 	mbtowc.o		\
@@ -785,9 +787,10 @@ PORTLOCALE=			\
 	wcrtomb.o		\
 	wcscoll.o		\
 	wcsftime.o		\
+	wcsnrtombs.o		\
 	wcsrtombs.o		\
-	wcswidth.o		\
 	wcstombs.o		\
+	wcswidth.o		\
 	wcsxfrm.o		\
 	wctob.o			\
 	wctomb.o		\
@@ -982,12 +985,6 @@ CRTSRCS= ../../common/sparcv9
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/lib/Makefile.lib.64
 
-# NOTE: libc_i18n.a will be part of libc.so.1.  Therefore, the compilation
-# conditions such as the settings of CFLAGS and CPPFLAGS for the libc_i18n stuff
-# need to be compatible with the ones for the libc stuff.  Whenever the changes
-# that affect the compilation conditions of libc happened, those for libc_i18n
-# also need to be updated.
-
 # we need to override the default SONAME here because we might
 # be building a variant object (still libc.so.1, but different filename)
 SONAME = libc.so.1
@@ -1009,7 +1006,6 @@ CFLAGS64 += $(XSTRCONST)
 
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
-$(DYNLIB) := PICS += $(ROOTFS_LIBDIR64)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(EXTPICS)
 
 MAPFILES =	$(LIBCDIR)/port/mapfile-vers
