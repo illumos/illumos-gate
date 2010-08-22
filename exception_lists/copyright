@@ -316,7 +316,7 @@ usr/src/lib/krb5/ss/utils.c
 usr/src/lib/libkmsagent/common/SOAP/*.*
 usr/src/lib/librstp/common/*.[ch]
 usr/src/lib/librstp/common/[CRT]*
-usr/src/uts/intel/os/illumos.xpm
+usr/src/uts/intel/os/splashimage.xpm
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c
 usr/src/uts/common/gssapi/mechs/krb5/crypto/checksum_length.c
 usr/src/uts/common/gssapi/mechs/krb5/crypto/des/f_parity.c

@@ -475,7 +475,13 @@ be_append_menu(char *be_name, char *be_root_pool, char *boot_pool,
 			if (strstr(line, BE_GRUB_COMMENT) != NULL ||
 			    strstr(line, "BOOTADM") != NULL)
 				continue;
-			entries[num_lines] = strdup(temp_line);
+			if (strcmp(tok, "splashimage") == 0) {
+				entries[num_lines] =
+				    strdup("splashimage "
+				    "/boot/splashimage.xpm\n");
+			} else {
+				entries[num_lines] = strdup(temp_line);
+			}
 			num_lines++;
 		} else if (found_title && !found_orig_be) {
 			tmp_entries[num_tmp_lines] = strdup(temp_line);
