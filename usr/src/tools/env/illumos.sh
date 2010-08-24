@@ -55,11 +55,11 @@ ON_CLOSED_BINS="$CODEMGR_WS/closed";		export ON_CLOSED_BINS
 ON_CRYPTO_BINS="$CODEMGR_WS/on-crypto.$MACH.tar.bz2" export ON_CRYPTO_BINS
 
 
-# Maximum number of dmake jobs.  The recommended number is 2 + (2 *
-# NCPUS), where NCPUS is the number of CPUs on your build system.
+# Maximum number of dmake jobs.  The recommended number is 2 + NCPUS,
+# where NCPUS is the number of logical CPUs on your build system.
 maxjobs() {
-	ncpu=`/usr/sbin/psrinfo -p`
-	expr $ncpu \* 2 + 2
+	ncpu=`kstat -p cpu_info:::state | grep -c on-line`
+	expr $ncpu + 2
 }
 DMAKE_MAX_JOBS=`maxjobs`;			export DMAKE_MAX_JOBS
 
