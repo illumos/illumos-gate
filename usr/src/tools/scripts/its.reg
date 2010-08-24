@@ -23,7 +23,7 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-
+# Copyright 2010, Richard Lowe
 
 #
 # This file constitutes an informal registry for information tracking
@@ -153,3 +153,12 @@ EXTERNAL_URL=http://bugs.opensolaris.org/bugdatabase/view_bug.do?bug_id=\\1
 INTERNAL_URL_sun.com=http://monaco.sfbay.sun.com/detail.jsf?cr=\\1
 REGEX=\\([0-9]\\{7\\}\\)
 CONTACT=opendev-discuss@opensolaris.org
+
+#
+# The redmine instance on illumos.org
+#
+PREFIX=illumos
+INFO=http://illumos.org
+EXTERNAL_URL=https://illumos.org/issues/\\1
+REGEX=\\([0-9]\\{1\,6\\}\\)
+CONTACT=developer@lists.illumos.org

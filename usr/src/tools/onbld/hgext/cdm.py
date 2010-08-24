@@ -17,6 +17,8 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+# Copyright 2008, 2010, Richard Lowe
+
 '''OpenSolaris workspace extensions for mercurial
 
 This extension contains a number of commands to help you work within
@@ -67,7 +69,7 @@ from mercurial import cmdutil, ignore, node
 from onbld.Scm.WorkSpace import ActiveEntry, WorkSpace
 from onbld.Scm.Backup import CdmBackup
 from onbld.Checks import Cddl, Comments, Copyright, CStyle, HdrChk
-from onbld.Checks import JStyle, Keywords, Mapfile, Rti, onSWAN
+from onbld.Checks import JStyle, Keywords, Mapfile
 
 
 def yes_no(ui, msg, default):
@@ -249,15 +251,6 @@ def cdm_list(ui, repo, **opts):
                 ui.write('\t%s\n' % elt.name)
 
 
-def cdm_arcs(ui, repo, parent=None):
-    'show all ARC cases in checkin comments'
-    act = wslist[repo].active(parent)
-
-    # We take a set of the appropriate comments to eliminate duplicates.
-    for elt in set(filter(Comments.isARC, act.comments())):
-        ui.write(elt + '\n')
-
-
 def cdm_bugs(ui, repo, parent=None):
     'show all bug IDs in checkin comments'
     act = wslist[repo].active(parent)
@@ -299,8 +292,7 @@ def cdm_comchk(ui, repo, **opts):
     ui.write('Comments check:\n')
 
     check_db = not opts.get('nocheck')
-    return Comments.comchk(active.comments(), check_db=check_db, output=ui,
-                           arcPath=ui.config('cdm', 'arcpath', None))
+    return Comments.comchk(active.comments(), check_db=check_db, output=ui)
 
 
 def cdm_cddlchk(ui, repo, *args, **opts):
@@ -585,35 +577,6 @@ def cdm_branchchk(ui, repo, **opts):
     return 0
 
 
-def cdm_rtichk(ui, repo, **opts):
-    '''check active bug/RFEs for approved RTIs
-
-    Only works on SWAN.'''
-
-    if opts.get('nocheck') or os.path.exists(repo.join('cdm/rtichk.NOT')):
-        ui.status('Skipping RTI checks...\n')
-        return 0
-
-    if not onSWAN():
-        ui.write('RTI checks only work on SWAN, skipping...\n')
-        return 0
-
-    parent = wslist[repo].parent(opts.get('parent'))
-    active = wslist[repo].active(parent)
-
-    ui.write('RTI check:\n')
-
-    bugs = []
-
-    for com in active.comments():
-        match = Comments.isBug(com)
-        if match and match.group(1) not in bugs:
-            bugs.append(match.group(1))
-
-    # RTI normalizes the gate path for us
-    return int(not Rti.rti(bugs, gatePath=parent, output=ui))
-
-
 def cdm_keywords(ui, repo, *args, **opts):
     '''check source files do not contain SCCS keywords'''
 
@@ -700,11 +663,10 @@ def run_checks(ws, cmds, *args, **opts):
 def cdm_nits(ui, repo, *args, **opts):
     '''check for stylistic nits in active files
 
-    Run cddlchk, copyright, cstyle, hdrchk, jstyle, mapfilechk,
+    Run copyright, cstyle, hdrchk, jstyle, mapfilechk,
     permchk, and keywords checks.'''
 
-    cmds = [cdm_cddlchk,
-        cdm_copyright,
+    cmds = [cdm_copyright,
         cdm_cstyle,
         cdm_hdrchk,
         cdm_jstyle,
@@ -718,8 +680,8 @@ def cdm_nits(ui, repo, *args, **opts):
 def cdm_pbchk(ui, repo, **opts):
     '''pre-putback check all active files
 
-    Run cddlchk, comchk, copyright, cstyle, hdrchk, jstyle, mapfilechk,
-    permchk, tagchk, branchchk, keywords and rtichk checks.  Additionally,
+    Run comchk, copyright, cstyle, hdrchk, jstyle, mapfilechk,
+    permchk, tagchk, branchchk and keywords checks.  Additionally,
     warn about uncommitted changes.'''
 
     #
@@ -727,8 +689,7 @@ def cdm_pbchk(ui, repo, **opts):
     # run first in the same order as they would in cdm_nits.  Then the
     # pbchk specifics run
     #
-    cmds = [cdm_cddlchk,
-        cdm_copyright,
+    cmds = [cdm_copyright,
         cdm_cstyle,
         cdm_hdrchk,
         cdm_jstyle,
@@ -738,7 +699,6 @@ def cdm_pbchk(ui, repo, **opts):
         cdm_comchk,
         cdm_tagchk,
         cdm_branchchk,
-        cdm_rtichk,
         cdm_outchk,
         cdm_mergechk]
 
@@ -1132,8 +1092,6 @@ cmdtable = {
     'apply': (cdm_apply, [('p', 'parent', '', 'parent workspace'),
                           ('r', 'remain', None, 'do not change directories')],
               'hg apply [-p PARENT] [-r] command...'),
-    'arcs': (cdm_arcs, [('p', 'parent', '', 'parent workspace')],
-             'hg arcs [-p PARENT]'),
     '^backup|bu': (cdm_backup, [('t', 'if-newer', None,
                              'only backup if workspace files are newer')],
                'hg backup [-t]'),
@@ -1172,7 +1130,7 @@ cmdtable = {
     '^nits': (cdm_nits, [('p', 'parent', '', 'parent workspace')],
              'hg nits [-p PARENT]'),
     '^pbchk': (cdm_pbchk, [('p', 'parent', '', 'parent workspace'),
-                           ('N', 'nocheck', None, 'skip RTI check')],
+                           ('N', 'nocheck', None, 'skip database checks')],
               'hg pbchk [-N] [-p PARENT]'),
     'permchk': (cdm_permchk, [('p', 'parent', '', 'parent workspace')],
                 'hg permchk [-p PARENT]'),
@@ -1206,9 +1164,6 @@ cmdtable = {
     'reparent': (cdm_reparent, [], 'hg reparent PARENT'),
     '^restore': (cdm_restore, [('g', 'generation', '', 'generation number')],
                  'hg restore [-g GENERATION] BACKUP'),
-    'rtichk': (cdm_rtichk, [('p', 'parent', '', 'parent workspace'),
-                            ('N', 'nocheck', None, 'skip RTI check')],
-               'hg rtichk [-N] [-p PARENT]'),
     'tagchk': (cdm_tagchk, [('p', 'parent', '', 'parent workspace')],
                'hg tagchk [-p PARENT]'),
     'webrev': (cdm_webrev, [('C', 'C', '', 'ITS priority file'),

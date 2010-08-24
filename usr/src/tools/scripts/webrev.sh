@@ -24,6 +24,8 @@
 # Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+# Copyright 2008, 2010, Richard Lowe
+
 #
 # This script takes a file list and a workspace and builds a set of html files
 # suitable for doing a code review of source changes via a web page.
@@ -2773,7 +2775,8 @@ if [[ -z $nflag ]]; then
 		#
 		itsinfo["${p}_URL"]="<a href=\\\"${itsinfo[${p}_URL]}\\\">&</a>"
 
-		print "/^${p}[ 	]/ {
+		# The character class below contains a literal tab
+		print "/^${p}[: 	]/ {
 				s;${itsinfo[${p}_REGEX]};${itsinfo[${p}_URL]};g
 				s;^${p};${itsinfo[${p}_INFO]};
 			}" >> ${its_sed_script}
@@ -2785,7 +2788,7 @@ if [[ -z $nflag ]]; then
 	#
 	for p in ${its_priority}; do
 		print "/^${itsinfo[${p}_REGEX]}[ 	]/ {
-				s;${itsinfo[${p}_REGEX]};${itsinfo[${p}_URL]};g
+				s;^${itsinfo[${p}_REGEX]};${itsinfo[${p}_URL]};g
 			}" >> ${its_sed_script}
 	done
 fi

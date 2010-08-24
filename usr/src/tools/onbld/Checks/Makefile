@@ -23,6 +23,8 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+# Copyright 2010, Richard Lowe
+
 include $(SRC)/Makefile.master
 include ../../Makefile.tools
 
@@ -36,9 +38,8 @@ PYSRCS = \
 	HdrChk.py	\
 	JStyle.py	\
 	Keywords.py	\
-	Mapfile.py		\
+	Mapfile.py	\
 	ProcessCheck.py \
-	Rti.py		\
 	__init__.py
 
 PYOBJS =	$(PYSRCS:%.py=%.pyc)

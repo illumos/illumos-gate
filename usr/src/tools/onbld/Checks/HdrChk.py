@@ -24,8 +24,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+# Copyright 2008, 2010, Richard Lowe
 
 #
 # Check that header files conform to our standards
@@ -68,6 +68,7 @@
 #
 
 import re, os, sys
+from onbld.Checks.Copyright import is_copyright
 
 class HeaderFile(object):
 	def __init__(self, fh, filename=None, lenient=False):
@@ -120,11 +121,11 @@ class HeaderFile(object):
 				# a match for every possibly valid copyright
 				# notice
 				#
-				if re.search(r'Copyright (?!\[yyyy\])', line):
+				if is_copyright(line):
 					self.has_copyright = True
 				line = self.getline()
 
-			if re.search(r'Copyright (?!\[yyyy\])', line):
+			if is_copyright(line):
 				self.has_copyright = True
 			line = self.getline()
 
@@ -170,7 +171,7 @@ def hdrchk(fh, filename=None, lenient=False, output=sys.stderr):
 	if not hdr.has_copyright:
 		err(output, "Missing copyright in opening comment", hdr)
 		ret = 1
-	
+
 	#
 	# Step 2:
 	#

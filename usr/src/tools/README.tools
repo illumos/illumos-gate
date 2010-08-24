@@ -225,9 +225,6 @@ interface_cmp
 lintdump
 	dumps the contents of one or more lint libraries; see lintdump(1)
 
-keywords
-	checks files for proper SCCS keywords.
-
 ndrgen
 	Network Data Language (NDL) RPC protocol compiler to support DCE
 	RPC/MSRPC and SMB/CIFS.  ndrgen takes an input protocol definition
@@ -256,41 +253,12 @@ protocmp.terse
 protolist
 	create a list of what's in the proto area, to feed to protocmp.
 
-rtichk
-	checks that a set of CRs have approved RTIs.  Primarily used
-	by wx
-
-sccscp
-	copy a file under SCCS control to another location in a workspace.
-	also updates teamware's nametable.
-
-sccshist
-	Display the history, comments and diffs, of a file under SCCS
-	control.
-
-sccsmv
-	rename a file under SCCS control to another location in a workspace.
-	also updates teamware's nametable.
-
-sccsrm
-	delete a file under SCCS control workspace. also updates teamware's
-	nametable. Actually renames it to .del-<file>-`date` so that others
-	will see it move when it is brought over (in case they were working
-	on it).
 
 ws
 	creates a shell with the environment set up to build in the given
 	workspace. Used mostly for non-full-build workspaces, so it sets up
 	to pull headers and libraries from the proto area of the parent if
 	they aren't in the childs proto area.
-
-wx
-	A great workspace tool by bonwick. See wx.README for information
-	and warnings.
-
-wx2hg
-	Converts a TeamWare workspace under the control of wx to a
-	Mercurial workspace, discarding intermediate deltas.
 
 tokenize
 	Used to build the sun4u boot block.
@@ -344,6 +312,6 @@ Files you have to update to add a tool
 
 1.  Add the tool in its appropriate place.
 2.  Update the Makefile as required.
-3.  Update usr/src/tools/SUNWonbld/prototype_*.
+3.  Update usr/src/pkg/manifests/developer-build-onbld.mf
 4.  Update usr/src/tools/README.tools (this file).
 5.  Repeat 1-4 for any man pages.

@@ -25,46 +25,46 @@
 # Use is subject to license terms.
 #
 
+# Copyright 2007, 2010 Richard Lowe
+
 #
 # Check delta comments:
 # 	- Have the correct form.
-# 	- Have a synopsis matching that of the CR or ARC case.
+# 	- Have a synopsis matching that of the bug
 # 	- Appear only once.
 #
 
 import re, sys
-from onbld.Checks.DbLookups import BugDB, ARC
+from onbld.Checks.DbLookups import BugDB
 
-arcre = re.compile(r'^([A-Z][A-Z]*ARC[/ \t][12]\d{3}/\d{3}) (.*)$')
-bugre = re.compile(r'^(\d{7}) (.*)$')
 
-def isARC(comment):
-	return arcre.match(comment)
+bugre = re.compile(r'^(\d{2,7}) (.*)$')
+
 
 def isBug(comment):
 	return bugre.match(comment)
 
-#
-# Translate any acceptable case number format into "<ARC> <YEAR>/<NUM>"
-# format.
-#
-def normalize_arc(caseid):
-	return re.sub(r'^([A-Z][A-Z]*ARC)[/ \t]', '\\1 ', caseid)
 
-def comchk(comments, check_db=True, output=sys.stderr, arcPath=None):
+def comchk(comments, check_db=True, output=sys.stderr):
 	'''Validate checkin comments against ON standards.
 
 	Comments must be a list of one-line comments, with no trailing
 	newline.
-	
-	If check_db is True (the default), validate CR and ARC
-	synopses against the databases.
+
+	If check_db is True (the default), validate bug synopses against the
+	databases.
 
 	Error messages intended for the user are written to output,
 	which defaults to stderr
 	'''
-	bugnospcre = re.compile(r'^(\d{7})([^ ].*)')
-	ignorere = re.compile(r'^(Portions contributed by |Contributed by |back[ -]?out )')
+	bugnospcre = re.compile(r'^(\d{2,7})([^ ].*)')
+	ignorere = re.compile(r'^(' +
+                              r'Portions contributed by|' +
+                              r'Contributed by|' +
+                              r'Reviewed[ -]by|' +
+                              r'Approved[ -]by|' +
+                              r'back[ -]?out)' +
+                              r'[: ]')
 
 	errors = { 'bugnospc': [],
 		   'mutant': [],
@@ -72,7 +72,6 @@ def comchk(comments, check_db=True, output=sys.stderr, arcPath=None):
 		   'nomatch': [],
 		   'nonexistent': [] }
 	bugs = {}
-	arcs = {}
 	ret = 0
 	blanks = False
 
@@ -109,13 +108,6 @@ def comchk(comments, check_db=True, output=sys.stderr, arcPath=None):
 			errors['bugnospc'].append(com)
 			continue
 
-		# ARC case
-		match = arcre.search(com)
-		if match:
-			arc, case = re.split('[/ \t]', match.group(1), 1)
-			arcs.setdefault((arc, case), []).append(match.group(2))
-			continue
-
 		# Anything else is bogus
 		errors['mutant'].append(com)
 
@@ -146,35 +138,6 @@ def comchk(comments, check_db=True, output=sys.stderr, arcPath=None):
 				errors['nomatch'].append([crid, synopsis,
 							entered])
 
-	if check_db:
-		valid = ARC(arcs.keys(), arcPath)
-
-	for case, insts in arcs.iteritems():
-		if len(insts) > 1:
-			errors['dup'].append(' '.join(case))
-
- 		if not check_db:
-			continue
-                
-		if not case in valid:
-			errors['nonexistent'].append(' '.join(case))
-			continue
-
-		#
-		# We first try a direct match between the actual case name
-		# and the entered comment.  If that fails we remove a possible
-		# trailing (fix nit)-type comment, and re-try.
-		#
-		for entered in insts:
-			if entered == valid[case]:
-				break
-			else:
-				# Try again with trailing (fix ...) removed.
-				dbcom = re.sub(r' \([^)]+\)$', '', entered)
-				if dbcom != valid[case]:
-					errors['nomatch'].append(
-						[' '.join(case), valid[case],
-						 entered])
 
 	if blanks:
 		output.write("WARNING: Blank line(s) in comments\n")
@@ -196,23 +159,22 @@ def comchk(comments, check_db=True, output=sys.stderr, arcPath=None):
 
 	if errors['mutant']:
 		ret = 1
-		output.write("These comments are neither bug nor ARC case:\n")
+		output.write("These comments are not valid bugs:\n")
 		for com in errors['mutant']:
 			output.write("  %s\n" % com)
 
 	if errors['nonexistent']:
 		ret = 1
-		output.write("These bugs/ARC cases were not found in the "
-			     "databases:\n")
+		output.write("These bugs were not found in the databases:\n")
 		for id in errors['nonexistent']:
 			output.write("  %s\n" % id)
 
 	if errors['nomatch']:
 		ret = 1
-		output.write("These bugs/ARC case synopsis/names don't match "
+		output.write("These bug synopses don't match "
 			     "the database entries:\n")
 		for err in errors['nomatch']:
-			output.write("Synopsis/name of %s is wrong:\n" % err[0])
+			output.write("Synopsis of %s is wrong:\n" % err[0])
 			output.write("  should be: '%s'\n" % err[1])
 			output.write("         is: '%s'\n" % err[2])
 

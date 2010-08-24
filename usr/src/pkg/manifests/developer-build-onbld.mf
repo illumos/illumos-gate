@@ -23,6 +23,8 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+# Copyright 2010, Richard Lowe
+
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
 set name=pkg.description value="tools used to build the OS-Net consolidation"
 set name=pkg.summary value="OS-Net Build Tools"
@@ -119,12 +121,7 @@ file path=opt/onbld/bin/mktpl mode=0555
 file path=opt/onbld/bin/nightly mode=0555
 file path=opt/onbld/bin/onu mode=0555
 file path=opt/onbld/bin/protocmp.terse mode=0555
-file path=opt/onbld/bin/rtichk mode=0555
 file path=opt/onbld/bin/sccscheck mode=0555
-file path=opt/onbld/bin/sccscp mode=0555
-file path=opt/onbld/bin/sccshist mode=0555
-file path=opt/onbld/bin/sccsmv mode=0555
-file path=opt/onbld/bin/sccsrm mode=0555
 file path=opt/onbld/bin/signit mode=0555
 file path=opt/onbld/bin/signproto mode=0555
 file path=opt/onbld/bin/validate_flg mode=0555
@@ -135,8 +132,6 @@ file path=opt/onbld/bin/webrev mode=0555
 file path=opt/onbld/bin/which_scm mode=0555
 file path=opt/onbld/bin/ws mode=0555
 file path=opt/onbld/bin/wsdiff mode=0555
-file path=opt/onbld/bin/wx mode=0555
-file path=opt/onbld/bin/wx2hg mode=0555
 file path=opt/onbld/bin/xref mode=0555
 file path=opt/onbld/bin/xref.mk
 file path=opt/onbld/env/developer
@@ -178,8 +173,6 @@ file path=opt/onbld/lib/python2.4/onbld/Checks/Mapfile.py mode=0444
 file path=opt/onbld/lib/python2.4/onbld/Checks/Mapfile.pyc mode=0444
 file path=opt/onbld/lib/python2.4/onbld/Checks/ProcessCheck.py mode=0444
 file path=opt/onbld/lib/python2.4/onbld/Checks/ProcessCheck.pyc mode=0444
-file path=opt/onbld/lib/python2.4/onbld/Checks/Rti.py mode=0444
-file path=opt/onbld/lib/python2.4/onbld/Checks/Rti.pyc mode=0444
 file path=opt/onbld/lib/python2.4/onbld/Checks/__init__.py mode=0444
 file path=opt/onbld/lib/python2.4/onbld/Checks/__init__.pyc mode=0444
 file path=opt/onbld/lib/python2.4/onbld/Scm/Backup.py mode=0444
@@ -217,8 +210,6 @@ file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/ProcessCheck.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/ProcessCheck.pyc mode=0444
-file path=opt/onbld/lib/python2.6/onbld/Checks/Rti.py mode=0444
-file path=opt/onbld/lib/python2.6/onbld/Checks/Rti.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Scm/Backup.py mode=0444
@@ -257,17 +248,12 @@ file path=opt/onbld/man/man1/ndrgen.1
 file path=opt/onbld/man/man1/nightly.1
 file path=opt/onbld/man/man1/onu.1
 file path=opt/onbld/man/man1/sccscheck.1
-file path=opt/onbld/man/man1/sccscp.1
-file path=opt/onbld/man/man1/sccsmv.1
-file path=opt/onbld/man/man1/sccsrm.1
 file path=opt/onbld/man/man1/signit.1
 file path=opt/onbld/man/man1/signproto.1
 file path=opt/onbld/man/man1/webrev.1
 file path=opt/onbld/man/man1/which_scm.1
 file path=opt/onbld/man/man1/ws.1
 file path=opt/onbld/man/man1/wsdiff.1
-file path=opt/onbld/man/man1/wx.1
-file path=opt/onbld/man/man1/wx2hg.1
 file path=opt/onbld/man/man1/xref.1
 file path=opt/onbld/man/sman1/get_depend_info.1
 file path=opt/onbld/man/sman1/make_pkg_db.1

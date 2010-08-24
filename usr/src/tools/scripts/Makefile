@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2010, Richard Lowe
 
 SHELL=/usr/bin/ksh93
 
@@ -38,21 +39,14 @@ SHFILES= \
 	flg.flp \
 	genoffsets \
 	hgsetup \
-	keywords \
 	mkclosed \
 	nightly \
 	onu \
 	protocmp.terse \
 	sccscheck \
-	sccscp \
-	sccshist \
-	sccsmv \
-	sccsrm \
 	webrev \
 	which_scm \
 	ws \
-	wx \
-	wx2hg \
 	xref
 
 PERLFILES= \
@@ -78,7 +72,6 @@ PYFILES= \
 	hdrchk \
 	hg-active \
 	mapfilechk \
-	rtichk \
 	validate_pkg \
 	wsdiff
 
@@ -101,15 +94,10 @@ MAN1FILES= \
 	nightly.1 \
 	onu.1 \
 	sccscheck.1 \
-	sccscp.1 \
-	sccsmv.1 \
-	sccsrm.1 \
 	webrev.1 \
 	which_scm.1 \
 	ws.1 \
 	wsdiff.1 \
-	wx.1 \
-	wx2hg.1 \
 	xref.1
 
 MAKEFILES= \
@@ -152,7 +140,7 @@ clean:
 bldenv: bldenv.sh stdenv.sh
 	$(RM) "$@"
 	sed -e '/# STDENV_START/ r stdenv.sh' bldenv.sh > "$@"
-	# Check for shell lint and fail if we hit warings
+	# Check for shell lint and fail if we hit warnings
 	shlintout="$$( /usr/bin/ksh93 -n "$@" 2>&1 )" ; \
 		[[ "$${shlintout}" != "" ]] && \
 		{ print -r -- "$${shlintout}" ;	false ; } || true

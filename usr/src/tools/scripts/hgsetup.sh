@@ -25,6 +25,8 @@
 # Use is subject to license terms.
 #
 
+# Copyright 2010, Richard Lowe
+
 #
 # Easy setup script for populating a user's ~/.hgrc
 # This currently does the following:
@@ -50,12 +52,9 @@ usage() {
 	-p proxy      : enable use of web proxy with specified proxy
 	-s style_path : override path to style file
 
-	if -e isn't provided, and you are on SWAN, an LDAP query is done
 	if -n isn't provided, the entry from /etc/passwd is used
 	
 	proxy should be in the form of hostname:port
-	if on-SWAN, $prog will lookup your email address.  this can be
-	overridden by using the -e flag.
 	"
 	exit 1
 }
@@ -121,19 +120,6 @@ host=$proxy
 "
 fi
 
-if getent hosts sunweb.central.sun.com >/dev/null; then
-	# on SWAN
-	echo "Detected SWAN connection"
-	ON_SWAN=1
-	ldapemail='preferredrfc822recipient'
-	ldapquery="uid=$login $ldapemail"
-	ldapcmd="$LDAPCLIENT -1 -h sun-ds -b dc=sun,dc=com $ldapquery"
-	if [[ -z "$email" ]]; then 
-		echo "Looking up e-mail address in LDAP"
-		email=${email:=$($ldapcmd | $AWK /^$ldapemail:/'{print $2}')}
-	fi
-fi
-
 if [[ -z $email ]]; then
 	my_id=$(id -un)
 	my_checkhostname=$(check-hostname)
@@ -173,24 +159,9 @@ hgext.cdm=$cdm_path
 from=$email
 
 [paths]
-EOF
-
-if [[ -n $ON_SWAN ]]; then
-	cat <<EOF >> $HGRC
-onnv-gate=ssh://onnv.sfbay.sun.com//export/onnv-gate
-onnv-clone=ssh://onnv.sfbay.sun.com//export/onnv-clone
-onnv-closed=ssh://onnv.sfbay.sun.com//export/onnv-gate/usr/closed
-onnv-closed-clone=ssh://onnv.sfbay.sun.com//export/onnv-clone/usr/closed
-
-EOF
-else
-	cat <<EOF >> $HGRC
 onnv-gate=ssh://anon@hg.opensolaris.org//hg/onnv/onnv-gate
+illumos-gate=http://hg.illumos.org/illumos-gate
 
-EOF
-fi
-
-cat <<EOF >> $HGRC
 [merge-tools]
 filemerge.gui=True
 filemerge.args=-a \$base \$local \$other \$output
