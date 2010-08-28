@@ -45,16 +45,6 @@ GATE=testws;			export GATE
 # CODEMGR_WS - where is your workspace at (or what should nightly name it)
 CODEMGR_WS="/export/$GATE";			export CODEMGR_WS
 
-#
-#  The following two macros are the closed/crypto binaries.  Once
-#  Illumos has totally freed itself, we can remove these references.
-#
-# Location of encumbered binaries.
-ON_CLOSED_BINS="$CODEMGR_WS/closed";		export ON_CLOSED_BINS
-# Location of signed cryptographic binaries.
-ON_CRYPTO_BINS="$CODEMGR_WS/on-crypto.$MACH.tar.bz2" export ON_CRYPTO_BINS
-
-
 # Maximum number of dmake jobs.  The recommended number is 2 + NCPUS,
 # where NCPUS is the number of logical CPUs on your build system.
 maxjobs() {
@@ -93,6 +83,15 @@ LOCKNAME="`basename $CODEMGR_WS`_nightly.lock"; export LOCKNAME
 ATLOG="$CODEMGR_WS/log";			export ATLOG
 LOGFILE="$ATLOG/nightly.log";			export LOGFILE
 MACH=`uname -p`;				export MACH
+
+#
+#  The following two macros are the closed/crypto binaries.  Once
+#  Illumos has totally freed itself, we can remove these references.
+#
+# Location of encumbered binaries.
+ON_CLOSED_BINS="$CODEMGR_WS/closed";		export ON_CLOSED_BINS
+# Location of signed cryptographic binaries.
+ON_CRYPTO_BINS="$CODEMGR_WS/on-crypto.$MACH.tar.bz2"; export ON_CRYPTO_BINS
 
 # REF_PROTO_LIST - for comparing the list of stuff in your proto area
 # with. Generally this should be left alone, since you want to see differences
