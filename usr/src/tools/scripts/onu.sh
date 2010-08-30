@@ -22,26 +22,23 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-#
+# Copyright 2010, Richard Lowe
+# 
 
 PATH=/usr/bin:/usr/sbin
 export PATH
 
 DEFAULTONURI="http://ipkg.sfbay/on-nightly"
 DEFAULTONPUB="on-nightly"
-DEFAULTONEXTRAURI="http://ipkg.sfbay/on-extra"
-DEFAULTONEXTRAPUB="on-extra"
 
 usage()
 {
 	echo "usage: $0 [opts] [-s beName] -t beName"
 	echo "usage: $0 [opts] -r"
 	echo
+	echo "\t-c consolidation : consolidation being upgraded"
 	echo "\t-d repodir : directory for repositories"
-	echo "\t-e uri : origin URI for extra repository"
-	echo "\t-E prefix : prefix for extra repository"
-	echo "\t-O : open mode, no extra repository will be used"
-	echo "\t-r : start repository servers only"
+	echo "\t-r : configure publisher only"
 	echo "\t-s : source BE to clone"
 	echo "\t-t : new BE name"
 	echo "\t-u uri : origin URI for redist repository"
@@ -55,8 +52,7 @@ usage()
 	echo "Update to the nightly build:"
 	echo "\tonu -t newbe"
 	echo
-	echo "Re-enable the publishers, and start any pkg.depotd servers"
-	echo "necessary in the current BE:"
+	echo "Re-enable the publishers in the current BE:"
 	echo "\tonu -r -d /path/to/my/ws/packages/\`uname -p\`/nightly"
 	exit 1
 }
@@ -64,16 +60,7 @@ usage()
 exit_error()
 {
 	echo $*
-	cleanup
 	exit 2
-}
-
-cleanup()
-{
-	[ $redistpid -gt 0 ] && kill $redistpid
-	[ $extrapid -gt 0 ] && kill $extrapid
-	[ -d /tmp/redist.$$ ] && /bin/rm -rf /tmp/redist.$$
-	[ -d /tmp/extra.$$ ] && /bin/rm -rf /tmp/extra.$$
 }
 
 do_cmd()
@@ -91,31 +78,20 @@ configure_publishers()
 {
 	root=$1
 
-	do_cmd pkg -R $root set-publisher --no-refresh --non-sticky opensolaris.org
+	#
+	# Get the publisher name from the 'list -v' output.  It may seem we
+	# could do this more tidily using 'info', but that is
+	# internationalized.
+	#
+	typeset on_publisher=$(pkg -R $root list -Hv \
+	    "${consolidation}-incorporation" | cut -d/ -f3)
+
+        if [[ "$on_publisher" != "$redistpub" ]]; then
+	        do_cmd pkg -R $root set-publisher --no-refresh \
+                    --non-sticky $on_publisher
+        fi
 	do_cmd pkg -R $root set-publisher -e --no-refresh -P -O $uri $redistpub
-	[ $open -eq 0 ] && {
-		do_cmd pkg -R $root set-publisher -e \
-		    --no-refresh -O $extrauri $extrapub
-	}
 	do_cmd pkg -R $root refresh --full
-}
-
-#
-# If we're working from a repodir, disable the new publishers in the new
-# BE; they won't work without further configuration, in which case the
-# -r option should be used.
-#
-unconfigure_publishers()
-{
-	root=$1
-
-	if [ -n "$repodir" ]; then
-		do_cmd pkg -R $root set-publisher -P opensolaris.org
-		do_cmd pkg -R $root set-publisher -d $redistpub
-		[ $open -eq 0 ] && {
-			do_cmd pkg -R $root set-publisher -d $extrapub
-		}
-	fi
 }
 
 update()
@@ -128,8 +104,6 @@ update()
 	configure_publishers $root
 
 	do_cmd pkg -R $root image-update
-
-	unconfigure_publishers $root
 }
 
 update_zone()
@@ -169,33 +143,22 @@ update_zone()
 sourcebe=""
 targetbe=""
 uri=""
-extrauri=""
 repodir=""
+consolidation="osnet"
 verbose=0
-open=0
-redistpid=0
-extrapid=0
-redistport=13000
-extraport=13001
 no_zones=0
 zone_warned=0
 reposonly=0
 
-trap cleanup 1 2 3 15
-
-while getopts :d:E:e:Ors:t:U:u:vZ i ; do
+while getopts :c:d:Ors:t:U:u:vZ i ; do
 	case $i in
+	c)
+		consolidation=$OPTARG
+		;;
 	d)
 		repodir=$OPTARG
 		;;
-	E)
-		extrapub=$OPTARG
-		;;
-	e)
-		extrauri=$OPTARG
-		;;
-	O)
-		open=1
+	O)			# no-op, compatibility with recommended use
 		;;
 	r)
 		reposonly=1
@@ -237,53 +200,27 @@ fi
 [ -z "$uri" ] && uri=$DEFAULTONURI
 [ -z "$redistpub" ] && redistpub=$ONPUB
 [ -z "$redistpub" ] && redistpub=$DEFAULTONPUB
-[ -z "$extrauri" ] && extrauri=$ONEXTRAURI
-[ -z "$extrauri" ] && extrauri=$DEFAULTONEXTRAURI
-[ -z "$extrapub" ] && extrapub=$ONEXTRAPUB
-[ -z "$extrapub" ] && extrapub=$DEFAULTONEXTRAPUB
 
 if [ -n "$repodir" ]; then
 	redistdir=$repodir/repo.redist
 	[ -d $redistdir ] || exit_error "$redistdir not found"
+	typeset cfgfile=$redistdir/cfg_cache
+	[[ ! -e $cfgfile ]] && cfgfile=$redistdir/pkg5.repository
+	# need an absolute path
+	[[ $redistdir == /* ]] || redistdir=$PWD/$redistdir
 	redistpub=$(python2.6 <<# EOF
 		import ConfigParser
 		p = ConfigParser.SafeConfigParser()
-		p.read("$redistdir/cfg_cache")
+		p.read("$cfgfile")
 		pp = p.get("publisher", "prefix")
 		print "%s" % pp
-		EOF)
-	[ $verbose -gt 0 ] && echo "starting pkg.depotd -d $redistdir -p $redistport"
-	ARGS="--readonly --writable-root"
-	mkdir /tmp/redist.$$
-	/usr/lib/pkg.depotd -d $redistdir -p $redistport $ARGS /tmp/redist.$$ >/dev/null &
-	redistpid=$!
-	uri="http://localhost:$redistport/"
-	if [ $open -eq 0 ]; then
-		extradir=$repodir/repo.extra
-		[ -d $extradir ] || exit_error "$extradir not found"
-		extrapub=$(python2.6 <<# EOF
-			import ConfigParser
-			p = ConfigParser.SafeConfigParser()
-			p.read("$extradir/cfg_cache")
-			pp = p.get("publisher", "prefix")
-			print "%s" % pp
-			EOF)
-		[ $verbose -gt 0 ] && echo "starting pkg.depotd -d $extradir -p $extraport"
-		mkdir /tmp/extra.$$
-		/usr/lib/pkg.depotd -d $extradir -p $extraport $ARGS /tmp/extra.$$ >/dev/null &
-		extrapid=$!
-		extrauri="http://localhost:$extraport/"
-	fi
+		EOF) || exit_error "Cannot determine publisher prefix"
+	[[ -n "$redistpub" ]] || exit_error "Repository has no publisher prefix"
+	uri="file://$redistdir"
 fi
 
 if [ "$reposonly" -eq 1 ]; then
 	configure_publishers /
-	if [ "$redistpid" -ne 0 ]; then
-		echo "$redistpub pkg.depotd running with pid $redistpid"
-	fi
-	if [ "$extrapid" -ne 0 ]; then
-		echo "$extrapub pkg.depotd running with pid $extrapid"
-	fi
 	exit 0
 fi
 
@@ -305,5 +242,4 @@ if [ "$no_zones" != 1 ]; then
 	done
 fi
 
-cleanup
 exit 0

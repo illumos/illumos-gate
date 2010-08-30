@@ -18,11 +18,12 @@
 .\" " CDDL HEADER END
 .\" "
 .\" "Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-.\"
-.TH onu 1 "20 July 2010"
+.\" "Copyright 2010, Richard Lowe
+.\" "
+.TH onu 1 "28 August 2010"
 .SH NAME
 .I onu
-\- Os/Net Update
+\- OS/Net Update
 .SH SYNOPSIS
 \fBonu [opts] [-s <beName>] -t <beName>\fP
 .br
@@ -37,34 +38,22 @@ is a replacement for
 used to update a system with the latest set of IPS packages for the ON
 (OS/Net) consolidation of Solaris, using beadm(1M) to create a new Boot
 Environment (BE) and pkg(1) to update the image.
-.LP
-After updating an image, 
-.I onu
-can then be used to start repository depot servers, in preparation for
-using
-.I pkg
-to install additional packages and/or zones.
 .SH OPTIONS
 .LP
 The following global options are supported:
 .TP 4
+.B \-c <consolidation>
+Specifies the consolidation being installed via 
+.IR onu ,
+used to locate the publisher from which that consolidation is currently
+installed.  This is almost always "osnet".
+.TP 4
 .B \-d <dir>
-Specifies that <dir> contains repo.redist and repo.extra sub-directories;
+Specifies that <dir> contains the repo.redist sub-directory;
 .I onu
-will stand up a depot for each and use them for the publisher and extra
-packaging repositories.  Note that -d ignores -u, -U, -e, and -E, as well
+will run a depot using this packaging repository.
+Note that -d ignores -u and -U as well
 as the environment variables used by those options.
-.TP 4
-.B \-e <URI>
-Specifies that <URI> should be used as the origin URI for the extra repository.
-See \fBONEXTRAURI\fP below for default values.
-.TP 4
-.B \-E <publisher>
-Specifies that <publisher> should be used as the publisher name for
-the extra repository.  See \fBONEXTRAPUB\fP below for default values.
-.TP 4
-.B \-O
-Open mode, where the extra repository will not be used.
 .TP 4
 .B \-u <URI>
 Specifies that <URI> should be used as the origin URI for the publisher
@@ -94,10 +83,8 @@ Do not update any installed zones.
 The second form of onu takes the following option:
 .TP 4
 .B \-r
-In the current BE, create the repository depot servers and configure
-the requested publishers appropriately, without updating. After
-\fBonu\fP exits, one or two pkg.depotd servers will be left running,
-allowing \fBpkg\fP operations using the related publishers to succeed.
+In the current BE configure the requested publisher appropriately, without
+updating.
 .SH EXIT STATUS
 .LP
 The following exit values are returned:
@@ -197,21 +184,7 @@ If the -U option is not provided, and this variable is set, it will be
 used as the publisher name for the packaging repository.  If -U is not
 provided and this variable is not set, on-nightly will be used.
 .LP
-ONEXTRAURI
-.IP
-If the -e option is not provided, and this variable is set, it will be used
-as the origin URI for the extra repository.  If -e is not provided and this
-variable is not set, http://ipkg.sfbay/on-extra will be used.  Note: for
-external users where an extra repository does not apply, use the -O option.
-.LP
-ONEXTRAPUB
-.IP
-If the -E option is not provided, and this variable is set, it will be
-used as the publisher name for the extra repository.  If -E is not
-provided and this variable is not set, on-extra will be used.
-.LP
 .SH SEE ALSO
 .BR beadm "(1M), "
 .BR pkg "(1), "
-.BR pkg.depotd "(1M), "
 .BR pkg "(5) "
