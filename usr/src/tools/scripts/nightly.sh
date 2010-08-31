@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2008, 2010, Richard Lowe
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -2261,57 +2262,67 @@ if [ "$w_FLAG" = "y" -a "$MULTI_PROTO" = yes -a -d "$ROOT-nd" ]; then
 	mv $ROOT-nd $ROOT-nd.prev
 fi
 
-# Echo the SCM types of $CODEMGR_WS and $BRINGOVER_WS
-function wstypes {
-	typeset parent_type child_type junk
+#
+# Echo the SCM type of the parent workspace, this can't just be which_scm
+# as that does not know how to identify various network repositories.
+#
+function parent_wstype {
+	typeset scm_type junk
 
 	CODEMGR_WS="$BRINGOVER_WS" "$WHICH_SCM" 2>/dev/null \
-	    | read parent_type junk
-	if [[ -z "$parent_type" || "$parent_type" == unknown ]]; then
+	    | read scm_type junk
+	if [[ -z "$scm_type" || "$scm_type" == unknown ]]; then
 		# Probe BRINGOVER_WS to determine its type
 		if [[ $BRINGOVER_WS == svn*://* ]]; then
-			parent_type="subversion"
+			scm_type="subversion"
 		elif [[ $BRINGOVER_WS == file://* ]] &&
 		    egrep -s "This is a Subversion repository" \
 		    ${BRINGOVER_WS#file://}/README.txt 2> /dev/null; then
-			parent_type="subversion"
+			scm_type="subversion"
 		elif [[ $BRINGOVER_WS == ssh://* ]]; then
-			parent_type="mercurial"
-		elif svn info $BRINGOVER_WS > /dev/null 2>&1; then
-			parent_type="subversion"
+			scm_type="mercurial"
 		elif [[ $BRINGOVER_WS == http://* ]] && \
-		    http_get "$BRINGOVER_WS/?cmd=heads" | \
+		    wget -q -O- --save-headers "$BRINGOVER_WS/?cmd=heads" | \
 		    egrep -s "application/mercurial" 2> /dev/null; then
-			parent_type="mercurial"
+			scm_type="mercurial"
+		elif svn info $BRINGOVER_WS > /dev/null 2>&1; then
+			scm_type="subversion"
 		else
-			parent_type="none"
+			scm_type="none"
 		fi
-	fi
+	fi    
+
+	# fold both unsupported and unrecognized results into "none"
+	case "$scm_type" in
+	none|subversion|teamware|mercurial)
+		;;
+	*)	scm_type=none
+		;;
+	esac
+
+	echo $scm_type
+}
+
+# Echo the SCM types of $CODEMGR_WS and $BRINGOVER_WS
+function child_wstype {
+	typeset scm_type junk
 
 	# Probe CODEMGR_WS to determine its type
 	if [[ -d $CODEMGR_WS ]]; then
-		$WHICH_SCM | read child_type junk || exit 1
+		$WHICH_SCM | read scm_type junk || exit 1
 	fi
 
-	# fold both unsupported and unrecognized results into "none"
-	case "$parent_type" in
+	case "$scm_type" in
 	none|subversion|teamware|mercurial)
 		;;
-	*)	parent_type=none
-		;;
-	esac
-	case "$child_type" in
-	none|subversion|teamware|mercurial)
-		;;
-	*)	child_type=none
+	*)	scm_type=none
 		;;
 	esac
 
-	echo $child_type $parent_type
+	echo $scm_type
 }
 
-wstypes | read SCM_TYPE PARENT_SCM_TYPE
-export SCM_TYPE PARENT_SCM_TYPE
+export SCM_TYPE=$(child_wstype)
 
 #
 #	Decide whether to clobber
@@ -2642,51 +2653,11 @@ type bringover_none > /dev/null 2>&1 || function bringover_none {
 	touch $TMPDIR/bringover_failed
 }
 
-# Parse the URL.
-# The other way to deal with empty components is to echo a string that can
-# be eval'ed by the caller to associate values (possibly empty) with
-# variables.  In that case, passing in a printf string would let the caller
-# choose the variable names.
-function parse_url {
-	typeset url method host port path
-
-	url=$1
-	method=${url%%://*}
-	host=${url#$method://}
-	path=${host#*/}
-	host=${host%%/*}
-	if [[ $host == *:* ]]; then
-		port=${host#*:}
-		host=${host%:*}
-	fi
-
-	# method can never be empty.  host can only be empty if method is
-	# file, and that implies it's localhost.  path can default to / if
-	# it's otherwise empty, leaving port as the only component without
-	# a default, so it has to go last.
-	echo $method ${host:-localhost} ${path:-/} $port
-}
-
-function http_get {
-	typeset url method host port path
-
-	url=$1
-
-	if [[ -n $http_proxy ]]; then
-		parse_url $http_proxy | read method host path port
-		echo "GET $url HTTP/1.0\r\n" |
-			mconnect -p ${port:-8080} $host
-	else
-		parse_url $url | read method host path port
-		echo "GET $path HTTP/1.0\r\n" |
-			mconnect -p ${port:-80} $host
-	fi
-}
-
 #
 #	Decide whether to bringover to the codemgr workspace
 #
 if [ "$n_FLAG" = "n" ]; then
+	PARENT_SCM_TYPE=$(parent_wstype)
 
 	if [[ $SCM_TYPE != none && $SCM_TYPE != $PARENT_SCM_TYPE ]]; then
 		echo "cannot bringover from $PARENT_SCM_TYPE to $SCM_TYPE, " \

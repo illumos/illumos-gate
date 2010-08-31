@@ -266,3 +266,9 @@ license usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE \
 license usr/src/tools/onbld/THIRDPARTYLICENSE \
     license=usr/src/tools/onbld/THIRDPARTYLICENSE
 link path=opt/onbld/lib/python target=python2.4
+# DbLookups.py requires elementtree
+depend fmri=library/python-2/python-extra-24 type=require
+# webrev(1) requires ps2pdf
+depend fmri=print/filter/ghostscript type=require
+# nightly uses wget
+depend fmri=web/wget type=require
