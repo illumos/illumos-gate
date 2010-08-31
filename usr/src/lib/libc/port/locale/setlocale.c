@@ -33,7 +33,6 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #include "lint.h"

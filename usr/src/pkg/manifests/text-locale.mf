@@ -38,13 +38,6 @@ dir path=usr/lib/iconv/$(ARCH64)
 dir path=usr/lib/iconv/geniconvtbl
 dir path=usr/lib/iconv/geniconvtbl/binarytables
 dir path=usr/lib/iconv/geniconvtbl/srcs
-dir path=usr/lib/locale
-dir path=usr/lib/locale/iso_8859_1
-dir path=usr/lib/locale/iso_8859_1/$(ARCH64)
-dir path=usr/lib/locale/iso_8859_1/LC_CTYPE
-dir path=usr/lib/localedef
-dir path=usr/lib/localedef/src
-dir path=usr/lib/localedef/src/iso_8859_1
 file path=usr/bin/gencat mode=0555
 file path=usr/bin/genmsg mode=0555
 file path=usr/bin/gettxt mode=0555
@@ -66,11 +59,6 @@ file path=usr/lib/iconv/geniconvtbl/srcs/ISO8859-1_to_ISO646.src mode=0444
 file path=usr/lib/iconv/geniconvtbl/srcs/ISO8859-1_to_UTF-8.src mode=0444
 file path=usr/lib/iconv/geniconvtbl/srcs/UTF-8_to_ISO8859-1.src mode=0444
 file path=usr/lib/iconv/geniconvtbl/srcs/eucJP_to_ISO-2022-JP.src mode=0444
-file path=usr/lib/locale/iso_8859_1/$(ARCH64)/iso_8859_1.so.3 mode=0555
-file path=usr/lib/locale/iso_8859_1/iso_8859_1.so.3 mode=0555
-file path=usr/lib/localedef/src/iso_8859_1/charmap.src mode=0444
-file path=usr/lib/localedef/src/iso_8859_1/extension.src mode=0444
-file path=usr/lib/localedef/src/iso_8859_1/localedef.src mode=0444
 legacy pkg=SUNWloc \
     desc="localization utilities and C locale (POSIX default) definitions" \
     name="System Localization"

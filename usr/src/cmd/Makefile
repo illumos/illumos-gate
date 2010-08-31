@@ -254,6 +254,7 @@ COMMON_SUBDIRS=		\
 	mkdir		\
 	mkfifo		\
 	mkfile		\
+	mklocale	\
 	mkmsgs		\
 	mknod		\
 	mkpwdict	\

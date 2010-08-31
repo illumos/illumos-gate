@@ -43,5 +43,6 @@ usr/src/cmd/troff/troff.d/tmac.d/*
 usr/src/lib/README.mapfiles
 usr/src/lib/fm/topo/maps/Makefile.map
 usr/src/cmd/perl/*
+usr/src/cmd/mklocale/*
 usr/src/tools/onbld/Checks/Mapfile*
 usr/src/tools/scripts/*

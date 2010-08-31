@@ -27,7 +27,6 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #include "lint.h"
@@ -79,12 +78,9 @@ __collate_load_tables(const char *encoding)
 	 * Slurp the locale file into the cache.
 	 */
 
-	/* 'PathLocale' must be already set & checked. */
-	/* Range checking not needed, encoding has fixed size */
-	(void) strcpy(buf, _PathLocale);
-	(void) strcat(buf, "/");
-	(void) strcat(buf, encoding);
-	(void) strcat(buf, "/LC_COLLATE");
+	(void) snprintf(buf, sizeof (buf), "%s/%s/LC_COLLATE/LCL_DATA",
+	    _PathLocale, encoding);
+
 	if ((fp = fopen(buf, "r")) == NULL)
 		return (_LDP_ERROR);
 

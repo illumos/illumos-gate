@@ -199,9 +199,6 @@ dir path=usr/lib/locale/C/LC_MESSAGES
 dir path=usr/lib/locale/C/LC_MONETARY
 dir path=usr/lib/locale/C/LC_NUMERIC
 dir path=usr/lib/locale/C/LC_TIME
-dir path=usr/lib/localedef
-dir path=usr/lib/localedef/extensions
-dir path=usr/lib/localedef/src
 dir path=usr/lib/netsvc group=sys
 dir path=usr/lib/pci
 dir path=usr/lib/rcm
@@ -816,7 +813,6 @@ file path=usr/bin/line mode=0555
 file path=usr/bin/listdgrp mode=0555
 file path=usr/bin/listusers mode=0555
 file path=usr/bin/loadkeys mode=0555
-file path=usr/bin/localedef mode=0555
 file path=usr/bin/logger mode=0555
 file path=usr/bin/login mode=4555
 file path=usr/bin/logins mode=0750

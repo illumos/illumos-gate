@@ -32,7 +32,6 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #include "lint.h"
@@ -112,11 +111,8 @@ __setrunelocale(const char *encoding)
 	 * Slurp the locale file into the cache.
 	 */
 
-	/* Range checking not needed, encoding length already checked before */
-	(void) strcpy(name, _PathLocale);
-	(void) strcat(name, "/");
-	(void) strcat(name, encoding);
-	(void) strcat(name, "/LC_CTYPE");
+	(void) snprintf(name, sizeof (name), "%s/%s/LC_CTYPE/LCL_DATA",
+	    _PathLocale, encoding);
 
 	if ((fp = fopen(name, "r")) == NULL)
 		return (errno == 0 ? ENOENT : errno);

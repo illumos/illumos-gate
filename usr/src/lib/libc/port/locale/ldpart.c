@@ -26,7 +26,6 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #include "lint.h"
@@ -39,6 +38,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 
 #include "ldpart.h"
 #include "setlocale.h"
@@ -79,12 +79,9 @@ __part_load_locale(const char *name, int *using_locale,
 
 	/* 'PathLocale' must be already set & checked. */
 
-	/* Range checking not needed, 'name' size is limited */
-	(void) strcpy(filename, _PathLocale);
-	(void) strcat(filename, "/");
-	(void) strcat(filename, name);
-	(void) strcat(filename, "/");
-	(void) strcat(filename, category_filename);
+	(void) snprintf(filename, sizeof (filename), "%s/%s/%s/LCL_DATA",
+	    _PathLocale, name, category_filename);
+
 	if ((fd = open(filename, O_RDONLY)) < 0)
 		return (_LDP_ERROR);
 	if (fstat(fd, &st) != 0)
