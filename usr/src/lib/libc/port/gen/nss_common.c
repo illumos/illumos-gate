@@ -61,7 +61,7 @@
 /*
  * PSARC/2005/133 updated the buffering mechanisms to handle
  * up to 2^64 buffering.  But sets a practical limit of 512*1024.
- * the expectation is the practical limit will be dynamic from
+ * The expectation is the practical limit will be dynamic from
  * nscd.  For now, set the group limit to this value.
  */
 
@@ -2286,7 +2286,7 @@ _nsc_endent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 /*
  * Internal private API to return default suggested buffer sizes
- * for nsswitch API requests
+ * for nsswitch API requests.
  */
 
 size_t
