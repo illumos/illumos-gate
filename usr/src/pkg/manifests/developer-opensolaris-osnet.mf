@@ -30,7 +30,6 @@ set name=info.classification \
     value="org.opensolaris.category.2008:Development/Distribution Tools"
 set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=cde/cde-runtime@0.5.11-0.133 type=require
 depend fmri=data/docbook@0.5.11-0.133 type=require
 depend fmri=developer/astdev@0.5.11-0.133 type=require
 depend fmri=developer/build/make@0.5.11-0.133 type=require
@@ -43,11 +42,9 @@ depend fmri=developer/parser/bison@2.3-0.133 type=require
 depend fmri=developer/versioning/mercurial@1.3.1-0.133 type=require
 depend fmri=library/gnome/base-libs@0.5.11-0.133 type=require
 depend fmri=library/gnome/gnome-vfs@0.5.11-0.133 type=require
-depend fmri=library/motif@0.5.11-0.133 type=require
 depend fmri=library/nspr/header-nspr@0.5.11-0.133 type=require
 depend fmri=library/perl-5/xml-parser@0.5.11-0.133 type=require
 depend fmri=library/security/trousers@0.3.2-0.133 type=require
-depend fmri=library/tooltalk@0.5.11-0.133 type=require
 depend fmri=package/svr4@0.5.11-0.133 type=require
 depend fmri=print/cups@1.4.2-0.133 type=require
 depend fmri=runtime/perl-510/extra@5.10.0-0.133 type=require
