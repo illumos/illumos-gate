@@ -1,3 +1,10 @@
+To ensure that everyone can use the same boilerplate text without triggering
+copyright ownership because of the boilerplate itself, I hereby place the
+following text in the public domain, which should be used to reference the
+CDDL version 1.0 for each new file introduced in illumos.
+
+	- Garrett D'Amore
+
 /*
  * This file and its contents are supplied under the terms of the
  * Common Development and Distribution License ("CDDL"), version 1.0.
@@ -11,8 +18,4 @@
 
 /*
  * Copyright 2010 <contributor>.  All rights reserved.
- */
-
-/*
- * Document the purpose of the file here.
  */
