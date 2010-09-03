@@ -74,7 +74,7 @@ install: all
 			cd $(STAGE); \
 			find . \( -name ".packlist" -o -name "perllocal.pod" \) \
 				-exec $(RM) {} \; ; \
-			/usr/bin/pax -rwpe ./*  ${ROOT} ; \
+			/usr/bin/pax -rw -pe ./*  ${ROOT} ; \
 			) \
 		else \
 			/bin/false; \
