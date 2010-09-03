@@ -45,6 +45,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <alloca.h>
+#include <stdio.h>
 #include "collate.h"
 #include "lmonetary.h"	/* for __monetary_load_locale() */
 #include "lnumeric.h"	/* for __numeric_load_locale() */
@@ -54,12 +55,12 @@
 #include "timelocal.h" /* for __time_load_locale() */
 #include "../i18n/_loc_path.h"
 
-#define	NUM_CATS	7
 /*
  * Category names for getenv()  Note that this was modified
  * for Solaris.  See <iso/locale_iso.h>.
  */
-static char *categories[NUM_CATS] = {
+#define NUM_CATS	7
+static char *categories[7] = {
 	"LC_CTYPE",
 	"LC_NUMERIC",
 	"LC_TIME",
@@ -125,6 +126,8 @@ setlocale(int category, const char *locale)
 	if (!*locale) {
 		if (category == LC_ALL) {
 			for (i = 0; i < NUM_CATS; ++i) {
+				if (i == LC_ALL)
+					continue;
 				env = __get_locale_env(i);
 				if (strlen(env) > ENCODING_LEN) {
 					errno = EINVAL;
@@ -152,21 +155,21 @@ setlocale(int category, const char *locale)
 				errno = EINVAL;
 				return (NULL);
 			}
-			for (i = 1; i < NUM_CATS; ++i)
+			for (i = 0; i < NUM_CATS; ++i)
 				(void) strcpy(new_categories[i], locale);
 		} else {
 			char	*buf;
 			char	*save;
 
 			buf = alloca(strlen(locale) + 1);
+			(void) strcpy(buf, locale);
 
-			for (i = 0, save = NULL; i <= LC_ALL; i++) {
-				r = strtok_r(buf, "/", &save);
+			save = NULL;
+			r = strtok_r(buf, "/", &save);
+			for (i = 0;  i < NUM_CATS; i++) {
+				if (i == LC_ALL)
+					continue;
 				if (r == NULL) {
-					if (i == LC_ALL) {
-						/* Good!  Fully specified! */
-						break;
-					}
 					/*
 					 * Composite Locale is inadequately
 					 * specified!   (Or with empty fields.)
@@ -177,14 +180,17 @@ setlocale(int category, const char *locale)
 					errno = EINVAL;
 					return (NULL);
 				}
-				if (i == LC_ALL) {
-					/* Too many components */
-					errno = EINVAL;
-					return (NULL);
-				}
 				(void) strlcpy(new_categories[i], r,
 				    ENCODING_LEN);
-				buf = NULL;	/* for strtok's benefit */
+				r = strtok_r(NULL, "/", &save);
+			}
+			if (r != NULL) {
+				/*
+				 * Too many components - we had left over
+				 * data in the LC_ALL.  It is malformed.
+				 */
+				errno = EINVAL;
+				return (NULL);
 			}
 		}
 	}
@@ -192,13 +198,17 @@ setlocale(int category, const char *locale)
 	if (category != LC_ALL)
 		return (loadlocale(category));
 
-	for (i = 0; i < LC_ALL; ++i) {
+	for (i = 0; i < NUM_CATS; ++i) {
 		(void) strcpy(saved_categories[i], current_categories[i]);
+		if (i == LC_ALL)
+			continue;
 		if (loadlocale(i) == NULL) {
 			saverr = errno;
-			for (j = 1; j < i; j++) {
+			for (j = 0; j < i; j++) {
 				(void) strcpy(new_categories[j],
 				    saved_categories[j]);
+				if (i == LC_ALL)
+					continue;
 				if (loadlocale(j) == NULL) {
 					(void) strcpy(new_categories[j], "C");
 					(void) loadlocale(j);
@@ -215,18 +225,37 @@ static char *
 currentlocale(void)
 {
 	int i;
+	int composite = 0;
 
-	(void) strcpy(current_locale_string, current_categories[0]);
-
-	for (i = 1; i < LC_ALL; ++i)
-		if (strcmp(current_categories[1], current_categories[i])) {
-			for (i = 1; i < LC_ALL; ++i) {
-				(void) strcat(current_locale_string, "/");
-				(void) strcat(current_locale_string,
-				    current_categories[i]);
-			}
+	/* Look to see if any category is different */
+	for (i = 1; i < NUM_CATS; ++i) {
+		if (i == LC_ALL)
+			continue;
+		if (strcmp(current_categories[0], current_categories[i])) {
+			composite = 1;
 			break;
 		}
+	}
+
+	if (composite) {
+		/*
+		 * Note ordering of these follows the numeric order,
+		 * if the order is changed, then setlocale() will need
+		 * to be changed as well.
+		 */
+		(void) snprintf(current_locale_string,
+		    sizeof (current_locale_string),
+		    "%s/%s/%s/%s/%s/%s",
+		    current_categories[LC_CTYPE],
+		    current_categories[LC_NUMERIC],
+		    current_categories[LC_TIME],
+		    current_categories[LC_COLLATE],
+		    current_categories[LC_MONETARY],
+		    current_categories[LC_MESSAGES]);
+	} else {
+		(void) strlcpy(current_locale_string, current_categories[0],
+		    sizeof (current_locale_string));
+	}
 	return (current_locale_string);
 }
 
@@ -285,7 +314,7 @@ __get_locale_env(int category)
 	const char *env;
 
 	/* 1. check LC_ALL. */
-	env = getenv(categories[0]);
+	env = getenv(categories[LC_ALL]);
 
 	/* 2. check LC_* */
 	if (env == NULL || !*env)
