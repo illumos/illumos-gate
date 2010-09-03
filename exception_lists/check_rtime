@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2010, Richard Lowe
 #
 
 # This file provides exceptions to the usual rules applied to ELF objects by
@@ -117,6 +118,7 @@ UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnss3\.so
 UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnssutil3\.so
 UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libsmime3\.so
 UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libssl3\.so
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libavahi-[^\.]*.so
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libdbus-1\.so\.3
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libdbus-glib-1\.so\.2
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libglib-2\.0\.so\.0
@@ -140,6 +142,7 @@ UNUSED_RPATH	/usr.*\ from\ .*tst\.gcc\.exe			# gcc built
 
 
 # Unreferenced objects of non-OSnet objects we can't change
+UNREF_OBJ	/lib.*\ of\ .*libavahi-[^\.]*\.so
 UNREF_OBJ	/lib.*\ of\ .*libcimapi\.so
 UNREF_OBJ	/lib.*\ of\ .*libdbus-1\.so\.3
 UNREF_OBJ	/lib.*\ of\ .*libdbus-glib-1\.so\.2
