@@ -1478,6 +1478,7 @@ static lb_property_t loopmodes[] = {
 	{ normal,	"normal",	QLGE_LOOP_NONE			},
 	{ internal,	"parallel",	QLGE_LOOP_INTERNAL_PARALLEL	},
 	{ internal,	"serial",	QLGE_LOOP_INTERNAL_SERIAL	},
+	{ external,	"phy",		QLGE_LOOP_EXTERNAL_PHY		}
 };
 
 /*
@@ -1502,6 +1503,7 @@ qlge_set_loop_mode(qlge_t *qlge, uint32_t mode)
 	case QLGE_LOOP_NONE:
 	case QLGE_LOOP_INTERNAL_PARALLEL:
 	case QLGE_LOOP_INTERNAL_SERIAL:
+	case QLGE_LOOP_EXTERNAL_PHY:
 		break;
 	}
 
@@ -1512,6 +1514,13 @@ qlge_set_loop_mode(qlge_t *qlge, uint32_t mode)
 	mutex_enter(&qlge->mbx_mutex);
 	(void) ql_set_loop_back_mode(qlge);
 	mutex_exit(&qlge->mbx_mutex);
+	/* if loopback mode test is done */
+	if (mode == QLGE_LOOP_NONE) {
+		mutex_enter(&qlge->hw_mutex);
+		(void) ql_route_initialize(qlge);
+		mutex_exit(&qlge->hw_mutex);
+	}
+
 	return (IOC_REPLY);
 }
 /*

@@ -46,6 +46,7 @@ static int32_t  emlxs_send_menlo(emlxs_port_t *port, emlxs_buf_t *sbp);
 static void	emlxs_fca_attach(emlxs_hba_t *hba);
 static void	emlxs_fca_detach(emlxs_hba_t *hba);
 static void	emlxs_drv_banner(emlxs_hba_t *hba);
+static int32_t	emlxs_fca_reset(opaque_t fca_port_handle, uint32_t cmd);
 
 static int32_t	emlxs_get_props(emlxs_hba_t *hba);
 static int32_t	emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp);
@@ -268,7 +269,7 @@ ddi_device_acc_attr_t emlxs_data_acc_attr = {
 	emlxs_ub_free,
 	emlxs_ub_release,
 	emlxs_pkt_abort,
-	emlxs_reset,
+	emlxs_fca_reset,
 	emlxs_port_manage,
 	emlxs_get_device,
 	emlxs_notify
@@ -306,7 +307,7 @@ static fc_fca_tran_t emlxs_fca_tran = {
 	emlxs_ub_free,
 	emlxs_ub_release,
 	emlxs_pkt_abort,
-	emlxs_reset,
+	emlxs_fca_reset,
 	emlxs_port_manage,
 	emlxs_get_device,
 	emlxs_notify
@@ -344,7 +345,7 @@ static fc_fca_tran_t emlxs_fca_tran = {
 	emlxs_ub_free,
 	emlxs_ub_release,
 	emlxs_pkt_abort,
-	emlxs_reset,
+	emlxs_fca_reset,
 	emlxs_port_manage,
 	emlxs_get_device,
 	emlxs_notify
@@ -375,7 +376,7 @@ static fc_fca_tran_t emlxs_fca_tran = {
 	emlxs_ub_free,
 	emlxs_ub_release,
 	emlxs_pkt_abort,
-	emlxs_reset,
+	emlxs_fca_reset,
 	emlxs_port_manage,
 	emlxs_get_device,
 	emlxs_notify
@@ -3851,20 +3852,12 @@ emlxs_abort_all(emlxs_hba_t *hba, uint32_t *tx, uint32_t *chip)
 
 
 extern int32_t
-emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
+emlxs_reset(emlxs_port_t *port, uint32_t cmd)
 {
-	emlxs_port_t	*port = (emlxs_port_t *)fca_port_handle;
 	emlxs_hba_t	*hba = HBA;
 	int		rval;
 	int		ret;
 	clock_t		timeout;
-
-	if (!(port->flag & EMLXS_PORT_BOUND)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "fca_reset failed. Port not bound.");
-
-		return (FC_UNBOUND);
-	}
 
 	switch (cmd) {
 	case FC_FCA_LINK_RESET:
@@ -3875,7 +3868,7 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "fca_reset: Resetting Link.");
+		    "Resetting Link.");
 
 		mutex_enter(&EMLXS_LINKUP_LOCK);
 		hba->linkup_wait_flag = TRUE;
@@ -3910,7 +3903,7 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 	case FC_FCA_CORE:
 #ifdef DUMP_SUPPORT
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "fca_reset: Core dump.");
+		    "Dumping Core.");
 
 		/* Schedule a USER dump */
 		emlxs_dump(hba, EMLXS_USER_DUMP, 0, 0);
@@ -3925,7 +3918,7 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 	case FC_FCA_RESET_CORE:
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "fca_reset: Resetting Adapter.");
+		    "Resetting Adapter.");
 
 		rval = FC_SUCCESS;
 
@@ -3933,7 +3926,7 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 			(void) emlxs_online(hba);
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_reset: Adapter reset failed. Device busy.");
+			    "Adapter reset failed. Device busy.");
 
 			rval = FC_DEVICE_BUSY;
 		}
@@ -3942,7 +3935,7 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "fca_reset: Unknown command. cmd=%x", cmd);
+		    "emlxs_reset: Unknown command. cmd=%x", cmd);
 
 		break;
 	}
@@ -3950,6 +3943,64 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 	return (FC_FAILURE);
 
 } /* emlxs_reset() */
+
+
+static int32_t
+emlxs_fca_reset(opaque_t fca_port_handle, uint32_t cmd)
+{
+	emlxs_port_t	*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_hba_t	*hba = HBA;
+	int32_t		rval;
+
+	if (!(port->flag & EMLXS_PORT_BOUND)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_reset: Port not bound.");
+
+		return (FC_UNBOUND);
+	}
+
+	switch (cmd) {
+	case FC_FCA_LINK_RESET:
+		if (hba->fw_flag & FW_UPDATE_NEEDED) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_reset: FC_FCA_LINK_RESET -> FC_FCA_RESET");
+			cmd = FC_FCA_RESET;
+		} else {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_reset: FC_FCA_LINK_RESET");
+		}
+		break;
+
+	case FC_FCA_CORE:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_reset: FC_FCA_CORE");
+		break;
+
+	case FC_FCA_RESET:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_reset: FC_FCA_RESET");
+		break;
+
+	case FC_FCA_RESET_CORE:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_reset: FC_FCA_RESET_CORE");
+		break;
+
+	default:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_reset: Unknown command. cmd=%x", cmd);
+		return (FC_FAILURE);
+	}
+
+	if (hba->fw_flag & FW_UPDATE_NEEDED) {
+		hba->fw_flag |= FW_UPDATE_KERNEL;
+	}
+
+	rval = emlxs_reset(port, cmd);
+
+	return (rval);
+
+} /* emlxs_fca_reset() */
 
 
 extern int
@@ -6859,6 +6910,18 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 		default:
 			break;
+		}
+		break;
+
+	case CFG_FW_CHECK:
+		/* The 0x2 bit implies the 0x1 bit will also be set */
+		if (new_value & 0x2) {
+			new_value |= 0x1;
+		}
+
+		/* The 0x4 bit should not be set if 0x1 or 0x2 is not set */
+		if (!(new_value & 0x3) && (new_value & 0x4)) {
+			new_value &= ~0x4;
 		}
 		break;
 

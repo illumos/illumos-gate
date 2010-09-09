@@ -1086,13 +1086,22 @@ static void
 zfs_set_fuid_feature(zfsvfs_t *zfsvfs)
 {
 	zfsvfs->z_use_fuids = USE_FUIDS(zfsvfs->z_version, zfsvfs->z_os);
-	if (zfsvfs->z_use_fuids && zfsvfs->z_vfs) {
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_XVATTR);
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_SYSATTR_VIEWS);
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_ACEMASKONACCESS);
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_ACLONCREATE);
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_ACCESS_FILTER);
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_REPARSE);
+	if (zfsvfs->z_vfs) {
+		if (zfsvfs->z_use_fuids) {
+			vfs_set_feature(zfsvfs->z_vfs, VFSFT_XVATTR);
+			vfs_set_feature(zfsvfs->z_vfs, VFSFT_SYSATTR_VIEWS);
+			vfs_set_feature(zfsvfs->z_vfs, VFSFT_ACEMASKONACCESS);
+			vfs_set_feature(zfsvfs->z_vfs, VFSFT_ACLONCREATE);
+			vfs_set_feature(zfsvfs->z_vfs, VFSFT_ACCESS_FILTER);
+			vfs_set_feature(zfsvfs->z_vfs, VFSFT_REPARSE);
+		} else {
+			vfs_clear_feature(zfsvfs->z_vfs, VFSFT_XVATTR);
+			vfs_clear_feature(zfsvfs->z_vfs, VFSFT_SYSATTR_VIEWS);
+			vfs_clear_feature(zfsvfs->z_vfs, VFSFT_ACEMASKONACCESS);
+			vfs_clear_feature(zfsvfs->z_vfs, VFSFT_ACLONCREATE);
+			vfs_clear_feature(zfsvfs->z_vfs, VFSFT_ACCESS_FILTER);
+			vfs_clear_feature(zfsvfs->z_vfs, VFSFT_REPARSE);
+		}
 	}
 	zfsvfs->z_use_sa = USE_SA(zfsvfs->z_version, zfsvfs->z_os);
 }
@@ -2010,7 +2019,7 @@ zfs_suspend_fs(zfsvfs_t *zfsvfs)
 int
 zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname)
 {
-	int err, err2;
+	int err;
 
 	ASSERT(RRW_WRITE_HELD(&zfsvfs->z_teardown_lock));
 	ASSERT(RW_WRITE_HELD(&zfsvfs->z_teardown_inactive_lock));
@@ -2023,18 +2032,33 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname)
 		znode_t *zp;
 		uint64_t sa_obj = 0;
 
-		err2 = zap_lookup(zfsvfs->z_os, MASTER_NODE_OBJ,
-		    ZFS_SA_ATTRS, 8, 1, &sa_obj);
+		/*
+		 * Make sure version hasn't changed
+		 */
 
-		if ((err || err2) && zfsvfs->z_version >= ZPL_VERSION_SA)
+		err = zfs_get_zplprop(zfsvfs->z_os, ZFS_PROP_VERSION,
+		    &zfsvfs->z_version);
+
+		if (err)
 			goto bail;
 
+		err = zap_lookup(zfsvfs->z_os, MASTER_NODE_OBJ,
+		    ZFS_SA_ATTRS, 8, 1, &sa_obj);
+
+		if (err && zfsvfs->z_version >= ZPL_VERSION_SA)
+			goto bail;
 
 		if ((err = sa_setup(zfsvfs->z_os, sa_obj,
 		    zfs_attr_table,  ZPL_END, &zfsvfs->z_attr_table)) != 0)
 			goto bail;
 
+		if (zfsvfs->z_version >= ZPL_VERSION_SA)
+			sa_register_update_callback(zfsvfs->z_os,
+			    zfs_sa_upgrade);
+
 		VERIFY(zfsvfs_setup(zfsvfs, B_FALSE) == 0);
+
+		zfs_set_fuid_feature(zfsvfs);
 
 		/*
 		 * Attempt to re-establish all the active znodes with
@@ -2048,7 +2072,6 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname)
 			(void) zfs_rezget(zp);
 		}
 		mutex_exit(&zfsvfs->z_znodes_lock);
-
 	}
 
 bail:
@@ -2058,8 +2081,8 @@ bail:
 
 	if (err) {
 		/*
-		 * Since we couldn't reopen zfsvfs::z_os, force
-		 * unmount this file system.
+		 * Since we couldn't reopen zfsvfs::z_os, or
+		 * setup the sa framework force unmount this file system.
 		 */
 		if (vn_vfswlock(zfsvfs->z_vfs->vfs_vnodecovered) == 0)
 			(void) dounmount(zfsvfs->z_vfs, MS_FORCE, CRED());
@@ -2219,8 +2242,7 @@ zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers)
 
 	zfsvfs->z_version = newvers;
 
-	if (zfsvfs->z_version >= ZPL_VERSION_FUID)
-		zfs_set_fuid_feature(zfsvfs);
+	zfs_set_fuid_feature(zfsvfs);
 
 	return (0);
 }

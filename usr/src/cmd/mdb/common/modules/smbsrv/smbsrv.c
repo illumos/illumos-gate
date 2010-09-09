@@ -584,16 +584,10 @@ static const char *smb_server_state[SMB_SERVER_STATE_SENTINEL] =
 static const smb_exp_t smb_server_exp[] =
 {
 	{ SMB_OPT_ALL_OBJ,
-	    offsetof(smb_server_t, sv_nbt_daemon.ld_session_list.se_rdy.lst),
+	    offsetof(smb_server_t, sv_nbt_daemon.ld_session_list.ll_list),
 	    "smbsess", "smb_session"},
 	{ SMB_OPT_ALL_OBJ,
-	    offsetof(smb_server_t, sv_nbt_daemon.ld_session_list.se_act.lst),
-	    "smbsess", "smb_session"},
-	{ SMB_OPT_ALL_OBJ,
-	    offsetof(smb_server_t, sv_tcp_daemon.ld_session_list.se_rdy.lst),
-	    "smbsess", "smb_session"},
-	{ SMB_OPT_ALL_OBJ,
-	    offsetof(smb_server_t, sv_tcp_daemon.ld_session_list.se_act.lst),
+	    offsetof(smb_server_t, sv_tcp_daemon.ld_session_list.ll_list),
 	    "smbsess", "smb_session"},
 	{ 0, 0, NULL, NULL }
 };

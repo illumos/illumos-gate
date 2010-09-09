@@ -140,8 +140,7 @@ smb_notify_init(void)
 	    offsetof(smb_request_t, sr_ncr.nc_lnd));
 
 	smb_thread_init(&smb_thread_notify_daemon,
-	    "smb_notify_change_daemon", smb_notify_change_daemon, NULL,
-	    NULL, NULL);
+	    "smb_notify_change_daemon", smb_notify_change_daemon, NULL);
 
 	rc = smb_thread_start(&smb_thread_notify_daemon);
 	if (rc) {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,8 +170,7 @@ extern void			emlxs_update_sd_bucket(emlxs_buf_t *sbp);
 
 extern uint32_t			emlxs_get_instance(int32_t ddiinst);
 extern char			*emlxs_mscmd_xlate(uint16_t cmd);
-extern int32_t			emlxs_reset(opaque_t fca_port_handle,
-					uint32_t cmd);
+extern int32_t			emlxs_reset(emlxs_port_t *port, uint32_t cmd);
 extern void			emlxs_swap_service_params(SERV_PARM *sp);
 extern void			emlxs_swap_fcp_pkt(emlxs_buf_t *sbp);
 extern void			emlxs_swap_ct_pkt(emlxs_buf_t *sbp);

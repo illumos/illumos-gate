@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION: Contains top level functions to read/write to the DIT. These
@@ -615,6 +612,16 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 	int			next_print = PRINT_FREQ;
 	int			search_flag = SUCCESS;
 
+	int			m;
+
+	/* list of maps whose keys will be transliterated to lowercase */
+	char			*xlate_to_lcase_maps[] = {
+		"hosts.byname",
+		"ipnodes.byname",
+		NULL
+	};
+	bool_t			xlate_to_lcase = FALSE;
+
 	if (!map || !map->map_name || !map->domain) {
 		return (FAILURE);
 	}
@@ -690,6 +697,20 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 		delete_map(temp_ttl);
 		sfree(temp_ttl);
 		return (FAILURE);
+	}
+
+	/*
+	 * set xlate_to_lcase to TRUE if map_name is found in
+	 * xlate_to_lcase_maps[]
+	 */
+	m = 0;
+	while (xlate_to_lcase_maps[m] != NULL) {
+		if (strncmp(map->map_name, xlate_to_lcase_maps[m],
+			strlen(xlate_to_lcase_maps[m])) == 0) {
+			xlate_to_lcase = TRUE;
+			break;
+		}
+		++m;
 	}
 
 	/* Try each mapping for the map */
@@ -802,7 +823,7 @@ update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 
 				/* Obtain the datum for key */
 				datkey = getKeyFromRuleValue(t, &rv[i],
-						&nv, &statP);
+				    &nv, &statP, xlate_to_lcase);
 				if (datkey == 0) {
 					logmsg(MSG_NOTIMECHECK, LOG_WARNING,
 						"%s: Unable to obtain NIS "

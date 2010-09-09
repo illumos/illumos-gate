@@ -512,10 +512,7 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 	char			*valstr1 = NULL;
 	char			*valstr2 = NULL;
 	char			pbuf[PROTOCOL_LEN]; /* protocol */
-	char			pxbuf[ADDR_LEN]; /* prxy src range */
 	char			hcpbuf[PORT_LEN]; /* hcport */
-	char			addrstr_buf[INET6_ADDRSTRLEN];
-	char			addrstr_buf1[INET6_ADDRSTRLEN];
 	int			audit_error;
 
 	if ((ucredp == NULL) && (cmd == ILBD_CREATE_RULE))  {
@@ -577,12 +574,18 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 
 		event->adt_ilb_create_rule.auth_used = NET_ILB_CONFIG_AUTH;
 
-		/* Fill in virtual IP address */
-		addrstr_buf[0] = '\0';
-		ilbd_addr2str(&rlinfo->rl_vip, addrstr_buf,
-		    sizeof (addrstr_buf));
-		event->adt_ilb_create_rule.virtual_ipaddress = addrstr_buf;
-
+		/* Fill in virtual IP address type */
+		if (IN6_IS_ADDR_V4MAPPED(&rlinfo->rl_vip)) {
+			event->adt_ilb_create_rule.virtual_ipaddress_type =
+			    ADT_IPv4;
+			cvt_addr(event->adt_ilb_create_rule.virtual_ipaddress,
+			    ADT_IPv4, rlinfo->rl_vip);
+		} else {
+			event->adt_ilb_create_rule.virtual_ipaddress_type =
+			    ADT_IPv6;
+			cvt_addr(event->adt_ilb_create_rule.virtual_ipaddress,
+			    ADT_IPv6, rlinfo->rl_vip);
+		}
 		/* Fill in port - could be a single value or a range */
 		event->adt_ilb_create_rule.min_port = ntohs(rlinfo->rl_minport);
 		if (ntohs(rlinfo->rl_maxport) > ntohs(rlinfo->rl_minport)) {
@@ -614,20 +617,53 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 
 		/* Fill in proxy-src for the NAT case */
 		if (rlinfo->rl_topo == ILB_TOPO_NAT)  {
-			ilbd_addr2str(&rlinfo->rl_nat_src_start, addrstr_buf,
-			    sizeof (addrstr_buf));
-			if (&rlinfo->rl_nat_src_end == 0) {
-				/* Single address */
-				(void) snprintf(pxbuf, ADDR_LEN,
-				    "%s", addrstr_buf);
+			/* copy starting proxy-src address */
+			if (IN6_IS_ADDR_V4MAPPED(&rlinfo->rl_nat_src_start)) {
+				/* V4 case */
+				event->adt_ilb_create_rule.proxy_src_min_type =
+				    ADT_IPv4;
+				cvt_addr(
+				    event->adt_ilb_create_rule.proxy_src_min,
+				    ADT_IPv4, rlinfo->rl_nat_src_start);
 			} else {
-				/* address range */
-				ilbd_addr2str(&rlinfo->rl_nat_src_end,
-				    addrstr_buf1, sizeof (addrstr_buf1));
-				(void) snprintf(pxbuf, ADDR_LEN,
-				    "%s-%s", addrstr_buf, addrstr_buf1);
+				/* V6 case */
+				event->adt_ilb_create_rule.proxy_src_min_type =
+				    ADT_IPv6;
+				cvt_addr(
+				    event->adt_ilb_create_rule.proxy_src_min,
+				    ADT_IPv6, rlinfo->rl_nat_src_start);
 			}
-			event->adt_ilb_create_rule.proxy_src = pxbuf;
+
+			/* copy ending proxy-src address */
+			if (&rlinfo->rl_nat_src_end == 0) {
+				/* proxy-src is a single address */
+				event->adt_ilb_create_rule.proxy_src_max_type =
+				    event->
+				    adt_ilb_create_rule.proxy_src_min_type;
+				(void) memcpy(
+				    event->adt_ilb_create_rule.proxy_src_max,
+				    event->adt_ilb_create_rule.proxy_src_min,
+				    (4 * sizeof (uint32_t)));
+			} else if (
+			    IN6_IS_ADDR_V4MAPPED(&rlinfo->rl_nat_src_end)) {
+				/*
+				 * proxy-src is a address range - copy ending
+				 * proxy-src address
+				 * V4 case
+				 */
+				event->adt_ilb_create_rule.proxy_src_max_type =
+				    ADT_IPv4;
+				cvt_addr(
+				    event->adt_ilb_create_rule.proxy_src_max,
+				    ADT_IPv4, rlinfo->rl_nat_src_end);
+			} else {
+				/* V6 case */
+				event->adt_ilb_create_rule.proxy_src_max_type =
+				    ADT_IPv6;
+				cvt_addr(
+				    event->adt_ilb_create_rule.proxy_src_max,
+				    ADT_IPv6, rlinfo->rl_nat_src_end);
+			}
 		}
 
 		/*
@@ -691,6 +727,24 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 	free(valstr1);
 	free(valstr2);
 	(void) adt_end_session(ah);
+}
+/*
+ * converts IP address from in6_addr format to uint32_t[4]
+ * This conversion is needed for recording IP address in
+ * audit records.
+ */
+void
+cvt_addr(uint32_t *audit, int32_t type, struct in6_addr address)
+{
+
+	if (type == ADT_IPv4)  {
+		/* address is IPv4 */
+		audit[0] = address._S6_un._S6_u32[3];
+	} else {
+		/* address is IPv6 */
+		(void) memcpy(audit, address._S6_un._S6_u32,
+		    (4 * sizeof (uint32_t)));
+	}
 }
 
 static ilb_status_t

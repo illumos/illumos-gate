@@ -222,8 +222,6 @@ SYMBOL_VERSION SUNWprivate {
         smb_kmod_get_open_num;
 	smb_kmod_get_spool_doc;
 	smb_kmod_isbound;
-	smb_kmod_nbtlisten;
-	smb_kmod_nbtreceive;
 	smb_kmod_session_close;
 	smb_kmod_setcfg;
 	smb_kmod_setgmtoff;
@@ -231,8 +229,6 @@ SYMBOL_VERSION SUNWprivate {
 	smb_kmod_shareinfo;
 	smb_kmod_start;
 	smb_kmod_stop;
-	smb_kmod_tcplisten;
-	smb_kmod_tcpreceive;
 	smb_kmod_unbind;
 	smb_kmod_unshare;
 	smb_join;

@@ -205,16 +205,22 @@ ilbd_audit_server_event(audit_sg_event_data_t *data,
 		    NET_ILB_ENABLE_AUTH;
 		event->adt_ilb_enable_server.server_id =
 		    data->ed_serverid;
-		event->adt_ilb_enable_server.server_ipaddress =
-		    data->ed_server_address;
+		event->adt_ilb_enable_server.server_ipaddress_type =
+		    data->ed_ipaddr_type;
+		(void) memcpy(event->adt_ilb_enable_server.server_ipaddress,
+		    data->ed_server_address,
+		    (sizeof (data->ed_server_address)));
 		break;
 	case ILBD_DISABLE_SERVER:
 		event->adt_ilb_disable_server.auth_used =
 		    NET_ILB_ENABLE_AUTH;
 		event->adt_ilb_disable_server.server_id =
 		    data->ed_serverid;
-		event->adt_ilb_disable_server.server_ipaddress =
-		    data->ed_server_address;
+		event->adt_ilb_disable_server.server_ipaddress_type =
+		    data->ed_ipaddr_type;
+		(void) memcpy(event->adt_ilb_disable_server.server_ipaddress,
+		    data->ed_server_address,
+		    (sizeof (data->ed_server_address)));
 		break;
 	case ILBD_REM_SERVER_FROM_GROUP:
 		event->adt_ilb_remove_server.auth_used =
@@ -222,8 +228,11 @@ ilbd_audit_server_event(audit_sg_event_data_t *data,
 		event->adt_ilb_remove_server.server_id =
 		    data->ed_serverid;
 		event->adt_ilb_remove_server.server_group = data->ed_sgroup;
-		event->adt_ilb_remove_server.server_ipaddress =
-		    data->ed_server_address;
+		event->adt_ilb_remove_server.server_ipaddress_type =
+		    data->ed_ipaddr_type;
+		(void) memcpy(event->adt_ilb_remove_server.server_ipaddress,
+		    data->ed_server_address,
+		    (sizeof (data->ed_server_address)));
 		break;
 	case ILBD_CREATE_SERVERGROUP:
 		event->adt_ilb_create_servergroup.auth_used =
@@ -234,8 +243,11 @@ ilbd_audit_server_event(audit_sg_event_data_t *data,
 	case ILBD_ADD_SERVER_TO_GROUP:
 		event->adt_ilb_add_server.auth_used =
 		    NET_ILB_CONFIG_AUTH;
-		event->adt_ilb_add_server.server_ipaddress =
-		    data->ed_server_address;
+		event->adt_ilb_add_server.server_ipaddress_type =
+		    data->ed_ipaddr_type;
+		(void) memcpy(event->adt_ilb_add_server.server_ipaddress,
+		    data->ed_server_address,
+		    (sizeof (data->ed_server_address)));
 		event->adt_ilb_add_server.server_id =
 		    data->ed_serverid;
 		event->adt_ilb_add_server.server_group =
@@ -547,19 +559,24 @@ fill_audit_record(ilb_sg_info_t *sg, audit_sg_event_data_t *audit_sg_data,
 	for (i = 0; i < sg->sg_srvcount; i++) {
 		tsrv = &sg->sg_servers[i];
 		if (cmd == ILBD_ADD_SERVER_TO_GROUP)  {
-			char	addrstr_buf[INET6_ADDRSTRLEN];
 
 			audit_sg_data->ed_serverid = NULL;
-			ilbd_addr2str(&tsrv->sgs_addr, addrstr_buf,
-			    sizeof (addrstr_buf));
-			audit_sg_data->ed_server_address = addrstr_buf;
+			if (IN6_IS_ADDR_V4MAPPED(&tsrv->sgs_addr)) {
+				audit_sg_data->ed_ipaddr_type = ADT_IPv4;
+				cvt_addr(audit_sg_data->ed_server_address,
+				    ADT_IPv4, tsrv->sgs_addr);
+			} else {
+				audit_sg_data->ed_ipaddr_type = ADT_IPv6;
+				cvt_addr(audit_sg_data->ed_server_address,
+				    ADT_IPv6, tsrv->sgs_addr);
+			}
 			audit_sg_data->ed_minport = tsrv->sgs_minport;
 			audit_sg_data->ed_maxport = tsrv->sgs_maxport;
 			audit_sg_data->ed_sgroup = sg->sg_name;
 		} else if (cmd == ILBD_REM_SERVER_FROM_GROUP) {
 			audit_sg_data->ed_serverid = tsrv->sgs_srvID;
 			audit_sg_data->ed_sgroup = sg->sg_name;
-			audit_sg_data->ed_server_address = NULL;
+
 			audit_sg_data->ed_minport = 0;
 			audit_sg_data->ed_maxport = 0;
 		}
@@ -582,7 +599,6 @@ ilbd_add_server_to_group(ilb_sg_info_t *sg_info, int ev_port,
 	ilbd_srv_t	*nsrv;
 	ilb_sg_srv_t	*srv;
 	audit_sg_event_data_t   audit_sg_data;
-	char    addrstr_buf[INET6_ADDRSTRLEN];
 
 	if (ps != NULL) {
 		rc = ilbd_check_client_config_auth(ps);
@@ -624,9 +640,15 @@ ilbd_add_server_to_group(ilb_sg_info_t *sg_info, int ev_port,
 		srv = &sg_info->sg_servers[i];
 
 		(void) memset(&audit_sg_data, 0, sizeof (audit_sg_data));
-		ilbd_addr2str(&srv->sgs_addr, addrstr_buf,
-		    sizeof (addrstr_buf));
-		audit_sg_data.ed_server_address = addrstr_buf;
+		if (IN6_IS_ADDR_V4MAPPED(&srv->sgs_addr)) {
+			audit_sg_data.ed_ipaddr_type = ADT_IPv4;
+			cvt_addr(audit_sg_data.ed_server_address, ADT_IPv4,
+			    srv->sgs_addr);
+		} else {
+			audit_sg_data.ed_ipaddr_type = ADT_IPv6;
+			cvt_addr(audit_sg_data.ed_server_address, ADT_IPv6,
+			    srv->sgs_addr);
+		}
 		audit_sg_data.ed_minport = srv->sgs_minport;
 		audit_sg_data.ed_maxport = srv->sgs_maxport;
 		audit_sg_data.ed_sgroup = sg_info->sg_name;
@@ -938,7 +960,6 @@ ilbd_rem_server_from_group(ilb_sg_info_t *sg_info, int ev_port,
 	ilbd_srv_t	*srv, tmp_srv;
 	ilb_sg_srv_t    *tsrv;
 	audit_sg_event_data_t   audit_sg_data;
-	char    addrstr_buf[INET6_ADDRSTRLEN];
 
 	rc = ilbd_check_client_config_auth(ps);
 	if (rc != ILB_STATUS_OK) {
@@ -958,7 +979,6 @@ ilbd_rem_server_from_group(ilb_sg_info_t *sg_info, int ev_port,
 	tsrv = &sg_info->sg_servers[0];
 	audit_sg_data.ed_serverid = tsrv->sgs_srvID;
 	audit_sg_data.ed_sgroup = sg_info->sg_name;
-	audit_sg_data.ed_server_address = NULL;
 
 	assert(sg_info->sg_srvcount == 1);
 	srv = i_find_srv(&tmp_sg->isg_srvlist, &sg_info->sg_servers[0],
@@ -971,9 +991,15 @@ ilbd_rem_server_from_group(ilb_sg_info_t *sg_info, int ev_port,
 		return (ILB_STATUS_SRVUNAVAIL);
 	}
 	tsrv = &srv->isv_srv;
-	ilbd_addr2str(&tsrv->sgs_addr, addrstr_buf,
-	    sizeof (addrstr_buf));
-	audit_sg_data.ed_server_address = addrstr_buf;
+	if (IN6_IS_ADDR_V4MAPPED(&tsrv->sgs_addr)) {
+		audit_sg_data.ed_ipaddr_type = ADT_IPv4;
+		cvt_addr(audit_sg_data.ed_server_address, ADT_IPv4,
+		    tsrv->sgs_addr);
+	} else {
+		audit_sg_data.ed_ipaddr_type = ADT_IPv6;
+		cvt_addr(audit_sg_data.ed_server_address, ADT_IPv6,
+		    tsrv->sgs_addr);
+	}
 	/*
 	 * i_delete_srv frees srv, therefore we need to save
 	 * this information for ilbd_scf_del_srv
@@ -1184,7 +1210,6 @@ ilbd_Xable_server(ilb_sg_info_t *sg, const struct passwd *ps,
 	uint32_t	nflags;
 	ilbd_srv_status_ind_t u_cmd;
 	audit_sg_event_data_t   audit_sg_data;
-	char    addrstr_buf[INET6_ADDRSTRLEN];
 
 	(void) memset(&audit_sg_data, 0, sizeof (audit_sg_data));
 
@@ -1193,7 +1218,6 @@ ilbd_Xable_server(ilb_sg_info_t *sg, const struct passwd *ps,
 
 	srv = &sg->sg_servers[0];
 	audit_sg_data.ed_serverid = srv->sgs_srvID;
-	audit_sg_data.ed_server_address = NULL;
 
 	rc = ilbd_check_client_enable_auth(ps);
 	if (rc != ILB_STATUS_OK) {
@@ -1298,9 +1322,15 @@ ilbd_Xable_server(ilb_sg_info_t *sg, const struct passwd *ps,
 		return (ILB_STATUS_INVAL_ENBSRVR);
 	}
 	/* Fill in the server IP address for audit record */
-	ilbd_addr2str(&tmp_srv->isv_addr, addrstr_buf,
-	    sizeof (addrstr_buf));
-	audit_sg_data.ed_server_address = addrstr_buf;
+	if (IN6_IS_ADDR_V4MAPPED(&tmp_srv->isv_addr)) {
+		audit_sg_data.ed_ipaddr_type = ADT_IPv4;
+		cvt_addr(audit_sg_data.ed_server_address, ADT_IPv4,
+		    tmp_srv->isv_addr);
+	} else {
+		audit_sg_data.ed_ipaddr_type = ADT_IPv6;
+		cvt_addr(audit_sg_data.ed_server_address, ADT_IPv6,
+		    tmp_srv->isv_addr);
+	}
 
 	/*
 	 * We have found the server in memory, perform the following
@@ -1538,38 +1568,6 @@ ilbd_srvID_to_address(ilb_sg_info_t *sg, uint32_t *rbuf, size_t *rbufsz)
 	*rbufsz += sizeof (ilb_sg_srv_t);
 
 	return (ILB_STATUS_OK);
-}
-
-void
-ilbd_addr2str(struct in6_addr *ipaddr, char *addrstr_buf, size_t sz)
-{
-	ilb_ip_addr_t	ilb_ip;
-
-	IP_COPY_IMPL_2_CLI(ipaddr, &ilb_ip);
-	addr2str(ilb_ip, addrstr_buf, sz);
-}
-
-/* Convert ip address to a address string */
-void
-addr2str(ilb_ip_addr_t ip, char *buf, size_t sz)
-{
-
-	switch (ip.ia_af) {
-	case AF_INET:
-		if ((uint32_t *)&(ip).ia_v4 == 0)
-			buf[0] = '\0';
-		else
-			(void) inet_ntop(AF_INET, (void *)&(ip).ia_v4, buf, sz);
-		break;
-	case AF_INET6:
-		if (IN6_IS_ADDR_UNSPECIFIED(&(ip).ia_v6)) {
-			buf[0] = '\0';
-			break;
-		}
-		(void) inet_ntop(ip.ia_af, (void *)&(ip).ia_v6, buf, sz);
-		break;
-	default: buf[0] = '\0';
-	}
 }
 
 /*

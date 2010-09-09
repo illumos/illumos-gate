@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _DIT_ACCESS_UTILS_H
 #define	_DIT_ACCESS_UTILS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -73,7 +69,8 @@ extern suc_code			addSplitFieldValues(__nis_table_mapping_t *t,
 extern datum			*ruleValueToDatum(__nis_table_mapping_t *t,
 				__nis_rule_value_t *rv, int *statP);
 extern datum 			*getKeyFromRuleValue(__nis_table_mapping_t *t,
-				__nis_rule_value_t *rv, int *nv, int *statP);
+				__nis_rule_value_t *rv, int *nv, int *statP,
+				bool_t xlate_to_lcase);
 extern const char		*getObjectClass(char *rdn);
 extern suc_code			makeNISObject(char *domain, char *dn);
 extern suc_code			addNISObject(char *domain, char *dn,

@@ -58,7 +58,6 @@ static int ql_alloc_phys_rbuf(dev_info_t *, ddi_dma_handle_t *,
     size_t, size_t, caddr_t *, ddi_dma_cookie_t *);
 static void ql_free_phys(ddi_dma_handle_t *, ddi_acc_handle_t *);
 static int ql_set_routing_reg(qlge_t *, uint32_t, uint32_t, int);
-static int ql_route_initialize(qlge_t *);
 static int ql_attach(dev_info_t *, ddi_attach_cmd_t);
 static int ql_detach(dev_info_t *, ddi_detach_cmd_t);
 static int ql_bringdown_adapter(qlge_t *);
@@ -1446,13 +1445,18 @@ ql_alloc_sbufs(qlge_t *qlge, struct rx_ring *rx_ring)
 	int i;
 	ddi_dma_cookie_t dma_cookie;
 
+	rx_ring->sbq_use_head = 0;
+	rx_ring->sbq_use_tail = 0;
+	rx_ring->sbuf_in_use_count = 0;
+	rx_ring->sbq_free_head = 0;
+	rx_ring->sbq_free_tail = 0;
+	rx_ring->sbuf_free_count = 0;
 	rx_ring->sbuf_free = kmem_zalloc(rx_ring->sbq_len *
 	    sizeof (struct bq_desc *), KM_NOSLEEP);
 	if (rx_ring->sbuf_free == NULL) {
 		cmn_err(CE_WARN,
 		    "!%s: sbuf_free_list alloc: failed",
 		    __func__);
-		rx_ring->sbuf_free_count = 0;
 		goto alloc_sbuf_err;
 	}
 
@@ -1462,13 +1466,9 @@ ql_alloc_sbufs(qlge_t *qlge, struct rx_ring *rx_ring)
 		cmn_err(CE_WARN,
 		    "!%s: sbuf_inuse_list alloc: failed",
 		    __func__);
-		rx_ring->sbuf_in_use_count = 0;
 		goto alloc_sbuf_err;
 	}
-	rx_ring->sbq_use_head = 0;
-	rx_ring->sbq_use_tail = 0;
-	rx_ring->sbq_free_head = 0;
-	rx_ring->sbq_free_tail = 0;
+
 	sbq_desc = &rx_ring->sbq_desc[0];
 
 	for (i = 0; i < rx_ring->sbq_len; i++, sbq_desc++) {
@@ -1591,13 +1591,18 @@ ql_alloc_lbufs(qlge_t *qlge, struct rx_ring *rx_ring)
 	int i;
 	uint32_t lbq_buf_size;
 
+	rx_ring->lbq_use_head = 0;
+	rx_ring->lbq_use_tail = 0;
+	rx_ring->lbuf_in_use_count = 0;
+	rx_ring->lbq_free_head = 0;
+	rx_ring->lbq_free_tail = 0;
+	rx_ring->lbuf_free_count = 0;
 	rx_ring->lbuf_free = kmem_zalloc(rx_ring->lbq_len *
 	    sizeof (struct bq_desc *), KM_NOSLEEP);
 	if (rx_ring->lbuf_free == NULL) {
 		cmn_err(CE_WARN,
 		    "!%s: lbuf_free_list alloc: failed",
 		    __func__);
-		rx_ring->lbuf_free_count = 0;
 		goto alloc_lbuf_err;
 	}
 
@@ -1608,13 +1613,8 @@ ql_alloc_lbufs(qlge_t *qlge, struct rx_ring *rx_ring)
 		cmn_err(CE_WARN,
 		    "!%s: lbuf_inuse_list alloc: failed",
 		    __func__);
-		rx_ring->lbuf_in_use_count = 0;
 		goto alloc_lbuf_err;
 	}
-	rx_ring->lbq_use_head = 0;
-	rx_ring->lbq_use_tail = 0;
-	rx_ring->lbq_free_head = 0;
-	rx_ring->lbq_free_tail = 0;
 
 	lbq_buf_size = (qlge->mtu == ETHERMTU) ?
 	    LRG_BUF_NORMAL_SIZE : LRG_BUF_JUMBO_SIZE;
@@ -1710,7 +1710,7 @@ ql_alloc_rx_buffers(qlge_t *qlge)
 	return (DDI_SUCCESS);
 
 alloc_err:
-
+	ql_free_rx_buffers(qlge);
 	return (DDI_FAILURE);
 }
 
@@ -3189,11 +3189,13 @@ ql_alloc_ioctl_dma_buf(qlge_t *qlge)
 static void
 ql_free_phys(ddi_dma_handle_t *dma_handle, ddi_acc_handle_t *acc_handle)
 {
-	if (dma_handle != NULL) {
+	if (*dma_handle != NULL) {
 		(void) ddi_dma_unbind_handle(*dma_handle);
-		if (acc_handle != NULL)
+		if (*acc_handle != NULL)
 			ddi_dma_mem_free(acc_handle);
 		ddi_dma_free_handle(dma_handle);
+		*acc_handle = NULL;
+		*dma_handle = NULL;
 	}
 }
 
@@ -3319,9 +3321,11 @@ ql_free_tx_resources(struct tx_ring *tx_ring)
 	struct tx_ring_desc *tx_ring_desc;
 	int i, j;
 
-	ql_free_phys(&tx_ring->wq_dma.dma_handle, &tx_ring->wq_dma.acc_handle);
-	bzero(&tx_ring->wq_dma, sizeof (tx_ring->wq_dma));
-
+	if (tx_ring->wq_dma.dma_handle != NULL) {
+		ql_free_phys(&tx_ring->wq_dma.dma_handle,
+		    &tx_ring->wq_dma.acc_handle);
+		bzero(&tx_ring->wq_dma, sizeof (tx_ring->wq_dma));
+	}
 	if (tx_ring->wq_desc != NULL) {
 		tx_ring_desc = tx_ring->wq_desc;
 		for (i = 0; i < tx_ring->wq_len; i++, tx_ring_desc++) {
@@ -3417,7 +3421,7 @@ ql_alloc_tx_resources(qlge_t *qlge, struct tx_ring *tx_ring)
 				cmn_err(CE_WARN, "%s(%d): reqQ tx buf &"
 				    "oal alloc failed.",
 				    __func__, qlge->instance);
-				return (DDI_FAILURE);
+				goto err;
 			}
 
 			tx_ring_desc->oal = tx_ring_desc->oal_dma.vaddr;
@@ -3436,10 +3440,14 @@ ql_alloc_tx_resources(qlge_t *qlge, struct tx_ring *tx_ring)
 				    DDI_DMA_DONTWAIT,
 				    0, &tx_ring_desc->tx_dma_handle[j])
 				    != DDI_SUCCESS) {
+					tx_ring_desc->tx_dma_handle[j] = NULL;
 					cmn_err(CE_WARN,
 					    "!%s: ddi_dma_alloc_handle: "
 					    "tx_dma_handle "
 					    "alloc failed", __func__);
+					ql_free_phys(
+					    &tx_ring_desc->oal_dma.dma_handle,
+					    &tx_ring_desc->oal_dma.acc_handle);
 					goto err;
 				}
 			}
@@ -3457,7 +3465,7 @@ ql_alloc_tx_resources(qlge_t *qlge, struct tx_ring *tx_ring)
 		bzero(&tx_ring->wqicb_dma, sizeof (tx_ring->wqicb_dma));
 		cmn_err(CE_WARN, "%s(%d): wqicb allocation failed.",
 		    __func__, qlge->instance);
-		return (DDI_FAILURE);
+		goto err;
 	}
 	tx_ring->wqicb_dma.dma_addr = dma_cookie.dmac_laddress;
 
@@ -3482,9 +3490,11 @@ ql_free_rx_resources(struct rx_ring *rx_ring)
 	}
 
 	/* Free the small buffer queue control blocks. */
-	kmem_free(rx_ring->sbq_desc, rx_ring->sbq_len *
-	    sizeof (struct bq_desc));
-	rx_ring->sbq_desc = NULL;
+	if (rx_ring->sbq_desc != NULL) {
+		kmem_free(rx_ring->sbq_desc, rx_ring->sbq_len *
+		    sizeof (struct bq_desc));
+		rx_ring->sbq_desc = NULL;
+	}
 
 	/* Free the large buffer queue. */
 	if (rx_ring->lbq_dma.dma_handle) {
@@ -3494,9 +3504,11 @@ ql_free_rx_resources(struct rx_ring *rx_ring)
 	}
 
 	/* Free the large buffer queue control blocks. */
-	kmem_free(rx_ring->lbq_desc, rx_ring->lbq_len *
-	    sizeof (struct bq_desc));
-	rx_ring->lbq_desc = NULL;
+	if (rx_ring->lbq_desc != NULL) {
+		kmem_free(rx_ring->lbq_desc, rx_ring->lbq_len *
+		    sizeof (struct bq_desc));
+		rx_ring->lbq_desc = NULL;
+	}
 
 	/* Free cqicb struct */
 	if (rx_ring->cqicb_dma.dma_handle) {
@@ -3616,7 +3628,7 @@ ql_alloc_rx_resources(qlge_t *qlge, struct rx_ring *rx_ring)
 		bzero(&rx_ring->cqicb_dma, sizeof (rx_ring->cqicb_dma));
 		cmn_err(CE_WARN, "%s(%d): cqicb allocation failed.",
 		    __func__, qlge->instance);
-		return (DDI_FAILURE);
+		goto err_mem;
 	}
 	rx_ring->cqicb_dma.dma_addr = dma_cookie.dmac_laddress;
 
@@ -3709,13 +3721,14 @@ ql_alloc_mem_resources(qlge_t *qlge)
 		bzero(&qlge->ricb_dma, sizeof (qlge->ricb_dma));
 		cmn_err(CE_WARN, "%s(%d): ricb allocation failed.",
 		    __func__, qlge->instance);
-		return (DDI_FAILURE);
+		goto err_mem;
 	}
 	qlge->ricb_dma.dma_addr = dma_cookie.dmac_laddress;
 
 	return (DDI_SUCCESS);
 
 err_mem:
+	ql_free_mem_resources(qlge);
 	return (DDI_FAILURE);
 }
 
@@ -3758,6 +3771,7 @@ ql_alloc_phys_rbuf(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
 	    dma_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, QL_BANG "%s:  ddi_dma_alloc_handle FAILED",
 		    __func__);
+		*dma_handle = NULL;
 		return (QL_ERROR);
 	}
 	/*
@@ -3769,6 +3783,8 @@ ql_alloc_phys_rbuf(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
 	    NULL, vaddr, &rlen, acc_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "alloc_phys: DMA Memory alloc Failed");
 		ddi_dma_free_handle(dma_handle);
+		*acc_handle = NULL;
+		*dma_handle = NULL;
 		return (QL_ERROR);
 	}
 
@@ -3780,6 +3796,8 @@ ql_alloc_phys_rbuf(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
 		ddi_dma_free_handle(dma_handle);
 		cmn_err(CE_WARN, "%s ddi_dma_addr_bind_handle FAILED",
 		    __func__);
+		*acc_handle = NULL;
+		*dma_handle = NULL;
 		return (QL_ERROR);
 	}
 
@@ -3834,6 +3852,7 @@ ql_alloc_phys(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
 	    dma_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, QL_BANG "%s:  ddi_dma_alloc_handle FAILED",
 		    __func__);
+		*dma_handle = NULL;
 		return (QL_ERROR);
 	}
 	/*
@@ -3845,6 +3864,8 @@ ql_alloc_phys(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
 	    NULL, vaddr, &rlen, acc_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "alloc_phys: DMA Memory alloc Failed");
 		ddi_dma_free_handle(dma_handle);
+		*acc_handle = NULL;
+		*dma_handle = NULL;
 		return (QL_ERROR);
 	}
 
@@ -3852,10 +3873,11 @@ ql_alloc_phys(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
 	    dma_flags, DDI_DMA_DONTWAIT, NULL,
 	    dma_cookie, &cnt) != DDI_DMA_MAPPED) {
 		ddi_dma_mem_free(acc_handle);
-
 		ddi_dma_free_handle(dma_handle);
 		cmn_err(CE_WARN, "%s ddi_dma_addr_bind_handle FAILED",
 		    __func__);
+		*acc_handle = NULL;
+		*dma_handle = NULL;
 		return (QL_ERROR);
 	}
 
@@ -4462,7 +4484,7 @@ ql_free_resources(qlge_t *qlge)
 		qlge->sequence &= ~INIT_PCI_CONFIG_SETUP;
 	}
 
-	if (qlge->sequence & INIT_ADD_INTERRUPT) {
+	if (qlge->sequence & INIT_INTR_ALLOC) {
 		ql_free_irq_vectors(qlge);
 		qlge->sequence &= ~INIT_ADD_INTERRUPT;
 	}
@@ -6862,7 +6884,7 @@ ql_stop_routing(qlge_t *qlge)
 }
 
 /* Initialize the frame-to-queue routing. */
-static int
+int
 ql_route_initialize(qlge_t *qlge)
 {
 	int status = 0;

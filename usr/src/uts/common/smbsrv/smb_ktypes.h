@@ -238,13 +238,6 @@ typedef struct {
  * Transition T5
  *
  *    This transition is executed in smb_thread_destroy().
- *
- * Comments
- * --------
- *
- *    The field smb_thread_aw_t contains a function pointer that knows how to
- *    awake the thread. It is a temporary solution to work around the fact that
- *    kernel threads (not part of a userspace process) cannot be signaled.
  */
 typedef enum smb_thread_state {
 	SMB_THREAD_STATE_STARTING = 0,
@@ -256,7 +249,6 @@ typedef enum smb_thread_state {
 struct _smb_thread;
 
 typedef void (*smb_thread_ep_t)(struct _smb_thread *, void *ep_arg);
-typedef void (*smb_thread_aw_t)(struct _smb_thread *, void *aw_arg);
 
 #define	SMB_THREAD_MAGIC	0x534D4254	/* SMBT */
 
@@ -268,8 +260,6 @@ typedef struct _smb_thread {
 	kt_did_t		sth_did;
 	smb_thread_ep_t		sth_ep;
 	void			*sth_ep_arg;
-	smb_thread_aw_t		sth_aw;
-	void			*sth_aw_arg;
 	boolean_t		sth_kill;
 	kmutex_t		sth_mtx;
 	kcondvar_t		sth_cv;
@@ -452,19 +442,6 @@ typedef struct smb_avl {
 	uint32_t	avl_sequence;
 	smb_avl_nops_t	*avl_nops;
 } smb_avl_t;
-
-typedef struct smb_session_list {
-	krwlock_t	se_lock;
-	uint64_t	se_wrop;
-	struct {
-		list_t		lst;
-		uint32_t	count;
-	} se_rdy;
-	struct {
-		list_t		lst;
-		uint32_t	count;
-	} se_act;
-} smb_session_list_t;
 
 typedef struct {
 	kcondvar_t	rwx_cv;
@@ -1806,13 +1783,20 @@ typedef enum {
 #define	SMB_SERVER_VALID(s)	\
     ASSERT(((s) != NULL) && ((s)->sv_magic == SMB_SERVER_MAGIC))
 
+#define	SMB_LISTENER_MAGIC	0x4C53544E	/* 'LSTN' */
+#define	SMB_LISTENER_VALID(ld)	\
+    ASSERT(((ld) != NULL) && ((ld)->ld_magic == SMB_LISTENER_MAGIC))
+
 typedef struct {
-	kthread_t		*ld_kth;
-	kt_did_t		ld_ktdid;
+	uint32_t		ld_magic;
+	struct smb_server	*ld_sv;
+	smb_thread_t		ld_thread;
 	ksocket_t		ld_so;
+	in_port_t		ld_port;
+	int			ld_family;
 	struct sockaddr_in	ld_sin;
 	struct sockaddr_in6	ld_sin6;
-	smb_session_list_t	ld_session_list;
+	smb_llist_t		ld_session_list;
 } smb_listener_daemon_t;
 
 #define	SMB_SSETUP_CMD			"authentication"
@@ -1881,7 +1865,8 @@ typedef struct smb_server {
 
 	smb_thread_t		si_thread_timers;
 
-	taskq_t			*sv_thread_pool;
+	taskq_t			*sv_worker_pool;
+	taskq_t			*sv_receiver_pool;
 
 	kmem_cache_t		*si_cache_request;
 	kmem_cache_t		*si_cache_session;

@@ -494,6 +494,7 @@ void	vfs_remove(struct vfs *);
 
 /* VFS feature routines */
 void	vfs_set_feature(vfs_t *, vfs_feature_t);
+void	vfs_clear_feature(vfs_t *, vfs_feature_t);
 int	vfs_has_feature(vfs_t *, vfs_feature_t);
 void	vfs_propagate_features(vfs_t *, vfs_t *);
 

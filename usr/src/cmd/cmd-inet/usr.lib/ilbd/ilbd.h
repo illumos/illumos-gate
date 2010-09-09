@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _ILBD_H
 #define	_ILBD_H
@@ -284,7 +283,8 @@ typedef struct ilbd_hc_srv_s {
  * data. Not all events use all members of the structure.
  */
 typedef struct audit_sg_event_data {
-	char	*ed_server_address;	/* server's IP address */
+	int32_t	ed_ipaddr_type;	/* ADT_IPv4 or ADT_IPv6 */
+	uint32_t ed_server_address[4];  /* server's IP address */
 	char	*ed_serverid;   /* serverid. */
 	uint16_t	ed_minport;	/* server's minport */
 	uint16_t	ed_maxport;	/* server's maxport */
@@ -421,11 +421,10 @@ ilb_status_t	ilbd_walk_sg_pgs(ilb_status_t (*)(ilb_sg_info_t *, int,
 		    const struct passwd *, ucred_t *), void *, void *);
 ilb_status_t	ilbd_walk_hc_pgs(ilb_status_t (*)(const ilb_hc_info_t *, int,
 		    const struct passwd *, ucred_t *), void *, void *);
-void		ilbd_addr2str(struct in6_addr *, char *, size_t);
-void		addr2str(ilb_ip_addr_t, char *, size_t);
 void		ilbd_algo_to_str(ilb_algo_t, char *);
 void		ilbd_topo_to_str(ilb_topo_t, char *);
 void		ilbd_ip_to_str(uint16_t, struct in6_addr *, char *);
+void		cvt_addr(uint32_t *, int32_t, struct in6_addr);
 int		ilberror2auditerror(ilb_status_t);
 
 #ifdef __cplusplus

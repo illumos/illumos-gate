@@ -180,6 +180,7 @@ emlxs_sli4_online(emlxs_hba_t *hba)
 	uint8_t *outptr;
 	uint32_t status;
 	uint32_t fw_check;
+	uint32_t kern_update = 0;
 	emlxs_firmware_t hba_fw;
 	emlxs_firmware_t *fw;
 
@@ -191,6 +192,11 @@ emlxs_sli4_online(emlxs_hba_t *hba)
 
 	/* Set the fw_check flag */
 	fw_check = cfg[CFG_FW_CHECK].current;
+
+	if ((fw_check & 0x04) ||
+	    (hba->fw_flag & FW_UPDATE_KERNEL)) {
+		kern_update = 1;
+	}
 
 	hba->mbox_queue_flag = 0;
 	hba->fc_edtov = FF_DEF_EDTOV;
@@ -532,8 +538,11 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 	 * If firmware checking is enabled and the adapter model indicates
 	 * a firmware image, then perform firmware version check
 	 */
-	if (((fw_check == 1) && (hba->model_info.flags & EMLXS_SUN_BRANDED) &&
-	    hba->model_info.fwid) || ((fw_check == 2) &&
+	hba->fw_flag = 0;
+	hba->fw_timer = 0;
+
+	if (((fw_check & 0x1) && (hba->model_info.flags & EMLXS_SUN_BRANDED) &&
+	    hba->model_info.fwid) || ((fw_check & 0x2) &&
 	    hba->model_info.fwid)) {
 
 		/* Find firmware image indicated by adapter model */
@@ -563,7 +572,13 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 				hba_fw.sli4 = vpd->sli4FwRev;
 			}
 
-			if ((fw->kern && (hba_fw.kern != fw->kern)) ||
+			if (!kern_update &&
+			    ((fw->kern && (hba_fw.kern != fw->kern)) ||
+			    (fw->stub && (hba_fw.stub != fw->stub)))) {
+
+				hba->fw_flag |= FW_UPDATE_NEEDED;
+
+			} else if ((fw->kern && (hba_fw.kern != fw->kern)) ||
 			    (fw->stub && (hba_fw.stub != fw->stub)) ||
 			    (fw->sli1 && (hba_fw.sli1 != fw->sli1)) ||
 			    (fw->sli2 && (hba_fw.sli2 != fw->sli2)) ||
@@ -591,6 +606,9 @@ emlxs_data_dump(hba, "RD_REV", (uint32_t *)mb, 18, 0);
 						EMLXS_MSGF(EMLXS_CONTEXT,
 						    &emlxs_init_msg,
 						    "Firmware update failed.");
+
+						hba->fw_flag |=
+						    FW_UPDATE_NEEDED;
 					}
 #ifdef MODFW_SUPPORT
 					/*
@@ -6689,6 +6707,7 @@ extern int
 emlxs_sli4_check_fcf_config(emlxs_hba_t *hba, FCF_RECORD_t *fcfrec)
 {
 	int i;
+	uint32_t rval = 1;
 
 	if (!(hba->flag & FC_FIP_SUPPORTED)) {
 		if (!hba->sli.sli4.cfgFCOE.length) {
@@ -6718,12 +6737,15 @@ emlxs_sli4_check_fcf_config(emlxs_hba_t *hba, FCF_RECORD_t *fcfrec)
 	/* Just check FabricName for now */
 	for (i = 0; i < MAX_FCFCONNECTLIST_ENTRIES; i++) {
 		if ((hba->sli.sli4.cfgFCF.entry[i].FabricNameValid) &&
-		    (bcmp((char *)fcfrec->fabric_name_identifier,
-		    hba->sli.sli4.cfgFCF.entry[i].FabricName, 8) == 0)) {
-			return (1);  /* success */
+		    (hba->sli.sli4.cfgFCF.entry[i].Valid)) {
+			rval = 0;
+			if (bcmp((char *)fcfrec->fabric_name_identifier,
+			    hba->sli.sli4.cfgFCF.entry[i].FabricName, 8) == 0) {
+				return (1);  /* success */
+			}
 		}
 	}
-	return (0);
+	return (rval);
 }
 
 

@@ -283,10 +283,10 @@ emlxs_config_t  emlxs_cfg[] = {
 
 	/* CFG_FW_CHECK */
 	{"fw-check",
-		0, 2, 1, 0,
-		PARM_DYNAMIC_RESET | PARM_BOOLEAN | PARM_HIDDEN,
-	"Enables firmware revision checking of adapters. "
-		"[0=Off 1=Sun-only 2=All]"},
+		0, 7, 1, 0,
+		PARM_DYNAMIC_RESET | PARM_HEX | PARM_HIDDEN,
+	"Enables firmware revision checking. "
+		"[0=Off 1=Sun-only 2=All 4=kern-update]"},
 
 	/* CFG_TRI_REQUIRED */
 	{"tri-required",

@@ -1813,6 +1813,11 @@ typedef struct emlxs_hba
 #define	FC_LINKDOWN_MASK	0xFFF30C1F	/* Bits to protect during */
 						/* a linkdown */
 
+	uint32_t fw_timer;
+	uint32_t fw_flag;
+#define	FW_UPDATE_NEEDED	0x00000001
+#define	FW_UPDATE_KERNEL	0x00000002
+
 	uint32_t temperature;			/* Last reported temperature */
 
 	/* SBUS adapter management */

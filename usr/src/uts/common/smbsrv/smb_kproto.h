@@ -367,10 +367,6 @@ int smb_server_stop(void);
 boolean_t smb_server_is_stopping(void);
 int smb_server_cancel_event(uint32_t);
 int smb_server_notify_event(smb_ioc_event_t *);
-int smb_server_nbt_listen(smb_ioc_listen_t *);
-int smb_server_tcp_listen(smb_ioc_listen_t *);
-int smb_server_nbt_receive(void);
-int smb_server_tcp_receive(void);
 uint32_t smb_server_get_session_count(void);
 int smb_server_set_gmtoff(smb_ioc_gmt_t *);
 int smb_server_numopen(smb_ioc_opennum_t *);
@@ -514,28 +510,22 @@ void smb_request_wait(smb_request_t *);
  * session functions (file smb_session.c)
  */
 smb_session_t *smb_session_create(ksocket_t, uint16_t, smb_server_t *, int);
-int smb_session_daemon(smb_session_list_t *);
-void smb_session_reconnection_check(smb_session_list_t *, smb_session_t *);
-void smb_session_timers(smb_session_list_t *);
+void smb_session_receiver(smb_session_t *);
+void smb_session_disconnect(smb_session_t *);
+void smb_session_reconnection_check(smb_llist_t *, smb_session_t *);
+void smb_session_timers(smb_llist_t *);
 void smb_session_delete(smb_session_t *session);
 void smb_session_cancel_requests(smb_session_t *, smb_tree_t *,
     smb_request_t *);
 void smb_session_config(smb_session_t *session);
-void smb_session_disconnect_from_share(smb_session_list_t *, char *);
-void smb_session_list_constructor(smb_session_list_t *);
-void smb_session_list_destructor(smb_session_list_t *);
-void smb_session_list_append(smb_session_list_t *, smb_session_t *);
-void smb_session_list_delete_tail(smb_session_list_t *);
-smb_session_t *smb_session_list_activate_head(smb_session_list_t *);
-void smb_session_list_terminate(smb_session_list_t *, smb_session_t *);
-void smb_session_list_signal(smb_session_list_t *);
+void smb_session_disconnect_from_share(smb_llist_t *, char *);
 smb_user_t *smb_session_dup_user(smb_session_t *, char *, char *);
 smb_user_t *smb_session_lookup_uid(smb_session_t *, uint16_t);
 void smb_session_post_user(smb_session_t *, smb_user_t *);
 void smb_session_disconnect_share(smb_session_t *, const char *);
 void smb_session_getclient(smb_session_t *, char *, size_t);
 boolean_t smb_session_isclient(smb_session_t *, const char *);
-void smb_session_correct_keep_alive_values(smb_session_list_t *, uint32_t);
+void smb_session_correct_keep_alive_values(smb_llist_t *, uint32_t);
 void smb_session_oplock_break(smb_session_t *, uint16_t, uint16_t, uint8_t);
 int smb_session_send(smb_session_t *, uint8_t type, mbuf_chain_t *);
 int smb_session_xprt_gethdr(smb_session_t *, smb_xprt_t *);
@@ -745,8 +735,7 @@ int	smb_rwx_rwwait(smb_rwx_t *rwx, clock_t timeout);
 krw_t   smb_rwx_rwupgrade(smb_rwx_t *rwx);
 void    smb_rwx_rwdowngrade(smb_rwx_t *rwx, krw_t mode);
 
-void	smb_thread_init(smb_thread_t *, char *, smb_thread_ep_t, void *,
-    smb_thread_aw_t, void *);
+void	smb_thread_init(smb_thread_t *, char *, smb_thread_ep_t, void *);
 void	smb_thread_destroy(smb_thread_t *);
 int	smb_thread_start(smb_thread_t *);
 void	smb_thread_stop(smb_thread_t *);
@@ -754,7 +743,6 @@ void    smb_thread_signal(smb_thread_t *);
 boolean_t smb_thread_continue(smb_thread_t *);
 boolean_t smb_thread_continue_nowait(smb_thread_t *);
 boolean_t smb_thread_continue_timedwait(smb_thread_t *, int /* seconds */);
-void smb_thread_set_awaken(smb_thread_t *, smb_thread_aw_t, void *);
 
 uint32_t smb_denymode_to_sharemode(uint32_t desired_access, char *fname);
 uint32_t smb_ofun_to_crdisposition(uint16_t ofun);

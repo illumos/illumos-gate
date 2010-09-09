@@ -1519,8 +1519,13 @@ segkmem_zio_init(void *zio_mem_base, size_t zio_mem_size)
 	ASSERT(zio_mem_base != NULL);
 	ASSERT(zio_mem_size != 0);
 
+	/*
+	 * To reduce VA space fragmentation, we set up quantum caches for the
+	 * smaller sizes;  we chose 32k because that translates to 128k VA
+	 * slabs, which matches nicely with the common 128k zio_data bufs.
+	 */
 	zio_arena = vmem_create("zfs_file_data", zio_mem_base, zio_mem_size,
-	    PAGESIZE, NULL, NULL, NULL, 0, VM_SLEEP);
+	    PAGESIZE, NULL, NULL, NULL, 32 * 1024, VM_SLEEP);
 
 	zio_alloc_arena = vmem_create("zfs_file_data_buf", NULL, 0, PAGESIZE,
 	    segkmem_zio_alloc, segkmem_zio_free, zio_arena, 0, VM_SLEEP);

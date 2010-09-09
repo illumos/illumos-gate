@@ -20,8 +20,7 @@
 
  CDDL HEADER END
 
-Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-Use is subject to license terms.
+Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
 -->
 
@@ -2064,7 +2063,7 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_ilb_create_healthcheck" header="0" idNo="120" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Create Integrated Loadbalancer healthcheck object</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
         <entry id="subject">
@@ -2115,7 +2114,7 @@ Use is subject to license terms.
     </event> 
 
     <event id="AUE_ilb_delete_healthcheck" header="0" idNo="121" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Delete Integrated Loadbalancer healthcheck object</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
         <entry id="subject">
@@ -2138,12 +2137,8 @@ Use is subject to license terms.
         </entry>
     </event>
 
-    <!--
-	virtual_address and proxy-src token are set to be char *.
-	But they should be in6_addr See audit bug 6864075 	.
-     -->
     <event id="AUE_ilb_create_rule" header="0" idNo="122" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Create Integrated Loadbalancer rule</title>
 	<program>/usr/sbin/ilbadm</program>
 	<see>ilbadm(1m)</see>
 	<entry id="subject">
@@ -2155,19 +2150,19 @@ Use is subject to license terms.
 	    <external opt="required" type="char *"/>
 	    <comment>authorization used</comment>
 	</entry>
-	<entry id="virtual_ipaddress">
-	    <internal token="text"/>
-	    <external opt="required" type="char *"/>
+	<entry id="virtual_ipaddress_type,virtual_ipaddress">
+	    <internal token="in_remote"/>
+	    <external opt="required" type="int32_t,uint32_t[4]"/>
 	    <comment>LB virtual IP address</comment>
 	</entry>
 	<entry id="min_port">
-	    <internal token="text"/>
-	    <external opt="required" type="uint32_t"/>
+	    <internal token="iport"/>
+	    <external opt="required" type="uint16_t"/>
 	    <comment>minimum value in port range</comment>
 	</entry>
 	<entry id="max_port">
-	    <internal token="text"/>
-	    <external opt="required" type="uint32_t"/>
+	    <internal token="iport"/>
+	    <external opt="required" type="uint16_t"/>
 	    <comment>maximum value in port range - max=min means single
 		port is specified
 	    </comment>
@@ -2182,11 +2177,16 @@ Use is subject to license terms.
             <external opt="required" type="char *"/>
             <comment>[rr,hip,hipp,hipv],[dsr,nat,half-nat]</comment>
         </entry>
-        <entry id="proxy_src">
-            <internal token="text"/>
-            <external opt="optional" type="char *"/>
-            <comment>proxy source address for NAT - may be single
-		address or a address range
+        <entry id="proxy_src_min_type,proxy_src_min">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>min value for proxy source address for NAT</comment>
+        </entry>
+        <entry id="proxy_src_max_type,proxy_src_max">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>max value in proxy source address range for NAT
+	          - max=min means single address is specified
 	    </comment>
         </entry>
         <entry id="persist_mask">
@@ -2269,31 +2269,27 @@ Use is subject to license terms.
 <!--  instances of the ILB generic rule  event. -->
     <event id="AUE_ilb_delete_rule" instance_of="AUE_generic_ILB_rule"
         header="0" idNo="123">
-        <title>Integrated Loadbalancer</title>
+        <title>Delete Integrated Loadbalancer rule</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
     </event>
 
     <event id="AUE_ilb_disable_rule" instance_of="AUE_generic_ILB_rule"
         header="0" idNo="124">
-        <title>Integrated Loadbalancer</title>
+        <title>Disable Integrated Loadbalancer rule</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
     </event>
 
     <event id="AUE_ilb_enable_rule" instance_of="AUE_generic_ILB_rule"
         header="0" idNo="125">
-        <title>Integrated Loadbalancer</title>
+        <title>Enable Integrated Loadbalancer rule</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
     </event>
 
-    <!--
-	server_ipaddress token is set to be char *. But it should be
-	in6_addr See audit bug 6864075.
-     -->
     <event id="AUE_ilb_add_server" header="0" idNo="126" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Add server to Integrated Loadbalancer</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
         <entry id="subject">
@@ -2305,9 +2301,9 @@ Use is subject to license terms.
 	    <external opt="required" type="char *"/>
 	    <comment>authorization used</comment>
 	</entry>
-        <entry id="server_ipaddress">
-            <internal token="text"/>
-            <external opt="required" type="char *"/>
+        <entry id="server_ipaddress_type,server_ipaddress">
+            <internal token="in_remote"/>
+            <external opt="required" type="int32_t,uint32_t[4]"/>
             <comment>IP address</comment>
         </entry>
         <entry id="server_id">
@@ -2325,15 +2321,15 @@ Use is subject to license terms.
             <comment>server group name</comment>
         </entry>
 	<entry id="server_minport">
-	    <internal token="text"/>
-	    <external opt="optional" type="uint32_t" />
+	    <internal token="iport"/>
+	    <external opt="optional" type="uint16_t" />
 	    <comment>server's minimum value in port range - empty
 		means default value (see man page)
 	    </comment>
 	</entry>
 	<entry id="server_maxport">
-	    <internal token="text"/>
-	    <external opt="optional" type="uint32_t" />
+	    <internal token="iport"/>
+	    <external opt="optional" type="uint16_t" />
 	    <comment>server's maximum value in port range - empty 
 		means default value(see man page)
 	    </comment>
@@ -2344,12 +2340,8 @@ Use is subject to license terms.
         </entry>
     </event> 
 
-    <!--
-	server_ipaddress token is set to be char *. But it should be
-	in6_addr See audit bug 6864075.
-     -->
     <event id="AUE_ilb_disable_server" header="0" idNo="127" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Disable server to Integrated Loadbalancer</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
         <entry id="subject">
@@ -2366,10 +2358,10 @@ Use is subject to license terms.
             <external opt="required" type="char *"/>
             <comment>serverid</comment>
         </entry>
-        <entry id="server_ipaddress">
-            <internal token="text"/>
-            <external opt="optional" type="char *"/>
-            <comment>IPaddr corresponding to the serverid - empty
+        <entry id="server_ipaddress_type,server_ipaddress">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>IPaddr corresponding to the serverid - empty 
 		if authorization fails, or user specified serverid
 		is nonexistent
 	    </comment>
@@ -2380,12 +2372,8 @@ Use is subject to license terms.
         </entry>
     </event> 
 
-    <!--
-	server_ipaddress token is set to be char *. But it should be
-	in6_addr See audit bug 6864075.
-     -->
     <event id="AUE_ilb_enable_server" header="0" idNo="128" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Enable server to Integrated Loadbalancer</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
         <entry id="subject">
@@ -2402,10 +2390,10 @@ Use is subject to license terms.
             <external opt="required" type="char *"/>
             <comment>serverid</comment>
         </entry>
-        <entry id="server_ipaddress">
-            <internal token="text"/>
-            <external opt="optional" type="char *"/>
-            <comment>IPaddr corresponding to the serverid - empty
+        <entry id="server_ipaddress_type,server_ipaddress">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>IPaddr corresponding to the serverid - empty 
 		if authorization fails, or user specified serverid
 		is nonexistent
 	    </comment>
@@ -2416,12 +2404,8 @@ Use is subject to license terms.
         </entry>
     </event> 
 
-    <!--
-	server_ipaddress token is set to be char *. But it should be
-	in6_addr See audit bug 6864075 	.
-     -->
     <event id="AUE_ilb_remove_server" header="0" idNo="129" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Remove server from Integrated Loadbalancer</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
         <entry id="subject">
@@ -2443,10 +2427,10 @@ Use is subject to license terms.
             <external opt="required" type="char *"/>
             <comment>server group name</comment>
         </entry>
-        <entry id="server_ipaddress">
-            <internal token="text"/>
-            <external opt="optional" type="char *"/>
-            <comment>IPaddr corresponding to serverid - empty
+        <entry id="server_ipaddress_type,server_ipaddress">
+            <internal token="in_remote"/>
+            <external opt="optional" type="int32_t,uint32_t[4]"/>
+            <comment>IPaddr corresponding to serverid - empty 
 		if authorization fails or user specified serverid
 		serverid is nonexistent
 	    </comment>
@@ -2458,7 +2442,7 @@ Use is subject to license terms.
     </event> 
 
     <event id="AUE_ilb_create_servergroup" header="0" idNo="130" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Create server group for Integrated Loadbalancer</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
         <entry id="subject">
@@ -2482,7 +2466,7 @@ Use is subject to license terms.
     </event> 
 
     <event id="AUE_ilb_delete_servergroup" header="0" idNo="131" omit="JNI">
-        <title>Integrated Loadbalancer</title>
+        <title>Delete server group from Integrated Loadbalancer</title>
         <program>/usr/sbin/ilbadm</program>
         <see>ilbadm(1m)</see>
         <entry id="subject">
