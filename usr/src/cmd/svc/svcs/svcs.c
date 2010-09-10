@@ -3327,7 +3327,7 @@ main(int argc, char **argv)
 
 	(void) setlocale(LC_ALL, "");
 
-	locale = setlocale(LC_MESSAGES, "");
+	locale = setlocale(LC_MESSAGES, NULL);
 	if (locale) {
 		locale = safe_strdup(locale);
 		_scf_sanitize_locale(locale);
