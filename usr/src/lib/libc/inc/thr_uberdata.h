@@ -860,6 +860,8 @@ typedef struct {
 
 /*
  * This is data that is global to all link maps (uberdata, aka super-global).
+ * Note: When changing this, please be sure to keep the 32-bit variant of
+ * this in sync.  (see uberdata32_t below)
  */
 typedef struct uberdata {
 	pad_lock_t	_link_lock;
@@ -1116,6 +1118,7 @@ typedef struct uberdata32 {
 	caddr32_t	atforklist;
 	caddr32_t	robustlocks;
 	caddr32_t	robustlist;
+	caddr32_t	progname;
 	caddr32_t	tdb_bootstrap;
 	tdb32_t		tdb;
 } uberdata32_t;
