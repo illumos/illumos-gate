@@ -151,7 +151,7 @@ bracket(s)
 		s->str = p + 1;
 		return (1);
 	case '=':				/* "[=equiv=]" */
-		if ((p = strchr(s->str + 2, ']')) == NULL)
+		if ((p = strchr(s->str + 3, ']')) == NULL)
 			return (0);
 		if (*(p - 1) != '=' || p - s->str < 4)
 			goto repeat;
