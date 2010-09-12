@@ -48,12 +48,6 @@ ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 include $(UTSBASE)/sparc/Makefile.sparc
 
 #
-#	FIPS-140 Self Integrity Test
-#
-POST_PROCESS	+= ; $(FIPS140_CHECK)
-
-
-#
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)

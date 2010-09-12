@@ -162,12 +162,6 @@ static crypto_random_number_ops_t swrand_random_number_ops = {
 	swrand_generate_random
 };
 
-static void swrand_POST(int *);
-
-static crypto_fips140_ops_t swrand_fips140_ops = {
-	swrand_POST
-};
-
 static crypto_ops_t swrand_crypto_ops = {
 	&swrand_control_ops,
 	NULL,
@@ -185,7 +179,7 @@ static crypto_ops_t swrand_crypto_ops = {
 	NULL,
 	NULL,
 	NULL,
-	&swrand_fips140_ops
+	NULL,
 };
 
 static crypto_provider_info_t swrand_prov_info = {
@@ -911,15 +905,4 @@ rnd_handler(void *arg)
 	swrand_schedule_timeout();
 
 	mutex_exit(&srndpool_lock);
-}
-
-/*
- * Swrand Power-Up Self-Test
- */
-void
-swrand_POST(int *rc)
-{
-
-	*rc = fips_rng_post();
-
 }

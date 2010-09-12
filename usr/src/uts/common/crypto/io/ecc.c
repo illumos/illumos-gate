@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -188,13 +191,6 @@ static crypto_nostore_key_ops_t ecc_nostore_key_ops = {
 	ecc_nostore_key_derive
 };
 
-static void ecc_POST(int *);
-
-static crypto_fips140_ops_t ecc_fips140_ops = {
-	ecc_POST
-};
-
-
 static crypto_ops_t ecc_crypto_ops = {
 	&ecc_control_ops,
 	NULL,
@@ -212,7 +208,7 @@ static crypto_ops_t ecc_crypto_ops = {
 	NULL,
 	NULL,
 	&ecc_nostore_key_ops,
-	&ecc_fips140_ops
+	NULL,
 };
 
 static crypto_provider_info_t ecc_prov_info = {
@@ -238,10 +234,6 @@ static int get_template_attr_ulong(crypto_object_attribute_t *,
 static void ecc_free_context(crypto_ctx_t *);
 static void free_ecparams(ECParams *, boolean_t);
 static void free_ecprivkey(ECPrivateKey *);
-
-static int fips_pairwise_check(ECPrivateKey *);
-extern int fips_ecdsa_post(void);
-
 
 int
 _init(void)
@@ -406,7 +398,7 @@ ecc_knzero_random_generator(uint8_t *ran_out, size_t ran_len)
 	uint8_t extrarand[32];
 	size_t extrarand_len;
 
-	if ((rv = random_get_pseudo_bytes_fips140(ran_out, ran_len)) != 0)
+	if ((rv = random_get_pseudo_bytes(ran_out, ran_len)) != 0)
 		return (rv);
 
 	/*
@@ -429,7 +421,7 @@ ecc_knzero_random_generator(uint8_t *ran_out, size_t ran_len)
 		if (ebc == 0) {
 			/* refresh extrarand */
 			extrarand_len = sizeof (extrarand);
-			if ((rv = random_get_pseudo_bytes_fips140(extrarand,
+			if ((rv = random_get_pseudo_bytes(extrarand,
 			    extrarand_len)) != 0) {
 				return (rv);
 			}
@@ -1167,13 +1159,6 @@ ecc_nostore_key_generate_pair(crypto_provider_handle_t provider,
 	bcopy(privKey->publicValue.data, point, xylen);
 	pub_out_template[point_idx].oa_value_len = xylen;
 
-	if (kcf_get_fips140_mode() == FIPS140_MODE_ENABLED) {
-		/* Pair-wise consistency test */
-		if ((rv = fips_pairwise_check(privKey)) != CRYPTO_SUCCESS)
-			cmn_err(CE_WARN, "ecc: fips_pairwise_check() "
-			    "failed (0x%x).", rv);
-	}
-
 out:
 	free_ecprivkey(privKey);
 	free_ecparams(ecparams, B_TRUE);
@@ -1333,74 +1318,4 @@ free_ecprivkey(ECPrivateKey *key)
 	SECITEM_FreeItem(&key->privateValue, B_FALSE);
 	SECITEM_FreeItem(&key->version, B_FALSE);
 	kmem_free(key, sizeof (ECPrivateKey));
-}
-
-/*
- * Pair-wise Consistency Test
- */
-static int
-fips_pairwise_check(ECPrivateKey *ecdsa_private_key)
-{
-
-	SECItem signature_item;
-	SECItem digest_item;
-	uchar_t signed_data[EC_MAX_SIG_LEN];
-	uchar_t sha1[SHA1_DIGEST_SIZE];
-	ECPublicKey ecdsa_public_key;
-	SHA1_CTX *sha1_context;
-	int rv;
-	static uint8_t msg[] = {
-		"OpenSolarisCommunity"
-	};
-
-	/* construct public key from private key. */
-	if ((EC_CopyParams(ecdsa_private_key->ecParams.arena,
-	    &ecdsa_public_key.ecParams, &ecdsa_private_key->ecParams))
-	    != SECSuccess)
-		return (CRYPTO_FAILED);
-
-	ecdsa_public_key.publicValue = ecdsa_private_key->publicValue;
-
-	if ((sha1_context = kmem_zalloc(sizeof (SHA1_CTX),
-	    KM_SLEEP)) == NULL)
-		return (CRYPTO_HOST_MEMORY);
-
-	SHA1Init(sha1_context);
-	SHA1Update(sha1_context, msg, SHA1_DIGEST_SIZE);
-	SHA1Final(sha1, sha1_context);
-
-	digest_item.data = sha1;
-	digest_item.len = SHA1_DIGEST_SIZE;
-	signature_item.data = signed_data;
-	signature_item.len = sizeof (signed_data);
-
-	if ((ECDSA_SignDigest(ecdsa_private_key, &signature_item,
-	    &digest_item, 0)) != SECSuccess) {
-		rv = CRYPTO_FAILED;
-		goto loser;
-	}
-
-	if (ECDSA_VerifyDigest(&ecdsa_public_key, &signature_item,
-	    &digest_item, 0) != SECSuccess) {
-		rv = CRYPTO_SIGNATURE_INVALID;
-	} else {
-		rv = CRYPTO_SUCCESS;
-	}
-
-loser:
-	kmem_free(sha1_context, sizeof (SHA1_CTX));
-	return (rv);
-
-}
-
-
-/*
- * ECC Power-Up Self-Test
- */
-void
-ecc_POST(int *rc)
-{
-
-	*rc = fips_ecdsa_post();
-
 }

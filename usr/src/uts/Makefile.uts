@@ -674,9 +674,3 @@ PRIVS_DEF = $(SRC)/uts/common/os/priv_defs
 #
 USBDEVS_AWK =	$(SRC)/uts/common/io/usb/usbdevs2h.awk
 USBDEVS_DATA =	$(SRC)/uts/common/io/usb/usbdevs
-
-#
-# FIPS140 Self Integrity Check Command for HW Crypto modules
-#
-FIPS140_CMDDIR	= $(SRC)/tools/fips_addchecksum
-FIPS140_CHECK	= $(FIPS140_CMDDIR)/fips_addchecksum $(BINARY)

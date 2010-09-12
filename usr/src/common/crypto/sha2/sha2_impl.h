@@ -30,8 +30,6 @@
 extern "C" {
 #endif
 
-#include <fips/fips_post.h>
-
 typedef enum {
 	SHA1_TYPE,
 	SHA256_TYPE,
@@ -59,27 +57,6 @@ typedef struct sha2_hmac_ctx {
 	SHA2_CTX		hc_ocontext;	/* outer SHA2 context */
 } sha2_hmac_ctx_t;
 
-#endif
-
-extern int fips_sha2_post(void);
-extern int fips_sha2_hash(SHA2_CTX *, uchar_t *, ulong_t, uchar_t *);
-
-#ifndef _KERNEL
-/* SHA2 funtions */
-extern SHA2_CTX *fips_sha2_build_context(CK_MECHANISM_TYPE);
-
-/* SHA2 HMAC functions */
-extern soft_hmac_ctx_t *fips_sha2_hmac_build_context(CK_MECHANISM_TYPE,
-	uint8_t *, unsigned int);
-extern CK_RV fips_hmac_sha2_hash(unsigned char *, uint8_t *,
-	unsigned int, uint8_t *, unsigned int, CK_MECHANISM_TYPE);
-#else
-
-extern SHA2_CTX *fips_sha2_build_context(sha2_mech_t);
-extern sha2_hmac_ctx_t *fips_sha2_hmac_build_context(sha2_mech_t,
-	uint8_t *, unsigned int);
-extern void fips_hmac_sha2_hash(sha2_hmac_ctx_t *, uint8_t *, uint32_t,
-	uint8_t *, sha2_mech_t);
 #endif
 
 #ifdef	__cplusplus

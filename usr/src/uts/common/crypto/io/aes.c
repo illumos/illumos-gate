@@ -37,7 +37,6 @@
 #include <sys/sysmacros.h>
 #include <sys/strsun.h>
 #include <modes/modes.h>
-#define	_AES_FIPS_POST
 #define	_AES_IMPL
 #include <aes/aes_impl.h>
 
@@ -186,12 +185,6 @@ static crypto_ctx_ops_t aes_ctx_ops = {
 	aes_free_context
 };
 
-static void aes_POST(int *);
-
-static crypto_fips140_ops_t aes_fips140_ops = {
-	aes_POST
-};
-
 static crypto_ops_t aes_crypto_ops = {
 	&aes_control_ops,
 	NULL,
@@ -209,7 +202,7 @@ static crypto_ops_t aes_crypto_ops = {
 	&aes_ctx_ops,
 	NULL,
 	NULL,
-	&aes_fips140_ops
+	NULL,
 };
 
 static crypto_provider_info_t aes_prov_info = {
@@ -1529,33 +1522,4 @@ aes_mac_verify_atomic(crypto_provider_handle_t provider,
 
 	return (aes_decrypt_atomic(provider, session_id, &gcm_mech,
 	    key, mac, &null_crypto_data, template, req));
-}
-
-/*
- * AES Power-Up Self-Test
- */
-void
-aes_POST(int *rc)
-{
-
-	int ret;
-
-	/* AES Power-Up Self-Test for 128-bit key. */
-	ret = fips_aes_post(FIPS_AES_128_KEY_SIZE);
-
-	if (ret != CRYPTO_SUCCESS)
-		goto out;
-
-	/* AES Power-Up Self-Test for 192-bit key. */
-	ret = fips_aes_post(FIPS_AES_192_KEY_SIZE);
-
-	if (ret != CRYPTO_SUCCESS)
-		goto out;
-
-	/* AES Power-Up Self-Test for 256-bit key. */
-	ret = fips_aes_post(FIPS_AES_256_KEY_SIZE);
-
-out:
-	*rc = ret;
-
 }

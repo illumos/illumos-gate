@@ -207,8 +207,6 @@ usage(void)
 	    " [mechanism=<%s>]\n",
 	    gettext("provider-name"), gettext("mechanism-list"));
 	(void) fprintf(stderr,
-	    "  cryptoadm list fips-140\n");
-	(void) fprintf(stderr,
 	    "  cryptoadm disable provider=<%s>"
 	    " mechanism=<%s> | random | all\n",
 	    gettext("provider-name"), gettext("mechanism-list"));
@@ -216,8 +214,6 @@ usage(void)
 	    "  cryptoadm disable metaslot"
 	    " [auto-key-migrate] [mechanism=<%s>]\n",
 	    gettext("mechanism-list"));
-	(void) fprintf(stderr,
-	    "  cryptoadm disable fips-140\n");
 	(void) fprintf(stderr,
 	    "  cryptoadm enable provider=<%s>"
 	    " mechanism=<%s> | random | all\n",
@@ -228,8 +224,6 @@ usage(void)
 	    " | [default-keystore]] | [auto-key-migrate]\n",
 	    gettext("mechanism-list"), gettext("token-label"),
 	    gettext("slot-description"));
-	(void) fprintf(stderr,
-	    "  cryptoadm enable fips-140\n");
 	(void) fprintf(stderr,
 	    "  cryptoadm install provider=<%s>\n",
 	    gettext("provider-name"));
@@ -547,30 +541,6 @@ do_list(int argc, char **argv)
 	cryptoadm_provider_t	*prov = NULL;
 	int			rc = SUCCESS;
 
-	if ((argc == 3) && (strncmp(argv[2], FIPS_KEYWORD,
-	    strlen(FIPS_KEYWORD))) == 0) {
-		int	success_count = 0;
-		/*
-		 * cryptoadm list fips-140
-		 */
-		rc = do_fips_actions(FIPS140_STATUS, NOT_REFRESH);
-		if (rc == SUCCESS)
-			success_count++;
-		(void) printf(gettext("\nKernel hardware providers:\n"));
-		(void) printf(gettext("=========================:\n"));
-		rc = do_fips_hw_actions(FIPS140_STATUS, HW_PROVIDER_NCP);
-		if (rc == SUCCESS)
-			success_count++;
-		rc = do_fips_hw_actions(FIPS140_STATUS, HW_PROVIDER_N2CP);
-		if (rc == SUCCESS)
-			success_count++;
-		rc = do_fips_hw_actions(FIPS140_STATUS, HW_PROVIDER_N2RNG);
-		if (rc == SUCCESS)
-			success_count++;
-		/* succeed to get status from config file? */
-		return ((success_count > 0) ? SUCCESS: FAILURE);
-	}
-
 	argc -= 1;
 	argv += 1;
 
@@ -753,38 +723,6 @@ do_disable(int argc, char **argv)
 	int			rc = SUCCESS;
 	boolean_t		auto_key_migrate_flag = B_FALSE;
 
-	if ((argc == 3) && (strncmp(argv[2], FIPS_KEYWORD,
-	    strlen(FIPS_KEYWORD))) == 0) {
-		int	success_count = 0;
-		/*
-		 * cryptoadm disable fips-140
-		 */
-		rc = do_fips_actions(FIPS140_DISABLE, NOT_REFRESH);
-		if (rc == SUCCESS)
-			success_count++;
-		(void) printf(gettext("\nKernel hardware providers:\n"));
-		(void) printf(gettext("=========================:\n"));
-		rc = do_fips_hw_actions(FIPS140_DISABLE, HW_PROVIDER_NCP);
-		if (rc == SUCCESS)
-			success_count++;
-		rc = do_fips_hw_actions(FIPS140_DISABLE, HW_PROVIDER_N2CP);
-		if (rc == SUCCESS)
-			success_count++;
-		rc = do_fips_hw_actions(FIPS140_DISABLE, HW_PROVIDER_N2RNG);
-		if (rc == SUCCESS)
-			success_count++;
-
-		if (success_count > 0) {
-			(void) printf(gettext(
-			    "\nThe FIPS-140 mode has changed.\n"));
-			(void) printf(gettext(
-			    "The system will require a reboot.\n"));
-			return (SUCCESS);
-		} else {
-			return (FAILURE);
-		}
-	}
-
 	if ((argc < 3) || (argc > 5)) {
 		usage();
 		return (ERROR_USAGE);
@@ -903,38 +841,6 @@ do_enable(int argc, char **argv)
 	char 			*alt_token = NULL, *alt_slot = NULL;
 	boolean_t		use_default = B_FALSE;
 	boolean_t		auto_key_migrate_flag = B_FALSE;
-
-	if ((argc == 3) && (strncmp(argv[2], FIPS_KEYWORD,
-	    strlen(FIPS_KEYWORD))) == 0) {
-		int	success_count = 0;
-		/*
-		 * cryptoadm enable fips-140
-		 */
-		rc = do_fips_actions(FIPS140_ENABLE, NOT_REFRESH);
-		if (rc == SUCCESS)
-			success_count++;
-		(void) printf(gettext("\nKernel hardware providers:\n"));
-		(void) printf(gettext("=========================:\n"));
-		rc = do_fips_hw_actions(FIPS140_ENABLE, HW_PROVIDER_NCP);
-		if (rc == SUCCESS)
-			success_count++;
-		rc = do_fips_hw_actions(FIPS140_ENABLE, HW_PROVIDER_N2CP);
-		if (rc == SUCCESS)
-			success_count++;
-		rc = do_fips_hw_actions(FIPS140_ENABLE, HW_PROVIDER_N2RNG);
-		if (rc == SUCCESS)
-			success_count++;
-
-		if (success_count > 0) {
-			(void) printf(gettext(
-			    "\nThe FIPS-140 mode has changed.\n"));
-			(void) printf(gettext(
-			    "The system will require a reboot.\n"));
-			return (SUCCESS);
-		} else {
-			return (FAILURE);
-		}
-	}
 
 	if ((argc < 3) || (argc > 6)) {
 		usage();
@@ -1302,26 +1208,24 @@ do_refresh(int argc)
 
 /*
  * The top level function for the "cryptoadm start" subcommand.
+ * This used to start up kcfd, but now all it does is load up the
+ * initial providers.
  */
 static int
 do_start(int argc)
 {
-	int ret;
-
 	if (argc != 2) {
 		usage();
 		return (ERROR_USAGE);
 	}
 
-	ret = do_refresh(argc);
-	if (ret != SUCCESS)
-		return (ret);
-
-	return (start_daemon());
+	return (do_refresh(argc));
 }
 
 /*
  * The top level function for the "cryptoadm stop" subcommand.
+ * This no longer does anything useful, but we leave it here
+ * for compatibility.
  */
 static int
 do_stop(int argc)
@@ -1331,7 +1235,7 @@ do_stop(int argc)
 		return (ERROR_USAGE);
 	}
 
-	return (stop_daemon());
+	return (SUCCESS);
 }
 
 

@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * This file contains the core framework routines for the
  * kernel cryptographic framework. These routines are at the
  * layer, between the kernel API/ioctls and the SPI.
@@ -89,14 +93,15 @@ static kcf_areq_node_t *kcf_areqnode_alloc(kcf_provider_desc_t *,
     kcf_context_t *, crypto_call_req_t *, kcf_req_params_t *, boolean_t);
 static int kcf_disp_sw_request(kcf_areq_node_t *);
 static void process_req_hwp(void *);
-static kcf_areq_node_t	*kcf_dequeue();
+static kcf_areq_node_t	*kcf_dequeue(void);
 static int kcf_enqueue(kcf_areq_node_t *);
-static void kcf_failover_thread();
-static void kcfpool_alloc();
+static void kcfpool_alloc(void);
 static void kcf_reqid_delete(kcf_areq_node_t *areq);
 static crypto_req_id_t kcf_reqid_insert(kcf_areq_node_t *areq);
 static int kcf_misc_kstat_update(kstat_t *ksp, int rw);
-static void compute_min_max_threads();
+static void compute_min_max_threads(void);
+static void kcfpool_svc(void *);
+static void kcfpoold(void *);
 
 
 /*
@@ -198,18 +203,12 @@ kcf_areqnode_alloc(kcf_provider_desc_t *pd, kcf_context_t *ictx,
 /*
  * Queue the request node and do one of the following:
  *	- If there is an idle thread signal it to run.
- *	- If there is no idle thread and max running threads is not
- *	  reached, signal the creator thread for more threads.
- *
- * If the two conditions above are not met, we don't need to do
- * any thing. The request will be picked up by one of the
- * worker threads when it becomes available.
+ *	- Else, signal the creator thread to possibly create more threads.
  */
 static int
 kcf_disp_sw_request(kcf_areq_node_t *areq)
 {
 	int err;
-	int cnt = 0;
 
 	if ((err = kcf_enqueue(areq)) != 0)
 		return (err);
@@ -223,29 +222,10 @@ kcf_disp_sw_request(kcf_areq_node_t *areq)
 		return (CRYPTO_QUEUED);
 	}
 
-	/*
-	 * We keep the number of running threads to be at
-	 * kcf_minthreads to reduce gs_lock contention.
-	 */
-	cnt = kcf_minthreads -
-	    (kcfpool->kp_threads - kcfpool->kp_blockedthreads);
-	if (cnt > 0) {
-		/*
-		 * The following ensures the number of threads in pool
-		 * does not exceed kcf_maxthreads.
-		 */
-		cnt = min(cnt, kcf_maxthreads - kcfpool->kp_threads);
-		if (cnt > 0) {
-			/* Signal the creator thread for more threads */
-			mutex_enter(&kcfpool->kp_user_lock);
-			if (!kcfpool->kp_signal_create_thread) {
-				kcfpool->kp_signal_create_thread = B_TRUE;
-				kcfpool->kp_nthrs = cnt;
-				cv_signal(&kcfpool->kp_user_cv);
-			}
-			mutex_exit(&kcfpool->kp_user_lock);
-		}
-	}
+	/* Signal the creator thread for more threads */
+	mutex_enter(&kcfpool->kp_lock);
+	cv_signal(&kcfpool->kp_cv);
+	mutex_exit(&kcfpool->kp_lock);
 
 	return (CRYPTO_QUEUED);
 }
@@ -959,7 +939,7 @@ kcf_remove_node(kcf_areq_node_t *node)
  * The caller must hold the queue lock.
  */
 static kcf_areq_node_t *
-kcf_dequeue()
+kcf_dequeue(void)
 {
 	kcf_areq_node_t *tnode = NULL;
 
@@ -1019,27 +999,12 @@ kcf_enqueue(kcf_areq_node_t *node)
 }
 
 /*
- * Decrement the thread pool count and signal the failover
- * thread if we are the last one out.
- */
-static void
-kcf_decrcnt_andsignal()
-{
-	KCF_ATOMIC_DECR(kcfpool->kp_threads);
-
-	mutex_enter(&kcfpool->kp_thread_lock);
-	if (kcfpool->kp_threads == 0)
-		cv_signal(&kcfpool->kp_nothr_cv);
-	mutex_exit(&kcfpool->kp_thread_lock);
-}
-
-/*
  * Function run by a thread from kcfpool to work on global software queue.
- * It is called from ioctl(CRYPTO_POOL_RUN, ...).
  */
-int
-kcf_svc_do_run(void)
+void
+kcfpool_svc(void *arg)
 {
+	_NOTE(ARGUNUSED(arg));
 	int error = 0;
 	clock_t rv;
 	clock_t timeout_val = drv_usectohz(kcf_idlethr_timeout);
@@ -1054,33 +1019,25 @@ kcf_svc_do_run(void)
 
 		while ((req = kcf_dequeue()) == NULL) {
 			KCF_ATOMIC_INCR(kcfpool->kp_idlethreads);
-			rv = cv_reltimedwait_sig(&gswq->gs_cv,
+			rv = cv_reltimedwait(&gswq->gs_cv,
 			    &gswq->gs_lock, timeout_val, TR_CLOCK_TICK);
 			KCF_ATOMIC_DECR(kcfpool->kp_idlethreads);
 
 			switch (rv) {
 			case 0:
-				/*
-				 * A signal (as in kill(2)) is pending. We did
-				 * not get any cv_signal().
-				 */
-				kcf_decrcnt_andsignal();
-				mutex_exit(&gswq->gs_lock);
-				return (EINTR);
-
 			case -1:
 				/*
-				 * Timed out and we are not signaled. Let us
-				 * see if this thread should exit. We should
-				 * keep at least kcf_minthreads.
+				 * Woke up with no work to do. Check
+				 * if this thread should exit. We keep
+				 * at least kcf_minthreads.
 				 */
 				if (kcfpool->kp_threads > kcf_minthreads) {
-					kcf_decrcnt_andsignal();
+					KCF_ATOMIC_DECR(kcfpool->kp_threads);
 					mutex_exit(&gswq->gs_lock);
-					return (0);
+					return;
 				}
 
-				/* Resume the wait for work */
+				/* Resume the wait for work. */
 				break;
 
 			default:
@@ -1243,8 +1200,6 @@ kcf_sched_init(void)
 	    sizeof (struct kcf_context), 64, kcf_context_cache_constructor,
 	    kcf_context_cache_destructor, NULL, NULL, NULL, 0);
 
-	mutex_init(&kcf_dh_lock, NULL, MUTEX_DEFAULT, NULL);
-
 	gswq = kmem_alloc(sizeof (kcf_global_swq_t), KM_SLEEP);
 
 	mutex_init(&gswq->gs_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -1296,10 +1251,6 @@ kcf_sched_start(void)
 {
 	if (kcf_sched_running)
 		return;
-
-	/* Start the failover kernel thread for now */
-	(void) thread_create(NULL, 0, &kcf_failover_thread, 0, 0, &p0,
-	    TS_RUN, minclsyspri);
 
 	/* Start the background processing thread. */
 	(void) thread_create(NULL, 0, &crypto_bufcall_service, 0, 0, &p0,
@@ -1426,94 +1377,96 @@ kcf_aop_done(kcf_areq_node_t *areq, int error)
 }
 
 /*
- * Allocate the thread pool and initialize all the fields.
+ * kcfpool thread spawner.  This runs as a process that never exits.
+ * Its a process so that the threads it owns can be manipulated via priocntl.
  */
 static void
-kcfpool_alloc()
+kcfpoold(void *arg)
 {
-	kcfpool = kmem_alloc(sizeof (kcf_pool_t), KM_SLEEP);
+	callb_cpr_t	cprinfo;
+	user_t		*pu = PTOU(curproc);
+	int		cnt;
+	clock_t		timeout_val = drv_usectohz(kcf_idlethr_timeout);
+	_NOTE(ARGUNUSED(arg));
 
-	kcfpool->kp_threads = kcfpool->kp_idlethreads = 0;
-	kcfpool->kp_blockedthreads = 0;
-	kcfpool->kp_signal_create_thread = B_FALSE;
-	kcfpool->kp_nthrs = 0;
-	kcfpool->kp_user_waiting = B_FALSE;
+	CALLB_CPR_INIT(&cprinfo, &kcfpool->kp_lock,
+	    callb_generic_cpr, "kcfpool");
 
-	mutex_init(&kcfpool->kp_thread_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&kcfpool->kp_nothr_cv, NULL, CV_DEFAULT, NULL);
+	/* make our process "kcfpoold" */
+	(void) snprintf(pu->u_psargs, sizeof (pu->u_psargs), "kcfpoold");
+	(void) strlcpy(pu->u_comm, pu->u_psargs, sizeof (pu->u_comm));
 
-	mutex_init(&kcfpool->kp_user_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&kcfpool->kp_user_cv, NULL, CV_DEFAULT, NULL);
+	mutex_enter(&kcfpool->kp_lock);
 
-	kcf_idlethr_timeout = KCF_DEFAULT_THRTIMEOUT;
-}
+	/*
+	 * Go to sleep, waiting for the signaled flag.  Note that as
+	 * we always do the same thing, and its always idempotent, we
+	 * don't even need to have a real condition to check against.
+	 */
+	for (;;) {
+		int rv;
+		
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+		rv = cv_reltimedwait(&kcfpool->kp_cv,
+		    &kcfpool->kp_lock, timeout_val, TR_CLOCK_TICK);
+		CALLB_CPR_SAFE_END(&cprinfo, &kcfpool->kp_lock);
 
-/*
- * This function is run by the 'creator' thread in the pool.
- * It is called from ioctl(CRYPTO_POOL_WAIT, ...).
- */
-int
-kcf_svc_wait(int *nthrs)
-{
-	clock_t rv;
-	clock_t timeout_val = drv_usectohz(kcf_idlethr_timeout);
-
-	if (kcfpool == NULL)
-		return (ENOENT);
-
-	mutex_enter(&kcfpool->kp_user_lock);
-	/* Check if there's already a user thread waiting on this kcfpool */
-	if (kcfpool->kp_user_waiting) {
-		mutex_exit(&kcfpool->kp_user_lock);
-		*nthrs = 0;
-		return (EBUSY);
-	}
-
-	kcfpool->kp_user_waiting = B_TRUE;
-
-	/* Go to sleep, waiting for the signaled flag. */
-	while (!kcfpool->kp_signal_create_thread) {
-		rv = cv_reltimedwait_sig(&kcfpool->kp_user_cv,
-		    &kcfpool->kp_user_lock, timeout_val, TR_CLOCK_TICK);
 		switch (rv) {
-		case 0:
-			/* Interrupted, return to handle exit or signal */
-			kcfpool->kp_user_waiting = B_FALSE;
-			kcfpool->kp_signal_create_thread = B_FALSE;
-			mutex_exit(&kcfpool->kp_user_lock);
-			/*
-			 * kcfd is exiting. Release the door and
-			 * invalidate it.
-			 */
-			mutex_enter(&kcf_dh_lock);
-			if (kcf_dh != NULL) {
-				door_ki_rele(kcf_dh);
-				kcf_dh = NULL;
-			}
-			mutex_exit(&kcf_dh_lock);
-			return (EINTR);
-
 		case -1:
 			/* Timed out. Recalculate the min/max threads */
 			compute_min_max_threads();
 			break;
 
 		default:
-			/* Worker thread did a cv_signal() */
+			/* Someone may be looking for a worker thread */
 			break;
 		}
+
+		/*
+		 * We keep the number of running threads to be at
+		 * kcf_minthreads to reduce gs_lock contention.
+		 */
+		cnt = kcf_minthreads -
+		    (kcfpool->kp_threads - kcfpool->kp_blockedthreads);
+		if (cnt > 0) {
+			/*
+			 * The following ensures the number of threads in pool
+			 * does not exceed kcf_maxthreads.
+			 */
+			cnt = min(cnt, kcf_maxthreads - kcfpool->kp_threads);
+		}
+
+		for (int i = 0; i < cnt; i++) {
+			(void) lwp_kernel_create(curproc,
+			    kcfpool_svc, NULL, TS_RUN, curthread->t_pri);
+		}
 	}
-
-	kcfpool->kp_signal_create_thread = B_FALSE;
-	kcfpool->kp_user_waiting = B_FALSE;
-
-	*nthrs = kcfpool->kp_nthrs;
-	mutex_exit(&kcfpool->kp_user_lock);
-
-	/* Return to userland for possible thread creation. */
-	return (0);
 }
 
+/*
+ * Allocate the thread pool and initialize all the fields.
+ */
+static void
+kcfpool_alloc(void)
+{
+	kcfpool = kmem_alloc(sizeof (kcf_pool_t), KM_SLEEP);
+
+	kcfpool->kp_threads = kcfpool->kp_idlethreads = 0;
+	kcfpool->kp_blockedthreads = 0;
+
+	mutex_init(&kcfpool->kp_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&kcfpool->kp_cv, NULL, CV_DEFAULT, NULL);
+
+	kcf_idlethr_timeout = KCF_DEFAULT_THRTIMEOUT;
+
+	/*
+	 * Create the daemon thread.
+	 */
+	if (newproc(kcfpoold, NULL, syscid, minclsyspri,
+	    NULL, 0) != 0) {
+		cmn_err(CE_PANIC, "unable to fork kcfpoold()");
+	}
+}
 
 /*
  * This routine introduces a locking order for gswq->gs_lock followed
@@ -1522,7 +1475,7 @@ kcf_svc_wait(int *nthrs)
  * k-api routines.
  */
 static void
-compute_min_max_threads()
+compute_min_max_threads(void)
 {
 	mutex_enter(&gswq->gs_lock);
 	mutex_enter(&cpu_lock);
@@ -1531,96 +1484,6 @@ compute_min_max_threads()
 	kcf_maxthreads = kcf_thr_multiple * kcf_minthreads;
 	gswq->gs_maxjobs = kcf_maxthreads * crypto_taskq_maxalloc;
 	mutex_exit(&gswq->gs_lock);
-}
-
-/*
- * This is the main routine of the failover kernel thread.
- * If there are any threads in the pool we sleep. The last thread in the
- * pool to exit will signal us to get to work. We get back to sleep
- * once we detect that the pool has threads.
- *
- * Note that in the hand-off from us to a pool thread we get to run once.
- * Since this hand-off is a rare event this should be fine.
- */
-static void
-kcf_failover_thread()
-{
-	int error = 0;
-	kcf_context_t *ictx;
-	kcf_areq_node_t *req;
-	callb_cpr_t cpr_info;
-	kmutex_t cpr_lock;
-	static boolean_t is_logged = B_FALSE;
-
-	mutex_init(&cpr_lock, NULL, MUTEX_DEFAULT, NULL);
-	CALLB_CPR_INIT(&cpr_info, &cpr_lock, callb_generic_cpr,
-	    "kcf_failover_thread");
-
-	for (;;) {
-		/*
-		 * Wait if there are any threads are in the pool.
-		 */
-		if (kcfpool->kp_threads > 0) {
-			mutex_enter(&cpr_lock);
-			CALLB_CPR_SAFE_BEGIN(&cpr_info);
-			mutex_exit(&cpr_lock);
-
-			mutex_enter(&kcfpool->kp_thread_lock);
-			cv_wait(&kcfpool->kp_nothr_cv,
-			    &kcfpool->kp_thread_lock);
-			mutex_exit(&kcfpool->kp_thread_lock);
-
-			mutex_enter(&cpr_lock);
-			CALLB_CPR_SAFE_END(&cpr_info, &cpr_lock);
-			mutex_exit(&cpr_lock);
-			is_logged = B_FALSE;
-		}
-
-		/*
-		 * Get the requests from the queue and wait if needed.
-		 */
-		mutex_enter(&gswq->gs_lock);
-
-		while ((req = kcf_dequeue()) == NULL) {
-			mutex_enter(&cpr_lock);
-			CALLB_CPR_SAFE_BEGIN(&cpr_info);
-			mutex_exit(&cpr_lock);
-
-			KCF_ATOMIC_INCR(kcfpool->kp_idlethreads);
-			cv_wait(&gswq->gs_cv, &gswq->gs_lock);
-			KCF_ATOMIC_DECR(kcfpool->kp_idlethreads);
-
-			mutex_enter(&cpr_lock);
-			CALLB_CPR_SAFE_END(&cpr_info, &cpr_lock);
-			mutex_exit(&cpr_lock);
-		}
-
-		mutex_exit(&gswq->gs_lock);
-
-		/*
-		 * We check the kp_threads since kcfd could have started
-		 * while we are waiting on the global software queue.
-		 */
-		if ((kcfpool->kp_threads == 0) && !is_logged) {
-			cmn_err(CE_WARN, "kcfd is not running. Please check "
-			    "and restart kcfd. Using the failover kernel "
-			    "thread for now.\n");
-			is_logged = B_TRUE;
-		}
-
-		/*
-		 * Get to work on the request.
-		 */
-		ictx = req->an_context;
-		mutex_enter(&req->an_lock);
-		req->an_state = REQ_INPROGRESS;
-		mutex_exit(&req->an_lock);
-
-		error = common_submit_request(req->an_provider, ictx ?
-		    &ictx->kc_glbl_ctx : NULL, &req->an_params, req);
-
-		kcf_aop_done(req, error);
-	}
 }
 
 /*
@@ -1831,7 +1694,6 @@ crypto_cancel_ctx(crypto_context_t ctx)
 static int
 kcf_misc_kstat_update(kstat_t *ksp, int rw)
 {
-	uint_t tcnt;
 	kcf_stats_t *ks_data;
 
 	if (rw == KSTAT_WRITE)
@@ -1840,14 +1702,7 @@ kcf_misc_kstat_update(kstat_t *ksp, int rw)
 	ks_data = ksp->ks_data;
 
 	ks_data->ks_thrs_in_pool.value.ui32 = kcfpool->kp_threads;
-	/*
-	 * The failover thread is counted in kp_idlethreads in
-	 * some corner cases. This is done to avoid doing more checks
-	 * when submitting a request. We account for those cases below.
-	 */
-	if ((tcnt = kcfpool->kp_idlethreads) == (kcfpool->kp_threads + 1))
-		tcnt--;
-	ks_data->ks_idle_thrs.value.ui32 = tcnt;
+	ks_data->ks_idle_thrs.value.ui32 = kcfpool->kp_idlethreads;
 	ks_data->ks_minthrs.value.ui32 = kcf_minthreads;
 	ks_data->ks_maxthrs.value.ui32 = kcf_maxthreads;
 	ks_data->ks_swq_njobs.value.ui32 = gswq->gs_njobs;

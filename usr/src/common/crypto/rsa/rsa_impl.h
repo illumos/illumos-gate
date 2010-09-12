@@ -129,40 +129,6 @@ CK_RV rsa_decrypt(RSAbytekey *bkey,
 #define	rsa_sign(key, msg, len, sig)	rsa_decrypt((key), (msg), (len), (sig))
 #define	rsa_verify(key, msg, len, sig)	rsa_encrypt((key), (msg), (len), (sig))
 
-/*
- * The following definitions and declarations are only used by RSA FIPS POST
- */
-#ifdef _RSA_FIPS_POST
-
-/* RSA FIPS Declarations */
-#define	FIPS_RSA_PUBLIC_EXPONENT_LENGTH		  3 /*   24-bits */
-#define	FIPS_RSA_PRIVATE_VERSION_LENGTH		  1 /*    8-bits */
-#define	FIPS_RSA_MESSAGE_LENGTH			128 /* 1024-bits */
-#define	FIPS_RSA_COEFFICIENT_LENGTH		 64 /*  512-bits */
-#define	FIPS_RSA_PRIME0_LENGTH			 64 /*  512-bits */
-#define	FIPS_RSA_PRIME1_LENGTH			 64 /*  512-bits */
-#define	FIPS_RSA_EXPONENT0_LENGTH		 64 /*  512-bits */
-#define	FIPS_RSA_EXPONENT1_LENGTH		 64 /*  512-bits */
-#define	FIPS_RSA_PRIVATE_EXPONENT_LENGTH	128 /* 1024-bits */
-#define	FIPS_RSA_ENCRYPT_LENGTH			128 /* 1024-bits */
-#define	FIPS_RSA_DECRYPT_LENGTH			128 /* 1024-bits */
-#define	FIPS_RSA_SIGNATURE_LENGTH		128 /* 1024-bits */
-#define	FIPS_RSA_MODULUS_LENGTH			128 /* 1024-bits */
-#define	MAX_KEY_ATTR_BUFLEN			1024
-
-typedef struct RSAPrivateKey_s {
-	uint8_t		*version;
-	int		version_len;
-	RSAbytekey	bkey;
-} RSAPrivateKey_t;
-
-/* RSA FIPS functions */
-extern int fips_rsa_post(void);
-extern int fips_rsa_encrypt(RSAPrivateKey_t *, uint8_t *, int, uint8_t *);
-extern int fips_rsa_decrypt(RSAPrivateKey_t *, uint8_t *, int, uint8_t *);
-
-#endif /* _RSA_FIPS_POST */
-
 #ifdef	__cplusplus
 }
 #endif

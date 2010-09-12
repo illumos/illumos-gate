@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights resrved.
+ */
 
 #include <cryptoutil.h>
 #include <fcntl.h>
@@ -1660,45 +1663,4 @@ display_verbose_mech_header()
 	(void) printf("%28s ---- ---- "
 	    "-  -  -  -  -  -  -  -  -  -  -  -  -  -\n",
 	    gettext("----------------------------"));
-}
-
-int
-fips_update_pkcs11conf(int action)
-{
-
-	char	*str;
-
-	if (action == FIPS140_ENABLE)
-		str = "fips-140:fips_status=enabled\n";
-	else
-		str = "fips-140:fips_status=disabled\n";
-
-	if (update_conf(_PATH_PKCS11_CONF, str) != SUCCESS)
-		return (FAILURE);
-
-	return (SUCCESS);
-}
-
-void
-fips_status_pkcs11conf(int *status)
-{
-
-	uentry_t *puent = NULL;
-
-	if ((puent = getent_uef(FIPS_KEYWORD)) == NULL) {
-		/*
-		 * By default (no fips-140 entry), we assume fips-140
-		 * mode is disabled.
-		 */
-		*status = CRYPTO_FIPS_MODE_DISABLED;
-		return;
-	}
-
-	if (puent->flag_fips_enabled)
-		*status = CRYPTO_FIPS_MODE_ENABLED;
-	else
-		*status = CRYPTO_FIPS_MODE_DISABLED;
-
-	return;
-
 }

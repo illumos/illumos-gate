@@ -163,12 +163,6 @@ static crypto_ctx_ops_t sha1_ctx_ops = {
 	sha1_free_context
 };
 
-static void sha1_POST(int *);
-
-static crypto_fips140_ops_t sha1_fips140_ops = {
-	sha1_POST
-};
-
 static crypto_ops_t sha1_crypto_ops = {
 	&sha1_control_ops,
 	&sha1_digest_ops,
@@ -186,7 +180,7 @@ static crypto_ops_t sha1_crypto_ops = {
 	&sha1_ctx_ops,
 	NULL,
 	NULL,
-	&sha1_fips140_ops
+	NULL,
 };
 
 static crypto_provider_info_t sha1_prov_info = {
@@ -1446,15 +1440,4 @@ sha1_free_context(crypto_ctx_t *ctx)
 	ctx->cc_provider_private = NULL;
 
 	return (CRYPTO_SUCCESS);
-}
-
-/*
- * SHA-1 Power-Up Self-Test
- */
-void
-sha1_POST(int *rc)
-{
-
-	*rc = fips_sha1_post();
-
 }

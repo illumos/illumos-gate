@@ -31,8 +31,6 @@
 extern "C" {
 #endif
 
-#include <fips/fips_post.h>
-
 #ifdef _KERNEL
 #define	SHA1_HASH_SIZE		20	/* SHA_1 digest length in bytes */
 #define	SHA1_DIGEST_LENGTH	20	/* SHA1 digest length in bytes */
@@ -68,25 +66,6 @@ typedef struct sha1_hmac_ctx {
 	SHA1_CTX		hc_ocontext;	/* outer SHA1 context */
 } sha1_hmac_ctx_t;
 
-#endif
-
-extern int fips_sha1_post(void);
-
-/* SHA1 funtions */
-extern SHA1_CTX *fips_sha1_build_context(void);
-extern int fips_sha1_hash(SHA1_CTX *, uchar_t *, ulong_t, uchar_t *);
-
-/* SHA1 HMAC functions */
-#ifndef _KERNEL
-extern soft_hmac_ctx_t *fips_sha1_hmac_build_context(uint8_t *,
-	unsigned int);
-extern CK_RV fips_hmac_sha1_hash(unsigned char *, uint8_t *,
-	unsigned int, uint8_t *, unsigned int);
-#else
-extern sha1_hmac_ctx_t *fips_sha1_hmac_build_context(uint8_t *,
-	unsigned int);
-extern void fips_hmac_sha1_hash(sha1_hmac_ctx_t *, uint8_t *,
-	uint32_t, uint8_t *);
 #endif
 
 #ifdef	__cplusplus

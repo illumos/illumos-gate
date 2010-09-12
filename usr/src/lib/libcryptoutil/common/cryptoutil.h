@@ -20,6 +20,9 @@
  *
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _CRYPTOUTIL_H
 #define	_CRYPTOUTIL_H
@@ -222,8 +225,6 @@ extern int open_nointr(const char *path, int oflag, ...);
 extern ssize_t readn_nointr(int fd, void *dbuf, size_t dlen);
 extern ssize_t writen_nointr(int fd, void *dbuf, size_t dlen);
 extern int update_conf(char *conf_file, char *entry);
-
-extern CK_RV get_fips_mode(int *);
 
 extern int pkcs11_parse_uri(const char *str, pkcs11_uri_t *uri);
 extern void pkcs11_free_uri(pkcs11_uri_t *uri);

@@ -71,108 +71,6 @@ if [[ ! -x $WHICH_SCM ]]; then
 fi
 
 #
-# Datestamp for crypto tarballs.  We don't use BUILD_DATE because it
-# doesn't sort right and it uses English abbreviations for the month.
-# We want to guarantee a consistent string, so just invoke date(1)
-# once and save the result in a global variable.  YYYY-MM-DD is easier
-# to parse visually than YYYYMMDD.
-#
-cryptostamp=$(date +%Y-%m-%d)
-
-#
-# Echo the path for depositing a crypto tarball, creating the target
-# directory if it doesn't already exist.
-# usage: cryptodest suffix
-# where "suffix" is "" or "-nd".
-#
-function cryptodest {
-	typeset suffix=$1
-	#
-	# $PKGARCHIVE gets wiped out with each build, so put the
-	# tarball one level up.
-	#
-	typeset dir=$(dirname "$PKGARCHIVE")
-	[ -d "$dir" ] || mkdir -p "$dir" >> "$LOGFILE" 2>&1
-	#
-	# Put the suffix after the datestamp to make it easier for
-	# gatelings to use crypto from a specific date (no need to
-	# copy and rename the gate tarball).
-	#
-	echo "$dir/on-crypto-$cryptostamp$suffix.$MACH.tar"
-}
-
-#
-# Create a non-stamped symlink to the given crypto tarball.
-# Return 0 on success, non-zero on failure.
-#
-function cryptolink {
-	typeset targpath=$1
-	typeset suffix=$2
-	if [ ! -f "$targpath" ]; then
-		echo "no crypto at $targpath"
-		return 1
-	fi
-	typeset dir=$(dirname "$targpath")
-	typeset targfile=$(basename "$targpath")
-	typeset link=on-crypto$suffix.$MACH.tar.bz2
-	(cd "$dir"; rm -f "$link")
-	(cd "$dir"; ln -s "$targfile" "$link")
-	return $?
-}
-
-#
-# Generate a crypto tarball from the proto area and put it in the
-# canonical location, along with the datestamp-free symlink.
-# Sets build_ok to "n" if there is a problem.
-#
-function crypto_from_proto {
-	typeset label=$1
-	typeset suffix=$2
-	typeset -i stat
-	typeset to
-
-	echo "Creating $label crypto tarball..." >> "$LOGFILE"
-
-	#
-	# Generate the crypto THIRDPARTYLICENSE file.  This needs to
-	# be done after the build has finished and before we run
-	# cryptodrop.  We'll generate the file twice if we're building
-	# both DEBUG and non-DEBUG, but it's a cheap operation and not
-	# worth the complexity to only do once.
-	#
-	if [ -d ${ROOT}${suffix}/licenses/usr ]; then
-		( cd ${ROOT}${suffix}/licenses ; \
-		    mktpl -c $SRC/pkg/license-list ) >> "$LOGFILE" 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create crypto THIRDPARTYLICENSE files" |
-			    tee -a "$mail_msg_file" >> "$LOGFILE"
-			build_ok=n
-			return
-		fi
-	else
-		echo "No licenses found under ${ROOT}${suffix}/licenses" |
-		    tee -a "$mail_msg_file" >> "$LOGFILE"
-	fi
-
-	to=$(cryptodest "$suffix")
-	if [ "$suffix" = "-nd" ]; then
-		cryptodrop -n "$to" >> "$LOGFILE" 2>&1
-	else
-		cryptodrop "$to" >> "$LOGFILE" 2>&1
-	fi
-	if (( $? != 0 )) ; then
-		echo "\nCould not create $label crypto tarball." |
-		   tee -a "$mail_msg_file" >> "$LOGFILE"
-		build_ok=n
-	else
-		cryptolink "$to.bz2" "$suffix" >> "$LOGFILE" 2>&1
-		if (( $? != 0 )) ; then
-			build_ok=n
-		fi
-	fi
-}
-
-#
 # Function to do a DEBUG and non-DEBUG build. Needed because we might
 # need to do another for the source build, and since we only deliver DEBUG or
 # non-DEBUG packages.
@@ -182,27 +80,19 @@ function crypto_from_proto {
 function normal_build {
 
 	typeset orig_p_FLAG="$p_FLAG"
-	typeset crypto_in="$ON_CRYPTO_BINS"
 	typeset crypto_signer="$CODESIGN_USER"
-	typeset gencrypto=no
 
 	suffix=""
-	[ -n "$CODESIGN_USER" ] && gencrypto=yes
 
 	# non-DEBUG build begins
 
 	if [ "$F_FLAG" = "n" ]; then
 		set_non_debug_build_flags
 		CODESIGN_USER="$crypto_signer" \
-		    build "non-DEBUG" "$suffix-nd" "-nd" "$MULTI_PROTO" \
-		    $(ndcrypto "$crypto_in")
+		    build "non-DEBUG" "$suffix-nd" "-nd" "$MULTI_PROTO"
 		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
 		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs non-DEBUG -nd
-		fi
-
-		if [[ "$gencrypto" = yes && "$build_ok" = y ]]; then
-			crypto_from_proto non-DEBUG -nd
 		fi
 	else
 		echo "\n==== No non-DEBUG $open_only build ====\n" >> "$LOGFILE"
@@ -215,14 +105,10 @@ function normal_build {
 	if [ "$D_FLAG" = "y" ]; then
 		set_debug_build_flags
 		CODESIGN_USER="$crypto_signer" \
-		    build "DEBUG" "$suffix" "" "$MULTI_PROTO" "$crypto_in"
+		    build "DEBUG" "$suffix" "" "$MULTI_PROTO"
 		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
 		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs DEBUG ""
-		fi
-
-		if [[ "$gencrypto" = yes && "$build_ok" = y ]]; then
-			crypto_from_proto DEBUG ""
 		fi
 	else
 		echo "\n==== No DEBUG $open_only build ====\n" >> "$LOGFILE"
@@ -584,48 +470,20 @@ function myheaders {
 }
 
 #
-# Unpack the crypto tarball into the proto area.  We first extract the
-# tarball into a temp directory so that we can handle the non-DEBUG
-# tarball correctly with MULTI_PROTO=no.
-# Return 0 on success, non-zero on failure.
-# 
-function unpack_crypto {
-	typeset tarfile=$1
-	typeset suffix=$2
-	typeset ctop=$(mktemp -d /tmp/crypto.XXXXXX)
-	[ -n "$ctop" ] || return 1
-	typeset croot=$ctop/proto/root_$MACH$suffix
-	echo "Unpacking crypto ($tarfile)..."
-	bzcat "$tarfile" | (cd "$ctop"; tar xfBp -)
-	if [[ $? -ne 0 || ! -d "$croot" ]]; then
-		return 1
-	fi
-	#
-	# We extract with -p so that we maintain permissions on directories.
-	#
-	(cd "$croot"; tar cf - *) | (cd "$ROOT"; tar xfBp -)
-	typeset -i stat=$?
-	rm -rf "$ctop"
-	return $stat
-}
-
-#
 # Function to do the build, including package generation.
-# usage: build LABEL SUFFIX ND MULTIPROTO CRYPTO
+# usage: build LABEL SUFFIX ND MULTIPROTO
 # - LABEL is used to tag build output.
 # - SUFFIX is used to distinguish files (e.g., DEBUG vs non-DEBUG,
 #   open-only vs full tree).
 # - ND is "-nd" (non-DEBUG builds) or "" (DEBUG builds).
 # - If MULTIPROTO is "yes", it means to name the proto area according to
 #   SUFFIX.  Otherwise ("no"), (re)use the standard proto area.
-# - CRYPTO is the path to the crypto tarball, or null.
 #
 function build {
 	LABEL=$1
 	SUFFIX=$2
 	ND=$3
 	MULTIPROTO=$4
-	CRYPTOPATH=$5
 	INSTALLOG=install${SUFFIX}-${MACH}
 	NOISE=noise${SUFFIX}-${MACH}
 	PKGARCHIVE=${PKGARCHIVE_ORIG}${SUFFIX}
@@ -674,16 +532,6 @@ function build {
 	if [ "$?" = "0" ]; then
 		build_ok=n
 		this_build_ok=n
-	fi
-
-	if [ -n "$CRYPTOPATH" ]; then
-		unpack_crypto "$CRYPTOPATH" "$ND" >> "$LOGFILE" 2>&1
-		if (( $? != 0 )) ; then
-			echo "Could not unpack crypto ($CRYPTOPATH)" |
-			    tee -a "$mail_msg_file" >> "$LOGFILE"
-			build_ok=n
-			this_build_ok=n
-		fi
 	fi
 
 	if [ "$W_FLAG" = "n" ]; then
@@ -1678,63 +1526,6 @@ fi
 export PATH
 export MAKE
 
-#
-# Make sure the crypto tarball is available if it's needed.
-#
-
-# Echo the non-DEBUG name corresponding to the given crypto tarball path.
-function ndcrypto {
-	typeset dir file
-
-	if [ -z "$1" ]; then
-		echo ""
-		return
-	fi
-
-	dir=$(dirname "$1")
-	file=$(basename "$1" ".$MACH.tar.bz2")
-
-	echo "$dir/$file-nd.$MACH.tar.bz2"
-}
-
-# Return 0 (success) if the required crypto tarball(s) are present.
-function crypto_is_present {
-	if [ -z "$ON_CRYPTO_BINS" ]; then
-		echo "ON_CRYPTO_BINS is null or not set."
-		return 1
-	fi
-	if [ "$D_FLAG" = y ]; then
-		if [ ! -f "$ON_CRYPTO_BINS" ]; then
-			echo "DEBUG crypto tarball is unavailable."
-			return 1
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		if [ ! -f $(ndcrypto "$ON_CRYPTO_BINS") ]; then
-			echo "Non-DEBUG crypto tarball is unavailable."
-			return 1
-		fi
-	fi
-
-	return 0
-}
-
-#
-# Canonicalize ON_CRYPTO_BINS, just in case it was set to the -nd
-# tarball.
-#
-if [ -n "$ON_CRYPTO_BINS" ]; then
-	export ON_CRYPTO_BINS=$(echo "$ON_CRYPTO_BINS" | 
-	    sed -e s/-nd.$MACH.tar/.$MACH.tar/)
-fi
-
-if [[ "$O_FLAG" = y && -z "$CODESIGN_USER" ]]; then
-	if ! crypto_is_present; then
-		echo "OpenSolaris deliveries need signed crypto."
-		exit 1
-	fi
-fi
-
 if [[ "$O_FLAG" = y ]]; then
 	export TONICBUILD=""
 else
@@ -2237,12 +2028,6 @@ yes|no)	;;
 	;;
 esac
 
-# If CODESIGN_USER is set, we'll want the crypto that we just built.
-if [[ -n "$CODESIGN_USER" && -n "$ON_CRYPTO_BINS" ]]; then
-	echo "Clearing ON_CRYPTO_BINS for signing build." >> "$LOGFILE"
-	unset ON_CRYPTO_BINS
-fi
-
 echo "\n==== Build version ====\n" | tee -a $mail_msg_file >> $LOGFILE
 echo $VERSION | tee -a $mail_msg_file >> $LOGFILE
 
@@ -2706,27 +2491,6 @@ if [[ "$O_FLAG" = y && "$CLOSED_IS_PRESENT" != "yes" ]]; then
 	echo "OpenSolaris binary deliverables need usr/closed." \
 	    | tee -a "$mail_msg_file" >> $LOGFILE
 	exit 1
-fi
-
-if [ "$CLOSED_IS_PRESENT" = no ]; then
-	#
-	# Not all consolidations have a closed tree, and even if they
-	# did, they wouldn't necessarily have signed crypto.  But if
-	# the current source base does have signed crypto and it can't
-	# be generated, error out, rather than silently building
-	# unusable binaries.
-	#
-	grep -s ELFSIGN_CRYPTO "$SRC/Makefile.master" > /dev/null
-	if (( $? == 0 )); then
-		crypto_is_present >> "$LOGFILE"
-		if (( $? != 0 )); then
-			build_ok=n
-			echo "A crypto tarball must be provided when" \
-			    "there is no closed tree." |
-			    tee -a "$mail_msg_file" >> "$LOGFILE"
-			exit 1
-		fi
-	fi
 fi
 
 echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
@@ -3349,68 +3113,6 @@ fi
 # steps need to come after findunref and are commented below.
 #
 
-#
-# Copy an input crypto tarball to the canonical destination (with
-# datestamp), and point the non-stamped symlink at it.
-# Usage: copyin_crypto from_path suffix
-# Returns 0 if successful, non-zero if not.
-#
-function copyin_crypto {
-	typeset from=$1
-	typeset suffix=$2
-	typeset to=$(cryptodest "$suffix").bz2
-	typeset -i stat
-	cp "$from" "$to"
-	stat=$?
-	if (( $stat == 0 )); then
-		cryptolink "$to" "$suffix"
-		stat=$?
-	fi
-	return $stat
-}
-
-#
-# Copy a crypto tarball to $CODEMGR_WS to go with the other
-# OpenSolaris deliverables.
-# Usage: copyout_crypto suffix
-# where $suffix is "" or "-nd".
-#
-function copyout_crypto {
-	typeset suffix=$1
-	typeset cryptof=on-crypto$suffix.$MACH.tar.bz2
-	[ -f $cryptof ] && rm $cryptof
-	cp $(cryptodest "$suffix").bz2 $cryptof
-}
-
-#
-# Pass through the crypto tarball(s) that we were given, putting it in
-# the same place that crypto_from_proto puts things.
-# Returns with non-zero status if there is a problem.
-#
-function crypto_passthrough {
-	echo "Reusing $ON_CRYPTO_BINS for crypto tarball(s)..." >> "$LOGFILE"
-	typeset -i stat=0
-	if [ "$D_FLAG" = y ]; then
-		copyin_crypto "$ON_CRYPTO_BINS" "" >> "$LOGFILE" 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create DEBUG crypto tarball." |
-			    tee -a "$mail_msg_file" >> "$LOGFILE"
-			stat=1
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		copyin_crypto $(ndcrypto "$ON_CRYPTO_BINS") "-nd" \
-		    >> "$LOGFILE" 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create non-DEBUG crypto tarball." |
-			    tee -a "$mail_msg_file" >> "$LOGFILE"
-			stat=1
-		fi
-	fi
-
-	return $stat
-}
-
 # If we are doing an OpenSolaris _source_ build (-S O) then we do
 # not have usr/closed available to us to generate closedbins from,
 # so skip this part.
@@ -3455,37 +3157,6 @@ if [ "$SO_FLAG" = n -a "$O_FLAG" = y -a "$build_ok" = y ]; then
 		echo "Couldn't create README.opensolaris." |
 		    tee -a $mail_msg_file >> $LOGFILE
 		build_ok=n
-	fi
-
-	typeset have_crypto=y
-	if [ -n "$ON_CRYPTO_BINS" ]; then
-		crypto_passthrough || have_crypto=n
-	fi
-	#
-	# Make another copy of the crypto so that all the OpenSolaris
-	# deliverables are in $CODEMGR_WS.
-	#
-	if [ "$have_crypto" != y ]; then
-		build_ok=n
-	else
-		echo "Copying crypto tarball to $CODEMGR_WS" >> "$LOGFILE"
-		if [ "$D_FLAG" = y ]; then
-			copyout_crypto "" >> "$LOGFILE" 2>&1
-			if (( $? != 0 )) ; then
-				echo "Couldn't create DEBUG crypto tarball" |
-				    tee -a $mail_msg_file >> "$LOGFILE"
-				build_ok=n
-			fi
-		fi
-		if [ "$F_FLAG" = n ]; then
-			copyout_crypto "-nd" >> "$LOGFILE" 2>&1
-			if (( $? != 0 )) ; then
-				echo "Couldn't create non-DEBUG" \
-				    "crypto tarball" |
-				    tee -a $mail_msg_file >> "$LOGFILE"
-				build_ok=n
-			fi
-		fi
 	fi
 fi
 

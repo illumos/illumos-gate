@@ -129,9 +129,6 @@ ses_to_be_freed_list_t ses_delay_freed;
 /* protects softtoken_initialized and access to C_Initialize/C_Finalize */
 pthread_mutex_t soft_giant_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-/* fips mode setting */
-int softtoken_fips_mode = CRYPTO_FIPS_MODE_DISABLED;
-
 static CK_RV finalize_common(boolean_t force, CK_VOID_PTR pReserved);
 static void softtoken_init();
 static void softtoken_fini();
@@ -277,15 +274,6 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 	ses_delay_freed.count = 0;
 	ses_delay_freed.first = NULL;
 	ses_delay_freed.last = NULL;
-
-	/*
-	 * Perform POST when fips mode is enabled.
-	 */
-	if ((rv = get_fips_mode(&softtoken_fips_mode)) == CKR_OK) {
-		if (softtoken_fips_mode == CRYPTO_FIPS_MODE_ENABLED) {
-			rv = soft_fips_post();
-		}
-	}
 
 	if (rv != CKR_OK) {
 		(void) pthread_mutex_destroy(

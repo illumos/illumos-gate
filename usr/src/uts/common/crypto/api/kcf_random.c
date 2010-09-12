@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * This file implements the interfaces that the /dev/random
@@ -1045,52 +1048,6 @@ int
 random_get_bytes(uint8_t *ptr, size_t len)
 {
 	ASSERT(!mutex_owned(&rndpool_lock));
-
-	if (len < 1)
-		return (0);
-	return (kcf_rnd_get_bytes(ptr, len, B_TRUE));
-}
-
-/*
- * The two functions below are identical to random_get_pseudo_bytes() and
- * random_get_bytes_fips, this function is called for consumers that want
- * FIPS 140-2.  This function waits until the FIPS boundary can be verified.
- */
-
-/*
- * Get bytes from the /dev/urandom generator. This function
- * always succeeds. Returns 0.
- */
-int
-random_get_pseudo_bytes_fips140(uint8_t *ptr, size_t len)
-{
-	ASSERT(!mutex_owned(&rndpool_lock));
-
-	mutex_enter(&fips140_mode_lock);
-	while (global_fips140_mode < FIPS140_MODE_ENABLED) {
-		cv_wait(&cv_fips140, &fips140_mode_lock);
-	}
-	mutex_exit(&fips140_mode_lock);
-
-	if (len < 1)
-		return (0);
-	return (kcf_rnd_get_pseudo_bytes(ptr, len));
-}
-
-/*
- * Get bytes from the /dev/random generator. Returns 0
- * on success. Returns EAGAIN if there is insufficient entropy.
- */
-int
-random_get_bytes_fips140(uint8_t *ptr, size_t len)
-{
-	ASSERT(!mutex_owned(&rndpool_lock));
-
-	mutex_enter(&fips140_mode_lock);
-	while (global_fips140_mode < FIPS140_MODE_ENABLED) {
-		cv_wait(&cv_fips140, &fips140_mode_lock);
-	}
-	mutex_exit(&fips140_mode_lock);
 
 	if (len < 1)
 		return (0);

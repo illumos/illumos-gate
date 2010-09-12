@@ -173,11 +173,6 @@ int big_is_zero(BIGNUM *n);
 BIG_CHUNK_TYPE big_n0(BIG_CHUNK_TYPE n);
 
 
-/*
- * Kernel bignum module: module integrity test
- */
-extern int	bignum_fips_check(void);
-
 #if defined(HWCAP)
 
 #if (BIG_CHUNK_SIZE != 32)

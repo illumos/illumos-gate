@@ -869,58 +869,6 @@ kcf_prov_tab_dump(char *message)
 
 #endif /* DEBUG */
 
-/*
- * This function goes through the provider table and verifies
- * any KCF_PROV_UNVERIFIED providers.
- *
- * This is called when kcfd is up and the door handle is ready.  It is
- * again called when the status of FIPS 140 has been determined, so providers
- * delayed by FIPS 140 can now be verified.
- */
-void
-verify_unverified_providers()
-{
-	int i;
-	kcf_provider_desc_t *pd;
-	boolean_t need_verify;
-
-	if (kcf_dh == NULL)
-		return;
-
-	mutex_enter(&prov_tab_mutex);
-
-	for (i = 0; i < KCF_MAX_PROVIDERS; i++) {
-		if ((pd = prov_tab[i]) == NULL)
-			continue;
-
-		if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
-			continue;
-
-		mutex_enter(&pd->pd_lock);
-		need_verify = pd->pd_state == KCF_PROV_UNVERIFIED;
-		mutex_exit(&pd->pd_lock);
-
-		if (!need_verify)
-			continue;
-
-		KCF_PROV_REFHOLD(pd);
-
-		/*
-		 * We need to drop this lock, since it could be
-		 * acquired by kcf_verify_signature().
-		 * This is safe, as any providers that are
-		 * added to the table after we dropped the
-		 * lock *will see* a non NULL kcf_dh and hence
-		 * would have been verified by other means.
-		 */
-		mutex_exit(&prov_tab_mutex);
-		/* This routine will release the above holds */
-		kcf_verify_signature(pd);
-		mutex_enter(&prov_tab_mutex);
-	}
-
-	mutex_exit(&prov_tab_mutex);
-}
 
 /* protected by prov_tab_mutex */
 boolean_t kcf_need_provtab_walk = B_FALSE;

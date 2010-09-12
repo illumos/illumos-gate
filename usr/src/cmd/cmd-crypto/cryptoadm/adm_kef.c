@@ -1195,21 +1195,6 @@ refresh(void)
 		}
 	}
 
-	/*
-	 * handle fips_status=enabled|disabled
-	 */
-	{
-		int	pkcs11_fips_mode = 0;
-
-		/* Get FIPS-140 status from pkcs11.conf */
-		fips_status_pkcs11conf(&pkcs11_fips_mode);
-		if (pkcs11_fips_mode == CRYPTO_FIPS_MODE_ENABLED) {
-			rc = do_fips_actions(FIPS140_ENABLE, REFRESH);
-		} else {
-			rc = do_fips_actions(FIPS140_DISABLE, REFRESH);
-		}
-	}
-
 	(void) close(fd);
 	return (rc);
 }

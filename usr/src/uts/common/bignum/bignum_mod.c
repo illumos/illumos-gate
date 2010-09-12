@@ -28,7 +28,6 @@
 #include <sys/modctl.h>
 #include <sys/cmn_err.h>
 #include <sys/ddi.h>
-#include <fips/fips_checksum.h>
 
 extern struct mod_ops mod_cryptoops;
 
@@ -60,15 +59,4 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
-}
-
-int
-bignum_fips_check()
-{
-	if (fips_check_module("misc/bignum", (void *)_init) != 0) {
-		cmn_err(CE_WARN, "bignum: FIPS-140 Software Integrity Test "
-		    "failed");
-		return (EINVAL);
-	}
-	return (0);
 }

@@ -41,7 +41,6 @@ extern pthread_mutex_t soft_giant_mutex;
 extern struct slot soft_slot;
 extern struct obj_to_be_freed_list obj_delay_freed;
 extern struct ses_to_be_freed_list ses_delay_freed;
-extern int softtoken_fips_mode;
 
 #define	SOFTTOKEN_SLOTID	1
 
@@ -70,8 +69,6 @@ extern int softtoken_fips_mode;
 				CKF_RESTORE_KEY_NOT_NEEDED|\
 				CKF_DUAL_CRYPTO_OPERATIONS|\
 				CKF_TOKEN_INITIALIZED
-
-extern CK_RV soft_fips_post(void);
 
 #ifdef	__cplusplus
 }

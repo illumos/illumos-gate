@@ -22,6 +22,10 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #ifndef _SYS_CRYPTO_SCHED_IMPL_H
 #define	_SYS_CRYPTO_SCHED_IMPL_H
 
@@ -371,23 +375,11 @@ typedef struct kcf_pool {
 	uint32_t	kp_blockedthreads;	/* Blocked threads in pool */
 
 	/*
-	 * cv & lock to monitor the condition when no threads
-	 * are around. In this case the failover thread kicks in.
+	 * cv & lock for the condition where more threads need to be created.
 	 */
-	kcondvar_t	kp_nothr_cv;
-	kmutex_t	kp_thread_lock;
+	kcondvar_t	kp_cv;		/* Creator cond. variable */
+	kmutex_t	kp_lock;		/* Creator lock */
 
-	/* Userspace thread creator variables. */
-	boolean_t	kp_signal_create_thread; /* Create requested flag  */
-	int		kp_nthrs;		/* # of threads to create */
-	boolean_t	kp_user_waiting;	/* Thread waiting for work */
-
-	/*
-	 * cv & lock for the condition where more threads need to be
-	 * created. kp_user_lock also protects the three fileds above.
-	 */
-	kcondvar_t	kp_user_cv;		/* Creator cond. variable */
-	kmutex_t	kp_user_lock;		/* Creator lock */
 } kcf_pool_t;
 
 
@@ -467,10 +459,6 @@ extern kcf_global_swq_t *gswq;
 extern int kcf_maxthreads;
 extern int kcf_minthreads;
 
-/* Door handle for talking to kcfd */
-extern door_handle_t kcf_dh;
-extern kmutex_t	 kcf_dh_lock;
-
 /*
  * All pending crypto bufcalls are put on a list. cbuf_list_lock
  * protects changes to this list.
@@ -516,13 +504,7 @@ extern int common_submit_request(kcf_provider_desc_t *,
     crypto_ctx_t *, kcf_req_params_t *, crypto_req_handle_t);
 extern void kcf_free_context(kcf_context_t *);
 
-extern int kcf_svc_wait(int *);
-extern int kcf_svc_do_run(void);
-extern int kcf_need_fips140_verification(kcf_provider_desc_t *);
-extern int kcf_need_signature_verification(kcf_provider_desc_t *);
-extern void kcf_verify_signature(void *);
 extern struct modctl *kcf_get_modctl(crypto_provider_info_t *);
-extern void verify_unverified_providers();
 extern void kcf_free_req(kcf_areq_node_t *areq);
 extern void crypto_bufcall_service(void);
 

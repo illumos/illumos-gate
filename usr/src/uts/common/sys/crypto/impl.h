@@ -525,13 +525,6 @@ typedef struct crypto_session_data {
 
 #define	KCF_MAX_PIN_LEN			1024
 
-/* Global FIPS 140 mode variable */
-extern uint32_t global_fips140_mode;
-/* Global FIPS 140 mode lock */
-extern kmutex_t fips140_mode_lock;
-/* Conditional variable for kcf to wait until kcfd tells the FIPS mode status */
-extern kcondvar_t cv_fips140;
-
 /*
  * Per-minor info.
  *
@@ -1408,11 +1401,6 @@ extern int kcf_policy_load_soft_disabled(char *, uint_t, crypto_mech_name_t *,
 extern int kcf_policy_load_dev_disabled(char *, uint_t, uint_t,
     crypto_mech_name_t *, uint_t *, crypto_mech_name_t **);
 extern void remove_soft_config(char *);
-
-/* FIPS 140 functions */
-extern int kcf_get_fips140_mode(void);
-extern void kcf_fips140_validate();
-extern void kcf_activate();
 
 #endif	/* _KERNEL */
 

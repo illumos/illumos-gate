@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * This file is part of the core Kernel Cryptographic Framework.
@@ -57,7 +60,6 @@ static void process_logical_providers(crypto_provider_info_t *,
     kcf_provider_desc_t *);
 static int init_prov_mechs(crypto_provider_info_t *, kcf_provider_desc_t *);
 static int kcf_prov_kstat_update(kstat_t *, int);
-static void undo_register_provider_extra(kcf_provider_desc_t *);
 static void delete_kstat(kcf_provider_desc_t *);
 
 static kcf_prov_stats_t kcf_stats_ks_data_template = {
@@ -129,7 +131,6 @@ int
 crypto_register_provider(crypto_provider_info_t *info,
     crypto_kcf_provider_handle_t *handle)
 {
-	int need_fips140_verify, need_verify = 1;
 	struct modctl *mcp;
 	char *name;
 	char ks_name[KSTAT_STRLEN];
@@ -250,21 +251,6 @@ crypto_register_provider(crypto_provider_info_t *info,
 		goto bail;
 	}
 
-	if ((need_verify = kcf_need_signature_verification(prov_desc)) == -1) {
-		undo_register_provider(prov_desc, B_TRUE);
-		ret = CRYPTO_MODVERIFICATION_FAILED;
-		goto bail;
-	}
-
-	if ((need_fips140_verify =
-	    kcf_need_fips140_verification(prov_desc)) == -1) {
-		mutex_enter(&prov_desc->pd_lock);
-		prov_desc->pd_state = KCF_PROV_VERIFICATION_FAILED;
-		mutex_exit(&prov_desc->pd_lock);
-		ret = CRYPTO_FIPS140_ERROR;
-		goto bail;
-	}
-
 	/*
 	 * We create a taskq only for a hardware provider. The global
 	 * software queue is used for software providers. We handle ordering
@@ -367,47 +353,10 @@ crypto_register_provider(crypto_provider_info_t *info,
 	if (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER)
 		process_logical_providers(info, prov_desc);
 
-	/* This provider needs to wait until we know the FIPS 140 status */
-	if (need_fips140_verify == 1) {
-		mutex_enter(&prov_desc->pd_lock);
-		prov_desc->pd_state = KCF_PROV_UNVERIFIED_FIPS140;
-		mutex_exit(&prov_desc->pd_lock);
-		goto exit;
-	}
-
-	/* This provider needs to have the signature verified */
-	if (need_verify == 1) {
-		mutex_enter(&prov_desc->pd_lock);
-		prov_desc->pd_state = KCF_PROV_UNVERIFIED;
-		mutex_exit(&prov_desc->pd_lock);
-
-		/* kcf_verify_signature routine will release this hold */
-		KCF_PROV_REFHOLD(prov_desc);
-
-		if (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER) {
-			/*
-			 * It is not safe to make the door upcall to kcfd from
-			 * this context since the kcfd thread could reenter
-			 * devfs. So, we dispatch a taskq job to do the
-			 * verification and return to the provider.
-			 */
-			(void) taskq_dispatch(system_taskq,
-			    kcf_verify_signature, (void *)prov_desc, TQ_SLEEP);
-		} else if (prov_desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
-			kcf_verify_signature(prov_desc);
-			if (prov_desc->pd_state ==
-			    KCF_PROV_VERIFICATION_FAILED) {
-				undo_register_provider_extra(prov_desc);
-				ret = CRYPTO_MODVERIFICATION_FAILED;
-				goto bail;
-			}
-		}
-	} else {
-		mutex_enter(&prov_desc->pd_lock);
-		prov_desc->pd_state = KCF_PROV_READY;
-		mutex_exit(&prov_desc->pd_lock);
-		kcf_do_notify(prov_desc, B_TRUE);
-	}
+	mutex_enter(&prov_desc->pd_lock);
+	prov_desc->pd_state = KCF_PROV_READY;
+	mutex_exit(&prov_desc->pd_lock);
+	kcf_do_notify(prov_desc, B_TRUE);
 
 exit:
 	*handle = prov_desc->pd_kcf_prov_handle;
@@ -953,13 +902,6 @@ undo_register_provider(kcf_provider_desc_t *desc, boolean_t remove_prov)
 	/* remove provider from providers table */
 	if (remove_prov)
 		(void) kcf_prov_tab_rem_provider(desc->pd_prov_id);
-}
-
-static void
-undo_register_provider_extra(kcf_provider_desc_t *desc)
-{
-	delete_kstat(desc);
-	undo_register_provider(desc, B_TRUE);
 }
 
 /*

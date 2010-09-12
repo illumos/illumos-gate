@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _SYS_CRYPTO_ELFSIGN_H
 #define	_SYS_CRYPTO_ELFSIGN_H
@@ -52,28 +55,9 @@ typedef enum ELFsign_status_e {
 } ELFsign_status_t;
 
 
-/* Version values for da_version in kcf_door_args_t */
-#define	KCF_KCFD_VERSION1	1
-#define	KCFD_FIPS140_INTCHECK	2
-
 #define	SIG_MAX_LENGTH		1024
 
 #define	ELF_SIGNATURE_SECTION	".SUNW_signature"
-
-typedef struct kcf_door_arg_s {
-	short		da_version;
-	boolean_t	da_iskernel;
-
-	union {
-		char filename[MAXPATHLEN];	/* For request */
-
-		struct kcf_door_result_s {	/* For response */
-			ELFsign_status_t	status;
-			uint32_t		siglen;
-			uchar_t			signature[1];
-		} result;
-	} da_u;
-} kcf_door_arg_t;
 
 typedef uint32_t	filesig_vers_t;
 
@@ -133,8 +117,6 @@ struct filesignatures {
 #define	FILESIG_VERSION4	4	/* version3 format, SHF_ALLOC only */
 
 #ifndef	_KERNEL
-
-#define	_PATH_KCFD_DOOR	"/etc/svc/volatile/kcfd_door"
 
 #endif	/* _KERNEL */
 

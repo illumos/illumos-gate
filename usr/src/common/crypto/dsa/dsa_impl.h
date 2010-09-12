@@ -107,28 +107,6 @@ CK_RV dsa_sign(DSAbytekey *bkey, uchar_t *msg, uint32_t msglen, uchar_t *sig);
 
 CK_RV dsa_verify(DSAbytekey *bkey, uchar_t *msg, uchar_t *sig);
 
-
-/*
- * The following definitions and declarations are only used by DSA FIPS POST
- */
-#ifdef _DSA_FIPS_POST
-
-/* DSA FIPS Declarations */
-#define	FIPS_DSA_PRIME_LENGTH		128 /* 1024-bits */
-#define	FIPS_DSA_SUBPRIME_LENGTH	20 /*  160-bits */
-#define	FIPS_DSA_BASE_LENGTH		128 /* 1024-bits */
-#define	FIPS_DSA_SEED_LENGTH		20 /*  160-bits */
-#define	FIPS_DSA_DIGEST_LENGTH		20 /*  160-bits */
-#define	FIPS_DSA_SIGNATURE_LENGTH	40 /*  320-bits */
-
-/* DSA FIPS functions */
-extern int fips_dsa_post(void);
-extern int fips_dsa_genkey_pair(DSAbytekey *);
-extern int fips_dsa_digest_sign(DSAbytekey *, uint8_t *, uint32_t, uint8_t *);
-extern int fips_dsa_verify(DSAbytekey *, uint8_t *, uint8_t *);
-
-#endif /* _DSA_FIPS_POST */
-
 #ifdef	__cplusplus
 }
 #endif

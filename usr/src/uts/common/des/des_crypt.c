@@ -48,7 +48,7 @@
 #include <sys/strsun.h>
 #include <sys/note.h>
 #include <modes/modes.h>
-#define	_DES_FIPS_POST
+#define	_DES_IMPL
 #include <des/des_impl.h>
 
 /* EXPORT DELETE START */
@@ -221,12 +221,6 @@ static crypto_key_ops_t des_key_ops = {
 	des_key_check
 };
 
-static void des_POST(int *);
-
-static crypto_fips140_ops_t des_fips140_ops = {
-	des_POST
-};
-
 static crypto_ops_t des_crypto_ops = {
 	&des_control_ops,
 	NULL,
@@ -244,7 +238,7 @@ static crypto_ops_t des_crypto_ops = {
 	&des_ctx_ops,
 	NULL,
 	NULL,
-	&des_fips140_ops
+	NULL
 };
 
 static crypto_provider_info_t des_prov_info = {
@@ -1231,15 +1225,4 @@ des_common_init_ctx(des_ctx_t *des_ctx, crypto_spi_ctx_template_t *template,
 /* EXPORT DELETE END */
 
 	return (rv);
-}
-
-/*
- * Triple DES Power-Up Self-Test
- */
-void
-des_POST(int *rc)
-{
-
-	*rc = fips_des3_post();
-
 }

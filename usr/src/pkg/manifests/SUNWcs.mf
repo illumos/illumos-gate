@@ -500,7 +500,6 @@ file path=etc/ttysrch group=sys preserve=true
 file path=etc/user_attr group=sys preserve=true timestamp=19700101T000000Z
 file path=etc/user_attr.d/SUNWcs group=sys
 file path=etc/vfstab group=sys preserve=true
-file path=lib/crypto/kcfd mode=0555
 file path=lib/inet/in.mpathd mode=0555
 file path=lib/inet/ipmgmtd mode=0555
 file path=lib/inet/netcfgd mode=0555

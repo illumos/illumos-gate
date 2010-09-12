@@ -53,8 +53,7 @@ COMMON_SUBDIRS= \
 #  special versions of commands for use only in build
 #
 UNSHIPPED_SUBDIRS = \
-	elfsign \
-	fips_addchecksum
+	elfsign
 
 sparc_SUBDIRS= \
 	chk4ubin \

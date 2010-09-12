@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef	_CRYPTOADM_H
 #define	_CRYPTOADM_H
@@ -34,7 +37,6 @@
 extern "C" {
 #endif
 
-#define	_PATH_KCFD		"/lib/crypto/kcfd"
 #define	TMPFILE_TEMPLATE	"/etc/crypto/admXXXXXX"
 
 #define	ERROR_USAGE	2
@@ -99,8 +101,6 @@ extern void free_mechlist(mechlist_t *);
 
 /* adm_kef_util */
 extern boolean_t is_device(char *);
-extern int fips_update_pkcs11conf(int);
-extern void fips_status_pkcs11conf(int *);
 extern char *ent2str(entry_t *);
 extern entry_t *getent_kef(char *provname,
 		entrylist_t *pdevlist, entrylist_t *psoftlist);
@@ -159,8 +159,6 @@ extern int install_kef(char *, mechlist_t *);
 extern int uninstall_kef(char *);
 extern int unload_kef_soft(char *provname);
 extern int refresh(void);
-extern int start_daemon(void);
-extern int stop_daemon(void);
 
 /* adm_ioctl */
 extern crypto_load_soft_config_t *setup_soft_conf(entry_t *);
@@ -172,7 +170,6 @@ extern int get_dev_list(crypto_get_dev_list_t **);
 extern int get_soft_info(char *provname, mechlist_t **ppmechlist,
 		entrylist_t *phardlist, entrylist_t *psoftlist);
 extern int get_soft_list(crypto_get_soft_list_t **);
-extern int do_fips_actions(int, int);
 
 /* adm_metaslot */
 extern int list_metaslot_info(boolean_t, boolean_t, mechlist_t *);
@@ -180,9 +177,6 @@ extern int list_metaslot_policy();
 extern int disable_metaslot(mechlist_t *, boolean_t, boolean_t);
 extern int enable_metaslot(char *, char *, boolean_t, mechlist_t *, boolean_t,
     boolean_t);
-
-/* adm_hw */
-extern int do_fips_hw_actions(int, int);
 
 #ifdef __cplusplus
 }
