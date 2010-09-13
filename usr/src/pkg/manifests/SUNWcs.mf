@@ -1248,9 +1248,6 @@ file path=usr/lib/isaexec mode=0555
 file path=usr/lib/kssladm mode=0555
 $(sparc_ONLY)file path=usr/lib/ld.so
 file path=usr/lib/libshare.so.1
-file path=usr/lib/locale/C/locale_description mode=0444
-file path=usr/lib/localedef/extensions/generic_eucbc.x mode=0444
-file path=usr/lib/localedef/extensions/single_byte.x mode=0444
 file path=usr/lib/makekey mode=0555
 file path=usr/lib/more.help
 file path=usr/lib/newsyslog group=sys mode=0555

@@ -68,7 +68,7 @@ INCDIR=		../../include
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
-LDLIBS +=	-lcryptoutil -lc -lscf
+LDLIBS +=	-lcryptoutil -lc
 
 CFLAGS	+=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(INCDIR) -I$(SRCDIR) -D_REENTRANT

@@ -187,6 +187,7 @@ ELFEDIT=	/usr/bin/elfedit
 ELFSIGN=	/usr/bin/elfsign
 DTRACE=		/usr/sbin/dtrace
 UNIQ=		/usr/bin/uniq
+TAR=		/usr/bin/tar
 
 FILEMODE=	644
 DIRMODE=	755

@@ -138,6 +138,4 @@ echo_file  usr/src/cmd/Makefile.cmd
 echo_file  usr/src/cmd/Makefile.targ
 echo_file  usr/src/pkg/Makefile
 echo_file  exception_lists/packaging
-echo_file  exception_lists/packaging.closed
-echo_file  exception_lists/packaging.open
 find_files "s.*" usr/src/common/mapfiles

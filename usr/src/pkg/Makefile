@@ -107,9 +107,6 @@ PKGDEST=	$(PKGDEST.cmd:sh)
 # This matches the conditions under which the internal key and cert
 # are needed for the packaged objects.
 #
-# We use X_FLAG, as exported by nightly and bldenv, to decide when we
-# need IHV-related exceptions for protocmp.
-#
 $(CLOSED_BUILD)OPEN_ONLY_BUILD= $(POUND_SIGN)
 
 USE_INTERNAL_CRYPTO= $(POUND_SIGN)
@@ -119,15 +116,8 @@ $(CLOSED_BUILD)USE_INTERNAL_CRYPTO= $(UI1)$(UI2)
 USE_SIGNED_CRYPTO=
 $(USE_INTERNAL_CRYPTO)USE_SIGNED_CRYPTO= $(POUND_SIGN)
 
-X_FLAG=			n
-IHV_COPY_BUILD1=	$(X_FLAG:n%=$(POUND_SIGN)%)
-IHV_COPY_BUILD=		$(IHV_COPY_BUILD1:y%=%)
-
 
 EXCEPTIONS= packaging
-$(CLOSED_BUILD)EXCEPTIONS += packaging.closed
-$(OPEN_ONLY_BUILD)EXCEPTIONS += packaging.open
-$(IHV_COPY_BUILD)EXCEPTIONS += packaging.ihv
 
 PKGMOGRIFY= pkgmogrify
 

@@ -276,9 +276,6 @@ DIRS= \
 	/usr/lib/krb5 \
 	/usr/lib/link_audit \
 	/usr/lib/libp \
-	/usr/lib/localedef \
-	/usr/lib/localedef/extensions \
-	/usr/lib/localedef/src \
 	/usr/lib/lwp \
 	/usr/lib/mdb \
 	/usr/lib/mdb/kvm \

@@ -136,8 +136,9 @@ closedbins: FRC $(ROOTDIRS)
 			exit 1; \
 		fi; \
 		$(ECHO) "Copying closed binaries from $$CLOSED_ROOT"; \
-		(cd $$CLOSED_ROOT; tar cf - .) | \
-		    (cd $(ROOT); tar xBpf -); \
+		(cd $$CLOSED_ROOT; \
+		    $(TAR) cfX - $(CODEMGR_WS)/exception_lists/closed-bins .) | \
+		    (cd $(ROOT); $(TAR) xBpf -); \
 	fi
 
 #

@@ -526,13 +526,6 @@ usr/include/sys/mdesc_impl.h				sparc
 usr/platform/sun4v/include/sys/mach_descrip.h		sparc
 #
 # The following files are installed in the proto area by the build of
-# libc_i18n.  libc_i18n.a is used only when linking libc.so.1.
-#
-lib/libc_i18n.a
-lib/amd64/libc_i18n.a		i386
-lib/sparcv9/libc_i18n.a		sparc
-#
-# The following files are installed in the proto area by the build of
 # libpcp.  libpcp contains interfaces which are all private.
 # Only the shared object is shipped.
 #
@@ -947,3 +940,20 @@ licenses
 # Libbe is private
 #
 usr/include/libbe_priv.h
+#
+# Exception List for packaging during an open-only build -  I'm not
+# sure why we even have dprov given that it isn't packaged.  It looks
+# like it exists to emulate a real hardware provider probably for test.
+#
+kernel/crypto/amd64/dprov	i386
+kernel/crypto/dprov		i386
+kernel/crypto/sparcv9/dprov	sparc
+kernel/drv/amd64/dprov		i386
+kernel/drv/dprov		i386
+kernel/drv/dprov.conf
+kernel/drv/sparcv9/dprov	sparc
+#
+# Probably we should nuke this one, along with any other vestiges of
+# ksh88.
+#
+usr/has/bin/pfksh

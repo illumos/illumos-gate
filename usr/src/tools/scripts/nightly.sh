@@ -2774,11 +2774,6 @@ if [ "$build_ok" = "y" ]; then
 		f2=
 		if [ -d "$SRC/pkg" ]; then
 			f2="$f2 exceptions/packaging"
-			if [ "$CLOSED_IS_PRESENT" = "no" ]; then
-				f2="$f2 exceptions/packaging.open"
-			else
-				f2="$f2 exceptions/packaging.closed"
-			fi
 		fi
 
 		for f in $f2; do
