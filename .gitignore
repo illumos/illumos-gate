@@ -5,3 +5,5 @@
 *.so.1
 *.a
 *.pyc
+packages/
+log/
